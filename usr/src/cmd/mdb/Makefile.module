@@ -23,6 +23,7 @@
 # Use is subject to license terms.
 #
 # Copyright (c) 2013 by Delphix. All rights reserved.
+# Copyright 2015, Joyent, Inc.
 #
 
 .KEEP_STATE:
@@ -31,9 +32,10 @@
 include $(SRC)/cmd/mdb/Makefile.tools
 
 $(KMOD_SOURCES_DIFFERENT)KMODSRCS = $(MODSRCS)
+$(KMOD_SOURCES_DIFFERENT)KMODASMSRCS = $(MODASMSRCS)
 
-MODOBJS = $(MODSRCS:%.c=dmod/%.o)
-KMODOBJS = $(KMODSRCS:%.c=kmod/%.o)
+MODOBJS = $(MODSRCS:%.c=dmod/%.o) $(MODASMSRCS:%.s=dmod/%.o)
+KMODOBJS = $(KMODSRCS:%.c=kmod/%.o) $(KMODASMSRCS:%.s=kmod/%.o)
 
 MODNAME = $(MODULE:%.so=%)
 KMODULE = $(MODNAME)
@@ -102,6 +104,8 @@ CFLAGS64		+= $(CCVERBOSE)
 CPPFLAGS		+= $($(MDBTGT)_TGTFLAGS) -I../../../common
 LDFLAGS			+= $(ZTEXT)
 LDFLAGS64		+= $(ZTEXT)
+ASFLAGS			+= -P
+AS_CPPFLAGS		+= -D_ASM
 
 # Module type-specific compiler flags
 $(MODOBJS) :=			CFLAGS += $(C_BIGPICFLAGS) $(XREGSFLAG)
@@ -189,6 +193,7 @@ $(KMODFILE): kmod .WAIT $(KMODOBJS) $(MAPFILE)
 	$(KMDB_LINKTEST_CMD)
 	$(KMDB_FPTEST_CMD)
 	$(CTFMERGE) -f -L VERSION -o $@ $(KMODOBJS)
+	$(POST_PROCESS)
 	$(SETDYNFLAG) -f DF_1_NOKSYMS $@
 
 linktest: linktest_check .WAIT kmod .WAIT $(KMODOBJS)
@@ -208,16 +213,32 @@ dmod/%.o kmod/%.o: %.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+dmod/%.o kmod%.o: %.s
+	$(COMPILE.s) -o $@ $<
+	$(CTFCONVERT_O)
+
 dmod/%.o kmod/%.o: ../%.c
 	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+dmod/%.o kmod%.o: ../%.s
+	$(COMPILE.s) -o $@ $<
 	$(CTFCONVERT_O)
 
 dmod/%.o kmod/%.o: ../../../common/modules/$(MODNAME)/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+dmod/%.o kmod%.o: ../../../common/modules/$(MODNAME)/%.s
+	$(COMPILE.s) -o $@ $<
+	$(CTFCONVERT_O)
+
 dmod/%.o kmod/%.o: $$(MODSRCS_DIR)/%.c
 	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+dmod/%.o kmod%.o: $$(MODSRCS_DIR)/%.s
+	$(COMPILE.s) -o $@ $<
 	$(CTFCONVERT_O)
 
 #
@@ -226,14 +247,26 @@ dmod/%.o kmod/%.o: $$(MODSRCS_DIR)/%.c
 dmod/%.ln kmod/%.ln: %.c
 	$(LINT.c) -dirout=$(@D) -c $<
 
+dmod/%.ln kmod/%.ln: %.s
+	$(LINT.s) -dirout=$(@D) -c $<
+
 dmod/%.ln kmod/%.ln: ../%.c
 	$(LINT.c) -dirout=$(@D) -c $<
+
+dmod/%.ln kmod/%.ln: ../%.s
+	$(LINT.s) -dirout=$(@D) -c $<
 
 dmod/%.ln kmod/%.ln: ../../../common/modules/$(MODNAME)/%.c
 	$(LINT.c) -dirout=$(@D) -c $<
 
+dmod/%.ln kmod/%.ln: ../../../common/modules/$(MODNAME)/%.s
+	$(LINT.s) -dirout=$(@D) -c $<
+
 dmod/%.ln kmod/%.ln: $$(MODSRCS_DIR)/%.c
 	$(LINT.c) -dirout=$(@D) -c $<
+
+dmod/%.ln kmod/%.ln: $$(MODSRCS_DIR)/%.s
+	$(LINT.s) -dirout=$(@D) -c $<
 
 #
 # Installation targets

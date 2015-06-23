@@ -1,4 +1,5 @@
 /*
+ * Copyright 2013 Garrett D'Amore <garrett@damore.org>
  * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2002-2004 Tim J. Robbins.
  * All rights reserved.
@@ -28,14 +29,23 @@
 #include "lint.h"
 #include <wchar.h>
 #include "mblocal.h"
+#include "localeimpl.h"
+#include "lctype.h"
 
 size_t
-mbrtowc(wchar_t *_RESTRICT_KYWD pwc, const char *_RESTRICT_KYWD s,
-    size_t n, mbstate_t *_RESTRICT_KYWD ps)
+mbrtowc_l(wchar_t *_RESTRICT_KYWD pwc, const char *_RESTRICT_KYWD s,
+    size_t n, mbstate_t *_RESTRICT_KYWD ps, locale_t loc)
 {
 	static mbstate_t mbs;
 
 	if (ps == NULL)
 		ps = &mbs;
-	return (__mbrtowc(pwc, s, n, ps));
+	return (loc->ctype->lc_mbrtowc(pwc, s, n, ps));
+}
+
+size_t
+mbrtowc(wchar_t *_RESTRICT_KYWD pwc, const char *_RESTRICT_KYWD s,
+    size_t n, mbstate_t *_RESTRICT_KYWD ps)
+{
+	return (mbrtowc_l(pwc, s, n, ps, uselocale(NULL)));
 }

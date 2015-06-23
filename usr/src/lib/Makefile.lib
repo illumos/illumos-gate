@@ -18,6 +18,7 @@
 #
 # CDDL HEADER END
 #
+# Copyright 2015 Gary Mills
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 #
@@ -155,8 +156,10 @@ SRCS=		$(OBJECTS:%.o=$(SRCDIR)/%.c)
 # default build of an archive and a shared object,
 # overridden locally when extra processing is needed
 BUILD.AR=	$(AR) $(ARFLAGS) $@ $(AROBJS)
-BUILD.SO=	$(CC) -o $@ $(GSHARED) $(DYNFLAGS) $(PICS) $(EXTPICS) $(LDLIBS)
-BUILDCCC.SO=	$(CCC) -o $@ $(GSHARED) $(DYNFLAGS) $(PICS) $(EXTPICS) $(LDLIBS)
+BUILD.SO=	$(CC) $(CFLAGS) -o $@ $(GSHARED) $(DYNFLAGS) \
+		$(PICS) $(EXTPICS) $(LDLIBS)
+BUILDCCC.SO=	$(CCC) $(CCFLAGS) -o $@ $(GSHARED) $(DYNFLAGS) \
+		$(PICS) $(EXTPICS) $(LDLIBS)
 
 # default dynamic library symlink
 INS.liblink=	-$(RM) $@; $(SYMLINK) $(LIBLINKPATH)$(LIBLINKS)$(VERS) $@

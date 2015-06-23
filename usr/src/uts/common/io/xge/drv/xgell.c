@@ -1180,7 +1180,7 @@ _begin:
 	xge_hal_fifo_dtr_post(ring->channelh, dtr);
 
 	/* Update per-ring tx statistics */
-	atomic_add_64(&ring->tx_pkts, 1);
+	atomic_inc_64(&ring->tx_pkts);
 	atomic_add_64(&ring->tx_bytes, sent_bytes);
 
 	return (NULL);

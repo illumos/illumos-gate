@@ -1,57 +1,41 @@
-/*
- * CDDL HEADER START
- *
- * The contents of this file are subject to the terms of the
- * Common Development and Distribution License (the "License").
- * You may not use this file except in compliance with the License.
- *
- * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
- * See the License for the specific language governing permissions
- * and limitations under the License.
- *
- * When distributing Covered Code, include this CDDL HEADER in each
- * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
- * If applicable, add the following below this CDDL HEADER, with the
- * fields enclosed by brackets "[]" replaced with your own identifying
- * information: Portions Copyright [yyyy] [name of copyright owner]
- *
- * CDDL HEADER END
- */
-
-/*
- * Copyright (c) 2000 to 2009, LSI Corporation.
+/*-
+ * Copyright (c) 2013 LSI Corp.
  * All rights reserved.
  *
- * Redistribution and use in source and binary forms of all code within
- * this file that is exclusively owned by LSI, with or without
- * modification, is permitted provided that, in addition to the CDDL 1.0
- * License requirements, the following conditions are met:
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the author nor the names of any co-contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
  *
- *    Neither the name of the author nor the names of its contributors may be
- *    used to endorse or promote products derived from this software without
- *    specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
- * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
- * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
- * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
- * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
- * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
- * DAMAGE.
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
  */
 
 /*
+ *  Copyright (c) 2000-2013 LSI Corporation.
+ *
+ *
  *           Name:  mpi2_raid.h
  *          Title:  MPI Integrated RAID messages and structures
  *  Creation Date:  April 26, 2007
  *
- *    mpi2_raid.h Version:  02.00.04
+ *    mpi2_raid.h Version:  02.00.10
  *
  *  Version History
  *  ---------------
@@ -67,6 +51,15 @@
  *                      can be sized by the build environment.
  *  07-30-09  02.00.04  Added proper define for the Use Default Settings bit of
  *                      VolumeCreationFlags and marked the old one as obsolete.
+ *  05-12-10  02.00.05  Added MPI2_RAID_VOL_FLAGS_OP_MDC define.
+ *  08-24-10  02.00.06  Added MPI2_RAID_ACTION_COMPATIBILITY_CHECK along with
+ *                      related structures and defines.
+ *                      Added product-specific range to RAID Action values.
+ *  11-18-11  02.00.07  Incorporating additions for MPI v2.5.
+ *  02-06-12  02.00.08  Added MPI2_RAID_ACTION_PHYSDISK_HIDDEN.
+ *  07-26-12  02.00.09  Added ElapsedSeconds field to MPI2_RAID_VOL_INDICATOR.
+ *                      Added MPI2_RAID_VOL_FLAGS_ELAPSED_SECONDS_VALID define.
+ *  04-17-13  02.00.10  Added MPI25_RAID_ACTION_ADATA_ALLOW_PI.
  *  --------------------------------------------------------------------------
  */
 
@@ -82,6 +75,9 @@
 /****************************************************************************
 *  RAID Action messages
 ****************************************************************************/
+
+/* ActionDataWord defines for use with MPI2_RAID_ACTION_CREATE_VOLUME action */
+#define MPI25_RAID_ACTION_ADATA_ALLOW_PI            (0x80000000)
 
 /* ActionDataWord defines for use with MPI2_RAID_ACTION_DELETE_VOLUME action */
 #define MPI2_RAID_ACTION_ADATA_KEEP_LBA0            (0x00000000)
@@ -220,6 +216,10 @@ typedef struct _MPI2_RAID_ACTION_REQUEST
 #define MPI2_RAID_ACTION_SYSTEM_SHUTDOWN_INITIATED  (0x20)
 #define MPI2_RAID_ACTION_START_RAID_FUNCTION        (0x21)
 #define MPI2_RAID_ACTION_STOP_RAID_FUNCTION         (0x22)
+#define MPI2_RAID_ACTION_COMPATIBILITY_CHECK        (0x23)
+#define MPI2_RAID_ACTION_PHYSDISK_HIDDEN            (0x24)
+#define MPI2_RAID_ACTION_MIN_PRODUCT_SPECIFIC       (0x80)
+#define MPI2_RAID_ACTION_MAX_PRODUCT_SPECIFIC       (0xFF)
 
 
 /* RAID Volume Creation Structure */
@@ -265,7 +265,7 @@ typedef struct _MPI2_RAID_VOLUME_CREATION_STRUCT
 
 /* defines for the VolumeCreationFlags field */
 #define MPI2_RAID_VOL_CREATION_DEFAULT_SETTINGS     (0x80000000)
-#define MPI2_RAID_VOL_CREATION_BACKGROUND_INIT      (0x00000004)
+#define MPI2_RAID_VOL_CREATION_BACKGROUND_INIT      (0x00000004) /* MPI 2.0 only */
 #define MPI2_RAID_VOL_CREATION_LOW_LEVEL_INIT       (0x00000002)
 #define MPI2_RAID_VOL_CREATION_MIGRATE_DATA         (0x00000001)
 /* The following is an obsolete define.
@@ -289,6 +289,25 @@ typedef struct _MPI2_RAID_ONLINE_CAPACITY_EXPANSION
   MPI2_POINTER pMpi2RaidOnlineCapacityExpansion_t;
 
 
+/* RAID Compatibility Input Structure */
+
+typedef struct _MPI2_RAID_COMPATIBILITY_INPUT_STRUCT
+{
+    U16                     SourceDevHandle;                /* 0x00 */
+    U16                     CandidateDevHandle;             /* 0x02 */
+    U32                     Flags;                          /* 0x04 */
+    U32                     Reserved1;                      /* 0x08 */
+    U32                     Reserved2;                      /* 0x0C */
+} MPI2_RAID_COMPATIBILITY_INPUT_STRUCT,
+  MPI2_POINTER PTR_MPI2_RAID_COMPATIBILITY_INPUT_STRUCT,
+  Mpi2RaidCompatibilityInputStruct_t,
+  MPI2_POINTER pMpi2RaidCompatibilityInputStruct_t;
+
+/* defines for RAID Compatibility Structure Flags field */
+#define MPI2_RAID_COMPAT_SOURCE_IS_VOLUME_FLAG      (0x00000002)
+#define MPI2_RAID_COMPAT_REPORT_SOURCE_INFO_FLAG    (0x00000001)
+
+
 /* RAID Volume Indicator Structure */
 
 typedef struct _MPI2_RAID_VOL_INDICATOR
@@ -296,25 +315,62 @@ typedef struct _MPI2_RAID_VOL_INDICATOR
     U64                     TotalBlocks;                    /* 0x00 */
     U64                     BlocksRemaining;                /* 0x08 */
     U32                     Flags;                          /* 0x10 */
+    U32                     ElapsedSeconds;                 /* 0x14 */
 } MPI2_RAID_VOL_INDICATOR, MPI2_POINTER PTR_MPI2_RAID_VOL_INDICATOR,
   Mpi2RaidVolIndicator_t, MPI2_POINTER pMpi2RaidVolIndicator_t;
 
 /* defines for RAID Volume Indicator Flags field */
+#define MPI2_RAID_VOL_FLAGS_ELAPSED_SECONDS_VALID   (0x80000000)
+
 #define MPI2_RAID_VOL_FLAGS_OP_MASK                 (0x0000000F)
 #define MPI2_RAID_VOL_FLAGS_OP_BACKGROUND_INIT      (0x00000000)
 #define MPI2_RAID_VOL_FLAGS_OP_ONLINE_CAP_EXPANSION (0x00000001)
 #define MPI2_RAID_VOL_FLAGS_OP_CONSISTENCY_CHECK    (0x00000002)
 #define MPI2_RAID_VOL_FLAGS_OP_RESYNC               (0x00000003)
+#define MPI2_RAID_VOL_FLAGS_OP_MDC                  (0x00000004)
+
+
+/* RAID Compatibility Result Structure */
+
+typedef struct _MPI2_RAID_COMPATIBILITY_RESULT_STRUCT
+{
+    U8                      State;                          /* 0x00 */
+    U8                      Reserved1;                      /* 0x01 */
+    U16                     Reserved2;                      /* 0x02 */
+    U32                     GenericAttributes;              /* 0x04 */
+    U32                     OEMSpecificAttributes;          /* 0x08 */
+    U32                     Reserved3;                      /* 0x0C */
+    U32                     Reserved4;                      /* 0x10 */
+} MPI2_RAID_COMPATIBILITY_RESULT_STRUCT,
+  MPI2_POINTER PTR_MPI2_RAID_COMPATIBILITY_RESULT_STRUCT,
+  Mpi2RaidCompatibilityResultStruct_t,
+  MPI2_POINTER pMpi2RaidCompatibilityResultStruct_t;
+
+/* defines for RAID Compatibility Result Structure State field */
+#define MPI2_RAID_COMPAT_STATE_COMPATIBLE           (0x00)
+#define MPI2_RAID_COMPAT_STATE_NOT_COMPATIBLE       (0x01)
+
+/* defines for RAID Compatibility Result Structure GenericAttributes field */
+#define MPI2_RAID_COMPAT_GENATTRIB_4K_SECTOR            (0x00000010)
+
+#define MPI2_RAID_COMPAT_GENATTRIB_MEDIA_MASK           (0x0000000C)
+#define MPI2_RAID_COMPAT_GENATTRIB_SOLID_STATE_DRIVE    (0x00000008)
+#define MPI2_RAID_COMPAT_GENATTRIB_HARD_DISK_DRIVE      (0x00000004)
+
+#define MPI2_RAID_COMPAT_GENATTRIB_PROTOCOL_MASK        (0x00000003)
+#define MPI2_RAID_COMPAT_GENATTRIB_SAS_PROTOCOL         (0x00000002)
+#define MPI2_RAID_COMPAT_GENATTRIB_SATA_PROTOCOL        (0x00000001)
 
 
 /* RAID Action Reply ActionData union */
 typedef union _MPI2_RAID_ACTION_REPLY_DATA
 {
-    U32                     Word[5];
-    MPI2_RAID_VOL_INDICATOR RaidVolumeIndicator;
-    U16                     VolDevHandle;
-    U8                      VolumeState;
-    U8                      PhysDiskNum;
+    U32                                     Word[6];
+    MPI2_RAID_VOL_INDICATOR                 RaidVolumeIndicator;
+    U16                                     VolDevHandle;
+    U8                                      VolumeState;
+    U8                                      PhysDiskNum;
+    MPI2_RAID_COMPATIBILITY_RESULT_STRUCT   RaidCompatibilityResult;
 } MPI2_RAID_ACTION_REPLY_DATA, MPI2_POINTER PTR_MPI2_RAID_ACTION_REPLY_DATA,
   Mpi2RaidActionReplyData_t, MPI2_POINTER pMpi2RaidActionReplyData_t;
 

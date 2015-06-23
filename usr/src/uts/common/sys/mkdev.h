@@ -19,6 +19,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -82,25 +84,12 @@ extern "C" {
 #undef major
 #undef minor
 
-#if defined(__STDC__)
-
 extern dev_t makedev(const major_t, const minor_t);
 extern major_t major(const dev_t);
 extern minor_t minor(const dev_t);
 extern dev_t __makedev(const int, const major_t, const minor_t);
 extern major_t __major(const int, const dev_t);
 extern minor_t __minor(const int, const dev_t);
-
-#else
-
-extern dev_t makedev();
-extern major_t major();
-extern minor_t minor();
-extern dev_t __makedev();
-extern major_t __major();
-extern minor_t __minor();
-
-#endif	/* defined(__STDC__) */
 
 #define	OLDDEV 0	/* old device format */
 #define	NEWDEV 1	/* new device format */

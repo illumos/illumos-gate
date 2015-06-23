@@ -43,6 +43,7 @@ _MANFILES=	Intro.4				\
 		core.4				\
 		crypt.conf.4			\
 		crypto_certs.4			\
+		ctf.4				\
 		d_passwd.4			\
 		dacf.conf.4			\
 		dat.conf.4			\
@@ -56,9 +57,6 @@ _MANFILES=	Intro.4				\
 		devices.4			\
 		dfstab.4			\
 		dhcp_inittab.4			\
-		dhcp_network.4			\
-		dhcpsvc.conf.4			\
-		dhcptab.4			\
 		dialups.4			\
 		dir_ufs.4			\
 		driver.conf.4			\
@@ -70,11 +68,6 @@ _MANFILES=	Intro.4				\
 		fspec.4				\
 		fstypes.4			\
 		ftp.4				\
-		ftpaccess.4			\
-		ftpconversions.4		\
-		ftpgroups.4			\
-		ftphosts.4			\
-		ftpservers.4			\
 		ftpusers.4			\
 		fx_dptbl.4			\
 		gateways.4			\
@@ -108,6 +101,7 @@ _MANFILES=	Intro.4				\
 		logindevperm.4			\
 		loginlog.4			\
 		magic.4				\
+		mailer.conf.4			\
 		md.tab.4			\
 		mddb.cf.4			\
 		mech.4				\
@@ -186,7 +180,7 @@ _MANFILES=	Intro.4				\
 		smbautohome.4			\
 		smhba.conf.4			\
 		sndr.4				\
-		sock2path.4			\
+		sock2path.d.4			\
 		space.4				\
 		ssh_config.4			\
 		sshd_config.4			\
@@ -210,7 +204,6 @@ _MANFILES=	Intro.4				\
 		volume-request.4		\
 		wanboot.conf.4			\
 		warn.conf.4			\
-		xferlog.4			\
 		ypfiles.4			\
 		yppasswdd.4			\
 		ypserv.4			\

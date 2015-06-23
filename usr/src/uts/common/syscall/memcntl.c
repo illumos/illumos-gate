@@ -21,13 +21,12 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2015 Joyent, Inc.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/bitmap.h>
@@ -122,7 +121,7 @@ memcntl(caddr_t addr, size_t len, int cmd, caddr_t arg, int attr, int mask)
 			iarg |= MS_SYNC;
 
 		if (((iarg & ~(MS_SYNC|MS_ASYNC|MS_INVALIDATE)) != 0) ||
-			((iarg & (MS_SYNC|MS_ASYNC)) == (MS_SYNC|MS_ASYNC))) {
+		    ((iarg & (MS_SYNC|MS_ASYNC)) == (MS_SYNC|MS_ASYNC))) {
 			error = set_errno(EINVAL);
 		} else {
 			error = as_ctl(as, addr, len, cmd, attr, iarg, NULL, 0);
@@ -383,6 +382,10 @@ memcntl(caddr_t addr, size_t len, int cmd, caddr_t arg, int attr, int mask)
 				(void) set_errno(error);
 			return (error);
 		}
+		break;
+	case MC_INHERIT_ZERO:
+		if (arg != 0 || attr != 0 || mask != 0)
+			return (set_errno(EINVAL));
 		break;
 	default:
 		return (set_errno(EINVAL));

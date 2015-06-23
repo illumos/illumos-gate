@@ -75,9 +75,9 @@ SRCS =		$(LOC_SRCS) $(COM_SRCS) $(DHCP_SRCS)
 SRCDIR =	$(LOC_DIR)
 $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 
-# OpenSSL requires us to turn this off
-LINTFLAGS   +=    -erroff=E_BAD_PTR_CAST_ALIGN
-LINTFLAGS64 +=    -erroff=E_BAD_PTR_CAST_ALIGN
+# OpenSSL (incl. varying versions) requires us to turn these off
+LINTFLAGS   +=    -erroff=E_BAD_PTR_CAST_ALIGN,E_SUPPRESSION_DIRECTIVE_UNUSED
+LINTFLAGS64 +=    -erroff=E_BAD_PTR_CAST_ALIGN,E_SUPPRESSION_DIRECTIVE_UNUSED
 
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-I$(LOC_DIR) -I$(COM_DIR) -I$(DHCP_DIR)

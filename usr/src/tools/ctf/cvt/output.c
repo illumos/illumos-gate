@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Routines for preparing tdata trees for conversion into CTF data, and
  * for placing the resulting data into an output file.
@@ -458,7 +456,6 @@ write_file(Elf *src, const char *srcname, Elf *dst, const char *dstname,
 	off_t new_offset = 0;
 	off_t ctfnameoff = 0;
 	int dynsym = (flags & CTF_USE_DYNSYM);
-	int keep_stabs = (flags & CTF_KEEP_STABS);
 	int *secxlate;
 	int srcidx, dstidx;
 	int curnmoff = 0;
@@ -466,7 +463,7 @@ write_file(Elf *src, const char *srcname, Elf *dst, const char *dstname,
 	int pad;
 	int i;
 
-	if (gelf_newehdr(dst, gelf_getclass(src)) == NULL)
+	if (gelf_newehdr(dst, gelf_getclass(src)) == 0)
 		elfterminate(dstname, "Cannot copy ehdr to temp file");
 	gelf_getehdr(src, &sehdr);
 	memcpy(&dehdr, &sehdr, sizeof (GElf_Ehdr));
@@ -482,7 +479,7 @@ write_file(Elf *src, const char *srcname, Elf *dst, const char *dstname,
 	 */
 	if (sehdr.e_phnum != 0) {
 		(void) elf_flagelf(dst, ELF_C_SET, ELF_F_LAYOUT);
-		if (gelf_newphdr(dst, sehdr.e_phnum) == NULL)
+		if (gelf_newphdr(dst, sehdr.e_phnum) == 0)
 			elfterminate(dstname, "Cannot make phdrs in temp file");
 
 		for (i = 0; i < sehdr.e_phnum; i++) {
@@ -507,12 +504,6 @@ write_file(Elf *src, const char *srcname, Elf *dst, const char *dstname,
 		}
 
 		if (strcmp(sname, CTF_ELF_SCN_NAME) == 0) {
-			secxlate[srcidx] = -1;
-		} else if (!keep_stabs &&
-		    (strncmp(sname, ".stab", 5) == 0 ||
-		    strncmp(sname, ".debug", 6) == 0 ||
-		    strncmp(sname, ".rel.debug", 10) == 0 ||
-		    strncmp(sname, ".rela.debug", 11) == 0)) {
 			secxlate[srcidx] = -1;
 		} else if (dynsym && shdr.sh_type == SHT_SYMTAB) {
 			/*
@@ -616,7 +607,7 @@ write_file(Elf *src, const char *srcname, Elf *dst, const char *dstname,
 			}
 		}
 
-		if (gelf_update_shdr(dscn, &shdr) == NULL)
+		if (gelf_update_shdr(dscn, &shdr) == 0)
 			elfterminate(dstname, "Cannot update sect %s", sname);
 
 		new_offset = (off_t)shdr.sh_offset;

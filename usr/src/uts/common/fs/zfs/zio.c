@@ -20,10 +20,11 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2011, 2014 by Delphix. All rights reserved.
+ * Copyright (c) 2011, 2015 by Delphix. All rights reserved.
  * Copyright (c) 2011 Nexenta Systems, Inc. All rights reserved.
  */
 
+#include <sys/sysmacros.h>
 #include <sys/zfs_context.h>
 #include <sys/fm/fs/zfs.h>
 #include <sys/spa.h>
@@ -36,6 +37,7 @@
 #include <sys/dmu_objset.h>
 #include <sys/arc.h>
 #include <sys/ddt.h>
+#include <sys/blkptr.h>
 #include <sys/zfeature.h>
 
 /*
@@ -61,6 +63,9 @@ kmem_cache_t *zio_data_buf_cache[SPA_MAXBLOCKSIZE >> SPA_MINBLOCKSHIFT];
 #ifdef _KERNEL
 extern vmem_t *zio_alloc_arena;
 #endif
+
+#define	ZIO_PIPELINE_CONTINUE		0x100
+#define	ZIO_PIPELINE_STOP		0x101
 
 /*
  * The following actions directly effect the spa's sync-to-convergence logic.
@@ -108,9 +113,8 @@ zio_init(void)
 
 	/*
 	 * For small buffers, we want a cache for each multiple of
-	 * SPA_MINBLOCKSIZE.  For medium-size buffers, we want a cache
-	 * for each quarter-power of 2.  For large buffers, we want
-	 * a cache for each multiple of PAGESIZE.
+	 * SPA_MINBLOCKSIZE.  For larger buffers, we want a cache
+	 * for each quarter-power of 2.
 	 */
 	for (c = 0; c < SPA_MAXBLOCKSIZE >> SPA_MINBLOCKSHIFT; c++) {
 		size_t size = (c + 1) << SPA_MINBLOCKSHIFT;
@@ -118,7 +122,7 @@ zio_init(void)
 		size_t align = 0;
 		size_t cflags = (size > zio_buf_debug_limit) ? KMC_NODEBUG : 0;
 
-		while (p2 & (p2 - 1))
+		while (!ISP2(p2))
 			p2 &= p2 - 1;
 
 #ifndef _KERNEL
@@ -133,10 +137,8 @@ zio_init(void)
 #endif
 		if (size <= 4 * SPA_MINBLOCKSIZE) {
 			align = SPA_MINBLOCKSIZE;
-		} else if (IS_P2ALIGNED(size, PAGESIZE)) {
-			align = PAGESIZE;
 		} else if (IS_P2ALIGNED(size, p2 >> 2)) {
-			align = p2 >> 2;
+			align = MIN(p2 >> 2, PAGESIZE);
 		}
 
 		if (align != 0) {
@@ -214,7 +216,7 @@ zio_buf_alloc(size_t size)
 {
 	size_t c = (size - 1) >> SPA_MINBLOCKSHIFT;
 
-	ASSERT(c < SPA_MAXBLOCKSIZE >> SPA_MINBLOCKSHIFT);
+	VERIFY3U(c, <, SPA_MAXBLOCKSIZE >> SPA_MINBLOCKSHIFT);
 
 	return (kmem_cache_alloc(zio_buf_cache[c], KM_PUSHPAGE));
 }
@@ -230,7 +232,7 @@ zio_data_buf_alloc(size_t size)
 {
 	size_t c = (size - 1) >> SPA_MINBLOCKSHIFT;
 
-	ASSERT(c < SPA_MAXBLOCKSIZE >> SPA_MINBLOCKSHIFT);
+	VERIFY3U(c, <, SPA_MAXBLOCKSIZE >> SPA_MINBLOCKSHIFT);
 
 	return (kmem_cache_alloc(zio_data_buf_cache[c], KM_PUSHPAGE));
 }
@@ -240,7 +242,7 @@ zio_buf_free(void *buf, size_t size)
 {
 	size_t c = (size - 1) >> SPA_MINBLOCKSHIFT;
 
-	ASSERT(c < SPA_MAXBLOCKSIZE >> SPA_MINBLOCKSHIFT);
+	VERIFY3U(c, <, SPA_MAXBLOCKSIZE >> SPA_MINBLOCKSHIFT);
 
 	kmem_cache_free(zio_buf_cache[c], buf);
 }
@@ -250,7 +252,7 @@ zio_data_buf_free(void *buf, size_t size)
 {
 	size_t c = (size - 1) >> SPA_MINBLOCKSHIFT;
 
-	ASSERT(c < SPA_MAXBLOCKSIZE >> SPA_MINBLOCKSHIFT);
+	VERIFY3U(c, <, SPA_MAXBLOCKSIZE >> SPA_MINBLOCKSHIFT);
 
 	kmem_cache_free(zio_data_buf_cache[c], buf);
 }
@@ -488,7 +490,7 @@ static zio_t *
 zio_create(zio_t *pio, spa_t *spa, uint64_t txg, const blkptr_t *bp,
     void *data, uint64_t size, zio_done_func_t *done, void *private,
     zio_type_t type, zio_priority_t priority, enum zio_flag flags,
-    vdev_t *vd, uint64_t offset, const zbookmark_t *zb,
+    vdev_t *vd, uint64_t offset, const zbookmark_phys_t *zb,
     enum zio_stage stage, enum zio_stage pipeline)
 {
 	zio_t *zio;
@@ -594,12 +596,96 @@ zio_root(spa_t *spa, zio_done_func_t *done, void *private, enum zio_flag flags)
 	return (zio_null(NULL, spa, NULL, done, private, flags));
 }
 
+void
+zfs_blkptr_verify(spa_t *spa, const blkptr_t *bp)
+{
+	if (!DMU_OT_IS_VALID(BP_GET_TYPE(bp))) {
+		zfs_panic_recover("blkptr at %p has invalid TYPE %llu",
+		    bp, (longlong_t)BP_GET_TYPE(bp));
+	}
+	if (BP_GET_CHECKSUM(bp) >= ZIO_CHECKSUM_FUNCTIONS ||
+	    BP_GET_CHECKSUM(bp) <= ZIO_CHECKSUM_ON) {
+		zfs_panic_recover("blkptr at %p has invalid CHECKSUM %llu",
+		    bp, (longlong_t)BP_GET_CHECKSUM(bp));
+	}
+	if (BP_GET_COMPRESS(bp) >= ZIO_COMPRESS_FUNCTIONS ||
+	    BP_GET_COMPRESS(bp) <= ZIO_COMPRESS_ON) {
+		zfs_panic_recover("blkptr at %p has invalid COMPRESS %llu",
+		    bp, (longlong_t)BP_GET_COMPRESS(bp));
+	}
+	if (BP_GET_LSIZE(bp) > SPA_MAXBLOCKSIZE) {
+		zfs_panic_recover("blkptr at %p has invalid LSIZE %llu",
+		    bp, (longlong_t)BP_GET_LSIZE(bp));
+	}
+	if (BP_GET_PSIZE(bp) > SPA_MAXBLOCKSIZE) {
+		zfs_panic_recover("blkptr at %p has invalid PSIZE %llu",
+		    bp, (longlong_t)BP_GET_PSIZE(bp));
+	}
+
+	if (BP_IS_EMBEDDED(bp)) {
+		if (BPE_GET_ETYPE(bp) > NUM_BP_EMBEDDED_TYPES) {
+			zfs_panic_recover("blkptr at %p has invalid ETYPE %llu",
+			    bp, (longlong_t)BPE_GET_ETYPE(bp));
+		}
+	}
+
+	/*
+	 * Pool-specific checks.
+	 *
+	 * Note: it would be nice to verify that the blk_birth and
+	 * BP_PHYSICAL_BIRTH() are not too large.  However, spa_freeze()
+	 * allows the birth time of log blocks (and dmu_sync()-ed blocks
+	 * that are in the log) to be arbitrarily large.
+	 */
+	for (int i = 0; i < BP_GET_NDVAS(bp); i++) {
+		uint64_t vdevid = DVA_GET_VDEV(&bp->blk_dva[i]);
+		if (vdevid >= spa->spa_root_vdev->vdev_children) {
+			zfs_panic_recover("blkptr at %p DVA %u has invalid "
+			    "VDEV %llu",
+			    bp, i, (longlong_t)vdevid);
+			continue;
+		}
+		vdev_t *vd = spa->spa_root_vdev->vdev_child[vdevid];
+		if (vd == NULL) {
+			zfs_panic_recover("blkptr at %p DVA %u has invalid "
+			    "VDEV %llu",
+			    bp, i, (longlong_t)vdevid);
+			continue;
+		}
+		if (vd->vdev_ops == &vdev_hole_ops) {
+			zfs_panic_recover("blkptr at %p DVA %u has hole "
+			    "VDEV %llu",
+			    bp, i, (longlong_t)vdevid);
+			continue;
+		}
+		if (vd->vdev_ops == &vdev_missing_ops) {
+			/*
+			 * "missing" vdevs are valid during import, but we
+			 * don't have their detailed info (e.g. asize), so
+			 * we can't perform any more checks on them.
+			 */
+			continue;
+		}
+		uint64_t offset = DVA_GET_OFFSET(&bp->blk_dva[i]);
+		uint64_t asize = DVA_GET_ASIZE(&bp->blk_dva[i]);
+		if (BP_IS_GANG(bp))
+			asize = vdev_psize_to_asize(vd, SPA_GANGBLOCKSIZE);
+		if (offset + asize > vd->vdev_asize) {
+			zfs_panic_recover("blkptr at %p DVA %u has invalid "
+			    "OFFSET %llu",
+			    bp, i, (longlong_t)offset);
+		}
+	}
+}
+
 zio_t *
 zio_read(zio_t *pio, spa_t *spa, const blkptr_t *bp,
     void *data, uint64_t size, zio_done_func_t *done, void *private,
-    zio_priority_t priority, enum zio_flag flags, const zbookmark_t *zb)
+    zio_priority_t priority, enum zio_flag flags, const zbookmark_phys_t *zb)
 {
 	zio_t *zio;
+
+	zfs_blkptr_verify(spa, bp);
 
 	zio = zio_create(pio, spa, BP_PHYSICAL_BIRTH(bp), bp,
 	    data, size, done, private,
@@ -615,7 +701,7 @@ zio_write(zio_t *pio, spa_t *spa, uint64_t txg, blkptr_t *bp,
     void *data, uint64_t size, const zio_prop_t *zp,
     zio_done_func_t *ready, zio_done_func_t *physdone, zio_done_func_t *done,
     void *private,
-    zio_priority_t priority, enum zio_flag flags, const zbookmark_t *zb)
+    zio_priority_t priority, enum zio_flag flags, const zbookmark_phys_t *zb)
 {
 	zio_t *zio;
 
@@ -637,13 +723,23 @@ zio_write(zio_t *pio, spa_t *spa, uint64_t txg, blkptr_t *bp,
 	zio->io_physdone = physdone;
 	zio->io_prop = *zp;
 
+	/*
+	 * Data can be NULL if we are going to call zio_write_override() to
+	 * provide the already-allocated BP.  But we may need the data to
+	 * verify a dedup hit (if requested).  In this case, don't try to
+	 * dedup (just take the already-allocated BP verbatim).
+	 */
+	if (data == NULL && zio->io_prop.zp_dedup_verify) {
+		zio->io_prop.zp_dedup = zio->io_prop.zp_dedup_verify = B_FALSE;
+	}
+
 	return (zio);
 }
 
 zio_t *
 zio_rewrite(zio_t *pio, spa_t *spa, uint64_t txg, blkptr_t *bp, void *data,
     uint64_t size, zio_done_func_t *done, void *private,
-    zio_priority_t priority, enum zio_flag flags, zbookmark_t *zb)
+    zio_priority_t priority, enum zio_flag flags, zbookmark_phys_t *zb)
 {
 	zio_t *zio;
 
@@ -676,6 +772,14 @@ zio_write_override(zio_t *zio, blkptr_t *bp, int copies, boolean_t nopwrite)
 void
 zio_free(spa_t *spa, uint64_t txg, const blkptr_t *bp)
 {
+
+	/*
+	 * The check for EMBEDDED is a performance optimization.  We
+	 * process the free here (by ignoring it) rather than
+	 * putting it on the list and then processing it in zio_free_sync().
+	 */
+	if (BP_IS_EMBEDDED(bp))
+		return;
 	metaslab_check_free(spa, bp);
 
 	/*
@@ -700,12 +804,12 @@ zio_free_sync(zio_t *pio, spa_t *spa, uint64_t txg, const blkptr_t *bp,
 	zio_t *zio;
 	enum zio_stage stage = ZIO_FREE_PIPELINE;
 
-	dprintf_bp(bp, "freeing in txg %llu, pass %u",
-	    (longlong_t)txg, spa->spa_sync_pass);
-
 	ASSERT(!BP_IS_HOLE(bp));
 	ASSERT(spa_syncing_txg(spa) == txg);
 	ASSERT(spa_sync_pass(spa) < zfs_sync_pass_deferred_free);
+
+	if (BP_IS_EMBEDDED(bp))
+		return (zio_null(pio, spa, NULL, NULL, NULL, 0));
 
 	metaslab_check_free(spa, bp);
 	arc_freed(spa, bp);
@@ -722,7 +826,6 @@ zio_free_sync(zio_t *pio, spa_t *spa, uint64_t txg, const blkptr_t *bp,
 	    NULL, NULL, ZIO_TYPE_FREE, ZIO_PRIORITY_NOW, flags,
 	    NULL, 0, NULL, ZIO_STAGE_OPEN, stage);
 
-
 	return (zio);
 }
 
@@ -731,6 +834,11 @@ zio_claim(zio_t *pio, spa_t *spa, uint64_t txg, const blkptr_t *bp,
     zio_done_func_t *done, void *private, enum zio_flag flags)
 {
 	zio_t *zio;
+
+	dprintf_bp(bp, "claiming in txg %llu", txg);
+
+	if (BP_IS_EMBEDDED(bp))
+		return (zio_null(pio, spa, NULL, NULL, NULL, 0));
 
 	/*
 	 * A claim is an allocation of a specific block.  Claims are needed
@@ -792,8 +900,8 @@ zio_read_phys(zio_t *pio, vdev_t *vd, uint64_t offset, uint64_t size,
 	ASSERT3U(offset + size, <=, vd->vdev_psize);
 
 	zio = zio_create(pio, vd->vdev_spa, 0, NULL, data, size, done, private,
-	    ZIO_TYPE_READ, priority, flags, vd, offset, NULL,
-	    ZIO_STAGE_OPEN, ZIO_READ_PHYS_PIPELINE);
+	    ZIO_TYPE_READ, priority, flags | ZIO_FLAG_PHYSICAL, vd, offset,
+	    NULL, ZIO_STAGE_OPEN, ZIO_READ_PHYS_PIPELINE);
 
 	zio->io_prop.zp_checksum = checksum;
 
@@ -813,8 +921,8 @@ zio_write_phys(zio_t *pio, vdev_t *vd, uint64_t offset, uint64_t size,
 	ASSERT3U(offset + size, <=, vd->vdev_psize);
 
 	zio = zio_create(pio, vd->vdev_spa, 0, NULL, data, size, done, private,
-	    ZIO_TYPE_WRITE, priority, flags, vd, offset, NULL,
-	    ZIO_STAGE_OPEN, ZIO_WRITE_PHYS_PIPELINE);
+	    ZIO_TYPE_WRITE, priority, flags | ZIO_FLAG_PHYSICAL, vd, offset,
+	    NULL, ZIO_STAGE_OPEN, ZIO_WRITE_PHYS_PIPELINE);
 
 	zio->io_prop.zp_checksum = checksum;
 
@@ -938,10 +1046,18 @@ zio_read_bp_init(zio_t *zio)
 	if (BP_GET_COMPRESS(bp) != ZIO_COMPRESS_OFF &&
 	    zio->io_child_type == ZIO_CHILD_LOGICAL &&
 	    !(zio->io_flags & ZIO_FLAG_RAW)) {
-		uint64_t psize = BP_GET_PSIZE(bp);
+		uint64_t psize =
+		    BP_IS_EMBEDDED(bp) ? BPE_GET_PSIZE(bp) : BP_GET_PSIZE(bp);
 		void *cbuf = zio_buf_alloc(psize);
 
 		zio_push_transform(zio, cbuf, psize, psize, zio_decompress);
+	}
+
+	if (BP_IS_EMBEDDED(bp) && BPE_GET_ETYPE(bp) == BP_EMBEDDED_TYPE_DATA) {
+		zio->io_pipeline = ZIO_INTERLOCK_PIPELINE;
+		decode_embedded_bp_compressed(bp, zio->io_data);
+	} else {
+		ASSERT(!BP_IS_EMBEDDED(bp));
 	}
 
 	if (!DMU_OT_IS_METADATA(BP_GET_TYPE(bp)) && BP_GET_LEVEL(bp) == 0)
@@ -987,6 +1103,9 @@ zio_write_bp_init(zio_t *zio)
 		*bp = *zio->io_bp_override;
 		zio->io_pipeline = ZIO_INTERLOCK_PIPELINE;
 
+		if (BP_IS_EMBEDDED(bp))
+			return (ZIO_PIPELINE_CONTINUE);
+
 		/*
 		 * If we've been overridden and nopwrite is set then
 		 * set the flag accordingly to indicate that a nopwrite
@@ -1011,8 +1130,6 @@ zio_write_bp_init(zio_t *zio)
 			zio->io_pipeline |= ZIO_STAGE_DDT_WRITE;
 			return (ZIO_PIPELINE_CONTINUE);
 		}
-		zio->io_bp_override = NULL;
-		BP_ZERO(bp);
 	}
 
 	if (!BP_IS_HOLE(bp) && bp->blk_birth == zio->io_txg) {
@@ -1035,7 +1152,7 @@ zio_write_bp_init(zio_t *zio)
 			compress = ZIO_COMPRESS_OFF;
 
 		/* Make sure someone doesn't change their mind on overwrites */
-		ASSERT(MIN(zp->zp_copies + BP_IS_GANG(bp),
+		ASSERT(BP_IS_EMBEDDED(bp) || MIN(zp->zp_copies + BP_IS_GANG(bp),
 		    spa_max_replication(spa)) == BP_GET_NDVAS(bp));
 	}
 
@@ -1045,9 +1162,42 @@ zio_write_bp_init(zio_t *zio)
 		if (psize == 0 || psize == lsize) {
 			compress = ZIO_COMPRESS_OFF;
 			zio_buf_free(cbuf, lsize);
+		} else if (!zp->zp_dedup && psize <= BPE_PAYLOAD_SIZE &&
+		    zp->zp_level == 0 && !DMU_OT_HAS_FILL(zp->zp_type) &&
+		    spa_feature_is_enabled(spa, SPA_FEATURE_EMBEDDED_DATA)) {
+			encode_embedded_bp_compressed(bp,
+			    cbuf, compress, lsize, psize);
+			BPE_SET_ETYPE(bp, BP_EMBEDDED_TYPE_DATA);
+			BP_SET_TYPE(bp, zio->io_prop.zp_type);
+			BP_SET_LEVEL(bp, zio->io_prop.zp_level);
+			zio_buf_free(cbuf, lsize);
+			bp->blk_birth = zio->io_txg;
+			zio->io_pipeline = ZIO_INTERLOCK_PIPELINE;
+			ASSERT(spa_feature_is_active(spa,
+			    SPA_FEATURE_EMBEDDED_DATA));
+			return (ZIO_PIPELINE_CONTINUE);
 		} else {
-			ASSERT(psize < lsize);
-			zio_push_transform(zio, cbuf, psize, lsize, NULL);
+			/*
+			 * Round up compressed size up to the ashift
+			 * of the smallest-ashift device, and zero the tail.
+			 * This ensures that the compressed size of the BP
+			 * (and thus compressratio property) are correct,
+			 * in that we charge for the padding used to fill out
+			 * the last sector.
+			 */
+			ASSERT3U(spa->spa_min_ashift, >=, SPA_MINBLOCKSHIFT);
+			size_t rounded = (size_t)P2ROUNDUP(psize,
+			    1ULL << spa->spa_min_ashift);
+			if (rounded >= lsize) {
+				compress = ZIO_COMPRESS_OFF;
+				zio_buf_free(cbuf, lsize);
+				psize = lsize;
+			} else {
+				bzero((char *)cbuf + psize, rounded - psize);
+				psize = rounded;
+				zio_push_transform(zio, cbuf,
+				    psize, lsize, NULL);
+			}
 		}
 	}
 
@@ -1304,7 +1454,7 @@ zio_nowait(zio_t *zio)
 		 */
 		spa_t *spa = zio->io_spa;
 
-		zio_add_child(spa->spa_async_zio_root, zio);
+		zio_add_child(spa->spa_async_zio_root[CPU_SEQID], zio);
 	}
 
 	zio_execute(zio);
@@ -2013,7 +2163,7 @@ zio_ddt_collision(zio_t *zio, ddt_t *ddt, ddt_entry_t *dde)
 
 		if (ddp->ddp_phys_birth != 0) {
 			arc_buf_t *abuf = NULL;
-			uint32_t aflags = ARC_WAIT;
+			arc_flags_t aflags = ARC_FLAG_WAIT;
 			blkptr_t blk = *zio->io_bp;
 			int error;
 
@@ -2403,6 +2553,18 @@ zio_free_zil(spa_t *spa, uint64_t txg, blkptr_t *bp)
  * Read and write to physical devices
  * ==========================================================================
  */
+
+
+/*
+ * Issue an I/O to the underlying vdev. Typically the issue pipeline
+ * stops after this stage and will resume upon I/O completion.
+ * However, there are instances where the vdev layer may need to
+ * continue the pipeline when an I/O was not issued. Since the I/O
+ * that was sent to the vdev layer might be different than the one
+ * currently active in the pipeline (see vdev_queue_io()), we explicitly
+ * force the underlying vdev layers to call either zio_execute() or
+ * zio_interrupt() to ensure that the pipeline continues with the correct I/O.
+ */
 static int
 zio_vdev_io_start(zio_t *zio)
 {
@@ -2420,7 +2582,8 @@ zio_vdev_io_start(zio_t *zio)
 		/*
 		 * The mirror_ops handle multiple DVAs in a single BP.
 		 */
-		return (vdev_mirror_ops.vdev_op_io_start(zio));
+		vdev_mirror_ops.vdev_op_io_start(zio);
+		return (ZIO_PIPELINE_STOP);
 	}
 
 	/*
@@ -2428,7 +2591,7 @@ zio_vdev_io_start(zio_t *zio)
 	 * can quickly react to certain workloads.  In particular, we care
 	 * about non-scrubbing, top-level reads and writes with the following
 	 * characteristics:
-	 * 	- synchronous writes of user data to non-slog devices
+	 *	- synchronous writes of user data to non-slog devices
 	 *	- any reads of user data
 	 * When these conditions are met, adjust the timestamp of spa_last_io
 	 * which allows the scan thread to adjust its workload accordingly.
@@ -2445,7 +2608,9 @@ zio_vdev_io_start(zio_t *zio)
 
 	align = 1ULL << vd->vdev_top->vdev_ashift;
 
-	if (P2PHASE(zio->io_size, align) != 0) {
+	if (!(zio->io_flags & ZIO_FLAG_PHYSICAL) &&
+	    P2PHASE(zio->io_size, align) != 0) {
+		/* Transform logical writes to be a full physical block size. */
 		uint64_t asize = P2ROUNDUP(zio->io_size, align);
 		char *abuf = zio_buf_alloc(asize);
 		ASSERT(vd == vd->vdev_top);
@@ -2456,8 +2621,22 @@ zio_vdev_io_start(zio_t *zio)
 		zio_push_transform(zio, abuf, asize, asize, zio_subblock);
 	}
 
-	ASSERT(P2PHASE(zio->io_offset, align) == 0);
-	ASSERT(P2PHASE(zio->io_size, align) == 0);
+	/*
+	 * If this is not a physical io, make sure that it is properly aligned
+	 * before proceeding.
+	 */
+	if (!(zio->io_flags & ZIO_FLAG_PHYSICAL)) {
+		ASSERT0(P2PHASE(zio->io_offset, align));
+		ASSERT0(P2PHASE(zio->io_size, align));
+	} else {
+		/*
+		 * For physical writes, we allow 512b aligned writes and assume
+		 * the device will perform a read-modify-write as necessary.
+		 */
+		ASSERT0(P2PHASE(zio->io_offset, SPA_MINBLOCKSIZE));
+		ASSERT0(P2PHASE(zio->io_size, SPA_MINBLOCKSIZE));
+	}
+
 	VERIFY(zio->io_type != ZIO_TYPE_WRITE || spa_writeable(spa));
 
 	/*
@@ -2498,7 +2677,8 @@ zio_vdev_io_start(zio_t *zio)
 		}
 	}
 
-	return (vd->vdev_ops->vdev_op_io_start(zio));
+	vd->vdev_ops->vdev_op_io_start(zio);
+	return (ZIO_PIPELINE_STOP);
 }
 
 static int
@@ -2723,7 +2903,8 @@ zio_checksum_verify(zio_t *zio)
 
 	if ((error = zio_checksum_error(zio, &info)) != 0) {
 		zio->io_error = error;
-		if (!(zio->io_flags & ZIO_FLAG_SPECULATIVE)) {
+		if (error == ECKSUM &&
+		    !(zio->io_flags & ZIO_FLAG_SPECULATIVE)) {
 			zfs_ereport_start_checksum(zio->io_spa,
 			    zio->io_vd, zio, zio->io_offset,
 			    zio->io_size, NULL, &info);
@@ -2745,7 +2926,7 @@ zio_checksum_verified(zio_t *zio)
 /*
  * ==========================================================================
  * Error rank.  Error are ranked in the order 0, ENXIO, ECKSUM, EIO, other.
- * An error of 0 indictes success.  ENXIO indicates whole-device failure,
+ * An error of 0 indicates success.  ENXIO indicates whole-device failure,
  * which may be transient (e.g. unplugged) or permament.  ECKSUM and EIO
  * indicate errors that are specific to one I/O, and most likely permanent.
  * Any other error is presumed to be worse because we weren't expecting it.
@@ -2855,7 +3036,7 @@ zio_done(zio_t *zio)
 		for (int w = 0; w < ZIO_WAIT_TYPES; w++)
 			ASSERT(zio->io_children[c][w] == 0);
 
-	if (bp != NULL) {
+	if (bp != NULL && !BP_IS_EMBEDDED(bp)) {
 		ASSERT(bp->blk_pad[0] == 0);
 		ASSERT(bp->blk_pad[1] == 0);
 		ASSERT(bcmp(bp, &zio->io_bp_copy, sizeof (blkptr_t)) == 0 ||
@@ -3137,20 +3318,13 @@ static zio_pipe_stage_t *zio_pipeline[] = {
 
 /* dnp is the dnode for zb1->zb_object */
 boolean_t
-zbookmark_is_before(const dnode_phys_t *dnp, const zbookmark_t *zb1,
-    const zbookmark_t *zb2)
+zbookmark_is_before(const dnode_phys_t *dnp, const zbookmark_phys_t *zb1,
+    const zbookmark_phys_t *zb2)
 {
 	uint64_t zb1nextL0, zb2thisobj;
 
 	ASSERT(zb1->zb_objset == zb2->zb_objset);
 	ASSERT(zb2->zb_level == 0);
-
-	/*
-	 * A bookmark in the deadlist is considered to be after
-	 * everything else.
-	 */
-	if (zb2->zb_object == DMU_DEADLIST_OBJECT)
-		return (B_TRUE);
 
 	/* The objset_phys_t isn't before anything. */
 	if (dnp == NULL)

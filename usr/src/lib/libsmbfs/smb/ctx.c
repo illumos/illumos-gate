@@ -33,8 +33,8 @@
  */
 
 /*
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/param.h>
@@ -74,6 +74,9 @@
 #ifndef TRUE
 #define	TRUE	1
 #endif
+
+#define	SMB_AT_DEFAULT	(SMB_AT_KRB5 | SMB_AT_NTLM2)
+#define	SMB_AT_MINAUTH	(SMB_AT_KRB5 | SMB_AT_NTLM2 | SMB_AT_NTLM1)
 
 struct nv {
 	char *name;
@@ -260,7 +263,7 @@ smb_ctx_init(struct smb_ctx *ctx)
 	ctx->ct_vopt = SMBVOPT_EXT_SEC;
 	ctx->ct_owner = SMBM_ANY_OWNER;
 	ctx->ct_authflags = SMB_AT_DEFAULT;
-	ctx->ct_minauth = SMB_AT_DEFAULT;
+	ctx->ct_minauth = SMB_AT_MINAUTH;
 
 	/*
 	 * Default domain, user, ...
@@ -1118,13 +1121,7 @@ smb_ctx_resolve(struct smb_ctx *ctx)
 	 * check for a keychain entry.
 	 * XXX: Only for auth NTLM?
 	 */
-	if (ctx->ct_user[0] == '\0') {
-		/*
-		 * No user name (anonymous session).
-		 * The minauth checks do not apply.
-		 */
-		ctx->ct_authflags = SMB_AT_ANON;
-	} else {
+	if (ctx->ct_user[0] != '\0') {
 		/*
 		 * Have a user name.
 		 * If we don't have a p/w yet,

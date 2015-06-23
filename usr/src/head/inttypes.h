@@ -20,14 +20,14 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _INTTYPES_H
 #define	_INTTYPES_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file, <inttypes.h>, is specified by the ISO C standard,
@@ -105,7 +105,6 @@ typedef struct {
 #if (!defined(_XOPEN_SOURCE) || defined(_XPG6)) || defined(_STDC_C99) || \
 	defined(__EXTENSIONS__)
 
-#ifdef __STDC__
 extern intmax_t  imaxabs(intmax_t);
 extern imaxdiv_t imaxdiv(intmax_t, intmax_t);
 extern intmax_t  strtoimax(const char *_RESTRICT_KYWD, char **_RESTRICT_KYWD,
@@ -116,14 +115,6 @@ extern intmax_t  wcstoimax(const wchar_t *_RESTRICT_KYWD,
 	wchar_t **_RESTRICT_KYWD, int);
 extern uintmax_t wcstoumax(const wchar_t *_RESTRICT_KYWD,
 	wchar_t **_RESTRICT_KYWD, int);
-#else
-extern intmax_t  imaxabs();
-extern imaxdiv_t imaxdiv();
-extern intmax_t  strtoimax();
-extern uintmax_t strtoumax();
-extern intmax_t  wcstoimax();
-extern uintmax_t wcstoumax();
-#endif
 
 #endif /* (!defined(_XOPEN_SOURCE) || defined(_XPG6)) ... */
 

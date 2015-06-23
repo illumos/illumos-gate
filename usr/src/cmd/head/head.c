@@ -37,7 +37,7 @@
  * contributors.
  */
 /*
- * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
  */
 
 
@@ -52,6 +52,7 @@
 
 static	void	copyout(off_t, int);
 static	void	Usage();
+static	FILE	*input;
 
 
 /*
@@ -137,13 +138,16 @@ main(int argc, char **argv)
 			break;
 
 		if (argv[optind] != NULL) {
-			(void) close(0);
-			if (freopen(argv[optind], "r", stdin) == NULL) {
+			if (input != NULL)
+				(void) fclose(input);
+			if ((input = fopen(argv[optind], "r")) == NULL) {
 				perror(argv[optind]);
 				error = 1;
 				optind++;
 				continue;
 			}
+		} else {
+			input = stdin;
 		}
 
 		if (quiet == 0) {
@@ -172,7 +176,7 @@ copyout(off_t cnt, int isline)
 	char lbuf[BUFSIZ];
 	size_t len;
 
-	while (cnt > 0 && fgets(lbuf, sizeof (lbuf), stdin) != 0) {
+	while (cnt > 0 && fgets(lbuf, sizeof (lbuf), input) != 0) {
 		len = strlen(lbuf);
 		if (isline) {
 			(void) printf("%s", lbuf);

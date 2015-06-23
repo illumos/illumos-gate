@@ -19,6 +19,11 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2014 Joyent, Inc.
+ */
+
 /*
  * Copyright 2001 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -37,8 +42,7 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+#include <err.h>
 #include "rcv.h"
 #include <locale.h>
 
@@ -213,9 +217,13 @@ printhead(int mesg)
 	char *fromline;
 	char pbuf[LINESIZE];
 	char name[LINESIZE];
-	struct headline hl;
+	headline_t *hl;
 	register char *cp;
 	int showto;
+
+	if (headline_alloc(&hl) != 0) {
+		err(1, "could not allocate memory");
+	}
 
 	mp = &message[mesg-1];
 	ibuf = setinput(mp);
@@ -248,9 +256,14 @@ printhead(int mesg)
 			dispc = 'H';
 	if (mp->m_flag & MBOX)
 		dispc = 'M';
-	parse(headline, &hl, pbuf);
-	if (hl.l_date == NOSTR)
-		hl.l_date = "<Unknown date>";
+	if (parse_headline(headline, hl) == -1) {
+		headline_reset(hl);
+	}
+	if (custr_len(hl->hl_date) == 0) {
+		if (custr_append(hl->hl_date, "<Unknown date>") != 0) {
+			err(1, "could not print header");
+		}
+	}
 
 	/*
 	 * Netnews interface?
@@ -299,11 +312,14 @@ printhead(int mesg)
 	}
 	if (mp->m_text) {
 		printf("%16.16s %4ld/%-5ld %-.25s\n",
-			hl.l_date, mp->m_lines, mp->m_size, subjline);
-	} else {
-		printf("%16.16s binary/%-5ld %-.25s\n", hl.l_date, mp->m_size,
+		    custr_cstr(hl->hl_date), mp->m_lines, mp->m_size,
 		    subjline);
+	} else {
+		printf("%16.16s binary/%-5ld %-.25s\n", custr_cstr(hl->hl_date),
+		    mp->m_size, subjline);
 	}
+
+	headline_free(hl);
 }
 
 /*

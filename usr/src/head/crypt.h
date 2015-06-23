@@ -19,6 +19,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -30,8 +32,6 @@
 #ifndef	_CRYPT_H
 #define	_CRYPT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
-
 #include <pwd.h>
 
 #ifdef	__cplusplus
@@ -42,7 +42,6 @@ extern "C" {
 
 #define	CRYPT_MAXCIPHERTEXTLEN	512
 
-#if defined(__STDC__)
 extern char *crypt(const char *, const char *);
 extern char *crypt_gensalt(const char *, const struct passwd *);
 extern char *crypt_genhash_impl(char *, size_t, const char *,
@@ -57,20 +56,6 @@ extern void encrypt(char *, int);
 extern int run_crypt(long, char *, unsigned, int *);
 extern int run_setkey(int *, const char *);
 extern void setkey(const char *);
-#else
-extern char *crypt();
-extern char *crypt_gensalt();
-extern char *crypt_genhash_impl();
-extern char *crytp_gensalt_impl();
-extern int crypt_close();
-extern char *des_crypt();
-extern void des_encrypt();
-extern void des_setkey();
-extern void encrypt();
-extern int run_crypt();
-extern int run_setkey();
-extern void setkey();
-#endif
 
 #ifdef	__cplusplus
 }

@@ -22,16 +22,15 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 1997-2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _MON_H
 #define	_MON_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -75,11 +74,7 @@ typedef unsigned short WORD;
 #endif
 #endif
 
-#if defined(__STDC__)
 extern void monitor(int (*)(void), int (*)(void), WORD *, size_t, size_t);
-#else
-extern void monitor();
-#endif
 
 #ifdef	__cplusplus
 }

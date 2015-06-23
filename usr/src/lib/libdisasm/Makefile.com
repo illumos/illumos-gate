@@ -21,6 +21,8 @@
 #
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2012 Joshua M. Clulow <josh@sysmgr.org>
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 #
 
 #
@@ -28,9 +30,6 @@
 # libraries, because libdisasm must be built in two flavors - as a standalone
 # for use by kmdb and as a normal library.  We use $(CURTYPE) to indicate the
 # current flavor being built.
-#
-# The SPARC library is built from the closed gate.  This Makefile is shared
-# between both environments, so all paths must be absolute.
 #
 
 LIBRARY=	libdisasm.a
@@ -45,32 +44,46 @@ CURTYPE=	library
 COMDIR=		$(SRC)/lib/libdisasm/common
 
 #
-# Architecture-dependent files common to both versions of libdisasm
+# Architecture-independent files
 #
-OBJECTS_common_i386 = dis_i386.o dis_tables.o
-OBJECTS_common_sparc = dis_sparc.o instr.o dis_sparc_fmt.o
-
-SRCS_common_i386 = $(ISASRCDIR)/dis_i386.c $(SRC)/common/dis/i386/dis_tables.c
-SRCS_common_sparc = $(ISASRCDIR)/dis_sparc.c $(ISASRCDIR)/instr.c \
-	$(ISASRCDIR)/dis_sparc_fmt.c
+SRCS_common=		$(COMDIR)/libdisasm.c
+OBJECTS_common=		libdisasm.o
 
 #
-# Architecture-independent files common to both version of libdisasm
+# Architecture-dependent disassembly files
 #
-OBJECTS_common_common = libdisasm.o
-SRC_common_common = $(OBJECTS_common_common:%.o=$(COMDIR)/%.c)
+SRCS_i386=		$(COMDIR)/dis_i386.c \
+			$(SRC)/common/dis/i386/dis_tables.c
+SRCS_sparc=		$(COMDIR)/dis_sparc.c \
+			$(COMDIR)/dis_sparc_fmt.c \
+			$(COMDIR)/dis_sparc_instr.c
 
+OBJECTS_i386=		dis_i386.o \
+			dis_tables.o
+OBJECTS_sparc=		dis_sparc.o \
+			dis_sparc_fmt.o \
+			dis_sparc_instr.o
 
-OBJECTS=				\
-	$(OBJECTS_common_$(MACH))	\
-	$(OBJECTS_common_common)
+#
+# We build the regular shared library with support for all architectures.
+# The standalone version should only contain code for the native
+# architecture to reduce the memory footprint of kmdb.
+#
+OBJECTS_library=	$(OBJECTS_common) \
+			$(OBJECTS_i386) \
+			$(OBJECTS_sparc)
+OBJECTS_standalone=	$(OBJECTS_common) \
+			$(OBJECTS_$(MACH))
+OBJECTS=		$(OBJECTS_$(CURTYPE))
 
 include $(SRC)/lib/Makefile.lib
 
-SRCS=					\
-	$(SRCS_$(CURTYPE))		\
-	$(SRCS_common_$(MACH))		\
-	$(SRCS_common_common)
+SRCS_library=		$(SRCS_common) \
+			$(SRCS_i386) \
+			$(SRCS_sparc)
+SRCS_standalone=	$(SRCS_common) \
+			$(SRCS_$(MACH))
+SRCS=			$(SRCS_$(CURTYPE))
 
 #
 # Used to verify that the standalone doesn't have any unexpected external
@@ -108,22 +121,12 @@ CERRWARN +=	-_gcc=-Wno-uninitialized
 # doesn't get it.
 DTS_ERRNO=
 
-# We need to rename some standard functions so we can easily implement them 
-# in consumers.
-STAND_RENAMED_FUNCS= \
-	snprintf
-
-CPPFLAGS_standalone = -DDIS_STANDALONE $(STAND_RENAMED_FUNCS:%=-D%=mdb_%) \
-	-Dvsnprintf=mdb_iob_vsnprintf -I$(SRC)/cmd/mdb/common
+CPPFLAGS_standalone = -DDIS_STANDALONE -I$(SRC)/cmd/mdb/common
 CPPFLAGS_library = -D_REENTRANT
 CPPFLAGS +=	-I$(COMDIR) $(CPPFLAGS_$(CURTYPE))
 
-#
-# For x86, we have to link to sources in usr/src/common
-#
-CPPFLAGS_dis_i386 = -I$(SRC)/common/dis/i386 -DDIS_TEXT
-CPPFLAGS_dis_sparc =
-CPPFLAGS +=	$(CPPFLAGS_dis_$(MACH))
+# For the x86 disassembler we have to include sources from usr/src/common
+CPPFLAGS += -I$(SRC)/common/dis/i386 -DDIS_TEXT
 
 CFLAGS_standalone = $(STAND_FLAGS_32)
 CFLAGS_common =

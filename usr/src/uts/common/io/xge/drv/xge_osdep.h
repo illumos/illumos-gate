@@ -188,8 +188,8 @@ static inline int xge_os_sprintf(char *buf, char *fmt, ...) {
 
 #define	xge_os_cmpxchg(targetp, cmp, newval)		\
 	sizeof (*(targetp)) == 4 ?			\
-	cas32((uint32_t *)targetp, cmp, newval) :	\
-	cas64((uint64_t *)targetp, cmp, newval)
+	atomic_cas_32((uint32_t *)targetp, cmp, newval) :	\
+	atomic_cas_64((uint64_t *)targetp, cmp, newval)
 
 /* ------------------------- misc primitives ------------------------------- */
 

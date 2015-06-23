@@ -1,11 +1,12 @@
 '\" te
 .\" Copyright (c) 2006 Sun Microsystems, Inc., All Rights Reserved
+.\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SCSI_HBA_ATTACH_SETUP 9F "May 30, 2006"
+.TH SCSI_HBA_ATTACH_SETUP 9F "May 24, 2014"
 .SH NAME
-scsi_hba_attach_setup, scsi_hba_attach, scsi_hba_detach \- SCSI HBA attach and
+scsi_hba_attach_setup, scsi_hba_detach \- SCSI HBA attach and
 detach routines
 .SH SYNOPSIS
 .LP
@@ -16,12 +17,6 @@ detach routines
 
 \fBint\fR \fBscsi_hba_attach_setup\fR(\fBdev_info_t *\fR\fIdip\fR, \fBddi_dma_attr_t *\fR\fIhba_dma_attr\fR,
      \fBscsi_hba_tran_t *\fR\fIhba_tran\fR, \fBint\fR \fIhba_flags\fR);
-.fi
-
-.LP
-.nf
-\fBint\fR \fBscsi_hba_attach\fR(\fBdev_info_t *\fR\fIdip\fR, \fBddi_dma_lim_t *\fR\fIhba_lim\fR,
-     \fBscsi_hba_tran_t *\fR\fIhba_tran\fR, \fBint\fR \fIhba_flags\fR, \fBvoid *\fR\fIhba_options\fR);
 .fi
 
 .LP
@@ -42,15 +37,6 @@ Solaris architecture specific (Solaris DDI).
 .RS 16n
 Pointer to the \fBdev_info_t\fR structure that refers to the instance of the
 HBA device.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fIhba_lim\fR\fR
-.ad
-.RS 16n
-Pointer to a \fBddi_dma_lim\fR(9S) structure.
 .RE
 
 .sp
@@ -93,25 +79,20 @@ Pointer to a \fBddi_dma_attr\fR(9S) structure.
 
 .SH DESCRIPTION
 .sp
-.LP
-The \fBscsi_hba_attach_setup()\fR function is the recommended interface over
-the \fBscsi_hba_attach()\fR function.
-.SS "scsi_hba_attach_setup(\|) scsi_hba_attach(\|)"
+.SS "scsi_hba_attach_setup(\|)"
 .sp
 .LP
-The \fBscsi_hba_attach()\fR function registers the \fIhba_lim\fR DMA limits and
-the \fIhba_tran\fR transport vectors of each instance of the HBA device defined
-by \fIdip\fR. The \fBscsi_hba_attach_setup()\fR function registers the
+The \fBscsi_hba_attach_setup()\fR function registers the
 \fIhba_dma_attr\fR DMA attributes and the \fIhba_tran\fR transport vectors of
 each instance of the HBA device defined by \fIdip\fR. The HBA driver can pass
-different DMA limits or DMA attributes and the transport vectors for each
+different DMA attributes and the transport vectors for each
 instance of the device to support any constraints imposed by the  HBA itself.
 .sp
 .LP
-The \fBscsi_hba_attach()\fR and \fBscsi_hba_attach_setup()\fR functions use the
+The \fBscsi_hba_attach_setup()\fR function uses the
 \fBdev_bus_ops\fR field in the \fBdev_ops\fR(9S) structure. The HBA driver
 should initialize this field to \fINULL\fR before calling
-\fBscsi_hba_attach()\fR or \fBscsi_hba_attach_setup()\fR.
+\fBscsi_hba_attach_setup()\fR.
 .sp
 .LP
 If \fBSCSI_HBA_TRAN_CLONE\fR is requested in \fIhba_flags\fR, the
@@ -132,7 +113,7 @@ when \fBtran_setup_pkt()\fR is used. See \fBtran_setup_pkt\fR(9E) for
 information on using these flags.
 .sp
 .LP
-The \fBscsi_hba_attach()\fR and \fBscsi_hba_attach_setup()\fR functions attach
+The \fBscsi_hba_attach_setup()\fR function attaches
 a number of integer-valued properties to \fIdip\fR, unless properties of the
 same name are already attached to the node. An HBA driver should retrieve these
 configuration parameters via \fBddi_prop_get_int\fR(9F), and respect any
@@ -278,19 +259,19 @@ individual HBA man pages for any HBA-specific information
 .SS "scsi_hba_detach(\|)"
 .sp
 .LP
-The \fBscsi_hba_detach()\fR function removes the reference to the DMA limits or
+The \fBscsi_hba_detach()\fR function removes the reference to the DMA
 attributes structure and the transport vector for the given instance of an HBA
 driver.
 .SH RETURN VALUES
 .sp
 .LP
-The \fBscsi_hba_attach()\fR, \fBscsi_hba_attach_setup()\fR, and
+The \fBscsi_hba_attach_setup()\fR and
 \fBscsi_hba_detach()\fR functions return \fBDDI_SUCCESS\fR if the function call
 succeeds, and return \fBDDI_FAILURE\fR on failure.
 .SH CONTEXT
 .sp
 .LP
-The \fBscsi_hba_attach()\fR and \fBscsi_hba_attach_setup()\fR functions should
+The \fBscsi_hba_attach_setup()\fR function should
 be called from \fBattach\fR(9E). The \fBscsi_hba_detach()\fR function should be
 called from \fBdetach\fR(9E).
 .SH SEE ALSO
@@ -298,7 +279,7 @@ called from \fBdetach\fR(9E).
 .LP
 \fBattach\fR(9E), \fBdetach\fR(9E), \fBtran_setup_pkt\fR(9E),
 \fBtran_tgt_init\fR(9E), \fBddi_prop_get_int\fR(9F), \fBddi_dma_attr\fR(9S),
-\fBddi_dma_lim\fR(9S), \fBdev_ops\fR(9S), \fBscsi_address\fR(9S),
+\fBdev_ops\fR(9S), \fBscsi_address\fR(9S),
 \fBscsi_hba_tran\fR(9S)
 .sp
 .LP
@@ -309,7 +290,3 @@ called from \fBdetach\fR(9E).
 It is the HBA driver's responsibility to ensure that no more transport requests
 will be taken on behalf of any SCSI target device driver after
 \fBscsi_hba_detach()\fR is called.
-.sp
-.LP
-The \fBscsi_hba_attach()\fR function is obsolete and will be discontinued in a
-future release. This function is replaced by \fBscsi_hba_attach_setup()\fR.

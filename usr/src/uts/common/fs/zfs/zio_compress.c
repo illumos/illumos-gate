@@ -34,6 +34,7 @@
 #include <sys/zfs_context.h>
 #include <sys/compress.h>
 #include <sys/spa.h>
+#include <sys/zfeature.h>
 #include <sys/zio.h>
 #include <sys/zio_compress.h>
 
@@ -61,26 +62,34 @@ zio_compress_info_t zio_compress_table[ZIO_COMPRESS_FUNCTIONS] = {
 };
 
 enum zio_compress
-zio_compress_select(enum zio_compress child, enum zio_compress parent)
+zio_compress_select(spa_t *spa, enum zio_compress child,
+    enum zio_compress parent)
 {
+	enum zio_compress result;
+
 	ASSERT(child < ZIO_COMPRESS_FUNCTIONS);
 	ASSERT(parent < ZIO_COMPRESS_FUNCTIONS);
-	ASSERT(parent != ZIO_COMPRESS_INHERIT && parent != ZIO_COMPRESS_ON);
+	ASSERT(parent != ZIO_COMPRESS_INHERIT);
 
-	if (child == ZIO_COMPRESS_INHERIT)
-		return (parent);
+	result = child;
+	if (result == ZIO_COMPRESS_INHERIT)
+		result = parent;
 
-	if (child == ZIO_COMPRESS_ON)
-		return (ZIO_COMPRESS_ON_VALUE);
+	if (result == ZIO_COMPRESS_ON) {
+		if (spa_feature_is_active(spa, SPA_FEATURE_LZ4_COMPRESS))
+			result = ZIO_COMPRESS_LZ4_ON_VALUE;
+		else
+			result = ZIO_COMPRESS_LEGACY_ON_VALUE;
+	}
 
-	return (child);
+	return (result);
 }
 
 size_t
 zio_compress_data(enum zio_compress c, void *src, void *dst, size_t s_len)
 {
 	uint64_t *word, *word_end;
-	size_t c_len, d_len, r_len;
+	size_t c_len, d_len;
 	zio_compress_info_t *ci = &zio_compress_table[c];
 
 	ASSERT((uint_t)c < ZIO_COMPRESS_FUNCTIONS);
@@ -102,28 +111,13 @@ zio_compress_data(enum zio_compress c, void *src, void *dst, size_t s_len)
 		return (s_len);
 
 	/* Compress at least 12.5% */
-	d_len = P2ALIGN(s_len - (s_len >> 3), (size_t)SPA_MINBLOCKSIZE);
-	if (d_len == 0)
-		return (s_len);
-
+	d_len = s_len - (s_len >> 3);
 	c_len = ci->ci_compress(src, dst, s_len, d_len, ci->ci_level);
 
 	if (c_len > d_len)
 		return (s_len);
 
-	/*
-	 * Cool.  We compressed at least as much as we were hoping to.
-	 * For both security and repeatability, pad out the last sector.
-	 */
-	r_len = P2ROUNDUP(c_len, (size_t)SPA_MINBLOCKSIZE);
-	if (r_len > c_len) {
-		bzero((char *)dst + c_len, r_len - c_len);
-		c_len = r_len;
-	}
-
 	ASSERT3U(c_len, <=, d_len);
-	ASSERT(P2PHASE(c_len, (size_t)SPA_MINBLOCKSIZE) == 0);
-
 	return (c_len);
 }
 

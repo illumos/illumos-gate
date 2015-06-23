@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <mdb/mdb_signal.h>
 #include <mdb/mdb_err.h>
 #include <mdb/mdb.h>
@@ -114,7 +112,10 @@ static const char *const _mdb_errlist[] = {
 	"boot-loaded kmdb cannot be unloaded",		/* EMDB_KNOUNLOAD */
 	"too many enabled watchpoints for this machine", /* EMDB_WPTOOMANY */
 	"DTrace is active",				/* EMDB_DTACTIVE */
-	"boot-loaded module cannot be unloaded"		/* EMDB_KMODNOUNLOAD */
+	"boot-loaded module cannot be unloaded",	/* EMDB_KMODNOUNLOAD */
+	"stack frame pointer is invalid",		/* EMDB_STKFRAME */
+	"unexpected short write"			/* EMDB_SHORTWRITE */
+
 };
 
 static const int _mdb_nerr = sizeof (_mdb_errlist) / sizeof (_mdb_errlist[0]);

@@ -5,8 +5,8 @@
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
  *
- * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
+ * You can obtain a copy of the license at
+ * http://www.opensource.org/licenses/cddl1.txt.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -20,10 +20,9 @@
  */
 
 /*
- * Copyright 2010 Emulex.  All rights reserved.
+ * Copyright (c) 2004-2012 Emulex. All rights reserved.
  * Use is subject to license terms.
  */
-
 
 #include <emlxs.h>
 
@@ -162,7 +161,7 @@ emlxs_diag_echo_run(emlxs_port_t *port, uint32_t did, uint32_t pattern)
 	}
 
 	/* Check for the host node */
-	ndlp = emlxs_node_find_did(port, port->did);
+	ndlp = emlxs_node_find_did(port, port->did, 1);
 
 	if (!ndlp || !ndlp->nlp_active) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_diag_error_msg,
@@ -217,9 +216,9 @@ emlxs_diag_echo_run(emlxs_port_t *port, uint32_t did, uint32_t pattern)
 	} else {
 		/* Program the default echo pattern */
 		bzero(pattern_buffer, length);
-		(void) sprintf(pattern_buffer, "Emulex. We network storage. "
+		(void) snprintf(pattern_buffer, length,
 		    "Emulex. We network storage. Emulex. We network storage. "
-		    "Emulex. We network storage.");
+		    "Emulex. We network storage. Emulex. We network storage.");
 	}
 
 	/* Send ECHO pkt */
@@ -296,17 +295,14 @@ extern uint32_t
 emlxs_diag_biu_run(emlxs_hba_t *hba, uint32_t pattern)
 {
 	emlxs_port_t *port = &PPORT;
-	MAILBOXQ *mbq;
-	MATCHMAP *mp;
-	MATCHMAP *mp1;
+	MAILBOXQ *mbq = NULL;
+	MATCHMAP *mp = NULL;
+	MATCHMAP *mp1 = NULL;
 	uint32_t i;
 	uint8_t *inptr;
 	uint8_t *outptr;
 	int32_t rval = FC_SUCCESS;
 	uint32_t *lptr;
-
-	mp1 = 0;
-	mbq = 0;
 
 	/* Check if device is ready */
 	if (hba->state < FC_LINK_DOWN) {
@@ -319,7 +315,7 @@ emlxs_diag_biu_run(emlxs_hba_t *hba, uint32_t pattern)
 	/*
 	 * Get a buffer which will be used for the mailbox command
 	 */
-	if ((mbq = (MAILBOXQ *) emlxs_mem_get(hba, MEM_MBOX, 1)) == 0) {
+	if ((mbq = (MAILBOXQ *) emlxs_mem_get(hba, MEM_MBOX)) == 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_diag_error_msg,
 		    "BIU: Mailbox allocation failed.");
 
@@ -330,8 +326,8 @@ emlxs_diag_biu_run(emlxs_hba_t *hba, uint32_t pattern)
 	/*
 	 * Setup and issue mailbox RUN BIU DIAG command Setup test buffers
 	 */
-	if (((mp = (MATCHMAP *) emlxs_mem_get(hba, MEM_BUF, 1)) == 0) ||
-	    ((mp1 = (MATCHMAP *) emlxs_mem_get(hba, MEM_BUF, 1)) == 0)) {
+	if (((mp = (MATCHMAP *) emlxs_mem_get(hba, MEM_BUF)) == 0) ||
+	    ((mp1 = (MATCHMAP *) emlxs_mem_get(hba, MEM_BUF)) == 0)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_diag_error_msg,
 		    "BIU: Buffer allocation failed.");
 
@@ -402,7 +398,7 @@ done:
 		    != DDI_FM_OK) {
 			EMLXS_MSGF(EMLXS_CONTEXT,
 			    &emlxs_invalid_dma_handle_msg,
-			    "emlxs_diag_biu_run: hdl=%p",
+			    "diag_biu_run: hdl=%p",
 			    mp->dma_handle);
 			rval = EMLXS_TEST_FAILED;
 		}
@@ -415,7 +411,7 @@ done:
 		    != DDI_FM_OK) {
 			EMLXS_MSGF(EMLXS_CONTEXT,
 			    &emlxs_invalid_dma_handle_msg,
-			    "emlxs_diag_biu_run: hdl=%p",
+			    "diag_biu_run: hdl=%p",
 			    mp1->dma_handle);
 			rval = EMLXS_TEST_FAILED;
 		}
@@ -445,7 +441,7 @@ emlxs_diag_post_run(emlxs_hba_t *hba)
 	}
 
 	/* Take board offline */
-	if ((rval = emlxs_offline(hba))) {
+	if ((rval = emlxs_offline(hba, 0))) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_post_failed_msg,
 		    "Unable to take adapter offline.");
 

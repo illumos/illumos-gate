@@ -77,11 +77,15 @@ $(i386_ONLY)driver name=bge clone_perms="bge 0666 root sys" \
     alias=pci14e4,16a7 \
     alias=pci14e4,16a8 \
     alias=pci14e4,16c7 \
+    alias=pciex14e4,1643 \
     alias=pciex14e4,1655 \
     alias=pciex14e4,1656 \
+    alias=pciex14e4,1657 \
     alias=pciex14e4,165a \
     alias=pciex14e4,165b \
     alias=pciex14e4,165c \
+    alias=pciex14e4,165f \
+    alias=pciex14e4,1665 \
     alias=pciex14e4,1673 \
     alias=pciex14e4,1674 \
     alias=pciex14e4,1677 \
@@ -92,6 +96,7 @@ $(i386_ONLY)driver name=bge clone_perms="bge 0666 root sys" \
     alias=pciex14e4,1684 \
     alias=pciex14e4,1692 \
     alias=pciex14e4,169d \
+    alias=pciex14e4,16f3 \
     alias=pciex14e4,16fd \
     alias=pciex14e4,1713
 $(sparc_ONLY)driver name=bge clone_perms="bge 0666 root sys" \

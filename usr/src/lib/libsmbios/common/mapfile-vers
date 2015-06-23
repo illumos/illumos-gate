@@ -19,6 +19,7 @@
 # CDDL HEADER END
 #
 #
+# Copyright 2015 OmniTI Computer Consulting, Inc.  All rights reserved.
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
@@ -117,6 +118,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	smbios_memdevice_flag_name;
 	smbios_memdevice_form_desc;
 	smbios_memdevice_type_desc;
+	smbios_memdevice_rank_desc;
 	smbios_open;
 	smbios_port_conn_desc;
 	smbios_port_type_desc;
@@ -124,6 +126,8 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	smbios_processor_status_desc;
 	smbios_processor_type_desc;
 	smbios_processor_upgrade_desc;
+	smbios_processor_core_flag_desc;
+	smbios_processor_core_flag_name;
 	smbios_psn;
 	smbios_slot_ch1_desc;
 	smbios_slot_ch1_name;

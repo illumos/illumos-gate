@@ -10,7 +10,7 @@
 #
 #
 # Copyright (c) 2014 Racktop Systems.
-# Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
+# Copyright 2015, OmniTI Computer Consulting, Inc. All rights reserved.
 #
 
 # Link against libc as perl solaris specs
@@ -23,8 +23,8 @@ $(ROOTPERLEXT) := FILEMODE = 0555
 $(ROOTPERLMOD) := FILEMODE = 0444
 
 # CFLAGS for perl, specifically.
-PCFLAGS= -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 -DPERL_USE_SAFE_PUTENV \
-	-D_TS_ERRNO
+PCFLAGS= -DPERL_EUPXS_ALWAYS_EXPORT -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 \
+	-DPERL_USE_SAFE_PUTENV -D_TS_ERRNO
 
 $(MACH):
 	$(INS.dir)

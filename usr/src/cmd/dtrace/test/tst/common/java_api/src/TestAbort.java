@@ -22,8 +22,6 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- *
- * ident	"%Z%%M%	%I%	%E% SMI"
  */
 
 import org.opensolaris.os.dtrace.*;
@@ -49,7 +47,7 @@ public class TestAbort {
 	    consumer.enable();
 	    consumer.go();
 	    try {
-		Thread.currentThread().sleep(1000);
+		Thread.sleep(1000);
 	    } catch (InterruptedException e) {
 		e.printStackTrace();
 		System.exit(1);
@@ -77,7 +75,7 @@ public class TestAbort {
 	    consumer.enable();
 	    consumer.go();
 	    try {
-		Thread.currentThread().sleep(1000);
+		Thread.sleep(1000);
 	    } catch (InterruptedException e) {
 		e.printStackTrace();
 		System.exit(1);
@@ -129,7 +127,7 @@ public class TestAbort {
 	    consumer.enable();
 	    consumer.go();
 	    try {
-		Thread.currentThread().sleep(1000);
+		Thread.sleep(1000);
 	    } catch (InterruptedException e) {
 		e.printStackTrace();
 		System.exit(1);

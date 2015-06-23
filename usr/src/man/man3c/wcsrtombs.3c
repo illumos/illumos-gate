@@ -1,4 +1,5 @@
 '\" te
+.\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
 .\" Copyright (c) 1992, X/Open Company Limited. All Rights Reserved.  Portions Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
@@ -7,22 +8,37 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH WCSRTOMBS 3C "Nov 1, 2003"
+.TH WCSRTOMBS 3C "Jul 13, 2014"
 .SH NAME
-wcsrtombs \- convert a wide-character string to a character string
+wcsnrtombs, wcsnrtombs_l, wcsrtombs, wcsrtombs_l \- convert a wide-character string to a character string
 (restartable)
 .SH SYNOPSIS
 .LP
 .nf
 #include <wchar.h>
 
-\fBsize_t\fR \fBwcsrtombs\fR(\fBchar *restrict\fR \fIdst\fR,
-     \fBconst wchar_t **restrict\fR \fIsrc\fR, \fBsize_t\fR \fIlen\fR,
-     \fBmbstate_t *restrict\fR \fIps\fR);
+\fBsize_t\fR \fBwcsrtombs\fR(\fBchar *restrict\fR \fIdst\fR, \fBconst wchar_t **restrict\fR \fIsrc\fR,
+     \fBsize_t\fR \fIlen\fR, \fBmbstate_t *restrict\fR \fIps\fR);
 .fi
+.LP
+.nf
+\fBsize_t\fR \fBwcsnrtombs\fR(\fBchar *restrict\fR \fIdst\fR, \fBconst wchar_t **restrict\fR \fIsrc\fR,
+     \fBsize_t\fR \fInwc\fR, \fBsize_t\fR \fIlen\fR, \fBmbstate_t *restrict\fR \fIps\fR);
+.fi
+.LP
+.nf
+#include <wchar.h>
+#include <xlocale.h>
 
+\fBsize_t\fR \fBwcsrtombs_l\fR(\fBchar *restrict\fR \fIdst\fR, \fBconst wchar_t **restrict\fR \fIsrc\fR,
+     \fBsize_t\fR \fIlen\fR, \fBmbstate_t *restrict\fR \fIps\fR, \fBlocale_t\fR \fIloc\fR);
+.fi
+.LP
+.nf
+\fBsize_t\fR \fBwcsnrtombs_l\fR(\fBchar *restrict\fR \fIdst\fR, \fBconst wchar_t **restrict\fR \fIsrc\fR,
+     \fBsize_t\fR \fInwc\fR, \fBsize_t\fR \fIlen\fR, \fBmbstate_t *restrict\fR \fIps\fR, \fBlocale_t\fR \fIloc\fR);
+.fi
 .SH DESCRIPTION
-.sp
 .LP
 The \fBwcsrtombs()\fR function converts a sequence of wide-characters from the
 array indirectly pointed to by \fIsrc\fR into a sequence of corresponding
@@ -45,10 +61,15 @@ When the next character would exceed the limit of \fIlen\fR total bytes to be
 stored in the array pointed to by \fIdst\fR (and \fIdst\fR is not a null
 pointer).
 .RE
-.sp
+.RS +4
+.TP
+.ie t \(bu
+.el o
+In the case of \fBwcsnrtombs()\fR and \fBwcsnrtombs_l()\fR, when \fInwc\fR
+wide characters have been completely converted.
+.RE
 .LP
 Each conversion takes place as if by a call to the \fBwcrtomb()\fR function.
-.sp
 .LP
 If \fIdst\fR is not a null pointer, the pointer object pointed to by \fIsrc\fR
 is assigned either a null pointer (if conversion stopped due to reaching a
@@ -56,31 +77,32 @@ terminating null wide-character) or the address just  past the last
 wide-character converted (if any). If conversion stopped due to reaching a
 terminating null wide-character, the resulting state described is the initial
 conversion state.
-.sp
 .LP
-If \fIps\fR is a null pointer, the \fBwcsrtombs()\fR function uses its own
+If \fIps\fR is a null pointer, these functions uses their own
 internal \fBmbstate_t\fR object, which is initialized at program startup to the
 initial conversion state.  Otherwise, the  \fBmbstate_t\fR object pointed to by
 \fIps\fR is used to completely describe the current conversion state of the
-associated character sequence. Solaris will behave as if no function defined in
-the Solaris Reference Manual calls \fBwcsrtombs()\fR.
-.sp
+associated character sequence. The system will behave as if no function defined
+in the Reference Manual calls any of these functions.
 .LP
-The behavior of this function is affected by the \fBLC_CTYPE\fR category of the
-current locale.  See \fBenviron\fR(5).
+The behavior of \fBwcsrtombs()\fR and \fBwcsnrtombs()\fR are affected by the
+\fBLC_CTYPE\fR category of the current locale.  See \fBenviron\fR(5).
+.LP
+The \fBwcsrtombs_l()\fR and \fBwcsnrtombs_l()\fR functions behave identically
+to \fBwcsrtombs()\fR and \fBwcsnrtombs()\fR respectively, except
+that instead of operating in the current locale, they operate in the locale
+specified by \fIloc\fR.
 .SH RETURN VALUES
-.sp
 .LP
 If conversion stops because a code is reached that does not correspond to a
-valid character, an encoding error occurs.  In this case, the \fBwcsrtombs()\fR
-function stores the value of the macro \fBEILSEQ\fR in \fBerrno\fR and returns
-\fB(size_t)\(mi1\fR; the conversion state is undefined.  Otherwise, it returns
+valid character, an encoding error occurs.  In this case, these
+functions store the value of the macro \fBEILSEQ\fR in \fBerrno\fR and return
+\fB(size_t)\(mi1\fR; the conversion state is undefined.  Otherwise, they return
 the number of bytes in the resulting character sequence, not including the
 terminating null (if any).
 .SH ERRORS
-.sp
 .LP
-The \fBwcsrtombs()\fR function may fail if:
+These functions may fail if:
 .sp
 .ne 2
 .na
@@ -99,36 +121,28 @@ state.
 .RS 10n
 A wide-character code does not correspond to a valid character.
 .RE
-
-.SH USAGE
-.sp
-.LP
-If \fIps\fR is not a null pointer, \fBwcsrtombs()\fR uses the \fBmbstate_t\fR
-object pointed to by \fIps\fR and the function can be used safely in
-multithreaded applications, as long as \fBsetlocale\fR(3C) is not being called
-to change the locale. If \fIps\fR is a null pointer, \fBwcsrtombs()\fR uses its
-internal \fBmbstate_t\fR object and the function is Unsafe in multithreaded
-applications.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
 .TS
 box;
 c | c
 l | l .
 ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface Stability	Standard
+Interface Stability	See below.
 _
-MT-Level	See NOTES below
+MT-Level	See below.
 .TE
 
-.SH SEE ALSO
-.sp
 .LP
-\fBmbsinit\fR(3C), \fBsetlocale\fR(3C), \fBwcrtomb\fR(3C), \fBattributes\fR(5),
+The \fBwcsrtombs()\fR and \fBwcsnrtombs()\fR functions are Standard.  The
+\fBwcsrtombs_l()\fR and \fBwcsnrtombs_l()\fR functions are Uncommitted.
+.LP
+If \fIps\fR is a null pointer, these functions should be considered Unsafe
+for use in multithreaded applications.  Otherwise, they are MT-Safe.
+.SH SEE ALSO
+.LP
+\fBmbsinit\fR(3C), \fBnewlocale\fR(3C), \fBsetlocale\fR(3C), \fBuselocale\fR(3C),
+\fBwcrtomb\fR(3C), \fBattributes\fR(5),
 \fBenviron\fR(5), \fBstandards\fR(5)

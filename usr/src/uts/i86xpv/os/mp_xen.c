@@ -586,7 +586,7 @@ mp_enter_barrier(void)
 
 	ASSERT(MUTEX_HELD(&cpu_lock));
 
-	pause_cpus(NULL);
+	pause_cpus(NULL, NULL);
 
 	while (!done) {
 		done = 1;

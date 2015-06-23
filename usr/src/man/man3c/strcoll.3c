@@ -1,4 +1,5 @@
 '\" te
+.\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
 .\" Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Copyright 1989 AT&T
 .\" Portions Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
@@ -9,9 +10,9 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH STRCOLL 3C "Nov 1, 2003"
+.TH STRCOLL 3C "Jun 23, 2014"
 .SH NAME
-strcoll \- string collation
+strcoll, strcoll_l \- string collation
 .SH SYNOPSIS
 .LP
 .nf
@@ -19,40 +20,43 @@ strcoll \- string collation
 
 \fBint\fR \fBstrcoll\fR(\fBconst char *\fR\fIs1\fR, \fBconst char *\fR\fIs2\fR);
 .fi
+.LP
+.nf
+\fBint\fR \fBstrcoll_l\fR(\fBconst char *\fR\fIs1\fR, \fBconst char *\fR\fIs2\fR, \fBlocale_t\fR \fIloc\fR);
+.fi
 
 .SH DESCRIPTION
-.sp
 .LP
 Both \fBstrcoll()\fR and \fBstrxfrm\fR(3C) provide for locale-specific string
 sorting.  \fBstrcoll()\fR is intended for applications in which the number of
 comparisons per string is small. When strings are to be compared a number of
 times, \fBstrxfrm\fR(3C) is a more appropriate function because the
 transformation process occurs only once.
-.sp
+.LP
+The \fBstrcoll_l()\fR function behaves
+identically to \fBstrcoll()\fR, except instead of operating in the current
+locale, it operates in the locale specified by \fIloc\fR.
 .LP
 The \fBstrcoll()\fR function does not change the setting of \fBerrno\fR if
 successful.
-.sp
 .LP
 Since no return value is reserved to indicate an error, an application wishing
 to check for error situations should set \fBerrno\fR to 0, then call
 \fBstrcoll()\fR, then check \fBerrno\fR.
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, \fBstrcoll()\fR returns an integer greater than,
 equal to, or less than zero in direct correlation to whether string \fIs1\fR is
 greater than, equal to, or less than the string \fIs2\fR.  The comparison is
-based on strings interpreted as appropriate to the program's locale  for
+based on strings interpreted as appropriate to the locale
 category \fBLC_COLLATE\fR (see \fBsetlocale\fR(3C)).
-.sp
 .LP
 On error, \fBstrcoll()\fR may set \fBerrno\fR, but no return value is reserved
 to indicate an error.
 .SH ERRORS
 .sp
 .LP
-The \fBstrcoll()\fR function may fail if:
+The \fBstrcoll()\fR and \fBstrcoll_l()\fR functions may fail if:
 .sp
 .ne 2
 .na
@@ -62,25 +66,12 @@ The \fBstrcoll()\fR function may fail if:
 The \fIs1\fR or \fIs2\fR arguments contain characters outside the domain of the
 collating sequence.
 .RE
-
 .SH FILES
-.sp
-.ne 2
-.na
-\fB\fB/usr/lib/locale/\fIlocale\fR/\fIlocale\fR.so.*\fR\fR
-.ad
-.sp .6
-.RS 4n
-\fBLC_COLLATE\fR database for \fIlocale\fR
-.RE
-
+.IP \fB/usr/lib/locale/\fR\fIlocale\fR\fB/LC_COLLATE/*\fR
+collation database for \fIlocale\fR
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
 .TS
 box;
 c | c
@@ -91,15 +82,12 @@ CSI	Enabled
 _
 Interface Stability	Standard
 _
-MT-Level	MT-Safe with exceptions
+MT-Level	MT-Safe
 .TE
 
-.sp
-.LP
-The \fBstrcoll()\fR function can be used safely in multithreaded applications,
-as long as \fBsetlocale\fR(3C) is not being called to change the locale.
 .SH SEE ALSO
 .sp
 .LP
-\fBlocaledef\fR(1), \fBsetlocale\fR(3C), \fBstring\fR(3C), \fBstrxfrm\fR(3C),
+\fBlocaledef\fR(1), \fBnewlocale\fR(3C), \fBsetlocale\fR(3C), \fBstring\fR(3C),
+\fBstrxfrm\fR(3C), \fBuselocale\fR(3C),
 \fBwsxfrm\fR(3C), \fBattributes\fR(5), \fBenviron\fR(5), \fBstandards\fR(5)

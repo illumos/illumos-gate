@@ -21,17 +21,15 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/tzfile.h>
 #include <sys/atomic.h>
-#include <sys/kidmap.h>
 #include <sys/time.h>
 #include <sys/spl.h>
-#include <sys/cpuvar.h>
 #include <sys/random.h>
 #include <smbsrv/smb_kproto.h>
 #include <smbsrv/smb_fsops.h>
@@ -43,10 +41,7 @@
 #include <sys/sid.h>
 #include <sys/priv_names.h>
 
-static kmem_cache_t	*smb_dtor_cache;
-static boolean_t	smb_llist_initialized = B_FALSE;
-
-static boolean_t smb_thread_continue_timedwait_locked(smb_thread_t *, int);
+static kmem_cache_t	*smb_dtor_cache = NULL;
 
 static boolean_t smb_avl_hold(smb_avl_t *);
 static void smb_avl_rele(smb_avl_t *);
@@ -71,7 +66,7 @@ struct	tm {
 	int	tm_isdst;
 };
 
-static int days_in_month[] = {
+static const int days_in_month[] = {
 	31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31
 };
 
@@ -197,12 +192,6 @@ int32_t
 clock_get_milli_uptime()
 {
 	return (TICK_TO_MSEC(ddi_get_lbolt()));
-}
-
-int /*ARGSUSED*/
-smb_noop(void *p, size_t size, int foo)
-{
-	return (0);
 }
 
 /*
@@ -380,13 +369,11 @@ smb_idpool_free(
 void
 smb_llist_init(void)
 {
-	if (smb_llist_initialized)
+	if (smb_dtor_cache != NULL)
 		return;
 
 	smb_dtor_cache = kmem_cache_create("smb_dtor_cache",
 	    sizeof (smb_dtor_t), 8, NULL, NULL, NULL, NULL, NULL, 0);
-
-	smb_llist_initialized = B_TRUE;
 }
 
 /*
@@ -395,11 +382,10 @@ smb_llist_init(void)
 void
 smb_llist_fini(void)
 {
-	if (!smb_llist_initialized)
-		return;
-
-	kmem_cache_destroy(smb_dtor_cache);
-	smb_llist_initialized = B_FALSE;
+	if (smb_dtor_cache != NULL) {
+		kmem_cache_destroy(smb_dtor_cache);
+		smb_dtor_cache = NULL;
+	}
 }
 
 /*
@@ -769,258 +755,7 @@ smb_slist_exit(smb_slist_t *sl)
 	mutex_exit(&sl->sl_mutex);
 }
 
-/*
- * smb_thread_entry_point
- *
- * Common entry point for all the threads created through smb_thread_start.
- * The state of the thread is set to "running" at the beginning and moved to
- * "exiting" just before calling thread_exit(). The condition variable is
- *  also signaled.
- */
-static void
-smb_thread_entry_point(
-    smb_thread_t	*thread)
-{
-	ASSERT(thread->sth_magic == SMB_THREAD_MAGIC);
-	mutex_enter(&thread->sth_mtx);
-	ASSERT(thread->sth_state == SMB_THREAD_STATE_STARTING);
-	thread->sth_th = curthread;
-	thread->sth_did = thread->sth_th->t_did;
-
-	if (!thread->sth_kill) {
-		thread->sth_state = SMB_THREAD_STATE_RUNNING;
-		cv_signal(&thread->sth_cv);
-		mutex_exit(&thread->sth_mtx);
-		thread->sth_ep(thread, thread->sth_ep_arg);
-		mutex_enter(&thread->sth_mtx);
-	}
-	thread->sth_th = NULL;
-	thread->sth_state = SMB_THREAD_STATE_EXITING;
-	cv_broadcast(&thread->sth_cv);
-	mutex_exit(&thread->sth_mtx);
-	thread_exit();
-}
-
-/*
- * smb_thread_init
- */
-void
-smb_thread_init(
-    smb_thread_t	*thread,
-    char		*name,
-    smb_thread_ep_t	ep,
-    void		*ep_arg)
-{
-	ASSERT(thread->sth_magic != SMB_THREAD_MAGIC);
-
-	bzero(thread, sizeof (*thread));
-
-	(void) strlcpy(thread->sth_name, name, sizeof (thread->sth_name));
-	thread->sth_ep = ep;
-	thread->sth_ep_arg = ep_arg;
-	thread->sth_state = SMB_THREAD_STATE_EXITED;
-	mutex_init(&thread->sth_mtx, NULL, MUTEX_DEFAULT, NULL);
-	cv_init(&thread->sth_cv, NULL, CV_DEFAULT, NULL);
-	thread->sth_magic = SMB_THREAD_MAGIC;
-}
-
-/*
- * smb_thread_destroy
- */
-void
-smb_thread_destroy(
-    smb_thread_t	*thread)
-{
-	ASSERT(thread->sth_magic == SMB_THREAD_MAGIC);
-	ASSERT(thread->sth_state == SMB_THREAD_STATE_EXITED);
-	thread->sth_magic = 0;
-	mutex_destroy(&thread->sth_mtx);
-	cv_destroy(&thread->sth_cv);
-}
-
-/*
- * smb_thread_start
- *
- * This function starts a thread with the parameters provided. It waits until
- * the state of the thread has been moved to running.
- */
-/*ARGSUSED*/
-int
-smb_thread_start(
-    smb_thread_t	*thread)
-{
-	int		rc = 0;
-	kthread_t	*tmpthread;
-
-	ASSERT(thread->sth_magic == SMB_THREAD_MAGIC);
-
-	mutex_enter(&thread->sth_mtx);
-	switch (thread->sth_state) {
-	case SMB_THREAD_STATE_EXITED:
-		thread->sth_state = SMB_THREAD_STATE_STARTING;
-		mutex_exit(&thread->sth_mtx);
-		tmpthread = thread_create(NULL, 0, smb_thread_entry_point,
-		    thread, 0, &p0, TS_RUN, minclsyspri);
-		ASSERT(tmpthread != NULL);
-		mutex_enter(&thread->sth_mtx);
-		while (thread->sth_state == SMB_THREAD_STATE_STARTING)
-			cv_wait(&thread->sth_cv, &thread->sth_mtx);
-		if (thread->sth_state != SMB_THREAD_STATE_RUNNING)
-			rc = -1;
-		break;
-	default:
-		ASSERT(0);
-		rc = -1;
-		break;
-	}
-	mutex_exit(&thread->sth_mtx);
-	return (rc);
-}
-
-/*
- * smb_thread_stop
- *
- * This function signals a thread to kill itself and waits until the "exiting"
- * state has been reached.
- */
-void
-smb_thread_stop(smb_thread_t *thread)
-{
-	ASSERT(thread->sth_magic == SMB_THREAD_MAGIC);
-
-	mutex_enter(&thread->sth_mtx);
-	switch (thread->sth_state) {
-	case SMB_THREAD_STATE_RUNNING:
-	case SMB_THREAD_STATE_STARTING:
-		if (!thread->sth_kill) {
-			thread->sth_kill = B_TRUE;
-			cv_broadcast(&thread->sth_cv);
-			while (thread->sth_state != SMB_THREAD_STATE_EXITING)
-				cv_wait(&thread->sth_cv, &thread->sth_mtx);
-			mutex_exit(&thread->sth_mtx);
-			thread_join(thread->sth_did);
-			mutex_enter(&thread->sth_mtx);
-			thread->sth_state = SMB_THREAD_STATE_EXITED;
-			thread->sth_did = 0;
-			thread->sth_kill = B_FALSE;
-			cv_broadcast(&thread->sth_cv);
-			break;
-		}
-		/*FALLTHRU*/
-
-	case SMB_THREAD_STATE_EXITING:
-		if (thread->sth_kill) {
-			while (thread->sth_state != SMB_THREAD_STATE_EXITED)
-				cv_wait(&thread->sth_cv, &thread->sth_mtx);
-		} else {
-			thread->sth_state = SMB_THREAD_STATE_EXITED;
-			thread->sth_did = 0;
-		}
-		break;
-
-	case SMB_THREAD_STATE_EXITED:
-		break;
-
-	default:
-		ASSERT(0);
-		break;
-	}
-	mutex_exit(&thread->sth_mtx);
-}
-
-/*
- * smb_thread_signal
- *
- * This function signals a thread.
- */
-void
-smb_thread_signal(smb_thread_t *thread)
-{
-	ASSERT(thread->sth_magic == SMB_THREAD_MAGIC);
-
-	mutex_enter(&thread->sth_mtx);
-	switch (thread->sth_state) {
-	case SMB_THREAD_STATE_RUNNING:
-		cv_signal(&thread->sth_cv);
-		break;
-
-	default:
-		break;
-	}
-	mutex_exit(&thread->sth_mtx);
-}
-
-boolean_t
-smb_thread_continue(smb_thread_t *thread)
-{
-	boolean_t result;
-
-	ASSERT(thread->sth_magic == SMB_THREAD_MAGIC);
-
-	mutex_enter(&thread->sth_mtx);
-	result = smb_thread_continue_timedwait_locked(thread, 0);
-	mutex_exit(&thread->sth_mtx);
-
-	return (result);
-}
-
-boolean_t
-smb_thread_continue_nowait(smb_thread_t *thread)
-{
-	boolean_t result;
-
-	ASSERT(thread->sth_magic == SMB_THREAD_MAGIC);
-
-	mutex_enter(&thread->sth_mtx);
-	/*
-	 * Setting ticks=-1 requests a non-blocking check.  We will
-	 * still block if the thread is in "suspend" state.
-	 */
-	result = smb_thread_continue_timedwait_locked(thread, -1);
-	mutex_exit(&thread->sth_mtx);
-
-	return (result);
-}
-
-boolean_t
-smb_thread_continue_timedwait(smb_thread_t *thread, int seconds)
-{
-	boolean_t result;
-
-	ASSERT(thread->sth_magic == SMB_THREAD_MAGIC);
-
-	mutex_enter(&thread->sth_mtx);
-	result = smb_thread_continue_timedwait_locked(thread,
-	    SEC_TO_TICK(seconds));
-	mutex_exit(&thread->sth_mtx);
-
-	return (result);
-}
-
-/*
- * smb_thread_continue_timedwait_locked
- *
- * Internal only.  Ticks==-1 means don't block, Ticks == 0 means wait
- * indefinitely
- */
-static boolean_t
-smb_thread_continue_timedwait_locked(smb_thread_t *thread, int ticks)
-{
-	boolean_t	result;
-
-	/* -1 means don't block */
-	if (ticks != -1 && !thread->sth_kill) {
-		if (ticks == 0) {
-			cv_wait(&thread->sth_cv, &thread->sth_mtx);
-		} else {
-			(void) cv_reltimedwait(&thread->sth_cv,
-			    &thread->sth_mtx, (clock_t)ticks, TR_CLOCK_TICK);
-		}
-	}
-	result = (thread->sth_kill == 0);
-
-	return (result);
-}
+/* smb_thread_... moved to smb_thread.c */
 
 /*
  * smb_rwx_init
@@ -1125,8 +860,8 @@ smb_rwx_rwwait(
     smb_rwx_t	*rwx,
     clock_t	timeout)
 {
-	int	rc;
 	krw_t	mode;
+	int	rc = 1;
 
 	mutex_enter(&rwx->rwx_mutex);
 	rwx->rwx_waiting = B_TRUE;
@@ -1144,7 +879,6 @@ smb_rwx_rwwait(
 	mutex_enter(&rwx->rwx_mutex);
 	if (rwx->rwx_waiting) {
 		if (timeout == -1) {
-			rc = 1;
 			cv_wait(&rwx->rwx_cv, &rwx->rwx_mutex);
 		} else {
 			rc = cv_reltimedwait(&rwx->rwx_cv, &rwx->rwx_mutex,
@@ -1157,361 +891,7 @@ smb_rwx_rwwait(
 	return (rc);
 }
 
-/*
- * SMB ID mapping
- *
- * Solaris ID mapping service (aka Winchester) works with domain SIDs
- * and RIDs where domain SIDs are in string format. CIFS service works
- * with binary SIDs understandable by CIFS clients. A layer of SMB ID
- * mapping functions are implemeted to hide the SID conversion details
- * and also hide the handling of array of batch mapping requests.
- *
- * IMPORTANT NOTE The Winchester API requires a zone. Because CIFS server
- * currently only runs in the global zone the global zone is specified.
- * This needs to be fixed when the CIFS server supports zones.
- */
-
-static int smb_idmap_batch_binsid(smb_idmap_batch_t *sib);
-
-/*
- * smb_idmap_getid
- *
- * Maps the given Windows SID to a Solaris ID using the
- * simple mapping API.
- */
-idmap_stat
-smb_idmap_getid(smb_sid_t *sid, uid_t *id, int *idtype)
-{
-	smb_idmap_t sim;
-	char sidstr[SMB_SID_STRSZ];
-
-	smb_sid_tostr(sid, sidstr);
-	if (smb_sid_splitstr(sidstr, &sim.sim_rid) != 0)
-		return (IDMAP_ERR_SID);
-	sim.sim_domsid = sidstr;
-	sim.sim_id = id;
-
-	switch (*idtype) {
-	case SMB_IDMAP_USER:
-		sim.sim_stat = kidmap_getuidbysid(global_zone, sim.sim_domsid,
-		    sim.sim_rid, sim.sim_id);
-		break;
-
-	case SMB_IDMAP_GROUP:
-		sim.sim_stat = kidmap_getgidbysid(global_zone, sim.sim_domsid,
-		    sim.sim_rid, sim.sim_id);
-		break;
-
-	case SMB_IDMAP_UNKNOWN:
-		sim.sim_stat = kidmap_getpidbysid(global_zone, sim.sim_domsid,
-		    sim.sim_rid, sim.sim_id, &sim.sim_idtype);
-		break;
-
-	default:
-		ASSERT(0);
-		return (IDMAP_ERR_ARG);
-	}
-
-	*idtype = sim.sim_idtype;
-
-	return (sim.sim_stat);
-}
-
-/*
- * smb_idmap_getsid
- *
- * Maps the given Solaris ID to a Windows SID using the
- * simple mapping API.
- */
-idmap_stat
-smb_idmap_getsid(uid_t id, int idtype, smb_sid_t **sid)
-{
-	smb_idmap_t sim;
-
-	switch (idtype) {
-	case SMB_IDMAP_USER:
-		sim.sim_stat = kidmap_getsidbyuid(global_zone, id,
-		    (const char **)&sim.sim_domsid, &sim.sim_rid);
-		break;
-
-	case SMB_IDMAP_GROUP:
-		sim.sim_stat = kidmap_getsidbygid(global_zone, id,
-		    (const char **)&sim.sim_domsid, &sim.sim_rid);
-		break;
-
-	case SMB_IDMAP_EVERYONE:
-		/* Everyone S-1-1-0 */
-		sim.sim_domsid = "S-1-1";
-		sim.sim_rid = 0;
-		sim.sim_stat = IDMAP_SUCCESS;
-		break;
-
-	default:
-		ASSERT(0);
-		return (IDMAP_ERR_ARG);
-	}
-
-	if (sim.sim_stat != IDMAP_SUCCESS)
-		return (sim.sim_stat);
-
-	if (sim.sim_domsid == NULL)
-		return (IDMAP_ERR_NOMAPPING);
-
-	sim.sim_sid = smb_sid_fromstr(sim.sim_domsid);
-	if (sim.sim_sid == NULL)
-		return (IDMAP_ERR_INTERNAL);
-
-	*sid = smb_sid_splice(sim.sim_sid, sim.sim_rid);
-	smb_sid_free(sim.sim_sid);
-	if (*sid == NULL)
-		sim.sim_stat = IDMAP_ERR_INTERNAL;
-
-	return (sim.sim_stat);
-}
-
-/*
- * smb_idmap_batch_create
- *
- * Creates and initializes the context for batch ID mapping.
- */
-idmap_stat
-smb_idmap_batch_create(smb_idmap_batch_t *sib, uint16_t nmap, int flags)
-{
-	ASSERT(sib);
-
-	bzero(sib, sizeof (smb_idmap_batch_t));
-
-	sib->sib_idmaph = kidmap_get_create(global_zone);
-
-	sib->sib_flags = flags;
-	sib->sib_nmap = nmap;
-	sib->sib_size = nmap * sizeof (smb_idmap_t);
-	sib->sib_maps = kmem_zalloc(sib->sib_size, KM_SLEEP);
-
-	return (IDMAP_SUCCESS);
-}
-
-/*
- * smb_idmap_batch_destroy
- *
- * Frees the batch ID mapping context.
- * If ID mapping is Solaris -> Windows it frees memories
- * allocated for binary SIDs.
- */
-void
-smb_idmap_batch_destroy(smb_idmap_batch_t *sib)
-{
-	char *domsid;
-	int i;
-
-	ASSERT(sib);
-	ASSERT(sib->sib_maps);
-
-	if (sib->sib_idmaph)
-		kidmap_get_destroy(sib->sib_idmaph);
-
-	if (sib->sib_flags & SMB_IDMAP_ID2SID) {
-		/*
-		 * SIDs are allocated only when mapping
-		 * UID/GID to SIDs
-		 */
-		for (i = 0; i < sib->sib_nmap; i++)
-			smb_sid_free(sib->sib_maps[i].sim_sid);
-	} else if (sib->sib_flags & SMB_IDMAP_SID2ID) {
-		/*
-		 * SID prefixes are allocated only when mapping
-		 * SIDs to UID/GID
-		 */
-		for (i = 0; i < sib->sib_nmap; i++) {
-			domsid = sib->sib_maps[i].sim_domsid;
-			if (domsid)
-				smb_mem_free(domsid);
-		}
-	}
-
-	if (sib->sib_size && sib->sib_maps)
-		kmem_free(sib->sib_maps, sib->sib_size);
-}
-
-/*
- * smb_idmap_batch_getid
- *
- * Queue a request to map the given SID to a UID or GID.
- *
- * sim->sim_id should point to variable that's supposed to
- * hold the returned UID/GID. This needs to be setup by caller
- * of this function.
- *
- * If requested ID type is known, it's passed as 'idtype',
- * if it's unknown it'll be returned in sim->sim_idtype.
- */
-idmap_stat
-smb_idmap_batch_getid(idmap_get_handle_t *idmaph, smb_idmap_t *sim,
-    smb_sid_t *sid, int idtype)
-{
-	char strsid[SMB_SID_STRSZ];
-	idmap_stat idm_stat;
-
-	ASSERT(idmaph);
-	ASSERT(sim);
-	ASSERT(sid);
-
-	smb_sid_tostr(sid, strsid);
-	if (smb_sid_splitstr(strsid, &sim->sim_rid) != 0)
-		return (IDMAP_ERR_SID);
-	sim->sim_domsid = smb_mem_strdup(strsid);
-
-	switch (idtype) {
-	case SMB_IDMAP_USER:
-		idm_stat = kidmap_batch_getuidbysid(idmaph, sim->sim_domsid,
-		    sim->sim_rid, sim->sim_id, &sim->sim_stat);
-		break;
-
-	case SMB_IDMAP_GROUP:
-		idm_stat = kidmap_batch_getgidbysid(idmaph, sim->sim_domsid,
-		    sim->sim_rid, sim->sim_id, &sim->sim_stat);
-		break;
-
-	case SMB_IDMAP_UNKNOWN:
-		idm_stat = kidmap_batch_getpidbysid(idmaph, sim->sim_domsid,
-		    sim->sim_rid, sim->sim_id, &sim->sim_idtype,
-		    &sim->sim_stat);
-		break;
-
-	default:
-		ASSERT(0);
-		return (IDMAP_ERR_ARG);
-	}
-
-	return (idm_stat);
-}
-
-/*
- * smb_idmap_batch_getsid
- *
- * Queue a request to map the given UID/GID to a SID.
- *
- * sim->sim_domsid and sim->sim_rid will contain the mapping
- * result upon successful process of the batched request.
- */
-idmap_stat
-smb_idmap_batch_getsid(idmap_get_handle_t *idmaph, smb_idmap_t *sim,
-    uid_t id, int idtype)
-{
-	idmap_stat idm_stat;
-
-	switch (idtype) {
-	case SMB_IDMAP_USER:
-		idm_stat = kidmap_batch_getsidbyuid(idmaph, id,
-		    (const char **)&sim->sim_domsid, &sim->sim_rid,
-		    &sim->sim_stat);
-		break;
-
-	case SMB_IDMAP_GROUP:
-		idm_stat = kidmap_batch_getsidbygid(idmaph, id,
-		    (const char **)&sim->sim_domsid, &sim->sim_rid,
-		    &sim->sim_stat);
-		break;
-
-	case SMB_IDMAP_OWNERAT:
-		/* Current Owner S-1-5-32-766 */
-		sim->sim_domsid = NT_BUILTIN_DOMAIN_SIDSTR;
-		sim->sim_rid = SECURITY_CURRENT_OWNER_RID;
-		sim->sim_stat = IDMAP_SUCCESS;
-		idm_stat = IDMAP_SUCCESS;
-		break;
-
-	case SMB_IDMAP_GROUPAT:
-		/* Current Group S-1-5-32-767 */
-		sim->sim_domsid = NT_BUILTIN_DOMAIN_SIDSTR;
-		sim->sim_rid = SECURITY_CURRENT_GROUP_RID;
-		sim->sim_stat = IDMAP_SUCCESS;
-		idm_stat = IDMAP_SUCCESS;
-		break;
-
-	case SMB_IDMAP_EVERYONE:
-		/* Everyone S-1-1-0 */
-		sim->sim_domsid = NT_WORLD_AUTH_SIDSTR;
-		sim->sim_rid = 0;
-		sim->sim_stat = IDMAP_SUCCESS;
-		idm_stat = IDMAP_SUCCESS;
-		break;
-
-	default:
-		ASSERT(0);
-		return (IDMAP_ERR_ARG);
-	}
-
-	return (idm_stat);
-}
-
-/*
- * smb_idmap_batch_binsid
- *
- * Convert sidrids to binary sids
- *
- * Returns 0 if successful and non-zero upon failure.
- */
-static int
-smb_idmap_batch_binsid(smb_idmap_batch_t *sib)
-{
-	smb_sid_t *sid;
-	smb_idmap_t *sim;
-	int i;
-
-	if (sib->sib_flags & SMB_IDMAP_SID2ID)
-		/* This operation is not required */
-		return (0);
-
-	sim = sib->sib_maps;
-	for (i = 0; i < sib->sib_nmap; sim++, i++) {
-		ASSERT(sim->sim_domsid);
-		if (sim->sim_domsid == NULL)
-			return (1);
-
-		if ((sid = smb_sid_fromstr(sim->sim_domsid)) == NULL)
-			return (1);
-
-		sim->sim_sid = smb_sid_splice(sid, sim->sim_rid);
-		smb_sid_free(sid);
-	}
-
-	return (0);
-}
-
-/*
- * smb_idmap_batch_getmappings
- *
- * trigger ID mapping service to get the mappings for queued
- * requests.
- *
- * Checks the result of all the queued requests.
- * If this is a Solaris -> Windows mapping it generates
- * binary SIDs from returned (domsid, rid) pairs.
- */
-idmap_stat
-smb_idmap_batch_getmappings(smb_idmap_batch_t *sib)
-{
-	idmap_stat idm_stat = IDMAP_SUCCESS;
-	int i;
-
-	idm_stat = kidmap_get_mappings(sib->sib_idmaph);
-	if (idm_stat != IDMAP_SUCCESS)
-		return (idm_stat);
-
-	/*
-	 * Check the status for all the queued requests
-	 */
-	for (i = 0; i < sib->sib_nmap; i++) {
-		if (sib->sib_maps[i].sim_stat != IDMAP_SUCCESS)
-			return (sib->sib_maps[i].sim_stat);
-	}
-
-	if (smb_idmap_batch_binsid(sib) != 0)
-		idm_stat = IDMAP_ERR_OTHER;
-
-	return (idm_stat);
-}
+/* smb_idmap_... moved to smb_idmap.c */
 
 uint64_t
 smb_time_unix_to_nt(timestruc_t *unix_time)
@@ -1537,6 +917,18 @@ smb_time_nt_to_unix(uint64_t nt_time, timestruc_t *unix_time)
 	if ((nt_time == 0) || (nt_time == -1)) {
 		unix_time->tv_sec = 0;
 		unix_time->tv_nsec = 0;
+		return;
+	}
+
+	/*
+	 * Can't represent times less than or equal NT_TIME_BIAS,
+	 * so convert them to the oldest date we can store.
+	 * Note that time zero is "special" being converted
+	 * both directions as 0:0 (unix-to-nt, nt-to-unix).
+	 */
+	if (nt_time <= NT_TIME_BIAS) {
+		unix_time->tv_sec = 0;
+		unix_time->tv_nsec = 100;
 		return;
 	}
 
@@ -1799,7 +1191,8 @@ smb_panic(char *file, const char *func, int line)
  * structure using the passed args
  */
 void
-smb_avl_create(smb_avl_t *avl, size_t size, size_t offset, smb_avl_nops_t *ops)
+smb_avl_create(smb_avl_t *avl, size_t size, size_t offset,
+	const smb_avl_nops_t *ops)
 {
 	ASSERT(avl);
 	ASSERT(ops);
@@ -2254,109 +1647,77 @@ smb_srqueue_update(smb_srqueue_t *srq, smb_kstat_utilization_t *kd)
 }
 
 void
-smb_threshold_init(smb_cmd_threshold_t *ct, char *cmd, int threshold,
-    int timeout)
+smb_threshold_init(smb_cmd_threshold_t *ct, char *cmd,
+    uint_t threshold, uint_t timeout)
 {
 	bzero(ct, sizeof (smb_cmd_threshold_t));
 	mutex_init(&ct->ct_mutex, NULL, MUTEX_DEFAULT, NULL);
+	cv_init(&ct->ct_cond, NULL, CV_DEFAULT, NULL);
+
 	ct->ct_cmd = cmd;
 	ct->ct_threshold = threshold;
-	ct->ct_event = smb_event_create(timeout);
-	ct->ct_event_id = smb_event_txid(ct->ct_event);
-
-	if (smb_threshold_debug) {
-		cmn_err(CE_NOTE, "smb_threshold_init[%s]: threshold (%d), "
-		    "timeout (%d)", cmd, threshold, timeout);
-	}
+	ct->ct_timeout = timeout;
 }
 
-/*
- * This function must be called prior to SMB_SERVER_STATE_STOPPING state
- * so that ct_event can be successfully removed from the event list.
- * It should not be called when the server mutex is held or when the
- * server is removed from the server list.
- */
 void
 smb_threshold_fini(smb_cmd_threshold_t *ct)
 {
-	smb_event_destroy(ct->ct_event);
+	cv_destroy(&ct->ct_cond);
 	mutex_destroy(&ct->ct_mutex);
-	bzero(ct, sizeof (smb_cmd_threshold_t));
 }
 
 /*
- * This threshold mechanism can be used to limit the number of simultaneous
- * requests, which serves to limit the stress that can be applied to the
- * service and also allows the service to respond to requests before the
- * client times out and reports that the server is not responding,
- *
- * If the number of requests exceeds the threshold, new requests will be
- * stalled until the number drops back to the threshold.  Stalled requests
- * will be notified as appropriate, in which case 0 will be returned.
- * If the timeout expires before the request is notified, a non-zero errno
- * value will be returned.
- *
- * To avoid a flood of messages, the message rate is throttled as well.
+ * This threshold mechanism is used to limit the number of simultaneous
+ * named pipe connections, concurrent authentication conversations, etc.
+ * Requests that would take us over the threshold wait until either the
+ * resources are available (return zero) or timeout (return error).
  */
 int
 smb_threshold_enter(smb_cmd_threshold_t *ct)
 {
-	int	rc;
+	clock_t	time, rem;
 
+	time = MSEC_TO_TICK(ct->ct_timeout) + ddi_get_lbolt();
 	mutex_enter(&ct->ct_mutex);
-	if (ct->ct_active_cnt >= ct->ct_threshold && ct->ct_event != NULL) {
-		atomic_inc_32(&ct->ct_blocked_cnt);
 
-		if (smb_threshold_debug) {
-			cmn_err(CE_NOTE, "smb_threshold_enter[%s]: blocked "
-			    "(blocked ops: %u, inflight ops: %u)",
-			    ct->ct_cmd, ct->ct_blocked_cnt, ct->ct_active_cnt);
-		}
-
-		mutex_exit(&ct->ct_mutex);
-
-		if ((rc = smb_event_wait(ct->ct_event)) != 0) {
-			if (rc == ECANCELED)
-				return (rc);
-
-			mutex_enter(&ct->ct_mutex);
-			if (ct->ct_active_cnt >= ct->ct_threshold) {
-
-				if ((ct->ct_error_cnt %
-				    SMB_THRESHOLD_REPORT_THROTTLE) == 0) {
-					cmn_err(CE_NOTE, "%s: server busy: "
-					    "threshold %d exceeded)",
-					    ct->ct_cmd, ct->ct_threshold);
-				}
-
-				atomic_inc_32(&ct->ct_error_cnt);
-				mutex_exit(&ct->ct_mutex);
-				return (rc);
-			}
-
+	while (ct->ct_threshold != 0 &&
+	    ct->ct_threshold <= ct->ct_active_cnt) {
+		ct->ct_blocked_cnt++;
+		rem = cv_timedwait(&ct->ct_cond, &ct->ct_mutex, time);
+		ct->ct_blocked_cnt--;
+		if (rem < 0) {
 			mutex_exit(&ct->ct_mutex);
-
-		}
-
-		mutex_enter(&ct->ct_mutex);
-		atomic_dec_32(&ct->ct_blocked_cnt);
-		if (smb_threshold_debug) {
-			cmn_err(CE_NOTE, "smb_threshold_enter[%s]: resumed "
-			    "(blocked ops: %u, inflight ops: %u)", ct->ct_cmd,
-			    ct->ct_blocked_cnt, ct->ct_active_cnt);
+			return (ETIME);
 		}
 	}
+	if (ct->ct_threshold == 0) {
+		mutex_exit(&ct->ct_mutex);
+		return (ECANCELED);
+	}
 
-	atomic_inc_32(&ct->ct_active_cnt);
+	ASSERT3U(ct->ct_active_cnt, <, ct->ct_threshold);
+	ct->ct_active_cnt++;
+
 	mutex_exit(&ct->ct_mutex);
 	return (0);
 }
 
 void
-smb_threshold_exit(smb_cmd_threshold_t *ct, smb_server_t *sv)
+smb_threshold_exit(smb_cmd_threshold_t *ct)
 {
 	mutex_enter(&ct->ct_mutex);
-	atomic_dec_32(&ct->ct_active_cnt);
+	ASSERT3U(ct->ct_active_cnt, >, 0);
+	ct->ct_active_cnt--;
+	if (ct->ct_blocked_cnt)
+		cv_signal(&ct->ct_cond);
 	mutex_exit(&ct->ct_mutex);
-	smb_event_notify(sv, ct->ct_event_id);
+}
+
+void
+smb_threshold_wake_all(smb_cmd_threshold_t *ct)
+{
+	mutex_enter(&ct->ct_mutex);
+	ct->ct_threshold = 0;
+	cv_broadcast(&ct->ct_cond);
+	mutex_exit(&ct->ct_mutex);
 }

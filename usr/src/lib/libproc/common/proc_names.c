@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1997, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015, Joyent, Inc.  All rights reserved.
  */
 
 #include <stdio.h>
@@ -235,10 +236,10 @@ static const char *const systable[] = {
 	"fchdir",		/* 120 */
 	"readv",		/* 121 */
 	"writev",		/* 122 */
-	NULL,			/* 123 */
-	NULL,			/* 124 */
+	"preadv",		/* 123 */
+	"pwritev",		/* 124 */
 	NULL,			/* 125 */
-	NULL,			/* 126 */
+	"getrandom",		/* 126 */
 	"mmapobj",		/* 127 */
 	"setrlimit",		/* 128 */
 	"getrlimit",		/* 129 */

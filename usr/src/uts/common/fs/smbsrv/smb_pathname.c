@@ -555,7 +555,7 @@ smb_pathname_lookup(pathname_t *pn, pathname_t *rpn, int flags,
 
 	err = lookuppnvp(pn, rpn, flags, NULL, vp, rootvp, dvp, cred);
 	if ((err == 0) && (attr != NULL))
-		(void) smb_vop_getattr(*vp, NULL, attr, 0, kcred);
+		(void) smb_vop_getattr(*vp, NULL, attr, 0, zone_kcred());
 
 	return (err);
 }
@@ -628,7 +628,7 @@ smb_lookuppathvptovp(smb_request_t *sr, char *path, vnode_t *startvp,
 
 		/* lookuppnvp should release the holds */
 		if (lookuppnvp(&pn, NULL, lookup_flags, NULL, &vp,
-		    rootvp, startvp, kcred) != 0) {
+		    rootvp, startvp, zone_kcred()) != 0) {
 			pn_free(&pn);
 			return (NULL);
 		}

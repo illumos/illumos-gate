@@ -2,60 +2,60 @@
 .\" To view license terms, attribution, and copyright for IP Filter, the default path is /usr/lib/ipf/IPFILTER.LICENCE. If the Solaris operating environment has been installed anywhere other than the default, modify the given path to access the file at the installed
 .\" location.
 .\" Portions Copyright (c) 2008, Sun Microsystems Inc. All Rights Reserved.
-.TH IPPOOL 1M "Apr 3, 2008"
+.\" Portions Copyright (c) 2012, Joyent, Inc. All Rights Reserved.
+.TH IPPOOL 1M "Nov 26, 2012"
 .SH NAME
 ippool \- user interface to the IP Filter pools
 .SH SYNOPSIS
 .LP
 .nf
-\fBippool\fR \fB-a\fR [\fB-dnv\fR] [\fB-m\fR \fIpoolname\fR] [\fB-o\fR \fIrole\fR] \fB-i\fR \fIipaddr\fR
+\fBippool\fR \fB-a\fR [\fB-dnv\fR] [\fB-G\fR | \fB-z\fR \fIzonename\fR] [\fB-m\fR \fIpoolname\fR] [\fB-o\fR \fIrole\fR] \fB-i\fR \fIipaddr\fR
      [/\fInetmask\fR]
 .fi
 
 .LP
 .nf
-\fBippool\fR \fB-A\fR [\fB-dnv\fR] [\fB-m\fR \fIpoolname\fR] [\fB-o\fR \fIrole\fR] [\fB-S\fR \fIseed\fR]
+\fBippool\fR \fB-A\fR [\fB-dnv\fR] [\fB-G\fR | \fB-z\fR \fIzonename\fR] [\fB-m\fR \fIpoolname\fR] [\fB-o\fR \fIrole\fR] [\fB-S\fR \fIseed\fR]
      [\fB-t\fR \fItype\fR]
 .fi
 
 .LP
 .nf
-\fBippool\fR \fB-f\fR \fIfile\fR [\fB-dnuv\fR]
+\fBippool\fR \fB-f\fR \fIfile\fR [\fB-G\fR | \fB-z\fR \fIzonename\fR] [\fB-dnuv\fR]
 .fi
 
 .LP
 .nf
-\fBippool\fR \fB-F\fR [\fB-dv\fR] [\fB-o\fR \fIrole\fR] [\fB-t\fR \fItype\fR]
+\fBippool\fR \fB-F\fR [\fB-dv\fR] [\fB-G\fR | \fB-z\fR \fIzonename\fR] [\fB-o\fR \fIrole\fR] [\fB-t\fR \fItype\fR]
 .fi
 
 .LP
 .nf
-\fBippool\fR \fB-h\fR [\fB-dv\fR] [\fB-m\fR \fIpoolname\fR] [\fB-t\fR \fItype\fR]
+\fBippool\fR \fB-h\fR [\fB-dv\fR] [\fB-G\fR | \fB-z\fR \fIzonename\fR] [\fB-m\fR \fIpoolname\fR] [\fB-t\fR \fItype\fR]
 .fi
 
 .LP
 .nf
-\fBippool\fR \fB-l\fR [\fB-dv\fR] [\fB-m\fR \fIpoolname\fR] [\fB-t\fR \fItype\fR]
+\fBippool\fR \fB-l\fR [\fB-dv\fR] [\fB-G\fR | \fB-z\fR \fIzonename\fR] [\fB-m\fR \fIpoolname\fR] [\fB-t\fR \fItype\fR]
 .fi
 
 .LP
 .nf
-\fBippool\fR \fB-r\fR [\fB-dnv\fR] [\fB-m\fR \fIpoolname\fR] [\fB-o\fR \fIrole\fR] \fB-i\fR \fIipaddr\fR
+\fBippool\fR \fB-r\fR [\fB-dnv\fR] [\fB-G\fR | \fB-z\fR \fIzonename\fR] [\fB-m\fR \fIpoolname\fR] [\fB-o\fR \fIrole\fR] \fB-i\fR \fIipaddr\fR
      [/\fInetmask\fR]
 .fi
 
 .LP
 .nf
-\fBippool\fR \fB-R\fR [\fB-dnv\fR] [\fB-m\fR \fIpoolname\fR] [\fB-o\fR \fIrole\fR] [\fB-t\fR \fItype\fR]
+\fBippool\fR \fB-R\fR [\fB-dnv\fR] [\fB-G\fR | \fB-z\fR \fIzonename\fR] [\fB-m\fR \fIpoolname\fR] [\fB-o\fR \fIrole\fR] [\fB-t\fR \fItype\fR]
 .fi
 
 .LP
 .nf
-\fBippool\fR \fB-s\fR [\fB-dtv\fR] [\fB-M\fR \fIcore\fR] [\fB-N\fR \fInamelist\fR]
+\fBippool\fR \fB-s\fR [\fB-dtv\fR] [\fB-G\fR | \fB-z\fR \fIzonename\fR] [\fB-M\fR \fIcore\fR] [\fB-N\fR \fInamelist\fR]
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBippool\fR utility is used to manage information stored in the IP pools
 subsystem of IP Filter software. Configuration file information can be parsed
@@ -76,11 +76,9 @@ and the instance-specific options.
 \fB/dev/ipl\fR, and \fB/dev/ipstate\fR. The default permissions of these files
 require \fBippool\fR to be run as root for all operations.
 .SH OPTIONS
-.sp
 .LP
 \fBippool\fR supports the option categories described below.
 .SS "Global Options"
-.sp
 .LP
 The following global options are supported:
 .sp
@@ -111,8 +109,31 @@ would alter the currently running kernel.
 Turn verbose mode on.
 .RE
 
-.SS "Instance-Specific Options"
 .sp
+.ne 2
+.na
+\fB\fB-z\fR \fIzonename\fR\fR
+.ad
+.RS 6n
+Manage the specified zone's in-zone IP pools. If neither this option nor
+\fB-G\fR is specified, the current zone is used. This command is only
+available in the Global Zone. See \fBZONES\fR in \fBipf\fR(1m) for more
+information.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-G\fR \fIzonename\fR\fR
+.ad
+.RS 6n
+Manage the specified zone's global zone controlled IP pools. If neither this
+option nor \fB-z\fR is specified, the current zone is used. This command is
+only available in the Global Zone. See \fBZONES\fR in \fBipf\fR(1m) for more
+information.
+.RE
+
+.SS "Instance-Specific Options"
 .LP
 The following instance-specific options are supported:
 .sp
@@ -198,7 +219,6 @@ Display IP pool statistical information.
 .RE
 
 .SS "Other Options"
-.sp
 .LP
 The following, additional options are supported:
 .sp
@@ -282,7 +302,6 @@ kernel, unload it.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/dev/ippool\fR\fR
@@ -310,7 +329,6 @@ Location of \fBippool\fR startup configuration file.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -326,6 +344,6 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBipf\fR(1M), \fBipfstat\fR(1M), \fBippool\fR(4), \fBattributes\fR(5)
+\fBipf\fR(1M), \fBipfstat\fR(1M), \fBippool\fR(4), \fBattributes\fR(5),
+\fBzones(5)\fR

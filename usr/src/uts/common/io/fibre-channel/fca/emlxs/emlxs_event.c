@@ -5,8 +5,8 @@
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
  *
- * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
+ * You can obtain a copy of the license at
+ * http://www.opensource.org/licenses/cddl1.txt.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -20,10 +20,9 @@
  */
 
 /*
- * Copyright 2010 Emulex.  All rights reserved.
+ * Copyright (c) 2004-2012 Emulex. All rights reserved.
  * Use is subject to license terms.
  */
-
 
 #define	DEF_EVENT_STRUCT  /* Needed for emlxs_events.h in emlxs_event.h */
 #include <emlxs.h>
@@ -65,18 +64,12 @@ extern uint32_t
 emlxs_event_queue_create(emlxs_hba_t *hba)
 {
 	emlxs_event_queue_t *eventq = &EVENTQ;
-	char buf[40];
 	ddi_iblock_cookie_t iblock;
 
 	/* Clear the queue */
 	bzero(eventq, sizeof (emlxs_event_queue_t));
 
-	/* Initialize */
-	(void) sprintf(buf, "?%s%d_evt_lock control variable", DRIVER_NAME,
-	    hba->ddiinst);
-	cv_init(&eventq->lock_cv, buf, CV_DRIVER, NULL);
-
-	(void) sprintf(buf, "?%s%d_evt_lock mutex", DRIVER_NAME, hba->ddiinst);
+	cv_init(&eventq->lock_cv, NULL, CV_DRIVER, NULL);
 
 	if (!(hba->intr_flags & EMLXS_MSI_ENABLED)) {
 		/* Get the current interrupt block cookie */
@@ -84,12 +77,12 @@ emlxs_event_queue_create(emlxs_hba_t *hba)
 		    &iblock);
 
 		/* Create the mutex lock */
-		mutex_init(&eventq->lock, buf, MUTEX_DRIVER, (void *)iblock);
+		mutex_init(&eventq->lock, NULL, MUTEX_DRIVER, (void *)iblock);
 	}
 #ifdef  MSI_SUPPORT
 	else {
 		/* Create event mutex lock */
-		mutex_init(&eventq->lock, buf, MUTEX_DRIVER,
+		mutex_init(&eventq->lock, NULL, MUTEX_DRIVER,
 		    DDI_INTR_PRI(hba->intr_arg));
 	}
 #endif
@@ -130,7 +123,7 @@ emlxs_event_queue_destroy(emlxs_hba_t *hba)
 		cv_broadcast(&eventq->lock_cv);
 
 		mutex_exit(&eventq->lock);
-		DELAYMS(10);
+		BUSYWAIT_MS(10);
 		mutex_enter(&eventq->lock);
 	}
 
@@ -198,7 +191,9 @@ emlxs_event_destroy(emlxs_hba_t *hba, emlxs_event_entry_t *entry)
 	    entry->evt->label, entry->id, entry->flag, missed, eventq->count);
 
 	/* Call notification handler */
-	entry->evt->destroy(entry);
+	if (entry->evt->destroy != emlxs_null_func) {
+		entry->evt->destroy(entry);
+	}
 
 	/* Free context buffer */
 	if (entry->bp && entry->size) {
@@ -251,6 +246,11 @@ emlxs_event(emlxs_port_t *port, emlxs_event_t *evt, void *bp, uint32_t size)
 		entry->timer = entry->timestamp + evt->timeout;
 	}
 
+	/* Eventq id starts with 1 */
+	if (eventq->next_id == 0) {
+		eventq->next_id = 1;
+	}
+
 	/* Set the event id */
 	entry->id = eventq->next_id++;
 
@@ -294,11 +294,8 @@ emlxs_event(emlxs_port_t *port, emlxs_event_t *evt, void *bp, uint32_t size)
 
 failed:
 
-	/* Call notification handler */
-	entry->evt->destroy(entry);
-
-	if (entry->bp && entry->size) {
-		kmem_free(entry->bp, entry->size);
+	if (bp && size) {
+		kmem_free(bp, size);
 	}
 
 	return;
@@ -435,6 +432,42 @@ emlxs_log_vportrscn_event(emlxs_port_t *port, uint8_t *payload, uint32_t size)
 
 
 extern uint32_t
+emlxs_flush_ct_event(emlxs_port_t *port, uint32_t rxid)
+{
+	emlxs_hba_t *hba = HBA;
+	emlxs_event_queue_t *eventq = &EVENTQ;
+	emlxs_event_entry_t *entry;
+	uint32_t *ptr;
+	uint32_t found = 0;
+
+	mutex_enter(&eventq->lock);
+
+	for (entry = eventq->first; entry != NULL; entry = entry->next) {
+		if ((entry->port != port) ||
+		    (entry->evt != &emlxs_ct_event)) {
+			continue;
+		}
+
+		ptr = (uint32_t *)entry->bp;
+		if (rxid == *ptr) {
+			/* This will prevent a CT exchange abort */
+			/* in emlxs_ct_event_destroy() */
+			entry->flag |= EMLXS_DFC_EVENT_DONE;
+
+			emlxs_event_destroy(hba, entry);
+			found = 1;
+			break;
+		}
+	}
+
+	mutex_exit(&eventq->lock);
+
+	return (found);
+
+} /* emlxs_flush_ct_event() */
+
+
+extern uint32_t
 emlxs_log_ct_event(emlxs_port_t *port, uint8_t *payload, uint32_t size,
     uint32_t rxid)
 {
@@ -556,6 +589,8 @@ emlxs_log_link_event(emlxs_port_t *port)
 			*linkspeed = HBA_PORTSPEED_8GBIT;
 		} else if (hba->linkspeed == LA_10GHZ_LINK) {
 			*linkspeed = HBA_PORTSPEED_10GBIT;
+		} else if (hba->linkspeed == LA_16GHZ_LINK) {
+			*linkspeed = HBA_PORTSPEED_16GBIT;
 		} else {
 			*linkspeed = HBA_PORTSPEED_1GBIT;
 		}
@@ -706,7 +741,7 @@ emlxs_log_fcoe_event(emlxs_port_t *port, menlo_init_rsp_t *init_rsp)
 	}
 
 	/* Check if this is a FCOE adapter */
-	if (hba->model_info.device_id != PCI_DEVICE_ID_LP21000_M) {
+	if (hba->model_info.device_id != PCI_DEVICE_ID_HORNET) {
 		return;
 	}
 
@@ -921,7 +956,7 @@ emlxs_get_dfc_eventinfo(emlxs_port_t *port, HBA_EVENTINFO *eventinfo,
 } /* emlxs_get_dfc_eventinfo() */
 
 
-uint32_t
+void
 emlxs_get_dfc_event(emlxs_port_t *port, emlxs_dfc_event_t *dfc_event,
     uint32_t sleep)
 {
@@ -939,10 +974,6 @@ emlxs_get_dfc_event(emlxs_port_t *port, emlxs_dfc_event_t *dfc_event,
 	}
 	dfc_event->size = 0;
 
-	if (!dfc_event->event) {
-		return (DFC_ARG_INVALID);
-	}
-
 	/* Calculate the event index */
 	mask = dfc_event->event;
 	for (i = 0; i < 32; i++) {
@@ -953,6 +984,10 @@ emlxs_get_dfc_event(emlxs_port_t *port, emlxs_dfc_event_t *dfc_event,
 		mask >>= 1;
 	}
 
+	if (i == 32) {
+		return;
+	}
+
 	mutex_enter(&eventq->lock);
 
 wait_for_event:
@@ -961,7 +996,7 @@ wait_for_event:
 	if (dfc_event->last_id == eventq->last_id[i]) {
 		if (!sleep) {
 			mutex_exit(&eventq->lock);
-			return (0);
+			return;
 		}
 
 		/* While event is still active and */
@@ -976,7 +1011,7 @@ wait_for_event:
 				dfc_event->pid = 0;
 				dfc_event->event = 0;
 				mutex_exit(&eventq->lock);
-				return (0);
+				return;
 			}
 		}
 
@@ -984,7 +1019,7 @@ wait_for_event:
 		/* return immediately */
 		if (!(dfc_event->event & hba->event_mask)) {
 			mutex_exit(&eventq->lock);
-			return (0);
+			return;
 		}
 	}
 
@@ -996,7 +1031,7 @@ wait_for_event:
 		dfc_event->last_id = eventq->last_id[i];
 
 		mutex_exit(&eventq->lock);
-		return (0);
+		return;
 	}
 
 	/* !!! The requester wants the next event buffer !!! */
@@ -1029,12 +1064,7 @@ wait_for_event:
 			size = entry->size;
 		}
 
-		if (ddi_copyout((void *)entry->bp, dfc_event->dataout, size,
-		    dfc_event->mode) != 0) {
-			mutex_exit(&eventq->lock);
-
-			return (DFC_COPYOUT_ERROR);
-		}
+		bcopy((void *)entry->bp, dfc_event->dataout, size);
 
 		/* Event has been retrieved by DFCLIB */
 		entry->flag |= EMLXS_DFC_EVENT_DONE;
@@ -1046,7 +1076,7 @@ wait_for_event:
 
 	mutex_exit(&eventq->lock);
 
-	return (0);
+	return;
 
 } /* emlxs_get_dfc_event() */
 
@@ -1351,7 +1381,7 @@ emlxs_log_sd_scsi_check_event(emlxs_port_t *port, HBA_WWN *remoteport,
 } /* emlxs_log_sd_scsi_check_event() */
 
 
-uint32_t
+void
 emlxs_get_sd_event(emlxs_port_t *port, emlxs_dfc_event_t *dfc_event,
     uint32_t sleep)
 {
@@ -1369,10 +1399,6 @@ emlxs_get_sd_event(emlxs_port_t *port, emlxs_dfc_event_t *dfc_event,
 	}
 	dfc_event->size = 0;
 
-	if (!dfc_event->event) {
-		return (DFC_ARG_INVALID);
-	}
-
 	/* Calculate the event index */
 	mask = dfc_event->event;
 	for (i = 0; i < 32; i++) {
@@ -1383,6 +1409,10 @@ emlxs_get_sd_event(emlxs_port_t *port, emlxs_dfc_event_t *dfc_event,
 		mask >>= 1;
 	}
 
+	if (i == 32) {
+		return;
+	}
+
 	mutex_enter(&eventq->lock);
 
 wait_for_event:
@@ -1391,7 +1421,7 @@ wait_for_event:
 	if (dfc_event->last_id == eventq->last_id[i]) {
 		if (!sleep) {
 			mutex_exit(&eventq->lock);
-			return (0);
+			return;
 		}
 
 		/* While event is active and no new event has been logged */
@@ -1404,14 +1434,14 @@ wait_for_event:
 				dfc_event->pid = 0;
 				dfc_event->event = 0;
 				mutex_exit(&eventq->lock);
-				return (0);
+				return;
 			}
 		}
 
 		/* If the event is no longer registered then return */
 		if (!(dfc_event->event & port->sd_event_mask)) {
 			mutex_exit(&eventq->lock);
-			return (0);
+			return;
 		}
 	}
 
@@ -1423,7 +1453,7 @@ wait_for_event:
 		dfc_event->last_id = eventq->last_id[i];
 
 		mutex_exit(&eventq->lock);
-		return (0);
+		return;
 	}
 
 	/* !!! The requester wants the next event buffer !!! */
@@ -1457,12 +1487,7 @@ wait_for_event:
 			size = entry->size;
 		}
 
-		if (ddi_copyout((void *) entry->bp, dfc_event->dataout,
-		    size, dfc_event->mode) != 0) {
-			mutex_exit(&eventq->lock);
-
-			return (DFC_COPYOUT_ERROR);
-		}
+		bcopy((void *)entry->bp, dfc_event->dataout, size);
 
 		/* Event has been retrieved by SANDIAG */
 		entry->flag |= EMLXS_SD_EVENT_DONE;
@@ -1474,7 +1499,7 @@ wait_for_event:
 
 	mutex_exit(&eventq->lock);
 
-	return (0);
+	return;
 
 } /* emlxs_get_sd_event */
 #endif /* SAN_DIAG_SUPPORT */

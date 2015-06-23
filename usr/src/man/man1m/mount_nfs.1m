@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\" See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH MOUNT_NFS 1M "Jul 26, 2009"
+.TH MOUNT_NFS 1M "Jun 3, 2015"
 .SH NAME
 mount_nfs \- mount remote NFS resources
 .SH SYNOPSIS
@@ -25,7 +25,6 @@ mount_nfs \- mount remote NFS resources
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBmount\fR utility attaches a named \fIresource\fR to the file system
 hierarchy at the pathname location \fImount_point\fR, which must already exist.
@@ -119,7 +118,6 @@ The \fBmount\fR command maintains a table of mounted file systems in
 \fBmount_nfs\fR supports both NFSv3 and NFSv4 mounts. The default NFS version
 is NFSv4.
 .SH OPTIONS
-.sp
 .LP
 See \fBmount\fR(1M) for the list of supported \fIgeneric_options\fR. See
 \fBshare_nfs\fR(1M) for a description of server options.
@@ -416,7 +414,7 @@ errors.
 .sp .6
 .RS 4n
 Set the read buffer size to a maximum of \fIn\fR bytes. The default value is
-\fB1048576\fR when using connection-orientated transports with Version 3 or
+\fB1048576\fR when using connection-oriented transports with Version 3 or
 Version 4 of the \fBNFS\fR protocol, and \fB32768\fR when using connection-less
 transports. The default can be negotiated down if the server prefers a smaller
 transfer size. "\fBRead\fR" operations may not necessarily use the maximum
@@ -498,7 +496,7 @@ maximum, the next lowest version attempted until a matching version is found.
 .sp .6
 .RS 4n
 Set the write buffer size to a maximum of \fIn\fR bytes. The default value is
-\fB1048576\fR when using connection-orientated transports with Version 3 or
+\fB1048576\fR when using connection-oriented transports with Version 3 or
 Version 4 of the \fBNFS\fR protocol, and \fB32768\fR when using connection-less
 transports. The default can be negotiated down if the server prefers a smaller
 transfer size. "\fBWrite\fR" operations may not necessarily use the maximum
@@ -534,7 +532,6 @@ producing the error "device busy."
 .RE
 
 .SH NFS FILE SYSTEMS
-.sp
 .ne 2
 .na
 \fBBackground versus Foreground\fR
@@ -648,7 +645,6 @@ active for that file.
 .RE
 
 .SS "File Attributes"
-.sp
 .LP
 To improve \fBNFS\fR read performance, files and file attributes are cached.
 File modification times get updated whenever a write occurs. However, file
@@ -678,7 +674,6 @@ viewed immediately by other clients, it has a significant adverse effect on
 client write performance. Data written into memory-mapped file pages
 (\fBmmap\fR(2)) are not written directly to this server.
 .SS "Specifying Values for Attribute Cache Duration Options"
-.sp
 .LP
 The attribute cache duration options are \fBacdirmax\fR, \fBacdirmin\fR,
 \fBacregmax\fR, \fBacregmin\fR, and \fBactimeo\fR, as described under OPTIONS.
@@ -833,7 +828,6 @@ example# mount serv\(mix:/usr/man,serv\(miy:/var/man,nfs://serv-z/man /usr/man
 .sp
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/mnttab\fR\fR
@@ -864,7 +858,6 @@ table of automatically mounted resources
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBrdist\fR(1), \fBlockd\fR(1M), \fBmountall\fR(1M), \fBmountd\fR(1M),
 \fBnfsd\fR(1M), \fBquota\fR(1M), \fBstatd\fR(1M), \fBmkdir\fR(2),
@@ -883,7 +876,6 @@ Callaghan, Brent, \fINFS URL Scheme\fR, RFC 2224, October 1997.
 Berners-Lee, Masinter & McCahill , \fIUniform Resource Locators (URL)\fR, RFC
 1738, December 1994.
 .SH NOTES
-.sp
 .LP
 An \fBNFS\fR server should not attempt to mount its own file systems. See
 \fBlofs\fR(7FS).

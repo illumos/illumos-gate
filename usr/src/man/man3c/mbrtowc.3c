@@ -1,4 +1,5 @@
 '\" te
+.\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
 .\" Copyright (c) 1992, X/Open Company Limited. All Rights Reserved.  Portions Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
@@ -7,9 +8,9 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH MBRTOWC 3C "Nov 1, 2003"
+.TH MBRTOWC 3C "Jun 23, 2014"
 .SH NAME
-mbrtowc \- convert a character to a wide-character code (restartable)
+mbrtowc, mbrtowc_l \- convert a character to a wide-character code (restartable)
 .SH SYNOPSIS
 .LP
 .nf
@@ -18,146 +19,177 @@ mbrtowc \- convert a character to a wide-character code (restartable)
 \fBsize_t\fR \fBmbrtowc\fR(\fBwchar_t *restrict\fR \fIpwc\fR, \fBconst char *restrict\fR \fIs\fR, \fBsize_t\fR \fIn\fR,
      \fBmbstate_t *restrict\fR \fIps\fR);
 .fi
-
-.SH DESCRIPTION
-.sp
 .LP
-If \fIs\fR is a null pointer, the \fBmbrtowc()\fR function is equivalent to the
-call:
+.nf
+#include <wchar.h>
+#include <xlocale.h>
+
+\fBsize_t\fR \fBmbrtowc_l\fR(\fBwchar_t *restrict\fR \fIpwc\fR, \fBconst char *restrict\fR \fIs\fR, \fBsize_t\fR \fIn\fR,
+     \fBmbstate_t *restrict\fR \fIps\fR, \fBlocale_t\fR \fIloc\fR);
+.fi
+.SH DESCRIPTION
+.LP
+If
+.I s
+is a null pointer, the
+.B mbrtowc()
+function is equivalent to the call:
 .sp
 .in +2
 .nf
-mbrtowc(NULL, ``'', 1, ps)
+\fBmbrtowc\fR(NULL, "", 1, \fIps\fR)
 .fi
 .in -2
-
-.sp
 .LP
-In this case, the values of the arguments \fIpwc\fR and \fIn\fR are ignored.
+Likewise, if
+.I s
+is a null pointer, the
+.B mbrtowc_l()
+function is equivalent to the call:
 .sp
+.in +2
+.nf
+\fBmbrtowc_l\fR(NULL, "", 1, \fIps\fR, \fIloc\fR);
+.fi
+.in -2
 .LP
-If \fIs\fR is not a null pointer, the \fBmbrtowc()\fR function inspects at most
-\fIn\fR bytes beginning at the byte pointed to by  \fIs\fR to determine the
-number of bytes needed to complete the next  character (including any shift
-sequences).  If the function determines that the next character is completed,
-it determines the value of the corresponding wide-character and then, if
-\fIpwc\fR is not a null pointer, stores that value in the object pointed to by
-\fIpwc\fR. If the corresponding wide-character is the null wide-character, the
+In these cases, the values of the arguments
+.I pwc
+and
+.I n
+are ignored.
+.LP
+If
+.I s
+is not a null pointer, these functions inspect at most
+.I n
+bytes beginning at the byte pointed to by
+.I s
+to determine the number of bytes needed to complete the next character
+(including any shift sequences).  If the functions determine that the next
+character is completed,
+they determine the value of the corresponding wide-character and then, if
+.I pwc
+is not a null pointer, stores that value in the object pointed to by
+.IR pwc .
+If the corresponding wide-character is the null wide-character, the
 resulting state described is the initial conversion state.
-.sp
 .LP
-If \fIps\fR is a null pointer, the \fBmbrtowc()\fR function uses its own
-internal \fBmbstate_t\fR object, which is initialized at program startup to the
-initial conversion state.   Otherwise, the  \fBmbstate_t\fR object pointed to
-by \fIps\fR is used to completely describe the current conversion state of the
-associated character sequence. Solaris will behave as if no function defined in
-the Solaris Reference Manual calls \fBmbrtowc()\fR.
-.sp
+If
+.I ps
+is a null pointer, these functions use their own
+internal
+.B mbstate_t
+object, which is initialized at program startup to the
+initial conversion state. Otherwise, the
+.B mbstate_t
+object pointed to by
+.I ps
+is used to completely describe the current conversion state of the
+associated character sequence. The system will behave as if no function defined
+in the Reference Manual calls
+.B mbrtowc()
+or
+.BR Bmbrtowc_l() .
 .LP
-The behavior of this function is affected by the \fBLC_CTYPE\fR category of the
-current locale.  See \fBenviron\fR(5).
+The behavior of
+.B mbrtowc()
+is affected by the
+.B LC_CTYPE
+category of the current locale.  The
+.B mbrtowc_l()
+function is affected by the
+.B LC_CTYPE
+category of the specified
+.I loc
+locale object.  See
+.B environ (5).
 .SH RETURN VALUES
-.sp
 .LP
-The \fBmbrtowc()\fR function returns the first of the following that applies:
-.sp
-.ne 2
-.na
-\fB\fB0\fR\fR
-.ad
-.RS 17n
-If the next \fIn\fR or fewer bytes complete the character that corresponds to
+The
+.B mbrtowc()
+and
+.B mbrtowc_l()
+functions return the first of the following that applies:
+.IP \fB0\fR
+If the next
+.I n
+or fewer bytes complete the character that corresponds to
 the null wide-character (which is the value stored).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBpositive\fR\fR
-.ad
-.RS 17n
-If the next \fIn\fR or fewer bytes complete a valid character (which is the
+.IP \fBpositive\fR
+If the next
+.I n
+or fewer bytes complete a valid character (which is the
 value stored); the value returned is the number of bytes that complete the
 character.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB(size_t)\(mi2\fR\fR
-.ad
-.RS 17n
-If the next \fIn\fR bytes contribute to an incomplete but potentially valid
-character, and all \fIn\fR bytes have been processed (no value is stored).
-When \fIn\fR has at least the value of the \fBMB_CUR_MAX\fR macro, this case
-can only occur if  \fIs\fR points at a sequence of redundant shift sequences
+.IP \fB(size_t)\(mi2\fR
+If the next
+.I n
+bytes contribute to an incomplete but potentially valid
+character, and all
+.I n
+bytes have been processed (no value is stored).
+When
+.I n
+has at least the value of the
+.B MB_CUR_MAX
+macro, this case can only occur if
+.I s
+points at a sequence of redundant shift sequences
 (for implementations with state-dependent encodings).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB(size_t)\(mi1\fR\fR
-.ad
-.RS 17n
+.IP \fB(size_t)\(mi1\fR
 If an encoding error occurs, in which case the next \fIn\fR or fewer bytes do
 not contribute to a complete and valid  character (no value is stored).  In
-this case, \fBEILSEQ\fR is stored in \fBerrno\fR and the conversion state is
-undefined.
-.RE
-
+this case,
+.B EILSEQ
+is stored in
+.B errno
+and the conversion state is undefined.
 .SH ERRORS
-.sp
 .LP
-The \fBmbrtowc()\fR function may fail if:
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 10n
-The \fIps\fR argument points to an object that contains an invalid conversion
+The
+.B mbrtowc()
+and
+.B mbrtowc_l()
+functions may fail if:
+.IP \fBEINVAL\fR
+The
+.I ps
+argument points to an object that contains an invalid conversion
 state.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEILSEQ\fR\fR
-.ad
-.RS 10n
+.IP \fBEILSEQ\fR
 Invalid character sequence is detected.
-.RE
-
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
 .TS
 box;
 c | c
 l | l .
 ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface Stability	Standard
+Interface Stability	See below.
 _
-MT-Level	See NOTES below
+MT-Level	See below.
 .TE
 
+.LP
+The
+.B mbrtowc()
+function is Standard.  The
+.B mbrtowc_l()
+function is Uncommitted.
+.LP
+If
+.I ps
+is a null pointer, these functions are Unsafe for use in
+multithreaded applications.  Otherwise they are MT-Safe.
 .SH SEE ALSO
-.sp
 .LP
-\fBmbsinit\fR(3C), \fBsetlocale\fR(3C), \fBattributes\fR(5), \fBenviron\fR(5),
-\fBstandards\fR(5)
-.SH NOTES
-.sp
-.LP
-If \fIps\fR is not a null pointer, \fBmbrtowc()\fR uses the \fBmbstate_t\fR
-object pointed to by \fIps\fR and the function can be used safely in
-multithreaded applications, as long as \fBsetlocale\fR(3C) is not being called
-to change the locale. If \fIps\fR is a null pointer, \fBmbrtowc()\fR uses its
-internal \fBmbstate_t\fR object and the function is Unsafe in multithreaded
-applications.
+.BR mbsinit (3C),
+.BR newlocale (3C),
+.BR setlocale (3C),
+.BR uselocale (3C),
+.BR attributes (5),
+.BR environ (5),
+.BR standards (5)

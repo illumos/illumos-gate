@@ -35,10 +35,6 @@
 #ifndef _E1000_NVM_H_
 #define _E1000_NVM_H_
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #if !defined(NO_READ_PBA_RAW) || !defined(NO_WRITE_PBA_RAW)
 struct e1000_pba {
 	u16 word[2];
@@ -83,8 +79,4 @@ void e1000_release_nvm_generic(struct e1000_hw *hw);
 
 #define E1000_STM_OPCODE	0xDB00
 
-#ifdef __cplusplus
-}
 #endif
-
-#endif	/* _E1000_NVM_H_ */

@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -1791,12 +1792,8 @@ spec_getpage(
 		if (((u_offset_t)off + len) > (SPEC_SIZE(sp) + PAGEOFFSET))
 			return (EFAULT);	/* beyond EOF */
 
-		if (len <= PAGESIZE)
-			err = spec_getapage(vp, (u_offset_t)off, len, protp, pl,
-			    plsz, seg, addr, rw, cr);
-		else
-			err = pvn_getpages(spec_getapage, vp, (u_offset_t)off,
-			    len, protp, pl, plsz, seg, addr, rw, cr);
+		err = pvn_getpages(spec_getapage, vp, (u_offset_t)off, len,
+		    protp, pl, plsz, seg, addr, rw, cr);
 		break;
 
 	case VCHR:

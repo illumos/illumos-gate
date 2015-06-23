@@ -20,6 +20,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -31,8 +33,6 @@
 
 #ifndef	_GETOPT_H
 #define	_GETOPT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -67,18 +67,12 @@ extern int  optopt;
 /*
  * The use of getopt_long_only in new development is strongly discouraged.
  */
-#ifdef __STDC__
 extern int	getopt_long(int, char * const *, const char *,
 		    const struct option *, int *);
 extern int	getopt_long_only(int, char * const *, const char *,
 		    const struct option *, int *);
 extern int	getopt_clip(int, char * const *, const char *,
 		    const struct option *, int *);
-#else   /* __STDC__ */
-extern int	getopt_long();
-extern int	getopt_long_only();
-extern int	getopt_clip();
-#endif  /* __STDC__ */
 
 #ifdef __cplusplus
 }

@@ -1,10 +1,11 @@
 '\" te
+.\" Copyright 2015 Nexenta Systems Inc.
 .\" Copyright (c) 2008 Sun Microsystems, Inc. All Rights Reserved
 .\" Copyright 1989 AT&T
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\" See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH BOOT 1M "Mar 2, 2009"
+.TH BOOT 1M "Jun 13, 2015"
 .SH NAME
 boot \- start the system kernel or a standalone program
 .SH SYNOPSIS
@@ -23,7 +24,6 @@ boot \- start the system kernel or a standalone program
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 Bootstrapping is the process of loading and executing a standalone program. For
 the purpose of this discussion, bootstrapping means the process of loading and
@@ -44,7 +44,6 @@ Once the kernel is loaded, it starts the UNIX system, mounts the necessary file
 systems (see \fBvfstab\fR(4)), and runs \fB/sbin/init\fR to bring the system to
 the "initdefault" state specified in \fB/etc/inittab\fR. See \fBinittab\fR(4).
 .SS "SPARC Bootstrap Procedure"
-.sp
 .LP
 On SPARC based systems, the bootstrap procedure on most machines consists of
 the following basic phases.
@@ -424,7 +423,6 @@ of the \fB-o\fR options, subject to the OBP limit of 128 bytes for boot
 arguments. For example, \fB-o\fR \fBlist,go\fR would simply list current
 (default) values of the parameters and then continue booting.
 .SS "iSCSI Boot"
-.sp
 .LP
 iSCSI boot is currently supported only on x86. The host being booted must be
 equipped with NIC(s) capable of iBFT (iSCSI Boot Firmware Table) or have the
@@ -441,7 +439,6 @@ of the process of iSCSI booting is the same as booting from a local disk.
 To configure the iBFT properly, users need to refer to the documentation from
 their hardware vendors.
 .SS "Booting from Disk"
-.sp
 .LP
 When booting from disk, the OpenBoot PROM firmware reads the boot blocks from
 blocks 1 to 15 of the partition specified as the boot device. This standalone
@@ -473,7 +470,6 @@ system and the capabilities of the hardware and firmware.
 .LP
 The path to the kernel must not contain any whitespace.
 .SS "Booting from ZFS"
-.sp
 .LP
 Booting from ZFS differs from booting from UFS in that, with ZFS, a device
 specifier identifies a storage pool, not a single root file system. A storage
@@ -485,7 +481,6 @@ the one identified by the pool's \fBbootfs\fR property. This default selection
 can be overridden by specifying an alternate bootable dataset with the \fB-Z\fR
 option.
 .SS "Boot Archive Phase"
-.sp
 .LP
 The boot archive contains a file system image that is mounted using an
 in-memory disk. The image is self-describing, specifically containing a file
@@ -512,7 +507,6 @@ modules from the in-memory filesystem until I/O can be turned on and the root
 filesystem mounted. Once the root filesystem is mounted, the in-memory
 filesystem is no longer needed and is discarded.
 .SS "OpenBoot PROM \fBboot\fR Command Behavior"
-.sp
 .LP
 The OpenBoot \fBboot\fR command takes arguments of the following form:
 .sp
@@ -931,7 +925,6 @@ using infinite retries.
 attempted before the DHCP process is determined to have failed. Defaults to of
 using infinite retries.
 .SS "x86 Bootstrap Procedure"
-.sp
 .LP
 On x86 based systems, the bootstrapping process consists of two conceptually
 distinct phases, kernel loading and kernel initialization. Kernel loading is
@@ -970,7 +963,6 @@ the root file system on the real root device. At this point, the kernel regains
 storage I/O, mounts additional file systems (see \fBvfstab\fR(4)), and starts
 various operating system services (see \fBsmf\fR(5)).
 .SS "Failsafe Mode"
-.sp
 .LP
 A requirement of booting from a root filesystem image built into a boot archive
 then remounting root onto the actual root device is that the contents of the
@@ -1030,14 +1022,12 @@ service, the administrator may elect to rebuild the archive by invoking:
 .sp
 
 .SS "Failsafe Boot Archive"
-.sp
 .LP
 The failsafe archive can be used to boot the machine at any time for
 maintenance or troubleshooting. The failsafe boot archive is installed on the
 machine, sourced from the miniroot archive. Booting the failsafe archive causes
 the machine to boot using the in-memory filesystem as the root device.
 .SS "SPARC"
-.sp
 .LP
 The SPARC failsafe archive is:
 .sp
@@ -1072,7 +1062,6 @@ ok \fBboot [\fIdevice-specifier\fR] -Z \fIdataset\fR -F failsafe\fR
 .sp
 
 .SS "x86"
-.sp
 .LP
 The x86 failsafe archive is:
 .sp
@@ -1089,7 +1078,6 @@ The x86 failsafe archive is:
 GRUB menu.
 .SH OPTIONS
 .SS "SPARC"
-.sp
 .LP
 The following SPARC options are supported:
 .sp
@@ -1214,7 +1202,6 @@ Boot from the root file system in the specified ZFS dataset.
 .RE
 
 .SS "x86"
-.sp
 .LP
 The following x86 options are supported:
 .sp
@@ -1267,7 +1254,6 @@ the machine.
 .RE
 
 .SH X86 BOOT SEQUENCE DETAILS
-.sp
 .LP
 After a PC-compatible machine is turned on, the system firmware in the \fBBIOS
 ROM\fR executes a power-on self test (POST), runs \fBBIOS\fR extensions in
@@ -1277,16 +1263,6 @@ consists of trying to read the first physical sector from the first diskette
 drive, or, if that fails, from the first hard disk. The processor then jumps to
 the first byte of the sector image in memory.
 .SH X86 PRIMARY BOOT
-.sp
-.LP
-The first sector on a floppy disk contains the master boot block (GRUB
-\fBstage1\fR). The stage 1 is responsible for loading GRUB \fBstage2\fR. Now
-GRUB is fully functional. It reads and executes the menu file
-\fB/boot/grub/menu.lst\fR. A similar sequence occurs for DVD or CD boot, but
-the master boot block location and contents are dictated by the El Torito
-specification. The El Torito boot also leads to \fBstrap.com\fR, which in turn
-loads \fBboot.bin\fR.
-.sp
 .LP
 The first sector on a hard disk contains the master boot block, which contains
 the master boot program and the \fBFDISK\fR table, named for the \fBPC\fR
@@ -1295,7 +1271,16 @@ program that maintains it. The master boot finds the active partition in the
 first byte in memory. This completes the standard PC-compatible hard disk boot
 sequence. If GRUB \fBstage1\fR is installed on the master boot block (see the
 \fB-m\fR option of \fBinstallgrub\fR(1M)), then \fBstage2\fR is loaded directly
-from the Solaris \fBFDISK\fR partition regardless of the active partition.
+from the Solaris partition regardless of the active partition.
+.sp
+.LP
+A similar sequence occurs for DVD or CD boot, but the master boot block location
+and contents are dictated by the El Torito specification. The El Torito boot
+will then continue in the same way as with the hard disk.
+.sp
+.LP
+Floppy booting is not longer supported. Booting from USB devices follows the
+same procedure as with hard disks.
 .sp
 .LP
 An x86 \fBFDISK\fR partition for the Solaris software begins with a
@@ -1312,6 +1297,13 @@ GRUB menu is displayed, the user can choose to boot an operating system on a
 different partition, a different disk, or possibly from the network.
 .sp
 .LP
+The behavior is slightly different when a disk is using \fBEFI\fR
+partitioning. In that case the GRUB \fBstage1\fR is always installed
+in the first sector of the disk, and it always loads \fBstage2\fR from
+the partition specified at GRUB installation time. This only works on
+partitions containing a ZFS root pool.
+.sp
+.LP
 For network booting, the supported method is Intel's Preboot eXecution
 Environment (PXE) standard. When booting from the network using PXE, the system
 or network adapter BIOS uses DHCP to locate a network bootstrap program
@@ -1320,7 +1312,6 @@ Protocol (TFTP). The BIOS executes the \fBpxegrub\fR by jumping to its first
 byte in memory. The \fBpxegrub\fR program downloads a menu file and presents
 the entries to user.
 .SH X86 KERNEL STARTUP
-.sp
 .LP
 The kernel startup process is independent of the kernel loading process. During
 kernel startup, console I/O goes to the device specified by the \fBconsole\fR
@@ -1486,17 +1477,6 @@ to \fB/boot/grub/menu.lst\fR, and use the \fBset-menu\fR subcommand of
 \fBbootadm set-menu\fR.
 
 .SH FILES
-.sp
-.ne 2
-.na
-\fB\fB/platform/\fR\fIplatform-name\fR\fB/ufsboot\fR\fR
-.ad
-.sp .6
-.RS 4n
-Second-level program to boot from a disk, DVD, or CD
-.RE
-
-.sp
 .ne 2
 .na
 \fB\fB/etc/inittab\fR\fR
@@ -1517,7 +1497,6 @@ Program that brings the system to the \fBinitdefault\fR state
 .RE
 
 .SS "64-bit SPARC Only"
-.sp
 .ne 2
 .na
 \fB\fB/platform/\fR\fIplatform-name\fR\fB/kernel/sparcv9/unix\fR\fR
@@ -1528,7 +1507,6 @@ Default program to boot system.
 .RE
 
 .SS "x86 Only"
-.sp
 .ne 2
 .na
 \fB\fB/boot\fR\fR
@@ -1541,11 +1519,16 @@ Directory containing boot-related files.
 .sp
 .ne 2
 .na
-\fB\fB/boot/grub/menu.lst\fR\fR
+\fB\fB/rpool/boot/grub/menu.lst\fR\fR
 .ad
 .sp .6
 .RS 4n
 Menu of bootable operating systems displayed by GRUB.
+.sp
+\fBNote:\fR this file is located on the root ZFS pool. While many installs
+often name their root zpool 'rpool', this is not required and the
+/rpool in the path above should be substituted with the name of
+the root pool of your current system.
 .RE
 
 .sp
@@ -1559,7 +1542,6 @@ Menu of bootable operating systems displayed by GRUB.
 .RE
 
 .SS "64-bit x86 Only"
-.sp
 .ne 2
 .na
 \fB\fB/platform/i86pc/kernel/amd64/unix\fR\fR
@@ -1570,7 +1552,6 @@ Menu of bootable operating systems displayed by GRUB.
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBkmdb\fR(1), \fBuname\fR(1), \fBbootadm\fR(1M), \fBeeprom\fR(1M),
 \fBinit\fR(1M), \fBinstallboot\fR(1M), \fBkernel\fR(1M), \fBmonitor\fR(1M),
@@ -1603,14 +1584,12 @@ RFC 2396, \fIUniform Resource Identifiers (URI): Generic Syntax\fR,
 .LP
 \fIOpenBoot Command Reference Manual\fR
 .SH WARNINGS
-.sp
 .LP
 The \fBboot\fR utility is unable to determine which files can be used as
 bootable programs. If the booting of a file that is not bootable is requested,
 the \fBboot\fR utility loads it and branches to it. What happens after that is
 unpredictable.
 .SH NOTES
-.sp
 .LP
 \fIplatform-name\fR can be found using the \fB-i\fR option of \fBuname\fR(1).
 \fIhardware-class-name\fR can be found using the \fB-m\fR option of

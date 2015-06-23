@@ -19,9 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 
@@ -332,7 +333,7 @@ smb_com_trans2_find_first2(smb_request_t *sr, smb_xa_t *xa)
 		return (SDRC_ERROR);
 	}
 
-	od = smb_tree_lookup_odir(sr->tid_tree, odid);
+	od = smb_tree_lookup_odir(sr, odid);
 	if (od == NULL)
 		return (SDRC_ERROR);
 
@@ -463,7 +464,7 @@ smb_com_trans2_find_next2(smb_request_t *sr, smb_xa_t *xa)
 	if (args.fa_maxdata == 0)
 		return (SDRC_ERROR);
 
-	od = smb_tree_lookup_odir(sr->tid_tree, odid);
+	od = smb_tree_lookup_odir(sr, odid);
 	if (od == NULL) {
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE,
 		    ERRDOS, ERROR_INVALID_HANDLE);
@@ -535,10 +536,10 @@ static int
 smb_trans2_find_entries(smb_request_t *sr, smb_xa_t *xa, smb_odir_t *od,
     smb_find_args_t *args)
 {
-	int		rc;
-	uint16_t	count, maxcount;
 	smb_fileinfo_t	fileinfo;
 	smb_odir_resume_t odir_resume;
+	uint16_t	count, maxcount;
+	int		rc = -1;
 
 	if ((maxcount = args->fa_maxcount) == 0)
 		maxcount = 1;
@@ -943,7 +944,7 @@ smb_com_find_close2(smb_request_t *sr)
 	if (smbsr_decode_vwv(sr, "w", &odid) != 0)
 		return (SDRC_ERROR);
 
-	od = smb_tree_lookup_odir(sr->tid_tree, odid);
+	od = smb_tree_lookup_odir(sr, odid);
 	if (od == NULL) {
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE,
 		    ERRDOS, ERROR_INVALID_HANDLE);

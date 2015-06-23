@@ -23,7 +23,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 #
 
 %.o:		../common/%.c
@@ -42,18 +42,36 @@
 		$(COMPILE.c) -o $@ $<
 		$(POST_PROCESS_O)
 
-gen_struct_layout:	../common/gen_struct_layout.c
-		$(NATIVECC) $(NATIVECC_CFLAGS) $(CFLAGS) -o $@ \
-			../common/gen_struct_layout.c
+all:		$(PROG)
 
-$(PROG):	$(OBJS) $(MAPFILE) gen_struct_layout
+$(PROG):	$(OBJS) $(MAPFILE) check_struct_layout
 		$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
 		$(POST_PROCESS)
 
-all:		$(PROG)
+check_struct_layout: gen_struct_layout gen_layout_obj.o
+	sed -e '/^#include <struct_layout.h>/q' \
+	  ../common/struct_layout_$(ARCH).c | sed -e '$$d' \
+	  > struct_layout_$(ARCH).tmp
+	./gen_struct_layout gen_layout_obj.o $(ARCH) \
+	  >> struct_layout_$(ARCH).tmp
+	@diff -u struct_layout_$(ARCH).tmp \
+	  ../common/struct_layout_$(ARCH).c ||\
+	{ echo "Error: struct_layout_$(ARCH).c needs update!" ; exit 1; }
+	touch $@
+
+# We need CTF data in this object.
+gen_layout_obj.o := CFLAGS += $(CTF_FLAGS)
+gen_layout_obj.o := CFLAGS64 += $(CTF_FLAGS)
+gen_layout_obj.o := POST_PROCESS_O = $(CTFCONVERT_O)
+
+gen_struct_layout:	../common/gen_struct_layout.c
+		$(NATIVECC) $(NATIVECC_CFLAGS) -o $@ \
+			../common/gen_struct_layout.c -lctf
 
 clean:
-		$(RM) $(OBJS) $(CLEANFILES)
+		$(RM) $(OBJS) $(CLEANFILES) gen_struct_layout \
+		  check_struct_layout gen_layout_obj.o \
+		  struct_layout_$(ARCH).tmp
 
 delete:
 		$(RM) $(PROG)

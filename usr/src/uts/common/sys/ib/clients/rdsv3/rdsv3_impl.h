@@ -136,8 +136,6 @@ uint_t	rdsv3_one_sec_in_hz;
 
 #define	MAX_SCHEDULE_TIMEOUT	(~0UL>>1)
 
-#define	RDMA_CM_EVENT_ADDR_CHANGE	14
-
 /* list */
 /* copied and modified list_remove_node */
 #define	list_remove_node(node)						\
@@ -377,7 +375,7 @@ void rdsv3_ib_dma_unmap_sg(ib_device_t *dev, struct rdsv3_scatterlist *scat,
 static inline void
 rdsv3_sk_sock_hold(struct rsock *sk)
 {
-	atomic_add_32(&sk->sk_refcount, 1);
+	atomic_inc_32(&sk->sk_refcount);
 }
 static inline void
 rdsv3_sk_sock_put(struct rsock *sk)

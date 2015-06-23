@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -110,7 +111,7 @@ typedef struct smb_catia_map
 	smb_wchar_t winchar;	/* v5 */
 } smb_catia_map_t;
 
-smb_catia_map_t catia_maps[SMB_CATIA_NUM_MAPS] =
+smb_catia_map_t const catia_maps[SMB_CATIA_NUM_MAPS] =
 {
 	{'"',  SMB_CATIA_WIN_DIAERESIS},
 	{'*',  SMB_CATIA_WIN_CURRENCY},
@@ -134,7 +135,7 @@ static void smb_vop_catia_init();
 extern sysid_t lm_alloc_sysidt();
 
 #define	SMB_AT_MAX	16
-static uint_t smb_attrmap[SMB_AT_MAX] = {
+static const uint_t smb_attrmap[SMB_AT_MAX] = {
 	0,
 	AT_TYPE,
 	AT_MODE,
@@ -172,6 +173,8 @@ smb_vop_init(void)
 	 * Since the CIFS server is mapping its locks to POSIX locks,
 	 * only one pid is used for operations originating from the
 	 * CIFS server (to represent CIFS in the VOP_FRLOCK routines).
+	 *
+	 * XXX: Should smb_ct be per-zone?
 	 */
 	smb_ct.cc_sysid = lm_alloc_sysidt();
 	if (smb_ct.cc_sysid == LM_NOSYSID)
@@ -489,7 +492,8 @@ smb_vop_setattr(vnode_t *vp, vnode_t *unnamed_vp, smb_attr_t *attr,
 
 	if (at_size) {
 		attr->sa_vattr.va_mask = AT_SIZE;
-		error = VOP_SETATTR(vp, &attr->sa_vattr, flags, kcred, &smb_ct);
+		error = VOP_SETATTR(vp, &attr->sa_vattr, flags,
+		    zone_kcred(), &smb_ct);
 	}
 
 	return (error);
@@ -621,7 +625,8 @@ smb_vop_lookup(
 
 		if (attr != NULL) {
 			attr->sa_mask = SMB_AT_ALL;
-			(void) smb_vop_getattr(*vpp, NULL, attr, 0, kcred);
+			(void) smb_vop_getattr(*vpp, NULL, attr, 0,
+			    zone_kcred());
 		}
 	}
 
@@ -829,6 +834,20 @@ smb_vop_commit(vnode_t *vp, cred_t *cr)
 	return (VOP_FSYNC(vp, 1, cr, &smb_ct));
 }
 
+/*
+ * Some code in smb_node.c needs to know which DOS attributes
+ * we can actually store.  Let's define a mask here of all the
+ * DOS attribute flags supported by the following function.
+ */
+const uint32_t
+smb_vop_dosattr_settable =
+	FILE_ATTRIBUTE_ARCHIVE |
+	FILE_ATTRIBUTE_SYSTEM |
+	FILE_ATTRIBUTE_HIDDEN |
+	FILE_ATTRIBUTE_READONLY |
+	FILE_ATTRIBUTE_OFFLINE |
+	FILE_ATTRIBUTE_SPARSE_FILE;
+
 static void
 smb_vop_setup_xvattr(smb_attr_t *smb_attr, xvattr_t *xvattr)
 {
@@ -1026,8 +1045,8 @@ smb_vop_stream_lookup(
 	 */
 
 	solaris_stream_name = kmem_alloc(MAXNAMELEN, KM_SLEEP);
-	(void) sprintf(solaris_stream_name, "%s%s", SMB_STREAM_PREFIX,
-	    stream_name);
+	(void) snprintf(solaris_stream_name, MAXNAMELEN,
+	    "%s%s", SMB_STREAM_PREFIX, stream_name);
 
 	/*
 	 * "name" will hold the on-disk name returned from smb_vop_lookup
@@ -1066,8 +1085,8 @@ smb_vop_stream_create(vnode_t *fvp, char *stream_name, smb_attr_t *attr,
 	 */
 
 	solaris_stream_name = kmem_alloc(MAXNAMELEN, KM_SLEEP);
-	(void) sprintf(solaris_stream_name, "%s%s", SMB_STREAM_PREFIX,
-	    stream_name);
+	(void) snprintf(solaris_stream_name, MAXNAMELEN,
+	    "%s%s", SMB_STREAM_PREFIX, stream_name);
 
 	if ((error = smb_vop_create(*xattrdirvpp, solaris_stream_name, attr,
 	    vpp, flags, cr, NULL)) != 0)
@@ -1094,8 +1113,8 @@ smb_vop_stream_remove(vnode_t *vp, char *stream_name, int flags, cred_t *cr)
 	 */
 
 	solaris_stream_name = kmem_alloc(MAXNAMELEN, KM_SLEEP);
-	(void) sprintf(solaris_stream_name, "%s%s", SMB_STREAM_PREFIX,
-	    stream_name);
+	(void) snprintf(solaris_stream_name, MAXNAMELEN,
+	    "%s%s", SMB_STREAM_PREFIX, stream_name);
 
 	/* XXX might have to use kcred */
 	error = smb_vop_remove(xattrdirvp, solaris_stream_name, flags, cr);
@@ -1239,7 +1258,8 @@ smb_vop_acl_type(vnode_t *vp)
 	int error;
 	ulong_t whichacl;
 
-	error = VOP_PATHCONF(vp, _PC_ACL_ENABLED, &whichacl, kcred, NULL);
+	error = VOP_PATHCONF(vp, _PC_ACL_ENABLED, &whichacl,
+	    zone_kcred(), NULL);
 	if (error != 0) {
 		/*
 		 * If we got an error, then the filesystem
@@ -1271,14 +1291,14 @@ smb_vop_acl_type(vnode_t *vp)
 	return (ACE_T);
 }
 
-static int zfs_perms[] = {
+static const int zfs_perms[] = {
 	ACE_READ_DATA, ACE_WRITE_DATA, ACE_APPEND_DATA, ACE_READ_NAMED_ATTRS,
 	ACE_WRITE_NAMED_ATTRS, ACE_EXECUTE, ACE_DELETE_CHILD,
 	ACE_READ_ATTRIBUTES, ACE_WRITE_ATTRIBUTES, ACE_DELETE, ACE_READ_ACL,
 	ACE_WRITE_ACL, ACE_WRITE_OWNER, ACE_SYNCHRONIZE
 };
 
-static int unix_perms[] = { VREAD, VWRITE, VEXEC };
+static const int unix_perms[] = { VREAD, VWRITE, VEXEC };
 /*
  * smb_vop_eaccess
  *

@@ -737,7 +737,7 @@ i_cpr_stop_other_cpus(void)
 		mutex_exit(&cpu_lock);
 		return;
 	}
-	pause_cpus(NULL);
+	pause_cpus(NULL, NULL);
 	cpu_are_paused = 1;
 
 	mutex_exit(&cpu_lock);
@@ -944,8 +944,7 @@ i_cpr_start_cpu(void)
 	 * We need to Sync PAT with cpu0's PAT. We have to do
 	 * this with interrupts disabled.
 	 */
-	if (is_x86_feature(x86_featureset, X86FSET_PAT))
-		pat_sync();
+	pat_sync();
 
 	/*
 	 * If we use XSAVE, we need to restore XFEATURE_ENABLE_MASK register.

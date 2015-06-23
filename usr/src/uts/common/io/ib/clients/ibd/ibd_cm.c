@@ -1236,7 +1236,7 @@ ibd_rc_post_srq(ibd_state_t *state, ibd_rwqe_t *rwqe)
 	 * the corresponding ibd_rc_process_rx() is called.
 	 */
 	ASSERT(state->rc_srq_rwqe_list.dl_cnt < state->rc_srq_size);
-	atomic_add_32(&state->rc_srq_rwqe_list.dl_cnt, 1);
+	atomic_inc_32(&state->rc_srq_rwqe_list.dl_cnt);
 	if (ibt_post_srq(state->rc_srq_hdl, &rwqe->w_rwr, 1, NULL) !=
 	    IBT_SUCCESS) {
 		atomic_dec_32(&state->rc_srq_rwqe_list.dl_cnt);
@@ -1258,7 +1258,7 @@ ibd_rc_post_rwqe(ibd_rc_chan_t *chan, ibd_rwqe_t *rwqe)
 	 * have to make sure dl_cnt has already updated before
 	 * corresponding ibd_rc_process_rx() is called.
 	 */
-	atomic_add_32(&chan->rx_wqe_list.dl_cnt, 1);
+	atomic_inc_32(&chan->rx_wqe_list.dl_cnt);
 	if (ibt_post_recv(chan->chan_hdl, &rwqe->w_rwr, 1, NULL) !=
 	    IBT_SUCCESS) {
 		atomic_dec_32(&chan->rx_wqe_list.dl_cnt);
@@ -1499,11 +1499,10 @@ ibd_rc_process_rx(ibd_rc_chan_t *chan, ibd_rwqe_t *rwqe, ibt_wc_t *wc)
 		 * network layer
 		 */
 		if (state->rc_enable_srq) {
-			atomic_add_32(&state->rc_srq_rwqe_list.
-			    dl_bufs_outstanding, 1);
+			atomic_inc_32(
+			    &state->rc_srq_rwqe_list.dl_bufs_outstanding);
 		} else {
-			atomic_add_32(&chan->rx_wqe_list.
-			    dl_bufs_outstanding, 1);
+			atomic_inc_32(&chan->rx_wqe_list.dl_bufs_outstanding);
 		}
 		mp = rwqe->rwqe_im_mblk;
 	} else {
@@ -1669,7 +1668,7 @@ ibd_rc_freemsg_cb(char *arg)
 		ibd_rc_free_rwqe(chan, rwqe);
 		return;
 	}
-	atomic_add_32(&chan->rx_wqe_list.dl_bufs_outstanding, -1);
+	atomic_dec_32(&chan->rx_wqe_list.dl_bufs_outstanding);
 }
 
 /*

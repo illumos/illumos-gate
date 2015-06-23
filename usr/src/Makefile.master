@@ -22,6 +22,8 @@
 #
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright 2015, OmniTI Computer Consulting, Inc. All rights reserved.
 #
 
 #
@@ -94,6 +96,13 @@ __SUNC=			$(POUND_SIGN)
 $(__SUNC)__GNUC=	$(POUND_SIGN)
 __GNUC64=		$(__GNUC)
 
+# Allow build-time "configuration" to enable or disable some things.
+# The default is POUND_SIGN, meaning "not enabled". If the environment
+# passes in an override like ENABLE_SMB_PRINTING= (empty) that will
+# uncomment things in the lower Makefiles to enable the feature.
+ENABLE_IPP_PRINTING=	$(POUND_SIGN)
+ENABLE_SMB_PRINTING=	$(POUND_SIGN)
+
 # CLOSED is the root of the tree that contains source which isn't released
 # as open source
 CLOSED=		$(SRC)/../closed
@@ -104,12 +113,10 @@ CLOSED=		$(SRC)/../closed
 BUILD_TOOLS=		/ws/onnv-tools
 ONBLD_TOOLS=		$(BUILD_TOOLS)/onbld
 
+# define runtime JAVA_HOME, primarily for cmd/pools/poold
+JAVA_HOME=	/usr/java
+# define buildtime JAVA_ROOT
 JAVA_ROOT=	/usr/java
-
-SFW_ROOT=	/usr/sfw
-SFWINCDIR=	$(SFW_ROOT)/include
-SFWLIBDIR=	$(SFW_ROOT)/lib
-SFWLIBDIR64=	$(SFW_ROOT)/lib/$(MACH64)
 
 GCC_ROOT=	/opt/gcc/4.4.4
 GCCLIBDIR=	$(GCC_ROOT)/lib
@@ -145,7 +152,7 @@ ELFDUMP=	/usr/ccs/bin/elfdump
 M4=		/usr/ccs/bin/m4
 STRIP=		/usr/ccs/bin/strip
 LEX=		/usr/ccs/bin/lex
-FLEX=		$(SFW_ROOT)/bin/flex
+FLEX=		/usr/bin/flex
 YACC=		/usr/ccs/bin/yacc
 CPP=		/usr/lib/cpp
 JAVAC=		$(JAVA_ROOT)/bin/javac
@@ -159,11 +166,13 @@ CTFSTABS=	$(ONBLD_TOOLS)/bin/$(MACH)/ctfstabs
 CTFSTRIP=	$(ONBLD_TOOLS)/bin/$(MACH)/ctfstrip
 NDRGEN=		$(ONBLD_TOOLS)/bin/$(MACH)/ndrgen
 GENOFFSETS=	$(ONBLD_TOOLS)/bin/genoffsets
-CTFCVTPTBL=	$(ONBLD_TOOLS)/bin/ctfcvtptbl
-CTFFINDMOD=	$(ONBLD_TOOLS)/bin/ctffindmod
 XREF=		$(ONBLD_TOOLS)/bin/xref
 FIND=		/usr/bin/find
 PERL=		/usr/bin/perl
+PERL_VERSION=	5.10.0
+PERL_PKGVERS=	-510
+PERL_ARCH =		i86pc-solaris-64int
+$(SPARC_BLD)PERL_ARCH =	sun4-solaris-64int
 PYTHON_26=	/usr/bin/python2.6
 PYTHON=		$(PYTHON_26)
 SORT=		/usr/bin/sort
@@ -180,11 +189,6 @@ MSGCC=		$(ASTBINDIR)/msgcc
 
 FILEMODE=	644
 DIRMODE=	755
-
-#
-# The version of the patch makeup table optimized for build-time use.  Used
-# during patch builds only.
-$(PATCH_BUILD)PMTMO_FILE=$(SRC)/patch_makeup_table.mo
 
 # Declare that nothing should be built in parallel.
 # Individual Makefiles can use the .PARALLEL target to declare otherwise.
@@ -399,7 +403,7 @@ C99MODE=	$(C99_DISABLE)
 C99LMODE=	$(C99MODE:-xc99%=-Xc99%)
 
 # In most places, assignments to these macros should be appended with +=
-# (CPPFLAGS.master allows values to be prepended to CPPFLAGS).
+# (CPPFLAGS.first allows values to be prepended to CPPFLAGS).
 sparc_CFLAGS=	$(sparc_XARCH) $(CCSTATICSYM)
 sparcv9_CFLAGS=	$(sparcv9_XARCH) -dalign $(CCVERBOSE) $(V9ABIWARN) $(CCREGSYM) \
 		$(CCSTATICSYM)
@@ -547,14 +551,15 @@ NATIVE_CFLAGS=	$(COPTFLAG) $($(NATIVE_MACH)_CFLAGS) $(CCMODE) \
 
 DTEXTDOM=-DTEXT_DOMAIN=\"$(TEXT_DOMAIN)\"	# For messaging.
 DTS_ERRNO=-D_TS_ERRNO
+CPPFLAGS.first=	# Please keep empty.  Only lower makefiles should set this.
 CPPFLAGS.master=$(DTEXTDOM) $(DTS_ERRNO) \
 	$(ENVCPPFLAGS1) $(ENVCPPFLAGS2) $(ENVCPPFLAGS3) $(ENVCPPFLAGS4) \
 	$(ADJUNCT_PROTO:%=-I%/usr/include)
 CPPFLAGS.native=$(ENVCPPFLAGS1) $(ENVCPPFLAGS2) $(ENVCPPFLAGS3) \
 		$(ENVCPPFLAGS4) -I$(NATIVE_ADJUNCT)/include
-CPPFLAGS=	$(CPPFLAGS.master)
-AS_CPPFLAGS=	$(CPPFLAGS.master)
-JAVAFLAGS=	-deprecation
+CPPFLAGS=	$(CPPFLAGS.first) $(CPPFLAGS.master)
+AS_CPPFLAGS=	$(CPPFLAGS.first) $(CPPFLAGS.master)
+JAVAFLAGS=	-source 1.6 -target 1.6 -Xlint:deprecation,-options
 
 #
 # For source message catalogue
@@ -655,8 +660,9 @@ MAPFILE.NGB =		$(MAPFILE.NGB_$(MACH))
 MAPFILE.INT =		mapfile-intf
 
 #
-# LDLIBS32 can be set in the environment to override the following assignment.
-# LDLIBS64 can be set to override the assignment made in Makefile.master.64.
+# LDLIBS32 and LDLIBS64 can be set in the environment to override the following
+# assignments.
+#
 # These environment settings make sure that no libraries are searched outside
 # of the local workspace proto area:
 #	LDLIBS32=-YP,$ROOT/lib:$ROOT/usr/lib
@@ -666,6 +672,12 @@ LDLIBS32 =	$(ENVLDLIBS1) $(ENVLDLIBS2) $(ENVLDLIBS3)
 LDLIBS32 +=	$(ADJUNCT_PROTO:%=-L%/usr/lib -L%/lib)
 LDLIBS.cmd = 	$(LDLIBS32)
 LDLIBS.lib =	$(LDLIBS32)
+
+LDLIBS64 =	$(ENVLDLIBS1:%=%/$(MACH64)) \
+		$(ENVLDLIBS2:%=%/$(MACH64)) \
+		$(ENVLDLIBS3:%=%/$(MACH64))
+LDLIBS64 +=     $(ADJUNCT_PROTO:%=-L%/usr/lib/$(MACH64) -L%/lib/$(MACH64))
+
 #
 # Define compilation macros.
 #
@@ -749,7 +761,7 @@ NATIVE_MACH=	$(MACH:amd64=i386)
 #
 SPRO_ROOT=		$(BUILD_TOOLS)/SUNWspro
 SPRO_VROOT=		$(SPRO_ROOT)/SS12
-GNU_ROOT=		$(SFW_ROOT)
+GNU_ROOT=		/usr
 
 # Till SS12u1 formally becomes the NV CBE, LINT is hard
 # coded to be picked up from the $SPRO_ROOT/sunstudio12.1/
@@ -888,7 +900,6 @@ AS_BIGPICFLAGS=		$(C_BIGPICFLAGS)
 # Default label for CTF sections
 #
 CTFCVTFLAGS=		-i -L VERSION
-$(SRCDBGBLD)CTFCVTFLAGS 	+= -g
 
 #
 # Override to pass module-specific flags to ctfmerge.  Currently used only by
@@ -896,8 +907,6 @@ $(SRCDBGBLD)CTFCVTFLAGS 	+= -g
 # stripping.
 #
 CTFMRGFLAGS=
-$(SRCDBGBLD)CTFMRGFLAGS 	+= -g
-
 
 CTFCONVERT_O		= $(CTFCONVERT) $(CTFCVTFLAGS) $@
 
@@ -960,11 +969,10 @@ DEV_CM=		"@($(POUND_SIGN))SunOS Internal Development: non-nightly build"
 PROCESS_COMMENT=  @?${MCS} -d -a $(RELEASE_CM) -a $(DEV_CM)
 $(RELEASE_BUILD)PROCESS_COMMENT=   @?${MCS} -d -a $(RELEASE_CM)
 
-STRIP_STABS=			   :
-$(RELEASE_BUILD)STRIP_STABS=	   $(STRIP) -x $@
+STRIP_STABS=			   $(STRIP) -x $@
 $(SRCDBGBLD)STRIP_STABS=	   :
 
-POST_PROCESS_O=		$(PROCESS_COMMENT) $@
+POST_PROCESS_O=	
 POST_PROCESS_A=
 POST_PROCESS_SO=	$(PROCESS_COMMENT) $@ ; $(STRIP_STABS) ; \
 			$(ELFSIGN_OBJECT)

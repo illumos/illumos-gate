@@ -9,8 +9,12 @@
  */
 
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _SYS_TIME_H
@@ -57,7 +61,7 @@ struct timeval {
 
 #define	TIMEVAL_TO_TIMEVAL32(tv32, tv)	{		\
 	(tv32)->tv_sec = (time32_t)(tv)->tv_sec;	\
-	(tv32)->tv_usec = (tv)->tv_usec;		\
+	(tv32)->tv_usec = (int32_t)(tv)->tv_usec;	\
 }
 
 #define	TIME32_MAX	INT32_MAX
@@ -66,7 +70,7 @@ struct timeval {
 #define	TIMEVAL_OVERFLOW(tv)	\
 	((tv)->tv_sec < TIME32_MIN || (tv)->tv_sec > TIME32_MAX)
 
-#endif	/* _SYSCALL32 || _KERNEL */
+#endif	/* _SYSCALL32 */
 
 #endif	/* _ASM */
 #endif	/* !defined(__XOPEN_OR_POSIX) || defined(_XPG4_2) ... */
@@ -248,7 +252,7 @@ struct itimerval32 {
  */
 typedef	longlong_t	hrtime_t;
 
-#ifdef _KERNEL
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 
 #include <sys/time_impl.h>
 #include <sys/mutex.h>
@@ -372,26 +376,16 @@ extern	void		hrt2ts32(hrtime_t, timestruc32_t *);
 #endif /* _KERNEL */
 
 #if !defined(_KERNEL) && !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__)
-#if defined(__STDC__)
 int adjtime(struct timeval *, struct timeval *);
-#else
-int adjtime();
-#endif
 #endif /* !defined(_KERNEL) && !defined(__XOPEN_OR_POSIX) ... */
 
 #if !defined(_KERNEL) && !defined(__XOPEN_OR_POSIX) || \
 	defined(_ATFILE_SOURCE) || defined(__EXTENSIONS__)
-#if defined(__STDC__)
 int futimesat(int, const char *, const struct timeval *);
-#else
-int futimesat();
-#endif /* defined(__STDC__) */
 #endif /* defined(__ATFILE_SOURCE) */
 
 #if !defined(_KERNEL) && !defined(__XOPEN_OR_POSIX) || defined(_XPG4_2) || \
 	defined(__EXTENSIONS__)
-
-#if defined(__STDC__)
 
 int getitimer(int, struct itimerval *);
 int utimes(const char *, const struct timeval *);
@@ -403,12 +397,6 @@ int setitimer(int, struct itimerval *_RESTRICT_KYWD,
 	struct itimerval *_RESTRICT_KYWD);
 #endif /* defined(_XPG2_2) */
 
-#else /* __STDC__ */
-
-int gettimer();
-int settimer();
-int utimes();
-#endif /* __STDC__ */
 #endif /* !defined(_KERNEL) ... defined(_XPG4_2) */
 
 /*
@@ -427,7 +415,6 @@ int utimes();
  */
 #if !defined(_KERNEL) && !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__)
 
-#if defined(__STDC__)
 #if defined(_SVID_GETTOD)
 int settimeofday(struct timeval *);
 #else
@@ -435,26 +422,17 @@ int settimeofday(struct timeval *, void *);
 #endif
 hrtime_t	gethrtime(void);
 hrtime_t	gethrvtime(void);
-#else /* __STDC__ */
-int settimeofday();
-hrtime_t	gethrtime();
-hrtime_t	gethrvtime();
-#endif /* __STDC__ */
 
 #endif /* !(defined _KERNEL) && !defined(__XOPEN_OR_POSIX) ... */
 
 #if !defined(_KERNEL) && !defined(__XOPEN_OR_POSIX) || defined(_XPG4_2) || \
 	defined(__EXTENSIONS__)
 
-#if defined(__STDC__)
 #if defined(_SVID_GETTOD)
 int gettimeofday(struct timeval *);
 #else
 int gettimeofday(struct timeval *_RESTRICT_KYWD, void *_RESTRICT_KYWD);
 #endif
-#else /* __STDC__ */
-int gettimeofday();
-#endif /* __STDC__ */
 
 #endif /* !defined(_KERNEL) && !defined(__XOPEN_OR_POSIX) ... */
 
@@ -469,7 +447,7 @@ int gettimeofday();
  * non-X/Open applications, including this header will still make
  * visible these definitions.
  */
-#if !defined(_BOOT) && !defined(_KERNEL) && \
+#if !defined(_BOOT) && !defined(_KERNEL) && !defined(_FAKE_KERNEL) && \
 	!defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__)
 #include <time.h>
 #endif
@@ -481,8 +459,9 @@ int gettimeofday();
  * beginning with XSH4v2.  Placement required after definition
  * for itimerval.
  */
-#if !defined(_KERNEL) && !defined(__XOPEN_OR_POSIX) || defined(_XPG4_2) || \
-	defined(__EXTENSIONS__)
+#if !defined(_KERNEL) && !defined(_FAKE_KERNEL) && \
+	!defined(__XOPEN_OR_POSIX) || \
+	defined(_XPG4_2) || defined(__EXTENSIONS__)
 #include <sys/select.h>
 #endif
 

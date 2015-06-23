@@ -7,6 +7,8 @@
  *
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
  */
 
 #include <stdio.h>
@@ -55,6 +57,7 @@
 #include "ipf.h"
 #include "netinet/ipl.h"
 #include "kmem.h"
+#include "ipfzone.h"
 
 #ifdef	__hpux
 # define	nlist	nlist64
@@ -95,7 +98,8 @@ int	opts;
 void usage(name)
 char *name;
 {
-	fprintf(stderr, "Usage: %s [-CdFhlnrRsv] [-f filename]\n", name);
+	fprintf(stderr, "Usage: %s [-CdFhlnrRsv] [-f filename]", name);
+	fprintf(stderr, " [-G|-z zonename]\n");
 	exit(1);
 }
 
@@ -117,7 +121,7 @@ char *argv[];
 	kernel = NULL;
 	mode = O_RDWR;
 
-	while ((c = getopt(argc, argv, "CdFf:hlM:N:nrRsv")) != -1)
+	while ((c = getopt(argc, argv, "CdFf:G:hlM:N:nrRsvz:")) != -1)
 		switch (c)
 		{
 		case 'C' :
@@ -131,6 +135,9 @@ char *argv[];
 			break;
 		case 'F' :
 			opts |= OPT_FLUSH;
+			break;
+		case 'G' :
+			setzonename_global(optarg);
 			break;
 		case 'h' :
 			opts |=OPT_HITS;
@@ -162,6 +169,9 @@ char *argv[];
 		case 'v' :
 			opts |= OPT_VERBOSE;
 			break;
+		case 'z' :
+			setzonename(optarg);
+			break;
 		default :
 			usage(argv[0]);
 		}
@@ -192,6 +202,11 @@ char *argv[];
 		    ((fd = open(IPNAT_NAME, O_RDONLY)) == -1)) {
 			(void) fprintf(stderr, "%s: open: %s\n", IPNAT_NAME,
 				STRERROR(errno));
+			exit(1);
+		}
+
+		if (setzone(fd) != 0) {
+			close(fd);
 			exit(1);
 		}
 

@@ -19,7 +19,6 @@ pf_key \- Security association database interface
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 Keying information for IPsec security services is maintained in security
 association databases (\fBSADB\fRs).  The security associations (\fBSA\fRs) are
@@ -52,7 +51,6 @@ message and all extensions must be eight-byte aligned.  An example message is
 the \fBGET\fR message, which  requires the base header, the \fBSA \fRextension,
 and the \fBADDRESS_DST\fR extension.
 .SS "Messages"
-.sp
 .LP
 Messages include:
 .sp
@@ -162,7 +160,6 @@ Security Association Information Extension flags:
 .LP
 Extension headers include:
 .SS "Generic Extension Header"
-.sp
 .in +2
 .nf
 struct sadb_ext {
@@ -173,7 +170,6 @@ struct sadb_ext {
 .in -2
 
 .SS "Security Association Information Extension"
-.sp
 .in +2
 .nf
 struct sadb_sa {
@@ -190,7 +186,6 @@ struct sadb_sa {
 .in -2
 
 .SS "Lifetime Extension"
-.sp
 .in +2
 .nf
 struct sadb_lifetime {
@@ -205,7 +200,6 @@ struct sadb_lifetime {
 .in -2
 
 .SS "Address Extension"
-.sp
 .in +2
 .nf
 struct sadb_address {
@@ -221,7 +215,6 @@ struct sadb_address {
 .in -2
 
 .SS "Keying Material Extension"
-.sp
 .in +2
 .nf
 struct sadb_key {
@@ -236,7 +229,6 @@ struct sadb_key {
 .in -2
 
 .SS "Indentity Extension"
-.sp
 .in +2
 .nf
 struct sadb_ident {
@@ -251,7 +243,6 @@ struct sadb_ident {
 .in -2
 
 .SS "Sensitivity/Integrity Extension"
-.sp
 .in +2
 .nf
 struct sadb_sens {
@@ -273,7 +264,6 @@ struct sadb_sens {
 .in -2
 
 .SS "Proposal Extension"
-.sp
 .in +2
 .nf
 struct sadb_prop {
@@ -288,7 +278,6 @@ struct sadb_prop {
 .in -2
 
 .SS "Combination Instance for a Proposal"
-.sp
 .in +2
 .nf
 struct sadb_comb {
@@ -313,7 +302,6 @@ struct sadb_comb {
 .in -2
 
 .SS "Extended Combination"
-.sp
 .in +2
 .nf
 struct sadb_x_ecomb {
@@ -334,7 +322,6 @@ struct sadb_x_ecomb {
 .in -2
 
 .SS "Extended Combination Algorithm Descriptors"
-.sp
 .in +2
 .nf
 struct sadb_x_algdesc {
@@ -349,7 +336,6 @@ struct sadb_x_algdesc {
 .in -2
 
 .SS "Extended Register"
-.sp
 .in +2
 .nf
 struct sadb_x_ereg {
@@ -361,7 +347,6 @@ struct sadb_x_ereg {
 .in -2
 
 .SS "Key Management Cookie"
-.sp
 .in +2
 .nf
 struct sadb_x_kmc {
@@ -375,7 +360,6 @@ struct sadb_x_kmc {
 .in -2
 
 .SS "Supported Algorithms Extension"
-.sp
 .in +2
 .nf
 struct sadb_supported {
@@ -387,7 +371,6 @@ struct sadb_supported {
 .in -2
 
 .SS "Algorithm Instance"
-.sp
 .in +2
 .nf
 struct sadb_alg {
@@ -401,7 +384,6 @@ struct sadb_alg {
 .in -2
 
 .SS "SPI Extension Range"
-.sp
 .in +2
 .nf
 struct sadb_spirange {
@@ -415,7 +397,6 @@ struct sadb_spirange {
 .in -2
 
 .SS "Security Association Pair Extension"
-.sp
 .in +2
 .nf
 struct sadb_x_pair {
@@ -427,7 +408,6 @@ struct sadb_x_pair {
 .in -2
 
 .SS "Message Use and Behavior"
-.sp
 .LP
 Each message has a behavior. A behavior is defined as where the initial message
 travels, for example, user to kernel, and what subsequent actions are expected
@@ -529,7 +509,6 @@ Message exceeds the maximum length allowed.
 .LP
 The following are examples of message use and behavior:
 .SS "\fBSADB_GETSPI\fR"
-.sp
 .LP
 Send a \fBSADB_GETSPI\fR message from a user process to the kernel.
 .sp
@@ -550,7 +529,6 @@ The kernel returns the \fBSADB_GETSPI\fR message to all listening processes.
 .in -2
 
 .SS "\fBSADB_UPDATE\fR"
-.sp
 .LP
 Send a \fBSADB_UPDATE\fR message from a user process to the kernel.
 .sp
@@ -579,7 +557,6 @@ security association contained in that extension. The resulting security
 association "pair" can be updated or as a single entity using the
 \fBSADB_X_UPDATEPAIR\fR or \fBSADB_X_DELPAIR\fR message types.
 .SS "\fBSADB_ADD\fR"
-.sp
 .LP
 Send a \fBSADB_ADD\fR message from a user process to the kernel.
 .sp
@@ -602,7 +579,6 @@ The kernel returns the \fBSADB_ADD\fR message to all listening processes.
 .in -2
 
 .SS "\fBSADB_X_UPDATEPAIR\fR"
-.sp
 .LP
 Send a \fBSADB_X_UPDATEPAIR\fR message from a user process to  the  kernel.
 This message type is used to update the lifetime values of a security
@@ -616,7 +592,6 @@ with.
 .in -2
 
 .SS "\fBSADB_DELETE | SADB_X_DELPAIR\fR"
-.sp
 .LP
 Send a \fBSADB_DELETE\fR message from a user process to the  kernel. The
 \fBSADB_X_DELPAIR\fR message type will request deletion of the security
@@ -639,7 +614,6 @@ The kernel returns the \fBSADB_DELETE\fR message to all listening processes.
 .in -2
 
 .SS "\fBSADB_GET\fR"
-.sp
 .LP
 Send a \fBSADB_GET\fR message from a user process to the kernel.
 .sp
@@ -662,7 +636,6 @@ The kernel returns the \fBSADB_GET\fR message to the socket that sent the
 .in -2
 
 .SS "\fBSADB_ACQUIRE\fR"
-.sp
 .LP
 The kernel sends a \fBSADB_ACQUIRE\fR message to registered sockets. Note that
 any \fBGETSPI\fR, \fBADD\fR, or \fBUPDATE\fR calls in reaction to an
@@ -702,7 +675,6 @@ If key management fails, send an \fBSADB_ACQUIRE\fR to indicate failure.
 .in -2
 
 .SS "\fBSADB_X_INVERSE_ACQUIRE\fR"
-.sp
 .LP
 For inbound Key Management processing, a Key Management application may wish to
 consult the kernel for its policy.  The application should send to the kernel:
@@ -725,7 +697,6 @@ The kernel returns a message similar to a kernel-generated extended ACQUIRE:
 .in -2
 
 .SS "\fBSADB_REGISTER\fR"
-.sp
 .LP
 Send a \fBSADB_REGISTER\fR message from a user process to the kernel.
 .sp
@@ -764,7 +735,6 @@ extended ACQUIREs.
 Which returns a series of SADB_REGISTER replies (one for each security protocol
 registered) from the kernel.
 .SS "\fBSADB_EXPIRE\fR"
-.sp
 .LP
 The kernel sends a \fBSADB_EXPIRE\fR message to all listeners when the soft
 limit of a security association has been expired.
@@ -776,7 +746,6 @@ limit of a security association has been expired.
 .in -2
 
 .SS "\fBSADB_FLUSH\fR"
-.sp
 .LP
 Send a \fBSADB_FLUSH\fR message from a user process to the kernel.
 .sp
@@ -797,7 +766,6 @@ The kernel returns the \fBSADB_FLUSH\fR message to all listening sockets.
 .in -2
 
 .SS "\fBSADB_DUMP\fR"
-.sp
 .LP
 Send a \fBSADB_DUMP\fR message from a user process to the kernel.
 .sp
@@ -831,7 +799,6 @@ To mark the end of a dump a single base header arrives with its
 .in -2
 
 .SS "\fBSADB_X_PROMISC\fR"
-.sp
 .LP
 Send a \fBSADB_X_PROMISC\fR message from a user process to the kernel.
 .sp
@@ -852,7 +819,6 @@ The kernel returns the \fBSADB_X_PROMISC\fR message to all listening processes.
 .in -2
 
 .SH DIAGNOSTICS
-.sp
 .LP
 The message returning from the kernel will contain a diagnostic value in the
 base message header, the diagnostic value will indicate if action requested by
@@ -970,7 +936,6 @@ Diagnostic Values:
 .in -2
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5)  for descriptions of the following attributes:
 .sp
@@ -985,16 +950,15 @@ Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBin.iked\fR(1M), \fBipseckey\fR(1M), \fBipsec\fR(7P), \fBipsecah\fR(7P),
+\fBin.iked\fR(1M), \fBipseckey\fR(1M), \fBsockaddr\fR(3SOCKET),
+\fBipsec\fR(7P), \fBipsecah\fR(7P),
 \fBipsecesp\fR(7P), \fBroute\fR(7P), \fBudp\fR(7P)
 .sp
 .LP
 McDonald, D.L., Metz, C.W., and Phan, B.G., \fIRFC 2367, PF_KEY Key Management
 API, Version 2\fR, The Internet Society, July 1998.
 .SH NOTES
-.sp
 .LP
 Time-based lifetimes may not expire with exact precision in seconds because
 kernel load may affect the aging of \fBSA\fR's.

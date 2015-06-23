@@ -4421,6 +4421,27 @@ ip_stack_fini(netstackid_t stackid, void *arg)
 	dce_stack_destroy(ipst);
 	ip_mrouter_stack_destroy(ipst);
 
+	/*
+	 * Quiesce all of our timers. Note we set the quiesce flags before we
+	 * call untimeout. The slowtimers may actually kick off another instance
+	 * of the non-slow timers.
+	 */
+	mutex_enter(&ipst->ips_igmp_timer_lock);
+	ipst->ips_igmp_timer_quiesce = B_TRUE;
+	mutex_exit(&ipst->ips_igmp_timer_lock);
+
+	mutex_enter(&ipst->ips_mld_timer_lock);
+	ipst->ips_mld_timer_quiesce = B_TRUE;
+	mutex_exit(&ipst->ips_mld_timer_lock);
+
+	mutex_enter(&ipst->ips_igmp_slowtimeout_lock);
+	ipst->ips_igmp_slowtimeout_quiesce = B_TRUE;
+	mutex_exit(&ipst->ips_igmp_slowtimeout_lock);
+
+	mutex_enter(&ipst->ips_mld_slowtimeout_lock);
+	ipst->ips_mld_slowtimeout_quiesce = B_TRUE;
+	mutex_exit(&ipst->ips_mld_slowtimeout_lock);
+
 	ret = untimeout(ipst->ips_igmp_timeout_id);
 	if (ret == -1) {
 		ASSERT(ipst->ips_igmp_timeout_id == 0);
@@ -12120,7 +12141,6 @@ ip_xmit_attach_llhdr(mblk_t *mp, nce_t *nce)
 		    priority;
 	}
 	return (mp1);
-#undef rptr
 }
 
 /*

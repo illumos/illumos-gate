@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -35,7 +36,7 @@ extern "C" {
 #endif
 
 #include <sys/types.h>
-#include <libnvpair.h>
+#include <sys/nvpair.h>
 
 /*
  * Basic datatypes for most functions

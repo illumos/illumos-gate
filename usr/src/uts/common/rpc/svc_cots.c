@@ -149,7 +149,7 @@ static const struct rpc_cots_server {
 #define	CLONE2STATS(clone_xprt)	\
 	((struct cots_master_data *)(clone_xprt)->xp_master->xp_p2)->cmd_stats
 #define	RSSTAT_INCR(s, x)	\
-	atomic_add_64(&(s)->x.value.ui64, 1)
+	atomic_inc_64(&(s)->x.value.ui64)
 
 /*
  * Pointer to a transport specific `ready to receive' function in rpcmod

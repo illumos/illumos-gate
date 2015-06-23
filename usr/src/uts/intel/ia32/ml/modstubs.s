@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2015, Joyent, Inc. All rights reserved.
  */
 
 #include <sys/asm_linkage.h>
@@ -574,8 +574,6 @@ fcnname/**/_info:							\
  */
 #ifndef NFSSRV_MODULE
 	MODULE(nfssrv,misc);
-	STUB(nfssrv,		lm_nfs3_fhtovp,	nomod_minus_one);
-	STUB(nfssrv,		lm_fhtovp,	nomod_minus_one);
 	STUB(nfssrv,		exportfs,	nomod_minus_one);
 	STUB(nfssrv,		nfs_getfh,	nomod_minus_one);
 	STUB(nfssrv,		nfsl_flush,	nomod_minus_one);
@@ -1230,6 +1228,7 @@ fcnname/**/_info:							\
 	NO_UNLOAD_STUB(kcf, crypto_verify_recover_init_prov, nomod_minus_one);
 	NO_UNLOAD_STUB(kcf, random_add_entropy, nomod_minus_one);
 	NO_UNLOAD_STUB(kcf, random_add_pseudo_entropy, nomod_minus_one);
+	NO_UNLOAD_STUB(kcf, random_get_blocking_bytes, nomod_minus_one);
 	NO_UNLOAD_STUB(kcf, random_get_bytes, nomod_minus_one);
 	NO_UNLOAD_STUB(kcf, random_get_pseudo_bytes, nomod_minus_one);
 	END_MODULE(kcf);

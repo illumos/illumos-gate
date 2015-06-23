@@ -5,8 +5,8 @@
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
  *
- * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
+ * You can obtain a copy of the license at
+ * http://www.opensource.org/licenses/cddl1.txt.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -20,10 +20,9 @@
  */
 
 /*
- * Copyright 2011 Emulex.  All rights reserved.
+ * Copyright (c) 2004-2012 Emulex. All rights reserved.
  * Use is subject to license terms.
  */
-
 
 #include <emlxs.h>
 
@@ -74,6 +73,7 @@ emlxs_handle_fcp_event(emlxs_hba_t *hba, CHANNEL *cp, IOCBQ *iocbq)
 	uint8_t scsi_opcode;
 	uint16_t scsi_dl;
 	uint32_t data_rx;
+	uint32_t length;
 
 	cmd = &iocbq->iocb;
 
@@ -96,7 +96,7 @@ emlxs_handle_fcp_event(emlxs_hba_t *hba, CHANNEL *cp, IOCBQ *iocbq)
 		HBASTATS.FcpStray++;
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_stray_fcp_completion_msg,
-		    "cmd=%x iotag=%x", cmd->ULPCOMMAND, cmd->ULPIOTAG);
+		    "cmd=%x iotag=%d", cmd->ULPCOMMAND, cmd->ULPIOTAG);
 
 		return;
 	}
@@ -181,278 +181,397 @@ emlxs_handle_fcp_event(emlxs_hba_t *hba, CHANNEL *cp, IOCBQ *iocbq)
 	 * is reported.
 	 */
 
-	/* Check if a response buffer was provided */
-	if ((iostat == IOSTAT_FCP_RSP_ERROR) && pkt->pkt_rsplen) {
-		EMLXS_MPDATA_SYNC(pkt->pkt_resp_dma, 0, pkt->pkt_rsplen,
-		    DDI_DMA_SYNC_FORKERNEL);
+	/* Check if a response buffer was not provided */
+	if ((iostat != IOSTAT_FCP_RSP_ERROR) || (pkt->pkt_rsplen == 0)) {
+		goto done;
+	}
 
-		/* Get the response buffer pointer */
-		rsp = (fcp_rsp_t *)pkt->pkt_resp;
+	EMLXS_MPDATA_SYNC(pkt->pkt_resp_dma, 0, pkt->pkt_rsplen,
+	    DDI_DMA_SYNC_FORKERNEL);
 
-		/* Set the valid response flag */
-		sbp->pkt_flags |= PACKET_FCP_RSP_VALID;
+	/* Get the response buffer pointer */
+	rsp = (fcp_rsp_t *)pkt->pkt_resp;
 
-		scsi_status = rsp->fcp_u.fcp_status.scsi_status;
+	/* Validate the response payload */
+	if (!rsp->fcp_u.fcp_status.resid_under &&
+	    !rsp->fcp_u.fcp_status.resid_over) {
+		rsp->fcp_resid = 0;
+	}
+
+	if (!rsp->fcp_u.fcp_status.rsp_len_set) {
+		rsp->fcp_response_len = 0;
+	}
+
+	if (!rsp->fcp_u.fcp_status.sense_len_set) {
+		rsp->fcp_sense_len = 0;
+	}
+
+	length = sizeof (fcp_rsp_t) + LE_SWAP32(rsp->fcp_response_len) +
+	    LE_SWAP32(rsp->fcp_sense_len);
+
+	if (length > pkt->pkt_rsplen) {
+		iostat = IOSTAT_RSP_INVALID;
+		pkt->pkt_data_resid = pkt->pkt_datalen;
+		goto done;
+	}
+
+	/* Set the valid response flag */
+	sbp->pkt_flags |= PACKET_FCP_RSP_VALID;
+
+	scsi_status = rsp->fcp_u.fcp_status.scsi_status;
 
 #ifdef SAN_DIAG_SUPPORT
-		ndlp = (NODELIST *)iocbq->node;
-		if (scsi_status == SCSI_STAT_QUE_FULL) {
-			emlxs_log_sd_scsi_event(port, SD_SCSI_SUBCATEGORY_QFULL,
-			    (HBA_WWN *)&ndlp->nlp_portname, sbp->lun);
-		} else if (scsi_status == SCSI_STAT_BUSY) {
-			emlxs_log_sd_scsi_event(port,
-			    SD_SCSI_SUBCATEGORY_DEVBSY,
-			    (HBA_WWN *)&ndlp->nlp_portname, sbp->lun);
-		}
+	ndlp = (NODELIST *)iocbq->node;
+	if (scsi_status == SCSI_STAT_QUE_FULL) {
+		emlxs_log_sd_scsi_event(port, SD_SCSI_SUBCATEGORY_QFULL,
+		    (HBA_WWN *)&ndlp->nlp_portname, sbp->lun);
+	} else if (scsi_status == SCSI_STAT_BUSY) {
+		emlxs_log_sd_scsi_event(port,
+		    SD_SCSI_SUBCATEGORY_DEVBSY,
+		    (HBA_WWN *)&ndlp->nlp_portname, sbp->lun);
+	}
 #endif
 
-		/*
-		 * Convert a task abort to a check condition with no data
-		 * transferred. We saw a data corruption when Solaris received
-		 * a Task Abort from a tape.
-		 */
+	/*
+	 * Convert a task abort to a check condition with no data
+	 * transferred. We saw a data corruption when Solaris received
+	 * a Task Abort from a tape.
+	 */
 
-		if (scsi_status == SCSI_STAT_TASK_ABORT) {
-			EMLXS_MSGF(EMLXS_CONTEXT,
-			    &emlxs_fcp_completion_error_msg,
-			    "Task Abort. "
-			    "Fixed.did=0x%06x sbp=%p cmd=%02x dl=%d",
-			    did, sbp, scsi_opcode, pkt->pkt_datalen);
+	if (scsi_status == SCSI_STAT_TASK_ABORT) {
+		EMLXS_MSGF(EMLXS_CONTEXT,
+		    &emlxs_fcp_completion_error_msg,
+		    "Task Abort. "
+		    "Fixed. did=0x%06x sbp=%p cmd=%02x dl=%d",
+		    did, sbp, scsi_opcode, pkt->pkt_datalen);
 
-			rsp->fcp_u.fcp_status.scsi_status =
-			    SCSI_STAT_CHECK_COND;
-			rsp->fcp_u.fcp_status.rsp_len_set = 0;
-			rsp->fcp_u.fcp_status.sense_len_set = 0;
-			rsp->fcp_u.fcp_status.resid_over = 0;
+		rsp->fcp_u.fcp_status.scsi_status =
+		    SCSI_STAT_CHECK_COND;
+		rsp->fcp_u.fcp_status.rsp_len_set = 0;
+		rsp->fcp_u.fcp_status.sense_len_set = 0;
+		rsp->fcp_u.fcp_status.resid_over = 0;
 
-			if (pkt->pkt_datalen) {
-				rsp->fcp_u.fcp_status.resid_under = 1;
-				rsp->fcp_resid =
-				    LE_SWAP32(pkt->pkt_datalen);
-			} else {
-				rsp->fcp_u.fcp_status.resid_under = 0;
-				rsp->fcp_resid = 0;
-			}
-
-			scsi_status = SCSI_STAT_CHECK_COND;
+		if (pkt->pkt_datalen) {
+			rsp->fcp_u.fcp_status.resid_under = 1;
+			rsp->fcp_resid =
+			    LE_SWAP32(pkt->pkt_datalen);
+		} else {
+			rsp->fcp_u.fcp_status.resid_under = 0;
+			rsp->fcp_resid = 0;
 		}
 
-		/*
-		 * We only need to check underrun if data could
-		 * have been sent
-		 */
+		scsi_status = SCSI_STAT_CHECK_COND;
+	}
 
-		/* Always check underrun if status is good */
-		if (scsi_status == SCSI_STAT_GOOD) {
-			check_underrun = 1;
+	/*
+	 * We only need to check underrun if data could
+	 * have been sent
+	 */
+
+	/* Always check underrun if status is good */
+	if (scsi_status == SCSI_STAT_GOOD) {
+		check_underrun = 1;
+	}
+	/* Check the sense codes if this is a check condition */
+	else if (scsi_status == SCSI_STAT_CHECK_COND) {
+		check_underrun = 1;
+
+		/* Check if sense data was provided */
+		if (LE_SWAP32(rsp->fcp_sense_len) >= 14) {
+			sense = *((uint8_t *)rsp + 32 + 2);
+			asc = *((uint8_t *)rsp + 32 + 12);
+			ascq = *((uint8_t *)rsp + 32 + 13);
 		}
-		/* Check the sense codes if this is a check condition */
-		else if (scsi_status == SCSI_STAT_CHECK_COND) {
-			check_underrun = 1;
-
-			/* Check if sense data was provided */
-			if (LE_SWAP32(rsp->fcp_sense_len) >= 14) {
-				sense = *((uint8_t *)rsp + 32 + 2);
-				asc = *((uint8_t *)rsp + 32 + 12);
-				ascq = *((uint8_t *)rsp + 32 + 13);
-			}
 
 #ifdef SAN_DIAG_SUPPORT
-			emlxs_log_sd_scsi_check_event(port,
+		emlxs_log_sd_scsi_check_event(port,
+		    (HBA_WWN *)&ndlp->nlp_portname, sbp->lun,
+		    scsi_opcode, sense, asc, ascq);
+#endif
+	}
+	/* Status is not good and this is not a check condition */
+	/* No data should have been sent */
+	else {
+		check_underrun = 0;
+	}
+
+	/* Initialize the resids */
+	pkt->pkt_resp_resid = 0;
+	pkt->pkt_data_resid = 0;
+
+	/* Check if no data was to be transferred */
+	if (pkt->pkt_datalen == 0) {
+		goto done;
+	}
+
+	/* Get the residual underrun count reported by the SCSI reply */
+	rsp_data_resid = (rsp->fcp_u.fcp_status.resid_under) ?
+	    LE_SWAP32(rsp->fcp_resid) : 0;
+
+	/* Set the pkt_data_resid to what the scsi response resid */
+	pkt->pkt_data_resid = rsp_data_resid;
+
+	/* Adjust the pkt_data_resid field if needed */
+	if (pkt->pkt_tran_type == FC_PKT_FCP_READ) {
+		/*
+		 * Get the residual underrun count reported by
+		 * our adapter
+		 */
+		pkt->pkt_data_resid = cmd->un.fcpi.fcpi_parm;
+
+#ifdef SAN_DIAG_SUPPORT
+		if ((rsp_data_resid == 0) && (pkt->pkt_data_resid)) {
+			emlxs_log_sd_fc_rdchk_event(port,
 			    (HBA_WWN *)&ndlp->nlp_portname, sbp->lun,
-			    scsi_opcode, sense, asc, ascq);
+			    scsi_opcode, pkt->pkt_data_resid);
+		}
 #endif
-		}
-		/* Status is not good and this is not a check condition */
-		/* No data should have been sent */
-		else {
-			check_underrun = 0;
-		}
 
-		/* Get the residual underrun count reported by the SCSI reply */
-		rsp_data_resid = (pkt->pkt_datalen &&
-		    rsp->fcp_u.fcp_status.resid_under) ? LE_SWAP32(rsp->
-		    fcp_resid) : 0;
+		/* Get the actual amount of data transferred */
+		data_rx = pkt->pkt_datalen - pkt->pkt_data_resid;
 
-		/* Set the pkt resp_resid field */
-		pkt->pkt_resp_resid = 0;
+		/*
+		 * If the residual being reported by the adapter is
+		 * greater than the residual being reported in the
+		 * reply, then we have a true underrun.
+		 */
+		if (check_underrun && (pkt->pkt_data_resid > rsp_data_resid)) {
+			switch (scsi_opcode) {
+			case SCSI_INQUIRY:
+				scsi_dl = scsi_cmd[16];
+				break;
 
-		/* Set the pkt data_resid field */
-		if (pkt->pkt_datalen &&
-		    (pkt->pkt_tran_type == FC_PKT_FCP_READ)) {
-			/*
-			 * Get the residual underrun count reported by
-			 * our adapter
-			 */
-			pkt->pkt_data_resid = cmd->un.fcpi.fcpi_parm;
+			case SCSI_RX_DIAG:
+				scsi_dl =
+				    (scsi_cmd[15] * 0x100) +
+				    scsi_cmd[16];
+				break;
 
-#ifdef SAN_DIAG_SUPPORT
-			if ((rsp_data_resid == 0) && (pkt->pkt_data_resid)) {
-				emlxs_log_sd_fc_rdchk_event(port,
-				    (HBA_WWN *)&ndlp->nlp_portname, sbp->lun,
-				    scsi_opcode, pkt->pkt_data_resid);
+			default:
+				scsi_dl = pkt->pkt_datalen;
 			}
-#endif
-
-			/* Get the actual amount of data transferred */
-			data_rx = pkt->pkt_datalen - pkt->pkt_data_resid;
-
-			/*
-			 * If the residual being reported by the adapter is
-			 * greater than the residual being reported in the
-			 * reply, then we have a true underrun.
-			 */
-			if (check_underrun &&
-			    (pkt->pkt_data_resid > rsp_data_resid)) {
-				switch (scsi_opcode) {
-				case SCSI_INQUIRY:
-					scsi_dl = scsi_cmd[16];
-					break;
-
-				case SCSI_RX_DIAG:
-					scsi_dl =
-					    (scsi_cmd[15] * 0x100) +
-					    scsi_cmd[16];
-					break;
-
-				default:
-					scsi_dl = pkt->pkt_datalen;
-				}
 
 #ifdef FCP_UNDERRUN_PATCH1
 if (cfg[CFG_ENABLE_PATCH].current & FCP_UNDERRUN_PATCH1) {
-				/*
-				 * If status is not good and no data was
-				 * actually transferred, then we must fix
-				 * the issue
-				 */
-				if ((scsi_status != SCSI_STAT_GOOD) &&
-				    (data_rx == 0)) {
-					fix_it = 1;
+			/*
+			 * If status is not good and no data was
+			 * actually transferred, then we must fix
+			 * the issue
+			 */
+			if ((scsi_status != SCSI_STAT_GOOD) && (data_rx == 0)) {
+				fix_it = 1;
 
-					EMLXS_MSGF(EMLXS_CONTEXT,
-					    &emlxs_fcp_completion_error_msg,
-					    "Underrun(1). Fixed. "
-					    "did=0x%06x sbp=%p cmd=%02x "
-					    "dl=%d,%d rx=%d rsp=%d",
-					    did, sbp, scsi_opcode,
-					    pkt->pkt_datalen, scsi_dl,
-					    (pkt->pkt_datalen -
-					    cmd->un.fcpi.fcpi_parm),
-					    rsp_data_resid);
+				EMLXS_MSGF(EMLXS_CONTEXT,
+				    &emlxs_fcp_completion_error_msg,
+				    "Underrun(1). Fixed. "
+				    "did=0x%06x sbp=%p cmd=%02x "
+				    "dl=%d,%d rx=%d rsp=%d",
+				    did, sbp, scsi_opcode,
+				    pkt->pkt_datalen, scsi_dl,
+				    (pkt->pkt_datalen -
+				    pkt->pkt_data_resid),
+				    rsp_data_resid);
 
-				}
+			}
 }
 #endif /* FCP_UNDERRUN_PATCH1 */
 
 
 #ifdef FCP_UNDERRUN_PATCH2
 if (cfg[CFG_ENABLE_PATCH].current & FCP_UNDERRUN_PATCH2) {
-				if ((scsi_status == SCSI_STAT_GOOD)) {
-					emlxs_msg_t	*msg;
+			if (scsi_status == SCSI_STAT_GOOD) {
+				emlxs_msg_t	*msg;
 
-					msg = &emlxs_fcp_completion_error_msg;
-					/*
-					 * If status is good and this is an
-					 * inquiry request and the amount of
-					 * data
-					 */
-					/*
-					 * requested <= data received, then we
-					 * must fix the issue.
-					 */
+				msg = &emlxs_fcp_completion_error_msg;
+				/*
+				 * If status is good and this is an
+				 * inquiry request and the amount of
+				 * data
+				 */
+				/*
+				 * requested <= data received, then we
+				 * must fix the issue.
+				 */
 
-					if ((scsi_opcode == SCSI_INQUIRY) &&
-					    (pkt->pkt_datalen >= data_rx) &&
-					    (scsi_dl <= data_rx)) {
-						fix_it = 1;
+				if ((scsi_opcode == SCSI_INQUIRY) &&
+				    (pkt->pkt_datalen >= data_rx) &&
+				    (scsi_dl <= data_rx)) {
+					fix_it = 1;
 
-						EMLXS_MSGF(EMLXS_CONTEXT, msg,
-						    "Underrun(2). Fixed. "
-						    "did=0x%06x sbp=%p "
-						    "cmd=%02x dl=%d,%d "
-						    "rx=%d rsp=%d",
-						    did, sbp, scsi_opcode,
-						    pkt->pkt_datalen, scsi_dl,
-						    data_rx, rsp_data_resid);
-
-					}
-
-					/*
-					 * If status is good and this is an
-					 * inquiry request and the amount of
-					 * data requested >= 128 bytes, but
-					 * only 128 bytes were received,
-					 * then we must fix the issue.
-					 */
-					else if ((scsi_opcode ==
-					    SCSI_INQUIRY) &&
-					    (pkt->pkt_datalen >= 128) &&
-					    (scsi_dl >= 128) &&
-					    (data_rx == 128)) {
-						fix_it = 1;
-
-						EMLXS_MSGF(EMLXS_CONTEXT, msg,
-						    "Underrun(3). Fixed. "
-						    "did=0x%06x sbp=%p "
-						    "cmd=%02x dl=%d,%d "
-						    "rx=%d rsp=%d",
-						    did, sbp, scsi_opcode,
-						    pkt->pkt_datalen, scsi_dl,
-						    data_rx, rsp_data_resid);
-
-					}
+					EMLXS_MSGF(EMLXS_CONTEXT, msg,
+					    "Underrun(2). Fixed. "
+					    "did=0x%06x sbp=%p "
+					    "cmd=%02x dl=%d,%d "
+					    "rx=%d rsp=%d",
+					    did, sbp, scsi_opcode,
+					    pkt->pkt_datalen, scsi_dl,
+					    data_rx, rsp_data_resid);
 
 				}
+
+				/*
+				 * If status is good and this is an
+				 * inquiry request and the amount of
+				 * data requested >= 128 bytes, but
+				 * only 128 bytes were received,
+				 * then we must fix the issue.
+				 */
+				else if ((scsi_opcode == SCSI_INQUIRY) &&
+				    (pkt->pkt_datalen >= 128) &&
+				    (scsi_dl >= 128) && (data_rx == 128)) {
+					fix_it = 1;
+
+					EMLXS_MSGF(EMLXS_CONTEXT, msg,
+					    "Underrun(3). Fixed. "
+					    "did=0x%06x sbp=%p "
+					    "cmd=%02x dl=%d,%d "
+					    "rx=%d rsp=%d",
+					    did, sbp, scsi_opcode,
+					    pkt->pkt_datalen, scsi_dl,
+					    data_rx, rsp_data_resid);
+
+				}
+			}
 }
 #endif /* FCP_UNDERRUN_PATCH2 */
 
-				/*
-				 * Check if SCSI response payload should be
-				 * fixed or if a DATA_UNDERRUN should be
-				 * reported
-				 */
-				if (fix_it) {
-					/*
-					 * Fix the SCSI response payload itself
-					 */
-					rsp->fcp_u.fcp_status.resid_under = 1;
-					rsp->fcp_resid =
-					    LE_SWAP32(pkt->pkt_data_resid);
-				} else {
-					/*
-					 * Change the status from
-					 * IOSTAT_FCP_RSP_ERROR to
-					 * IOSTAT_DATA_UNDERRUN
-					 */
-					iostat = IOSTAT_DATA_UNDERRUN;
-					pkt->pkt_data_resid =
-					    pkt->pkt_datalen;
-				}
-			}
-
 			/*
-			 * If the residual being reported by the adapter is
-			 * less than the residual being reported in the reply,
-			 * then we have a true overrun. Since we don't know
-			 * where the extra data came from or went to then we
-			 * cannot trust anything we received
+			 * Check if SCSI response payload should be
+			 * fixed or if a DATA_UNDERRUN should be
+			 * reported
 			 */
-			else if (rsp_data_resid > pkt->pkt_data_resid) {
+			if (fix_it) {
+				/*
+				 * Fix the SCSI response payload itself
+				 */
+				rsp->fcp_u.fcp_status.resid_under = 1;
+				rsp->fcp_resid =
+				    LE_SWAP32(pkt->pkt_data_resid);
+			} else {
 				/*
 				 * Change the status from
 				 * IOSTAT_FCP_RSP_ERROR to
-				 * IOSTAT_DATA_OVERRUN
+				 * IOSTAT_DATA_UNDERRUN
 				 */
-				iostat = IOSTAT_DATA_OVERRUN;
-				pkt->pkt_data_resid = pkt->pkt_datalen;
+				iostat = IOSTAT_DATA_UNDERRUN;
+				pkt->pkt_data_resid =
+				    pkt->pkt_datalen;
 			}
-		} else {	/* pkt->pkt_datalen==0 or FC_PKT_FCP_WRITE */
+		}
 
-			/* Report whatever the target reported */
-			pkt->pkt_data_resid = rsp_data_resid;
+		/*
+		 * If the residual being reported by the adapter is
+		 * less than the residual being reported in the reply,
+		 * then we have a true overrun. Since we don't know
+		 * where the extra data came from or went to then we
+		 * cannot trust anything we received
+		 */
+		else if (rsp_data_resid > pkt->pkt_data_resid) {
+			/*
+			 * Change the status from
+			 * IOSTAT_FCP_RSP_ERROR to
+			 * IOSTAT_DATA_OVERRUN
+			 */
+			iostat = IOSTAT_DATA_OVERRUN;
+			pkt->pkt_data_resid = pkt->pkt_datalen;
+		}
+
+	} else if ((hba->sli_mode == EMLXS_HBA_SLI4_MODE) &&
+	    (pkt->pkt_tran_type == FC_PKT_FCP_WRITE)) {
+		/*
+		 * Get the residual underrun count reported by
+		 * our adapter
+		 */
+		pkt->pkt_data_resid = cmd->un.fcpi.fcpi_parm;
+
+#ifdef SAN_DIAG_SUPPORT
+		if ((rsp_data_resid == 0) && (pkt->pkt_data_resid)) {
+			emlxs_log_sd_fc_rdchk_event(port,
+			    (HBA_WWN *)&ndlp->nlp_portname, sbp->lun,
+			    scsi_opcode, pkt->pkt_data_resid);
+		}
+#endif /* SAN_DIAG_SUPPORT */
+
+		/* Get the actual amount of data transferred */
+		data_rx = pkt->pkt_datalen - pkt->pkt_data_resid;
+
+		/*
+		 * If the residual being reported by the adapter is
+		 * greater than the residual being reported in the
+		 * reply, then we have a true underrun.
+		 */
+		if (check_underrun && (pkt->pkt_data_resid > rsp_data_resid)) {
+
+			scsi_dl = pkt->pkt_datalen;
+
+#ifdef FCP_UNDERRUN_PATCH1
+if (cfg[CFG_ENABLE_PATCH].current & FCP_UNDERRUN_PATCH1) {
+			/*
+			 * If status is not good and no data was
+			 * actually transferred, then we must fix
+			 * the issue
+			 */
+			if ((scsi_status != SCSI_STAT_GOOD) && (data_rx == 0)) {
+				fix_it = 1;
+
+				EMLXS_MSGF(EMLXS_CONTEXT,
+				    &emlxs_fcp_completion_error_msg,
+				    "Underrun(1). Fixed. "
+				    "did=0x%06x sbp=%p cmd=%02x "
+				    "dl=%d,%d rx=%d rsp=%d",
+				    did, sbp, scsi_opcode,
+				    pkt->pkt_datalen, scsi_dl,
+				    (pkt->pkt_datalen -
+				    pkt->pkt_data_resid),
+				    rsp_data_resid);
+
+			}
+}
+#endif /* FCP_UNDERRUN_PATCH1 */
+
+			/*
+			 * Check if SCSI response payload should be
+			 * fixed or if a DATA_UNDERRUN should be
+			 * reported
+			 */
+			if (fix_it) {
+				/*
+				 * Fix the SCSI response payload itself
+				 */
+				rsp->fcp_u.fcp_status.resid_under = 1;
+				rsp->fcp_resid =
+				    LE_SWAP32(pkt->pkt_data_resid);
+			} else {
+				/*
+				 * Change the status from
+				 * IOSTAT_FCP_RSP_ERROR to
+				 * IOSTAT_DATA_UNDERRUN
+				 */
+				iostat = IOSTAT_DATA_UNDERRUN;
+				pkt->pkt_data_resid =
+				    pkt->pkt_datalen;
+			}
+		}
+
+		/*
+		 * If the residual being reported by the adapter is
+		 * less than the residual being reported in the reply,
+		 * then we have a true overrun. Since we don't know
+		 * where the extra data came from or went to then we
+		 * cannot trust anything we received
+		 */
+		else if (rsp_data_resid > pkt->pkt_data_resid) {
+			/*
+			 * Change the status from
+			 * IOSTAT_FCP_RSP_ERROR to
+			 * IOSTAT_DATA_OVERRUN
+			 */
+			iostat = IOSTAT_DATA_OVERRUN;
+			pkt->pkt_data_resid = pkt->pkt_datalen;
 		}
 	}
+
+done:
 
 	/* Print completion message */
 	switch (iostat) {
@@ -558,6 +677,16 @@ if (cfg[CFG_ENABLE_PATCH].current & FCP_UNDERRUN_PATCH2) {
 		    rsp_data_resid, scsi_status, sense, asc, ascq);
 		break;
 
+	case IOSTAT_RSP_INVALID:
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcp_completion_error_msg,
+		    "Rsp Invalid. did=0x%06x sbp=%p cmd=%02x dl=%d rl=%d"
+		    "(%d, %d, %d)",
+		    did, sbp, scsi_opcode, pkt->pkt_datalen, pkt->pkt_rsplen,
+		    LE_SWAP32(rsp->fcp_resid),
+		    LE_SWAP32(rsp->fcp_sense_len),
+		    LE_SWAP32(rsp->fcp_response_len));
+		break;
+
 	default:
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcp_completion_error_msg,
 		    "Unknown status=%x reason=%x did=0x%06x sbp=%p cmd=%02x",
@@ -565,8 +694,6 @@ if (cfg[CFG_ENABLE_PATCH].current & FCP_UNDERRUN_PATCH2) {
 		    scsi_opcode);
 		break;
 	}
-
-done:
 
 	if (iostat == IOSTAT_SUCCESS) {
 		HBASTATS.FcpGood++;
@@ -581,7 +708,6 @@ done:
 	return;
 
 } /* emlxs_handle_fcp_event() */
-
 
 
 /*
@@ -636,7 +762,7 @@ emlxs_post_buffer(emlxs_hba_t *hba, RING *rp, int16_t cnt)
 	 * While there are buffers to post
 	 */
 	while (cnt) {
-		if ((iocbq = (IOCBQ *)emlxs_mem_get(hba, MEM_IOCB, 0)) == 0) {
+		if ((iocbq = (IOCBQ *)emlxs_mem_get(hba, MEM_IOCB)) == 0) {
 			rp->fc_missbufcnt = cnt;
 			return (cnt);
 		}
@@ -655,7 +781,7 @@ emlxs_post_buffer(emlxs_hba_t *hba, RING *rp, int16_t cnt)
 				break;
 
 			/* fill in BDEs for command */
-			if ((mp = (MATCHMAP *)emlxs_mem_get(hba, seg, 1))
+			if ((mp = (MATCHMAP *)emlxs_mem_get(hba, seg))
 			    == 0) {
 				icmd->ULPBDECOUNT = i;
 				for (j = 0; j < i; j++) {
@@ -713,6 +839,60 @@ emlxs_post_buffer(emlxs_hba_t *hba, RING *rp, int16_t cnt)
 } /* emlxs_post_buffer() */
 
 
+static void
+emlxs_fcp_tag_nodes(emlxs_port_t *port)
+{
+	NODELIST *nlp;
+	int i;
+
+	/* We will process all nodes with this tag later */
+	rw_enter(&port->node_rwlock, RW_READER);
+	for (i = 0; i < EMLXS_NUM_HASH_QUES; i++) {
+		nlp = port->node_table[i];
+		while (nlp != NULL) {
+			nlp->nlp_tag = 1;
+			nlp = nlp->nlp_list_next;
+		}
+	}
+	rw_exit(&port->node_rwlock);
+}
+
+
+static NODELIST *
+emlxs_find_tagged_node(emlxs_port_t *port)
+{
+	NODELIST *nlp;
+	NODELIST *tagged;
+	int i;
+
+	/* Find first node */
+	rw_enter(&port->node_rwlock, RW_READER);
+	tagged = 0;
+	for (i = 0; i < EMLXS_NUM_HASH_QUES; i++) {
+		nlp = port->node_table[i];
+		while (nlp != NULL) {
+			if (!nlp->nlp_tag) {
+				nlp = nlp->nlp_list_next;
+				continue;
+			}
+			nlp->nlp_tag = 0;
+
+			if (nlp->nlp_Rpi == FABRIC_RPI) {
+				nlp = nlp->nlp_list_next;
+				continue;
+			}
+			tagged = nlp;
+			break;
+		}
+		if (tagged) {
+			break;
+		}
+	}
+	rw_exit(&port->node_rwlock);
+	return (tagged);
+}
+
+
 extern int
 emlxs_port_offline(emlxs_port_t *port, uint32_t scope)
 {
@@ -733,7 +913,8 @@ emlxs_port_offline(emlxs_port_t *port, uint32_t scope)
 	uint8_t format;
 
 	/* Target mode only uses this routine for linkdowns */
-	if (port->tgt_mode && (scope != 0xffffffff) && (scope != 0xfeffffff)) {
+	if ((port->mode == MODE_TARGET) && (scope != 0xffffffff) &&
+	    (scope != 0xfeffffff) && (scope != 0xfdffffff)) {
 		return (0);
 	}
 
@@ -768,12 +949,6 @@ emlxs_port_offline(emlxs_port_t *port, uint32_t scope)
 		mask = 0x00000000;
 		break;
 
-	case 0xfd:	/* New fabric */
-		mask = 0x00000000;
-		linkdown = 1;
-		clear_all = 1;
-		break;
-
 #ifdef DHCHAP_SUPPORT
 	case 0xfe:	/* Virtual link down */
 		mask = 0x00000000;
@@ -786,6 +961,12 @@ emlxs_port_offline(emlxs_port_t *port, uint32_t scope)
 		linkdown = 1;
 		break;
 
+	case 0xfd:	/* New fabric */
+	default:
+		mask = 0x00000000;
+		linkdown = 1;
+		clear_all = 1;
+		break;
 	}
 
 	aff_d_id = aid->aff_d_id & mask;
@@ -803,14 +984,21 @@ emlxs_port_offline(emlxs_port_t *port, uint32_t scope)
 
 		if (port->ulp_statec != FC_STATE_OFFLINE) {
 			port->ulp_statec = FC_STATE_OFFLINE;
+
 			port->prev_did = port->did;
+			port->did = 0;
+			port->rdid = 0;
+
 			bcopy(&port->fabric_sparam, &port->prev_fabric_sparam,
 			    sizeof (SERV_PARM));
-			port->did = 0;
+			bzero(&port->fabric_sparam, sizeof (SERV_PARM));
+
 			update = 1;
 		}
 
 		mutex_exit(&EMLXS_PORT_LOCK);
+
+		emlxs_timer_cancel_clean_address(port);
 
 		/* Tell ULP about it */
 		if (update) {
@@ -820,12 +1008,11 @@ emlxs_port_offline(emlxs_port_t *port, uint32_t scope)
 					    &emlxs_link_down_msg, NULL);
 				}
 
-				if (port->ini_mode) {
-					port->ulp_statec_cb(port->ulp_handle,
-					    FC_STATE_OFFLINE);
+				if (port->mode == MODE_INITIATOR) {
+					emlxs_fca_link_down(port);
 				}
 #ifdef SFCT_SUPPORT
-				else if (port->tgt_mode) {
+				else if (port->mode == MODE_TARGET) {
 					emlxs_fct_link_down(port);
 				}
 #endif /* SFCT_SUPPORT */
@@ -866,6 +1053,8 @@ emlxs_port_offline(emlxs_port_t *port, uint32_t scope)
 
 		mutex_exit(&EMLXS_PORT_LOCK);
 
+		emlxs_timer_cancel_clean_address(port);
+
 		/* Tell ULP about it */
 		if (update) {
 			if (port->flag & EMLXS_PORT_BOUND) {
@@ -875,18 +1064,14 @@ emlxs_port_offline(emlxs_port_t *port, uint32_t scope)
 					    "Switch authentication failed.");
 				}
 
-#ifdef SFCT_SUPPORT
-				if (port->tgt_mode) {
-					emlxs_fct_link_down(port);
-
-				} else if (port->ini_mode) {
-					port->ulp_statec_cb(port->ulp_handle,
-					    FC_STATE_OFFLINE);
+				if (port->mode == MODE_INITIATOR) {
+					emlxs_fca_link_down(port);
 				}
-#else
-				port->ulp_statec_cb(port->ulp_handle,
-				    FC_STATE_OFFLINE);
-#endif	/* SFCT_SUPPORT */
+#ifdef SFCT_SUPPORT
+				else if (port->mode == MODE_TARGET) {
+					emlxs_fct_link_down(port);
+				}
+#endif /* SFCT_SUPPORT */
 			} else {
 				if (port->vpi == 0) {
 					EMLXS_MSGF(EMLXS_CONTEXT,
@@ -903,22 +1088,29 @@ emlxs_port_offline(emlxs_port_t *port, uint32_t scope)
 		(void) emlxs_chipq_node_flush(port, 0, &port->node_base, 0);
 	}
 #endif /* DHCHAP_SUPPORT */
+	else {
+		emlxs_timer_cancel_clean_address(port);
+	}
 
-	if (port->tgt_mode) {
+	if (port->mode == MODE_TARGET) {
+		if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
+			/* Set the node tags */
+			emlxs_fcp_tag_nodes(port);
+			unreg_vpi = 0;
+			while ((nlp = emlxs_find_tagged_node(port))) {
+				(void) emlxs_rpi_pause_notify(port,
+				    nlp->rpip);
+				/*
+				 * In port_online we need to resume
+				 * these RPIs before we can use them.
+				 */
+			}
+		}
 		goto done;
 	}
 
 	/* Set the node tags */
-	/* We will process all nodes with this tag */
-	rw_enter(&port->node_rwlock, RW_READER);
-	for (i = 0; i < EMLXS_NUM_HASH_QUES; i++) {
-		nlp = port->node_table[i];
-		while (nlp != NULL) {
-			nlp->nlp_tag = 1;
-			nlp = nlp->nlp_list_next;
-		}
-	}
-	rw_exit(&port->node_rwlock);
+	emlxs_fcp_tag_nodes(port);
 
 	if (!clear_all && (hba->flag & FC_ONLINE_MODE)) {
 		adisc_support = cfg[CFG_ADISC_SUPPORT].current;
@@ -933,7 +1125,7 @@ emlxs_port_offline(emlxs_port_t *port, uint32_t scope)
 		for (;;) {
 			/*
 			 * We need to hold the locks this way because
-			 * emlxs_mb_unreg_node and the flush routines enter the
+			 * EMLXS_SLI_UNREG_NODE and the flush routines enter the
 			 * same locks. Also, when we release the lock the list
 			 * can change out from under us.
 			 */
@@ -978,9 +1170,11 @@ emlxs_port_offline(emlxs_port_t *port, uint32_t scope)
 			if (action == 0) {
 				break;
 			} else if (action == 1) {
-				(void) emlxs_mb_unreg_node(port, nlp,
+				(void) EMLXS_SLI_UNREG_NODE(port, nlp,
 				    NULL, NULL, NULL);
 			} else if (action == 2) {
+				EMLXS_SET_DFC_STATE(nlp, NODE_LIMBO);
+
 #ifdef DHCHAP_SUPPORT
 				emlxs_dhc_auth_stop(port, nlp);
 #endif /* DHCHAP_SUPPORT */
@@ -1011,7 +1205,7 @@ emlxs_port_offline(emlxs_port_t *port, uint32_t scope)
 
 			/*
 			 * We need to hold the locks this way because
-			 * emlxs_mb_unreg_node and the flush routines enter the
+			 * EMLXS_SLI_UNREG_NODE and the flush routines enter the
 			 * same locks. Also, when we release the lock the list
 			 * can change out from under us.
 			 */
@@ -1069,9 +1263,11 @@ emlxs_port_offline(emlxs_port_t *port, uint32_t scope)
 			if (action == 0) {
 				break;
 			} else if (action == 1) {
-				(void) emlxs_mb_unreg_node(port, nlp,
+				(void) EMLXS_SLI_UNREG_NODE(port, nlp,
 				    NULL, NULL, NULL);
 			} else if (action == 2) {
+				EMLXS_SET_DFC_STATE(nlp, NODE_LIMBO);
+
 #ifdef DHCHAP_SUPPORT
 				emlxs_dhc_auth_stop(port, nlp);
 #endif /* DHCHAP_SUPPORT */
@@ -1092,6 +1288,8 @@ emlxs_port_offline(emlxs_port_t *port, uint32_t scope)
 				(void) emlxs_chipq_node_flush(port, 0, nlp, 0);
 
 			} else if (action == 3) {	/* FCP2 devices */
+				EMLXS_SET_DFC_STATE(nlp, NODE_LIMBO);
+
 				unreg_vpi = 0;
 
 				if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
@@ -1140,7 +1338,7 @@ emlxs_port_offline(emlxs_port_t *port, uint32_t scope)
 		for (;;) {
 			/*
 			 * We need to hold the locks this way because
-			 * emlxs_mb_unreg_node and the flush routines enter the
+			 * EMLXS_SLI_UNREG_NODE and the flush routines enter the
 			 * same locks. Also, when we release the lock the list
 			 * can change out from under us.
 			 */
@@ -1195,9 +1393,11 @@ emlxs_port_offline(emlxs_port_t *port, uint32_t scope)
 			if (action == 0) {
 				break;
 			} else if (action == 1) {
-				(void) emlxs_mb_unreg_node(port, nlp,
+				(void) EMLXS_SLI_UNREG_NODE(port, nlp,
 				    NULL, NULL, NULL);
 			} else if (action == 2) {
+				EMLXS_SET_DFC_STATE(nlp, NODE_LIMBO);
+
 				/*
 				 * Close the node for any further normal IO
 				 * A PLOGI with reopen the node
@@ -1214,6 +1414,8 @@ emlxs_port_offline(emlxs_port_t *port, uint32_t scope)
 				(void) emlxs_chipq_node_flush(port, 0, nlp, 0);
 
 			} else if (action == 3) {	/* FCP2 devices */
+				EMLXS_SET_DFC_STATE(nlp, NODE_LIMBO);
+
 				unreg_vpi = 0;
 
 				if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
@@ -1268,6 +1470,7 @@ emlxs_port_online(emlxs_port_t *vport)
 {
 	emlxs_hba_t *hba = vport->hba;
 	emlxs_port_t *port = &PPORT;
+	NODELIST *nlp;
 	uint32_t state;
 	uint32_t update;
 	uint32_t npiv_linkup;
@@ -1287,59 +1490,73 @@ emlxs_port_online(emlxs_port_t *vport)
 	}
 
 	if (!(vport->flag & EMLXS_PORT_BOUND) ||
-	    !(vport->flag & EMLXS_PORT_ENABLE)) {
+	    !(vport->flag & EMLXS_PORT_ENABLED)) {
 		return;
 	}
 
-	mutex_enter(&EMLXS_PORT_LOCK);
-
 	/* Check for mode */
-	if (port->tgt_mode) {
-		(void) strcpy(mode, ", target");
-	} else if (port->ini_mode) {
-		(void) strcpy(mode, ", initiator");
+	if (port->mode == MODE_TARGET) {
+		(void) strlcpy(mode, ", target", sizeof (mode));
+
+		if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
+			/* Set the node tags */
+			emlxs_fcp_tag_nodes(vport);
+			while ((nlp = emlxs_find_tagged_node(vport))) {
+				/* The RPI was paused in port_offline */
+				(void) emlxs_rpi_resume_notify(vport,
+				    nlp->rpip, 0);
+			}
+		}
+	} else if (port->mode == MODE_INITIATOR) {
+		(void) strlcpy(mode, ", initiator", sizeof (mode));
 	} else {
-		(void) strcpy(mode, "");
+		(void) strlcpy(mode, "unknown", sizeof (mode));
 	}
+	mutex_enter(&EMLXS_PORT_LOCK);
 
 	/* Check for loop topology */
 	if (hba->topology == TOPOLOGY_LOOP) {
 		state = FC_STATE_LOOP;
-		(void) strcpy(topology, ", loop");
+		(void) strlcpy(topology, ", loop", sizeof (topology));
 	} else {
 		state = FC_STATE_ONLINE;
-		(void) strcpy(topology, ", fabric");
+		(void) strlcpy(topology, ", fabric", sizeof (topology));
 	}
 
 	/* Set the link speed */
 	switch (hba->linkspeed) {
 	case 0:
-		(void) strcpy(linkspeed, "Gb");
+		(void) strlcpy(linkspeed, "Gb", sizeof (linkspeed));
 		state |= FC_STATE_1GBIT_SPEED;
 		break;
 
 	case LA_1GHZ_LINK:
-		(void) strcpy(linkspeed, "1Gb");
+		(void) strlcpy(linkspeed, "1Gb", sizeof (linkspeed));
 		state |= FC_STATE_1GBIT_SPEED;
 		break;
 	case LA_2GHZ_LINK:
-		(void) strcpy(linkspeed, "2Gb");
+		(void) strlcpy(linkspeed, "2Gb", sizeof (linkspeed));
 		state |= FC_STATE_2GBIT_SPEED;
 		break;
 	case LA_4GHZ_LINK:
-		(void) strcpy(linkspeed, "4Gb");
+		(void) strlcpy(linkspeed, "4Gb", sizeof (linkspeed));
 		state |= FC_STATE_4GBIT_SPEED;
 		break;
 	case LA_8GHZ_LINK:
-		(void) strcpy(linkspeed, "8Gb");
+		(void) strlcpy(linkspeed, "8Gb", sizeof (linkspeed));
 		state |= FC_STATE_8GBIT_SPEED;
 		break;
 	case LA_10GHZ_LINK:
-		(void) strcpy(linkspeed, "10Gb");
+		(void) strlcpy(linkspeed, "10Gb", sizeof (linkspeed));
 		state |= FC_STATE_10GBIT_SPEED;
 		break;
+	case LA_16GHZ_LINK:
+		(void) strlcpy(linkspeed, "16Gb", sizeof (linkspeed));
+		state |= FC_STATE_16GBIT_SPEED;
+		break;
 	default:
-		(void) sprintf(linkspeed, "unknown(0x%x)", hba->linkspeed);
+		(void) snprintf(linkspeed, sizeof (linkspeed), "unknown(0x%x)",
+		    hba->linkspeed);
 		break;
 	}
 
@@ -1359,14 +1576,6 @@ emlxs_port_online(emlxs_port_t *vport)
 
 	mutex_exit(&EMLXS_PORT_LOCK);
 
-
-	/*
-	 * EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_link_up_msg,
-	 *    "linkup_callback: update=%d vpi=%d flag=%d fc_flag=%x state=%x"
-	 *    "statec=%x", update, vport->vpi, npiv_linkup, hba->flag,
-	 *    hba->state, vport->ulp_statec);
-	 */
-
 	if (update) {
 		if (vport->flag & EMLXS_PORT_BOUND) {
 			if (vport->vpi == 0) {
@@ -1379,12 +1588,11 @@ emlxs_port_online(emlxs_port_t *vport)
 				    linkspeed, topology, mode);
 			}
 
-			if (vport->ini_mode) {
-				vport->ulp_statec_cb(vport->ulp_handle,
-				    state);
+			if (vport->mode == MODE_INITIATOR) {
+				emlxs_fca_link_up(vport);
 			}
 #ifdef SFCT_SUPPORT
-			else if (vport->tgt_mode) {
+			else if (vport->mode == MODE_TARGET) {
 				emlxs_fct_link_up(vport);
 			}
 #endif /* SFCT_SUPPORT */
@@ -1471,6 +1679,9 @@ emlxs_linkup(emlxs_hba_t *hba)
 
 	mutex_enter(&EMLXS_PORT_LOCK);
 
+	/* Check for any mode changes */
+	emlxs_mode_set(hba);
+
 	HBASTATS.LinkUp++;
 	EMLXS_STATE_CHANGE_LOCKED(hba, FC_LINK_UP);
 
@@ -1524,12 +1735,13 @@ emlxs_reset_link(emlxs_hba_t *hba, uint32_t linkup, uint32_t wait)
 	MAILBOXQ *mbq = NULL;
 	MAILBOX *mb = NULL;
 	int rval = 0;
+	int tmo;
 	int rc;
 
 	/*
 	 * Get a buffer to use for the mailbox command
 	 */
-	if ((mbq = (MAILBOXQ *)emlxs_mem_get(hba, MEM_MBOX, 1))
+	if ((mbq = (MAILBOXQ *)emlxs_mem_get(hba, MEM_MBOX))
 	    == NULL) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_link_reset_failed_msg,
 		    "Unable to allocate mailbox buffer.");
@@ -1564,13 +1776,28 @@ emlxs_reset_link(emlxs_hba_t *hba, uint32_t linkup, uint32_t wait)
 		goto reset_link_fail;
 	}
 
+	tmo = 120;
+	do {
+		delay(drv_usectohz(500000));
+		tmo--;
+
+		if (!tmo)   {
+			rval = 1;
+
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_link_reset_msg,
+			    "Linkdown timeout.");
+
+			goto reset_link_fail;
+		}
+	} while ((hba->state >= FC_LINK_UP) && (hba->state != FC_ERROR));
+
 	if (linkup) {
 		/*
 		 * Setup and issue mailbox INITIALIZE LINK command
 		 */
 
 		if (wait == MBX_NOWAIT) {
-			if ((mbq = (MAILBOXQ *)emlxs_mem_get(hba, MEM_MBOX, 1))
+			if ((mbq = (MAILBOXQ *)emlxs_mem_get(hba, MEM_MBOX))
 			    == NULL) {
 				EMLXS_MSGF(EMLXS_CONTEXT,
 				    &emlxs_link_reset_failed_msg,
@@ -1650,7 +1877,7 @@ emlxs_online(emlxs_hba_t *hba)
 
 		mutex_exit(&EMLXS_PORT_LOCK);
 
-		DELAYMS(1000);
+		BUSYWAIT_MS(1000);
 	}
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_adapter_trans_msg,
@@ -1663,7 +1890,6 @@ emlxs_online(emlxs_hba_t *hba)
 
 		/* Set FC_OFFLINE_MODE */
 		mutex_enter(&EMLXS_PORT_LOCK);
-		emlxs_diag_state = DDI_OFFDI;
 		hba->flag |= FC_OFFLINE_MODE;
 		hba->flag &= ~FC_ONLINING_MODE;
 		mutex_exit(&EMLXS_PORT_LOCK);
@@ -1676,7 +1902,6 @@ emlxs_online(emlxs_hba_t *hba)
 
 	/* Set FC_ONLINE_MODE */
 	mutex_enter(&EMLXS_PORT_LOCK);
-	emlxs_diag_state = DDI_ONDI;
 	hba->flag |= FC_ONLINE_MODE;
 	hba->flag &= ~FC_ONLINING_MODE;
 	mutex_exit(&EMLXS_PORT_LOCK);
@@ -1684,7 +1909,9 @@ emlxs_online(emlxs_hba_t *hba)
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_online_msg, NULL);
 
 #ifdef SFCT_SUPPORT
-	(void) emlxs_fct_port_initialize(port);
+	if (port->flag & EMLXS_TGT_ENABLED) {
+		(void) emlxs_fct_port_initialize(port);
+	}
 #endif /* SFCT_SUPPORT */
 
 	return (rval);
@@ -1693,7 +1920,7 @@ emlxs_online(emlxs_hba_t *hba)
 
 
 extern int
-emlxs_offline(emlxs_hba_t *hba)
+emlxs_offline(emlxs_hba_t *hba, uint32_t reset_requested)
 {
 	emlxs_port_t *port = &PPORT;
 	uint32_t i = 0;
@@ -1727,21 +1954,21 @@ emlxs_offline(emlxs_hba_t *hba)
 
 		mutex_exit(&EMLXS_PORT_LOCK);
 
-		DELAYMS(1000);
+		BUSYWAIT_MS(1000);
 	}
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_adapter_trans_msg,
 	    "Going offline...");
 
-	if (port->ini_mode) {
-		if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
-			(void) emlxs_fcf_shutdown_notify(port, 1);
-		} else {
-			emlxs_linkdown(hba);
-		}
+	/* Declare link down */
+	if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
+		(void) emlxs_fcf_shutdown_notify(port, 1);
+	} else {
+		emlxs_linkdown(hba);
 	}
+
 #ifdef SFCT_SUPPORT
-	else {
+	if (port->flag & EMLXS_TGT_ENABLED) {
 		(void) emlxs_fct_port_shutdown(port);
 	}
 #endif /* SFCT_SUPPORT */
@@ -1784,12 +2011,11 @@ emlxs_offline(emlxs_hba_t *hba)
 	}
 
 	/* Shutdown the adapter interface */
-	EMLXS_SLI_OFFLINE(hba);
+	EMLXS_SLI_OFFLINE(hba, reset_requested);
 
 	mutex_enter(&EMLXS_PORT_LOCK);
 	hba->flag |= FC_OFFLINE_MODE;
 	hba->flag &= ~FC_OFFLINING_MODE;
-	emlxs_diag_state = DDI_OFFDI;
 	mutex_exit(&EMLXS_PORT_LOCK);
 
 	rval = 0;
@@ -1812,7 +2038,7 @@ emlxs_power_down(emlxs_hba_t *hba)
 #endif  /* FMA_SUPPORT */
 	int32_t rval = 0;
 
-	if ((rval = emlxs_offline(hba))) {
+	if ((rval = emlxs_offline(hba, 0))) {
 		return (rval);
 	}
 	EMLXS_SLI_HBA_RESET(hba, 1, 1, 0);
@@ -1865,7 +2091,7 @@ emlxs_power_up(emlxs_hba_t *hba)
 
 	return (rval);
 
-} /* End emlxs_power_up */
+} /* emlxs_power_up() */
 
 
 /*
@@ -1896,7 +2122,7 @@ emlxs_ffcleanup(emlxs_hba_t *hba)
 		port = &VPORT(i);
 
 		if (port->node_count) {
-			(void) emlxs_mb_unreg_node(port, 0, 0, 0, 0);
+			(void) EMLXS_SLI_UNREG_NODE(port, 0, 0, 0, 0);
 		}
 	}
 
@@ -1952,7 +2178,7 @@ emlxs_register_pkt(CHANNEL *cp, emlxs_buf_t *sbp)
 
 	/*
 	 * EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-	 *    "emlxs_register_pkt: channel=%d iotag=%d sbp=%p",
+	 *    "register_pkt: channel=%d iotag=%d sbp=%p",
 	 *    cp->channelno, iotag, sbp);
 	 */
 
@@ -2111,7 +2337,7 @@ emlxs_tx_channel_flush(emlxs_hba_t *hba, CHANNEL *cp, emlxs_buf_t *fpkt)
 		if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
 			sbp = iocbq->sbp;
 			if (sbp) {
-				emlxs_sli4_free_xri(hba, sbp, sbp->xrip, 1);
+				emlxs_sli4_free_xri(port, sbp, sbp->xrip, 1);
 			}
 		} else {
 			sbp = emlxs_unregister_pkt((CHANNEL *)iocbq->channel,
@@ -2358,7 +2584,7 @@ emlxs_tx_node_flush(emlxs_port_t *port, NODELIST *ndlp, CHANNEL *chan,
 		if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
 			sbp = iocbq->sbp;
 			if (sbp) {
-				emlxs_sli4_free_xri(hba, sbp, sbp->xrip, 1);
+				emlxs_sli4_free_xri(port, sbp, sbp->xrip, 1);
 			}
 		} else {
 			sbp = emlxs_unregister_pkt((CHANNEL *)iocbq->channel,
@@ -2662,7 +2888,7 @@ emlxs_tx_lun_flush(emlxs_port_t *port, NODELIST *ndlp, uint32_t lun,
 		if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
 			sbp = iocbq->sbp;
 			if (sbp) {
-				emlxs_sli4_free_xri(hba, sbp, sbp->xrip, 1);
+				emlxs_sli4_free_xri(port, sbp, sbp->xrip, 1);
 			}
 		} else {
 			sbp = emlxs_unregister_pkt((CHANNEL *)iocbq->channel,
@@ -2804,7 +3030,6 @@ emlxs_tx_put(IOCBQ *iocbq, uint32_t lock)
 	channelno = cp->channelno;
 	sbp = (emlxs_buf_t *)iocbq->sbp;
 
-	/* under what cases, nlp is NULL */
 	if (nlp == NULL) {
 		/* Set node to base node by default */
 		nlp = &port->node_base;
@@ -2827,7 +3052,7 @@ emlxs_tx_put(IOCBQ *iocbq, uint32_t lock)
 			mutex_exit(&sbp->mtx);
 
 			if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
-				emlxs_sli4_free_xri(hba, sbp, sbp->xrip, 1);
+				emlxs_sli4_free_xri(port, sbp, sbp->xrip, 1);
 			} else {
 				(void) emlxs_unregister_pkt(cp, sbp->iotag, 0);
 			}
@@ -3320,7 +3545,7 @@ emlxs_tx_move(NODELIST *ndlp, CHANNEL *from_chan, CHANNEL *to_chan,
 		if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
 			sbp = iocbq->sbp;
 			if (sbp) {
-				emlxs_sli4_free_xri(hba, sbp, sbp->xrip, 1);
+				emlxs_sli4_free_xri(port, sbp, sbp->xrip, 1);
 			}
 		} else {
 			sbp = emlxs_unregister_pkt((CHANNEL *)iocbq->channel,
@@ -3557,7 +3782,7 @@ emlxs_iotag_flush(emlxs_hba_t *hba)
 			    (sbp->pkt_flags & (PACKET_ULP_OWNED|
 			    PACKET_COMPLETED|PACKET_IN_COMPLETION))) {
 				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_debug_msg,
-				    "iotag_flush: Invalid IO found. iotag=%x",
+				    "iotag_flush: Invalid IO found. iotag=%d",
 				    iotag);
 
 				continue;
@@ -3578,19 +3803,18 @@ emlxs_iotag_flush(emlxs_hba_t *hba)
 				if (sbp->xrip) {
 					EMLXS_MSGF(EMLXS_CONTEXT,
 					    &emlxs_sli_debug_msg,
-					    "iotag_flush: iotag=%x sbp=%p "
+					    "iotag_flush: iotag=%d sbp=%p "
 					    "xrip=%p state=%x flag=%x",
 					    iotag, sbp, sbp->xrip,
 					    sbp->xrip->state, sbp->xrip->flag);
 				} else {
 					EMLXS_MSGF(EMLXS_CONTEXT,
 					    &emlxs_sli_debug_msg,
-					    "iotag_flush: iotag=%x sbp=%p "
-					    "xrip=NULL",
-					    iotag, sbp);
+					    "iotag_flush: iotag=%d sbp=%p "
+					    "xrip=NULL", iotag, sbp);
 				}
 
-				emlxs_sli4_free_xri(hba, sbp, sbp->xrip, 0);
+				emlxs_sli4_free_xri(port, sbp, sbp->xrip, 0);
 			} else {
 				/* Clean up the sbp */
 				mutex_enter(&sbp->mtx);
@@ -3786,7 +4010,7 @@ emlxs_create_abort_xri_cn(emlxs_port_t *port, NODELIST *ndlp,
 	emlxs_buf_t *sbp;
 	uint16_t abort_iotag;
 
-	if ((iocbq = (IOCBQ *)emlxs_mem_get(hba, MEM_IOCB, 0)) == NULL) {
+	if ((iocbq = (IOCBQ *)emlxs_mem_get(hba, MEM_IOCB)) == NULL) {
 		return (NULL);
 	}
 
@@ -3820,7 +4044,7 @@ emlxs_create_abort_xri_cn(emlxs_port_t *port, NODELIST *ndlp,
 		wqe->RequestTag = abort_iotag;
 		wqe->Command = CMD_ABORT_XRI_CX;
 		wqe->Class = CLASS3;
-		wqe->CQId = 0x3ff;
+		wqe->CQId = (uint16_t)0xffff;  /* default CQ for response */
 		wqe->CmdType = WQE_TYPE_ABORT;
 	} else {
 		iocb = &iocbq->iocb;
@@ -3850,7 +4074,7 @@ emlxs_create_abort_xri_cx(emlxs_port_t *port, NODELIST *ndlp, uint16_t xid,
 	emlxs_wqe_t *wqe;
 	uint16_t abort_iotag;
 
-	if ((iocbq = (IOCBQ *)emlxs_mem_get(hba, MEM_IOCB, 0)) == NULL) {
+	if ((iocbq = (IOCBQ *)emlxs_mem_get(hba, MEM_IOCB)) == NULL) {
 		return (NULL);
 	}
 
@@ -3875,7 +4099,7 @@ emlxs_create_abort_xri_cx(emlxs_port_t *port, NODELIST *ndlp, uint16_t xid,
 		wqe->AbortTag = xid;
 		wqe->Command = CMD_ABORT_XRI_CX;
 		wqe->Class = CLASS3;
-		wqe->CQId = 0x3ff;
+		wqe->CQId = (uint16_t)0xffff;  /* default CQ for response */
 		wqe->CmdType = WQE_TYPE_ABORT;
 	} else {
 		iocb = &iocbq->iocb;
@@ -3906,7 +4130,7 @@ emlxs_create_close_xri_cn(emlxs_port_t *port, NODELIST *ndlp,
 	emlxs_buf_t *sbp;
 	uint16_t abort_iotag;
 
-	if ((iocbq = (IOCBQ *)emlxs_mem_get(hba, MEM_IOCB, 0)) == NULL) {
+	if ((iocbq = (IOCBQ *)emlxs_mem_get(hba, MEM_IOCB)) == NULL) {
 		return (NULL);
 	}
 
@@ -3939,7 +4163,7 @@ emlxs_create_close_xri_cn(emlxs_port_t *port, NODELIST *ndlp,
 		wqe->RequestTag = abort_iotag;
 		wqe->Command = CMD_ABORT_XRI_CX;
 		wqe->Class = CLASS3;
-		wqe->CQId = 0x3ff;
+		wqe->CQId = (uint16_t)0xffff;  /* default CQ for response */
 		wqe->CmdType = WQE_TYPE_ABORT;
 	} else {
 		iocb = &iocbq->iocb;
@@ -3969,7 +4193,7 @@ emlxs_create_close_xri_cx(emlxs_port_t *port, NODELIST *ndlp, uint16_t xid,
 	emlxs_wqe_t *wqe;
 	uint16_t abort_iotag;
 
-	if ((iocbq = (IOCBQ *)emlxs_mem_get(hba, MEM_IOCB, 0)) == NULL) {
+	if ((iocbq = (IOCBQ *)emlxs_mem_get(hba, MEM_IOCB)) == NULL) {
 		return (NULL);
 	}
 
@@ -3994,7 +4218,7 @@ emlxs_create_close_xri_cx(emlxs_port_t *port, NODELIST *ndlp, uint16_t xid,
 		wqe->AbortTag = xid;
 		wqe->Command = CMD_ABORT_XRI_CX;
 		wqe->Class = CLASS3;
-		wqe->CQId = 0x3ff;
+		wqe->CQId = (uint16_t)0xffff;  /* default CQ for response */
 		wqe->CmdType = WQE_TYPE_ABORT;
 	} else {
 		iocb = &iocbq->iocb;
@@ -4009,57 +4233,6 @@ emlxs_create_close_xri_cx(emlxs_port_t *port, NODELIST *ndlp, uint16_t xid,
 	return (iocbq);
 
 } /* emlxs_create_close_xri_cx() */
-
-
-#ifdef SFCT_SUPPORT
-void
-emlxs_abort_fct_exchange(emlxs_hba_t *hba, emlxs_port_t *port, uint32_t rxid)
-{
-	CHANNEL *cp;
-	IOCBQ *iocbq;
-	IOCB *iocb;
-
-	if (rxid == 0 || rxid == 0xFFFF) {
-		return;
-	}
-
-	if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fct_detail_msg,
-		    "Aborting FCT exchange: xid=%x", rxid);
-
-		if (emlxs_sli4_unreserve_xri(hba, rxid, 1) == 0) {
-			/* We have no way to abort unsolicited exchanges */
-			/* that we have not responded to at this time */
-			/* So we will return for now */
-			return;
-		}
-	}
-
-	cp = &hba->chan[hba->channel_fcp];
-
-	mutex_enter(&EMLXS_FCTAB_LOCK);
-
-	/* Create the abort IOCB */
-	if (hba->state >= FC_LINK_UP) {
-		iocbq = emlxs_create_abort_xri_cx(port, NULL, rxid, cp,
-		    CLASS3, ABORT_TYPE_ABTS);
-	} else {
-		iocbq = emlxs_create_close_xri_cx(port, NULL, rxid, cp);
-	}
-
-	mutex_exit(&EMLXS_FCTAB_LOCK);
-
-	if (iocbq) {
-		iocb = &iocbq->iocb;
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fct_detail_msg,
-		    "Aborting FCT exchange: xid=%x iotag=%x", rxid,
-		    iocb->ULPIOTAG);
-
-		EMLXS_SLI_ISSUE_IOCB_CMD(hba, cp, iocbq);
-	}
-
-} /* emlxs_abort_fct_exchange() */
-#endif /* SFCT_SUPPORT */
 
 
 void
@@ -4077,7 +4250,7 @@ emlxs_close_els_exchange(emlxs_hba_t *hba, emlxs_port_t *port, uint32_t rxid)
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_unsol_els_msg,
 		    "Closing ELS exchange: xid=%x", rxid);
 
-		if (emlxs_sli4_unreserve_xri(hba, rxid, 1) == 0) {
+		if (emlxs_sli4_unreserve_xri(port, rxid, 1) == 0) {
 			return;
 		}
 	}
@@ -4094,7 +4267,7 @@ emlxs_close_els_exchange(emlxs_hba_t *hba, emlxs_port_t *port, uint32_t rxid)
 	if (iocbq) {
 		iocb = &iocbq->iocb;
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_unsol_els_msg,
-		    "Closing ELS exchange: xid=%x iotag=%x", rxid,
+		    "Closing ELS exchange: xid=%x iotag=%d", rxid,
 		    iocb->ULPIOTAG);
 
 		EMLXS_SLI_ISSUE_IOCB_CMD(hba, cp, iocbq);
@@ -4119,7 +4292,7 @@ emlxs_abort_els_exchange(emlxs_hba_t *hba, emlxs_port_t *port, uint32_t rxid)
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_unsol_els_msg,
 		    "Aborting ELS exchange: xid=%x", rxid);
 
-		if (emlxs_sli4_unreserve_xri(hba, rxid, 1) == 0) {
+		if (emlxs_sli4_unreserve_xri(port, rxid, 1) == 0) {
 			/* We have no way to abort unsolicited exchanges */
 			/* that we have not responded to at this time */
 			/* So we will return for now */
@@ -4144,7 +4317,7 @@ emlxs_abort_els_exchange(emlxs_hba_t *hba, emlxs_port_t *port, uint32_t rxid)
 	if (iocbq) {
 		iocb = &iocbq->iocb;
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_unsol_els_msg,
-		    "Aborting ELS exchange: xid=%x iotag=%x", rxid,
+		    "Aborting ELS exchange: xid=%x iotag=%d", rxid,
 		    iocb->ULPIOTAG);
 
 		EMLXS_SLI_ISSUE_IOCB_CMD(hba, cp, iocbq);
@@ -4168,7 +4341,7 @@ emlxs_abort_ct_exchange(emlxs_hba_t *hba, emlxs_port_t *port, uint32_t rxid)
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_unsol_ct_msg,
 		    "Aborting CT exchange: xid=%x", rxid);
 
-		if (emlxs_sli4_unreserve_xri(hba, rxid, 1) == 0) {
+		if (emlxs_sli4_unreserve_xri(port, rxid, 1) == 0) {
 			/* We have no way to abort unsolicited exchanges */
 			/* that we have not responded to at this time */
 			/* So we will return for now */
@@ -4193,7 +4366,7 @@ emlxs_abort_ct_exchange(emlxs_hba_t *hba, emlxs_port_t *port, uint32_t rxid)
 	if (iocbq) {
 		iocb = &iocbq->iocb;
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_unsol_els_msg,
-		    "Aborting CT exchange: xid=%x iotag=%x", rxid,
+		    "Aborting CT exchange: xid=%x iotag=%d", rxid,
 		    iocb->ULPIOTAG);
 
 		EMLXS_SLI_ISSUE_IOCB_CMD(hba, cp, iocbq);

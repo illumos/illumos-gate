@@ -19,6 +19,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -33,8 +35,6 @@
 
 #ifndef _NSS_COMMON_H
 #define	_NSS_COMMON_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <synch.h>
 
@@ -248,11 +248,7 @@ typedef enum {
 
 struct nss_backend;
 
-#if defined(__STDC__)
 typedef nss_status_t (*nss_backend_op_t)(struct nss_backend *, void *args);
-#else
-typedef nss_status_t (*nss_backend_op_t)();
-#endif
 
 struct nss_backend {
 	nss_backend_op_t	*ops;
@@ -295,24 +291,15 @@ typedef int			nss_dbop_t;
  * backend, properly initialized (or returns NULL).
  */
 
-#if defined(__STDC__)
 typedef	nss_backend_t		*(*nss_backend_constr_t)(const char *db_name,
 							const char *src_name,
 /* Hook for (unimplemented) args in nsswitch.conf */	const char *cfg_args);
-#else
-typedef	nss_backend_t 		*(*nss_backend_constr_t)();
-#endif
 
 struct nss_backend_finder {
-#if defined(__STDC__)
 	nss_backend_constr_t	(*lookup)
 		(void *lkp_priv, const char *, const char *, void **del_privp);
 	void			(*delete)
 		(void *del_priv, nss_backend_constr_t);
-#else
-	nss_backend_constr_t	(*lookup)();
-	void			(*delete)();
-#endif
 	struct nss_backend_finder *next;
 	void			*lookup_priv;
 };
@@ -375,11 +362,7 @@ struct nss_db_params {
 
 typedef struct nss_db_params nss_db_params_t;
 
-#if defined(__STDC__)
 typedef void (*nss_db_initf_t)(nss_db_params_t *);
-#else
-typedef void (*nss_db_initf_t)();
-#endif
 
 /*
  * DBD param offsets in NSS2 nscd header.
@@ -451,7 +434,6 @@ struct nss_config {
 typedef struct nss_config nss_config_t;
 
 
-#if defined(__STDC__)
 extern nss_status_t nss_config(nss_config_t **, int);
 
 extern nss_status_t nss_search(nss_db_root_t *, nss_db_initf_t,
@@ -480,25 +462,6 @@ extern nss_status_t _nsc_setent_u(nss_db_root_t *, nss_db_initf_t,
 extern nss_status_t _nsc_endent_u(nss_db_root_t *, nss_db_initf_t,
 			nss_getent_t *);
 
-#else
-extern nss_status_t nss_config();
-
-extern nss_status_t nss_search();
-extern nss_status_t nss_getent();
-extern void nss_setent();
-extern void nss_endent();
-extern void nss_delete();
-
-extern int nss_pack();
-extern int nss_pack_ent();
-extern int nss_unpack();
-extern int nss_unpack_ent();
-
-extern nss_status_t _nsc_search();
-extern nss_status_t _nsc_getent_u();
-extern nss_status_t _nsc_setent_u();
-extern nss_status_t _nsc_endent_u();
-#endif
 
 #ifdef	__cplusplus
 }

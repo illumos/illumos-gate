@@ -19,14 +19,14 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_FS_UFS_FILIO_H
 #define	_SYS_FS_UFS_FILIO_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -88,7 +88,7 @@ typedef struct fiolog {
 #define	FIOLOG_ECLEAN	5
 #define	FIOLOG_ENOULOCK	6
 
-#if defined(_KERNEL) && defined(__STDC__)
+#if defined(_KERNEL)
 
 extern	int	ufs_fiosatime(struct vnode *, struct timeval *, int,
 		struct cred *);
@@ -104,7 +104,7 @@ extern	int	ufs_fioislog(vnode_t *, uint32_t *, cred_t *, int);
 extern	int	ufs_fio_holey(vnode_t *, int, offset_t *);
 extern	int	ufs_mark_compressed(struct vnode *vp);
 
-#endif	/* defined(_KERNEL) && defined(__STDC__) */
+#endif	/* defined(_KERNEL) */
 
 #ifdef	__cplusplus
 }

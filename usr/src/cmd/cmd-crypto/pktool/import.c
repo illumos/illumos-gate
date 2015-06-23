@@ -707,7 +707,7 @@ pk_import_rawkey(KMF_HANDLE_T kmfhandle,
 	uint32_t keylen;
 	boolean_t sensitive = B_FALSE;
 	boolean_t not_extractable = B_FALSE;
-	KMF_DATA keydata = {NULL, 0};
+	KMF_DATA keydata = { 0, NULL };
 	KMF_KEY_HANDLE rawkey;
 
 	rv = kmf_read_input_file(kmfhandle, filename, &keydata);

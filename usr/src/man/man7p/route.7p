@@ -22,7 +22,6 @@ route \- kernel packet forwarding database
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 UNIX provides some packet routing facilities. The kernel maintains a routing
 information database, which is used in selecting the appropriate network
@@ -208,7 +207,6 @@ that configure interfaces and wish to wait until the interface is ready can
 wait until \fBRTM_IFINFO\fR is returned and \fBSIOCGLIFFLAGS\fR shows that
 \fBIFF_DUPLICATE\fR is not set.
 .SS "Messages"
-.sp
 .LP
 User processes can obtain information about the routing entry to a specific
 destination by using a \fBRTM_GET\fR message.
@@ -323,12 +321,10 @@ struct rt_metrics {
 .in -2
 
 .SH SEE ALSO
-.sp
 .LP
 \fBioctl\fR(2), \fBsetsockopt\fR(3SOCKET), \fBshutdown\fR(3SOCKET),
-\fBrouting\fR(7P)
+\fBsockaddr\fR(3SOCKET), \fBrouting\fR(7P)
 .SH NOTES
-.sp
 .LP
 Some of the metrics might not be implemented and return zero. The implemented
 metrics are set in \fBrtm_inits\fR.

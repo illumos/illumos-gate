@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  */
 
 /*
@@ -169,51 +169,9 @@ ddi_set_callback(
 }
 
 int
-ddi_dma_map(
-	dev_info_t *a,
-	dev_info_t *b,
-	struct ddi_dma_req *c,
-	ddi_dma_handle_t *d)
-{
-	struct bus_ops *ops;
-	(*ops->bus_dma_map)(0, 0, 0, 0);
-}
-
-int
-ddi_dma_setup(
-	dev_info_t *a,
-	struct ddi_dma_req *b,
-	ddi_dma_handle_t *c)
-{
-	struct bus_ops *ops;
-	(*ops->bus_dma_map)(0, 0, 0, 0);
-}
-
-int
 ddi_dma_mctl(dev_info_t *a, dev_info_t *b, ddi_dma_handle_t c,
 	enum ddi_dma_ctlops d, off_t *e, size_t *f, caddr_t *g,
 	uint_t h)
-{
-	struct bus_ops *ops;
-	(*ops->bus_dma_ctl)(0, 0, 0, 0, 0, 0, 0, 0);
-}
-
-int
-ddi_dma_kvaddrp(ddi_dma_handle_t h, off_t off, size_t len, caddr_t *kp)
-{
-	struct bus_ops *ops;
-	(*ops->bus_dma_ctl)(0, 0, 0, 0, 0, 0, 0, 0);
-}
-
-int
-ddi_dma_htoc(ddi_dma_handle_t h, off_t o, ddi_dma_cookie_t *c)
-{
-	struct bus_ops *ops;
-	(*ops->bus_dma_ctl)(0, 0, 0, 0, 0, 0, 0, 0);
-}
-
-int
-ddi_dma_coff(ddi_dma_handle_t h, ddi_dma_cookie_t *c, off_t *o)
 {
 	struct bus_ops *ops;
 	(*ops->bus_dma_ctl)(0, 0, 0, 0, 0, 0, 0, 0);
@@ -227,51 +185,7 @@ ddi_dma_get_error(ddi_dma_handle_t h, uint_t len, caddr_t errblk)
 }
 
 int
-ddi_dma_segtocookie(ddi_dma_seg_t seg, off_t *o, off_t *l,
-    ddi_dma_cookie_t *cookiep)
-{
-	struct bus_ops *ops;
-	(*ops->bus_dma_ctl)(0, 0, 0, 0, 0, 0, 0, 0);
-}
-
-int
 ddi_dma_sync(ddi_dma_handle_t h, off_t o, size_t l, uint_t whom)
-{
-	struct bus_ops *ops;
-	(*ops->bus_dma_ctl)(0, 0, 0, 0, 0, 0, 0, 0);
-}
-
-int
-ddi_dma_free(ddi_dma_handle_t h)
-{
-	struct bus_ops *ops;
-	(*ops->bus_dma_ctl)(0, 0, 0, 0, 0, 0, 0, 0);
-}
-
-int
-ddi_iopb_alloc(dev_info_t *dip, ddi_dma_lim_t *limp, uint_t len, caddr_t *iopbp)
-{
-	struct bus_ops *ops;
-	(*ops->bus_dma_ctl)(0, 0, 0, 0, 0, 0, 0, 0);
-}
-
-void
-ddi_iopb_free(caddr_t iopb)
-{
-	struct bus_ops *ops;
-	(*ops->bus_dma_ctl)(0, 0, 0, 0, 0, 0, 0, 0);
-}
-
-int
-ddi_mem_alloc(dev_info_t *dip, ddi_dma_lim_t *limits, uint_t length,
-	uint_t flags, caddr_t *kaddrp, uint_t *real_length)
-{
-	struct bus_ops *ops;
-	(*ops->bus_dma_ctl)(0, 0, 0, 0, 0, 0, 0, 0);
-}
-
-void
-ddi_mem_free(caddr_t kaddr)
 {
 	struct bus_ops *ops;
 	(*ops->bus_dma_ctl)(0, 0, 0, 0, 0, 0, 0, 0);

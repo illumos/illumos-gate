@@ -18,10 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -88,7 +89,7 @@ u_longlong_t nfs3_srv_caller_id;
 /* ARGSUSED */
 void
 rfs3_getattr(GETATTR3args *args, GETATTR3res *resp, struct exportinfo *exi,
-	struct svc_req *req, cred_t *cr)
+    struct svc_req *req, cred_t *cr, bool_t ro)
 {
 	int error;
 	vnode_t *vp;
@@ -149,7 +150,7 @@ rfs3_getattr_getfh(GETATTR3args *args)
 
 void
 rfs3_setattr(SETATTR3args *args, SETATTR3res *resp, struct exportinfo *exi,
-	struct svc_req *req, cred_t *cr)
+    struct svc_req *req, cred_t *cr, bool_t ro)
 {
 	int error;
 	vnode_t *vp;
@@ -224,7 +225,7 @@ rfs3_setattr(SETATTR3args *args, SETATTR3res *resp, struct exportinfo *exi,
 
 	bvap = &bva;
 
-	if (rdonly(exi, vp, req)) {
+	if (rdonly(ro, vp)) {
 		resp->status = NFS3ERR_ROFS;
 		goto out1;
 	}
@@ -364,7 +365,7 @@ rfs3_setattr_getfh(SETATTR3args *args)
 /* ARGSUSED */
 void
 rfs3_lookup(LOOKUP3args *args, LOOKUP3res *resp, struct exportinfo *exi,
-	struct svc_req *req, cred_t *cr)
+    struct svc_req *req, cred_t *cr, bool_t ro)
 {
 	int error;
 	vnode_t *vp;
@@ -466,8 +467,7 @@ rfs3_lookup(LOOKUP3args *args, LOOKUP3res *resp, struct exportinfo *exi,
 				if (exi != NULL)
 					exi_rele(exi);
 				VN_RELE(vp);
-				resp->status = NFS3ERR_ACCES;
-				error = 1;
+				error = EACCES;
 			}
 			if (tp != NULL)
 				TPC_RELE(tp);
@@ -493,8 +493,7 @@ rfs3_lookup(LOOKUP3args *args, LOOKUP3res *resp, struct exportinfo *exi,
 				if (publicfh_flag && exi != NULL)
 					exi_rele(exi);
 				VN_RELE(vp);
-				resp->status = NFS3ERR_ACCES;
-				error = 1;
+				error = EACCES;
 			}
 		}
 	}
@@ -576,7 +575,7 @@ rfs3_lookup_getfh(LOOKUP3args *args)
 /* ARGSUSED */
 void
 rfs3_access(ACCESS3args *args, ACCESS3res *resp, struct exportinfo *exi,
-	struct svc_req *req, cred_t *cr)
+    struct svc_req *req, cred_t *cr, bool_t ro)
 {
 	int error;
 	vnode_t *vp;
@@ -605,7 +604,7 @@ rfs3_access(ACCESS3args *args, ACCESS3res *resp, struct exportinfo *exi,
 	 * Special files are interpreted by the client, so the underlying
 	 * permissions are sent back to the client for interpretation.
 	 */
-	if (rdonly(exi, vp, req) && (vp->v_type == VREG || vp->v_type == VDIR))
+	if (rdonly(ro, vp) && (vp->v_type == VREG || vp->v_type == VDIR))
 		checkwriteperm = 0;
 	else
 		checkwriteperm = 1;
@@ -732,7 +731,7 @@ rfs3_access_getfh(ACCESS3args *args)
 /* ARGSUSED */
 void
 rfs3_readlink(READLINK3args *args, READLINK3res *resp, struct exportinfo *exi,
-	struct svc_req *req, cred_t *cr)
+    struct svc_req *req, cred_t *cr, bool_t ro)
 {
 	int error;
 	vnode_t *vp;
@@ -915,7 +914,7 @@ rfs3_readlink_free(READLINK3res *resp)
 /* ARGSUSED */
 void
 rfs3_read(READ3args *args, READ3res *resp, struct exportinfo *exi,
-	struct svc_req *req, cred_t *cr)
+    struct svc_req *req, cred_t *cr, bool_t ro)
 {
 	int error;
 	vnode_t *vp;
@@ -1254,7 +1253,7 @@ static int rfs3_write_misses = 0;
 
 void
 rfs3_write(WRITE3args *args, WRITE3res *resp, struct exportinfo *exi,
-	struct svc_req *req, cred_t *cr)
+    struct svc_req *req, cred_t *cr, bool_t ro)
 {
 	int error;
 	vnode_t *vp;
@@ -1347,7 +1346,7 @@ rfs3_write(WRITE3args *args, WRITE3res *resp, struct exportinfo *exi,
 		goto err1;
 	}
 
-	if (rdonly(exi, vp, req)) {
+	if (rdonly(ro, vp)) {
 		resp->status = NFS3ERR_ROFS;
 		goto err1;
 	}
@@ -1506,7 +1505,7 @@ rfs3_write_getfh(WRITE3args *args)
 
 void
 rfs3_create(CREATE3args *args, CREATE3res *resp, struct exportinfo *exi,
-	struct svc_req *req, cred_t *cr)
+    struct svc_req *req, cred_t *cr, bool_t ro)
 {
 	int error;
 	int in_crit = 0;
@@ -1553,7 +1552,7 @@ rfs3_create(CREATE3args *args, CREATE3res *resp, struct exportinfo *exi,
 		goto out1;
 	}
 
-	if (rdonly(exi, dvp, req)) {
+	if (rdonly(ro, dvp)) {
 		resp->status = NFS3ERR_ROFS;
 		goto out1;
 	}
@@ -1869,7 +1868,7 @@ rfs3_create_getfh(CREATE3args *args)
 
 void
 rfs3_mkdir(MKDIR3args *args, MKDIR3res *resp, struct exportinfo *exi,
-	struct svc_req *req, cred_t *cr)
+    struct svc_req *req, cred_t *cr, bool_t ro)
 {
 	int error;
 	vnode_t *vp = NULL;
@@ -1910,7 +1909,7 @@ rfs3_mkdir(MKDIR3args *args, MKDIR3res *resp, struct exportinfo *exi,
 		goto out1;
 	}
 
-	if (rdonly(exi, dvp, req)) {
+	if (rdonly(ro, dvp)) {
 		resp->status = NFS3ERR_ROFS;
 		goto out1;
 	}
@@ -2017,7 +2016,7 @@ rfs3_mkdir_getfh(MKDIR3args *args)
 
 void
 rfs3_symlink(SYMLINK3args *args, SYMLINK3res *resp, struct exportinfo *exi,
-	struct svc_req *req, cred_t *cr)
+    struct svc_req *req, cred_t *cr, bool_t ro)
 {
 	int error;
 	vnode_t *vp;
@@ -2059,7 +2058,7 @@ rfs3_symlink(SYMLINK3args *args, SYMLINK3res *resp, struct exportinfo *exi,
 		goto err1;
 	}
 
-	if (rdonly(exi, dvp, req)) {
+	if (rdonly(ro, dvp)) {
 		resp->status = NFS3ERR_ROFS;
 		goto err1;
 	}
@@ -2191,7 +2190,7 @@ rfs3_symlink_getfh(SYMLINK3args *args)
 
 void
 rfs3_mknod(MKNOD3args *args, MKNOD3res *resp, struct exportinfo *exi,
-	struct svc_req *req, cred_t *cr)
+    struct svc_req *req, cred_t *cr, bool_t ro)
 {
 	int error;
 	vnode_t *vp;
@@ -2235,7 +2234,7 @@ rfs3_mknod(MKNOD3args *args, MKNOD3res *resp, struct exportinfo *exi,
 		goto out1;
 	}
 
-	if (rdonly(exi, dvp, req)) {
+	if (rdonly(ro, dvp)) {
 		resp->status = NFS3ERR_ROFS;
 		goto out1;
 	}
@@ -2388,7 +2387,7 @@ rfs3_mknod_getfh(MKNOD3args *args)
 
 void
 rfs3_remove(REMOVE3args *args, REMOVE3res *resp, struct exportinfo *exi,
-	struct svc_req *req, cred_t *cr)
+    struct svc_req *req, cred_t *cr, bool_t ro)
 {
 	int error = 0;
 	vnode_t *vp;
@@ -2432,7 +2431,7 @@ rfs3_remove(REMOVE3args *args, REMOVE3res *resp, struct exportinfo *exi,
 		goto err1;
 	}
 
-	if (rdonly(exi, vp, req)) {
+	if (rdonly(ro, vp)) {
 		resp->status = NFS3ERR_ROFS;
 		goto err1;
 	}
@@ -2533,7 +2532,7 @@ rfs3_remove_getfh(REMOVE3args *args)
 
 void
 rfs3_rmdir(RMDIR3args *args, RMDIR3res *resp, struct exportinfo *exi,
-	struct svc_req *req, cred_t *cr)
+    struct svc_req *req, cred_t *cr, bool_t ro)
 {
 	int error;
 	vnode_t *vp;
@@ -2576,7 +2575,7 @@ rfs3_rmdir(RMDIR3args *args, RMDIR3res *resp, struct exportinfo *exi,
 		goto err1;
 	}
 
-	if (rdonly(exi, vp, req)) {
+	if (rdonly(ro, vp)) {
 		resp->status = NFS3ERR_ROFS;
 		goto err1;
 	}
@@ -2660,7 +2659,7 @@ rfs3_rmdir_getfh(RMDIR3args *args)
 
 void
 rfs3_rename(RENAME3args *args, RENAME3res *resp, struct exportinfo *exi,
-	struct svc_req *req, cred_t *cr)
+    struct svc_req *req, cred_t *cr, bool_t ro)
 {
 	int error = 0;
 	vnode_t *fvp;
@@ -2756,7 +2755,7 @@ rfs3_rename(RENAME3args *args, RENAME3res *resp, struct exportinfo *exi,
 		goto err1;
 	}
 
-	if (rdonly(exi, tvp, req)) {
+	if (rdonly(ro, tvp)) {
 		resp->status = NFS3ERR_ROFS;
 		goto err1;
 	}
@@ -2892,7 +2891,7 @@ rfs3_rename_getfh(RENAME3args *args)
 
 void
 rfs3_link(LINK3args *args, LINK3res *resp, struct exportinfo *exi,
-	struct svc_req *req, cred_t *cr)
+    struct svc_req *req, cred_t *cr, bool_t ro)
 {
 	int error;
 	vnode_t *vp;
@@ -2980,7 +2979,7 @@ rfs3_link(LINK3args *args, LINK3res *resp, struct exportinfo *exi,
 		goto out1;
 	}
 
-	if (rdonly(exi, dvp, req)) {
+	if (rdonly(ro, dvp)) {
 		resp->status = NFS3ERR_ROFS;
 		goto out1;
 	}
@@ -3096,7 +3095,7 @@ rfs3_link_getfh(LINK3args *args)
 /* ARGSUSED */
 void
 rfs3_readdir(READDIR3args *args, READDIR3res *resp, struct exportinfo *exi,
-	struct svc_req *req, cred_t *cr)
+    struct svc_req *req, cred_t *cr, bool_t ro)
 {
 	int error;
 	vnode_t *vp;
@@ -3353,7 +3352,7 @@ static int rfs3_readdir_unit = MAXBSIZE;
 /* ARGSUSED */
 void
 rfs3_readdirplus(READDIRPLUS3args *args, READDIRPLUS3res *resp,
-	struct exportinfo *exi, struct svc_req *req, cred_t *cr)
+    struct exportinfo *exi, struct svc_req *req, cred_t *cr, bool_t ro)
 {
 	int error;
 	vnode_t *vp;
@@ -3717,7 +3716,7 @@ rfs3_readdirplus_free(READDIRPLUS3res *resp)
 /* ARGSUSED */
 void
 rfs3_fsstat(FSSTAT3args *args, FSSTAT3res *resp, struct exportinfo *exi,
-	struct svc_req *req, cred_t *cr)
+    struct svc_req *req, cred_t *cr, bool_t ro)
 {
 	int error;
 	vnode_t *vp;
@@ -3808,9 +3807,10 @@ rfs3_fsstat_getfh(FSSTAT3args *args)
 	return (&args->fsroot);
 }
 
+/* ARGSUSED */
 void
 rfs3_fsinfo(FSINFO3args *args, FSINFO3res *resp, struct exportinfo *exi,
-	struct svc_req *req, cred_t *cr)
+    struct svc_req *req, cred_t *cr, bool_t ro)
 {
 	vnode_t *vp;
 	struct vattr *vap;
@@ -3919,7 +3919,7 @@ rfs3_fsinfo_getfh(FSINFO3args *args)
 /* ARGSUSED */
 void
 rfs3_pathconf(PATHCONF3args *args, PATHCONF3res *resp, struct exportinfo *exi,
-	struct svc_req *req, cred_t *cr)
+    struct svc_req *req, cred_t *cr, bool_t ro)
 {
 	int error;
 	vnode_t *vp;
@@ -4016,7 +4016,7 @@ rfs3_pathconf_getfh(PATHCONF3args *args)
 
 void
 rfs3_commit(COMMIT3args *args, COMMIT3res *resp, struct exportinfo *exi,
-	struct svc_req *req, cred_t *cr)
+    struct svc_req *req, cred_t *cr, bool_t ro)
 {
 	int error;
 	vnode_t *vp;
@@ -4050,7 +4050,7 @@ rfs3_commit(COMMIT3args *args, COMMIT3res *resp, struct exportinfo *exi,
 
 	bvap = &bva;
 
-	if (rdonly(exi, vp, req)) {
+	if (rdonly(ro, vp)) {
 		resp->status = NFS3ERR_ROFS;
 		goto out1;
 	}

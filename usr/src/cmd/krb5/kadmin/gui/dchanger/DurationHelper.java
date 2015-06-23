@@ -20,8 +20,6 @@
  * CDDL HEADER END
  */
 /*
- * ident	"%Z%%M%	%I%	%E% SMI"
- *
  * Copyright (c) 1999-2000 by Sun Microsystems, Inc.
  * All rights reserved.
  */
@@ -51,33 +49,33 @@
 	private Button help;
 	private Button compute;
 
-        private HelpDialog hd = null;
+	private HelpDialog hd = null;
 
 	// For I18N
 	    private static ResourceBundle rb =
 	    ResourceBundle.getBundle("GuiResource" /* NOI18N */);
-            private static ResourceBundle hrb =
+	    private static ResourceBundle hrb =
 	    ResourceBundle.getBundle("HelpData" /* NOI18N */);
 
 	private static String[] units = { getString("Seconds"),
-	            			getString("Minutes"),
-		    			getString("Hours"),
-		    			getString("Days"),
-		    			getString("Weeks"),
-		    			getString("Months"),
-		    			getString("Years")	};
+					getString("Minutes"),
+					getString("Hours"),
+					getString("Days"),
+					getString("Weeks"),
+					getString("Months"),
+					getString("Years")	};
 	private static int[] unitMultipliers = {1, 60, 60*60, 60*60*24,
-                                                60*60*24*7, 60*60*24*30,
-                                                60*60*24*365	};
-        private static NumberFormat nf = NumberFormat.getInstance();
+						60*60*24*7, 60*60*24*30,
+						60*60*24*365	};
+	private static NumberFormat nf = NumberFormat.getInstance();
 	private static Toolkit toolkit = Toolkit.getDefaultToolkit();
 
-        /**
-         * Constructor for DurationHelper.
-         * @param parent the parent Frame to whom input will be blocked
-         * while this dialog box is begin shown(modal behaviour).
-         */
-    public DurationHelper(Frame parent,  Color background, Color foreground) {
+	/**
+	 * Constructor for DurationHelper.
+	 * @param parent the parent Frame to whom input will be blocked
+	 * while this dialog box is begin shown(modal behaviour).
+	 */
+    public DurationHelper(Frame parent,	 Color background, Color foreground) {
 		super(parent, getString("SEAM Duration Helper"), true);
 
 		this.parent = parent;
@@ -95,7 +93,7 @@
      * Adds all the labels.
      */
     private void addLabels() {
-        GridBagConstraints gbc = new GridBagConstraints();
+	GridBagConstraints gbc = new GridBagConstraints();
 	gbc.weightx = gbc.weighty = 1;
 	add(new Label(getString("Unit")), gbc);
 	add(new Label(getString("Value")), gbc);
@@ -109,7 +107,7 @@
      * Initializes the strings for the units.
      */
     private void initUnits() {
-        unit = new Choice();
+	unit = new Choice();
 	for (int i = 0; i < units.length; i++)
 	    unit.add(units[i]);
 	unit.select(getString("Hours"));
@@ -124,7 +122,7 @@
      * Adds all the fields
      */
     private void addFields(Color background, Color foreground) {
-        GridBagConstraints gbc = new GridBagConstraints();
+	GridBagConstraints gbc = new GridBagConstraints();
 	gbc.weightx =  gbc.weighty = 1;
 	initUnits();
 	value = new TextField();
@@ -132,9 +130,9 @@
 	value.setForeground(foreground);
 	value.setColumns(10);
 
-        // TBD: make total large enough to hold the largest int
-        total = new Label("             " /* NO18N */,
-                            Label.RIGHT);
+	// TBD: make total large enough to hold the largest int
+	total = new Label("		" /* NO18N */,
+			    Label.RIGHT);
 	gbc.gridx = 0;
 	gbc.gridy = 1;
 	add(unit, gbc);
@@ -155,7 +153,7 @@
      */
     private void addButtons() {
 
-        GridBagConstraints gbc = new GridBagConstraints();
+	GridBagConstraints gbc = new GridBagConstraints();
 	gbc.weightx =  gbc.weighty = 1;
 
 	gbc.gridwidth = GridBagConstraints.REMAINDER;
@@ -172,7 +170,7 @@
 	cancel =  new Button(getString("Cancel"));
 	help = new Button(getString("Help"));
 	gbc = new GridBagConstraints();
-        gbc.weightx =  gbc.weighty = 1;
+	gbc.weightx =  gbc.weighty = 1;
 	p.add(ok, gbc);
 	p.add(cancel, gbc);
 	p.add(help, gbc);
@@ -202,18 +200,18 @@
      * field is not parseable, true otherwise.
      */
     private boolean checkErrorAndSetTotal() {
-        try {
-            String noSpaces = value.getText().trim();
+	try {
+	    String noSpaces = value.getText().trim();
 	    value.setText(noSpaces);
 	    Long l = Long.valueOf(noSpaces);
 	    total.setText(nf.format(l.longValue() *
-                unitMultipliers[unit.getSelectedIndex()]));
-        } catch (NumberFormatException e) {
-          value.requestFocus();
-          value.selectAll();
-          toolkit.beep();
+		unitMultipliers[unit.getSelectedIndex()]));
+	} catch (NumberFormatException e) {
+	  value.requestFocus();
+	  value.selectAll();
+	  toolkit.beep();
 	  return false;
-        }
+	}
 
 	return true;
     }
@@ -224,10 +222,10 @@
      * the dialog box, false if it is to be discarded. This is decided
      * based on whether the user clicked on the "Ok" button or the
      * "Cancel" button. Choosing the window close menu is equivalent to
-     *  clicking on "Cancel."
+     *	clicking on "Cancel."
      */
     private void durationHelperClose(boolean save) {
-        if (save == true) {
+	if (save == true) {
 	    if (!checkErrorAndSetTotal())
 		return;
 	}
@@ -239,7 +237,7 @@
      * Determine whether or not the user wanted to save the value in
      * this Dialog box. The user indicates this by clicking on the Ok
      * button to save it and on the Cancel button to discard it. Using the
-     * window close menu responds the same way as cancel. 
+     * window close menu responds the same way as cancel.
      * @return true if the user wanted to use this value,
      * false if it is to be discarded.
      */
@@ -256,7 +254,7 @@
     }
 
     // * **********************************************
-    // 	 I N N E R    C L A S S E S   F O L L O W
+    //	 I N N E R    C L A S S E S   F O L L O W
     // * **********************************************
 
     /**
@@ -264,7 +262,7 @@
      * menu.
      */
     private class DHWindowListener extends WindowAdapter {
-	public  void windowClosing(WindowEvent e) {
+	public	void windowClosing(WindowEvent e) {
 		durationHelperClose(false);
 	}
     }
@@ -275,25 +273,25 @@
      * of reducing the number of overall listeners.
      */
     private class ButtonListener implements ActionListener {
-        public void actionPerformed(ActionEvent e) {
-            if (e.getSource() == ok) {
-                DurationHelper.this.durationHelperClose(true);
+	public void actionPerformed(ActionEvent e) {
+	    if (e.getSource() == ok) {
+		DurationHelper.this.durationHelperClose(true);
 	    } else if (e.getSource() == cancel) {
-                DurationHelper.this.durationHelperClose(false);
+		DurationHelper.this.durationHelperClose(false);
 	    } else if (e.getSource() == help) {
-                if (hd != null)
-                    hd.show();
-                else {
-                    hd = new HelpDialog(DurationHelper. this.parent,
-                        getString("Help for entering time duration"),
-                                    false, 5, 45);
-                    hd.setVisible(true);
-                    hd.setText(getString(hrb, "DurationHelperHelp"));
-                }
-            } else if (e.getSource() == compute) {
-                checkErrorAndSetTotal();
-            }
-        }
+		if (hd != null)
+		    hd.setVisible(true);
+		else {
+		    hd = new HelpDialog(DurationHelper. this.parent,
+			getString("Help for entering time duration"),
+				    false, 5, 45);
+		    hd.setVisible(true);
+		    hd.setText(getString(hrb, "DurationHelperHelp"));
+		}
+	    } else if (e.getSource() == compute) {
+		checkErrorAndSetTotal();
+	    }
+	}
     }
 
     /**
@@ -307,9 +305,9 @@
     }
 
     private static final String getString(ResourceBundle rb, String key) {
-        try {
+	try {
 	    String res = rb.getString(key);
-            return res;
+	    return res;
 	} catch (MissingResourceException e) {
 		System.out.println("Missing resource "+key+", using English.");
 		return key;
@@ -319,13 +317,15 @@
     /*
      * A main method to test this class.
      */
+    /* BEGIN JSTYLED */
     /*
     public static void main(String args[]) {
-        Frame f = new Frame("Test DurationHelper");
-        f.setVisible(true); // for help dialog to use this as parent
-        DurationHelper dh = new DurationHelper(f, Color.white, Color.black);
-        dh.setVisible(true);
-        System.out.println("Save is " + dh.save);
+	Frame f = new Frame("Test DurationHelper");
+	f.setVisible(true); // for help dialog to use this as parent
+	DurationHelper dh = new DurationHelper(f, Color.white, Color.black);
+	dh.setVisible(true);
+	System.out.println("Save is " + dh.save);
     }
 	  */
+    /* END JSTYLED */
 }

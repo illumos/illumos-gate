@@ -79,13 +79,13 @@ ksid_rele(ksid_t *ks)
 void
 ksiddomain_hold(ksiddomain_t *kd)
 {
-	atomic_add_32(&kd->kd_ref, 1);
+	atomic_inc_32(&kd->kd_ref);
 }
 
 void
 ksiddomain_rele(ksiddomain_t *kd)
 {
-	if (atomic_add_32_nv(&kd->kd_ref, -1) == 0) {
+	if (atomic_dec_32_nv(&kd->kd_ref) == 0) {
 		/*
 		 * The kd reference can only be incremented from 0 when
 		 * the sid_lock is held; so we lock and then check need to
@@ -104,13 +104,13 @@ ksiddomain_rele(ksiddomain_t *kd)
 void
 ksidlist_hold(ksidlist_t *ksl)
 {
-	atomic_add_32(&ksl->ksl_ref, 1);
+	atomic_inc_32(&ksl->ksl_ref);
 }
 
 void
 ksidlist_rele(ksidlist_t *ksl)
 {
-	if (atomic_add_32_nv(&ksl->ksl_ref, -1) == 0) {
+	if (atomic_dec_32_nv(&ksl->ksl_ref) == 0) {
 		int i;
 
 		for (i = 0; i < ksl->ksl_nsid; i++)
@@ -261,13 +261,13 @@ kcrsid_dup(credsid_t *org)
 void
 kcrsid_hold(credsid_t *kcr)
 {
-	atomic_add_32(&kcr->kr_ref, 1);
+	atomic_inc_32(&kcr->kr_ref);
 }
 
 void
 kcrsid_rele(credsid_t *kcr)
 {
-	if (atomic_add_32_nv(&kcr->kr_ref, -1) == 0) {
+	if (atomic_dec_32_nv(&kcr->kr_ref) == 0) {
 		ksid_index_t i;
 
 		for (i = 0; i < KSID_COUNT; i++)

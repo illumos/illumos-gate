@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _IPRB_H
@@ -26,8 +26,9 @@
 #define	NUM_TX		128	/* outstanding tx queue */
 #define	NUM_RX		128	/* outstanding rx queue */
 
-#define	RX_WATCHDOG	15	/* timeout for rx watchdog (sec) */
-#define	TX_WATCHDOG	15	/* timeout for tx watchdog (sec) */
+/* timeouts for the rx and tx watchdogs (nsec) */
+#define	RX_WATCHDOG	(15 * NANOSEC)
+#define	TX_WATCHDOG	(15 * NANOSEC)
 
 /*
  * Driver structures.
@@ -72,7 +73,7 @@ typedef struct iprb {
 	iprb_dma_t		cmds[NUM_TX];
 	iprb_dma_t		rxb[NUM_RX];
 	iprb_dma_t		stats;
-	time_t			stats_time;
+	hrtime_t		stats_time;
 
 	uint16_t		cmd_head;
 	uint16_t		cmd_last;
@@ -81,10 +82,10 @@ typedef struct iprb {
 
 	uint16_t		rx_index;
 	uint16_t		rx_last;
-	time_t			rx_wdog;
-	time_t			rx_timeout;
-	time_t			tx_wdog;
-	time_t			tx_timeout;
+	hrtime_t		rx_wdog;
+	hrtime_t		rx_timeout;
+	hrtime_t		tx_wdog;
+	hrtime_t		tx_timeout;
 
 	uint16_t		eeprom_bits;
 

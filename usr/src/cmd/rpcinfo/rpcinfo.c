@@ -17,7 +17,13 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
+ */
+
+/*
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ */
+
+/*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -39,7 +45,7 @@
  */
 
 /*
- * We are for now defining PORTMAP here.  It doesnt even compile
+ * We are for now defining PORTMAP here.  It doesn't even compile
  * unless it is defined.
  */
 #ifndef	PORTMAP
@@ -57,7 +63,6 @@
 #include <rpc/nettype.h>
 #include <netdir.h>
 #include <rpc/rpcent.h>
-#include <sys/utsname.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
@@ -488,7 +493,6 @@ pmapdump(argc, argv)
 	struct rpcent *rpc;
 	enum clnt_stat clnt_st;
 	struct rpc_err err;
-	struct utsname utsname;
 	char *host;
 
 	if (argc > 1) {
@@ -497,12 +501,11 @@ pmapdump(argc, argv)
 	}
 	if (argc == 1) {
 		host = argv[0];
-		get_inet_address(&server_addr, host);
 	} else {
-		(void) uname(&utsname);
-		host = utsname.nodename;
-		get_inet_address(&server_addr, host);
+		host = HOST_SELF_CONNECT;
 	}
+	get_inet_address(&server_addr, host);
+
 	minutetimeout.tv_sec = 60;
 	minutetimeout.tv_usec = 0;
 	server_addr.sin_port = htons(PMAPPORT);
@@ -715,7 +718,6 @@ rpcbdump(dumptype, netid, argc, argv)
 	struct rpcbdump_short *rs, *rs_tail;
 	enum clnt_stat clnt_st;
 	struct rpc_err err;
-	struct utsname utsname;
 	struct rpcbdump_short *rs_head = NULL;
 
 	if (argc > 1) {
@@ -725,8 +727,7 @@ rpcbdump(dumptype, netid, argc, argv)
 	if (argc == 1) {
 		host = argv[0];
 	} else {
-		(void) uname(&utsname);
-		host = utsname.nodename;
+		host = HOST_SELF_CONNECT;
 	}
 	if (netid == NULL) {
 	    if (loopback_netid == NULL) {
@@ -1061,7 +1062,6 @@ rpcbgetstat(argc, argv)
 	rpcbs_addrlist *pa;
 	rpcbs_rmtcalllist *pr;
 	int cnt, flen;
-	struct utsname utsname;
 #define	MAXFIELD	64
 	char fieldbuf[MAXFIELD];
 #define	MAXLINE		256
@@ -1085,8 +1085,7 @@ rpcbgetstat(argc, argv)
 	if (argc >= 1) {
 		host = argv[0];
 	} else {
-		(void) uname(&utsname);
-		host = utsname.nodename;
+		host = HOST_SELF_CONNECT;
 	}
 	if (loopback_netid != NULL) {
 		client = getclnthandle(host, loopback_nconf, RPCBVERS4, NULL);
@@ -1582,20 +1581,22 @@ progping(netid, argc, argv)
 static void
 usage()
 {
-	(void) fprintf(stderr, "Usage: rpcinfo [-m | -s] [host]\n");
+	(void) fprintf(stderr, "Usage: rpcinfo [-T netid] [-m | -s] [host]\n");
 #ifdef PORTMAP
 	(void) fprintf(stderr, "       rpcinfo -p [host]\n");
 #endif
 	(void) fprintf(stderr,
 	    "       rpcinfo -T netid host prognum [versnum]\n");
-	(void) fprintf(stderr, "       rpcinfo -l host prognum versnum\n");
+	(void) fprintf(stderr,
+	    "       rpcinfo -l [-T netid] host prognum versnum\n");
 #ifdef PORTMAP
 	(void) fprintf(stderr,
-"       rpcinfo [-n portnum] -u | -t host prognum [versnum]\n");
+	    "       rpcinfo [-n portnum] -u | -t host prognum [versnum]\n");
 #endif
 	(void) fprintf(stderr,
-"       rpcinfo -a serv_address -T netid prognum [version]\n");
-	(void) fprintf(stderr, "       rpcinfo -b prognum versnum\n");
+	    "       rpcinfo -a serv_address -T netid prognum [versnum]\n");
+	(void) fprintf(stderr,
+	    "       rpcinfo -b [-T netid] prognum versnum\n");
 	(void) fprintf(stderr,
 	    "       rpcinfo -d [-T netid] prognum versnum\n");
 }

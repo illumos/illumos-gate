@@ -22,12 +22,11 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Joyent, Inc.  All rights reserved.
  */
 
 #ifndef	_SYS_FSS_H
 #define	_SYS_FSS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/thread.h>
@@ -86,6 +85,7 @@ typedef struct fsspset {
 					/* on the list			*/
 	struct fssproj	*fssps_list;	/* list of project parts	*/
 	struct fsszone	*fssps_zones;	/* list of fsszone_t's in pset	*/
+	uint32_t	fssps_gen;	/* generation for zone's kstats */
 } fsspset_t;
 
 /*
@@ -101,7 +101,10 @@ typedef struct fssproj {
 					/* protected by fssps_lock	*/
 	uint32_t	fssp_shares;	/* copy of our kpj_shares	*/
 					/* protected by fssps_displock	*/
-	uint32_t	fssp_ticks;	/* total of all ticks		*/
+	uint32_t	fssp_ticks;	/* total of nice tick values	*/
+					/* protected by fssps_displock	*/
+	uint32_t	fssp_tick_cnt;	/* cnt of all ticks in this sec	*/
+	uint32_t	fssp_shr_pct;	/* active shr % in this sec	*/
 					/* protected by fssps_displock	*/
 	fssusage_t	fssp_usage;	/* this project's decayed usage */
 	fssusage_t	fssp_shusage;	/* normalized usage		*/

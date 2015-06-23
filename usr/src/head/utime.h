@@ -19,6 +19,9 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ */
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
@@ -28,19 +31,13 @@
 #ifndef _UTIME_H
 #define	_UTIME_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.3	*/
-
 #include <sys/utime.h>
 
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
-#if defined(__STDC__)
 extern int utime(const char *, const struct utimbuf *);
-#else
-extern int utime();
-#endif /* __STDC__ */
 
 #ifdef	__cplusplus
 }

@@ -5,8 +5,8 @@
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
  *
- * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
+ * You can obtain a copy of the license at
+ * http://www.opensource.org/licenses/cddl1.txt.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -20,10 +20,9 @@
  */
 
 /*
- * Copyright 2010 Emulex.  All rights reserved.
+ * Copyright (c) 2004-2011 Emulex. All rights reserved.
  * Use is subject to license terms.
  */
-
 
 #include <emlxs.h>
 
@@ -31,7 +30,7 @@
 EMLXS_MSG_DEF(EMLXS_PKT_C);
 
 #if (EMLXS_MODREV >= EMLXS_MODREV3)
-typedef struct _emlxs_pkt_cookie_t
+typedef struct
 {
 	ddi_dma_cookie_t pkt_cmd_cookie;
 	ddi_dma_cookie_t pkt_resp_cookie;
@@ -58,7 +57,7 @@ emlxs_pkt_thread(emlxs_hba_t *hba, void *arg1, void *arg2)
 
 	if (rval != FC_SUCCESS) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_trans_msg,
-		    "Deferred emlxs_pkt_send failed: status=%x pkt=%p", rval,
+		    "Deferred pkt_send failed: status=%x pkt=%p", rval,
 		    pkt);
 
 		if (pkt->pkt_comp) {

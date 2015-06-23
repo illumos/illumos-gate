@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -460,67 +461,56 @@ smb_iod_connect(smb_ctx_t *ctx)
 	}
 
 	/*
-	 * SMB Negotiate Protocol and
-	 * SMB Session Setup, one of 3 ways:
-	 *	NULL session
-	 *	Extended security,
-	 *	NTLM (v2, v1)
-	 *
+	 * Do SMB Negotiate Protocol.
+	 */
+	err = smb_negprot(ctx, &blob);
+	if (err)
+		goto out;
+
+	/*
 	 * Empty user name means an explicit request for
-	 * NULL session setup.  No fall-back logic here.
-	 *
-	 * For NULL session, don't offer extended security.
-	 * That's a lot simpler than dealing with NTLMSSP.
+	 * NULL session setup, which is a special case.
+	 * If negotiate determined that we want to do
+	 * SMB signing, we have to turn that off for a
+	 * NULL session. [MS-SMB 3.3.5.3].
 	 */
 	if (ctx->ct_user[0] == '\0') {
-		ctx->ct_vopt &= ~SMBVOPT_EXT_SEC;
-		err = smb_negprot(ctx, &blob);
-		if (err)
-			goto out;
-		err = smb_ssnsetup_null(ctx);
-	} else {
-		/*
-		 * Do SMB Negotiate Protocol.
-		 */
-		err = smb_negprot(ctx, &blob);
-		if (err)
-			goto out;
-
-		/*
-		 * Do SMB Session Setup (authenticate)
-		 *
-		 * If the server negotiated extended security,
-		 * run the SPNEGO state machine.
-		 */
-		if (ctx->ct_sopt.sv_caps & SMB_CAP_EXT_SECURITY) {
-			err = smb_ssnsetup_spnego(ctx, &blob);
-		} else {
-			/*
-			 * Server did NOT negotiate extended security.
-			 * Try NTLMv2, NTLMv1 (if enabled).
-			 */
-			if ((ctx->ct_authflags &
-			    (SMB_AT_NTLM2 | SMB_AT_NTLM1)) == 0) {
-				/*
-				 * Don't return EAUTH, because a
-				 * new password will not help.
-				 */
-				DPRINT("No NTLM authflags");
-				err = ENOTSUP;
-				goto out;
-			}
-			if (ctx->ct_authflags & SMB_AT_NTLM2)
-				err = smb_ssnsetup_ntlm2(ctx);
-			else
-				err = EAUTH;
-			if (err == EAUTH && 0 !=
-			    (ctx->ct_authflags & SMB_AT_NTLM1))
-				err = smb_ssnsetup_ntlm1(ctx);
-		}
+		/* Null user should have null domain too. */
+		ctx->ct_domain[0] = '\0';
+		ctx->ct_authflags = SMB_AT_ANON;
+		ctx->ct_clnt_caps &= ~SMB_CAP_EXT_SECURITY;
+		ctx->ct_vcflags &= ~SMBV_WILL_SIGN;
 	}
 
-	/* Tell library code we have a session. */
-	ctx->ct_flags |= SMBCF_RESOLVED | SMBCF_SSNACTIVE;
+	/*
+	 * Do SMB Session Setup (authenticate)
+	 *
+	 * If the server negotiated extended security,
+	 * run the SPNEGO state machine, otherwise do
+	 * one of the old-style variants.
+	 */
+	if (ctx->ct_clnt_caps & SMB_CAP_EXT_SECURITY) {
+		err = smb_ssnsetup_spnego(ctx, &blob);
+	} else {
+		/*
+		 * Server did NOT negotiate extended security.
+		 * Try NTLMv2, NTLMv1, or ANON (if enabled).
+		 */
+		if (ctx->ct_authflags & SMB_AT_NTLM2) {
+			err = smb_ssnsetup_ntlm2(ctx);
+		} else if (ctx->ct_authflags & SMB_AT_NTLM1) {
+			err = smb_ssnsetup_ntlm1(ctx);
+		} else if (ctx->ct_authflags & SMB_AT_ANON) {
+			err = smb_ssnsetup_null(ctx);
+		} else {
+			/*
+			 * Don't return EAUTH, because a new
+			 * password prompt will not help.
+			 */
+			DPRINT("No NTLM authflags");
+			err = ENOTSUP;
+		}
+	}
 
 out:
 	mb_done(&blob);
@@ -528,8 +518,11 @@ out:
 	if (err) {
 		close(ctx->ct_tran_fd);
 		ctx->ct_tran_fd = -1;
-	} else
+	} else {
+		/* Tell library code we have a session. */
+		ctx->ct_flags |= SMBCF_SSNACTIVE;
 		DPRINT("tran_fd = %d", ctx->ct_tran_fd);
+	}
 
 	return (err);
 }

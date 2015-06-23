@@ -32,6 +32,7 @@
  *    by Hermon hardware or which live in Hermon's direct attached DDR memory.
  */
 
+#include <sys/sysmacros.h>
 #include <sys/types.h>
 #include <sys/conf.h>
 #include <sys/ddi.h>
@@ -2666,7 +2667,7 @@ hermon_rsrc_mcg_entry_get_size(hermon_state_t *state, uint_t *mcg_size_shift)
 	 */
 	num_qp_per_mcg = state->hs_cfg_profile->cp_num_qp_per_mcg + 8;
 	log2 = highbit(num_qp_per_mcg);
-	if ((num_qp_per_mcg & (num_qp_per_mcg - 1)) == 0) {
+	if (ISP2(num_qp_per_mcg)) {
 		log2 = log2 - 1;
 	}
 	state->hs_cfg_profile->cp_num_qp_per_mcg = (1 << log2) - 8;

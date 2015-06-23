@@ -911,7 +911,7 @@ stdmain(int argc, char **argv)
 		}
 
 		/* for each active process --- */
-		while (dentp = readdir(dirp)) {
+		while ((dentp = readdir(dirp)) != NULL) {
 			if (dentp->d_name[0] == '.')    /* skip . and .. */
 				continue;
 			if (print_proc(dentp->d_name) == 0)
@@ -1659,7 +1659,7 @@ print_field(psinfo_t *psinfo, struct field *f, const char *ttyp)
 	char *cp;
 	int length;
 	ulong_t mask;
-	char c, *csave;
+	char c = '\0', *csave = NULL;
 	int zombie_lwp;
 
 	zombie_lwp = (Lflg && psinfo->pr_lwp.pr_sname == 'Z');

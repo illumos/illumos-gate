@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2014 Nexenta Systems, Inc.
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2012 OmniTI Computer Consulting, Inc.  All rights reserved.
 # Copyright (c) 2013 Gary Mills
@@ -300,6 +300,7 @@ file path=lib/libsec.so.1
 file path=lib/libsecdb.so.1
 file path=lib/libsendfile.so.1
 file path=lib/libsocket.so.1
+file path=lib/libsqlite-sys.so.2.8.15
 file path=lib/libsysevent.so.1
 file path=lib/libtermcap.so.1
 file path=lib/libthread.so.1
@@ -485,6 +486,7 @@ file path=usr/lib/security/$(ARCH64)/pam_passwd_auth.so.1
 file path=usr/lib/security/$(ARCH64)/pam_rhosts_auth.so.1
 file path=usr/lib/security/$(ARCH64)/pam_roles.so.1
 file path=usr/lib/security/$(ARCH64)/pam_sample.so.1
+file path=usr/lib/security/$(ARCH64)/pam_timestamp.so.1
 file path=usr/lib/security/$(ARCH64)/pam_tsol_account.so.1
 file path=usr/lib/security/$(ARCH64)/pam_unix_account.so.1
 file path=usr/lib/security/$(ARCH64)/pam_unix_auth.so.1
@@ -514,6 +516,7 @@ file path=usr/lib/security/pam_passwd_auth.so.1
 file path=usr/lib/security/pam_rhosts_auth.so.1
 file path=usr/lib/security/pam_roles.so.1
 file path=usr/lib/security/pam_sample.so.1
+file path=usr/lib/security/pam_timestamp.so.1
 file path=usr/lib/security/pam_tsol_account.so.1
 file path=usr/lib/security/pam_unix_account.so.1
 file path=usr/lib/security/pam_unix_auth.so.1
@@ -586,6 +589,10 @@ license usr/src/lib/passwdutil/THIRDPARTYLICENSE \
     license=usr/src/lib/passwdutil/THIRDPARTYLICENSE
 license usr/src/lib/pkcs11/pkcs11_tpm/THIRDPARTYLICENSE \
     license=usr/src/lib/pkcs11/pkcs11_tpm/THIRDPARTYLICENSE
+license usr/src/man/man3c/THIRDPARTYLICENSE.arc4random \
+    license=usr/src/man/man3c/THIRDPARTYLICENSE.arc4random
+license usr/src/man/man3c/THIRDPARTYLICENSE.getentropy \
+    license=usr/src/man/man3c/THIRDPARTYLICENSE.getentropy
 license usr/src/uts/common/sys/THIRDPARTYLICENSE.unicode \
     license=usr/src/uts/common/sys/THIRDPARTYLICENSE.unicode
 link path=lib/$(ARCH64)/libadm.so target=libadm.so.1
@@ -1228,6 +1235,8 @@ link path=usr/lib/security/$(ARCH64)/pam_rhosts_auth.so \
     target=./pam_rhosts_auth.so.1
 link path=usr/lib/security/$(ARCH64)/pam_roles.so target=./pam_roles.so.1
 link path=usr/lib/security/$(ARCH64)/pam_sample.so target=./pam_sample.so.1
+link path=usr/lib/security/$(ARCH64)/pam_timestamp.so \
+    target=./pam_timestamp.so.1
 link path=usr/lib/security/$(ARCH64)/pam_tsol_account.so \
     target=./pam_tsol_account.so.1
 link path=usr/lib/security/$(ARCH64)/pam_unix_account.so \
@@ -1267,6 +1276,7 @@ link path=usr/lib/security/pam_passwd_auth.so target=./pam_passwd_auth.so.1
 link path=usr/lib/security/pam_rhosts_auth.so target=./pam_rhosts_auth.so.1
 link path=usr/lib/security/pam_roles.so target=./pam_roles.so.1
 link path=usr/lib/security/pam_sample.so target=./pam_sample.so.1
+link path=usr/lib/security/pam_timestamp.so target=./pam_timestamp.so.1
 link path=usr/lib/security/pam_tsol_account.so target=./pam_tsol_account.so.1
 link path=usr/lib/security/pam_unix_account.so target=./pam_unix_account.so.1
 link path=usr/lib/security/pam_unix_auth.so target=./pam_unix_auth.so.1

@@ -355,7 +355,7 @@ cmt_hier_promote(pg_cmt_t *pg, cpu_pg_t *pgdata)
 	 * We're changing around the hierarchy, which is actively traversed
 	 * by the dispatcher. Pause CPUS to ensure exclusivity.
 	 */
-	pause_cpus(NULL);
+	pause_cpus(NULL, NULL);
 
 	/*
 	 * If necessary, update the parent's sibling set, replacing parent
@@ -1358,9 +1358,9 @@ cmt_ev_thread_swtch(pg_t *pg, cpu_t *cp, hrtime_t now, kthread_t *old,
 	pg_cmt_t	*cmt_pg = (pg_cmt_t *)pg;
 
 	if (old == cp->cpu_idle_thread) {
-		atomic_add_32(&cmt_pg->cmt_utilization, 1);
+		atomic_inc_32(&cmt_pg->cmt_utilization);
 	} else if (new == cp->cpu_idle_thread) {
-		atomic_add_32(&cmt_pg->cmt_utilization, -1);
+		atomic_dec_32(&cmt_pg->cmt_utilization);
 	}
 }
 
@@ -1383,7 +1383,7 @@ cmt_ev_thread_swtch_pwr(pg_t *pg, cpu_t *cp, hrtime_t now, kthread_t *old,
 
 	if (old == cp->cpu_idle_thread) {
 		ASSERT(new != cp->cpu_idle_thread);
-		u = atomic_add_32_nv(&cmt->cmt_utilization, 1);
+		u = atomic_inc_32_nv(&cmt->cmt_utilization);
 		if (u == 1) {
 			/*
 			 * Notify the CPU power manager that the domain
@@ -1395,7 +1395,7 @@ cmt_ev_thread_swtch_pwr(pg_t *pg, cpu_t *cp, hrtime_t now, kthread_t *old,
 		}
 	} else if (new == cp->cpu_idle_thread) {
 		ASSERT(old != cp->cpu_idle_thread);
-		u = atomic_add_32_nv(&cmt->cmt_utilization, -1);
+		u = atomic_dec_32_nv(&cmt->cmt_utilization);
 		if (u == 0) {
 			/*
 			 * The domain is idle, notify the CPU power
@@ -1555,7 +1555,7 @@ pg_cmt_prune(pg_cmt_t *pg_bad, pg_cmt_t **lineage, int *sz, cpu_pg_t *pgdata)
 	 * We're operating on the PG hierarchy. Pause CPUs to ensure
 	 * exclusivity with respect to the dispatcher.
 	 */
-	pause_cpus(NULL);
+	pause_cpus(NULL, NULL);
 
 	/*
 	 * Prune all PG instances of the hardware sharing relationship
@@ -1675,7 +1675,7 @@ pg_cmt_disable(void)
 
 	ASSERT(MUTEX_HELD(&cpu_lock));
 
-	pause_cpus(NULL);
+	pause_cpus(NULL, NULL);
 	cpu = cpu_list;
 
 	do {

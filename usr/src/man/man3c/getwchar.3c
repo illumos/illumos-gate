@@ -1,4 +1,5 @@
 '\" te
+.\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
 .\"  Copyright (c) 1992, X/Open Company Limited  All Rights Reserved  Portions Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved
 .\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
@@ -17,45 +18,47 @@ getwchar \- get wide character from stdin stream
 
 \fBwint_t\fR \fBgetwchar\fR(void)
 .fi
-
-.SH DESCRIPTION
-.sp
 .LP
-The \fBgetwchar()\fR function is equivalent to \fBgetwc(stdin)\fR.
+.nf
+#include <wchar.h>
+#include <xlocale.h>
+
+\fBwint_t\fR \fBgetwchar_l\fR(locale_t loc)
+.fi
+.SH DESCRIPTION
+.LP
+The \fBgetwchar()\fR function is equivalent to \fBgetwc\fR(\fBstdin\fR).
+.LP
+The\fBgetwchar_l()\fR function is equivalent to \fBgetwc\fR(\fBstdin\fR, \fIloc\fR).
 .SH RETURN VALUES
-.sp
 .LP
 Refer to \fBfgetwc\fR(3C).
 .SH ERRORS
-.sp
 .LP
 Refer to \fBfgetwc\fR(3C).
 .SH USAGE
-.sp
 .LP
 If the \fBwint_t\fR value returned by \fBgetwchar()\fR is stored into a
 variable of type \fBwchar_t\fR and then compared against the \fBwint_t\fR macro
 \fBWEOF\fR, the comparison may never succeed because \fBwchar_t\fR is defined
 as unsigned.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
 .TS
 box;
 c | c
 l | l .
 ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface Stability	Standard
+Interface Stability	See below.
 _
 MT-Level	MT-Safe
 .TE
 
+.LP
+The \fBgetwchar()\fR function is Standard.  The \fBgetwchar_l()\fR function
+is Uncommitted.
 .SH SEE ALSO
-.sp
 .LP
 \fBfgetwc\fR(3C), \fBgetwc\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)

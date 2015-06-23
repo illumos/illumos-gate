@@ -152,7 +152,7 @@ K5_OS=	an_to_ln.o def_realm.o ccdefname.o free_krbhs.o free_hstrl.o \
 
 K5_OS_UTS=init_os_ctx.o timeofday.o toffset.o c_ustime.o
 
-K5_POSIX= setenv.o daemon.o
+K5_POSIX= setenv.o
 
 K5_RCACHE=rc_base.o rc_file.o rc_mem.o rc_common.o rc_io.o rcdef.o rc_conv.o \
 	ser_rc.o rcfns.o rc_none.o

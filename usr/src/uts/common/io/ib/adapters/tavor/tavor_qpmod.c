@@ -33,6 +33,7 @@
  *    and from Reset, Init, RTR, RTS, SQD, SQErr, and Error.
  */
 
+#include <sys/sysmacros.h>
 #include <sys/types.h>
 #include <sys/conf.h>
 #include <sys/ddi.h>
@@ -3438,7 +3439,7 @@ tavor_qp_validate_resp_rsrc(tavor_state_t *state, ibt_qp_rc_attr_t *rc,
 	if (rdma_ra_in == 0) {
 		rdma_ra_in = 1;
 	}
-	if ((rdma_ra_in & (rdma_ra_in - 1)) == 0) {
+	if (ISP2(rdma_ra_in)) {
 		*rra_max = highbit(rdma_ra_in) - 1;
 	} else {
 		*rra_max = highbit(rdma_ra_in);
@@ -3474,7 +3475,7 @@ tavor_qp_validate_init_depth(tavor_state_t *state, ibt_qp_rc_attr_t *rc,
 	if (rdma_ra_out == 0) {
 		rdma_ra_out = 1;
 	}
-	if ((rdma_ra_out & (rdma_ra_out - 1)) == 0) {
+	if (ISP2(rdma_ra_out)) {
 		*sra_max = highbit(rdma_ra_out) - 1;
 	} else {
 		*sra_max = highbit(rdma_ra_out);

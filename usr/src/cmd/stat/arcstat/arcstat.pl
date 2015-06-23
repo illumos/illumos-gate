@@ -44,6 +44,10 @@
 # @hdr is the array of fields that needs to be printed, so we
 # just iterate over this array and print the values using our pretty printer.
 
+#
+# Copyright (c) 2015 by Delphix. All rights reserved.
+#
+
 use strict;
 use warnings;
 use POSIX qw(strftime);
@@ -72,14 +76,13 @@ my %cols = (# HDR => [Size, Scale, Description]
 	"mh%"		=>[3, 100, "Metadata hit percentage"],
 	"mm%"		=>[3, 100, "Metadata miss percentage"],
 	"arcsz"		=>[5, 1024, "ARC Size"],
-	"c" 		=>[4, 1024, "ARC Target Size"],
-	"mfu" 		=>[4, 1000, "MFU List hits per second"],
-	"mru" 		=>[4, 1000, "MRU List hits per second"],
-	"mfug" 		=>[4, 1000, "MFU Ghost List hits per second"],
-	"mrug" 		=>[4, 1000, "MRU Ghost List hits per second"],
+	"c"		=>[4, 1024, "ARC Target Size"],
+	"mfu"		=>[4, 1000, "MFU List hits per second"],
+	"mru"		=>[4, 1000, "MRU List hits per second"],
+	"mfug"		=>[4, 1000, "MFU Ghost List hits per second"],
+	"mrug"		=>[4, 1000, "MRU Ghost List hits per second"],
 	"eskip"		=>[5, 1000, "evict_skip per second"],
 	"mtxmis"	=>[6, 1000, "mutex_miss per second"],
-	"rmis"		=>[4, 1000, "recycle_miss per second"],
 	"dread"		=>[5, 1000, "Demand data accesses per second"],
 	"pread"		=>[5, 1000, "Prefetch accesses per second"],
 	"l2hits"	=>[6, 1000, "L2ARC hits per second"],
@@ -87,15 +90,15 @@ my %cols = (# HDR => [Size, Scale, Description]
 	"l2read"	=>[6, 1000, "Total L2ARC accesses per second"],
 	"l2hit%"	=>[6, 100, "L2ARC access hit percentage"],
 	"l2miss%"	=>[7, 100, "L2ARC access miss percentage"],
-	"l2asize"       =>[7, 1024, "Actual (compressed) size of the L2ARC"],
+	"l2asize"	=>[7, 1024, "Actual (compressed) size of the L2ARC"],
 	"l2size"	=>[6, 1024, "Size of the L2ARC"],
 	"l2bytes"	=>[7, 1024, "bytes read per second from the L2ARC"],
 );
 my %v=();
 my @hdr = qw(time read miss miss% dmis dm% pmis pm% mmis mm% arcsz c);
-my @xhdr = qw(time mfu mru mfug mrug eskip mtxmis rmis dread pread read);
+my @xhdr = qw(time mfu mru mfug mrug eskip mtxmis dread pread read);
 my $int = 1;		# Default interval is 1 second
-my $count = 1;		# Default count is 1 
+my $count = 1;		# Default count is 1
 my $hdr_intr = 20;	# Print header every 20 lines of output
 my $opfile = "";
 my $sep = "  ";		# Default separator is 2 spaces
@@ -326,7 +329,6 @@ sub calculate {
 	$v{"mrug"} = $d{"mru_ghost_hits"}/$int;
 	$v{"mfug"} = $d{"mfu_ghost_hits"}/$int;
 	$v{"eskip"} = $d{"evict_skip"}/$int;
-	$v{"rmiss"} = $d{"recycle_miss"}/$int;
 	$v{"mtxmis"} = $d{"mutex_miss"}/$int;
 
 	if ($l2exist) {

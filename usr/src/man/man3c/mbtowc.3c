@@ -1,4 +1,5 @@
 '\" te
+.\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
 .\" Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.  Portions Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
@@ -7,9 +8,9 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH MBTOWC 3C "Nov 1, 2003"
+.TH MBTOWC 3C "Jun 23, 2014"
 .SH NAME
-mbtowc \- convert a character to a wide-character code
+mbtowc, mbtowc_l \- convert a character to a wide-character code
 .SH SYNOPSIS
 .LP
 .nf
@@ -17,9 +18,15 @@ mbtowc \- convert a character to a wide-character code
 
 \fBint\fR \fBmbtowc\fR(\fBwchar_t *restrict\fR \fIpwc\fR, \fBconst char *restrict\fR \fIs\fR, \fBsize_t\fR \fIn\fR);
 .fi
+.LP
+.nf
+#include <stdlib.h>
+#include <xlocale.h>
 
+\fBint\fR \fBmbtowc_l\fR(\fBwchar_t *restrict\fR \fIpwc\fR, \fBconst char *restrict\fR \fIs\fR, \fBsize_t\fR \fIn\fR,
+    \fBlocale_t\fR \fIloc\fR);
+.fi
 .SH DESCRIPTION
-.sp
 .LP
 If \fIs\fR is not a null pointer, \fBmbtowc()\fR determines the number of the
 bytes that constitute the character pointed to by \fIs\fR. It then determines
@@ -28,28 +35,28 @@ that character. (The value of the wide-character code corresponding to the null
 byte is 0.) If the character is valid and \fIpwc\fR is not a null pointer,
 \fBmbtowc()\fR stores the wide-character code in the object pointed to by
 \fIpwc\fR.
-.sp
 .LP
 A call with \fIs\fR as a null pointer causes this function to return \fB0\fR.
 The behavior of this function is affected by the \fBLC_CTYPE\fR category of the
 current locale. At most \fIn\fR bytes of the array pointed to by \fIs\fR will
 be examined.
-.SH RETURN VALUES
-.sp
 .LP
-If \fIs\fR is a null pointer, \fBmbtowc()\fR returns \fB0\fR. If \fIs\fR is not
-a null pointer, \fBmbtowc()\fR returns \fB0\fR (if \fIs\fR points to the null
+The function \fBmbtowc_l()\fR behaves identically to \fBmbtowc()\fR, except
+instead of using the current locale, it uses the locale as specified by
+\fIloc\fR.
+.SH RETURN VALUES
+.LP
+If \fIs\fR is a null pointer, these functions return \fB0\fR. If \fIs\fR is not
+a null pointer, they return \fB0\fR (if \fIs\fR points to the null
 byte), the number of bytes that constitute the converted character (if the next
 \fIn\fR or fewer bytes form a valid character), or  \fB\(mi1\fR and may set
 \fBerrno\fR to indicate the error (if they do not form a valid character).
-.sp
 .LP
 In no case will the value returned be greater than \fIn\fR or the value of the
 \fBMB_CUR_MAX\fR macro.
 .SH ERRORS
-.sp
 .LP
-The \fBmbtowc()\fR function may fail if:
+The \fBmbtowc()\fR and \fBmbtowc_l()\fR functions may fail if:
 .sp
 .ne 2
 .na
@@ -58,34 +65,30 @@ The \fBmbtowc()\fR function may fail if:
 .RS 10n
 Invalid character sequence is detected.
 .RE
-
-.SH USAGE
-.sp
-.LP
-The \fBmbtowc()\fR function can be used safely in multithreaded applications,
-as long as \fBsetlocale\fR(3C) is not being called to change the locale.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
 .TS
 box;
-l | l
+c | c
 l | l .
 ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
 CSI	Enabled
 _
-Interface Stability	Standard
+Interface Stability	See below.
 _
-MT-Level	MT-Safe with exceptions
+MT-Level	MT-Safe
 .TE
 
-.SH SEE ALSO
-.sp
 .LP
-\fBmblen\fR(3C), \fBmbstowcs\fR(3C), \fBsetlocale\fR(3C), \fBwcstombs\fR(3C),
-\fBwctomb\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)
+The
+.B mbtowc()
+function is Standard.  The
+.B mbtowc_l()
+function is Uncommitted.
+.SH SEE ALSO
+.LP
+\fBmblen\fR(3C), \fBmbstowcs\fR(3C),
+\fBnewlocale\fR(3C), \fBsetlocale\fR(3C), \fBuselocale\fR(3C),
+\fBwcstombs\fR(3C), \fBwctomb\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)

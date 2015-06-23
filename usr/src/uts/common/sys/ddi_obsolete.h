@@ -3,7 +3,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  */
 
 #ifndef	_SYS_DDI_OBSOLETE_H
@@ -23,22 +23,10 @@ extern "C" {
 #endif
 
 
-/*
- * The following are intentionally outside of _DDI_STRICT, they are obsolete
- * and shouldn't be used by drivers, but are still used in the consolidation.
- * e.g. DDI implementation.
- */
-int ddi_iomin(dev_info_t *dip, int initial, int streaming);
-
-
 #ifndef	_DDI_STRICT
 
 extern long strtol(const char *, char **, int);
 extern unsigned long strtoul(const char *, char **, int);
-
-/* we'd really like to remove this; unbundled  nexus drivers might have it */
-int ddi_dma_map(dev_info_t *dip, dev_info_t *rdip,
-    struct ddi_dma_req *dmareqp, ddi_dma_handle_t *handlep);
 
 uint8_t ddi_mem_get8(ddi_acc_handle_t handle, uint8_t *host_addr);
 uint16_t ddi_mem_get16(ddi_acc_handle_t handle, uint16_t *host_addr);

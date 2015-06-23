@@ -1563,7 +1563,7 @@ page_list_noreloc_startup(page_t *pp)
 	/*
 	 * Update cage freemem counter
 	 */
-	atomic_add_long(&kcage_freemem, 1);
+	atomic_inc_ulong(&kcage_freemem);
 }
 #else	/* __sparc */
 
@@ -4117,7 +4117,7 @@ struct repl_page_stats {
 	uint_t	nnofree;
 	uint_t	nnext_pp;
 } repl_page_stats;
-#define	REPL_STAT_INCR(v)	atomic_add_32(&repl_page_stats.v, 1)
+#define	REPL_STAT_INCR(v)	atomic_inc_32(&repl_page_stats.v)
 #else /* REPL_PAGE_STATS */
 #define	REPL_STAT_INCR(v)
 #endif /* REPL_PAGE_STATS */

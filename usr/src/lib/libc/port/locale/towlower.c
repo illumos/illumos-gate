@@ -1,4 +1,5 @@
 /*
+ * Copyright 2013 Garrett D'Amore <garrett@damore.org>
  * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -39,21 +40,23 @@
 #include "lint.h"
 #include <wctype.h>
 #include <stdio.h>
+#include "localeimpl.h"
+#include "lctype.h"
 #include "runetype.h"
 
 static wint_t
-__change_case_ext(wint_t c, int lower)
+change_case_ext(locale_t loc, wint_t c, int lower)
 {
+	const _RuneLocale *rl;
+	const _RuneRange *rr;
+	const _RuneEntry *base, *re;
 	size_t lim;
-	_RuneRange *rr;
-	_RuneEntry *base, *re;
 
 	if (c < 0 || c == EOF)
 		return (c);
 
-	rr = lower ?
-	    &_CurrentRuneLocale->__maplower_ext :
-	    &_CurrentRuneLocale->__mapupper_ext;
+	rl = loc->runelocale;
+	rr = lower ? &rl->__maplower_ext : &rl->__mapupper_ext;
 	/* Binary search -- see bsearch.c for explanation. */
 	base = rr->__ranges;
 	for (lim = rr->__nranges; lim != 0; lim >>= 1) {
@@ -69,20 +72,40 @@ __change_case_ext(wint_t c, int lower)
 	return (c);
 }
 
+wint_t
+towlower_l(wint_t wc, locale_t loc)
+{
+	return (iswascii(wc) ? __trans_lower[wc] :
+	    (wc < 0 || wc >= _CACHED_RUNES) ?
+	    change_case_ext(loc, wc, 1) :
+	    loc->runelocale->__maplower[wc]);
+}
+
 #undef towlower
 wint_t
 towlower(wint_t wc)
 {
-	return ((wc < 0 || wc >= _CACHED_RUNES) ?
-	    __change_case_ext(wc, 1) :
-	    _CurrentRuneLocale->__maplower[wc]);
+	return (iswascii(wc) ? __trans_lower[wc] :
+	    (wc < 0 || wc >= _CACHED_RUNES) ?
+	    change_case_ext(uselocale(NULL), wc, 1) :
+	    uselocale(NULL)->runelocale->__maplower[wc]);
+}
+
+wint_t
+towupper_l(wint_t wc, locale_t loc)
+{
+	return (iswascii(wc) ? __trans_upper[wc] :
+	    (wc < 0 || wc >= _CACHED_RUNES) ?
+	    change_case_ext(loc, wc, 0) :
+	    loc->runelocale->__mapupper[wc]);
 }
 
 #undef towupper
 wint_t
 towupper(wint_t wc)
 {
-	return ((wc < 0 || wc >= _CACHED_RUNES) ?
-	    __change_case_ext(wc, 0) :
-	    _CurrentRuneLocale->__mapupper[wc]);
+	return (iswascii(wc) ? __trans_upper[wc] :
+	    (wc < 0 || wc >= _CACHED_RUNES) ?
+	    change_case_ext(uselocale(NULL), wc, 0) :
+	    uselocale(NULL)->runelocale->__mapupper[wc]);
 }

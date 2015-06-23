@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -391,14 +391,8 @@ smb_enable_share(sa_share_t share)
 	boolean_t online;
 
 	/*
-	 * We only start in the global zone and only run if we aren't
-	 * running Trusted Extensions.
+	 * Don't support Trusted Extensions.
 	 */
-	if (getzoneid() != GLOBAL_ZONEID) {
-		(void) printf(dgettext(TEXT_DOMAIN,
-		    "SMB: service not supported in local zone\n"));
-		return (SA_NOT_SUPPORTED);
-	}
 	if (is_system_labeled()) {
 		(void) printf(dgettext(TEXT_DOMAIN,
 		    "SMB: service not supported with Trusted Extensions\n"));
@@ -451,12 +445,6 @@ smb_enable_share(sa_share_t share)
 		if (err != SA_OK) {
 			(void) printf(dgettext(TEXT_DOMAIN,
 			    "SMB: Unable to enable service\n"));
-			/*
-			 * For now, it is OK to not be able to enable
-			 * the service.
-			 */
-			if (err == SA_BUSY || err == SA_SYSTEM_ERR)
-				err = SA_OK;
 		} else {
 			online = B_TRUE;
 		}
@@ -923,6 +911,8 @@ struct smb_proto_option_defs {
 	    SMB_REFRESH_REFRESH },
 	{ SMB_CI_DISPOSITION, 0, MAX_VALUE_BUFLEN,
 	    disposition_validator, SMB_REFRESH_REFRESH },
+	{ SMB_CI_NETBIOS_ENABLE, 0, 0, true_false_validator,
+	    SMB_REFRESH_REFRESH },
 };
 
 #define	SMB_OPT_NUM \
@@ -1483,10 +1473,6 @@ smb_enable_service(void)
 			} else if (smb_ismaint()) {
 				/* maintenance requires help */
 				ret = SA_SYSTEM_ERR;
-				break;
-			} else if (smb_isdisabled()) {
-				/* disabled is ok */
-				ret = SA_OK;
 				break;
 			} else {
 				/* try another time */

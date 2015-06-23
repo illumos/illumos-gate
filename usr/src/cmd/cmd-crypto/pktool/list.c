@@ -314,7 +314,7 @@ list_pk11_objects(KMF_HANDLE_T kmfhandle, char *token, int oclass,
 	KMF_KEY_CLASS keyclass;
 	KMF_ENCODE_FORMAT format;
 	int auth = 0;
-	KMF_CREDENTIAL cred = {NULL, 0};
+	KMF_CREDENTIAL cred = { NULL, 0 };
 
 	/*
 	 * Symmetric keys and RSA/DSA/ECDSA private keys are always
@@ -916,7 +916,7 @@ pk_list(int argc, char *argv[])
 	KMF_HANDLE_T		kmfhandle = NULL;
 	char			*find_criteria = NULL;
 	KMF_CERT_VALIDITY	find_criteria_flag = KMF_ALL_CERTS;
-	KMF_CREDENTIAL		tokencred = {NULL, 0};
+	KMF_CREDENTIAL		tokencred = { NULL, 0 };
 
 	/* Parse command line options.  Do NOT i18n/l10n. */
 	while ((opt = getopt_av(argc, argv,

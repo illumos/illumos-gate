@@ -1,4 +1,5 @@
 /*
+ * Copyright 2013 Garrett D'Amore <garrett@damore.org>
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2002-2004 Tim J. Robbins
  * All rights reserved.
@@ -28,11 +29,11 @@
 #include "lint.h"
 #include <errno.h>
 #include <limits.h>
-#include "runetype.h"
 #include <stdlib.h>
 #include <string.h>
 #include <wchar.h>
 #include "mblocal.h"
+#include "lctype.h"
 
 static size_t	_UTF8_mbrtowc(wchar_t *_RESTRICT_KYWD,
 		    const char *_RESTRICT_KYWD,
@@ -53,29 +54,16 @@ typedef struct {
 	wchar_t	lbound;
 } _UTF8State;
 
-int
-_UTF8_init(_RuneLocale *rl)
+void
+_UTF8_init(struct lc_ctype *lct)
 {
-	__mbrtowc = _UTF8_mbrtowc;
-	__wcrtomb = _UTF8_wcrtomb;
-	__mbsinit = _UTF8_mbsinit;
-	__mbsnrtowcs = _UTF8_mbsnrtowcs;
-	__wcsnrtombs = _UTF8_wcsnrtombs;
-	_CurrentRuneLocale = rl;
-
-	charset_is_ascii = 0;
-
-	/*
-	 * In theory up to 6 bytes can be used for the encoding,
-	 * but only encodings with more than 4 bytes are illegal.
-	 */
-	__ctype[520] = 4;
-	/*
-	 * Note that the other CSWIDTH members are nonsensical for this
-	 * this coding.  They only are valid with EUC codings.
-	 */
-
-	return (0);
+	lct->lc_mbrtowc = _UTF8_mbrtowc;
+	lct->lc_wcrtomb = _UTF8_wcrtomb;
+	lct->lc_mbsinit = _UTF8_mbsinit;
+	lct->lc_mbsnrtowcs = _UTF8_mbsnrtowcs;
+	lct->lc_wcsnrtombs = _UTF8_wcsnrtombs;
+	lct->lc_is_ascii = 0;
+	lct->lc_max_mblen = 4;
 }
 
 static int

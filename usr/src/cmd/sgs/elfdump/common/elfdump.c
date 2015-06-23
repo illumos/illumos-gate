@@ -551,7 +551,7 @@ unwind_eh_frame(Cache *cache, Word shndx, Word shnum, Phdr *uphdr, Ehdr *ehdr,
 	Conv_dwarf_ehe_buf_t	dwarf_ehe_buf;
 	uint64_t		ndx, frame_ptr, fde_cnt, tabndx;
 	uint_t			vers, frame_ptr_enc, fde_cnt_enc, table_enc;
-	uint64_t		initloc, initloc0;
+	uint64_t		initloc, initloc0 = 0;
 	uint64_t		gotaddr = 0;
 	int			cnt;
 
@@ -561,6 +561,12 @@ unwind_eh_frame(Cache *cache, Word shndx, Word shnum, Phdr *uphdr, Ehdr *ehdr,
 			gotaddr = cache[cnt].c_shdr->sh_addr;
 			break;
 		}
+	}
+
+	if ((data == NULL) || (datasize == 0)) {
+		(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADSZ),
+		    file, _cache ->c_name);
+		return;
 	}
 
 	/*
@@ -587,8 +593,20 @@ unwind_eh_frame(Cache *cache, Word shndx, Word shnum, Phdr *uphdr, Ehdr *ehdr,
 
 		dbg_print(0, MSG_ORIG(MSG_UNW_FRMVERS), vers);
 
-		frame_ptr = dwarf_ehe_extract(data, &ndx, frame_ptr_enc,
-		    ehdr->e_ident, B_TRUE, shdr->sh_addr, ndx, gotaddr);
+		switch (dwarf_ehe_extract(data, datasize, &ndx,
+		    &frame_ptr, frame_ptr_enc, ehdr->e_ident, B_TRUE,
+		    shdr->sh_addr, ndx, gotaddr)) {
+		case DW_OVERFLOW:
+			(void) fprintf(stderr, MSG_INTL(MSG_ERR_DWOVRFLW),
+			    file, _cache->c_name);
+			return;
+		case DW_BAD_ENCODING:
+			(void) fprintf(stderr, MSG_INTL(MSG_ERR_DWBADENC),
+			    file, _cache->c_name, frame_ptr_enc);
+			return;
+		case DW_SUCCESS:
+			break;
+		}
 		if (eh_state->hdr_cnt == 1) {
 			eh_state->hdr_ndx = shndx;
 			eh_state->frame_ptr = frame_ptr;
@@ -598,8 +616,20 @@ unwind_eh_frame(Cache *cache, Word shndx, Word shnum, Phdr *uphdr, Ehdr *ehdr,
 		    conv_dwarf_ehe(frame_ptr_enc, &dwarf_ehe_buf),
 		    EC_XWORD(frame_ptr));
 
-		fde_cnt = dwarf_ehe_extract(data, &ndx, fde_cnt_enc,
-		    ehdr->e_ident, B_TRUE, shdr->sh_addr, ndx, gotaddr);
+		switch (dwarf_ehe_extract(data, datasize, &ndx, &fde_cnt,
+		    fde_cnt_enc, ehdr->e_ident, B_TRUE, shdr->sh_addr, ndx,
+		    gotaddr)) {
+		case DW_OVERFLOW:
+			(void) fprintf(stderr, MSG_INTL(MSG_ERR_DWOVRFLW),
+			    file, _cache->c_name);
+			return;
+		case DW_BAD_ENCODING:
+			(void) fprintf(stderr, MSG_INTL(MSG_ERR_DWBADENC),
+			    file, _cache->c_name, fde_cnt_enc);
+			return;
+		case DW_SUCCESS:
+			break;
+		}
 
 		dbg_print(0, MSG_ORIG(MSG_UNW_FDCNENC),
 		    conv_dwarf_ehe(fde_cnt_enc, &dwarf_ehe_buf),
@@ -610,18 +640,48 @@ unwind_eh_frame(Cache *cache, Word shndx, Word shnum, Phdr *uphdr, Ehdr *ehdr,
 		dbg_print(0, MSG_ORIG(MSG_UNW_BINSRTAB2));
 
 		for (tabndx = 0; tabndx < fde_cnt; tabndx++) {
-			initloc = dwarf_ehe_extract(data, &ndx, table_enc,
-			    ehdr->e_ident, B_TRUE, shdr->sh_addr, ndx, gotaddr);
-			/*LINTED:E_VAR_USED_BEFORE_SET*/
+			uint64_t table;
+
+			switch (dwarf_ehe_extract(data, datasize, &ndx,
+			    &initloc, table_enc, ehdr->e_ident, B_TRUE,
+			    shdr->sh_addr, ndx, gotaddr)) {
+			case DW_OVERFLOW:
+				(void) fprintf(stderr,
+				    MSG_INTL(MSG_ERR_DWOVRFLW), file,
+				    _cache->c_name);
+				return;
+			case DW_BAD_ENCODING:
+				(void) fprintf(stderr,
+				    MSG_INTL(MSG_ERR_DWBADENC), file,
+				    _cache->c_name, table_enc);
+				return;
+			case DW_SUCCESS:
+				break;
+			}
 			if ((tabndx != 0) && (initloc0 > initloc))
 				(void) fprintf(stderr,
 				    MSG_INTL(MSG_ERR_BADSORT), file,
 				    _cache->c_name, EC_WORD(tabndx));
+			switch (dwarf_ehe_extract(data, datasize, &ndx, &table,
+			    table_enc, ehdr->e_ident, B_TRUE, shdr->sh_addr,
+			    ndx, gotaddr)) {
+			case DW_OVERFLOW:
+				(void) fprintf(stderr,
+				    MSG_INTL(MSG_ERR_DWOVRFLW), file,
+				    _cache->c_name);
+				return;
+			case DW_BAD_ENCODING:
+				(void) fprintf(stderr,
+				    MSG_INTL(MSG_ERR_DWBADENC), file,
+				    _cache->c_name, table_enc);
+				return;
+			case DW_SUCCESS:
+				break;
+			}
+
 			dbg_print(0, MSG_ORIG(MSG_UNW_BINSRTABENT),
 			    EC_XWORD(initloc),
-			    EC_XWORD(dwarf_ehe_extract(data, &ndx,
-			    table_enc, ehdr->e_ident, B_TRUE, shdr->sh_addr,
-			    ndx, gotaddr)));
+			    EC_XWORD(table));
 			initloc0 = initloc;
 		}
 	} else {		/* Display the .eh_frame section */
@@ -637,8 +697,8 @@ unwind_eh_frame(Cache *cache, Word shndx, Word shnum, Phdr *uphdr, Ehdr *ehdr,
 			    file, EC_WORD(shndx), _cache->c_name,
 			    conv_ehdr_type(osabi, ehdr->e_type, 0, &inv_buf));
 		}
-		dump_eh_frame(data, datasize, shdr->sh_addr,
-		    ehdr->e_machine, ehdr->e_ident, gotaddr);
+		dump_eh_frame(file, _cache->c_name, data, datasize,
+		    shdr->sh_addr, ehdr->e_machine, ehdr->e_ident, gotaddr);
 	}
 
 	/*
@@ -736,7 +796,7 @@ unwind_exception_ranges(Cache *_cache, const char *file, int do_swap)
 	exception_range_entry	scratch, *ent, *cur_ent = &scratch;
 	char			index[MAXNDXSIZE];
 	Word			i, nelts;
-	Addr			addr, addr0, offset = 0;
+	Addr			addr, addr0 = 0, offset = 0;
 	Addr			exc_addr = _cache->c_shdr->sh_addr;
 
 	dbg_print(0, MSG_INTL(MSG_EXR_TITLE));
@@ -763,7 +823,6 @@ unwind_exception_ranges(Cache *_cache, const char *file, int do_swap)
 		 * that addresses grow monotonically.
 		 */
 		addr = SRELPTR(ret_addr);
-		/*LINTED:E_VAR_USED_BEFORE_SET*/
 		if ((i != 0) && (addr0 > addr))
 			(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADSORT),
 			    file, _cache->c_name, EC_WORD(i));
@@ -3681,6 +3740,9 @@ note_entry(Cache *cache, Word *data, size_t size, Ehdr *ehdr, const char *file)
 				    do_swap, pnstate.pn_type, pnstate.pn_desc,
 				    pnstate.pn_descsz);
 				switch (corenote_ret) {
+				case CORENOTE_R_OK_DUMP:
+					hexdump = 1;
+					break;
 				case CORENOTE_R_OK:
 					hexdump = 0;
 					break;
@@ -3698,6 +3760,13 @@ note_entry(Cache *cache, Word *data, size_t size, Ehdr *ehdr, const char *file)
 					    conv_ehdr_mach(ehdr->e_machine,
 					    0, &inv_buf));
 					break;
+				case CORENOTE_R_BADTYPE:
+					(void) fprintf(stderr,
+					    MSG_INTL(MSG_NOTE_BADCORETYPE),
+					    file,
+					    EC_WORD(pnstate.pn_type));
+					break;
+
 				}
 			}
 
@@ -4917,6 +4986,8 @@ regular(const char *file, int fd, Elf *elf, uint_t flags,
 		if (create_cache(file, fd, elf, ehdr, &cache, shstrndx,
 		    &shnum, &flags) == 0)
 			return (ret);
+		break;
+	case CACHE_OK:
 		break;
 	case CACHE_FAIL:
 		return (ret);

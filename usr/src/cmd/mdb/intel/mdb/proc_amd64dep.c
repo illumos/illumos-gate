@@ -24,7 +24,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 /*
@@ -40,10 +40,13 @@
 #include <mdb/mdb_amd64util.h>
 #include <mdb/mdb.h>
 
+#include <sys/ucontext.h>
 #include <sys/frame.h>
 #include <libproc.h>
 #include <sys/fp.h>
 #include <ieeefp.h>
+
+#include <stddef.h>
 
 const mdb_tgt_regdesc_t pt_regdesc[] = {
 	{ "r15",	REG_R15,	MDB_TGT_R_EXPORT },
@@ -153,9 +156,37 @@ pt_regs(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	mdb_tgt_tid_t tid;
 	prgregset_t grs;
 	prgreg_t rflags;
+	boolean_t from_ucontext = B_FALSE;
 
-	if (argc != 0)
+	if (mdb_getopts(argc, argv,
+	    'u', MDB_OPT_SETBITS, B_TRUE, &from_ucontext, NULL) != argc) {
 		return (DCMD_USAGE);
+	}
+
+	if (from_ucontext) {
+		int off;
+		int o0, o1;
+
+		if (!(flags & DCMD_ADDRSPEC)) {
+			mdb_warn("-u requires a ucontext_t address\n");
+			return (DCMD_ERR);
+		}
+
+		o0 = mdb_ctf_offsetof_by_name("ucontext_t", "uc_mcontext");
+		o1 = mdb_ctf_offsetof_by_name("mcontext_t", "gregs");
+		if (o0 == -1 || o1 == -1) {
+			off = offsetof(ucontext_t, uc_mcontext) +
+			    offsetof(mcontext_t, gregs);
+		} else {
+			off = o0 + o1;
+		}
+
+		if (mdb_vread(&grs, sizeof (grs), addr + off) != sizeof (grs)) {
+			mdb_warn("failed to read from ucontext_t %p", addr);
+			return (DCMD_ERR);
+		}
+		goto print_regs;
+	}
 
 	if (t->t_pshandle == NULL || Pstate(t->t_pshandle) == PS_UNDEAD) {
 		mdb_warn("no process active\n");
@@ -177,6 +208,7 @@ pt_regs(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_ERR);
 	}
 
+print_regs:
 	rflags = grs[REG_RFL];
 
 	mdb_printf("%%rax = 0x%0?p\t%%r8  = 0x%0?p\n",

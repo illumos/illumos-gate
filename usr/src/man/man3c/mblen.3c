@@ -1,4 +1,5 @@
 '\" te
+.\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
 .\"  Copyright 1989 AT&T  Copyright (c) 1992, X/Open Company Limited  All Rights Reserved  Portions Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved
 .\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
@@ -7,9 +8,9 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH MBLEN 3C "Jul 24, 2002"
+.TH MBLEN 3C "Jun 24, 2014"
 .SH NAME
-mblen \- get number of bytes in a character
+mblen, mblen_l \- get number of bytes in a character
 .SH SYNOPSIS
 .LP
 .nf
@@ -17,25 +18,37 @@ mblen \- get number of bytes in a character
 
 \fBint\fR \fBmblen\fR(\fBconst char *\fR\fIs\fR, \fBsize_t\fR \fIn\fR);
 .fi
+.LP
+.nf
+#include <stdlib.h>
+#include <xlocale.h>
+
+\fBint\fR \fBmblen_l\fR(\fBconst char *\fR\fIs\fR, \fBsize_t\fR \fIn\fR, \fBlocale_t\fR \fIloc\fR);
+.fi
 
 .SH DESCRIPTION
 .sp
 .LP
-If \fIs\fR is not a null pointer, \fBmblen()\fR determines the number of bytes
-constituting the character pointed to by \fIs\fR. It is equivalent to:
-.sp
+If \fIs\fR is not a null pointer, \fBmblen()\fR and \fBmblen_l()\fR
+determine the number of bytes constituting the character pointed to by
+\fIs\fR. The call
+.IP
+\fBmblen(\fIs\fR, \fIn\fR)\fR;
 .LP
-\fBmbtowc((wchar_t *)0, \fR\fIs\fR, \fIn\fR);
-.sp
+is equivalent to:
+.IP
+\fBmbtowc\fR((\fBwchar_t\fR *)0, \fIs\fR, \fIn\fR);
 .LP
 A call with \fIs\fR as a null pointer causes this function to return \fB0\fR.
-The behavior of this function is affected by the \fBLC_CTYPE\fR category of the
-current locale.
-.SH RETURN VALUES
-.sp
 .LP
-If \fIs\fR is a null pointer, \fBmblen()\fR returns \fB0\fR. It \fIs\fR is not
-a null pointer, \fBmblen()\fR returns \fB0\fR (if \fIs\fR points to the null
+Whereas the behavior of the \fBmblen()\fR function is affected by the
+\fBLC_CTYPE\fR category of the current locale, the behavior of
+\fBmblen_l()\fR is affected by the \fBLC_CTYPE\fR category of the
+locale specified by \fIloc\fR.
+.SH RETURN VALUES
+.LP
+If \fIs\fR is a null pointer, \fBmblen()\fR and \fBmblen_l()\fR returns \fB0\fR. It \fIs\fR is not
+a null pointer, \fBmblen()\fR and \fBmblen_l()\fR returns \fB0\fR (if \fIs\fR points to the null
 byte), the number of bytes that constitute the character (if the next \fIn\fR
 or fewer bytes form a valid character), or  \fB\(mi1\fR (if they do not form a
 valid character) and may set \fBerrno\fR to indicate the error. In no case will
@@ -44,7 +57,7 @@ macro.
 .SH ERRORS
 .sp
 .LP
-The \fBmblen()\fR function may fail if:
+The \fBmblen()\fR and \fBmblen_l()\fR functions may fail if:
 .sp
 .ne 2
 .na
@@ -53,12 +66,6 @@ The \fBmblen()\fR function may fail if:
 .RS 10n
 Invalid character sequence is detected.
 .RE
-
-.SH USAGE
-.sp
-.LP
-The \fBmblen()\fR function can be used safely in multithreaded applications, as
-long as \fBsetlocale\fR(3C) is not being called to change the locale.
 .SH ATTRIBUTES
 .sp
 .LP
@@ -74,13 +81,19 @@ ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
 CSI	Enabled
 _
-Interface Stability	Standard
+Interface Stability	See below.
 _
-MT-Level	MT-Safe with exceptions
+MT-Level	MT-Safe
 .TE
 
-.SH SEE ALSO
-.sp
 .LP
-\fBmbstowcs\fR(3C), \fBmbtowc\fR(3C), \fBsetlocale\fR(3C), \fBwcstombs\fR(3C),
-\fBwctomb\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)
+The
+.B mblen()
+function is Standard. The
+.B mblen_l()
+function is Uncommitted.
+.SH SEE ALSO
+.LP
+\fBmbstowcs\fR(3C), \fBmbtowc\fR(3C), \fBnewlocale\fR(3C), \fBsetlocale\fR(3C),
+\fBwcstombs\fR(3C), \fBwctomb\fR(3C), \fBuselocale\fR(3C) \fBattributes\fR(5),
+\fBstandards\fR(5)

@@ -2574,7 +2574,7 @@ ah_finish_up(ah_t *phdr_ah, ah_t *inbound_ah, ipsa_t *assoc,
 		phdr_ah->ah_spi = assoc->ipsa_spi;
 
 		phdr_ah->ah_replay =
-		    htonl(atomic_add_32_nv(&assoc->ipsa_replay, 1));
+		    htonl(atomic_inc_32_nv(&assoc->ipsa_replay));
 		if (phdr_ah->ah_replay == 0 && assoc->ipsa_replay_wsize != 0) {
 			/*
 			 * XXX We have replay counter wrapping.  We probably

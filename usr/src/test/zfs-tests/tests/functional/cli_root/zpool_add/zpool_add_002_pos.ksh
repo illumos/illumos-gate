@@ -24,6 +24,10 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+
+#
+# Copyright (c) 2014 by Delphix. All rights reserved.
+#
 . $STF_SUITE/include/libtest.shlib
 . $STF_SUITE/tests/functional/cli_root/zpool_add/zpool_add.kshlib
 
@@ -59,9 +63,9 @@ create_pool "$TESTPOOL" mirror "${disk}s${SLICE0}" "${disk}s${SLICE1}"
 log_must poolexists "$TESTPOOL"
 
 log_mustnot $ZPOOL add "$TESTPOOL" ${disk}s${SLICE3}
-log_mustnot iscontained "$TESTPOOL" "${disk}s${SLICE3}"
+log_mustnot vdevs_in_pool "$TESTPOOL" "${disk}s${SLICE3}"
 
 log_must $ZPOOL add -f "$TESTPOOL" ${disk}s${SLICE3}
-log_must iscontained "$TESTPOOL" "${disk}s${SLICE3}"
+log_must vdevs_in_pool "$TESTPOOL" "${disk}s${SLICE3}"
 
 log_pass "'zpool add -f <pool> <vdev> ...' executes successfully."

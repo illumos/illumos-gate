@@ -23,6 +23,7 @@
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+#include <sys/sysmacros.h>
 #include <sys/socket.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -66,7 +67,7 @@ sctp_hash_init(sctp_stack_t *sctps)
 	/* Start with /etc/system value */
 	sctps->sctps_conn_hash_size = sctp_conn_hash_size;
 
-	if (sctps->sctps_conn_hash_size & (sctps->sctps_conn_hash_size - 1)) {
+	if (!ISP2(sctps->sctps_conn_hash_size)) {
 		/* Not a power of two. Round up to nearest power of two */
 		for (i = 0; i < 31; i++) {
 			if (sctps->sctps_conn_hash_size < (1 << i))

@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -41,11 +42,7 @@ extern "C" {
 #define	INT_IPL(x) (x)
 #define	AV_INT_SPURIOUS	-1
 
-#ifdef	__STDC__
 typedef uint_t (*avfunc)(caddr_t, caddr_t);
-#else
-typedef uint_t (*avfunc)();
-#endif	/* __STDC__ */
 
 struct autovec {
 

@@ -19,6 +19,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -63,7 +65,6 @@ typedef struct nsc_release {
 	const char *runtime;	/* runtime release(s) */
 } nsc_release_t;
 
-#ifdef __STDC__
 extern void _nsc_nocheck(void);
 extern nsc_fd_t *nsc_open(char *, int, int);
 extern nsc_fd_t *nsc_fdopen(int, char *, int);
@@ -79,23 +80,6 @@ extern int nsc_getsystemid(int *id);
 extern int nsc_name_to_id(char *name, int *id);
 extern int nsc_id_to_name(char **name, int id);
 extern int nsc_check_release(const char *, nsc_release_t *, char **);
-#else
-extern void _nsc_nocheck();
-extern nsc_fd_t *nsc_open();
-extern nsc_fd_t *nsc_fdopen();
-extern int nsc_close();
-extern int nsc_fileno();
-extern int nsc_reserve();
-extern int nsc_release();
-extern int nsc_partsize();
-extern int nsc_freeze();
-extern int nsc_unfreeze();
-extern int nsc_isfrozen();
-extern int nsc_getsystemid();
-extern int nsc_name_to_id();
-extern int nsc_id_to_name();
-extern int nsc_check_release();
-#endif
 
 #ifdef	__cplusplus
 }

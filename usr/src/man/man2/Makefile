@@ -13,6 +13,7 @@
 # Copyright 2011, Richard Lowe
 # Copyright 2013, OmniTI Computer Consulting, Inc
 # Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+# Copyright (c) 2015, Joyent, Inc.  All rights reserved.
 #
 
 include		$(SRC)/Makefile.master
@@ -183,6 +184,7 @@ MANLINKS=	_Exit.2				\
 	 	facl.2				\
 	 	fchdir.2			\
 	 	fchmod.2			\
+	 	fchmodat.2			\
 	 	fchown.2			\
 	 	fchownat.2			\
 	 	fchroot.2			\
@@ -195,6 +197,7 @@ MANLINKS=	_Exit.2				\
 	 	fstatat.2			\
 	 	fstatvfs.2			\
 	 	futimesat.2			\
+		futimens.2			\
 	 	getaudit_addr.2			\
 	 	getegid.2			\
 	 	geteuid.2			\
@@ -208,17 +211,24 @@ MANLINKS=	_Exit.2				\
 	 	gettaskid.2			\
 	 	intro.2				\
 	 	lchown.2			\
+		linkat.2			\
 	 	lstat.2				\
+		mkdirat.2			\
+		mknodat.2			\
 	 	openat.2			\
 	 	pathconf.2			\
 		pipe2.2				\
+		ppoll.2				\
 	 	pread.2				\
+		preadv.2			\
 	 	pset_assign.2			\
 	 	pset_destroy.2			\
 	 	pset_getattr.2			\
 	 	putacct.2			\
 	 	putpmsg.2			\
 	 	pwrite.2			\
+		pwritev.2			\
+		readlinkat.2			\
 	 	readv.2				\
 	 	renameat.2			\
 	 	sbrk.2				\
@@ -239,8 +249,10 @@ MANLINKS=	_Exit.2				\
 	 	shmat.2				\
 	 	shmdt.2				\
 	 	sigsendset.2			\
+		symlinkat.2			\
 	 	umount2.2			\
 	 	unlinkat.2			\
+		utimensat.2			\
 	 	vforkx.2			\
 	 	wracct.2			\
 	 	writev.2
@@ -270,6 +282,7 @@ sbrk.2				:= LINKSRC = brk.2
 fchdir.2			:= LINKSRC = chdir.2
 
 fchmod.2			:= LINKSRC = chmod.2
+fchmodat.2			:= LINKSRC = chmod.2
 
 fchown.2			:= LINKSRC = chown.2
 fchownat.2			:= LINKSRC = chown.2
@@ -329,9 +342,17 @@ getgid.2			:= LINKSRC = getuid.2
 
 setustack.2			:= LINKSRC = getustack.2
 
+linkat.2			:= LINKSRC = link.2
+
+mkdirat.2			:= LINKSRC = mkdir.2
+
+mknodat.2			:= LINKSRC = mknod.2
+
 openat.2			:= LINKSRC = open.2
 
 pipe2.2				:= LINKSRC = pipe.2
+
+ppoll.2				:= LINKSRC = poll.2
 
 pset_assign.2			:= LINKSRC = pset_create.2
 pset_destroy.2			:= LINKSRC = pset_create.2
@@ -342,6 +363,9 @@ putpmsg.2			:= LINKSRC = putmsg.2
 
 pread.2				:= LINKSRC = read.2
 readv.2				:= LINKSRC = read.2
+preadv.2			:= LINKSRC = read.2
+
+readlinkat.2			:= LINKSRC = readlink.2
 
 renameat.2			:= LINKSRC = rename.2
 
@@ -361,6 +385,8 @@ shmdt.2				:= LINKSRC = shmop.2
 
 sigsendset.2			:= LINKSRC = sigsend.2
 
+symlinkat.2			:= LINKSRC = symlink.2
+
 fstat.2				:= LINKSRC = stat.2
 fstatat.2			:= LINKSRC = stat.2
 lstat.2				:= LINKSRC = stat.2
@@ -371,12 +397,15 @@ umount2.2			:= LINKSRC = umount.2
 
 unlinkat.2			:= LINKSRC = unlink.2
 
+futimens.2			:= LINKSRC = utimes.2
 futimesat.2			:= LINKSRC = utimes.2
+utimensat.2			:= LINKSRC = utimes.2
 
 vforkx.2			:= LINKSRC = vfork.2
 
 pwrite.2			:= LINKSRC = write.2
 writev.2			:= LINKSRC = write.2
+pwritev.2			:= LINKSRC = write.2
 
 .KEEP_STATE:
 

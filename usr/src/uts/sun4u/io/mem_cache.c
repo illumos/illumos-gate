@@ -815,7 +815,7 @@ retry_l2_retire:
 			    << PN_CACHE_LINE_SHIFT);
 			mutex_enter(&cpu_lock);
 			affinity_set(cache_info->cpu_id);
-			(void) pause_cpus(NULL);
+			pause_cpus(NULL, NULL);
 			mutex_exit(&cpu_lock);
 			/*
 			 * We bind ourself to a CPU and send cross trap to

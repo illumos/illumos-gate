@@ -20,14 +20,14 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright (c) 1995, 1996, by Sun Microsystems, Inc.
  * All rights reserved.
  */
 
 #ifndef	_STRINGS_H
 #define	_STRINGS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/feature_tests.h>
@@ -39,8 +39,6 @@
 #ifdef	__cplusplus
 extern "C" {
 #endif
-
-#if defined(__STDC__)
 
 extern int bcmp(const void *, const void *, size_t);
 extern void bcopy(const void *, void *, size_t);
@@ -63,24 +61,15 @@ extern char *rindex(const char *, int);
 extern int ffs(int);
 extern int strcasecmp(const char *, const char *);
 extern int strncasecmp(const char *, const char *, size_t);
+#if defined(_XPG7)
+#ifndef	_LOCALE_T
+#define	_LOCALE_T
+typedef struct _locale *locale_t;
+#endif
+extern int strcasecmp_l(const char *, const char *, locale_t);
+extern int strncasecmp_l(const char *, const char *, size_t, locale_t);
+#endif	/* defined(_XPG7) */
 #endif	/* defined(_XPG4_2) && !defined(__EXTENSIONS__) */
-
-#else
-
-extern int bcmp();
-extern void bcopy();
-extern void bzero();
-
-extern char *index();
-extern char *rindex();
-
-#if defined(_XPG4_2) && !defined(__EXTENSIONS__)
-extern int ffs();
-extern int strcasecmp();
-extern int strncasecmp();
-#endif /* defined(_XPG4_2) && !defined(__EXTENSIONS__) */
-
-#endif	/* __STDC__ */
 
 #ifdef	__cplusplus
 }

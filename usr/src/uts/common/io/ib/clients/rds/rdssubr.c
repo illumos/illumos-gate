@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  */
 
+#include <sys/sysmacros.h>
 #include <sys/ib/clients/rds/rds.h>
 #include <sys/ib/clients/rds/rds_kstat.h>
 
@@ -149,7 +150,7 @@ rds_hash_init()
 {
 	int i;
 
-	if (rds_bind_fanout_size & (rds_bind_fanout_size - 1)) {
+	if (!ISP2(rds_bind_fanout_size)) {
 		/* Not a power of two. Round up to nearest power of two */
 		for (i = 0; i < UINT_32_BITS; i++) {
 			if (rds_bind_fanout_size < (1 << i))

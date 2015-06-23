@@ -21,9 +21,11 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
-#ifdef _KERNEL
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 #include <sys/types.h>
 #include <sys/sunddi.h>
 #else
@@ -324,7 +326,7 @@ netbios_name_isvalid(char *in, char *out)
  * RFC883. This is global so that it can be patched if there is
  * a need to change the valid characters in the field.
  */
-unsigned char *dns_allowed = (unsigned char *)"-_";
+static const char dns_allowed[] = "-_";
 
 /*
  * dns_is_allowed
@@ -335,10 +337,10 @@ unsigned char *dns_allowed = (unsigned char *)"-_";
 static int
 dns_is_allowed(unsigned char c)
 {
-	unsigned char *p = dns_allowed;
+	const char *p = dns_allowed;
 
 	while (*p) {
-		if (c == *p++)
+		if ((char)c == *p++)
 			return (1);
 	}
 

@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -129,7 +130,6 @@ typedef struct userattr_s {
 	kva_t  *attr;		/* array of key-value pair attributes */
 } userattr_t;
 
-#ifdef	__STDC__
 extern userattr_t *getusernam(const char *);
 extern userattr_t *getuseruid(uid_t uid);
 extern userattr_t *getuserattr(void);
@@ -137,17 +137,6 @@ extern userattr_t *fgetuserattr(struct __FILE *);
 extern void setuserattr(void);
 extern void enduserattr(void);
 extern void free_userattr(userattr_t *);
-
-#else				/* not __STDC__ */
-
-extern userattr_t *getusernam();
-extern userattr_t *getuseruid();
-extern userattr_t *getuserattr();
-extern userattr_t *fgetuserattr();
-extern void setuserattr();
-extern void enduserattr();
-extern void free_userattr();
-#endif
 
 #ifdef	__cplusplus
 }

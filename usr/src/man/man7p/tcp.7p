@@ -5,7 +5,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH TCP 7P "Jun 30, 2006"
+.TH TCP 7P "May 27, 2014"
 .SH NAME
 tcp, TCP \- Internet Transmission Control Protocol
 .SH SYNOPSIS
@@ -184,7 +184,7 @@ calculated by \fIRFC 3390\fR.
 .sp
 .LP
 SunOS supports \fBTCP\fR Extensions for High Performance (\fIRFC 1323\fR) which
-includes the window scale and time stamp options, and Protection Against Wrap
+includes the window scale and timestamp options, and Protection Against Wrap
 Around Sequence Numbers (PAWS). SunOS also supports Selective Acknowledgment
 (SACK) capabilities (RFC 2018) and Explicit Congestion Notification (ECN)
 mechanism (\fIRFC 3168\fR).
@@ -261,13 +261,13 @@ outgoing connections. The default for \fBtcp_ecn_permitted\fR is 1.
 .RE
 .sp
 .LP
-Turn on the time stamp option in the following way:
+Turn on the timestamp option in the following way:
 .RS +4
 .TP
 .ie t \(bu
 .el o
 Use \fBndd\fR to modify the configuration parameter \fBtcp_tstamp_always\fR. If
-\fBtcp_tstamp_always\fR is \fB1\fR, the time stamp option will always be set
+\fBtcp_tstamp_always\fR is \fB1\fR, the timestamp option will always be set
 when connecting to a remote machine. If \fBtcp_tstamp_always\fR is \fB0\fR, the
 timestamp option will not be set when connecting to a remote system. The
 default for \fBtcp_tstamp_always\fR is \fB0\fR.
@@ -276,29 +276,29 @@ default for \fBtcp_tstamp_always\fR is \fB0\fR.
 .TP
 .ie t \(bu
 .el o
-Regardless of the value of \fBtcp_tstamp_always\fR, the time stamp option will
+Regardless of the value of \fBtcp_tstamp_always\fR, the timestamp option will
 always be included in a connect acknowledgement (and all succeeding packets) if
-the connecting system has used the time stamp option.
+the connecting system has used the timestamp option.
 .RE
 .sp
 .LP
-Use the following procedure to turn on the time stamp option only when the
+Use the following procedure to turn on the timestamp option only when the
 window scale option is in effect:
 .RS +4
 .TP
 .ie t \(bu
 .el o
 Use \fBndd\fR to modify the configuration parameter \fBtcp_tstamp_if_wscale\fR.
-Setting \fBtcp_tstamp_if_wscale\fR to \fB1\fR will cause the time stamp option
+Setting \fBtcp_tstamp_if_wscale\fR to \fB1\fR will cause the timestamp option
 to be set when connecting to a remote system, if the window scale option has
-been set. If \fBtcp_tstamp_if_wscale\fR is \fB0\fR, the time stamp option will
+been set. If \fBtcp_tstamp_if_wscale\fR is \fB0\fR, the timestamp option will
 not be set when connecting to a remote system. The default for
 \fBtcp_tstamp_if_wscale\fR is \fB1\fR.
 .RE
 .sp
 .LP
 Protection Against Wrap Around Sequence Numbers (PAWS) is always used when the
-time stamp option is set.
+timestamp option is set.
 .sp
 .LP
 SunOS also supports multiple methods of generating initial sequence numbers.

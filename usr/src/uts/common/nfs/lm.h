@@ -23,9 +23,8 @@
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
 /*
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _NFS_LM_H
@@ -43,9 +42,9 @@ extern "C" {
 #include <sys/fcntl.h>
 #include <sys/types.h>
 #include <sys/vnode.h>
-#include <rpc/rpc.h>
+#include <rpc/xdr.h>
 
-#ifdef _KERNEL
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 
 /*
  * Common interfaces.
@@ -77,6 +76,8 @@ struct exportinfo;
  * Struct used to represent a host.
  */
 struct lm_sysid;
+struct knetconfig;
+struct netbuf;
 
 /*
  * Given a knetconfig and network address, returns a reference to the

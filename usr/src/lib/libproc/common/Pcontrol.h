@@ -24,7 +24,7 @@
  */
 /*
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
- * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2014, Joyent, Inc. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
  */
 
@@ -149,6 +149,7 @@ typedef struct fd_info {
 
 typedef struct core_info {	/* information specific to core files */
 	char core_dmodel;	/* data model for core file */
+	char core_osabi;	/* ELF OS ABI */
 	int core_errno;		/* error during initialization if != 0 */
 	plist_t core_lwp_head;	/* head of list of lwp info */
 	lwp_info_t *core_lwp;	/* current lwp information */

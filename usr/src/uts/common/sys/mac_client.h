@@ -22,6 +22,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2013 Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -135,6 +136,8 @@ extern void mac_multicast_remove(mac_client_handle_t, const uint8_t *);
 
 extern void mac_rx_set(mac_client_handle_t, mac_rx_t, void *);
 extern void mac_rx_clear(mac_client_handle_t);
+extern void mac_secondary_dup(mac_client_handle_t, mac_client_handle_t);
+extern void mac_secondary_cleanup(mac_client_handle_t);
 extern mac_tx_cookie_t mac_tx(mac_client_handle_t, mblk_t *,
     uintptr_t, uint16_t, mblk_t **);
 extern boolean_t mac_tx_is_flow_blocked(mac_client_handle_t, mac_tx_cookie_t);
@@ -157,6 +160,8 @@ extern uint64_t mac_stat_get(mac_handle_t, uint_t);
 extern int mac_unicast_primary_set(mac_handle_t, const uint8_t *);
 extern void mac_unicast_primary_get(mac_handle_t, uint8_t *);
 extern void mac_unicast_primary_info(mac_handle_t, char *, boolean_t *);
+
+extern void mac_unicast_secondary_get(mac_client_handle_t, uint8_t *);
 
 extern boolean_t mac_dst_get(mac_handle_t, uint8_t *);
 

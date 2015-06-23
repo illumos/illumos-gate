@@ -24,6 +24,8 @@
  * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2013 OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright (c) 2013 Gary Mills
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ * Copyright 2015 Circonus, Inc.  All rights reserved.
  */
 
 /* LINTLIBRARY */
@@ -165,6 +167,7 @@
 #if defined(__amd64)
 #include <stack_unwind.h>
 #endif
+#include <xlocale.h>
 
 /*
  * This really comes from the crt*.s startup modules.
@@ -758,7 +761,7 @@ void perror(const char *s);
 int pipe(int *fds);
 
 /* psiginfo.c */
-void psiginfo(siginfo_t *sip, char *s);
+void psiginfo(const siginfo_t *sip, const char *s);
 
 /* psignal.c */
 void psignal(int sig, const char *s);

@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/modctl.h>
@@ -1378,7 +1376,7 @@ ipp_packet_process(
 			 *	 being incremented.
 			 */
 
-			atomic_add_32(&(ap->ippa_packets), 1);
+			atomic_inc_32(&(ap->ippa_packets));
 
 			imp = ap->ippa_mod;
 			ASSERT(imp != NULL);
@@ -1420,7 +1418,7 @@ ipp_packet_process(
 			 * Decrement the packet count.
 			 */
 
-			atomic_add_32(&(ap->ippa_packets), -1);
+			atomic_dec_32(&(ap->ippa_packets));
 
 			/*
 			 * If the class' action id is the same now as it was
@@ -2379,7 +2377,7 @@ hold_mod(
 	 * freed.
 	 */
 
-	atomic_add_32(&(imp->ippm_hold_count), 1);
+	atomic_inc_32(&(imp->ippm_hold_count));
 	rw_exit(ipp_mod_byid_lock);
 
 	return (imp);
@@ -2397,7 +2395,7 @@ rele_mod(
 	 */
 
 	ASSERT(imp->ippm_hold_count != 0);
-	atomic_add_32(&(imp->ippm_hold_count), -1);
+	atomic_dec_32(&(imp->ippm_hold_count));
 
 	/*
 	 * If the structure has 'destruct pending' set then we tried to free
@@ -3071,7 +3069,7 @@ hold_action(
 	 * freed.
 	 */
 
-	atomic_add_32(&(ap->ippa_hold_count), 1);
+	atomic_inc_32(&(ap->ippa_hold_count));
 	rw_exit(ipp_action_byid_lock);
 
 	return (ap);
@@ -3089,7 +3087,7 @@ rele_action(
 	 */
 
 	ASSERT(ap->ippa_hold_count != 0);
-	atomic_add_32(&(ap->ippa_hold_count), -1);
+	atomic_dec_32(&(ap->ippa_hold_count));
 
 	/*
 	 * If the structure has 'destruct pending' set then we tried to free

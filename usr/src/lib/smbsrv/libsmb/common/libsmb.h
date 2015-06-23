@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef	_LIBSMB_H
@@ -35,16 +35,14 @@ extern "C" {
 #include <sys/list.h>
 #include <sys/avl.h>
 #include <arpa/inet.h>
-#include <net/if.h>
-#include <inet/tcp.h>
-#include <uuid/uuid.h>
+#include <net/if.h>	/* LIFNAMSIZ */
 #include <netdb.h>
 #include <stdlib.h>
 #include <libscf.h>
 #include <libshare.h>
-#include <sqlite/sqlite.h>
 #include <uuid/uuid.h>
 #include <synch.h>
+#include <stdarg.h>
 
 #include <smbsrv/string.h>
 #include <smbsrv/smb_idmap.h>
@@ -131,6 +129,7 @@ typedef enum {
 	SMB_CI_SYNC_ENABLE,
 
 	SMB_CI_SECURITY,
+	SMB_CI_NETBIOS_ENABLE,
 	SMB_CI_NBSCOPE,
 	SMB_CI_SYS_CMNT,
 	SMB_CI_LM_LEVEL,
@@ -151,6 +150,7 @@ typedef enum {
 	SMB_CI_DISPOSITION,
 	SMB_CI_DFS_STDROOT_NUM,
 	SMB_CI_TRAVERSE_MOUNTS,
+
 	SMB_CI_MAX
 } smb_cfg_id_t;
 
@@ -189,6 +189,8 @@ extern int smb_config_setstr(smb_cfg_id_t, char *);
 extern int smb_config_setnum(smb_cfg_id_t, int64_t);
 extern int smb_config_setbool(smb_cfg_id_t, boolean_t);
 
+extern boolean_t smb_config_get_ads_enable(void);
+extern int smb_config_get_debug(void);
 extern uint8_t smb_config_get_fg_flag(void);
 extern char *smb_config_get_localsid(void);
 extern int smb_config_secmode_fromstr(char *);
@@ -289,6 +291,8 @@ void smb_trace(const char *s);
 void smb_tracef(const char *fmt, ...);
 
 const char *xlate_nt_status(unsigned int);
+
+void libsmb_redirect_syslog(__FILE_TAG *fp, int priority);
 
 /*
  * Authentication
@@ -478,6 +482,8 @@ extern int smb_auth_hmac_md5(unsigned char *, int, unsigned char *, int,
 
 extern int smb_auth_DES(unsigned char *, int, unsigned char *, int,
     unsigned char *, int);
+extern int smb_auth_RC4(unsigned char *, int, unsigned char *, int,
+    unsigned char *, int);
 
 extern int smb_auth_md4(unsigned char *, unsigned char *, int);
 extern int smb_auth_lm_hash(const char *, unsigned char *);
@@ -496,6 +502,8 @@ boolean_t smb_auth_validate_lm(unsigned char *, uint32_t, smb_passwd_t *,
     unsigned char *, int, char *, char *);
 boolean_t smb_auth_validate_nt(unsigned char *, uint32_t, smb_passwd_t *,
     unsigned char *, int, char *, char *, uchar_t *);
+
+int smb_gen_random_passwd(char *passwd, size_t bufsz);
 
 /*
  * SMB authenticated IPC
@@ -674,10 +682,13 @@ typedef struct smb_gsid {
 	uint16_t gs_type;
 } smb_gsid_t;
 
+struct sqlite_vm;
+struct sqlite;
+
 typedef struct smb_giter {
-	sqlite_vm	*sgi_vm;
-	sqlite		*sgi_db;
-	uint32_t	sgi_nerr;
+	struct sqlite_vm	*sgi_vm;
+	struct sqlite		*sgi_db;
+	uint32_t		sgi_nerr;
 } smb_giter_t;
 
 typedef struct smb_group {
@@ -986,37 +997,9 @@ int smb_reparse_svcget(const char *, const char *, char **);
 
 uint32_t smb_get_txid(void);
 
-#define	SMB_LOG_LINE_SZ		256
-
-typedef uint32_t	smb_log_hdl_t;
-
-typedef struct smb_log_item {
-	list_node_t	li_lnd;
-	char		li_msg[SMB_LOG_LINE_SZ];
-} smb_log_item_t;
-
-typedef struct smb_log {
-	smb_log_hdl_t	l_handle;
-	int		l_cnt;
-	int		l_max_cnt;
-	mutex_t		l_mtx;
-	list_t		l_list;
-	char		l_file[MAXPATHLEN];
-} smb_log_t;
-
-typedef struct smb_loglist_item {
-	list_node_t	lli_lnd;
-	smb_log_t	lli_log;
-} smb_loglist_item_t;
-
-typedef struct smb_loglist {
-	mutex_t		ll_mtx;
-	list_t		ll_list;
-} smb_loglist_t;
-
-smb_log_hdl_t smb_log_create(int, char *);
-void smb_log(smb_log_hdl_t, int, const char *, ...);
-void smb_log_dumpall(void);
+void smb_syslog(int, const char *, ...);
+void smb_vsyslog(int, const char *, va_list ap);
+char *smb_syslog_fmt_m(char *, int, const char *, int);
 
 #ifdef	__cplusplus
 }

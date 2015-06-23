@@ -215,6 +215,7 @@ struct seg_ops segdev_ops = {
 	segdev_getmemid,
 	segdev_getpolicy,
 	segdev_capable,
+	seg_inherit_notsup
 };
 
 /*

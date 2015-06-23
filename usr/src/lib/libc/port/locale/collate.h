@@ -1,4 +1,5 @@
 /*
+ * Copyright 2013 Garrett D'Amore <garrett@damore.org>
  * Copyright 2010 Nexenta Systmes, Inc.  All rights reserved.
  * Copyright (c) 1995 Alex Tatmanjants <alex@elvisti.kiev.ua>
  *		at Electronni Visti IA, Kiev, Ukraine.
@@ -31,6 +32,8 @@
 
 #include <sys/types.h>
 #include <limits.h>
+#include <locale.h>
+#include "localeimpl.h"
 
 #define	COLLATE_STR_LEN		24		/* should be 64-bit multiple */
 #define	COLLATE_VERSION		"IllumosCollate2\n"
@@ -92,14 +95,30 @@ typedef struct collate_subst {
 	int32_t pri[COLLATE_STR_LEN];
 } collate_subst_t;
 
-int	_collate_load_tables(const char *);
-void	_collate_lookup(const wchar_t *, int *, int *, int, int **);
-size_t	_collate_wxfrm(const wchar_t *, wchar_t *, size_t);
-size_t	_collate_sxfrm(const wchar_t *, char *, size_t);
-int	_collate_range_cmp(wchar_t, wchar_t);
+struct lc_collate {
+	int		lc_is_posix;
 
-extern int _collate_load_error;
-extern int _collate_substitute_nontrivial;
-extern collate_info_t *_collate_info;
+	uint8_t		lc_directive_count;
+	uint8_t		lc_directive[COLL_WEIGHTS_MAX];
+	int32_t		lc_pri_count[COLL_WEIGHTS_MAX];
+	int32_t		lc_flags;
+	int32_t		lc_chain_count;
+	int32_t		lc_large_count;
+	int32_t		lc_subst_count[COLL_WEIGHTS_MAX];
+	int32_t		lc_undef_pri[COLL_WEIGHTS_MAX];
+
+	collate_info_t	*lc_info;
+	collate_char_t	*lc_char_table;
+	collate_large_t	*lc_large_table;
+	collate_chain_t	*lc_chain_table;
+	collate_subst_t	*lc_subst_table[COLL_WEIGHTS_MAX];
+};
+
+void	_collate_lookup(const struct lc_collate *, const wchar_t *,
+    int *, int *, int, const int **);
+size_t	_collate_wxfrm(const struct lc_collate *, const wchar_t *,
+    wchar_t *, size_t);
+size_t	_collate_sxfrm(const wchar_t *, char *, size_t, locale_t);
+int	_collate_range_cmp(wchar_t, wchar_t, locale_t);
 
 #endif /* !_COLLATE_H_ */

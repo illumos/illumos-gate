@@ -20,6 +20,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -30,8 +32,6 @@
 
 #ifndef	_LANGINFO_H
 #define	_LANGINFO_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.2	*/
 
 #include <sys/feature_tests.h>
 #include <nl_types.h>
@@ -144,10 +144,15 @@ extern "C" {
 /*
  * and the definitions of functions langinfo(3C)
  */
-#if defined(__STDC__)
 char   *nl_langinfo(nl_item);	/* get a string from the database	*/
-#else
-char   *nl_langinfo();		/* get a string from the database	*/
+
+#if defined(_XPG7) || !defined(_STRICT_SYMBOLS)
+#ifndef	_LOCALE_T
+#define	_LOCALE_T
+typedef struct _locale *locale_t;
+#endif
+
+char	*nl_langinfo_l(nl_item, locale_t);
 #endif
 
 #ifdef	__cplusplus

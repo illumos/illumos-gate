@@ -10,22 +10,40 @@
  */
 
 /*
+ * Copyright 2013 Garrett D'Amore <garrett@damore.org>
  * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
  */
 #include "lint.h"
 #include <ctype.h>
+#include <locale.h>
+#include "localeimpl.h"
+#include "lctype.h"
 
 #pragma weak _tolower = tolower
 #pragma weak _toupper = toupper
 
 int
-tolower(int c)
+tolower_l(int c, locale_t loc)
 {
-	return (((unsigned)c > 255) ? c : __trans_lower[c]);
+	return (((unsigned)c > 255) ? c : loc->ctype->lc_trans_lower[c]);
 }
 
 int
+toupper_l(int c, locale_t loc)
+{
+	return (((unsigned)c > 255) ? c : loc->ctype->lc_trans_upper[c]);
+}
+
+#undef tolower
+int
+tolower(int c)
+{
+	return (isascii(c) ? __trans_lower[c] : tolower_l(c, uselocale(NULL)));
+}
+
+#undef toupper
+int
 toupper(int c)
 {
-	return (((unsigned)c > 255) ? c : __trans_upper[c]);
+	return (isascii(c) ? __trans_upper[c] : toupper_l(c, uselocale(NULL)));
 }

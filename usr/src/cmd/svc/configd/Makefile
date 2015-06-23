@@ -48,7 +48,8 @@ $(NATIVE_BUILD)OBJS = $(MYOBJS:%.o=%-native.o)
 
 ROOTCMDDIR=	$(ROOT)/lib/svc/bin
 
-MYCPPFLAGS = -I. -I../common -I../../../common/svc -I$(ROOT)/usr/include/sqlite -D_REENTRANT
+MYCPPFLAGS = -I. -I../common -I../../../common/svc \
+	-I$(ROOT)/usr/include/sqlite-sys -D_REENTRANT
 CPPFLAGS += $(MYCPPFLAGS)
 CFLAGS	+= $(CCVERBOSE)
 CERRWARN += -_gcc=-Wno-parentheses
@@ -69,6 +70,9 @@ LIBSCF		= $(SRC)/lib/libscf
 SCRIPTFILE	= restore_repository
 ROOTSCRIPTFILE	= $(ROOTCMDDIR)/$(SCRIPTFILE)
 
+#
+# Native variant (used in ../seed)
+#
 $(NATIVE_BUILD)CC =	$(NATIVECC)
 $(NATIVE_BUILD)LD =	$(NATIVELD)
 $(NATIVE_BUILD)CFLAGS =	$(NATIVE_CFLAGS)
@@ -81,16 +85,16 @@ $(NATIVE_BUILD)LDLIBS = -L$(ADJUNCT_PROTO)/usr/lib -R$(ADJUNCT_PROTO)/usr/lib \
 DIRMODE = 0755
 FILEMODE = 0555
 
-LIBSQLITE = $(ROOT)/usr/lib/libsqlite.o
-$(NATIVE_BUILD)LIBSQLITE = $(ROOT)/usr/lib/libsqlite-native.o
-SQLITELINT = $(ROOT)/usr/lib/llib-lsqlite.ln
+OBJSQLITE =
+LIBSQLITE = -lsqlite-sys
+$(NATIVE_BUILD)OBJSQLITE = $(ROOT)/lib/libsqlite-native.o
+$(NATIVE_BUILD)LIBSQLITE =
 
-OBJS += $(LIBSQLITE)
+OBJS += $(OBJSQLITE)
+LDLIBS += $(LIBSQLITE)
 
 install := TARGET = install
 clobber := TARGET = clobber
-
-lint	:= LDLIBS += $(SQLITELINT)
 
 .KEEP_STATE:
 .PARALLEL: $(MYOBJS) $(MYOBJS:%.o=%-native.o)

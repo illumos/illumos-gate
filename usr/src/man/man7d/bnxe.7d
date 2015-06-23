@@ -1,0 +1,163 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright (c) 2014 QLogic Corporation. All Rights Reserved
+.\"
+.TH BNXE 7D "Jul 17, 2014"
+.SH NAME
+bnxe \- QLogic NetXtreme II 10 Gigabit Ethernet Device Driver
+
+.SH SYNOPSIS
+.na
+/dev/bnxe*
+.ad
+
+.SH DESCRIPTION
+.LP
+The
+.B bnxe
+Ethernet driver is a multi-threaded, loadable,
+clonable, GLDv3-based driver supporting the Data Link Provider Interface,
+.BR dlpi (7P),
+over QLogic NetXtreme II 10 Gigabit Ethernet controllers.  Multiple
+NetXtreme II controllers installed within the system are supported by
+the driver.
+
+The
+.B bnxe
+driver provides support for the NetXtreme II 10 Gigabit line of devices.
+Functions include chip initialization, frame transmit and receive,
+multicast and promiscuous support, error recovery and reporting. These
+devices provide 10/100/1000/2500/10000 Mbps networking interfaces.
+
+.SH DRIVER CONFIGURATION
+
+The primary methods of configuration are via modification of the
+.I /kernel/drv/bnxe.conf
+file or execution of the
+.BR dladm (1M)
+utility. There are many configuration items available and all are thoroughly
+documented in the
+.I /kernel/drv/bnxe.conf
+file. Note that for
+changes to this file to take affect the driver must be reloaded or the system
+rebooted. In order to reload the driver with new configuration changes all
+.B bnxe
+interfaces must be first unplumbed and then the
+.BR update_drv (1M)
+tool must be executed. For the configuration items that do not require a
+driver reload the
+.BR dladm (1M)
+tool can be used to dynamically change the option.
+
+.SH DEBUGGING
+
+.SS kstat
+
+There are many statistics exposed via
+.B kstat
+by
+.BR bnxe .
+
+The main groups are:
+.TP
+"intr"
+for interrupts stats
+.TP
+"l2chip"
+for layer 2 chip stats,
+.TP
+"l2driver"
+for layer 2 driver stats,
+.TP
+"l2stats"
+for general layer 2 stats,
+.TP
+"link"
+for detailed link status,
+.TP
+"mac"
+for GLDv3 MAC layer stats,
+.TP
+"rxq#"
+for Rx ring stats,
+.TP
+"txq#"
+for Tx ring stats, and
+.TP
+"stats"
+for general driver stats and version info.
+.LP
+To get a list of all the individual statistics in these goups run:
+.na
+% kstat -m bnxe -i 0 -l
+.ad
+
+.SH FILES
+.ne 2
+.na
+/dev/bnxe[instance]
+.ad
+.RS 16n
+.B bnxe
+Character special device
+.RE
+
+.sp
+.ne 2
+.na
+/kernel/drv/bnxe.conf
+.ad
+.RS 16n
+Driver configuration file.
+.RE
+
+.sp
+.ne 2
+.na
+/kernel/drv/bnxe
+.ad
+.RS 16n
+32-bit i386 driver binary.
+.RE
+
+.sp
+.ne 2
+.na
+/kernel/drv/amd64/bnxe
+.ad
+.RS 16n
+64-bit i386 driver binary.
+.RE
+
+.sp
+.ne 2
+.na
+/kernel/drv/sparcv9/bnxe
+.ad
+.RS 16n
+SPARC driver binary.
+.RE
+
+.SH SEE ALSO
+.BR dladm (1M),
+.BR netstat (1M),
+.BR ifconfig (1M),
+.BR driver.conf (4),
+.BR gld (7P)
+.LP
+.I QLogic NetXtreme II 10 Gigabit Adapter Driver Installation Notes
+.LP
+.I Writing Device Drivers
+.LP
+.I STREAMS Programming Guide
+.LP
+.I Network Interfaces Guide

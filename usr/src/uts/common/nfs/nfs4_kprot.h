@@ -18,6 +18,11 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ */
+
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -43,6 +48,7 @@ extern "C" {
 
 #define	NFS4_FHSIZE 128
 #define	NFS4_VERIFIER_SIZE 8
+#define	NFS4_OTHER_SIZE 12
 
 /*
  * Reasonable upper bounds to catch badly behaving partners
@@ -151,6 +157,8 @@ typedef uint64_t length4;
 
 typedef uint64_t clientid4;
 
+typedef uint32_t nfs_lease4;
+
 typedef uint32_t seqid4;
 
 typedef struct {
@@ -169,7 +177,12 @@ typedef uint64_t nfs_lockid4;
 
 typedef uint64_t nfs_cookie4;
 
-typedef utf8string linktext4;
+typedef struct {
+	uint_t linktext4_len;
+	char *linktext4_val;
+} linktext4;
+
+typedef utf8string ascii_REQUIRED4;
 
 typedef struct {
 	uint_t sec_oid4_len;
@@ -227,14 +240,10 @@ struct fs_locations4 {
 };
 typedef struct fs_locations4 fs_locations4;
 
-struct nfs_fsl_info {
-	uint_t netbuf_len;
-	uint_t netnm_len;
-	uint_t knconf_len;
-	char *netname;
-	struct netbuf *addr;
-	struct knetconfig *knconf;
-};
+/*
+ * This structure is declared in nfs4.h
+ */
+struct nfs_fsl_info;
 
 /*
  * ACL support
@@ -412,7 +421,7 @@ typedef fsid4 fattr4_fsid;
 
 typedef bool_t fattr4_unique_handles;
 
-typedef uint32_t fattr4_lease_time;
+typedef nfs_lease4 fattr4_lease_time;
 
 typedef nfsstat4 fattr4_rdattr_error;
 
@@ -459,7 +468,7 @@ typedef uint64_t fattr4_maxread;
 
 typedef uint64_t fattr4_maxwrite;
 
-typedef utf8string fattr4_mimetype;
+typedef ascii_REQUIRED4 fattr4_mimetype;
 
 typedef mode4 fattr4_mode;
 
@@ -584,14 +593,14 @@ struct clientaddr4 {
 typedef struct clientaddr4 clientaddr4;
 
 struct cb_client4 {
-	uint32_t cb_program;
+	uint_t cb_program;
 	clientaddr4 cb_location;
 };
 typedef struct cb_client4 cb_client4;
 
 struct stateid4 {
 	uint32_t seqid;
-	char other[12];
+	char other[NFS4_OTHER_SIZE];
 };
 typedef struct stateid4 stateid4;
 

@@ -1,4 +1,5 @@
 '\" te
+.\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
 .\" Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.  Portions Copyright (c) 2004, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
@@ -7,11 +8,17 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ISWALPHA 3C "Apr 19, 2004"
+.TH ISWALPHA 3C "Jun 23, 2014"
 .SH NAME
-iswalpha, isenglish, isideogram, isnumber, isphonogram, isspecial, iswalnum,
-iswascii, iswblank, iswcntrl, iswdigit, iswgraph, iswlower, iswprint, iswpunct,
-iswspace, iswupper, iswxdigit \- wide-character code classification functions
+iswalpha, isenglish, isideogram, iswideogram, isnumber, iswnumber,
+isphonogram, iswphonogram, isspecial, iswspecial, iswalnum, iswascii,
+iswblank, iswcntrl, iswdigit, iswgraph, iswlower, iswprint, iswpunct,
+iswspace, iswupper, iswxdigit, iswhexnumber, iswalpha_l, iswideogram_l,
+iswnumber_l, iswphonogram_l, iswspecial_l, iswalnum_l, iswascii_l,
+iswblank_l, iswcntrl_l, iswdigit_l, iswgraph_l, iswlower_l, iswprint_l,
+iswpunct_l, iswspace_l, iswupper_l, iswhexnumber_l \- wide-character
+code classification functions
+
 .SH SYNOPSIS
 .LP
 .nf
@@ -20,99 +27,187 @@ iswspace, iswupper, iswxdigit \- wide-character code classification functions
 
 \fBint\fR \fBiswalpha\fR(\fBwint_t\fR \fIwc\fR);
 .fi
-
 .LP
 .nf
 \fBint\fR \fBisenglish\fR(\fBwint_t\fR \fIwc\fR);
 .fi
-
 .LP
 .nf
 \fBint\fR \fBisideogram\fR(\fBwint_t\fR \fIwc\fR);
 .fi
-
 .LP
 .nf
 \fBint\fR \fBisnumber\fR(\fBwint_t\fR \fIwc\fR);
 .fi
-
 .LP
 .nf
 \fBint\fR \fBisphonogram\fR(\fBwint_t\fR \fIwc\fR);
 .fi
-
 .LP
 .nf
 \fBint\fR \fBisspecial\fR(\fBwint_t\fR \fIwc\fR);
 .fi
-
 .LP
 .nf
 \fBint\fR \fBiswalnum\fR(\fBwint_t\fR \fIwc\fR);
 .fi
-
 .LP
 .nf
 \fBint\fR \fBiswascii\fR(\fBwint_t\fR \fIwc\fR);
 .fi
-
 .LP
 .nf
 \fBint\fR \fBiswblank\fR(\fBwint_t\fR \fIwc\fR);
 .fi
-
 .LP
 .nf
 \fBint\fR \fBiswcntrl\fR(\fBwint_t\fR \fIwc\fR);
 .fi
-
 .LP
 .nf
 \fBint\fR \fBiswdigit\fR(\fBwint_t\fR \fIwc\fR);
 .fi
-
 .LP
 .nf
 \fBint\fR \fBiswgraph\fR(\fBwint_t\fR \fIwc\fR);
 .fi
-
 .LP
 .nf
 \fBint\fR \fBiswlower\fR(\fBwint_t\fR \fIwc\fR);
 .fi
-
 .LP
 .nf
 \fBint\fR \fBiswprint\fR(\fBwint_t\fR \fIwc\fR);
 .fi
-
 .LP
 .nf
 \fBint\fR \fBiswpunct\fR(\fBwint_t\fR \fIwc\fR);
 .fi
-
 .LP
 .nf
 \fBint\fR \fBiswspace\fR(\fBwint_t\fR \fIwc\fR);
 .fi
-
 .LP
 .nf
 \fBint\fR \fBiswupper\fR(\fBwint_t\fR \fIwc\fR);
 .fi
-
 .LP
 .nf
 \fBint\fR \fBiswxdigit\fR(\fBwint_t\fR \fIwc\fR);
 .fi
+.LP
+.nf
+\fBint\fR \fBiswhexnumber\fR(\fBwint_t\fR \fIwc\fR);
+.fi
+.LP
+.nf
+\fBint\fR \fBiswideogram\fR(\fBwint_t\fR \fIwc\fR);
+.fi
+.LP
+.nf
+\fBint\fR \fBiswnumber\fR(\fBwint_t\fR \fIwc\fR);
+.fi
+.LP
+.nf
+\fBint\fR \fBiswphonogram\fR(\fBwint_t\fR \fIwc\fR);
+.fi
+.LP
+.nf
+\fBint\fR \fBiswspecial\fR(\fBwint_t\fR \fIwc\fR);
+.fi
+.LP
+.nf
+\fBint\fR \fBiswalpha_l\fR(\fBwint_t\fR \fIwc\fR, \fBlocale_t\fR \fIloc\fR);
+.fi
+.LP
+.nf
+\fBint\fR \fBiswideogram_l\fR(\fBwint_t\fR \fIwc\fR, \fBlocale_t\fR \fIloc\fR);
+.fi
+.LP
+.nf
+\fBint\fR \fBiswnumber_l\fR(\fBwint_t\fR \fIwc\fR, \fBlocale_t\fR \fIloc\fR);
+.fi
+.LP
+.nf
+\fBint\fR \fBiswphonogram_l\fR(\fBwint_t\fR \fIwc\fR, \fBlocale_t\fR \fIloc\fR);
+.fi
+.LP
+.nf
+\fBint\fR \fBiswspecial_l\fR(\fBwint_t\fR \fIwc\fR, \fBlocale_t\fR \fIloc\fR);
+.fi
+.LP
+.nf
+\fBint\fR \fBiswalnum_l\fR(\fBwint_t\fR \fIwc\fR, \fBlocale_t\fR \fIloc\fR);
+.fi
+.LP
+.nf
+\fBint\fR \fBiswascii_l\fR(\fBwint_t\fR \fIwc\fR, \fBlocale_t\fR \fIloc\fR);
+.fi
+.LP
+.nf
+\fBint\fR \fBiswblank_l\fR(\fBwint_t\fR \fIwc\fR, \fBlocale_t\fR \fIloc\fR);
+.fi
+.LP
+.nf
+\fBint\fR \fBiswcntrl_l\fR(\fBwint_t\fR \fIwc\fR, \fBlocale_t\fR \fIloc\fR);
+.fi
+.LP
+.nf
+\fBint\fR \fBiswdigit_l\fR(\fBwint_t\fR \fIwc\fR, \fBlocale_t\fR \fIloc\fR);
+.fi
+.LP
+.nf
+\fBint\fR \fBiswgraph_l\fR(\fBwint_t\fR \fIwc\fR, \fBlocale_t\fR \fIloc\fR);
+.fi
+.LP
+.nf
+\fBint\fR \fBiswlower_l\fR(\fBwint_t\fR \fIwc\fR, \fBlocale_t\fR \fIloc\fR);
+.fi
+.LP
+.nf
+\fBint\fR \fBiswprint_l\fR(\fBwint_t\fR \fIwc\fR, \fBlocale_t\fR \fIloc\fR);
+.fi
+.LP
+.nf
+\fBint\fR \fBiswpunct_l\fR(\fBwint_t\fR \fIwc\fR, \fBlocale_t\fR \fIloc\fR);
+.fi
+.LP
+.nf
+\fBint\fR \fBiswspace_l\fR(\fBwint_t\fR \fIwc\fR, \fBlocale_t\fR \fIloc\fR);
+.fi
+.LP
+.nf
+\fBint\fR \fBiswupper\fR(\fBwint_t\fR \fIwc\fR, \fBlocale_t\fR \fIloc\fR);
+.fi
+.LP
+.nf
+\fBint\fR \fBiswxdigit\fR(\fBwint_t\fR \fIwc\fR, \fBlocale_t\fR \fIloc\fR);
+.fi
+.LP
+.nf
+#include <xlocale.h>
+
+\fBint\fR \fBiswhexnumber\fR(\fBwint_t\fR \fIwc\fR, \fBlocale_t\fR \fIloc\fR);
+.fi
 
 .SH DESCRIPTION
-.sp
 .LP
 These functions test whether \fIwc\fR is a wide-character code representing a
 character of a particular class defined in the \fBLC_CTYPE\fR category of the
-current locale.
-.sp
+current locale or the locale specified by \fIloc\fR.
+.LP
+The functions \fBiswalpha_l()\fR, \fBiswideogram_l()\fR, \fBiswnumber_l()\fR,
+\fBiswphonogram_l()\fR, \fBiswspecial_l()\fR, \fBiswalnum_l()\fR,
+\fBiswascii_l()\fR, \fBiswblank_l()\fR, \fBiswcntrl_l()\fR, \fBiswdigit_l()\fR,
+\fBiswgraph_l()\fR, \fBiswlower_l()\fR, \fBiswprint_l()\fR, \fBiswpunct_l()\fR,
+\fBiswspace_l()\fR, \fBiswupper_l()\fR, all behave identically to their
+counterparts without the '\fB_l\fR' suffix, but instead of operating on the
+current locale, they operate on the locale specified by \fIloc\fR.
+.LP
+The functions, \fBiswideogram()\fR, \fBiswnumber()\fR, \fBiswphonogram()\fR,
+\fBiswspecial()\fR, and \fBiswhexnumber()\fR, are respectively identical to
+\fBisideogram()\fR, \fBisnumber()\fR, \fBisphonogram()\fR, \fBisspecial()\fR,
+\fBiswxdigit()\fR respectively.  They are provided for compatability purposes.
 .LP
 In all cases, \fIwc\fR is a \fBwint_t\fR, the value of which must be a
 wide-character code corresponding to a valid character in the current locale or
@@ -303,30 +398,31 @@ class "xdigit" in the program's current locale.
 .sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
 .TS
 box;
-l | l
+c | c
 l | l .
 ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
 CSI	Enabled
 _
-Interface Stability	See  below.
+Interface Stability	See below.
 _
-MT-Level	MT-Safe with exceptions
+MT-Level	MT-Safe
 .TE
 
-.sp
 .LP
 The \fBiswalpha()\fR, \fBiswalnum()\fR, \fBiswblank()\fR, \fBiswcntrl()\fR,
 \fBiswdigit()\fR, \fBiswgraph()\fR, \fBiswlower()\fR, \fBiswprint()\fR,
 \fBiswpunct()\fR, \fBiswspace()\fR, \fBiswupper()\fR, and \fBiswxdigit()\fR
 functions are Standard.
-.SH SEE ALSO
-.sp
 .LP
-\fBlocaledef\fR(1), \fBsetlocale\fR(3C), \fBstdio\fR(3C), \fBascii\fR(5),
-\fBattributes\fR(5), \fBstandards\fR(5)
+The \fBiswalpha_l()\fR, \fBiswalnum_l()\fR, \fBiswblank_l()\fR, \fBiswcntrl_l()\fR,
+\fBiswdigit_l()\fR, \fBiswgraph_l()\fR, \fBiswlower_l()\fR, \fBiswprint_l()\fR,
+\fBiswpunct_l()\fR, \fBiswspace_l()\fR, and \fBiswupper_l()\fR
+functions are Standard.
+.SH SEE ALSO
+.LP
+\fBlocaledef\fR(1), \fBnewlocale\fR(3C),
+\fBsetlocale\fR(3C), \fBstdio\fR(3C), \fBuselocale\fR(3C),
+\fBascii\fR(5), \fBattributes\fR(5), \fBstandards\fR(5)

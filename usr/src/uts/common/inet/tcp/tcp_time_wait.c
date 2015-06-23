@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2011, Joyent Inc. All rights reserved.
+ * Copyright (c) 2012, Joyent Inc. All rights reserved.
  */
 
 /*
@@ -111,6 +111,21 @@ tcp_time_wait_remove(tcp_t *tcp, tcp_squeue_priv_t *tcp_time_wait)
 	return (B_TRUE);
 }
 
+/* Constants used for fast checking of a localhost address */
+#if defined(_BIG_ENDIAN)
+#define	IPv4_LOCALHOST	0x7f000000U
+#define	IPv4_LH_MASK	0xffffff00U
+#else
+#define	IPv4_LOCALHOST	0x0000007fU
+#define	IPv4_LH_MASK	0x00ffffffU
+#endif
+
+#define	IS_LOCAL_HOST(x)	( \
+	((x)->tcp_connp->conn_ipversion == IPV4_VERSION && \
+	((x)->tcp_connp->conn_laddr_v4 & IPv4_LH_MASK) == IPv4_LOCALHOST) || \
+	((x)->tcp_connp->conn_ipversion == IPV6_VERSION && \
+	IN6_IS_ADDR_LOOPBACK(&(x)->tcp_connp->conn_laddr_v6)))
+
 /*
  * Add a connection to the list of detached TIME_WAIT connections
  * and set its time to expire.
@@ -122,6 +137,7 @@ tcp_time_wait_append(tcp_t *tcp)
 	squeue_t	*sqp = tcp->tcp_connp->conn_sqp;
 	tcp_squeue_priv_t *tcp_time_wait =
 	    *((tcp_squeue_priv_t **)squeue_getprivate(sqp, SQPRIVATE_TCP));
+	hrtime_t firetime = 0;
 
 	tcp_timers_stop(tcp);
 
@@ -138,13 +154,37 @@ tcp_time_wait_append(tcp_t *tcp)
 	ASSERT(tcp->tcp_listener == NULL);
 
 	tcp->tcp_time_wait_expire = ddi_get_lbolt64();
-	/*
-	 * Since tcp_time_wait_expire is lbolt64, it should not wrap around
-	 * in practice.  Hence it cannot be 0.  Note that zero means that the
-	 * tcp_t is not in the TIME_WAIT list.
-	 */
-	tcp->tcp_time_wait_expire += MSEC_TO_TICK(
-	    tcps->tcps_time_wait_interval);
+	if (IS_LOCAL_HOST(tcp)) {
+		/*
+		 * This is the fastpath for handling localhost connections.
+		 * Since we don't have to worry about packets on the localhost
+		 * showing up after a long network delay, we want to expire
+		 * these quickly so the port range on the localhost doesn't
+		 * get starved by short-running, local apps.
+		 *
+		 * Leave tcp_time_wait_expire at the current time. This
+		 * essentially means the connection is expired now and it will
+		 * clean up the next time tcp_time_wait_collector runs.  We set
+		 * firetime to use a short delay so that if we have to start a
+		 * tcp_time_wait_collector thread below, it runs soon instead
+		 * of after a delay of time_wait_interval. firetime being set
+		 * to a non-0 value is also our indicator that we should add
+		 * this connection to the head of the time wait list (since we
+		 * are already expired) so that its sure to get cleaned up on
+		 * the next run of tcp_time_wait_collector (which expects the
+		 * entries to appear in time-order and stops when it hits the
+		 * first non-expired entry).
+		 */
+		firetime = TCP_TIME_WAIT_DELAY;
+	} else {
+		/*
+		 * Since tcp_time_wait_expire is lbolt64, it should not wrap
+		 * around in practice.  Hence it cannot be 0.  Note that zero
+		 * means that the tcp_t is not in the TIME_WAIT list.
+		 */
+		tcp->tcp_time_wait_expire += MSEC_TO_TICK(
+		    tcps->tcps_time_wait_interval);
+	}
 
 	ASSERT(TCP_IS_DETACHED(tcp));
 	ASSERT(tcp->tcp_state == TCPS_TIME_WAIT);
@@ -164,13 +204,17 @@ tcp_time_wait_append(tcp_t *tcp)
 		 * a timer is needed.
 		 */
 		if (tcp_time_wait->tcp_time_wait_tid == 0) {
+			if (firetime == 0)
+				firetime = (hrtime_t)
+				    (tcps->tcps_time_wait_interval + 1) *
+				    MICROSEC;
+
 			tcp_time_wait->tcp_time_wait_tid =
 			    timeout_generic(CALLOUT_NORMAL,
-			    tcp_time_wait_collector, sqp,
-			    (hrtime_t)(tcps->tcps_time_wait_interval + 1) *
-			    MICROSEC, CALLOUT_TCP_RESOLUTION,
-			    CALLOUT_FLAG_ROUNDUP);
+			    tcp_time_wait_collector, sqp, firetime,
+			    CALLOUT_TCP_RESOLUTION, CALLOUT_FLAG_ROUNDUP);
 		}
+		tcp_time_wait->tcp_time_wait_tail = tcp;
 	} else {
 		/*
 		 * The list is not empty, so a timer must be running.  If not,
@@ -182,11 +226,23 @@ tcp_time_wait_append(tcp_t *tcp)
 		ASSERT(tcp_time_wait->tcp_time_wait_tail != NULL);
 		ASSERT(tcp_time_wait->tcp_time_wait_tail->tcp_state ==
 		    TCPS_TIME_WAIT);
-		tcp_time_wait->tcp_time_wait_tail->tcp_time_wait_next = tcp;
-		tcp->tcp_time_wait_prev = tcp_time_wait->tcp_time_wait_tail;
 
+		if (firetime == 0) {
+			/* add at end */
+			tcp_time_wait->tcp_time_wait_tail->tcp_time_wait_next =
+			    tcp;
+			tcp->tcp_time_wait_prev =
+			    tcp_time_wait->tcp_time_wait_tail;
+			tcp_time_wait->tcp_time_wait_tail = tcp;
+		} else {
+			/* add at head */
+			tcp->tcp_time_wait_next =
+			    tcp_time_wait->tcp_time_wait_head;
+			tcp_time_wait->tcp_time_wait_head->tcp_time_wait_prev =
+			    tcp;
+			tcp_time_wait->tcp_time_wait_head = tcp;
+		}
 	}
-	tcp_time_wait->tcp_time_wait_tail = tcp;
 	mutex_exit(&tcp_time_wait->tcp_time_wait_lock);
 }
 
@@ -415,6 +471,10 @@ tcp_time_wait_collector(void *arg)
 	if ((tcp = tcp_time_wait->tcp_time_wait_head) != NULL &&
 	    tcp_time_wait->tcp_time_wait_tid == 0) {
 		hrtime_t firetime;
+
+		/* shouldn't be necessary, but just in case */
+		if (tcp->tcp_time_wait_expire < now)
+			tcp->tcp_time_wait_expire = now;
 
 		firetime = TICK_TO_NSEC(tcp->tcp_time_wait_expire - now);
 		/* This ensures that we won't wake up too often. */

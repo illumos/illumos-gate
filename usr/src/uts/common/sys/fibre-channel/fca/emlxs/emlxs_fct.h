@@ -5,8 +5,8 @@
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
  *
- * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
+ * You can obtain a copy of the license at
+ * http://www.opensource.org/licenses/cddl1.txt.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Emulex.  All rights reserved.
+ * Copyright (c) 2004-2011 Emulex. All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,21 +40,12 @@ extern "C" {
 #include <sys/sunddi.h>
 #include <sys/modctl.h>
 
-
-#ifdef	NS_RSNN_NN
-#undef	NS_RSNN_NN
-#endif /* NS_RSNN_NN */
-
-#include <stmf_defines.h>
-
 #ifdef FC_WELL_KNOWN_ADDR
 #undef FC_WELL_KNOWN_ADDR
 #endif /* FC_WELL_KNOWN_ADDR */
 
-#include <fct_defines.h>
-#include <stmf.h>
-#include <portif.h>
-#include <fct.h>
+#include <sys/stmf.h>
+#include <sys/fct.h>
 
 #ifndef LINK_SPEED_8G
 #define	LINK_SPEED_8G		5
@@ -67,6 +58,16 @@ extern "C" {
 #ifndef PORT_SPEED_10G
 #define	PORT_SPEED_10G		0x10
 #endif /* PORT_SPEED_10G */
+
+#ifndef PORT_SPEED_16G
+#define	PORT_SPEED_16G		0x20
+#endif /* PORT_SPEED_16G */
+
+/*
+ * Number of ports that do not require a valid cmd handle
+ * because they will not be sending any IO, ELS cmds ONLY.
+ */
+#define	EMLXS_FCT_NUM_ELS_ONLY		8
 
 #ifndef MODSYM_SUPPORT
 #pragma weak fct_alloc
@@ -91,30 +92,6 @@ extern "C" {
 extern void* stmf_alloc();
 extern void* fct_alloc();
 #endif /* MODSYM_SUPPORT */
-
-struct emlxs_fct_dmem_bucket;
-typedef struct emlxs_fct_dmem_bctl
-{
-	struct emlxs_fct_dmem_bucket	*bctl_bucket;
-	struct emlxs_fct_dmem_bctl	*bctl_next;
-	uint64_t			bctl_dev_addr;
-	stmf_data_buf_t			*bctl_buf;
-} emlxs_fct_dmem_bctl_t;
-
-typedef struct emlxs_fct_dmem_bucket
-{
-	uint32_t		dmem_buf_size;
-	uint32_t		dmem_nbufs;
-	uint32_t		dmem_nbufs_free;
-	uint8_t			*dmem_host_addr;
-	uint64_t		dmem_dev_addr;
-	ddi_dma_handle_t	dmem_dma_handle;
-	ddi_acc_handle_t	dmem_acc_handle;
-	emlxs_fct_dmem_bctl_t	*dmem_bctl_free_list;
-	void			*dmem_bctls_mem;
-	kmutex_t		dmem_lock;
-} emlxs_fct_dmem_bucket_t;
-
 
 #endif	/* SFCT_SUPPORT */
 

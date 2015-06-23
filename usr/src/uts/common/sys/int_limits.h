@@ -20,14 +20,14 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_INT_LIMITS_H
 #define	_SYS_INT_LIMITS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file, <sys/int_limits.h>, is part of the Sun Microsystems implementation
@@ -80,9 +80,7 @@ extern "C" {
  * where the ABI specifies "char" as unsigned when the translation mode is
  * not ANSI-C.
  */
-#if defined(_CHAR_IS_SIGNED) || defined(__STDC__)
 #define	INT8_MAX	(127)
-#endif
 #define	INT16_MAX	(32767)
 #define	INT32_MAX	(2147483647)
 #if defined(_LP64)
@@ -112,9 +110,7 @@ extern "C" {
 #define	UINTMAX_MAX	UINT32_MAX
 #endif
 
-#if defined(_CHAR_IS_SIGNED) || defined(__STDC__)
 #define	INT_LEAST8_MAX	INT8_MAX
-#endif
 #define	INT_LEAST16_MAX INT16_MAX
 #define	INT_LEAST32_MAX INT32_MAX
 #ifdef INT64_MAX
@@ -128,9 +124,7 @@ extern "C" {
 #define	UINT_LEAST64_MAX UINT64_MAX
 #endif
 
-#if defined(_CHAR_IS_SIGNED) || defined(__STDC__)
 #define	INT_FAST8_MAX	INT8_MAX
-#endif
 #define	INT_FAST16_MAX INT16_MAX
 #define	INT_FAST32_MAX INT32_MAX
 #ifdef INT64_MAX
@@ -204,9 +198,7 @@ extern "C" {
  */
 #if defined(__EXTENSIONS__) || !defined(__XOPEN_OR_POSIX) || defined(_XPG6)
 
-#if defined(_CHAR_IS_SIGNED) || defined(__STDC__)
 #define	INT8_MIN	(-128)
-#endif
 #define	INT16_MIN	(-32767-1)
 #define	INT32_MIN	(-2147483647-1)
 #if defined(_LP64)
@@ -221,18 +213,14 @@ extern "C" {
 #define	INTMAX_MIN	INT32_MIN
 #endif
 
-#if defined(_CHAR_IS_SIGNED) || defined(__STDC__)
 #define	INT_LEAST8_MIN	INT8_MIN
-#endif
 #define	INT_LEAST16_MIN	INT16_MIN
 #define	INT_LEAST32_MIN INT32_MIN
 #ifdef INT64_MIN
 #define	INT_LEAST64_MIN	INT64_MIN
 #endif
 
-#if defined(_CHAR_IS_SIGNED) || defined(__STDC__)
 #define	INT_FAST8_MIN	INT8_MIN
-#endif
 #define	INT_FAST16_MIN	INT16_MIN
 #define	INT_FAST32_MIN INT32_MIN
 #ifdef INT64_MIN

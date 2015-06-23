@@ -366,8 +366,8 @@ var	line	*undadot;	/* If we saved all lines, dot reverts here */
 var	int	xflag;		/* True if we are in encryption mode */
 var	int	xtflag;		/* True if the temp file is being encrypted */
 var	int	kflag;		/* True if the key has been accepted */
-var	int	crflag;		/* True if the key has been accepted  and the file 
-				   being read is ciphertext 
+var	int	crflag;		/* True if the key has been accepted  and the file
+				   being read is ciphertext
 				 */
 var	int	perm[2];	/* pipe connection to crypt for file being edited */
 var	int	tperm[2];	/* pipe connection to crypt for temporary file */
@@ -379,7 +379,7 @@ char	*getpass();
 
 var	bool	write_quit;	/* True if executing a 'wq' command */
 var	int	errcnt;		/* number of error/warning messages in */
-				/*	editing session (global flag)  */ 
+				/*	editing session (global flag)  */
 /*
  * Function type definitions
  */
@@ -440,10 +440,9 @@ int	normchar(wchar_t);
 int	normline(void);
 int	numbline(int);
 var	void	(*oldquit)();
-#ifdef __STDC__
+
 void	onhup(int);
 void	onintr(int);
-void	onemt(int);
 void	oncore(int);
 #ifdef CBREAK
 void	vintr(int);
@@ -452,19 +451,6 @@ void	onsusp(int);
 int	putch(char);
 int	plodput(char);
 int	vputch(char);
-#else
-void	onhup();
-void	onintr();
-void	onemt();
-void	oncore();
-#ifdef CBREAK
-void	vintr();
-#endif
-void	onsusp();
-int	putch();
-int	plodput();
-int	vputch();
-#endif /* __STDC__ */
 
 void	shift(int, int);
 int	termchar(wchar_t);

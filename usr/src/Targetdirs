@@ -22,9 +22,11 @@
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2011, Richard Lowe
 # Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2012, Igor Kozhukhov <ikozhukhov@gmail.com>
 # Copyright 2012 OmniTI Computer Consulting, Inc.  All rights reserved.
 # Copyright (c) 2013 RackTop Systems.
 # Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2014 Garrett D'Amore <garrett@damore.org>
 #
 
 #
@@ -50,6 +52,7 @@ i386_DIRS=			\
 	/boot/grub		\
 	/boot/grub/bin		\
 	/platform/i86pc		\
+	/lib/libmvec		\
 	/usr/lib/xen		\
 	/usr/lib/xen/bin
 
@@ -266,10 +269,6 @@ DIRS= \
 	/usr/lib/gss \
 	/usr/lib/hal \
 	/usr/lib/inet \
-	/usr/lib/inet/dhcp \
-	/usr/lib/inet/dhcp/nsu \
-	/usr/lib/inet/dhcp/svc \
-	/usr/lib/inet/dhcp/svcadm \
 	/usr/lib/inet/ilb \
 	/usr/lib/inet/$(MACH32) \
 	/usr/lib/inet/wanboot \
@@ -360,10 +359,12 @@ DIRS= \
 	/usr/share/man/man3ldap \
 	/usr/share/man/man3lgrp \
 	/usr/share/man/man3lib \
+	/usr/share/man/man3m \
 	/usr/share/man/man3mail \
 	/usr/share/man/man3malloc \
 	/usr/share/man/man3mp \
 	/usr/share/man/man3mpapi \
+	/usr/share/man/man3mvec \
 	/usr/share/man/man3nsl \
 	/usr/share/man/man3nvpair \
 	/usr/share/man/man3pam \
@@ -955,6 +956,9 @@ $(ROOT)/usr/lib/libkmfberder.so:=	REALPATH=../../lib/libkmfberder.so.1
 $(ROOT)/usr/lib/libkstat.so.1:=		REALPATH=../../lib/libkstat.so.1
 $(ROOT)/usr/lib/libkstat.so:=		REALPATH=../../lib/libkstat.so.1
 $(ROOT)/usr/lib/liblddbg.so.4:=		REALPATH=../../lib/liblddbg.so.4
+$(ROOT)/usr/lib/libm.so.1:=		REALPATH=../../lib/libm.so.1
+$(ROOT)/usr/lib/libm.so.2:=		REALPATH=../../lib/libm.so.2
+$(ROOT)/usr/lib/libm.so:=		REALPATH=../../lib/libm.so.2
 $(ROOT)/usr/lib/libmd.so.1:=		REALPATH=../../lib/libmd.so.1
 $(ROOT)/usr/lib/libmd.so:=		REALPATH=../../lib/libmd.so.1
 $(ROOT)/usr/lib/libmd5.so.1:=		REALPATH=../../lib/libmd5.so.1
@@ -964,6 +968,8 @@ $(ROOT)/usr/lib/libmeta.so:=		REALPATH=../../lib/libmeta.so.1
 $(ROOT)/usr/lib/libmp.so.1:=		REALPATH=../../lib/libmp.so.1
 $(ROOT)/usr/lib/libmp.so.2:=		REALPATH=../../lib/libmp.so.2
 $(ROOT)/usr/lib/libmp.so:=		REALPATH=../../lib/libmp.so.2
+$(ROOT)/usr/lib/libmvec.so.1:=		REALPATH=../../lib/libmvec.so.1
+$(ROOT)/usr/lib/libmvec.so:=		REALPATH=../../lib/libmvec.so.1
 $(ROOT)/usr/lib/libnsl.so.1:=		REALPATH=../../lib/libnsl.so.1
 $(ROOT)/usr/lib/libnsl.so:=		REALPATH=../../lib/libnsl.so.1
 $(ROOT)/usr/lib/libnvpair.so.1:=	REALPATH=../../lib/libnvpair.so.1
@@ -1074,6 +1080,8 @@ $(ROOT)/usr/lib/llib-lintl.ln:=		REALPATH=../../lib/llib-lintl.ln
 $(ROOT)/usr/lib/llib-lintl:=		REALPATH=../../lib/llib-lintl
 $(ROOT)/usr/lib/llib-lkstat.ln:=	REALPATH=../../lib/llib-lkstat.ln
 $(ROOT)/usr/lib/llib-lkstat:=		REALPATH=../../lib/llib-lkstat
+$(ROOT)/usr/lib/llib-lm:=		REALPATH=../../lib/llib-lm
+$(ROOT)/usr/lib/llib-lm.ln:=		REALPATH=../../lib/llib-lm.ln
 $(ROOT)/usr/lib/llib-lmd5.ln:=		REALPATH=../../lib/llib-lmd5.ln
 $(ROOT)/usr/lib/llib-lmd5:=		REALPATH=../../lib/llib-lmd5
 $(ROOT)/usr/lib/llib-lmeta.ln:=		REALPATH=../../lib/llib-lmeta.ln
@@ -1246,6 +1254,12 @@ $(ROOT)/usr/lib/$(MACH64)/libkstat.so:= \
 	REALPATH=../../../lib/$(MACH64)/libkstat.so.1
 $(ROOT)/usr/lib/$(MACH64)/liblddbg.so.4:= \
 	REALPATH=../../../lib/$(MACH64)/liblddbg.so.4
+$(ROOT)/usr/lib/$(MACH64)/libm.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/libm.so.1
+$(ROOT)/usr/lib/$(MACH64)/libm.so.2:= \
+	REALPATH=../../../lib/$(MACH64)/libm.so.2
+$(ROOT)/usr/lib/$(MACH64)/libm.so:= \
+	REALPATH=../../../lib/$(MACH64)/libm.so.2
 $(ROOT)/usr/lib/$(MACH64)/libmd.so.1:= \
 	REALPATH=../../../lib/$(MACH64)/libmd.so.1
 $(ROOT)/usr/lib/$(MACH64)/libmd.so:= \
@@ -1258,6 +1272,10 @@ $(ROOT)/usr/lib/$(MACH64)/libmp.so.2:= \
 	REALPATH=../../../lib/$(MACH64)/libmp.so.2
 $(ROOT)/usr/lib/$(MACH64)/libmp.so:= \
 	REALPATH=../../../lib/$(MACH64)/libmp.so.2
+$(ROOT)/usr/lib/$(MACH64)/libmvec.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/libmvec.so.1
+$(ROOT)/usr/lib/$(MACH64)/libmvec.so:= \
+	REALPATH=../../../lib/$(MACH64)/libmvec.so.1
 $(ROOT)/usr/lib/$(MACH64)/libnsl.so.1:= \
 	REALPATH=../../../lib/$(MACH64)/libnsl.so.1
 $(ROOT)/usr/lib/$(MACH64)/libnsl.so:= \
@@ -1430,6 +1448,8 @@ $(ROOT)/usr/lib/$(MACH64)/llib-lintl.ln:= \
 	REALPATH=../../../lib/$(MACH64)/llib-lintl.ln
 $(ROOT)/usr/lib/$(MACH64)/llib-lkstat.ln:= \
 	REALPATH=../../../lib/$(MACH64)/llib-lkstat.ln
+$(ROOT)/usr/lib/$(MACH64)/llib-lm.ln:= \
+	REALPATH=../../../lib/$(MACH64)/llib-lm.ln
 $(ROOT)/usr/lib/$(MACH64)/llib-lmd5.ln:= \
 	REALPATH=../../../lib/$(MACH64)/llib-lmd5.ln
 $(ROOT)/usr/lib/$(MACH64)/llib-lnsl.ln:= \
@@ -1567,6 +1587,9 @@ SYM.USRLIB= \
 	/usr/lib/libkstat.so \
 	/usr/lib/libkstat.so.1 \
 	/usr/lib/liblddbg.so.4 \
+	/usr/lib/libm.so.1 \
+	/usr/lib/libm.so.2 \
+	/usr/lib/libm.so \
 	/usr/lib/libmd.so \
 	/usr/lib/libmd.so.1 \
 	/usr/lib/libmd5.so \
@@ -1576,6 +1599,8 @@ SYM.USRLIB= \
 	/usr/lib/libmp.so \
 	/usr/lib/libmp.so.1 \
 	/usr/lib/libmp.so.2 \
+	/usr/lib/libmvec.so.1 \
+	/usr/lib/libmvec.so \
 	/usr/lib/libnsl.so \
 	/usr/lib/libnsl.so.1 \
 	/usr/lib/libnvpair.so \
@@ -1684,6 +1709,8 @@ SYM.USRLIB= \
 	/usr/lib/llib-lintl.ln \
 	/usr/lib/llib-lkstat \
 	/usr/lib/llib-lkstat.ln \
+	/usr/lib/llib-lm \
+	/usr/lib/llib-lm.ln \
 	/usr/lib/llib-lmd5 \
 	/usr/lib/llib-lmd5.ln \
 	/usr/lib/llib-lmeta \
@@ -1813,12 +1840,17 @@ SYM.USRLIB64= \
 	/usr/lib/$(MACH64)/libkstat.so \
 	/usr/lib/$(MACH64)/libkstat.so.1 \
 	/usr/lib/$(MACH64)/liblddbg.so.4 \
+	/usr/lib/$(MACH64)/libm.so.1 \
+	/usr/lib/$(MACH64)/libm.so.2 \
+	/usr/lib/$(MACH64)/libm.so \
 	/usr/lib/$(MACH64)/libmd.so \
 	/usr/lib/$(MACH64)/libmd.so.1 \
 	/usr/lib/$(MACH64)/libmd5.so \
 	/usr/lib/$(MACH64)/libmd5.so.1 \
 	/usr/lib/$(MACH64)/libmp.so \
 	/usr/lib/$(MACH64)/libmp.so.2 \
+	/usr/lib/$(MACH64)/libmvec.so.1 \
+	/usr/lib/$(MACH64)/libmvec.so \
 	/usr/lib/$(MACH64)/libnsl.so \
 	/usr/lib/$(MACH64)/libnsl.so.1 \
 	/usr/lib/$(MACH64)/libnvpair.so \
@@ -1903,6 +1935,7 @@ SYM.USRLIB64= \
 	/usr/lib/$(MACH64)/llib-linetutil.ln \
 	/usr/lib/$(MACH64)/llib-lintl.ln \
 	/usr/lib/$(MACH64)/llib-lkstat.ln \
+	/usr/lib/$(MACH64)/llib-lm.ln \
 	/usr/lib/$(MACH64)/llib-lmd5.ln \
 	/usr/lib/$(MACH64)/llib-lnsl.ln \
 	/usr/lib/$(MACH64)/llib-lnvpair.ln \

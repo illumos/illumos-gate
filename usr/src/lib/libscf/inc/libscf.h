@@ -295,6 +295,7 @@ typedef struct scf_tmpl_error scf_tmpl_error_t;
 #define	SCF_PROPERTY_COREFILE_PATTERN	((const char *)"corefile_pattern")
 #define	SCF_PROPERTY_DEGRADED		((const char *)"degraded")
 #define	SCF_PROPERTY_DEGRADE_IMMEDIATE	((const char *)"degrade_immediate")
+#define	SCF_PROPERTY_DODUMP		((const char *)"do_dump")
 #define	SCF_PROPERTY_DURATION		((const char *)"duration")
 #define	SCF_PROPERTY_ENABLED		((const char *)"enabled")
 #define	SCF_PROPERTY_DEATHROW		((const char *)"deathrow")

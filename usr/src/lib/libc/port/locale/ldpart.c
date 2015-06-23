@@ -1,4 +1,5 @@
 /*
+ * Copyright 2013 Garrett D'Amore <garrett@damore.org>
  * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2000, 2001 Alexey Zelkin <phantom@FreeBSD.org>
  * All rights reserved.
@@ -37,13 +38,14 @@
 #include <unistd.h>
 #include <stdio.h>
 
+#include "libc.h"
 #include "ldpart.h"
 #include "setlocale.h"
 
 static int split_lines(char *, const char *);
 
 int
-__part_load_locale(const char *name, int *using_locale,
+__part_load_locale(const char *name,
     char **locale_buf, const char *category_filename,
     int locale_buf_size_max, int locale_buf_size_min,
     const char **dst_localebuf)
@@ -54,20 +56,6 @@ __part_load_locale(const char *name, int *using_locale,
 	char		filename[PATH_MAX];
 	struct stat	st;
 	size_t		namesize, bufsize;
-
-	/* 'name' must be already checked. */
-	if (strcmp(name, "C") == 0 || strcmp(name, "POSIX") == 0) {
-		*using_locale = 0;
-		return (_LDP_CACHE);
-	}
-
-	/*
-	 * If the locale name is the same as our cache, use the cache.
-	 */
-	if (*locale_buf != NULL && strcmp(name, *locale_buf) == 0) {
-		*using_locale = 1;
-		return (_LDP_CACHE);
-	}
 
 	/*
 	 * Slurp the locale file into the cache.
@@ -88,7 +76,7 @@ __part_load_locale(const char *name, int *using_locale,
 		goto bad_locale;
 	}
 	bufsize = namesize + st.st_size;
-	if ((lbuf = malloc(bufsize)) == NULL) {
+	if ((lbuf = libc_malloc(bufsize)) == NULL) {
 		errno = ENOMEM;
 		goto bad_locale;
 	}
@@ -117,14 +105,11 @@ __part_load_locale(const char *name, int *using_locale,
 	/*
 	 * Record the successful parse in the cache.
 	 */
-	if (*locale_buf != NULL)
-		free(*locale_buf);
 	*locale_buf = lbuf;
 	for (p = *locale_buf, i = 0; i < num_lines; i++)
 		dst_localebuf[i] = (p += strlen(p) + 1);
 	for (i = num_lines; i < locale_buf_size_max; i++)
 		dst_localebuf[i] = NULL;
-	*using_locale = 1;
 
 	return (_LDP_LOADED);
 

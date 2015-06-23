@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright (c) 2015, Joyent, Inc.
  */
 
 /*
@@ -1093,4 +1094,14 @@ random_get_bytes(uint8_t *ptr, size_t len)
 	if (len < 1)
 		return (0);
 	return (kcf_rnd_get_bytes(ptr, len, B_TRUE));
+}
+
+int
+random_get_blocking_bytes(uint8_t *ptr, size_t len)
+{
+	ASSERT(!mutex_owned(&rndpool_lock));
+
+	if (len < 1)
+		return (0);
+	return (kcf_rnd_get_bytes(ptr, len, B_FALSE));
 }

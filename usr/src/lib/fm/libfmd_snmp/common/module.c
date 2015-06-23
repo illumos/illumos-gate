@@ -215,7 +215,7 @@ modinfo_update_one(const fmd_adm_modinfo_t *modinfo, void *arg)
 
 	data->d_valid = valid_stamp;
 
-	DEBUGMSGTL((MODNAME_STR, "timestamp updated for %lu/%s@%p: %lu\n",
+	DEBUGMSGTL((MODNAME_STR, "timestamp updated for %lu/%s@%p: %d\n",
 	    data->d_index, data->d_ami_name, data, data->d_valid));
 
 	if ((update_ctx->uc_type & UCT_ALL) ||

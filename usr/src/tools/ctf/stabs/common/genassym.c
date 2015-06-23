@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * In this mode, we generate header files containg various #defines which can
  * be used to access members of various structures, and to walk through arrays.
@@ -182,7 +180,8 @@ ga_process_name(char *line)
 	if (shdef != NULL) {
 		ssize_t tsz;
 
-		for (shift = -1, tsz = sz; tsz > 0; tsz >>= 1, shift++);
+		for (shift = -1, tsz = sz; tsz > 0; tsz >>= 1, shift++)
+			;
 		if (shift < 0 || 1 << shift != sz) {
 			return (parse_warn("Can't make shift #define: %s size "
 			    "(%d) isn't a power of 2", curname, sz));
@@ -273,7 +272,7 @@ ga_member_find(ctf_id_t curtype, ga_member_cb_data_t *md)
 	int rc;
 
 	if ((c = strchr(md->gmcb_memname, '.')) != NULL)
-		*c++ = NULL;
+		*c++ = '\0';
 	md->gmcb_submem = c;
 
 	if ((rc = ctf_member_iter(ctf, curtype, ga_member_cb, md)) == 0) {

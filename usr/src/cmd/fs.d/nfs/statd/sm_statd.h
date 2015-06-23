@@ -19,6 +19,11 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -38,7 +43,6 @@
  */
 
 /*
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
  */
 
@@ -79,7 +83,7 @@ struct mon_entry {
 };
 typedef struct mon_entry mon_entry;
 
-/* Structure entry for record (rec_table) and recovery (recov_q) tables */
+/* Structure entry for record (record_table) and recovery (recov_q) tables */
 struct name_entry {
 	char *name;			/* name of host */
 	int count;			/* count of entries */
@@ -98,7 +102,7 @@ typedef struct moninfo {
 typedef struct sm_hash {
 	union {
 		struct mon_entry *mon_hdptr;	/* Head ptr for mon_table */
-		name_entry *rec_hdptr;		/* Head ptr for rec_table */
+		name_entry *rec_hdptr;		/* Head ptr for record_table */
 		name_entry *recov_hdptr;	/* Head ptr for recov_q */
 	} smhd_t;
 	mutex_t	lock;			/* Lock to protect each list head */
@@ -131,7 +135,6 @@ extern int die;			/* Flag to indicate that an SM_CRASH */
 				/* request came in & to stop threads cleanly */
 extern int in_crash;		/* Flag to single thread sm_crash requests. */
 extern int regfiles_only;	/* Flag to indicate symlink use in statmon */
-extern cond_t crash_finish;	/* Condition to wait until crash is finished */
 extern mutex_t sm_trylock;	/* Lock to single thread sm_try */
 /*
  * The only established lock precedence here is:
@@ -141,6 +144,11 @@ extern mutex_t sm_trylock;	/* Lock to single thread sm_try */
 extern mutex_t name_addrlock;	/* Locks all entries of name-to-addr table */
 extern rwlock_t thr_rwlock;	/* Reader/writer lock for requests coming in */
 extern cond_t retrywait;	/* Condition to wait before starting retry */
+
+extern boolean_t in_merges;	/* Flag to indicate the host_name is not */
+				/* populated yet */
+extern mutex_t merges_lock;	/* Lock for in_merges variable */
+extern cond_t merges_cond;	/* Condition variable for in_merges */
 
 extern char STATE[MAXPATHLEN], CURRENT[MAXPATHLEN];
 extern char BACKUP[MAXPATHLEN];
@@ -185,7 +193,7 @@ extern int	create_file(char *name);
 extern void	delete_file(char *name);
 extern void	record_name(char *name, int op);
 extern void	sm_crash(void);
-extern void	statd_init();
+extern void	statd_init(void);
 extern void	merge_hosts(void);
 extern void	merge_ips(void);
 extern CLIENT	*create_client(char *, int, int, char *, struct timeval *);
@@ -203,7 +211,7 @@ extern void	sm_unmon_all_svc(my_id *myidp, sm_stat *resp);
 extern void	sm_simu_crash_svc(void *myidp);
 extern void	sm_notify_svc(stat_chge *ntfp);
 
-extern void	sm_inithash();
+extern void	sm_inithash(void);
 extern void	copydir_from_to(char *from_dir, char *to_dir);
 extern int	str_cmp_unqual_hostname(char *, char *);
 extern void	record_addr(char *name, sa_family_t family, struct netobj *ah);

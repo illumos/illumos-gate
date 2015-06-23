@@ -625,6 +625,19 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 		}
 
 		/*
+		 * If we have an Instruction fault in kernel mode, then that
+		 * means we've tried to execute a user page (SMEP) or both of
+		 * PAE and NXE are enabled. In either case, given that it's a
+		 * kernel fault, we should panic immediately and not try to make
+		 * any more forward progress. This indicates a bug in the
+		 * kernel, which if execution continued, could be exploited to
+		 * wreak havoc on the system.
+		 */
+		if (errcode & PF_ERR_EXEC) {
+			(void) die(type, rp, addr, cpuid);
+		}
+
+		/*
 		 * See if we can handle as pagefault. Save lofault and onfault
 		 * across this. Here we assume that an address less than
 		 * KERNELBASE is a user fault.  We can do this as copy.s

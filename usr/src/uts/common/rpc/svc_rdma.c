@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1983, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
 /* All Rights Reserved */
@@ -182,7 +183,7 @@ struct {
 kstat_named_t *rdmarsstat_ptr = (kstat_named_t *)&rdmarsstat;
 uint_t rdmarsstat_ndata = sizeof (rdmarsstat) / sizeof (kstat_named_t);
 
-#define	RSSTAT_INCR(x)	atomic_add_64(&rdmarsstat.x.value.ui64, 1)
+#define	RSSTAT_INCR(x)	atomic_inc_64(&rdmarsstat.x.value.ui64)
 /*
  * Create a transport record.
  * The transport record, output buffer, and private data structure
@@ -256,6 +257,10 @@ svc_rdma_kcreate(char *netid, SVC_CALLOUT_TABLE *sct, int id,
 		mutex_init(&xprt->xp_thread_lock, NULL, MUTEX_DEFAULT, NULL);
 		xprt->xp_req_head = (mblk_t *)0;
 		xprt->xp_req_tail = (mblk_t *)0;
+		xprt->xp_full = FALSE;
+		xprt->xp_enable = FALSE;
+		xprt->xp_reqs = 0;
+		xprt->xp_size = 0;
 		xprt->xp_threads = 0;
 		xprt->xp_detached_threads = 0;
 

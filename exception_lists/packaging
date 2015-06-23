@@ -21,8 +21,9 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2012 OmniTI Computer Consulting, Inc.  All rights reserved.
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2014 Garrett D'Amore <garrett@damore.org>
 #
 
 #
@@ -44,7 +45,6 @@ usr/include/rpcsvc/daemon_utils.h
 usr/include/rpcsvc/svc_dg_priv.h
 usr/include/security/pam_impl.h
 usr/include/sys/clock_impl.h
-usr/include/sys/ieeefp.h
 usr/include/sys/winlockio.h
 usr/include/scsi/plugins/ses/vendor/sun_impl.h
 #
@@ -66,14 +66,8 @@ usr/lib/sparcv9/llib-lsoftcrypto.ln	sparc
 # standalone's DHCP implementation, and the kernel (nfs_dlboot).
 # They contain interfaces which are currently private.
 #
-usr/include/dhcp_svc_confkey.h
-usr/include/dhcp_svc_confopt.h
-usr/include/dhcp_svc_private.h
 usr/include/dhcp_symbol.h
 usr/include/sys/sunos_dhcp_class.h
-usr/lib/libdhcpsvc.so
-usr/lib/llib-ldhcpsvc
-usr/lib/llib-ldhcpsvc.ln
 #
 # Private MAC driver header files
 #
@@ -709,11 +703,11 @@ usr/include/sys/u8_textprep_data.h
 #
 # SQLite is private, used by SMF (svc.configd), idmapd and libsmb.
 #
-usr/include/sqlite
-usr/lib/libsqlite-native.o
-usr/lib/libsqlite.o
-usr/lib/llib-lsqlite.ln
-usr/lib/smbsrv/libsqlite.so
+usr/include/sqlite-sys
+lib/libsqlite-native.o
+lib/libsqlite-sys.so
+lib/llib-lsqlite-sys
+lib/llib-lsqlite-sys.ln
 #
 # Private/Internal kiconv header files. Do not ship.
 #
@@ -758,14 +752,37 @@ usr/include/sys/srn.h
 usr/include/smb
 usr/include/smbsrv
 #
+# Private/Internal libraries for smbsrv in user space
+#
+usr/include/libfakekernel
+usr/lib/libfakekernel.so
+usr/lib/libfakekernel.so.1
+usr/lib/llib-lfakekernel
+usr/lib/llib-lfakekernel.ln
+usr/lib/amd64/llib-lfakekernel.ln		i386
+usr/lib/sparcv9/llib-lfakekernel.ln		sparc
+usr/lib/amd64/libfakekernel.so			i386
+usr/lib/amd64/libfakekernel.so.1		i386
+usr/lib/sparcv9/libfakekernel.so		sparc
+usr/lib/sparcv9/libfakekernel.so.1		sparc
+#
 # Private/Internal dtrace scripts of smbsrv. Do not ship.
 #
 usr/lib/smbsrv/dtrace
 #
-# Private/Internal (lint) libraries of smbsrv. Do not ship.
+# Private/Internal libraries of smbsrv. Do not ship.
 #
+usr/lib/mdb/proc/libfksmbsrv.so
+usr/lib/mdb/proc/amd64/libfksmbsrv.so		i386
+usr/lib/mdb/proc/sparcv9/libfksmbsrv.so		sparc
 usr/lib/reparse/llib-lreparse_smb
 usr/lib/reparse/llib-lreparse_smb.ln
+usr/lib/smbsrv/bind-helper
+usr/lib/smbsrv/fksmbd
+usr/lib/smbsrv/libfksmbsrv.so
+usr/lib/smbsrv/libfksmbsrv.so.1
+usr/lib/smbsrv/llib-lfksmbsrv
+usr/lib/smbsrv/llib-lfksmbsrv.ln
 usr/lib/smbsrv/llib-lmlrpc
 usr/lib/smbsrv/llib-lmlrpc.ln
 usr/lib/smbsrv/llib-lmlsvc
@@ -827,7 +844,7 @@ usr/lib/sparcv9/llib-lsmbfs.ln		sparc
 #
 usr/lib/fs/smbfs/chacl
 usr/lib/fs/smbfs/lsacl
-usr/lib/fs/smbfs/testnp
+opt/smbcl-tests
 #
 # FC related files
 kernel/kmdb/fcip		i386
@@ -946,6 +963,8 @@ usr/lib/sparcv9/llib-lvrrpadm.ln	sparc
 #
 opt/onbld/bin/i386/elfsign	i386
 opt/onbld/bin/sparc/elfsign	sparc
+opt/onbld/bin/i386/mandoc	i386
+opt/onbld/bin/sparc/mandoc	sparc
 
 #
 # Private libdwarf

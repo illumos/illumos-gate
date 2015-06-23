@@ -22,6 +22,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 #ifndef	_SYS_USB_HUBDVAR_H
 #define	_SYS_USB_HUBDVAR_H
@@ -91,9 +94,9 @@ typedef struct hub_power_struct {
 
 	uint8_t		hubp_current_power;	/* current power level */
 
-	time_t		hubp_time_at_full_power;	/* timestamp 0->3 */
+	hrtime_t	hubp_time_at_full_power;	/* timestamp 0->3 */
 
-	uint8_t		hubp_min_pm_threshold;		/* in seconds */
+	hrtime_t	hubp_min_pm_threshold;		/* in nanoseconds */
 
 	/* power state of all children are tracked here */
 	uint8_t		*hubp_child_pwrstate;

@@ -34,7 +34,7 @@
 #include <errno.h>
 #include <auth_list.h>
 
-#define	_PATH_SENDMAIL_BIN	"/usr/lib/sendmail"
+#define	_PATH_SENDMAIL_BIN	"/usr/lib/smtp/sendmail/sendmail"
 
 int
 main(int argc, char *argv[], char *envp[])

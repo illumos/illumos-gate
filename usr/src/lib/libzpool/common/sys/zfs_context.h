@@ -389,8 +389,10 @@ typedef struct vnode {
 	uint64_t	v_size;
 	int		v_fd;
 	char		*v_path;
+	int		v_dump_fd;
 } vnode_t;
 
+extern char *vn_dumpdir;
 #define	AV_SCANSTAMP_SZ	32		/* length of anti-virus scanstamp */
 
 typedef struct xoptattr {
@@ -503,6 +505,7 @@ extern void delay(clock_t ticks);
 	} while (0);
 
 #define	max_ncpus	64
+#define	boot_ncpus	(sysconf(_SC_NPROCESSORS_ONLN))
 
 #define	minclsyspri	60
 #define	maxclsyspri	99

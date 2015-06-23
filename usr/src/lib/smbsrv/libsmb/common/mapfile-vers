@@ -19,7 +19,7 @@
 #
 #
 # Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 #
 
 #
@@ -74,12 +74,12 @@ SYMBOL_VERSION SUNWprivate {
 	smb_acl_sort;
 	smb_acl_to_zfs;
 	smb_auth_DES;
+	smb_auth_RC4;
 	smb_auth_gen_session_key;
 	smb_auth_hmac_md5;
 	smb_auth_ntlm_hash;
 	smb_auth_ntlmv2_hash;
 	smb_auth_qnd_unicode;
-	smb_auth_set_info;
 	smb_auth_validate_lm;
 	smb_auth_validate_nt;
 	smb_buf32_xdr;
@@ -98,6 +98,8 @@ SYMBOL_VERSION SUNWprivate {
 	smb_common_decode;
 	smb_common_encode;
 	smb_config_get;
+	smb_config_get_ads_enable;
+	smb_config_get_debug;
 	smb_config_get_execinfo;
 	smb_config_get_fg_flag;
 	smb_config_get_localsid;
@@ -176,6 +178,7 @@ SYMBOL_VERSION SUNWprivate {
 	smb_fsacl_free;
 	smb_fssd_init;
 	smb_fssd_term;
+	smb_gen_random_passwd;
 	smb_get_dcinfo;
 	smb_get_nameservers;
 	smb_get_txid;
@@ -215,7 +218,7 @@ SYMBOL_VERSION SUNWprivate {
 	smb_isupper;
 	smb_isstrlwr;
 	smb_isstrupr;
-	smb_kmod_bind;
+	smb_kmod_bind			{ FLAGS = NODIRECT };
 	smb_kmod_enum;
 	smb_kmod_enum_init;
 	smb_kmod_enum_fini;
@@ -223,15 +226,16 @@ SYMBOL_VERSION SUNWprivate {
 	smb_kmod_file_close;
         smb_kmod_get_open_num;
 	smb_kmod_get_spool_doc;
-	smb_kmod_isbound;
+	smb_kmod_ioctl			{ FLAGS = NODIRECT };
+	smb_kmod_isbound		{ FLAGS = NODIRECT };
 	smb_kmod_session_close;
 	smb_kmod_setcfg;
 	smb_kmod_setgmtoff;
 	smb_kmod_share;
 	smb_kmod_shareinfo;
-	smb_kmod_start;
-	smb_kmod_stop;
-	smb_kmod_unbind;
+	smb_kmod_start			{ FLAGS = NODIRECT };
+	smb_kmod_stop			{ FLAGS = NODIRECT };
+	smb_kmod_unbind			{ FLAGS = NODIRECT };
 	smb_kmod_unshare;
 	smb_join;
 	smb_lgrp_add;
@@ -256,11 +260,9 @@ SYMBOL_VERSION SUNWprivate {
 	smb_lgrp_stop;
 	smb_lgrp_strerror;
 	smb_load_kconfig;
-	smb_log;
-	smb_log_create;
-	smb_log_dumpall;
 	smb_logon_decode;
 	smb_logon_free;
+	smb_logon_xdr;
 	smb_lookup_name;
 	smb_lookup_sid;
 	smb_mac_chk;
@@ -268,7 +270,6 @@ SYMBOL_VERSION SUNWprivate {
 	smb_mac_inc_seqnum;
 	smb_mac_init;
 	smb_mac_sign;
-	smb_match;
 	smb_match_netlogon_seqnum;
 	smb_mbstos;
 	smb_mbstowcs;
@@ -298,6 +299,7 @@ SYMBOL_VERSION SUNWprivate {
 	smb_netfileinfo_encode;
 	smb_netuserinfo_decode;
 	smb_netuserinfo_encode;
+	smb_netuserinfo_xdr;
 	smb_nic_addhost;
 	smb_nic_delhost;
 	smb_nic_is_local;
@@ -381,17 +383,21 @@ SYMBOL_VERSION SUNWprivate {
 	smb_string_xdr;
 	smb_strlwr;
 	smb_strupr;
+	smb_syslog			{ FLAGS = NODIRECT };
+	smb_syslog_fmt_m;
 	smb_tolower;
 	smb_toupper;
 	smb_token_encode;
 	smb_token_query_privilege;
 	smb_token_valid;
+	smb_token_xdr;
 	smb_tonetbiosname;
-	smb_trace;
-	smb_tracef;
+	smb_trace			{ FLAGS = NODIRECT };
+	smb_tracef			{ FLAGS = NODIRECT };
 	smb_unc_free;
 	smb_unc_init;
 	smb_update_netlogon_seqnum;
+	smb_vsyslog			{ FLAGS = NODIRECT };
 	smb_wcequiv_strlen;
 	smb_wcstombs;
 	smb_wctomb;

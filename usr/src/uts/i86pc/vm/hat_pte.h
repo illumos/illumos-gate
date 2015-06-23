@@ -26,8 +26,6 @@
 #ifndef	_VM_HAT_PTE_H
 #define	_VM_HAT_PTE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -235,7 +233,8 @@ struct hat_mmu_info {
  * The concept of a VA hole exists in AMD64. This might need to be made
  * model specific eventually.
  *
- * In the 64 bit kernel PTE loads are atomic, but need cas64 on 32 bit kernel.
+ * In the 64 bit kernel PTE loads are atomic, but need atomic_cas_64 on 32
+ * bit kernel.
  */
 #if defined(__amd64)
 
@@ -248,7 +247,7 @@ struct hat_mmu_info {
 #define	FMT_PTE "0x%lx"
 #define	GET_PTE(ptr)		(*(x86pte_t *)(ptr))
 #define	SET_PTE(ptr, pte)	(*(x86pte_t *)(ptr) = pte)
-#define	CAS_PTE(ptr, x, y)	cas64(ptr, x, y)
+#define	CAS_PTE(ptr, x, y)	atomic_cas_64(ptr, x, y)
 
 #elif defined(__i386)
 
@@ -263,8 +262,8 @@ extern x86pte_t get_pte64(x86pte_t *ptr);
 	((mmu.pae_hat ? ((x86pte32_t *)(ptr))[1] = (pte >> 32) : 0),	\
 	*(x86pte32_t *)(ptr) = pte)
 #define	CAS_PTE(ptr, x, y)			\
-	(mmu.pae_hat ? cas64(ptr, x, y) :	\
-	cas32((uint32_t *)(ptr), (uint32_t)(x), (uint32_t)(y)))
+	(mmu.pae_hat ? atomic_cas_64(ptr, x, y) :	\
+	atomic_cas_32((uint32_t *)(ptr), (uint32_t)(x), (uint32_t)(y)))
 
 #endif	/* __i386 */
 

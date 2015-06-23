@@ -155,39 +155,10 @@ cpu_inv_tsb(caddr_t tsb_base, uint_t tsb_bytes)
  *  Atomic Function Stubs
  */
 
-uint8_t
-cas8(uint8_t *target, uint8_t value1, uint8_t value2)
-{ return (0); }
-
-/* ARGSUSED */
-uint32_t
-cas32(uint32_t *target, uint32_t value1, uint32_t value2)
-{ return (0); }
-
 /* ARGSUSED */
 uint64_t
-cas64(uint64_t *target, uint64_t value1, uint64_t value2)
+atomic_cas_64(volatile uint64_t *target, uint64_t value1, uint64_t value2)
 { return (0); }
-
-/* ARGSUSED */
-ulong_t
-caslong(ulong_t *target, ulong_t value1, ulong_t value2)
-{ return (0); }
-
-/* ARGSUSED */
-void *
-casptr(void *ptr1, void *ptr2, void *ptr3)
-{ return (0); }
-
-/* ARGSUSED */
-void
-atomic_and_long(ulong_t *target, ulong_t value)
-{}
-
-/* ARGSUSED */
-void
-atomic_or_long(ulong_t *target, ulong_t value)
-{}
 
 /* ARGSUSED */
 void

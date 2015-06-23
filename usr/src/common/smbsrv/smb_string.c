@@ -21,9 +21,11 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
-#ifdef _KERNEL
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 #include <sys/types.h>
 #include <sys/sunddi.h>
 #else
@@ -45,7 +47,7 @@
  * Global pointer to the current codepage: defaults to ASCII,
  * and a flag indicating whether the codepage is Unicode or ASCII.
  */
-static smb_codepage_t *current_codepage = usascii_codepage;
+static const smb_codepage_t *current_codepage = usascii_codepage;
 static boolean_t is_unicode = B_FALSE;
 
 static smb_codepage_t *smb_unicode_init(void);
@@ -113,7 +115,7 @@ strcanon(char *buf, const char *class)
 void
 smb_codepage_init(void)
 {
-	smb_codepage_t *cp;
+	const smb_codepage_t *cp;
 
 	if (is_unicode)
 		return;
@@ -441,7 +443,7 @@ smb_unc_init(const char *path, smb_unc_t *unc)
 
 	bzero(unc, sizeof (smb_unc_t));
 
-#ifdef _KERNEL
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 	unc->unc_buf = smb_mem_strdup(path);
 #else
 	if ((unc->unc_buf = strdup(path)) == NULL)
@@ -492,7 +494,7 @@ smb_unc_free(smb_unc_t *unc)
 	if (unc == NULL)
 		return;
 
-#ifdef _KERNEL
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 	smb_mem_free(unc->unc_buf);
 #else
 	free(unc->unc_buf);

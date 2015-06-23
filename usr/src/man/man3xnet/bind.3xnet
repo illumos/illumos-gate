@@ -22,7 +22,6 @@ bind \- bind a name to a socket
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBbind()\fR function assigns an \fIaddress\fR to an unnamed socket.
 Sockets created with \fBsocket\fR(3XNET) function are initially unnamed. They
@@ -65,17 +64,14 @@ Specifies the length of the \fBsockaddr\fR structure pointed to by the
 The socket in use may require the process to have appropriate privileges to use
 the \fBbind()\fR function.
 .SH USAGE
-.sp
 .LP
 An application program can retrieve the assigned socket name with the
 \fBgetsockname\fR(3XNET) function.
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, \fBbind()\fR returns 0.  Otherwise, \(mi1 is
 returned and \fBerrno\fR is set to indicate the error.
 .SH ERRORS
-.sp
 .LP
 The \fBbind()\fR function will fail if:
 .sp
@@ -296,7 +292,6 @@ There were insufficient STREAMS resources for the operation to complete.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -314,8 +309,8 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
+\fBsockaddr\fR(3SOCKET),
 \fBconnect\fR(3XNET), \fBgetsockname\fR(3XNET), \fBlisten\fR(3XNET),
 \fBsocket\fR(3XNET), \fBattributes\fR(5), \fBprivileges\fR(5),
 \fBstandards\fR(5)

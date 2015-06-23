@@ -2,6 +2,7 @@
 .\" Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Copyright 1989 AT&T
 .\" Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
+.\" Copyright (c) 2015, Joyent, Inc.  All rights reserved.
 .\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
@@ -9,9 +10,9 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH READ 2 "Sep 13, 2007"
+.TH READ 2 "Jan 15, 2015"
 .SH NAME
-read, readv, pread \- read from file
+read, readv, pread, preadv \- read from file
 .SH SYNOPSIS
 .LP
 .nf
@@ -31,9 +32,13 @@ read, readv, pread \- read from file
 
 \fBssize_t\fR \fBreadv\fR(\fBint\fR \fIfildes\fR, \fBconst struct iovec *\fR\fIiov\fR, \fBint\fR \fIiovcnt\fR);
 .fi
+.LP
+.nf
+\fBssize_t\fR \fBpreadv\fR(\fBint\fR \fIfildes\fR, \fBconst struct iovec *\fR\fIiov\fR, \fBint\fR \fIiovcnt\fR, \fBoff_t\fR \fIoffset\fR);
+.fi
+
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBread()\fR function attempts to read \fInbyte\fR bytes from the file
 associated with the open file descriptor, \fIfildes\fR, into the buffer pointed
@@ -245,7 +250,6 @@ reflects the prior error. If a hangup occurs on the stream being read,
 \fBread()\fR continues to operate normally until the stream head read queue is
 empty. Thereafter, it returns \fB0\fR.
 .SS "\fBreadv()\fR"
-.sp
 .LP
 The \fBreadv()\fR function is equivalent to \fBread()\fR, but places the input
 data into the \fIiovcnt\fR buffers specified by the members of the \fIiov\fR
@@ -273,7 +277,6 @@ area completely before proceeding to the next.
 Upon successful completion, \fBreadv()\fR marks for update the \fBst_atime\fR
 field of the file.
 .SS "\fBpread()\fR"
-.sp
 .LP
 The \fBpread()\fR function performs the same action as \fBread()\fR, except
 that it reads from a given position in the file without changing the file
@@ -283,16 +286,24 @@ desired position inside the file. \fBpread()\fR will read up to the maximum
 offset value that can be represented in an \fBoff_t\fR for regular files. An
 attempt to perform a \fBpread()\fR on a file that is incapable of seeking
 results in an error.
+.SS "\fBpreadv()\fR"
+.LP
+The \fBpreadv()\fR function performs the same action as \fBreadv()\fR except it
+reads from a given position in the file without changing the file pointer. The
+first three arguments are the same as \fBreadv()\fR with the addition of a
+fourth argument \fIoffset\fR for the desired position inside the file.
+\fBpreadv()\fR will read up to the maximum offset value that can be represented
+in an \fBoff_t\fR for regular files. An attempt to perform a \fBpreadv()\fR on a
+file that is incapable of seeking results in an error.
+
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, \fBread()\fR and \fBreadv()\fR return a
 non-negative integer indicating the number of bytes actually read. Otherwise,
 the functions return \fB\(mi1\fR and set \fBerrno\fR to indicate the error.
 .SH ERRORS
-.sp
 .LP
-The \fBread()\fR, \fBreadv()\fR, and \fBpread()\fR functions will fail if:
+The \fBread()\fR, \fBreadv()\fR, \fBpread()\fR, and \fBpreadv()\fR functions will fail if:
 .sp
 .ne 2
 .na
@@ -323,6 +334,17 @@ The \fIfildes\fR argument is not a valid file descriptor open for reading.
 .ad
 .RS 11n
 Message waiting to be read on a stream is not a data message.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBECONNRESET\fR\fR
+.ad
+.RS 11n
+The \fIfiledes\fR argument refers to a connection oriented socket and the
+connection was forcibly closed by the peer and is no longer valid.  I/O can no
+longer be performed to \fIfiledes\fR.
 .RE
 
 .sp
@@ -442,7 +464,7 @@ associated with \fIfildes\fR.
 
 .sp
 .LP
-The \fBreadv()\fR function may fail if:
+The \fBreadv()\fR and \fBpreadv()\fR functions may fail if:
 .sp
 .ne 2
 .na
@@ -467,7 +489,8 @@ of the \fBiov_len\fR values in the \fIiov\fR array overflowed an \fBssize_t\fR.
 
 .sp
 .LP
-The \fBpread()\fR function will fail and the file pointer remain unchanged if:
+The \fBpread()\fR and \fBpreadv()\fR functions will fail and the file pointer
+remain unchanged if:
 .sp
 .ne 2
 .na
@@ -478,12 +501,10 @@ The \fIfildes\fR argument is associated with a pipe or FIFO.
 .RE
 
 .SH USAGE
-.sp
 .LP
 The \fBpread()\fR function has a transitional interface for 64-bit file
 offsets.  See \fBlf64\fR(5).
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -503,7 +524,6 @@ Standard	See \fBstandards\fR(5).
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBIntro\fR(2), \fBchmod\fR(2), \fBcreat\fR(2), \fBdup\fR(2), \fBfcntl\fR(2),
 \fBgetmsg\fR(2), \fBioctl\fR(2), \fBlseek\fR(2), \fBopen\fR(2), \fBpipe\fR(2),

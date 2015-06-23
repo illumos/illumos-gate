@@ -46,6 +46,12 @@ CPPFLAGS += -D_LARGEFILE64_SOURCE=1 -D_REENTRANT $(INCS) -DDEBUG
 LINTFLAGS += -xerroff=E_NAME_DEF_NOT_USED2
 LINTFLAGS64 += -xerroff=E_NAME_DEF_NOT_USED2
 
+# lint complains about unused inline functions, even though
+# they are "inline", not "static inline", with "extern inline"
+# implementations and usage in libzpool.
+LINTFLAGS += -erroff=E_STATIC_UNUSED
+LINTFLAGS64 += -erroff=E_STATIC_UNUSED
+
 CERRWARN += -_gcc=-Wno-switch
 
 .KEEP_STATE:

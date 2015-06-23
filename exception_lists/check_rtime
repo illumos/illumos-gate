@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2015, OmniTI Computer Consulting, Inc. All rights reserved.
 #
 
 # This file provides exceptions to the usual rules applied to ELF objects by
@@ -47,7 +48,6 @@ SKIP		^usr/src/			# no objects in source code
 
 # Individual files that we don't examine
 SKIP		^boot/grub/bin/grub$
-SKIP		^usr/apache/libexec/mod_ipp.so$	# Apache loadable module
 # USIII specific extns. cause ldd noise on USII bld. m/c
 SKIP		^usr/lib/fps/sun4u/UltraSPARC.*/fptest$
 SKIP		^usr/MACH(lib)/lddstub$		# lddstub has no dependencies
@@ -100,6 +100,10 @@ UNUSED_DEPS	^usr/lib/libp	# profile libc makes libm an unused dep of libc
 # libm.so.2 dependency
 UNUSED_OBJ	unused object=.*MACH(libm)/libm_hwcap1\.so\.2
 
+# libnetsnmphelpers.so is empty in some net-snmp versions
+UNUSED_OBJ	unused object=.*/libnetsnmphelpers\.so\..*
+UNREF_OBJ	unreferenced object=.*/libnetsnmphelpers\.so\..*
+
 # Unused runpaths due to dlopen() use
 UNUSED_RPATH	/usr/lib/fs/autofs.*\ from\ .automountd
 UNUSED_RPATH	/etc/ppp/plugins.*\ from\ .*pppd
@@ -128,7 +132,7 @@ UNUSED_RPATH	/usr/X11/lib.*\ from\ .*libgobject-2\.0\.so\.0
 UNUSED_RPATH	/usr/sfw/lib.*\ from\ .*libgthread-2\.0\.so\.0
 UNUSED_RPATH	/usr/X11/lib.*\ from\ .*libgthread-2\.0\.so\.0
 UNUSED_RPATH	/usr/sfw/lib.*\ from\ .*libcrypto\.so\.0\.9\.8
-UNUSED_RPATH	/usr/sfw/lib.*\ from\ .*libnetsnmp\.so\.15
+UNUSED_RPATH	/usr/sfw/lib.*\ from\ .*libnetsnmp\.so\..*
 UNUSED_RPATH	/usr/sfw/lib.*\ from\ .*libgcc_s\.so\.1
 UNUSED_RPATH	/usr/ccs/lib.*\ from\ .*libgcc_s\.so\.1
 UNUSED_RPATH	/usr/lib.*\ from\ .*libgcc_s\.so\.1
@@ -136,6 +140,10 @@ UNUSED_RPATH	/usr/postgres/8.3/lib.*\ from\ .*libpq\.so\.5
 UNUSED_RPATH	/usr/sfw/lib.*\ from\ .*libpq\.so\.5
 UNUSED_RPATH	/usr/lib.*\ from\ .*/usr/lib/mps
 UNUSED_RPATH	/usr/ccs/lib.*\ from\ .*/usr/lib/mps
+UNUSED_RPATH	/usr/gnu/lib.*\ from\ .*/usr/lib/libpython2\.6
+UNUSED_RPATH	/usr/gnu/lib.*\ from\ .*/usr/lib/64/libpython2\.6
+UNUSED_RPATH	/usr/snadm/lib.*\ from\ .*/usr/snadm/lib/libspmicommon\.so\.1
+
 
 # Unused runpaths for reasons not captured above
 UNUSED_RPATH	/usr/lib/smbsrv.*\ from\ .*libsmb\.so\.1 	# future needs
@@ -146,14 +154,15 @@ UNUSED_RPATH	/usr.*\ from\ .*tst\.gcc\.exe			# gcc built
 UNREF_OBJ	/lib.*\ of\ .*libcimapi\.so
 UNREF_OBJ	/lib.*\ of\ .*libdbus-1\.so\.3
 UNREF_OBJ	/lib.*\ of\ .*libdbus-glib-1\.so\.2
+UNREF_OBJ	/lib.*\ of\ .*libgio-2.0\.so\.0
 UNREF_OBJ	/lib.*\ of\ .*libglib-2.0\.so\.0
 UNREF_OBJ	/lib.*\ of\ .*libgobject-2.0\.so\.0
 UNREF_OBJ	/lib.*\ of\ .*libgthread-2\.0\.so\.0
 UNREF_OBJ	/lib.*\ of\ .*libjvm\.so
-UNREF_OBJ	/lib.*\ of\ .*libnetsnmp\.so\.15
-UNREF_OBJ	/lib.*\ of\ .*libnetsnmpagent\.so\.15
-UNREF_OBJ	/lib.*\ of\ .*libnetsnmpmibs\.so\.15
-UNREF_OBJ	/lib.*\ of\ .*libnetsnmphelpers\.so\.15
+UNREF_OBJ	/lib.*\ of\ .*libnetsnmp\.so\..*
+UNREF_OBJ	/lib.*\ of\ .*libnetsnmpagent\.so\..*
+UNREF_OBJ	/lib.*\ of\ .*libnetsnmpmibs\.so\..*
+UNREF_OBJ	/lib.*\ of\ .*libnetsnmphelpers\.so\..*
 UNREF_OBJ	/lib.*\ of\ .*libnspr4\.so
 UNREF_OBJ	/lib.*\ of\ .*libpq\.so\.5
 UNREF_OBJ	/lib.*\ of\ .*libsoftokn3\.so
@@ -165,11 +174,14 @@ UNREF_OBJ	/lib.*\ of\ .*libxml2\.so\.2
 UNREF_OBJ	/lib.*\ of\ .*libxslt\.so\.1
 UNREF_OBJ	/lib.*\ of\ .*libpq\.so\.4
 UNREF_OBJ	/lib.*\ of\ .*libpython2\.4\.so\.1\.0
+UNREF_OBJ	/lib.*\ of\ .*libpython2\.6\.so\.1\.0
 UNREF_OBJ	/libgcc_s.*\ of\ .*libstdc\+\+\.so\.6
+UNREF_OBJ	/libgcc_s.*\ of\ .*libgmodule-2\.0\.so\.0
 
 # Unreferenced object of objects we can't change for other reasons
 UNREF_OBJ	/libmapmalloc\.so\.1;\ unused\ dependency\ of	# interposer
 UNREF_OBJ	/libstdc\+\+\.so\.6;\ unused\ dependency\ of	# gcc build
+UNREF_OBJ	/libgcc_s\.so\.1.*\ of\ .*libstdc\+\+\.so\.6	# omnios gcc mix
 UNREF_OBJ	/libm\.so\.2.*\ of\ .*libstdc\+\+\.so\.6	# gcc build
 UNREF_OBJ	/lib.*\ of\ .*/lib/picl/plugins/		# picl
 UNREF_OBJ	/lib.*\ of\ .*kcfd				# interposer

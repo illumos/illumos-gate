@@ -1,10 +1,11 @@
 '\" te
+.\" Copyright 2014 Nexenta Systems, Inc.  All Rights Reserved.
 .\" Copyright (c) 2000, Sun Microsystems, Inc.  All Rights Reserved
 .\" Copyright 1989 AT&T
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH RPC 3NSL "Jun 5, 2001"
+.TH RPC 3NSL "Nov 24, 2014"
 .SH NAME
 rpc \- library routines for remote procedure calls
 .SH SYNOPSIS
@@ -16,7 +17,6 @@ rpc \- library routines for remote procedure calls
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 These routines allow C language programs to make procedure calls on other
 machines across a network. First, the client sends a request to the server. On
@@ -29,7 +29,6 @@ take a \fBnetconfig\fR structure also require that \fB<netconfig.h>\fR be
 included. Applications using  \fBRPC\fR and  \fBXDR\fR routines should be
 linked with the \fBlibnsl\fR library.
 .SS "Multithread Considerations"
-.sp
 .LP
 In the case of multithreaded applications, the \fB-mt\fR option must be
 specified on the command line at compilation time to enable a thread-specific
@@ -51,8 +50,7 @@ contains a single data area for decoding arguments and encoding results.  See
 between threads that call functions that do this.  Routines that are affected
 by this restriction are marked as unsafe for MT applications. See
 \fBrpc_svc_calls\fR(3NSL).
-.SS "Nettyp"
-.sp
+.SS "Nettype"
 .LP
 Some of the high-level \fBRPC\fR interface routines take a \fInettype\fR string
 as one of the parameters (for example, \fBclnt_create()\fR, \fBsvc_create()\fR,
@@ -149,7 +147,6 @@ If  \fInettype\fR is  \fINULL\fR, it defaults to \fBnetpath\fR. The transports
 are tried in left to right order in the \fBNETPATH\fR variable or in top to
 down order in the \fB/etc/netconfig\fR file.
 .SS "Derived Types"
-.sp
 .LP
 In a 64-bit environment, the derived types are defined as follows:
 .sp
@@ -184,11 +181,9 @@ l l l .
 .TE
 
 .SS "Data Structures"
-.sp
 .LP
 Some of the data structures used by the \fBRPC\fR package are shown below.
 .SS "The \fBAUTH\fR Structure"
-.sp
 .in +2
 .nf
 union  des_block  {
@@ -228,7 +223,6 @@ struct  opaque_auth  {
 .in -2
 
 .SS "The \fBCLIENT\fR Structure"
-.sp
 .in +2
 .nf
 /*
@@ -255,7 +249,6 @@ struct  opaque_auth  {
 .in -2
 
 .SS "The \fBSVCXPRT\fR Structure"
-.sp
 .in +2
 .nf
 enum  xprt_stat  {
@@ -299,7 +292,6 @@ typedef  struct  {
 .in -2
 
 .SS "The \fBsvc_reg\fR Structure"
-.sp
 .in +2
 .nf
 struct  svc_req  {
@@ -315,7 +307,6 @@ struct  svc_req  {
 .in -2
 
 .SS "The \fBXDR\fR Structure"
-.sp
 .in +2
 .nf
 /*
@@ -379,7 +370,6 @@ XDR;
 .in -2
 
 .SS "Index to Routines"
-.sp
 .LP
 The following table lists  \fBRPC\fR routines and the manual reference pages on
 which they are described:
@@ -638,15 +628,6 @@ which they are described:
 .sp
 .ne 2
 .na
-\fB\fBclnt_udpcreate\fR\fR
-.ad
-.RS 27n
-\fBrpc_soc\fR(3NSL)
-.RE
-
-.sp
-.ne 2
-.na
 \fB\fBclnt_vc_create\fR\fR
 .ad
 .RS 27n
@@ -675,6 +656,15 @@ which they are described:
 .ne 2
 .na
 \fB\fBclntudp_bufcreate\fR\fR
+.ad
+.RS 27n
+\fBrpc_soc\fR(3NSL)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBclntudp_create\fR\fR
 .ad
 .RS 27n
 \fBrpc_soc\fR(3NSL)
@@ -848,7 +838,7 @@ which they are described:
 \fB\fBrpc_reg\fR\fR
 .ad
 .RS 27n
-\fBrpc_svc_calls\fR(3NSL)
+\fBrpc_svc_reg\fR(3NSL)
 .RE
 
 .sp
@@ -911,7 +901,7 @@ which they are described:
 \fB\fBsvc_freeargs\fR\fR
 .ad
 .RS 27n
-\fBrpc_svc_reg\fR(3NSL)
+\fBrpc_svc_calls\fR(3NSL)
 .RE
 
 .sp
@@ -920,7 +910,7 @@ which they are described:
 \fB\fBsvc_getargs\fR\fR
 .ad
 .RS 27n
-\fBrpc_svc_reg\fR(3NSL)
+\fBrpc_svc_calls\fR(3NSL)
 .RE
 
 .sp
@@ -974,7 +964,7 @@ which they are described:
 \fB\fBsvc_reg\fR\fR
 .ad
 .RS 27n
-\fBrpc_svc_calls\fR(3NSL)
+\fBrpc_svc_reg\fR(3NSL)
 .RE
 
 .sp
@@ -992,7 +982,7 @@ which they are described:
 \fB\fBsvc_run\fR\fR
 .ad
 .RS 27n
-\fBrpc_svc_reg\fR(3NSL)
+\fBrpc_svc_calls\fR(3NSL)
 .RE
 
 .sp
@@ -1001,7 +991,7 @@ which they are described:
 \fB\fBsvc_sendreply\fR\fR
 .ad
 .RS 27n
-\fBrpc_svc_reg\fR(3NSL)
+\fBrpc_svc_calls\fR(3NSL)
 .RE
 
 .sp
@@ -1028,7 +1018,7 @@ which they are described:
 \fB\fBsvc_unreg\fR\fR
 .ad
 .RS 27n
-\fBrpc_svc_calls\fR(3NSL)
+\fBrpc_svc_reg\fR(3NSL)
 .RE
 
 .sp
@@ -1244,7 +1234,7 @@ which they are described:
 \fB\fBxprt_register\fR\fR
 .ad
 .RS 27n
-\fBrpc_svc_calls\fR(3NSL)
+\fBrpc_svc_reg\fR(3NSL)
 .RE
 
 .sp
@@ -1253,15 +1243,13 @@ which they are described:
 \fB\fBxprt_unregister\fR\fR
 .ad
 .RS 27n
-\fBrpc_svc_calls\fR(3NSL)
+\fBrpc_svc_reg\fR(3NSL)
 .RE
 
 .SH FILES
-.sp
 .LP
 \fB/etc/netconfig\fR
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -1277,7 +1265,6 @@ MT-Level	MT-Safe with exceptions
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBgetnetconfig\fR(3NSL), \fBgetnetpath\fR(3NSL), \fBrpc_clnt_auth\fR(3NSL),
 \fBrpc_clnt_calls\fR(3NSL), \fBrpc_clnt_create\fR(3NSL),

@@ -379,7 +379,7 @@ struct visinfo_kstat {
 	extern void __dtrace_probe___visinfo_##opcode(uint64_t *);	\
 	uint64_t *stataddr = &visinfo.opcode.value.ui64;		\
 	__dtrace_probe___visinfo_##opcode(stataddr);       		\
-	atomic_add_64(&visinfo.opcode.value.ui64, 1);			\
+	atomic_inc_64(&visinfo.opcode.value.ui64);			\
 }
 
 

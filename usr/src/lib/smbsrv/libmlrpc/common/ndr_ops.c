@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -158,44 +159,6 @@ nds_initialize(ndr_stream_t *nds, unsigned pdu_size_hint,
 
 	nds->outer_queue_tailp = &nds->outer_queue_head;
 	return (0);
-}
-
-void
-nds_finalize(ndr_stream_t *nds, ndr_fraglist_t *frags)
-{
-	iovec_t *iov;
-	ndr_frag_t *frag;
-	uint32_t size = 0;
-
-	bzero(frags, sizeof (ndr_fraglist_t));
-
-	for (frag = nds->frags.head; frag; frag = frag->next)
-		size += frag->len;
-
-	if (size == 0 || size >= NDR_PDU_MAX_SIZE)
-		return;
-
-	frags->iov = malloc(nds->frags.nfrag * sizeof (iovec_t));
-	if (frags->iov == NULL)
-		return;
-
-	frags->head = nds->frags.head;
-	frags->tail = nds->frags.tail;
-	frags->nfrag = nds->frags.nfrag;
-	bzero(&nds->frags, sizeof (ndr_fraglist_t));
-
-	frags->uio.uio_iov = frags->iov;
-	frags->uio.uio_iovcnt = frags->nfrag;
-	frags->uio.uio_offset = 0;
-	frags->uio.uio_segflg = UIO_USERSPACE;
-	frags->uio.uio_resid = size;
-
-	iov = frags->uio.uio_iov;
-	for (frag = frags->head; frag; frag = frag->next) {
-		iov->iov_base = (caddr_t)frag->buf;
-		iov->iov_len = frag->len;
-		++iov;
-	}
 }
 
 /*
@@ -424,7 +387,6 @@ ndo_reset(ndr_stream_t *nds)
 static void
 ndo_destruct(ndr_stream_t *nds)
 {
-	ndr_frag_t *frag;
 
 	ndo_printf(nds, 0, "destruct");
 
@@ -436,13 +398,6 @@ ndo_destruct(ndr_stream_t *nds)
 		nds->pdu_base_addr = NULL;
 		nds->pdu_base_offset = 0;
 	}
-
-	while ((frag = nds->frags.head) != NULL) {
-		nds->frags.head = frag->next;
-		free(frag);
-	}
-
-	bzero(&nds->frags, sizeof (ndr_fraglist_t));
 
 	nds->outer_queue_head = 0;
 	nds->outer_current = 0;

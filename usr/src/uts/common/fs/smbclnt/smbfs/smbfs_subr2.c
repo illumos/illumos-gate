@@ -403,7 +403,7 @@ start:
 		np = kmem_cache_alloc(smbnode_cache, KM_SLEEP);
 		new_vp = vn_alloc(KM_SLEEP);
 
-		atomic_add_long((ulong_t *)&smbnodenew, 1);
+		atomic_inc_ulong((ulong_t *)&smbnodenew);
 		vp = new_vp;
 	}
 
@@ -1027,7 +1027,7 @@ sn_destroy_node(smbnode_t *np)
 	ASSERT(np->n_rpath == NULL);
 	ASSERT(!(np->r_flags & RHASHED));
 	ASSERT(np->r_freef == NULL && np->r_freeb == NULL);
-	atomic_add_long((ulong_t *)&smbnodenew, -1);
+	atomic_dec_ulong((ulong_t *)&smbnodenew);
 	vn_invalid(vp);
 	vn_free(vp);
 	kmem_cache_free(smbnode_cache, np);

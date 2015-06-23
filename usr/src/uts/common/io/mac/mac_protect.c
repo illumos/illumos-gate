@@ -21,6 +21,10 @@
 
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
+ */
+/*
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/strsun.h>
@@ -141,7 +145,7 @@
  */
 static ulong_t	dhcp_max_pending_txn = 512;
 static ulong_t	dhcp_max_completed_txn = 512;
-static time_t	txn_cleanup_interval = 60;
+static hrtime_t	txn_cleanup_interval = 60 * NANOSEC;
 
 /*
  * DHCPv4 transaction. It may be added to three different tables
@@ -149,7 +153,7 @@ static time_t	txn_cleanup_interval = 60;
  */
 typedef struct dhcpv4_txn {
 	uint32_t		dt_xid;
-	time_t			dt_timestamp;
+	hrtime_t		dt_timestamp;
 	uint8_t			dt_cid[DHCP_MAX_OPT_SIZE];
 	uint8_t			dt_cid_len;
 	ipaddr_t		dt_ipaddr;
@@ -186,7 +190,7 @@ typedef struct dhcpv6_cid {
  */
 typedef struct dhcpv6_txn {
 	uint32_t		dt_xid;
-	time_t			dt_timestamp;
+	hrtime_t		dt_timestamp;
 	dhcpv6_cid_t		*dt_cid;
 	avl_node_t		dt_node;
 	struct dhcpv6_txn	*dt_next;
@@ -455,7 +459,7 @@ create_dhcpv4_txn(uint32_t xid, uint8_t *cid, uint8_t cid_len, ipaddr_t ipaddr)
 		return (NULL);
 
 	txn->dt_xid = xid;
-	txn->dt_timestamp = ddi_get_time();
+	txn->dt_timestamp = gethrtime();
 	if (cid_len > 0)
 		bcopy(cid, &txn->dt_cid, cid_len);
 	txn->dt_cid_len = cid_len;
@@ -512,8 +516,7 @@ txn_cleanup_v4(mac_client_impl_t *mcip)
 	 */
 	for (txn = avl_first(&mcip->mci_v4_pending_txn); txn != NULL;
 	    txn = avl_walk(&mcip->mci_v4_pending_txn, txn, AVL_AFTER)) {
-		if (ddi_get_time() - txn->dt_timestamp >
-		    txn_cleanup_interval) {
+		if (gethrtime() - txn->dt_timestamp > txn_cleanup_interval) {
 			DTRACE_PROBE2(found__expired__txn,
 			    mac_client_impl_t *, mcip,
 			    dhcpv4_txn_t *, txn);
@@ -617,7 +620,7 @@ intercept_dhcpv4_outbound(mac_client_impl_t *mcip, ipha_t *ipha, uchar_t *end)
 	if ((txn = find_dhcpv4_pending_txn(mcip, dh4->xid)) != NULL) {
 		DTRACE_PROBE2(update, mac_client_impl_t *, mcip,
 		    dhcpv4_txn_t *, txn);
-		txn->dt_timestamp = ddi_get_time();
+		txn->dt_timestamp = gethrtime();
 		goto done;
 	}
 
@@ -1116,7 +1119,7 @@ create_dhcpv6_txn(uint32_t xid, dhcpv6_cid_t *cid)
 
 	txn->dt_xid = xid;
 	txn->dt_cid = cid;
-	txn->dt_timestamp = ddi_get_time();
+	txn->dt_timestamp = gethrtime();
 	return (txn);
 }
 
@@ -1183,8 +1186,7 @@ txn_cleanup_v6(mac_client_impl_t *mcip)
 	 */
 	for (txn = avl_first(&mcip->mci_v6_pending_txn); txn != NULL;
 	    txn = avl_walk(&mcip->mci_v6_pending_txn, txn, AVL_AFTER)) {
-		if (ddi_get_time() - txn->dt_timestamp >
-		    txn_cleanup_interval) {
+		if (gethrtime() - txn->dt_timestamp > txn_cleanup_interval) {
 			DTRACE_PROBE2(found__expired__txn,
 			    mac_client_impl_t *, mcip,
 			    dhcpv6_txn_t *, txn);
@@ -1248,7 +1250,7 @@ intercept_dhcpv6_outbound(mac_client_impl_t *mcip, ip6_t *ip6h, uchar_t *end)
 	if ((txn = find_dhcpv6_pending_txn(mcip, xid)) != NULL) {
 		DTRACE_PROBE2(update, mac_client_impl_t *, mcip,
 		    dhcpv6_txn_t *, txn);
-		txn->dt_timestamp = ddi_get_time();
+		txn->dt_timestamp = gethrtime();
 		goto done;
 	}
 	if ((txn = create_dhcpv6_txn(xid, cid)) == NULL)
@@ -1357,7 +1359,7 @@ txn_cleanup_timer(void *arg)
 		DTRACE_PROBE1(restarting__timer, mac_client_impl_t *, mcip);
 
 		mcip->mci_txn_cleanup_tid = timeout(txn_cleanup_timer, mcip,
-		    drv_usectohz(txn_cleanup_interval * 1000000));
+		    drv_usectohz(txn_cleanup_interval / (NANOSEC / MICROSEC)));
 	}
 	mutex_exit(&mcip->mci_protect_lock);
 }
@@ -1368,7 +1370,7 @@ start_txn_cleanup_timer(mac_client_impl_t *mcip)
 	ASSERT(MUTEX_HELD(&mcip->mci_protect_lock));
 	if (mcip->mci_txn_cleanup_tid == 0) {
 		mcip->mci_txn_cleanup_tid = timeout(txn_cleanup_timer, mcip,
-		    drv_usectohz(txn_cleanup_interval * 1000000));
+		    drv_usectohz(txn_cleanup_interval / (NANOSEC / MICROSEC)));
 	}
 }
 
@@ -1532,9 +1534,22 @@ ipnospoof_check_v4(mac_client_impl_t *mcip, mac_protect_t *protect,
 	for (i = 0; i < protect->mp_ipaddrcnt; i++) {
 		mac_ipaddr_t	*v4addr = &protect->mp_ipaddrs[i];
 
-		if (v4addr->ip_version == IPV4_VERSION &&
-		    V4_PART_OF_V6(v4addr->ip_addr) == *addr)
-			return (B_TRUE);
+		if (v4addr->ip_version == IPV4_VERSION) {
+			uint32_t mask;
+
+			/* LINTED E_SUSPICIOUS_COMPARISON */
+			ASSERT(v4addr->ip_netmask >= 0 &&
+			    v4addr->ip_netmask <= 32);
+			mask = 0xFFFFFFFFu << (32 - v4addr->ip_netmask);
+			/*
+			 * Since we have a netmask we know this entry
+			 * signifies the entire subnet. Check if the
+			 * given address is on the subnet.
+			 */
+			if (htonl(V4_PART_OF_V6(v4addr->ip_addr)) ==
+			    (htonl(*addr) & mask))
+				return (B_TRUE);
+		}
 	}
 	return (protect->mp_ipaddrcnt == 0 ?
 	    check_dhcpv4_dyn_ip(mcip, *addr) : B_FALSE);
@@ -1559,7 +1574,9 @@ ipnospoof_check_v6(mac_client_impl_t *mcip, mac_protect_t *protect,
 		mac_ipaddr_t	*v6addr = &protect->mp_ipaddrs[i];
 
 		if (v6addr->ip_version == IPV6_VERSION &&
-		    IN6_ARE_ADDR_EQUAL(&v6addr->ip_addr, addr))
+		    /* LINTED E_SUSPICIOUS_COMPARISON */
+		    IN6_ARE_PREFIXEDADDR_EQUAL(&v6addr->ip_addr, addr,
+		    v6addr->ip_netmask))
 			return (B_TRUE);
 	}
 	return (protect->mp_ipaddrcnt == 0 ?
@@ -2094,14 +2111,27 @@ validate_ips(mac_protect_t *p)
 		mac_ipaddr_t	*addr = &p->mp_ipaddrs[i];
 
 		/*
-		 * The unspecified address is implicitly allowed
-		 * so there's no need to add it to the list.
+		 * The unspecified address is implicitly allowed so there's no
+		 * need to add it to the list. Also, validate that the netmask,
+		 * if any, is sane for the specific version of IP. A mask of
+		 * some kind is always required.
 		 */
+		if (addr->ip_netmask == 0)
+			return (EINVAL);
+
 		if (addr->ip_version == IPV4_VERSION) {
 			if (V4_PART_OF_V6(addr->ip_addr) == INADDR_ANY)
 				return (EINVAL);
+			if (addr->ip_netmask > 32)
+				return (EINVAL);
 		} else if (addr->ip_version == IPV6_VERSION) {
 			if (IN6_IS_ADDR_UNSPECIFIED(&addr->ip_addr))
+				return (EINVAL);
+
+			if (IN6_IS_ADDR_V4MAPPED_ANY(&addr->ip_addr))
+				return (EINVAL);
+
+			if (addr->ip_netmask > 128)
 				return (EINVAL);
 		} else {
 			/* invalid ip version */

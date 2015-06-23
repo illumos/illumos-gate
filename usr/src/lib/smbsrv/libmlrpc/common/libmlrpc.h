@@ -19,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef	_LIBMLRPC_H
@@ -247,27 +247,17 @@ typedef struct ndr_binding {
 #define	NDR_N_BINDING_POOL	2
 
 typedef struct ndr_pipe {
+	void 			*np_listener;
+	const char		*np_endpoint;
+	smb_netuserinfo_t	*np_user;
+	int			(*np_send)(struct ndr_pipe *, void *, size_t);
+	int			(*np_recv)(struct ndr_pipe *, void *, size_t);
 	int			np_fid;
-	uint32_t		np_txid;
-	smb_netuserinfo_t	np_user;
-	char			*np_buf;
-	struct uio		np_uio;
-	iovec_t			np_iov;
-	ndr_fraglist_t		np_frags;
-	int			np_refcnt;
 	uint16_t		np_max_xmit_frag;
 	uint16_t		np_max_recv_frag;
 	ndr_binding_t		*np_binding;
 	ndr_binding_t		np_binding_pool[NDR_N_BINDING_POOL];
 } ndr_pipe_t;
-
-typedef struct ndr_pipe_info {
-	uint32_t		npi_fid;
-	uint32_t		npi_permissions;
-	uint32_t		npi_num_locks;
-	char			npi_pathname[MAXPATHLEN];
-	char			npi_username[MAXNAMELEN];
-} ndr_pipe_info_t;
 
 /*
  * Number of bytes required to align SIZE on the next dword/4-byte
@@ -429,7 +419,6 @@ int ndr_heap_avail(ndr_heap_t *);
 #define	NDR_SIDDUP(XA, S)	ndr_heap_siddup((XA)->heap, (S))
 
 typedef struct ndr_xa {
-	int			fid;
 	unsigned short		ptype;		/* high bits special */
 	unsigned short		opnum;
 	ndr_stream_t		recv_nds;
@@ -476,7 +465,7 @@ typedef struct ndr_client {
 typedef struct ndr_handle {
 	ndr_hdid_t		nh_id;
 	struct ndr_handle	*nh_next;
-	int			nh_fid;
+	ndr_pipe_t		*nh_pipe;
 	const ndr_service_t	*nh_svc;
 	ndr_client_t		*nh_clnt;
 	void			*nh_data;
@@ -495,7 +484,6 @@ typedef struct ndr_buf {
 
 /* ndr_ops.c */
 int nds_initialize(ndr_stream_t *, unsigned, int, ndr_heap_t *);
-void nds_finalize(ndr_stream_t *, ndr_fraglist_t *);
 void nds_destruct(ndr_stream_t *);
 void nds_show_state(ndr_stream_t *);
 
@@ -522,11 +510,7 @@ unsigned ndr_bind_ack_hdr_size(ndr_xa_t *);
 unsigned ndr_alter_context_rsp_hdr_size(void);
 
 /* ndr_server.c */
-int ndr_pipe_open(int, uint8_t *, uint32_t);
-int ndr_pipe_close(int);
-int ndr_pipe_read(int, uint8_t *, uint32_t *, uint32_t *);
-int ndr_pipe_write(int, uint8_t *, uint32_t);
-void *ndr_pipe_transact(void *);
+void ndr_pipe_worker(ndr_pipe_t *);
 
 int ndr_generic_call_stub(ndr_xa_t *);
 
@@ -550,7 +534,7 @@ void ndr_uuid_unparse(ndr_uuid_t *, char *);
 ndr_hdid_t *ndr_hdalloc(const ndr_xa_t *, const void *);
 void ndr_hdfree(const ndr_xa_t *, const ndr_hdid_t *);
 ndr_handle_t *ndr_hdlookup(const ndr_xa_t *, const ndr_hdid_t *);
-void ndr_hdclose(int fid);
+void ndr_hdclose(ndr_pipe_t *);
 
 ssize_t ndr_uiomove(caddr_t, size_t, enum uio_rw, struct uio *);
 

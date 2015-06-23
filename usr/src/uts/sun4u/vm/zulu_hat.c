@@ -278,7 +278,7 @@ zulu_ctx_tsb_lock_enter(struct zulu_hat *zhat)
 
 			new_lck = lck | ZULU_CTX_LOCK;
 
-			old_lck = cas64(plck, lck, new_lck);
+			old_lck = atomic_cas_64(plck, lck, new_lck);
 
 			if (old_lck == lck) {
 				/*

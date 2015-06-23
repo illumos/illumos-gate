@@ -27,6 +27,7 @@
 
 /*
  * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/param.h>
@@ -3681,13 +3682,8 @@ retry:
 
 	mutex_exit(&rp->r_statelock);
 
-	if (len <= PAGESIZE) {
-		error = nfs_getapage(vp, off, len, protp, pl, plsz,
-		    seg, addr, rw, cr);
-	} else {
-		error = pvn_getpages(nfs_getapage, vp, off, len, protp,
-		    pl, plsz, seg, addr, rw, cr);
-	}
+	error = pvn_getpages(nfs_getapage, vp, off, len, protp, pl, plsz,
+	    seg, addr, rw, cr);
 
 	switch (error) {
 	case NFS_EOF:
@@ -3701,7 +3697,7 @@ retry:
 }
 
 /*
- * Called from pvn_getpages or nfs_getpage to get a particular page.
+ * Called from pvn_getpages to get a particular page.
  */
 /* ARGSUSED */
 static int
@@ -4365,11 +4361,11 @@ nfs_map(vnode_t *vp, offset_t off, struct as *as, caddr_t *addrp,
 
 	if (nfs_rw_enter_sig(&rp->r_rwlock, RW_WRITER, INTR(vp)))
 		return (EINTR);
-	atomic_add_int(&rp->r_inmap, 1);
+	atomic_inc_uint(&rp->r_inmap);
 	nfs_rw_exit(&rp->r_rwlock);
 
 	if (nfs_rw_enter_sig(&rp->r_lkserlock, RW_READER, INTR(vp))) {
-		atomic_add_int(&rp->r_inmap, -1);
+		atomic_dec_uint(&rp->r_inmap);
 		return (EINTR);
 	}
 	if (vp->v_flag & VNOCACHE) {
@@ -4410,7 +4406,7 @@ nfs_map(vnode_t *vp, offset_t off, struct as *as, caddr_t *addrp,
 
 done:
 	nfs_rw_exit(&rp->r_lkserlock);
-	atomic_add_int(&rp->r_inmap, -1);
+	atomic_dec_uint(&rp->r_inmap);
 	return (error);
 }
 

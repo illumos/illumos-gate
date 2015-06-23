@@ -5,8 +5,8 @@
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
  *
- * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
+ * You can obtain a copy of the license at
+ * http://www.opensource.org/licenses/cddl1.txt.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2010 Emulex.  All rights reserved.
+ * Copyright (c) 2004-2012 Emulex. All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -106,11 +106,12 @@ extern "C" {
 #define	MBX_READ_SPARM64		0x8D
 #define	MBX_READ_RPI64			0x8F
 #define	MBX_CONFIG_MSI			0x90
-#define	MBX_REG_LOGIN64			0x93  /* SLI2/3 */
-#define	MBX_REG_RPI			0x93  /* SLI4 */
-#define	MBX_READ_LA64			0x95
-#define	MBX_REG_VPI			0x96	/* NPIV */
-#define	MBX_UNREG_VPI			0x97	/* NPIV */
+#define	MBX_REG_LOGIN64			0x93 /* SLI2/3 */
+#define	MBX_REG_RPI			0x93 /* SLI4 */
+#define	MBX_READ_LA64			0x95 /* SLI2/3 */
+#define	MBX_READ_TOPOLOGY		0x95 /* SLI4 */
+#define	MBX_REG_VPI			0x96 /* NPIV */
+#define	MBX_UNREG_VPI			0x97 /* NPIV */
 #define	MBX_FLASH_WR_ULA		0x98
 #define	MBX_SET_DEBUG			0x99
 #define	MBX_SLI_CONFIG			0x9B
@@ -149,6 +150,61 @@ extern "C" {
 #define	MBXERR_NOT_SUPPORTED		0x10
 #define	MBXERR_UNSUPPORTED_FEATURE	0x11
 #define	MBXERR_UNKNOWN_COMMAND		0x12
+#define	MBXERR_BAD_IP_BIT		0x13
+#define	MBXERR_BAD_PCB_ALIGN		0x14
+#define	MBXERR_BAD_HBQ_ID		0x15
+#define	MBXERR_BAD_HBQ_STATE		0x16
+#define	MBXERR_BAD_HBQ_MASK_NUM		0x17
+#define	MBXERR_BAD_HBQ_MASK_SUBSET	0x18
+#define	MBXERR_HBQ_CREATE_FAIL		0x19
+#define	MBXERR_HBQ_EXISTING		0x1A
+#define	MBXERR_HBQ_RSPRING_FULL		0x1B
+#define	MBXERR_HBQ_DUP_MASK		0x1C
+#define	MBXERR_HBQ_INVAL_GET_PTR	0x1D
+#define	MBXERR_BAD_HBQ_SIZE		0x1E
+#define	MBXERR_BAD_HBQ_ORDER		0x1F
+#define	MBXERR_INVALID_ID		0x20
+
+#define	MBXERR_INVALID_VFI		0x30
+
+#define	MBXERR_FLASH_WRITE_FAILED	0x100
+
+#define	MBXERR_INVALID_LINKSPEED	0x500
+
+#define	MBXERR_BAD_REDIRECT		0x900
+#define	MBXERR_RING_ALREADY_CONFIG	0x901
+
+#define	MBXERR_RING_INACTIVE		0xA00
+
+#define	MBXERR_RPI_INACTIVE		0xF00
+
+#define	MBXERR_NO_ACTIVE_XRI		0x1100
+#define	MBXERR_XRI_NOT_ACTIVE		0x1101
+
+#define	MBXERR_RPI_INUSE		0x1400
+
+#define	MBXERR_NO_LINK_ATTENTION	0x1500
+
+#define	MBXERR_INVALID_SLI_MODE		0x8800
+#define	MBXERR_INVALID_HOST_PTR		0x8801
+#define	MBXERR_CANT_CFG_SLI_MODE	0x8802
+#define	MBXERR_BAD_OVERLAY		0x8803
+#define	MBXERR_INVALID_FEAT_REQ		0x8804
+
+#define	MBXERR_CONFIG_CANT_COMPLETE	0x88FF
+
+#define	MBXERR_DID_ALREADY_REGISTERED	0x9600
+#define	MBXERR_DID_INCONSISTENT		0x9601
+#define	MBXERR_VPI_TOO_LARGE		0x9603
+
+#define	MBXERR_STILL_ASSOCIATED		0x9700
+
+#define	MBXERR_INVALID_VF_STATE		0x9F00
+#define	MBXERR_VFI_ALREADY_REGISTERED	0x9F02
+#define	MBXERR_VFI_TOO_LARGE		0x9F03
+
+#define	MBXERR_LOAD_FW_FAILED		0xFFFE
+#define	MBXERR_FIND_FW_FAILED		0xFFFF
 
 /* Driver special codes */
 #define	MBX_DRIVER_RESERVED		0xF9 /* Set to lowest drv status */
@@ -701,6 +757,7 @@ typedef struct
 #define	LMT_4GB_CAPABLE		0x0040
 #define	LMT_8GB_CAPABLE		0x0080
 #define	LMT_10GB_CAPABLE	0x0100
+#define	LMT_16GB_CAPABLE	0x0200
 /* E2E supported on adapters >= 8GB */
 #define	LMT_E2E_CAPABLE		(LMT_8GB_CAPABLE|LMT_10GB_CAPABLE)
 
@@ -725,13 +782,24 @@ typedef struct
 
 typedef struct
 {
-	uint32_t	rsvd1;		/* Word 1 */
 #ifdef EMLXS_BIG_ENDIAN
-	uint32_t	topology:8;
-	uint32_t	rsvd2:24;	/* Word 2 */
+	uint32_t	extents:1;	/* Word 1 */
+	uint32_t	rsvd1:31;
+
+	uint32_t	topology:8;	/* Word 2 */
+	uint32_t	rsvd2:15;
+	uint32_t	ldv:1;
+	uint32_t	link_type:2;
+	uint32_t	link_number:6;
 #endif
 #ifdef EMLXS_LITTLE_ENDIAN
-	uint32_t	rsvd2:24;	/* Word 2 */
+	uint32_t	rsvd1:31;	/* Word 1 */
+	uint32_t	extents:1;
+
+	uint32_t	link_number:6;	/* Word 2 */
+	uint32_t	link_type:2;
+	uint32_t	ldv:1;
+	uint32_t	rsvd2:15;
 	uint32_t	topology:8;
 #endif
 	uint32_t	rsvd3;		/* Word 3 */
@@ -782,11 +850,11 @@ typedef struct
 	uint16_t	rsvd10;		/* Word 16 */
 	uint16_t	FCFICount;	/* Word 16 */
 
-	uint16_t	EQCount;	/* Word 17 */
 	uint16_t	RQCount;	/* Word 17 */
+	uint16_t	EQCount;	/* Word 17 */
 
-	uint16_t	CQCount;	/* Word 18 */
 	uint16_t	WQCount;	/* Word 18 */
+	uint16_t	CQCount;	/* Word 18 */
 #endif
 
 } READ_CONFIG4_VAR;
@@ -1174,14 +1242,20 @@ typedef struct
 	uint16_t	rsvd1;
 	uint16_t	rpi;
 	uint32_t	CI:1;
-	uint32_t	rsvd2:7;
+	uint32_t	rsvd2:1;
+	uint32_t	TERP:1;
+	uint32_t	rsvd3:4;
+	uint32_t	update:1;
 	uint32_t	did:24;
 #endif
 #ifdef EMLXS_LITTLE_ENDIAN
 	uint16_t	rpi;
 	uint16_t	rsvd1;
 	uint32_t	did:24;
-	uint32_t	rsvd2:7;
+	uint32_t	update:1;
+	uint32_t	rsvd3:4;
+	uint32_t	TERP:1;
+	uint32_t	rsvd2:1;
 	uint32_t	CI:1;
 #endif
 	union
@@ -1423,6 +1497,8 @@ typedef struct
 #define	AT_RESERVED	0x00	/* Reserved - attType */
 #define	AT_LINK_UP	0x01	/* Link is up */
 #define	AT_LINK_DOWN	0x02	/* Link is down */
+#define	AT_NO_HARD_ALPA	0x03	/* SLI4 */
+
 #ifdef EMLXS_BIG_ENDIAN
 	uint8_t		granted_AL_PA;
 	uint8_t		lipAlPs;
@@ -1490,12 +1566,12 @@ typedef struct
 	uint32_t	Utf:1;
 	uint32_t	Ulu:1;
 #endif
-
 #define	LA_1GHZ_LINK   0x04	/* lnkSpeed */
 #define	LA_2GHZ_LINK   0x08	/* lnkSpeed */
 #define	LA_4GHZ_LINK   0x10	/* lnkSpeed */
 #define	LA_8GHZ_LINK   0x20	/* lnkSpeed */
 #define	LA_10GHZ_LINK  0x40	/* lnkSpeed */
+#define	LA_16GHZ_LINK  0x80	/* lnkSpeed */
 } READ_LA_VAR;
 
 
@@ -1947,9 +2023,10 @@ typedef struct
 typedef struct
 {
 #ifdef EMLXS_BIG_ENDIAN
-	uint32_t	rsvd1:3;
-	uint32_t	vp:1;
-	uint32_t	rsvd2:12;
+	uint16_t	rsvd1:2;
+	uint16_t	upd:1;
+	uint16_t	vp:1;
+	uint16_t	rsvd2:12;
 	uint16_t	vfi;
 
 	uint16_t	vpi;
@@ -1968,9 +2045,10 @@ typedef struct
 #endif
 #ifdef EMLXS_LITTLE_ENDIAN
 	uint16_t	vfi;
-	uint32_t	rsvd2:12;
-	uint32_t	vp:1;
-	uint32_t	rsvd1:3;
+	uint16_t	rsvd2:12;
+	uint16_t	vp:1;
+	uint16_t	upd:1;
+	uint16_t	rsvd1:2;
 
 	uint16_t	fcfi;
 	uint16_t	vpi;
@@ -2176,7 +2254,10 @@ typedef struct
 	uint32_t	rsvd1:24;
 #endif
 #ifdef EMLXS_BIG_ENDIAN
-	uint32_t	rsvd2:24;
+	uint32_t	rsvd2:19;	/* Reserved */
+	uint32_t	gdss:1;		/* Configure Data Security SLI */
+	uint32_t	rsvd3:3;	/* Reserved */
+	uint32_t	gbg:1;		/* Grant BlockGuard */
 	uint32_t	gmv:1;		/* Grant Max VPIs */
 	uint32_t	gcrp:1;		/* Grant Command Ring Polling */
 	uint32_t	gsah:1;		/* Grant Synchronous Abort Handling */
@@ -2195,7 +2276,10 @@ typedef struct
 	uint32_t	gsah:1;		/* Grant Synchronous Abort Handling */
 	uint32_t	gcrp:1;		/* Grant Command Ring Polling */
 	uint32_t	gmv:1;		/* Grant Max VPIs */
-	uint32_t	rsvd2:24;
+	uint32_t	gbg:1;		/* Grant BlockGuard */
+	uint32_t	rsvd3:3;	/* Reserved */
+	uint32_t	gdss:1;		/* Configure Data Security SLI */
+	uint32_t	rsvd2:19;	/* Reserved */
 #endif
 
 #ifdef EMLXS_BIG_ENDIAN
@@ -2209,22 +2293,22 @@ typedef struct
 
 #ifdef EMLXS_BIG_ENDIAN
 	uint32_t	max_hbq:16;	/* Max HBQs Host expect to configure */
-	uint32_t	rsvd3:16;	/* Max HBQs Host expect to configure */
+	uint32_t	rsvd4:16;	/* Max HBQs Host expect to configure */
 #endif
 #ifdef EMLXS_LITTLE_ENDIAN
-	uint32_t	rsvd3:16;	/* Max HBQs Host expect to configure */
+	uint32_t	rsvd4:16;	/* Max HBQs Host expect to configure */
 	uint32_t	max_hbq:16;	/* Max HBQs Host expect to configure */
 #endif
 
-	uint32_t	rsvd4;	/* Reserved */
+	uint32_t	rsvd5;		/* Reserved */
 
 #ifdef EMLXS_BIG_ENDIAN
-	uint32_t	rsvd5:16;	/* Reserved */
+	uint32_t	rsvd6:16;	/* Reserved */
 	uint32_t	vpi_max:16;	/* Max number of virt N-Ports */
 #endif
 #ifdef EMLXS_LITTLE_ENDIAN
 	uint32_t	vpi_max:16;	/* Max number of virt N-Ports */
-	uint32_t	rsvd5:16;	/* Reserved */
+	uint32_t	rsvd6:16;	/* Reserved */
 #endif
 } CONFIG_PORT_VAR;
 
@@ -2247,14 +2331,18 @@ typedef struct
 
 } REQUEST_FEATURES_VAR;
 
-#define	SLI4_FEATURE_INHIBIT_AUTO_ABTS	0x0001
-#define	SLI4_FEATURE_NPIV		0x0002
-#define	SLI4_FEATURE_DIF		0x0004
-#define	SLI4_FEATURE_VIRTUAL_FABRICS	0x0008
-#define	SLI4_FEATURE_FCP_INITIATOR	0x0010
-#define	SLI4_FEATURE_FCP_TARGET		0x0020
-#define	SLI4_FEATURE_FCP_COMBO		0x0040
-#define	SLI4_FEATURE_INHIBIT_FIP	0x0080
+#define	SLI4_FEATURE_INHIBIT_AUTO_ABTS		0x0001
+#define	SLI4_FEATURE_NPIV			0x0002
+#define	SLI4_FEATURE_DIF			0x0004
+#define	SLI4_FEATURE_VIRTUAL_FABRICS		0x0008
+#define	SLI4_FEATURE_FCP_INITIATOR		0x0010
+#define	SLI4_FEATURE_FCP_TARGET			0x0020
+#define	SLI4_FEATURE_FCP_COMBO			0x0040
+#define	SLI4_FEATURE_RSVD1			0x0080
+#define	SLI4_FEATURE_RQD			0x0100
+#define	SLI4_FEATURE_INHIBIT_AUTO_ABTS_R	0x0200
+#define	SLI4_FEATURE_HIGH_LOGIN_MODE		0x0400
+#define	SLI4_FEATURE_PERF_HINT			0x0800
 
 
 /* SLI-2 Port Control Block */
@@ -2511,17 +2599,63 @@ typedef struct mbox_req_hdr
 	uint32_t	port:8;
 	uint32_t	subsystem:8;
 	uint32_t	opcode:8;
+
+	uint32_t	timeout;		/* word 7 */
+
+	uint32_t	req_length;		/* word 8 */
+
+	uint32_t	reserved1:24;		/* word 9 */
+	uint32_t	version:8;		/* word 9 */
 #endif
 #ifdef EMLXS_LITTLE_ENDIAN
 	uint32_t	opcode:8;
 	uint32_t	subsystem:8;
 	uint32_t	port:8;
 	uint32_t	domain:8;		/* word 6 */
-#endif
+
 	uint32_t	timeout;		/* word 7 */
+
 	uint32_t	req_length;		/* word 8 */
-	uint32_t	reserved1;		/* word 9 */
+
+	uint32_t	version:8;		/* word 9 */
+	uint32_t	reserved1:24;		/* word 9 */
+#endif
+
 } mbox_req_hdr_t;
+
+
+typedef struct mbox_req_hdr2
+{
+#ifdef EMLXS_BIG_ENDIAN
+	uint32_t	vf_number:16;		/* word 6 */
+	uint32_t	subsystem:8;
+	uint32_t	opcode:8;
+
+	uint32_t	timeout;		/* word 7 */
+
+	uint32_t	req_length;		/* word 8 */
+
+	uint32_t	vh_number:6;		/* word 9 */
+	uint32_t	pf_number:10;
+	uint32_t	reserved1:8;
+	uint32_t	version:8;
+#endif
+#ifdef EMLXS_LITTLE_ENDIAN
+	uint32_t	opcode:8;
+	uint32_t	subsystem:8;
+	uint32_t	vf_number:16;		/* word 6 */
+
+	uint32_t	timeout;		/* word 7 */
+
+	uint32_t	req_length;		/* word 8 */
+
+	uint32_t	version:8;
+	uint32_t	reserved1:8;
+	uint32_t	pf_number:10;
+	uint32_t	vh_number:6;		/* word 9 */
+#endif
+
+} mbox_req_hdr2_t;
 
 typedef struct mbox_rsp_hdr
 {
@@ -2556,6 +2690,8 @@ typedef struct mbox_rsp_hdr
 #define	MBX_RSP_STATUS_FCF_IN_USE	0x3A
 #define	MBX_RSP_STATUS_NO_FCF		0x43
 
+#define	MGMT_ADDI_STATUS_INCOMPATIBLE	0xA2
+
 typedef struct be_req_hdr
 {
 #ifdef EMLXS_BIG_ENDIAN
@@ -2579,6 +2715,7 @@ typedef struct be_req_hdr
 	union
 	{
 		mbox_req_hdr_t	hdr_req;
+		mbox_req_hdr2_t hdr_req2;
 		mbox_rsp_hdr_t	hdr_rsp;
 	} un_hdr;
 } be_req_hdr_t;
@@ -2600,8 +2737,41 @@ typedef struct be_req_hdr
 #define	COMMON_OPCODE_NOP			0x21
 #define	COMMON_OPCODE_QUERY_FIRMWARE_CONFIG	0x3A
 #define	COMMON_OPCODE_RESET			0x3D
+#define	COMMON_OPCODE_SET_PHYSICAL_LINK_CFG_V1	0x3E
+
+#define	COMMON_OPCODE_GET_BOOT_CFG		0x42
+#define	COMMON_OPCODE_SET_BOOT_CFG		0x43
 #define	COMMON_OPCODE_MANAGE_FAT		0x44
-#define	COMMON_OPCODE_MCC_CREATE_EXT		0x5A
+#define	COMMON_OPCODE_GET_PHYSICAL_LINK_CFG_V1	0x47
+#define	COMMON_OPCODE_GET_PORT_NAME		0x4D
+
+#define	COMMON_OPCODE_MQ_CREATE_EXT		0x5A
+#define	COMMON_OPCODE_GET_VPD_DATA		0x5B
+#define	COMMON_OPCODE_GET_PHY_DETAILS		0x66
+#define	COMMON_OPCODE_SEND_ACTIVATION		0x73
+#define	COMMON_OPCODE_RESET_LICENSES		0x74
+#define	COMMON_OPCODE_GET_CNTL_ADDL_ATTRIB	0x79
+
+#define	COMMON_OPCODE_GET_EXTENTS_INFO		0x9A
+#define	COMMON_OPCODE_GET_EXTENTS		0x9B
+#define	COMMON_OPCODE_ALLOC_EXTENTS		0x9C
+#define	COMMON_OPCODE_DEALLOC_EXTENTS		0x9D
+
+#define	COMMON_OPCODE_GET_PROFILE_CAPS		0xA1
+#define	COMMON_OPCODE_GET_MR_PROFILE_CAPS	0xA2
+#define	COMMON_OPCODE_SET_MR_PROFILE_CAPS	0xA3
+#define	COMMON_OPCODE_GET_PROFILE_CFG		0xA4
+#define	COMMON_OPCODE_SET_PROFILE_CFG		0xA5
+#define	COMMON_OPCODE_GET_PROFILE_LIST		0xA6
+#define	COMMON_OPCODE_GET_ACTIVE_PROFILE	0xA7
+#define	COMMON_OPCODE_SET_ACTIVE_PROFILE	0xA8
+#define	COMMON_OPCODE_SET_FACTORY_PROFILE_CFG	0xA9
+
+#define	COMMON_OPCODE_READ_OBJ			0xAB
+#define	COMMON_OPCODE_WRITE_OBJ			0xAC
+#define	COMMON_OPCODE_READ_OBJ_LIST		0xAD
+#define	COMMON_OPCODE_DELETE_OBJ		0xAE
+#define	COMMON_OPCODE_GET_SLI4_PARAMS		0xB5
 
 #define	FCOE_OPCODE_WQ_CREATE			0x01
 #define	FCOE_OPCODE_CFG_POST_SGL_PAGES		0x03
@@ -2611,6 +2781,7 @@ typedef struct be_req_hdr
 #define	FCOE_OPCODE_DELETE_FCF_TABLE		0x0A
 #define	FCOE_OPCODE_POST_HDR_TEMPLATES		0x0B
 #define	FCOE_OPCODE_REDISCOVER_FCF_TABLE	0x10
+#define	FCOE_OPCODE_SET_FCLINK_SETTINGS		0x21
 
 #define	DCBX_OPCODE_GET_DCBX_MODE		0x04
 #define	DCBX_OPCODE_SET_DCBX_MODE		0x05
@@ -2626,6 +2797,10 @@ typedef	struct
 #define	MGMT_FLASHROM_OPCODE_REPORT		4
 #define	MGMT_FLASHROM_OPCODE_INFO		5
 #define	MGMT_FLASHROM_OPCODE_CRC		6
+#define	MGMT_FLASHROM_OPCODE_OFFSET_FLASH	7
+#define	MGMT_FLASHROM_OPCODE_OFFSET_SAVE	8
+#define	MGMT_PHY_FLASHROM_OPCODE_FLASH		9
+#define	MGMT_PHY_FLASHROM_OPCODE_SAVE		10
 
 		uint32_t optype;
 #define	MGMT_FLASHROM_OPTYPE_ISCSI_FIRMWARE	0
@@ -2642,7 +2817,11 @@ typedef	struct
 #define	MGMT_FLASHROM_OPTYPE_FCOE_BACKUP	11
 #define	MGMT_FLASHROM_OPTYPE_CTRLP		12
 #define	MGMT_FLASHROM_OPTYPE_NCSI_FIRMWARE	13
-#define	MGMT_FLASHROM_OPTYPE_NCSI_8051		14
+#define	MGMT_FLASHROM_OPTYPE_CFG_NIC		14
+#define	MGMT_FLASHROM_OPTYPE_CFG_DCBX		15
+#define	MGMT_FLASHROM_OPTYPE_CFG_PXE_BIOS	16
+#define	MGMT_FLASHROM_OPTYPE_CFG_ALL		17
+#define	MGMT_FLASHROM_OPTYPE_PHY_FIRMWARE	0xff /* Driver defined */
 
 		uint32_t data_buffer_size; /* Align to 4KB */
 		uint32_t offset;
@@ -2651,6 +2830,137 @@ typedef	struct
 	} params;
 
 } IOCTL_COMMON_FLASHROM;
+
+
+typedef	struct
+{
+	union
+	{
+		struct
+		{
+			uint32_t rsvd;
+		} request;
+
+
+		struct
+		{
+#ifdef EMLXS_BIG_ENDIAN
+			uint16_t interface_type;
+			uint16_t phy_type;
+#endif
+#ifdef EMLXS_LITTLE_ENDIAN
+			uint16_t phy_type;
+			uint16_t interface_type;
+#endif
+
+/* phy_type */
+#define	PHY_XAUI		0x0
+#define	PHY_AEL_2020		0x1 /* eluris/Netlogic */
+#define	PHY_LSI_BRCM1		0x2 /* Peak pre-production board */
+#define	PHY_LSI_BRCM2		0x3 /* Peak production board */
+#define	PHY_SOLARFLARE		0x4 /* Dell recommended */
+#define	PHY_AMCC_QT2025		0x5 /* AMCC PHY */
+#define	PHY_AMCC_QT2225		0x6 /* AMCC PHY */
+#define	PHY_BRCM_5931		0x7 /* Broadcom Phy used by HP LOM */
+#define	PHY_BE3_INTERNAL_10GB	0x8 /* Internal 10GbPHY in BE3 */
+#define	PHY_BE3_INTERNAL_1GB	0x9 /* Internal 1Gb PHY in BE3 */
+#define	PHY_TN_2022		0xa /* Teranetics dual port 65nm PHY */
+#define	PHY_MARVELL_88E1340	0xb /* Marvel 1G PHY */
+#define	PHY_MARVELL_88E1322	0xc /* Marvel 1G PHY */
+#define	PHY_TN_8022		0xd /* Teranetics dual port 40nm PHY */
+#define	PHY_TYPE_NOT_SUPPORTED
+
+/* interface_type */
+#define	CX4_10GB_TYPE		0x0
+#define	XFP_10GB_TYPE		0x1
+#define	SFP_1GB_TYPE		0x2
+#define	SFP_PLUS_10GB_TYPE	0x3
+#define	KR_10GB_TYPE		0x4
+#define	KX4_10GB_TYPE		0x5
+#define	BASET_10GB_TYPE		0x6 /* 10G BaseT */
+#define	BASET_1000_TYPE		0x7 /* 1000 BaseT */
+#define	BASEX_1000_TYPE		0x8 /* 1000 BaseX */
+#define	SGMII_TYPE		0x9
+#define	INTERFACE_10GB_DISABLED	0xff /* Interface type not supported */
+
+			uint32_t misc_params;
+			uint32_t rsvd[4];
+		} response;
+
+	} params;
+
+} IOCTL_COMMON_GET_PHY_DETAILS;
+
+
+typedef	struct
+{
+	union
+	{
+		struct
+		{
+			uint32_t rsvd;
+		} request;
+
+
+		struct
+		{
+#ifdef EMLXS_BIG_ENDIAN
+			uint8_t port3_name;
+			uint8_t port2_name;
+			uint8_t port1_name;
+			uint8_t port0_name;
+#endif
+#ifdef EMLXS_LITTLE_ENDIAN
+			uint8_t port0_name;
+			uint8_t port1_name;
+			uint8_t port2_name;
+			uint8_t port3_name;
+#endif
+		} response;
+
+	} params;
+
+} IOCTL_COMMON_GET_PORT_NAME;
+
+
+typedef	struct
+{
+	union
+	{
+		struct
+		{
+#ifdef EMLXS_BIG_ENDIAN
+			uint32_t rsvd:30;
+			uint32_t pt:2;
+#endif
+#ifdef EMLXS_LITTLE_ENDIAN
+			uint32_t pt:2;
+			uint32_t rsvd:30;
+#endif
+#define	PORT_TYPE_GIGE		0
+#define	PORT_TYPE_FC		1
+		} request;
+
+
+		struct
+		{
+#ifdef EMLXS_BIG_ENDIAN
+			uint8_t port3_name;
+			uint8_t port2_name;
+			uint8_t port1_name;
+			uint8_t port0_name;
+#endif
+#ifdef EMLXS_LITTLE_ENDIAN
+			uint8_t port0_name;
+			uint8_t port1_name;
+			uint8_t port2_name;
+			uint8_t port3_name;
+#endif
+		} response;
+
+	} params;
+
+} IOCTL_COMMON_GET_PORT_NAME_V1;
 
 
 typedef	struct
@@ -2682,6 +2992,145 @@ typedef	struct
 	} params;
 
 } IOCTL_COMMON_MANAGE_FAT;
+
+
+typedef	struct
+{
+	union
+	{
+		struct
+		{
+#ifdef EMLXS_BIG_ENDIAN
+			uint32_t EOF:1; /* word 4 */
+			uint32_t rsvd0:7;
+			uint32_t desired_write_length:24;
+#endif
+#ifdef EMLXS_LITTLE_ENDIAN
+			uint32_t desired_write_length:24;
+			uint32_t rsvd0:7;
+			uint32_t EOF:1;  /* word 4 */
+#endif
+			uint32_t write_offset;  /* word 5 */
+			char object_name[(4 * 26)];   /* word 6 - 31 */
+			uint32_t buffer_desc_count; /* word 32 */
+
+#ifdef EMLXS_BIG_ENDIAN
+			uint32_t rsvd:8; /* word 33 */
+			uint32_t buffer_length:24;
+#endif
+#ifdef EMLXS_LITTLE_ENDIAN
+			uint32_t buffer_length:24;
+			uint32_t rsvd:8; /* word 33 */
+#endif
+			uint32_t buffer_addrlo; /* word 34 */
+			uint32_t buffer_addrhi; /* word 35 */
+		} request;
+
+		struct
+		{
+			uint32_t actual_write_length;
+
+#ifdef EMLXS_BIG_ENDIAN
+			uint32_t rsvd:24;
+			uint32_t change_status:8;
+#endif
+#ifdef EMLXS_LITTLE_ENDIAN
+			uint32_t change_status:8;
+			uint32_t rsvd:24;
+#endif
+#define	CS_NO_RESET		0
+#define	CS_REBOOT_RQD		1
+#define	CS_FW_RESET_RQD		2
+#define	CS_PROTO_RESET_RQD	3
+		} response;
+
+	} params;
+
+} IOCTL_COMMON_WRITE_OBJECT;
+
+
+typedef	struct
+{
+	union
+	{
+		struct
+		{
+#ifdef EMLXS_BIG_ENDIAN
+			uint32_t descriptor_offset:16; /* word 4 */
+			uint32_t descriptor_count:16;
+#endif
+#ifdef EMLXS_LITTLE_ENDIAN
+			uint32_t descriptor_count:16;
+			uint32_t descriptor_offset:16; /* word 4 */
+#endif
+			uint32_t reserved;  /* word 5 */
+			char object_name[(4 * 26)];   /* word 6 - 31 */
+			uint32_t buffer_desc_count; /* word 32 */
+
+#ifdef EMLXS_BIG_ENDIAN
+			uint32_t rsvd:8; /* word 33 */
+			uint32_t buffer_length:24;
+#endif
+#ifdef EMLXS_LITTLE_ENDIAN
+			uint32_t buffer_length:24;
+			uint32_t rsvd:8; /* word 33 */
+#endif
+			uint32_t buffer_addrlo; /* word 34 */
+			uint32_t buffer_addrhi; /* word 35 */
+		} request;
+
+		struct
+		{
+#ifdef EMLXS_BIG_ENDIAN
+			uint32_t reserved:16;
+			uint32_t actual_descriptor_count:16;
+#endif
+#ifdef EMLXS_LITTLE_ENDIAN
+			uint32_t actual_descriptor_count:16;
+			uint32_t reserved:16;
+#endif
+		} response;
+
+	} params;
+
+} IOCTL_COMMON_READ_OBJECT_LIST;
+
+
+typedef	struct
+{
+	union
+	{
+		struct
+		{
+#ifdef EMLXS_BIG_ENDIAN
+			uint32_t reserved:16; /* word 4 */
+			uint32_t boot_instance:8;
+			uint32_t boot_status:8;
+#endif
+#ifdef EMLXS_LITTLE_ENDIAN
+			uint32_t boot_status:8;
+			uint32_t boot_instance:8;
+			uint32_t reserved:16; /* word 4 */
+#endif
+		} request;
+
+		struct
+		{
+#ifdef EMLXS_BIG_ENDIAN
+			uint32_t reserved:16; /* word 4 */
+			uint32_t boot_instance:8;
+			uint32_t boot_status:8;
+#endif
+#ifdef EMLXS_LITTLE_ENDIAN
+			uint32_t boot_status:8;
+			uint32_t boot_instance:8;
+			uint32_t reserved:16; /* word 4 */
+#endif
+		} response;
+
+	} params;
+
+} IOCTL_COMMON_BOOT_CFG;
 
 
 /* IOCTL_COMMON_QUERY_FIRMWARE_CONFIG */
@@ -2728,7 +3177,10 @@ typedef struct
 
 	uint8_t		fabric_name_identifier[8];
 
-	uint8_t		fcf_valid;
+	uint8_t		fcf_sol:1;
+	uint8_t		rsvd0:5;
+	uint8_t		fcf_fc:1;
+	uint8_t		fcf_valid:1;
 	uint8_t		fc_map[3];
 
 	uint16_t	fcf_state;
@@ -2744,7 +3196,10 @@ typedef struct
 	uint8_t		fabric_name_identifier[8];
 
 	uint8_t		fc_map[3];
-	uint8_t		fcf_valid;
+	uint8_t		fcf_valid:1;
+	uint8_t		fcf_fc:1;
+	uint8_t		rsvd0:5;
+	uint8_t		fcf_sol:1;
 
 	uint16_t	fcf_index;
 	uint16_t	fcf_state;
@@ -2908,56 +3363,37 @@ typedef	struct _EQ_CONTEXT
 	uint32_t	Size:1;
 	uint32_t	Rsvd2:1;
 	uint32_t	Valid:1;
-	uint32_t	EPIndex:13;
-	uint32_t	Rsvd1:3;
-	uint32_t	ConsumerIndex:13;
+	uint32_t	Rsvd1:29;
 
 	uint32_t	Armed:1;
-	uint32_t	Stalled:1;
-	uint32_t	SolEvent:1;
+	uint32_t	Rsvd4:2;
 	uint32_t	Count:3;
-	uint32_t	ProtectionDomain:10;
-	uint32_t	Rsvd3:3;
-	uint32_t	ProduderIndex:13;
+	uint32_t	Rsvd3:26;
 
-	uint32_t	Rsvd7:4;
-	uint32_t	NoDelay:1;
-	uint32_t	Phase:2;
-	uint32_t	Rsvd6:2;
+	uint32_t	Rsvd6:9;
 	uint32_t	DelayMult:10;
-	uint32_t	Rsvd5:1;
-	uint32_t	Func:8;
-	uint32_t	Rsvd4:4;
+	uint32_t	Rsvd5:13;
 #endif
 #ifdef EMLXS_LITTLE_ENDIAN
-	uint32_t	ConsumerIndex:13;
-	uint32_t	Rsvd1:3;
-	uint32_t	EPIndex:13;
+	uint32_t	Rsvd1:29;
 	uint32_t	Valid:1;
 	uint32_t	Rsvd2:1;
 	uint32_t	Size:1;
 
-	uint32_t	ProduderIndex:13;
-	uint32_t	Rsvd3:3;
-	uint32_t	ProtectionDomain:10;
+	uint32_t	Rsvd3:26;
 	uint32_t	Count:3;
-	uint32_t	SolEvent:1;
-	uint32_t	Stalled:1;
+	uint32_t	Rsvd4:2;
 	uint32_t	Armed:1;
 
-	uint32_t	Rsvd4:4;
-	uint32_t	Func:8;
-	uint32_t	Rsvd5:1;
+	uint32_t	Rsvd5:13;
 	uint32_t	DelayMult:10;
-	uint32_t	Rsvd6:2;
-	uint32_t	Phase:2;
-	uint32_t	NoDelay:1;
-	uint32_t	Rsvd7:4;
+	uint32_t	Rsvd6:9;
 #endif
 
-	uint32_t	Rsvd8;
+	uint32_t	Rsvd7;
 
-}EQ_CONTEXT;
+} EQ_CONTEXT;
+
 
 /* define for Count field */
 #define	EQ_ELEMENT_COUNT_1024	2
@@ -2975,59 +3411,97 @@ typedef	struct _CQ_CONTEXT
 {
 #ifdef EMLXS_BIG_ENDIAN
 	uint32_t	Eventable:1;
-	uint32_t	SolEvent:1;
+	uint32_t	Rsvd3:1;
 	uint32_t	Valid:1;
 	uint32_t	Count:2;
-	uint32_t	Rsvd2:1;
-	uint32_t	EPIndex:11;
+	uint32_t	Rsvd2:12;
 	uint32_t	NoDelay:1;
 	uint32_t	CoalesceWM:2;
-	uint32_t	Rsvd1:1;
-	uint32_t	ConsumerIndex:11;
+	uint32_t	Rsvd1:12;
 
 	uint32_t	Armed:1;
-	uint32_t	Stalled:1;
+	uint32_t	Rsvd5:1;
 	uint32_t	EQId:8;
-	uint32_t	ProtectionDomain:10;
-	uint32_t	Rsvd3:1;
-	uint32_t	ProduderIndex:11;
-
-	uint32_t	Rsvd5:20;
-	uint32_t	Func:8;
-	uint32_t	Rsvd4:4;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint32_t	ConsumerIndex:11;
-	uint32_t	Rsvd1:1;
-	uint32_t	CoalesceWM:2;
-	uint32_t	NoDelay:1;
-	uint32_t	EPIndex:11;
-	uint32_t	Rsvd2:1;
-	uint32_t	Count:2;
-	uint32_t	Valid:1;
-	uint32_t	SolEvent:1;
-	uint32_t	Eventable:1;
-
-	uint32_t	ProduderIndex:11;
-	uint32_t	Rsvd3:1;
-	uint32_t	ProtectionDomain:10;
-	uint32_t	EQId:8;
-	uint32_t	Stalled:1;
-	uint32_t	Armed:1;
-
-	uint32_t	Rsvd4:4;
-	uint32_t	Func:8;
-	uint32_t	Rsvd5:20;
-#endif
+	uint32_t	Rsvd4:22;
 
 	uint32_t	Rsvd6;
+#endif
+#ifdef EMLXS_LITTLE_ENDIAN
+	uint32_t	Rsvd1:12;
+	uint32_t	CoalesceWM:2;
+	uint32_t	NoDelay:1;
+	uint32_t	Rsvd2:12;
+	uint32_t	Count:2;
+	uint32_t	Valid:1;
+	uint32_t	Rsvd3:1;
+	uint32_t	Eventable:1;
+
+	uint32_t	Rsvd4:22;
+	uint32_t	EQId:8;
+	uint32_t	Rsvd5:1;
+	uint32_t	Armed:1;
+
+	uint32_t	Rsvd6;
+#endif
+
+	uint32_t	Rsvd7;
 
 } CQ_CONTEXT;
+
+typedef	struct _CQ_CONTEXT_V2
+{
+#ifdef EMLXS_BIG_ENDIAN
+	uint32_t	Eventable:1;
+	uint32_t	Rsvd3:1;
+	uint32_t	Valid:1;
+	uint32_t	CqeCnt:2;
+	uint32_t	CqeSize:2;
+	uint32_t	Rsvd2:9;
+	uint32_t	AutoValid:1;
+	uint32_t	NoDelay:1;
+	uint32_t	CoalesceWM:2;
+	uint32_t	Rsvd1:12;
+
+	uint32_t	Armed:1;
+	uint32_t	Rsvd4:15;
+	uint32_t	EQId:16;
+
+	uint32_t	Rsvd5:16;
+	uint32_t	Count1:16;
+#endif
+#ifdef EMLXS_LITTLE_ENDIAN
+	uint32_t	Rsvd1:12;
+	uint32_t	CoalesceWM:2;
+	uint32_t	NoDelay:1;
+	uint32_t	AutoValid:1;
+	uint32_t	Rsvd2:9;
+	uint32_t	CqeSize:2;
+	uint32_t	CqeCnt:2;
+	uint32_t	Valid:1;
+	uint32_t	Rsvd3:1;
+	uint32_t	Eventable:1;
+
+	uint32_t	EQId:16;
+	uint32_t	Rsvd4:15;
+	uint32_t	Armed:1;
+
+	uint32_t	Count1:16;
+	uint32_t	Rsvd5:16;
+#endif
+
+	uint32_t	Rsvd7;
+
+} CQ_CONTEXT_V2;
+
+/* CqeSize */
+#define	CQE_SIZE_16_BYTES	0
+#define	CQE_SIZE_32_BYTES	1
 
 /* define for Count field */
 #define	CQ_ELEMENT_COUNT_256	0
 #define	CQ_ELEMENT_COUNT_512	1
 #define	CQ_ELEMENT_COUNT_1024	2
+#define	CQ_ELEMENT_COUNT_SPECIFIED	3
 
 /*	Context for MQ create	*/
 typedef	struct _MQ_CONTEXT
@@ -3036,31 +3510,63 @@ typedef	struct _MQ_CONTEXT
 	uint32_t	CQId:10;
 	uint32_t	Rsvd2:2;
 	uint32_t	Size:4;
-	uint32_t	Rsvd1:2;
-	uint32_t	ConsumerIndex:14;
+	uint32_t	Rsvd1:16;
 
 	uint32_t	Valid:1;
-	uint32_t	ProtectionDomain:9;
-	uint32_t	FunctionNumber:8;
-	uint32_t	ProduderIndex:14;
+	uint32_t	Rsvd3:31;
+
+	uint32_t	Rsvd4:21;
+	uint32_t	ACQId:10;
+	uint32_t	ACQV:1;
 #endif
 #ifdef EMLXS_LITTLE_ENDIAN
-	uint32_t	ConsumerIndex:14;
-	uint32_t	Rsvd1:2;
+	uint32_t	Rsvd1:16;
 	uint32_t	Size:4;
 	uint32_t	Rsvd2:2;
 	uint32_t	CQId:10;
 
-	uint32_t	ProduderIndex:14;
-	uint32_t	FunctionNumber:8;
-	uint32_t	ProtectionDomain:9;
+	uint32_t	Rsvd3:31;
 	uint32_t	Valid:1;
+
+	uint32_t	ACQV:1;
+	uint32_t	ACQId:10;
+	uint32_t	Rsvd4:21;
 #endif
 
-	uint32_t	Rsvd3;
-	uint32_t	Rsvd4;
+	uint32_t	Rsvd5;
 
 } MQ_CONTEXT;
+
+
+typedef	struct _MQ_CONTEXT_V1
+{
+#ifdef EMLXS_BIG_ENDIAN
+	uint32_t	Rsvd2:12;
+	uint32_t	Size:4;
+	uint32_t	ACQId:16;
+
+	uint32_t	Valid:1;
+	uint32_t	Rsvd3:31;
+
+	uint32_t	Rsvd4:31;
+	uint32_t	ACQV:1;
+#endif
+#ifdef EMLXS_LITTLE_ENDIAN
+	uint32_t	ACQId:16;
+	uint32_t	Size:4;
+	uint32_t	Rsvd2:12;
+
+	uint32_t	Rsvd3:31;
+	uint32_t	Valid:1;
+
+	uint32_t	ACQV:1;
+	uint32_t	Rsvd4:31;
+#endif
+
+	uint32_t	Rsvd5;
+
+} MQ_CONTEXT_V1;
+
 
 /* define for Size field */
 #define	MQ_ELEMENT_COUNT_16 0x05
@@ -3069,33 +3575,72 @@ typedef	struct _MQ_CONTEXT
 typedef	struct _RQ_CONTEXT
 {
 #ifdef EMLXS_BIG_ENDIAN
-	uint32_t	Rsvd2:8;
-	uint32_t	RQState:4;
-	uint32_t	RQSize:4;
+	uint32_t	Rsvd2:12;
+	uint32_t	RqeCnt:4;
 	uint32_t	Rsvd1:16;
 
 	uint32_t	Rsvd3;
 
-	uint32_t	Rsvd4:6;
-	uint32_t	CQIdRecv:10;
+	uint32_t	CQId:16;
 	uint32_t	BufferSize:16;
 #endif
 #ifdef EMLXS_LITTLE_ENDIAN
 	uint32_t	Rsvd1:16;
-	uint32_t	RQSize:4;
-	uint32_t	RQState:4;
-	uint32_t	Rsvd2:8;
+	uint32_t	RqeCnt:4;
+	uint32_t	Rsvd2:12;
 
 	uint32_t	Rsvd3;
 
 	uint32_t	BufferSize:16;
-	uint32_t	CQIdRecv:10;
-	uint32_t	Rsvd4:6;
+	uint32_t	CQId:16;
 #endif
 
 	uint32_t  Rsvd5;
 
 } RQ_CONTEXT;
+
+typedef	struct _RQ_CONTEXT_V1
+{
+#ifdef EMLXS_BIG_ENDIAN
+	uint32_t	RqeCnt:16;
+	uint32_t	Rsvd1:4;
+	uint32_t	RqeSize:4;
+	uint32_t	PageSize:8;
+
+	uint32_t	Rsvd2;
+
+	uint32_t	CQId:16;
+	uint32_t	Rsvd:16;
+#endif
+#ifdef EMLXS_LITTLE_ENDIAN
+	uint32_t	PageSize:8;
+	uint32_t	RqeSize:4;
+	uint32_t	Rsvd1:4;
+	uint32_t	RqeCnt:16;
+
+	uint32_t	Rsvd2;
+
+	uint32_t	Rsvd:16;
+	uint32_t	CQId:16;
+#endif
+
+	uint32_t	BufferSize;
+
+} RQ_CONTEXT_V1;
+
+/* RqeSize */
+#define	RQE_SIZE_8_BYTES	0x02
+#define	RQE_SIZE_16_BYTES	0x03
+#define	RQE_SIZE_32_BYTES	0x04
+#define	RQE_SIZE_64_BYTES	0x05
+#define	RQE_SIZE_128_BYTES	0x06
+
+/* RQ PageSize */
+#define	RQ_PAGE_SIZE_4K		0x01
+#define	RQ_PAGE_SIZE_8K		0x02
+#define	RQ_PAGE_SIZE_16K	0x04
+#define	RQ_PAGE_SIZE_32K	0x08
+#define	RQ_PAGE_SIZE_64K	0x10
 
 
 /* IOCTL_COMMON_EQ_CREATE */
@@ -3120,17 +3665,314 @@ typedef	struct
 		struct
 		{
 #ifdef EMLXS_BIG_ENDIAN
-			uint16_t	Rsvd1;
+			uint16_t	MsiIndex; /* V1 only */
 			uint16_t	EQId;
 #endif
 #ifdef EMLXS_LITTLE_ENDIAN
 			uint16_t	EQId;
-			uint16_t	Rsvd1;
+			uint16_t	MsiIndex; /* V1 only */
 #endif
 		} response;
 	} params;
 
 } IOCTL_COMMON_EQ_CREATE;
+
+
+typedef	struct
+{
+#ifdef EMLXS_BIG_ENDIAN
+		uint32_t	Rsvd1:24;		/* Word 0 */
+		uint32_t	ProtocolType:8;
+
+		uint32_t	Rsvd3:3;		/* Word 1 */
+		uint32_t	SliHint2:5;
+		uint32_t	SliHint1:8;
+		uint32_t	IfType:4;
+		uint32_t	SliFamily:4;
+		uint32_t	Revision:4;
+		uint32_t	Rsvd2:3;
+		uint32_t	FT:1;
+
+		uint32_t	EqRsvd3:4;		/* Word 2 */
+		uint32_t	EqeCntMethod:4;
+		uint32_t	EqPageSize:8;
+		uint32_t	EqRsvd2:4;
+		uint32_t	EqeSize:4;
+		uint32_t	EqRsvd1:4;
+		uint32_t	EqPageCnt:4;
+
+		uint32_t	EqRsvd4:16;		/* Word 3 */
+		uint32_t	EqeCntMask:16;
+
+		uint32_t	CqRsvd3:4;		/* Word 4 */
+		uint32_t	CqeCntMethod:4;
+		uint32_t	CqPageSize:8;
+		uint32_t	CQV:2;
+		uint32_t	CqRsvd2:2;
+		uint32_t	CqeSize:4;
+		uint32_t	CqRsvd1:4;
+		uint32_t	CqPageCnt:4;
+
+		uint32_t	CqRsvd4:16;		/* Word 5 */
+		uint32_t	CqeCntMask:16;
+
+		uint32_t	MqRsvd2:4;		/* Word 6 */
+		uint32_t	MqeCntMethod:4;
+		uint32_t	MqPageSize:8;
+		uint32_t	MQV:2;
+		uint32_t	MqRsvd1:10;
+		uint32_t	MqPageCnt:4;
+
+		uint32_t	MqRsvd3:16;		/* Word 7 */
+		uint32_t	MqeCntMask:16;
+
+		uint32_t	WqRsvd3:4;		/* Word 8 */
+		uint32_t	WqeCntMethod:4;
+		uint32_t	WqPageSize:8;
+		uint32_t	WQV:2;
+		uint32_t	WqeRsvd2:2;
+		uint32_t	WqeSize:4;
+		uint32_t	WqRsvd1:4;
+		uint32_t	WqPageCnt:4;
+
+		uint32_t	WqRsvd4:16;		/* Word 9 */
+		uint32_t	WqeCntMask:16;
+
+		uint32_t	RqRsvd3:4;		/* Word 10 */
+		uint32_t	RqeCntMethod:4;
+		uint32_t	RqPageSize:8;
+		uint32_t	RQV:2;
+		uint32_t	RqeRsvd2:2;
+		uint32_t	RqeSize:4;
+		uint32_t	RqRsvd1:4;
+		uint32_t	RqPageCnt:4;
+
+		uint32_t	RqDbWin:4;		/* Word 11 */
+		uint32_t	RqRsvd4:12;
+		uint32_t	RqeCntMask:16;
+
+		uint32_t	Loopback:4;		/* Word 12 */
+		uint32_t	Rsvd4:12;
+		uint32_t	PHWQ:1;
+		uint32_t	PHON:1;
+		uint32_t	PHOFF:1;
+		uint32_t	TRIR:1;
+		uint32_t	TRTY:1;
+		uint32_t	TCCA:1;
+		uint32_t	MWQE:1;
+		uint32_t	ASSI:1;
+		uint32_t	TERP:1;
+		uint32_t	TGT:1;
+		uint32_t	AREG:1;
+		uint32_t	FBRR:1;
+		uint32_t	SGLR:1;
+		uint32_t	HDRR:1;
+		uint32_t	EXT:1;
+		uint32_t	FCOE:1;
+
+		uint32_t	SgeLength;		/* Word 13 */
+
+		uint32_t	SglRsvd2:8;		/* Word 14 */
+		uint32_t	SglAlign:8;
+		uint32_t	SglPageSize:8;
+		uint32_t	SglRsvd1:4;
+		uint32_t	SglPageCnt:4;
+
+		uint32_t	Rsvd5:16;		/* Word 15 */
+		uint32_t	MinRqSize:16;
+
+		uint32_t	MaxRqSize;		/* Word 16 */
+
+		uint32_t	RPIMax:16;
+		uint32_t	XRIMax:16;		/* Word 17 */
+
+		uint32_t	VFIMax:16;
+		uint32_t	VPIMax:16;		/* Word 18 */
+#endif
+#ifdef EMLXS_LITTLE_ENDIAN
+		uint32_t	ProtocolType:8;		/* Word 0 */
+		uint32_t	Rsvd1:24;
+
+		uint32_t	FT:1;			/* Word 1 */
+		uint32_t	Rsvd2:3;
+		uint32_t	Revision:4;
+		uint32_t	SliFamily:4;
+		uint32_t	IfType:4;
+		uint32_t	SliHint1:8;
+		uint32_t	SliHint2:5;
+		uint32_t	Rsvd3:3;
+
+		uint32_t	EqPageCnt:4;		/* Word 2 */
+		uint32_t	EqRsvd1:4;
+		uint32_t	EqeSize:4;
+		uint32_t	EqRsvd2:4;
+		uint32_t	EqPageSize:8;
+		uint32_t	EqeCntMethod:4;
+		uint32_t	EqRsvd3:4;
+
+		uint32_t	EqeCntMask:16;		/* Word 3 */
+		uint32_t	EqRsvd4:16;
+
+		uint32_t	CqPageCnt:4;		/* Word 4 */
+		uint32_t	CqRsvd1:4;
+		uint32_t	CqeSize:4;
+		uint32_t	CqRsvd2:2;
+		uint32_t	CQV:2;
+		uint32_t	CqPageSize:8;
+		uint32_t	CqeCntMethod:4;
+		uint32_t	CqRsvd3:4;
+
+		uint32_t	CqeCntMask:16;		/* Word 5 */
+		uint32_t	CqRsvd4:16;
+
+		uint32_t	MqPageCnt:4;		/* Word 6 */
+		uint32_t	MqRsvd1:10;
+		uint32_t	MQV:2;
+		uint32_t	MqPageSize:8;
+		uint32_t	MqeCntMethod:4;
+		uint32_t	MqRsvd2:4;
+
+		uint32_t	MqeCntMask:16;		/* Word 7 */
+		uint32_t	MqRsvd3:16;
+
+		uint32_t	WqPageCnt:4;		/* Word 8 */
+		uint32_t	WqRsvd1:4;
+		uint32_t	WqeSize:4;
+		uint32_t	WqeRsvd2:2;
+		uint32_t	WQV:2;
+		uint32_t	WqPageSize:8;
+		uint32_t	WqeCntMethod:4;
+		uint32_t	WqRsvd3:4;
+
+		uint32_t	WqeCntMask:16;		/* Word 9 */
+		uint32_t	WqRsvd4:16;
+
+		uint32_t	RqPageCnt:4;		/* Word 10 */
+		uint32_t	RqRsvd1:4;
+		uint32_t	RqeSize:4;
+		uint32_t	RqeRsvd2:2;
+		uint32_t	RQV:2;
+		uint32_t	RqPageSize:8;
+		uint32_t	RqeCntMethod:4;
+		uint32_t	RqRsvd3:4;
+
+		uint32_t	RqeCntMask:16;		/* Word 11 */
+		uint32_t	RqRsvd4:12;
+		uint32_t	RqDbWin:4;
+
+		uint32_t	FCOE:1;			/* Word 12 */
+		uint32_t	EXT:1;
+		uint32_t	HDRR:1;
+		uint32_t	SGLR:1;
+		uint32_t	FBRR:1;
+		uint32_t	AREG:1;
+		uint32_t	TGT:1;
+		uint32_t	TERP:1;
+		uint32_t	ASSI:1;
+		uint32_t	MWQE:1;
+		uint32_t	TCCA:1;
+		uint32_t	TRTY:1;
+		uint32_t	TRIR:1;
+		uint32_t	PHOFF:1;
+		uint32_t	PHON:1;
+		uint32_t	PHWQ:1;
+		uint32_t	Rsvd4:12;
+		uint32_t	Loopback:4;
+
+		uint32_t	SgeLength;		/* Word 13 */
+
+		uint32_t	SglPageCnt:4;		/* Word 14 */
+		uint32_t	SglRsvd1:4;
+		uint32_t	SglPageSize:8;
+		uint32_t	SglAlign:8;
+		uint32_t	SglRsvd2:8;
+
+		uint32_t	MinRqSize:16;		/* Word 15 */
+		uint32_t	Rsvd5:16;
+
+		uint32_t	MaxRqSize;		/* Word 16 */
+
+		uint32_t	XRIMax:16;		/* Word 17 */
+		uint32_t	RPIMax:16;
+
+		uint32_t	VPIMax:16;		/* Word 18 */
+		uint32_t	VFIMax:16;
+#endif
+
+		uint32_t	Rsvd6;			/* Word 19 */
+
+} sli_params_t;
+
+/* SliFamily values */
+#define	SLI_FAMILY_BE2		0x0
+#define	SLI_FAMILY_BE3		0x1
+#define	SLI_FAMILY_LANCER_A	0xA
+#define	SLI_FAMILY_LANCER_B	0xB
+
+
+
+/* IOCTL_COMMON_SLI4_PARAMS */
+typedef	struct
+{
+	union
+	{
+		struct
+		{
+			uint32_t	Rsvd1;
+		} request;
+
+		struct
+		{
+			sli_params_t param;
+		} response;
+	} params;
+
+} IOCTL_COMMON_SLI4_PARAMS;
+
+
+#define	MAX_EXTENTS		16 /* 1 to 104 */
+
+/* IOCTL_COMMON_EXTENTS */
+typedef	struct
+{
+	union
+	{
+		struct
+		{
+#ifdef EMLXS_BIG_ENDIAN
+			uint16_t	RscCnt;
+			uint16_t	RscType;
+#endif
+#ifdef EMLXS_LITTLE_ENDIAN
+			uint16_t	RscType;
+			uint16_t	RscCnt;
+#endif
+		} request;
+
+		struct
+		{
+#ifdef EMLXS_BIG_ENDIAN
+			uint16_t	ExtentSize;
+			uint16_t	ExtentCnt;
+#endif
+#ifdef EMLXS_LITTLE_ENDIAN
+			uint16_t	ExtentCnt;
+			uint16_t	ExtentSize;
+#endif
+
+			uint16_t	RscId[MAX_EXTENTS];
+
+		} response;
+	} params;
+
+} IOCTL_COMMON_EXTENTS;
+
+/* RscType */
+#define	RSC_TYPE_FCOE_VFI	0x20
+#define	RSC_TYPE_FCOE_VPI	0x21
+#define	RSC_TYPE_FCOE_RPI	0x22
+#define	RSC_TYPE_FCOE_XRI	0x23
+
 
 
 /* IOCTL_COMMON_CQ_CREATE */
@@ -3168,6 +4010,50 @@ typedef	struct
 } IOCTL_COMMON_CQ_CREATE;
 
 
+/* IOCTL_COMMON_CQ_CREATE_V2 */
+typedef	struct
+{
+	union
+	{
+		struct
+		{
+#ifdef EMLXS_BIG_ENDIAN
+			uint8_t		Rsvd1;
+			uint8_t		PageSize;
+			uint16_t	NumPages;
+#endif
+#ifdef EMLXS_LITTLE_ENDIAN
+			uint16_t	NumPages;
+			uint8_t		PageSize;
+			uint8_t		Rsvd1;
+#endif
+			CQ_CONTEXT_V2	CQContext;
+			BE_PHYS_ADDR	Pages[8];
+		} request;
+
+		struct
+		{
+#ifdef EMLXS_BIG_ENDIAN
+			uint16_t	Rsvd1;
+			uint16_t	CQId;
+#endif
+#ifdef EMLXS_LITTLE_ENDIAN
+			uint16_t	CQId;
+			uint16_t	Rsvd1;
+#endif
+		} response;
+	} params;
+
+} IOCTL_COMMON_CQ_CREATE_V2;
+
+#define	CQ_PAGE_SIZE_4K		0x01
+#define	CQ_PAGE_SIZE_8K		0x02
+#define	CQ_PAGE_SIZE_16K	0x04
+#define	CQ_PAGE_SIZE_32K	0x08
+#define	CQ_PAGE_SIZE_64K	0x10
+
+
+
 /* IOCTL_COMMON_MQ_CREATE */
 typedef	struct
 {
@@ -3203,7 +4089,7 @@ typedef	struct
 } IOCTL_COMMON_MQ_CREATE;
 
 
-/* IOCTL_COMMON_MCC_CREATE_EXT */
+/* IOCTL_COMMON_MQ_CREATE_EXT */
 typedef	struct
 {
 	union
@@ -3220,9 +4106,15 @@ typedef	struct
 #endif
 			uint32_t	async_event_bitmap;
 
-#define	ASYNC_LINK_EVENT	0x2
-#define	ASYNC_FCF_EVENT		0x4
-#define	ASYNC_GROUP5_EVENT	0x20
+#define	ASYNC_LINK_EVENT	0x00000002
+#define	ASYNC_FCF_EVENT		0x00000004
+#define	ASYNC_DCBX_EVENT	0x00000008
+#define	ASYNC_iSCSI_EVENT	0x00000010
+#define	ASYNC_GROUP5_EVENT	0x00000020
+#define	ASYNC_FC_EVENT		0x00010000
+#define	ASYNC_PORT_EVENT	0x00020000
+#define	ASYNC_VF_EVENT		0x00040000
+#define	ASYNC_MR_EVENT		0x00080000
 
 			MQ_CONTEXT	context;
 			BE_PHYS_ADDR	pages[8];
@@ -3232,17 +4124,55 @@ typedef	struct
 		{
 #ifdef EMLXS_BIG_ENDIAN
 			uint16_t	rsvd0;
-			uint16_t	id;
+			uint16_t	MQId;
 #endif
 #ifdef EMLXS_LITTLE_ENDIAN
-			uint16_t	id;
+			uint16_t	MQId;
 			uint16_t	rsvd0;
 #endif
 		} response;
 
 	} params;
 
-} IOCTL_COMMON_MCC_CREATE_EXT;
+} IOCTL_COMMON_MQ_CREATE_EXT;
+
+
+/* IOCTL_COMMON_MQ_CREATE_EXT_V1 */
+typedef	struct
+{
+	union
+	{
+		struct
+		{
+#ifdef EMLXS_BIG_ENDIAN
+			uint16_t	CQId;
+			uint16_t	num_pages;
+#endif
+#ifdef EMLXS_LITTLE_ENDIAN
+			uint16_t	num_pages;
+			uint16_t	CQId;
+#endif
+			uint32_t	async_event_bitmap;
+
+			MQ_CONTEXT_V1	context;
+			BE_PHYS_ADDR	pages[8];
+		} request;
+
+		struct
+		{
+#ifdef EMLXS_BIG_ENDIAN
+			uint16_t	rsvd0;
+			uint16_t	MQId;
+#endif
+#ifdef EMLXS_LITTLE_ENDIAN
+			uint16_t	MQId;
+			uint16_t	rsvd0;
+#endif
+		} response;
+
+	} params;
+
+} IOCTL_COMMON_MQ_CREATE_EXT_V1;
 
 
 /* IOCTL_FCOE_RQ_CREATE */
@@ -3253,14 +4183,12 @@ typedef	struct
 		struct
 		{
 #ifdef EMLXS_BIG_ENDIAN
-			uint8_t		rsvd0;
-			uint8_t		ulpNum;
+			uint16_t	Rsvd0;
 			uint16_t	NumPages;
 #endif
 #ifdef EMLXS_LITTLE_ENDIAN
 			uint16_t	NumPages;
-			uint8_t		ulpNum;
-			uint8_t		rsvd0;
+			uint16_t	Rsvd0;
 #endif
 			RQ_CONTEXT	RQContext;
 			BE_PHYS_ADDR	Pages[8];
@@ -3281,6 +4209,48 @@ typedef	struct
 	} params;
 
 } IOCTL_FCOE_RQ_CREATE;
+
+
+/* IOCTL_FCOE_RQ_CREATE_V1 */
+typedef	struct
+{
+	union
+	{
+		struct
+		{
+#ifdef EMLXS_BIG_ENDIAN
+			uint32_t 	DNB:1;
+			uint32_t 	DFD:1;
+			uint32_t 	DIM:1;
+			uint32_t	Rsvd0:13;
+			uint32_t	NumPages:16;
+#endif
+#ifdef EMLXS_LITTLE_ENDIAN
+			uint32_t	NumPages:16;
+			uint32_t	Rsvd0:13;
+			uint32_t 	DIM:1;
+			uint32_t 	DFD:1;
+			uint32_t 	DNB:1;
+#endif
+			RQ_CONTEXT_V1	RQContext;
+			BE_PHYS_ADDR	Pages[8];
+		} request;
+
+		struct
+		{
+#ifdef EMLXS_BIG_ENDIAN
+			uint16_t	Rsvd1;
+			uint16_t	RQId;
+#endif
+#ifdef EMLXS_LITTLE_ENDIAN
+			uint16_t	RQId;
+			uint16_t	Rsvd1;
+#endif
+		} response;
+
+	} params;
+
+} IOCTL_FCOE_RQ_CREATE_V1;
 
 
 /* IOCTL_FCOE_WQ_CREATE */
@@ -3316,6 +4286,64 @@ typedef	struct
 	} params;
 
 } IOCTL_FCOE_WQ_CREATE;
+
+
+/* IOCTL_FCOE_WQ_CREATE_V1 */
+typedef	struct
+{
+	union
+	{
+		struct
+		{
+#ifdef EMLXS_BIG_ENDIAN
+			uint16_t	CQId;
+			uint16_t	NumPages;
+
+			uint32_t	WqeCnt:16;
+			uint32_t	Rsvd1:4;
+			uint32_t	WqeSize:4;
+			uint32_t	PageSize:8;
+#endif
+#ifdef EMLXS_LITTLE_ENDIAN
+			uint16_t	NumPages;
+			uint16_t	CQId;
+
+			uint32_t	PageSize:8;
+			uint32_t	WqeSize:4;
+			uint32_t	Rsvd1:4;
+			uint32_t	WqeCnt:16;
+#endif
+			uint32_t	Rsvd:2;
+			BE_PHYS_ADDR	Pages[4];
+		} request;
+
+		struct
+		{
+#ifdef EMLXS_BIG_ENDIAN
+			uint16_t	Rsvd0;
+			uint16_t	WQId;
+#endif
+#ifdef EMLXS_LITTLE_ENDIAN
+			uint16_t	WQId;
+			uint16_t	Rsvd0;
+#endif
+		} response;
+
+	} params;
+
+} IOCTL_FCOE_WQ_CREATE_V1;
+
+/* WqeSize */
+#define	WQE_SIZE_64_BYTES	0x05
+#define	WQE_SIZE_128_BYTES	0x06
+
+/* PageSize */
+#define	WQ_PAGE_SIZE_4K		0x01
+#define	WQ_PAGE_SIZE_8K		0x02
+#define	WQ_PAGE_SIZE_16K	0x04
+#define	WQ_PAGE_SIZE_32K	0x08
+#define	WQ_PAGE_SIZE_64K	0x10
+
 
 
 /* IOCTL_FCOE_CFG_POST_SGL_PAGES */
@@ -3364,10 +4392,10 @@ typedef struct _IOCTL_FCOE_POST_HDR_TEMPLATES
 		{
 #ifdef EMLXS_BIG_ENDIAN
 			uint16_t	num_pages;
-			uint16_t	starting_rpi_index;
+			uint16_t	rpi_offset;
 #endif
 #ifdef EMLXS_LITTLE_ENDIAN
-			uint16_t	starting_rpi_index;
+			uint16_t	rpi_offset;
 			uint16_t	num_pages;
 #endif
 			BE_PHYS_ADDR	pages[32];
@@ -3517,10 +4545,15 @@ typedef	union
 {
 	IOCTL_COMMON_NOP		NOPVar;
 	IOCTL_FCOE_WQ_CREATE		WQCreateVar;
+	IOCTL_FCOE_WQ_CREATE_V1		WQCreateVar1;
+	IOCTL_FCOE_RQ_CREATE		RQCreateVar;
+	IOCTL_FCOE_RQ_CREATE_V1		RQCreateVar1;
 	IOCTL_COMMON_EQ_CREATE		EQCreateVar;
 	IOCTL_COMMON_CQ_CREATE		CQCreateVar;
+	IOCTL_COMMON_CQ_CREATE_V2	CQCreateVar2;
 	IOCTL_COMMON_MQ_CREATE		MQCreateVar;
-	IOCTL_COMMON_MCC_CREATE_EXT	MCCCreateExtVar;
+	IOCTL_COMMON_MQ_CREATE_EXT	MQCreateExtVar;
+	IOCTL_COMMON_MQ_CREATE_EXT_V1	MQCreateExtVar1;
 	IOCTL_FCOE_CFG_POST_SGL_PAGES	PostSGLVar;
 	IOCTL_COMMON_GET_CNTL_ATTRIB	GetCntlAttributesVar;
 	IOCTL_FCOE_READ_FCF_TABLE	ReadFCFTableVar;
@@ -3530,6 +4563,13 @@ typedef	union
 	IOCTL_COMMON_MANAGE_FAT		FATVar;
 	IOCTL_DCBX_GET_DCBX_MODE	GetDCBX;
 	IOCTL_DCBX_SET_DCBX_MODE	SetDCBX;
+	IOCTL_COMMON_SLI4_PARAMS	Sli4ParamVar;
+	IOCTL_COMMON_EXTENTS		ExtentsVar;
+	IOCTL_COMMON_GET_PHY_DETAILS	PHYDetailsVar;
+	IOCTL_COMMON_GET_PORT_NAME	PortNameVar;
+	IOCTL_COMMON_GET_PORT_NAME_V1	PortNameVar1;
+	IOCTL_COMMON_WRITE_OBJECT	WriteObjVar;
+	IOCTL_COMMON_BOOT_CFG		BootCfgVar;
 
 } IOCTL_VARIANTS;
 
@@ -3554,6 +4594,8 @@ typedef union
 	READ_REV4_VAR		varRdRev4;	/* cmd = x11 (READ_REV) */
 	READ_LNK_VAR		varRdLnk;	/* cmd = x12 (READ_LNK_STAT) */
 	DUMP4_VAR		varDmp4;	/* cmd = x17 (DUMP) */
+	UPDATE_CFG_VAR		varUpdateCfg;	/* cmd = x1b (update Cfg) */
+	BIU_DIAG_VAR		varBIUdiag;	/* cmd = x84 (RUN_BIU_DIAG64) */
 	READ_SPARM_VAR		varRdSparm;	/* cmd = x8D (READ_SPARM64) */
 	REG_FCFI_VAR		varRegFCFI;	/* cmd = xA0 (REG_FCFI) */
 	UNREG_FCFI_VAR		varUnRegFCFI;	/* cmd = xA2 (UNREG_FCFI) */
@@ -3596,7 +4638,7 @@ typedef volatile struct
 	uint8_t		mbxCommand;
 	uint16_t	mbxStatus;
 #endif
-	MAILVARIANTS4	un;		/* 124 bytes */
+	MAILVARIANTS4	un;		/* 252 bytes */
 } MAILBOX4;				/* Used for SLI-4 */
 
 /*

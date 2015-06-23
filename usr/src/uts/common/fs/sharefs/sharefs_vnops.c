@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <fs/fs_subr.h>
 
 #include <sys/errno.h>
@@ -253,7 +251,7 @@ sharefs_open(vnode_t **vpp, int flag, cred_t *cr, caller_context_t *ct)
 	 * No need for the lock, no other thread can be accessing
 	 * this data structure.
 	 */
-	atomic_add_32(&sft->sharefs_refs, 1);
+	atomic_inc_32(&sft->sharefs_refs);
 	sft->sharefs_real_vp = 0;
 
 	/*
@@ -285,7 +283,7 @@ sharefs_close(vnode_t *vp, int flag, int count,
 			sft->sharefs_generation = 0;
 		}
 	}
-	atomic_add_32(&sft->sharefs_refs, -1);
+	atomic_dec_32(&sft->sharefs_refs);
 	rw_exit(&sharefs_lock);
 
 	return (0);

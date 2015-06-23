@@ -419,7 +419,8 @@ process_shdr(Elf_Info *EI)
 	int 		i, j, idx;
 	FILE_ELF_OFF_T	cap_off;
 	FILE_ELF_SIZE_T	csize;
-	char		*section_name;
+	char		*strtab;
+	size_t		strtab_sz;
 	Elf_Cap 	Chdr;
 	Elf_Shdr	*shdr = &EI_Shdr;
 
@@ -435,16 +436,18 @@ process_shdr(Elf_Info *EI)
 	if (get_shdr(EI, EI_Ehdr_shstrndx) == ELF_READ_FAIL)
 		return (ELF_READ_FAIL);
 
-	if ((section_name = malloc(shdr->sh_size)) == NULL)
+	if ((strtab = malloc(shdr->sh_size)) == NULL)
 		return (ELF_READ_FAIL);
 
-	if (pread64(EI->elffd, section_name, shdr->sh_size, shdr->sh_offset)
+	if (pread64(EI->elffd, strtab, shdr->sh_size, shdr->sh_offset)
 	    != shdr->sh_size)
 		return (ELF_READ_FAIL);
 
+	strtab_sz = shdr->sh_size;
+
 	/* read all the sections and process them */
 	for (idx = 1, i = 0; i < EI_Ehdr_shnum; idx++, i++) {
-		char *str;
+		char *shnam;
 
 		if (get_shdr(EI, i) == ELF_READ_FAIL)
 			return (ELF_READ_FAIL);
@@ -538,16 +541,19 @@ process_shdr(Elf_Info *EI)
 			continue;
 		}
 
-		str = &section_name[shdr->sh_name];
+		if (shdr->sh_name >= strtab_sz)
+			shnam = NULL;
+		else
+			shnam = &strtab[shdr->sh_name];
 
 		if (!(EI->stripped & E_DBGINF) &&
 		    ((shdr->sh_type == SHT_SUNW_DEBUG) ||
 		    (shdr->sh_type == SHT_SUNW_DEBUGSTR) ||
-		    (is_in_list(str)))) {
+		    (shnam != NULL && is_in_list(shnam)))) {
 			EI->stripped |= E_DBGINF;
 		}
 	}
-	free(section_name);
+	free(strtab);
 
 	return (ELF_READ_OKAY);
 }

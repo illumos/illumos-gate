@@ -1,9 +1,10 @@
 '\" te
 .\"  Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
+.\"  Copyright 2015, Joyent, Inc. All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing. See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH AUDITCONFIG 1M "Sep 14, 2009"
+.TH AUDITCONFIG 1M "Jan 28, 2015"
 .SH NAME
 auditconfig \- configure auditing
 .SH SYNOPSIS
@@ -13,7 +14,6 @@ auditconfig \- configure auditing
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBauditconfig\fR provides a command line interface to get and set kernel audit
 parameters.
@@ -36,7 +36,6 @@ global zone; setting these policies requires the privileges of a global zone
 administrator. \fBperzone\fR and \fBahlt\fR are described under the
 \fB-setpolicy\fR option, below.
 .SH OPTIONS
-.sp
 .ne 2
 .na
 \fB\fB-aconf\fR\fR
@@ -233,6 +232,26 @@ records. See \fBauditon\fR(2) and \fBauditd\fR(1M) for further information.
 .sp
 .ne 2
 .na
+\fB\fB-getcwd\fR\fR
+.ad
+.sp .6
+.RS 4n
+Prints current working directory (anchored from zone root at system boot). For
+example:
+.sp
+.in +2
+.nf
+# cd /usr/tmp
+# auditconfig -getcwd
+current working directory = /var/tmp
+.fi
+.in -2
+.sp
+.RE
+
+.sp
+.ne 2
+.na
 \fB\fB-getestate\fR \fIevent\fR\fR
 .ad
 .sp .6
@@ -249,7 +268,25 @@ audit class mask for event AUE_RENAME(42) = 0x30
 .fi
 .in -2
 .sp
+.RE
 
+.sp
+.ne 2
+.na
+\fB\fB-getflags\fR\fR
+.ad
+.sp .6
+.RS 4n
+Display the current active and configured user default audit flags. For
+example:
+.sp
+.in +2
+.nf
+# auditconfig -getflags
+active user default audit flags = no(0x0,0x0)
+configured user default audit flags = ex,lo(0x40001000,0x40001000)
+.fi
+.in -2
 .RE
 
 .sp
@@ -300,12 +337,57 @@ global zone. Otherwise, it is that of the local zone.
 .sp
 .ne 2
 .na
+\fB\fB-getnaflags\fR\fR
+.ad
+.sp .6
+.RS 4n
+Display the current active and configured non-attributable audit flags. For
+example:
+.sp
+.in +2
+.nf
+# auditconfig -getnaflags
+active non-attributable audit flags = no(0x0,0x0)
+configured non-attributable audit flags = lo(0x1000,0x1000)
+.fi
+.in -2
+.RE
+
+.sp
+.ne 2
+.na
 \fB\fB-getpinfo\fR \fIpid\fR\fR
 .ad
 .sp .6
 .RS 4n
 Display the audit ID, preselection mask, terminal ID, and audit session ID for
 the specified process.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-getplugin\fR [\fIplugin\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Display the currently installed plugins and their attributes. If \fIplugin\fR is
+specified, \fB-getplugin\fR only shows information for that \fIplugin\fR. For
+example:
+.sp
+.in +2
+.nf
+# auditconfig -getplugin
+Plugin: audit_binfile (active)
+        Attributes: p_dir=/var/audit;p_fsize=0;p_minfree=0;
+
+Plugin: audit_syslog (inactive)
+        Attributes: p_flags=;
+
+Plugin: audit_remote (inactive)
+        Attributes: p_hosts=;p_retries=3;p_timeout=5;
+.fi
+.in -2
 .RE
 
 .sp
@@ -319,27 +401,6 @@ Display the kernel audit policy. The \fBahlt\fR and \fBperzone\fR policies
 reflect the settings from the global zone. If \fBperzone\fR is set, all other
 policies reflect the local zone's settings. If \fBperzone\fR is not set, the
 policies are machine-wide.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-getcwd\fR\fR
-.ad
-.sp .6
-.RS 4n
-Prints current working directory (anchored from zone root at system boot). For
-example:
-.sp
-.in +2
-.nf
-# cd /usr/tmp
-# auditconfig -getcwd
-current working directory = /var/tmp
-.fi
-.in -2
-.sp
-
 .RE
 
 .sp
@@ -567,6 +628,24 @@ global zone.
 .sp
 .ne 2
 .na
+\fB\fB-setflags\fR \fIaudit_flags\fR\fR
+.ad
+.sp .6
+.RS 4n
+Sets the user default audit flags. For example, to set execute and login
+auditing for all users:
+.sp
+.in +2
+.nf
+# auditconfig -setflags ex,lo
+user default audit flags = ex,lo(0x40001000,0x40001000)
+.fi
+.in -2
+.RE
+
+.sp
+.ne 2
+.na
 \fB\fB-setkaudit\fR \fIIP-address_type\fR \fIIP_address\fR\fR
 .ad
 .sp .6
@@ -587,6 +666,39 @@ If \fBperzone\fR is not set, this option is valid only in the global zone.
 Set non-attributes selection flags of machine.
 .sp
 If \fBperzone\fR is not set, this option is valid only in the global zone.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-setnaflags\fR \fIaudit_flags\fR\fR
+.ad
+.sp .6
+.RS 4n
+Sets the non-attributable audit flags. For example:
+.sp
+.in +2
+.nf
+# auditconfig -setnaflags lo
+non-attributable audit flags = lo(0x1000,0x1000)
+.fi
+.in -2
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-setplugin\fR \fIname active\fR|\fIinactive\fR [\fIattributes\fR [\fIqsize\fR]]\fR
+.ad
+.sp .6
+.RS 4n
+Configures a plugin's attributes. For example:
+.sp
+.in +2
+.nf
+# auditconfig -setplugin audit_syslog active
+.fi
+.in -2
 .RE
 
 .sp
@@ -893,7 +1005,6 @@ The following is an example of an \fBauditconfig\fR program:
 .sp
 
 .SH EXIT STATUS
-.sp
 .ne 2
 .na
 \fB\fB0\fR\fR
@@ -912,7 +1023,6 @@ An error occurred.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/security/audit_event\fR\fR
@@ -931,7 +1041,6 @@ Stores class definitions used in the audit system.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -947,7 +1056,6 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBaudit\fR(1M), \fBauditd\fR(1M), \fBauditstat\fR(1M), \fBbsmconv\fR(1M),
 \fBpraudit\fR(1M), \fBauditon\fR(2), \fBexecv\fR(2), \fBaudit_class\fR(4),
@@ -958,7 +1066,6 @@ Interface Stability	Committed
 See the section on Solaris Auditing in \fISystem Administration Guide: Security
 Services\fR.
 .SH NOTES
-.sp
 .LP
 If plugin output is selected using \fBaudit_control\fR(4), the behavior of the
 system with respect to the \fB-setpolicy\fR \fB+cnt\fR and the

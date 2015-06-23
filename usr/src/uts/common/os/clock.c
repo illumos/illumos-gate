@@ -67,6 +67,7 @@
 #include <sys/ddi_periodic.h>
 #include <sys/random.h>
 #include <sys/modctl.h>
+#include <sys/zone.h>
 
 /*
  * for NTP support
@@ -1149,6 +1150,10 @@ loadavg_update()
 
 	} while ((cpupart = cpupart->cp_next) != cp_list_head);
 
+	/*
+	 * Third pass totals up per-zone statistics.
+	 */
+	zone_loadavg_update();
 }
 
 /*
@@ -1645,7 +1650,7 @@ profil_tick(uintptr_t upc)
 
 	do {
 		ticks = lwp->lwp_oweupc;
-	} while (cas32(&lwp->lwp_oweupc, ticks, 0) != ticks);
+	} while (atomic_cas_32(&lwp->lwp_oweupc, ticks, 0) != ticks);
 
 	mutex_enter(&p->p_pflock);
 	if (pr->pr_scale >= 2 && upc >= pr->pr_off) {
@@ -1982,7 +1987,7 @@ deadman(void)
 	 * typically be a multiple of the total number of CPUs in
 	 * the system.
 	 */
-	atomic_add_32(&deadman_panics, 1);
+	atomic_inc_32(&deadman_panics);
 
 	if (!deadman_enabled) {
 		CPU->cpu_deadman_countdown = deadman_seconds;

@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * t1394.c
  *    1394 Target Driver Interface
@@ -32,6 +30,7 @@
  *    by target drivers
  */
 
+#include <sys/sysmacros.h>
 #include <sys/conf.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -1909,7 +1908,7 @@ t1394_alloc_isoch_cec(t1394_handle_t t1394_hdl, t1394_isoch_cec_props_t *props,
 	temp = props->cec_channel_mask;
 	if (props->cec_options & T1394_NO_IRM_ALLOC) {
 		/* If T1394_NO_IRM_ALLOC, then only one bit should be set */
-		if ((temp & (temp - 1)) != 0) {
+		if (!ISP2(temp)) {
 			TNF_PROBE_1(t1394_alloc_isoch_cec_error,
 			    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string, msg,
 			    "Invalid channel mask");

@@ -1,142 +1,130 @@
-'\" te
+.\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
 .\"  Copyright (c) 1996, Sun Microsystems, Inc.  All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH APROPOS 1 "Dec 20, 1996"
-.SH NAME
-apropos \- locate commands by keyword lookup
-.SH SYNOPSIS
-.LP
-.nf
-\fBapropos\fR \fIkeyword\fR...
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
-The \fBapropos\fR utility displays the man page name, section number, and a
-short description for each man page whose \fBNAME\fR line contains
-\fIkeyword\fR. This information is contained in the \fB/usr/share/man/windex\fR
-database created by \fBcatman\fR(1M). If \fBcatman\fR(1M) was not run, or was
-run with the \fB-n\fR option, \fBapropos\fR fails. Each word is considered
-separately and the case of letters is ignored. Words which are part of other
-words are considered; for example, when looking for `compile', \fBapropos\fR
-finds all instances of `compiler' also.
-.sp
-.LP
-\fBapropos\fR is actually just the \fB-k\fR option to the \fBman\fR(1) command.
-.SH EXAMPLES
-.LP
-\fBExample 1 \fRTo find a man page whose NAME line contains a keyword
-.sp
-.LP
-Try
-
-.sp
-.in +2
-.nf
-example% \fBapropos password\fR
-.fi
-.in -2
-.sp
-
-.sp
-.LP
+.Dd "Jul 20, 2014"
+.Dt APROPOS 1
+.Os
+.Sh NAME
+.Nm apropos, whatis
+.Nd locate commands by keyword lookup
+.Sh SYNOPSIS
+.Nm apropos
+.Op Fl M Ar path
+.Op Fl s Ar section
+.Ar keyword ...
+.Nm whatis
+.Op Fl M Ar path
+.Op Fl s Ar section
+.Ar keyword ...
+.Sh DESCRIPTION
+The
+.Nm apropos
+utility displays the man page name, section number, and a
+short description for each man page whose
+.Em NAME
+line contains
+.Ar keyword .
+This information is contained in the
+.Nm whatis
+database created by the
+.Fl w
+option used with
+.Xr man 1 .
+If this database is not present,
+.Nm apropos
 and
-
-.sp
-.in +2
-.nf
-example% \fBapropos editor\fR
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-If the line starts `\fIfilename\fR(\fIsection\fR) .\|.\|.' you can run
-
-.sp
-.in +2
-.nf
-man -s \fIsection filename\fR
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-to display the man page for \fIfilename\fR.
-
-.LP
-\fBExample 2 \fRTo find the man page for the subroutine \fBprintf()\fR
-.sp
-.LP
-Try
-
-.sp
-.in +2
-.nf
-example% \fBapropos format\fR
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-and then
-
-.sp
-.in +2
-.nf
-example% \fBman -s 3s printf\fR
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-to get the manual page on the subroutine \fBprintf()\fR.
-
-.SH FILES
-.sp
-.ne 2
-.na
-\fB\fB/usr/share/man/windex\fR \fR
-.ad
-.RS 26n
+.Nm whatis
+fail.
+.Lp
+Each word is considered
+separately and the case of letters is ignored. Words which are part of other
+words are considered; for example, when looking for
+.Sq compile ,
+.Nm apropos
+finds all instances of
+.Sq compiler
+also.
+.Lp
+The
+.Nm whatis
+command performs the same search, but only matches whole words. In the above
+example,
+.Nm whatis
+would not match the instances of
+.Sq compiler
+when
+.Ar keyword
+is
+.Sq compile .
+.Lp
+The
+.Nm apropos
+command is actually just the
+.Fl k
+option to the
+.Xr man 1
+command.
+.Sh OPTIONS
+.Bl -tag -width "-s section"
+.It Fl M Ar path
+Force a specific colon separated manual path instead of the
+default search path.  Overrides the MANPATH environment variable.
+.It Fl s Ar section
+Restrict search to specified section.
+.El
+.Sh ENVIRONMENT
+.Bl -tag -width "MANPATH, PATH"
+.It Ev MANPATH , PATH
+Used to find the location of the
+.Nm whatis
+database.
+.El
+.Sh FILES
+.Bl -tag -width "/usr/share/man/whatis"
+.It Pa /usr/share/man/whatis
 table of contents and keyword database
-.RE
-
-.SH ATTRIBUTES
-.sp
-.LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-CSI	Enabled
-.TE
-
-.SH SEE ALSO
-.sp
-.LP
-\fBman\fR(1), \fBwhatis\fR(1), \fBcatman\fR(1M), \fBattributes\fR(5)
-.SH DIAGNOSTICS
-.sp
-.ne 2
-.na
-\fB\f(CW/usr/share/man/windex: No such file or directory\fR\fR
-.ad
-.sp .6
-.RS 4n
-This database does not exist. \fBcatman\fR(1M) must be run to create it.
-.RE
-
+.El
+.Sh EXAMPLES
+.Ss Example 1 To find a man page whose NAME line contains a keyword
+Try
+.Lp
+.Dl example% apropos password
+.Lp
+If the line starts
+.So Ar filename Ns Po Ar section Pc .\|.\|. Sc
+you can run
+.Lp
+.Dl % Nm man Fl s Ar section Ar filename
+.Lp
+to display the man page for \fIfilename\fR.
+.Ss Example 2 To find the man page for the subroutine \fBprintf()
+Try
+.Lp
+.Dl example% Nm apropos Li format
+.Lp
+and then
+.Lp
+.Dl example% Nm man Fl s Ar 3C Li printf
+.Lp
+to get the manual page on the subroutine
+.Xr printf 3C .
+.Sh DIAGNOSTICS
+.Bl -tag -width Ds
+.It "/usr/share/man/whatis: No such file or directory"
+The
+.Nm whatis
+database does not exist.
+The command
+.Nm man
+.Fl w
+must be run to create it.
+.El
+.Sh CODE SET INDEPENDENCE
+Enabled.
+.Sh INTERFACE STABILITY
+.Nm Committed .
+.Sh SEE ALSO
+.Xr man 1 ,
+.Xr catman 1M

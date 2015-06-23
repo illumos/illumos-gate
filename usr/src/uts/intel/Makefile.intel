@@ -19,7 +19,7 @@
 #
 
 # Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright (c) 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright (c) 2014 Nexenta Systems, Inc. All rights reserved.
 # Copyright (c) 2013 Andrew Stormont.  All rights reserved.
 
 #
@@ -321,6 +321,7 @@ DRV_KMODS	+= sdhost
 DRV_KMODS	+= sgen
 DRV_KMODS	+= si3124
 DRV_KMODS	+= smbios
+DRV_KMODS	+= skd
 DRV_KMODS	+= softmac
 DRV_KMODS	+= spdsock
 DRV_KMODS	+= smbsrv
@@ -376,6 +377,7 @@ DRV_KMODS	+= iptun
 DRV_KMODS	+= afe
 DRV_KMODS	+= atge
 DRV_KMODS	+= bfe
+DRV_KMODS	+= bnxe
 DRV_KMODS	+= dmfe
 DRV_KMODS	+= e1000g
 DRV_KMODS	+= efe
@@ -454,7 +456,6 @@ DRV_KMODS	+= ses
 #	USB specific modules
 #
 DRV_KMODS	+= hid
-DRV_KMODS	+= hwarc hwahc
 DRV_KMODS	+= hubd
 DRV_KMODS	+= uhci
 DRV_KMODS	+= ehci
@@ -473,8 +474,6 @@ DRV_KMODS	+= usb_as
 DRV_KMODS	+= usbskel
 DRV_KMODS	+= usbvc
 DRV_KMODS	+= usbftdi
-DRV_KMODS	+= wusb_df
-DRV_KMODS	+= wusb_ca
 DRV_KMODS	+= usbecm
 
 #
@@ -635,9 +634,7 @@ MISC_KMODS	+= qlc_fw_2400
 MISC_KMODS	+= qlc_fw_2500
 MISC_KMODS	+= qlc_fw_6322
 MISC_KMODS	+= qlc_fw_8100
-MISC_KMODS	+= hwa1480_fw
 MISC_KMODS	+= uathfw
-MISC_KMODS	+= uwba
 
 MISC_KMODS	+= klmmod klmops
 

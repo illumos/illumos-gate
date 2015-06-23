@@ -898,7 +898,7 @@ get_color_start(struct as *as)
 	do {
 		old = color_start_current;
 		new = old + (color_start_stride << (vac_shift - MMU_PAGESHIFT));
-	} while (cas32(&color_start_current, old, new) != old);
+	} while (atomic_cas_32(&color_start_current, old, new) != old);
 
 	return ((uint_t)(new));
 }

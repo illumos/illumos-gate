@@ -19,6 +19,7 @@
 # CDDL HEADER END
 #
 # Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2015, Nexenta Systems, Inc.
 # 
 
 PROG= installgrub
@@ -45,7 +46,7 @@ LDLIBS += -lmd5
 i386_CFLAGS += -D_LARGEFILE64_SOURCE
 i386_CFLAGS += -D_FILE_OFFSET_BITS=64
 
-LDLIBS += -lfdisk
+LDLIBS += -lfdisk -lefi -lfstyp
 
 LINTFLAGS += \
 	-erroff=E_BAD_PTR_CAST_ALIGN \

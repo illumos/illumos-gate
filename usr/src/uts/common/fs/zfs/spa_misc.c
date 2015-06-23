@@ -20,8 +20,9 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2013 by Delphix. All rights reserved.
+ * Copyright (c) 2011, 2015 by Delphix. All rights reserved.
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright (c) 2014 Spectra Logic Corporation, All rights reserved.
  */
 
 #include <sys/zfs_context.h>
@@ -250,7 +251,38 @@ int zfs_flags = 0;
  * This should only be used as a last resort, as it typically results
  * in leaked space, or worse.
  */
-int zfs_recover = 0;
+boolean_t zfs_recover = B_FALSE;
+
+/*
+ * If destroy encounters an EIO while reading metadata (e.g. indirect
+ * blocks), space referenced by the missing metadata can not be freed.
+ * Normally this causes the background destroy to become "stalled", as
+ * it is unable to make forward progress.  While in this stalled state,
+ * all remaining space to free from the error-encountering filesystem is
+ * "temporarily leaked".  Set this flag to cause it to ignore the EIO,
+ * permanently leak the space from indirect blocks that can not be read,
+ * and continue to free everything else that it can.
+ *
+ * The default, "stalling" behavior is useful if the storage partially
+ * fails (i.e. some but not all i/os fail), and then later recovers.  In
+ * this case, we will be able to continue pool operations while it is
+ * partially failed, and when it recovers, we can continue to free the
+ * space, with no leaks.  However, note that this case is actually
+ * fairly rare.
+ *
+ * Typically pools either (a) fail completely (but perhaps temporarily,
+ * e.g. a top-level vdev going offline), or (b) have localized,
+ * permanent errors (e.g. disk returns the wrong data due to bit flip or
+ * firmware bug).  In case (a), this setting does not matter because the
+ * pool will be suspended and the sync thread will not be able to make
+ * forward progress regardless.  In case (b), because the error is
+ * permanent, the best we can do is leak the minimum amount of space,
+ * which is what setting this flag will do.  Therefore, it is reasonable
+ * for this flag to normally be set, but we chose the more conservative
+ * approach of not setting it, so that there is no possibility of
+ * leaking space in the "partial temporary" failure case.
+ */
+boolean_t zfs_free_leak_on_eio = B_FALSE;
 
 /*
  * Expiration time in milliseconds. This value has two meanings. First it is
@@ -284,6 +316,32 @@ int zfs_deadman_enabled = -1;
  *     (VDEV_RAIDZ_MAXPARITY + 1) * SPA_DVAS_PER_BP * 2 == 24
  */
 int spa_asize_inflation = 24;
+
+/*
+ * Normally, we don't allow the last 3.2% (1/(2^spa_slop_shift)) of space in
+ * the pool to be consumed.  This ensures that we don't run the pool
+ * completely out of space, due to unaccounted changes (e.g. to the MOS).
+ * It also limits the worst-case time to allocate space.  If we have
+ * less than this amount of free space, most ZPL operations (e.g. write,
+ * create) will return ENOSPC.
+ *
+ * Certain operations (e.g. file removal, most administrative actions) can
+ * use half the slop space.  They will only return ENOSPC if less than half
+ * the slop space is free.  Typically, once the pool has less than the slop
+ * space free, the user will use these operations to free up space in the pool.
+ * These are the operations that call dsl_pool_adjustedsize() with the netfree
+ * argument set to TRUE.
+ *
+ * A very restricted set of operations are always permitted, regardless of
+ * the amount of free space.  These are the operations that call
+ * dsl_sync_task(ZFS_SPACE_CHECK_NONE), e.g. "zfs destroy".  If these
+ * operations result in a net increase in the amount of space used,
+ * it is possible to run the pool completely out of space, causing it to
+ * be permanently read-only.
+ *
+ * See also the comments in zfs_space_check_t.
+ */
+int spa_slop_shift = 5;
 
 /*
  * ==========================================================================
@@ -494,6 +552,7 @@ spa_add(const char *name, nvlist_t *config, const char *altroot)
 	mutex_init(&spa->spa_async_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&spa->spa_errlist_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&spa->spa_errlog_lock, NULL, MUTEX_DEFAULT, NULL);
+	mutex_init(&spa->spa_evicting_os_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&spa->spa_history_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&spa->spa_proc_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&spa->spa_props_lock, NULL, MUTEX_DEFAULT, NULL);
@@ -503,6 +562,7 @@ spa_add(const char *name, nvlist_t *config, const char *altroot)
 	mutex_init(&spa->spa_iokstat_lock, NULL, MUTEX_DEFAULT, NULL);
 
 	cv_init(&spa->spa_async_cv, NULL, CV_DEFAULT, NULL);
+	cv_init(&spa->spa_evicting_os_cv, NULL, CV_DEFAULT, NULL);
 	cv_init(&spa->spa_proc_cv, NULL, CV_DEFAULT, NULL);
 	cv_init(&spa->spa_scrub_io_cv, NULL, CV_DEFAULT, NULL);
 	cv_init(&spa->spa_suspend_cv, NULL, CV_DEFAULT, NULL);
@@ -588,6 +648,9 @@ spa_add(const char *name, nvlist_t *config, const char *altroot)
 
 	spa->spa_debug = ((zfs_flags & ZFS_DEBUG_SPA) != 0);
 
+	spa->spa_min_ashift = INT_MAX;
+	spa->spa_max_ashift = 0;
+
 	/*
 	 * As a pool is being created, treat all features as disabled by
 	 * setting SPA_FEATURE_DISABLED for all entries in the feature
@@ -612,6 +675,7 @@ spa_remove(spa_t *spa)
 
 	ASSERT(MUTEX_HELD(&spa_namespace_lock));
 	ASSERT(spa->spa_state == POOL_STATE_UNINITIALIZED);
+	ASSERT3U(refcount_count(&spa->spa_refcount), ==, 0);
 
 	nvlist_free(spa->spa_config_splitting);
 
@@ -653,6 +717,7 @@ spa_remove(spa_t *spa)
 		bplist_destroy(&spa->spa_free_bplist[t]);
 
 	cv_destroy(&spa->spa_async_cv);
+	cv_destroy(&spa->spa_evicting_os_cv);
 	cv_destroy(&spa->spa_proc_cv);
 	cv_destroy(&spa->spa_scrub_io_cv);
 	cv_destroy(&spa->spa_suspend_cv);
@@ -660,6 +725,7 @@ spa_remove(spa_t *spa)
 	mutex_destroy(&spa->spa_async_lock);
 	mutex_destroy(&spa->spa_errlist_lock);
 	mutex_destroy(&spa->spa_errlog_lock);
+	mutex_destroy(&spa->spa_evicting_os_lock);
 	mutex_destroy(&spa->spa_history_lock);
 	mutex_destroy(&spa->spa_proc_lock);
 	mutex_destroy(&spa->spa_props_lock);
@@ -713,6 +779,20 @@ spa_close(spa_t *spa, void *tag)
 {
 	ASSERT(refcount_count(&spa->spa_refcount) > spa->spa_minref ||
 	    MUTEX_HELD(&spa_namespace_lock));
+	(void) refcount_remove(&spa->spa_refcount, tag);
+}
+
+/*
+ * Remove a reference to the given spa_t held by a dsl dir that is
+ * being asynchronously released.  Async releases occur from a taskq
+ * performing eviction of dsl datasets and dirs.  The namespace lock
+ * isn't held and the hold by the object being evicted may contribute to
+ * spa_minref (e.g. dataset or directory released during pool export),
+ * so the asserts in spa_close() do not apply.
+ */
+void
+spa_async_close(spa_t *spa, void *tag)
+{
 	(void) refcount_remove(&spa->spa_refcount, tag);
 }
 
@@ -1341,7 +1421,10 @@ snprintf_blkptr(char *buf, size_t buflen, const blkptr_t *bp)
 			(void) strlcpy(type, dmu_ot[BP_GET_TYPE(bp)].ot_name,
 			    sizeof (type));
 		}
-		checksum = zio_checksum_table[BP_GET_CHECKSUM(bp)].ci_name;
+		if (!BP_IS_EMBEDDED(bp)) {
+			checksum =
+			    zio_checksum_table[BP_GET_CHECKSUM(bp)].ci_name;
+		}
 		compress = zio_compress_table[BP_GET_COMPRESS(bp)].ci_name;
 	}
 
@@ -1544,6 +1627,18 @@ spa_get_asize(spa_t *spa, uint64_t lsize)
 	return (lsize * spa_asize_inflation);
 }
 
+/*
+ * Return the amount of slop space in bytes.  It is 1/32 of the pool (3.2%),
+ * or at least 32MB.
+ *
+ * See the comment above spa_slop_shift for details.
+ */
+uint64_t
+spa_get_slop_space(spa_t *spa) {
+	uint64_t space = spa_get_dspace(spa);
+	return (MAX(space >> spa_slop_shift, SPA_MINDEVSIZE >> 1));
+}
+
 uint64_t
 spa_get_dspace(spa_t *spa)
 {
@@ -1597,6 +1692,34 @@ spa_log_class(spa_t *spa)
 	return (spa->spa_log_class);
 }
 
+void
+spa_evicting_os_register(spa_t *spa, objset_t *os)
+{
+	mutex_enter(&spa->spa_evicting_os_lock);
+	list_insert_head(&spa->spa_evicting_os_list, os);
+	mutex_exit(&spa->spa_evicting_os_lock);
+}
+
+void
+spa_evicting_os_deregister(spa_t *spa, objset_t *os)
+{
+	mutex_enter(&spa->spa_evicting_os_lock);
+	list_remove(&spa->spa_evicting_os_list, os);
+	cv_broadcast(&spa->spa_evicting_os_cv);
+	mutex_exit(&spa->spa_evicting_os_lock);
+}
+
+void
+spa_evicting_os_wait(spa_t *spa)
+{
+	mutex_enter(&spa->spa_evicting_os_lock);
+	while (!list_is_empty(&spa->spa_evicting_os_list))
+		cv_wait(&spa->spa_evicting_os_cv, &spa->spa_evicting_os_lock);
+	mutex_exit(&spa->spa_evicting_os_lock);
+
+	dmu_buf_user_evict_wait();
+}
+
 int
 spa_max_replication(spa_t *spa)
 {
@@ -1643,7 +1766,7 @@ bp_get_dsize_sync(spa_t *spa, const blkptr_t *bp)
 {
 	uint64_t dsize = 0;
 
-	for (int d = 0; d < SPA_DVAS_PER_BP; d++)
+	for (int d = 0; d < BP_GET_NDVAS(bp); d++)
 		dsize += dva_get_dsize_sync(spa, &bp->blk_dva[d]);
 
 	return (dsize);
@@ -1656,7 +1779,7 @@ bp_get_dsize(spa_t *spa, const blkptr_t *bp)
 
 	spa_config_enter(spa, SCL_VDEV, FTAG, RW_READER);
 
-	for (int d = 0; d < SPA_DVAS_PER_BP; d++)
+	for (int d = 0; d < BP_GET_NDVAS(bp); d++)
 		dsize += dva_get_dsize_sync(spa, &bp->blk_dva[d]);
 
 	spa_config_exit(spa, SCL_VDEV, FTAG);
@@ -1804,6 +1927,16 @@ spa_writeable(spa_t *spa)
 	return (!!(spa->spa_mode & FWRITE));
 }
 
+/*
+ * Returns true if there is a pending sync task in any of the current
+ * syncing txg, the current quiescing txg, or the current open txg.
+ */
+boolean_t
+spa_has_pending_synctask(spa_t *spa)
+{
+	return (!txg_all_lists_empty(&spa->spa_dsl_pool->dp_sync_tasks));
+}
+
 int
 spa_mode(spa_t *spa)
 {
@@ -1880,4 +2013,13 @@ boolean_t
 spa_debug_enabled(spa_t *spa)
 {
 	return (spa->spa_debug);
+}
+
+int
+spa_maxblocksize(spa_t *spa)
+{
+	if (spa_feature_is_enabled(spa, SPA_FEATURE_LARGE_BLOCKS))
+		return (SPA_MAXBLOCKSIZE);
+	else
+		return (SPA_OLD_MAXBLOCKSIZE);
 }

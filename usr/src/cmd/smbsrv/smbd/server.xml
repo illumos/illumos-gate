@@ -22,7 +22,7 @@ information: Portions Copyright [yyyy] [name of copyright owner]
 CDDL HEADER END
 
 Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
-Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
 
 NOTE:  This service manifest is not editable; its contents will
 be overwritten by package or patch operations, including
@@ -96,12 +96,7 @@ file.
 		name='start'
 		exec='/usr/lib/smbsrv/smbd %m'
 		timeout_seconds='60' >
-		<method_context>
-			<method_credential
-				user='root'
-				group='sys'
-				privileges='all' />
-		</method_context>
+		<!-- XXX: need method_context? -->
 	</exec_method>
 
 	<exec_method
@@ -155,6 +150,8 @@ file.
 			value='true' override='true'/>
 		<propval name='autohome_map' type='astring'
 			value='/etc' override='true'/>
+		<propval name='debug' type='integer'
+			value='0' override='true'/>
 		<propval name='domain_sid' type='astring'
 			value='' override='true'/>
 		<propval name='domain_member' type='boolean'
@@ -193,6 +190,8 @@ file.
 			value='false' override='true'/>
 		<propval name='security' type='astring'
 			value='workgroup' override='true'/>
+		<propval name='netbios_enable' type='boolean'
+			value='false' override='true'/>
 		<propval name='netbios_scope' type='astring'
 			value='' override='true'/>
 		<propval name='system_comment' type='astring'

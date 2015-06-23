@@ -21,6 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2015, Joyent, Inc.  All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -2543,6 +2544,19 @@ retry:
 					AS_LOCK_EXIT(as, &as->a_lock);
 					return (error);
 				}
+			}
+			break;
+
+		case MC_INHERIT_ZERO:
+			if (seg->s_ops->inherit == NULL) {
+				error = ENOTSUP;
+			} else {
+				error = SEGOP_INHERIT(seg, raddr, ssize,
+				    SEGP_INH_ZERO);
+			}
+			if (error != 0) {
+				AS_LOCK_EXIT(as, &as->a_lock);
+				return (error);
 			}
 			break;
 

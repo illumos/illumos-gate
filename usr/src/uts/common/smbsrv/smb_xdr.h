@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef	_SMBSRV_SMB_XDR_H
@@ -32,6 +33,7 @@ extern "C" {
 #include <rpc/xdr.h>
 #include <sys/param.h>
 #include <sys/avl.h>
+#include <sys/list.h>
 #include <smbsrv/wintypes.h>
 #include <smbsrv/smb_sid.h>
 #include <smbsrv/smbinfo.h>
@@ -41,11 +43,14 @@ extern "C" {
 #include <smbsrv/smb_dfs.h>
 #include <smbsrv/wintypes.h>
 
-#ifdef _KERNEL
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
+#include <sys/sysmacros.h>
 #define	xdr_int8_t	xdr_char
 #define	xdr_uint8_t	xdr_u_char
 #define	xdr_int16_t	xdr_short
 #define	xdr_uint16_t	xdr_u_short
+#else /* _KERNEL */
+#include <stddef.h>	/* offsetof */
 #endif /* _KERNEL */
 
 /* null-terminated string */
@@ -53,27 +58,29 @@ typedef struct smb_string {
 	char *buf;
 } smb_string_t;
 
-/* 32-bit opaque buffer (non-null terminated strings) */
-typedef struct smb_buf32 {
-	uint32_t	len;
-	uint8_t		*val;
-} smb_buf32_t;
-
-#define	SMB_OPIPE_HDR_MAGIC	0x4F484452	/* OHDR */
-#define	SMB_OPIPE_DOOR_BUFSIZE	(30 * 1024)
+struct smb_buf32;
 
 /*
- * Door operations for opipes.
+ * Initial message on server named pipes.
+ * Followed by smb_netuserinfo
  */
-typedef enum {
-	SMB_OPIPE_NULL = 0,
-	SMB_OPIPE_LOOKUP,
-	SMB_OPIPE_OPEN,
-	SMB_OPIPE_CLOSE,
-	SMB_OPIPE_READ,
-	SMB_OPIPE_WRITE,
-	SMB_OPIPE_EXEC
-} smb_opipe_op_t;
+typedef struct smb_pipehdr {
+	uint32_t ph_magic;
+	uint32_t ph_uilen;
+} smb_pipehdr_t;
+
+#define	SMB_PIPE_HDR_MAGIC	0x50495045	/* PIPE */
+
+/*
+ * Maximum message size for SMB named pipes.
+ * Should be less than PIPE_BUF (5120).
+ * Use the same value Windows does.
+ */
+#define	SMB_PIPE_MAX_MSGSIZE	4280
+
+/*
+ * Door up-call stuff shared with smbd
+ */
 
 #define	SMB_DOOR_HDR_MAGIC	0x444F4F52	/* DOOR */
 
@@ -83,6 +90,7 @@ typedef enum {
 #define	SMB_DF_ASYNC		0x00000001	/* Asynchronous call */
 #define	SMB_DF_SYSSPACE		0x00000002	/* Called from the kernel */
 #define	SMB_DF_USERSPACE	0x00000004	/* Called from user space */
+#define	SMB_DF_FAKE_KERNEL	0x00000008	/* Called from fake kernel */
 
 /*
  * Header for door calls.  The op codes and return codes are defined
@@ -173,7 +181,7 @@ typedef struct smb_netsvc {
 } smb_netsvc_t;
 
 
-bool_t smb_buf32_xdr(XDR *, smb_buf32_t *);
+bool_t smb_buf32_xdr(XDR *, struct smb_buf32 *);
 bool_t smb_string_xdr(XDR *, smb_string_t *);
 bool_t smb_inaddr_xdr(XDR *, smb_inaddr_t *);
 

@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <ctype.h>
@@ -49,41 +49,11 @@
 
 #define	SMB_LIB_ALT	"/usr/lib/smbsrv/libsmbex.so"
 
-#define	SMB_TIMEBUF_SZ		16
-#define	SMB_TRACEBUF_SZ		200
-
-#define	SMB_LOG_FILE_FMT	"/var/smb/%s_log.txt"
-
-typedef struct smb_log_pri {
-	char	*lp_name;
-	int	lp_value;
-} smb_log_pri_t;
-
-static smb_log_pri_t smb_log_pri[] = {
-	"panic",	LOG_EMERG,
-	"emerg",	LOG_EMERG,
-	"alert",	LOG_ALERT,
-	"crit",		LOG_CRIT,
-	"error",	LOG_ERR,
-	"err",		LOG_ERR,
-	"warn",		LOG_WARNING,
-	"warning",	LOG_WARNING,
-	"notice",	LOG_NOTICE,
-	"info",		LOG_INFO,
-	"debug",	LOG_DEBUG
-};
-
-static void smb_log_trace(int, const char *);
-static smb_log_t *smb_log_get(smb_log_hdl_t);
-static void smb_log_dump(smb_log_t *);
-
 static boolean_t smb_netgroup_match(struct nd_hostservlist *, char *, int);
 
 extern int __multi_innetgr();
 extern int __netdir_getbyaddr_nosrv(struct netconfig *,
     struct nd_hostservlist **, struct netbuf *);
-
-static smb_loglist_t smb_loglist;
 
 #define	C2H(c)		"0123456789ABCDEF"[(c)]
 #define	H2C(c)    (((c) >= '0' && (c) <= '9') ? ((c) - '0') :     \
@@ -325,29 +295,6 @@ trim_whitespace(char *buf)
 	}
 
 	return (buf);
-}
-
-/*
- * randomize
- *
- * Randomize the contents of the specified buffer.
- */
-void
-randomize(char *data, unsigned len)
-{
-	unsigned dwlen = len / 4;
-	unsigned remlen = len % 4;
-	unsigned tmp;
-	unsigned i; /*LINTED E_BAD_PTR_CAST_ALIGN*/
-	unsigned *p = (unsigned *)data;
-
-	for (i = 0; i < dwlen; ++i)
-		*p++ = random();
-
-	if (remlen) {
-		tmp = random();
-		(void) memcpy(p, &tmp, remlen);
-	}
 }
 
 /*
@@ -1133,190 +1080,4 @@ smb_get_txid(void)
 	(void) mutex_unlock(&txmutex);
 
 	return (txid_ret);
-}
-
-/*
- *  Creates a log object and inserts it into a list of logs.
- */
-smb_log_hdl_t
-smb_log_create(int max_cnt, char *name)
-{
-	smb_loglist_item_t *log_node;
-	smb_log_t *log = NULL;
-	smb_log_hdl_t handle = 0;
-
-	if (max_cnt <= 0 || name == NULL)
-		return (0);
-
-	(void) mutex_lock(&smb_loglist.ll_mtx);
-
-	log_node = malloc(sizeof (smb_loglist_item_t));
-
-	if (log_node != NULL) {
-		log = &log_node->lli_log;
-
-		bzero(log, sizeof (smb_log_t));
-
-		handle = log->l_handle = smb_get_txid();
-		log->l_max_cnt = max_cnt;
-		(void) snprintf(log->l_file, sizeof (log->l_file),
-		    SMB_LOG_FILE_FMT, name);
-
-		list_create(&log->l_list, sizeof (smb_log_item_t),
-		    offsetof(smb_log_item_t, li_lnd));
-
-		if (smb_loglist.ll_list.list_size == 0)
-			list_create(&smb_loglist.ll_list,
-			    sizeof (smb_loglist_item_t),
-			    offsetof(smb_loglist_item_t, lli_lnd));
-
-		list_insert_tail(&smb_loglist.ll_list, log_node);
-	}
-
-	(void) mutex_unlock(&smb_loglist.ll_mtx);
-
-	return (handle);
-}
-
-/*
- * Keep the most recent log entries, based on max count.
- * If the priority is LOG_ERR or higher then the entire log is
- * dumped to a file.
- *
- * The date format for each message is the same as a syslog entry.
- *
- * The log is also added to syslog via smb_log_trace().
- */
-void
-smb_log(smb_log_hdl_t hdl, int priority, const char *fmt, ...)
-{
-	va_list		ap;
-	smb_log_t	*log;
-	smb_log_item_t	*msg;
-	time_t		now;
-	struct		tm *tm;
-	char		timebuf[SMB_TIMEBUF_SZ];
-	char		buf[SMB_TRACEBUF_SZ];
-	char		netbiosname[NETBIOS_NAME_SZ];
-	char		*pri_name;
-	int		i;
-
-	va_start(ap, fmt);
-	(void) vsnprintf(buf, SMB_TRACEBUF_SZ, fmt, ap);
-	va_end(ap);
-
-	priority &= LOG_PRIMASK;
-	smb_log_trace(priority, buf);
-
-	if ((log = smb_log_get(hdl)) == NULL)
-		return;
-
-	(void) mutex_lock(&log->l_mtx);
-
-	(void) time(&now);
-	tm = localtime(&now);
-	(void) strftime(timebuf, SMB_TIMEBUF_SZ, "%b %d %H:%M:%S", tm);
-
-	if (smb_getnetbiosname(netbiosname, NETBIOS_NAME_SZ) != 0)
-		(void) strlcpy(netbiosname, "unknown", NETBIOS_NAME_SZ);
-
-	if (log->l_cnt == log->l_max_cnt) {
-		msg = list_head(&log->l_list);
-		list_remove(&log->l_list, msg);
-	} else {
-		if ((msg = malloc(sizeof (smb_log_item_t))) == NULL) {
-			(void) mutex_unlock(&log->l_mtx);
-			return;
-		}
-		log->l_cnt++;
-	}
-
-	pri_name = "info";
-	for (i = 0; i < sizeof (smb_log_pri) / sizeof (smb_log_pri[0]); i++) {
-		if (priority == smb_log_pri[i].lp_value) {
-			pri_name = smb_log_pri[i].lp_name;
-			break;
-		}
-	}
-
-	(void) snprintf(msg->li_msg, SMB_LOG_LINE_SZ,
-	    "%s %s smb[%d]: [ID 0 daemon.%s] %s",
-	    timebuf, netbiosname, getpid(), pri_name, buf);
-	list_insert_tail(&log->l_list, msg);
-
-	if (priority <= LOG_ERR)
-		smb_log_dump(log);
-
-	(void) mutex_unlock(&log->l_mtx);
-}
-
-/*
- * Dumps all the logs in the log list.
- */
-void
-smb_log_dumpall()
-{
-	smb_loglist_item_t *log_node;
-
-	(void) mutex_lock(&smb_loglist.ll_mtx);
-
-	log_node = list_head(&smb_loglist.ll_list);
-
-	while (log_node != NULL) {
-		smb_log_dump(&log_node->lli_log);
-		log_node = list_next(&smb_loglist.ll_list, log_node);
-	}
-
-	(void) mutex_unlock(&smb_loglist.ll_mtx);
-}
-
-static void
-smb_log_trace(int priority, const char *s)
-{
-	syslog(priority, "%s", s);
-}
-
-static smb_log_t *
-smb_log_get(smb_log_hdl_t hdl)
-{
-	smb_loglist_item_t *log_node;
-	smb_log_t *log;
-
-	(void) mutex_lock(&smb_loglist.ll_mtx);
-
-	log_node = list_head(&smb_loglist.ll_list);
-
-	while (log_node != NULL) {
-		if (log_node->lli_log.l_handle == hdl) {
-			log = &log_node->lli_log;
-			(void) mutex_unlock(&smb_loglist.ll_mtx);
-			return (log);
-		}
-		log_node = list_next(&smb_loglist.ll_list, log_node);
-	}
-
-	(void) mutex_unlock(&smb_loglist.ll_mtx);
-	return (NULL);
-}
-
-/*
- * Dumps the log to a file.
- */
-static void
-smb_log_dump(smb_log_t *log)
-{
-	smb_log_item_t *msg;
-	FILE *fp;
-
-	if ((fp = fopen(log->l_file, "w")) == NULL)
-		return;
-
-	msg = list_head(&log->l_list);
-
-	while (msg != NULL) {
-		(void) fprintf(fp, "%s\n", msg->li_msg);
-		msg = list_next(&log->l_list, msg);
-	}
-
-	(void) fclose(fp);
 }

@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
@@ -44,6 +45,7 @@
 #include <stdarg.h>
 #include <string.h>
 #include <strings.h>
+#include <time.h>
 #include <unistd.h>
 #include <wait.h>
 #include <poll.h>
@@ -240,6 +242,9 @@ static const char *emsg_dpt_no_dep;
 
 static int li_only = 0;
 static int no_refresh = 0;
+
+/* how long in ns we should wait between checks for a pg */
+static uint64_t pg_timeout = 100 * (NANOSEC / MILLISEC);
 
 /* import globals, to minimize allocations */
 static scf_scope_t *imp_scope = NULL;
@@ -6751,6 +6756,207 @@ connaborted:
 }
 
 /*
+ * When an instance is imported we end up telling configd about it. Once we tell
+ * configd about these changes, startd eventually notices. If this is a new
+ * instance, the manifest may not specify the SCF_PG_RESTARTER (restarter)
+ * property group. However, many of the other tools expect that this property
+ * group exists and has certain values.
+ *
+ * These values are added asynchronously by startd. We should not return from
+ * this routine until we can verify that the property group we need is there.
+ *
+ * Before we go ahead and verify this, we have to ask ourselves an important
+ * question: Is the early manifest service currently running?  Because if it is
+ * running and it has invoked us, then the service will never get a restarter
+ * property because svc.startd is blocked on EMI finishing before it lets itself
+ * fully connect to svc.configd. Of course, this means that this race condition
+ * is in fact impossible to 100% eliminate.
+ *
+ * svc.startd makes sure that EMI only runs once and has succeeded by checking
+ * the state of the EMI instance. If it is online it bails out and makes sure
+ * that it doesn't run again. In this case, we're going to do something similar,
+ * only if the state is online, then we're going to actually verify. EMI always
+ * has to be present, but it can be explicitly disabled to reduce the amount of
+ * damage it can cause. If EMI has been disabled then we no longer have to worry
+ * about the implicit race condition and can go ahead and check things. If EMI
+ * is in some state that isn't online or disabled and isn't runinng, then we
+ * assume that things are rather bad and we're not going to get in your way,
+ * even if the rest of SMF does.
+ *
+ * Returns 0 on success or returns an errno.
+ */
+#ifndef NATIVE_BUILD
+static int
+lscf_instance_verify(scf_scope_t *scope, entity_t *svc, entity_t *inst)
+{
+	int ret, err;
+	struct timespec ts;
+	char *emi_state;
+
+	/*
+	 * smf_get_state does not distinguish between its different failure
+	 * modes: memory allocation failures, SMF internal failures, and a lack
+	 * of EMI entirely because it's been removed. In these cases, we're
+	 * going to be conservative and opt to say that if we don't know, better
+	 * to not block import or falsely warn to the user.
+	 */
+	if ((emi_state = smf_get_state(SCF_INSTANCE_EMI)) == NULL) {
+		return (0);
+	}
+
+	/*
+	 * As per the block comment for this function check the state of EMI
+	 */
+	if (strcmp(emi_state, SCF_STATE_STRING_ONLINE) != 0 &&
+	    strcmp(emi_state, SCF_STATE_STRING_DISABLED) != 0) {
+		warn(gettext("Not validating instance %s:%s because EMI's "
+		    "state is %s\n"), svc->sc_name, inst->sc_name, emi_state);
+		free(emi_state);
+		return (0);
+	}
+
+	free(emi_state);
+
+	/*
+	 * First we have to get the property.
+	 */
+	if ((ret = scf_scope_get_service(scope, svc->sc_name, imp_svc)) != 0) {
+		ret = scf_error();
+		warn(gettext("Failed to look up service: %s\n"), svc->sc_name);
+		return (ret);
+	}
+
+	/*
+	 * We should always be able to get the instance. It should already
+	 * exist because we just created it or got it. There probably is a
+	 * slim chance that someone may have come in and deleted it though from
+	 * under us.
+	 */
+	if ((ret = scf_service_get_instance(imp_svc, inst->sc_name, imp_inst))
+	    != 0) {
+		ret = scf_error();
+		warn(gettext("Failed to verify instance: %s\n"), inst->sc_name);
+		switch (ret) {
+		case SCF_ERROR_DELETED:
+			err = ENODEV;
+			break;
+		case SCF_ERROR_CONNECTION_BROKEN:
+			warn(gettext("Lost repository connection\n"));
+			err = ECONNABORTED;
+			break;
+		case SCF_ERROR_NOT_FOUND:
+			warn(gettext("Instance \"%s\" disappeared out from "
+			    "under us.\n"), inst->sc_name);
+			err = ENOENT;
+			break;
+		default:
+			bad_error("scf_service_get_instance", ret);
+		}
+
+		return (err);
+	}
+
+	/*
+	 * An astute observer may want to use _scf_wait_pg which would notify us
+	 * of a property group change, unfortunately that does not work if the
+	 * property group in question does not exist. So instead we have to
+	 * manually poll and ask smf the best way to get to it.
+	 */
+	while ((ret = scf_instance_get_pg(imp_inst, SCF_PG_RESTARTER, imp_pg))
+	    != SCF_SUCCESS) {
+		ret = scf_error();
+		if (ret != SCF_ERROR_NOT_FOUND) {
+			warn(gettext("Failed to get restarter property "
+			    "group for instance: %s\n"), inst->sc_name);
+			switch (ret) {
+			case SCF_ERROR_DELETED:
+				err = ENODEV;
+				break;
+			case SCF_ERROR_CONNECTION_BROKEN:
+				warn(gettext("Lost repository connection\n"));
+				err = ECONNABORTED;
+				break;
+			default:
+				bad_error("scf_service_get_instance", ret);
+			}
+
+			return (err);
+		}
+
+		ts.tv_sec = pg_timeout / NANOSEC;
+		ts.tv_nsec = pg_timeout % NANOSEC;
+
+		(void) nanosleep(&ts, NULL);
+	}
+
+	/*
+	 * svcadm also expects that the SCF_PROPERTY_STATE property is present.
+	 * So in addition to the property group being present, we need to wait
+	 * for the property to be there in some form.
+	 *
+	 * Note that a property group is a frozen snapshot in time. To properly
+	 * get beyond this, you have to refresh the property group each time.
+	 */
+	while ((ret = scf_pg_get_property(imp_pg, SCF_PROPERTY_STATE,
+	    imp_prop)) != 0) {
+
+		ret = scf_error();
+		if (ret != SCF_ERROR_NOT_FOUND) {
+			warn(gettext("Failed to get property %s from the "
+			    "restarter property group of instance %s\n"),
+			    SCF_PROPERTY_STATE, inst->sc_name);
+			switch (ret) {
+			case SCF_ERROR_CONNECTION_BROKEN:
+				warn(gettext("Lost repository connection\n"));
+				err = ECONNABORTED;
+				break;
+			case SCF_ERROR_DELETED:
+				err = ENODEV;
+				break;
+			default:
+				bad_error("scf_pg_get_property", ret);
+			}
+
+			return (err);
+		}
+
+		ts.tv_sec = pg_timeout / NANOSEC;
+		ts.tv_nsec = pg_timeout % NANOSEC;
+
+		(void) nanosleep(&ts, NULL);
+
+		ret = scf_instance_get_pg(imp_inst, SCF_PG_RESTARTER, imp_pg);
+		if (ret != SCF_SUCCESS) {
+			warn(gettext("Failed to get restarter property "
+			    "group for instance: %s\n"), inst->sc_name);
+			switch (ret) {
+			case SCF_ERROR_DELETED:
+				err = ENODEV;
+				break;
+			case SCF_ERROR_CONNECTION_BROKEN:
+				warn(gettext("Lost repository connection\n"));
+				err = ECONNABORTED;
+				break;
+			default:
+				bad_error("scf_service_get_instance", ret);
+			}
+
+			return (err);
+		}
+	}
+
+	/*
+	 * We don't have to free the property groups or other values that we got
+	 * because we stored them in global variables that are allocated and
+	 * freed by the routines that call into these functions. Unless of
+	 * course the rest of the code here that we are basing this on is
+	 * mistaken.
+	 */
+	return (0);
+}
+#endif
+
+/*
  * If the service is missing, create it, import its properties, and import the
  * instances.  Since the service is brand new, it should be empty, and if we
  * run into any existing entities (SCF_ERROR_EXISTS), abort.
@@ -6834,6 +7040,7 @@ lscf_service_import(void *v, void *pvt)
 	int fresh = 0;
 	scf_snaplevel_t *running;
 	int have_ge = 0;
+	boolean_t retried = B_FALSE;
 
 	const char * const ts_deleted = gettext("Temporary service svc:/%s "
 	    "was deleted unexpectedly.\n");
@@ -6889,6 +7096,7 @@ lscf_service_import(void *v, void *pvt)
 		return (UU_WALK_ERROR);
 	}
 
+retry:
 	if (scf_scope_add_service(imp_scope, imp_tsname, imp_tsvc) != 0) {
 		switch (scf_error()) {
 		case SCF_ERROR_CONNECTION_BROKEN:
@@ -6898,6 +7106,11 @@ lscf_service_import(void *v, void *pvt)
 			return (stash_scferror(lcbdata));
 
 		case SCF_ERROR_EXISTS:
+			if (!retried) {
+				lscf_delete(imp_tsname, 0);
+				retried = B_TRUE;
+				goto retry;
+			}
 			warn(gettext(
 			    "Temporary service \"%s\" must be deleted before "
 			    "this manifest can be imported.\n"), imp_tsname);
@@ -8059,6 +8272,7 @@ lscf_bundle_import(bundle_t *bndl, const char *filename, uint_t flags)
 
 	if (uu_list_walk(bndl->sc_bundle_services, lscf_service_import,
 	    &cbdata, UU_DEFAULT) == 0) {
+		char *eptr;
 		/* Success.  Refresh everything. */
 
 		if (flags & SCI_NOREFRESH || no_refresh) {
@@ -8122,7 +8336,45 @@ lscf_bundle_import(bundle_t *bndl, const char *filename, uint_t flags)
 				goto progress;
 
 		result = 0;
+
+		/*
+		 * This snippet of code assumes that we are running svccfg as we
+		 * normally do -- witih svc.startd running. Of course, that is
+		 * not actually the case all the time because we also use a
+		 * varient of svc.configd and svccfg which are only meant to
+		 * run during the build process. During this time we have no
+		 * svc.startd, so this check would hang the build process.
+		 *
+		 * However, we've also given other consolidations, a bit of a
+		 * means to tie themselves into a knot. They're not properly
+		 * using the native build equivalents, but they've been getting
+		 * away with it anyways. Therefore, if we've found that
+		 * SVCCFG_REPOSITORY is set indicating that a separate configd
+		 * should be spun up, then we have to assume it's not using a
+		 * startd and we should not do this check.
+		 */
+#ifndef NATIVE_BUILD
+		/*
+		 * Verify that the restarter group is preset
+		 */
+		eptr = getenv("SVCCFG_REPOSITORY");
+		for (svc = uu_list_first(bndl->sc_bundle_services);
+		    svc != NULL && eptr == NULL;
+		    svc = uu_list_next(bndl->sc_bundle_services, svc)) {
+
+			insts = svc->sc_u.sc_service.sc_service_instances;
+
+			for (inst = uu_list_first(insts);
+			    inst != NULL;
+			    inst = uu_list_next(insts, inst)) {
+				if (lscf_instance_verify(imp_scope, svc,
+				    inst) != 0)
+					goto progress;
+			}
+		}
+#endif
 		goto out;
+
 	}
 
 	if (uu_error() != UU_ERROR_CALLBACK_FAILED)
@@ -10630,6 +10882,10 @@ int
 lscf_service_export(char *fmri, const char *filename, int flags)
 {
 	struct export_args args;
+	char *fmridup;
+	const char *scope, *svc, *inst;
+	size_t cblen = 3 * max_scf_name_len;
+	char *canonbuf = alloca(cblen);
 	int ret, err;
 
 	lscf_prep_hndl();
@@ -10637,6 +10893,29 @@ lscf_service_export(char *fmri, const char *filename, int flags)
 	bzero(&args, sizeof (args));
 	args.filename = filename;
 	args.flags = flags;
+
+	/*
+	 * If some poor user has passed an exact instance FMRI, of the sort
+	 * one might cut and paste from svcs(1) or an error message, warn
+	 * and chop off the instance instead of failing.
+	 */
+	fmridup = alloca(strlen(fmri) + 1);
+	(void) strcpy(fmridup, fmri);
+	if (strncmp(fmridup, SCF_FMRI_SVC_PREFIX,
+	    sizeof (SCF_FMRI_SVC_PREFIX) -1) == 0 &&
+	    scf_parse_svc_fmri(fmridup, &scope, &svc, &inst, NULL, NULL) == 0 &&
+	    inst != NULL) {
+		(void) strlcpy(canonbuf, "svc:/", cblen);
+		if (strcmp(scope, SCF_FMRI_LOCAL_SCOPE) != 0) {
+			(void) strlcat(canonbuf, "/", cblen);
+			(void) strlcat(canonbuf, scope, cblen);
+		}
+		(void) strlcat(canonbuf, svc, cblen);
+		fmri = canonbuf;
+
+		warn(gettext("Only services may be exported; ignoring "
+		    "instance portion of argument.\n"));
+	}
 
 	err = 0;
 	if ((ret = scf_walk_fmri(g_hndl, 1, (char **)&fmri,

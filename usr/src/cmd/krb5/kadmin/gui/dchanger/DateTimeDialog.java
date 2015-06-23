@@ -20,8 +20,6 @@
  * CDDL HEADER END
  */
 /*
- * ident	"%Z%%M%	%I%	%E% SMI"
- *
  * Copyright (c) 1999-2000 by Sun Microsystems, Inc.
  * All rights reserved.
  */
@@ -44,25 +42,25 @@ import java.util.*;
 // help. The last two panels are separated by a LineSeparator.
 
 public class DateTimeDialog extends Dialog {
-  
+
     private boolean save;
 
     private Frame parent;
-  
+
     private DCPanel dateDCPanel;
     private DCPanel yearDCPanel;
     private DCPanel hourDCPanel;
     private DCPanel minuteDCPanel;
     private DCPanel secondDCPanel;
-  
+
     private Choice month;
-  
+
     private DCCircularTextField date;
     private DCCircularTextField hour;
     private DCCircularTextField second;
     private DCCircularTextField minute;
     private DCTextField year;
-  
+
     private Button ok;
     private Button cancel;
     private Button help;
@@ -70,32 +68,32 @@ public class DateTimeDialog extends Dialog {
     private Button midnight;
 
     private HelpDialog hd = null;
-  
+
     private Panel topPanel;
     private Panel middlePanel;
     private Panel bottomPanel;
-  
+
     private GregorianCalendar calendar = null;
     private static int MONTH_LEN[] = {31, 28, 31, 30, 31, 30, 31,
-                                      31, 30, 31, 30, 31};
+				    31, 30, 31, 30, 31};
     private static DateFormat df =
     DateFormat.getDateTimeInstance(DateFormat.MEDIUM,
 				 DateFormat.MEDIUM);
     private static Toolkit toolkit = Toolkit.getDefaultToolkit();
-  
+
   // For I18N
     private static ResourceBundle rb =
-    ResourceBundle.getBundle("GuiResource" /* NOI18N */); 
+    ResourceBundle.getBundle("GuiResource" /* NOI18N */);
     private static ResourceBundle hrb =
-    ResourceBundle.getBundle("HelpData" /* NOI18N */); 
+    ResourceBundle.getBundle("HelpData" /* NOI18N */);
 
     /**
      * Constructor that lays out the componeents and sets the different
-     * event handlers. 
+     * event handlers.
      */
     public DateTimeDialog(Frame parent, Color background, Color foreground) {
     super(parent, getString("SEAM Date/Time Helper"), true);
-    
+
     this.parent = parent;
 
     setLayout(new GridBagLayout());
@@ -107,64 +105,64 @@ public class DateTimeDialog extends Dialog {
     setCurrentTime();
     setSize(250, 300);
     setResizable(false);
-    
+
     addWindowListener(new DCWindowListener());
-    //      initializeFocusOnTextField();
+    //	    initializeFocusOnTextField();
     }
 
     /**
      * Adds the labels only
      */
     private void addLabels() {
-    
+
     GridBagConstraints gbc = new GridBagConstraints();
     gbc.weighty = 1;
-    
+
     topPanel = new Panel();
     topPanel.setLayout(new GridBagLayout());
-    gbc.gridwidth = GridBagConstraints.REMAINDER;    
+    gbc.gridwidth = GridBagConstraints.REMAINDER;
     gbc.fill = GridBagConstraints.BOTH;
     gbc.anchor = GridBagConstraints.CENTER;
     gbc.gridx = 0;
     gbc.gridy = 0;
     add(topPanel, gbc);
-    
+
     gbc.fill = GridBagConstraints.NONE;
     gbc.anchor = GridBagConstraints.EAST;
     gbc.gridx = 0;
     gbc.gridwidth = 1;
-    
+
     gbc.gridy = 0;
     topPanel.add(new Label(getString("Month")), gbc);
-    
+
     gbc.gridy = 1;
     topPanel.add(new Label(getString("Date")), gbc);
-    
+
     gbc.gridy = 2;
     topPanel.add(new Label(getString("Year")), gbc);
-    
+
     gbc.gridy = 3;
     topPanel.add(new Label(getString("Hour")), gbc);
-    
+
     gbc.gridy = 4;
     topPanel.add(new Label(getString("Minute")), gbc);
-    
+
     gbc.gridy = 5;
     topPanel.add(new Label(getString("Second")), gbc);
     }
-  
+
     /**
      * Adds the fields that will store the month, year, date, hour,
      * minute and second.
      */
     private void addFields(Color background, Color foreground) {
-    
+
     GridBagConstraints gbc = new GridBagConstraints();
     gbc.weighty = 1;
-    
+
     month = new Choice();
     initializeMonth();
-    
+
     date = new DCCircularTextField("1", 2);
     date.setMinimum(1);
     date.setBackground(background);
@@ -180,11 +178,11 @@ public class DateTimeDialog extends Dialog {
     second = new DCCircularTextField("00", 2);
     second.setBackground(background);
     second.setForeground(foreground);
-    
+
     year  = new DCTextField("2000", 4);
     year.setBackground(background);
     year.setForeground(foreground);
-    
+
     Panel tempPanel = new Panel();
     tempPanel.add(month);
     gbc.gridwidth = GridBagConstraints.REMAINDER;
@@ -193,62 +191,62 @@ public class DateTimeDialog extends Dialog {
     gbc.gridx = 1;
     gbc.gridy = 0;
     topPanel.add(tempPanel, gbc);
-    
-    
+
+
     // Remaining fields are in topPanel
     gbc.gridwidth = 1;
     gbc.fill = GridBagConstraints.NONE;
     gbc.gridx = 1;
-    
+
     gbc.gridy = 1;
     topPanel.add(date, gbc);
-    
+
     gbc.gridy = 2;
     topPanel.add(year, gbc);
-    
+
     gbc.gridy = 3;
     topPanel.add(hour, gbc);
-    
+
     gbc.gridy = 4;
     topPanel.add(minute, gbc);
-    
+
     gbc.gridy = 5;
     topPanel.add(second, gbc);
-    
+
     }
 
   // Adds the panels with the +/- buttons for each DCField
     private void addDCPanels() {
-    
+
     GridBagConstraints gbc = new GridBagConstraints();
     gbc.weighty = 1;
-    
+
     gbc.gridx = 2;
     gbc.gridwidth = GridBagConstraints.REMAINDER;
     gbc.gridheight = 1;
     gbc.fill = GridBagConstraints.NONE;
-    
+
     dateDCPanel = new DCPanel();
     yearDCPanel = new DCPanel();
     hourDCPanel = new DCPanel();
     minuteDCPanel = new DCPanel();
     secondDCPanel = new DCPanel();
-    
+
     gbc.gridy = 1;
     topPanel.add(dateDCPanel, gbc);
-    
+
     gbc.gridy = GridBagConstraints.RELATIVE;
     topPanel.add(yearDCPanel, gbc);
     topPanel.add(hourDCPanel, gbc);
     topPanel.add(minuteDCPanel, gbc);
     topPanel.add(secondDCPanel, gbc);
-    
+
     dateDCPanel.setListener(date);
     yearDCPanel.setListener(year);
     hourDCPanel.setListener(hour);
     minuteDCPanel.setListener(minute);
     secondDCPanel.setListener(second);
-    
+
     }
 
 
@@ -259,60 +257,60 @@ public class DateTimeDialog extends Dialog {
     private void initializeMonth() {
     DateFormatSymbols dfSymbols = new DateFormatSymbols();
     String[] monthStrings = dfSymbols.getMonths();
-    
-        month.removeAll();
-    
-        for (int i = 0; i < monthStrings.length; i++) {
-	month.add(monthStrings[i]);
-        }
 
-        month.addItemListener(new DCMonthChangeListener());
+	month.removeAll();
+
+	for (int i = 0; i < monthStrings.length; i++) {
+	month.add(monthStrings[i]);
+	}
+
+	month.addItemListener(new DCMonthChangeListener());
     }
 
   // Adds all the buttons
     private void addButtons() {
 
-        GridBagConstraints gbc = new GridBagConstraints();
-        gbc.weighty = 1;
+	GridBagConstraints gbc = new GridBagConstraints();
+	gbc.weighty = 1;
 
 
-        middlePanel = new Panel();
-        now  = new Button(getString("Now"));
-        midnight	= new Button(getString("Midnight"));
-        middlePanel.add(midnight);
-        middlePanel.add(now);
-        gbc.fill = GridBagConstraints.HORIZONTAL;
-        gbc.gridwidth = GridBagConstraints.REMAINDER;
-        gbc.gridx = 0;
-        gbc.gridy = 1;
-        add(middlePanel, gbc);
+	middlePanel = new Panel();
+	now  = new Button(getString("Now"));
+	midnight	= new Button(getString("Midnight"));
+	middlePanel.add(midnight);
+	middlePanel.add(now);
+	gbc.fill = GridBagConstraints.HORIZONTAL;
+	gbc.gridwidth = GridBagConstraints.REMAINDER;
+	gbc.gridx = 0;
+	gbc.gridy = 1;
+	add(middlePanel, gbc);
 
-        gbc.gridwidth = GridBagConstraints.REMAINDER;
-        gbc.gridheight = 1;
-        gbc.fill = GridBagConstraints.BOTH;
-        gbc.gridx = 0;
-        gbc.gridy = 2;
-        add(new LineSeparator(), gbc);
+	gbc.gridwidth = GridBagConstraints.REMAINDER;
+	gbc.gridheight = 1;
+	gbc.fill = GridBagConstraints.BOTH;
+	gbc.gridx = 0;
+	gbc.gridy = 2;
+	add(new LineSeparator(), gbc);
 
-        bottomPanel = new Panel();
-        ok = new Button(getString("OK"));
-        cancel =	new Button(getString("Cancel"));
-        help = new Button(getString("Help"));
-        bottomPanel.add(ok);
-        bottomPanel.add(cancel);
-        bottomPanel.add(help);
-        gbc.fill = GridBagConstraints.HORIZONTAL;
-        gbc.gridwidth = GridBagConstraints.REMAINDER;
-        gbc.gridx = 0;
-        gbc.gridy = 3;
-        add(bottomPanel, gbc);
+	bottomPanel = new Panel();
+	ok = new Button(getString("OK"));
+	cancel =	new Button(getString("Cancel"));
+	help = new Button(getString("Help"));
+	bottomPanel.add(ok);
+	bottomPanel.add(cancel);
+	bottomPanel.add(help);
+	gbc.fill = GridBagConstraints.HORIZONTAL;
+	gbc.gridwidth = GridBagConstraints.REMAINDER;
+	gbc.gridx = 0;
+	gbc.gridy = 3;
+	add(bottomPanel, gbc);
 
-        DCButtonListener bl = new DCButtonListener();
-        ok.addActionListener(bl);
-        cancel.addActionListener(bl);
-        help.addActionListener(bl);
-        now.addActionListener(bl);
-        midnight.addActionListener(bl);
+	DCButtonListener bl = new DCButtonListener();
+	ok.addActionListener(bl);
+	cancel.addActionListener(bl);
+	help.addActionListener(bl);
+	now.addActionListener(bl);
+	midnight.addActionListener(bl);
 
     }
 
@@ -334,10 +332,10 @@ public class DateTimeDialog extends Dialog {
      * Closes (hides) the dialog box when the user is done
      * @param save true if the box is being dismissed by clicking on
      * "ok" and the user wants to retain the modified value, false
-     * otherwise. 
+     * otherwise.
      */
     private void dateTimeDialogClose(boolean save) {
-        if (save == true) {
+	if (save == true) {
 	if (!updateFromGui())
 	   return;
     }
@@ -350,9 +348,9 @@ public class DateTimeDialog extends Dialog {
      * @return true if all are valid, false otherwise.
      */
     private boolean updateFromGui() {
-        return (checkErrorAndSet(date) && checkErrorAndSet(year) &&
-	        checkErrorAndSet(hour) && checkErrorAndSet(minute) &&
-	        checkErrorAndSet(second));
+	return (checkErrorAndSet(date) && checkErrorAndSet(year) &&
+		checkErrorAndSet(hour) && checkErrorAndSet(minute) &&
+		checkErrorAndSet(second));
     }
 
     /**
@@ -362,21 +360,21 @@ public class DateTimeDialog extends Dialog {
      * otherwise.
      */
     private boolean checkErrorAndSet(DCTextField tf) {
-        int i = 0;
-        boolean errorState = false;
-        try {
+	int i = 0;
+	boolean errorState = false;
+	try {
 	i = new Integer(tf.getText().trim()).intValue();
 	errorState = !tf.checkValue(i);
-        } catch (NumberFormatException e2) {
+	} catch (NumberFormatException e2) {
 	errorState =  true;
-        }	
-        if (errorState) {
+	}
+	if (errorState) {
 	tf.selectAll();
 	toolkit.beep();
-        }
-        else
+	}
+	else
 	tf.setValue(i);
-        return !errorState;
+	return !errorState;
     }
 
     /**
@@ -388,34 +386,34 @@ public class DateTimeDialog extends Dialog {
      */
 
     public boolean isSaved() {
-        return save;
+	return save;
     }
 
     /**
      * Sets the date and time in fields to the current date and time.
      */
     public void setCurrentTime() {
-        setDate(new Date());
+	setDate(new Date());
     }
 
     /**
      * Sets the current date of the DateTimeDialog and updates the gui
-     *   components to reflect that.
+     *	 components to reflect that.
      * @param date the Date to set it to.
      */
     public void setDate(Date newDate) {
-        calendar = new GregorianCalendar();
-        calendar.setTime(newDate);
+	calendar = new GregorianCalendar();
+	calendar.setTime(newDate);
 
     // update gui components now
 
     year.setValue(calendar.get(Calendar.YEAR));
     month.select(calendar.get(Calendar.MONTH));
     date.setValue(calendar.get(Calendar.DATE));
-    
+
     // Make sure the date is in the valid range for the given month
     fixDateField();
-    
+
     hour.setValue(calendar.get(Calendar.HOUR_OF_DAY));
     minute.setValue(calendar.get(Calendar.MINUTE));
     second.setValue(calendar.get(Calendar.SECOND));
@@ -436,33 +434,33 @@ public class DateTimeDialog extends Dialog {
      * for the currently selected month.
      */
     private void fixDateField() {
-        int monthIndex = month.getSelectedIndex();
-        int max = MONTH_LEN[monthIndex];
-        date.setMaximum(calendar.isLeapYear(year.getValue()) &&
-	        monthIndex == 1 ? max + 1 : max);
+	int monthIndex = month.getSelectedIndex();
+	int max = MONTH_LEN[monthIndex];
+	date.setMaximum(calendar.isLeapYear(year.getValue()) &&
+		monthIndex == 1 ? max + 1 : max);
     }
-    
+
   // * **********************************************
-  // 	 I N N E R    C L A S S E S   F O L L O W
+  //	 I N N E R    C L A S S E S   F O L L O W
   // ***********************************************
-    
+
     /**
      * Listener for closing the dialog box through the window close
      * menu.
      */
     private class DCWindowListener extends WindowAdapter {
     public  void windowClosing(WindowEvent e) {
-        dateTimeDialogClose(false);
-        }
+	dateTimeDialogClose(false);
+	}
     }
-  
+
     /**
      * Listener for any change in the month selected through the
      * pull down menu
      */
     private class DCMonthChangeListener implements ItemListener {
     public void itemStateChanged(ItemEvent e) {
-        fixDateField();
+	fixDateField();
     }
     }
 
@@ -473,12 +471,12 @@ public class DateTimeDialog extends Dialog {
      */
     private class DCButtonListener implements ActionListener {
     public void actionPerformed(ActionEvent e) {
-        if (e.getSource() == ok) {
+	if (e.getSource() == ok) {
 	DateTimeDialog.this.dateTimeDialogClose(true);
-        }
-        else
+	}
+	else
 	if (e.getSource() == cancel) {
-    	  DateTimeDialog.this.dateTimeDialogClose(false);
+	  DateTimeDialog.this.dateTimeDialogClose(false);
 	}
 	else
 	  if (e.getSource() == now) {
@@ -489,18 +487,18 @@ public class DateTimeDialog extends Dialog {
 		DateTimeDialog.this.setMidnight();
 	    }
 	    else
-               if (e.getSource() == help) {
-		if (hd != null)
-		  hd.show();
+		if (e.getSource() == help) {
+		    if (hd != null)
+			hd.setVisible(true);
 		else {
-		  hd = new
+		    hd = new
 		    HelpDialog(DateTimeDialog.this.parent,
 			getString("Help for Date and Time Dialog"), false);
-		  hd.setVisible(true);
-		  hd.setText(getString(hrb, "DateTimeDialogHelp"));
-		   }
-	        }
-        } // actionPerformed
+		    hd.setVisible(true);
+		    hd.setText(getString(hrb, "DateTimeDialogHelp"));
+		}
+	    }
+	} // actionPerformed
     }
 
     /**
@@ -511,10 +509,10 @@ public class DateTimeDialog extends Dialog {
      */
     private class DCFocusListener extends FocusAdapter {
 
-        public void focusLost(FocusEvent e) {
+	public void focusLost(FocusEvent e) {
 	if (!checkErrorAndSet((DCTextField)e.getSource()))
 	  ((DCTextField)e.getSource()).requestFocus();
-        }
+	}
     }
 
     /**
@@ -523,13 +521,13 @@ public class DateTimeDialog extends Dialog {
      * default format, but to MEDIUM length formatting style.
      */
     public String toString() {
-        calendar = new GregorianCalendar(year.getValue(),
-				       month.getSelectedIndex(),
-				       date.getValue(),
-				       hour.getValue(),
-				       minute.getValue(),
-				       second.getValue());
-        return df.format(calendar.getTime());
+	calendar = new GregorianCalendar(year.getValue(),
+					month.getSelectedIndex(),
+					date.getValue(),
+					hour.getValue(),
+					minute.getValue(),
+					second.getValue());
+	return df.format(calendar.getTime());
     }
 
     /**
@@ -548,17 +546,19 @@ public class DateTimeDialog extends Dialog {
     } catch (MissingResourceException e) {
 	System.out.println("Missing resource "+key+", using English.");
 	return key;
-        }
+	}
     }
 
+    /* BEGIN JSTYLED */
     /*
     public static final void main(String args[]) {
     Frame f = new Frame();
-    //  while (true){
-        DateTimeDialog d = new DateTimeDialog(f, Color.white, Color.black);
-        d.setVisible(true);
-        System.out.println(d.toString());
+    //	while (true){
+	DateTimeDialog d = new DateTimeDialog(f, Color.white, Color.black);
+	d.setVisible(true);
+	System.out.println(d.toString());
       //    }
     }
     */
+    /* END JSTYLED */
 }

@@ -5,8 +5,8 @@
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
  *
- * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
+ * You can obtain a copy of the license at
+ * http://www.opensource.org/licenses/cddl1.txt.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -20,16 +20,18 @@
  */
 
 /*
- * Copyright 2010 Emulex.  All rights reserved.
+ * Copyright (c) 2004-2011 Emulex. All rights reserved.
  * Use is subject to license terms.
  */
-
 
 #include <emlxs.h>
 
 
 /* Required for EMLXS_CONTEXT in EMLXS_MSGF calls */
 EMLXS_MSG_DEF(EMLXS_NODE_C);
+
+static void	emlxs_node_add(emlxs_port_t *, NODELIST *);
+static int	emlxs_node_match_did(emlxs_port_t *, NODELIST *, uint32_t);
 
 /* Timeout == -1 will enable the offline timer */
 /* Timeout not -1 will apply the timeout */
@@ -289,7 +291,7 @@ emlxs_node_open(emlxs_port_t *port, NODELIST *ndlp, uint32_t channelno)
 	mutex_exit(&EMLXS_TX_CHANNEL_LOCK);
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_node_opened_msg,
-	    "node=%p did=%06x rpi=%x channel=%d", ndlp, ndlp->nlp_DID,
+	    "node=%p did=%06x rpi=%d channel=%d", ndlp, ndlp->nlp_DID,
 	    ndlp->nlp_Rpi, channelno);
 
 	/* If link attention needs to be cleared */
@@ -324,7 +326,7 @@ emlxs_node_open(emlxs_port_t *port, NODELIST *ndlp, uint32_t channelno)
 		if (!found) {
 			/* Clear link attention */
 			if ((mbox = (MAILBOXQ *)emlxs_mem_get(hba,
-			    MEM_MBOX, 1))) {
+			    MEM_MBOX))) {
 				mutex_enter(&EMLXS_PORT_LOCK);
 
 				/*
@@ -418,7 +420,7 @@ out:
 
 	return (0);
 
-} /* End emlxs_node_match_did */
+} /* emlxs_node_match_did() */
 
 
 
@@ -470,7 +472,7 @@ emlxs_node_find_mac(emlxs_port_t *port, uint8_t *mac)
 
 
 extern NODELIST *
-emlxs_node_find_did(emlxs_port_t *port, uint32_t did)
+emlxs_node_find_did(emlxs_port_t *port, uint32_t did, uint32_t lock)
 {
 	emlxs_hba_t *hba = HBA;
 	NODELIST *nlp;
@@ -512,25 +514,34 @@ emlxs_node_find_did(emlxs_port_t *port, uint32_t did)
 		did = FABRIC_DID;
 	}
 
-	rw_enter(&port->node_rwlock, RW_READER);
+	if (lock) {
+		rw_enter(&port->node_rwlock, RW_READER);
+	}
 	hash = EMLXS_DID_HASH(did);
 	nlp = port->node_table[hash];
 	while (nlp != NULL) {
 		/* Check for obvious match */
 		if (nlp->nlp_DID == did) {
-			rw_exit(&port->node_rwlock);
+			if (lock) {
+				rw_exit(&port->node_rwlock);
+			}
 			return (nlp);
 		}
 
 		/* Check for detailed match */
 		else if (emlxs_node_match_did(port, nlp, did)) {
-			rw_exit(&port->node_rwlock);
+			if (lock) {
+				rw_exit(&port->node_rwlock);
+			}
 			return (nlp);
 		}
 
 		nlp = (NODELIST *)nlp->nlp_list_next;
 	}
-	rw_exit(&port->node_rwlock);
+
+	if (lock) {
+		rw_exit(&port->node_rwlock);
+	}
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_node_not_found_msg, "find: did=%x",
 	    did);
@@ -561,7 +572,7 @@ emlxs_node_find_rpi(emlxs_port_t *port, uint32_t rpi)
 	}
 	rw_exit(&port->node_rwlock);
 
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_node_not_found_msg, "find: rpi=%x",
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_node_not_found_msg, "find: rpi=%d",
 	    rpi);
 
 	/* no match found */
@@ -571,7 +582,7 @@ emlxs_node_find_rpi(emlxs_port_t *port, uint32_t rpi)
 
 
 extern NODELIST *
-emlxs_node_find_wwpn(emlxs_port_t *port, uint8_t *wwpn)
+emlxs_node_find_wwpn(emlxs_port_t *port, uint8_t *wwpn, uint32_t lock)
 {
 	NODELIST *nlp;
 	uint32_t i;
@@ -579,7 +590,10 @@ emlxs_node_find_wwpn(emlxs_port_t *port, uint8_t *wwpn)
 	uint8_t *bptr1;
 	uint8_t *bptr2;
 
-	rw_enter(&port->node_rwlock, RW_READER);
+	if (lock) {
+		rw_enter(&port->node_rwlock, RW_READER);
+	}
+
 	for (i = 0; i < EMLXS_NUM_HASH_QUES; i++) {
 		nlp = port->node_table[i];
 		while (nlp != NULL) {
@@ -595,14 +609,19 @@ emlxs_node_find_wwpn(emlxs_port_t *port, uint8_t *wwpn)
 			}
 
 			if (j == 8) {
-				rw_exit(&port->node_rwlock);
+				if (lock) {
+					rw_exit(&port->node_rwlock);
+				}
 				return (nlp);
 			}
 
 			nlp = (NODELIST *)nlp->nlp_list_next;
 		}
 	}
-	rw_exit(&port->node_rwlock);
+
+	if (lock) {
+		rw_exit(&port->node_rwlock);
+	}
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_node_not_found_msg,
 	    "find: wwpn=%02x%02x%02x%02x%02x%02x%02x%02x", wwpn[0], wwpn[1],
@@ -714,7 +733,7 @@ emlxs_node_destroy_all(emlxs_port_t *port)
 			wwn = (uint8_t *)&ndlp->nlp_portname;
 			EMLXS_MSGF(EMLXS_CONTEXT,
 			    &emlxs_node_destroy_msg, "did=%06x "
-			    "rpi=%x wwpn=%02x%02x%02x%02x%02x%02x%02x%02x "
+			    "rpi=%d wwpn=%02x%02x%02x%02x%02x%02x%02x%02x "
 			    "count=%d", ndlp->nlp_DID, ndlp->nlp_Rpi, wwn[0],
 			    wwn[1], wwn[2], wwn[3], wwn[4], wwn[5], wwn[6],
 			    wwn[7], port->node_count);
@@ -759,17 +778,24 @@ extern NODELIST *
 emlxs_node_create(emlxs_port_t *port, uint32_t did, uint32_t rpi, SERV_PARM *sp)
 {
 	emlxs_hba_t *hba = HBA;
-	NODELIST *ndlp;
+	NODELIST *ndlp, *ndlp_wwn;
 	uint8_t *wwn;
 	emlxs_vvl_fmt_t vvl;
 	RPIobj_t *rpip;
 
-	ndlp = emlxs_node_find_did(port, did);
+	rw_enter(&port->node_rwlock, RW_WRITER);
+
+	ndlp = emlxs_node_find_did(port, did, 0);
+	ndlp_wwn = emlxs_node_find_wwpn(port, (uint8_t *)&sp->portName, 0);
+
+	/* Zero out the stale node worldwide names */
+	if (ndlp_wwn && (ndlp != ndlp_wwn)) {
+		bzero((uint8_t *)&ndlp_wwn->nlp_nodename, sizeof (NAME_TYPE));
+		bzero((uint8_t *)&ndlp_wwn->nlp_portname, sizeof (NAME_TYPE));
+	}
 
 	/* Update the node */
 	if (ndlp) {
-		rw_enter(&port->node_rwlock, RW_WRITER);
-
 		ndlp->nlp_Rpi = (uint16_t)rpi;
 		ndlp->nlp_DID = did;
 
@@ -796,17 +822,16 @@ emlxs_node_create(emlxs_port_t *port, uint32_t did, uint32_t rpi, SERV_PARM *sp)
 
 				EMLXS_MSGF(EMLXS_CONTEXT,
 				    &emlxs_node_create_msg,
-				    "Unable to find RPI. did=%x rpi=%x",
+				    "Unable to find RPI. did=%x rpi=%d",
 				    did, rpi);
 			}
 		} else {
 			ndlp->rpip = NULL;
 		}
-		rw_exit(&port->node_rwlock);
 
 		wwn = (uint8_t *)&ndlp->nlp_portname;
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_node_update_msg,
-		    "node=%p did=%06x rpi=%x "
+		    "node=%p did=%06x rpi=%d "
 		    "wwpn=%02x%02x%02x%02x%02x%02x%02x%02x",
 		    ndlp, ndlp->nlp_DID, ndlp->nlp_Rpi, wwn[0],
 		    wwn[1], wwn[2], wwn[3], wwn[4], wwn[5], wwn[6], wwn[7]);
@@ -815,11 +840,9 @@ emlxs_node_create(emlxs_port_t *port, uint32_t did, uint32_t rpi, SERV_PARM *sp)
 	}
 
 	/* Allocate a new node */
-	ndlp = (NODELIST *)emlxs_mem_get(hba, MEM_NLP, 0);
+	ndlp = (NODELIST *)emlxs_mem_get(hba, MEM_NLP);
 
 	if (ndlp) {
-		rw_enter(&port->node_rwlock, RW_WRITER);
-
 		ndlp->nlp_Rpi = (uint16_t)rpi;
 		ndlp->nlp_DID = did;
 
@@ -852,13 +875,16 @@ emlxs_node_create(emlxs_port_t *port, uint32_t did, uint32_t rpi, SERV_PARM *sp)
 
 				EMLXS_MSGF(EMLXS_CONTEXT,
 				    &emlxs_node_create_msg,
-				    "Unable to find RPI. did=%x rpi=%x",
+				    "Unable to find RPI. did=%x rpi=%d",
 				    did, rpi);
 			}
 		} else {
 			ndlp->rpip = NULL;
 		}
-		rw_exit(&port->node_rwlock);
+
+#ifdef NODE_THROTTLE_SUPPORT
+		emlxs_node_throttle_set(port, ndlp);
+#endif /* NODE_THROTTLE_SUPPORT */
 
 		/* Add the node */
 		emlxs_node_add(port, ndlp);
@@ -866,6 +892,7 @@ emlxs_node_create(emlxs_port_t *port, uint32_t did, uint32_t rpi, SERV_PARM *sp)
 		goto done;
 	}
 
+	rw_exit(&port->node_rwlock);
 	wwn = (uint8_t *)&sp->portName;
 	EMLXS_MSGF(EMLXS_CONTEXT,
 	    &emlxs_node_create_failed_msg,
@@ -877,6 +904,7 @@ emlxs_node_create(emlxs_port_t *port, uint32_t did, uint32_t rpi, SERV_PARM *sp)
 	return (NULL);
 
 done:
+	rw_exit(&port->node_rwlock);
 	if (sp->VALID_VENDOR_VERSION) {
 		bcopy((caddr_t *)&sp->vendorVersion[0],
 		    (caddr_t *)&vvl, sizeof (emlxs_vvl_fmt_t));
@@ -896,19 +924,21 @@ done:
 	emlxs_node_open(port, ndlp, hba->channel_ip);
 	emlxs_node_open(port, ndlp, hba->channel_fcp);
 
+	EMLXS_SET_DFC_STATE(ndlp, NODE_LOGIN);
+
 	return (ndlp);
 
 } /* emlxs_node_create() */
 
 
-extern void
+/* node_rwlock must be held when calling this routine */
+static void
 emlxs_node_add(emlxs_port_t *port, NODELIST *ndlp)
 {
 	NODELIST *np;
 	uint8_t *wwn;
 	uint32_t hash;
 
-	rw_enter(&port->node_rwlock, RW_WRITER);
 	hash = EMLXS_DID_HASH(ndlp->nlp_DID);
 	np = port->node_table[hash];
 
@@ -925,11 +955,9 @@ emlxs_node_add(emlxs_port_t *port, NODELIST *ndlp)
 
 	wwn = (uint8_t *)&ndlp->nlp_portname;
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_node_create_msg,
-	    "node=%p did=%06x rpi=%x wwpn=%02x%02x%02x%02x%02x%02x%02x%02x "
+	    "node=%p did=%06x rpi=%d wwpn=%02x%02x%02x%02x%02x%02x%02x%02x "
 	    "count=%d", ndlp, ndlp->nlp_DID, ndlp->nlp_Rpi, wwn[0], wwn[1],
 	    wwn[2], wwn[3], wwn[4], wwn[5], wwn[6], wwn[7], port->node_count);
-
-	rw_exit(&port->node_rwlock);
 
 	return;
 
@@ -965,7 +993,7 @@ emlxs_node_rm(emlxs_port_t *port, NODELIST *ndlp)
 			wwn = (uint8_t *)&ndlp->nlp_portname;
 			EMLXS_MSGF(EMLXS_CONTEXT,
 			    &emlxs_node_destroy_msg, "did=%06x "
-			    "rpi=%x wwpn=%02x%02x%02x%02x%02x%02x%02x%02x "
+			    "rpi=%d wwpn=%02x%02x%02x%02x%02x%02x%02x%02x "
 			    "count=%d", ndlp->nlp_DID, ndlp->nlp_Rpi, wwn[0],
 			    wwn[1], wwn[2], wwn[3], wwn[4], wwn[5], wwn[6],
 			    wwn[7], port->node_count);
@@ -996,3 +1024,42 @@ emlxs_node_rm(emlxs_port_t *port, NODELIST *ndlp)
 	return;
 
 } /* emlxs_node_rm() */
+
+
+extern void
+emlxs_node_throttle_set(emlxs_port_t *port, NODELIST *ndlp)
+{
+	emlxs_hba_t *hba = HBA;
+	emlxs_config_t *cfg = &CFG;
+	char prop[64];
+	char buf1[32];
+	uint32_t throttle;
+
+	/* Set global default */
+	throttle = (ndlp->nlp_fcp_info & NLP_FCP_TGT_DEVICE)?
+	    cfg[CFG_TGT_DEPTH].current:0;
+
+	/* Check per wwpn default */
+	(void) snprintf(prop, sizeof (prop), "w%s-depth",
+	    emlxs_wwn_xlate(buf1, sizeof (buf1),
+	    (uint8_t *)&ndlp->nlp_portname));
+
+	throttle = (uint32_t)ddi_prop_get_int(DDI_DEV_T_ANY,
+	    (void *)hba->dip, DDI_PROP_DONTPASS, prop, throttle);
+
+	/* Check per driver/wwpn default */
+	(void) snprintf(prop, sizeof (prop), "%s%d-w%s-depth", DRIVER_NAME,
+	    hba->ddiinst, emlxs_wwn_xlate(buf1, sizeof (buf1),
+	    (uint8_t *)&ndlp->nlp_portname));
+
+	throttle = (uint32_t)ddi_prop_get_int(DDI_DEV_T_ANY,
+	    (void *)hba->dip, DDI_PROP_DONTPASS, prop, throttle);
+
+	/* Check limit */
+	throttle = MIN(throttle, MAX_NODE_THROTTLE);
+
+	ndlp->io_throttle = throttle;
+
+	return;
+
+} /* emlxs_node_throttle_set() */

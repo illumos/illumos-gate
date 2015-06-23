@@ -1,9 +1,10 @@
 '\" te
+.\" Copyright 2014 Nexenta Systems, Inc.  All Rights Reserved.
 .\"  Copyright (c) 2009, Sun Microsystems, Inc.  All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LOFS 7FS "Aug 31, 2009"
+.TH LOFS 7FS "Nov 24, 2014"
 .SH NAME
 lofs \- loopback virtual file system
 .SH SYNOPSIS
@@ -12,11 +13,10 @@ lofs \- loopback virtual file system
 #include <sys/param.h>
 #include <sys/mount.h>
 
-\fBint\fR \fBmount\fR (\fBconst char*\fR \fIdir\fR, \fBconst char*\fR \fIvirtual\fR, \fBint\fR \fImflag\fR, \fB\fR\fIlofs\fR, \fB\fR\fINULL\fR, \fB\fR\fI0\fR);
+\fBint\fR \fBmount\fR (\fBconst char *\fR\fIdir\fR, \fBconst char *\fR\fIvirtual\fR, \fBint\fR \fImflag\fR, \fB"lofs"\fR, \fBNULL\fR, \fB0\fR);
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The loopback file system device allows new, virtual file systems to be created,
 which provide access to existing files using alternate pathnames. Once the
@@ -55,7 +55,6 @@ contain yet another file system hierarchy; rather, it appears just as
 \fB/tmp/newroot\fR did before the loopback mount was performed (for example, as
 an empty directory).
 .SS "Examples"
-.sp
 .LP
 \fBlofs\fR file systems are mounted using:
 .sp
@@ -67,12 +66,10 @@ an empty directory).
 .sp
 
 .SH SEE ALSO
-.sp
 .LP
 \fBlofiadm\fR(1M), \fBmount\fR(1M), \fBchroot\fR(2), \fBmount\fR(2),
 \fBsysfs\fR(2), \fBvfstab\fR(4), \fBlofi\fR(7D)
 .SH NOTES
-.sp
 .LP
 All access to entries in \fBlofs\fR mounted file systems map to their
 underlying file system. If a mount point is made available in multiple
@@ -82,7 +79,6 @@ specified. See \fBmount\fR(1M). Examples of a mount point being busy within a
 \fBlofs\fR mount include having a file system mounted on it or it being a
 processes' current working directory.
 .SH WARNINGS
-.sp
 .LP
 Because of the potential for confusing users and applications, you should use
 loopback mounts with care. A loopback mount entry in \fB/etc/vfstab\fR must be

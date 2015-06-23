@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/errno.h>
 #include <sys/systm.h>
@@ -81,13 +79,13 @@ install_utrap(utrap_entry_t type, utrap_handler_t new_handler,
 	}
 	/*
 	 * Allocate proc space for saving the addresses to these user
-	 * trap handlers, which must later be freed. Use casptr to
+	 * trap handlers, which must later be freed. Use atomic_cas_ptr to
 	 * do this atomically.
 	 */
 	if (p->p_utraps == NULL) {
 		pv = sv = kmem_zalloc((UT_PRECISE_MAXTRAPS+1) *
 		    sizeof (utrap_handler_t *), KM_SLEEP);
-		tmp = casptr(&p->p_utraps, NULL, sv);
+		tmp = atomic_cas_ptr(&p->p_utraps, NULL, sv);
 		if (tmp != NULL) {
 			kmem_free(pv, (UT_PRECISE_MAXTRAPS+1) *
 			    sizeof (utrap_handler_t *));
@@ -96,12 +94,12 @@ install_utrap(utrap_entry_t type, utrap_handler_t new_handler,
 	ASSERT(p->p_utraps != NULL);
 
 	/*
-	 * Use casptr to atomically install the handler.
+	 * Use atomic_cas_ptr to atomically install the handler.
 	 */
 	ov = p->p_utraps[idx];
 	if (new_handler != (utrap_handler_t)UTRAP_UTH_NOCHANGE) {
 		for (;;) {
-			tmp = casptr(&p->p_utraps[idx], ov, nv);
+			tmp = atomic_cas_ptr(&p->p_utraps[idx], ov, nv);
 			if (ov == tmp)
 				break;
 			ov = tmp;
@@ -225,13 +223,13 @@ sparc_utrap_install(utrap_entry_t type,
 
 	/*
 	 * Allocate proc space for saving the addresses to these user
-	 * trap handlers, which must later be freed. Use casptr to
+	 * trap handlers, which must later be freed. Use atomic_cas_ptr to
 	 * do this atomically.
 	 */
 	if (p->p_utraps == NULL) {
 		pv = sv = kmem_zalloc((UT_PRECISE_MAXTRAPS+1) *
 		    sizeof (utrap_handler_t *), KM_SLEEP);
-		tmp = casptr(&p->p_utraps, NULL, sv);
+		tmp = atomic_cas_ptr(&p->p_utraps, NULL, sv);
 		if (tmp != NULL) {
 			kmem_free(pv, (UT_PRECISE_MAXTRAPS+1) *
 			    sizeof (utrap_handler_t *));
@@ -240,12 +238,12 @@ sparc_utrap_install(utrap_entry_t type,
 	ASSERT(p->p_utraps != NULL);
 
 	/*
-	 * Use casptr to atomically install the handlers.
+	 * Use atomic_cas_ptr to atomically install the handlers.
 	 */
 	ov = p->p_utraps[idx];
 	if (new_precise != (utrap_handler_t)UTH_NOCHANGE) {
 		for (;;) {
-			tmp = casptr(&p->p_utraps[idx], ov, nvp);
+			tmp = atomic_cas_ptr(&p->p_utraps[idx], ov, nvp);
 			if (ov == tmp)
 				break;
 			ov = tmp;

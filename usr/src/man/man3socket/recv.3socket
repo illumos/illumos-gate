@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH RECV 3SOCKET "Aug 20, 2007"
+.TH RECV 3SOCKET "Dec 03, 2014"
 .SH NAME
 recv, recvfrom, recvmsg \- receive a message from a socket
 .SH SYNOPSIS
@@ -30,7 +30,6 @@ recv, recvfrom, recvmsg \- receive a message from a socket
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBrecv()\fR, \fBrecvfrom()\fR, and \fBrecvmsg()\fR functions are used to
 receive messages from another socket. The \fIs\fR socket is created with
@@ -116,13 +115,11 @@ write requests are unaffected.
 The \fBrecvmsg()\fR function call uses a \fBmsghdr\fR structure defined in
 <\fBsys/socket.h\fR> to minimize the number of directly supplied parameters.
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, these functions return the number of bytes
 received. Otherwise, they return \fB-1\fR and set \fBerrno\fR to indicate the
 error.
 .SH ERRORS
-.sp
 .LP
 The \fBrecv()\fR, \fBrecvfrom()\fR, and \fBrecvmsg()\fR functions return errors
 under the following conditions:
@@ -133,6 +130,17 @@ under the following conditions:
 .ad
 .RS 16n
 The \fIs\fR file descriptor is invalid.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBECONNRESET\fR\fR
+.ad
+.RS 16n
+The \fIs\fR argument refers to a connection oriented socket and the connection
+was forcibly closed by the peer and is no longer valid. I/O can no longer be
+performed to \fIfiledes\fR.
 .RE
 
 .sp
@@ -259,7 +267,6 @@ One of the \fIiov_len\fR values in the \fBmsg_iov\fR array member of the
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -277,9 +284,8 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBfcntl\fR(2), \fBioctl\fR(2), \fBread\fR(2), \fBconnect\fR(3SOCKET),
 \fBgetsockopt\fR(3SOCKET), \fBlibxnet\fR(3LIB), \fBselect\fR(3C),
-\fBsend\fR(3SOCKET), \fBsocket\fR(3SOCKET), \fBsocket.h\fR(3HEAD),
-\fBattributes\fR(5)
+\fBsend\fR(3SOCKET), \fBsockaddr\fR(3SOCKET), \fBsocket\fR(3SOCKET),
+\fBsocket.h\fR(3HEAD), \fBattributes\fR(5)

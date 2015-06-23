@@ -60,6 +60,7 @@ OUTPUTMAP = {
         ("path", "path=")
     ],
     "link": [
+        ("mediator", "mediator="),
         ("path", "path="),
         ("target", "target=")
     ],
@@ -196,9 +197,10 @@ class FileInfo(object):
 
         #
         # For symlinks, all that's left is the link target.
+        # For mediated symlinks targets can differ.
         #
         if typelhs == "link":
-            return lhs.target != rhs.target
+            return (lhs.mediator is None) and (lhs.target != rhs.target)
 
         #
         # For a directory, it's important that both be directories,
@@ -306,6 +308,7 @@ class ActionInfo(FileInfo):
         elif action.name == "link":
             target = action.attrs["target"]
             self.target = os.path.normpath(target)
+            self.mediator = action.attrs.get("mediator")
         elif action.name == "dir":
             self.owner = action.attrs["owner"]
             self.group = action.attrs["group"]
@@ -366,6 +369,7 @@ class RealFileInfo(FileInfo):
             self.isdir = True
         elif stat.S_ISLNK(mode):
             self.target = os.path.normpath(os.readlink(path))
+            self.mediator = None
         else:
             raise UnsupportedFileFormatError(path, mode)
 

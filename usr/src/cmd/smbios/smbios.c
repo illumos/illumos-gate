@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright 2015 OmniTI Computer Consulting, Inc.  All rights reserved.
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -337,6 +338,8 @@ print_chassis(smbios_hdl_t *shp, id_t id, FILE *fp)
 	(void) smbios_info_chassis(shp, id, &c);
 
 	oprintf(fp, "  OEM Data: 0x%x\n", c.smbc_oemdata);
+	oprintf(fp, "  SKU number: %s\n",
+	    c.smbc_sku == NULL ? "<unknown>" : c.smbc_sku);
 	oprintf(fp, "  Lock Present: %s\n", c.smbc_lock ? "Y" : "N");
 
 	desc_printf(smbios_chassis_type_desc(c.smbc_type),
@@ -398,6 +401,10 @@ print_processor(smbios_hdl_t *shp, id_t id, FILE *fp)
 	desc_printf(smbios_processor_family_desc(p.smbp_family),
 	    fp, "  Family: %u", p.smbp_family);
 
+	if (p.smbp_family2 != 0)
+		desc_printf(smbios_processor_family_desc(p.smbp_family2),
+		    fp, "  Family Ext: %u", p.smbp_family2);
+
 	oprintf(fp, "  CPUID: 0x%llx\n", (u_longlong_t)p.smbp_cpuid);
 
 	desc_printf(smbios_processor_type_desc(p.smbp_type),
@@ -432,6 +439,28 @@ print_processor(smbios_hdl_t *shp, id_t id, FILE *fp)
 		    (float)SMB_PRV_VOLTAGE(p.smbp_voltage) / 10);
 	}
 
+	if (p.smbp_corecount != 0)
+		oprintf(fp, "  Core Count: %u\n", p.smbp_corecount);
+	else
+		oprintf(fp, "  Core Count: Unknown\n");
+
+	if (p.smbp_coresenabled != 0)
+		oprintf(fp, "  Cores Enabled: %u\n", p.smbp_coresenabled);
+	else
+		oprintf(fp, "  Cores Enabled: Unknown\n");
+
+	if (p.smbp_threadcount != 0)
+		oprintf(fp, "  Thread Count: %u\n", p.smbp_threadcount);
+	else
+		oprintf(fp, "  Thread Count: Unknown\n");
+
+	if (p.smbp_cflags) {
+		flag_printf(fp, "Processor Characteristics",
+		    p.smbp_cflags, sizeof (p.smbp_cflags) * NBBY,
+		    smbios_processor_core_flag_name,
+		    smbios_processor_core_flag_desc);
+	}
+
 	if (p.smbp_clkspeed != 0)
 		oprintf(fp, "  External Clock Speed: %uMHz\n", p.smbp_clkspeed);
 	else
@@ -447,9 +476,9 @@ print_processor(smbios_hdl_t *shp, id_t id, FILE *fp)
 	else
 		oprintf(fp, "  Current Speed: Unknown\n");
 
-	id_printf(fp, "  L1 Cache: ", p.smbp_l1cache);
-	id_printf(fp, "  L2 Cache: ", p.smbp_l2cache);
-	id_printf(fp, "  L3 Cache: ", p.smbp_l3cache);
+	id_printf(fp, "	 L1 Cache: ", p.smbp_l1cache);
+	id_printf(fp, "	 L2 Cache: ", p.smbp_l2cache);
+	id_printf(fp, "	 L3 Cache: ", p.smbp_l3cache);
 }
 
 static void
@@ -675,11 +704,11 @@ print_bytes(const uint8_t *data, size_t size, FILE *fp)
 	char buf[17];
 	uint8_t x;
 
-	oprintf(fp, "\n  offset:   0 1 2 3  4 5 6 7  8 9 a b  c d e f  "
+	oprintf(fp, "\n	 offset:   0 1 2 3  4 5 6 7  8 9 a b  c d e f  "
 	    "0123456789abcdef\n");
 
 	for (row = 0; row < rows; row++) {
-		oprintf(fp, "    %#4lx: ", (ulong_t)row * 16);
+		oprintf(fp, "	 %#4lx: ", (ulong_t)row * 16);
 		cols = MIN(size - row * 16, 16);
 
 		for (col = 0; col < cols; col++) {
@@ -721,7 +750,7 @@ print_memarray(smbios_hdl_t *shp, id_t id, FILE *fp)
 	    fp, "  ECC: %u", ma.smbma_ecc);
 
 	oprintf(fp, "  Number of Slots/Sockets: %u\n", ma.smbma_ndevs);
-	id_printf(fp, "  Memory Error Data: ", ma.smbma_err);
+	id_printf(fp, "	 Memory Error Data: ", ma.smbma_err);
 	oprintf(fp, "  Max Capacity: %llu bytes\n",
 	    (u_longlong_t)ma.smbma_size);
 }
@@ -733,8 +762,8 @@ print_memdevice(smbios_hdl_t *shp, id_t id, FILE *fp)
 
 	(void) smbios_info_memdevice(shp, id, &md);
 
-	id_printf(fp, "  Physical Memory Array: ", md.smbmd_array);
-	id_printf(fp, "  Memory Error Data: ", md.smbmd_error);
+	id_printf(fp, "	 Physical Memory Array: ", md.smbmd_array);
+	id_printf(fp, "	 Memory Error Data: ", md.smbmd_error);
 
 	if (md.smbmd_twidth != -1u)
 		oprintf(fp, "  Total Width: %u bits\n", md.smbmd_twidth);
@@ -768,6 +797,13 @@ print_memdevice(smbios_hdl_t *shp, id_t id, FILE *fp)
 	else
 		oprintf(fp, "  Set: %u\n", md.smbmd_set);
 
+	if (md.smbmd_rank != 0) {
+		desc_printf(smbios_memdevice_rank_desc(md.smbmd_rank),
+		    fp, "  Rank: %u", md.smbmd_rank);
+	} else {
+		oprintf(fp, "  Rank: Unknown\n");
+	}
+
 	desc_printf(smbios_memdevice_type_desc(md.smbmd_type),
 	    fp, "  Memory Type: %u", md.smbmd_type);
 
@@ -775,12 +811,38 @@ print_memdevice(smbios_hdl_t *shp, id_t id, FILE *fp)
 	    smbios_memdevice_flag_name, smbios_memdevice_flag_desc);
 
 	if (md.smbmd_speed != 0)
-		oprintf(fp, "  Speed: %uns\n", md.smbmd_speed);
+		oprintf(fp, "  Speed: %u MHz\n", md.smbmd_speed);
 	else
 		oprintf(fp, "  Speed: Unknown\n");
 
+	if (md.smbmd_clkspeed != 0)
+		oprintf(fp, "  Configured Speed: %u MHz\n", md.smbmd_clkspeed);
+	else
+		oprintf(fp, "  Configured Speed: Unknown\n");
+
 	oprintf(fp, "  Device Locator: %s\n", md.smbmd_dloc);
 	oprintf(fp, "  Bank Locator: %s\n", md.smbmd_bloc);
+
+	if (md.smbmd_minvolt != 0) {
+		oprintf(fp, "  Minimum Voltage: %.2fV\n",
+		    md.smbmd_minvolt / 1000.0);
+	} else {
+		oprintf(fp, "  Minimum Voltage: Unknown\n");
+	}
+
+	if (md.smbmd_maxvolt != 0) {
+		oprintf(fp, "  Maximum Voltage: %.2fV\n",
+		    md.smbmd_maxvolt / 1000.0);
+	} else {
+		oprintf(fp, "  Maximum Voltage: Unknown\n");
+	}
+
+	if (md.smbmd_confvolt != 0) {
+		oprintf(fp, "  Configured Voltage: %.2fV\n",
+		    md.smbmd_confvolt / 1000.0);
+	} else {
+		oprintf(fp, "  Configured Voltage: Unknown\n");
+	}
 }
 
 static void
@@ -790,7 +852,7 @@ print_memarrmap(smbios_hdl_t *shp, id_t id, FILE *fp)
 
 	(void) smbios_info_memarrmap(shp, id, &ma);
 
-	id_printf(fp, "  Physical Memory Array: ", ma.smbmam_array);
+	id_printf(fp, "	 Physical Memory Array: ", ma.smbmam_array);
 	oprintf(fp, "  Devices per Row: %u\n", ma.smbmam_width);
 
 	oprintf(fp, "  Physical Address: 0x%llx\n  Size: %llu bytes\n",
@@ -804,8 +866,8 @@ print_memdevmap(smbios_hdl_t *shp, id_t id, FILE *fp)
 
 	(void) smbios_info_memdevmap(shp, id, &md);
 
-	id_printf(fp, "  Memory Device: ", md.smbmdm_device);
-	id_printf(fp, "  Memory Array Mapped Address: ", md.smbmdm_arrmap);
+	id_printf(fp, "	 Memory Device: ", md.smbmdm_device);
+	id_printf(fp, "	 Memory Array Mapped Address: ", md.smbmdm_arrmap);
 
 	oprintf(fp, "  Physical Address: 0x%llx\n  Size: %llu bytes\n",
 	    (u_longlong_t)md.smbmdm_addr, (u_longlong_t)md.smbmdm_size);
@@ -979,11 +1041,11 @@ print_struct(smbios_hdl_t *shp, const smbios_struct_t *sp, void *fp)
 	    (uint_t)sp->smbstr_id, (ulong_t)sp->smbstr_size);
 
 	if ((s = smbios_type_name(sp->smbstr_type)) != NULL)
-		oprintf(fp, " %s", s);
+		oprintf(fp, " %s (type %u)", s, sp->smbstr_type);
 	else if (sp->smbstr_type > SMB_TYPE_OEM_LO &&
 	    sp->smbstr_type < SMB_TYPE_OEM_HI)
-		oprintf(fp, " %s+%u", "SMB_TYPE_OEM_LO",
-		    sp->smbstr_type - SMB_TYPE_OEM_LO);
+		oprintf(fp, " %s+%u (type %u)", "SMB_TYPE_OEM_LO",
+		    sp->smbstr_type - SMB_TYPE_OEM_LO, sp->smbstr_type);
 	else
 		oprintf(fp, " %u", sp->smbstr_type);
 

@@ -25,6 +25,8 @@
 
 /*
  * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2015 Toomas Soome <tsoome@me.com>
+ * Copyright 2015 Gary Mills
  */
 
 /*
@@ -131,7 +133,8 @@ usage(void)
 	    "\t\t[-o property=value] ... [-p zpool] [-v] beName@snapshot\n"
 	    "\tbeadm destroy [-Ffsv] beName \n"
 	    "\tbeadm destroy [-Fv] beName@snapshot \n"
-	    "\tbeadm list [[-a] | [-d] [-s]] [-H] [-v] [beName]\n"
+	    "\tbeadm list [[-a] | [-d] [-s]] [-H]\n"
+	    "\t\t[-k|-K date | name | space] [-v] [beName]\n"
 	    "\tbeadm mount [-s ro|rw] [-v] beName [mountpoint]\n"
 	    "\tbeadm unmount [-fv] beName | mountpoint\n"
 	    "\tbeadm umount [-fv] beName | mountpoint\n"
@@ -1085,8 +1088,9 @@ be_do_list(int argc, char **argv)
 	int		err = 1;
 	int		c = 0;
 	char		*be_name = NULL;
+	be_sort_t	order = BE_SORT_UNSPECIFIED;
 
-	while ((c = getopt(argc, argv, "adsvH")) != -1) {
+	while ((c = getopt(argc, argv, "adk:svHK:")) != -1) {
 		switch (c) {
 		case 'a':
 			all = B_TRUE;
@@ -1094,6 +1098,39 @@ be_do_list(int argc, char **argv)
 		case 'd':
 			dsets = B_TRUE;
 			break;
+		case 'k':
+		case 'K':
+			if (order != BE_SORT_UNSPECIFIED) {
+				(void) fprintf(stderr, _("Sort key can be "
+				    "specified only once.\n"));
+				usage();
+				return (1);
+			}
+			if (strcmp(optarg, "date") == 0) {
+				if (c == 'k')
+					order = BE_SORT_DATE;
+				else
+					order = BE_SORT_DATE_REV;
+				break;
+			}
+			if (strcmp(optarg, "name") == 0) {
+				if (c == 'k')
+					order = BE_SORT_NAME;
+				else
+					order = BE_SORT_NAME_REV;
+				break;
+			}
+			if (strcmp(optarg, "space") == 0) {
+				if (c == 'k')
+					order = BE_SORT_SPACE;
+				else
+					order = BE_SORT_SPACE_REV;
+				break;
+			}
+			(void) fprintf(stderr, _("Unknown sort key: %s\n"),
+			    optarg);
+			usage();
+			return (1);
 		case 's':
 			snaps = B_TRUE;
 			break;
@@ -1138,6 +1175,21 @@ be_do_list(int argc, char **argv)
 
 	switch (err) {
 	case BE_SUCCESS:
+		/* the default sort is ascending date, no need to sort twice */
+		if (order == BE_SORT_UNSPECIFIED)
+			order = BE_SORT_DATE;
+
+		if (order != BE_SORT_DATE) {
+			err = be_sort(&be_nodes, order);
+			if (err != BE_SUCCESS) {
+				(void) fprintf(stderr, _("Unable to sort Boot "
+				    "Environment\n"));
+				(void) fprintf(stderr, "%s\n",
+				    be_err_to_str(err));
+				break;
+			}
+		}
+
 		print_nodes(be_name, dsets, snaps, parsable, be_nodes);
 		break;
 	case BE_ERR_BE_NOENT:

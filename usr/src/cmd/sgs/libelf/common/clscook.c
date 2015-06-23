@@ -27,8 +27,6 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This stuff used to live in cook.c, but was moved out to
  * facilitate dual (Elf32 and Elf64) compilation.  See block
@@ -39,6 +37,7 @@
 #include <ar.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <sys/sysmacros.h>
 #include "decl.h"
 #include "member.h"
 #include "msg.h"
@@ -177,7 +176,7 @@ _elf_cookscn(Elf_Scn * s)
 	d->db_data.d_off = 0;
 	fsz = elf_fsize(d->db_data.d_type, 1, elf->ed_version);
 	msz = _elf_msize(d->db_data.d_type, elf->ed_version);
-	d->db_data.d_size = (sh->sh_size / fsz) * msz;
+	d->db_data.d_size = MAX(sh->sh_size, (sh->sh_size / fsz) * msz);
 	d->db_shsz = sh->sh_size;
 	d->db_raw = 0;
 	d->db_buf = 0;
@@ -315,7 +314,8 @@ _elf_phdr(Elf * elf, int inplace)
 	ELFACCESSDATA(work, _elf_work)
 	msz = _elf_msize(ELF_T_PHDR, work) * eh->e_phnum;
 	if ((eh->e_phoff == 0) ||
-	    ((fsz + eh->e_phoff) > elf->ed_fsz)) {
+	    (elf->ed_fsz <= eh->e_phoff) ||
+	    (elf->ed_fsz - eh->e_phoff < fsz)) {
 		_elf_seterr(EFMT_PHTAB, 0);
 		return (-1);
 	}

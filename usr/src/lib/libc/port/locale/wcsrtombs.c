@@ -1,4 +1,5 @@
 /*
+ * Copyright 2013 Garrett D'Amore <garrett@damore.org>
  * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2002-2004 Tim J. Robbins.
  * All rights reserved.
@@ -30,15 +31,24 @@
 #include <stdlib.h>
 #include <string.h>
 #include <wchar.h>
+#include "localeimpl.h"
+#include "lctype.h"
 #include "mblocal.h"
 
 size_t
-wcsrtombs(char *_RESTRICT_KYWD dst, const wchar_t **_RESTRICT_KYWD src,
-    size_t len, mbstate_t *_RESTRICT_KYWD ps)
+wcsrtombs_l(char *_RESTRICT_KYWD dst, const wchar_t **_RESTRICT_KYWD src,
+    size_t len, mbstate_t *_RESTRICT_KYWD ps, locale_t loc)
 {
 	static mbstate_t mbs;
 
 	if (ps == NULL)
 		ps = &mbs;
-	return (__wcsnrtombs(dst, src, ULONG_MAX, len, ps));
+	return (loc->ctype->lc_wcsnrtombs(dst, src, ULONG_MAX, len, ps));
+}
+
+size_t
+wcsrtombs(char *_RESTRICT_KYWD dst, const wchar_t **_RESTRICT_KYWD src,
+    size_t len, mbstate_t *_RESTRICT_KYWD ps)
+{
+	return (wcsrtombs_l(dst, src, len, ps, uselocale(NULL)));
 }

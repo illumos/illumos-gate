@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/vfs.h>
@@ -27,7 +28,7 @@
 #include <smbsrv/smb_kproto.h>
 
 static smb_vfs_t *smb_vfs_find(smb_export_t *, vfs_t *);
-static void smb_vfs_destroy(smb_export_t *, smb_vfs_t *);
+static void smb_vfs_destroy(smb_vfs_t *);
 
 /*
  * If a hold on the specified VFS has already been taken
@@ -60,7 +61,7 @@ smb_vfs_hold(smb_export_t *se, vfs_t *vfsp)
 		return (rc);
 	}
 
-	smb_vfs = kmem_cache_alloc(se->e_cache_vfs, KM_SLEEP);
+	smb_vfs = kmem_cache_alloc(smb_kshare_cache_vfs, KM_SLEEP);
 
 	bzero(smb_vfs, sizeof (smb_vfs_t));
 
@@ -95,13 +96,13 @@ smb_vfs_rele(smb_export_t *se, vfs_t *vfsp)
 
 	smb_llist_enter(&se->e_vfs_list, RW_WRITER);
 	smb_vfs = smb_vfs_find(se, vfsp);
-	DTRACE_PROBE1(smb_vfs_release, smb_vfs_t *, smb_vfs)
+	DTRACE_PROBE1(smb_vfs_release, smb_vfs_t *, smb_vfs);
 	if (smb_vfs) {
 		ASSERT(smb_vfs->sv_refcnt);
 		if (--smb_vfs->sv_refcnt == 0) {
 			smb_llist_remove(&se->e_vfs_list, smb_vfs);
 			smb_llist_exit(&se->e_vfs_list);
-			smb_vfs_destroy(se, smb_vfs);
+			smb_vfs_destroy(smb_vfs);
 			return;
 		}
 	}
@@ -126,7 +127,7 @@ smb_vfs_rele_all(smb_export_t *se)
 		ASSERT(smb_vfs->sv_magic == SMB_VFS_MAGIC);
 		DTRACE_PROBE1(smb_vfs_rele_all_hit, smb_vfs_t *, smb_vfs);
 		smb_llist_remove(&se->e_vfs_list, smb_vfs);
-		smb_vfs_destroy(se, smb_vfs);
+		smb_vfs_destroy(smb_vfs);
 	}
 	smb_llist_exit(&se->e_vfs_list);
 }
@@ -155,9 +156,9 @@ smb_vfs_find(smb_export_t *se, vfs_t *vfsp)
 }
 
 static void
-smb_vfs_destroy(smb_export_t *se, smb_vfs_t *smb_vfs)
+smb_vfs_destroy(smb_vfs_t *smb_vfs)
 {
 	VN_RELE(smb_vfs->sv_rootvp);
 	smb_vfs->sv_magic = (uint32_t)~SMB_VFS_MAGIC;
-	kmem_cache_free(se->e_cache_vfs, smb_vfs);
+	kmem_cache_free(smb_kshare_cache_vfs, smb_vfs);
 }

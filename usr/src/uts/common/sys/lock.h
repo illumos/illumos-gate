@@ -19,14 +19,15 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
 #ifndef _SYS_LOCK_H
 #define	_SYS_LOCK_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 11.7	*/
 
 #ifdef	__cplusplus
 extern "C" {
@@ -44,19 +45,11 @@ extern "C" {
 
 #define	MEMLOCK	 8
 
-#if defined(__STDC__)
 int punlock(void);
-#else
-int punlock();
-#endif	/* __STDC__ */
 
 #else
 
-#if defined(__STDC__)
 int plock(int);
-#else
-int plock();
-#endif	/* __STDC__ */
 
 #endif	/* _KERNEL */
 

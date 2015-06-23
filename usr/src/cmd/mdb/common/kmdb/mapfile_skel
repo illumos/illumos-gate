@@ -21,6 +21,7 @@
 /* BEGIN PROLOGUE */
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  */
 
 /*
@@ -44,10 +45,19 @@ SYMBOL_SCOPE {
 		 * Secret additions to the module API
 		 */
 
-		/* Implementation detail of the ctype macros */
-		__ctype;	/* variable */
 		/* There should be only one - ours */
 		errno;		/* variable */
+		isprint;
+		isalnum;
+		isalpha;
+		isgraph;
+		iscntrl;
+		isdigit;
+		isxdigit;
+		isupper;
+		islower;
+		ispunct;
+		isspace;
 
 		mdb_tgt_aread;
 		mdb_dis_create;

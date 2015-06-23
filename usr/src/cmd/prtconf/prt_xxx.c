@@ -422,8 +422,8 @@ dump_priv_data(int ilev, di_node_t node)
 int
 print_pciid(di_node_t node, di_prom_handle_t ph, pcidb_hdl_t *pci)
 {
-	pcidb_vendor_t *vend;
-	pcidb_device_t *dev;
+	pcidb_vendor_t *vend = NULL;
+	pcidb_device_t *dev = NULL;
 	di_node_t pnode = di_parent_node(node);
 	char *s = NULL;
 	int *i, type = di_nodeid(node);
@@ -447,7 +447,7 @@ print_pciid(di_node_t node, di_prom_handle_t ph, pcidb_hdl_t *pci)
 	    "device-id", &i) > 0)
 		(void) printf(",%x", i[0]);
 
-	if (pci != NULL)
+	if (vend != NULL)
 		dev = pcidb_lookup_device_by_vendor(vend, i[0]);
 
 	(void) printf(") [");

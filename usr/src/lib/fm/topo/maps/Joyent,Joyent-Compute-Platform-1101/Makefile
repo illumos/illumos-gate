@@ -38,4 +38,6 @@ SRCDIR = ../Joyent,Joyent-Compute-Platform-1101
 PLATFORM = Joyent-Compute-Platform-1101
 TOPOBASE = ../i86pc/i86pc-hc-topology.xml
 
+CLOBBERFILES +=	$(TOPOFILE)
+
 include ../Makefile.map

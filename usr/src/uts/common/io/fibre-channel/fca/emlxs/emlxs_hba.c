@@ -5,8 +5,8 @@
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
  *
- * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
+ * You can obtain a copy of the license at
+ * http://www.opensource.org/licenses/cddl1.txt.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -20,10 +20,9 @@
  */
 
 /*
- * Copyright 2010 Emulex.  All rights reserved.
+ * Copyright (c) 2004-2012 Emulex. All rights reserved.
  * Use is subject to license terms.
  */
-
 
 #define	EMLXS_FW_TABLE_DEF
 #define	EMLXS_MODEL_DEF
@@ -72,6 +71,29 @@ emlxs_table_t emlxs_pci_cap[] = {
 	{PCI_CAP_ID_FLR, "PCI_CAP_ID_FLR"}
 
 }; /* emlxs_pci_cap */
+
+emlxs_table_t emlxs_pci_ecap[] = {
+	{PCIE_EXT_CAP_ID_AER, "PCIE_EXT_CAP_ID_AER"},
+	{PCIE_EXT_CAP_ID_VC, "PCIE_EXT_CAP_ID_VC"},
+	{PCIE_EXT_CAP_ID_SER, "PCIE_EXT_CAP_ID_SER"},
+	{PCIE_EXT_CAP_ID_PWR_BUDGET, "PCIE_EXT_CAP_ID_PWR_BUDGET"},
+	{PCIE_EXT_CAP_ID_RC_LINK_DECL, "PCIE_EXT_CAP_ID_RC_LINK_DECL"},
+	{PCIE_EXT_CAP_ID_RC_INT_LINKCTRL, "PCIE_EXT_CAP_ID_RC_INT_LINKCTRL"},
+	{PCIE_EXT_CAP_ID_RC_EVNT_CEA, "PCIE_EXT_CAP_ID_RC_EVNT_CEA"},
+	{PCIE_EXT_CAP_ID_MFVC, "PCIE_EXT_CAP_ID_MFVC"},
+	{PCIE_EXT_CAP_ID_VC_WITH_MFVC, "PCIE_EXT_CAP_ID_VC_WITH_MFVC"},
+	{PCIE_EXT_CAP_ID_RCRB, "PCIE_EXT_CAP_ID_RCRB"},
+	{PCIE_EXT_CAP_ID_VS, "PCIE_EXT_CAP_ID_VS"},
+	{PCIE_EXT_CAP_ID_CAC, "PCIE_EXT_CAP_ID_CAC"},
+	{PCIE_EXT_CAP_ID_ACS, "PCIE_EXT_CAP_ID_ACS"},
+	{PCIE_EXT_CAP_ID_ARI, "PCIE_EXT_CAP_ID_ARI"},
+	{PCIE_EXT_CAP_ID_ATS, "PCIE_EXT_CAP_ID_ATS"},
+	{PCI_EXT_CAP_ID_SRIOV, "PCI_EXT_CAP_ID_SRIOV"},
+	{PCI_EXT_CAP_ID_TPH, "PCI_EXT_CAP_ID_TPH"},
+	{PCI_EXT_CAP_ID_SEC_PCI, "PCI_EXT_CAP_ID_SEC_PCI"}
+
+}; /* emlxs_pci_ecap */
+
 
 emlxs_table_t emlxs_ring_table[] = {
 	{FC_FCP_RING, "FCP Ring"},
@@ -123,7 +145,6 @@ emlxs_msi_init(emlxs_hba_t *hba, uint32_t max)
 	int32_t *intr_cap = NULL;
 	int32_t hilevel_pri;
 	emlxs_config_t *cfg = &CFG;
-	char buf[64];
 
 	if (!(hba->intr_flags & EMLXS_MSI_ENABLED)) {
 		return (emlxs_intx_init(hba, max));
@@ -187,7 +208,7 @@ begin:
 
 		if (ret == DDI_SUCCESS && nintrs) {
 			type = DDI_INTR_TYPE_MSIX;
-			(void) strcpy(s_type, "TYPE_MSIX");
+			(void) strlcpy(s_type, "TYPE_MSIX", sizeof (s_type));
 			goto initialize;
 		}
 	}
@@ -202,7 +223,7 @@ begin:
 
 		if (ret == DDI_SUCCESS && nintrs) {
 			type = DDI_INTR_TYPE_MSI;
-			(void) strcpy(s_type, "TYPE_MSI");
+			(void) strlcpy(s_type, "TYPE_MSI", sizeof (s_type));
 			goto initialize;
 		}
 	}
@@ -218,7 +239,7 @@ begin:
 
 		if (ret == DDI_SUCCESS) {
 			type = DDI_INTR_TYPE_FIXED;
-			(void) strcpy(s_type, "TYPE_FIXED");
+			(void) strlcpy(s_type, "TYPE_FIXED", sizeof (s_type));
 			goto initialize;
 		}
 	}
@@ -404,9 +425,7 @@ initialize:
 		hba->intr_map[i] = emlxs_msi_map[mode][i];
 		hba->intr_cond |= emlxs_msi_map[mode][i];
 
-		(void) sprintf(buf, "%s%d_msi%d mutex", DRIVER_NAME,
-		    hba->ddiinst, i);
-		mutex_init(&hba->intr_lock[i], buf, MUTEX_DRIVER,
+		mutex_init(&hba->intr_lock[i], NULL, MUTEX_DRIVER,
 		    DDI_INTR_PRI(hba->intr_arg));
 	}
 
@@ -415,9 +434,7 @@ initialize:
 
 	/* Create the interrupt threads */
 	for (i = 0; i < hba->chan_count; i++) {
-		(void) sprintf(buf, "%s%d_channel%d mutex", DRIVER_NAME,
-		    hba->ddiinst, i);
-		mutex_init(&hba->chan[i].rsp_lock, buf, MUTEX_DRIVER,
+		mutex_init(&hba->chan[i].rsp_lock, NULL, MUTEX_DRIVER,
 		    DDI_INTR_PRI(hba->intr_arg));
 
 		emlxs_thread_create(hba, &hba->chan[i].intr_thread);
@@ -490,7 +507,7 @@ emlxs_msi_uninit(emlxs_hba_t *hba)
 
 	/*
 	 * EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_init_debug_msg,
-	 *    "MSI: emlxs_msi_uninit called. flags=%x",
+	 *    "MSI: msi_uninit called. flags=%x",
 	 *    hba->intr_flags);
 	 */
 
@@ -556,7 +573,7 @@ emlxs_msi_uninit(emlxs_hba_t *hba)
 
 	/*
 	 * EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_init_debug_msg,
-	 *    "MSI: emlxs_msi_uninit done. flags=%x",
+	 *    "MSI: msi_uninit done. flags=%x",
 	 *    hba->intr_flags);
 	 */
 
@@ -687,7 +704,7 @@ emlxs_msi_remove(emlxs_hba_t *hba)
 
 	/*
 	 * EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_init_debug_msg,
-	 *    "MSI: emlxs_msi_remove called. flags=%x",
+	 *    "MSI: msi_remove called. flags=%x",
 	 *    hba->intr_flags);
 	 */
 
@@ -763,7 +780,6 @@ emlxs_intx_init(emlxs_hba_t *hba, uint32_t max)
 	emlxs_config_t *cfg = &CFG;
 	int32_t ret;
 	uint32_t i;
-	char buf[64];
 
 	/* Check if interrupts have already been initialized */
 	if (hba->intr_flags & EMLXS_INTX_INITED) {
@@ -813,9 +829,7 @@ emlxs_intx_init(emlxs_hba_t *hba, uint32_t max)
 
 	/* Create the interrupt threads */
 	for (i = 0; i < hba->chan_count; i++) {
-		(void) sprintf(buf, "%s%d_channel%d mutex", DRIVER_NAME,
-		    hba->ddiinst, i);
-		mutex_init(&hba->chan[i].rsp_lock, buf, MUTEX_DRIVER,
+		mutex_init(&hba->chan[i].rsp_lock, NULL, MUTEX_DRIVER,
 		    DDI_INTR_PRI(hba->intr_arg));
 
 		emlxs_thread_create(hba, &hba->chan[i].intr_thread);
@@ -933,7 +947,6 @@ emlxs_process_link_speed(emlxs_hba_t *hba)
 {
 	emlxs_vpd_t *vpd;
 	emlxs_config_t *cfg;
-	char *cptr;
 	uint32_t hi;
 
 	/*
@@ -943,42 +956,41 @@ emlxs_process_link_speed(emlxs_hba_t *hba)
 	vpd = &VPD;
 	cfg = &hba->config[CFG_LINK_SPEED];
 
-	cptr = cfg->help;
-	(void) strcpy(cptr, "Select link speed. [0=Auto");
-	cptr += 26;
+	(void) strlcpy(cfg->help, "Select link speed. [0=Auto",
+	    EMLXS_CFG_HELP_SIZE);
 	hi = 0;
 
 	if (vpd->link_speed & LMT_1GB_CAPABLE) {
-		(void) strcpy(cptr, ", 1=1Gb");
-		cptr += 7;
+		(void) strlcat(cfg->help, ", 1=1Gb", EMLXS_CFG_HELP_SIZE);
 		hi = 1;
 	}
 
 	if (vpd->link_speed & LMT_2GB_CAPABLE) {
-		(void) strcpy(cptr, ", 2=2Gb");
-		cptr += 7;
+		(void) strlcat(cfg->help, ", 2=2Gb", EMLXS_CFG_HELP_SIZE);
 		hi = 2;
 	}
 
 	if (vpd->link_speed & LMT_4GB_CAPABLE) {
-		(void) strcpy(cptr, ", 4=4Gb");
-		cptr += 7;
+		(void) strlcat(cfg->help, ", 4=4Gb", EMLXS_CFG_HELP_SIZE);
 		hi = 4;
 	}
 
 	if (vpd->link_speed & LMT_8GB_CAPABLE) {
-		(void) strcpy(cptr, ", 8=8Gb");
-		cptr += 7;
+		(void) strlcat(cfg->help, ", 8=8Gb", EMLXS_CFG_HELP_SIZE);
 		hi = 8;
 	}
 
 	if (vpd->link_speed & LMT_10GB_CAPABLE) {
-		(void) strcpy(cptr, ", 10=10Gb");
-		cptr += 9;
+		(void) strlcat(cfg->help, ", 10=10Gb", EMLXS_CFG_HELP_SIZE);
 		hi = 10;
 	}
 
-	(void) strcpy(cptr, "]");
+	if (vpd->link_speed & LMT_16GB_CAPABLE) {
+		(void) strlcat(cfg->help, ", 16=16Gb", EMLXS_CFG_HELP_SIZE);
+		hi = 16;
+	}
+
+	(void) strlcat(cfg->help, "]", EMLXS_CFG_HELP_SIZE);
 	cfg->hi = hi;
 
 	/* Now revalidate the current parameter setting */
@@ -1042,7 +1054,7 @@ emlxs_parse_vpd(emlxs_hba_t *hba, uint8_t *vpd_buf, uint32_t size)
 			bcopy(&vpd_buf[index], buffer,
 			    (block_size < (n - 1)) ? block_size : (n - 1));
 
-			(void) strcpy(vpd->id, buffer);
+			(void) strncpy(vpd->id, buffer, (sizeof (vpd->id)-1));
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_vpd_msg, "ID: %s",
 			    vpd->id);
 
@@ -1096,7 +1108,8 @@ emlxs_parse_vpd(emlxs_hba_t *hba, uint8_t *vpd_buf, uint32_t size)
 				 * Look for Engineering Change (EC)
 				 */
 				if (strcmp(tag, "EC") == 0) {
-					(void) strcpy(vpd->eng_change, buffer);
+					(void) strncpy(vpd->eng_change, buffer,
+					    (sizeof (vpd->eng_change)-1));
 					EMLXS_MSGF(EMLXS_CONTEXT,
 					    &emlxs_vpd_msg, "EC: %s",
 					    vpd->eng_change);
@@ -1105,8 +1118,9 @@ emlxs_parse_vpd(emlxs_hba_t *hba, uint8_t *vpd_buf, uint32_t size)
 				 * Look for Manufacturer (MN)
 				 */
 				else if (strcmp(tag, "MN") == 0) {
-					(void) strcpy(vpd->manufacturer,
-					    buffer);
+					(void) strncpy(vpd->manufacturer,
+					    buffer,
+					    (sizeof (vpd->manufacturer)-1));
 					EMLXS_MSGF(EMLXS_CONTEXT,
 					    &emlxs_vpd_msg, "MN: %s",
 					    vpd->manufacturer);
@@ -1115,7 +1129,8 @@ emlxs_parse_vpd(emlxs_hba_t *hba, uint8_t *vpd_buf, uint32_t size)
 				 * Look for Serial Number (SN)
 				 */
 				else if (strcmp(tag, "SN") == 0) {
-					(void) strcpy(vpd->serial_num, buffer);
+					(void) strncpy(vpd->serial_num, buffer,
+					    (sizeof (vpd->serial_num)-1));
 					EMLXS_MSGF(EMLXS_CONTEXT,
 					    &emlxs_vpd_msg, "SN: %s",
 					    vpd->serial_num);
@@ -1132,7 +1147,8 @@ emlxs_parse_vpd(emlxs_hba_t *hba, uint8_t *vpd_buf, uint32_t size)
 				 * Look for Part Number (PN)
 				 */
 				else if (strcmp(tag, "PN") == 0) {
-					(void) strcpy(vpd->part_num, buffer);
+					(void) strncpy(vpd->part_num, buffer,
+					    (sizeof (vpd->part_num)-1));
 					EMLXS_MSGF(EMLXS_CONTEXT,
 					    &emlxs_vpd_msg, "PN: %s",
 					    vpd->part_num);
@@ -1149,7 +1165,8 @@ emlxs_parse_vpd(emlxs_hba_t *hba, uint8_t *vpd_buf, uint32_t size)
 				 * Look for model description (V1)
 				 */
 				else if (strcmp(tag, "V1") == 0) {
-					(void) strcpy(vpd->model_desc, buffer);
+					(void) strncpy(vpd->model_desc, buffer,
+					    (sizeof (vpd->model_desc)-1));
 					EMLXS_MSGF(EMLXS_CONTEXT,
 					    &emlxs_vpd_msg, "Desc: %s",
 					    vpd->model_desc);
@@ -1158,7 +1175,8 @@ emlxs_parse_vpd(emlxs_hba_t *hba, uint8_t *vpd_buf, uint32_t size)
 				 * Look for model (V2)
 				 */
 				else if (strcmp(tag, "V2") == 0) {
-					(void) strcpy(vpd->model, buffer);
+					(void) strncpy(vpd->model, buffer,
+					    (sizeof (vpd->model)-1));
 					EMLXS_MSGF(EMLXS_CONTEXT,
 					    &emlxs_vpd_msg, "Model: %s",
 					    vpd->model);
@@ -1168,7 +1186,9 @@ emlxs_parse_vpd(emlxs_hba_t *hba, uint8_t *vpd_buf, uint32_t size)
 				 */
 
 				else if (strcmp(tag, "V3") == 0) {
-					(void) strcpy(vpd->prog_types, buffer);
+					(void) strncpy(vpd->prog_types,
+					    buffer,
+					    (sizeof (vpd->prog_types)-1));
 					EMLXS_MSGF(EMLXS_CONTEXT,
 					    &emlxs_vpd_msg, "Prog Types: %s",
 					    vpd->prog_types);
@@ -1177,7 +1197,8 @@ emlxs_parse_vpd(emlxs_hba_t *hba, uint8_t *vpd_buf, uint32_t size)
 				 * Look for port number (V4)
 				 */
 				else if (strcmp(tag, "V4") == 0) {
-					(void) strcpy(vpd->port_num, buffer);
+					(void) strncpy(vpd->port_num, buffer,
+					    (sizeof (vpd->port_num)-1));
 					vpd->port_index =
 					    emlxs_strtol(vpd->port_num, 10);
 
@@ -1239,6 +1260,10 @@ emlxs_parse_fcoe(emlxs_hba_t *hba, uint8_t *fcoep, uint32_t size)
 	tlv_fcoe_t *fcoelist;
 	tlv_fcfconnectlist_t *fcflist;
 	int i;
+	uint32_t flags;
+	uint32_t entry_count;
+	char FabricName[32];
+	char SwitchName[32];
 
 	/* Validate the config region 23 signature */
 	if ((*fcoep != 'R') || (*(fcoep+1) != 'G') ||
@@ -1272,8 +1297,28 @@ emlxs_parse_fcoe(emlxs_hba_t *hba, uint8_t *fcoep, uint32_t size)
 		fcflist = (tlv_fcfconnectlist_t *)(fcoep+i);
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_vpd_msg,
 		    "Found FCF ConnectList (A1):%d", fcflist->length);
+
 		bcopy((uint8_t *)fcflist, (uint8_t *)&hba->sli.sli4.cfgFCF,
 		    sizeof (tlv_fcfconnectlist_t));
+
+		/* Display the list */
+		entry_count = (hba->sli.sli4.cfgFCF.length *
+		    sizeof (uint32_t)) / sizeof (tlv_fcfconnectentry_t);
+
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_vpd_msg,
+		    "FCF List: %d entries", entry_count);
+
+		for (i = 0; i < entry_count; i++) {
+			flags = *(uint32_t *)&hba->sli.sli4.cfgFCF.entry[i];
+			(void) emlxs_wwn_xlate(FabricName, sizeof (FabricName),
+			    hba->sli.sli4.cfgFCF.entry[i].FabricName);
+			(void) emlxs_wwn_xlate(SwitchName, sizeof (SwitchName),
+			    hba->sli.sli4.cfgFCF.entry[i].SwitchName);
+
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_vpd_msg,
+			    "FCF List:%02d %08x %s %s",
+			    i, flags, FabricName, SwitchName);
+		}
 	}
 
 	return (1);
@@ -1287,28 +1332,40 @@ emlxs_decode_firmware_rev(emlxs_hba_t *hba, emlxs_vpd_t *vpd)
 	if (vpd->rBit) {
 		switch (hba->sli_mode) {
 		case EMLXS_HBA_SLI4_MODE:
-			(void) strcpy(vpd->fw_version, vpd->sli4FwName);
-			(void) strcpy(vpd->fw_label, vpd->sli4FwLabel);
+			(void) strncpy(vpd->fw_version, vpd->sli4FwName,
+			    (sizeof (vpd->fw_version)-1));
+			(void) strncpy(vpd->fw_label, vpd->sli4FwLabel,
+			    (sizeof (vpd->fw_label)-1));
 			break;
 		case EMLXS_HBA_SLI3_MODE:
-			(void) strcpy(vpd->fw_version, vpd->sli3FwName);
-			(void) strcpy(vpd->fw_label, vpd->sli3FwLabel);
+			(void) strncpy(vpd->fw_version, vpd->sli3FwName,
+			    (sizeof (vpd->fw_version)-1));
+			(void) strncpy(vpd->fw_label, vpd->sli3FwLabel,
+			    (sizeof (vpd->fw_label)-1));
 			break;
 		case EMLXS_HBA_SLI2_MODE:
-			(void) strcpy(vpd->fw_version, vpd->sli2FwName);
-			(void) strcpy(vpd->fw_label, vpd->sli2FwLabel);
+			(void) strncpy(vpd->fw_version, vpd->sli2FwName,
+			    (sizeof (vpd->fw_version)-1));
+			(void) strncpy(vpd->fw_label, vpd->sli2FwLabel,
+			    (sizeof (vpd->fw_label)-1));
 			break;
 		case EMLXS_HBA_SLI1_MODE:
-			(void) strcpy(vpd->fw_version, vpd->sli1FwName);
-			(void) strcpy(vpd->fw_label, vpd->sli1FwLabel);
+			(void) strncpy(vpd->fw_version, vpd->sli1FwName,
+			    (sizeof (vpd->fw_version)-1));
+			(void) strncpy(vpd->fw_label, vpd->sli1FwLabel,
+			    (sizeof (vpd->fw_label)-1));
 			break;
 		default:
-			(void) strcpy(vpd->fw_version, "unknown");
-			(void) strcpy(vpd->fw_label, vpd->fw_version);
+			(void) strncpy(vpd->fw_version, "unknown",
+			    (sizeof (vpd->fw_version)-1));
+			(void) strncpy(vpd->fw_label, vpd->fw_version,
+			    (sizeof (vpd->fw_label)-1));
 		}
 	} else {
-		emlxs_decode_version(vpd->smFwRev, vpd->fw_version);
-		(void) strcpy(vpd->fw_label, vpd->fw_version);
+		emlxs_decode_version(vpd->smFwRev, vpd->fw_version,
+		    sizeof (vpd->fw_version));
+		(void) strncpy(vpd->fw_label, vpd->fw_version,
+		    (sizeof (vpd->fw_label)-1));
 	}
 
 	return;
@@ -1318,7 +1375,7 @@ emlxs_decode_firmware_rev(emlxs_hba_t *hba, emlxs_vpd_t *vpd)
 
 
 extern void
-emlxs_decode_version(uint32_t version, char *buffer)
+emlxs_decode_version(uint32_t version, char *buffer, size_t len)
 {
 	uint32_t b1, b2, b3, b4;
 	char c;
@@ -1329,7 +1386,7 @@ emlxs_decode_version(uint32_t version, char *buffer)
 	b4 = (version & 0x00000030) >> 4;
 
 	if (b1 == 0 && b2 == 0) {
-		(void) sprintf(buffer, "none");
+		(void) snprintf(buffer, len, "none");
 		return;
 	}
 
@@ -1354,9 +1411,9 @@ emlxs_decode_version(uint32_t version, char *buffer)
 	b4 = (version & 0x0000000f);
 
 	if (c == 0) {
-		(void) sprintf(buffer, "%d.%d%d", b1, b2, b3);
+		(void) snprintf(buffer, len, "%d.%d%d", b1, b2, b3);
 	} else {
-		(void) sprintf(buffer, "%d.%d%d%c%d", b1, b2, b3, c, b4);
+		(void) snprintf(buffer, len, "%d.%d%d%c%d", b1, b2, b3, c, b4);
 	}
 
 	return;
@@ -1365,12 +1422,13 @@ emlxs_decode_version(uint32_t version, char *buffer)
 
 
 extern void
-emlxs_decode_label(char *label, char *buffer, int bige)
+emlxs_decode_label(char *label, char *buffer, int bige, size_t len)
 {
 	uint32_t i;
 	char name[16];
 
-	bcopy(label, name, sizeof (name));
+	bzero(name, sizeof (name));
+	bcopy(label, name, MIN(sizeof (name), len));
 	/* bige is TRUE if the data format is big endian */
 
 	if (bige) {
@@ -1393,7 +1451,7 @@ emlxs_decode_label(char *label, char *buffer, int bige)
 		}
 	}
 
-	(void) strcpy(buffer, name);
+	(void) strlcpy(buffer, name, len);
 
 	return;
 
@@ -1732,123 +1790,145 @@ emlxs_parse_prog_types(emlxs_hba_t *hba, char *prog_types)
 
 
 extern void
-emlxs_build_prog_types(emlxs_hba_t *hba, char *prog_types)
+emlxs_build_prog_types(emlxs_hba_t *hba, emlxs_vpd_t *vpd)
 {
 	uint32_t i;
 	uint32_t found = 0;
 	char buffer[256];
 
-	bzero(prog_types, 256);
+	bzero(vpd->prog_types, sizeof (vpd->prog_types));
 
 	/* Rebuild the prog type string */
 	if (hba->model_info.pt_2[0]) {
-		(void) strcat(prog_types, "T2:");
+		(void) strlcat(vpd->prog_types, "T2:",
+		    sizeof (vpd->prog_types));
 		found = 1;
 
 		i = 0;
-		while (hba->model_info.pt_2[i] && i < 8) {
-			(void) sprintf(buffer, "%X,", hba->model_info.pt_2[i]);
-			(void) strcat(prog_types, buffer);
+		while ((i < 8) && (hba->model_info.pt_2[i])) {
+			(void) snprintf(buffer, sizeof (buffer), "%X,",
+			    hba->model_info.pt_2[i]);
+			(void) strlcat(vpd->prog_types, buffer,
+			    sizeof (vpd->prog_types));
 			i++;
 		}
 	}
 
 	if (hba->model_info.pt_3[0]) {
-		(void) strcat(prog_types, "T3:");
+		(void) strlcat(vpd->prog_types, "T3:",
+		    sizeof (vpd->prog_types));
 		found = 1;
 
 		i = 0;
-		while (hba->model_info.pt_3[i] && i < 8) {
-			(void) sprintf(buffer, "%X,", hba->model_info.pt_3[i]);
-			(void) strcat(prog_types, buffer);
+		while ((i < 8) && (hba->model_info.pt_3[i])) {
+			(void) snprintf(buffer, sizeof (buffer), "%X,",
+			    hba->model_info.pt_3[i]);
+			(void) strlcat(vpd->prog_types, buffer,
+			    sizeof (vpd->prog_types));
 			i++;
 
 		}
 	}
 
 	if (hba->model_info.pt_6[0]) {
-		(void) strcat(prog_types, "T6:");
+		(void) strlcat(vpd->prog_types, "T6:",
+		    sizeof (vpd->prog_types));
 		found = 1;
 
 		i = 0;
-		while (hba->model_info.pt_6[i] && i < 8) {
-			(void) sprintf(buffer, "%X,", hba->model_info.pt_6[i]);
-			(void) strcat(prog_types, buffer);
+		while ((i < 8) && (hba->model_info.pt_6[i])) {
+			(void) snprintf(buffer, sizeof (buffer), "%X,",
+			    hba->model_info.pt_6[i]);
+			(void) strlcat(vpd->prog_types, buffer,
+			    sizeof (vpd->prog_types));
 			i++;
 		}
 	}
 
 	if (hba->model_info.pt_7[0]) {
-		(void) strcat(prog_types, "T7:");
+		(void) strlcat(vpd->prog_types, "T7:",
+		    sizeof (vpd->prog_types));
 		found = 1;
 
 		i = 0;
-		while (hba->model_info.pt_7[i] && i < 8) {
-			(void) sprintf(buffer, "%X,", hba->model_info.pt_7[i]);
-			(void) strcat(prog_types, buffer);
+		while ((i < 8) && (hba->model_info.pt_7[i])) {
+			(void) snprintf(buffer, sizeof (buffer), "%X,",
+			    hba->model_info.pt_7[i]);
+			(void) strlcat(vpd->prog_types, buffer,
+			    sizeof (vpd->prog_types));
 			i++;
 		}
 	}
 
 	if (hba->model_info.pt_A[0]) {
-		(void) strcat(prog_types, "TA:");
+		(void) strlcat(vpd->prog_types, "TA:",
+		    sizeof (vpd->prog_types));
 		found = 1;
 
 		i = 0;
-		while (hba->model_info.pt_A[i] && i < 8) {
-			(void) sprintf(buffer, "%X,", hba->model_info.pt_A[i]);
-			(void) strcat(prog_types, buffer);
+		while ((i < 8) && (hba->model_info.pt_A[i])) {
+			(void) snprintf(buffer, sizeof (buffer), "%X,",
+			    hba->model_info.pt_A[i]);
+			(void) strlcat(vpd->prog_types, buffer,
+			    sizeof (vpd->prog_types));
 			i++;
 		}
 	}
 
 
 	if (hba->model_info.pt_B[0]) {
-		(void) strcat(prog_types, "TB:");
+		(void) strlcat(vpd->prog_types, "TB:",
+		    sizeof (vpd->prog_types));
 		found = 1;
 
 		i = 0;
-		while (hba->model_info.pt_B[i] && i < 8) {
-			(void) sprintf(buffer, "%X,", hba->model_info.pt_B[i]);
-			(void) strcat(prog_types, buffer);
+		while ((i < 8) && (hba->model_info.pt_B[i])) {
+			(void) snprintf(buffer, sizeof (buffer), "%X,",
+			    hba->model_info.pt_B[i]);
+			(void) strlcat(vpd->prog_types, buffer,
+			    sizeof (vpd->prog_types));
 			i++;
 		}
 	}
 
 	if (hba->model_info.pt_20[0]) {
-		(void) strcat(prog_types, "T20:");
+		(void) strlcat(vpd->prog_types, "T20:",
+		    sizeof (vpd->prog_types));
 		found = 1;
 
 		i = 0;
-		while (hba->model_info.pt_20[i] && i < 8) {
-			(void) sprintf(buffer, "%X,", hba->model_info.pt_20[i]);
-			(void) strcat(prog_types, buffer);
+		while ((i < 8) && (hba->model_info.pt_20[i])) {
+			(void) snprintf(buffer, sizeof (buffer), "%X,",
+			    hba->model_info.pt_20[i]);
+			(void) strlcat(vpd->prog_types, buffer,
+			    sizeof (vpd->prog_types));
 			i++;
 		}
 	}
 
 	if (hba->model_info.pt_FF[0]) {
-		(void) strcat(prog_types, "TFF:");
+		(void) strlcat(vpd->prog_types, "TFF:",
+		    sizeof (vpd->prog_types));
 		found = 1;
 
 		i = 0;
-		while (hba->model_info.pt_FF[i] && i < 8) {
-			(void) sprintf(buffer, "%X,", hba->model_info.pt_FF[i]);
-			(void) strcat(prog_types, buffer);
+		while ((i < 8) && (hba->model_info.pt_FF[i])) {
+			(void) snprintf(buffer, sizeof (buffer), "%X,",
+			    hba->model_info.pt_FF[i]);
+			(void) strlcat(vpd->prog_types, buffer,
+			    sizeof (vpd->prog_types));
 			i++;
 		}
 	}
 
 	if (found) {
 		/* Terminate at the last comma in string */
-		prog_types[(strlen(prog_types) - 1)] = 0;
+		vpd->prog_types[(strlen(vpd->prog_types) - 1)] = 0;
 	}
 
 	return;
 
 } /* emlxs_build_prog_types() */
-
-
 
 
 extern uint32_t
@@ -1932,53 +2012,38 @@ emlxs_init_adapter_info(emlxs_hba_t *hba)
 
 		/* Check for the multifunction bit being set */
 		if ((cache_line & 0x00ff0000) == 0x00800000) {
-			channels = 2;
+			channels = EMLXS_MULTI_CHANNEL;
 		} else {
-			channels = 1;
+			channels = EMLXS_SINGLE_CHANNEL;
 		}
 
 		/* If device ids are unique, then use them for search */
 		if (device_id != ssdid) {
-			if (channels > 1) {
-				/*
-				 * Find matching adapter model using
-				 * device_id, ssdid and channels
-				 */
-				for (i = 1; i < emlxs_pci_model_count; i++) {
-					if (emlxs_pci_model[i].device_id ==
-					    device_id &&
-					    emlxs_pci_model[i].ssdid == ssdid &&
-					    emlxs_pci_model[i].channels ==
-					    channels) {
-						bcopy(&emlxs_pci_model[i],
-						    &hba->model_info,
-						    sizeof (emlxs_model_t));
-						found = 1;
-						break;
-					}
-				}
-			} else {
-				/*
-				 * Find matching adapter model using
-				 * device_id and ssdid
-				 */
-				for (i = 1; i < emlxs_pci_model_count; i++) {
-					if (emlxs_pci_model[i].device_id ==
-					    device_id &&
-					    emlxs_pci_model[i].ssdid == ssdid) {
-						bcopy(&emlxs_pci_model[i],
-						    &hba->model_info,
-						    sizeof (emlxs_model_t));
-						found = 1;
-						break;
-					}
+			/*
+			 * Find matching adapter model using
+			 * device_id, ssdid, and channels
+			 */
+			for (i = 1; i < emlxs_pci_model_count; i++) {
+				if (emlxs_pci_model[i].device_id ==
+				    device_id &&
+				    emlxs_pci_model[i].ssdid == ssdid &&
+				    emlxs_pci_model[i].channels ==
+				    channels) {
+					bcopy(&emlxs_pci_model[i],
+					    &hba->model_info,
+					    sizeof (emlxs_model_t));
+					found = 1;
+					break;
 				}
 			}
 		}
 
 		/* If adapter not found, try again */
 		if (!found) {
-			/* Find matching adapter model */
+			/*
+			 * Find matching adapter model using
+			 * device_id and channels
+			 */
 			for (i = 1; i < emlxs_pci_model_count; i++) {
 				if (emlxs_pci_model[i].device_id == device_id &&
 				    emlxs_pci_model[i].channels == channels) {
@@ -1993,7 +2058,10 @@ emlxs_init_adapter_info(emlxs_hba_t *hba)
 
 		/* If adapter not found, try one last time */
 		if (!found) {
-			/* Find matching adapter model */
+			/*
+			 * Find matching adapter model using
+			 * device_id only
+			 */
 			for (i = 1; i < emlxs_pci_model_count; i++) {
 				if (emlxs_pci_model[i].device_id == device_id) {
 					bcopy(&emlxs_pci_model[i],
@@ -2043,6 +2111,29 @@ emlxs_init_adapter_info(emlxs_hba_t *hba)
 			hba->model_info.flags &= ~EMLXS_MSIX_SUPPORTED;
 		}
 #endif /* MSI_SUPPORT */
+
+		/* Set the sli_intf value */
+		if (hba->pci_cap_offset[PCI_CAP_ID_VS]) {
+			/* Save the SLI_INTF register, this contains */
+			/* information about the BAR register layout */
+			/* and other HBA information. */
+			hba->sli_intf =
+			    ddi_get32(hba->pci_acc_handle,
+			    (uint32_t *)(hba->pci_addr +
+			    hba->pci_cap_offset[PCI_CAP_ID_VS] +
+			    PCI_VS_SLI_INTF_OFFSET));
+
+			EMLXS_MSGF(EMLXS_CONTEXT,
+			    &emlxs_init_debug_msg, "PCI_CAP_ID_VS: "
+			    "SLI_INTF:%08x",
+			    hba->sli_intf);
+
+			/* Check validity */
+			if ((hba->sli_intf & SLI_INTF_VALID_MASK) !=
+			    SLI_INTF_VALID) {
+				hba->sli_intf = 0;
+			}
+		}
 	}
 
 	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, hba->dip, 0,
@@ -2050,15 +2141,52 @@ emlxs_init_adapter_info(emlxs_hba_t *hba)
 		/* Parse the property for PCI function, device and bus no. */
 		hba->pci_function_number =
 		    (uint8_t)((prop[0] & 0x00000700) >> 8);
-		hba->pci_device_number = (uint8_t)((prop[0] & 0x00008100) >> 8);
+		hba->pci_device_number =
+		    (uint8_t)((prop[0] & 0x0000f800) >> 11);
 		hba->pci_bus_number = (uint8_t)((prop[0] & 0x00ff0000) >> 16);
 		ddi_prop_free((void *)prop);
 	}
 
-	if (hba->model_info.sli_mask & EMLXS_SLI4_MASK) {
-		hba->sli_api = emlxs_sli4_api;
-	} else {
+	switch (hba->sli_intf & SLI_INTF_SLI_REV_MASK) {
+	case SLI_INTF_SLI_REV_NONE: /* Legacy support */
+		if (hba->model_info.sli_mask & EMLXS_SLI4_MASK) {
+			hba->sli_api = emlxs_sli4_api;
+		} else {
+			hba->sli_api = emlxs_sli3_api;
+		}
+		break;
+
+	case SLI_INTF_SLI_REV_3:
+		if (!(hba->model_info.sli_mask & EMLXS_SLI3_MASK)) {
+			EMLXS_MSGF(EMLXS_CONTEXT,
+			    &emlxs_init_failed_msg,
+			    "Adapter does not support SLI3 interface. "
+			    "sli_intf=%08x sli_mask=%08x",
+			    hba->sli_intf, hba->model_info.sli_mask);
+			return (0);
+		}
 		hba->sli_api = emlxs_sli3_api;
+		break;
+
+	case SLI_INTF_SLI_REV_4:
+		if (!(hba->model_info.sli_mask & EMLXS_SLI4_MASK)) {
+			EMLXS_MSGF(EMLXS_CONTEXT,
+			    &emlxs_init_failed_msg,
+			    "Adapter does not support SLI4 interface. "
+			    "sli_intf=%08x sli_mask=%08x",
+			    hba->sli_intf, hba->model_info.sli_mask);
+			return (0);
+		}
+		hba->sli_api = emlxs_sli4_api;
+		break;
+
+	default:
+		EMLXS_MSGF(EMLXS_CONTEXT,
+		    &emlxs_init_failed_msg,
+		    "Invalid SLI interface specified. "
+		    "sli_intf=%08x sli_mask=%08x",
+		    hba->sli_intf, hba->model_info.sli_mask);
+		return (0);
 	}
 
 #ifdef FMA_SUPPORT
@@ -2184,7 +2312,7 @@ emlxs_shutdown_thread(emlxs_hba_t *hba, void *arg1, void *arg2)
 	    "Shutting down...");
 
 	/* Take adapter offline and leave it there */
-	(void) emlxs_offline(hba);
+	(void) emlxs_offline(hba, 0);
 
 	if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
 		/*
@@ -2218,7 +2346,7 @@ emlxs_proc_channel(emlxs_hba_t *hba, CHANNEL *cp, void *arg2)
 
 	/*
 	 * EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-	 * "emlxs_proc_channel: channel=%d", cp->channelno);
+	 * "proc_channel: channel=%d", cp->channelno);
 	 */
 
 	mutex_enter(&cp->rsp_lock);
@@ -2257,6 +2385,7 @@ emlxs_proc_channel_event(emlxs_hba_t *hba, CHANNEL *cp, IOCBQ *iocbq)
 	char buffer[MAX_MSG_DATA + 1];
 	IOCB *iocb;
 	emlxs_buf_t *sbp;
+	fc_packet_t *pkt;
 
 	iocb = &iocbq->iocb;
 
@@ -2271,7 +2400,7 @@ emlxs_proc_channel_event(emlxs_hba_t *hba, CHANNEL *cp, IOCBQ *iocbq)
 		    PACKET_IN_COMPLETION))) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_iocb_stale_msg,
 			    "Duplicate: iocb=%p cmd=%x status=%x "
-			    "error=%x iotag=%x context=%x info=%x",
+			    "error=%x iotag=%d context=%x info=%x",
 			    iocbq, (uint8_t)iocbq->iocb.ULPCOMMAND,
 			    iocbq->iocb.ULPSTATUS,
 			    (uint8_t)iocbq->iocb.un.grsp.perr.statLocalError,
@@ -2306,7 +2435,7 @@ emlxs_proc_channel_event(emlxs_hba_t *hba, CHANNEL *cp, IOCBQ *iocbq)
 	if (iocb->ULPSTATUS == IOSTAT_LOCAL_REJECT) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_iocb_event_msg,
 		    "Local reject. ringno=%d iocb=%p cmd=%x "
-		    "iotag=%x context=%x info=%x error=%x",
+		    "iotag=%d context=%x info=%x error=%x",
 		    cp->channelno, iocb, (uint8_t)iocb->ULPCOMMAND,
 		    (uint16_t)iocb->ULPIOTAG, (uint16_t)iocb->ULPCONTEXT,
 		    (uint8_t)iocb->ULPRSVDBYTE,
@@ -2337,7 +2466,9 @@ emlxs_proc_channel_event(emlxs_hba_t *hba, CHANNEL *cp, IOCBQ *iocbq)
 	case CMD_FCP_TRECEIVE64_CX:	/* FCP_TARGET IOCB command */
 	case CMD_FCP_TRSP_CX:		/* FCP_TARGET IOCB command */
 	case CMD_FCP_TRSP64_CX:		/* FCP_TARGET IOCB command */
-		(void) emlxs_fct_handle_fcp_event(hba, cp, iocbq);
+		if (port->mode == MODE_TARGET) {
+			(void) emlxs_fct_handle_fcp_event(hba, cp, iocbq);
+		}
 		break;
 #endif /* SFCT_SUPPORT */
 
@@ -2364,7 +2495,7 @@ emlxs_proc_channel_event(emlxs_hba_t *hba, CHANNEL *cp, IOCBQ *iocbq)
 
 		default:
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_iocb_invalid_msg,
-			    "cmd=%x type=%x status=%x iotag=%x context=%x ",
+			    "cmd=%x type=%x status=%x iotag=%d context=%x ",
 			    iocb->ULPCOMMAND, iocb->un.rcvseq64.w5.hcsw.Type,
 			    iocb->ULPSTATUS, iocb->ULPIOTAG,
 			    iocb->ULPCONTEXT);
@@ -2417,7 +2548,7 @@ emlxs_proc_channel_event(emlxs_hba_t *hba, CHANNEL *cp, IOCBQ *iocbq)
 
 		default:
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_iocb_invalid_msg,
-			    "cmd=%x type=%x status=%x iotag=%x context=%x ",
+			    "cmd=%x type=%x status=%x iotag=%d context=%x ",
 			    iocb->ULPCOMMAND, iocb->un.rcvseq64.w5.hcsw.Type,
 			    iocb->ULPSTATUS, iocb->ULPIOTAG,
 			    iocb->ULPCONTEXT);
@@ -2427,13 +2558,13 @@ emlxs_proc_channel_event(emlxs_hba_t *hba, CHANNEL *cp, IOCBQ *iocbq)
 	case CMD_ABORT_XRI_CN:	/* Abort fcp command */
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_flushed_msg,
-		    "ABORT_XRI_CN: rpi=%d iotag=%x status=%x parm=%x",
+		    "ABORT_XRI_CN: rpi=%d iotag=%d status=%x parm=%x",
 		    (uint32_t)iocb->un.acxri.abortContextTag,
 		    (uint32_t)iocb->un.acxri.abortIoTag, iocb->ULPSTATUS,
 		    iocb->un.acxri.parm);
 
 #ifdef SFCT_SUPPORT
-		if (port->tgt_mode) {
+		if (port->mode == MODE_TARGET) {
 			(void) emlxs_fct_handle_abort(hba, cp, iocbq);
 		}
 #endif /* SFCT_SUPPORT */
@@ -2442,13 +2573,13 @@ emlxs_proc_channel_event(emlxs_hba_t *hba, CHANNEL *cp, IOCBQ *iocbq)
 	case CMD_ABORT_XRI_CX:	/* Abort command */
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_flushed_msg,
-		    "ABORT_XRI_CX: rpi=%d iotag=%x status=%x parm=%x sbp=%p",
+		    "ABORT_XRI_CX: rpi=%d iotag=%d status=%x parm=%x sbp=%p",
 		    (uint32_t)iocb->un.acxri.abortContextTag,
 		    (uint32_t)iocb->un.acxri.abortIoTag, iocb->ULPSTATUS,
 		    iocb->un.acxri.parm, iocbq->sbp);
 
 #ifdef SFCT_SUPPORT
-		if (port->tgt_mode) {
+		if (port->mode == MODE_TARGET) {
 			(void) emlxs_fct_handle_abort(hba, cp, iocbq);
 		}
 #endif /* SFCT_SUPPORT */
@@ -2457,13 +2588,13 @@ emlxs_proc_channel_event(emlxs_hba_t *hba, CHANNEL *cp, IOCBQ *iocbq)
 	case CMD_XRI_ABORTED_CX:	/* Handle ABORT condition */
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_flushed_msg,
-		    "XRI_ABORTED_CX: rpi=%d iotag=%x status=%x parm=%x",
+		    "XRI_ABORTED_CX: rpi=%d iotag=%d status=%x parm=%x",
 		    (uint32_t)iocb->un.acxri.abortContextTag,
 		    (uint32_t)iocb->un.acxri.abortIoTag, iocb->ULPSTATUS,
 		    iocb->un.acxri.parm);
 
 #ifdef SFCT_SUPPORT
-		if (port->tgt_mode) {
+		if (port->mode == MODE_TARGET) {
 			(void) emlxs_fct_handle_abort(hba, cp, iocbq);
 		}
 #endif /* SFCT_SUPPORT */
@@ -2472,13 +2603,13 @@ emlxs_proc_channel_event(emlxs_hba_t *hba, CHANNEL *cp, IOCBQ *iocbq)
 	case CMD_CLOSE_XRI_CN:	/* Handle CLOSE condition */
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_flushed_msg,
-		    "CLOSE_XRI_CN: rpi=%d iotag=%x status=%x parm=%x",
+		    "CLOSE_XRI_CN: rpi=%d iotag=%d status=%x parm=%x",
 		    (uint32_t)iocb->un.acxri.abortContextTag,
 		    (uint32_t)iocb->un.acxri.abortIoTag, iocb->ULPSTATUS,
 		    iocb->un.acxri.parm);
 
 #ifdef SFCT_SUPPORT
-		if (port->tgt_mode) {
+		if (port->mode == MODE_TARGET) {
 			(void) emlxs_fct_handle_abort(hba, cp, iocbq);
 		}
 #endif /* SFCT_SUPPORT */
@@ -2487,13 +2618,13 @@ emlxs_proc_channel_event(emlxs_hba_t *hba, CHANNEL *cp, IOCBQ *iocbq)
 	case CMD_CLOSE_XRI_CX:	/* Handle CLOSE condition */
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_flushed_msg,
-		    "CLOSE_XRI_CX: rpi=%d iotag=%x status=%x parm=%x sbp=%p",
+		    "CLOSE_XRI_CX: rpi=%d iotag=%d status=%x parm=%x sbp=%p",
 		    (uint32_t)iocb->un.acxri.abortContextTag,
 		    (uint32_t)iocb->un.acxri.abortIoTag, iocb->ULPSTATUS,
 		    iocb->un.acxri.parm, iocbq->sbp);
 
 #ifdef SFCT_SUPPORT
-		if (port->tgt_mode) {
+		if (port->mode == MODE_TARGET) {
 			(void) emlxs_fct_handle_abort(hba, cp, iocbq);
 		}
 #endif /* SFCT_SUPPORT */
@@ -2516,9 +2647,25 @@ emlxs_proc_channel_event(emlxs_hba_t *hba, CHANNEL *cp, IOCBQ *iocbq)
 		emlxs_handle_async_event(hba, cp, iocbq);
 		break;
 
+	case CMD_XMIT_BLS_RSP64_CX:
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_flushed_msg,
+		    "CMD_XMIT_BLS_RSP64_CX: sbp = %p", sbp);
+
+		/*
+		 * The exchange should have been already freed in the wqe_cmpl
+		 * so just free up the pkt here.
+		 */
+		pkt = PRIV2PKT(sbp);
+		emlxs_pkt_free(pkt);
+		break;
+
 	default:
+		if (iocb->ULPCOMMAND == 0) {
+			break;
+		}
+
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_iocb_invalid_msg,
-		    "cmd=%x status=%x iotag=%x context=%x", iocb->ULPCOMMAND,
+		    "cmd=%x status=%x iotag=%d context=%x", iocb->ULPCOMMAND,
 		    iocb->ULPSTATUS, iocb->ULPIOTAG, iocb->ULPCONTEXT);
 
 		break;
@@ -2543,7 +2690,7 @@ emlxs_ffstate_xlate(uint32_t state)
 		}
 	}
 
-	(void) sprintf(buffer, "state=0x%x", state);
+	(void) snprintf(buffer, sizeof (buffer), "state=0x%x", state);
 	return (buffer);
 
 } /* emlxs_ffstate_xlate() */
@@ -2563,7 +2710,7 @@ emlxs_ring_xlate(uint32_t ringno)
 		}
 	}
 
-	(void) sprintf(buffer, "ring=0x%x", ringno);
+	(void) snprintf(buffer, sizeof (buffer), "ring=0x%x", ringno);
 	return (buffer);
 
 } /* emlxs_ring_xlate() */
@@ -2583,10 +2730,30 @@ emlxs_pci_cap_xlate(uint32_t id)
 		}
 	}
 
-	(void) sprintf(buffer, "PCI_CAP_ID_%02X", id);
+	(void) snprintf(buffer, sizeof (buffer), "PCI_CAP_ID_%02X", id);
 	return (buffer);
 
 } /* emlxs_pci_cap_xlate() */
+
+
+extern char *
+emlxs_pci_ecap_xlate(uint32_t id)
+{
+	static char buffer[32];
+	uint32_t i;
+	uint32_t count;
+
+	count = sizeof (emlxs_pci_ecap) / sizeof (emlxs_table_t);
+	for (i = 0; i < count; i++) {
+		if (id == emlxs_pci_ecap[i].code) {
+			return (emlxs_pci_ecap[i].string);
+		}
+	}
+
+	(void) snprintf(buffer, sizeof (buffer), "PCI_EXT_CAP_ID_%02X", id);
+	return (buffer);
+
+} /* emlxs_pci_ecap_xlate() */
 
 
 extern void
@@ -2628,7 +2795,8 @@ xlate:
 		goto xlate;
 	}
 
-	if ((mbq = (MAILBOXQ *)emlxs_mem_get(hba, MEM_MBOX, 1)) == 0) {
+	if ((mbq = (MAILBOXQ *) kmem_zalloc((sizeof (MAILBOXQ)),
+	    KM_SLEEP)) == 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_init_debug_msg,
 		    "PCI_MAX_READ: Unable to allocate mailbox buffer.");
 		return;
@@ -2655,7 +2823,7 @@ xlate:
 		}
 	}
 
-	emlxs_mem_put(hba, MEM_MBOX, (void *)mbq);
+	(void) kmem_free((uint8_t *)mbq, sizeof (MAILBOXQ));
 
 	return;
 
@@ -2735,6 +2903,7 @@ emlxs_fw_load(emlxs_hba_t *hba, emlxs_firmware_t *fw)
 	emlxs_port_t *port = &PPORT;
 	int (*emlxs_fw_get)(emlxs_firmware_t *);
 	int err;
+	char name[64];
 
 	/* Make sure image is unloaded and image buffer pointer is clear */
 	emlxs_fw_unload(hba, fw);
@@ -2752,12 +2921,13 @@ emlxs_fw_load(emlxs_hba_t *hba, emlxs_firmware_t *fw)
 		    "Firmware module loaded.");
 	}
 
+	(void) snprintf(name, sizeof (name), "%s_fw_get", DRIVER_NAME);
 	err = 0;
 	emlxs_fw_get =
-	    (int (*)())ddi_modsym(hba->fw_modhandle, "emlxs_fw_get", &err);
+	    (int (*)())ddi_modsym(hba->fw_modhandle, name, &err);
 	if ((void *)emlxs_fw_get == NULL) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_init_failed_msg,
-		    "emlxs_fw_get not present. error=%d", err);
+		    "%s not present. error=%d", name, err);
 
 		emlxs_fw_unload(hba, fw);
 		return;
@@ -2804,33 +2974,90 @@ static void
 emlxs_pci_cap_offsets(emlxs_hba_t *hba)
 {
 	emlxs_port_t *port = &PPORT;
+	uint32_t reg;
 	uint8_t	offset;
+	uint8_t	next;
 	uint8_t	id;
+	uint16_t eoffset;
+	uint16_t enext;
+	uint8_t eversion;
+	uint16_t eid;
+
+	/* Read PCI capbabilities */
 
 	bzero(hba->pci_cap_offset, sizeof (hba->pci_cap_offset));
 
 	/* Read first offset */
+	offset = PCI_CAP_POINTER;
 	offset = ddi_get8(hba->pci_acc_handle,
-	    (uint8_t *)(hba->pci_addr + PCI_CAP_POINTER));
-	offset &= PCI_CAP_PTR_MASK;
+	    (uint8_t *)(hba->pci_addr + offset));
 
 	while (offset >= PCI_CAP_PTR_OFF) {
-		/* Read the next cap id */
-		id = ddi_get8(hba->pci_acc_handle,
-		    (uint8_t *)(hba->pci_addr + offset));
+		/* Read the cap */
+		reg = ddi_get32(hba->pci_acc_handle,
+		    (uint32_t *)(hba->pci_addr + offset));
 
-		if (id < PCI_CAP_MAX_PTR) {
+		id = ((reg >> PCI_CAP_ID_SHIFT) & PCI_CAP_ID_MASK);
+		next = ((reg >> PCI_CAP_NEXT_PTR_SHIFT) &
+		    PCI_CAP_NEXT_PTR_MASK);
+
+		if ((id < PCI_CAP_MAX_PTR) &&
+		    (hba->pci_cap_offset[id] == 0)) {
 			hba->pci_cap_offset[id] = offset;
 		}
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_init_debug_msg,
-		    "%s: offset=0x%x",
-		    emlxs_pci_cap_xlate(id), offset);
+		    "%s: offset=0x%x next=0x%x",
+		    emlxs_pci_cap_xlate(id), offset, next);
 
-		/* Read next offset */
-		offset = ddi_get8(hba->pci_acc_handle,
-		    (uint8_t *)(hba->pci_addr + offset + PCI_CAP_NEXT_PTR));
-		offset &= PCI_CAP_PTR_MASK;
+		offset = next;
+	}
+
+	/* Workaround for BE adapters */
+	if ((hba->pci_cap_offset[PCI_CAP_ID_VS] == 0) &&
+	    (hba->model_info.chip & EMLXS_BE_CHIPS)) {
+		hba->pci_cap_offset[PCI_CAP_ID_VS] = 0x54;
+
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_init_debug_msg,
+		    "%s: offset=0x%x  Added.",
+		    emlxs_pci_cap_xlate(PCI_CAP_ID_VS),
+		    hba->pci_cap_offset[PCI_CAP_ID_VS]);
+	}
+
+	if (! hba->pci_cap_offset[PCI_CAP_ID_PCI_E]) {
+		/* It's not a PCIE adapter. */
+		return;
+	}
+
+	/* Read PCI Extended capbabilities */
+
+	bzero(hba->pci_ecap_offset, sizeof (hba->pci_ecap_offset));
+
+	/* Set first offset */
+	eoffset = PCIE_EXT_CAP;
+
+	while (eoffset >= PCIE_EXT_CAP) {
+		/* Read the cap */
+		reg = ddi_get32(hba->pci_acc_handle,
+		    (uint32_t *)(hba->pci_addr + eoffset));
+
+		eid = ((reg >> PCIE_EXT_CAP_ID_SHIFT) & PCIE_EXT_CAP_ID_MASK);
+		eversion = ((reg >> PCIE_EXT_CAP_VER_SHIFT) &
+		    PCIE_EXT_CAP_VER_MASK);
+		enext = ((reg >> PCIE_EXT_CAP_NEXT_PTR_SHIFT) &
+		    PCIE_EXT_CAP_NEXT_PTR_MASK);
+
+		if ((eid < PCI_EXT_CAP_MAX_PTR) &&
+		    (hba->pci_ecap_offset[eid] == 0)) {
+			hba->pci_ecap_offset[eid] = eoffset;
+		}
+
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_init_debug_msg,
+		    "%s: offset=0x%x version=0x%x next=0x%x",
+		    emlxs_pci_ecap_xlate(eid),
+		    eoffset, eversion, enext);
+
+		eoffset = enext;
 	}
 
 	return;

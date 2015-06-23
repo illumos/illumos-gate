@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
- * Copyright (c) 2013 by Delphix. All rights reserved.
+ * Copyright (c) 2011, 2014 by Delphix. All rights reserved.
  * Copyright (c) 2012 by Frederik Wessels. All rights reserved.
  * Copyright (c) 2013 by Prasad Joshi (sTec). All rights reserved.
  */
@@ -707,6 +707,8 @@ zpool_do_create(int argc, char **argv)
 					enable_all_pool_feat = B_FALSE;
 				}
 			}
+			if (zpool_name_to_prop(optarg) == ZPOOL_PROP_ALTROOT)
+				altroot = propval;
 			break;
 		case 'O':
 			if ((propval = strchr(optarg, '=')) == NULL) {
@@ -1887,7 +1889,7 @@ zpool_do_import(int argc, char **argv)
 			break;
 		case 'T':
 			errno = 0;
-			txg = strtoull(optarg, &endptr, 10);
+			txg = strtoull(optarg, &endptr, 0);
 			if (errno != 0 || *endptr != '\0') {
 				(void) fprintf(stderr,
 				    gettext("invalid txg value\n"));
@@ -2711,10 +2713,7 @@ print_pool(zpool_handle_t *zhp, list_cbdata_t *cb)
 
 		right_justify = B_FALSE;
 		if (pl->pl_prop != ZPROP_INVAL) {
-			if (pl->pl_prop == ZPOOL_PROP_EXPANDSZ &&
-			    zpool_get_prop_int(zhp, pl->pl_prop, NULL) == 0)
-				propstr = "-";
-			else if (zpool_get_prop(zhp, pl->pl_prop, property,
+			if (zpool_get_prop(zhp, pl->pl_prop, property,
 			    sizeof (property), NULL, cb->cb_literal) != 0)
 				propstr = "-";
 			else
@@ -2748,15 +2747,36 @@ print_pool(zpool_handle_t *zhp, list_cbdata_t *cb)
 }
 
 static void
-print_one_column(zpool_prop_t prop, uint64_t value, boolean_t scripted)
+print_one_column(zpool_prop_t prop, uint64_t value, boolean_t scripted,
+    boolean_t valid)
 {
 	char propval[64];
 	boolean_t fixed;
 	size_t width = zprop_width(prop, &fixed, ZFS_TYPE_POOL);
 
-	zfs_nicenum(value, propval, sizeof (propval));
+	switch (prop) {
+	case ZPOOL_PROP_EXPANDSZ:
+		if (value == 0)
+			(void) strlcpy(propval, "-", sizeof (propval));
+		else
+			zfs_nicenum(value, propval, sizeof (propval));
+		break;
+	case ZPOOL_PROP_FRAGMENTATION:
+		if (value == ZFS_FRAG_INVALID) {
+			(void) strlcpy(propval, "-", sizeof (propval));
+		} else {
+			(void) snprintf(propval, sizeof (propval), "%llu%%",
+			    value);
+		}
+		break;
+	case ZPOOL_PROP_CAPACITY:
+		(void) snprintf(propval, sizeof (propval), "%llu%%", value);
+		break;
+	default:
+		zfs_nicenum(value, propval, sizeof (propval));
+	}
 
-	if (prop == ZPOOL_PROP_EXPANDSZ && value == 0)
+	if (!valid)
 		(void) strlcpy(propval, "-", sizeof (propval));
 
 	if (scripted)
@@ -2774,11 +2794,17 @@ print_list_stats(zpool_handle_t *zhp, const char *name, nvlist_t *nv,
 	uint_t c, children;
 	char *vname;
 	boolean_t scripted = cb->cb_scripted;
+	uint64_t islog = B_FALSE;
+	boolean_t haslog = B_FALSE;
+	char *dashes = "%-*s      -      -      -         -      -      -\n";
 
 	verify(nvlist_lookup_uint64_array(nv, ZPOOL_CONFIG_VDEV_STATS,
 	    (uint64_t **)&vs, &c) == 0);
 
 	if (name != NULL) {
+		boolean_t toplevel = (vs->vs_space != 0);
+		uint64_t cap;
+
 		if (scripted)
 			(void) printf("\t%s", name);
 		else if (strlen(name) + depth > cb->cb_namewidth)
@@ -2787,22 +2813,26 @@ print_list_stats(zpool_handle_t *zhp, const char *name, nvlist_t *nv,
 			(void) printf("%*s%s%*s", depth, "", name,
 			    (int)(cb->cb_namewidth - strlen(name) - depth), "");
 
-		/* only toplevel vdevs have capacity stats */
-		if (vs->vs_space == 0) {
-			if (scripted)
-				(void) printf("\t-\t-\t-");
-			else
-				(void) printf("      -      -      -");
-		} else {
-			print_one_column(ZPOOL_PROP_SIZE, vs->vs_space,
-			    scripted);
-			print_one_column(ZPOOL_PROP_CAPACITY, vs->vs_alloc,
-			    scripted);
-			print_one_column(ZPOOL_PROP_FREE,
-			    vs->vs_space - vs->vs_alloc, scripted);
-		}
-		print_one_column(ZPOOL_PROP_EXPANDSZ, vs->vs_esize,
-		    scripted);
+		/*
+		 * Print the properties for the individual vdevs. Some
+		 * properties are only applicable to toplevel vdevs. The
+		 * 'toplevel' boolean value is passed to the print_one_column()
+		 * to indicate that the value is valid.
+		 */
+		print_one_column(ZPOOL_PROP_SIZE, vs->vs_space, scripted,
+		    toplevel);
+		print_one_column(ZPOOL_PROP_ALLOCATED, vs->vs_alloc, scripted,
+		    toplevel);
+		print_one_column(ZPOOL_PROP_FREE, vs->vs_space - vs->vs_alloc,
+		    scripted, toplevel);
+		print_one_column(ZPOOL_PROP_EXPANDSZ, vs->vs_esize, scripted,
+		    B_TRUE);
+		print_one_column(ZPOOL_PROP_FRAGMENTATION,
+		    vs->vs_fragmentation, scripted,
+		    (vs->vs_fragmentation != ZFS_FRAG_INVALID && toplevel));
+		cap = (vs->vs_space == 0) ? 0 :
+		    (vs->vs_alloc * 100 / vs->vs_space);
+		print_one_column(ZPOOL_PROP_CAPACITY, cap, scripted, toplevel);
 		(void) printf("\n");
 	}
 
@@ -2817,24 +2847,47 @@ print_list_stats(zpool_handle_t *zhp, const char *name, nvlist_t *nv,
 		    ZPOOL_CONFIG_IS_HOLE, &ishole) == 0 && ishole)
 			continue;
 
+		if (nvlist_lookup_uint64(child[c],
+		    ZPOOL_CONFIG_IS_LOG, &islog) == 0 && islog) {
+			haslog = B_TRUE;
+			continue;
+		}
+
 		vname = zpool_vdev_name(g_zfs, zhp, child[c], B_FALSE);
 		print_list_stats(zhp, vname, child[c], cb, depth + 2);
 		free(vname);
 	}
 
-	/*
-	 * Include level 2 ARC devices in iostat output
-	 */
-	if (nvlist_lookup_nvlist_array(nv, ZPOOL_CONFIG_L2CACHE,
-	    &child, &children) != 0)
-		return;
-
-	if (children > 0) {
-		(void) printf("%-*s      -      -      -      -      -      "
-		    "-\n", cb->cb_namewidth, "cache");
+	if (haslog == B_TRUE) {
+		/* LINTED E_SEC_PRINTF_VAR_FMT */
+		(void) printf(dashes, cb->cb_namewidth, "log");
 		for (c = 0; c < children; c++) {
-			vname = zpool_vdev_name(g_zfs, zhp, child[c],
-			    B_FALSE);
+			if (nvlist_lookup_uint64(child[c], ZPOOL_CONFIG_IS_LOG,
+			    &islog) != 0 || !islog)
+				continue;
+			vname = zpool_vdev_name(g_zfs, zhp, child[c], B_FALSE);
+			print_list_stats(zhp, vname, child[c], cb, depth + 2);
+			free(vname);
+		}
+	}
+
+	if (nvlist_lookup_nvlist_array(nv, ZPOOL_CONFIG_L2CACHE,
+	    &child, &children) == 0 && children > 0) {
+		/* LINTED E_SEC_PRINTF_VAR_FMT */
+		(void) printf(dashes, cb->cb_namewidth, "cache");
+		for (c = 0; c < children; c++) {
+			vname = zpool_vdev_name(g_zfs, zhp, child[c], B_FALSE);
+			print_list_stats(zhp, vname, child[c], cb, depth + 2);
+			free(vname);
+		}
+	}
+
+	if (nvlist_lookup_nvlist_array(nv, ZPOOL_CONFIG_SPARES, &child,
+	    &children) == 0 && children > 0) {
+		/* LINTED E_SEC_PRINTF_VAR_FMT */
+		(void) printf(dashes, cb->cb_namewidth, "spare");
+		for (c = 0; c < children; c++) {
+			vname = zpool_vdev_name(g_zfs, zhp, child[c], B_FALSE);
 			print_list_stats(zhp, vname, child[c], cb, depth + 2);
 			free(vname);
 		}
@@ -2871,7 +2924,8 @@ list_callback(zpool_handle_t *zhp, void *data)
  *	-H	Scripted mode.  Don't display headers, and separate properties
  *		by a single tab.
  *	-o	List of properties to display.  Defaults to
- *		"name,size,allocated,free,capacity,health,altroot"
+ *		"name,size,allocated,free,expandsize,fragmentation,capacity,"
+ *		"dedupratio,health,altroot"
  * 	-p	Diplay values in parsable (exact) format.
  *	-T	Display a timestamp in date(1) or Unix format
  *
@@ -2885,8 +2939,8 @@ zpool_do_list(int argc, char **argv)
 	int ret;
 	list_cbdata_t cb = { 0 };
 	static char default_props[] =
-	    "name,size,allocated,free,expandsize,capacity,dedupratio,"
-	    "health,altroot";
+	    "name,size,allocated,free,expandsize,fragmentation,capacity,"
+	    "dedupratio,health,altroot";
 	char *props = default_props;
 	unsigned long interval = 0, count = 0;
 	zpool_list_t *list;
@@ -2930,17 +2984,10 @@ zpool_do_list(int argc, char **argv)
 	if (zprop_get_list(g_zfs, props, &cb.cb_proplist, ZFS_TYPE_POOL) != 0)
 		usage(B_FALSE);
 
-	if ((list = pool_list_get(argc, argv, &cb.cb_proplist, &ret)) == NULL)
-		return (1);
-
-	if (argc == 0 && !cb.cb_scripted && pool_list_count(list) == 0) {
-		(void) printf(gettext("no pools available\n"));
-		zprop_free_list(cb.cb_proplist);
-		return (0);
-	}
-
 	for (;;) {
-		pool_list_update(list);
+		if ((list = pool_list_get(argc, argv, &cb.cb_proplist,
+		    &ret)) == NULL)
+			return (1);
 
 		if (pool_list_count(list) == 0)
 			break;
@@ -2963,9 +3010,16 @@ zpool_do_list(int argc, char **argv)
 		if (count != 0 && --count == 0)
 			break;
 
+		pool_list_free(list);
 		(void) sleep(interval);
 	}
 
+	if (argc == 0 && !cb.cb_scripted && pool_list_count(list) == 0) {
+		(void) printf(gettext("no pools available\n"));
+		ret = 0;
+	}
+
+	pool_list_free(list);
 	zprop_free_list(cb.cb_proplist);
 	return (ret);
 }

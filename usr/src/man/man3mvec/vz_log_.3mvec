@@ -1,0 +1,89 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH vz_log_ 3MVEC "14 Dec 2007" "SunOS 5.11" "Vector Math Library Functions"
+.SH NAME
+vz_log_, vc_log_ \- vector complex logarithm functions
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lmvec\fR [ \fIlibrary\fR\&.\|.\|. ]
+
+\fBvoid\fR \fBvz_log_\fR(\fBint *\fR\fIn\fR, \fBdouble complex * restrict\fR \fIz\fR,
+     \fBint *\fR\fIstridez\fR, \fBdouble _complex * restrict\fR \fIw\fR, \fBint *\fR\fIstridew\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBvc_log_\fR(\fBint *\fR\fIn\fR, \fBfloat complex * restrict\fR \fIz\fR,
+     \fBint *\fR\fIstridez\fR, \fBfloat complex * restrict\fR \fIw\fR, \fBint *\fR\fIstridew\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions evaluate the complex function \fBlog\fR(\fIz\fR) for an entire
+vector of values at once. The first parameter specifies the number of values to
+compute. Subsequent parameters specify the argument and result vectors. Each
+vector is described by a pointer to the first element and a stride, which is
+the increment between successive elements.
+.sp
+.LP
+Specifically, \fBvz_log_\fR(\fIn\fR, \fIz\fR, \fIsz\fR, \fIw\fR, \fIsw\fR)
+computes \fIw\fR[\fIi\fR * *\fIsw\fR] = \fBlog\fR(\fIz\fR[\fIi\fR * *\fIsz\fR])
+for each \fIi\fR = 0, 1, ..., *\fIn\fR - 1. The \fBvc_log_()\fR function
+performs the same computation for single precision data.
+.sp
+.LP
+These functions are not guaranteed to deliver results that are identical to the
+results of the \fBclog\fR(3M) functions given the same arguments.
+.SH USAGE
+.sp
+.LP
+The element count *\fIn\fR must be greater than zero. The strides for the
+argument and result arrays can be arbitrary integers, but the arrays themselves
+must not be the same or overlap. A zero stride effectively collapses an entire
+vector into a single element. A negative stride causes a vector to be accessed
+in descending memory order, but note that the corresponding pointer must still
+point to the first element of the vector to be used; if the stride is negative,
+this will be the highest-addressed element in memory. This convention differs
+from the Level 1 BLAS, in which array parameters always refer to the
+lowest-addressed element in memory even when negative increments are used.
+.sp
+.LP
+These functions assume that the default round-to-nearest rounding direction
+mode is in effect. On x86, these functions also assume that the default
+round-to-64-bit rounding precision mode is in effect. The result of calling a
+vector function with a non-default rounding mode in effect is undefined.
+.sp
+.LP
+Unlike the c99 \fBclog\fR(3M) functions, the vector complex exponential
+functions make no attempt to handle special cases and exceptions; they simply
+use textbook formulas to compute a complex exponential in terms of real
+elementary functions. As a result, these functions can raise different
+exceptions and/or deliver different results from \fBclog()\fR.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBclog\fR(3M), \fBattributes\fR(5)

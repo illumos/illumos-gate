@@ -1,4 +1,5 @@
 '\" te
+.\" Copyright (c) 2014, Joyent, Inc.
 .\" Copyright 1989 AT&T.  Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved.  Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
 .\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
@@ -7,7 +8,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH READLINK 2 "Dec 1, 2003"
+.TH READLINK 2 "Dec 23, 2014"
 .SH NAME
 readlink \- read the contents of a symbolic link
 .SH SYNOPSIS
@@ -18,26 +19,34 @@ readlink \- read the contents of a symbolic link
 \fBssize_t\fR \fBreadlink\fR(\fBconst char *restrict\fR \fIpath\fR,
      \fBchar *restrict\fR \fIbuf\fR, \fBsize_t\fR \fIbufsiz\fR);
 .fi
+.LP
+.nf
+\fBssize_t\fR \fBreadlinkat\fR(\fBint\fR \fIfd\fR, \fBconst char *restrict\fR \fIpath\fR,
+     \fBchar *restrict\fR \fIbuf\fR, \fBsize_t\fR \fIbufsiz\fR);
+.fi
 
 .SH DESCRIPTION
+.LP
+The \fBreadlink()\fR and \fBreadlinkat()\fR functions place the contents of the
+symbolic link referred to by \fIpath\fR in the buffer \fIbuf\fR which has size
+\fIbufsiz\fR.  If the number of bytes in the symbolic link is less than
+\fIbufsiz\fR, the contents of the remainder of \fIbuf\fR are left unchanged. If
+the \fIbuf\fR argument is not large enough to contain the link content, the
+first \fIbufsize\fR bytes are placed in \fIbuf\fR.
 .sp
 .LP
-The \fBreadlink()\fR function places the contents of the symbolic link referred
-to by \fIpath\fR in the buffer \fIbuf\fR which has size \fIbufsiz\fR.  If the
-number of bytes in the symbolic link is less than \fIbufsiz\fR, the contents of
-the remainder of \fIbuf\fR are left unchanged. If the \fIbuf\fR argument is not
-large enough to contain the link content, the first \fIbufsize\fR bytes are
-placed in \fIbuf\fR.
+The \fBrealinkat()\fR function behaves similarly to \fBreadlink()\fR; however,
+when \fIpath\fR is a relative path, it is resolved relative to the directory
+referred to by \fIfd\fR. To use the current working directory, \fIfd\fR should
+be the special value \fBAT_FDCWD\fR.
 .SH RETURN VALUES
-.sp
 .LP
-Upon successful completion, \fBreadlink()\fR returns the count of bytes placed
-in the buffer.  Otherwise, it returns  \fB\(mi1\fR, leaves the buffer
-unchanged, and sets \fBerrno\fR to indicate the error.
+Upon successful completion, \fBreadlink()\fR and \fBreadlinkat()\fR return the
+count of bytes placed in the buffer.  Otherwise, they returns \fB\(mi1\fR, leave
+the buffer unchanged, and set \fBerrno\fR to indicate the error.
 .SH ERRORS
-.sp
 .LP
-The \fBreadlink()\fR function will fail if:
+The \fBreadlink()\fR and \fBreadlinkat()\fR functions will fail if:
 .sp
 .ne 2
 .na
@@ -110,7 +119,9 @@ longer than {\fBNAME_MAX\fR} while \fB_POSIX_NO_TRUNC\fR is in effect.
 \fB\fBENOTDIR\fR\fR
 .ad
 .RS 16n
-A component of the path prefix is not a directory.
+A component of the path prefix is not a directory. For \fBreadlinkat()\fR, if
+\fIpath\fR is a relative path and \fIfd\fR refers to a valid file descriptor
+which is not a directory.
 .RE
 
 .sp
@@ -120,6 +131,19 @@ A component of the path prefix is not a directory.
 .ad
 .RS 16n
 The file system does not support symbolic links.
+.RE
+
+.sp
+.LP
+The \fBreadlinkat()\fR function will fail if:
+.sp
+.ne 2
+.na
+.B EBADF
+.ad
+.RS 16n
+The \fIpath\fR argument is a relative path and \fIfd\fR is not a valid, open
+file descriptor or the special value \fBAT_FDCWD\fR.
 .RE
 
 .sp
@@ -155,12 +179,10 @@ the length of the substituted pathname string exceeded {\fBPATH_MAX\fR}.
 .RE
 
 .SH USAGE
-.sp
 .LP
 Portable applications should not assume that the returned contents of the
 symbolic link are null-terminated.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -178,6 +200,5 @@ MT-Level	Async-Signal-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBstat\fR(2), \fBsymlink\fR(2), \fBattributes\fR(5), \fBstandards\fR(5)

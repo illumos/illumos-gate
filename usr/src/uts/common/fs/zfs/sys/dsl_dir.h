@@ -22,6 +22,7 @@
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright (c) 2014, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2014 Spectra Logic Corporation, All rights reserved.
  */
 
 #ifndef	_SYS_DSL_DIR_H
@@ -84,11 +85,14 @@ typedef struct dsl_dir_phys {
 } dsl_dir_phys_t;
 
 struct dsl_dir {
+	dmu_buf_user_t dd_dbu;
+
 	/* These are immutable; no lock needed: */
 	uint64_t dd_object;
-	dsl_dir_phys_t *dd_phys;
-	dmu_buf_t *dd_dbuf;
 	dsl_pool_t *dd_pool;
+
+	/* Stable until user eviction; no lock needed: */
+	dmu_buf_t *dd_dbuf;
 
 	/* protected by lock on pool's dp_dirty_dirs list */
 	txg_node_t dd_dirty_link;
@@ -111,7 +115,14 @@ struct dsl_dir {
 	char dd_myname[MAXNAMELEN];
 };
 
+inline dsl_dir_phys_t *
+dsl_dir_phys(dsl_dir_t *dd)
+{
+	return (dd->dd_dbuf->db_data);
+}
+
 void dsl_dir_rele(dsl_dir_t *dd, void *tag);
+void dsl_dir_async_rele(dsl_dir_t *dd, void *tag);
 int dsl_dir_hold(dsl_pool_t *dp, const char *name, void *tag,
     dsl_dir_t **, const char **tail);
 int dsl_dir_hold_obj(dsl_pool_t *dp, uint64_t ddobj,
@@ -160,6 +171,7 @@ boolean_t dsl_dir_is_zapified(dsl_dir_t *dd);
 #define	ORIGIN_DIR_NAME "$ORIGIN"
 #define	XLATION_DIR_NAME "$XLATION"
 #define	FREE_DIR_NAME "$FREE"
+#define	LEAK_DIR_NAME "$LEAK"
 
 #ifdef ZFS_DEBUG
 #define	dprintf_dd(dd, fmt, ...) do { \

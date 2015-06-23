@@ -41,6 +41,7 @@
 #ifndef	_DRMP_H
 #define	_DRMP_H
 
+#include <sys/sysmacros.h>
 #include <sys/types.h>
 #include <sys/conf.h>
 #include <sys/modctl.h>
@@ -325,9 +326,6 @@ typedef uint_t		irqreturn_t;
 #define	DRM_UNSUPPORT	0
 
 #define	__OS_HAS_AGP	1
-
-#define	__offsetof(type, field) ((size_t)(&((type *)0)->field))
-#define	offsetof(type, field)   __offsetof(type, field)
 
 typedef struct drm_pci_id_list
 {

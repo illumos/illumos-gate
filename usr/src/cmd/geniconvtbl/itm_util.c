@@ -22,9 +22,8 @@
 /*
  * Copyright (c) 1999 by Sun Microsystems, Inc.
  * All rights reserved.
+ * Copyright 2015 PALO, Richard.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -90,19 +89,19 @@ itm_def_process(itm_data_t	*itm_name)
 	}
 	if ((sizeof (itm_place_t)) < itm_hdr->interpreter.size) {
 		(void) obj_register(ITMC_OBJ_STRING, NULL,
-				(void *)itm_hdr->interpreter.place.itm_ptr,
-				itm_hdr->interpreter.size,
-				&(itm_hdr->interpreter.place),
-				OBJ_REG_HEAD);
+		    (void *)itm_hdr->interpreter.place.itm_ptr,
+		    itm_hdr->interpreter.size,
+		    &(itm_hdr->interpreter.place),
+		    OBJ_REG_HEAD);
 	}
 
 	itm_hdr->type_id = *itm_name;
 	if ((sizeof (itm_place_t)) < itm_hdr->type_id.size) {
 		(void) obj_register(ITMC_OBJ_STRING, NULL,
-				(void *)itm_hdr->type_id.place.itm_ptr,
-				itm_hdr->type_id.size,
-				&(itm_hdr->type_id.place),
-				OBJ_REG_HEAD);
+		    (void *)itm_hdr->type_id.place.itm_ptr,
+		    itm_hdr->type_id.size,
+		    &(itm_hdr->type_id.place),
+		    OBJ_REG_HEAD);
 	}
 
 	(void) assemble(itm_hdr);
@@ -126,13 +125,13 @@ direction_unit(
 	du->obj = direc = malloc_vital(sizeof (itm_direc_t));
 
 	if (NULL != cond) {
-		direc->condition.itm_ptr = 0;
+		direc->condition.itm_ptr = (uintptr_t)NULL;
 		cond->referencer = &(direc->condition);
 		du->ref[0] = cond;
 	} else if (NULL != cond_name) {
 		direc->condition.itm_ptr = (itm_place2_t)(cond_name);
 		du->ref[0] = obj_register(ITMC_OBJ_COND, cond_name, NULL, 0,
-					&(direc->condition), OBJ_REG_TAIL);
+		    &(direc->condition), OBJ_REG_TAIL);
 	} else {
 		direc->condition.itm_ptr = 0;
 		du->ref[0] = NULL;
@@ -142,13 +141,13 @@ direction_unit(
 	if (NULL != act_name) {
 		direc->action.itm_ptr = (itm_place2_t)(act_name);
 		du->ref[1] = obj_register(ITMC_OBJ_ACTION, act_name, NULL, 0,
-					&(direc->action), OBJ_REG_TAIL);
+		    &(direc->action), OBJ_REG_TAIL);
 	} else if (NULL != act && act->tbl_hdr != NULL) {
 		direc->action.itm_ptr = (itm_place2_t)(act->tbl_hdr);
 		du->ref[1] = obj_register(act->type,
-				(itm_data_t *)(act->tbl_hdr->name.itm_ptr),
-				act->tbl_hdr, act->tbl_hdr->size,
-				&(direc->action), OBJ_REG_TAIL);
+		    (itm_data_t *)(act->tbl_hdr->name.itm_ptr),
+		    act->tbl_hdr, act->tbl_hdr->size,
+		    &(direc->action), OBJ_REG_TAIL);
 	} else {
 		return (NULL);
 	}
@@ -169,7 +168,7 @@ obj_table(itm_type_t	tbl_type,
 	obj_array_t	obj_array;
 
 	obj_array = obj_list_to_array(sizeof (itm_tbl_hdr_t),
-					obj_list, obj_size);
+	    obj_list, obj_size);
 	tbl = obj_array.obj;
 
 	tbl->type = tbl_type;
@@ -182,7 +181,7 @@ obj_table(itm_type_t	tbl_type,
 #if !defined(_LP64)
 		tbl->name.itm_pad = 0;
 #endif
-		tbl->name.itm_ptr = NULL;
+		tbl->name.itm_ptr = (uintptr_t)NULL;
 	}
 	tbl->size = (sizeof (itm_tbl_hdr_t)) + (obj_array.num	*obj_size);
 	tbl->number = obj_array.num;
@@ -219,21 +218,21 @@ obj_list_to_array(itm_size_t hdr_size, itmc_obj_t	*obj_list,
 		(void) memcpy((char *)(obj_array.obj) + offset, ol->obj, size);
 		if (ol->ref[0]) {
 			ol->ref[0]->referencer =
-			(void *)((char *)(ol->ref[0]->referencer) +
-			((char *)(obj_array.obj) -
-			(char *)(ol->obj) + offset));
+			    (void *)((char *)(ol->ref[0]->referencer) +
+			    ((char *)(obj_array.obj) -
+			    (char *)(ol->obj) + offset));
 		}
 		if (ol->ref[1]) {
 			ol->ref[1]->referencer =
-			(void *)((char *)(ol->ref[1]->referencer) +
-			((char *)(obj_array.obj) -
-			(char *)(ol->obj) + offset));
+			    (void *)((char *)(ol->ref[1]->referencer) +
+			    ((char *)(obj_array.obj) -
+			    (char *)(ol->obj) + offset));
 		}
 		if (ol->ref[2]) {
 			ol->ref[2]->referencer =
-			(void *)((char *)(ol->ref[2]->referencer) +
-			((char *)(obj_array.obj) -
-			(char *)(ol->obj) + offset));
+			    (void *)((char *)(ol->ref[2]->referencer) +
+			    ((char *)(obj_array.obj) -
+			    (char *)(ol->obj) + offset));
 		}
 	}
 
@@ -257,12 +256,12 @@ op_hirarchy(itm_tbl_hdr_t	*optbl,
 
 	for (ol = obj_list; ol != NULL; ol = ol->next) {
 		if ((ol->type == ITMC_OBJ_OP) &&
-			(((itm_op_t *)ol->obj)->type == ITM_OP_OPERATION)) {
+		    (((itm_op_t *)ol->obj)->type == ITM_OP_OPERATION)) {
 			in = malloc_vital(sizeof (itm_op_inner_t));
 			in->in = o->in;
 			o->in = in;
 			TRACE_MESSAGE('L', ("o->in(%x) in->in(%x)\n",
-				o->in, in->in));
+			    o->in, in->in));
 			in->ref = ol->ref[0];
 		}
 	}
@@ -270,9 +269,9 @@ op_hirarchy(itm_tbl_hdr_t	*optbl,
 #ifdef ENABLE_TRACE
 	for (in = o->in; in != NULL; in = in->in) {
 		TRACE_MESSAGE('L', ("o=%x in=%x in->in=%x\n",
-				o, in, in->in));
+		    o, in, in->in));
 		TRACE_MESSAGE('L', ("o(table)%x->in(ref)=%x\n",
-		o->optbl, in->ref));
+		    o->optbl, in->ref));
 	}
 #endif
 
@@ -306,7 +305,7 @@ obj_register(itm_type_t type, itm_data_t	*name,
 	itmc_ref_t	*refp;
 
 	TRACE_MESSAGE('O', ("obj_register: %6ld %08p %08p %08ld %08p %ld\n",
-			type, name, obj, size, ref, reg_place));
+	    type, name, obj, size, ref, reg_place));
 
 	refp = malloc_vital(sizeof (itmc_ref_t));
 	refp->name = NULL;
@@ -324,9 +323,9 @@ obj_register(itm_type_t type, itm_data_t	*name,
 			if (0 == error_deferred) {
 				/* should never happen */
 				itm_error(
-				gettext("internal error: "
-					"obj_register: (NULL == obj) "
-					"&& (NULL == name)\n"));
+				    gettext("internal error: "
+				    "obj_register: (NULL == obj) "
+				    "&& (NULL == name)\n"));
 				exit(ITMC_STATUS_SYS2);
 			}
 			return (NULL);
@@ -384,7 +383,7 @@ range_table(itm_data_t		*name, itmc_obj_t	*obj_list)
 		if (length == 0) {
 			if (rp->data0.size == 0) {
 				itm_error(gettext("between has null range\n"));
-					error_deferred += 1;
+				error_deferred += 1;
 				return	(NULL);
 			}
 			length = rp->data0.size;
@@ -392,7 +391,7 @@ range_table(itm_data_t		*name, itmc_obj_t	*obj_list)
 		if ((rp->data0.size != length) ||
 		    (rp->data1.size != length)) {
 			itm_error(gettext(
-			"length of source sequences must be the same\n"));
+			    "length of source sequences must be the same\n"));
 			error_deferred += 1;
 			return	(NULL);
 		}
@@ -403,7 +402,7 @@ range_table(itm_data_t		*name, itmc_obj_t	*obj_list)
 		return	(NULL);
 	}
 	table_size = ((sizeof (itm_tbl_hdr_t)) +
-			(sizeof (itm_range_hdr_t)) + (length * num) * 2);
+	    (sizeof (itm_range_hdr_t)) + (length * num) * 2);
 	table_size = ITMROUNDUP(table_size);
 
 	table = malloc_vital(table_size);
@@ -453,7 +452,7 @@ escseq_table(itm_data_t		*name, itmc_obj_t	*obj_list)
 	}
 	if (num == 0) {
 		itm_error(gettext
-			("escape sequence is defined without sequence\n"));
+		    ("escape sequence is defined without sequence\n"));
 		error_deferred += 1;
 		return	(NULL);
 	} else if (0 == len_min) {
@@ -463,8 +462,8 @@ escseq_table(itm_data_t		*name, itmc_obj_t	*obj_list)
 	}
 
 	table_size = ((sizeof (itm_tbl_hdr_t)) +
-			(sizeof (itm_escapeseq_hdr_t)) +
-			(sizeof (itm_data_t) * num));
+	    (sizeof (itm_escapeseq_hdr_t)) +
+	    (sizeof (itm_data_t) * num));
 	table_size = ITMROUNDUP(table_size);
 	table = malloc_vital(table_size);
 	table->type = ITM_TBL_ESCAPESEQ;
@@ -483,22 +482,23 @@ escseq_table(itm_data_t		*name, itmc_obj_t	*obj_list)
 		*ep = *((itm_data_t *)(ol->obj));
 		if ((sizeof (itm_place_t)) < ep->size) {
 			(void) obj_register(ITMC_OBJ_DATA, NULL,
-					(void *)(ep->place.itm_ptr), ep->size,
-					&(ep->place), OBJ_REG_TAIL);
+			    (void *)(ep->place.itm_ptr), ep->size,
+			    &(ep->place), OBJ_REG_TAIL);
 		}
 	}
 	(void) qsort((itm_data_t *)(eh + 1), num, sizeof (itm_data_t),
-		(int (*)(const void *, const void *))data_compare);
+	    (int (*)(const void *, const void *))data_compare);
 
 	for (i = 0, ep = (itm_data_t *)(eh + 1);
 	    i < num - 1;
 	    i++, ep++) {
 		if (0 <= data_compare(ep, (ep + 1))) {
 			itm_error(
-			gettext(
-			"same escape sequences are defined: 0x%1$s 0x%2$s\n"),
-			data_to_hexadecimal(ep),
-			data_to_hexadecimal(ep + 1));
+			    gettext(
+			    "same escape sequences are defined: "
+			    "0x%1$s 0x%2$s\n"),
+			    data_to_hexadecimal(ep),
+			    data_to_hexadecimal(ep + 1));
 			error_deferred += 1;
 			return	(NULL);
 		}
@@ -534,7 +534,7 @@ map_table(itm_data_t	*name, itmc_map_t	*map_list,
 	unsigned char		*byte_seq_max;
 	unsigned char		*p;
 	long			i;
-	itmc_map_type_t		map_type = NULL;
+	itmc_map_type_t		map_type = ITMC_MAP_UNKNOWN;
 	itmc_map_name_type_t	*map_name_type;
 	long			hash_factor;
 	long			result_len_specfied = 0;
@@ -546,12 +546,12 @@ map_table(itm_data_t	*name, itmc_map_t	*map_list,
 	if (attr != NULL) {
 		map_type = check_map_type(attr);
 	}
-	if (NULL == map_type) {
+	if (ITMC_MAP_UNKNOWN == map_type) {
 		map_type = ITMC_MAP_AUTOMATIC;
 	}
 	hash_factor = ((NULL != attr) && (attr->hash_factor != 0)) ?
-							attr->hash_factor:
-							200;
+	    attr->hash_factor :
+	    200;
 
 	map_name_type = cmd_opt.map_name_type;
 	for (; map_name_type; map_name_type = map_name_type->next) {
@@ -577,7 +577,7 @@ map_table(itm_data_t	*name, itmc_map_t	*map_list,
 		if (MAXSEQUENCE < attr->resultlen) {
 			itm_error(
 			gettext("output_byte_length must be less than %1$d\n"),
-			MAXSEQUENCE);
+			    MAXSEQUENCE);
 			error_deferred += 1;
 			return	(NULL);
 		}
@@ -625,10 +625,11 @@ map_table(itm_data_t	*name, itmc_map_t	*map_list,
 			if (ml->data_pair.range.size !=
 			    ml->data_pair.data0.size) {
 				itm_error(
-				gettext("length of source range must be "
-				"the same: 0x%1$s 0x%2$s\n"),
-				data_to_hexadecimal(&(ml->data_pair.data0)),
-				data_to_hexadecimal(&(ml->data_pair.range)));
+				    gettext("length of source range must be "
+				    "the same: 0x%1$s 0x%2$s\n"),
+				    data_to_hexadecimal(&(ml->data_pair.data0)),
+				    data_to_hexadecimal(
+				    &(ml->data_pair.range)));
 				error_deferred += 1;
 				return	(NULL);
 			}
@@ -636,8 +637,10 @@ map_table(itm_data_t	*name, itmc_map_t	*map_list,
 			    &((ml->data_pair.range)))) {
 				itm_error(
 				gettext("source range error: 0x%1$s 0x%2$s\n"),
-				data_to_hexadecimal(&(ml->data_pair.data0)),
-				data_to_hexadecimal(&(ml->data_pair.range)));
+				    data_to_hexadecimal(
+				    &(ml->data_pair.data0)),
+				    data_to_hexadecimal(
+				    &(ml->data_pair.range)));
 				error_deferred += 1;
 				return	(NULL);
 			}
@@ -649,7 +652,7 @@ map_table(itm_data_t	*name, itmc_map_t	*map_list,
 	}
 	if (num == 0) {
 		itm_error(
-			gettext("no mapping pair\n"));
+		    gettext("no mapping pair\n"));
 		error_deferred += 1;
 		return	(NULL);
 	}
@@ -657,9 +660,9 @@ map_table(itm_data_t	*name, itmc_map_t	*map_list,
 	if (0 != result_len_specfied) {
 		if (result_len > result_len_specfied) {
 			itm_error(
-			gettext("result value length is "
-			"over specifed output_byte_length(%1$ld)\n"),
-			result_len_specfied);
+			    gettext("result value length is "
+			    "over specifed output_byte_length(%1$ld)\n"),
+			    result_len_specfied);
 			error_deferred += 1;
 			return	(NULL);
 		}
@@ -686,7 +689,7 @@ map_table(itm_data_t	*name, itmc_map_t	*map_list,
 		}
 		if (ml->data_pair.range.size > 0) {
 			map_range_adjust_byte_seq(byte_seq_min, byte_seq_max,
-					    source_len, &(ml->data_pair));
+			    source_len, &(ml->data_pair));
 		} else {
 			p = (unsigned char *)(NSPTR(&((ml->data_pair).data0)));
 			for (i = 0; i < source_len; i++) {
@@ -702,7 +705,7 @@ map_table(itm_data_t	*name, itmc_map_t	*map_list,
 	for (dense_encoded_map_ent = 1, i = 0; i < source_len; i++) {
 		u = dense_encoded_map_ent;
 		dense_encoded_map_ent *=
-			(*(byte_seq_max + i) - *(byte_seq_min + i) + 1);
+		    (*(byte_seq_max + i) - *(byte_seq_min + i) + 1);
 		if (dense_encoded_map_ent < u) {
 			dense_encoded_map_ent = (ulong_t)(~0);
 			break;
@@ -712,7 +715,7 @@ map_table(itm_data_t	*name, itmc_map_t	*map_list,
 	if (TRACE('m')) {
 		int	i;
 		TRACE_MESSAGE('m', ("map_table: ent=%lu num=%lu	",
-				dense_encoded_map_ent, num));
+		    dense_encoded_map_ent, num));
 		TRACE_MESSAGE('m', ("byte_seq_min=0x"));
 		for (i = 0; i < source_len; i++) {
 			TRACE_MESSAGE('m', ("%02x", *(byte_seq_min + i)));
@@ -734,7 +737,7 @@ map_table(itm_data_t	*name, itmc_map_t	*map_list,
 			range_num = 1;
 			if (ml->data_pair.range.size > 0) {
 				range_num +=
-				map_table_num_range(&(ml->data_pair));
+				    map_table_num_range(&(ml->data_pair));
 			}
 			num2 += range_num;
 			if (0 == ml->data_pair.data1.size) {
@@ -744,7 +747,7 @@ map_table(itm_data_t	*name, itmc_map_t	*map_list,
 		}
 	}
 	(void) qsort(tpp, num, sizeof (itmc_data_pair_t *),
-		(int (*)(const void *, const void *))data_pair_compare);
+	    (int (*)(const void *, const void *))data_pair_compare);
 
 	/* check if map_pair range and next map_pair are overrapped */
 	for (n = 0, dp1 = tpp; n < (num-1); n++, dp1++) {
@@ -752,10 +755,10 @@ map_table(itm_data_t	*name, itmc_map_t	*map_list,
 		    (0 <= data_compare(&((*(dp1+0))->range),
 		    &((*(dp1+1))->data0)))) {
 			itm_error(
-			gettext("ranges of source sequences "
-			"overrapped: %1$s %2$s\n"),
-			data_to_hexadecimal(&((*(dp1+0))->range)),
-			data_to_hexadecimal(&((*(dp1+1))->data0)));
+			    gettext("ranges of source sequences "
+			    "overrapped: %1$s %2$s\n"),
+			    data_to_hexadecimal(&((*(dp1+0))->range)),
+			    data_to_hexadecimal(&((*(dp1+1))->data0)));
 			error_deferred += 1;
 			return	(NULL);
 		}
@@ -763,20 +766,20 @@ map_table(itm_data_t	*name, itmc_map_t	*map_list,
 
 	if (1 < default_count) {
 		itm_error(
-			gettext("default is specified %1$d times in a map\n"),
-			default_count);
+		    gettext("default is specified %1$d times in a map\n"),
+		    default_count);
 		error_deferred_local += 1;
 	}
 	if ((1 == default_count) && (!source_fixed_len)) {
 		itm_error(
-			gettext("default is specified,"
-				" but length of source data is not fixed\n"));
+		    gettext("default is specified,"
+		    " but length of source data is not fixed\n"));
 		error_deferred_local += 1;
 	}
 	if ((1 <= pass_through) && (source_len != result_len)) {
 		itm_error(
-			gettext("\"default no_change_copy\" is "
-			"specified, but size does not match\n"));
+		    gettext("\"default no_change_copy\" is "
+		    "specified, but size does not match\n"));
 		error_deferred_local += 1;
 	}
 
@@ -795,7 +798,7 @@ map_table(itm_data_t	*name, itmc_map_t	*map_list,
 		simple_indexed_map_ent = source_end - source_start + 1;
 
 		TRACE_MESSAGE('m', ("map_table: simple_indexed_map_ent=%lu\n",
-				simple_indexed_map_ent));
+		    simple_indexed_map_ent));
 
 		switch (map_type) {
 		case ITMC_MAP_AUTOMATIC:
@@ -814,8 +817,8 @@ map_table(itm_data_t	*name, itmc_map_t	*map_list,
 				if ((sizeof (long)) < source_len) {
 					itm_error(
 					gettext("length of source is too long "
-						"for large table: %ld\n"),
-						source_len);
+					    "for large table: %ld\n"),
+					    source_len);
 					error_deferred += 1;
 					return	(NULL);
 				}
@@ -837,8 +840,8 @@ map_table(itm_data_t	*name, itmc_map_t	*map_list,
 			if ((sizeof (long)) < source_len) {
 				itm_error(
 				gettext("length of source is too long "
-					"for index lookup: %ld\n"),
-					source_len);
+				    "for index lookup: %ld\n"),
+				    source_len);
 				error_deferred += 1;
 				return	(NULL);
 			}
@@ -850,7 +853,7 @@ map_table(itm_data_t	*name, itmc_map_t	*map_list,
 			if (u < num2) {
 				itm_error(
 				gettext("map is too large for hashing: %lu\n"),
-					num2);
+				    num2);
 				error_deferred += 1;
 				return	(NULL);
 			}
@@ -861,9 +864,10 @@ map_table(itm_data_t	*name, itmc_map_t	*map_list,
 			}
 			if (u < dense_encoded_map_ent) {
 				itm_error(
-				gettext(
-				"map is too large for dense encoding: %lu\n"),
-				dense_encoded_map_ent);
+				    gettext(
+				    "map is too large for dense encoding: "
+				    "%lu\n"),
+				    dense_encoded_map_ent);
 				error_deferred += 1;
 				return	(NULL);
 			}
@@ -875,8 +879,8 @@ map_table(itm_data_t	*name, itmc_map_t	*map_list,
 			if (u < num2) {
 				itm_error(
 				gettext("length of source is too long for "
-					"binary search: %ld\n"),
-				source_len);
+				    "binary search: %ld\n"),
+				    source_len);
 				error_deferred += 1;
 				return	(NULL);
 			}
@@ -887,25 +891,25 @@ map_table(itm_data_t	*name, itmc_map_t	*map_list,
 		switch (map_type) {
 		case ITMC_MAP_SIMPLE_INDEX:
 			table = map_table_indexed_fixed(
-				tpp, num, default_data,
-				result_len, error_count);
+			    tpp, num, default_data,
+			    result_len, error_count);
 			break;
 		case ITMC_MAP_SIMPLE_HASH:
 			table = map_table_hash(tpp, num, default_data,
-					hash_factor, result_len, num2,
-					error_count);
+			    hash_factor, result_len, num2,
+			    error_count);
 			break;
 		case ITMC_MAP_DENSE_ENCODING:
 			table = map_table_dense_encoding(tpp, num,
-					default_data,
-					dense_encoded_map_ent,
-					byte_seq_min, byte_seq_max,
-					result_len, error_count);
+			    default_data,
+			    dense_encoded_map_ent,
+			    byte_seq_min, byte_seq_max,
+			    result_len, error_count);
 			break;
 		case ITMC_MAP_BINARY_SEARCH:
 			table = map_table_lookup_fixed(tpp, num,
-					default_data,
-					result_len, num2);
+			    default_data,
+			    result_len, num2);
 			break;
 		}
 	} else {
@@ -930,7 +934,7 @@ check_map_type(itmc_map_attr_t *attr)
 	}
 	for (i = 0; NULL != map_type_name[i].name; i++) {
 		if (0 == strncmp(((char *)&(attr->type->place)),
-				map_type_name[i].name, attr->type->size)) {
+		    map_type_name[i].name, attr->type->size)) {
 			return (map_type_name[i].type);
 		}
 	}
@@ -979,8 +983,8 @@ map_table_indexed_fixed(
 	entry_num = source_end - source_start + 1;
 
 	table_size = ((sizeof (itm_tbl_hdr_t)) +
-			(sizeof (itm_map_idx_fix_hdr_t)) +
-			(resultlen * entry_num));
+	    (sizeof (itm_map_idx_fix_hdr_t)) +
+	    (resultlen * entry_num));
 	if (0 < error_count) {
 		table_size += entry_num;
 	}
@@ -1035,8 +1039,8 @@ map_table_indexed_fixed(
 	if (-1 == sub_hdr->default_error) {
 		if (source->size != resultlen) {
 			itm_error(
-				gettext("\"default no_change_copy\" is "
-				"specified, but size does not match\n"));
+			    gettext("\"default no_change_copy\" is "
+			    "specified, but size does not match\n"));
 			exit(ITMC_STATUS_BT);
 		}
 
@@ -1045,9 +1049,9 @@ map_table_indexed_fixed(
 		    i++, j += resultlen) {
 			for (k = 0; k < resultlen; k++) {
 				*(table + j + k) =
-					(((source_start + i) >>
-					((resultlen - k - 1) * 8)) &
-					0x00ff);
+				    (((source_start + i) >>
+				    ((resultlen - k - 1) * 8)) &
+				    0x00ff);
 			}
 		}
 	} else if (0 == sub_hdr->default_error) {
@@ -1057,18 +1061,18 @@ map_table_indexed_fixed(
 			    i < (entry_num + 1); /* last one is for default */
 			    i++, j += resultlen) {
 				(void) memcpy(table + j +
-				(resultlen - default_data->size),
-				(void *)(&(default_data->place.itm_64d)),
-				default_data->size);
+				    (resultlen - default_data->size),
+				    (void *)(&(default_data->place.itm_64d)),
+				    default_data->size);
 			}
 		} else {
 			for (i = 0, j = 0;
 			    i < (entry_num + 1); /* last one is for default */
 			    i++, j += resultlen) {
 				(void) memcpy(table + j +
-				(resultlen - default_data->size),
-				(void *)(default_data->place.itm_ptr),
-				default_data->size);
+				    (resultlen - default_data->size),
+				    (void *)(default_data->place.itm_ptr),
+				    default_data->size);
 			}
 		}
 	}
@@ -1079,10 +1083,10 @@ map_table_indexed_fixed(
 				continue; /* error sequence */
 			}
 			j = data_to_long(&((*(tpp + i))->data0)) -
-				source_start;
+			    source_start;
 			k = ((*(tpp + i))->range.size) == 0 ? j :
 			    data_to_long(&((*(tpp + i))->range)) -
-				source_start;
+			    source_start;
 			for (; j <= k; j++) {
 				*(error_table + j) = 0;
 			}
@@ -1093,10 +1097,10 @@ map_table_indexed_fixed(
 			if (0 == (*(tpp + i))->data1.size) {
 				/* error sequence */
 				j = data_to_long(&((*(tpp + i))->data0)) -
-					source_start;
+				    source_start;
 				k = ((*(tpp + i))->range.size) == 0 ? j :
-				data_to_long(&((*(tpp + i))->range)) -
-				source_start;
+				    data_to_long(&((*(tpp + i))->range)) -
+				    source_start;
 				for (; j <= k; j++) {
 					*(error_table + j) = 1;
 				}
@@ -1114,8 +1118,8 @@ map_table_indexed_fixed(
 			k = j;
 		(void) memset(p, 0, sizeof (uchar_t *) * resultlen);
 		(void) memcpy(p + (resultlen  - (*(tpp + i))->data1.size),
-			((caddr_t)NSPTR(&((*(tpp + i))->data1))),
-			(*(tpp + i))->data1.size);
+		    ((caddr_t)NSPTR(&((*(tpp + i))->data1))),
+		    (*(tpp + i))->data1.size);
 		map_range_make_result(table, j, k, p, resultlen);
 	}
 	free(p);
@@ -1147,13 +1151,13 @@ map_table_lookup_fixed(
 	uchar_t			*result_data;
 
 	TRACE_MESSAGE('m', ("map_table_lookup_fixed : %ld(%ld) 0x%lx\n",
-			num, num2, default_data));
+	    num, num2, default_data));
 
 	source = &((*(tpp + 0))->data0);
 
 	table_size = ((sizeof (itm_tbl_hdr_t)) +
-			(sizeof (itm_map_idx_fix_hdr_t)) +
-			((source->size + 1 + resultlen) * num2));
+	    (sizeof (itm_map_idx_fix_hdr_t)) +
+	    ((source->size + 1 + resultlen) * num2));
 	if ((NULL != default_data) &&
 	    (((itm_data_t *)(-1)) != default_data)) {
 		table_size += (source->size + 1 + resultlen);
@@ -1188,7 +1192,7 @@ map_table_lookup_fixed(
 	result_data = malloc_vital(resultlen);
 	for (i = 0, j = 0; i < num; i++) {
 		(void) memcpy(table + j,
-			NSPTR(&((*(tpp + i))->data0)), source->size);
+		    NSPTR(&((*(tpp + i))->data0)), source->size);
 		j += source->size;
 		if (0 == (*(tpp + i))->data1.size) {
 			*(table + j) = 1; /* specified error */
@@ -1197,21 +1201,21 @@ map_table_lookup_fixed(
 			/* *(table + j) = 0; ** valid */
 			j += 1;
 			(void) memcpy(table + j +
-				(resultlen  - (*(tpp + i))->data1.size),
-				NSPTR(&((*(tpp + i))->data1)),
-				(*(tpp + i))->data1.size);
+			    (resultlen  - (*(tpp + i))->data1.size),
+			    NSPTR(&((*(tpp + i))->data1)),
+			    (*(tpp + i))->data1.size);
 		}
 		j += resultlen;
 
 		if ((*(tpp + i))->range.size != 0) {
 			(void) memcpy(source_data,
-				NSPTR(&((*(tpp + i))->data0)),
-				source->size);
+			    NSPTR(&((*(tpp + i))->data0)),
+			    source->size);
 			(void) memset(result_data, 0, resultlen);
 			(void) memcpy(result_data +
-				(resultlen  - (*(tpp + i))->data1.size),
-				NSPTR(&((*(tpp + i))->data1)),
-				(*(tpp + i))->data1.size);
+			    (resultlen  - (*(tpp + i))->data1.size),
+			    NSPTR(&((*(tpp + i))->data1)),
+			    (*(tpp + i))->data1.size);
 			h = map_table_num_range((*(tpp + i)));
 			for (k = 0; k < h; k++) {
 				uchar_t		*dp;
@@ -1231,7 +1235,7 @@ map_table_lookup_fixed(
 					}
 				}
 				(void) memcpy(table + j,
-					source_data, source->size);
+				    source_data, source->size);
 				j += source->size;
 
 				if (0 == (*(tpp + i))->data1.size) {
@@ -1255,7 +1259,7 @@ map_table_lookup_fixed(
 						}
 					}
 					(void) memcpy(table + j, result_data,
-						resultlen);
+					    resultlen);
 				}
 				j += resultlen;
 			}
@@ -1269,8 +1273,8 @@ map_table_lookup_fixed(
 	    (((itm_data_t *)(-1)) != default_data)) {
 		(void) memset(table + j, 0, source->size + 1 + resultlen);
 		(void) memcpy(table + j + source->size + 1 +
-		(resultlen  - default_data->size),
-		NSPTR(default_data), default_data->size);
+		    (resultlen  - default_data->size),
+		    NSPTR(default_data), default_data->size);
 	}
 	return	(header);
 }
@@ -1316,7 +1320,7 @@ map_table_hash(
 	itm_size_t		h;
 
 	TRACE_MESSAGE('m', ("map_table_hash : %ld(%ld) 0x%lx\n",
-			num, num2, default_data));
+	    num, num2, default_data));
 	source = &((*(tpp + 0))->data0);
 	pair_size = (source->size + 1 + resultlen);
 
@@ -1333,10 +1337,9 @@ map_table_hash(
 
 	hash_table = malloc_vital(hash_table_num);
 	for (i = 0, of_table_num = 0; i < num; i++) {
-		hash_value =
-			hash(NSPTR(&((*(tpp + i))->data0)),
-				(*(tpp + i))->data0.size,
-				hash_table_num);
+		hash_value = hash(NSPTR(&((*(tpp + i))->data0)),
+		    (*(tpp + i))->data0.size,
+		    hash_table_num);
 		if (0 == *(hash_table + hash_value)) {
 			*(hash_table + hash_value) = 1;
 		} else {
@@ -1346,8 +1349,8 @@ map_table_hash(
 
 		if ((*(tpp + i))->range.size != 0) {
 			(void) memcpy(source_data,
-				NSPTR(&((*(tpp + i))->data0)),
-				source->size);
+			    NSPTR(&((*(tpp + i))->data0)),
+			    source->size);
 			h = map_table_num_range((*(tpp + i)));
 			for (n = 0; n < h; n++) {
 				for (m = 0,
@@ -1363,9 +1366,9 @@ map_table_hash(
 						break;
 					}
 				}
-				hash_value =
-					hash((char *)source_data, source->size,
-						hash_table_num);
+				hash_value = hash((char *)source_data,
+				    source->size,
+				    hash_table_num);
 
 				if (0 == *(hash_table + hash_value)) {
 					*(hash_table + hash_value) = 1;
@@ -1405,16 +1408,16 @@ map_table_hash(
 		}
 		(void) putchar('\n');
 		(void) printf("null=%ld one=%ld conflict=%ld\n",
-			hash_none, hash_one, hash_conflict);
+		    hash_none, hash_one, hash_conflict);
 	}
 #endif /* DEBUG */
 
 	free(hash_table);
 	table_size = ((sizeof (itm_tbl_hdr_t)) +
-			(sizeof (itm_map_hash_hdr_t)) +
-			(hash_table_num) +
-			(pair_size * hash_table_num) +
-			(pair_size * of_table_num));
+	    (sizeof (itm_map_hash_hdr_t)) +
+	    (hash_table_num) +
+	    (pair_size * hash_table_num) +
+	    (pair_size * of_table_num));
 	if ((NULL != default_data) &&
 	    (((itm_data_t *)(-1)) != default_data)) {
 		table_size += pair_size;
@@ -1448,16 +1451,15 @@ map_table_hash(
 	sub_hdr->hash_tbl_size = (pair_size * hash_table_num);
 	sub_hdr->hash_tbl_num = hash_table_num;
 	sub_hdr->hash_of_size =
-		(pair_size * of_table_num);
+	    (pair_size * of_table_num);
 	sub_hdr->hash_of_num = of_table_num;
 	sub_hdr->error_num = error_count; /* > 0; so pad4 = 0 */
 
 	/* specified map */
 	for (i = 0, j = 0, k = 0; i < num; i++) {
-		hash_value =
-			hash(NSPTR(&((*(tpp + i))->data0)),
-				(*(tpp + i))->data0.size,
-				hash_table_num);
+		hash_value = hash(NSPTR(&((*(tpp + i))->data0)),
+		    (*(tpp + i))->data0.size,
+		    hash_table_num);
 		p = error_table + hash_value;
 		if (*p) {	/* conflict */
 			if (*p < 63) {
@@ -1479,23 +1481,23 @@ map_table_hash(
 			/* (*p) = 0; ** valid */
 			p++;
 			(void) memset(p, 0,
-				(resultlen - (*(tpp + i))->data1.size));
+			    (resultlen - (*(tpp + i))->data1.size));
 			(void) memcpy(p +
-				(resultlen - (*(tpp + i))->data1.size),
-				NSPTR(&((*(tpp + i))->data1)),
-			(*(tpp + i))->data1.size);
+			    (resultlen - (*(tpp + i))->data1.size),
+			    NSPTR(&((*(tpp + i))->data1)),
+			    (*(tpp + i))->data1.size);
 		}
 
 		if ((*(tpp + i))->range.size != 0) {
 			(void) memcpy(source_data,
-				NSPTR(&((*(tpp + i))->data0)),
-				source->size);
+			    NSPTR(&((*(tpp + i))->data0)),
+			    source->size);
 			(void) memset(result_data, 0,
-				(resultlen  - (*(tpp + i))->data1.size));
+			    (resultlen  - (*(tpp + i))->data1.size));
 			(void) memcpy(result_data +
-				(resultlen  - (*(tpp + i))->data1.size),
-				NSPTR(&((*(tpp + i))->data1)),
-				(*(tpp + i))->data1.size);
+			    (resultlen  - (*(tpp + i))->data1.size),
+			    NSPTR(&((*(tpp + i))->data1)),
+			    (*(tpp + i))->data1.size);
 			h = map_table_num_range((*(tpp + i)));
 			for (n = 0; n < h; n++) {
 				for (m = 0,
@@ -1513,8 +1515,8 @@ map_table_hash(
 				}
 
 				hash_value = hash((char *)source_data,
-						source->size,
-						hash_table_num);
+				    source->size,
+				    hash_table_num);
 				p = error_table + hash_value;
 				if (*p) {	/* conflict */
 					if (*p < 63) {
@@ -1525,7 +1527,7 @@ map_table_hash(
 				} else {
 					*p = 1;
 					p = hash_table +
-						(pair_size * hash_value);
+					    (pair_size * hash_value);
 				}
 				(void) memcpy(p, source_data, source->size);
 				p += source->size;
@@ -1550,7 +1552,7 @@ map_table_hash(
 						}
 					}
 					(void) memcpy(p,
-						result_data, resultlen);
+					    result_data, resultlen);
 				}
 			}
 		}
@@ -1562,18 +1564,18 @@ map_table_hash(
 	if ((NULL != default_data) &&
 	    (((itm_data_t *)(-1)) != default_data)) {
 		j = ((pair_size * hash_table_num) +
-			(pair_size * of_table_num));
+		    (pair_size * of_table_num));
 		(void) memcpy(hash_table + j + (resultlen - default_data->size),
-			NSPTR(default_data), default_data->size);
+		    NSPTR(default_data), default_data->size);
 	}
 #if defined(ENABLE_TRACE)
 	for (i = 0, p = of_table; i < of_table_num; i++, p += 5) {
 		(void) printf("0x%02x%02x%02x%02x	0x%02x\n",
-			((unsigned char)(*(p + 0))),
-			((unsigned char)(*(p + 1))),
-			((unsigned char)(*(p + 2))),
-			((unsigned char)(*(p + 3))),
-			((unsigned char)(*(p + 4))));
+		    ((unsigned char)(*(p + 0))),
+		    ((unsigned char)(*(p + 1))),
+		    ((unsigned char)(*(p + 2))),
+		    ((unsigned char)(*(p + 3))),
+		    ((unsigned char)(*(p + 4))));
 	}
 #endif
 	return	(header);
@@ -1612,9 +1614,9 @@ map_table_dense_encoding(
 
 
 	table_size = ((sizeof (itm_tbl_hdr_t)) +
-			(sizeof (itm_map_dense_enc_hdr_t)) +
-			(source->size + source->size) +
-			(resultlen * entry_num));
+	    (sizeof (itm_map_dense_enc_hdr_t)) +
+	    (source->size + source->size) +
+	    (resultlen * entry_num));
 	if (0 < error_count) {
 		table_size += entry_num;
 	}
@@ -1661,20 +1663,20 @@ map_table_dense_encoding(
 
 	(void) memcpy((char *)(sub_hdr + 1), byte_seq_min, source->size);
 	(void) memcpy((char *)(sub_hdr + 1) + source->size,
-		byte_seq_max, source->size);
+	    byte_seq_max, source->size);
 
 	if (-1 == sub_hdr->default_error) {
 		byte_seq_def = malloc_vital((sizeof (unsigned char *)) *
-					    resultlen);
+		    resultlen);
 		if (source->size != resultlen) {
 			itm_error(
-				gettext("\"default no_change_copy\" is "
-				"specified, but size does not match\n"));
+			gettext("\"default no_change_copy\" is "
+			    "specified, but size does not match\n"));
 			exit(ITMC_STATUS_BT);
 		}
 		put_dense_encoding_default(
-			table, byte_seq_min, byte_seq_max, byte_seq_def,
-			resultlen - 1, 0, 0);
+		    table, byte_seq_min, byte_seq_max, byte_seq_def,
+		    resultlen - 1, 0, 0);
 		free(byte_seq_def);
 	} else if (0 == sub_hdr->default_error) {
 		if (default_data->size <= (sizeof (itm_place_t))) {
@@ -1682,18 +1684,18 @@ map_table_dense_encoding(
 			    i < (entry_num + 1); /* 1:default data */
 			    i++, j += resultlen) {
 				(void) memcpy(table + j +
-				(resultlen - default_data->size),
-				(void *)(&(default_data->place.itm_64d)),
-				default_data->size);
+				    (resultlen - default_data->size),
+				    (void *)(&(default_data->place.itm_64d)),
+				    default_data->size);
 			}
 		} else {
 			for (i = 0, j = 0;
 			    i < (entry_num + 1);  /* 1:default data */
 			    i++, j += resultlen) {
 				(void) memcpy(table + j +
-				(resultlen - default_data->size),
-				(void *)(default_data->place.itm_ptr),
-				default_data->size);
+				    (resultlen - default_data->size),
+				    (void *)(default_data->place.itm_ptr),
+				    default_data->size);
 			}
 		}
 	}
@@ -1705,12 +1707,12 @@ map_table_dense_encoding(
 				continue; /* error sequence */
 			}
 			j = hash_dense_encoding(NSPTR(&((*(tpp + i))->data0)),
-						(*(tpp + i))->data0.size,
-						byte_seq_min, byte_seq_max);
+			    (*(tpp + i))->data0.size,
+			    byte_seq_min, byte_seq_max);
 			k = ((*(tpp + i))->range.size) == 0 ? j :
 			    hash_dense_encoding(NSPTR(&((*(tpp + i))->range)),
-						(*(tpp + i))->data0.size,
-						byte_seq_min, byte_seq_max);
+			    (*(tpp + i))->data0.size,
+			    byte_seq_min, byte_seq_max);
 			for (; j <= k; j++) {
 				*(error_table + j) = 0;
 			}
@@ -1724,14 +1726,14 @@ map_table_dense_encoding(
 		for (i = 0; i < num; i++) {
 			if (0 == (*(tpp + i))->data1.size) {
 				j = hash_dense_encoding(
-					NSPTR(&((*(tpp + i))->data0)),
-						(*(tpp + i))->data0.size,
-						byte_seq_min, byte_seq_max);
+				    NSPTR(&((*(tpp + i))->data0)),
+				    (*(tpp + i))->data0.size,
+				    byte_seq_min, byte_seq_max);
 				k = ((*(tpp + i))->range.size) == 0 ? j :
-					hash_dense_encoding(
-					NSPTR(&((*(tpp + i))->range)),
-					(*(tpp + i))->data0.size,
-					byte_seq_min, byte_seq_max);
+				    hash_dense_encoding(
+				    NSPTR(&((*(tpp + i))->range)),
+				    (*(tpp + i))->data0.size,
+				    byte_seq_min, byte_seq_max);
 				for (; j <= k; j++) {
 					*(error_table + j) = 1; /* specified */
 				}
@@ -1743,20 +1745,20 @@ map_table_dense_encoding(
 	p = malloc_vital(resultlen);
 	for (i = 0; i < num; i++) {
 		j = hash_dense_encoding(NSPTR(&((*(tpp + i))->data0)),
-					(*(tpp + i))->data0.size,
-					byte_seq_min, byte_seq_max);
+		    (*(tpp + i))->data0.size,
+		    byte_seq_min, byte_seq_max);
 
 		if (0 != (*(tpp + i))->range.size)
 			k = hash_dense_encoding(
-						NSPTR(&((*(tpp + i))->range)),
-						(*(tpp + i))->range.size,
-						byte_seq_min, byte_seq_max);
+			    NSPTR(&((*(tpp + i))->range)),
+			    (*(tpp + i))->range.size,
+			    byte_seq_min, byte_seq_max);
 		else
 			k = j;
 		(void) memset(p, 0, (resultlen	 - (*(tpp + i))->data1.size));
 		(void) memcpy(p + (resultlen  - (*(tpp + i))->data1.size),
-			((caddr_t)NSPTR(&((*(tpp + i))->data1))),
-			(*(tpp + i))->data1.size);
+		    ((caddr_t)NSPTR(&((*(tpp + i))->data1))),
+		    (*(tpp + i))->data1.size);
 		map_range_make_result(table, j, k, p, resultlen);
 	}
 	free(p);
@@ -1782,13 +1784,13 @@ put_dense_encoding_default(
 		    i <= *(byte_seq_max + position); i++) {
 			*(byte_seq_def + position) = i;
 			put_dense_encoding_default(
-				table,
-				byte_seq_min, byte_seq_max,
-				byte_seq_def,
-				pos_max, position + 1,
-				((dense_encoded_value + i) *
-				(*(byte_seq_max + position) -
-				*(byte_seq_min + position) + 1)));
+			    table,
+			    byte_seq_min, byte_seq_max,
+			    byte_seq_def,
+			    pos_max, position + 1,
+			    ((dense_encoded_value + i) *
+			    (*(byte_seq_max + position) -
+			    *(byte_seq_min + position) + 1)));
 		}
 		return;
 	}
@@ -1797,8 +1799,8 @@ put_dense_encoding_default(
 	    i <= *(byte_seq_max + position); i++) {
 		*(byte_seq_def + position) = i;
 		(void) memcpy(table +
-			((pos_max + 1) * (dense_encoded_value + i - 1)),
-			byte_seq_def, pos_max + 1);
+		    ((pos_max + 1) * (dense_encoded_value + i - 1)),
+		    byte_seq_def, pos_max + 1);
 	}
 }
 
@@ -1829,9 +1831,9 @@ dense_enc_index_to_byte_seq(
 	p = buf + 2;
 	for (i = length - 1; 0 <= i; --i) {
 		residue = value % (*(byte_seq_max + i) -
-					*(byte_seq_min + i) + 1);
+		    *(byte_seq_min + i) + 1);
 		value /= (*(byte_seq_max + i) -
-				*(byte_seq_min + i) + 1);
+		    *(byte_seq_min + i) + 1);
 
 		residue += *(byte_seq_min + i);
 		l = ((0xf0 & residue) >> 4);
@@ -1855,7 +1857,7 @@ itm_tbl_hdr_t *
 map_table_lookup_var()
 {
 	itm_error(gettext(
-		"lenghth of all source sequences must be the same\n"));
+	    "length of all source sequences must be the same\n"));
 	error_deferred += 1;
 	return	(NULL);
 }
@@ -1913,11 +1915,11 @@ map_table_resultlen(itmc_map_t		*ml)
 	if (j < ml->data_pair.data1.size) j = ml->data_pair.data1.size;
 	if (j < ml->data_pair.range.size) j = ml->data_pair.range.size;
 	c1 = (uchar_t *)(NSPTR(&((ml->data_pair).data0))) +
-			ml->data_pair.data0.size - 1;
+	    ml->data_pair.data0.size - 1;
 	c2 = (uchar_t *)(NSPTR(&((ml->data_pair).data1))) +
-			ml->data_pair.data1.size - 1;
+	    ml->data_pair.data1.size - 1;
 	c3 = (uchar_t *)(NSPTR(&((ml->data_pair.range)))) +
-			ml->data_pair.range.size - 1;
+	    ml->data_pair.range.size - 1;
 	m = 0;
 	for (len = 0; len < j; len++, c1--, c2--, c3--) {
 		if (len < ml->data_pair.data0.size) m -= *c1;
@@ -1929,11 +1931,11 @@ map_table_resultlen(itmc_map_t		*ml)
 		len += 1;
 	}
 	TRACE_MESSAGE('g', ("map_table_resutlen: source(0x%s..0x%s), "
-			"result(0x%s.... len= %ld)\n",
-			data_to_hexadecimal(&(ml->data_pair.data0)),
-			data_to_hexadecimal(&(ml->data_pair.range)),
-			data_to_hexadecimal(&(ml->data_pair.data1)),
-			len));
+	    "result(0x%s.... len= %ld)\n",
+	    data_to_hexadecimal(&(ml->data_pair.data0)),
+	    data_to_hexadecimal(&(ml->data_pair.range)),
+	    data_to_hexadecimal(&(ml->data_pair.data1)),
+	    len));
 	return (len);
 }
 
@@ -1993,15 +1995,15 @@ map_table_num_range(itmc_data_pair_t	*pair)
 		if (i < pair->range.size) num2 = *c2;
 		if (i < pair->data0.size) num2 -= *c1;
 		TRACE_MESSAGE('G', (" num += %d(=%d-%d)\n ",
-				*c2 - *c1, *c2, *c1));
+		    *c2 - *c1, *c2, *c1));
 		num2 <<= (i*8);
 		num += num2;
 	}
 	TRACE_MESSAGE('g', ("map_table_num_range: source(0x%s..0x%s), "
-			"num= %ld\n",
-			data_to_hexadecimal(&(pair->data0)),
-			data_to_hexadecimal(&(pair->range)),
-			num));
+	    "num= %ld\n",
+	    data_to_hexadecimal(&(pair->data0)),
+	    data_to_hexadecimal(&(pair->range)),
+	    num));
 	return (num);
 }
 
@@ -2064,21 +2066,21 @@ op_unit(itm_op_type_t	type,
 	obj->ref[0] = obj->ref[1] = obj->ref[2] = NULL;
 	if (NULL != data0) {
 		obj->ref[0] = obj_register(ITMC_OBJ_EXPR, NULL,
-						data0, data0_size,
-						&(op->data.operand[0]),
-						OBJ_REG_TAIL);
+		    data0, data0_size,
+		    &(op->data.operand[0]),
+		    OBJ_REG_TAIL);
 	}
 	if (NULL != data1) {
 		obj->ref[1] = obj_register(ITMC_OBJ_EXPR, NULL,
-						data1, data1_size,
-						&(op->data.operand[1]),
-						OBJ_REG_TAIL);
+		    data1, data1_size,
+		    &(op->data.operand[1]),
+		    OBJ_REG_TAIL);
 	}
 	if (NULL != data2) {
 		obj->ref[2] = obj_register(ITMC_OBJ_EXPR, NULL,
-						data2, data2_size,
-						&(op->data.operand[2]),
-						OBJ_REG_TAIL);
+		    data2, data2_size,
+		    &(op->data.operand[2]),
+		    OBJ_REG_TAIL);
 	}
 	obj->next = NULL;
 	obj->last = NULL;
@@ -2146,9 +2148,10 @@ expr_self(itm_expr_type_t type, itm_data_t	*data)
 			return	(NULL);
 		} else if (NULL == name) {
 			if (reg_id >= MAXREGID) {
-			itm_error(
-				gettext("more than %d variables are used\n"),
-				MAXREGID);
+				itm_error(
+				    gettext(
+				    "more than %d variables are used\n"),
+				    MAXREGID);
 				exit(ITMC_STATUS_BT2);
 			}
 			name = name_register(data, ITMC_OBJ_REGISTER, NULL);
@@ -2158,14 +2161,14 @@ expr_self(itm_expr_type_t type, itm_data_t	*data)
 		expr->data.itm_exnum = name->reg_id;
 #if !defined(_LP64)
 		expr->data.itm_expad =
-			(expr->data.itm_exnum < 0) ? (pad_t)(~0) : 0;
+		    (expr->data.itm_exnum < 0) ? (pad_t)(~0) : 0;
 #endif
 		break;
 	case ITM_EXPR_SEQ:
 		if ((sizeof (itm_place_t)) < data->size) {
 			(void) obj_register(ITMC_OBJ_DATA, NULL,
-				(void *)(data->place.itm_ptr), data->size,
-				&(expr->data.value.place), OBJ_REG_TAIL);
+			    (void *)(data->place.itm_ptr), data->size,
+			    &(expr->data.value.place), OBJ_REG_TAIL);
 		}
 		break;
 	}
@@ -2182,8 +2185,8 @@ expr_unary(itm_expr_type_t type, itm_expr_t *data0)
 	expr->type = type;
 	expr->data.operand[0].itm_ptr = (itm_place2_t)(data0);
 	(void) obj_register(ITMC_OBJ_EXPR, NULL,
-			data0, sizeof (itm_expr_t),
-			&(expr->data.operand[0]), OBJ_REG_TAIL);
+	    data0, sizeof (itm_expr_t),
+	    &(expr->data.operand[0]), OBJ_REG_TAIL);
 
 	return	(expr);
 }
@@ -2220,11 +2223,11 @@ expr_binary(itm_expr_type_t type,
 	expr->data.operand[1].itm_ptr = (itm_place2_t)(data1);
 
 	(void) obj_register(ITMC_OBJ_EXPR, NULL,
-			data0, sizeof (itm_expr_t),
-			&(expr->data.operand[0]), OBJ_REG_TAIL);
+	    data0, sizeof (itm_expr_t),
+	    &(expr->data.operand[0]), OBJ_REG_TAIL);
 	(void) obj_register(ITMC_OBJ_EXPR, NULL,
-			data1, sizeof (itm_expr_t),
-			&(expr->data.operand[1]), OBJ_REG_TAIL);
+	    data1, sizeof (itm_expr_t),
+	    &(expr->data.operand[1]), OBJ_REG_TAIL);
 
 	return	(expr);
 }
@@ -2254,8 +2257,8 @@ expr_binary2(itm_expr_type_t type,
 		data0 = expr_self_num(ITM_EXPR_INT, num);
 		expr->data.operand[0].itm_ptr = (itm_place2_t)(data0);
 		(void) obj_register(ITMC_OBJ_EXPR, NULL,
-				data0, sizeof (itm_expr_t),
-				&(expr->data.operand[0]), OBJ_REG_TAIL);
+		    data0, sizeof (itm_expr_t),
+		    &(expr->data.operand[0]), OBJ_REG_TAIL);
 		break;
 	case ITM_EXPR_INT:
 	case ITM_EXPR_REG:
@@ -2265,8 +2268,8 @@ expr_binary2(itm_expr_type_t type,
 	default:
 		expr->data.operand[0].itm_ptr = (itm_place2_t)(data0);
 		(void) obj_register(ITMC_OBJ_EXPR, NULL,
-				data0, sizeof (itm_expr_t),
-				&(expr->data.operand[0]), OBJ_REG_TAIL);
+		    data0, sizeof (itm_expr_t),
+		    &(expr->data.operand[0]), OBJ_REG_TAIL);
 		break;
 	}
 
@@ -2279,8 +2282,8 @@ expr_binary2(itm_expr_type_t type,
 		data1 = expr_self_num(ITM_EXPR_INT, num);
 		expr->data.operand[1].itm_ptr = (itm_place2_t)(data1);
 		(void) obj_register(ITMC_OBJ_EXPR, NULL,
-				data1, sizeof (itm_expr_t),
-				&(expr->data.operand[1]), OBJ_REG_TAIL);
+		    data1, sizeof (itm_expr_t),
+		    &(expr->data.operand[1]), OBJ_REG_TAIL);
 		break;
 	case ITM_EXPR_INT:
 	case ITM_EXPR_REG:
@@ -2290,8 +2293,8 @@ expr_binary2(itm_expr_type_t type,
 	default:
 		expr->data.operand[1].itm_ptr = (itm_place2_t)(data1);
 		(void) obj_register(ITMC_OBJ_EXPR, NULL,
-				data1, sizeof (itm_expr_t),
-				&(expr->data.operand[1]), OBJ_REG_TAIL);
+		    data1, sizeof (itm_expr_t),
+		    &(expr->data.operand[1]), OBJ_REG_TAIL);
 		break;
 	}
 	return	(expr);
@@ -2320,8 +2323,8 @@ expr_assign(itm_expr_type_t type,
 	expr->data.operand[0].itm_ptr = name->reg_id;
 
 	(void) obj_register(ITMC_OBJ_EXPR, NULL,
-			data1, sizeof (itm_expr_t),
-			&(expr->data.operand[1]), OBJ_REG_TAIL);
+	    data1, sizeof (itm_expr_t),
+	    &(expr->data.operand[1]), OBJ_REG_TAIL);
 	return	(expr);
 }
 
@@ -2357,7 +2360,7 @@ name_lookup(itm_data_t		*name, itm_type_t type)
 	itmc_name_t	*p;
 
 	TRACE_MESSAGE('N', ("name_lookup\t: \"%-16s\" %2ld %2ld %2ld\n",
-			name_to_str(name), name->size, type, name_id));
+	    name_to_str(name), name->size, type, name_id));
 
 	if (0 == name->size)
 		return	(NULL);
@@ -2378,11 +2381,11 @@ name_lookup(itm_data_t		*name, itm_type_t type)
 		    (ITMC_OBJ_OP	!= type) &&
 		    (ITMC_OBJ_MAP	!= type)))) {
 			itm_error(
-				gettext("name type conflict: \"%1$s\" "
-				"%2$s %3$s\n"),
-				name_to_str(name),
-				itm_name_type_name[type],
-				itm_name_type_name[p->type]);
+			    gettext("name type conflict: \"%1$s\" "
+			    "%2$s %3$s\n"),
+			    name_to_str(name),
+			    itm_name_type_name[type],
+			    itm_name_type_name[p->type]);
 			error_deferred += 1;
 			return (&name_lookup_error);
 		} else {
@@ -2402,7 +2405,7 @@ name_refer(itm_data_t	*name, itm_type_t type, itmc_ref_t	*refp)
 	p = name_lookup(name, type);
 
 	TRACE_MESSAGE('N', ("name_refer\t: \"%-16s\" %2ld %2ld %08p %2d %08p\n",
-			name_to_str(name), name->size, type, refp, name_id, p));
+	    name_to_str(name), name->size, type, refp, name_id, p));
 
 	if (&name_lookup_error == p) {
 		return	(NULL);
@@ -2451,7 +2454,7 @@ name_register(itm_data_t	*name, itm_type_t type, itmc_ref_t	*refp)
 	itmc_name_t	*p;
 
 	TRACE_MESSAGE('N', ("name_register\t: \"%-16s\" %2ld %2ld %08p %2ld\n",
-			name_to_str(name), name->size, type, refp, name_id));
+	    name_to_str(name), name->size, type, refp, name_id));
 
 
 	p = name_lookup(name, type);
@@ -2461,8 +2464,8 @@ name_register(itm_data_t	*name, itm_type_t type, itmc_ref_t	*refp)
 	if (NULL != p) {
 		if (NULL != p->object) {
 			itm_error(gettext(
-				"same names are specified: %1$s\n"),
-				name_to_str(name));
+			    "same names are specified: %1$s\n"),
+			    name_to_str(name));
 			error_deferred += 1;
 			return (NULL);
 		}
@@ -2559,8 +2562,8 @@ data_pair_compare(itmc_data_pair_t	**p0, itmc_data_pair_t	**p1)
 			d = d1;
 		}
 		itm_error(gettext(
-			"distinct source values are specified: 0x%1$s\n"),
-			data_to_hexadecimal(d));
+		    "distinct source values are specified: 0x%1$s\n"),
+		    data_to_hexadecimal(d));
 		error_deferred += 1;
 	}
 	return	(r);

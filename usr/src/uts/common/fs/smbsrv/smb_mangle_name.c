@@ -20,12 +20,14 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/sunddi.h>
 #include <sys/errno.h>
+#include <sys/extdirent.h>
 #include <smbsrv/string.h>
 #include <smbsrv/smb_vops.h>
 #include <smbsrv/smb_kproto.h>
@@ -38,7 +40,7 @@
  * '.' is also an invalid DOS char but since it's a special
  * case it doesn't appear in the list.
  */
-static char *invalid_dos_chars =
+static const char invalid_dos_chars[] =
 	"\001\002\003\004\005\006\007\010\011\012\013\014\015\016\017"
 	"\020\021\022\023\024\025\026\027\030\031\032\033\034\035\036\037"
 	" \"/\\:|<>*?";
@@ -51,7 +53,7 @@ static char *invalid_dos_chars =
  * But some of these chars and some other chars (e.g. +) are replaced
  * with underscore (_). They are introduced here as special chars.
  */
-static char *special_chars = "[];=,+";
+static const char special_chars[] = "[];=,+";
 
 #define	isinvalid(c)	(strchr(invalid_dos_chars, c) || (c & 0x80))
 
@@ -374,13 +376,13 @@ smb_unmangle(smb_node_t *dnode, char *name, char *namebuf,
 	char		shortname[SMB_SHORTNAMELEN];
 	vnode_t		*vp;
 	union {
-		char		*bufptr;
-		edirent_t	*edp;
-		dirent64_t	*dp;
+		char		*u_bufptr;
+		edirent_t	*u_edp;
+		dirent64_t	*u_dp;
 	} u;
-#define	bufptr	u.bufptr
-#define	edp		u.edp
-#define	dp		u.dp
+#define	bufptr		u.u_bufptr
+#define	edp		u.u_edp
+#define	dp		u.u_dp
 
 	if (dnode == NULL || name == NULL || namebuf == NULL || buflen == 0)
 		return (EINVAL);
@@ -399,7 +401,7 @@ smb_unmangle(smb_node_t *dnode, char *name, char *namebuf,
 	offset = 0;
 
 	while ((err = smb_vop_readdir(vp, offset, buf, &bufsize,
-	    &eof, flags, kcred)) == 0) {
+	    &eof, flags, zone_kcred())) == 0) {
 		if (bufsize == 0) {
 			err = ENOENT;
 			break;

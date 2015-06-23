@@ -21,6 +21,8 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <stdio.h>
@@ -47,6 +49,7 @@
 #include <sys/systeminfo.h>
 
 #include <smbsrv/libsmb.h>
+#include <sqlite-sys/sqlite.h>
 
 #define	SMB_NIC_DB_NAME		"/var/smb/smbhosts.db"
 #define	SMB_NIC_DB_TIMEOUT	3000		/* in millisecond */

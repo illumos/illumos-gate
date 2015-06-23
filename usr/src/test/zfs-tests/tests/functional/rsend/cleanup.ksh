@@ -26,20 +26,12 @@
 #
 
 #
-# Copyright (c) 2013 by Delphix. All rights reserved.
+# Copyright (c) 2013, 2014 by Delphix. All rights reserved.
 #
 
 . $STF_SUITE/tests/functional/rsend/rsend.kshlib
 
 verify_runnable "both"
-
-#
-# Check if the system support 'send -R'
-#
-$ZFS send 2>&1 | $GREP "\[-[a-zA-Z]*R[a-zA-Z]*\]" >/dev/null 2>&1
-if (($? != 0)); then
-	log_unsupported
-fi
 
 if is_global_zone ; then
 	destroy_pool $POOL

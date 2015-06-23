@@ -327,71 +327,27 @@ CTFMERGE_GENUNIX 	= \
 	$(UTSBASE)/$(CTFMERGE_GUDIR)/genunix/$(OBJS_DIR)/genunix
 
 #
-# Used to uniquify a non-genunix module against genunix.  If used in patch
-# mode (PATCH_BUILD != "#"), the patch ID corresponding to the module being
-# built will be used as the label.  If no ID is available, or if patch mode
-# is not being used, the value of $VERSION will be used.
+# Used to uniquify a non-genunix module against genunix. $VERSION is used
+# for the label.
 #
 # For the ease of developers dropping modules onto possibly unrelated systems,
 # you can set NO_GENUNIX_UNIQUIFY= in the environment to skip uniquifying
 # against genunix.
 #
 NO_GENUNIX_UNIQUIFY=$(POUND_SIGN)
-SKIP_GENUNIX_UNIQUIFY=no
-$(NO_GENUNIX_UNIQUIFY)SKIP_GENUNIX_UNIQUIFY=yes
+CTFMERGE_GENUNIX_DFLAG=-d $(CTFMERGE_GENUNIX)
+$(NO_GENUNIX_UNIQUIFY)CTF_GENUNIX_DFLAG=
 
 CTFMERGE_UNIQUIFY_AGAINST_GENUNIX	= \
-	@label="-L VERSION" ; \
-	uniq= ; \
-	if [ -z "$(PATCH_BUILD)" ] ; then \
-		uniq="-D BASE" ; \
-		set -- `$(CTFFINDMOD) -n -r -t $(PMTMO_FILE) $@` ; \
-		if [ "X$$1" != "X-" ] ; then \
-			label="-l $$1" ; \
-			if [ "$$2" != "fcs" ] ; then \
-				uniq="-D $$2" ; \
-			fi ; \
-		fi ; \
-	fi ; \
-	if [ "$(SKIP_GENUNIX_UNIQUIFY)" = "yes" ]; then \
-		uniq= ; \
-	else \
-		uniq="-d $(CTFMERGE_GENUNIX) $$uniq" ; \
-	fi ; \
-	cmd="$(CTFMERGE) $(CTFMRGFLAGS) $$label $$uniq" ; \
-	cmd="$$cmd -o $@ $(OBJECTS) $(CTFEXTRAOBJS)" ; \
-	echo $$cmd ; \
-	$$cmd
+	$(CTFMERGE) $(CTFMRGFLAGS) -L VERSION \
+	$(CTFMERGE_GENUNIX_DFLAG) -o $@ $(OBJECTS) $(CTFEXTRAOBJS)
 
 #
-# Used to merge the genunix module.  genunix has special requirements in
-# patch mode.  In particular, it needs to be able to find the genunix used
-# in the previous version of the KU patch (or the FCS version of genunix in
-# the case of KU 1).
+# Used to merge the genunix module.
 #
 CTFMERGE_GENUNIX_MERGE		= \
-	@if [ -z "$(PATCH_BUILD)" ] ; then \
-		set -- `$(CTFFINDMOD) -b $(OBJS_DIR) -o patch,lastgu -n -r \
-		    -t $(PMTMO_FILE) $(GENUNIX) || true` '' ; \
-		msg= ; \
-		if [ $$$(POUND_SIGN) -eq 1 ] ; \
-		    then msg="Error in $(CTFFINDMOD)" ; \
-		elif [ "X$$1" = "X-" ] ; then msg="Did not get label" ; \
-		elif [ "X$$2" = "X-" ] ; then msg="Did not get withfile" ; \
-		fi ; \
-		if [ -n "$$msg" ] ; then \
-			echo "make ctf: $$msg - removing $(GENUNIX)" ; \
-			$(RM) $(GENUNIX) ; \
-			exit 1 ; \
-		fi ; \
-		label="-l $$1" ; \
-		with="-w $$2" ; \
-	else \
-		label="-L VERSION" ; \
-	fi ; \
-	cmd="$(CTFMERGE) $(CTFMRGFLAGS) $$label $$with -o $@" ; \
-	echo $$cmd "$(OBJECTS) $(CTFEXTRAOBJS) $(IPCTF_TARGET)"; \
-	$$cmd $(OBJECTS) $(CTFEXTRAOBJS) $(IPCTF_TARGET)
+	$(CTFMERGE) $(CTFMRGFLAGS) -L VERSION -o $@ \
+	$(OBJECTS) $(CTFEXTRAOBJS) $(IPCTF_TARGET)
 
 #
 # We ctfmerge the ip objects into genunix to maximize the number of common types
@@ -632,10 +588,6 @@ LINT_KMODS = $(DRV_KMODS) $(EXEC_KMODS) $(FS_KMODS) $(SCHED_KMODS) \
 	  $(CRYPTO_KMODS) $(PCBE_KMODS) \
 	  $(DRV_KMODS_$(CLASS)) $(MISC_KMODS_$(CLASS)) $(MAC_KMODS) \
 	  $(BRAND_KMODS) $(KICONV_KMODS) $(SOCKET_KMODS)
-
-THIS_YEAR:sh=	/bin/date +%Y
-$(OBJS_DIR)/logsubr.o	:= CPPFLAGS += -DTHIS_YEAR=$(THIS_YEAR)
-$(OBJS_DIR)/logsubr.ln	:= CPPFLAGS += -DTHIS_YEAR=$(THIS_YEAR)
 
 #
 #	Files to be compiled with -xa, to generate basic block execution

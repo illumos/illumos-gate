@@ -27,14 +27,13 @@
 #ifndef	_ZONE_H
 #define	_ZONE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <mdb/mdb_modapi.h>
 
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
+extern int zid2zone(uintptr_t, uint_t, int argc, const mdb_arg_t *);
 extern int zoneprt(uintptr_t, uint_t, int argc, const mdb_arg_t *);
 
 extern int zone_walk_init(mdb_walk_state_t *);

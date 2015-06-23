@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright (c) 2013 by Delphix. All rights reserved.
+# Copyright (c) 2013, 2014 by Delphix. All rights reserved.
 #
 
 include $(SRC)/Makefile.master
@@ -20,6 +20,7 @@ TESTDIR = $(ROOTOPTPKG)/tests/functional/no_space
 
 PROGS = cleanup \
 	enospc_001_pos \
+	enospc_002_pos \
 	setup
 
 FILES = enospc.cfg

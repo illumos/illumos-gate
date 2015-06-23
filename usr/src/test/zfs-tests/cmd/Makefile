@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2012, 2014 by Delphix. All rights reserved.
 #
 
 .PARALLEL: $(SUBDIRS)
@@ -21,8 +21,10 @@ SUBDIRS = chg_usr_exec \
 	file_check \
 	file_trunc \
 	file_write \
+	getholes \
 	largest_file \
 	mkbusy \
+	mkholes \
 	mktree \
 	mmapwrite \
 	randfree_file \

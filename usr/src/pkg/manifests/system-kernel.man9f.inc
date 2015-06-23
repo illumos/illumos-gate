@@ -11,8 +11,8 @@
 
 #
 # Copyright 2011, Richard Lowe
-# Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
 # Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2014 Garrett D'Amore <garrett@damore.org>
 #
 
 file path=usr/share/man/man9f/ASSERT.9f
@@ -55,6 +55,7 @@ file path=usr/share/man/man9f/btopr.9f
 file path=usr/share/man/man9f/bufcall.9f
 file path=usr/share/man/man9f/bzero.9f
 file path=usr/share/man/man9f/canput.9f
+file path=usr/share/man/man9f/canputnext.9f
 file path=usr/share/man/man9f/clrbuf.9f
 file path=usr/share/man/man9f/cmn_err.9f
 file path=usr/share/man/man9f/condvar.9f
@@ -197,7 +198,6 @@ file path=usr/share/man/man9f/ddi_io_get8.9f
 file path=usr/share/man/man9f/ddi_io_put8.9f
 file path=usr/share/man/man9f/ddi_io_rep_get8.9f
 file path=usr/share/man/man9f/ddi_io_rep_put8.9f
-file path=usr/share/man/man9f/ddi_iomin.9f
 file path=usr/share/man/man9f/ddi_log_sysevent.9f
 file path=usr/share/man/man9f/ddi_map_regs.9f
 file path=usr/share/man/man9f/ddi_mem_get8.9f
@@ -595,6 +595,7 @@ link path=usr/share/man/man9f/atomic_swap_uchar.9f target=atomic_swap.9f
 link path=usr/share/man/man9f/atomic_swap_uint.9f target=atomic_swap.9f
 link path=usr/share/man/man9f/atomic_swap_ulong.9f target=atomic_swap.9f
 link path=usr/share/man/man9f/atomic_swap_ushort.9f target=atomic_swap.9f
+link path=usr/share/man/man9f/bcanputnext.9f target=canputnext.9f
 link path=usr/share/man/man9f/crgetgid.9f target=ddi_cred.9f
 link path=usr/share/man/man9f/crgetgroups.9f target=ddi_cred.9f
 link path=usr/share/man/man9f/crgetngroups.9f target=ddi_cred.9f
@@ -673,7 +674,6 @@ link path=usr/share/man/man9f/ddi_dmae_disable.9f target=ddi_dmae.9f
 link path=usr/share/man/man9f/ddi_dmae_enable.9f target=ddi_dmae.9f
 link path=usr/share/man/man9f/ddi_dmae_getattr.9f target=ddi_dmae.9f
 link path=usr/share/man/man9f/ddi_dmae_getcnt.9f target=ddi_dmae.9f
-link path=usr/share/man/man9f/ddi_dmae_getlim.9f target=ddi_dmae.9f
 link path=usr/share/man/man9f/ddi_dmae_prog.9f target=ddi_dmae.9f
 link path=usr/share/man/man9f/ddi_dmae_release.9f target=ddi_dmae.9f
 link path=usr/share/man/man9f/ddi_dmae_stop.9f target=ddi_dmae.9f
@@ -868,6 +868,7 @@ link path=usr/share/man/man9f/ddi_umem_free.9f target=ddi_umem_alloc.9f
 link path=usr/share/man/man9f/ddi_umem_unlock.9f target=ddi_umem_lock.9f
 link path=usr/share/man/man9f/ddi_unmap_regs.9f target=ddi_map_regs.9f
 link path=usr/share/man/man9f/desballoc.9f target=esballoc.9f
+link path=usr/share/man/man9f/dev_err.9f target=cmn_err.9f
 link path=usr/share/man/man9f/devmap_load.9f target=devmap_unload.9f
 link path=usr/share/man/man9f/devmap_umem_setup.9f \
     target=devmap_devmem_setup.9f
@@ -1181,8 +1182,6 @@ link path=usr/share/man/man9f/rw_tryupgrade.9f target=rwlock.9f
 link path=usr/share/man/man9f/samestr.9f target=SAMESTR.9f
 link path=usr/share/man/man9f/scsi_dmafree.9f target=scsi_dmaget.9f
 link path=usr/share/man/man9f/scsi_dname.9f target=scsi_cname.9f
-link path=usr/share/man/man9f/scsi_hba_attach.9f \
-    target=scsi_hba_attach_setup.9f
 link path=usr/share/man/man9f/scsi_hba_detach.9f \
     target=scsi_hba_attach_setup.9f
 link path=usr/share/man/man9f/scsi_hba_fini.9f target=scsi_hba_init.9f
@@ -1237,5 +1236,6 @@ link path=usr/share/man/man9f/va_copy.9f target=va_arg.9f
 link path=usr/share/man/man9f/va_end.9f target=va_arg.9f
 link path=usr/share/man/man9f/va_start.9f target=va_arg.9f
 link path=usr/share/man/man9f/vcmn_err.9f target=cmn_err.9f
+link path=usr/share/man/man9f/vzcmn_err.9f target=cmn_err.9f
 link path=usr/share/man/man9f/wr.9f target=WR.9f
 link path=usr/share/man/man9f/zcmn_err.9f target=cmn_err.9f

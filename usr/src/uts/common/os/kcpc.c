@@ -938,7 +938,7 @@ kcpc_overflow_intr(caddr_t arg, uint64_t bitmap)
 	if (t->t_flag & T_INTR_THREAD) {
 		klwp_t *lwp;
 
-		atomic_add_32(&kcpc_intrctx_count, 1);
+		atomic_inc_32(&kcpc_intrctx_count);
 
 		/*
 		 * Note that t_lwp is always set to point at the underlying
@@ -1008,7 +1008,7 @@ kcpc_overflow_intr(caddr_t arg, uint64_t bitmap)
 		cmn_err(CE_NOTE,
 		    "null cpc context found in overflow handler!\n");
 #endif
-		atomic_add_32(&kcpc_nullctx_count, 1);
+		atomic_inc_32(&kcpc_nullctx_count);
 	} else if ((ctx->kc_flags & KCPC_CTX_INVALID) == 0) {
 		/*
 		 * Schedule an ast to sample the counters, which will

@@ -1,0 +1,94 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
+.\"
+.Dd "Nov 4, 2014"
+.Dt WCSLEN 3C
+.Os
+.Sh NAME
+.Nm wcslen ,
+.Nm wcsnlen
+.Nd get length of wide-character string
+.Sh SYNOPSIS
+.In wchar.h
+.
+.Ft size_t
+.Fo wcslen
+.Fa "const wchar_t *string"
+.Fc
+.
+.Ft size_t
+.Fo wcsnlen
+.Fa "const wchar_t *string"
+.Fa "size_t maxlen"
+.Fc
+.
+.Sh DESCRIPTION
+The
+.Fn wcslen
+and
+.Fn wcsnlen
+functions count the number of wide-characters that are present in
+.Fa string .
+They stop counting when they encounter a null wide-character.
+The terminating null wide-character is not included in the count.
+.Lp
+Additionally,
+.Fn wcsnlen
+stops counting after it has counted
+.Fa maxlen
+wide-characters.
+.Lp
+The
+.Fn wcslen
+and
+.Fn wcsnlen
+functions are the wide-character equivalents of
+.Xr strlen 3C
+and
+.Xr strnlen 3C ,
+respectively.
+.Sh RETURN VALUES
+The
+.Fn wcslen
+function returns the length of
+.Fa string .
+The
+.Fn wcsnlen
+function returns the smaller of the length of
+.Fa string
+and
+.Fa maxlen .
+.Sh ERRORS
+None.
+.Sh INTERFACE STABILITY
+.Sy Standard .
+.Sh MT-LEVEL
+.Sy MT-Safe .
+.Sh SEE ALSO
+.Xr free 3C ,
+.Xr strlen 3C ,
+.Xr strnlen 3C ,
+.Xr wchar.h 3HEAD ,
+.Xr locale 5 ,
+.Xr standards 5
+.Sh STANDARDS
+The
+.Fn wcslen
+function was introduced in
+.St -xpg4
+and standardized in
+.St -isoC-99 .
+The
+.Fn wcsnlen
+function was introduced in
+.St -p1003.1-2008 .

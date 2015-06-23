@@ -24,6 +24,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2011 Jason King.  All rights reserved.
+ * Copyright 2012 Joshua M. Clulow <josh@sysmgr.org>
  */
 
 #include <ctype.h>
@@ -97,6 +98,22 @@ getsymname(uint64_t addr, const char *symbol, off_t offset, char *buf,
 }
 
 /*
+ * Determine if we are on an architecture with fixed-size instructions,
+ * and if so, what size they are.
+ */
+static int
+insn_size(dis_handle_t *dhp)
+{
+	int min = dis_min_instrlen(dhp);
+	int max = dis_max_instrlen(dhp);
+
+	if (min == max)
+		return (min);
+
+	return (0);
+}
+
+/*
  * The main disassembly routine.  Given a fixed-sized buffer and starting
  * address, disassemble the data using the supplied target and libdisasm handle.
  */
@@ -115,6 +132,8 @@ dis_data(dis_tgt_t *tgt, dis_handle_t *dhp, uint64_t addr, void *data,
 	size_t symsize;
 	int isfunc;
 	size_t symwidth = 0;
+	int ret;
+	int insz = insn_size(dhp);
 
 	db.db_tgt = tgt;
 	db.db_data = data;
@@ -130,17 +149,17 @@ dis_data(dis_tgt_t *tgt, dis_handle_t *dhp, uint64_t addr, void *data,
 
 	while (addr < db.db_addr + db.db_size) {
 
-		if (dis_disassemble(dhp, addr, buf, BUFSIZE) != 0) {
-#if defined(__sparc)
+		ret = dis_disassemble(dhp, addr, buf, BUFSIZE);
+		if (ret != 0 && insz > 0) {
 			/*
-			 * Since sparc instructions are fixed size, we
+			 * Since we know instructions are fixed size, we
 			 * always know the address of the next instruction
 			 */
 			(void) snprintf(buf, sizeof (buf),
 			    "*** invalid opcode ***");
-			db.db_nextaddr = addr + 4;
+			db.db_nextaddr = addr + insz;
 
-#else
+		} else if (ret != 0) {
 			off_t next;
 
 			(void) snprintf(buf, sizeof (buf),
@@ -163,7 +182,6 @@ dis_data(dis_tgt_t *tgt, dis_handle_t *dhp, uint64_t addr, void *data,
 				else
 					db.db_nextaddr = addr + next;
 			}
-#endif
 		}
 
 		/*
@@ -482,7 +500,6 @@ dis_file(const char *filename)
 		 * native machine type.
 		 */
 		switch (ehdr.e_machine) {
-#ifdef __sparc
 		case EM_SPARC:
 			if (ehdr.e_ident[EI_CLASS] != ELFCLASS32 ||
 			    ehdr.e_ident[EI_DATA] != ELFDATA2MSB) {
@@ -520,9 +537,7 @@ dis_file(const char *filename)
 
 			g_flags |= DIS_SPARC_V9 | DIS_SPARC_V9_SGI;
 			break;
-#endif /* __sparc */
 
-#if defined(__i386) || defined(__amd64)
 		case EM_386:
 			g_flags |= DIS_X86_SIZE32;
 			break;
@@ -530,7 +545,6 @@ dis_file(const char *filename)
 		case EM_AMD64:
 			g_flags |= DIS_X86_SIZE64;
 			break;
-#endif /* __i386 || __amd64 */
 
 		default:
 			die("%s: unsupported ELF machine 0x%x", filename,

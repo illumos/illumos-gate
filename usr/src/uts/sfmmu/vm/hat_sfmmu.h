@@ -359,13 +359,12 @@ typedef union sf_region_map_u {
 }
 
 #define	SF_SCD_INCR_REF(scdp) {						\
-	atomic_add_32((volatile uint32_t *)&(scdp)->scd_refcnt, 1);	\
+	atomic_inc_32((volatile uint32_t *)&(scdp)->scd_refcnt);	\
 }
 
 #define	SF_SCD_DECR_REF(srdp, scdp) {				\
 	sf_region_map_t _scd_rmap = (scdp)->scd_region_map;	\
-	if (!atomic_add_32_nv(					\
-	    (volatile uint32_t *)&(scdp)->scd_refcnt, -1)) {	\
+	if (!atomic_dec_32_nv((volatile uint32_t *)&(scdp)->scd_refcnt)) {\
 		sfmmu_destroy_scd((srdp), (scdp), &_scd_rmap);	\
 	}							\
 }

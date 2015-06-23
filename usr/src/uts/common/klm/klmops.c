@@ -123,9 +123,7 @@ lm4_shrlock(struct vnode *vp, int cmd,
 }
 
 /*
- * Helper for lm_frlock, lm4_frlock, nfs_lockrelease
- * After getting a lock from a remote lock manager,
- * register the lock locally.
+ * Helper for nfs_lockrelease.
  */
 void
 lm_register_lock_locally(struct vnode *vp, struct lm_sysid *ls,

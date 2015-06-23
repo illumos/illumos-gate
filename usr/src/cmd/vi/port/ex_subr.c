@@ -224,7 +224,7 @@ getmark(c)
 	int c;
 {
 	line *addr;
-	
+
 	for (addr = one; addr <= dol; addr++)
 		if (names[c - 'a'] == (*addr &~ 01)) {
 			return (addr);
@@ -576,7 +576,7 @@ qcolumn(unsigned char *lim, unsigned char *gp)
 			length = mbtowc(&wchar, (char *)lim, MULTI_BYTE_MAX);
 		if(length < 0)
 			length = 1;
-		x = lim[length]; 
+		x = lim[length];
 		lim[length] = 0;
 	}
 	pline(0);
@@ -622,7 +622,7 @@ nqcolumn(unsigned char *lim, unsigned char *gp)
 			length = mbtowc(&wchar, (char *)lim, MULTI_BYTE_MAX);
 		if(length < 0)
 			length = 1;
-		x = lim[length]; 
+		x = lim[length];
 		lim[length] = 0;
 	}
 	pline(0);
@@ -924,32 +924,6 @@ markit(line *addr)
 }
 
 /*
- * The following code is defensive programming against a bug in the
- * pdp-11 overlay implementation.  Sometimes it goes nuts and asks
- * for an overlay with some garbage number, which generates an emt
- * trap.  This is a less than elegant solution, but it is somewhat
- * better than core dumping and losing your work, leaving your tty
- * in a weird state, etc.
- */
-int _ovno;
-
-/*ARGSUSED*/
-void 
-onemt(sig)
-int sig;
-{
-	int oovno;
-
-	signal(SIGEMT, onemt);
-	oovno = _ovno;
-	/* 2 and 3 are valid on 11/40 type vi, so */
-	if (_ovno < 0 || _ovno > 3)
-		_ovno = 0;
-	error(value(vi_TERSE) ? gettext("emt trap, _ovno is %d ") :
-gettext("emt trap, _ovno is %d   - try again"));
-}
-
-/*
  * When a hangup occurs our actions are similar to a preserve
  * command.  If the buffer has not been [Modified], then we do
  * nothing but remove the temporary files and exit.
@@ -961,7 +935,7 @@ gettext("emt trap, _ovno is %d   - try again"));
  */
 
 /*ARGSUSED*/
-void 
+void
 onhup(sig)
 int sig;
 {
@@ -1034,7 +1008,7 @@ int sig;
  */
 
 /*ARGSUSED*/
-void 
+void
 onintr(sig)
 int sig;
 {
@@ -1123,7 +1097,7 @@ void exit(i)
 extern void redraw();
 
 /*ARGSUSED*/
-void 
+void
 onsusp(sig)
 int sig;
 {
@@ -1161,7 +1135,7 @@ int sig;
 		vdirty(0, lines);
 		if (sig)
 			vrepaint(cursor);
-	}	
+	}
 }
 #endif
 
@@ -1195,7 +1169,7 @@ unsigned char *linebuf, *cursor;
 			ccursor += length;
 	}
 	return(ocursor);
-}		 	
+}
 
 int
 ixlatctl(int flag)

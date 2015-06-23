@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH RAND 3C "May 19, 2004"
+.TH RAND 3C "Feb 11, 2015"
 .SH NAME
 rand, srand, rand_r \- simple random-number generator
 .SH SYNOPSIS
@@ -25,7 +25,6 @@ rand, srand, rand_r \- simple random-number generator
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBrand()\fR function uses a multiplicative congruential random-number
 generator with period 2^32 that returns successive pseudo-random numbers in the
@@ -55,9 +54,8 @@ call \fBrand_r()\fR with a pointer to the same seed object. The \fBrand_r()\fR
 function allows a thread to generate a private pseudo-random stream by having
 the seed object be private to the thread.
 .SH USAGE
-.sp
 .LP
-The spectral properties of \fBrand()\fR are limited.  The \fBdrand48\fR(3C)
+The spectral properties of \fBrand()\fR are limited.  The \fBarc4random\fR(3C)
 function provides a better, more elaborate random-number generator.
 .sp
 .LP
@@ -65,7 +63,6 @@ When compiling multithreaded applications, the  \fB_REENTRANT\fR flag must be
 defined on the compile line.  This flag should be used only in multithreaded
 applications.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -83,6 +80,5 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBdrand48\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)
+\fBarc4random\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)

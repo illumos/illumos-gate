@@ -12,7 +12,7 @@
 #
 # Copyright 2011, Richard Lowe
 # Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
-# Copyright 2013 Garrett D'Amore <garrett@damore.org>
+# Copyright 2014 Garrett D'Amore <garrett@damore.org>
 #
 
 include		$(SRC)/Makefile.master
@@ -30,6 +30,8 @@ _MANFILES=	aac.7d		\
 		audiots.7d	\
 		av1394.7d	\
 		bge.7d		\
+		blkdev.7d	\
+		bnxe.7d		\
 		bscv.7d		\
 		chxge.7d	\
 		console.7d	\
@@ -56,8 +58,6 @@ _MANFILES=	aac.7d		\
 		hid.7d		\
 		hme.7d		\
 		hubd.7d		\
-		hwahc.7d	\
-		hwarc.7d	\
 		hxge.7d		\
 		ib.7d		\
 		ibcm.7d		\
@@ -106,6 +106,7 @@ _MANFILES=	aac.7d		\
 		ramdisk.7d	\
 		random.7d	\
 		rge.7d		\
+		rtls.7d		\
 		sad.7d		\
 		sata.7d		\
 		scsa1394.7d	\
@@ -138,13 +139,10 @@ _MANFILES=	aac.7d		\
 		usbsksp.7d	\
 		usbsprl.7d	\
 		usbvc.7d	\
-		uwba.7d		\
 		virtualkm.7d	\
 		vni.7d		\
 		vr.7d		\
 		wscons.7d	\
-		wusb_ca.7d	\
-		wusb_df.7d	\
 		xge.7d		\
 		yge.7d		\
 		zcons.7d	\
@@ -209,9 +207,11 @@ i386_MANFILES=	ahci.7d		\
 		cpqary3.7d	\
 		dnet.7d		\
 		ecpp.7d		\
+		elxl.7d		\
 		heci.7d		\
 		i915.7d		\
 		ipmi.7d		\
+		iprb.7d		\
 		ipw.7d		\
 		iwh.7d		\
 		iwi.7d		\
@@ -227,9 +227,9 @@ i386_MANFILES=	ahci.7d		\
 		rwd.7d		\
 		rwn.7d		\
 		sda.7d		\
-		sdcard.7d	\
 		sdhost.7d	\
 		si3124.7d	\
+ 	 	skd.7d		\
 		smbios.7d	\
 		uath.7d		\
 		ural.7d		\
@@ -242,15 +242,13 @@ _MANLINKS=	1394.7d		\
 	 	bscbus.7d	\
 	 	fdc.7d		\
 	 	firewire.7d	\
-	 	hwa1480_fw.7d	\
 	 	i2bsc.7d	\
 	 	kmem.7d		\
 	 	lo0.7d		\
 	 	ticots.7d	\
 	 	ticotsord.7d	\
 	 	urandom.7d	\
-	 	usb.7d		\
-	 	uwb.7d
+	 	usb.7d
 
 sparc_MANLINKS=	drmach.7d	\
 		ngdr.7d		\
@@ -282,10 +280,6 @@ ticots.7d	:= LINKSRC = ticlts.7d
 ticotsord.7d	:= LINKSRC = ticlts.7d
 
 usb.7d		:= LINKSRC = usba.7d
-
-uwb.7d		:= LINKSRC = uwba.7d
-
-hwa1480_fw.7d	:= LINKSRC = wusb_df.7d
 
 .KEEP_STATE:
 

@@ -24,6 +24,9 @@
  */
 
 /* Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved. */
+/*
+ * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+ */
 
 #include <sys/types.h>
 #include <sys/t_lock.h>
@@ -1862,6 +1865,9 @@ sockconfig(int cmd, void *arg1, void *arg2, void *arg3, void *arg4)
 	case SOCKCONFIG_REMOVE_FILTER:
 		error = sockconfig_remove_filter((const char *)arg1);
 		break;
+	case SOCKCONFIG_GET_SOCKTABLE:
+		error = sockparams_copyout_socktable((int)(uintptr_t)arg1);
+		break;
 	default:
 #ifdef	DEBUG
 		cmn_err(CE_NOTE, "sockconfig: unkonwn subcommand %d", cmd);
@@ -2402,7 +2408,7 @@ void
 snf_vmap_desbfree(snf_vmap_desbinfo *snfv)
 {
 	ASSERT(snfv->snfv_ref != 0);
-	if (atomic_add_32_nv(&snfv->snfv_ref, -1) == 0) {
+	if (atomic_dec_32_nv(&snfv->snfv_ref) == 0) {
 		vpm_unmap_pages(snfv->snfv_vml, S_READ);
 		VN_RELE(snfv->snfv_vp);
 		kmem_free(snfv, sizeof (snf_vmap_desbinfo));

@@ -121,7 +121,7 @@ labeldup(const ts_label_t *val, int flag)
 void
 label_hold(ts_label_t *lab)
 {
-	atomic_add_32(&lab->tsl_ref, 1);
+	atomic_inc_32(&lab->tsl_ref);
 }
 
 /*
@@ -130,7 +130,7 @@ label_hold(ts_label_t *lab)
 void
 label_rele(ts_label_t *lab)
 {
-	if (atomic_add_32_nv(&lab->tsl_ref, -1) == 0)
+	if (atomic_dec_32_nv(&lab->tsl_ref) == 0)
 		kmem_cache_free(tslabel_cache, lab);
 }
 

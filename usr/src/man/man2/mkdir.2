@@ -1,5 +1,6 @@
 '\" te
 .\" Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright (c) 2014, Joyent, Inc.
 .\" Copyright 1989 AT&T
 .\" Portions Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
 .\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
@@ -9,9 +10,9 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH MKDIR 2 "May 18, 2007"
+.TH MKDIR 2 "Dec 23, 2014"
 .SH NAME
-mkdir \- make a directory
+mkdir, mkdirat \- make a directory
 .SH SYNOPSIS
 .LP
 .nf
@@ -20,15 +21,18 @@ mkdir \- make a directory
 
 \fBint\fR \fBmkdir\fR(\fBconst char *\fR\fIpath\fR, \fBmode_t\fR \fImode\fR);
 .fi
+.LP
+.nf
+\fBint\fR \fBmkdirat\fR(\fBint\fR \fIfd\fR, \fBconst char *\fR\fIpath\fR, \fBmode_t\fR \fImode\fR);
+.fi
 
 .SH DESCRIPTION
-.sp
 .LP
-The \fBmkdir()\fR function creates a  new directory named by the path name
-pointed to by \fIpath\fR. The mode of the new directory is  initialized from
-\fImode\fR (see \fBchmod\fR(2) for values of mode). The protection part of the
-\fImode\fR argument is modified by the process's file creation mask (see
-\fBumask\fR(2)).
+The \fBmkdir()\fR and \fBmkidrat()\fR functions create a  new directory named by
+the path name pointed to by \fIpath\fR. The mode of the new directory is
+initialized from \fImode\fR (see \fBchmod\fR(2) for values of mode). The
+protection part of the \fImode\fR argument is modified by the process's file
+creation mask (see \fBumask\fR(2)).
 .sp
 .LP
 The directory's owner \fBID\fR is set to  the process's effective user ID. The
@@ -38,28 +42,32 @@ of the directory is inherited from the parent.  The \fBS_ISGID\fR bit of the
 new directory is  inherited from the parent directory.
 .sp
 .LP
-If \fIpath\fR names a symbolic link, \fBmkdir()\fR fails and sets errno to
-\fBEEXIST\fR.
+If \fIpath\fR names a symbolic link, \fBmkdir()\fR and \fBmkdirat()\fR fail and
+set errno to \fBEEXIST\fR.
 .sp
 .LP
 The newly created directory is empty with the exception of entries for itself
 (\fB\&.\fR) and its parent directory (\fB\&..\fR).
 .sp
 .LP
-Upon successful completion, \fBmkdir()\fR marks for update the \fBst_atime\fR,
-\fBst_ctime\fR and \fBst_mtime\fR fields of the directory. Also, the
-\fBst_ctime\fR and \fBst_mtime\fR fields of the directory that contains the new
-entry are marked for update.
-.SH RETURN VALUES
+The \fBmkdirat()\fR function behaves similarly to \fBmkdir()\fR; however, if
+\fIpath\fR is a relative path, then the directory represented by \fBfd\fR is
+used as the starting point for resolving \fIpath\fR. To use the processes
+current working directory, \fIfd\fR may be set to the value \fBAT_FDCWD\fR.
 .sp
+.LP
+Upon successful completion, \fBmkdir()\fR and \fBmkdirat()\fR mark for update
+the \fBst_atime\fR, \fBst_ctime\fR and \fBst_mtime\fR fields of the directory.
+Also, the \fBst_ctime\fR and \fBst_mtime\fR fields of the directory that
+contains the new entry are marked for update.
+.SH RETURN VALUES
 .LP
 Upon successful completion, \fB0\fR is returned. Otherwise, \fB\(mi1\fR is
 returned, no directory is created, and  \fBerrno\fR is set to indicate the
 error.
 .SH ERRORS
-.sp
 .LP
-The \fBmkdir()\fR function will fail if:
+The \fBmkdir()\fR and \fBmkdirat()\fR functions will fail if:
 .sp
 .ne 2
 .na
@@ -193,7 +201,9 @@ No free space is available on the device containing the directory.
 \fB\fBENOTDIR\fR\fR
 .ad
 .RS 16n
-A component of the path prefix is not a directory.
+A component of the path prefix is not a directory. For \fBlinkat()\fR, if
+\fIpath\fR is a relative path and \fIfd\fR refers to a valid file descriptor
+which is not a directory.
 .RE
 
 .sp
@@ -203,6 +213,19 @@ A component of the path prefix is not a directory.
 .ad
 .RS 16n
 The path prefix resides on a read-only file system.
+.RE
+
+.sp
+.LP
+The \fBmkdirat()\fR function will fail if:
+.sp
+.ne 2
+.na
+.B EBADF
+.ad
+.RS 16n
+The path \fIpath\fR is a relative path and \fIfd\fR is not a valid open file
+descriptor or the value \fBAT_FDCWD\fR.
 .RE
 
 .sp
@@ -241,7 +264,6 @@ status = mkdir("/home/cnd/mod1",
 .in -2
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -259,7 +281,6 @@ MT-Level	Async-Signal-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBchmod\fR(2), \fBmknod\fR(2), \fBumask\fR(2), \fBmkdirp\fR(3GEN),
 \fBstat.h\fR(3HEAD), \fBattributes\fR(5), \fBstandards\fR(5)

@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "nge.h"
 
 /*
@@ -44,7 +42,7 @@ nge_atomic_decrease(uint64_t *count_p, uint64_t n)
 		newval = oldval - n;
 		if (oldval < n)
 			return (B_FALSE);
-	} while (cas64(count_p, oldval, newval) != oldval);
+	} while (atomic_cas_64(count_p, oldval, newval) != oldval);
 
 	return (B_TRUE);
 }
@@ -62,7 +60,7 @@ nge_atomic_increase(uint64_t *count_p, uint64_t n)
 	do {
 		oldval = *count_p;
 		newval = oldval + n;
-	} while (cas64(count_p, oldval, newval) != oldval);
+	} while (atomic_cas_64(count_p, oldval, newval) != oldval);
 }
 
 
@@ -80,7 +78,7 @@ nge_atomic_shl32(uint32_t *sp, uint_t count)
 	do {
 		oldval = *sp;
 		newval = oldval << count;
-	} while (cas32(sp, oldval, newval) != oldval);
+	} while (atomic_cas_32(sp, oldval, newval) != oldval);
 
 	return (oldval);
 }

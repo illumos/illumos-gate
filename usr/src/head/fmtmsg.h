@@ -24,14 +24,14 @@
 
 
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 1996-2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_FMTMSG_H
 #define	_FMTMSG_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.3	*/
 
 #include <sys/feature_tests.h>
 
@@ -197,19 +197,11 @@ extern "C" {
 /* Function definition */
 
 #if !defined(_XPG4_2) || defined(__EXTENSIONS__)
-#if defined(__STDC__)
 int	addseverity(int, const char *);
-#else /* __STDC__ */
-int	addseverity();
-#endif  /* __STDC__ */
 #endif /* !defined(_XPG4_2) || defined(__EXTENSIONS__) */
 
-#if defined(__STDC__)
 int	fmtmsg(long, const char *, int, const char *, const char *,
 	    const char *);
-#else /* __STDC__ */
-int	fmtmsg();
-#endif  /* __STDC__ */
 
 #ifdef	__cplusplus
 }

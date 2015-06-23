@@ -792,7 +792,10 @@ devzvol_readdir(struct vnode *dvp, struct uio *uiop, struct cred *cred,
 		return (devname_readdir_func(dvp, uiop, cred, eofp, 0));
 	}
 
-	ptr = strchr(ptr + 1, '/') + 1;
+	ptr = strchr(ptr + 1, '/');
+	if (ptr == NULL)
+		return (ENOENT);
+	ptr++;
 	rw_exit(&sdvp->sdev_contents);
 	sdev_iter_datasets(dvp, ZFS_IOC_DATASET_LIST_NEXT, ptr);
 	rw_enter(&sdvp->sdev_contents, RW_READER);

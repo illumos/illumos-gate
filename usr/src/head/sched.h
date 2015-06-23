@@ -20,14 +20,14 @@
  */
 
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SCHED_H
 #define	_SCHED_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <time.h>
@@ -56,7 +56,6 @@ struct sched_param {
 /*
  * function prototypes
  */
-#if	defined(__STDC__)
 int	sched_getparam(pid_t, struct sched_param *);
 int	sched_setparam(pid_t, const struct sched_param *);
 int	sched_getscheduler(pid_t);
@@ -65,16 +64,6 @@ int	sched_yield(void);
 int	sched_get_priority_max(int);
 int	sched_get_priority_min(int);
 int	sched_rr_get_interval(pid_t, struct timespec *);
-#else
-int	sched_getparam();
-int	sched_setparam();
-int	sched_getscheduler();
-int	sched_setscheduler();
-int	sched_yield();
-int	sched_get_priority_max();
-int	sched_get_priority_min();
-int	sched_rr_get_interval();
-#endif	/* __STDC__ */
 
 #ifdef	__cplusplus
 }

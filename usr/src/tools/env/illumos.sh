@@ -21,6 +21,7 @@
 # Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2010, 2011 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2012 Joshua M. Clulow <josh@sysmgr.org>
+# Copyright 2015, OmniTI Computer Consulting, Inc. All rights reserved.
 #
 
 # Configuration variables for the runtime environment of the nightly
@@ -128,8 +129,7 @@ export MAILTO="$STAFFER"
 # specified, the build is simply run in a new task in the current project.
 export BUILD_PROJECT=''
 
-# You should not need to change the next four lines
-export LOCKNAME="$(basename -- "$CODEMGR_WS")_nightly.lock"
+# You should not need to change the next three lines
 export ATLOG="$CODEMGR_WS/log"
 export LOGFILE="$ATLOG/nightly.log"
 export MACH="$(uname -p)"
@@ -228,5 +228,17 @@ export SPRO_VROOT="$SPRO_ROOT"
 # nightly(1) for interactions between environment variables and this command.
 #POST_NIGHTLY=
 
-# Uncomment this to disable support for SMB printing.
-# export ENABLE_SMB_PRINTING='#'
+# Comment this out to disable support for IPP printing, i.e. if you
+# don't want to bother providing the Apache headers this needs.
+export ENABLE_IPP_PRINTING=
+
+# Comment this out to disable support for SMB printing, i.e. if you
+# don't want to bother providing the CUPS headers this needs.
+export ENABLE_SMB_PRINTING=
+
+# If your distro uses certain versions of Perl, make sure either Makefile.master
+# contains your new defaults OR your .env file sets them.
+# These are how you would override for building on OmniOS r151012, for example.
+#export PERL_VERSION=5.16.1
+#export PERL_ARCH=i86pc-solaris-thread-multi-64int
+#export PERL_PKGVERS=-5161

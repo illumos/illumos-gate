@@ -22,6 +22,7 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2014 Garrett D'Amore <garrett@damore.org>
 #
 
 #
@@ -40,6 +41,8 @@ dir path=etc group=sys
 dir path=kernel group=sys
 dir path=kernel/drv group=sys
 dir path=kernel/drv/$(ARCH64) group=sys
+dir path=usr/share/man
+dir path=usr/share/man/man7d
 driver name=iprb clone_perms="iprb 0666 root sys" perms="* 0666 root sys" \
     alias=pci8086,1029 \
     alias=pci8086,1030 \
@@ -59,6 +62,7 @@ driver name=iprb clone_perms="iprb 0666 root sys" perms="* 0666 root sys" \
     alias=pci8086,27dc
 file path=kernel/drv/$(ARCH64)/iprb group=sys
 file path=kernel/drv/iprb group=sys
+file path=usr/share/man/man7d/iprb.7d
 license lic_CDDL license=lic_CDDL
 license usr/src/uts/common/io/iprb/THIRDPARTYLICENSE \
     license=usr/src/uts/common/io/iprb/THIRDPARTYLICENSE

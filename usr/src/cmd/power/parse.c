@@ -104,7 +104,8 @@ set_perm(char *defstr, char *user, int *perm, int cons)
 	else if (user != NULL &&
 	    (*dinfo == '<') && (tk = strrchr(++dinfo, '>'))) {
 		/* Scan dinfo for a matching user. */
-		for (*tk = '\0'; tk = strtok(dinfo, ", "); dinfo = NULL) {
+		for (*tk = '\0'; (tk = strtok(dinfo, ", ")) != NULL;
+		    dinfo = NULL) {
 			mesg(MDEBUG, "match_user: cmp (\"%s\", \"%s\")\n",
 			    tk, user);
 			if (strcmp(tk, user) == 0) {
@@ -353,7 +354,7 @@ find_line_end(char *line, int *lcnt)
 
 	*lcnt = 0;
 	next = line;
-	while (lf = strchr(next, '\n')) {
+	while ((lf = strchr(next, '\n')) != NULL) {
 		(*lcnt)++;
 		if (lf == line || (*(lf - 1) != '\\') || *(lf + 1) == '\0')
 			break;
@@ -391,7 +392,7 @@ parse_conf_file(char *name, vact_t action, boolean_t first_parse)
 
 	lineno = 1;
 	line = file_buf;
-	while (lend = find_line_end(line, &linc)) {
+	while ((lend = find_line_end(line, &linc)) != NULL) {
 		/*
 		 * Each line should start with valid data
 		 * but leading white-space can be ignored
@@ -429,7 +430,7 @@ parse_conf_file(char *name, vact_t action, boolean_t first_parse)
 			mesg(MDEBUG, "\nline %d, blank...\n", lineno);
 		else if (*line == '#')
 			mesg(MDEBUG, "\nline %d, comment...\n", lineno);
-		else if (cnt = build_args(cline, cline + llen)) {
+		else if ((cnt = build_args(cline, cline + llen)) != 0) {
 			if ((cip = get_cinfo()) == NULL) {
 				mesg(MEXIT, "unrecognized keyword \"%s\"\n",
 				    LINEARG(0));

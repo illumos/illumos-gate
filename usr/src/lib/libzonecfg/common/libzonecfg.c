@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright 2014 Gary Mills
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -1767,7 +1768,7 @@ match_prop(xmlNodePtr cur, const xmlChar *attr, char *user_prop)
 		return (B_FALSE);
 	prop_result = xmlStrcmp(gotten_prop, (const xmlChar *) user_prop);
 	xmlFree(gotten_prop);
-	return ((prop_result == 0));
+	return ((prop_result == 0));	/* empty strings will match */
 }
 
 static int
@@ -2255,7 +2256,7 @@ zonecfg_delete_nwif_core(zone_dochandle_t handle, struct zone_nwiftab *tabptr)
 		phys_match = match_prop(cur, DTD_ATTR_PHYSICAL,
 		    tabptr->zone_nwif_physical);
 
-		if ((addr_match || allowed_addr_match) && phys_match) {
+		if (addr_match && allowed_addr_match && phys_match) {
 			xmlUnlinkNode(cur);
 			xmlFreeNode(cur);
 			return (Z_OK);

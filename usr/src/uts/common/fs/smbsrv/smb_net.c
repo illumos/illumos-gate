@@ -21,20 +21,20 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
 #include <sys/param.h>
-#include <sys/cpuvar.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 #include <sys/time.h>
 #include <sys/varargs.h>
 #include <sys/modctl.h>
 #include <sys/pathname.h>
-#include <sys/fs/snode.h>
-#include <sys/fs/dv_node.h>
 #include <sys/vnode.h>
+#include <sys/socket.h>
 #include <sys/ksocket.h>
 #undef mem_free /* XXX Remove this after we convert everything to kmem_alloc */
 
@@ -57,18 +57,15 @@ static	kmem_cache_t	*smb_txr_cache = NULL;
  *	0	Initialization successful
  *	ENOMEM	Initialization failed
  */
-int
+void
 smb_net_init(void)
 {
-	int	rc = 0;
 
-	ASSERT(smb_txr_cache == NULL);
+	if (smb_txr_cache != NULL)
+		return;
 
 	smb_txr_cache = kmem_cache_create(SMBSRV_KSTAT_TXRCACHE,
 	    sizeof (smb_txreq_t), 8, NULL, NULL, NULL, NULL, NULL, 0);
-	if (smb_txr_cache == NULL)
-		rc = ENOMEM;
-	return (rc);
 }
 
 /*

@@ -100,14 +100,14 @@
  */
 #define	IXA_REFRELE(ixa)					\
 {								\
-	if (atomic_add_32_nv(&(ixa)->ixa_refcnt, -1) == 0)	\
+	if (atomic_dec_32_nv(&(ixa)->ixa_refcnt) == 0)	\
 		ixa_inactive(ixa);				\
 }
 
 #define	IXA_REFHOLD(ixa)					\
 {								\
 	ASSERT((ixa)->ixa_refcnt != 0);				\
-	atomic_add_32(&(ixa)->ixa_refcnt, 1);			\
+	atomic_inc_32(&(ixa)->ixa_refcnt);			\
 }
 
 /*
@@ -754,7 +754,7 @@ conn_get_ixa_impl(conn_t *connp, boolean_t replace, int kmflag)
 
 	/* At least one references for the conn_t */
 	ASSERT(ixa->ixa_refcnt >= 1);
-	if (atomic_add_32_nv(&ixa->ixa_refcnt, 1) == 2) {
+	if (atomic_inc_32_nv(&ixa->ixa_refcnt) == 2) {
 		/* No other thread using conn_ixa */
 		mutex_exit(&connp->conn_lock);
 		return (ixa);
@@ -856,7 +856,7 @@ conn_get_ixa_exclusive(conn_t *connp)
 	ASSERT(ixa->ixa_refcnt >= 1);
 
 	/* Make sure conn_ixa doesn't disappear while we copy it */
-	atomic_add_32(&ixa->ixa_refcnt, 1);
+	atomic_inc_32(&ixa->ixa_refcnt);
 
 	ixa = kmem_alloc(sizeof (*ixa), KM_NOSLEEP);
 	if (ixa == NULL) {

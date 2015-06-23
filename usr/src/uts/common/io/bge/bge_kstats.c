@@ -20,6 +20,11 @@
  */
 
 /*
+ * Copyright (c) 2010-2013, by Broadcom, Inc.
+ * All Rights Reserved.
+ */
+
+/*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -286,6 +291,10 @@ static const bge_ksindex_t bge_chipid[] = {
 	{ 18,				"&supported"		},
 	{ 19,				"&interface"		},
 
+	{ 20,				"nvtype"		},
+
+	{ 21,				"asic_rev_prod_id"	},
+
 	{ -1,				NULL 			}
 };
 
@@ -342,6 +351,13 @@ bge_chipid_update(kstat_t *ksp, int flag)
 	    tmp & CHIP_FLAG_SUPPORTED ? "yes" : "no");
 	bge_set_char_kstat(knp++,
 	    tmp & CHIP_FLAG_SERDES ? "serdes" : "copper");
+
+	(knp++)->value.ui64 =
+	    ((bgep->chipid.nvtype == BGE_NVTYPE_NONE) ||
+	     (bgep->chipid.nvtype == BGE_NVTYPE_UNKNOWN)) ?
+	    0 : bgep->chipid.nvtype;
+
+	(knp++)->value.ui64 = bgep->chipid.asic_rev_prod_id;
 
 	return (0);
 }
@@ -499,6 +515,7 @@ static const bge_ksindex_t bge_phydata[] = {
 	{ MII_INTR_STATUS,		"intr_status"		},
 	{ MII_INTR_MASK,		"intr_mask"		},
 	{ MII_HCD_STATUS,		"hcd_status"		},
+	{ EEE_MODE_REG,			"eee"			},
 
 	{ -1,				NULL }
 };
@@ -540,6 +557,16 @@ bge_phydata_update(kstat_t *ksp, int flag)
 			knp->value.ui64 |= bge_mii_get16(bgep, MII_PHYIDL);
 			break;
 
+		case EEE_MODE_REG:
+			knp->value.ui64 = 0;
+			if (bgep->link_state == LINK_STATE_UP)
+			{
+				knp->value.ui64 =
+				    (bge_reg_get32(bgep, EEE_MODE_REG) & 0x80) ?
+				        1 : 0;
+			}
+			break;
+
 		default:
 			knp->value.ui64 = bge_mii_get16(bgep, ksip->index);
 			break;
@@ -567,7 +594,7 @@ bge_setup_named_kstat(bge_t *bgep, int instance, char *name,
 
 	size /= sizeof (bge_ksindex_t);
 	ksp = kstat_create(BGE_DRIVER_NAME, instance, name, "net",
-	    KSTAT_TYPE_NAMED, size-1, KSTAT_FLAG_PERSISTENT);
+	    KSTAT_TYPE_NAMED, size-1, 0);
 	if (ksp == NULL)
 		return (NULL);
 
@@ -663,7 +690,7 @@ bge_m_stat(void *arg, uint_t stat, uint64_t *val)
 	bge_statistics_t *bstp;
 	bge_statistics_reg_t *pstats;
 
-	if (bgep->bge_chip_state == BGE_CHIP_FAULT) {
+	if (bgep->bge_chip_state != BGE_CHIP_RUNNING) {
 		return (EINVAL);
 	}
 
@@ -735,7 +762,8 @@ bge_m_stat(void *arg, uint_t stat, uint64_t *val)
 
 	switch (stat) {
 	case MAC_STAT_IFSPEED:
-		*val = bgep->param_link_speed * 1000000ull;
+		*val = (bgep->link_state != LINK_STATE_UNKNOWN) ?
+		           (bgep->param_link_speed * 1000000ull) : 0;
 		break;
 
 	case MAC_STAT_MULTIRCV:
@@ -916,12 +944,14 @@ bge_m_stat(void *arg, uint_t stat, uint64_t *val)
 			*val = pstats->dot3StatsFrameTooLongs;
 		break;
 
+#if (MAC_VERSION > 1)
 	case ETHER_STAT_TOOSHORT_ERRORS:
 		if (bgep->chipid.statistic_type == BGE_STAT_BLK)
 			*val = bstp->s.etherStatsUndersizePkts;
 		else
 			*val = pstats->etherStatsUndersizePkts;
 		break;
+#endif
 
 	case ETHER_STAT_XCVR_ADDR:
 		*val = bgep->phy_mii_addr;
@@ -994,9 +1024,11 @@ bge_m_stat(void *arg, uint_t stat, uint64_t *val)
 		*val = 1;
 		break;
 
+#if (MAC_VERSION > 1)
 	case ETHER_STAT_CAP_REMFAULT:
 		*val = 1;
 		break;
+#endif
 
 	case ETHER_STAT_ADV_CAP_1000FDX:
 		*val = bgep->param_adv_1000fdx;
@@ -1034,6 +1066,7 @@ bge_m_stat(void *arg, uint_t stat, uint64_t *val)
 		*val = bgep->param_adv_autoneg;
 		break;
 
+#if (MAC_VERSION > 1)
 	case ETHER_STAT_ADV_REMFAULT:
 		if (bgep->chipid.flags & CHIP_FLAG_SERDES)
 			*val = 0;
@@ -1049,6 +1082,7 @@ bge_m_stat(void *arg, uint_t stat, uint64_t *val)
 			mutex_exit(bgep->genlock);
 		}
 		break;
+#endif
 
 	case ETHER_STAT_LP_CAP_1000FDX:
 		*val = bgep->param_lp_1000fdx;
@@ -1086,6 +1120,7 @@ bge_m_stat(void *arg, uint_t stat, uint64_t *val)
 		*val = bgep->param_lp_autoneg;
 		break;
 
+#if (MAC_VERSION > 1)
 	case ETHER_STAT_LP_REMFAULT:
 		if (bgep->chipid.flags & CHIP_FLAG_SERDES)
 			*val = 0;
@@ -1101,6 +1136,7 @@ bge_m_stat(void *arg, uint_t stat, uint64_t *val)
 			mutex_exit(bgep->genlock);
 		}
 		break;
+#endif
 
 	case ETHER_STAT_LINK_ASMPAUSE:
 		*val = bgep->param_adv_asym_pause &&
@@ -1117,7 +1153,8 @@ bge_m_stat(void *arg, uint_t stat, uint64_t *val)
 		break;
 
 	case ETHER_STAT_LINK_DUPLEX:
-		*val = bgep->param_link_duplex;
+		*val = (bgep->link_state != LINK_STATE_UNKNOWN) ?
+		           bgep->param_link_duplex : LINK_DUPLEX_UNKNOWN;
 		break;
 
 	default:

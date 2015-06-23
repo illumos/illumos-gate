@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <smbsrv/smb_kproto.h>
@@ -41,9 +41,6 @@ static fem_t		*smb_oplock_ops = NULL;
 /*
  * Declarations for FCN (file change notification) FEM monitors
  */
-
-void smb_fem_fcn_install(smb_node_t *);
-void smb_fem_fcn_uninstall(smb_node_t *);
 
 static int smb_fem_fcn_create(femarg_t *, char *, vattr_t *, vcexcl_t, int,
     vnode_t **, cred_t *, int, caller_context_t *, vsecattr_t *);
@@ -74,9 +71,6 @@ static const fs_operation_def_t smb_fcn_tmpl[] = {
 /*
  * Declarations for oplock FEM monitors
  */
-
-int smb_fem_oplock_install(smb_node_t *);
-int smb_fem_oplock_uninstall(smb_node_t *);
 
 static int smb_fem_oplock_open(femarg_t *, int, cred_t *,
     struct caller_context *);
@@ -149,37 +143,55 @@ smb_fem_fini(void)
 	if (!smb_fem_initialized)
 		return;
 
-	fem_free(smb_fcn_ops);
-	fem_free(smb_oplock_ops);
-	smb_fcn_ops = NULL;
-	smb_oplock_ops = NULL;
+	if (smb_fcn_ops != NULL) {
+		fem_free(smb_fcn_ops);
+		smb_fcn_ops = NULL;
+	}
+	if (smb_oplock_ops != NULL) {
+		fem_free(smb_oplock_ops);
+		smb_oplock_ops = NULL;
+	}
 	smb_fem_initialized = B_FALSE;
 }
 
-void
+int
 smb_fem_fcn_install(smb_node_t *node)
 {
-	(void) fem_install(node->vp, smb_fcn_ops, (void *)node, OPARGUNIQ,
+	int rc;
+
+	if (smb_fcn_ops == NULL)
+		return (ENOSYS);
+	rc = fem_install(node->vp, smb_fcn_ops, (void *)node, OPARGUNIQ,
 	    (fem_func_t)smb_node_ref, (fem_func_t)smb_node_release);
+	return (rc);
 }
 
 void
 smb_fem_fcn_uninstall(smb_node_t *node)
 {
-	(void) fem_uninstall(node->vp, smb_fcn_ops, (void *)node);
+	if (smb_fcn_ops == NULL)
+		return;
+	VERIFY0(fem_uninstall(node->vp, smb_fcn_ops, (void *)node));
 }
 
 int
 smb_fem_oplock_install(smb_node_t *node)
 {
-	return (fem_install(node->vp, smb_oplock_ops, (void *)node, OPARGUNIQ,
-	    (fem_func_t)smb_node_ref, (fem_func_t)smb_node_release));
+	int rc;
+
+	if (smb_oplock_ops == NULL)
+		return (ENOSYS);
+	rc = fem_install(node->vp, smb_oplock_ops, (void *)node, OPARGUNIQ,
+	    (fem_func_t)smb_node_ref, (fem_func_t)smb_node_release);
+	return (rc);
 }
 
-int
+void
 smb_fem_oplock_uninstall(smb_node_t *node)
 {
-	return (fem_uninstall(node->vp, smb_oplock_ops, (void *)node));
+	if (smb_oplock_ops == NULL)
+		return;
+	VERIFY0(fem_uninstall(node->vp, smb_oplock_ops, (void *)node));
 }
 
 /*
@@ -223,7 +235,7 @@ smb_fem_fcn_create(
 	error = vnext_create(arg, name, vap, excl, mode, vpp, cr, flag,
 	    ct, vsecp);
 
-	if (error == 0)
+	if (error == 0 && ct != &smb_ct)
 		smb_node_notify_change(dnode, FILE_ACTION_ADDED, name);
 
 	return (error);
@@ -257,7 +269,7 @@ smb_fem_fcn_remove(
 
 	error = vnext_remove(arg, name, cr, ct, flags);
 
-	if (error == 0)
+	if (error == 0 && ct != &smb_ct)
 		smb_node_notify_change(dnode, FILE_ACTION_REMOVED, name);
 
 	return (error);
@@ -282,18 +294,19 @@ smb_fem_fcn_rename(
 
 	error = vnext_rename(arg, snm, tdvp, tnm, cr, ct, flags);
 
-	if (error != 0)
-		return (error);
+	if (error == 0 && ct != &smb_ct) {
+		/*
+		 * Note that renames in the same directory are normally
+		 * delivered in {old,new} pairs, and clients expect them
+		 * in that order, if both events are delivered.
+		 */
+		smb_node_notify_change(dnode,
+		    FILE_ACTION_RENAMED_OLD_NAME, snm);
+		smb_node_notify_change(dnode,
+		    FILE_ACTION_RENAMED_NEW_NAME, tnm);
+	}
 
-	/*
-	 * Note that renames in the same directory are normally
-	 * delivered in {old,new} pairs, and clients expect them
-	 * in that order, if both events are delivered.
-	 */
-	smb_node_notify_change(dnode, FILE_ACTION_RENAMED_OLD_NAME, snm);
-	smb_node_notify_change(dnode, FILE_ACTION_RENAMED_NEW_NAME, tnm);
-
-	return (0);
+	return (error);
 }
 
 static int
@@ -316,7 +329,7 @@ smb_fem_fcn_mkdir(
 
 	error = vnext_mkdir(arg, name, vap, vpp, cr, ct, flags, vsecp);
 
-	if (error == 0)
+	if (error == 0 && ct != &smb_ct)
 		smb_node_notify_change(dnode, FILE_ACTION_ADDED, name);
 
 	return (error);
@@ -340,7 +353,7 @@ smb_fem_fcn_rmdir(
 
 	error = vnext_rmdir(arg, name, cdir, cr, ct, flags);
 
-	if (error == 0)
+	if (error == 0 && ct != &smb_ct)
 		smb_node_notify_change(dnode, FILE_ACTION_REMOVED, name);
 
 	return (error);
@@ -364,7 +377,7 @@ smb_fem_fcn_link(
 
 	error = vnext_link(arg, svp, tnm, cr, ct, flags);
 
-	if (error == 0)
+	if (error == 0 && ct != &smb_ct)
 		smb_node_notify_change(dnode, FILE_ACTION_ADDED, tnm);
 
 	return (error);
@@ -389,7 +402,7 @@ smb_fem_fcn_symlink(
 
 	error = vnext_symlink(arg, linkname, vap, target, cr, ct, flags);
 
-	if (error == 0)
+	if (error == 0 && ct != &smb_ct)
 		smb_node_notify_change(dnode, FILE_ACTION_ADDED, linkname);
 
 	return (error);
@@ -409,17 +422,19 @@ smb_fem_oplock_open(
     cred_t		*cr,
     caller_context_t	*ct)
 {
-	int		rc;
 	uint32_t	flags;
+	int		rc = 0;
 
-	if (mode & (FWRITE|FTRUNC))
-		flags = SMB_OPLOCK_BREAK_TO_NONE;
-	else
-		flags = SMB_OPLOCK_BREAK_TO_LEVEL_II;
-
-	rc = smb_fem_oplock_break(arg, ct, flags);
+	if (ct != &smb_ct) {
+		if (mode & (FWRITE|FTRUNC))
+			flags = SMB_OPLOCK_BREAK_TO_NONE;
+		else
+			flags = SMB_OPLOCK_BREAK_TO_LEVEL_II;
+		rc = smb_fem_oplock_break(arg, ct, flags);
+	}
 	if (rc == 0)
 		rc = vnext_open(arg, mode, cr, ct);
+
 	return (rc);
 }
 
@@ -436,11 +451,15 @@ smb_fem_oplock_read(
     cred_t		*cr,
     caller_context_t	*ct)
 {
-	int	rc;
+	int	rc = 0;
 
-	rc = smb_fem_oplock_break(arg, ct, SMB_OPLOCK_BREAK_TO_LEVEL_II);
+	if (ct != &smb_ct) {
+		rc = smb_fem_oplock_break(arg, ct,
+		    SMB_OPLOCK_BREAK_TO_LEVEL_II);
+	}
 	if (rc == 0)
 		rc = vnext_read(arg, uiop, ioflag, cr, ct);
+
 	return (rc);
 }
 
@@ -457,11 +476,13 @@ smb_fem_oplock_write(
     cred_t		*cr,
     caller_context_t	*ct)
 {
-	int	rc;
+	int	rc = 0;
 
-	rc = smb_fem_oplock_break(arg, ct, SMB_OPLOCK_BREAK_TO_NONE);
+	if (ct != &smb_ct)
+		rc = smb_fem_oplock_break(arg, ct, SMB_OPLOCK_BREAK_TO_NONE);
 	if (rc == 0)
 		rc = vnext_write(arg, uiop, ioflag, cr, ct);
+
 	return (rc);
 }
 
@@ -475,7 +496,7 @@ smb_fem_oplock_setattr(
 {
 	int	rc = 0;
 
-	if (vap->va_mask & AT_SIZE)
+	if (ct != &smb_ct && (vap->va_mask & AT_SIZE) != 0)
 		rc = smb_fem_oplock_break(arg, ct, SMB_OPLOCK_BREAK_TO_NONE);
 	if (rc == 0)
 		rc = vnext_setattr(arg, vap, flags, cr, ct);
@@ -488,15 +509,16 @@ smb_fem_oplock_rwlock(
     int			write_lock,
     caller_context_t	*ct)
 {
-	int		rc;
 	uint32_t	flags;
+	int		rc = 0;
 
-	if (write_lock)
-		flags = SMB_OPLOCK_BREAK_TO_NONE;
-	else
-		flags = SMB_OPLOCK_BREAK_TO_LEVEL_II;
-
-	rc = smb_fem_oplock_break(arg, ct, flags);
+	if (ct != &smb_ct) {
+		if (write_lock)
+			flags = SMB_OPLOCK_BREAK_TO_NONE;
+		else
+			flags = SMB_OPLOCK_BREAK_TO_LEVEL_II;
+		rc = smb_fem_oplock_break(arg, ct, flags);
+	}
 	if (rc == 0)
 		rc = vnext_rwlock(arg, write_lock, ct);
 
@@ -513,9 +535,10 @@ smb_fem_oplock_space(
     cred_t		*cr,
     caller_context_t	*ct)
 {
-	int	rc;
+	int	rc = 0;
 
-	rc = smb_fem_oplock_break(arg, ct, SMB_OPLOCK_BREAK_TO_NONE);
+	if (ct != &smb_ct)
+		rc = smb_fem_oplock_break(arg, ct, SMB_OPLOCK_BREAK_TO_NONE);
 	if (rc == 0)
 		rc = vnext_space(arg, cmd, bfp, flag, offset, cr, ct);
 	return (rc);
@@ -543,28 +566,31 @@ smb_fem_oplock_vnevent(
     char		*name,
     caller_context_t	*ct)
 {
-	int		rc;
 	uint32_t	flags;
+	int		rc = 0;
 
-	switch (vnevent) {
-	case VE_REMOVE:
-	case VE_RENAME_DEST:
-		flags = SMB_OPLOCK_BREAK_TO_NONE | SMB_OPLOCK_BREAK_BATCH;
-		rc = smb_fem_oplock_break(arg, ct, flags);
-		break;
-	case VE_RENAME_SRC:
-		flags = SMB_OPLOCK_BREAK_TO_LEVEL_II | SMB_OPLOCK_BREAK_BATCH;
-		rc = smb_fem_oplock_break(arg, ct, flags);
-		break;
-	default:
-		rc = 0;
-		break;
+	if (ct != &smb_ct) {
+		switch (vnevent) {
+		case VE_REMOVE:
+		case VE_RENAME_DEST:
+			flags = SMB_OPLOCK_BREAK_TO_NONE |
+			    SMB_OPLOCK_BREAK_BATCH;
+			rc = smb_fem_oplock_break(arg, ct, flags);
+			break;
+		case VE_RENAME_SRC:
+			flags = SMB_OPLOCK_BREAK_TO_LEVEL_II |
+			    SMB_OPLOCK_BREAK_BATCH;
+			rc = smb_fem_oplock_break(arg, ct, flags);
+			break;
+		default:
+			rc = 0;
+			break;
+		}
 	}
+	if (rc == 0)
+		rc = vnext_vnevent(arg, vnevent, dvp, name, ct);
 
-	if (rc != 0)
-		return (rc);
-
-	return (vnext_vnevent(arg, vnevent, dvp, name, ct));
+	return (rc);
 }
 
 static int
@@ -576,8 +602,7 @@ smb_fem_oplock_break(femarg_t *arg, caller_context_t *ct, uint32_t flags)
 	node = (smb_node_t *)((arg)->fa_fnode->fn_available);
 	SMB_NODE_VALID(node);
 
-	if (ct && (ct->cc_caller_id == smb_ct.cc_caller_id))
-		return (0);
+	ASSERT(ct != &smb_ct);
 
 	if (ct && (ct->cc_flags & CC_DONTBLOCK)) {
 		flags |= SMB_OPLOCK_BREAK_NOWAIT;

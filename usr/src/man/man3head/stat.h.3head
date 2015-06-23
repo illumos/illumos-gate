@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH STAT.H 3HEAD "Sep 1, 2009"
+.TH STAT.H 3HEAD "Jan 22, 2015"
 .SH NAME
 stat.h, stat \- data returned by stat system call
 .SH SYNOPSIS
@@ -15,7 +15,6 @@ stat.h, stat \- data returned by stat system call
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The system calls \fBstat()\fR, \fBlstat()\fR and \fBfstat()\fR return data in a
 \fBstat\fR structure, which is defined in <\fBstat.h\fR>.
@@ -88,12 +87,11 @@ of the range [0, 999 999 999], for use with the \fBfutimens()\fR and
 .in +2
 .nf
 #define    UTIME_NOW        use the current time
-@define    UTIME_OMIT       no time change
+#define    UTIME_OMIT       no time change
 .fi
 .in -2
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -111,7 +109,6 @@ Standard	See \fBstandards\fR(5).
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBfutimens\fR(2), \fBstat\fR(2), \fBtypes.h\fR(3HEAD), \fBattributes\fR(5),
 \fBstandards\fR(5)

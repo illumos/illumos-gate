@@ -21,20 +21,20 @@
 
 #
 # Copyright (c) 1996, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2014 Garrett D'Amore <garrett@damore.org>
 #
 
-SUBDIRS=	bridged dhcp dsvclockd ilbd in.chargend in.daytimed \
-		in.discardd in.echod in.dhcpd in.mpathd in.ndpd \
+SUBDIRS=	bridged ilbd in.chargend in.daytimed \
+		in.discardd in.echod in.mpathd in.ndpd \
 		in.ripngd in.timed inetd mdnsd ncaconfd pppoe \
 		slpd vrrpd wanboot wpad
 
-MSGSUBDIRS=	dsvclockd ilbd in.dhcpd inetd ncaconfd vrrpd wanboot
+MSGSUBDIRS=	ilbd inetd ncaconfd vrrpd wanboot
 
 include ../../Makefile.cmd
 include ./Makefile.lib
 
-POFILES=	dsvclockd/dsvclockd.po in.dhcpd/in.dhcpd.po \
-		inetd/inetd.po ncaconfd/ncaconfd.po vrrpd/vrrpd.po \
+POFILES=	inetd/inetd.po ncaconfd/ncaconfd.po vrrpd/vrrpd.po \
 		wanboot/wanboot.po
 POFILE=		usr.lib.po
 
@@ -54,18 +54,9 @@ install: $(SUBDIRS)
 	-$(LN) $(ISAEXEC) $(ROOTLIBINET)/in.iked
 
 
-_msg: $(MSGSUBDIRS) 
+_msg: $(MSGSUBDIRS)
 
-#
-# The reason this rule checks for the existence of the
-# Makefile is that some of the directories do not exist
-# in our exportable source builds or in OpenSolaris.
-#
 $(SUBDIRS): FRC
-	@if [ -f $@/Makefile  ]; then \
-		cd $@; pwd; $(MAKE) $(TARGET); \
-	else \
-		true; \
-	fi
+	@cd $@; pwd; $(MAKE) $(MFLAGS) $(TARGET)
 
 FRC:

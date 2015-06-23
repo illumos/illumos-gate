@@ -910,7 +910,7 @@ ds_get_hv_pri(ds_pri_state_t *sp)
 	 * contig_mem_alloc requires size to be a power of 2.
 	 * Increase size to next power of 2 if necessary.
 	 */
-	if ((pri_size & (pri_size - 1)) != 0)
+	if (!ISP2(pri_size))
 		buf_size = 1 << highbit(pri_size);
 	DS_PRI_DBG("ds_get_hv_pri: buf_size = 0x%lx\n", buf_size);
 

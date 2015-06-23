@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -467,7 +468,7 @@ vfs_setops(vfs_t *vfsp, vfsops_t *vfsops)
 	op = vfsp->vfs_op;
 	membar_consumer();
 	if (vfsp->vfs_femhead == NULL &&
-	    casptr(&vfsp->vfs_op, op, vfsops) == op) {
+	    atomic_cas_ptr(&vfsp->vfs_op, op, vfsops) == op) {
 		return;
 	}
 	fsem_setvfsops(vfsp, vfsops);
@@ -1129,6 +1130,7 @@ domount(char *fsname, struct mounta *uap, vnode_t *vp, struct cred *credp,
 	struct pathname	pn, rpn;
 	vsk_anchor_t	*vskap;
 	char fstname[FSTYPSZ];
+	zone_t		*zone;
 
 	/*
 	 * The v_flag value for the mount point vp is permanently set
@@ -1590,9 +1592,24 @@ domount(char *fsname, struct mounta *uap, vnode_t *vp, struct cred *credp,
 	}
 
 	/*
-	 * Serialize with zone creations.
+	 * Serialize with zone state transitions.
+	 * See vfs_list_add; zone mounted into is:
+	 * 	zone_find_by_path(refstr_value(vfsp->vfs_mntpt))
+	 * not the zone doing the mount (curproc->p_zone), but if we're already
+	 * inside a NGZ, then we know what zone we are.
 	 */
-	mount_in_progress();
+	if (INGLOBALZONE(curproc)) {
+		zone = zone_find_by_path(mountpt);
+		ASSERT(zone != NULL);
+	} else {
+		zone = curproc->p_zone;
+		/*
+		 * zone_find_by_path does a hold, so do one here too so that
+		 * we can do a zone_rele after mount_completed.
+		 */
+		zone_hold(zone);
+	}
+	mount_in_progress(zone);
 	/*
 	 * Instantiate (or reinstantiate) the file system.  If appropriate,
 	 * splice it into the file system name space.
@@ -1761,7 +1778,8 @@ domount(char *fsname, struct mounta *uap, vnode_t *vp, struct cred *credp,
 
 		vfs_unlock(vfsp);
 	}
-	mount_completed();
+	mount_completed(zone);
+	zone_rele(zone);
 	if (splice)
 		vn_vfsunlock(vp);
 
@@ -2969,7 +2987,7 @@ vfs_mono_time(timespec_t *ts)
 		oldhrt = hrt;
 		if (newhrt <= hrt)
 			newhrt = hrt + 1;
-		if (cas64((uint64_t *)&hrt, oldhrt, newhrt) == oldhrt)
+		if (atomic_cas_64((uint64_t *)&hrt, oldhrt, newhrt) == oldhrt)
 			break;
 	}
 	hrt2ts(newhrt, ts);
@@ -4331,7 +4349,7 @@ vfs_free(vfs_t *vfsp)
 void
 vfs_hold(vfs_t *vfsp)
 {
-	atomic_add_32(&vfsp->vfs_count, 1);
+	atomic_inc_32(&vfsp->vfs_count);
 	ASSERT(vfsp->vfs_count != 0);
 }
 
@@ -4344,7 +4362,7 @@ void
 vfs_rele(vfs_t *vfsp)
 {
 	ASSERT(vfsp->vfs_count != 0);
-	if (atomic_add_32_nv(&vfsp->vfs_count, -1) == 0) {
+	if (atomic_dec_32_nv(&vfsp->vfs_count) == 0) {
 		VFS_FREEVFS(vfsp);
 		lofi_remove(vfsp);
 		if (vfsp->vfs_zone)

@@ -2622,7 +2622,7 @@ void bscbus_cmd_log(struct bscbus_channel_state *csp, bsc_cmd_stamp_t cat,
 		return;
 	if ((bscbus_cmd_log_flags & (1 << cat)) == 0)
 		return;
-	idx = atomic_add_32_nv(&ssp->cmd_log_idx, 1);
+	idx = atomic_inc_32_nv(&ssp->cmd_log_idx);
 	logp = &ssp->cmd_log[idx % ssp->cmd_log_size];
 	logp->bcl_seq = idx;
 	logp->bcl_cat = cat;

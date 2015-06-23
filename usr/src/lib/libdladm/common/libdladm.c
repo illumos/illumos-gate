@@ -415,6 +415,9 @@ dladm_status2str(dladm_status_t status, char *buf)
 	case DLADM_STATUS_PORT_NOPROTO:
 		s = "local or remote port requires transport";
 		break;
+	case DLADM_STATUS_INVALID_MTU:
+		s = "MTU check failed, MTU outside of device's supported range";
+		break;
 	default:
 		s = "<unknown error>";
 		break;
@@ -1175,7 +1178,7 @@ dladm_range2strs(mac_propval_range_t *rangep, char **prop_val)
 
 		/* Write ranges and individual elements */
 		ur = &rangep->mpr_range_uint32[0];
-		for (i = 0; i <= rangep->mpr_count; i++, ur++) {
+		for (i = 0; i < rangep->mpr_count; i++, ur++) {
 			if (ur->mpur_min == ur->mpur_max) {
 				/* single element */
 				(void) snprintf(prop_val[i], DLADM_PROP_VAL_MAX,

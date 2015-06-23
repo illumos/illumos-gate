@@ -23,6 +23,7 @@
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2011 Joyent, Inc. All rights reserved.
+ * Copyright (c) 2014 by Delphix. All rights reserved.
  */
 
 /* This file contains all TCP input processing functions. */
@@ -1426,10 +1427,10 @@ tcp_input_listener(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *ira)
 		tcp_listen_cnt_t *tlc = listener->tcp_listen_cnt;
 		int64_t now;
 
-		if (atomic_add_32_nv(&tlc->tlc_cnt, 1) > tlc->tlc_max + 1) {
+		if (atomic_inc_32_nv(&tlc->tlc_cnt) > tlc->tlc_max + 1) {
 			mutex_exit(&listener->tcp_eager_lock);
 			now = ddi_get_lbolt64();
-			atomic_add_32(&tlc->tlc_cnt, -1);
+			atomic_dec_32(&tlc->tlc_cnt);
 			TCP_STAT(tcps, tcp_listen_cnt_drop);
 			tlc->tlc_drop++;
 			if (now - tlc->tlc_report_time >
@@ -1871,7 +1872,7 @@ error3:
 error2:
 	freemsg(mp);
 	if (tlc_set)
-		atomic_add_32(&listener->tcp_listen_cnt->tlc_cnt, -1);
+		atomic_dec_32(&listener->tcp_listen_cnt->tlc_cnt);
 }
 
 /*
@@ -1939,7 +1940,8 @@ tcp_input_listener_unbound(void *arg, mblk_t *mp, void *arg2,
 		}
 		if (connp->conn_sqp != new_sqp) {
 			while (connp->conn_sqp != new_sqp)
-				(void) casptr(&connp->conn_sqp, sqp, new_sqp);
+				(void) atomic_cas_ptr(&connp->conn_sqp, sqp,
+				    new_sqp);
 			/* No special MT issues for outbound ixa_sqp hint */
 			connp->conn_ixa->ixa_sqp = new_sqp;
 		}
@@ -1947,8 +1949,8 @@ tcp_input_listener_unbound(void *arg, mblk_t *mp, void *arg2,
 		do {
 			conn_flags = connp->conn_flags;
 			conn_flags |= IPCL_FULLY_BOUND;
-			(void) cas32(&connp->conn_flags, connp->conn_flags,
-			    conn_flags);
+			(void) atomic_cas_32(&connp->conn_flags,
+			    connp->conn_flags, conn_flags);
 		} while (!(connp->conn_flags & IPCL_FULLY_BOUND));
 
 		mutex_exit(&connp->conn_fanout->connf_lock);
@@ -2643,8 +2645,6 @@ tcp_input_data(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *ira)
 				tcp->tcp_rexmit = B_FALSE;
 				tcp->tcp_rexmit_nxt = tcp->tcp_snxt;
 				tcp->tcp_rexmit_max = tcp->tcp_snxt;
-				tcp->tcp_snd_burst = tcp->tcp_localnet ?
-				    TCP_CWND_INFINITE : TCP_CWND_NORMAL;
 				tcp->tcp_ms_we_have_waited = 0;
 
 				/*
@@ -3839,8 +3839,6 @@ process_ack:
 			tcp->tcp_rexmit = B_FALSE;
 			tcp->tcp_rexmit_nxt = tcp->tcp_snxt;
 			tcp->tcp_rexmit_max = tcp->tcp_snxt;
-			tcp->tcp_snd_burst = tcp->tcp_localnet ?
-			    TCP_CWND_INFINITE : TCP_CWND_NORMAL;
 			tcp->tcp_ms_we_have_waited = 0;
 			tcp->tcp_cwnd = mss;
 		}
@@ -4007,15 +4005,6 @@ process_ack:
 				} else {
 					tcp->tcp_rexmit_max = tcp->tcp_snxt;
 				}
-
-				/*
-				 * Do not allow bursty traffic during.
-				 * fast recovery.  Refer to Fall and Floyd's
-				 * paper "Simulation-based Comparisons of
-				 * Tahoe, Reno and SACK TCP" (in CCR?)
-				 * This is a best current practise.
-				 */
-				tcp->tcp_snd_burst = TCP_CWND_SS;
 
 				/*
 				 * For SACK:
@@ -4217,8 +4206,6 @@ process_ack:
 			}
 			tcp->tcp_rexmit_max = seg_ack;
 			tcp->tcp_cwnd_cnt = 0;
-			tcp->tcp_snd_burst = tcp->tcp_localnet ?
-			    TCP_CWND_INFINITE : TCP_CWND_NORMAL;
 
 			/*
 			 * Remove all notsack info to avoid confusion with
@@ -4279,8 +4266,6 @@ process_ack:
 			} else {
 				tcp->tcp_rexmit = B_FALSE;
 				tcp->tcp_rexmit_nxt = tcp->tcp_snxt;
-				tcp->tcp_snd_burst = tcp->tcp_localnet ?
-				    TCP_CWND_INFINITE : TCP_CWND_NORMAL;
 			}
 			tcp->tcp_ms_we_have_waited = 0;
 		}

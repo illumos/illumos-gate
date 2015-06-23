@@ -35,6 +35,9 @@
  * 4.3 BSD under license from the Regents of the University of
  * California.
  */
+/*
+ * Copyright 2014 Shruti V Sampat <shrutisampat@gmail.com>
+ */
 
 /*
  * Implements a connectionless client side RPC.
@@ -55,7 +58,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <strings.h>
-
+#include <note.h>
 
 extern int __rpc_timeval_to_msec(struct timeval *);
 extern bool_t xdr_opaque_auth(XDR *, struct opaque_auth *);
@@ -682,9 +685,7 @@ clnt_dg_send(CLIENT *cl, rpcproc_t proc, xdrproc_t xargs, caddr_t argsp)
 static void
 clnt_dg_geterr(CLIENT *cl, struct rpc_err *errp)
 {
-/* LINTED pointer alignment */
-	struct cu_data *cu = (struct cu_data *)cl->cl_private;
-
+        NOTE(ARGUNUSED(cl))
 	*errp = rpc_callerr;
 }
 

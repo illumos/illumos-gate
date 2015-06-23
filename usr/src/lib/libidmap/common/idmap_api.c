@@ -2173,7 +2173,7 @@ idmap_getgidbywinname(const char *name, const char *domain, int flag,
 /*
  * Get winname given pid
  */
-static idmap_retcode
+idmap_stat
 idmap_getwinnamebypid(uid_t pid, int is_user, int flag, char **name,
 	char **domain)
 {

@@ -5,8 +5,8 @@
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
  *
- * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
+ * You can obtain a copy of the license at
+ * http://www.opensource.org/licenses/cddl1.txt.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Emulex.  All rights reserved.
+ * Copyright (c) 2004-2011 Emulex. All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,10 +37,10 @@
 
 static const mdb_dcmd_t dcmds[] =
 {
-	{ "emlxs_msgbuf", "<instance>", "dumps the emlxs driver internal " \
-	    "message buffer", emlxs_msgbuf, emlxs_msgbuf_help},
-	{ "emlxs_dump", "<type> <instance>", "dumps the emlxs driver " \
-	    "firmware core", emlxs_dump, emlxs_dump_help},
+	{ DRIVER_NAME"_msgbuf", "<instance>", "dumps the "DRIVER_NAME
+	    " driver internal message buffer", emlxs_msgbuf, emlxs_msgbuf_help},
+	{ DRIVER_NAME"_dump", "<type> <instance>", "dumps the "DRIVER_NAME
+	    " driver firmware core", emlxs_dump, emlxs_dump_help},
 	{ NULL }
 };
 
@@ -252,7 +252,7 @@ int emlxs_msgbuf(uintptr_t base_addr, uint_t flags, int argc,
 			if (entry.buffer[0] != 0) {
 				mdb_snprintf(merge, sizeof (merge),
 				    "[%Y:%03d:%03d:%03d] "
-				    "%6d:[%1X.%04X]%s:%7s:%4d: %s\n(%s)\n",
+				    "%6d:[%1X.%04X]%s:%7s:%4d:\n%s\n(%s)\n",
 				    entry.id_time.tv_sec,
 				    (int)entry.id_time.tv_nsec/1000000,
 				    (int)(entry.id_time.tv_nsec/1000)%1000,
@@ -264,7 +264,7 @@ int emlxs_msgbuf(uintptr_t base_addr, uint_t flags, int argc,
 			} else {
 				mdb_snprintf(merge, sizeof (merge),
 				    "[%Y:%03d:%03d:%03d] "
-				    "%6d:[%1X.%04X]%s:%7s:%4d: %s\n",
+				    "%6d:[%1X.%04X]%s:%7s:%4d:\n%s\n",
 				    entry.id_time.tv_sec,
 				    (int)entry.id_time.tv_nsec/1000000,
 				    (int)(entry.id_time.tv_nsec/1000)%1000,
@@ -289,7 +289,7 @@ int emlxs_msgbuf(uintptr_t base_addr, uint_t flags, int argc,
 			} else {
 				mdb_snprintf(merge, sizeof (merge),
 				    "[%Y:%03d:%03d:%03d] "
-				    "%6d:[%1X.%04X]%s:%7s:%4d: %s\n",
+				    "%6d:[%1X.%04X]%s:%7s:%4d:\n%s\n",
 				    entry.id_time.tv_sec,
 				    (int)entry.id_time.tv_nsec/1000000,
 				    (int)(entry.id_time.tv_nsec/1000)%1000,

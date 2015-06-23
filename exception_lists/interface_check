@@ -43,7 +43,6 @@
 # Plugins are not required to have versioned file names, and are not required
 # to be internally versioned.
 #
-PLUGIN		^usr/apache/libexec
 PLUGIN		^usr/lib/devfsadm
 PLUGIN		^usr/lib/efcode/.*\.so$
 PLUGIN		^usr/lib/elfedit
@@ -53,6 +52,7 @@ PLUGIN		^usr/lib/fm/topo/plugins
 PLUGIN		^usr/lib/fwflash
 PLUGIN		^usr/lib/iconv
 PLUGIN		^usr/lib/inet/ppp
+PLUGIN		^usr/lib/lp/ipp
 PLUGIN		^usr/lib/mdb
 PLUGIN		^usr/lib/pci
 PLUGIN		^usr/lib/picl/plugins
@@ -98,12 +98,11 @@ NOVERDEF	^usr/sadm/admin/printmgr/lib/libpmgr\.so\.1$
 
 # Objects that are allowed to deviate from our standard version
 # names.
+NONSTD_VERNAME	^MACH(lib)/libsqlite-sys\.so\.
 NONSTD_VERNAME	^usr/MACH(lib)/libtecla\.so\.1$
-
 
 # These libc variants have an SONAME of libc\.so\.1$
 NONSTD_VERNAME	^usr/MACH(lib)/libc/libc_hwcap[1-3]+\.so\.1$
-
 
 # The ABI requires the SONAME for libsys.so.1 to be /usr/lib/ld.so.1
 # That means that the base version will also be /usr/lib/ld.so.1, which

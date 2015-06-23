@@ -1,4 +1,5 @@
 /*
+ * Copyright 2013 Garrett D'Amore <garrett@damore.org>
  * Copyright (c) 2002-2004 Tim J. Robbins.
  * All rights reserved.
  *
@@ -72,8 +73,6 @@ __fputwc_impl(wchar_t wc, FILE *fp, int orient)
 	if (MB_CUR_MAX == 1 && wc > 0 && wc <= UCHAR_MAX) {
 		/*
 		 * Assume single-byte locale with no special encoding.
-		 * A more careful test would be to check
-		 * _CurrentRuneLocale->encoding.
 		 */
 		*buf = (unsigned char)wc;
 		len = 1;

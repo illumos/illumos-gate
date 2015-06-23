@@ -20,14 +20,14 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 1998-2002 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_CONFIG_ADMIN_H
 #define	_SYS_CONFIG_ADMIN_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * config_admin.h
@@ -176,8 +176,6 @@ typedef enum {
 } cfga_err_t;
 
 
-#if defined(__STDC__)
-
 /*
  * config_admin.3x library interfaces
  */
@@ -255,13 +253,6 @@ cfga_err_t cfga_list(const char *, struct cfga_stat_data **, int *,
 
 
 #endif /* CFGA_PLUGIN_LIB */
-
-#else /* !defined __STDC__ */
-
-extern const char *config_strerror();
-extern int config_ap_id_cmp();
-
-#endif /* __STDC__ */
 
 #ifdef __cplusplus
 }

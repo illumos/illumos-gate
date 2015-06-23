@@ -1,0 +1,120 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright (c) 2014, Joyent, Inc. 
+.\"
+.Dd "Dec 22, 2014"
+.Dt PTHREAD_MUTEXATTR_GETROBUST 3C
+.Os
+.Sh NAME
+.Nm pthread_mutexattr_getrobust ,
+.Nm pthrad_mutexattr_setrobust
+.Nd get and set the mutex robust attribute
+.Sh SYNOPSIS
+.In pthread.h
+.Ft int
+.Fo pthread_mutexattr_getrobust
+.Fa "const pthread_mutexattr_t *attr"
+.Fa "int *robust"
+.Fc
+.Ft int
+.Fo pthread_mutexattr_setrobust
+.Fa "pthread_mutexattr_t *attr"
+.Fa "int robust"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn pthread_mutexattr_getrobust
+and
+.Fn pthread_mtuexattr_setrobust
+functions obtain and set a mutex's
+.Em robust
+attribute, putting it in, or obtaining it from
+.Va robust .
+The valid values for
+.Va robust
+include:
+.Bl -tag -width Dv
+.It Sy PTHREAD_MUTEX_STALLED
+The mutex referred to by
+.Va attr
+is a traditional mutex. When a thread holding an intra-process lock or a
+process holding an inter-process lock crashes or terminates without
+unlocking the mutex, then the lock will be
+.Sy stalled .
+For another thread or process to obtain the lock, something else must
+unlock it.
+.It Sy PTHREAD_MUTEX_ROBUST
+The mutex referred to by
+.Va attr
+is considered a robust mutex. When a process holding an inter-process
+lock crashes or terminates without unlocking the mutex, the attempt to
+lock it will return
+.Er EOWNERDEAD .
+This allows the new owner the chance to fix the internal state and call
+.Xr pthread_mutex_consistent 3C
+prior to unlocking the lock, allowing normal operation to proceed. Any
+crashes while in this state cause the next owner to obtain
+.Er EOWNERDEAD .
+.El
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn pthread_mutexattr_getrobust
+function will return
+.Sy 0
+and update
+.Fa robust
+with the current value of the robust attribute. Upon successful
+completion, the
+.Fn pthread_mutexattr_setrobust
+function will return
+.Sy 0
+and update the robust property of the attributes pointed to by
+.Va attr
+to
+.Va robust .
+If either function fails, an error code will be returned to indicate the
+error. Valid errors are defined below.
+.Sh ERRORS
+The
+.Fn pthread_mutexattr_getrobust
+function will fail if:
+.Bl -tag -width Er
+.It Er EINVAL
+.Va attr
+is invalid or a null pointer,
+.Va robust
+is a null pointer.
+.El
+.Lp
+The
+.Fn pthread_mutexattr_setrobust
+function will fail if:
+.Bl -tag -width Er
+.It Er EINVAL
+.Va attr
+is invalid or a null pointer,
+.Va robust
+is not one of
+.Sy PTHREAD_MUTEX_STALLED
+or
+.Sy PTHREAD_MUTEX_ROBUST .
+.El
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh MT-LEVEL
+.Sy MT-Safe
+.Sh SEE ALSO
+.Xr pthread_mutex_consistent 3C ,
+.Xr pthread 3HEAD ,
+.Xr libpthread 3LIB ,
+.Xr attributes 5 ,
+.Xr mutex 5

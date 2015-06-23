@@ -19,6 +19,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -29,8 +31,6 @@
 
 #ifndef	_FTW_H
 #define	_FTW_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/feature_tests.h>
 
@@ -122,8 +122,6 @@ struct FTW
 #endif	/* __PRAGMA_REDEFINE_EXTNAME */
 #endif	/* _LP64 && _LARGEFILE64_SOURCE */
 
-#if defined(__STDC__)
-
 extern int ftw(const char *,
 	int (*)(const char *, const struct stat *, int), int);
 extern int _xftw(int, const char *,
@@ -149,26 +147,6 @@ extern int nftw64(const char *,
 	int, int);
 #endif /* !defined(_XOPEN_SOURCE) */
 #endif /* _LARGEFILE64_SOURCE .. */
-
-#else /* __STDC__ */
-
-extern int ftw(), _xftw();
-
-#if defined(__EXTENSIONS__) || !defined(_XOPEN_SOURCE) || defined(_XPG4_2)
-extern int nftw();
-#endif /* defined(__EXTENSIONS__) || !defined(_XOPEN_SOURCE) ... */
-
-/* transitional large file interface versions */
-#if	defined(_LARGEFILE64_SOURCE) && !((_FILE_OFFSET_BITS == 64) && \
-	    !defined(__PRAGMA_REDEFINE_EXTNAME))
-extern int ftw64();
-extern int _xftw64();
-#if !defined(_XOPEN_SOURCE)
-extern int nftw64();
-#endif /* !defined(_XOPEN_SOURCE) */
-#endif /* _LARGEFILE64_SOURCE .. */
-
-#endif /* __STDC__ */
 
 #define	_XFTWVER	2	/* version of file tree walk */
 

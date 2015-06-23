@@ -25,12 +25,6 @@
 
 set name=pkg.fmri \
     value=pkg:/storage/storage-nas@0.1,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
-set name=pkg.summary value="Network Attached Storage cluster"
-set name=info.classification \
-    value=org.opensolaris.category.2008:Drivers/Storage
+set name=pkg.obsolete value=true
+set name=org.opensolaris.noincorp value=true
 set name=variant.arch value=$(ARCH)
-depend fmri=network/iscsi/initiator type=require
-depend fmri=service/file-system/nfs type=require
-depend fmri=service/file-system/smb type=require
-depend fmri=service/storage/ndmp type=require
-depend fmri=service/storage/virus-scan type=require

@@ -19,8 +19,11 @@
 # CDDL HEADER END
 #
 
+#
 # Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2015 Garrett D'Amore <garrett@damore.org>
 
 # include global definitions
 include Makefile.master
@@ -49,7 +52,6 @@ COMMON_SUBDIRS = \
 	cmd/bart \
 	cmd/basename \
 	cmd/bdiff \
-	cmd/bfs \
 	cmd/busstat \
 	cmd/boot \
 	cmd/cal \
@@ -71,9 +73,7 @@ COMMON_SUBDIRS = \
 	cmd/cmd-inet/sbin \
 	cmd/cmd-inet/usr.bin \
 	cmd/cmd-inet/usr.lib/bridged \
-	cmd/cmd-inet/usr.lib/dsvclockd \
 	cmd/cmd-inet/usr.lib/ilbd \
-	cmd/cmd-inet/usr.lib/in.dhcpd \
 	cmd/cmd-inet/usr.lib/in.mpathd \
 	cmd/cmd-inet/usr.lib/in.ndpd \
 	cmd/cmd-inet/usr.lib/inetd \
@@ -194,7 +194,7 @@ COMMON_SUBDIRS = \
 	cmd/ls \
 	cmd/luxadm \
 	cmd/lvm \
-	cmd/machid \
+	cmd/mailwrapper \
 	cmd/makekey \
 	cmd/mdb \
 	cmd/mesg \
@@ -316,7 +316,6 @@ COMMON_SUBDIRS = \
 	cmd/who \
 	cmd/whodo \
 	cmd/wracct \
-	cmd/wusbadm \
 	cmd/xargs \
 	cmd/xstr \
 	cmd/yes \
@@ -362,8 +361,6 @@ COMMON_SUBDIRS = \
 	lib/libdevid \
 	lib/libdevinfo \
 	lib/libdhcpagent \
-	lib/libdhcpdu \
-	lib/libdhcpsvc \
 	lib/libdhcputil \
 	lib/libdisasm \
 	lib/libdiskmgt \
@@ -395,6 +392,9 @@ COMMON_SUBDIRS = \
 	lib/libkstat \
 	lib/liblgrp \
 	lib/liblm \
+	lib/libm \
+	lib/libm1 \
+	lib/libmvec \
 	lib/libmalloc \
 	lib/libmapmalloc \
 	lib/libmapid \

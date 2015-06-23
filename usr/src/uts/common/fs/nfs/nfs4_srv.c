@@ -18,10 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -869,7 +870,7 @@ static nfsstat4
 do_rfs4_op_secinfo(struct compound_state *cs, char *nm, SECINFO4res *resp)
 {
 	int error, different_export = 0;
-	vnode_t *dvp, *vp, *tvp;
+	vnode_t *dvp, *vp;
 	struct exportinfo *exi = NULL;
 	fid_t fid;
 	uint_t count, i;
@@ -950,14 +951,12 @@ do_rfs4_op_secinfo(struct compound_state *cs, char *nm, SECINFO4res *resp)
 	 * If it's a mountpoint, then traverse it.
 	 */
 	if (vn_ismntpt(vp)) {
-		tvp = vp;
-		if ((error = traverse(&tvp)) != 0) {
+		if ((error = traverse(&vp)) != 0) {
 			VN_RELE(vp);
 			return (puterrno4(error));
 		}
 		/* remember that we had to traverse mountpoint */
 		did_traverse = TRUE;
-		vp = tvp;
 		different_export = 1;
 	} else if (vp->v_vfsp != dvp->v_vfsp) {
 		/*
@@ -1063,7 +1062,7 @@ do_rfs4_op_secinfo(struct compound_state *cs, char *nm, SECINFO4res *resp)
 			perm = secp[i].s_flags;
 
 			access = nfsauth4_secinfo_access(exi, cs->req,
-			    flavor, perm);
+			    flavor, perm, cs->basecr);
 
 			if (! (access & NFSAUTH_DENIED) &&
 			    ! (access & NFSAUTH_WRONGSEC)) {
@@ -1274,7 +1273,7 @@ rfs4_op_access(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	 * Special files are interpreted by the client, so the underlying
 	 * permissions are sent back to the client for interpretation.
 	 */
-	if (rdonly4(cs->exi, cs->vp, req) &&
+	if (rdonly4(req, cs) &&
 	    (vp->v_type == VREG || vp->v_type == VDIR))
 		checkwriteperm = 0;
 	else
@@ -1410,7 +1409,7 @@ rfs4_op_commit(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		*cs->statusp = resp->status = puterrno4(error);
 		goto out;
 	}
-	if (rdonly4(cs->exi, cs->vp, req)) {
+	if (rdonly4(req, cs)) {
 		*cs->statusp = resp->status = NFS4ERR_ROFS;
 		goto out;
 	}
@@ -1581,7 +1580,7 @@ rfs4_op_create(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		goto out;
 	}
 
-	if (rdonly4(cs->exi, cs->vp, req)) {
+	if (rdonly4(req, cs)) {
 		*cs->statusp = resp->status = NFS4ERR_ROFS;
 		goto out;
 	}
@@ -1693,7 +1692,8 @@ rfs4_op_create(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		/*
 		 * symlink names must be treated as data
 		 */
-		lnm = utf8_to_str(&args->ftype4_u.linkdata, &llen, NULL);
+		lnm = utf8_to_str((utf8string *)&args->ftype4_u.linkdata,
+		    &llen, NULL);
 
 		if (lnm == NULL) {
 			*cs->statusp = resp->status = NFS4ERR_INVAL;
@@ -2520,7 +2520,7 @@ rfs4_op_link(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		goto out;
 	}
 
-	if (rdonly4(cs->exi, cs->vp, req)) {
+	if (rdonly4(req, cs)) {
 		*cs->statusp = resp->status = NFS4ERR_ROFS;
 		kmem_free(nm, len);
 		goto out;
@@ -2610,7 +2610,7 @@ do_rfs4_op_lookup(char *nm, struct svc_req *req, struct compound_state *cs)
 {
 	int error;
 	int different_export = 0;
-	vnode_t *vp, *tvp, *pre_tvp = NULL, *oldvp = NULL;
+	vnode_t *vp, *pre_tvp = NULL, *oldvp = NULL;
 	struct exportinfo *exi = NULL, *pre_exi = NULL;
 	nfsstat4 stat;
 	fid_t fid;
@@ -2708,13 +2708,11 @@ do_rfs4_op_lookup(char *nm, struct svc_req *req, struct compound_state *cs)
 		 * need pre_tvp below if checkexport4 fails
 		 */
 		VN_HOLD(pre_tvp);
-		tvp = vp;
-		if ((error = traverse(&tvp)) != 0) {
+		if ((error = traverse(&vp)) != 0) {
 			VN_RELE(vp);
 			VN_RELE(pre_tvp);
 			return (puterrno4(error));
 		}
-		vp = tvp;
 		different_export = 1;
 	} else if (vp->v_vfsp != cs->vp->v_vfsp) {
 		/*
@@ -3045,7 +3043,7 @@ rfs4_op_openattr(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	 * Returning NOTSUPP is more appropriate in this case
 	 * because the object will never be able to have an attrdir.
 	 */
-	if (args->createdir && ! (exp_ro = rdonly4(cs->exi, cs->vp, req)))
+	if (args->createdir && ! (exp_ro = rdonly4(req, cs)))
 		lookup_flags |= CREATE_XATTR_DIR;
 
 	error = VOP_LOOKUP(cs->vp, "", &avp, NULL, lookup_flags, NULL, cs->cr,
@@ -3856,7 +3854,7 @@ rfs4_op_readlink(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	/*
 	 * treat link name as data
 	 */
-	(void) str_to_utf8(name, &resp->link);
+	(void) str_to_utf8(name, (utf8string *)&resp->link);
 
 	if (name != data)
 		kmem_free(name, MAXPATHLEN + 1);
@@ -3872,7 +3870,7 @@ static void
 rfs4_op_readlink_free(nfs_resop4 *resop)
 {
 	READLINK4res *resp = &resop->nfs_resop4_u.opreadlink;
-	utf8string *symlink = &resp->link;
+	utf8string *symlink = (utf8string *)&resp->link;
 
 	if (symlink->utf8string_val) {
 		UTF8STRING_FREE(*symlink)
@@ -4131,7 +4129,7 @@ rfs4_op_remove(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		goto out;
 	}
 
-	if (rdonly4(cs->exi, cs->vp, req)) {
+	if (rdonly4(req, cs)) {
 		*cs->statusp = resp->status = NFS4ERR_ROFS;
 		kmem_free(nm, len);
 		goto out;
@@ -4493,7 +4491,7 @@ rfs4_op_rename(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	}
 
 
-	if (rdonly4(cs->exi, cs->vp, req)) {
+	if (rdonly4(req, cs)) {
 		*cs->statusp = resp->status = NFS4ERR_ROFS;
 		if (onm != converted_onm)
 			kmem_free(converted_onm, MAXPATHLEN + 1);
@@ -5388,7 +5386,7 @@ rfs4_op_setattr(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 
 	resp->attrsset = 0;
 
-	if (rdonly4(cs->exi, cs->vp, req)) {
+	if (rdonly4(req, cs)) {
 		*cs->statusp = resp->status = NFS4ERR_ROFS;
 		goto out;
 	}
@@ -5615,7 +5613,7 @@ rfs4_op_write(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		goto out;
 	}
 
-	if (rdonly4(cs->exi, cs->vp, req)) {
+	if (rdonly4(req, cs)) {
 		*cs->statusp = resp->status = NFS4ERR_ROFS;
 		goto out;
 	}
@@ -6284,7 +6282,7 @@ check_open_access(uint32_t access, struct compound_state *cs,
 	 * to open for write, then return NFS4ERR_ROFS
 	 */
 
-	readonly = rdonly4(cs->exi, cs->vp, req);
+	readonly = rdonly4(req, cs);
 
 	if ((access & OPEN4_SHARE_ACCESS_WRITE) && readonly)
 		return (NFS4ERR_ROFS);
@@ -6338,7 +6336,7 @@ rfs4_createfile(OPEN4args *args, struct svc_req *req, struct compound_state *cs,
 	dvp = cs->vp;
 
 	/* Check if the file system is read only */
-	if (rdonly4(cs->exi, dvp, req))
+	if (rdonly4(req, cs))
 		return (NFS4ERR_ROFS);
 
 	/* check the label of including directory */

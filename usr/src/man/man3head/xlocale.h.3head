@@ -1,0 +1,59 @@
+'\" te
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
+.\"
+.TH XLOCALE.H 3HEAD "Jun 26, 2014"
+.SH NAME
+xlocale.h, xlocale \- extended locale support
+.SH SYNOPSIS
+.LP
+.nf
+#include <\fBxlocale.h\fR>
+.fi
+.SH DESCRIPTION
+.LP
+The
+.RB < xlocale.h >
+header supplies prototypes for various functions that operate
+using the
+.B locale_t
+structure but which are not specified as part of any formal standard.
+Their location in this header follows the convention established by
+other operating systems.
+.LP
+As none of the definitions supplied in this header, nor this
+header itself, are specified in any standard, their use should
+be avoided in portable applications.
+.SH ATTRIBUTES
+.LP
+See
+.BR attributes (5)
+for descriptions of the following attributes:
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Interface Stability	Uncommitted
+.TE
+
+.SH SEE ALSO
+.LP
+.BR newlocale (3C),
+.BR setlocale (3C),
+.BR uselocale (3C),
+.BR locale (3HEAD),
+.BR attributes (5),
+.BR locale (5),
+.BR standards (5)

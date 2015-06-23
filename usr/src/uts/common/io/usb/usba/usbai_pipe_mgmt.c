@@ -21,6 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  */
 
 
@@ -458,7 +460,7 @@ usba_init_pipe_handle(dev_info_t *dip,
 		    "USB_%s_%x_pipehndl_tq_%d",
 		    ddi_driver_name(dip), ep->bEndpointAddress, instance);
 	} else {
-		def_instance = atomic_add_32_nv(&anon_instance, 1);
+		def_instance = atomic_inc_32_nv(&anon_instance);
 
 		(void) snprintf(tq_name, sizeof (tq_name),
 		    "USB_%s_%x_pipehndl_tq_%d_",
@@ -523,14 +525,6 @@ usba_init_pipe_handle(dev_info_t *dip,
 		uint16_t	maxpktsize;
 
 		maxpktsize = usba_device->usb_dev_descr->bMaxPacketSize0;
-		if (usba_device->usb_is_wireless) {
-			/*
-			 * according to wusb 1.0 spec 4.8.1, the host must
-			 * assume a wMaxPacketSize of 512 for the default
-			 * control pipe of a wusb device
-			 */
-			maxpktsize = 0x200;
-		}
 		USB_DPRINTF_L3(DPRINT_MASK_USBAI, usbai_log_handle,
 		    "adjusting max packet size from %d to %d",
 		    ph_data->p_ep.wMaxPacketSize, maxpktsize);

@@ -19,30 +19,22 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ */
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 #ifndef	_PW_H
 #define	_PW_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.2	*/
 
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
-#if defined(__STDC__)
-
 extern char *logname(void);
 extern char *regcmp(const char *, ...);
 extern char *regex(const char *, const char *, ...);
-#else
-extern char *logname();
-extern char *regcmp();
-extern char *regex();
-
-#endif
 
 #ifdef	__cplusplus
 }

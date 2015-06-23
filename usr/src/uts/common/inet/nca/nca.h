@@ -695,7 +695,7 @@ extern struct node_ts *node_tp;
 		_p = node_tp;						\
 		if ((_np = _p + 1) == &node_tv[NODE_TV_SZ])		\
 			_np = node_tv;					\
-	} while (casptr(&node_tp, _p, _np) != _p);			\
+	} while (atomic_cas_ptr(&node_tp, _p, _np) != _p);		\
 	_p->node = (p);							\
 	_p->action = (a);						\
 	_p->ref = (p) ? (p)->ref : 0;					\
@@ -785,7 +785,7 @@ extern struct door_ts *door_tp;
 		_p = door_tp;						\
 		if ((_np = _p + 1) == &door_tv[DOOR_TV_SZ])		\
 			_np = door_tv;					\
-	} while (casptr(&door_tp, _p, _np) != _p);			\
+	} while (atomic_cas_ptr(&door_tp, _p, _np) != _p);		\
 	_p->cp = _cp;							\
 	_p->np = _req_np;						\
 	_p->action = (a);						\
@@ -959,7 +959,7 @@ extern kmutex_t nca_dcb_readers;
 #define	DCB_RD_EXIT(cpu) {						\
 	uint32_t *rp = &nca_gv[cpu].dcb_readers;			\
 									\
-	if (atomic_add_32_nv(rp, -1) == DCB_COUNT_USELOCK) {		\
+	if (atomic_dec_32_nv(rp) == DCB_COUNT_USELOCK) {		\
 		mutex_enter(&nca_dcb_lock);				\
 		if (CV_HAS_WAITERS(&nca_dcb_wait)) {			\
 			/* May be the last reader for this CPU */	\
@@ -987,7 +987,7 @@ extern kmutex_t nca_dcb_readers;
 				continue;				\
 			}						\
 			new = old | DCB_COUNT_USELOCK;			\
-			while (cas32(rp, old, new) != old) {		\
+			while (atomic_cas_32(rp, old, new) != old) {	\
 				old = *rp;				\
 				new = old | DCB_COUNT_USELOCK;		\
 			}						\
@@ -1010,7 +1010,7 @@ extern kmutex_t nca_dcb_readers;
 		int old = *rp;						\
 									\
 		new = old & ~DCB_COUNT_USELOCK;				\
-		while (cas32(rp, old, new) != old) {			\
+		while (atomic_cas_32(rp, old, new) != old) {		\
 			old = *rp;					\
 			new = old & ~DCB_COUNT_USELOCK;			\
 		}							\
@@ -1543,7 +1543,7 @@ extern struct conn_ts *conn_tp;
 		_p = conn_tp;					\
 		if ((_np = _p + 1) == &con_tv[CON_TV_SZ])	\
 			_np = con_tv;				\
-	} while (casptr(&conn_tp, _p, _np) != _p);			\
+	} while (atomic_cas_ptr(&conn_tp, _p, _np) != _p);		\
 	_p->conn = (p);							\
 	_p->action = (a);						\
 	_p->ref = (p)->ref;						\
@@ -1765,7 +1765,7 @@ extern nca_counter_t *nca_counter_tp;
 		_ntp = _otp + 1;					\
 		if (_ntp == &nca_counter_tv[NCA_COUNTER_TRACE_SZ])	\
 			_ntp = nca_counter_tv;				\
-	} while (casptr((void *)&nca_counter_tp, (void *)_otp,		\
+	} while (atomic_cas_ptr((void *)&nca_counter_tp, (void *)_otp,	\
 	    (void *)_ntp) != (void *)_otp);				\
 	_ntp->t = gethrtime();						\
 	_ntp->p = p;							\

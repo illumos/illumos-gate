@@ -40,7 +40,6 @@ retrieve and set a socket's multicast filter
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 These functions allow applications to retrieve and modify the multicast
 filtering state for a tuple consisting of socket, interface, and multicast
@@ -109,12 +108,10 @@ number of addresses in the \fIslist\fR array. The \fIslist\fR argument points
 to the array of source addresses to be included or excluded, depending on the
 \fIfmode\fR value.
 .SH RETURN VALUES
-.sp
 .LP
 If successful, all four functions return \fB0\fR. Otherwise, they return
 \fB\(mi1\fR and set \fBerrno\fR to indicate the error.
 .SH ERRORS
-.sp
 .LP
 These functions will fail if:
 .sp
@@ -202,7 +199,6 @@ The source filter list is larger than that allowed by the implementation.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -220,9 +216,9 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBif_nametoindex\fR(3SOCKET), \fBsocket\fR(3SOCKET), \fBattributes\fR(5)
+\fBif_nametoindex\fR(3SOCKET), \fBsocket\fR(3SOCKET), \fBsockaddr\fR(3SOCKET),
+\fBattributes\fR(5)
 .sp
 .LP
 RFC 3678

@@ -19,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -32,14 +32,13 @@
 #include <smbsrv/smb_kproto.h>
 #include <smbsrv/smb_token.h>
 
-static int smb_authenticate(smb_request_t *, smb_arg_sessionsetup_t *,
-    smb_session_key_t **);
-static int smb_authenticate_core(smb_request_t *, smb_arg_sessionsetup_t *,
-    smb_session_key_t **);
-static cred_t *smb_cred_create(smb_token_t *);
+static int smb_authenticate(smb_request_t *, smb_arg_sessionsetup_t *);
+static int smb_authenticate_core(smb_request_t *, smb_arg_sessionsetup_t *);
+static uint32_t smb_priv_xlate(smb_token_t *);
+#ifdef	_KERNEL
 static void smb_cred_set_sid(smb_id_t *id, ksid_t *ksid);
 static ksidlist_t *smb_cred_set_sidlist(smb_ids_t *token_grps);
-static uint32_t smb_priv_xlate(smb_token_t *);
+#endif	/* _KERNEL */
 
 /*
  * In NTLM 0.12, the padding between the Native OS and Native LM is a bit
@@ -63,6 +62,7 @@ smb_pre_session_setup_andx(smb_request_t *sr)
 	smb_arg_sessionsetup_t	*sinfo;
 	char			*native_os;
 	char			*native_lm;
+	uint32_t		junk_sesskey;
 	uint16_t		maxbufsize;
 	uint16_t		vcnumber;
 	int			rc = 0;
@@ -74,7 +74,7 @@ smb_pre_session_setup_andx(smb_request_t *sr)
 		rc = smbsr_decode_vwv(sr, "b.wwwwlww4.l", &sr->andx_com,
 		    &sr->andx_off, &maxbufsize,
 		    &sinfo->ssi_maxmpxcount, &vcnumber,
-		    &sinfo->ssi_sesskey, &sinfo->ssi_cipwlen,
+		    &junk_sesskey, &sinfo->ssi_cipwlen,
 		    &sinfo->ssi_cspwlen, &sinfo->ssi_capabilities);
 		if (rc != 0)
 			goto pre_session_setup_andx_done;
@@ -110,7 +110,7 @@ smb_pre_session_setup_andx(smb_request_t *sr)
 		rc = smbsr_decode_vwv(sr, "b.wwwwlw4.", &sr->andx_com,
 		    &sr->andx_off, &maxbufsize,
 		    &sinfo->ssi_maxmpxcount, &vcnumber,
-		    &sinfo->ssi_sesskey, &sinfo->ssi_cipwlen);
+		    &junk_sesskey, &sinfo->ssi_cipwlen);
 		if (rc != 0)
 			goto pre_session_setup_andx_done;
 
@@ -174,11 +174,9 @@ smb_sdrc_t
 smb_com_session_setup_andx(smb_request_t *sr)
 {
 	smb_arg_sessionsetup_t	*sinfo = sr->sr_ssetup;
-	smb_session_key_t	*session_key = NULL;
-	char			ipaddr_buf[INET6_ADDRSTRLEN];
 	int			rc;
 
-	if (smb_authenticate(sr, sinfo, &session_key) != 0)
+	if (smb_authenticate(sr, sinfo) != 0)
 		return (SDRC_ERROR);
 
 	if (sr->session->native_lm == NATIVE_LM_WIN2000)
@@ -189,25 +187,6 @@ smb_com_session_setup_andx(smb_request_t *sr)
 		sr->session->capabilities &= ~CAP_LEVEL_II_OPLOCKS;
 
 	sr->session->capabilities = sinfo->ssi_capabilities;
-
-	if (!(sr->session->signing.flags & SMB_SIGNING_ENABLED) &&
-	    (sr->session->secmode & NEGOTIATE_SECURITY_SIGNATURES_ENABLED) &&
-	    (sr->smb_flg2 & SMB_FLAGS2_SMB_SECURITY_SIGNATURE) &&
-	    session_key)
-		smb_sign_init(sr, session_key, (char *)sinfo->ssi_cspwd,
-		    sinfo->ssi_cspwlen);
-
-	if (!(sr->smb_flg2 & SMB_FLAGS2_SMB_SECURITY_SIGNATURE) &&
-	    (sr->sr_cfg->skc_signing_required)) {
-		(void) smb_inet_ntop(&sr->session->ipaddr, ipaddr_buf,
-		    SMB_IPSTRLEN(sr->session->ipaddr.a_family));
-		cmn_err(CE_NOTE,
-		    "SmbSessonSetupX: client %s does not support signing",
-		    ipaddr_buf);
-		smbsr_error(sr, NT_STATUS_LOGON_FAILURE,
-		    ERRDOS, ERROR_LOGON_FAILURE);
-		return (SDRC_ERROR);
-	}
 
 	rc = smbsr_encode_result(sr, 3, VAR_BCC, "bb.www%uuu",
 	    3,
@@ -224,8 +203,7 @@ smb_com_session_setup_andx(smb_request_t *sr)
 }
 
 static int
-smb_authenticate(smb_request_t *sr, smb_arg_sessionsetup_t *sinfo,
-    smb_session_key_t **session_key)
+smb_authenticate(smb_request_t *sr, smb_arg_sessionsetup_t *sinfo)
 {
 	int		rc;
 	smb_server_t	*sv = sr->sr_server;
@@ -235,8 +213,8 @@ smb_authenticate(smb_request_t *sr, smb_arg_sessionsetup_t *sinfo,
 		return (-1);
 	}
 
-	rc = smb_authenticate_core(sr, sinfo, session_key);
-	smb_threshold_exit(&sv->sv_ssetup_ct, sv);
+	rc = smb_authenticate_core(sr, sinfo);
+	smb_threshold_exit(&sv->sv_ssetup_ct);
 	return (rc);
 }
 
@@ -249,8 +227,7 @@ smb_authenticate(smb_request_t *sr, smb_arg_sessionsetup_t *sinfo,
  * generate a cred and new user based on the token.
  */
 static int
-smb_authenticate_core(smb_request_t *sr, smb_arg_sessionsetup_t *sinfo,
-    smb_session_key_t **session_key)
+smb_authenticate_core(smb_request_t *sr, smb_arg_sessionsetup_t *sinfo)
 {
 	char		*hostname = sr->sr_cfg->skc_hostname;
 	int		security = sr->sr_cfg->skc_secmode;
@@ -331,7 +308,7 @@ smb_authenticate_core(smb_request_t *sr, smb_arg_sessionsetup_t *sinfo,
 
 	DTRACE_PROBE1(smb__sessionsetup__clntinfo, smb_logon_t *, &user_info);
 
-	if ((token = smb_get_token(&user_info)) == NULL) {
+	if ((token = smb_get_token(sr->session, &user_info)) == NULL) {
 		smbsr_error(sr, 0, ERRSRV, ERRbadpw);
 		return (-1);
 	}
@@ -349,12 +326,6 @@ smb_authenticate_core(smb_request_t *sr, smb_arg_sessionsetup_t *sinfo,
 		}
 	}
 
-	if (token->tkn_session_key) {
-		*session_key = smb_srm_zalloc(sr, sizeof (smb_session_key_t));
-		bcopy(token->tkn_session_key, *session_key,
-		    sizeof (smb_session_key_t));
-	}
-
 	if ((cr = smb_cred_create(token)) == NULL) {
 		smb_token_free(token);
 		smbsr_error(sr, 0, ERRDOS, ERROR_INVALID_HANDLE);
@@ -366,8 +337,15 @@ smb_authenticate_core(smb_request_t *sr, smb_arg_sessionsetup_t *sinfo,
 	user = smb_user_login(sr->session, cr,
 	    token->tkn_domain_name, token->tkn_account_name,
 	    token->tkn_flags, privileges, token->tkn_audit_sid);
-
 	crfree(cr);
+
+	/*
+	 * Save the session key, and (maybe) enable signing,
+	 * but only for real logon (not ANON or GUEST).
+	 */
+	if ((token->tkn_flags & (SMB_ATF_GUEST | SMB_ATF_ANON)) == 0)
+		(void) smb_sign_begin(sr, token);
+
 	smb_token_free(token);
 
 	if (user == NULL) {
@@ -382,6 +360,7 @@ smb_authenticate_core(smb_request_t *sr, smb_arg_sessionsetup_t *sinfo,
 	return (0);
 }
 
+#ifdef	_KERNEL
 /*
  * Allocate a Solaris cred and initialize it based on the access token.
  *
@@ -392,7 +371,7 @@ smb_authenticate_core(smb_request_t *sr, smb_arg_sessionsetup_t *sinfo,
  * obtained, the cred gid is set to whatever Solaris group is mapped
  * to the token's primary group.
  */
-static cred_t *
+cred_t *
 smb_cred_create(smb_token_t *token)
 {
 	ksid_t			ksid;
@@ -434,8 +413,22 @@ smb_cred_create(smb_token_t *token)
 	ksidlist = smb_cred_set_sidlist(&token->tkn_win_grps);
 	crsetsidlist(cr, ksidlist);
 
-	if (smb_token_query_privilege(token, SE_TAKE_OWNERSHIP_LUID))
-		(void) crsetpriv(cr, PRIV_FILE_CHOWN, NULL);
+	/*
+	 * In the AD world, "take ownership privilege" is very much
+	 * like having Unix "root" privileges.  It's normally given
+	 * to members of the "Administrators" group, which normally
+	 * includes the the local Administrator (like root) and when
+	 * joined to a domain, "Domain Admins".
+	 */
+	if (smb_token_query_privilege(token, SE_TAKE_OWNERSHIP_LUID)) {
+		(void) crsetpriv(cr,
+		    PRIV_FILE_CHOWN,
+		    PRIV_FILE_DAC_READ,
+		    PRIV_FILE_DAC_SEARCH,
+		    PRIV_FILE_DAC_WRITE,
+		    PRIV_FILE_OWNER,
+		    NULL);
+	}
 
 	return (cr);
 }
@@ -483,6 +476,7 @@ smb_cred_set_sidlist(smb_ids_t *token_grps)
 
 	return (lp);
 }
+#endif	/* _KERNEL */
 
 /*
  * Convert access token privileges to local definitions.

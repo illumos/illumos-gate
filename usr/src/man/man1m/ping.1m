@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PING 1M "Sep 7, 2006"
+.TH PING 1M "Feb 20, 2015"
 .SH NAME
 ping \- send ICMP (ICMP6) ECHO_REQUEST packets to network hosts
 .SH SYNOPSIS
@@ -15,7 +15,7 @@ ping \- send ICMP (ICMP6) ECHO_REQUEST packets to network hosts
 
 .LP
 .nf
-\fB/usr/sbin/ping\fR \fB-s\fR [\fB-l\fR | \fB-U\fR] [\fB-abdlLnrRv\fR] [\fB-A\fR \fIaddr_family\fR]
+\fB/usr/sbin/ping\fR \fB-s\fR [\fB-l\fR | \fB-U\fR] [\fB-abdDLnrRv\fR] [\fB-A\fR \fIaddr_family\fR]
      [\fB-c\fR \fItraffic_class\fR] [\fB-g\fR \fIgateway\fR [\fB-g\fR \fIgateway\fR...]]
      [\fB-N\fR \fInext_hop_router\fR] [\fB-F\fR \fIflow_label\fR] [\fB-I\fR \fIinterval\fR]
      [\fB-i\fR \fIinterface\fR] [\fB-P\fR \fItos\fR] [\fB-p\fR \fIport\fR] [\fB-t\fR \fIttl\fR] \fIhost\fR
@@ -23,7 +23,6 @@ ping \- send ICMP (ICMP6) ECHO_REQUEST packets to network hosts
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The utility \fBping\fR utilizes the \fBICMP\fR (\fBICMP6\fR in IPv6) protocol's
 \fBECHO_REQUEST\fR datagram to elicit an \fBICMP\fR (\fBICMP6\fR)
@@ -68,7 +67,6 @@ displays a summary of this information upon termination or timeout. The default
 When using \fBping\fR for fault isolation, first \fBping\fR the local host to
 verify that the local network interface is running.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -97,6 +95,16 @@ is associated with the host name. If none exists, \fBping\fR states that the
 host is unknown and exits.
 .RE
 
+.sp
+.ne 2
+.na
+\fB\fB-D\fR\fR
+.ad
+.RS 24n
+Don't allow probe packets to be fragmented. If the packet size exceeds the MTU
+of a gateway it passes through, the gateway will reject it.
+.RE
+ 
 .sp
 .ne 2
 .na
@@ -336,7 +344,6 @@ from the target host.
 .RE
 
 .SH OPERANDS
-.sp
 .ne 2
 .na
 \fB\fIhost\fR\fR
@@ -389,7 +396,6 @@ This example shows the \fBndd\fR module, \fB/dev/icmp\fR, used to set the
 .sp
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -412,7 +418,6 @@ machine was not alive.
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBifconfig\fR(1M), \fBin.routed\fR(1M), \fBndd\fR(1M), \fBnetstat\fR(1M),
 \fBrpcinfo\fR(1M), \fBtraceroute\fR(1M), \fBattributes\fR(5), \fBicmp\fR(7P),

@@ -1,4 +1,4 @@
-'\" te
+.\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
 .\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright (c) 1980 Regents of the University of California.  All rights reserved.  The Berkeley software License Agreement specifies the terms and conditions for redistribution.
 .\" Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved.
@@ -6,68 +6,74 @@
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
-.TH USLEEP 3C "Feb 5, 2008"
-.SH NAME
-usleep \- suspend execution for interval in microseconds
-.SH SYNOPSIS
-.LP
-.nf
-#include <unistd.h>
-
-\fBint\fR \fBusleep\fR(\fBuseconds_t\fR \fIuseconds\fR);
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
-The \fBusleep()\fR function suspends the caller from execution for the number
-of microseconds specified by the \fIuseconds\fR argument. The actual suspension
+.Dd "Aug 16, 2014"
+.Dt USLEEP 3C
+.Os
+.Sh NAME
+.Nm usleep
+.Nd suspend execution for interval in microseconds
+.Sh SYNOPSIS
+.In unistd.h
+.Ft int
+.Fn usleep "useconds_t useconds"
+.Sh DESCRIPTION
+The
+.Fn usleep
+function suspends the caller from execution for the number
+of microseconds specified by the
+.Fa useconds
+argument. The actual suspension
 time might be less than requested because any caught signal will terminate
-\fBusleep()\fR following execution of that signal's catching routine. The
+.Fn usleep
+following execution of that signal's catching routine. The
 suspension time might be longer than requested by an arbitrary amount because
 of the scheduling of other activity in the system.
-.sp
-.LP
-If the value of \fIuseconds\fR is 0, then the call has no effect.
-.sp
-.LP
-The use of the \fBusleep()\fR function has no effect on the action or blockage
+.Lp
+If the value of
+.Fa useconds
+is 0, then the call has no effect.
+.Lp
+The use of the
+usleep
+function has no effect on the action or blockage
 of any signal. In a multithreaded process, only the invoking thread is
 suspended from execution.
-.SH RETURN VALUES
-.sp
-.LP
-On completion, \fBusleep()\fR returns \fB0\fR. There are no error returns.
-.SH ERRORS
-.sp
-.LP
+.Sh RETURN VALUES
+On completion,
+.Fn usleep
+returns 0. There are no error returns.
+.Sh ERRORS
 No errors are returned.
-.SH USAGE
-.sp
-.LP
-The \fBusleep()\fR function is included for its historical usage.  The
-\fBnanosleep\fR(3C) function is preferred over this function.
-.SH ATTRIBUTES
-.sp
-.LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Interface Stability	Committed
-_
-MT-Level	Safe
-_
-Standard	See \fBstandards\fR(5).
-.TE
-
-.SH SEE ALSO
-.sp
-.LP
-\fBnanosleep\fR(3C), \fBsleep\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)
+.Sh USAGE
+The
+.Fn usleep
+function is included for its historical usage and is Obsolete.  The
+.Xr nanosleep 3C
+function is preferred over this function.
+.Sh INTERFACE STABILITY
+.Sy Obsolete Standard .
+.Sh MT-LEVEL
+.Sy Safe .
+.Sh SEE ALSO
+.Xr nanosleep 3C ,
+.Xr sleep 3C ,
+.Xr unistd.h 3HEAD ,
+.Xr standards 5
+.Sh STANDARDS
+The
+.Fn usleep
+function is available in the following compilation environments.  See
+.Xr standards 5 .
+.Lp
+.Bl -bullet -compact
+.It
+.St -xpg4.2
+.It
+.St -susv2
+.It
+.St -susv3
+.El
+.Lp
+It is marked obsolete in
+.St -susv3 , and was removed from
+.St -p1003.1-2008 .

@@ -9,7 +9,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH MAILX 1 "Sep 19, 2001"
+.TH MAILX 1 "Dec 18, 2014"
 .SH NAME
 mailx \- interactive message processing system
 .SH SYNOPSIS
@@ -36,7 +36,6 @@ mailx \- interactive message processing system
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The mail utilities listed above provide a comfortable, flexible environment for
 sending and receiving mail messages electronically.
@@ -64,7 +63,6 @@ the secondary file can then be read or otherwise processed using the same
 \fBCommands\fR as in the primary \fBmailbox\fR. This gives rise within these
 pages to the notion of a current \fBmailbox\fR.
 .SH OPTIONS
-.sp
 .LP
 On the command line options start with a dash (\(mi). Any other arguments are
 taken to be destinations (recipients). If no recipients are specified,
@@ -294,7 +292,6 @@ Interpret tilde escapes in the input even if not reading from a tty.
 .RE
 
 .SH OPERANDS
-.sp
 .LP
 The following operands are supported:
 .sp
@@ -308,7 +305,6 @@ Addressee of message.
 
 .SH USAGE
 .SS "Starting Mail"
-.sp
 .LP
 At startup time, \fBmailx\fR executes the system startup file
 \fB/etc/mail/mailx.rc\fR. If invoked as \fBmail\fR or \fBMail\fR, the system
@@ -380,7 +376,6 @@ temporary file. Commands may be entered by beginning a line with the tilde (~)
 escape character followed by a single command letter and optional arguments.
 See \fBTilde Escapes\fR for a summary of these commands.
 .SS "Reading Mail"
-.sp
 .LP
 Each message is assigned a sequential number, and there is at any time the
 notion of a current message, marked by a right angle bracket (>) in the header
@@ -544,20 +539,23 @@ command involved. Filenames, where expected, are expanded using the normal
 shell conventions (see \fBsh\fR(1)). Special characters are recognized by
 certain commands and are documented with the commands below.
 .SS "Sending Mail"
-.sp
 .LP
 Recipients listed on the command line may be of three types: login names, shell
 commands, or alias groups. Login names may be any network address, including
 mixed network addressing. If mail is found to be undeliverable, an attempt is
-made to return it to the sender's \fBmailbox\fR. If the recipient name begins
-with a pipe symbol ( | ), the rest of the name is taken to be a shell command
-to pipe the message through. This provides an automatic interface with any
-program that reads the standard input, such as \fBlp\fR(1) for recording
-outgoing mail on paper. Alias groups are set by the \fBa\fRlias command (see
-\fBCommands\fR below) or in a system startup file (for example,
-\fB$HOME/.mailrc\fR). Aliases are lists of recipients of any type.
-.SS "Forwarding Mail"
+made to return it to the sender's \fBmailbox\fR. If the \fBexpandaddr\fR option
+is not set (the default), then the following rules do not apply and the name of
+the recipient must be a local mailbox or network address. If the recipient name
+begins with a pipe symbol ( | ), the rest of the name is taken to be a shell
+command to pipe the message through. This provides an automatic interface with
+any program that reads the standard input, such as \fBlp\fR(1) for recording
+outgoing mail on paper.
 .sp
+.LP
+Alias groups are set by the \fBa\fRlias command (see \fBCommands\fR below) or in
+a system startup file (for example, \fB$HOME/.mailrc\fR). Aliases are lists of
+recipients of any type.
+.SS "Forwarding Mail"
 .LP
 To forward a specific message, include it in a message to the desired
 recipients with the \fB~f\fR or \fB~m\fR tilde escapes. See \fBTilde\fR
@@ -569,7 +567,6 @@ must be valid, or the messages will "bounce." You cannot, for instance, reroute
 your mail to a new host by forwarding it to your new address if it is not yet
 listed in the \fBNIS\fR aliases domain.
 .SS "Commands"
-.sp
 .LP
 Regular commands are of the form
 .sp
@@ -763,6 +760,18 @@ Echo the given strings (like \fBecho\fR(1)).
 Edit the given messages. Each message is placed in a temporary file and the
 program named by the \fBEDITOR\fR variable is invoked to edit it (see
 ENVIRONMENT VARIABLES). Default editor is \fBed\fR(1).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBexpandaddr\fR\fR
+.ad
+.sp .6
+.RS 4n
+Causes recipient addresses to be expanded based on the discussion in the section
+\fBSending Mail\fR. Note that enabling this option allows for addresses that can
+cause arbitrary command execution by starting with the \fB|\fR character.
 .RE
 
 .sp
@@ -1621,7 +1630,6 @@ Variables\fR).
 .RE
 
 .SS "Tilde Escapes"
-.sp
 .LP
 The following tilde escape commands can be used when composing mail to send.
 These may be entered only from \fIinput mode\fR, by beginning a line with the
@@ -1905,7 +1913,6 @@ replaces the message.
 .RE
 
 .SS "Internal Variables"
-.sp
 .LP
 The following variables are internal variables. They may be imported from the
 execution environment or set using the \fBse\fRt command at any time. The
@@ -2539,12 +2546,10 @@ the message is not sent.
 .RE
 
 .SS "Large File Behavior"
-.sp
 .LP
 See \fBlargefile\fR(5) for the description of the behavior of \fBmailx\fR when
 encountering files greater than or equal to 2 Gbyte ( 2^31 bytes).
 .SH ENVIRONMENT VARIABLES
-.sp
 .LP
 See \fBenviron\fR(5) for descriptions of the following environment variables
 that affect the execution of \fBmailx\fR: \fBHOME\fR, \fBLANG\fR,
@@ -2661,7 +2666,6 @@ The name of a preferred screen editor.  Default is \fBvi\fR(1).
 .RE
 
 .SH EXIT STATUS
-.sp
 .LP
 When the \fB-e\fR option is specified, the following exit values are returned:
 .sp
@@ -2706,7 +2710,6 @@ An error occurred
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB$HOME/.mailrc\fR\fR
@@ -2788,7 +2791,6 @@ post office directory
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -2804,7 +2806,6 @@ Interface Stability	Standard
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBbiff\fR(1B), \fBecho\fR(1), \fBed\fR(1), \fBex\fR(1), \fBfmt\fR(1),
 \fBlp\fR(1), \fBls\fR(1), \fBmail\fR(1), \fBmail\fR(1B), \fBmailcompat\fR(1),
@@ -2813,7 +2814,6 @@ Interface Stability	Standard
 \fBpasswd\fR(4), \fBattributes\fR(5), \fBenviron\fR(5), \fBlargefile\fR(5),
 \fBstandards\fR(5)
 .SH NOTES
-.sp
 .LP
 Where \fIshell-command\fR is shown as valid, arguments are not always allowed.
 Experimentation is recommended.

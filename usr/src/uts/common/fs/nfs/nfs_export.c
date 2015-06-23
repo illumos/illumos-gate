@@ -18,7 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -49,6 +51,7 @@
 #include <sys/utsname.h>
 #include <sys/sdt.h>
 #include <netinet/in.h>
+#include <sys/avl.h>
 
 #include <rpc/types.h>
 #include <rpc/auth.h>
@@ -797,6 +800,7 @@ int
 nfs_exportinit(void)
 {
 	int error;
+	int i;
 
 	rw_init(&exported_lock, NULL, RW_DEFAULT, NULL);
 
@@ -826,6 +830,18 @@ nfs_exportinit(void)
 		return (error);
 	}
 
+	/*
+	 * Initialize auth cache and auth cache lock
+	 */
+	for (i = 0; i < AUTH_TABLESIZE; i++) {
+		exi_root->exi_cache[i] = kmem_alloc(sizeof (avl_tree_t),
+		    KM_SLEEP);
+		avl_create(exi_root->exi_cache[i], nfsauth_cache_clnt_compar,
+		    sizeof (struct auth_cache_clnt),
+		    offsetof(struct auth_cache_clnt, authc_link));
+	}
+	rw_init(&exi_root->exi_cache_lock, NULL, RW_DEFAULT, NULL);
+
 	/* setup the fhandle template */
 	exi_root->exi_fh.fh_fsid = rootdir->v_vfsp->vfs_fsid;
 	exi_root->exi_fh.fh_xlen = exi_rootfid.fid_len;
@@ -851,12 +867,19 @@ nfs_exportinit(void)
 void
 nfs_exportfini(void)
 {
+	int i;
+
 	/*
 	 * Deallocate the place holder for the public file handle.
 	 */
 	srv_secinfo_list_free(exi_root->exi_export.ex_secinfo,
 	    exi_root->exi_export.ex_seccnt);
 	mutex_destroy(&exi_root->exi_lock);
+	rw_destroy(&exi_root->exi_cache_lock);
+	for (i = 0; i < AUTH_TABLESIZE; i++) {
+		avl_destroy(exi_root->exi_cache[i]);
+		kmem_free(exi_root->exi_cache[i], sizeof (avl_tree_t));
+	}
 	kmem_free(exi_root, sizeof (*exi_root));
 
 	rw_destroy(&exported_lock);
@@ -1170,8 +1193,14 @@ exportfs(struct exportfs_args *args, model_t model, cred_t *cr)
 	exi->exi_dvp = dvp;
 
 	/*
-	 * Initialize auth cache lock
+	 * Initialize auth cache and auth cache lock
 	 */
+	for (i = 0; i < AUTH_TABLESIZE; i++) {
+		exi->exi_cache[i] = kmem_alloc(sizeof (avl_tree_t), KM_SLEEP);
+		avl_create(exi->exi_cache[i], nfsauth_cache_clnt_compar,
+		    sizeof (struct auth_cache_clnt),
+		    offsetof(struct auth_cache_clnt, authc_link));
+	}
 	rw_init(&exi->exi_cache_lock, NULL, RW_DEFAULT, NULL);
 
 	/*
@@ -1587,7 +1616,13 @@ out1:
 		VN_RELE(dvp);
 	mutex_destroy(&exi->exi_lock);
 	rw_destroy(&exi->exi_cache_lock);
+	for (i = 0; i < AUTH_TABLESIZE; i++) {
+		avl_destroy(exi->exi_cache[i]);
+		kmem_free(exi->exi_cache[i], sizeof (avl_tree_t));
+	}
+
 	kmem_free(exi, sizeof (*exi));
+
 	return (error);
 }
 
@@ -2071,7 +2106,7 @@ makefh3(nfs_fh3 *fh, vnode_t *vp, struct exportinfo *exi)
 	fid_t fid;
 
 	bzero(&fid, sizeof (fid));
-	fid.fid_len = MAXFIDSZ;
+	fid.fid_len = sizeof (fh->fh3_data);
 	error = VOP_FID(vp, &fid, NULL);
 	if (error)
 		return (EREMOTE);
@@ -2080,12 +2115,16 @@ makefh3(nfs_fh3 *fh, vnode_t *vp, struct exportinfo *exi)
 	fh->fh3_fsid = exi->exi_fsid;
 	fh->fh3_len = fid.fid_len;
 	bcopy(fid.fid_data, fh->fh3_data, fh->fh3_len);
+
 	fh->fh3_xlen = exi->exi_fid.fid_len;
+	ASSERT(fh->fh3_xlen <= sizeof (fh->fh3_xdata));
 	bcopy(exi->exi_fid.fid_data, fh->fh3_xdata, fh->fh3_xlen);
-	fh->fh3_length = sizeof (fsid_t)
-	    + sizeof (ushort_t) + fh->fh3_len
-	    + sizeof (ushort_t) + fh->fh3_xlen;
+
+	fh->fh3_length = sizeof (fh->fh3_fsid)
+	    + sizeof (fh->fh3_len) + fh->fh3_len
+	    + sizeof (fh->fh3_xlen) + fh->fh3_xlen;
 	fh->fh3_flags = 0;
+
 	return (0);
 }
 
@@ -2188,6 +2227,7 @@ makefh4(nfs_fh4 *fh, vnode_t *vp, struct exportinfo *exi)
 
 	bzero(fh_fmtp->fh4_i.fhx_data, sizeof (fh_fmtp->fh4_i.fhx_data));
 	bzero(fh_fmtp->fh4_i.fhx_xdata, sizeof (fh_fmtp->fh4_i.fhx_xdata));
+	ASSERT(exi->exi_fh.fh_xlen <= sizeof (fh_fmtp->fh4_i.fhx_xdata));
 	bcopy(exi->exi_fh.fh_xdata, fh_fmtp->fh4_i.fhx_xdata,
 	    exi->exi_fh.fh_xlen);
 
@@ -2275,33 +2315,6 @@ nfs_fhtovp(fhandle_t *fh, struct exportinfo *exi)
 }
 
 /*
- * Convert an fhandle into a vnode.
- * Uses the file id (fh_len + fh_data) in the fhandle to get the vnode.
- * WARNING: users of this routine must do a VN_RELE on the vnode when they
- * are done with it.
- * This is just like nfs_fhtovp() but without the exportinfo argument.
- */
-
-vnode_t *
-lm_fhtovp(fhandle_t *fh)
-{
-	register vfs_t *vfsp;
-	vnode_t *vp;
-	int error;
-
-	vfsp = getvfs(&fh->fh_fsid);
-	if (vfsp == NULL)
-		return (NULL);
-
-	error = VFS_VGET(vfsp, &vp, (fid_t *)&(fh->fh_len));
-	VFS_RELE(vfsp);
-	if (error || vp == NULL)
-		return (NULL);
-
-	return (vp);
-}
-
-/*
  * Convert an nfs_fh3 into a vnode.
  * Uses the file id (fh_len + fh_data) in the file handle to get the vnode.
  * WARNING: users of this routine must do a VN_RELE on the vnode when they
@@ -2337,40 +2350,6 @@ nfs3_fhtovp(nfs_fh3 *fh, struct exportinfo *exi)
 	fidp = FH3TOFIDP(fh);
 
 	error = VFS_VGET(vfsp, &vp, fidp);
-	if (error || vp == NULL)
-		return (NULL);
-
-	return (vp);
-}
-
-/*
- * Convert an nfs_fh3 into a vnode.
- * Uses the file id (fh_len + fh_data) in the file handle to get the vnode.
- * WARNING: users of this routine must do a VN_RELE on the vnode when they
- * are done with it.
- * BTW: This is just like nfs3_fhtovp() but without the exportinfo arg.
- * Also, vfsp is accessed through getvfs() rather using exportinfo !!
- */
-
-vnode_t *
-lm_nfs3_fhtovp(nfs_fh3 *fh)
-{
-	vfs_t *vfsp;
-	vnode_t *vp;
-	int error;
-	fid_t *fidp;
-
-	if (fh->fh3_length < NFS3_OLDFHSIZE ||
-	    fh->fh3_length > NFS3_MAXFHSIZE)
-		return (NULL);
-
-	vfsp = getvfs(&fh->fh3_fsid);
-	if (vfsp == NULL)
-		return (NULL);
-	fidp = FH3TOFIDP(fh);
-
-	error = VFS_VGET(vfsp, &vp, fidp);
-	VFS_RELE(vfsp);
 	if (error || vp == NULL)
 		return (NULL);
 
@@ -2539,6 +2518,7 @@ exportfree(struct exportinfo *exi)
 {
 	struct exportdata *ex;
 	struct charset_cache *cache;
+	int i;
 
 	ex = &exi->exi_export;
 
@@ -2586,6 +2566,15 @@ exportfree(struct exportinfo *exi)
 
 	mutex_destroy(&exi->exi_lock);
 	rw_destroy(&exi->exi_cache_lock);
+	/*
+	 * All nodes in the exi_cache AVL trees were removed and freed in the
+	 * nfsauth_cache_free() call above.  We will just destroy and free the
+	 * empty AVL trees here.
+	 */
+	for (i = 0; i < AUTH_TABLESIZE; i++) {
+		avl_destroy(exi->exi_cache[i]);
+		kmem_free(exi->exi_cache[i], sizeof (avl_tree_t));
+	}
 
 	kmem_free(exi, sizeof (*exi));
 }

@@ -22,6 +22,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2015 Nexenta Systems, Inc.
+ */
 
 /*
  * This file contains all the functions that implement the following
@@ -399,10 +402,15 @@ findroot(const grub_line_t *lp, grub_barg_t *barg)
 			return (EG_FINDROOTFMT);
 
 		++pos;
-		if (pos[0] != ',' ||
-		    !IS_SLCNUM_VALID(barg->gb_slcnum = pos[1]) ||
-		    pos[2] != ')')
-			return (EG_FINDROOTFMT);
+		/*
+		 * check the slice only when its presented
+		 */
+		if (pos[0] != ')') {
+			if (pos[0] != ',' ||
+			    !IS_SLCNUM_VALID(barg->gb_slcnum = pos[1]) ||
+			    pos[2] != ')')
+				return (EG_FINDROOTFMT);
+		}
 	} else {
 		sz = strlen(sign);
 	}

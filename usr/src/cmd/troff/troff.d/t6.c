@@ -37,11 +37,9 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * t6.c
- * 
+ *
  * width functions, sizes and fonts
  */
 
@@ -98,7 +96,7 @@ tchar j;
 	if (sfbits(j) == oldbits) {
 		xfont = pfont;
 		xpts = ppts;
-	} else 
+	} else
 		xbits(j, 0);
 	if (widcache[i-32].fontpts == (xfont<<8) + xpts && !setwdf)
 		k = widcache[i-32].width;
@@ -186,8 +184,8 @@ int	i;
 	if (cs = cstab[xfont]) {
 		nocache = 1;
 		if (ccs = ccstab[xfont])
-			x = ccs; 
-		else 
+			x = ccs;
+		else
 			x = xpts;
 		cs = (cs * EMPTS(x)) / 36;
 	}
@@ -472,7 +470,7 @@ int	a;
 
 	if (a)
 		i = getrq();
-	else 
+	else
 		i = getsn();
 	if (!i || i == 'P') {
 		j = font1;
@@ -500,7 +498,7 @@ setwd()
 	int	delim, emsz, k;
 	int	savhp, savapts, savapts1, savfont, savfont1, savpts, savpts1;
 
-	base = numtab[ST].val = numtab[ST].val = wid = numtab[CT].val = 0;
+	base = numtab[ST].val = wid = numtab[CT].val = 0;
 	if (ismot(i = getch()))
 		return (0);
 	delim = cbits(i);
@@ -525,7 +523,7 @@ setwd()
 				k = -k;
 			base -= k;
 			emsz = 0;
-		} else 
+		} else
 			continue;
 		if (base < numtab[SB].val)
 			numtab[SB].val = base;
@@ -640,7 +638,7 @@ tchar i;
 				*pbp++ = k;
 				j = LIG_FF;
 			}
-		} else 
+		} else
 			j = LIG_FF;
 	} else {
 		*pbp++ = j;
@@ -718,8 +716,8 @@ char *truename;
 	fontbase[pos]->nwfont = n;	/* so can load a larger one again later */
 	close(k);
 	if (pos == smnt) {
-		smnt = 0; 
-		sbold = 0; 
+		smnt = 0;
+		sbold = 0;
 	}
 	if ((fontlab[pos] = f) == 'S')
 		smnt = pos;
@@ -776,7 +774,7 @@ bd0:
 	if (skip() || !(i = getrq()) || (j = findft(i)) == -1) {
 		if (k)
 			goto bd1;
-		else 
+		else
 			return (0);
 	}
 	if (j == smnt) {
@@ -810,7 +808,7 @@ casevs()
 	i = inumb(&lss);
 	if (nonumb)
 		i = lss1;
-	if (i < VERT) 
+	if (i < VERT)
 		i = VERT;
 	lss1 = lss;
 	lss = i;

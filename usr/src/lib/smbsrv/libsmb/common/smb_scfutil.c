@@ -21,9 +21,9 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
-
-#pragma ident	"@(#)smb_scfutil.c	1.5	08/07/30 SMI"
 
 /* helper functions for using libscf with CIFS */
 
@@ -49,12 +49,10 @@
 static void
 smb_smf_scf_log_error(char *msg)
 {
-	if (!msg) {
-		syslog(LOG_ERR, " SMBD SMF problem: %s\n",
-		    scf_strerror(scf_error()));
-	} else { /*LINTED E_SEC_PRINTF_E_VAR_FMT*/
-		syslog(LOG_ERR, msg, scf_strerror(scf_error()));
-	}
+	if (msg == NULL)
+		msg = "SMBD SMF problem";
+
+	syslog(LOG_ERR, " %s: %s", msg, scf_strerror(scf_error()));
 }
 
 /*

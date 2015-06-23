@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -254,6 +255,11 @@ smb_com_locking_andx(smb_request_t *sr)
 		return (SDRC_ERROR);
 	}
 	ofile = sr->fid_ofile;
+	if (ofile->f_node == NULL) {
+		smbsr_error(sr, NT_STATUS_INVALID_PARAMETER,
+		    ERRDOS, ERROR_INVALID_PARAMETER);
+		return (SDRC_ERROR);
+	}
 
 	if (lock_type & LOCKING_ANDX_SHARED_LOCK)
 		ltype = SMB_LOCK_TYPE_READONLY;

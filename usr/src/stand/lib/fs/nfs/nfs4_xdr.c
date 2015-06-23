@@ -19,12 +19,15 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ */
+
 /*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/salib.h>
 #include <rpc/types.h>
@@ -42,7 +45,7 @@ static bool_t
 xdr_b_utf8string(XDR *xdrs, utf8string *objp)
 {
 	return (xdr_bytes(xdrs, (char **)&objp->utf8string_val,
-		(uint_t *)&objp->utf8string_len, NFS4_MAX_UTF8STRING));
+	    (uint_t *)&objp->utf8string_len, NFS4_MAX_UTF8STRING));
 }
 
 static bool_t
@@ -50,7 +53,7 @@ xdr_nfs_bfh4(XDR *xdrs, struct nfs_bfh4 *objp)
 {
 	char *data = (char *)&objp->data;
 	return (xdr_bytes(xdrs, (char **)&data, (uint_t *)&objp->len,
-				NFS4_FHSIZE));
+	    NFS4_FHSIZE));
 }
 
 static bool_t
@@ -99,8 +102,8 @@ xdr_b_bitmap4(XDR *xdrs, b_bitmap4_t *objp)
 {
 	char *arp = (char *)&objp->b_bitmap_val;
 	return (xdr_array(xdrs, (char **)&arp,
-				(uint_t *)&objp->b_bitmap_len, ~0,
-				sizeof (uint_t), (xdrproc_t)xdr_u_int));
+	    (uint_t *)&objp->b_bitmap_len, ~0,
+	    sizeof (uint_t), (xdrproc_t)xdr_u_int));
 }
 
 static bool_t
@@ -108,7 +111,7 @@ xdr_b_stateid4(XDR *xdrs, stateid4 *objp)
 {
 	if (!xdr_u_int(xdrs, (uint_t *)&objp->seqid))
 		return (FALSE);
-	return (xdr_opaque(xdrs, objp->other, 12));
+	return (xdr_opaque(xdrs, objp->other, NFS4_OTHER_SIZE));
 }
 
 bool_t
@@ -141,12 +144,11 @@ xdr_b_getattr_res_common(XDR *xdrs, getattrres_cmn_t *objp)
 
 		bzero(&attrvals, sizeof (attrvals));
 		if (!xdr_bytes(xdrs, (char **)&ap,
-				(uint_t *)&objp->gc_attrlist_len,
-				sizeof (b_fattr4_t)))
+		    (uint_t *)&objp->gc_attrlist_len, sizeof (b_fattr4_t)))
 			return (FALSE);
 #ifdef DEBUG
 		printf("xdr_b_getattr_res_common: attrlist_len = %d\n",
-			objp->gc_attrlist_len);
+		    objp->gc_attrlist_len);
 #endif
 		/*
 		 * Go through the bitmap and see if the server
@@ -170,11 +172,11 @@ xdr_b_getattr_res_common(XDR *xdrs, getattrres_cmn_t *objp)
 
 #ifdef DEBUG
 			printf("xdr_b_getattr_res_common: bitmap1 = %d "
-				"			bitmap2 = %d\n",
-				bitmap1.word, bitmap2.word);
+			    "			bitmap2 = %d\n",
+			    bitmap1.word, bitmap2.word);
 #endif
 			xdrmem_create(&mxdrs, ap, objp->gc_attrlist_len,
-					XDR_DECODE);
+			    XDR_DECODE);
 
 			/*
 			 * Start with the first bitmap
@@ -182,7 +184,8 @@ xdr_b_getattr_res_common(XDR *xdrs, getattrres_cmn_t *objp)
 			if (bitmap1.word > 0) {
 				if (bitmap1.bm_supported_attrs) {
 					if (!xdr_b_bitmap4(&mxdrs,
-				(b_bitmap4_t *)&fattrp->b_supported_attrs))
+					    (b_bitmap4_t *)&fattrp->
+					    b_supported_attrs))
 						return (FALSE);
 				}
 
@@ -194,27 +197,32 @@ xdr_b_getattr_res_common(XDR *xdrs, getattrres_cmn_t *objp)
 				}
 				if (bitmap1.bm_fattr4_size) {
 					if (!xdr_u_longlong_t(&mxdrs,
-				(u_longlong_t *)&fattrp->b_fattr4_size))
+					    (u_longlong_t *)&fattrp->
+					    b_fattr4_size))
 						return (FALSE);
 				}
 
 				if (bitmap1.bm_fattr4_fsid) {
 					if (!xdr_u_longlong_t(&mxdrs,
-			(u_longlong_t *)&fattrp->b_fattr4_fsid.major))
+					    (u_longlong_t *)&fattrp->
+					    b_fattr4_fsid.major))
 						return (FALSE);
 
 					if (!xdr_u_longlong_t(&mxdrs,
-			(u_longlong_t *)&fattrp->b_fattr4_fsid.minor))
+					    (u_longlong_t *)&fattrp->
+					    b_fattr4_fsid.minor))
 						return (FALSE);
 				}
 				if (bitmap1.bm_fattr4_filehandle) {
 					if (!xdr_nfs_bfh4(&mxdrs,
-		(struct nfs_bfh4 *)&fattrp->b_fattr4_filehandle))
+					    (struct nfs_bfh4 *)&fattrp->
+					    b_fattr4_filehandle))
 						return (FALSE);
 				}
 				if (bitmap1.bm_fattr4_fileid) {
 					if (!xdr_u_longlong_t(&mxdrs,
-			(u_longlong_t *)&fattrp->b_fattr4_fileid))
+					    (u_longlong_t *)&fattrp->
+					    b_fattr4_fileid))
 						return (FALSE);
 				}
 			}
@@ -224,35 +232,41 @@ xdr_b_getattr_res_common(XDR *xdrs, getattrres_cmn_t *objp)
 			 */
 			if (bitmap2.word > 0) {
 				if (bitmap2.bm_fattr4_mode) {
-					if (!xdr_u_int(&mxdrs,
-				(uint_t *)&objp->gc_attrs.b_fattr4_mode))
+					if (!xdr_u_int(&mxdrs, (uint_t *)&objp->
+					    gc_attrs.b_fattr4_mode))
 						return (FALSE);
 				}
 
 				if (bitmap2.bm_fattr4_time_access) {
 					if (!xdr_longlong_t(&mxdrs,
-		(longlong_t *)&objp->gc_attrs.b_fattr4_time_access.seconds))
+					    (longlong_t *)&objp->gc_attrs.
+					    b_fattr4_time_access.seconds))
 						return (FALSE);
 					if (!xdr_u_int(&mxdrs,
-		(uint_t *)&objp->gc_attrs.b_fattr4_time_access.nseconds))
+					    (uint_t *)&objp->gc_attrs.
+					    b_fattr4_time_access.nseconds))
 						return (FALSE);
 				}
 
 				if (bitmap2.bm_fattr4_time_metadata) {
 					if (!xdr_longlong_t(&mxdrs,
-		(longlong_t *)&objp->gc_attrs.b_fattr4_time_metadata.seconds))
+					    (longlong_t *)&objp->gc_attrs.
+					    b_fattr4_time_metadata.seconds))
 						return (FALSE);
 					if (!xdr_u_int(&mxdrs,
-		(uint_t *)&objp->gc_attrs.b_fattr4_time_metadata.nseconds))
+					    (uint_t *)&objp->gc_attrs.
+					    b_fattr4_time_metadata.nseconds))
 						return (FALSE);
 				}
 
 				if (bitmap2.bm_fattr4_time_modify) {
 					if (!xdr_longlong_t(&mxdrs,
-		(longlong_t *)&objp->gc_attrs.b_fattr4_time_modify.seconds))
+					    (longlong_t *)&objp->gc_attrs.
+					    b_fattr4_time_modify.seconds))
 						return (FALSE);
 					if (!xdr_u_int(&mxdrs,
-		(uint_t *)&objp->gc_attrs.b_fattr4_time_modify.nseconds))
+					    (uint_t *)&objp->gc_attrs.
+					    b_fattr4_time_modify.nseconds))
 						return (FALSE);
 				}
 			}
@@ -267,7 +281,7 @@ xdr_getattr4_res(XDR *xdrs, getattr4res_t *objp)
 	if (!xdr_b_compound_res(xdrs, (b_compound_t *)&objp->gr_res))
 		return (FALSE);
 	return (xdr_b_getattr_res_common(xdrs,
-					(getattrres_cmn_t *)&objp->gr_cmn));
+	    (getattrres_cmn_t *)&objp->gr_cmn));
 }
 
 bool_t
@@ -295,7 +309,7 @@ xdr_lookup4_res(XDR *xdrs, lookup4res_t *objp)
 		return (FALSE);
 	if (objp->lr_lookup_status == NFS4_OK) {
 		return (xdr_b_getattr_res_common(xdrs,
-					(getattrres_cmn_t *)&objp->lr_gcmn));
+		    (getattrres_cmn_t *)&objp->lr_gcmn));
 	}
 	return (TRUE);
 }
@@ -339,7 +353,7 @@ xdr_read4_res(XDR *xdrs, read4res_t *objp)
 		if (!xdr_bool(xdrs, (bool_t *)&objp->r_eof))
 			return (FALSE);
 		return (xdr_bytes(xdrs, (char **)&objp->r_data_val,
-					(uint_t *)&objp->r_data_len, ~0));
+		    (uint_t *)&objp->r_data_len, ~0));
 	}
 	return (TRUE);
 }
@@ -377,7 +391,7 @@ xdr_b_entry4(XDR *xdrs, b_entry4_t *objp)
 
 	bzero(&attrvals, sizeof (attrvals));
 	if (!xdr_bytes(xdrs, (char **)&ap, (uint_t *)&attrlen,
-			sizeof (b_fattr4_t)))
+	    sizeof (b_fattr4_t)))
 		return (FALSE);
 
 	/*
@@ -391,7 +405,7 @@ xdr_b_entry4(XDR *xdrs, b_entry4_t *objp)
 	if (!xdr_u_longlong_t(&mxdrs, (u_longlong_t *)&objp->b_fileid))
 		return (FALSE);
 	return (xdr_pointer(xdrs, (char **)&objp->b_nextentry,
-			sizeof (b_entry4_t), (xdrproc_t)xdr_b_entry4));
+	    sizeof (b_entry4_t), (xdrproc_t)xdr_b_entry4));
 }
 
 bool_t
@@ -407,7 +421,7 @@ xdr_readdir4_res(XDR *xdrs, readdir4res_t *objp)
 		if (!xdr_opaque(xdrs, objp->rd_cookieverf, NFS4_VERIFIER_SIZE))
 			return (FALSE);
 		if (!xdr_pointer(xdrs, (char **)&objp->rd_entries,
-				sizeof (b_entry4_t), (xdrproc_t)xdr_b_entry4))
+		    sizeof (b_entry4_t), (xdrproc_t)xdr_b_entry4))
 			return (FALSE);
 		return (xdr_bool(xdrs, &objp->rd_eof));
 	}

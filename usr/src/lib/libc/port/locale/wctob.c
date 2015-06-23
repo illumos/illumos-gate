@@ -1,4 +1,5 @@
 /*
+ * Copyright 2013 Garrett D'Amore <garrett@damore.org>
  * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2002-2004 Tim J. Robbins.
  * All rights reserved.
@@ -29,16 +30,24 @@
 #include <limits.h>
 #include <stdio.h>
 #include <wchar.h>
+#include <locale.h>
+#include <xlocale.h>
 #include "mblocal.h"
 
 int
-wctob(wint_t c)
+wctob_l(wint_t c, locale_t loc)
 {
 	static const mbstate_t initial = { 0 };
 	mbstate_t mbs = initial;
 	char buf[MB_LEN_MAX];
 
-	if (c == WEOF || __wcrtomb(buf, c, &mbs) != 1)
+	if (c == WEOF || wcrtomb_l(buf, c, &mbs, loc) != 1)
 		return (EOF);
 	return ((unsigned char)*buf);
+}
+
+int
+wctob(wint_t c)
+{
+	return (wctob_l(c, uselocale(NULL)));
 }

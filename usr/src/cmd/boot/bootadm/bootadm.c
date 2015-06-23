@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*
@@ -116,12 +116,15 @@ typedef struct {
 #define	ENTRY_INIT	-1	/* entryNum initial value */
 #define	ALL_ENTRIES	-2	/* selects all boot entries */
 
+#define	PARTNO_NOTFOUND -1	/* Solaris partition not found */
+#define	PARTNO_EFI	-2	/* EFI partition table found */
+
 #define	GRUB_DIR		"/boot/grub"
 #define	GRUB_STAGE2		GRUB_DIR "/stage2"
 #define	GRUB_MENU		"/boot/grub/menu.lst"
 #define	MENU_TMP		"/boot/grub/menu.lst.tmp"
 #define	GRUB_BACKUP_MENU	"/etc/lu/GRUB_backup_menu"
-#define	RAMDISK_SPECIAL		"/ramdisk"
+#define	RAMDISK_SPECIAL		"/dev/ramdisk/"
 #define	STUBBOOT		"/stubboot"
 #define	MULTIBOOT		"/platform/i86pc/multiboot"
 #define	GRUBSIGN_DIR		"/boot/grub/bootsign"
@@ -3466,7 +3469,8 @@ is_ramdisk(char *root)
 		return (0);
 	}
 
-	if (strstr(mnt.mnt_special, RAMDISK_SPECIAL) != NULL) {
+	if (strncmp(mnt.mnt_special, RAMDISK_SPECIAL,
+	    strlen(RAMDISK_SPECIAL)) == 0) {
 		if (bam_verbose)
 			bam_error(IS_RAMDISK, bam_root);
 		(void) fclose(fp);
@@ -4915,14 +4919,14 @@ create_diskmap(char *osroot)
 static int
 get_partition(char *device)
 {
-	int i, fd, is_pcfs, partno = -1;
+	int i, fd, is_pcfs, partno = PARTNO_NOTFOUND;
 	struct mboot *mboot;
 	char boot_sect[SECTOR_SIZE];
 	char *wholedisk, *slice;
 #ifdef i386
 	ext_part_t *epp;
 	uint32_t secnum, numsec;
-	int rval, pno, ext_partno = -1;
+	int rval, pno, ext_partno = PARTNO_NOTFOUND;
 #endif
 
 	/* form whole disk (p0) */
@@ -4978,6 +4982,11 @@ get_partition(char *device)
 				break;
 			}
 		} else {	/* look for solaris partition, old and new */
+			if (part->systid == EFI_PMBR) {
+				partno = PARTNO_EFI;
+				break;
+			}
+
 #ifdef i386
 			if ((part->systid == SUNIXOS &&
 			    (fdisk_is_linux_swap(epp, part->relsect,
@@ -4998,7 +5007,7 @@ get_partition(char *device)
 	}
 #ifdef i386
 	/* If no primary solaris partition, check extended partition */
-	if ((partno == -1) && (ext_partno != -1)) {
+	if ((partno == PARTNO_NOTFOUND) && (ext_partno != PARTNO_NOTFOUND)) {
 		rval = fdisk_get_solaris_part(epp, &pno, &secnum, &numsec);
 		if (rval == FDISK_SUCCESS) {
 			partno = pno - 1;
@@ -5071,13 +5080,18 @@ get_grubroot(char *osroot, char *osdev, char *menu_root)
 	}
 
 	fdiskpart = get_partition(osdev);
-	INJECT_ERROR1("GRUBROOT_FDISK_FAIL", fdiskpart = -1);
-	if (fdiskpart == -1) {
+	INJECT_ERROR1("GRUBROOT_FDISK_FAIL", fdiskpart = PARTNO_NOTFOUND);
+	if (fdiskpart == PARTNO_NOTFOUND) {
 		bam_error(FDISKPART_FAIL, osdev);
 		return (NULL);
 	}
 
 	grubroot = s_calloc(1, 10);
+	if (fdiskpart == PARTNO_EFI) {
+		fdiskpart = atoi(&slice[1]);
+		slice = NULL;
+	}
+
 	if (slice) {
 		(void) snprintf(grubroot, 10, "(hd%s,%d,%c)",
 		    grubhd, fdiskpart, slice[1] + 'a' - '0');
@@ -7102,14 +7116,19 @@ get_grubsign(char *osroot, char *osdev)
 		bam_print(GRUBSIGN_FOUND_OR_CREATED, sign, osdev);
 
 	fdiskpart = get_partition(osdev);
-	INJECT_ERROR1("GET_GRUBSIGN_FDISK", fdiskpart = -1);
-	if (fdiskpart == -1) {
+	INJECT_ERROR1("GET_GRUBSIGN_FDISK", fdiskpart = PARTNO_NOTFOUND);
+	if (fdiskpart == PARTNO_NOTFOUND) {
 		bam_error(FDISKPART_FAIL, osdev);
 		free(sign);
 		return (NULL);
 	}
 
 	slice = strrchr(osdev, 's');
+
+	if (fdiskpart == PARTNO_EFI) {
+		fdiskpart = atoi(&slice[1]);
+		slice = NULL;
+	}
 
 	grubsign = s_calloc(1, MAXNAMELEN + 10);
 	if (slice) {

@@ -176,7 +176,7 @@ restart:
 		ret = -ENOMEM;
 		goto out;
 	}
-	atomic_add_32(&conn->c_senders, 1);
+	atomic_inc_32(&conn->c_senders);
 
 	if (conn->c_trans->xmit_prepare)
 		conn->c_trans->xmit_prepare(conn);
@@ -567,7 +567,7 @@ rdsv3_send_get_message(struct rdsv3_connection *conn,
 
 	RDSV3_FOR_EACH_LIST_NODE_SAFE(rm, tmp, &conn->c_retrans, m_conn_item) {
 		if (rm->m_rdma_op == op) {
-			atomic_add_32(&rm->m_refcount, 1);
+			atomic_inc_32(&rm->m_refcount);
 			found = rm;
 			goto out;
 		}
@@ -576,7 +576,7 @@ rdsv3_send_get_message(struct rdsv3_connection *conn,
 	RDSV3_FOR_EACH_LIST_NODE_SAFE(rm, tmp, &conn->c_send_queue,
 	    m_conn_item) {
 		if (rm->m_rdma_op == op) {
-			atomic_add_32(&rm->m_refcount, 1);
+			atomic_inc_32(&rm->m_refcount);
 			found = rm;
 			break;
 		}

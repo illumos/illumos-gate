@@ -20,6 +20,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -42,8 +44,6 @@
 
 #ifndef	_ISO_LOCALE_ISO_H
 #define	_ISO_LOCALE_ISO_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/feature_tests.h>
 
@@ -107,13 +107,8 @@ struct lconv {
 #endif
 #endif
 
-#if	defined(__STDC__)
 extern char	*setlocale(int, const char *);
 extern struct lconv *localeconv(void);
-#else
-extern char   *setlocale();
-extern struct lconv	*localeconv();
-#endif
 
 #if __cplusplus >= 199711L
 }

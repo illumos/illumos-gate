@@ -41,10 +41,11 @@ CDDL HEADER END
 	    <service_fmri value='svc:/application/print/server' />
 	</dependency>
 
+	<!-- Change /usr/apache2/... if Apache 2.x is elsewhere. -->
 	<exec_method
 	    type='method'
 	    name='start'
-	    exec='/usr/apache/bin/httpd -f /etc/apache/httpd-standalone-ipp.conf'
+	    exec='/usr/apache2/2.2/bin/httpd -f /etc/lp/ipp/httpd-standalone-ipp.conf'
 	    timeout_seconds='10' />
 
 	<exec_method

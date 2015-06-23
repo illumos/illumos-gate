@@ -20,8 +20,6 @@
  * CDDL HEADER END
  */
 /*
- * ident	"%Z%%M%	%I%	%E% SMI"
- *
  * Copyright (c) 1999-2000 by Sun Microsystems, Inc.
  * All rights reserved.
  */
@@ -41,7 +39,7 @@
      * increments/decrements. (It is up to the listener to decide the
      * increment/decrement corresponding to large/small.) Moreover, these
      * notifications will be sent out much faster if the button is kept
-     * pressed. 
+     * pressed.
      */
 
     // The panel waits for a period of BIG_SLEEP_TIME before the faster
@@ -52,30 +50,30 @@
     // every time it wakes up.
 
     public class DCPanel extends Panel {
-  
+
     private Button plusButton;
     private Button minusButton;
-  
+
     private DCListener listener = null;
 
     private Timer bigTimer;
     private Timer smallTimer;
 
-    private static int BIG_SLEEP_TIME   = 1000;
+    private static int BIG_SLEEP_TIME	= 1000;
     private static int SMALL_SLEEP_TIME = 100;
-  
+
     private boolean incrementFlag;
 
     public DCPanel() {
 
     setLayout(new GridLayout(1, 2));
-    
-    bigTimer     = new BigTimer();
-    smallTimer   = new SmallTimer();
-    
+
+    bigTimer	 = new BigTimer();
+    smallTimer	 = new SmallTimer();
+
     bigTimer.start();
     smallTimer.start();
-    
+
     plusButton = new DCButton("+");
     minusButton = new DCButton("-");
 
@@ -90,7 +88,7 @@
      * of going to a text field.
      * @return false always.
      */
-    public boolean isFocusTraversable() {
+    public boolean isFocusable() {
     return false;
     }
 
@@ -138,29 +136,29 @@
     private void informListener(boolean bigFlag) {
     // System.out.println("DCPanel.informListener: " + bigFlag);
 
-        if (listener != null) {
+	if (listener != null) {
 
-            if (bigFlag) {
+	    if (bigFlag) {
 	    // request a big change
 	    if (incrementFlag)
-	        listener.bigIncrement();
-	    else 
-	        listener.bigDecrement();
-            } else {
+		listener.bigIncrement();
+	    else
+		listener.bigDecrement();
+	    } else {
 	    // request a small change
 	    if (incrementFlag)
-	        listener.increment();
-	    else 
-	        listener.decrement();
-            }
+		listener.increment();
+	    else
+		listener.decrement();
+	    }
 
-        }
-      
+	}
+
     } // informListener
 
 
     // ***********************************************
-    // 	 I N N E R    C L A S S E S   F O L L O W
+    //	 I N N E R    C L A S S E S   F O L L O W
     // ***********************************************
 
     /**
@@ -175,7 +173,7 @@
      * loops forever like this.
      */
     public void run() {
-        while (true) {
+	while (true) {
 	try {
 	  synchronized (this) {
 	    running = false;
@@ -185,7 +183,7 @@
 	  }
 	  doTask();
 	} catch (InterruptedException e) {}
-        } // while loop
+	} // while loop
     } // run method
 
     protected void doTask() {} // bug in java workshop
@@ -194,16 +192,16 @@
      * Wakes up the timer.
      */
     public synchronized void request() {
-        notify();
+	notify();
     }
 
     /**
      * Cancels the timer if it is running.
      */
     public void cancel() {
-        if (running) {
+	if (running) {
 	interrupt();
-        }
+	}
     }
 
     }// class Timer
@@ -220,13 +218,13 @@
      * done, schedule the smaller (faster) timer from this point on.
      */
     protected void doTask() {
-        try {
+	try {
 	sleep(BIG_SLEEP_TIME);
 	informListener(true);
 	smallTimer.request();
-        } catch (InterruptedException e) {
+	} catch (InterruptedException e) {
 	informListener(false);
-        }
+	}
     }
 
     } // class BigTimer
@@ -240,13 +238,13 @@
     private class SmallTimer extends Timer {
 
     protected void doTask() {
-        try {
+	try {
 	// loop forever and keep rescheduling yourself
 	while (true) {
 	  sleep(SMALL_SLEEP_TIME);
 	  informListener(true);
 	    }
-        } catch (InterruptedException e) {}
+	} catch (InterruptedException e) {}
     } // doTask method
 
     } // class SmallTimer
@@ -262,47 +260,47 @@
     /**
      * Constructor for DCMouseListener.
      * @param plusOrMinus true if this is a listener for the plus
-     *     button, false if it is for the minus button.
+     *	   button, false if it is for the minus button.
      */
     public DCMouseListener(boolean plusOrMinus) {
-        this.plusOrMinus = plusOrMinus;
+	this.plusOrMinus = plusOrMinus;
     }
 
     /**
      * Kicks in when the mouse is pressed.
      */
     public void mousePressed(MouseEvent e) {
-        incrementFlag = plusOrMinus;
-        DCPanel.this.startAction();
+	incrementFlag = plusOrMinus;
+	DCPanel.this.startAction();
     }
 
     /**
      * Kicks in when the mouse is released.
      */
     public void mouseReleased(MouseEvent e) {
-        incrementFlag = plusOrMinus;
-        DCPanel.this.stopAction();
-        }
-    } 
+	incrementFlag = plusOrMinus;
+	DCPanel.this.stopAction();
+	}
+    }
 
     /**
      * The button used by this DCPanel.
-     */  
+     */
     private class DCButton extends Button {
     public DCButton(String text) {
-        super(text);
-        if (text.equals("+"))
-           addMouseListener(new DCMouseListener(true));
-        else
-        addMouseListener(new DCMouseListener(false));
+	super(text);
+	if (text.equals("+"))
+	   addMouseListener(new DCMouseListener(true));
+	else
+	addMouseListener(new DCMouseListener(false));
     }
 
     /**
      * Make the button non-focus traversable so that it cannot be
      * tabbed in to.
      */
-    public boolean isFocusTraversable() {
-        return false;
+    public boolean isFocusable() {
+	return false;
     }
 
     } // DCButton
@@ -317,5 +315,5 @@
     f.setBounds(new Rectangle(100, 100, 100, 100));
     f.setVisible(true);
     }
-  
+
 }

@@ -1687,9 +1687,9 @@ skip:
 		 */
 		if (p->p_pool != pool) {
 			ASSERT(p->p_pool->pool_ref > 0);
-			atomic_add_32(&p->p_pool->pool_ref, -1);
+			atomic_dec_32(&p->p_pool->pool_ref);
 			p->p_pool = pool;
-			atomic_add_32(&p->p_pool->pool_ref, 1);
+			atomic_inc_32(&p->p_pool->pool_ref);
 		}
 		/*
 		 * Okay, we've tortured this guy enough.

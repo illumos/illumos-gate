@@ -2615,7 +2615,8 @@ igb_init_unicst(igb_t *igb)
 	} else {
 		/* Re-configure the RAR registers */
 		for (slot = 0; slot < igb->unicst_total; slot++) {
-			e1000_rar_set_vmdq(hw, igb->unicst_addr[slot].mac.addr,
+			(void) e1000_rar_set_vmdq(hw,
+			    igb->unicst_addr[slot].mac.addr,
 			    slot, igb->vmdq_mode,
 			    igb->unicst_addr[slot].mac.group_index);
 		}
@@ -2660,7 +2661,7 @@ igb_unicst_set(igb_t *igb, const uint8_t *mac_addr,
 	/*
 	 * Set the unicast address to the RAR register
 	 */
-	e1000_rar_set(hw, (uint8_t *)mac_addr, slot);
+	(void) e1000_rar_set(hw, (uint8_t *)mac_addr, slot);
 
 	if (igb_check_acc_handle(igb->osdep.reg_handle) != DDI_FM_OK) {
 		ddi_fm_service_impact(igb->dip, DDI_SERVICE_DEGRADED);

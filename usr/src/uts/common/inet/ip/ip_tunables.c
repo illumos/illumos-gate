@@ -666,7 +666,7 @@ mod_prop_info_t ip_propinfo_tbl[] = {
 
 	{ "_ipsec_policy_log_interval", MOD_PROTO_IP,
 	    mod_set_uint32, mod_get_uint32,
-	    {0, 999999, 1000}, {1000} },
+	    {0, 999999, 0}, {0} },
 
 	/* tunable - 40 */
 	{ "_pim_accept_clear_messages", MOD_PROTO_IP,

@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/param.h>
@@ -61,13 +62,6 @@
 #define	SMB_ADS_COMPUTER_NUM_ATTR 8
 #define	SMB_ADS_SHARE_NUM_ATTR 3
 #define	SMB_ADS_SITE_MAX MAXHOSTNAMELEN
-
-/*
- * [MS-DISO] A machine password is an ASCII string of randomly chosen
- * characters. Each character's ASCII code is between 32 and 122 inclusive.
- */
-#define	SMB_ADS_PWD_CHAR_NUM	91
-#define	SMB_ADS_PWD_CHAR_START	32
 
 #define	SMB_ADS_MSDCS_SRV_DC_RR		"_ldap._tcp.dc._msdcs"
 #define	SMB_ADS_MSDCS_SRV_SITE_RR	"_ldap._tcp.%s._sites.dc._msdcs"
@@ -209,7 +203,6 @@ static smb_ads_qstat_t smb_ads_lookup_computer_n_attr(smb_ads_handle_t *,
     smb_ads_avpair_t *, int, char *);
 static int smb_ads_update_computer_cntrl_attr(smb_ads_handle_t *, int, char *);
 static krb5_kvno smb_ads_lookup_computer_attr_kvno(smb_ads_handle_t *, char *);
-static int smb_ads_gen_machine_passwd(char *, size_t);
 static void smb_ads_free_cached_host(void);
 static int smb_ads_alloc_attr(LDAPMod **, int);
 static void smb_ads_free_attr(LDAPMod **);
@@ -560,18 +553,18 @@ smb_ads_decode_host_ip(int addit_cnt, int ans_cnt, uchar_t **ptr,
 		/* LINTED: E_CONSTANT_CONDITION */
 		NS_GET16(size, *ptr);
 
-		if (size == INADDRSZ) {
+		if (size == NS_INADDRSZ) {
 			/* LINTED: E_CONSTANT_CONDITION */
 			NS_GET32(ipaddr.a_ipv4, *ptr);
 			ipaddr.a_ipv4 = htonl(ipaddr.a_ipv4);
 			ipaddr.a_family = AF_INET;
-		} else if (size == IN6ADDRSZ) {
+		} else if (size == NS_IN6ADDRSZ) {
 #ifdef BIG_ENDIAN
-			bcopy(*ptr, &ipaddr.a_ipv6, IN6ADDRSZ);
+			bcopy(*ptr, &ipaddr.a_ipv6, NS_IN6ADDRSZ);
 #else
-			for (i = 0; i < IN6ADDRSZ; i++)
+			for (i = 0; i < NS_IN6ADDRSZ; i++)
 				(uint8_t *)(ipaddr.a_ipv6)
-				    [IN6ADDRSZ-1-i] = *(*ptr+i);
+				    [NS_IN6ADDRSZ-1-i] = *(*ptr+i);
 #endif
 			ipaddr.a_family = AF_INET6;
 			*ptr += size;
@@ -807,14 +800,14 @@ smb_ads_getipnodebyname(smb_ads_host_info_t *hentry)
 	case AF_INET6:
 		h = getipnodebyname(hentry->name, hentry->ipaddr.a_family,
 		    AI_DEFAULT, &error);
-		if (h == NULL || h->h_length != IPV6_ADDR_LEN)
+		if (h == NULL || h->h_length != NS_IN6ADDRSZ)
 			return (-1);
 		break;
 
 	case AF_INET:
 		h = getipnodebyname(hentry->name, hentry->ipaddr.a_family,
 		    0, &error);
-		if (h == NULL || h->h_length != INADDRSZ)
+		if (h == NULL || h->h_length != NS_INADDRSZ)
 			return (-1);
 		break;
 
@@ -2145,39 +2138,6 @@ smb_ads_lookup_computer_attr_kvno(smb_ads_handle_t *ah, char *dn)
 	return (kvno);
 }
 
-static int
-smb_ads_gen_machine_passwd(char *machine_passwd, size_t bufsz)
-{
-	int i;
-	size_t pwdlen;
-	uint8_t *random_bytes;
-
-	errno = 0;
-	if (machine_passwd == NULL || bufsz == 0) {
-		errno = EINVAL;
-		return (-1);
-	}
-
-	pwdlen = bufsz - 1;
-	random_bytes = calloc(1, pwdlen);
-	if (random_bytes == NULL)
-		return (-1);
-
-	if (pkcs11_get_random(random_bytes, pwdlen) != 0) {
-		free(random_bytes);
-		return (-1);
-	}
-
-	for (i = 0; i < pwdlen; i++)
-		machine_passwd[i] = (random_bytes[i] % SMB_ADS_PWD_CHAR_NUM) +
-		    SMB_ADS_PWD_CHAR_START;
-
-	machine_passwd[pwdlen] = 0;
-	bzero(random_bytes, pwdlen);
-	free(random_bytes);
-	return (0);
-}
-
 /*
  * smb_ads_join
  *
@@ -2204,8 +2164,7 @@ smb_ads_gen_machine_passwd(char *machine_passwd, size_t bufsz)
  * principal after the domain join operation.
  */
 smb_adjoin_status_t
-smb_ads_join(char *domain, char *user, char *usr_passwd, char *machine_passwd,
-    size_t len)
+smb_ads_join(char *domain, char *user, char *usr_passwd, char *machine_passwd)
 {
 	smb_ads_handle_t *ah = NULL;
 	krb5_context ctx = NULL;
@@ -2226,13 +2185,6 @@ smb_ads_join(char *domain, char *user, char *usr_passwd, char *machine_passwd,
 	if ((ah = smb_ads_open_main(domain, user, usr_passwd)) == NULL) {
 		smb_ccache_remove(SMB_CCACHE_PATH);
 		return (SMB_ADJOIN_ERR_GET_HANDLE);
-	}
-
-	if (smb_ads_gen_machine_passwd(machine_passwd, len) != 0) {
-		syslog(LOG_NOTICE, "machine password generation: %m");
-		smb_ads_close(ah);
-		smb_ccache_remove(SMB_CCACHE_PATH);
-		return (SMB_ADJOIN_ERR_GEN_PWD);
 	}
 
 	if ((dclevel = smb_ads_get_dc_level(ah)) == -1) {
@@ -2294,6 +2246,7 @@ smb_ads_join(char *domain, char *user, char *usr_passwd, char *machine_passwd,
 	cnt = spns.s_cnt;
 	smb_krb5_free_pn_set(&spns);
 
+	/* New machine_passwd was filled in by our caller. */
 	if (smb_krb5_setpwd(ctx, ah->domain, machine_passwd) != 0) {
 		rc = SMB_ADJOIN_ERR_KSETPWD;
 		goto adjoin_cleanup;
@@ -2360,16 +2313,6 @@ adjoin_cleanup:
 		if (rename(tmpfile, SMBNS_KRB5_KEYTAB) != 0) {
 			(void) unlink(tmpfile);
 			rc = SMB_ADJOIN_ERR_COMMIT_KEYTAB;
-		} else {
-			/* Set IDMAP config */
-			if (smb_config_set_idmap_domain(ah->domain) != 0) {
-				rc = SMB_ADJOIN_ERR_IDMAP_SET_DOMAIN;
-			} else {
-
-				/* Refresh IDMAP service */
-				if (smb_config_refresh_idmap() != 0)
-					rc = SMB_ADJOIN_ERR_IDMAP_REFRESH;
-			}
 		}
 	} else {
 		(void) unlink(tmpfile);

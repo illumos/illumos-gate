@@ -11,7 +11,7 @@
 #
 
 #
-# Copyright (c) 2013 by Delphix. All rights reserved.
+# Copyright (c) 2013, 2014 by Delphix. All rights reserved.
 #
 
 .PARALLEL: $(SUBDIRS)
@@ -33,11 +33,13 @@ SUBDIRS = acl \
 	grow_pool \
 	grow_replicas \
 	history \
+	holes \
 	inheritance \
 	interop \
 	inuse \
 	large_files \
 	largest_pool \
+	libzfs \
 	link_count \
 	mdb \
 	migration \

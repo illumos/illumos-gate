@@ -19,10 +19,11 @@
 # CDDL HEADER END
 #
 
+# Copyright 2014 Gary Mills
 #
 # Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2014 Garrett D'Amore <garrett@damore.org>
 #
-
 #
 # open-tree exception list
 #
@@ -44,7 +45,6 @@
 ./usr/src/cmd/sqlite
 ./usr/src/lib/libsqlite
 ./usr/src/cmd/tcpd
-./usr/src/common/openssl
 ./usr/src/grub
 ./usr/src/uts/intel/sys/acpi
 
@@ -182,7 +182,6 @@
 # Ignore sample source code.
 #
 ./usr/src/cmd/sendmail/libmilter/example.c
-./usr/src/lib/libdhcpsvc/modules/templates
 
 #
 # Ignore .xcl files that aren't used because the program is statically linked.

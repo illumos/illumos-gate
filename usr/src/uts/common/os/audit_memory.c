@@ -39,7 +39,7 @@ kmem_cache_t *au_pad_cache;
 void
 au_pathhold(struct audit_path *app)
 {
-	atomic_add_32(&app->audp_ref, 1);
+	atomic_inc_32(&app->audp_ref);
 }
 
 /*
@@ -48,7 +48,7 @@ au_pathhold(struct audit_path *app)
 void
 au_pathrele(struct audit_path *app)
 {
-	if (atomic_add_32_nv(&app->audp_ref, -1) > 0)
+	if (atomic_dec_32_nv(&app->audp_ref) > 0)
 		return;
 	kmem_free(app, app->audp_size);
 }

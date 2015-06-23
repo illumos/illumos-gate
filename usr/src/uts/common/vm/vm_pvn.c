@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1986, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -1090,10 +1091,8 @@ pvn_vpzero(struct vnode *vp, u_offset_t vplen, size_t zbytes)
 }
 
 /*
- * Handles common work of the VOP_GETPAGE routines when more than
- * one page must be returned by calling a file system specific operation
- * to do most of the work.  Must be called with the vp already locked
- * by the VOP_GETPAGE routine.
+ * Handles common work of the VOP_GETPAGE routines by iterating page by page
+ * calling the getpage helper for each.
  */
 int
 pvn_getpages(
@@ -1115,7 +1114,8 @@ pvn_getpages(
 	size_t sz, xlen;
 	int err;
 
-	ASSERT(plsz >= len);		/* insure that we have enough space */
+	/* ensure that we have enough space */
+	ASSERT(pl == NULL || plsz >= len);
 
 	/*
 	 * Loop one page at a time and let getapage function fill
@@ -1128,12 +1128,12 @@ pvn_getpages(
 	 * able to get from an earlier call doesn't cost too much.
 	 */
 	ppp = pl;
-	sz = PAGESIZE;
+	sz = (pl != NULL) ? PAGESIZE : 0;
 	eoff = off + len;
 	xlen = len;
 	for (o = off; o < eoff; o += PAGESIZE, addr += PAGESIZE,
 	    xlen -= PAGESIZE) {
-		if (o + PAGESIZE >= eoff) {
+		if (o + PAGESIZE >= eoff && pl != NULL) {
 			/*
 			 * Last time through - allow the all of
 			 * what's left of the pl[] array to be used.

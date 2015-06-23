@@ -25,6 +25,8 @@
 
 /*
  * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2015 Toomas Soome <tsoome@me.com>
+ * Copyright 2015 Gary Mills
  */
 
 #ifndef _LIBBE_H
@@ -203,6 +205,17 @@ typedef struct be_node_list {
 #define	BE_DESTROY_FLAG_SNAPSHOTS	0x00000001
 #define	BE_DESTROY_FLAG_FORCE_UNMOUNT	0x00000002
 
+/* sort rules for be_sort() */
+typedef enum {
+	BE_SORT_UNSPECIFIED = -1,
+	BE_SORT_DATE = 0,
+	BE_SORT_DATE_REV,
+	BE_SORT_NAME,
+	BE_SORT_NAME_REV,
+	BE_SORT_SPACE,
+	BE_SORT_SPACE_REV
+} be_sort_t;
+
 /*
  * BE functions
  */
@@ -228,6 +241,7 @@ int be_list(char *, be_node_list_t **);
 void be_free_list(be_node_list_t *);
 int be_max_avail(char *, uint64_t *);
 char *be_err_to_str(int);
+int be_sort(be_node_list_t **, int);
 
 /*
  * Library functions

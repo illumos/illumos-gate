@@ -233,7 +233,7 @@ main(int argc, char *argv[])
 	}
 
 	/*
-	 * read the UTMP_FILE (contains information about each logged in user)
+	 * read the UTMPX_FILE (contains information about each logged in user)
 	 */
 	if (stat(UTMPX_FILE, &sbuf) == ERR) {
 		(void) fprintf(stderr, gettext("%s: stat error of %s: %s\n"),
@@ -264,7 +264,7 @@ main(int argc, char *argv[])
 		prtat(&now);
 		for (ut = utmpbegin; ut < utmpend; ut++) {
 			if (ut->ut_type == USER_PROCESS) {
-				if (!nonuser(*ut))
+				if (!nonuserx(*ut))
 					nusers++;
 			} else if (ut->ut_type == BOOT_TIME) {
 				uptime = now - ut->ut_xtime;

@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -2677,7 +2678,7 @@ mlsvc_NetShareEnumCommon(ndr_xa_t *mxa, smb_svcenum_t *se,
 static boolean_t
 srvsvc_add_autohome(ndr_xa_t *mxa, smb_svcenum_t *se, void *infop)
 {
-	smb_netuserinfo_t *user = &mxa->pipe->np_user;
+	smb_netuserinfo_t *user = mxa->pipe->np_user;
 	char *username;
 	smb_share_t si;
 	DWORD status;

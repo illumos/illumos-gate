@@ -1,4 +1,6 @@
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
@@ -130,15 +132,9 @@ void __h_errno_set(struct __res_state *res, int err);
 #define	_PATH_RESCONF		"/etc/resolv.conf"
 #endif
 
-#ifdef __STDC__
 #ifndef __P
 #define	__P(x)	x
 #endif
-#else
-#ifndef __P
-#define	__P(x)	()
-#endif
-#endif /* __STDC__ */
 
 typedef enum { res_goahead, res_nextns, res_modified, res_done, res_error }
 	res_sendhookact;

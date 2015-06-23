@@ -20,14 +20,14 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_INT_FMTIO_H
 #define	_SYS_INT_FMTIO_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file, <sys/int_fmtio.h>, is part of the Sun Microsystems implementation
@@ -94,11 +94,9 @@ extern "C" {
 #define	_PRIx	"x"
 #define	_PRIX	"X"
 
-#if defined(_CHAR_IS_SIGNED) || defined(__STDC__)
 #define	PRId8			_MODF8 _PRId
 #define	PRIdLEAST8		PRId8
 #define	PRIdFAST8		PRId8
-#endif
 #define	PRId16			_MODF16 _PRId
 #define	PRIdLEAST16		PRId16
 #define	PRId32			"d"
@@ -117,11 +115,9 @@ extern "C" {
 #define	PRIdFAST64		PRId64
 #endif
 
-#if defined(_CHAR_IS_SIGNED) || defined(__STDC__)
 #define	PRIi8			_MODF8 _PRIi
 #define	PRIiLEAST8		PRIi8
 #define	PRIiFAST8		PRIi8
-#endif
 #define	PRIi16			_MODF16 _PRIi
 #define	PRIiLEAST16		PRIi16
 #define	PRIi32			"i"
@@ -251,11 +247,9 @@ extern "C" {
 /*
  * fscanf macros for signed integers
  */
-#if defined(_CHAR_IS_SIGNED) || defined(__STDC__)
 #define	SCNd8			"hhd"
 #define	SCNdLEAST8		SCNd8
 #define	SCNdFAST8		SCNd8
-#endif
 #define	SCNd16			"hd"
 #define	SCNdLEAST16		SCNd16
 #define	SCNd32			"d"
@@ -269,11 +263,9 @@ extern "C" {
 #endif
 #define	SCNdPTR			PRIdPTR
 
-#if defined(_CHAR_IS_SIGNED) || defined(__STDC__)
 #define	SCNi8			"hhi"
 #define	SCNiLEAST8		SCNi8
 #define	SCNiFAST8		SCNi8
-#endif
 #define	SCNi16			"hi"
 #define	SCNiLEAST16		SCNi16
 #define	SCNi32			"i"

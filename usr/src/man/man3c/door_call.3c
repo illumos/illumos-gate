@@ -1,9 +1,10 @@
 '\" te
+.\" Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 .\" Copyright (c) 2005, Sun Microsystems, Inc.  All Rights Reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DOOR_CALL 3C "Mar 22, 2005"
+.TH DOOR_CALL 3C "Feb 7, 2015"
 .SH NAME
 door_call \- invoke the function associated with a door descriptor
 .SH SYNOPSIS
@@ -16,7 +17,6 @@ door_call \- invoke the function associated with a door descriptor
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBdoor_call()\fR function invokes the function associated with the door
 descriptor  \fId\fR, and passes the arguments (if any) specified in
@@ -24,6 +24,41 @@ descriptor  \fId\fR, and passes the arguments (if any) specified in
 during a door invocation and may be updated  upon returning from a door call.
 Passing \fINULL\fR for \fIparams\fR indicates there  are no arguments to be
 passed and no results expected.
+.sp
+.LP
+The \fBdoor_arg_t\fR structure includes the following members:
+.sp
+.in +2
+.nf
+typedef struct {
+        char            *data_ptr;      /* Argument/result data */
+        size_t          data_size;      /* Argument/result data size */
+        door_desc_t     *desc_ptr;      /* Argument/result descriptors */
+        uint_t          desc_num;       /* Argument/result num discriptors */
+        char            *rbuf;          /* Result area */
+        size_t          rsize;          /* Result size */
+} door_arg_t;
+.fi
+.in -2
+
+.sp
+.LP
+The \fBdoor_desc_t\fR structure includes the following members:
+.sp
+.in +2
+.nf
+typedef struct {
+        door_attr_t     d_attributes;           /* Describes the parameter */
+        union {
+                struct {
+                        int             d_descriptor;   /* Descriptor */
+                        door_id_t       d_id;           /* Unique door id */
+                } d_desc;
+        } d_data;
+} door_desc_t;
+.fi
+.in -2
+
 .sp
 .LP
 Arguments are specified using the  \fBdata_ptr\fR and \fBdesc_ptr\fR members of
@@ -61,29 +96,11 @@ will be  closed even if \fBdoor_call()\fR returns an error, unless that error
 is \fBEFAULT\fR or \fBEBADF\fR.
 .sp
 .LP
-The \fBdoor_desc_t\fR structure includes the following members:
-.sp
-.in +2
-.nf
-typedef struct {
-         door_attr_t d_attributes;   /* Describes the parameter */
-         union {
-                 struct {
-                         int d_descriptor;   /* Descriptor */
-                         door_id_t d_id;    /* Unique door id */
-                         } d_desc;
-                 } d_data;
-         } door_desc_t;
-.fi
-.in -2
-
-.sp
-.LP
 When file descriptors are passed or returned,  a new descriptor is created in
 the target address space and the \fBd_descriptor\fR member in the target
 argument is updated to reflect the new descriptor. In addition, the system
 passes a system-wide unique number associated with each door in the
-\fBdoor_id\fR member and marks the \fBd_attributes\fR member with other
+\fBd_id\fR member and marks the \fBd_attributes\fR member with other
 attributes associated with a door including the following:
 .sp
 .ne 2
@@ -160,21 +177,11 @@ generated during a \fBdoor_call()\fR operation. If the client aborts in the
 middle of a \fBdoor_call()\fR and the door was not created with the
 \fBDOOR_NO_CANCEL\fR flag, the server thread is notified using the POSIX (see
 \fBstandards\fR(5)) thread cancellation mechanism. See \fBcancellation\fR(5).
-.sp
-.LP
-The descriptor returned from \fBdoor_create()\fR is marked as close on
-\fBexec(FD_CLOEXEC)\fR. Information about a door is available for all clients
-of a door using \fBdoor_info()\fR. Applications concerned with security should
-not place secure information in door data that is accessible by
-\fBdoor_info()\fR. In particular, secure data should not be stored in the data
-item \fIcookie\fR. See  \fBdoor_info\fR(3C).
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, \fB0\fR is returned. Otherwise, \fB\(mi1\fR is
 returned and \fBerrno\fR is set to indicate the error.
 .SH ERRORS
-.sp
 .LP
 The  \fBdoor_call()\fR function will fail if:
 .sp
@@ -283,7 +290,6 @@ System could not create overflow area in caller for results.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -303,7 +309,6 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBmunmap\fR(2), \fBdoor_create\fR(3C), \fBdoor_getparam\fR(3C),
 \fBdoor_info\fR(3C), \fBdoor_return\fR(3C), \fBlibdoor\fR(3LIB),

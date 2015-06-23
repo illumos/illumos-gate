@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2011, Joyent, Inc. All rights reserved.
+ * Copyright 2013, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -6287,6 +6287,8 @@ scf_walk_fmri(scf_handle_t *h, int argc, char **argv, int flags,
 	ssize_t max_name_length;
 	char *pgname = NULL;
 	scf_walkinfo_t info;
+	boolean_t partial_fmri = B_FALSE;
+	boolean_t wildcard_fmri = B_FALSE;
 
 #ifndef NDEBUG
 	if (flags & SCF_WALK_EXPLICIT)
@@ -6494,6 +6496,7 @@ scf_walk_fmri(scf_handle_t *h, int argc, char **argv, int flags,
 			goto error;
 		}
 		pattern[i].sp_type = PATTERN_EXACT;
+		partial_fmri = B_TRUE;	/* we just iterated all instances */
 
 		continue;
 
@@ -6518,6 +6521,7 @@ badfmri:
 			 * Prepend svc:/ to patterns which don't begin with * or
 			 * svc: or lrc:.
 			 */
+			wildcard_fmri = B_TRUE;
 			pattern[i].sp_type = PATTERN_GLOB;
 			if (argv[i][0] == '*' ||
 			    (strlen(argv[i]) >= 4 && argv[i][3] == ':'))
@@ -6530,6 +6534,7 @@ badfmri:
 					    argv[i]);
 			}
 		} else {
+			partial_fmri = B_TRUE;
 			pattern[i].sp_type = PATTERN_PARTIAL;
 			pattern[i].sp_arg = strdup(argv[i]);
 		}
@@ -6815,6 +6820,26 @@ nolegacy:
 					info.count++;
 				match->sm_key->sk_seen = 1;
 			}
+		}
+	}
+
+	if (flags & SCF_WALK_UNIPARTIAL && info.count > 1) {
+		/*
+		 * If the SCF_WALK_UNIPARTIAL flag was passed in and we have
+		 * more than one fmri, then this is an error if we matched
+		 * because of a partial fmri parameter, unless we also matched
+		 * more than one fmri because of wildcards in the parameters.
+		 * That is, the presence of wildcards indicates that it is ok
+		 * to match more than one fmri in this case.
+		 * For example, a parameter of 'foo' that matches more than
+		 * one fmri is an error, but parameters of 'foo *bar*' that
+		 * matches more than one is fine.
+		 */
+		if (partial_fmri && !wildcard_fmri) {
+			errfunc(scf_get_msg(SCF_MSG_PATTERN_MULTIPARTIAL));
+			if (err != NULL)
+				*err = UU_EXIT_FATAL;
+			goto error;
 		}
 	}
 

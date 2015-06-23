@@ -1,0 +1,114 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\" Copyright 2014 Nexenta Systems, Inc.
+.\"
+.Dd Aug 20, 2014
+.Dt PAM_TIMESTAMP 5
+.Os
+.Sh NAME
+.Nm pam_timestamp
+.Nd PAM authentication module using cached successful
+authentication attempts
+.Sh SYNOPSIS
+.Nm pam_timestamp.so.1
+.Op Ar debug
+.Op Ar timeout=min
+.Sh DESCRIPTION
+The
+.Nm
+module caches successful tty-based authentication attempts by
+creating user's directories and per tty timestamp files in the
+common timestamp directory
+.Pa /var/run/tty_timestamps .
+Next authentication, if the timestamp file exist and not expired,
+the user will not be asked for a password, otherwise timestamp
+file will be deleted and user will be prompted to enter a password.
+.Lp
+The PAM items
+.Dv PAM_USER ,
+.Dv PAM_AUSER
+and
+.Dv PAM_TTY
+are used by this module.
+.Sy pam_timestamp
+is normally configured as
+.Sy sufficient
+and must be used in conjunction with the modules that support
+the UNIX authentication, which are
+.Xr pam_authtok_get 5 ,
+.Xr pam_unix_cred 5
+and
+.Xr pam_unix_auth 5 .
+Proper authentication operation requires
+.Xr pam_unix_cred 5
+be stacked above
+.Xr pam_timestamp .
+.Sh OPTIONS
+.Bl -tag -width Ds
+.It Dv debug
+Provides
+.Xr syslog 3
+debugging information at the
+.Sy LOG_AUTH | LOG_DEBUG
+level.
+.It Dv timeout
+Specifies the period (in miniutes) for which the timestamp
+file is valid. The default value is 5 minutes.
+.El
+.Sh FILES
+.Bl -tag -width indent
+.It Pa /var/run/tty_timestamps/...
+stores timestamp directories and files
+.El
+.Sh EXIT STATUS
+.Bl -tag -width Ds
+.It Dv PAM_SUCCESS
+Timestamp file is not expired.
+.It Dv PAM_IGNORE
+The
+.Nm
+module was not able to retrieve required credentials
+or timestamp file is expired or corrupt.
+.El
+.Sh EXAMPLES
+.Ss Example 1 Allowing su authentication
+.
+The following example is a
+.Xr pam.conf 4
+fragment that illustartes a default settings for allowing
+.Xr su 1M
+authentication:
+.Bd -literal -offset indent
+su  auth required	pam_unix_cred.so.1
+su  auth sufficient	pam_timestamp.so.1
+su  auth requisite	pam_authtok_get.so.1
+su  auth required	pam_unix_auth.so.1
+.Ed
+.Ss Example 2 Changing default timeout
+.
+The default timeout set to 10 minutes:
+.Bd -literal -offset indent
+su  auth required	pam_unix_cred.so.1
+su  auth sufficient	pam_timestamp.so.1	timeout=10
+su  auth requisite	pam_authtok_get.so.1
+su  auth required	pam_unix_auth.so.1
+.Ed
+.Sh INTERFACE STABILITY
+.Sy Uncommitted .
+.Sh MT LEVEL
+.Sy MT-Safe .
+.Sh SEE ALSO
+.Xr su 1M ,
+.Xr pam 3PAM ,
+.Xr pam_sm_authenticate 3PAM ,
+.Xr pam_sm_setcred 3PAM ,
+.Xr pam.conf 4 ,
+.Xr syslog 3C

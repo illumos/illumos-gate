@@ -21,6 +21,8 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/sid.h>
@@ -72,11 +74,13 @@
  *    owner: full access
  *    SYSTEM: full access
  */
-static ace_t default_dacl[DEFAULT_DACL_ACENUM] = {
+#ifdef	_KERNEL
+static const ace_t const default_dacl[DEFAULT_DACL_ACENUM] = {
 	{ (uid_t)-1, ACE_ALL_PERMS, 0, ACE_ACCESS_ALLOWED_ACE_TYPE },
 	{ IDMAP_WK_LOCAL_SYSTEM_GID, ACE_ALL_PERMS, ACE_IDENTIFIER_GROUP,
 	    ACE_ACCESS_ALLOWED_ACE_TYPE }
 };
+#endif	/* _KERNEL */
 
 /*
  * Note:
@@ -88,9 +92,11 @@ static ace_t default_dacl[DEFAULT_DACL_ACENUM] = {
 
 static idmap_stat smb_fsacl_getsids(smb_idmap_batch_t *, acl_t *);
 static acl_t *smb_fsacl_null_empty(boolean_t);
+#ifdef	_KERNEL
 static int smb_fsacl_inheritable(acl_t *, int);
-
 static void smb_ace_inherit(ace_t *, ace_t *, int, uid_t, gid_t);
+#endif	/* _KERNEL */
+
 static boolean_t smb_ace_isvalid(smb_ace_t *, int);
 static uint16_t smb_ace_len(smb_ace_t *);
 static uint32_t smb_ace_mask_g2s(uint32_t);
@@ -468,7 +474,7 @@ smb_fsacl_getsids(smb_idmap_batch_t *sib, acl_t *zacl)
 	ace_t *zace;
 	idmap_stat idm_stat;
 	smb_idmap_t *sim;
-	uid_t id;
+	uid_t id = (uid_t)-1;
 	int i, idtype;
 
 	sim = sib->sib_maps;
@@ -609,8 +615,8 @@ void
 smb_fsacl_split(acl_t *zacl, acl_t **dacl, acl_t **sacl, int which_acl)
 {
 	ace_t *zace;
-	ace_t *access_ace;
-	ace_t *audit_ace;
+	ace_t *access_ace = NULL;
+	ace_t *audit_ace = NULL;
 	int naccess, naudit;
 	int get_dacl, get_sacl;
 	int i;
@@ -703,6 +709,7 @@ smb_fsacl_split(acl_t *zacl, acl_t **dacl, acl_t **sacl, int which_acl)
  * which the generic information has been mapped.
  */
 
+#ifdef	_KERNEL
 /*
  * smb_fsacl_inherit
  *
@@ -830,6 +837,7 @@ smb_fsacl_inherit(acl_t *dir_zacl, int is_dir, int which_acl, cred_t *cr)
 
 	return (new_zacl);
 }
+#endif	/* _KERNEL */
 
 /*
  * smb_fsacl_from_vsa
@@ -1006,6 +1014,7 @@ smb_fsacl_to_vsa(acl_t *acl_info, vsecattr_t *vsecattr, int *aclbsize)
 	return (error);
 }
 
+#ifdef	_KERNEL
 /*
  * smb_fsacl_inheritable
  *
@@ -1086,6 +1095,7 @@ smb_fsacl_inheritable(acl_t *zacl, int is_dir)
 
 	return (num_inheritable);
 }
+#endif	/* _KERNEL */
 
 
 /*
@@ -1175,6 +1185,7 @@ smb_ace_len(smb_ace_t *ace)
 	    smb_sid_len(ace->se_sid));
 }
 
+#ifdef	_KERNEL
 static void
 smb_ace_inherit(ace_t *dir_zace, ace_t *zace, int is_dir, uid_t uid, gid_t gid)
 {
@@ -1205,6 +1216,7 @@ smb_ace_inherit(ace_t *dir_zace, ace_t *zace, int is_dir, uid_t uid, gid_t gid)
 		zace->a_flags &= ~ACE_INHERIT_FLAGS;
 	}
 }
+#endif	/* _KERNEL */
 
 /*
  * smb_ace_mask_g2s

@@ -895,7 +895,7 @@ drmach_init(void)
 		    "(%d) physical processors on one board.",
 		    MAX_CMP_UNITS_PER_BOARD);
 		return (ENXIO);
-	} else if (MAX_CORES_PER_CMP & (MAX_CORES_PER_CMP - 1)) {
+	} else if (!ISP2(MAX_CORES_PER_CMP)) {
 		cmn_err(CE_WARN, "!drmach_init: number of logical CPUs (%d) in "
 		    "physical processor is not power of 2.",
 		    MAX_CORES_PER_CMP);

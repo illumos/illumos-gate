@@ -70,7 +70,7 @@ kmf_set_csr_pubkey(KMF_HANDLE_T handle,
 	KMF_RETURN ret;
 	KMF_X509_SPKI *spki_ptr;
 	KMF_PLUGIN *plugin;
-	KMF_DATA KeyData = {NULL, 0};
+	KMF_DATA KeyData = { 0, NULL };
 
 	CLEAR_ERROR(handle, ret);
 	if (ret != KMF_OK)
@@ -137,7 +137,7 @@ kmf_create_csr_file(KMF_DATA *csrdata, KMF_ENCODE_FORMAT format,
 {
 	KMF_RETURN rv = KMF_OK;
 	int fd = -1;
-	KMF_DATA pemdata = {NULL, 0};
+	KMF_DATA pemdata = { 0, NULL };
 
 	if (csrdata == NULL || csrfile == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
@@ -366,7 +366,7 @@ sign_csr(KMF_HANDLE_T handle,
 {
 	KMF_CSR_DATA	subj_csr;
 	KMF_TBS_CSR	*tbs_csr = NULL;
-	KMF_DATA	signed_data = {0, NULL};
+	KMF_DATA	signed_data = { 0, NULL };
 	KMF_RETURN	ret = KMF_OK;
 	KMF_ATTRIBUTE	attlist[5];
 	KMF_ALGORITHM_INDEX algid;
@@ -500,7 +500,7 @@ kmf_sign_csr(KMF_HANDLE_T handle,
 	KMF_DATA	*SignedCsr)
 {
 	KMF_RETURN err;
-	KMF_DATA csrdata = { NULL, 0 };
+	KMF_DATA csrdata = { 0, NULL };
 
 	CLEAR_ERROR(handle, err);
 	if (err != KMF_OK)

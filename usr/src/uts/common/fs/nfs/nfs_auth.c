@@ -18,9 +18,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/param.h>
@@ -37,6 +38,7 @@
 #include <sys/door.h>
 #include <sys/sdt.h>
 #include <sys/thread.h>
+#include <sys/avl.h>
 
 #include <rpc/types.h>
 #include <rpc/auth.h>
@@ -47,24 +49,16 @@
 #include <nfs/nfs_clnt.h>
 #include <nfs/auth.h>
 
-#define	EQADDR(a1, a2)  \
-	(bcmp((char *)(a1)->buf, (char *)(a2)->buf, (a1)->len) == 0 && \
-	(a1)->len == (a2)->len)
-
-static struct knetconfig auth_knconf;
-static servinfo_t svp;
-static clinfo_t ci;
-
 static struct kmem_cache *exi_cache_handle;
 static void exi_cache_reclaim(void *);
 static void exi_cache_trim(struct exportinfo *exi);
 
 extern pri_t minclsyspri;
 
-int nfsauth_cache_hit;
-int nfsauth_cache_miss;
-int nfsauth_cache_refresh;
-int nfsauth_cache_reclaim;
+volatile uint_t nfsauth_cache_hit;
+volatile uint_t nfsauth_cache_miss;
+volatile uint_t nfsauth_cache_refresh;
+volatile uint_t nfsauth_cache_reclaim;
 
 /*
  * The lifetime of an auth cache entry:
@@ -117,6 +111,7 @@ typedef struct refreshq_exi_node {
 
 typedef struct refreshq_auth_node {
 	struct auth_cache	*ran_auth;
+	char			*ran_netid;
 	list_node_t		ran_node;
 } refreshq_auth_node_t;
 
@@ -129,22 +124,6 @@ typedef struct refreshq_auth_node {
 static kmutex_t refreshq_lock;
 static list_t refreshq_queue;
 static kcondvar_t refreshq_cv;
-
-/*
- * A list_t would be overkill. These are auth_cache
- * entries which are no longer linked to an exi.
- * It should be the case that all of their states
- * are NFS_AUTH_INVALID.
- *
- * I.e., the only way to be put on this list is
- * iff their state indicated that they had been placed
- * on the refreshq_queue.
- *
- * Note that while there is no link from the exi or
- * back to the exi, the exi can not go away until
- * these entries are harvested.
- */
-static struct auth_cache	*refreshq_dead_entries;
 
 /*
  * If there is ever a problem with loading the
@@ -163,8 +142,9 @@ nfsauth_refreshq_thread_state_t
 refreshq_thread_state = REFRESHQ_THREAD_HALTED;
 
 static void nfsauth_free_node(struct auth_cache *);
-static void nfsauth_remove_dead_entry(struct auth_cache *);
 static void nfsauth_refresh_thread(void);
+
+static int nfsauth_cache_compar(const void *, const void *);
 
 /*
  * mountd is a server-side only daemon. This will need to be
@@ -177,7 +157,7 @@ void
 mountd_args(uint_t did)
 {
 	mutex_enter(&mountd_lock);
-	if (mountd_dh)
+	if (mountd_dh != NULL)
 		door_ki_rele(mountd_dh);
 	mountd_dh = door_ki_lookup(did);
 	mutex_exit(&mountd_lock);
@@ -195,7 +175,6 @@ nfsauth_init(void)
 	mutex_init(&refreshq_lock, NULL, MUTEX_DEFAULT, NULL);
 	list_create(&refreshq_queue, sizeof (refreshq_exi_node_t),
 	    offsetof(refreshq_exi_node_t, ren_node));
-	refreshq_dead_entries = NULL;
 
 	cv_init(&refreshq_cv, NULL, CV_DEFAULT, NULL);
 
@@ -219,12 +198,9 @@ void
 nfsauth_fini(void)
 {
 	refreshq_exi_node_t	*ren;
-	refreshq_auth_node_t	*ran;
-	struct auth_cache	*p;
-	struct auth_cache	*auth_next;
 
 	/*
-	 * Prevent the refreshq_thread from getting new
+	 * Prevent the nfsauth_refresh_thread from getting new
 	 * work.
 	 */
 	mutex_enter(&refreshq_lock);
@@ -239,13 +215,20 @@ nfsauth_fini(void)
 			cv_wait(&refreshq_cv, &refreshq_lock);
 		}
 	}
+	mutex_exit(&refreshq_lock);
 
 	/*
-	 * Walk the exi_list and in turn, walk the
-	 * auth_lists.
+	 * Walk the exi_list and in turn, walk the auth_lists and free all
+	 * lists.  In addition, free INVALID auth_cache entries.
 	 */
 	while ((ren = list_remove_head(&refreshq_queue))) {
-		while ((ran = list_remove_head(&ren->ren_authlist))) {
+		refreshq_auth_node_t *ran;
+
+		while ((ran = list_remove_head(&ren->ren_authlist)) != NULL) {
+			struct auth_cache *p = ran->ran_auth;
+			if (p->auth_state == NFS_AUTH_INVALID)
+				nfsauth_free_node(p);
+			strfree(ran->ran_netid);
 			kmem_free(ran, sizeof (refreshq_auth_node_t));
 		}
 
@@ -253,19 +236,6 @@ nfsauth_fini(void)
 		exi_rele(ren->ren_exi);
 		kmem_free(ren, sizeof (refreshq_exi_node_t));
 	}
-
-	/*
-	 * Okay, now that the lists are deleted, we
-	 * need to see if there are any dead entries
-	 * to harvest.
-	 */
-	for (p = refreshq_dead_entries; p != NULL; p = auth_next) {
-		auth_next = p->auth_next;
-		nfsauth_free_node(p);
-	}
-
-	mutex_exit(&refreshq_lock);
-
 	list_destroy(&refreshq_queue);
 
 	cv_destroy(&refreshq_cv);
@@ -316,11 +286,12 @@ addrmask(struct netbuf *addr, struct netbuf *mask)
  * used does not meet the policy.
  */
 int
-nfsauth4_access(struct exportinfo *exi, vnode_t *vp, struct svc_req *req)
+nfsauth4_access(struct exportinfo *exi, vnode_t *vp, struct svc_req *req,
+    cred_t *cr, uid_t *uid, gid_t *gid, uint_t *ngids, gid_t **gids)
 {
 	int access;
 
-	access = nfsauth_access(exi, req);
+	access = nfsauth_access(exi, req, cr, uid, gid, ngids, gids);
 
 	/*
 	 * There are cases that the server needs to allow the client
@@ -368,17 +339,15 @@ sys_log(const char *msg)
  */
 static bool_t
 nfsauth_retrieve(struct exportinfo *exi, char *req_netid, int flavor,
-    struct netbuf *addr, int *access)
+    struct netbuf *addr, int *access, uid_t clnt_uid, gid_t clnt_gid,
+    uint_t clnt_gids_cnt, const gid_t *clnt_gids, uid_t *srv_uid,
+    gid_t *srv_gid, uint_t *srv_gids_cnt, gid_t **srv_gids)
 {
 	varg_t			  varg = {0};
 	nfsauth_res_t		  res = {0};
-	XDR			  xdrs_a;
-	XDR			  xdrs_r;
+	XDR			  xdrs;
 	size_t			  absz;
 	caddr_t			  abuf;
-	size_t			  rbsz = (size_t)(BYTES_PER_XDR_UNIT * 2);
-	char			  result[BYTES_PER_XDR_UNIT * 2] = {0};
-	caddr_t			  rbuf = (caddr_t)&result;
 	int			  last = 0;
 	door_arg_t		  da;
 	door_info_t		  di;
@@ -390,16 +359,70 @@ nfsauth_retrieve(struct exportinfo *exi, char *req_netid, int flavor,
 	 * so we need to call the nfsauth service in the
 	 * mount daemon.
 	 */
+
+	varg.vers = V_PROTO;
+	varg.arg_u.arg.cmd = NFSAUTH_ACCESS;
+	varg.arg_u.arg.areq.req_client.n_len = addr->len;
+	varg.arg_u.arg.areq.req_client.n_bytes = addr->buf;
+	varg.arg_u.arg.areq.req_netid = req_netid;
+	varg.arg_u.arg.areq.req_path = exi->exi_export.ex_path;
+	varg.arg_u.arg.areq.req_flavor = flavor;
+	varg.arg_u.arg.areq.req_clnt_uid = clnt_uid;
+	varg.arg_u.arg.areq.req_clnt_gid = clnt_gid;
+	varg.arg_u.arg.areq.req_clnt_gids.len = clnt_gids_cnt;
+	varg.arg_u.arg.areq.req_clnt_gids.val = (gid_t *)clnt_gids;
+
+	DTRACE_PROBE1(nfsserv__func__nfsauth__varg, varg_t *, &varg);
+
+	/*
+	 * Setup the XDR stream for encoding the arguments. Notice that
+	 * in addition to the args having variable fields (req_netid and
+	 * req_path), the argument data structure is itself versioned,
+	 * so we need to make sure we can size the arguments buffer
+	 * appropriately to encode all the args. If we can't get sizing
+	 * info _or_ properly encode the arguments, there's really no
+	 * point in continuting, so we fail the request.
+	 */
+	if ((absz = xdr_sizeof(xdr_varg, &varg)) == 0) {
+		*access = NFSAUTH_DENIED;
+		return (FALSE);
+	}
+
+	abuf = (caddr_t)kmem_alloc(absz, KM_SLEEP);
+	xdrmem_create(&xdrs, abuf, absz, XDR_ENCODE);
+	if (!xdr_varg(&xdrs, &varg)) {
+		XDR_DESTROY(&xdrs);
+		goto fail;
+	}
+	XDR_DESTROY(&xdrs);
+
+	/*
+	 * Prepare the door arguments
+	 *
+	 * We don't know the size of the message the daemon
+	 * will pass back to us.  By setting rbuf to NULL,
+	 * we force the door code to allocate a buf of the
+	 * appropriate size.  We must set rsize > 0, however,
+	 * else the door code acts as if no response was
+	 * expected and doesn't pass the data to us.
+	 */
+	da.data_ptr = (char *)abuf;
+	da.data_size = absz;
+	da.desc_ptr = NULL;
+	da.desc_num = 0;
+	da.rbuf = NULL;
+	da.rsize = 1;
+
 retry:
 	mutex_enter(&mountd_lock);
 	dh = mountd_dh;
-	if (dh)
+	if (dh != NULL)
 		door_ki_hold(dh);
 	mutex_exit(&mountd_lock);
 
 	if (dh == NULL) {
 		/*
-		 * The rendezvous point has not been established yet !
+		 * The rendezvous point has not been established yet!
 		 * This could mean that either mountd(1m) has not yet
 		 * been started or that _this_ routine nuked the door
 		 * handle after receiving an EINTR for a REVOKED door.
@@ -413,194 +436,150 @@ retry:
 			goto retry;
 		}
 
+		kmem_free(abuf, absz);
+
 		sys_log("nfsauth: mountd has not established door");
 		*access = NFSAUTH_DROP;
 		return (FALSE);
 	}
 
 	ntries = 0;
-	varg.vers = V_PROTO;
-	varg.arg_u.arg.cmd = NFSAUTH_ACCESS;
-	varg.arg_u.arg.areq.req_client.n_len = addr->len;
-	varg.arg_u.arg.areq.req_client.n_bytes = addr->buf;
-	varg.arg_u.arg.areq.req_netid = req_netid;
-	varg.arg_u.arg.areq.req_path = exi->exi_export.ex_path;
-	varg.arg_u.arg.areq.req_flavor = flavor;
 
 	/*
-	 * Setup the XDR stream for encoding the arguments. Notice that
-	 * in addition to the args having variable fields (req_netid and
-	 * req_path), the argument data structure is itself versioned,
-	 * so we need to make sure we can size the arguments buffer
-	 * appropriately to encode all the args. If we can't get sizing
-	 * info _or_ properly encode the arguments, there's really no
-	 * point in continuting, so we fail the request.
+	 * Now that we've got what we need, place the call.
 	 */
-	DTRACE_PROBE1(nfsserv__func__nfsauth__varg, varg_t *, &varg);
-	if ((absz = xdr_sizeof(xdr_varg, (void *)&varg)) == 0) {
-		door_ki_rele(dh);
-		*access = NFSAUTH_DENIED;
-		return (FALSE);
-	}
-
-	abuf = (caddr_t)kmem_alloc(absz, KM_SLEEP);
-	xdrmem_create(&xdrs_a, abuf, absz, XDR_ENCODE);
-	if (!xdr_varg(&xdrs_a, &varg)) {
-		door_ki_rele(dh);
-		goto fail;
-	}
-	XDR_DESTROY(&xdrs_a);
-
-	/*
-	 * The result (nfsauth_res_t) is always two int's, so we don't
-	 * have to dynamically size (or allocate) the results buffer.
-	 * Now that we've got what we need, we prep the door arguments
-	 * and place the call.
-	 */
-	da.data_ptr = (char *)abuf;
-	da.data_size = absz;
-	da.desc_ptr = NULL;
-	da.desc_num = 0;
-	da.rbuf = (char *)rbuf;
-	da.rsize = rbsz;
-
 	switch (door_ki_upcall_limited(dh, &da, NULL, SIZE_MAX, 0)) {
-		case 0:				/* Success */
-			if (da.data_ptr != da.rbuf && da.data_size == 0) {
-				/*
-				 * The door_return that contained the data
-				 * failed ! We're here because of the 2nd
-				 * door_return (w/o data) such that we can
-				 * get control of the thread (and exit
-				 * gracefully).
-				 */
-				DTRACE_PROBE1(nfsserv__func__nfsauth__door__nil,
-				    door_arg_t *, &da);
-				door_ki_rele(dh);
-				goto fail;
+	case 0:				/* Success */
+		door_ki_rele(dh);
 
-			} else if (rbuf != da.rbuf) {
-				/*
-				 * The only time this should be true
-				 * is iff userland wanted to hand us
-				 * a bigger response than what we
-				 * expect; that should not happen
-				 * (nfsauth_res_t is only 2 int's),
-				 * but we check nevertheless.
-				 */
-				rbuf = da.rbuf;
-				rbsz = da.rsize;
-
-			} else if (rbsz > da.data_size) {
-				/*
-				 * We were expecting two int's; but if
-				 * userland fails in encoding the XDR
-				 * stream, we detect that here, since
-				 * the mountd forces down only one byte
-				 * in such scenario.
-				 */
-				door_ki_rele(dh);
-				goto fail;
-			}
-			door_ki_rele(dh);
-			break;
-
-		case EAGAIN:
+		if (da.data_ptr == NULL && da.data_size == 0) {
 			/*
-			 * Server out of resources; back off for a bit
+			 * The door_return that contained the data
+			 * failed! We're here because of the 2nd
+			 * door_return (w/o data) such that we can
+			 * get control of the thread (and exit
+			 * gracefully).
 			 */
-			door_ki_rele(dh);
-			kmem_free(abuf, absz);
-			delay(hz);
-			goto retry;
-			/* NOTREACHED */
+			DTRACE_PROBE1(nfsserv__func__nfsauth__door__nil,
+			    door_arg_t *, &da);
+			goto fail;
+		}
 
-		case EINTR:
-			if (!door_ki_info(dh, &di)) {
-				if (di.di_attributes & DOOR_REVOKED) {
-					/*
-					 * The server barfed and revoked
-					 * the (existing) door on us; we
-					 * want to wait to give smf(5) a
-					 * chance to restart mountd(1m)
-					 * and establish a new door handle.
-					 */
-					mutex_enter(&mountd_lock);
-					if (dh == mountd_dh)
-						mountd_dh = NULL;
-					mutex_exit(&mountd_lock);
-					door_ki_rele(dh);
-					kmem_free(abuf, absz);
-					delay(hz);
-					goto retry;
+		break;
+
+	case EAGAIN:
+		/*
+		 * Server out of resources; back off for a bit
+		 */
+		door_ki_rele(dh);
+		delay(hz);
+		goto retry;
+		/* NOTREACHED */
+
+	case EINTR:
+		if (!door_ki_info(dh, &di)) {
+			door_ki_rele(dh);
+
+			if (di.di_attributes & DOOR_REVOKED) {
+				/*
+				 * The server barfed and revoked
+				 * the (existing) door on us; we
+				 * want to wait to give smf(5) a
+				 * chance to restart mountd(1m)
+				 * and establish a new door handle.
+				 */
+				mutex_enter(&mountd_lock);
+				if (dh == mountd_dh) {
+					door_ki_rele(mountd_dh);
+					mountd_dh = NULL;
 				}
-				/*
-				 * If the door was _not_ revoked on us,
-				 * then more than likely we took an INTR,
-				 * so we need to fail the operation.
-				 */
-				door_ki_rele(dh);
-				goto fail;
-			}
-			/*
-			 * The only failure that can occur from getting
-			 * the door info is EINVAL, so we let the code
-			 * below handle it.
-			 */
-			/* FALLTHROUGH */
-
-		case EBADF:
-		case EINVAL:
-		default:
-			/*
-			 * If we have a stale door handle, give smf a last
-			 * chance to start it by sleeping for a little bit.
-			 * If we're still hosed, we'll fail the call.
-			 *
-			 * Since we're going to reacquire the door handle
-			 * upon the retry, we opt to sleep for a bit and
-			 * _not_ to clear mountd_dh. If mountd restarted
-			 * and was able to set mountd_dh, we should see
-			 * the new instance; if not, we won't get caught
-			 * up in the retry/DELAY loop.
-			 */
-			door_ki_rele(dh);
-			if (!last) {
+				mutex_exit(&mountd_lock);
 				delay(hz);
-				last++;
 				goto retry;
 			}
-			sys_log("nfsauth: stale mountd door handle");
+			/*
+			 * If the door was _not_ revoked on us,
+			 * then more than likely we took an INTR,
+			 * so we need to fail the operation.
+			 */
 			goto fail;
+		}
+		/*
+		 * The only failure that can occur from getting
+		 * the door info is EINVAL, so we let the code
+		 * below handle it.
+		 */
+		/* FALLTHROUGH */
+
+	case EBADF:
+	case EINVAL:
+	default:
+		/*
+		 * If we have a stale door handle, give smf a last
+		 * chance to start it by sleeping for a little bit.
+		 * If we're still hosed, we'll fail the call.
+		 *
+		 * Since we're going to reacquire the door handle
+		 * upon the retry, we opt to sleep for a bit and
+		 * _not_ to clear mountd_dh. If mountd restarted
+		 * and was able to set mountd_dh, we should see
+		 * the new instance; if not, we won't get caught
+		 * up in the retry/DELAY loop.
+		 */
+		door_ki_rele(dh);
+		if (!last) {
+			delay(hz);
+			last++;
+			goto retry;
+		}
+		sys_log("nfsauth: stale mountd door handle");
+		goto fail;
 	}
+
+	ASSERT(da.rbuf != NULL);
 
 	/*
 	 * No door errors encountered; setup the XDR stream for decoding
 	 * the results. If we fail to decode the results, we've got no
 	 * other recourse than to fail the request.
 	 */
-	xdrmem_create(&xdrs_r, rbuf, rbsz, XDR_DECODE);
-	if (!xdr_nfsauth_res(&xdrs_r, &res))
+	xdrmem_create(&xdrs, da.rbuf, da.rsize, XDR_DECODE);
+	if (!xdr_nfsauth_res(&xdrs, &res)) {
+		xdr_free(xdr_nfsauth_res, (char *)&res);
+		XDR_DESTROY(&xdrs);
+		kmem_free(da.rbuf, da.rsize);
 		goto fail;
-	XDR_DESTROY(&xdrs_r);
+	}
+	XDR_DESTROY(&xdrs);
+	kmem_free(da.rbuf, da.rsize);
 
 	DTRACE_PROBE1(nfsserv__func__nfsauth__results, nfsauth_res_t *, &res);
 	switch (res.stat) {
 		case NFSAUTH_DR_OKAY:
 			*access = res.ares.auth_perm;
-			kmem_free(abuf, absz);
+			*srv_uid = res.ares.auth_srv_uid;
+			*srv_gid = res.ares.auth_srv_gid;
+			*srv_gids_cnt = res.ares.auth_srv_gids.len;
+			*srv_gids = kmem_alloc(*srv_gids_cnt * sizeof (gid_t),
+			    KM_SLEEP);
+			bcopy(res.ares.auth_srv_gids.val, *srv_gids,
+			    *srv_gids_cnt * sizeof (gid_t));
 			break;
 
 		case NFSAUTH_DR_EFAIL:
 		case NFSAUTH_DR_DECERR:
 		case NFSAUTH_DR_BADCMD:
 		default:
+			xdr_free(xdr_nfsauth_res, (char *)&res);
 fail:
 			*access = NFSAUTH_DENIED;
 			kmem_free(abuf, absz);
 			return (FALSE);
 			/* NOTREACHED */
 	}
+
+	xdr_free(xdr_nfsauth_res, (char *)&res);
+	kmem_free(abuf, absz);
 
 	return (TRUE);
 }
@@ -648,44 +627,58 @@ nfsauth_refresh_thread(void)
 		 * protect it by any lock.
 		 */
 		while ((ran = list_remove_head(&ren->ren_authlist))) {
-
+			uid_t uid;
+			gid_t gid;
+			uint_t ngids;
+			gid_t *gids;
 			struct auth_cache *p = ran->ran_auth;
+			char *netid = ran->ran_netid;
 
 			ASSERT(p != NULL);
-			kmem_free(ran, sizeof (refreshq_auth_node_t));
+			ASSERT(netid != NULL);
 
-			/*
-			 * We are shutting down. No need to refresh
-			 * entries which are about to be nuked.
-			 *
-			 * So just throw them away until we are done
-			 * with this exi node...
-			 */
-			if (refreshq_thread_state != REFRESHQ_THREAD_RUNNING)
-				continue;
+			kmem_free(ran, sizeof (refreshq_auth_node_t));
 
 			mutex_enter(&p->auth_lock);
 
 			/*
-			 * Make sure the state is valid now that
-			 * we have the lock. Note that once we
-			 * change the state to NFS_AUTH_REFRESHING,
-			 * no other thread will be able to work on
-			 * this entry.
+			 * Once the entry goes INVALID, it can not change
+			 * state.
+			 *
+			 * No need to refresh entries also in a case we are
+			 * just shutting down.
+			 *
+			 * In general, there is no need to hold the
+			 * refreshq_lock to test the refreshq_thread_state.  We
+			 * do hold it at other places because there is some
+			 * related thread synchronization (or some other tasks)
+			 * close to the refreshq_thread_state check.
+			 *
+			 * The check for the refreshq_thread_state value here
+			 * is purely advisory to allow the faster
+			 * nfsauth_refresh_thread() shutdown.  In a case we
+			 * will miss such advisory, nothing catastrophic
+			 * happens: we will just spin longer here before the
+			 * shutdown.
 			 */
-			if (p->auth_state != NFS_AUTH_STALE) {
-				/*
-				 * Once it goes INVALID, it can not
-				 * change state.
-				 */
-				if (p->auth_state == NFS_AUTH_INVALID) {
-					mutex_exit(&p->auth_lock);
-					nfsauth_remove_dead_entry(p);
-				} else
-					mutex_exit(&p->auth_lock);
+			if (p->auth_state == NFS_AUTH_INVALID ||
+			    refreshq_thread_state != REFRESHQ_THREAD_RUNNING) {
+				mutex_exit(&p->auth_lock);
+
+				if (p->auth_state == NFS_AUTH_INVALID)
+					nfsauth_free_node(p);
+
+				strfree(netid);
 
 				continue;
 			}
+
+			/*
+			 * Make sure the state is valid.  Note that once we
+			 * change the state to NFS_AUTH_REFRESHING, no other
+			 * thread will be able to work on this entry.
+			 */
+			ASSERT(p->auth_state == NFS_AUTH_STALE);
 
 			p->auth_state = NFS_AUTH_REFRESHING;
 			mutex_exit(&p->auth_lock);
@@ -704,22 +697,24 @@ nfsauth_refresh_thread(void)
 			 * of the request which triggered the
 			 * refresh attempt.
 			 */
-			ASSERT(p->auth_netid != NULL);
-
-			retrieval = nfsauth_retrieve(exi, p->auth_netid,
-			    p->auth_flavor, &p->auth_addr, &access);
+			retrieval = nfsauth_retrieve(exi, netid,
+			    p->auth_flavor, &p->auth_clnt->authc_addr, &access,
+			    p->auth_clnt_uid, p->auth_clnt_gid,
+			    p->auth_clnt_ngids, p->auth_clnt_gids, &uid, &gid,
+			    &ngids, &gids);
 
 			/*
 			 * This can only be set in one other place
 			 * and the state has to be NFS_AUTH_FRESH.
 			 */
-			kmem_free(p->auth_netid, strlen(p->auth_netid) + 1);
-			p->auth_netid = NULL;
+			strfree(netid);
 
 			mutex_enter(&p->auth_lock);
 			if (p->auth_state == NFS_AUTH_INVALID) {
 				mutex_exit(&p->auth_lock);
-				nfsauth_remove_dead_entry(p);
+				nfsauth_free_node(p);
+				if (retrieval == TRUE)
+					kmem_free(gids, ngids * sizeof (gid_t));
 			} else {
 				/*
 				 * If we got an error, do not reset the
@@ -729,9 +724,19 @@ nfsauth_refresh_thread(void)
 				 */
 				if (retrieval == TRUE) {
 					p->auth_access = access;
+
+					p->auth_srv_uid = uid;
+					p->auth_srv_gid = gid;
+					kmem_free(p->auth_srv_gids,
+					    p->auth_srv_ngids * sizeof (gid_t));
+					p->auth_srv_ngids = ngids;
+					p->auth_srv_gids = gids;
+
 					p->auth_freshness = gethrestime_sec();
 				}
 				p->auth_state = NFS_AUTH_FRESH;
+
+				cv_broadcast(&p->auth_cv);
 				mutex_exit(&p->auth_lock);
 			}
 		}
@@ -747,23 +752,78 @@ nfsauth_refresh_thread(void)
 	zthread_exit();
 }
 
+int
+nfsauth_cache_clnt_compar(const void *v1, const void *v2)
+{
+	int c;
+
+	const struct auth_cache_clnt *a1 = (const struct auth_cache_clnt *)v1;
+	const struct auth_cache_clnt *a2 = (const struct auth_cache_clnt *)v2;
+
+	if (a1->authc_addr.len < a2->authc_addr.len)
+		return (-1);
+	if (a1->authc_addr.len > a2->authc_addr.len)
+		return (1);
+
+	c = memcmp(a1->authc_addr.buf, a2->authc_addr.buf, a1->authc_addr.len);
+	if (c < 0)
+		return (-1);
+	if (c > 0)
+		return (1);
+
+	return (0);
+}
+
+static int
+nfsauth_cache_compar(const void *v1, const void *v2)
+{
+	const struct auth_cache *a1 = (const struct auth_cache *)v1;
+	const struct auth_cache *a2 = (const struct auth_cache *)v2;
+
+	if (a1->auth_flavor < a2->auth_flavor)
+		return (-1);
+	if (a1->auth_flavor > a2->auth_flavor)
+		return (1);
+
+	if (a1->auth_clnt_uid < a2->auth_clnt_uid)
+		return (-1);
+	if (a1->auth_clnt_uid > a2->auth_clnt_uid)
+		return (1);
+
+	if (a1->auth_clnt_gid < a2->auth_clnt_gid)
+		return (-1);
+	if (a1->auth_clnt_gid > a2->auth_clnt_gid)
+		return (1);
+
+	return (0);
+}
+
 /*
  * Get the access information from the cache or callup to the mountd
  * to get and cache the access information in the kernel.
  */
-int
-nfsauth_cache_get(struct exportinfo *exi, struct svc_req *req, int flavor)
+static int
+nfsauth_cache_get(struct exportinfo *exi, struct svc_req *req, int flavor,
+    cred_t *cr, uid_t *uid, gid_t *gid, uint_t *ngids, gid_t **gids)
 {
 	struct netbuf		*taddrmask;
-	struct netbuf		addr;
-	struct netbuf		*claddr;
-	struct auth_cache	**head;
-	struct auth_cache	*p;
+	struct netbuf		addr;	/* temporary copy of client's address */
+	const struct netbuf	*claddr;
+	avl_tree_t		*tree;
+	struct auth_cache	ac;	/* used as a template for avl_find() */
+	struct auth_cache_clnt	*c;
+	struct auth_cache_clnt	acc;	/* used as a template for avl_find() */
+	struct auth_cache	*p = NULL;
 	int			access;
-	time_t			refresh;
 
-	refreshq_exi_node_t	*ren;
-	refreshq_auth_node_t	*ran;
+	uid_t			tmpuid;
+	gid_t			tmpgid;
+	uint_t			tmpngids;
+	gid_t			*tmpgids;
+
+	avl_index_t		where;	/* used for avl_find()/avl_insert() */
+
+	ASSERT(cr != NULL);
 
 	/*
 	 * Now check whether this client already
@@ -779,46 +839,306 @@ nfsauth_cache_get(struct exportinfo *exi, struct svc_req *req, int flavor)
 	addr = *claddr;
 	addr.buf = kmem_alloc(addr.len, KM_SLEEP);
 	bcopy(claddr->buf, addr.buf, claddr->len);
+
 	SVC_GETADDRMASK(req->rq_xprt, SVC_TATTR_ADDRMASK, (void **)&taddrmask);
 	ASSERT(taddrmask != NULL);
-	if (taddrmask)
-		addrmask(&addr, taddrmask);
+	addrmask(&addr, taddrmask);
+
+	ac.auth_flavor = flavor;
+	ac.auth_clnt_uid = crgetuid(cr);
+	ac.auth_clnt_gid = crgetgid(cr);
+
+	acc.authc_addr = addr;
+
+	tree = exi->exi_cache[hash(&addr)];
 
 	rw_enter(&exi->exi_cache_lock, RW_READER);
-	head = &exi->exi_cache[hash(&addr)];
-	for (p = *head; p; p = p->auth_next) {
-		if (EQADDR(&addr, &p->auth_addr) && flavor == p->auth_flavor)
-			break;
+	c = (struct auth_cache_clnt *)avl_find(tree, &acc, NULL);
+
+	if (c == NULL) {
+		struct auth_cache_clnt *nc;
+
+		rw_exit(&exi->exi_cache_lock);
+
+		nc = kmem_alloc(sizeof (*nc), KM_NOSLEEP | KM_NORMALPRI);
+		if (nc == NULL)
+			goto retrieve;
+
+		/*
+		 * Initialize the new auth_cache_clnt
+		 */
+		nc->authc_addr = addr;
+		nc->authc_addr.buf = kmem_alloc(addr.len,
+		    KM_NOSLEEP | KM_NORMALPRI);
+		if (addr.len != 0 && nc->authc_addr.buf == NULL) {
+			kmem_free(nc, sizeof (*nc));
+			goto retrieve;
+		}
+		bcopy(addr.buf, nc->authc_addr.buf, addr.len);
+		rw_init(&nc->authc_lock, NULL, RW_DEFAULT, NULL);
+		avl_create(&nc->authc_tree, nfsauth_cache_compar,
+		    sizeof (struct auth_cache),
+		    offsetof(struct auth_cache, auth_link));
+
+		rw_enter(&exi->exi_cache_lock, RW_WRITER);
+		c = (struct auth_cache_clnt *)avl_find(tree, &acc, &where);
+		if (c == NULL) {
+			avl_insert(tree, nc, where);
+			rw_downgrade(&exi->exi_cache_lock);
+			c = nc;
+		} else {
+			rw_downgrade(&exi->exi_cache_lock);
+
+			avl_destroy(&nc->authc_tree);
+			rw_destroy(&nc->authc_lock);
+			kmem_free(nc->authc_addr.buf, nc->authc_addr.len);
+			kmem_free(nc, sizeof (*nc));
+		}
 	}
 
-	if (p != NULL) {
-		nfsauth_cache_hit++;
+	ASSERT(c != NULL);
+
+	rw_enter(&c->authc_lock, RW_READER);
+	p = (struct auth_cache *)avl_find(&c->authc_tree, &ac, NULL);
+
+	if (p == NULL) {
+		struct auth_cache *np;
+
+		rw_exit(&c->authc_lock);
+
+		np = kmem_cache_alloc(exi_cache_handle,
+		    KM_NOSLEEP | KM_NORMALPRI);
+		if (np == NULL) {
+			rw_exit(&exi->exi_cache_lock);
+			goto retrieve;
+		}
+
+		/*
+		 * Initialize the new auth_cache
+		 */
+		np->auth_clnt = c;
+		np->auth_flavor = flavor;
+		np->auth_clnt_uid = crgetuid(cr);
+		np->auth_clnt_gid = crgetgid(cr);
+		np->auth_clnt_ngids = 0;
+		np->auth_clnt_gids = NULL;
+		np->auth_srv_ngids = 0;
+		np->auth_srv_gids = NULL;
+		np->auth_time = np->auth_freshness = gethrestime_sec();
+		np->auth_state = NFS_AUTH_NEW;
+		mutex_init(&np->auth_lock, NULL, MUTEX_DEFAULT, NULL);
+		cv_init(&np->auth_cv, NULL, CV_DEFAULT, NULL);
+
+		rw_enter(&c->authc_lock, RW_WRITER);
+		rw_exit(&exi->exi_cache_lock);
+
+		p = (struct auth_cache *)avl_find(&c->authc_tree, &ac, &where);
+		if (p == NULL) {
+			avl_insert(&c->authc_tree, np, where);
+			rw_downgrade(&c->authc_lock);
+			p = np;
+		} else {
+			rw_downgrade(&c->authc_lock);
+
+			cv_destroy(&np->auth_cv);
+			mutex_destroy(&np->auth_lock);
+			kmem_cache_free(exi_cache_handle, np);
+		}
+	} else {
+		rw_exit(&exi->exi_cache_lock);
+	}
+
+	mutex_enter(&p->auth_lock);
+	rw_exit(&c->authc_lock);
+
+wait:
+	/*
+	 * If the entry is in the WAITING state then some other thread is just
+	 * retrieving the required info.  The entry was either NEW, or the list
+	 * of client's supplemental groups is going to be changed (either by
+	 * this thread, or by some other thread).  We need to wait until the
+	 * nfsauth_retrieve() is done.
+	 */
+	while (p->auth_state == NFS_AUTH_WAITING)
+		cv_wait(&p->auth_cv, &p->auth_lock);
+
+	/*
+	 * Here the entry cannot be in WAITING or INVALID state.
+	 */
+	ASSERT(p->auth_state != NFS_AUTH_WAITING);
+	ASSERT(p->auth_state != NFS_AUTH_INVALID);
+
+	/*
+	 * In a case the client's list of supplemental groups changed (or, the
+	 * list is not initialized yet) we need to (re)allocate it and make
+	 * sure the auth_cache entry is (re)retrieved.
+	 */
+	if (p->auth_clnt_ngids != crgetngroups(cr) ||
+	    bcmp(p->auth_clnt_gids, crgetgroups(cr),
+	    p->auth_clnt_ngids * sizeof (gid_t)) != 0) {
+
+		/*
+		 * If the refresh thread is just working on this entry then
+		 * wait for it so we do not modify the list of supplemental
+		 * groups in the middle of its processing.
+		 */
+		if (p->auth_state == NFS_AUTH_REFRESHING) {
+			p->auth_state = NFS_AUTH_WAITING;
+			goto wait;
+		}
+
+		/*
+		 * We won't modify (and use) the STALE entries here since they
+		 * are already in the refreshq_queue list.  Such entries will
+		 * be updated later.
+		 */
+		if (p->auth_state == NFS_AUTH_STALE) {
+			mutex_exit(&p->auth_lock);
+
+			p = NULL;
+
+			goto retrieve;
+		}
+
+		p->auth_state = NFS_AUTH_NEW;
+
+		/*
+		 * If the number of supplemental groups differ, we need to
+		 * reallocate first.
+		 */
+		if (p->auth_clnt_ngids != crgetngroups(cr)) {
+			kmem_free(p->auth_clnt_gids,
+			    p->auth_clnt_ngids * sizeof (gid_t));
+
+			p->auth_clnt_ngids = crgetngroups(cr);
+			p->auth_clnt_gids = kmem_alloc(
+			    p->auth_clnt_ngids * sizeof (gid_t),
+			    KM_NOSLEEP | KM_NORMALPRI);
+
+			/*
+			 * If we failed to preallocate the memory for
+			 * supplemental groups, we won't cache the retrieved
+			 * data.
+			 */
+			if (p->auth_clnt_ngids != 0 &&
+			    p->auth_clnt_gids == NULL)
+				p->auth_clnt_ngids = 0;
+				mutex_exit(&p->auth_lock);
+
+				p = NULL;
+
+				goto retrieve;
+		}
+
+		/*
+		 * Fill the client's supplemental groups.
+		 */
+		bcopy(crgetgroups(cr), p->auth_clnt_gids,
+		    p->auth_clnt_ngids * sizeof (gid_t));
+	}
+
+	/*
+	 * If the cache entry is not valid yet, we need to retrieve the
+	 * info ourselves.
+	 */
+	if (p->auth_state == NFS_AUTH_NEW) {
+		bool_t res;
+		/*
+		 * NFS_AUTH_NEW is the default output auth_state value in a
+		 * case we failed somewhere below.
+		 */
+		auth_state_t state = NFS_AUTH_NEW;
+
+		p->auth_state = NFS_AUTH_WAITING;
+		mutex_exit(&p->auth_lock);
+		kmem_free(addr.buf, addr.len);
+		addr = p->auth_clnt->authc_addr;
+
+		atomic_inc_uint(&nfsauth_cache_miss);
+
+		res = nfsauth_retrieve(exi, svc_getnetid(req->rq_xprt), flavor,
+		    &addr, &access, crgetuid(cr), crgetgid(cr),
+		    crgetngroups(cr), crgetgroups(cr), &tmpuid, &tmpgid,
+		    &tmpngids, &tmpgids);
+
+		p->auth_access = access;
+		p->auth_time = p->auth_freshness = gethrestime_sec();
+
+		if (res == TRUE) {
+			if (uid != NULL)
+				*uid = tmpuid;
+			if (gid != NULL)
+				*gid = tmpgid;
+			if (ngids != NULL && gids != NULL) {
+				*ngids = tmpngids;
+				*gids = tmpgids;
+
+				/*
+				 * We need a copy of gids for the
+				 * auth_cache entry
+				 */
+				tmpgids = kmem_alloc(tmpngids * sizeof (gid_t),
+				    KM_NOSLEEP | KM_NORMALPRI);
+				if (tmpgids != NULL)
+					bcopy(*gids, tmpgids,
+					    tmpngids * sizeof (gid_t));
+			}
+
+			if (tmpgids != NULL || tmpngids == 0) {
+				p->auth_srv_uid = tmpuid;
+				p->auth_srv_gid = tmpgid;
+				p->auth_srv_ngids = tmpngids;
+				p->auth_srv_gids = tmpgids;
+
+				state = NFS_AUTH_FRESH;
+			}
+		}
+
+		/*
+		 * Set the auth_state and notify waiters.
+		 */
+		mutex_enter(&p->auth_lock);
+		p->auth_state = state;
+		cv_broadcast(&p->auth_cv);
+		mutex_exit(&p->auth_lock);
+	} else {
+		uint_t nach;
+		time_t refresh;
 
 		refresh = gethrestime_sec() - p->auth_freshness;
-		DTRACE_PROBE2(nfsauth__debug__cache__hit,
-		    int, nfsauth_cache_hit,
-		    time_t, refresh);
 
-		mutex_enter(&p->auth_lock);
+		p->auth_time = gethrestime_sec();
+
+		if (uid != NULL)
+			*uid = p->auth_srv_uid;
+		if (gid != NULL)
+			*gid = p->auth_srv_gid;
+		if (ngids != NULL && gids != NULL) {
+			*ngids = p->auth_srv_ngids;
+			*gids = kmem_alloc(*ngids * sizeof (gid_t), KM_SLEEP);
+			bcopy(p->auth_srv_gids, *gids, *ngids * sizeof (gid_t));
+		}
+
+		access = p->auth_access;
+
 		if ((refresh > NFSAUTH_CACHE_REFRESH) &&
 		    p->auth_state == NFS_AUTH_FRESH) {
+			refreshq_auth_node_t *ran;
+			uint_t nacr;
+
 			p->auth_state = NFS_AUTH_STALE;
 			mutex_exit(&p->auth_lock);
 
-			ASSERT(p->auth_netid == NULL);
-			p->auth_netid =
-			    strdup(svc_getnetid(req->rq_xprt));
-
-			nfsauth_cache_refresh++;
-
+			nacr = atomic_inc_uint_nv(&nfsauth_cache_refresh);
 			DTRACE_PROBE3(nfsauth__debug__cache__stale,
 			    struct exportinfo *, exi,
 			    struct auth_cache *, p,
-			    int, nfsauth_cache_refresh);
+			    uint_t, nacr);
 
 			ran = kmem_alloc(sizeof (refreshq_auth_node_t),
 			    KM_SLEEP);
 			ran->ran_auth = p;
+			ran->ran_netid = strdup(svc_getnetid(req->rq_xprt));
 
 			mutex_enter(&refreshq_lock);
 			/*
@@ -827,6 +1147,8 @@ nfsauth_cache_get(struct exportinfo *exi, struct svc_req *req, int flavor)
 			 * accepting them.
 			 */
 			if (refreshq_thread_state == REFRESHQ_THREAD_RUNNING) {
+				refreshq_exi_node_t *ren;
+
 				/*
 				 * Is there an existing exi_list?
 				 */
@@ -860,6 +1182,7 @@ nfsauth_cache_get(struct exportinfo *exi, struct svc_req *req, int flavor)
 
 				cv_broadcast(&refreshq_cv);
 			} else {
+				strfree(ran->ran_netid);
 				kmem_free(ran, sizeof (refreshq_auth_node_t));
 			}
 
@@ -868,46 +1191,41 @@ nfsauth_cache_get(struct exportinfo *exi, struct svc_req *req, int flavor)
 			mutex_exit(&p->auth_lock);
 		}
 
-		access = p->auth_access;
-		p->auth_time = gethrestime_sec();
+		nach = atomic_inc_uint_nv(&nfsauth_cache_hit);
+		DTRACE_PROBE2(nfsauth__debug__cache__hit,
+		    uint_t, nach,
+		    time_t, refresh);
 
-		rw_exit(&exi->exi_cache_lock);
 		kmem_free(addr.buf, addr.len);
-
-		return (access);
 	}
 
-	rw_exit(&exi->exi_cache_lock);
+	return (access);
 
-	nfsauth_cache_miss++;
-
-	if (!nfsauth_retrieve(exi, svc_getnetid(req->rq_xprt), flavor,
-	    &addr, &access)) {
-		kmem_free(addr.buf, addr.len);
-		return (access);
-	}
-
+retrieve:
 	/*
-	 * Now cache the result on the cache chain
-	 * for this export (if there's enough memory)
+	 * Retrieve the required data without caching.
 	 */
-	p = kmem_cache_alloc(exi_cache_handle, KM_NOSLEEP);
-	if (p != NULL) {
-		p->auth_addr = addr;
-		p->auth_flavor = flavor;
-		p->auth_access = access;
-		p->auth_time = p->auth_freshness = gethrestime_sec();
-		p->auth_state = NFS_AUTH_FRESH;
-		p->auth_netid = NULL;
-		mutex_init(&p->auth_lock, NULL, MUTEX_DEFAULT, NULL);
 
-		rw_enter(&exi->exi_cache_lock, RW_WRITER);
-		p->auth_next = *head;
-		*head = p;
-		rw_exit(&exi->exi_cache_lock);
-	} else {
-		kmem_free(addr.buf, addr.len);
+	ASSERT(p == NULL);
+
+	atomic_inc_uint(&nfsauth_cache_miss);
+
+	if (nfsauth_retrieve(exi, svc_getnetid(req->rq_xprt), flavor, &addr,
+	    &access, crgetuid(cr), crgetgid(cr), crgetngroups(cr),
+	    crgetgroups(cr), &tmpuid, &tmpgid, &tmpngids, &tmpgids)) {
+		if (uid != NULL)
+			*uid = tmpuid;
+		if (gid != NULL)
+			*gid = tmpgid;
+		if (ngids != NULL && gids != NULL) {
+			*ngids = tmpngids;
+			*gids = tmpgids;
+		} else {
+			kmem_free(tmpgids, tmpngids * sizeof (gid_t));
+		}
 	}
+
+	kmem_free(addr.buf, addr.len);
 
 	return (access);
 }
@@ -918,7 +1236,7 @@ nfsauth_cache_get(struct exportinfo *exi, struct svc_req *req, int flavor)
  */
 int
 nfsauth4_secinfo_access(struct exportinfo *exi, struct svc_req *req,
-			int flavor, int perm)
+			int flavor, int perm, cred_t *cr)
 {
 	int access;
 
@@ -929,7 +1247,7 @@ nfsauth4_secinfo_access(struct exportinfo *exi, struct svc_req *req,
 	/*
 	 * Optimize if there are no lists
 	 */
-	if ((perm & (M_ROOT|M_NONE)) == 0) {
+	if ((perm & (M_ROOT | M_NONE | M_MAP)) == 0) {
 		perm &= ~M_4SEC_EXPORTED;
 		if (perm == M_RO)
 			return (NFSAUTH_RO);
@@ -937,18 +1255,41 @@ nfsauth4_secinfo_access(struct exportinfo *exi, struct svc_req *req,
 			return (NFSAUTH_RW);
 	}
 
-	access = nfsauth_cache_get(exi, req, flavor);
+	access = nfsauth_cache_get(exi, req, flavor, cr, NULL, NULL, NULL,
+	    NULL);
 
 	return (access);
 }
 
 int
-nfsauth_access(struct exportinfo *exi, struct svc_req *req)
+nfsauth_access(struct exportinfo *exi, struct svc_req *req, cred_t *cr,
+    uid_t *uid, gid_t *gid, uint_t *ngids, gid_t **gids)
 {
 	int access, mapaccess;
 	struct secinfo *sp;
 	int i, flavor, perm;
 	int authnone_entry = -1;
+
+	/*
+	 * By default root is mapped to anonymous user.
+	 * This might get overriden later in nfsauth_cache_get().
+	 */
+	if (crgetuid(cr) == 0) {
+		if (uid != NULL)
+			*uid = exi->exi_export.ex_anon;
+		if (gid != NULL)
+			*gid = exi->exi_export.ex_anon;
+	} else {
+		if (uid != NULL)
+			*uid = crgetuid(cr);
+		if (gid != NULL)
+			*gid = crgetgid(cr);
+	}
+
+	if (ngids != NULL)
+		*ngids = 0;
+	if (gids != NULL)
+		*gids = NULL;
 
 	/*
 	 *  Get the nfs flavor number from xprt.
@@ -1007,10 +1348,12 @@ nfsauth_access(struct exportinfo *exi, struct svc_req *req)
 		return (mapaccess | NFSAUTH_RO);
 
 	/*
-	 * Optimize if there are no lists
+	 * Optimize if there are no lists.
+	 * We cannot optimize for AUTH_SYS with NGRPS (16) supplemental groups.
 	 */
 	perm = sp[i].s_flags;
-	if ((perm & (M_ROOT|M_NONE)) == 0) {
+	if ((perm & (M_ROOT | M_NONE | M_MAP)) == 0 && (ngroups_max <= NGRPS ||
+	    flavor != AUTH_SYS || crgetngroups(cr) < NGRPS)) {
 		perm &= ~M_4SEC_EXPORTED;
 		if (perm == M_RO)
 			return (mapaccess | NFSAUTH_RO);
@@ -1018,7 +1361,19 @@ nfsauth_access(struct exportinfo *exi, struct svc_req *req)
 			return (mapaccess | NFSAUTH_RW);
 	}
 
-	access = nfsauth_cache_get(exi, req, flavor);
+	access = nfsauth_cache_get(exi, req, flavor, cr, uid, gid, ngids, gids);
+
+	/*
+	 * For both NFSAUTH_DENIED and NFSAUTH_WRONGSEC we do not care about
+	 * the supplemental groups.
+	 */
+	if (access & NFSAUTH_DENIED || access & NFSAUTH_WRONGSEC) {
+		if (ngids != NULL && gids != NULL) {
+			kmem_free(*gids, *ngids * sizeof (gid_t));
+			*ngids = 0;
+			*gids = NULL;
+		}
+	}
 
 	/*
 	 * Client's security flavor doesn't match with "ro" or
@@ -1030,7 +1385,8 @@ nfsauth_access(struct exportinfo *exi, struct svc_req *req)
 		 */
 		if (authnone_entry != -1) {
 			mapaccess = NFSAUTH_MAPNONE;
-			access = nfsauth_cache_get(exi, req, AUTH_NONE);
+			access = nfsauth_cache_get(exi, req, AUTH_NONE, cr,
+			    NULL, NULL, NULL, NULL);
 		} else {
 			/*
 			 * Check for AUTH_NONE presence.
@@ -1039,7 +1395,8 @@ nfsauth_access(struct exportinfo *exi, struct svc_req *req)
 				if (sp[i].s_secinfo.sc_nfsnum == AUTH_NONE) {
 					mapaccess = NFSAUTH_MAPNONE;
 					access = nfsauth_cache_get(exi, req,
-					    AUTH_NONE);
+					    AUTH_NONE, cr, NULL, NULL, NULL,
+					    NULL);
 					break;
 				}
 			}
@@ -1053,44 +1410,29 @@ nfsauth_access(struct exportinfo *exi, struct svc_req *req)
 }
 
 static void
-nfsauth_free_node(struct auth_cache *p)
+nfsauth_free_clnt_node(struct auth_cache_clnt *p)
 {
-	if (p->auth_netid != NULL)
-		kmem_free(p->auth_netid, strlen(p->auth_netid) + 1);
-	kmem_free(p->auth_addr.buf, p->auth_addr.len);
-	mutex_destroy(&p->auth_lock);
-	kmem_cache_free(exi_cache_handle, (void *)p);
+	void *cookie = NULL;
+	struct auth_cache *node;
+
+	while ((node = avl_destroy_nodes(&p->authc_tree, &cookie)) != NULL)
+		nfsauth_free_node(node);
+	avl_destroy(&p->authc_tree);
+
+	kmem_free(p->authc_addr.buf, p->authc_addr.len);
+	rw_destroy(&p->authc_lock);
+
+	kmem_free(p, sizeof (*p));
 }
 
-/*
- * Remove the dead entry from the refreshq_dead_entries
- * list.
- */
 static void
-nfsauth_remove_dead_entry(struct auth_cache *dead)
+nfsauth_free_node(struct auth_cache *p)
 {
-	struct auth_cache	*p;
-	struct auth_cache	*prev;
-	struct auth_cache	*next;
-
-	mutex_enter(&refreshq_lock);
-	prev = NULL;
-	for (p = refreshq_dead_entries; p != NULL; p = next) {
-		next = p->auth_next;
-
-		if (p == dead) {
-			if (prev == NULL)
-				refreshq_dead_entries = next;
-			else
-				prev->auth_next = next;
-
-			nfsauth_free_node(dead);
-			break;
-		}
-
-		prev = p;
-	}
-	mutex_exit(&refreshq_lock);
+	kmem_free(p->auth_clnt_gids, p->auth_clnt_ngids * sizeof (gid_t));
+	kmem_free(p->auth_srv_gids, p->auth_srv_ngids * sizeof (gid_t));
+	mutex_destroy(&p->auth_lock);
+	cv_destroy(&p->auth_cv);
+	kmem_cache_free(exi_cache_handle, p);
 }
 
 /*
@@ -1100,20 +1442,19 @@ void
 nfsauth_cache_free(struct exportinfo *exi)
 {
 	int i;
-	struct auth_cache *p, *next;
+
+	/*
+	 * The only way we got here was with an exi_rele, which means that no
+	 * auth cache entry is being refreshed.
+	 */
 
 	for (i = 0; i < AUTH_TABLESIZE; i++) {
-		for (p = exi->exi_cache[i]; p; p = next) {
-			next = p->auth_next;
+		avl_tree_t *tree = exi->exi_cache[i];
+		void *cookie = NULL;
+		struct auth_cache_clnt *node;
 
-			/*
-			 * The only way we got here
-			 * was with an exi_rele, which
-			 * means that no auth cache entry
-			 * is being refreshed.
-			 */
-			nfsauth_free_node(p);
-		}
+		while ((node = avl_destroy_nodes(tree, &cookie)) != NULL)
+			nfsauth_free_clnt_node(node);
 	}
 }
 
@@ -1137,60 +1478,95 @@ exi_cache_reclaim(void *cdrarg)
 			exi_cache_trim(exi);
 		}
 	}
-	nfsauth_cache_reclaim++;
 
 	rw_exit(&exported_lock);
+
+	atomic_inc_uint(&nfsauth_cache_reclaim);
 }
 
 void
 exi_cache_trim(struct exportinfo *exi)
 {
+	struct auth_cache_clnt *c;
+	struct auth_cache_clnt *nextc;
 	struct auth_cache *p;
-	struct auth_cache *prev, *next;
+	struct auth_cache *next;
 	int i;
 	time_t stale_time;
-
-	stale_time = gethrestime_sec() - NFSAUTH_CACHE_TRIM;
-
-	rw_enter(&exi->exi_cache_lock, RW_WRITER);
+	avl_tree_t *tree;
 
 	for (i = 0; i < AUTH_TABLESIZE; i++) {
+
+		tree = exi->exi_cache[i];
+		stale_time = gethrestime_sec() - NFSAUTH_CACHE_TRIM;
+
+		rw_enter(&exi->exi_cache_lock, RW_READER);
 
 		/*
 		 * Free entries that have not been
 		 * used for NFSAUTH_CACHE_TRIM seconds.
 		 */
-		prev = NULL;
-		for (p = exi->exi_cache[i]; p; p = next) {
-			next = p->auth_next;
-			if (p->auth_time > stale_time) {
-				prev = p;
-				continue;
+		for (c = avl_first(tree); c != NULL; c = AVL_NEXT(tree, c)) {
+			rw_enter(&c->authc_lock, RW_WRITER);
+			for (p = avl_first(&c->authc_tree); p != NULL;
+			    p = next) {
+				next = AVL_NEXT(&c->authc_tree, p);
+
+				ASSERT(p->auth_state != NFS_AUTH_INVALID);
+
+				mutex_enter(&p->auth_lock);
+
+				/*
+				 * We won't trim recently used and/or WAITING
+				 * entries.
+				 */
+				if (p->auth_time > stale_time ||
+				    p->auth_state == NFS_AUTH_WAITING) {
+					mutex_exit(&p->auth_lock);
+					continue;
+				}
+
+				DTRACE_PROBE1(nfsauth__debug__trim__state,
+				    auth_state_t, p->auth_state);
+
+				/*
+				 * STALE and REFRESHING entries needs to be
+				 * marked INVALID only because they are
+				 * referenced by some other structures or
+				 * threads.  They will be freed later.
+				 */
+				if (p->auth_state == NFS_AUTH_STALE ||
+				    p->auth_state == NFS_AUTH_REFRESHING) {
+					p->auth_state = NFS_AUTH_INVALID;
+					mutex_exit(&p->auth_lock);
+
+					avl_remove(&c->authc_tree, p);
+				} else {
+					mutex_exit(&p->auth_lock);
+
+					avl_remove(&c->authc_tree, p);
+					nfsauth_free_node(p);
+				}
 			}
-
-			mutex_enter(&p->auth_lock);
-			DTRACE_PROBE1(nfsauth__debug__trim__state,
-			    auth_state_t, p->auth_state);
-
-			if (p->auth_state != NFS_AUTH_FRESH) {
-				p->auth_state = NFS_AUTH_INVALID;
-				mutex_exit(&p->auth_lock);
-
-				mutex_enter(&refreshq_lock);
-				p->auth_next = refreshq_dead_entries;
-				refreshq_dead_entries = p;
-				mutex_exit(&refreshq_lock);
-			} else {
-				mutex_exit(&p->auth_lock);
-				nfsauth_free_node(p);
-			}
-
-			if (prev == NULL)
-				exi->exi_cache[i] = next;
-			else
-				prev->auth_next = next;
+			rw_exit(&c->authc_lock);
 		}
-	}
 
-	rw_exit(&exi->exi_cache_lock);
+		if (rw_tryupgrade(&exi->exi_cache_lock) == 0) {
+			rw_exit(&exi->exi_cache_lock);
+			rw_enter(&exi->exi_cache_lock, RW_WRITER);
+		}
+
+		for (c = avl_first(tree); c != NULL; c = nextc) {
+			nextc = AVL_NEXT(tree, c);
+
+			if (avl_is_empty(&c->authc_tree) == B_FALSE)
+				continue;
+
+			avl_remove(tree, c);
+
+			nfsauth_free_clnt_node(c);
+		}
+
+		rw_exit(&exi->exi_cache_lock);
+	}
 }

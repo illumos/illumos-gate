@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <sys/stat.h>
@@ -34,10 +35,10 @@
 #include "utils.h"
 
 static const char USAGE[] = "\
-Usage: %s [-nuy] [-c kernel | curproc | all ] [-d dump-device | swap ]\n\
+Usage: %s [-enuy] [-c kernel | curproc | all ] [-d dump-device | swap ]\n\
 	[-m min {k|m|%%} ] [-s savecore-dir] [-r root-dir] [-z on|off]\n";
 
-static const char OPTS[] = "inuyc:d:m:s:r:z:";
+static const char OPTS[] = "einuyc:d:m:s:r:z:";
 
 static const char PATH_DEVICE[] = "/dev/dump";
 static const char PATH_CONFIG[] = "/etc/dumpadm.conf";
@@ -51,6 +52,7 @@ main(int argc, char *argv[])
 	struct stat st;
 	int c;
 	int dflag = 0;			/* for checking in use during -d ops */
+	int eflag = 0;			/* print estimated dump size */
 	int dcmode = DC_CURRENT;	/* kernel settings override unless -u */
 	int modified = 0;		/* have we modified the dump config? */
 	char *minfstr = NULL;		/* string value of -m argument */
@@ -121,7 +123,9 @@ main(int argc, char *argv[])
 				dflag++;
 				modified++;
 				break;
-
+			case 'e':
+				eflag++;
+				break;
 			case 'i':
 				/* undocumented option */
 				if (chrooted) {
@@ -166,6 +170,14 @@ main(int argc, char *argv[])
 				break;
 			}
 		}
+	}
+
+	if (eflag) {
+		if (argc == 2 && argv[1][0] == '-' && argv[1][1] == 'e' &&
+		    !argv[1][2])
+			return (dconf_get_dumpsize(&dc) ? E_SUCCESS : E_ERROR);
+		else
+			die(gettext("-e cannot be used with other options\n"));
 	}
 
 	if (douuid)

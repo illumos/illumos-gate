@@ -20,14 +20,14 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _MQUEUE_H
 #define	_MQUEUE_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/feature_tests.h>
 #include <sys/types.h>
@@ -53,7 +53,6 @@ struct mq_attr {
 /*
  * function prototypes
  */
-#if	defined(__STDC__)
 #if	(_POSIX_C_SOURCE - 0 > 0) && (_POSIX_C_SOURCE - 0 <= 2)
 #error	"POSIX Message Passing is not supported in POSIX.1-1990"
 #endif
@@ -77,20 +76,6 @@ int	mq_notify(mqd_t, const struct sigevent *);
 int	mq_getattr(mqd_t, struct mq_attr *);
 int	mq_setattr(mqd_t, const struct mq_attr *_RESTRICT_KYWD,
 		struct mq_attr *_RESTRICT_KYWD);
-#else
-mqd_t	mq_open();
-int	mq_close();
-int	mq_unlink();
-int	mq_send();
-int	mq_timedsend();
-int	mq_reltimedsend_np();
-ssize_t	mq_receive();
-ssize_t	mq_timedreceive();
-ssize_t	mq_reltimedreceive_np();
-int	mq_notify();
-int	mq_getattr();
-int	mq_setattr();
-#endif	/* __STDC__ */
 
 #ifdef	__cplusplus
 }

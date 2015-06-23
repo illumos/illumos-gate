@@ -24,7 +24,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright (c) 2012, 2014 by Delphix. All rights reserved.
  */
 
 #include "lint.h"
@@ -409,16 +409,32 @@ __assfail(const char *assertion, const char *filename, int line_num)
 		lwpid = _lwp_self();
 	}
 
-	(void) strcpy(buf, "assertion failed for thread ");
+	/*
+	 * This is a hack, but since the Abort function isn't exported
+	 * to outside consumers, libzpool's vpanic() function calls
+	 * assfail() with a filename set to NULL. In that case, it'd be
+	 * best not to print "assertion failed" since it was a panic and
+	 * not an assertion failure.
+	 */
+	if (filename == NULL) {
+		(void) strcpy(buf, "failure for thread ");
+	} else {
+		(void) strcpy(buf, "assertion failed for thread ");
+	}
+
 	ultos((uint64_t)(uintptr_t)self, 16, buf + strlen(buf));
 	(void) strcat(buf, ", thread-id ");
 	ultos((uint64_t)lwpid, 10, buf + strlen(buf));
 	(void) strcat(buf, ": ");
 	(void) strcat(buf, assertion);
-	(void) strcat(buf, ", file ");
-	(void) strcat(buf, filename);
-	(void) strcat(buf, ", line ");
-	ultos((uint64_t)line_num, 10, buf + strlen(buf));
+
+	if (filename != NULL) {
+		(void) strcat(buf, ", file ");
+		(void) strcat(buf, filename);
+		(void) strcat(buf, ", line ");
+		ultos((uint64_t)line_num, 10, buf + strlen(buf));
+	}
+
 	(void) strcat(buf, "\n");
 	(void) __write(2, buf, strlen(buf));
 	/*

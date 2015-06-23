@@ -8,7 +8,6 @@
 .SH NAME
 if_tcp, if \- general properties of Internet Protocol network interfaces
 .SH DESCRIPTION
-.sp
 .LP
 A network interface is a device for sending and receiving packets on a network.
 It is usually a hardware device, although it can be implemented in software.
@@ -16,7 +15,6 @@ Network interfaces used by the Internet Protocol (IPv4 or IPv6) must be STREAMS
 devices conforming to the Data Link Provider Interface (\fBDLPI\fR). See
 \fBdlpi\fR(7P).
 .SH APPLICATION PROGRAMMING INTERFACE
-.sp
 .LP
 An interface becomes available to \fBIP\fR when it is opened and the \fBIP\fR
 module is pushed onto the stream with the \fBI_PUSH\fR \fBioctl\fR(2) command.
@@ -37,7 +35,6 @@ when an interface's address is set.
 You cannot create IPMP IP  interfaces using  the procedure described above.
 Instead, use \fBifconfig\fR(1M).
 .SH IOCTLS
-.sp
 .LP
 The following \fBioctl()\fR calls may be used to manipulate \fBIP\fR network
 interfaces. Unless specified otherwise, the request takes an \fBlifreq\fR
@@ -749,7 +746,6 @@ struct ifconf {
 .in -2
 
 .SS "IFF_ Flags"
-.sp
 .LP
 You can use the \fBifconfig\fR(1M) command to display the \fBIFF\fR_ flags
 listed below (with the leading \fBIFF\fR_ prefix removed). See the
@@ -809,7 +805,6 @@ listed below (with the leading \fBIFF\fR_ prefix removed). See the
 .in -2
 
 .SH ERRORS
-.sp
 .ne 2
 .na
 \fB\fBEPERM\fR\fR
@@ -871,7 +866,7 @@ specified by \fBlifr_ppa\fR plumbed.
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBifconfig\fR(1M), \fBin.routed\fR(1M), \fBioctl\fR(2), \fBstreamio\fR(7I),
-\fBarp\fR(7P), \fBdlpi\fR(7P), \fBip\fR(7P), \fBip6\fR(7P)
+\fBifconfig\fR(1M), \fBin.routed\fR(1M), \fBioctl\fR(2),
+\fBsockaddr\fR(3SOCKET), \fBstreamio\fR(7I), \fBarp\fR(7P), \fBdlpi\fR(7P),
+\fBip\fR(7P), \fBip6\fR(7P)

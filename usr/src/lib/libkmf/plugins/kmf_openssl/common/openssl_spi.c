@@ -1264,7 +1264,7 @@ OpenSSL_DeleteCert(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 {
 	KMF_RETURN rv;
 	KMF_HANDLE *kmfh = (KMF_HANDLE *)handle;
-	KMF_DATA certdata = {NULL, 0};
+	KMF_DATA certdata = { 0, NULL };
 	char *dirpath = NULL;
 	char *filename = NULL;
 	char *fullpath = NULL;
@@ -2033,7 +2033,7 @@ OpenSSL_CertGetPrintable(KMF_HANDLE_T handle, const KMF_DATA *pcert,
 #if OPENSSL_VERSION_NUMBER < 0x10000000L
 	STACK *emlst = NULL;
 #else
-        STACK_OF(OPENSSL_STRING) *emlst = NULL;
+	STACK_OF(OPENSSL_STRING) *emlst = NULL;
 #endif
 	X509_EXTENSION *ex;
 	X509_CINF *ci;
@@ -2153,7 +2153,7 @@ OpenSSL_CertGetPrintable(KMF_HANDLE_T handle, const KMF_DATA *pcert,
 #else
 		for (j = 0; j < sk_OPENSSL_STRING_num(emlst); j++)
 			(void) BIO_printf(mem, "%s\n",
-                            sk_OPENSSL_STRING_value(emlst, j));
+			    sk_OPENSSL_STRING_value(emlst, j));
 #endif
 
 		len = BIO_gets(mem, resultStr, KMF_CERT_PRINTABLE_LEN);
@@ -3778,7 +3778,7 @@ set_pkey_attrib(EVP_PKEY *pkey, ASN1_TYPE *attrib, int nid)
 			if (OBJ_obj2nid(a->object) == nid) {
 				X509_ATTRIBUTE_free(a);
 				/* LINTED E_BAD_PTR_CAST_ALIGN */
-				sk_X509_ATTRIBUTE_set(pkey->attributes,
+				(void) sk_X509_ATTRIBUTE_set(pkey->attributes,
 				    i, attr);
 				return (KMF_OK);
 			}
@@ -4865,7 +4865,7 @@ OpenSSL_StoreKey(KMF_HANDLE_T handle, int numattr,
 	KMF_RAW_KEY_DATA *rawkey;
 	EVP_PKEY *pkey = NULL;
 	KMF_ENCODE_FORMAT format = KMF_FORMAT_PEM;
-	KMF_CREDENTIAL cred = {NULL, 0};
+	KMF_CREDENTIAL cred = { NULL, 0 };
 	BIO *out = NULL;
 	int keys = 0;
 	char *fullpath = NULL;

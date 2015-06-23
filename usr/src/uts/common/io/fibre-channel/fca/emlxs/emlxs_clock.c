@@ -5,8 +5,8 @@
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
  *
- * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
+ * You can obtain a copy of the license at
+ * http://www.opensource.org/licenses/cddl1.txt.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -20,10 +20,9 @@
  */
 
 /*
- * Copyright 2011 Emulex.  All rights reserved.
+ * Copyright (c) 2004-2012 Emulex. All rights reserved.
  * Use is subject to license terms.
  */
-
 
 #include <emlxs.h>
 
@@ -41,6 +40,7 @@ static void emlxs_timer_check_loopback(emlxs_hba_t *hba);
 static void emlxs_timer_check_dhchap(emlxs_port_t *port);
 #endif /* DHCHAP_SUPPORT */
 
+static void	emlxs_timer_check_pools(emlxs_hba_t *hba);
 static void	emlxs_timer(void *arg);
 static void	emlxs_timer_check_fw_update(emlxs_hba_t *hba);
 static void	emlxs_timer_check_heartbeat(emlxs_hba_t *hba);
@@ -48,6 +48,7 @@ static uint32_t	emlxs_timer_check_pkts(emlxs_hba_t *hba, uint8_t *flag);
 static void	emlxs_timer_check_nodes(emlxs_port_t *port, uint8_t *flag);
 static void	emlxs_timer_check_linkup(emlxs_hba_t *hba);
 static void	emlxs_timer_check_discovery(emlxs_port_t *port);
+static void	emlxs_timer_check_clean_address(emlxs_port_t *port);
 static void	emlxs_timer_check_ub(emlxs_port_t *port);
 static void	emlxs_timer_check_channels(emlxs_hba_t *hba, uint8_t *flag);
 static uint32_t	emlxs_pkt_chip_timeout(emlxs_port_t *port, emlxs_buf_t *sbp,
@@ -80,6 +81,7 @@ static void
 emlxs_timer(void *arg)
 {
 	emlxs_hba_t *hba = (emlxs_hba_t *)arg;
+	emlxs_port_t *port = &PPORT;
 
 	if (!hba->timer_id) {
 		return;
@@ -96,6 +98,7 @@ emlxs_timer(void *arg)
 	/* Check if a kill request has been made */
 	if (hba->timer_flags & EMLXS_TIMER_KILL) {
 		hba->timer_id = 0;
+		hba->timer_tics = 0;
 		hba->timer_flags |= EMLXS_TIMER_ENDED;
 
 		mutex_exit(&EMLXS_TIMER_LOCK);
@@ -104,6 +107,13 @@ emlxs_timer(void *arg)
 
 	hba->timer_flags |= (EMLXS_TIMER_BUSY | EMLXS_TIMER_STARTED);
 	hba->timer_tics = DRV_TIME;
+
+	/* Check io_active count (Safety net) */
+	if (hba->io_active & 0x80000000) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_debug_msg,
+		    "Timer: io_active=0x%x. Reset to zero.", hba->io_active);
+		hba->io_active = 0;
+	}
 
 	mutex_exit(&EMLXS_TIMER_LOCK);
 
@@ -190,6 +200,9 @@ emlxs_timer_checks(emlxs_hba_t *hba)
 		/* Check for node gate timeouts */
 		emlxs_timer_check_nodes(port, flag);
 
+		/* Check for clean address bit delay timeout */
+		emlxs_timer_check_clean_address(port);
+
 		/* Check for tape discovery timeout */
 		emlxs_timer_check_discovery(port);
 
@@ -202,6 +215,9 @@ emlxs_timer_checks(emlxs_hba_t *hba)
 #endif /* DHCHAP_SUPPORT */
 
 	}
+
+	/* Check memory pools */
+	emlxs_timer_check_pools(hba);
 
 	/* Check for IO channel service timeouts */
 	/* Always do this last */
@@ -437,7 +453,7 @@ emlxs_timer_check_pkts(emlxs_hba_t *hba, uint8_t *flag)
 		sbp = iocbq->sbp;
 		if (sbp && (sbp != STALE_PACKET)) {
 			if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
-				emlxs_sli4_free_xri(hba, sbp, sbp->xrip, 1);
+				emlxs_sli4_free_xri(port, sbp, sbp->xrip, 1);
 			} else {
 				(void) emlxs_unregister_pkt(
 				    (CHANNEL *)iocbq->channel,
@@ -473,7 +489,7 @@ emlxs_timer_check_pkts(emlxs_hba_t *hba, uint8_t *flag)
 			pkt = PRIV2PKT(sbp);
 
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_timeout_msg,
-			    "TXQ abort: sbp=%p iotag=%x tmo=%d", sbp,
+			    "TXQ abort: sbp=%p iotag=%d tmo=%d", sbp,
 			    sbp->iotag, (pkt) ? pkt->pkt_timeout : 0);
 
 			if (hba->state >= FC_LINK_UP) {
@@ -501,7 +517,7 @@ emlxs_timer_check_pkts(emlxs_hba_t *hba, uint8_t *flag)
 	for (iotag = 1; iotag < hba->max_iotag; iotag++) {
 		sbp = hba->fc_table[iotag];
 
-		if (!sbp || (sbp == STALE_PACKET)) {
+		if (!sbp || sbp == STALE_PACKET) {
 			continue;
 		}
 
@@ -510,7 +526,7 @@ emlxs_timer_check_pkts(emlxs_hba_t *hba, uint8_t *flag)
 		    (sbp->pkt_flags & (PACKET_ULP_OWNED|
 		    PACKET_COMPLETED|PACKET_IN_COMPLETION))) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_debug_msg,
-			    "timer_check_pkts: Invalid IO found. iotag=%x",
+			    "timer_check_pkts: Invalid IO found. iotag=%d",
 			    iotag);
 
 			hba->fc_table[iotag] = STALE_PACKET;
@@ -556,13 +572,32 @@ emlxs_timer_check_pkts(emlxs_hba_t *hba, uint8_t *flag)
 	}
 
 	if (rc == 1) {
-		/* Spawn a thread to reset the link */
-		emlxs_thread_spawn(hba, emlxs_reset_link_thread, NULL, NULL);
+		mutex_enter(&EMLXS_PORT_LOCK);
+		/* If a link reset or port reset is already requested, exit */
+		if (!(hba->reset_request & (FC_LINK_RESET | FC_PORT_RESET))) {
+			hba->reset_request |= FC_LINK_RESET;
+			mutex_exit(&EMLXS_PORT_LOCK);
+			/* Spawn a thread to reset the link */
+			emlxs_thread_spawn(hba, emlxs_reset_link_thread, NULL,
+			    NULL);
+			goto exit;
+		}
+		mutex_exit(&EMLXS_PORT_LOCK);
 	} else if (rc == 2) {
-		/* Spawn a thread to reset the adapter */
-		emlxs_thread_spawn(hba, emlxs_restart_thread, NULL, NULL);
+		mutex_enter(&EMLXS_PORT_LOCK);
+		/* If a port reset is already requested, exit */
+		if (!(hba->reset_request & FC_PORT_RESET)) {
+			hba->reset_request |= FC_PORT_RESET;
+			mutex_exit(&EMLXS_PORT_LOCK);
+			/* Spawn a thread to reset the adapter */
+			emlxs_thread_spawn(hba, emlxs_restart_thread, NULL,
+			    NULL);
+			goto exit;
+		}
+		mutex_exit(&EMLXS_PORT_LOCK);
 	}
 
+exit:
 	return (rc);
 
 } /* emlxs_timer_check_pkts() */
@@ -648,6 +683,19 @@ emlxs_timer_check_nodes(emlxs_port_t *port, uint8_t *flag)
 		for (i = 0; i < EMLXS_NUM_HASH_QUES; i++) {
 			nlp = port->node_table[i];
 			while (nlp != NULL) {
+#ifdef NODE_THROTTLE_SUPPORT
+				/* Check io_active count (Safety net) */
+				if (nlp->io_active & 0x80000000) {
+					EMLXS_MSGF(EMLXS_CONTEXT,
+					    &emlxs_sli_debug_msg,
+					    "timer_check_nodes: did=%06x "
+					    "io_active=0x%x. Reset to zero.",
+					    nlp->nlp_DID, nlp->io_active);
+
+					nlp->io_active = 0;
+				}
+#endif /* NODE_THROTTLE_SUPPORT */
+
 				for (channelno = 0;
 				    channelno < hba->chan_count;
 				    channelno++) {
@@ -811,7 +859,7 @@ emlxs_timer_check_heartbeat(emlxs_hba_t *hba)
 		return;
 	}
 
-	if ((mbq = (MAILBOXQ *)emlxs_mem_get(hba, MEM_MBOX, 1)) == 0) {
+	if ((mbq = (MAILBOXQ *)emlxs_mem_get(hba, MEM_MBOX)) == 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_init_debug_msg,
 		    "Unable to allocate heartbeat mailbox.");
 		return;
@@ -834,6 +882,7 @@ static void
 emlxs_timer_check_fw_update(emlxs_hba_t *hba)
 {
 	emlxs_port_t *port = &PPORT;
+	char msgbuf[128];
 
 	if (!(hba->fw_flag & FW_UPDATE_NEEDED)) {
 		hba->fw_timer = 0;
@@ -844,15 +893,24 @@ emlxs_timer_check_fw_update(emlxs_hba_t *hba)
 		return;
 	}
 
-	if (hba->tgt_mode) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fw_update_msg,
-		    "A manual HBA reset or link reset (using emlxadm) "
-		    "is required.");
+	if (port->mode == MODE_TARGET) {
+		(void) strncpy(msgbuf,
+		    "To trigger an update, a manual HBA or link reset "
+		    "using emlxadm is required.",
+		    (sizeof (msgbuf)-1));
 	} else {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fw_update_msg,
-		    "A manual HBA reset or link reset (using luxadm or fcadm) "
-		    "is required.");
+		(void) strncpy(msgbuf,
+		    "To trigger an update, a manual HBA or link reset "
+		    "using luxadm, fcadm, or emlxadm is required.",
+		    (sizeof (msgbuf)-1));
 	}
+
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fw_update_msg, msgbuf);
+
+	/* Force message to console */
+	cmn_err(CE_WARN,
+	    "^%s%d: Firmware update required.\n\t(%s)\n",
+	    DRIVER_NAME, hba->ddiinst, msgbuf);
 
 	/* Set timer for 24 hours */
 	hba->fw_timer = hba->timer_tics + (60 * 60 * 24);
@@ -918,7 +976,7 @@ emlxs_timer_check_discovery(emlxs_port_t *port)
 
 		mutex_exit(&EMLXS_PORT_LOCK);
 
-		(void) emlxs_mb_unreg_node(port, nlp, NULL, NULL, NULL);
+		(void) EMLXS_SLI_UNREG_NODE(port, nlp, NULL, NULL, NULL);
 
 		mutex_enter(&EMLXS_PORT_LOCK);
 
@@ -927,7 +985,7 @@ emlxs_timer_check_discovery(emlxs_port_t *port)
 
 	/* Try to send clear link attention, if needed */
 	if ((hba->sli_mode < EMLXS_HBA_SLI4_MODE) && (send_clear_la == 1) &&
-	    (mbox = (MAILBOXQ *)emlxs_mem_get(hba, MEM_MBOX, 1))) {
+	    (mbox = (MAILBOXQ *)emlxs_mem_get(hba, MEM_MBOX))) {
 		mutex_enter(&EMLXS_PORT_LOCK);
 
 		/*
@@ -959,6 +1017,64 @@ emlxs_timer_check_discovery(emlxs_port_t *port)
 
 } /* emlxs_timer_check_discovery()  */
 
+
+static void
+emlxs_timer_check_clean_address(emlxs_port_t *port)
+{
+	emlxs_hba_t *hba = HBA;
+	emlxs_buf_t *sbp;
+
+	if (port->clean_address_timer &&
+	    (hba->timer_tics < port->clean_address_timer)) {
+		return;
+	}
+	port->clean_address_timer = 0;
+
+	sbp = port->clean_address_sbp;
+	if (!sbp) {
+		return;
+	}
+	port->clean_address_sbp = 0;
+
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_els_completion_msg,
+	    "Clean Address timeout: sid=%x prev=%x RATOV %d",
+	    port->did, port->prev_did, hba->fc_ratov);
+
+	if (EMLXS_SLI_REG_DID(port, FABRIC_DID, &port->fabric_sparam,
+	    sbp, NULL, NULL) == 0) {
+		/* Deferred completion of this pkt until */
+		/* login is complete */
+		return;
+	}
+
+	emlxs_pkt_complete(sbp, IOSTAT_LOCAL_REJECT,
+	    IOERR_NO_RESOURCES, 1);
+
+	return;
+
+} /* emlxs_timer_check_clean_address()  */
+
+extern void
+emlxs_timer_cancel_clean_address(emlxs_port_t *port)
+{
+	emlxs_hba_t *hba = HBA;
+	emlxs_buf_t *sbp;
+
+	port->clean_address_timer = 0;
+	sbp = port->clean_address_sbp;
+	if (!sbp) {
+		return;
+	}
+	port->clean_address_sbp = 0;
+
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_els_completion_msg,
+	    "Clean Address cancel: sid=%x prev=%x RATOV %d",
+	    port->did, port->prev_did, hba->fc_ratov);
+
+	emlxs_pkt_complete(sbp, IOSTAT_LOCAL_REJECT,
+	    IOERR_LINK_DOWN, 1);
+
+} /* emlxs_timer_cancel_clean_address() */
 
 static void
 emlxs_timer_check_ub(emlxs_port_t *port)
@@ -1054,7 +1170,7 @@ emlxs_pkt_chip_timeout(emlxs_port_t *port, emlxs_buf_t *sbp, Q *abortq,
 		/* Create the abort IOCB */
 		if (hba->state >= FC_LINK_UP) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_timeout_msg,
-			    "chipQ: 1:Aborting. sbp=%p iotag=%x tmo=%d "
+			    "chipQ: 1:Aborting. sbp=%p iotag=%d tmo=%d "
 			    "flags=%x",
 			    sbp, sbp->iotag,
 			    (pkt) ? pkt->pkt_timeout : 0, sbp->pkt_flags);
@@ -1069,7 +1185,7 @@ emlxs_pkt_chip_timeout(emlxs_port_t *port, emlxs_buf_t *sbp, Q *abortq,
 			    hba->timer_tics + (4 * hba->fc_ratov) + 10;
 		} else {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_timeout_msg,
-			    "chipQ: 1:Closing. sbp=%p iotag=%x tmo=%d "
+			    "chipQ: 1:Closing. sbp=%p iotag=%d tmo=%d "
 			    "flags=%x",
 			    sbp, sbp->iotag,
 			    (pkt) ? pkt->pkt_timeout : 0, sbp->pkt_flags);
@@ -1092,7 +1208,7 @@ emlxs_pkt_chip_timeout(emlxs_port_t *port, emlxs_buf_t *sbp, Q *abortq,
 	case 1:
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_timeout_msg,
-		    "chipQ: 2:Closing. sbp=%p iotag=%x", sbp, sbp->iotag);
+		    "chipQ: 2:Closing. sbp=%p iotag=%d", sbp, sbp->iotag);
 
 		iocbq =
 		    emlxs_create_close_xri_cn(port, sbp->node, sbp->iotag,
@@ -1108,7 +1224,7 @@ emlxs_pkt_chip_timeout(emlxs_port_t *port, emlxs_buf_t *sbp, Q *abortq,
 	case 2:
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_timeout_msg,
-		    "chipQ: 3:Resetting link. sbp=%p iotag=%x", sbp,
+		    "chipQ: 3:Resetting link. sbp=%p iotag=%d", sbp,
 		    sbp->iotag);
 
 		sbp->ticks = hba->timer_tics + 60;
@@ -1119,7 +1235,7 @@ emlxs_pkt_chip_timeout(emlxs_port_t *port, emlxs_buf_t *sbp, Q *abortq,
 	default:
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_timeout_msg,
-		    "chipQ: %d:Resetting adapter. sbp=%p iotag=%x",
+		    "chipQ: %d:Resetting adapter. sbp=%p iotag=%d",
 		    sbp->abort_attempts, sbp, sbp->iotag);
 
 		sbp->ticks = hba->timer_tics + 60;
@@ -1147,6 +1263,59 @@ emlxs_pkt_chip_timeout(emlxs_port_t *port, emlxs_buf_t *sbp, Q *abortq,
 	return (rc);
 
 } /* emlxs_pkt_chip_timeout() */
+
+
+static void
+emlxs_timer_check_pools(emlxs_hba_t *hba)
+{
+	uint32_t i;
+	MEMSEG *seg;
+	emlxs_config_t *cfg = &CFG;
+
+	if (cfg[CFG_MEM_DYNAMIC].current == 0) {
+		return;
+	}
+
+	if (hba->mem_timer > hba->timer_tics) {
+		return;
+	}
+
+	hba->mem_timer = hba->timer_tics + cfg[CFG_MEM_DYNAMIC].current;
+
+	seg = hba->memseg;
+	for (i = 0; i < FC_MAX_SEG; i++, seg++) {
+		if (seg->fc_memflag & FC_MEMSEG_DYNAMIC) {
+			emlxs_mem_pool_clean(hba, seg);
+		}
+	}
+
+#ifdef SFCT_SUPPORT
+{
+	uint32_t j;
+	emlxs_port_t *port;
+
+	for (i = 0; i < MAX_VPORTS; i++) {
+		port = &VPORT(i);
+
+		if (!(port->flag & EMLXS_PORT_BOUND) ||
+		    !(port->flag & EMLXS_TGT_ENABLED) ||
+		    !port->fct_memseg) {
+			continue;
+		}
+
+		seg = port->fct_memseg;
+		for (j = 0; j < port->fct_memseg_cnt; j++, seg++) {
+			if (seg->fc_memflag & FC_MEMSEG_DYNAMIC) {
+				emlxs_mem_pool_clean(hba, seg);
+			}
+		}
+	}
+}
+#endif /* SFCT_SUPPORT */
+
+	return;
+
+} /* emlxs_timer_check_pools() */
 
 
 #ifdef TX_WATCHDOG

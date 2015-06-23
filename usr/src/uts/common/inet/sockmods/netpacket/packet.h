@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2015 Joyent, Inc. All rights reserved.
  */
 
 #ifndef _PACKET_H
@@ -39,10 +40,11 @@
 #define	PACKET_MULTICAST	LINUX_SLL_MULTICAST
 #define	PACKET_OTHERHOST	LINUX_SLL_OTHERHOST
 
-#define	PACKET_STATISTICS	1
+#define	PACKET_STATISTICS_SHORT	1
 #define	PACKET_ADD_MEMBERSHIP	2
 #define	PACKET_DROP_MEMBERSHIP	3
 #define	PACKET_AUXDATA		4
+#define	PACKET_STATISTICS	5
 
 
 struct packet_mreq {
@@ -95,6 +97,11 @@ struct tpacket2_hdr {			/* tp_macoff/tp_netoff ?? */
 };
 
 struct tpacket_stats {
+	uint32_t	tp_packets;
+	uint32_t	tp_drops;
+};
+
+struct tpacket_stats_short {
 	uint16_t	tp_packets;
 	uint16_t	tp_drops;
 };
@@ -183,6 +190,8 @@ typedef struct pfpsock {
 	kmutex_t			ps_lock;
 	boolean_t			ps_flow_ctrld;
 	ulong_t				ps_flow_ctrl_drops;
+	timespec_t			ps_timestamp;
+	size_t				ps_rcvbuf;
 } pfpsock_t;
 
 typedef struct pfp_kstats_s {

@@ -19,6 +19,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -59,7 +61,6 @@ extern "C" {
 
 #define	DC_STD		((0) | (DC_CASE))
 
-#ifdef __STDC__
 extern int defcntl(int, int);
 extern int defopen(char *);
 extern char *defread(char *);
@@ -68,16 +69,6 @@ extern int	defcntl_r(int, int, void *);
 extern void	*defopen_r(const char *);
 extern char	*defread_r(const char *, void *);
 extern void	defclose_r(void *);
-#else
-extern int defcntl();
-extern int defopen();
-extern char *defread();
-
-extern int	defcntl_r();
-extern void	*defopen_r();
-extern char	*defread_r();
-extern void	defclose_r();
-#endif
 
 #define	TURNON(flags, mask)	((flags) |= (mask))
 #define	TURNOFF(flags, mask)	((flags) &= ~(mask))

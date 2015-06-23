@@ -20,14 +20,14 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_INT_CONST_H
 #define	_SYS_INT_CONST_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file, <sys/int_const.h>, is part of the Sun Microsystems implementation
@@ -72,17 +72,10 @@ extern "C" {
  * standard requires a space between arguments, but the historical,
  * non-ANSI-C ``method'' of concatenation can't tolerate those spaces.
  */
-#ifdef __STDC__
 /* CSTYLED */
 #define	__CONCAT__(A,B) A ## B
-#else
-/* CSTYLED */
-#define	__CONCAT__(A,B) A/**/B
-#endif
 
-#if defined(_CHAR_IS_SIGNED) || defined(__STDC__)
 #define	INT8_C(c)	(c)
-#endif
 #define	INT16_C(c)	(c)
 #define	INT32_C(c)	(c)
 #ifdef  _LP64

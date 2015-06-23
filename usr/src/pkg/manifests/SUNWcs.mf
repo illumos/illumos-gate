@@ -21,8 +21,9 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2015 Nexenta Systems, Inc. All rights reserved.
 # Copyright (c) 2013 Gary Mills
+# Copyright 2014 Garrett D'Amore <garrett@damore.org>
 #
 
 <include SUNWcs.man1.inc>
@@ -201,9 +202,6 @@ dir path=usr/lib/iconv
 dir path=usr/lib/inet
 dir path=usr/lib/inet/$(ARCH32)
 dir path=usr/lib/inet/$(ARCH64)
-dir path=usr/lib/inet/dhcp
-dir path=usr/lib/inet/dhcp/nsu
-dir path=usr/lib/inet/dhcp/svc
 dir path=usr/lib/locale
 dir path=usr/lib/locale/C
 dir path=usr/lib/locale/C/LC_COLLATE
@@ -277,9 +275,6 @@ dir path=var/news
 dir path=var/opt group=sys
 dir path=var/preserve mode=1777
 dir path=var/run group=sys
-dir path=var/sadm group=sys
-dir path=var/sadm/system group=sys
-dir path=var/sadm/system/admin group=sys
 dir path=var/saf
 dir path=var/saf/zsmon group=sys
 dir path=var/spool
@@ -375,10 +370,7 @@ file path=etc/inet/wanboot.conf.sample group=sys mode=0444
 file path=etc/init.d/PRESERVE group=sys mode=0744 preserve=true
 file path=etc/init.d/README group=sys preserve=true
 file path=etc/init.d/cachefs.daemon group=sys mode=0744 preserve=true
-file path=etc/init.d/ldap.client group=sys mode=0744
-file path=etc/init.d/nscd group=sys mode=0744
 file path=etc/init.d/sysetup group=sys mode=0744 preserve=true
-file path=etc/init.d/ufs_quota group=sys mode=0744 preserve=true
 file path=etc/inittab group=sys preserve=true
 file path=etc/ioctl.syscon group=sys preserve=true
 file path=etc/ksh.kshrc group=sys preserve=renameold
@@ -405,7 +397,7 @@ file path=etc/nsswitch.files group=sys
 file path=etc/nsswitch.ldap group=sys
 file path=etc/pam.conf group=sys preserve=true
 file path=etc/passwd group=sys preserve=true
-file path=etc/profile group=sys preserve=true
+file path=etc/profile group=sys preserve=renamenew
 file path=etc/project group=sys preserve=true
 file path=etc/rc2.d/README group=sys
 file path=etc/rc3.d/README group=sys
@@ -667,7 +659,6 @@ file path=sbin/uadmin group=sys mode=0555
 file path=sbin/umount mode=0555
 file path=sbin/umountall group=sys mode=0555
 file path=sbin/uname mode=0555
-file path=sbin/wusbadm mode=0555
 file path=sbin/zonename mode=0555
 $(i386_ONLY)file path=usr/bin/$(ARCH32)/amt mode=0555
 file path=usr/bin/$(ARCH32)/decrypt mode=0555
@@ -774,7 +765,6 @@ file path=usr/bin/groups mode=0555
 file path=usr/bin/head mode=0555
 file path=usr/bin/hostid mode=0555
 file path=usr/bin/hostname mode=0555
-file path=usr/bin/i286 mode=0555
 file path=usr/bin/iconv mode=0555
 file path=usr/bin/id mode=0555
 file path=usr/bin/infocmp mode=0555
@@ -1446,7 +1436,6 @@ file path=usr/share/doc/ksh/images/tag_ksh93.png
 file path=usr/share/doc/ksh/images/tag_l10n.png
 file path=usr/share/doc/ksh/images/tag_perf.png
 file path=usr/share/doc/ksh/shell_styleguide.docbook
-file path=usr/share/doc/ksh/shell_styleguide.html
 file path=usr/share/lib/mailx/mailx.help
 file path=usr/share/lib/mailx/mailx.help.~
 file path=usr/share/lib/tabset/3101
@@ -1471,7 +1460,6 @@ file path=var/adm/utmpx preserve=true
 file path=var/adm/wtmpx group=adm owner=adm preserve=true
 file path=var/log/authlog group=sys mode=0600 preserve=true
 file path=var/log/syslog group=sys preserve=true
-file path=var/sadm/system/admin/default_java group=sys mode=0444
 file path=var/saf/zsmon/log group=sys preserve=true
 file path=var/spool/cron/crontabs/adm group=sys mode=0600 preserve=true
 file path=var/spool/cron/crontabs/root group=sys mode=0600 preserve=true
@@ -1518,11 +1506,6 @@ hardlink path=usr/bin/fc target=../../usr/bin/alias
 hardlink path=usr/bin/fg target=../../usr/bin/alias
 hardlink path=usr/bin/getopts target=../../usr/bin/alias
 hardlink path=usr/bin/hash target=../../usr/bin/alias
-hardlink path=usr/bin/i386 target=../../usr/bin/i286
-hardlink path=usr/bin/i486 target=../../usr/bin/i286
-hardlink path=usr/bin/i860 target=../../usr/bin/i286
-hardlink path=usr/bin/i86pc target=../../usr/bin/i286
-hardlink path=usr/bin/iAPX286 target=../../usr/bin/i286
 hardlink path=usr/bin/jobs target=../../usr/bin/alias
 hardlink path=usr/bin/join target=../../usr/bin/alias
 hardlink path=usr/bin/kill target=../../usr/bin/alias
@@ -1530,19 +1513,12 @@ hardlink path=usr/bin/ksh target=../../usr/lib/isaexec
 hardlink path=usr/bin/ksh93 target=../../usr/lib/isaexec
 hardlink path=usr/bin/ln target=../../usr/bin/cp
 hardlink path=usr/bin/logname target=../../usr/bin/alias
-hardlink path=usr/bin/m68k target=../../usr/bin/i286
 hardlink path=usr/bin/mac target=../../usr/lib/isaexec
-hardlink path=usr/bin/mc68000 target=../../usr/bin/i286
-hardlink path=usr/bin/mc68010 target=../../usr/bin/i286
-hardlink path=usr/bin/mc68020 target=../../usr/bin/i286
-hardlink path=usr/bin/mc68030 target=../../usr/bin/i286
-hardlink path=usr/bin/mc68040 target=../../usr/bin/i286
 hardlink path=usr/bin/mv target=../../usr/bin/cp
 hardlink path=usr/bin/newtask target=../../usr/lib/isaexec
 hardlink path=usr/bin/nohup target=../../usr/lib/isaexec
 hardlink path=usr/bin/page target=../../usr/bin/more
 hardlink path=usr/bin/paste target=../../usr/bin/alias
-hardlink path=usr/bin/pdp11 target=../../usr/bin/i286
 hardlink path=usr/bin/pfbash target=../../usr/bin/pfexec
 hardlink path=usr/bin/pfcsh target=../../usr/bin/pfexec
 hardlink path=usr/bin/pfksh target=../../usr/bin/pfexec
@@ -1565,32 +1541,16 @@ hardlink path=usr/bin/rksh93 target=../../usr/lib/isaexec
 hardlink path=usr/bin/savecore target=../../usr/lib/isaexec
 hardlink path=usr/bin/setuname target=../../usr/lib/isaexec
 hardlink path=usr/bin/sleep target=../../usr/bin/alias
-hardlink path=usr/bin/sparc target=../../usr/bin/i286
 hardlink path=usr/bin/sum target=../../usr/bin/alias
-hardlink path=usr/bin/sun target=../../usr/bin/i286
-hardlink path=usr/bin/sun2 target=../../usr/bin/i286
-hardlink path=usr/bin/sun3 target=../../usr/bin/i286
-hardlink path=usr/bin/sun3x target=../../usr/bin/i286
-hardlink path=usr/bin/sun4 target=../../usr/bin/i286
-hardlink path=usr/bin/sun4c target=../../usr/bin/i286
-hardlink path=usr/bin/sun4d target=../../usr/bin/i286
-hardlink path=usr/bin/sun4e target=../../usr/bin/i286
-hardlink path=usr/bin/sun4m target=../../usr/bin/i286
 hardlink path=usr/bin/tee target=../../usr/bin/alias
 hardlink path=usr/bin/test target=../../usr/bin/alias
 hardlink path=usr/bin/touch target=../../usr/bin/settime
 hardlink path=usr/bin/type target=../../usr/bin/alias
-hardlink path=usr/bin/u370 target=../../usr/bin/i286
-hardlink path=usr/bin/u3b target=../../usr/bin/i286
-hardlink path=usr/bin/u3b15 target=../../usr/bin/i286
-hardlink path=usr/bin/u3b2 target=../../usr/bin/i286
-hardlink path=usr/bin/u3b5 target=../../usr/bin/i286
 hardlink path=usr/bin/ulimit target=../../usr/bin/alias
 hardlink path=usr/bin/umask target=../../usr/bin/alias
 hardlink path=usr/bin/unalias target=../../usr/bin/alias
 hardlink path=usr/bin/uniq target=../../usr/bin/alias
 hardlink path=usr/bin/uptime target=../../usr/lib/isaexec
-hardlink path=usr/bin/vax target=../../usr/bin/i286
 hardlink path=usr/bin/vedit target=../has/bin/edit
 hardlink path=usr/bin/w target=../../usr/lib/isaexec
 hardlink path=usr/bin/wait target=../../usr/bin/alias
@@ -1688,8 +1648,6 @@ license usr/src/cmd/cmd-inet/usr.sbin/THIRDPARTYLICENSE.route \
     license=usr/src/cmd/cmd-inet/usr.sbin/THIRDPARTYLICENSE.route
 license usr/src/cmd/cmd-inet/usr.sbin/ifconfig/THIRDPARTYLICENSE \
     license=usr/src/cmd/cmd-inet/usr.sbin/ifconfig/THIRDPARTYLICENSE
-license usr/src/cmd/cmd-inet/usr.sbin/in.ftpd/LICENSE \
-    license=usr/src/cmd/cmd-inet/usr.sbin/in.ftpd/LICENSE
 license usr/src/cmd/cmd-inet/usr.sbin/traceroute/THIRDPARTYLICENSE \
     license=usr/src/cmd/cmd-inet/usr.sbin/traceroute/THIRDPARTYLICENSE
 license usr/src/cmd/cron/THIRDPARTYLICENSE \
@@ -1734,6 +1692,7 @@ link path=etc/format target=../usr/sbin/format
 link path=etc/fsck target=../usr/sbin/fsck
 link path=etc/fsdb target=../usr/sbin/fsdb
 link path=etc/fstyp target=../usr/sbin/fstyp
+link path=etc/ftpusers target=./ftpd/ftpusers
 link path=etc/getty target=../usr/lib/saf/ttymon
 link path=etc/grpck target=../usr/sbin/grpck
 link path=etc/halt target=../usr/sbin/halt
@@ -1818,7 +1777,6 @@ link path=usr/lib/locale/POSIX target=./C
 link path=usr/lib/rsh target=../bin/ksh93
 link path=usr/lib/secure/32 target=.
 link path=usr/lib/secure/64 target=$(ARCH64)
-link path=usr/lib/wusbd target=../../sbin/wusbadm
 link path=usr/mail target=../var/mail
 link path=usr/net/nls/listen target=../../lib/saf/listen
 link path=usr/net/nls/nlps_server target=../../lib/saf/nlps_server
@@ -1871,7 +1829,6 @@ link path=usr/sbin/uadmin target=../../sbin/uadmin
 link path=usr/sbin/ufsdump target=../lib/fs/ufs/ufsdump
 link path=usr/sbin/ufsrestore target=../lib/fs/ufs/ufsrestore
 link path=usr/sbin/umount target=../../sbin/umount
-link path=usr/sbin/wusbadm target=../../sbin/wusbadm
 link path=usr/spool target=../var/spool
 link path=usr/src target=./share/src
 link path=usr/tmp target=../var/tmp
@@ -1884,7 +1841,11 @@ depend fmri=release/name type=require
 #
 # intrd and others use the illumos-defaulted perl interpreter
 #
-depend fmri=runtime/perl-510 type=require
+depend fmri=runtime/perl$(PERL_PKGVERS) type=require
+#
+# intrd uses sun-solaris Perl modules
+#
+depend fmri=runtime/perl$(PERL_PKGVERS)/module/sun-solaris type=require
 #
 # The loadkeys binary needs the keytables.
 #
@@ -1897,3 +1858,7 @@ depend fmri=system/data/terminfo type=require
 # Depend on zoneinfo data.
 #
 depend fmri=system/data/zoneinfo type=require
+#
+# The mailx binary calls /usr/lib/sendmail provided by mailwrapper
+#
+depend fmri=system/network/mailwrapper type=require

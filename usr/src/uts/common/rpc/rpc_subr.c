@@ -19,6 +19,11 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
@@ -26,9 +31,6 @@
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- */
-/*
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /* SVr4.0 1.1 */
@@ -496,7 +498,7 @@ out:
 /*
  * Try to get the address for the desired service by using the rpcbind
  * protocol.  Ignores signals.  If addr is a loopback address, it is
- * expected to be initialized to "<hostname>.".
+ * expected to be initialized to "localhost.".
  * rpcbind_getaddr() is able to work with RPCBIND protocol version 3 and 4
  * and PORTMAP protocol version 2.
  * It tries version 4 at first, then version 3 and finally (if both failed)

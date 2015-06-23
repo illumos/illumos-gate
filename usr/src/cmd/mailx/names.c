@@ -38,8 +38,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * mailx -- a modified version of a University of California at Berkeley
  *	mail program
@@ -53,8 +51,10 @@
 static struct name	*nalloc(char str[]);
 static int		isfileaddr(char *name);
 static int		lengthof(struct name *name);
-static struct name	*gexpand(struct name *nlist, struct grouphead *gh, int metoo, int arg_ntype);
-static char		*norm(register char *user, register char *ubuf, int nbangs);
+static struct name	*gexpand(struct name *nlist, struct grouphead *gh,
+    int metoo, int arg_ntype);
+static char		*norm(register char *user, register char *ubuf,
+    int nbangs);
 static struct name	*put(struct name *list, struct name *node);
 
 /*
@@ -68,13 +68,13 @@ nalloc(char str[])
 {
 	register struct name *np;
 
-	np = (struct name *) salloc(sizeof *np);
+	np = (struct name *)salloc(sizeof (*np));
 	np->n_flink = NIL;
 	np->n_blink = NIL;
 	np->n_type = -1;
 	np->n_full = savestr(str);
 	np->n_name = skin(np->n_full);
-	return(np);
+	return (np);
 }
 
 /*
@@ -88,10 +88,10 @@ tailof(struct name *name)
 
 	np = name;
 	if (np == NIL)
-		return(NIL);
+		return (NIL);
 	while (np->n_flink != NIL)
 		np = np->n_flink;
-	return(np);
+	return (np);
 }
 
 /*
@@ -110,7 +110,7 @@ extract(char line[], int arg_ntype)
 	int comma;
 
 	if (line == NOSTR || strlen(line) == 0)
-		return(NIL);
+		return (NIL);
 	comma = docomma(line);
 	top = NIL;
 	np = NIL;
@@ -119,12 +119,12 @@ extract(char line[], int arg_ntype)
 		if (np != NIL && equal(nbuf, "at")) {
 			nstrcpy(abuf, sizeof (abuf), nbuf);
 			if ((cp = yankword(cp, nbuf, sizeof (nbuf),
-				comma)) == NOSTR) {
+			    comma)) == NOSTR) {
 				nstrcpy(nbuf, sizeof (nbuf), abuf);
 				goto normal;
 			}
 			snprintf(abuf, sizeof (abuf), "%s@%s", np->n_name,
-				nbuf); 
+			    nbuf);
 			np->n_name = savestr(abuf);
 			continue;
 		}
@@ -138,7 +138,7 @@ normal:
 		t->n_blink = np;
 		np = t;
 	}
-	return(top);
+	return (top);
 }
 
 /*
@@ -153,28 +153,28 @@ detract(register struct name *np, int ntype)
 	register struct name *p;
 
 	if (np == NIL)
-		return(NOSTR);
+		return (NOSTR);
 	s = 0;
 	for (p = np; p != NIL; p = p->n_flink) {
-		if ((ntype && (p->n_type & GMASK) != ntype)
-		 || (p->n_type & GDEL))
+		if ((ntype && (p->n_type & GMASK) != ntype) ||
+		    (p->n_type & GDEL))
 			continue;
 		s += strlen(p->n_full) + 2;
 	}
 	if (s == 0)
-		return(NOSTR);
+		return (NOSTR);
 	top = (char *)salloc((unsigned)(++s));
 	cp = top;
 	for (p = np; p != NIL; p = p->n_flink) {
-		if ((ntype && (p->n_type & GMASK) != ntype)
-		 || (p->n_type & GDEL))
+		if ((ntype && (p->n_type & GMASK) != ntype) ||
+		    (p->n_type & GDEL))
 			continue;
 		cp = copy(p->n_full, cp);
 		*cp++ = ',';
 		*cp++ = ' ';
 	}
 	*cp = 0;
-	return(top);
+	return (top);
 }
 
 struct name *
@@ -185,13 +185,13 @@ outpre(struct name *to)
 	for (np = to; np; np = np->n_flink)
 		if (isfileaddr(np->n_name))
 			np->n_type |= GDEL;
-	return to;
+	return (to);
 }
 
 /*
  * For each recipient in the passed name list with a /
  * in the name, append the message to the end of the named file
- * and remove him from the recipient list.
+ * and remove them from the recipient list.
  *
  * Recipients whose name begins with | are piped through the given
  * program and removed.
@@ -207,10 +207,13 @@ outof(struct name *names, FILE *fo)
 	FILE *fout, *fin;
 	int ispipe;
 	int nout = 0;
-	int fd = 0; 
+	int fd = 0;
 #ifdef preSVr4
 	char line[BUFSIZ];
 #endif
+
+	if (value("expandaddr") == NOSTR)
+		return (nout);
 
 	for (np = names; np != NIL; np = np->n_flink) {
 		if (!isfileaddr(np->n_name) && np->n_name[0] != '|')
@@ -229,10 +232,10 @@ outof(struct name *names, FILE *fo)
 
 		if (image < 0) {
 			fd = open(tempEdit, O_CREAT|O_EXCL|O_APPEND|O_WRONLY,
-					0600);
+			    0600);
 			if ((fd  < 0) && (errno == EEXIST)) {
 				if ((fd = open(tempEdit, O_APPEND|O_WRONLY,
-						0600)) < 0) {
+				    0600)) < 0) {
 					perror(tempEdit);
 					senderr++;
 					goto cant;
@@ -282,9 +285,11 @@ outof(struct name *names, FILE *fo)
 				dup(image);
 				close(image);
 				lseek(0, 0L, 0);
-				if ((shell = value("SHELL")) == NOSTR || *shell=='\0')
+				if ((shell = value("SHELL")) == NOSTR ||
+				    *shell == '\0')
 					shell = SHELL;
-				(void) execlp(shell, shell, "-c", fname, (char *)0);
+				(void) execlp(shell, shell, "-c", fname,
+				    (char *)0);
 				perror(shell);
 				exit(1);
 				break;
@@ -294,8 +299,7 @@ outof(struct name *names, FILE *fo)
 				senderr++;
 				goto cant;
 			}
-		}
-		else {
+		} else {
 			if ((fout = fopen(fname, "a")) == NULL) {
 				perror(fname);
 				senderr++;
@@ -312,8 +316,8 @@ outof(struct name *names, FILE *fo)
 			rewind(fin);
 #ifdef preSVr4
 			putc(getc(fin), fout);
-			while (fgets(line, sizeof line, fin)) {
-				if (!strncmp(line, "From ", 5))
+			while (fgets(line, sizeof (line), fin)) {
+				if (strncmp(line, "From ", 5) == 0)
 					putc('>', fout);
 				fputs(line, fout);
 			}
@@ -361,7 +365,7 @@ cant:
 		close(image);
 		image = -1;
 	}
-	return(nout);
+	return (nout);
 }
 
 /*
@@ -371,27 +375,27 @@ cant:
  * If "fcc" has been unset, then short-circuit those tests, but not
  * the +... test.
  */
-static int 
+static int
 isfileaddr(char *name)
 {
 	register char *cp;
 	char *fcc = value("fcc");
 
 	if (any('@', name))
-		return(0);
+		return (0);
 	if (*name == '+')
-		return(1);
+		return (1);
 	if (fcc == NOSTR)
-		return(0);
+		return (0);
 	for (cp = name; *cp; cp++) {
 		if (*cp == '.')
 			continue;
 		if (any(*cp, metanet))
-			return(0);
+			return (0);
 		if (*cp == '/')
-			return(1);
+			return (1);
 	}
-	return(0);
+	return (0);
 }
 
 /*
@@ -426,7 +430,7 @@ usermap(struct name *names)
 			newnames = put(newnames, np);
 		np = cp;
 	}
-	return(newnames);
+	return (newnames);
 }
 
 /*
@@ -448,7 +452,7 @@ gexpand(struct name *nlist, struct grouphead *gh, int metoo, int arg_ntype)
 	if (depth > MAXEXP) {
 		printf(gettext("Expanding alias to depth larger than %d\n"),
 		    MAXEXP);
-		return(nlist);
+		return (nlist);
 	}
 	depth++;
 	for (gp = gh->g_list; gp != NOGE; gp = gp->ge_link) {
@@ -476,7 +480,7 @@ skip:
 		nlist = put(nlist, np);
 	}
 	depth--;
-	return(nlist);
+	return (nlist);
 }
 
 /*
@@ -488,7 +492,8 @@ norm(register char *user, register char *ubuf, int nbangs)
 	register char *cp;
 	int inubuf = 0;
 
-	while (*user++ == '!');
+	while (*user++ == '!')
+		;
 	user--;
 	if (!strchr(user, '!')) {
 		snprintf(ubuf, BUFSIZ, "%s!%s", host, user);
@@ -498,7 +503,8 @@ norm(register char *user, register char *ubuf, int nbangs)
 	if (nbangs) {
 		cp = user + strlen(user);
 		while (nbangs--)
-			while (cp > user && *--cp != '!');
+			while (cp > user && *--cp != '!')
+				;
 		user = (cp > user) ? ++cp : cp;
 		/*
 		 * Now strip off all Internet-type
@@ -515,18 +521,18 @@ norm(register char *user, register char *ubuf, int nbangs)
 				*cp = '\0';
 		}
 	}
-	return user;
+	return (user);
 }
 
 /*
  * Implement allnet options.
  */
-int 
+int
 samebody(register char *user, register char *addr, int fuzzy)
 {
 	char ubuf[BUFSIZ], abuf[BUFSIZ];
 	char *allnet = value("allnet");
-	int nbangs = allnet ? !strcmp(allnet, "uucp") ? 2 : 1 : 0;
+	int nbangs = allnet ? (strcmp(allnet, "uucp") == 0) ? 2 : 1 : 0;
 
 	if (fuzzy && value("fuzzymatch")) {
 		int i;
@@ -541,14 +547,14 @@ samebody(register char *user, register char *addr, int fuzzy)
 	}
 	user = norm(user, ubuf, nbangs);
 	addr = norm(addr, abuf, nbangs);
-	return strcmp(user, addr) == 0;
+	return (strcmp(user, addr) == 0);
 }
 
 /*
  * Compute the length of the passed name list and
  * return it.
  */
-static int 
+static int
 lengthof(struct name *name)
 {
 	register struct name *np;
@@ -556,7 +562,7 @@ lengthof(struct name *name)
 
 	for (c = 0, np = name; np != NIL; c++, np = np->n_flink)
 		;
-	return(c);
+	return (c);
 }
 
 /*
@@ -569,13 +575,13 @@ cat(struct name *n1, struct name *n2)
 	register struct name *tail;
 
 	if (n1 == NIL)
-		return(n2);
+		return (n2);
 	if (n2 == NIL)
-		return(n1);
+		return (n1);
 	tail = tailof(n1);
 	tail->n_flink = n2;
 	n2->n_blink = tail;
-	return(n1);
+	return (n1);
 }
 
 /*
@@ -596,18 +602,18 @@ unpack(struct name *np)
 		panic("No names to unpack");
 
 	/*
-	 * Compute the number of extra arguments we will need.
-	 * We need at least 2 extra -- one for "mail" and one for
-	 * the terminating 0 pointer.
-	 * Additional spots may be needed to pass along -r and -f to 
-	 * the host mailer.
+	 * Compute the number of extra arguments we will need.  We need at least
+	 * 3 extra -- one for "mail", one for a terminating -- to stop sendmail
+	 * option processing, and one for the terminating 0 pointer.
+	 *
+	 * Additional spots may be needed to pass along -r and -f to the host
+	 * mailer.
 	 */
 
-	extra = 2;
+	extra = 3;
 
 	if (rflag != NOSTR)
 		extra += 2;
-#ifdef SENDMAIL
 	extra++;
 	metoo = value("metoo") != NOSTR;
 	if (metoo)
@@ -617,15 +623,13 @@ unpack(struct name *np)
 		extra++;
 	if (hflag)
 		extra += 2;
-#endif /* SENDMAIL */
-	top = (char **) salloc((t + extra) * sizeof (char *));
+	top = (char **)salloc((t + extra) * sizeof (char *));
 	ap = top;
-	*ap++ = "mail";
+	*ap++ = "sendmail";
 	if (rflag != NOSTR) {
 		*ap++ = "-r";
 		*ap++ = rflag;
 	}
-#ifdef SENDMAIL
 	*ap++ = "-i";
 	if (metoo)
 		*ap++ = "-m";
@@ -636,7 +640,7 @@ unpack(struct name *np)
 		snprintf(hbuf, sizeof (hbuf), "%d", hflag);
 		*ap++ = savestr(hbuf);
 	}
-#endif /* SENDMAIL */
+	*ap++ = "--";
 	while (n != NIL) {
 		if (n->n_type & GDEL) {
 			n = n->n_flink;
@@ -646,7 +650,7 @@ unpack(struct name *np)
 		n = n->n_flink;
 	}
 	*ap = NOSTR;
-	return(top);
+	return (top);
 }
 
 /*
@@ -655,7 +659,7 @@ unpack(struct name *np)
  * selfsent so that we avoid removing his mailbox.
  */
 
-void 
+void
 mechk(struct name *names)
 {
 	register struct name *np;
@@ -681,7 +685,7 @@ elide(struct name *names)
 	struct name *x;
 
 	if (names == NIL)
-		return(NIL);
+		return (NIL);
 	newnames = names;
 	np = names;
 	np = np->n_flink;
@@ -752,7 +756,7 @@ elide(struct name *names)
 
 		t = np;
 		type = np->n_type;
-		while (t->n_flink!=NIL &&
+		while (t->n_flink != NIL &&
 		    strcmp(np->n_name, t->n_flink->n_name) == 0) {
 			t = t->n_flink;
 			/* "To" before "Cc" before "Bcc" */
@@ -775,7 +779,7 @@ elide(struct name *names)
 		np->n_type = type;
 		np = np->n_flink;
 	}
-	return(newnames);
+	return (newnames);
 }
 
 /*
@@ -790,7 +794,7 @@ put(struct name *list, struct name *node)
 	node->n_blink = NIL;
 	if (list != NIL)
 		list->n_blink = node;
-	return(node);
+	return (node);
 }
 
 
@@ -818,7 +822,7 @@ delname(register struct name *np, char name[])
 			p->n_blink->n_flink = p->n_flink;
 			p->n_flink->n_blink = p->n_blink;
 		}
-	return(np);
+	return (np);
 }
 
 /*
@@ -826,7 +830,7 @@ delname(register struct name *np, char name[])
  * list, replacing said value if need be.
  */
 
-void 
+void
 mapf(register struct name *np, char *from)
 {
 	register struct name *p;

@@ -22,7 +22,7 @@
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef	_IDM_IMPL_H_
@@ -377,7 +377,7 @@ typedef struct idm_pdu_s {
 	uint32_t	isp_flags;
 	uint_t		isp_hdrbuflen;
 	uint_t		isp_databuflen;
-	time_t		isp_queue_time;
+	hrtime_t	isp_queue_time;
 
 	/* Taskq dispatching state for deferred PDU */
 	taskq_ent_t	isp_tqent;

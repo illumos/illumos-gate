@@ -23,6 +23,8 @@
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2010, Richard Lowe
 # Copyright 2012, Piotr Jasiukajtis
+# Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright (c) 2014, Joyent, Inc.
 #
 
 set name=pkg.fmri value=pkg:/developer/build/onbld@$(PKGVERS)
@@ -90,8 +92,6 @@ file path=opt/onbld/bin/checkpaths mode=0555
 file path=opt/onbld/bin/checkproto mode=0555
 file path=opt/onbld/bin/copyrightchk mode=0555
 file path=opt/onbld/bin/cstyle mode=0555
-file path=opt/onbld/bin/ctfcvtptbl mode=0555
-file path=opt/onbld/bin/ctffindmod mode=0555
 file path=opt/onbld/bin/elfcmp mode=0555
 file path=opt/onbld/bin/elfsigncmp mode=0555
 file path=opt/onbld/bin/find_elf mode=0555
@@ -159,6 +159,8 @@ file path=opt/onbld/lib/python2.6/onbld/Checks/JStyle.py mode=0444
 file path=opt/onbld/lib/python2.6/onbld/Checks/JStyle.pyc mode=0444
 file path=opt/onbld/lib/python2.6/onbld/Checks/Keywords.py mode=0444
 file path=opt/onbld/lib/python2.6/onbld/Checks/Keywords.pyc mode=0444
+file path=opt/onbld/lib/python2.6/onbld/Checks/ManLint.py mode=0444
+file path=opt/onbld/lib/python2.6/onbld/Checks/ManLint.pyc mode=0444
 file path=opt/onbld/lib/python2.6/onbld/Checks/Mapfile.py mode=0444
 file path=opt/onbld/lib/python2.6/onbld/Checks/Mapfile.pyc mode=0444
 file path=opt/onbld/lib/python2.6/onbld/Checks/ProcessCheck.py mode=0444
@@ -167,6 +169,8 @@ file path=opt/onbld/lib/python2.6/onbld/Checks/__init__.py mode=0444
 file path=opt/onbld/lib/python2.6/onbld/Checks/__init__.pyc mode=0444
 file path=opt/onbld/lib/python2.6/onbld/Scm/Backup.py mode=0444
 file path=opt/onbld/lib/python2.6/onbld/Scm/Backup.pyc mode=0444
+file path=opt/onbld/lib/python2.6/onbld/Scm/Ignore.py mode=0444
+file path=opt/onbld/lib/python2.6/onbld/Scm/Ignore.pyc mode=0444
 file path=opt/onbld/lib/python2.6/onbld/Scm/Version.py mode=0444
 file path=opt/onbld/lib/python2.6/onbld/Scm/Version.pyc mode=0444
 file path=opt/onbld/lib/python2.6/onbld/Scm/WorkSpace.py mode=0444
@@ -225,7 +229,5 @@ link path=opt/onbld/lib/python target=python2.6
 link path=opt/onbld/man/man1/git-nits.1 target=git-pbchk.1
 # webrev(1) requires ps2pdf
 depend fmri=print/filter/ghostscript type=require
-# hgsetup(1) uses check-hostname(1) and nightly sendmail(1M)
-depend fmri=service/network/smtp/sendmail type=require
 # nightly(1) uses wget
 depend fmri=web/wget type=require

@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/list.h>
@@ -43,25 +44,6 @@
 #include <smbsrv/libmlsvc.h>
 #include <smbsrv/libsmbns.h>
 #include "smbd.h"
-
-#define	SMBD_ARG_MAGIC		0x53415247	/* 'SARG' */
-
-/*
- * Parameter for door operations.
- */
-typedef struct smbd_arg {
-	uint32_t	magic;
-	list_node_t	lnd;
-	smb_doorhdr_t	hdr;
-	const char	*opname;
-	char		*data;
-	size_t		datalen;
-	char		*rbuf;
-	size_t		rsize;
-	boolean_t	response_ready;
-	boolean_t	response_abort;
-	uint32_t	status;
-} smbd_arg_t;
 
 /*
  * The list contains asynchronous requests that have been initiated
@@ -127,11 +109,11 @@ static smbd_doorsvc_t smbd_doorsvc;
 static int smbd_door_fd = -1;
 static int smbd_door_cookie = 0x534D4244;	/* SMBD */
 static smbd_door_t smbd_door_sdh;
+static char *smbd_door_name = NULL;
 
 static void smbd_door_dispatch(void *, char *, size_t, door_desc_t *, uint_t);
 static int smbd_door_dispatch_async(smbd_arg_t *);
 static void smbd_door_release_async(smbd_arg_t *);
-static void *smbd_door_dispatch_op(void *);
 
 /*
  * Start the smbd door service.  Create and bind to a door.
@@ -150,6 +132,10 @@ smbd_door_start(void)
 		return (-1);
 	}
 
+	smbd_door_name = getenv("SMBD_DOOR_NAME");
+	if (smbd_door_name == NULL)
+		smbd_door_name = SMBD_DOOR_NAME;
+
 	smbd_door_init(&smbd_door_sdh, "doorsrv");
 
 	list_create(&smbd_doorsvc.sd_async_list, sizeof (smbd_arg_t),
@@ -165,9 +151,9 @@ smbd_door_start(void)
 		return (-1);
 	}
 
-	(void) unlink(SMBD_DOOR_NAME);
+	(void) unlink(smbd_door_name);
 
-	if ((newfd = creat(SMBD_DOOR_NAME, 0644)) < 0) {
+	if ((newfd = creat(smbd_door_name, 0644)) < 0) {
 		(void) fprintf(stderr, "smb_doorsrv_start: open: %s",
 		    strerror(errno));
 		(void) door_revoke(smbd_door_fd);
@@ -177,9 +163,9 @@ smbd_door_start(void)
 	}
 
 	(void) close(newfd);
-	(void) fdetach(SMBD_DOOR_NAME);
+	(void) fdetach(smbd_door_name);
 
-	if (fattach(smbd_door_fd, SMBD_DOOR_NAME) < 0) {
+	if (fattach(smbd_door_fd, smbd_door_name) < 0) {
 		(void) fprintf(stderr, "smb_doorsrv_start: fattach: %s",
 		    strerror(errno));
 		(void) door_revoke(smbd_door_fd);
@@ -202,8 +188,10 @@ smbd_door_stop(void)
 
 	smbd_door_fini(&smbd_door_sdh);
 
+	if (smbd_door_name)
+		(void) fdetach(smbd_door_name);
+
 	if (smbd_door_fd != -1) {
-		(void) fdetach(SMBD_DOOR_NAME);
 		(void) door_revoke(smbd_door_fd);
 		smbd_door_fd = -1;
 	}
@@ -377,7 +365,7 @@ smbd_door_release_async(smbd_arg_t *arg)
  * We send a notification when asynchronous (ASYNC) door calls
  * from the kernel (SYSSPACE) have completed.
  */
-static void *
+void *
 smbd_door_dispatch_op(void *thread_arg)
 {
 	smbd_arg_t	*arg = (smbd_arg_t *)thread_arg;
@@ -435,7 +423,7 @@ smbd_door_dispatch_op(void *thread_arg)
 void
 smbd_door_init(smbd_door_t *sdh, const char *name)
 {
-	(void) strlcpy(sdh->sd_name, name, SMBD_DOOR_NAMESZ);
+	(void) strlcpy(sdh->sd_name, name, sizeof (sdh->sd_name));
 }
 
 void

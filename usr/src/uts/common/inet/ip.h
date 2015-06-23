@@ -720,14 +720,14 @@ typedef struct ipsec_latch_s
 } ipsec_latch_t;
 
 #define	IPLATCH_REFHOLD(ipl) { \
-	atomic_add_32(&(ipl)->ipl_refcnt, 1);		\
+	atomic_inc_32(&(ipl)->ipl_refcnt);		\
 	ASSERT((ipl)->ipl_refcnt != 0);			\
 }
 
 #define	IPLATCH_REFRELE(ipl) {				\
 	ASSERT((ipl)->ipl_refcnt != 0);				\
 	membar_exit();						\
-	if (atomic_add_32_nv(&(ipl)->ipl_refcnt, -1) == 0)	\
+	if (atomic_dec_32_nv(&(ipl)->ipl_refcnt) == 0)	\
 		iplatch_free(ipl);				\
 }
 

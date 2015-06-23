@@ -26,7 +26,7 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2011, 2012 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _SYS_SYSMACROS_H
@@ -132,7 +132,7 @@ extern unsigned char bcd_to_byte[256];
 
 #define	getminor(x)	(minor_t)((x) & L_MAXMIN)
 
-#else
+#else	/* _KERNEL */
 
 /* major part of a device external from the kernel (same as emajor below) */
 
@@ -367,7 +367,7 @@ extern unsigned char bcd_to_byte[256];
 #endif  /* _BIT_FIELDS_LTOH */
 
 /* avoid any possibility of clashing with <stddef.h> version */
-#if defined(_KERNEL) && !defined(_KMEMUSER)
+#if (defined(_KERNEL) || defined(_FAKE_KERNEL)) && !defined(_KMEMUSER)
 
 #if !defined(offsetof)
 #define	offsetof(s, m)	((size_t)(&(((s *)0)->m)))

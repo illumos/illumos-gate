@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -267,7 +268,7 @@ smb_lock_range_access(
     smb_request_t	*sr,
     smb_node_t		*node,
     uint64_t		start,
-    uint64_t		length,
+    uint64_t		length,	 /* zero means to EoF */
     boolean_t		will_write)
 {
 	smb_lock_t	*lock;
@@ -359,44 +360,50 @@ smb_lock_range_error(smb_request_t *sr, uint32_t status32)
 }
 
 /*
- * smb_range_check()
+ * An SMB variant of nbl_conflict().
  *
- * Perform range checking.  First check for internal CIFS range conflicts
- * and then check for external conflicts, for example, with NFS or local
- * access.
+ * SMB prevents remove or rename when conflicting locks exist
+ * (unlike NFS, which is why we can't just use nbl_conflict).
  *
- * If nbmand is enabled, this function must be called from within an nbmand
- * critical region
+ * Returns:
+ *	NT_STATUS_SHARING_VIOLATION - nbl_share_conflict
+ *	NT_STATUS_FILE_LOCK_CONFLICT - nbl_lock_conflict
+ *	NT_STATUS_SUCCESS - operation can proceed
+ *
+ * NB: This function used to also check the list of ofiles,
+ * via: smb_lock_range_access() but we _can't_ do that here
+ * due to lock order constraints between node->n_lock_list
+ * and node->vp->vnbllock (taken via nvl_start_crit).
+ * They must be taken in that order, and in here, we
+ * already hold vp->vnbllock.
  */
-
 DWORD
-smb_range_check(smb_request_t *sr, smb_node_t *node, uint64_t start,
-    uint64_t length, boolean_t will_write)
+smb_nbl_conflict(smb_node_t *node, uint64_t off, uint64_t len, nbl_op_t op)
 {
-	smb_error_t smberr;
 	int svmand;
-	int nbl_op;
-	int rc;
 
 	SMB_NODE_VALID(node);
-
 	ASSERT(smb_node_in_crit(node));
+	ASSERT(op == NBL_READ || op == NBL_WRITE || op == NBL_READWRITE ||
+	    op == NBL_REMOVE || op == NBL_RENAME);
 
 	if (smb_node_is_dir(node))
 		return (NT_STATUS_SUCCESS);
 
-	rc = smb_lock_range_access(sr, node, start, length, will_write);
-	if (rc)
-		return (NT_STATUS_FILE_LOCK_CONFLICT);
+	if (nbl_share_conflict(node->vp, op, &smb_ct))
+		return (NT_STATUS_SHARING_VIOLATION);
 
-	if ((rc = nbl_svmand(node->vp, kcred, &svmand)) != 0) {
-		smbsr_map_errno(rc, &smberr);
-		return (smberr.status);
-	}
+	/*
+	 * When checking for lock conflicts, rename and remove
+	 * are not allowed, so treat those as read/write.
+	 */
+	if (op == NBL_RENAME || op == NBL_REMOVE)
+		op = NBL_READWRITE;
 
-	nbl_op = (will_write) ? NBL_WRITE : NBL_READ;
+	if (nbl_svmand(node->vp, zone_kcred(), &svmand))
+		svmand = 1;
 
-	if (nbl_lock_conflict(node->vp, nbl_op, start, length, svmand, &smb_ct))
+	if (nbl_lock_conflict(node->vp, op, off, len, svmand, &smb_ct))
 		return (NT_STATUS_FILE_LOCK_CONFLICT);
 
 	return (NT_STATUS_SUCCESS);
@@ -588,7 +595,7 @@ smb_lock_range_lckrules(
 static clock_t
 smb_lock_wait(smb_request_t *sr, smb_lock_t *b_lock, smb_lock_t *c_lock)
 {
-	clock_t		rc;
+	clock_t		rc = 0;
 
 	ASSERT(sr->sr_awaiting == NULL);
 

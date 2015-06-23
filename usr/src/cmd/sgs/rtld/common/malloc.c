@@ -207,11 +207,23 @@ void *
 calloc(size_t num, size_t size)
 {
 	void *	mp;
+	size_t	total;
 
-	num *= size;
-	if ((mp = malloc(num)) == NULL)
+	if (num == 0 || size == 0) {
+		total = 0;
+	} else {
+		total = num * size;
+
+		/* check for overflow */
+		if ((total / num) != size) {
+			errno = ENOMEM;
+			return (NULL);
+		}
+	}
+
+	if ((mp = malloc(total)) == NULL)
 		return (NULL);
-	(void) memset(mp, 0, num);
+	(void) memset(mp, 0, total);
 	return (mp);
 }
 

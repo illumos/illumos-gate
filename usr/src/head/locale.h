@@ -24,10 +24,19 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
+ * Portions of this file developed by Garrett D'Amore are licensed
+ * under the terms of the Common Development and Distribution License (CDDL)
+ * version 1.0 only.  The use of subsequent versions of the License are
+ * is specifically prohibited unless those terms are not in conflict with
+ * version 1.0 of the License.  You can find this license on-line at
+ * http://www.illumos.org/license/CDDL
+ */
+
 #ifndef _LOCALE_H
 #define	_LOCALE_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <iso/locale_iso.h>
 
@@ -55,6 +64,35 @@ extern "C" {
 #define	_ValidCategory(c) \
 	(((int)(c) >= LC_CTYPE) && ((int)(c) <= _LastCategory) || \
 	((int)c == LC_ALL))
+
+
+#if defined(_XPG7) || !defined(_STRICT_SYMBOLS)
+
+/*
+ * These were added in POSIX 2008 as part of the newlocale() specification.
+ */
+#define	LC_CTYPE_MASK		(1 << LC_CTYPE)
+#define	LC_NUMERIC_MASK		(1 << LC_NUMERIC)
+#define	LC_TIME_MASK		(1 << LC_TIME)
+#define	LC_COLLATE_MASK		(1 << LC_COLLATE)
+#define	LC_MONETARY_MASK	(1 << LC_MONETARY)
+#define	LC_MESSAGES_MASK	(1 << LC_MESSAGES)
+#define	LC_ALL_MASK		(0x3f)
+
+#ifndef _LOCALE_T
+#define	_LOCALE_T
+typedef struct _locale *locale_t;
+#endif
+
+extern locale_t	duplocale(locale_t);
+extern void	freelocale(locale_t);
+extern locale_t	newlocale(int, const char *, locale_t);
+extern locale_t	uselocale(locale_t);
+
+#define	LC_GLOBAL_LOCALE	(__global_locale())
+extern locale_t			__global_locale(void);
+
+#endif	/* defined(_XPG7) || !defined(_STRICT_SYMBOLS) */
 
 #ifdef	__cplusplus
 }

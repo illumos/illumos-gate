@@ -1,4 +1,5 @@
 '\" te
+.\" Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 .\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Copyright 1989 AT&T
 .\" Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
@@ -10,7 +11,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH OPEN 2 "Nov 16, 2013"
+.TH OPEN 2 "Feb 14, 2015"
 .SH NAME
 open, openat \- open a file
 .SH SYNOPSIS
@@ -30,7 +31,6 @@ open, openat \- open a file
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBopen()\fR function establishes the connection between a file and a file
 descriptor. It creates an open file description that refers to a file and a
@@ -168,6 +168,19 @@ regardless of the contents of the symbolic link. If \fBO_EXCL\fR is set and
 .sp
 .ne 2
 .na
+.B O_EXEC
+.na
+.ad
+.sp .6
+.RS 4n
+If set, indicates that the file should be opened for execute permission.
+This option is only valid for regular files, an error will be returned
+if it is not.
+.RE
+
+.sp
+.ne 2
+.na
 \fB\fBO_LARGEFILE\fR\fR
 .ad
 .sp .6
@@ -291,6 +304,18 @@ the file descriptor complete as defined by synchronized I/O data integrity
 completion.  If both \fBO_SYNC\fR and \fBO_RSYNC\fR are set in \fIoflag\fR, all
 I/O operations on the file descriptor complete as defined by synchronized I/O
 file integrity completion.
+.RE
+
+.sp
+.ne 2
+.na
+.B O_SEARCH
+.ad
+.sp .6
+.RS 4n
+If set, indicates that the directory should be opened for searching.
+This option is only valid for a directory, an error will be returned if
+it is not.
 .RE
 
 .sp
@@ -420,14 +445,12 @@ Certain flag values can be set following \fBopen()\fR as described in
 The largest value that can be represented correctly in an object of type
 \fBoff_t\fR is established as the offset maximum in the open file description.
 .SH RETURN VALUES
-.sp
 .LP
-Upon successful completion, the \fBopen()\fR function opens the file and return
-a non-negative integer representing the lowest numbered unused file descriptor.
-Otherwise, \fB\(mi1\fR is returned, \fBerrno\fR is set to indicate the error,
-and no files are created or modified.
+Upon successful completion, both \fBopen()\fR and \fBopenat()\fR functions open
+the file and return a non-negative integer representing the lowest numbered
+unused file descriptor.  Otherwise, \fB\(mi1\fR is returned, \fBerrno\fR is set
+to indicate the error, and no files are created or modified.
 .SH ERRORS
-.sp
 .LP
 The \fBopen()\fR and \fBopenat()\fR functions will fail if:
 .sp
@@ -632,6 +655,16 @@ The \fBO_CREAT\fR flag is not set and the named file does not exist; or the
 .sp
 .ne 2
 .na
+.B ENOEXEC
+.ad
+.RS 16n
+The \fBO_EXEC\fR flag is set and \fIpath\fR does not point to a regular
+file.
+.RE
+
+.sp
+.ne 2
+.na
 \fB\fBENOLINK\fR\fR
 .ad
 .RS 16n
@@ -676,7 +709,8 @@ The device specified by \fIpath\fR does not support the open operation.
 .RS 16n
 A component of the path prefix is not a directory or a relative path was
 supplied to \fBopenat()\fR, the \fBO_XATTR\fR flag was not supplied, and the
-file descriptor does not refer to a directory.
+file descriptor does not refer to a directory. The \fBO_SEARCH\fR flag
+was passed and \fIpath\fR does not refer to a directory.
 .RE
 
 .sp
@@ -877,13 +911,11 @@ if ((pfd = open(filename, O_WRONLY | O_CREAT | O_TRUNC,
 .in -2
 
 .SH USAGE
-.sp
 .LP
 The \fBopen()\fR function has a transitional interface for 64-bit file offsets.
 See \fBlf64\fR(5). Note that using \fBopen64()\fR is equivalent to using
 \fBopen()\fR with \fBO_LARGEFILE\fR set in \fIoflag\fR.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -903,7 +935,6 @@ Standard	For \fBopen()\fR, see \fBstandards\fR(5).
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBIntro\fR(2), \fBchmod\fR(2), \fBclose\fR(2), \fBcreat\fR(2), \fBdup\fR(2),
 \fBexec\fR(2), \fBfcntl\fR(2), \fBgetmsg\fR(2), \fBgetrlimit\fR(2),
@@ -912,7 +943,6 @@ Standard	For \fBopen()\fR, see \fBstandards\fR(5).
 \fBunlockpt\fR(3C), \fBattributes\fR(5), \fBlf64\fR(5), \fBprivileges\fR(5),
 \fBstandards\fR(5), \fBconnld\fR(7M), \fBstreamio\fR(7I)
 .SH NOTES
-.sp
 .LP
 Hierarchical Storage Management (HSM) file systems can sometimes cause long
 delays when opening a file, since HSM files must be recalled from secondary

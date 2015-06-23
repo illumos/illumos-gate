@@ -54,4 +54,4 @@ legacy pkg=SUNWapct \
     name="ABI Application Certification Tools"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
-depend fmri=runtime/perl-510 type=require
+depend fmri=runtime/perl$(PERL_PKGVERS) type=require

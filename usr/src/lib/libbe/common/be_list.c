@@ -25,6 +25,8 @@
 
 /*
  * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2015 Toomas Soome <tsoome@me.com>
+ * Copyright 2015 Gary Mills
  */
 
 #include <assert.h>
@@ -66,8 +68,14 @@ static int be_get_ds_data(zfs_handle_t *, char *, be_dataset_list_t *,
     be_node_list_t *);
 static int be_get_ss_data(zfs_handle_t *, char *, be_snapshot_list_t *,
     be_node_list_t *);
-static void be_sort_list(be_node_list_t **);
-static int be_qsort_compare_BEs(const void *, const void *);
+static int be_sort_list(be_node_list_t **,
+    int (*)(const void *, const void *));
+static int be_qsort_compare_BEs_name(const void *, const void *);
+static int be_qsort_compare_BEs_name_rev(const void *, const void *);
+static int be_qsort_compare_BEs_date(const void *, const void *);
+static int be_qsort_compare_BEs_date_rev(const void *, const void *);
+static int be_qsort_compare_BEs_space(const void *, const void *);
+static int be_qsort_compare_BEs_space_rev(const void *, const void *);
 static int be_qsort_compare_snapshots(const void *x, const void *y);
 static int be_qsort_compare_datasets(const void *x, const void *y);
 static void *be_list_alloc(int *, size_t);
@@ -130,6 +138,57 @@ be_list(char *be_name, be_node_list_t **be_nodes)
 	return (ret);
 }
 
+/*
+ * Function:	be_sort
+ * Description:	Sort BE node list
+ * Parameters:
+ *		pointer to address of list head
+ *		sort order type
+ * Return:
+ *              BE_SUCCESS - Success
+ *              be_errno_t - Failure
+ * Side effect:
+ *		node list sorted by name
+ * Scope:
+ *		Public
+ */
+int
+be_sort(be_node_list_t **be_nodes, int order)
+{
+	int (*compar)(const void *, const void *) = be_qsort_compare_BEs_date;
+
+	if (be_nodes == NULL)
+		return (BE_ERR_INVAL);
+
+	switch (order) {
+	case BE_SORT_UNSPECIFIED:
+	case BE_SORT_DATE:
+		compar = be_qsort_compare_BEs_date;
+		break;
+	case BE_SORT_DATE_REV:
+		compar = be_qsort_compare_BEs_date_rev;
+		break;
+	case BE_SORT_NAME:
+		compar = be_qsort_compare_BEs_name;
+		break;
+	case BE_SORT_NAME_REV:
+		compar = be_qsort_compare_BEs_name_rev;
+		break;
+	case BE_SORT_SPACE:
+		compar = be_qsort_compare_BEs_space;
+		break;
+	case BE_SORT_SPACE_REV:
+		compar = be_qsort_compare_BEs_space_rev;
+		break;
+	default:
+		be_print_err(gettext("be_sort: invalid sort order %d\n"),
+		    order);
+		return (BE_ERR_INVAL);
+	}
+
+	return (be_sort_list(be_nodes, compar));
+}
+
 /* ******************************************************************** */
 /*			Semi-Private Functions				*/
 /* ******************************************************************** */
@@ -157,6 +216,7 @@ _be_list(char *be_name, be_node_list_t **be_nodes)
 	list_callback_data_t cb = { 0 };
 	be_transaction_data_t bt = { 0 };
 	int ret = BE_SUCCESS;
+	int sret;
 	zpool_handle_t *zphp;
 	char *rpool = NULL;
 	struct be_defaults be_defaults;
@@ -220,9 +280,9 @@ _be_list(char *be_name, be_node_list_t **be_nodes)
 
 	free(cb.be_name);
 
-	be_sort_list(be_nodes);
+	sret = be_sort(be_nodes, BE_SORT_DATE);
 
-	return (ret);
+	return ((ret == BE_SUCCESS) ? sret : ret);
 }
 
 /*
@@ -626,34 +686,44 @@ be_add_children_callback(zfs_handle_t *zhp, void *data)
  * Description:	Sort BE node list
  * Parameters:
  *		pointer to address of list head
- * Returns:
- *		nothing
+ *		compare function
+ * Return:
+ *              BE_SUCCESS - Success
+ *              be_errno_t - Failure
  * Side effect:
  *		node list sorted by name
  * Scope:
  *		Private
  */
-static void
-be_sort_list(be_node_list_t **pstart)
+static int
+be_sort_list(be_node_list_t **pstart, int (*compar)(const void *, const void *))
 {
+	int ret = BE_SUCCESS;
 	size_t ibe, nbe;
 	be_node_list_t *p = NULL;
 	be_node_list_t **ptrlist = NULL;
+	be_node_list_t **ptrtmp;
 
-	if (pstart == NULL)
-		return;
+	if (pstart == NULL) /* Nothing to sort */
+		return (BE_SUCCESS);
 	/* build array of linked list BE struct pointers */
 	for (p = *pstart, nbe = 0; p != NULL; nbe++, p = p->be_next_node) {
-		ptrlist = realloc(ptrlist,
+		ptrtmp = realloc(ptrlist,
 		    sizeof (be_node_list_t *) * (nbe + 2));
+		if (ptrtmp == NULL) { /* out of memory */
+			be_print_err(gettext("be_sort_list: memory "
+			    "allocation failed\n"));
+			ret = BE_ERR_NOMEM;
+			goto free;
+		}
+		ptrlist = ptrtmp;
 		ptrlist[nbe] = p;
 	}
-	if (nbe == 0)
-		return;
+	if (nbe == 0) /* Nothing to sort */
+		return (BE_SUCCESS);
 	/* in-place list quicksort using qsort(3C) */
 	if (nbe > 1)	/* no sort if less than 2 BEs */
-		qsort(ptrlist, nbe, sizeof (be_node_list_t *),
-		    be_qsort_compare_BEs);
+		qsort(ptrlist, nbe, sizeof (be_node_list_t *), compar);
 
 	ptrlist[nbe] = NULL; /* add linked list terminator */
 	*pstart = ptrlist[0]; /* set new linked list header */
@@ -670,8 +740,10 @@ be_sort_list(be_node_list_t **pstart)
 			    malloc(sizeof (be_snapshot_list_t *) * (nmax + 1));
 			be_snapshot_list_t *p;
 
-			if (slist == NULL)
+			if (slist == NULL) {
+				ret = BE_ERR_NOMEM;
 				continue;
+			}
 			/* build array of linked list snapshot struct ptrs */
 			for (ns = 0, p = ptrlist[ibe]->be_node_snapshots;
 			    ns < nmax && p != NULL;
@@ -698,8 +770,10 @@ end_snapshot:
 			    malloc(sizeof (be_dataset_list_t *) * (nmax + 1));
 			be_dataset_list_t *p;
 
-			if (slist == NULL)
+			if (slist == NULL) {
+				ret = BE_ERR_NOMEM;
 				continue;
+			}
 			/* build array of linked list dataset struct ptrs */
 			for (ns = 0, p = ptrlist[ibe]->be_node_datasets;
 			    ns < nmax && p != NULL;
@@ -722,11 +796,40 @@ end_dataset:
 	}
 free:
 	free(ptrlist);
+	return (ret);
 }
 
 /*
- * Function:	be_qsort_compare_BEs
- * Description:	lexical compare of BE names for qsort(3C)
+ * Function:	be_qsort_compare_BEs_date
+ * Description:	compare BE creation times for qsort(3C)
+ *		will sort BE list from oldest to most recent
+ * Parameters:
+ *		x,y - BEs with names to compare
+ * Returns:
+ *		positive if x>y, negative if y>x, 0 if equal
+ * Scope:
+ *		Private
+ */
+static int
+be_qsort_compare_BEs_date(const void *x, const void *y)
+{
+	be_node_list_t *p = *(be_node_list_t **)x;
+	be_node_list_t *q = *(be_node_list_t **)y;
+
+	assert(p != NULL);
+	assert(q != NULL);
+
+	if (p->be_node_creation > q->be_node_creation)
+		return (1);
+	if (p->be_node_creation < q->be_node_creation)
+		return (-1);
+	return (0);
+}
+
+/*
+ * Function:	be_qsort_compare_BEs_date_rev
+ * Description:	compare BE creation times for qsort(3C)
+ *		will sort BE list from recent to oldest
  * Parameters:
  *		x,y - BEs with names to compare
  * Returns:
@@ -735,16 +838,93 @@ free:
  *		Private
  */
 static int
-be_qsort_compare_BEs(const void *x, const void *y)
+be_qsort_compare_BEs_date_rev(const void *x, const void *y)
+{
+	return (be_qsort_compare_BEs_date(y, x));
+}
+
+/*
+ * Function:	be_qsort_compare_BEs_name
+ * Description:	lexical compare of BE names for qsort(3C)
+ * Parameters:
+ *		x,y - BEs with names to compare
+ * Returns:
+ *		positive if x>y, negative if y>x, 0 if equal
+ * Scope:
+ *		Private
+ */
+static int
+be_qsort_compare_BEs_name(const void *x, const void *y)
 {
 	be_node_list_t *p = *(be_node_list_t **)x;
 	be_node_list_t *q = *(be_node_list_t **)y;
 
-	if (p == NULL || p->be_node_name == NULL)
-		return (1);
-	if (q == NULL || q->be_node_name == NULL)
-		return (-1);
+	assert(p != NULL);
+	assert(p->be_node_name != NULL);
+	assert(q != NULL);
+	assert(q->be_node_name != NULL);
+
 	return (strcmp(p->be_node_name, q->be_node_name));
+}
+
+/*
+ * Function:	be_qsort_compare_BEs_name_rev
+ * Description:	reverse lexical compare of BE names for qsort(3C)
+ * Parameters:
+ *		x,y - BEs with names to compare
+ * Returns:
+ *		positive if y>x, negative if x>y, 0 if equal
+ * Scope:
+ *		Private
+ */
+static int
+be_qsort_compare_BEs_name_rev(const void *x, const void *y)
+{
+	return (be_qsort_compare_BEs_name(y, x));
+}
+
+/*
+ * Function:	be_qsort_compare_BEs_space
+ * Description:	compare BE sizes for qsort(3C)
+ *		will sort BE list in growing order
+ * Parameters:
+ *		x,y - BEs with names to compare
+ * Returns:
+ *		positive if x>y, negative if y>x, 0 if equal
+ * Scope:
+ *		Private
+ */
+static int
+be_qsort_compare_BEs_space(const void *x, const void *y)
+{
+	be_node_list_t *p = *(be_node_list_t **)x;
+	be_node_list_t *q = *(be_node_list_t **)y;
+
+	assert(p != NULL);
+	assert(q != NULL);
+
+	if (p->be_space_used > q->be_space_used)
+		return (1);
+	if (p->be_space_used < q->be_space_used)
+		return (-1);
+	return (0);
+}
+
+/*
+ * Function:	be_qsort_compare_BEs_space_rev
+ * Description:	compare BE sizes for qsort(3C)
+ *		will sort BE list in shrinking
+ * Parameters:
+ *		x,y - BEs with names to compare
+ * Returns:
+ *		positive if y>x, negative if x>y, 0 if equal
+ * Scope:
+ *		Private
+ */
+static int
+be_qsort_compare_BEs_space_rev(const void *x, const void *y)
+{
+	return (be_qsort_compare_BEs_space(y, x));
 }
 
 /*

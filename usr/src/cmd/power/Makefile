@@ -90,9 +90,6 @@ $(ROOTUSRSBINSYSIDPM) := FILEMODE= 755
 # lint pass one enforcement
 #
 CFLAGS += $(CCVERBOSE)
-CERRWARN += -_gcc=-Wno-parentheses
-CERRWARN += -_gcc=-Wno-uninitialized
-CERRWARN += -_gcc=-Wno-unused-value
 
 .PARALLEL: $(OBJS)
 

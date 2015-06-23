@@ -8,6 +8,7 @@
 # source.  A copy of the CDDL is also available via the Internet at
 # http://www.illumos.org/license/CDDL.
 #
+# Copyright 2014 Gary Mills
 #
 # Copyright (c) 2014 Racktop Systems.
 #
@@ -20,6 +21,11 @@ LDLIBS += -lkstat
 
 CERRWARN += -_gcc=-Wno-unused-value
 CERRWARN += -_gcc=-Wno-unused-variable
+
+# Additional include directories only needed for the SPARC platform
+
+$(SPARC_BLD) CPPFLAGS += -I$(ROOT)/usr/platform/sun4u/include \
+			 -I$(ROOT)/usr/platform/sun4v/include
 
 MAPFILES = mapfile-vers
 

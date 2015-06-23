@@ -5,6 +5,8 @@
  *
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
  */
 
 #ifdef __FreeBSD__
@@ -71,6 +73,7 @@
 #if defined(__NetBSD__) || (__OpenBSD__)
 # include <paths.h>
 #endif
+#include "ipfzone.h"
 
 #if !defined(lint)
 static const char sccsid[] = "@(#)fils.c	1.21 4/20/96 (C) 1993-2000 Darren Reed";
@@ -177,6 +180,7 @@ char *name;
 #else
 	fprintf(stderr, "       %s -t [-C] ", name);
 #endif
+	fprintf(stderr, "[-G|-z zonename] ");
 	fprintf(stderr, "[-D destination address] [-P protocol] [-S source address] [-T refresh time]\n");
 	exit(1);
 }
@@ -207,9 +211,9 @@ char *argv[];
 	u_32_t frf;
 
 #ifdef	USE_INET6
-	options = "6aACdfghIilnostvD:M:N:P:RS:T:";
+	options = "6aACdfgG:hIilnostvD:M:N:P:RS:T:z:";
 #else
-	options = "aACdfghIilnostvD:M:N:P:RS:T:";
+	options = "aACdfgG:hIilnostvD:M:N:P:RS:T:z:";
 #endif
 
 	saddr.in4.s_addr = INADDR_ANY; 	/* default any v4 source addr */
@@ -223,13 +227,16 @@ char *argv[];
 	opterr = 0;
 
 	/*
-	 * Parse these two arguments now lest there be any buffer overflows
+	 * Parse these four arguments now lest there be any buffer overflows
 	 * in the parsing of the rest.
 	 */
 	myoptind = optind;
 	while ((c = getopt(argc, argv, options)) != -1) {
 		switch (c)
 		{
+		case 'G' :
+			setzonename_global(optarg);
+			break;
 		case 'M' :
 			memf = optarg;
 			live_kernel = 0;
@@ -237,6 +244,9 @@ char *argv[];
 		case 'N' :
 			kern = optarg;
 			live_kernel = 0;
+			break;
+		case 'z' :
+			setzonename(optarg);
 			break;
 		}
 	}
@@ -247,9 +257,20 @@ char *argv[];
 			perror("open(IPSTATE_NAME)");
 			exit(-1);
 		}
+
+		if (setzone(state_fd) != 0) {
+			close(state_fd);
+			exit(-1);
+		}
+
 		if ((ipf_fd = open(device, O_RDONLY)) == -1) {
 			fprintf(stderr, "open(%s)", device);
 			perror("");
+			exit(-1);
+		}
+
+		if (setzone(ipf_fd) != 0) {
+			close(ipf_fd);
 			exit(-1);
 		}
 	}
@@ -297,6 +318,9 @@ char *argv[];
 			break;
 		case 'g' :
 			opts |= OPT_GROUPS;
+			break;
+		case 'G' :
+			/* Already handled by getzoneopt() above */
 			break;
 		case 'h' :
 			opts |= OPT_HITS;
@@ -359,6 +383,9 @@ char *argv[];
 		case 'v' :
 			opts |= OPT_VERBOSE;
 			opts |= OPT_UNDEF;
+			break;
+		case 'z' :
+			/* Already handled by getzoneopt() above */
 			break;
 		default :
 			usage(argv[0]);
@@ -479,6 +506,11 @@ u_32_t *frfp;
 		device = IPAUTH_NAME;
 		if ((ipf_fd = open(device, O_RDONLY)) == -1) {
 			perror("open");
+			exit(-1);
+		}
+
+		if (setzone(ipf_fd) != 0) {
+			close(ipf_fd);
 			exit(-1);
 		}
 

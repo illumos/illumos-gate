@@ -334,7 +334,7 @@ pk_genkeypair(int argc, char *argv[])
 	KMF_ENCODE_FORMAT fmt = KMF_FORMAT_ASN1;
 	KMF_KEY_ALG keyAlg = KMF_RSA;
 	KMF_ALGORITHM_INDEX sigAlg;
-	KMF_CREDENTIAL tokencred = {NULL, 0};
+	KMF_CREDENTIAL tokencred = { NULL, 0 };
 	KMF_OID *curveoid = NULL; /* ECC */
 	int y_flag = 0;
 

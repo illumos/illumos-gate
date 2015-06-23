@@ -1,0 +1,29 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+#
+
+set name=pkg.fmri value=pkg:/SUNWlibm@0.5.11,5.11-0.133
+set name=pkg.description \
+    value="Math & Microtasking Library Headers & Lint Files"
+# license license=SUNWlibm.copyright
+# license license=SUNWlibmr.copyright
+set name=pkg.renamed value=true
+# set name=pkg.renamed value=true
+set name=pkg.summary value="Math & Microtasking Library Headers & Lint Files"
+set name=info.classification \
+    value=org.opensolaris.category.2008:System/Libraries
+# set name=org.opensolaris.consolidation value=sunpro
+set name=variant.arch value=$(ARCH)
+set name=variant.opensolaris.zone value=global value=nonglobal
+depend fmri=pkg:/system/library/math/header-math@$(PKGVERS) type=require

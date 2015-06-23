@@ -21,8 +21,9 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
  */
-
 /*
  * General-Purpose Functions
  * (as defined in PKCS#11 spec section 11.4)
@@ -196,8 +197,12 @@ meta_Finalize(CK_VOID_PTR pReserved)
 
 	(void) pthread_mutex_lock(&initmutex);
 
-	pkcs11_close_urandom();
-	pkcs11_close_urandom_seed();
+	/*
+	 * There used to be calls to cleanup libcryptoutil here.  Given that
+	 * libcryptoutil can be linked and invoked independently of PKCS#11,
+	 * cleaning up libcryptoutil here makes no sense.  Decoupling these
+	 * two also prevent deadlocks and other artificial dependencies.
+	 */
 
 	meta_objectManager_finalize();
 

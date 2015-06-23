@@ -149,12 +149,16 @@ igmp_start_timers(unsigned next, ip_stack_t *ipst)
 	}
 	if (ipst->ips_igmp_timeout_id == 0) {
 		/*
-		 * The timer is inactive. We need to start a timer
+		 * The timer is inactive. We need to start a timer if we haven't
+		 * been asked to quiesce.
 		 */
 		ipst->ips_igmp_time_to_next = next;
-		ipst->ips_igmp_timeout_id = timeout(igmp_timeout_handler,
-		    (void *)ipst, MSEC_TO_TICK(ipst->ips_igmp_time_to_next));
-		ipst->ips_igmp_timer_scheduled_last = ddi_get_lbolt();
+		if (ipst->ips_igmp_timer_quiesce != B_TRUE) {
+			ipst->ips_igmp_timeout_id =
+			    timeout(igmp_timeout_handler, (void *)ipst,
+			    MSEC_TO_TICK(ipst->ips_igmp_time_to_next));
+			ipst->ips_igmp_timer_scheduled_last = ddi_get_lbolt();
+		}
 		ipst->ips_igmp_timer_setter_active = B_FALSE;
 		mutex_exit(&ipst->ips_igmp_timer_lock);
 		return;
@@ -193,7 +197,8 @@ igmp_start_timers(unsigned next, ip_stack_t *ipst)
 		ASSERT(ipst->ips_igmp_timeout_id != 0);
 		ipst->ips_igmp_timeout_id = 0;
 	}
-	if (ipst->ips_igmp_time_to_next != 0) {
+	if (ipst->ips_igmp_time_to_next != 0 &&
+	    ipst->ips_igmp_timer_quiesce != B_TRUE) {
 		ipst->ips_igmp_time_to_next =
 		    MIN(ipst->ips_igmp_time_to_next, next);
 		ipst->ips_igmp_timeout_id = timeout(igmp_timeout_handler,
@@ -235,12 +240,16 @@ mld_start_timers(unsigned next, ip_stack_t *ipst)
 	}
 	if (ipst->ips_mld_timeout_id == 0) {
 		/*
-		 * The timer is inactive. We need to start a timer
+		 * The timer is inactive. We need to start a timer, if we
+		 * haven't been asked to quiesce.
 		 */
 		ipst->ips_mld_time_to_next = next;
-		ipst->ips_mld_timeout_id = timeout(mld_timeout_handler,
-		    (void *)ipst, MSEC_TO_TICK(ipst->ips_mld_time_to_next));
-		ipst->ips_mld_timer_scheduled_last = ddi_get_lbolt();
+		if (ipst->ips_mld_timer_quiesce != B_TRUE) {
+			ipst->ips_mld_timeout_id = timeout(mld_timeout_handler,
+			    (void *)ipst,
+			    MSEC_TO_TICK(ipst->ips_mld_time_to_next));
+			ipst->ips_mld_timer_scheduled_last = ddi_get_lbolt();
+		}
 		ipst->ips_mld_timer_setter_active = B_FALSE;
 		mutex_exit(&ipst->ips_mld_timer_lock);
 		return;
@@ -279,7 +288,8 @@ mld_start_timers(unsigned next, ip_stack_t *ipst)
 		ASSERT(ipst->ips_mld_timeout_id != 0);
 		ipst->ips_mld_timeout_id = 0;
 	}
-	if (ipst->ips_mld_time_to_next != 0) {
+	if (ipst->ips_mld_time_to_next != 0 &&
+	    ipst->ips_mld_timer_quiesce == B_FALSE) {
 		ipst->ips_mld_time_to_next =
 		    MIN(ipst->ips_mld_time_to_next, next);
 		ipst->ips_mld_timeout_id = timeout(mld_timeout_handler,
@@ -508,7 +518,7 @@ igmp_query_in(ipha_t *ipha, igmpa_t *igmpa, ill_t *ill)
 		if (ill->ill_mcast_type != IGMP_V1_ROUTER) {
 			ip1dbg(("Received IGMPv1 Query on %s, switching mode "
 			    "to IGMP_V1_ROUTER\n", ill->ill_name));
-			atomic_add_16(&ill->ill_ifptr->illif_mcast_v1, 1);
+			atomic_inc_16(&ill->ill_ifptr->illif_mcast_v1);
 			ill->ill_mcast_type = IGMP_V1_ROUTER;
 		}
 
@@ -545,7 +555,7 @@ igmp_query_in(ipha_t *ipha, igmpa_t *igmpa, ill_t *ill)
 		if (ill->ill_mcast_type == IGMP_V3_ROUTER) {
 			ip1dbg(("Received IGMPv2 Query on %s, switching mode "
 			    "to IGMP_V2_ROUTER", ill->ill_name));
-			atomic_add_16(&ill->ill_ifptr->illif_mcast_v2, 1);
+			atomic_inc_16(&ill->ill_ifptr->illif_mcast_v2);
 			ill->ill_mcast_type = IGMP_V2_ROUTER;
 		}
 		ill->ill_mcast_v2_time = 0;
@@ -1716,7 +1726,7 @@ igmp_slowtimo(void *arg)
 				}
 				ill->ill_mcast_v1_time = 0;
 				ill->ill_mcast_v1_tset = 0;
-				atomic_add_16(&ifp->illif_mcast_v1, -1);
+				atomic_dec_16(&ifp->illif_mcast_v1);
 			}
 			if ((ill->ill_mcast_type == IGMP_V2_ROUTER) &&
 			    (ipst->ips_igmp_max_version >= IGMP_V3_ROUTER) &&
@@ -1727,7 +1737,7 @@ igmp_slowtimo(void *arg)
 				ill->ill_mcast_type = IGMP_V3_ROUTER;
 				ill->ill_mcast_v2_time = 0;
 				ill->ill_mcast_v2_tset = 0;
-				atomic_add_16(&ifp->illif_mcast_v2, -1);
+				atomic_dec_16(&ifp->illif_mcast_v2);
 			}
 			rw_exit(&ill->ill_mcast_lock);
 			ill_refrele(ill);
@@ -1737,8 +1747,12 @@ igmp_slowtimo(void *arg)
 	rw_exit(&ipst->ips_ill_g_lock);
 	ill_mcast_timer_start(ipst);
 	mutex_enter(&ipst->ips_igmp_slowtimeout_lock);
-	ipst->ips_igmp_slowtimeout_id = timeout(igmp_slowtimo, (void *)ipst,
-	    MSEC_TO_TICK(MCAST_SLOWTIMO_INTERVAL));
+	if (ipst->ips_igmp_slowtimeout_quiesce != B_TRUE) {
+		ipst->ips_igmp_slowtimeout_id = timeout(igmp_slowtimo,
+		    (void *)ipst, MSEC_TO_TICK(MCAST_SLOWTIMO_INTERVAL));
+	} else {
+		ipst->ips_igmp_slowtimeout_id = 0;
+	}
 	mutex_exit(&ipst->ips_igmp_slowtimeout_lock);
 }
 
@@ -1786,7 +1800,7 @@ mld_slowtimo(void *arg)
 				ill->ill_mcast_type = MLD_V2_ROUTER;
 				ill->ill_mcast_v1_time = 0;
 				ill->ill_mcast_v1_tset = 0;
-				atomic_add_16(&ifp->illif_mcast_v1, -1);
+				atomic_dec_16(&ifp->illif_mcast_v1);
 			}
 			rw_exit(&ill->ill_mcast_lock);
 			ill_refrele(ill);
@@ -1796,8 +1810,12 @@ mld_slowtimo(void *arg)
 	rw_exit(&ipst->ips_ill_g_lock);
 	ill_mcast_timer_start(ipst);
 	mutex_enter(&ipst->ips_mld_slowtimeout_lock);
-	ipst->ips_mld_slowtimeout_id = timeout(mld_slowtimo, (void *)ipst,
-	    MSEC_TO_TICK(MCAST_SLOWTIMO_INTERVAL));
+	if (ipst->ips_mld_slowtimeout_quiesce != B_TRUE) {
+		ipst->ips_mld_slowtimeout_id = timeout(mld_slowtimo,
+		    (void *)ipst, MSEC_TO_TICK(MCAST_SLOWTIMO_INTERVAL));
+	} else {
+		ipst->ips_mld_slowtimeout_id = 0;
+	}
 	mutex_exit(&ipst->ips_mld_slowtimeout_lock);
 }
 
@@ -2216,7 +2234,7 @@ mld_query_in(mld_hdr_t *mldh, ill_t *ill)
 	if (ill->ill_mcast_type == MLD_V2_ROUTER) {
 		ip1dbg(("Received MLDv1 Query on %s, switching mode to "
 		    "MLD_V1_ROUTER\n", ill->ill_name));
-		atomic_add_16(&ill->ill_ifptr->illif_mcast_v1, 1);
+		atomic_inc_16(&ill->ill_ifptr->illif_mcast_v1);
 		ill->ill_mcast_type = MLD_V1_ROUTER;
 	}
 

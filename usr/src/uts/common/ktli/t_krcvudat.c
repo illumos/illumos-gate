@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Gary Mills
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -36,8 +37,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Kernel TLI-like function to read a datagram off of a
  * transport endpoints stream head.
@@ -49,7 +48,6 @@
  * 	T_UDERR		If an error indication has been received,
  * 			in which case uderr contains the unitdata
  * 			error number.
- * 	T_ERROR
  */
 
 #include <sys/param.h>
@@ -294,14 +292,14 @@ t_krcvudata(TIUSER *tiptr, struct t_kunitdata *unitdata, int *type, int *uderr)
 	case M_FLUSH:
 		KTLILOG(1, "t_krcvudata: tli_recv returned M_FLUSH\n", 0);
 		freemsg(bp);
-		*type = T_ERROR;
+		error = EBADMSG;
 		break;
 
 	default:
 		KTLILOG(1, "t_krcvudata: unknown message type %x\n",
 		    bp->b_datap->db_type);
 		freemsg(bp);
-		*type = T_ERROR;
+		error = EBADMSG;
 		break;
 	}
 

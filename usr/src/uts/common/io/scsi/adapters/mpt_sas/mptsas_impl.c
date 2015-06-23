@@ -23,6 +23,7 @@
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2014 OmniTI Computer Consulting, Inc. All rights reserved.
+ * Copyright (c) 2014, Tegile Systems Inc. All rights reserved.
  */
 
 /*
@@ -88,10 +89,6 @@
  * FMA header files.
  */
 #include <sys/fm/io/ddi.h>
-
-#if defined(MPTSAS_DEBUG)
-extern uint32_t mptsas_debug_flags;
-#endif
 
 /*
  *  prototypes
@@ -206,7 +203,8 @@ mptsas_start_config_page_access(mptsas_t *mpt, mptsas_cmd_t *cmd)
 	struct scsi_pkt		*pkt = cmd->cmd_pkt;
 	mptsas_config_request_t	*config = pkt->pkt_ha_private;
 	uint8_t			direction;
-	uint32_t		length, flagslength, request_desc_low;
+	uint32_t		length, flagslength;
+	uint64_t		request_desc;
 
 	ASSERT(mutex_owned(&mpt->m_mutex));
 
@@ -280,10 +278,10 @@ mptsas_start_config_page_access(mptsas_t *mpt, mptsas_cmd_t *cmd)
 
 	(void) ddi_dma_sync(mpt->m_dma_req_frame_hdl, 0, 0,
 	    DDI_DMA_SYNC_FORDEV);
-	request_desc_low = (cmd->cmd_slot << 16) +
+	request_desc = (cmd->cmd_slot << 16) +
 	    MPI2_REQ_DESCRIPT_FLAGS_DEFAULT_TYPE;
 	cmd->cmd_rfm = NULL;
-	MPTSAS_START_CMD(mpt, request_desc_low, 0);
+	MPTSAS_START_CMD(mpt, request_desc);
 	if ((mptsas_check_dma_handle(mpt->m_dma_req_frame_hdl) !=
 	    DDI_SUCCESS) ||
 	    (mptsas_check_acc_handle(mpt->m_acc_req_frame_hdl) !=
@@ -393,7 +391,7 @@ mptsas_access_config_page(mptsas_t *mpt, uint8_t action, uint8_t page_type,
 		(void) ddi_dma_sync(mpt->m_dma_reply_frame_hdl, 0, 0,
 		    DDI_DMA_SYNC_FORCPU);
 		reply = (pMpi2ConfigReply_t)(mpt->m_reply_frame + (cmd->cmd_rfm
-		    - mpt->m_reply_frame_dma_addr));
+		    - (mpt->m_reply_frame_dma_addr & 0xffffffffu)));
 		config.page_type = ddi_get8(mpt->m_acc_reply_frame_hdl,
 		    &reply->Header.PageType);
 		config.page_number = ddi_get8(mpt->m_acc_reply_frame_hdl,
@@ -468,6 +466,8 @@ mptsas_access_config_page(mptsas_t *mpt, uint8_t action, uint8_t page_type,
 	    &cmd->cmd_dmahandle, &accessp, &page_memp,
 	    len, &cookie) == FALSE) {
 		rval = DDI_FAILURE;
+		mptsas_log(mpt, CE_WARN,
+		    "mptsas_dma_addr_create(len=0x%x) failed", (int)len);
 		goto page_done;
 	}
 	/* NOW we can safely call mptsas_dma_addr_destroy(). */
@@ -536,7 +536,7 @@ mptsas_access_config_page(mptsas_t *mpt, uint8_t action, uint8_t page_type,
 		(void) ddi_dma_sync(cmd->cmd_dmahandle, 0, 0,
 		    DDI_DMA_SYNC_FORCPU);
 		reply = (pMpi2ConfigReply_t)(mpt->m_reply_frame + (cmd->cmd_rfm
-		    - mpt->m_reply_frame_dma_addr));
+		    - (mpt->m_reply_frame_dma_addr & 0xffffffffu)));
 		iocstatus = ddi_get16(mpt->m_acc_reply_frame_hdl,
 		    &reply->IOCStatus);
 		iocstatus = MPTSAS_IOCSTATUS(iocstatus);
@@ -613,7 +613,7 @@ page_done:
 int
 mptsas_send_config_request_msg(mptsas_t *mpt, uint8_t action, uint8_t pagetype,
 	uint32_t pageaddress, uint8_t pagenumber, uint8_t pageversion,
-	uint8_t pagelength, uint32_t SGEflagslength, uint32_t SGEaddress32)
+	uint8_t pagelength, uint32_t SGEflagslength, uint64_t SGEaddress)
 {
 	pMpi2ConfigRequest_t	config;
 	int			send_numbytes;
@@ -630,7 +630,10 @@ mptsas_send_config_request_msg(mptsas_t *mpt, uint8_t action, uint8_t pagetype,
 	ddi_put32(mpt->m_hshk_acc_hdl,
 	    &config->PageBufferSGE.MpiSimple.FlagsLength, SGEflagslength);
 	ddi_put32(mpt->m_hshk_acc_hdl,
-	    &config->PageBufferSGE.MpiSimple.u.Address32, SGEaddress32);
+	    &config->PageBufferSGE.MpiSimple.u.Address64.Low, SGEaddress);
+	ddi_put32(mpt->m_hshk_acc_hdl,
+	    &config->PageBufferSGE.MpiSimple.u.Address64.High,
+	    SGEaddress >> 32);
 	send_numbytes = sizeof (MPI2_CONFIG_REQUEST);
 
 	/*
@@ -647,7 +650,7 @@ int
 mptsas_send_extended_config_request_msg(mptsas_t *mpt, uint8_t action,
 	uint8_t extpagetype, uint32_t pageaddress, uint8_t pagenumber,
 	uint8_t pageversion, uint16_t extpagelength,
-	uint32_t SGEflagslength, uint32_t SGEaddress32)
+	uint32_t SGEflagslength, uint64_t SGEaddress)
 {
 	pMpi2ConfigRequest_t	config;
 	int			send_numbytes;
@@ -666,7 +669,10 @@ mptsas_send_extended_config_request_msg(mptsas_t *mpt, uint8_t action,
 	ddi_put32(mpt->m_hshk_acc_hdl,
 	    &config->PageBufferSGE.MpiSimple.FlagsLength, SGEflagslength);
 	ddi_put32(mpt->m_hshk_acc_hdl,
-	    &config->PageBufferSGE.MpiSimple.u.Address32, SGEaddress32);
+	    &config->PageBufferSGE.MpiSimple.u.Address64.Low, SGEaddress);
+	ddi_put32(mpt->m_hshk_acc_hdl,
+	    &config->PageBufferSGE.MpiSimple.u.Address64.High,
+	    SGEaddress >> 32);
 	send_numbytes = sizeof (MPI2_CONFIG_REQUEST);
 
 	/*
@@ -1094,7 +1100,7 @@ mptsas_ioc_task_management(mptsas_t *mpt, int task_type, uint16_t dev_handle,
 	mptsas_cmd_t				*cmd;
 	struct scsi_pkt				*pkt;
 	mptsas_slots_t				*slots = mpt->m_active;
-	uint32_t				request_desc_low, i;
+	uint64_t				request_desc, i;
 	pMPI2DefaultReply_t			reply_msg;
 
 	/*
@@ -1150,9 +1156,9 @@ mptsas_ioc_task_management(mptsas_t *mpt, int task_type, uint16_t dev_handle,
 	 */
 	(void) ddi_dma_sync(mpt->m_dma_req_frame_hdl, 0, 0,
 	    DDI_DMA_SYNC_FORDEV);
-	request_desc_low = (cmd->cmd_slot << 16) +
+	request_desc = (cmd->cmd_slot << 16) +
 	    MPI2_REQ_DESCRIPT_FLAGS_HIGH_PRIORITY;
-	MPTSAS_START_CMD(mpt, request_desc_low, 0);
+	MPTSAS_START_CMD(mpt, request_desc);
 	rval = mptsas_poll(mpt, cmd, MPTSAS_POLL_TIME);
 
 	if (pkt->pkt_reason == CMD_INCOMPLETE)
@@ -1168,7 +1174,7 @@ mptsas_ioc_task_management(mptsas_t *mpt, int task_type, uint16_t dev_handle,
 		    DDI_DMA_SYNC_FORCPU);
 		reply_msg = (pMPI2DefaultReply_t)
 		    (mpt->m_reply_frame + (cmd->cmd_rfm -
-		    mpt->m_reply_frame_dma_addr));
+		    (mpt->m_reply_frame_dma_addr & 0xffffffffu)));
 		if (reply_size > sizeof (MPI2_SCSI_TASK_MANAGE_REPLY)) {
 			reply_size = sizeof (MPI2_SCSI_TASK_MANAGE_REPLY);
 		}
@@ -1206,6 +1212,83 @@ mptsas_ioc_task_management(mptsas_t *mpt, int task_type, uint16_t dev_handle,
 	return (rval);
 }
 
+/*
+ * Complete firmware download frame for v2.0 cards.
+ */
+static void
+mptsas_uflash2(pMpi2FWDownloadRequest fwdownload,
+    ddi_acc_handle_t acc_hdl, uint32_t size, uint8_t type,
+    ddi_dma_cookie_t flsh_cookie)
+{
+	pMpi2FWDownloadTCSGE_t	tcsge;
+	pMpi2SGESimple64_t	sge;
+	uint32_t		flagslength;
+
+	ddi_put8(acc_hdl, &fwdownload->Function,
+	    MPI2_FUNCTION_FW_DOWNLOAD);
+	ddi_put8(acc_hdl, &fwdownload->ImageType, type);
+	ddi_put8(acc_hdl, &fwdownload->MsgFlags,
+	    MPI2_FW_DOWNLOAD_MSGFLGS_LAST_SEGMENT);
+	ddi_put32(acc_hdl, &fwdownload->TotalImageSize, size);
+
+	tcsge = (pMpi2FWDownloadTCSGE_t)&fwdownload->SGL;
+	ddi_put8(acc_hdl, &tcsge->ContextSize, 0);
+	ddi_put8(acc_hdl, &tcsge->DetailsLength, 12);
+	ddi_put8(acc_hdl, &tcsge->Flags, 0);
+	ddi_put32(acc_hdl, &tcsge->ImageOffset, 0);
+	ddi_put32(acc_hdl, &tcsge->ImageSize, size);
+
+	sge = (pMpi2SGESimple64_t)(tcsge + 1);
+	flagslength = size;
+	flagslength |= ((uint32_t)(MPI2_SGE_FLAGS_LAST_ELEMENT |
+	    MPI2_SGE_FLAGS_END_OF_BUFFER |
+	    MPI2_SGE_FLAGS_SIMPLE_ELEMENT |
+	    MPI2_SGE_FLAGS_SYSTEM_ADDRESS |
+	    MPI2_SGE_FLAGS_64_BIT_ADDRESSING |
+	    MPI2_SGE_FLAGS_HOST_TO_IOC |
+	    MPI2_SGE_FLAGS_END_OF_LIST) << MPI2_SGE_FLAGS_SHIFT);
+	ddi_put32(acc_hdl, &sge->FlagsLength, flagslength);
+	ddi_put32(acc_hdl, &sge->Address.Low,
+	    flsh_cookie.dmac_address);
+	ddi_put32(acc_hdl, &sge->Address.High,
+	    (uint32_t)(flsh_cookie.dmac_laddress >> 32));
+}
+
+/*
+ * Complete firmware download frame for v2.5 cards.
+ */
+static void
+mptsas_uflash25(pMpi25FWDownloadRequest fwdownload,
+    ddi_acc_handle_t acc_hdl, uint32_t size, uint8_t type,
+    ddi_dma_cookie_t flsh_cookie)
+{
+	pMpi2IeeeSgeSimple64_t	sge;
+	uint8_t			flags;
+
+	ddi_put8(acc_hdl, &fwdownload->Function,
+	    MPI2_FUNCTION_FW_DOWNLOAD);
+	ddi_put8(acc_hdl, &fwdownload->ImageType, type);
+	ddi_put8(acc_hdl, &fwdownload->MsgFlags,
+	    MPI2_FW_DOWNLOAD_MSGFLGS_LAST_SEGMENT);
+	ddi_put32(acc_hdl, &fwdownload->TotalImageSize, size);
+
+	ddi_put32(acc_hdl, &fwdownload->ImageOffset, 0);
+	ddi_put32(acc_hdl, &fwdownload->ImageSize, size);
+
+	sge = (pMpi2IeeeSgeSimple64_t)&fwdownload->SGL;
+	flags = MPI2_IEEE_SGE_FLAGS_SIMPLE_ELEMENT |
+	    MPI2_IEEE_SGE_FLAGS_SYSTEM_ADDR |
+	    MPI25_IEEE_SGE_FLAGS_END_OF_LIST;
+	ddi_put8(acc_hdl, &sge->Flags, flags);
+	ddi_put32(acc_hdl, &sge->Length, size);
+	ddi_put32(acc_hdl, &sge->Address.Low,
+	    flsh_cookie.dmac_address);
+	ddi_put32(acc_hdl, &sge->Address.High,
+	    (uint32_t)(flsh_cookie.dmac_laddress >> 32));
+}
+
+static int mptsas_enable_mpi25_flashupdate = 0;
+
 int
 mptsas_update_flash(mptsas_t *mpt, caddr_t ptrbuffer, uint32_t size,
     uint8_t type, int mode)
@@ -1223,15 +1306,23 @@ mptsas_update_flash(mptsas_t *mpt, caddr_t ptrbuffer, uint32_t size,
 	ddi_dma_handle_t	flsh_dma_handle;
 	ddi_acc_handle_t	flsh_accessp;
 	caddr_t			memp, flsh_memp;
-	uint32_t		flagslength;
-	pMpi2FWDownloadRequest	fwdownload;
-	pMpi2FWDownloadTCSGE_t	tcsge;
-	pMpi2SGESimple64_t	sge;
 	mptsas_cmd_t		*cmd;
 	struct scsi_pkt		*pkt;
 	int			i;
 	int			rvalue = 0;
-	uint32_t		request_desc_low;
+	uint64_t		request_desc;
+
+	if (mpt->m_MPI25 && !mptsas_enable_mpi25_flashupdate) {
+		/*
+		 * The code is there but not tested yet.
+		 * User has to know there are risks here.
+		 */
+		mptsas_log(mpt, CE_WARN, "mptsas_update_flash(): "
+		    "Updating firmware through MPI 2.5 has not been "
+		    "tested yet!\n"
+		    "To enable set mptsas_enable_mpi25_flashupdate to 1\n");
+		return (-1);
+	} /* Otherwise, you pay your money and you take your chances. */
 
 	if ((rvalue = (mptsas_request_from_pool(mpt, &cmd, &pkt))) == -1) {
 		mptsas_log(mpt, CE_WARN, "mptsas_update_flash(): allocation "
@@ -1292,45 +1383,23 @@ mptsas_update_flash(mptsas_t *mpt, caddr_t ptrbuffer, uint32_t size,
 	ASSERT(cmd->cmd_slot != 0);
 	memp = mpt->m_req_frame + (mpt->m_req_frame_size * cmd->cmd_slot);
 	bzero(memp, mpt->m_req_frame_size);
-	fwdownload = (void *)memp;
-	ddi_put8(mpt->m_acc_req_frame_hdl, &fwdownload->Function,
-	    MPI2_FUNCTION_FW_DOWNLOAD);
-	ddi_put8(mpt->m_acc_req_frame_hdl, &fwdownload->ImageType, type);
-	ddi_put8(mpt->m_acc_req_frame_hdl, &fwdownload->MsgFlags,
-	    MPI2_FW_DOWNLOAD_MSGFLGS_LAST_SEGMENT);
-	ddi_put32(mpt->m_acc_req_frame_hdl, &fwdownload->TotalImageSize, size);
 
-	tcsge = (pMpi2FWDownloadTCSGE_t)&fwdownload->SGL;
-	ddi_put8(mpt->m_acc_req_frame_hdl, &tcsge->ContextSize, 0);
-	ddi_put8(mpt->m_acc_req_frame_hdl, &tcsge->DetailsLength, 12);
-	ddi_put8(mpt->m_acc_req_frame_hdl, &tcsge->Flags, 0);
-	ddi_put32(mpt->m_acc_req_frame_hdl, &tcsge->ImageOffset, 0);
-	ddi_put32(mpt->m_acc_req_frame_hdl, &tcsge->ImageSize, size);
-
-	sge = (pMpi2SGESimple64_t)(tcsge + 1);
-	flagslength = size;
-	flagslength |= ((uint32_t)(MPI2_SGE_FLAGS_LAST_ELEMENT |
-	    MPI2_SGE_FLAGS_END_OF_BUFFER |
-	    MPI2_SGE_FLAGS_SIMPLE_ELEMENT |
-	    MPI2_SGE_FLAGS_SYSTEM_ADDRESS |
-	    MPI2_SGE_FLAGS_64_BIT_ADDRESSING |
-	    MPI2_SGE_FLAGS_HOST_TO_IOC |
-	    MPI2_SGE_FLAGS_END_OF_LIST) << MPI2_SGE_FLAGS_SHIFT);
-	ddi_put32(mpt->m_acc_req_frame_hdl, &sge->FlagsLength, flagslength);
-	ddi_put32(mpt->m_acc_req_frame_hdl, &sge->Address.Low,
-	    flsh_cookie.dmac_address);
-	ddi_put32(mpt->m_acc_req_frame_hdl, &sge->Address.High,
-	    (uint32_t)(flsh_cookie.dmac_laddress >> 32));
+	if (mpt->m_MPI25)
+		mptsas_uflash25((pMpi25FWDownloadRequest)memp,
+		    mpt->m_acc_req_frame_hdl, size, type, flsh_cookie);
+	else
+		mptsas_uflash2((pMpi2FWDownloadRequest)memp,
+		    mpt->m_acc_req_frame_hdl, size, type, flsh_cookie);
 
 	/*
 	 * Start command
 	 */
 	(void) ddi_dma_sync(mpt->m_dma_req_frame_hdl, 0, 0,
 	    DDI_DMA_SYNC_FORDEV);
-	request_desc_low = (cmd->cmd_slot << 16) +
+	request_desc = (cmd->cmd_slot << 16) +
 	    MPI2_REQ_DESCRIPT_FLAGS_DEFAULT_TYPE;
 	cmd->cmd_rfm = NULL;
-	MPTSAS_START_CMD(mpt, request_desc_low, 0);
+	MPTSAS_START_CMD(mpt, request_desc);
 
 	rvalue = 0;
 	(void) cv_reltimedwait(&mpt->m_fw_cv, &mpt->m_mutex,
@@ -1364,7 +1433,7 @@ mptsas_sasdevpage_0_cb(mptsas_t *mpt, caddr_t page_memp,
 	uint64_t		*sas_wwn;
 	uint32_t		*dev_info;
 	uint8_t			*physport, *phynum;
-	uint16_t		*pdevhdl;
+	uint16_t		*pdevhdl, *io_flags;
 	uint32_t		page_address;
 
 	if ((iocstatus != MPI2_IOCSTATUS_SUCCESS) &&
@@ -1398,7 +1467,7 @@ mptsas_sasdevpage_0_cb(mptsas_t *mpt, caddr_t page_memp,
 	pdevhdl = va_arg(ap, uint16_t *);
 	bay_num = va_arg(ap, uint16_t *);
 	enclosure = va_arg(ap, uint16_t *);
-
+	io_flags = va_arg(ap, uint16_t *);
 
 	sasdevpage = (pMpi2SasDevicePage0_t)page_memp;
 
@@ -1415,6 +1484,19 @@ mptsas_sasdevpage_0_cb(mptsas_t *mpt, caddr_t page_memp,
 	*pdevhdl = ddi_get16(accessp, &sasdevpage->ParentDevHandle);
 	*bay_num = ddi_get16(accessp, &sasdevpage->Slot);
 	*enclosure = ddi_get16(accessp, &sasdevpage->EnclosureHandle);
+	*io_flags = ddi_get16(accessp, &sasdevpage->Flags);
+
+	if (*io_flags & MPI25_SAS_DEVICE0_FLAGS_FAST_PATH_CAPABLE) {
+		/*
+		 * Leave a messages about FP cabability in the log.
+		 */
+		mptsas_log(mpt, CE_CONT,
+		    "!w%016"PRIx64" FastPath Capable%s", *sas_wwn,
+		    (*io_flags &
+		    MPI25_SAS_DEVICE0_FLAGS_ENABLED_FAST_PATH)?
+		    " and Enabled":" but Disabled");
+	}
+
 	return (rval);
 }
 
@@ -1426,7 +1508,7 @@ int
 mptsas_get_sas_device_page0(mptsas_t *mpt, uint32_t page_address,
     uint16_t *dev_handle, uint64_t *sas_wwn, uint32_t *dev_info,
     uint8_t *physport, uint8_t *phynum, uint16_t *pdev_handle,
-    uint16_t *bay_num, uint16_t *enclosure)
+    uint16_t *bay_num, uint16_t *enclosure, uint16_t *io_flags)
 {
 	int rval = DDI_SUCCESS;
 
@@ -1441,7 +1523,7 @@ mptsas_get_sas_device_page0(mptsas_t *mpt, uint32_t page_address,
 	    MPI2_CONFIG_EXTPAGETYPE_SAS_DEVICE, 0, page_address,
 	    mptsas_sasdevpage_0_cb, page_address, dev_handle, sas_wwn,
 	    dev_info, physport, phynum, pdev_handle,
-	    bay_num, enclosure);
+	    bay_num, enclosure, io_flags);
 
 	return (rval);
 }
@@ -1929,7 +2011,7 @@ mptsas_get_sas_io_unit_page_hndshk(mptsas_t *mpt)
 			    MPI2_SGE_FLAGS_END_OF_BUFFER |
 			    MPI2_SGE_FLAGS_SIMPLE_ELEMENT |
 			    MPI2_SGE_FLAGS_SYSTEM_ADDRESS |
-			    MPI2_SGE_FLAGS_32_BIT_ADDRESSING |
+			    MPI2_SGE_FLAGS_64_BIT_ADDRESSING |
 			    MPI2_SGE_FLAGS_IOC_TO_HOST |
 			    MPI2_SGE_FLAGS_END_OF_LIST) <<
 			    MPI2_SGE_FLAGS_SHIFT);
@@ -1945,7 +2027,7 @@ mptsas_get_sas_io_unit_page_hndshk(mptsas_t *mpt)
 			    MPI2_SGE_FLAGS_END_OF_BUFFER |
 			    MPI2_SGE_FLAGS_SIMPLE_ELEMENT |
 			    MPI2_SGE_FLAGS_SYSTEM_ADDRESS |
-			    MPI2_SGE_FLAGS_32_BIT_ADDRESSING |
+			    MPI2_SGE_FLAGS_64_BIT_ADDRESSING |
 			    MPI2_SGE_FLAGS_IOC_TO_HOST |
 			    MPI2_SGE_FLAGS_END_OF_LIST) <<
 			    MPI2_SGE_FLAGS_SHIFT);
@@ -1989,7 +2071,7 @@ mptsas_get_sas_io_unit_page_hndshk(mptsas_t *mpt)
 		    MPI2_CONFIG_EXTPAGETYPE_SAS_IO_UNIT, 0, page_number,
 		    ddi_get8(recv_accessp, &configreply->Header.PageVersion),
 		    ddi_get16(recv_accessp, &configreply->ExtPageLength),
-		    flags_length, page_cookie.dmac_address)) {
+		    flags_length, page_cookie.dmac_laddress)) {
 			goto cleanup;
 		}
 
@@ -2239,6 +2321,8 @@ mptsas_get_manufacture_page5(mptsas_t *mpt)
 
 	bzero(page_memp, sizeof (MPI2_CONFIG_PAGE_MAN_5));
 	m5 = (pMpi2ManufacturingPage5_t)page_memp;
+	NDBG20(("mptsas_get_manufacture_page5: paddr 0x%p",
+	    (void *)(uintptr_t)page_cookie.dmac_laddress));
 
 	/*
 	 * Give reply address to IOC to store config page in and send
@@ -2248,7 +2332,7 @@ mptsas_get_manufacture_page5(mptsas_t *mpt)
 	flagslength = sizeof (MPI2_CONFIG_PAGE_MAN_5);
 	flagslength |= ((uint32_t)(MPI2_SGE_FLAGS_LAST_ELEMENT |
 	    MPI2_SGE_FLAGS_END_OF_BUFFER | MPI2_SGE_FLAGS_SIMPLE_ELEMENT |
-	    MPI2_SGE_FLAGS_SYSTEM_ADDRESS | MPI2_SGE_FLAGS_32_BIT_ADDRESSING |
+	    MPI2_SGE_FLAGS_SYSTEM_ADDRESS | MPI2_SGE_FLAGS_64_BIT_ADDRESSING |
 	    MPI2_SGE_FLAGS_IOC_TO_HOST |
 	    MPI2_SGE_FLAGS_END_OF_LIST) << MPI2_SGE_FLAGS_SHIFT);
 
@@ -2257,7 +2341,7 @@ mptsas_get_manufacture_page5(mptsas_t *mpt)
 	    MPI2_CONFIG_PAGETYPE_MANUFACTURING, 0, 5,
 	    ddi_get8(recv_accessp, &configreply->Header.PageVersion),
 	    ddi_get8(recv_accessp, &configreply->Header.PageLength),
-	    flagslength, page_cookie.dmac_address)) {
+	    flagslength, page_cookie.dmac_laddress)) {
 		rval = DDI_FAILURE;
 		goto done;
 	}
@@ -2624,7 +2708,7 @@ mptsas_get_manufacture_page0(mptsas_t *mpt)
 	flagslength = sizeof (MPI2_CONFIG_PAGE_MAN_0);
 	flagslength |= ((uint32_t)(MPI2_SGE_FLAGS_LAST_ELEMENT |
 	    MPI2_SGE_FLAGS_END_OF_BUFFER | MPI2_SGE_FLAGS_SIMPLE_ELEMENT |
-	    MPI2_SGE_FLAGS_SYSTEM_ADDRESS | MPI2_SGE_FLAGS_32_BIT_ADDRESSING |
+	    MPI2_SGE_FLAGS_SYSTEM_ADDRESS | MPI2_SGE_FLAGS_64_BIT_ADDRESSING |
 	    MPI2_SGE_FLAGS_IOC_TO_HOST |
 	    MPI2_SGE_FLAGS_END_OF_LIST) << MPI2_SGE_FLAGS_SHIFT);
 
@@ -2633,7 +2717,7 @@ mptsas_get_manufacture_page0(mptsas_t *mpt)
 	    MPI2_CONFIG_PAGETYPE_MANUFACTURING, 0, 0,
 	    ddi_get8(recv_accessp, &configreply->Header.PageVersion),
 	    ddi_get8(recv_accessp, &configreply->Header.PageLength),
-	    flagslength, page_cookie.dmac_address)) {
+	    flagslength, page_cookie.dmac_laddress)) {
 		rval = DDI_FAILURE;
 		goto done;
 	}

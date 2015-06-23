@@ -1,4 +1,5 @@
 '\" te
+.\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
 .\"  Copyright (c) 1992, X/Open Company Limited All Rights Reserved  Portions Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved
 .\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
@@ -7,9 +8,9 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH MBSINIT 3C "Jul 24, 2002"
+.TH MBSINIT 3C "Jun 23, 2014"
 .SH NAME
-mbsinit \- determine conversion object status
+mbsinit,mbsinit_l \- determine conversion object status
 .SH SYNOPSIS
 .LP
 .nf
@@ -17,20 +18,25 @@ mbsinit \- determine conversion object status
 
 \fBint\fR \fBmbsinit\fR(\fBconst mbstate_t *\fR\fIps\fR);
 .fi
+.LP
+.nf
+#include <wchar.h>
+#include <xlocale.h>
 
+\fBint\fR \fBmbsinit_l\fR(\fBconst mbstate_t *\fR\fIps\fR, \fBlocale_t\fR \fIloc\fR);
+.fi
 .SH DESCRIPTION
-.sp
 .LP
 If \fBps\fR is not a null pointer, the \fBmbsinit()\fR function determines
-whether the object pointed to by \fBps\fR describes an initial conversion
-state.
+whether the object pointed to by \fBps\fR describes an initial conversion state.
+.LP
+The function \fBmbsinit_l()\fR behaves identically to \fBmbsinit()\fR except the
+current locale is ignored and the locale \fIloc\fR is used instead.
 .SH RETURN VALUES
-.sp
 .LP
 The \fBmbsinit()\fR function returns non-zero if  \fBps\fR is a null pointer,
 or if the pointed-to object describes an initial conversion state; otherwise,
 it returns \fB0\fR.
-.sp
 .LP
 If an \fBmbstate_t\fR object is altered by any of the functions described as
 "restartable", and is then used with a different character sequence, or in the
@@ -38,17 +44,14 @@ other conversion direction, or with a different \fBLC_CTYPE\fR category setting
 than on earlier function calls, the behavior is undefined.  See
 \fBenviron\fR(5).
 .SH ERRORS
-.sp
 .LP
 No errors are defined.
 .SH USAGE
-.sp
 .LP
 The \fBmbstate_t\fR object is used to describe the current conversion state
 from a particular character sequence to a wide-character sequence (or vice
 versa) under the rules of a particular setting of the \fBLC_CTYPE\fR category
 of the current locale.
-.sp
 .LP
 The initial conversion state corresponds, for a conversion in either direction,
 to the beginning of a new character sequence in the initial shift state.  A
@@ -57,31 +60,28 @@ conversion state.  A zero-valued \fBmbstate_t\fR object can be used to initiate
 conversion involving any character sequence, in any \fBLC_CTYPE\fR category
 setting.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
 .TS
 box;
 c | c
 l | l .
 ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface Stability	Standard
+Interface Stability	See below.
 _
-MT-Level	MT-Safe with exceptions
+MT-Level	MT-Safe
 .TE
 
+.LP
+The
+.B mbsinit()
+function is Standard.  The
+.B mbsinit_l()
+function is Uncommitted.
 .SH SEE ALSO
-.sp
 .LP
-\fBmbrlen\fR(3C), \fBmbrtowc\fR(3C), \fBmbsrtowcs\fR(3C), \fBsetlocale\fR(3C),
-\fBwcrtomb\fR(3C), \fBwcsrtombs\fR(3C), \fBattributes\fR(5), \fBenviron\fR(5),
+\fBmbrlen\fR(3C), \fBmbrtowc\fR(3C), \fBmbsrtowcs\fR(3C),
+\fBnewlocale\fR(3C), \fBsetlocale\fR(3C),
+\fBwcrtomb\fR(3C), \fBwcsrtombs\fR(3C), \fBuselocale\fR(), \fBattributes\fR(5), \fBenviron\fR(5),
 \fBstandards\fR(5)
-.SH NOTES
-.sp
-.LP
-The \fBmbsinit()\fR function can be used safely in multithreaded applications,
-as long as \fBsetlocale\fR(3C) is not being called to change the locale.

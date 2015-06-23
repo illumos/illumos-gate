@@ -415,7 +415,7 @@ top:
 	 * a new one and use that.
 	 */
 #ifdef DEBUG
-	atomic_add_64(&nfscl->nfscl_stat.clalloc.value.ui64, 1);
+	atomic_inc_64(&nfscl->nfscl_stat.clalloc.value.ui64);
 #endif
 	mutex_exit(&nfscl->nfscl_chtable_lock);
 
@@ -436,7 +436,7 @@ top:
 	if (error != 0) {
 		kmem_cache_free(chtab_cache, cp);
 #ifdef DEBUG
-		atomic_add_64(&nfscl->nfscl_stat.clalloc.value.ui64, -1);
+		atomic_dec_64(&nfscl->nfscl_stat.clalloc.value.ui64);
 #endif
 		/*
 		 * Warning is unnecessary if error is EINTR.
@@ -455,7 +455,7 @@ top:
 		CLNT_DESTROY(cp->ch_client);
 		kmem_cache_free(chtab_cache, cp);
 #ifdef DEBUG
-		atomic_add_64(&nfscl->nfscl_stat.clalloc.value.ui64, -1);
+		atomic_dec_64(&nfscl->nfscl_stat.clalloc.value.ui64);
 #endif
 		return ((error != 0) ? error : EINTR);
 	}
@@ -2537,7 +2537,7 @@ start:
 		rp = kmem_cache_alloc(rnode_cache, KM_SLEEP);
 		new_vp = vn_alloc(KM_SLEEP);
 
-		atomic_add_long((ulong_t *)&rnew, 1);
+		atomic_inc_ulong((ulong_t *)&rnew);
 #ifdef DEBUG
 		clstat_debug.nrnode.value.ui64++;
 #endif
@@ -3019,7 +3019,7 @@ destroy_rnode(rnode_t *rp)
 	ASSERT(rp->r_mapcnt == 0);
 	ASSERT(!(rp->r_flags & RHASHED));
 	ASSERT(rp->r_freef == NULL && rp->r_freeb == NULL);
-	atomic_add_long((ulong_t *)&rnew, -1);
+	atomic_dec_ulong((ulong_t *)&rnew);
 #ifdef DEBUG
 	clstat_debug.nrnode.value.ui64--;
 #endif
@@ -3813,7 +3813,7 @@ rddir_cache_alloc(int flags)
 		mutex_init(&rc->lock, NULL, MUTEX_DEFAULT, NULL);
 		rc->count = 1;
 #ifdef DEBUG
-		atomic_add_64(&clstat_debug.dirent.value.ui64, 1);
+		atomic_inc_64(&clstat_debug.dirent.value.ui64);
 #endif
 	}
 	return (rc);
@@ -3824,7 +3824,7 @@ rddir_cache_free(rddir_cache *rc)
 {
 
 #ifdef DEBUG
-	atomic_add_64(&clstat_debug.dirent.value.ui64, -1);
+	atomic_dec_64(&clstat_debug.dirent.value.ui64);
 #endif
 	if (rc->entries != NULL) {
 #ifdef DEBUG

@@ -333,7 +333,7 @@ irb_refrele(irb_t *irb)
 void
 ire_refhold(ire_t *ire)
 {
-	atomic_add_32(&(ire)->ire_refcnt, 1);
+	atomic_inc_32(&(ire)->ire_refcnt);
 	ASSERT((ire)->ire_refcnt != 0);
 #ifdef DEBUG
 	ire_trace_ref(ire);
@@ -343,7 +343,7 @@ ire_refhold(ire_t *ire)
 void
 ire_refhold_notr(ire_t *ire)
 {
-	atomic_add_32(&(ire)->ire_refcnt, 1);
+	atomic_inc_32(&(ire)->ire_refcnt);
 	ASSERT((ire)->ire_refcnt != 0);
 }
 
@@ -379,7 +379,7 @@ ire_refrele(ire_t *ire)
 #endif
 	ASSERT((ire)->ire_refcnt != 0);
 	membar_exit();
-	if (atomic_add_32_nv(&(ire)->ire_refcnt, -1) == 0)
+	if (atomic_dec_32_nv(&(ire)->ire_refcnt) == 0)
 		ire_inactive(ire);
 }
 
@@ -388,7 +388,7 @@ ire_refrele_notr(ire_t *ire)
 {
 	ASSERT((ire)->ire_refcnt != 0);
 	membar_exit();
-	if (atomic_add_32_nv(&(ire)->ire_refcnt, -1) == 0)
+	if (atomic_dec_32_nv(&(ire)->ire_refcnt) == 0)
 		ire_inactive(ire);
 }
 
@@ -1272,7 +1272,7 @@ ire_add_v4(ire_t *ire)
 			 * an identical_ref, but with an ire_ref held.
 			 */
 			if (ire->ire_type != IRE_IF_CLONE) {
-				atomic_add_32(&ire1->ire_identical_ref, 1);
+				atomic_inc_32(&ire1->ire_identical_ref);
 				DTRACE_PROBE2(ire__add__exist, ire_t *, ire1,
 				    ire_t *, ire);
 			}
@@ -1533,7 +1533,7 @@ ire_delete(ire_t *ire)
 	if (!IRE_IS_CONDEMNED(ire)) {
 		/* Is this an IRE representing multiple duplicate entries? */
 		ASSERT(ire->ire_identical_ref >= 1);
-		if (atomic_add_32_nv(&ire->ire_identical_ref, -1) != 0) {
+		if (atomic_dec_32_nv(&ire->ire_identical_ref) != 0) {
 			/* Removed one of the identical parties */
 			rw_exit(&irb->irb_lock);
 			return;
@@ -2618,7 +2618,7 @@ ire_make_condemned(ire_t *ire)
 	ASSERT(!IRE_IS_CONDEMNED(ire));
 	ire->ire_generation = IRE_GENERATION_CONDEMNED;
 	/* Count how many condemned ires for kmem_cache callback */
-	atomic_add_32(&ipst->ips_num_ire_condemned, 1);
+	atomic_inc_32(&ipst->ips_num_ire_condemned);
 	nce = ire->ire_nce_cache;
 	ire->ire_nce_cache = NULL;
 	mutex_exit(&ire->ire_lock);

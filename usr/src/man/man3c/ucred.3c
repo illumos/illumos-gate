@@ -1,0 +1,289 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH UCRED 3C "Nov 6, 2014"
+.SH NAME
+ucred, ucred_get, ucred_free, ucred_geteuid, ucred_getruid, ucred_getsuid,
+ucred_getegid, ucred_getrgid, ucred_getsgid, ucred_getgroups, ucred_getprivset,
+ucred_getpid, ucred_getprojid, ucred_getzoneid, ucred_getpflags,
+ucred_getlabel, ucred_size \- user credential functions
+.SH SYNOPSIS
+.LP
+.nf
+#include <ucred.h>
+
+\fBucred_t *\fR\fBucred_get\fR(\fBpid_t\fR \fIpid\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBucred_free\fR(\fBucred_t *\fR\fIuc\fR);
+.fi
+
+.LP
+.nf
+\fBuid_t\fR \fBucred_geteuid\fR(\fBconst ucred_t *\fR\fIuc\fR);
+.fi
+
+.LP
+.nf
+\fBuid_t\fR \fBucred_getruid\fR(\fBconst ucred_t *\fR\fIuc\fR);
+.fi
+
+.LP
+.nf
+\fBuid_t\fR \fBucred_getsuid\fR(\fBconst ucred_t *\fR\fIuc\fR);
+.fi
+
+.LP
+.nf
+\fBgid_t\fR \fBucred_getegid\fR(\fBconst ucred_t *\fR\fIuc\fR);
+.fi
+
+.LP
+.nf
+\fBgid_t\fR \fBucred_getrgid\fR(\fBconst ucred_t *\fR\fIuc\fR);
+.fi
+
+.LP
+.nf
+\fBgid_t\fR \fBucred_getsgid\fR(\fBconst ucred_t *\fR\fIuc\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBucred_getgroups\fR(\fBconst ucred_t *\fR\fIuc\fR, \fBconst gid_t **\fR\fIgroups\fR);
+.fi
+
+.LP
+.nf
+\fBconst priv_set_t *\fR\fBucred_getprivset\fR(\fBconst ucred_t *\fR\fIuc\fR,
+     \fBpriv_ptype_t\fR \fIset\fR);
+.fi
+
+.LP
+.nf
+\fBpid_t\fR \fBucred_getpid\fR(\fBconst ucred_t *\fR\fIuc\fR);
+.fi
+
+.LP
+.nf
+\fBprojid_t\fR \fBucred_getprojid\fR(\fBconst ucred_t *\fR\fIuc\fR);
+.fi
+
+.LP
+.nf
+\fBzoneid_t\fR \fBucred_getzoneid\fR(\fBconst ucred_t *\fR\fIuc\fR);
+.fi
+
+.LP
+.nf
+\fBuint_t\fR \fBucred_getpflags\fR(\fBconst ucred_t *\fR\fIuc\fR, \fBuint_t\fR \fIflags\fR);
+.fi
+
+.LP
+.nf
+\fBm_label_t *\fR\fBucred_getlabel\fR(\fBconst ucred_t *\fR\fIuc\fR);
+.fi
+
+.LP
+.nf
+\fBsize_t\fR \fBucred_size\fR(\fBvoid\fR);
+.fi
+
+.SH DESCRIPTION
+.LP
+These functions return or act on a user credential, \fBucred_t\fR. User
+credentials are returned by various functions and describe the credentials of a
+process. Information about the process can then be obtained by calling the
+access functions. Access functions can fail if the underlying mechanism did not
+return sufficient information.
+.sp
+.LP
+The \fBucred_get()\fR function returns the user credential of the specified
+\fIpid\fR or \fINULL\fR if none can be obtained. A \fIpid\fR value of
+\fBP_MYID\fR returns information about the calling process. The return value is
+dynamically allocated and must be freed using \fBucred_free()\fR.
+.sp
+.LP
+The \fBucred_geteuid()\fR, \fBucred_getruid()\fR, \fBucred_getsuid()\fR,
+\fBucred_getegid()\fR, \fBucred_getrgid()\fR, and \fBucred_getsgid()\fR
+functions return the effective UID, real UID, saved UID, effective GID, real
+GID, saved GID, respectively, or -1 if the user credential does not contain
+sufficient information.
+.sp
+.LP
+The \fBucred_getgroups()\fR function stores a pointer to the group list in the
+\fBgid_t *\fR pointed to by the second argument and returns the number of
+groups in the list. It returns -1 if the information is not available. The
+returned group list is valid until \fBucred_free()\fR is called on the user
+credential given as argument.
+.sp
+.LP
+The \fBucred_getpid()\fR function returns the process ID of the process or -1
+if the process ID is not available. The process ID returned in a user
+credential is only guaranteed to be correct in a very limited number of cases
+when returned by \fBdoor_ucred\fR(3C) and \fBucred_get()\fR. In all other
+cases, the process in question might have handed of the file descriptor, the
+process might have exited or executed another program, or the process ID might
+have been reused by a completely unrelated process after the original program
+exited.
+.sp
+.LP
+The \fBucred_getprojid()\fR function returns the project ID of the process or
+-1 if the project ID is not available.
+.sp
+.LP
+The \fBucred_getzoneid()\fR function returns the zone ID of the process or
+\(mi1 if the zone ID is not available.
+.sp
+.LP
+The \fBucred_getprivset()\fR function returns the specified privilege set
+specified as second argument, or \fINULL\fR if either the requested information
+is not available or the privilege set name is invalid. The returned privilege
+set is valid until \fBucred_free()\fR is called on the specified user
+credential.
+.sp
+.LP
+The \fBucred_getpflags()\fR function returns the value of the specified
+privilege flags from the \fBucred\fR structure, or (\fBuint_t\fR)-1 if none was
+present.
+.sp
+.LP
+The \fBucred_getlabel()\fR function returns the value of the label, or
+\fINULL\fR if the label is not available. The returned label is valid until
+\fBucred_free()\fR is called on the specified user credential. This function is
+available only if the system is configured with Trusted Extensions.
+.sp
+.LP
+The \fBucred_free()\fR function frees the memory allocated for the specified
+user credential.
+.sp
+.LP
+The \fBucred_size()\fR function returns \fBsizeof\fR(\fBucred_t\fR). This value
+is constant only until the next boot, at which time it could change. The
+\fBucred_size()\fR function can be used to determine the size of the buffer
+needed to receive a credential option with \fBSO_RECVUCRED\fR. See
+\fBsocket.h\fR(3HEAD).
+.SH RETURN VALUES
+.LP
+See DESCRIPTION.
+.SH ERRORS
+.LP
+The \fBucred_get()\fR function will fail if:
+.sp
+.ne 2
+.na
+\fB\fBEAGAIN\fR\fR
+.ad
+.RS 10n
+There is not enough memory available to allocate sufficient memory to hold a
+user credential. The application can try again later.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBEACCES\fR\fR
+.ad
+.RS 10n
+The caller does not have sufficient privileges to examine the target process.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBEMFILE\fR\fR
+.ad
+.br
+.na
+\fB\fBENFILE\fR\fR
+.ad
+.RS 10n
+The calling process cannot open any more files.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBENOMEM\fR\fR
+.ad
+.RS 10n
+The physical limits of the system are exceeded by the memory allocation needed
+to hold a user credential.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBESRCH\fR\fR
+.ad
+.RS 10n
+The target process does not exist.
+.RE
+
+.sp
+.LP
+The \fBucred_getprivset()\fR function will fail if:
+.sp
+.ne 2
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+The privilege set argument is invalid.
+.RE
+
+.sp
+.LP
+The \fBucred_getlabel()\fR function will fail if:
+.sp
+.ne 2
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+The label is not present.
+.RE
+
+.sp
+.LP
+The \fBucred_geteuid()\fR, \fBucred_getruid()\fR, \fBucred_getsuid()\fR,
+\fBucred_getegid()\fR, \fBucred_getrgid()\fR, \fBucred_getsgid()\fR,
+\fBucred_getgroups()\fR, \fBucred_getpflags()\fR, \fBucred_getprivset()\fR,
+\fBucred_getprojid()\fR, \fBucred_getpid()\fR, and \fBucred_getlabel()\fR
+functions will fail if:
+.sp
+.ne 2
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+The requested user credential attribute is not available in the specified user
+credential.
+.RE
+
+.SH ATTRIBUTES
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Interface Stability	Committed
+_
+MT-Level	MT-Safe
+.TE
+
+.SH SEE ALSO
+.LP
+\fBgetpflags\fR(2), \fBgetppriv\fR(2), \fBdoor_ucred\fR(3C),
+\fBgetpeerucred\fR(3C), \fBpriv_set\fR(3C), \fBsocket.h\fR(3HEAD),
+\fBattributes\fR(5), \fBlabels\fR(5), \fBprivileges\fR(5)

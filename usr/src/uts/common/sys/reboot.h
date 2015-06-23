@@ -20,14 +20,14 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_REBOOT_H
 #define	_SYS_REBOOT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifndef _ASM
 #include <sys/types.h>
@@ -65,11 +65,7 @@ extern "C" {
 
 #ifndef _ASM
 
-#if defined(__STDC__)
 extern int reboot(int, char *);
-#else
-extern int reboot();
-#endif
 
 #if defined(_KERNEL)
 

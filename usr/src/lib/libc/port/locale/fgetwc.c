@@ -1,4 +1,5 @@
 /*
+ * Copyright 2013 Garrett D'Amore <garrett@damore.org>
  * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2002-2004 Tim J. Robbins.
  * All rights reserved.
@@ -35,22 +36,26 @@
 #include <wchar.h>
 #include "mblocal.h"
 #include "stdiom.h"
+#include "localeimpl.h"
+#include "lctype.h"
 
 /*
  * Non-MT-safe version.
  */
 wint_t
-_fgetwc_unlocked(FILE *fp)
+_fgetwc_unlocked_l(FILE *fp, locale_t loc)
 {
 	wchar_t wc;
 	size_t nconv;
 	int	c;
 	mbstate_t	*statep;
+	const struct lc_ctype *lct;
 
 	if ((c = GETC(fp)) == EOF)
 		return (WEOF);
 
-	if (MB_CUR_MAX == 1) {
+	lct = loc->ctype;
+	if (lct->lc_max_mblen == 1) {
 		/* Fast path for single-byte encodings. */
 		return ((wint_t)c);
 	}
@@ -61,7 +66,7 @@ _fgetwc_unlocked(FILE *fp)
 	}
 	do {
 		char	x = (char)c;
-		nconv = __mbrtowc(&wc, &x, 1, statep);
+		nconv = lct->lc_mbrtowc(&wc, &x, 1, statep);
 		if (nconv == (size_t)-1) {
 			break;
 		} else if (nconv == (size_t)-2) {
@@ -89,51 +94,64 @@ _fgetwc_unlocked(FILE *fp)
 	return (WEOF);
 }
 
+wint_t
+_fgetwc_unlocked(FILE *fp)
+{
+	return (_fgetwc_unlocked_l(fp, uselocale(NULL)));
+}
+
 
 /*
  * MT safe version
  */
+#undef getwc
+#pragma weak getwc = fgetwc
 wint_t
 fgetwc(FILE *fp)
 {
 	wint_t		r;
 	rmutex_t	*l;
+	locale_t	loc = uselocale(NULL);
 
 	FLOCKFILE(l, fp);
-	r = _fgetwc_unlocked(fp);
+	r = _fgetwc_unlocked_l(fp, loc);
 	FUNLOCKFILE(l);
 
 	return (r);
-}
-
-#undef	getwc
-wint_t
-getwc(FILE *fp)
-{
-	return (getwc(fp));
 }
 
 /*
  * XPG5 version.
  */
+#undef	__getwc_xpg5
+#pragma weak __getwc_xpg5 = __fgetwc_xpg5
 wint_t
 __fgetwc_xpg5(FILE *fp)
 {
 	wint_t		r;
 	rmutex_t	*l;
+	locale_t	loc = uselocale(NULL);
 
 	FLOCKFILE(l, fp);
 	if (GET_NO_MODE(fp))
 		_setorientation(fp, _WC_MODE);
-	r = _fgetwc_unlocked(fp);
+	r = _fgetwc_unlocked_l(fp, loc);
 	FUNLOCKFILE(l);
 
 	return (r);
 }
 
-#undef	__getwc_xpg5
+#pragma weak getwc_l = fgetwc_l
 wint_t
-__getwc_xpg5(FILE *fp)
+fgetwc_l(FILE *fp, locale_t loc)
 {
-	return (__fgetwc_xpg5(fp));
+	wint_t		r;
+	rmutex_t	*l;
+	FLOCKFILE(l, fp);
+	if (GET_NO_MODE(fp))
+		_setorientation(fp, _WC_MODE);
+	r = _fgetwc_unlocked_l(fp, loc);
+	FUNLOCKFILE(l);
+
+	return (r);
 }

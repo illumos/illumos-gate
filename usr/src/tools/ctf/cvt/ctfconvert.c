@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Given a file containing sections with stabs data, convert the stabs data to
  * CTF data, and replace the stabs sections with a CTF section.
@@ -54,7 +52,7 @@ static void
 usage(void)
 {
 	(void) fprintf(stderr,
-	    "Usage: %s [-gis] -l label | -L labelenv [-o outfile] object_file\n"
+	    "Usage: %s [-is] -l label | -L labelenv [-o outfile] object_file\n"
 	    "\n"
 	    "  Note: if -L labelenv is specified and labelenv is not set in\n"
 	    "  the environment, a default value is used.\n",
@@ -150,7 +148,6 @@ main(int argc, char **argv)
 	char *label = NULL;
 	int verbose = 0;
 	int ignore_non_c = 0;
-	int keep_stabs = 0;
 	int c;
 
 	sighold(SIGINT);
@@ -164,7 +161,7 @@ main(int argc, char **argv)
 	if (getenv("CTFCONVERT_DEBUG_PARSE"))
 		debug_parse = atoi(getenv("CTFCONVERT_DEBUG_PARSE"));
 
-	while ((c = getopt(argc, argv, ":l:L:o:givs")) != EOF) {
+	while ((c = getopt(argc, argv, ":l:L:o:ivs")) != EOF) {
 		switch (c) {
 		case 'l':
 			label = optarg;
@@ -182,9 +179,6 @@ main(int argc, char **argv)
 		case 'i':
 			ignore_non_c = 1;
 			break;
-		case 'g':
-			keep_stabs = CTF_KEEP_STABS;
-			break;
 		case 'v':
 			verbose = 1;
 			break;
@@ -193,9 +187,6 @@ main(int argc, char **argv)
 			exit(2);
 		}
 	}
-
-	if (getenv("STRIPSTABS_KEEP_STABS") != NULL)
-		keep_stabs = CTF_KEEP_STABS;
 
 	if (argc - optind != 1 || label == NULL) {
 		usage();
@@ -240,11 +231,11 @@ main(int argc, char **argv)
 	 * to a temporary file, and replace the input file when we're done.
 	 */
 	if (outfile && strcmp(infile, outfile) != 0) {
-		write_ctf(mstrtd, infile, outfile, dynsym | keep_stabs);
+		write_ctf(mstrtd, infile, outfile, dynsym);
 	} else {
 		char *tmpname = mktmpname(infile, ".ctf");
 
-		write_ctf(mstrtd, infile, tmpname, dynsym | keep_stabs);
+		write_ctf(mstrtd, infile, tmpname, dynsym);
 		if (rename(tmpname, infile) != 0)
 			terminate("Couldn't rename temp file %s", tmpname);
 		free(tmpname);

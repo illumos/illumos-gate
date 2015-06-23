@@ -1,0 +1,64 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2014 Garrett D'Amore <garrett@damore.org>
+#
+
+set name=pkg.fmri value=pkg:/system/man@$(PKGVERS)
+set name=pkg.description \
+    value="utilities for display and formatting of reference manual pages"
+set name=pkg.summary value="Reference Manual Pages Tools"
+set name=info.classification \
+    value="org.opensolaris.category.2008:System/Text Tools"
+set name=variant.arch value=$(ARCH)
+dir path=usr/bin
+dir path=usr/lib
+dir path=usr/share
+dir path=usr/share/man
+dir path=usr/share/man/man1
+dir path=usr/share/man/man1m
+dir path=usr/share/man/man5
+file path=usr/bin/man mode=0555
+file path=usr/bin/mandoc mode=0555
+file path=usr/lib/mandoc_preconv mode=0555
+file path=usr/share/man/man1/apropos.1
+file path=usr/share/man/man1/man.1
+file path=usr/share/man/man1/mandoc.1
+file path=usr/share/man/man1m/catman.1m
+file path=usr/share/man/man5/eqn.5
+file path=usr/share/man/man5/man.5
+file path=usr/share/man/man5/mandoc_char.5
+file path=usr/share/man/man5/mandoc_roff.5
+file path=usr/share/man/man5/mdoc.5
+file path=usr/share/man/man5/tbl.5
+hardlink path=usr/bin/apropos target=../../usr/bin/man
+hardlink path=usr/bin/catman target=../../usr/bin/man
+hardlink path=usr/bin/whatis target=../../usr/bin/man
+hardlink path=usr/lib/makewhatis target=../../usr/bin/man
+license lic_CDDL license=lic_CDDL
+license usr/src/cmd/man/THIRDPARTYLICENSE \
+    license=usr/src/cmd/man/THIRDPARTYLICENSE
+license usr/src/cmd/mandoc/THIRDPARTYLICENSE \
+    license=usr/src/cmd/mandoc/THIRDPARTYLICENSE
+link path=usr/man target=./share/man
+link path=usr/share/man/man1/whatis.1 target=apropos.1
+# arguably we also need lp, for man -t support, but really we don't
+# want to make this mandatory, so we don't express teh dependency here.
+# gzcat/bzcat are used for displaying compressed manpages.  However,
+# as we don't format such pages this way by default, lets leave the
+# dependency out.
+#depend fmri=compress/bzip2 type=require
+#depend fmri=compress/gzip type=require
+# less is the default (per user environment) pager.  We really should just
+# import this into illumos-gate.
+depend fmri=text/less type=require

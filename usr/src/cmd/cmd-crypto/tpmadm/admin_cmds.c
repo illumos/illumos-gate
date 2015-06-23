@@ -50,13 +50,13 @@ int cmd_keyinfo(TSS_HCONTEXT hContext, TSS_HTPM hTPM, int argc, char *argv[]);
 int cmd_deletekey(TSS_HCONTEXT hContext, TSS_HTPM hTPM, int argc, char *argv[]);
 
 cmdtable_t commands[] = {
-	{"status", "", cmd_status},
-	{"init", "", cmd_init},
-	{"clear", "[owner | lock]", cmd_clear},
-	{"auth", "", cmd_auth},
-	{"keyinfo", "[uuid]", cmd_keyinfo},
-	{"deletekey", "uuid", cmd_deletekey},
-	{NULL, NULL, NULL},
+	{ "status", "", cmd_status },
+	{ "init", "", cmd_init },
+	{ "clear", "[owner | lock]", cmd_clear },
+	{ "auth", "", cmd_auth },
+	{ "keyinfo", "[uuid]", cmd_keyinfo },
+	{ "deletekey", "uuid", cmd_deletekey },
+	{ NULL, NULL, NULL },
 };
 
 BYTE well_known[] = TSS_WELL_KNOWN_SECRET;

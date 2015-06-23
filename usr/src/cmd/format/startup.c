@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  *
  * Copyright (c) 2011 Gary Mills
  *
@@ -2064,7 +2064,8 @@ add_device_to_disklist(char *devname, char *devpath)
 		if ((search_ctlr->ctlr_ctype->ctype_ctype != DKC_SCSI_CCS) &&
 		    (search_ctlr->ctlr_ctype->ctype_ctype != DKC_DIRECT) &&
 		    (search_ctlr->ctlr_ctype->ctype_ctype != DKC_VBD) &&
-		    (search_ctlr->ctlr_ctype->ctype_ctype != DKC_PCMCIA_ATA)) {
+		    (search_ctlr->ctlr_ctype->ctype_ctype != DKC_PCMCIA_ATA) &&
+		    (search_ctlr->ctlr_ctype->ctype_ctype != DKC_BLKDEV)) {
 			search_dtype->dtype_flags |= DT_NEED_SPEFS;
 		}
 	}

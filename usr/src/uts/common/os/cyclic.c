@@ -658,7 +658,8 @@ cyclic_coverage(char *why, int level, uint64_t arg0, uint64_t arg1)
 			break;
 
 		if (cyc_coverage[ndx].cyv_why != NULL ||
-		    casptr(&cyc_coverage[ndx].cyv_why, NULL, why) != NULL) {
+		    atomic_cas_ptr(&cyc_coverage[ndx].cyv_why, NULL, why) !=
+		    NULL) {
 
 			if (++ndx == CY_NCOVERAGE)
 				ndx = 0;
@@ -1219,9 +1220,10 @@ reread:
 			}
 
 			if ((opend =
-			    cas32(&cyclic->cy_pend, pend, npend)) != pend) {
+			    atomic_cas_32(&cyclic->cy_pend, pend, npend)) !=
+			    pend) {
 				/*
-				 * Our cas32 can fail for one of several
+				 * Our atomic_cas_32 can fail for one of several
 				 * reasons:
 				 *
 				 *  (a)	An intervening high level bumped up the
@@ -1311,7 +1313,8 @@ reread:
 		do {
 			lev = cpu->cyp_modify_levels;
 			nlev = lev + 1;
-		} while (cas32(&cpu->cyp_modify_levels, lev, nlev) != lev);
+		} while (atomic_cas_32(&cpu->cyp_modify_levels, lev, nlev) !=
+		    lev);
 
 		/*
 		 * If we are the last soft level to see the modification,

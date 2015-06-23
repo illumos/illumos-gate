@@ -24,6 +24,8 @@
 /*	definitions for international functions	*/
 
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -42,8 +44,6 @@
 
 #ifndef	_ISO_WCTYPE_ISO_H
 #define	_ISO_WCTYPE_ISO_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/feature_tests.h>
 
@@ -82,7 +82,6 @@ typedef unsigned int	wctrans_t;
 #endif /* WEOF */
 #endif /* not XPG4 and not XPG4v2 */
 
-#ifdef __STDC__
 extern	int iswalnum(wint_t);
 extern	int iswalpha(wint_t);
 extern	int iswcntrl(wint_t);
@@ -94,6 +93,12 @@ extern	int iswpunct(wint_t);
 extern	int iswspace(wint_t);
 extern	int iswupper(wint_t);
 extern	int iswxdigit(wint_t);
+
+#if (__cplusplus >= 201103L) || defined(_STDC_C99) || defined(_XPG6) || \
+	!defined(_STRICT_SYMBOLS)
+extern	int iswblank(wint_t);
+#endif
+
 /* tow* also become functions */
 extern	wint_t towlower(wint_t);
 extern	wint_t towupper(wint_t);
@@ -101,26 +106,6 @@ extern	wctrans_t wctrans(const char *);
 extern	wint_t towctrans(wint_t, wctrans_t);
 extern  int iswctype(wint_t, wctype_t);
 extern  wctype_t wctype(const char *);
-#else
-extern  int iswalnum();
-extern  int iswalpha();
-extern  int iswcntrl();
-extern  int iswdigit();
-extern  int iswgraph();
-extern  int iswlower();
-extern  int iswprint();
-extern  int iswpunct();
-extern  int iswspace();
-extern  int iswupper();
-extern  int iswxdigit();
-/* tow* also become functions */
-extern  wint_t towlower();
-extern  wint_t towupper();
-extern	wctrans_t wctrans();
-extern	wint_t towctrans();
-extern  int iswctype();
-extern  wctype_t wctype();
-#endif
 
 /* bit definition for character class */
 

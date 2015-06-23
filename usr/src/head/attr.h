@@ -19,14 +19,14 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_ATTR_H
 #define	_ATTR_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.6.1.7 */
 
 #include <sys/types.h>
 #include <sys/nvpair.h>
@@ -36,21 +36,10 @@
 extern "C" {
 #endif
 
-#if defined(__STDC__)
-
 extern int getattrat(int, xattr_view_t, const char *, nvlist_t **);
 extern int fgetattr(int, xattr_view_t, nvlist_t **);
 extern int setattrat(int, xattr_view_t, const char *, nvlist_t *);
 extern int fsetattr(int, xattr_view_t, nvlist_t *);
-
-#else	/* defined(__STDC__) */
-
-extern int getattrat();
-extern int fgetattr();
-extern int setattrat();
-extern int fsetattr();
-
-#endif	/* defined(__STDC__) */
 
 #ifdef	__cplusplus
 }

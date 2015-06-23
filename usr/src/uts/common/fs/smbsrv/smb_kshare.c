@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <smbsrv/smb_door.h>
@@ -33,7 +33,9 @@ typedef struct smb_unshare {
 	char		us_sharename[MAXNAMELEN];
 } smb_unshare_t;
 
-static smb_export_t smb_export;
+static kmem_cache_t	*smb_kshare_cache_share;
+static kmem_cache_t	*smb_kshare_cache_unexport;
+kmem_cache_t	*smb_kshare_cache_vfs;
 
 static int smb_kshare_cmp(const void *, const void *);
 static void smb_kshare_hold(const void *);
@@ -45,25 +47,25 @@ static boolean_t smb_kshare_is_admin(const char *);
 static smb_kshare_t *smb_kshare_decode(nvlist_t *);
 static uint32_t smb_kshare_decode_bool(nvlist_t *, const char *, uint32_t);
 static void smb_kshare_unexport_thread(smb_thread_t *, void *);
-static int smb_kshare_export(smb_kshare_t *);
-static int smb_kshare_unexport(const char *);
-static int smb_kshare_export_trans(char *, char *, char *);
+static int smb_kshare_export(smb_server_t *, smb_kshare_t *);
+static int smb_kshare_unexport(smb_server_t *, const char *);
+static int smb_kshare_export_trans(smb_server_t *, char *, char *, char *);
 static void smb_kshare_csc_flags(smb_kshare_t *, const char *);
 
-static boolean_t smb_export_isready(void);
+static boolean_t smb_export_isready(smb_server_t *);
 
+#ifdef	_KERNEL
 static int smb_kshare_chk_dsrv_status(int, smb_dr_ctx_t *);
+#endif	/* _KERNEL */
 
-static smb_avl_nops_t smb_kshare_avlops = {
+static const smb_avl_nops_t smb_kshare_avlops = {
 	smb_kshare_cmp,
 	smb_kshare_hold,
 	smb_kshare_rele,
 	smb_kshare_destroy
 };
 
-extern int smb_server_lookup(smb_server_t **);
-extern void smb_server_release(smb_server_t *);
-
+#ifdef	_KERNEL
 /*
  * This function is not MultiThread safe. The caller has to make sure only one
  * thread calls this function.
@@ -116,7 +118,8 @@ smb_kshare_upcall(door_handle_t dhdl, void *arg, boolean_t add_share)
 	switch (opcode) {
 	case SMB_SHROP_ADD:
 		lmshare = kmem_alloc(sizeof (smb_share_t), KM_SLEEP);
-		if (error = xcopyin(arg, lmshare, sizeof (smb_share_t))) {
+		error = xcopyin(arg, lmshare, sizeof (smb_share_t));
+		if (error != 0) {
 			kmem_free(lmshare, sizeof (smb_share_t));
 			kmem_free(buf, SMB_SHARE_DSIZE);
 			return (error);
@@ -126,7 +129,8 @@ smb_kshare_upcall(door_handle_t dhdl, void *arg, boolean_t add_share)
 
 	case SMB_SHROP_DELETE:
 		str = kmem_alloc(MAXPATHLEN, KM_SLEEP);
-		if (error = copyinstr(arg, str, MAXPATHLEN, NULL)) {
+		error = copyinstr(arg, str, MAXPATHLEN, NULL);
+		if (error != 0) {
 			kmem_free(str, MAXPATHLEN);
 			kmem_free(buf, SMB_SHARE_DSIZE);
 			return (error);
@@ -178,16 +182,17 @@ smb_kshare_upcall(door_handle_t dhdl, void *arg, boolean_t add_share)
 
 	return ((rc == NERR_DuplicateShare && add_share) ? 0 : rc);
 }
+#endif	/* _KERNEL */
 
 /*
  * Executes map and unmap command for shares.
  */
 int
-smb_kshare_exec(smb_shr_execinfo_t *execinfo)
+smb_kshare_exec(smb_server_t *sv, smb_shr_execinfo_t *execinfo)
 {
 	int exec_rc = 0;
 
-	(void) smb_kdoor_upcall(SMB_DR_SHR_EXEC,
+	(void) smb_kdoor_upcall(sv, SMB_DR_SHR_EXEC,
 	    execinfo, smb_shr_execinfo_xdr, &exec_rc, xdr_int);
 
 	return (exec_rc);
@@ -198,9 +203,10 @@ smb_kshare_exec(smb_shr_execinfo_t *execinfo)
  * share for the given host (ipaddr) by calling smbd
  */
 uint32_t
-smb_kshare_hostaccess(smb_kshare_t *shr, smb_inaddr_t *ipaddr)
+smb_kshare_hostaccess(smb_kshare_t *shr, smb_session_t *session)
 {
 	smb_shr_hostaccess_query_t req;
+	smb_inaddr_t *ipaddr = &session->ipaddr;
 	uint32_t host_access = SMB_SHRF_ACC_OPEN;
 	uint32_t flag = SMB_SHRF_ACC_OPEN;
 	uint32_t access;
@@ -226,7 +232,7 @@ smb_kshare_hostaccess(smb_kshare_t *shr, smb_inaddr_t *ipaddr)
 	req.shq_flag = flag;
 	req.shq_ipaddr = *ipaddr;
 
-	(void) smb_kdoor_upcall(SMB_DR_SHR_HOSTACCESS,
+	(void) smb_kdoor_upcall(session->s_server, SMB_DR_SHR_HOSTACCESS,
 	    &req, smb_shr_hostaccess_query_xdr, &host_access, xdr_uint32_t);
 
 	switch (host_access) {
@@ -251,23 +257,23 @@ smb_kshare_hostaccess(smb_kshare_t *shr, smb_inaddr_t *ipaddr)
  * exporting SMB shares
  */
 void
-smb_export_start(void)
+smb_export_start(smb_server_t *sv)
 {
-	mutex_enter(&smb_export.e_mutex);
-	if (smb_export.e_ready) {
-		mutex_exit(&smb_export.e_mutex);
+	mutex_enter(&sv->sv_export.e_mutex);
+	if (sv->sv_export.e_ready) {
+		mutex_exit(&sv->sv_export.e_mutex);
 		return;
 	}
 
-	smb_export.e_ready = B_TRUE;
-	mutex_exit(&smb_export.e_mutex);
+	sv->sv_export.e_ready = B_TRUE;
+	mutex_exit(&sv->sv_export.e_mutex);
 
-	smb_avl_create(&smb_export.e_share_avl, sizeof (smb_kshare_t),
+	smb_avl_create(&sv->sv_export.e_share_avl, sizeof (smb_kshare_t),
 	    offsetof(smb_kshare_t, shr_link), &smb_kshare_avlops);
 
-	(void) smb_kshare_export_trans("IPC$",	"IPC$", "Remote IPC");
-	(void) smb_kshare_export_trans("c$",	SMB_CVOL, "Default Share");
-	(void) smb_kshare_export_trans("vss$",	SMB_VSS, "VSS");
+	(void) smb_kshare_export_trans(sv, "IPC$", "IPC$", "Remote IPC");
+	(void) smb_kshare_export_trans(sv, "c$", SMB_CVOL, "Default Share");
+	(void) smb_kshare_export_trans(sv, "vss$", SMB_VSS, "VSS");
 }
 
 /*
@@ -276,70 +282,83 @@ smb_export_start(void)
  * available to clients
  */
 void
-smb_export_stop(void)
+smb_export_stop(smb_server_t *sv)
 {
-	mutex_enter(&smb_export.e_mutex);
-	if (!smb_export.e_ready) {
-		mutex_exit(&smb_export.e_mutex);
+	mutex_enter(&sv->sv_export.e_mutex);
+	if (!sv->sv_export.e_ready) {
+		mutex_exit(&sv->sv_export.e_mutex);
 		return;
 	}
-	smb_export.e_ready = B_FALSE;
-	mutex_exit(&smb_export.e_mutex);
+	sv->sv_export.e_ready = B_FALSE;
+	mutex_exit(&sv->sv_export.e_mutex);
 
-	smb_avl_destroy(&smb_export.e_share_avl);
-	smb_vfs_rele_all(&smb_export);
-}
-
-int
-smb_kshare_init(void)
-{
-	int rc;
-
-	smb_export.e_cache_share = kmem_cache_create("smb_share_cache",
-	    sizeof (smb_kshare_t), 8, NULL, NULL, NULL, NULL, NULL, 0);
-
-	smb_export.e_cache_unexport = kmem_cache_create("smb_unexport_cache",
-	    sizeof (smb_unshare_t), 8, NULL, NULL, NULL, NULL, NULL, 0);
-
-	smb_export.e_cache_vfs = kmem_cache_create("smb_vfs_cache",
-	    sizeof (smb_vfs_t), 8, NULL, NULL, NULL, NULL, NULL, 0);
-
-	smb_llist_constructor(&smb_export.e_vfs_list, sizeof (smb_vfs_t),
-	    offsetof(smb_vfs_t, sv_lnd));
-
-	smb_slist_constructor(&smb_export.e_unexport_list,
-	    sizeof (smb_unshare_t), offsetof(smb_unshare_t, us_lnd));
-
-	smb_thread_init(&smb_export.e_unexport_thread, "smb_thread_unexport",
-	    smb_kshare_unexport_thread, NULL);
-
-	if ((rc = smb_thread_start(&smb_export.e_unexport_thread)) != 0)
-		return (rc);
-
-	return (0);
+	smb_avl_destroy(&sv->sv_export.e_share_avl);
+	smb_vfs_rele_all(&sv->sv_export);
 }
 
 void
-smb_kshare_fini(void)
+smb_kshare_g_init(void)
+{
+	smb_kshare_cache_share = kmem_cache_create("smb_share_cache",
+	    sizeof (smb_kshare_t), 8, NULL, NULL, NULL, NULL, NULL, 0);
+
+	smb_kshare_cache_unexport = kmem_cache_create("smb_unexport_cache",
+	    sizeof (smb_unshare_t), 8, NULL, NULL, NULL, NULL, NULL, 0);
+
+	smb_kshare_cache_vfs = kmem_cache_create("smb_vfs_cache",
+	    sizeof (smb_vfs_t), 8, NULL, NULL, NULL, NULL, NULL, 0);
+}
+
+void
+smb_kshare_init(smb_server_t *sv)
+{
+
+	smb_llist_constructor(&sv->sv_export.e_vfs_list, sizeof (smb_vfs_t),
+	    offsetof(smb_vfs_t, sv_lnd));
+
+	smb_slist_constructor(&sv->sv_export.e_unexport_list,
+	    sizeof (smb_unshare_t), offsetof(smb_unshare_t, us_lnd));
+}
+
+int
+smb_kshare_start(smb_server_t *sv)
+{
+	smb_thread_init(&sv->sv_export.e_unexport_thread, "smb_thread_unexport",
+	    smb_kshare_unexport_thread, sv, smbsrv_base_pri);
+
+	return (smb_thread_start(&sv->sv_export.e_unexport_thread));
+}
+
+void
+smb_kshare_stop(smb_server_t *sv)
+{
+	smb_thread_stop(&sv->sv_export.e_unexport_thread);
+	smb_thread_destroy(&sv->sv_export.e_unexport_thread);
+}
+
+void
+smb_kshare_fini(smb_server_t *sv)
 {
 	smb_unshare_t *ux;
 
-	smb_thread_stop(&smb_export.e_unexport_thread);
-	smb_thread_destroy(&smb_export.e_unexport_thread);
-
-	while ((ux = list_head(&smb_export.e_unexport_list.sl_list)) != NULL) {
-		smb_slist_remove(&smb_export.e_unexport_list, ux);
-		kmem_cache_free(smb_export.e_cache_unexport, ux);
+	while ((ux = list_head(&sv->sv_export.e_unexport_list.sl_list))
+	    != NULL) {
+		smb_slist_remove(&sv->sv_export.e_unexport_list, ux);
+		kmem_cache_free(smb_kshare_cache_unexport, ux);
 	}
-	smb_slist_destructor(&smb_export.e_unexport_list);
+	smb_slist_destructor(&sv->sv_export.e_unexport_list);
 
-	smb_vfs_rele_all(&smb_export);
+	smb_vfs_rele_all(&sv->sv_export);
 
-	smb_llist_destructor(&smb_export.e_vfs_list);
+	smb_llist_destructor(&sv->sv_export.e_vfs_list);
+}
 
-	kmem_cache_destroy(smb_export.e_cache_unexport);
-	kmem_cache_destroy(smb_export.e_cache_share);
-	kmem_cache_destroy(smb_export.e_cache_vfs);
+void
+smb_kshare_g_fini(void)
+{
+	kmem_cache_destroy(smb_kshare_cache_unexport);
+	kmem_cache_destroy(smb_kshare_cache_share);
+	kmem_cache_destroy(smb_kshare_cache_vfs);
 }
 
 /*
@@ -351,22 +370,24 @@ smb_kshare_fini(void)
 int
 smb_kshare_export_list(smb_ioc_share_t *ioc)
 {
+	smb_server_t	*sv = NULL;
 	nvlist_t	*shrlist = NULL;
 	nvlist_t	 *share;
 	nvpair_t	 *nvp;
 	smb_kshare_t	 *shr;
 	char		*shrname;
-	int		rc = 0;
-	smb_server_t	*sv = NULL;
-
-	if (!smb_export_isready())
-		return (ENOTACTIVE);
+	int		rc;
 
 	if ((rc = smb_server_lookup(&sv)) != 0)
 		return (rc);
 
-	if ((rc = nvlist_unpack(ioc->shr, ioc->shrlen, &shrlist, KM_SLEEP))
-	    != 0)
+	if (!smb_export_isready(sv)) {
+		rc = ENOTACTIVE;
+		goto out;
+	}
+
+	rc = nvlist_unpack(ioc->shr, ioc->shrlen, &shrlist, KM_SLEEP);
+	if (rc != 0)
 		goto out;
 
 	for (nvp = nvlist_next_nvpair(shrlist, NULL); nvp != NULL;
@@ -399,7 +420,7 @@ smb_kshare_export_list(smb_ioc_share_t *ioc)
 		}
 
 		/* smb_kshare_export consumes shr so it's not leaked */
-		if ((rc = smb_kshare_export(shr)) != 0) {
+		if ((rc = smb_kshare_export(sv, shr)) != 0) {
 			smb_kshare_destroy(shr);
 			continue;
 		}
@@ -432,15 +453,19 @@ out:
 int
 smb_kshare_unexport_list(smb_ioc_share_t *ioc)
 {
+	smb_server_t	*sv = NULL;
 	smb_unshare_t	*ux;
-	nvlist_t	*shrlist;
+	nvlist_t	*shrlist = NULL;
 	nvpair_t	*nvp;
 	boolean_t	unexport = B_FALSE;
 	char		*shrname;
 	int		rc;
 
-	if ((rc = nvlist_unpack(ioc->shr, ioc->shrlen, &shrlist, 0)) != 0)
+	if ((rc = smb_server_lookup(&sv)) != 0)
 		return (rc);
+
+	if ((rc = nvlist_unpack(ioc->shr, ioc->shrlen, &shrlist, 0)) != 0)
+		goto out;
 
 	for (nvp = nvlist_next_nvpair(shrlist, NULL); nvp != NULL;
 	    nvp = nvlist_next_nvpair(shrlist, nvp)) {
@@ -450,22 +475,25 @@ smb_kshare_unexport_list(smb_ioc_share_t *ioc)
 		shrname = nvpair_name(nvp);
 		ASSERT(shrname);
 
-		if ((rc = smb_kshare_unexport(shrname)) != 0)
+		if ((rc = smb_kshare_unexport(sv, shrname)) != 0)
 			continue;
 
-		ux = kmem_cache_alloc(smb_export.e_cache_unexport, KM_SLEEP);
+		ux = kmem_cache_alloc(smb_kshare_cache_unexport, KM_SLEEP);
 		(void) strlcpy(ux->us_sharename, shrname, MAXNAMELEN);
 
-		smb_slist_insert_tail(&smb_export.e_unexport_list, ux);
+		smb_slist_insert_tail(&sv->sv_export.e_unexport_list, ux);
 		unexport = B_TRUE;
 	}
 
-	nvlist_free(shrlist);
-
 	if (unexport)
-		smb_thread_signal(&smb_export.e_unexport_thread);
+		smb_thread_signal(&sv->sv_export.e_unexport_thread);
+	rc = 0;
 
-	return (0);
+out:
+	if (shrlist != NULL)
+		nvlist_free(shrlist);
+	smb_server_release(sv);
+	return (rc);
 }
 
 /*
@@ -493,7 +521,7 @@ smb_kshare_info(smb_ioc_shareinfo_t *ioc)
  * encoded in one round without unnecessarily complicating the code.
  */
 void
-smb_kshare_enum(smb_enumshare_info_t *esi)
+smb_kshare_enum(smb_server_t *sv, smb_enumshare_info_t *esi)
 {
 	smb_avl_t *share_avl;
 	smb_avl_cursor_t cursor;
@@ -508,7 +536,7 @@ smb_kshare_enum(smb_enumshare_info_t *esi)
 	smb_msgbuf_t cmnt_mb;
 	boolean_t autohome_added = B_FALSE;
 
-	if (!smb_export_isready()) {
+	if (!smb_export_isready(sv)) {
 		esi->es_ntotal = esi->es_nsent = 0;
 		esi->es_datasize = 0;
 		return;
@@ -516,7 +544,7 @@ smb_kshare_enum(smb_enumshare_info_t *esi)
 
 	esi->es_ntotal = esi->es_nsent = 0;
 	remained = esi->es_bufsize;
-	share_avl = &smb_export.e_share_avl;
+	share_avl = &sv->sv_export.e_share_avl;
 
 	/* Do the necessary calculations in the first round */
 	smb_avl_iterinit(share_avl, &cursor);
@@ -609,18 +637,18 @@ smb_kshare_enum(smb_enumshare_info_t *esi)
  * smb_kshare_release().
  */
 smb_kshare_t *
-smb_kshare_lookup(const char *shrname)
+smb_kshare_lookup(smb_server_t *sv, const char *shrname)
 {
 	smb_kshare_t key;
 	smb_kshare_t *shr;
 
 	ASSERT(shrname);
 
-	if (!smb_export_isready())
+	if (!smb_export_isready(sv))
 		return (NULL);
 
 	key.shr_name = (char *)shrname;
-	shr = smb_avl_lookup(&smb_export.e_share_avl, &key);
+	shr = smb_avl_lookup(&sv->sv_export.e_share_avl, &key);
 	return (shr);
 }
 
@@ -628,12 +656,12 @@ smb_kshare_lookup(const char *shrname)
  * Releases the hold taken on the specified share object
  */
 void
-smb_kshare_release(smb_kshare_t *shr)
+smb_kshare_release(smb_server_t *sv, smb_kshare_t *shr)
 {
 	ASSERT(shr);
 	ASSERT(shr->shr_magic == SMB_SHARE_MAGIC);
 
-	smb_avl_release(&smb_export.e_share_avl, shr);
+	smb_avl_release(&sv->sv_export.e_share_avl, shr);
 }
 
 /*
@@ -648,14 +676,14 @@ smb_kshare_release(smb_kshare_t *shr)
  * that share is incremented.
  */
 static int
-smb_kshare_export(smb_kshare_t *shr)
+smb_kshare_export(smb_server_t *sv, smb_kshare_t *shr)
 {
 	smb_avl_t	*share_avl;
 	smb_kshare_t	*auto_shr;
 	vnode_t		*vp;
 	int		rc = 0;
 
-	share_avl = &smb_export.e_share_avl;
+	share_avl = &sv->sv_export.e_share_avl;
 
 	if (!STYPE_ISDSK(shr->shr_type)) {
 		if ((rc = smb_avl_add(share_avl, shr)) != 0) {
@@ -679,17 +707,17 @@ smb_kshare_export(smb_kshare_t *shr)
 		return (0);
 	}
 
-	if ((rc = smb_server_sharevp(shr->shr_path, &vp)) != 0) {
+	if ((rc = smb_server_sharevp(sv, shr->shr_path, &vp)) != 0) {
 		cmn_err(CE_WARN, "export[%s(%s)]: failed obtaining vnode (%d)",
 		    shr->shr_name, shr->shr_path, rc);
 		return (rc);
 	}
 
-	if ((rc = smb_vfs_hold(&smb_export, vp->v_vfsp)) == 0) {
+	if ((rc = smb_vfs_hold(&sv->sv_export, vp->v_vfsp)) == 0) {
 		if ((rc = smb_avl_add(share_avl, shr)) != 0) {
 			cmn_err(CE_WARN, "export[%s]: failed caching (%d)",
 			    shr->shr_name, rc);
-			smb_vfs_rele(&smb_export, vp->v_vfsp);
+			smb_vfs_rele(&sv->sv_export, vp->v_vfsp);
 		}
 	} else {
 		cmn_err(CE_WARN, "export[%s(%s)]: failed holding VFS (%d)",
@@ -713,7 +741,7 @@ smb_kshare_export(smb_kshare_t *shr)
  * the AVL tree.
  */
 static int
-smb_kshare_unexport(const char *shrname)
+smb_kshare_unexport(smb_server_t *sv, const char *shrname)
 {
 	smb_avl_t	*share_avl;
 	smb_kshare_t	key;
@@ -722,7 +750,7 @@ smb_kshare_unexport(const char *shrname)
 	int		rc;
 	boolean_t	auto_unexport;
 
-	share_avl = &smb_export.e_share_avl;
+	share_avl = &sv->sv_export.e_share_avl;
 
 	key.shr_name = (char *)shrname;
 	if ((shr = smb_avl_lookup(share_avl, &key)) == NULL)
@@ -740,14 +768,14 @@ smb_kshare_unexport(const char *shrname)
 	}
 
 	if (STYPE_ISDSK(shr->shr_type)) {
-		if ((rc = smb_server_sharevp(shr->shr_path, &vp)) != 0) {
+		if ((rc = smb_server_sharevp(sv, shr->shr_path, &vp)) != 0) {
 			smb_avl_release(share_avl, shr);
 			cmn_err(CE_WARN, "unexport[%s]: failed obtaining vnode"
 			    " (%d)", shrname, rc);
 			return (rc);
 		}
 
-		smb_vfs_rele(&smb_export, vp->v_vfsp);
+		smb_vfs_rele(&sv->sv_export, vp->v_vfsp);
 		VN_RELE(vp);
 	}
 
@@ -761,18 +789,17 @@ smb_kshare_unexport(const char *shrname)
  * Exports IPC$ or Admin shares
  */
 static int
-smb_kshare_export_trans(char *name, char *path, char *cmnt)
+smb_kshare_export_trans(smb_server_t *sv, char *name, char *path, char *cmnt)
 {
 	smb_kshare_t *shr;
 
 	ASSERT(name);
 	ASSERT(path);
 
-	shr = kmem_cache_alloc(smb_export.e_cache_share, KM_SLEEP);
+	shr = kmem_cache_alloc(smb_kshare_cache_share, KM_SLEEP);
 	bzero(shr, sizeof (smb_kshare_t));
 
 	shr->shr_magic = SMB_SHARE_MAGIC;
-	shr->shr_cache = smb_export.e_cache_share;
 	shr->shr_refcnt = 1;
 	shr->shr_flags = SMB_SHRF_TRANS | smb_kshare_is_admin(shr->shr_name);
 	if (strcasecmp(name, "IPC$") == 0)
@@ -789,7 +816,7 @@ smb_kshare_export_trans(char *name, char *path, char *cmnt)
 		shr->shr_cmnt = smb_mem_strdup(cmnt);
 	shr->shr_oemname = smb_kshare_oemname(name);
 
-	return (smb_kshare_export(shr));
+	return (smb_kshare_export(sv, shr));
 }
 
 /*
@@ -861,11 +888,10 @@ smb_kshare_decode(nvlist_t *share)
 	(void) nvlist_lookup_string(smb, SHOPT_CSC, &csc_name);
 	smb_kshare_csc_flags(&tmp, csc_name);
 
-	shr = kmem_cache_alloc(smb_export.e_cache_share, KM_SLEEP);
+	shr = kmem_cache_alloc(smb_kshare_cache_share, KM_SLEEP);
 	bzero(shr, sizeof (smb_kshare_t));
 
 	shr->shr_magic = SMB_SHARE_MAGIC;
-	shr->shr_cache = smb_export.e_cache_share;
 	shr->shr_refcnt = 1;
 
 	shr->shr_name = smb_mem_strdup(tmp.shr_name);
@@ -999,7 +1025,7 @@ smb_kshare_destroy(void *p)
 	smb_mem_free(shr->shr_access_ro);
 	smb_mem_free(shr->shr_access_rw);
 
-	kmem_cache_free(shr->shr_cache, shr);
+	kmem_cache_free(smb_kshare_cache_share, shr);
 }
 
 
@@ -1152,30 +1178,32 @@ smb_kshare_csc_flags(smb_kshare_t *shr, const char *value)
 static void
 smb_kshare_unexport_thread(smb_thread_t *thread, void *arg)
 {
+	smb_server_t	*sv = arg;
 	smb_unshare_t	*ux;
 
 	while (smb_thread_continue(thread)) {
-		while ((ux = list_head(&smb_export.e_unexport_list.sl_list))
+		while ((ux = list_head(&sv->sv_export.e_unexport_list.sl_list))
 		    != NULL) {
-			smb_slist_remove(&smb_export.e_unexport_list, ux);
+			smb_slist_remove(&sv->sv_export.e_unexport_list, ux);
 			(void) smb_server_unshare(ux->us_sharename);
-			kmem_cache_free(smb_export.e_cache_unexport, ux);
+			kmem_cache_free(smb_kshare_cache_unexport, ux);
 		}
 	}
 }
 
 static boolean_t
-smb_export_isready(void)
+smb_export_isready(smb_server_t *sv)
 {
 	boolean_t ready;
 
-	mutex_enter(&smb_export.e_mutex);
-	ready = smb_export.e_ready;
-	mutex_exit(&smb_export.e_mutex);
+	mutex_enter(&sv->sv_export.e_mutex);
+	ready = sv->sv_export.e_ready;
+	mutex_exit(&sv->sv_export.e_mutex);
 
 	return (ready);
 }
 
+#ifdef	_KERNEL
 /*
  * Return 0 upon success. Otherwise > 0
  */
@@ -1200,3 +1228,4 @@ smb_kshare_chk_dsrv_status(int opcode, smb_dr_ctx_t *dec_ctx)
 	ASSERT(0);
 	return (EINVAL);
 }
+#endif	/* _KERNEL */

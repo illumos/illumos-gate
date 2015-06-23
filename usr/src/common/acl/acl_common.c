@@ -20,13 +20,16 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/errno.h>
 #include <sys/avl.h>
-#if defined(_KERNEL)
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
+#include <sys/debug.h>
+#include <sys/kmem.h>
 #include <sys/systm.h>
 #include <sys/sysmacros.h>
 #include <acl/acl_common.h>
@@ -221,7 +224,7 @@ cmp2acls(void *a, void *b)
 static void *
 cacl_realloc(void *ptr, size_t size, size_t new_size)
 {
-#if defined(_KERNEL)
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 	void *tmp;
 
 	tmp = kmem_alloc(new_size, KM_SLEEP);
@@ -236,7 +239,7 @@ cacl_realloc(void *ptr, size_t size, size_t new_size)
 static int
 cacl_malloc(void **ptr, size_t size)
 {
-#if defined(_KERNEL)
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 	*ptr = kmem_zalloc(size, KM_SLEEP);
 	return (0);
 #else
@@ -252,7 +255,7 @@ cacl_malloc(void **ptr, size_t size)
 static void
 cacl_free(void *ptr, size_t size)
 {
-#if defined(_KERNEL)
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 	kmem_free(ptr, size);
 #else
 	free(ptr);
@@ -1462,7 +1465,7 @@ convert_ace_to_aent(ace_t *acebufp, int acecnt, boolean_t isdir,
 	int error = 0;
 	aclent_t *aclentp, *dfaclentp;
 	int aclcnt, dfaclcnt;
-	int aclsz, dfaclsz;
+	int aclsz, dfaclsz = 0;
 
 	error = ln_ace_to_aent(acebufp, acecnt, owner, group,
 	    &aclentp, &aclcnt, &dfaclentp, &dfaclcnt, isdir);
@@ -1553,11 +1556,11 @@ acl_translate(acl_t *aclp, int target_flavor, boolean_t isdir, uid_t owner,
 
 out:
 
-#if !defined(_KERNEL)
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
+	return (error);
+#else
 	errno = error;
 	return (-1);
-#else
-	return (error);
 #endif
 }
 

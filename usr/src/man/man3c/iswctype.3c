@@ -1,4 +1,5 @@
 '\" te
+.\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
 .\"  Copyright (c) 1992, X/Open Company Limited  All Rights Reserved  Portions Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved
 .\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
@@ -7,7 +8,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ISWCTYPE 3C "Jul 24, 2002"
+.TH ISWCTYPE 3C "Jul 26, 2014"
 .SH NAME
 iswctype \- test character for specified class
 .SH SYNOPSIS
@@ -17,33 +18,61 @@ iswctype \- test character for specified class
 
 \fBint\fR \fBiswctype\fR(\fBwint_t\fR \fIwc\fR, \fBwctype_t\fR \fIcharclass\fR);
 .fi
+.LP
+.nf
+\fBint\fR \fBiswctype\fR(\fBwint_t\fR \fIwc\fR, \fBwctype_t\fR \fIcharclass\fR, \fBlocale_t\fR \fIloc\fR);
+.fi
 
 .SH DESCRIPTION
-.sp
 .LP
-The \fBiswctype()\fR function determines whether the wide-character code
-\fIwc\fR has the character class \fIcharclass\fR, returning \fBTRUE\fR or
-\fBFALSE\fR. The \fBiswctype()\fR function is defined on \fBWEOF\fR and
-wide-character codes corresponding to the valid character encodings in the
-current locale. If the \fIwc\fR argument is not in the domain of the function,
-the result is undefined. If the value of \fIcharclass\fR is invalid (that is,
-not obtained by a call to \fBwctype\fR(3C) or \fIcharclass \fR is invalidated
-by a subsequent call to \fBsetlocale\fR(3C) that has affected category
-\fBLC_CTYPE\fR), the result is indeterminate.
+The
+.B iswctype()
+and
+.B iswctype_l()
+functions determine whether the wide-character code
+.I wc
+is a member of the character class
+.IR charclass ,
+returning
+.B TRUE
+or
+.BR FALSE .
+These functions are defined on
+.B WEOF
+and wide-character codes corresponding to the valid character encodings in the
+current locale (or
+.I loc
+for
+.BR iswctype_l() .)
+If the
+.I wc
+argument is not in the domain of the function,
+the result is undefined. If the value of
+.I charclass
+is invalid (that is,
+not obtained by a call to
+.B wctype (3C)
+or obtained from a different locale), the result is indeterminate.
+.LP
+Whereas
+.B iswctype()
+operates in the current locale,
+.B iswctype_l()
+operates in the locale specified with
+.IR loc .
 .SH RETURN VALUES
-.sp
 .LP
-The \fBiswctype()\fR function returns \fB0\fR for \fBFALSE\fR and non-zero for
-\fBTRUE\fR.
+These functions return
+.B 0
+for
+.B FALSE
+and non-zero for
+.BR TRUE .
 .SH USAGE
-.sp
 .LP
 There are twelve strings that are reserved for the standard character classes:
-.sp
-
-.sp
 .TS
-l | l | l
+box;
 l | l | l .
 "alnum"	"alpha"	"blank"
 _
@@ -54,45 +83,36 @@ _
 "space"	"upper"	"xdigit"
 .TE
 
-.sp
 .LP
 In the table below, the functions in the left column are equivalent to the
 functions in the right column.
-.sp
-
-.sp
 .TS
-l l
-l l .
-\fBiswalnum(\fR\fIwc\fR\fB)\fR	iswctype(\fIwc,\fR\fB wctype(\fR"alnum"\fB))\fR
-iswalpha(\fIwc\fR\fB)\fR	iswctype(\fIwc,\fR\fB wctype(\fR"alpha"\fB))\fR
-iswcntrl(\fIwc\fR\fB)\fR	iswctype(\fIwc,\fR\fB wctype(\fR"cntrl"\fB))\fR
-iswdigit(\fI wc\fR\fB)\fR	iswctype(\fIwc,\fR\fB wctype(\fR"digit"\fB))\fR
-iswgraph(\fIwc\fR\fB)\fR	iswctype(\fIwc,\fR\fB wctype(\fR"graph"\fB))\fR
-iswlower(\fIwc\fR\fB)\fR	iswctype(\fIwc,\fR\fB wctype(\fR"lower"\fB))\fR
-iswprint(\fIwc\fR\fB)\fR	iswctype(\fIwc,\fR\fB wctype(\fR"print"\fB))\fR
-iswpunct(\fIwc\fR\fB)\fR	iswctype(\fI wc,\fR\fB wctype(\fR"punct"\fB))\fR
-iswspace(\fIwc\fR\fB)\fR	iswctype(\fIwc,\fR\fB wctype(\fR"space"\fB))\fR
-iswupper(\fIwc\fR\fB)\fR	iswctype(\fIwc,\fR\fB wctype(\fR"upper"\fB))\fR
-iswxdigit(\fIwc\fR\fB)\fR	iswctype(\fIwc,\fR\fB wctype(\fR"xdigit"\fB))\fR
+box;
+l | l .
+\fBiswalnum\fR(\fIwc\fR)	\fBiswctype\fR(\fIwc\fR, \fBwctype\fR("alnum"))
+\fBiswalpha\fR(\fIwc\fR)	\fBiswctype\fR(\fIwc\fR, \fBwctype\fR("alpha"))
+\fBiswcntrl\fR(\fIwc\fR)	\fBiswctype\fR(\fIwc\fR, \fBwctype\fR("cntrl"))
+\fBiswdigit\fR(\fIwc\fR)	\fBiswctype\fR(\fIwc\fR, \fBwctype\fR("digit"))
+\fBiswgraph\fR(\fIwc\fR)	\fBiswctype\fR(\fIwc\fR, \fBwctype\fR("graph"))
+\fBiswlower\fR(\fIwc\fR)	\fBiswctype\fR(\fIwc\fR, \fBwctype\fR("lower"))
+\fBiswprint\fR(\fIwc\fR)	\fBiswctype\fR(\fIwc\fR, \fBwctype\fR("print"))
+\fBiswpunct\fR(\fIwc\fR)	\fBiswctype\fR(\fIwc\fR, \fBwctype\fR("punct"))
+\fBiswspace\fR(\fIwc\fR)	\fBiswctype\fR(\fIwc\fR, \fBwctype\fR("space"))
+\fBiswupper\fR(\fIwc\fR)	\fBiswctype\fR(\fIwc\fR, \fBwctype\fR("upper"))
+\fBiswxdigit\fR(\fIwc\fR)	\fBiswctype\fR(\fIwc\fR, \fBwctype\fR("xdigit"))
 .TE
 
-.sp
 .LP
 The call
-.sp
 .LP
-\fBiswctype(\fR\fIwc,\fR\fB wctype(\fR"blank"\fB))\fR
-.sp
+\fBiswctype\fR(\fIwc\fR, \fBwctype\fR("blank"))
 .LP
-does not have an equivalent  \fBisw*(\|)\fR function.
+does not have an equivalent \fBisw*(\|)\fR function.
 .SH ATTRIBUTES
-.sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
+See
+.BR attributes (5)
+for descriptions of the following attributes:
 .TS
 box;
 c | c
@@ -103,11 +123,15 @@ CSI	Enabled
 _
 Interface Stability	Standard
 _
-MT-Level	MT-Safe with exceptions
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBiswalpha\fR(3C), \fBsetlocale\fR(3C), \fBwctype\fR(3C), \fBattributes\fR(5),
-\fBenviron\fR(5), \fBstandards\fR(5)
+.BR iswalpha (3C),
+.BR newlocale (3C),
+.BR setlocale (3C),
+.BR uselocale (3C),
+.BR wctype (3C),
+.BR attributes (5),
+.BR standards (5)

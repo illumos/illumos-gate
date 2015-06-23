@@ -1271,6 +1271,8 @@ forward_register(ulong_t caller_xid, struct netbuf *caller_addr, int forward_fd,
 
 	fi->prev = NULL;
 	fi->next = fihead;
+	if (fihead != NULL)
+		fihead->prev = fi;
 	fihead = fi;
 	if (fitail == NULL)
 		fitail = fi;

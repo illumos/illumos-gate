@@ -522,11 +522,6 @@ function use_tools {
 	CTFMERGE=${TOOLSROOT}/opt/onbld/bin/${MACH}/ctfmerge
 	export CTFMERGE
 
-	CTFCVTPTBL=${TOOLSROOT}/opt/onbld/bin/ctfcvtptbl
-	export CTFCVTPTBL
-	CTFFINDMOD=${TOOLSROOT}/opt/onbld/bin/ctffindmod
-	export CTFFINDMOD
-
 	if [ "$VERIFY_ELFSIGN" = "y" ]; then
 		ELFSIGN=${TOOLSROOT}/opt/onbld/bin/elfsigncmp
 	else
@@ -548,8 +543,6 @@ function use_tools {
 	echo "CTFSTABS=${CTFSTABS}" >> $LOGFILE
 	echo "CTFCONVERT=${CTFCONVERT}" >> $LOGFILE
 	echo "CTFMERGE=${CTFMERGE}" >> $LOGFILE
-	echo "CTFCVTPTBL=${CTFCVTPTBL}" >> $LOGFILE
-	echo "CTFFINDMOD=${CTFFINDMOD}" >> $LOGFILE
 	echo "ELFSIGN=${ELFSIGN}" >> $LOGFILE
 	echo "PATH=${PATH}" >> $LOGFILE
 	echo "ONBLD_TOOLS=${ONBLD_TOOLS}" >> $LOGFILE
@@ -2156,9 +2149,9 @@ if [ "$CHECK_PATHS" = y -a "$N_FLAG" != y ]; then
 		>>$mail_msg_file
 	arg=-b
 	[ "$build_ok" = y ] && arg=
-	checkpaths $arg $checkroot > $SRC/checkpaths.out 2>&1
-	if [[ -s $SRC/checkpaths.out ]]; then
-		tee -a $LOGFILE < $SRC/checkpaths.out >> $mail_msg_file
+	checkpaths $arg $checkroot > $SRC/check-paths.out 2>&1
+	if [[ -s $SRC/check-paths.out ]]; then
+		tee -a $LOGFILE < $SRC/check-paths.out >> $mail_msg_file
 		build_extras_ok=n
 	fi
 fi

@@ -1,144 +1,62 @@
-'\" te
-.\" Copyright (c) 2001-2007 by Garrett D'Amore.
-.\" Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met: 1. Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
-.\" 2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution. 3. Neither the name of the author nor the names of any co-contributors may be used to endorse
-.\" or promote products derived from this software    without specific prior written permission.  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDER AND CONTRIBUTORS ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-.\" FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
-.\" OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
-.\" Portions Copyright (c) 2007 by Sun Microsystems, Inc.  All Rights Reserved.
-.TH MXFE 7D "Aug 31, 2007"
-.SH NAME
-mxfe \- MXFE Fast Ethernet device driver
-.SH SYNOPSIS
-.LP
-.nf
-\fB/dev/mxfe*\fR
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
-The \fBmxfe\fR is a Solaris STREAMS hardware driver supporting the Data Link
-Provider Interface (\fBdlpi\fR(7P)) over the Macronix 98715 family (including
-the Lite-On PNIC-II) of Fast Ethernet controllers.
-.SH DLPI SPECIFICATIONS
-.sp
-.LP
-The \fBmxfe\fR driver supports both style 1 and style 2 modes of operation.
-Physical points of attachment (PPAs) are interpreted as the instance number of
-the  \fBmxfe\fR controller as assigned by the operating system.
-.sp
-.LP
-The  relevant  fields  returned  as part of a DL_INFO_ACK response are:
-.RS +4
-.TP
-.ie t \(bu
-.el o
-Maximum SDU is 1500.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-Minimum SDU is 0.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-DLSAP address length is 8.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-MAC type is \fBDL_ETHER\fR.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-\fBSAP\fR length value is \fI-2\fR, meaning the physical address component is
-followed immediately by a 2-byte \fBSAP\fR component within the \fBDLSAP\fR
-address.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-Service mode is DL_CLDLS.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-Broadcast address value is the 6-byte Ethernet/IEEE broadcast address
-(ff:ff:ff:ff:ff:ff).
-.RE
-.sp
-.LP
-If the SAP provided is zero, \fIIEEE 802.3\fR mode is assumed and outbound
-frames will have the frame payload length written into the type field Likewise,
-inbound  frames with a SAP between zero and 1500 are interpreted as \fIIEEE
-802.3\fR frames and delivered to streams that have bound to SAP zero (the
-\fI802.3\fR SAP).
-.SH FILES
-.sp
-.ne 2
-.na
-\fB\fB/dev/mxfe*\fR\fR
-.ad
-.RS 28n
-Special character device
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/kernel/drv/mxfe\fR\fR
-.ad
-.RS 28n
-32-bit driver binary (x86).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/kernel/drv/amd64/mxfe\fR\fR
-.ad
-.RS 28n
-64-bit ELF kernel module (x86).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/kernel/drv/sparcv9/mxfe\fR\fR
-.ad
-.RS 28n
-Driver binary (SPARC).
-.RE
-
-.SH ATTRIBUTES
-.sp
-.LP
-See \fBattributes\fR(5) for a description of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Architecture	SPARC, x86
-.TE
-
-.SH SEE ALSO
-.sp
-.LP
-\fBifconfig\fR(1M), \fBndd\fR(1M), \fBattributes\fR(5), \fBdlpi\fR(7P)
-.sp
-.LP
-\fIIEEE 802.3\fR \(em Institute of Electrical and Electronics Engineers, 2002
+.\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\"
+.\" THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDER AND CONTRIBUTORS
+.\" ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+.\" LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+.\" FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE
+.\" COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+.\" INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+.\" NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
+.\" USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+.\" ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+.\" (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+.\" THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
+.\"
+.Dd "Aug 7, 2014"
+.Dt MXFE 7D
+.Os
+.Sh NAME
+.Nm mxfe
+.Nd Macronix Fast Ethernet device driver
+.Sh SYNOPSIS
+.Pa /dev/mxfe
+.Sh DESCRIPTION
+The
+.Nm
+driver provides support for the
+Macronix 98715 family (including the Lite-On PNIC-II) of Fast Ethernet
+PCI controllers.
+.Lp
+These devices generally support the standard Fast Ethernet features, including
+10BASE-T and 100BASE-TX, both full and half duplex operation, IEEE 802.3
+autonegotiation, etc.  They also support full size MTUs (1500 bytes),
+even when used with VLANs.
+.
+.Lp
+The device driver supports the
+.Xr ieee802.3 5
+properties, which can be configured with
+.Xr dladm 1M .
+.Sh FILES
+.Bl -tag -width /dev/mxfe
+.It Pa /dev/mxfe
+Special character device.
+.El
+.Sh SEE ALSO
+.Xr dladm 1M ,
+.Xr ifconfig 1M ,
+.Xr pci 4 ,
+.Xr ieee802.3 5 ,
+.Xr dlpi 7P
+.Rs
+.%T IEEE 802.3: Ethernet
+.%Q IEEE Standards Association
+.Re

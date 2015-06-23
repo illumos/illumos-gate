@@ -1,4 +1,5 @@
 '\" te
+.\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
 .\" Copyright (c) 1992, X/Open Company Limited. All Rights Reserved.  Portions Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
@@ -7,9 +8,9 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH MBRLEN 3C "Nov 1, 2003"
+.TH MBRLEN 3C "Jun 21, 2014"
 .SH NAME
-mbrlen \- get number of bytes in a character (restartable)
+mbrlen, mbrlen_l \- get number of bytes in a character (restartable)
 .SH SYNOPSIS
 .LP
 .nf
@@ -17,36 +18,46 @@ mbrlen \- get number of bytes in a character (restartable)
 
 \fBsize_t\fR \fBmbrlen\fR(\fBconst char *restrict\fR \fIs\fR, \fBsize_t\fR \fIn\fR, \fBmbstate_t *restrict\fR \fIps\fR);
 .fi
-
-.SH DESCRIPTION
-.sp
 .LP
-If \fIs\fR is not a null pointer,  \fBmbrlen()\fR determines the number of
-bytes constituting the character pointed to by  \fIs\fR. It is equivalent to:
-.sp
-.in +2
 .nf
-mbstate_t internal;
-mbrtowc(NULL, s, n, ps != NULL ? ps : &internal);
-.fi
-.in -2
+#include <wchar.h>
+#include <xlocale.h>
 
-.sp
+\fBsize_t\fR \fBmbrlen_l\fR(\fBconst char *restrict\fR \fIs\fR, \fBsize_t\fR \fIn\fR, \fBmbstate_t *restrict\fR \fIps\fR,
+    \fBlocale_t\fR \fIloc\fR);
+.fi
+.SH DESCRIPTION
 .LP
-If \fIps\fR is a null pointer, the \fBmbrlen()\fR function uses its own
+If \fIs\fR is not a null pointer,  \fBmbrlen()\fR and \fBmbrlen_l()\fR determine
+the number of bytes constituting the character pointed to by \fIs\fR.
+The call
+.nf
+.IP
+\fBmbrlen\fR(\fIs\fR, \fIn\fR, \fIps\fR);
+.fi
+.LP
+is equivalent to:
+.nf
+.IP
+mbstate_t internal;
+\fBmbrtowc\fR(NULL, \fIs\fR, \fIn\fR, \fIps\fR != NULL ? \fIps\fR : &internal);
+.fi
+.LP
+If \fIps\fR is a null pointer, the \fBmbrlen()\fR and \fBmbrlen_l()\fR
+functions use their own
 internal \fBmbstate_t\fR object, which is initialized at program startup to the
 initial conversion state.   Otherwise, the  \fBmbstate_t\fR object pointed to
 by \fIps\fR is used to completely describe the current conversion state of the
-associated character sequence. Solaris will behave as if no function defined in
-the Solaris Reference Manual calls \fBmbrlen()\fR.
-.sp
+associated character sequence. The implemenation will behave as if no function
+defined in the Reference Manual calls \fBmbrlen()\fR.
 .LP
-The behavior of this function is affected by the \fBLC_CTYPE\fR category of the
-current locale.  See \fBenviron\fR(5).
+The behavior of \fBmbrlen()\fR is affected by the \fBLC_CTYPE\fR category of the
+current locale.  See \fBenviron\fR(5). The behavior of \fBmbrlen_l()\fR does not
+use the current enivronment and instead uses the locale specified by \fBloc\fR.
 .SH RETURN VALUES
-.sp
 .LP
-The \fBmbrlen()\fR function returns the first of the following that applies:
+The \fBmbrlen()\fR and \fBmbrlen_l()\fR functions return the first of the
+following that applies:
 .sp
 .ne 2
 .na
@@ -92,9 +103,8 @@ is stored in \fBerrno\fR and the conversion state is undefined.
 .RE
 
 .SH ERRORS
-.sp
 .LP
-The \fBmbrlen()\fR function may fail if:
+The \fBmbrlen()\fR and \fBmbrlen_l()\fR functions may fail if:
 .sp
 .ne 2
 .na
@@ -115,27 +125,29 @@ Invalid character sequence is detected.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
 .TS
 box;
 c | c
 l | l .
 ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface Stability	Standard
+Interface Stability	See below.
 _
-MT-Level	See NOTES below
+MT-Level	MT-Safe
 .TE
 
-.SH SEE ALSO
-.sp
 .LP
-\fBmbrtowc\fR(3C), \fBmbsinit\fR(3C), \fBsetlocale\fR(3C), \fBattributes\fR(5),
+The
+.B mbrlen()
+function is Standard.  The
+.B mbrlen_l()
+function is Uncommitted.
+.SH SEE ALSO
+.LP
+\fBmbrtowc\fR(3C), \fBmbsinit\fR(3C), \fBnewlocale\fR(3C),
+\fBsetlocale\fR(3C), \fBattributes\fR(5),
 \fBenviron\fR(5), \fBstandards\fR(5)
 .SH NOTES
 .sp
@@ -143,6 +155,7 @@ MT-Level	See NOTES below
 If \fIps\fR is not a null pointer, \fBmbrlen()\fR uses the \fBmbstate_t\fR
 object pointed to by \fIps\fR and the function can be used safely in
 multithreaded applications, as long as \fBsetlocale\fR(3C) is not being called
-to change the locale. If \fIps\fR is a null pointer, \fBmbrlen()\fR uses its
-internal \fBmbstate_t\fR object and the function is Unsafe in multithreaded
-applications.
+to change the locale or a per-thread locale has been installed on the calling
+thread with \fBuselocale\fR(3C). If \fIps\fR is a null pointer, \fBmbrlen()\fR
+uses its internal \fBmbstate_t\fR object and the function is Unsafe in
+multithreaded applications.

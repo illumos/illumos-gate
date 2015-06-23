@@ -413,7 +413,7 @@ ipgpc_invoke_action(ipp_action_id_t aid, ipp_packet_t *packet)
 			mp = mp->b_cont; /* jump over the M_CTL into M_DATA */
 		} else {
 			ipgpc0dbg(("ipgpc_invoke_action: no data\n"));
-			atomic_add_64(&ipgpc_epackets, 1);
+			atomic_inc_64(&ipgpc_epackets);
 			return (EINVAL);
 		}
 	}
@@ -485,7 +485,7 @@ ipgpc_invoke_action(ipp_action_id_t aid, ipp_packet_t *packet)
 
 	/* ipgpc_classify will only return NULL if a memory error occured */
 	if (out_class == NULL) {
-		atomic_add_64(&ipgpc_epackets, 1);
+		atomic_inc_64(&ipgpc_epackets);
 		return (ENOMEM);
 	}
 
@@ -495,7 +495,7 @@ ipgpc_invoke_action(ipp_action_id_t aid, ipp_packet_t *packet)
 
 	if ((rc = ipp_packet_add_class(packet, out_class->class_name,
 	    out_class->next_action)) != 0) {
-		atomic_add_64(&ipgpc_epackets, 1);
+		atomic_inc_64(&ipgpc_epackets);
 		ipgpc0dbg(("ipgpc_invoke_action: ipp_packet_add_class " \
 		    "failed with error %d", rc));
 		return (rc);

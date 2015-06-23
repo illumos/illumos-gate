@@ -12,6 +12,7 @@
 #
 # Copyright 2011, Richard Lowe
 # Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2014 Garrett D'Amore <garrett@damore.org>
 #
 
 include		$(SRC)/Makefile.master
@@ -28,9 +29,6 @@ MANFILES= 	Intro.9s			\
 	 	ddi_device_acc_attr.9s		\
 	 	ddi_dma_attr.9s			\
 	 	ddi_dma_cookie.9s		\
-	 	ddi_dma_lim_sparc.9s		\
-	 	ddi_dma_lim_x86.9s		\
-	 	ddi_dma_req.9s			\
 	 	ddi_dmae_req.9s			\
 	 	ddi_fm_error.9s			\
 	 	ddi_idevice_cookie.9s		\
@@ -92,15 +90,12 @@ MANFILES= 	Intro.9s			\
 	 	usb_string_descr.9s
 
 MANLINKS=	dblk.9s		\
-		ddi_dma_lim.9s	\
 		intro.9s	\
 		mblk.9s
 
 intro.9s	:= LINKSRC = Intro.9s
 
 dblk.9s		:= LINKSRC = datab.9s
-
-ddi_dma_lim.9s	:= LINKSRC = ddi_dma_lim_sparc.9s
 
 mblk.9s		:= LINKSRC = msgb.9s
 

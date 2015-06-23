@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2013 Joyent, Inc.  All rights reserved.
+# Copyright 2014 Joyent, Inc.  All rights reserved.
 # Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 #
 
@@ -27,6 +27,13 @@ dir path=kernel/drv/$(ARCH64) group=sys
 dir path=usr/share/man
 dir path=usr/share/man/man7d
 driver name=cpqary3 class=scsi \
+    alias=pci103c,1920 \
+    alias=pci103c,1921 \
+    alias=pci103c,1922 \
+    alias=pci103c,1923 \
+    alias=pci103c,1924 \
+    alias=pci103c,1926 \
+    alias=pci103c,1928 \
     alias=pci103c,3211 \
     alias=pci103c,3212 \
     alias=pci103c,3223 \

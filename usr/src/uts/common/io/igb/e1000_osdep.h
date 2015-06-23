@@ -54,6 +54,7 @@ extern "C" {
 #include "igb_debug.h"
 
 #define	usec_delay(x)		drv_usecwait(x)
+#define	usec_delay_irq		usec_delay
 #define	msec_delay(x)		drv_usecwait(x * 1000)
 #define	msec_delay_irq		msec_delay
 

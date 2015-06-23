@@ -2,7 +2,7 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2012 Milan Jurik. All rights reserved.
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -74,16 +74,18 @@ typedef struct ndmp_scfhandle {
 	scf_propertygroup_t *scf_pg;
 } ndmp_scfhandle_t;
 
-static int ndmp_config_saveenv(ndmp_scfhandle_t *);
-static ndmp_scfhandle_t *ndmp_smf_scf_init(char *);
+static int ndmp_config_saveenv(ndmp_scfhandle_t *, boolean_t);
+static ndmp_scfhandle_t *ndmp_smf_scf_init(const char *);
 static void ndmp_smf_scf_fini(ndmp_scfhandle_t *);
 static int ndmp_smf_start_transaction(ndmp_scfhandle_t *);
-static int ndmp_smf_end_transaction(ndmp_scfhandle_t *);
-static int ndmp_smf_set_property(ndmp_scfhandle_t *, char *, char *);
-static int ndmp_smf_get_property(ndmp_scfhandle_t *, char *, char *, size_t);
-static int ndmp_smf_create_service_pgroup(ndmp_scfhandle_t *, char *);
-static int ndmp_smf_delete_property(ndmp_scfhandle_t *, char *);
-static int ndmp_smf_get_pg_name(ndmp_scfhandle_t *, char *, char **);
+static int ndmp_smf_end_transaction(ndmp_scfhandle_t *, boolean_t);
+static int ndmp_smf_set_property(ndmp_scfhandle_t *, const char *,
+		const char *);
+static int ndmp_smf_get_property(ndmp_scfhandle_t *, const char *, char *,
+		size_t);
+static int ndmp_smf_create_service_pgroup(ndmp_scfhandle_t *, const char *);
+static int ndmp_smf_delete_property(ndmp_scfhandle_t *, const char *);
+static int ndmp_smf_get_pg_name(ndmp_scfhandle_t *, const char *, char **);
 
 /*
  * This routine send a refresh signal to ndmpd service which cause ndmpd
@@ -92,11 +94,11 @@ static int ndmp_smf_get_pg_name(ndmp_scfhandle_t *, char *, char **);
 int
 ndmp_service_refresh(void)
 {
-	if ((smf_get_state(NDMP_INST)) != NULL)
-		return (smf_refresh_instance(NDMP_INST));
+	int rc = smf_refresh_instance(NDMP_INST);
 
-	ndmp_errno = ENDMP_SMF_INTERNAL;
-	return (-1);
+	if (rc != 0)
+		ndmp_errno = ENDMP_SMF_INTERNAL;
+	return (rc);
 }
 
 /*
@@ -105,28 +107,28 @@ ndmp_service_refresh(void)
  * defined otherwise it would be NULL.
  */
 int
-ndmp_get_prop(char *prop, char **value)
+ndmp_get_prop(const char *prop, char **value)
 {
-	ndmp_scfhandle_t *handle = NULL;
-	char *lval = (char *)malloc(NDMP_PROP_LEN);
+	ndmp_scfhandle_t *handle;
+	char *lval;
 	char *pgname;
 
-	if (!lval) {
-		ndmp_errno = ENDMP_MEM_ALLOC;
-		return (-1);
-	}
+	*value = NULL;
 	if ((handle = ndmp_smf_scf_init(NDMP_GROUP_FMRI_PREFIX)) == NULL) {
-		free(lval);
 		return (-1);
 	}
 	if (ndmp_smf_get_pg_name(handle, prop, &pgname)) {
-		free(lval);
+		ndmp_smf_scf_fini(handle);
 		ndmp_errno = ENDMP_SMF_PROP_GRP;
 		return (-1);
 	}
 	if (ndmp_smf_create_service_pgroup(handle, pgname)) {
 		ndmp_smf_scf_fini(handle);
-		free(lval);
+		return (-1);
+	}
+	if ((lval = malloc(NDMP_PROP_LEN)) == NULL) {
+		ndmp_smf_scf_fini(handle);
+		ndmp_errno = ENDMP_MEM_ALLOC;
 		return (-1);
 	}
 	if (ndmp_smf_get_property(handle, prop, lval, NDMP_PROP_LEN) != 0) {
@@ -141,42 +143,44 @@ ndmp_get_prop(char *prop, char **value)
 }
 
 int
-ndmp_set_prop(char *env, char *env_val)
+ndmp_set_prop(const char *env, const char *env_val)
 {
-	ndmp_scfhandle_t *handle = NULL;
+	ndmp_scfhandle_t *handle;
 	char *pgname;
+	int rc;
 
 	if ((handle = ndmp_smf_scf_init(NDMP_GROUP_FMRI_PREFIX)) == NULL)
 		return (-1);
 
 	if (ndmp_smf_get_pg_name(handle, env, &pgname)) {
+		ndmp_smf_scf_fini(handle);
 		ndmp_errno = ENDMP_SMF_PROP_GRP;
 		return (-1);
 	}
 
-	if (ndmp_smf_create_service_pgroup(handle, pgname))
+	if (ndmp_smf_create_service_pgroup(handle, pgname)) {
+		ndmp_smf_scf_fini(handle);
 		return (-1);
-
-	if (ndmp_smf_start_transaction(handle))
-		return (-1);
-
-	if (env_val) {
-		if (ndmp_smf_set_property(handle, env, env_val)) {
-			return (-1);
-		}
-	} else {
-		if (ndmp_smf_delete_property(handle, env))
-			return (-1);
 	}
 
-	if (ndmp_config_saveenv(handle) != 0)
+	if (ndmp_smf_start_transaction(handle)) {
+		ndmp_smf_scf_fini(handle);
 		return (-1);
+	}
 
-	return (0);
+	if (env_val)
+		rc = ndmp_smf_set_property(handle, env, env_val);
+	else
+		rc = ndmp_smf_delete_property(handle, env);
+
+	if (ndmp_config_saveenv(handle, (rc == 0)) == 0)
+		return (rc);
+	else
+		return (-1);
 }
 
 static int
-ndmp_smf_get_pg_name(ndmp_scfhandle_t *h, char *pname, char **pgname)
+ndmp_smf_get_pg_name(ndmp_scfhandle_t *h, const char *pname, char **pgname)
 {
 	scf_value_t *value;
 	scf_property_t *prop;
@@ -216,11 +220,11 @@ ndmp_smf_get_pg_name(ndmp_scfhandle_t *h, char *pname, char **pgname)
  * Basically commit the transaction.
  */
 static int
-ndmp_config_saveenv(ndmp_scfhandle_t *handle)
+ndmp_config_saveenv(ndmp_scfhandle_t *handle, boolean_t commit)
 {
 	int ret = 0;
 
-	ret = ndmp_smf_end_transaction(handle);
+	ret = ndmp_smf_end_transaction(handle, commit);
 
 	ndmp_smf_scf_fini(handle);
 	return (ret);
@@ -234,15 +238,16 @@ ndmp_config_saveenv(ndmp_scfhandle_t *handle)
 static void
 ndmp_smf_scf_fini(ndmp_scfhandle_t *handle)
 {
-	if (handle != NULL) {
-		scf_scope_destroy(handle->scf_scope);
-		scf_service_destroy(handle->scf_service);
-		scf_pg_destroy(handle->scf_pg);
-		handle->scf_state = NDMP_SCH_STATE_UNINIT;
-		(void) scf_handle_unbind(handle->scf_handle);
-		scf_handle_destroy(handle->scf_handle);
-		free(handle);
-	}
+	if (handle == NULL)
+		return;
+
+	scf_scope_destroy(handle->scf_scope);
+	scf_service_destroy(handle->scf_service);
+	scf_pg_destroy(handle->scf_pg);
+	handle->scf_state = NDMP_SCH_STATE_UNINIT;
+	(void) scf_handle_unbind(handle->scf_handle);
+	scf_handle_destroy(handle->scf_handle);
+	free(handle);
 }
 
 /*
@@ -250,7 +255,7 @@ ndmp_smf_scf_fini(ndmp_scfhandle_t *handle)
  * ndmp_scfhandle_t pointer if success.
  */
 static ndmp_scfhandle_t *
-ndmp_smf_scf_init(char *svc_name)
+ndmp_smf_scf_init(const char *svc_name)
 {
 	ndmp_scfhandle_t *handle;
 
@@ -301,7 +306,7 @@ err:
  * Create a new property group at service level.
  */
 static int
-ndmp_smf_create_service_pgroup(ndmp_scfhandle_t *handle, char *pgroup)
+ndmp_smf_create_service_pgroup(ndmp_scfhandle_t *handle, const char *pgroup)
 {
 	int err;
 
@@ -379,25 +384,29 @@ ndmp_smf_start_transaction(ndmp_scfhandle_t *handle)
  * necessary cleanup.
  */
 static int
-ndmp_smf_end_transaction(ndmp_scfhandle_t *handle)
+ndmp_smf_end_transaction(ndmp_scfhandle_t *handle, boolean_t commit)
 {
-	if (scf_transaction_commit(handle->scf_trans) < 0) {
-		ndmp_errno = ENDMP_SMF_INTERNAL;
-		return (-1);
+	int rc = 0;
+
+	if (commit) {
+		if (scf_transaction_commit(handle->scf_trans) < 0) {
+			ndmp_errno = ENDMP_SMF_INTERNAL;
+			rc = -1;
+		}
 	}
 
 	scf_transaction_destroy_children(handle->scf_trans);
 	scf_transaction_destroy(handle->scf_trans);
 	handle->scf_trans = NULL;
 
-	return (0);
+	return (rc);
 }
 
 /*
  * Deletes property in current pg
  */
 static int
-ndmp_smf_delete_property(ndmp_scfhandle_t *handle, char *propname)
+ndmp_smf_delete_property(ndmp_scfhandle_t *handle, const char *propname)
 {
 	scf_transaction_entry_t *entry = NULL;
 
@@ -429,13 +438,13 @@ ndmp_smf_delete_property(ndmp_scfhandle_t *handle, char *propname)
  * Sets property in current pg
  */
 static int
-ndmp_smf_set_property(ndmp_scfhandle_t *handle,
-    char *propname, char *valstr)
+ndmp_smf_set_property(ndmp_scfhandle_t *handle, const char *propname,
+    const char *valstr)
 {
 	int ret = 0;
 	scf_value_t *value = NULL;
 	scf_transaction_entry_t *entry = NULL;
-	scf_property_t *prop;
+	scf_property_t *prop = NULL;
 	scf_type_t type;
 	int64_t valint;
 	uint8_t valbool;
@@ -444,68 +453,60 @@ ndmp_smf_set_property(ndmp_scfhandle_t *handle,
 	 * Properties must be set in transactions and don't take effect until
 	 * the transaction has been ended/committed.
 	 */
-	if (((value = scf_value_create(handle->scf_handle)) != NULL) &&
-	    (entry = scf_entry_create(handle->scf_handle)) != NULL) {
-		if (((prop =
-		    scf_property_create(handle->scf_handle)) != NULL) &&
-		    ((scf_pg_get_property(handle->scf_pg, propname,
-		    prop)) == 0)) {
-			if (scf_property_get_value(prop, value) == 0) {
-				type = scf_value_type(value);
-				if ((scf_transaction_property_change(
-				    handle->scf_trans, entry, propname,
-				    type) == 0) ||
-				    (scf_transaction_property_new(
-				    handle->scf_trans, entry, propname,
-				    type) == 0)) {
-					switch (type) {
-					case SCF_TYPE_ASTRING:
-						if ((scf_value_set_astring(
-						    value,
-						    valstr)) != SCF_SUCCESS)
-							ret = -1;
-						break;
-					case SCF_TYPE_INTEGER:
-						valint = strtoll(valstr, 0, 0);
-						scf_value_set_integer(value,
-						    valint);
-						break;
-					case SCF_TYPE_BOOLEAN:
-						if (strncmp(valstr, "yes", 3))
-							valbool = 0;
-						else
-							valbool = 1;
-						scf_value_set_boolean(value,
-						    valbool);
-						break;
-					default:
-						ret = -1;
-					}
-					if (scf_entry_add_value(entry,
-					    value) != 0) {
-						ret = -1;
-						scf_value_destroy(value);
-					}
-					/* The value is in the transaction */
-					value = NULL;
-				}
-				/* The entry is in the transaction */
-				entry = NULL;
-			} else {
-				ret = -1;
-			}
-		} else {
+	if (((value = scf_value_create(handle->scf_handle)) == NULL) ||
+	    ((entry = scf_entry_create(handle->scf_handle)) == NULL) ||
+	    ((prop = scf_property_create(handle->scf_handle)) == NULL) ||
+	    (scf_pg_get_property(handle->scf_pg, propname, prop) != 0) ||
+	    (scf_property_get_value(prop, value) != 0)) {
+		ret = -1;
+		goto out;
+	}
+
+	type = scf_value_type(value);
+	if ((scf_transaction_property_change(handle->scf_trans, entry, propname,
+	    type) != 0) &&
+	    (scf_transaction_property_new(handle->scf_trans, entry, propname,
+	    type) != 0)) {
+		ret = -1;
+		goto out;
+	}
+
+	switch (type) {
+	case SCF_TYPE_ASTRING:
+		if ((scf_value_set_astring(value, valstr)) != SCF_SUCCESS)
 			ret = -1;
-		}
+		break;
+	case SCF_TYPE_INTEGER:
+		valint = strtoll(valstr, 0, 0);
+		scf_value_set_integer(value, valint);
+		break;
+	case SCF_TYPE_BOOLEAN:
+		if (strncmp(valstr, "yes", 3))
+			valbool = 0;
+		else
+			valbool = 1;
+		scf_value_set_boolean(value, valbool);
+		break;
+	default:
+		ret = -1;
+	}
+	if (scf_entry_add_value(entry, value) == 0) {
+		/* The value is in the transaction */
+		value = NULL;
 	} else {
 		ret = -1;
 	}
+	/* The entry is in the transaction */
+	entry = NULL;
+
+out:
 	if (ret == -1) {
 		if ((scf_error() == SCF_ERROR_PERMISSION_DENIED))
 			ndmp_errno = ENDMP_SMF_PERM;
 		else
 			ndmp_errno = ENDMP_SMF_INTERNAL;
 	}
+	scf_property_destroy(prop);
 	scf_value_destroy(value);
 	scf_entry_destroy(entry);
 	return (ret);
@@ -516,12 +517,12 @@ ndmp_smf_set_property(ndmp_scfhandle_t *handle,
  * memory allocated.
  */
 static int
-ndmp_smf_get_property(ndmp_scfhandle_t *handle, char *propname,
+ndmp_smf_get_property(ndmp_scfhandle_t *handle, const char *propname,
     char *valstr, size_t sz)
 {
 	int ret = 0;
-	scf_value_t *value;
-	scf_property_t *prop;
+	scf_value_t *value = NULL;
+	scf_property_t *prop = NULL;
 	scf_type_t type;
 	int64_t valint;
 	uint8_t valbool;

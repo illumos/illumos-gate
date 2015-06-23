@@ -18,8 +18,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <stdio.h>
@@ -806,14 +808,14 @@ i_ipadm_init_ifs(ipadm_handle_t iph, const char *ifs, nvlist_t **allifs)
 		status = ipadm_errno2status(err);
 		goto done;
 	}
-	nvlsize = rvalp->ir_nvlsize;
-	nvlbuf = (char *)rvalp + sizeof (ipmgmt_get_rval_t);
 
 	/*
-	 * nvlbuf contains a list of nvlists, each of which represents
-	 * configuration information for the given interface(s)
+	 * Daemon reply pointed to by rvalp contains ipmgmt_get_rval_t structure
+	 * followed by a list of packed nvlists, each of which represents
+	 * configuration information for the given interface(s).
 	 */
-	err = nvlist_unpack(nvlbuf, nvlsize, allifs, NV_ENCODE_NATIVE);
+	err = nvlist_unpack((char *)rvalp + sizeof (ipmgmt_get_rval_t),
+	    rvalp->ir_nvlsize, allifs, NV_ENCODE_NATIVE);
 	if (err != 0)
 		status = ipadm_errno2status(err);
 done:

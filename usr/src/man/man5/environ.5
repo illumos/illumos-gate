@@ -1,28 +1,27 @@
 '\" te
 .\" Copyright 1989 AT&T
 .\" Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved
+.\" Copyright (c) 2014, Joyent, Inc.  All Rights Reserved
+.\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ENVIRON 5 "Nov 19, 2002"
+.TH ENVIRON 5 "Jun 26, 2014"
 .SH NAME
 environ \- user environment
 .SH DESCRIPTION
-.sp
 .LP
 When a process begins execution, one of the \fBexec\fR family of functions
 makes available an array of strings called the environment; see \fBexec\fR(2).
 By convention, these strings have the form \fIvariable=value\fR, for example,
 \fBPATH=/sbin:/usr/sbin\fR. These environmental variables provide a way to make
 information about a program's environment available to programs.
-.sp
 .LP
 A name may be placed in the environment by the \fBexport\fR command and
 \fIname\fR=\fIvalue\fR arguments in \fBsh\fR(1), or by one of the \fBexec\fR
 functions. It is unwise to conflict with certain shell variables such as
 \fBMAIL\fR, \fBPS1\fR, \fBPS2\fR, and \fBIFS\fR that are frequently exported by
 \fB\&.profile\fR files; see \fBprofile\fR(4).
-.sp
 .LP
 The following environmental variables can be used by applications and are
 expected to be set in the target run-time environment.
@@ -45,8 +44,9 @@ file; see \fBpasswd\fR(4).
 .sp .6
 .RS 4n
 The string used to specify internationalization information that allows users
-to work with different national conventions. The \fBsetlocale\fR(3C) function
-checks the \fBLANG\fR environment variable when it is called with \fB""\fR as
+to work with different national conventions. The \fBsetlocale\fR(3C) and
+\fBnewlocale\fR(3C) functions
+check the \fBLANG\fR environment variable when they are called with \fB""\fR as
 the \fBlocale\fR argument.  \fBLANG\fR is used as the default locale if the
 corresponding environment variable for a particular category is unset or null.
 If, however,  \fBLC_ALL\fR is set to a valid, non-empty value, its contents are
@@ -60,7 +60,10 @@ locale will be used to set the \fBLC_CTYPE\fR category.
 .sp
 Most commands will invoke \fBsetlocale(LC_ALL, "")\fR prior to any other
 processing. This allows the command to be used with different national
-conventions by setting the appropriate environment variables.
+conventions by setting the appropriate environment variables. In addition, some
+commands will use
+.BR uselocale (3C)
+to set a thread-specific locale.
 .sp
 The following environment variables correspond to each category of
 \fBsetlocale\fR(3C):
@@ -84,7 +87,7 @@ and all the other \fBLC_*\fRvariables.
 .RS 4n
 This category specifies the character collation sequence being used.  The
 information corresponding to this category is stored in a database  created by
-the \fBlocaledef\fR(1) command.   This environment variable affects
+the \fBlocaledef\fR(1) command.  This environment variable affects
 \fBstrcoll\fR(3C) and \fBstrxfrm\fR(3C).
 .RE
 
@@ -517,7 +520,6 @@ The \fItime\fR has the same format as \fIoffset\fR except that no leading sign
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBcat\fR(1), \fBdate\fR(1), \fBed\fR(1), \fBfmtmsg\fR(1), \fBlocaledef\fR(1),
 \fBlogin\fR(1), \fBls\fR(1), \fBmkmsgs\fR(1), \fBnice\fR(1), \fBnohup\fR(1),
@@ -525,6 +527,7 @@ The \fItime\fR has the same format as \fIoffset\fR except that no leading sign
 \fBaddseverity\fR(3C), \fBcatopen\fR(3C), \fBctime\fR(3C), \fBctype\fR(3C),
 \fBfmtmsg\fR(3C), \fBgetdate\fR(3C), \fBgetnetpath\fR(3NSL), \fBgettext\fR(3C),
 \fBgettxt\fR(3C), \fBlocaleconv\fR(3C), \fBmblen\fR(3C), \fBmktime\fR(3C),
+\fBnewlocale\fR(3C),
 \fBprintf\fR(3C), \fBsetlocale\fR(3C), \fBstrcoll\fR(3C), \fBstrftime\fR(3C),
-\fBstrtod\fR(3C), \fBstrxfrm\fR(3C), \fBTIMEZONE\fR(4), \fBnetconfig\fR(4),
-\fBpasswd\fR(4), \fBprofile\fR(4)
+\fBstrtod\fR(3C), \fBstrxfrm\fR(3C), \fBuselocale\fR(3C), \fBTIMEZONE\fR(4),
+\fBnetconfig\fR(4), \fBpasswd\fR(4), \fBprofile\fR(4)

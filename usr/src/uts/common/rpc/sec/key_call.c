@@ -18,6 +18,11 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ */
+
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -30,8 +35,6 @@
  * Portions of this source code were derived from Berkeley 4.3 BSD
  * under license from the Regents of the University of California.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * key_call.c, Interface to keyserver
@@ -53,7 +56,6 @@
 #include <sys/vnode.h>
 #include <sys/uio.h>
 #include <sys/debug.h>
-#include <sys/utsname.h>
 #include <sys/cmn_err.h>
 
 #include <rpc/rpc.h>
@@ -64,7 +66,6 @@
 
 struct auth_globals {
 	struct knetconfig	auth_config;
-	char 			auth_keyname[SYS_NMLN+16];
 };
 
 static struct timeval keytrytimeout = { KEY_TIMEOUT, 0 };
@@ -236,26 +237,15 @@ key_call(rpcproc_t procn, xdrproc_t xdr_args, caddr_t args,
 	vnode_t *vp;
 	int error;
 	struct auth_globals *authg;
-	char *keyname;
 	struct knetconfig *configp;
 	k_sigset_t smask;
 
 	authg = zone_getspecific(auth_zone_key, curproc->p_zone);
-	keyname = authg->auth_keyname;
 	configp = &authg->auth_config;
 
-	/*
-	 * Using a global here is obviously busted and fraught with danger.
-	 */
-	(void) strcpy(keyname, uts_nodename());
-	netaddr.len = strlen(keyname);
-	(void) strcpy(&keyname[netaddr.len], ".keyserv");
-
-	netaddr.buf = keyname;
-	/*
-	 * 8 = strlen(".keyserv");
-	 */
-	netaddr.len = netaddr.maxlen = netaddr.len + 8;
+	/* strlen("localhost.keyserv") is 17 */
+	netaddr.len = netaddr.maxlen = 17;
+	netaddr.buf = "localhost.keyserv";
 
 	/*
 	 * filch a knetconfig structure.

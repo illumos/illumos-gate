@@ -1,11 +1,12 @@
 '\" te
+.\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
 .\"  Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH TOUPPER 3C "Aug 14, 2002"
+.TH TOUPPER 3C "Jun 21, 2014"
 .SH NAME
-toupper \- transliterate lower-case characters to upper-case
+toupper, toupper_l \- transliterate lower-case characters to upper-case
 .SH SYNOPSIS
 .LP
 .nf
@@ -13,33 +14,34 @@ toupper \- transliterate lower-case characters to upper-case
 
 \fBint\fR \fBtoupper\fR(\fBint\fR \fIc\fR);
 .fi
+.LP
+.nf
+\fBint\fR \fBtoupper_l\fR(\fBint\fR \fIc\fR, \fBlocale_t\fR \fIloc\fR);
+.fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBtoupper()\fR function has as a domain a type \fBint\fR, the value of
 which is representable as an \fBunsigned char\fR or the value of \fBEOF\fR. If
 the argument has any other value, the argument is returned unchanged. If the
 argument of \fBtoupper()\fR represents a lower-case letter, and there exists a
 corresponding upper-case letter (as defined by character type information in
-the program locale category \fBLC_CTYPE\fR),   the result is the corresponding
+the locale category \fBLC_CTYPE\fR),   the result is the corresponding
 upper-case letter. All other arguments in the domain are returned unchanged.
+.LP
+The function \fBtoupper_l()\fR behaves identically to \fBtoupper()\fR, except
+instead of operating in the current locale, it operates in the locale
+specified by \fIloc\fR.
 .SH RETURN VALUES
-.sp
 .LP
 On successful completion, \fBtoupper()\fR returns the upper-case letter
 corresponding to the argument passed.
 .SH ERRORS
-.sp
 .LP
 No errors are defined.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
 .TS
 box;
 c | c
@@ -54,7 +56,7 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
-\fB_toupper\fR(3C), \fBsetlocale\fR(3C), \fBattributes\fR(5),
-\fBstandards\fR(5)
+\fB_toupper\fR(3C), \fBnewlocale\fR(3C), \fBsetlocale\fR(3C),
+\fBuselocale\fR(3C),
+\fBattributes\fR(5), \fBstandards\fR(5)

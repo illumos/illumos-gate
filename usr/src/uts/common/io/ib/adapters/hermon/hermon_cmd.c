@@ -697,7 +697,7 @@ hermon_impl_mbox_free(hermon_mboxlist_t *mblist, hermon_mbox_t **mb)
 	 */
 	if (mblist->mbl_pollers > 0 && mblist->mbl_waiters > 0) {
 		/* flip the signal value */
-		mblist->mbl_signal = (++mblist->mbl_signal) % 2;
+		mblist->mbl_signal = (mblist->mbl_signal + 1) % 2;
 	} else if (mblist->mbl_waiters > 0) {
 		mblist->mbl_signal = 1;
 	} else {

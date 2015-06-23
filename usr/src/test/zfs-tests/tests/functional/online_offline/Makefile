@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright (c) 2013 by Delphix. All rights reserved.
+# Copyright (c) 2013, 2014 by Delphix. All rights reserved.
 #
 
 include $(SRC)/Makefile.master
@@ -24,9 +24,7 @@ PROGS = cleanup \
 	online_offline_003_neg \
 	setup
 
-FILES = online_offline.cfg
-
-CMDS = $(PROGS:%=$(TESTDIR)/%) $(FILES:%=$(TESTDIR)/%)
+CMDS = $(PROGS:%=$(TESTDIR)/%)
 $(CMDS) := FILEMODE = 0555
 
 all lint clean clobber:

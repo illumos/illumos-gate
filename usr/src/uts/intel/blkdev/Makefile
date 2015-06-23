@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2014, Nexenta Systems Inc.  All rights reserved.
 #
 
 #
@@ -56,8 +57,6 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 # Note dependancy on misc/scsi.
 #
 LDFLAGS += -dy -Nmisc/cmlb
-
-CERRWARN	+= -_gcc=-Wno-uninitialized
 
 #
 # Default build targets.

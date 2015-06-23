@@ -20,13 +20,12 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  * Copyright (c) 1999 by Sun Microsystems, Inc. All rights reserved.
  */
 
 #ifndef	_AUTH_ATTR_H
 #define	_AUTH_ATTR_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -90,23 +89,12 @@ typedef struct authattr_s {
 	kva_t  *attr;		/* array of key-value pair attributes */
 } authattr_t;
 
-#ifdef __STDC__
 extern authattr_t *getauthnam(const char *);
 extern authattr_t *getauthattr(void);
 extern void setauthattr(void);
 extern void endauthattr(void);
 extern void free_authattr(authattr_t *);
 extern int chkauthattr(const char *, const char *);
-
-#else				/* not __STDC__ */
-
-extern authattr_t *getauthnam();
-extern authattr_t *getauthattr();
-extern void setauthattr();
-extern void endauthattr();
-extern void free_authattr();
-extern int chkauthattr();
-#endif
 
 #ifdef	__cplusplus
 }

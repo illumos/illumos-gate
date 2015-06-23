@@ -1,4 +1,5 @@
 /*
+ * Copyright 2013 Garrett D'Amore <garrett@damore.org>
  * Copyright (c) 2000, 2001 Alexey Zelkin <phantom@FreeBSD.org>
  * All rights reserved.
  *
@@ -27,7 +28,7 @@
 #ifndef _LMONETARY_H_
 #define	_LMONETARY_H_
 
-struct lc_monetary_T {
+struct lc_monetary {
 	const char	*int_curr_symbol;
 	const char	*currency_symbol;
 	const char	*mon_decimal_point;
@@ -49,9 +50,9 @@ struct lc_monetary_T {
 	const char	*int_n_sep_by_space;
 	const char	*int_p_sign_posn;
 	const char	*int_n_sign_posn;
+	char		*crncystr;		/* nl_langinfo */
 };
 
-struct lc_monetary_T *__get_current_monetary_locale(void);
 int	__monetary_load_locale(const char *);
 
 #endif /* !_LMONETARY_H_ */

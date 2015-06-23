@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -39,15 +39,15 @@
  * +-------------------+       +-------------------+      +-------------------+
  * |     SESSION       |<----->|     SESSION       |......|      SESSION      |
  * +-------------------+       +-------------------+      +-------------------+
- *          |
- *          |
- *          v
- * +-------------------+       +-------------------+      +-------------------+
- * |       USER        |<----->|       USER        |......|       USER        |
- * +-------------------+       +-------------------+      +-------------------+
- *          |
- *          |
- *          v
+ *   |          |
+ *   |          |
+ *   |          v
+ *   |  +-------------------+     +-------------------+   +-------------------+
+ *   |  |       USER        |<--->|       USER        |...|       USER        |
+ *   |  +-------------------+     +-------------------+   +-------------------+
+ *   |
+ *   |
+ *   v
  * +-------------------+       +-------------------+      +-------------------+
  * |       TREE        |<----->|       TREE        |......|       TREE        |
  * +-------------------+       +-------------------+      +-------------------+
@@ -153,7 +153,7 @@
  *	and add it into the tree's list of odirs.
  *	Return an identifier (odid) uniquely identifying the created odir.
  *
- * smb_odir_t *odir = smb_tree_lookup_odir(odid)
+ * smb_odir_t *odir = smb_tree_lookup_odir(..., odid)
  *	Find the odir corresponding to the specified odid in the tree's
  *	list of odirs. Place a hold on the odir.
  *
@@ -312,9 +312,9 @@ smb_odir_open(smb_request_t *sr, char *path, uint16_t sattr, uint32_t flags)
 	}
 
 	if (flags & SMB_ODIR_OPENF_BACKUP_INTENT)
-		cr = smb_user_getprivcred(tree->t_user);
+		cr = smb_user_getprivcred(sr->uid_user);
 	else
-		cr = tree->t_user->u_cred;
+		cr = sr->uid_user->u_cred;
 
 	odid = smb_odir_create(sr, dnode, pattern, sattr, cr);
 	smb_node_release(dnode);
@@ -353,7 +353,7 @@ smb_odir_openat(smb_request_t *sr, smb_node_t *unode)
 		    ERRDOS, ERROR_ACCESS_DENIED);
 		return (0);
 	}
-	cr = kcred;
+	cr = zone_kcred();
 
 	/* find the xattrdir vnode */
 	rc = smb_vop_lookup_xattrdir(unode->vp, &xattr_dvp, LOOKUP_XATTR, cr);
@@ -680,6 +680,7 @@ smb_odir_read_streaminfo(smb_request_t *sr, smb_odir_t *od,
 	}
 
 	odirent = kmem_alloc(sizeof (smb_odirent_t), KM_SLEEP);
+	bzero(&attr, sizeof (attr));
 
 	for (;;) {
 		bzero(sinfo, sizeof (smb_streaminfo_t));
@@ -694,7 +695,9 @@ smb_odir_read_streaminfo(smb_request_t *sr, smb_odir_t *od,
 		rc = smb_fsop_lookup(sr, od->d_cred, 0, od->d_tree->t_snode,
 		    od->d_dnode, odirent->od_name, &fnode);
 		if (rc == 0) {
-			rc = smb_node_getattr(sr, fnode, &attr);
+			attr.sa_mask = SMB_AT_SIZE | SMB_AT_ALLOCSZ;
+			rc = smb_node_getattr(sr, fnode, od->d_cred,
+			    NULL, &attr);
 			smb_node_release(fnode);
 		}
 
@@ -875,7 +878,7 @@ smb_odir_create(smb_request_t *sr, smb_node_t *dnode,
 		return (0);
 	}
 
-	od = kmem_cache_alloc(tree->t_server->si_cache_odir, KM_SLEEP);
+	od = kmem_cache_alloc(smb_cache_odir, KM_SLEEP);
 	bzero(od, sizeof (smb_odir_t));
 
 	mutex_init(&od->d_mutex, NULL, MUTEX_DEFAULT, NULL);
@@ -885,6 +888,12 @@ smb_odir_create(smb_request_t *sr, smb_node_t *dnode,
 	od->d_opened_by_pid = sr->smb_pid;
 	od->d_session = tree->t_session;
 	od->d_cred = cr;
+	/*
+	 * grab a ref for od->d_user
+	 * released in  smb_odir_delete()
+	 */
+	smb_user_hold_internal(sr->uid_user);
+	od->d_user = sr->uid_user;
 	od->d_tree = tree;
 	od->d_dnode = dnode;
 	smb_node_ref(dnode);
@@ -944,8 +953,9 @@ smb_odir_delete(void *arg)
 
 	od->d_magic = 0;
 	smb_node_release(od->d_dnode);
+	smb_user_release(od->d_user);
 	mutex_destroy(&od->d_mutex);
-	kmem_cache_free(od->d_tree->t_server->si_cache_odir, od);
+	kmem_cache_free(smb_cache_odir, od);
 }
 
 /*
@@ -1122,7 +1132,10 @@ smb_odir_single_fileinfo(smb_request_t *sr, smb_odir_t *od,
 			case_conflict = B_TRUE;
 	}
 
-	if ((rc = smb_node_getattr(sr, fnode, &attr)) != 0) {
+	bzero(&attr, sizeof (attr));
+	attr.sa_mask = SMB_AT_ALL;
+	rc = smb_node_getattr(sr, fnode, zone_kcred(), NULL, &attr);
+	if (rc != 0) {
 		smb_node_release(fnode);
 		return (rc);
 	}
@@ -1133,7 +1146,9 @@ smb_odir_single_fileinfo(smb_request_t *sr, smb_odir_t *od,
 	    smb_odir_lookup_link(sr, od, fnode->od_name, &tgt_node)) {
 		smb_node_release(fnode);
 		fnode = tgt_node;
-		if ((rc = smb_node_getattr(sr, fnode, &attr)) != 0) {
+		attr.sa_mask = SMB_AT_ALL;
+		rc = smb_node_getattr(sr, fnode, zone_kcred(), NULL, &attr);
+		if (rc != 0) {
 			smb_node_release(fnode);
 			return (rc);
 		}
@@ -1201,6 +1216,7 @@ smb_odir_wildcard_fileinfo(smb_request_t *sr, smb_odir_t *od,
     smb_odirent_t *odirent, smb_fileinfo_t *fileinfo)
 {
 	int		rc;
+	cred_t		*cr;
 	smb_node_t	*fnode, *tgt_node;
 	smb_attr_t	attr;
 	char		*name;
@@ -1232,7 +1248,25 @@ smb_odir_wildcard_fileinfo(smb_request_t *sr, smb_odir_t *od,
 		return (ENOENT);
 	}
 
-	if ((rc = smb_node_getattr(sr, fnode, &attr)) != 0) {
+	/*
+	 * Windows directory listings return not only names, but
+	 * also some attributes.  In Unix, you need some access to
+	 * get those attributes.  Which credential should we use to
+	 * get those?  If we're doing Access Based Enumeration (ABE)
+	 * we want this getattr to fail, which will cause the caller
+	 * to skip this entry.  If we're NOT doing ABE, we normally
+	 * want to show all the directory entries (including their
+	 * attributes) so we want this getattr to succeed!
+	 */
+	if (smb_tree_has_feature(od->d_tree, SMB_TREE_ABE))
+		cr = od->d_cred;
+	else
+		cr = zone_kcred();
+
+	bzero(&attr, sizeof (attr));
+	attr.sa_mask = SMB_AT_ALL;
+	rc = smb_node_getattr(NULL, fnode, cr, NULL, &attr);
+	if (rc != 0) {
 		smb_node_release(fnode);
 		return (rc);
 	}

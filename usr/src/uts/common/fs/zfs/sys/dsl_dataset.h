@@ -23,6 +23,7 @@
  * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  * Copyright (c) 2013 Steven Hartland. All rights reserved.
+ * Copyright (c) 2014 Spectra Logic Corporation, All rights reserved.
  */
 
 #ifndef	_SYS_DSL_DATASET_H
@@ -48,7 +49,7 @@ struct dsl_pool;
 
 #define	DS_FLAG_INCONSISTENT	(1ULL<<0)
 #define	DS_IS_INCONSISTENT(ds)	\
-	((ds)->ds_phys->ds_flags & DS_FLAG_INCONSISTENT)
+	(dsl_dataset_phys(ds)->ds_flags & DS_FLAG_INCONSISTENT)
 
 /*
  * Do not allow this dataset to be promoted.
@@ -68,7 +69,7 @@ struct dsl_pool;
  */
 #define	DS_FLAG_DEFER_DESTROY	(1ULL<<3)
 #define	DS_IS_DEFER_DESTROY(ds)	\
-	((ds)->ds_phys->ds_flags & DS_FLAG_DEFER_DESTROY)
+	(dsl_dataset_phys(ds)->ds_flags & DS_FLAG_DEFER_DESTROY)
 
 /*
  * DS_FIELD_* are strings that are used in the "extensified" dataset zap object.
@@ -81,6 +82,13 @@ struct dsl_pool;
  * in the refcount of the SPA_FEATURES_BOOKMARKS feature.
  */
 #define	DS_FIELD_BOOKMARK_NAMES "com.delphix:bookmarks"
+
+/*
+ * This field is present (with value=0) if this dataset may contain large
+ * blocks (>128KB).  If it is present, then this dataset
+ * is counted in the refcount of the SPA_FEATURE_LARGE_BLOCKS feature.
+ */
+#define	DS_FIELD_LARGE_BLOCKS "org.open-zfs:large_blocks"
 
 /*
  * DS_FLAG_CI_DATASET is set if the dataset contains a file system whose
@@ -125,16 +133,20 @@ typedef struct dsl_dataset_phys {
 } dsl_dataset_phys_t;
 
 typedef struct dsl_dataset {
+	dmu_buf_user_t ds_dbu;
+
 	/* Immutable: */
 	struct dsl_dir *ds_dir;
-	dsl_dataset_phys_t *ds_phys;
 	dmu_buf_t *ds_dbuf;
 	uint64_t ds_object;
 	uint64_t ds_fsid_guid;
+	boolean_t ds_is_snapshot;
 
 	/* only used in syncing context, only valid for non-snapshots: */
 	struct dsl_dataset *ds_prev;
 	uint64_t ds_bookmarks;  /* DMU_OTN_ZAP_METADATA */
+	boolean_t ds_large_blocks;
+	boolean_t ds_need_large_blocks;
 
 	/* has internal locking: */
 	dsl_deadlist_t ds_deadlist;
@@ -177,6 +189,12 @@ typedef struct dsl_dataset {
 	char ds_snapname[MAXNAMELEN];
 } dsl_dataset_t;
 
+inline dsl_dataset_phys_t *
+dsl_dataset_phys(dsl_dataset_t *ds)
+{
+	return (ds->ds_dbuf->db_data);
+}
+
 /*
  * The max length of a temporary tag prefix is the number of hex digits
  * required to express UINT64_MAX plus one for the hyphen.
@@ -184,13 +202,15 @@ typedef struct dsl_dataset {
 #define	MAX_TAG_PREFIX_LEN	17
 
 #define	dsl_dataset_is_snapshot(ds) \
-	((ds)->ds_phys->ds_num_children != 0)
+	(dsl_dataset_phys(ds)->ds_num_children != 0)
 
 #define	DS_UNIQUE_IS_ACCURATE(ds)	\
-	(((ds)->ds_phys->ds_flags & DS_FLAG_UNIQUE_ACCURATE) != 0)
+	((dsl_dataset_phys(ds)->ds_flags & DS_FLAG_UNIQUE_ACCURATE) != 0)
 
 int dsl_dataset_hold(struct dsl_pool *dp, const char *name, void *tag,
     dsl_dataset_t **dsp);
+boolean_t dsl_dataset_try_add_ref(struct dsl_pool *dp, dsl_dataset_t *ds,
+    void *tag);
 int dsl_dataset_hold_obj(struct dsl_pool *dp, uint64_t dsobj, void *tag,
     dsl_dataset_t **);
 void dsl_dataset_rele(dsl_dataset_t *ds, void *tag);
@@ -244,6 +264,8 @@ int dsl_dataset_space_written(dsl_dataset_t *oldsnap, dsl_dataset_t *new,
 int dsl_dataset_space_wouldfree(dsl_dataset_t *firstsnap, dsl_dataset_t *last,
     uint64_t *usedp, uint64_t *compp, uint64_t *uncompp);
 boolean_t dsl_dataset_is_dirty(dsl_dataset_t *ds);
+int dsl_dataset_activate_large_blocks(const char *dsname);
+void dsl_dataset_activate_large_blocks_sync_impl(uint64_t dsobj, dmu_tx_t *tx);
 
 int dsl_dsobj_to_dsname(char *pname, uint64_t obj, char *buf);
 

@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013, Joyent, Inc. All rights reserved.
+ * Copyright 2014, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -161,6 +161,7 @@ struct {
 	kstat_named_t avenrun_5min;
 	kstat_named_t avenrun_15min;
 	kstat_named_t boot_time;
+	kstat_named_t nsec_per_tick;
 } system_misc_kstat = {
 	{ "ncpus",		KSTAT_DATA_UINT32 },
 	{ "lbolt",		KSTAT_DATA_UINT32 },
@@ -172,6 +173,7 @@ struct {
 	{ "avenrun_5min",	KSTAT_DATA_UINT32 },
 	{ "avenrun_15min",	KSTAT_DATA_UINT32 },
 	{ "boot_time",		KSTAT_DATA_UINT32 },
+	{ "nsec_per_tick",	KSTAT_DATA_UINT32 },
 };
 
 struct {
@@ -806,7 +808,6 @@ system_misc_kstat_update(kstat_t *ksp, int rw)
 {
 	int myncpus = ncpus;
 	int *loadavgp = &avenrun[0];
-	int loadavg[LOADAVG_NSTATS];
 	time_t zone_boot_time;
 	clock_t zone_lbolt;
 	hrtime_t zone_hrtime;
@@ -823,17 +824,11 @@ system_misc_kstat_update(kstat_t *ksp, int rw)
 		 */
 		mutex_enter(&cpu_lock);
 		if (pool_pset_enabled()) {
-			psetid_t mypsid = zone_pset_get(curproc->p_zone);
-			int error;
-
 			myncpus = zone_ncpus_get(curproc->p_zone);
 			ASSERT(myncpus > 0);
-			error = cpupart_get_loadavg(mypsid, &loadavg[0],
-			    LOADAVG_NSTATS);
-			ASSERT(error == 0);
-			loadavgp = &loadavg[0];
 		}
 		mutex_exit(&cpu_lock);
+		loadavgp = &curproc->p_zone->zone_avenrun[0];
 	}
 
 	if (INGLOBALZONE(curproc)) {
@@ -862,6 +857,8 @@ system_misc_kstat_update(kstat_t *ksp, int rw)
 	system_misc_kstat.avenrun_15min.value.ui32	= (uint32_t)loadavgp[2];
 	system_misc_kstat.boot_time.value.ui32		= (uint32_t)
 	    zone_boot_time;
+	system_misc_kstat.nsec_per_tick.value.ui32	= (uint32_t)
+	    nsec_per_tick;
 	return (0);
 }
 
@@ -1210,8 +1207,16 @@ kstat_install(kstat_t *ksp)
 
 	/*
 	 * Now that the kstat is active, make it visible to the kstat driver.
+	 * When copying out kstats the count is determined in
+	 * header_kstat_update() and actually copied into kbuf in
+	 * header_kstat_snapshot(). kstat_chain_lock is held across the two
+	 * calls to ensure that this list doesn't change. Thus, we need to
+	 * also take the lock to ensure that the we don't copy the new kstat
+	 * in the 2nd pass and overrun the buf.
 	 */
+	mutex_enter(&kstat_chain_lock);
 	ksp->ks_flags &= ~KSTAT_FLAG_INVALID;
+	mutex_exit(&kstat_chain_lock);
 	kstat_rele(ksp);
 }
 

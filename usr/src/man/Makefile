@@ -11,7 +11,8 @@
 
 #
 # Copyright 2011, Richard Lowe
-# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+# Copyright (c) 2012, Igor Kozhukhov <ikozhukhov@gmail.com>
+# Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 #
 
 SUBDIRS=	man1		\
@@ -48,10 +49,12 @@ SUBDIRS=	man1		\
 		man3ldap	\
 		man3lgrp	\
 		man3lib		\
+		man3m		\
 		man3mail	\
 		man3malloc	\
 		man3mp		\
 		man3mpapi	\
+		man3mvec	\
 		man3nsl		\
 		man3nvpair	\
 		man3pam		\
@@ -102,8 +105,9 @@ all		:= TARGET = all
 clean		:= TARGET = clean
 clobber		:= TARGET = clobber
 install		:= TARGET = install
+check		:= TARGET = check
 
-all clean clobber install: $(SUBDIRS)
+all check clean clobber install: $(SUBDIRS)
 
 $(SUBDIRS):	FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

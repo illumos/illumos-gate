@@ -26,14 +26,15 @@
  */
 
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Gary Mills
  */
 
 #ifndef _SYS_TIUSER_H
 #define	_SYS_TIUSER_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 /*
@@ -55,7 +56,6 @@ extern "C" {
 #define	T_DATA		0x0004	/* normal data received			*/
 #define	T_EXDATA	0x0008	/* expedited data received		*/
 #define	T_DISCONNECT	0x0010	/* disconnect received			*/
-#define	T_ERROR		0x0020	/* fatal error occurred			*/
 #define	T_UDERR		0x0040	/* data gram error indication		*/
 #define	T_ORDREL	0x0080	/* orderly release indication		*/
 #define	T_EVENTS	0x00ff	/* event mask				*/
@@ -194,8 +194,6 @@ struct t_uderr {
 #define	LOCALNAME	0
 #define	REMOTENAME	1
 
-#if defined(__STDC__)
-
 extern int t_accept(int fildes, int resfd, struct t_call *call);
 extern char *t_alloc(int fildes, int struct_type, int fields);
 extern int t_bind(int fildes, struct t_bind *req, struct t_bind *ret);
@@ -231,8 +229,6 @@ extern int t_unbind(int fildes);
  */
 extern char *t_errlist[];
 extern int t_nerr;
-
-#endif /* __STDC__ */
 
 #ifdef	__cplusplus
 }

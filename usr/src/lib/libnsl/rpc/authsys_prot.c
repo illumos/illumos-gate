@@ -21,6 +21,10 @@
  */
 
 /*
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ */
+
+/*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -33,8 +37,6 @@
  * California.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * XDR for UNIX style authentication parameters for RPC
  */
@@ -44,9 +46,6 @@
 #include <rpc/xdr.h>
 #include <rpc/auth.h>
 #include <rpc/auth_sys.h>
-
-extern bool_t xdr_uid_t(XDR *, uid_t *);
-extern bool_t xdr_gid_t(XDR *, gid_t *);
 
 /*
  * XDR for unix authentication parameters.

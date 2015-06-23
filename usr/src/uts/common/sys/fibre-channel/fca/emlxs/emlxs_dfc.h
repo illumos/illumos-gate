@@ -5,8 +5,8 @@
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
  *
- * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
+ * You can obtain a copy of the license at
+ * http://www.opensource.org/licenses/cddl1.txt.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2010 Emulex.  All rights reserved.
+ * Copyright (c) 2004-2011 Emulex. All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -136,6 +136,7 @@ typedef struct sd_bucket_info
 #define	EMLXS_SET_DIAG			30
 #define	EMLXS_LOOPBACK_MODE		31
 #define	EMLXS_LOOPBACK_TEST		32
+#define	EMLXS_RESET_PORT		33
 
 #define	EMLXS_READ_PCI			40
 #define	EMLXS_WRITE_PCI			41
@@ -226,9 +227,8 @@ typedef struct sd_bucket_info
 #define	DFC_NPIV_UNSUPPORTED	(DFC_ERRNO_START + 19) /* NPIV not supported */
 #define	DFC_NPIV_ACTIVE		(DFC_ERRNO_START + 20) /* NPIV active */
 
-/* FCOE_SUPPORT */
-#define	DFC_FCOE_NOTSUPPORTED	(DFC_ERRNO_START + 21) /* FCoE not supported */
-#define	DFC_FCOE_NO_DATA	(DFC_ERRNO_START + 22) /* No Data to return */
+#define	DFC_NOT_SUPPORTED	(DFC_ERRNO_START + 21) /* Not supported */
+#define	DFC_NO_DATA		(DFC_ERRNO_START + 22) /* No Data to return */
 
 /* DHCHAP_SUPPORT */
 #define	DFC_AUTH_NOT_CONFIGURED			(DFC_ERRNO_START + 30)
@@ -308,6 +308,7 @@ typedef struct dfc_hbainfo
 #define	HBA_FLAG_FCOE			0x00000200 /* Supports FCoE */
 #define	HBA_FLAG_PERSISTLINK		0x00000400 /* Supports Persist Link */
 						    /* Up/Down */
+#define	HBA_FLAG_EXT_MBOX		0x00000800 /* Supports Ext MBOX cmds */
 
 	uint32_t	device_id;
 	uint32_t	vendor_id;
@@ -543,6 +544,9 @@ typedef struct dfc_node
 #define	PORT_FLAG_FCP2		0x00000004
 #define	PORT_FLAG_IP		0x00000008
 #define	PORT_FLAG_VPORT		0x00000010
+
+#define	PORT_FLAG_DFC_STATE_VALID	0x00000020
+#define	PORT_FLAG_DFC_STATE		0xF0000000
 
 	fc_sparm_t	sparm;
 

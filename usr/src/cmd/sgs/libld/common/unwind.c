@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.
  */
 
 #include	<string.h>
@@ -409,15 +410,10 @@ ld_unwind_make_hdr(Ofl_desc *ofl)
 				 */
 				if (id == 0) {
 					uint_t	cieversion;
-					/*
-					 * The only CIE version supported
-					 * is '1' - quick sanity check
-					 * here.
-					 */
 					cieversion = data[off + ndx];
 					ndx += 1;
 					/* BEGIN CSTYLED */
-					if (cieversion != 1) {
+					if (cieversion != 1 && cieversion != 3) {
 					    ld_eprintf(ofl, ERR_FATAL,
 						MSG_INTL(MSG_UNW_BADCIEVERS),
 						isp->is_file->ifl_name,
@@ -541,7 +537,8 @@ ld_unwind_populate_hdr(Ofl_desc *ofl)
 	for (APLIST_TRAVERSE(ofl->ofl_unwind, idx, osp)) {
 		uchar_t		*data;
 		size_t		size;
-		uint64_t	off = 0;
+		uint64_t	off = 0, ujunk;
+		int64_t		sjunk;
 		uint_t		cieRflag = 0, ciePflag = 0;
 		Shdr		*shdr;
 
@@ -582,6 +579,7 @@ ld_unwind_populate_hdr(Ofl_desc *ofl)
 			if (id == 0) {
 				char	*cieaugstr;
 				uint_t	cieaugndx;
+				uint_t	cieversion;
 
 				ciePflag = 0;
 				cieRflag = 0;
@@ -592,10 +590,8 @@ ld_unwind_populate_hdr(Ofl_desc *ofl)
 				 * are encoded.
 				 */
 
-				/*
-				 * burn through version
-				 */
-				ndx++;
+				cieversion = data[off + ndx];
+				ndx += 1;
 
 				/*
 				 * augstr
@@ -606,14 +602,40 @@ ld_unwind_populate_hdr(Ofl_desc *ofl)
 				/*
 				 * calign & dalign
 				 */
-				(void) uleb_extract(&data[off], &ndx);
-				(void) sleb_extract(&data[off], &ndx);
+				if (uleb_extract(&data[off], &ndx,
+				    size - off, &ujunk) == DW_OVERFLOW) {
+					ld_eprintf(ofl, ERR_FATAL,
+					    MSG_INTL(MSG_SCN_DWFOVRFLW),
+					    ofl->ofl_name,
+					    osp->os_name);
+					return (S_ERROR);
+				}
+
+				if (sleb_extract(&data[off], &ndx,
+				    size - off, &sjunk) == DW_OVERFLOW) {
+					ld_eprintf(ofl, ERR_FATAL,
+					    MSG_INTL(MSG_SCN_DWFOVRFLW),
+					    ofl->ofl_name,
+					    osp->os_name);
+					return (S_ERROR);
+				}
 
 				/*
 				 * retreg
 				 */
-				ndx++;
-
+				if (cieversion == 1) {
+					ndx++;
+				} else {
+					if (uleb_extract(&data[off], &ndx,
+					    size - off, &ujunk) ==
+					    DW_OVERFLOW) {
+						ld_eprintf(ofl, ERR_FATAL,
+						    MSG_INTL(MSG_SCN_DWFOVRFLW),
+						    ofl->ofl_name,
+						    osp->os_name);
+						return (S_ERROR);
+					}
+				}
 				/*
 				 * we walk through the augmentation
 				 * section now looking for the Rflag
@@ -624,8 +646,15 @@ ld_unwind_populate_hdr(Ofl_desc *ofl)
 					switch (cieaugstr[cieaugndx]) {
 					case 'z':
 					    /* size */
-					    (void) uleb_extract(&data[off],
-						&ndx);
+					    if (uleb_extract(&data[off],
+					        &ndx, size - off, &ujunk) ==
+						DW_OVERFLOW) {
+						ld_eprintf(ofl, ERR_FATAL,
+						    MSG_INTL(MSG_SCN_DWFOVRFLW),
+						    ofl->ofl_name,
+						    osp->os_name);
+						return (S_ERROR);
+					    }
 					    break;
 					case 'P':
 					    /* personality */
@@ -636,11 +665,26 @@ ld_unwind_populate_hdr(Ofl_desc *ofl)
 						 * value to move on to the next
 						 * field.
 						 */
-					    (void) dwarf_ehe_extract(
-						&data[off + ndx],
-						&ndx, ciePflag,
+					    switch (dwarf_ehe_extract(
+						&data[off], size - off,
+						&ndx, &ujunk, ciePflag,
 						ofl->ofl_dehdr->e_ident, B_FALSE,
-						shdr->sh_addr, off + ndx, 0);
+						shdr->sh_addr, off + ndx, 0)) {
+					    case DW_OVERFLOW:
+						ld_eprintf(ofl, ERR_FATAL,
+						    MSG_INTL(MSG_SCN_DWFOVRFLW),
+						    ofl->ofl_name,
+						    osp->os_name);
+						return (S_ERROR);
+					    case DW_BAD_ENCODING:
+						ld_eprintf(ofl, ERR_FATAL,
+						    MSG_INTL(MSG_SCN_DWFBADENC),
+						    ofl->ofl_name,
+						    osp->os_name, ciePflag);
+						return (S_ERROR);
+					    case DW_SUCCESS:
+						break;
+					    }
 					    break;
 					case 'R':
 					    /* code encoding */
@@ -664,11 +708,25 @@ ld_unwind_populate_hdr(Ofl_desc *ofl)
 					gotaddr =
 					    ofl->ofl_osgot->os_shdr->sh_addr;
 
-				initloc = dwarf_ehe_extract(&data[off],
-				    &ndx, cieRflag, ofl->ofl_dehdr->e_ident,
-				    B_FALSE,
-				    shdr->sh_addr, off + ndx,
-				    gotaddr);
+				switch (dwarf_ehe_extract(&data[off],
+				    size - off, &ndx, &initloc, cieRflag,
+				    ofl->ofl_dehdr->e_ident, B_FALSE,
+				    shdr->sh_addr, off + ndx, gotaddr)) {
+				case DW_OVERFLOW:
+					ld_eprintf(ofl, ERR_FATAL,
+					    MSG_INTL(MSG_SCN_DWFOVRFLW),
+					    ofl->ofl_name,
+					    osp->os_name);
+					return (S_ERROR);
+				case DW_BAD_ENCODING:
+					ld_eprintf(ofl, ERR_FATAL,
+					    MSG_INTL(MSG_SCN_DWFBADENC),
+					    ofl->ofl_name,
+					    osp->os_name, cieRflag);
+					return (S_ERROR);
+				case DW_SUCCESS:
+					break;
+				}
 
 				/*
 				 * Ignore FDEs with initloc set to 0.

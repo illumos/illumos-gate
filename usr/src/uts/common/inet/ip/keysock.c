@@ -537,7 +537,7 @@ keysock_close(queue_t *q)
 		ks3dbg(keystack,
 		    ("Driver close, PF_KEY socket is going away.\n"));
 		if ((ks->keysock_flags & KEYSOCK_EXTENDED) != 0)
-			atomic_add_32(&keystack->keystack_num_extended, -1);
+			atomic_dec_32(&keystack->keystack_num_extended);
 		size = sizeof (keysock_t);
 		mutex_enter(&keystack->keystack_list_lock);
 		*(ks->keysock_ptpn) = ks->keysock_next;
@@ -1565,7 +1565,7 @@ keysock_extended_register(keysock_t *ks, mblk_t *mp, sadb_ext_t *extv[])
 	/*
 	 * Set global to indicate we prefer an extended ACQUIRE.
 	 */
-	atomic_add_32(&keystack->keystack_num_extended, 1);
+	atomic_inc_32(&keystack->keystack_num_extended);
 }
 
 static void
@@ -2335,8 +2335,8 @@ keysock_rput(queue_t *q, mblk_t *mp)
 			 * the last one, send up the end-of-{FLUSH,DUMP} to
 			 * the appropriate PF_KEY socket.
 			 */
-			if (atomic_add_32_nv(&keystack->keystack_flushdump,
-			    -1) != 0) {
+			if (atomic_dec_32_nv(&keystack->keystack_flushdump) !=
+			    0) {
 				ks1dbg(keystack,
 				    ("One flush/dump message back from %d,"
 				    " more to go.\n", samsg->sadb_msg_satype));
@@ -2382,5 +2382,5 @@ keysock_next_seq(netstack_t *ns)
 {
 	keysock_stack_t	*keystack = ns->netstack_keysock;
 
-	return (atomic_add_32_nv(&keystack->keystack_acquire_seq, -1));
+	return (atomic_dec_32_nv(&keystack->keystack_acquire_seq));
 }

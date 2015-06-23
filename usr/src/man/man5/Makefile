@@ -12,7 +12,8 @@
 #
 # Copyright 2011, Richard Lowe
 # Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2014 Nexenta Systems, Inc.
+# Copyright 2014 Garrett D'Amore <garrett@damore.org>
 #
 
 include		$(SRC)/Makefile.master
@@ -39,8 +40,8 @@ MANFILES=	Intro.5			\
 		crypt_unix.5		\
 		device_clean.5		\
 		dhcp.5			\
-		dhcp_modules.5		\
 		environ.5		\
+		eqn.5			\
 		eqnchar.5		\
 		extendedFILE.5		\
 		filesystem.5		\
@@ -52,6 +53,7 @@ MANFILES=	Intro.5			\
 		hal.5			\
 		iconv.5			\
 		iconv_unicode.5		\
+		ieee802.3.5		\
 		ieee802.11.5		\
 		ipfilter.5		\
 		isalist.5		\
@@ -64,7 +66,9 @@ MANFILES=	Intro.5			\
 		lfcompile64.5		\
 		locale.5		\
 		man.5			\
-		mansun.5		\
+		mandoc_char.5		\
+		mandoc_roff.5		\
+		mdoc.5			\
 		me.5			\
 		mech_spnego.5		\
 		mm.5			\
@@ -88,6 +92,7 @@ MANFILES=	Intro.5			\
 		pam_sample.5		\
 		pam_smb_passwd.5	\
 		pam_smbfs_login.5	\
+		pam_timestamp.5		\
 		pam_tsol_account.5	\
 		pam_unix_account.5	\
 		pam_unix_auth.5		\
@@ -110,6 +115,7 @@ MANFILES=	Intro.5			\
 		smf_template.5		\
 		standards.5		\
 		sticky.5		\
+		tbl.5			\
 		tecla.5			\
 		term.5			\
 		threads.5		\

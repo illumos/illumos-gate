@@ -27,8 +27,6 @@
 #ifndef _MDB_ERRNO_H
 #define	_MDB_ERRNO_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -114,7 +112,9 @@ enum {
 	EMDB_KNOUNLOAD,				/* kmdb cannot be unloaded */
 	EMDB_WPTOOMANY,				/* Too many watchpoints */
 	EMDB_DTACTIVE,				/* DTrace is active */
-	EMDB_KMODNOUNLOAD			/* module can't be unloaded */
+	EMDB_KMODNOUNLOAD,			/* module can't be unloaded */
+	EMDB_STKFRAME,				/* Bad stack frame pointer */
+	EMDB_SHORTWRITE				/* unexpected short write */
 };
 
 #endif /* _MDB */

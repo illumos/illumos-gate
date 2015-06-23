@@ -20,14 +20,14 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 1996-2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SCHEDCTL_H
 #define	_SCHEDCTL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -51,15 +51,9 @@ extern void yield(void);
 /*
  * libsched API
  */
-#if	defined(__STDC__)
 schedctl_t	*schedctl_init(void);
 schedctl_t	*schedctl_lookup(void);
 void		schedctl_exit(void);
-#else
-schedctl_t	*schedctl_init();
-schedctl_t	*schedctl_lookup();
-void		schedctl_exit();
-#endif	/* __STDC__ */
 
 #ifdef __cplusplus
 }

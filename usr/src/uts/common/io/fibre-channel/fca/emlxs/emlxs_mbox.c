@@ -5,8 +5,8 @@
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
  *
- * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
+ * You can obtain a copy of the license at
+ * http://www.opensource.org/licenses/cddl1.txt.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -20,10 +20,9 @@
  */
 
 /*
- * Copyright 2010 Emulex.  All rights reserved.
+ * Copyright (c) 2004-2012 Emulex. All rights reserved.
  * Use is subject to license terms.
  */
-
 
 #include <emlxs.h>
 
@@ -31,6 +30,67 @@
 EMLXS_MSG_DEF(EMLXS_MBOX_C);
 
 
+emlxs_table_t emlxs_mb_status_table[] = {
+	{MBX_SUCCESS, "SUCCESS"},
+	{MBX_FAILURE, "FAILURE"},
+	{MBXERR_NUM_IOCBS, "NUM_IOCBS"},
+	{MBXERR_IOCBS_EXCEEDED, "IOCBS_EXCEEDED"},
+	{MBXERR_BAD_RING_NUMBER, "BAD_RING_NUMBER"},
+	{MBXERR_MASK_ENTRIES_RANGE, "MASK_ENTRIES_RANGE"},
+	{MBXERR_MASKS_EXCEEDED, "MASKS_EXCEEDED"},
+	{MBXERR_BAD_PROFILE, "BAD_PROFILE"},
+	{MBXERR_BAD_DEF_CLASS, "BAD_DEF_CLASS"},
+	{MBXERR_BAD_MAX_RESPONDER, "BAD_MAX_RESPONDER"},
+	{MBXERR_BAD_MAX_ORIGINATOR, "BAD_MAX_ORIGINATOR"},
+	{MBXERR_RPI_REGISTERED, "RPI_REGISTERED"},
+	{MBXERR_RPI_FULL, "RPI_FULL"},
+	{MBXERR_NO_RESOURCES, "NO_RESOURCES"},
+	{MBXERR_BAD_RCV_LENGTH, "BAD_RCV_LENGTH"},
+	{MBXERR_DMA_ERROR, "DMA_ERROR"},
+	{MBXERR_NOT_SUPPORTED, "NOT_SUPPORTED"},
+	{MBXERR_UNSUPPORTED_FEATURE, "UNSUPPORTED_FEATURE"},
+	{MBXERR_UNKNOWN_COMMAND, "UNKNOWN_COMMAND"},
+	{MBXERR_BAD_IP_BIT, "BAD_IP_BIT"},
+	{MBXERR_BAD_PCB_ALIGN, "BAD_PCB_ALIGN"},
+	{MBXERR_BAD_HBQ_ID, "BAD_HBQ_ID"},
+	{MBXERR_BAD_HBQ_STATE, "BAD_HBQ_STATE"},
+	{MBXERR_BAD_HBQ_MASK_NUM, "BAD_HBQ_MASK_NUM"},
+	{MBXERR_BAD_HBQ_MASK_SUBSET, "BAD_HBQ_MASK_SUBSET"},
+	{MBXERR_HBQ_CREATE_FAIL, "HBQ_CREATE_FAIL"},
+	{MBXERR_HBQ_EXISTING, "HBQ_EXISTING"},
+	{MBXERR_HBQ_RSPRING_FULL, "HBQ_RSPRING_FULL"},
+	{MBXERR_HBQ_DUP_MASK, "HBQ_DUP_MASK"},
+	{MBXERR_HBQ_INVAL_GET_PTR, "HBQ_INVAL_GET_PTR"},
+	{MBXERR_BAD_HBQ_SIZE, "BAD_HBQ_SIZE"},
+	{MBXERR_BAD_HBQ_ORDER, "BAD_HBQ_ORDER"},
+	{MBXERR_INVALID_ID, "INVALID_ID"},
+	{MBXERR_INVALID_VFI, "INVALID_VFI"},
+	{MBXERR_FLASH_WRITE_FAILED, "FLASH_WRITE_FAILED"},
+	{MBXERR_INVALID_LINKSPEED, "INVALID_LINKSPEED"},
+	{MBXERR_BAD_REDIRECT, "BAD_REDIRECT"},
+	{MBXERR_RING_ALREADY_CONFIG, "RING_ALREADY_CONFIG"},
+	{MBXERR_RING_INACTIVE, "RING_INACTIVE"},
+	{MBXERR_RPI_INACTIVE, "RPI_INACTIVE"},
+	{MBXERR_NO_ACTIVE_XRI, "NO_ACTIVE_XRI"},
+	{MBXERR_XRI_NOT_ACTIVE, "XRI_NOT_ACTIVE"},
+	{MBXERR_RPI_INUSE, "RPI_INUSE"},
+	{MBXERR_NO_LINK_ATTENTION, "NO_LINK_ATTENTION"},
+	{MBXERR_INVALID_SLI_MODE, "INVALID_SLI_MODE"},
+	{MBXERR_INVALID_HOST_PTR, "INVALID_HOST_PTR"},
+	{MBXERR_CANT_CFG_SLI_MODE, "CANT_CFG_SLI_MODE"},
+	{MBXERR_BAD_OVERLAY, "BAD_OVERLAY"},
+	{MBXERR_INVALID_FEAT_REQ, "INVALID_FEAT_REQ"},
+	{MBXERR_CONFIG_CANT_COMPLETE, "CONFIG_CANT_COMPLETE"},
+	{MBXERR_DID_ALREADY_REGISTERED, "DID_ALREADY_REGISTERED"},
+	{MBXERR_DID_INCONSISTENT, "DID_INCONSISTENT"},
+	{MBXERR_VPI_TOO_LARGE, "VPI_TOO_LARGE"},
+	{MBXERR_STILL_ASSOCIATED, "STILL_ASSOCIATED"},
+	{MBXERR_INVALID_VF_STATE, "INVALID_VF_STATE"},
+	{MBXERR_VFI_ALREADY_REGISTERED, "VFI_ALREADY_REGISTERED"},
+	{MBXERR_VFI_TOO_LARGE, "VFI_TOO_LARGE"},
+	{MBXERR_LOAD_FW_FAILED, "LOAD_FW_FAILED"},
+	{MBXERR_FIND_FW_FAILED, "FIND_FW_FAILED"},
+};
 
 emlxs_table_t emlxs_mb_cmd_table[] = {
 	{MBX_SHUTDOWN, "SHUTDOWN"},
@@ -103,8 +163,46 @@ emlxs_table_t emlxs_mb_cmd_table[] = {
 	{MBX_UNREG_VFI, "UNREG_VFI"},
 	{MBX_UNREG_FCFI, "UNREG_FCFI"},
 	{MBX_INIT_VFI, "INIT_VFI"},
-	{MBX_INIT_VPI, "INIT_VPI"}
+	{MBX_INIT_VPI, "INIT_VPI"},
+	{MBX_WRITE_VPARMS, "WRITE_VPARMS"},
+	{MBX_ACCESS_VDATA, "ACCESS_VDATA"}
 };	/* emlxs_mb_cmd_table */
+
+
+emlxs_table_t emlxs_request_feature_table[] = {
+	{SLI4_FEATURE_INHIBIT_AUTO_ABTS, "IAA "},	/* Bit 0 */
+	{SLI4_FEATURE_NPIV, "NPIV "},			/* Bit 1 */
+	{SLI4_FEATURE_DIF, "DIF "},			/* Bit 2 */
+	{SLI4_FEATURE_VIRTUAL_FABRICS, "VF "},		/* Bit 3 */
+	{SLI4_FEATURE_FCP_INITIATOR, "FCPI "},		/* Bit 4 */
+	{SLI4_FEATURE_FCP_TARGET, "FCPT "},		/* Bit 5 */
+	{SLI4_FEATURE_FCP_COMBO, "FCPC "},		/* Bit 6 */
+	{SLI4_FEATURE_RSVD1, "RSVD1 "},			/* Bit 7 */
+	{SLI4_FEATURE_RQD, "RQD "},			/* Bit 8 */
+	{SLI4_FEATURE_INHIBIT_AUTO_ABTS_R, "IAAR "},	/* Bit 9 */
+	{SLI4_FEATURE_HIGH_LOGIN_MODE, "HLM "},		/* Bit 10 */
+	{SLI4_FEATURE_PERF_HINT, "PERFH "}		/* Bit 11 */
+};	/* emlxs_request_feature_table */
+
+
+extern char *
+emlxs_mb_xlate_status(uint32_t status)
+{
+	static char	buffer[32];
+	uint32_t	i;
+	uint32_t	count;
+
+	count = sizeof (emlxs_mb_status_table) / sizeof (emlxs_table_t);
+	for (i = 0; i < count; i++) {
+		if (status == emlxs_mb_status_table[i].code) {
+			return (emlxs_mb_status_table[i].string);
+		}
+	}
+
+	(void) snprintf(buffer, sizeof (buffer), "status=%x", status);
+	return (buffer);
+
+} /* emlxs_mb_xlate_status() */
 
 
 /* SLI4 */
@@ -141,12 +239,12 @@ emlxs_mb_resetport(emlxs_hba_t *hba, MAILBOXQ *mbq)
 /* SLI4 */
 /*ARGSUSED*/
 extern void
-emlxs_mb_request_features(emlxs_hba_t *hba, MAILBOXQ *mbq)
+emlxs_mb_request_features(emlxs_hba_t *hba, MAILBOXQ *mbq, uint32_t mask)
 {
-	emlxs_config_t	*cfg = &CFG;
 	MAILBOX4 *mb4 = (MAILBOX4 *)mbq;
 
 	hba->flag &= ~FC_NPIV_ENABLED;
+	hba->sli.sli4.flag &= ~(EMLXS_SLI4_PHON | EMLXS_SLI4_PHWQ);
 
 	bzero((void *) mb4, MAILBOX_CMD_SLI4_BSIZE);
 	mbq->nonembed = NULL;
@@ -155,13 +253,9 @@ emlxs_mb_request_features(emlxs_hba_t *hba, MAILBOXQ *mbq)
 
 	mb4->mbxCommand = MBX_REQUEST_FEATURES;
 	mb4->mbxOwner = OWN_HOST;
-	mb4->un.varReqFeatures.featuresRequested |=
-	    SLI4_FEATURE_FCP_INITIATOR;
 
-	if (cfg[CFG_NPIV_ENABLE].current) {
-		mb4->un.varReqFeatures.featuresRequested |=
-		    SLI4_FEATURE_NPIV;
-	}
+	mb4->un.varReqFeatures.featuresRequested = mask;
+	return;
 
 } /* emlxs_mb_request_features() */
 
@@ -214,7 +308,7 @@ emlxs_mbext_noop(emlxs_hba_t *hba, MAILBOXQ *mbq)
 
 	bzero((void *) mb4, MAILBOX_CMD_SLI4_BSIZE);
 
-	if ((mp = (MATCHMAP *)emlxs_mem_get(hba, MEM_BUF, 1)) == 0) {
+	if ((mp = (MATCHMAP *)emlxs_mem_get(hba, MEM_BUF)) == 0) {
 		return (1);
 	}
 	/*
@@ -271,12 +365,13 @@ emlxs_mb_eq_create(emlxs_hba_t *hba, MAILBOXQ *mbq, uint32_t num)
 	mb4->un.varSLIConfig.be.un_hdr.hdr_req.timeout = 0;
 	mb4->un.varSLIConfig.be.un_hdr.hdr_req.req_length =
 	    sizeof (IOCTL_COMMON_EQ_CREATE);
+	mb4->un.varSLIConfig.be.un_hdr.hdr_req.version = 0;
+
 	qp = (IOCTL_COMMON_EQ_CREATE *)&mb4->un.varSLIConfig.payload;
 
 	/* 1024 * 4 bytes = 4K */
 	qp->params.request.EQContext.Count = EQ_ELEMENT_COUNT_1024;
 	qp->params.request.EQContext.Valid = 1;
-	qp->params.request.EQContext.NoDelay = 0;
 	qp->params.request.EQContext.DelayMult = EQ_DELAY_MULT;
 
 	addr = hba->sli.sli4.eq[num].addr.phys;
@@ -296,7 +391,9 @@ emlxs_mb_cq_create(emlxs_hba_t *hba, MAILBOXQ *mbq, uint32_t num)
 {
 	MAILBOX4 *mb4 = (MAILBOX4 *)mbq;
 	IOCTL_COMMON_CQ_CREATE *qp;
+	IOCTL_COMMON_CQ_CREATE_V2 *qp2;
 	uint64_t	addr;
+	uint32_t	i;
 
 	bzero((void *) mb4, MAILBOX_CMD_SLI4_BSIZE);
 	mbq->nonembed = NULL;
@@ -310,31 +407,311 @@ emlxs_mb_cq_create(emlxs_hba_t *hba, MAILBOXQ *mbq, uint32_t num)
 
 	mb4->mbxCommand = MBX_SLI_CONFIG;
 	mb4->mbxOwner = OWN_HOST;
-	mb4->un.varSLIConfig.be.payload_length =
-	    sizeof (IOCTL_COMMON_CQ_CREATE) + IOCTL_HEADER_SZ;
-	mb4->un.varSLIConfig.be.un_hdr.hdr_req.subsystem =
-	    IOCTL_SUBSYSTEM_COMMON;
-	mb4->un.varSLIConfig.be.un_hdr.hdr_req.opcode = COMMON_OPCODE_CQ_CREATE;
-	mb4->un.varSLIConfig.be.un_hdr.hdr_req.timeout = 0;
-	mb4->un.varSLIConfig.be.un_hdr.hdr_req.req_length =
-	    sizeof (IOCTL_COMMON_CQ_CREATE);
-	qp = (IOCTL_COMMON_CQ_CREATE *)&mb4->un.varSLIConfig.payload;
 
-	/* 256 * 16 bytes = 4K */
-	qp->params.request.CQContext.Count = CQ_ELEMENT_COUNT_256;
-	qp->params.request.CQContext.EQId = hba->sli.sli4.cq[num].eqid;
-	qp->params.request.CQContext.Valid = 1;
-	qp->params.request.CQContext.Eventable = 1;
-	qp->params.request.CQContext.NoDelay = 0;
+	switch (hba->sli.sli4.param.CQV) {
+	case 0:
+		mb4->un.varSLIConfig.be.payload_length =
+		    sizeof (IOCTL_COMMON_CQ_CREATE) + IOCTL_HEADER_SZ;
+		mb4->un.varSLIConfig.be.un_hdr.hdr_req.subsystem =
+		    IOCTL_SUBSYSTEM_COMMON;
+		mb4->un.varSLIConfig.be.un_hdr.hdr_req.opcode =
+		    COMMON_OPCODE_CQ_CREATE;
+		mb4->un.varSLIConfig.be.un_hdr.hdr_req.timeout = 0;
+		mb4->un.varSLIConfig.be.un_hdr.hdr_req.req_length =
+		    sizeof (IOCTL_COMMON_CQ_CREATE);
+		mb4->un.varSLIConfig.be.un_hdr.hdr_req.version = 0;
 
-	addr = hba->sli.sli4.cq[num].addr.phys;
-	qp->params.request.NumPages = 1;
-	qp->params.request.Pages[0].addrLow = PADDR_LO(addr);
-	qp->params.request.Pages[0].addrHigh = PADDR_HI(addr);
+		qp = (IOCTL_COMMON_CQ_CREATE *)
+		    &mb4->un.varSLIConfig.payload;
 
+		/* 256 * 16 bytes = 4K */
+		qp->params.request.CQContext.Count = CQ_ELEMENT_COUNT_256;
+		qp->params.request.CQContext.EQId =
+		    (uint8_t)hba->sli.sli4.cq[num].eqid;
+		qp->params.request.CQContext.Valid = 1;
+		qp->params.request.CQContext.Eventable = 1;
+		qp->params.request.CQContext.NoDelay = 0;
+		qp->params.request.CQContext.CoalesceWM = 0;
+
+		addr = hba->sli.sli4.cq[num].addr.phys;
+		qp->params.request.NumPages = 1;
+		qp->params.request.Pages[0].addrLow = PADDR_LO(addr);
+		qp->params.request.Pages[0].addrHigh = PADDR_HI(addr);
+
+		break;
+
+	case 2:
+	default:
+		mb4->un.varSLIConfig.be.payload_length =
+		    sizeof (IOCTL_COMMON_CQ_CREATE_V2) + IOCTL_HEADER_SZ;
+		mb4->un.varSLIConfig.be.un_hdr.hdr_req.subsystem =
+		    IOCTL_SUBSYSTEM_COMMON;
+		mb4->un.varSLIConfig.be.un_hdr.hdr_req.opcode =
+		    COMMON_OPCODE_CQ_CREATE;
+		mb4->un.varSLIConfig.be.un_hdr.hdr_req.timeout = 0;
+		mb4->un.varSLIConfig.be.un_hdr.hdr_req.req_length =
+		    sizeof (IOCTL_COMMON_CQ_CREATE_V2);
+		mb4->un.varSLIConfig.be.un_hdr.hdr_req.version = 2;
+
+		qp2 = (IOCTL_COMMON_CQ_CREATE_V2 *)
+		    &mb4->un.varSLIConfig.payload;
+
+		qp2->params.request.CQContext.CqeCnt = CQ_ELEMENT_COUNT_1024;
+		qp2->params.request.CQContext.CqeSize = CQE_SIZE_16_BYTES;
+		qp2->params.request.CQContext.EQId = hba->sli.sli4.cq[num].eqid;
+		qp2->params.request.CQContext.Valid = 1;
+		qp2->params.request.CQContext.AutoValid = 0;
+		qp2->params.request.CQContext.Eventable = 1;
+		qp2->params.request.CQContext.NoDelay = 0;
+		qp2->params.request.CQContext.Count1 = 0;
+		qp2->params.request.CQContext.CoalesceWM = 0;
+
+		addr = hba->sli.sli4.cq[num].addr.phys;
+		qp2->params.request.PageSize = CQ_PAGE_SIZE_4K;
+		qp2->params.request.NumPages = EMLXS_NUM_CQ_PAGES_V2;
+
+		for (i = 0; i < EMLXS_NUM_CQ_PAGES_V2; i++) {
+			qp2->params.request.Pages[i].addrLow = PADDR_LO(addr);
+			qp2->params.request.Pages[i].addrHigh = PADDR_HI(addr);
+			addr += 4096;
+		}
+
+		break;
+	}
 	return;
 
 } /* emlxs_mb_cq_create() */
+
+
+/* SLI4 */
+/*ARGSUSED*/
+extern void
+emlxs_mb_get_port_name(emlxs_hba_t *hba, MAILBOXQ *mbq)
+{
+	MAILBOX4 *mb4 = (MAILBOX4 *)mbq;
+
+	bzero((void *) mb4, MAILBOX_CMD_SLI4_BSIZE);
+	mbq->nonembed = NULL;
+	mbq->mbox_cmpl = NULL; /* no cmpl needed */
+	mbq->port = (void *)&PPORT;
+
+	mb4->un.varSLIConfig.be.embedded = 1;
+	mb4->mbxCommand = MBX_SLI_CONFIG;
+	mb4->mbxOwner = OWN_HOST;
+
+	mb4->un.varSLIConfig.be.payload_length = IOCTL_HEADER_SZ;
+	mb4->un.varSLIConfig.be.un_hdr.hdr_req.subsystem =
+	    IOCTL_SUBSYSTEM_COMMON;
+	mb4->un.varSLIConfig.be.un_hdr.hdr_req.opcode =
+	    COMMON_OPCODE_GET_PORT_NAME;
+	mb4->un.varSLIConfig.be.un_hdr.hdr_req.timeout = 0;
+	mb4->un.varSLIConfig.be.un_hdr.hdr_req.req_length = 0;
+
+	if (hba->model_info.chip & EMLXS_BE_CHIPS) {
+		mb4->un.varSLIConfig.be.un_hdr.hdr_req.version = 0; /* V0 */
+	} else {
+		IOCTL_COMMON_GET_PORT_NAME_V1 *pn;
+
+		mb4->un.varSLIConfig.be.un_hdr.hdr_req.version = 1; /* V1 */
+
+		pn = (IOCTL_COMMON_GET_PORT_NAME_V1 *)
+		    &mb4->un.varSLIConfig.payload;
+		pn->params.request.pt = PORT_TYPE_FC;
+	}
+
+	return;
+
+} /* emlxs_mb_get_port_name() */
+
+
+/* SLI4 */
+/*ARGSUSED*/
+extern void
+emlxs_mb_get_sli4_params(emlxs_hba_t *hba, MAILBOXQ *mbq)
+{
+	MAILBOX4 *mb4 = (MAILBOX4 *)mbq;
+
+	bzero((void *) mb4, MAILBOX_CMD_SLI4_BSIZE);
+	mbq->nonembed = NULL;
+	mbq->mbox_cmpl = NULL; /* no cmpl needed */
+	mbq->port = (void *)&PPORT;
+
+	mb4->un.varSLIConfig.be.embedded = 1;
+	mb4->mbxCommand = MBX_SLI_CONFIG;
+	mb4->mbxOwner = OWN_HOST;
+
+	mb4->un.varSLIConfig.be.payload_length = IOCTL_HEADER_SZ;
+	mb4->un.varSLIConfig.be.un_hdr.hdr_req.subsystem =
+	    IOCTL_SUBSYSTEM_COMMON;
+	mb4->un.varSLIConfig.be.un_hdr.hdr_req.opcode =
+	    COMMON_OPCODE_GET_SLI4_PARAMS;
+	mb4->un.varSLIConfig.be.un_hdr.hdr_req.timeout = 0;
+	mb4->un.varSLIConfig.be.un_hdr.hdr_req.req_length = 0;
+	mb4->un.varSLIConfig.be.un_hdr.hdr_req.version = 0; /* V0 */
+
+	return;
+
+} /* emlxs_mb_get_sli4_params() */
+
+
+/* SLI4 */
+/*ARGSUSED*/
+extern void
+emlxs_mb_get_extents_info(emlxs_hba_t *hba, MAILBOXQ *mbq, uint16_t type)
+{
+	MAILBOX4 *mb4 = (MAILBOX4 *)mbq;
+	IOCTL_COMMON_EXTENTS *ep;
+
+	bzero((void *) mb4, MAILBOX_CMD_SLI4_BSIZE);
+	mbq->nonembed = NULL;
+	mbq->mbox_cmpl = NULL; /* no cmpl needed */
+	mbq->port = (void *)&PPORT;
+
+	mb4->un.varSLIConfig.be.embedded = 1;
+	mb4->mbxCommand = MBX_SLI_CONFIG;
+	mb4->mbxOwner = OWN_HOST;
+
+	mb4->un.varSLIConfig.be.payload_length = IOCTL_HEADER_SZ;
+	mb4->un.varSLIConfig.be.un_hdr.hdr_req2.subsystem =
+	    IOCTL_SUBSYSTEM_COMMON;
+	mb4->un.varSLIConfig.be.un_hdr.hdr_req2.opcode =
+	    COMMON_OPCODE_GET_EXTENTS_INFO;
+	mb4->un.varSLIConfig.be.un_hdr.hdr_req2.timeout = 0;
+	mb4->un.varSLIConfig.be.un_hdr.hdr_req2.req_length =
+	    sizeof (IOCTL_COMMON_EXTENTS);
+	mb4->un.varSLIConfig.be.un_hdr.hdr_req2.vf_number = 0;
+	mb4->un.varSLIConfig.be.un_hdr.hdr_req2.vh_number = 0;
+	mb4->un.varSLIConfig.be.un_hdr.hdr_req2.pf_number = 0;
+
+	mb4->un.varSLIConfig.be.un_hdr.hdr_req2.version = 0; /* V0 */
+
+	ep = (IOCTL_COMMON_EXTENTS *)&mb4->un.varSLIConfig.payload;
+	ep->params.request.RscType = type;
+
+	return;
+
+} /* emlxs_mb_get_extents_info() */
+
+
+/* SLI4 */
+/*ARGSUSED*/
+extern void
+emlxs_mb_get_extents(emlxs_hba_t *hba, MAILBOXQ *mbq, uint16_t type)
+{
+	MAILBOX4 *mb4 = (MAILBOX4 *)mbq;
+	IOCTL_COMMON_EXTENTS *ep;
+
+	bzero((void *) mb4, MAILBOX_CMD_SLI4_BSIZE);
+	mbq->nonembed = NULL;
+	mbq->mbox_cmpl = NULL; /* no cmpl needed */
+	mbq->port = (void *)&PPORT;
+
+	mb4->un.varSLIConfig.be.embedded = 1;
+	mb4->mbxCommand = MBX_SLI_CONFIG;
+	mb4->mbxOwner = OWN_HOST;
+
+	mb4->un.varSLIConfig.be.payload_length = IOCTL_HEADER_SZ;
+	mb4->un.varSLIConfig.be.un_hdr.hdr_req2.subsystem =
+	    IOCTL_SUBSYSTEM_COMMON;
+	mb4->un.varSLIConfig.be.un_hdr.hdr_req2.opcode =
+	    COMMON_OPCODE_GET_EXTENTS;
+	mb4->un.varSLIConfig.be.un_hdr.hdr_req2.timeout = 0;
+	mb4->un.varSLIConfig.be.un_hdr.hdr_req2.req_length =
+	    sizeof (IOCTL_COMMON_EXTENTS);
+	mb4->un.varSLIConfig.be.un_hdr.hdr_req2.vf_number = 0;
+	mb4->un.varSLIConfig.be.un_hdr.hdr_req2.vh_number = 0;
+	mb4->un.varSLIConfig.be.un_hdr.hdr_req2.pf_number = 0;
+
+	mb4->un.varSLIConfig.be.un_hdr.hdr_req2.version = 0; /* V0 */
+
+	ep = (IOCTL_COMMON_EXTENTS *)&mb4->un.varSLIConfig.payload;
+	ep->params.request.RscType = type;
+
+	return;
+
+} /* emlxs_mb_get_extents() */
+
+
+/* SLI4 */
+/*ARGSUSED*/
+extern void
+emlxs_mb_alloc_extents(emlxs_hba_t *hba, MAILBOXQ *mbq, uint16_t type,
+    uint16_t count)
+{
+	MAILBOX4 *mb4 = (MAILBOX4 *)mbq;
+	IOCTL_COMMON_EXTENTS *ep;
+
+	bzero((void *) mb4, MAILBOX_CMD_SLI4_BSIZE);
+	mbq->nonembed = NULL;
+	mbq->mbox_cmpl = NULL; /* no cmpl needed */
+	mbq->port = (void *)&PPORT;
+
+	mb4->un.varSLIConfig.be.embedded = 1;
+	mb4->mbxCommand = MBX_SLI_CONFIG;
+	mb4->mbxOwner = OWN_HOST;
+
+	mb4->un.varSLIConfig.be.payload_length = IOCTL_HEADER_SZ;
+	mb4->un.varSLIConfig.be.un_hdr.hdr_req2.subsystem =
+	    IOCTL_SUBSYSTEM_COMMON;
+	mb4->un.varSLIConfig.be.un_hdr.hdr_req2.opcode =
+	    COMMON_OPCODE_ALLOC_EXTENTS;
+	mb4->un.varSLIConfig.be.un_hdr.hdr_req2.timeout = 0;
+	mb4->un.varSLIConfig.be.un_hdr.hdr_req2.req_length =
+	    sizeof (IOCTL_COMMON_EXTENTS);
+	mb4->un.varSLIConfig.be.un_hdr.hdr_req2.vf_number = 0;
+	mb4->un.varSLIConfig.be.un_hdr.hdr_req2.vh_number = 0;
+	mb4->un.varSLIConfig.be.un_hdr.hdr_req2.pf_number = 0;
+
+	mb4->un.varSLIConfig.be.un_hdr.hdr_req2.version = 0; /* V0 */
+
+	ep = (IOCTL_COMMON_EXTENTS *)&mb4->un.varSLIConfig.payload;
+	ep->params.request.RscType = type;
+
+	count = min(count, MAX_EXTENTS);
+	ep->params.request.RscCnt = count;
+
+	return;
+
+} /* emlxs_mb_alloc_extents() */
+
+
+/* SLI4 */
+/*ARGSUSED*/
+extern void
+emlxs_mb_dealloc_extents(emlxs_hba_t *hba, MAILBOXQ *mbq, uint16_t type)
+{
+	MAILBOX4 *mb4 = (MAILBOX4 *)mbq;
+	IOCTL_COMMON_EXTENTS *ep;
+
+	bzero((void *) mb4, MAILBOX_CMD_SLI4_BSIZE);
+	mbq->nonembed = NULL;
+	mbq->mbox_cmpl = NULL; /* no cmpl needed */
+	mbq->port = (void *)&PPORT;
+
+	mb4->un.varSLIConfig.be.embedded = 1;
+	mb4->mbxCommand = MBX_SLI_CONFIG;
+	mb4->mbxOwner = OWN_HOST;
+
+	mb4->un.varSLIConfig.be.payload_length = IOCTL_HEADER_SZ;
+	mb4->un.varSLIConfig.be.un_hdr.hdr_req2.subsystem =
+	    IOCTL_SUBSYSTEM_COMMON;
+	mb4->un.varSLIConfig.be.un_hdr.hdr_req2.opcode =
+	    COMMON_OPCODE_DEALLOC_EXTENTS;
+	mb4->un.varSLIConfig.be.un_hdr.hdr_req2.timeout = 0;
+	mb4->un.varSLIConfig.be.un_hdr.hdr_req2.req_length =
+	    sizeof (IOCTL_COMMON_EXTENTS);
+	mb4->un.varSLIConfig.be.un_hdr.hdr_req2.vf_number = 0;
+	mb4->un.varSLIConfig.be.un_hdr.hdr_req2.vh_number = 0;
+	mb4->un.varSLIConfig.be.un_hdr.hdr_req2.pf_number = 0;
+
+	mb4->un.varSLIConfig.be.un_hdr.hdr_req2.version = 0; /* V0 */
+
+	ep = (IOCTL_COMMON_EXTENTS *)&mb4->un.varSLIConfig.payload;
+	ep->params.request.RscType = type;
+
+	return;
+
+} /* emlxs_mb_dealloc_extents() */
 
 
 /* SLI4 */
@@ -344,6 +721,7 @@ emlxs_mb_wq_create(emlxs_hba_t *hba, MAILBOXQ *mbq, uint32_t num)
 {
 	MAILBOX4 *mb4 = (MAILBOX4 *)mbq;
 	IOCTL_FCOE_WQ_CREATE *qp;
+	IOCTL_FCOE_WQ_CREATE_V1 *qp1;
 	uint64_t addr;
 	int i;
 
@@ -359,25 +737,64 @@ emlxs_mb_wq_create(emlxs_hba_t *hba, MAILBOXQ *mbq, uint32_t num)
 
 	mb4->mbxCommand = MBX_SLI_CONFIG;
 	mb4->mbxOwner = OWN_HOST;
-	mb4->un.varSLIConfig.be.payload_length =
-	    sizeof (IOCTL_FCOE_WQ_CREATE) + IOCTL_HEADER_SZ;
-	mb4->un.varSLIConfig.be.un_hdr.hdr_req.subsystem =
-	    IOCTL_SUBSYSTEM_FCOE;
-	mb4->un.varSLIConfig.be.un_hdr.hdr_req.opcode = FCOE_OPCODE_WQ_CREATE;
-	mb4->un.varSLIConfig.be.un_hdr.hdr_req.timeout = 0;
-	mb4->un.varSLIConfig.be.un_hdr.hdr_req.req_length =
-	    sizeof (IOCTL_FCOE_WQ_CREATE);
 
-	addr = hba->sli.sli4.wq[num].addr.phys;
-	qp = (IOCTL_FCOE_WQ_CREATE *)&mb4->un.varSLIConfig.payload;
+	switch (hba->sli.sli4.param.WQV) {
+	case 0:
+		mb4->un.varSLIConfig.be.payload_length =
+		    sizeof (IOCTL_FCOE_WQ_CREATE) + IOCTL_HEADER_SZ;
+		mb4->un.varSLIConfig.be.un_hdr.hdr_req.subsystem =
+		    IOCTL_SUBSYSTEM_FCOE;
+		mb4->un.varSLIConfig.be.un_hdr.hdr_req.opcode =
+		    FCOE_OPCODE_WQ_CREATE;
+		mb4->un.varSLIConfig.be.un_hdr.hdr_req.timeout = 0;
+		mb4->un.varSLIConfig.be.un_hdr.hdr_req.req_length =
+		    sizeof (IOCTL_FCOE_WQ_CREATE);
+		mb4->un.varSLIConfig.be.un_hdr.hdr_req.version = 0;
 
-	qp->params.request.CQId = hba->sli.sli4.wq[num].cqid;
+		addr = hba->sli.sli4.wq[num].addr.phys;
+		qp = (IOCTL_FCOE_WQ_CREATE *)&mb4->un.varSLIConfig.payload;
 
-	qp->params.request.NumPages = EMLXS_NUM_WQ_PAGES;
-	for (i = 0; i < EMLXS_NUM_WQ_PAGES; i++) {
-		qp->params.request.Pages[i].addrLow = PADDR_LO(addr);
-		qp->params.request.Pages[i].addrHigh = PADDR_HI(addr);
-		addr += 4096;
+		qp->params.request.CQId = hba->sli.sli4.wq[num].cqid;
+
+		qp->params.request.NumPages = EMLXS_NUM_WQ_PAGES;
+		for (i = 0; i < EMLXS_NUM_WQ_PAGES; i++) {
+			qp->params.request.Pages[i].addrLow = PADDR_LO(addr);
+			qp->params.request.Pages[i].addrHigh = PADDR_HI(addr);
+			addr += 4096;
+		}
+
+		break;
+
+	case 1:
+	default:
+		mb4->un.varSLIConfig.be.payload_length =
+		    sizeof (IOCTL_FCOE_WQ_CREATE_V1) + IOCTL_HEADER_SZ;
+		mb4->un.varSLIConfig.be.un_hdr.hdr_req.subsystem =
+		    IOCTL_SUBSYSTEM_FCOE;
+		mb4->un.varSLIConfig.be.un_hdr.hdr_req.opcode =
+		    FCOE_OPCODE_WQ_CREATE;
+		mb4->un.varSLIConfig.be.un_hdr.hdr_req.timeout = 0;
+		mb4->un.varSLIConfig.be.un_hdr.hdr_req.req_length =
+		    sizeof (IOCTL_FCOE_WQ_CREATE_V1);
+		mb4->un.varSLIConfig.be.un_hdr.hdr_req.version = 1;
+
+		addr = hba->sli.sli4.wq[num].addr.phys;
+		qp1 = (IOCTL_FCOE_WQ_CREATE_V1 *)&mb4->un.varSLIConfig.payload;
+
+		qp1->params.request.CQId = hba->sli.sli4.wq[num].cqid;
+		qp1->params.request.NumPages = EMLXS_NUM_WQ_PAGES;
+
+		qp1->params.request.WqeCnt = WQ_DEPTH;
+		qp1->params.request.WqeSize = WQE_SIZE_64_BYTES;
+		qp1->params.request.PageSize = WQ_PAGE_SIZE_4K;
+
+		for (i = 0; i < EMLXS_NUM_WQ_PAGES; i++) {
+			qp1->params.request.Pages[i].addrLow = PADDR_LO(addr);
+			qp1->params.request.Pages[i].addrHigh = PADDR_HI(addr);
+			addr += 4096;
+		}
+
+		break;
 	}
 
 	return;
@@ -392,6 +809,7 @@ emlxs_mb_rq_create(emlxs_hba_t *hba, MAILBOXQ *mbq, uint32_t num)
 {
 	MAILBOX4 *mb4 = (MAILBOX4 *)mbq;
 	IOCTL_FCOE_RQ_CREATE *qp;
+	IOCTL_FCOE_RQ_CREATE_V1 *qp1;
 	uint64_t	addr;
 
 	bzero((void *) mb4, MAILBOX_CMD_SLI4_BSIZE);
@@ -406,25 +824,66 @@ emlxs_mb_rq_create(emlxs_hba_t *hba, MAILBOXQ *mbq, uint32_t num)
 
 	mb4->mbxCommand = MBX_SLI_CONFIG;
 	mb4->mbxOwner = OWN_HOST;
-	mb4->un.varSLIConfig.be.payload_length =
-	    sizeof (IOCTL_FCOE_RQ_CREATE) + IOCTL_HEADER_SZ;
-	mb4->un.varSLIConfig.be.un_hdr.hdr_req.subsystem =
-	    IOCTL_SUBSYSTEM_FCOE;
-	mb4->un.varSLIConfig.be.un_hdr.hdr_req.opcode = FCOE_OPCODE_RQ_CREATE;
-	mb4->un.varSLIConfig.be.un_hdr.hdr_req.timeout = 0;
-	mb4->un.varSLIConfig.be.un_hdr.hdr_req.req_length =
-	    sizeof (IOCTL_FCOE_RQ_CREATE);
-	addr = hba->sli.sli4.rq[num].addr.phys;
 
-	qp = (IOCTL_FCOE_RQ_CREATE *)&mb4->un.varSLIConfig.payload;
+	switch (hba->sli.sli4.param.RQV) {
+	case 0:
+		mb4->un.varSLIConfig.be.payload_length =
+		    sizeof (IOCTL_FCOE_RQ_CREATE) + IOCTL_HEADER_SZ;
+		mb4->un.varSLIConfig.be.un_hdr.hdr_req.subsystem =
+		    IOCTL_SUBSYSTEM_FCOE;
+		mb4->un.varSLIConfig.be.un_hdr.hdr_req.opcode =
+		    FCOE_OPCODE_RQ_CREATE;
+		mb4->un.varSLIConfig.be.un_hdr.hdr_req.timeout = 0;
+		mb4->un.varSLIConfig.be.un_hdr.hdr_req.req_length =
+		    sizeof (IOCTL_FCOE_RQ_CREATE);
+		mb4->un.varSLIConfig.be.un_hdr.hdr_req.version = 0;
 
-	qp->params.request.RQContext.RQSize	= RQ_DEPTH_EXPONENT;
-	qp->params.request.RQContext.BufferSize	= RQB_DATA_SIZE;
-	qp->params.request.RQContext.CQIdRecv	= hba->sli.sli4.rq[num].cqid;
+		addr = hba->sli.sli4.rq[num].addr.phys;
 
-	qp->params.request.NumPages = 1;
-	qp->params.request.Pages[0].addrLow = PADDR_LO(addr);
-	qp->params.request.Pages[0].addrHigh = PADDR_HI(addr);
+		qp = (IOCTL_FCOE_RQ_CREATE *)&mb4->un.varSLIConfig.payload;
+
+		qp->params.request.RQContext.RqeCnt	= RQ_DEPTH_EXPONENT;
+		qp->params.request.RQContext.BufferSize	= RQB_DATA_SIZE;
+		qp->params.request.RQContext.CQId	=
+		    hba->sli.sli4.rq[num].cqid;
+
+		qp->params.request.NumPages = 1;
+		qp->params.request.Pages[0].addrLow = PADDR_LO(addr);
+		qp->params.request.Pages[0].addrHigh = PADDR_HI(addr);
+
+		break;
+
+	case 1:
+	default:
+		mb4->un.varSLIConfig.be.payload_length =
+		    sizeof (IOCTL_FCOE_RQ_CREATE_V1) + IOCTL_HEADER_SZ;
+		mb4->un.varSLIConfig.be.un_hdr.hdr_req.subsystem =
+		    IOCTL_SUBSYSTEM_FCOE;
+		mb4->un.varSLIConfig.be.un_hdr.hdr_req.opcode =
+		    FCOE_OPCODE_RQ_CREATE;
+		mb4->un.varSLIConfig.be.un_hdr.hdr_req.timeout = 0;
+		mb4->un.varSLIConfig.be.un_hdr.hdr_req.req_length =
+		    sizeof (IOCTL_FCOE_RQ_CREATE_V1);
+		mb4->un.varSLIConfig.be.un_hdr.hdr_req.version = 1;
+
+		addr = hba->sli.sli4.rq[num].addr.phys;
+
+		qp1 = (IOCTL_FCOE_RQ_CREATE_V1 *)&mb4->un.varSLIConfig.payload;
+
+		qp1->params.request.RQContext.RqeCnt	 = RQ_DEPTH;
+		qp1->params.request.RQContext.RqeSize	 = RQE_SIZE_8_BYTES;
+		qp1->params.request.RQContext.PageSize	 = RQ_PAGE_SIZE_4K;
+
+		qp1->params.request.RQContext.BufferSize = RQB_DATA_SIZE;
+		qp1->params.request.RQContext.CQId	 =
+		    hba->sli.sli4.rq[num].cqid;
+
+		qp1->params.request.NumPages = 1;
+		qp1->params.request.Pages[0].addrLow = PADDR_LO(addr);
+		qp1->params.request.Pages[0].addrHigh = PADDR_HI(addr);
+
+		break;
+	}
 
 	return;
 
@@ -480,10 +939,11 @@ emlxs_mb_mq_create(emlxs_hba_t *hba, MAILBOXQ *mbq)
 /* SLI4 */
 /*ARGSUSED*/
 extern void
-emlxs_mb_mcc_create_ext(emlxs_hba_t *hba, MAILBOXQ *mbq)
+emlxs_mb_mq_create_ext(emlxs_hba_t *hba, MAILBOXQ *mbq)
 {
 	MAILBOX4 *mb4 = (MAILBOX4 *)mbq;
-	IOCTL_COMMON_MCC_CREATE_EXT *qp;
+	IOCTL_COMMON_MQ_CREATE_EXT *qp;
+	IOCTL_COMMON_MQ_CREATE_EXT_V1 *qp1;
 	uint64_t	addr;
 
 	bzero((void *) mb4, MAILBOX_CMD_SLI4_BSIZE);
@@ -498,32 +958,70 @@ emlxs_mb_mcc_create_ext(emlxs_hba_t *hba, MAILBOXQ *mbq)
 
 	mb4->mbxCommand = MBX_SLI_CONFIG;
 	mb4->mbxOwner = OWN_HOST;
-	mb4->un.varSLIConfig.be.payload_length =
-	    sizeof (IOCTL_COMMON_MQ_CREATE) + IOCTL_HEADER_SZ;
-	mb4->un.varSLIConfig.be.un_hdr.hdr_req.subsystem =
-	    IOCTL_SUBSYSTEM_COMMON;
-	mb4->un.varSLIConfig.be.un_hdr.hdr_req.opcode =
-	    COMMON_OPCODE_MCC_CREATE_EXT;
-	mb4->un.varSLIConfig.be.un_hdr.hdr_req.timeout = 0;
-	mb4->un.varSLIConfig.be.un_hdr.hdr_req.req_length =
-	    sizeof (IOCTL_COMMON_MCC_CREATE_EXT);
 
-	addr = hba->sli.sli4.mq.addr.phys;
-	qp = (IOCTL_COMMON_MCC_CREATE_EXT *)&mb4->un.varSLIConfig.payload;
+	switch (hba->sli.sli4.param.MQV) {
+	case 0:
+		mb4->un.varSLIConfig.be.payload_length =
+		    sizeof (IOCTL_COMMON_MQ_CREATE_EXT) + IOCTL_HEADER_SZ;
+		mb4->un.varSLIConfig.be.un_hdr.hdr_req.subsystem =
+		    IOCTL_SUBSYSTEM_COMMON;
+		mb4->un.varSLIConfig.be.un_hdr.hdr_req.opcode =
+		    COMMON_OPCODE_MQ_CREATE_EXT;
+		mb4->un.varSLIConfig.be.un_hdr.hdr_req.timeout = 0;
+		mb4->un.varSLIConfig.be.un_hdr.hdr_req.req_length =
+		    sizeof (IOCTL_COMMON_MQ_CREATE_EXT);
+		mb4->un.varSLIConfig.be.un_hdr.hdr_req.version = 0;
 
-	qp->params.request.num_pages = 1;
-	qp->params.request.async_event_bitmap =
-	    ASYNC_LINK_EVENT | ASYNC_FCF_EVENT | ASYNC_GROUP5_EVENT;
-	qp->params.request.context.Size = MQ_ELEMENT_COUNT_16;
-	qp->params.request.context.Valid = 1;
-	qp->params.request.context.CQId = hba->sli.sli4.mq.cqid;
+		addr = hba->sli.sli4.mq.addr.phys;
+		qp = (IOCTL_COMMON_MQ_CREATE_EXT *)
+		    &mb4->un.varSLIConfig.payload;
 
-	qp->params.request.pages[0].addrLow = PADDR_LO(addr);
-	qp->params.request.pages[0].addrHigh = PADDR_HI(addr);
+		qp->params.request.num_pages = 1;
+		qp->params.request.async_event_bitmap =
+		    ASYNC_LINK_EVENT | ASYNC_FCF_EVENT | ASYNC_GROUP5_EVENT;
+		qp->params.request.context.Size = MQ_ELEMENT_COUNT_16;
+		qp->params.request.context.Valid = 1;
+		qp->params.request.context.CQId = hba->sli.sli4.mq.cqid;
+
+		qp->params.request.pages[0].addrLow = PADDR_LO(addr);
+		qp->params.request.pages[0].addrHigh = PADDR_HI(addr);
+
+		break;
+
+	case 1:
+	default:
+		mb4->un.varSLIConfig.be.payload_length =
+		    sizeof (IOCTL_COMMON_MQ_CREATE) + IOCTL_HEADER_SZ;
+		mb4->un.varSLIConfig.be.un_hdr.hdr_req.subsystem =
+		    IOCTL_SUBSYSTEM_COMMON;
+		mb4->un.varSLIConfig.be.un_hdr.hdr_req.opcode =
+		    COMMON_OPCODE_MQ_CREATE_EXT;
+		mb4->un.varSLIConfig.be.un_hdr.hdr_req.timeout = 0;
+		mb4->un.varSLIConfig.be.un_hdr.hdr_req.req_length =
+		    sizeof (IOCTL_COMMON_MQ_CREATE_EXT_V1);
+		mb4->un.varSLIConfig.be.un_hdr.hdr_req.version = 1;
+
+		addr = hba->sli.sli4.mq.addr.phys;
+		qp1 = (IOCTL_COMMON_MQ_CREATE_EXT_V1 *)
+		    &mb4->un.varSLIConfig.payload;
+
+		qp1->params.request.num_pages = 1;
+		qp1->params.request.async_event_bitmap =
+		    ASYNC_LINK_EVENT | ASYNC_FCF_EVENT | ASYNC_GROUP5_EVENT |
+		    ASYNC_FC_EVENT | ASYNC_PORT_EVENT;
+		qp1->params.request.context.Size = MQ_ELEMENT_COUNT_16;
+		qp1->params.request.context.Valid = 1;
+		qp1->params.request.CQId = hba->sli.sli4.mq.cqid;
+
+		qp1->params.request.pages[0].addrLow = PADDR_LO(addr);
+		qp1->params.request.pages[0].addrHigh = PADDR_HI(addr);
+
+		break;
+	}
 
 	return;
 
-} /* emlxs_mb_mcc_create_ext() */
+} /* emlxs_mb_mq_create_ext() */
 
 
 /*ARGSUSED*/
@@ -976,7 +1474,7 @@ emlxs_mb_retry(emlxs_hba_t *hba, MAILBOXQ *mbq)
 	MAILBOX	*mbox;
 	int rc;
 
-	mbox = (MAILBOX *)emlxs_mem_get(hba, MEM_MBOX, 1);
+	mbox = (MAILBOX *)emlxs_mem_get(hba, MEM_MBOX);
 	if (!mbox) {
 		return;
 	}
@@ -1093,7 +1591,7 @@ emlxs_read_la_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq)
 	if ((la.attType == AT_LINK_UP) && (hba->state < FC_LINK_UP)) {
 
 #ifdef MENLO_SUPPORT
-		if ((hba->model_info.device_id == PCI_DEVICE_ID_LP21000_M) &&
+		if ((hba->model_info.device_id == PCI_DEVICE_ID_HORNET) &&
 		    (hba->flag & (FC_ILB_MODE | FC_ELB_MODE))) {
 			la.topology = TOPOLOGY_LOOP;
 			la.granted_AL_PA = 0;
@@ -1113,7 +1611,8 @@ emlxs_read_la_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq)
 		}
 
 		if ((hba->topology = la.topology) == TOPOLOGY_LOOP) {
-			port->did = la.granted_AL_PA;
+			port->granted_alpa = la.granted_AL_PA;
+			port->did = port->granted_alpa;
 			port->lip_type = la.lipType;
 			if (hba->flag & FC_SLIM2_MODE) {
 				i = la.un.lilpBde64.tus.f.bdeSize;
@@ -1163,7 +1662,7 @@ emlxs_read_la_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq)
 #ifdef MENLO_SUPPORT
 		/* Check if Menlo maintenance mode is enabled */
 		if (hba->model_info.device_id ==
-		    PCI_DEVICE_ID_LP21000_M) {
+		    PCI_DEVICE_ID_HORNET) {
 			if (la.mm == 1) {
 				EMLXS_MSGF(EMLXS_CONTEXT,
 				    &emlxs_link_atten_msg,
@@ -1192,7 +1691,7 @@ emlxs_read_la_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq)
 #endif /* MENLO_SUPPORT */
 
 		if ((mbox = (MAILBOXQ *)emlxs_mem_get(hba,
-		    MEM_MBOX, 1))) {
+		    MEM_MBOX))) {
 			/* This should turn on DELAYED ABTS for */
 			/* ELS timeouts */
 			emlxs_mb_set_var(hba, mbox, 0x00052198, 0x1);
@@ -1201,7 +1700,7 @@ emlxs_read_la_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq)
 		}
 
 		if ((mbox = (MAILBOXQ *)emlxs_mem_get(hba,
-		    MEM_MBOX, 1))) {
+		    MEM_MBOX))) {
 			/* If link not already down then */
 			/* declare it down now */
 			if (emlxs_mb_read_sparam(hba, mbox) == 0) {
@@ -1213,7 +1712,7 @@ emlxs_read_la_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq)
 		}
 
 		if ((mbox = (MAILBOXQ *)emlxs_mem_get(hba,
-		    MEM_MBOX, 1))) {
+		    MEM_MBOX))) {
 			emlxs_mb_config_link(hba, mbox);
 
 			emlxs_mb_put(hba, mbox);
@@ -1248,7 +1747,6 @@ emlxs_read_la_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq)
 } /* emlxs_read_la_mbcmpl() */
 
 
-/* SLI3 */
 extern uint32_t
 emlxs_mb_read_la(emlxs_hba_t *hba, MAILBOXQ *mbq)
 {
@@ -1257,7 +1755,7 @@ emlxs_mb_read_la(emlxs_hba_t *hba, MAILBOXQ *mbq)
 
 	bzero((void *)mb, MAILBOX_CMD_BSIZE);
 
-	if ((mp = (MATCHMAP *)emlxs_mem_get(hba, MEM_BUF, 1)) == 0) {
+	if ((mp = (MATCHMAP *)emlxs_mem_get(hba, MEM_BUF)) == 0) {
 		mb->mbxCommand = MBX_READ_LA64;
 
 		return (1);
@@ -1300,7 +1798,7 @@ emlxs_clear_la_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq)
 			/* Get a buffer which will be used for */
 			/* mailbox commands */
 			if ((mbox = (MAILBOXQ *)emlxs_mem_get(hba,
-			    MEM_MBOX, 1))) {
+			    MEM_MBOX))) {
 				/* Get link attention message */
 				if (emlxs_mb_read_la(hba, mbox) == 0) {
 					rc =  EMLXS_SLI_ISSUE_MBOX_CMD(hba,
@@ -1524,8 +2022,9 @@ emlxs_mb_config_link(emlxs_hba_t *hba, MAILBOXQ *mbq)
 		mb->un.varCfgLnk.cr_count = cfg[CFG_CR_COUNT].current;
 	}
 
-	if (cfg[CFG_ACK0].current)
+	if (cfg[CFG_ACK0].current) {
 		mb->un.varCfgLnk.ack0_enable = 1;
+	}
 
 	mb->un.varCfgLnk.myId = port->did;
 	mb->un.varCfgLnk.edtov = hba->fc_edtov;
@@ -1593,7 +2092,8 @@ emlxs_mb_init_link(emlxs_hba_t *hba, MAILBOXQ *mbq, uint32_t topology,
 	emlxs_vpd_t	*vpd = &VPD;
 	emlxs_config_t	*cfg = &CFG;
 
-	if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
+	if ((hba->sli_mode == EMLXS_HBA_SLI4_MODE) &&
+	    (SLI4_FCOE_MODE)) {
 		bzero((void *) mb, MAILBOX_CMD_SLI4_BSIZE);
 		mbq->nonembed = NULL;
 		mbq->mbox_cmpl = NULL; /* no cmpl needed */
@@ -1669,6 +2169,12 @@ emlxs_mb_init_link(emlxs_hba_t *hba, MAILBOXQ *mbq, uint32_t topology,
 		}
 		break;
 
+	case 16:
+		if (!(vpd->link_speed & LMT_16GB_CAPABLE)) {
+			linkspeed = 0;
+		}
+		break;
+
 	default:
 		linkspeed = 0;
 		break;
@@ -1719,7 +2225,7 @@ emlxs_mb_down_link(emlxs_hba_t *hba, MAILBOXQ *mbq)
 static uint32_t
 emlxs_read_sparam_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq)
 {
-	emlxs_port_t *port = (emlxs_port_t *)mbq->port;
+	emlxs_port_t *port = &PPORT;
 	MAILBOX *mb;
 	MATCHMAP *mp;
 	emlxs_port_t *vport;
@@ -1768,11 +2274,9 @@ emlxs_read_sparam_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq)
 	    hba->fc_edtov, hba->sparam.cmn.e_d_tov,
 	    hba->sparam.cmn.bbCreditlsb);
 
-	hba->sparam.cmn.e_d_tov = hba->fc_edtov;
-
 	/* Initialize the physical port */
-	bcopy((caddr_t)&hba->sparam,
-	    (caddr_t)&port->sparam, sizeof (SERV_PARM));
+	bcopy((caddr_t)&hba->sparam, (caddr_t)&port->sparam,
+	    sizeof (SERV_PARM));
 	bcopy((caddr_t)&hba->wwpn, (caddr_t)&port->wwpn,
 	    sizeof (NAME_TYPE));
 	bcopy((caddr_t)&hba->wwnn, (caddr_t)&port->wwnn,
@@ -1781,7 +2285,7 @@ emlxs_read_sparam_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq)
 	/* Initialize the virtual ports */
 	for (i = 1; i < MAX_VPORTS; i++) {
 		vport = &VPORT(i);
-		if (vport->flag & EMLXS_PORT_BOUND) {
+		if (! (vport->flag & EMLXS_PORT_BOUND)) {
 			continue;
 		}
 
@@ -1814,7 +2318,7 @@ emlxs_mb_read_sparam(emlxs_hba_t *hba, MAILBOXQ *mbq)
 
 	bzero((void *)mb, MAILBOX_CMD_BSIZE);
 
-	if ((mp = (MATCHMAP *)emlxs_mem_get(hba, MEM_BUF, 1)) == 0) {
+	if ((mp = (MATCHMAP *)emlxs_mem_get(hba, MEM_BUF)) == 0) {
 		mb->mbxCommand = MBX_READ_SPARM64;
 
 		return (1);
@@ -1943,350 +2447,6 @@ emlxs_mb_check_sparm(emlxs_hba_t *hba, SERV_PARM *nsp)
 	return (0);
 
 } /* emlxs_mb_check_sparm() */
-
-
-/* SLI3 */
-static uint32_t
-emlxs_reg_did_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq)
-{
-	emlxs_port_t *port = (emlxs_port_t *)mbq->port;
-	MAILBOX *mb;
-	MATCHMAP *mp;
-	NODELIST *ndlp;
-	emlxs_port_t *vport;
-	SERV_PARM *sp;
-	int32_t i;
-	uint32_t  control;
-	uint32_t ldata;
-	uint32_t ldid;
-	uint16_t lrpi;
-	uint16_t lvpi;
-
-	mb = (MAILBOX *)mbq;
-
-	if (mb->mbxStatus) {
-		if (mb->mbxStatus == MBXERR_NO_RESOURCES) {
-			control = mb->un.varRegLogin.un.sp.bdeSize;
-			if (control == 0) {
-				/* Special handle for vport PLOGI */
-				if (mbq->iocbq == (uint8_t *)1) {
-					mbq->iocbq = NULL;
-				}
-				return (0);
-			}
-			emlxs_mb_retry(hba, mbq);
-			return (1);
-		}
-		if (mb->mbxStatus == MBXERR_RPI_FULL) {
-			EMLXS_MSGF(EMLXS_CONTEXT,
-			    &emlxs_node_create_failed_msg,
-			    "Limit reached. count=%d", port->node_count);
-		}
-
-		/* Special handle for vport PLOGI */
-		if (mbq->iocbq == (uint8_t *)1) {
-			mbq->iocbq = NULL;
-		}
-
-		return (0);
-	}
-
-	mp = (MATCHMAP *)mbq->bp;
-	if (!mp) {
-		return (0);
-	}
-
-	ldata = mb->un.varWords[5];
-	lvpi = (ldata & 0xffff) - hba->vpi_base;
-	port = &VPORT(lvpi);
-
-	/* First copy command data */
-	ldata = mb->un.varWords[0];	/* get rpi */
-	lrpi = ldata & 0xffff;
-
-	ldata = mb->un.varWords[1];	/* get did */
-	ldid = ldata & MASK_DID;
-
-	sp = (SERV_PARM *)mp->virt;
-
-	/* Create or update the node */
-	ndlp = emlxs_node_create(port, ldid, lrpi, sp);
-
-	if (ndlp->nlp_DID == FABRIC_DID) {
-		/* FLOGI/FDISC successfully completed on this port */
-		mutex_enter(&EMLXS_PORT_LOCK);
-		port->flag |= EMLXS_PORT_FLOGI_CMPL;
-		mutex_exit(&EMLXS_PORT_LOCK);
-
-		/* If CLEAR_LA has been sent, then attempt to */
-		/* register the vpi now */
-		if (hba->state == FC_READY) {
-			(void) emlxs_mb_reg_vpi(port, NULL);
-		}
-
-		/*
-		 * If NPIV Fabric support has just been established on
-		 * the physical port, then notify the vports of the
-		 * link up
-		 */
-		if ((lvpi == 0) &&
-		    (hba->flag & FC_NPIV_ENABLED) &&
-		    (hba->flag & FC_NPIV_SUPPORTED)) {
-			/* Skip the physical port */
-			for (i = 1; i < MAX_VPORTS; i++) {
-				vport = &VPORT(i);
-
-				if (!(vport->flag & EMLXS_PORT_BOUND) ||
-				    !(vport->flag &
-				    EMLXS_PORT_ENABLE)) {
-					continue;
-				}
-
-				emlxs_port_online(vport);
-			}
-		}
-	}
-
-	/* Check for special restricted login flag */
-	if (mbq->iocbq == (uint8_t *)1) {
-		mbq->iocbq = NULL;
-		(void) emlxs_mb_unreg_node(port, ndlp, NULL, NULL, NULL);
-		return (0);
-	}
-
-	/* Needed for FCT trigger in emlxs_mb_deferred_cmpl */
-	if (mbq->sbp) {
-		((emlxs_buf_t *)mbq->sbp)->node = ndlp;
-	}
-
-#ifdef DHCHAP_SUPPORT
-	if (mbq->sbp || mbq->ubp) {
-		if (emlxs_dhc_auth_start(port, ndlp, mbq->sbp,
-		    mbq->ubp) == 0) {
-			/* Auth started - auth completion will */
-			/* handle sbp and ubp now */
-			mbq->sbp = NULL;
-			mbq->ubp = NULL;
-		}
-	}
-#endif	/* DHCHAP_SUPPORT */
-
-	return (0);
-
-} /* emlxs_reg_did_mbcmpl() */
-
-
-/* SLI3 */
-extern uint32_t
-emlxs_mb_reg_did(emlxs_port_t *port, uint32_t did, SERV_PARM *param,
-    emlxs_buf_t *sbp, fc_unsol_buf_t *ubp, IOCBQ *iocbq)
-{
-	emlxs_hba_t	*hba = HBA;
-	MATCHMAP	*mp;
-	MAILBOXQ	*mbq;
-	MAILBOX		*mb;
-	uint32_t	rval;
-
-	if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
-		rval = emlxs_sli4_reg_did(port, did, param, sbp, ubp, iocbq);
-		return (rval);
-	}
-
-	/* Check for invalid node ids to register */
-	if ((did == 0) && (!(hba->flag & FC_LOOPBACK_MODE))) {
-		return (1);
-	}
-
-	if (did & 0xff000000) {
-		return (1);
-	}
-
-	if ((rval = emlxs_mb_check_sparm(hba, param))) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_node_create_failed_msg,
-		    "Invalid service parameters. did=%06x rval=%d", did,
-		    rval);
-
-		return (1);
-	}
-
-	/* Check if the node limit has been reached */
-	if (port->node_count >= hba->max_nodes) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_node_create_failed_msg,
-		    "Limit reached. did=%06x count=%d", did,
-		    port->node_count);
-
-		return (1);
-	}
-
-	if (!(mbq = (MAILBOXQ *)emlxs_mem_get(hba, MEM_MBOX, 1))) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_node_create_failed_msg,
-		    "Unable to allocate mailbox. did=%x", did);
-
-		return (1);
-	}
-	mb = (MAILBOX *)mbq->mbox;
-	bzero((void *)mb, MAILBOX_CMD_BSIZE);
-
-	/* Build login request */
-	if ((mp = (MATCHMAP *)emlxs_mem_get(hba, MEM_BUF, 1)) == 0) {
-		emlxs_mem_put(hba, MEM_MBOX, (void *)mbq);
-
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_node_create_failed_msg,
-		    "Unable to allocate buffer. did=%x", did);
-		return (1);
-	}
-	bcopy((void *)param, (void *)mp->virt, sizeof (SERV_PARM));
-
-	mb->un.varRegLogin.un.sp64.tus.f.bdeSize = sizeof (SERV_PARM);
-	mb->un.varRegLogin.un.sp64.addrHigh = PADDR_HI(mp->phys);
-	mb->un.varRegLogin.un.sp64.addrLow = PADDR_LO(mp->phys);
-	mb->un.varRegLogin.did = did;
-	mb->un.varWords[30] = 0;	/* flags */
-	mb->mbxCommand = MBX_REG_LOGIN64;
-	mb->mbxOwner = OWN_HOST;
-	mb->un.varRegLogin.vpi = port->vpi;
-	mb->un.varRegLogin.rpi = 0;
-
-	mbq->sbp = (void *)sbp;
-	mbq->ubp = (void *)ubp;
-	mbq->iocbq = (void *)iocbq;
-	mbq->bp = (void *)mp;
-	mbq->mbox_cmpl = emlxs_reg_did_mbcmpl;
-	mbq->context = NULL;
-	mbq->port = (void *)port;
-
-	rval = EMLXS_SLI_ISSUE_MBOX_CMD(hba, mbq, MBX_NOWAIT, 0);
-	if ((rval != MBX_BUSY) && (rval != MBX_SUCCESS)) {
-		emlxs_mem_put(hba, MEM_BUF, (void *)mp);
-		emlxs_mem_put(hba, MEM_MBOX, (void *)mbq);
-
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_node_create_failed_msg,
-		    "Unable to send mbox. did=%x", did);
-		return (1);
-	}
-
-	return (0);
-
-} /* emlxs_mb_reg_did() */
-
-/* SLI3 */
-/*ARGSUSED*/
-static uint32_t
-emlxs_unreg_node_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq)
-{
-	emlxs_port_t	*port = (emlxs_port_t *)mbq->port;
-	MAILBOX		*mb;
-	NODELIST	*node;
-	uint16_t	rpi;
-
-	node = (NODELIST *)mbq->context;
-	mb = (MAILBOX *)mbq;
-	rpi = (node)? node->nlp_Rpi:0xffff;
-
-	if (mb->mbxStatus) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-		    "unreg_node_mbcmpl:failed. node=%p rpi=%x status=%x",
-		    node, rpi, mb->mbxStatus);
-
-		return (0);
-	}
-
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-	    "unreg_node_mbcmpl: node=%p rpi=%x",
-	    node, rpi);
-
-	if (node) {
-		emlxs_node_rm(port, node);
-
-	} else {  /* All nodes */
-		emlxs_node_destroy_all(port);
-	}
-
-	return (0);
-
-} /* emlxs_unreg_node_mbcmpl */
-
-
-/* SLI3 */
-extern uint32_t
-emlxs_mb_unreg_node(emlxs_port_t *port, NODELIST *node, emlxs_buf_t *sbp,
-    fc_unsol_buf_t *ubp, IOCBQ *iocbq)
-{
-	emlxs_hba_t	*hba = HBA;
-	MAILBOXQ	*mbq;
-	MAILBOX		*mb;
-	uint16_t	rpi;
-	uint32_t	rval;
-
-	if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
-		rval = emlxs_sli4_unreg_node(port, node, sbp, ubp, iocbq);
-		return (rval);
-	}
-
-	if (node) {
-		/* Check for base node */
-		if (node == &port->node_base) {
-			/* just flush base node */
-			(void) emlxs_tx_node_flush(port, &port->node_base,
-			    0, 0, 0);
-			(void) emlxs_chipq_node_flush(port, 0,
-			    &port->node_base, 0);
-
-			port->did = 0;
-
-			/* Return now */
-			return (1);
-		}
-
-		rpi = (uint16_t)node->nlp_Rpi;
-
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-		    "unreg_node:%p  rpi=%d", node, rpi);
-
-		/* This node must be (0xFFFFFE) which registered by vport */
-		if (rpi == 0) {
-			emlxs_node_rm(port, node);
-			return (0);
-		}
-
-	} else {	/* Unreg all nodes */
-		rpi = 0xffff;
-
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-		    "unreg_node: All");
-	}
-
-	if (!(mbq = (MAILBOXQ *)emlxs_mem_get(hba, MEM_MBOX, 1))) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-		    "unreg_node:failed. Unable to allocate mbox");
-		return (1);
-	}
-
-	mb = (MAILBOX *)mbq->mbox;
-	mb->un.varUnregLogin.rpi = rpi;
-	mb->un.varUnregLogin.vpi = port->VPIobj.VPI;
-
-	mb->mbxCommand = MBX_UNREG_LOGIN;
-	mb->mbxOwner = OWN_HOST;
-	mbq->sbp = (void *)sbp;
-	mbq->ubp = (void *)ubp;
-	mbq->iocbq = (void *)iocbq;
-	mbq->mbox_cmpl = emlxs_unreg_node_mbcmpl;
-	mbq->context = (void *)node;
-	mbq->port = (void *)port;
-
-	rval = EMLXS_SLI_ISSUE_MBOX_CMD(hba, mbq, MBX_NOWAIT, 0);
-	if ((rval != MBX_BUSY) && (rval != MBX_SUCCESS)) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-		    "unreg_node:failed. Unable to send request.");
-
-		emlxs_mem_put(hba, MEM_MBOX, (void *)mbq);
-		return (1);
-	}
-
-	return (0);
-
-} /* emlxs_mb_unreg_node() */
 
 
 
@@ -2484,7 +2644,7 @@ emlxs_mb_reg_vpi(emlxs_port_t *port, emlxs_buf_t *sbp)
 		return (1);
 	}
 
-	if (!(mbq = (MAILBOXQ *)emlxs_mem_get(hba, MEM_MBOX, 1))) {
+	if (!(mbq = (MAILBOXQ *)emlxs_mem_get(hba, MEM_MBOX))) {
 		mutex_exit(&EMLXS_PORT_LOCK);
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
@@ -2582,7 +2742,7 @@ emlxs_mb_unreg_vpi(emlxs_port_t *port)
 		return (0);
 	}
 
-	if (!(mbq = (MAILBOXQ *)emlxs_mem_get(hba, MEM_MBOX, 1))) {
+	if (!(mbq = (MAILBOXQ *)emlxs_mem_get(hba, MEM_MBOX))) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
 		    "unreg_vpi:%d failed. Unable to allocate mbox.",
 		    port->vpi);
@@ -2773,7 +2933,11 @@ emlxs_mb_init(emlxs_hba_t *hba, MAILBOXQ *mbq, uint32_t flag, uint32_t tmo)
 	hba->mbox_queue_flag = flag;
 
 	/* Set the Mailbox timer */
-	hba->mbox_timer = hba->timer_tics + tmo;
+	if (hba->timer_tics) {
+		hba->mbox_timer = hba->timer_tics + tmo;
+	} else {
+		hba->mbox_timer = DRV_TIME + tmo;
+	}
 
 	/* Initialize mailbox */
 	mbq->flag &= MBQ_INIT_MASK;
@@ -2849,6 +3013,15 @@ emlxs_mb_fini(emlxs_hba_t *hba, MAILBOX *mb, uint32_t mbxStatus)
 
 	mutex_exit(&EMLXS_PORT_LOCK);
 
+#ifdef SFCT_SUPPORT
+	if (mb && mbox_sbp && mbox_sbp->fct_cmd) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fct_detail_msg,
+		    "FCT mailbox: %s: status=%x",
+		    emlxs_mb_cmd_xlate(mb->mbxCommand),
+		    mb->mbxStatus);
+	}
+#endif /* SFCT_SUPPORT */
+
 	if (mbox_queue_flag == MBX_NOWAIT) {
 		/* Check for deferred MBUF cleanup */
 		if (mbox_bp) {
@@ -2893,15 +3066,6 @@ emlxs_mb_fini(emlxs_hba_t *hba, MAILBOX *mb, uint32_t mbxStatus)
 		}
 	}
 
-#ifdef SFCT_SUPPORT
-	if (mb && mbox_sbp && mbox_sbp->fct_cmd) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fct_detail_msg,
-		    "FCT mailbox: %s: status=%x",
-		    emlxs_mb_cmd_xlate(mb->mbxCommand),
-		    (uint32_t)mb->mbxStatus);
-	}
-#endif /* SFCT_SUPPORT */
-
 	emlxs_mb_deferred_cmpl(port, mbxStatus, mbox_sbp, mbox_ubp, mbox_iocbq);
 
 	return;
@@ -2917,19 +3081,13 @@ emlxs_mb_deferred_cmpl(emlxs_port_t *port, uint32_t mbxStatus, emlxs_buf_t *sbp,
 	emlxs_ub_priv_t	*ub_priv;
 
 #ifdef SFCT_SUPPORT
-	if ((mbxStatus == MBX_SUCCESS) && sbp && sbp->fct_cmd) {
-		emlxs_buf_t *cmd_sbp = sbp;
+	if (sbp && sbp->fct_cmd && (sbp->fct_state == EMLXS_FCT_REG_PENDING)) {
+		mutex_enter(&EMLXS_PKT_LOCK);
+		sbp->fct_flags |= EMLXS_FCT_REGISTERED;
+		cv_broadcast(&EMLXS_PKT_CV);
+		mutex_exit(&EMLXS_PKT_LOCK);
 
-		if ((cmd_sbp->fct_state == EMLXS_FCT_REG_PENDING) &&
-		    (cmd_sbp->node)) {
-
-			mutex_enter(&EMLXS_PKT_LOCK);
-			cmd_sbp->fct_flags |= EMLXS_FCT_REGISTERED;
-			cv_broadcast(&EMLXS_PKT_CV);
-			mutex_exit(&EMLXS_PKT_LOCK);
-
-			sbp = NULL;
-		}
+		sbp = NULL;
 	}
 #endif /* SFCT_SUPPORT */
 
@@ -3026,7 +3184,24 @@ emlxs_mb_cmd_xlate(uint8_t cmd)
 		}
 	}
 
-	(void) sprintf(buffer, "Cmd=0x%x", cmd);
+	(void) snprintf(buffer, sizeof (buffer), "Cmd=0x%x", cmd);
 	return (buffer);
 
 } /* emlxs_mb_cmd_xlate() */
+
+extern char *
+emlxs_request_feature_xlate(uint32_t mask)
+{
+	static char	buffer[64];
+	uint32_t	i;
+
+	bzero((char *)&buffer[0], 64);
+	for (i = 0; i < 12; i++) {
+		if (mask & (1<<i)) {
+			(void) strlcat(buffer,
+			    emlxs_request_feature_table[i].string,
+			    sizeof (buffer));
+		}
+	}
+	return (buffer);
+}

@@ -292,21 +292,27 @@ __inet_pton(int af, char *inp, void *outp, int compat)
 		v6outp = (union v6buf_u *)outp;
 
 		if (strchr_w(inp, '.') != NULL) {
+			int ret = 0;
+
 			/* v4 mapped or v4 compatable */
 			if (strncmp(inp, "::ffff:", 7) == 0) {
 				ipaddr_t ipv4_all_zeroes = 0;
 				/* mapped - first init prefix and then fill */
 				IN6_IPADDR_TO_V4MAPPED(ipv4_all_zeroes,
 				    &v6outp->v6addr_u);
-				return (str2inet_addr(inp + 7,
-				    &(v6outp->v6addr_u.s6_addr32[3])));
+				ret = str2inet_addr(inp + 7,
+				    &(v6outp->v6addr_u.s6_addr32[3]));
 			} else if (strncmp(inp, "::", 2) == 0) {
 				/* v4 compatable - prefix all zeroes */
 				bzero(&v6outp->v6addr_u, sizeof (in6_addr_t));
-				return (str2inet_addr(inp + 2,
-				    &(v6outp->v6addr_u.s6_addr32[3])));
+				ret = str2inet_addr(inp + 2,
+				    &(v6outp->v6addr_u.s6_addr32[3]));
 			}
-			return (0);
+			if (ret > 0 && !compat) {
+				v6outp->v6addr_u.s6_addr32[3] =
+				    htonl(v6outp->v6addr_u.s6_addr32[3]);
+			}
+			return (ret);
 		}
 		for (i = 0; i < 8; i++) {
 			int error;

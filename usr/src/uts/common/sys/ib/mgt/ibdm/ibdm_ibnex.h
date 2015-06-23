@@ -22,6 +22,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 #ifndef _SYS_IB_MGT_IBDM_IBDM_IBNEX_H
 #define	_SYS_IB_MGT_IBDM_IBDM_IBNEX_H
@@ -215,7 +218,7 @@ typedef struct ibdm_hca_list_s {
 	ib_guid_t		hl_hca_guid;		/* HCA GUID */
 	uint32_t		hl_nports;		/* #ports of this HCA */
 	uint32_t		hl_nports_active;	/* #ports active */
-	time_t			hl_attach_time;		/* attach time */
+	hrtime_t		hl_attach_time;		/* attach time */
 	ibt_hca_hdl_t		hl_hca_hdl;		/* HCA handle */
 	ibdm_port_attr_t	*hl_hca_port_attr;	/* Dummy Port Attr */
 							/* for HCA node */

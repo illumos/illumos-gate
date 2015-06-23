@@ -598,7 +598,7 @@ pk_gencert(int argc, char *argv[])
 	KMF_ALGORITHM_INDEX sigAlg = KMF_ALGID_SHA1WithRSA;
 	boolean_t interactive = B_FALSE;
 	char *subname = NULL;
-	KMF_CREDENTIAL tokencred = {NULL, 0};
+	KMF_CREDENTIAL tokencred = { NULL, 0 };
 	uint16_t kubits = 0;
 	int altcrit = 0, kucrit = 0;
 	EKU_LIST *ekulist = NULL;

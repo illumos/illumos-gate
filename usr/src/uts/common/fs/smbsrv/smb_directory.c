@@ -21,6 +21,8 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <smbsrv/smb_kproto.h>
@@ -279,7 +281,13 @@ smb_com_delete_directory(smb_request_t *sr)
 		return (SDRC_ERROR);
 	}
 
-	rc = smb_node_getattr(sr, fqi->fq_fnode, &fqi->fq_fattr);
+	/*
+	 * Using kcred because we just want the DOS attrs
+	 * and don't want access errors for this.
+	 */
+	fqi->fq_fattr.sa_mask = SMB_AT_DOSATTR;
+	rc = smb_node_getattr(sr, fqi->fq_fnode, zone_kcred(), NULL,
+	    &fqi->fq_fattr);
 	if (rc != 0) {
 		smbsr_errno(sr, rc);
 		smb_node_release(fqi->fq_dnode);

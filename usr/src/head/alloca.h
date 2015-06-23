@@ -20,14 +20,14 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_ALLOCA_H
 #define	_ALLOCA_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 
@@ -56,19 +56,11 @@ extern "C" {
 	defined(__sparc) || defined(__i386) || defined(__amd64)
 #define	alloca(x)	__builtin_alloca(x)
 
-#ifdef	__STDC__
 extern void *__builtin_alloca(size_t);
-#else
-extern void *__builtin_alloca();
-#endif
 
 #else
 
-#ifdef	__STDC__
 extern void *alloca(size_t);
-#else
-extern void *alloca();
-#endif
 
 #endif	/* defined(__BUILTIN_VA_ARG_INCR) || defined(__sparc) ... */
 

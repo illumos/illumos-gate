@@ -51,9 +51,9 @@
  *
  * This implementation uses a message passing architecture to allow multiple
  * concurrent cross calls to be in flight at any given time. We use the cmpxchg
- * instruction, aka casptr(), to implement simple efficient work queues for
- * message passing between CPUs with almost no need for regular locking.
- * See xc_extract() and xc_insert() below.
+ * instruction, aka atomic_cas_ptr(), to implement simple efficient work
+ * queues for message passing between CPUs with almost no need for regular
+ * locking.  See xc_extract() and xc_insert() below.
  *
  * The general idea is that initiating a cross call means putting a message
  * on a target(s) CPU's work queue. Any synchronization is handled by passing
@@ -64,8 +64,9 @@
  * with every message that finishes all processing.
  *
  * The code needs no mfence or other membar_*() calls. The uses of
- * casptr(), cas32() and atomic_dec_32() for the message passing are
- * implemented with LOCK prefix instructions which are equivalent to mfence.
+ * atomic_cas_ptr(), atomic_cas_32() and atomic_dec_32() for the message
+ * passing are implemented with LOCK prefix instructions which are
+ * equivalent to mfence.
  *
  * One interesting aspect of this implmentation is that it allows 2 or more
  * CPUs to initiate cross calls to intersecting sets of CPUs at the same time.
@@ -144,7 +145,7 @@ xc_increment(struct machcpu *mcpu)
 	int old;
 	do {
 		old = mcpu->xc_work_cnt;
-	} while (cas32((uint32_t *)&mcpu->xc_work_cnt, old, old + 1) != old);
+	} while (atomic_cas_32(&mcpu->xc_work_cnt, old, old + 1) != old);
 	return (old);
 }
 
@@ -168,7 +169,7 @@ xc_insert(void *queue, xc_msg_t *msg)
 	do {
 		old_head = (xc_msg_t *)*(volatile xc_msg_t **)queue;
 		msg->xc_next = old_head;
-	} while (casptr(queue, old_head, msg) != old_head);
+	} while (atomic_cas_ptr(queue, old_head, msg) != old_head);
 }
 
 /*
@@ -185,7 +186,8 @@ xc_extract(xc_msg_t **queue)
 		old_head = (xc_msg_t *)*(volatile xc_msg_t **)queue;
 		if (old_head == NULL)
 			return (old_head);
-	} while (casptr(queue, old_head, old_head->xc_next) != old_head);
+	} while (atomic_cas_ptr(queue, old_head, old_head->xc_next) !=
+	    old_head);
 	old_head->xc_next = NULL;
 	return (old_head);
 }
@@ -279,7 +281,7 @@ xc_flush_cpu(struct cpu *cpup)
 	 * This is used to work around a race condition window in xc_common()
 	 * between checking CPU_READY flag and increasing working item count.
 	 */
-	pause_cpus(cpup);
+	pause_cpus(cpup, NULL);
 	start_cpus();
 
 	for (i = 0; i < XC_FLUSH_MAX_WAITS; i++) {
@@ -608,7 +610,7 @@ xc_priority_common(
 		XC_BT_SET(xc_priority_set, c);
 		send_dirint(c, XC_HI_PIL);
 		for (i = 0; i < 10; ++i) {
-			(void) casptr(&cpup->cpu_m.xc_msgbox,
+			(void) atomic_cas_ptr(&cpup->cpu_m.xc_msgbox,
 			    cpup->cpu_m.xc_msgbox, cpup->cpu_m.xc_msgbox);
 		}
 	}

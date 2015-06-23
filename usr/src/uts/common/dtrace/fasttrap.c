@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2015, Joyent, Inc. All rights reserved.
  */
 
 #include <sys/atomic.h>
@@ -928,11 +928,21 @@ fasttrap_pid_enable(void *arg, dtrace_id_t id, void *parg)
 		mutex_enter(&pidlock);
 		p = prfind(probe->ftp_pid);
 
+		if (p == NULL) {
+			/*
+			 * So it's not that the target process is being born,
+			 * it's that it isn't there at all (and we simply
+			 * happen to be forking).  Anyway, we know that the
+			 * target is definitely gone, so bail out.
+			 */
+			mutex_exit(&pidlock);
+			return (0);
+		}
+
 		/*
 		 * Confirm that curproc is indeed forking the process in which
 		 * we're trying to enable probes.
 		 */
-		ASSERT(p != NULL);
 		ASSERT(p->p_parent == curproc);
 		ASSERT(p->p_stat == SIDL);
 
@@ -1182,7 +1192,7 @@ fasttrap_proc_lookup(pid_t pid)
 			mutex_enter(&fprc->ftpc_mtx);
 			mutex_exit(&bucket->ftb_mtx);
 			fprc->ftpc_rcount++;
-			atomic_add_64(&fprc->ftpc_acount, 1);
+			atomic_inc_64(&fprc->ftpc_acount);
 			ASSERT(fprc->ftpc_acount <= fprc->ftpc_rcount);
 			mutex_exit(&fprc->ftpc_mtx);
 
@@ -1212,7 +1222,7 @@ fasttrap_proc_lookup(pid_t pid)
 			mutex_enter(&fprc->ftpc_mtx);
 			mutex_exit(&bucket->ftb_mtx);
 			fprc->ftpc_rcount++;
-			atomic_add_64(&fprc->ftpc_acount, 1);
+			atomic_inc_64(&fprc->ftpc_acount);
 			ASSERT(fprc->ftpc_acount <= fprc->ftpc_rcount);
 			mutex_exit(&fprc->ftpc_mtx);
 
@@ -1424,7 +1434,7 @@ fasttrap_provider_free(fasttrap_provider_t *provider)
 	 * count of active providers on the associated process structure.
 	 */
 	if (!provider->ftp_retired) {
-		atomic_add_64(&provider->ftp_proc->ftpc_acount, -1);
+		atomic_dec_64(&provider->ftp_proc->ftpc_acount);
 		ASSERT(provider->ftp_proc->ftpc_acount <
 		    provider->ftp_proc->ftpc_rcount);
 	}
@@ -1499,7 +1509,7 @@ fasttrap_provider_retire(pid_t pid, const char *name, int mprov)
 	 * bucket lock therefore protects the integrity of the provider hash
 	 * table.
 	 */
-	atomic_add_64(&fp->ftp_proc->ftpc_acount, -1);
+	atomic_dec_64(&fp->ftp_proc->ftpc_acount);
 	ASSERT(fp->ftp_proc->ftpc_acount < fp->ftp_proc->ftpc_rcount);
 
 	fp->ftp_retired = 1;
@@ -1595,10 +1605,10 @@ fasttrap_add_probe(fasttrap_probe_spec_t *pdata)
 			    pdata->ftps_mod, pdata->ftps_func, name_str) != 0)
 				continue;
 
-			atomic_add_32(&fasttrap_total, 1);
+			atomic_inc_32(&fasttrap_total);
 
 			if (fasttrap_total > fasttrap_max) {
-				atomic_add_32(&fasttrap_total, -1);
+				atomic_dec_32(&fasttrap_total);
 				goto no_mem;
 			}
 
@@ -2156,7 +2166,7 @@ fasttrap_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	if (nent == 0 || nent > 0x1000000)
 		nent = FASTTRAP_TPOINTS_DEFAULT_SIZE;
 
-	if ((nent & (nent - 1)) == 0)
+	if (ISP2(nent))
 		fasttrap_tpoints.fth_nent = nent;
 	else
 		fasttrap_tpoints.fth_nent = 1 << fasttrap_highbit(nent);
@@ -2169,7 +2179,7 @@ fasttrap_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	 * ... and the providers hash table...
 	 */
 	nent = FASTTRAP_PROVIDERS_DEFAULT_SIZE;
-	if ((nent & (nent - 1)) == 0)
+	if (ISP2(nent))
 		fasttrap_provs.fth_nent = nent;
 	else
 		fasttrap_provs.fth_nent = 1 << fasttrap_highbit(nent);
@@ -2182,7 +2192,7 @@ fasttrap_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	 * ... and the procs hash table.
 	 */
 	nent = FASTTRAP_PROCS_DEFAULT_SIZE;
-	if ((nent & (nent - 1)) == 0)
+	if (ISP2(nent))
 		fasttrap_procs.fth_nent = nent;
 	else
 		fasttrap_procs.fth_nent = 1 << fasttrap_highbit(nent);

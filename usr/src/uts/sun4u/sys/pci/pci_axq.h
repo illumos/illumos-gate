@@ -27,8 +27,6 @@
 #ifndef	_SYS_PCI_AXQ_H
 #define	_SYS_PCI_AXQ_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/atomic.h>
 
@@ -42,18 +40,18 @@ extern "C" {
 					do {\
 						n = p->pbm_pio_counter;\
 					} while (n <= 0);\
-					if (atomic_add_32_nv(\
-					    (uint_t *)&p->pbm_pio_counter, -1)\
+					if (atomic_dec_32_nv(\
+					    (uint_t *)&p->pbm_pio_counter)\
 					    == (n - 1))\
 						break;\
-					atomic_add_32(\
-					    (uint_t *)&p->pbm_pio_counter, 1);\
+					atomic_inc_32(\
+					    (uint_t *)&p->pbm_pio_counter);\
 				}\
 				}
 
 
 
-#define	PIO_LIMIT_EXIT(p)	atomic_add_32((uint_t *)&p->pbm_pio_counter, 1);
+#define	PIO_LIMIT_EXIT(p)	atomic_inc_32((uint_t *)&p->pbm_pio_counter);
 
 extern void pci_axq_setup(ddi_map_req_t *mp, pbm_t *pbm_p);
 extern void pci_axq_pio_limit(pbm_t *pbm_p);

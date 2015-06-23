@@ -24,6 +24,7 @@
  */
 /*
  * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -194,8 +195,9 @@ mdb_ia32_kvm_stack_iter(mdb_tgt_t *t, const mdb_tgt_gregset_t *gsp,
 	mdb_tgt_gregset_t gregs;
 	kreg_t *kregs = &gregs.kregs[0];
 	int got_pc = (gsp->kregs[KREG_EIP] != 0);
+	int err;
 
-	struct {
+	struct fr {
 		uintptr_t fr_savfp;
 		uintptr_t fr_savpc;
 		long fr_argv[32];
@@ -203,11 +205,13 @@ mdb_ia32_kvm_stack_iter(mdb_tgt_t *t, const mdb_tgt_gregset_t *gsp,
 
 	uintptr_t fp = gsp->kregs[KREG_EBP];
 	uintptr_t pc = gsp->kregs[KREG_EIP];
-	uintptr_t lastfp;
+	uintptr_t lastfp = 0;
 
 	ssize_t size;
 	uint_t argc;
 	int detect_exception_frames = 0;
+	int advance_tortoise = 1;
+	uintptr_t tortoise_fp = 0;
 #ifndef	_KMDB
 	int xp;
 
@@ -218,18 +222,45 @@ mdb_ia32_kvm_stack_iter(mdb_tgt_t *t, const mdb_tgt_gregset_t *gsp,
 	bcopy(gsp, &gregs, sizeof (gregs));
 
 	while (fp != 0) {
-
-		if (fp & (STACK_ALIGN - 1))
-			return (set_errno(EMDB_STKALIGN));
-
+		if (fp & (STACK_ALIGN - 1)) {
+			err = EMDB_STKALIGN;
+			goto badfp;
+		}
 		if ((size = mdb_tgt_vread(t, &fr, sizeof (fr), fp)) >=
 		    (ssize_t)(2 * sizeof (uintptr_t))) {
 			size -= (ssize_t)(2 * sizeof (uintptr_t));
 			argc = kvm_argcount(t, fr.fr_savpc, size);
 		} else {
-			bzero(&fr, sizeof (fr));
-			argc = 0;
+			err = EMDB_NOMAP;
+			goto badfp;
 		}
+
+		if (tortoise_fp == 0) {
+			tortoise_fp = fp;
+		} else {
+			/*
+			 * Advance tortoise_fp every other frame, so we detect
+			 * cycles with Floyd's tortoise/hare.
+			 */
+			if (advance_tortoise != 0) {
+				struct fr tfr;
+
+				if (mdb_tgt_vread(t, &tfr, sizeof (tfr),
+				    tortoise_fp) != sizeof (tfr)) {
+					err = EMDB_NOMAP;
+					goto badfp;
+				}
+
+				tortoise_fp = tfr.fr_savfp;
+			}
+
+			if (fp == tortoise_fp) {
+				err = EMDB_STKFRAME;
+				goto badfp;
+			}
+		}
+
+		advance_tortoise = !advance_tortoise;
 
 		if (got_pc && func(arg, pc, argc, fr.fr_argv, &gregs) != 0)
 			break;
@@ -257,6 +288,10 @@ mdb_ia32_kvm_stack_iter(mdb_tgt_t *t, const mdb_tgt_gregset_t *gsp,
 	}
 
 	return (0);
+
+badfp:
+	mdb_printf("%p [%s]", fp, mdb_strerror(err));
+	return (set_errno(err));
 }
 
 /*

@@ -20,8 +20,10 @@
  */
 
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
+ * Copyright (c) 2015, Joyent, Inc.  All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -292,6 +294,9 @@ extern "C" {
 #define	SYS_fchdir	120
 #define	SYS_readv	121
 #define	SYS_writev	122
+#define	SYS_preadv	123
+#define	SYS_pwritev	124
+#define	SYS_getrandom	126
 #define	SYS_mmapobj	127
 #define	SYS_setrlimit	128
 #define	SYS_getrlimit	129
@@ -506,15 +511,9 @@ typedef struct {	/* return values from system call */
 
 #if !defined(_KERNEL)
 
-#if defined(__STDC__)
 extern int	syscall(int, ...);
 extern int	__systemcall(sysret_t *, int, ...);
 extern int	__set_errno(int);
-#else
-extern int	syscall();
-extern int	__systemcall();
-extern int	__set_errno();
-#endif
 
 #endif	/* _KERNEL */
 

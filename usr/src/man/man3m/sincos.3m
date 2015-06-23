@@ -1,0 +1,60 @@
+'\" te
+.\" Copyright (c) 2006, Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH sincos 3M "12 Jul 2006" "SunOS 5.11" "Mathematical Library Functions"
+.SH NAME
+sincos, sincosf, sincosl \- combined sine and cosine function
+.SH SYNOPSIS
+.LP
+.nf
+c99 [ \fIflag\fR... ] \fIfile\fR... \fB-lm\fR [ \fIlibrary\fR... ]
+#include <math.h>
+
+\fBvoid\fR \fBsincos\fR(\fBdouble\fR \fIx\fR, \fBdouble *\fR\fIs\fR, \fBdouble *\fR\fIc\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBsincosf\fR(\fBfloat\fR \fIx\fR, \fBfloat *\fR\fIs\fR, \fBfloat *\fR\fIc\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBsincosl\fR(\fBlong double\fR \fIx\fR, \fBlong double *\fR\fIs\fR, \fBlong double *\fR\fIc\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions compute the sine and cosine of the first argument \fIx\fR,
+measured in radians.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, these functions return the sine of \fIx\fR in
+*\fIs\fR and cosine of \fIx\fR in *\fIc\fR.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStable
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcos\fR(3M), \fBsin\fR(3M), \fBmath.h\fR(3HEAD), \fBattributes\fR(5)

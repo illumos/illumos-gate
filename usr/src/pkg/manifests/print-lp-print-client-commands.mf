@@ -81,4 +81,4 @@ link path=usr/sbin/lpmove target=./print-service
 link path=usr/sbin/reject target=./print-service
 link path=usr/share/man/man1/disable.1 target=enable.1
 link path=usr/share/man/man1m/reject.1m target=accept.1m
-depend fmri=runtime/perl-510 type=require
+depend fmri=runtime/perl$(PERL_PKGVERS) type=require

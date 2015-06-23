@@ -20,13 +20,14 @@
 #
 
 #
-# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 # Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
 #
 
 include ../Makefile.lib
 
 SUBDIRS = \
+	libfksmbsrv \
 	libmlsvc \
 	libmlrpc \
 	libsmb \
@@ -36,5 +37,6 @@ SUBDIRS = \
 libmlrpc: libsmb
 libsmbns: libsmb
 libmlsvc: libsmb libmlrpc libsmbns
+libfksmbsrv: libsmb
 
 include ./Makefile.subdirs

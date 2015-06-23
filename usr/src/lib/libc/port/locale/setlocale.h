@@ -1,4 +1,5 @@
 /*
+ * Copyright 2013 Garrett D'Amore <garrett@damore.org>
  * Copyright (C) 1997 by Andrey A. Chernov, Moscow, Russia.
  * All rights reserved.
  *
@@ -32,8 +33,5 @@
 #define	CATEGORY_LEN 11
 
 extern char *_PathLocale;
-
-int	__detect_path_locale(void);
-int	__wrap_setrunelocale(const char *);
 
 #endif /* !_SETLOCALE_H_ */

@@ -22,7 +22,7 @@
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
  * Copyright 2012 Alexey Zaytsev <alexey.zaytsev@gmail.com> All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -75,6 +75,7 @@ struct bd {
 	uint32_t	d_qactive;
 	uint32_t	d_maxxfer;
 	uint32_t	d_blkshift;
+	uint32_t	d_pblkshift;
 	uint64_t	d_numblks;
 	ddi_devid_t	d_devid;
 
@@ -541,7 +542,7 @@ bd_xfer_alloc(bd_t *bd, struct buf *bp, int (*func)(void *, bd_xfer_t *),
     int kmflag)
 {
 	bd_xfer_impl_t		*xi;
-	int			rv;
+	int			rv = 0;
 	int			status;
 	unsigned		dir;
 	int			(*cb)(caddr_t);
@@ -1042,6 +1043,11 @@ bd_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *credp, int *rvalp)
 	if (rv != ENOTTY)
 		return (rv);
 
+	if (rvalp != NULL) {
+		/* the return value of the ioctl is 0 by default */
+		*rvalp = 0;
+	}
+
 	switch (cmd) {
 	case DKIOCGMEDIAINFO: {
 		struct dk_minfo minfo;
@@ -1065,7 +1071,7 @@ bd_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *credp, int *rvalp)
 		bzero(&miext, sizeof (miext));
 		miext.dki_media_type = DK_FIXED_DISK;
 		miext.dki_lbsize = (1U << bd->d_blkshift);
-		miext.dki_pbsize = miext.dki_lbsize;
+		miext.dki_pbsize = (1U << bd->d_pblkshift);
 		miext.dki_capacity = bd->d_numblks;
 		if (ddi_copyout(&miext, ptr, sizeof (miext), flag)) {
 			return (EFAULT);
@@ -1305,7 +1311,6 @@ bd_sched(bd_t *bd)
 		rv = xi->i_func(bd->d_private, &xi->i_public);
 		if (rv != 0) {
 			bp = xi->i_bp;
-			bd_xfer_free(xi);
 			bioerror(bp, rv);
 			biodone(bp);
 
@@ -1313,6 +1318,7 @@ bd_sched(bd_t *bd)
 			bd->d_qactive--;
 			kstat_runq_exit(bd->d_kiop);
 			list_remove(&bd->d_runq, xi);
+			bd_xfer_free(xi);
 		} else {
 			mutex_enter(&bd->d_iomutex);
 		}
@@ -1359,54 +1365,56 @@ bd_runq_exit(bd_xfer_impl_t *xi, int err)
 static void
 bd_update_state(bd_t *bd)
 {
-	enum	dkio_state	state;
-	bd_media_t		media;
+	enum	dkio_state	state = DKIO_INSERTED;
 	boolean_t		docmlb = B_FALSE;
+	bd_media_t		media;
 
 	bzero(&media, sizeof (media));
 
 	mutex_enter(&bd->d_statemutex);
-	if (bd->d_ops.o_media_info(bd->d_private, &media) == 0) {
-		if ((1U << bd->d_blkshift) != media.m_blksize) {
-			if ((media.m_blksize < 512) ||
-			    (!ISP2(media.m_blksize)) ||
-			    (P2PHASE(bd->d_maxxfer, media.m_blksize))) {
-				cmn_err(CE_WARN,
-				    "%s%d: Invalid media block size (%d)",
-				    ddi_driver_name(bd->d_dip),
-				    ddi_get_instance(bd->d_dip),
-				    media.m_blksize);
-				/*
-				 * We can't use the media, treat it as
-				 * not present.
-				 */
-				state = DKIO_EJECTED;
-				bd->d_numblks = 0;
-			} else {
-				bd->d_blkshift = ddi_ffs(media.m_blksize) - 1;
-				bd->d_numblks = media.m_nblks;
-				bd->d_rdonly = media.m_readonly;
-				bd->d_ssd = media.m_solidstate;
-				state = DKIO_INSERTED;
-			}
-
-			/* Device size changed */
-			docmlb = B_TRUE;
-
-		} else {
-			if (bd->d_numblks != media.m_nblks) {
-				/* Device size changed */
-				docmlb = B_TRUE;
-			}
-			bd->d_numblks = media.m_nblks;
-			bd->d_rdonly = media.m_readonly;
-			state = DKIO_INSERTED;
-		}
-
-	} else {
+	if (bd->d_ops.o_media_info(bd->d_private, &media) != 0) {
 		bd->d_numblks = 0;
 		state = DKIO_EJECTED;
+		goto done;
 	}
+
+	if ((media.m_blksize < 512) ||
+	    (!ISP2(media.m_blksize)) ||
+	    (P2PHASE(bd->d_maxxfer, media.m_blksize))) {
+		cmn_err(CE_WARN, "%s%d: Invalid media block size (%d)",
+		    ddi_driver_name(bd->d_dip), ddi_get_instance(bd->d_dip),
+		    media.m_blksize);
+		/*
+		 * We can't use the media, treat it as not present.
+		 */
+		state = DKIO_EJECTED;
+		bd->d_numblks = 0;
+		goto done;
+	}
+
+	if (((1U << bd->d_blkshift) != media.m_blksize) ||
+	    (bd->d_numblks != media.m_nblks)) {
+		/* Device size changed */
+		docmlb = B_TRUE;
+	}
+
+	bd->d_blkshift = ddi_ffs(media.m_blksize) - 1;
+	bd->d_pblkshift = bd->d_blkshift;
+	bd->d_numblks = media.m_nblks;
+	bd->d_rdonly = media.m_readonly;
+	bd->d_ssd = media.m_solidstate;
+
+	/*
+	 * Only use the supplied physical block size if it is non-zero,
+	 * greater or equal to the block size, and a power of 2. Ignore it
+	 * if not, it's just informational and we can still use the media.
+	 */
+	if ((media.m_pblksize != 0) &&
+	    (media.m_pblksize >= media.m_blksize) &&
+	    (ISP2(media.m_pblksize)))
+		bd->d_pblkshift = ddi_ffs(media.m_pblksize) - 1;
+
+done:
 	if (state != bd->d_state) {
 		bd->d_state = state;
 		cv_broadcast(&bd->d_statecv);

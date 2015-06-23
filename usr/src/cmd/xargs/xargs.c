@@ -19,7 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ * Copyright 2012 DEY Storage Systems, Inc.
  *
  * Portions of this file developed by DEY Storage Systems, Inc. are licensed
  * under the terms of the Common Development and Distribution License (CDDL)
@@ -115,6 +116,8 @@ static int	N_lines = 0;
 static int	DASHX = FALSE;
 static int	MORE = TRUE;
 static int	PER_LINE = FALSE;
+static int	LINE_CONT = FALSE;
+static int	EAT_LEAD = FALSE;
 static int	ERR = FALSE;
 static int	OK = TRUE;
 static int	LEGAL = FALSE;
@@ -211,7 +214,8 @@ main(int argc, char **argv)
 
 		case 'I':
 			/* -I replstr: Insert mode. replstr *is* required. */
-			INSERT = PER_LINE = LEGAL = TRUE;
+			INSERT = PER_LINE = LEGAL = EAT_LEAD = TRUE;
+			LINE_CONT = FALSE;
 			N_ARGS = 0;
 			INSPAT = optarg;
 			if (*optarg == '\0') {
@@ -232,7 +236,8 @@ main(int argc, char **argv)
 			 * parse this by hand:
 			 */
 
-			INSERT = PER_LINE = LEGAL = TRUE;
+			INSERT = PER_LINE = LEGAL = EAT_LEAD = TRUE;
+			LINE_CONT = FALSE;
 			N_ARGS = 0;
 			if ((optarg != NULL) && (*optarg != '\0')) {
 				INSPAT = optarg;
@@ -254,9 +259,9 @@ main(int argc, char **argv)
 			 * -L number: # of times cmd is executed
 			 * number *is* required here:
 			 */
-			PER_LINE = TRUE;
+			PER_LINE = LINE_CONT = TRUE;
 			N_ARGS = 0;
-			INSERT = FALSE;
+			INSERT = EAT_LEAD = FALSE;
 			if ((PER_LINE = atoi(optarg)) <= 0) {
 				ermsg(_("#lines must be positive int: %s\n"),
 				    optarg);
@@ -272,9 +277,9 @@ main(int argc, char **argv)
 			 * parseargs handles the optional arg processing.
 			 */
 
-			PER_LINE = LEGAL = TRUE;  /* initialization	*/
+			PER_LINE = LINE_CONT = LEGAL = TRUE;
 			N_ARGS = 0;
-			INSERT = FALSE;
+			INSERT = EAT_LEAD = FALSE;
 
 			if ((optarg != NULL) && (*optarg != '\0')) {
 				if ((PER_LINE = atoi(optarg)) <= 0)
@@ -292,7 +297,7 @@ main(int argc, char **argv)
 				    optarg);
 			} else {
 				LEGAL = DASHX || N_ARGS == 1;
-				INSERT = PER_LINE = FALSE;
+				INSERT = PER_LINE = LINE_CONT = FALSE;
 			}
 			break;
 
@@ -421,8 +426,8 @@ main(int argc, char **argv)
 
 			N_args++;
 
-			if ((PER_LINE && N_lines >= PER_LINE) ||
-			    (N_ARGS && (N_args) >= N_ARGS)) {
+			if ((PER_LINE && (N_lines >= PER_LINE)) ||
+			    (N_ARGS && (N_args >= N_ARGS))) {
 				break;
 			}
 
@@ -520,17 +525,19 @@ static char *
 getarg(char *arg)
 {
 	char	*xarg = arg;
-	wchar_t	c;
+	wchar_t	c = 0;
 	char	mbc[MB_LEN_MAX];
 	size_t	len;
 	int	escape = 0;
 	int	inquote = 0;
+	int	last = 0;
 
 	arg[0] = '\0';
 
 	while (MORE) {
 
 		len = 0;
+		last = c;
 		c = getwchr(mbc, &len);
 
 		if (((arg - xarg) + len) > BUFLIM) {
@@ -544,6 +551,16 @@ getarg(char *arg)
 		case '\n':
 			if (ZERO) {
 				store_str(&arg, mbc, len);
+				continue;
+			}
+			/*
+			 * NB: Some other versions rip off all of the trailing
+			 * blanks.  The spec only claims that this should
+			 * be done for a single blank.  We follow the spec.
+			 */
+			if (LINE_CONT && iswctype(last, blank)) {
+				len = 0;
+				*arg = 0;
 				continue;
 			}
 			/* FALLTHRU */
@@ -617,7 +634,16 @@ getarg(char *arg)
 				store_str(&arg, mbc, len);
 				continue;
 			}
-			/* unquoted blank */
+			if (EAT_LEAD && last == 0) {
+				c = 0;		/* Roll it back */
+				continue;
+			}
+			if (PER_LINE) {
+				store_str(&arg, mbc, len);
+				continue;
+			}
+
+			/* unquoted blank without special handling */
 			break;
 		}
 
@@ -729,7 +755,7 @@ insert(char *pattern, char *subst)
 	bufend = &buffer[MAXSBUF];
 
 	while (*++pat) {
-		if (strncmp(pat, INSPAT, ipatlen) == 0) {
+		if (strncmp(pat, INSPAT, ipatlen + 1) == 0) {
 			if (pbuf + len >= bufend) {
 				break;
 			} else {
@@ -904,8 +930,8 @@ usage()
  *	-Estr	-> "-E "str"
  *	-i	-> "-i "{}"
  *	-irep	-> "-i "rep"
- *	-l	-> "-i "1"
- *	-l10	-> "-i "10"
+ *	-l	-> "-l "1"
+ *	-l10	-> "-l "10"
  *
  *	since the -e, -i and -l flags all take optional subarguments,
  */

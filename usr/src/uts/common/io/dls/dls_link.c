@@ -361,7 +361,7 @@ i_dls_link_rx(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
 
 		DLS_PREPARE_PKT(dlp->dl_mh, mp, &mhi, err);
 		if (err != 0) {
-			atomic_add_32(&(dlp->dl_unknowns), 1);
+			atomic_inc_32(&(dlp->dl_unknowns));
 			nextp = mp->b_next;
 			mp->b_next = NULL;
 			freemsg(mp);
@@ -535,7 +535,7 @@ dls_rx_vlan_promisc(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
 	}
 
 drop:
-	atomic_add_32(&dlp->dl_unknowns, 1);
+	atomic_inc_32(&dlp->dl_unknowns);
 	freemsg(mp);
 }
 
@@ -575,7 +575,7 @@ dls_rx_promisc(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
 	return;
 
 drop:
-	atomic_add_32(&dlp->dl_unknowns, 1);
+	atomic_inc_32(&dlp->dl_unknowns);
 	freemsg(mp);
 }
 
@@ -732,7 +732,7 @@ dls_link_hold_common(const char *name, dls_link_t **dlpp, boolean_t create)
 	    (mod_hash_val_t)dlp);
 	ASSERT(err == 0);
 
-	atomic_add_32(&i_dls_link_count, 1);
+	atomic_inc_32(&i_dls_link_count);
 	ASSERT(i_dls_link_count != 0);
 
 done:
@@ -819,7 +819,7 @@ dls_link_rele(dls_link_t *dlp)
 		 */
 		i_dls_link_destroy(dlp);
 		ASSERT(i_dls_link_count > 0);
-		atomic_add_32(&i_dls_link_count, -1);
+		atomic_dec_32(&i_dls_link_count);
 	}
 }
 

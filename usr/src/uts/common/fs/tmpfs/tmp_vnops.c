@@ -26,6 +26,7 @@
 
 /*
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -1809,12 +1810,8 @@ tmp_getpage(
 	}
 
 
-	if (len <= PAGESIZE)
-		err = tmp_getapage(vp, (u_offset_t)off, len, protp, pl, plsz,
-		    seg, addr, rw, cr);
-	else
-		err = pvn_getpages(tmp_getapage, vp, (u_offset_t)off, len,
-		    protp, pl, plsz, seg, addr, rw, cr);
+	err = pvn_getpages(tmp_getapage, vp, (u_offset_t)off, len, protp,
+	    pl, plsz, seg, addr, rw, cr);
 
 	gethrestime(&now);
 	tp->tn_atime = now;
@@ -1827,7 +1824,7 @@ out:
 }
 
 /*
- * Called from pvn_getpages or swap_getpage to get a particular page.
+ * Called from pvn_getpages to get a particular page.
  */
 /*ARGSUSED*/
 static int

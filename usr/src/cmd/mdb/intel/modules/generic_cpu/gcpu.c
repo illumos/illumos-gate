@@ -127,7 +127,7 @@ cmih_ent_next(struct cmih_walk_state *wsp)
 		return (B_TRUE);
 
 	/* increment the chip id */
-	wsp->chipid = ++wsp->chipid & (CMI_MAX_CHIPID);
+	wsp->chipid = (wsp->chipid + 1) & (CMI_MAX_CHIPID);
 
 	return (B_TRUE);
 }

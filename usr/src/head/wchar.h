@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -119,8 +120,6 @@ typedef	int	wctype_t;
 typedef __va_list va_list;
 #endif  /* defined(_XPG6) && !defined(_VA_LIST) */
 
-#ifdef __STDC__
-
 #if !defined(_STRICT_STDC) || defined(_XOPEN_SOURCE) || defined(__EXTENSIONS__)
 #if __cplusplus >= 199711L
 namespace std {
@@ -167,53 +166,29 @@ using std::wctype;
 #endif
 #endif /* !defined(_STRICT_STDC) || defined(_XOPEN_SOURCE)... */
 
-#if defined(__EXTENSIONS__) || \
-	(!defined(_STRICT_STDC) && !defined(__XOPEN_OR_POSIX))
-	/* || defined(_XPG7) */
-extern wchar_t *wcsdup(const wchar_t *);
+#if defined(_XPG7) || !defined(_STRICT_SYMBOLS)
+
+#ifndef _LOCALE_T
+#define	_LOCALE_T
+typedef struct _locale *locale_t;
+#endif
+
 extern size_t wcsnlen(const wchar_t *, size_t);
 extern wchar_t *wcpcpy(wchar_t *_RESTRICT_KYWD, const wchar_t *_RESTRICT_KYWD);
 extern wchar_t *wcpncpy(wchar_t *_RESTRICT_KYWD, const wchar_t *_RESTRICT_KYWD,
     size_t);
+extern size_t wcsxfrm_l(wchar_t *_RESTRICT_KYWD, const wchar_t *_RESTRICT_KYWD,
+    size_t, locale_t);
+extern int wcscoll_l(const wchar_t *, const wchar_t *, locale_t);
+extern wchar_t *wcsdup(const wchar_t *);
 extern int wcscasecmp(const wchar_t *, const wchar_t *);
+extern int wcscasecmp_l(const wchar_t *, const wchar_t *, locale_t);
 extern int wcsncasecmp(const wchar_t *, const wchar_t *, size_t);
-#endif
+extern int wcsncasecmp_l(const wchar_t *, const wchar_t *, size_t, locale_t);
+extern size_t mbsnrtowcs(wchar_t *_RESTRICT_KYWD, const char **_RESTRICT_KYWD,
+    size_t, size_t, mbstate_t *_RESTRICT_KYWD);
 
-#else /* __STDC__ */
-
-#if !defined(_STRICT_STDC) || defined(_XOPEN_SOURCE) || defined(__EXTENSIONS__)
-extern  int iswalpha();
-extern  int iswupper();
-extern  int iswlower();
-extern  int iswdigit();
-extern  int iswxdigit();
-extern  int iswalnum();
-extern  int iswspace();
-extern  int iswpunct();
-extern  int iswprint();
-extern  int iswgraph();
-extern  int iswcntrl();
-extern  int iswctype();
-extern  wint_t towlower();
-extern  wint_t towupper();
-extern wchar_t *wcswcs();
-extern int wcswidth();
-extern int wcwidth();
-extern wctype_t wctype();
-#endif /* !defined(_STRICT_STDC) || defined(_XOPEN_SOURCE)... */
-
-#if defined(__EXTENSIONS__) || \
-	(!defined(_STRICT_STDC) && !defined(__XOPEN_OR_POSIX))
-	/* || defined(_XPG7) */
-extern wchar_t *wcsdup();
-extern size_t wcsnlen();
-extern wchar_t *wcpcpy();
-extern wchar_t *wcpncpy();
-extern int wcscasecmp();
-extern int wcsncasecmp();
-#endif
-
-#endif /* __STDC__ */
+#endif	/* defined(_XPG7) || !defined(_STRICT_SYMBOLS) */
 
 #ifdef	__cplusplus
 }

@@ -20,6 +20,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 1996-2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -31,8 +33,6 @@
 
 #ifndef _SYS_IPC_H
 #define	_SYS_IPC_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/isa_defs.h>
 #include <sys/feature_tests.h>
@@ -78,11 +78,7 @@ struct ipc_perm {
 
 #if (!defined(_KERNEL) && !defined(_XOPEN_SOURCE)) || defined(_XPG4_2) || \
 	defined(__EXTENSIONS__)
-#if defined(__STDC__)
 key_t ftok(const char *, int);
-#else
-key_t ftok();
-#endif /* defined(__STDC__) */
 #endif /* (!defined(_KERNEL) && !defined(_XOPEN_SOURCE))... */
 
 #ifdef	__cplusplus

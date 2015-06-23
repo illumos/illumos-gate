@@ -19,14 +19,14 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 #ifndef _DIAL_H
 #define	_DIAL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.2	*/
 
 #ifndef IUCLC
 #include <sys/termio.h>
@@ -76,17 +76,8 @@ typedef struct {
 	int	dev_len;	/* unused */
 } CALL;
 
-#if defined(__STDC__)
-
 extern int dial(CALL);
 extern void undial(int);
-
-#else
-
-extern int dial();
-extern void undial();
-
-#endif
 
 #ifdef	__cplusplus
 }

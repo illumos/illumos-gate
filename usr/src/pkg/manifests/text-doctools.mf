@@ -22,8 +22,10 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2014 Garrett D'Amore <garrett@damore.org>
 #
 
+# man moved to system/man
 set name=pkg.fmri value=pkg:/text/doctools@$(PKGVERS)
 set name=pkg.description \
     value="utilities and fonts for development, display, and production of documentation such as manual pages (nroff/troff)"
@@ -50,7 +52,6 @@ dir path=usr/share/man/man1
 dir path=usr/share/man/man1m
 dir path=usr/share/man/man5
 file path=usr/bin/addbib mode=0555
-file path=usr/bin/apropos mode=0555
 file path=usr/bin/checkeq mode=0555
 file path=usr/bin/checknr mode=0555
 file path=usr/bin/deroff mode=0555
@@ -228,8 +229,6 @@ file path=usr/lib/font/devpost/charlib/sq group=lp mode=0444
 file path=usr/lib/font/devpost/charlib/~ group=lp mode=0444
 file path=usr/lib/font/devpost/fontmaps/post group=lp mode=0444
 file path=usr/lib/font/makedev group=lp mode=0555
-file path=usr/lib/getNAME mode=0555
-file path=usr/lib/makewhatis mode=0555
 file path=usr/lib/refer/hunt mode=0555
 file path=usr/lib/refer/inv mode=0555
 file path=usr/lib/refer/mkey mode=0555
@@ -294,14 +293,12 @@ file path=usr/share/lib/tmac/tz.map
 file path=usr/share/lib/tmac/v
 file path=usr/share/lib/tmac/vgrind
 file path=usr/share/man/man1/addbib.1
-file path=usr/share/man/man1/apropos.1
 file path=usr/share/man/man1/checknr.1
 file path=usr/share/man/man1/deroff.1
 file path=usr/share/man/man1/diffmk.1
 file path=usr/share/man/man1/eqn.1
 file path=usr/share/man/man1/indxbib.1
 file path=usr/share/man/man1/lookbib.1
-file path=usr/share/man/man1/man.1
 file path=usr/share/man/man1/nroff.1
 file path=usr/share/man/man1/refer.1
 file path=usr/share/man/man1/roffbib.1
@@ -311,18 +308,11 @@ file path=usr/share/man/man1/tbl.1
 file path=usr/share/man/man1/troff.1
 file path=usr/share/man/man1/ul.1
 file path=usr/share/man/man1/vgrind.1
-file path=usr/share/man/man1/whatis.1
-file path=usr/share/man/man1m/catman.1m
 file path=usr/share/man/man5/eqnchar.5
-file path=usr/share/man/man5/man.5
-file path=usr/share/man/man5/mansun.5
 file path=usr/share/man/man5/me.5
 file path=usr/share/man/man5/mm.5
 file path=usr/share/man/man5/ms.5
 file path=usr/share/man/man5/vgrindefs.5
-hardlink path=usr/bin/catman target=../../usr/bin/apropos
-hardlink path=usr/bin/man target=../../usr/bin/apropos
-hardlink path=usr/bin/whatis target=../../usr/bin/apropos
 hardlink path=usr/lib/font/devpost/charlib/~= target=./~
 hardlink path=usr/share/lib/nterm/tab.300s \
     target=../../../../usr/share/lib/nterm/tab.300S
@@ -340,8 +330,6 @@ license usr/src/cmd/checknr/THIRDPARTYLICENSE \
     license=usr/src/cmd/checknr/THIRDPARTYLICENSE
 license usr/src/cmd/eqn/THIRDPARTYLICENSE \
     license=usr/src/cmd/eqn/THIRDPARTYLICENSE
-license usr/src/cmd/man/src/THIRDPARTYLICENSE \
-    license=usr/src/cmd/man/src/THIRDPARTYLICENSE
 license usr/src/cmd/refer/THIRDPARTYLICENSE \
     license=usr/src/cmd/refer/THIRDPARTYLICENSE
 license usr/src/cmd/soelim/THIRDPARTYLICENSE \
@@ -353,14 +341,6 @@ license usr/src/cmd/ul/THIRDPARTYLICENSE \
 license usr/src/cmd/vgrind/THIRDPARTYLICENSE \
     license=usr/src/cmd/vgrind/THIRDPARTYLICENSE
 link path=usr/lib/tmac target=../share/lib/tmac
-link path=usr/man target=./share/man
 link path=usr/share/man/man1/checkeq.1 target=eqn.1
 link path=usr/share/man/man1/neqn.1 target=eqn.1
-# lp is used by man -t and -r
-depend fmri=print/lp/print-client-commands type=require
-# awk is used by catman (via makewhatis)
-depend fmri=system/extended-system-utilities type=require
-# gpic is used as a preprocessor by the apropos command
-depend fmri=text/groff type=require
-# less is the default (per user environment) pager
-depend fmri=text/less type=require
+depend fmri=system/man type=require

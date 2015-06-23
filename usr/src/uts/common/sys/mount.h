@@ -24,14 +24,14 @@
 
 
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright (c) 1996, 1999 by Sun Microsystems, Inc.
  * All rights reserved.
  */
 
 #ifndef _SYS_MOUNT_H
 #define	_SYS_MOUNT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 11.10	*/
 
 #ifdef	__cplusplus
 extern "C" {
@@ -76,7 +76,7 @@ extern "C" {
  */
 #define	MAX_MNTOPT_STR	1024	/* max length of mount options string */
 
-#if defined(__STDC__) && !defined(_KERNEL)
+#if !defined(_KERNEL)
 int mount(const char *, const char *, int, ...);
 int umount(const char *);
 int umount2(const char *, int);

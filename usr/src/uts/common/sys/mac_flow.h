@@ -22,6 +22,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2013 Joyent, Inc.  All rights reserved.
  */
 
 #ifndef	_MAC_FLOW_H
@@ -157,6 +158,7 @@ typedef enum {
 typedef struct mac_ipaddr_s {
 	uint32_t	ip_version;
 	in6_addr_t	ip_addr;
+	uint8_t		ip_netmask;
 } mac_ipaddr_t;
 
 typedef enum {

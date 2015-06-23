@@ -20,7 +20,7 @@
 #
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
+# Copyright 2015 Nexenta Systems, Inc. All rights reserved.
 
 # The profile that all logins get before using their own .profile.
 
@@ -29,8 +29,7 @@ export LOGNAME PATH
 
 if [ "$TERM" = "" ]
 then
-	if /bin/i386
-	then
+	if [ `uname -p` = "i386" ]; then
 		TERM=sun-color
 	else
 		TERM=sun

@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 #
 
 LIBRARY= libsmb.a
@@ -28,7 +29,6 @@ VERS= .1
 OBJS_SHARED = 			\
 	smb_door_legacy.o 	\
 	smb_inet.o		\
-	smb_match.o 		\
 	smb_msgbuf.o		\
 	smb_native.o		\
 	smb_oem.o		\
@@ -63,6 +63,7 @@ OBJS_COMMON = 			\
 	smb_scfutil.o		\
 	smb_sd.o		\
 	smb_status_tbl.o	\
+	smb_syslog.o		\
 	smb_util.o		\
 	smb_wksids.o
 
@@ -74,11 +75,14 @@ include ../../Makefile.lib
 INCS += -I$(SRC)/common/smbsrv
 
 LINTCHECKFLAGS += -erroff=E_INCONS_ARG_DECL2
+LINTCHECKFLAGS += -erroff=E_BAD_FORMAT_STR2
 
 LDLIBS +=	$(MACH_LDLIBS)
-LDLIBS +=	-lscf -lmd -luuid -lnsl -lpkcs11 -lsec -lsocket -lresolv
-LDLIBS +=	-lidmap -lreparse -lnvpair -lcmdutils -lavl -lc
+LDLIBS +=	-lscf -lmd -luuid -lpkcs11 -lcryptoutil
+LDLIBS +=	-lsec -lidmap -lnsl -lsocket -lresolv
+LDLIBS +=	-lreparse -lnvpair -lcmdutils -lavl -lc
 CPPFLAGS +=	$(INCS) -D_REENTRANT
+CPPFLAGS +=	-Dsyslog=smb_syslog
 CERRWARN +=	-_gcc=-Wno-uninitialized
 CERRWARN +=	-_gcc=-Wno-char-subscripts
 CERRWARN +=	-_gcc=-Wno-switch

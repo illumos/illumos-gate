@@ -329,7 +329,7 @@ typedef enum {
     DDI_DEVSTATE_UP = 32
 } ddi_devstate_t;
 
-#ifdef	_KERNEL
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 
 /*
  * Common property definitions
@@ -503,6 +503,9 @@ extern size_t kiconv(kiconv_t, char **, size_t *, char **, size_t *, int *);
 extern int kiconv_close(kiconv_t);
 extern size_t kiconvstr(const char *, const char *, char *, size_t *, char *,
 	size_t *, int, int *);
+
+#endif /* _KERNEL || _FAKE_KERNEL */
+#ifdef	_KERNEL
 
 /*
  * ddi_map_regs

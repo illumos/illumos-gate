@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <smbsrv/smb_kproto.h>
@@ -107,18 +107,18 @@ smb_com_transaction(smb_request_t *sr)
 	xa->req_disp_param = pscnt;
 	xa->req_disp_data  = dscnt;
 
-	if (MBC_SHADOW_CHAIN(&xa->req_setup_mb, &sr->smb_vwv,
+	if (smb_mbc_copy(&xa->req_setup_mb, &sr->smb_vwv,
 	    sr->smb_vwv.chain_offset, suwcnt * 2)) {
 		smb_xa_rele(sr->session, xa);
 		smbsr_error(sr, 0, ERRDOS, ERRbadformat);
 		return (SDRC_ERROR);
 	}
-	if (MBC_SHADOW_CHAIN(&xa->req_param_mb, &sr->command, psoff, pscnt)) {
+	if (smb_mbc_copy(&xa->req_param_mb, &sr->command, psoff, pscnt)) {
 		smb_xa_rele(sr->session, xa);
 		smbsr_error(sr, 0, ERRDOS, ERRbadformat);
 		return (SDRC_ERROR);
 	}
-	if (MBC_SHADOW_CHAIN(&xa->req_data_mb, &sr->command, dsoff, dscnt)) {
+	if (smb_mbc_copy(&xa->req_data_mb, &sr->command, dsoff, dscnt)) {
 		smb_xa_rele(sr->session, xa);
 		smbsr_error(sr, 0, ERRDOS, ERRbadformat);
 		return (SDRC_ERROR);
@@ -192,18 +192,43 @@ smb_com_transaction_secondary(smb_request_t *sr)
 		return (SDRC_ERROR);
 
 	mutex_enter(&xa->xa_mutex);
-	xa->smb_tpscnt = tpscnt;	/* might have shrunk */
-	xa->smb_tdscnt = tdscnt;	/* might have shrunk */
-	xa->req_disp_param = psdisp+pscnt;
-	xa->req_disp_data  = dsdisp+dscnt;
+	if (xa->smb_tpscnt > tpscnt)
+		xa->smb_tpscnt = tpscnt;
+	if (xa->smb_tdscnt > tdscnt)
+		xa->smb_tdscnt = tdscnt;
+	xa->req_disp_param = psdisp + pscnt;
+	xa->req_disp_data  = dsdisp + dscnt;
 
-	if (MBC_SHADOW_CHAIN(&xa->req_param_mb, &sr->command, psoff, pscnt)) {
+	/*
+	 * The words psdisp, dsdisp, tell us what displacement
+	 * into the entire trans parameter and data buffers
+	 * where we should put the params & data that are
+	 * delivered by this request.  [MS-CIFS] says all the
+	 * parameters and data SHOULD be sent sequentially, so
+	 * so we can normally reassemble by simply appending.
+	 * However, the components MAY come out of order, so
+	 * check and set the current offset.  This is rare,
+	 * and we might like to know when this happens, so
+	 * fire some static dtrace probes when it does.
+	 */
+	if (xa->req_param_mb.chain_offset != psdisp) {
+		DTRACE_PROBE2(trans_param_disp,
+		    smb_xa_t *, xa, uint16_t, psdisp);
+		xa->req_param_mb.chain_offset = psdisp;
+	}
+	if (xa->req_data_mb.chain_offset != dsdisp) {
+		DTRACE_PROBE2(trans_data_disp,
+		    smb_xa_t *, xa, uint16_t, dsdisp);
+		xa->req_data_mb.chain_offset = dsdisp;
+	}
+
+	if (smb_mbc_copy(&xa->req_param_mb, &sr->command, psoff, pscnt)) {
 		mutex_exit(&xa->xa_mutex);
 		smb_xa_close(xa);
 		smbsr_error(sr, 0, ERRDOS, ERRbadformat);
 		return (SDRC_ERROR);
 	}
-	if (MBC_SHADOW_CHAIN(&xa->req_data_mb, &sr->command, dsoff, dscnt)) {
+	if (smb_mbc_copy(&xa->req_data_mb, &sr->command, dsoff, dscnt)) {
 		mutex_exit(&xa->xa_mutex);
 		smb_xa_close(xa);
 		smbsr_error(sr, 0, ERRDOS, ERRbadformat);
@@ -294,18 +319,18 @@ smb_com_transaction2(struct smb_request *sr)
 	xa->req_disp_param = pscnt;
 	xa->req_disp_data  = dscnt;
 
-	if (MBC_SHADOW_CHAIN(&xa->req_setup_mb, &sr->smb_vwv,
+	if (smb_mbc_copy(&xa->req_setup_mb, &sr->smb_vwv,
 	    sr->smb_vwv.chain_offset, suwcnt*2)) {
 		smb_xa_rele(sr->session, xa);
 		smbsr_error(sr, 0, ERRDOS, ERRbadformat);
 		return (SDRC_ERROR);
 	}
-	if (MBC_SHADOW_CHAIN(&xa->req_param_mb, &sr->command, psoff, pscnt)) {
+	if (smb_mbc_copy(&xa->req_param_mb, &sr->command, psoff, pscnt)) {
 		smb_xa_rele(sr->session, xa);
 		smbsr_error(sr, 0, ERRDOS, ERRbadformat);
 		return (SDRC_ERROR);
 	}
-	if (MBC_SHADOW_CHAIN(&xa->req_data_mb, &sr->command, dsoff, dscnt)) {
+	if (smb_mbc_copy(&xa->req_data_mb, &sr->command, dsoff, dscnt)) {
 		smb_xa_rele(sr->session, xa);
 		smbsr_error(sr, 0, ERRDOS, ERRbadformat);
 		return (SDRC_ERROR);
@@ -379,19 +404,36 @@ smb_com_transaction2_secondary(smb_request_t *sr)
 		return (SDRC_ERROR);
 
 	mutex_enter(&xa->xa_mutex);
-	xa->smb_tpscnt = tpscnt;	/* might have shrunk */
-	xa->smb_tdscnt = tdscnt;	/* might have shrunk */
-	xa->xa_smb_fid = fid;		/* overwrite rules? */
+	if (xa->smb_tpscnt > tpscnt)
+		xa->smb_tpscnt = tpscnt;
+	if (xa->smb_tdscnt > tdscnt)
+		xa->smb_tdscnt = tdscnt;
+	if (fid != 0xFFFF)
+		xa->xa_smb_fid = fid;
 	xa->req_disp_param = psdisp + pscnt;
 	xa->req_disp_data  = dsdisp + dscnt;
 
-	if (MBC_SHADOW_CHAIN(&xa->req_param_mb, &sr->command, psoff, pscnt)) {
+	/*
+	 * See comment in smb_com_transaction_secondary
+	 */
+	if (xa->req_param_mb.chain_offset != psdisp) {
+		DTRACE_PROBE2(trans_param_disp,
+		    smb_xa_t *, xa, uint16_t, psdisp);
+		xa->req_param_mb.chain_offset = psdisp;
+	}
+	if (xa->req_data_mb.chain_offset != dsdisp) {
+		DTRACE_PROBE2(trans_data_disp,
+		    smb_xa_t *, xa, uint16_t, dsdisp);
+		xa->req_data_mb.chain_offset = dsdisp;
+	}
+
+	if (smb_mbc_copy(&xa->req_param_mb, &sr->command, psoff, pscnt)) {
 		mutex_exit(&xa->xa_mutex);
 		smb_xa_close(xa);
 		smbsr_error(sr, 0, ERRDOS, ERRbadformat);
 		return (SDRC_ERROR);
 	}
-	if (MBC_SHADOW_CHAIN(&xa->req_data_mb, &sr->command, dsoff, dscnt)) {
+	if (smb_mbc_copy(&xa->req_data_mb, &sr->command, dsoff, dscnt)) {
 		mutex_exit(&xa->xa_mutex);
 		smb_xa_close(xa);
 		smbsr_error(sr, 0, ERRDOS, ERRbadformat);
@@ -414,19 +456,6 @@ smb_nt_trans_dispatch(struct smb_request *sr, struct smb_xa *xa)
 	int rc;
 	int total_bytes, n_setup, n_param, n_data;
 	int param_off, param_pad, data_off, data_pad;
-
-	n_setup = (xa->smb_msrcnt < 200) ? xa->smb_msrcnt : 200;
-	n_setup++;
-	n_setup = n_setup & ~0x0001;
-	n_param = (xa->smb_mprcnt < smb_maxbufsize)
-	    ? xa->smb_mprcnt : smb_maxbufsize;
-	n_param++;
-	n_param = n_param & ~0x0001;
-	rc = smb_maxbufsize - (SMBHEADERSIZE + 28 + n_setup + n_param);
-	n_data = (xa->smb_mdrcnt < rc) ? xa->smb_mdrcnt : rc;
-	MBC_INIT(&xa->rep_setup_mb, n_setup * 2);
-	MBC_INIT(&xa->rep_param_mb, n_param);
-	MBC_INIT(&xa->rep_data_mb, n_data);
 
 	switch (xa->smb_func) {
 	case NT_TRANSACT_CREATE:
@@ -566,18 +595,18 @@ smb_com_nt_transact(struct smb_request *sr)
 	xa->req_disp_param = pscnt;
 	xa->req_disp_data  = dscnt;
 
-	if (MBC_SHADOW_CHAIN(&xa->req_setup_mb, &sr->smb_vwv,
+	if (smb_mbc_copy(&xa->req_setup_mb, &sr->smb_vwv,
 	    sr->smb_vwv.chain_offset, SetupCount * 2)) {
 		smb_xa_rele(sr->session, xa);
 		smbsr_error(sr, 0, ERRDOS, ERRbadformat);
 		return (SDRC_ERROR);
 	}
-	if (MBC_SHADOW_CHAIN(&xa->req_param_mb, &sr->command, psoff, pscnt)) {
+	if (smb_mbc_copy(&xa->req_param_mb, &sr->command, psoff, pscnt)) {
 		smb_xa_rele(sr->session, xa);
 		smbsr_error(sr, 0, ERRDOS, ERRbadformat);
 		return (SDRC_ERROR);
 	}
-	if (MBC_SHADOW_CHAIN(&xa->req_data_mb, &sr->command, dsoff, dscnt)) {
+	if (smb_mbc_copy(&xa->req_data_mb, &sr->command, dsoff, dscnt)) {
 		smb_xa_rele(sr->session, xa);
 		smbsr_error(sr, 0, ERRDOS, ERRbadformat);
 		return (SDRC_ERROR);
@@ -651,19 +680,36 @@ smb_com_nt_transact_secondary(struct smb_request *sr)
 		return (SDRC_ERROR);
 
 	mutex_enter(&xa->xa_mutex);
-	xa->smb_tpscnt = tpscnt;	/* might have shrunk */
-	xa->smb_tdscnt = tdscnt;	/* might have shrunk */
-	xa->xa_smb_fid = fid;		/* overwrite rules? */
-	xa->req_disp_param = psdisp+pscnt;
-	xa->req_disp_data  = dsdisp+dscnt;
+	if (xa->smb_tpscnt > tpscnt)
+		xa->smb_tpscnt = tpscnt;
+	if (xa->smb_tdscnt > tdscnt)
+		xa->smb_tdscnt = tdscnt;
+	if (fid != 0xFFFF)
+		xa->xa_smb_fid = fid;
+	xa->req_disp_param = psdisp + pscnt;
+	xa->req_disp_data  = dsdisp + dscnt;
 
-	if (MBC_SHADOW_CHAIN(&xa->req_param_mb, &sr->command, psoff, pscnt)) {
+	/*
+	 * See comment in smb_com_transaction_secondary
+	 */
+	if (xa->req_param_mb.chain_offset != psdisp) {
+		DTRACE_PROBE2(trans_param_disp,
+		    smb_xa_t *, xa, uint16_t, psdisp);
+		xa->req_param_mb.chain_offset = psdisp;
+	}
+	if (xa->req_data_mb.chain_offset != dsdisp) {
+		DTRACE_PROBE2(trans_data_disp,
+		    smb_xa_t *, xa, uint16_t, dsdisp);
+		xa->req_data_mb.chain_offset = dsdisp;
+	}
+
+	if (smb_mbc_copy(&xa->req_param_mb, &sr->command, psoff, pscnt)) {
 		mutex_exit(&xa->xa_mutex);
 		smb_xa_close(xa);
 		smbsr_error(sr, 0, ERRDOS, ERRbadformat);
 		return (SDRC_ERROR);
 	}
-	if (MBC_SHADOW_CHAIN(&xa->req_data_mb, &sr->command, dsoff, dscnt)) {
+	if (smb_mbc_copy(&xa->req_data_mb, &sr->command, dsoff, dscnt)) {
 		mutex_exit(&xa->xa_mutex);
 		smb_xa_close(xa);
 		smbsr_error(sr, 0, ERRDOS, ERRbadformat);
@@ -716,7 +762,7 @@ smb_encode_SHARE_INFO_2(struct mbuf_chain *output, struct mbuf_chain *text,
 	(void) smb_mbc_encodef(output, "wwwl9c.",
 	    access,
 	    sr->sr_cfg->skc_maxconnections,
-	    smb_server_get_session_count(),
+	    smb_server_get_session_count(sr->sr_server),
 	    MBC_LENGTH(text),
 	    pword);
 	(void) smb_mbc_encodef(text, "s", path);
@@ -774,12 +820,6 @@ smb_trans_net_share_enum(struct smb_request *sr, struct smb_xa *xa)
 
 	ASSERT(sr->uid_user);
 
-	/*
-	 * Initialize the mbuf chain of reply to zero. If it is not
-	 * zero, code inside the while loop will try to free the chain.
-	 */
-	bzero(&reply, sizeof (struct mbuf_chain));
-
 	if (smb_mbc_decodef(&xa->req_param_mb, "ww", &level,
 	    &esi.es_bufsize) != 0)
 		return (SDRC_NOT_IMPLEMENTED);
@@ -797,7 +837,7 @@ smb_trans_net_share_enum(struct smb_request *sr, struct smb_xa *xa)
 
 	esi.es_buf = smb_srm_zalloc(sr, esi.es_bufsize);
 	esi.es_posix_uid = crgetuid(sr->uid_user->u_cred);
-	smb_kshare_enum(&esi);
+	smb_kshare_enum(sr->sr_server, &esi);
 
 	/* client buffer size is not big enough to hold any shares */
 	if (esi.es_nsent == 0) {
@@ -807,14 +847,19 @@ smb_trans_net_share_enum(struct smb_request *sr, struct smb_xa *xa)
 	}
 
 	/*
+	 * Initialize the reply mbuf chain.  Note that we re-initialize
+	 * this on each pass through the loop below.
+	 */
+	MBC_SETUP(&reply, smb_maxbufsize);
+
+	/*
 	 * The rep_setup_mb is already initialized in smb_trans_dispatch().
 	 * Calling MBC_INIT() will initialized the structure and so the
 	 * pointer to the mbuf chains will be lost. Therefore, we need
 	 * to free the resources before calling MBC_INIT() again.
 	 */
 	n_setup = 0;	/* Setup count for NetShareEnum SMB is 0 */
-	m_freem(xa->rep_setup_mb.chain);
-	MBC_INIT(&xa->rep_setup_mb, n_setup * 2);
+	MBC_FLUSH(&xa->rep_setup_mb);
 
 	n_param = 8;
 	pkt_bufsize = sr->session->smb_msg_size -
@@ -828,8 +873,7 @@ smb_trans_net_share_enum(struct smb_request *sr, struct smb_xa *xa)
 		data_scnt = esi.es_datasize - tot_data_scnt;
 		if (data_scnt > pkt_bufsize)
 			data_scnt = pkt_bufsize;
-		m_freem(xa->rep_data_mb.chain);
-		MBC_INIT(&xa->rep_data_mb, data_scnt);
+		MBC_FLUSH(&xa->rep_data_mb);
 
 		(void) sprintf(fmt, "%dc", data_scnt);
 		(void) smb_mbc_encodef(&xa->rep_data_mb, fmt, sent_buf);
@@ -843,8 +887,7 @@ smb_trans_net_share_enum(struct smb_request *sr, struct smb_xa *xa)
 		param_off = SMB_HEADER_ED_LEN + RESP_HEADER_LEN;
 		param_disp = (first_resp) ? 0 : n_param;
 
-		m_freem(xa->rep_param_mb.chain);
-		MBC_INIT(&xa->rep_param_mb, param_scnt);
+		MBC_FLUSH(&xa->rep_param_mb);
 
 		if (first_resp) {
 			first_resp = B_FALSE;
@@ -862,19 +905,7 @@ smb_trans_net_share_enum(struct smb_request *sr, struct smb_xa *xa)
 		tot_packet_bytes = param_pad + param_scnt + data_pad +
 		    data_scnt;
 
-		/*
-		 * Calling MBC_INIT() will initialized the structure and so the
-		 * pointer to the mbuf chains will be lost. Therefore, we need
-		 * to free the resources if any before calling MBC_INIT().
-		 */
-		m_freem(reply.chain);
-		MBC_INIT(&reply, SMB_HEADER_ED_LEN
-		    + sizeof (uint8_t)		/* word parameters count */
-		    + 10*sizeof (uint16_t)	/* word parameters */
-		    + n_setup*sizeof (uint16_t)	/* setup parameters */
-		    + sizeof (uint16_t)		/* total data byte count */
-		    + tot_packet_bytes);
-
+		MBC_FLUSH(&reply);
 		(void) smb_mbc_encodef(&reply, SMB_HEADER_ED_FMT,
 		    sr->first_smb_com,
 		    sr->smb_rcls,
@@ -912,7 +943,10 @@ smb_trans_net_share_enum(struct smb_request *sr, struct smb_xa *xa)
 			smb_sign_reply(sr, &reply);
 
 		(void) smb_session_send(sr->session, 0, &reply);
+
 	}
+
+	m_freem(reply.chain);
 
 	return (SDRC_NO_REPLY);
 }
@@ -930,12 +964,12 @@ smb_trans_net_share_getinfo(smb_request_t *sr, struct smb_xa *xa)
 	    &share, &level, &max_bytes) != 0)
 		return (SDRC_NOT_IMPLEMENTED);
 
-	si = smb_kshare_lookup(share);
+	si = smb_kshare_lookup(sr->sr_server, share);
 	if ((si == NULL) || (si->shr_oemname == NULL)) {
 		(void) smb_mbc_encodef(&xa->rep_param_mb, "www",
 		    NERR_NetNameNotFound, 0, 0);
 		if (si)
-			smb_kshare_release(si);
+			smb_kshare_release(sr->sr_server, si);
 		return (SDRC_SUCCESS);
 	}
 
@@ -962,14 +996,14 @@ smb_trans_net_share_getinfo(smb_request_t *sr, struct smb_xa *xa)
 		break;
 
 	default:
-		smb_kshare_release(si);
+		smb_kshare_release(sr->sr_server, si);
 		(void) smb_mbc_encodef(&xa->rep_param_mb, "www",
 		    ERROR_INVALID_LEVEL, 0, 0);
 		m_freem(str_mb.chain);
 		return (SDRC_NOT_IMPLEMENTED);
 	}
 
-	smb_kshare_release(si);
+	smb_kshare_release(sr->sr_server, si);
 	(void) smb_mbc_encodef(&xa->rep_param_mb, "www", NERR_Success,
 	    -MBC_LENGTH(&xa->rep_data_mb),
 	    MBC_LENGTH(&xa->rep_data_mb) + MBC_LENGTH(&str_mb));
@@ -1349,16 +1383,85 @@ is_supported_mailslot(const char *mailslot)
 }
 
 /*
- * Currently, just return false if the pipe is \\PIPE\repl.
- * Otherwise, return true.
+ * smb_trans_nmpipe
+ *
+ * This is used for RPC bind and request transactions.
+ *
+ * If the data available from the pipe is larger than the maximum
+ * data size requested by the client, return as much as requested.
+ * The residual data remains in the pipe until the client comes back
+ * with a read request or closes the pipe.
+ *
+ * When we read less than what's available, we MUST return the
+ * status NT_STATUS_BUFFER_OVERFLOW (or ERRDOS/ERROR_MORE_DATA)
  */
-static boolean_t
-is_supported_pipe(const char *pname)
+static smb_sdrc_t
+smb_trans_nmpipe(smb_request_t *sr, smb_xa_t *xa)
 {
-	if (smb_strcasecmp(pname, PIPE_REPL, 0) == 0)
-		return (B_FALSE);
+	smb_vdb_t	vdb;
+	struct mbuf	*mb;
+	int rc;
 
-	return (B_TRUE);
+	smbsr_lookup_file(sr);
+	if (sr->fid_ofile == NULL) {
+		smbsr_error(sr, NT_STATUS_INVALID_HANDLE,
+		    ERRDOS, ERRbadfid);
+		return (SDRC_ERROR);
+	}
+
+	rc = smb_mbc_decodef(&xa->req_data_mb, "#B",
+	    xa->smb_tdscnt, &vdb);
+	if (rc != 0) {
+		/* Not enough data sent. */
+		smbsr_error(sr, 0, ERRSRV, ERRerror);
+		return (SDRC_ERROR);
+	}
+
+	rc = smb_opipe_write(sr, &vdb.vdb_uio);
+	if (rc != 0) {
+		smbsr_errno(sr, rc);
+		return (SDRC_ERROR);
+	}
+
+	vdb.vdb_tag = 0;
+	vdb.vdb_uio.uio_iov = &vdb.vdb_iovec[0];
+	vdb.vdb_uio.uio_iovcnt = MAX_IOVEC;
+	vdb.vdb_uio.uio_segflg = UIO_SYSSPACE;
+	vdb.vdb_uio.uio_extflg = UIO_COPY_DEFAULT;
+	vdb.vdb_uio.uio_loffset = (offset_t)0;
+	vdb.vdb_uio.uio_resid = xa->smb_mdrcnt;
+	mb = smb_mbuf_allocate(&vdb.vdb_uio);
+
+	rc = smb_opipe_read(sr, &vdb.vdb_uio);
+	if (rc != 0) {
+		m_freem(mb);
+		smbsr_errno(sr, rc);
+		return (SDRC_ERROR);
+	}
+
+	smb_mbuf_trim(mb, xa->smb_mdrcnt - vdb.vdb_uio.uio_resid);
+	MBC_ATTACH_MBUF(&xa->rep_data_mb, mb);
+
+	/*
+	 * If the output buffer holds a partial pipe message,
+	 * we're supposed to return NT_STATUS_BUFFER_OVERFLOW.
+	 * As we don't have message boundary markers, the best
+	 * we can do is return that status when we have ALL of:
+	 *	Output buffer was < SMB_PIPE_MAX_MSGSIZE
+	 *	We filled the output buffer (resid==0)
+	 *	There's more data (ioctl FIONREAD)
+	 */
+	if (xa->smb_mdrcnt < SMB_PIPE_MAX_MSGSIZE &&
+	    vdb.vdb_uio.uio_resid == 0) {
+		int nread = 0;
+		rc = smb_opipe_get_nread(sr, &nread);
+		if (rc == 0 && nread != 0) {
+			smbsr_status(sr, NT_STATUS_BUFFER_OVERFLOW,
+			    ERRDOS, ERROR_MORE_DATA);
+		}
+	}
+
+	return (SDRC_SUCCESS);
 }
 
 static smb_sdrc_t
@@ -1371,20 +1474,6 @@ smb_trans_dispatch(smb_request_t *sr, smb_xa_t *xa)
 	uint16_t	devstate;
 	char		*req_fmt;
 	char		*rep_fmt;
-	smb_vdb_t	vdb;
-
-	n_setup = (xa->smb_msrcnt < 200) ? xa->smb_msrcnt : 200;
-	n_setup++;
-	n_setup = n_setup & ~0x0001;
-	n_param = (xa->smb_mprcnt < smb_maxbufsize)
-	    ? xa->smb_mprcnt : smb_maxbufsize;
-	n_param++;
-	n_param = n_param & ~0x0001;
-	rc = smb_maxbufsize - (SMBHEADERSIZE + 28 + n_setup + n_param);
-	n_data =  (xa->smb_mdrcnt < rc) ? xa->smb_mdrcnt : rc;
-	MBC_INIT(&xa->rep_setup_mb, n_setup * 2);
-	MBC_INIT(&xa->rep_param_mb, n_param);
-	MBC_INIT(&xa->rep_data_mb, n_data);
 
 	if (xa->smb_suwcnt > 0 && STYPE_ISIPC(sr->tid_tree->t_res_type)) {
 		rc = smb_mbc_decodef(&xa->req_setup_mb, "ww", &opcode,
@@ -1401,26 +1490,11 @@ smb_trans_dispatch(smb_request_t *sr, smb_xa_t *xa)
 			break;
 
 		case TRANS_TRANSACT_NMPIPE:
-			smbsr_lookup_file(sr);
-			if (sr->fid_ofile == NULL) {
-				smbsr_error(sr, NT_STATUS_INVALID_HANDLE,
-				    ERRDOS, ERRbadfid);
-				return (SDRC_ERROR);
-			}
-
-			rc = smb_mbc_decodef(&xa->req_data_mb, "#B",
-			    xa->smb_tdscnt, &vdb);
-			if (rc != 0)
-				goto trans_err_not_supported;
-
-			rc = smb_opipe_transact(sr, &vdb.vdb_uio);
+			rc = smb_trans_nmpipe(sr, xa);
 			break;
 
 		case TRANS_WAIT_NMPIPE:
-			if (!is_supported_pipe(xa->xa_pipe_name)) {
-				smbsr_error(sr, 0, ERRDOS, ERRbadfile);
-				return (SDRC_ERROR);
-			}
+			delay(SEC_TO_TICK(1));
 			rc = SDRC_SUCCESS;
 			break;
 
@@ -1548,23 +1622,13 @@ smb_trans2_dispatch(smb_request_t *sr, smb_xa_t *xa)
 {
 	int		rc, pos;
 	int		total_bytes, n_setup, n_param, n_data;
-	int		param_off, param_pad, data_off, data_pad;
+	int		param_off, param_pad, data_off;
+	uint16_t	data_pad;
 	uint16_t	opcode;
 	uint16_t  nt_unknown_secret = 0x0100;
 	char *fmt;
 
-	n_setup = (xa->smb_msrcnt < 200) ? xa->smb_msrcnt : 200;
-	n_setup++;
-	n_setup = n_setup & ~0x0001;
-	n_param = (xa->smb_mprcnt < smb_maxbufsize)
-	    ? xa->smb_mprcnt : smb_maxbufsize;
-	n_param++;
-	n_param = n_param & ~0x0001;
-	rc = smb_maxbufsize - (SMBHEADERSIZE + 28 + n_setup + n_param);
-	n_data =  (xa->smb_mdrcnt < rc) ? xa->smb_mdrcnt : rc;
-	MBC_INIT(&xa->rep_setup_mb, n_setup * 2);
-	MBC_INIT(&xa->rep_param_mb, n_param);
-	MBC_INIT(&xa->rep_data_mb, n_data);
+	n_data = xa->smb_mdrcnt;
 
 	if (smb_mbc_decodef(&xa->req_setup_mb, "w", &opcode) != 0)
 		goto trans_err_not_supported;
@@ -1720,7 +1784,6 @@ smb_trans2_dispatch(smb_request_t *sr, smb_xa_t *xa)
 		/* Param off from hdr start */
 		data_off = param_off + n_param + data_pad;
 		fmt = "bww2.wwwwwwb.Cw#.C#.C";
-		/*LINTED E_ASSIGN_NARROW_CONV*/
 		nt_unknown_secret = data_pad;
 	}
 
@@ -1768,6 +1831,10 @@ trans_err:
 	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 }
 
+static uint32_t smb_xa_max_setup_count = 200;
+static uint32_t smb_xa_max_param_count = 32 * 1024;
+static uint32_t smb_xa_max_data_count  = 64 * 1024;
+
 smb_xa_t *
 smb_xa_create(
     smb_session_t	*session,
@@ -1782,6 +1849,28 @@ smb_xa_create(
 	smb_xa_t	*xa, *nxa;
 	smb_llist_t	*xlist;
 
+	/*
+	 * Sanity check what the client says it will send.
+	 * Caller handles NULL return as ERRnoroom.
+	 */
+	if (setup_word_count > smb_xa_max_setup_count)
+		return (NULL);
+	if (total_parameter_count > smb_xa_max_param_count)
+		return (NULL);
+	if (total_data_count > smb_xa_max_data_count)
+		return (NULL);
+
+	/*
+	 * Limit what the client asks us to allocate for
+	 * returned setup, params, data.
+	 */
+	if (max_setup_count > smb_xa_max_setup_count)
+		max_setup_count = smb_xa_max_setup_count;
+	if (max_parameter_count > smb_xa_max_param_count)
+		max_parameter_count = smb_xa_max_param_count;
+	if (max_data_count > smb_xa_max_data_count)
+		max_data_count = smb_xa_max_data_count;
+
 	xa = kmem_zalloc(sizeof (smb_xa_t), KM_SLEEP);
 	xa->xa_refcnt = 1;
 	xa->smb_com = sr->smb_com;
@@ -1791,6 +1880,7 @@ smb_xa_create(
 	xa->smb_pid = sr->smb_pid;
 	xa->smb_uid = sr->smb_uid;
 	xa->xa_smb_mid = sr->smb_mid;
+	xa->xa_smb_fid = 0xFFFF;
 	xa->reply_seqnum = sr->reply_seqnum;
 	xa->smb_tpscnt = total_parameter_count;
 	xa->smb_tdscnt = total_data_count;
@@ -1800,6 +1890,16 @@ smb_xa_create(
 	xa->smb_suwcnt = setup_word_count;
 	xa->xa_session = session;
 	xa->xa_magic = SMB_XA_MAGIC;
+
+	/* request parts */
+	xa->req_setup_mb.max_bytes = setup_word_count * 2;
+	xa->req_param_mb.max_bytes = total_parameter_count;
+	xa->req_data_mb.max_bytes  = total_data_count;
+
+	/* reply parts */
+	xa->rep_setup_mb.max_bytes = max_setup_count * 2;
+	xa->rep_param_mb.max_bytes = max_parameter_count;
+	xa->rep_data_mb.max_bytes =  max_data_count;
 
 	/*
 	 * The new xa structure is checked against the current list to see
@@ -1834,6 +1934,15 @@ smb_xa_delete(smb_xa_t *xa)
 	if (xa->xa_pipe_name)
 		smb_mem_free(xa->xa_pipe_name);
 
+	/* request parts */
+	if (xa->req_setup_mb.chain != NULL)
+		m_freem(xa->req_setup_mb.chain);
+	if (xa->req_param_mb.chain != NULL)
+		m_freem(xa->req_param_mb.chain);
+	if (xa->req_data_mb.chain != NULL)
+		m_freem(xa->req_data_mb.chain);
+
+	/* reply parts */
 	if (xa->rep_setup_mb.chain != NULL)
 		m_freem(xa->rep_setup_mb.chain);
 	if (xa->rep_param_mb.chain != NULL)
@@ -1919,11 +2028,22 @@ smb_xa_complete(smb_xa_t *xa)
 
 	mutex_enter(&xa->xa_mutex);
 	if (xa->xa_flags & (SMB_XA_FLAG_COMPLETE | SMB_XA_FLAG_CLOSE)) {
-		rc = 0;
+		rc = 0; /* error ("not complete") */
 	} else {
-		rc = 1;
+		rc = 1; /* Yes, "complete" */
 		xa->xa_flags |= SMB_XA_FLAG_COMPLETE;
+
+		/*
+		 * During trans & trans-secondary processing,
+		 * we copied the request data into these.
+		 * Now we want to parse them, so we need to
+		 * move the "finger" back to the beginning.
+		 */
+		xa->req_setup_mb.chain_offset = 0;
+		xa->req_param_mb.chain_offset = 0;
+		xa->req_data_mb.chain_offset  = 0;
 	}
+
 	mutex_exit(&xa->xa_mutex);
 	return (rc);
 }

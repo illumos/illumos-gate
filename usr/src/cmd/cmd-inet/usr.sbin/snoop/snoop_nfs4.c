@@ -18,6 +18,11 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ */
+
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -1152,7 +1157,7 @@ component_name(component4 *cp)
 static char *
 linktext_name(linktext4 *lp)
 {
-	return (utf8localize(lp));
+	return (utf8localize((utf8string *)lp));
 }
 
 /*
@@ -1388,7 +1393,7 @@ detail_createtype4(createtype4 *crtp)
 	switch (crtp->type) {
 	case NF4LNK:
 		sprintf(get_line(0, 0), "Linkdata = %s",
-		    utf8localize(&crtp->createtype4_u.linkdata));
+		    utf8localize((utf8string *)&crtp->createtype4_u.linkdata));
 		break;
 	case NF4BLK:
 	case NF4CHR:

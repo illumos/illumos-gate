@@ -235,7 +235,7 @@ dsngl_enque(opaque_t queuep, struct buf *in_bp)
 		kstat_waitq_enter(KSTAT_IO_PTR(dsnglp->ds_kstat));
 	}
 	if (TGCOM_PKT(tgcom_objp, in_bp, dsngl_restart,
-		(caddr_t)dsnglp) != DDI_SUCCESS) {
+	    (caddr_t)dsnglp) != DDI_SUCCESS) {
 
 		dsnglp->ds_bp = in_bp;
 		mutex_exit(&dsnglp->ds_mutex);
@@ -369,7 +369,7 @@ dmult_enque(opaque_t queuep, struct buf *in_bp)
 	}
 
 	if (TGCOM_PKT(tgcom_objp, in_bp, dmult_restart,
-		(caddr_t)dmultp) != DDI_SUCCESS) {
+	    (caddr_t)dmultp) != DDI_SUCCESS) {
 
 		dmultp->ds_bp = in_bp;
 		mutex_exit(&dmultp->ds_mutex);
@@ -859,7 +859,7 @@ qmerge_create()
 
 	queobjp->que_ops = &qmerge_ops;
 	qfp = (struct que_data *)(queobjp+1);
-	qfp->q_tab.hd_private = qfp->q_tab.hd_private = 0;
+	qfp->q_tab.hd_private = 0;
 	qfp->q_tab.hd_sync_next = qfp->q_tab.hd_async_next = NULL;
 	qfp->q_tab.hd_cnt = (void *)qmerge_sync2async;
 	queobjp->que_data = (opaque_t)qfp;
@@ -1176,7 +1176,7 @@ begin_nextbp:
 				} else {
 					flags &= ~QNEAR_ASYNCALSO;
 					SYNC2ASYNC(qfp) =
-						(void *)qmerge_sync2async;
+					    (void *)qmerge_sync2async;
 					qfp->q_tab.hd_private = 0;
 					goto begin_nextbp;
 				}
@@ -1232,7 +1232,7 @@ begin_nextbp:
 					if (*async_bpp)
 						flags |= QNEAR_ASYNCALSO;
 					SYNC2ASYNC(qfp) =
-						(void *)qmerge_sync2async;
+					    (void *)qmerge_sync2async;
 				}
 				private = 0;
 			}
@@ -1250,7 +1250,7 @@ begin_nextbp:
 					if (*async_bpp)
 						flags |= QNEAR_ASYNCALSO;
 					SYNC2ASYNC(qfp) =
-						(void *)qmerge_sync2async;
+					    (void *)qmerge_sync2async;
 				}
 			}
 		} else if (qmerge2wayscan == 0) {

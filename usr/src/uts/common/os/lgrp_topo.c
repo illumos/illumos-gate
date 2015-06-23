@@ -1480,7 +1480,7 @@ lgrp_topo_update(lgrp_t **lgrps, int lgrp_count, klgrpset_t *changed)
 	}
 
 	mutex_enter(&cpu_lock);
-	pause_cpus(NULL);
+	pause_cpus(NULL, NULL);
 
 	/*
 	 * Look for any leaf lgroup without its latency set, finish adding it

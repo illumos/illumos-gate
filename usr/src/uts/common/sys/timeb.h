@@ -1,12 +1,12 @@
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_TIMEB_H
 #define	_SYS_TIMEB_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -60,11 +60,7 @@ struct timeb {
 	short	dstflag;		/* DST == non-zero */
 };
 
-#if defined(__STDC__)
 extern int ftime(struct timeb *);
-#else
-extern int ftime();
-#endif
 
 #ifdef	__cplusplus
 }

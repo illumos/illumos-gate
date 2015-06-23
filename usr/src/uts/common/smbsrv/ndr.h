@@ -21,6 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _SMBSRV_NDR_H
@@ -38,7 +40,9 @@
  * ogspecs@opengroup.org
  */
 
-#ifndef _KERNEL
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
+#error "not used in kernel code"
+#else /* _KERNEL */
 #include <sys/types.h>
 #include <sys/uio.h>
 #include <syslog.h>
@@ -47,7 +51,7 @@
 #include <smbsrv/wintypes.h>
 #include <smbsrv/ndl/rpcpdu.ndl>
 #include <smbsrv/string.h>
-#endif
+#endif	/* _KERNEL */
 
 #ifdef __cplusplus
 extern "C" {
@@ -230,20 +234,6 @@ typedef struct ndr_stream_ops {
 #define	NDS_RESET(NDS)		(*(NDS)->ndo->ndo_reset)(NDS)
 #define	NDS_DESTRUCT(NDS)	(*(NDS)->ndo->ndo_destruct)(NDS)
 
-typedef struct ndr_frag {
-	struct ndr_frag *next;
-	uint8_t *buf;
-	uint32_t len;
-} ndr_frag_t;
-
-typedef struct ndr_fraglist {
-	struct uio	uio;
-	iovec_t		*iov;
-	ndr_frag_t	*head;
-	ndr_frag_t	*tail;
-	uint32_t	nfrag;
-} ndr_fraglist_t;
-
 typedef struct ndr_stream {
 	unsigned long		pdu_size;
 	unsigned long		pdu_max_size;
@@ -251,7 +241,6 @@ typedef struct ndr_stream {
 	unsigned long		pdu_scan_offset;
 	unsigned char		*pdu_base_addr;
 
-	ndr_fraglist_t		frags;
 	ndr_stream_ops_t	*ndo;
 
 	unsigned char		m_op;

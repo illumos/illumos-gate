@@ -852,7 +852,7 @@ mntopen(vnode_t **vpp, int flag, cred_t *cr, caller_context_t *ct)
 	nmnp = mntgetnode(vp);
 
 	*vpp = MTOV(nmnp);
-	atomic_add_32(&MTOD(nmnp)->mnt_nopen, 1);
+	atomic_inc_32(&MTOD(nmnp)->mnt_nopen);
 	VN_RELE(vp);
 	return (0);
 }
@@ -875,7 +875,7 @@ mntclose(vnode_t *vp, int flag, int count, offset_t offset, cred_t *cr,
 		mntfs_freesnap(mnp, &mnp->mnt_read);
 		mntfs_freesnap(mnp, &mnp->mnt_ioctl);
 		rw_exit(&mnp->mnt_contents);
-		atomic_add_32(&MTOD(mnp)->mnt_nopen, -1);
+		atomic_dec_32(&MTOD(mnp)->mnt_nopen);
 	}
 	return (0);
 }

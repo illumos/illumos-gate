@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Kernel Physical Mapping (kpm) segment driver (segkpm).
  *
@@ -136,6 +134,7 @@ static struct seg_ops segkpm_ops = {
 	SEGKPM_BADOP(int),	/* getmemid */
 	SEGKPM_BADOP(lgrp_mem_policy_info_t *),	/* getpolicy */
 	segkpm_capable,		/* capable */
+	seg_inherit_notsup	/* inherit */
 };
 
 /*
@@ -160,8 +159,8 @@ segkpm_create(struct seg *seg, void *argsp)
 
 	ASSERT(seg->s_as && RW_WRITE_HELD(&seg->s_as->a_lock));
 	ASSERT(btokpmp(seg->s_size) >= 1 &&
-		kpmpageoff((uintptr_t)seg->s_base) == 0 &&
-		kpmpageoff((uintptr_t)seg->s_base + seg->s_size) == 0);
+	    kpmpageoff((uintptr_t)seg->s_base) == 0 &&
+	    kpmpageoff((uintptr_t)seg->s_base + seg->s_size) == 0);
 
 	skd = kmem_zalloc(sizeof (struct segkpm_data), KM_SLEEP);
 
@@ -193,7 +192,7 @@ segkpm_create(struct seg *seg, void *argsp)
 	skd->skd_nvcolors = b->nvcolors;
 
 	p = skd->skd_va_select =
-		kmem_zalloc(NCPU * b->nvcolors * sizeof (ushort_t), KM_SLEEP);
+	    kmem_zalloc(NCPU * b->nvcolors * sizeof (ushort_t), KM_SLEEP);
 
 	for (i = 0; i < NCPU; i++)
 		for (j = 0; j < b->nvcolors; j++, p++)

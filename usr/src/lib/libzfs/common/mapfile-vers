@@ -20,7 +20,7 @@
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2011 Nexenta Systems, Inc. All rights reserved.
-# Copyright (c) 2013 by Delphix. All rights reserved.
+# Copyright (c) 2011, 2014 by Delphix. All rights reserved.
 #
 # MAPFILE HEADER START
 #
@@ -75,6 +75,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zfs_expand_proplist;
 	zfs_get_handle;
 	zfs_get_holds;
+	zfs_get_hole_count;
 	zfs_get_name;
 	zfs_get_pool_handle;
 	zfs_get_user_props;
@@ -121,6 +122,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zfs_prop_is_string;
 	zfs_prop_readonly;
 	zfs_prop_set;
+	zfs_prop_set_list;
 	zfs_prop_string_to_index;
 	zfs_prop_to_name;
 	zfs_prop_user;

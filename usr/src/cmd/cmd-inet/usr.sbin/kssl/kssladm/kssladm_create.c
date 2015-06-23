@@ -577,7 +577,7 @@ load_from_pkcs11(KMF_HANDLE_T kmfh,
 	KMF_X509_DER_CERT cert;
 	KMF_KEY_HANDLE key, rawkey;
 	KMF_CREDENTIAL creds;
-	KMF_DATA iddata = { NULL, 0 };
+	KMF_DATA iddata = { 0, NULL };
 	kssl_params_t *kssl_params = NULL;
 	uint32_t ncerts, nkeys;
 	char *err, *idstr = NULL;

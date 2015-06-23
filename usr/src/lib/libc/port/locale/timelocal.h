@@ -1,4 +1,5 @@
 /*
+ * Copyright 2013 Garrett D'Amore <garrett@damore.org>
  * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1997-2002 FreeBSD Project.
  * All rights reserved.
@@ -32,7 +33,7 @@
  * Private header file for the strftime and strptime localization
  * stuff.
  */
-struct lc_time_T {
+struct lc_time {
 	const char	*mon[12];
 	const char	*month[12];
 	const char	*wday[7];
@@ -46,7 +47,7 @@ struct lc_time_T {
 	const char	*ampm_fmt;
 };
 
-struct lc_time_T *__get_current_time_locale(void);
+struct lc_time *__get_current_time_locale(void);
 int	__time_load_locale(const char *);
 
 #endif /* !_TIMELOCAL_H_ */

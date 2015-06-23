@@ -1,21 +1,32 @@
 '\" te
 .\" Copyright (c) 2003, Sun Microsystems, Inc.
 .\" All Rights Reserved.
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH MOD_IPP 4 "Nov 26, 2003"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.TH MOD_IPP 4 "Feb 14, 2015"
 .SH NAME
 mod_ipp \- Embedded Internet Print Protocol (IPP) listener for the Apache HTTP
 server
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/apache/libexec/mod_ipp.so\fR
+\fB/usr/lib/lp/ipp/mod_ipp.so\fR
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBmod_ipp\fR module implements RFCs 2910 and 2911 to provide an IPP
 handling service for the Apache HTTP server. When loaded on the Apache server,
@@ -23,7 +34,6 @@ handling service for the Apache HTTP server. When loaded on the Apache server,
 \fBapplication/ipp\fR. The \fBmod_ipp\fR module also processes additional
 configuration directives to enable or disable portions of the protocol support.
 .SS "Using Configuration Directives"
-.sp
 .LP
 The following is a list of configuration directives that apply to the Apache
 IPP Listening service:
@@ -50,7 +60,6 @@ will disable support for the named operation.
 .RE
 .RE
 .SS "Operations"
-.sp
 .LP
 The following is a list of IPP handling service operations:
 .sp
@@ -248,83 +257,20 @@ operations implemented by the \fBmod_ipp\fR Apache module.
 The following configuration file can be used to start a standalone Apache
 server to respond to IPP request sent to port 631.
 
-.sp
-.in +2
+See
 .nf
-ServerType standalone
-ServerRoot "/usr/apache"
-PidFile /var/run/httpd-standalone-ipp.pid
-ErrorLog /var/lp/logs/ipp-errors
-
-Timeout 300
-KeepAlive On
-MaxKeepAliveRequests 100
-KeepAliveTimeout 15
-
-MinSpareServers 1
-MaxSpareServers 3
-StartServers 1
-MaxClients 150
-MaxRequestsPerChild 0
-
-LoadModule ipp_module libexec/mod_ipp.so
-
-ClearModuleList
-AddModule mod_ipp.c
-AddModule mod_so.c
-
-Port 631
-
-User lp
-Group lp
-
-ServerAdmin lp@localhost
-DefaultType application/ipp
-
-<IFModule mod_app>
-        <Location />
-               ipp-operation all on
-        </Location>
-</IFModule mod_app>
+ \fB/etc/lp/ipp/httpd-standalone-ipp.conf\fR
 .fi
-.in -2
 
-.sp
-.LP
-A more restrictive configuration might include the following parameters:
-
-.sp
-.in +2
-.nf
-<IFModule mod_app>
-        <Location />
-               ipp-operation all offn
-               ipp-operation required on
-        </Location>
-</IFModule mod_app>
-.fi
-.in -2
-
-.SH ATTRIBUTES
-.sp
-.LP
-See \fBattributes\fR(5) or descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Interface Stability	External
-.TE
+Note that this will require a usable printer configured under the
+\fBlp\fR print system.  See \fBlpadmin\fR(1M) for details.
+The CUPS printing system has its own IPP listener separate from
+this Apache module.  See \fBprint-service\fR for instructions
+on switching between the \fBlp\fR and \fBcups\fR systems.
 
 .SH SEE ALSO
-.sp
 .LP
-\fBman\fR(1), \fBcatman\fR(1M), \fBattributes\fR(5)
+\fBlp\fR(1), \fBlpadmin\fR(1M), \fBprint-service\fR(1M)
 .sp
 .LP
 Herriot, R., Ed., Butler, S., Moore, P., Turner, R., Wenn, J. \fIRFC 2910,
@@ -339,7 +285,6 @@ Group. September 2000.
 .LP
 http://www.apache.org
 .SH NOTES
-.sp
 .LP
 Configuration file directives are processed in the order listed in the config
 file. The default behavior is to enable support for all operations implemented
@@ -390,7 +335,6 @@ information is available at http://www.apache.org
 .sp
 .LP
 The \fBhttpd\fR(8) man page and other Apache man pages are provided with the
-programming modules. To view the Apache manual pages with the man command, add
-\fB/usr/apache/man\fR to the \fBMANPATH\fR environment variable. See
-\fBman\fR(1) for  more information. Running \fBcatman\fR(1M) on the Apache
-manual pages is not supported.
+programming modules. To view the Apache manual pages with the man command,
+add (i.e.) \fB/usr/apache2/2.2/man\fR to the \fBMANPATH\fR environment
+variable. See \fBman\fR(1) for  more information.

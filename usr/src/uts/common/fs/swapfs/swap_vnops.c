@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -116,8 +117,6 @@ swap_getpage(
 	struct cred *cr,
 	caller_context_t *ct)
 {
-	int err;
-
 	SWAPFS_PRINT(SWAP_VOPS, "swap_getpage: vp %p, off %llx, len %lx\n",
 	    (void *)vp, off, len, 0, 0);
 
@@ -125,19 +124,12 @@ swap_getpage(
 	    "swapfs getpage:vp %p off %llx len %ld",
 	    (void *)vp, off, len);
 
-	if (len <= PAGESIZE) {
-		err = swap_getapage(vp, (u_offset_t)off, len, protp, pl, plsz,
-		    seg, addr, rw, cr);
-	} else {
-		err = pvn_getpages(swap_getapage, vp, (u_offset_t)off, len,
-		    protp, pl, plsz, seg, addr, rw, cr);
-	}
-
-	return (err);
+	return (pvn_getpages(swap_getapage, vp, (u_offset_t)off, len, protp,
+	    pl, plsz, seg, addr, rw, cr));
 }
 
 /*
- * Called from pvn_getpages or swap_getpage to get a particular page.
+ * Called from pvn_getpages to get a particular page.
  */
 /*ARGSUSED*/
 static int

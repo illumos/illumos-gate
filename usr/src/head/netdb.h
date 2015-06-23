@@ -1,4 +1,6 @@
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -121,7 +123,10 @@ struct addrinfo {
 	struct addrinfo *ai_next;	/* next structure in linked list */
 };
 
-
+/*
+ * The flag 0x8000 is currently reserved for private use between libnsl and
+ * libsocket. See lib/libsocket/inet/getaddrinfo.c for more information.
+ */
 /* addrinfo flags */
 #define	AI_PASSIVE	0x0008	/* intended for bind() + listen() */
 #define	AI_CANONNAME	0x0010	/* return canonical version of host */
@@ -229,7 +234,6 @@ struct	servent {
 	char	*s_proto;	/* protocol to use */
 };
 
-#ifdef	__STDC__
 #if !defined(_XPG4_2) || defined(__EXTENSIONS__)
 struct hostent	*gethostbyname_r
 	(const char *, struct hostent *, char *, int, int *h_errnop);
@@ -353,81 +357,6 @@ void freeipsecalgent(struct ipsecalgent *ptr);
 /* END IPsec algorithm prototype definitions */
 
 #endif /* !defined(_XPG4_2) || defined(__EXTENSIONS__) */
-#else	/* __STDC__ */
-struct hostent	*gethostbyname_r();
-struct hostent	*gethostbyaddr_r();
-struct hostent	*getipnodebyname();
-struct hostent	*getipnodebyaddr();
-void		 freehostent();
-struct hostent	*gethostent_r();
-struct servent	*getservbyname_r();
-struct servent	*getservbyport_r();
-struct servent	*getservent_r();
-struct netent	*getnetbyname_r();
-struct netent	*getnetbyaddr_r();
-struct netent	*getnetent_r();
-struct protoent	*getprotobyname_r();
-struct protoent	*getprotobynumber_r();
-struct protoent	*getprotoent_r();
-int		 getnetgrent_r();
-int		 innetgr();
-
-/* Old interfaces that return a pointer to a static area;  MT-unsafe */
-struct hostent	*gethostbyname();
-struct hostent	*gethostbyaddr();
-struct hostent	*gethostent();
-struct netent	*getnetbyname();
-struct netent	*getnetbyaddr();
-struct netent	*getnetent();
-struct servent	*getservbyname();
-struct servent	*getservbyport();
-struct servent	*getservent();
-struct protoent	*getprotobyname();
-struct protoent	*getprotobynumber();
-struct protoent	*getprotoent();
-int		 getnetgrent();
-
-int sethostent();
-int endhostent();
-int setnetent();
-int endnetent();
-int setservent();
-int endservent();
-int setprotoent();
-int endprotoent();
-int setnetgrent();
-int endnetgrent();
-int rcmd();
-int rcmd_af();
-int rexec();
-int rexec_af();
-int rresvport();
-int rresvport_af();
-int rresvport_addr();
-int ruserok();
-/* BIND */
-struct hostent	*gethostbyname2();
-void		herror();
-char		*hstrerror();
-/* IPv6 prototype definitons */
-int		getaddrinfo();
-void		freeaddrinfo();
-const char	*gai_strerror();
-int		getnameinfo();
-/* END IPv6 prototype definitions */
-/* End BIND */
-
-#if !defined(_XPG4_2) || defined(__EXTENSIONS__)
-/* IPsec algorithm prototype definitions */
-struct ipsecalgent *getalgbyname();
-struct ipsecalgent *getalgbydoi();
-int getdoidomainbyname();
-const char *getdoidomainbynum();
-void freealgent();
-/* END IPsec algorithm prototype definitions */
-#endif /* !defined(_XPG4_2) || defined(__EXTENSIONS__) */
-
-#endif	/* __STDC__ */
 
 /*
  * Error return codes from gethostbyname() and gethostbyaddr()
@@ -437,11 +366,7 @@ void freealgent();
 extern  int h_errno;
 
 #ifdef	_REENTRANT
-#ifdef	__STDC__
 extern int	*__h_errno(void);
-#else
-extern int	*__h_errno();
-#endif	/* __STDC__ */
 
 /* Only #define h_errno if there is no conflict with other use */
 #ifdef	H_ERRNO_IS_FUNCTION

@@ -56,7 +56,7 @@ tests = ['atime_001_pos', 'atime_002_neg']
 
 [/opt/zfs-tests/tests/functional/bootfs]
 tests = ['bootfs_001_pos', 'bootfs_002_neg', 'bootfs_003_pos',
-    'bootfs_004_neg', 'bootfs_005_neg', 'bootfs_006_pos', 'bootfs_007_neg',
+    'bootfs_004_neg', 'bootfs_005_neg', 'bootfs_006_pos', 'bootfs_007_pos',
     'bootfs_008_neg']
 pre =
 post =
@@ -351,6 +351,9 @@ tests = ['history_001_pos', 'history_002_pos', 'history_003_pos',
     'history_004_pos', 'history_005_neg', 'history_006_neg', 'history_007_pos',
     'history_008_pos', 'history_009_pos', 'history_010_pos']
 
+[/opt/zfs-tests/tests/functional/holes]
+tests = ['holes_sanity']
+
 [/opt/zfs-tests/tests/functional/inheritance]
 tests = ['inherit_001_pos']
 pre =
@@ -397,7 +400,7 @@ tests = ['mv_files_001_pos', 'mv_files_002_pos']
 tests = ['nestedfs_001_pos']
 
 [/opt/zfs-tests/tests/functional/no_space]
-tests = ['enospc_001_pos']
+tests = ['enospc_001_pos', 'enospc_002_pos']
 
 [/opt/zfs-tests/tests/functional/nopwrite]
 tests = ['nopwrite_copies', 'nopwrite_mtime', 'nopwrite_negative',
@@ -455,7 +458,7 @@ tests = ['rootpool_002_neg', 'rootpool_003_neg', 'rootpool_007_neg']
 tests = ['rsend_001_pos', 'rsend_002_pos', 'rsend_003_pos', 'rsend_004_pos',
     'rsend_005_pos', 'rsend_006_pos', 'rsend_007_pos', 'rsend_008_pos',
     'rsend_009_pos', 'rsend_010_pos', 'rsend_011_pos', 'rsend_012_pos',
-    'rsend_013_pos']
+    'rsend_013_pos', 'rsend_014_pos']
 
 [/opt/zfs-tests/tests/functional/scrub_mirror]
 tests = ['scrub_mirror_001_pos', 'scrub_mirror_002_pos',
@@ -524,3 +527,8 @@ tests = ['zvol_misc_001_neg', 'zvol_misc_002_pos', 'zvol_misc_003_neg',
 [/opt/zfs-tests/tests/functional/zvol/zvol_swap]
 tests = ['zvol_swap_001_pos', 'zvol_swap_002_pos', 'zvol_swap_003_pos',
     'zvol_swap_004_pos', 'zvol_swap_005_pos', 'zvol_swap_006_pos']
+
+[/opt/zfs-tests/tests/functional/libzfs]
+tests = ['many_fds']
+pre =
+post =

@@ -24,14 +24,14 @@
 
 
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright (c) 1995, 1998 by Sun Microsystems, Inc.
  * All rights reserved.
  */
 
 #ifndef _SYS_POLL_H
 #define	_SYS_POLL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 11.9 */
 
 #ifdef	__cplusplus
 extern "C" {
@@ -138,11 +138,7 @@ extern void pollhead_clean(pollhead_t *);
 #endif /* defined(_KERNEL) || defined(_KMEMUSER) */
 
 #if !defined(_KERNEL)
-#if defined(__STDC__)
 int poll(struct pollfd *, nfds_t, int);
-#else
-int poll();
-#endif /* __STDC__ */
 #endif /* !_KERNEL */
 
 #ifdef	__cplusplus

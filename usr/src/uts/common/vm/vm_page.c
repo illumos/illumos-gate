@@ -79,8 +79,6 @@
 #include <sys/ddi.h>
 #include <sys/modctl.h>
 
-static int nopageage = 0;
-
 static pgcnt_t max_page_get;	/* max page_get request size in pages */
 pgcnt_t total_pages = 0;	/* total number of pages (used by /proc) */
 
@@ -317,7 +315,7 @@ struct memseg_stats {
 } memseg_stats;
 
 #define	MEMSEG_STAT_INCR(v) \
-	atomic_add_32(&memseg_stats.v, 1)
+	atomic_inc_32(&memseg_stats.v)
 #else
 #define	MEMSEG_STAT_INCR(x)
 #endif
@@ -2691,7 +2689,7 @@ page_free(page_t *pp, int dontneed)
 	} else {
 		PP_CLRAGED(pp);
 
-		if (!dontneed || nopageage) {
+		if (!dontneed) {
 			/* move it to the tail of the list */
 			page_list_add(pp, PG_CACHE_LIST | PG_LIST_TAIL);
 

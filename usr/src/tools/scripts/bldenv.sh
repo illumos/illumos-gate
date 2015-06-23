@@ -23,6 +23,7 @@
 #
 # Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2014 Garrett D'Amore <garrett@damore.org>
 #
 # Uses supplied "env" file, based on /opt/onbld/etc/env, to set shell variables
 # before spawning a shell for doing a release-style builds interactively
@@ -229,7 +230,7 @@ shift
 # must match the getopts in nightly.sh
 OPTIND=1
 NIGHTLY_OPTIONS="-${NIGHTLY_OPTIONS#-}"
-while getopts '+0ABCDdFfGIilMmNnpRrtUuwW' FLAG "$NIGHTLY_OPTIONS"
+while getopts '+0ABCDdFfGIilMmNnpRrtUuwW' FLAG $NIGHTLY_OPTIONS
 do
 	case "$FLAG" in
 	  t)	flags.t=true  ;;
@@ -292,9 +293,6 @@ if "${flags.t}" ; then
 
 	export CTFCONVERT="${TOOLS_PROTO}/opt/onbld/bin/${MACH}/ctfconvert"
 	export CTFMERGE="${TOOLS_PROTO}/opt/onbld/bin/${MACH}/ctfmerge"
-
-	export CTFCVTPTBL="${TOOLS_PROTO}/opt/onbld/bin/ctfcvtptbl"
-	export CTFFINDMOD="${TOOLS_PROTO}/opt/onbld/bin/ctffindmod"
 
 	PATH="${TOOLS_PROTO}/opt/onbld/bin/${MACH}:${PATH}"
 	PATH="${TOOLS_PROTO}/opt/onbld/bin:${PATH}"

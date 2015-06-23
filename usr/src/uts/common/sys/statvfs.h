@@ -22,16 +22,15 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_STATVFS_H
 #define	_SYS_STATVFS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.10 */
 
 #include <sys/feature_tests.h>
 #include <sys/types.h>
@@ -188,7 +187,6 @@ typedef struct statvfs64_32 {
 #endif
 #endif	/* _LP64 && _LARGEFILE64_SOURCE */
 
-#if defined(__STDC__)
 int statvfs(const char *_RESTRICT_KYWD, statvfs_t *_RESTRICT_KYWD);
 int fstatvfs(int, statvfs_t *);
 
@@ -198,7 +196,6 @@ int fstatvfs(int, statvfs_t *);
 int statvfs64(const char *_RESTRICT_KYWD, statvfs64_t *_RESTRICT_KYWD);
 int fstatvfs64(int, statvfs64_t *);
 #endif	/* _LARGEFILE64_SOURCE... */
-#endif	/* defined(__STDC__) */
 #endif	/* !defined(_KERNEL) */
 
 #ifdef	__cplusplus

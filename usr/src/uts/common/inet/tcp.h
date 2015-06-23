@@ -22,6 +22,7 @@
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011, Joyent, Inc. All rights reserved.
  * Copyright (c) 2011 Nexenta Systems, Inc. All rights reserved.
+ * Copyright (c) 2014 by Delphix. All rights reserved.
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -180,7 +181,6 @@ typedef struct tcp_s {
 	uint32_t tcp_suna;		/* Sender unacknowledged */
 	uint32_t tcp_rexmit_nxt;	/* Next rexmit seq num */
 	uint32_t tcp_rexmit_max;	/* Max retran seq num */
-	int32_t	tcp_snd_burst;		/* Send burst factor */
 	uint32_t tcp_cwnd;		/* Congestion window */
 	int32_t tcp_cwnd_cnt;		/* cwnd cnt in congestion avoidance */
 

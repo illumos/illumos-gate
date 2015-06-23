@@ -21,10 +21,10 @@
    
     CDDL HEADER END
    
+    Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+    Copyright 2014 OmniTI Computer Consulting, Inc. All rights reserved.
     Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
     Use is subject to license terms.
-
-    Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 
     Service manifest for rpcbind
 
@@ -51,27 +51,6 @@
 		restart_on='none'
 		type='service'>
 		<service_fmri value='svc:/system/filesystem/minimal' />
-	</dependency>
-
-	<!--
-		rpcbind(1M) has a strong dependency on the hostname.
-	-->
-	<dependency
-		name='identity'
-		grouping='require_all'
-		restart_on='refresh'
-		type='service'>
-		<service_fmri
-			value='svc:/system/identity:node' />
-	</dependency>
-
-	<dependency
-		name='sysidtool'
-		grouping='require_all'
-		restart_on='none'
-		type='service'>
-		<service_fmri
-			value='svc:/system/sysidtool:net' />
 	</dependency>
 
 	<!--

@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2014 by Delphix. All rights reserved.
  */
 
 /* This file contains all TCP output processing functions. */
@@ -1761,15 +1762,14 @@ tcp_send_synack(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *dummy)
  * tcp_send() is called by tcp_wput_data() and returns one of the following:
  *
  * -1 = failed allocation.
- *  0 = success; burst count reached, or usable send window is too small,
- *      and that we'd rather wait until later before sending again.
+ *  0 = We've either successfully sent data, or our usable send window is too
+ *      small and we'd rather wait until later before sending again.
  */
 static int
 tcp_send(tcp_t *tcp, const int mss, const int total_hdr_len,
     const int tcp_hdr_len, const int num_sack_blk, int *usable,
     uint_t *snxt, int *tail_unsent, mblk_t **xmit_tail, mblk_t *local_time)
 {
-	int		num_burst_seg = tcp->tcp_snd_burst;
 	int		num_lso_seg = 1;
 	uint_t		lso_usable;
 	boolean_t	do_lso_send = B_FALSE;
@@ -1795,25 +1795,16 @@ tcp_send(tcp_t *tcp, const int mss, const int total_hdr_len,
 		int		len;
 
 		/*
-		 * Burst count reached, return successfully.
-		 */
-		if (num_burst_seg == 0)
-			break;
-
-		/*
 		 * Calculate the maximum payload length we can send at one
 		 * time.
 		 */
 		if (do_lso_send) {
 			/*
-			 * Check whether be able to to do LSO for the current
-			 * available data.
+			 * Determine whether or not it's possible to do LSO,
+			 * and if so, how much data we can send.
 			 */
-			if (num_burst_seg >= 2 && (*usable - 1) / mss >= 1) {
+			if ((*usable - 1) / mss >= 1) {
 				lso_usable = MIN(tcp->tcp_lso_max, *usable);
-				lso_usable = MIN(lso_usable,
-				    num_burst_seg * mss);
-
 				num_lso_seg = lso_usable / mss;
 				if (lso_usable % mss) {
 					num_lso_seg++;
@@ -1830,14 +1821,6 @@ tcp_send(tcp_t *tcp, const int mss, const int total_hdr_len,
 		}
 
 		ASSERT(num_lso_seg <= IP_MAXPACKET / mss + 1);
-#ifdef DEBUG
-		DTRACE_PROBE2(tcp_send_lso, int, num_lso_seg, boolean_t,
-		    do_lso_send);
-#endif
-		/*
-		 * Adjust num_burst_seg here.
-		 */
-		num_burst_seg -= num_lso_seg;
 
 		len = mss;
 		if (len > *usable) {
@@ -3424,9 +3407,6 @@ tcp_sack_rexmit(tcp_t *tcp, uint_t *flags)
 /*
  * tcp_ss_rexmit() is called to do slow start retransmission after a timeout
  * or ICMP errors.
- *
- * To limit the number of duplicate segments, we limit the number of segment
- * to be sent in one time to tcp_snd_burst, the burst variable.
  */
 void
 tcp_ss_rexmit(tcp_t *tcp)
@@ -3436,7 +3416,6 @@ tcp_ss_rexmit(tcp_t *tcp)
 	int32_t		win;
 	int32_t		mss;
 	int32_t		off;
-	int32_t		burst = tcp->tcp_snd_burst;
 	mblk_t		*snxt_mp;
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
@@ -3455,8 +3434,7 @@ tcp_ss_rexmit(tcp_t *tcp)
 		mss = tcp->tcp_mss;
 		snxt_mp = tcp_get_seg_mp(tcp, snxt, &off);
 
-		while (SEQ_LT(snxt, smax) && (win > 0) &&
-		    (burst > 0) && (snxt_mp != NULL)) {
+		while (SEQ_LT(snxt, smax) && (win > 0) && (snxt_mp != NULL)) {
 			mblk_t	*xmit_mp;
 			mblk_t	*old_snxt_mp = snxt_mp;
 			uint32_t cnt = mss;
@@ -3485,7 +3463,6 @@ tcp_ss_rexmit(tcp_t *tcp)
 			TCPS_UPDATE_MIB(tcps, tcpRetransBytes, cnt);
 
 			tcp->tcp_rexmit_nxt = snxt;
-			burst--;
 		}
 		/*
 		 * If we have transmitted all we have at the time
@@ -3526,7 +3503,6 @@ tcp_rexmit_after_error(tcp_t *tcp)
 	tcp->tcp_rexmit_nxt = tcp->tcp_suna;
 	tcp->tcp_rexmit = B_TRUE;
 	tcp->tcp_dupack_cnt = 0;
-	tcp->tcp_snd_burst = TCP_CWND_SS;
 	tcp_ss_rexmit(tcp);
 }
 

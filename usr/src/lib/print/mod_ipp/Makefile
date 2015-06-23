@@ -22,6 +22,8 @@
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+#
 
 LIBRARY =		mod_ipp.a
 VERS =
@@ -30,13 +32,22 @@ OBJECTS = mod_ipp.o
 include ../../Makefile.lib
 include ../../Makefile.rootfs
 
-APACHEMODDIR =	$(ROOT)/usr/apache/libexec
-APACHECONFDIR =	$(ROOT)/etc/apache
+# These *BASE paths are used ONLY at build time to locate headers.
+# This builds against Apache 2.2 but the module should work with
+# any Apache 2.x version, and APR 1.3 or later.
+APACHEBASE =	/usr/apache2/2.2
+APR_BASE =	/usr/apr/1.3
+APRUBASE =	/usr/apr-util/1.3
+
+IPPCONFDIR =	$(ROOT)/etc/lp/ipp
+IPPLIBDIR =	$(ROOT)/usr/lib/lp/ipp
 LISTENERDIR =	$(ROOT)/var/lp/ipp-listener
 
-ROOTDIRS =	$(ROOT)/usr/apache $(APACHEMODDIR) $(APACHECONFDIR) \
+ROOTDIRS =	$(ROOT)/etc/lp $(IPPCONFDIR) \
+		$(ROOT)/usr/lib/lp $(IPPLIBDIR) \
 		$(ROOT)/var/lp $(LISTENERDIR)
 
+$(ROOT)/etc/lp:=	DIRMODE = 775
 $(ROOT)/var/lp:=	DIRMODE = 775
 $(ROOT)/var/lp:=	FILEMODE = 775
 
@@ -48,11 +59,17 @@ SRCS = $(OBJECTS:%.o = %.c)
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-I../libipp-listener/common
 CPPFLAGS +=	-I../libipp-core/common
-CPPFLAGS +=	-I/usr/apache/include
+CPPFLAGS +=	-I$(ADJUNCT_PROTO)$(APACHEBASE)/include
+CPPFLAGS +=	-I$(ADJUNCT_PROTO)$(APR_BASE)/include
+CPPFLAGS +=	-I$(ADJUNCT_PROTO)$(APRUBASE)/include
+CPPFLAGS +=	-DAPACHE2
 CPPFLAGS +=	-DEAPI
-ZDEFS =		$(ZNODEFS)
 
-MAPFILES =	mapfile
+# See: /usr/apache2/2.2/build/config_vars.mk
+# Make sure to build with compatible flags.
+CPPFLAGS +=	-D_REENTRANT -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
+
+MAPFILES =	mapfile httpd-syms.map
 
 LDLIBS +=	-lipp-listener -lipp-core -lpapi -lc
 
@@ -63,19 +80,20 @@ ROOTMANIFEST=		$(MANIFEST:%=$(ROOTMANIFESTDIR)/%)
 $(ROOTMANIFEST)         := FILEMODE= 444
 
 #	Apache module
-$(APACHEMODDIR)/$(LIBLINKS):	$(ROOTDIRS)
+#	LIBLINKS is not a link here, just the bare *.so name
+$(IPPLIBDIR)/$(LIBLINKS):	$(ROOTDIRS)
 
 #	Apache config
-APACHECONFFILE=	$(APACHECONFDIR)/httpd-standalone-ipp.conf
+APACHECONFFILE=	$(IPPCONFDIR)/httpd-standalone-ipp.conf
 $(APACHECONFFILE)         := FILEMODE= 644
 LISTENERFILE=	$(LISTENERDIR)/index.html
 $(LISTENERFILE)         := FILEMODE= 444
 
 $(ROOT)/var/lp:=	FILEMODE = 0775
 
-$(APACHEMODDIR)/$(LIBLINKS):=	FILEMODE = 0555
+$(IPPLIBDIR)/$(LIBLINKS):=	FILEMODE = 0555
 
-$(ROOTMANIFESTDIR)/% $(APACHEMODDIR)/% $(APACHECONFDIR)/% $(LISTENERDIR)/%:	%
+$(ROOTMANIFESTDIR)/% $(IPPLIBDIR)/% $(IPPCONFDIR)/% $(LISTENERDIR)/%:	%
 	$(INS.file)
 
 $(ROOTDIRS):
@@ -85,7 +103,7 @@ $(ROOTDIRS):
 
 all:	$(LIBS)
 
-install:	all $(APACHEMODDIR)/$(LIBLINKS) $(APACHECONFFILE) \
+install:	all $(IPPLIBDIR)/$(LIBLINKS) $(APACHECONFFILE) \
 		$(LISTENERFILE) $(ROOTMANIFEST)
 
 install_h:

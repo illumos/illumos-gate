@@ -11,7 +11,7 @@
 
 #
 # Copyright 2011, Richard Lowe
-# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2015 Nexenta Systems, Inc. All rights reserved.
 #
 
 file path=usr/share/man/man1/Intro.1
@@ -107,6 +107,7 @@ file path=usr/share/man/man1/keylogout.1
 file path=usr/share/man/man1/kill.1
 file path=usr/share/man/man1/kmfcfg.1
 file path=usr/share/man/man1/ksh93.1
+file path=usr/share/man/man1/kvmstat.1
 file path=usr/share/man/man1/ld.so.1.1
 file path=usr/share/man/man1/let.1
 file path=usr/share/man/man1/limit.1
@@ -124,7 +125,6 @@ file path=usr/share/man/man1/ls.1
 file path=usr/share/man/man1/m4.1
 file path=usr/share/man/man1/mac.1
 file path=usr/share/man/man1/mach.1
-file path=usr/share/man/man1/machid.1
 file path=usr/share/man/man1/mail.1
 file path=usr/share/man/man1/mailx.1
 file path=usr/share/man/man1/makekey.1
@@ -250,11 +250,6 @@ link path=usr/share/man/man1/helptime.1 target=cktime.1
 link path=usr/share/man/man1/helpuid.1 target=ckuid.1
 link path=usr/share/man/man1/helpyorn.1 target=ckyorn.1
 link path=usr/share/man/man1/hist.1 target=history.1
-link path=usr/share/man/man1/i286.1 target=machid.1
-link path=usr/share/man/man1/i386.1 target=machid.1
-link path=usr/share/man/man1/i486.1 target=machid.1
-link path=usr/share/man/man1/i860.1 target=machid.1
-link path=usr/share/man/man1/iAPX286.1 target=machid.1
 link path=usr/share/man/man1/if.1 target=shell_builtins.1
 link path=usr/share/man/man1/intro.1 target=Intro.1
 link path=usr/share/man/man1/jsh.1 target=ksh93.1
@@ -263,7 +258,6 @@ link path=usr/share/man/man1/notify.1 target=jobs.1
 link path=usr/share/man/man1/onintr.1 target=trap.1
 link path=usr/share/man/man1/page.1 target=more.1
 link path=usr/share/man/man1/pcred.1 target=proc.1
-link path=usr/share/man/man1/pdp11.1 target=machid.1
 link path=usr/share/man/man1/pfcsh.1 target=pfexec.1
 link path=usr/share/man/man1/pfiles.1 target=proc.1
 link path=usr/share/man/man1/pfksh.1 target=pfexec.1
@@ -293,16 +287,9 @@ link path=usr/share/man/man1/setenv.1 target=set.1
 link path=usr/share/man/man1/settime.1 target=touch.1
 link path=usr/share/man/man1/sh.1 target=ksh93.1
 link path=usr/share/man/man1/source.1 target=exec.1
-link path=usr/share/man/man1/sparc.1 target=machid.1
 link path=usr/share/man/man1/stop.1 target=jobs.1
 link path=usr/share/man/man1/strconf.1 target=strchg.1
-link path=usr/share/man/man1/sun.1 target=machid.1
 link path=usr/share/man/man1/switch.1 target=shell_builtins.1
-link path=usr/share/man/man1/u370.1 target=machid.1
-link path=usr/share/man/man1/u3b.1 target=machid.1
-link path=usr/share/man/man1/u3b15.1 target=machid.1
-link path=usr/share/man/man1/u3b2.1 target=machid.1
-link path=usr/share/man/man1/u3b5.1 target=machid.1
 link path=usr/share/man/man1/ulimit.1 target=limit.1
 link path=usr/share/man/man1/unalias.1 target=alias.1
 link path=usr/share/man/man1/unhash.1 target=hash.1
@@ -319,7 +306,6 @@ link path=usr/share/man/man1/valstr.1 target=ckstr.1
 link path=usr/share/man/man1/valtime.1 target=cktime.1
 link path=usr/share/man/man1/valuid.1 target=ckuid.1
 link path=usr/share/man/man1/valyorn.1 target=ckyorn.1
-link path=usr/share/man/man1/vax.1 target=machid.1
 link path=usr/share/man/man1/vedit.1 target=../../../has/man/man1has/vi.1has
 link path=usr/share/man/man1/whence.1 target=typeset.1
 link path=usr/share/man/man1/while.1 target=shell_builtins.1

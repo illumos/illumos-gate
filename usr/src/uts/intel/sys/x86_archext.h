@@ -28,7 +28,7 @@
  * All rights reserved.
  */
 /*
- * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2015, Joyent, Inc.
  * Copyright 2012 Jens Elkner <jel+illumos@cs.uni-magdeburg.de>
  * Copyright 2012 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
  * Copyright 2014 Josef 'Jeff' Sipek <jeffpc@josefsipek.net>
@@ -108,7 +108,7 @@ extern "C" {
 #define	CPUID_INTC_ECX_SSSE3	0x00000200	/* Supplemental SSE3 insns */
 #define	CPUID_INTC_ECX_CID	0x00000400	/* L1 context ID */
 						/* 0x00000800 - reserved */
-						/* 0x00001000 - reserved */
+#define	CPUID_INTC_ECX_FMA	0x00001000	/* Fused Multiply Add */
 #define	CPUID_INTC_ECX_CX16	0x00002000	/* cmpxchg16 */
 #define	CPUID_INTC_ECX_ETPRD	0x00004000	/* extended task pri messages */
 						/* 0x00008000 - reserved */
@@ -212,6 +212,17 @@ extern "C" {
  */
 #define	CPUID_INTC_ECX_AHF64	0x00100000	/* LAHF and SAHF in long mode */
 
+/*
+ * Intel also uses cpuid leaf 7 to have additional instructions and features.
+ * Like some other leaves, but unlike the current ones we care about, it
+ * requires us to specify both a leaf in %eax and a sub-leaf in %ecx. To deal
+ * with the potential use of additional sub-leaves in the future, we now
+ * specifically label the EBX features with their leaf and sub-leaf.
+ */
+#define	CPUID_INTC_EBX_7_0_BMI1		0x00000008	/* BMI1 instrs */
+#define	CPUID_INTC_EBX_7_0_AVX2		0x00000020	/* AVX2 supported */
+#define	CPUID_INTC_EBX_7_0_SMEP		0x00000080	/* SMEP in CR4 */
+#define	CPUID_INTC_EBX_7_0_BMI2		0x00000100	/* BMI2 Instrs */
 
 #define	P5_MCHADDR	0x0
 #define	P5_CESR		0x11
@@ -382,6 +393,11 @@ extern "C" {
 #define	X86FSET_F16C		38
 #define	X86FSET_RDRAND		39
 #define	X86FSET_X2APIC		40
+#define	X86FSET_AVX2		41
+#define	X86FSET_BMI1		42
+#define	X86FSET_BMI2		43
+#define	X86FSET_FMA		44
+#define	X86FSET_SMEP		45
 
 /*
  * flags to patch tsc_read routine.
@@ -642,7 +658,7 @@ extern "C" {
 
 #if defined(_KERNEL) || defined(_KMEMUSER)
 
-#define	NUM_X86_FEATURES	41
+#define	NUM_X86_FEATURES	46
 extern uchar_t x86_featureset[];
 
 extern void free_x86_featureset(void *featureset);

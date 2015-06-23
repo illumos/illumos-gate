@@ -13,6 +13,7 @@
 # Copyright 2011, Richard Lowe
 # Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2013 OmniTI Computer Consulting, Inc. All rights reserved.
+# Copyright 2014 Garrett D'Amore <garrett@damore.org>
 #
 
 file path=usr/share/man/man3c/__fbufsize.3c
@@ -35,6 +36,7 @@ file path=usr/share/man/man3c/aiocancel.3c
 file path=usr/share/man/man3c/aioread.3c
 file path=usr/share/man/man3c/aiowait.3c
 file path=usr/share/man/man3c/assert.3c
+file path=usr/share/man/man3c/arc4random.3c
 file path=usr/share/man/man3c/atexit.3c
 file path=usr/share/man/man3c/atomic_add.3c
 file path=usr/share/man/man3c/atomic_and.3c
@@ -55,6 +57,7 @@ file path=usr/share/man/man3c/catgets.3c
 file path=usr/share/man/man3c/catopen.3c
 file path=usr/share/man/man3c/cfgetispeed.3c
 file path=usr/share/man/man3c/cfsetispeed.3c
+file path=usr/share/man/man3c/clearenv.3c
 file path=usr/share/man/man3c/clock.3c
 file path=usr/share/man/man3c/clock_nanosleep.3c
 file path=usr/share/man/man3c/clock_settime.3c
@@ -107,6 +110,7 @@ file path=usr/share/man/man3c/euclen.3c
 file path=usr/share/man/man3c/exit.3c
 file path=usr/share/man/man3c/fattach.3c
 file path=usr/share/man/man3c/fclose.3c
+file path=usr/share/man/man3c/fcloseall.3c
 file path=usr/share/man/man3c/fdatasync.3c
 file path=usr/share/man/man3c/fdetach.3c
 file path=usr/share/man/man3c/fdopen.3c
@@ -143,6 +147,7 @@ file path=usr/share/man/man3c/getcpuid.3c
 file path=usr/share/man/man3c/getcwd.3c
 file path=usr/share/man/man3c/getdate.3c
 file path=usr/share/man/man3c/getdtablesize.3c
+file path=usr/share/man/man3c/getentropy.3c
 file path=usr/share/man/man3c/getenv.3c
 file path=usr/share/man/man3c/getexecname.3c
 file path=usr/share/man/man3c/getgrnam.3c
@@ -154,12 +159,14 @@ file path=usr/share/man/man3c/getloadavg.3c
 file path=usr/share/man/man3c/getlogin.3c
 file path=usr/share/man/man3c/getmntent.3c
 file path=usr/share/man/man3c/getnetgrent.3c
+file path=usr/share/man/man3c/get_nprocs.3c
 file path=usr/share/man/man3c/getopt.3c
 file path=usr/share/man/man3c/getpagesize.3c
 file path=usr/share/man/man3c/getpagesizes.3c
 file path=usr/share/man/man3c/getpass.3c
 file path=usr/share/man/man3c/getpeerucred.3c
 file path=usr/share/man/man3c/getpriority.3c
+file path=usr/share/man/man3c/getprogname.3c
 file path=usr/share/man/man3c/getpw.3c
 file path=usr/share/man/man3c/getpwnam.3c
 file path=usr/share/man/man3c/getrusage.3c
@@ -235,6 +242,7 @@ file path=usr/share/man/man3c/msync.3c
 file path=usr/share/man/man3c/mutex_init.3c
 file path=usr/share/man/man3c/nanosleep.3c
 file path=usr/share/man/man3c/ndbm.3c
+file path=usr/share/man/man3c/newlocale.3c
 file path=usr/share/man/man3c/nl_langinfo.3c
 file path=usr/share/man/man3c/offsetof.3c
 file path=usr/share/man/man3c/opendir.3c
@@ -308,12 +316,14 @@ file path=usr/share/man/man3c/pthread_key_create.3c
 file path=usr/share/man/man3c/pthread_key_delete.3c
 file path=usr/share/man/man3c/pthread_kill.3c
 file path=usr/share/man/man3c/pthread_mutex_getprioceiling.3c
+file path=usr/share/man/man3c/pthread_mutex_consistent.3c
 file path=usr/share/man/man3c/pthread_mutex_init.3c
 file path=usr/share/man/man3c/pthread_mutex_lock.3c
 file path=usr/share/man/man3c/pthread_mutex_timedlock.3c
 file path=usr/share/man/man3c/pthread_mutexattr_getprioceiling.3c
 file path=usr/share/man/man3c/pthread_mutexattr_getprotocol.3c
 file path=usr/share/man/man3c/pthread_mutexattr_getpshared.3c
+file path=usr/share/man/man3c/pthread_mutexattr_getrobust.3c
 file path=usr/share/man/man3c/pthread_mutexattr_gettype.3c
 file path=usr/share/man/man3c/pthread_mutexattr_init.3c
 file path=usr/share/man/man3c/pthread_once.3c
@@ -397,6 +407,7 @@ file path=usr/share/man/man3c/sigsetops.3c
 file path=usr/share/man/man3c/sigstack.3c
 file path=usr/share/man/man3c/sigwaitinfo.3c
 file path=usr/share/man/man3c/sleep.3c
+file path=usr/share/man/man3c/smt_pause.3c
 file path=usr/share/man/man3c/ssignal.3c
 file path=usr/share/man/man3c/stack_getbounds.3c
 file path=usr/share/man/man3c/stack_inbounds.3c
@@ -406,6 +417,7 @@ file path=usr/share/man/man3c/stdio.3c
 file path=usr/share/man/man3c/str2sig.3c
 file path=usr/share/man/man3c/strcoll.3c
 file path=usr/share/man/man3c/strerror.3c
+file path=usr/share/man/man3c/strfmon.3c
 file path=usr/share/man/man3c/strftime.3c
 file path=usr/share/man/man3c/string.3c
 file path=usr/share/man/man3c/string_to_decimal.3c
@@ -457,6 +469,8 @@ file path=usr/share/man/man3c/tmpnam.3c
 file path=usr/share/man/man3c/toascii.3c
 file path=usr/share/man/man3c/tolower.3c
 file path=usr/share/man/man3c/toupper.3c
+file path=usr/share/man/man3c/towlower.3c
+file path=usr/share/man/man3c/towupper.3c
 file path=usr/share/man/man3c/truncate.3c
 file path=usr/share/man/man3c/tsearch.3c
 file path=usr/share/man/man3c/ttyname.3c
@@ -466,11 +480,12 @@ file path=usr/share/man/man3c/u8_textprep_str.3c
 file path=usr/share/man/man3c/u8_validate.3c
 file path=usr/share/man/man3c/ualarm.3c
 file path=usr/share/man/man3c/uconv_u16tou32.3c
-file path=usr/share/man/man3c/ucred_get.3c
+file path=usr/share/man/man3c/ucred.3c
 file path=usr/share/man/man3c/ungetc.3c
 file path=usr/share/man/man3c/ungetwc.3c
 file path=usr/share/man/man3c/unlockpt.3c
 file path=usr/share/man/man3c/unsetenv.3c
+file path=usr/share/man/man3c/uselocale.3c
 file path=usr/share/man/man3c/usleep.3c
 file path=usr/share/man/man3c/vfwprintf.3c
 file path=usr/share/man/man3c/vlfmt.3c
@@ -481,9 +496,13 @@ file path=usr/share/man/man3c/wait.3c
 file path=usr/share/man/man3c/wait3.3c
 file path=usr/share/man/man3c/waitpid.3c
 file path=usr/share/man/man3c/walkcontext.3c
+file path=usr/share/man/man3c/wcpcpy.3c
 file path=usr/share/man/man3c/wcrtomb.3c
+file path=usr/share/man/man3c/wcscasecmp.3c
 file path=usr/share/man/man3c/wcscoll.3c
+file path=usr/share/man/man3c/wcsdup.3c
 file path=usr/share/man/man3c/wcsftime.3c
+file path=usr/share/man/man3c/wcslen.3c
 file path=usr/share/man/man3c/wcsrtombs.3c
 file path=usr/share/man/man3c/wcsstr.3c
 file path=usr/share/man/man3c/wcstod.3c
@@ -495,6 +514,7 @@ file path=usr/share/man/man3c/wcswidth.3c
 file path=usr/share/man/man3c/wcsxfrm.3c
 file path=usr/share/man/man3c/wctob.3c
 file path=usr/share/man/man3c/wctomb.3c
+file path=usr/share/man/man3c/wctrans.3c
 file path=usr/share/man/man3c/wctype.3c
 file path=usr/share/man/man3c/wcwidth.3c
 file path=usr/share/man/man3c/wmemchr.3c
@@ -528,6 +548,8 @@ link path=usr/share/man/man3c/addrtosymstr.3c target=walkcontext.3c
 link path=usr/share/man/man3c/aiowrite.3c target=aioread.3c
 link path=usr/share/man/man3c/alloca.3c target=malloc.3c
 link path=usr/share/man/man3c/alphasort.3c target=scandir.3c
+link path=usr/share/man/man3c/arc4random_buf.3c target=arc4random.3c
+link path=usr/share/man/man3c/arc4random_uniform.3c target=arc4random.3c
 link path=usr/share/man/man3c/ascftime.3c target=strftime.3c
 link path=usr/share/man/man3c/asctime.3c target=ctime.3c
 link path=usr/share/man/man3c/asctime_r.3c target=ctime.3c
@@ -649,8 +671,10 @@ link path=usr/share/man/man3c/bcmp.3c target=bstring.3c
 link path=usr/share/man/man3c/bcopy.3c target=bstring.3c
 link path=usr/share/man/man3c/bind_textdomain_codeset.3c target=gettext.3c
 link path=usr/share/man/man3c/bindtextdomain.3c target=gettext.3c
+link path=usr/share/man/man3c/btowc_l.3c target=btowc.3c
 link path=usr/share/man/man3c/bzero.3c target=bstring.3c
 link path=usr/share/man/man3c/calloc.3c target=malloc.3c
+link path=usr/share/man/man3c/canonicalize_file_name.3c target=realpath.3c
 link path=usr/share/man/man3c/catclose.3c target=catopen.3c
 link path=usr/share/man/man3c/cfgetospeed.3c target=cfgetispeed.3c
 link path=usr/share/man/man3c/cfsetospeed.3c target=cfsetispeed.3c
@@ -698,6 +722,7 @@ link path=usr/share/man/man3c/door_unbind.3c target=door_bind.3c
 link path=usr/share/man/man3c/double_to_decimal.3c \
     target=floating_to_decimal.3c
 link path=usr/share/man/man3c/dup3.3c target=dup2.3c
+link path=usr/share/man/man3c/duplocale.3c target=newlocale.3c
 link path=usr/share/man/man3c/edata.3c target=end.3c
 link path=usr/share/man/man3c/endgrent.3c target=getgrnam.3c
 link path=usr/share/man/man3c/endnetgrent.3c target=getnetgrent.3c
@@ -712,6 +737,7 @@ link path=usr/share/man/man3c/errx.3c target=err.3c
 link path=usr/share/man/man3c/etext.3c target=end.3c
 link path=usr/share/man/man3c/euccol.3c target=euclen.3c
 link path=usr/share/man/man3c/eucscol.3c target=euclen.3c
+link path=usr/share/man/man3c/explicit_bzero.3c target=bstring.3c
 link path=usr/share/man/man3c/extended_to_decimal.3c \
     target=floating_to_decimal.3c
 link path=usr/share/man/man3c/fconvert.3c target=econvert.3c
@@ -719,6 +745,8 @@ link path=usr/share/man/man3c/fcvt.3c target=ecvt.3c
 link path=usr/share/man/man3c/fdopendir.3c target=opendir.3c
 link path=usr/share/man/man3c/fdwalk.3c target=closefrom.3c
 link path=usr/share/man/man3c/feof.3c target=ferror.3c
+link path=usr/share/man/man3c/ffsl.3c target=ffs.3c
+link path=usr/share/man/man3c/ffsll.3c target=ffs.3c
 link path=usr/share/man/man3c/fgetgrent.3c target=getgrnam.3c
 link path=usr/share/man/man3c/fgetgrent_r.3c target=getgrnam.3c
 link path=usr/share/man/man3c/fgetpwent.3c target=getpwnam.3c
@@ -726,10 +754,14 @@ link path=usr/share/man/man3c/fgetpwent_r.3c target=getpwnam.3c
 link path=usr/share/man/man3c/fgets.3c target=gets.3c
 link path=usr/share/man/man3c/fgetspent.3c target=getspnam.3c
 link path=usr/share/man/man3c/fgetspent_r.3c target=getspnam.3c
+link path=usr/share/man/man3c/fgetwc_l.3c target=fgetwc.3c
 link path=usr/share/man/man3c/fgetws.3c target=getws.3c
 link path=usr/share/man/man3c/file_to_decimal.3c target=string_to_decimal.3c
 link path=usr/share/man/man3c/fileno.3c target=ferror.3c
 link path=usr/share/man/man3c/finite.3c target=isnand.3c
+link path=usr/share/man/man3c/fls.3c target=ffs.3c
+link path=usr/share/man/man3c/flsl.3c target=ffs.3c
+link path=usr/share/man/man3c/flsll.3c target=ffs.3c
 link path=usr/share/man/man3c/fpclass.3c target=isnand.3c
 link path=usr/share/man/man3c/fpgetmask.3c target=fpgetround.3c
 link path=usr/share/man/man3c/fpgetsticky.3c target=fpgetround.3c
@@ -739,6 +771,7 @@ link path=usr/share/man/man3c/fpsetround.3c target=fpgetround.3c
 link path=usr/share/man/man3c/fpsetsticky.3c target=fpgetround.3c
 link path=usr/share/man/man3c/fputs.3c target=puts.3c
 link path=usr/share/man/man3c/free.3c target=malloc.3c
+link path=usr/share/man/man3c/freelocale.3c target=newlocale.3c
 link path=usr/share/man/man3c/fscanf.3c target=scanf.3c
 link path=usr/share/man/man3c/fseeko.3c target=fseek.3c
 link path=usr/share/man/man3c/fsetattr.3c target=fgetattr.3c
@@ -766,6 +799,7 @@ link path=usr/share/man/man3c/gethrvtime.3c target=gethrtime.3c
 link path=usr/share/man/man3c/getlogin_r.3c target=getlogin.3c
 link path=usr/share/man/man3c/getmntany.3c target=getmntent.3c
 link path=usr/share/man/man3c/getnetgrent_r.3c target=getnetgrent.3c
+link path=usr/share/man/man3c/get_nprocs_conf.3c target=get_nprocs.3c
 link path=usr/share/man/man3c/getpassphrase.3c target=getpass.3c
 link path=usr/share/man/man3c/getpwent.3c target=getpwnam.3c
 link path=usr/share/man/man3c/getpwent_r.3c target=getpwnam.3c
@@ -785,6 +819,8 @@ link path=usr/share/man/man3c/getvfsany.3c target=getvfsent.3c
 link path=usr/share/man/man3c/getvfsfile.3c target=getvfsent.3c
 link path=usr/share/man/man3c/getvfsspec.3c target=getvfsent.3c
 link path=usr/share/man/man3c/getw.3c target=fgetc.3c
+link path=usr/share/man/man3c/getwc_l.3c target=getwc.3c
+link path=usr/share/man/man3c/getwchar_l.3c target=getwchar.3c
 link path=usr/share/man/man3c/getzoneidbyname.3c target=getzoneid.3c
 link path=usr/share/man/man3c/getzonenamebyid.3c target=getzoneid.3c
 link path=usr/share/man/man3c/globfree.3c target=glob.3c
@@ -797,36 +833,71 @@ link path=usr/share/man/man3c/hdestroy.3c target=hsearch.3c
 link path=usr/share/man/man3c/initstate.3c target=random.3c
 link path=usr/share/man/man3c/innetgr.3c target=getnetgrent.3c
 link path=usr/share/man/man3c/isalnum.3c target=ctype.3c
+link path=usr/share/man/man3c/isalnum_l.3c target=ctype.3c
 link path=usr/share/man/man3c/isalpha.3c target=ctype.3c
+link path=usr/share/man/man3c/isalpha_l.3c target=ctype.3c
 link path=usr/share/man/man3c/isascii.3c target=ctype.3c
 link path=usr/share/man/man3c/isblank.3c target=ctype.3c
+link path=usr/share/man/man3c/isblank_l.3c target=ctype.3c
 link path=usr/share/man/man3c/iscntrl.3c target=ctype.3c
+link path=usr/share/man/man3c/iscntrl_l.3c target=ctype.3c
 link path=usr/share/man/man3c/isdigit.3c target=ctype.3c
+link path=usr/share/man/man3c/isdigit_l.3c target=ctype.3c
 link path=usr/share/man/man3c/isenglish.3c target=iswalpha.3c
 link path=usr/share/man/man3c/isgraph.3c target=ctype.3c
+link path=usr/share/man/man3c/isgraph_l.3c target=ctype.3c
 link path=usr/share/man/man3c/isideogram.3c target=iswalpha.3c
 link path=usr/share/man/man3c/islower.3c target=ctype.3c
+link path=usr/share/man/man3c/islower_l.3c target=ctype.3c
 link path=usr/share/man/man3c/isnanf.3c target=isnand.3c
 link path=usr/share/man/man3c/isnumber.3c target=iswalpha.3c
 link path=usr/share/man/man3c/isphonogram.3c target=iswalpha.3c
 link path=usr/share/man/man3c/isprint.3c target=ctype.3c
+link path=usr/share/man/man3c/isprint_l.3c target=ctype.3c
 link path=usr/share/man/man3c/ispunct.3c target=ctype.3c
+link path=usr/share/man/man3c/ispunct_l.3c target=ctype.3c
 link path=usr/share/man/man3c/isspace.3c target=ctype.3c
+link path=usr/share/man/man3c/isspace_l.3c target=ctype.3c
 link path=usr/share/man/man3c/isspecial.3c target=iswalpha.3c
 link path=usr/share/man/man3c/isupper.3c target=ctype.3c
+link path=usr/share/man/man3c/isupper_l.3c target=ctype.3c
 link path=usr/share/man/man3c/iswalnum.3c target=iswalpha.3c
+link path=usr/share/man/man3c/iswalnum_l.3c target=iswalpha.3c
+link path=usr/share/man/man3c/iswalpha_l.3c target=iswalpha.3c
 link path=usr/share/man/man3c/iswascii.3c target=iswalpha.3c
 link path=usr/share/man/man3c/iswblank.3c target=iswalpha.3c
+link path=usr/share/man/man3c/iswblank_l.3c target=iswalpha.3c
 link path=usr/share/man/man3c/iswcntrl.3c target=iswalpha.3c
+link path=usr/share/man/man3c/iswcntrl_l.3c target=iswalpha.3c
+link path=usr/share/man/man3c/iswctype_l.3c target=iswctype.3c
 link path=usr/share/man/man3c/iswdigit.3c target=iswalpha.3c
+link path=usr/share/man/man3c/iswdigit_l.3c target=iswalpha.3c
 link path=usr/share/man/man3c/iswgraph.3c target=iswalpha.3c
+link path=usr/share/man/man3c/iswgraph_l.3c target=iswalpha.3c
+link path=usr/share/man/man3c/iswhexnumber.3c target=iswalpha.3c
+link path=usr/share/man/man3c/iswhexnumber_l.3c target=iswalpha.3c
+link path=usr/share/man/man3c/iswideogram.3c target=iswalpha.3c
+link path=usr/share/man/man3c/iswideogram_l.3c target=iswalpha.3c
 link path=usr/share/man/man3c/iswlower.3c target=iswalpha.3c
+link path=usr/share/man/man3c/iswlower_l.3c target=iswalpha.3c
+link path=usr/share/man/man3c/iswnumber.3c target=iswalpha.3c
+link path=usr/share/man/man3c/iswnumber_l.3c target=iswalpha.3c
+link path=usr/share/man/man3c/iswphonogram.3c target=iswalpha.3c
+link path=usr/share/man/man3c/iswphonogram_l.3c target=iswalpha.3c
 link path=usr/share/man/man3c/iswprint.3c target=iswalpha.3c
+link path=usr/share/man/man3c/iswprint_l.3c target=iswalpha.3c
 link path=usr/share/man/man3c/iswpunct.3c target=iswalpha.3c
+link path=usr/share/man/man3c/iswpunct_l.3c target=iswalpha.3c
 link path=usr/share/man/man3c/iswspace.3c target=iswalpha.3c
+link path=usr/share/man/man3c/iswspace_l.3c target=iswalpha.3c
+link path=usr/share/man/man3c/iswspecial.3c target=iswalpha.3c
+link path=usr/share/man/man3c/iswspecial_l.3c target=iswalpha.3c
 link path=usr/share/man/man3c/iswupper.3c target=iswalpha.3c
+link path=usr/share/man/man3c/iswupper_l.3c target=iswalpha.3c
 link path=usr/share/man/man3c/iswxdigit.3c target=iswalpha.3c
+link path=usr/share/man/man3c/iswxdigit_l.3c target=iswalpha.3c
 link path=usr/share/man/man3c/isxdigit.3c target=ctype.3c
+link path=usr/share/man/man3c/isxdigit_l.3c target=ctype.3c
 link path=usr/share/man/man3c/jrand48.3c target=drand48.3c
 link path=usr/share/man/man3c/l64a.3c target=a64l.3c
 link path=usr/share/man/man3c/labs.3c target=abs.3c
@@ -841,6 +912,16 @@ link path=usr/share/man/man3c/localtime_r.3c target=ctime.3c
 link path=usr/share/man/man3c/longjmp.3c target=setjmp.3c
 link path=usr/share/man/man3c/lrand48.3c target=drand48.3c
 link path=usr/share/man/man3c/major.3c target=makedev.3c
+link path=usr/share/man/man3c/mblen_l.3c target=mblen.3c
+link path=usr/share/man/man3c/mbrlen_l.3c target=mbrlen.3c
+link path=usr/share/man/man3c/mbrtowc_l.3c target=mbrtowc.3c
+link path=usr/share/man/man3c/mbsinit_l.3c target=mbsinit.3c
+link path=usr/share/man/man3c/mbsnrtowcs.3c target=mbsrtowcs.3c
+link path=usr/share/man/man3c/mbsnrtowcs_l.3c target=mbsrtowcs.3c
+link path=usr/share/man/man3c/mbsrtowcs_l.3c target=mbsrtowcs.3c
+link path=usr/share/man/man3c/mbstowcs.3c target=mbsrtowcs.3c
+link path=usr/share/man/man3c/mbstowcs_l.3c target=mbsrtowcs.3c
+link path=usr/share/man/man3c/mbtowc_l.3c target=mbtowc.3c
 link path=usr/share/man/man3c/memalign.3c target=malloc.3c
 link path=usr/share/man/man3c/membar_consumer.3c target=membar_ops.3c
 link path=usr/share/man/man3c/membar_enter.3c target=membar_ops.3c
@@ -850,9 +931,11 @@ link path=usr/share/man/man3c/memccpy.3c target=memory.3c
 link path=usr/share/man/man3c/memchr.3c target=memory.3c
 link path=usr/share/man/man3c/memcmp.3c target=memory.3c
 link path=usr/share/man/man3c/memcpy.3c target=memory.3c
+link path=usr/share/man/man3c/memmem.3c target=memory.3c
 link path=usr/share/man/man3c/memmove.3c target=memory.3c
 link path=usr/share/man/man3c/memset.3c target=memory.3c
 link path=usr/share/man/man3c/minor.3c target=makedev.3c
+link path=usr/share/man/man3c/mkfifoat.3c target=mkfifo.3c
 link path=usr/share/man/man3c/mkdtemp.3c target=mkstemp.3c
 link path=usr/share/man/man3c/mkostemp.3c target=mkstemp.3c
 link path=usr/share/man/man3c/mkostemps.3c target=mkstemp.3c
@@ -871,6 +954,7 @@ link path=usr/share/man/man3c/mutex_trylock.3c target=mutex_init.3c
 link path=usr/share/man/man3c/mutex_unlock.3c target=mutex_init.3c
 link path=usr/share/man/man3c/nftw.3c target=ftw.3c
 link path=usr/share/man/man3c/ngettext.3c target=gettext.3c
+link path=usr/share/man/man3c/nl_langinfo_l.3c target=nl_langinfo.3c
 link path=usr/share/man/man3c/nrand48.3c target=drand48.3c
 link path=usr/share/man/man3c/openlog.3c target=syslog.3c
 link path=usr/share/man/man3c/pclose.3c target=popen.3c
@@ -983,6 +1067,8 @@ link path=usr/share/man/man3c/pthread_mutexattr_setprotocol.3c \
     target=pthread_mutexattr_getprotocol.3c
 link path=usr/share/man/man3c/pthread_mutexattr_setpshared.3c \
     target=pthread_mutexattr_getpshared.3c
+link path=usr/share/man/man3c/pthread_mutexattr_setrobust.3c \
+    target=pthread_mutexattr_getrobust.3c
 link path=usr/share/man/man3c/pthread_mutexattr_settype.3c \
     target=pthread_mutexattr_gettype.3c
 link path=usr/share/man/man3c/pthread_rwlock_destroy.3c \
@@ -1090,6 +1176,7 @@ link path=usr/share/man/man3c/setlinebuf.3c target=setbuffer.3c
 link path=usr/share/man/man3c/setlogmask.3c target=syslog.3c
 link path=usr/share/man/man3c/setnetgrent.3c target=getnetgrent.3c
 link path=usr/share/man/man3c/setpriority.3c target=getpriority.3c
+link path=usr/share/man/man3c/setprogname.3c target=getprogname.3c
 link path=usr/share/man/man3c/setpwent.3c target=getpwnam.3c
 link path=usr/share/man/man3c/setspent.3c target=getspnam.3c
 link path=usr/share/man/man3c/setstate.3c target=random.3c
@@ -1125,23 +1212,38 @@ link path=usr/share/man/man3c/sscanf.3c target=scanf.3c
 link path=usr/share/man/man3c/stderr.3c target=stdio.3c
 link path=usr/share/man/man3c/stdin.3c target=stdio.3c
 link path=usr/share/man/man3c/stdout.3c target=stdio.3c
+link path=usr/share/man/man3c/stpcpy.3c target=string.3c
+link path=usr/share/man/man3c/stpncpy.3c target=string.3c
 link path=usr/share/man/man3c/strcasecmp.3c target=string.3c
+link path=usr/share/man/man3c/strcasecmp_l.3c target=string.3c
+link path=usr/share/man/man3c/strcasestr.3c target=string.3c
+link path=usr/share/man/man3c/strcasestr_l.3c target=string.3c
 link path=usr/share/man/man3c/strcat.3c target=string.3c
 link path=usr/share/man/man3c/strchr.3c target=string.3c
+link path=usr/share/man/man3c/strchrnul.3c target=string.3c
 link path=usr/share/man/man3c/strcmp.3c target=string.3c
+link path=usr/share/man/man3c/strcoll_l.3c target=strcoll.3c
 link path=usr/share/man/man3c/strcpy.3c target=string.3c
 link path=usr/share/man/man3c/strcspn.3c target=string.3c
 link path=usr/share/man/man3c/strdup.3c target=string.3c
+link path=usr/share/man/man3c/strdupa.3c target=string.3c
 link path=usr/share/man/man3c/strerror_r.3c target=strerror.3c
+link path=usr/share/man/man3c/strfmon_l.3c target=strfmon.3c
+link path=usr/share/man/man3c/strftime_l.3c target=strftime.3c
 link path=usr/share/man/man3c/strlcat.3c target=string.3c
 link path=usr/share/man/man3c/strlcpy.3c target=string.3c
 link path=usr/share/man/man3c/strlen.3c target=string.3c
 link path=usr/share/man/man3c/strncasecmp.3c target=string.3c
+link path=usr/share/man/man3c/strncasecmp_l.3c target=string.3c
 link path=usr/share/man/man3c/strncat.3c target=string.3c
 link path=usr/share/man/man3c/strncmp.3c target=string.3c
 link path=usr/share/man/man3c/strncpy.3c target=string.3c
+link path=usr/share/man/man3c/strndup.3c target=string.3c
+link path=usr/share/man/man3c/strndupa.3c target=string.3c
 link path=usr/share/man/man3c/strnlen.3c target=string.3c
+link path=usr/share/man/man3c/strnstr.3c target=string.3c
 link path=usr/share/man/man3c/strpbrk.3c target=string.3c
+link path=usr/share/man/man3c/strptime_l.3c target=strptime.3c
 link path=usr/share/man/man3c/strrchr.3c target=string.3c
 link path=usr/share/man/man3c/strsep.3c target=string.3c
 link path=usr/share/man/man3c/strspn.3c target=string.3c
@@ -1153,6 +1255,7 @@ link path=usr/share/man/man3c/strtold.3c target=strtod.3c
 link path=usr/share/man/man3c/strtoll.3c target=strtol.3c
 link path=usr/share/man/man3c/strtoull.3c target=strtoul.3c
 link path=usr/share/man/man3c/strtoumax.3c target=strtoimax.3c
+link path=usr/share/man/man3c/strxfrm_l.3c target=strxfrm.3c
 link path=usr/share/man/man3c/swapcontext.3c target=makecontext.3c
 link path=usr/share/man/man3c/swprintf.3c target=fwprintf.3c
 link path=usr/share/man/man3c/swscanf.3c target=fwscanf.3c
@@ -1174,6 +1277,12 @@ link path=usr/share/man/man3c/timercmp.3c target=timeradd.3c
 link path=usr/share/man/man3c/timerisset.3c target=timeradd.3c
 link path=usr/share/man/man3c/timersub.3c target=timeradd.3c
 link path=usr/share/man/man3c/tmpnam_r.3c target=tmpnam.3c
+link path=usr/share/man/man3c/tolower_l.3c target=tolower.3c
+link path=usr/share/man/man3c/toupper_l.3c target=toupper.3c
+link path=usr/share/man/man3c/towctrans.3c target=wctrans.3c
+link path=usr/share/man/man3c/towctrans_l.3c target=wctrans.3c
+link path=usr/share/man/man3c/towlower_l.3c target=towlower.3c
+link path=usr/share/man/man3c/towupper_l.3c target=towupper.3c
 link path=usr/share/man/man3c/ttyname_r.3c target=ttyname.3c
 link path=usr/share/man/man3c/twalk.3c target=tsearch.3c
 link path=usr/share/man/man3c/tzset.3c target=ctime.3c
@@ -1182,21 +1291,22 @@ link path=usr/share/man/man3c/uconv_u32tou16.3c target=uconv_u16tou32.3c
 link path=usr/share/man/man3c/uconv_u32tou8.3c target=uconv_u16tou32.3c
 link path=usr/share/man/man3c/uconv_u8tou16.3c target=uconv_u16tou32.3c
 link path=usr/share/man/man3c/uconv_u8tou32.3c target=uconv_u16tou32.3c
-link path=usr/share/man/man3c/ucred_free.3c target=ucred_get.3c
-link path=usr/share/man/man3c/ucred_getegid.3c target=ucred_get.3c
-link path=usr/share/man/man3c/ucred_geteuid.3c target=ucred_get.3c
-link path=usr/share/man/man3c/ucred_getgroups.3c target=ucred_get.3c
-link path=usr/share/man/man3c/ucred_getlabel.3c target=ucred_get.3c
-link path=usr/share/man/man3c/ucred_getpflags.3c target=ucred_get.3c
-link path=usr/share/man/man3c/ucred_getpid.3c target=ucred_get.3c
-link path=usr/share/man/man3c/ucred_getprivset.3c target=ucred_get.3c
-link path=usr/share/man/man3c/ucred_getprojid.3c target=ucred_get.3c
-link path=usr/share/man/man3c/ucred_getrgid.3c target=ucred_get.3c
-link path=usr/share/man/man3c/ucred_getruid.3c target=ucred_get.3c
-link path=usr/share/man/man3c/ucred_getsgid.3c target=ucred_get.3c
-link path=usr/share/man/man3c/ucred_getsuid.3c target=ucred_get.3c
-link path=usr/share/man/man3c/ucred_getzoneid.3c target=ucred_get.3c
-link path=usr/share/man/man3c/ucred_size.3c target=ucred_get.3c
+link path=usr/share/man/man3c/ucred_free.3c target=ucred.3c
+link path=usr/share/man/man3c/ucred_get.3c target=ucred.3c
+link path=usr/share/man/man3c/ucred_getegid.3c target=ucred.3c
+link path=usr/share/man/man3c/ucred_geteuid.3c target=ucred.3c
+link path=usr/share/man/man3c/ucred_getgroups.3c target=ucred.3c
+link path=usr/share/man/man3c/ucred_getlabel.3c target=ucred.3c
+link path=usr/share/man/man3c/ucred_getpflags.3c target=ucred.3c
+link path=usr/share/man/man3c/ucred_getpid.3c target=ucred.3c
+link path=usr/share/man/man3c/ucred_getprivset.3c target=ucred.3c
+link path=usr/share/man/man3c/ucred_getprojid.3c target=ucred.3c
+link path=usr/share/man/man3c/ucred_getrgid.3c target=ucred.3c
+link path=usr/share/man/man3c/ucred_getruid.3c target=ucred.3c
+link path=usr/share/man/man3c/ucred_getsgid.3c target=ucred.3c
+link path=usr/share/man/man3c/ucred_getsuid.3c target=ucred.3c
+link path=usr/share/man/man3c/ucred_getzoneid.3c target=ucred.3c
+link path=usr/share/man/man3c/ucred_size.3c target=ucred.3c
 link path=usr/share/man/man3c/ulckpwdf.3c target=lckpwdf.3c
 link path=usr/share/man/man3c/ulltostr.3c target=strtol.3c
 link path=usr/share/man/man3c/unordered.3c target=isnand.3c
@@ -1228,18 +1338,27 @@ link path=usr/share/man/man3c/watof.3c target=wcstod.3c
 link path=usr/share/man/man3c/watoi.3c target=wcstol.3c
 link path=usr/share/man/man3c/watol.3c target=wcstol.3c
 link path=usr/share/man/man3c/watoll.3c target=wcstol.3c
+link path=usr/share/man/man3c/wcpncpy.3c target=wcpcpy.3c
+link path=usr/share/man/man3c/wcrtomb_l.3c target=wcrtomb.3c
+link path=usr/share/man/man3c/wcscasecmp_l.3c target=wcscasecmp.3c
 link path=usr/share/man/man3c/wcscat.3c target=wcstring.3c
 link path=usr/share/man/man3c/wcschr.3c target=wcstring.3c
 link path=usr/share/man/man3c/wcscmp.3c target=wcstring.3c
+link path=usr/share/man/man3c/wcscoll_l.3c target=wcscoll.3c
 link path=usr/share/man/man3c/wcscpy.3c target=wcstring.3c
 link path=usr/share/man/man3c/wcscspn.3c target=wcstring.3c
 link path=usr/share/man/man3c/wcsetno.3c target=cset.3c
-link path=usr/share/man/man3c/wcslen.3c target=wcstring.3c
+link path=usr/share/man/man3c/wcsncasecmp.3c target=wcscasecmp.3c
+link path=usr/share/man/man3c/wcsncasecmp_l.3c target=wcscasecmp.3c
 link path=usr/share/man/man3c/wcsncat.3c target=wcstring.3c
 link path=usr/share/man/man3c/wcsncmp.3c target=wcstring.3c
 link path=usr/share/man/man3c/wcsncpy.3c target=wcstring.3c
+link path=usr/share/man/man3c/wcsnlen.3c target=wcslen.3c
+link path=usr/share/man/man3c/wcsnrtombs.3c target=wcsrtombs.3c
+link path=usr/share/man/man3c/wcsnrtombs_l.3c target=wcsrtombs.3c
 link path=usr/share/man/man3c/wcspbrk.3c target=wcstring.3c
 link path=usr/share/man/man3c/wcsrchr.3c target=wcstring.3c
+link path=usr/share/man/man3c/wcsrtombs_l.3c target=wcsrtombs.3c
 link path=usr/share/man/man3c/wcsspn.3c target=wcstring.3c
 link path=usr/share/man/man3c/wcstof.3c target=wcstod.3c
 link path=usr/share/man/man3c/wcstok.3c target=wcstring.3c
@@ -1248,6 +1367,12 @@ link path=usr/share/man/man3c/wcstoll.3c target=wcstol.3c
 link path=usr/share/man/man3c/wcstoull.3c target=wcstoul.3c
 link path=usr/share/man/man3c/wcstoumax.3c target=wcstoimax.3c
 link path=usr/share/man/man3c/wcswcs.3c target=wcstring.3c
+link path=usr/share/man/man3c/wcswidth_l.3c target=wcswidth.3c
+link path=usr/share/man/man3c/wctob_l.3c target=wctob.3c
+link path=usr/share/man/man3c/wctomb_l.3c target=wctomb.3c
+link path=usr/share/man/man3c/wctrans_l.3c target=wctrans.3c
+link path=usr/share/man/man3c/wctype_l.3c target=wctype.3c
+link path=usr/share/man/man3c/wcwidth_l.3c target=wcwidth.3c
 link path=usr/share/man/man3c/windex.3c target=wcstring.3c
 link path=usr/share/man/man3c/wordfree.3c target=wordexp.3c
 link path=usr/share/man/man3c/wprintf.3c target=fwprintf.3c

@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2013 by Delphix. All rights reserved.
+ * Copyright (c) 2011, 2014 by Delphix. All rights reserved.
  * Copyright 2012 Milan Jurik. All rights reserved.
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  * Copyright (c) 2013 Steven Hartland.  All rights reserved.
@@ -63,6 +63,7 @@
 #include <libuutil.h>
 #include <aclutils.h>
 #include <directory.h>
+#include <idmap.h>
 
 #include "zfs_iter.h"
 #include "zfs_util.h"
@@ -256,12 +257,12 @@ get_usage(zfs_help_t idx)
 	case HELP_ROLLBACK:
 		return (gettext("\trollback [-rRf] <snapshot>\n"));
 	case HELP_SEND:
-		return (gettext("\tsend [-DnPpRv] [-[iI] snapshot] "
+		return (gettext("\tsend [-DnPpRvLe] [-[iI] snapshot] "
 		    "<snapshot>\n"
-		    "\tsend [-i snapshot|bookmark] "
+		    "\tsend [-Le] [-i snapshot|bookmark] "
 		    "<filesystem|volume|snapshot>\n"));
 	case HELP_SET:
-		return (gettext("\tset <property=value> "
+		return (gettext("\tset <property=value> ... "
 		    "<filesystem|volume|snapshot> ...\n"));
 	case HELP_SHARE:
 		return (gettext("\tshare <-a | filesystem>\n"));
@@ -476,15 +477,18 @@ usage(boolean_t requested)
 	exit(requested ? 0 : 2);
 }
 
+/*
+ * Take a property=value argument string and add it to the given nvlist.
+ * Modifies the argument inplace.
+ */
 static int
-parseprop(nvlist_t *props)
+parseprop(nvlist_t *props, char *propname)
 {
-	char *propname = optarg;
 	char *propval, *strval;
 
 	if ((propval = strchr(propname, '=')) == NULL) {
 		(void) fprintf(stderr, gettext("missing "
-		    "'=' for -o option\n"));
+		    "'=' for property=value argument\n"));
 		return (-1);
 	}
 	*propval = '\0';
@@ -573,6 +577,7 @@ finish_progress(char *done)
 	free(pt_header);
 	pt_header = NULL;
 }
+
 /*
  * zfs clone [-p] [-o prop=value] ... <snap> <fs | vol>
  *
@@ -599,7 +604,7 @@ zfs_do_clone(int argc, char **argv)
 	while ((c = getopt(argc, argv, "o:p")) != -1) {
 		switch (c) {
 		case 'o':
-			if (parseprop(props))
+			if (parseprop(props, optarg) != 0)
 				return (1);
 			break;
 		case 'p':
@@ -746,7 +751,7 @@ zfs_do_create(int argc, char **argv)
 				nomem();
 			break;
 		case 'o':
-			if (parseprop(props))
+			if (parseprop(props, optarg))
 				goto error;
 			break;
 		case 's':
@@ -1888,9 +1893,13 @@ zfs_do_inherit(int argc, char **argv)
 			if (prop == ZFS_PROP_QUOTA ||
 			    prop == ZFS_PROP_RESERVATION ||
 			    prop == ZFS_PROP_REFQUOTA ||
-			    prop == ZFS_PROP_REFRESERVATION)
+			    prop == ZFS_PROP_REFRESERVATION) {
 				(void) fprintf(stderr, gettext("use 'zfs set "
 				    "%s=none' to clear\n"), propname);
+				(void) fprintf(stderr, gettext("use 'zfs "
+				    "inherit -S %s' to revert to received "
+				    "value\n"), propname);
+			}
 			return (1);
 		}
 		if (received && (prop == ZFS_PROP_VOLSIZE ||
@@ -2371,9 +2380,8 @@ userspace_cb(void *arg, const char *domain, uid_t rid, uint64_t space)
 		/* SMB */
 		char sid[ZFS_MAXNAMELEN + 32];
 		uid_t id;
-		uint64_t classes;
 		int err;
-		directory_error_t e;
+		int flag = IDMAP_REQ_FLG_USE_CACHE;
 
 		smbentity = B_TRUE;
 
@@ -2390,10 +2398,13 @@ userspace_cb(void *arg, const char *domain, uid_t rid, uint64_t space)
 		if (err == 0) {
 			rid = id;
 			if (!cb->cb_sid2posix) {
-				e = directory_name_from_sid(NULL, sid, &name,
-				    &classes);
-				if (e != NULL)
-					directory_error_free(e);
+				if (type == USTYPE_SMB_USR) {
+					(void) idmap_getwinnamebyuid(rid, flag,
+					    &name, NULL);
+				} else {
+					(void) idmap_getwinnamebygid(rid, flag,
+					    &name, NULL);
+				}
 				if (name == NULL)
 					name = sid;
 			}
@@ -3299,6 +3310,7 @@ rollback_check_dependent(zfs_handle_t *zhp, void *data)
 	zfs_close(zhp);
 	return (0);
 }
+
 /*
  * Report any snapshots more recent than the one specified.  Used when '-r' is
  * not specified.  We reuse this same callback for the snapshot dependents - if
@@ -3432,21 +3444,17 @@ out:
 }
 
 /*
- * zfs set property=value { fs | snap | vol } ...
+ * zfs set property=value ... { fs | snap | vol } ...
  *
- * Sets the given property for all datasets specified on the command line.
+ * Sets the given properties for all datasets specified on the command line.
  */
-typedef struct set_cbdata {
-	char		*cb_propname;
-	char		*cb_value;
-} set_cbdata_t;
 
 static int
 set_callback(zfs_handle_t *zhp, void *data)
 {
-	set_cbdata_t *cbp = data;
+	nvlist_t *props = data;
 
-	if (zfs_prop_set(zhp, cbp->cb_propname, cbp->cb_value) != 0) {
+	if (zfs_prop_set_list(zhp, props) != 0) {
 		switch (libzfs_errno(g_zfs)) {
 		case EZFS_MOUNTFAILED:
 			(void) fprintf(stderr, gettext("property may be set "
@@ -3465,7 +3473,8 @@ set_callback(zfs_handle_t *zhp, void *data)
 static int
 zfs_do_set(int argc, char **argv)
 {
-	set_cbdata_t cb;
+	nvlist_t *props = NULL;
+	int ds_start = -1; /* argv idx of first dataset arg */
 	int ret = 0;
 
 	/* check for options */
@@ -3477,36 +3486,51 @@ zfs_do_set(int argc, char **argv)
 
 	/* check number of arguments */
 	if (argc < 2) {
-		(void) fprintf(stderr, gettext("missing property=value "
-		    "argument\n"));
+		(void) fprintf(stderr, gettext("missing arguments\n"));
 		usage(B_FALSE);
 	}
 	if (argc < 3) {
-		(void) fprintf(stderr, gettext("missing dataset name\n"));
+		if (strchr(argv[1], '=') == NULL) {
+			(void) fprintf(stderr, gettext("missing property=value "
+			    "argument(s)\n"));
+		} else {
+			(void) fprintf(stderr, gettext("missing dataset "
+			    "name(s)\n"));
+		}
 		usage(B_FALSE);
 	}
 
-	/* validate property=value argument */
-	cb.cb_propname = argv[1];
-	if (((cb.cb_value = strchr(cb.cb_propname, '=')) == NULL) ||
-	    (cb.cb_value[1] == '\0')) {
-		(void) fprintf(stderr, gettext("missing value in "
-		    "property=value argument\n"));
+	/* validate argument order:  prop=val args followed by dataset args */
+	for (int i = 1; i < argc; i++) {
+		if (strchr(argv[i], '=') != NULL) {
+			if (ds_start > 0) {
+				/* out-of-order prop=val argument */
+				(void) fprintf(stderr, gettext("invalid "
+				    "argument order\n"), i);
+				usage(B_FALSE);
+			}
+		} else if (ds_start < 0) {
+			ds_start = i;
+		}
+	}
+	if (ds_start < 0) {
+		(void) fprintf(stderr, gettext("missing dataset name(s)\n"));
 		usage(B_FALSE);
 	}
 
-	*cb.cb_value = '\0';
-	cb.cb_value++;
-
-	if (*cb.cb_propname == '\0') {
-		(void) fprintf(stderr,
-		    gettext("missing property in property=value argument\n"));
-		usage(B_FALSE);
+	/* Populate a list of property settings */
+	if (nvlist_alloc(&props, NV_UNIQUE_NAME, 0) != 0)
+		nomem();
+	for (int i = 1; i < ds_start; i++) {
+		if ((ret = parseprop(props, argv[i])) != 0)
+			goto error;
 	}
 
-	ret = zfs_for_each(argc - 2, argv + 2, NULL,
-	    ZFS_TYPE_DATASET, NULL, NULL, 0, set_callback, &cb);
+	ret = zfs_for_each(argc - ds_start, argv + ds_start, 0,
+	    ZFS_TYPE_DATASET, NULL, NULL, 0, set_callback, props);
 
+error:
+	nvlist_free(props);
 	return (ret);
 }
 
@@ -3566,7 +3590,7 @@ zfs_do_snapshot(int argc, char **argv)
 	while ((c = getopt(argc, argv, "ro:")) != -1) {
 		switch (c) {
 		case 'o':
-			if (parseprop(props))
+			if (parseprop(props, optarg))
 				return (1);
 			break;
 		case 'r':
@@ -3638,7 +3662,7 @@ zfs_do_send(int argc, char **argv)
 	boolean_t extraverbose = B_FALSE;
 
 	/* check options */
-	while ((c = getopt(argc, argv, ":i:I:RDpvnP")) != -1) {
+	while ((c = getopt(argc, argv, ":i:I:RDpvnPLe")) != -1) {
 		switch (c) {
 		case 'i':
 			if (fromname)
@@ -3672,6 +3696,12 @@ zfs_do_send(int argc, char **argv)
 			break;
 		case 'n':
 			flags.dryrun = B_TRUE;
+			break;
+		case 'L':
+			flags.largeblock = B_TRUE;
+			break;
+		case 'e':
+			flags.embed_data = B_TRUE;
 			break;
 		case ':':
 			(void) fprintf(stderr, gettext("missing argument for "
@@ -3711,6 +3741,7 @@ zfs_do_send(int argc, char **argv)
 	if (strchr(argv[0], '@') == NULL ||
 	    (fromname && strchr(fromname, '#') != NULL)) {
 		char frombuf[ZFS_MAXNAMELEN];
+		enum lzc_send_flags lzc_flags = 0;
 
 		if (flags.replicate || flags.doall || flags.props ||
 		    flags.dedup || flags.dryrun || flags.verbose ||
@@ -3725,6 +3756,11 @@ zfs_do_send(int argc, char **argv)
 		if (zhp == NULL)
 			return (1);
 
+		if (flags.largeblock)
+			lzc_flags |= LZC_SEND_FLAG_LARGE_BLOCK;
+		if (flags.embed_data)
+			lzc_flags |= LZC_SEND_FLAG_EMBED_DATA;
+
 		if (fromname != NULL &&
 		    (fromname[0] == '#' || fromname[0] == '@')) {
 			/*
@@ -3738,7 +3774,7 @@ zfs_do_send(int argc, char **argv)
 			(void) strlcat(frombuf, fromname, sizeof (frombuf));
 			fromname = frombuf;
 		}
-		err = zfs_send_one(zhp, fromname, STDOUT_FILENO);
+		err = zfs_send_one(zhp, fromname, STDOUT_FILENO, lzc_flags);
 		zfs_close(zhp);
 		return (err != 0);
 	}
@@ -6699,6 +6735,9 @@ zfs_do_bookmark(int argc, char **argv)
 		case ENOTSUP:
 			err_msg = "bookmark feature not enabled";
 			break;
+		case ENOSPC:
+			err_msg = "out of space";
+			break;
 		default:
 			err_msg = "unknown error";
 			break;
@@ -6707,7 +6746,7 @@ zfs_do_bookmark(int argc, char **argv)
 		    dgettext(TEXT_DOMAIN, err_msg));
 	}
 
-	return (ret);
+	return (ret != 0);
 
 usage:
 	usage(B_FALSE);

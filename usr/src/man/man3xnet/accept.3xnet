@@ -22,7 +22,6 @@ accept \- accept a new connection on a socket
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBaccept()\fR function extracts the first connection on the queue of
 pending connections, creates a new socket with the same socket type protocol
@@ -91,18 +90,15 @@ requests and O_NONBLOCK is set on the file descriptor for the socket,
 The accepted socket cannot itself accept more connections.  The original socket
 remains open and can accept more connections.
 .SH USAGE
-.sp
 .LP
 When a connection is available, \fBselect\fR(3C) will indicate that the file
 descriptor for the socket is ready for reading.
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, \fBaccept()\fR returns the nonnegative file
 descriptor of the accepted socket.  Otherwise, \(mi1 is returned and
 \fBerrno\fR is set to indicate the error.
 .SH ERRORS
-.sp
 .LP
 The \fBaccept()\fR function will fail if:
 .sp
@@ -243,7 +239,6 @@ been initialized.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -261,7 +256,7 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
+\fBsockaddr\fR(3SOCKET),
 \fBbind\fR(3XNET), \fBconnect\fR(3XNET), \fBlisten\fR(3XNET),
 \fBsocket\fR(3XNET), \fBattributes\fR(5), \fBstandards\fR(5)

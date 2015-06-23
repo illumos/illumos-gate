@@ -120,7 +120,7 @@ fi
 	FMRI=$2
 	IPP_FMRI="svc:/application/print/ipp-listener:default"
 	RFC1179_FMRI="svc:/application/print/rfc1179:default"
-	IPP_CONF=/etc/apache/httpd-standalone-ipp.conf
+	IPP_CONF=/etc/lp/ipp/httpd-standalone-ipp.conf
 	ip="any"
 
 	policy=`get_policy $FMRI`

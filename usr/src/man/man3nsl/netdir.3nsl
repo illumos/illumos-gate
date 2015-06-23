@@ -1,10 +1,11 @@
 '\" te
+.\" Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 .\"  Copyright 1989 AT&T
 .\" Copyright (C) 2005, Sun Microsystems, Inc. All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH NETDIR 3NSL "Dec 25, 2013"
+.TH NETDIR 3NSL "Feb 14, 2015"
 .SH NAME
 netdir, netdir_getbyname, netdir_getbyaddr, netdir_free, netdir_options,
 taddr2uaddr, uaddr2taddr, netdir_perror, netdir_sperror, netdir_mergeaddr \-
@@ -57,7 +58,6 @@ generic transport name-to-address translation
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBnetdir\fR functions provide a generic interface for name-to-address
 mapping that will work with all transport protocols. This interface provides a
@@ -180,10 +180,6 @@ struct nd_hostservlist   ND_HOSTSERVLIST
 
 .sp
 .LP
-The \fBfree()\fR function is used to free the universal address returned by the
-\fBtaddr2uaddr()\fR function.
-.sp
-.LP
 The \fBnetdir_options()\fR function is used to do all transport-specific setups
 and option management. \fIfildes\fR is the associated file descriptor.
 \fIoption\fR, \fIfildes\fR, and \fIpointer_to_args\fR are passed to the
@@ -288,9 +284,13 @@ returns \fINULL\fR if the conversion is not possible. This is not a fatal
 condition as some transports do not support a universal address form.
 .sp
 .LP
+The \fBfree()\fR function is used to free the universal address returned by the
+\fBtaddr2uaddr()\fR function.
+.sp
+.LP
 The \fBuaddr2taddr()\fR function is the reverse of the \fBtaddr2uaddr()\fR
 function. It returns the \fBstruct netbuf\fR data structure for the given
-universal address.
+universal address and \fINULL\fR on failure.
 
 .sp
 .LP
@@ -303,7 +303,6 @@ The \fBnetdir_sperror()\fR function returns a string with an error message that
 states the cause of a name-to-address mapping failure.
 
 .SH RETURN VALUES
-.sp
 .LP
 The \fBnetdir_sperror()\fR function returns a pointer to a buffer which
 contains the error message string. The buffer is overwritten on each call. In
@@ -311,10 +310,9 @@ multithreaded applications, this buffer is implemented as thread-specific
 data.
 .sp
 .LP
-The \fBnetdir_getbyaddr()\fR function returns \fB0\fR on success and a non-zero
-value on failure.
+The \fBnetdir_getbyname()\fR, \fBnetdir_getbyaddr()\fR, and \fBnetdir_options()\fR
+functions return \fB0\fR on success and a non-zero value on failure.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -330,7 +328,6 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBgethostname\fR(3C), \fBgetnetconfig\fR(3NSL), \fBgetnetpath\fR(3NSL),
 \fBnetconfig\fR(4), \fBattributes\fR(5)

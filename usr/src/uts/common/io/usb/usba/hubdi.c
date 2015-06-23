@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -596,11 +597,6 @@ static usb_event_t hubd_events = {
 
 /*
  * hubd_get_soft_state() returns the hubd soft state
- *
- * WUSB support extends this function to support wire adapter class
- * devices. The hubd soft state for the wire adapter class device
- * would be stored in usb_root_hubd field of the usba_device structure,
- * just as the USB host controller drivers do.
  */
 hubd_t *
 hubd_get_soft_state(dev_info_t *dip)
@@ -610,7 +606,7 @@ hubd_get_soft_state(dev_info_t *dip)
 		return (NULL);
 	}
 
-	if (usba_is_root_hub(dip) || usba_is_wa(dip)) {
+	if (usba_is_root_hub(dip)) {
 		usba_device_t *usba_device = usba_get_usba_device(dip);
 
 		return (usba_device->usb_root_hubd);
@@ -749,7 +745,7 @@ hubd_can_suspend(hubd_t *hubd)
 	 * Don't go to lower power if haven't been at full power for enough
 	 * time to let hotplug thread kickoff.
 	 */
-	if (ddi_get_time() < (hubpm->hubp_time_at_full_power +
+	if (gethrtime() < (hubpm->hubp_time_at_full_power +
 	    hubpm->hubp_min_pm_threshold)) {
 
 		return (USB_FAILURE);
@@ -1720,7 +1716,7 @@ hubd_pwrlvl3(hubd_t *hubd)
 		ASSERT(rval == USB_SUCCESS);
 		hubd->h_dev_state = USB_DEV_ONLINE;
 		hubpm->hubp_current_power = USB_DEV_OS_FULL_PWR;
-		hubpm->hubp_time_at_full_power = ddi_get_time();
+		hubpm->hubp_time_at_full_power = gethrtime();
 		hubd_start_polling(hubd, 0);
 
 		/* FALLTHRU */
@@ -3712,7 +3708,7 @@ hubd_hotplug_thread(void *arg)
 
 			/* mark the root hub as full power */
 			hubpm->hubp_current_power = USB_DEV_OS_FULL_PWR;
-			hubpm->hubp_time_at_full_power = ddi_get_time();
+			hubpm->hubp_time_at_full_power = gethrtime();
 			mutex_exit(HUBD_MUTEX(hubd));
 
 			USB_DPRINTF_L4(DPRINT_MASK_HOTPLUG, hubd->h_log_handle,
@@ -6465,19 +6461,6 @@ hubd_delete_child(hubd_t *hubd, usb_port_t port, uint_t flag, boolean_t retry)
 
 		rval = usba_destroy_child_devi(child_dip, flag);
 
-		if ((rval != USB_SUCCESS) && usba_is_hwa(child_dip)) {
-			/*
-			 * This is only useful for HWA device node.
-			 * Since hwahc interface must hold hwarc interface
-			 * open until hwahc is detached, the first call to
-			 * ndi_devi_unconfig_one() can only offline hwahc
-			 * driver but not hwarc driver. Need to make a second
-			 * call to ndi_devi_unconfig_one() to make the hwarc
-			 * driver detach.
-			 */
-			rval = usba_destroy_child_devi(child_dip, flag);
-		}
-
 		if ((rval == USB_SUCCESS) && (flag & NDI_DEVI_REMOVE)) {
 			/*
 			 * if the child was still < DS_INITIALIZED
@@ -7273,8 +7256,8 @@ hubd_create_pm_components(dev_info_t *dip, hubd_t *hubd)
 	hubpm->hubp_hubd = hubd;
 	hubpm->hubp_pm_capabilities = 0;
 	hubpm->hubp_current_power = USB_DEV_OS_FULL_PWR;
-	hubpm->hubp_time_at_full_power = ddi_get_time();
-	hubpm->hubp_min_pm_threshold = hubdi_min_pm_threshold;
+	hubpm->hubp_time_at_full_power = gethrtime();
+	hubpm->hubp_min_pm_threshold = hubdi_min_pm_threshold * NANOSEC;
 
 	/* alloc memory to save power states of children */
 	hubpm->hubp_child_pwrstate = (uint8_t *)
@@ -8709,7 +8692,7 @@ hubd_reset_thread(void *arg)
 
 		/* mark the root hub as full power */
 		hubpm->hubp_current_power = USB_DEV_OS_FULL_PWR;
-		hubpm->hubp_time_at_full_power = ddi_get_time();
+		hubpm->hubp_time_at_full_power = gethrtime();
 		mutex_exit(HUBD_MUTEX(hubd));
 
 		USB_DPRINTF_L3(DPRINT_MASK_HOTPLUG, hubd->h_log_handle,

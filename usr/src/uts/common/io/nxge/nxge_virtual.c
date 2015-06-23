@@ -3964,8 +3964,8 @@ nxge_ldgv_setup(p_nxge_ldg_t *ldgp, p_nxge_ldv_t *ldvp, uint8_t ldv,
 		NXGE_DEBUG_MSG((NULL, INT_CTL, "==> nxge_ldgv_setup(done): "
 		    "ldv %d endldg %d ldg %d, ldvp $%p",
 		    ldv, endldg, (*ldgp)->ldg, (*ldgp)->ldvp));
-		(*ldvp) = ++*ldvp;
-		(*ldgp) = ++*ldgp;
+		++*ldvp;
+		++*ldgp;
 		NXGE_DEBUG_MSG((NULL, INT_CTL,
 		    "==> nxge_ldgv_setup: new ngrps %d", *ngrps));
 	}

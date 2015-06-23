@@ -25,6 +25,7 @@
 
 /*
  * Copyright 2014 Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2014, Tegile Systems Inc. All rights reserved.
  */
 
 #include <limits.h>
@@ -150,12 +151,12 @@ mdi_info_cb(uintptr_t addr, const void *data, void *cbdata)
 }
 
 void
-mdi_info(struct mptsas m, int target)
+mdi_info(struct mptsas *mp, int target)
 {
 	struct	dev_info	d;
 	struct	mdi_phci	p;
 
-	if (mdb_vread(&d, sizeof (d), (uintptr_t)m.m_dip) == -1) {
+	if (mdb_vread(&d, sizeof (d), (uintptr_t)mp->m_dip) == -1) {
 		mdb_warn("couldn't read m_dip");
 		return;
 	}
@@ -246,7 +247,7 @@ klist_next(list_t *lp, uintptr_t klp, void *op)
 }
 
 static void *
-krefhash_first(uintptr_t khp)
+krefhash_first(uintptr_t khp, uintptr_t *addr)
 {
 	refhash_t mh;
 	uintptr_t klp;
@@ -259,6 +260,8 @@ krefhash_first(uintptr_t khp)
 		return (NULL);
 
 	kop = klp - mh.rh_link_off;
+	if (addr)
+		*addr = kop;
 	rp = mdb_alloc(mh.rh_obj_size, UM_SLEEP);
 	mdb_vread(rp, mh.rh_obj_size, kop);
 
@@ -266,7 +269,7 @@ krefhash_first(uintptr_t khp)
 }
 
 static void *
-krefhash_next(uintptr_t khp, void *op)
+krefhash_next(uintptr_t khp, void *op, uintptr_t *addr)
 {
 	refhash_t mh;
 	void *prev = op;
@@ -293,6 +296,8 @@ krefhash_next(uintptr_t khp, void *op)
 	}
 
 	kop = klp - mh.rh_link_off;
+	if (addr)
+		*addr = kop;
 	rp = mdb_alloc(mh.rh_obj_size, UM_SLEEP);
 	mdb_vread(rp, mh.rh_obj_size, kop);
 
@@ -301,52 +306,31 @@ krefhash_next(uintptr_t khp, void *op)
 }
 
 void
-display_targets(struct mptsas *mp)
+display_targets(struct mptsas *mp, uint_t verbose)
 {
 	mptsas_target_t *ptgt;
 	mptsas_smp_t *psmp;
+	int loop, comma;
+	uintptr_t p_addr;
 
 	mdb_printf("\n");
-	mdb_printf("The SCSI target information\n");
-	for (ptgt = (mptsas_target_t *)krefhash_first((uintptr_t)mp->m_targets);
+	mdb_printf(" mptsas_target_t slot devhdl      wwn     ncmds throttle   "
+	    "dr_flag dups\n");
+	mdb_printf("---------------------------------------"
+	    "-------------------------------\n");
+	for (ptgt = krefhash_first((uintptr_t)mp->m_targets, &p_addr);
 	    ptgt != NULL;
-	    ptgt = krefhash_next((uintptr_t)mp->m_targets, ptgt)) {
-		mdb_printf("\n");
-		mdb_printf("devhdl %x, sasaddress %"PRIx64", phymask %x,"
-		    "devinfo %x\n", ptgt->m_devhdl, ptgt->m_addr.mta_wwn,
-		    ptgt->m_addr.mta_phymask, ptgt->m_deviceinfo);
-		mdb_printf("throttle %x, dr_flag %x, m_t_ncmds %x, "
-		    "enclosure %x, slot_num %x\n", ptgt->m_t_throttle,
-		    ptgt->m_dr_flag, ptgt->m_t_ncmds, ptgt->m_enclosure,
-		    ptgt->m_slot_num);
-	}
-
-	mdb_printf("\n");
-	mdb_printf("The smp child information\n");
-	for (psmp = (mptsas_smp_t *)krefhash_first(
-	    (uintptr_t)mp->m_smp_targets);
-	    psmp != NULL;
-	    psmp = krefhash_next((uintptr_t)mp->m_smp_targets, psmp)) {
-		mdb_printf("\n");
-		mdb_printf("devhdl %x, sasaddress %"PRIx64", phymask %x \n",
-		    psmp->m_devhdl, psmp->m_addr.mta_wwn,
-		    psmp->m_addr.mta_phymask);
-	}
-	mdb_printf("\n");
-#if 0
-	mdb_printf("targ         wwn      ncmds throttle "
-	    "dr_flag  timeout  dups\n");
-	mdb_printf("-------------------------------"
-	    "--------------------------------\n");
-	for (i = 0; i < MPTSAS_MAX_TARGETS; i++) {
-		if (s->m_target[i].m_addr.mta_wwn ||
-		    s->m_target[i].m_deviceinfo) {
-			mdb_printf("%4d ", i);
-			if (s->m_target[i].m_addr.mta_wwn)
+	    ptgt = krefhash_next((uintptr_t)mp->m_targets, ptgt, &p_addr)) {
+		if (ptgt->m_addr.mta_wwn ||
+		    ptgt->m_deviceinfo) {
+			mdb_printf("%16p ", p_addr);
+			mdb_printf("%4d ", ptgt->m_slot_num);
+			mdb_printf("%4d ", ptgt->m_devhdl);
+			if (ptgt->m_addr.mta_wwn)
 				mdb_printf("%"PRIx64" ",
-				    s->m_target[i].m_addr.mta_wwn);
-			mdb_printf("%3d", s->m_target[i].m_t_ncmds);
-			switch (s->m_target[i].m_t_throttle) {
+				    ptgt->m_addr.mta_wwn);
+			mdb_printf("%3d", ptgt->m_t_ncmds);
+			switch (ptgt->m_t_throttle) {
 				case QFULL_THROTTLE:
 					mdb_printf("   QFULL ");
 					break;
@@ -359,53 +343,39 @@ display_targets(struct mptsas *mp)
 				case MAX_THROTTLE:
 					mdb_printf("     MAX ");
 					break;
-				case CHOKE_THROTTLE:
-					mdb_printf("   CHOKE ");
-					break;
 				default:
 					mdb_printf("%8d ",
-					    s->m_target[i].m_t_throttle);
+					    ptgt->m_t_throttle);
 			}
-			switch (s->m_target[i].m_dr_flag) {
+			switch (ptgt->m_dr_flag) {
 				case MPTSAS_DR_INACTIVE:
 					mdb_printf("  INACTIVE ");
 					break;
-				case MPTSAS_DR_PRE_OFFLINE_TIMEOUT:
-					mdb_printf("   TIMEOUT ");
-					break;
-				case MPTSAS_DR_PRE_OFFLINE_TIMEOUT_NO_CANCEL:
-					mdb_printf("TIMEOUT_NC ");
-					break;
-				case MPTSAS_DR_OFFLINE_IN_PROGRESS:
-					mdb_printf(" OFFLINING ");
-					break;
-				case MPTSAS_DR_ONLINE_IN_PROGRESS:
-					mdb_printf("  ONLINING ");
+				case MPTSAS_DR_INTRANSITION:
+					mdb_printf("TRANSITION ");
 					break;
 				default:
 					mdb_printf("   UNKNOWN ");
 					break;
 				}
-			mdb_printf("%3d/%-3d   %d/%d\n",
-			    s->m_target[i].m_dr_timeout, m.m_offline_delay,
-			    s->m_target[i].m_dr_online_dups,
-			    s->m_target[i].m_dr_offline_dups);
+			mdb_printf("%d\n",
+			    ptgt->m_dups);
 
 			if (verbose) {
 				mdb_inc_indent(5);
-				if ((s->m_target[i].m_deviceinfo &
+				if ((ptgt->m_deviceinfo &
 				    MPI2_SAS_DEVICE_INFO_MASK_DEVICE_TYPE) ==
 				    MPI2_SAS_DEVICE_INFO_FANOUT_EXPANDER)
 					mdb_printf("Fanout expander: ");
-				if ((s->m_target[i].m_deviceinfo &
+				if ((ptgt->m_deviceinfo &
 				    MPI2_SAS_DEVICE_INFO_MASK_DEVICE_TYPE) ==
 				    MPI2_SAS_DEVICE_INFO_EDGE_EXPANDER)
 					mdb_printf("Edge expander: ");
-				if ((s->m_target[i].m_deviceinfo &
+				if ((ptgt->m_deviceinfo &
 				    MPI2_SAS_DEVICE_INFO_MASK_DEVICE_TYPE) ==
 				    MPI2_SAS_DEVICE_INFO_END_DEVICE)
 					mdb_printf("End device: ");
-				if ((s->m_target[i].m_deviceinfo &
+				if ((ptgt->m_deviceinfo &
 				    MPI2_SAS_DEVICE_INFO_MASK_DEVICE_TYPE) ==
 				    MPI2_SAS_DEVICE_INFO_NO_DEVICE)
 					mdb_printf("No device ");
@@ -413,7 +383,7 @@ display_targets(struct mptsas *mp)
 				for (loop = 0, comma = 0;
 				    loop < (sizeof (devinfo_array) /
 				    sizeof (devinfo_array[0])); loop++) {
-					if (s->m_target[i].m_deviceinfo &
+					if (ptgt->m_deviceinfo &
 					    devinfo_array[loop].value) {
 						mdb_printf("%s%s",
 						    (comma ? ", " : ""),
@@ -422,40 +392,94 @@ display_targets(struct mptsas *mp)
 					}
 				}
 				mdb_printf("\n");
-
-				if (s->m_target[i].m_tgt_dip) {
-					*target_path = 0;
-					if (construct_path((uintptr_t)
-					    s->m_target[i].m_tgt_dip,
-					    target_path)
-					    == DCMD_OK)
-						mdb_printf("%s\n", target_path);
-				}
-				mdi_info(m, i);
+				mdi_info(mp, ptgt->m_slot_num);
 				mdb_dec_indent(5);
 			}
 		}
 	}
-#endif
+
+	mdb_printf("\n");
+	mdb_printf("    mptsas_smp_t devhdl      wwn          phymask\n");
+	mdb_printf("---------------------------------------"
+	    "------------------\n");
+	for (psmp = (mptsas_smp_t *)krefhash_first(
+	    (uintptr_t)mp->m_smp_targets, &p_addr);
+	    psmp != NULL;
+	    psmp = krefhash_next((uintptr_t)mp->m_smp_targets, psmp,
+	    &p_addr)) {
+		mdb_printf("%16p   ", p_addr);
+		mdb_printf("%4d  %"PRIx64"    %04x\n",
+		    psmp->m_devhdl, psmp->m_addr.mta_wwn,
+		    psmp->m_addr.mta_phymask);
+
+		if (!verbose)
+			continue;
+
+		mdb_inc_indent(5);
+		if ((psmp->m_deviceinfo & MPI2_SAS_DEVICE_INFO_MASK_DEVICE_TYPE)
+		    == MPI2_SAS_DEVICE_INFO_FANOUT_EXPANDER)
+			mdb_printf("Fanout expander: ");
+		if ((psmp->m_deviceinfo & MPI2_SAS_DEVICE_INFO_MASK_DEVICE_TYPE)
+		    == MPI2_SAS_DEVICE_INFO_EDGE_EXPANDER)
+			mdb_printf("Edge expander: ");
+		if ((psmp->m_deviceinfo & MPI2_SAS_DEVICE_INFO_MASK_DEVICE_TYPE)
+		    == MPI2_SAS_DEVICE_INFO_END_DEVICE)
+			mdb_printf("End device: ");
+		if ((psmp->m_deviceinfo & MPI2_SAS_DEVICE_INFO_MASK_DEVICE_TYPE)
+		    == MPI2_SAS_DEVICE_INFO_NO_DEVICE)
+			mdb_printf("No device ");
+
+		for (loop = 0, comma = 0;
+		    loop < (sizeof (devinfo_array)
+		    / sizeof (devinfo_array[0]));
+		    loop++) {
+			if (psmp->m_deviceinfo &
+			    devinfo_array[loop].value) {
+				mdb_printf("%s%s",
+				    (comma ? ", " : ""),
+				    devinfo_array[loop].text);
+				comma++;
+			}
+		}
+		mdb_printf("\n");
+		mdb_dec_indent(5);
+	}
 }
 
 int
-display_slotinfo()
+display_slotinfo(struct mptsas *mp, struct mptsas_slots *s)
 {
-#if 0
-	int	i, nslots;
-	struct	mptsas_cmd		c, *q, *slots;
-	int	header_output = 0;
-	int	rv = DCMD_OK;
-	int	slots_in_use = 0;
-	int	tcmds = 0;
-	int	mismatch = 0;
-	int	wq, dq;
-	int	ncmds = 0;
-	ulong_t	saved_indent;
+	int			i, nslots;
+	struct mptsas_cmd	c, *q, *slots;
+	mptsas_target_t		*ptgt;
+	int			header_output = 0;
+	int			rv = DCMD_OK;
+	int			slots_in_use = 0;
+	int			tcmds = 0;
+	int			mismatch = 0;
+	int			wq, dq;
+	int			ncmds = 0;
+	ulong_t			saved_indent;
+	uintptr_t		panicstr;
+	int			state;
+
+	if ((state = mdb_get_state()) == MDB_STATE_RUNNING) {
+		mdb_warn("mptsas: slot info can only be displayed on a system "
+		    "dump or under kmdb\n");
+		return (DCMD_ERR);
+	}
+
+	if (mdb_readvar(&panicstr, "panicstr") == -1) {
+		mdb_warn("can't read variable 'panicstr'");
+		return (DCMD_ERR);
+	}
+
+	if (state != MDB_STATE_STOPPED && panicstr == NULL) {
+		mdb_warn("mptsas: slot info not available for live dump\n");
+		return (DCMD_ERR);
+	}
 
 	nslots = s->m_n_normal;
-
 	slots = mdb_alloc(sizeof (mptsas_cmd_t) * nslots, UM_SLEEP);
 
 	for (i = 0; i < nslots; i++)
@@ -472,22 +496,28 @@ display_slotinfo()
 				mismatch++;
 		}
 
-	for (q = m.m_waitq, wq = 0; q; q = c.cmd_linkp, wq++)
+	for (q = mp->m_waitq, wq = 0; q; q = c.cmd_linkp, wq++)
 		if (mdb_vread(&c, sizeof (mptsas_cmd_t), (uintptr_t)q) == -1) {
 			mdb_warn("couldn't follow m_waitq");
 			rv = DCMD_ERR;
 			goto exit;
 		}
 
-	for (q = m.m_doneq, dq = 0; q; q = c.cmd_linkp, dq++)
+	for (q = mp->m_doneq, dq = 0; q; q = c.cmd_linkp, dq++)
 		if (mdb_vread(&c, sizeof (mptsas_cmd_t), (uintptr_t)q) == -1) {
 			mdb_warn("couldn't follow m_doneq");
 			rv = DCMD_ERR;
 			goto exit;
 		}
 
-	for (i = 0; i < MPTSAS_MAX_TARGETS; i++)
-		ncmds += s->m_target[i].m_t_ncmds;
+	for (ptgt = krefhash_first((uintptr_t)mp->m_targets, NULL);
+	    ptgt != NULL;
+	    ptgt = krefhash_next((uintptr_t)mp->m_targets, ptgt, NULL)) {
+		if (ptgt->m_addr.mta_wwn ||
+		    ptgt->m_deviceinfo) {
+			ncmds += ptgt->m_t_ncmds;
+		}
+	}
 
 	mdb_printf("\n");
 	mdb_printf("   mpt.  slot               mptsas_slots     slot");
@@ -498,8 +528,8 @@ display_slotinfo()
 	mdb_printf("----------------------------------------------------");
 	mdb_printf("\n");
 
-	mdb_printf("%7d ", m.m_ncmds);
-	mdb_printf("%s", (m.m_ncmds == slots_in_use ? "  " : "!="));
+	mdb_printf("%7d ", mp->m_ncmds);
+	mdb_printf("%s", (mp->m_ncmds == slots_in_use ? "  " : "!="));
 	mdb_printf("%3d               total %3d ", slots_in_use, ncmds);
 	mdb_printf("%s", (tcmds == ncmds ? "     " : "   !="));
 	mdb_printf("%3d %2d %2d\n", tcmds, wq, dq);
@@ -532,8 +562,8 @@ display_slotinfo()
 
 	/* print the wait queue */
 
-	for (q = m.m_waitq; q; q = c.cmd_linkp) {
-		if (q == m.m_waitq)
+	for (q = mp->m_waitq; q; q = c.cmd_linkp) {
+		if (q == mp->m_waitq)
 			mdb_printf("\n");
 		if (mdb_vread(&c, sizeof (mptsas_cmd_t), (uintptr_t)q)
 		    == -1) {
@@ -549,8 +579,8 @@ display_slotinfo()
 
 	/* print the done queue */
 
-	for (q = m.m_doneq; q; q = c.cmd_linkp) {
-		if (q == m.m_doneq)
+	for (q = mp->m_doneq; q; q = c.cmd_linkp) {
+		if (q == mp->m_doneq)
 			mdb_printf("\n");
 		if (mdb_vread(&c, sizeof (mptsas_cmd_t), (uintptr_t)q)
 		    == -1) {
@@ -566,7 +596,7 @@ display_slotinfo()
 
 	mdb_inc_indent(saved_indent);
 
-	if (m.m_ncmds != slots_in_use)
+	if (mp->m_ncmds != slots_in_use)
 		mdb_printf("WARNING: mpt.m_ncmds does not match the number of "
 		    "slots in use\n");
 
@@ -580,7 +610,7 @@ display_slotinfo()
 
 	/* now check for corruptions */
 
-	for (q = m.m_waitq; q; q = c.cmd_linkp) {
+	for (q = mp->m_waitq; q; q = c.cmd_linkp) {
 		for (i = 0; i < nslots; i++)
 			if (s->m_slot[i] == q)
 				mdb_printf("WARNING: m_waitq entry"
@@ -594,7 +624,7 @@ display_slotinfo()
 		}
 	}
 
-	for (q = m.m_doneq; q; q = c.cmd_linkp) {
+	for (q = mp->m_doneq; q; q = c.cmd_linkp) {
 		for (i = 0; i < nslots; i++)
 			if (s->m_slot[i] == q)
 				mdb_printf("WARNING: m_doneq entry "
@@ -622,10 +652,6 @@ display_slotinfo()
 exit:
 	mdb_free(slots, sizeof (mptsas_cmd_t) * nslots);
 	return (rv);
-#endif
-	mdb_printf("\n");
-	mdb_printf("The slot information is not implemented yet\n");
-	return (0);
 }
 
 void
@@ -639,80 +665,103 @@ display_deviceinfo(struct mptsas *mp)
 	}
 
 	mdb_printf("\n");
-	mdb_printf("Path in device tree %s\n", device_path);
-#if 0
 	mdb_printf("base_wwid          phys "
-	    "mptid prodid  devid        revid   ssid\n");
+	    " prodid  devid          revid   ssid\n");
 	mdb_printf("-----------------------------"
 	    "----------------------------------\n");
-	mdb_printf("%"PRIx64"     %2d   %3d "
-	    "0x%04x 0x%04x ", m.un.m_base_wwid, m.m_num_phys, m.m_mptid,
-	    m.m_productid, m.m_devid);
-	switch (m.m_devid) {
-		case MPTSAS_909:
-			mdb_printf("(909)   ");
+	mdb_printf("%"PRIx64"     %2d  "
+	    "0x%04x 0x%04x ", mp->un.m_base_wwid, mp->m_num_phys,
+	    mp->m_productid, mp->m_devid);
+	switch (mp->m_devid) {
+		case MPI2_MFGPAGE_DEVID_SAS2004:
+			mdb_printf("(SAS2004) ");
 			break;
-		case MPTSAS_929:
-			mdb_printf("(929)   ");
+		case MPI2_MFGPAGE_DEVID_SAS2008:
+			mdb_printf("(SAS2008) ");
 			break;
-		case MPTSAS_919:
-			mdb_printf("(919)   ");
+		case MPI2_MFGPAGE_DEVID_SAS2108_1:
+		case MPI2_MFGPAGE_DEVID_SAS2108_2:
+		case MPI2_MFGPAGE_DEVID_SAS2108_3:
+			mdb_printf("(SAS2108) ");
 			break;
-		case MPTSAS_1030:
-			mdb_printf("(1030)  ");
+		case MPI2_MFGPAGE_DEVID_SAS2116_1:
+		case MPI2_MFGPAGE_DEVID_SAS2116_2:
+			mdb_printf("(SAS2116) ");
 			break;
-		case MPTSAS_1064:
-			mdb_printf("(1064)  ");
+		case MPI2_MFGPAGE_DEVID_SSS6200:
+			mdb_printf("(SSS6200) ");
 			break;
-		case MPTSAS_1068:
-			mdb_printf("(1068)  ");
+		case MPI2_MFGPAGE_DEVID_SAS2208_1:
+		case MPI2_MFGPAGE_DEVID_SAS2208_2:
+		case MPI2_MFGPAGE_DEVID_SAS2208_3:
+		case MPI2_MFGPAGE_DEVID_SAS2208_4:
+		case MPI2_MFGPAGE_DEVID_SAS2208_5:
+		case MPI2_MFGPAGE_DEVID_SAS2208_6:
+			mdb_printf("(SAS2208) ");
 			break;
-		case MPTSAS_1064E:
-			mdb_printf("(1064E) ");
+		case MPI2_MFGPAGE_DEVID_SAS2308_1:
+		case MPI2_MFGPAGE_DEVID_SAS2308_2:
+		case MPI2_MFGPAGE_DEVID_SAS2308_3:
+			mdb_printf("(SAS2308) ");
 			break;
-		case MPTSAS_1068E:
-			mdb_printf("(1068E) ");
+		case MPI25_MFGPAGE_DEVID_SAS3004:
+			mdb_printf("(SAS3004) ");
+			break;
+		case MPI25_MFGPAGE_DEVID_SAS3008:
+			mdb_printf("(SAS3008) ");
+			break;
+		case MPI25_MFGPAGE_DEVID_SAS3108_1:
+		case MPI25_MFGPAGE_DEVID_SAS3108_2:
+		case MPI25_MFGPAGE_DEVID_SAS3108_5:
+		case MPI25_MFGPAGE_DEVID_SAS3108_6:
+			mdb_printf("(SAS3108) ");
 			break;
 		default:
-			mdb_printf("(?????) ");
+			mdb_printf("(SAS????) ");
 			break;
 	}
-	mdb_printf("0x%02x 0x%04x\n", m.m_revid, m.m_ssid);
+	mdb_printf("0x%02x 0x%04x\n", mp->m_revid, mp->m_ssid);
 	mdb_printf("%s\n", device_path);
 
-	for (i = 0; i < MAX_MPI2_PORTS; i++) {
-		if (i%4 == 0)
-			mdb_printf("\n");
+}
 
-		mdb_printf("%d:", i);
+void
+dump_debug_log(void)
+{
+	uint32_t idx;
+	size_t	linecnt, linelen;
+	char	*logbuf;
+	int	i;
 
-		switch (m.m_port_type[i]) {
-			case MPI2_PORTFACTS_PORTTYPE_INACTIVE:
-				mdb_printf("inactive     ",
-				    m.m_protocol_flags[i]);
-				break;
-			case MPI2_PORTFACTS_PORTTYPE_SCSI:
-				mdb_printf("SCSI (0x%1x)   ",
-				    m.m_protocol_flags[i]);
-				break;
-			case MPI2_PORTFACTS_PORTTYPE_FC:
-				mdb_printf("FC (0x%1x)     ",
-				    m.m_protocol_flags[i]);
-				break;
-			case MPI2_PORTFACTS_PORTTYPE_ISCSI:
-				mdb_printf("iSCSI (0x%1x)  ",
-				    m.m_protocol_flags[i]);
-				break;
-			case MPI2_PORTFACTS_PORTTYPE_SAS:
-				mdb_printf("SAS (0x%1x)    ",
-				    m.m_protocol_flags[i]);
-				break;
-			default:
-				mdb_printf("unknown      ");
-		}
+	if (mdb_readsym(&idx, sizeof (uint32_t), "mptsas_dbglog_idx") == -1) {
+		mdb_warn("No debug log buffer present");
+		return;
 	}
-#endif
+	if (mdb_readsym(&linecnt, sizeof (size_t), "mptsas_dbglog_linecnt")
+	    == -1) {
+		mdb_warn("No debug linecnt present");
+		return;
+	}
+	if (mdb_readsym(&linelen, sizeof (size_t), "mptsas_dbglog_linelen")
+	    == -1) {
+		mdb_warn("No debug linelen present");
+		return;
+	}
+	logbuf = mdb_alloc(linelen * linecnt, UM_SLEEP);
+
+	if (mdb_readsym(logbuf, linelen * linecnt, "mptsas_dbglog_bufs")
+	    == -1) {
+		mdb_warn("No debug log buffer present");
+		return;
+	}
 	mdb_printf("\n");
+	idx &= linecnt - 1;
+	for (i = 0; i < linecnt; i++) {
+		mdb_printf("%s\n", &logbuf[idx * linelen]);
+		idx++;
+		idx &= linecnt - 1;
+	}
+	mdb_free(logbuf, linelen * linecnt);
 }
 
 static int
@@ -728,11 +777,12 @@ mptsas_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	uint_t			slot_info = FALSE;
 	uint_t			device_info = FALSE;
 	uint_t			port_info = FALSE;
+	uint_t			debug_log = FALSE;
 	int			rv = DCMD_OK;
-	void			*mptsas_state;
 
 	if (!(flags & DCMD_ADDRSPEC)) {
-		mptsas_state = NULL;
+		void		*mptsas_state = NULL;
+
 		if (mdb_readvar(&mptsas_state, "mptsas_state") == -1) {
 			mdb_warn("can't read mptsas_state");
 			return (DCMD_ERR);
@@ -751,6 +801,7 @@ mptsas_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    't', MDB_OPT_SETBITS, TRUE, &target_info,
 	    'p', MDB_OPT_SETBITS, TRUE, &port_info,
 	    'v', MDB_OPT_SETBITS, TRUE, &verbose,
+	    'D', MDB_OPT_SETBITS, TRUE, &debug_log,
 	    NULL) != argc)
 		return (DCMD_USAGE);
 
@@ -823,7 +874,7 @@ mptsas_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	mdb_inc_indent(17);
 
 	if (target_info)
-		display_targets(&m);
+		display_targets(&m, verbose);
 
 	if (port_info)
 		display_ports(&m);
@@ -832,7 +883,10 @@ mptsas_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		display_deviceinfo(&m);
 
 	if (slot_info)
-		display_slotinfo();
+		display_slotinfo(&m, s);
+
+	if (debug_log)
+		dump_debug_log();
 
 	mdb_dec_indent(17);
 
@@ -850,13 +904,15 @@ mptsas_help()
 	    "Without the address of a \"struct mptsas\", prints every "
 	    "instance.\n\n"
 	    "Switches:\n"
-	    "  -t   includes information about targets\n"
-	    "  -p   includes information about port\n"
-	    "  -d   includes information about the hardware\n");
+	    "  -t[v]  includes information about targets, v = be more verbose\n"
+	    "  -p     includes information about port\n"
+	    "  -s     includes information about mpt slots\n"
+	    "  -d     includes information about the hardware\n"
+	    "  -D     print the mptsas specific debug log\n");
 }
 
 static const mdb_dcmd_t dcmds[] = {
-	{ "mptsas", "?[-tpd]", "print mpt_sas information", mptsas_dcmd,
+	{ "mptsas", "?[-tpsdD]", "print mpt_sas information", mptsas_dcmd,
 	    mptsas_help}, { NULL }
 };
 

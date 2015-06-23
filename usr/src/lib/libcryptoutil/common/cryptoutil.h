@@ -22,6 +22,7 @@
  */
 /*
  * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
  */
 
 #ifndef _CRYPTOUTIL_H
@@ -216,9 +217,6 @@ extern int pkcs11_seed_urandom(void *sbuf, size_t slen);
 extern int pkcs11_get_random(void *dbuf, size_t dlen);
 extern int pkcs11_get_urandom(void *dbuf, size_t dlen);
 extern int pkcs11_get_nzero_urandom(void *dbuf, size_t dlen);
-extern void pkcs11_close_random(void);
-extern void pkcs11_close_urandom(void);
-extern void pkcs11_close_urandom_seed(void);
 extern int pkcs11_read_data(char *filename, void **dbuf, size_t *dlen);
 
 extern int open_nointr(const char *path, int oflag, ...);

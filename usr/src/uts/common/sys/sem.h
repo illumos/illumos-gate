@@ -20,6 +20,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 1997-2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -30,8 +32,6 @@
 
 #ifndef _SYS_SEM_H
 #define	_SYS_SEM_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/ipc.h>
 
@@ -103,7 +103,6 @@ struct sembuf {
 };
 
 #if !defined(_KERNEL)
-#if defined(__STDC__)
 int semctl(int, int, int, ...);
 int semget(key_t, int, int);
 int semids(int *, uint_t, uint_t *);
@@ -111,13 +110,6 @@ int semop(int, struct sembuf *, size_t);
 #if defined(__EXTENSIONS__) || !defined(_XOPEN_SOURCE)
 int semtimedop(int, struct sembuf *, size_t, const struct timespec *);
 #endif
-#else /* __STDC__ */
-int semctl();
-int semget();
-int semids();
-int semop();
-int semtimedop();
-#endif /* __STDC__ */
 #endif /* ! _KERNEL */
 
 #ifdef	__cplusplus

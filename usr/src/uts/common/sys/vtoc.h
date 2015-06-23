@@ -20,6 +20,8 @@
  */
 
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -78,7 +80,13 @@ extern "C" {
 #define	V_HOME		0x08		/* Home partition */
 #define	V_ALTSCTR	0x09		/* Alternate sector partition */
 #define	V_CACHE		0x0a		/* Cache (cachefs) partition */
+
+/* Tags for EFI/GPT labels */
 #define	V_RESERVED	0x0b		/* SMI reserved data */
+#define	V_SYSTEM	0x0c		/* EFI/GPT system partition */
+#define	V_BIOS_BOOT	0x18		/* BIOS Boot partition */
+
+#define	V_UNKNOWN	0xff		/* Unknown partition */
 
 /*
  * Partition permission flags
@@ -327,21 +335,10 @@ struct vtoc32 {
 #define	CK_CHECKSUM	0	/* check checksum */
 #define	CK_MAKESUM	1	/* generate checksum */
 
-#if defined(__STDC__)
-
 extern	int	read_vtoc(int, struct vtoc *);
 extern	int	write_vtoc(int, struct vtoc *);
 extern	int	read_extvtoc(int, struct extvtoc *);
 extern	int	write_extvtoc(int, struct extvtoc *);
-
-#else
-
-extern	int	read_vtoc();
-extern	int	write_vtoc();
-extern	int	read_extvtoc();
-extern	int	write_extvtoc();
-
-#endif 	/* __STDC__ */
 
 #ifdef	__cplusplus
 }

@@ -22,6 +22,8 @@
 /*
  *  nl_types.h
  *
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright (c) 1991,1997,2000 by Sun Microsystems, Inc.
  * All rights reserved.
  */
@@ -31,8 +33,6 @@
 
 #ifndef	_NL_TYPES_H
 #define	_NL_TYPES_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/isa_defs.h>
 
@@ -105,15 +105,9 @@ typedef int nl_item;	/* XPG3 Conformant for nl_langinfo(). */
 /* Need to be removed later */
 typedef	nl_item	__nl_item;
 
-#ifdef	__STDC__
 int	catclose(nl_catd);
 char	*catgets(nl_catd, int, int, const char *);
 nl_catd catopen(const char *, int);
-#else
-int	catclose();
-char	*catgets();
-nl_catd catopen();
-#endif	/* __STDC__ */
 
 #ifdef	__cplusplus
 }

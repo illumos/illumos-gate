@@ -91,7 +91,7 @@ rdsv3_mr_tree_walk(struct avl_tree *root, uint32_t key,
 	mr = avl_find(root, &key, &where);
 	if ((mr == NULL) && (insert != NULL)) {
 		avl_insert(root, (void *)insert, where);
-		atomic_add_32(&insert->r_refcount, 1);
+		atomic_inc_32(&insert->r_refcount);
 		return (NULL);
 	}
 
@@ -254,7 +254,7 @@ __rdsv3_rdma_map(struct rdsv3_sock *rs, struct rds_get_mr_args *args,
 	ASSERT(!(found && found != mr));
 
 	if (mr_ret) {
-		atomic_add_32(&mr->r_refcount, 1);
+		atomic_inc_32(&mr->r_refcount);
 		*mr_ret = mr;
 	}
 
@@ -399,7 +399,7 @@ rdsv3_rdma_unuse(struct rdsv3_sock *rs, uint32_t r_key, int force)
 		RB_CLEAR_NODE(&mr->r_rb_node);
 		zot_me = 1;
 	} else {
-		atomic_add_32(&mr->r_refcount, 1);
+		atomic_inc_32(&mr->r_refcount);
 	}
 	mutex_exit(&rs->rs_rdma_lock);
 
@@ -638,7 +638,7 @@ rdsv3_cmsg_rdma_dest(struct rdsv3_sock *rs, struct rdsv3_message *rm,
 	if (!mr)
 		err = -EINVAL;	/* invalid r_key */
 	else
-		atomic_add_32(&mr->r_refcount, 1);
+		atomic_inc_32(&mr->r_refcount);
 	mutex_exit(&rs->rs_rdma_lock);
 
 	if (mr) {

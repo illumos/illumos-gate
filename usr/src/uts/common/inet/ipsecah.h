@@ -105,8 +105,8 @@ struct ipsecah_stack {
 
 	/*
 	 * Keysock instance of AH.  There can be only one per stack instance.
-	 * Use casptr() on this because I don't set it until KEYSOCK_HELLO
-	 * comes down.
+	 * Use atomic_cas_ptr() on this because I don't set it until
+	 * KEYSOCK_HELLO comes down.
 	 * Paired up with the ah_pfkey_q is the ah_event, which will age SAs.
 	 */
 	queue_t			*ah_pfkey_q;

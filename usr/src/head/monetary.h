@@ -20,14 +20,14 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_MONETARY_H
 #define	_MONETARY_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/feature_tests.h>
 #include <sys/types.h>
@@ -36,11 +36,18 @@
 extern "C" {
 #endif
 
-#if defined(__STDC__)
 extern ssize_t	strfmon(char *_RESTRICT_KYWD, size_t,
 			const char *_RESTRICT_KYWD, ...);
-#else
-extern ssize_t	strfmon();
+
+#if defined(_XPG7) || (!defined(_STRICT_STRICT_SYMBOLS))
+
+#ifndef _LOCALE_T
+#define	_LOCALE_T
+typedef struct _locale *locale_t;
+#endif
+
+extern ssize_t strfmon_l(char *_RESTRICT_KYWD, size_t, locale_t,
+		const char *_RESTRICT_KYWD, ...);
 #endif
 
 #ifdef __cplusplus

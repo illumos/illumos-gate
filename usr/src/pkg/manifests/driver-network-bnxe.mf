@@ -35,25 +35,36 @@ set name=pkg.description \
 set name=pkg.summary value="Broadcom NetXtreme II 10GbE NIC Driver"
 set name=info.classification \
     value=org.opensolaris.category.2008:Drivers/Networking
-set name=variant.arch value=i386
+set name=variant.arch value=$(ARCH)
 dir path=kernel group=sys
 dir path=kernel/drv group=sys
 dir path=kernel/drv/$(ARCH64) group=sys
+dir path=usr/share/man
+dir path=usr/share/man/man7d
 driver name=bnxe perms="* 0666 root sys" \
     alias=pci14e4,164e \
     alias=pci14e4,164f \
     alias=pci14e4,1650 \
     alias=pciex14e4,164e \
     alias=pciex14e4,164f \
-    alias=pciex14e4,1650
+    alias=pciex14e4,1650 \
+    alias=pciex14e4,1662 \
+    alias=pciex14e4,1663 \
+    alias=pciex14e4,168a \
+    alias=pciex14e4,168d \
+    alias=pciex14e4,168e \
+    alias=pciex14e4,16a1 \
+    alias=pciex14e4,16a4 \
+    alias=pciex14e4,16a5 \
+    alias=pciex14e4,16ab \
+    alias=pciex14e4,16ae
 file path=kernel/drv/$(ARCH64)/bnxe group=sys
-file path=kernel/drv/bnxe group=sys
+$(i386_ONLY)file path=kernel/drv/bnxe group=sys
 file path=kernel/drv/bnxe.conf group=sys \
     original_name=BRCMbnxe:kernel/drv/bnxe.conf preserve=renameold
+file path=usr/share/man/man7d/bnxe.7d
 legacy pkg=BRCMbnxe \
     desc="Broadcom NetXtreme II 10 Gigabit Ethernet PCI-X/PCIE Adapter Driver" \
     name="Broadcom NetXtreme II 10GbE NIC Driver" \
     vendor="Broadcom Corporation, Inc."
 license cr_Sun license=cr_Sun
-license lic_OSBL license=lic_OSBL
-license lic_OSBL_preamble license=lic_OSBL_preamble

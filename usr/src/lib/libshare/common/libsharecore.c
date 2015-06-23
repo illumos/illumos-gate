@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -772,7 +773,7 @@ add_syntax_comment(xmlNodePtr root, char *line, char *err, int todfstab)
 /*
  * sa_is_share(object)
  *
- * returns true of the object is of type "share".
+ * returns true if the object is of type "share".
  */
 
 int
@@ -787,7 +788,7 @@ sa_is_share(void *object)
 /*
  * sa_is_resource(object)
  *
- * returns true of the object is of type "share".
+ * returns true if the object is of type "resource".
  */
 
 int

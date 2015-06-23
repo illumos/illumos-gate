@@ -1,0 +1,128 @@
+'\" te
+.\" Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
+.\" Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
+.\" Portions Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH asin 3M "12 Jul 2006" "SunOS 5.11" "Mathematical Library Functions"
+.SH NAME
+asin, asinf, asinl \- arc sine function
+.SH SYNOPSIS
+.LP
+.nf
+c99 [ \fIflag\fR... ] \fIfile\fR... \fB-lm\fR [ \fIlibrary\fR... ]
+#include <math.h>
+
+\fBdouble\fR \fBasin\fR(\fBdouble\fR \fIx\fR);
+.fi
+
+.LP
+.nf
+\fBfloat\fR \fBasinf\fR(\fBfloat\fR \fIx\fR);
+.fi
+
+.LP
+.nf
+\fBlong double\fR \fBasinl\fR(\fBlong double\fR \fIx\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions compute the principal value of the arc sine of their argument
+\fIx\fR. The value of \fIx\fR should be in the range [\(mi1,1].
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, these functions return the arc sine of \fIx\fR in
+the range [\(mi\c
+.if n pi\c
+.if t \(*p
+\c
+/2, \c
+.if n pi\c
+.if t \(*p
+\c
+/2] radians.
+.sp
+.LP
+For finite values of \fIx\fR not in the range [\(mi1,1], a domain error occurs
+and a NaN is returned.
+.sp
+.LP
+If \fIx\fR is NaN, NaN is returned.
+.sp
+.LP
+If \fIx\fR is \(+-0, \fIx\fR is returned.
+.sp
+.LP
+If \fIx\fR is \(+-Inf, a domain error occurs and a NaN is returned.
+.sp
+.LP
+For exceptional cases, \fBmatherr\fR(3M) tabulates the values to be returned by
+\fBasin()\fR as specified by SVID3 and XPG3.
+.SH ERRORS
+.sp
+.LP
+These functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fBDomain Error\fR
+.ad
+.RS 16n
+.rt  
+The \fIx\fR argument is finite and not in the range [\(mi1,1], or is \(+-Inf.
+.sp
+If the integer expression (\fBmath_errhandling\fR & \fBMATH_ERREXCEPT\fR) is
+non-zero, the invalid floating-point exception is raised.
+.sp
+The \fBasin()\fR function sets \fBerrno\fR to \fBEDOM\fR if \fIx\fR is not
+\(+-Inf or NaN and is not in the range [\(mi1,1].
+.RE
+
+.SH USAGE
+.sp
+.LP
+An application wanting to check for exceptions should call
+\fBfeclearexcept\fR(\fBFE_ALL_EXCEPT\fR) before calling these functions. On
+return, if \fBfetestexcept\fR(\fBFE_INVALID\fR | \fBFE_DIVBYZERO\fR |
+\fBFE_OVERFLOW\fR | \fBFE_UNDERFLOW\fR) is non-zero, an exception has been
+raised. An application should either examine the return value or check the
+floating point exception flags to detect exceptions.
+.sp
+.LP
+An application can also set \fBerrno\fR to 0 before calling \fBasin()\fR. On
+return, if \fBerrno\fR is non-zero, an error has occurred. The \fBasinf()\fR
+and \fBasinl()\fR functions do not set \fBerrno\fR.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBisnan\fR(3M), \fBfeclearexcept\fR(3M), \fBfetestexcept\fR(3M),
+\fBmath.h\fR(3HEAD), \fBmatherr\fR(3M), \fBsin\fR(3M), \fBattributes\fR(5),
+\fBstandards\fR(5)

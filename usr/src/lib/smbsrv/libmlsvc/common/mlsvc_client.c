@@ -20,8 +20,8 @@
  */
 
 /*
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -49,27 +49,6 @@
 #include <libsmbrdr.h>
 #include <mlsvc.h>
 
-/*
- * Server info cache entry expiration in seconds.
- */
-#define	NDR_SVINFO_TIMEOUT	1800
-
-typedef struct ndr_svinfo {
-	list_node_t		svi_lnd;
-	time_t			svi_tcached;
-	char			svi_server[MAXNAMELEN];
-	char			svi_domain[MAXNAMELEN];
-	srvsvc_server_info_t	svi_svinfo;
-} ndr_svinfo_t;
-
-typedef struct ndr_svlist {
-	list_t		svl_list;
-	mutex_t		svl_mtx;
-	boolean_t	svl_init;
-} ndr_svlist_t;
-
-static ndr_svlist_t ndr_svlist;
-
 static int ndr_xa_init(ndr_client_t *, ndr_xa_t *);
 static int ndr_xa_exchange(ndr_client_t *, ndr_xa_t *);
 static int ndr_xa_read(ndr_client_t *, ndr_xa_t *);
@@ -77,53 +56,6 @@ static void ndr_xa_preserve(ndr_client_t *, ndr_xa_t *);
 static void ndr_xa_destruct(ndr_client_t *, ndr_xa_t *);
 static void ndr_xa_release(ndr_client_t *);
 
-static int ndr_svinfo_lookup(char *, char *, srvsvc_server_info_t *);
-static boolean_t ndr_svinfo_match(const char *, const char *, const
-    ndr_svinfo_t *);
-static boolean_t ndr_svinfo_expired(ndr_svinfo_t *);
-
-/*
- * Initialize the RPC client interface: create the server info cache.
- */
-void
-ndr_rpc_init(void)
-{
-	(void) mutex_lock(&ndr_svlist.svl_mtx);
-
-	if (!ndr_svlist.svl_init) {
-		list_create(&ndr_svlist.svl_list, sizeof (ndr_svinfo_t),
-		    offsetof(ndr_svinfo_t, svi_lnd));
-		ndr_svlist.svl_init = B_TRUE;
-	}
-
-	(void) mutex_unlock(&ndr_svlist.svl_mtx);
-}
-
-/*
- * Terminate the RPC client interface: flush and destroy the server info
- * cache.
- */
-void
-ndr_rpc_fini(void)
-{
-	ndr_svinfo_t *svi;
-
-	(void) mutex_lock(&ndr_svlist.svl_mtx);
-
-	if (ndr_svlist.svl_init) {
-		while ((svi = list_head(&ndr_svlist.svl_list)) != NULL) {
-			list_remove(&ndr_svlist.svl_list, svi);
-			free(svi->svi_svinfo.sv_name);
-			free(svi->svi_svinfo.sv_comment);
-			free(svi);
-		}
-
-		list_destroy(&ndr_svlist.svl_list);
-		ndr_svlist.svl_init = B_FALSE;
-	}
-
-	(void) mutex_unlock(&ndr_svlist.svl_mtx);
-}
 
 /*
  * This call must be made to initialize an RPC client structure and bind
@@ -158,10 +90,9 @@ ndr_rpc_bind(mlsvc_handle_t *handle, char *server, char *domain,
 
 	/*
 	 * Set the default based on the assumption that most
-	 * servers will be Windows 2000 or later.
-	 * Don't lookup the svinfo if this is a SRVSVC request
-	 * because the SRVSVC is used to get the server info.
-	 * None of the SRVSVC calls depend on the server info.
+	 * servers will be Windows 2000 or later.  This used to
+	 * try to get the actual server version, but that RPC
+	 * is not necessarily allowed anymore, so don't bother.
 	 */
 	bzero(&svinfo, sizeof (srvsvc_server_info_t));
 	svinfo.sv_platform_id = SV_PLATFORM_ID_NT;
@@ -170,8 +101,12 @@ ndr_rpc_bind(mlsvc_handle_t *handle, char *server, char *domain,
 	svinfo.sv_type = SV_TYPE_DEFAULT;
 	svinfo.sv_os = NATIVE_OS_WIN2000;
 
-	if (strcasecmp(service, "SRVSVC") != 0)
-		(void) ndr_svinfo_lookup(server, domain, &svinfo);
+	/*
+	 * Some callers pass this when they want a NULL session.
+	 * Todo: have callers pass an empty string for that.
+	 */
+	if (strcmp(username, MLSVC_ANON_USER) == 0)
+		username = "";
 
 	/*
 	 * Setup smbfs library handle, authenticate, connect to
@@ -180,9 +115,10 @@ ndr_rpc_bind(mlsvc_handle_t *handle, char *server, char *domain,
 	 * server, user, domain.
 	 */
 	if ((rc = smbrdr_ctx_new(&ctx, server, domain, username)) != 0) {
-		syslog(LOG_ERR, "ndr_rpc_bind: "
-		    "smbrdr_ctx_new(S=%s, D=%s, U=%s), err=%d",
-		    server, domain, username, rc);
+		syslog(LOG_ERR, "ndr_rpc_bind: smbrdr_ctx_new"
+		    "(Srv=%s Dom=%s User=%s), %s (0x%x)",
+		    server, domain, username,
+		    xlate_nt_status(rc), rc);
 		goto errout;
 	}
 
@@ -200,7 +136,7 @@ ndr_rpc_bind(mlsvc_handle_t *handle, char *server, char *domain,
 	 * Setup the RPC client handle.
 	 */
 	if ((clnt = malloc(sizeof (ndr_client_t))) == NULL)
-		return (-1);
+		goto errout;
 	bzero(clnt, sizeof (ndr_client_t));
 
 	clnt->handle = &handle->handle;
@@ -623,107 +559,6 @@ ndr_xa_release(ndr_client_t *clnt)
 	}
 }
 
-/*
- * Lookup platform, type and version information about a server.
- * If the cache doesn't already contain the data, contact the server and
- * cache the response before returning the server info to the caller.
- *
- * We don't provide the name or comment for now, which avoids the need
- * to deal with unnecessary memory management.
- */
-static int
-ndr_svinfo_lookup(char *server, char *domain, srvsvc_server_info_t *svinfo)
-{
-	static boolean_t	timechecked = B_FALSE;
-	ndr_svinfo_t *svi;
-
-	(void) mutex_lock(&ndr_svlist.svl_mtx);
-	if (!ndr_svlist.svl_init)
-		return (-1);
-
-	svi = list_head(&ndr_svlist.svl_list);
-	while (svi != NULL) {
-		if (ndr_svinfo_expired(svi)) {
-			svi = list_head(&ndr_svlist.svl_list);
-			continue;
-		}
-
-		if (ndr_svinfo_match(server, domain, svi)) {
-			bcopy(&svi->svi_svinfo, svinfo,
-			    sizeof (srvsvc_server_info_t));
-			svinfo->sv_name = NULL;
-			svinfo->sv_comment = NULL;
-			(void) mutex_unlock(&ndr_svlist.svl_mtx);
-			return (0);
-		}
-
-		svi = list_next(&ndr_svlist.svl_list, svi);
-	}
-
-	if ((svi = malloc(sizeof (ndr_svinfo_t))) == NULL) {
-		(void) mutex_unlock(&ndr_svlist.svl_mtx);
-		return (-1);
-	}
-
-	if (srvsvc_net_server_getinfo(server, domain, &svi->svi_svinfo) < 0) {
-		(void) mutex_unlock(&ndr_svlist.svl_mtx);
-		free(svi);
-		return (-1);
-	}
-
-	(void) time(&svi->svi_tcached);
-	(void) strlcpy(svi->svi_server, server, MAXNAMELEN);
-	(void) strlcpy(svi->svi_domain, domain, MAXNAMELEN);
-	list_insert_tail(&ndr_svlist.svl_list, svi);
-	bcopy(&svi->svi_svinfo, svinfo, sizeof (srvsvc_server_info_t));
-	svinfo->sv_name = NULL;
-	svinfo->sv_comment = NULL;
-
-	if (!timechecked) {
-		timechecked = B_TRUE;
-		ndr_srvsvc_timecheck(server, domain);
-	}
-
-	(void) mutex_unlock(&ndr_svlist.svl_mtx);
-	return (0);
-}
-
-static boolean_t
-ndr_svinfo_match(const char *server, const char *domain,
-    const ndr_svinfo_t *svi)
-{
-	if ((smb_strcasecmp(server, svi->svi_server, 0) == 0) &&
-	    (smb_strcasecmp(domain, svi->svi_domain, 0) == 0)) {
-		return (B_TRUE);
-	}
-
-	return (B_FALSE);
-}
-
-/*
- * If the server info in the cache has expired, discard it and return true.
- * Otherwise return false.
- *
- * This is a private function to support ndr_svinfo_lookup() that assumes
- * the list mutex is held.
- */
-static boolean_t
-ndr_svinfo_expired(ndr_svinfo_t *svi)
-{
-	time_t	tnow;
-
-	(void) time(&tnow);
-
-	if (difftime(tnow, svi->svi_tcached) > NDR_SVINFO_TIMEOUT) {
-		list_remove(&ndr_svlist.svl_list, svi);
-		free(svi->svi_svinfo.sv_name);
-		free(svi->svi_svinfo.sv_comment);
-		free(svi);
-		return (B_TRUE);
-	}
-
-	return (B_FALSE);
-}
 
 /*
  * Compare the time here with the remote time on the server

@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -517,7 +518,7 @@ static int
 lsarpc_s_GetConnectedUser(void *arg, ndr_xa_t *mxa)
 {
 	struct mslsa_GetConnectedUser *param = arg;
-	smb_netuserinfo_t *user = &mxa->pipe->np_user;
+	smb_netuserinfo_t *user = mxa->pipe->np_user;
 	DWORD status = NT_STATUS_SUCCESS;
 	smb_domainex_t di;
 	int rc1;

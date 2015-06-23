@@ -27,6 +27,7 @@ include ../Makefile.com
 PROG =		wanboot-cgi
 LDLIBS +=	-lgen -lnsl -lwanbootutil -lnvpair -lwanboot -lcrypto
 CPPFLAGS +=	-I$(CMNCRYPTDIR)
+LINTFLAGS +=	-erroff=E_SUPPRESSION_DIRECTIVE_UNUSED
 
 all:		$(PROG)
 

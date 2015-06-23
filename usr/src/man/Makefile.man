@@ -11,12 +11,12 @@
 
 #
 # Copyright 2011, Richard Lowe
-# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 #
 
+MANDOC=		$(ONBLD_TOOLS)/bin/${MACH}/mandoc
 ROOTMAN=	$(ROOT)/usr/share/man
 ROOTHASMAN=	$(ROOT)/usr/has/man
-
 FILEMODE=	0444
 
 # The manual section being built, client Makefiles must set this to, for e.g.
@@ -24,11 +24,23 @@ FILEMODE=	0444
 #
 # MANSECT=
 
+MANCHECKS=	$(MANFILES:%=%.check)
 ROOTMANFILES= 	$(MANFILES:%=$(ROOTMAN)/man$(MANSECT)/%)
 ROOTMANLINKS=	$(MANLINKS:%=$(ROOTMAN)/man$(MANSECT)/%)
 
 $(ROOTMAN)/man$(MANSECT)/% $(ROOTHASMAN)/man$(MANSECT)/%: %
 		$(INS.file)
+
+#
+# Note that new mandoc adds some checks for lots of extra whitespace.
+# We don't want to check our legacy pages for that.  There are thousands
+# and thousands of them in our man pages.  Please still check them
+# manually when editing (git pbchk will do so for you.)
+#
+$(MANCHECKS):
+		@$(EGREP) -q "^.TH" $(@:%.check=%) || \
+		( $(ECHO) "checking $(@:%.check=%)"; \
+		$(MANDOC) -Tlint $(@:%.check=%) )
 
 $(MANLINKS):
 		$(RM) $@; $(SYMLINK) $(LINKSRC) $@
@@ -37,6 +49,8 @@ $(ROOTMANLINKS): $(MANLINKS)
 		$(RM) $@; $(CP) -RP $(@F) $(@D)
 
 all:
+
+check:		$(MANCHECKS)
 
 clean:
 

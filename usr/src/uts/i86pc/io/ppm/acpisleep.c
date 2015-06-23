@@ -70,8 +70,6 @@ extern int flushes_require_xcalls;
 extern int tsc_gethrtime_enable;
 
 extern cpuset_t cpu_ready_set;
-extern void *(*cpu_pause_func)(void *);
-
 
 
 /*

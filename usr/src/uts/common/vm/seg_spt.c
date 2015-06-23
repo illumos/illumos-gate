@@ -109,6 +109,7 @@ struct seg_ops segspt_ops = {
 	SEGSPT_BADOP(int),		/* getmemid */
 	segspt_getpolicy,		/* getpolicy */
 	SEGSPT_BADOP(int),		/* capable */
+	seg_inherit_notsup		/* inherit */
 };
 
 static int segspt_shmdup(struct seg *seg, struct seg *newseg);
@@ -168,6 +169,7 @@ struct seg_ops segspt_shmops = {
 	segspt_shmgetmemid,
 	segspt_shmgetpolicy,
 	segspt_shmcapable,
+	seg_inherit_notsup
 };
 
 static void segspt_purge(struct seg *seg);
@@ -1088,7 +1090,7 @@ segspt_dismpagelock(struct seg *seg, caddr_t addr, size_t len,
 	 * In either case, we increment softlockcnt on the 'real' segment.
 	 */
 	sptd->spt_pcachecnt++;
-	atomic_add_long((ulong_t *)(&(shmd->shm_softlockcnt)), 1);
+	atomic_inc_ulong((ulong_t *)(&(shmd->shm_softlockcnt)));
 
 	ppa = sptd->spt_ppa;
 	for (an_idx = pg_idx; an_idx < pg_idx + npages; ) {
@@ -1367,7 +1369,7 @@ segspt_shmpagelock(struct seg *seg, caddr_t addr, size_t len,
 	 * In either case, we increment softlockcnt on the 'real' segment.
 	 */
 	sptd->spt_pcachecnt++;
-	atomic_add_long((ulong_t *)(&(shmd->shm_softlockcnt)), 1);
+	atomic_inc_ulong((ulong_t *)(&(shmd->shm_softlockcnt)));
 
 	/*
 	 * We can now drop the sptd->spt_lock since the ppa[]
@@ -1519,7 +1521,7 @@ segspt_reclaim(void *ptag, caddr_t addr, size_t len, struct page **pplist,
 	 * Now decrement softlockcnt.
 	 */
 	ASSERT(shmd->shm_softlockcnt > 0);
-	atomic_add_long((ulong_t *)(&(shmd->shm_softlockcnt)), -1);
+	atomic_dec_ulong((ulong_t *)(&(shmd->shm_softlockcnt)));
 
 	if (shmd->shm_softlockcnt <= 0) {
 		if (async || AS_ISUNMAPWAIT(seg->s_as)) {
@@ -2911,7 +2913,7 @@ segspt_shmadvise(struct seg *seg, caddr_t addr, size_t len, uint_t behav)
 		 * to keep this segment resident.
 		 */
 		writer = AS_WRITE_HELD(seg->s_as, &seg->s_as->a_lock);
-		atomic_add_long((ulong_t *)(&(shmd->shm_softlockcnt)), 1);
+		atomic_inc_ulong((ulong_t *)(&(shmd->shm_softlockcnt)));
 		AS_LOCK_EXIT(seg->s_as, &seg->s_as->a_lock);
 
 		mutex_enter(&sptd->spt_lock);
@@ -2935,7 +2937,7 @@ segspt_shmadvise(struct seg *seg, caddr_t addr, size_t len, uint_t behav)
 		/* Regrab the AS_LOCK and release our hold on the segment */
 		AS_LOCK_ENTER(seg->s_as, &seg->s_as->a_lock,
 		    writer ? RW_WRITER : RW_READER);
-		atomic_add_long((ulong_t *)(&(shmd->shm_softlockcnt)), -1);
+		atomic_dec_ulong((ulong_t *)(&(shmd->shm_softlockcnt)));
 		if (shmd->shm_softlockcnt <= 0) {
 			if (AS_ISUNMAPWAIT(seg->s_as)) {
 				mutex_enter(&seg->s_as->a_contents);

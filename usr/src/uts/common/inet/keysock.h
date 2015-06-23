@@ -74,7 +74,7 @@ struct keysock_stack {
 
 	/*
 	 * State for flush/dump.  This would normally be a boolean_t, but
-	 * cas32() works best for a known 32-bit quantity.
+	 * atomic_cas_32() works best for a known 32-bit quantity.
 	 */
 	uint32_t		keystack_flushdump;
 	int			keystack_flushdump_errno;

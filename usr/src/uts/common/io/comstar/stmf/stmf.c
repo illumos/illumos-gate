@@ -198,8 +198,8 @@ volatile int stmf_worker_scale_down_delay = 20;
 
 /* === [ Debugging and fault injection ] === */
 #ifdef	DEBUG
-volatile int stmf_drop_task_counter = 0;
-volatile int stmf_drop_buf_counter = 0;
+volatile uint32_t stmf_drop_task_counter = 0;
+volatile uint32_t stmf_drop_buf_counter = 0;
 
 #endif
 
@@ -2094,7 +2094,7 @@ stmf_set_alua_state(stmf_alua_state_desc_t *alua_state)
 			}
 			if (alua_state->alua_node != 0) {
 				ilport->ilport_rtpid =
-				    atomic_add_16_nv(&stmf_rtpid_counter, 1);
+				    atomic_inc_16_nv(&stmf_rtpid_counter);
 			}
 			lport = ilport->ilport_lport;
 			ic_reg_port = ic_reg_port_msg_alloc(
@@ -3253,7 +3253,7 @@ stmf_register_local_port(stmf_local_port_t *lport)
 	 * and ports that are alua participants (ilport_alua == 1)
 	 */
 	if (ilport->ilport_standby == 0) {
-		ilport->ilport_rtpid = atomic_add_16_nv(&stmf_rtpid_counter, 1);
+		ilport->ilport_rtpid = atomic_inc_16_nv(&stmf_rtpid_counter);
 	}
 
 	if (stmf_state.stmf_alua_state == 1 &&
@@ -3595,7 +3595,7 @@ stmf_register_scsi_session(stmf_local_port_t *lport, stmf_scsi_session_t *ss)
 	mutex_exit(&stmf_state.stmf_lock);
 
 	iss->iss_creation_time = ddi_get_time();
-	ss->ss_session_id = atomic_add_64_nv(&stmf_session_counter, 1);
+	ss->ss_session_id = atomic_inc_64_nv(&stmf_session_counter);
 	iss->iss_flags &= ~ISS_BEING_CREATED;
 	/* XXX should we remove ISS_LUN_INVENTORY_CHANGED on new session? */
 	iss->iss_flags &= ~ISS_LUN_INVENTORY_CHANGED;
@@ -3794,7 +3794,7 @@ stmf_do_itl_dereg(stmf_lu_t *lu, stmf_itl_data_t *itl, uint8_t hdlrm_reason)
 
 	ASSERT(itl->itl_counter);
 
-	if (atomic_add_32_nv(&itl->itl_counter, -1))
+	if (atomic_dec_32_nv(&itl->itl_counter))
 		return;
 
 	stmf_release_itl_handle(lu, itl);
@@ -4152,12 +4152,12 @@ stmf_task_alloc(struct stmf_local_port *lport, stmf_scsi_session_t *ss,
 	}
 
 	itask->itask_ilu_task_cntr = ilu->ilu_cur_task_cntr;
-	atomic_add_32(itask->itask_ilu_task_cntr, 1);
+	atomic_inc_32(itask->itask_ilu_task_cntr);
 	itask->itask_start_time = ddi_get_lbolt();
 
 	if ((lun_map_ent != NULL) && ((itask->itask_itl_datap =
 	    lun_map_ent->ent_itl_datap) != NULL)) {
-		atomic_add_32(&itask->itask_itl_datap->itl_counter, 1);
+		atomic_inc_32(&itask->itask_itl_datap->itl_counter);
 		task->task_lu_itl_handle = itask->itask_itl_datap->itl_handle;
 	} else {
 		itask->itask_itl_datap = NULL;
@@ -4185,7 +4185,7 @@ stmf_task_lu_free(scsi_task_t *task, stmf_i_scsi_session_t *iss)
 	if (ilu->ilu_ntasks == ilu->ilu_ntasks_free)
 		cv_signal(&ilu->ilu_offline_pending_cv);
 	mutex_exit(&ilu->ilu_task_lock);
-	atomic_add_32(itask->itask_ilu_task_cntr, -1);
+	atomic_dec_32(itask->itask_ilu_task_cntr);
 }
 
 void
@@ -4408,8 +4408,8 @@ stmf_task_free(scsi_task_t *task)
 	    hrtime_t,
 	    itask->itask_done_timestamp - itask->itask_start_timestamp);
 	if (itask->itask_itl_datap) {
-		if (atomic_add_32_nv(&itask->itask_itl_datap->itl_counter,
-		    -1) == 0) {
+		if (atomic_dec_32_nv(&itask->itask_itl_datap->itl_counter) ==
+		    0) {
 			stmf_release_itl_handle(task->task_lu,
 			    itask->itask_itl_datap);
 		}
@@ -4418,8 +4418,8 @@ stmf_task_free(scsi_task_t *task)
 	rw_enter(iss->iss_lockp, RW_READER);
 	lport->lport_task_free(task);
 	if (itask->itask_worker) {
-		atomic_add_32(&stmf_cur_ntasks, -1);
-		atomic_add_32(&itask->itask_worker->worker_ref_count, -1);
+		atomic_dec_32(&stmf_cur_ntasks);
+		atomic_dec_32(&itask->itask_worker->worker_ref_count);
 	}
 	/*
 	 * After calling stmf_task_lu_free, the task pointer can no longer
@@ -4445,10 +4445,10 @@ stmf_post_task(scsi_task_t *task, stmf_data_buf_t *dbuf)
 		task->task_max_nbufs = 4;
 	task->task_cur_nbufs = 0;
 	/* Latest value of currently running tasks */
-	ct = atomic_add_32_nv(&stmf_cur_ntasks, 1);
+	ct = atomic_inc_32_nv(&stmf_cur_ntasks);
 
 	/* Select the next worker using round robin */
-	nv = (int)atomic_add_32_nv((uint32_t *)&stmf_worker_sel_counter, 1);
+	nv = (int)atomic_inc_32_nv((uint32_t *)&stmf_worker_sel_counter);
 	if (nv >= stmf_nworkers_accepting_cmds) {
 		int s = nv;
 		do {
@@ -4525,7 +4525,7 @@ stmf_post_task(scsi_task_t *task, stmf_data_buf_t *dbuf)
 	}
 	/* Measure task waitq time */
 	itask->itask_waitq_enter_timestamp = gethrtime();
-	atomic_add_32(&w->worker_ref_count, 1);
+	atomic_inc_32(&w->worker_ref_count);
 	itask->itask_cmd_stack[0] = ITASK_CMD_NEW_TASK;
 	itask->itask_ncmds = 1;
 	stmf_task_audit(itask, TE_TASK_START, CMD_OR_IOF_NA, dbuf);
@@ -4613,8 +4613,7 @@ stmf_xfer_data(scsi_task_t *task, stmf_data_buf_t *dbuf, uint32_t ioflags)
 		return (STMF_ABORTED);
 #ifdef	DEBUG
 	if (!(ioflags & STMF_IOF_STATS_ONLY) && stmf_drop_buf_counter > 0) {
-		if (atomic_add_32_nv((uint32_t *)&stmf_drop_buf_counter, -1) ==
-		    1)
+		if (atomic_dec_32_nv(&stmf_drop_buf_counter) == 1)
 			return (STMF_SUCCESS);
 	}
 #endif
@@ -5710,7 +5709,7 @@ stmf_scsilib_uniq_lu_id2(uint32_t company_id, uint32_t host_id,
 
 	p = (uint8_t *)lu_id;
 
-	gen_number = atomic_add_16_nv(&stmf_lu_id_gen_number, 1);
+	gen_number = atomic_inc_16_nv(&stmf_lu_id_gen_number);
 
 	p[0] = 0xf1; p[1] = 3; p[2] = 0; p[3] = 0x10;
 	p[4] = ((company_id >> 20) & 0xf) | 0x60;
@@ -6342,11 +6341,9 @@ out_itask_flag_loop:
 			}
 #ifdef	DEBUG
 			if (stmf_drop_task_counter > 0) {
-				if (atomic_add_32_nv(
-				    (uint32_t *)&stmf_drop_task_counter,
-				    -1) == 1) {
+				if (atomic_dec_32_nv(&stmf_drop_task_counter)
+				    == 1)
 					break;
-				}
 			}
 #endif
 			DTRACE_PROBE1(scsi__task__start, scsi_task_t *, task);

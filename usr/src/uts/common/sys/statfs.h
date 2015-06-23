@@ -20,6 +20,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 1996 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -29,8 +31,6 @@
 
 #ifndef _SYS_STATFS_H
 #define	_SYS_STATFS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -71,7 +71,7 @@ struct statfs32 {
 
 #endif	/* _SYSCALL32 */
 
-#if defined(__STDC__) && !defined(_KERNEL)
+#if !defined(_KERNEL)
 int statfs(const char *, struct statfs *, int, int);
 int fstatfs(int, struct statfs *, int, int);
 #endif

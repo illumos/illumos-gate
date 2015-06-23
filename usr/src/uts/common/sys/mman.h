@@ -21,8 +21,11 @@
 
 /* Copyright 2013 OmniTI Computer Consulting, Inc. All rights reserved. */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2015 Joyent, Inc.  All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -221,7 +224,6 @@ typedef struct mmapobj_result32 {
  * Except for old binaries mmap() will return the resultant
  * address of mapping on success and (caddr_t)-1 on error.
  */
-#ifdef	__STDC__
 #if (_POSIX_C_SOURCE > 2) || defined(_XPG4_2)
 extern void *mmap(void *, size_t, int, int, int, off_t);
 extern int munmap(void *, size_t);
@@ -276,33 +278,6 @@ extern int posix_madvise(void *, size_t, int);
 /* mmap failure value */
 #define	MAP_FAILED	((void *) -1)
 
-#else	/* __STDC__ */
-extern caddr_t mmap();
-extern int munmap();
-extern int mmapobj();
-extern int mprotect();
-extern int mincore();
-extern int memcntl();
-extern int msync();
-extern int madvise();
-extern int posix_madvise();
-extern int getpagesizes();
-extern int getpagesizes2();
-extern int mlock();
-extern int mlockall();
-extern int munlock();
-extern int munlockall();
-extern int meminfo();
-extern int shm_open();
-extern int shm_unlink();
-
-/* transitional large file interface version */
-#if	defined(_LARGEFILE64_SOURCE) && !((_FILE_OFFSET_BITS == 64) && \
-	    !defined(__PRAGMA_REDEFINE_EXTNAME))
-extern caddr_t mmap64();
-#endif	/* _LARGEFILE64_SOURCE... */
-#endif	/* __STDC__ */
-
 
 #endif	/* !_ASM && !_KERNEL */
 
@@ -328,7 +303,12 @@ struct memcntl_mha32 {
 #endif	/* !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__) */
 
 #if	(_POSIX_C_SOURCE <= 2) && !defined(_XPG4_2) || defined(__EXTENSIONS__)
-/* advice to madvise */
+/*
+ * advice to madvise
+ *
+ * Note, if more than 4 bits worth of advice (eg. 16) are specified then
+ * changes will be necessary to the struct vpage.
+ */
 #define	MADV_NORMAL		0	/* no further special treatment */
 #define	MADV_RANDOM		1	/* expect random page references */
 #define	MADV_SEQUENTIAL		2	/* expect sequential page references */
@@ -338,6 +318,7 @@ struct memcntl_mha32 {
 #define	MADV_ACCESS_DEFAULT	6	/* default access */
 #define	MADV_ACCESS_LWP		7	/* next LWP to access heavily */
 #define	MADV_ACCESS_MANY	8	/* many processes to access heavily */
+
 #endif	/* (_POSIX_C_SOURCE <= 2) && !defined(_XPG4_2) ...  */
 
 #if !defined(__XOPEN_OR_POSIX) || defined(_XPG6) || defined(__EXTENSIONS__)
@@ -366,6 +347,7 @@ struct memcntl_mha32 {
 #define	MC_LOCKAS	5		/* lock address space in memory */
 #define	MC_UNLOCKAS	6		/* unlock address space from memory */
 #define	MC_HAT_ADVISE	7		/* advise hat map size */
+#define	MC_INHERIT_ZERO	8		/* zero out regions on fork() */
 
 /* sub-commands for MC_HAT_ADVISE */
 #define	MHA_MAPSIZE_VA		0x1	/* set preferred page size */
@@ -388,7 +370,7 @@ struct memcntl_mha32 {
 /* definitions for meminfosys syscall */
 #define	MISYS_MEMINFO		0x0
 
-#if !defined(_ASM) && defined(__STDC__)
+#if !defined(_ASM)
 
 #if defined(_INT64_TYPE)
 /* private structure for meminfo */
@@ -411,7 +393,7 @@ typedef struct meminfo32 {
 } meminfo32_t;
 #endif /* defined(_SYSCALL32) */
 
-#endif /* !defined(_ASM) && defined(__STDC__) */
+#endif /* !defined(_ASM) */
 
 /*
  * info_req request type definitions for meminfo

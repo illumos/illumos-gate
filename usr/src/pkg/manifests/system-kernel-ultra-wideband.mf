@@ -22,6 +22,7 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2014 Garrett D'Amore <garrett@damore.org>
 #
 
 #
@@ -31,21 +32,5 @@
 #
 <include global_zone_only_component>
 set name=pkg.fmri value=pkg:/system/kernel/ultra-wideband@$(PKGVERS)
-set name=pkg.description value="Common framework for UWB device drivers"
-set name=pkg.summary value="Ultra Wideband (UWB) support modules"
-set name=info.classification \
-    value=org.opensolaris.category.2008:System/Hardware
+set name=pkg.obsolete value=true
 set name=variant.arch value=$(ARCH)
-dir path=kernel group=sys
-dir path=kernel/misc group=sys
-dir path=kernel/misc/$(ARCH64) group=sys
-dir path=usr/share/man
-dir path=usr/share/man/man7d
-file path=kernel/misc/$(ARCH64)/uwba group=sys mode=0755
-$(i386_ONLY)file path=kernel/misc/uwba group=sys mode=0755
-file path=usr/share/man/man7d/uwba.7d
-legacy pkg=SUNWuwb desc="Common framework for UWB device drivers" \
-    name="Ultra Wideband (UWB) support modules"
-license cr_Sun license=cr_Sun
-license lic_CDDL license=lic_CDDL
-link path=usr/share/man/man7d/uwb.7d target=uwba.7d

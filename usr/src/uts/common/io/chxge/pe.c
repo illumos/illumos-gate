@@ -35,8 +35,6 @@
  * Interface code
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/systm.h>
 #include <sys/cmn_err.h>
@@ -1390,7 +1388,7 @@ ch_small_rbuf_recycle(ch_esb_t *rbp)
 		 * We decrement here so anyone trying to do fini will
 		 * only remove the driver once the counts go to 0.
 		 */
-		atomic_add_32(&buffers_in_use[i], -1);
+		atomic_dec_32(&buffers_in_use[i]);
 
 		return;
 	}
@@ -1403,7 +1401,7 @@ ch_small_rbuf_recycle(ch_esb_t *rbp)
 	/*
 	 * decrement count of receive buffers freed by callback
 	 */
-	atomic_add_32(&buffers_in_use[rbp->cs_index], -1);
+	atomic_dec_32(&buffers_in_use[rbp->cs_index]);
 }
 
 /*
@@ -1433,7 +1431,7 @@ ch_big_rbuf_recycle(ch_esb_t *rbp)
 		 * We decrement here so anyone trying to do fini will
 		 * only remove the driver once the counts go to 0.
 		 */
-		atomic_add_32(&buffers_in_use[i], -1);
+		atomic_dec_32(&buffers_in_use[i]);
 
 		return;
 	}
@@ -1446,7 +1444,7 @@ ch_big_rbuf_recycle(ch_esb_t *rbp)
 	/*
 	 * decrement count of receive buffers freed by callback
 	 */
-	atomic_add_32(&buffers_in_use[rbp->cs_index], -1);
+	atomic_dec_32(&buffers_in_use[rbp->cs_index]);
 }
 
 /*

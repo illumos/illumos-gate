@@ -119,6 +119,11 @@ ipdadm_list(int argc, char *argv[])
 	}
 
 	fd = ipd_open(NULL);
+	if (fd < 0) {
+		(void) fprintf(stderr, "%s: failed to open ipd ctl node: %s\n",
+		    g_pname, ipd_errmsg);
+		return (E_ERROR);
+	}
 	rval = ipd_status_read(fd, &hdl);
 	(void) ipd_close(fd);
 
@@ -146,6 +151,11 @@ ipdadm_info(int argc, char *argv[])
 		return (usage(stderr));
 
 	fd = ipd_open(NULL);
+	if (fd < 0) {
+		(void) fprintf(stderr, "%s: failed to open ipd ctl node: %s\n",
+		    g_pname, ipd_errmsg);
+		return (E_ERROR);
+	}
 	rval = ipd_status_read(fd, &hdl);
 	(void) ipd_close(fd);
 	if (rval != 0) {
@@ -231,6 +241,11 @@ ipdadm_corrupt(int argc, char *argv[])
 	ic.ic_corrupt = val;
 
 	fd = ipd_open(NULL);
+	if (fd < 0) {
+		(void) fprintf(stderr, "%s: failed to open ipd ctl node: %s\n",
+		    g_pname, ipd_errmsg);
+		return (E_ERROR);
+	}
 	rval = ipd_ctl(fd, g_zid, &ic);
 	(void) ipd_close(fd);
 
@@ -262,6 +277,11 @@ ipdadm_delay(int argc, char *argv[])
 	ic.ic_delay = val;
 
 	fd = ipd_open(NULL);
+	if (fd < 0) {
+		(void) fprintf(stderr, "%s: failed to open ipd ctl node: %s\n",
+		    g_pname, ipd_errmsg);
+		return (E_ERROR);
+	}
 	rval = ipd_ctl(fd, g_zid, &ic);
 	(void) ipd_close(fd);
 
@@ -293,6 +313,11 @@ ipdadm_drop(int argc, char *argv[])
 	ic.ic_drop = val;
 
 	fd = ipd_open(NULL);
+	if (fd < 0) {
+		(void) fprintf(stderr, "%s: failed to open ipd ctl node: %s\n",
+		    g_pname, ipd_errmsg);
+		return (E_ERROR);
+	}
 	rval = ipd_ctl(fd, g_zid, &ic);
 	(void) ipd_close(fd);
 
@@ -360,6 +385,11 @@ ipdadm_remove(int argc, char *argv[])
 	ic.ic_mask |= rval;
 
 	fd = ipd_open(NULL);
+	if (fd < 0) {
+		(void) fprintf(stderr, "%s: failed to open ipd ctl node: %s\n",
+		    g_pname, ipd_errmsg);
+		return (E_ERROR);
+	}
 	rval = ipd_ctl(fd, g_zid, &ic);
 	(void) ipd_close(fd);
 	if (rval == -1) {

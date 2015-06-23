@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright 2014 Igor Kozhukhov <ikozhukhov@gmail.com>.
  */
 
 #ifndef _SYS_CPUVAR_H
@@ -32,6 +33,7 @@
 #include <sys/disp.h>
 #include <sys/processor.h>
 
+#include <sys/loadavg.h>
 #if (defined(_KERNEL) || defined(_KMEMUSER)) && defined(_MACHDEP)
 #include <sys/machcpuvar.h>
 #endif
@@ -53,15 +55,6 @@ extern "C" {
 struct squeue_set_s;
 
 #define	CPU_CACHE_COHERENCE_SIZE	64
-#define	S_LOADAVG_SZ	11
-#define	S_MOVAVG_SZ	10
-
-struct loadavg_s {
-	int lg_cur;		/* current loadavg entry */
-	unsigned int lg_len;	/* number entries recorded */
-	hrtime_t lg_total;	/* used to temporarily hold load totals */
-	hrtime_t lg_loads[S_LOADAVG_SZ];	/* table of recorded entries */
-};
 
 /*
  * For fast event tracing.
@@ -528,8 +521,8 @@ typedef	ulong_t	cpuset_t;	/* a set of CPUs */
 	largest = (uint_t)(highbit(set) - 1);		\
 }
 
-#define	CPUSET_ATOMIC_DEL(set, cpu)	atomic_and_long(&(set), ~CPUSET(cpu))
-#define	CPUSET_ATOMIC_ADD(set, cpu)	atomic_or_long(&(set), CPUSET(cpu))
+#define	CPUSET_ATOMIC_DEL(set, cpu)	atomic_and_ulong(&(set), ~CPUSET(cpu))
+#define	CPUSET_ATOMIC_ADD(set, cpu)	atomic_or_ulong(&(set), CPUSET(cpu))
 
 #define	CPUSET_ATOMIC_XADD(set, cpu, result) \
 	{ result = atomic_set_long_excl(&(set), (cpu)); }
@@ -659,7 +652,7 @@ void	poke_cpu(int cpun);	 /* interrupt another CPU (to preempt) */
 
 void	mach_cpu_pause(volatile char *);
 
-void	pause_cpus(cpu_t *off_cp);
+void	pause_cpus(cpu_t *off_cp, void *(*func)(void *));
 void	start_cpus(void);
 int	cpus_paused(void);
 

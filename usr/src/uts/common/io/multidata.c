@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Multidata, as described in the following papers:
  *
@@ -1294,7 +1292,7 @@ mmd_addpattr(multidata_t *mmd, pdesc_t *pd, pattrinfo_t *pai,
 			return (NULL);
 
 		/* if someone got there first, use his table instead */
-		if ((o_tbl = casptr(tbl_p, NULL, tbl)) != NULL) {
+		if ((o_tbl = atomic_cas_ptr(tbl_p, NULL, tbl)) != NULL) {
 			kmem_cache_free(pattbl_cache, tbl);
 			tbl = o_tbl;
 		}

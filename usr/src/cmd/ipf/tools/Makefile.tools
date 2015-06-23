@@ -24,17 +24,19 @@
 #
 # Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
 #
+# Copyright (c) 2012, Joyent Inc. All rights reserved.
+#
 
 PROG=		ipf ipfs ipmon ipnat ippool ipfstat
 IPFPROG=	ipftest
 
-IPF_OBJS=	ipf.o ipfcomp.o ipf_y.o ipf_l.o
-IPFS_OBJS=	ipfs.o
-IPFSTAT_OBJS=	ipfstat.o
-IPMON_OBJS=	ipmon.o ipmon_y.o ipmon_l.o
-IPNAT_OBJS=	ipnat.o ipnat_y.o ipnat_l.o
-IPPOOL_OBJS=	ippool.o ippool_y.o ippool_l.o
-IPFTEST_OBJS=	ipftest.o  \
+IPF_OBJS=	ipf.o ipfcomp.o ipfzone.o ipf_y.o ipf_l.o
+IPFS_OBJS=	ipfs.o ipfzone.o
+IPFSTAT_OBJS=	ipfstat.o ipfzone.o
+IPMON_OBJS=	ipmon.o ipfzone.o ipmon_y.o ipmon_l.o
+IPNAT_OBJS=	ipnat.o ipfzone.o ipnat_y.o ipnat_l.o
+IPPOOL_OBJS=	ippool.o ipfzone.o ippool_y.o ippool_l.o
+IPFTEST_OBJS=	ipftest.o ipfzone.o \
 		ip_fil.o ip_state.o ip_compat.o \
 		ip_frag.o ip_nat.o ip_nat6.o fil.o \
 		ip_htable.o ip_lookup.o \

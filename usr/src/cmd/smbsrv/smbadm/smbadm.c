@@ -19,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -229,8 +229,14 @@ smbadm_cmdusage(FILE *fp, smbadm_cmdinfo_t *cmd)
 		return;
 
 	case HELP_JOIN:
+#if 0	/* Don't document "-p" yet, still needs work (NX 11960) */
+		(void) fprintf(fp, gettext("\t%s -p domain\n"
+		    "\t%s -u username domain\n\t%s -w workgroup\n"),
+		    cmd->name, cmd->name, cmd->name);
+#else
 		(void) fprintf(fp, gettext("\t%s -u username domain\n"
 		    "\t%s -w workgroup\n"), cmd->name, cmd->name);
+#endif
 		return;
 
 	case HELP_LIST:
@@ -457,45 +463,25 @@ smbadm_join(int argc, char **argv)
 	uint32_t mode = 0;
 	char option;
 
-	while ((option = getopt(argc, argv, "u:w:")) != -1) {
+	while ((option = getopt(argc, argv, "pu:w")) != -1) {
+		if (mode != 0) {
+			(void) fprintf(stderr, gettext(
+			    "join options are mutually exclusive\n"));
+			smbadm_usage(B_FALSE);
+		}
 		switch (option) {
-		case 'w':
-			if (mode != 0) {
-				(void) fprintf(stderr,
-				    gettext("-u and -w must only appear "
-				    "once and are mutually exclusive\n"));
-				smbadm_usage(B_FALSE);
-			}
-
-			mode = SMB_SECMODE_WORKGRP;
-			domain = optarg;
+		case 'p':
+			mode = SMB_SECMODE_DOMAIN;
+			/* leave username = NULL */
 			break;
 
 		case 'u':
-			if (mode != 0) {
-				(void) fprintf(stderr,
-				    gettext("-u and -w must only appear "
-				    "once and are mutually exclusive\n"));
-				smbadm_usage(B_FALSE);
-			}
-
 			mode = SMB_SECMODE_DOMAIN;
 			username = optarg;
+			break;
 
-			if ((domain = argv[optind]) == NULL) {
-				/*
-				 * The domain was not specified as a separate
-				 * argument, check for the combination forms.
-				 */
-				(void) strlcpy(buf, username, sizeof (buf));
-				smbadm_extract_domain(buf, &username, &domain);
-			}
-
-			if ((username == NULL) || (*username == '\0')) {
-				(void) fprintf(stderr,
-				    gettext("missing username\n"));
-				smbadm_usage(B_FALSE);
-			}
+		case 'w':
+			mode = SMB_SECMODE_WORKGRP;
 			break;
 
 		default:
@@ -504,16 +490,28 @@ smbadm_join(int argc, char **argv)
 		}
 	}
 
+	if (optind < argc)
+		domain = argv[optind];
+
+	if (username != NULL && domain == NULL) {
+		/*
+		 * The domain was not specified as a separate
+		 * argument, check for the combination forms.
+		 */
+		(void) strlcpy(buf, username, sizeof (buf));
+		smbadm_extract_domain(buf, &username, &domain);
+	}
+
 	if ((domain == NULL) || (*domain == '\0')) {
 		(void) fprintf(stderr, gettext("missing %s name\n"),
 		    (mode == SMB_SECMODE_WORKGRP) ? "workgroup" : "domain");
 		smbadm_usage(B_FALSE);
 	}
 
-	if (mode == SMB_SECMODE_WORKGRP)
+	if (mode == SMB_SECMODE_WORKGRP) {
 		return (smbadm_join_workgroup(domain));
-	else
-		return (smbadm_join_domain(domain, username));
+	}
+	return (smbadm_join_domain(domain, username));
 }
 
 /*
@@ -582,37 +580,46 @@ smbadm_join_domain(const char *domain, const char *username)
 	if (!smbadm_join_prompt(jdi.domain_name))
 		return (0);
 
-	if ((p = strchr(username, '+')) != NULL) {
-		++p;
+	/*
+	 * Note: username is null for "unsecure join"
+	 * (join using a pre-created computer account)
+	 * No password either.
+	 */
+	if (username != NULL) {
+		if ((p = strchr(username, '+')) != NULL) {
+			++p;
 
-		len = (int)(p - username);
-		if (len > sizeof (jdi.domain_name))
-			len = sizeof (jdi.domain_name);
+			len = (int)(p - username);
+			if (len > sizeof (jdi.domain_name))
+				len = sizeof (jdi.domain_name);
 
-		(void) strlcpy(jdi.domain_username, username, len);
-		(void) strlcpy(jdi.domain_passwd, p,
-		    sizeof (jdi.domain_passwd));
-	} else {
-		(void) strlcpy(jdi.domain_username, username,
-		    sizeof (jdi.domain_username));
-	}
+			(void) strlcpy(jdi.domain_username, username, len);
+			(void) strlcpy(jdi.domain_passwd, p,
+			    sizeof (jdi.domain_passwd));
+		} else {
+			(void) strlcpy(jdi.domain_username, username,
+			    sizeof (jdi.domain_username));
+		}
 
-	if (smb_name_validate_account(jdi.domain_username) != ERROR_SUCCESS) {
-		(void) fprintf(stderr,
-		    gettext("username contains invalid characters\n"));
-		smbadm_usage(B_FALSE);
-	}
-
-	if (*jdi.domain_passwd == '\0') {
-		prompt = gettext("Enter domain password: ");
-
-		if ((p = getpassphrase(prompt)) == NULL) {
-			(void) fprintf(stderr, gettext("missing password\n"));
+		if (smb_name_validate_account(jdi.domain_username)
+		    != ERROR_SUCCESS) {
+			(void) fprintf(stderr,
+			    gettext("username contains invalid characters\n"));
 			smbadm_usage(B_FALSE);
 		}
 
-		(void) strlcpy(jdi.domain_passwd, p,
-		    sizeof (jdi.domain_passwd));
+		if (*jdi.domain_passwd == '\0') {
+			prompt = gettext("Enter domain password: ");
+
+			if ((p = getpassphrase(prompt)) == NULL) {
+				(void) fprintf(stderr, gettext(
+				    "missing password\n"));
+				smbadm_usage(B_FALSE);
+			}
+
+			(void) strlcpy(jdi.domain_passwd, p,
+			    sizeof (jdi.domain_passwd));
+		}
 	}
 
 	(void) printf(gettext("Joining %s ... this may take a minute ...\n"),
@@ -632,6 +639,19 @@ smbadm_join_domain(const char *domain, const char *username)
 		(void) fprintf(stderr,
 		    gettext("failed to find any domain controllers for %s\n"),
 		    jdi.domain_name);
+		bzero(&jdi, sizeof (jdi));
+		return (1);
+
+	case NT_STATUS_BAD_NETWORK_PATH:
+		(void) fprintf(stderr,
+		    gettext("failed to resolve domain controller name\n"));
+		bzero(&jdi, sizeof (jdi));
+		return (1);
+
+	case NT_STATUS_NETWORK_ACCESS_DENIED:
+	case NT_STATUS_BAD_NETWORK_NAME:
+		(void) fprintf(stderr,
+		    gettext("failed connecting to domain controller\n"));
 		bzero(&jdi, sizeof (jdi));
 		return (1);
 
@@ -1008,7 +1028,7 @@ smbadm_group_show(int argc, char **argv)
 
 	if ((status != SMB_LGRP_NO_MORE) || smb_lgrp_itererror(&gi)) {
 		if (status != SMB_LGRP_NO_MORE)
-			syslog(LOG_ERR, "smb_lgrp_iterate: %s",
+			smb_syslog(LOG_ERR, "smb_lgrp_iterate: %s",
 			    smb_lgrp_strerror(status));
 
 		(void) fprintf(stderr,
@@ -1447,16 +1467,10 @@ main(int argc, char **argv)
 
 	progname = basename(argv[0]);
 
-	if (getzoneid() != GLOBAL_ZONEID) {
-		(void) fprintf(stderr,
-		    gettext("cannot execute in non-global zone\n"));
-		return (0);
-	}
-
 	if (is_system_labeled()) {
 		(void) fprintf(stderr,
 		    gettext("Trusted Extensions not supported\n"));
-		return (0);
+		return (1);
 	}
 
 	if (argc < 2) {

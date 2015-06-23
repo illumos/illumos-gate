@@ -1,4 +1,5 @@
 /*
+ * Copyright 2013 Garrett D'Amore <garrett@damore.org>
  * Copyright (C) 1996 by Andrey A. Chernov, Moscow, Russia.
  * All rights reserved.
  *
@@ -30,15 +31,17 @@
 #include "collate.h"
 
 /*
- * Compare two characters using collate
+ * Compare two characters using collate - thread safe.
  */
 
 int
-_collate_range_cmp(wchar_t c1, wchar_t c2)
+_collate_range_cmp(wchar_t c1, wchar_t c2, locale_t loc)
 {
-	static wchar_t s1[2], s2[2];
+	wchar_t s1[2], s2[2];
 
 	s1[0] = c1;
+	s1[1] = 0;
 	s2[0] = c2;
-	return (wcscoll(s1, s2));
+	s2[1] = 0;
+	return (wcscoll_l(s1, s2, loc));
 }

@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2015, Joyent, Inc.
  */
 
 /* LINTLIBRARY */
@@ -315,7 +315,23 @@ static const elfcap_desc_t hw2_386[ELFCAP_NUM_HW2_386] = {
 	{						/* 0x00000002 */
 		AV_386_2_RDRAND, STRDESC("AV_386_2_RDRAND"),
 		STRDESC("RDRAND"), STRDESC("rdrand"),
-	}
+	},
+	{						/* 0x00000004 */
+		AV_386_2_BMI1, STRDESC("AV_386_2_BMI1"),
+		STRDESC("BMI1"), STRDESC("bmi1"),
+	},
+	{						/* 0x00000008 */
+		AV_386_2_BMI2, STRDESC("AV_386_2_BMI2"),
+		STRDESC("BMI2"), STRDESC("bmi2"),
+	},
+	{						/* 0x00000010 */
+		AV_386_2_FMA, STRDESC("AV_386_2_FMA"),
+		STRDESC("FMA"), STRDESC("fma"),
+	},
+	{						/* 0x00000020 */
+		AV_386_2_AVX2, STRDESC("AV_386_2_AVX2"),
+		STRDESC("AVX2"), STRDESC("avx2"),
+	},
 };
 
 /*

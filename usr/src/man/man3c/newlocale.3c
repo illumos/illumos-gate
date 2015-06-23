@@ -1,0 +1,191 @@
+'\" te
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright (c) 2014 Joyent, Inc.  All rights reserved.
+.\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
+.\"
+.TH NEWLOCALE 3C "Jun 23, 2014"
+.SH NAME
+duplocale, freelocale, newlocale \- create, duplicate, and destroy locale objects
+.SH SYNOPSIS
+.LP
+.nf
+#include <locale.h>
+
+\fBlocale_t\fR \fBnewlocale\fR(\fBint\fR \fIcategory_mask\fR, \fBconst char *\fR \fIlocale\fR,
+    \fBlocale_t\fR \fIbase\fR);
+.fi
+.LP
+.nf
+\fBlocale_t\fR \fBduplocale\fR(\fBlocale_t\fR \fIloc\fR);
+.fi
+.LP
+.nf
+\fBvoid\fR \fBfreelocale\fR(\fBlocale_t\fR \fIloc\fR);
+.fi
+.SH DESCRIPTION
+.LP
+These functions manipulate locale objects that can be used
+.BR uselocale (3C)
+and functions that take arguments of type
+.BR locale_t .
+.LP
+The function
+.B newlocale()
+can be used to create a new locale object. It can also be used to modify an
+existing locale object, the new locale object will be a replacement for the
+modified locale object. To create a new locale, the argument
+.I base
+should be passed the special argument
+.RB ( locale_t )0.
+This will use a copy of the current global locale as a starting point. To modify
+an existing locale object, it should be passed in as the argument
+.IR base .
+The new locale object is constructed by taking the categories specified in
+.I category_mask
+from the locale specified by the string
+.IR locale ,
+and filling in the remaining categories from the locale
+.IR base .
+When
+.B newlocale()
+returns, callers must no longer use
+.IR base
+and assume that
+.BR freelocale (3C)
+has been called on it. In addition to locales defined on the system, the
+following three locales may always be passed in as the string
+.IR locale :
+.TP
+"C"
+Specifies the traditional UNIX system behavior.
+.TP
+"POSIX"
+An alternate name fo the locale "C".
+.TP
+""
+Indicates that the locale should be processed based in the values in the
+environment. See
+.BR setlocale (3C)
+and
+.BR environ (5)
+for more information.
+.LP
+The value of
+.I category_mask
+is a bitwise-inclusive or of the following macros which correspond to categories
+as defined in
+.BR locale (5)
+and
+.BR environ (5):
+.TP
+.B LC_CTYPE_MASK
+Character classification and case conversion.
+.TP
+.B LC_NUMERIC_MASK
+Numeric formatting.
+.TP
+.B LC_TIME_MASK
+Date and time formatting.
+.TP
+.B LC_COLLATE_MASK
+Collation order.
+.TP
+.B LC_MONETARY_MASK
+Monetary formatting.
+.TP
+.B LC_MESSAGES_MASK
+Formats of informative and diagnostic messages and interactive responses.
+.TP
+.B LC_ALL_MASK
+Mask of all categories.
+.LP
+The function
+.B duplocale()
+duplicates the locale object specified by
+.IR loc .
+If the locale object passed is
+.BR LC_GLOBAL_LOCALE ,
+.B duplocale()
+creates a copy of the current global locale as defined through calls to
+.BR setlocale (3C).
+.LP
+The function
+.B freelocale()
+removes and releases all resources associated with the locale object
+.IR loc .
+Programs must not call
+.B freelocale()
+on
+.BR LC_GLOBAL_LOCALE .
+.SH RETURN VALUES
+.LP
+On success, the functions
+.B newlocale()
+and
+.B duplocale()
+return a new locale object that can be used with functions that take a
+.BR locale_t .
+Locale objects created this way should be freed with
+.BR freelocale() .
+On error, the functions
+.B newlocale()
+and
+.B duplocale()
+return
+.BR (locale_t) 0
+and
+.B errno
+is set to indicate the error. The
+.B freelocale()
+function does not set
+.B errno.
+.SH ERRORS
+.LP
+The
+.B newlocale()
+and
+.B duplocale()
+functions will fail if:
+.TP
+.B ENOMEM
+Insufficient memory was available to create the locale object or to load the
+requested locale data.
+.LP
+The
+.B newlocale()
+function will fail if:
+.TP
+.B EINVAL
+An unknown bit is specified in
+.IR category_mask .
+.TP
+.B ENOENT
+Locale data was not found for a category specified in
+.SH ATTRIBUTES
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Interface Stability	Standard
+_
+MT-Level	Safe
+.TE
+
+.SH SEE ALSO
+.BR locale (1),
+.BR setlocale (3C),
+.BR uselocale (3C),
+.BR environ (5),
+.BR locale (5)

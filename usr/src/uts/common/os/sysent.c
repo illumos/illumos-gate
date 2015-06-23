@@ -23,6 +23,7 @@
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Milan Jurik. All rights reserved.
  * Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved.
+ * Copyright (c) 2015, Joyent, Inc.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -152,6 +153,8 @@ ssize_t	uucopystr(const char *, char *, size_t);
 ssize_t	write(int, void *, size_t);
 ssize_t	readv(int, struct iovec *, int);
 ssize_t	writev(int, struct iovec *, int);
+ssize_t	preadv(int, struct iovec *, int, off_t, off_t);
+ssize_t	pwritev(int, struct iovec *, int, off_t, off_t);
 int	syslwp_park(int, uintptr_t, uintptr_t);
 int	rmdir(char *);
 int	mkdir(char *, int);
@@ -325,6 +328,7 @@ int	getsockopt(int, int, int, void *, socklen_t *, int);
 int	setsockopt(int, int, int, void *, socklen_t *, int);
 int	sockconfig(int, void *, void *, void *, void *);
 ssize_t	sendfilev(int, int, const struct sendfilevec *, int, size_t *);
+int	getrandom(void *, size_t, int);
 
 typedef int64_t	(*llfcn_t)();	/* for casting one-word returns */
 
@@ -576,10 +580,10 @@ struct sysent sysent[NSYSCALL] =
 	/* 120 */ SYSENT_CI("fchdir",		fchdir,		1),
 	/* 121 */ SYSENT_CL("readv",		readv,		3),
 	/* 122 */ SYSENT_CL("writev",		writev,		3),
-	/* 123 */ SYSENT_LOADABLE(),			/* (was xstat) */
-	/* 124 */ SYSENT_LOADABLE(),			/* (was lxstat) */
+	/* 123 */ SYSENT_CL("preadv",		preadv,		5),
+	/* 124 */ SYSENT_CL("pwritev",		pwritev,	5),
 	/* 125 */ SYSENT_LOADABLE(),			/* (was fxstat) */
-	/* 126 */ SYSENT_LOADABLE(),			/* (was xmknod) */
+	/* 126 */ SYSENT_CI("getrandom",	getrandom,	3),
 	/* 127 */ SYSENT_CI("mmapobj",		mmapobjsys,	5),
 	/* 128 */ IF_LP64(
 			SYSENT_CI("setrlimit",	setrlimit64,	2),
@@ -941,10 +945,10 @@ struct sysent sysent32[NSYSCALL] =
 	/* 120 */ SYSENT_CI("fchdir",		fchdir,		1),
 	/* 121 */ SYSENT_CI("readv",		readv32,	3),
 	/* 122 */ SYSENT_CI("writev",		writev32,	3),
-	/* 123 */ SYSENT_LOADABLE32(),		/*	was xstat32	*/
-	/* 124 */ SYSENT_LOADABLE32(),		/*	was lxstat32	*/
+	/* 123 */ SYSENT_CI("preadv",		preadv,		5),
+	/* 124 */ SYSENT_CI("pwritev",		pwritev,	5),
 	/* 125 */ SYSENT_LOADABLE32(),		/*	was fxstat32	*/
-	/* 126 */ SYSENT_LOADABLE32(),		/*	was xmknod	*/
+	/* 126 */ SYSENT_CI("getrandom",	getrandom,	3),
 	/* 127 */ SYSENT_CI("mmapobj",		mmapobjsys,	5),
 	/* 128 */ SYSENT_CI("setrlimit",	setrlimit32,	2),
 	/* 129 */ SYSENT_CI("getrlimit",	getrlimit32,	2),

@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2015, Joyent, Inc.  All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -98,6 +99,7 @@ typedef struct	segvn_data {
 	size_t	swresv;		/* swap space reserved for this segment */
 	uchar_t	advice;		/* madvise flags for segment */
 	uchar_t	pageadvice;	/* true if per page advice set */
+	uchar_t svn_inz;	/* true if pages marked as inherit zero */
 	ushort_t flags;		/* flags - from sys/mman.h */
 	spgcnt_t softlockcnt;	/* # of pages SOFTLOCKED in seg */
 	lgrp_mem_policy_info_t policy_info; /* memory allocation policy */
@@ -120,6 +122,13 @@ typedef struct	segvn_data {
 #define	SEGVN_TR_INIT	(0)	/* Check if text replication can be enabled */
 #define	SEGVN_TR_ON	(1)	/* Text replication is enabled */
 #define	SEGVN_TR_OFF	(2)	/* Text replication is disabled */
+
+/*
+ * Inherit zero states
+ */
+#define	SEGVN_INZ_NONE	(0)	/* Nothing in the segment is inherit zero */
+#define	SEGVN_INZ_ALL	(1)	/* Everything in the segment is inherit zero */
+#define	SEGVN_INZ_VPP	(2)	/* Check struct vpages for inherit zero */
 
 /*
  * Macros for segvn segment driver locking.

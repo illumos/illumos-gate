@@ -22,6 +22,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
@@ -115,7 +117,7 @@ typedef struct sclass {
 #define	SCHED_INSTALLED(s)	((s)->cl_funcs != NULL)
 #define	ALLOCATED_SCHED(s)	((s)->cl_lock != NULL)
 
-#ifdef	_KERNEL
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 
 #define	CLASS_KERNEL(cid)	((cid) == syscid || (cid) == sysdccid)
 

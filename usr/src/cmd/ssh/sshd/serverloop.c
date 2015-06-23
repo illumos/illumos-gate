@@ -1229,7 +1229,10 @@ server_input_channel_req(int type, u_int32_t seq, void *ctxt)
 	if ((c = channel_lookup(id)) == NULL)
 		packet_disconnect("server_input_channel_req: "
 		    "unknown channel %d", id);
-	if (c->type == SSH_CHANNEL_LARVAL || c->type == SSH_CHANNEL_OPEN)
+	if (!strcmp(rtype, "eow@openssh.com")) {
+		packet_check_eom();
+		chan_rcvd_eow(c);
+        } else if (c->type == SSH_CHANNEL_LARVAL || c->type == SSH_CHANNEL_OPEN)
 		success = session_input_channel_req(c, rtype);
 	if (reply) {
 		packet_start(success ?
