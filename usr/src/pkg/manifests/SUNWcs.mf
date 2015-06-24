@@ -1336,7 +1336,6 @@ file path=usr/sbin/ikecert mode=0555
 file path=usr/sbin/inetadm mode=0555
 file path=usr/sbin/inetconv mode=0555
 file path=usr/sbin/install mode=0555
-file path=usr/sbin/installboot group=sys mode=0555
 file path=usr/sbin/ipaddrsel mode=0555
 file path=usr/sbin/ipsecalgs mode=0555
 file path=usr/sbin/ipsecconf mode=0555
