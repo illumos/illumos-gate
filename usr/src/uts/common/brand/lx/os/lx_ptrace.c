@@ -1644,6 +1644,16 @@ lx_ptrace_issig_stop(proc_t *p, klwp_t *lwp)
 	if (lwpd->br_ptrace_tracer == NULL || lwp->lwp_cursig == SIGKILL ||
 	    (lwp->lwp_cursig == 0 || lwp->lwp_cursig > NSIG) ||
 	    (lx_sig = stol_signo[lwp->lwp_cursig]) < 1) {
+		if (lwp->lwp_cursig == 0) {
+			/*
+			 * If this lwp has no current signal, it means that any
+			 * signal ignorance enabled by br_ptrace_donesig has
+			 * already taken place (the signal was consumed).
+			 * By clearing donesig, we declare desire to ignore no
+			 * signals for accurate ptracing.
+			 */
+			lwpd->br_ptrace_donesig = 0;
+		}
 		return (0);
 	}
 
