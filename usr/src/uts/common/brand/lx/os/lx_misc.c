@@ -37,6 +37,7 @@
 #include <sys/brand.h>
 #include <sys/lx_brand.h>
 #include <sys/lx_misc.h>
+#include <sys/lx_siginfo.h>
 #include <sys/lx_futex.h>
 #include <lx_errno.h>
 #include <sys/cmn_err.h>
@@ -806,3 +807,99 @@ lx_sigfd_translate(k_siginfo_t *infop)
 		infop->si_pid = 0;
 	}
 }
+
+int
+stol_ksiginfo_copyout(k_siginfo_t *sip, void *ulxsip)
+{
+	lx_siginfo_t lsi;
+
+	bzero(&lsi, sizeof (lsi));
+	lsi.lsi_signo = lx_stol_signo(sip->si_signo, SIGCLD);
+	lsi.lsi_code = lx_stol_sigcode(sip->si_code);
+	lsi.lsi_errno = lx_errno(sip->si_errno, EINVAL);
+
+	switch (lsi.lsi_signo) {
+	case LX_SIGPOLL:
+		lsi.lsi_band = sip->si_band;
+		lsi.lsi_fd = sip->si_fd;
+		break;
+
+	case LX_SIGCHLD:
+		lsi.lsi_pid = sip->si_pid;
+		if (sip->si_code <= 0 || sip->si_code == CLD_EXITED) {
+			lsi.lsi_status = sip->si_status;
+		} else {
+			lsi.lsi_status = lx_stol_status(sip->si_status,
+			    SIGKILL);
+		}
+		lsi.lsi_utime = sip->si_utime;
+		lsi.lsi_stime = sip->si_stime;
+		break;
+
+	case LX_SIGILL:
+	case LX_SIGBUS:
+	case LX_SIGFPE:
+	case LX_SIGSEGV:
+		lsi.lsi_addr = sip->si_addr;
+		break;
+
+	default:
+		lsi.lsi_pid = sip->si_pid;
+		lsi.lsi_uid = LX_UID32_TO_UID16(sip->si_uid);
+	}
+
+	if (copyout(&lsi, ulxsip, sizeof (lsi)) != 0) {
+		return (set_errno(EFAULT));
+	}
+
+	return (0);
+}
+
+#if defined(_SYSCALL32_IMPL)
+int
+stol_ksiginfo32_copyout(k_siginfo_t *sip, void *ulxsip)
+{
+	lx_siginfo32_t lsi;
+
+	bzero(&lsi, sizeof (lsi));
+	lsi.lsi_signo = lx_stol_signo(sip->si_signo, SIGCLD);
+	lsi.lsi_code = lx_stol_sigcode(sip->si_code);
+	lsi.lsi_errno = lx_errno(sip->si_errno, EINVAL);
+
+	switch (lsi.lsi_signo) {
+	case LX_SIGPOLL:
+		lsi.lsi_band = sip->si_band;
+		lsi.lsi_fd = sip->si_fd;
+		break;
+
+	case LX_SIGCHLD:
+		lsi.lsi_pid = sip->si_pid;
+		if (sip->si_code <= 0 || sip->si_code == CLD_EXITED) {
+			lsi.lsi_status = sip->si_status;
+		} else {
+			lsi.lsi_status = lx_stol_status(sip->si_status,
+			    SIGKILL);
+		}
+		lsi.lsi_utime = sip->si_utime;
+		lsi.lsi_stime = sip->si_stime;
+		break;
+
+	case LX_SIGILL:
+	case LX_SIGBUS:
+	case LX_SIGFPE:
+	case LX_SIGSEGV:
+		lsi.lsi_addr = (caddr32_t)(uintptr_t)sip->si_addr;
+		break;
+
+	default:
+		lsi.lsi_pid = sip->si_pid;
+		lsi.lsi_uid = LX_UID32_TO_UID16(sip->si_uid);
+	}
+
+	if (copyout(&lsi, ulxsip, sizeof (lsi)) != 0) {
+		return (set_errno(EFAULT));
+	}
+
+	return (0);
+}
+#endif

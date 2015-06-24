@@ -66,6 +66,7 @@ extern "C" {
 #define	LX_PTRACE_SYSCALL	24
 #define	LX_PTRACE_SETOPTIONS	0x4200
 #define	LX_PTRACE_GETEVENTMSG	0x4201
+#define	LX_PTRACE_GETSIGINFO	0x4202
 
 /*
  * For clone(2):

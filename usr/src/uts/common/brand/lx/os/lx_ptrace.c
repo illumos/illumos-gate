@@ -870,6 +870,36 @@ lx_ptrace_setregs(lx_lwp_data_t *remote, void *uregsp)
 	}
 }
 
+static int
+lx_ptrace_getsiginfo(lx_lwp_data_t *remote, void *usiginfo)
+{
+	klwp_t *lwp = remote->br_lwp;
+	int lx_sig;
+
+	lx_sig = lx_stol_signo(lwp->lwp_cursig, 0);
+	if (lx_sig < 1 || lwp->lwp_curinfo == NULL) {
+		return (EINVAL);
+	}
+
+#if defined(_SYSCALL32_IMPL)
+	if (get_udatamodel() != DATAMODEL_NATIVE) {
+		if (stol_ksiginfo32_copyout(&lwp->lwp_curinfo->sq_info,
+		    usiginfo) != 0) {
+			return (EFAULT);
+		}
+	} else
+#endif
+	{
+		if (stol_ksiginfo_copyout(&lwp->lwp_curinfo->sq_info,
+		    usiginfo) != 0) {
+			return (EFAULT);
+		}
+	}
+
+	return (0);
+}
+
+
 /*
  * Implements the PTRACE_CONT subcommand of the Linux ptrace(2) interface.
  */
@@ -2355,6 +2385,10 @@ lx_ptrace_kernel(int ptrace_op, pid_t lxpid, uintptr_t addr, uintptr_t data)
 
 	case LX_PTRACE_SETREGS:
 		error = lx_ptrace_setregs(remote, (void *)data);
+		break;
+
+	case LX_PTRACE_GETSIGINFO:
+		error = lx_ptrace_getsiginfo(remote, (void *)data);
 		break;
 
 	default:

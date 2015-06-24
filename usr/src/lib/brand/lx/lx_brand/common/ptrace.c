@@ -839,6 +839,7 @@ lx_ptrace(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4)
 	 */
 	case LX_PTRACE_SETOPTIONS:
 	case LX_PTRACE_GETEVENTMSG:
+	case LX_PTRACE_GETSIGINFO:
 	case LX_PTRACE_GETREGS:
 	case LX_PTRACE_SETREGS:
 		return (lx_ptrace_kernel(ptrace_op, lxpid, p3, p4));
