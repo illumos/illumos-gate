@@ -18,27 +18,49 @@
 #
 # CDDL HEADER END
 #
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2016 Toomas Soome <tsoome@me.com>
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
 #
 
-SUBDIRS =	$(MACH)
+PROG= installboot
 
-all	:=	TARGET= all
-install	:=	TARGET= install
-clean	:=	TARGET= clean
-clobber	:=	TARGET= clobber
-_msg	:=	TARGET= _msg
-lint	:=	TARGET= lint
+EINFO_SRC =../../common/bblk_einfo.c
+UTILS_SRC =../../common/boot_utils.c
+EXTRA_SRC =../../common/mboot_extra.c
+
+OBJS= installboot.o bblk_einfo.o  boot_utils.o mboot_extra.o
+SRCS= installboot.c $(UTILS_SRC) $(EINFO_SRC) $(EXTRA_SRC)
+
+include ../../Makefile.com
+
+CPPFLAGS += -I$(SRC)/uts/common
+
+LDLIBS += -lmd5
+
+C99MODE=	$(C99_ENABLE)
+
+LINTFLAGS += -erroff=E_BAD_PTR_CAST_ALIGN
 
 .KEEP_STATE:
 
-install: $(SUBDIRS)
+all: $(PROG)
 
-all clobber clean lint _msg: $(SUBDIRS)
+$(PROG): $(OBJS)
+	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
+	$(POST_PROCESS)
 
-FRC:
+boot_utils.o:	$(UTILS_SRC)
+		$(COMPILE.c) -o $@ $(UTILS_SRC)
 
-$(SUBDIRS):	FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
+mboot_extra.o:	$(EXTRA_SRC)
+		$(COMPILE.c) -o $@ $(EXTRA_SRC)
+
+bblk_einfo.o:	$(EINFO_SRC)
+		$(COMPILE.c) -o $@ $(EINFO_SRC)
+
+install: all $(ROOTUSRSBINPROG)
+
+clean:
+	$(RM) $(OBJS)
+
+lint:	lint_SRCS

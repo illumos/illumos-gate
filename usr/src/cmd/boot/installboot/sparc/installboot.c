@@ -36,9 +36,9 @@
 #include <sys/sysmacros.h>
 
 #include "installboot.h"
-#include "./../common/bblk_einfo.h"
-#include "./../common/boot_utils.h"
-#include "./../common/mboot_extra.h"
+#include "../../common/bblk_einfo.h"
+#include "../../common/boot_utils.h"
+#include "../../common/mboot_extra.h"
 
 #ifndef	TEXT_DOMAIN
 #define	TEXT_DOMAIN	"SUNW_OST_OSCMD"
