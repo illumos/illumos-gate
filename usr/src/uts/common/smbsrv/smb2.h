@@ -263,6 +263,11 @@ typedef enum {
  * This value is only supported for the SMB 2.1 and 3.0 dialects.
  */
 
+#define	SMB2_CREATE_CTX_AAPL			0x4141504c /* ("AAPL") */
+/*
+ * Client is MacOS X looking for MacOS-specific extensions.
+ */
+
 /* SMB2 create request lease */
 #define	SMB2_LEASE_NONE				0x00
 #define	SMB2_LEASE_READ_CACHING			0x01

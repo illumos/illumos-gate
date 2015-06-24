@@ -34,7 +34,7 @@
 #define	CCTX_TIMEWARP_TOKEN		0x40
 #define	CCTX_QUERY_ON_DISK_ID		0x80
 #define	CCTX_REQUEST_LEASE		0x100
-
+#define	CCTX_AAPL_EXT			0x200
 
 typedef struct smb2_create_ctx_elem {
 	uint32_t cce_len;
@@ -52,9 +52,11 @@ typedef struct smb2_create_ctx {
 	smb2_create_ctx_elem_t cc_in_alloc_size;
 	smb2_create_ctx_elem_t cc_in_time_warp;
 	smb2_create_ctx_elem_t cc_in_req_lease;
+	smb2_create_ctx_elem_t cc_in_aapl;
 	/* Elements we my place in the response */
 	smb2_create_ctx_elem_t cc_out_max_access;
 	smb2_create_ctx_elem_t cc_out_file_id;
+	smb2_create_ctx_elem_t cc_out_aapl;
 } smb2_create_ctx_t;
 
 static uint32_t smb2_decode_create_ctx(
@@ -362,6 +364,24 @@ smb2_create(smb_request_t *sr)
 		/* reserved (16 bytes)  .15. */
 		cctx.cc_out_flags |= CCTX_QUERY_ON_DISK_ID;
 	}
+	if ((cctx.cc_in_flags & CCTX_AAPL_EXT) != 0) {
+		cce = &cctx.cc_out_aapl;
+		/*
+		 * smb2_aapl_crctx has a variable response depending on
+		 * what the incoming context looks like, so it does all
+		 * the work of building cc_out_aapl, including setting
+		 * cce_len, cce_mbc.max_bytes, and smb_mbc_encode.
+		 * If we see errors getting this, simply omit it from
+		 * the collection of returned create contexts.
+		 */
+		status = smb2_aapl_crctx(sr,
+		    &cctx.cc_in_aapl.cce_mbc, &cce->cce_mbc);
+		if (status == 0) {
+			cce->cce_len = cce->cce_mbc.chain_offset;
+			cctx.cc_out_flags |= CCTX_AAPL_EXT;
+		}
+		status = 0;
+	}
 	if (cctx.cc_out_flags) {
 		sr->raw_data.max_bytes = smb2_max_trans;
 		status = smb2_encode_create_ctx(&sr->raw_data, &cctx);
@@ -520,6 +540,10 @@ smb2_decode_create_ctx(mbuf_chain_t *in_mbc, smb2_create_ctx_t *cc)
 			cc->cc_in_flags |= CCTX_REQUEST_LEASE;
 			cce = &cc->cc_in_req_lease;
 			break;
+		case SMB2_CREATE_CTX_AAPL:		/* ("AAPL") */
+			cc->cc_in_flags |= CCTX_AAPL_EXT;
+			cce = &cc->cc_in_aapl;
+			break;
 		default:
 			/*
 			 * Unknown create context values are normal, and
@@ -598,6 +622,17 @@ smb2_encode_create_ctx(mbuf_chain_t *mbc, smb2_create_ctx_t *cc)
 		    mbc->chain_offset - last_top);
 	}
 
+	if (cc->cc_out_flags & CCTX_AAPL_EXT) {
+		cce = &cc->cc_out_aapl;
+		last_top = mbc->chain_offset;
+		rc = smb2_encode_create_ctx_elem(mbc, cce,
+		    SMB2_CREATE_CTX_AAPL);
+		if (rc)
+			return (NT_STATUS_INTERNAL_ERROR);
+		(void) smb_mbc_poke(mbc, last_top, "l",
+		    mbc->chain_offset - last_top);
+	}
+
 	if (last_top >= 0)
 		(void) smb_mbc_poke(mbc, last_top, "l", 0);
 
@@ -663,6 +698,10 @@ smb2_free_create_ctx(smb2_create_ctx_t *cc)
 	}
 	if (cc->cc_out_flags & CCTX_QUERY_ON_DISK_ID) {
 		cce = &cc->cc_out_file_id;
+		MBC_FLUSH(&cce->cce_mbc);
+	}
+	if (cc->cc_out_flags & CCTX_AAPL_EXT) {
+		cce = &cc->cc_out_aapl;
 		MBC_FLUSH(&cce->cce_mbc);
 	}
 }

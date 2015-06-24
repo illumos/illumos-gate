@@ -620,14 +620,23 @@ smb_vop_lookup(
 
 	pn_alloc(&rpn);
 
+	/*
+	 * Easier to not have junk in rpn, as not every FS type
+	 * will necessarily fill that in for us.
+	 */
+	bzero(rpn.pn_buf, rpn.pn_bufsize);
+
 	error = VOP_LOOKUP(dvp, np, vpp, NULL, option_flags, NULL, cr,
 	    &smb_ct, direntflags, &rpn);
 
 	if (error == 0) {
 		if (od_name) {
 			bzero(od_name, MAXNAMELEN);
-			np = (option_flags == FIGNORECASE) ? rpn.pn_buf : name;
-
+			if ((option_flags & FIGNORECASE) != 0 &&
+			    rpn.pn_buf[0] != '\0')
+				np = rpn.pn_buf;
+			else
+				np = name;
 			if (flags & SMB_CATIA)
 				smb_vop_catia_v4tov5(np, od_name, MAXNAMELEN);
 			else

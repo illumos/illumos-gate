@@ -27,6 +27,8 @@ extern uint32_t smb2_tcp_rcvbuf;
 extern uint32_t smb2_max_rwsize;
 extern uint32_t smb2_max_trans;
 
+extern int smb2_aapl_use_file_ids;
+
 void	smb2_dispatch_stats_init(smb_server_t *);
 void	smb2_dispatch_stats_fini(smb_server_t *);
 void	smb2_dispatch_stats_update(smb_server_t *,
@@ -72,6 +74,9 @@ smb_sdrc_t smb2_set_info(smb_request_t *);
 smb_sdrc_t smb2_oplock_break_ack(smb_request_t *);
 
 int smb2_newrq_negotiate(smb_request_t *);
+
+uint32_t smb2_aapl_crctx(smb_request_t *,
+	mbuf_chain_t *, mbuf_chain_t *);
 
 uint32_t smb2_ofile_getattr(smb_request_t *, smb_ofile_t *, smb_attr_t *);
 uint32_t smb2_ofile_getstd(smb_ofile_t *, smb_queryinfo_t *);

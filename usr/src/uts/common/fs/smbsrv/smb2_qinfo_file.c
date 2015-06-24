@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -86,6 +86,7 @@ smb2_qinfo_file(smb_request_t *sr, smb_queryinfo_t *qi)
 
 	case FileStreamInformation:
 		mask = SMB_AT_STANDARD;
+		getstd = B_TRUE;
 		break;
 
 	case FileCompressionInformation:
@@ -288,12 +289,18 @@ static uint32_t
 smb2_qif_internal(smb_request_t *sr, smb_queryinfo_t *qi)
 {
 	smb_attr_t *sa = &qi->qi_attr;
+	u_longlong_t nodeid;
 
 	ASSERT((sa->sa_mask & SMB_AT_NODEID) == SMB_AT_NODEID);
+	nodeid = sa->sa_vattr.va_nodeid;
+
+	if (smb2_aapl_use_file_ids == 0 &&
+	    (sr->session->s_flags & SMB_SSN_AAPL_CCEXT) != 0)
+		nodeid = 0;
 
 	(void) smb_mbc_encodef(
 	    &sr->raw_data, "q",
-	    sa->sa_vattr.va_nodeid);	/* q */
+	    nodeid);	/* q */
 
 	return (0);
 }

@@ -397,36 +397,11 @@ smb_open_subr(smb_request_t *sr)
 	cur_node = op->fqi.fq_dnode ?
 	    op->fqi.fq_dnode : sr->tid_tree->t_snode;
 
-	/*
-	 * if no path or filename are specified the stream should be
-	 * created on cur_node
-	 */
-	if (!is_dir && !pn->pn_pname && !pn->pn_fname && pn->pn_sname) {
-		/*
-		 * Can't currently handle a stream on the tree root.
-		 * If a stream is being opened return "not found", otherwise
-		 * return "access denied".
-		 */
-		if (cur_node == sr->tid_tree->t_snode) {
-			if (op->create_disposition == FILE_OPEN) {
-				return (NT_STATUS_OBJECT_NAME_NOT_FOUND);
-			}
-			return (NT_STATUS_ACCESS_DENIED);
-		}
-
-		(void) snprintf(op->fqi.fq_last_comp,
-		    sizeof (op->fqi.fq_last_comp),
-		    "%s%s", cur_node->od_name, pn->pn_sname);
-
-		op->fqi.fq_dnode = cur_node->n_dnode;
-		smb_node_ref(op->fqi.fq_dnode);
-	} else {
-		rc = smb_pathname_reduce(sr, sr->user_cr, pn->pn_path,
-		    sr->tid_tree->t_snode, cur_node, &op->fqi.fq_dnode,
-		    op->fqi.fq_last_comp);
-		if (rc != 0) {
-			return (smb_errno2status(rc));
-		}
+	rc = smb_pathname_reduce(sr, sr->user_cr, pn->pn_path,
+	    sr->tid_tree->t_snode, cur_node, &op->fqi.fq_dnode,
+	    op->fqi.fq_last_comp);
+	if (rc != 0) {
+		return (smb_errno2status(rc));
 	}
 
 	/*
