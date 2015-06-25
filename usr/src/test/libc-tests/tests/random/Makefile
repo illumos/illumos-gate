@@ -17,7 +17,6 @@ include $(SRC)/Makefile.master
 
 ROOTOPTPKG = $(ROOT)/opt/libc-tests
 TESTDIR = $(ROOTOPTPKG)/tests/random
-ROOTBINDIR = $(ROOTOPTPKG)/bin
 
 PROGS = arc4random 		\
 	arc4random_prefork 	\
@@ -74,16 +73,11 @@ arc4random_preforksig: arc4random_forksig.c
 	$(POST_PROCESS)
 
 chacha: chacha_tv.c
-	$(COMPILE.c) -DKEYSTREAM_ONLY -I$(SRC)/common/crypto/chacha -o chacha.o -c $(SRC)/common/crypto/chacha/chacha.c
+	$(COMPILE.c) -DKEYSTREAM_ONLY -I$(SRC)/common/crypto/chacha \
+	    -o chacha.o -c $(SRC)/common/crypto/chacha/chacha.c
 	$(COMPILE.c) -I$(SRC)/common/crypto/chacha -o chacha_tv.o -c chacha_tv.c
 	$(LINK.c) -o $@ chacha_tv.o chacha.o $(LDLIBS)
 	$(POST_PROCESS)
-
-$(ROOTBINDIR):
-	$(INS.dir)
-
-$(ROOTBINDIR)/%: %
-	$(INS.file)
 
 $(TESTDIR):
 	$(INS.dir)
