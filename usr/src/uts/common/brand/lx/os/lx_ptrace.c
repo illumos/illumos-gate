@@ -2101,6 +2101,7 @@ lx_waitid_helper(idtype_t idtype, id_t id, k_siginfo_t *ip, int options,
 	proc_t *rproc = NULL;
 	pid_t event_pid = 0, event_ppid = 0;
 	boolean_t waitflag = !(options & WNOWAIT);
+	boolean_t target_found = B_FALSE;
 
 	VERIFY(MUTEX_HELD(&pidlock));
 	VERIFY(MUTEX_NOT_HELD(&p->p_lock));
@@ -2179,6 +2180,9 @@ lx_waitid_helper(idtype_t idtype, id_t id, k_siginfo_t *ip, int options,
 			cmn_err(CE_PANIC, "unexpected idtype: %d", idtype);
 		}
 
+		/* This tracee matches provided idtype and id */
+		target_found = B_TRUE;
+
 		/*
 		 * Check if this LWP is in "ptrace-stop".  If in the correct
 		 * stop condition, lock the process containing the tracee LWP.
@@ -2218,12 +2222,13 @@ lx_waitid_helper(idtype_t idtype, id_t id, k_siginfo_t *ip, int options,
 	if (!found) {
 		/*
 		 * There were no events of interest, but we have tracees.
-		 * If specific tracee critera were not specified, signal to
-		 * waitid() that it should block if the provided flags allow
+		 * If any of the tracees matched the spcified criteria, signal
+		 * to waitid() that it should block if the provided flags allow
 		 * for it.
 		 */
-		if (idtype == P_ALL)
+		if (target_found) {
 			*brand_wants_wait = B_TRUE;
+		}
 
 		return (-1);
 	}
