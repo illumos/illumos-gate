@@ -663,8 +663,6 @@ lx_init(int argc, char *argv[], char *envp[])
 	if (lx_statfs_init() != 0)
 		lx_err_fatal("failed to setup the statfs translator");
 
-	lx_ptrace_init();
-
 #if defined(_LP64)
 	vdso_hdr = map_vdso();
 	edp.ed_vdso = (uintptr_t)vdso_hdr;
@@ -1031,7 +1029,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_getrusage,			/*  98: getrusage */
 	NULL,				/*  99: sysinfo */
 	lx_times,			/* 100: times */
-	lx_ptrace,			/* 101: ptrace */
+	NULL,				/* 101: ptrace */
 	lx_getuid,			/* 102: getuid */
 	lx_syslog,			/* 103: syslog */
 	lx_getgid,			/* 104: getgid */
@@ -1287,7 +1285,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_setuid16,			/*  23: setuid16 */
 	lx_getuid16,			/*  24: getuid16 */
 	lx_stime,			/*  25: stime */
-	lx_ptrace,			/*  26: ptrace */
+	NULL,				/*  26: ptrace */
 	lx_alarm,			/*  27: alarm */
 	NULL,				/*  28: fstat */
 	lx_pause,			/*  29: pause */

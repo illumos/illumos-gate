@@ -48,6 +48,7 @@
 #include <lx_signum.h>
 #include <lx_syscall.h>
 #include <sys/proc.h>
+#include <sys/procfs.h>
 #include <net/if.h>
 #include <sys/sunddi.h>
 #include <sys/dlpi.h>
@@ -1010,4 +1011,58 @@ lx_read_argv_bounds(proc_t *p)
 	pd->l_args_start = arg_start;
 	pd->l_envs_start = env_start;
 	pd->l_envs_end = env_end;
+}
+
+/* Given an LX LWP, determine where user register state is stored. */
+lx_regs_location_t
+lx_regs_location(lx_lwp_data_t *lwpd, void **ucp, boolean_t for_write)
+{
+	switch (lwpd->br_stack_mode) {
+	case LX_STACK_MODE_BRAND:
+		/*
+		 * The LWP was stopped with the brand stack and register state
+		 * loaded, e.g. during a syscall emulated within the kernel.
+		 */
+		return (LX_REG_LOC_LWP);
+
+	case LX_STACK_MODE_PREINIT:
+		if (for_write) {
+			/* setting registers not allowed in this state */
+			break;
+		}
+		if (lwpd->br_ptrace_whatstop == LX_PR_SIGNALLED ||
+		    lwpd->br_ptrace_whatstop == LX_PR_SYSEXIT) {
+			/* The LWP was stopped by tracing on exec. */
+			return (LX_REG_LOC_LWP);
+		}
+		break;
+
+	case LX_STACK_MODE_NATIVE:
+		if (for_write) {
+			/* setting registers not allowed in this state */
+			break;
+		}
+		if (lwpd->br_ptrace_whystop == PR_BRAND &&
+		    lwpd->br_ptrace_whatstop == LX_PR_EVENT) {
+			/* Called while ptrace-event-stopped by lx_exec. */
+			return (LX_REG_LOC_LWP);
+		}
+		break;
+	default:
+		break;
+	}
+
+	if (lwpd->br_ptrace_stopucp != NULL) {
+		/*
+		 * The LWP was stopped in the usermode emulation library
+		 * but a ucontext_t for the preserved brand stack and
+		 * register state was provided.  Return the register state
+		 * from that ucontext_t.
+		 */
+		VERIFY(ucp != NULL);
+		*ucp = (void *)lwpd->br_ptrace_stopucp;
+		return (LX_REG_LOC_UCP);
+	}
+
+	return (LX_REG_LOC_UNAVAIL);
 }

@@ -12,7 +12,7 @@
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-# Copyright 2014 Joyent, Inc.  All rights reserved.
+# Copyright 2015 Joyent, Inc.
 #
 #
 # lib/brand/lx/amd64/Makefile
@@ -31,15 +31,6 @@ POFILE=		lx_brand.po
 MSGFILES=	$(CSRCS)
 
 ASSYMDEP_OBJS = lx_handler.o
-
-$(ASSYMDEP_OBJS:%=pics/%): assym.h
-
-OFFSETS = ../$(MACH64)/offsets.in
-
-assym.h: $(OFFSETS)
-	$(OFFSETS_CREATE) $(CTF_FLAGS) < $(OFFSETS) > $@
-
-CLOBBERFILES += assym.h
 
 install: all $(ROOTLIBS64)
 

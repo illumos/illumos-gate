@@ -217,6 +217,16 @@ typedef enum lx_ptrace_cont_flags_t {
 	LX_PTC_SINGLESTEP = 0x02
 } lx_ptrace_cont_flags_t;
 
+
+extern int lx_user_regs_copyin(lx_lwp_data_t *, void *);
+extern int lx_user_regs_copyout(lx_lwp_data_t *, void *);
+extern int lx_ptrace_peekuser(lx_lwp_data_t *, uintptr_t, void *);
+extern int lx_ptrace_pokeuser(lx_lwp_data_t *, uintptr_t, void *);
+extern int lx_user_fpregs_copyin(lx_lwp_data_t *, void *);
+extern int lx_user_fpregs_copyout(lx_lwp_data_t *, void *);
+extern int lx_user_fpxregs_copyin(lx_lwp_data_t *, void *);
+extern int lx_user_fpxregs_copyout(lx_lwp_data_t *, void *);
+
 /*
  * Macros for checking the state of an LWP via "br_ptrace_flags":
  */
@@ -803,74 +813,6 @@ lx_ptrace_geteventmsg(lx_lwp_data_t *remote, void *umsgp)
 }
 
 static int
-lx_ptrace_getregs(lx_lwp_data_t *remote, void *uregsp)
-{
-	if (remote->br_stack_mode == LX_STACK_MODE_BRAND) {
-		/*
-		 * The LWP was stopped with the brand stack and register
-		 * state loaded, e.g. during a system call emulated within
-		 * the kernel.  Return the LWP register state.
-		 */
-		return (lx_regs_to_userregs(remote, uregsp));
-	} else if (remote->br_stack_mode == LX_STACK_MODE_PREINIT &&
-	    (remote->br_ptrace_whatstop == LX_PR_SIGNALLED ||
-	    remote->br_ptrace_whatstop == LX_PR_SYSEXIT)) {
-		/*
-		 * The LWP was stopped by tracing on exec.
-		 */
-		return (lx_regs_to_userregs(remote, uregsp));
-	} else if (remote->br_stack_mode == LX_STACK_MODE_NATIVE &&
-	    remote->br_ptrace_whystop == PR_BRAND &&
-	    remote->br_ptrace_whatstop == LX_PR_EVENT) {
-		/*
-		 * Called while we're ptrace event stopped by lx_exec.
-		 */
-		return (lx_regs_to_userregs(remote, uregsp));
-	} else if (remote->br_ptrace_stopucp != NULL) {
-		/*
-		 * The LWP was stopped in the usermode emulation library
-		 * but a ucontext_t for the preserved brand stack and
-		 * register state was provided.  Return the register state
-		 * from that ucontext_t.
-		 */
-		return (lx_uc_to_userregs(remote,
-		    (void *)remote->br_ptrace_stopucp, uregsp));
-	} else {
-		/*
-		 * The register state is not currently available.
-		 */
-		return (EIO);
-	}
-}
-
-static int
-lx_ptrace_setregs(lx_lwp_data_t *remote, void *uregsp)
-{
-	if (remote->br_stack_mode == LX_STACK_MODE_BRAND) {
-		/*
-		 * The LWP was stopped with the brand stack and register
-		 * state loaded, e.g. during a system call emulated within
-		 * the kernel.  Write to the LWP register state.
-		 */
-		return (lx_userregs_to_regs(remote, uregsp));
-	} else if (remote->br_ptrace_stopucp != NULL) {
-		/*
-		 * The LWP was stopped in the usermode emulation library
-		 * but a ucontext_t for the preserved brand stack and
-		 * register state was provided.  Write to the register state
-		 * in that ucontext_t.
-		 */
-		return (lx_userregs_to_uc(remote,
-		    (void *)remote->br_ptrace_stopucp, uregsp));
-	} else {
-		/*
-		 * The register state is not currently available.
-		 */
-		return (EIO);
-	}
-}
-
-static int
 lx_ptrace_getsiginfo(lx_lwp_data_t *remote, void *usiginfo)
 {
 	klwp_t *lwp = remote->br_lwp;
@@ -965,6 +907,7 @@ lx_ptrace_detach(lx_ptrace_accord_t *accord, lx_lwp_data_t *remote, int signo,
 	 * Detach the LWP from the accord and set it running.
 	 */
 	VERIFY(!TRACEE_BUSY(remote));
+	VERIFY(MUTEX_HELD(&accord->lxpa_tracees_lock));
 	remote->br_ptrace_flags &= ~(LX_PTF_SYSCALL | LX_PTF_INHERIT);
 	VERIFY(list_link_active(&remote->br_ptrace_linkage));
 	list_remove(&accord->lxpa_tracees, remote);
@@ -2285,11 +2228,72 @@ lx_waitid_helper(idtype_t idtype, id_t id, k_siginfo_t *ip, int options,
 	return (0);
 }
 
-/*
- * Some PTRACE_* requests are handled in-kernel by this function.  It is called
- * through brandsys() via the B_PTRACE_KERNEL subcommand.
- */
-int
+static int
+lx_ptrace_peek(lx_lwp_data_t *lwpd, uintptr_t addr, void *data)
+{
+	proc_t *p = lwptoproc(lwpd->br_lwp);
+	long buf;
+	int error = 0, size = sizeof (buf);
+
+#if defined(_LP64)
+	if (get_udatamodel() != DATAMODEL_NATIVE) {
+		size = sizeof (uint32_t);
+	}
+#endif
+	if ((addr & (size - 1)) != 0) {
+		/* unaligned access */
+		return (EINVAL);
+	}
+
+	mutex_exit(&p->p_lock);
+	error = uread(p, &buf, size, addr);
+	mutex_enter(&p->p_lock);
+
+	if (error != 0) {
+		return (EIO);
+	}
+	if (copyout(&buf, data, size) != 0) {
+		return (EFAULT);
+	}
+
+	return (0);
+}
+
+static int
+lx_ptrace_poke(lx_lwp_data_t *lwpd, uintptr_t addr, uintptr_t data)
+{
+	proc_t *p = lwptoproc(lwpd->br_lwp);
+	int error = 0, size = sizeof (data);
+
+#if defined(_LP64)
+	if (get_udatamodel() != DATAMODEL_NATIVE) {
+		size = sizeof (uint32_t);
+	}
+#endif
+	if ((addr & (size - 1)) != 0) {
+		/* unaligned access */
+		return (EINVAL);
+	}
+
+	mutex_exit(&p->p_lock);
+	error = uwrite(p, &data, size, addr);
+	mutex_enter(&p->p_lock);
+
+	if (error != 0) {
+		return (EIO);
+	}
+	return (0);
+}
+
+static int
+lx_ptrace_kill(lx_lwp_data_t *lwpd)
+{
+	sigtoproc(lwptoproc(lwpd->br_lwp), NULL, SIGKILL);
+
+	return (0);
+}
+
+static int
 lx_ptrace_kernel(int ptrace_op, pid_t lxpid, uintptr_t addr, uintptr_t data)
 {
 	lx_lwp_data_t *local = ttolxlwp(curthread);
@@ -2299,12 +2303,10 @@ lx_ptrace_kernel(int ptrace_op, pid_t lxpid, uintptr_t addr, uintptr_t data)
 	proc_t *rproc;
 	int error;
 	boolean_t found = B_FALSE;
-	boolean_t release_hold = B_FALSE;
-
-	_NOTE(ARGUNUSED(addr));
 
 	/*
-	 * These actions do not require the target LWP to be traced or stopped.
+	 * PTRACE_TRACEME and PTRACE_ATTACH operations induce the tracing of
+	 * one LWP by another.  The target LWP must not be traced already.
 	 */
 	switch (ptrace_op) {
 	case LX_PTRACE_TRACEME:
@@ -2365,15 +2367,39 @@ lx_ptrace_kernel(int ptrace_op, pid_t lxpid, uintptr_t addr, uintptr_t data)
 	rlwp = remote->br_lwp;
 	rproc = lwptoproc(rlwp);
 
+
+	if (ptrace_op == LX_PTRACE_DETACH) {
+		boolean_t release_hold = B_FALSE;
+		error = lx_ptrace_detach(accord, remote, (int)data,
+		    &release_hold);
+		/*
+		 * Drop the lock on both the tracee process and the tracee list.
+		 */
+		mutex_exit(&rproc->p_lock);
+		mutex_exit(&accord->lxpa_tracees_lock);
+
+		if (release_hold) {
+			/*
+			 * Release a hold from the accord.
+			 */
+			lx_ptrace_accord_enter(accord);
+			lx_ptrace_accord_rele(accord);
+			lx_ptrace_accord_exit(accord);
+		}
+
+		return (error);
+	}
+
+	/*
+	 * The tracees lock is not needed for any of the other operations.
+	 * Drop it so further actions can avoid deadlock.
+	 */
+	mutex_exit(&accord->lxpa_tracees_lock);
+
 	/*
 	 * Process the ptrace(2) request:
 	 */
 	switch (ptrace_op) {
-	case LX_PTRACE_DETACH:
-		error = lx_ptrace_detach(accord, remote, (int)data,
-		    &release_hold);
-		break;
-
 	case LX_PTRACE_CONT:
 		error = lx_ptrace_cont(remote, LX_PTC_NONE, (int)data);
 		break;
@@ -2395,15 +2421,53 @@ lx_ptrace_kernel(int ptrace_op, pid_t lxpid, uintptr_t addr, uintptr_t data)
 		break;
 
 	case LX_PTRACE_GETREGS:
-		error = lx_ptrace_getregs(remote, (void *)data);
+		error = lx_user_regs_copyout(remote, (void *)data);
 		break;
 
 	case LX_PTRACE_SETREGS:
-		error = lx_ptrace_setregs(remote, (void *)data);
+		error = lx_user_regs_copyin(remote, (void *)data);
 		break;
 
 	case LX_PTRACE_GETSIGINFO:
 		error = lx_ptrace_getsiginfo(remote, (void *)data);
+		break;
+
+	case LX_PTRACE_PEEKTEXT:
+	case LX_PTRACE_PEEKDATA:
+		error = lx_ptrace_peek(remote, addr, (void *)data);
+		break;
+
+	case LX_PTRACE_POKETEXT:
+	case LX_PTRACE_POKEDATA:
+		error = lx_ptrace_poke(remote, addr, data);
+		break;
+
+	case LX_PTRACE_PEEKUSER:
+		error = lx_ptrace_peekuser(remote, addr, (void *)data);
+		break;
+
+	case LX_PTRACE_POKEUSER:
+		error = lx_ptrace_pokeuser(remote, addr, (void *)data);
+		break;
+
+	case LX_PTRACE_GETFPREGS:
+		error = lx_user_fpregs_copyout(remote, (void *)data);
+		break;
+
+	case LX_PTRACE_SETFPREGS:
+		error = lx_user_fpregs_copyin(remote, (void *)data);
+		break;
+
+	case LX_PTRACE_GETFPXREGS:
+		error = lx_user_fpxregs_copyout(remote, (void *)data);
+		break;
+
+	case LX_PTRACE_SETFPXREGS:
+		error = lx_user_fpxregs_copyin(remote, (void *)data);
+		break;
+
+	case LX_PTRACE_KILL:
+		error = lx_ptrace_kill(remote);
 		break;
 
 	default:
@@ -2414,18 +2478,20 @@ lx_ptrace_kernel(int ptrace_op, pid_t lxpid, uintptr_t addr, uintptr_t data)
 	 * Drop the lock on both the tracee process and the tracee list.
 	 */
 	mutex_exit(&rproc->p_lock);
-	mutex_exit(&accord->lxpa_tracees_lock);
-
-	if (release_hold) {
-		/*
-		 * Release a hold from the accord.
-		 */
-		lx_ptrace_accord_enter(accord);
-		lx_ptrace_accord_rele(accord);
-		lx_ptrace_accord_exit(accord);
-	}
 
 	return (error);
+}
+
+int
+lx_ptrace(int ptrace_op, pid_t lxpid, uintptr_t addr, uintptr_t data)
+{
+	int error;
+
+	error = lx_ptrace_kernel(ptrace_op, lxpid, addr, data);
+	if (error != 0) {
+		return (set_errno(error));
+	}
+	return (0);
 }
 
 void

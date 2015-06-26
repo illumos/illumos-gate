@@ -1138,9 +1138,6 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 		return (lx_ptrace_set_clone_inherit((int)arg1, arg2 == 0 ?
 		    B_FALSE : B_TRUE));
 
-	case B_PTRACE_KERNEL:
-		return (lx_ptrace_kernel((int)arg1, (pid_t)arg2, arg3, arg4));
-
 	case B_HELPER_WAITID: {
 		idtype_t idtype = (idtype_t)arg1;
 		id_t id = (id_t)arg2;

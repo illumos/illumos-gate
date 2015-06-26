@@ -82,6 +82,7 @@ extern long lx_pipe();
 extern long lx_pipe2();
 extern long lx_prctl();
 extern long lx_prlimit64();
+extern long lx_ptrace();
 extern long lx_read();
 extern long lx_recv();
 extern long lx_recvmsg();
