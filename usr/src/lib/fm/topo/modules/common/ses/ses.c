@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Milan Jurik. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <alloca.h>
@@ -452,12 +453,15 @@ ses_contract_thread(void *arg)
 	ctid_t ctid;
 	struct pollfd fds;
 	int pollret;
+	sigset_t sigset;
 
 	ses_ct_print("start contract event thread");
 	efd = open64(CTFS_ROOT "/device/pbundle", O_RDONLY);
 	fds.fd = efd;
 	fds.events = POLLIN;
 	fds.revents = 0;
+	sigaddset(&sigset, sesthread.thr_sig);
+	pthread_sigmask(SIG_UNBLOCK, &sigset, NULL);
 	for (;;) {
 		/* check if we've been asked to exit */
 		(void) pthread_mutex_lock(&sesthread.mt);
