@@ -549,7 +549,7 @@ lx_sysent_t lx_sysent32[] = {
 	{"setuid16",	NULL,			0,		1}, /* 23 */
 	{"getuid16",	NULL,			0,		0}, /* 24 */
 	{"stime",	NULL,			0,		1}, /* 25 */
-	{"ptrace",	NULL,			0,		4}, /* 26 */
+	{"ptrace",	lx_ptrace,		0,		4}, /* 26 */
 	{"alarm",	NULL,			0,		1}, /* 27 */
 	{"fstat",	NULL,			NOSYS_OBSOLETE,	0}, /* 28 */
 	{"pause",	NULL,			0,		0}, /* 29 */
@@ -995,7 +995,7 @@ lx_sysent_t lx_sysent64[] = {
 	{"getrusage",	NULL,			0,		2}, /* 98 */
 	{"sysinfo",	lx_sysinfo64,		0,		1}, /* 99 */
 	{"times",	NULL,			0,		1}, /* 100 */
-	{"ptrace",	NULL,			0,		4}, /* 101 */
+	{"ptrace",	lx_ptrace,		0,		4}, /* 101 */
 	{"getuid",	NULL,			0,		0}, /* 102 */
 	{"syslog",	NULL,			0,		3}, /* 103 */
 	{"getgid",	NULL,			0,		0}, /* 104 */

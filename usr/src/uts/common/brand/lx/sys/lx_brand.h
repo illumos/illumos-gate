@@ -82,7 +82,7 @@ extern "C" {
 #define	B_LPID_TO_SPAIR		128
 #define	B_GET_CURRENT_CONTEXT	129
 #define	B_EMULATION_DONE	130
-#define	B_PTRACE_KERNEL		131
+/* formerly B_PTRACE_KERNEL	131 */
 #define	B_SET_AFFINITY_MASK	132
 #define	B_GET_AFFINITY_MASK	133
 #define	B_PTRACE_CLONE_BEGIN	134
@@ -196,149 +196,6 @@ typedef struct lx_brand_registration32 {
 	uint32_t lxbr_handler;		/* base address of handler */
 	uint32_t lxbr_flags;		/* LX_PROC_* registration flags */
 } lx_brand_registration32_t;
-
-#ifdef __amd64
-
-typedef struct lx_regs {
-	long lxr_fs;
-	long lxr_rdi;
-	long lxr_rsi;
-	long lxr_rbp;
-	long lxr_rsp;
-	long lxr_rbx;
-	long lxr_rdx;
-	long lxr_rcx;
-	long lxr_rax;
-	long lxr_r8;
-	long lxr_r9;
-	long lxr_r10;
-	long lxr_r11;
-	long lxr_r12;
-	long lxr_r13;
-	long lxr_r14;
-	long lxr_r15;
-	long lxr_rip;
-
-	long lxr_orig_rax;
-} lx_regs_t;
-
-typedef struct lx_regs32 {
-	uint32_t lxr_gs;
-	uint32_t lxr_edi;
-	uint32_t lxr_esi;
-	uint32_t lxr_ebp;
-	uint32_t lxr_esp;
-	uint32_t lxr_ebx;
-	uint32_t lxr_edx;
-	uint32_t lxr_ecx;
-	uint32_t lxr_eax;
-	uint32_t lxr_eip;
-
-	uint32_t lxr_orig_eax;
-} lx_regs32_t;
-
-#else /* ! __amd64 */
-
-typedef struct lx_regs {
-	long lxr_gs;
-	long lxr_edi;
-	long lxr_esi;
-	long lxr_ebp;
-	long lxr_esp;
-	long lxr_ebx;
-	long lxr_edx;
-	long lxr_ecx;
-	long lxr_eax;
-	long lxr_eip;
-
-	long lxr_orig_eax;
-} lx_regs_t;
-
-#endif /* __amd64 */
-
-#ifdef __amd64
-/*
- * The 64-bit native "user_regs_struct" Linux structure.
- */
-typedef struct lx_user_regs {
-	long lxur_r15;
-	long lxur_r14;
-	long lxur_r13;
-	long lxur_r12;
-	long lxur_rbp;
-	long lxur_rbx;
-	long lxur_r11;
-	long lxur_r10;
-	long lxur_r9;
-	long lxur_r8;
-	long lxur_rax;
-	long lxur_rcx;
-	long lxur_rdx;
-	long lxur_rsi;
-	long lxur_rdi;
-	long lxur_orig_rax;
-	long lxur_rip;
-	long lxur_xcs;
-	long lxur_rflags;
-	long lxur_rsp;
-	long lxur_xss;
-	long lxur_xfs_base;
-	long lxur_xgs_base;
-	long lxur_xds;
-	long lxur_xes;
-	long lxur_xfs;
-	long lxur_xgs;
-} lx_user_regs_t;
-
-#if defined(_KERNEL) && defined(_SYSCALL32_IMPL)
-/*
- * 64-bit kernel view of the 32-bit "user_regs_struct" Linux structure.
- */
-typedef struct lx_user_regs32 {
-	int32_t lxur_ebx;
-	int32_t lxur_ecx;
-	int32_t lxur_edx;
-	int32_t lxur_esi;
-	int32_t lxur_edi;
-	int32_t lxur_ebp;
-	int32_t lxur_eax;
-	int32_t lxur_xds;
-	int32_t lxur_xes;
-	int32_t lxur_xfs;
-	int32_t lxur_xgs;
-	int32_t lxur_orig_eax;
-	int32_t lxur_eip;
-	int32_t lxur_xcs;
-	int32_t lxur_eflags;
-	int32_t lxur_esp;
-	int32_t lxur_xss;
-} lx_user_regs32_t;
-#endif /* defined(_KERNEL) && defined(_SYSCALL32_IMPL) */
-
-#else /* !__amd64 */
-/*
- * The 32-bit native "user_regs_struct" Linux structure.
- */
-typedef struct lx_user_regs {
-	long lxur_ebx;
-	long lxur_ecx;
-	long lxur_edx;
-	long lxur_esi;
-	long lxur_edi;
-	long lxur_ebp;
-	long lxur_eax;
-	long lxur_xds;
-	long lxur_xes;
-	long lxur_xfs;
-	long lxur_xgs;
-	long lxur_orig_eax;
-	long lxur_eip;
-	long lxur_xcs;
-	long lxur_eflags;
-	long lxur_esp;
-	long lxur_xss;
-} lx_user_regs_t;
-#endif /* __amd64 */
 
 #endif /* _ASM */
 
@@ -713,10 +570,6 @@ extern void lx_lwp_set_native_stack_current(lx_lwp_data_t *, uintptr_t);
 extern void lx_divert(klwp_t *, uintptr_t);
 extern int lx_runexe(klwp_t *, void *);
 extern void lx_switch_to_native(klwp_t *);
-extern int lx_regs_to_userregs(lx_lwp_data_t *, void *);
-extern int lx_uc_to_userregs(lx_lwp_data_t *, void *, void *);
-extern int lx_userregs_to_regs(lx_lwp_data_t *lwpd, void *);
-extern int lx_userregs_to_uc(lx_lwp_data_t *lwpd, void *, void *);
 
 extern int lx_syscall_enter(void);
 extern int lx_syscall_return(klwp_t *, int, long);

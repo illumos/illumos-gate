@@ -50,6 +50,15 @@ extern int stol_ksiginfo32_copyout(k_siginfo_t *, void *);
 #endif
 extern void lx_read_argv_bounds(proc_t *p);
 
+typedef enum lx_regs_location {
+	LX_REG_LOC_UNAVAIL,
+	LX_REG_LOC_LWP,
+	LX_REG_LOC_UCP
+} lx_regs_location_t;
+
+extern lx_regs_location_t lx_regs_location(lx_lwp_data_t *, void **, boolean_t);
+
+
 typedef enum lx_if_action {
 	LX_IF_FROMNATIVE,
 	LX_IF_TONATIVE
@@ -69,7 +78,6 @@ extern boolean_t lx_ptrace_stop(ushort_t);
 extern void lx_stop_notify(proc_t *, klwp_t *, ushort_t, ushort_t);
 extern void lx_ptrace_init(void);
 extern void lx_ptrace_fini(void);
-extern int lx_ptrace_kernel(int, pid_t, uintptr_t, uintptr_t);
 extern int lx_waitid_helper(idtype_t, id_t, k_siginfo_t *, int, boolean_t *,
     int *);
 extern void lx_ptrace_exit(proc_t *, klwp_t *);
