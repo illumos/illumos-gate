@@ -76,6 +76,7 @@
 #include <sys/sysevent/eventdefs.h>
 #include <sys/sysevent/dr.h>
 #include <sys/sata/sata_defs.h>
+#include <sys/sata/sata_hba.h>
 #include <sys/scsi/generic/sas.h>
 #include <sys/scsi/impl/scsi_sas.h>
 
@@ -3117,7 +3118,6 @@ mptsas_scsi_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 		char model[SATA_ID_MODEL_LEN + 1];
 		char fw[SATA_ID_FW_LEN + 1];
 		char *vid, *pid;
-		int i;
 
 		mutex_exit(&mpt->m_mutex);
 		/*
@@ -3146,29 +3146,7 @@ mptsas_scsi_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 		model[SATA_ID_MODEL_LEN] = 0;
 		fw[SATA_ID_FW_LEN] = 0;
 
-		/*
-		 * split model into into vid/pid
-		 */
-		for (i = 0, pid = model; i < SATA_ID_MODEL_LEN; i++, pid++)
-			if ((*pid == ' ') || (*pid == '\t'))
-				break;
-		if (i < SATA_ID_MODEL_LEN) {
-			vid = model;
-			/*
-			 * terminate vid, establish pid
-			 */
-			*pid++ = 0;
-		} else {
-			/*
-			 * vid will stay "ATA     ", the rule is same
-			 * as sata framework implementation.
-			 */
-			vid = NULL;
-			/*
-			 * model is all pid
-			 */
-			pid = model;
-		}
+		sata_split_model(model, &vid, &pid);
 
 		/*
 		 * override SCSA "inquiry-*" properties

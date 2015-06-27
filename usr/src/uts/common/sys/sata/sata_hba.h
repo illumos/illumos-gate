@@ -24,7 +24,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _SATA_HBA_H
@@ -751,6 +751,7 @@ sata_pkt_t *sata_get_rdwr_pmult_pkt(dev_info_t *, sata_device_t *, uint8_t,
 void	sata_free_rdwr_pmult_pkt(sata_pkt_t *);
 void	sata_register_pmult(dev_info_t *, sata_device_t *, sata_pmult_gscr_t *);
 void	sata_free_dma_resources(sata_pkt_t *);
+void	sata_split_model(char *, char **, char **);
 
 /*
  * SATA trace ring buffer constants
