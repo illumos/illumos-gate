@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  *
  * Copyright (c) 2011 Gary Mills
  *
@@ -150,7 +150,7 @@ static char	**search_path = NULL;
 
 static int name_represents_wholedisk(char *name);
 
-static void get_disk_name(int fd, char *disk_name);
+static void get_disk_name(int fd, char *disk_name, struct disk_info *disk_info);
 
 /*
  * This routine digests the options on the command line.  It returns
@@ -1546,9 +1546,21 @@ search_for_logical_dev(char *devname)
  * Get the disk name from the inquiry data
  */
 static void
-get_disk_name(int fd, char *disk_name)
+get_disk_name(int fd, char *disk_name, struct disk_info *disk_info)
 {
 	struct scsi_inquiry	inquiry;
+	char			*vid, *pid, *rid;
+
+	if (get_disk_inquiry_prop(disk_info->devfs_name, &vid, &pid, &rid)
+	    == 0) {
+		(void) snprintf(disk_name, MAXNAMELEN - 1, "%s-%s-%s",
+		    vid, pid, rid);
+		free(vid);
+		free(pid);
+		free(rid);
+
+		return;
+	}
 
 	if (uscsi_inquiry(fd, (char *)&inquiry, sizeof (inquiry))) {
 		if (option_msg)
@@ -1880,7 +1892,7 @@ add_device_to_disklist(char *devname, char *devpath)
 	if (search_disk->label_type == L_TYPE_SOLARIS) {
 		status = read_label(search_file, &search_label);
 	} else {
-		status = read_efi_label(search_file, &efi_info);
+		status = read_efi_label(search_file, &efi_info, search_disk);
 	}
 	/*
 	 * If reading the label failed, and this is a SCSI
@@ -1964,9 +1976,20 @@ add_device_to_disklist(char *devname, char *devpath)
 		}
 		search_dtype->dtype_next = NULL;
 
-		(void) strlcpy(search_dtype->vendor, efi_info.vendor, 9);
-		(void) strlcpy(search_dtype->product, efi_info.product, 17);
-		(void) strlcpy(search_dtype->revision, efi_info.revision, 5);
+		search_dtype->vendor = strdup(efi_info.vendor);
+		search_dtype->product = strdup(efi_info.product);
+		search_dtype->revision = strdup(efi_info.revision);
+
+		if (search_dtype->vendor == NULL ||
+		    search_dtype->product == NULL ||
+		    search_dtype->revision == NULL) {
+			free(search_dtype->vendor);
+			free(search_dtype->product);
+			free(search_dtype->revision);
+			free(search_dtype);
+			goto out;
+		}
+
 		search_dtype->capacity = efi_info.capacity;
 		search_disk->disk_type = search_dtype;
 
@@ -1996,7 +2019,12 @@ add_device_to_disklist(char *devname, char *devpath)
 				break;
 			}
 		}
+	out:
 		(void) close(search_file);
+
+		free(efi_info.vendor);
+		free(efi_info.product);
+		free(efi_info.revision);
 		return;
 	}
 
@@ -2035,7 +2063,8 @@ add_device_to_disklist(char *devname, char *devpath)
 		search_dtype->dtype_next = NULL;
 		if (strncmp(search_label.dkl_asciilabel, "DEFAULT",
 		    strlen("DEFAULT")) == 0) {
-			(void) get_disk_name(search_file, disk_name);
+			(void) get_disk_name(search_file, disk_name,
+			    search_disk);
 			search_dtype->dtype_asciilabel = (char *)
 			    zalloc(strlen(disk_name) + 1);
 			(void) strcpy(search_dtype->dtype_asciilabel,
@@ -2989,6 +3018,7 @@ name_represents_wholedisk(char	*name)
 			else
 				return (1);
 		}
+
 		(void) strcpy(localname, symname);
 	}
 	return (0);

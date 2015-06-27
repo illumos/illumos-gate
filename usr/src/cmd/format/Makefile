@@ -22,6 +22,8 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+#
 
 PROG= format
 
@@ -58,7 +60,7 @@ $(ROOTETCDATA) := FILEMODE = 0644
 
 LDLIBS_i386= -lfdisk 
 LDLIBS_sparc=
-LDLIBS +=	-ladm -lefi -ldiskmgt -lnvpair -ldevid $(LDLIBS_$(MACH))
+LDLIBS +=	-ladm -lefi -ldiskmgt -lnvpair -ldevid -ldevinfo $(LDLIBS_$(MACH))
 
 LINTFLAGS += -xerroff=E_NAME_DEF_NOT_USED2
 CPPFLAGS    += -D_EXTVTOC
