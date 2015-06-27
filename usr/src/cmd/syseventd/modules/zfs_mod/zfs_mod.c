@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*
@@ -297,7 +297,7 @@ zfs_iter_vdev(zpool_handle_t *zhp, nvlist_t *nvl, void *data)
 		if (nvlist_lookup_uint64(nvl, ZPOOL_CONFIG_GUID,
 		    &guid) != 0 || guid != dp->dd_vdev_guid)
 			return;
-	} else if (dp->dd_compare != NULL) {
+	} else {
 		len = strlen(dp->dd_compare);
 
 		if (nvlist_lookup_string(nvl, dp->dd_prop, &path) != 0 ||
@@ -585,109 +585,6 @@ zfsdle_vdev_online(zpool_handle_t *zhp, void *data)
 	return (0);
 }
 
-/*
- * This function is called for each vdev of a pool for which any of the
- * following events was recieved:
- *  - ESC_ZFS_vdev_add
- *  - ESC_ZFS_vdev_attach
- *  - ESC_ZFS_vdev_clear
- *  - ESC_ZFS_vdev_online
- *  - ESC_ZFS_pool_create
- *  - ESC_ZFS_pool_import
- * It will update the vdevs FRU property if it is out of date.
- */
-/*ARGSUSED2*/
-static void
-zfs_sync_vdev_fru(zpool_handle_t *zhp, nvlist_t *vdev, boolean_t isdisk)
-{
-	char *devpath, *cptr, *oldfru = NULL;
-	const char *newfru;
-	uint64_t vdev_guid;
-
-	(void) nvlist_lookup_uint64(vdev, ZPOOL_CONFIG_GUID, &vdev_guid);
-	(void) nvlist_lookup_string(vdev, ZPOOL_CONFIG_PHYS_PATH, &devpath);
-	(void) nvlist_lookup_string(vdev, ZPOOL_CONFIG_FRU, &oldfru);
-
-	/* remove :<slice> from devpath */
-	cptr = strrchr(devpath, ':');
-	if (cptr != NULL)
-		*cptr = '\0';
-
-	newfru = libzfs_fru_lookup(g_zfshdl, devpath);
-	if (newfru == NULL) {
-		syseventd_print(9, "zfs_sync_vdev_fru: no FRU for %s\n",
-		    devpath);
-		return;
-	}
-
-	/* do nothing if the FRU hasn't changed */
-	if (oldfru != NULL && libzfs_fru_compare(g_zfshdl, oldfru, newfru)) {
-		syseventd_print(9, "zfs_sync_vdev_fru: FRU unchanged\n");
-		return;
-	}
-
-	syseventd_print(9, "zfs_sync_vdev_fru: devpath = %s\n", devpath);
-	syseventd_print(9, "zfs_sync_vdev_fru: FRU = %s\n", newfru);
-
-	(void) zpool_fru_set(zhp, vdev_guid, newfru);
-}
-
-/*
- * This function handles the following events:
- *  - ESC_ZFS_vdev_add
- *  - ESC_ZFS_vdev_attach
- *  - ESC_ZFS_vdev_clear
- *  - ESC_ZFS_vdev_online
- *  - ESC_ZFS_pool_create
- *  - ESC_ZFS_pool_import
- * It will iterate over the pool vdevs to update the FRU property.
- */
-int
-zfs_deliver_sync(nvlist_t *nvl)
-{
-	dev_data_t dd = { 0 };
-	char *pname;
-	zpool_handle_t *zhp;
-	nvlist_t *config, *vdev;
-
-	if (nvlist_lookup_string(nvl, "pool_name", &pname) != 0) {
-		syseventd_print(9, "zfs_deliver_sync: no pool name\n");
-		return (-1);
-	}
-
-	/*
-	 * If this event was triggered by a pool export or destroy we cannot
-	 * open the pool. This is not an error, just return 0 as we don't care
-	 * about these events.
-	 */
-	zhp = zpool_open_canfail(g_zfshdl, pname);
-	if (zhp == NULL)
-		return (0);
-
-	config = zpool_get_config(zhp, NULL);
-	if (config == NULL) {
-		syseventd_print(9, "zfs_deliver_sync: "
-		    "failed to get pool config for %s\n", pname);
-		zpool_close(zhp);
-		return (-1);
-	}
-
-	if (nvlist_lookup_nvlist(config, ZPOOL_CONFIG_VDEV_TREE, &vdev) != 0) {
-		syseventd_print(0, "zfs_deliver_sync: "
-		    "failed to get vdev tree for %s\n", pname);
-		zpool_close(zhp);
-		return (-1);
-	}
-
-	libzfs_fru_refresh(g_zfshdl);
-
-	dd.dd_func = zfs_sync_vdev_fru;
-	zfs_iter_vdev(zhp, vdev, &dd);
-
-	zpool_close(zhp);
-	return (0);
-}
-
 int
 zfs_deliver_dle(nvlist_t *nvl)
 {
@@ -725,8 +622,7 @@ zfs_deliver_event(sysevent_t *ev, int unused)
 	const char *subclass = sysevent_get_subclass_name(ev);
 	nvlist_t *nvl;
 	int ret;
-	boolean_t is_lofi = B_FALSE, is_check = B_FALSE;
-	boolean_t is_dle = B_FALSE, is_sync = B_FALSE;
+	boolean_t is_lofi, is_check, is_dle = B_FALSE;
 
 	if (strcmp(class, EC_DEV_ADD) == 0) {
 		/*
@@ -741,26 +637,14 @@ zfs_deliver_event(sysevent_t *ev, int unused)
 			return (0);
 
 		is_check = B_FALSE;
-	} else if (strcmp(class, EC_ZFS) == 0) {
-		if (strcmp(subclass, ESC_ZFS_VDEV_CHECK) == 0) {
-			/*
-			 * This event signifies that a device failed to open
-			 * during pool load, but the 'autoreplace' property was
-			 * set, so we should pretend it's just been added.
-			 */
-			is_check = B_TRUE;
-		} else if ((strcmp(subclass, ESC_ZFS_VDEV_ADD) == 0) ||
-		    (strcmp(subclass, ESC_ZFS_VDEV_ATTACH) == 0) ||
-		    (strcmp(subclass, ESC_ZFS_VDEV_CLEAR) == 0) ||
-		    (strcmp(subclass, ESC_ZFS_VDEV_ONLINE) == 0) ||
-		    (strcmp(subclass, ESC_ZFS_POOL_CREATE) == 0) ||
-		    (strcmp(subclass, ESC_ZFS_POOL_IMPORT) == 0)) {
-			/*
-			 * When we receive these events we check the pool
-			 * configuration and update the vdev FRUs if necessary.
-			 */
-			is_sync = B_TRUE;
-		}
+	} else if (strcmp(class, EC_ZFS) == 0 &&
+	    strcmp(subclass, ESC_ZFS_VDEV_CHECK) == 0) {
+		/*
+		 * This event signifies that a device failed to open during pool
+		 * load, but the 'autoreplace' property was set, so we should
+		 * pretend it's just been added.
+		 */
+		is_check = B_TRUE;
 	} else if (strcmp(class, EC_DEV_STATUS) == 0 &&
 	    strcmp(subclass, ESC_DEV_DLE) == 0) {
 		is_dle = B_TRUE;
@@ -773,8 +657,6 @@ zfs_deliver_event(sysevent_t *ev, int unused)
 
 	if (is_dle)
 		ret = zfs_deliver_dle(nvl);
-	else if (is_sync)
-		ret = zfs_deliver_sync(nvl);
 	else if (is_check)
 		ret = zfs_deliver_check(nvl);
 	else
