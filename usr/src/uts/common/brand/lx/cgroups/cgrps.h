@@ -49,24 +49,20 @@ extern "C" {
 #define	CG_PSNSIZE	256	/* max size of pseudo file name entries */
 #define	CG_PSDSIZE	16	/* pretend that a dir entry takes 16 bytes */
 
+#define	CG_START_ID	0	/* initial node ID for allocation */
+
 /*
  * The order of these entries must be in sync with the cg_ssde_dir array.
  */
 typedef enum cgrp_ssid {
 	CG_SSID_GENERIC = 1,
-	CG_SSID_CPUSET,
-	CG_SSID_MEMORY,
-	CG_SSID_NUM		/* number of cgroup subsystem id types */
+	CG_SSID_NUM		/* last ssid for range checking */
 } cgrp_ssid_t;
 
 typedef enum cgrp_nodetype {
 	CG_CGROUP_DIR = 1,	/* cgroup directory entry */
-	CG_CLONE_CHILDREN,
 	CG_PROCS,
-	CG_CPUSET_CPUS,
-	CG_MEMORY_USAGE_IN_BYTES,
 	CG_TASKS,
-	CG_NFILES		/* number of cgroup file types */
 } cgrp_nodetype_t;
 
 typedef struct cgrp_subsys_dirent {
@@ -85,7 +81,7 @@ typedef struct cgrp_mnt {
 	char 		*cg_mntpath;	/* name of cgroup mount point */
 	cgrp_ssid_t	cg_ssid;	/* subsystem type */
 	dev_t		cg_dev;		/* unique dev # of mounted `device' */
-	uint_t		cg_gen;		/* pseudo generation number for files */
+	uint_t		cg_gen;		/* node ID source for files */
 	kmutex_t	cg_contents;	/* lock for cgrp_mnt structure */
 	kmutex_t	cg_renamelck;	/* rename lock for this mount */
 } cgrp_mnt_t;
@@ -105,16 +101,8 @@ typedef struct cgrp_mnt {
  *	cgn_forw and cgn_back which are used to maintain a linked
  *	list of all cgroup files associated with that file system
  *
- *	The anon array represents the secondary store for cgroups.
- * 	To grow or shrink the file or fill in holes requires
- *	manipulation of the anon array. These operations are protected
- *	by a combination of cgn_rwlock and cgn_contents. Growing or shrinking
- * 	the array requires the write lock on cgn_rwlock and cgn_contents.
- *	Filling in a slot in the array requires the write lock on cgn_contents.
- *	Reading the array requires the read lock on cgn_contents.
- *
  *	The ordering of the locking is:
- *	cg_rwlock -> cgn_contents -> page locks on pages in file
+ *	cg_rwlock -> cgn_contents
  *
  *	cgn_tlock doesn't require any cgrp_node locks
  */
@@ -123,10 +111,11 @@ typedef struct cgrp_node {
 	struct cgrp_node	*cgn_back;	/* lnked lst of cgrp_nodes */
 	struct cgrp_node	*cgn_forw;	/* lnked lst of cgrp_nodes */
 	struct cgrp_dirent	*cgn_dir;	/* dirent list */
+	struct cgrp_node	*cgn_parent;	/* dir containing this node */
 	uint_t			cgn_dirents;	/* number of dirents */
 	cgrp_nodetype_t		cgn_type;	/* type for this node */
 	struct vnode 		*cgn_vnode;	/* vnode for this cgrp_node */
-	int 			cgn_gen;	/* gen number for inode */
+	int 			cgn_id;		/* ID number for the cgroup */
 	struct vattr		cgn_attr;	/* attributes */
 	krwlock_t		cgn_contents;	/* serialize mods */
 	krwlock_t		cgn_rwlock;	/* rw - serialize */

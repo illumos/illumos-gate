@@ -432,9 +432,11 @@ lx_initlwp(klwp_t *lwp, void *lwpbd)
 	/*
 	 * If the parent LWP has a ptrace(2) tracer, the new LWP may
 	 * need to inherit that same tracer.
+	 * In addition the new LPW inherits the parent LWP cgroup ID.
 	 */
 	if (plwpd != NULL) {
 		lx_ptrace_inherit_tracer(plwpd, lwpd);
+		lwpd->br_cgroupid = plwpd->br_cgroupid;
 	}
 }
 

@@ -36,11 +36,21 @@
 #include <sys/cmn_err.h>
 #include <sys/buf.h>
 #include <sys/vm.h>
+#include <sys/prsystm.h>
 #include <sys/policy.h>
 #include <fs/fs_subr.h>
 #include <sys/sdt.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+#include <sys/brand.h>
+#include <sys/lx_brand.h>
 
 #include "cgrps.h"
+
+typedef enum cgrp_wr_type {
+	CG_WR_PROCS = 1,
+	CG_WR_TASKS
+} cgrp_wr_type_t;
 
 /* ARGSUSED1 */
 static int
@@ -52,6 +62,7 @@ cgrp_open(struct vnode **vpp, int flag, struct cred *cred, caller_context_t *ct)
 	 */
 	if ((*vpp)->v_flag & VISSWAP)
 		return (EINVAL);
+
 	return (0);
 }
 
@@ -66,8 +77,222 @@ cgrp_close(struct vnode *vp, int flag, int count, offset_t offset,
 }
 
 /*
- * cgrp_wr does the real work of write requests for cgroups.
+ * Lookup proc or task based on pid and typ.
  */
+static proc_t *
+cgrp_p_for_wr(pid_t pid, cgrp_wr_type_t typ)
+{
+	int i;
+	zoneid_t zoneid = curproc->p_zone->zone_id;
+	pid_t schedpid = curproc->p_zone->zone_zsched->p_pid;
+
+	ASSERT(MUTEX_HELD(&pidlock));
+
+	/* getting a proc from a pid is easy */
+	if (typ == CG_WR_PROCS)
+		return (prfind(pid));
+
+	ASSERT(typ == CG_WR_TASKS);
+
+	/*
+	 * We have to scan all of the process entries to find the proc
+	 * containing this task.
+	 */
+	mutex_exit(&pidlock);
+	for (i = 1; i < v.v_proc; i++) {
+		proc_t *p;
+		kthread_t *t;
+
+		mutex_enter(&pidlock);
+		/*
+		 * Skip indices for which there is no pid_entry, PIDs for
+		 * which there is no corresponding process, system processes,
+		 * a PID of 0, the pid for our zsched process, anything the
+		 * security policy doesn't allow us to look at, its not an
+		 * lx-branded process and processes that are not in the zone.
+		 */
+		if ((p = pid_entry(i)) == NULL ||
+		    p->p_stat == SIDL ||
+		    (p->p_flag & SSYS) != 0 ||
+		    p->p_pid == 0 ||
+		    p->p_pid == schedpid ||
+		    secpolicy_basic_procinfo(CRED(), p, curproc) != 0 ||
+		    p->p_brand != &lx_brand ||
+		    p->p_zone->zone_id != zoneid) {
+			mutex_exit(&pidlock);
+			continue;
+		}
+
+		mutex_enter(&p->p_lock);
+		if ((t = p->p_tlist) == NULL) {
+			/* no threads, skip it */
+			mutex_exit(&p->p_lock);
+			mutex_exit(&pidlock);
+			continue;
+		}
+
+		/*
+		 * Check all threads in this proc.
+		 */
+		do {
+			lx_lwp_data_t *plwpd = ttolxlwp(t);
+			if (plwpd != NULL && plwpd->br_pid == pid) {
+				mutex_exit(&p->p_lock);
+				return (p);
+			}
+
+			t = t->t_forw;
+		} while (t != p->p_tlist);
+
+		mutex_exit(&p->p_lock);
+		mutex_exit(&pidlock);
+	}
+
+	mutex_enter(&pidlock);
+	return (NULL);
+}
+
+/*
+ * Assign either all of the threads, or a single thread, for the specified pid
+ * to the new cgroup. Controlled by the typ argument.
+ */
+static int
+cgrp_proc_set_id(uint_t cg_id, pid_t pid, cgrp_wr_type_t typ)
+{
+	proc_t *p;
+	kthread_t *t;
+	int error;
+
+	if (pid == 1)
+		pid = curproc->p_zone->zone_proc_initpid;
+
+	mutex_enter(&pidlock);
+
+	p = cgrp_p_for_wr(pid, typ);
+	if (p == NULL) {
+		mutex_exit(&pidlock);
+		return (ESRCH);
+	}
+
+	/*
+	 * Fail writes for pids for which there is no corresponding process,
+	 * system processes, a pid of 0, the pid for our zsched process,
+	 * anything the security policy doesn't allow us to look at, and
+	 * processes that are not in the zone.
+	 */
+	if (p->p_stat == SIDL ||
+	    (p->p_flag & SSYS) != 0 ||
+	    p->p_pid == 0 ||
+	    p->p_pid == curproc->p_zone->zone_zsched->p_pid ||
+	    secpolicy_basic_procinfo(CRED(), p, curproc) != 0 ||
+	    p->p_zone->zone_id != curproc->p_zone->zone_id) {
+		mutex_exit(&pidlock);
+		return (ESRCH);
+	}
+
+	/*
+	 * Ignore writes for PID which is not an lx-branded process or with
+	 * no threads.
+	 */
+	mutex_enter(&p->p_lock);
+	if (p->p_brand != &lx_brand || (t = p->p_tlist) == NULL) {
+		mutex_exit(&p->p_lock);
+		mutex_exit(&pidlock);
+		return (0);
+	}
+
+	/*
+	 * Move one or all threads to this cgroup.
+	 */
+	if (typ == CG_WR_TASKS) {
+		error = ESRCH;
+	} else {
+		error = 0;
+	}
+
+	do {
+		lx_lwp_data_t *plwpd = ttolxlwp(t);
+		if (plwpd != NULL) {
+			if (typ == CG_WR_PROCS) {
+				plwpd->br_cgroupid = cg_id;
+			} else if (plwpd->br_pid == pid) {
+				/* type is CG_WR_TASKS and we found the task */
+				plwpd->br_cgroupid = cg_id;
+				error = 0;
+				break;
+			}
+		}
+		t = t->t_forw;
+	} while (t != p->p_tlist);
+
+	mutex_exit(&p->p_lock);
+	mutex_exit(&pidlock);
+
+	return (error);
+}
+
+/*
+ * User-level is writing a pid string. We need to get that string and convert
+ * it to a pid. The user-level code has to completely write an entire pid
+ * string at once. The user-level code could write multiple strings (delimited
+ * by newline) although that is frowned upon. However, we must handle this
+ * case too. Thus we consume the input one byte at a time until we get a whole
+ * pid string. We can't consume more than a byte at a time since otherwise we
+ * might be left with a partial pid string.
+ */
+static int
+cgrp_get_pid_str(struct uio *uio, pid_t *pid)
+{
+	char buf[16];	/* big enough for a pid string */
+	int i;
+	int error;
+	char *p = &buf[0];
+	char *ep;
+	long pidnum;
+
+	bzero(buf, sizeof (buf));
+	for (i = 0; uio->uio_resid > 0 && i < sizeof (buf); i++, p++) {
+		error = uiomove(p, 1, UIO_WRITE, uio);
+		if (error != 0)
+			return (error);
+		if (buf[i] == '\n') {
+			buf[i] = '\0';
+			break;
+		}
+	}
+
+	if (buf[0] == '\0' || i >= sizeof (buf)) /* no input or too long */
+		return (EINVAL);
+
+	error = ddi_strtol(buf, &ep, 10, &pidnum);
+	if (error != 0 || *ep != '\0' || pidnum > maxpid || pidnum < 0)
+		return (EINVAL);
+
+	*pid = (pid_t)pidnum;
+	return (0);
+}
+
+static int
+cgrp_wr_proc_or_task(cgrp_node_t *cn, struct uio *uio, cgrp_wr_type_t typ)
+{
+	/* the cgroup ID is on the containing dir */
+	uint_t cg_id = cn->cgn_parent->cgn_id;
+	int error;
+	pid_t pidnum;
+
+	while (uio->uio_resid > 0) {
+		error = cgrp_get_pid_str(uio, &pidnum);
+		if (error != 0)
+			return (error);
+
+		error = cgrp_proc_set_id(cg_id, pidnum, typ);
+		if (error != 0)
+			return (error);
+	}
+
+	return (0);
+}
+
 static int
 cgrp_wr(cgrp_mnt_t *cgm, cgrp_node_t *cn, struct uio *uio, struct cred *cr,
     caller_context_t *ct)
@@ -97,30 +322,349 @@ cgrp_wr(cgrp_mnt_t *cgm, cgrp_node_t *cn, struct uio *uio, struct cred *cr,
 	if (limit > MAXOFF_T)
 		limit = MAXOFF_T;
 
-	/* XXX implement pseudo file write for subsystem and type */
-	DTRACE_PROBE2(cgrp__wr, int, cgm->cg_ssid, int, cn->cgn_type);
-
-	/* pretend we wrote the whole thing */
-	uio->uio_offset += uio->uio_resid;
-	uio->uio_resid = 0;
+	switch (cn->cgn_type) {
+	case CG_PROCS:
+		error = cgrp_wr_proc_or_task(cn, uio, CG_WR_PROCS);
+		break;
+	case CG_TASKS:
+		error = cgrp_wr_proc_or_task(cn, uio, CG_WR_TASKS);
+		break;
+	default:
+		VERIFY(0);
+	}
 
 	return (error);
 }
 
 /*
- * cgrp_rd does the real work of read requests for cgroups.
+ * pidlock is held on entry but dropped on exit. Because we might have to drop
+ * locks and loop if the process is already P_PR_LOCKed, it is possible that
+ * the process might be gone when we return from this function.
  */
+static proc_t *
+cgrp_p_lock(proc_t *p)
+{
+	kmutex_t *mp;
+	pid_t pid;
+
+	ASSERT(MUTEX_HELD(&pidlock));
+
+	/* first try the fast path */
+	mutex_enter(&p->p_lock);
+	if (!(p->p_proc_flag & P_PR_LOCK)) {
+		p->p_proc_flag |= P_PR_LOCK;
+		mutex_exit(&p->p_lock);
+		mutex_exit(&pidlock);
+		THREAD_KPRI_REQUEST();
+		return (p);
+	}
+	mutex_exit(&p->p_lock);
+
+	pid = p->p_pid;
+	for (;;) {
+		/*
+		 * p_lock is persistent, but p itself is not -- it could
+		 * vanish during cv_wait().  Load p->p_lock now so we can
+		 * drop it after cv_wait() without referencing p.
+		 */
+		mp = &p->p_lock;
+		mutex_enter(mp);
+		mutex_exit(&pidlock);
+
+		if (p->p_flag & SEXITING) {
+			mutex_exit(mp);
+			return (NULL);
+		}
+
+		if (!(p->p_proc_flag & P_PR_LOCK))
+			break;
+
+		cv_wait(&pr_pid_cv[p->p_slot], mp);
+		mutex_exit(mp);
+
+		mutex_enter(&pidlock);
+		p = prfind(pid);
+		if (p == NULL || p->p_stat == SIDL) {
+			mutex_exit(&pidlock);
+			return (NULL);
+		}
+	}
+
+	p->p_proc_flag |= P_PR_LOCK;
+	mutex_exit(mp);
+	ASSERT(!MUTEX_HELD(&pidlock));
+	THREAD_KPRI_REQUEST();
+	return (p);
+}
+
+static void
+cgrp_p_unlock(proc_t *p)
+{
+	ASSERT(p->p_proc_flag & P_PR_LOCK);
+	ASSERT(MUTEX_HELD(&p->p_lock));
+	ASSERT(!MUTEX_HELD(&pidlock));
+
+	cv_signal(&pr_pid_cv[p->p_slot]);
+	p->p_proc_flag &= ~P_PR_LOCK;
+	mutex_exit(&p->p_lock);
+	THREAD_KPRI_RELEASE();
+}
+
+/*
+ * Read pids from the cgroup.procs pseudo file. We have to look at all of the
+ * processes to find applicable ones, then report pids for any process which
+ * has all of its threads in the same cgroup.
+ */
+static int
+cgrp_rd_procs(cgrp_mnt_t *cgm, cgrp_node_t *cn, struct uio *uio)
+{
+	int i;
+	ssize_t offset = 0;
+	ssize_t uresid;
+	zoneid_t zoneid = curproc->p_zone->zone_id;
+	int error = 0;
+	pid_t initpid = curproc->p_zone->zone_proc_initpid;
+	pid_t schedpid = curproc->p_zone->zone_zsched->p_pid;
+	/* the cgroup ID is on the containing dir */
+	uint_t cg_id = cn->cgn_parent->cgn_id;
+
+	/* Scan all of the process entries */
+	for (i = 1; i < v.v_proc && (uresid = uio->uio_resid) > 0; i++) {
+		proc_t *p;
+		int len;
+		pid_t pid;
+		char buf[16];
+		char *rdp;
+		kthread_t *t;
+		boolean_t in_cg;
+
+		mutex_enter(&pidlock);
+		/*
+		 * Skip indices for which there is no pid_entry, PIDs for
+		 * which there is no corresponding process, system processes,
+		 * a PID of 0, the pid for our zsched process,  anything the
+		 * security policy doesn't allow us to look at, its not an
+		 * lx-branded process and processes that are not in the zone.
+		 */
+		if ((p = pid_entry(i)) == NULL ||
+		    p->p_stat == SIDL ||
+		    (p->p_flag & SSYS) != 0 ||
+		    p->p_pid == 0 ||
+		    p->p_pid == schedpid ||
+		    secpolicy_basic_procinfo(CRED(), p, curproc) != 0 ||
+		    p->p_brand != &lx_brand ||
+		    p->p_zone->zone_id != zoneid) {
+			mutex_exit(&pidlock);
+			continue;
+		}
+
+		mutex_enter(&p->p_lock);
+		if ((t = p->p_tlist) == NULL) {
+			/* no threads, skip it */
+			mutex_exit(&p->p_lock);
+			mutex_exit(&pidlock);
+			continue;
+		}
+
+		/*
+		 * Check if all threads are in this cgroup.
+		 */
+		in_cg = B_TRUE;
+		do {
+			lx_lwp_data_t *plwpd = ttolxlwp(t);
+			if (plwpd == NULL || plwpd->br_cgroupid != cg_id) {
+				in_cg = B_FALSE;
+				break;
+			}
+
+			t = t->t_forw;
+		} while (t != p->p_tlist);
+
+		mutex_exit(&p->p_lock);
+		if (!in_cg) {
+			/*
+			 * This proc, or at least one of its threads, is not
+			 * in this cgroup.
+			 */
+			mutex_exit(&pidlock);
+			continue;
+		}
+
+		/*
+		 * Convert pid to the Linux default of 1 if we're the zone's
+		 * init process, otherwise use the value from the proc struct
+		 */
+		if (p->p_pid == initpid) {
+			pid = 1;
+		} else {
+			pid = p->p_pid;
+		}
+
+		mutex_exit(&pidlock);
+
+		/*
+		 * Generate pid line and write all or part of it if we're
+		 * in the right spot within the pseudo file.
+		 */
+		len = snprintf(buf, sizeof (buf), "%u\n", pid);
+		if ((offset + len) > uio->uio_offset) {
+			int diff = (int)(uio->uio_offset - offset);
+
+			ASSERT(diff < len);
+			offset += diff;
+			rdp = &buf[diff];
+			len -= diff;
+			if (len > uresid)
+				len = uresid;
+
+			error = uiomove(rdp, len, UIO_READ, uio);
+			if (error != 0)
+				return (error);
+		}
+		offset += len;
+	}
+
+	return (0);
+}
+
+/*
+ * We are given a locked process we know is valid, report on any of its thresds
+ * that are in the cgroup.
+ */
+static int
+cgrp_rd_proc_tasks(uint_t cg_id, proc_t *p, pid_t initpid, ssize_t *offset,
+    struct uio *uio)
+{
+	int error = 0;
+	uint_t tid;
+	char buf[16];
+	char *rdp;
+	kthread_t *t;
+
+	ASSERT(p->p_proc_flag & P_PR_LOCK);
+
+	/*
+	 * Report all threads in this cgroup.
+	 */
+	t = p->p_tlist;
+	do {
+		lx_lwp_data_t *plwpd = ttolxlwp(t);
+		if (plwpd == NULL) {
+			t = t->t_forw;
+			continue;
+		}
+
+		if (plwpd->br_cgroupid == cg_id) {
+			int len;
+
+			/*
+			 * Convert taskid to the Linux default of 1 if
+			 * we're the zone's init process.
+			 */
+			tid = plwpd->br_pid;
+			if (tid == initpid)
+				tid = 1;
+
+			len = snprintf(buf, sizeof (buf), "%u\n", tid);
+			if ((*offset + len) > uio->uio_offset) {
+				int diff;
+
+				diff = (int)(uio->uio_offset - *offset);
+				ASSERT(diff < len);
+				*offset = *offset + diff;
+				rdp = &buf[diff];
+				len -= diff;
+				if (len > uio->uio_resid)
+					len = uio->uio_resid;
+
+				error = uiomove(rdp, len, UIO_READ, uio);
+				if (error != 0)
+					return (error);
+			}
+			*offset = *offset + len;
+		}
+
+		t = t->t_forw;
+	} while (t != p->p_tlist && uio->uio_resid > 0);
+
+	return (0);
+}
+
+/*
+ * Read pids from the tasks pseudo file. We have to look at all of the
+ * processes to find applicable ones, then report pids for any thread in the
+ * cgroup. We return the emulated lx thread pid here, not the internal thread
+ * ID. Because we're possibly doing IO for each taskid we lock the process
+ * so that the threads don't change while we're working on it (although threads
+ * can change if we fill up the read buffer and come back later for a
+ * subsequent read).
+ */
+int
+cgrp_rd_tasks(cgrp_mnt_t *cgm, cgrp_node_t *cn, struct uio *uio)
+{
+	int i;
+	ssize_t offset = 0;
+	ssize_t uresid;
+	zoneid_t zoneid = curproc->p_zone->zone_id;
+	int error = 0;
+	pid_t initpid = curproc->p_zone->zone_proc_initpid;
+	pid_t schedpid = curproc->p_zone->zone_zsched->p_pid;
+	/* the cgroup ID is on the containing dir */
+	uint_t cg_id = cn->cgn_parent->cgn_id;
+
+	/* Scan all of the process entries */
+	for (i = 1; i < v.v_proc && (uresid = uio->uio_resid) > 0; i++) {
+		proc_t *p;
+
+		mutex_enter(&pidlock);
+		/*
+		 * Skip indices for which there is no pid_entry, PIDs for
+		 * which there is no corresponding process, system processes,
+		 * a PID of 0, the pid for our zsched process,  anything the
+		 * security policy doesn't allow us to look at, its not an
+		 * lx-branded process and processes that are not in the zone.
+		 */
+		if ((p = pid_entry(i)) == NULL ||
+		    p->p_stat == SIDL ||
+		    (p->p_flag & SSYS) != 0 ||
+		    p->p_pid == 0 ||
+		    p->p_pid == schedpid ||
+		    secpolicy_basic_procinfo(CRED(), p, curproc) != 0 ||
+		    p->p_brand != &lx_brand ||
+		    p->p_zone->zone_id != zoneid) {
+			mutex_exit(&pidlock);
+			continue;
+		}
+
+		if (p->p_tlist == NULL) {
+			/* no threads, skip it */
+			mutex_exit(&pidlock);
+			continue;
+		}
+
+		p = cgrp_p_lock(p);
+		ASSERT(!MUTEX_HELD(&pidlock));
+		if (p == NULL)
+			continue;
+
+		error = cgrp_rd_proc_tasks(cg_id, p, initpid, &offset, uio);
+
+		mutex_enter(&p->p_lock);
+		cgrp_p_unlock(p);
+
+		if (error != 0)
+			return (error);
+	}
+
+	return (0);
+}
+
 static int
 cgrp_rd(cgrp_mnt_t *cgm, cgrp_node_t *cn, struct uio *uio, caller_context_t *ct)
 {
-	struct vnode *vp;
 	int error = 0;
 
-	vp = CGNTOV(cn);
-
 	ASSERT(RW_LOCK_HELD(&cn->cgn_contents));
-
-	ASSERT(cn->cgn_type != CG_CGROUP_DIR);
 
 	if (uio->uio_loffset >= MAXOFF_T)
 		return (0);
@@ -129,8 +673,16 @@ cgrp_rd(cgrp_mnt_t *cgm, cgrp_node_t *cn, struct uio *uio, caller_context_t *ct)
 	if (uio->uio_resid == 0)
 		return (0);
 
-	/* XXX implement pseudo file read for subsystem and type */
-	DTRACE_PROBE2(cgrp__rd, int, cgm->cg_ssid, int, cn->cgn_type);
+	switch (cn->cgn_type) {
+	case CG_PROCS:
+		error = cgrp_rd_procs(cgm, cn, uio);
+		break;
+	case CG_TASKS:
+		error = cgrp_rd_tasks(cgm, cn, uio);
+		break;
+	default:
+		VERIFY(0);
+	}
 
 	return (error);
 }
