@@ -34,26 +34,7 @@ static int cgrp_dirmakecgnode(cgrp_node_t *, cgrp_mnt_t *, struct vattr *,
 	enum de_op, cgrp_node_t **, struct cred *);
 static int cgrp_diraddentry(cgrp_node_t *, cgrp_node_t *, char *, enum de_op);
 
-/*
- * XXX these subsystem pseudo files are temporary placeholders to stub out the
- * support for the file entries.
- */
-static cgrp_subsys_dirent_t cgrp_cpuset_dir[] = {
-	{ CG_CLONE_CHILDREN,	"cgroup.clone_children" },
-	{ CG_PROCS,		"cgroup.procs" },
-	{ CG_CPUSET_CPUS,	"cpuset.cpus" },
-	{ CG_TASKS,		"tasks" }
-};
-
-static cgrp_subsys_dirent_t cgrp_memory_dir[] = {
-	{ CG_CLONE_CHILDREN,	"cgroup.clone_children" },
-	{ CG_PROCS,		"cgroup.procs" },
-	{ CG_MEMORY_USAGE_IN_BYTES, "memory.usage_in_bytes" },
-	{ CG_TASKS,		"tasks" }
-};
-
 static cgrp_subsys_dirent_t cgrp_generic_dir[] = {
-	{ CG_CLONE_CHILDREN,	"cgroup.clone_children" },
 	{ CG_PROCS,		"cgroup.procs" },
 	{ CG_TASKS,		"tasks" }
 };
@@ -74,12 +55,6 @@ static cgrp_ssde_t cg_ssde_dir[] = {
 
 	/* CG_SSID_GENERIC */
 	{cgrp_generic_dir, CGDIRLISTSZ(cgrp_generic_dir)},
-
-	/* CG_SSID_CPUSET */
-	{cgrp_cpuset_dir, CGDIRLISTSZ(cgrp_cpuset_dir)},
-
-	/* CG_SSID_MEMORY */
-	{cgrp_memory_dir, CGDIRLISTSZ(cgrp_memory_dir)},
 };
 
 
@@ -605,16 +580,16 @@ cgrp_node_init(cgrp_mnt_t *cgm, cgrp_node_t *cn, vattr_t *vap, cred_t *cred)
 	vp->v_type = vap->va_type;
 	vp->v_rdev = vap->va_rdev;
 	vp->v_data = (caddr_t)cn;
+
 	mutex_enter(&cgm->cg_contents);
+
 	/*
-	 * Increment the pseudo generation number for this cgrp_node.
-	 * Since cgrp_nodes are allocated and freed, there really is no
-	 * particular generation number for a new cgrp_node.  Just fake it
-	 * by using a counter on each mount. We also use this value as the
-	 * directory nodeid (which is used to derive the inode) so each cgroup
-	 * in the tree will have a unique id (and inode).
+	 * Set the cgroup ID for this cgrp_node by using a counter on each
+	 * mount. We also use this value as the directory nodeid (which is used
+	 * to derive the inode) so each cgroup in the tree will have a unique
+	 * id (and inode).
 	 */
-	cn->cgn_nodeid = cn->cgn_gen = cgm->cg_gen++;
+	cn->cgn_nodeid = cn->cgn_id = cgm->cg_gen++;
 
 	/*
 	 * Add new cgrp_node to end of linked list of cgrp_nodes for this
@@ -792,6 +767,8 @@ cgrp_diraddentry(cgrp_node_t *dir, cgrp_node_t *cn, char *name, enum de_op op)
 	cdp = kmem_zalloc(alloc_size, KM_NOSLEEP | KM_NORMALPRI);
 	if (cdp == NULL)
 		return (ENOSPC);
+
+	cn->cgn_parent = dir;
 
 	dir->cgn_size += alloc_size;
 	dir->cgn_dirents++;

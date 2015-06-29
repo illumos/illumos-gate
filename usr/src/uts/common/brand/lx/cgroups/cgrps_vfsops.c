@@ -15,32 +15,51 @@
 
 /*
  * The cgroup file system implements a subset of the Linux cgroup functionality
- * for use by lx-branded zones. Cgroups are a generic process grouping
+ * for use by lx-branded zones. On Linux, cgroups are a generic process grouping
  * mechanism which is used to apply various behaviors to the processes within
  * the group, although it's primary purpose is for resource management.
  *
+ * In Linux, the cgroup file system provides two pieces of functionality:
+ * 1) A per-mount set of cgroups arranged in a tree, such that every task in
+ *    the system is in one, and only one, of the cgroups in the tree.
+ * 2) A set of subsystems; each subsystem has subsystem-specific state and
+ *    behavior and is associated with a cgroup mount. This provides a way to
+ *    apply arbitrary functionality (but generally resource management related)
+ *    to the processes associated with the nodes in the tree at that mount
+ *    point.
+ *
+ * For example, it is common to see cgroup trees (each is its own mount with a
+ * different subsystem controller) for blkio, cpuset, memory, systemd (has no
+ * controller), etc. Within each tree there is a top-level directory with at
+ * least a cgroup.procs and tasks file listing the processes within that group,
+ * although there could be subdirectories, which define new cgroups, that then
+ * contain a subset of the processes. Each subdirectory also has, at a minimum,
+ * a cgroup.procs and tasks file.
+ *
+ * Since we're using lx to run user-level code within zones, the majority (all?)
+ * of the cgroup resource management functionality simply doesn't apply to us.
+ * The primary need for cgroups is to support the init program 'systemd' as the
+ * consumer. systemd only requires the process grouping hierarchy of cgroups,
+ * although it can also use the resource management features if they are
+ * available. Given this, our cgroup file system only implements the process
+ * hierarchy and does not report that any resource management controllers are
+ * available for separate mounts.
+ *
  * This file system is similar to tmpfs in that directories only exist in
  * memory. Each subdirectory represents a different cgroup. Within the cgroup
- * there are pseudo files with well-defined names which control the
- * configuration and behavior of the cgroup. The primary file within a cgroup
- * is named 'tasks' and it is used to list which processes belong to the
- * cgroup. However, there can be additional files in the cgroup which define
- * additional behavior.
+ * there are pseudo files (see cg_ssde_dir) with well-defined names which
+ * control the configuration and behavior of the cgroup (see cgrp_nodetype_t).
+ * The primary files within every cgroup are named 'cgroup.procs' and 'tasks'.
+ * These are used to control and list which processes/threads belong to the
+ * cgroup. In the general case there can be additional files in the cgroup
+ * which define additional behavior, although none exists at this time.
  *
- * Linux defines a mounted instance of cgroups as a hierarchy:
- *
- * 1) A set of cgroups arranged in a tree, such that every task in the system
- *    is in exactly one of the cgroups in the hierarchy.
- * 2) A set of subsystems; each subsystem has system-specific state attached to
- *    each cgroup in the hierarchy.
- * 3) Each hierarchy has an instance of the cgroup virtual filesystem
- *    associated with it.
- *
- * For example, it is common to see cgroup mounts for systemd, cpuset, memory,
- * etc. Each of these mounts would be used for a different subsystem. Within
- * each mount there is at least one tasks file listing the processes within
- * that group although there could be subdirectories which define new cgroups
- * that contain a subset of the processes.
+ * Each cgroup node has a unique ID (cgn_nodeid) within the mount. This ID is
+ * used to correlate with the threads to determine cgroup membership. When
+ * assigning a PID to a cgroup (via write) the code updates the br_cgroupid
+ * member in the brand-specific lx_lwp_data structure to control which cgroup
+ * the thread belongs to. Note that because the br_cgroupid lives in
+ * lx_lwp_data, native processes will not appear in the cgroup hierarchy.
  *
  * An overview of the behavior for the various vnode operations is:
  * - no hardlinks or symlinks
@@ -52,12 +71,36 @@
  * - can mkdir and rmdir to create/destroy cgroups
  * - cannot rmdir while it contains a subdir (i.e. a sub-cgroup)
  * - open, read/write, close on the subsytem-specific pseudo files is
- *   allowed as this is the interface to configure and report on the cgroup.
+ *   allowed, as this is the interface to configure and report on the cgroup.
  *   The pseudo file's mode controls write access and cannot be changed.
+ *
+ * EXTENDING THE FILE SYSTEM
  *
  * When adding support for a new subsystem, be sure to also update the
  * lxpr_read_cgroups function in lx_procfs so that the subsystem is reported
  * by proc.
+ *
+ * Although we don't currently support any subsystem controllers, the design
+ * allows for the file system to be extended to add controller emulation
+ * if needed. New controller IDs (i.e. different subsystems) for a mount can
+ * be defined in the cgrp_ssid_t enum (e.g. CG_SSID_CPUSET or CG_SSID_MEMORY)
+ * and new node types for additional pseudo files in the tree can be defined in
+ * the cgrp_nodetype_t enum (e.g. CG_CPUSET_CPUS or CG_MEMORY_USAGE_IN_BYTES).
+ * The cg_ssde_dir array would need a new entry for the new subsystem to
+ * control which nodes are visible in a directory for the new subsystem.
+ *
+ * New emulation would then need to be written to manage the behavior on the
+ * new pseudo file(s) associated with new cgrp_nodetype_t types.
+ *
+ * Within lx procfs the lxpr_read_pid_cgroup() function would need to be
+ * updated so that it reported the various subsystems used by the different
+ * mounts.
+ *
+ * In addition, in order to support more than one cgroup mount we would need a
+ * list of cgroup IDs associated with every thread, instead of just one ID
+ * (br_cgroupid). The thread data would need to become a struct which held
+ * both an ID and an indication as to which mounted cgroup file system instance
+ * the ID was associated with.
  */
 
 #include <sys/types.h>
@@ -80,6 +123,7 @@
 #include <sys/systm.h>
 #include <sys/mntent.h>
 #include <sys/policy.h>
+#include <sys/lx_brand.h>
 
 #include "cgrps.h"
 
@@ -249,7 +293,6 @@ cgrp_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 	struct pathname dpn;
 	int error;
 	struct vattr rattr;
-	char *argstr;
 	cgrp_ssid_t ssid = CG_SSID_GENERIC;
 
 	if ((error = secpolicy_fs_mount(cr, mvp, vfsp)) != 0)
@@ -257,6 +300,13 @@ cgrp_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 
 	if (mvp->v_type != VDIR)
 		return (ENOTDIR);
+
+	/*
+	 * Since we depend on per-thread lx brand data, only allow mounting
+	 * within lx zones.
+	 */
+	if (curproc->p_zone->zone_brand != &lx_brand)
+		return (EINVAL);
 
 	/*
 	 * Ensure we don't allow overlaying mounts
@@ -281,24 +331,19 @@ cgrp_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 	}
 
 	/*
-	 * If provided set the subsystem.
-	 * XXX These subsystems are temporary placeholders to stub out the
-	 * concept of different cgroup subsystem mounts.
+	 * Here is where we could support subsystem-specific controller
+	 * mounting. For example, if mounting a cgroup fs with the 'cpuset'
+	 * option to specify that particular controller.
+	 *
+	 * char *argstr;
+	 * if (vfs_optionisset(vfsp, "cpuset", &argstr)) {
+	 *	if (ssid != CG_SSID_GENERIC) {
+	 *		error = EINVAL;
+	 *		goto out;
+	 *	}
+	 *	ssid = CG_SSID_CPUSET;
+	 * }
 	 */
-	if (vfs_optionisset(vfsp, "cpuset", &argstr)) {
-		if (ssid != CG_SSID_GENERIC) {
-			error = EINVAL;
-			goto out;
-		}
-		ssid = CG_SSID_CPUSET;
-	}
-	if (vfs_optionisset(vfsp, "memory", &argstr)) {
-		if (ssid != CG_SSID_GENERIC) {
-			error = EINVAL;
-			goto out;
-		}
-		ssid = CG_SSID_MEMORY;
-	}
 
 	error = pn_get(uap->dir,
 	    (uap->flags & MS_SYSSPACE) ? UIO_SYSSPACE : UIO_USERSPACE, &dpn);
@@ -312,7 +357,7 @@ cgrp_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 
 	cgm->cg_vfsp = vfsp;
 	cgm->cg_ssid = ssid;
-	cgm->cg_gen++;		/* start at 1 */
+	cgm->cg_gen = CG_START_ID;
 
 	vfsp->vfs_data = (caddr_t)cgm;
 	vfsp->vfs_fstype = cgrp_fstype;

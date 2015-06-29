@@ -610,6 +610,11 @@ struct lx_lwp_data {
 	 * Hold a pre-allocated lx_pid structure to be used during lx_initlwp.
 	 */
 	struct lx_pid *br_lpid;
+
+	/*
+	 * ID of the cgroup this thread belongs to.
+	 */
+	uint_t br_cgroupid;
 };
 
 /*
