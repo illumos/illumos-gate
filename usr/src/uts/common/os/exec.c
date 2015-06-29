@@ -303,25 +303,38 @@ exec_common(const char *fname, const char **argp, const char **envp,
 	if (brandme) {
 		void *brand_data = NULL;
 
-		brand_setbrand(p);
-		if (BROP(p)->b_lwpdata_alloc != NULL &&
-		    (brand_data = BROP(p)->b_lwpdata_alloc(p)) == NULL) {
+		/*
+		 * Process branding may fail if multiple LWPs are present and
+		 * holdlwps() cannot complete successfully.
+		 */
+		error = brand_setbrand(p, B_TRUE);
+
+		if (error == 0 && BROP(p)->b_lwpdata_alloc != NULL) {
+			brand_data = BROP(p)->b_lwpdata_alloc(p);
+			if (brand_data == NULL) {
+				error = 1;
+			}
+		}
+
+		if (error == 0) {
+			mutex_enter(&p->p_lock);
+			BROP(p)->b_initlwp(lwp, brand_data);
+			mutex_exit(&p->p_lock);
+		} else {
 			VN_RELE(vp);
-			if (dir != NULL)
+			if (dir != NULL) {
 				VN_RELE(dir);
+			}
 			pn_free(&resolvepn);
 			goto fail;
 		}
-		mutex_enter(&p->p_lock);
-		BROP(p)->b_initlwp(lwp, brand_data);
-		mutex_exit(&p->p_lock);
 	}
 
 	if ((error = gexec(&vp, &ua, &args, NULL, 0, &execsz,
 	    exec_file, p->p_cred, &brand_action)) != 0) {
 		if (brandme) {
 			BROP(p)->b_freelwp(lwp);
-			brand_clearbrand(p);
+			brand_clearbrand(p, B_TRUE);
 		}
 		VN_RELE(vp);
 		if (dir != NULL)
@@ -441,7 +454,7 @@ exec_common(const char *fname, const char **argp, const char **envp,
 	/* Unbrand ourself if necessary. */
 	if (PROC_IS_BRANDED(p) && (brand_action == EBA_NATIVE)) {
 		BROP(p)->b_freelwp(lwp);
-		brand_clearbrand(p);
+		brand_clearbrand(p, B_FALSE);
 	}
 
 	setregs(&args);

@@ -235,8 +235,8 @@ extern brand_t	*brand_register_zone(struct brand_attr *);
 extern brand_t	*brand_find_name(char *);
 extern void	brand_unregister_zone(brand_t *);
 extern int	brand_zone_count(brand_t *);
-extern void	brand_setbrand(proc_t *);
-extern void	brand_clearbrand(proc_t *);
+extern int	brand_setbrand(proc_t *, boolean_t);
+extern void	brand_clearbrand(proc_t *, boolean_t);
 
 /*
  * The following functions can be shared among kernel brand modules which

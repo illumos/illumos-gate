@@ -262,8 +262,22 @@ lx_freelwp(klwp_t *lwp)
 	struct lx_lwp_data *lwpd = lwptolxlwp(lwp);
 	proc_t *p = lwptoproc(lwp);
 
-	VERIFY(lwpd != NULL);
 	VERIFY(MUTEX_NOT_HELD(&p->p_lock));
+
+	if (lwpd == NULL) {
+		/*
+		 * There is one case where an LX branded process will possess
+		 * LWPs which lack their own brand data.  During the course of
+		 * executing native binary, the process will be preemptively
+		 * branded to allow hooks such as b_native_exec to function.
+		 * If that process possesses multiple LWPS, they will _not_ be
+		 * branded since they will exit if the exec succeeds.  It's
+		 * during this LWP exit that lx_freelwp would be called on an
+		 * unbranded LWP.  When that is the case, it is acceptable to
+		 * bypass the hook.
+		 */
+		return;
+	}
 
 	/*
 	 * It is possible for the lx_freelwp hook to be called without a prior

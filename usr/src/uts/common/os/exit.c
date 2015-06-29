@@ -1356,7 +1356,7 @@ freeproc(proc_t *p)
 
 	/* Clear any remaining brand data */
 	if (PROC_IS_BRANDED(p)) {
-		brand_clearbrand(p);
+		brand_clearbrand(p, B_FALSE);
 	}
 
 
