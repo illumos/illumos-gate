@@ -704,7 +704,7 @@ fork_fail(proc_t *cp)
 	if (PTOU(curproc)->u_cwd)
 		refstr_rele(PTOU(curproc)->u_cwd);
 	if (PROC_IS_BRANDED(cp)) {
-		brand_clearbrand(cp);
+		brand_clearbrand(cp, B_FALSE);
 	}
 }
 
@@ -1162,7 +1162,14 @@ getproc(proc_t **cpp, pid_t pid, uint_t flags)
 	mutex_exit(&pidlock);
 
 	if (PROC_IS_BRANDED(pp)) {
-		brand_setbrand(cp);
+		/*
+		 * The only reason why process branding should fail is when
+		 * the procedure is complicated by multiple LWPs on the scene.
+		 * With an LWP count of 0, this newly allocated process has no
+		 * reason to fail branding.
+		 */
+		VERIFY0(brand_setbrand(cp, B_FALSE));
+
 		BROP(pp)->b_copy_procdata(cp, pp);
 	}
 

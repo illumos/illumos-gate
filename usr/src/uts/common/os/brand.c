@@ -312,8 +312,8 @@ brand_unregister_zone(struct brand *bp)
 	mutex_exit(&brand_list_lock);
 }
 
-void
-brand_setbrand(proc_t *p)
+int
+brand_setbrand(proc_t *p, boolean_t lwps_ok)
 {
 	brand_t *bp = p->p_zone->zone_brand;
 	void *brand_data = NULL;
@@ -322,10 +322,48 @@ brand_setbrand(proc_t *p)
 	VERIFY(bp != NULL);
 
 	/*
-	 * We should only be called from exec() or getproc(), when we know the
-	 * process has 0 or 1 threads.
+	 * Process branding occurs during fork() and exec().  When it happens
+	 * during fork(), the LWP count will always be 0 since branding is
+	 * performed as part of getproc(), before LWPs have been associated.
+	 * The same is not true during exec(), where a multi-LWP process may
+	 * undergo branding just prior to gexec(). This is to ensure
+	 * exec-related brand hooks are available.  While it may seem
+	 * complicated to brand a multi-LWP process, the two possible outcomes
+	 * simplify things:
+	 *
+	 * 1. The exec() succeeds:  LWPs besides the caller will be killed and
+	 *    any further branding will occur in a single-LWP context.
+	 * 2. The exec() fails: The process will be promptly unbranded since
+	 *    the hooks are no longer needed.
+	 *
+	 * To prevent inconsistent brand state from being encountered during
+	 * the exec(), LWPs beyond the caller which are associated with this
+	 * process must be held temporarily.  They will be released either when
+	 * they are killed in the exec() success, or when the brand is cleared
+	 * after exec() failure.
 	 */
-	VERIFY((p->p_tlist == NULL) || (p->p_tlist == p->p_tlist->t_forw));
+	if (lwps_ok) {
+		/*
+		 * We've been called from a exec() context tolerating the
+		 * existence of multiple LWPs during branding is necessary.
+		 */
+		VERIFY(p == curproc);
+		VERIFY(p->p_tlist != NULL);
+
+		if (p->p_tlist != p->p_tlist->t_forw) {
+			/*
+			 * Multiple LWPs are present.  Hold all but the caller.
+			 */
+			if (!holdlwps(SHOLDFORK1)) {
+				return (-1);
+			}
+		}
+	} else {
+		/*
+		 * Processes branded during fork() should not have LWPs at all.
+		 */
+		VERIFY(p->p_tlist == NULL);
+	}
 
 	if (bp->b_data_size > 0) {
 		brand_data = kmem_zalloc(bp->b_data_size, KM_SLEEP);
@@ -338,10 +376,11 @@ brand_setbrand(proc_t *p)
 	ASSERT(PROC_IS_BRANDED(p));
 	BROP(p)->b_setbrand(p);
 	mutex_exit(&p->p_lock);
+	return (0);
 }
 
 void
-brand_clearbrand(proc_t *p)
+brand_clearbrand(proc_t *p, boolean_t lwps_ok)
 {
 	brand_t *bp = p->p_zone->zone_brand;
 	void *brand_data;
@@ -350,16 +389,30 @@ brand_clearbrand(proc_t *p)
 	VERIFY(bp != NULL);
 	VERIFY(PROC_IS_BRANDED(p));
 
-	/*
-	 * There cannot be more than one lwp associated with a process when
-	 * stripping the brand.
-	 */
-	VERIFY((p->p_tlist == NULL) || (p->p_tlist == p->p_tlist->t_forw));
-
 	mutex_enter(&p->p_lock);
 	p->p_brand = &native_brand;
 	brand_data = p->p_brand_data;
 	p->p_brand_data = NULL;
+
+	if (lwps_ok) {
+		VERIFY(p == curproc);
+		/*
+		 * A process with multiple LWPs is being de-branded after
+		 * failing an exec.  The other LWPs were held as part of the
+		 * procedure, so they must be resumed now.
+		 */
+		if (p->p_tlist != NULL && p->p_tlist != p->p_tlist->t_forw) {
+			continuelwps(p);
+		}
+	} else {
+		/*
+		 * While clearing the brand, it's ok for one LWP to be present.
+		 * This happens when a native binary is executed inside a
+		 * branded zone, since the brand will be removed during the
+		 * course of a successful exec.
+		 */
+		VERIFY(p->p_tlist == NULL || p->p_tlist == p->p_tlist->t_forw);
+	}
 	mutex_exit(&p->p_lock);
 
 	if (brand_data != NULL) {
