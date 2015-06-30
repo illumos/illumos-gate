@@ -66,7 +66,8 @@
 
 #define	LX_DEV_LOG			"/dev/log"
 #define	LX_DEV_LOG_REDIRECT		"/var/run/.dev_log_redirect"
-#define	LX_DEV_LOG_REDIRECT_LEN		18
+#define	LX_DEV_LOG_REDIRECT_LEN		18 /* len appended to /dev/log len */
+#define	LX_DEV_LOG_REDIRECT_TOT_LEN	26
 
 typedef enum {
 	lxa_none,
@@ -1174,6 +1175,19 @@ lx_getsockname(int sockfd, void *np, int *nlp)
 
 	if (getsockname(sockfd, name, &namelen) < 0)
 		return (-errno);
+
+	/*
+	 * See our other handling for LX_DEV_LOG_REDIRECT. We need to change
+	 * the name back to /dev/log since some code depends on that.
+	 */
+	if (namelen == (LX_DEV_LOG_REDIRECT_TOT_LEN + sizeof (ushort_t) + 1) &&
+	    namelen_orig >=
+	    (LX_DEV_LOG_REDIRECT_TOT_LEN + sizeof (ushort_t) + 1) &&
+	    strcmp(name->sa_data, LX_DEV_LOG_REDIRECT) == 0) {
+		/* we don't check len since we know /dev/log is shorter */
+		(void) strcpy(name->sa_data, LX_DEV_LOG);
+		namelen = strlen(LX_DEV_LOG) + sizeof (ushort_t) + 1;
+	}
 
 	/*
 	 * If the name that getsockname() wants to return is larger
