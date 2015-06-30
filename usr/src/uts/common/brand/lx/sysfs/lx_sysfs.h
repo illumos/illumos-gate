@@ -126,8 +126,7 @@ struct lxsys_node {
 	unsigned int		lxsys_instance;	/* instance ID node	*/
 	unsigned int		lxsys_endpoint;	/* endpoint ID node	*/
 	vnode_t			*lxsys_vnode;	/* vnode for the node	*/
-	vnode_t			*lxsys_parent;	/* parent directory	*/
-	vnode_t			*lxsys_realvp;	/* real vnode		*/
+	vnode_t			*lxsys_parentvp; /* parent directory	*/
 	lxsys_node_t		*lxsys_next;	/* next list entry	*/
 	timestruc_t		lxsys_time;	/* creation time	*/
 	mode_t			lxsys_mode;	/* file mode bits	*/
