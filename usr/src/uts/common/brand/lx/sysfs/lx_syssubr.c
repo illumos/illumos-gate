@@ -111,7 +111,7 @@ lxsys_parentinode(lxsys_node_t *lxsnp)
 	    lxsnp->lxsys_instance == LXSYS_INST_ROOT) {
 		return (lxsnp->lxsys_ino);
 	} else {
-		return (VTOLXS(lxsnp->lxsys_parent)->lxsys_ino);
+		return (VTOLXS(lxsnp->lxsys_parentvp)->lxsys_ino);
 	}
 }
 
@@ -141,8 +141,7 @@ lxsys_getnode(vnode_t *dp, lxsys_nodetype_t type, unsigned int instance,
 	lxsnp->lxsys_instance = instance;
 	lxsnp->lxsys_endpoint = endpoint;
 	lxsnp->lxsys_next = NULL;
-	lxsnp->lxsys_realvp = NULL;
-	lxsnp->lxsys_parent = dp;
+	lxsnp->lxsys_parentvp = dp;
 	VN_HOLD(dp);
 
 	lxsnp->lxsys_time = now;
@@ -178,7 +177,7 @@ lxsys_getnode_static(vnode_t *dp, unsigned int instance)
 	lnp = lxsm->lxsysm_node;
 	while (1) {
 		if (lnp->lxsys_instance == instance) {
-			VERIFY(lnp->lxsys_parent == dp);
+			VERIFY(lnp->lxsys_parentvp == dp);
 
 			VN_HOLD(lnp->lxsys_vnode);
 			mutex_exit(&lxsm->lxsysm_lock);
@@ -266,16 +265,10 @@ lxsys_freenode(lxsys_node_t *lxsnp)
 	}
 
 	/*
-	 * delete any association with realvp
-	 */
-	if (lxsnp->lxsys_realvp != NULL)
-		VN_RELE(lxsnp->lxsys_realvp);
-
-	/*
 	 * delete any association with parent vp
 	 */
-	if (lxsnp->lxsys_parent != NULL)
-		VN_RELE(lxsnp->lxsys_parent);
+	if (lxsnp->lxsys_parentvp != NULL)
+		VN_RELE(lxsnp->lxsys_parentvp);
 
 	/*
 	 * Release the lxsysnode.

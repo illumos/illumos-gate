@@ -65,7 +65,6 @@ static int lxsys_readdir(vnode_t *, uio_t *, cred_t *, int *,
     caller_context_t *, int);
 static int lxsys_readlink(vnode_t *, uio_t *, cred_t *, caller_context_t *);
 static int lxsys_cmp(vnode_t *, vnode_t *, caller_context_t *);
-static int lxsys_realvp(vnode_t *, vnode_t **, caller_context_t *);
 static int lxsys_sync(void);
 static void lxsys_inactive(vnode_t *, cred_t *, caller_context_t *);
 
@@ -97,7 +96,6 @@ const fs_operation_def_t lxsys_vnodeops_template[] = {
 	VOPNAME_SEEK,		{ .error = lxsys_sync },
 	VOPNAME_INACTIVE,	{ .vop_inactive = lxsys_inactive },
 	VOPNAME_CMP,		{ .vop_cmp = lxsys_cmp },
-	VOPNAME_REALVP,		{ .vop_realvp = lxsys_realvp },
 	NULL,			NULL
 };
 
@@ -246,39 +244,13 @@ static int (*lxsys_readlink_function[LXSYS_MAXTYPE])() = {
 static int
 lxsys_open(vnode_t **vpp, int flag, cred_t *cr, caller_context_t *ct)
 {
-	vnode_t		*vp = *vpp;
-	lxsys_node_t	*lxsnp = VTOLXS(vp);
-	vnode_t		*rvp;
-	int		error = 0;
-
 	/*
 	 * We only allow reading in this file system
 	 */
 	if (flag & FWRITE)
 		return (EROFS);
 
-	/*
-	 * If we are opening an underlying file only allow regular files,
-	 * reject the open for anything else.
-	 * Just do it if we are opening the current or root directory.
-	 */
-	if (lxsnp->lxsys_realvp != NULL) {
-		rvp = lxsnp->lxsys_realvp;
-
-		/*
-		 * Need to hold rvp since VOP_OPEN() may release it.
-		 */
-		VN_HOLD(rvp);
-		error = VOP_OPEN(&rvp, flag, cr, ct);
-		if (error) {
-			VN_RELE(rvp);
-		} else {
-			*vpp = rvp;
-			VN_RELE(vp);
-		}
-	}
-
-	return (error);
+	return (0);
 }
 
 
@@ -337,32 +309,6 @@ lxsys_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
     caller_context_t *ct)
 {
 	register lxsys_node_t *lxsnp = VTOLXS(vp);
-	int error;
-
-	/*
-	 * Return attributes of underlying vnode if ATTR_REAL
-	 *
-	 * but keep fd files with the symlink permissions
-	 */
-	if (lxsnp->lxsys_realvp != NULL && (flags & ATTR_REAL)) {
-		vnode_t *rvp = lxsnp->lxsys_realvp;
-
-		/*
-		 * limit attribute information to owner or root
-		 */
-		if ((error = VOP_ACCESS(rvp, 0, 0, cr, ct)) != 0) {
-			return (error);
-		}
-
-		/*
-		 * now its attributes
-		 */
-		if ((error = VOP_GETATTR(rvp, vap, flags, cr, ct)) != 0) {
-			return (error);
-		}
-
-		return (0);
-	}
 
 	/* Default attributes, that may be overridden below */
 	bzero(vap, sizeof (*vap));
@@ -393,13 +339,6 @@ lxsys_access(vnode_t *vp, int mode, int flags, cred_t *cr, caller_context_t *ct)
 	 * Although our lx sysfs is basically a read only file system, Linux
 	 * expects it to be writable so we can't just error if (mode & VWRITE).
 	 */
-
-	if (lxsnp->lxsys_realvp != NULL) {
-		/*
-		 * For these we use the underlying vnode's accessibility.
-		 */
-		return (VOP_ACCESS(lxsnp->lxsys_realvp, mode, flags, cr, ct));
-	}
 
 	/* If user is root allow access regardless of permission bits */
 	if (secpolicy_proc_access(cr) == 0)
@@ -451,8 +390,8 @@ lxsys_lookup(vnode_t *dp, char *comp, vnode_t **vpp, pathname_t *pathp,
 	 * Just return the parent vnode if that's where we are trying to go.
 	 */
 	if (strcmp(comp, "..") == 0) {
-		VN_HOLD(lxsnp->lxsys_parent);
-		*vpp = lxsnp->lxsys_parent;
+		VN_HOLD(lxsnp->lxsys_parentvp);
+		*vpp = lxsnp->lxsys_parentvp;
 		return (0);
 	}
 
@@ -1146,38 +1085,8 @@ lxsys_sync()
 static int
 lxsys_cmp(vnode_t *vp1, vnode_t *vp2, caller_context_t *ct)
 {
-	vnode_t *rvp;
-
-	while (vn_matchops(vp1, lxsys_vnodeops) &&
-	    (rvp = VTOLXS(vp1)->lxsys_realvp) != NULL) {
-		vp1 = rvp;
-	}
-
-	while (vn_matchops(vp2, lxsys_vnodeops) &&
-	    (rvp = VTOLXS(vp2)->lxsys_realvp) != NULL) {
-		vp2 = rvp;
-	}
-
 	if (vn_matchops(vp1, lxsys_vnodeops) ||
 	    vn_matchops(vp2, lxsys_vnodeops))
 		return (vp1 == vp2);
 	return (VOP_CMP(vp1, vp2, ct));
-}
-
-/*
- * lxsys_realvp(): Vnode operation for VOP_REALVP()
- */
-static int
-lxsys_realvp(vnode_t *vp, vnode_t **vpp, caller_context_t *ct)
-{
-	vnode_t *rvp;
-
-	if ((rvp = VTOLXS(vp)->lxsys_realvp) != NULL) {
-		vp = rvp;
-		if (VOP_REALVP(vp, &rvp, ct) == 0)
-			vp = rvp;
-	}
-
-	*vpp = vp;
-	return (0);
 }
