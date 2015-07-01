@@ -500,7 +500,10 @@ new-device
    \ block read that check for holes, gangs, compression, etc
    : read-bp  ( adr len bp -- )
       \ sparse block?
-      dup  blk_birth x0=  if
+      dup x@ x0=                         ( addr len bp flag0 )
+      swap dup 8 + x@ x0=                ( addr len flag0 bp flag1 )
+      rot                                ( addr len bp flag1 flag0 )
+      and if
          drop  erase  exit               (  )
       then
 
