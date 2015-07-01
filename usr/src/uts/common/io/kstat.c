@@ -106,14 +106,15 @@ read_kstat_data(int *rvalp, void *user_ksp, int flag)
 	/*
 	 * If it's a fixed-size kstat, allocate the buffer now, so we
 	 * don't have to do it under the kstat's data lock.  (If it's a
-	 * var-size kstat, we don't know the size until after the update
-	 * routine is called, so we can't do this optimization.)
+	 * var-size kstat or one with long strings, we don't know the size
+	 * until after the update routine is called, so we can't do this
+	 * optimization.)
 	 * The allocator relies on this behavior to prevent recursive
 	 * mutex_enter in its (fixed-size) kstat update routine.
 	 * It's a zalloc to prevent unintentional exposure of random
 	 * juicy morsels of (old) kernel data.
 	 */
-	if (!(ksp->ks_flags & KSTAT_FLAG_VAR_SIZE)) {
+	if (!(ksp->ks_flags & (KSTAT_FLAG_VAR_SIZE | KSTAT_FLAG_LONGSTRINGS))) {
 		kbufsize = ksp->ks_data_size;
 		kbuf = kmem_zalloc(kbufsize + 1, KM_NOSLEEP);
 		if (kbuf == NULL) {
@@ -178,6 +179,8 @@ read_kstat_data(int *rvalp, void *user_ksp, int flag)
 
 		if (ksp->ks_type == KSTAT_TYPE_NAMED) {
 			kstat_named_t *kn = kbuf;
+			char *strbuf = (char *)((kstat_named_t *)kn +
+			    ksp->ks_ndata);
 
 			for (i = 0; i < user_kstat.ks_ndata; kn++, i++)
 				switch (kn->data_type) {
@@ -202,6 +205,27 @@ read_kstat_data(int *rvalp, void *user_ksp, int flag)
 				case KSTAT_DATA_STRING:
 					if (KSTAT_NAMED_STR_PTR(kn) == NULL)
 						break;
+					/*
+					 * If the string lies outside of kbuf
+					 * copy it there and update the pointer.
+					 */
+					if (KSTAT_NAMED_STR_PTR(kn) <
+					    (char *)kbuf ||
+					    KSTAT_NAMED_STR_PTR(kn) +
+					    KSTAT_NAMED_STR_BUFLEN(kn) >
+					    (char *)kbuf + kbufsize + 1) {
+						bcopy(KSTAT_NAMED_STR_PTR(kn),
+						    strbuf,
+						    KSTAT_NAMED_STR_BUFLEN(kn));
+
+						KSTAT_NAMED_STR_PTR(kn) =
+						    strbuf;
+						strbuf +=
+						    KSTAT_NAMED_STR_BUFLEN(kn);
+						ASSERT(strbuf <=
+						    (char *)kbuf +
+						    kbufsize + 1);
+					}
 					/*
 					 * The offsets within the buffers are
 					 * the same, so add the offset to the
@@ -278,6 +302,8 @@ read_kstat_data(int *rvalp, void *user_ksp, int flag)
 	case DDI_MODEL_NONE:
 		if (ksp->ks_type == KSTAT_TYPE_NAMED) {
 			kstat_named_t *kn = kbuf;
+			char *strbuf = (char *)((kstat_named_t *)kn +
+			    ksp->ks_ndata);
 
 			for (i = 0; i < user_kstat.ks_ndata; kn++, i++)
 				switch (kn->data_type) {
@@ -294,6 +320,28 @@ read_kstat_data(int *rvalp, void *user_ksp, int flag)
 				case KSTAT_DATA_STRING:
 					if (KSTAT_NAMED_STR_PTR(kn) == NULL)
 						break;
+					/*
+					 * If the string lies outside of kbuf
+					 * copy it there and update the pointer.
+					 */
+					if (KSTAT_NAMED_STR_PTR(kn) <
+					    (char *)kbuf ||
+					    KSTAT_NAMED_STR_PTR(kn) +
+					    KSTAT_NAMED_STR_BUFLEN(kn) >
+					    (char *)kbuf + kbufsize + 1) {
+						bcopy(KSTAT_NAMED_STR_PTR(kn),
+						    strbuf,
+						    KSTAT_NAMED_STR_BUFLEN(kn));
+
+						KSTAT_NAMED_STR_PTR(kn) =
+						    strbuf;
+						strbuf +=
+						    KSTAT_NAMED_STR_BUFLEN(kn);
+						ASSERT(strbuf <=
+						    (char *)kbuf +
+						    kbufsize + 1);
+					}
+
 					KSTAT_NAMED_STR_PTR(kn) =
 					    (char *)user_kstat.ks_data +
 					    (KSTAT_NAMED_STR_PTR(kn) -

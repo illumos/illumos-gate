@@ -22,10 +22,8 @@
 /*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -127,7 +125,8 @@ kstat_read(kstat_ctl_t *kc, kstat_t *ksp, void *data)
 		 * resize your buffer and try again.  In practice,
 		 * this almost always converges in two passes.
 		 */
-		if (errno == ENOMEM && (ksp->ks_flags & KSTAT_FLAG_VAR_SIZE)) {
+		if (errno == ENOMEM && (ksp->ks_flags &
+		    (KSTAT_FLAG_VAR_SIZE | KSTAT_FLAG_LONGSTRINGS))) {
 			kstat_zalloc(&ksp->ks_data, ksp->ks_data_size, 1);
 			if (ksp->ks_data != NULL)
 				continue;
