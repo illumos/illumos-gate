@@ -154,6 +154,7 @@ fork13
 fork14
 ftruncate04
 ftruncate04_64
+futex_wake04		# OS-4471
 getdents02
 getdents02_64
 get_mempolicy01
