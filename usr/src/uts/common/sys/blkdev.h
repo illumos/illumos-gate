@@ -108,6 +108,8 @@ struct bd_drive {
 	char			*d_vendor;
 	size_t			d_product_len;
 	char			*d_product;
+	size_t			d_model_len;
+	char			*d_model;
 	size_t			d_serial_len;
 	char			*d_serial;
 	size_t			d_revision_len;
@@ -151,6 +153,34 @@ struct bd_ops {
 
 #define	BD_OPS_VERSION_0		0
 
+struct bd_errstats {
+	/* these are managed by blkdev itself */
+	kstat_named_t	bd_softerrs;
+	kstat_named_t	bd_harderrs;
+	kstat_named_t	bd_transerrs;
+	kstat_named_t	bd_model;
+	kstat_named_t	bd_vid;
+	kstat_named_t	bd_pid;
+	kstat_named_t	bd_revision;
+	kstat_named_t	bd_serial;
+	kstat_named_t	bd_capacity;
+
+	/* the following are updated on behalf of the HW driver */
+	kstat_named_t	bd_rq_media_err;
+	kstat_named_t	bd_rq_ntrdy_err;
+	kstat_named_t	bd_rq_nodev_err;
+	kstat_named_t	bd_rq_recov_err;
+	kstat_named_t	bd_rq_illrq_err;
+	kstat_named_t	bd_rq_pfa_err;
+};
+
+#define	BD_ERR_MEDIA	0
+#define	BD_ERR_NTRDY	1
+#define	BD_ERR_NODEV	2
+#define	BD_ERR_RECOV	3
+#define	BD_ERR_ILLRQ	4
+#define	BD_ERR_PFA	5
+
 /*
  * Note, one handler *per* address.  Drivers with multiple targets at
  * different addresses must use separate handles.
@@ -161,6 +191,7 @@ int		bd_attach_handle(dev_info_t *, bd_handle_t);
 int		bd_detach_handle(bd_handle_t);
 void		bd_state_change(bd_handle_t);
 void		bd_xfer_done(bd_xfer_t *, int);
+void		bd_error(bd_xfer_t *, int);
 void		bd_mod_init(struct dev_ops *);
 void		bd_mod_fini(struct dev_ops *);
 
