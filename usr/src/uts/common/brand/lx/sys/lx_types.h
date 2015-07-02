@@ -40,6 +40,10 @@ extern "C" {
 #define	INT_MAX		2147483647	/* max value of an "int" */
 #define	UINT_MAX	4294967295U	/* max value of an "unsigned int" */
 
+#ifndef LLONG_MAX
+#define	LLONG_MAX	9223372036854775807LL
+#endif
+
 #if defined(_LP64)
 #define	LONG_MAX	9223372036854775807L
 #define	ULONG_MAX	18446744073709551615UL
