@@ -801,8 +801,8 @@ new-device
 
    \ read meta object set from uber-block
    : get-mos  ( -- )
-      mos-dn  /dnode                  ( adr len )
-      uber-block ub_rootbp  read-bp
+      mos-dn uber-block ub_rootbp    ( adr bp )
+      dup bp-lsize swap read-bp
    ;
 
    : get-mos-dnode  ( obj# -- )
@@ -882,7 +882,7 @@ new-device
 
    \ get objset from dataset
    : get-objset  ( adr dn -- )
-      >dsl-ds ds_bp  /dnode swap  read-bp
+      >dsl-ds ds_bp  dup bp-lsize swap  read-bp
    ;
 
 
