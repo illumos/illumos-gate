@@ -851,7 +851,7 @@ lx_sysent_t lx_sysent32[] = {
 	{"signalfd",	NULL,			0,		3}, /* 321 */
 	{"timerfd_create", NULL,		0,		2}, /* 322 */
 	{"eventfd",	NULL,			0,		1}, /* 323 */
-	{"fallocate",	NULL,			NOSYS_NULL,	0}, /* 324 */
+	{"fallocate",	lx_fallocate,		0,		4}, /* 324 */
 	{"timerfd_settime", NULL,		0,		4}, /* 325 */
 	{"timerfd_gettime", NULL,		0,		2}, /* 326 */
 	{"signalfd4",	NULL,			0,		4}, /* 327 */
@@ -1179,7 +1179,7 @@ lx_sysent_t lx_sysent64[] = {
 	{"signalfd",	NULL,			0,		3}, /* 282 */
 	{"timerfd_create", NULL,		0,		2}, /* 283 */
 	{"eventfd",	NULL,			0,		1}, /* 284 */
-	{"fallocate",	NULL,			NOSYS_NULL,	0}, /* 285 */
+	{"fallocate",	lx_fallocate,		0,		4}, /* 285 */
 	{"timerfd_settime", NULL,		0,		4}, /* 286 */
 	{"timerfd_gettime", NULL,		0,		2}, /* 287 */
 	{"accept4",	NULL,			0,		4}, /* 288 */
