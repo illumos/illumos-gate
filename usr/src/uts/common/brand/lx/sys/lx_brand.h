@@ -419,6 +419,9 @@ typedef ulong_t lx_affmask_t[LX_AFF_ULONGS];
 /* Max. length of kernel version string */
 #define	LX_VERS_MAX	16
 
+/* Length of proc boot_id string */
+#define	LX_BOOTID_LEN	37
+
 /*
  * Flag values for uc_brand_data[0] in the ucontext_t:
  */
@@ -627,6 +630,7 @@ struct lx_lwp_data {
 typedef struct lx_zone_data {
 	char lxzd_kernel_version[LX_VERS_MAX];
 	ksocket_t lxzd_ioctl_sock;
+	char lxzd_bootid[LX_BOOTID_LEN];	/* procfs boot_id */
 } lx_zone_data_t;
 
 #define	BR_CPU_BOUND	0x0001
