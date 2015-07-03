@@ -19,15 +19,17 @@
 # CDDL HEADER END
 #
 #
+# Copyright 2015 Gary Mills
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 include  ../../Makefile.master
 
-PROTOCOL_DIR= $(ROOT)/usr/include/rpcsvc
+# Relative path to ensure path to header file is also relative
+HEAD_DIR= ../../head/rpcsvc
+UTS_DIR= ../../uts/common/rpcsvc
+RPC_DIR= ../../uts/common/rpc
 
 SUBDIRS=	$(MACH)
 $(BUILD64)SUBDIRS += $(MACH64)
@@ -81,32 +83,32 @@ clean clobber lint: $(SUBDIRS)
 #
 # Derived files
 #
-common/bootparam_prot_xdr.c: $(PROTOCOL_DIR)/bootparam_prot.x
-	$(RPCGEN) -c $(PROTOCOL_DIR)/bootparam_prot.x > $@
+common/bootparam_prot_xdr.c: $(HEAD_DIR)/bootparam_prot.x
+	$(RPCGEN) -c $(HEAD_DIR)/bootparam_prot.x > $@
 
-common/rstat_xdr.c: $(PROTOCOL_DIR)/rstat.x
-	$(RPCGEN) -c $(PROTOCOL_DIR)/rstat.x > $@
+common/rstat_xdr.c: $(HEAD_DIR)/rstat.x
+	$(RPCGEN) -c $(HEAD_DIR)/rstat.x > $@
 
-common/rusers_xdr.c: $(PROTOCOL_DIR)/rusers.x
-	$(RPCGEN) -c $(PROTOCOL_DIR)/rusers.x > $@
+common/rusers_xdr.c: $(HEAD_DIR)/rusers.x
+	$(RPCGEN) -c $(HEAD_DIR)/rusers.x > $@
 
-common/sm_inter_xdr.c: $(PROTOCOL_DIR)/sm_inter.x
-	$(RPCGEN) -c $(PROTOCOL_DIR)/sm_inter.x > $@
+common/sm_inter_xdr.c: $(UTS_DIR)/sm_inter.x
+	$(RPCGEN) -c $(UTS_DIR)/sm_inter.x > $@
 
-common/spray_xdr.c: $(PROTOCOL_DIR)/spray.x
-	$(RPCGEN) -c $(PROTOCOL_DIR)/spray.x > $@
+common/spray_xdr.c: $(HEAD_DIR)/spray.x
+	$(RPCGEN) -c $(HEAD_DIR)/spray.x > $@
 
-common/nlm_prot.c: $(PROTOCOL_DIR)/nlm_prot.x
-	$(RPCGEN) -c $(PROTOCOL_DIR)/nlm_prot.x > $@
+common/nlm_prot.c: $(UTS_DIR)/nlm_prot.x
+	$(RPCGEN) -c $(UTS_DIR)/nlm_prot.x > $@
 
-common/mount_xdr.c: $(PROTOCOL_DIR)/mount.x
-	$(RPCGEN) -c $(PROTOCOL_DIR)/mount.x > $@
+common/mount_xdr.c: $(HEAD_DIR)/mount.x
+	$(RPCGEN) -c $(HEAD_DIR)/mount.x > $@
 
-common/nsm_addr_xdr.c: $(PROTOCOL_DIR)/nsm_addr.x
-	$(RPCGEN) -c $(PROTOCOL_DIR)/nsm_addr.x > $@
+common/nsm_addr_xdr.c: $(UTS_DIR)/nsm_addr.x
+	$(RPCGEN) -c $(UTS_DIR)/nsm_addr.x > $@
 
-common/rpc_sztypes.c: $(PROTOCOL_DIR)/rpc_sztypes.x
-	$(RPCGEN) -c $(PROTOCOL_DIR)/rpc_sztypes.x > $@
+common/rpc_sztypes.c: $(RPC_DIR)/rpc_sztypes.x
+	$(RPCGEN) -c $(RPC_DIR)/rpc_sztypes.x > $@
 
 # include library targets
 include ../Makefile.targ

@@ -1,0 +1,82 @@
+<?xml version='1.0'?>
+<!DOCTYPE service_bundle SYSTEM '/usr/share/lib/xml/dtd/service_bundle.dtd.1'>
+<!--
+
+This file and its contents are supplied under the terms of the
+Common Development and Distribution License ("CDDL"), version 1.0.
+You may only use this file in accordance with the terms of version
+of the CDDL.
+
+A full copy of the text of the CDDL should have accompanied this
+source.  A copy of the CDDL is also available via the Internet at
+http://www.illumos.org/license/CDDL.
+
+Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+
+NOTE:  This service manifest is not editable; its contents will
+be overwritten by package or patch operations, including
+operating system upgrade.
+
+-->
+
+<service_bundle type='manifest' name='network:tftp'>
+
+<service
+	name='network/tftp/udp6'
+	type='service'
+	version='1'>
+
+	<create_default_instance enabled='false'/>
+
+	<restarter>
+		<service_fmri value='svc:/network/inetd:default' />
+	</restarter>
+
+	<exec_method
+		type='method'
+		name='inetd_start'
+		exec='/usr/sbin/in.tftpd -s /tftpboot'
+		timeout_seconds='0'>
+		<method_context>
+			<method_credential user='root' group='root' />
+		</method_context>
+	</exec_method>
+
+	<exec_method
+		type='method'
+		name='inetd_disable'
+		exec=':kill'
+		timeout_seconds='0'>
+	</exec_method>
+
+	<exec_method
+		type='method'
+		name='inetd_offline'
+		exec=':kill_process'
+		timeout_seconds='0'>
+	</exec_method>
+
+	<property_group name='inetd' type='framework'>
+		<propval name='name' type='astring' value='tftp' />
+		<propval name='endpoint_type' type='astring' value='dgram' />
+		<propval name='proto' type='astring' value='udp6' />
+		<propval name='wait' type='boolean' value='true' />
+		<propval name='isrpc' type='boolean' value='false' />
+	</property_group>
+
+	<stability value='External' />
+
+	<template>
+		<common_name>
+			<loctext xml:lang='C'>
+			TFTP server
+			</loctext>
+		</common_name>
+		<documentation>
+                        <manpage title='in.tftpd' section='1M'
+				manpath='/usr/share/man' />
+                </documentation>
+	</template>
+</service>
+
+</service_bundle>
