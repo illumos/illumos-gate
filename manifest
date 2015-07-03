@@ -1553,6 +1553,7 @@ f lib/svc/manifest/network/smb/client.xml 0444 root sys
 f lib/svc/manifest/network/smb/server.xml 0444 root sys
 f lib/svc/manifest/network/smtp-sendmail.xml 0444 root sys
 f lib/svc/manifest/network/ssh.xml 0444 root sys
+f lib/svc/manifest/network/tftp-udp6.xml 0444 root sys
 f lib/svc/manifest/network/time.xml 0444 root sys
 f lib/svc/manifest/network/varpd.xml 0444 root sys
 f lib/svc/manifest/network/vrrp.xml 0444 root sys

@@ -19,6 +19,7 @@
 # CDDL HEADER END
 #
 #
+# Copyright 2015 Gary Mills
 # Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 #
@@ -48,7 +49,8 @@ LDLIBS +=	-lc -lavl -lnsl -lnvpair -luutil
 SRCDIR =	../common
 $(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
 
-IDMAP_PROT_X =		$(SRC)/uts/common/rpcsvc/idmap_prot.x
+# Relative path to ensure path to idmap_prot.h is also relative
+IDMAP_PROT_X =		../../../uts/common/rpcsvc/idmap_prot.x
 
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-D_REENTRANT -I$(SRCDIR)
