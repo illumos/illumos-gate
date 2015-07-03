@@ -99,6 +99,7 @@ extern long lx_setresuid();
 extern long lx_setresuid16();
 extern long lx_setrlimit();
 extern long lx_socketcall();
+extern long lx_syncfs();
 extern long lx_sysinfo32();
 extern long lx_sysinfo64();
 extern long lx_tgkill();

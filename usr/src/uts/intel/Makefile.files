@@ -315,6 +315,7 @@ LX_BRAND_OBJS  =		\
 	lx_sched.o		\
 	lx_signum.o		\
 	lx_socket.o		\
+	lx_sync.o		\
 	lx_syscall.o		\
 	lx_sysinfo.o		\
 	lx_thread_area.o	\

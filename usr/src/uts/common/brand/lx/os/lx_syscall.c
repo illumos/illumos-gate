@@ -871,7 +871,7 @@ lx_sysent_t lx_sysent32[] = {
 	{"name_to_handle_at", NULL,		NOSYS_NULL,	0}, /* 341 */
 	{"open_by_handle_at", NULL,		NOSYS_NULL,	0}, /* 342 */
 	{"clock_adjtime", NULL,			NOSYS_NULL,	0}, /* 343 */
-	{"syncfs",	NULL,			NOSYS_NULL,	0}, /* 344 */
+	{"syncfs",	lx_syncfs,		0,		1}, /* 344 */
 	{"sendmmsg",	NULL,			NOSYS_NULL,	0}, /* 345 */
 	{"setns",	NULL,			NOSYS_NULL,	0}, /* 346 */
 	{"process_vm_readv", NULL,		NOSYS_NULL,	0}, /* 347 */
@@ -1200,7 +1200,7 @@ lx_sysent_t lx_sysent64[] = {
 	{"name_to_handle_at", NULL,		NOSYS_NULL,	0}, /* 303 */
 	{"open_by_handle_at", NULL,		NOSYS_NULL,	0}, /* 304 */
 	{"clock_adjtime", NULL,			NOSYS_NULL,	0}, /* 305 */
-	{"syncfs",	NULL,			NOSYS_NULL,	0}, /* 306 */
+	{"syncfs",	lx_syncfs,		0,		1}, /* 306 */
 	{"sendmmsg",	NULL,			NOSYS_NULL,	0}, /* 307 */
 	{"setns",	NULL,			NOSYS_NULL,	0}, /* 309 */
 	{"getcpu",	lx_getcpu,		0,		3}, /* 309 */
