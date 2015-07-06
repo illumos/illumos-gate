@@ -189,8 +189,6 @@ x open01	need PRIV_SYS_CONFIG to set sticky bit on reg file
 # open10	setgid on sgid subdir behavior
 x open11	makes device
 # ppoll01
-# prctl01	get/set deathsig    
-# prctl02	more deathsig
 # process_vm_readv01
 # process_vm_readv02
 # process_vm_readv03

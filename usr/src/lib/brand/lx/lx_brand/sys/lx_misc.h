@@ -103,19 +103,6 @@ extern pid_t zoneinit_pid;
 #define	LX_RUSAGE_THREAD	1
 
 /*
- * Constants for prctl().  We only include the ones here that we actually
- * support; everything else will be ENOSYS.
- */
-#define	LX_PR_GET_DUMPABLE	3
-#define	LX_PR_SET_DUMPABLE	4
-#define	LX_PR_SET_KEEPCAPS	8
-#define	LX_PR_SET_NAME		15
-#define	LX_PR_GET_SECUREBITS	27
-#define	LX_PR_SET_SECUREBITS	28
-
-#define	LX_PR_SET_NAME_NAMELEN	16
-
-/*
  * Based on code from brand_misc.h, but use of that is incompatible with the
  * lx brand.
  *

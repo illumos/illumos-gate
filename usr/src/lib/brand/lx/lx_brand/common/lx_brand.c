@@ -1071,7 +1071,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/* 154: modify_ldt */
 	NULL,				/* 155: pivot_root */
 	lx_sysctl,			/* 156: sysctl */
-	lx_prctl,			/* 157: prctl */
+	NULL,				/* 157: prctl */
 	NULL,				/* 158: arch_prctl */
 	lx_adjtimex,			/* 159: adjtimex */
 	NULL,				/* 160: setrlimit */
@@ -1417,7 +1417,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/* 169: nfsservctl */
 	NULL,				/* 170: setresgid16 */
 	lx_getresgid16,			/* 171: getresgid16 */
-	lx_prctl,			/* 172: prctl */
+	NULL,				/* 172: prctl */
 	lx_rt_sigreturn,		/* 173: rt_sigreturn */
 	lx_rt_sigaction,		/* 174: rt_sigaction */
 	lx_rt_sigprocmask,		/* 175: rt_sigprocmask */

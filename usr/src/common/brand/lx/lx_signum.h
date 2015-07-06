@@ -75,6 +75,7 @@ extern const int ltos_signo[];
 extern const int stol_signo[];
 
 extern int lx_stol_signo(int, int);
+extern int lx_ltos_signo(int, int);
 extern int lx_stol_status(int, int);
 extern int lx_stol_sigcode(int);
 

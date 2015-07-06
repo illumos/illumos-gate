@@ -271,6 +271,28 @@ lx_stol_signo(int signo, int defsig)
 	return (rval);
 }
 
+
+/*
+ * Convert a Linux signal number to an illumos signal number and return it.
+ * Error behavior is identical to lx_stol_signo.
+ */
+int
+lx_ltos_signo(int signo, int defsig)
+{
+#ifdef	_KERNEL
+	VERIFY3S(defsig, >=, 0);
+#endif
+
+	if (signo < 1 || signo >= NSIG) {
+#ifndef	_KERNEL
+		VERIFY3S(defsig, >=, 0);
+#endif
+		return (defsig);
+	}
+
+	return (ltos_signo[signo]);
+}
+
 /*
  * Convert the "status" field of a SIGCLD siginfo_t.  We need to extract the
  * illumos signal number and convert it to a Linux signal number while leaving
