@@ -371,8 +371,11 @@ typedef lx_elf_data32_t lx_elf_data_t;
 #endif
 
 typedef enum lx_proc_flags {
-	LX_PROC_INSTALL_MODE = 0x01,
-	LX_PROC_STRICT_MODE = 0x02
+	/* flags configurable via brandsys() and members of LX_PROC_ALL */
+	LX_PROC_INSTALL_MODE	= 0x01,
+	LX_PROC_STRICT_MODE	= 0x02,
+	/* internal flags */
+	LX_PROC_CHILD_DEATHSIG	= 0x04
 } lx_proc_flags_t;
 
 #define	LX_PROC_ALL	(LX_PROC_INSTALL_MODE | LX_PROC_STRICT_MODE)
@@ -398,8 +401,10 @@ typedef struct lx_proc_data {
 	pid_t l_ppid;		/* pid of originating parent proc */
 	uint64_t l_ptrace;	/* process being observed with ptrace */
 	lx_elf_data_t l_elf_data; /* ELF data for linux executable */
-	int l_signal;		/* signal to deliver to parent when this */
-				/* thread group dies */
+	/* signal to deliver to parent when this thread group dies */
+	int l_signal;
+	/* native signal to deliver to process when parent dies */
+	int l_parent_deathsig;
 	lx_proc_flags_t l_flags;
 
 	lx_rlimit64_t l_fake_limits[LX_RLFAKE_NLIMITS];

@@ -177,8 +177,6 @@ open10
 perf_event_open01
 perf_event_open02
 ppoll01
-prctl01
-prctl02
 process_vm_readv01
 process_vm_readv02
 process_vm_readv03

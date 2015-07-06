@@ -310,8 +310,31 @@ static struct modlinkage modlinkage = {
 void
 lx_proc_exit(proc_t *p)
 {
-	VERIFY(p->p_brand == &lx_brand);
-	VERIFY(p->p_brand_data != NULL);
+	lx_proc_data_t *lxpd;
+	proc_t *cp;
+
+	mutex_enter(&p->p_lock);
+	VERIFY(lxpd = ptolxproc(p));
+	if ((lxpd->l_flags & LX_PROC_CHILD_DEATHSIG) == 0) {
+		mutex_exit(&p->p_lock);
+		return;
+	}
+	mutex_exit(&p->p_lock);
+
+	/* Check for children which desire notification of parental death. */
+	mutex_enter(&pidlock);
+	for (cp = p->p_child; cp != NULL; cp = cp->p_sibling) {
+		mutex_enter(&cp->p_lock);
+		if ((lxpd = ptolxproc(cp)) == NULL) {
+			mutex_exit(&cp->p_lock);
+			continue;
+		}
+		if (lxpd->l_parent_deathsig != 0) {
+			sigtoproc(p, NULL, lxpd->l_parent_deathsig);
+		}
+		mutex_exit(&cp->p_lock);
+	}
+	mutex_exit(&pidlock);
 }
 
 void
@@ -879,7 +902,7 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 		    (void *)&lx_brand, (void *)reg.lxbr_handler, (void *)p);
 		pd = p->p_brand_data;
 		pd->l_handler = (uintptr_t)reg.lxbr_handler;
-		pd->l_flags = reg.lxbr_flags;
+		pd->l_flags = reg.lxbr_flags & LX_PROC_ALL;
 
 		return (0);
 
