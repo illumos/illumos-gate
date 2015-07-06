@@ -25,6 +25,10 @@
  */
 
 /*
+ * Copyright (c) 2015, Joyent, Inc. All rights reserved.
+ */
+
+/*
  * Dump an elf file.
  */
 #include	<stddef.h>
@@ -4747,6 +4751,7 @@ shdr_cache(const char *file, Elf *elf, Ehdr *ehdr, size_t shstrndx,
 		 * final bytes.
 		 */
 		if ((_cache->c_shdr->sh_type == SHT_STRTAB) &&
+		    (_cache->c_data != NULL) &&
 		    (_cache->c_data->d_buf != NULL) &&
 		    (_cache->c_data->d_size > 0)) {
 			const char *s = _cache->c_data->d_buf;
