@@ -851,7 +851,7 @@ lx_sysent_t lx_sysent32[] = {
 	{"signalfd",	NULL,			0,		3}, /* 321 */
 	{"timerfd_create", NULL,		0,		2}, /* 322 */
 	{"eventfd",	NULL,			0,		1}, /* 323 */
-	{"fallocate",	lx_fallocate,		0,		4}, /* 324 */
+	{"fallocate",	lx_fallocate32,		LX_SYS_EBPARG6,	6}, /* 324 */
 	{"timerfd_settime", NULL,		0,		4}, /* 325 */
 	{"timerfd_gettime", NULL,		0,		2}, /* 326 */
 	{"signalfd4",	NULL,			0,		4}, /* 327 */

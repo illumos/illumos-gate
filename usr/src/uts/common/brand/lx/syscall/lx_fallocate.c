@@ -225,3 +225,24 @@ done:
 
 	return (0);
 }
+
+long
+lx_fallocate32(int fd, int mode, uint32_t offl, uint32_t offh, uint32_t lenl,
+    uint32_t lenh)
+{
+	int64_t offset = 0, len = 0;
+
+	/*
+	 * From 32-bit callers, Linux passes the 64-bit offset and len by
+	 * concatenating consecutive arguments. We must perform the same
+	 * conversion here.
+	 */
+	offset = offh;
+	offset = offset << 32;
+	offset |= offl;
+	len = lenh;
+	len = len << 32;
+	len |= lenl;
+
+	return (lx_fallocate(fd, mode, (off_t)offset, (off_t)len));
+}

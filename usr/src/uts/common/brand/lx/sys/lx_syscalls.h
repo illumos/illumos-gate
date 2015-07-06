@@ -44,6 +44,7 @@ extern long lx_clock_gettime();
 extern long lx_clock_settime();
 extern long lx_connect();
 extern long lx_fallocate();
+extern long lx_fallocate32();
 extern long lx_fchmod();
 extern long lx_fchmodat();
 extern long lx_fchown();
