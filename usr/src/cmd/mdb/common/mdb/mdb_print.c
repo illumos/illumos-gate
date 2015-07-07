@@ -25,7 +25,7 @@
 
 /*
  * Copyright (c) 2012, 2014 by Delphix. All rights reserved.
- * Copyright (c) 2012 Joyent, Inc. All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  * Copyright (c) 2014 Nexenta Systems, Inc. All rights reserved.
  */
 
@@ -3109,6 +3109,7 @@ cmd_printf(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	}
 
 	mdb_printf("%s", last);
+	mdb_set_dot(addr + mdb_ctf_type_size(id));
 
 	return (DCMD_OK);
 }
