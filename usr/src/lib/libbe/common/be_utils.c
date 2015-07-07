@@ -25,6 +25,7 @@
 
 /*
  * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2015 Toomas Soome <tsoome@me.com>
  */
 
 
@@ -57,6 +58,7 @@
 
 #include <libbe.h>
 #include <libbe_priv.h>
+#include <boot_utils.h>
 
 /* Private function prototypes */
 static int update_dataset(char *, int, char *, char *, char *);
@@ -2976,6 +2978,33 @@ be_get_default_isa(void)
 }
 
 /*
+ * Function: be_get_platform
+ * Description:
+ *      Returns the platfom name
+ * Parameters:
+ *		none
+ * Returns:
+ *		NULL - the platform name returned by sysinfo() was too
+ *			long for local variables
+ *		char * - pointer to a string containing the platform name
+ * Scope:
+ *		Semi-private (library wide use only)
+ */
+char *
+be_get_platform(void)
+{
+	int	i;
+	static char	default_inst[ARCH_LENGTH] = "";
+
+	if (default_inst[0] == '\0') {
+		i = sysinfo(SI_PLATFORM, default_inst, ARCH_LENGTH);
+		if (i < 0 || i > ARCH_LENGTH)
+			return (NULL);
+	}
+	return (default_inst);
+}
+
+/*
  * Function: be_run_cmd
  * Description:
  *	Runs a command in a separate subprocess.  Splits out stdout from stderr
@@ -3087,7 +3116,11 @@ be_run_cmd(char *command, char *stderr_buf, int stderr_bufsize,
 		rval = BE_ERR_EXTCMD;
 	} else if (WIFEXITED(exit_status)) {
 		exit_status = (int)((char)WEXITSTATUS(exit_status));
-		if (exit_status != 0) {
+		/*
+		 * error code BC_NOUPDT means more recent version
+		 * is installed
+		 */
+		if (exit_status != BC_SUCCESS && exit_status != BC_NOUPDT) {
 			(void) snprintf(oneline, BUFSIZ, gettext("be_run_cmd: "
 			    "command terminated with error status: %d\n"),
 			    exit_status);
