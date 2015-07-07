@@ -115,7 +115,7 @@ lx_prctl(int opt, uintptr_t data)
 	}
 
 	case LX_PR_SET_NAME: {
-		char name[LX_PR_SET_NAME_NAMELEN];
+		char name[LX_PR_SET_NAME_NAMELEN + 1];
 		proc_t *p = curproc;
 		/*
 		 * In Linux, PR_SET_NAME sets the name of the thread, not the
@@ -133,10 +133,10 @@ lx_prctl(int opt, uintptr_t data)
 		if (copyin((void *)data, name, LX_PR_SET_NAME_NAMELEN) != 0) {
 			return (set_errno(EFAULT));
 		}
-		name[LX_PR_SET_NAME_NAMELEN - 1] = '\0';
+		name[LX_PR_SET_NAME_NAMELEN] = '\0';
 		mutex_enter(&p->p_lock);
-		(void) strncpy(name, p->p_user.u_comm, MAXCOMLEN);
-		(void) strncpy(name, p->p_user.u_psargs, PSARGSZ);
+		(void) strncpy(p->p_user.u_comm, name, MAXCOMLEN + 1);
+		(void) strncpy(p->p_user.u_psargs, name, PSARGSZ);
 		mutex_exit(&p->p_lock);
 		return (0);
 	}
