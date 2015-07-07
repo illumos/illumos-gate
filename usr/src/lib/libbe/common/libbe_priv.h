@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
- * Copyright 2015 Toomas Soome <tsoome@me.com>
+ * Copyright 2016 Toomas Soome <tsoome@me.com>
  * Copyright (c) 2015 by Delphix. All rights reserved.
  */
 
@@ -61,6 +61,8 @@ extern "C" {
 #define	BE_GRUB_STAGE_1		"/boot/grub/stage1"
 #define	BE_GRUB_STAGE_2		"/boot/grub/stage2"
 #define	BE_INSTALL_BOOT		"/usr/sbin/installboot"
+#define	BE_LOADER_STAGE_1	"/boot/pmbr"
+#define	BE_LOADER_STAGE_2	"/boot/gptzfsboot"
 #define	BE_SPARC_BOOTBLK	"/lib/fs/zfs/bootblk"
 
 #define	ZFS_CLOSE(_zhp) \
