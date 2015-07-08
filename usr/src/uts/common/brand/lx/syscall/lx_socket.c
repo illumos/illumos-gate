@@ -38,6 +38,7 @@
 #include <sys/un.h>
 #include <sys/sunddi.h>
 #include <sys/cred.h>
+#include <sys/ucred.h>
 #include <sys/model.h>
 #include <sys/brand.h>
 #include <sys/vmsystm.h>
@@ -47,9 +48,14 @@
 
 #include <sys/lx_brand.h>
 #include <sys/lx_socket.h>
+#include <sys/lx_types.h>
 #include <sys/lx_impl.h>
 
-
+typedef struct lx_ucred {
+	pid_t		lxu_pid;
+	lx_uid_t	lxu_uid;
+	lx_gid_t	lxu_gid;
+} lx_ucred_t;
 
 typedef struct lx_socket_aux_data
 {
@@ -503,19 +509,28 @@ stol_sockaddr_copyout(struct sockaddr *inaddr, socklen_t inlen,
 	return (0);
 }
 
-
-typedef struct {
+typedef struct lx_cmsg_xlate {
 	int lcx_sunos_level;
 	int lcx_sunos_type;
+	int (*lcx_stol_conv)(struct cmsghdr *, struct cmsghdr *);
 	int lcx_linux_level;
 	int lcx_linux_type;
+	int (*lcx_ltos_conv)(struct cmsghdr *, struct cmsghdr *);
 } lx_cmsg_xlate_t;
 
+static int cmsg_conv_generic(struct cmsghdr *, struct cmsghdr *);
+static int stol_conv_ucred(struct cmsghdr *, struct cmsghdr *);
+static int ltos_conv_ucred(struct cmsghdr *, struct cmsghdr *);
+
 static lx_cmsg_xlate_t lx_cmsg_xlate_tbl[] = {
-	{ SOL_SOCKET, SCM_RIGHTS, LX_SOL_SOCKET, LX_SCM_RIGHTS },
-	{ SOL_SOCKET, SCM_UCRED, LX_SOL_SOCKET, LX_SCM_CRED },
-	{ SOL_SOCKET, SCM_TIMESTAMP, LX_SOL_SOCKET, LX_SCM_TIMESTAMP },
-	{ IPPROTO_IPV6, IPV6_PKTINFO, LX_IPPROTO_IPV6, LX_IPV6_PKTINFO }
+	{ SOL_SOCKET, SCM_RIGHTS, cmsg_conv_generic,
+	    LX_SOL_SOCKET, LX_SCM_RIGHTS, cmsg_conv_generic },
+	{ SOL_SOCKET, SCM_UCRED, stol_conv_ucred,
+	    LX_SOL_SOCKET, LX_SCM_CRED, ltos_conv_ucred },
+	{ SOL_SOCKET, SCM_TIMESTAMP, cmsg_conv_generic,
+	    LX_SOL_SOCKET, LX_SCM_TIMESTAMP, cmsg_conv_generic },
+	{ IPPROTO_IPV6, IPV6_PKTINFO, cmsg_conv_generic,
+	    LX_IPPROTO_IPV6, LX_IPV6_PKTINFO, cmsg_conv_generic }
 };
 
 #define	LX_MAX_CMSG_XLATE	\
@@ -556,10 +571,87 @@ typedef struct {
 
 #endif /* defined(_LP64) */
 
+/*
+ * convert ucred_s to lx_ucred.
+ */
+static int
+stol_conv_ucred(struct cmsghdr *inmsg, struct cmsghdr *omsg)
+{
+	int len;
+
+	len = sizeof (struct cmsghdr) + sizeof (lx_ucred_t);
+
+	/*
+	 * Format the data correctly in the omsg buffer.
+	 */
+	if (omsg != NULL) {
+		struct ucred_s *scred = (struct ucred_s *)CMSG_CONTENT(inmsg);
+		prcred_t *cr;
+		lx_ucred_t lcred;
+
+		lcred.lxu_pid = scred->uc_pid;
+		cr = UCCRED(scred);
+		if (cr != NULL) {
+			lcred.lxu_uid = cr->pr_euid;
+			lcred.lxu_gid = cr->pr_egid;
+		} else {
+			lcred.lxu_uid = lcred.lxu_gid = 0;
+		}
+
+		bcopy(&lcred, CMSG_CONTENT(omsg), sizeof (lx_ucred_t));
+	}
+
+	return (len);
+}
+
+static int
+ltos_conv_ucred(struct cmsghdr *inmsg, struct cmsghdr *omsg)
+{
+	int len;
+	size_t data_len;
+
+	data_len = sizeof (struct ucred_s) + sizeof (prcred_t);
+
+	len = sizeof (struct cmsghdr) + data_len;
+
+	if (omsg != NULL) {
+		struct ucred_s *uc;
+		prcred_t *pc;
+		lx_ucred_t *lcred;
+
+		uc = (struct ucred_s *)CMSG_CONTENT(omsg);
+		pc = (prcred_t *)((char *)uc + sizeof (struct ucred_s));
+
+		uc->uc_credoff = sizeof (struct ucred_s);
+
+		lcred = (lx_ucred_t *)CMSG_CONTENT(inmsg);
+
+		uc->uc_pid = lcred->lxu_pid;
+		pc->pr_euid = lcred->lxu_uid;
+		pc->pr_egid = lcred->lxu_gid;
+	}
+
+	return (len);
+}
+
+static int
+cmsg_conv_generic(struct cmsghdr *inmsg, struct cmsghdr *omsg)
+{
+	if (omsg != NULL) {
+		size_t data_len;
+
+		data_len = inmsg->cmsg_len - sizeof (struct cmsghdr);
+		bcopy(CMSG_CONTENT(inmsg), CMSG_CONTENT(omsg), data_len);
+	}
+
+	return (inmsg->cmsg_len);
+}
+
 static int
 lx_xlate_cmsg(struct cmsghdr *inmsg, struct cmsghdr *omsg, lx_xlate_dir_t dir)
 {
 	int i;
+	int len;
 
 	VERIFY(dir == SUNOS_TO_LX || dir == LX_TO_SUNOS);
 
@@ -567,22 +659,26 @@ lx_xlate_cmsg(struct cmsghdr *inmsg, struct cmsghdr *omsg, lx_xlate_dir_t dir)
 		lx_cmsg_xlate_t *xlate = &lx_cmsg_xlate_tbl[i];
 		if (dir == LX_TO_SUNOS &&
 		    inmsg->cmsg_level == xlate->lcx_linux_level &&
-		    inmsg->cmsg_type == xlate->lcx_linux_level) {
+		    inmsg->cmsg_type == xlate->lcx_linux_type) {
+			ASSERT(xlate->lcx_ltos_conv != NULL);
+			len = xlate->lcx_ltos_conv(inmsg, omsg);
 			if (omsg != NULL) {
-				bcopy(inmsg, omsg, inmsg->cmsg_len);
+				omsg->cmsg_len = len;
 				omsg->cmsg_level = xlate->lcx_sunos_level;
 				omsg->cmsg_type = xlate->lcx_sunos_type;
 			}
-			return (inmsg->cmsg_len);
+			return (len);
 		} else if (dir == SUNOS_TO_LX &&
 		    inmsg->cmsg_level == xlate->lcx_sunos_level &&
 		    inmsg->cmsg_type == xlate->lcx_sunos_type) {
+			ASSERT(xlate->lcx_stol_conv != NULL);
+			len = xlate->lcx_stol_conv(inmsg, omsg);
 			if (omsg != NULL) {
-				bcopy(inmsg, omsg, inmsg->cmsg_len);
+				omsg->cmsg_len = len;
 				omsg->cmsg_level = xlate->lcx_linux_level;
 				omsg->cmsg_type = xlate->lcx_linux_type;
 			}
-			return (inmsg->cmsg_len);
+			return (len);
 		}
 	}
 	/*
@@ -599,6 +695,7 @@ ltos_cmsgs_copyin(void *addr, socklen_t inlen, void **outmsg,
 {
 	void *inbuf, *obuf;
 	struct cmsghdr *inmsg, *omsg;
+	int slen = 0;
 
 	if (inlen < sizeof (struct cmsghdr) || inlen > SO_MAXARGSIZE) {
 		return (EINVAL);
@@ -621,8 +718,8 @@ ltos_cmsgs_copyin(void *addr, socklen_t inlen, void **outmsg,
 #if defined(_LP64)
 	if (get_udatamodel() == DATAMODEL_NATIVE) {
 		/*
-		 * Linux cmsgs are longer than illumos under x86_64.
-		 * Convert to reguar cmsgs first.
+		 * Linux cmsg headers are longer than illumos under x86_64.
+		 * Convert to regular cmsgs first.
 		 */
 		lx_cmsghdr64_t *lmsg;
 		struct cmsghdr *smsg;
@@ -669,23 +766,37 @@ ltos_cmsgs_copyin(void *addr, socklen_t inlen, void **outmsg,
 	}
 #endif /* defined(_LP64) */
 
-	obuf = kmem_zalloc(inlen, KM_SLEEP);
+	/*
+	 * Now determine how much space we need for the conversion.
+	 */
+	for (inmsg = (struct cmsghdr *)inbuf;
+	    CMSG_VALID(inmsg, inbuf, (uintptr_t)inbuf + inlen) != 0;
+	    inmsg = CMSG_NEXT(inmsg)) {
+		int sz;
+
+		if ((sz = lx_xlate_cmsg(inmsg, NULL, LX_TO_SUNOS)) < 0) {
+			/* unsupported msg */
+			kmem_free(inbuf, inlen);
+			return (-sz);
+		}
+
+		slen += ROUNDUP_cmsglen(sz);
+	}
+
+	obuf = kmem_zalloc(slen, KM_SLEEP);
+
+	/*
+	 * Now do the conversion.
+	 */
 	for (inmsg = (struct cmsghdr *)inbuf, omsg = (struct cmsghdr *)obuf;
 	    CMSG_VALID(inmsg, inbuf, (uintptr_t)inbuf + inlen) != 0;
 	    inmsg = CMSG_NEXT(inmsg), omsg = CMSG_NEXT(omsg)) {
-		int res;
-
-		if ((res = lx_xlate_cmsg(inmsg, omsg, LX_TO_SUNOS)) < 0) {
-			/* unsupported msg */
-			kmem_free(obuf, inlen);
-			kmem_free(inbuf, inlen);
-			return (-res);
-		}
+		VERIFY(lx_xlate_cmsg(inmsg, omsg, LX_TO_SUNOS) >= 0);
 	}
 
 	kmem_free(inbuf, inlen);
 	*outmsg = obuf;
-	*outlenp = inlen;
+	*outlenp = slen;
 	return (0);
 }
 
@@ -696,6 +807,7 @@ stol_cmsgs_copyout(void *input, socklen_t inlen, void *addr,
 	void *obuf;
 	struct cmsghdr *inmsg, *omsg;
 	int error = 0, count = 0;
+	socklen_t lx_len = 0;
 
 	if (inlen == 0) {
 		/* Simply output the zero controllen */
@@ -705,37 +817,68 @@ stol_cmsgs_copyout(void *input, socklen_t inlen, void *addr,
 	VERIFY(inlen > sizeof (struct cmsghdr));
 
 	/*
-	 * Since cmsgs are often padded to an aligned size, kmem_zalloc is
-	 * necessary to prevent leaking the contents of uninitialized memory.
+	 * First determine how much space we need for the conversion and
+	 * make sure the caller has provided at least that much space to return
+	 * results.
 	 */
-	obuf = kmem_zalloc(inlen, KM_SLEEP);
-	for (inmsg = (struct cmsghdr *)input, omsg = (struct cmsghdr *)obuf;
+	for (inmsg = (struct cmsghdr *)input;
 	    CMSG_VALID(inmsg, input, (uintptr_t)input + inlen) != 0;
-	    inmsg = CMSG_NEXT(inmsg), omsg = CMSG_NEXT(omsg)) {
-		int res;
+	    inmsg = CMSG_NEXT(inmsg)) {
+		int sz;
 
-		if ((res = lx_xlate_cmsg(inmsg, omsg, SUNOS_TO_LX)) < 0) {
+		if ((sz = lx_xlate_cmsg(inmsg, NULL, SUNOS_TO_LX)) < 0) {
 			/* unsupported msg */
-			kmem_free(obuf, inlen);
-			return (-res);
+			return (-sz);
 		}
-		/* maintain a count of outgoing messages */
 		count++;
+		lx_len += sz;
 	}
 
 #if defined(_LP64)
 	if (get_udatamodel() == DATAMODEL_NATIVE) {
-		/* Linux cmsgs are longer than illumos under x86_64. */
+		/*
+		 * Account for the extra header space needed here so we can
+		 * fail out now if the orig_outlen is too short.
+		 */
+
+		lx_len += count * LX_CMSG64_DIFF;
+	}
+#endif /* defined(_LP64) */
+
+	if (lx_len > orig_outlen || addr == NULL) {
+		/* This will be interpreted by the caller */
+		error = EMSGSIZE;
+		lx_len = 0;
+		goto finish;
+	}
+
+	/*
+	 * Since cmsgs are often padded to an aligned size, kmem_zalloc is
+	 * necessary to prevent leaking the contents of uninitialized memory.
+	 */
+	obuf = kmem_zalloc(lx_len, KM_SLEEP);
+
+	/*
+	 * Convert the msgs.
+	 */
+	for (inmsg = (struct cmsghdr *)input, omsg = (struct cmsghdr *)obuf;
+	    CMSG_VALID(inmsg, input, (uintptr_t)input + inlen) != 0;
+	    inmsg = CMSG_NEXT(inmsg), omsg = CMSG_NEXT(omsg)) {
+		VERIFY(lx_xlate_cmsg(inmsg, omsg, SUNOS_TO_LX) >= 0);
+	}
+
+#if defined(_LP64)
+	if (get_udatamodel() == DATAMODEL_NATIVE) {
+		/* Linux cmsg headers are longer than illumos under x86_64. */
 		struct cmsghdr *smsg;
 		lx_cmsghdr64_t *lmsg;
 		void *newbuf;
-		int len = inlen + (count * LX_CMSG64_DIFF);
 
 		/*
 		 * Once again, kmem_zalloc is needed to avoid leaking the
 		 * contents of uninialized memory
 		 */
-		newbuf = kmem_zalloc(len, KM_SLEEP);
+		newbuf = kmem_zalloc(lx_len, KM_SLEEP);
 		for (smsg = (struct cmsghdr *)obuf,
 		    lmsg = (lx_cmsghdr64_t *)newbuf;
 		    CMSG_VALID(smsg, obuf, (uintptr_t)obuf + inlen) != 0;
@@ -745,34 +888,26 @@ stol_cmsgs_copyout(void *input, socklen_t inlen, void *addr,
 			lmsg->cmsg_len = smsg->cmsg_len + LX_CMSG64_DIFF;
 
 			ASSERT(LX_CMSG64_VALID(lmsg, newbuf,
-			    (uintptr_t)newbuf + len) != 0);
+			    (uintptr_t)newbuf + lx_len) != 0);
 
 			bcopy(CMSG_CONTENT(smsg), LX_CMSG64_DATA(lmsg),
 			    smsg->cmsg_len - sizeof (*smsg));
 		}
 
-		kmem_free(obuf, inlen);
+		kmem_free(obuf, lx_len);
 		obuf = newbuf;
-		inlen = len;
 	}
 #endif /* defined(_LP64) */
 
-	if (inlen > orig_outlen || addr == NULL) {
-		kmem_free(obuf, inlen);
-		/* This will be interpreted by the caller */
-		error = EMSGSIZE;
-		inlen = 0;
-		goto finish;
-	}
-
-	if (copyout(obuf, addr, inlen) != 0) {
-		kmem_free(obuf, inlen);
+	if (copyout(obuf, addr, lx_len) != 0) {
+		kmem_free(obuf, lx_len);
 		return (EFAULT);
 	}
-	kmem_free(obuf, inlen);
+	kmem_free(obuf, lx_len);
 
 finish:
-	if (outlenp != NULL && copyout(&inlen, outlenp, sizeof (inlen)) != 0) {
+	if (outlenp != NULL &&
+	    copyout(&lx_len, outlenp, sizeof (lx_len)) != 0) {
 		return (EFAULT);
 	}
 	return (error);
