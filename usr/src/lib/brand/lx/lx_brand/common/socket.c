@@ -1454,6 +1454,21 @@ lx_setsockopt(int sockfd, int level, int optname, void *optval, int optlen)
 		if (optname == LX_SO_BSDCOMPAT)
 			return (0);
 
+		if (optname == LX_SO_TIMESTAMP) {
+			struct sockaddr nm;
+			socklen_t nmlen = sizeof (nm);
+
+			/*
+			 * SO_TIMESTAMP is not supported on AF_UNIX sockets
+			 * but we have some of those which apps use for
+			 * logging, etc., so pretend this worked.
+			 */
+			if (getsockname(sockfd, &nm, &nmlen) == 0 &&
+			    nm.sa_family == AF_UNIX) {
+				return (0);
+			}
+		}
+
 		/* Convert bpf program struct */
 		if (optname == LX_SO_ATTACH_FILTER) {
 			struct lx_bpf_program *lbp;
