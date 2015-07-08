@@ -63,6 +63,8 @@ typedef struct {
 #define	LX_CAP_VERSION_2	0x20071026	/* deprecated by Linux */
 #define	LX_CAP_VERSION_3	0x20080522
 
+#define	LX_CAP_SETPCAP	8
+
 /*
  * Even though we lack mappings for capabilities higher than 36, it's valuable
  * to test all the way out to the end of the second field.  This ensures that
@@ -216,10 +218,24 @@ lx_cap_update_priv(priv_set_t *priv, const uint32_t cap[])
 		cap_set = LX_CAP_CAPISSET(i, cap);
 		if (lx_cap_mapping[i] == NULL || i > LX_CAP_MAX_VALID) {
 			/* don't allow setting unsupported caps */
-			if (cap_set)
+			if (cap_set) {
+				/*
+				 * CAP_SETPCAP is a special capability, with
+				 * varying behavior, that can be used to
+				 * control if the process can change other
+				 * process's capabilities, or to control moving
+				 * capabilities between sets. For now we ignore
+				 * this if its passed in.
+				 */
+				if (i == LX_CAP_SETPCAP) {
+					continue;
+				}
+				lx_unsupported("set unsupported capability %d",
+				    i);
 				return (-1);
-			else
+			} else {
 				continue;
+			}
 		}
 		for (j = 0; lx_cap_mapping[i][j] != NULL; j++) {
 			priv_set = priv_ismember(priv, lx_cap_mapping[i][j]);
