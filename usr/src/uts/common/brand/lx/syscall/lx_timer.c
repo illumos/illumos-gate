@@ -23,6 +23,10 @@
  * Fortunately, most of the commonly used Linux clock types are either similar
  * enough to the native clock backends that they can be directly mapped, or
  * represent queries to the per-process and per-LWP microstate counters.
+ *
+ * CLOCK_BOOTTIME is identical to CLOCK_MONOTONIC, except that it takes into
+ * account time that the system is suspended. Since that is uninteresting to
+ * us, we treat it the same.
  */
 
 #include <sys/time.h>
@@ -79,7 +83,8 @@ static lx_clock_backend_t lx_clock_backends[] = {
 	EMUL(CLOCK_THREAD_CPUTIME_ID),	/* LX_CLOCK_THREAD_CPUTIME_ID */
 	NATIVE(CLOCK_HIGHRES),		/* LX_CLOCK_MONOTONIC_RAW */
 	NATIVE(CLOCK_REALTIME),		/* LX_CLOCK_REALTIME_COARSE */
-	NATIVE(CLOCK_HIGHRES)		/* LX_CLOCK_MONOTONIC_COARSE */
+	NATIVE(CLOCK_HIGHRES),		/* LX_CLOCK_MONOTONIC_COARSE */
+	NATIVE(CLOCK_HIGHRES)		/* LX_CLOCK_BOOTTIME */
 };
 
 #define	LX_CLOCK_MAX \
