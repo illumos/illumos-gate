@@ -43,6 +43,7 @@
 #include <sys/brand.h>
 #include <sys/vmsystm.h>
 #include <sys/limits.h>
+#include <sys/fcntl.h>
 #include <netpacket/packet.h>
 #include <sockcommon.h>
 
@@ -171,8 +172,12 @@ static lx_flag_map_t lx_flag_map_tbl[] = {
 	{ LXFM_MAP,	MSG_WAITALL,		LX_MSG_WAITALL,		NULL },
 	/* MSG_CONFIRM is safe to ignore */
 	{ LXFM_IGNORE,	0,			LX_MSG_CONFIRM,		NULL },
-	/* NOSIGNAL is handled by by the emulation */
+	/*
+	 * The NOSIGNAL and CMSG_CLOEXEC flags are handled by the emulation
+	 * outside of the flag-conversion routine.
+	 */
 	{ LXFM_IGNORE,	0,			LX_MSG_NOSIGNAL,	NULL },
+	{ LXFM_IGNORE,	0,			LX_MSG_CMSG_CLOEXEC,	NULL },
 	{ LXFM_UNSUP,	LX_MSG_PROXY,		0,	"MSG_PROXY" },
 	{ LXFM_UNSUP,	LX_MSG_FIN,		0,	"MSG_FIN" },
 	{ LXFM_UNSUP,	LX_MSG_SYN,		0,	"MSG_SYN" },
@@ -181,7 +186,6 @@ static lx_flag_map_t lx_flag_map_tbl[] = {
 	{ LXFM_UNSUP,	LX_MSG_MORE,		0,	"MSG_MORE" },
 	{ LXFM_UNSUP,	LX_MSG_WAITFORONE,	0,	"MSG_WAITFORONE" },
 	{ LXFM_UNSUP,	LX_MSG_FASTOPEN,	0,	"MSG_FASTOPEN" },
-	{ LXFM_UNSUP,	LX_MSG_CMSG_CLOEXEC,	0,	"MSG_CMSG_CLOEXEC" },
 };
 
 #define	LX_FLAG_MAP_MAX	\
@@ -913,6 +917,37 @@ finish:
 	return (error);
 }
 
+static void
+lx_cmsg_set_cloexec(void *input, socklen_t inlen)
+{
+	struct cmsghdr *inmsg;
+
+	if (inlen == 0) {
+		return;
+	}
+
+	for (inmsg = (struct cmsghdr *)input;
+	    CMSG_VALID(inmsg, input, (uintptr_t)input + inlen) != 0;
+	    inmsg = CMSG_NEXT(inmsg)) {
+		if (inmsg->cmsg_level == SOL_SOCKET &&
+		    inmsg->cmsg_type == SCM_RIGHTS) {
+			int *fds = (int *)CMSG_CONTENT(inmsg);
+			int i, num = (int)CMSG_CONTENTLEN(inmsg) / sizeof (int);
+			for (i = 0; i < num; i++) {
+				char flags;
+				file_t *fp;
+				/* set CLOEXEC on the fd */
+				fp = getf(fds[i]);
+				VERIFY(fp != NULL);
+				flags = f_getfd(fds[i]);
+				flags |= FD_CLOEXEC;
+				f_setfd(fds[i], flags);
+				releasef(fds[i]);
+			}
+		}
+	}
+}
+
 static lx_socket_aux_data_t *
 lx_sad_acquire(vnode_t *vp)
 {
@@ -1019,11 +1054,13 @@ lx_recv_common(int sock, struct nmsghdr *msg, struct uio *uiop, int flags,
 	socklen_t controllen;
 	ssize_t len;
 	int error;
+	boolean_t fd_cloexec;
 
 	if ((so = getsonode(sock, &error, &fp)) == NULL) {
 		return (set_errno(error));
 	}
 
+	fd_cloexec = ((flags & LX_MSG_CMSG_CLOEXEC) != 0);
 	flags = lx_xlate_sock_flags(flags, LX_TO_SUNOS);
 	len = uiop->uio_resid;
 	uiop->uio_fmode = fp->f_flag;
@@ -1073,6 +1110,16 @@ lx_recv_common(int sock, struct nmsghdr *msg, struct uio *uiop, int flags,
 	}
 
 	if (controllen != 0) {
+		if (fd_cloexec) {
+			/*
+			 * If CLOEXEC needs to set on file descriptors passed
+			 * via SCM_RIGHTS, do so before formatting the cmsgs
+			 * for Linux.
+			 */
+			lx_cmsg_set_cloexec(msg->msg_control,
+			    msg->msg_controllen);
+		}
+
 		error = stol_cmsgs_copyout(msg->msg_control,
 		    msg->msg_controllen, control, controllenp, controllen);
 
