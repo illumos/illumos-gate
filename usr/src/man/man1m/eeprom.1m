@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH EEPROM 1M "Mar 28, 2007"
+.TH EEPROM 1M "Feb 21, 2016"
 .SH NAME
 eeprom \- EEPROM display and load utility
 .SH SYNOPSIS
@@ -13,7 +13,6 @@ eeprom \- EEPROM display and load utility
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBeeprom\fR displays or changes the values of parameters in the \fBEEPROM.\fR
 It processes parameters in the order given. When processing a \fIparameter\fR
@@ -35,13 +34,11 @@ incorrect.
 \fIplatform-name\fR is the name of the platform implementation and can be found
 using the \fB-i\fR option of \fBuname\fR(1).
 .SS "SPARC"
-.sp
 .LP
 \fBSPARC\fR based systems implement firmware password protection with
 \fBeeprom\fR, using the \fBsecurity-mode\fR, \fBsecurity-password\fR and
 \fBsecurity-#badlogins\fR properties.
 .SS "x86"
-.sp
 .LP
 \fBEEPROM\fR storage is simulated using a file residing in the
 platform-specific boot area. The \fB/boot/solaris/bootenv.rc\fR file simulates
@@ -55,7 +52,6 @@ program. While it is possible to set the \fBsecurity-mode\fR,
 systems, these properties have no special meaning or behavior on x86 based
 systems.
 .SH OPTIONS
-.sp
 .ne 2
 .na
 \fB\fB-f\fR \fIdevice\fR\fR
@@ -67,7 +63,6 @@ Use \fIdevice\fR as the \fBEEPROM\fR device.
 
 .SH OPERANDS
 .SS "x86 Only"
-.sp
 .ne 2
 .na
 \fB\fIacpi-user-options\fR\fR
@@ -107,15 +102,26 @@ and then, if you do not obtain satisfactory results, \fB0x02\fR.
 Specifies the console device.
 Possible values are \fBttya\fR, \fBttyb\fR, \fBttyc\fR, \fBttyd\fR, and
 \fBtext\fR. In \fBtext\fR mode, console output goes to the frame buffer and
-input comes from the keyboard. When this property is not present, the console
-device falls back to the device specified by \fBinput-device\fR and
+input comes from the keyboard. For SPARC, when this property is not present,
+the console device falls back to the device specified by \fBinput-device\fR and
 \fBoutput-device\fR. When neither the console property or the
 \fBinput-device\fR and \fBoutput-device\fR property pair are present, the
 console defaults to the frame buffer and keyboard.
 .RE
 
+.SS "x86 Only"
+.ne 2
+.na
+\fB\fIos_console\fR\fR
+.ad
+.sp .6
+.RS 4n
+While \fBconsole\fR controls both boot loader and kernel console, setting
+\fBos_console\fR allows setting console device only for kernel. Values
+are the same as for \fBconsole\fR.
+.RE
+
 .SH NVRAM CONFIGURATION PARAMETERS
-.sp
 .LP
 Not all OpenBoot systems support all parameters. Defaults vary depending on the
 system and the \fBPROM\fR revision. See the output in the "Default Value"
@@ -129,8 +135,7 @@ prompt, to determine the default for your system.
 .sp .6
 .RS 4n
 If \fBtrue\fR, boots automatically after power-on or reset. Defaults to
-\fBtrue\fR. On x86, this parameter is controlled by the grub menu file. See
-\fBinstallgrub\fR(1M).
+\fBtrue\fR.
 .RE
 
 .sp
@@ -1270,7 +1275,6 @@ you might use a device other than device \fBa\fR, as shown above. For example,
 you could set console to \fBttyb\fR if the second serial port is present.
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/boot/solaris/bootenv.rc\fR\fR
@@ -1302,7 +1306,6 @@ Platform-specific version of \fBeeprom\fR. Use \fBuname\fR \fB-i\fR to obtain
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBpasswd\fR(1), \fBsh\fR(1), \fBsvcs\fR(1),  \fBtip\fR(1),  \fBuname\fR(1),
 \fBboot\fR(1M), \fBkadb\fR(1M), \fBkernel\fR(1M), \fBinit\fR(1M),

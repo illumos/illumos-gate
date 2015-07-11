@@ -33,10 +33,17 @@ extern "C" {
 #endif
 
 #include <assert.h>
+#include <libintl.h>
 
 #ifndef	TEXT_DOMAIN
 #define	TEXT_DOMAIN	"SUNW_OST_OSCMD"
 #endif  /* TEXT_DOMAIN */
+
+#ifndef	lint
+#define	_(x) gettext(x)
+#else
+#define	_(x) (x)
+#endif
 
 /* Type definitions */
 
@@ -154,6 +161,27 @@ typedef enum {
 	BAM_FINDROOT_PRESENT
 } findroot_t;
 
+typedef enum {
+	OPT_ABSENT = 0,		/* No option */
+	OPT_REQ,		/* option required */
+	OPT_OPTIONAL		/* option may or may not be present */
+} option_t;
+
+typedef struct {
+	char	*subcmd;
+	option_t option;
+	error_t	(*handler)();
+	int	unpriv;			/* is this an unprivileged command */
+} subcmd_defn_t;
+
+typedef enum zfs_mnted {
+	ZFS_MNT_ERROR = -1,
+	LEGACY_MOUNTED = 1,
+	LEGACY_ALREADY,
+	ZFS_MOUNTED,
+	ZFS_ALREADY
+} zfs_mnted_t;
+
 extern int bam_verbose;
 extern int bam_force;
 extern direct_or_multi_t bam_direct;
@@ -167,6 +195,11 @@ extern error_t set_global(menu_t *, char *, int);
 extern error_t upgrade_menu(menu_t *, char *, char *);
 extern error_t cvt_to_hyper(menu_t *, char *, char *);
 extern error_t cvt_to_metal(menu_t *, char *, char *);
+extern error_t check_subcmd_and_options(char *, char *, subcmd_defn_t *,
+    error_t (**fp)());
+extern char *mount_top_dataset(char *pool, zfs_mnted_t *mnted);
+extern void elide_trailing_slash(const char *, char *, size_t);
+extern int umount_top_dataset(char *, zfs_mnted_t, char *);
 extern void *s_calloc(size_t, size_t);
 extern void *s_realloc(void *, size_t);
 extern char *s_fgets(char *buf, int n, FILE *fp);
@@ -175,6 +208,7 @@ extern void bam_exit(int);
 extern void bam_print(char *, ...);
 extern void bam_print_stderr(char *format, ...);
 extern void bam_derror(char *format, ...);
+extern error_t bam_loader_menu(char *, char *, int, char *[]);
 extern error_t get_boot_cap(const char *osroot);
 extern char *get_special(char *);
 extern char *os_to_grubdisk(char *, int);
@@ -190,6 +224,8 @@ extern void unlink_line(menu_t *mp, line_t *lp);
 extern void line_free(line_t *lp);
 extern char *s_strdup(char *);
 extern int is_sparc(void);
+extern int is_pcfs(char *);
+extern int is_zfs(char *);
 extern int bootadm_digest(const char *, char **);
 
 #define	BAM_MAXLINE	8192
