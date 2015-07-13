@@ -1,0 +1,607 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 2009, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
+.\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH SYSV-MAKE 1 "Aug 24, 2009"
+.SH NAME
+sysV-make \- maintain, update, and regenerate groups of programs
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/lib/svr4.make\fR [\fB-f\fR \fImakefile\fR] [\fB-eiknpqrst\fR] [\fInames\fR]
+.fi
+
+.SH DESCRIPTION
+.LP
+This is the \fBvanilla\fR System V version of \fBmake\fR. If the environment
+variable \fBUSE_SVR4_MAKE\fR is set, then the command \fBmake\fR will invoke
+this version of  \fBmake\fR. (See also the \fBENVIRONMENT\fR section.)
+.sp
+.LP
+\fBmake\fR allows the programmer to maintain, update, and regenerate groups of
+computer programs. \fBmake\fR executes commands in \fImakefile\fR to update one
+or more target \fInames\fR (\fInames\fR are typically programs). If the
+\fB-f\fR option is not present, then \fBmakefile\fR, \fBMakefile\fR, and the
+Source Code Control System (SCCS) files \fBs.makefile\fR and \fBs.Makefile\fR
+are tried in order. If \fImakefile\fR is `\fB\(mi\fR\&' the standard input is
+taken. More than one \fB-f\fR \fImakefile\fR argument pair may appear.
+.sp
+.LP
+\fBmake\fR updates a target only if its dependents are newer than the target.
+All prerequisite files of a target are added recursively to the list of
+targets. Missing files are deemed to be outdated.
+.sp
+.LP
+The following list of four directives can be included in \fImakefile\fR to
+extend the options provided by \fBmake\fR. They are used in \fImakefile\fR as
+if they were targets:
+.sp
+.ne 2
+.na
+\fB\fB\&.DEFAULT:\fR\fR
+.ad
+.RS 16n
+If a file must be made but there are no explicit commands or relevant built-in
+rules, the commands associated with the name \fB\&.DEFAULT\fR are used if it
+exists.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB\&.IGNORE:\fR\fR
+.ad
+.RS 16n
+Same effect as the \fB-i\fR option.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB\&.PRECIOUS:\fR\fR
+.ad
+.RS 16n
+Dependents of the \fB\&.PRECIOUS\fR entry will not be removed when quit or
+interrupt are hit.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB\&.SILENT:\fR\fR
+.ad
+.RS 16n
+Same effect as the \fB-s\fR option.
+.RE
+
+.SS "Options"
+.LP
+The options for \fBmake\fR are listed below:
+.sp
+.ne 2
+.na
+\fB\fB-e\fR\fR
+.ad
+.RS 15n
+Environment variables override assignments within makefiles.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-f\fR \fImakefile\fR\fR
+.ad
+.RS 15n
+Description filename (\fImakefile\fR is assumed to be the name of a description
+file).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-i\fR\fR
+.ad
+.RS 15n
+Ignore error codes returned by invoked commands.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-k\fR\fR
+.ad
+.RS 15n
+Abandon work on the current entry if it fails, but continue on other branches
+that do not depend on that entry.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-n\fR\fR
+.ad
+.RS 15n
+No execute mode. Print commands, but do not execute them. Even command lines
+beginning with an `\fB@\fR' are printed.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-p\fR\fR
+.ad
+.RS 15n
+Print out the complete set of macro definitions and target descriptions.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-q\fR\fR
+.ad
+.RS 15n
+Question. \fBmake\fR returns a zero or non-zero status code depending on
+whether or not the target file has been updated.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-r\fR\fR
+.ad
+.RS 15n
+Do not use the built-in rules.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-s\fR\fR
+.ad
+.RS 15n
+Silent mode. Do not print command lines before executing.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-t\fR\fR
+.ad
+.RS 15n
+Touch the target files (causing them to be updated) rather than issue the usual
+commands.
+.RE
+
+.SS "Creating the makefile"
+.LP
+The makefile invoked with the \fB-f\fR option is a carefully structured file of
+explicit instructions for updating and regenerating programs, and contains a
+sequence of entries that specify dependencies.  The first line of an entry is a
+blank-separated, non-null list of targets, then a `\fB:\fR', then a (possibly
+null) list of prerequisite files or dependencies. Text following a `\fB;\fR'
+and all following lines that begin with a tab are shell commands to be executed
+to update the target. The first non-empty line that does not begin with a tab
+or `\fB#\fR' begins a new dependency or macro definition. Shell commands may be
+continued across lines with a backslash-new-line (\fB\e\fR-NEWLINE) sequence.
+Everything printed by make (except the initial TAB) is passed directly to the
+shell as is. Thus,
+.sp
+.in +2
+.nf
+echo a\e
+b
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+will produce
+.sp
+.LP
+\fBab\fR
+.sp
+.LP
+exactly the same as the shell would.
+.sp
+.LP
+Number-sign (\fB#\fR) and \fBNEWLINE\fR surround comments including contained
+`\fB\e\fR\(miNEWLINE' sequences.
+.sp
+.LP
+The following makefile says that \fBpgm\fR depends on two files \fBa.o\fR and
+\fBb.o\fR, and that they in turn depend on their corresponding source files
+(\fBa.c\fR and \fBb.c\fR) and a common file \fBincl.h\fR:
+.sp
+.in +2
+.nf
+pgm: a.o b.o
+        cc a.o b.o -o pgm
+a.o: incl.h a.c
+        cc -c a.c
+b.o: incl.h b.c
+        cc -c b.c
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Command lines are executed one at a time, each by its own shell. The
+\fBSHELL\fR environment variable can be used to specify which shell \fBmake\fR
+should use to execute commands. The default is \fB/usr/bin/sh\fR. The first one
+or two characters in a command can be the following: `\fB@\fR', `\fB\(mi\fR\&',
+`\fB@\(mi\fR', or `\fB\(mi@\fR\&'. If `\fB@\fR' is present, printing of the
+command is suppressed. If `\fB\(mi\fR\&' is present, \fBmake\fR ignores an
+error. A line is printed when it is executed unless the \fB-s\fR option is
+present, or the entry \fB\&.SILENT:\fR is included in \fImakefile\fR, or unless
+the initial character sequence contains a \fB@\fR. The \fB-n\fR option
+specifies printing without execution; however, if the command line has the
+string \fB$(MAKE)\fR in it, the line is always executed (see the discussion of
+the \fBMAKEFLAGS\fR macro in the \fBmake\fR \fBEnvironment\fR sub-section
+below). The \fB-t\fR (touch) option updates the modified date of a file without
+executing any commands.
+.sp
+.LP
+Commands returning non-zero status normally terminate \fBmake\fR. If the
+\fB-i\fR option is present, if the entry \fB\&.IGNORE:\fR is included in
+\fImakefile\fR, or if the initial character sequence of the command contains
+`\fB\(mi\fR\&', the error is ignored. If the \fB-k\fR option is present, work
+is abandoned on the current entry, but continues on other branches that do not
+depend on that entry.
+.sp
+.LP
+Interrupt and quit cause the target to be deleted unless the target is a
+dependent of the directive \fB\&.PRECIOUS\fR.
+.SS "make Environment"
+.LP
+The environment is read by \fBmake\fR. All variables are assumed to be macro
+definitions and are processed as such. The environment variables are processed
+before any makefile and after the internal rules; thus, macro assignments in a
+makefile override environment variables. The \fB-e\fR option causes the
+environment to override the macro assignments in a makefile. Suffixes and their
+associated rules in the makefile will override any identical suffixes in the
+built-in rules.
+.sp
+.LP
+The \fBMAKEFLAGS\fR environment variable is processed by \fBmake\fR as
+containing any legal input option (except \fB-f\fR and \fB-p\fR) defined for
+the command line. Further, upon invocation, \fBmake\fR "invents" the variable
+if it is not in the environment, puts the current options into it, and passes
+it on to invocations of commands. Thus, \fBMAKEFLAGS\fR always contains the
+current input options. This feature proves very useful for "super-makes". In
+fact, as noted above, when the \fB-n\fR option is used, the command
+\fB$(MAKE)\fR is executed anyway; hence, one can perform a \fBmake\fR \fB-n\fR
+recursively on a whole software system to see what would have been executed.
+This result is possible because the \fB-n\fR is put in \fBMAKEFLAGS\fR and
+passed to further invocations of \fB$(MAKE)\fR. This usage is one way of
+debugging all of the makefiles for a software project without actually doing
+anything.
+.SS "Include Files"
+.LP
+If the string \fIinclude\fR appears as the first seven letters of a line in a
+\fImakefile\fR, and is followed by a blank or a tab, the rest of the line is
+assumed to be a filename and will be read by  the current invocation, after
+substituting for any macros.
+.SS "Macros"
+.LP
+Entries of the form \fIstring1\fR \fB=\fR \fIstring2\fR are macro definitions.
+\fIstring2\fR is defined as all characters up to a comment character or an
+unescaped NEWLINE. Subsequent appearances of
+\fB$\fR(\fIstring1\fR[\fB:\fR\fIsubst1\fR\fB=\fR[\fIsubst2\fR]]) are replaced
+by \fIstring2\fR. The parentheses are optional if a single-character macro name
+is used and there is no substitute sequence. The optional
+:\fIsubst1\fR=\fIsubst2\fR is a substitute sequence. If it is specified, all
+non-overlapping occurrences of \fIsubst1\fR in the named macro are replaced by
+\fIsubst2\fR. Strings (for the purposes of this type of substitution) are
+delimited by BLANKs, TABs, NEWLINE characters, and beginnings of lines. An
+example of the use of the substitute sequence is shown in the \fBLibraries\fR
+sub-section below.
+.SS "Internal Macros"
+.LP
+There are five internally maintained macros that are useful for writing rules
+for building targets.
+.sp
+.ne 2
+.na
+\fB\fB$*\fR\fR
+.ad
+.RS 6n
+The macro \fB$*\fR stands for the filename part of the current dependent with
+the suffix deleted. It is evaluated only for inference rules.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB$@\fR\fR
+.ad
+.RS 6n
+The \fB$@\fR macro stands for the full target name of the current target. It is
+evaluated only for explicitly named dependencies.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB$<\fR\fR
+.ad
+.RS 6n
+The \fB$<\fR macro is only evaluated for inference rules or the
+\fB\&.DEFAULT\fR rule. It is the module that is outdated with respect to the
+target (the "manufactured" dependent file name). Thus, in the \fB\&.c.o\fR
+rule, the \fB$<\fR macro would evaluate to the \fB\&.c\fR file. An example for
+making optimized \fB\&.o\fR files from \fB\&.c\fR files is:
+.sp
+.in +2
+.nf
+\&.c.o:
+        cc c O $*.c
+.fi
+.in -2
+.sp
+
+or:
+.sp
+.in +2
+.nf
+\&.c.o:
+        cc c O $<
+.fi
+.in -2
+.sp
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB$?\fR\fR
+.ad
+.RS 6n
+The \fB$?\fR macro is evaluated when explicit rules from the makefile are
+evaluated. It is the list of prerequisites that are outdated with respect to
+the target, and essentially those modules that must be rebuilt.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB$%\fR\fR
+.ad
+.RS 6n
+The \fB$%\fR macro is only evaluated when the target is an archive library
+member of the form \fBlib(file.o)\fR. In this case, \fB$@\fR evaluates to
+\fBlib\fR and \fB$%\fR evaluates to the library member, \fBfile.o\fR.
+.RE
+
+.sp
+.LP
+Four of the five macros can have alternative forms. When an upper case \fBD\fR
+or \fBF\fR is appended to any of the four macros, the meaning is changed to
+"directory part" for \fBD\fR and "file part" for \fBF\fR. Thus, \fB$(@D)\fR
+refers to the directory part of the string \fB$@\fR. If there is no directory
+part, \fB\&./\fR is generated. The only macro excluded from this alternative
+form is \fB$?\fR.
+.SS "Suffixes"
+.LP
+Certain names (for instance, those ending with \fB\&.o\fR) have inferable
+prerequisites such as \fB\&.c\fR, \fB\&.s\fR, etc. If no update commands for
+such a file appear in \fImakefile\fR, and if an inferable prerequisite exists,
+that prerequisite is compiled to make the target. In this case, \fBmake\fR has
+inference rules that allow building files from other files by examining the
+suffixes and determining an appropriate inference rule to use. The current
+default inference rules are:
+.sp
+
+.sp
+.TS
+tab(	);
+lw(.55i) lw(.55i) lw(.55i) lw(.55i) lw(.55i) lw(.55i) lw(.55i) lw(.55i) lw(.55i) lw(.55i) 
+lw(.55i) lw(.55i) lw(.55i) lw(.55i) lw(.55i) lw(.55i) lw(.55i) lw(.55i) lw(.55i) lw(.55i) .
+\&.c	\&.c~	\&.f	\&.f~	\&.s	\&.s~	\&.sh	\&.sh~	\&.C	\&.C~
+\&.c.a	\&.c.o	\&.c~.a	\&.c~.c	\&.c~.o	\&.f.a	\&.f.o	\&.f~.a	\&.f~.f	\&.f~.o
+\&.h~.h	\&.l.c	\&.l.o	\&.l~.c	\&.l~.l	\&.l~.o	\&.s.a	\&.s.o	\&.s~.a	\&.s~.o
+\&.s~.s	\&.sh~.sh	\&.y.c	\&.y.o	\&.y~.c	\&.y~.o	\&.y~.y	\&.C.a	\&.C.o	\&.C~.a
+\&.C~.C	\&.C~.o	\&.L.C	\&.L.o	\&.L~.C	\&.L~.L	\&.L~.o	\&.Y.C	\&.Y.o	\&.Y~.C
+\&.Y~.o	\&.Y~.Y								
+.TE
+
+.sp
+.LP
+The internal rules for \fBmake\fR are contained in the source file
+\fBmake.rules\fR for the \fBmake\fR program. These rules can be locally
+modified. To print out the rules compiled into the \fBmake\fR on any machine in
+a form suitable for re-compilation, the following command is used:
+.sp
+.in +2
+.nf
+make -pf \(mi2>/dev/null < /dev/null
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+A tilde in the above rules refers to an SCCS file (see \fBsccsfile\fR(4)).
+Thus, the rule \fB\&.c~.o\fR would transform an SCCS C source file into an
+object file (\fB\&.o\fR). Because the \fBs.\fR of the SCCS files is a prefix,
+it is incompatible with the \fBmake\fR suffix point of view. Hence, the tilde
+is a way of changing any file reference into an SCCS file reference.
+.sp
+.LP
+A rule with only one suffix (for example, \fB\&.c:\fR) is the definition of how
+to build \fIx\fR from \fIx\fR\fB\&.c\fR. In effect, the other suffix is null.
+This feature is useful for building targets from only one source file, for
+example, shell procedures and simple C programs.
+.sp
+.LP
+Additional suffixes are given as the dependency list for \fB\&.SUFFIXES\fR.
+Order is significant: the first possible name for which both a file and a rule
+exist is inferred as a prerequisite. The default list is:
+.sp
+.LP
+\fB\&.SUFFIXES: .o .c .c~ .y .y~ .l .l~ .s .s~ .sh .sh~ .h .h~ .f .f~\fR
+\fB\&.C .C~ .Y .Y~ .L .L~\fR
+.sp
+.LP
+Here again, the above command for printing the internal rules will display the
+list of suffixes implemented on the current machine. Multiple suffix lists
+accumulate; \fB\&.SUFFIXES:\fR with no dependencies clears the list of
+suffixes.
+.SS "Inference Rules"
+.LP
+The first example can be done more briefly.
+.sp
+.in +2
+.nf
+pgm: a.o b.o
+    cc a.o b.o o pgm
+a.o b.o: incl.h
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+This abbreviation is possible because \fBmake\fR has a set of internal rules
+for building files. The user may add rules to this list by simply putting them
+in the \fImakefile\fR.
+.sp
+.LP
+Certain macros are used by the default inference rules to permit the inclusion
+of optional matter in any resulting commands. Again, the previous method for
+examining the current rules is recommended.
+.sp
+.LP
+The inference of prerequisites can be controlled. The rule to create a file
+with suffix \fB\&.o\fR from a file with suffix \fB\&.c\fR is specified as an
+entry with \fB\&.c.o:\fR as the target and no dependents. Shell commands
+associated with the target define the rule for making a \fB\&.o\fR file from a
+\fB\&.c\fR file. Any target that has no slashes in it and starts with a dot is
+identified as a rule and not a true target.
+.SS "Libraries"
+.LP
+If a target or dependency name contains parentheses, it is assumed to be an
+archive library, the string within parentheses referring to a member within the
+library. Thus, \fBlib(file.o)\fR and \fB$(LIB)(file.o)\fR both refer to an
+archive library that contains \fBfile.o\fR. (This example assumes the \fBLIB\fR
+macro has been previously defined.)  The expression \fB$(LIB)(file1.o
+file2.o)\fR is not legal. Rules pertaining to archive libraries have the form
+\fB\&.\fR\fIXX\fR\fB\&.a\fR where the \fB\fR\fIXX\fR\fB \fR is the suffix from
+which the archive member is to be made. An unfortunate by-product of the
+current implementation requires the \fB\fR\fIXX\fR\fB \fR to be different from
+the suffix of the archive member. Thus, one cannot have \fBlib(file.o)\fR
+depend upon \fBfile.o\fR explicitly. The most common use of the archive
+interface follows. Here, we assume the source files are all C type source:
+.sp
+.in +2
+.nf
+lib:	lib(file1.o) lib(file2.o) lib(file3.o)
+	@echo lib is now up-to-date
+\&.c.a:
+        $(CC) -c $(CFLAGS) $<
+	$(AR) $(ARFLAGS) $@ $*.o
+        rm -f $*.o
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+In fact, the \fB\&.c.a\fR rule listed above is built into \fBmake\fR and is
+unnecessary in this example. A more interesting, but more limited example of an
+archive library maintenance construction follows:
+.sp
+.in +2
+.nf
+lib:	lib(file1.o) lib(file2.o) lib(file3.o)
+        $(CC) -c $(CFLAGS) $(?:.o=.c)
+	$(AR) $(ARFLAGS) lib $?
+	rm $?
+	@echo lib is now up-to-date
+\&.c.a:;
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Here the substitution mode of the macro expansions is used. The \fB$?\fR list
+is defined to be the set of object filenames (inside \fBlib\fR) whose C source
+files are outdated. The substitution mode translates the \fB\&.o\fR to
+\fB\&.c\fR. (Unfortunately, one cannot as yet transform to \fB\&.c~\fR;
+however, this transformation may become possible in the future.)  Also note the
+disabling of the \fB\&.c.a:\fR rule, which would have created each object file,
+one by one. This particular construct speeds up archive library maintenance
+considerably. This type of construct becomes very cumbersome if the archive
+library contains a mix of assembly programs and C programs.
+.SH ENVIRONMENT VARIABLES
+.ne 2
+.na
+\fB\fBUSE_SVR4_MAKE\fR\fR
+.ad
+.RS 17n
+If this environment variable is set, then the \fBmake\fR command will invoke
+this System V version of  \fBmake\fR. If this variable is not set, then the
+default version of  \fBmake\fR(1S) is invoked.
+.sp
+\fBUSE_SVR4_MAKE\fR can be set as follows (Bourne shell):
+.sp
+\fB$ USE_SVR4_MAKE=``''; export USE_SVR4_MAKE\fR
+.sp
+or (C shell):
+.sp
+\fB% setenv USE_SVR4_MAKE\fR
+.RE
+
+.SH FILES
+.ne 2
+.na
+\fB\fB[Mm]akefile\fR\fR
+.ad
+.br
+.na
+\fB\fBs.[Mm]akefile\fR\fR
+.ad
+.sp .6
+.RS 4n
+default makefiles
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/usr/bin/sh\fR\fR
+.ad
+.sp .6
+.RS 4n
+default shell for \fBmake\fR
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/usr/share/lib/make/make.rules\fR\fR
+.ad
+.sp .6
+.RS 4n
+default rules for \fBmake\fR
+.RE
+
+.SH SEE ALSO
+.LP
+\fBcd\fR(1), \fBmake\fR(1S), \fBsh\fR(1), \fBprintf\fR(3C), \fBsccsfile\fR(4),
+\fBattributes\fR(5)
+.SH NOTES
+.LP
+Some commands return non-zero status inappropriately; use \fB-i\fR or the
+`\fB-\fR' command line prefix to overcome the difficulty.
+.sp
+.LP
+Filenames containing the characters \fB=\fR, \fB:\fR, and \fB@\fR do not work.
+Commands that are directly executed by the shell, notably \fBcd\fR(1), are
+ineffectual across \fBNEWLINEs\fR in \fBmake\fR. The syntax \fBlib(file1.o\fR
+\fBfile2.o\fR \fBfile3.o)\fR is illegal. You cannot build \fBlib(file.o)\fR
+from \fBfile.o\fR.

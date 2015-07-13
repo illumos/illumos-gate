@@ -1134,6 +1134,10 @@ CPPFORPO=$(COMPILE.cpp:\"$(TEXT_DOMAIN)\"=TEXT_DOMAIN)
 	$(CPPFORPO) $< > $<.i
 	$(BUILD.po)
 
+.cc.po:
+	$(CPPFORPO) $< > $<.i
+	$(BUILD.po)
+
 .y.po:
 	$(YACC) -d $<
 	$(CPPFORPO) y.tab.c  > $<.i

@@ -224,6 +224,7 @@ MANFILES=	acctcom.1			\
 	 	mailq.1				\
 	 	mailstats.1			\
 	 	mailx.1				\
+		make.1				\
 	 	makekey.1			\
 	 	man.1				\
 	 	mandoc.1			\
@@ -366,6 +367,7 @@ MANFILES=	acctcom.1			\
 	 	svcprop.1			\
 	 	svcs.1				\
 	 	symorder.1			\
+		sysV-make.1			\
 	 	sys-suspend.1			\
 	 	tabs.1				\
 	 	tail.1				\
@@ -436,6 +438,7 @@ MANLINKS=	batch.1		\
 	 	dirname.1	\
 	 	dirs.1		\
 	 	disable.1	\
+		dmake.1		\
 	 	dumpkeys.1	\
 		edit.1		\
 	 	errange.1	\
@@ -608,6 +611,8 @@ red.1		:= LINKSRC = ed.1
 disable.1	:= LINKSRC = enable.1
 
 decrypt.1	:= LINKSRC = encrypt.1
+
+dmake.1		:= LINKSRC = make.1
 
 checkeq.1	:= LINKSRC = eqn.1
 neqn.1		:= LINKSRC = eqn.1

@@ -1,0 +1,2788 @@
+'\" te
+.\" Copyright 1989 AT&T 
+.\" Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
+.\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved  
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH MAKE 1 "Jun 24, 2015"
+.SH NAME
+make \- maintain, update, and regenerate related programs and files
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/bin/make\fR [\fB-d\fR] [\fB-dd\fR] [\fB-D\fR] [\fB-DD\fR] [\fB-e\fR]
+     [\fB-i\fR] [\fB-j\fR \FImaxjobs\fR] [\fB-k\fR] [\fB-m\fR \fI{serial | parallel}\fR]
+     [\fB-n\fR] [\fB-p\fR] [\fB-P\fR] [\fB-q\fR] [\fB-r\fR] [\fB-s\fR] [\fB-S\fR] [\fB-t\fR] [\fB-V\fR] 
+     [\fB-f\fR \fImakefile\fR]... [\fB-K\fR \fIstatefile\fR]... [\fItarget\fR]... 
+     [\fImacro\fR = \fIvalue\fR...]
+.fi
+
+.nf
+\fB/usr/bin/dmake\fR [\fB-d\fR] [\fB-dd\fR] [\fB-D\fR] [\fB-DD\fR] [\fB-e\fR]
+     [\fB-i\fR] [\fB-j\fR \FImaxjobs\fR] [\fB-k\fR]  [\fB-m\fR \fI{serial | parallel}\fR]
+     [\fB-n\fR] [\fB-p\fR] [\fB-P\fR] [\fB-q\fR] [\fB-r\fR] [\fB-s\fR] [\fB-S\fR] [\fB-t\fR] [\fB-V\fR] 
+     [\fB-f\fR \fImakefile\fR]... [\fB-K\fR \fIstatefile\fR]... [\fItarget\fR]... 
+     [\fImacro\fR = \fIvalue\fR...]
+.fi
+
+.LP
+.nf
+\fB/usr/xpg4/bin/make\fR [\fB-d\fR] [\fB-dd\fR] [\fB-D\fR] [\fB-DD\fR]
+     [\fB-e\fR] [\fB-i\fR]  [\fB-j\fR \FImaxjobs\fR] [\fB-k\fR] [\fB-m\fR \fI{serial | parallel}\fR]
+     [\fB-n\fR] [\fB-p\fR] [\fB-P\fR] [\fB-q\fR] [\fB-r\fR] [\fB-s\fR] [\fB-S\fR] [\fB-t\fR] [\fB-V\fR] 
+     [\fB-f\fR \fImakefile\fR]... [\fItarget\fR]... [\fImacro\fR = \fIvalue\fR...]
+.fi
+
+.SH DESCRIPTION
+.LP
+The \fBmake\fR utility executes a list of shell commands associated with each
+\fItarget\fR, typically to create or update a file of the same name.
+\fImakefile\fR contains entries that describe how to bring a target up to date
+with respect to those on which it depends, which are called \fIdependencies\fR.
+Since each dependency is a target, it can have dependencies of its own.
+Targets, dependencies, and sub-dependencies comprise a tree structure that
+\fBmake\fR traces when deciding whether or not to rebuild a \fItarget\fR.
+.sp
+.LP
+The \fBmake\fR utility recursively checks each \fItarget\fR against its
+dependencies, beginning with the first target entry in \fImakefile\fR if no
+\fItarget\fR argument is supplied on the command line. If, after processing all
+of its dependencies, a target file is found either to be missing, or to be
+older than any of its dependencies, \fBmake\fR rebuilds it. Optionally with
+this version of \fBmake\fR, a target can be treated as out-of-date when the
+commands used to generate it have changed since the last time the target was
+built.
+.sp
+.LP
+To build a given target, \fBmake\fR executes the list of commands, called a
+\fIrule\fR. This rule can be listed explicitly in the target's makefile entry,
+or it can be supplied implicitly by \fBmake\fR.
+.sp
+.LP
+If no \fItarget\fR is specified on the command line, \fBmake\fR uses the first
+target defined in \fImakefile\fR.
+.sp
+.LP
+If a \fItarget\fR has no makefile entry, or if its entry has no rule,
+\fBmake\fR attempts to derive a rule by each of the following methods, in turn,
+until a suitable rule is found. Each method is described under Usage below.
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Pattern matching rules.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Implicit rules, read in from a user-supplied makefile.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Standard implicit rules (also known as suffix rules), typically read in from
+the file \fB/usr/share/lib/make/make.rules\fR.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBSCCS\fR retrieval. \fBmake\fR retrieves the most recent version from the
+\fBSCCS\fR history file (if any).  See the description of the
+\fB\&.SCCS_GET:\fR special-function target for details.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The rule from the \fB\&.DEFAULT:\fR target entry, if there is such an entry in
+the makefile.
+.RE
+.sp
+.LP
+If there is no makefile entry for a \fItarget\fR, if no rule can be derived for
+building it, and if no file by that name is present, \fBmake\fR issues an error
+message and halts.
+.SH OPTIONS
+.LP
+The following options are supported:
+.sp
+.ne 2
+.na
+\fB\fB-d\fR\fR
+.ad
+.RS 16n
+Displays the reasons why \fBmake\fR chooses to rebuild a target. \fBmake\fR
+displays any and all dependencies that are newer. In addition, \fBmake\fR
+displays options read in from the \fBMAKEFLAGS\fR environment variable.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-dd\fR\fR
+.ad
+.RS 16n
+Displays the dependency check and processing in vast detail.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-D\fR\fR
+.ad
+.RS 16n
+Displays the text of the makefiles read in.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-DD\fR\fR
+.ad
+.RS 16n
+Displays the text of the makefiles, \fBmake.rules\fR file, the state file, and
+all hidden-dependency reports.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-e\fR\fR
+.ad
+.RS 16n
+Environment variables override assignments within makefiles.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-f\fR \fImakefile\fR\fR
+.ad
+.RS 16n
+Uses the description file \fImakefile\fR. A \fB\(mi\fR as the \fImakefile\fR
+argument denotes the standard input. The contents of \fImakefile\fR, when
+present, override the standard set of implicit rules and predefined macros.
+When more than one \fB-f\fR \fImakefile\fR argument pair appears, \fBmake\fR
+uses the concatenation of those files, in order of appearance.
+.sp
+When no \fImakefile\fR is specified, \fB/usr/bin/make\fR tries the following in
+sequence, except when in POSIX mode (see \fB\&.POSIX\fR in Usage):
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If there is a file named \fBmakefile\fR in the working directory, \fBmake\fR
+uses that file. If, however, there is an \fBSCCS\fR history file
+(\fBSCCS/s.makefile\fR) which is newer, \fBmake\fR attempts to retrieve and use
+the most recent version.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+In the absence of the above file(s), if a file named \fBMakefile\fR is present
+in the working directory, \fBmake\fR attempts to use it.  If there is an
+\fBSCCS\fR history file (\fBSCCS/s.Makefile\fR) that is newer, \fBmake\fR
+attempts to retrieve and use the most recent version.
+.RE
+When no \fImakefile\fR is specified, \fB/usr/bin/make\fR in POSIX mode and
+\fB/usr/xpg4/bin/make\fR try the following files in sequence:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fB\&./makefile\fR, \fB\&./Makefile\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBs.makefile\fR, \fBSCCS/s.makefile\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBs.Makefile\fR, \fBSCCS/s.Makefile\fR
+.RE
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-i\fR\fR
+.ad
+.RS 16n
+Ignores error codes returned by commands.  Equivalent to the special-function
+target \fB\&.IGNORE:\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB-j\fR \fImaxjobs\fR
+.ad
+.RS 16n
+Specify the maximum number of jobs that each instance of \fBmake\fR will invoke.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-k\fR\fR
+.ad
+.RS 16n
+When a nonzero error status is returned by a rule, or when \fBmake\fR cannot
+find a rule, abandons work on the current target, but continues with other
+dependency branches that do not depend on it.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-K\fR \fIstatefile\fR\fR
+.ad
+.RS 16n
+Uses the state file \fIstatefile\fR. A \fB\(mi\fR as the \fIstatefile\fR
+argument denotes the standard input. The contents of \fIstatefile\fR, when
+present, override the standard set of implicit rules and predefined macros.
+When more than one \fB-K\fR \fIstatefile\fR argument pair appears, \fBmake\fR
+uses the concatenation of those files, in order of appearance. (See also
+\fB\&.KEEP_STATE\fR  and \fB\&.KEEP_STATE_FILE\fR in the Special-Function
+Targets section).
+.RE
+
+.sp
+.ne 2
+.na
+\fB-m\fR \fI{serial | parallel}\fR
+.ad
+.RS 16n
+Specify whether \fBmake\fR should execute jobs serially or in parallel.  The
+default for \fBmake\fR is to run serially unless \fB-j\fR is specified.  The
+default is for \fBdmake\fR is to run in parallel.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-n\fR\fR
+.ad
+.RS 16n
+No execution mode. Prints commands, but does not execute them. Even lines
+beginning with an \fB@\fR are printed. However, if a command line contains a
+reference to the \fB$(MAKE)\fR macro, that line is always executed (see the
+discussion of \fBMAKEFLAGS\fR in Reading Makefiles and the Environment). When
+in POSIX mode, lines beginning with a "\fB+\fR" are executed.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-p\fR\fR
+.ad
+.RS 16n
+Prints out the complete set of macro definitions and target descriptions.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-P\fR\fR
+.ad
+.RS 16n
+Merely reports dependencies, rather than building them.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-q\fR\fR
+.ad
+.RS 16n
+Question mode. \fBmake\fR returns a zero or nonzero status code depending on
+whether or not the target file is up to date. When in POSIX mode, lines
+beginning with a "\fB+\fR" are executed.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-r\fR\fR
+.ad
+.RS 16n
+Does not read in the default makefile \fB/usr/share/lib/make/make.rules\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-s\fR\fR
+.ad
+.RS 16n
+Silent mode. Does not print command lines before executing them. Equivalent to
+the special-function target \fB\&.SILENT:\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-S\fR\fR
+.ad
+.RS 16n
+Undoes the effect of the \fB-k\fR option. Stops processing when a non-zero exit
+status is returned by a command.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-t\fR\fR
+.ad
+.RS 16n
+Touches the target files (bringing them up to date) rather than performing
+their rules. \fBWarning:\fR This can be \fBdangerous\fR when files are
+maintained by more than one person. When the \fB\&.KEEP_STATE:\fR target
+appears in the makefile, this option updates the state file just as if the
+rules had been performed. When in POSIX mode, lines beginning with a "\fB+\fR"
+are executed.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-V\fR\fR
+.ad
+.RS 16n
+Puts \fBmake\fR into SysV mode. Refer to \fBsysV-make\fR(1) for respective
+details.
+.RE
+
+.SH OPERANDS
+.LP
+The following operands are supported:
+.sp
+.ne 2
+.na
+\fB\fItarget\fR\fR
+.ad
+.RS 15n
+Target names, as defined in Usage.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fImacro\fR\fB=\fR\fIvalue\fR\fR
+.ad
+.RS 15n
+Macro definition. This definition overrides any regular definition for the
+specified macro within the makefile itself, or in the environment. However,
+this definition can still be overridden by conditional macro assignments.
+.RE
+
+.SH USAGE
+.LP
+The usage of \fBmake\fR is described below:
+.SS "Reading Makefiles and the Environment"
+.LP
+When \fBmake\fR first starts, it reads the \fBMAKEFLAGS\fR environment variable
+to obtain any of the following options specified present in its value:
+\fB-d\fR, \fB-D\fR, \fB-e\fR, \fB-i\fR, \fB-k\fR, \fB-n\fR, \fB-p\fR, \fB-q\fR,
+\fB-r\fR, \fB-s\fR, \fB-S\fR, or \fB-t\fR. Due to the implementation of POSIX.2
+(see \fBPOSIX.2\fR(5), the \fBMAKEFLAGS\fR values contains a leading \fB\(mi\fR
+character. The \fBmake\fR utility then reads the command line for additional
+options, which also take effect.
+.sp
+.LP
+Next, \fBmake\fR reads in a default makefile that typically contains predefined
+macro definitions, target entries for implicit rules, and additional rules,
+such as the rule for retrieving \fBSCCS\fR files. If present, \fBmake\fR uses
+the file \fBmake.rules\fR in the current directory; otherwise it reads the file
+\fB/usr/share/lib/make/make.rules\fR, which contains the standard definitions
+and rules. Use the directive:
+.sp
+.in +2
+.nf
+\fBinclude /usr/share/lib/make/make.rules\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+in your local \fBmake.rules\fR file to include them.
+.sp
+.LP
+Next, \fBmake\fR imports variables from the environment (unless the \fB-e\fR
+option is in effect), and treats them as defined macros. Because \fBmake\fR
+uses the most recent definition it encounters, a macro definition in the
+makefile normally overrides an environment variable of the same name. When
+\fB-e\fR is in effect, however, environment variables are read in \fBafter\fR
+all makefiles have been read. In that case, the environment variables take
+precedence over definitions in the makefile.
+.sp
+.LP
+Next, \fBmake\fR reads any makefiles you specify with \fB-f\fR, or one of
+\fBmakefile\fR or \fBMakefile\fR as described above and then the state file, in
+the local directory if it exists. If the makefile contains a
+\fB\&.KEEP_STATE_FILE\fR target, then it reads the state file that follows the
+target. Refer to special target \fB\&.KEEP_STATE_FILE\fR for details.
+.sp
+.LP
+Next (after reading the environment if \fB-e\fR is in effect), \fBmake\fR reads
+in any macro definitions supplied as command line arguments. These override
+macro definitions in the makefile and the environment both, but only for the
+\fBmake\fR command itself.
+.sp
+.LP
+\fBmake\fR exports environment variables, using the most recently defined
+value. Macro definitions supplied on the command line are not normally
+exported, unless the macro is also an environment variable.
+.sp
+.LP
+\fBmake\fR does not export macros defined in the makefile. If an environment
+variable is set, and a macro with the same name is defined on the command line,
+\fBmake\fR exports its value as defined on the command line. Unless \fB-e\fR is
+in effect, macro definitions within the makefile take precedence over those
+imported from the environment.
+.sp
+.LP
+The macros \fBMAKEFLAGS\fR, \fBMAKE\fR, \fBSHELL\fR, \fBHOST_ARCH\fR,
+\fBHOST_MACH\fR, and \fBTARGET_MACH\fR are special cases. See Special-Purpose
+Macros below for details.
+.SS "Makefile Target Entries"
+.LP
+A target entry has the following format:
+.sp
+.in +2
+.nf
+       \fItarget\fR [\fB:\fR|\fB::\fR] [\fIdependency\fR] ... [\fB;\fR \fBcommand\fR] ... 
+                      [\fBcommand\fR] 
+                      ...
+.fi
+.in -2
+
+.sp
+.LP
+The first line contains the name of a target, or a space-separated list of
+target names, terminated with a colon or double colon. If a list of targets is
+given, this is equivalent to having a separate entry of the same form for each
+target. The colon(s) can be followed by a \fIdependency\fR, or a dependency
+list. \fBmake\fR checks this list before building the target. The dependency
+list can be terminated with a semicolon (\fB;\fR), which in turn can be
+followed by a single Bourne shell command. Subsequent lines in the target entry
+begin with a \fBTAB\fR and contain Bourne shell commands. These commands
+comprise the rule for building the target.
+.sp
+.LP
+Shell commands can be continued across input lines by escaping the
+\fBNEWLINE\fR with a backslash (\fB\e\fR). The continuing line must also start
+with a \fBTAB\fR.
+.sp
+.LP
+To rebuild a target, \fBmake\fR expands macros, strips off initial \fBTAB\fR
+characters and either executes the command directly (if it contains no shell
+metacharacters), or passes each command line to a Bourne shell for execution.
+.sp
+.LP
+The first \fInon-empty\fR line that does not begin with a \fBTAB\fR or \fB#\fR
+begins another target or macro definition.
+.SS "Special Characters"
+.LP
+Special characters are defined below.
+.SS "\fIGlobal\fR"
+.ne 2
+.na
+\fB\fB#\fR\fR
+.ad
+.RS 20n
+Start a comment. The comment ends at the next \fBNEWLINE\fR. If the \fB#\fR
+follows the \fBTAB\fR in a command line, that line is passed to the shell
+(which also treats \fB#\fR as the start of a comment).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBinclude\fR \fIfilename\fR\fR
+.ad
+.RS 20n
+If the word \fBinclude\fR appears as the first seven letters of a line and is
+followed by a \fBSPACE\fR or \fBTAB\fR, the string that follows is taken as a
+filename to interpolate at that line. \fBinclude\fR files can be nested to a
+depth of no more than 38 nested makefiles . If \fIfilename\fR is a macro
+reference, it is expanded.
+.RE
+
+.SS "\fITargets and Dependencies\fR"
+.ne 2
+.na
+\fB\fB:\fR\fR
+.ad
+.sp .6
+.RS 4n
+Target list terminator. Words following the colon are added to the dependency
+list for the target or targets. If a target is named in more than one
+colon-terminated target entry, the dependencies for all its entries are added
+to form that target's complete dependency list.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB::\fR\fR
+.ad
+.sp .6
+.RS 4n
+Target terminator for alternate dependencies. When used in place of a \fB:\fR
+the double-colon allows a target to be checked and updated with respect to
+alternate dependency lists. When the target is out-of-date with respect to
+dependencies listed in the first alternate, it is built according to the rule
+for that entry. When out-of-date with respect to dependencies in another
+alternate, it is built according the rule in that other entry. Implicit rules
+do not apply to double-colon targets; you must supply a rule for each entry. If
+no dependencies are specified, the rule is always performed.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fItarget\fR [\fB+\fR \fItarget\fR.\|.\|.\|] \fB:\fR\fR
+.ad
+.sp .6
+.RS 4n
+Target group. The rule in the target entry builds all the indicated targets as
+a group. It is normally performed only once per \fBmake\fR run, but is checked
+for command dependencies every time a target in the group is encountered in the
+dependency scan.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB%\fR\fR
+.ad
+.sp .6
+.RS 4n
+Pattern matching wild card metacharacter.  Like the \fB*\fR shell wild card,
+\fB%\fR matches any string of zero or more characters in a target name or
+dependency, in the target portion of a conditional macro definition, or within
+a pattern replacement macro reference. Notice that only one \fB%\fR can appear
+in a target, dependency-name, or pattern-replacement macro reference.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB\&./\fR\fIpathname\fR\fR
+.ad
+.sp .6
+.RS 4n
+\fBmake\fR ignores the leading \fB\&./\fR characters from targets with names
+given as pathnames relative to "dot," the working directory.
+.RE
+
+.SS "\fIMacros\fR"
+.ne 2
+.na
+\fB\fB=\fR\fR
+.ad
+.RS 9n
+Macro definition. The word to the left of this character is the macro name;
+words to the right comprise its value. Leading and trailing white space
+characters are stripped from the value. A word break following the \fB=\fR is
+implied.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB$\fR\fR
+.ad
+.RS 9n
+Macro reference. The following character, or the parenthesized or bracketed
+string, is interpreted as a macro reference: \fBmake\fR expands the reference
+(including the \fB$\fR) by replacing it with the macro's value.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB( )\fR\fR
+.ad
+.br
+.na
+\fB\fB{ }\fR\fR
+.ad
+.RS 9n
+Macro-reference name delimiters. A parenthesized or bracketed word appended to
+a \fB$\fR is taken as the name of the macro being referred to. Without the
+delimiters, \fBmake\fR recognizes only the first character as the macro name.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB$$\fR\fR
+.ad
+.RS 9n
+A reference to the dollar-sign macro, the value of which is the character
+\fB$\fR. Used to pass variable expressions beginning with \fB$\fR to the shell,
+to refer to environment variables which are expanded by the shell, or to delay
+processing of dynamic macros within the dependency list of a target, until that
+target is actually processed.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB\e$\fR\fR
+.ad
+.RS 9n
+Escaped dollar-sign character.  Interpreted as a literal dollar sign within a
+rule.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB+=\fR\fR
+.ad
+.RS 9n
+When used in place of \fB=\fR, appends a string to a macro definition (must be
+surrounded by white space, unlike \fB=\fR).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB:=\fR\fR
+.ad
+.RS 9n
+Conditional macro assignment. When preceded by a list of targets with explicit
+target entries, the macro definition that follows takes effect when processing
+only those targets, and their dependencies.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB:sh\fR \fB=\fR\fR
+.ad
+.RS 9n
+Define the value of a macro to be the output of a command (see Command
+Substitutions below).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB:sh\fR\fR
+.ad
+.RS 9n
+In a macro reference, execute the command stored in the macro, and replace the
+reference with the output of that command (see \fBCommand Substitutions\fR
+below).
+.RE
+
+.SS "\fIRules\fR"
+.ne 2
+.na
+\fB\fB+\fR\fR
+.ad
+.RS 8n
+\fBmake\fR always executes the commands preceded by a "\fB+\fR", even when
+\fB-n\fR is specified.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB\(mi\fR\fR
+.ad
+.RS 8n
+\fBmake\fR ignores any nonzero error code returned by a command line for which
+the first non-\fBTAB\fR character is a \fB\(mi\fR\&. This character is not
+passed to the shell as part of the command line. \fBmake\fR normally terminates
+when a command returns nonzero status, unless the \fB-i\fR or \fB-k\fR options,
+or the \fB\&.IGNORE:\fR special-function target is in effect.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB@\fR\fR
+.ad
+.RS 8n
+If the first non-\fBTAB\fR character is a \fB@\fR, \fBmake\fR does not print
+the command line before executing it. This character is not passed to the
+shell.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB?\fR\fR
+.ad
+.RS 8n
+Escape command-dependency checking. Command lines starting with this character
+are not subject to command dependency checking.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB!\fR\fR
+.ad
+.RS 8n
+Force command-dependency checking. Command-dependency checking is applied to
+command lines for which it would otherwise be suppressed. This checking is
+normally suppressed for lines that contain references to the \fB?\fR dynamic
+macro (for example, \fB$?\fR).
+.sp
+When any combination of \fB+\fR, \fB\(mi\fR, \fB@\fR, \fB?\fR, or \fB!\fR
+appear as the first characters after the \fBTAB\fR, all that are present apply.
+None are passed to the shell.
+.RE
+
+.SS "Special-Function Targets"
+.LP
+When incorporated in a makefile, the following target names perform
+special-functions:
+.sp
+.ne 2
+.na
+\fB\fB\&.DEFAULT:\fR\fR
+.ad
+.RS 23n
+If it has an entry in the makefile, the rule for this target is used to process
+a target when there is no other entry for it, no rule for building it, and no
+\fBSCCS\fR history file from which to retrieve a current version. \fBmake\fR
+ignores any dependencies for this target.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB\&.DONE:\fR\fR
+.ad
+.RS 23n
+If defined in the makefile, \fBmake\fR processes this target and its
+dependencies after all other targets are built.  This target is also performed
+when \fBmake\fR halts with an error, unless the \fB\&.FAILED\fR target is
+defined.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB\&.FAILED:\fR\fR
+.ad
+.RS 23n
+This target, along with its dependencies, is performed instead of \fB\&.DONE\fR
+when defined in the makefile and \fBmake\fR halts with an error.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB\&.GET_POSIX:\fR\fR
+.ad
+.RS 23n
+This target contains the rule for retrieving the current version of an
+\fBSCCS\fR file from its history file in the current working directory.
+\fBmake\fR uses this rule when it is running in POSIX mode.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB\&.IGNORE:\fR\fR
+.ad
+.RS 23n
+Ignore errors.  When this target appears in the makefile, \fBmake\fR ignores
+non-zero error codes returned from commands. When used in POSIX mode,
+\fB\&.IGNORE\fR could be followed by target names only, for which the errors is
+ignored.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB\&.INIT:\fR\fR
+.ad
+.RS 23n
+If defined in the makefile, this target and its dependencies are built before
+any other targets are processed.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB\&.KEEP_STATE:\fR\fR
+.ad
+.RS 23n
+If this target is in effect, \fBmake\fR updates the state file,
+\fB\&.make.state\fR, in the current directory.  This target also activates
+command dependencies, and hidden dependency checks. If either the
+\fB\&.KEEP_STATE:\fR target appears in the makefile, or the environment
+variable \fBKEEP_STATE\fR is set (\fBsetenv KEEP_STATE\fR), \fBmake\fR rebuilds
+everything in order to collect dependency information, even if all the targets
+were up to date due to previous \fBmake\fR runs. See also the Environment
+Variables section.  This target has no effect if used in POSIX mode.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB\&.KEEP_STATE_FILE:\fR\fR
+.ad
+.RS 23n
+This target has no effect if used in POSIX mode. This target implies
+\fB\&.KEEP_STATE\fR. If the target is followed by a filename, \fBmake\fR uses
+it as the state file. If the target is followed by a directory name, \fBmake\fR
+looks for a \fB\&.make.state\fR file in that directory. If the target is not
+followed by any name, \fBmake\fR looks for \fB\&.make.state\fR file in the
+current working directory.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB\&.MAKE_VERSION:\fR\fR
+.ad
+.RS 23n
+A target-entry of the form:
+.sp
+.in +2
+.nf
+\&.MAKE_VERSION:  VERSION\(mi\fInumber\fR
+.fi
+.in -2
+
+enables version checking. If the version of \fBmake\fR differs from the version
+indicated by a string like \fBVERSION-1.0\fR, \fBmake\fR issues a warning
+message.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB\&.NO_PARALLEL:\fR\fR
+.ad
+.RS 23n
+Dependencies of this target will be executed serially.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB\&.PARALLEL:\fR\fR
+.ad
+.RS 23n
+Dependencies of this target will be executed in parallel.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB\&.POSIX:\fR\fR
+.ad
+.RS 23n
+This target enables POSIX mode.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB\&.PRECIOUS:\fR\fR
+.ad
+.RS 23n
+List of files not to delete. \fBmake\fR does not remove any of the files listed
+as dependencies for this target when interrupted. \fBmake\fR normally removes
+the current target when it receives an interrupt. When used in POSIX mode, if
+the target is not followed by a list of files, all the file are assumed
+precious.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB\&.SCCS_GET:\fR\fR
+.ad
+.RS 23n
+This target contains the rule for retrieving the current version of an
+\fBSCCS\fR file from its history file. To suppress automatic retrieval, add an
+entry for this target with an empty rule to your makefile.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB\&.SCCS_GET_POSIX:\fR\fR
+.ad
+.RS 23n
+This target contains the rule for retrieving the current version of an
+\fBSCCS\fR file from its history file. \fBmake\fR uses this rule when it is
+running in POSIX mode.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB\&.SILENT:\fR\fR
+.ad
+.RS 23n
+Run silently. When this target appears in the makefile, \fBmake\fR does not
+echo commands before executing them. When used in POSIX mode, it could be
+followed by target names, and only those are executed silently.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB\&.SUFFIXES:\fR\fR
+.ad
+.RS 23n
+The suffixes list for selecting implicit rules (see The Suffixes List).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB\&.WAIT:\fR\fR
+.ad
+.RS 23n
+In a dependency list, wait until any dependency preceding this has completed
+before moving on to any dependency following it.
+.RE
+
+.SS "\fIClearing Special Targets\fR"
+.LP
+In this version of \fBmake\fR, you can clear the definition of the following
+special targets by supplying entries for them with no dependencies and no rule:
+.sp
+.LP
+\fB\&.DEFAULT, .SCCS_GET,  and .SUFFIXES\fR
+.SS "Command Dependencies"
+.LP
+When the \fB\&.KEEP_STATE:\fR target is effective, \fBmake\fR checks the
+command for building a target against the state file. If the command has
+changed since the last \fBmake\fR run, \fBmake\fR rebuilds the target.
+.SS "Hidden Dependencies"
+.LP
+When the \fB\&.KEEP_STATE:\fR target is effective, \fBmake\fR reads reports
+from \fBcpp\fR(1) and other compilation processors for any "hidden" files, such
+as \fB#include\fR files. If the target is out of date with respect to any of
+these files, \fBmake\fR rebuilds it.
+.SS "Macros"
+.LP
+Entries of the form
+.sp
+.in +2
+.nf
+\fImacro\fR\fB=\fR\fIvalue\fR
+.fi
+.in -2
+
+.sp
+.LP
+define macros. \fImacro\fR is the name of the macro, and \fIvalue\fR, which
+consists of all characters up to a comment character or unescaped
+\fBNEWLINE\fR, is the value. \fBmake\fR strips both leading and trailing white
+space in accepting the value.
+.sp
+.LP
+Subsequent references to the macro, of the forms: \fB$(\fR\fIname\fR\fB)\fR or
+\fB${\fR\fIname\fR\fB}\fR are replaced by \fIvalue\fR. The parentheses or
+brackets can be omitted in a reference to a macro with a single-character name.
+.sp
+.LP
+Macro references can contain references to other macros, in which case nested
+references are expanded first.
+.SS "\fISuffix Replacement Macro References\fR"
+.LP
+Substitutions within macros can be made as follows:
+.sp
+.in +2
+.nf
+     \fB$(\fR\fIname\fR\fB:\fR\fIstring1\fR\fB=\fR\fIstring2\fR\fB)\fR
+.fi
+.in -2
+
+.sp
+.LP
+where \fIstring1\fR is either a suffix, or a word to be replaced in the macro
+definition, and \fIstring2\fR is the replacement suffix or word. Words in a
+macro value are separated by \fBSPACE\fR, \fBTAB\fR, and escaped \fBNEWLINE\fR
+characters.
+.SS "\fIPattern Replacement Macro References\fR"
+.LP
+Pattern matching replacements can also be applied to macros, with a reference
+of the form:
+.sp
+.in +2
+.nf
+     \fB$(\fR\fIname\fR\fB:\fR \fIop\fR\fB%\fR\fIos\fR\fB=\fR \fInp\fR\fB%\fR\fIns\fR\fB)\fR
+.fi
+.in -2
+
+.sp
+.LP
+where \fIop\fR is the existing (old) prefix and \fIos\fR is the existing (old)
+suffix, \fInp\fR and \fIns\fR are the new prefix and new suffix, respectively,
+and the pattern matched by \fB%\fR (a string of zero or more characters), is
+carried forward from the value being replaced. For example:
+.sp
+.in +2
+.nf
+\fBPROGRAM=fabricate 
+DEBUG= $(PROGRAM:%=tmp/%\(mig)\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+sets the value of \fBDEBUG\fR to \fBtmp/fabricate\(mig\fR.
+.sp
+.LP
+Notice that pattern replacement macro references cannot be used in the
+dependency list of a pattern matching rule; the \fB%\fR characters are not
+evaluated independently. Also, any number of \fB%\fR metacharacters can appear
+after the equal-sign.
+.SS "\fIAppending to a Macro\fR"
+.LP
+Words can be appended to macro values as follows:
+.sp
+.in +2
+.nf
+     \fImacro\fR \fB+=\fR \fIword .\|.\|.\fR
+.fi
+.in -2
+
+.SS "Special-Purpose Macros"
+.LP
+When the \fBMAKEFLAGS\fR variable is present in the environment, \fBmake\fR
+takes options from it, in combination with options entered on the command line.
+\fBmake\fR retains this combined value as the \fBMAKEFLAGS\fR macro, and
+exports it automatically to each command or shell it invokes.
+.sp
+.LP
+Notice that flags passed by way of \fBMAKEFLAGS\fR are only displayed when the
+\fB-d\fR, or \fB-dd\fR options are in effect.
+.sp
+.LP
+The \fBMAKE\fR macro is another special case. It has the value \fBmake\fR by
+default, and temporarily overrides the \fB-n\fR option for any line in which it
+is referred to. This allows nested invocations of \fBmake\fR written as:
+.sp
+.in +2
+.nf
+     \fB$(MAKE)\fR .\|.\|. 
+.fi
+.in -2
+
+.sp
+.LP
+to run recursively, with the \fB-n\fR flag in effect for all commands but
+\fBmake\fR. This lets you use \fBmake\fR \fB-n\fR to test an entire hierarchy
+of makefiles.
+.sp
+.LP
+For compatibility with the 4.2 \fBBSD\fR \fBmake\fR, the \fBMFLAGS\fR macro is
+set from the \fBMAKEFLAGS\fR variable by prepending a \fB-\fR\&. \fBMFLAGS\fR
+is not exported automatically.
+.sp
+.LP
+The \fBSHELL\fR macro, when set to a single-word value such as
+\fB/usr/bin/csh\fR, indicates the name of an alternate shell to use. The
+default is \fB/bin/sh\fR. Notice that \fBmake\fR executes commands that contain
+no shell metacharacters itself. Built-in commands, such as \fBdirs\fR in the C
+shell, are not recognized unless the command line includes a metacharacter (for
+instance, a semicolon). This macro is neither imported from, nor exported to
+the environment, regardless of \fB-e\fR. To be sure it is set properly, you
+must define this macro within every makefile that requires it.
+.sp
+.LP
+The syntax of the \fBVPATH\fR macro is:
+.sp
+.in +2
+.nf
+     \fBVPATH\fR = [ \fIpathname\fR [ : \fIpathname\fR ] ... ]
+.fi
+.in -2
+
+.sp
+.LP
+\fBVPATH\fR specifies a list of directories to search for the files, which are
+targets or dependencies, when \fBmake\fR is executed.  \fBVPATH\fR is also used
+in order to search for the \fBinclude\fR files mentioned in the particular
+makefile.
+.sp
+.LP
+When processing a target or a dependency or an include directive, \fBmake\fR
+checks the existence of the file with the same name in the current directory.
+If the file is found to be missing, \fBmake\fR searches for this file in the
+list of directories presented in \fBVPATH\fR (like the \fBPATH\fR variable in
+the shell). Unlike the \fBPATH\fR variable, \fBVPATH\fR is used in order to
+search for the files with relative pathnames. When \fBmake\fR attempts to apply
+implicit rules to the target, it also searches for the dependency files using
+\fBVPATH\fR.
+.sp
+.LP
+When the file is found using \fBVPATH\fR, internal macros \fB$@\fR, \fB@<\fR,
+\fB$?\fR, \fB$*\fR, and their alternative forms (with \fBD\fR or \fBF\fR
+appended) are set in accordance with the name derived from \fBVPATH\fR. For
+instance, if the target \fBsubdir/foo.o\fR is found in the directory
+\fB/aaa/bbb\fR using \fBVPATH\fR, then the value of the internal macro \fB$@\fR
+for this target is \fB/aaa/bbb/subdir/foo.o\fR.
+.sp
+.LP
+If a target or a dependency file is found using \fBVPATH\fR, then any
+occurrences of the word that is the same as the target name in the subsequent
+rules are replaced with the actual name of the target derived from \fBVPATH\fR.
+.sp
+.LP
+For example:
+.sp
+.in +2
+.nf
+\fBVPATH=./subdir
+file.o : file.c
+         cc -c file.c -o file.o\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+If \fBfile.c\fR is found in \fB\&./subdir\fR, then the command
+.sp
+.in +2
+.nf
+\fBcc -c ./subdir/file.c -o file.o\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+are executed.
+.sp
+.LP
+The following macros are provided for use with cross-compilation:
+.sp
+.ne 2
+.na
+\fB\fBHOST_ARCH\fR\fR
+.ad
+.RS 15n
+The processor type of the host system. By default, this is the output of the
+\fBmach\fR(1) command, prepended with \fB-\fR\&. Under normal circumstances,
+this value should never be altered by the user.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBHOST_MACH\fR\fR
+.ad
+.RS 15n
+The machine architecture of the host system. By default, this is the output of
+the \fBarch\fR(1) command, prepended with \fB\(mi\fR\&. Under normal
+circumstances, this value should never be altered by the user.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBTARGET_ARCH\fR\fR
+.ad
+.RS 15n
+The processor type of the target system. By default, the output of \fBmach\fR,
+prepended with \fB\(mi\fR\&.
+.RE
+
+.SS "Dynamic Macros"
+.LP
+There are several dynamically maintained macros that are useful as
+abbreviations within rules. They are shown here as references; if you were to
+define them, \fBmake\fR would simply override the definition.
+.sp
+.ne 2
+.na
+\fB\fB$*\fR\fR
+.ad
+.RS 6n
+The basename of the current target, derived as if selected for use with an
+implicit rule.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB$<\fR\fR
+.ad
+.RS 6n
+The name of a dependency file, derived as if selected for use with an implicit
+rule.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB$@\fR\fR
+.ad
+.RS 6n
+The name of the current target. This is the only dynamic macro whose value is
+strictly determined when used in a dependency list. (In which case it takes the
+form \fB$$@\fR.)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB$?\fR\fR
+.ad
+.RS 6n
+The list of dependencies that are newer than the target. Command-dependency
+checking is automatically suppressed for lines that contain this macro, just as
+if the command had been prefixed with a \fB?\fR. See the description of
+\fB?\fR, under \fBSpecial Character\fR Rules above. You can force this check
+with the \fB!\fR command-line prefix.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB$%\fR\fR
+.ad
+.RS 6n
+The name of the library member being processed. (See Library Maintenance
+below.)
+.RE
+
+.sp
+.LP
+To refer to the \fB$@\fR dynamic macro within a dependency list, precede the
+reference with an additional \fB$\fR character (as in, \fB$$@\fR). Because
+\fBmake\fR assigns \fB$<\fR and \fB$*\fR as it would for implicit rules
+(according to the suffixes list and the directory contents), they can be
+unreliable when used within explicit target entries.
+.sp
+.LP
+These macros can be modified to apply either to the filename part, or the
+directory part of the strings they stand for, by adding an upper case \fBF\fR
+or \fBD\fR, respectively (and enclosing the resulting name in parentheses or
+braces). Thus, \fB$(@D)\fR refers to the directory part of the string \fB$@\fR;
+if there is no directory part, \fB\&.\fR is assigned. \fB$(@F)\fR refers to the
+filename part.
+.SS "Conditional Macro Definitions"
+.LP
+A macro definition of the form:
+.sp
+.in +2
+.nf
+\fItarget-list\fR \fB:=\fR \fImacro\fR \fB=\fR \fIvalue\fR
+.fi
+.in -2
+
+.sp
+.LP
+indicates that when processing any of the targets listed \fIand their
+dependencies\fR, \fImacro\fR is to be set to the \fIvalue\fR supplied. Notice
+that if a conditional macro is referred to in a dependency list, the \fB$\fR
+must be delayed (use \fB$$\fR instead). Also, \fItarget-list\fR can contain a
+\fB%\fR pattern, in which case the macro is conditionally defined for all
+targets encountered that match the pattern. A pattern replacement reference can
+be used within the \fIvalue\fR.
+.sp
+.LP
+You can temporarily append to a macros value with a conditional definition of
+the form:
+.sp
+.in +2
+.nf
+\fItarget-list\fR \fB:=\fR \fImacro\fR \fB+=\fR \fIvalue\fR
+.fi
+.in -2
+
+.SS "Predefined Macros"
+.LP
+\fBmake\fR supplies the macros shown in the table that follows for compilers
+and their options, host architectures, and other commands. Unless these macros
+are read in as environment variables, their values are not exported by
+\fBmake\fR. If you run \fBmake\fR with any of these set in the environment, it
+is a good idea to add commentary to the makefile to indicate what value each is
+expected to take. If \fB-r\fR is in effect, \fBmake\fR does not read the
+default makefile (\fB\&./make.rules\fR or \fB/usr/share/lib/make/make.rules\fR)
+in which these macro definitions are supplied.
+.sp
+
+.sp
+.TS
+box;
+cw(1i) | cw(1.17i) | cw(3.33i)
+cw(1i) | cw(1.17i) | cw(3.33i) .
+\fITable of Predefined Macros\fR
+_
+\fIUse\fR	\fIMacro\fR	\fIDefault Value\fR
+_
+Library	\fBAR\fR	\fBar\fR
+Archives	\fBARFLAGS\fR	\fBrv\fR
+_
+		
+Assembler	\fBAS\fR	\fBas\fR
+Commands	\fBASFLAGS\fR	
+	\fBCOMPILE.s\fR	\fB$(AS) $(ASFLAGS)\fR
+	\fBCOMPILE.S\fR	\fB$(CC) $(ASFLAGS) $(CPPFLAGS)\fR \fB-c\fR
+_
+		
+C	\fBCC\fR	\fBcc\fR
+Compiler	\fBCFLAGS\fR	
+Commands	\fBCPPFLAGS\fR	
+	\fBCOMPILE.c\fR	\fB$(CC) $(CFLAGS) $(CPPFLAGS)\fR \fB-c\fR
+	\fBLINK.c\fR	\fB$(CC) $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)\fR
+_
+		
+C++	\fBCCC\fR	\fBCC\fR
+Compiler	\fBCCFLAGS\fR	\fBCFLAGS\fR
+Commands	\fBCPPFLAGS\fR	
+	\fBCOMPILE.cc\fR	\fB$(CCC) $(CCFLAGS) $(CPPFLAGS)\fR \fB-c\fR
+	\fBLINK.cc\fR	\fB$(CCC) $(CCFLAGS) $(CPPFLAGS) $(LDFLAGS)\fR
+	\fBCOMPILE.C\fR	\fB$(CCC) $(CCFLAGS) $(CPPFLAGS)\fR \fB-c\fR
+	\fBLINK.C\fR	\fB$(CCC) $(CCFLAGS) $(CPPFLAGS) $(LDFLAGS)\fR
+_
+		
+FORTRAN 77	\fBFC\fR	\fBf77\fR
+Compiler	\fBFFLAGS\fR	
+Commands	\fBCOMPILE.f\fR	\fB$(FC) $(FFLAGS)\fR \fB-c\fR
+	\fBLINK.f\fR	\fB$(FC) $(FFLAGS) $(LDFLAGS)\fR
+	\fBCOMPILE.F\fR	\fB$(FC) $(FFLAGS) $(CPPFLAGS)\fR \fB-c\fR
+	\fBLINK.F\fR	\fB$(FC) $(FFLAGS) $(CPPFLAGS) $(LDFLAGS)\fR
+_
+		
+FORTRAN 90	\fBFC\fR	\fBf90\fR
+Compiler	\fBF90FLAGS\fR	
+Commands	\fBCOMPILE.f90\fR	\fB$(F90C) $(F90FLAGS)\fR \fB-c\fR
+	\fBLINK.f90\fR	\fB$(F90C) $(F90FLAGS) $(LDFLAGS)\fR
+	\fBCOMPILE.ftn\fR	\fB$(F90C) $(F90FLAGS) $(CPPFLAGS)\fR \fB-c\fR
+	\fBLINK.ftn\fR	T{
+\fB$(F90C) $(F90FLAGS) $(CPPFLAGS) $(LDFLAGS)\fR
+T}
+_
+		
+Link Editor	\fBLD\fR	\fBld\fR
+Command	\fBLDFLAGS\fR	
+_
+		
+lex	\fBLEX\fR	\fBlex\fR
+Command	\fBLFLAGS\fR	
+	\fBLEX.l\fR	\fB$(LEX) $(LFLAGS)\fR \fB-t\fR
+_
+		
+lint	\fBLINT\fR	\fBlint\fR
+Command	\fBLINTFLAGS\fR	
+	\fBLINT.c\fR	\fB$(LINT) $(LINTFLAGS) $(CPPFLAGS)\fR
+_
+		
+Modula 2	\fBM2C\fR	\fBm2c\fR
+Commands	\fBM2FLAGS\fR	
+	\fBMODFLAGS\fR	
+	\fBDEFFLAGS\fR	
+	\fBCOMPILE.def\fR	\fB$(M2C) $(M2FLAGS) $(DEFFLAGS)\fR
+	\fBCOMPILE.mod\fR	\fB$(M2C) $(M2FLAGS) $(MODFLAGS)\fR
+_
+		
+Pascal	\fBPC\fR	\fBpc\fR
+Compiler	\fBPFLAGS\fR	
+Commands	\fBCOMPILE.p\fR	\fB$(PC) $(PFLAGS) $(CPPFLAGS)\fR \fB-c\fR
+	\fBLINK.p\fR	\fB$(PC) $(PFLAGS) $(CPPFLAGS) $(LDFLAGS)\fR
+_
+		
+Ratfor	\fBRFLAGS\fR	
+Compilation	\fBCOMPILE.r\fR	\fB$(FC) $(FFLAGS) $(RFLAGS)\fR \fB-c\fR
+Commands	\fBLINK.r\fR	\fB$(FC) $(FFLAGS) $(RFLAGS) $(LDFLAGS)\fR
+_
+		
+rm Command	\fBRM\fR	\fBrm\fR \fB-f\fR
+_
+		
+sccs	\fBSCCSFLAGS\fR	
+Command	\fBSCCSGETFLAGS\fR	\fB-s\fR
+_
+		
+yacc	\fBYACC\fR	\fByacc\fR
+Command	\fBYFLAGS\fR	
+	\fBYACC.y\fR	\fB$(YACC) $(YFLAGS)\fR
+_
+		
+Suffixes List	\fBSUFFIXES\fR	T{
+\fB\&.o .c .c~ .cc .cc~ .y .y~ .l .l~ .s .s~ .sh .sh~ .S .S~ .ln .h .h~ .f .f~ .F .F~  .mod .mod~ .sym .def .def~ .p .p~ .r .r~ .cps .cps~ .C .C~ .Y .Y~ .L .L .f90 .f90~ .ftn .ftn~\fR
+T}
+.TE
+
+.SS "Implicit Rules"
+.LP
+When a target has no entry in the makefile, \fBmake\fR attempts to determine
+its class (if any) and apply the rule for that class. An implicit rule
+describes how to build any target of a given class, from an associated
+dependency file. The class of a target can be determined either by a pattern,
+or by a suffix; the corresponding dependency file (with the same basename) from
+which such a target might be built. In addition to a predefined set of implicit
+rules, \fBmake\fR allows you to define your own, either by pattern, or by
+suffix.
+.SS "\fIPattern Matching Rules\fR"
+.LP
+A target entry of the form:
+.sp
+.in +2
+.nf
+\fItp\fR\fB%\fR\fIts\fR:\|\fIdp\fR\fB%\fR\fIds\fR
+     \fIrule\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+is a pattern matching rule, in which \fItp\fR is a target prefix, \fIts\fR is a
+target suffix, \fIdp\fR is a dependency prefix, and \fIds\fR is a dependency
+suffix (any of which can be null). The \fB%\fR stands for a basename of zero or
+more characters that is matched in the target, and is used to construct the
+name of a dependency. When \fBmake\fR encounters a match in its search for an
+implicit rule, it uses the rule in that target entry to build the target from
+the dependency file. Pattern-matching implicit rules typically make use of the
+\fB$@\fR and \fB$<\fR dynamic macros as placeholders for the target and
+dependency names. Other, regular dependencies can occur in the dependency list;
+however, none of the regular dependencies can contain \fB%\fR. An entry of the
+form:
+.sp
+.in +2
+.nf
+\fItp\fR%\fIts\fR:\|[\fIdependency .\|.\|.\fR\|] \fIdp\fR%\fIds\fR\|[\fIdependency .\|.\|.\fR\|] 
+     \fIrule\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+is a valid pattern matching rule.
+.SS "\fISuffix Rules\fR"
+.LP
+When no pattern matching rule applies, \fBmake\fR checks the target name to see
+if it ends with a suffix in the known suffixes list. If so, \fBmake\fR checks
+for any suffix rules, as well as a dependency file with same root and another
+recognized suffix, from which to build it.
+.sp
+.LP
+The target entry for a suffix rule takes the form:
+.sp
+.in +2
+.nf
+\fIDsTs\fR: \fIrule\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+where \fITs\fR is the suffix of the target, \fIDs\fR is the suffix of the
+dependency file, and \fIrule\fR is the rule for building a target in the class.
+Both \fIDs\fR and \fITs\fR must appear in the suffixes list. (A suffix need not
+begin with a \fB\&.\fR to be recognized.)
+.sp
+.LP
+A suffix rule with only one suffix describes how to build a target having a
+null (or no) suffix from a dependency file with the indicated suffix. For
+instance, the \fB\&.c\fR rule could be used to build an executable program
+named \fBfile\fR from a C source file named \fBfile.c\fR. If a target with a
+null suffix has an explicit dependency, \fBmake\fR omits the search for a
+suffix rule.
+.sp
+
+.sp
+.TS
+box;
+cw(1.57i) |cw(3.93i) 
+cw(1.57i) |cw(3.93i) .
+T{
+\fITable of Standard Implicit (Suffix) Rules for Assembly Files\fR
+T}
+_
+\fIImplicit Rule Name\fR	\fICommand Line\fR
+_
+\fB\&.s.o\fR	\fB$(COMPILE.s)\fR \fB-o\fR \fB$@ $<\fR
+_
+	
+\fB\&.s.a\fR	\fB$(COMPILE.s)\fR \fB-o\fR \fB$% $<\fR
+	\fB$(AR) $(ARFLAGS) $@ $%\fR
+	\fB$(RM) $%\fR
+_
+	
+\fB\&.s~.o\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.s\fR
+	\fB$(COMPILE.s)\fR \fB-o\fR \fB$@ $*.s\fR
+_
+	
+\fB\&.S.o\fR	\fB$(COMPILE.S)\fR \fB-o\fR \fB$@ $<\fR
+_
+	
+\fB\&.S.a\fR	\fB$(COMPILE.S)\fR \fB-o\fR \fB$% $<\fR
+	\fB$(AR) $(ARFLAGS) $@ $%\fR
+	\fB$(RM) $%\fR
+_
+	
+\fB\&.S~.o\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.S\fR
+	\fB$(COMPILE.S)\fR \fB-o\fR \fB$@ $*.S\fR
+_
+	
+\fB\&.S~.a\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.S\fR
+	\fB$(COMPILE.S)\fR \fB-o\fR \fB$% $*.S\fR
+	\fB$(AR) $(ARFLAGS) $@ $%\fR
+	\fB$(RM) $%\fR
+.TE
+
+.sp
+
+.sp
+.TS
+box;
+cw(1.57i) |cw(3.93i) 
+cw(1.57i) |cw(3.93i) .
+T{
+\fITable of Standard Implicit (Suffix) Rules for C Files\fR
+T}
+_
+\fIImplicit Rule Name\fR	\fICommand Line\fR
+_
+\fB\&.c\fR	\fB$(LINK.c)\fR \fB-o\fR \fB$@ $< $(LDLIBS)\fR
+_
+	
+\fB\&.c.ln\fR	\fB$(LINT.c) $(OUTPUT_OPTION)\fR \fB-i\fR \fB$<\fR
+_
+	
+\fB\&.c.o\fR	\fB$(COMPILE.c) $(OUTPUT_OPTION) $<\fR
+_
+	
+\fB\&.c.a\fR	\fB$(COMPILE.c)\fR \fB-o\fR \fB$% $<\fR
+	\fB$(AR) $(ARFLAGS) $@ $%\fR
+	\fB$(RM) $%\fR
+_
+	
+\fB\&.c~\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.c\fR
+	\fB$(CC) $(CFLAGS) $(LDFLAGS)\fR \fB-o\fR \fB$@ $*.c\fR
+_
+	
+\fB\&.c~.o\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.c\fR
+	\fB$(CC) $(CFLAGS)\fR \fB-c\fR \fB$*.c\fR
+_
+	
+\fB\&.c~.ln\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.c\fR
+	\fB$(LINT.c) $(OUTPUT_OPTION)\fR \fB-c\fR \fB$*.c\fR
+_
+	
+\fB\&.c~.a\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.c\fR
+	\fB$(COMPILE.c)\fR \fB-o\fR \fB$% $*.c\fR
+	\fB$(AR) $(ARFLAGS) $@ $%\fR
+	\fB$(RM) $%\fR
+.TE
+
+.sp
+
+.sp
+.TS
+box;
+cw(1.57i) |cw(3.93i) 
+cw(1.57i) |cw(3.93i) .
+T{
+\fITable of Standard Implicit (Suffix) Rules for C++ Files\fR
+T}
+_
+\fIImplicit Rule Name\fR	\fICommand Line\fR
+_
+\fB\&.cc\fR	\fB$(LINK.cc)\fR \fB-o\fR \fB$@ $< $(LDLIBS)\fR
+_
+	
+\fB\&.cc.o\fR	\fB$(COMPILE.cc) $(OUTPUT_OPTION) $<\fR
+_
+	
+\fB\&.cc.a\fR	\fB$(COMPILE.cc)\fR \fB-o\fR \fB$% $<\fR
+	\fB$(AR) $(ARFLAGS) $@ $%\fR
+	\fB$(RM) $%\fR
+_
+	
+\fB\&.cc~\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.cc\fR
+	\fB$(LINK.cc)\fR \fB-o\fR \fB$@ $*.cc $(LDLIBS)\fR
+_
+	
+\fB\&.cc.o\fR	\fB$(COMPILE.cc) $(OUTPUT_OPTION) $<\fR
+_
+	
+\fB\&.cc~.o\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.cc\fR
+	\fB$(COMPILE.cc) $(OUTPUT_OPTION) $*.cc\fR
+_
+	
+\fB\&.cc.a\fR	\fB$(COMPILE.cc)\fR \fB-o\fR \fB$% $<\fR
+	\fB$(AR) $(ARFLAGS) $@ $%\fR
+	\fB$(RM) $%\fR
+_
+	
+\fB\&.cc~.a\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.cc\fR
+	\fB$(COMPILE.cc)\fR \fB-o\fR \fB$% $*.cc\fR
+	\fB$(AR) $(ARFLAGS) $@ $%\fR
+	\fB$(RM) $%\fR
+_
+	
+\fB\&.C\fR	\fB$(LINK.C)\fR \fB-o\fR \fB$@ $< $(LDLIBS)\fR
+_
+	
+\fB\&.C~\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.C\fR
+	\fB$(LINK.C)\fR \fB-o\fR \fB$@ $*.C $(LDLIBS)\fR
+_
+	
+\fB\&.C.o\fR	\fB$(COMPILE.C) $(OUTPUT_OPTION) $<\fR
+_
+	
+\fB\&.C~.o\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.C\fR
+	\fB$(COMPILE.C) $(OUTPUT_OPTION) $*.C\fR
+_
+	
+\fB\&.C.a\fR	\fB$(COMPILE.C)\fR \fB-o\fR \fB$% $<\fR
+	\fB$(AR) $(ARFLAGS) $@ $%\fR
+	\fB$(RM) $%\fR
+_
+	
+\fB\&.C~.a\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.C\fR
+	\fB$(COMPILE.C)\fR \fB-o\fR \fB$% $*.C\fR
+	\fB$(AR) $(ARFLAGS) $@ $%\fR
+	\fB$(RM) $%\fR
+.TE
+
+.sp
+
+.sp
+.TS
+box;
+cw(1.57i) |cw(3.93i) 
+cw(1.57i) |cw(3.93i) .
+T{
+\fITable of Standard Implicit (Suffix) Rules for FORTRAN 77 Files\fR
+T}
+_
+\fIImplicit Rule Name\fR	\fICommand Line\fR
+_
+\fB\&.f\fR	\fB$(LINK.f)\fR \fB-o\fR \fB$@ $< $(LDLIBS)\fR
+_
+	
+\fB\&.f.o\fR	\fB$(COMPILE.f) $(OUTPUT_OPTION) $<\fR
+_
+	
+\fB\&.f.a\fR	\fB$(COMPILE.f)\fR \fB-o\fR \fB$% $<\fR
+	\fB$(AR) $(ARFLAGS) $@ $%\fR
+	\fB$(RM) $%\fR
+_
+	
+\fB\&.f\fR	\fB$(LINK.f)\fR \fB-o\fR \fB$@ $< $(LDLIBS)\fR
+_
+	
+\fB\&.f~\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.f\fR
+	\fB$(FC) $(FFLAGS) $(LDFLAGS)\fR \fB-o\fR \fB$@ $*.f\fR
+_
+	
+\fB\&.f~.o\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.f\fR
+	\fB$(FC) $(FFLAGS)\fR \fB-c\fR \fB$*.f\fR
+_
+	
+\fB\&.f~.a\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.f\fR
+	\fB$(COMPILE.f)\fR \fB-o\fR \fB$% $*.f\fR
+	\fB$(AR) $(ARFLAGS) $@ $%\fR
+	\fB$(RM) $%\fR
+_
+	
+\fB\&.F\fR	\fB$(LINK.F)\fR \fB-o\fR \fB$@ $< $(LDLIBS)\fR
+_
+	
+\fB\&.F.o\fR	\fB$(COMPILE.F) $(OUTPUT_OPTION) $<\fR
+_
+	
+\fB\&.F.a\fR	\fB$(COMPILE.F)\fR \fB-o\fR \fB$% $<\fR
+	\fB$(AR) $(ARFLAGS) $@ $%\fR
+	\fB$(RM) $%\fR
+_
+	
+\fB\&.F~\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.F\fR
+	\fB$(FC) $(FFLAGS) $(LDFLAGS)\fR \fB-o\fR \fB$@ $*.F\fR
+_
+	
+\fB\&.F~.o\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.F\fR
+	\fB$(FC) $(FFLAGS)\fR \fB-c\fR \fB$*.F\fR
+_
+	
+\fB\&.F~.a\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.F\fR
+	\fB$(COMPILE.F)\fR \fB-o\fR \fB$% $*.F\fR
+	\fB$(AR) $(ARFLAGS) $@ $%\fR
+	\fB$(RM) $%\fR
+.TE
+
+.sp
+
+.sp
+.TS
+box;
+cw(1.57i) |cw(3.93i) 
+cw(1.57i) |cw(3.93i) .
+T{
+\fITable of Standard Implicit (Suffix) Rules for FORTRAN 90 Files\fR
+T}
+_
+\fIImplicit Rule Name\fR	\fICommand Line\fR
+_
+\fB\&.f90\fR	\fB$(LINK.f90)\fR \fB-o\fR \fB$@ $< $(LDLIBS)\fR
+_
+	
+\fB\&.f90~\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.f90\fR
+	\fB$(LINK.f90)\fR \fB-o\fR \fB$@ $*.f90 $(LDLIBS)\fR
+_
+	
+\fB\&.f90.o\fR	\fB$(COMPILE.f90) $(OUTPUT_OPTION) $<\fR
+_
+	
+\fB\&.f90~.o\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.f90\fR
+	\fB$(COMPILE.f90) $(OUTPUT_OPTION) $*.f90\fR
+_
+	
+\fB\&.f90.a\fR	\fB$(COMPILE.f90)\fR \fB-o\fR \fB$% $<\fR
+	\fB$(AR) $(ARFLAGS) $@ $%\fR
+	\fB$(RM) $%\fR
+_
+	
+\fB\&.f90~.a\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.f90\fR
+	\fB$(COMPILE.f90)\fR \fB-o\fR \fB$% $*.f90\fR
+	\fB$(AR) $(ARFLAGS) $@ $%\fR
+	\fB$(RM) $%\fR
+_
+	
+\fB\&.ftn\fR	\fB$(LINK.ftn)\fR \fB-o\fR \fB$@ $< $(LDLIBS)\fR
+_
+	
+\fB\&.ftn~\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.ftn\fR
+	\fB$(LINK.ftn)\fR \fB-o\fR \fB$@ $*.ftn $(LDLIBS)\fR
+_
+	
+\fB\&.ftn.o\fR	\fB$(COMPILE.ftn) $(OUTPUT_OPTION) $<\fR
+_
+	
+\fB\&.ftn~.o\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.ftn\fR
+	\fB$(COMPILE.ftn) $(OUTPUT_OPTION) $*.ftn\fR
+_
+	
+\fB\&.ftn.a\fR	\fB$(COMPILE.ftn)\fR \fB-o\fR \fB$% $<\fR
+	\fB$(AR) $(ARFLAGS) $@ $%\fR
+	\fB$(RM) $%\fR
+_
+	
+\fB\&.ftn~.a\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.ftn\fR
+	\fB$(COMPILE.ftn)\fR \fB-o\fR \fB$% $*.ftn\fR
+	\fB$(AR) $(ARFLAGS) $@ $%\fR
+	\fB$(RM) $%\fR
+.TE
+
+.sp
+
+.sp
+.TS
+box;
+cw(1.57i) |cw(3.93i) 
+cw(1.57i) |cw(3.93i) .
+T{
+\fITable of Standard Implicit (Suffix) Rules for lex Files\fR
+T}
+_
+\fIImplicit Rule Name\fR	\fICommand Line\fR
+_
+\fB\&.l\fR	\fB$(RM) $*.c\fR
+	\fB$(LEX.l) $< > $*.c\fR
+	\fB$(LINK.c)\fR \fB-o\fR \fB$@ $*.c $(LDLIBS)\fR
+	\fB$(RM) $*.c\fR
+_
+	
+\fB\&.l.c\fR	\fB$(RM) $@\fR
+	\fB$(LEX.l) $< > $@\fR
+_
+	
+\fB\&.l.ln\fR	\fB$(RM) $*.c\fR
+	\fB$(LEX.l) $< > $*.c\fR
+	\fB$(LINT.c)\fR \fB-o\fR \fB$@\fR \fB-i\fR \fB$*.c\fR
+	\fB$(RM) $*.c\fR
+_
+	
+\fB\&.l.o\fR	\fB$(RM) $*.c\fR
+	\fB$(LEX.l) $< > $*.c\fR
+	\fB$(COMPILE.c)\fR \fB-o\fR \fB$@ $*.c\fR
+	\fB$(RM) $*.c\fR
+_
+	
+\fB\&.l~\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.l\fR
+	\fB$(LEX) $(LFLAGS) $*.l\fR
+	\fB$(CC) $(CFLAGS)\fR \fB-c\fR \fBlex.yy.c\fR
+	\fBrm\fR \fB-f\fR \fBlex.yy.c\fR
+	\fBmv lex.yy.c $@\fR
+_
+	
+\fB\&.l~.c\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.l\fR
+	\fB$(LEX) $(LFLAGS) $*.l\fR
+	\fBmv lex.yy.c $@\fR
+_
+	
+\fB\&.l~.ln\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.l\fR
+	\fB$(RM) $*.c\fR
+	\fB$(LEX.l) $*.l > $*.c\fR
+	\fB$(LINT.c)\fR \fB-o\fR \fB$@\fR \fB-i\fR \fB$*.c\fR
+	\fB$(RM) $*.c\fR
+_
+	
+\fB\&.l~.o\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.l\fR
+	\fB$(LEX) $(LFLAGS) $*.l\fR
+	\fB$(CC) $(CFLAGS)\fR \fB-c\fR \fBlex.yy.c\fR
+	\fBrm\fR \fB-f\fR \fBlex.yy.c\fR
+	\fBmv lex.yy.c $@\fR
+.TE
+
+.sp
+
+.sp
+.TS
+box;
+cw(1.57i) |cw(3.93i) 
+cw(1.57i) |cw(3.93i)  .
+T{
+\fITable of Standard Implicit (Suffix) Rules for Modula 2 Files\fR
+T}
+_
+\fIImplicit Rule Name\fR	\fICommand Line\fR
+_
+\fB\&.mod\fR	\fB$(COMPILE.mod)\fR \fB-o\fR \fB$@\fR \fB-e\fR \fB$@ $<\fR
+_
+	
+\fB\&.mod.o\fR	\fB$(COMPILE.mod)\fR \fB-o\fR \fB$@ $<\fR
+_
+	
+\fB\&.def.sym\fR	\fB$(COMPILE.def)\fR \fB-o\fR \fB$@ $<\fR
+_
+	
+\fB\&.def~.sym\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.def\fR
+	\fB$(COMPILE.def)\fR \fB-o\fR\fB$@ $*.def\fR
+_
+	
+\fB\&.mod~\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.mod\fR
+	\fB$(COMPILE.mod)\fR \fB-o\fR \fB$@\fR \fB-e\fR \fB$@ $*.mod\fR
+_
+	
+\fB\&.mod~.o\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.mod\fR
+	\fB$(COMPILE.mod)\fR \fB-o\fR \fB$@ $*.mod\fR
+_
+	
+\fB\&.mod~.a\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.mod\fR
+	\fB$(COMPILE.mod)\fR \fB-o\fR \fB$% $*.mod\fR
+	\fB$(AR) $(ARFLAGS) $@ $%\fR
+	\fB$(RM) $%\fR
+.TE
+
+.sp
+
+.sp
+.TS
+box;
+cw(1.57i) |cw(3.93i) 
+cw(1.57i) |cw(3.93i) .
+T{
+\fITable of Standard Implicit (Suffix) Rules for NeWS Files\fR
+T}
+_
+\fIImplicit Rule Name\fR	\fICommand Line\fR
+_
+\fB\&.cps.h\fR	\fBcps $*.cps\fR
+_
+\fB\&.cps~.h\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.cps\fR
+	\fB$(CPS) $(CPSFLAGS) $*.cps\fR
+.TE
+
+.sp
+
+.sp
+.TS
+box;
+cw(1.57i) |cw(3.93i) 
+cw(1.57i) |cw(3.93i) .
+T{
+\fITable of Standard Implicit (Suffix) Rules for Pascal Files\fR
+T}
+_
+\fIImplicit Rule Name\fR	\fICommand Line\fR
+_
+\fB\&.p\fR	\fB$(LINK.p)\fR \fB-o\fR \fB$@ $< $(LDLIBS)\fR
+_
+	
+\fB\&.p.o\fR	\fB$(COMPILE.p) $(OUTPUT_OPTION) $<\fR
+_
+	
+\fB\&.p~\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.p\fR
+	\fB$(LINK.p)\fR \fB-o\fR \fB$@ $*.p $(LDLIBS)\fR
+_
+	
+\fB\&.p~.o\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.p\fR
+	\fB$(COMPILE.p) $(OUTPUT_OPTION) $*.p\fR
+_
+	
+\fB\&.p~.a\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.p\fR
+	\fB$(COMPILE.p)\fR \fB-o\fR \fB$% $*.p\fR
+	\fB$(AR) $(ARFLAGS) $@ $%\fR
+	\fB$(RM) $%\fR
+.TE
+
+.sp
+
+.sp
+.TS
+box;
+cw(1.57i) |cw(3.93i) 
+cw(1.57i) |cw(3.93i) .
+T{
+\fITable of Standard Implicit (Suffix) Rules for Ratfor Files\fR
+T}
+_
+\fIImplicit Rule Name\fR	\fICommand Line\fR
+_
+\fB\&.r\fR	\fB$(LINK.r)\fR \fB-o\fR \fB$@ $< $(LDLIBS)\fR
+_
+	
+\fB\&.r.o\fR	\fB$(COMPILE.r) $(OUTPUT_OPTION) $<\fR
+_
+	
+\fB\&.r.a\fR	\fB$(COMPILE.r)\fR \fB-o\fR \fB$% $<\fR
+	\fB$(AR) $(ARFLAGS) $@ $%\fR
+	\fB$(RM) $%\fR
+_
+	
+\fB\&.r~\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.r\fR
+	\fB$(LINK.r)\fR \fB-o\fR \fB$@ $*.r $(LDLIBS)\fR
+_
+	
+\fB\&.r~.o\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.r\fR
+	\fB$(COMPILE.r) $(OUTPUT_OPTION) $*.r\fR
+_
+	
+\fB\&.r~.a\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.r\fR
+	\fB$(COMPILE.r)\fR \fB-o\fR \fB$% $*.r\fR
+	\fB$(AR) $(ARFLAGS) $@ $%\fR
+	\fB$(RM) $%\fR
+.TE
+
+.sp
+
+.sp
+.TS
+box;
+cw(1.57i) |cw(3.93i) 
+cw(1.57i) |cw(3.93i) .
+T{
+\fITable of Standard Implicit (Suffix) Rules for SCCS Files\fR
+T}
+_
+\fIImplicit Rule Name\fR	\fICommand Line\fR
+_
+\fB\&.SCCS_GET\fR	T{
+\fBsccs $(SCCSFLAGS) get $(SCCSGETFLAGS) $@\fR \fB-G\fR\fB$@\fR
+T}
+	
+_
+	
+\fB\&.SCCS_GET_POSIX\fR	\fBsccs $(SCCSFLAGS) get $(SCCSGETFLAGS) $@\fR
+_
+	
+\fB\&.GET_POSIX\fR	\fB$(GET) $(GFLAGS) s.$@\fR
+.TE
+
+.sp
+
+.sp
+.TS
+box;
+cw(1.57i) |cw(3.93i) 
+cw(1.57i) |cw(3.93i) .
+T{
+\fITable of Standard Implicit (Suffix) Rules for Shell Scripts\fR
+T}
+_
+\fIImplicit Rule Name\fR	\fICommand Line\fR
+_
+\fB\&.sh\fR	\fBcat $< >$@\fR
+	\fBchmod +x $@\fR
+_
+	
+\fB\&.sh~\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.sh\fR
+	\fBcp $*.sh $@\fR
+	\fBchmod a+x $@\fR
+.TE
+
+.sp
+
+.sp
+.TS
+box;
+cw(1.57i) |cw(3.93i) 
+cw(1.57i) |cw(3.93i) .
+T{
+\fITable of Standard Implicit (Suffix) Rules for yacc Files\fR
+T}
+_
+\fIImplicit Rule Name\fR	\fICommand Line\fR
+_
+\fB\&.y\fR	\fB$(YACC.y) $<\fR
+	\fB$(LINK.c)\fR \fB-o\fR \fB$@ y.tab.c $(LDLIBS)\fR
+	\fB$(RM) y.tab.c\fR
+_
+	
+\fB\&.y.c\fR	\fB$(YACC.y) $<\fR
+	\fBmv y.tab.c $@\fR
+_
+	
+\fB\&.y.ln\fR	\fB$(YACC.y) $<\fR
+	\fB$(LINT.c)\fR \fB-o\fR \fB$@\fR \fB-i\fR \fBy.tab.c\fR
+	\fB$(RM) y.tab.c\fR
+_
+	
+\fB\&.y.o\fR	\fB$(YACC.y) $<\fR
+	\fB$(COMPILE.c)\fR \fB-o\fR \fB$@ y.tab.c\fR
+	\fB$(RM) y.tab.c\fR
+_
+	
+\fB\&.y~\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.y\fR
+	\fB$(YACC) $(YFLAGS) $*.y\fR
+	\fB$(COMPILE.c)\fR \fB-o\fR \fB$@ y.tab.c\fR
+	\fB$(RM) y.tab.c\fR
+_
+	
+\fB\&.y~.c\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.y\fR
+	\fB$(YACC) $(YFLAGS) $*.y\fR
+	\fBmv y.tab.c $@\fR
+_
+	
+\fB\&.y~.ln\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.y\fR
+	\fB$(YACC.y) $*.y\fR
+	\fB$(LINT.c)\fR \fB-o\fR \fB$@\fR \fB-i\fR \fBy.tab.c\fR
+	\fB$(RM) y.tab.c\fR
+_
+	
+\fB\&.y~.o\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.y\fR
+	\fB$(YACC) $(YFLAGS) $*.y\fR
+	\fB$(CC) $(CFLAGS)\fR \fB-c\fR \fBy.tab.c\fR
+	\fBrm\fR \fB-f\fR \fBy.tab.c\fR
+	\fBmv y.tab.o $@\fR
+.TE
+
+.sp
+.LP
+\fBmake\fR reads in the standard set of implicit rules from the file
+\fB/usr/share/lib/make/make.rules\fR, unless \fB-r\fR is in effect, or there is
+a \fBmake.rules\fR file in the local directory that does not \fBinclude\fR that
+file.
+.SS "The Suffixes List"
+.LP
+The suffixes list is given as the list of dependencies for the
+\fB\&.SUFFIXES:\fR special-function target. The default list is contained in
+the \fBSUFFIXES\fR macro (See \fITable of Predefined Macros\fR for the standard
+list of suffixes). You can define additional \fB\&.SUFFIXES:\fR targets; a
+\fB\&.SUFFIXES\fR target with no dependencies clears the list of suffixes.
+Order is significant within the list; \fBmake\fR selects a rule that
+corresponds to the target's suffix and the first dependency-file suffix found
+in the list. To place suffixes at the head of the list, clear the list and
+replace it with the new suffixes, followed by the default list:
+.sp
+.in +2
+.nf
+   .SUFFIXES:
+   .SUFFIXES: \fIsuffixes\fR $(SUFFIXES)
+.fi
+.in -2
+
+.sp
+.LP
+A tilde (\fB~\fR) indicates that if a dependency file with the indicated suffix
+(minus the ~) is under \fBSCCS\fR its most recent version should be retrieved,
+if necessary, before the target is processed.
+.SS "Library Maintenance"
+.LP
+A target name  of the form:
+.sp
+.in +2
+.nf
+   \fIlib\fR(\fImember ...\fR)
+.fi
+.in -2
+
+.sp
+.LP
+refers to a member, or a space-separated list of members, in an \fBar\fR(1)
+library.
+.sp
+.LP
+The dependency of the library member on the corresponding file must be given as
+an explicit entry in the makefile. This can be handled by a pattern matching
+rule of the form:
+.sp
+.in +2
+.nf
+   \fIlib\fR(%\fI\&.s\fR): %\fI\&.s\fR
+.fi
+.in -2
+
+.sp
+.LP
+where \fI\&.s\fR is the suffix of the member; this suffix is typically
+\fB\&.o\fR for object libraries.
+.sp
+.LP
+A target name of the form:
+.sp
+.in +2
+.nf
+   \fIlib\fR((\fIsymbol\fR)) 
+.fi
+.in -2
+
+.sp
+.LP
+refers to the member of a randomized object library that defines the entry
+point named \fIsymbol\fR.
+.SS "Command Execution"
+.LP
+Command lines are executed one at a time, \fIeach by its own process or
+shell\fR. Shell commands, notably \fBcd\fR, are ineffectual across an unescaped
+\fBNEWLINE\fR in the makefile. A line is printed (after macro expansion) just
+before being executed. This is suppressed if it starts with a \fB@\fR, if there
+is a \fB\&.SILENT:\fR entry in the makefile, or if \fBmake\fR is run with the
+\fB-s\fR option. Although the \fB-n\fR option specifies printing without
+execution, lines containing the macro \fB$(MAKE)\fR are executed regardless,
+and lines containing the \fB@\fR special character are printed. The \fB-t\fR
+(touch) option updates the modification date of a file without executing any
+rules. This can be dangerous when sources are maintained by more than one
+person.
+.sp
+.LP
+\fBmake\fR invokes the shell with the \fB-e\fR (exit-on-errors) argument. Thus,
+with semicolon-separated command sequences, execution of the later commands
+depends on the success of the former. This behavior can be overridden by
+starting the command line with a \fB\|-\fR, or by writing a shell script that
+returns a non-zero status only as it finds appropriate.
+.SS "Bourne Shell Constructs"
+.LP
+To use the Bourne shell \fBif\fR control structure for branching, use a command
+line of the form:
+.sp
+.in +2
+.nf
+if \fIexpression\fR ; \e
+then \fIcommand\fR ; \e
+     ... ; \e
+else \fIcommand\fR; \e
+     ... ; \e
+fi 
+.fi
+.in -2
+
+.sp
+.LP
+Although composed of several input lines, the escaped \fBNEWLINE\fR characters
+insure that \fBmake\fR treats them all as one (shell) command line.
+.sp
+.LP
+To use the Bourne shell \fBfor\fR control structure for loops, use a command
+line of the form:
+.sp
+.in +2
+.nf
+for \fIvar\fR in \fIlist\fR ; \e
+do \fIcommand\fR; \e
+     ... \fB; \e\fRdone
+.fi
+.in -2
+
+.sp
+.LP
+To refer to a shell variable, use a double-dollar-sign (\fB$$\fR). This
+prevents expansion of the dollar-sign by \fBmake\fR.
+.SS "Command Substitutions"
+.LP
+To incorporate the standard output of a shell command in a macro, use a
+definition of the form:
+.sp
+.in +2
+.nf
+   \fIMACRO\|\fR:sh =\fIcommand\fR
+.fi
+.in -2
+
+.sp
+.LP
+The command is executed only once, standard error output is discarded, and
+\fBNEWLINE\fR characters are replaced with \fBSPACE\fRs. If the command has a
+non-zero exit status, \fBmake\fR halts with an error.
+.sp
+.LP
+To capture the output of a shell command in a macro reference, use a reference
+of the form:
+.sp
+.in +2
+.nf
+$(\fIMACRO\|\fR:sh) 
+.fi
+.in -2
+
+.sp
+.LP
+where \fIMACRO\fR is the name of a macro containing a valid Bourne shell
+command line. In this case, the command is executed whenever the reference is
+evaluated. As with shell command substitutions, the reference is replaced with
+the standard output of the command. If the command has a non-zero exit status,
+\fBmake\fR halts with an error.
+.sp
+.LP
+In contrast to commands in rules, the command is not subject for macro
+substitution; therefore, a dollar sign (\fB$\fR) need not be replaced with a
+double dollar sign (\fB$$\fR).
+.SS "\fISignals\fR"
+.LP
+\fBINT\fR, \fBSIGTERM\fR, and \fBQUIT\fR signals received from the keyboard
+halt \fBmake\fR and remove the target file being processed unless that target
+is in the dependency list for \fB\&.PRECIOUS:\fR.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRDefining dependencies
+.sp
+.LP
+This makefile says that \fBpgm\fR depends on two files \fBa.o\fR and \fBb.o\fR,
+and that they in turn depend on their corresponding source files (\fBa.c\fR and
+\fBb.c\fR) along with a common file \fBincl.h\fR:
+
+.sp
+.in +2
+.nf
+pgm:  a.o  b.o
+     $(LINK.c) -o $@a.o  b.o
+a.o:  incl.h  a.c
+     cc -c a.c
+b.o:  incl.h  b.c
+     cc -c b.c 
+.fi
+.in -2
+
+.LP
+\fBExample 2 \fRUsing implicit rules
+.sp
+.LP
+The following makefile uses implicit rules to express the same dependencies:
+
+.sp
+.in +2
+.nf
+pgm:  a.o  b.o
+     cc  a.o  b.o -o pgm
+a.o  b.o:  incl.h
+.fi
+.in -2
+
+.SH ENVIRONMENT VARIABLES
+.LP
+See \fBenviron\fR(5) for descriptions of the following environment variables
+that affect the execution of \fBmake\fR: \fBLANG\fR, \fBLC_ALL\fR,
+\fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
+
+.sp
+.ne 2
+.na
+\fBDMAKE_MAX_JOBS\fR
+.ad
+.RS 17n
+The maximum number of jobs that each instance of \fBmake\fR should run.
+.RE
+
+.sp
+.ne 2
+.na
+\fBDMAKE_ADJUST_MAX_JOBS\fR
+.ad
+.RS 17n
+If \fBYES\fR adjust the maximum number of jobs each instance of \fBmake\fR
+runs based on system load.  If \fBNO\fR do not
+.RE
+
+.sp
+.ne 2
+.na
+\fBDMAKE_OUTPUT_MODE\fR
+.ad
+.RS 17n
+Adjusts the format of output from \fBmake\fR when executing jobs in parallel.
+
+If the value is \fBTEXT1\fR \fBmake\fR will print the hostname and the command
+executed once when the job begins, and again preceding any output from that
+job.
+
+If the value is \fBTEXT2\fR \fBmake\fR will only print the command and its
+output only once, when execution is complete.
+.RE
+
+.sp
+.ne 2
+.na
+\fBDMAKE_MODE\fR
+.ad
+.RS 17n
+Specify whether jobs should be executed in serial, or parallel.  Equivalent to
+passing the \fB-m\FR option.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBKEEP_STATE\fR\fR
+.ad
+.RS 17n
+This environment variable has the same effect as the .KEEP_STATE:
+special-function target. It enables command dependencies, hidden dependencies
+and writing of the state file.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBUSE_SVR4_MAKE\fR\fR
+.ad
+.RS 17n
+This environment variable causes \fBmake\fR to invoke the generic System V
+version of \fBmake\fR (\fB/usr/lib/svr4.make\fR). See \fBsysV-make\fR(1).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBMAKEFLAGS\fR\fR
+.ad
+.RS 17n
+This variable is interpreted as a character string representing a series of
+option characters to be used as the default options. The implementation accepts
+both of the following formats (but need not accept them when intermixed):
+.RS +4
+.TP
+1.
+The characters are option letters without the leading hyphens or blank
+character separation used on a command line.
+.RE
+.RS +4
+.TP
+2.
+The characters are formatted in a manner similar to a portion of the
+\fBmake\fR command line: options are preceded by hyphens and
+blank-character-separated. The \fImacro=name\fR macro definition operands can
+also be included. The difference between the contents of \fBMAKEFLAGS\fR and
+the command line is that the contents of the variable is not subjected to the
+word expansions associated with parsing the command line values. See
+\fBwordexp\fR(3C).
+.sp
+When the command-line options \fB-f\fR or \fB-p\fR are used, they take effect
+regardless of whether they also appear in \fBMAKEFLAGS\fR. If they otherwise
+appear in \fBMAKEFLAGS\fR, the result is undefined.
+.RE
+The \fBMAKEFLAGS\fR variable is accessed from the environment before the
+makefile is read. At that time, all of the options (except \fB-f\fR and
+\fB-p\fR) and command-line macros not already included in \fBMAKEFLAGS\fR are
+added to the \fBMAKEFLAGS\fR macro. The \fBMAKEFLAGS\fR macro is passed into
+the environment as an environment variable for all child processes. If the
+\fBMAKEFLAGS\fR macro is subsequently set by the makefile, it replaces the
+\fBMAKEFLAGS\fR variable currently found in the environment.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPROJECTDIR\fR\fR
+.ad
+.RS 17n
+Provides a directory to be used to search for SCCS files not found in the
+current  directory. In all of the following cases, the search for SCCS files is
+made in  the directory SCCS in the identified directory. If the value of
+\fBPROJECTDIR\fR begins with a slash, it shall be considered an absolute
+pathname. Otherwise, the value of \fBPROJECTDIR\fR is treated as a user name
+and that user's initial working directory shall be examined for a subdirectory
+\fBsrc\fR or \fBsource\fR. If such a directory is found, it shall be used.
+Otherwise, the value is used as a relative pathname.
+.sp
+If \fBPROJECTDIR\fR is not set or has a null value, the search for SCCS files
+shall be made in the directory SCCS in the current directory. The setting of
+\fBPROJECTDIR\fR affects all files listed in the remainder of this utility
+description for files  with a component named SCCS.
+.RE
+
+.SH EXIT STATUS
+.LP
+When the \fB-q\fR option is specified, the \fBmake\fR utility exits with one of
+the following values:
+.sp
+.ne 2
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 6n
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB1\fR\fR
+.ad
+.RS 6n
+The target was not up-to-date.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB>1\fR\fR
+.ad
+.RS 6n
+An error occurred.
+.RE
+
+.sp
+.LP
+When the \fB-q\fR option is not specified, the \fBmake\fR utility exits with
+one of the following values:
+.sp
+.ne 2
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 6n
+Successful completion
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB>0\fR\fR
+.ad
+.RS 6n
+An error occurred
+.RE
+
+.SH FILES
+.ne 2
+.na
+\fB\fBmakefile\fR\fR
+.ad
+.br
+.na
+\fB\fBMakefile\fR\fR
+.ad
+.sp .6
+.RS 4n
+current version(s) of \fBmake\fR description file
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBs.makefile\fR\fR
+.ad
+.br
+.na
+\fB\fBs.Makefile\fR\fR
+.ad
+.sp .6
+.RS 4n
+\fBSCCS\fR history files for the above makefile(s) in the current directory
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBSCCS/s.makefile\fR\fR
+.ad
+.br
+.na
+\fB\fBSCCS/s.Makefile\fR\fR
+.ad
+.sp .6
+.RS 4n
+\fBSCCS\fR history files for the above makefile(s)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBmake.rules\fR\fR
+.ad
+.sp .6
+.RS 4n
+default file for user-defined targets, macros, and implicit rules
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/usr/share/lib/make/make.rules\fR\fR
+.ad
+.sp .6
+.RS 4n
+makefile for standard implicit rules and macros (not read if \fBmake.rules\fR
+is)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB\&.make.state\fR\fR
+.ad
+.sp .6
+.RS 4n
+state file in the local directory
+.RE
+
+.SH ATTRIBUTES
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.SS "/usr/xpg4/bin/make"
+.TS
+box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Interface Stability	Committed
+_
+Standard	See \fBstandards\fR(5).
+.TE
+
+.SH SEE ALSO
+.LP
+\fBar\fR(1), \fBarch\fR(1), \fBcd\fR(1), \fBcpp\fR(1), \fBlex\fR(1),
+\fBmach\fR(1), \fBsccs-get\fR(1), \fBsh\fR(1), \fBsysV-make\fR(1),
+\fByacc\fR(1), \fBwordexp\fR(3C), \fBpasswd\fR(4), \fBattributes\fR(5),
+\fBenviron\fR(5), \fBPOSIX.2\fR(5), \fBstandards\fR(5)
+.sp
+.LP
+\fISolaris Advanced User\&'s Guide\fR
+.SH DIAGNOSTICS
+.ne 2
+.na
+\fB\fBDon't know how to make target \fItarget\fR\fR\fR
+.ad
+.sp .6
+.RS 4n
+There is no makefile entry for \fItarget\fR, and none of \fBmake\fR's implicit
+rules apply (there is no dependency file with a suffix in the suffixes list, or
+the target's suffix is not in the list).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB***\fR \fItarget\fR \fBremoved.\fR\fR
+.ad
+.sp .6
+.RS 4n
+\fBmake\fR was interrupted while building \fItarget\fR. Rather than leaving a
+partially-completed version that is newer than its dependencies, \fBmake\fR
+removes the file named \fItarget\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB***\fR \fItarget\fR \fBnot removed.\fR\fR
+.ad
+.sp .6
+.RS 4n
+\fBmake\fR was interrupted while building \fItarget\fR and \fItarget\fR was not
+present in the directory.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB***\fR \fItarget\fR \fBcould not be removed,\fR \fIreason\fR\fR
+.ad
+.sp .6
+.RS 4n
+\fBmake\fR was interrupted while building \fItarget\fR, which was not removed
+for the indicated reason.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBRead of include file\fR \fBfile\fR \fBfailed\fR\fR
+.ad
+.sp .6
+.RS 4n
+The makefile indicated in an \fBinclude\fR directive was not found, or was
+inaccessible.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBLoop detected when expanding macro value\fR \fImacro\fR\fB\&'\fR\fR
+.ad
+.sp .6
+.RS 4n
+A reference to the macro being defined was found in the definition.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBCould not write state file\fR \fIfile\fR\fB\fR\fR
+.ad
+.sp .6
+.RS 4n
+You used the \fB\&.KEEP_STATE:\fR target, but do not have write permission on
+the state file.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB***Error code\fR \fIn\fR\fR
+.ad
+.sp .6
+.RS 4n
+The previous shell command returned a nonzero error code.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB***\fR \fIsignal message\fR\fR
+.ad
+.sp .6
+.RS 4n
+The previous shell command was aborted due to a signal. If \fB- core dumped\fR
+appears after the message, a \fBcore\fR file was created.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBConditional macro conflict encountered\fR\fR
+.ad
+.sp .6
+.RS 4n
+Displayed only when \fB-d\fR is in effect, this message indicates that two or
+more parallel targets currently being processed depend on a target which is
+built differently for each by virtue of conditional macros. Since the target
+cannot simultaneously satisfy both dependency relationships, it is conflicted.
+.RE
+
+.SH BUGS
+.LP
+Some commands return nonzero status inappropriately; to overcome this
+difficulty, prefix the offending command line in the rule with a \fB\(mi\fR\&.
+.sp
+.LP
+Filenames with the characters \fB=\fR, \fB:\fR, or \fB@\fR, do not work.
+.sp
+.LP
+You cannot build \fBfile.o\fR from \fBlib(file.o)\fR.
+.sp
+.LP
+Options supplied by \fBMAKEFLAGS\fR should be reported for nested \fBmake\fR
+commands. Use the \fB-d\fR option to find out what options the nested command
+picks up from \fBMAKEFLAGS\fR.
+.sp
+.LP
+This version of \fBmake\fR is incompatible in certain respects with previous
+versions:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The \fB-d\fR option output is much briefer in this version. \fB-dd\fR now
+produces the equivalent voluminous output.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBmake\fR attempts to derive values for the dynamic macros \fB$*\fR, \fB$<\fR,
+and \fB$?\fR, while processing explicit targets. It uses the same method as for
+implicit rules; in some cases this can lead either to unexpected values, or to
+an empty value being assigned. (Actually, this was true for earlier versions as
+well, even though the documentation stated otherwise.)
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBmake\fR no longer searches for \fBSCCS\fR history (\fBs\fR.) files.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Suffix replacement in macro references are now applied after the macro is
+expanded.
+.RE
+.sp
+.LP
+There is no guarantee that makefiles created for this version of \fBmake\fR
+work with earlier versions.
+.sp
+.LP
+If there is no \fBmake.rules\fR file in the current directory, and the file
+\fB/usr/share/lib/make/make.rules\fR is missing, \fBmake\fR stops before
+processing any targets. To force \fBmake\fR to run anyway, create an empty
+\fBmake.rules\fR file in the current directory.
+.sp
+.LP
+Once a dependency is made, \fBmake\fR assumes the dependency file is present
+for the remainder of the run. If a rule subsequently removes that file and
+future targets depend on its existence, unexpected errors can result.
+.sp
+.LP
+When hidden dependency checking is in effect, the \fB$?\fR macro's value
+includes the names of hidden dependencies.  This can lead to improper filename
+arguments to commands when \fB$?\fR is used in a rule.
+.sp
+.LP
+Pattern replacement macro references cannot be used in the dependency list of a
+pattern matching rule.
+.sp
+.LP
+Unlike previous versions, this version of \fBmake\fR strips a leading
+\fB\&./\fR from the value of the \fB$@\fR dynamic macro.
+.sp
+.LP
+With automatic \fBSCCS\fR retrieval, this version of \fBmake\fR does not
+support tilde suffix rules.
+.sp
+.LP
+The only dynamic macro whose value is strictly determined when used in a
+dependency list is \fB$@\fR (takes the form \fB$$@\fR).
+.sp
+.LP
+\fBmake\fR invokes the shell with the \fB-e\fR argument. This cannot be
+inferred from the syntax of the rule alone.

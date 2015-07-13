@@ -964,39 +964,6 @@ elif [[ ! -x "$MAKE" ]]; then
 	echo "\$MAKE is set to garbage in the environment"
 	exit 1	
 fi
-# get the dmake version string alone
-DMAKE_VERSION=$( $MAKE -v )
-DMAKE_VERSION=${DMAKE_VERSION#*: }
-# focus in on just the dotted version number alone
-DMAKE_MAJOR=$( echo $DMAKE_VERSION | \
-	sed -e 's/.*\<\([^.]*\.[^   ]*\).*$/\1/' )
-# extract the second (or final) integer
-DMAKE_MINOR=${DMAKE_MAJOR#*.}
-DMAKE_MINOR=${DMAKE_MINOR%%.*}
-# extract the first integer
-DMAKE_MAJOR=${DMAKE_MAJOR%%.*}
-CHECK_DMAKE=${CHECK_DMAKE:-y}
-# x86 was built on the 12th, sparc on the 13th.
-if [ "$CHECK_DMAKE" = "y" -a \
-     "$DMAKE_VERSION" != "Sun Distributed Make 7.3 2003/03/12" -a \
-     "$DMAKE_VERSION" != "Sun Distributed Make 7.3 2003/03/13" -a \( \
-     "$DMAKE_MAJOR" -lt 7 -o \
-     "$DMAKE_MAJOR" -eq 7 -a "$DMAKE_MINOR" -lt 4 \) ]; then
-	if [ -z "$DMAKE_VERSION" ]; then
-		echo "$MAKE is missing."
-		exit 1
-	fi
-	echo `whence $MAKE`" version is:"
-	echo "  ${DMAKE_VERSION}"
-	cat <<EOF
-
-This version may not be safe for use, if you really want to use this version
-anyway add the following to your environment to disable this check:
-
-  CHECK_DMAKE=n
-EOF
-	exit 1
-fi
 export PATH
 export MAKE
 

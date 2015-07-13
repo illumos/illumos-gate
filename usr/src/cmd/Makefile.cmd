@@ -75,6 +75,7 @@ ROOTCCSBIN=	$(ROOT)/usr/ccs/bin
 ROOTCCSBIN64=	$(ROOTCCSBIN)/$(MACH64)
 ROOTCCSBINLINKDIR=	$(ROOT)/../../bin
 ROOTCCSBINLINKDIR64=	$(ROOT)../../../bin/$(MACH)
+ROOTCCSLIB=	$(ROOT)/usr/ccs/lib
 ROOTUSRKVM=	$(ROOT)/usr/kvm
 ROOTHAS=	$(ROOT)/usr/has
 ROOTHASBIN=	$(ROOT)/usr/has/bin

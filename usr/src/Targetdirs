@@ -330,6 +330,7 @@ DIRS= \
 	/usr/share/man/man1b \
 	/usr/share/man/man1c \
 	/usr/share/man/man1m \
+       	/usr/share/man/man1s \
 	/usr/share/man/man2 \
 	/usr/share/man/man3 \
 	/usr/share/man/man3bsm \
