@@ -1,0 +1,498 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Copyright 2003 Sun Microsystems, Inc. All rights reserved.
+# Use is subject to license terms.
+#
+
+SUFFIXES = .o .c .c~ .cc .cc~ .y .y~ .l .l~ .s .s~ .sh .sh~ .S .S~ .i .ln \
+	.h .h~ .f .f~ .for .for~ .F .F~ .f90 .f90~ .ftn .ftn~ .mod .mod~ \
+	.sym .def .def~ .p .p~ .r .r~ .cps .cps~ .C .C~ .Y .Y~ .L .L~ \
+	.java .java~ .class
+
+.SUFFIXES: $(SUFFIXES)
+
+# OUTPUT_OPTION should be defined to "-o $@" when
+# the default rules are used for non-local files.
+OUTPUT_OPTION=
+
+#	C language section.
+CC=cc
+CFLAGS=
+CPPFLAGS=
+LINT=lint
+LINTFLAGS=
+COMPILE.c=$(CC) $(CFLAGS) $(CPPFLAGS) -c
+LINK.c=$(CC) $(CFLAGS) $(CPPFLAGS) $(LDFLAGS) 
+LINT.c=$(LINT) $(LINTFLAGS) $(CPPFLAGS) 
+.c:
+	$(LINK.c) -o $@ $< $(LDLIBS)
+.c~:
+	$(GET) $(GFLAGS) -p $< > $*.c
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $*.c
+.c.o:
+	$(COMPILE.c) $(OUTPUT_OPTION) $<
+.c~.o:
+	$(GET) $(GFLAGS) -p $< > $*.c
+	$(CC) $(CFLAGS) -c  $*.c
+.c.i:
+	$(CC) $(CFLAGS) $(CPPFLAGS) -P $<
+.c~.i:
+	$(GET) $(GFLAGS) -p $< > $*.c
+	$(CC) $(CFLAGS) $(CPPFLAGS) -P $*.c
+.c.ln:
+	$(LINT.c) $(OUTPUT_OPTION) -c $<
+.c~.ln:
+	$(GET) $(GFLAGS) -p $< > $*.c
+	$(LINT.c) $(OUTPUT_OPTION) -c $*.c
+.c.a:
+	$(COMPILE.c) -o $% $<
+	$(AR) $(ARFLAGS) $@ $%
+	$(RM) $%
+.c~.a:
+	$(GET) $(GFLAGS) -p $< > $*.c
+	$(COMPILE.c) -o $% $*.c
+	$(AR) $(ARFLAGS) $@ $%
+	$(RM) $%
+
+#	C language section. yacc.
+YACC=yacc
+YFLAGS=
+YACC.y=$(YACC) $(YFLAGS)
+.y:
+	$(YACC.y) $<
+	$(LINK.c) -o $@ y.tab.c $(LDLIBS)
+	$(RM) y.tab.c
+.y~:
+	$(GET) $(GFLAGS) -p $< > $*.y
+	$(YACC) $(YFLAGS) $*.y
+	$(COMPILE.c) -o $@ y.tab.c
+	$(RM) y.tab.c
+
+.y.c:
+	$(YACC.y) $<
+	mv y.tab.c $@
+.y~.c:
+	$(GET) $(GFLAGS) -p $< > $*.y
+	$(YACC) $(YFLAGS) $*.y
+	mv y.tab.c $@
+.y.ln:
+	$(YACC.y) $<
+	$(LINT.c) -o $@ -i y.tab.c
+	$(RM) y.tab.c
+.y~.ln:
+	$(GET) $(GFLAGS) -p $< > $*.y
+	$(YACC.y) $*.y
+	$(LINT.c) -o $@ -i y.tab.c
+	$(RM) y.tab.c
+.y.o:
+	$(YACC.y) $<
+	$(COMPILE.c) -o $@ y.tab.c
+	$(RM) y.tab.c
+.y~.o:
+	$(GET) $(GFLAGS) -p $< > $*.y
+	$(YACC) $(YFLAGS) $*.y
+	$(CC) $(CFLAGS) -c y.tab.c
+	rm -f y.tab.c
+	mv y.tab.o $@
+
+#	C language section. lex.
+LEX=lex
+LFLAGS=
+LEX.l=$(LEX) $(LFLAGS) -t
+.l:
+	$(RM) $*.c
+	$(LEX.l) $< > $*.c
+	$(LINK.c) -o $@ $*.c -ll $(LDLIBS)
+	$(RM) $*.c
+.l~:
+	$(GET) $(GFLAGS) -p $< > $*.l
+	$(LEX) $(LFLAGS) $*.l
+	$(CC) $(CFLAGS) -c lex.yy.c
+	rm -f lex.yy.c
+	mv lex.yy.c $@
+
+.l.c :
+	$(RM) $@
+	$(LEX.l) $< > $@
+.l~.c:
+	$(GET) $(GFLAGS) -p $< > $*.l
+	$(LEX) $(LFLAGS) $*.l
+	mv lex.yy.c $@
+.l.ln:
+	$(RM) $*.c
+	$(LEX.l) $< > $*.c
+	$(LINT.c) -o $@ -i $*.c
+	$(RM) $*.c
+.l~.ln:
+	$(GET) $(GFLAGS) -p $< > $*.l
+	$(RM) $*.c
+	$(LEX.l) $*.l > $*.c
+	$(LINT.c) -o $@ -i $*.c
+	$(RM) $*.c
+.l.o:
+	$(RM) $*.c
+	$(LEX.l) $< > $*.c
+	$(COMPILE.c) -o $@ $*.c
+	$(RM) $*.c
+.l~.o:
+	$(GET) $(GFLAGS) -p $< > $*.l
+	$(LEX) $(LFLAGS) $*.l
+	$(CC) $(CFLAGS) -c lex.yy.c
+	rm -f lex.yy.c
+	mv lex.yy.c $@
+
+#       C++ language section.
+CCC=CC
+CCFLAGS=
+COMPILE.cc=$(CCC) $(CCFLAGS) $(CPPFLAGS)  -c
+LINK.cc=$(CCC) $(CCFLAGS) $(CPPFLAGS) $(LDFLAGS) 
+COMPILE.C=$(CCC) $(CCFLAGS) $(CPPFLAGS)  -c
+LINK.C=$(CCC) $(CCFLAGS) $(CPPFLAGS) $(LDFLAGS) 
+.cc:
+	$(LINK.cc) -o $@ $< $(LDLIBS)
+.cc~:
+	$(GET) $(GFLAGS) -p $< > $*.cc
+	$(LINK.cc) -o $@ $*.cc $(LDLIBS)
+.cc.o:
+	$(COMPILE.cc) $(OUTPUT_OPTION) $<
+.cc~.o:
+	$(GET) $(GFLAGS) -p $< > $*.cc
+	$(COMPILE.cc) $(OUTPUT_OPTION) $*.cc
+.cc.i:
+	$(CCC) $(CCFLAGS) $(CPPFLAGS) -P $<
+.cc~.i:
+	$(GET) $(GFLAGS) -p $< > $*.cc
+	$(CCC) $(CCFLAGS) $(CPPFLAGS) -P $*.cc
+.cc.a:
+	$(COMPILE.cc) -o $% $<
+	$(AR) $(ARFLAGS) $@ $%
+	$(RM) $%
+.cc~.a:
+	$(GET) $(GFLAGS) -p $< > $*.cc
+	$(COMPILE.cc) -o $% $*.cc
+	$(AR) $(ARFLAGS) $@ $%
+	$(RM) $%
+
+.C:
+	$(LINK.C) -o $@ $< $(LDLIBS)
+.C~:
+	$(GET) $(GFLAGS) -p $< > $*.C
+	$(LINK.C) -o $@ $*.C $(LDLIBS)
+.C.o:
+	$(COMPILE.C) $(OUTPUT_OPTION) $<
+.C~.o:
+	$(GET) $(GFLAGS) -p $< > $*.C
+	$(COMPILE.C) $(OUTPUT_OPTION) $*.C
+.C.i:
+	$(CCC) $(CCFLAGS) $(CPPFLAGS) -P $<
+.C~.i:
+	$(GET) $(GFLAGS) -p $< > $*.C
+	$(CCC) $(CCFLAGS) $(CPPFLAGS) -P  $*.C
+.C.a:
+	$(COMPILE.C) -o $% $<
+	$(AR) $(ARFLAGS) $@ $%
+	$(RM) $%
+.C~.a:
+	$(GET) $(GFLAGS) -p $< > $*.C
+	$(COMPILE.C) -o $% $*.C
+	$(AR) $(ARFLAGS) $@ $%
+	$(RM) $%
+
+#	FORTRAN section.
+FC=f77
+FFLAGS=
+COMPILE.f=$(FC) $(FFLAGS)  -c
+LINK.f=$(FC) $(FFLAGS) $(LDFLAGS) 
+COMPILE.F=$(FC) $(FFLAGS) $(CPPFLAGS)  -c
+LINK.F=$(FC) $(FFLAGS) $(CPPFLAGS) $(LDFLAGS) 
+.f:
+	$(LINK.f) -o $@ $< $(LDLIBS)
+.f~:
+	$(GET) $(GFLAGS) -p $< > $*.f
+	$(FC) $(FFLAGS) $(LDFLAGS) -o $@ $*.f
+.f.o:
+	$(COMPILE.f) $(OUTPUT_OPTION) $<
+.f~.o:
+	$(GET) $(GFLAGS) -p $< > $*.f
+	$(FC) $(FFLAGS) -c  $*.f
+.f.a:
+	$(COMPILE.f) -o $% $<
+	$(AR) $(ARFLAGS) $@ $%
+	$(RM) $%
+.f~.a:
+	$(GET) $(GFLAGS) -p $< > $*.f
+	$(COMPILE.f) -o $% $*.f
+	$(AR) $(ARFLAGS) $@ $%
+	$(RM) $%
+.for:
+	$(LINK.f) -o $@ $< $(LDLIBS)
+.for~:
+	$(GET) $(GFLAGS) -p $< > $*.for
+	$(FC) $(FFLAGS) $(LDFLAGS) -o $@ $*.for
+.for.o:
+	$(COMPILE.f) $(OUTPUT_OPTION) $<
+.for~.o:
+	$(GET) $(GFLAGS) -p $< > $*.for
+	$(FC) $(FFLAGS) -c  $*.for
+.for.a:
+	$(COMPILE.f) -o $% $<
+	$(AR) $(ARFLAGS) $@ $%
+	$(RM) $%
+.for~.a:
+	$(GET) $(GFLAGS) -p $< > $*.for
+	$(COMPILE.f) -o $% $*.for
+	$(AR) $(ARFLAGS) $@ $%
+	$(RM) $%
+.F:
+	$(LINK.F) -o $@ $< $(LDLIBS)
+.F~:
+	$(GET) $(GFLAGS) -p $< > $*.F
+	$(FC) $(FFLAGS) $(LDFLAGS) -o $@ $*.F
+.F.o:
+	$(COMPILE.F) $(OUTPUT_OPTION) $<
+.F~.o:
+	$(GET) $(GFLAGS) -p $< > $*.F
+	$(FC) $(FFLAGS) -c  $*.F
+.F.a:
+	$(COMPILE.F) -o $% $<
+	$(AR) $(ARFLAGS) $@ $%
+	$(RM) $%
+.F~.a:
+	$(GET) $(GFLAGS) -p $< > $*.F
+	$(COMPILE.F) -o $% $*.F
+	$(AR) $(ARFLAGS) $@ $%
+	$(RM) $%
+
+#	FORTRAN section. ratfor.
+RFLAGS=
+COMPILE.r=$(FC) $(FFLAGS) $(RFLAGS)  -c
+LINK.r=$(FC) $(FFLAGS) $(RFLAGS) $(LDFLAGS) 
+.r:
+	$(LINK.r) -o $@ $< $(LDLIBS)
+.r~:
+	$(GET) $(GFLAGS) -p $< > $*.r
+	$(LINK.r) -o $@ $*.r $(LDLIBS)
+.r.o:
+	$(COMPILE.r) $(OUTPUT_OPTION) $<
+.r~.o:
+	$(GET) $(GFLAGS) -p $< > $*.r
+	$(COMPILE.r) $(OUTPUT_OPTION) $*.r
+.r.a:
+	$(COMPILE.r) -o $% $<
+	$(AR) $(ARFLAGS) $@ $%
+	$(RM) $%
+.r~.a:
+	$(GET) $(GFLAGS) -p $< > $*.r
+	$(COMPILE.r) -o $% $*.r
+	$(AR) $(ARFLAGS) $@ $%
+	$(RM) $%
+
+#	FORTRAN 90 section.
+F90C=f90
+F90FLAGS=
+COMPILE.f90=$(F90C) $(F90FLAGS) -c
+LINK.f90=$(F90C) $(F90FLAGS) $(LDFLAGS)
+COMPILE.ftn=$(F90C) $(F90FLAGS) -c
+LINK.ftn=$(F90C) $(F90FLAGS) $(LDFLAGS)
+.f90:
+	$(LINK.f90) -o $@ $< $(LDLIBS)
+.f90~:
+	$(GET) $(GFLAGS) -p $< > $*.f90
+	$(LINK.f90) -o $@ $*.f90 $(LDLIBS)
+.f90.o:
+	$(COMPILE.f90) $(OUTPUT_OPTION) $<
+.f90~.o:
+	$(GET) $(GFLAGS) -p $< > $*.f90
+	$(COMPILE.f90) $(OUTPUT_OPTION) $*.f90
+.f90.a:
+	$(COMPILE.f90) -o $% $<
+	$(AR) $(ARFLAGS) $@ $%
+	$(RM) $%
+.f90~.a:
+	$(GET) $(GFLAGS) -p $< > $*.f90
+	$(COMPILE.f90) -o $% $*.f90
+	$(AR) $(ARFLAGS) $@ $%
+	$(RM) $%
+.ftn:
+	$(LINK.ftn) -o $@ $< $(LDLIBS)
+.ftn~:
+	$(GET) $(GFLAGS) -p $< > $*.ftn
+	$(LINK.ftn) -o $@ $*.ftn $(LDLIBS)
+.ftn.o:
+	$(COMPILE.ftn) $(OUTPUT_OPTION) $<
+.ftn~.o:
+	$(GET) $(GFLAGS) -p $< > $*.ftn
+	$(COMPILE.ftn) $(OUTPUT_OPTION) $*.ftn
+.ftn.a:
+	$(COMPILE.ftn) -o $% $<
+	$(AR) $(ARFLAGS) $@ $%
+	$(RM) $%
+.ftn~.a:
+	$(GET) $(GFLAGS) -p $< > $*.ftn
+	$(COMPILE.ftn) -o $% $*.ftn
+	$(AR) $(ARFLAGS) $@ $%
+	$(RM) $%
+
+#	Modula-2 section.
+M2C=m2c
+M2FLAGS=
+MODFLAGS=
+DEFFLAGS=
+COMPILE.def=$(M2C) $(M2FLAGS) $(DEFFLAGS) 
+COMPILE.mod=$(M2C) $(M2FLAGS) $(MODFLAGS) 
+.def.sym:
+	$(COMPILE.def) -o $@ $<
+.def~.sym:
+	$(GET) $(GFLAGS) -p $< > $*.def
+	$(COMPILE.def) -o $@ $*.def
+.mod:
+	$(COMPILE.mod) -o $@ -e $@ $<
+.mod~:
+	$(GET) $(GFLAGS) -p $< > $*.mod
+	$(COMPILE.mod) -o $@ -e $@ $*.mod
+.mod.o:
+	$(COMPILE.mod) -o $@ $<
+.mod~.o:
+	$(GET) $(GFLAGS) -p $< > $*.mod
+	$(COMPILE.mod) -o $@ $*.mod
+.mod.a:
+	$(COMPILE.mod) -o $% $<
+	$(AR) $(ARFLAGS) $@ $%
+	$(RM) $%
+.mod~.a:
+	$(GET) $(GFLAGS) -p $< > $*.mod
+	$(COMPILE.mod) -o $% $*.mod
+	$(AR) $(ARFLAGS) $@ $%
+	$(RM) $%
+
+#	Pascal section.
+PC=pc
+PFLAGS=
+COMPILE.p=$(PC) $(PFLAGS) $(CPPFLAGS)  -c
+LINK.p=$(PC) $(PFLAGS) $(CPPFLAGS) $(LDFLAGS) 
+.p:
+	$(LINK.p) -o $@ $< $(LDLIBS)
+.p~:
+	$(GET) $(GFLAGS) -p $< > $*.p
+	$(LINK.p) -o $@ $*.p $(LDLIBS)
+.p.o:
+	$(COMPILE.p) $(OUTPUT_OPTION) $<
+.p~.o:
+	$(GET) $(GFLAGS) -p $< > $*.p
+	$(COMPILE.p) $(OUTPUT_OPTION) $*.p
+.p.a:
+	$(COMPILE.p) -o $% $<
+	$(AR) $(ARFLAGS) $@ $%
+	$(RM) $%
+.p~.a:
+	$(GET) $(GFLAGS) -p $< > $*.p
+	$(COMPILE.p) -o $% $*.p
+	$(AR) $(ARFLAGS) $@ $%
+	$(RM) $%
+
+#	Assembly section.
+AS=as
+ASFLAGS=
+COMPILE.s=$(AS) $(ASFLAGS) 
+COMPILE.S=$(CC) $(ASFLAGS) $(CPPFLAGS)  -c
+.s.o:
+	$(COMPILE.s) -o $@ $<
+.s~.o:
+	$(GET) $(GFLAGS) -p $< > $*.s
+	$(COMPILE.s) -o $@ $*.s
+.s.a:
+	$(COMPILE.s) -o $% $<
+	$(AR) $(ARFLAGS) $@ $%
+	$(RM) $%
+.s~.a:
+	$(GET) $(GFLAGS) -p $< > $*.s
+	$(COMPILE.s) -o $% $*.s
+	$(AR) $(ARFLAGS) $@ $%
+	$(RM) $%
+.S.o:
+	$(COMPILE.S) -o $@ $<
+.S~.o:
+	$(GET) $(GFLAGS) -p $< > $*.S
+	$(COMPILE.S) -o $@ $*.S
+.S.a:
+	$(COMPILE.S) -o $% $<
+	$(AR) $(ARFLAGS) $@ $%
+	$(RM) $%
+.S~.a:
+	$(GET) $(GFLAGS) -p $< > $*.S
+	$(COMPILE.S) -o $% $*.S
+	$(AR) $(ARFLAGS) $@ $%
+	$(RM) $%
+
+#	Shell section.
+.sh:
+	$(RM) $@
+	cat $< > $@
+	chmod +x $@
+.sh~:
+	$(GET) $(GFLAGS) -p $< > $*.sh
+	cp $*.sh $@
+	chmod a+x $@
+
+#	NeWS section
+CPS=cps
+CPSFLAGS=
+.cps.h:
+	$(CPS) $(CPSFLAGS) $*.cps
+.cps~.h:
+	$(GET) $(GFLAGS) -p $< > $*.cps
+	$(CPS) $(CPSFLAGS) $*.cps
+
+#	JAVA section
+JAVAC=javac
+JAVACFLAGS=
+.java.class:
+	$(JAVAC) $(JAVACFLAGS) $<
+.java~.class:
+	$(GET) $(GFLAGS) -p $< > $*.java
+	$(JAVAC) $(JAVACFLAGS) $<
+
+#	Miscellaneous section.
+LD=ld
+LDFLAGS=
+LDLIBS=
+MAKE=make
+RM=rm -f
+AR=ar
+ARFLAGS=rv
+GET=get
+GFLAGS=
+
+markfile.o:	markfile
+	echo "static char _sccsid[] = \"`grep @'(#)' markfile`\";" > markfile.c
+	cc -c markfile.c
+	$(RM) markfile.c
+
+SCCSFLAGS=
+SCCSGETFLAGS=-s
+.SCCS_GET:
+	sccs $(SCCSFLAGS) get $(SCCSGETFLAGS) $@ -G$@
+
+.SCCS_GET_POSIX:
+	sccs $(SCCSFLAGS) get $(SCCSGETFLAGS) $@ 
+
+.GET_POSIX:
+	$(GET) $(GFLAGS) s.$@ 

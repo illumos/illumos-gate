@@ -1,0 +1,241 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Copyright 1994 Sun Microsystems, Inc. All rights reserved.
+# Use is subject to license terms.
+#
+#
+.SUFFIXES: .o .c .c~ .y .y~ .l .l~ .s .s~ .sh .sh~ .h .h~ .f .f~ \
+.C .C~ .Y .Y~ .L .L~
+
+MAKE=make
+BUILD=build
+AR=ar
+ARFLAGS=rv
+AS=as
+ASFLAGS=
+CC=cc
+CFLAGS=-O
+F77=f77
+FFLAGS=-O
+GET=get
+GFLAGS=
+LD=ld
+LDFLAGS=
+LEX=lex
+LFLAGS=
+YACC=yacc
+YFLAGS=
+C++C=CC
+C++FLAGS=-O
+
+
+.c:
+	$(CC) $(CFLAGS) $< -o $@ $(LDFLAGS)
+.c~:
+	$(GET) $(GFLAGS) $<
+	$(CC) $(CFLAGS) $*.c -o $@ $(LDFLAGS)
+	-rm -f $*.c
+.f:
+	$(F77) $(FFLAGS) $< -o $@ $(LDFLAGS)
+.f~:
+	$(GET) $(GFLAGS) $<
+	$(F77) $(FFLAGS) $*.f -o $@ $(LDFLAGS)
+	-rm -f $*.f
+.s:
+	$(AS) $(ASFLAGS) $< -o $@ $(LDFLAGS)
+.s~:
+	$(GET) $(GFLAGS) $<
+	$(AS) $(ASFLAGS) $*.s -o $* $(LDFLAGS)
+	-rm -f $*.s
+.sh:
+	cp $< $@; chmod 0777 $@
+.sh~:
+	$(GET) $(GFLAGS) $<
+	cp $*.sh $*; chmod 0777 $@
+	-rm -f $*.sh
+.C:
+	$(C++C) $(C++FLAGS) $< -o $@ $(LDFLAGS)
+.C~:
+	$(GET) $(GFLAGS) $<
+	$(C++C) $(C++FLAGS) $*.C -o $@ $(LDFLAGS)
+	-rm -f $*.C
+
+.c.a:
+	$(CC) $(CFLAGS) -c $<
+	$(AR) $(ARFLAGS) $@ $*.o
+	-rm -f $*.o
+.c.o:
+	$(CC) $(CFLAGS) -c $<
+.c~.a:
+	$(GET) $(GFLAGS) $<
+	$(CC) $(CFLAGS) -c $*.c
+	$(AR) $(ARFLAGS) $@ $*.o
+	-rm -f $*.[co]
+.c~.c:
+	$(GET) $(GFLAGS) $<
+.c~.o:
+	$(GET) $(GFLAGS) $<
+	$(CC) $(CFLAGS) -c $*.c
+	-rm -f $*.c
+.f.a:
+	$(F77) $(FFLAGS) -c $*.f
+	$(AR) $(ARFLAGS) $@ $*.o
+	-rm -f $*.o
+.f.o:
+	$(F77) $(FFLAGS) -c $*.f
+.f~.a:
+	$(GET) $(GFLAGS) $<
+	$(F77) $(FFLAGS) -c $*.f
+	$(AR) $(ARFLAGS) $@ $*.o
+	-rm -f $*.[fo]
+.f~.f:
+	$(GET) $(GFLAGS) $<
+.f~.o:
+	$(GET) $(GFLAGS) $<
+	$(F77) $(FFLAGS) -c $*.f
+	-rm -f $*.f
+.h~.h:
+	$(GET) $(GFLAGS) $<
+.l.c:
+	$(LEX) $(LFLAGS) $<
+	mv lex.yy.c $@
+.l.o:
+	$(LEX) $(LFLAGS) $<
+	$(CC) $(CFLAGS) -c lex.yy.c
+	-rm lex.yy.c; mv lex.yy.o $@
+.l~.c:
+	$(GET) $(GFLAGS) $<
+	$(LEX) $(LFLAGS) $*.l
+	mv lex.yy.c $@
+	-rm -f $*.l
+.l~.l:
+	$(GET) $(GFLAGS) $<
+.l~.o:
+	$(GET) $(GFLAGS) $<
+	$(LEX) $(LFLAGS) $*.l
+	$(CC) $(CFLAGS) -c lex.yy.c
+	-rm -f lex.yy.c $*.l
+	mv lex.yy.o $@
+.s.a:
+	$(AS) $(ASFLAGS) -o $*.o $*.s
+	$(AR) $(ARFLAGS) $@ $*.o
+.s.o:
+	$(AS) $(ASFLAGS) -o $@ $<
+.s~.a:
+	$(GET) $(GFLAGS) $<
+	$(AS) $(ASFLAGS) -o $*.o $*.s
+	$(AR) $(ARFLAGS) $@ $*.o
+	-rm -f $*.[so]
+.s~.o:
+	$(GET) $(GFLAGS) $<
+	$(AS) $(ASFLAGS) -o $*.o $*.s
+	-rm -f $*.s
+.s~.s:
+	$(GET) $(GFLAGS) $<
+.sh~.sh:
+	$(GET) $(GFLAGS) $<
+.y.c:
+	$(YACC) $(YFLAGS) $<
+	mv y.tab.c $@
+.y.o:
+	$(YACC) $(YFLAGS) $<
+	$(CC) $(CFLAGS) -c y.tab.c
+	-rm y.tab.c
+	mv y.tab.o $@
+.y~.c:
+	$(GET) $(GFLAGS) $<
+	$(YACC) $(YFLAGS) $*.y
+	mv y.tab.c $*.c
+	-rm -f $*.y
+.y~.o:
+	$(GET) $(GFLAGS) $<
+	$(YACC) $(YFLAGS) $*.y
+	$(CC) $(CFLAGS) -c y.tab.c
+	-rm -f y.tab.c $*.y
+	mv y.tab.o $*.o
+.y~.y :
+	$(GET) $(GFLAGS) $<
+.C.a:
+	$(C++C) $(C++FLAGS) -c $<
+	$(AR) $(ARFLAGS) $@ $*.o
+	-rm -f $*.o
+.C.o:
+	$(C++C) $(C++FLAGS) -c $<
+.C~.a:
+	$(GET) $(GFLAGS) $<
+	$(C++C) $(C++FLAGS) -c $*.C
+	$(AR) $(ARFLAGS) $@ $*.o
+	-rm -f $*.[Co]
+.C~.C:
+	$(GET) $(GFLAGS) $<
+.C~.o:
+	$(GET) $(GFLAGS) $<
+	$(C++C) $(C++FLAGS) -c $*.C
+	-rm -f $*.C
+.L.C:
+	$(LEX) $(LFLAGS) $<
+	mv lex.yy.c $@
+.L.o:
+	$(LEX) $(LFLAGS) $<
+	$(C++C) $(C++FLAGS) -c lex.yy.c
+	-rm lex.yy.c; mv lex.yy.o $@
+.L~.C:
+	$(GET) $(GFLAGS) $<
+	$(LEX) $(LFLAGS) $*.L
+	mv lex.yy.c $@
+	-rm -f $*.L
+.L~.L:
+	$(GET) $(GFLAGS) $<
+.L~.o:
+	$(GET) $(GFLAGS) $<
+	$(LEX) $(LFLAGS) $*.L
+	$(C++C) $(C++FLAGS) -c lex.yy.c
+	-rm -f lex.yy.c $*.L
+	mv lex.yy.c $@
+.Y.C:
+	$(YACC) $(YFLAGS) $<
+	mv y.tab.c $@
+.Y.o:
+	$(YACC) $(YFLAGS) $<
+	$(C++C) $(C++FLAGS) -c y.tab.c
+	-rm y.tab.c
+	mv y.tab.o $@
+.Y~.C:
+	$(GET) $(GFLAGS) $<
+	$(YACC) $(YFLAGS) $*.Y
+	mv y.tab.c $*.C
+	-rm -f $*.Y
+.Y~.o:
+	$(GET) $(GFLAGS) $<
+	$(YACC) $(YFLAGS) $*.Y
+	$(C++C) $(C++FLAGS) -c y.tab.c
+	-rm -f y.tab.c $*.Y
+	mv y.tab.o $*.o
+.Y~.Y :
+	$(GET) $(GFLAGS) $<
+
+markfile.o:	markfile
+	echo "static char _sccsid[] = \"`grep @'(#)' markfile`\";" > markfile.c
+	$(CC) -c markfile.c
+	-rm -f markfile.c
+
+.SCCS_GET:
+	$(GET) $(GFLAGS)  s.$@

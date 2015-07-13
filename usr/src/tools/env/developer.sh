@@ -176,10 +176,6 @@ UT_NO_USAGE_TRACKING="1"; export UT_NO_USAGE_TRACKING
 #IA32_IHV_BINARY_PKGS=/ws/${GATE}-ihv-bin
 #export IA32_IHV_BINARY_PKGS
 
-# Set this flag to 'n' to disable the automatic validation of the dmake
-# version in use.  The default is to check it.
-#CHECK_DMAKE=y
-
 # Set this flag to 'n' to disable the use of 'checkpaths'.  The default,
 # if the 'N' option is not specified, is to run this test.
 #CHECK_PATHS=y

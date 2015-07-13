@@ -1,0 +1,37 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+# Copyright 2015, Richard Lowe.
+
+set name=pkg.fmri value=pkg:/developer/build/make@$(PKGVERS)
+set name=pkg.description value="Parallel make(1) build tool"
+set name=pkg.summary value="Parallel make(1) build tool"
+set name=info.classification \
+    value="org.opensolaris.category.2008:Development/Source Code Management"
+set name=variant.arch value=$(ARCH)
+dir path=usr/share/lib/make
+dir path=usr/share/man/man1
+dir path=usr/share/man/man1s
+file path=usr/bin/make mode=0555
+file path=usr/lib/$(ARCH64)/libmakestate.so.1
+file path=usr/lib/libmakestate.so.1
+file path=usr/share/lib/make/make.rules
+file path=usr/share/lib/make/svr4.make.rules
+file path=usr/share/man/man1/make.1
+file path=usr/share/man/man1/sysV-make.1
+link path=usr/bin/dmake target=make
+link path=usr/ccs/bin/make target=../../bin/make
+link path=usr/ccs/lib/svr4.make target=../../bin/make
+link path=usr/lib/svr4.make target=../bin/make
+link path=usr/share/man/man1/dmake.1 target=make.1
+link path=usr/share/man/man1s/dmake.1s target=../man1/make.1
+link path=usr/share/man/man1s/make.1s target=../man1/make.1
+link path=usr/xpg4/bin/make target=../../bin/make
