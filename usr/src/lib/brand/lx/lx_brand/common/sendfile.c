@@ -48,7 +48,7 @@ lx_sendfile(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4)
 	off_t *offp = (off_t *)p3;
 	int error;
 	struct sendfilevec sfv;
-	size_t xferred;
+	size_t xferred = 0;
 	size_t sz = (size_t)p4;
 
 	if (offp == NULL) {
@@ -69,6 +69,12 @@ lx_sendfile(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4)
 	error = __systemcall(&rval, SYS_sendfilev, SENDFILEV, p1, &sfv,
 	    1, &xferred);
 
+	/* Suppress EAGAIN errors if we were able to write any data at all. */
+	if (error == EAGAIN && xferred > 0) {
+		error = 0;
+		rval.sys_rval1 = xferred;
+	}
+
 	if (error == 0 && xferred > 0) {
 		if (offp == NULL) {
 			/* If no offp, we must adjust current offset */
@@ -76,7 +82,9 @@ lx_sendfile(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4)
 				return (-errno);
 		} else {
 			off += xferred;
-			error = uucopy(&off, offp, sizeof (off));
+			if (uucopy(&off, offp, sizeof (off)) != 0) {
+				return (-EFAULT);
+			}
 		}
 	}
 
@@ -114,6 +122,12 @@ lx_sendfile64(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4)
 	error = __systemcall(&rval, SYS_sendfilev, SENDFILEV64, p1, &sfv,
 	    1, &xferred);
 
+	/* Suppress EAGAIN errors if we were able to write any data at all. */
+	if (error == EAGAIN && xferred > 0) {
+		error = 0;
+		rval.sys_rval1 = xferred;
+	}
+
 	if (error == 0 && xferred > 0) {
 		if (offp == NULL) {
 			/* If no offp, we must adjust current offset */
@@ -121,7 +135,9 @@ lx_sendfile64(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4)
 				return (-errno);
 		} else {
 			off += xferred;
-			error = uucopy(&off, offp, sizeof (off));
+			if (uucopy(&off, offp, sizeof (off)) != 0) {
+				return (-EFAULT);
+			}
 		}
 	}
 
