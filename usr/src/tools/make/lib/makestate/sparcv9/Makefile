@@ -12,4 +12,5 @@
 # Copyright 2015, Richard Lowe.
 
 include ../Makefile.com
+include $(SRC)/lib/Makefile.lib.64
 install: all $(ROOTONBLDLIBMACH64)/libmakestate.so.1
