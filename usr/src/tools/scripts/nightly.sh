@@ -965,18 +965,6 @@ elif [[ ! -x "$MAKE" ]]; then
 	echo "\$MAKE is set to garbage in the environment"
 	exit 1	
 fi
-# get the dmake version string alone
-DMAKE_VERSION=$( $MAKE -v )
-# Admittedly not the best check, but better than the old one.
-if ! echo $DMAKE_VERSION | grep -q rm; then
-	cat <<EOF
-The version of dmake you are using ($DMAKE_VERSION) is not the current open
-source version for building illumos. Please ensure that you are building
-illumos-joyent with the latest version of dmake in illumos-extra.
-EOF
-	exit 1
-fi
-
 export PATH
 export MAKE
 

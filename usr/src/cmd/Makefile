@@ -250,6 +250,7 @@ COMMON_SUBDIRS=		\
 	mail		\
 	mailwrapper	\
 	mailx		\
+	make		\
 	makekey		\
 	man		\
 	mandoc		\
@@ -614,6 +615,7 @@ MSGSUBDIRS=		\
 	ls		\
 	luxadm		\
 	mailx		\
+	make		\
 	man		\
 	mesg		\
 	mkdir		\

@@ -21,7 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2010, Richard Lowe
+# Copyright 2015, Richard Lowe
 # Copyright 2012, Piotr Jasiukajtis
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright (c) 2014, Joyent, Inc.
@@ -49,6 +49,7 @@ dir path=opt/onbld/etc/exception_lists
 dir path=opt/onbld/gk
 dir path=opt/onbld/lib
 dir path=opt/onbld/lib/$(ARCH)
+dir path=opt/onbld/lib/$(ARCH)/64
 dir path=opt/onbld/lib/perl
 dir path=opt/onbld/lib/python2.6
 dir path=opt/onbld/lib/python2.6/onbld
@@ -57,6 +58,7 @@ dir path=opt/onbld/lib/python2.6/onbld/Scm
 dir path=opt/onbld/lib/python2.6/onbld/hgext
 dir path=opt/onbld/man
 dir path=opt/onbld/man/man1
+dir path=opt/onbld/share
 $(i386_ONLY)file path=opt/onbld/bin/$(ARCH)/aw mode=0555
 $(sparc_ONLY)file path=opt/onbld/bin/$(ARCH)/chk4ubin mode=0555
 file path=opt/onbld/bin/$(ARCH)/codereview mode=0555
@@ -73,6 +75,7 @@ $(sparc_ONLY)file path=opt/onbld/bin/$(ARCH)/forth mode=0555
 $(sparc_ONLY)file path=opt/onbld/bin/$(ARCH)/forth_preload.so.1 mode=0555
 file path=opt/onbld/bin/$(ARCH)/install mode=0555
 file path=opt/onbld/bin/$(ARCH)/lintdump mode=0555
+file path=opt/onbld/bin/$(ARCH)/make mode=0555
 $(i386_ONLY)file path=opt/onbld/bin/$(ARCH)/mbh_patch mode=0555
 file path=opt/onbld/bin/$(ARCH)/ndrgen mode=0555
 file path=opt/onbld/bin/$(ARCH)/ndrgen1 mode=0555
@@ -138,7 +141,9 @@ file path=opt/onbld/etc/its.reg
 file path=opt/onbld/gk/.cshrc
 file path=opt/onbld/gk/.login
 file path=opt/onbld/gk/gen_make.machines mode=0755
+file path=opt/onbld/lib/$(ARCH)/64/libmakestate.so.1
 file path=opt/onbld/lib/$(ARCH)/libdwarf.so.1
+file path=opt/onbld/lib/$(ARCH)/libmakestate.so.1
 file path=opt/onbld/lib/perl/onbld_elfmod.pm
 file path=opt/onbld/lib/perl/onbld_elfmod_vertype.pm
 file path=opt/onbld/lib/python2.6/onbld/Checks/CStyle.py mode=0444
@@ -215,6 +220,7 @@ file path=opt/onbld/man/man1/which_scm.1
 file path=opt/onbld/man/man1/ws.1
 file path=opt/onbld/man/man1/wsdiff.1
 file path=opt/onbld/man/man1/xref.1
+file path=opt/onbld/share/make.rules mode=0444
 hardlink path=opt/onbld/bin/$(ARCH)/install.bin target=./install
 legacy pkg=SUNWonbld desc="tools used to build the OS-Net consolidation" \
     name="OS-Net Build Tools" version=11.11,REV=2009.10.22
@@ -224,6 +230,7 @@ license usr/src/tools/ctf/dwarf/THIRDPARTYLICENSE \
     license=usr/src/tools/ctf/dwarf/THIRDPARTYLICENSE
 license usr/src/tools/onbld/THIRDPARTYLICENSE \
     license=usr/src/tools/onbld/THIRDPARTYLICENSE
+link path=opt/onbld/bin/$(ARCH)/dmake target=make
 link path=opt/onbld/bin/git-nits target=git-pbchk
 link path=opt/onbld/lib/python target=python2.6
 link path=opt/onbld/man/man1/git-nits.1 target=git-pbchk.1
