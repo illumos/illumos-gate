@@ -208,7 +208,7 @@ typedef struct lx_proto_opts {
  * IP_ROUTER_ALERT            5
  * IP_RECVOPTS                6			IP_RECVOPTS 5
  * IP_RETOPTS                 7			IP_RETOPTS  8
- * IP_PKTINFO                 8
+ * IP_PKTINFO                 8			IP_PKTINFO  26
  * IP_PKTOPTIONS              9
  * IP_MTU_DISCOVER            10		emulated for traceroute
  * IP_RECVERR                 11		emulated for traceroute
@@ -258,7 +258,8 @@ static const lx_sockopt_map_t ltos_ip_sockopts[LX_IP_UNICAST_IF + 1] = {
 	{ OPTNOTSUP, 0 },
 	{ IP_RECVOPTS, sizeof (int) },
 	{ IP_RETOPTS, sizeof (int) },
-	{ OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 },
+	{ IP_PKTINFO, sizeof (int) },
+	{ OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 },
 	{ IP_RECVTTL, sizeof (int) },
 	{ OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 },
 	{ OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 },

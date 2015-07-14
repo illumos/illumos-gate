@@ -556,6 +556,8 @@ static lx_cmsg_xlate_t lx_cmsg_xlate_tbl[] = {
 	    LX_SOL_SOCKET, LX_SCM_CRED, ltos_conv_ucred },
 	{ SOL_SOCKET, SCM_TIMESTAMP, cmsg_conv_generic,
 	    LX_SOL_SOCKET, LX_SCM_TIMESTAMP, cmsg_conv_generic },
+	{ IPPROTO_IP, IP_PKTINFO, cmsg_conv_generic,
+	    LX_IPPROTO_IP, LX_IP_PKTINFO, cmsg_conv_generic },
 	{ IPPROTO_IPV6, IPV6_PKTINFO, cmsg_conv_generic,
 	    LX_IPPROTO_IPV6, LX_IPV6_PKTINFO, cmsg_conv_generic }
 };

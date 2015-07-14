@@ -158,6 +158,53 @@ extern "C" {
 
 /*
  * Options for use with [gs]etsockopt at the IP level.
+ * IPPROTO_IP
+ */
+#define	LX_IP_TOS		1
+#define	LX_IP_TTL		2
+#define	LX_IP_HDRINCL		3
+#define	LX_IP_OPTIONS		4
+#define	LX_IP_ROUTER_ALERT	5
+#define	LX_IP_RECVOPTS		6
+#define	LX_IP_RETOPTS		7
+#define	LX_IP_PKTINFO		8
+#define	LX_IP_PKTOPTIONS	9
+#define	LX_IP_MTU_DISCOVER	10
+#define	LX_IP_RECVERR		11
+#define	LX_IP_RECVTTL		12
+#define	LX_IP_RECVTOS		13
+#define	LX_IP_MTU		14
+#define	LX_IP_FREEBIND		15
+#define	LX_IP_IPSEC_POLICY	16
+#define	LX_IP_XFRM_POLICY	17
+#define	LX_IP_PASSSEC		18
+#define	LX_IP_TRANSPARENT	19
+#define	LX_IP_ORIGDSTADDR	20
+#define	LX_IP_MINTTL		21
+#define	LX_IP_NODEFRAG		22
+/* Linux apparently leaves a gap here */
+#define	LX_IP_MULTICAST_IF	32
+#define	LX_IP_MULTICAST_TTL	33
+#define	LX_IP_MULTICAST_LOOP	34
+#define	LX_IP_ADD_MEMBERSHIP	35
+#define	LX_IP_DROP_MEMBERSHIP	36
+#define	LX_IP_UNBLOCK_SOURC	37
+#define	LX_IP_BLOCK_SOURCE	38
+#define	LX_IP_ADD_SOURCE_MEMBERSHIP 39
+#define	LX_IP_DROP_SOURCE_MEMBERSHIP 40
+#define	LX_IP_MSFILTER		41
+#define	LX_MCAST_JOIN_GROUP	42
+#define	LX_MCAST_BLOCK_SOURCE	43
+#define	LX_MCAST_UNBLOCK_SOURCE	44
+#define	LX_MCAST_LEAVE_GROUP	45
+#define	LX_MCAST_JOIN_SOURCE_GROUP 46
+#define	LX_MCAST_LEAVE_SOURCE_GROUP 47
+#define	LX_MCAST_MSFILTER	48
+#define	LX_IP_MULTICAST_ALL	49
+#define	LX_IP_UNICAST_IF	50
+
+/*
+ * Options for use with [gs]etsockopt at the IP level.
  * IPPROTO_IPV6
  */
 
