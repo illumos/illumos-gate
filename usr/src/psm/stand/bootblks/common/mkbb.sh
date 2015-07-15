@@ -23,10 +23,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-
-#!/bin/sh
 
 # defaults
 bblen=7680
@@ -75,8 +71,8 @@ dd if=$2 of=$3 conv=notrunc bs=1 oseek=$rdoff
 #
 if [ $totlen -gt $bblen ]; then
     extsize=$(ls -l $extra | awk -e '{ print $5 }')
-    if [ $extsize -gt 8192 ]; then
-	printf "$1 must be smaller than 8k\n"
+    if [ $extsize -gt 16384 ]; then
+	printf "$1 must be smaller than 16k\n"
 	exit -1
     fi
     dd if=$extra of=$3 conv=notrunc bs=1 oseek=$bblen
