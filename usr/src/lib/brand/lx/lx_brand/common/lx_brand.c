@@ -963,7 +963,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/*  46: sendmsg */
 	NULL,				/*  47: recvmsg */
 	lx_shutdown,			/*  48: shutdown */
-	lx_bind,			/*  49: bind */
+	NULL,				/*  49: bind */
 	lx_listen,			/*  50: listen */
 	lx_getsockname,			/*  51: getsockname */
 	lx_getpeername,			/*  52: getpeername */

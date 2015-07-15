@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2015 Joyent, Inc.
  */
 
 #ifndef _SOCKFS_SOCKTPI_IMPL_H
@@ -56,6 +57,8 @@ extern int	sogetrderr(vnode_t *, int, int *);
 extern int	sogetwrerr(vnode_t *, int, int *);
 extern int	so_addr_verify(struct sonode *, const struct sockaddr *,
 			socklen_t);
+extern int	so_ux_lookup(struct sonode *, struct sockaddr_un *, int,
+		vnode_t **);
 extern int	so_ux_addr_xlate(struct sonode *, struct sockaddr *,
 			socklen_t, int, void **, socklen_t *);
 extern void	so_unix_close(struct sonode *);

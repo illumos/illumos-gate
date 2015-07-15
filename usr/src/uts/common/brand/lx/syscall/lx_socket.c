@@ -46,6 +46,7 @@
 #include <sys/fcntl.h>
 #include <netpacket/packet.h>
 #include <sockcommon.h>
+#include <socktpi_impl.h>
 
 #include <sys/lx_brand.h>
 #include <sys/lx_socket.h>
@@ -280,9 +281,15 @@ convert_abst_path(const struct sockaddr *inaddr, socklen_t len,
 	(void) strcpy(outaddr->sa_data, buf.sun_path);
 }
 
+typedef enum lx_sun_type {
+	LX_SUN_NORMAL,
+	LX_SUN_ABSTRACT,
+	LX_SUN_DEVLOG
+} lx_sun_type_t;
+
 static long
 ltos_sockaddr_copyin(const struct sockaddr *inaddr, const socklen_t inlen,
-    struct sockaddr **outaddr, socklen_t *outlen)
+    struct sockaddr **outaddr, socklen_t *outlen, lx_sun_type_t *sun_type)
 {
 	sa_family_t family;
 	struct sockaddr *laddr;
@@ -292,7 +299,7 @@ ltos_sockaddr_copyin(const struct sockaddr *inaddr, const socklen_t inlen,
 	VERIFY(inaddr != NULL);
 
 	if (inlen < sizeof (sa_family_t) ||
-	    inlen > sizeof (struct sockaddr_un)) {
+	    inlen > sizeof (struct sockaddr_storage)) {
 		return (EINVAL);
 	}
 	laddr = kmem_alloc(inlen, KM_SLEEP);
@@ -335,12 +342,17 @@ ltos_sockaddr_copyin(const struct sockaddr *inaddr, const socklen_t inlen,
 				 * domain socket used for logging that has had
 				 * its path hard-coded far and wide -- we need
 				 * to relocate the socket into a writable
-				 * filesystem.  This also necessitates some
-				 * cleanup in bind(); see lx_bind() for
-				 * details.
+				 * filesystem.
+				 *
+				 * Since this path should be reusable after
+				 * being closed (but not unlinked), it is
+				 * implicitly cleaned up during bind().
 				 */
 				(void) strcpy((*outaddr)->sa_data,
 				    LX_DEV_LOG_REDIRECT);
+				if (sun_type != NULL) {
+					*sun_type = LX_SUN_DEVLOG;
+				}
 			} else if (laddr->sa_data[0] == '\0') {
 				/*
 				 * Linux supports abstract Unix sockets, which
@@ -352,11 +364,22 @@ ltos_sockaddr_copyin(const struct sockaddr *inaddr, const socklen_t inlen,
 				 * real place in /tmp directory, by prepending
 				 * ABST_PRFX and replacing all illegal
 				 * characters with * '_'.
+				 *
+				 * Since these sockets are supposed to exist
+				 * outside the filesystem, they must be cleaned
+				 * up after use.  This removal is performed
+				 * during bind().
 				 */
 				convert_abst_path(laddr, inlen, *outaddr);
+				if (sun_type != NULL) {
+					*sun_type = LX_SUN_ABSTRACT;
+				}
 			} else {
 				bcopy(laddr->sa_data, (*outaddr)->sa_data,
 				    inlen - sizeof (sa_family_t));
+				if (sun_type != NULL) {
+					*sun_type = LX_SUN_NORMAL;
+				}
 			}
 			/* AF_UNIX bypasses the standard copy logic */
 			kmem_free(laddr, inlen);
@@ -392,7 +415,7 @@ ltos_sockaddr_copyin(const struct sockaddr *inaddr, const socklen_t inlen,
 			 * than the Linux version.  We simply zero that field
 			 * via kmem_zalloc.
 			 */
-			if (inlen != sizeof (lx_sockaddr_in6_t)) {
+			if (inlen < sizeof (lx_sockaddr_in6_t)) {
 				error = EINVAL;
 				break;
 			}
@@ -979,6 +1002,82 @@ lx_sad_acquire(vnode_t *vp)
 }
 
 long
+lx_bind(long sock, uintptr_t name, socklen_t namelen)
+{
+	struct sonode *so;
+	struct sockaddr *addr = NULL;
+	socklen_t len = 0;
+	file_t *fp;
+	int error;
+	lx_sun_type_t sun_type;
+	boolean_t not_sock = B_FALSE;
+
+	if ((so = getsonode(sock, &error, &fp)) == NULL) {
+		return (set_errno(error));
+	}
+
+	if (namelen != 0) {
+		error = ltos_sockaddr_copyin((struct sockaddr *)name, namelen,
+		    &addr, &len, &sun_type);
+		if (error != 0) {
+			releasef(sock);
+			return (set_errno(error));
+		}
+	}
+
+	if (addr != NULL && addr->sa_family == AF_UNIX) {
+		vnode_t *vp;
+
+		error = so_ux_lookup(so, (struct sockaddr_un *)addr, B_TRUE,
+		    &vp);
+		if (error == 0) {
+			/* A valid socket exists and is open at this address. */
+			VN_RELE(vp);
+		} else {
+			/* Keep track of paths which are not valid sockets. */
+			if (error == ENOTSOCK) {
+				not_sock = B_TRUE;
+			}
+
+			/*
+			 * When binding to an abstract namespace address or
+			 * /dev/log, implicit clean-up must occur if there is
+			 * not a valid socket at the specififed address.  See
+			 * ltos_sockaddr_copyin for details about why these
+			 * socket types act differently.
+			 */
+			if (sun_type == LX_SUN_ABSTRACT ||
+			    sun_type == LX_SUN_DEVLOG) {
+				(void) vn_removeat(NULL, addr->sa_data,
+				    UIO_SYSSPACE, RMFILE);
+			}
+		}
+	}
+
+	error = socket_bind(so, addr, len, _SOBIND_XPG4_2, CRED());
+
+	/*
+	 * Linux returns EADDRINUSE for attempts to bind to Unix domain
+	 * sockets that aren't sockets.
+	 */
+	if (error == EINVAL && addr != NULL && addr->sa_family == AF_UNIX &&
+	    not_sock == B_TRUE) {
+		error = EADDRINUSE;
+	}
+
+	releasef(sock);
+
+	if (addr != NULL) {
+		kmem_free(addr, len);
+	}
+
+	if (error != 0) {
+		return (set_errno(error));
+	}
+	return (0);
+}
+
+long
 lx_connect(long sock, uintptr_t name, socklen_t namelen)
 {
 	struct sonode *so;
@@ -999,7 +1098,7 @@ lx_connect(long sock, uintptr_t name, socklen_t namelen)
 	 */
 	if (namelen != 0) {
 		error = ltos_sockaddr_copyin((struct sockaddr *)name, namelen,
-		    &addr, &len);
+		    &addr, &len, NULL);
 		if (error != 0) {
 			releasef(sock);
 			return (set_errno(error));
@@ -1489,7 +1588,7 @@ lx_send_common(int sock, struct nmsghdr *msg, struct uio *uiop, int flags)
 		ASSERT(MUTEX_NOT_HELD(&so->so_lock));
 
 		error = ltos_sockaddr_copyin((struct sockaddr *)msg->msg_name,
-		    msg->msg_namelen, &name, &namelen);
+		    msg->msg_namelen, &name, &namelen, NULL);
 		if (error != 0) {
 			goto done;
 		}
@@ -1749,7 +1848,7 @@ static struct {
 	int s_nargs;		/* Number of arguments the function takes */
 } lx_socketcall_fns[] = {
 	NULL,		3,	/* socket */
-	NULL,		3,	/* bind */
+	lx_bind,	3,	/* bind */
 	lx_connect,	3,	/* connect */
 	NULL,		2,	/* listen */
 	NULL,		3,	/* accept */

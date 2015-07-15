@@ -943,7 +943,7 @@ lx_sysent_t lx_sysent64[] = {
 	{"sendmsg",	lx_sendmsg,		0,		3}, /* 46 */
 	{"recvmsg",	lx_recvmsg,		0,		3}, /* 47 */
 	{"shutdown",	NULL,			0,		2}, /* 48 */
-	{"bind",	NULL,			0,		3}, /* 49 */
+	{"bind",	lx_bind,		0,		3}, /* 49 */
 	{"listen",	NULL,			0,		2}, /* 50 */
 	{"getsockname",	NULL,			0,		3}, /* 51 */
 	{"getpeername",	NULL,			0,		3}, /* 52 */

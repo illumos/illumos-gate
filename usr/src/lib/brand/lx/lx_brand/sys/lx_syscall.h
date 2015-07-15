@@ -89,7 +89,6 @@ extern long lx_pwrite64(uintptr_t, uintptr_t, uintptr_t, uintptr_t,
 extern long lx_socketcall(uintptr_t, uintptr_t);
 extern long lx_accept(int, void *, int *);
 extern long lx_accept4(int, void *, int *, int);
-extern long lx_bind(int, void *, int);
 extern long lx_getpeername(int, void *, int *);
 extern long lx_getsockname(int, void *, int *);
 extern long lx_getsockopt(int, int, int, void *, int *);
