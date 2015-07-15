@@ -78,7 +78,6 @@ typedef enum {
 #ifdef __i386
 
 static int lx_socket32(ulong_t *);
-static int lx_bind32(ulong_t *);
 static int lx_listen32(ulong_t *);
 static int lx_accept32(ulong_t *);
 static int lx_getsockname32(ulong_t *);
@@ -98,7 +97,7 @@ static struct {
 	int s_nargs;	/* Number of arguments the function takes */
 } sockfns[] = {
 	lx_socket32, 3,
-	lx_bind32, 3,
+	NULL, 3,
 	NULL, 3,
 	lx_listen32, 2,
 	lx_accept32, 3,
@@ -676,159 +675,6 @@ convert_pkt_proto(int protocol)
 	}
 }
 
-/*
- * If inaddr is an abstract namespace Unix socket, this function expects addr
- * to have enough memory to hold the expanded socket name, ie it must be of
- * size *len + ABST_PRFX_LEN. If inaddr is a netlink socket then we expect
- * addr to have enough memory to hold an Unix socket address.
- */
-static int
-ltos_sockaddr(struct sockaddr *addr, socklen_t *len,
-    struct sockaddr *inaddr, socklen_t inlen, lx_addr_type_t type)
-{
-	sa_family_t family;
-	struct sockaddr_ll *sll;
-	int proto;
-	int size;
-	int i, orig_len;
-
-	/*
-	 * Note that if the buffer at inaddr is ever smaller than inlen bytes,
-	 * we may erroneously return EFAULT rather than a possible EINVAL
-	 * as the copy comes before the various checks as to whether inlen
-	 * is of the proper length for the socket type.
-	 *
-	 * This isn't an issue at present because all callers to this routine
-	 * do meet that constraint.
-	 */
-	if ((int)inlen < 0)
-		return (-EINVAL);
-	if (uucopy(inaddr, addr, inlen) != 0)
-		return (-errno);
-
-	family = LTOS_FAMILY(addr->sa_family);
-
-	switch (family) {
-		case (sa_family_t)AF_NOTSUPPORTED:
-			return (-EPROTONOSUPPORT);
-		case (sa_family_t)AF_INVAL:
-			return (-EAFNOSUPPORT);
-		case AF_INET:
-			size = sizeof (struct sockaddr);
-
-			if (inlen < size)
-				return (-EINVAL);
-
-			*len = size;
-			break;
-
-		case AF_INET6:
-			/*
-			 * The illumos sockaddr_in6 has one more 32-bit field
-			 * than the Linux version.  We assume the caller has
-			 * zeroed the sockaddr we're copying into.
-			 */
-			if (inlen != sizeof (lx_sockaddr_in6_t))
-				return (-EINVAL);
-
-			*len = sizeof (struct sockaddr_in6);
-			break;
-
-		case AF_UNIX:
-			if (inlen > sizeof (struct sockaddr_un))
-				return (-EINVAL);
-
-			*len = inlen;
-
-			/*
-			 * In order to support /dev/log -- a Unix domain socket
-			 * used for logging that has had its path hard-coded
-			 * far and wide -- we need to relocate the socket
-			 * into a writable filesystem.  This also necessitates
-			 * some cleanup in bind(); see lx_bind() for details.
-			 */
-			if (type == lxa_devlog) {
-				*len = inlen + LX_DEV_LOG_REDIRECT_LEN;
-				strcpy(addr->sa_data, LX_DEV_LOG_REDIRECT);
-				break;
-			}
-
-			/*
-			 * Linux supports abstract Unix sockets, which are
-			 * simply sockets that do not exist on the file system.
-			 * These sockets are denoted by beginning the path with
-			 * a NULL character. To support these, we strip out the
-			 * leading NULL character and change the path to point
-			 * to a real place in /tmp directory, by prepending
-			 * ABST_PRFX and replacing all illegal characters with
-			 * '_'.
-			 */
-			if (type == lxa_abstract) {
-				/*
-				 * inlen is the entire size of the sockaddr_un
-				 * data structure, including the sun_family, so
-				 * we need to subtract this out. We subtract
-				 * 1 since we want to overwrite the leadin NULL
-				 * character, and thus do not include it in the
-				 * length.
-				 */
-				orig_len = inlen - sizeof (addr->sa_family) - 1;
-
-				/*
-				 * Since abstract paths can contain illegal
-				 * filename characters, we simply replace these
-				 * with '_'
-				 */
-				for (i = 1; i < orig_len + 1; i++) {
-					if (addr->sa_data[i] == '\0' ||
-					    addr->sa_data[i] == '/')
-						addr->sa_data[i] = '_';
-				}
-
-				/*
-				 * prepend ABST_PRFX to file name, minus the
-				 * leading NULL character. This places the
-				 * socket as a hidden file in the /tmp
-				 * directory.
-				 */
-				(void) memmove(addr->sa_data + ABST_PRFX_LEN,
-				    addr->sa_data + 1, orig_len);
-				bcopy(ABST_PRFX, addr->sa_data, ABST_PRFX_LEN);
-
-				/*
-				 * Since abstract socket paths may not be NULL
-				 * terminated, we must explicitly NULL terminate
-				 * our string.
-				 */
-				addr->sa_data[orig_len + ABST_PRFX_LEN] = '\0';
-
-				/*
-				 * Make len reflect the new len of our string.
-				 * Although we removed the NULL character at the
-				 * beginning of the string, we added a NULL
-				 * character to the end, so the net gain in
-				 * length is simply ABST_PRFX_LEN.
-				 */
-				*len = inlen + ABST_PRFX_LEN;
-			}
-			break;
-
-		case AF_PACKET:
-			sll = (struct sockaddr_ll *)addr;
-			if ((proto = convert_pkt_proto(sll->sll_protocol)) < 0)
-				return (-EINVAL);
-			sll->sll_protocol = proto;
-			*len = inlen;
-			break;
-
-		default:
-			*len = inlen;
-	}
-
-	addr->sa_family = family;
-	return (0);
-}
-
 static int
 stol_sockaddr(struct sockaddr *addr, socklen_t *len,
     struct sockaddr *inaddr, socklen_t inlen, socklen_t orig)
@@ -957,89 +803,6 @@ lx_socket(int domain, int type, int protocol)
 		return (-ESOCKTNOSUPPORT);
 
 	return (-errno);
-}
-
-long
-lx_bind(int sockfd, void *np, int nl)
-{
-	struct stat64 statbuf;
-	struct sockaddr *name;
-	socklen_t len;
-	int r, r2, ret, tmperrno;
-	int nlen;
-	lx_addr_type_t type;
-	struct stat sb;
-
-	if ((nlen = calc_addr_size(np, nl, &type)) < 0)
-		return (nlen);
-
-	if ((name = SAFE_ALLOCA(nlen)) == NULL)
-		return (-EINVAL);
-	bzero(name, nlen);
-
-	if ((r = ltos_sockaddr(name, &len, np, nl, type)) < 0)
-		return (r);
-
-	/*
-	 * There are two types of Unix domain sockets for which we need to
-	 * do some special handling with respect to bind:  abstract namespace
-	 * sockets and /dev/log.  Abstract namespace sockets are simply Unix
-	 * domain sockets that do not exist on the filesystem; we emulate them
-	 * by changing their paths in ltos_sockaddr() to point to real
-	 * file names in the  filesystem.  /dev/log is a special Unix domain
-	 * socket that is used for system logging.  On us, /dev isn't writable,
-	 * so we rewrite these sockets in ltos_sockaddr() to point to a
-	 * writable file (defined by LX_DEV_LOG_REDIRECT).  In both cases, we
-	 * introduce a new problem with respect to cleanup:  abstract namespace
-	 * sockets don't need to be cleaned up (when they are closed they are
-	 * removed) and /dev/log can't be cleaned up because it's in the
-	 * non-writable /dev.  We solve these problems by cleaning up here in
-	 * lx_bind():  before we create the socket, we check to see if it
-	 * exists.  If it does, we attempt to connect to it to see if it is in
-	 * use, or just left over from a previous lx_bind() call. If we are
-	 * unable to connect, we assume it is not in use and remove the file,
-	 * then continue on as if the file never existed.
-	 */
-	if ((type == lxa_abstract || type == lxa_devlog) &&
-	    stat(name->sa_data, &sb) == 0 && S_ISSOCK(sb.st_mode)) {
-		if ((r2 = socket(AF_UNIX, SOCK_STREAM, 0)) < 0)
-			return (-ENOSR);
-		ret = connect(r2, name, len);
-		tmperrno = errno;
-		if (close(r2) < 0)
-			return (-EINVAL);
-
-		/*
-		 * if we can't connect to the socket, assume no one is using it
-		 * and remove it, otherwise assume it is in use and return
-		 * EADDRINUSE.
-		 */
-		if ((ret < 0) && (tmperrno == ECONNREFUSED)) {
-			if (unlink(name->sa_data) < 0) {
-				return (-EADDRINUSE);
-			}
-		} else {
-			return (-EADDRINUSE);
-		}
-	}
-
-	lx_debug("\tbind(%d, 0x%p, %d)", sockfd, name, len);
-
-	if (name->sa_family == AF_UNIX)
-		lx_debug("\t\tAF_UNIX, path = %s", name->sa_data);
-
-	r = bind(sockfd, name, len);
-
-	/*
-	 * Linux returns EADDRINUSE for attempts to bind to Unix domain
-	 * sockets that aren't sockets.
-	 */
-	if ((r < 0) && (errno == EINVAL) && (name->sa_family == AF_UNIX) &&
-	    ((stat64(name->sa_data, &statbuf) == 0) &&
-	    (!S_ISSOCK(statbuf.st_mode))))
-		return (-EADDRINUSE);
-
-	return ((r < 0) ? -errno : r);
 }
 
 long
@@ -1790,13 +1553,6 @@ static int
 lx_socket32(ulong_t *args)
 {
 	return (lx_socket((int)args[0], (int)args[1], (int)args[2]));
-}
-
-static int
-lx_bind32(ulong_t *args)
-{
-	return (lx_bind((int)args[0], (struct sockaddr *)args[1],
-	    (int)args[2]));
 }
 
 static int

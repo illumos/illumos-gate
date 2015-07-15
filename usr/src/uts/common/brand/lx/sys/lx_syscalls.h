@@ -35,6 +35,7 @@ extern "C" {
 #ifdef	_KERNEL
 
 extern long lx_arch_prctl();
+extern long lx_bind();
 extern long lx_brk();
 extern long lx_chmod();
 extern long lx_chown();
