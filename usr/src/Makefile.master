@@ -565,8 +565,7 @@ CPPFLAGS.first=	# Please keep empty.  Only lower makefiles should set this.
 CPPFLAGS.master=$(DTEXTDOM) $(DTS_ERRNO) \
 	$(ENVCPPFLAGS1) $(ENVCPPFLAGS2) $(ENVCPPFLAGS3) $(ENVCPPFLAGS4) \
 	$(ADJUNCT_PROTO:%=-I%/usr/include)
-CPPFLAGS.native=$(ENVCPPFLAGS1) $(ENVCPPFLAGS2) $(ENVCPPFLAGS3) \
-		$(ENVCPPFLAGS4) -I$(NATIVE_ADJUNCT)/include
+CPPFLAGS.native=-I$(NATIVE_ADJUNCT)/include
 CPPFLAGS=	$(CPPFLAGS.first) $(CPPFLAGS.master)
 AS_CPPFLAGS=	$(CPPFLAGS.first) $(CPPFLAGS.master)
 JAVAFLAGS=	-source 1.6 -target 1.6 -Xlint:deprecation,-options
