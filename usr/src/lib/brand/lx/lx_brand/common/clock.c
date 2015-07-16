@@ -26,9 +26,12 @@
  */
 
 #include <errno.h>
+#include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <unistd.h>
 #include <sys/resource.h>
+#include <sys/syscall.h>
 #include <sys/lx_misc.h>
 #include <sys/lx_syscall.h>
 #include <lx_signum.h>
@@ -113,10 +116,11 @@ static int ltos_sigev[] = {
 	SIGEV_NONE,
 	SIGEV_THREAD,
 	0,		/* Linux skips event 3 */
-	SIGEV_THREAD	/* the Linux SIGEV_THREAD_ID */
+	SIGEV_THREAD	/* Linux SIGEV_THREAD_ID -- see lx_sigev_thread_id() */
 };
 
-#define	LX_SIGEV_MAX	(sizeof (ltos_sigev) / sizeof (ltos_sigev[0]))
+#define	LX_SIGEV_MAX		(sizeof (ltos_sigev) / sizeof (ltos_sigev[0]))
+#define	LX_SIGEV_THREAD_ID	4
 
 long
 lx_clock_nanosleep(int clock, int flags, struct timespec *rqtp,
@@ -163,6 +167,22 @@ lx_adjtimex(void *tp)
 }
 
 /*
+ * Notification function for use with native SIGEV_THREAD in order to
+ * emulate Linux SIGEV_THREAD_ID. Native SIGEV_THREAD is used as the
+ * timer mechanism and B_SIGEV_THREAD_ID performs the actual event
+ * delivery to the appropriate lx tid.
+ */
+static void
+lx_sigev_thread_id(union sigval sival)
+{
+	lx_sigevent_t *lev = (lx_sigevent_t *)sival.sival_ptr;
+	syscall(SYS_brand, B_SIGEV_THREAD_ID, lev->lx_sigev_un.lx_tid,
+	    lev->lx_sigev_signo, lev->lx_sigev_value.sival_ptr);
+	free(lev);
+}
+
+
+/*
  * The Illumos timer_create man page says it accepts the following clocks:
  *   CLOCK_REALTIME (3)	wall clock
  *   CLOCK_VIRTUAL (1)	user CPU usage clock - No Backend
@@ -189,13 +209,67 @@ lx_timer_create(int clock, struct sigevent *lx_sevp, timer_t *tid)
 		return (-EINVAL);
 
 	sev.sigev_notify = ltos_sigev[lev.lx_sigev_notify];
-	sev.sigev_signo = ltos_signo[lev.lx_sigev_signo];
+	sev.sigev_signo = lx_ltos_signo(lev.lx_sigev_signo, 0);
 	sev.sigev_value = lev.lx_sigev_value;
 
 	/*
-	 * The sigevent sigev_notify_function and sigev_notify_attributes
-	 * members are not used by timer_create, so no conversion is needed.
+	 * The signal number is meaningless in SIGEV_NONE, Linux
+	 * accepts any value. We convert invalid signals to 0 so other
+	 * parts of lx signal handling don't break.
 	 */
+	if ((sev.sigev_notify != SIGEV_NONE) && (sev.sigev_signo == 0))
+		return (-EINVAL);
+
+	/*
+	 * Assume all Linux libc implementations map SIGEV_THREAD to
+	 * SIGEV_THREAD_ID and ignore passed-in attributes.
+	 */
+	sev.sigev_notify_attributes = NULL;
+
+	if (lev.lx_sigev_notify == LX_SIGEV_THREAD_ID) {
+		pid_t caller_pid = getpid();
+		pid_t target_pid;
+		lwpid_t ignore;
+		lx_sigevent_t *lev_copy;
+
+		if (lx_lpid_to_spair(lev.lx_sigev_un.lx_tid,
+		    &target_pid, &ignore) != 0)
+			return (-EINVAL);
+
+		/*
+		 * The caller of SIGEV_THREAD_ID must be in the same
+		 * process as the target thread.
+		 */
+		if (caller_pid != target_pid)
+			return (-EINVAL);
+
+		/*
+		 * Pass the original lx sigevent_t to the native
+		 * notify function so that it may pass it to the lx
+		 * helper thread. It is the responsibility of
+		 * lx_sigev_thread_id() to free lev_copy after the
+		 * information is relayed to lx.
+		 *
+		 * If the calling process is forked without an exec
+		 * after this copy but before the timer fires then
+		 * lev_copy will leak in the child. This is acceptable
+		 * given the rarity of this event, the miniscule
+		 * amount leaked, and the fact that the memory is
+		 * reclaimed when the proc dies. It is firmly in the
+		 * land of "good enough".
+		 */
+		lev_copy = malloc(sizeof (lx_sigevent_t));
+		if (lev_copy == NULL)
+			return (-ENOMEM);
+
+		if (uucopy(&lev, lev_copy, sizeof (lx_sigevent_t)) < 0) {
+			free(lev_copy);
+			return (-EFAULT);
+		}
+
+		sev.sigev_notify_function = lx_sigev_thread_id;
+		sev.sigev_value.sival_ptr = lev_copy;
+	}
 
 	return ((timer_create(ltos_timer[clock], &sev, tid) < 0) ? -errno : 0);
 }

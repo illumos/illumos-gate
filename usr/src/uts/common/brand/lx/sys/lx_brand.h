@@ -95,6 +95,7 @@ extern "C" {
 #define	B_HELPER_SIGQUEUE	145
 #define	B_HELPER_TGSIGQUEUE	146
 #define	B_SET_NATIVE_STACK	147
+#define	B_SIGEV_THREAD_ID	148
 
 #ifndef _ASM
 /*
