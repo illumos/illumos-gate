@@ -607,54 +607,6 @@ typedef struct {
 	/* one 32-bit field shorter than illumos */
 } lx_sockaddr_in6_t;
 
-/*
- * We may need a different size socket address vs. the one passed in.
- */
-static int
-calc_addr_size(struct sockaddr *a, int nlen, lx_addr_type_t *type)
-{
-	struct sockaddr name;
-	sa_family_t family;
-	size_t fsize = sizeof (name.sa_family);
-	int copylen = MIN(nlen, sizeof (struct sockaddr));
-
-	if (uucopy(a, &name, copylen) != 0)
-		return (-errno);
-	family = LTOS_FAMILY(name.sa_family);
-
-	if (family != AF_UNIX) {
-		*type = lxa_none;
-
-		if (family == AF_INET6)
-			return (sizeof (struct sockaddr_in6));
-		else if (nlen < sizeof (struct sockaddr))
-			return (sizeof (struct sockaddr));
-		else
-			return (nlen);
-	}
-
-	/*
-	 * Handle Linux abstract sockets, which are Unix sockets whose path
-	 * begins with a NULL character.
-	 */
-	if (name.sa_data[0] == '\0') {
-		*type = lxa_abstract;
-		return (nlen + ABST_PRFX_LEN);
-	}
-
-	/*
-	 * For /dev/log, we need to create the Unix domain socket away from
-	 * the (unwritable) /dev.
-	 */
-	if (strncmp(name.sa_data, LX_DEV_LOG, nlen - fsize) == 0) {
-		*type = lxa_devlog;
-		return (nlen + LX_DEV_LOG_REDIRECT_LEN);
-	}
-
-	*type = lxa_none;
-	return (nlen);
-}
-
 static int
 convert_pkt_proto(int protocol)
 {
