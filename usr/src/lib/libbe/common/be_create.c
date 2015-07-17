@@ -21,10 +21,8 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- */
-
-/*
  * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
+ * Copyright (c) 2014 by Delphix. All rights reserved.
  */
 
 /*
@@ -2480,7 +2478,7 @@ be_send_fs_callback(zfs_handle_t *zhp, void *data)
 	(void) close(srpipe[1]);
 
 	/* Receive dataset */
-	if (zfs_receive(g_zfs, clone_ds, &flags, srpipe[0], NULL) != 0) {
+	if (zfs_receive(g_zfs, clone_ds, NULL, &flags, srpipe[0], NULL) != 0) {
 		be_print_err(gettext("be_send_fs_callback: failed to "
 		    "recv dataset (%s)\n"), clone_ds);
 	}
