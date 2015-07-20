@@ -1,4 +1,5 @@
 /*
+ * Copyright 2015 Gary Mills
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -23,10 +24,12 @@
 #include <netdb.h>
 #include <stdio.h>
 #include <errno.h>
+#include <string.h>
 #include <arpa/inet.h>
 #include <arpa/nameser.h>
 #include <resolv.h>
 #include <syslog.h>
+#include "crossl.h"
 
 /*
  * When the name service switch calls libresolv, it doesn't want fallback
@@ -103,8 +106,8 @@ getanswer(answer, anslen, iquery)
 	cp = answer->buf + sizeof (HEADER);
 	if (qdcount) {
 		if (iquery) {
-			if ((n = dn_expand((char *)answer->buf, eom,
-						cp, bp, buflen)) < 0) {
+			if ((n = dn_expand(answer->buf, eom,
+			    cp, (u_char *)bp, buflen)) < 0) {
 				h_errno = NO_RECOVERY;
 				return ((struct hostent *) NULL);
 			}
@@ -132,8 +135,8 @@ getanswer(answer, anslen, iquery)
 #endif
 	haveanswer = 0;
 	while (--ancount >= 0 && cp < eom && haveanswer < MAXADDRS) {
-		if ((n = dn_expand((char *)answer->buf, eom,
-						cp, bp, buflen)) < 0)
+		if ((n = dn_expand(answer->buf, eom,
+		    cp, (u_char *)bp, buflen)) < 0)
 			break;
 		cp += n;
 		type = _getshort(cp);
@@ -153,8 +156,8 @@ getanswer(answer, anslen, iquery)
 			continue;
 		}
 		if (iquery && type == T_PTR) {
-			if ((n = dn_expand((char *)answer->buf, eom,
-					cp, bp, buflen)) < 0) {
+			if ((n = dn_expand(answer->buf, eom,
+			    cp, (u_char *)bp, buflen)) < 0) {
 				cp += n;
 				continue;
 			}
@@ -231,7 +234,6 @@ res_gethostbyname(name)
 	querybuf buf;
 	register char *cp;
 	int n;
-	struct hostent *hp, *gethostdomain();
 
 	/*
 	 * disallow names consisting only of digits/dots, unless
@@ -281,7 +283,7 @@ _getrhbyaddr(addr, len, type)
 		((unsigned)addr[2] & 0xff),
 		((unsigned)addr[1] & 0xff),
 		((unsigned)addr[0] & 0xff));
-	n = res_query(qbuf, C_IN, T_PTR, (char *)&buf, sizeof (buf));
+	n = res_query(qbuf, C_IN, T_PTR, (u_char *)&buf, sizeof (buf));
 	if (n < 0) {
 #ifdef DEBUG
 		if (_res.options & RES_DEBUG)

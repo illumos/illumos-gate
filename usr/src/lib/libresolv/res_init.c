@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright 2015 Gary Mills
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -37,13 +38,15 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/sockio.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <stropts.h>
 #include <arpa/nameser.h>
 #include <resolv.h>
 
@@ -51,6 +54,12 @@
 #include <net/if.h>
 #include <netinet/if_ether.h>
 #include <arpa/inet.h>
+
+/*
+ * Undocumented external function in libnsl
+ */
+extern int
+getdomainname(char *, int);
 
 #define	MAXIFS	256
 
@@ -87,13 +96,6 @@ res_init(void)
 	register char *cp, **pp;
 	register int n;
 	char buf[BUFSIZ];
-#ifdef SYSV
-	extern char *strchr();
-#else
-	extern char *index();
-#endif
-	extern char *strcpy(), *strncpy();
-	extern char *getenv();
 	int nserv = 0;    /* number of nameserver records read from file */
 	int haveenv = 0;
 	int havesearch = 0;
@@ -111,7 +113,6 @@ res_init(void)
 		unsigned bufsize;
 		unsigned int flags;
 		char *buf;
-		extern void *malloc();
 
 		if ((s = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
 			perror("socket");
@@ -124,14 +125,14 @@ res_init(void)
 		buf = (char *)malloc(bufsize);
 		if (buf == NULL) {
 			perror("out of memory");
-			close(s);
+			(void) close(s);
 			return (-1);
 		}
 		ifc.ifc_len = bufsize;
 		ifc.ifc_buf = buf;
 		if (ioctl(s, SIOCGIFCONF, (char *)&ifc) < 0) {
 			perror("ifconfig: SIOCGIFCONF");
-			close(s);
+			(void) close(s);
 			free(buf);
 			return (-1);
 		}
@@ -140,12 +141,12 @@ res_init(void)
 		ifrp = ifc.ifc_req;
 		for (n = ifc.ifc_len / sizeof (struct ifreq); n > 0;
 								n--, ifrp++) {
-			memset((void *) &ifr, 0, sizeof (ifr));
+			(void) memset((void *) &ifr, 0, sizeof (ifr));
 			strncpy(ifr.ifr_name, ifrp->ifr_name,
 							sizeof (ifr.ifr_name));
 			if (ioctl(s, SIOCGIFFLAGS, (char *)&ifr) < 0) {
 				perror("SIOCGIFFLAGS");
-				close(s);
+				(void) close(s);
 				free(buf);
 				return (-1);
 			}
@@ -154,7 +155,7 @@ res_init(void)
 			if ((flags & IFF_UP) && ((flags & IFF_LOOPBACK) == 0))
 				int_up = 1;
 		}
-		close(s);
+		(void) close(s);
 		free(buf);
 		if (int_up == 0) /* all the non-LOOPBACK interfaces are DOWN */
 			return (-1);
@@ -166,9 +167,9 @@ res_init(void)
 	 * for the benefit of hidden NIS domains, we use the same procedure
 	 * as sendmail: convert leading + to dot, then drop to first dot
 	 */
-	getdomainname(buf, BUFSIZ);
+	(void) getdomainname(buf, BUFSIZ);
 	if (buf[0] == '+')
-	buf[0] = '.';
+		buf[0] = '.';
 #ifdef SYSV
 	cp = strchr(buf, (int)'.');
 #else

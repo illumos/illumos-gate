@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright 2015 Gary Mills
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -37,15 +38,15 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <arpa/nameser.h>
 #include <netinet/in.h>
 #include <resolv.h>
+#include "crossl.h"
 
 void
 res_sethostent(stayopen)
+int stayopen;
 {
 	if (stayopen)
 		_res.options |= RES_STAYOPEN | RES_USEVC;
