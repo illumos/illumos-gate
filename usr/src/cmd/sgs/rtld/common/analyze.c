@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2014, Joyent, Inc. All rights reserved.
+ * Copyright 2015, Joyent, Inc.
  */
 
 /*
@@ -844,10 +844,23 @@ is_so_loaded(Lm_list *lml, const char *name, int *in_nfavl)
 static int
 is_load_toxic(Lm_list *lml, Rt_map *nlmp)
 {
-	const char	*fpath = PATHNAME(nlmp);
-	size_t		flen = strlen(fpath);
+	const char	*fpath;
+	size_t		flen;
 	Pdesc 		*pdp;
 	Aliste 		idx;
+
+	fpath = PATHNAME(nlmp);
+
+	/*
+	 * If we have a NULL path name, that indicates that rtld is processing
+	 * an in-memory shared object. For example, trying to run ldd or doing
+	 * an LD_PRELOAD on an object file. In those cases, we'll always allow
+	 * it.
+	 */
+	if (fpath == NULL)
+		return (0);
+
+	flen = strlen(fpath);
 
 	for (ALIST_TRAVERSE(rpl_toxdirs, idx, pdp)) {
 		if (pdp->pd_plen == 0)
