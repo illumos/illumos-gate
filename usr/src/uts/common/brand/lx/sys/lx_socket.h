@@ -47,11 +47,12 @@ extern "C" {
 #define	LX_AF_X25		9  /* X.25 */
 #define	LX_AF_INET6		10 /* IPV 6 */
 #define	LX_AF_ROSE		11 /* Amateur Radio X.25 */
-#define	LX_AF_DECnet		12 /* DECnet */
+#define	LX_AF_DECNET		12 /* DECnet */
 #define	LX_AF_NETBEUI		13 /* 802.2LLC */
 #define	LX_AF_SECURITY		14 /* Security callback */
 #define	LX_AF_KEY		15 /* key management */
 #define	LX_AF_ROUTE		16 /* Alias to emulate 4.4BSD */
+#define	LX_AF_NETLINK		LX_AF_ROUTE
 #define	LX_AF_PACKET		17 /* Packet family */
 #define	LX_AF_ASH		18 /* Ash ? */
 #define	LX_AF_ECONET		19 /* Acorn Econet */
@@ -60,8 +61,16 @@ extern "C" {
 #define	LX_AF_IRDA		23 /* IRDA sockets */
 #define	LX_AF_PPPOX		24 /* PPPoX sockets */
 #define	LX_AF_WANPIPE		25 /* Wanpipe API sockets */
+#define	LX_AF_LLC		26
+/* gap in Linux defines for 27 and 28 */
+#define	LX_AF_CAN		29
+#define	LX_AF_TIPC		30
 #define	LX_AF_BLUETOOTH		31 /* Bluetooth sockets */
-#define	LX_AF_MAX		32 /* MAX socket type  */
+#define	LX_AF_IUCV		32
+#define	LX_AF_RXRPC		33
+
+/* limit of AF mappings */
+#define	LX_AF_MAX		LX_AF_RXRPC
 
 #define	AF_NOTSUPPORTED		-1
 #define	AF_INVAL		-2
