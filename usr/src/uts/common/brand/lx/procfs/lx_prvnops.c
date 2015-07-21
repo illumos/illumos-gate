@@ -1017,7 +1017,7 @@ lxpr_read_pid_comm(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	proc_t *p;
 
 	VERIFY(lxpnp->lxpr_type == LXPR_PID_COMM ||
-	    lxpnp->lxpr_type == LXPR_PID_COMM);
+	    lxpnp->lxpr_type == LXPR_PID_TID_COMM);
 
 	/*
 	 * Because prctl(PR_SET_NAME) does not set custom names for threads
