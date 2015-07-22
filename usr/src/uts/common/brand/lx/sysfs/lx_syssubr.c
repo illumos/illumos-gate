@@ -229,6 +229,9 @@ lxsys_freenode_static(lxsys_node_t *lnp)
 	if (vp->v_count != 1) {
 		VERIFY(vp->v_count > 0);
 
+		/* Release our hold before bailing out of lxsys_inactive */
+		vp->v_count--;
+
 		mutex_exit(&vp->v_lock);
 		mutex_exit(&lxsm->lxsysm_lock);
 		return (-1);
