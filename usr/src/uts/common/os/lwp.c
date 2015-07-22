@@ -955,6 +955,7 @@ lwp_exit(void)
 		BROP(p)->b_lwpexit(lwp);
 		BROP(p)->b_freelwp(lwp);
 		mutex_enter(&p->p_lock);
+		prbarrier(p);
 	}
 
 	/*
