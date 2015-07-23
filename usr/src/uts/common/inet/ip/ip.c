@@ -12577,6 +12577,7 @@ ip_process_ioctl(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *arg)
 	struct iocblk *iocp = (struct iocblk *)mp->b_rptr;
 	ip_ioctl_cmd_t *ipip = arg;
 	ip_extract_func_t *extract_funcp;
+	ill_t *ill;
 	cmd_info_t ci;
 	int err;
 	boolean_t entered_ipsq = B_FALSE;
@@ -12697,6 +12698,13 @@ ip_process_ioctl(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *arg)
 	ipsq_current_start(ipsq, ci.ci_ipif, ipip->ipi_cmd);
 
 	/*
+	 * We need to cache the ill_t that we're going to use as the argument
+	 * to the ipif-ioctl DTrace probe (below) because the ci_ipif can be
+	 * blown away by calling ipi_func.
+	 */
+	ill = ci.ci_ipif == NULL ? NULL : ci.ci_ipif->ipif_ill;
+
+	/*
 	 * A return value of EINPROGRESS means the ioctl is
 	 * either queued and waiting for some reason or has
 	 * already completed.
@@ -12704,9 +12712,7 @@ ip_process_ioctl(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *arg)
 	err = (*ipip->ipi_func)(ci.ci_ipif, ci.ci_sin, q, mp, ipip, ci.ci_lifr);
 
 	DTRACE_PROBE4(ipif__ioctl, char *, "ip_process_ioctl finish WR",
-	    int, ipip->ipi_cmd,
-	    ill_t *, ci.ci_ipif == NULL ? NULL : ci.ci_ipif->ipif_ill,
-	    ipif_t *, ci.ci_ipif);
+	    int, ipip->ipi_cmd, ill_t *, ill, ipif_t *, ci.ci_ipif);
 	ip_ioctl_finish(q, mp, err, IPI2MODE(ipip), ipsq);
 
 	if (entered_ipsq)
