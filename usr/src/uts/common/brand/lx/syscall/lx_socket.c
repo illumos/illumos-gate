@@ -317,7 +317,7 @@ ltos_sockaddr_ux(const struct sockaddr *inaddr, const socklen_t inlen,
 
 	VERIFY(len > 0);
 	VERIFY(len <= sizeof (buf.sun_path));
-	bzero(&buf, sizeof(buf));
+	bzero(&buf, sizeof (buf));
 
 	if (inaddr->sa_data[0] == '\0') {
 		/*
@@ -1154,7 +1154,7 @@ lx_connect(long sock, uintptr_t name, socklen_t namelen)
 	struct sonode *so;
 	struct sockaddr *addr = NULL;
 	lx_socket_aux_data_t *sad = NULL;
-	socklen_t len;
+	socklen_t len = 0;
 	file_t *fp;
 	int error;
 
@@ -1175,7 +1175,6 @@ lx_connect(long sock, uintptr_t name, socklen_t namelen)
 			return (set_errno(error));
 		}
 	}
-
 
 	error = socket_connect(so, addr, len, fp->f_flag,
 	    _SOCONNECT_XPG4_2, CRED());
