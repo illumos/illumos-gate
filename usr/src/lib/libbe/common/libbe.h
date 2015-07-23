@@ -42,6 +42,7 @@ extern "C" {
 
 #define	BE_ATTR_ORIG_BE_NAME	"orig_be_name"
 #define	BE_ATTR_ORIG_BE_POOL	"orig_be_pool"
+#define	BE_ATTR_ORIG_BE_ROOT	"orig_be_root"
 #define	BE_ATTR_SNAP_NAME	"snap_name"
 
 #define	BE_ATTR_NEW_BE_NAME	"new_be_name"
@@ -59,6 +60,7 @@ extern "C" {
 #define	BE_ATTR_MOUNT_FLAGS	"mount_flags"
 #define	BE_ATTR_UNMOUNT_FLAGS	"unmount_flags"
 #define	BE_ATTR_DESTROY_FLAGS	"destroy_flags"
+#define	BE_ATTR_INSTALL_FLAGS	"install_flags"
 #define	BE_ATTR_ROOT_DS		"root_ds"
 #define	BE_ATTR_UUID_STR	"uuid_str"
 
@@ -205,6 +207,12 @@ typedef struct be_node_list {
 #define	BE_DESTROY_FLAG_SNAPSHOTS	0x00000001
 #define	BE_DESTROY_FLAG_FORCE_UNMOUNT	0x00000002
 
+/* Flags for installboot */
+#define	BE_INSTALLBOOT_FLAG_NULL	0x00000000
+#define	BE_INSTALLBOOT_FLAG_MBR		0x00000001
+#define	BE_INSTALLBOOT_FLAG_FORCE	0x00000002
+#define	BE_INSTALLBOOT_FLAG_VERBOSE	0x00000004
+
 /* sort rules for be_sort() */
 typedef enum {
 	BE_SORT_UNSPECIFIED = -1,
@@ -242,6 +250,11 @@ void be_free_list(be_node_list_t *);
 int be_max_avail(char *, uint64_t *);
 char *be_err_to_str(int);
 int be_sort(be_node_list_t **, int);
+
+/*
+ * Installboot support
+ */
+int be_installboot(nvlist_t *);
 
 /*
  * Library functions

@@ -55,8 +55,8 @@ static int set_bootfs(char *boot_rpool, char *be_root_ds);
 static int set_canmount(be_node_list_t *, char *);
 static boolean_t be_do_install_mbr(char *, nvlist_t *);
 static int be_do_installboot_helper(zpool_handle_t *, nvlist_t *, char *,
-    char *);
-static int be_do_installboot(be_transaction_data_t *);
+    char *, uint16_t);
+static int be_do_installboot(be_transaction_data_t *, uint16_t);
 static int be_get_grub_vers(be_transaction_data_t *, char **, char **);
 static int get_ver_from_capfile(char *, char **);
 static int be_promote_zone_ds(char *, char *);
@@ -119,6 +119,82 @@ be_activate(nvlist_t *be_attrs)
 	return (ret);
 }
 
+/*
+ * Function:	be_installboot
+ * Description:	Calls be_do_installboot to install/update bootloader on
+ *		pool passed in through be_attrs. The primary consumer is
+ *		bootadm command to avoid duplication of the code.
+ * Parameters:
+ *		be_attrs - pointer to nvlist_t of attributes being passed in.
+ *			The following attribute values are used:
+ *
+ *			BE_ATTR_ORIG_BE_NAME		*required
+ *			BE_ATTR_ORIG_BE_POOL		*required
+ *			BE_ATTR_ORIG_BE_ROOT		*required
+ *			BE_ATTR_INSTALL_FLAGS		optional
+ *
+ * Return:
+ *		BE_SUCCESS - Success
+ *		be_errno_t - Failure
+ * Scope:
+ *		Public
+ */
+int
+be_installboot(nvlist_t *be_attrs)
+{
+	int		ret = BE_SUCCESS;
+	uint16_t	flags = 0;
+	uint16_t	verbose;
+	be_transaction_data_t bt = { 0 };
+
+	/* Get flags */
+	if (nvlist_lookup_pairs(be_attrs, NV_FLAG_NOENTOK,
+	    BE_ATTR_INSTALL_FLAGS, DATA_TYPE_UINT16, &flags, NULL) != 0) {
+		be_print_err(gettext("be_installboot: failed to lookup "
+		    "BE_ATTR_INSTALL_FLAGS attribute\n"));
+		return (BE_ERR_INVAL);
+	}
+
+	/* Set verbose early, so we get all messages */
+	verbose = flags & BE_INSTALLBOOT_FLAG_VERBOSE;
+	if (verbose == BE_INSTALLBOOT_FLAG_VERBOSE)
+		libbe_print_errors(B_TRUE);
+
+	ret = nvlist_lookup_string(be_attrs, BE_ATTR_ORIG_BE_NAME,
+	    &bt.obe_name);
+	if (ret != 0) {
+		be_print_err(gettext("be_installboot: failed to "
+		    "lookup BE_ATTR_ORIG_BE_NAME attribute\n"));
+		return (BE_ERR_INVAL);
+	}
+
+	ret = nvlist_lookup_string(be_attrs, BE_ATTR_ORIG_BE_POOL,
+	    &bt.obe_zpool);
+	if (ret != 0) {
+		be_print_err(gettext("be_installboot: failed to "
+		    "lookup BE_ATTR_ORIG_BE_POOL attribute\n"));
+		return (BE_ERR_INVAL);
+	}
+
+	ret = nvlist_lookup_string(be_attrs, BE_ATTR_ORIG_BE_ROOT,
+	    &bt.obe_root_ds);
+	if (ret != 0) {
+		be_print_err(gettext("be_installboot: failed to "
+		    "lookup BE_ATTR_ORIG_BE_ROOT attribute\n"));
+		return (BE_ERR_INVAL);
+	}
+
+	/* Initialize libzfs handle */
+	if (!be_zfs_init())
+		return (BE_ERR_INIT);
+
+	ret = be_do_installboot(&bt, flags);
+
+	be_zfs_fini();
+
+	return (ret);
+}
+
 /* ******************************************************************** */
 /*			Semi Private Functions				*/
 /* ******************************************************************** */
@@ -175,7 +251,8 @@ _be_activate(char *be_name)
 	cb.obe_root_ds = strdup(root_ds);
 
 	if (getzoneid() == GLOBAL_ZONEID) {
-		if ((ret = be_do_installboot(&cb)) != BE_SUCCESS)
+		ret = be_do_installboot(&cb, BE_INSTALLBOOT_FLAG_NULL);
+		if (ret != BE_SUCCESS)
 			return (ret);
 
 		if (!be_has_menu_entry(root_ds, cb.obe_zpool, &entry)) {
@@ -794,14 +871,16 @@ be_do_install_mbr(char *diskname, nvlist_t *child)
 
 static int
 be_do_installboot_helper(zpool_handle_t *zphp, nvlist_t *child, char *stage1,
-    char *stage2)
+    char *stage2, uint16_t flags)
 {
 	char install_cmd[MAXPATHLEN];
 	char be_run_cmd_errbuf[BUFSIZ];
+	char be_run_cmd_outbuf[BUFSIZ];
 	char diskname[MAXPATHLEN];
 	char *vname;
 	char *path, *dsk_ptr;
 	char *flag = "";
+	int ret;
 
 	if (nvlist_lookup_string(child, ZPOOL_CONFIG_PATH, &path) != 0) {
 		be_print_err(gettext("be_do_installboot: "
@@ -836,31 +915,60 @@ be_do_installboot_helper(zpool_handle_t *zphp, nvlist_t *child, char *stage1,
 	}
 
 	if (be_is_isa("i386")) {
-		if (be_do_install_mbr(diskname, child))
-			flag = "-m -f";
+		uint16_t force = flags & BE_INSTALLBOOT_FLAG_FORCE;
+		uint16_t mbr = flags & BE_INSTALLBOOT_FLAG_MBR;
+
+		if (force == BE_INSTALLBOOT_FLAG_FORCE) {
+			if (mbr == BE_INSTALLBOOT_FLAG_MBR ||
+			    be_do_install_mbr(diskname, child))
+				flag = "-F -m -f";
+			else
+				flag = "-F";
+		} else {
+			if (mbr == BE_INSTALLBOOT_FLAG_MBR ||
+			    be_do_install_mbr(diskname, child))
+				flag = "-m -f";
+		}
+
 		(void) snprintf(install_cmd, sizeof (install_cmd),
 		    "%s %s %s %s %s", BE_INSTALL_GRUB, flag,
 		    stage1, stage2, diskname);
 	} else {
-		flag = "-F zfs";
+		if ((flags & BE_INSTALLBOOT_FLAG_FORCE) ==
+		    BE_INSTALLBOOT_FLAG_FORCE)
+			flag = "-f -F zfs";
+		else
+			flag = "-F zfs";
+
 		(void) snprintf(install_cmd, sizeof (install_cmd),
 		    "%s %s %s %s", BE_INSTALL_BOOT, flag, stage2, diskname);
 	}
 
-	if (be_run_cmd(install_cmd, be_run_cmd_errbuf, BUFSIZ, NULL, 0)
-	    != BE_SUCCESS) {
+	*be_run_cmd_outbuf = '\0';
+	*be_run_cmd_errbuf = '\0';
+
+	ret = be_run_cmd(install_cmd, be_run_cmd_errbuf, BUFSIZ,
+	    be_run_cmd_outbuf, BUFSIZ);
+
+	if (ret != BE_SUCCESS) {
 		be_print_err(gettext("be_do_installboot: install "
 		    "failed for device %s.\n"), vname);
-		/* Assume localized cmd err output. */
-		be_print_err(gettext("  Command: \"%s\"\n"),
-		    install_cmd);
+		ret = BE_ERR_BOOTFILE_INST;
+	}
+
+	be_print_err(gettext("  Command: \"%s\"\n"), install_cmd);
+	if (be_run_cmd_outbuf[0] != 0) {
+		be_print_err(gettext("  Output:\n"));
+		be_print_err("%s", be_run_cmd_outbuf);
+	}
+
+	if (be_run_cmd_errbuf[0] != 0) {
+		be_print_err(gettext("  Errors:\n"));
 		be_print_err("%s", be_run_cmd_errbuf);
-		free(vname);
-		return (BE_ERR_BOOTFILE_INST);
 	}
 	free(vname);
 
-	return (BE_SUCCESS);
+	return (ret);
 }
 
 /*
@@ -1069,6 +1177,7 @@ be_is_install_needed(be_transaction_data_t *bt, boolean_t *update)
  *
  * Parameters:
  *              bt - The transaction data for the BE we're activating.
+ *		flags - flags for bootloader install
  * Return:
  *		BE_SUCCESS - Success
  *		be_errno_t - Failure
@@ -1077,7 +1186,7 @@ be_is_install_needed(be_transaction_data_t *bt, boolean_t *update)
  *		Private
  */
 static int
-be_do_installboot(be_transaction_data_t *bt)
+be_do_installboot(be_transaction_data_t *bt, uint16_t flags)
 {
 	zpool_handle_t  *zphp = NULL;
 	zfs_handle_t	*zhp = NULL;
@@ -1096,9 +1205,11 @@ be_do_installboot(be_transaction_data_t *bt)
 	 * version implementation like grub. Embedded versioning is
 	 * checked by actual installer.
 	 */
-	ret = be_is_install_needed(bt, &update);
-	if (ret != BE_SUCCESS || update == B_FALSE)
-		return (ret);
+	if ((flags & BE_INSTALLBOOT_FLAG_FORCE) != BE_INSTALLBOOT_FLAG_FORCE) {
+		ret = be_is_install_needed(bt, &update);
+		if (ret != BE_SUCCESS || update == B_FALSE)
+			return (ret);
+	}
 
 	if ((zhp = zfs_open(g_zfs, bt->obe_root_ds, ZFS_TYPE_FILESYSTEM)) ==
 	    NULL) {
@@ -1205,7 +1316,7 @@ be_do_installboot(be_transaction_data_t *bt)
 
 			for (i = 0; i < nchildren; i++) {
 				ret = be_do_installboot_helper(zphp, nvchild[i],
-				    stage1, stage2);
+				    stage1, stage2, flags);
 				if (ret != BE_SUCCESS)
 					goto done;
 			}
@@ -1213,7 +1324,7 @@ be_do_installboot(be_transaction_data_t *bt)
 			free(vname);
 
 			ret = be_do_installboot_helper(zphp, child[c], stage1,
-			    stage2);
+			    stage2, flags);
 			if (ret != BE_SUCCESS)
 				goto done;
 		}
