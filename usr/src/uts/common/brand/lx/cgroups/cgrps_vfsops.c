@@ -56,7 +56,8 @@
  * file exists in each cgroup dir. If that file contains a '1' then the agent
  * is run when that group becomes empty. The agent is passed a path string of
  * the cgroup, relative to the file system mount point (e.g. a mount on
- * /sys/fs/cgroups/systemd with a sub-cgroup of foo/bar gets the arg foo/bar).
+ * /sys/fs/cgroups/systemd with a sub-cgroup of /sys/fs/cgroups/systemd/foo/bar
+ * gets the arg /foo/bar).
  *
  * Cgroup membership is implemented via hooks into the lx brand code. When
  * the cgroup file system loads it installs callbacks for:
@@ -879,12 +880,12 @@ cgrp_rel_agent_event(cgrp_mnt_t *cgm, cgrp_node_t *cn)
 		cgrp_get_dirname(cn, nm, sizeof (nm));
 		DTRACE_PROBE1(cgrp__dir__name, char *, nm);
 		if (*argstr == '\0') {
-			(void) strlcpy(argstr, nm, MAXPATHLEN);
+			(void) snprintf(argstr, MAXPATHLEN, "/%s", nm);
 		} else {
 			tmp = oldstr;
 			oldstr = argstr;
 			argstr = tmp;
-			(void) snprintf(argstr, MAXPATHLEN, "%s/%s", nm,
+			(void) snprintf(argstr, MAXPATHLEN, "/%s%s", nm,
 			    oldstr);
 		}
 
