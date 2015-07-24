@@ -820,6 +820,8 @@ usage(void)
 	(void) fprintf(stderr,
 	"\t[ -r ]			# Do not resolve address to name\n");
 	(void) fprintf(stderr,
+	"\t[ -z zone ]		# Open links from named zone\n");
+	(void) fprintf(stderr,
 	"\n\t[ filter expression ]\n");
 	(void) fprintf(stderr, "\nExample:\n");
 	(void) fprintf(stderr, "\tsnoop -o saved  host fred\n\n");
