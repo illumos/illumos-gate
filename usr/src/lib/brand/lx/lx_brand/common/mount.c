@@ -40,6 +40,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <stdlib.h>
 
 #include <sys/lx_autofs.h>
 #include <sys/lx_debug.h>
@@ -600,6 +601,32 @@ i_make_nfs_args(lx_nfs_mount_data_t *lx_nmd, struct nfs_args *nfs_args,
 	return (0);
 }
 
+static int
+run_cgrp_mgr(char *mntpnt)
+{
+	const char *cmd = "/native/usr/lib/brand/lx/cgrpmgr";
+	char *argv[] = { "cgrpmgr", NULL, NULL };
+
+	argv[1] = mntpnt;
+
+	switch (fork1()) {
+	case 0:
+		/* child */
+		execv(cmd, argv);
+		exit(1);
+		break;
+
+	case -1:
+		return (-1);
+
+	default:
+		/* the cgroup manager process runs until we unmount */
+		break;
+	}
+
+	return (0);
+}
+
 long
 lx_mount(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
     uintptr_t p5)
@@ -616,6 +643,8 @@ lx_mount(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 	char			target[MAXPATHLEN];
 	char			fstype[MAXPATHLEN], options[MAX_MNTOPT_STR];
 	int			sflags, rv;
+	long			res;
+	boolean_t		is_cgrp = B_FALSE;
 
 	/* Variables needed for nfs mounts. */
 	lx_nfs_mount_data_t	lx_nmd;
@@ -752,6 +781,8 @@ lx_mount(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 		}
 		lx_debug("\tlinux mount options: \"%s\"", options);
 
+		is_cgrp = B_TRUE;
+
 		/*
 		 * Currently don't verify Linux mount options since we can
 		 * have asubsystem string provided.
@@ -885,8 +916,24 @@ lx_mount(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 	lx_debug("\tsolaris mount fstype: %s", fstype);
 	lx_debug("\tsolaris mount options: \"%s\"", options);
 
-	return (mount(source, target, sflags, fstype, sdataptr, sdatalen,
-	    options, sizeof (options)) ? -errno : 0);
+	res = mount(source, target, sflags, fstype, sdataptr, sdatalen,
+	    options, sizeof (options));
+
+	if (res == 0) {
+		if (is_cgrp && run_cgrp_mgr(target) != 0) {
+			/*
+			 * Forking the cgrp manager failed, unmount and return
+			 * an ENOMEM error as the best approximation that we're
+			 * out of resources.
+			 */
+			(void) umount(target);
+			return (-ENOMEM);
+		} else {
+			return (0);
+		}
+	} else {
+		return (-errno);
+	}
 }
 
 /*

@@ -46,10 +46,35 @@ extern "C" {
 #include <sys/atomic.h>
 #include <vm/anon.h>
 
+/*
+ * cgrpmgr ioctl interface.
+ */
+#define	CGRPFS_IOC	('C' << 16 | 'G' << 8)
+#define	CGRPFS_GETEVNT	(CGRPFS_IOC | 1)
+
+typedef struct cgrpmgr_info {
+	pid_t	cgmi_pid;
+	char	*cgmi_rel_agent_path;
+	char	*cgmi_cgroup_path;
+} cgrpmgr_info_t;
+
+#if defined(_KERNEL)
+
+#include <sys/lx_brand.h>
+
+typedef struct cgrpmgr_info32 {
+	pid_t		cgmi_pid;
+	caddr32_t	cgmi_rel_agent_path;
+	caddr32_t	cgmi_cgroup_path;
+} cgrpmgr_info32_t;
+
+typedef struct cgrp_evnt {
+	list_node_t	cg_evnt_lst;
+	char		*cg_evnt_path;
+} cgrp_evnt_t;
+
 #define	CG_PSNSIZE	256	/* max size of pseudo file name entries */
 #define	CG_PSDSIZE	16	/* pretend that a dir entry takes 16 bytes */
-
-#define	CG_START_ID	0	/* initial node ID for allocation */
 
 /*
  * The order of these entries must be in sync with the cg_ssde_dir array.
@@ -61,8 +86,10 @@ typedef enum cgrp_ssid {
 
 typedef enum cgrp_nodetype {
 	CG_CGROUP_DIR = 1,	/* cgroup directory entry */
-	CG_PROCS,
-	CG_TASKS,
+	CG_NOTIFY,		/* notify_on_release file */
+	CG_PROCS,		/* cgroup.procs file */
+	CG_REL_AGENT,		/* release_agent file */
+	CG_TASKS,		/* tasks file */
 } cgrp_nodetype_t;
 
 typedef struct cgrp_subsys_dirent {
@@ -70,10 +97,19 @@ typedef struct cgrp_subsys_dirent {
 	char		*cgrp_ssd_name;
 } cgrp_subsys_dirent_t;
 
+#define	N_DIRENTS(m)	(cgrp_num_pseudo_ents((m)->cg_ssid) + 2)
+
+/*
+ * A modern systemd-based Linux system typically has 50-60 cgroups so
+ * we size the hash for 2x that number.
+ */
+#define	CGRP_HASH_SZ	128
+
 /*
  * cgroups per-mount data structure.
  *
- * All fields are protected by cg_contents.
+ * All but the event related fields are protected by cg_contents.
+ * The evnt_list and counter is protected by cg_events.
  */
 typedef struct cgrp_mnt {
 	struct vfs	*cg_vfsp;	/* filesystem's vfs struct */
@@ -82,45 +118,45 @@ typedef struct cgrp_mnt {
 	cgrp_ssid_t	cg_ssid;	/* subsystem type */
 	dev_t		cg_dev;		/* unique dev # of mounted `device' */
 	uint_t		cg_gen;		/* node ID source for files */
-	kmutex_t	cg_contents;	/* lock for cgrp_mnt structure */
-	kmutex_t	cg_renamelck;	/* rename lock for this mount */
+	uint_t		cg_grp_gen;	/* ID source for cgroups */
+	kmutex_t	cg_contents;	/* global lock for most fs activity */
+	char		cg_agent[MAXPATHLEN + 1]; /* release_agent path */
+	pid_t		cg_mgrpid;	/* pid of user-level manager */
+	kmutex_t	cg_events;	/* lock for event list */
+	kcondvar_t	cg_evnt_cv;	/* condvar for event list wakeup */
+	int		cg_evnt_cnt;	/* counter for num events in list */
+	list_t		cg_evnt_list;	/* list of agent events */
+	/* ptr to zone data for containing zone */
+	lx_zone_data_t	*cg_lxzdata;
+	struct cgrp_node **cg_grp_hash;	/* hash list of cgroups in the fs */
 } cgrp_mnt_t;
 
 /*
  * cgrp_node is the file system dependent node for cgroups.
  *
- *	cgn_rwlock protects access of the directory list at cgn_dir
- *	as well as syncronizing read and writes to the cgrp_node
+ * The node is used to represent both directories (a cgroup) and pseudo files
+ * within the directory.
  *
- *	cgn_contents protects growing, shrinking, reading and writing
- *	the file along with cgn_rwlock (see below).
- *
- *	cgn_tlock protects updates to cgn_mode and cgn_nlink
- *
- *	cg_contents in the cgrp_mount data structure protects
- *	cgn_forw and cgn_back which are used to maintain a linked
- *	list of all cgroup files associated with that file system
- *
- *	The ordering of the locking is:
- *	cg_rwlock -> cgn_contents
- *
- *	cgn_tlock doesn't require any cgrp_node locks
+ * Members are tagged in the comment to note which type of node they apply to:
+ * A - all
+ * D - dir (i.e. a cgroup)
+ * F - pseudo file
  */
 
 typedef struct cgrp_node {
-	struct cgrp_node	*cgn_back;	/* lnked lst of cgrp_nodes */
-	struct cgrp_node	*cgn_forw;	/* lnked lst of cgrp_nodes */
-	struct cgrp_dirent	*cgn_dir;	/* dirent list */
-	struct cgrp_node	*cgn_parent;	/* dir containing this node */
-	uint_t			cgn_dirents;	/* number of dirents */
-	cgrp_nodetype_t		cgn_type;	/* type for this node */
-	struct vnode 		*cgn_vnode;	/* vnode for this cgrp_node */
-	int 			cgn_id;		/* ID number for the cgroup */
-	struct vattr		cgn_attr;	/* attributes */
-	krwlock_t		cgn_contents;	/* serialize mods */
-	krwlock_t		cgn_rwlock;	/* rw - serialize */
-						/* mods and dir updates */
-	kmutex_t		cgn_tlock;	/* time, flag, and nlink lock */
+	struct cgrp_node	*cgn_back;	/* A lnked lst of cgrp_nodes */
+	struct cgrp_node	*cgn_forw;	/* A lnked lst of cgrp_nodes */
+	struct cgrp_dirent	*cgn_dir;	/* D dirent list */
+	struct cgrp_node	*cgn_parent;	/* A dir containing this node */
+	struct cgrp_node	*cgn_next;	/* D link in per-mount cgroup */
+						/*   hash table */
+	uint_t			cgn_dirents;	/* D number of dirents */
+	cgrp_nodetype_t		cgn_type;	/* A type for this node */
+	uint_t			cgn_notify;	/* D notify_on_release value */
+	uint_t			cgn_task_cnt;	/* D number of threads in grp */
+	struct vnode 		*cgn_vnode;	/* A vnode for this cgrp_node */
+	uint_t 			cgn_id;		/* D ID number for the cgroup */
+	struct vattr		cgn_attr;	/* A attributes */
 } cgrp_node_t;
 
 /*
@@ -184,6 +220,10 @@ void cgrp_node_init(cgrp_mnt_t *, cgrp_node_t *, vattr_t *, cred_t *);
 int cgrp_taccess(void *, int, cred_t *);
 ino_t cgrp_inode(cgrp_nodetype_t, unsigned int);
 int cgrp_num_pseudo_ents(cgrp_ssid_t);
+cgrp_node_t *cgrp_cg_hash_lookup(cgrp_mnt_t *, uint_t);
+void cgrp_rel_agent_event(cgrp_mnt_t *, cgrp_node_t *);
+
+#endif /* KERNEL */
 
 #ifdef	__cplusplus
 }

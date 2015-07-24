@@ -261,6 +261,7 @@ lx_freelwp(klwp_t *lwp)
 {
 	struct lx_lwp_data *lwpd = lwptolxlwp(lwp);
 	proc_t *p = lwptoproc(lwp);
+	lx_zone_data_t *lxzdata;
 
 	VERIFY(MUTEX_NOT_HELD(&p->p_lock));
 
@@ -277,6 +278,14 @@ lx_freelwp(klwp_t *lwp)
 		 * bypass the hook.
 		 */
 		return;
+	}
+
+	/* cgroup integration */
+	lxzdata = ztolxzd(p->p_zone);
+	if (lxzdata->lxzd_cgroup != NULL) {
+		ASSERT(lx_cgrp_freelwp != NULL);
+		(*lx_cgrp_freelwp)(lxzdata->lxzd_cgroup,
+		    lwpd->br_cgroupid, lwptot(lwp)->t_tid, lwpd->br_pid);
 	}
 
 	/*
@@ -370,6 +379,7 @@ lx_initlwp(klwp_t *lwp, void *lwpbd)
 	lx_lwp_data_t *plwpd = ttolxlwp(curthread);
 	kthread_t *tp = lwptot(lwp);
 	proc_t *p = lwptoproc(lwp);
+	lx_zone_data_t *lxzdata;
 
 	VERIFY(MUTEX_HELD(&p->p_lock));
 	VERIFY(lwp->lwp_brand == NULL);
@@ -452,6 +462,15 @@ lx_initlwp(klwp_t *lwp, void *lwpbd)
 		lx_ptrace_inherit_tracer(plwpd, lwpd);
 		lwpd->br_cgroupid = plwpd->br_cgroupid;
 	}
+
+	/* cgroup integration */
+	lxzdata = ztolxzd(p->p_zone);
+	if (lxzdata->lxzd_cgroup != NULL) {
+		ASSERT(lx_cgrp_initlwp != NULL);
+		(*lx_cgrp_initlwp)(lxzdata->lxzd_cgroup,
+		    lwpd->br_cgroupid, lwptot(lwp)->t_tid, lwpd->br_pid);
+	}
+
 }
 
 /*
@@ -465,6 +484,7 @@ lx_forklwp(klwp_t *srclwp, klwp_t *dstlwp)
 {
 	struct lx_lwp_data *src = srclwp->lwp_brand;
 	struct lx_lwp_data *dst = dstlwp->lwp_brand;
+	lx_zone_data_t *lxzdata;
 
 	dst->br_ppid = src->br_pid;
 	dst->br_ptid = lwptot(srclwp)->t_tid;
@@ -496,6 +516,15 @@ lx_forklwp(klwp_t *srclwp, klwp_t *dstlwp)
 	 */
 	dst->br_lwp_flags = src->br_lwp_flags & BR_CPU_BOUND;
 	dst->br_scall_args = NULL;
+
+	/* cgroup integration */
+	lxzdata = ztolxzd(srclwp->lwp_procp->p_zone);
+	if (lxzdata->lxzd_cgroup != NULL) {
+		ASSERT(lx_cgrp_forklwp != NULL);
+		(*lx_cgrp_forklwp)(lxzdata->lxzd_cgroup,
+		    dst->br_cgroupid, lwptoproc(dstlwp)->p_pid);
+	}
+
 }
 
 /*

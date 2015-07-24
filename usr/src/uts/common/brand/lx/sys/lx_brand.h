@@ -35,6 +35,7 @@
 #include <sys/cpuvar.h>
 #include <sys/zone.h>
 #include <sys/ksocket.h>
+#include <sys/vfs.h>
 #endif
 
 #ifdef	__cplusplus
@@ -383,6 +384,14 @@ typedef enum lx_proc_flags {
 
 #ifdef	_KERNEL
 
+/*
+ * Entry points for cgroup integration.
+ */
+extern void (*lx_cgrp_forklwp)(vfs_t *, uint_t, pid_t);
+extern void (*lx_cgrp_proc_exit)(vfs_t *, uint_t, pid_t);
+extern void (*lx_cgrp_initlwp)(vfs_t *, uint_t, id_t, pid_t);
+extern void (*lx_cgrp_freelwp)(vfs_t *, uint_t, id_t, pid_t);
+
 #define	LX_RLFAKE_LOCKS		0
 #define	LX_RLFAKE_NICE		1
 #define	LX_RLFAKE_RTPRIO	2
@@ -632,11 +641,18 @@ struct lx_lwp_data {
  */
 #define	LX_BR_ARGS_SIZE_MAX	(1024)
 
-/* brand specific data */
+/*
+ * brand specific data
+ *
+ * We currently only support a single cgroup mount in an lx zone so we only have
+ * one ptr (lxzd_cgroup) but this could be changed to a list if cgroups is ever
+ * enhanced to support different mounts with different subsystem controllers.
+ */
 typedef struct lx_zone_data {
 	char lxzd_kernel_version[LX_VERS_MAX];
 	ksocket_t lxzd_ioctl_sock;
 	char lxzd_bootid[LX_BOOTID_LEN];	/* procfs boot_id */
+	vfs_t *lxzd_cgroup;			/* cgroup for this zone */
 } lx_zone_data_t;
 
 #define	BR_CPU_BOUND	0x0001

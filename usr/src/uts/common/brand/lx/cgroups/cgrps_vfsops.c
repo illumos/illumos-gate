@@ -31,10 +31,12 @@
  * For example, it is common to see cgroup trees (each is its own mount with a
  * different subsystem controller) for blkio, cpuset, memory, systemd (has no
  * controller), etc. Within each tree there is a top-level directory with at
- * least a cgroup.procs and tasks file listing the processes within that group,
- * although there could be subdirectories, which define new cgroups, that then
- * contain a subset of the processes. Each subdirectory also has, at a minimum,
- * a cgroup.procs and tasks file.
+ * least a cgroup.procs, notify_on_release, release_agent, and tasks file.
+ * The cgroup.procs file lists the processes within that group and the tasks
+ * file lists the threads in the group. There could be subdirectories, which
+ * define new cgroups, that then contain a subset of the processes. Each
+ * subdirectory also has, at a minimum, a cgroup.procs, notify_on_release, and
+ * tasks file.
  *
  * Since we're using lx to run user-level code within zones, the majority (all?)
  * of the cgroup resource management functionality simply doesn't apply to us.
@@ -45,14 +47,54 @@
  * hierarchy and does not report that any resource management controllers are
  * available for separate mounts.
  *
+ * In addition to the hierarchy, the other important component of cgroups that
+ * is used by systemd is the 'release_agent'. This provides a mechanism to
+ * run a command when a cgroup becomes empty (the last task in the group
+ * leaves, either by exit or move, and there are no more sub-cgroups). The
+ * 'release_agent' file only exists in the top-level cgroup of the mounted
+ * file system and holds the path to a command to run. The 'notify_on_release'
+ * file exists in each cgroup dir. If that file contains a '1' then the agent
+ * is run when that group becomes empty. The agent is passed a path string of
+ * the cgroup, relative to the file system mount point (e.g. a mount on
+ * /sys/fs/cgroups/systemd with a sub-cgroup of foo/bar gets the arg foo/bar).
+ *
+ * Cgroup membership is implemented via hooks into the lx brand code. When
+ * the cgroup file system loads it installs callbacks for:
+ *    lx_cgrp_forklwp
+ *    lx_cgrp_procexit
+ *    lx_cgrp_initlwp
+ *    lx_cgrp_freelwp
+ * and when it unloads it clears those hooks. The lx brand code calls those
+ * hooks when a process/lwp starts and when it exits. Internally we use a
+ * simple reference counter (cgn_task_cnt) on the cgroup node to track how many
+ * threads are in the group, so we can tell when a group becomes empty.
+ * To make this quick, a hash table (cg_grp_hash) is maintained on the
+ * cgrp_mnt_t struct to allow quick lookups by cgroup ID. The hash table is
+ * sized so that there should typically only be 0 or 1 cgroups per bucket.
+ * We also keep a reference to the file system in the zone-specific brand data
+ * (lxzd_cgroup) so that the lx brand code can pass in the correct vfs_t
+ * when it runs the hook.
+ *
+ * Once a cgroup becomes empty, running the release agent is actually done
+ * by a user-level cgrpmgr process. That process makes a CGRPFS_GETEVNT
+ * ioctl which blocks until there is an event (i.e. the agent needs to run).
+ * Internally we maintain a list (cg_evnt_list) of release events on
+ * cgrp_mnt_t. The ioctl pulls an event off of the list, or blocks until an
+ * event is available, and then returns the event. The cgrpmgr process is
+ * started by the lx mount emulation when it mounts the file system. The
+ * cgrpmgr will exit when the ioctl returns EIO, indicating that the file
+ * system is being unmounted.
+ *
  * This file system is similar to tmpfs in that directories only exist in
  * memory. Each subdirectory represents a different cgroup. Within the cgroup
  * there are pseudo files (see cg_ssde_dir) with well-defined names which
  * control the configuration and behavior of the cgroup (see cgrp_nodetype_t).
- * The primary files within every cgroup are named 'cgroup.procs' and 'tasks'.
- * These are used to control and list which processes/threads belong to the
- * cgroup. In the general case there can be additional files in the cgroup
- * which define additional behavior, although none exists at this time.
+ * The primary files within every cgroup are named 'cgroup.procs',
+ * 'notify_on_release', and 'tasks' (as well as 'release_agent' in the
+ * top-level cgroup). The cgroup.procs and tasks files are used to control and
+ * list which processes/threads belong to the cgroup. In the general case there
+ * could be additional files in the cgroup, which defined additional behavior
+ * (i.e. subsystem specific pseudo files), although none exist at this time.
  *
  * Each cgroup node has a unique ID (cgn_nodeid) within the mount. This ID is
  * used to correlate with the threads to determine cgroup membership. When
@@ -69,10 +111,26 @@
  * - no file rename, but a directory (i.e. a cgroup) can be renamed within the
  *   containing directory, but not into a different directory
  * - can mkdir and rmdir to create/destroy cgroups
- * - cannot rmdir while it contains a subdir (i.e. a sub-cgroup)
+ * - cannot rmdir while it contains tasks or a subdir (i.e. a sub-cgroup)
  * - open, read/write, close on the subsytem-specific pseudo files is
  *   allowed, as this is the interface to configure and report on the cgroup.
  *   The pseudo file's mode controls write access and cannot be changed.
+ *
+ * The locking in this file system is simple since the file system is not
+ * subjected to heavy I/O activity and all data is in-memory. There is a single
+ * global mutex for each mount (cg_contents). This mutex is held for the life
+ * of most vnode operations. The most active path is probably the LWP start and
+ * exit hooks which increment/decrement the reference counter on the cgroup
+ * node. The lock is important for this case since we don't want concurrent
+ * activity (such as moving the process into another cgroup) while we're trying
+ * to lookup the cgroup from the mount's hash table. We must be careful to
+ * avoid a deadlock while reading or writing since that code can take pidlock
+ * and p_lock, but the cgrp_lwp_fork_helper can also be called while one of
+ * those is held. To prevent deadlock we always take cg_contents after pidlock
+ * and p_lock.
+ *
+ * In addition to the cg_contents lock there is also a second mutex (cg_events)
+ * used with the event queue condvar (cg_evnt_cv).
  *
  * EXTENDING THE FILE SYSTEM
  *
@@ -100,7 +158,8 @@
  * list of cgroup IDs associated with every thread, instead of just one ID
  * (br_cgroupid). The thread data would need to become a struct which held
  * both an ID and an indication as to which mounted cgroup file system instance
- * the ID was associated with.
+ * the ID was associated with. We would also need a list of cgroup mounts per
+ * zone, instead the current single zone reference.
  */
 
 #include <sys/types.h>
@@ -123,6 +182,8 @@
 #include <sys/systm.h>
 #include <sys/mntent.h>
 #include <sys/policy.h>
+#include <sys/sdt.h>
+#include <sys/ddi.h>
 #include <sys/lx_brand.h>
 
 #include "cgrps.h"
@@ -130,6 +191,11 @@
 /* Module level parameters */
 static int	cgrp_fstype;
 static dev_t	cgrp_dev;
+
+#define	MAX_AGENT_EVENTS	32		/* max num queued events */
+
+#define	UMNT_DELAY_TIME	drv_usectohz(50000)	/* 500th of a second */
+#define	UMNT_RETRY_MAX	100			/* 100 times - 2 secs */
 
 /*
  * cgrp_mountcount is used to prevent module unloads while there is still
@@ -171,6 +237,12 @@ static int cgrp_root(struct vfs *, struct vnode **);
 static int cgrp_statvfs(struct vfs *, struct statvfs64 *);
 static void cgrp_freevfs(vfs_t *vfsp);
 
+/* Forward declarations for hooks */
+static void cgrp_proc_fork_helper(vfs_t *, uint_t, pid_t);
+static void cgrp_proc_exit_helper(vfs_t *, uint_t, pid_t);
+static void cgrp_lwp_fork_helper(vfs_t *, uint_t, id_t, pid_t);
+static void cgrp_lwp_exit_helper(vfs_t *, uint_t, id_t, pid_t);
+
 /*
  * Loadable module wrapper
  */
@@ -208,6 +280,12 @@ _fini()
 
 	if (cgrp_mountcount)
 		return (EBUSY);
+
+	/* Disable hooks used by the lx brand module. */
+	lx_cgrp_forklwp = NULL;
+	lx_cgrp_proc_exit = NULL;
+	lx_cgrp_initlwp = NULL;
+	lx_cgrp_freelwp = NULL;
 
 	if ((error = mod_remove(&modlinkage)) != 0)
 		return (error);
@@ -282,6 +360,12 @@ cgrp_init(int fstype, char *name)
 	 */
 	cgrp_dev = makedevice(dev, 0);
 
+	/* Install the hooks used by the lx brand module. */
+	lx_cgrp_forklwp = cgrp_proc_fork_helper;
+	lx_cgrp_proc_exit = cgrp_proc_exit_helper;
+	lx_cgrp_initlwp = cgrp_lwp_fork_helper;
+	lx_cgrp_freelwp = cgrp_lwp_exit_helper;
+
 	return (0);
 }
 
@@ -294,6 +378,7 @@ cgrp_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 	int error;
 	struct vattr rattr;
 	cgrp_ssid_t ssid = CG_SSID_GENERIC;
+	lx_zone_data_t *lxzdata;
 
 	if ((error = secpolicy_fs_mount(cr, mvp, vfsp)) != 0)
 		return (error);
@@ -306,6 +391,13 @@ cgrp_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 	 * within lx zones.
 	 */
 	if (curproc->p_zone->zone_brand != &lx_brand)
+		return (EINVAL);
+
+	/*
+	 * We currently only support one mount per zone.
+	 */
+	lxzdata = ztolxzd(curproc->p_zone);
+	if (lxzdata->lxzd_cgroup != NULL)
 		return (EINVAL);
 
 	/*
@@ -354,10 +446,15 @@ cgrp_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 
 	/* Set but don't bother entering the mutex (not on mount list yet) */
 	mutex_init(&cgm->cg_contents, NULL, MUTEX_DEFAULT, NULL);
+	mutex_init(&cgm->cg_events, NULL, MUTEX_DEFAULT, NULL);
+	cv_init(&cgm->cg_evnt_cv, NULL, CV_DRIVER, NULL);
 
-	cgm->cg_vfsp = vfsp;
+	cgm->cg_vfsp = lxzdata->lxzd_cgroup = vfsp;
+	cgm->cg_lxzdata = lxzdata;
 	cgm->cg_ssid = ssid;
-	cgm->cg_gen = CG_START_ID;
+
+	list_create(&cgm->cg_evnt_list, sizeof (cgrp_evnt_t),
+	    offsetof(cgrp_evnt_t, cg_evnt_lst));
 
 	vfsp->vfs_data = (caddr_t)cgm;
 	vfsp->vfs_fstype = cgrp_fstype;
@@ -368,15 +465,19 @@ cgrp_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 	cgm->cg_mntpath = kmem_zalloc(dpn.pn_pathlen + 1, KM_SLEEP);
 	(void) strcpy(cgm->cg_mntpath, dpn.pn_path);
 
+	cgm->cg_grp_hash = kmem_zalloc(sizeof (cgrp_node_t *) * CGRP_HASH_SZ,
+	    KM_SLEEP);
+
 	/* allocate and initialize root cgrp_node structure */
 	bzero(&rattr, sizeof (struct vattr));
 	rattr.va_mode = (mode_t)(S_IFDIR | 0755);
 	rattr.va_type = VDIR;
 	rattr.va_rdev = 0;
 	cp = kmem_zalloc(sizeof (struct cgrp_node), KM_SLEEP);
+
+	mutex_enter(&cgm->cg_contents);
 	cgrp_node_init(cgm, cp, &rattr, cr);
 
-	rw_enter(&cp->cgn_rwlock, RW_WRITER);
 	CGNTOV(cp)->v_flag |= VROOT;
 
 	/*
@@ -393,7 +494,7 @@ cgrp_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 	cp->cgn_nodeid = cgrp_inode(ssid, cgm->cg_gen);
 	cgrp_dirinit(cp, cp, cr);
 
-	rw_exit(&cp->cgn_rwlock);
+	mutex_exit(&cgm->cg_contents);
 
 	pn_free(&dpn);
 	error = 0;
@@ -414,15 +515,20 @@ cgrp_unmount(struct vfs *vfsp, int flag, struct cred *cr)
 	struct vnode	*vp;
 	int error;
 	uint_t cnt;
+	int retry_cnt = 0;
 
 	if ((error = secpolicy_fs_unmount(cr, vfsp)) != 0)
 		return (error);
 
+retry:
 	mutex_enter(&cgm->cg_contents);
 
 	/*
-	 * In the normal unmount case, if there are no
-	 * open files, only the root node should have a reference count.
+	 * In the normal unmount case, if there were no open files, only the
+	 * root node would have a reference count. However, the user-level
+	 * agent manager should have the root vnode open and be waiting in
+	 * ioctl. We need to wake the manager and it may take some retries
+	 * before it closes its file descriptor.
 	 *
 	 * With cg_contents held, nothing can be added or removed.
 	 * There may be some dirty pages.  To prevent fsflush from
@@ -431,6 +537,29 @@ cgrp_unmount(struct vfs *vfsp, int flag, struct cred *cr)
 	 * placed and fail EBUSY.
 	 */
 	cgnp = cgm->cg_rootnode;
+
+	ASSERT(cgm->cg_lxzdata->lxzd_cgroup != NULL);
+
+	mutex_enter(&cgm->cg_events);
+	cv_signal(&cgm->cg_evnt_cv);
+
+	/*
+	 * Delete any queued events (normally there shouldn't be any).
+	 */
+	for (;;) {
+		cgrp_evnt_t *evntp;
+
+		evntp = list_remove_head(&cgm->cg_evnt_list);
+		if (evntp == NULL)
+			break;
+		kmem_free(evntp->cg_evnt_path, MAXPATHLEN);
+		kmem_free(evntp, sizeof (cgrp_evnt_t));
+		cgm->cg_evnt_cnt--;
+	}
+
+	/* Set the counter to -1 so an incoming ioctl knows we're unmounting */
+	cgm->cg_evnt_cnt = -1;
+	mutex_exit(&cgm->cg_events);
 
 	vp = CGNTOV(cgnp);
 	mutex_enter(&vp->v_lock);
@@ -441,10 +570,16 @@ cgrp_unmount(struct vfs *vfsp, int flag, struct cred *cr)
 		return (EINVAL);
 	}
 
+
 	cnt = vp->v_count;
 	if (cnt > 1) {
 		mutex_exit(&vp->v_lock);
 		mutex_exit(&cgm->cg_contents);
+		/* Likely because the user-level manager hasn't exited yet */
+		if (retry_cnt++ < UMNT_RETRY_MAX) {
+			delay(UMNT_DELAY_TIME);
+			goto retry;
+		}
 		return (EBUSY);
 	}
 
@@ -475,6 +610,11 @@ cgrp_unmount(struct vfs *vfsp, int flag, struct cred *cr)
 			mutex_exit(&vp->v_lock);
 		}
 	}
+
+	cgm->cg_lxzdata->lxzd_cgroup = NULL;
+	kmem_free(cgm->cg_grp_hash, sizeof (cgrp_node_t *) * CGRP_HASH_SZ);
+	list_destroy(&cgm->cg_evnt_list);
+	cv_destroy(&cgm->cg_evnt_cv);
 
 	/*
 	 * We can drop the mutex now because
@@ -519,10 +659,10 @@ cgrp_freevfs(vfs_t *vfsp)
 	 * Remove all directory entries
 	 */
 	for (cn = cgm->cg_rootnode; cn; cn = cn->cgn_forw) {
-		rw_enter(&cn->cgn_rwlock, RW_WRITER);
+		mutex_enter(&cgm->cg_contents);
 		if (cn->cgn_type == CG_CGROUP_DIR)
 			cgrp_dirtrunc(cn);
-		rw_exit(&cn->cgn_rwlock);
+		mutex_exit(&cgm->cg_contents);
 	}
 
 	ASSERT(cgm->cg_rootnode);
@@ -571,7 +711,7 @@ cgrp_freevfs(vfs_t *vfsp)
 	kmem_free(cgm->cg_mntpath, strlen(cgm->cg_mntpath) + 1);
 
 	mutex_destroy(&cgm->cg_contents);
-	mutex_destroy(&cgm->cg_renamelck);
+	mutex_destroy(&cgm->cg_events);
 	kmem_free(cgm, sizeof (cgrp_mnt_t));
 
 	/* Allow _fini() to succeed now */
@@ -675,4 +815,187 @@ cgrp_statvfs(struct vfs *vfsp, struct statvfs64 *sbp)
 	sbp->f_flag = vf_to_stf(vfsp->vfs_flag);
 	sbp->f_namemax = MAXNAMELEN - 1;
 	return (0);
+}
+
+static int
+cgrp_get_dirname(cgrp_node_t *cn, char *buf, int blen)
+{
+	cgrp_node_t *parent;
+	cgrp_dirent_t *dp;
+
+	buf[0] = '\0';
+
+	parent = cn->cgn_parent;
+	if (parent == NULL || parent == cn) {
+		(void) strlcpy(buf, ".", blen);
+		return (0);
+	}
+
+	/*
+	 * Search the parent dir list to find this cn's name.
+	 */
+	for (dp = parent->cgn_dir; dp != NULL; dp = dp->cgd_next) {
+		if (dp->cgd_cgrp_node->cgn_id == cn->cgn_id) {
+			(void) strlcpy(buf, dp->cgd_name, blen);
+			return (0);
+		}
+	}
+
+	return (-1);
+}
+
+/*
+ * Engueue an event for user-level release_agent manager. The event data is the
+ * pathname (relative to the mount point of the file system) of the newly empty
+ * cgroup.
+ */
+void
+cgrp_rel_agent_event(cgrp_mnt_t *cgm, cgrp_node_t *cn)
+{
+	cgrp_node_t *parent;
+	char nm[MAXNAMELEN];
+	char *argstr, *oldstr, *tmp;
+	cgrp_evnt_t *evntp;
+
+	ASSERT(MUTEX_HELD(&cgm->cg_contents));
+
+	/* Nothing to do if the agent is not set */
+	if (cgm->cg_agent[0] == '\0')
+		return;
+
+	parent = cn->cgn_parent;
+	/* Cannot remove the top-level cgroup (only via unmount) */
+	if (parent == cn)
+		return;
+
+	argstr = kmem_alloc(MAXPATHLEN, KM_SLEEP);
+	oldstr = kmem_alloc(MAXPATHLEN, KM_SLEEP);
+	*argstr = '\0';
+
+	/*
+	 * Iterate up the directory tree to construct the agent argument string.
+	 */
+	do {
+		cgrp_get_dirname(cn, nm, sizeof (nm));
+		DTRACE_PROBE1(cgrp__dir__name, char *, nm);
+		if (*argstr == '\0') {
+			(void) strlcpy(argstr, nm, MAXPATHLEN);
+		} else {
+			tmp = oldstr;
+			oldstr = argstr;
+			argstr = tmp;
+			(void) snprintf(argstr, MAXPATHLEN, "%s/%s", nm,
+			    oldstr);
+		}
+
+		if (cn->cgn_parent == NULL)
+			break;
+		cn = cn->cgn_parent;
+		parent = cn->cgn_parent;
+
+		/*
+		 * The arg path is relative to the mountpoint so we stop when
+		 * we get to the top level.
+		 */
+		if (parent == NULL || parent == cn)
+			break;
+	} while (parent != cn);
+
+	kmem_free(oldstr, MAXPATHLEN);
+
+	DTRACE_PROBE1(cgrp__agent__event, char *, argstr);
+
+	/*
+	 * Add the event to the list for the user-level agent. We add it to
+	 * the end of the list (which should normally be an empty list since
+	 * the user-level agent is designed to service events as quickly as
+	 * it can).
+	 */
+	evntp = kmem_zalloc(sizeof (cgrp_evnt_t), KM_SLEEP);
+	evntp->cg_evnt_path = argstr;
+
+	mutex_enter(&cgm->cg_events);
+	if (cgm->cg_evnt_cnt >= MAX_AGENT_EVENTS) {
+		/*
+		 * We don't queue up an arbitrary number of events. Because
+		 * the user-level manager should be servicing events quickly,
+		 * if the list gets long then something is wrong.
+		 */
+		cmn_err(CE_WARN, "cgrp: event queue full for zone %s",
+		    ttoproc(curthread)->p_zone->zone_name);
+		kmem_free(evntp->cg_evnt_path, MAXPATHLEN);
+		kmem_free(evntp, sizeof (cgrp_evnt_t));
+
+	} else {
+		list_insert_tail(&cgm->cg_evnt_list, evntp);
+		cgm->cg_evnt_cnt++;
+		cv_signal(&cgm->cg_evnt_cv);
+	}
+	mutex_exit(&cgm->cg_events);
+}
+
+/*ARGSUSED*/
+static void
+cgrp_proc_fork_helper(vfs_t *vfsp, uint_t cg_id, pid_t pid)
+{
+}
+
+/*ARGSUSED*/
+static void
+cgrp_proc_exit_helper(vfs_t *vfsp, uint_t cg_id, pid_t pid)
+{
+	if (curproc->p_zone->zone_proc_initpid == pid ||
+	    curproc->p_zone->zone_proc_initpid == -1) {
+		/*
+		 * The zone's init just exited. If this is because of a zone
+		 * reboot initiated from outside the zone, then we've never
+		 * tried to unmount this fs, so we need to wakeup the
+		 * user-level manager so that it can exit. Its also possible
+		 * init died abnormally, but that leads to a zone reboot so the
+		 * action is the same here.
+		 */
+		cgrp_mnt_t *cgm = (cgrp_mnt_t *)VFSTOCGM(vfsp);
+
+		mutex_enter(&cgm->cg_events);
+		cv_signal(&cgm->cg_evnt_cv);
+		mutex_exit(&cgm->cg_events);
+	}
+}
+
+/*ARGSUSED*/
+static void
+cgrp_lwp_fork_helper(vfs_t *vfsp, uint_t cg_id, id_t tid, pid_t tpid)
+{
+	cgrp_mnt_t *cgm = (cgrp_mnt_t *)VFSTOCGM(vfsp);
+	cgrp_node_t *cn;
+
+	mutex_enter(&cgm->cg_contents);
+	cn = cgrp_cg_hash_lookup(cgm, cg_id);
+	ASSERT(cn != NULL);
+	cn->cgn_task_cnt++;
+	mutex_exit(&cgm->cg_contents);
+
+	DTRACE_PROBE1(cgrp__lwp__fork, void *, cn);
+}
+
+/*ARGSUSED*/
+static void
+cgrp_lwp_exit_helper(vfs_t *vfsp, uint_t cg_id, id_t tid, pid_t tpid)
+{
+	cgrp_mnt_t *cgm = (cgrp_mnt_t *)VFSTOCGM(vfsp);
+	cgrp_node_t *cn;
+
+	mutex_enter(&cgm->cg_contents);
+	cn = cgrp_cg_hash_lookup(cgm, cg_id);
+	ASSERT(cn != NULL);
+	VERIFY(cn->cgn_task_cnt > 0);
+	cn->cgn_task_cnt--;
+	DTRACE_PROBE1(cgrp__lwp__exit, void *, cn);
+
+	if (cn->cgn_task_cnt == 0 && cn->cgn_dirents == N_DIRENTS(cgm) &&
+	    cn->cgn_notify == 1) {
+		cgrp_rel_agent_event(cgm, cn);
+	}
+
+	mutex_exit(&cgm->cg_contents);
 }

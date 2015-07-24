@@ -205,6 +205,14 @@ lx_systrace_f *lx_systrace_return_ptr;
 static int lx_systrace_enabled;
 
 /*
+ * cgroup file system maintenance functions which are set when cgroups loads.
+ */
+void (*lx_cgrp_forklwp)(vfs_t *, uint_t, pid_t);
+void (*lx_cgrp_proc_exit)(vfs_t *, uint_t, pid_t);
+void (*lx_cgrp_initlwp)(vfs_t *, uint_t, id_t, pid_t);
+void (*lx_cgrp_freelwp)(vfs_t *, uint_t, id_t, pid_t);
+
+/*
  * While this is effectively mmu.hole_start - PAGESIZE, we don't particularly
  * want an MMU dependency here (and should there be a microprocessor without
  * a hole, we don't want to start allocating from the top of the VA range).
@@ -312,6 +320,16 @@ lx_proc_exit(proc_t *p)
 {
 	lx_proc_data_t *lxpd;
 	proc_t *cp;
+	lx_zone_data_t *lxzdata;
+
+	/* cgroup integration */
+	lxzdata = ztolxzd(p->p_zone);
+	if (lxzdata->lxzd_cgroup != NULL) {
+		lx_lwp_data_t *lwpd = lwptolxlwp(ttolwp(curthread));
+		ASSERT(lx_cgrp_proc_exit != NULL);
+		(*lx_cgrp_proc_exit)(lxzdata->lxzd_cgroup,
+		    lwpd->br_cgroupid, p->p_pid);
+	}
 
 	mutex_enter(&p->p_lock);
 	VERIFY(lxpd = ptolxproc(p));
