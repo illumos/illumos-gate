@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright 2015 Gary Mills
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -37,8 +38,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Send query to name server and wait for reply.
  */
@@ -50,13 +49,24 @@
 #include <sys/stat.h>
 #include <netinet/in.h>
 #include <stdio.h>
+#include <string.h>
+#include <unistd.h>
 #include <errno.h>
 #include <arpa/nameser.h>
+#include <arpa/inet.h>
 #include <resolv.h>
+#include "crossl.h"
 
+/*
+ * Undocumented external function in libsocket
+ */
+extern int
+_socket(int, int, int);
 
 static int s = -1;	/* socket used for communications */
+#if	BSD >= 43
 static struct sockaddr no_addr;
+#endif /* BSD */
 
 
 #ifndef FD_SET
@@ -66,7 +76,7 @@ static struct sockaddr no_addr;
 #define	FD_CLR(n, p)	((p)->fds_bits[(n)/NFDBITS] &= ~(1 << ((n) % NFDBITS)))
 #define	FD_ISSET(n, p)	((p)->fds_bits[(n)/NFDBITS] & (1 << ((n) % NFDBITS)))
 #ifdef SYSV
-#define	FD_ZERO(p)	memset((void *)(p), 0, sizeof (*(p)))
+#define	FD_ZERO(p)	(void) memset((void *)(p), 0, sizeof (*(p)))
 #else
 #define	FD_ZERO(p)	bzero((char *)(p), sizeof (*(p)))
 #endif
@@ -129,7 +139,10 @@ res_send(buf, buflen, answer, anslen)
 {
 	register int n;
 	int try, v_circuit, resplen, ns;
-	int gotsomewhere = 0, connected = 0;
+	int gotsomewhere = 0;
+#if	BSD >= 43
+	int connected = 0;
+#endif /* BSD */
 	int connreset = 0;
 	u_short id, len;
 	char *cp;

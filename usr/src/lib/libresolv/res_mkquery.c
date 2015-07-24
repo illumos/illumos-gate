@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright 2015 Gary Mills
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -37,8 +38,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -46,8 +45,12 @@
 #include <netinet/in.h>
 #include <arpa/nameser.h>
 #include <resolv.h>
+#include <string.h>
+#include <stdlib.h>
+#include <unistd.h>
 #include <errno.h>
 #include <netdb.h>
+#include "crossl.h"
 
 /*
  * Kludge to time out quickly if there is no /etc/resolv.conf
@@ -97,11 +100,11 @@ static int _confcheck()
 			ns_sin.sin_port = htons(NAMESERVER_PORT);
 			if (connect(ns, (struct sockaddr *) &ns_sin,
 				    sizeof ns_sin) == -1) {
-				close(ns);
+				(void) close(ns);
 				return(-1);
 			}
 			else {
-				close(ns);
+				(void) close(ns);
 				return(0);
 			}
 		}
@@ -128,9 +131,9 @@ res_mkquery(op, dname, class, type, data, datalen, newrr, buf, buflen)
 	int buflen;		/* size of buffer */
 {
 	register HEADER *hp;
-	register char *cp;
+	register u_char *cp;
 	register int n;
-	char *dnptrs[10], **dpp, **lastdnptr;
+	u_char *dnptrs[10], **dpp, **lastdnptr;
 
 #ifdef DEBUG
 	if (_res.options & RES_DEBUG)
@@ -159,7 +162,7 @@ res_mkquery(op, dname, class, type, data, datalen, newrr, buf, buflen)
 	if ((buf == NULL) || (buflen < sizeof (HEADER)))
 		return (-1);
 #ifdef SYSV
-	memset(buf, 0, sizeof (HEADER));
+	(void) memset(buf, 0, sizeof (HEADER));
 #else
 	bzero(buf, sizeof (HEADER));
 #endif
@@ -169,10 +172,10 @@ res_mkquery(op, dname, class, type, data, datalen, newrr, buf, buflen)
 	hp->pr = (_res.options & RES_PRIMARY) != 0;
 	hp->rd = (_res.options & RES_RECURSE) != 0;
 	hp->rcode = NOERROR;
-	cp = buf + sizeof (HEADER);
+	cp = (u_char *)(buf + sizeof (HEADER));
 	buflen -= sizeof (HEADER);
 	dpp = dnptrs;
-	*dpp++ = buf;
+	*dpp++ = (u_char *)buf;
 	*dpp++ = NULL;
 	lastdnptr = dnptrs + sizeof (dnptrs) / sizeof (dnptrs[0]);
 	/*
@@ -182,7 +185,8 @@ res_mkquery(op, dname, class, type, data, datalen, newrr, buf, buflen)
 	case QUERY:
 		if ((buflen -= QFIXEDSZ) < 0)
 			return (-1);
-		if ((n = dn_comp(dname, cp, buflen, dnptrs, lastdnptr)) < 0)
+		if ((n = dn_comp((u_char *)dname, cp, buflen,
+		    dnptrs, lastdnptr)) < 0)
 			return (-1);
 		cp += n;
 		buflen -= n;
@@ -197,7 +201,8 @@ res_mkquery(op, dname, class, type, data, datalen, newrr, buf, buflen)
 		 * Make an additional record for completion domain.
 		 */
 		buflen -= RRFIXEDSZ;
-		if ((n = dn_comp(data, cp, buflen, dnptrs, lastdnptr)) < 0)
+		if ((n = dn_comp((u_char *)data, cp, buflen,
+		    dnptrs, lastdnptr)) < 0)
 			return (-1);
 		cp += n;
 		buflen -= n;
@@ -229,7 +234,7 @@ res_mkquery(op, dname, class, type, data, datalen, newrr, buf, buflen)
 		cp += sizeof (u_short);
 		if (datalen) {
 #ifdef SYSV
-			memcpy((void *)cp, (void *)data, datalen);
+			(void) memcpy((void *)cp, (void *)data, datalen);
 #else
 			bcopy(data, cp, datalen);
 #endif
@@ -254,7 +259,8 @@ res_mkquery(op, dname, class, type, data, datalen, newrr, buf, buflen)
 		 */
 	case UPDATEDA:
 		buflen -= RRFIXEDSZ + datalen;
-		if ((n = dn_comp(dname, cp, buflen, dnptrs, lastdnptr)) < 0)
+		if ((n = dn_comp((u_char *)dname, cp, buflen,
+		    dnptrs, lastdnptr)) < 0)
 			return (-1);
 		cp += n;
 		putshort(type, cp);
@@ -281,7 +287,8 @@ res_mkquery(op, dname, class, type, data, datalen, newrr, buf, buflen)
 
 	case UPDATEA:	/* Add new resource record */
 		buflen -= RRFIXEDSZ + datalen;
-		if ((n = dn_comp(dname, cp, buflen, dnptrs, lastdnptr)) < 0)
+		if ((n = dn_comp((u_char *)dname, cp, buflen,
+		    dnptrs, lastdnptr)) < 0)
 			return (-1);
 		cp += n;
 		putshort(newrr->r_type, cp);
@@ -305,5 +312,5 @@ res_mkquery(op, dname, class, type, data, datalen, newrr, buf, buflen)
 
 #endif /* ALLOW_UPDATES */
 	}
-	return (cp - buf);
+	return ((char *)cp - buf);
 }

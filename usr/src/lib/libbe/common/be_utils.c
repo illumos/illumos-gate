@@ -3036,7 +3036,7 @@ be_run_cmd(char *command, char *stderr_buf, int stderr_bufsize,
 	    (stderr_bufsize <= 0) || (stdout_bufsize <  0) ||
 	    ((stdout_buf != NULL) ^ (stdout_bufsize != 0))) {
 		return (BE_ERR_INVAL);
-}
+	}
 
 	/* Set up command so popen returns stderr, not stdout */
 	if (snprintf(cmdline, BUFSIZ, "%s 2> %s", command,

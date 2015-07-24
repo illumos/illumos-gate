@@ -29,7 +29,7 @@ copyright: Copyright 2009 Sun Microsystems, Inc. All Rights Reserved
 
 \ big bootblk
 create bigbootblk
-d# 8192  constant  /fs-fcode
+d# 16384  constant  /fs-fcode
 
 \ Set the offset to the correct zfs boot block area. This area is at offset 512K
 d# 512 d# 1024 * constant  fs-offset

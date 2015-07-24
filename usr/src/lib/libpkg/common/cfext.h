@@ -67,8 +67,8 @@ struct mergstat {
 struct cfextra {
 	struct cfent cf_ent;	/* basic contents file entry */
 	struct mergstat mstat;  /* merge status for installs */
-	short   fsys_value; /* fstab[] entry index */
-	short   fsys_base;  /* actual base filesystem in fs_tab[] */
+	uint32_t   fsys_value; /* fstab[] entry index */
+	uint32_t   fsys_base;  /* actual base filesystem in fs_tab[] */
 	char	*client_path;   /* the client-relative path */
 	char	*server_path;   /* the server-relative path */
 	char	*map_path;  /* as read from the pkgmap */
