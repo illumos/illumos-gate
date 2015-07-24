@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2012 Nexenta Systems, Inc.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2012 Alexey Zaytsev <alexey.zaytsev@gmail.com>
  */
 
@@ -71,6 +71,7 @@
 
 #include "virtiovar.h"
 #include "virtioreg.h"
+
 #define	NDEVNAMES	(sizeof (virtio_device_name) / sizeof (char *))
 #define	MINSEG_INDIRECT	2	/* use indirect if nsegs >= this value */
 #define	VIRTQUEUE_ALIGN(n) (((n)+(VIRTIO_PAGE_SIZE-1)) & \
@@ -81,14 +82,13 @@ virtio_set_status(struct virtio_softc *sc, unsigned int status)
 {
 	int old = 0;
 
-	if (status != 0)
-		old = ddi_get8(sc->sc_ioh,
-		    (uint8_t *)(sc->sc_io_addr +
+	if (status != 0) {
+		old = ddi_get8(sc->sc_ioh, (uint8_t *)(sc->sc_io_addr +
 		    VIRTIO_CONFIG_DEVICE_STATUS));
+	}
 
-	ddi_put8(sc->sc_ioh,
-	    (uint8_t *)(sc->sc_io_addr + VIRTIO_CONFIG_DEVICE_STATUS),
-	    status | old);
+	ddi_put8(sc->sc_ioh, (uint8_t *)(sc->sc_io_addr +
+	    VIRTIO_CONFIG_DEVICE_STATUS), status | old);
 }
 
 /*
@@ -104,8 +104,7 @@ virtio_negotiate_features(struct virtio_softc *sc, uint32_t guest_features)
 	    /* LINTED E_BAD_PTR_CAST_ALIGN */
 	    (uint32_t *)(sc->sc_io_addr + VIRTIO_CONFIG_DEVICE_FEATURES));
 
-	dev_debug(sc->sc_dev, CE_NOTE,
-	    "host features: %x, guest features: %x",
+	dev_debug(sc->sc_dev, CE_NOTE, "host features: %x, guest features: %x",
 	    host_features, guest_features);
 
 	features = host_features & guest_features;
@@ -120,8 +119,7 @@ virtio_negotiate_features(struct virtio_softc *sc, uint32_t guest_features)
 }
 
 size_t
-virtio_show_features(uint32_t features,
-    char *buf, size_t len)
+virtio_show_features(uint32_t features, char *buf, size_t len)
 {
 	char *orig_buf = buf;
 	char *bufend = buf + len;
@@ -194,8 +192,8 @@ virtio_read_device_config_8(struct virtio_softc *sc, unsigned int index)
 }
 
 void
-virtio_write_device_config_1(struct virtio_softc *sc,
-    unsigned int index, uint8_t value)
+virtio_write_device_config_1(struct virtio_softc *sc, unsigned int index,
+    uint8_t value)
 {
 	ASSERT(sc->sc_config_offset);
 	ddi_put8(sc->sc_ioh,
@@ -203,8 +201,8 @@ virtio_write_device_config_1(struct virtio_softc *sc,
 }
 
 void
-virtio_write_device_config_2(struct virtio_softc *sc,
-    unsigned int index, uint16_t value)
+virtio_write_device_config_2(struct virtio_softc *sc, unsigned int index,
+    uint16_t value)
 {
 	ASSERT(sc->sc_config_offset);
 	ddi_put16(sc->sc_ioh,
@@ -213,8 +211,8 @@ virtio_write_device_config_2(struct virtio_softc *sc,
 }
 
 void
-virtio_write_device_config_4(struct virtio_softc *sc,
-    unsigned int index, uint32_t value)
+virtio_write_device_config_4(struct virtio_softc *sc, unsigned int index,
+    uint32_t value)
 {
 	ASSERT(sc->sc_config_offset);
 	ddi_put32(sc->sc_ioh,
@@ -223,8 +221,8 @@ virtio_write_device_config_4(struct virtio_softc *sc,
 }
 
 void
-virtio_write_device_config_8(struct virtio_softc *sc,
-    unsigned int index, uint64_t value)
+virtio_write_device_config_8(struct virtio_softc *sc, unsigned int index,
+    uint64_t value)
 {
 	ASSERT(sc->sc_config_offset);
 	ddi_put32(sc->sc_ioh,
@@ -253,37 +251,34 @@ virtio_start_vq_intr(struct virtqueue *vq)
 }
 
 static ddi_dma_attr_t virtio_vq_dma_attr = {
-	DMA_ATTR_V0,	/* Version number */
-	0,		/* low address */
-	/*
-	 * high address. Has to fit into 32 bits
-	 * after page-shifting
-	 */
-	0x00000FFFFFFFFFFF,
-	0xFFFFFFFF,	/* counter register max */
-	VIRTIO_PAGE_SIZE, /* page alignment required */
-	0x3F,		/* burst sizes: 1 - 32 */
-	0x1,		/* minimum transfer size */
-	0xFFFFFFFF,	/* max transfer size */
-	0xFFFFFFFF,	/* address register max */
-	1,		/* no scatter-gather */
-	1,		/* device operates on bytes */
-	0,		/* attr flag: set to 0 */
+	DMA_ATTR_V0,		/* Version number */
+	0,			/* low address */
+	0x00000FFFFFFFFFFF,	/* high address. Has to fit into 32 bits */
+				/* after page-shifting */
+	0xFFFFFFFF,		/* counter register max */
+	VIRTIO_PAGE_SIZE,	/* page alignment required */
+	0x3F,			/* burst sizes: 1 - 32 */
+	0x1,			/* minimum transfer size */
+	0xFFFFFFFF,		/* max transfer size */
+	0xFFFFFFFF,		/* address register max */
+	1,			/* no scatter-gather */
+	1,			/* device operates on bytes */
+	0,			/* attr flag: set to 0 */
 };
 
 static ddi_dma_attr_t virtio_vq_indirect_dma_attr = {
-	DMA_ATTR_V0,	/* Version number */
-	0,		/* low address */
-	0xFFFFFFFFFFFFFFFF, /* high address */
-	0xFFFFFFFF,	/* counter register max */
-	1,		/* No specific alignment */
-	0x3F,		/* burst sizes: 1 - 32 */
-	0x1,		/* minimum transfer size */
-	0xFFFFFFFF,	/* max transfer size */
-	0xFFFFFFFF,	/* address register max */
-	1,		/* no scatter-gather */
-	1,		/* device operates on bytes */
-	0,		/* attr flag: set to 0 */
+	DMA_ATTR_V0,		/* Version number */
+	0,			/* low address */
+	0xFFFFFFFFFFFFFFFF,	/* high address */
+	0xFFFFFFFF,		/* counter register max */
+	1,			/* No specific alignment */
+	0x3F,			/* burst sizes: 1 - 32 */
+	0x1,			/* minimum transfer size */
+	0xFFFFFFFF,		/* max transfer size */
+	0xFFFFFFFF,		/* address register max */
+	1,			/* no scatter-gather */
+	1,			/* device operates on bytes */
+	0,			/* attr flag: set to 0 */
 };
 
 /* Same for direct and indirect descriptors. */
@@ -323,21 +318,20 @@ virtio_alloc_indirect(struct virtio_softc *sc, struct vq_entry *entry)
 	    DDI_DMA_SLEEP, NULL, &entry->qe_indirect_dma_handle);
 	if (ret != DDI_SUCCESS) {
 		dev_err(sc->sc_dev, CE_WARN,
-		    "Failed to allocate dma handle for indirect descriptors,"
-		    " entry %d, vq %d", entry->qe_index,
+		    "Failed to allocate dma handle for indirect descriptors, "
+		    "entry %d, vq %d", entry->qe_index,
 		    entry->qe_queue->vq_index);
 		goto out_alloc_handle;
 	}
 
-	ret = ddi_dma_mem_alloc(entry->qe_indirect_dma_handle,
-	    allocsize, &virtio_vq_devattr,
-	    DDI_DMA_CONSISTENT, DDI_DMA_SLEEP, NULL,
+	ret = ddi_dma_mem_alloc(entry->qe_indirect_dma_handle, allocsize,
+	    &virtio_vq_devattr, DDI_DMA_CONSISTENT, DDI_DMA_SLEEP, NULL,
 	    (caddr_t *)&entry->qe_indirect_descs, &len,
 	    &entry->qe_indirect_dma_acch);
 	if (ret != DDI_SUCCESS) {
 		dev_err(sc->sc_dev, CE_WARN,
-		    "Failed to alocate dma memory for indirect descriptors,"
-		    " entry %d, vq %d,", entry->qe_index,
+		    "Failed to allocate dma memory for indirect descriptors, "
+		    "entry %d, vq %d,", entry->qe_index,
 		    entry->qe_queue->vq_index);
 		goto out_alloc;
 	}
@@ -346,11 +340,11 @@ virtio_alloc_indirect(struct virtio_softc *sc, struct vq_entry *entry)
 
 	ret = ddi_dma_addr_bind_handle(entry->qe_indirect_dma_handle, NULL,
 	    (caddr_t)entry->qe_indirect_descs, len,
-	    DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
-	    DDI_DMA_SLEEP, NULL, &entry->qe_indirect_dma_cookie, &ncookies);
+	    DDI_DMA_RDWR | DDI_DMA_CONSISTENT, DDI_DMA_SLEEP, NULL,
+	    &entry->qe_indirect_dma_cookie, &ncookies);
 	if (ret != DDI_DMA_MAPPED) {
 		dev_err(sc->sc_dev, CE_WARN,
-		    "Failed to bind dma memory for indirect descriptors,"
+		    "Failed to bind dma memory for indirect descriptors, "
 		    "entry %d, vq %d", entry->qe_index,
 		    entry->qe_queue->vq_index);
 		goto out_bind;
@@ -399,12 +393,12 @@ virtio_init_vq(struct virtio_softc *sc, struct virtqueue *vq)
 		}
 	}
 
-	mutex_init(&vq->vq_freelist_lock, "virtio-freelist",
-	    MUTEX_DRIVER, DDI_INTR_PRI(sc->sc_intr_prio));
-	mutex_init(&vq->vq_avail_lock, "virtio-avail",
-	    MUTEX_DRIVER, DDI_INTR_PRI(sc->sc_intr_prio));
-	mutex_init(&vq->vq_used_lock, "virtio-used",
-	    MUTEX_DRIVER, DDI_INTR_PRI(sc->sc_intr_prio));
+	mutex_init(&vq->vq_freelist_lock, "virtio-freelist", MUTEX_DRIVER,
+	    DDI_INTR_PRI(sc->sc_intr_prio));
+	mutex_init(&vq->vq_avail_lock, "virtio-avail", MUTEX_DRIVER,
+	    DDI_INTR_PRI(sc->sc_intr_prio));
+	mutex_init(&vq->vq_used_lock, "virtio-used", MUTEX_DRIVER,
+	    DDI_INTR_PRI(sc->sc_intr_prio));
 
 	return (0);
 
@@ -418,24 +412,18 @@ out_indirect:
 	return (ret);
 }
 
-
-
 /*
  * Allocate/free a vq.
  */
 struct virtqueue *
-virtio_alloc_vq(struct virtio_softc *sc,
-    unsigned int index,
-    unsigned int size,
-    unsigned int indirect_num,
-    const char *name)
+virtio_alloc_vq(struct virtio_softc *sc, unsigned int index, unsigned int size,
+    unsigned int indirect_num, const char *name)
 {
 	int vq_size, allocsize1, allocsize2, allocsize = 0;
 	int ret;
 	unsigned int ncookies;
 	size_t len;
 	struct virtqueue *vq;
-
 
 	ddi_put16(sc->sc_ioh,
 	    /* LINTED E_BAD_PTR_CAST_ALIGN */
@@ -457,11 +445,10 @@ virtio_alloc_vq(struct virtio_softc *sc,
 
 	/* allocsize1: descriptor table + avail ring + pad */
 	allocsize1 = VIRTQUEUE_ALIGN(sizeof (struct vring_desc) * vq_size +
-	    sizeof (struct vring_avail) +
-	    sizeof (uint16_t) * vq_size);
+	    sizeof (struct vring_avail) + sizeof (uint16_t) * vq_size);
 	/* allocsize2: used ring + pad */
-	allocsize2 = VIRTQUEUE_ALIGN(sizeof (struct vring_used)
-	    + sizeof (struct vring_used_elem) * vq_size);
+	allocsize2 = VIRTQUEUE_ALIGN(sizeof (struct vring_used) +
+	    sizeof (struct vring_used_elem) * vq_size);
 
 	allocsize = allocsize1 + allocsize2;
 
@@ -478,14 +465,12 @@ virtio_alloc_vq(struct virtio_softc *sc,
 	    (caddr_t *)&vq->vq_vaddr, &len, &vq->vq_dma_acch);
 	if (ret != DDI_SUCCESS) {
 		dev_err(sc->sc_dev, CE_WARN,
-		    "Failed to alocate dma memory for vq %d", index);
+		    "Failed to allocate dma memory for vq %d", index);
 		goto out_alloc;
 	}
 
-
 	ret = ddi_dma_addr_bind_handle(vq->vq_dma_handle, NULL,
-	    (caddr_t)vq->vq_vaddr, len,
-	    DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
+	    (caddr_t)vq->vq_vaddr, len, DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
 	    DDI_DMA_SLEEP, NULL, &vq->vq_dma_cookie, &ncookies);
 	if (ret != DDI_DMA_MAPPED) {
 		dev_err(sc->sc_dev, CE_WARN,
@@ -532,7 +517,7 @@ virtio_alloc_vq(struct virtio_softc *sc,
 		goto out_init;
 
 	dev_debug(sc->sc_dev, CE_NOTE,
-	    "Allocated %d entries for vq %d:%s (%d incdirect descs)",
+	    "Allocated %d entries for vq %d:%s (%d indirect descs)",
 	    vq_size, index, name, indirect_num * vq_size);
 
 	return (vq);
@@ -549,7 +534,6 @@ out_alloc_handle:
 out:
 	return (NULL);
 }
-
 
 void
 virtio_free_vq(struct virtqueue *vq)
@@ -648,8 +632,6 @@ virtio_ve_set_desc(struct vring_desc *desc, uint64_t paddr, uint32_t len,
 	/* 'write' - from the driver's point of view */
 	if (!write)
 		desc->flags = VRING_DESC_F_WRITE;
-
-
 }
 
 void
@@ -657,6 +639,12 @@ virtio_ve_set(struct vq_entry *qe, uint64_t paddr, uint32_t len,
     boolean_t write)
 {
 	virtio_ve_set_desc(qe->qe_desc, paddr, len, write);
+}
+
+unsigned int
+virtio_ve_indirect_available(struct vq_entry *qe)
+{
+	return (qe->qe_queue->vq_indirect_num - (qe->qe_indirect_next - 1));
 }
 
 void
@@ -702,12 +690,13 @@ virtio_sync_vq(struct virtqueue *vq)
 	/* Make sure we see the flags update */
 	membar_consumer();
 
-	if (!(vq->vq_used->flags & VRING_USED_F_NO_NOTIFY))
+	if (!(vq->vq_used->flags & VRING_USED_F_NO_NOTIFY)) {
 		ddi_put16(vsc->sc_ioh,
 		    /* LINTED E_BAD_PTR_CAST_ALIGN */
 		    (uint16_t *)(vsc->sc_io_addr +
 		    VIRTIO_CONFIG_QUEUE_NOTIFY),
 		    vq->vq_index);
+	}
 }
 
 void
@@ -773,7 +762,9 @@ virtio_push_chain(struct vq_entry *qe, boolean_t sync)
 	mutex_exit(&vq->vq_avail_lock);
 }
 
-/* Get a chain of descriptors from the used ring, if one is available. */
+/*
+ * Get a chain of descriptors from the used ring, if one is available.
+ */
 struct vq_entry *
 virtio_pull_chain(struct virtqueue *vq, uint32_t *len)
 {
@@ -819,7 +810,7 @@ virtio_free_chain(struct vq_entry *qe)
 		tmp = qe->qe_next;
 		vq_free_entry(vq, qe);
 		qe = tmp;
-	} while (tmp);
+	} while (tmp != NULL);
 }
 
 void
@@ -831,8 +822,7 @@ virtio_ventry_stick(struct vq_entry *first, struct vq_entry *second)
 static int
 virtio_register_msi(struct virtio_softc *sc,
     struct virtio_int_handler *config_handler,
-    struct virtio_int_handler vq_handlers[],
-    int intr_types)
+    struct virtio_int_handler vq_handlers[], int intr_types)
 {
 	int count, actual;
 	int int_type;
@@ -852,7 +842,7 @@ virtio_register_msi(struct virtio_softc *sc,
 		;
 
 	/* +1 if there is a config change handler. */
-	if (config_handler)
+	if (config_handler != NULL)
 		handler_count++;
 
 	/* Number of MSIs supported by the device. */
@@ -868,8 +858,8 @@ virtio_register_msi(struct virtio_softc *sc,
 	 */
 	ASSERT(handler_count <= count);
 
-	sc->sc_intr_htable = kmem_zalloc(
-	    sizeof (ddi_intr_handle_t) * handler_count, KM_SLEEP);
+	sc->sc_intr_htable = kmem_zalloc(sizeof (ddi_intr_handle_t) *
+	    handler_count, KM_SLEEP);
 
 	ret = ddi_intr_alloc(sc->sc_dev, sc->sc_intr_htable, int_type, 0,
 	    handler_count, &actual, DDI_INTR_ALLOC_NORMAL);
@@ -887,7 +877,7 @@ virtio_register_msi(struct virtio_softc *sc,
 
 	sc->sc_intr_num = handler_count;
 	sc->sc_intr_config = B_FALSE;
-	if (config_handler) {
+	if (config_handler != NULL) {
 		sc->sc_intr_config = B_TRUE;
 	}
 
@@ -901,8 +891,7 @@ virtio_register_msi(struct virtio_softc *sc,
 	/* Add the vq handlers */
 	for (i = 0; vq_handlers[i].vh_func; i++) {
 		ret = ddi_intr_add_handler(sc->sc_intr_htable[i],
-		    vq_handlers[i].vh_func,
-		    sc, vq_handlers[i].vh_priv);
+		    vq_handlers[i].vh_func, sc, vq_handlers[i].vh_priv);
 		if (ret != DDI_SUCCESS) {
 			dev_err(sc->sc_dev, CE_WARN,
 			    "ddi_intr_add_handler failed");
@@ -916,10 +905,9 @@ virtio_register_msi(struct virtio_softc *sc,
 	}
 
 	/* Don't forget the config handler */
-	if (config_handler) {
+	if (config_handler != NULL) {
 		ret = ddi_intr_add_handler(sc->sc_intr_htable[i],
-		    config_handler->vh_func,
-		    sc, config_handler->vh_priv);
+		    config_handler->vh_func, sc, config_handler->vh_priv);
 		if (ret != DDI_SUCCESS) {
 			dev_err(sc->sc_dev, CE_WARN,
 			    "ddi_intr_add_handler failed");
@@ -935,8 +923,7 @@ virtio_register_msi(struct virtio_softc *sc,
 	/* We know we are using MSI, so set the config offset. */
 	sc->sc_config_offset = VIRTIO_CONFIG_DEVICE_CONFIG_MSI;
 
-	ret = ddi_intr_get_cap(sc->sc_intr_htable[0],
-	    &sc->sc_intr_cap);
+	ret = ddi_intr_get_cap(sc->sc_intr_htable[0], &sc->sc_intr_cap);
 	/* Just in case. */
 	if (ret != DDI_SUCCESS)
 		sc->sc_intr_cap = 0;
@@ -1008,18 +995,17 @@ virtio_register_intx(struct virtio_softc *sc,
 	    vq_handler_count++)
 		;
 
-	if (config_handler)
+	if (config_handler != NULL)
 		config_handler_count = 1;
 
 	vhc = kmem_zalloc(sizeof (struct virtio_handler_container) +
-	    sizeof (struct virtio_int_handler) * vq_handler_count,
-	    KM_SLEEP);
+	    sizeof (struct virtio_int_handler) * vq_handler_count, KM_SLEEP);
 
 	vhc->nhandlers = vq_handler_count;
 	(void) memcpy(vhc->vq_handlers, vq_handlers,
 	    sizeof (struct virtio_int_handler) * vq_handler_count);
 
-	if (config_handler) {
+	if (config_handler != NULL) {
 		(void) memcpy(&vhc->config_handler, config_handler,
 		    sizeof (struct virtio_int_handler));
 	}
@@ -1028,8 +1014,7 @@ virtio_register_intx(struct virtio_softc *sc,
 	sc->sc_intr_htable = kmem_zalloc(sizeof (ddi_intr_handle_t), KM_SLEEP);
 
 	ret = ddi_intr_alloc(sc->sc_dev, sc->sc_intr_htable,
-	    DDI_INTR_TYPE_FIXED, 0, 1, &actual,
-	    DDI_INTR_ALLOC_NORMAL);
+	    DDI_INTR_TYPE_FIXED, 0, 1, &actual, DDI_INTR_ALLOC_NORMAL);
 	if (ret != DDI_SUCCESS) {
 		dev_err(sc->sc_dev, CE_WARN,
 		    "Failed to allocate a fixed interrupt: %d", ret);
@@ -1111,7 +1096,6 @@ out_inttype:
 	return (ret);
 }
 
-
 static int
 virtio_enable_msi(struct virtio_softc *sc)
 {
@@ -1151,6 +1135,7 @@ virtio_enable_msi(struct virtio_softc *sc)
 	/* Bind the allocated MSI to the queues and config */
 	for (i = 0; i < vq_handler_count; i++) {
 		int check;
+
 		ddi_put16(sc->sc_ioh,
 		    /* LINTED E_BAD_PTR_CAST_ALIGN */
 		    (uint16_t *)(sc->sc_io_addr +
@@ -1166,7 +1151,7 @@ virtio_enable_msi(struct virtio_softc *sc)
 		    (uint16_t *)(sc->sc_io_addr +
 		    VIRTIO_CONFIG_QUEUE_VECTOR));
 		if (check != i) {
-			dev_err(sc->sc_dev, CE_WARN, "Failed to bind handler"
+			dev_err(sc->sc_dev, CE_WARN, "Failed to bind handler "
 			    "for VQ %d, MSI %d. Check = %x", i, i, check);
 			ret = ENODEV;
 			goto out_bind;
@@ -1175,6 +1160,7 @@ virtio_enable_msi(struct virtio_softc *sc)
 
 	if (sc->sc_intr_config) {
 		int check;
+
 		ddi_put16(sc->sc_ioh,
 		    /* LINTED E_BAD_PTR_CAST_ALIGN */
 		    (uint16_t *)(sc->sc_io_addr +
@@ -1219,14 +1205,17 @@ out_enable:
 	return (ret);
 }
 
-static int virtio_enable_intx(struct virtio_softc *sc)
+static int
+virtio_enable_intx(struct virtio_softc *sc)
 {
 	int ret;
 
 	ret = ddi_intr_enable(sc->sc_intr_htable[0]);
-	if (ret != DDI_SUCCESS)
+	if (ret != DDI_SUCCESS) {
 		dev_err(sc->sc_dev, CE_WARN,
 		    "Failed to enable interrupt: %d", ret);
+	}
+
 	return (ret);
 }
 
@@ -1282,7 +1271,7 @@ virtio_release_ints(struct virtio_softc *sc)
 		    sc->sc_intr_num);
 		if (ret != DDI_SUCCESS) {
 			dev_err(sc->sc_dev, CE_WARN,
-			    "Failed to disable MSIs, won't be able to"
+			    "Failed to disable MSIs, won't be able to "
 			    "reuse next time");
 		}
 	} else {
@@ -1292,7 +1281,6 @@ virtio_release_ints(struct virtio_softc *sc)
 				dev_err(sc->sc_dev, CE_WARN,
 				    "Failed to disable interrupt %d, "
 				    "won't be able to reuse", i);
-
 			}
 		}
 	}
@@ -1305,9 +1293,8 @@ virtio_release_ints(struct virtio_softc *sc)
 	for (i = 0; i < sc->sc_intr_num; i++)
 		(void) ddi_intr_free(sc->sc_intr_htable[i]);
 
-	kmem_free(sc->sc_intr_htable,
-	    sizeof (ddi_intr_handle_t) * sc->sc_intr_num);
-
+	kmem_free(sc->sc_intr_htable, sizeof (ddi_intr_handle_t) *
+	    sc->sc_intr_num);
 
 	/* After disabling interrupts, the config offset is non-MSI. */
 	sc->sc_config_offset = VIRTIO_CONFIG_DEVICE_CONFIG_NOMSI;
@@ -1317,7 +1304,7 @@ virtio_release_ints(struct virtio_softc *sc)
  * Module linkage information for the kernel.
  */
 static struct modlmisc modlmisc = {
-	&mod_miscops, /* Type of module */
+	&mod_miscops,	/* Type of module */
 	"VirtIO common library module",
 };
 

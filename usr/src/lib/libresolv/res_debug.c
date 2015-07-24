@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright 2015 Gary Mills
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -37,15 +38,16 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
+#include <sys/socket.h>
 #include <netinet/in.h>
+#include <arpa/inet.h>
 #include <stdio.h>
+#include <string.h>
 #include <arpa/nameser.h>
+#include <resolv.h>
+#include "crossl.h"
 
-extern char *p_cdname(), *p_rr(), *p_type(), *p_class(), *p_time();
-extern char *inet_ntoa();
 void fp_query(char *msg, FILE *file);
 
 char *_res_opcodes[] = {
@@ -195,7 +197,8 @@ p_cdname(cp, msg, file)
 	char name[MAXDNAME];
 	int n;
 
-	if ((n = dn_expand(msg, msg + 512, cp, name, sizeof (name))) < 0)
+	if ((n = dn_expand((u_char *)msg, (u_char *)(msg + 512), (u_char *)cp,
+	    (u_char *)name, sizeof (name))) < 0)
 		return (NULL);
 	if (name[0] == '\0') {
 		name[0] = '.';

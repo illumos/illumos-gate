@@ -443,9 +443,9 @@ usage(void)
 
 	/* archive usage */
 	(void) fprintf(stderr,
-	    "\t%s update-archive [-vn] [-R altroot [-p platform>]]\n", prog);
+	    "\t%s update-archive [-vn] [-R altroot [-p platform]]\n", prog);
 	(void) fprintf(stderr,
-	    "\t%s list-archive [-R altroot [-p platform>]]\n", prog);
+	    "\t%s list-archive [-R altroot [-p platform]]\n", prog);
 #if !defined(_OPB)
 	/* x86 only */
 	(void) fprintf(stderr, "\t%s set-menu [-R altroot] key=value\n", prog);

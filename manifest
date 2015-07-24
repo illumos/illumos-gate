@@ -707,6 +707,7 @@ f kernel/drv/amd64/upf 0755 root sys
 f kernel/drv/amd64/urf 0755 root sys
 f kernel/drv/amd64/vgatext 0755 root sys
 f kernel/drv/amd64/vioblk 0755 root sys
+f kernel/drv/amd64/vioif 0755 root sys
 f kernel/drv/amd64/vmxnet 0755 root sys
 f kernel/drv/amd64/vnd 0755 root sys
 f kernel/drv/amd64/vnic 0755 root sys

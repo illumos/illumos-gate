@@ -184,6 +184,7 @@ void virtio_reset(struct virtio_softc *);
 struct vq_entry *vq_alloc_entry(struct virtqueue *vq);
 void vq_free_entry(struct virtqueue *vq, struct vq_entry *qe);
 uint_t vq_num_used(struct virtqueue *vq);
+unsigned int virtio_ve_indirect_available(struct vq_entry *qe);
 
 void virtio_stop_vq_intr(struct virtqueue *);
 void virtio_start_vq_intr(struct virtqueue *);
