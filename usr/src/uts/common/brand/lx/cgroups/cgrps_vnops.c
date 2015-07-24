@@ -153,19 +153,69 @@ cgrp_p_for_wr(pid_t pid, cgrp_wr_type_t typ)
 }
 
 /*
+ * Move a thread from one cgroup to another. If the old cgroup is empty
+ * we queue up an agent event. We return true in that case since we've
+ * dropped the locks and the caller needs to reacquire them.
+ */
+static boolean_t
+cgrp_thr_move(cgrp_mnt_t *cgm, lx_lwp_data_t *plwpd, cgrp_node_t *ncn,
+    uint_t cg_id, proc_t *p)
+{
+	cgrp_node_t *ocn;
+
+	ASSERT(MUTEX_HELD(&cgm->cg_contents));
+	ASSERT(MUTEX_HELD(&p->p_lock));
+
+	ocn = cgrp_cg_hash_lookup(cgm, plwpd->br_cgroupid);
+	VERIFY(ocn != NULL);
+
+	ASSERT(ocn->cgn_task_cnt > 0);
+	atomic_dec_32(&ocn->cgn_task_cnt);
+	atomic_inc_32(&ncn->cgn_task_cnt);
+	plwpd->br_cgroupid = cg_id;
+
+	if (ocn->cgn_task_cnt == 0 && ocn->cgn_dirents == N_DIRENTS(cgm) &&
+	    ocn->cgn_notify == 1) {
+		/*
+		 * We want to drop p_lock before queuing the event since
+		 * that might sleep. Dropping p_lock might cause the caller to
+		 * have to restart the move process from the beginning.
+		 */
+		mutex_exit(&p->p_lock);
+		cgrp_rel_agent_event(cgm, ocn);
+		mutex_exit(&cgm->cg_contents);
+
+		return (B_TRUE);
+	}
+
+	return (B_FALSE);
+}
+
+/*
  * Assign either all of the threads, or a single thread, for the specified pid
  * to the new cgroup. Controlled by the typ argument.
  */
 static int
-cgrp_proc_set_id(uint_t cg_id, pid_t pid, cgrp_wr_type_t typ)
+cgrp_proc_set_id(cgrp_mnt_t *cgm, uint_t cg_id, pid_t pid, cgrp_wr_type_t typ)
 {
 	proc_t *p;
 	kthread_t *t;
 	int error;
+	cgrp_node_t *ncn;
 
 	if (pid == 1)
 		pid = curproc->p_zone->zone_proc_initpid;
 
+	/*
+	 * Move one or all threads to this cgroup.
+	 */
+	if (typ == CG_WR_TASKS) {
+		error = ESRCH;
+	} else {
+		error = 0;
+	}
+
+restart:
 	mutex_enter(&pidlock);
 
 	p = cgrp_p_for_wr(pid, typ);
@@ -194,39 +244,48 @@ cgrp_proc_set_id(uint_t cg_id, pid_t pid, cgrp_wr_type_t typ)
 	 * Ignore writes for PID which is not an lx-branded process or with
 	 * no threads.
 	 */
+
 	mutex_enter(&p->p_lock);
-	if (p->p_brand != &lx_brand || (t = p->p_tlist) == NULL) {
+	mutex_exit(&pidlock);
+	if (p->p_brand != &lx_brand || (t = p->p_tlist) == NULL ||
+	    p->p_flag & SEXITING) {
 		mutex_exit(&p->p_lock);
-		mutex_exit(&pidlock);
 		return (0);
 	}
 
-	/*
-	 * Move one or all threads to this cgroup.
-	 */
-	if (typ == CG_WR_TASKS) {
-		error = ESRCH;
-	} else {
-		error = 0;
-	}
+	mutex_enter(&cgm->cg_contents);
+
+	ncn = cgrp_cg_hash_lookup(cgm, cg_id);
+	VERIFY(ncn != NULL);
 
 	do {
 		lx_lwp_data_t *plwpd = ttolxlwp(t);
-		if (plwpd != NULL) {
+		if (plwpd != NULL && plwpd->br_cgroupid != cg_id) {
 			if (typ == CG_WR_PROCS) {
-				plwpd->br_cgroupid = cg_id;
+				if (cgrp_thr_move(cgm, plwpd, ncn, cg_id, p)) {
+					/*
+					 * We dropped all of the locks so we
+					 * need to start over.
+					 */
+					goto restart;
+				}
+
 			} else if (plwpd->br_pid == pid) {
 				/* type is CG_WR_TASKS and we found the task */
-				plwpd->br_cgroupid = cg_id;
 				error = 0;
-				break;
+				if (cgrp_thr_move(cgm, plwpd, ncn, cg_id, p)) {
+					goto done;
+				} else {
+					break;
+				}
 			}
 		}
 		t = t->t_forw;
 	} while (t != p->p_tlist);
 
+	mutex_exit(&cgm->cg_contents);
 	mutex_exit(&p->p_lock);
-	mutex_exit(&pidlock);
+done:
 
 	return (error);
 }
@@ -273,7 +332,56 @@ cgrp_get_pid_str(struct uio *uio, pid_t *pid)
 }
 
 static int
-cgrp_wr_proc_or_task(cgrp_node_t *cn, struct uio *uio, cgrp_wr_type_t typ)
+cgrp_wr_notify(cgrp_node_t *cn, struct uio *uio)
+{
+	int error;
+	uint_t value;
+
+	/*
+	 * This is cheesy but since we only take a 0 or 1 value we can
+	 * let the pid_str function do the uio string conversion.
+	 */
+	error = cgrp_get_pid_str(uio, (pid_t *)&value);
+	if (error != 0)
+		return (error);
+
+	if (value != 0 && value != 1)
+		return (EINVAL);
+
+	/*
+	 * The flag is on the containing dir. We don't bother taking the
+	 * cg_contents lock since this is a simple assignment.
+	 */
+	cn->cgn_parent->cgn_notify = value;
+	return (0);
+}
+
+static int
+cgrp_wr_rel_agent(cgrp_mnt_t *cgm, struct uio *uio)
+{
+	int error;
+	int len;
+	char *wrp;
+
+	len = uio->uio_offset + uio->uio_resid;
+	if (len > MAXPATHLEN)
+		return (EFBIG);
+
+	mutex_enter(&cgm->cg_contents);
+
+	wrp = &cgm->cg_agent[uio->uio_offset];
+	error = uiomove(wrp, uio->uio_resid, UIO_WRITE, uio);
+	cgm->cg_agent[len] = '\0';
+	if (len > 1 && cgm->cg_agent[len - 1] == '\n')
+		cgm->cg_agent[len - 1] = '\0';
+
+	mutex_exit(&cgm->cg_contents);
+	return (error);
+}
+
+static int
+cgrp_wr_proc_or_task(cgrp_mnt_t *cgm, cgrp_node_t *cn, struct uio *uio,
+    cgrp_wr_type_t typ)
 {
 	/* the cgroup ID is on the containing dir */
 	uint_t cg_id = cn->cgn_parent->cgn_id;
@@ -285,7 +393,7 @@ cgrp_wr_proc_or_task(cgrp_node_t *cn, struct uio *uio, cgrp_wr_type_t typ)
 		if (error != 0)
 			return (error);
 
-		error = cgrp_proc_set_id(cg_id, pidnum, typ);
+		error = cgrp_proc_set_id(cgm, cg_id, pidnum, typ);
 		if (error != 0)
 			return (error);
 	}
@@ -304,9 +412,6 @@ cgrp_wr(cgrp_mnt_t *cgm, cgrp_node_t *cn, struct uio *uio, struct cred *cr,
 	vp = CGNTOV(cn);
 	ASSERT(vp->v_type == VREG);
 
-	ASSERT(RW_WRITE_HELD(&cn->cgn_contents));
-	ASSERT(RW_WRITE_HELD(&cn->cgn_rwlock));
-
 	if (uio->uio_loffset < 0)
 		return (EINVAL);
 
@@ -323,11 +428,17 @@ cgrp_wr(cgrp_mnt_t *cgm, cgrp_node_t *cn, struct uio *uio, struct cred *cr,
 		limit = MAXOFF_T;
 
 	switch (cn->cgn_type) {
+	case CG_NOTIFY:
+		error = cgrp_wr_notify(cn, uio);
+		break;
 	case CG_PROCS:
-		error = cgrp_wr_proc_or_task(cn, uio, CG_WR_PROCS);
+		error = cgrp_wr_proc_or_task(cgm, cn, uio, CG_WR_PROCS);
+		break;
+	case CG_REL_AGENT:
+		error = cgrp_wr_rel_agent(cgm, uio);
 		break;
 	case CG_TASKS:
-		error = cgrp_wr_proc_or_task(cn, uio, CG_WR_TASKS);
+		error = cgrp_wr_proc_or_task(cgm, cn, uio, CG_WR_TASKS);
 		break;
 	default:
 		VERIFY(0);
@@ -351,6 +462,12 @@ cgrp_p_lock(proc_t *p)
 
 	/* first try the fast path */
 	mutex_enter(&p->p_lock);
+	if (p->p_flag & SEXITING) {
+		mutex_exit(&p->p_lock);
+		mutex_exit(&pidlock);
+		return (NULL);
+	}
+
 	if (!(p->p_proc_flag & P_PR_LOCK)) {
 		p->p_proc_flag |= P_PR_LOCK;
 		mutex_exit(&p->p_lock);
@@ -404,10 +521,73 @@ cgrp_p_unlock(proc_t *p)
 	ASSERT(MUTEX_HELD(&p->p_lock));
 	ASSERT(!MUTEX_HELD(&pidlock));
 
-	cv_signal(&pr_pid_cv[p->p_slot]);
 	p->p_proc_flag &= ~P_PR_LOCK;
+	cv_signal(&pr_pid_cv[p->p_slot]);
 	mutex_exit(&p->p_lock);
 	THREAD_KPRI_RELEASE();
+}
+
+/*
+ * Read value from the notify_on_release pseudo file on the parent node
+ * (which is the actual cgroup node). We don't bother taking the cg_contents
+ * lock since it's a single instruction so an empty group action/read will
+ * only see one value or the other.
+ */
+/* ARGSUSED */
+static int
+cgrp_rd_notify(cgrp_mnt_t *cgm, cgrp_node_t *cn, struct uio *uio)
+{
+	int len;
+	int error = 0;
+	char buf[16];
+	char *rdp;
+	/* the flag is on the containing dir */
+	uint_t value = cn->cgn_parent->cgn_notify;
+
+	len = snprintf(buf, sizeof (buf), "%u\n", value);
+	if (uio->uio_offset > len)
+		return (0);
+
+	len -= uio->uio_offset;
+	rdp = &buf[uio->uio_offset];
+	len = (uio->uio_resid < len) ? uio->uio_resid : len;
+
+	error = uiomove(rdp, len, UIO_READ, uio);
+	return (error);
+}
+
+/*
+ * Read value from the release_agent pseudo file.
+ */
+static int
+cgrp_rd_rel_agent(cgrp_mnt_t *cgm, struct uio *uio)
+{
+	int len;
+	int error = 0;
+	char *rdp;
+
+	mutex_enter(&cgm->cg_contents);
+
+	if (cgm->cg_agent[0] == '\0') {
+		mutex_exit(&cgm->cg_contents);
+		return (0);
+	}
+
+	len = strlen(cgm->cg_agent);
+	if (uio->uio_offset > len) {
+		mutex_exit(&cgm->cg_contents);
+		return (0);
+	}
+
+	len -= uio->uio_offset;
+	rdp = &cgm->cg_agent[uio->uio_offset];
+	len = (uio->uio_resid < len) ? uio->uio_resid : len;
+
+	error = uiomove(rdp, len, UIO_READ, uio);
+
+	mutex_exit(&cgm->cg_contents);
+
+	return (error);
 }
 
 /*
@@ -470,6 +650,7 @@ cgrp_rd_procs(cgrp_mnt_t *cgm, cgrp_node_t *cn, struct uio *uio)
 		 * Check if all threads are in this cgroup.
 		 */
 		in_cg = B_TRUE;
+		mutex_enter(&cgm->cg_contents);
 		do {
 			lx_lwp_data_t *plwpd = ttolxlwp(t);
 			if (plwpd == NULL || plwpd->br_cgroupid != cg_id) {
@@ -479,6 +660,7 @@ cgrp_rd_procs(cgrp_mnt_t *cgm, cgrp_node_t *cn, struct uio *uio)
 
 			t = t->t_forw;
 		} while (t != p->p_tlist);
+		mutex_exit(&cgm->cg_contents);
 
 		mutex_exit(&p->p_lock);
 		if (!in_cg) {
@@ -647,7 +829,9 @@ cgrp_rd_tasks(cgrp_mnt_t *cgm, cgrp_node_t *cn, struct uio *uio)
 		if (p == NULL)
 			continue;
 
+		mutex_enter(&cgm->cg_contents);
 		error = cgrp_rd_proc_tasks(cg_id, p, initpid, &offset, uio);
+		mutex_exit(&cgm->cg_contents);
 
 		mutex_enter(&p->p_lock);
 		cgrp_p_unlock(p);
@@ -664,8 +848,6 @@ cgrp_rd(cgrp_mnt_t *cgm, cgrp_node_t *cn, struct uio *uio, caller_context_t *ct)
 {
 	int error = 0;
 
-	ASSERT(RW_LOCK_HELD(&cn->cgn_contents));
-
 	if (uio->uio_loffset >= MAXOFF_T)
 		return (0);
 	if (uio->uio_loffset < 0)
@@ -674,8 +856,14 @@ cgrp_rd(cgrp_mnt_t *cgm, cgrp_node_t *cn, struct uio *uio, caller_context_t *ct)
 		return (0);
 
 	switch (cn->cgn_type) {
+	case CG_NOTIFY:
+		error = cgrp_rd_notify(cgm, cn, uio);
+		break;
 	case CG_PROCS:
 		error = cgrp_rd_procs(cgm, cn, uio);
+		break;
+	case CG_REL_AGENT:
+		error = cgrp_rd_rel_agent(cgm, uio);
 		break;
 	case CG_TASKS:
 		error = cgrp_rd_tasks(cgm, cn, uio);
@@ -692,8 +880,8 @@ static int
 cgrp_read(struct vnode *vp, struct uio *uiop, int ioflag, cred_t *cred,
     struct caller_context *ct)
 {
-	cgrp_node_t *cn = (cgrp_node_t *)VTOCGN(vp);
-	cgrp_mnt_t *cgm = (cgrp_mnt_t *)VTOCGM(vp);
+	cgrp_node_t *cn = VTOCGN(vp);
+	cgrp_mnt_t *cgm = VTOCGM(vp);
 	int error;
 
 	/*
@@ -703,16 +891,7 @@ cgrp_read(struct vnode *vp, struct uio *uiop, int ioflag, cred_t *cred,
 		return (EISDIR);
 	if (vp->v_type != VREG)
 		return (EINVAL);
-	/*
-	 * cgrp_rwlock should have already been called from layers above
-	 */
-	ASSERT(RW_READ_HELD(&cn->cgn_rwlock));
-
-	rw_enter(&cn->cgn_contents, RW_READER);
-
 	error = cgrp_rd(cgm, cn, uiop, ct);
-
-	rw_exit(&cn->cgn_contents);
 
 	return (error);
 }
@@ -721,8 +900,8 @@ static int
 cgrp_write(struct vnode *vp, struct uio *uiop, int ioflag, struct cred *cred,
     struct caller_context *ct)
 {
-	cgrp_node_t *cn = (cgrp_node_t *)VTOCGN(vp);
-	cgrp_mnt_t *cgm = (cgrp_mnt_t *)VTOCGM(vp);
+	cgrp_node_t *cn = VTOCGN(vp);
+	cgrp_mnt_t *cgm = VTOCGM(vp);
 	int error;
 
 	/*
@@ -731,11 +910,6 @@ cgrp_write(struct vnode *vp, struct uio *uiop, int ioflag, struct cred *cred,
 	if (vp->v_type != VREG)
 		return (EINVAL);
 
-	/* cgrp_rwlock should have already been called from layers above */
-	ASSERT(RW_WRITE_HELD(&cn->cgn_rwlock));
-
-	rw_enter(&cn->cgn_contents, RW_WRITER);
-
 	if (ioflag & FAPPEND) {
 		/* In append mode start at end of file. */
 		uiop->uio_loffset = cn->cgn_size;
@@ -743,9 +917,132 @@ cgrp_write(struct vnode *vp, struct uio *uiop, int ioflag, struct cred *cred,
 
 	error = cgrp_wr(cgm, cn, uiop, cred, ct);
 
-	rw_exit(&cn->cgn_contents);
-
 	return (error);
+}
+
+static int
+cgrp_ioctl(vnode_t *vp, int cmd, intptr_t data, int flag, cred_t *cr,
+    int *rvalp, caller_context_t *ct)
+{
+	cgrp_mnt_t *cgm = VTOCGM(vp);
+	model_t model;
+	cgrpmgr_info_t cgmi;
+	cgrp_evnt_t *evntp;
+	int res = 0;
+
+	/* We only support the cgrpmgr ioctls on the root vnode */
+	if (!(vp->v_flag & VROOT))
+		return (ENOTTY);
+
+	/* The caller must be root */
+	if (secpolicy_vnode_any_access(cr, vp, crgetuid(cr)) != 0 ||
+	    crgetuid(cr) != 0)
+		return (ENOTTY);
+
+	if (cmd != CGRPFS_GETEVNT)
+		return (ENOTTY);
+
+	model = get_udatamodel();
+	if (model == DATAMODEL_NATIVE) {
+		if (copyin((void *)data, &cgmi, sizeof (cgmi)))
+			return (EFAULT);
+
+	} else {
+		cgrpmgr_info32_t cgmi32;
+
+		if (copyin((void *)data, &cgmi32, sizeof (cgmi32)))
+			return (EFAULT);
+
+		cgmi.cgmi_pid = cgmi32.cgmi_pid;
+		cgmi.cgmi_rel_agent_path =
+		    (char *)(intptr_t)cgmi32.cgmi_rel_agent_path;
+		cgmi.cgmi_cgroup_path =
+		    (char *)(intptr_t)cgmi32.cgmi_cgroup_path;
+	}
+
+	if (cgm->cg_mgrpid == 0) {
+		/*
+		 * This is the initial call from the user-level manager,
+		 * keep track of its pid.
+		 */
+		cgm->cg_mgrpid  = cgmi.cgmi_pid;
+	} else if (cgm->cg_mgrpid != cgmi.cgmi_pid) {
+		/*
+		 * We only allow the manager which first contacted us to
+		 * make this ioctl.
+		 */
+		return (EINVAL);
+	}
+
+	/*
+	 * If there is a pending event, service it immediately, otherwise
+	 * block until an event occurs.
+	 */
+retry:
+	mutex_enter(&cgm->cg_events);
+
+	if (cgm->cg_evnt_cnt < 0) {
+		/*
+		 * Trying to unmount, tell the manager to quit.
+		 */
+		mutex_exit(&cgm->cg_events);
+		return (EIO);
+	}
+
+	if (cgm->cg_evnt_cnt == 0) {
+		cv_wait_sig(&cgm->cg_evnt_cv, &cgm->cg_events);
+
+		if (cgm->cg_evnt_cnt <= 0) {
+			/*
+			 * We were woken up but there are no events, it must
+			 * be due to an unmount and it's time for the user
+			 * manager to go away.
+			 */
+			mutex_exit(&cgm->cg_events);
+			return (EIO);
+		}
+	}
+
+	evntp = list_remove_head(&cgm->cg_evnt_list);
+	VERIFY(evntp != NULL);
+	ASSERT(cgm->cg_evnt_cnt > 0);
+	cgm->cg_evnt_cnt--;
+
+	mutex_exit(&cgm->cg_events);
+
+	/*
+	 * An event for the user-level manager should only occur if a
+	 * release_agent has been set, but on the unlikely chance that the
+	 * agent path was cleared after the event was enqueued, we check under
+	 * the lock and go back to waiting if the path is empty.
+	 */
+	mutex_enter(&cgm->cg_contents);
+	if (cgm->cg_agent[0] == '\0') {
+		mutex_exit(&cgm->cg_contents);
+		kmem_free(evntp->cg_evnt_path, MAXPATHLEN);
+		kmem_free(evntp, sizeof (cgrp_evnt_t));
+		goto retry;
+	}
+
+	if (copyout(cgm->cg_agent, (void *)cgmi.cgmi_rel_agent_path,
+	    strlen(cgm->cg_agent) + 1)) {
+		mutex_exit(&cgm->cg_contents);
+		res = EFAULT;
+		goto done;
+	}
+
+	mutex_exit(&cgm->cg_contents);
+
+	if (copyout(evntp->cg_evnt_path, (void *)cgmi.cgmi_cgroup_path,
+	    strlen(evntp->cg_evnt_path) + 1)) {
+		res = EFAULT;
+	}
+
+done:
+	kmem_free(evntp->cg_evnt_path, MAXPATHLEN);
+	kmem_free(evntp, sizeof (cgrp_evnt_t));
+
+	return (res);
 }
 
 /* ARGSUSED2 */
@@ -753,11 +1050,13 @@ static int
 cgrp_getattr(struct vnode *vp, struct vattr *vap, int flags, struct cred *cred,
     caller_context_t *ct)
 {
-	cgrp_node_t *cn = (cgrp_node_t *)VTOCGN(vp);
+	cgrp_node_t *cn = VTOCGN(vp);
+	cgrp_mnt_t *cgm;
 	struct vattr va;
 	int attrs = 1;
 
-	mutex_enter(&cn->cgn_tlock);
+	cgm = VTOCGM(cn->cgn_vnode);
+	mutex_enter(&cgm->cg_contents);
 	if (attrs == 0) {
 		cn->cgn_uid = va.va_uid;
 		cn->cgn_gid = va.va_gid;
@@ -778,7 +1077,7 @@ cgrp_getattr(struct vnode *vp, struct vattr *vap, int flags, struct cred *cred,
 	vap->va_seq = cn->cgn_seq;
 
 	vap->va_nblocks = (fsblkcnt64_t)btodb(ptob(btopr(vap->va_size)));
-	mutex_exit(&cn->cgn_tlock);
+	mutex_exit(&cgm->cg_contents);
 	return (0);
 }
 
@@ -787,7 +1086,8 @@ static int
 cgrp_setattr(struct vnode *vp, struct vattr *vap, int flags, struct cred *cred,
     caller_context_t *ct)
 {
-	cgrp_node_t *cn = (cgrp_node_t *)VTOCGN(vp);
+	cgrp_node_t *cn = VTOCGN(vp);
+	cgrp_mnt_t *cgm;
 	int error = 0;
 	struct vattr *get;
 	long mask;
@@ -799,7 +1099,8 @@ cgrp_setattr(struct vnode *vp, struct vattr *vap, int flags, struct cred *cred,
 	    (vap->va_mode & (S_ISUID | S_ISGID)) || (vap->va_mask & AT_SIZE))
 		return (EINVAL);
 
-	mutex_enter(&cn->cgn_tlock);
+	cgm = VTOCGM(cn->cgn_vnode);
+	mutex_enter(&cgm->cg_contents);
 
 	get = &cn->cgn_attr;
 	/*
@@ -832,7 +1133,7 @@ cgrp_setattr(struct vnode *vp, struct vattr *vap, int flags, struct cred *cred,
 		gethrestime(&cn->cgn_ctime);
 
 out:
-	mutex_exit(&cn->cgn_tlock);
+	mutex_exit(&cgm->cg_contents);
 	return (error);
 }
 
@@ -841,12 +1142,14 @@ static int
 cgrp_access(struct vnode *vp, int mode, int flags, struct cred *cred,
     caller_context_t *ct)
 {
-	cgrp_node_t *cn = (cgrp_node_t *)VTOCGN(vp);
+	cgrp_node_t *cn = VTOCGN(vp);
+	cgrp_mnt_t *cgm;
 	int error;
 
-	mutex_enter(&cn->cgn_tlock);
+	cgm = VTOCGM(cn->cgn_vnode);
+	mutex_enter(&cgm->cg_contents);
 	error = cgrp_taccess(cn, mode, cred);
-	mutex_exit(&cn->cgn_tlock);
+	mutex_exit(&cgm->cg_contents);
 	return (error);
 }
 
@@ -856,7 +1159,8 @@ cgrp_lookup(struct vnode *dvp, char *nm, struct vnode **vpp,
     struct pathname *pnp, int flags, struct vnode *rdir, struct cred *cred,
     caller_context_t *ct, int *direntflags, pathname_t *realpnp)
 {
-	cgrp_node_t *cn = (cgrp_node_t *)VTOCGN(dvp);
+	cgrp_node_t *cn = VTOCGN(dvp);
+	cgrp_mnt_t *cgm;
 	cgrp_node_t *ncn = NULL;
 	int error;
 
@@ -874,7 +1178,10 @@ cgrp_lookup(struct vnode *dvp, char *nm, struct vnode **vpp,
 	}
 	ASSERT(cn);
 
+	cgm = VTOCGM(cn->cgn_vnode);
+	mutex_enter(&cgm->cg_contents);
 	error = cgrp_dirlookup(cn, nm, &ncn, cred);
+	mutex_exit(&cgm->cg_contents);
 
 	if (error == 0) {
 		ASSERT(ncn);
@@ -890,17 +1197,21 @@ cgrp_create(struct vnode *dvp, char *nm, struct vattr *vap,
     enum vcexcl exclusive, int mode, struct vnode **vpp, struct cred *cred,
     int flag, caller_context_t *ct, vsecattr_t *vsecp)
 {
-	cgrp_node_t *parent = (cgrp_node_t *)VTOCGN(dvp);
+	cgrp_node_t *parent = VTOCGN(dvp);
 	cgrp_node_t *cn = NULL;
+	cgrp_mnt_t *cgm;
 	int error;
 
 	if (*nm == '\0')
 		return (EPERM);
 
+	cgm = VTOCGM(parent->cgn_vnode);
+	mutex_enter(&cgm->cg_contents);
 	error = cgrp_dirlookup(parent, nm, &cn, cred);
 	if (error == 0) {		/* name found */
 		ASSERT(cn);
 
+		mutex_exit(&cgm->cg_contents);
 		/*
 		 * Creating an existing file, allow it except for the following
 		 * errors.
@@ -919,6 +1230,7 @@ cgrp_create(struct vnode *dvp, char *nm, struct vattr *vap,
 		*vpp = CGNTOV(cn);
 		return (0);
 	}
+	mutex_exit(&cgm->cg_contents);
 
 	/*
 	 * cgroups doesn't allow creation of additional, non-subsystem specific
@@ -932,9 +1244,10 @@ static int
 cgrp_remove(struct vnode *dvp, char *nm, struct cred *cred,
     caller_context_t *ct, int flags)
 {
-	cgrp_node_t *parent = (cgrp_node_t *)VTOCGN(dvp);
+	cgrp_node_t *parent = VTOCGN(dvp);
 	int error;
 	cgrp_node_t *cn = NULL;
+	cgrp_mnt_t *cgm;
 
 	/*
 	 * Removal of subsystem-specific files is not allowed but we need
@@ -942,7 +1255,10 @@ cgrp_remove(struct vnode *dvp, char *nm, struct cred *cred,
 	 * file.
 	 */
 
+	cgm = VTOCGM(parent->cgn_vnode);
+	mutex_enter(&cgm->cg_contents);
 	error = cgrp_dirlookup(parent, nm, &cn, cred);
+	mutex_exit(&cgm->cg_contents);
 	if (error)
 		return (error);
 
@@ -979,11 +1295,11 @@ cgrp_rename(
 	cgrp_node_t *fromparent;
 	cgrp_node_t *toparent;
 	cgrp_node_t *fromcn = NULL;	/* source cgrp_node */
-	cgrp_mnt_t *cgm = (cgrp_mnt_t *)VTOCGM(odvp);
+	cgrp_mnt_t *cgm = VTOCGM(odvp);
 	int error, err;
 
-	fromparent = (cgrp_node_t *)VTOCGN(odvp);
-	toparent = (cgrp_node_t *)VTOCGN(ndvp);
+	fromparent = VTOCGN(odvp);
+	toparent = VTOCGN(ndvp);
 
 	if (fromparent != toparent)
 		return (EIO);
@@ -991,14 +1307,14 @@ cgrp_rename(
 	/* discourage additional use of toparent */
 	toparent = NULL;
 
-	mutex_enter(&cgm->cg_renamelck);
+	mutex_enter(&cgm->cg_contents);
 
 	/*
 	 * Look up cgrp_node of file we're supposed to rename.
 	 */
 	error = cgrp_dirlookup(fromparent, onm, &fromcn, cred);
 	if (error) {
-		mutex_exit(&cgm->cg_renamelck);
+		mutex_exit(&cgm->cg_contents);
 		return (error);
 	}
 
@@ -1030,11 +1346,9 @@ cgrp_rename(
 	/*
 	 * Link source to new target
 	 */
-	rw_enter(&fromparent->cgn_rwlock, RW_WRITER);
 	error = cgrp_direnter(cgm, fromparent, nnm, DE_RENAME,
 	    fromcn, (struct vattr *)NULL,
 	    (cgrp_node_t **)NULL, cred, ct);
-	rw_exit(&fromparent->cgn_rwlock);
 
 	if (error)
 		goto done;
@@ -1042,9 +1356,6 @@ cgrp_rename(
 	/*
 	 * Unlink from source.
 	 */
-	rw_enter(&fromparent->cgn_rwlock, RW_WRITER);
-	rw_enter(&fromcn->cgn_rwlock, RW_WRITER);
-
 	error = err = cgrp_dirdelete(fromparent, fromcn, onm, DR_RENAME, cred);
 
 	/*
@@ -1054,17 +1365,14 @@ cgrp_rename(
 	if (error == ENOENT)
 		error = 0;
 
-	rw_exit(&fromcn->cgn_rwlock);
-	rw_exit(&fromparent->cgn_rwlock);
-
 	if (err == 0) {
 		vnevent_rename_src(CGNTOV(fromcn), odvp, onm, ct);
 		vnevent_rename_dest_dir(ndvp, CGNTOV(fromcn), nnm, ct);
 	}
 
 done:
+	mutex_exit(&cgm->cg_contents);
 	cgnode_rele(fromcn);
-	mutex_exit(&cgm->cg_renamelck);
 
 	return (error);
 }
@@ -1074,9 +1382,9 @@ static int
 cgrp_mkdir(struct vnode *dvp, char *nm, struct vattr *va, struct vnode **vpp,
     struct cred *cred, caller_context_t *ct, int flags, vsecattr_t *vsecp)
 {
-	cgrp_node_t *parent = (cgrp_node_t *)VTOCGN(dvp);
+	cgrp_node_t *parent = VTOCGN(dvp);
 	cgrp_node_t *self = NULL;
-	cgrp_mnt_t *cgm = (cgrp_mnt_t *)VTOCGM(dvp);
+	cgrp_mnt_t *cgm = VTOCGM(dvp);
 	int error;
 
 	/*
@@ -1086,25 +1394,28 @@ cgrp_mkdir(struct vnode *dvp, char *nm, struct vattr *va, struct vnode **vpp,
 	if (parent->cgn_nlink == 0)
 		return (ENOENT);
 
+	mutex_enter(&cgm->cg_contents);
 	error = cgrp_dirlookup(parent, nm, &self, cred);
 	if (error == 0) {
 		ASSERT(self != NULL);
+		mutex_exit(&cgm->cg_contents);
 		cgnode_rele(self);
 		return (EEXIST);
 	}
-	if (error != ENOENT)
+	if (error != ENOENT) {
+		mutex_exit(&cgm->cg_contents);
 		return (error);
+	}
 
-	rw_enter(&parent->cgn_rwlock, RW_WRITER);
 	error = cgrp_direnter(cgm, parent, nm, DE_MKDIR, (cgrp_node_t *)NULL,
 	    va, &self, cred, ct);
 	if (error) {
-		rw_exit(&parent->cgn_rwlock);
+		mutex_exit(&cgm->cg_contents);
 		if (self != NULL)
 			cgnode_rele(self);
 		return (error);
 	}
-	rw_exit(&parent->cgn_rwlock);
+	mutex_exit(&cgm->cg_contents);
 	*vpp = CGNTOV(self);
 	return (0);
 }
@@ -1114,7 +1425,7 @@ static int
 cgrp_rmdir(struct vnode *dvp, char *nm, struct vnode *cdir, struct cred *cred,
     caller_context_t *ct, int flags)
 {
-	cgrp_node_t *parent = (cgrp_node_t *)VTOCGN(dvp);
+	cgrp_node_t *parent = VTOCGN(dvp);
 	cgrp_mnt_t *cgm;
 	cgrp_node_t *self = NULL;
 	struct vnode *vp;
@@ -1127,49 +1438,34 @@ cgrp_rmdir(struct vnode *dvp, char *nm, struct vnode *cdir, struct cred *cred,
 		return (EINVAL);
 	if (strcmp(nm, "..") == 0)
 		return (EEXIST); /* Should be ENOTEMPTY */
-	error = cgrp_dirlookup(parent, nm, &self, cred);
-	if (error)
-		return (error);
 
-	rw_enter(&parent->cgn_rwlock, RW_WRITER);
-	rw_enter(&self->cgn_rwlock, RW_WRITER);
+	cgm = VTOCGM(parent->cgn_vnode);
+	mutex_enter(&cgm->cg_contents);
+
+	error = cgrp_dirlookup(parent, nm, &self, cred);
+	if (error) {
+		mutex_exit(&cgm->cg_contents);
+		return (error);
+	}
 
 	vp = CGNTOV(self);
 	if (vp == dvp || vp == cdir) {
 		error = EINVAL;
-		goto done1;
+		goto done;
 	}
 	if (self->cgn_type != CG_CGROUP_DIR) {
 		error = ENOTDIR;
-		goto done1;
+		goto done;
 	}
 
 	cgm = (cgrp_mnt_t *)VFSTOCGM(self->cgn_vnode->v_vfsp);
 
-	mutex_enter(&self->cgn_tlock);
-	/* Check for the existence of any sub-cgroup directories */
-	if (self->cgn_nlink > 2) {
-		mutex_exit(&self->cgn_tlock);
-		error = EEXIST;
-		goto done1;
-	}
-	mutex_exit(&self->cgn_tlock);
-
-	if (vn_vfswlock(vp)) {
-		error = EBUSY;
-		goto done1;
-	}
-	if (vn_mountedvfs(vp) != NULL) {
-		error = EBUSY;
-		goto done;
-	}
-
 	/*
-	 * Confirm directory only includes entries for ".", ".." and the
-	 * fixed pseudo file entries.
+	 * Check for the existence of any sub-cgroup directories or tasks in
+	 * the cgroup.
 	 */
-	if (self->cgn_dirents > (cgrp_num_pseudo_ents(cgm->cg_ssid) + 2)) {
-		error = EEXIST;		/* should be ENOTEMPTY */
+	if (self->cgn_task_cnt > 0 || self->cgn_dirents > N_DIRENTS(cgm)) {
+		error = EEXIST;
 		/*
 		 * Update atime because checking cn_dirents is logically
 		 * equivalent to reading the directory
@@ -1178,12 +1474,25 @@ cgrp_rmdir(struct vnode *dvp, char *nm, struct vnode *cdir, struct cred *cred,
 		goto done;
 	}
 
-	error = cgrp_dirdelete(parent, self, nm, DR_RMDIR, cred);
-done:
+	if (vn_vfswlock(vp)) {
+		error = EBUSY;
+		goto done;
+	}
+	if (vn_mountedvfs(vp) != NULL) {
+		error = EBUSY;
+	} else {
+		error = cgrp_dirdelete(parent, self, nm, DR_RMDIR, cred);
+	}
+
 	vn_vfsunlock(vp);
-done1:
-	rw_exit(&self->cgn_rwlock);
-	rw_exit(&parent->cgn_rwlock);
+
+	if (parent->cgn_task_cnt == 0 &&
+	    parent->cgn_dirents == N_DIRENTS(cgm) && parent->cgn_notify == 1) {
+		cgrp_rel_agent_event(cgm, parent);
+	}
+
+done:
+	mutex_exit(&cgm->cg_contents);
 	vnevent_rmdir(CGNTOV(self), dvp, nm, ct);
 	cgnode_rele(self);
 
@@ -1195,7 +1504,8 @@ static int
 cgrp_readdir(struct vnode *vp, struct uio *uiop, struct cred *cred, int *eofp,
     caller_context_t *ct, int flags)
 {
-	cgrp_node_t *cn = (cgrp_node_t *)VTOCGN(vp);
+	cgrp_node_t *cn = VTOCGN(vp);
+	cgrp_mnt_t *cgm;
 	cgrp_dirent_t *cdp;
 	int error = 0;
 	size_t namelen;
@@ -1212,10 +1522,6 @@ cgrp_readdir(struct vnode *vp, struct uio *uiop, struct cred *cred, int *eofp,
 			*eofp = 1;
 		return (0);
 	}
-	/*
-	 * assuming system call has already called cgrp_rwlock
-	 */
-	ASSERT(RW_READ_HELD(&cn->cgn_rwlock));
 
 	if (uiop->uio_iovcnt != 1)
 		return (EINVAL);
@@ -1223,8 +1529,12 @@ cgrp_readdir(struct vnode *vp, struct uio *uiop, struct cred *cred, int *eofp,
 	if (vp->v_type != VDIR)
 		return (ENOTDIR);
 
+	cgm = VTOCGM(cn->cgn_vnode);
+	mutex_enter(&cgm->cg_contents);
+
 	if (cn->cgn_dir == NULL) {
 		VERIFY(cn->cgn_nlink == 0);
+		mutex_exit(&cgm->cg_contents);
 		return (0);
 	}
 
@@ -1284,6 +1594,9 @@ cgrp_readdir(struct vnode *vp, struct uio *uiop, struct cred *cred, int *eofp,
 		uiop->uio_offset = offset;
 	}
 	gethrestime(&cn->cgn_atime);
+
+	mutex_exit(&cgm->cg_contents);
+
 	kmem_free(outbuf, bufsize);
 	return (error);
 }
@@ -1301,11 +1614,10 @@ cgrp_symlink(struct vnode *dvp, char *lnm, struct vattr *cva, char *cnm,
 static void
 cgrp_inactive(struct vnode *vp, struct cred *cred, caller_context_t *ct)
 {
-	cgrp_node_t *cn = (cgrp_node_t *)VTOCGN(vp);
-	cgrp_mnt_t *cgm = (cgrp_mnt_t *)VFSTOCGM(vp->v_vfsp);
+	cgrp_node_t *cn = VTOCGN(vp);
+	cgrp_mnt_t *cgm = VFSTOCGM(vp->v_vfsp);
 
-	rw_enter(&cn->cgn_rwlock, RW_WRITER);
-	mutex_enter(&cn->cgn_tlock);
+	mutex_enter(&cgm->cg_contents);
 	mutex_enter(&vp->v_lock);
 	ASSERT(vp->v_count >= 1);
 
@@ -1316,27 +1628,22 @@ cgrp_inactive(struct vnode *vp, struct cred *cred, caller_context_t *ct)
 	if (vp->v_count > 1 || cn->cgn_nlink != 0) {
 		vp->v_count--;
 		mutex_exit(&vp->v_lock);
-		mutex_exit(&cn->cgn_tlock);
-		rw_exit(&cn->cgn_rwlock);
+		mutex_exit(&cgm->cg_contents);
 		return;
 	}
 
-	mutex_exit(&vp->v_lock);
-	mutex_exit(&cn->cgn_tlock);
-	/* Here's our chance to send invalid event while we're between locks */
-	vn_invalid(CGNTOV(cn));
-
-	mutex_enter(&cgm->cg_contents);
 	if (cn->cgn_forw == NULL)
 		cgm->cg_rootnode->cgn_back = cn->cgn_back;
 	else
 		cn->cgn_forw->cgn_back = cn->cgn_back;
 	cn->cgn_back->cgn_forw = cn->cgn_forw;
+
+	mutex_exit(&vp->v_lock);
 	mutex_exit(&cgm->cg_contents);
 
-	rw_exit(&cn->cgn_rwlock);
-	rw_destroy(&cn->cgn_rwlock);
-	mutex_destroy(&cn->cgn_tlock);
+	/* Here's our chance to send invalid event */
+	vn_invalid(CGNTOV(cn));
+
 	vn_free(CGNTOV(cn));
 	kmem_free(cn, sizeof (cgrp_node_t));
 }
@@ -1349,27 +1656,17 @@ cgrp_seek(struct vnode *vp, offset_t ooff, offset_t *noffp,
 	return ((*noffp < 0 || *noffp > MAXOFFSET_T) ? EINVAL : 0);
 }
 
-/* ARGSUSED2 */
+/* ARGSUSED */
 static int
 cgrp_rwlock(struct vnode *vp, int write_lock, caller_context_t *ctp)
 {
-	cgrp_node_t *cn = VTOCGN(vp);
-
-	if (write_lock) {
-		rw_enter(&cn->cgn_rwlock, RW_WRITER);
-	} else {
-		rw_enter(&cn->cgn_rwlock, RW_READER);
-	}
 	return (write_lock);
 }
 
-/* ARGSUSED1 */
+/* ARGSUSED */
 static void
 cgrp_rwunlock(struct vnode *vp, int write_lock, caller_context_t *ctp)
 {
-	cgrp_node_t *cn = VTOCGN(vp);
-
-	rw_exit(&cn->cgn_rwlock);
 }
 
 static int
@@ -1412,6 +1709,7 @@ const fs_operation_def_t cgrp_vnodeops_template[] = {
 	VOPNAME_CLOSE,		{ .vop_close = cgrp_close },
 	VOPNAME_READ,		{ .vop_read = cgrp_read },
 	VOPNAME_WRITE,		{ .vop_write = cgrp_write },
+	VOPNAME_IOCTL,		{ .vop_ioctl = cgrp_ioctl },
 	VOPNAME_GETATTR,	{ .vop_getattr = cgrp_getattr },
 	VOPNAME_SETATTR,	{ .vop_setattr = cgrp_setattr },
 	VOPNAME_ACCESS,		{ .vop_access = cgrp_access },
