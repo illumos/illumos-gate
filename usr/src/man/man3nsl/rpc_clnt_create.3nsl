@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH RPC_CLNT_CREATE 3NSL "Dec 16, 2013"
+.TH RPC_CLNT_CREATE 3NSL "Jul 25, 2015"
 .SH NAME
 rpc_clnt_create, clnt_control, clnt_create, clnt_create_timed,
 clnt_create_vers, clnt_create_vers_timed, clnt_destroy, clnt_dg_create,
@@ -29,8 +29,8 @@ of CLIENT handles
 .LP
 .nf
 \fBCLIENT *\fR\fBclnt_create_timed\fR(\fBconst char *\fR\fIhost\fR, \fBconst rpcprog_t\fR \fIprognum\fR,
-     \fBconst rpcvers_t\fR \fIversnum\fR, \fBconst\fR \fInettype\fR,
-     \fBconst struct timeval *\fR\fItimetout\fR);
+     \fBconst rpcvers_t\fR \fIversnum\fR, \fBconst char *\fR\fInettype\fR,
+     \fBconst struct timeval *\fR\fItimeout\fR);
 .fi
 
 .LP
@@ -120,7 +120,6 @@ of CLIENT handles
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBRPC\fR library routines allow  \fBC\fR language programs to make procedure
 calls on other machines across the network. First a \fBCLIENT\fR handle is
@@ -135,7 +134,6 @@ When the \fB-mt\fR option is specified, \fBrpc_createerr\fR becomes a macro
 that enables each thread to have its own \fBrpc_createerr\fR. See
 \fBthreads\fR(5).
 .SS "Routines"
-.sp
 .LP
 See \fBrpc\fR(3NSL) for the definition of the \fBCLIENT\fR data structure.
 .sp
@@ -547,7 +545,6 @@ value for \fBrpc_createerr\fR.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5)  for descriptions of the following attributes:
 .sp
@@ -567,7 +564,6 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBrpcbind\fR(1M), \fBrpc\fR(3NSL), \fBrpc_clnt_auth\fR(3NSL),
 \fBrpc_clnt_calls\fR(3NSL), \fBrpc_svc_create\fR(3NSL),
