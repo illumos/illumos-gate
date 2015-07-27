@@ -166,7 +166,8 @@ SUBDIRS += \
 	libvnd		\
 	libidspace	\
 	varpd		\
-	libbunyan
+	libbunyan	\
+	libdwarf
 
 SUBDIRS += \
 	passwdutil	\
@@ -391,6 +392,7 @@ HDRSUBDIRS=		\
 	libdevid	\
 	libdevinfo	\
 	libdiskmgt	\
+	libdwarf	\
 	libdladm	\
 	libdll		\
 	libdlpi		\
@@ -673,6 +675,7 @@ libstmf:	libm
 libvscan: 	libm
 libidspace:	libumem
 libbunyan:	libnvpair
+libctf:		libdwarf
 
 
 $(INTEL_BUILD)libdiskmgt:libfdisk

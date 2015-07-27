@@ -93,8 +93,13 @@ ctf_fdcreate(int fd, int *errp)
 	static const ctf_header_t hdr = { { CTF_MAGIC, CTF_VERSION, 0 } };
 
 	const ulong_t hashlen = 128;
-	ctf_dtdef_t **hash = ctf_alloc(hashlen * sizeof (ctf_dtdef_t *));
+	ctf_dtdef_t **hash;
 	ctf_sect_t cts;
+
+	if (fd == -1)
+		return (ctf_create(errp));
+
+	hash = ctf_alloc(hashlen * sizeof (ctf_dtdef_t *));
 
 	if (hash == NULL)
 		return (ctf_set_open_errno(errp, EAGAIN));
@@ -287,6 +292,7 @@ ctf_update(ctf_file_t *fp)
 	int err;
 	ulong_t i;
 	const char *plabel;
+	const char *sname;
 
 	uintptr_t symbase = (uintptr_t)fp->ctf_symtab.cts_data;
 	uintptr_t strbase = (uintptr_t)fp->ctf_strtab.cts_data;
@@ -673,8 +679,20 @@ ctf_update(ctf_file_t *fp)
 	bzero(&fp->ctf_dsdefs, sizeof (ctf_list_t));
 	bzero(&fp->ctf_dldefs, sizeof (ctf_list_t));
 
+	/*
+	 * Because the various containers share the data sections, we don't want
+	 * to have ctf_close free it all. However, the name of the section is in
+	 * fact unique to the ctf_sect_t. Thus we save the names of the symbol
+	 * and string sections around the bzero() and restore them afterwards,
+	 * ensuring that we don't result in a memory leak.
+	 */
+	sname = fp->ctf_symtab.cts_name;
 	bzero(&fp->ctf_symtab, sizeof (ctf_sect_t));
+	fp->ctf_symtab.cts_name = sname;
+
+	sname = fp->ctf_strtab.cts_name;
 	bzero(&fp->ctf_strtab, sizeof (ctf_sect_t));
+	fp->ctf_strtab.cts_name = sname;
 
 	bcopy(fp, &ofp, sizeof (ctf_file_t));
 	bcopy(nfp, fp, sizeof (ctf_file_t));
@@ -833,7 +851,7 @@ ctf_dsd_insert(ctf_file_t *fp, ctf_dsdef_t *dsd)
 void
 ctf_dsd_delete(ctf_file_t *fp, ctf_dsdef_t *dsd)
 {
-	if (dsd->dts_argc != NULL)
+	if (dsd->dts_nargs > 0)
 		ctf_free(dsd->dts_argc,
 		    sizeof (ctf_id_t) * dsd->dts_nargs);
 	ctf_list_delete(&fp->ctf_dsdefs, dsd);
@@ -962,25 +980,6 @@ ctf_add_generic(ctf_file_t *fp, uint_t flag, const char *name, ctf_dtdef_t **rp)
 	return (type);
 }
 
-/*
- * When encoding integer sizes, we want to convert a byte count in the range
- * 1-8 to the closest power of 2 (e.g. 3->4, 5->8, etc).  The clp2() function
- * is a clever implementation from "Hacker's Delight" by Henry Warren, Jr.
- */
-static size_t
-clp2(size_t x)
-{
-	x--;
-
-	x |= (x >> 1);
-	x |= (x >> 2);
-	x |= (x >> 4);
-	x |= (x >> 8);
-	x |= (x >> 16);
-
-	return (x + 1);
-}
-
 ctf_id_t
 ctf_add_encoded(ctf_file_t *fp, uint_t flag,
     const char *name, const ctf_encoding_t *ep, uint_t kind)
@@ -995,7 +994,14 @@ ctf_add_encoded(ctf_file_t *fp, uint_t flag,
 		return (CTF_ERR); /* errno is set for us */
 
 	dtd->dtd_data.ctt_info = CTF_TYPE_INFO(kind, flag, 0);
-	dtd->dtd_data.ctt_size = clp2(P2ROUNDUP(ep->cte_bits, NBBY) / NBBY);
+
+	/*
+	 * If the type's size is not an even number of bytes, then we should
+	 * round up the type size to the nearest byte.
+	 */
+	dtd->dtd_data.ctt_size = ep->cte_bits / NBBY;
+	if ((ep->cte_bits % NBBY) != 0)
+		dtd->dtd_data.ctt_size++;
 	dtd->dtd_u.dtu_enc = *ep;
 
 	return (type);
@@ -1054,13 +1060,17 @@ ctf_add_array(ctf_file_t *fp, uint_t flag, const ctf_arinfo_t *arp)
 
 	fpd = fp;
 	if (ctf_lookup_by_id(&fpd, arp->ctr_contents) == NULL &&
-	    ctf_dtd_lookup(fp, arp->ctr_contents) == NULL)
+	    ctf_dtd_lookup(fp, arp->ctr_contents) == NULL) {
+		ctf_dprintf("bad contents for array: %d\n", arp->ctr_contents);
 		return (ctf_set_errno(fp, ECTF_BADID));
+	}
 
 	fpd = fp;
 	if (ctf_lookup_by_id(&fpd, arp->ctr_index) == NULL &&
-	    ctf_dtd_lookup(fp, arp->ctr_index) == NULL)
+	    ctf_dtd_lookup(fp, arp->ctr_index) == NULL) {
+		ctf_dprintf("bad index for array: %d\n", arp->ctr_index);
 		return (ctf_set_errno(fp, ECTF_BADID));
+	}
 
 	if ((type = ctf_add_generic(fp, flag, NULL, &dtd)) == CTF_ERR)
 		return (CTF_ERR); /* errno is set for us */
@@ -1168,19 +1178,33 @@ ctf_add_struct(ctf_file_t *fp, uint_t flag, const char *name)
 {
 	ctf_hash_t *hp = &fp->ctf_structs;
 	ctf_helem_t *hep = NULL;
-	ctf_dtdef_t *dtd;
-	ctf_id_t type;
+	ctf_dtdef_t *dtd = NULL;
+	ctf_id_t type = CTF_ERR;
 
 	if (name != NULL)
 		hep = ctf_hash_lookup(hp, fp, name, strlen(name));
 
-	if (hep != NULL && ctf_type_kind(fp, hep->h_type) == CTF_K_FORWARD)
-		dtd = ctf_dtd_lookup(fp, type = hep->h_type);
-	else if ((type = ctf_add_generic(fp, flag, name, &dtd)) == CTF_ERR)
-		return (CTF_ERR); /* errno is set for us */
+	if (hep != NULL && ctf_type_kind(fp, hep->h_type) == CTF_K_FORWARD) {
+		type = hep->h_type;
+		dtd = ctf_dtd_lookup(fp, type);
+		if (CTF_INFO_KIND(dtd->dtd_data.ctt_info) != CTF_K_FORWARD)
+			dtd = NULL;
+	}
 
+	if (dtd == NULL) {
+		type = ctf_add_generic(fp, flag, name, &dtd);
+		if (type == CTF_ERR)
+			return (CTF_ERR); /* errno is set for us */
+	}
+
+	VERIFY(type != CTF_ERR);
 	dtd->dtd_data.ctt_info = CTF_TYPE_INFO(CTF_K_STRUCT, flag, 0);
 	dtd->dtd_data.ctt_size = 0;
+
+	/*
+	 * Always dirty in case we modified a forward.
+	 */
+	fp->ctf_flags |= LCTF_DIRTY;
 
 	return (type);
 }
@@ -1190,19 +1214,33 @@ ctf_add_union(ctf_file_t *fp, uint_t flag, const char *name)
 {
 	ctf_hash_t *hp = &fp->ctf_unions;
 	ctf_helem_t *hep = NULL;
-	ctf_dtdef_t *dtd;
-	ctf_id_t type;
+	ctf_dtdef_t *dtd = NULL;
+	ctf_id_t type = CTF_ERR;
 
 	if (name != NULL)
 		hep = ctf_hash_lookup(hp, fp, name, strlen(name));
 
-	if (hep != NULL && ctf_type_kind(fp, hep->h_type) == CTF_K_FORWARD)
-		dtd = ctf_dtd_lookup(fp, type = hep->h_type);
-	else if ((type = ctf_add_generic(fp, flag, name, &dtd)) == CTF_ERR)
-		return (CTF_ERR); /* errno is set for us */
+	if (hep != NULL && ctf_type_kind(fp, hep->h_type) == CTF_K_FORWARD) {
+		type = hep->h_type;
+		dtd = ctf_dtd_lookup(fp, type);
+		if (CTF_INFO_KIND(dtd->dtd_data.ctt_info) != CTF_K_FORWARD)
+			dtd = NULL;
+	}
 
+	if (dtd == NULL) {
+		type = ctf_add_generic(fp, flag, name, &dtd);
+		if (type == CTF_ERR)
+			return (CTF_ERR); /* errno is set for us */
+	}
+
+	VERIFY(type != CTF_ERR);
 	dtd->dtd_data.ctt_info = CTF_TYPE_INFO(CTF_K_UNION, flag, 0);
 	dtd->dtd_data.ctt_size = 0;
+
+	/*
+	 * Always dirty in case we modified a forward.
+	 */
+	fp->ctf_flags |= LCTF_DIRTY;
 
 	return (type);
 }
@@ -1212,19 +1250,33 @@ ctf_add_enum(ctf_file_t *fp, uint_t flag, const char *name)
 {
 	ctf_hash_t *hp = &fp->ctf_enums;
 	ctf_helem_t *hep = NULL;
-	ctf_dtdef_t *dtd;
-	ctf_id_t type;
+	ctf_dtdef_t *dtd = NULL;
+	ctf_id_t type = CTF_ERR;
 
 	if (name != NULL)
 		hep = ctf_hash_lookup(hp, fp, name, strlen(name));
 
-	if (hep != NULL && ctf_type_kind(fp, hep->h_type) == CTF_K_FORWARD)
-		dtd = ctf_dtd_lookup(fp, type = hep->h_type);
-	else if ((type = ctf_add_generic(fp, flag, name, &dtd)) == CTF_ERR)
-		return (CTF_ERR); /* errno is set for us */
+	if (hep != NULL && ctf_type_kind(fp, hep->h_type) == CTF_K_FORWARD) {
+		type = hep->h_type;
+		dtd = ctf_dtd_lookup(fp, type);
+		if (CTF_INFO_KIND(dtd->dtd_data.ctt_info) != CTF_K_FORWARD)
+			dtd = NULL;
+	}
 
+	if (dtd == NULL) {
+		type = ctf_add_generic(fp, flag, name, &dtd);
+		if (type == CTF_ERR)
+			return (CTF_ERR); /* errno is set for us */
+	}
+
+	VERIFY(type != CTF_ERR);
 	dtd->dtd_data.ctt_info = CTF_TYPE_INFO(CTF_K_ENUM, flag, 0);
 	dtd->dtd_data.ctt_size = fp->ctf_dmodel->ctd_int;
+
+	/*
+	 * Always dirty in case we modified a forward.
+	 */
+	fp->ctf_flags |= LCTF_DIRTY;
 
 	return (type);
 }
@@ -1338,8 +1390,10 @@ ctf_add_enumerator(ctf_file_t *fp, ctf_id_t enid, const char *name, int value)
 
 	for (dmd = ctf_list_next(&dtd->dtd_u.dtu_members);
 	    dmd != NULL; dmd = ctf_list_next(dmd)) {
-		if (strcmp(dmd->dmd_name, name) == 0)
+		if (strcmp(dmd->dmd_name, name) == 0) {
+			ctf_dprintf("encountered dupliacte member %s\n", name);
 			return (ctf_set_errno(fp, ECTF_DUPMEMBER));
+		}
 	}
 
 	if ((dmd = ctf_alloc(sizeof (ctf_dmdef_t))) == NULL)
@@ -1371,8 +1425,10 @@ ctf_add_member(ctf_file_t *fp, ctf_id_t souid, const char *name, ctf_id_t type,
 	ctf_dtdef_t *dtd = ctf_dtd_lookup(fp, souid);
 	ctf_dmdef_t *dmd;
 
+	ulong_t mbitsz;
 	ssize_t msize, malign, ssize;
 	uint_t kind, vlen, root;
+	int mkind;
 	char *s = NULL;
 
 	if (!(fp->ctf_flags & LCTF_RDWR))
@@ -1400,14 +1456,48 @@ ctf_add_member(ctf_file_t *fp, ctf_id_t souid, const char *name, ctf_id_t type,
 		for (dmd = ctf_list_next(&dtd->dtd_u.dtu_members);
 		    dmd != NULL; dmd = ctf_list_next(dmd)) {
 			if (dmd->dmd_name != NULL &&
-			    strcmp(dmd->dmd_name, name) == 0)
+			    strcmp(dmd->dmd_name, name) == 0) {
 				return (ctf_set_errno(fp, ECTF_DUPMEMBER));
+			}
 		}
 	}
 
 	if ((msize = ctf_type_size(fp, type)) == CTF_ERR ||
-	    (malign = ctf_type_align(fp, type)) == CTF_ERR)
+	    (malign = ctf_type_align(fp, type)) == CTF_ERR ||
+	    (mkind = ctf_type_kind(fp, type)) == CTF_ERR)
 		return (CTF_ERR); /* errno is set for us */
+
+	/*
+	 * ctf_type_size returns sizes in bytes. However, for bitfields, that
+	 * means that it may misrepresent and actually rounds it up to a power
+	 * of two and store that in bytes. So instead we have to get the
+	 * Integers encoding and rely on that.
+	 */
+	if (mkind == CTF_K_INTEGER) {
+		ctf_encoding_t e;
+
+		if (ctf_type_encoding(fp, type, &e) == CTF_ERR)
+			return (CTF_ERR); /* errno is set for us */
+		mbitsz = e.cte_bits;
+	} else if (mkind == CTF_K_FORWARD) {
+		/*
+		 * This is a rather rare case. In general one cannot add a
+		 * forward to a structure. However, the CTF tools traditionally
+		 * tried to add a forward to the struct cpu as the last member.
+		 * Therefore, if we find one here, we're going to verify the
+		 * size and make sure it's zero. It's certainly odd, but that's
+		 * life.
+		 *
+		 * Further, if it's not an absolute position being specified,
+		 * then we refuse to add it.
+		 */
+		if (offset == ULONG_MAX)
+			return (ctf_set_errno(fp, EINVAL));
+		VERIFY(msize == 0);
+		mbitsz = msize;
+	} else {
+		mbitsz = msize * 8;
+	}
 
 	if ((dmd = ctf_alloc(sizeof (ctf_dmdef_t))) == NULL)
 		return (ctf_set_errno(fp, EAGAIN));
@@ -1452,7 +1542,7 @@ ctf_add_member(ctf_file_t *fp, ctf_id_t souid, const char *name, ctf_id_t type,
 			ssize = off + msize;
 		} else {
 			dmd->dmd_offset = offset;
-			ssize = offset / NBBY + msize;
+			ssize = (offset + mbitsz) / NBBY;
 		}
 	} else {
 		dmd->dmd_offset = 0;
@@ -2040,5 +2130,66 @@ ctf_add_label(ctf_file_t *fp, const char *name, ctf_id_t type, uint_t position)
 	ctf_dld_insert(fp, dld, position);
 	fp->ctf_flags |= LCTF_DIRTY;
 
+	return (0);
+}
+
+/*
+ * Update the size of a structure or union. Note that we don't allow this to
+ * shrink the size of a struct or union, only to increase it. This is useful for
+ * cases when you have a structure whose actual size is larger than the sum of
+ * its members due to padding for natuaral alignment.
+ */
+int
+ctf_set_size(ctf_file_t *fp, ctf_id_t id, const ulong_t newsz)
+{
+	ctf_dtdef_t *dtd = ctf_dtd_lookup(fp, id);
+	uint_t kind;
+	size_t oldsz;
+
+	if (!(fp->ctf_flags & LCTF_RDWR))
+		return (ctf_set_errno(fp, ECTF_RDONLY));
+
+	if (dtd == NULL)
+		return (ctf_set_errno(fp, ECTF_BADID));
+
+	kind = CTF_INFO_KIND(dtd->dtd_data.ctt_info);
+
+	if (kind != CTF_K_STRUCT && kind != CTF_K_UNION)
+		return (ctf_set_errno(fp, ECTF_NOTSOU));
+
+	if ((oldsz = dtd->dtd_data.ctt_size) == CTF_LSIZE_SENT)
+		oldsz = CTF_TYPE_LSIZE(&dtd->dtd_data);
+
+	if (newsz < oldsz)
+		return (ctf_set_errno(fp, EINVAL));
+
+	if (newsz > CTF_MAX_SIZE) {
+		dtd->dtd_data.ctt_size = CTF_LSIZE_SENT;
+		dtd->dtd_data.ctt_lsizehi = CTF_SIZE_TO_LSIZE_HI(newsz);
+		dtd->dtd_data.ctt_lsizelo = CTF_SIZE_TO_LSIZE_LO(newsz);
+	} else {
+		dtd->dtd_data.ctt_size = (ushort_t)newsz;
+	}
+
+	fp->ctf_flags |= LCTF_DIRTY;
+	return (0);
+}
+
+int
+ctf_set_root(ctf_file_t *fp, ctf_id_t id, const boolean_t vis)
+{
+	ctf_dtdef_t *dtd = ctf_dtd_lookup(fp, id);
+	uint_t kind, vlen;
+
+	if (!(fp->ctf_flags & LCTF_RDWR))
+		return (ctf_set_errno(fp, ECTF_RDONLY));
+
+	if (dtd == NULL)
+		return (ctf_set_errno(fp, ECTF_BADID));
+
+	kind = CTF_INFO_KIND(dtd->dtd_data.ctt_info);
+	vlen = CTF_INFO_VLEN(dtd->dtd_data.ctt_info);
+
+	dtd->dtd_data.ctt_info = CTF_TYPE_INFO(kind, vis, vlen);
 	return (0);
 }

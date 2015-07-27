@@ -72,6 +72,8 @@ struct ctf_diff {
 	ctf_file_t *cds_ofp;
 	ctf_id_t *cds_forward;
 	ctf_id_t *cds_reverse;
+	size_t cds_fsize;
+	size_t cds_rsize;
 	ctf_diff_type_f cds_func;
 	ctf_diff_guess_t *cds_guess;
 	void *cds_arg;
@@ -144,6 +146,39 @@ ctf_diff_number(ctf_file_t *ifp, ctf_id_t iid, ctf_file_t *ofp, ctf_id_t oid)
 		return (B_TRUE);
 
 	return (B_FALSE);
+}
+
+/*
+ * Two typedefs are equivalent, if after we resolve a chain of typedefs, they
+ * point to equivalent types. This means that if a size_t is defined as follows:
+ *
+ * size_t -> ulong_t -> unsigned long
+ * size_t -> unsigned long
+ *
+ * That we'll ultimately end up treating them the same.
+ */
+static int
+ctf_diff_typedef(ctf_diff_t *cds, ctf_file_t *ifp, ctf_id_t iid,
+    ctf_file_t *ofp, ctf_id_t oid)
+{
+	ctf_id_t iref = CTF_ERR, oref = CTF_ERR;
+
+	while (ctf_type_kind(ifp, iid) == CTF_K_TYPEDEF) {
+		iref = ctf_type_reference(ifp, iid);
+		if (iref == CTF_ERR)
+			return (CTF_ERR);
+		iid = iref;
+	}
+
+	while (ctf_type_kind(ofp, oid) == CTF_K_TYPEDEF) {
+		oref = ctf_type_reference(ofp, oid);
+		if (oref == CTF_ERR)
+			return (CTF_ERR);
+		oid = oref;
+	}
+
+	VERIFY(iref != CTF_ERR && oref != CTF_ERR);
+	return (ctf_diff_type(cds, ifp, iref, ofp, oref));
 }
 
 /*
@@ -274,7 +309,8 @@ out:
 
 /*
  * Two structures are the same if every member is identical to its corresponding
- * type, at the same offset, and has the same name.
+ * type, at the same offset, and has the same name, as well as them having the
+ * same overall size.
  */
 static int
 ctf_diff_struct(ctf_diff_t *cds, ctf_file_t *ifp, ctf_id_t iid, ctf_file_t *ofp,
@@ -295,6 +331,9 @@ ctf_diff_struct(ctf_diff_t *cds, ctf_file_t *ifp, ctf_id_t iid, ctf_file_t *ofp,
 
 	if ((otp = ctf_lookup_by_id(&ofp, oid)) == NULL)
 		return (ctf_set_errno(oifp, ctf_errno(ofp)));
+
+	if (ctf_type_size(ifp, iid) != ctf_type_size(ofp, oid))
+		return (B_TRUE);
 
 	if (LCTF_INFO_VLEN(ifp, itp->ctt_info) !=
 	    LCTF_INFO_VLEN(ofp, otp->ctt_info))
@@ -639,8 +678,10 @@ ctf_diff_type(ctf_diff_t *cds, ctf_file_t *ifp, ctf_id_t iid, ctf_file_t *ofp,
 	case CTF_K_FORWARD:
 		ret = ctf_diff_forward(ifp, iid, ofp, oid);
 		break;
-	case CTF_K_POINTER:
 	case CTF_K_TYPEDEF:
+		ret = ctf_diff_typedef(cds, ifp, iid, ofp, oid);
+		break;
+	case CTF_K_POINTER:
 	case CTF_K_VOLATILE:
 	case CTF_K_CONST:
 	case CTF_K_RESTRICT:
@@ -664,9 +705,12 @@ ctf_diff_type(ctf_diff_t *cds, ctf_file_t *ifp, ctf_id_t iid, ctf_file_t *ofp,
 /*
  * Walk every type in the first container and try to find a match in the second.
  * If there is a match, then update both the forward and reverse mapping tables.
+ *
+ * The self variable tells us whether or not we should be comparing the input
+ * ctf container with itself or not.
  */
 static int
-ctf_diff_pass1(ctf_diff_t *cds)
+ctf_diff_pass1(ctf_diff_t *cds, boolean_t self)
 {
 	int i, j, diff;
 	int istart, iend, jstart, jend;
@@ -689,6 +733,17 @@ ctf_diff_pass1(ctf_diff_t *cds)
 
 	for (i = istart; i <= iend; i++) {
 		diff = B_TRUE;
+
+		/*
+		 * If we're doing a self diff for dedup purposes, then we want
+		 * to ensure that we compare a type i with every type in the
+		 * range, [ 1, i ). Yes, this does mean that when i equals 1,
+		 * we won't compare anything.
+		 */
+		if (self == B_TRUE) {
+			jstart = istart;
+			jend = i - 1;
+		}
 		for (j = jstart; j <= jend; j++) {
 			ctf_diff_guess_t *cdg, *tofree;
 
@@ -788,12 +843,14 @@ ctf_diff_init(ctf_file_t *ifp, ctf_file_t *ofp, ctf_diff_t **cdsp)
 		ctf_free(cds, sizeof (ctf_diff_t));
 		return (ctf_set_errno(ifp, ENOMEM));
 	}
+	cds->cds_fsize = fsize;
 	cds->cds_reverse = ctf_alloc(rsize);
 	if (cds->cds_reverse == NULL) {
 		ctf_free(cds->cds_forward, fsize);
 		ctf_free(cds, sizeof (ctf_diff_t));
 		return (ctf_set_errno(ifp, ENOMEM));
 	}
+	cds->cds_rsize = rsize;
 	bzero(cds->cds_forward, fsize);
 	bzero(cds->cds_reverse, rsize);
 
@@ -811,7 +868,7 @@ ctf_diff_types(ctf_diff_t *cds, ctf_diff_type_f cb, void *arg)
 	cds->cds_func = cb;
 	cds->cds_arg = arg;
 
-	ret = ctf_diff_pass1(cds);
+	ret = ctf_diff_pass1(cds, B_FALSE);
 	if (ret == 0)
 		ret = ctf_diff_pass2(cds);
 
@@ -821,11 +878,35 @@ ctf_diff_types(ctf_diff_t *cds, ctf_diff_type_f cb, void *arg)
 	return (ret);
 }
 
+/*
+ * Do a diff where we're comparing a container with itself. In other words we'd
+ * like to know what types are actually duplicates of existing types in the
+ * container.
+ *
+ * Note this should remain private to libctf and not be exported in the public
+ * mapfile for the time being.
+ */
+int
+ctf_diff_self(ctf_diff_t *cds, ctf_diff_type_f cb, void *arg)
+{
+	if (cds->cds_ifp != cds->cds_ofp)
+		return (EINVAL);
+
+	cds->cds_func = cb;
+	cds->cds_arg = arg;
+
+	return (ctf_diff_pass1(cds, B_TRUE));
+}
+
+
 void
 ctf_diff_fini(ctf_diff_t *cds)
 {
 	ctf_diff_guess_t *cdg;
 	size_t fsize, rsize;
+
+	if (cds == NULL)
+		return;
 
 	cds->cds_ifp->ctf_refcnt--;
 	cds->cds_ofp->ctf_refcnt--;
@@ -855,6 +936,10 @@ ctf_diff_fini(ctf_diff_t *cds)
 		cdg = cdg->cdg_next;
 		ctf_free(tofree, sizeof (ctf_diff_guess_t));
 	}
+	if (cds->cds_forward != NULL)
+		ctf_free(cds->cds_forward, cds->cds_fsize);
+	if (cds->cds_reverse != NULL)
+		ctf_free(cds->cds_reverse, cds->cds_rsize);
 	ctf_free(cds, sizeof (ctf_diff_t));
 }
 
@@ -867,7 +952,7 @@ ctf_diff_getflags(ctf_diff_t *cds)
 int
 ctf_diff_setflags(ctf_diff_t *cds, uint_t flags)
 {
-	if ((flags & ~CTF_DIFF_F_MASK) != 0)
+	if ((flags & ~CTF_DIFF_F_IGNORE_INTNAMES) != 0)
 		return (ctf_set_errno(cds->cds_ifp, EINVAL));
 
 	cds->cds_flags = flags;

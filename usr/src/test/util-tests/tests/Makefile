@@ -14,6 +14,6 @@
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 #
 
-SUBDIRS = dladm libnvpair_json printf xargs
+SUBDIRS = dladm libnvpair_json printf xargs mergeq
 
 include $(SRC)/test/Makefile.com

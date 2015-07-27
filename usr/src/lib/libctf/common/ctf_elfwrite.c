@@ -30,7 +30,7 @@
  * Routines for writing ctf data to elf files, originally from the ctf tools.
  */
 
-#include <ctf_impl.h>
+#include <libctf_impl.h>
 #include <libctf.h>
 #include <gelf.h>
 #include <sys/stat.h>
@@ -39,7 +39,6 @@
 #include <errno.h>
 #include <unistd.h>
 #include <libelf.h>
-#include <sys/zmod.h>
 
 static int
 ctf_write_elf(ctf_file_t *fp, Elf *src, Elf *dst, int flags)
@@ -52,37 +51,54 @@ ctf_write_elf(ctf_file_t *fp, Elf *src, Elf *dst, int flags)
 	off_t new_offset = 0;
 	off_t ctfnameoff = 0;
 	int compress = (flags & CTF_ELFWRITE_F_COMPRESS);
-	int *secxlate;
+	int *secxlate = NULL;
 	int srcidx, dstidx, pad, i;
 	int curnmoff = 0;
 	int changing = 0;
+	int ret;
 	size_t nshdr, nphdr, strndx;
+	void *strdatabuf = NULL, *symdatabuf = NULL;
+	size_t strdatasz = 0, symdatasz = 0;
 
 	void *cdata = NULL;
+	size_t elfsize, asize;
 
-	if ((flags & ~(CTF_ELFWRITE_F_COMPRESS)) != 0)
-		return (ctf_set_errno(fp, EINVAL));
+	if ((flags & ~(CTF_ELFWRITE_F_COMPRESS)) != 0) {
+		ret = ctf_set_errno(fp, EINVAL);
+		goto out;
+	}
 
-	if (gelf_newehdr(dst, gelf_getclass(src)) == NULL)
-		return (ctf_set_errno(fp, ECTF_ELF));
-
-	if (gelf_getehdr(src, &sehdr) == NULL)
-		return (ctf_set_errno(fp, ECTF_ELF));
+	if (gelf_newehdr(dst, gelf_getclass(src)) == NULL) {
+		ret = ctf_set_errno(fp, ECTF_ELF);
+		goto out;
+	}
+	if (gelf_getehdr(src, &sehdr) == NULL) {
+		ret = ctf_set_errno(fp, ECTF_ELF);
+		goto out;
+	}
 	(void) memcpy(&dehdr, &sehdr, sizeof (GElf_Ehdr));
-	if (gelf_update_ehdr(dst, &dehdr) == 0)
-		return (ctf_set_errno(fp, ECTF_ELF));
+	if (gelf_update_ehdr(dst, &dehdr) == 0) {
+		ret = ctf_set_errno(fp, ECTF_ELF);
+		goto out;
+	}
 
 	/*
 	 * Use libelf to get the number of sections and the string section to
 	 * deal with ELF files that may have a large number of sections. We just
 	 * always use this to make our live easier.
 	 */
-	if (elf_getphdrnum(src, &nphdr) != 0)
-		return (ctf_set_errno(fp, ECTF_ELF));
-	if (elf_getshdrnum(src, &nshdr) != 0)
-		return (ctf_set_errno(fp, ECTF_ELF));
-	if (elf_getshdrstrndx(src, &strndx) != 0)
-		return (ctf_set_errno(fp, ECTF_ELF));
+	if (elf_getphdrnum(src, &nphdr) != 0) {
+		ret = ctf_set_errno(fp, ECTF_ELF);
+		goto out;
+	}
+	if (elf_getshdrnum(src, &nshdr) != 0) {
+		ret = ctf_set_errno(fp, ECTF_ELF);
+		goto out;
+	}
+	if (elf_getshdrstrndx(src, &strndx) != 0) {
+		ret = ctf_set_errno(fp, ECTF_ELF);
+		goto out;
+	}
 
 	/*
 	 * Neither the existing debug sections nor the SUNW_ctf sections (new or
@@ -92,16 +108,22 @@ ctf_write_elf(ctf_file_t *fp, Elf *src, Elf *dst, int flags)
 	 */
 	if (nphdr != 0) {
 		(void) elf_flagelf(dst, ELF_C_SET, ELF_F_LAYOUT);
-		if (gelf_newphdr(dst, nphdr) == NULL)
-			return (ctf_set_errno(fp, ECTF_ELF));
+		if (gelf_newphdr(dst, nphdr) == NULL) {
+			ret = ctf_set_errno(fp, ECTF_ELF);
+			goto out;
+		}
 
 		for (i = 0; i < nphdr; i++) {
 			GElf_Phdr phdr;
 
-			if (gelf_getphdr(src, i, &phdr) == NULL)
-				return (ctf_set_errno(fp, ECTF_ELF));
-			if (gelf_update_phdr(dst, i, &phdr) == 0)
-				return (ctf_set_errno(fp, ECTF_ELF));
+			if (gelf_getphdr(src, i, &phdr) == NULL) {
+				ret = ctf_set_errno(fp, ECTF_ELF);
+				goto out;
+			}
+			if (gelf_update_phdr(dst, i, &phdr) == 0) {
+				ret = ctf_set_errno(fp, ECTF_ELF);
+				goto out;
+			}
 		}
 	}
 
@@ -112,13 +134,13 @@ ctf_write_elf(ctf_file_t *fp, Elf *src, Elf *dst, int flags)
 		char *sname;
 
 		if (gelf_getshdr(scn, &shdr) == NULL) {
-			ctf_free(secxlate, sizeof (int) * nshdr);
-			return (ctf_set_errno(fp, ECTF_ELF));
+			ret = ctf_set_errno(fp, ECTF_ELF);
+			goto out;
 		}
 		sname = elf_strptr(src, strndx, shdr.sh_name);
 		if (sname == NULL) {
-			ctf_free(secxlate, sizeof (int) * nshdr);
-			return (ctf_set_errno(fp, ECTF_ELF));
+			ret = ctf_set_errno(fp, ECTF_ELF);
+			goto out;
 		}
 
 		if (strcmp(sname, CTF_ELF_SCN_NAME) == 0) {
@@ -136,8 +158,8 @@ ctf_write_elf(ctf_file_t *fp, Elf *src, Elf *dst, int flags)
 
 		sscn = elf_getscn(src, srcidx);
 		if (gelf_getshdr(sscn, &shdr) == NULL) {
-			ctf_free(secxlate, sizeof (int) * nshdr);
-			return (ctf_set_errno(fp, ECTF_ELF));
+			ret = ctf_set_errno(fp, ECTF_ELF);
+			goto out;
 		}
 
 		if (secxlate[srcidx] == -1) {
@@ -147,8 +169,8 @@ ctf_write_elf(ctf_file_t *fp, Elf *src, Elf *dst, int flags)
 
 		dscn = elf_newscn(dst);
 		if (dscn == NULL) {
-			ctf_free(secxlate, sizeof (int) * nshdr);
-			return (ctf_set_errno(fp, ECTF_ELF));
+			ret = ctf_set_errno(fp, ECTF_ELF);
+			goto out;
 		}
 
 		/*
@@ -173,28 +195,28 @@ ctf_write_elf(ctf_file_t *fp, Elf *src, Elf *dst, int flags)
 
 		sname = elf_strptr(src, strndx, shdr.sh_name);
 		if (sname == NULL) {
-			ctf_free(secxlate, sizeof (int) * nshdr);
-			return (ctf_set_errno(fp, ECTF_ELF));
+			ret = ctf_set_errno(fp, ECTF_ELF);
+			goto out;
 		}
 		if ((sdata = elf_getdata(sscn, NULL)) == NULL) {
-			ctf_free(secxlate, sizeof (int) * nshdr);
-			return (ctf_set_errno(fp, ECTF_ELF));
+			ret = ctf_set_errno(fp, ECTF_ELF);
+			goto out;
 		}
 		if ((ddata = elf_newdata(dscn)) == NULL) {
-			ctf_free(secxlate, sizeof (int) * nshdr);
-			return (ctf_set_errno(fp, ECTF_ELF));
+			ret = ctf_set_errno(fp, ECTF_ELF);
+			goto out;
 		}
 		bcopy(sdata, ddata, sizeof (Elf_Data));
 
 		if (srcidx == strndx) {
 			char seclen = strlen(CTF_ELF_SCN_NAME);
 
-			ddata->d_buf = ctf_alloc(ddata->d_size + shdr.sh_size +
-			    seclen + 1);
+			strdatasz = ddata->d_size + shdr.sh_size +
+			    seclen + 1;
+			ddata->d_buf = strdatabuf = ctf_alloc(strdatasz);
 			if (ddata->d_buf == NULL) {
-				ctf_free(secxlate,
-				    sizeof (int) * nshdr);
-				return (ctf_set_errno(fp, ECTF_ELF));
+				ret = ctf_set_errno(fp, ECTF_ELF);
+				goto out;
 			}
 			bcopy(sdata->d_buf, ddata->d_buf, shdr.sh_size);
 			(void) strcpy((caddr_t)ddata->d_buf + shdr.sh_size,
@@ -212,11 +234,11 @@ ctf_write_elf(ctf_file_t *fp, Elf *src, Elf *dst, int flags)
 
 			symtab_idx = secxlate[srcidx];
 
-			ddata->d_buf = ctf_alloc(shdr.sh_size);
+			symdatasz = shdr.sh_size;
+			ddata->d_buf = symdatabuf = ctf_alloc(symdatasz);
 			if (ddata->d_buf == NULL) {
-				ctf_free(secxlate,
-				    sizeof (int) * nshdr);
-				return (ctf_set_errno(fp, ECTF_ELF));
+				ret = ctf_set_errno(fp, ECTF_ELF);
+				goto out;
 			}
 			(void) bcopy(sdata->d_buf, ddata->d_buf, shdr.sh_size);
 
@@ -236,19 +258,17 @@ ctf_write_elf(ctf_file_t *fp, Elf *src, Elf *dst, int flags)
 
 					if (gelf_update_sym(ddata, i, &sym) ==
 					    0) {
-						ctf_free(secxlate,
-						    sizeof (int) *
-						    nshdr);
-						return (ctf_set_errno(fp,
-						    ECTF_ELF));
+						ret = ctf_set_errno(fp,
+						    ECTF_ELF);
+						goto out;
 					}
 				}
 			}
 		}
 
 		if (gelf_update_shdr(dscn, &shdr) == NULL) {
-			ctf_free(secxlate, sizeof (int) * nshdr);
-			return (ctf_set_errno(fp, ECTF_ELF));
+			ret = ctf_set_errno(fp, ECTF_ELF);
+			goto out;
 		}
 
 		new_offset = (off_t)shdr.sh_offset;
@@ -257,18 +277,18 @@ ctf_write_elf(ctf_file_t *fp, Elf *src, Elf *dst, int flags)
 	}
 
 	if (symtab_idx == -1) {
-		ctf_free(secxlate, sizeof (int) * nshdr);
-		return (ctf_set_errno(fp, ECTF_ELF));
+		ret = ctf_set_errno(fp, ECTF_ELF);
+		goto out;
 	}
 
 	/* Add the ctf section */
 	if ((dscn = elf_newscn(dst)) == NULL) {
-		ctf_free(secxlate, sizeof (int) * nshdr);
-		return (ctf_set_errno(fp, ECTF_ELF));
+		ret = ctf_set_errno(fp, ECTF_ELF);
+		goto out;
 	}
 	if (gelf_getshdr(dscn, &shdr) == NULL) {
-		ctf_free(secxlate, sizeof (int) * nshdr);
-		return (ctf_set_errno(fp, ECTF_ELF));
+		ret = ctf_set_errno(fp, ECTF_ELF);
+		goto out;
 	}
 	shdr.sh_name = ctfnameoff;
 	shdr.sh_type = SHT_PROGBITS;
@@ -286,36 +306,24 @@ ctf_write_elf(ctf_file_t *fp, Elf *src, Elf *dst, int flags)
 	}
 
 	if ((ddata = elf_newdata(dscn)) == NULL) {
-		ctf_free(secxlate, sizeof (int) * nshdr);
-		return (ctf_set_errno(fp, ECTF_ELF));
+		ret = ctf_set_errno(fp, ECTF_ELF);
+		goto out;
 	}
 
 	if (compress != 0) {
-		size_t dlen;
-		ctf_header_t *cthp;
 		int err;
 
 		if (ctf_zopen(&err) == NULL) {
-			ctf_free(secxlate, sizeof (int) * nshdr);
-			return (ctf_set_errno(fp, err));
+			ret = ctf_set_errno(fp, err);
+			goto out;
 		}
 
-		dlen = fp->ctf_size;
-		cdata = ctf_data_alloc(dlen);
-		bcopy(fp->ctf_base, cdata, sizeof (ctf_header_t));
-		cthp = cdata;
-		cthp->cth_flags  |= CTF_F_COMPRESS;
-		dlen -= sizeof (ctf_header_t);
-		if (z_compress((void *)((uintptr_t)cdata +
-		    sizeof (ctf_header_t)), &dlen,
-		    fp->ctf_base + sizeof (ctf_header_t),
-		    fp->ctf_size - sizeof (ctf_header_t)) != Z_OK) {
-			ctf_data_free(cdata, fp->ctf_size);
-			ctf_free(secxlate, sizeof (int) * nshdr);
-			return (ctf_set_errno(fp, ECTF_ZLIB));
+		if ((err = ctf_compress(fp, &cdata, &asize, &elfsize)) != 0) {
+			ret = ctf_set_errno(fp, err);
+			goto out;
 		}
 		ddata->d_buf = cdata;
-		ddata->d_size = dlen + sizeof (ctf_header_t);
+		ddata->d_size = elfsize;
 	} else {
 		ddata->d_buf = (void *)fp->ctf_base;
 		ddata->d_size = fp->ctf_size;
@@ -323,10 +331,8 @@ ctf_write_elf(ctf_file_t *fp, Elf *src, Elf *dst, int flags)
 	ddata->d_align = shdr.sh_addralign;
 
 	if (gelf_update_shdr(dscn, &shdr) == 0) {
-		if (cdata != NULL)
-			ctf_data_free(cdata, fp->ctf_size);
-		ctf_free(secxlate, sizeof (int) * nshdr);
-		return (ctf_set_errno(fp, ECTF_ELF));
+		ret = ctf_set_errno(fp, ECTF_ELF);
+		goto out;
 	}
 
 	/* update the section header location */
@@ -346,23 +352,27 @@ ctf_write_elf(ctf_file_t *fp, Elf *src, Elf *dst, int flags)
 	else
 		dehdr.e_shstrndx = secxlate[sehdr.e_shstrndx];
 	if (gelf_update_ehdr(dst, &dehdr) == NULL) {
-		if (cdata != NULL)
-			ctf_data_free(cdata, fp->ctf_size);
-		ctf_free(secxlate, sizeof (int) * nshdr);
-		return (ctf_set_errno(fp, ECTF_ELF));
+		ret = ctf_set_errno(fp, ECTF_ELF);
+		goto out;
 	}
 	if (elf_update(dst, ELF_C_WRITE) < 0) {
-		if (cdata != NULL)
-			ctf_data_free(cdata, fp->ctf_size);
-		ctf_free(secxlate, sizeof (int) * nshdr);
-		return (ctf_set_errno(fp, ECTF_ELF));
+		ret = ctf_set_errno(fp, ECTF_ELF);
+		goto out;
 	}
 
+	ret = 0;
+
+out:
+	if (strdatabuf != NULL)
+		ctf_free(strdatabuf, strdatasz);
+	if (symdatabuf != NULL)
+		ctf_free(symdatabuf, symdatasz);
 	if (cdata != NULL)
 		ctf_data_free(cdata, fp->ctf_size);
-	ctf_free(secxlate, sizeof (int) * nshdr);
+	if (secxlate != NULL)
+		ctf_free(secxlate, sizeof (int) * nshdr);
 
-	return (0);
+	return (ret);
 }
 
 int

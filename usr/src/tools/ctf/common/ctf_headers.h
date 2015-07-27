@@ -35,6 +35,7 @@
  * as part of Solaris.  These include the following:
  *
  * $(SRC)/lib/libctf/common/libctf.h
+ * $(SRC)/lib/libctf/common/libctf_impl.h
  * $(SRC)/uts/common/sys/ctf_api.h
  * $(SRC)/uts/common/sys/ctf.h
  *
@@ -67,16 +68,6 @@
 #include <uts/common/sys/ctf_api.h>
 #include <common/ctf/ctf_impl.h>
 #include <lib/libctf/common/libctf.h>
-
-/*
- * XXX: This is hack to deal with GCC 4.x removing __builtin_stdarg_start
- *
- * We need to build on systems that don't have the fixed va_impl.h on the
- * system, to achieve that, we stub it out here and in all similar places to
- * give us a leg up.
- */
-#if __GNUC__ >= 4
-#define	__builtin_stdarg_start(list, name)	__builtin_va_start(list, name)
-#endif
+#include <lib/libctf/common/libctf_impl.h>
 
 #endif /* _CTF_HEADERS_H */

@@ -74,6 +74,8 @@ static ctfdump_stat_t g_stats;
 static ctf_id_t *g_fargc;
 static int g_nfargc;
 
+static int g_exit = 0;
+
 static const char *ctfdump_fpenc[] = {
 	NULL,
 	"SINGLE",
@@ -88,17 +90,6 @@ static const char *ctfdump_fpenc[] = {
 	"IMAGINARY",
 	"DIMAGINARY",
 	"LDIMAGINARY"
-};
-
-static const char *ctfdump_knames[CTF_K_MAX+1] = {
-	"unknown",	"integer",	"float",	"pointer",
-	"array",	"function",	"struct",	"union",
-	"enum",		"forward",	"typedef",	"volatile",
-	"const",	"restrict",	"CTF_K_14",	"CTF_K_15",
-	"CTF_K_16",	"CTF_K_17",	"CTF_K_18",	"CTF_K_19",
-	"CTF_K_20",	"CTF_K_21",	"CTF_K_22",	"CTF_K_23",
-	"CTF_K_24",	"CTF_K_25",	"CTF_K_26",	"CTF_K_27",
-	"CTF_K_28",	"CTF_K_29",	"CTF_K_30",	"CTF_K_MAX"
 };
 
 /*
@@ -116,6 +107,17 @@ ctfdump_printf(ctfdump_arg_t arg, const char *fmt, ...)
 
 	va_start(ap, fmt);
 	vfprintf(stdout, fmt, ap);
+	va_end(ap);
+}
+
+static void
+ctfdump_warn(const char *fmt, ...)
+{
+	va_list ap;
+
+	(void) fprintf(stderr, "%s: ", g_progname);
+	va_start(ap, fmt);
+	vfprintf(stderr, fmt, ap);
 	va_end(ap);
 }
 
@@ -183,9 +185,11 @@ static void
 ctfdump_objects(void)
 {
 	ctfdump_title(CTFDUMP_OBJECTS, "Data Objects");
-	if (ctf_object_iter(g_fp, ctfdump_objects_cb, NULL) == CTF_ERR)
-		ctfdump_fatal("failed to dump objects: %s\n",
+	if (ctf_object_iter(g_fp, ctfdump_objects_cb, NULL) == CTF_ERR) {
+		ctfdump_warn("failed to dump objects: %s\n",
 		    ctf_errmsg(ctf_errno(g_fp)));
+		g_exit = 1;
+	}
 }
 
 static void
@@ -236,9 +240,11 @@ ctfdump_functions(void)
 {
 	ctfdump_title(CTFDUMP_FUNCTIONS, "Functions");
 
-	if (ctf_function_iter(g_fp, ctfdump_functions_cb, NULL) == CTF_ERR)
-		ctfdump_fatal("failed to dump functions: %s\n",
+	if (ctf_function_iter(g_fp, ctfdump_functions_cb, NULL) == CTF_ERR) {
+		ctfdump_warn("failed to dump functions: %s\n",
 		    ctf_errmsg(ctf_errno(g_fp)));
+		g_exit = 1;
+	}
 }
 
 static void
@@ -286,9 +292,11 @@ static void
 ctfdump_labels(void)
 {
 	ctfdump_title(CTFDUMP_LABELS, "Label Table");
-	if (ctf_label_iter(g_fp, ctfdump_labels_cb, NULL) == CTF_ERR)
-		ctfdump_fatal("failed to dump labels: %s\n",
+	if (ctf_label_iter(g_fp, ctfdump_labels_cb, NULL) == CTF_ERR) {
+		ctfdump_warn("failed to dump labels: %s\n",
 		    ctf_errmsg(ctf_errno(g_fp)));
+		g_exit = 1;
+	}
 }
 
 static int
@@ -311,9 +319,11 @@ ctfdump_strings(void)
 	ulong_t stroff = 0;
 
 	ctfdump_title(CTFDUMP_STRINGS, "String Table");
-	if (ctf_string_iter(g_fp, ctfdump_strings_cb, &stroff) == CTF_ERR)
-		ctfdump_fatal("failed to dump strings: %s\n",
+	if (ctf_string_iter(g_fp, ctfdump_strings_cb, &stroff) == CTF_ERR) {
+		ctfdump_warn("failed to dump strings: %s\n",
 		    ctf_errmsg(ctf_errno(g_fp)));
+		g_exit = 1;
+	}
 }
 
 static void
@@ -504,7 +514,7 @@ ctfdump_types_cb(ctf_id_t id, boolean_t root, void *arg)
 			ctfdump_fatal("type %lu missing name: %s\n", id,
 			    ctf_errmsg(ctf_errno(g_fp)));
 		(void) snprintf(name, sizeof (name), "(unknown %s)",
-		    ctfdump_knames[kind]);
+		    ctf_kind_name(g_fp, kind));
 	}
 
 	g_stats.cs_ntypes[kind]++;
@@ -651,9 +661,11 @@ ctfdump_types(void)
 {
 	ctfdump_title(CTFDUMP_TYPES, "Types");
 
-	if (ctf_type_iter(g_fp, B_TRUE, ctfdump_types_cb, NULL) == CTF_ERR)
-		ctfdump_fatal("failed to dump labels: %s\n",
+	if (ctf_type_iter(g_fp, B_TRUE, ctfdump_types_cb, NULL) == CTF_ERR) {
+		ctfdump_warn("failed to dump labels: %s\n",
 		    ctf_errmsg(ctf_errno(g_fp)));
+		g_exit = 1;
+	}
 }
 
 static void
@@ -728,11 +740,11 @@ main(int argc, char *argv[])
 			ufile = optarg;
 			break;
 		case '?':
-			ctfdump_usage("Option -%c requires an operand\n",
-			    optopt);
+			ctfdump_usage("Unknown option: -%c\n", optopt);
 			return (2);
 		case ':':
-			ctfdump_usage("Unknown option: -%c\n", optopt);
+			ctfdump_usage("Option -%c requires an operand\n",
+			    optopt);
 			return (2);
 		}
 	}
@@ -799,5 +811,5 @@ main(int argc, char *argv[])
 	if (g_dump & CTFDUMP_OUTPUT)
 		ctfdump_output(ufile);
 
-	return (0);
+	return (g_exit);
 }

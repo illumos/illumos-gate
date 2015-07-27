@@ -113,7 +113,10 @@ enum {
 	ECTF_MCHILD,		/* cannot merge child container */
 	ECTF_LABELEXISTS,	/* label already exists */
 	ECTF_LCONFLICT,		/* merged labels conflict */
-	ECTF_ZLIB		/* zlib library failure */
+	ECTF_ZLIB,		/* zlib library failure */
+	ECTF_CONVBKERR,		/* CTF conversion backend error */
+	ECTF_CONVNOCSRC,	/* No C source to convert from */
+	ECTF_NOCONVBKEND	/* No applicable conversion backend */
 };
 
 /*
@@ -248,6 +251,7 @@ extern char *ctf_type_qname(ctf_file_t *, ctf_id_t, char *, size_t,
 extern ssize_t ctf_type_size(ctf_file_t *, ctf_id_t);
 extern ssize_t ctf_type_align(ctf_file_t *, ctf_id_t);
 extern int ctf_type_kind(ctf_file_t *, ctf_id_t);
+extern const char *ctf_kind_name(ctf_file_t *, int);
 extern ctf_id_t ctf_type_reference(ctf_file_t *, ctf_id_t);
 extern ctf_id_t ctf_type_pointer(ctf_file_t *, ctf_id_t);
 extern int ctf_type_encoding(ctf_file_t *, ctf_id_t, ctf_encoding_t *);
@@ -302,6 +306,8 @@ extern int ctf_add_object(ctf_file_t *, ulong_t, ctf_id_t);
 extern int ctf_add_label(ctf_file_t *, const char *, ctf_id_t, uint_t);
 
 extern int ctf_set_array(ctf_file_t *, ctf_id_t, const ctf_arinfo_t *);
+extern int ctf_set_root(ctf_file_t *, ctf_id_t, const boolean_t);
+extern int ctf_set_size(ctf_file_t *, ctf_id_t, const ulong_t);
 
 extern int ctf_delete_type(ctf_file_t *, ctf_id_t);
 

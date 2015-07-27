@@ -16,10 +16,21 @@
 include $(SRC)/lib/libctf/Makefile.shared.com
 include ../../Makefile.ctf
 
-CPPFLAGS += -include ../../common/ctf_headers.h \
+#
+# For some reason LDFLAGS doesn't seem to be taking effect at the
+# moment. Therefore add what we need to LDLIBS for now.
+#
+LDLIBS += \
+	-L$(ROOTONBLDLIBMACH) \
+	'-R$$ORIGIN/../../lib/$(MACH)' \
+
+CPPFLAGS +=	-I$(SRC)/lib/libctf/common/ \
+		-I$(SRC)/lib/libdwarf/common/ \
+		-I$(SRC)/lib/mergeq \
+		-include ../../common/ctf_headers.h \
 		-DCTF_OLD_VERSIONS \
 		-DCTF_TOOLS_BUILD
-LDLIBS += -lc -lelf
+LDLIBS += -lc -lelf -ldwarf -lavl
 
 .KEEP_STATE:
 

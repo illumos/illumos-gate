@@ -518,11 +518,6 @@ function use_tools {
 	GENOFFSETS=${TOOLSROOT}/opt/onbld/bin/genoffsets
 	export GENOFFSETS
 
-	CTFCONVERT=${TOOLSROOT}/opt/onbld/bin/${MACH}/ctfconvert
-	export CTFCONVERT
-	CTFMERGE=${TOOLSROOT}/opt/onbld/bin/${MACH}/ctfmerge
-	export CTFMERGE
-
 	if [ "$VERIFY_ELFSIGN" = "y" ]; then
 		ELFSIGN=${TOOLSROOT}/opt/onbld/bin/elfsigncmp
 	else
@@ -542,8 +537,6 @@ function use_tools {
 	echo "\n==== New environment settings. ====\n" >> $LOGFILE
 	echo "STABS=${STABS}" >> $LOGFILE
 	echo "CTFSTABS=${CTFSTABS}" >> $LOGFILE
-	echo "CTFCONVERT=${CTFCONVERT}" >> $LOGFILE
-	echo "CTFMERGE=${CTFMERGE}" >> $LOGFILE
 	echo "ELFSIGN=${ELFSIGN}" >> $LOGFILE
 	echo "PATH=${PATH}" >> $LOGFILE
 	echo "ONBLD_TOOLS=${ONBLD_TOOLS}" >> $LOGFILE

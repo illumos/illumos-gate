@@ -17,7 +17,7 @@ include ../../Makefile.ctf
 CFLAGS += $(CCVERBOSE)
 LDLIBS += -lctf -lelf
 
-LDFLAGS = \
+LDFLAGS += \
 	-L$(ROOTONBLDLIBMACH) \
 	'-R$$ORIGIN/../../lib/$(MACH)' \
 

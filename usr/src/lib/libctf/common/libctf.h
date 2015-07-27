@@ -55,8 +55,7 @@ extern "C" {
 extern int _libctf_debug;
 
 typedef enum ctf_diff_flag {
-	CTF_DIFF_F_IGNORE_INTNAMES = 0x01,
-	CTF_DIFF_F_MASK	= 0x01
+	CTF_DIFF_F_IGNORE_INTNAMES = 0x01
 } ctf_diff_flag_t;
 
 typedef struct ctf_diff ctf_diff_t;
@@ -75,12 +74,18 @@ extern int ctf_diff_functions(ctf_diff_t *, ctf_diff_func_f, void *);
 extern int ctf_diff_objects(ctf_diff_t *, ctf_diff_obj_f, void *);
 extern void ctf_diff_fini(ctf_diff_t *);
 
+#define	CTF_CONVERT_F_IGNNONC	0x01
+extern ctf_file_t *ctf_fdconvert(int, const char *, uint_t, uint_t, int *,
+    char *, size_t);
+
 typedef struct ctf_merge_handle ctf_merge_t;
 extern ctf_merge_t *ctf_merge_init(int, int *);
 extern int ctf_merge_add(ctf_merge_t *, ctf_file_t *);
+extern int ctf_merge_set_nthreads(ctf_merge_t *, const uint_t);
 extern int ctf_merge_label(ctf_merge_t *, const char *);
 extern int ctf_merge_uniquify(ctf_merge_t *, ctf_file_t *, const char *);
 extern int ctf_merge_merge(ctf_merge_t *, ctf_file_t **);
+extern int ctf_merge_dedup(ctf_merge_t *, ctf_file_t **);
 extern void ctf_merge_fini(ctf_merge_t *);
 
 #define	CTF_ELFWRITE_F_COMPRESS		0x1

@@ -44,7 +44,7 @@ typedef enum ctf_diff_cmd {
 typedef struct {
 	int		dil_next;
 	const char	**dil_labels;
-} diff_label_t;
+} ctfdiff_label_t;
 
 static char *g_progname;
 static const char *g_iname;
@@ -78,7 +78,7 @@ ctfdiff_fatal(const char *fmt, ...)
 }
 
 static const char *
-fp_to_name(ctf_file_t *fp)
+ctfdiff_fp_to_name(ctf_file_t *fp)
 {
 	if (fp == g_ifp)
 		return (g_iname);
@@ -89,8 +89,8 @@ fp_to_name(ctf_file_t *fp)
 
 /* ARGSUSED */
 static void
-diff_func_cb(ctf_file_t *ifp, ulong_t iidx, boolean_t similar, ctf_file_t *ofp,
-    ulong_t oidx, void *arg)
+ctfdiff_func_cb(ctf_file_t *ifp, ulong_t iidx, boolean_t similar,
+    ctf_file_t *ofp, ulong_t oidx, void *arg)
 {
 	char namebuf[CTFDIFF_NAMELEN];
 
@@ -101,7 +101,7 @@ diff_func_cb(ctf_file_t *ifp, ulong_t iidx, boolean_t similar, ctf_file_t *ofp,
 		if (g_nextfunc != 0)
 			return;
 		(void) printf("ctf container %s function %ld is different\n",
-		    fp_to_name(ifp), iidx);
+		    ctfdiff_fp_to_name(ifp), iidx);
 	} else {
 		if (g_nextfunc != 0) {
 			int i;
@@ -113,7 +113,7 @@ diff_func_cb(ctf_file_t *ifp, ulong_t iidx, boolean_t similar, ctf_file_t *ofp,
 				return;
 		}
 		(void) printf("ctf container %s function %s (%ld) is "
-		    "different\n", fp_to_name(ifp), namebuf, iidx);
+		    "different\n", ctfdiff_fp_to_name(ifp), namebuf, iidx);
 	}
 
 	g_different = B_TRUE;
@@ -121,7 +121,7 @@ diff_func_cb(ctf_file_t *ifp, ulong_t iidx, boolean_t similar, ctf_file_t *ofp,
 
 /* ARGSUSED */
 static void
-diff_obj_cb(ctf_file_t *ifp, ulong_t iidx, ctf_id_t iid, boolean_t similar,
+ctfdiff_obj_cb(ctf_file_t *ifp, ulong_t iidx, ctf_id_t iid, boolean_t similar,
     ctf_file_t *ofp, ulong_t oidx, ctf_id_t oid, void *arg)
 {
 	char namebuf[CTFDIFF_NAMELEN];
@@ -133,7 +133,7 @@ diff_obj_cb(ctf_file_t *ifp, ulong_t iidx, ctf_id_t iid, boolean_t similar,
 		if (g_nextobj != 0)
 			return;
 		(void) printf("ctf container %s object %ld is different\n",
-		    fp_to_name(ifp), iidx);
+		    ctfdiff_fp_to_name(ifp), iidx);
 	} else {
 		if (g_nextobj != 0) {
 			int i;
@@ -145,7 +145,7 @@ diff_obj_cb(ctf_file_t *ifp, ulong_t iidx, ctf_id_t iid, boolean_t similar,
 				return;
 		}
 		(void) printf("ctf container %s object %s (%ld) is different\n",
-		    fp_to_name(ifp), namebuf, iidx);
+		    ctfdiff_fp_to_name(ifp), namebuf, iidx);
 	}
 
 	g_different = B_TRUE;
@@ -153,7 +153,7 @@ diff_obj_cb(ctf_file_t *ifp, ulong_t iidx, ctf_id_t iid, boolean_t similar,
 
 /* ARGSUSED */
 static void
-diff_cb(ctf_file_t *ifp, ctf_id_t iid, boolean_t similar, ctf_file_t *ofp,
+ctfdiff_cb(ctf_file_t *ifp, ctf_id_t iid, boolean_t similar, ctf_file_t *ofp,
     ctf_id_t oid, void *arg)
 {
 	if (similar == B_TRUE)
@@ -173,7 +173,7 @@ diff_cb(ctf_file_t *ifp, ctf_id_t iid, boolean_t similar, ctf_file_t *ofp,
 		    NULL) {
 			ctfdiff_fatal("failed to obtain the name "
 			    "of type %ld from %s: %s\n",
-			    iid, fp_to_name(ifp),
+			    iid, ctfdiff_fp_to_name(ifp),
 			    ctf_errmsg(ctf_errno(ifp)));
 		}
 
@@ -192,12 +192,12 @@ diff_cb(ctf_file_t *ifp, ctf_id_t iid, boolean_t similar, ctf_file_t *ofp,
 		return;
 
 	(void) printf("ctf container %s type %ld is different\n",
-	    fp_to_name(ifp), iid);
+	    ctfdiff_fp_to_name(ifp), iid);
 }
 
 /* ARGSUSED */
 static int
-diff_labels_count(const char *name, const ctf_lblinfo_t *li, void *arg)
+ctfdiff_labels_count(const char *name, const ctf_lblinfo_t *li, void *arg)
 {
 	uint32_t *count = arg;
 	*count = *count + 1;
@@ -207,9 +207,9 @@ diff_labels_count(const char *name, const ctf_lblinfo_t *li, void *arg)
 
 /* ARGSUSED */
 static int
-diff_labels_fill(const char *name, const ctf_lblinfo_t *li, void *arg)
+ctfdiff_labels_fill(const char *name, const ctf_lblinfo_t *li, void *arg)
 {
-	diff_label_t *dil = arg;
+	ctfdiff_label_t *dil = arg;
 
 	dil->dil_labels[dil->dil_next] = name;
 	dil->dil_next++;
@@ -218,24 +218,25 @@ diff_labels_fill(const char *name, const ctf_lblinfo_t *li, void *arg)
 }
 
 static int
-diff_labels(ctf_file_t *ifp, ctf_file_t *ofp)
+ctfdiff_labels(ctf_file_t *ifp, ctf_file_t *ofp)
 {
 	int ret;
 	uint32_t nilabel, nolabel, i, j;
-	diff_label_t idl, odl;
+	ctfdiff_label_t idl, odl;
 	const char **ilptr, **olptr;
 
 	nilabel = nolabel = 0;
-	ret = ctf_label_iter(ifp, diff_labels_count, &nilabel);
+	ret = ctf_label_iter(ifp, ctfdiff_labels_count, &nilabel);
 	if (ret == CTF_ERR)
 		return (ret);
-	ret = ctf_label_iter(ofp, diff_labels_count, &nolabel);
+	ret = ctf_label_iter(ofp, ctfdiff_labels_count, &nolabel);
 	if (ret == CTF_ERR)
 		return (ret);
 
 	if (nilabel != nolabel) {
 		(void) printf("ctf container %s labels differ from ctf "
-		    "container %s\n", fp_to_name(ifp), fp_to_name(ofp));
+		    "container %s\n", ctfdiff_fp_to_name(ifp),
+		    ctfdiff_fp_to_name(ofp));
 		g_different = B_TRUE;
 		return (0);
 	}
@@ -255,9 +256,9 @@ diff_labels(ctf_file_t *ifp, ctf_file_t *ofp)
 	odl.dil_next = 0;
 	odl.dil_labels = olptr;
 
-	if ((ret = ctf_label_iter(ifp, diff_labels_fill, &idl)) != 0)
+	if ((ret = ctf_label_iter(ifp, ctfdiff_labels_fill, &idl)) != 0)
 		goto out;
-	if ((ret = ctf_label_iter(ofp, diff_labels_fill, &odl)) != 0)
+	if ((ret = ctf_label_iter(ofp, ctfdiff_labels_fill, &odl)) != 0)
 		goto out;
 
 	for (i = 0; i < nilabel; i++) {
@@ -268,7 +269,8 @@ diff_labels(ctf_file_t *ifp, ctf_file_t *ofp)
 
 		if (j == nolabel) {
 			(void) printf("ctf container %s labels differ from ctf "
-			    "container %s\n", fp_to_name(ifp), fp_to_name(ofp));
+			    "container %s\n", ctfdiff_fp_to_name(ifp),
+			    ctfdiff_fp_to_name(ofp));
 			g_different = B_TRUE;
 			break;
 		}
@@ -282,7 +284,7 @@ out:
 }
 
 static void
-diff_usage(const char *fmt, ...)
+ctfdiff_usage(const char *fmt, ...)
 {
 	if (fmt != NULL) {
 		va_list ap;
@@ -324,7 +326,7 @@ main(int argc, char *argv[])
 
 	g_progname = basename(argv[0]);
 
-	while ((c = getopt(argc, argv, "aqtfolIp:F:O:P:T:")) != -1) {
+	while ((c = getopt(argc, argv, ":aqtfolIp:F:O:P:T:")) != -1) {
 		switch (c) {
 		case 'a':
 			g_flag |= CTF_DIFF_ALL;
@@ -417,6 +419,14 @@ main(int argc, char *argv[])
 			}
 			g_typelist[g_nexttype] = optarg;
 			g_nexttype++;
+			break;
+		case ':':
+			ctfdiff_usage("Option -%c requires an operand\n",
+			    optopt);
+			return (CTFDIFF_EXIT_USAGE);
+		case '?':
+			ctfdiff_usage("Unknown option: -%c\n", optopt);
+			return (CTFDIFF_EXIT_USAGE);
 		}
 	}
 
@@ -427,22 +437,22 @@ main(int argc, char *argv[])
 		g_flag = CTF_DIFF_DEFAULT;
 
 	if (argc != 3) {
-		diff_usage(NULL);
+		ctfdiff_usage(NULL);
 		return (CTFDIFF_EXIT_USAGE);
 	}
 
 	if (g_nexttype != 0 && !(g_flag & CTF_DIFF_TYPES)) {
-		diff_usage("-T cannot be used if not diffing types\n");
+		ctfdiff_usage("-T cannot be used if not diffing types\n");
 		return (CTFDIFF_EXIT_USAGE);
 	}
 
 	if (g_nextfunc != 0 && !(g_flag & CTF_DIFF_FUNCS)) {
-		diff_usage("-F cannot be used if not diffing functions\n");
+		ctfdiff_usage("-F cannot be used if not diffing functions\n");
 		return (CTFDIFF_EXIT_USAGE);
 	}
 
 	if (g_nextobj != 0 && !(g_flag & CTF_DIFF_OBJS)) {
-		diff_usage("-O cannot be used if not diffing objects\n");
+		ctfdiff_usage("-O cannot be used if not diffing objects\n");
 		return (CTFDIFF_EXIT_USAGE);
 	}
 
@@ -489,13 +499,13 @@ main(int argc, char *argv[])
 
 	err = 0;
 	if ((g_flag & CTF_DIFF_TYPES) && err != CTF_ERR)
-		err = ctf_diff_types(cdp, diff_cb, NULL);
+		err = ctf_diff_types(cdp, ctfdiff_cb, NULL);
 	if ((g_flag & CTF_DIFF_FUNCS) && err != CTF_ERR)
-		err = ctf_diff_functions(cdp, diff_func_cb, NULL);
+		err = ctf_diff_functions(cdp, ctfdiff_func_cb, NULL);
 	if ((g_flag & CTF_DIFF_OBJS) && err != CTF_ERR)
-		err = ctf_diff_objects(cdp, diff_obj_cb, NULL);
+		err = ctf_diff_objects(cdp, ctfdiff_obj_cb, NULL);
 	if ((g_flag & CTF_DIFF_LABEL) && err != CTF_ERR)
-		err = diff_labels(ifp, ofp);
+		err = ctfdiff_labels(ifp, ofp);
 
 	ctf_diff_fini(cdp);
 	if (err == CTF_ERR) {

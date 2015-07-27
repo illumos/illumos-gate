@@ -80,7 +80,10 @@ static const char *const _ctf_errlist[] = {
 	"Cannot merge child container",			 /* ECTF_MCHILD */
 	"Label already exists",				 /* ECTF_LABEL */
 	"Merged labels conflict",			 /* ECTF_LCONFLICT */
-	"Zlib library failure"				 /* ECTF_ZLIB */
+	"Zlib library failure",				 /* ECTF_ZLIB */
+	"CTF conversion backend error",			 /* ECTF_CONVBKERR */
+	"No C source to convert from",			 /* ECTF_CONVNOCSRC */
+	"No applicable conversion backend"		 /* ECTF_NOCONVBKEND */
 };
 
 static const int _ctf_nerr = sizeof (_ctf_errlist) / sizeof (_ctf_errlist[0]);

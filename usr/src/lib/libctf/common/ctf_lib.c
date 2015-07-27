@@ -38,6 +38,7 @@
 #include <gelf.h>
 #include <zlib.h>
 #include <zone.h>
+#include <sys/debug.h>
 
 #ifdef _LP64
 static const char *_libctf_zlib = "/usr/lib/64/libz.so.1";
@@ -56,6 +57,18 @@ static struct {
 
 static size_t _PAGESIZE;
 static size_t _PAGEMASK;
+
+static uint64_t ctf_phase = 0;
+
+#define	CTF_COMPRESS_CHUNK	(64*1024)
+
+typedef struct ctf_zdata {
+	void		*czd_buf;
+	void		*czd_next;
+	ctf_file_t	*czd_ctfp;
+	size_t		czd_allocsz;
+	z_stream	czd_zstr;
+} ctf_zdata_t;
 
 #pragma init(_libctf_init)
 void
@@ -143,6 +156,182 @@ const char *
 z_strerror(int err)
 {
 	return (zlib.z_error(err));
+}
+
+static int
+ctf_zdata_init(ctf_zdata_t *czd, ctf_file_t *fp)
+{
+	int err;
+	ctf_header_t *cthp;
+
+	bzero(czd, sizeof (ctf_zdata_t));
+
+	czd->czd_allocsz = fp->ctf_size;
+	czd->czd_buf = ctf_data_alloc(czd->czd_allocsz);
+	if (czd->czd_buf == MAP_FAILED)
+		return (ctf_set_errno(fp, ENOMEM));
+
+	bcopy(fp->ctf_base, czd->czd_buf, sizeof (ctf_header_t));
+	czd->czd_ctfp = fp;
+	cthp = czd->czd_buf;
+	cthp->cth_flags |= CTF_F_COMPRESS;
+	czd->czd_next = (void *)((uintptr_t)czd->czd_buf +
+	    sizeof (ctf_header_t));
+
+	if ((err = zlib.z_initcomp(&czd->czd_zstr, Z_BEST_COMPRESSION,
+	    ZLIB_VERSION, sizeof (z_stream))) != Z_OK)
+		return (ctf_set_errno(fp, ECTF_ZLIB));
+
+	return (0);
+}
+
+static int
+ctf_zdata_grow(ctf_zdata_t *czd)
+{
+	size_t off;
+	size_t newsz;
+	void *ndata;
+
+	off = (uintptr_t)czd->czd_next - (uintptr_t)czd->czd_buf;
+	newsz = czd->czd_allocsz + CTF_COMPRESS_CHUNK;
+	ndata = ctf_data_alloc(newsz);
+	if (ndata == MAP_FAILED) {
+		return (ctf_set_errno(czd->czd_ctfp, ENOMEM));
+	}
+
+	bcopy(czd->czd_buf, ndata, off);
+	ctf_data_free(czd->czd_buf, czd->czd_allocsz);
+	czd->czd_allocsz = newsz;
+	czd->czd_buf = ndata;
+	czd->czd_next = (void *)((uintptr_t)ndata + off);
+
+	czd->czd_zstr.next_out = (Bytef *)czd->czd_next;
+	czd->czd_zstr.avail_out = CTF_COMPRESS_CHUNK;
+	return (0);
+}
+
+static int
+ctf_zdata_compress_buffer(ctf_zdata_t *czd, const void *buf, size_t bufsize)
+{
+	int err;
+
+	czd->czd_zstr.next_out = czd->czd_next;
+	czd->czd_zstr.avail_out = czd->czd_allocsz -
+	    (czd->czd_next - czd->czd_buf);
+	czd->czd_zstr.next_in = (Bytef *)buf;
+	czd->czd_zstr.avail_in = bufsize;
+
+	while (czd->czd_zstr.avail_in != 0) {
+		if (czd->czd_zstr.avail_out == 0) {
+			czd->czd_next = czd->czd_zstr.next_out;
+			if ((err = ctf_zdata_grow(czd)) != 0) {
+				return (err);
+			}
+		}
+
+		if ((err = zlib.z_compress(&czd->czd_zstr, Z_NO_FLUSH)) != Z_OK)
+			return (ctf_set_errno(czd->czd_ctfp, ECTF_ZLIB));
+	}
+	czd->czd_next = czd->czd_zstr.next_out;
+
+	return (0);
+}
+
+static int
+ctf_zdata_flush(ctf_zdata_t *czd, boolean_t finish)
+{
+	int err;
+	int flag = finish == B_TRUE ? Z_FINISH : Z_FULL_FLUSH;
+	int bret = finish == B_TRUE ? Z_STREAM_END : Z_BUF_ERROR;
+
+	for (;;) {
+		if (czd->czd_zstr.avail_out == 0) {
+			czd->czd_next = czd->czd_zstr.next_out;
+			if ((err = ctf_zdata_grow(czd)) != 0) {
+				return (err);
+			}
+		}
+
+		err = zlib.z_compress(&czd->czd_zstr, flag);
+		if (err == bret) {
+			break;
+		}
+		if (err != Z_OK)
+			return (ctf_set_errno(czd->czd_ctfp, ECTF_ZLIB));
+
+	}
+
+	czd->czd_next = czd->czd_zstr.next_out;
+
+	return (0);
+}
+
+static int
+ctf_zdata_end(ctf_zdata_t *czd)
+{
+	int ret;
+
+	if ((ret = ctf_zdata_flush(czd, B_TRUE)) != 0)
+		return (ret);
+
+	if ((ret = zlib.z_finicomp(&czd->czd_zstr)) != 0)
+		return (ctf_set_errno(czd->czd_ctfp, ECTF_ZLIB));
+
+	return (0);
+}
+
+static void
+ctf_zdata_cleanup(ctf_zdata_t *czd)
+{
+	ctf_data_free(czd->czd_buf, czd->czd_allocsz);
+	(void) zlib.z_finicomp(&czd->czd_zstr);
+}
+
+/*
+ * Compress our CTF data and return both the size of the compressed data and the
+ * size of the allocation. These may be different due to the nature of
+ * compression.
+ *
+ * In addition, we flush the compression inbetween our two phases such that we
+ * maintain a different dictionary bbetween the CTF data and the string section.
+ */
+int
+ctf_compress(ctf_file_t *fp, void **buf, size_t *allocsz, size_t *elfsize)
+{
+	int err;
+	ctf_zdata_t czd;
+	ctf_header_t *cthp = (ctf_header_t *)fp->ctf_base;
+
+	if ((err = ctf_zdata_init(&czd, fp)) != 0)
+		return (err);
+
+	if ((err = ctf_zdata_compress_buffer(&czd, fp->ctf_buf,
+	    cthp->cth_stroff)) != 0) {
+		ctf_zdata_cleanup(&czd);
+		return (err);
+	}
+
+	if ((err = ctf_zdata_flush(&czd, B_FALSE)) != 0) {
+		ctf_zdata_cleanup(&czd);
+		return (err);
+	}
+
+	if ((err = ctf_zdata_compress_buffer(&czd,
+	    fp->ctf_buf + cthp->cth_stroff, cthp->cth_strlen)) != 0) {
+		ctf_zdata_cleanup(&czd);
+		return (err);
+	}
+
+	if ((err = ctf_zdata_end(&czd)) != 0) {
+		ctf_zdata_cleanup(&czd);
+		return (err);
+	}
+
+	*buf = czd.czd_buf;
+	*allocsz = czd.czd_allocsz;
+	*elfsize = (uintptr_t)(czd.czd_next - czd.czd_buf);
+
+	return (0);
 }
 
 int
@@ -575,4 +764,26 @@ ctf_version(int version)
 	}
 
 	return (_libctf_version);
+}
+
+/*
+ * A utility function for folks debugging CTF conversion and merging.
+ */
+void
+ctf_phase_dump(ctf_file_t *fp, const char *phase)
+{
+	int fd;
+	static char *base;
+	char path[MAXPATHLEN];
+
+	if (base == NULL && (base = getenv("LIBCTF_WRITE_PHASES")) == NULL)
+		return;
+
+	(void) snprintf(path, sizeof (path), "%s/libctf.%s.%d.ctf", base,
+	    phase != NULL ? phase : "",
+	    ctf_phase);
+	if ((fd = open(path, O_CREAT | O_TRUNC | O_RDWR, 0777)) < 0)
+		return;
+	(void) ctf_write(fp, fd);
+	(void) close(fd);
 }

@@ -917,6 +917,15 @@ CTFCVTFLAGS=		-i -L VERSION
 #
 CTFMRGFLAGS=
 
+#
+# Make the transition between old and new CTF Tools. The new ctf tools
+# do not support stabs (eg. Sun Studio), so if GNUC is not set, we don't
+# honor them.
+#
+ENABLE_NEW_CTF=$(POUND_SIGN)
+$(ENABLE_NEW_CTF)$(_GNUC)CTFCONVERT=	$(ONBLD_TOOLS)/bin/$(MACH)/ctfconvert-altexec
+$(ENABLE_NEW_CTF)$(_GNUC)CTFMERGE=	$(ONBLD_TOOLS)/bin/$(MACH)/ctfmerge-altexec
+
 CTFCONVERT_O		= $(CTFCONVERT) $(CTFCVTFLAGS) $@
 
 ELFSIGN_O=	$(TRUE)

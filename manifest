@@ -1155,6 +1155,7 @@ f lib/amd64/libdlpi.so.1 0755 root bin
 s lib/amd64/libdlpi.so=libdlpi.so.1
 f lib/amd64/libdoor.so.1 0755 root bin
 s lib/amd64/libdoor.so=libdoor.so.1
+f lib/amd64/libdwarf.so.1 0755 root bin
 f lib/amd64/libefi.so.1 0755 root bin
 s lib/amd64/libefi.so=libefi.so.1
 f lib/amd64/libelf.so.1 0755 root bin
@@ -1338,6 +1339,7 @@ f lib/libdlpi.so.1 0755 root bin
 s lib/libdlpi.so=libdlpi.so.1
 f lib/libdoor.so.1 0755 root bin
 s lib/libdoor.so=libdoor.so.1
+f lib/libdwarf.so.1 0755 root bin
 f lib/libefi.so.1 0755 root bin
 s lib/libefi.so=libefi.so.1
 f lib/libelf.so.1 0755 root bin
@@ -4751,6 +4753,7 @@ f usr/lib/amd64/libdns_sd.so.1 0755 root bin
 s usr/lib/amd64/libdns_sd.so=libdns_sd.so.1
 s usr/lib/amd64/libdoor.so.1=../../../lib/amd64/libdoor.so.1
 s usr/lib/amd64/libdoor.so=../../../lib/amd64/libdoor.so.1
+s usr/lib/amd64/libdwarf.so.1=../../../lib/amd64/libdwarf.so.1
 f usr/lib/amd64/libdtrace.so.1 0755 root bin
 s usr/lib/amd64/libdtrace.so=libdtrace.so.1
 f usr/lib/amd64/libdtrace_jni.so.1 0755 root bin
@@ -6149,6 +6152,7 @@ f usr/lib/libdns_sd.so.1 0755 root bin
 s usr/lib/libdns_sd.so=libdns_sd.so.1
 s usr/lib/libdoor.so.1=../../lib/libdoor.so.1
 s usr/lib/libdoor.so=../../lib/libdoor.so.1
+s usr/lib/libdwarf.so.1=../../lib/libdwarf.so.1
 f usr/lib/libdscfg.so.1 0755 root bin
 s usr/lib/libdscfg.so=libdscfg.so.1
 f usr/lib/libdtrace.so.1 0755 root bin

@@ -33,12 +33,20 @@
 #include <sys/mman.h>
 #include <libgen.h>
 #include <stdarg.h>
+#include <limits.h>
 
 static char *g_progname;
 static char *g_unique;
 static char *g_outfile;
 static boolean_t g_req;
 static uint_t g_nctf;
+
+#define	CTFMERGE_OK	0
+#define	CTFMERGE_FATAL	1
+#define	CTFMERGE_USAGE	2
+
+#define	CTFMERGE_DEFAULT_NTHREADS	8
+#define	CTFMERGE_ALTEXEC	"CTFMERGE_ALTEXEC"
 
 static void
 ctfmerge_fatal(const char *fmt, ...)
@@ -53,7 +61,7 @@ ctfmerge_fatal(const char *fmt, ...)
 	if (g_outfile != NULL)
 		(void) unlink(g_outfile);
 
-	exit(1);
+	exit(CTFMERGE_FATAL);
 }
 
 static boolean_t
@@ -224,10 +232,9 @@ ctfmerge_elfopen(const char *name, Elf *elf, ctf_merge_t *cmh)
 			    name, ctf_errmsg(err));
 		}
 	} else {
-		if (ctf_merge_add(cmh, fp) != 0) {
+		if ((err = ctf_merge_add(cmh, fp)) != 0) {
 			ctfmerge_fatal("failed to add input %s: %s\n",
-			    name, ctf_errmsg(ctf_errno(fp)));
-			exit(1);
+			    name, ctf_errmsg(err));
 		}
 		g_nctf++;
 	}
@@ -294,10 +301,11 @@ ctfmerge_usage(const char *fmt, ...)
 	}
 
 	(void) fprintf(stderr, "Usage: %s [-gt] [-d uniqfile] [-l label] "
-	    "[-L labelenv] -o outfile file ...\n"
+	    "[-L labelenv] [-j nthrs] -o outfile file ...\n"
 	    "\n"
 	    "\t-d  uniquify merged output against uniqfile\n"
 	    "\t-g  do not remove source debug information (STABS, DWARF)\n"
+	    "\t-j  use nthrs threads to perform the merge\n"
 	    "\t-l  set output container's label to specified value\n"
 	    "\t-L  set output container's label to value from environment\n"
 	    "\t-o  file to add CTF data to\n"
@@ -305,22 +313,49 @@ ctfmerge_usage(const char *fmt, ...)
 	    g_progname);
 }
 
+static void
+ctfmerge_altexec(char **argv)
+{
+	const char *alt;
+	char *altexec;
+
+	alt = getenv(CTFMERGE_ALTEXEC);
+	if (alt == NULL || *alt == '\0')
+		return;
+
+	altexec = strdup(alt);
+	if (altexec == NULL)
+		ctfmerge_fatal("failed to allocate memory for altexec\n");
+	if (unsetenv(CTFMERGE_ALTEXEC) != 0)
+		ctfmerge_fatal("failed to unset %s from environment: %s\n",
+		    CTFMERGE_ALTEXEC, strerror(errno));
+
+	(void) execv(altexec, argv);
+	ctfmerge_fatal("failed to execute alternate program %s: %s",
+	    altexec, strerror(errno));
+}
+
 int
 main(int argc, char *argv[])
 {
 	int err, i, c, ofd;
+	uint_t nthreads = CTFMERGE_DEFAULT_NTHREADS;
 	char *tmpfile = NULL, *label = NULL;
 	int wflags = CTF_ELFWRITE_F_COMPRESS;
 	ctf_file_t *ofp;
 	ctf_merge_t *cmh;
+	long argj;
+	char *eptr;
 
 	g_progname = basename(argv[0]);
+
+	ctfmerge_altexec(argv);
 
 	/*
 	 * We support a subset of the old CTF merge flags, mostly for
 	 * compatability.
 	 */
-	while ((c = getopt(argc, argv, ":d:fgL:o:t")) != -1) {
+	while ((c = getopt(argc, argv, ":d:fgj:L:o:t")) != -1) {
 		switch (c) {
 		case 'd':
 			g_unique = optarg;
@@ -330,6 +365,17 @@ main(int argc, char *argv[])
 			break;
 		case 'g':
 			/* Silently ignored for compatibility */
+			break;
+		case 'j':
+			errno = 0;
+			argj = strtol(optarg, &eptr, 10);
+			if (errno != 0 || argj == LONG_MAX ||
+			    argj == LONG_MIN || argj <= 0 ||
+			    argj > UINT_MAX || *eptr != '\0') {
+				ctfmerge_fatal("invalid argument for -j: %s\n",
+				    optarg);
+			}
+			nthreads = (uint_t)argj;
 			break;
 		case 'l':
 			label = optarg;
@@ -344,18 +390,18 @@ main(int argc, char *argv[])
 			g_req = B_TRUE;
 			break;
 		case ':':
-			ctfmerge_usage("ctfmerge: Option -%c requires an "
-			    "operand\n", optopt);
-			return (2);
+			ctfmerge_usage("Option -%c requires an operand\n",
+			    optopt);
+			return (CTFMERGE_USAGE);
 		case '?':
 			ctfmerge_usage("Unknown option: -%c\n", optopt);
-			return (2);
+			return (CTFMERGE_USAGE);
 		}
 	}
 
 	if (g_outfile == NULL) {
 		ctfmerge_usage("missing required -o output file\n");
-		return (2);
+		return (CTFMERGE_USAGE);
 	}
 
 	(void) elf_version(EV_CURRENT);
@@ -373,13 +419,17 @@ main(int argc, char *argv[])
 
 	if (argc < 1) {
 		ctfmerge_usage("no input files specified");
-		return (2);
+		return (CTFMERGE_USAGE);
 	}
 
 	cmh = ctf_merge_init(ofd, &err);
 	if (cmh == NULL)
 		ctfmerge_fatal("failed to create merge handle: %s\n",
 		    ctf_errmsg(err));
+
+	if ((err = ctf_merge_set_nthreads(cmh, nthreads)) != 0)
+		ctfmerge_fatal("failed to set parallelism to %d: %s\n",
+		    nthreads, ctf_errmsg(err));
 
 	for (i = 0; i < argc; i++) {
 		ctf_file_t *ifp;
@@ -449,7 +499,6 @@ main(int argc, char *argv[])
 		if (ufp == NULL) {
 			ctfmerge_fatal("failed to open uniquify file %s: %s\n",
 			    g_unique, ctf_errmsg(err));
-			return (1);
 		}
 
 		base = basename(g_unique);
@@ -470,18 +519,20 @@ main(int argc, char *argv[])
 	if (asprintf(&tmpfile, "%s.ctf", g_outfile) == -1)
 		ctfmerge_fatal("ran out of memory for temporary file name\n");
 	err = ctf_elfwrite(ofp, g_outfile, tmpfile, wflags);
-	free(tmpfile);
 	if (err == CTF_ERR) {
 		(void) unlink(tmpfile);
+		free(tmpfile);
 		ctfmerge_fatal("encountered a libctf error: %s!\n",
 		    ctf_errmsg(ctf_errno(ofp)));
 	}
 
 	if (rename(tmpfile, g_outfile) != 0) {
 		(void) unlink(tmpfile);
+		free(tmpfile);
 		ctfmerge_fatal("failed to rename temporary file: %s\n",
 		    strerror(errno));
 	}
+	free(tmpfile);
 
-	return (0);
+	return (CTFMERGE_OK);
 }

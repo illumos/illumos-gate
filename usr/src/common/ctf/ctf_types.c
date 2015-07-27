@@ -367,6 +367,9 @@ ctf_type_size(ctf_file_t *fp, ctf_id_t type)
 	case CTF_K_FUNCTION:
 		return (0); /* function size is only known by symtab */
 
+	case CTF_K_FORWARD:
+		return (0);
+
 	case CTF_K_ENUM:
 		return (fp->ctf_dmodel->ctd_int);
 
@@ -1141,4 +1144,44 @@ ctf_string_iter(ctf_file_t *fp, ctf_string_f *func, void *arg)
 	}
 
 	return (0);
+}
+
+/*
+ * fp isn't strictly necesasry at the moment. However, if we ever rev the file
+ * format, the valid values for kind will change.
+ */
+const char *
+ctf_kind_name(ctf_file_t *fp, int kind)
+{
+	switch (kind) {
+	case CTF_K_INTEGER:
+		return ("integer");
+	case CTF_K_FLOAT:
+		return ("float");
+	case CTF_K_POINTER:
+		return ("pointer");
+	case CTF_K_ARRAY:
+		return ("array");
+	case CTF_K_FUNCTION:
+		return ("function");
+	case CTF_K_STRUCT:
+		return ("struct");
+	case CTF_K_UNION:
+		return ("union");
+	case CTF_K_ENUM:
+		return ("enum");
+	case CTF_K_FORWARD:
+		return ("forward");
+	case CTF_K_TYPEDEF:
+		return ("typedef");
+	case CTF_K_VOLATILE:
+		return ("volatile");
+	case CTF_K_CONST:
+		return ("const");
+	case CTF_K_RESTRICT:
+		return ("restrict");
+	case CTF_K_UNKNOWN:
+	default:
+		return ("unknown");
+	}
 }

@@ -72,7 +72,7 @@ DWARFLDFLAGS	= \
 	-L$(ROOTONBLDLIBMACH) \
 	'-R$$ORIGIN/../../lib/$(MACH)' \
 	-ldwarf
-DWARFCPPFLAGS	= -I../../dwarf/common
+DWARFCPPFLAGS	= -I$(SRC)/lib/libdwarf/common
 
 LDFLAGS		+= -L$(NATIVE_ADJUNCT)/lib
 LDLIBS		+= -lz -lelf

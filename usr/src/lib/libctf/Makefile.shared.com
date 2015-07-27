@@ -35,6 +35,7 @@ VERS = .1
 COMMON_OBJS = \
 	ctf_create.o \
 	ctf_decl.o \
+	ctf_dwarf.o \
 	ctf_error.o \
 	ctf_hash.o \
 	ctf_labels.o \
@@ -43,17 +44,22 @@ COMMON_OBJS = \
 	ctf_types.o \
 	ctf_util.o
 
+MERGEQ_OBJS = \
+	mergeq.o \
+	workq.o
+
 LIST_OBJS = \
 	list.o
 
 LIB_OBJS = \
+	ctf_convert.o \
 	ctf_elfwrite.o \
 	ctf_diff.o \
 	ctf_lib.o \
 	ctf_merge.o \
 	ctf_subr.o
 
-OBJECTS = $(COMMON_OBJS) $(LIB_OBJS) $(LIST_OBJS)
+OBJECTS = $(COMMON_OBJS) $(LIB_OBJS) $(LIST_OBJS) $(MERGEQ_OBJS)
 MAPFILEDIR = $(SRC)/lib/libctf
 
 include $(SRC)/lib/Makefile.lib
@@ -62,16 +68,21 @@ SRCS = \
 	$(COMMON_OBJS:%.o=$(SRC)/common/ctf/%.c) \
 	$(LIB_OBJS:%.o=$(SRC)/lib/libctf/common/%.c) \
 	$(LIST_OBJS:%.o=$(SRC)/common/list/%.c) \
+	$(MERGEQ_OBJS:%.o=$(SRC)/lib/mergeq/%.c)
 	
 LIBS = $(DYNLIB) $(LINTLIB)
-LDLIBS += -lc -lelf
+LDLIBS += -lc -lelf -ldwarf -lavl
 
 C99MODE=	-xc99=%all
 C99LMODE=	-Xc99=%all
 
 SRCDIR = $(SRC)/lib/libctf/common
 
-CPPFLAGS += -I$(SRC)/lib/libctf/common -I$(SRC)/common/ctf -DCTF_OLD_VERSIONS
+CPPFLAGS +=	-I$(SRC)/lib/libctf/common 	\
+		-I$(SRC)/common/ctf		\
+		-I$(SRC)/lib/libdwarf/common	\
+		-I$(SRC)/lib/mergeq		\
+		-DCTF_OLD_VERSIONS
 CFLAGS += $(CCVERBOSE)
 
 CERRWARN += -_gcc=-Wno-uninitialized
