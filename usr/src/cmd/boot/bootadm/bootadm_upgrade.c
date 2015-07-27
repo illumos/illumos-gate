@@ -21,7 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2014 Toomas Soome <tsoome@me.com>
+ * Copyright 2015 Toomas Soome <tsoome@me.com>
  */
 
 #include <stdio.h>
@@ -887,7 +887,7 @@ upgrade_menu(menu_t *mp, char *osroot, char *menu_root)
 	 */
 	if (bam_is_findroot != BAM_FINDROOT_PRESENT ||
 	    bam_direct != BAM_DIRECT_DBOOT) {
-		bam_error(DOWNGRADE_NOTSUP, osroot);
+		bam_error(DOWNGRADE_NOTSUP);
 		return (BAM_ERROR);
 	}
 
