@@ -540,6 +540,33 @@ set_setcontext_enforcement(int on)
 	setcontext_enforcement = on;
 }
 
+/*
+ * The LX brand emulation library implements an operation that is analogous to
+ * setcontext(), but takes a different path in to the kernel.  So that it can
+ * correctly restore a signal mask, we expose just the signal mask handling
+ * part of the regular setcontext() routine as a private interface.
+ */
+void
+setcontext_sigmask(ucontext_t *ucp)
+{
+	ulwp_t *self = curthread;
+
+	if (ucp->uc_flags & UC_SIGMASK) {
+		block_all_signals(self);
+		delete_reserved_signals(&ucp->uc_sigmask);
+		self->ul_sigmask = ucp->uc_sigmask;
+		if (self->ul_cursig) {
+			/*
+			 * We have a deferred signal present.
+			 * The signal mask will be set when the
+			 * signal is taken in take_deferred_signal().
+			 */
+			ASSERT(self->ul_critical + self->ul_sigdefer != 0);
+			ucp->uc_flags &= ~UC_SIGMASK;
+		}
+	}
+}
+
 #pragma weak _setcontext = setcontext
 int
 setcontext(const ucontext_t *ucp)
@@ -560,20 +587,7 @@ setcontext(const ucontext_t *ucp)
 	/*
 	 * Restore previous signal mask and context link.
 	 */
-	if (uc.uc_flags & UC_SIGMASK) {
-		block_all_signals(self);
-		delete_reserved_signals(&uc.uc_sigmask);
-		self->ul_sigmask = uc.uc_sigmask;
-		if (self->ul_cursig) {
-			/*
-			 * We have a deferred signal present.
-			 * The signal mask will be set when the
-			 * signal is taken in take_deferred_signal().
-			 */
-			ASSERT(self->ul_critical + self->ul_sigdefer != 0);
-			uc.uc_flags &= ~UC_SIGMASK;
-		}
-	}
+	setcontext_sigmask(&uc);
 	self->ul_siglink = uc.uc_link;
 
 	/*

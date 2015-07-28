@@ -498,6 +498,27 @@ lx_init_tsd(lx_tsd_t *lxtsd)
 	}
 }
 
+void
+lx_jump_to_linux(ucontext_t *ucp)
+{
+	extern void setcontext_sigmask(ucontext_t *);
+
+	/*
+	 * Call into this private libc interface to allow us to use only the
+	 * signal mask handling part of a regular setcontext() operation.
+	 */
+	setcontext_sigmask(ucp);
+
+	if (syscall(SYS_brand, B_JUMP_TO_LINUX, ucp) != 0) {
+		lx_err_fatal("B_JUMP_TO_LINUX failed: %s", strerror(errno));
+	}
+
+	/*
+	 * This system call should not return.
+	 */
+	abort();
+}
+
 static void
 lx_start(uintptr_t sp, uintptr_t entry)
 {
@@ -530,15 +551,7 @@ lx_start(uintptr_t sp, uintptr_t entry)
 #endif
 
 	lx_debug("starting Linux program sp %p ldentry %p", sp, entry);
-
-	/*
-	 * This system call should not return.
-	 */
-	if (syscall(SYS_brand, B_JUMP_TO_LINUX, &jump_uc) == -1) {
-		lx_err_fatal("B_JUMP_TO_LINUX failed: %s",
-		    strerror(errno));
-	}
-	abort();
+	lx_jump_to_linux(&jump_uc);
 }
 
 /*ARGSUSED*/

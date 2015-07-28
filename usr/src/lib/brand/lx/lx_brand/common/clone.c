@@ -50,6 +50,7 @@
 #include <sys/lx_thread.h>
 #include <sys/fork.h>
 #include <sys/mman.h>
+#include <sys/debug.h>
 #include <lx_syscall.h>
 
 
@@ -91,8 +92,7 @@ struct clone_state {
 	void 		*c_ptidp;
 	struct lx_desc	*c_ldtinfo;	/* thread-specific segment */
 	void		*c_ctidp;
-	ucontext_t	c_uc;		/* original register state */
-	sigset_t	c_sigmask;	/* signal mask */
+	ucontext_t	c_uc;		/* original register state/sigmask */
 	lx_affmask_t	c_affmask;	/* CPU affinity mask */
 	volatile int	*c_clone_res;	/* pid/error returned to cloner */
 	int		c_ptrace_event;	/* ptrace(2) event for child stop */
@@ -239,13 +239,6 @@ clone_start(void *arg)
 	 */
 	lx_install_stack(cs->c_ntv_stk, cs->c_ntv_stk_sz, lxtsd);
 
-	if (sigprocmask(SIG_SETMASK, &cs->c_sigmask, NULL) < 0) {
-		*(cs->c_clone_res) = -errno;
-
-		lx_err_fatal("Unable to release held signals for child "
-		    "thread: %s", strerror(errno));
-	}
-
 	/*
 	 * Let the parent know that the clone has (effectively) been
 	 * completed.
@@ -253,10 +246,11 @@ clone_start(void *arg)
 	*(cs->c_clone_res) = rval;
 
 	/*
-	 * We want to load the general registers from this context, and
-	 * switch to the BRAND stack.
+	 * We want to load the general registers from this context, restore the
+	 * original signal mask, and switch to the BRAND stack.  The original
+	 * signal mask was saved to the context by lx_clone().
 	 */
-	cs->c_uc.uc_flags = UC_CPU;
+	cs->c_uc.uc_flags = UC_CPU | UC_SIGMASK;
 	cs->c_uc.uc_brand_data[0] = (void *)LX_UC_STACK_BRAND;
 
 	/*
@@ -281,16 +275,9 @@ clone_start(void *arg)
 	lx_ptrace_stop_if_option(cs->c_ptrace_event, B_TRUE, 0, &cs->c_uc);
 
 	/*
-	 * Jump to the Linux process.  The system call must not return.
+	 * Jump to the Linux process.  This call cannot return.
 	 */
-	if (syscall(SYS_brand, B_JUMP_TO_LINUX, &cs->c_uc) == -1) {
-		lx_err_fatal("B_JUMP_TO_LINUX failed: %s",
-		    strerror(errno));
-	}
-	abort();
-
-	/*NOTREACHED*/
-	return (NULL);
+	lx_jump_to_linux(&cs->c_uc);
 }
 
 /*
@@ -666,19 +653,18 @@ lx_clone(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 
 	clone_res = 0;
 
-	(void) sigfillset(&sigmask);
-
 	/*
 	 * Block all signals because the thread we create won't be able to
 	 * properly handle them until it's fully set up.
 	 */
+	VERIFY0(sigfillset(&sigmask));
 	if (sigprocmask(SIG_BLOCK, &sigmask, &osigmask) < 0) {
 		lx_debug("lx_clone sigprocmask() failed: %s", strerror(errno));
 		free(cs->c_lx_tsd);
 		free(cs);
 		return (-errno);
 	}
-	cs->c_sigmask = osigmask;
+	cs->c_uc.uc_sigmask = osigmask;
 
 	/*
 	 * Allocate the native stack for this new thread now, so that we
