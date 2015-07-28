@@ -154,6 +154,8 @@ extern ucontext_t *lx_syscall_regs(void);
 extern uintptr_t lx_find_brand_sp(void);
 extern const ucontext_t *lx_find_brand_uc(void);
 
+extern void lx_jump_to_linux(ucontext_t *) __NORETURN;
+
 extern char *lx_fd_to_path(int fd, char *buf, int buf_size);
 extern int lx_lpid_to_spair(pid_t, pid_t *, lwpid_t *);
 extern int lx_lpid_to_spid(pid_t, pid_t *);

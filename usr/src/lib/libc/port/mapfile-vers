@@ -2973,6 +2973,7 @@ $endif
 	_semctl64;
 	set_escaped_context_cleanup;
 	set_setcontext_enforcement;
+	setcontext_sigmask;
 	_setbufend;
 	__set_errno;
 	setprojrctl;
