@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2000, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2014 Nexenta Systems Inc. All rights reserved.
  */
 
 /*
@@ -3656,23 +3657,11 @@ i_mdi_pi_state_change(mdi_pathinfo_t *pip, mdi_pathinfo_state_t state, int flag)
 					if ((rv != NDI_SUCCESS) &&
 					    (MDI_CLIENT_STATE(ct) ==
 					    MDI_CLIENT_STATE_DEGRADED)) {
-						/*
-						 * ndi_devi_online failed.
-						 * Reset client flags to
-						 * offline.
-						 */
 						MDI_DEBUG(1, (MDI_WARN, cdip,
 						    "!ndi_devi_online failed "
 						    "error %x", rv));
-						MDI_CLIENT_SET_OFFLINE(ct);
 					}
-					if (rv != NDI_SUCCESS) {
-						/* Reset the path state */
-						MDI_PI_LOCK(pip);
-						MDI_PI(pip)->pi_state =
-						    MDI_PI_OLD_STATE(pip);
-						MDI_PI_UNLOCK(pip);
-					}
+					rv = NDI_SUCCESS;
 				}
 				break;
 
@@ -5446,7 +5435,7 @@ mdi_phci_retire_notify(dev_info_t *dip, int *constraint)
  * last path to any client, check that constraints
  * have been applied.
  *
- * If constraint is 0, we aren't going to retire the 
+ * If constraint is 0, we aren't going to retire the
  * pHCI. However we still need to go through the paths
  * calling e_ddi_retire_finalize() to clear their
  * contract barriers.
