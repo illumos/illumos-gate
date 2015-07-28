@@ -22,7 +22,7 @@
  * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
- * Copyright 2013 Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 /*
  * Copyright (c) 2010, Intel Corporation.
@@ -282,6 +282,12 @@ int segzio_fromheap = 0;
 #else
 int segzio_fromheap = 1;
 #endif
+
+/*
+ * Give folks an escape hatch for disabling SMAP via kmdb. Doesn't work
+ * post-boot.
+ */
+int disable_smap = 0;
 
 /*
  * new memory fragmentations are possible in startup() due to BOP_ALLOCs. this
@@ -673,6 +679,60 @@ perform_allocations(void)
 }
 
 /*
+ * Set up and enable SMAP now before we start other CPUs, but after the kernel's
+ * VM has been set up so we can use hot_patch_kernel_text().
+ *
+ * We can only patch 1, 2, or 4 bytes, but not three bytes. So instead, we
+ * replace the four byte word at the patch point. See uts/intel/ia32/ml/copy.s
+ * for more information on what's going on here.
+ */
+static void
+startup_smap(void)
+{
+	int i;
+	uint32_t inst;
+	uint8_t *instp;
+	char sym[128];
+
+	extern int _smap_enable_patch_count;
+	extern int _smap_disable_patch_count;
+
+	if (disable_smap != 0)
+		remove_x86_feature(x86_featureset, X86FSET_SMAP);
+
+	if (is_x86_feature(x86_featureset, X86FSET_SMAP) == B_FALSE)
+		return;
+
+	for (i = 0; i < _smap_enable_patch_count; i++) {
+		int sizep;
+
+		VERIFY3U(i, <, _smap_enable_patch_count);
+		VERIFY(snprintf(sym, sizeof (sym), "_smap_enable_patch_%d", i) <
+		    sizeof (sym));
+		instp = (uint8_t *)(void *)kobj_getelfsym(sym, NULL, &sizep);
+		VERIFY(instp != 0);
+		inst = (instp[3] << 24) | (SMAP_CLAC_INSTR & 0x00ffffff);
+		hot_patch_kernel_text((caddr_t)instp, inst, 4);
+	}
+
+	for (i = 0; i < _smap_disable_patch_count; i++) {
+		int sizep;
+
+		VERIFY(snprintf(sym, sizeof (sym), "_smap_disable_patch_%d",
+		    i) < sizeof (sym));
+		instp = (uint8_t *)(void *)kobj_getelfsym(sym, NULL, &sizep);
+		VERIFY(instp != 0);
+		inst = (instp[3] << 24) | (SMAP_STAC_INSTR & 0x00ffffff);
+		hot_patch_kernel_text((caddr_t)instp, inst, 4);
+	}
+
+	hot_patch_kernel_text((caddr_t)smap_enable, SMAP_CLAC_INSTR, 4);
+	hot_patch_kernel_text((caddr_t)smap_disable, SMAP_STAC_INSTR, 4);
+	setcr4(getcr4() | CR4_SMAP);
+	smap_enable();
+}
+
+/*
  * Our world looks like this at startup time.
  *
  * In a 32-bit OS, boot loads the kernel text at 0xfe800000 and kernel data
@@ -727,6 +787,7 @@ startup(void)
 	 * the irq routing table (used for pci labels).
 	 */
 	startup_pci_bios();
+	startup_smap();
 #endif
 #if defined(__xpv)
 	startup_xen_mca();

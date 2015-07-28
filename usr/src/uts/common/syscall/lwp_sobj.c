@@ -22,6 +22,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2015 Joyent, Inc.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -1022,7 +1023,10 @@ out:
 }
 
 /*
- * Set the owner and ownerpid fields of a user-level mutex.
+ * Set the owner and ownerpid fields of a user-level mutex. Note, this function
+ * uses the suword*_noerr routines which must be called between
+ * on_fault/no_fault. However, this routine itself does not do the
+ * on_fault/no_fault and it is assumed all the callers will do so instead!
  */
 static void
 set_owner_pid(lwp_mutex_t *lp, uintptr_t owner, pid_t pid)
@@ -1201,9 +1205,21 @@ lwp_mutex_timedlock(lwp_mutex_t *lp, timespec_t *tsp, uintptr_t owner)
 	if (UPIMUTEX(type)) {
 		no_fault();
 		error = lwp_upimutex_lock(lp, type, UPIMUTEX_BLOCK, &lwpt);
-		if (error == 0 || error == EOWNERDEAD || error == ELOCKUNMAPPED)
+		if (error == 0 || error == EOWNERDEAD ||
+		    error == ELOCKUNMAPPED) {
+			volatile int locked = error != 0;
+			if (on_fault(&ljb)) {
+				if (locked != 0)
+					error = lwp_upimutex_unlock(lp, type);
+				else
+					error = EFAULT;
+				goto upierr;
+			}
 			set_owner_pid(lp, owner,
 			    (type & USYNC_PROCESS)? p->p_pid : 0);
+			no_fault();
+		}
+upierr:
 		if (tsp && !time_error)	/* copyout the residual time left */
 			error = lwp_timer_copyout(&lwpt, error);
 		if (error)
@@ -3045,9 +3061,22 @@ lwp_mutex_trylock(lwp_mutex_t *lp, uintptr_t owner)
 	if (UPIMUTEX(type)) {
 		no_fault();
 		error = lwp_upimutex_lock(lp, type, UPIMUTEX_TRY, NULL);
-		if (error == 0 || error == EOWNERDEAD || error == ELOCKUNMAPPED)
+		if (error == 0 || error == EOWNERDEAD ||
+		    error == ELOCKUNMAPPED) {
+			volatile int locked = error != 0;
+			if (on_fault(&ljb)) {
+				if (locked != 0)
+					error = lwp_upimutex_unlock(lp, type);
+				else
+					error = EFAULT;
+				goto upierr;
+			}
 			set_owner_pid(lp, owner,
 			    (type & USYNC_PROCESS)? p->p_pid : 0);
+			no_fault();
+		}
+
+upierr:
 		if (error)
 			return (set_errno(error));
 		return (0);

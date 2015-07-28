@@ -1427,9 +1427,6 @@ lx_emulate_user(klwp_t *lwp, int syscall_num, uintptr_t *args)
 	args_addr = uc_addr - SA(6 * sizeof (uintptr_t));
 
 	watched = watch_disable_addr((caddr_t)sp, frsz, S_WRITE);
-	if (on_fault(&lab)) {
-		goto badstack;
-	}
 
 	/*
 	 * Save the register state we preserved on the way into this brand
@@ -1448,6 +1445,10 @@ lx_emulate_user(klwp_t *lwp, int syscall_num, uintptr_t *args)
 		 * those intentional side effects.
 		 */
 		savecontext(&uc, NULL);
+
+		if (on_fault(&lab)) {
+			goto badstack;
+		}
 
 		/*
 		 * Mark this as a system call emulation context:
@@ -1594,9 +1595,6 @@ lx_emulate_user32(klwp_t *lwp, int syscall_num, uintptr_t *args)
 	args_addr = uc_addr - SA32(6 * sizeof (uint32_t));
 
 	watched = watch_disable_addr((caddr_t)(uintptr_t)sp, frsz, S_WRITE);
-	if (on_fault(&lab)) {
-		goto badstack;
-	}
 
 	/*
 	 * Save the register state we preserved on the way into this brand
@@ -1615,6 +1613,10 @@ lx_emulate_user32(klwp_t *lwp, int syscall_num, uintptr_t *args)
 		 * those intentional side effects.
 		 */
 		savecontext32(&uc, NULL);
+
+		if (on_fault(&lab)) {
+			goto badstack;
+		}
 
 		/*
 		 * Mark this as a system call emulation context:

@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 #ifndef _SYS_ARCHSYSTM_H
@@ -180,6 +181,17 @@ extern int sys_rtt_common(struct regs *);
 extern void fakesoftint(void);
 
 extern void *plat_traceback(void *);
+
+/*
+ * The following two macros are the four byte instruction sequence of stac, ret
+ * and clac, ret. These are used in startup_smap() as a part of properly setting
+ * up the valid instructions. For more information on SMAP, see
+ * uts/intel/ia32/ml/copy.s.
+ */
+#define	SMAP_CLAC_INSTR	0xc3ca010f
+#define	SMAP_STAC_INSTR	0xc3cb010f
+extern void smap_disable(void);
+extern void smap_enable(void);
 
 #if defined(__xpv)
 extern void xen_init_callbacks(void);
