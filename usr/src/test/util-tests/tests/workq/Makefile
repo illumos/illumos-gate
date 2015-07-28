@@ -17,7 +17,6 @@ include $(SRC)/Makefile.master
 
 ROOTOPTPKG = $(ROOT)/opt/util-tests
 TESTDIR = $(ROOTOPTPKG)/tests/mergeq
-ROOTBINDIR = $(ROOTOPTPKG)/bin
 
 PROG = wqt
 OBJS = wqt.o workq.o
@@ -26,7 +25,7 @@ include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/cmd/Makefile.ctf
 include $(SRC)/test/Makefile.com
 
-CMDS = $(PROG:%=$(ROOTBINDIR)/%) $(SCRIPTS:%=$(TESTDIR)/%)
+CMDS = $(PROG:%=$(TESTDIR)/%)
 $(CMDS) := FILEMODE = 0555
 
 CPPFLAGS += -I$(SRC)/lib/mergeq -D_REENTRANT
@@ -58,14 +57,8 @@ $(PROG): $(OBJS)
 
 $(CMDS): $(TESTDIR) $(PROG)
 
-$(ROOTBINDIR):
-	$(INS.dir)
-
-$(ROOTBINDIR)/%: %
-	$(INS.file)
-
 $(TESTDIR):
 	$(INS.dir)
 
-$(TESTDIR)/%: %.ksh
-	$(INS.rename)
+$(TESTDIR)/%: %
+	$(INS.file)

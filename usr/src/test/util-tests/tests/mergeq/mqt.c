@@ -63,7 +63,6 @@ mqt_int(void *first, void *second, void **outp, void *arg)
 static int
 mqt_append(void *first, void *second, void **outp, void *arg)
 {
-	int ret;
 	char *out;
 
 	/* Yes, this leaks, don't worry about it for the test */
