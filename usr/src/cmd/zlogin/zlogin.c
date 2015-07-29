@@ -1174,7 +1174,11 @@ prep_args(brand_handle_t bh, char *zonename, const char *login, char **argv)
 			argc++;
 
 		for (i = 0; i < argc; i++) {
-			subshell_len += strlen(argv[i]) + 1;
+			/*
+			 * Allocate enough space for the delimiter and 2
+			 * quotes which might be needed.
+			 */
+			subshell_len += strlen(argv[i]) + 3;
 		}
 		if ((subshell = calloc(1, subshell_len)) == NULL)
 			return (NULL);
@@ -1182,7 +1186,13 @@ prep_args(brand_handle_t bh, char *zonename, const char *login, char **argv)
 		for (i = 0; i < argc; i++) {
 			if (i > 0)
 				(void) strcat(subshell, " ");
-			(void) strcat(subshell, argv[i]);
+			if (strchr(argv[i], ' ') != NULL) {
+				(void) strcat(subshell, "'");
+				(void) strcat(subshell, argv[i]);
+				(void) strcat(subshell, "'");
+			} else {
+				(void) strcat(subshell, argv[i]);
+			}
 		}
 
 		if (failsafe) {
