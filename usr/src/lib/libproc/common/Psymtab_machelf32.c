@@ -243,7 +243,7 @@ fake_elf32(struct ps_prochandle *P, file_info_t *fptr, uintptr_t addr,
 	 * need be. The DI_SUNW_SYM* items are completely optional, so
 	 * we use them if they are present and ignore them otherwise.
 	 */
-	const int di_req_mask = (1 << DI_SYMTAB) | (1 << DI_HASH) |
+	const int di_req_mask = (1 << DI_SYMTAB) |
 		(1 << DI_SYMENT) | (1 << DI_STRTAB) | (1 << DI_STRSZ);
 	int di_mask = 0;
 	size_t size = 0;
@@ -259,7 +259,7 @@ fake_elf32(struct ps_prochandle *P, file_info_t *fptr, uintptr_t addr,
 	Off off;
 	size_t pltsz = 0, pltentries = 0;
 	uintptr_t hptr = NULL;
-	Word hnchains, hnbuckets;
+	Word hnchains = 0, hnbuckets = 0;
 
 	if (ehdr->e_type == ET_DYN)
 		phdr->p_vaddr += addr;
@@ -329,7 +329,8 @@ fake_elf32(struct ps_prochandle *P, file_info_t *fptr, uintptr_t addr,
 
 	/* Ensure all required entries were collected */
 	if ((di_mask & di_req_mask) != di_req_mask) {
-		dprintf("text section missing required dynamic entries\n");
+		dprintf("text section missing required dynamic entries: "
+		    "required 0x%x, found 0x%x\n", di_req_mask, di_mask);
 		goto bad;
 	}
 
@@ -368,11 +369,6 @@ fake_elf32(struct ps_prochandle *P, file_info_t *fptr, uintptr_t addr,
 
 		hnbuckets = hash[0];
 		hnchains = hash[1];
-	}
-
-	if ((d[DI_HASH] == NULL) || (hnbuckets == 0) || (hnchains == 0)) {
-		dprintf("empty or missing .hash\n");
-		goto bad;
 	}
 
 	/*
@@ -448,8 +444,10 @@ fake_elf32(struct ps_prochandle *P, file_info_t *fptr, uintptr_t addr,
 	}
 done_with_plt:
 
-	if ((elfdata = calloc(1, size)) == NULL)
+	if ((elfdata = calloc(1, size)) == NULL) {
+		dprintf("failed to allocate size %ld\n", (long)size);
 		goto bad;
+	}
 
 	/* LINTED - alignment */
 	ep = (Ehdr *)elfdata;
@@ -630,6 +628,11 @@ done_with_plt:
 			symtabptr = (Sym*)((uintptr_t)symtabptr + addr);
 		}
 
+		if ((hptr == NULL) || (hnbuckets == 0) || (hnchains == 0)) {
+			dprintf("empty or missing .hash\n");
+			goto badplt;
+		}
+
 		/* find the .hash bucket address for this symbol */
 		plt_symhash = elf_hash("_PROCEDURE_LINKAGE_TABLE_");
 		htmp = plt_symhash % hnbuckets;
@@ -715,6 +718,8 @@ badplt:
 
 	free(dp);
 	if ((elf = elf_memory(elfdata, size)) == NULL) {
+		dprintf("failed to create ELF object "
+		    "in memory for size %ld\n", (long)size);
 		free(elfdata);
 		return (NULL);
 	}
