@@ -29,14 +29,16 @@ EINFO_SRC= ./../common/bblk_einfo.c
 UTILS_SRC =./../common/boot_utils.c
 EXTRA_SRC =./../common/mboot_extra.c
 
-OBJS= installgrub.o pcfs_glue.o pcfs.o bblk_einfo.o boot_utils.o mboot_extra.o
+OBJS= installgrub.o pcfs_glue.o pcfs.o bblk_einfo.o boot_utils.o mboot_extra.o \
+	getresponse.o
 SRCS= installgrub.c pcfs_glue.c $(PCFS_SRC) $(UTILS_SRC) $(EINFO_SRC) \
-	$(EXTRA_SRC)
+	$(EXTRA_SRC) $(SRC)/common/util/getresponse.c
 SBINLINKS= $(PROG)
 
 include ../Makefile.com
 
 CPPFLAGS += -I$(SRC)/uts/i86pc -I$(SRC)/uts/intel -I$(SRC)/uts/common
+CPPFLAGS += -I$(SRC)/common/util
 CERRWARN += -_gcc=-Wno-unused-label
 CERRWARN += -_gcc=-Wno-unused-function
 CERRWARN += -_gcc=-Wno-uninitialized
@@ -79,6 +81,9 @@ mboot_extra.o:	$(EXTRA_SRC)
 
 bblk_einfo.o:	$(EINFO_SRC)
 		$(COMPILE.c) -o $@ $(EINFO_SRC)
+
+%.o:	$(SRC)/common/util/%.c
+		$(COMPILE.c) $(OUTPUT_OPTION) $<
 
 install: all $(ROOTSBINPROG) .WAIT $(ROOTUSRSBINLINKS)
 
