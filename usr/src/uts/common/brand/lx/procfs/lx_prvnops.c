@@ -209,6 +209,7 @@ static void lxpr_read_sys_kernel_pid_max(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_kernel_rand_bootid(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_kernel_shmmax(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_kernel_threads_max(lxpr_node_t *, lxpr_uiobuf_t *);
+static void lxpr_read_sys_vm_minfr_kb(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_vm_nhpages(lxpr_node_t *, lxpr_uiobuf_t *);
 
 /*
@@ -457,6 +458,7 @@ static lxpr_dirent_t sys_randdir[] = {
  * contents of /proc/sys/vm directory
  */
 static lxpr_dirent_t sys_vmdir[] = {
+	{ LXPR_SYS_KERNEL_VM_MINFR_KB,	"min_free_kbytes" },
 	{ LXPR_SYS_KERNEL_VM_NHUGEP,	"nr_hugepages" },
 };
 
@@ -640,6 +642,7 @@ static void (*lxpr_read_function[LXPR_NFILES])() = {
 	lxpr_read_sys_kernel_shmmax,	/* /proc/sys/kernel/shmmax */
 	lxpr_read_sys_kernel_threads_max, /* /proc/sys/kernel/threads-max */
 	lxpr_read_invalid,		/* /proc/sys/vm	*/
+	lxpr_read_sys_vm_minfr_kb,	/* /proc/sys/vm/min_free_kbytes */
 	lxpr_read_sys_vm_nhpages,	/* /proc/sys/vm/nr_hugepages */
 	lxpr_read_uptime,		/* /proc/uptime		*/
 	lxpr_read_version,		/* /proc/version	*/
@@ -748,6 +751,7 @@ static vnode_t *(*lxpr_lookup_function[LXPR_NFILES])() = {
 	lxpr_lookup_not_a_dir,		/* /proc/sys/kernel/shmmax */
 	lxpr_lookup_not_a_dir,		/* /proc/sys/kernel/threads-max */
 	lxpr_lookup_sys_vmdir,		/* /proc/sys/vm */
+	lxpr_lookup_not_a_dir,		/* /proc/sys/vm/min_free_kbytes */
 	lxpr_lookup_not_a_dir,		/* /proc/sys/vm/nr_hugepages */
 	lxpr_lookup_not_a_dir,		/* /proc/uptime		*/
 	lxpr_lookup_not_a_dir,		/* /proc/version	*/
@@ -856,6 +860,7 @@ static int (*lxpr_readdir_function[LXPR_NFILES])() = {
 	lxpr_readdir_not_a_dir,		/* /proc/sys/kernel/shmmax */
 	lxpr_readdir_not_a_dir,		/* /proc/sys/kernel/threads-max */
 	lxpr_readdir_sys_vmdir,		/* /proc/sys/vm */
+	lxpr_readdir_not_a_dir,		/* /proc/sys/vm/min_free_kbytes */
 	lxpr_readdir_not_a_dir,		/* /proc/sys/vm/nr_hugepages */
 	lxpr_readdir_not_a_dir,		/* /proc/uptime		*/
 	lxpr_readdir_not_a_dir,		/* /proc/version	*/
@@ -3779,6 +3784,13 @@ lxpr_read_sys_kernel_threads_max(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
 	ASSERT(lxpnp->lxpr_type == LXPR_SYS_KERNEL_THREADS_MAX);
 	lxpr_uiobuf_printf(uiobuf, "%d\n", curproc->p_zone->zone_nlwps_ctl);
+}
+
+static void
+lxpr_read_sys_vm_minfr_kb(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+{
+	ASSERT(lxpnp->lxpr_type == LXPR_SYS_KERNEL_VM_MINFR_KB);
+	lxpr_uiobuf_printf(uiobuf, "%d\n", 0);
 }
 
 static void

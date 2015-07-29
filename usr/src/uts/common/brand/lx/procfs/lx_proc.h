@@ -204,6 +204,7 @@ typedef enum lxpr_nodetype {
 	LXPR_SYS_KERNEL_SHMMAX,	/* /proc/sys/kernel/shmmax */
 	LXPR_SYS_KERNEL_THREADS_MAX,	/* /proc/sys/kernel/threads-max */
 	LXPR_SYS_VMDIR,		/* /proc/sys/vm */
+	LXPR_SYS_KERNEL_VM_MINFR_KB, /* /proc/sys/vm/min_free_kbytes */
 	LXPR_SYS_KERNEL_VM_NHUGEP, /* /proc/sys/vm/nr_hugepages */
 	LXPR_UPTIME,		/* /proc/uptime		*/
 	LXPR_VERSION,		/* /proc/version	*/
