@@ -42,35 +42,61 @@
  *
  * The poll side is more complex since all of the sigfds on the process need
  * to be examined every time a signal is delivered to the process in order to
- * determine if any thread is waiting in poll for that signal.
+ * pollwake any thread waiting in poll for that signal.
  *
- * Because it is likely that a process will only be using a few sigfds, but
- * perhaps many total file descriptors, we maintain a list of sigfds (which
- * may need pollwakeup) that lives on the proc's p_sigfd struct. In this way
- * only a few of the state structs will need to be examined every time a signal
- * is delivered to the process, instead of having to examine all of the file
- * descriptors to find the state structs.
+ * Because it is likely that a process will only be using one, or a few, sigfds,
+ * but many total file descriptors, we maintain a list of sigfds which need
+ * pollwakeup. The list lives on the proc's p_sigfd struct. In this way only
+ * zero, or a few, of the state structs will need to be examined every time a
+ * signal is delivered to the process, instead of having to examine all of the
+ * file descriptors to find the state structs. When a state struct with a
+ * matching signal set is found then pollwakeup is called.
  *
- * When a state struct with a matching signal set is found, if there are any
- * threads waiting in poll for that signal, then pollwakeup is called.
+ * The sigfd_list is self-cleaning; as signalfd_pollwake_cb is called, the list
+ * will clear out on its own. There is an exit helper (signalfd_exit_helper)
+ * which cleans up any remaining per-proc state when the process exits.
  *
- * Forking causes some complications with sigfd polling because now two
- * processes have a fd that references the same signalfd_state, but signals go
- * to only one of those processes. Because the state struct is referenced by
- * both file descriptors, and the state struct represents a signal stream to be
- * polled, it can be confusing as to which processes should get a pollwakeup.
+ * The main complexity with signalfd is the interaction of forking and polling.
+ * This interaction is complex because now two processes have a fd that
+ * references the same dev_t (and its associated signalfd_state), but signals
+ * go to only one of those processes. Also, we don't know when one of the
+ * processes closes its fd because our 'close' entry point is only called when
+ * the last fd is closed (which could be by either process).
+ *
+ * Because the state struct is referenced by both file descriptors, and the
+ * state struct represents a signal stream needing a pollwakeup, if both
+ * processes were polling then both processes would get a pollwakeup when a
+ * signal arrives for either process (that is, the pollhead is associated with
+ * our dev_t so when a signal arrives the pollwakeup wakes up all waiters).
+ *
  * Fortunately this is not a common problem in practice, but the implementation
- * goes to some length to mitigate unexpected behavior.
+ * attempts to mitigate unexpected behavior. The typical behavior is that the
+ * parent has been polling the signalfd (which is why it was open in the first
+ * place) and the parent might have a pending signalfd_state (with the
+ * pollhead) on its per-process sigfd_list. After the fork the child will
+ * simply close that fd (among others) as part of the typical fork/close/exec
+ * pattern. Because the child will never poll that fd, it will never get any
+ * state onto its own sigfd_list (the child starts with a null list). The
+ * intention is that the child sees no pollwakeup activity for signals unless
+ * it explicitly reinvokes poll on the sigfd.
  *
- * When the parent process forks (or forkall), if any thread is in poll then
- * both the parent and child will return from poll with EINTR. This means
- * that if either process wants to re-poll on a sigfd then it needs to re-run
- * poll. Our fork helper function will cleanup all of the poll state on the
- * parent process and null-out the state pointers on the child process. In this
- * way the state will only get reestablished on either process when one of them
- * does another poll on the sigfd. Under normal circumstances the child will
- * close the sigfd, so it never does a re-poll, and signal delivery for the
- * child will never come into our code path.
+ * As background, there are two primary polling cases to consider when the
+ * parent process forks:
+ * 1) If any thread is blocked in poll(2) then both the parent and child will
+ *    return from the poll syscall with EINTR. This means that if either
+ *    process wants to re-poll on a sigfd then it needs to re-run poll and
+ *    would come back in to the signalfd_poll entry point. The parent would
+ *    already have the dev_t's state on its sigfd_list and the child would not
+ *    have anything there unless it called poll again on its fd.
+ * 2) If the process is using /dev/poll(7D) then the polling info is being
+ *    cached by the poll device and the process might not currently be blocked
+ *    on anything polling related. A subsequent DP_POLL ioctl will not invoke
+ *    our signalfd_poll entry point again. Because the parent still has its
+ *    sigfd_list setup, an incoming signal will hit our signalfd_pollwake_cb
+ *    entry point, which in turn calls pollwake, and /dev/poll will do the
+ *    right thing on DP_POLL. The child will not have a sigfd_list yet so the
+ *    signal will not cause a pollwakeup. The dp code does its own handling for
+ *    cleaning up its cache.
  *
  * This leaves only one odd corner case. If the parent and child both use
  * the dup-ed sigfd to poll then when a signal is delivered to either process
@@ -212,23 +238,6 @@ signalfd_exit_helper()
 	kmem_free(p->p_sigfd, sizeof (sigfd_proc_state_t));
 	p->p_sigfd = NULL;
 	mutex_exit(&p->p_lock);
-}
-
-/*
- * Clear the parent's signal state list and pollwakeup callback. The child
- * starts with no signal pollwakeup state. That will be added when needed if
- * the child needs pollwakeup later.
- */
-static void
-signalfd_fork_helper(struct proc *p, struct proc *cp)
-{
-	/* This being non-null is the only way we can get here */
-	ASSERT(p->p_sigfd != NULL);
-
-	mutex_enter(&p->p_lock);
-	signalfd_wake_list_cleanup(p);
-	mutex_exit(&p->p_lock);
-	cp->p_sigfd = NULL;
 }
 
 /*
@@ -648,7 +657,6 @@ signalfd_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	signalfd_devi = devi;
 	signalfd_major = ddi_driver_major(signalfd_devi);
 
-	sigfd_fork_helper = signalfd_fork_helper;
 	sigfd_exit_helper = signalfd_exit_helper;
 
 	mutex_exit(&signalfd_lock);
@@ -679,7 +687,6 @@ signalfd_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 	ddi_remove_minor_node(signalfd_devi, NULL);
 	signalfd_devi = NULL;
-	sigfd_fork_helper = NULL;
 	sigfd_exit_helper = NULL;
 
 	ddi_soft_state_fini(&signalfd_softstate);

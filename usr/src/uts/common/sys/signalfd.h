@@ -89,7 +89,6 @@ typedef struct sigfd_proc_state {
 } sigfd_proc_state_t;
 
 
-extern void (*sigfd_fork_helper)(struct proc *, struct proc *);
 extern void (*sigfd_exit_helper)();
 
 #endif /* _KERNEL */

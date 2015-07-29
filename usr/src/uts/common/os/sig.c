@@ -98,9 +98,8 @@ static	void	post_sigcld(proc_t *, sigqueue_t *);
 
 
 /*
- * signalfd helper functions which are set when the signalfd driver loads.
+ * signalfd helper function which is set when the signalfd driver loads.
  */
-void (*sigfd_fork_helper)(struct proc *, struct proc *);
 void (*sigfd_exit_helper)();
 
 /*
