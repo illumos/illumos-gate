@@ -1239,7 +1239,7 @@ lx_netlink_getroute(lx_netlink_sock_t *lxsock, lx_netlink_hdr_t *hdr,
 	 * truncate our input to prevent later confusion.
 	 */
 	if (curproc->p_zone->zone_brand == &lx_brand &&
-	    lx_kern_version_cmp(curproc->p_zone, "2.6.32") <= 0 &&
+	    lx_kern_release_cmp(curproc->p_zone, "2.6.32") <= 0 &&
 	    rtmsgp->rtm_dst_len == 0) {
 		rtmsg_size = sizeof (rtmsg.rtm_family);
 	}

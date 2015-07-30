@@ -364,36 +364,77 @@ lx_setbrand(proc_t *p)
 
 /* ARGSUSED */
 int
-lx_setattr(zone_t *zone, int attr, void *buf, size_t bufsize)
+lx_setattr(zone_t *zone, int attr, void *ubuf, size_t ubufsz)
 {
-	char vers[LX_VERS_MAX];
+	lx_zone_data_t *lxzd = (lx_zone_data_t *)zone->zone_brand_data;
 
-	if (attr == LX_KERN_VERSION_NUM) {
-		if (bufsize > (LX_VERS_MAX - 1))
+	switch (attr) {
+	case LX_ATTR_KERN_RELEASE: {
+		char buf[LX_KERN_RELEASE_MAX];
+		bzero(buf, LX_KERN_RELEASE_MAX);
+		if (ubufsz >= LX_KERN_RELEASE_MAX) {
 			return (ERANGE);
-		bzero(vers, LX_VERS_MAX);
-		if (copyin(buf, &vers, bufsize) != 0)
+		}
+		if (copyin(ubuf, buf, ubufsz) != 0) {
 			return (EFAULT);
-		lx_set_kern_version(zone, vers);
+		}
+		(void) strlcpy(lxzd->lxzd_kernel_release, buf,
+		    LX_KERN_RELEASE_MAX);
 		return (0);
 	}
-	return (EINVAL);
+	case LX_ATTR_KERN_VERSION: {
+		char buf[LX_KERN_VERSION_MAX];
+		bzero(buf, LX_KERN_VERSION_MAX);
+		if (ubufsz >= LX_KERN_VERSION_MAX) {
+			return (ERANGE);
+		}
+		if (copyin(ubuf, buf, ubufsz) != 0) {
+			return (EFAULT);
+		}
+		(void) strlcpy(lxzd->lxzd_kernel_version, buf,
+		    LX_KERN_VERSION_MAX);
+		return (0);
+	}
+	default:
+		return (EINVAL);
+	}
 }
 
 /* ARGSUSED */
 int
-lx_getattr(zone_t *zone, int attr, void *buf, size_t *bufsize)
+lx_getattr(zone_t *zone, int attr, void *ubuf, size_t *ubufsz)
 {
-	if (attr == LX_KERN_VERSION_NUM) {
-		if (*bufsize < LX_VERS_MAX)
+	lx_zone_data_t *lxzd = (lx_zone_data_t *)zone->zone_brand_data;
+	int len;
+
+	switch (attr) {
+	case LX_ATTR_KERN_RELEASE: {
+		len = strnlen(lxzd->lxzd_kernel_release, LX_KERN_RELEASE_MAX);
+		len++;
+		if (*ubufsz < len) {
 			return (ERANGE);
-		if (copyout(lx_get_zone_kern_version(curzone), buf,
-		    LX_VERS_MAX) != 0)
+		}
+		if (copyout(lxzd->lxzd_kernel_release, ubuf, len) != 0) {
 			return (EFAULT);
-		*bufsize = LX_VERS_MAX;
+		}
+		*ubufsz = len;
 		return (0);
 	}
-	return (-EINVAL);
+	case LX_ATTR_KERN_VERSION: {
+		len = strnlen(lxzd->lxzd_kernel_version, LX_KERN_VERSION_MAX);
+		len++;
+		if (*ubufsz < len) {
+			return (ERANGE);
+		}
+		if (copyout(lxzd->lxzd_kernel_version, ubuf, len) != 0) {
+			return (EFAULT);
+		}
+		*ubufsz = len;
+		return (0);
+	}
+	default:
+		return (EINVAL);
+	}
 }
 
 uint32_t
@@ -725,7 +766,10 @@ lx_init_brand_data(zone_t *zone)
 	 * Set the default lxzd_kernel_version to 2.4.
 	 * This can be changed by a call to setattr() during zone boot.
 	 */
-	(void) strlcpy(data->lxzd_kernel_version, "2.4.21", LX_VERS_MAX);
+	(void) strlcpy(data->lxzd_kernel_release, "2.4.21",
+	    LX_KERN_RELEASE_MAX);
+	(void) strlcpy(data->lxzd_kernel_version, "BrandZ virtual linux",
+	    LX_KERN_VERSION_MAX);
 
 	/*
 	 * Linux is not at all picky about address family when it comes to
@@ -1369,32 +1413,43 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 		exit(code, sig);
 		/* NOTREACHED */
 		break;
+
+	case B_OVERRIDE_KERN_VER: {
+		void *urel = (void *)arg1;
+		void *uver = (void *)arg2;
+		size_t len;
+
+		pd = ptolxproc(p);
+		if (urel != NULL) {
+			if (copyinstr(urel, pd->l_uname_release,
+			    LX_KERN_RELEASE_MAX, &len) != 0) {
+				return (EFAULT);
+			}
+			pd->l_uname_release[LX_KERN_RELEASE_MAX - 1] = '\0';
+		}
+		if (uver != NULL) {
+			if (copyinstr(uver, pd->l_uname_version,
+			    LX_KERN_VERSION_MAX, &len) != 0) {
+				return (EFAULT);
+			}
+			pd->l_uname_version[LX_KERN_VERSION_MAX - 1] = '\0';
+		}
+
+		return (0);
+	}
+
 	}
 
 	return (EINVAL);
 }
 
-char *
-lx_get_zone_kern_version(zone_t *zone)
-{
-	return (((lx_zone_data_t *)zone->zone_brand_data)->lxzd_kernel_version);
-}
-
-void
-lx_set_kern_version(zone_t *zone, char *vers)
-{
-	lx_zone_data_t *lxzd = (lx_zone_data_t *)zone->zone_brand_data;
-
-	(void) strlcpy(lxzd->lxzd_kernel_version, vers, LX_VERS_MAX);
-}
-
 /*
  * Compare linux kernel version to the one set for the zone.
  * Returns greater than 0 if zone version is higher, less than 0 if the zone
- * version is lower, and 0 if the version are equal.
+ * version is lower, and 0 if the versions are equal.
  */
 int
-lx_kern_version_cmp(zone_t *zone, const char *vers)
+lx_kern_release_cmp(zone_t *zone, const char *vers)
 {
 	int zvers[3] = {0, 0, 0};
 	int cvers[3] = {0, 0, 0};
@@ -1402,7 +1457,7 @@ lx_kern_version_cmp(zone_t *zone, const char *vers)
 
 	VERIFY(zone->zone_brand == &lx_brand);
 
-	(void) sscanf(ztolxzd(zone)->lxzd_kernel_version, "%d.%d.%d", &zvers[0],
+	(void) sscanf(ztolxzd(zone)->lxzd_kernel_release, "%d.%d.%d", &zvers[0],
 	    &zvers[1], &zvers[2]);
 	(void) sscanf(vers, "%d.%d.%d", &cvers[0], &cvers[1], &cvers[2]);
 
@@ -1444,17 +1499,25 @@ lx_setid_clear(vattr_t *vap, cred_t *cr)
  * Copy the per-process brand data from a parent proc to a child.
  */
 void
-lx_copy_procdata(proc_t *child, proc_t *parent)
+lx_copy_procdata(proc_t *cp, proc_t *pp)
 {
-	lx_proc_data_t *cpd = child->p_brand_data;
-	lx_proc_data_t *ppd = parent->p_brand_data;
+	lx_proc_data_t *cpd, *ppd;
+	char buf_version[LX_SYS_UTS_LN];
 
-	VERIFY(parent->p_brand == &lx_brand);
-	VERIFY(child->p_brand == &lx_brand);
-	VERIFY(ppd != NULL);
-	VERIFY(cpd != NULL);
+	/*
+	 * Since b_copy_procdata is called during getproc(), while the child
+	 * process is still being initialized, acquiring cp->p_lock should not
+	 * be required.
+	 */
+	VERIFY(cp->p_brand == &lx_brand);
+	VERIFY(cpd = cp->p_brand_data);
 
-	*cpd = *ppd;
+	mutex_enter(&pp->p_lock);
+	VERIFY(pp->p_brand == &lx_brand);
+	VERIFY(ppd = pp->p_brand_data);
+
+	bcopy(ppd, cpd, sizeof (lx_proc_data_t));
+	mutex_exit(&pp->p_lock);
 
 	cpd->l_fake_limits[LX_RLFAKE_LOCKS].rlim_cur = LX_RLIM64_INFINITY;
 	cpd->l_fake_limits[LX_RLFAKE_LOCKS].rlim_max = LX_RLIM64_INFINITY;

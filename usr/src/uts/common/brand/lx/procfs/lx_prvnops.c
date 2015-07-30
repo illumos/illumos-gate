@@ -3408,14 +3408,12 @@ lxpr_read_diskstats(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 static void
 lxpr_read_version(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
-	char *vers;
-
-	vers = lx_get_zone_kern_version(LXPTOZ(lxpnp));
+	lx_zone_data_t *lxzd = ztolxzd(LXPTOZ(lxpnp));
 
 	lxpr_uiobuf_printf(uiobuf,
 	    "%s version %s (%s version %d.%d.%d) "
 	    "#%s SMP %s\n",
-	    LX_UNAME_SYSNAME, vers,
+	    LX_UNAME_SYSNAME, lxzd->lxzd_kernel_release,
 #if defined(__GNUC__)
 	    "gcc",
 	    __GNUC__,
@@ -3427,7 +3425,7 @@ lxpr_read_version(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	    (__SUNPRO_C & 0xff) / 0x10,
 	    __SUNPRO_C & 0xf,
 #endif
-	    LX_UNAME_VERSION,
+	    lxzd->lxzd_kernel_version,
 	    "00:00:00 00/00/00");
 }
 
@@ -3456,7 +3454,8 @@ lxpr_read_stat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	ulong_t pswitch_cum = 0;
 	ulong_t forks_cum = 0;
 	hrtime_t msnsecs[NCMSTATES];
-	char *lx_kern_version = lx_get_zone_kern_version(LXPTOZ(lxpnp));
+	/* is the emulated release > 2.4 */
+	boolean_t newer_than24 = lx_kern_release_cmp(LXPTOZ(lxpnp), "2.4") > 0;
 	/* temporary variable since scalehrtime modifies data in place */
 	hrtime_t tmptime;
 
@@ -3489,7 +3488,8 @@ lxpr_read_stat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 		pgswapin_cum += CPU_STATS(cp, vm.pgswapin);
 		pgswapout_cum += CPU_STATS(cp, vm.pgswapout);
 
-		if (strncmp(lx_kern_version, "2.4", 3) != 0) {
+
+		if (newer_than24) {
 			cpu_nrunnable_cum += cp->cpu_disp->disp_nrunnable;
 			w_io_cum += CPU_STATS(cp, sys.iowait);
 			for (i = 0; i < NCMSTATES; i++) {
@@ -3512,7 +3512,7 @@ lxpr_read_stat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 			cp = cp->cpu_next;
 	} while (cp != cpstart);
 
-	if (strncmp(lx_kern_version, "2.4", 3) != 0) {
+	if (newer_than24) {
 		lxpr_uiobuf_printf(uiobuf,
 		    "cpu %lu %lu %lu %lu %lu %lu %lu\n",
 		    user_cum, 0L, sys_cum, idle_cum, 0L, irq_cum, 0L);
@@ -3551,7 +3551,7 @@ lxpr_read_stat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 			irq_ticks += NSEC_TO_TICK(tmptime);
 		}
 
-		if (strncmp(lx_kern_version, "2.4", 3) != 0) {
+		if (newer_than24) {
 			lxpr_uiobuf_printf(uiobuf,
 			    "cpu%d %lu %lu %lu %lu %lu %lu %lu\n",
 			    cp->cpu_id, user_ticks, 0L, sys_ticks, idle_ticks,
@@ -3571,7 +3571,7 @@ lxpr_read_stat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 
 	mutex_exit(&cpu_lock);
 
-	if (strncmp(lx_kern_version, "2.4", 3) != 0) {
+	if (newer_than24) {
 		lxpr_uiobuf_printf(uiobuf,
 		    "page %lu %lu\n"
 		    "swap %lu %lu\n"

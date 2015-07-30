@@ -229,27 +229,6 @@ lx_getcwd(uintptr_t p1, uintptr_t p2)
 	return (len + 1);
 }
 
-long
-lx_uname(uintptr_t p1)
-{
-	struct lx_utsname *un = (struct lx_utsname *)p1;
-	char buf[LX_SYS_UTS_LN + 1];
-
-	if (gethostname(un->nodename, sizeof (un->nodename)) == -1)
-		return (-errno);
-
-	(void) strlcpy(un->sysname, LX_UNAME_SYSNAME, LX_SYS_UTS_LN);
-	(void) strlcpy(un->release, lx_release, LX_SYS_UTS_LN);
-	(void) strlcpy(un->version, LX_UNAME_VERSION, LX_SYS_UTS_LN);
-	(void) strlcpy(un->machine, LX_UNAME_MACHINE, LX_SYS_UTS_LN);
-	if ((sysinfo(SI_SRPC_DOMAIN, buf, LX_SYS_UTS_LN) < 0))
-		un->domainname[0] = '\0';
-	else
-		(void) strlcpy(un->domainname, buf, LX_SYS_UTS_LN);
-
-	return (0);
-}
-
 /*
  * {get,set}groups16() - Handle the conversion between 16-bit Linux gids and
  * 32-bit illumos gids.

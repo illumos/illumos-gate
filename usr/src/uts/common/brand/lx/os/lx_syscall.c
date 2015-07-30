@@ -645,7 +645,7 @@ lx_sysent_t lx_sysent32[] = {
 	{"sigreturn",	NULL,			0,		1}, /* 119 */
 	{"clone",	NULL,			0,		5}, /* 120 */
 	{"setdomainname", NULL,			0,		2}, /* 121 */
-	{"uname",	NULL,			0,		1}, /* 122 */
+	{"uname",	lx_uname,		0,		1}, /* 122 */
 	{"modify_ldt",	lx_modify_ldt,		0,		3}, /* 123 */
 	{"adjtimex",	NULL,			0,		1}, /* 124 */
 	{"mprotect",	NULL,			0,		3}, /* 125 */
@@ -957,7 +957,7 @@ lx_sysent_t lx_sysent64[] = {
 	{"exit",	NULL,			0,		1}, /* 60 */
 	{"wait4",	lx_wait4,		0,		4}, /* 61 */
 	{"kill",	lx_kill,		0,		2}, /* 62 */
-	{"uname",	NULL,			0,		1}, /* 63 */
+	{"uname",	lx_uname,		0,		1}, /* 63 */
 	{"semget",	NULL,			0,		3}, /* 64 */
 	{"semop",	NULL,			0,		3}, /* 65 */
 	{"semctl",	NULL,			0,		4}, /* 66 */
