@@ -97,6 +97,7 @@ extern "C" {
 #define	B_HELPER_TGSIGQUEUE	146
 #define	B_SET_NATIVE_STACK	147
 #define	B_SIGEV_THREAD_ID	148
+#define	B_OVERRIDE_KERN_VER	149
 
 #ifndef _ASM
 /*
@@ -143,7 +144,8 @@ typedef enum lx_ptrace_options {
 #define	LX_VERSION_1		1
 #define	LX_VERSION		LX_VERSION_1
 
-#define	LX_KERN_VERSION_NUM	ZONE_ATTR_BRAND_ATTRS
+#define	LX_ATTR_KERN_RELEASE	ZONE_ATTR_BRAND_ATTRS
+#define	LX_ATTR_KERN_VERSION	(ZONE_ATTR_BRAND_ATTRS + 1)
 
 /*
  * Aux vector containing phdr of Linux executable and ehdr of interpreter
@@ -382,6 +384,13 @@ typedef enum lx_proc_flags {
 
 #define	LX_PROC_ALL	(LX_PROC_INSTALL_MODE | LX_PROC_STRICT_MODE)
 
+/* Maximum length for fields of LX uname */
+#define	LX_SYS_UTS_LN	65
+
+/* Max. length of kernel release string */
+#define	LX_KERN_RELEASE_MAX	LX_SYS_UTS_LN
+#define	LX_KERN_VERSION_MAX	LX_SYS_UTS_LN
+
 #ifdef	_KERNEL
 
 /*
@@ -418,6 +427,10 @@ typedef struct lx_proc_data {
 	lx_proc_flags_t l_flags;
 
 	lx_rlimit64_t l_fake_limits[LX_RLFAKE_NLIMITS];
+
+	/* Override zone-wide settings for uname release and version */
+	char l_uname_release[LX_KERN_RELEASE_MAX];
+	char l_uname_version[LX_KERN_VERSION_MAX];
 } lx_proc_data_t;
 
 #endif	/* _KERNEL */
@@ -430,9 +443,6 @@ typedef struct lx_proc_data {
 #define	LX_NCPU		(1024)
 #define	LX_AFF_ULONGS	(LX_NCPU / (8 * sizeof (ulong_t)))
 typedef ulong_t lx_affmask_t[LX_AFF_ULONGS];
-
-/* Max. length of kernel version string */
-#define	LX_VERS_MAX	16
 
 /* Length of proc boot_id string */
 #define	LX_BOOTID_LEN	37
@@ -649,7 +659,8 @@ struct lx_lwp_data {
  * enhanced to support different mounts with different subsystem controllers.
  */
 typedef struct lx_zone_data {
-	char lxzd_kernel_version[LX_VERS_MAX];
+	char lxzd_kernel_release[LX_KERN_RELEASE_MAX];
+	char lxzd_kernel_version[LX_KERN_VERSION_MAX];
 	ksocket_t lxzd_ioctl_sock;
 	char lxzd_bootid[LX_BOOTID_LEN];	/* procfs boot_id */
 	vfs_t *lxzd_cgroup;			/* cgroup for this zone */
@@ -684,8 +695,7 @@ typedef struct lx_zone_data {
 #define	LX_MAX_SYSCALL(lwp)	lx_nsysent32
 #endif
 
-extern char *lx_get_zone_kern_version(zone_t *);
-extern int lx_kern_version_cmp(zone_t *, const char *);
+extern int lx_kern_release_cmp(zone_t *, const char *);
 
 extern void lx_lwp_set_native_stack_current(lx_lwp_data_t *, uintptr_t);
 extern void lx_divert(klwp_t *, uintptr_t);

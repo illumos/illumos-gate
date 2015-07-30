@@ -87,7 +87,7 @@
  * function should return -errno back to the Linux caller.
  */
 
-char lx_release[LX_VERS_MAX];
+char lx_release[LX_KERN_RELEASE_MAX];
 char lx_cmd_name[MAXNAMLEN];
 
 /*
@@ -545,7 +545,7 @@ lx_start(uintptr_t sp, uintptr_t entry)
 int
 lx_init(int argc, char *argv[], char *envp[])
 {
-	char		*r;
+	char		*rele, *vers;
 	auxv_t		*ap;
 	long		*p;
 	int		err;
@@ -572,16 +572,22 @@ lx_init(int argc, char *argv[], char *envp[])
 
 	lx_debug_init();
 
-	r = getenv("LX_RELEASE");
-	if (r == NULL) {
-		if (zone_getattr(getzoneid(), LX_KERN_VERSION_NUM, lx_release,
-		    sizeof (lx_release)) != sizeof (lx_release))
-			(void) strlcpy(lx_release, "2.4.21", LX_VERS_MAX);
+	rele = getenv("LX_RELEASE");
+	vers = getenv("LX_VERSION");
+	if (rele == NULL) {
+		if (zone_getattr(getzoneid(), LX_ATTR_KERN_RELEASE,
+		    lx_release, sizeof (lx_release)) <= 0)
+			(void) strlcpy(lx_release, "2.4.21",
+			    LX_KERN_RELEASE_MAX);
 	} else {
-		(void) strlcpy(lx_release, r, 128);
+		(void) strlcpy(lx_release, rele, LX_KERN_RELEASE_MAX);
 	}
 
+	if (syscall(SYS_brand, B_OVERRIDE_KERN_VER, rele, vers) != 0) {
+		lx_debug("failed to override kernel release/version");
+	}
 	lx_debug("lx_release: %s\n", lx_release);
+
 
 	/*
 	 * Should we kill an application that attempts an unimplemented
@@ -977,7 +983,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_exit,			/*  60: exit */
 	NULL,				/*  61: wait4 */
 	NULL,				/*  62: kill */
-	lx_uname,			/*  63: uname */
+	NULL,				/*  63: uname */
 	lx_semget,			/*  64: semget */
 	lx_semop,			/*  65: semop */
 	lx_semctl,			/*  66: semctl */
@@ -1367,7 +1373,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_sigreturn,			/* 119: sigreturn */
 	lx_clone,			/* 120: clone */
 	lx_setdomainname,		/* 121: setdomainname */
-	lx_uname,			/* 122: uname */
+	NULL,				/* 122: uname */
 	NULL,				/* 123: modify_ldt */
 	lx_adjtimex,			/* 124: adjtimex */
 	lx_mprotect,			/* 125: mprotect */

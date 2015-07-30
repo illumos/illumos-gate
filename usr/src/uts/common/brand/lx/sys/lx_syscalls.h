@@ -108,6 +108,7 @@ extern long lx_sysinfo64();
 extern long lx_tgkill();
 extern long lx_time();
 extern long lx_tkill();
+extern long lx_uname();
 extern long lx_wait4();
 extern long lx_waitid();
 extern long lx_waitpid();

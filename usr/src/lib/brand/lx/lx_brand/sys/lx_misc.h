@@ -47,7 +47,7 @@
 extern "C" {
 #endif
 
-extern char lx_release[LX_VERS_MAX];
+extern char lx_release[LX_KERN_RELEASE_MAX];
 extern char lx_cmd_name[MAXNAMLEN];
 extern pid_t zoneinit_pid;
 

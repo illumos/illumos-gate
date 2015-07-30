@@ -54,16 +54,6 @@ extern "C" {
 
 #endif /* !_KERNEL */
 
-#define	LX_SYS_UTS_LN	65
-
-struct lx_utsname {
-	char	sysname[LX_SYS_UTS_LN];
-	char	nodename[LX_SYS_UTS_LN];
-	char	release[LX_SYS_UTS_LN];
-	char	version[LX_SYS_UTS_LN];
-	char	machine[LX_SYS_UTS_LN];
-	char	domainname[LX_SYS_UTS_LN];
-};
 
 typedef	uint64_t	lx_dev_t;
 typedef	uint16_t	lx_dev16_t;

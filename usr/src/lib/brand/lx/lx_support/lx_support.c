@@ -60,8 +60,6 @@ static void usage(void) __NORETURN;
 #define	CP_CMD		"/usr/bin/cp"
 #define	MOUNT_CMD	"/sbin/mount"
 
-#define	KVSTRLEN		10
-
 static char *bname = NULL;
 static char *zonename = NULL;
 static char *zoneroot = NULL;
@@ -175,7 +173,7 @@ lxs_remove_autofsck()
  * Extract any lx-supported attributes from the zone configuration file.
  */
 static void
-lxs_getattrs(zone_dochandle_t zdh, char **kvers)
+lxs_getattrs(zone_dochandle_t zdh, char **krelease)
 {
 	struct zone_attrtab	attrtab;
 	int			err;
@@ -186,22 +184,22 @@ lxs_getattrs(zone_dochandle_t zdh, char **kvers)
 		lxs_err(gettext("error accessing zone configuration"));
 	}
 
-	*kvers = (char *)malloc(KVSTRLEN);
-	if (*kvers == NULL)
+	*krelease = (char *)malloc(LX_KERN_RELEASE_MAX);
+	if (*krelease == NULL)
 		lxs_err(gettext("out of memory"));
 
-	bzero(*kvers, KVSTRLEN);
+	bzero(*krelease, LX_KERN_RELEASE_MAX);
 	while ((err = zonecfg_getattrent(zdh, &attrtab)) == Z_OK) {
 		if ((strcmp(attrtab.zone_attr_name, "kernel-version") == 0) &&
-		    (zonecfg_get_attr_string(&attrtab, *kvers,
-		    KVSTRLEN) != Z_OK))
+		    (zonecfg_get_attr_string(&attrtab, *krelease,
+		    LX_KERN_RELEASE_MAX) != Z_OK))
 			lxs_err(gettext("invalid type for zone attribute: %s"),
 			    attrtab.zone_attr_name);
 	}
 
-	if (strlen(*kvers) == 0) {
-		free(*kvers);
-		*kvers = NULL;
+	if (strlen(*krelease) == 0) {
+		free(*krelease);
+		*krelease = NULL;
 	}
 
 	/* some kind of error while looking up attributes */
@@ -214,7 +212,7 @@ lxs_boot()
 {
 	zoneid_t	zoneid;
 	zone_dochandle_t zdh;
-	char		*kvers;
+	char		*krelease;
 
 	lxs_make_initctl();
 	lxs_remove_autofsck();
@@ -228,7 +226,7 @@ lxs_boot()
 	}
 
 	/* Extract any relevant attributes from the config file. */
-	lxs_getattrs(zdh, &kvers);
+	lxs_getattrs(zdh, &krelease);
 	zonecfg_fini_handle(zdh);
 
 	/*
@@ -238,16 +236,16 @@ lxs_boot()
 	if ((zoneid = getzoneidbyname(zonename)) < 0)
 		lxs_err(gettext("unable to get zoneid"));
 
-	if (kvers != NULL) {
+	if (krelease != NULL) {
 		/* Backward compatability with incomplete version attr */
-		if (strcmp(kvers, "2.4") == 0) {
-			kvers = "2.4.21";
-		} else if (strcmp(kvers, "2.6") == 0) {
-			kvers = "2.6.18";
+		if (strcmp(krelease, "2.4") == 0) {
+			krelease = "2.4.21";
+		} else if (strcmp(krelease, "2.6") == 0) {
+			krelease = "2.6.18";
 		}
 
-		if (zone_setattr(zoneid, LX_KERN_VERSION_NUM, kvers,
-		    strlen(kvers)) < 0)
+		if (zone_setattr(zoneid, LX_ATTR_KERN_RELEASE, krelease,
+		    strlen(krelease)) < 0)
 			lxs_err(gettext("unable to set kernel version"));
 	}
 
@@ -264,7 +262,7 @@ static int
 lxs_verify(char *xmlfile)
 {
 	zone_dochandle_t	handle;
-	char			*kvers;
+	char			*krelease;
 	char			hostidp[HW_HOSTID_LEN];
 	zone_iptype_t		iptype;
 
@@ -294,14 +292,14 @@ lxs_verify(char *xmlfile)
 	}
 
 	/* Extract any relevant attributes from the config file. */
-	lxs_getattrs(handle, &kvers);
+	lxs_getattrs(handle, &krelease);
 	zonecfg_fini_handle(handle);
 
-	if (kvers) {
-		if (strlen(kvers) > (LX_VERS_MAX - 1) ||
-		    (strncmp(kvers, "2.4", 3) != 0 &&
-		    strncmp(kvers, "2.6", 3) != 0 &&
-		    strncmp(kvers, "3.", 2) != 0))
+	if (krelease) {
+		if (strlen(krelease) >= LX_KERN_RELEASE_MAX ||
+		    (strncmp(krelease, "2.4", 3) != 0 &&
+		    strncmp(krelease, "2.6", 3) != 0 &&
+		    strncmp(krelease, "3.", 2) != 0))
 			lxs_err(gettext("invalid value for zone attribute: %s"),
 			    "kernel-version");
 	}
