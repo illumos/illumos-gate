@@ -1502,7 +1502,6 @@ void
 lx_copy_procdata(proc_t *cp, proc_t *pp)
 {
 	lx_proc_data_t *cpd, *ppd;
-	char buf_version[LX_SYS_UTS_LN];
 
 	/*
 	 * Since b_copy_procdata is called during getproc(), while the child
