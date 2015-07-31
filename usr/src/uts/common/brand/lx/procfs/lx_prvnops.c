@@ -158,6 +158,7 @@ static void lxpr_read_swaps(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_uptime(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_version(lxpr_node_t *, lxpr_uiobuf_t *);
 
+static void lxpr_read_pid_auxv(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_pid_cgroup(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_pid_cmdline(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_pid_comm(lxpr_node_t *, lxpr_uiobuf_t *);
@@ -289,6 +290,7 @@ static lxpr_dirent_t lx_procdir[] = {
  * Contents of an lx /proc/<pid> directory.
  */
 static lxpr_dirent_t piddir[] = {
+	{ LXPR_PID_AUXV,	"auxv" },
 	{ LXPR_PID_CGROUP,	"cgroup" },
 	{ LXPR_PID_CMDLINE,	"cmdline" },
 	{ LXPR_PID_COMM,	"comm" },
@@ -315,6 +317,7 @@ static lxpr_dirent_t piddir[] = {
  * Contents of an lx /proc/<pid>/task/<tid> directory.
  */
 static lxpr_dirent_t tiddir[] = {
+	{ LXPR_PID_TID_AUXV,	"auxv" },
 	{ LXPR_PID_CGROUP,	"cgroup" },
 	{ LXPR_PID_CMDLINE,	"cmdline" },
 	{ LXPR_PID_TID_COMM,	"comm" },
@@ -545,6 +548,7 @@ lxpr_close(vnode_t *vp, int flag, int count, offset_t offset, cred_t *cr,
 static void (*lxpr_read_function[LXPR_NFILES])() = {
 	lxpr_read_isdir,		/* /proc		*/
 	lxpr_read_isdir,		/* /proc/<pid>		*/
+	lxpr_read_pid_auxv,		/* /proc/<pid>/auxv	*/
 	lxpr_read_pid_cgroup,		/* /proc/<pid>/cgroup	*/
 	lxpr_read_pid_cmdline,		/* /proc/<pid>/cmdline	*/
 	lxpr_read_pid_comm,		/* /proc/<pid>/comm	*/
@@ -565,6 +569,7 @@ static void (*lxpr_read_function[LXPR_NFILES])() = {
 	lxpr_read_isdir,		/* /proc/<pid>/task/nn	*/
 	lxpr_read_isdir,		/* /proc/<pid>/fd	*/
 	lxpr_read_fd,			/* /proc/<pid>/fd/nn	*/
+	lxpr_read_pid_auxv,		/* /proc/<pid>/task/<tid>/auxv	*/
 	lxpr_read_pid_cgroup,		/* /proc/<pid>/task/<tid>/cgroup */
 	lxpr_read_pid_cmdline,		/* /proc/<pid>/task/<tid>/cmdline */
 	lxpr_read_pid_comm,		/* /proc/<pid>/task/<tid>/comm	*/
@@ -654,6 +659,7 @@ static void (*lxpr_read_function[LXPR_NFILES])() = {
 static vnode_t *(*lxpr_lookup_function[LXPR_NFILES])() = {
 	lxpr_lookup_procdir,		/* /proc		*/
 	lxpr_lookup_piddir,		/* /proc/<pid>		*/
+	lxpr_lookup_not_a_dir,		/* /proc/<pid>/auxv	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/cgroup	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/cmdline	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/comm	*/
@@ -674,6 +680,7 @@ static vnode_t *(*lxpr_lookup_function[LXPR_NFILES])() = {
 	lxpr_lookup_task_tid_dir,	/* /proc/<pid>/task/nn	*/
 	lxpr_lookup_fddir,		/* /proc/<pid>/fd	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/fd/nn	*/
+	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/auxv	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/cgroup */
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/cmdline */
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/comm	*/
@@ -763,6 +770,7 @@ static vnode_t *(*lxpr_lookup_function[LXPR_NFILES])() = {
 static int (*lxpr_readdir_function[LXPR_NFILES])() = {
 	lxpr_readdir_procdir,		/* /proc		*/
 	lxpr_readdir_piddir,		/* /proc/<pid>		*/
+	lxpr_readdir_not_a_dir,		/* /proc/<pid>/auxv	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/cgroup	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/cmdline	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/comm	*/
@@ -783,6 +791,7 @@ static int (*lxpr_readdir_function[LXPR_NFILES])() = {
 	lxpr_readdir_task_tid_dir,	/* /proc/<pid>/task/nn	*/
 	lxpr_readdir_fddir,		/* /proc/<pid>/fd	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/fd/nn	*/
+	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid>/auxv	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid>/cgroup */
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid>/cmdline */
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid>/comm	*/
@@ -956,6 +965,49 @@ lxpr_read_invalid(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 static void
 lxpr_read_empty(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
+}
+
+/*
+ * lxpr_read_pid_auxv(): read process aux vector
+ */
+static void
+lxpr_read_pid_auxv(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+{
+	proc_t *p;
+
+	ASSERT(lxpnp->lxpr_type == LXPR_PID_AUXV ||
+	    lxpnp->lxpr_type == LXPR_PID_TID_AUXV);
+
+	p = lxpr_lock(lxpnp->lxpr_pid);
+
+	if (p == NULL) {
+		lxpr_uiobuf_seterr(uiobuf, EINVAL);
+		return;
+	}
+
+	/*
+	 * No attempt is made to translate the native aux vector types and
+	 * values into what Linux expects.  This can be implemented later if
+	 * deemed to be necessary.
+	 */
+	if (p->p_model == DATAMODEL_NATIVE) {
+		lxpr_uiobuf_write(uiobuf, (char *)p->p_user.u_auxv,
+		    sizeof (auxv_t[__KERN_NAUXV_IMPL]));
+	}
+#if defined(_SYSCALL32_IMPL)
+	else {
+		auxv32_t buf[__KERN_NAUXV_IMPL];
+		int i;
+		for (i = 0; i < __KERN_NAUXV_IMPL; i++) {
+			buf[i].a_type = p->p_user.u_auxv[i].a_type;
+			buf[i].a_un.a_val = p->p_user.u_auxv[i].a_un.a_val;
+		}
+		lxpr_uiobuf_write(uiobuf, (char *)buf,
+		    sizeof (auxv32_t[__KERN_NAUXV_IMPL]));
+	}
+#endif /* defined(_SYSCALL32_IMPL) */
+
+	lxpr_unlock(p);
 }
 
 /*
