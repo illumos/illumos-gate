@@ -362,8 +362,10 @@ ltos_sockaddr_ux(const struct sockaddr *inaddr, const socklen_t inlen,
 		if (sun_type != NULL) {
 			*sun_type = LX_SUN_ABSTRACT;
 		}
-	} else if (len > LX_DEV_LOG_LEN &&
-	    strcmp(inaddr->sa_data, LX_DEV_LOG) == 0) {
+	} else if ((len == LX_DEV_LOG_LEN &&
+	    strncmp(inaddr->sa_data, LX_DEV_LOG, LX_DEV_LOG_LEN) == 0) ||
+	    (len > LX_DEV_LOG_LEN &&
+	    strcmp(inaddr->sa_data, LX_DEV_LOG) == 0)) {
 		/*
 		 * In order to support /dev/log -- a Unix domain socket used
 		 * for logging that has had its path hard-coded far and wide --
