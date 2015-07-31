@@ -722,6 +722,10 @@ lx_mount(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 			    options);
 			return (-errno);
 		}
+
+		/* Linux seems to always allow overlay mounts */
+		sflags |= MS_OVERLAY;
+
 	} else if (strcmp(fstype, "proc") == 0) {
 		struct stat64	sb;
 
@@ -808,6 +812,10 @@ lx_mount(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 			    options);
 			return (-errno);
 		}
+
+		/* Linux seems to always allow overlay mounts */
+		sflags |= MS_OVERLAY;
+
 	} else if (strcmp(fstype, "nfs") == 0) {
 
 		/*
@@ -880,6 +888,10 @@ lx_mount(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 		sflags |= MS_DATA;
 		sdataptr = (char *)&nfs_args;
 		sdatalen = sizeof (nfs_args);
+
+		/* Linux seems to always allow overlay mounts */
+		sflags |= MS_OVERLAY;
+
 	} else {
 		lx_unsupported("unsupported mount filesystem type: %s", fstype);
 		return (-ENODEV);
