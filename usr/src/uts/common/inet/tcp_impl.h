@@ -291,6 +291,15 @@ typedef struct tcp_opt_s {
 } tcp_opt_t;
 
 /*
+ * Flags returned from tcp_parse_options.
+ */
+#define	TCP_OPT_MSS_PRESENT	1
+#define	TCP_OPT_WSCALE_PRESENT	2
+#define	TCP_OPT_TSTAMP_PRESENT	4
+#define	TCP_OPT_SACK_OK_PRESENT	8
+#define	TCP_OPT_SACK_PRESENT	16
+
+/*
  * Write-side flow-control is implemented via the per instance STREAMS
  * write-side Q by explicitly setting QFULL to stop the flow of mblk_t(s)
  * and clearing QFULL and calling qbackenable() to restart the flow based
@@ -653,7 +662,8 @@ extern void	tcp_icmp_input(void *, mblk_t *, void *, ip_recv_attr_t *);
 extern void	tcp_input_data(void *, mblk_t *, void *, ip_recv_attr_t *);
 extern void	tcp_input_listener_unbound(void *, mblk_t *, void *,
 		    ip_recv_attr_t *);
-extern boolean_t	tcp_paws_check(tcp_t *, tcpha_t *, tcp_opt_t *);
+extern boolean_t	tcp_paws_check(tcp_t *, const tcp_opt_t *);
+extern int	tcp_parse_options(tcpha_t *, tcp_opt_t *);
 extern uint_t	tcp_rcv_drain(tcp_t *);
 extern void	tcp_rcv_enqueue(tcp_t *, mblk_t *, uint_t, cred_t *);
 extern boolean_t	tcp_verifyicmp(conn_t *, void *, icmph_t *, icmp6_t *,

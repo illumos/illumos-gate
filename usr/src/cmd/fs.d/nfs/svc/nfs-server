@@ -19,9 +19,10 @@
 #
 # CDDL HEADER END
 #
+
 #
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 # Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
 #
 
 # Start/stop processes required for server NFS
@@ -76,50 +77,30 @@ case "$1" in
 	# the shares would have been started long before getting here since
 	# nfsd has a dependency on them.
 
-	startnfsd=0
-
 	# restart stopped shares from the repository
 	/usr/sbin/sharemgr start -P nfs -a
 
-	# Start up mountd and nfsd if anything is exported.
-
-	if /usr/bin/grep -s nfs /etc/dfs/sharetab >/dev/null; then
-		startnfsd=1
-	fi
-
-	# If auto-enable behavior is disabled, always start nfsd
-
-	if [ `svcprop -p application/auto_enable nfs/server` = "false" ]; then
-		startnfsd=1
-	fi
-
 	# Options for nfsd are now set in SMF
-	if [ $startnfsd -ne 0 ]; then
-		/usr/lib/nfs/mountd
-		rc=$?
-		if [ $rc != 0 ]; then
-			/usr/sbin/svcadm mark -t maintenance svc:/network/nfs/server
-			echo "$0: mountd failed with $rc"
-			sleep 5 &
-			exit $SMF_EXIT_ERR_FATAL
-		fi
 
-		/usr/lib/nfs/nfsd
-		rc=$?
-		if [ $rc != 0 ]; then
-			/usr/sbin/svcadm mark -t maintenance svc:/network/nfs/server
-			echo "$0: nfsd failed with $rc"
-			sleep 5 &
-			exit $SMF_EXIT_ERR_FATAL
-		fi
-
-		configure_ipfilter
-	else
-		/usr/sbin/svcadm disable -t svc:/network/nfs/server
-		echo "No NFS filesystems are shared"
+	/usr/lib/nfs/mountd
+	rc=$?
+	if [ $rc != 0 ]; then
+		/usr/sbin/svcadm mark -t maintenance svc:/network/nfs/server
+		echo "$0: mountd failed with $rc"
 		sleep 5 &
+		exit $SMF_EXIT_ERR_FATAL
 	fi
 
+	/usr/lib/nfs/nfsd
+	rc=$?
+	if [ $rc != 0 ]; then
+		/usr/sbin/svcadm mark -t maintenance svc:/network/nfs/server
+		echo "$0: nfsd failed with $rc"
+		sleep 5 &
+		exit $SMF_EXIT_ERR_FATAL
+	fi
+
+	configure_ipfilter
 	;;
 
 'refresh')

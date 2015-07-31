@@ -2269,7 +2269,7 @@ is_valid_archive(char *root, int what)
 	if (stat(timestamp_path, &timestamp) != 0 ||
 	    sb.st_mtime > timestamp.st_mtime) {
 		if (bam_verbose && !bam_check)
-			bam_print(UPDATE_CACHE_OLD, timestamp);
+			bam_print(UPDATE_CACHE_OLD);
 		/*
 		 * Don't generate a false positive for the boot-archive service
 		 * but trigger an update of the archive cache in
@@ -2688,7 +2688,7 @@ update_timestamp(char *root)
 	 */
 	if (creat(timestamp_path, FILE_STAT_MODE) < 0) {
 		bam_error(OPEN_FAIL, timestamp_path, strerror(errno));
-		bam_error(TIMESTAMP_FAIL, rootbuf);
+		bam_error(TIMESTAMP_FAIL);
 	}
 }
 
