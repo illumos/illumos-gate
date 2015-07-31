@@ -1174,15 +1174,48 @@ prep_args(brand_handle_t bh, char *zonename, const char *login, char **argv)
 			argc++;
 
 		for (i = 0; i < argc; i++) {
-			subshell_len += strlen(argv[i]) + 1;
+			/*
+			 * Allocate enough space for the delimiter and 2
+			 * quotes which might be needed.
+			 */
+			subshell_len += strlen(argv[i]) + 3;
 		}
 		if ((subshell = calloc(1, subshell_len)) == NULL)
 			return (NULL);
 
+		/*
+		 * The handling of quotes in the following block may seem
+		 * unusual, but it is done this way for backward compatibility.
+		 * When running a command, zlogin is documented as:
+		 *    zlogin zonename command args
+		 * However, some code has come to depend on the following usage:
+		 *    zlogin zonename 'command args'
+		 * This relied on the fact that the single argument would be
+		 * re-parsed within the zone and excuted as a command with an
+		 * argument. To remain compatible with this (incorrect) usage,
+		 * if there is only a single argument, it is not quoted, even
+		 * if it has embedded spaces.
+		 *
+		 * Here are two examples which both need to work:
+		 * 1) zlogin foo 'echo hello'
+		 *    This has a single argv member with a space in it but will
+		 *    not be quoted on the command passed into the zone.
+		 * 2) zlogin foo bash -c 'echo hello'
+		 *    This has 3 argv members. The 3rd arg has a space and must
+		 *    be quoted on the command passed into the zone.
+		 */
 		for (i = 0; i < argc; i++) {
 			if (i > 0)
 				(void) strcat(subshell, " ");
-			(void) strcat(subshell, argv[i]);
+
+			if (argc > 1 && (strchr(argv[i], ' ') != NULL ||
+			    strchr(argv[i], '\t') != NULL)) {
+				(void) strcat(subshell, "'");
+				(void) strcat(subshell, argv[i]);
+				(void) strcat(subshell, "'");
+			} else {
+				(void) strcat(subshell, argv[i]);
+			}
 		}
 
 		if (failsafe) {
