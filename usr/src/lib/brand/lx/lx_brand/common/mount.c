@@ -723,8 +723,14 @@ lx_mount(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 			return (-errno);
 		}
 
-		/* Linux seems to always allow overlay mounts */
-		sflags |= MS_OVERLAY;
+		/*
+		 * Linux seems to always allow overlay mounts, but some distros
+		 * attempt to mount tmpfs on /dev and we can't allow that. We
+		 * also don't overlay on anything under /dev.
+		 */
+		if (strcmp(targetp, "/dev") != 0 &&
+		    strncmp(targetp, "/dev/", 5) != 0)
+			sflags |= MS_OVERLAY;
 
 	} else if (strcmp(fstype, "proc") == 0) {
 		struct stat64	sb;
