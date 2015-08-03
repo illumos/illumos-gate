@@ -24,12 +24,13 @@
  * Copyright 2015 Joyent, Inc.
  */
 
+#ifndef	_LX_PROC_H
+#define	_LX_PROC_H
+
 #ifdef _LXPROC_NATIVE_H
 #error Attempted to include branded lx_proc.h after native lxproc.h
 #endif
 
-#ifndef	_LXPROC_H
-#define	_LXPROC_H
 #define	_LXPROC_BRANDED_H
 
 #ifdef	__cplusplus
@@ -302,4 +303,4 @@ void lxpr_unlock(proc_t *);
 #define	toupper(x)	(islower(x) ? (x) - 'a' + 'A' : (x))
 #endif
 
-#endif /* _LXPROC_H */
+#endif /* _LX_PROC_H */
