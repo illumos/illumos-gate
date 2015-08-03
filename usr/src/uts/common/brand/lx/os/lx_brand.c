@@ -348,7 +348,7 @@ lx_proc_exit(proc_t *p)
 			continue;
 		}
 		if (lxpd->l_parent_deathsig != 0) {
-			sigtoproc(p, NULL, lxpd->l_parent_deathsig);
+			sigtoproc(cp, NULL, lxpd->l_parent_deathsig);
 		}
 		mutex_exit(&cp->p_lock);
 	}
