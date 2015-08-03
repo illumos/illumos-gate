@@ -436,10 +436,15 @@ new-device
 
    : blk_offset    ( bp -- n )  h#  8 +  x@  -1 h# 7fff.ffff  lxjoin  and  ;
    : blk_gang      ( bp -- n )  h#  8 +  x@  xlsplit  nip  d# 31 rshift  ;
-   : blk_comp      ( bp -- n )  h# 33 +  c@  ;
+   : blk_etype     ( bp -- n )  h# 32 +  c@  ;
+   : blk_comp      ( bp -- n )  h# 33 +  c@  h# 7f and ;
+   : blk_embedded? ( bp -- flag )  h# 33 +  c@  h# 80 and h# 80 = ;
    : blk_psize     ( bp -- n )  h# 34 +  w@  ;
    : blk_lsize     ( bp -- n )  h# 36 +  w@  ;
    : blk_birth     ( bp -- n )  h# 50 +  x@  ;
+
+   : blke_psize    ( bp -- n )  h# 34 +  c@  1 rshift h# 7f and 1+ ;
+   : blke_lsize    ( bp -- n )  h# 34 +  l@  h# 1ff.ffff and 1+ ;
 
    0 instance value dev-ih
    0 instance value blk-space
@@ -448,8 +453,21 @@ new-device
    : foff>doff  ( fs-off -- disk-off )    /disk-block *  h# 40.0000 +  ;
    : fsz>dsz    ( fs-size -- disk-size )  1+  /disk-block *  ;
 
-   : bp-dsize  ( bp -- dsize )  blk_psize fsz>dsz  ;
-   : bp-lsize  ( bp -- lsize )  blk_lsize fsz>dsz  ;
+   : bp-dsize  ( bp -- dsize )
+      dup blk_embedded? if
+         blke_psize
+      else
+         blk_psize fsz>dsz
+      then
+   ;
+
+   : bp-lsize  ( bp -- lsize )
+      dup blk_embedded? if
+         blke_lsize
+      else
+         blk_lsize fsz>dsz
+      then
+   ;
 
    : (read-dva)  ( adr len dva -- )
       blk_offset foff>doff  dev-ih  read-disk
@@ -497,6 +515,46 @@ new-device
       then
    ;
 
+   : read-embedded ( adr len bp -- )
+      \ loop over buf len, w in comment is octet count
+      \ note, we dont increment bp, but use index value of w
+      \ so we can skip the non-payload octets
+      swap 0 0                              ( adr bp len 0 0 )
+      rot 0 do                              ( adr bp 0 0 )
+         I 8 mod 0= if                      ( adr bp w x )
+            drop                            ( adr bp w )
+            2dup                            ( adr bp w bp w )
+            xa+                             ( adr bp w bp+w*8 )
+            x@ swap                         ( adr bp x w )
+            1+ dup 6 = if 1+ else           \ skip 6th word
+               dup h# a = if 1+ then        \ skip 10th word
+            then                            ( adr bp x w )
+            swap                            ( adr bp w x )
+         then
+         2swap                              ( w x adr bp )
+         -rot                               ( w bp x adr )
+         swap dup                           ( w bp adr x x )
+         I 8 mod 4 < if
+            xlsplit                         ( w bp adr x x.lo x.hi )
+            drop                            ( w bp adr x x.lo )
+         else
+            xlsplit                         ( w bp adr x x.lo x.hi )
+            nip                             ( w bp adr x x.hi )
+         then
+         I 4 mod 8 * rshift h# ff and       ( w bp adr x c )
+         rot                                ( w bp x c adr )
+         swap over                          ( w bp x adr c adr )
+         I + c!                             ( w bp x adr )
+
+         \ now we need to fix the stack for next pass
+         \ need to get ( adr bp w x )
+         swap 2swap                         ( adr x w bp )
+         -rot                               ( adr bp x w )
+         swap                               ( adr bp w x )
+      loop
+      2drop 2drop
+   ;
+
    \ block read that check for holes, gangs, compression, etc
    : read-bp  ( adr len bp -- )
       \ sparse block?
@@ -512,27 +570,27 @@ new-device
          read-dva  exit                  (  )
       then
 
-      \ lzjb?
-      dup blk_comp  lzjb-comp#  =  if
-         \ read into blk-space and de-compress
-         blk-space  over bp-dsize           ( adr len bp blk-adr rd-len )
-         rot  read-dva                      ( adr len )
-         blk-space -rot  lzjb               (  )
-         exit
+      \ read into blk-space. read is either from embedded area or disk
+      dup blk_embedded? if
+         dup blk-space  over bp-dsize    ( adr len bp bp blk-adr rd-len )
+         rot  read-embedded              ( adr len bp )
+      else
+         dup blk-space  over bp-dsize    ( adr len bp bp blk-adr rd-len )
+         rot  read-dva                   ( adr len bp )
       then
 
-      dup blk_comp  dup lz4-comp#  <>   ( adr len bp comp lz4? )
-      swap  def-comp#  <>  and  if       ( adr len bp )
-         dup hex . ." BP: "
-         blk_comp decimal .
-         ." : bug, unknown compression algorithm: "
-         " only lzjb and lz4 supported"  die
-      then
+      \ set up the stack for decompress
+      blk_comp >r                        ( adr len R: alg )
+      blk-space -rot r>                  ( blk-adr adr len alg )
 
-      \ read into blk-space and de-compress
-      blk-space  over bp-dsize           ( adr len bp blk-adr rd-len )
-      rot  read-dva                      ( adr len )
-      blk-space -rot  lz4                (  )
+      case
+         lzjb-comp#  of lzjb endof
+         lz4-comp#   of lz4  endof
+         def-comp#   of lz4  endof       \ isn't this writer only?
+         dup .h
+         "  : unknown compression algorithm, only lzjb and lz4 are supported"
+         die
+      endcase                             (  )
    ;
 
    \

@@ -200,7 +200,7 @@ ofmt_open(const char *str, const ofmt_field_t *template, uint_t flags,
 		 */
 		if (str == NULL || str[0] == '\0')
 			return (OFMT_EPARSENONE);
-		if (strcmp(str, "all") == 0)
+		if (strcasecmp(str, "all") == 0)
 			return (OFMT_EPARSEALL);
 		if (wrap)
 			return (OFMT_EPARSEWRAP);
@@ -213,10 +213,10 @@ ofmt_open(const char *str, const ofmt_field_t *template, uint_t flags,
 	 * split str into the columns selected, or construct the
 	 * full set of columns (equivalent to -o all).
 	 */
-	if (str != NULL && strcmp(str, "all") != 0) {
+	if (str != NULL && strcasecmp(str, "all") != 0) {
 		sp = split_str(str, nfields);
 	} else {
-		if (parsable || (str != NULL && strcmp(str, "all") == 0))
+		if (parsable || (str != NULL && strcasecmp(str, "all") == 0))
 			maxcols = 0;
 		sp = split_fields(template, nfields, maxcols);
 	}

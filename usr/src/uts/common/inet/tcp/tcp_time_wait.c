@@ -517,10 +517,20 @@ tcp_time_wait_processing(tcp_t *tcp, mblk_t *mp, uint32_t seg_seq,
 	flags = (unsigned int)tcpha->tha_flags & 0xFF;
 	new_swnd = ntohs(tcpha->tha_win) <<
 	    ((tcpha->tha_flags & TH_SYN) ? 0 : tcp->tcp_snd_ws);
-	if (tcp->tcp_snd_ts_ok) {
-		if (!tcp_paws_check(tcp, tcpha, &tcpopt)) {
-			tcp_xmit_ctl(NULL, tcp, tcp->tcp_snxt,
-			    tcp->tcp_rnxt, TH_ACK);
+
+	if (tcp->tcp_snd_ts_ok && !(tcpha->tha_flags & TH_RST)) {
+		int options;
+		if (tcp->tcp_snd_sack_ok)
+			tcpopt.tcp = tcp;
+		else
+			tcpopt.tcp = NULL;
+		options = tcp_parse_options(tcpha, &tcpopt);
+		if (!(options & TCP_OPT_TSTAMP_PRESENT)) {
+			DTRACE_TCP1(droppedtimestamp, tcp_t *, tcp);
+			goto done;
+		} else if (!tcp_paws_check(tcp, &tcpopt)) {
+			tcp_xmit_ctl(NULL, tcp, tcp->tcp_snxt, tcp->tcp_rnxt,
+			    TH_ACK);
 			goto done;
 		}
 	}
@@ -667,11 +677,10 @@ tcp_time_wait_processing(tcp_t *tcp, mblk_t *mp, uint32_t seg_seq,
 		}
 	}
 	/*
-	 * Check whether we can update tcp_ts_recent.  This test is
-	 * NOT the one in RFC 1323 3.4.  It is from Braden, 1993, "TCP
-	 * Extensions for High Performance: An Update", Internet Draft.
+	 * Check whether we can update tcp_ts_recent. This test is from RFC
+	 * 7323, section 5.3.
 	 */
-	if (tcp->tcp_snd_ts_ok &&
+	if (tcp->tcp_snd_ts_ok && !(flags & TH_RST) &&
 	    TSTMP_GEQ(tcpopt.tcp_opt_ts_val, tcp->tcp_ts_recent) &&
 	    SEQ_LEQ(seg_seq, tcp->tcp_rack)) {
 		tcp->tcp_ts_recent = tcpopt.tcp_opt_ts_val;

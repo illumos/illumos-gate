@@ -51,7 +51,7 @@
 #include <inet/ipsec_impl.h>
 
 /*
- * RFC1323-recommended phrasing of TSTAMP option, for easier parsing
+ * RFC7323-recommended phrasing of TSTAMP option, for easier parsing
  */
 
 #ifdef _BIG_ENDIAN
@@ -61,15 +61,6 @@
 #define	TCPOPT_NOP_NOP_TSTAMP ((10 << 24) | (TCPOPT_TSTAMP << 16) | \
 	(TCPOPT_NOP << 8) | TCPOPT_NOP)
 #endif
-
-/*
- * Flags returned from tcp_parse_options.
- */
-#define	TCP_OPT_MSS_PRESENT	1
-#define	TCP_OPT_WSCALE_PRESENT	2
-#define	TCP_OPT_TSTAMP_PRESENT	4
-#define	TCP_OPT_SACK_OK_PRESENT	8
-#define	TCP_OPT_SACK_PRESENT	16
 
 /*
  *  PAWS needs a timer for 24 days.  This is the number of ticks in 24 days
@@ -171,7 +162,6 @@ static void	tcp_icmp_error_ipv6(tcp_t *, mblk_t *, ip_recv_attr_t *);
 static mblk_t	*tcp_input_add_ancillary(tcp_t *, mblk_t *, ip_pkt_t *,
 		    ip_recv_attr_t *);
 static void	tcp_input_listener(void *, mblk_t *, void *, ip_recv_attr_t *);
-static int	tcp_parse_options(tcpha_t *, tcp_opt_t *);
 static void	tcp_process_options(tcp_t *, tcpha_t *);
 static mblk_t	*tcp_reass(tcp_t *, mblk_t *, uint32_t);
 static void	tcp_reass_elim_overlap(tcp_t *, mblk_t *);
@@ -237,7 +227,7 @@ tcp_mss_set(tcp_t *tcp, uint32_t mss)
  * Extract option values from a tcp header.  We put any found values into the
  * tcpopt struct and return a bitmask saying which options were found.
  */
-static int
+int
 tcp_parse_options(tcpha_t *tcpha, tcp_opt_t *tcpopt)
 {
 	uchar_t		*endp;
@@ -251,6 +241,19 @@ tcp_parse_options(tcpha_t *tcpha, tcp_opt_t *tcpopt)
 
 	endp = up + TCP_HDR_LENGTH(tcpha);
 	up += TCP_MIN_HEADER_LENGTH;
+	/*
+	 * If timestamp option is aligned as recommended in RFC 7323 Appendix
+	 * A, and is the only option, return quickly.
+	 */
+	if (TCP_HDR_LENGTH(tcpha) == (uint32_t)TCP_MIN_HEADER_LENGTH +
+	    TCPOPT_REAL_TS_LEN &&
+	    OK_32PTR(up) &&
+	    *(uint32_t *)up == TCPOPT_NOP_NOP_TSTAMP) {
+		tcpopt->tcp_opt_ts_val = ABE32_TO_U32((up+4));
+		tcpopt->tcp_opt_ts_ecr = ABE32_TO_U32((up+8));
+
+		return (TCP_OPT_TSTAMP_PRESENT);
+	}
 	while (up < endp) {
 		len = endp - up;
 		switch (*up) {
@@ -686,82 +689,27 @@ tcp_reass_elim_overlap(tcp_t *tcp, mblk_t *mp)
 }
 
 /*
- * This function does PAWS protection check. Returns B_TRUE if the
- * segment passes the PAWS test, else returns B_FALSE.
+ * This function does PAWS protection check, per RFC 7323 section 5. Requires
+ * that timestamp options are already processed into tcpoptp. Returns B_TRUE if
+ * the segment passes the PAWS test, else returns B_FALSE.
  */
 boolean_t
-tcp_paws_check(tcp_t *tcp, tcpha_t *tcpha, tcp_opt_t *tcpoptp)
+tcp_paws_check(tcp_t *tcp, const tcp_opt_t *tcpoptp)
 {
-	uint8_t	flags;
-	int	options;
-	uint8_t *up;
-	conn_t	*connp = tcp->tcp_connp;
-
-	flags = (unsigned int)tcpha->tha_flags & 0xFF;
-	/*
-	 * If timestamp option is aligned nicely, get values inline,
-	 * otherwise call general routine to parse.  Only do that
-	 * if timestamp is the only option.
-	 */
-	if (TCP_HDR_LENGTH(tcpha) == (uint32_t)TCP_MIN_HEADER_LENGTH +
-	    TCPOPT_REAL_TS_LEN &&
-	    OK_32PTR((up = ((uint8_t *)tcpha) +
-	    TCP_MIN_HEADER_LENGTH)) &&
-	    *(uint32_t *)up == TCPOPT_NOP_NOP_TSTAMP) {
-		tcpoptp->tcp_opt_ts_val = ABE32_TO_U32((up+4));
-		tcpoptp->tcp_opt_ts_ecr = ABE32_TO_U32((up+8));
-
-		options = TCP_OPT_TSTAMP_PRESENT;
-	} else {
-		if (tcp->tcp_snd_sack_ok) {
-			tcpoptp->tcp = tcp;
+	if (TSTMP_LT(tcpoptp->tcp_opt_ts_val,
+	    tcp->tcp_ts_recent)) {
+		if (LBOLT_FASTPATH64 <
+		    (tcp->tcp_last_rcv_lbolt + PAWS_TIMEOUT)) {
+			/* This segment is not acceptable. */
+			return (B_FALSE);
 		} else {
-			tcpoptp->tcp = NULL;
+			/*
+			 * Connection has been idle for
+			 * too long.  Reset the timestamp
+			 */
+			tcp->tcp_ts_recent =
+			    tcpoptp->tcp_opt_ts_val;
 		}
-		options = tcp_parse_options(tcpha, tcpoptp);
-	}
-
-	if (options & TCP_OPT_TSTAMP_PRESENT) {
-		/*
-		 * Do PAWS per RFC 1323 section 4.2.  Accept RST
-		 * regardless of the timestamp, page 18 RFC 1323.bis.
-		 */
-		if ((flags & TH_RST) == 0 &&
-		    TSTMP_LT(tcpoptp->tcp_opt_ts_val,
-		    tcp->tcp_ts_recent)) {
-			if (LBOLT_FASTPATH64 <
-			    (tcp->tcp_last_rcv_lbolt + PAWS_TIMEOUT)) {
-				/* This segment is not acceptable. */
-				return (B_FALSE);
-			} else {
-				/*
-				 * Connection has been idle for
-				 * too long.  Reset the timestamp
-				 * and assume the segment is valid.
-				 */
-				tcp->tcp_ts_recent =
-				    tcpoptp->tcp_opt_ts_val;
-			}
-		}
-	} else {
-		/*
-		 * If we don't get a timestamp on every packet, we
-		 * figure we can't really trust 'em, so we stop sending
-		 * and parsing them.
-		 */
-		tcp->tcp_snd_ts_ok = B_FALSE;
-
-		connp->conn_ht_iphc_len -= TCPOPT_REAL_TS_LEN;
-		connp->conn_ht_ulp_len -= TCPOPT_REAL_TS_LEN;
-		tcp->tcp_tcpha->tha_offset_and_reserved -= (3 << 4);
-		/*
-		 * Adjust the tcp_mss and tcp_cwnd accordingly. We avoid
-		 * doing a slow start here so as to not to lose on the
-		 * transfer rate built up so far.
-		 */
-		tcp_mss_set(tcp, tcp->tcp_mss + TCPOPT_REAL_TS_LEN);
-		if (tcp->tcp_snd_sack_ok)
-			tcp->tcp_max_sack_blk = 4;
 	}
 	return (B_TRUE);
 }
@@ -2912,23 +2860,47 @@ tcp_input_data(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *ira)
 	new_swnd = ntohs(tcpha->tha_win) <<
 	    ((tcpha->tha_flags & TH_SYN) ? 0 : tcp->tcp_snd_ws);
 
-	if (tcp->tcp_snd_ts_ok) {
-		if (!tcp_paws_check(tcp, tcpha, &tcpopt)) {
-			/*
-			 * This segment is not acceptable.
-			 * Drop it and send back an ACK.
-			 */
-			freemsg(mp);
-			flags |= TH_ACK_NEEDED;
-			goto ack_check;
-		}
-	} else if (tcp->tcp_snd_sack_ok) {
-		tcpopt.tcp = tcp;
+	/*
+	 * We are interested in two TCP options: timestamps (if negotiated) and
+	 * SACK (if negotiated). Skip option parsing if neither is negotiated.
+	 */
+	if (tcp->tcp_snd_ts_ok || tcp->tcp_snd_sack_ok) {
+		int options;
+		if (tcp->tcp_snd_sack_ok)
+			tcpopt.tcp = tcp;
+		else
+			tcpopt.tcp = NULL;
+		options = tcp_parse_options(tcpha, &tcpopt);
 		/*
-		 * SACK info in already updated in tcp_parse_options.  Ignore
-		 * all other TCP options...
+		 * RST segments must not be subject to PAWS and are not
+		 * required to have timestamps.
 		 */
-		(void) tcp_parse_options(tcpha, &tcpopt);
+		if (tcp->tcp_snd_ts_ok && !(flags & TH_RST)) {
+			/*
+			 * Per RFC 7323 section 3.2., silently drop non-RST
+			 * segments without expected TSopt. This is a 'SHOULD'
+			 * requirement.
+			 */
+			if (!(options & TCP_OPT_TSTAMP_PRESENT)) {
+				/*
+				 * Leave a breadcrumb for people to detect this
+				 * behavior.
+				 */
+				DTRACE_TCP1(droppedtimestamp, tcp_t *, tcp);
+				freemsg(mp);
+				return;
+			}
+
+			if (!tcp_paws_check(tcp, &tcpopt)) {
+				/*
+				 * This segment is not acceptable.
+				 * Drop it and send back an ACK.
+				 */
+				freemsg(mp);
+				flags |= TH_ACK_NEEDED;
+				goto ack_check;
+			}
+		}
 	}
 try_again:;
 	mss = tcp->tcp_mss;
@@ -3221,11 +3193,10 @@ ok:;
 	}
 
 	/*
-	 * Check whether we can update tcp_ts_recent.  This test is
-	 * NOT the one in RFC 1323 3.4.  It is from Braden, 1993, "TCP
-	 * Extensions for High Performance: An Update", Internet Draft.
+	 * Check whether we can update tcp_ts_recent. This test is from RFC
+	 * 7323, section 5.3.
 	 */
-	if (tcp->tcp_snd_ts_ok &&
+	if (tcp->tcp_snd_ts_ok && !(flags & TH_RST) &&
 	    TSTMP_GEQ(tcpopt.tcp_opt_ts_val, tcp->tcp_ts_recent) &&
 	    SEQ_LEQ(seg_seq, tcp->tcp_rack)) {
 		tcp->tcp_ts_recent = tcpopt.tcp_opt_ts_val;

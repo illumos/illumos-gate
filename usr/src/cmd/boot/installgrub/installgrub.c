@@ -58,6 +58,7 @@
 #include "./../common/bblk_einfo.h"
 #include "./../common/boot_utils.h"
 #include "./../common/mboot_extra.h"
+#include "getresponse.h"
 
 #ifndef	TEXT_DOMAIN
 #define	TEXT_DOMAIN	"SUNW_OST_OSCMD"
@@ -131,6 +132,11 @@ main(int argc, char *argv[])
 
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
+	if (init_yes() < 0) {
+		(void) fprintf(stderr, gettext(ERR_MSG_INIT_YES),
+		    strerror(errno));
+		exit(BC_ERROR);
+	}
 
 	/*
 	 * retro-compatibility: installing the bootblock is the default
@@ -849,7 +855,7 @@ found_part:
 	/* get confirmation for -m */
 	if (write_mbr && !force_mbr) {
 		(void) fprintf(stdout, MBOOT_PROMPT);
-		if (getchar() != 'y') {
+		if (!yes()) {
 			write_mbr = 0;
 			(void) fprintf(stdout, MBOOT_NOT_UPDATED);
 			return (BC_ERROR);

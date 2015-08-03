@@ -57,7 +57,7 @@ extern "C" {
 
 #define	MBOOT_PROMPT	\
 	gettext("Updating master boot sector destroys existing boot " \
-	"managers (if any).\ncontinue (y/n)?")
+	"managers (if any).\ncontinue (y/n)? ")
 
 #define	MBOOT_NOT_UPDATED	gettext("master boot sector not updated\n")
 
