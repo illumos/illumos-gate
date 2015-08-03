@@ -534,6 +534,13 @@ lxpr_getnode(vnode_t *dp, lxpr_nodetype_t type, proc_t *p, int desc)
 		lxpnp->lxpr_mode = 0400;	/* read-only by owner only */
 		break;
 
+	case LXPR_SYS_VM_SWAPPINESS:
+	case LXPR_PID_OOM_SCR_ADJ:
+	case LXPR_PID_TID_OOM_SCR_ADJ:
+		vp->v_type = VREG;
+		lxpnp->lxpr_mode = 0644;
+		break;
+
 	default:
 		vp->v_type = VREG;
 		lxpnp->lxpr_mode = 0444;	/* read-only by all */

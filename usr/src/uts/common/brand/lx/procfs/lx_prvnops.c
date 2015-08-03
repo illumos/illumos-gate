@@ -212,6 +212,7 @@ static void lxpr_read_sys_kernel_shmmax(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_kernel_threads_max(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_vm_minfr_kb(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_vm_nhpages(lxpr_node_t *, lxpr_uiobuf_t *);
+static void lxpr_read_sys_vm_swappiness(lxpr_node_t *, lxpr_uiobuf_t *);
 
 /*
  * Simple conversion
@@ -329,7 +330,7 @@ static lxpr_dirent_t tiddir[] = {
 	{ LXPR_PID_MAPS,	"maps" },
 	{ LXPR_PID_MEM,		"mem" },
 	{ LXPR_PID_MOUNTINFO,	"mountinfo" },
-	{ LXPR_PID_OOM_SCR_ADJ,	"oom_score_adj" },
+	{ LXPR_PID_TID_OOM_SCR_ADJ,	"oom_score_adj" },
 	{ LXPR_PID_ROOTDIR,	"root" },
 	{ LXPR_PID_TID_STAT,	"stat" },
 	{ LXPR_PID_STATM,	"statm" },
@@ -461,8 +462,9 @@ static lxpr_dirent_t sys_randdir[] = {
  * contents of /proc/sys/vm directory
  */
 static lxpr_dirent_t sys_vmdir[] = {
-	{ LXPR_SYS_KERNEL_VM_MINFR_KB,	"min_free_kbytes" },
-	{ LXPR_SYS_KERNEL_VM_NHUGEP,	"nr_hugepages" },
+	{ LXPR_SYS_VM_MINFR_KB,		"min_free_kbytes" },
+	{ LXPR_SYS_VM_NHUGEP,		"nr_hugepages" },
+	{ LXPR_SYS_VM_SWAPPINESS,	"swappiness" },
 };
 
 #define	SYS_VMDIRFILES (sizeof (sys_vmdir) / sizeof (sys_vmdir[0]))
@@ -479,9 +481,17 @@ lxpr_open(vnode_t **vpp, int flag, cred_t *cr, caller_context_t *ct)
 	vnode_t		*rvp;
 	int		error = 0;
 
-	/* Restrict writes to oom_score_adj for now */
-	if (flag & FWRITE && type != LXPR_PID_OOM_SCR_ADJ)
-		return (EPERM);
+	if (flag & FWRITE) {
+		/* Restrict writes to certain files */
+		switch (type) {
+		case LXPR_PID_OOM_SCR_ADJ:
+		case LXPR_PID_TID_OOM_SCR_ADJ:
+		case LXPR_SYS_VM_SWAPPINESS:
+			break;
+		default:
+			return (EPERM);
+		}
+	}
 
 	/*
 	 * If we are opening an underlying file only allow regular files,
@@ -649,6 +659,7 @@ static void (*lxpr_read_function[LXPR_NFILES])() = {
 	lxpr_read_invalid,		/* /proc/sys/vm	*/
 	lxpr_read_sys_vm_minfr_kb,	/* /proc/sys/vm/min_free_kbytes */
 	lxpr_read_sys_vm_nhpages,	/* /proc/sys/vm/nr_hugepages */
+	lxpr_read_sys_vm_swappiness,	/* /proc/sys/vm/swappiness */
 	lxpr_read_uptime,		/* /proc/uptime		*/
 	lxpr_read_version,		/* /proc/version	*/
 };
@@ -760,6 +771,7 @@ static vnode_t *(*lxpr_lookup_function[LXPR_NFILES])() = {
 	lxpr_lookup_sys_vmdir,		/* /proc/sys/vm */
 	lxpr_lookup_not_a_dir,		/* /proc/sys/vm/min_free_kbytes */
 	lxpr_lookup_not_a_dir,		/* /proc/sys/vm/nr_hugepages */
+	lxpr_lookup_not_a_dir,		/* /proc/sys/vm/swappiness */
 	lxpr_lookup_not_a_dir,		/* /proc/uptime		*/
 	lxpr_lookup_not_a_dir,		/* /proc/version	*/
 };
@@ -871,6 +883,7 @@ static int (*lxpr_readdir_function[LXPR_NFILES])() = {
 	lxpr_readdir_sys_vmdir,		/* /proc/sys/vm */
 	lxpr_readdir_not_a_dir,		/* /proc/sys/vm/min_free_kbytes */
 	lxpr_readdir_not_a_dir,		/* /proc/sys/vm/nr_hugepages */
+	lxpr_readdir_not_a_dir,		/* /proc/sys/vm/swappiness */
 	lxpr_readdir_not_a_dir,		/* /proc/uptime		*/
 	lxpr_readdir_not_a_dir,		/* /proc/version	*/
 };
@@ -3841,14 +3854,21 @@ lxpr_read_sys_kernel_threads_max(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 static void
 lxpr_read_sys_vm_minfr_kb(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
-	ASSERT(lxpnp->lxpr_type == LXPR_SYS_KERNEL_VM_MINFR_KB);
+	ASSERT(lxpnp->lxpr_type == LXPR_SYS_VM_MINFR_KB);
 	lxpr_uiobuf_printf(uiobuf, "%d\n", 0);
 }
 
 static void
 lxpr_read_sys_vm_nhpages(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
-	ASSERT(lxpnp->lxpr_type == LXPR_SYS_KERNEL_VM_NHUGEP);
+	ASSERT(lxpnp->lxpr_type == LXPR_SYS_VM_NHUGEP);
+	lxpr_uiobuf_printf(uiobuf, "%d\n", 0);
+}
+
+static void
+lxpr_read_sys_vm_swappiness(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+{
+	ASSERT(lxpnp->lxpr_type == LXPR_SYS_VM_SWAPPINESS);
 	lxpr_uiobuf_printf(uiobuf, "%d\n", 0);
 }
 
@@ -4273,12 +4293,21 @@ static int
 lxpr_access(vnode_t *vp, int mode, int flags, cred_t *cr, caller_context_t *ct)
 {
 	lxpr_node_t *lxpnp = VTOLXP(vp);
+	lxpr_nodetype_t type = lxpnp->lxpr_type;
 	int shift = 0;
 	proc_t *tp;
 
 	/* lx /proc is a read only file system */
-	if (mode & VWRITE)
-		return (EROFS);
+	if (mode & VWRITE) {
+		switch (type) {
+		case LXPR_SYS_VM_SWAPPINESS:
+		case LXPR_PID_OOM_SCR_ADJ:
+		case LXPR_PID_TID_OOM_SCR_ADJ:
+			break;
+		default:
+			return (EROFS);
+		}
+	}
 
 	/*
 	 * If this is a restricted file, check access permissions.
@@ -5698,34 +5727,44 @@ lxpr_create(struct vnode *dvp, char *nm, struct vattr *vap,
 		return (EEXIST);
 
 	/*
-	 * We're currently restricting O_CREAT to the oom_score_adj file.
+	 * We're currently restricting O_CREAT to:
+	 * - /proc/<pid>/oom_score_adj
+	 * - /proc/<pid>/task/<tid>/oom_score_adj
+	 * - /proc/sys/vm/swappiness
 	 */
-	if (strcmp(nm, "oom_score_adj") != 0)
-		return (EPERM);
-
-	if (type == LXPR_PIDDIR) {
+	if ((type == LXPR_PIDDIR || type == LXPR_PID_TASK_IDDIR) &&
+	    strcmp(nm, "oom_score_adj") == 0) {
 		proc_t *p;
 		p = lxpr_lock(lxpnp->lxpr_pid);
-		if (p != NULL)
+		if (p != NULL) {
 			vp = lxpr_lookup_common(dvp, nm, p, piddir,
 			    PIDDIRFILES);
+		}
 		lxpr_unlock(p);
+	} else if (type == LXPR_SYS_VMDIR && strcmp(nm, "swappiness") == 0) {
+		vp = lxpr_lookup_common(dvp, nm, NULL, sys_vmdir,
+		    SYS_VMDIRFILES);
 	}
 
-	if (vp != NULL) {		/* name found */
-		/*
-		 * Creating an existing file, allow it for regular files.
-		 */
+	if (vp != NULL) {
+		/* Creating an existing file, allow it for regular files. */
 		if (vp->v_type == VDIR)
 			return (EISDIR);
+
+		/* confirm permissions against existing file */
+		if ((error = lxpr_access(vp, mode, 0, cred, ct)) != 0) {
+			VN_RELE(vp);
+			return (error);
+		}
 
 		*vpp = vp;
 		return (0);
 	}
 
 	/*
-	 * proc doesn't allow creation of additional, non-subsystem specific
-	 * files in a dir
+	 * Linux proc does not allow creation of addition, non-subsystem
+	 * specific files inside the hierarchy.  ENOENT is tossed when such
+	 * actions are attempted.
 	 */
-	return (EPERM);
+	return (ENOENT);
 }
