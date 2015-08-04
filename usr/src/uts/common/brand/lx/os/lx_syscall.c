@@ -816,8 +816,8 @@ lx_sysent_t lx_sysent32[] = {
 	{"add_key",	NULL,			NOSYS_NULL,	0}, /* 286 */
 	{"request_key",	NULL,			NOSYS_NULL,	0}, /* 287 */
 	{"keyctl",	NULL,			NOSYS_NULL,	0}, /* 288 */
-	{"ioprio_set",	NULL,			NOSYS_NULL,	0}, /* 289 */
-	{"ioprio_get",	NULL,			NOSYS_NULL,	0}, /* 290 */
+	{"ioprio_set",	lx_ioprio_set,		0,		3}, /* 289 */
+	{"ioprio_get",	lx_ioprio_get,		0,		2}, /* 290 */
 	{"inotify_init", NULL,			0,		0}, /* 291 */
 	{"inotify_add_watch", NULL,		0,		3}, /* 292 */
 	{"inotify_rm_watch", NULL,		0,		2}, /* 293 */
@@ -1145,8 +1145,8 @@ lx_sysent_t lx_sysent64[] = {
 	{"add_key",	NULL,			NOSYS_NULL,	0}, /* 248 */
 	{"request_key",	NULL,			NOSYS_NULL,	0}, /* 249 */
 	{"keyctl",	NULL,			NOSYS_NULL,	0}, /* 250 */
-	{"ioprio_set",	NULL,			NOSYS_NULL,	0}, /* 251 */
-	{"ioprio_get",	NULL,			NOSYS_NULL,	0}, /* 252 */
+	{"ioprio_set",	lx_ioprio_set,		0,		3}, /* 251 */
+	{"ioprio_get",	lx_ioprio_get,		0,		2}, /* 252 */
 	{"inotify_init", NULL,			0,		0}, /* 253 */
 	{"inotify_add_watch", NULL,		0,		3}, /* 254 */
 	{"inotify_rm_watch", NULL,		0,		2}, /* 255 */
