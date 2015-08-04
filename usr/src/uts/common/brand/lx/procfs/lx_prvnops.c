@@ -1830,6 +1830,11 @@ lxpr_read_status_common(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf,
 	    0,
 	    0);
 
+	lxpr_uiobuf_printf(uiobuf,
+	    "CapBnd:\t%016llx\n",
+	    /* We report the full capability bounding set */
+	    0x1fffffffffLL);
+
 	lxpr_unlock(p);
 }
 
