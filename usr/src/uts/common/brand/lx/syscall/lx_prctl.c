@@ -191,6 +191,15 @@ lx_prctl(int opt, uintptr_t data)
 		return (0);
 	}
 
+	case LX_PR_CAPBSET_DROP: {
+		/*
+		 * On recent versions of Linux the login svc drops capabilities
+		 * and if that fails the svc dies and is restarted by systemd.
+		 * For now we pretend dropping capabilities succeeded.
+		 */
+		return (0);
+	}
+
 	default:
 		break;
 	}
