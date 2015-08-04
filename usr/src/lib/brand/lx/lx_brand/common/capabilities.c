@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2014 Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -66,12 +66,11 @@ typedef struct {
 #define	LX_CAP_SETPCAP	8
 
 /*
- * Even though we lack mappings for capabilities higher than 36, it's valuable
- * to test all the way out to the end of the second field.  This ensures that
- * new capabilities we lack support for are not silently accepted.
+ * Even though we lack mappings for capabilities higher than LX_CAP_MAX_VALID,
+ * it's valuable to test all the way out to the end of the second field. This
+ * ensures that new capabilities we lack support for are not silently accepted.
  */
 #define	LX_CAP_MAX_CHECK		63
-#define	LX_CAP_MAX_VALID		36
 
 #define	LX_CAP_CAPISSET(id, cap) \
 	(((id < 32) && (((0x1 << id) & cap[0]) != 0)) || \
