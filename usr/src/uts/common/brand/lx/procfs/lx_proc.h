@@ -197,6 +197,7 @@ typedef enum lxpr_nodetype {
 	LXPR_SYS_FS_INOTIFY_MAX_USER_INSTANCES,	/* inotify/max_user_instances */
 	LXPR_SYS_FS_INOTIFY_MAX_USER_WATCHES,	/* inotify/max_user_watches */
 	LXPR_SYS_KERNELDIR,	/* /proc/sys/kernel/	*/
+	LXPR_SYS_KERNEL_CAPLCAP,	/* /proc/sys/kernel/cap_last_cap */
 	LXPR_SYS_KERNEL_HOSTNAME,	/* /proc/sys/kernel/hostname */
 	LXPR_SYS_KERNEL_MSGMNI,	/* /proc/sys/kernel/msgmni */
 	LXPR_SYS_KERNEL_NGROUPS_MAX,	/* /proc/sys/kernel/ngroups_max */

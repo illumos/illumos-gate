@@ -70,6 +70,9 @@ extern "C" {
  */
 #define	LX_NSYSCALLS		358
 
+/* Highest capability we know about */
+#define	LX_CAP_MAX_VALID	36
+
 /*
  * brand(2) subcommands
  *

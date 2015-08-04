@@ -202,6 +202,7 @@ static void lxpr_read_sys_fs_inotify_max_user_instances(lxpr_node_t *,
     lxpr_uiobuf_t *);
 static void lxpr_read_sys_fs_inotify_max_user_watches(lxpr_node_t *,
     lxpr_uiobuf_t *);
+static void lxpr_read_sys_kernel_caplcap(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_kernel_hostname(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_kernel_msgmni(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_kernel_ngroups_max(lxpr_node_t *, lxpr_uiobuf_t *);
@@ -437,6 +438,7 @@ static lxpr_dirent_t sys_fs_inotifydir[] = {
  * contents of /proc/sys/kernel directory
  */
 static lxpr_dirent_t sys_kerneldir[] = {
+	{ LXPR_SYS_KERNEL_CAPLCAP,	"cap_last_cap" },
 	{ LXPR_SYS_KERNEL_HOSTNAME,	"hostname" },
 	{ LXPR_SYS_KERNEL_MSGMNI,	"msgmni" },
 	{ LXPR_SYS_KERNEL_NGROUPS_MAX,	"ngroups_max" },
@@ -647,6 +649,7 @@ static void (*lxpr_read_function[LXPR_NFILES])() = {
 	lxpr_read_sys_fs_inotify_max_user_instances, /* max_user_instances */
 	lxpr_read_sys_fs_inotify_max_user_watches, /* max_user_watches */
 	lxpr_read_invalid,		/* /proc/sys/kernel	*/
+	lxpr_read_sys_kernel_caplcap,	/* /proc/sys/kernel/cap_last_cap */
 	lxpr_read_sys_kernel_hostname,	/* /proc/sys/kernel/hostname */
 	lxpr_read_sys_kernel_msgmni,	/* /proc/sys/kernel/msgmni */
 	lxpr_read_sys_kernel_ngroups_max, /* /proc/sys/kernel/ngroups_max */
@@ -759,6 +762,7 @@ static vnode_t *(*lxpr_lookup_function[LXPR_NFILES])() = {
 	lxpr_lookup_not_a_dir,		/* .../inotify/max_user_instances */
 	lxpr_lookup_not_a_dir,		/* .../inotify/max_user_watches */
 	lxpr_lookup_sys_kerneldir,	/* /proc/sys/kernel	*/
+	lxpr_lookup_not_a_dir,		/* /proc/sys/kernel/cap_last_cap */
 	lxpr_lookup_not_a_dir,		/* /proc/sys/kernel/hostname */
 	lxpr_lookup_not_a_dir,		/* /proc/sys/kernel/msgmni */
 	lxpr_lookup_not_a_dir,		/* /proc/sys/kernel/ngroups_max */
@@ -871,6 +875,7 @@ static int (*lxpr_readdir_function[LXPR_NFILES])() = {
 	lxpr_readdir_not_a_dir,		/* .../inotify/max_user_instances */
 	lxpr_readdir_not_a_dir,		/* .../inotify/max_user_watches	*/
 	lxpr_readdir_sys_kerneldir,	/* /proc/sys/kernel	*/
+	lxpr_readdir_not_a_dir,		/* /proc/sys/kernel/cap_last_cap */
 	lxpr_readdir_not_a_dir,		/* /proc/sys/kernel/hostname */
 	lxpr_readdir_not_a_dir,		/* /proc/sys/kernel/msgmni */
 	lxpr_readdir_not_a_dir,		/* /proc/sys/kernel/ngroups_max */
@@ -3715,6 +3720,13 @@ lxpr_read_sys_fs_inotify_max_user_watches(lxpr_node_t *lxpnp,
 {
 	ASSERT(lxpnp->lxpr_type == LXPR_SYS_FS_INOTIFY_MAX_USER_WATCHES);
 	lxpr_uiobuf_printf(uiobuf, "%d\n", inotify_maxwatches);
+}
+
+static void
+lxpr_read_sys_kernel_caplcap(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+{
+	ASSERT(lxpnp->lxpr_type == LXPR_SYS_KERNEL_CAPLCAP);
+	lxpr_uiobuf_printf(uiobuf, "%d\n", LX_CAP_MAX_VALID);
 }
 
 static void
