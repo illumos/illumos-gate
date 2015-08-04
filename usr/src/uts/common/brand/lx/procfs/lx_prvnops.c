@@ -213,6 +213,7 @@ static void lxpr_read_sys_kernel_shmmax(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_kernel_threads_max(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_vm_minfr_kb(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_vm_nhpages(lxpr_node_t *, lxpr_uiobuf_t *);
+static void lxpr_read_sys_vm_overcommit_mem(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_vm_swappiness(lxpr_node_t *, lxpr_uiobuf_t *);
 
 /*
@@ -466,6 +467,7 @@ static lxpr_dirent_t sys_randdir[] = {
 static lxpr_dirent_t sys_vmdir[] = {
 	{ LXPR_SYS_VM_MINFR_KB,		"min_free_kbytes" },
 	{ LXPR_SYS_VM_NHUGEP,		"nr_hugepages" },
+	{ LXPR_SYS_VM_OVERCOMMIT_MEM,	"overcommit_memory" },
 	{ LXPR_SYS_VM_SWAPPINESS,	"swappiness" },
 };
 
@@ -488,6 +490,7 @@ lxpr_open(vnode_t **vpp, int flag, cred_t *cr, caller_context_t *ct)
 		switch (type) {
 		case LXPR_PID_OOM_SCR_ADJ:
 		case LXPR_PID_TID_OOM_SCR_ADJ:
+		case LXPR_SYS_VM_OVERCOMMIT_MEM:
 		case LXPR_SYS_VM_SWAPPINESS:
 			break;
 		default:
@@ -662,6 +665,7 @@ static void (*lxpr_read_function[LXPR_NFILES])() = {
 	lxpr_read_invalid,		/* /proc/sys/vm	*/
 	lxpr_read_sys_vm_minfr_kb,	/* /proc/sys/vm/min_free_kbytes */
 	lxpr_read_sys_vm_nhpages,	/* /proc/sys/vm/nr_hugepages */
+	lxpr_read_sys_vm_overcommit_mem, /* /proc/sys/vm/overcommit_memory */
 	lxpr_read_sys_vm_swappiness,	/* /proc/sys/vm/swappiness */
 	lxpr_read_uptime,		/* /proc/uptime		*/
 	lxpr_read_version,		/* /proc/version	*/
@@ -775,6 +779,7 @@ static vnode_t *(*lxpr_lookup_function[LXPR_NFILES])() = {
 	lxpr_lookup_sys_vmdir,		/* /proc/sys/vm */
 	lxpr_lookup_not_a_dir,		/* /proc/sys/vm/min_free_kbytes */
 	lxpr_lookup_not_a_dir,		/* /proc/sys/vm/nr_hugepages */
+	lxpr_lookup_not_a_dir,		/* /proc/sys/vm/overcommit_memory */
 	lxpr_lookup_not_a_dir,		/* /proc/sys/vm/swappiness */
 	lxpr_lookup_not_a_dir,		/* /proc/uptime		*/
 	lxpr_lookup_not_a_dir,		/* /proc/version	*/
@@ -888,6 +893,7 @@ static int (*lxpr_readdir_function[LXPR_NFILES])() = {
 	lxpr_readdir_sys_vmdir,		/* /proc/sys/vm */
 	lxpr_readdir_not_a_dir,		/* /proc/sys/vm/min_free_kbytes */
 	lxpr_readdir_not_a_dir,		/* /proc/sys/vm/nr_hugepages */
+	lxpr_readdir_not_a_dir,		/* /proc/sys/vm/overcommit_memory */
 	lxpr_readdir_not_a_dir,		/* /proc/sys/vm/swappiness */
 	lxpr_readdir_not_a_dir,		/* /proc/uptime		*/
 	lxpr_readdir_not_a_dir,		/* /proc/version	*/
@@ -3878,6 +3884,13 @@ lxpr_read_sys_vm_nhpages(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 }
 
 static void
+lxpr_read_sys_vm_overcommit_mem(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+{
+	ASSERT(lxpnp->lxpr_type == LXPR_SYS_VM_OVERCOMMIT_MEM);
+	lxpr_uiobuf_printf(uiobuf, "%d\n", 0);
+}
+
+static void
 lxpr_read_sys_vm_swappiness(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
 	ASSERT(lxpnp->lxpr_type == LXPR_SYS_VM_SWAPPINESS);
@@ -4312,9 +4325,10 @@ lxpr_access(vnode_t *vp, int mode, int flags, cred_t *cr, caller_context_t *ct)
 	/* lx /proc is a read only file system */
 	if (mode & VWRITE) {
 		switch (type) {
-		case LXPR_SYS_VM_SWAPPINESS:
 		case LXPR_PID_OOM_SCR_ADJ:
 		case LXPR_PID_TID_OOM_SCR_ADJ:
+		case LXPR_SYS_VM_OVERCOMMIT_MEM:
+		case LXPR_SYS_VM_SWAPPINESS:
 			break;
 		default:
 			return (EROFS);
@@ -5742,6 +5756,7 @@ lxpr_create(struct vnode *dvp, char *nm, struct vattr *vap,
 	 * We're currently restricting O_CREAT to:
 	 * - /proc/<pid>/oom_score_adj
 	 * - /proc/<pid>/task/<tid>/oom_score_adj
+	 * - /proc/sys/vm/overcommit_memory
 	 * - /proc/sys/vm/swappiness
 	 */
 	if ((type == LXPR_PIDDIR || type == LXPR_PID_TASK_IDDIR) &&
@@ -5753,7 +5768,9 @@ lxpr_create(struct vnode *dvp, char *nm, struct vattr *vap,
 			    PIDDIRFILES);
 		}
 		lxpr_unlock(p);
-	} else if (type == LXPR_SYS_VMDIR && strcmp(nm, "swappiness") == 0) {
+	} else if (type == LXPR_SYS_VMDIR &&
+	    (strcmp(nm, "overcommit_memory") == 0 ||
+	    strcmp(nm, "swappiness") == 0)) {
 		vp = lxpr_lookup_common(dvp, nm, NULL, sys_vmdir,
 		    SYS_VMDIRFILES);
 	}

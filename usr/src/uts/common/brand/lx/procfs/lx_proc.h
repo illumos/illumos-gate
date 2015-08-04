@@ -207,10 +207,11 @@ typedef enum lxpr_nodetype {
 	LXPR_SYS_KERNEL_RAND_BOOTID, /* /proc/sys/kernel/random/boot_id */
 	LXPR_SYS_KERNEL_SHMMAX,	/* /proc/sys/kernel/shmmax */
 	LXPR_SYS_KERNEL_THREADS_MAX,	/* /proc/sys/kernel/threads-max */
-	LXPR_SYS_VMDIR,		/* /proc/sys/vm			*/
-	LXPR_SYS_VM_MINFR_KB,	/* /proc/sys/vm/min_free_kbytes	*/
-	LXPR_SYS_VM_NHUGEP,	/* /proc/sys/vm/nr_hugepages	*/
-	LXPR_SYS_VM_SWAPPINESS,	/* /proc/sys/vm/swappiness	*/
+	LXPR_SYS_VMDIR,			/* /proc/sys/vm			*/
+	LXPR_SYS_VM_MINFR_KB,		/* /proc/sys/vm/min_free_kbytes	*/
+	LXPR_SYS_VM_NHUGEP,		/* /proc/sys/vm/nr_hugepages	*/
+	LXPR_SYS_VM_OVERCOMMIT_MEM,	/* /proc/sys/vm/overcommit_memory */
+	LXPR_SYS_VM_SWAPPINESS,		/* /proc/sys/vm/swappiness	*/
 	LXPR_UPTIME,		/* /proc/uptime		*/
 	LXPR_VERSION,		/* /proc/version	*/
 	LXPR_NFILES		/* number of lx /proc file types */
