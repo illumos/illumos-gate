@@ -724,9 +724,9 @@ lx_mount(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 		}
 
 		/*
-		 * Linux seems to always allow overlay mounts, but some distros
-		 * attempt to mount tmpfs on /dev and we can't allow that. We
-		 * also don't overlay on anything under /dev.
+		 * Linux seems to always allow overlay mounts. We allow this
+		 * everywhere except under /dev where it interferes with device
+		 * emulation.
 		 */
 		if (strcmp(targetp, "/dev") != 0 &&
 		    strncmp(targetp, "/dev/", 5) != 0)

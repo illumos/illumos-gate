@@ -67,6 +67,8 @@ extern long lx_getrlimit();
 extern long lx_gettid();
 extern long lx_gettimeofday();
 extern long lx_ioctl();
+extern long lx_ioprio_get();
+extern long lx_ioprio_set();
 extern long lx_kill();
 extern long lx_lchown();
 extern long lx_lchown16();
