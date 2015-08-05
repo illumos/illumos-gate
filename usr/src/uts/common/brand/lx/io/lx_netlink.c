@@ -29,17 +29,17 @@
 #include <sys/tihdr.h>
 #include <sys/sockio.h>
 #include <sys/brand.h>
+#include <sys/debug.h>
+#include <sys/ucred.h>
 #include <inet/ip.h>
 #include <inet/ip6.h>
 #include <inet/ip_impl.h>
 #include <inet/ip_ire.h>
 #include <sys/lx_brand.h>
 #include <sys/lx_misc.h>
+#include <sys/lx_socket.h>
 #include <sys/ethernet.h>
 #include <sys/dlpi.h>
-#include <sys/priv_const.h>
-#include <sys/priv_impl.h>
-#include <sys/priv.h>
 #include <sys/policy.h>
 
 /*
@@ -231,13 +231,6 @@
 #define	LX_NETLINK_IFA_F_NOPREFIXROUTE		0x200
 
 /*
- * Linux address families.
- */
-#define	LX_AF_INET		2
-#define	LX_AF_INET6		10
-#define	LX_AF_NETLINK		16
-
-/*
  * Linux interface flags.
  */
 #define	LX_IFF_UP		(1<<0)
@@ -306,6 +299,10 @@
 #define	LX_NETLINK_SO_RX_RING		6
 #define	LX_NETLINK_SO_TX_RING		7
 
+/* Internal socket flags */
+#define	LXNLF_RECVUCRED			0x1
+
+/* nlmsg structure macros */
 #define	LXNLMSG_ALIGNTO	4
 #define	LXNLMSG_ALIGN(len)	\
 	(((len) + LXNLMSG_ALIGNTO - 1) & ~(LXNLMSG_ALIGNTO - 1))
@@ -388,6 +385,7 @@ typedef struct lx_netlink_sock {
 	uint32_t lxns_port;			/* port identifier */
 	uint32_t lxns_groups;			/* group subscriptions */
 	uint32_t lxns_bufsize;			/* buffer size */
+	uint32_t lxns_flags;			/* socket flags */
 } lx_netlink_sock_t;
 
 typedef struct lx_netlink_reply {
@@ -438,7 +436,20 @@ static int
 lx_netlink_setsockopt(sock_lower_handle_t handle, int level,
     int option_name, const void *optval, socklen_t optlen, struct cred *cr)
 {
-	if (level == SOL_SOCKET) {
+	lx_netlink_sock_t *lxsock = (lx_netlink_sock_t *)handle;
+
+	if (level == SOL_SOCKET && option_name == SO_RECVUCRED) {
+		int *ival;
+		if (optlen != sizeof (int)) {
+			return (EINVAL);
+		}
+		ival = (int *)optval;
+		if (*ival == 0) {
+			lxsock->lxns_flags &= ~LXNLF_RECVUCRED;
+		} else {
+			lxsock->lxns_flags |= LXNLF_RECVUCRED;
+		}
+	} else if (level == SOL_SOCKET) {
 		return (0);
 	} else if (level != SOL_LX_NETLINK) {
 		return (EOPNOTSUPP);
@@ -531,10 +542,82 @@ lx_netlink_getsockname(sock_lower_handle_t handle, struct sockaddr *sa,
 }
 
 static mblk_t *
-lx_netlink_alloc_mp1()
+lx_netlink_alloc_mp1(lx_netlink_sock_t *lxsock)
 {
-	return (allocb(sizeof (struct T_unitdata_ind) +
-	    sizeof (lx_netlink_sockaddr_t), 0));
+	mblk_t *mp;
+	size_t size;
+	struct T_unitdata_ind *tunit;
+	lx_netlink_sockaddr_t *lxsa;
+	boolean_t send_ucred;
+
+	/*
+	 * Certain netlink clients (such as systemd) will set SO_RECVUCRED
+	 * (via the Linux SCM_CREDENTIALS) on the expectation that all replies
+	 * will contain credentials passed via cmsg.  They require this to
+	 * authenticate those messages as having originated in the kernel by
+	 * checking uc_pid == 0.
+	 */
+	VERIFY(lxsock != NULL);
+	send_ucred = ((lxsock->lxns_flags & LXNLF_RECVUCRED) != 0);
+
+	/*
+	 * Message structure:
+	 * +----------------------------+
+	 * | struct T_unit_data_ind	|
+	 * +----------------------------+
+	 * | lx_netlink_sockaddr_t	|
+	 * +----------------------------+  -+
+	 * | struct cmsghdr (SCM_UCRED)	|   |
+	 * +----------------------------+   +-(optional)
+	 * | struct ucred_s (cmsg data)	|   |
+	 * +----------------------------+  -+
+	 */
+	size = sizeof (*tunit) + sizeof (*lxsa);
+	if (send_ucred) {
+		size += sizeof (struct cmsghdr) +
+		    ROUNDUP_cmsglen(sizeof (struct ucred_s));
+	}
+	mp = allocb(size, 0);
+	if (mp == NULL) {
+		return (NULL);
+	}
+
+	tunit = (struct T_unitdata_ind *)mp->b_rptr;
+	lxsa = (lx_netlink_sockaddr_t *)((caddr_t)tunit + sizeof (*tunit));
+	mp->b_wptr += size;
+
+	mp->b_datap->db_type = M_PROTO;
+	tunit->PRIM_type = T_UNITDATA_IND;
+	tunit->SRC_length = sizeof (*lxsa);
+	tunit->SRC_offset = (caddr_t)lxsa - (caddr_t)mp->b_rptr;
+
+	lxsa->lxnl_family = AF_LX_NETLINK;
+	lxsa->lxnl_port = 0;
+	lxsa->lxnl_groups = 0;
+	lxsa->lxnl_pad = 0;
+
+	if (send_ucred) {
+		struct cmsghdr *cmsg;
+		struct ucred_s *ucred;
+
+		cmsg = (struct cmsghdr *)((caddr_t)lxsa + sizeof (*lxsa));
+		ucred = (struct ucred_s *)CMSG_CONTENT(cmsg);
+		cmsg->cmsg_len = sizeof (*cmsg) + sizeof (*ucred);
+		cmsg->cmsg_level = SOL_SOCKET;
+		cmsg->cmsg_type = SCM_UCRED;
+		bzero(ucred, sizeof (*ucred));
+		ucred->uc_size = sizeof (*ucred);
+		ucred->uc_zoneid = getzoneid();
+
+		tunit->OPT_length = sizeof (*cmsg) +
+		    ROUNDUP_cmsglen(sizeof (*ucred));
+		tunit->OPT_offset = (caddr_t)cmsg - (caddr_t)mp->b_rptr;
+	} else {
+		tunit->OPT_length = 0;
+		tunit->OPT_offset = 0;
+	}
+
+	return (mp);
 }
 
 static lx_netlink_reply_t *
@@ -551,7 +634,7 @@ lx_netlink_reply(lx_netlink_sock_t *lxsock,
 	if ((err = allocb(sizeof (lx_netlink_err_t), 0)) == NULL)
 		return (NULL);
 
-	if ((mp1 = lx_netlink_alloc_mp1()) == NULL) {
+	if ((mp1 = lx_netlink_alloc_mp1(lxsock)) == NULL) {
 		freeb(err);
 		return (NULL);
 	}
@@ -676,8 +759,6 @@ static void
 lx_netlink_reply_sendup(lx_netlink_reply_t *reply, mblk_t *mp, mblk_t *mp1)
 {
 	lx_netlink_sock_t *lxsock = reply->lxnr_sock;
-	lx_netlink_sockaddr_t *lxsa;
-	struct T_unitdata_ind *tunit;
 	int error;
 
 	/*
@@ -687,25 +768,8 @@ lx_netlink_reply_sendup(lx_netlink_reply_t *reply, mblk_t *mp, mblk_t *mp1)
 	 */
 	mp1->b_cont = mp;
 
-	mp = mp1;
-	mp->b_datap->db_type = M_PROTO;
-
-	tunit = (struct T_unitdata_ind *)mp->b_rptr;
-	tunit->PRIM_type = T_UNITDATA_IND;
-	tunit->SRC_length = sizeof (lx_netlink_sockaddr_t);
-	tunit->SRC_offset = sizeof (*tunit);
-	tunit->OPT_length = 0;
-
-	lxsa = (lx_netlink_sockaddr_t *)(mp->b_rptr + sizeof (*tunit));
-	lxsa->lxnl_family = AF_LX_NETLINK;
-	lxsa->lxnl_port = 0;
-	lxsa->lxnl_groups = 0;
-	lxsa->lxnl_pad = 0;
-
-	mp->b_wptr += sizeof (*tunit) + sizeof (*lxsa);
-
-	lxsock->lxns_upcalls->su_recv(lxsock->lxns_uphandle, mp,
-	    msgdsize(mp), 0, &error, NULL);
+	lxsock->lxns_upcalls->su_recv(lxsock->lxns_uphandle, mp1,
+	    msgdsize(mp1), 0, &error, NULL);
 
 	if (error != 0)
 		lx_netlink_flowctrld++;
@@ -719,7 +783,7 @@ lx_netlink_reply_send(lx_netlink_reply_t *reply)
 	if (reply->lxnr_errno)
 		return;
 
-	if ((mp1 = lx_netlink_alloc_mp1()) == NULL) {
+	if ((mp1 = lx_netlink_alloc_mp1(reply->lxnr_sock)) == NULL) {
 		reply->lxnr_errno = ENOMEM;
 		return;
 	}
@@ -752,18 +816,19 @@ lx_netlink_reply_done(lx_netlink_reply_t *reply)
 		}
 
 		mp = reply->lxnr_err;
+		VERIFY(mp != NULL);
+		reply->lxnr_err = NULL;
 		err = (lx_netlink_err_t *)mp->b_rptr;
 		hdr = &err->lxne_hdr;
+		mp->b_wptr += sizeof (lx_netlink_err_t);
 
+		err->lxne_failed = reply->lxnr_hdr;
+		err->lxne_errno = reply->lxnr_errno;
 		hdr->lxnh_type = LX_NETLINK_NLMSG_ERROR;
 		hdr->lxnh_seq = reply->lxnr_hdr.lxnh_seq;
 		hdr->lxnh_len = sizeof (lx_netlink_err_t);
 		hdr->lxnh_seq = reply->lxnr_hdr.lxnh_seq;
 		hdr->lxnh_pid = lxsock->lxns_port;
-		err->lxne_failed = reply->lxnr_hdr;
-		err->lxne_errno = reply->lxnr_errno;
-		mp->b_wptr += sizeof (lx_netlink_err_t);
-		reply->lxnr_err = NULL;
 	} else {
 		mp = reply->lxnr_mp;
 		VERIFY(mp != NULL);
