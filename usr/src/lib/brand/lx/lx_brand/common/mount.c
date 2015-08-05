@@ -724,6 +724,15 @@ lx_mount(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 		}
 
 		/*
+		 * Linux defaults to mode=1777 for tmpfs mounts.
+		 */
+		if (strstr(options, "mode=") == NULL) {
+			if (options[0] != '\0')
+				(void) strlcat(options, ",", sizeof (options));
+			(void) strlcat(options, "mode=1777", sizeof (options));
+		}
+
+		/*
 		 * Linux seems to always allow overlay mounts. We allow this
 		 * everywhere except under /dev where it interferes with device
 		 * emulation.
