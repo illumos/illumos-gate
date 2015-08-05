@@ -520,7 +520,7 @@ ltos_sockaddr_copyin(const struct sockaddr *inaddr, const socklen_t inlen,
  */
 static long
 stol_sockaddr_copyout(struct sockaddr *inaddr, socklen_t inlen,
-    struct sockaddr *outaddr, socklen_t *outlen, socklen_t orig)
+    struct sockaddr *outaddr, void *outlenp, socklen_t orig)
 {
 	socklen_t size = inlen;
 	struct sockaddr_storage buf;
@@ -533,14 +533,7 @@ stol_sockaddr_copyout(struct sockaddr *inaddr, socklen_t inlen,
 	VERIFY(inaddr != NULL || inlen == 0);
 
 	if (inlen == 0) {
-		/*
-		 * Inform userspace that there is no sockaddr as the result of
-		 * this operation by setting the output length to 0.
-		 */
-		if (copyout(&inlen, outlen, sizeof (inlen)) != 0) {
-			return (EFAULT);
-		}
-		return (0);
+		goto finish;
 	}
 
 
@@ -600,8 +593,20 @@ stol_sockaddr_copyout(struct sockaddr *inaddr, socklen_t inlen,
 	if (copyout(bufaddr, outaddr, size) != 0) {
 		return (EFAULT);
 	}
-	if (copyout(&inlen, outlen, sizeof (inlen)) != 0) {
-		return (EFAULT);
+
+finish:
+#if defined(_LP64)
+	if (get_udatamodel() != DATAMODEL_NATIVE) {
+		int32_t len32 = (int32_t)inlen;
+		if (copyout(&len32, outlenp, sizeof (len32)) != 0) {
+			return (EFAULT);
+		}
+	} else
+#endif /* defined(_LP64) */
+	{
+		if (copyout(&inlen, outlenp, sizeof (inlen)) != 0) {
+			return (EFAULT);
+		}
 	}
 
 	return (0);
@@ -902,7 +907,7 @@ ltos_cmsgs_copyin(void *addr, socklen_t inlen, void **outmsg,
 
 static long
 stol_cmsgs_copyout(void *input, socklen_t inlen, void *addr,
-    socklen_t *outlenp, socklen_t orig_outlen)
+    void *outlenp, socklen_t orig_outlen)
 {
 	void *obuf;
 	struct cmsghdr *inmsg, *omsg;
@@ -1006,9 +1011,20 @@ stol_cmsgs_copyout(void *input, socklen_t inlen, void *addr,
 	kmem_free(obuf, lx_len);
 
 finish:
-	if (outlenp != NULL &&
-	    copyout(&lx_len, outlenp, sizeof (lx_len)) != 0) {
-		return (EFAULT);
+	if (outlenp != NULL) {
+#if defined(_LP64)
+		if (get_udatamodel() != DATAMODEL_NATIVE) {
+			int32_t len32 = (int32_t)lx_len;
+			if (copyout(&len32, outlenp, sizeof (len32)) != 0) {
+				return (EFAULT);
+			}
+		} else
+#endif /* defined(_LP64) */
+		{
+			if (copyout(&lx_len, outlenp, sizeof (lx_len)) != 0) {
+				return (EFAULT);
+			}
+		}
 	}
 	return (error);
 }
@@ -1215,7 +1231,7 @@ lx_connect(long sock, uintptr_t name, socklen_t namelen)
 
 static long
 lx_recv_common(int sock, struct nmsghdr *msg, struct uio *uiop, int flags,
-    socklen_t *namelenp, socklen_t *controllenp, int *flagsp)
+    void *namelenp, void *controllenp, void *flagsp)
 {
 	struct sonode *so;
 	file_t *fp;
@@ -1442,9 +1458,7 @@ lx_recvmsg(int sock, void *msg, int flags)
 	int i, iovcnt, iovsize;
 	long res;
 	ssize_t len = 0;
-	socklen_t *namelenp;
-	socklen_t *controllenp;
-	int *flagsp;
+	void *namelenp, *controllenp, *flagsp;
 
 #if defined(_LP64)
 	if (get_udatamodel() != DATAMODEL_NATIVE) {
