@@ -145,7 +145,8 @@ typedef struct uioa_s {
  */
 typedef enum xuio_type {
 	UIOTYPE_ASYNCIO,
-	UIOTYPE_ZEROCOPY
+	UIOTYPE_ZEROCOPY,
+	UIOTYPE_PEEKSIZE
 } xuio_type_t;
 
 typedef struct xuio {
@@ -175,6 +176,15 @@ typedef struct xuio {
 			int xu_zc_rw;	/* read or write buffer */
 			void *xu_zc_priv;	/* fs specific */
 		} xu_zc;
+
+		/*
+		 * Peek Size Support -- facilitate peeking at the size of a
+		 * waiting message on a socket.
+		 */
+		struct {
+			ssize_t xu_ps_size;	/* size of waiting msg */
+			boolean_t xu_ps_set;	/* was size calculated? */
+		} xu_ps;
 	} xu_ext;
 } xuio_t;
 

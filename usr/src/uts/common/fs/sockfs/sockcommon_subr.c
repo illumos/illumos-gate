@@ -671,10 +671,15 @@ so_dequeue_msg(struct sonode *so, mblk_t **mctlp, struct uio *uiop,
 	int more = 0;
 	int error;
 	ssize_t oobmark;
+	ssize_t copied = 0;
 	sodirect_t *sodp = so->so_direct;
+	xuio_t *xuio = NULL;
 
 	partial_read = B_FALSE;
 	*mctlp = NULL;
+	if ((uiop->uio_extflg & UIO_XUIO) != 0) {
+		xuio = (xuio_t *)uiop;
+	}
 again:
 	mutex_enter(&so->so_lock);
 again1:
@@ -785,8 +790,6 @@ again1:
 		 * enabled socket, uio_resid can be 0.
 		 */
 		if (uiop->uio_resid >= 0) {
-			ssize_t copied = 0;
-
 			if (sodp != NULL && (DB_FLAGS(mp) & DBLK_UIOA)) {
 				mutex_enter(&so->so_lock);
 				ASSERT(uiop == (uio_t *)&sodp->sod_uioa);
@@ -844,6 +847,18 @@ again1:
 		}
 		if (mp != NULL) { /* more data blocks in msg */
 			more |= MOREDATA;
+
+			/*
+			 * If requested, tally up remaining data along with the
+			 * amount already copied.
+			 */
+			if (xuio != NULL &&
+			    xuio->xu_type == UIOTYPE_PEEKSIZE) {
+				xuio->xu_ext.xu_ps.xu_ps_set = B_TRUE;
+				xuio->xu_ext.xu_ps.xu_ps_size =
+				    copied + msgdsize(mp);
+			}
+
 			if ((flags & (MSG_PEEK|MSG_TRUNC))) {
 				if (flags & MSG_PEEK) {
 					freemsg(mp);
