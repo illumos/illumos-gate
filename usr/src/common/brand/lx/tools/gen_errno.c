@@ -185,12 +185,8 @@ process_line(const char *line, nvlist_t *nvl)
 	if (custr_alloc(&nam) != 0 || custr_alloc(&num) != 0) {
 		int en = errno;
 
-		if (nam != NULL) {
-			custr_free(nam);
-		}
-		if (num != NULL) {
-			custr_free(num);
-		}
+		custr_free(nam);
+		custr_free(num);
 
 		errno = en;
 		return (-1);
@@ -282,14 +278,12 @@ read_file_into_list(const char *path, nvlist_t *nvl)
 	FILE *f;
 	custr_t *cu = NULL;
 
-	if (custr_alloc(&cu) != 0 || custr_append(cu, "") != 0) {
-		if (cu != NULL) {
-			custr_free(cu);
-		}
+	if (custr_alloc(&cu) != 0) {
 		return (-1);
 	}
 
 	if ((f = fopen(path, "r")) == NULL) {
+		custr_free(cu);
 		return (-1);
 	}
 

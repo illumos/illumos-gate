@@ -311,9 +311,7 @@ hdlr_bareword(state_t *s)
 		return;
 	}
 
-	if ((str = custr_cstr(s->s_collect)) != NULL) {
-		abort();
-	}
+	str = custr_cstr(s->s_collect);
 	if (strcmp(str, "true") == 0) {
 		s->s_top->pf_value_type = JSON_TYPE_BOOLEAN;
 		s->s_top->pf_value = (void *)B_TRUE;
@@ -828,11 +826,9 @@ nvlist_parse_json(const char *buf, size_t buflen, nvlist_t **nvlp,
 	s.s_flags = flag;
 
 	/*
-	 * Allocate the collect buffer string and ensure it is backed by at
-	 * least some string memory.
+	 * Allocate the collect buffer string.
 	 */
-	if (custr_alloc(&s.s_collect) != 0 ||
-	    custr_append(s.s_collect, "") != 0) {
+	if (custr_alloc(&s.s_collect) != 0) {
 		s.s_errno = errno;
 		if (errout != NULL) {
 			(void) snprintf(errout->nje_message,
