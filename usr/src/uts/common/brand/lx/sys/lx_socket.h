@@ -284,9 +284,9 @@ typedef struct lx_msghdr {
 	void		*msg_name;	/* optional address */
 	socklen_t	msg_namelen;	/* size of address */
 	struct iovec	*msg_iov;	/* scatter/gather array */
-	int		msg_iovlen;	/* # elements in msg_iov */
+	size_t		msg_iovlen;	/* # elements in msg_iov */
 	void		*msg_control;	/* ancillary data */
-	socklen_t	msg_controllen;	/* ancillary data buffer len */
+	size_t		msg_controllen;	/* ancillary data buffer len */
 	int		msg_flags;	/* flags on received message */
 } lx_msghdr_t;
 
