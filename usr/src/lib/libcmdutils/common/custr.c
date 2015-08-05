@@ -14,7 +14,7 @@
  */
 
 /*
- * Copyright 2014, Joyent, Inc.
+ * Copyright 2015 Joyent, Inc.
  */
 
 #include <stdlib.h>
@@ -22,6 +22,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdarg.h>
+#include <sys/debug.h>
 
 #include "libcmdutils.h"
 
@@ -57,6 +58,16 @@ custr_len(custr_t *cus)
 const char *
 custr_cstr(custr_t *cus)
 {
+	if (cus->cus_data == NULL) {
+		VERIFY(cus->cus_strlen == 0);
+		VERIFY(cus->cus_datalen == 0);
+
+		/*
+		 * This function should never return NULL.  If no buffer has
+		 * been allocated, return a pointer to a zero-length string.
+		 */
+		return ("");
+	}
 	return (cus->cus_data);
 }
 
