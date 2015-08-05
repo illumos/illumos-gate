@@ -1230,7 +1230,7 @@ lx_connect(long sock, uintptr_t name, socklen_t namelen)
 }
 
 static long
-lx_recv_common(int sock, struct nmsghdr *msg, struct uio *uiop, int flags,
+lx_recv_common(int sock, struct nmsghdr *msg, xuio_t *xuiop, int flags,
     void *namelenp, void *controllenp, void *flagsp)
 {
 	struct sonode *so;
@@ -1242,6 +1242,7 @@ lx_recv_common(int sock, struct nmsghdr *msg, struct uio *uiop, int flags,
 	ssize_t len;
 	int error;
 	boolean_t fd_cloexec;
+	boolean_t is_peek_trunc;
 
 	if ((so = getsonode(sock, &error, &fp)) == NULL) {
 		return (set_errno(error));
@@ -1249,9 +1250,28 @@ lx_recv_common(int sock, struct nmsghdr *msg, struct uio *uiop, int flags,
 
 	fd_cloexec = ((flags & LX_MSG_CMSG_CLOEXEC) != 0);
 	flags = lx_xlate_sock_flags(flags, LX_TO_SUNOS);
-	len = uiop->uio_resid;
-	uiop->uio_fmode = fp->f_flag;
-	uiop->uio_extflg = UIO_COPY_CACHED;
+	is_peek_trunc = (flags & (MSG_PEEK|MSG_TRUNC)) == (MSG_PEEK|MSG_TRUNC);
+	len = xuiop->xu_uio.uio_resid;
+	xuiop->xu_uio.uio_fmode = fp->f_flag;
+	xuiop->xu_uio.uio_extflg = UIO_COPY_CACHED;
+
+	/*
+	 * Linux accepts MSG_TRUNC as an input flag, unlike SunOS and many
+	 * other UNIX distributions.  When combined with MSG_PEEK, it causes
+	 * recvmsg to return the size of the waiting message, regardless of
+	 * buffer size.  This behavior is commonly used with a 0-length buffer
+	 * to interrogate the size of a queued message prior to allocating a
+	 * buffer for it.
+	 *
+	 * In order to support this functionality, a custom XUIO type is used
+	 * to communicate the total message size out from the depths of sockfs.
+	 */
+	if (is_peek_trunc) {
+		xuiop->xu_uio.uio_extflg |= UIO_XUIO;
+		xuiop->xu_type = UIOTYPE_PEEKSIZE;
+		xuiop->xu_ext.xu_ps.xu_ps_set = B_FALSE;
+		xuiop->xu_ext.xu_ps.xu_ps_size = 0;
+	}
 
 	name = msg->msg_name;
 	namelen = msg->msg_namelen;
@@ -1270,7 +1290,7 @@ lx_recv_common(int sock, struct nmsghdr *msg, struct uio *uiop, int flags,
 	/* Default to XPG4.2 operation */
 	msg->msg_flags |= MSG_XPG4_2;
 
-	error = socket_recvmsg(so, msg, uiop, CRED());
+	error = socket_recvmsg(so, msg, (struct uio *)xuiop, CRED());
 	if (error) {
 		releasef(sock);
 		return (set_errno(error));
@@ -1357,7 +1377,16 @@ lx_recv_common(int sock, struct nmsghdr *msg, struct uio *uiop, int flags,
 		}
 	}
 
-	return (len - uiop->uio_resid);
+	/*
+	 * If both MSG_PEEK|MSG_TRUNC were set on the input flags and the
+	 * socket layer was able to calculate the total message size for us,
+	 * return that instead of the copied size.
+	 */
+	if (is_peek_trunc && xuiop->xu_ext.xu_ps.xu_ps_set == B_TRUE) {
+		return (xuiop->xu_ext.xu_ps.xu_ps_size);
+	}
+
+	return (len - xuiop->xu_uio.uio_resid);
 
 err:
 	if (msg->msg_controllen != 0) {
@@ -1375,8 +1404,8 @@ long
 lx_recv(int sock, void *buffer, size_t len, int flags)
 {
 	struct nmsghdr smsg;
-	struct uio auio;
-	struct iovec aiov[1];
+	xuio_t xuio;
+	struct iovec uiov;
 
 	if ((ssize_t)len < 0) {
 		/*
@@ -1386,19 +1415,19 @@ lx_recv(int sock, void *buffer, size_t len, int flags)
 		return (set_errno(EINVAL));
 	}
 
-	aiov[0].iov_base = buffer;
-	aiov[0].iov_len = len;
-	auio.uio_loffset = 0;
-	auio.uio_iov = aiov;
-	auio.uio_iovcnt = 1;
-	auio.uio_resid = len;
-	auio.uio_segflg = UIO_USERSPACE;
-	auio.uio_limit = 0;
+	uiov.iov_base = buffer;
+	uiov.iov_len = len;
+	xuio.xu_uio.uio_loffset = 0;
+	xuio.xu_uio.uio_iov = &uiov;
+	xuio.xu_uio.uio_iovcnt = 1;
+	xuio.xu_uio.uio_resid = len;
+	xuio.xu_uio.uio_segflg = UIO_USERSPACE;
+	xuio.xu_uio.uio_limit = 0;
 
 	smsg.msg_namelen = 0;
 	smsg.msg_controllen = 0;
 	smsg.msg_flags = 0;
-	return (lx_recv_common(sock, &smsg, &auio, flags, NULL, NULL, NULL));
+	return (lx_recv_common(sock, &smsg, &xuio, flags, NULL, NULL, NULL));
 }
 
 long
@@ -1406,22 +1435,22 @@ lx_recvfrom(int sock, void *buffer, size_t len, int flags,
     struct sockaddr *srcaddr, socklen_t *addrlenp)
 {
 	struct nmsghdr smsg;
-	struct uio auio;
-	struct iovec aiov[1];
+	xuio_t xuio;
+	struct iovec uiov;
 
 	if ((ssize_t)len < 0) {
 		/* Keep len reasonably limited (see lx_recv) */
 		return (set_errno(EINVAL));
 	}
 
-	aiov[0].iov_base = buffer;
-	aiov[0].iov_len = len;
-	auio.uio_loffset = 0;
-	auio.uio_iov = aiov;
-	auio.uio_iovcnt = 1;
-	auio.uio_resid = len;
-	auio.uio_segflg = UIO_USERSPACE;
-	auio.uio_limit = 0;
+	uiov.iov_base = buffer;
+	uiov.iov_len = len;
+	xuio.xu_uio.uio_loffset = 0;
+	xuio.xu_uio.uio_iov = &uiov;
+	xuio.xu_uio.uio_iovcnt = 1;
+	xuio.xu_uio.uio_resid = len;
+	xuio.xu_uio.uio_segflg = UIO_USERSPACE;
+	xuio.xu_uio.uio_limit = 0;
 
 	smsg.msg_name = (char *)srcaddr;
 	if (addrlenp != NULL && srcaddr != NULL) {
@@ -1445,7 +1474,7 @@ lx_recvfrom(int sock, void *buffer, size_t len, int flags,
 	smsg.msg_controllen = 0;
 	smsg.msg_flags = 0;
 
-	return (lx_recv_common(sock, &smsg, &auio, flags, addrlenp, NULL,
+	return (lx_recv_common(sock, &smsg, &xuio, flags, addrlenp, NULL,
 	    NULL));
 }
 
@@ -1453,8 +1482,8 @@ long
 lx_recvmsg(int sock, void *msg, int flags)
 {
 	struct nmsghdr smsg;
-	struct uio auio;
-	struct iovec buf[IOV_MAX_STACK], *aiov;
+	xuio_t xuio;
+	struct iovec luiov[IOV_MAX_STACK], *uiov;
 	int i, iovcnt, iovsize;
 	long res;
 	ssize_t len = 0;
@@ -1503,30 +1532,30 @@ lx_recvmsg(int sock, void *msg, int flags)
 	}
 	if (iovcnt > IOV_MAX_STACK) {
 		iovsize = iovcnt * sizeof (struct iovec);
-		aiov = kmem_alloc(iovsize, KM_SLEEP);
+		uiov = kmem_alloc(iovsize, KM_SLEEP);
 	} else {
 		iovsize = 0;
-		aiov = buf;
+		uiov = luiov;
 	}
 
 #if defined(_LP64)
 	if (get_udatamodel() != DATAMODEL_NATIVE) {
 		/* convert from 32bit iovec structs */
-		struct iovec32 buf32[IOV_MAX_STACK], *aiov32;
+		struct iovec32 luiov32[IOV_MAX_STACK], *uiov32;
 		ssize_t iov32size;
 		ssize32_t count32;
 
 		iov32size = iovcnt * sizeof (struct iovec32);
 		if (iovsize != 0) {
-			aiov32 = kmem_alloc(iov32size, KM_SLEEP);
+			uiov32 = kmem_alloc(iov32size, KM_SLEEP);
 		} else {
-			aiov32 = buf32;
+			uiov32 = luiov32;
 		}
 
-		if (copyin((struct iovec32 *)smsg.msg_iov, aiov32, iov32size)) {
+		if (copyin((struct iovec32 *)smsg.msg_iov, uiov32, iov32size)) {
 			if (iovsize != 0) {
-				kmem_free(aiov32, iov32size);
-				kmem_free(aiov, iovsize);
+				kmem_free(uiov32, iov32size);
+				kmem_free(uiov, iovsize);
 			}
 
 			return (set_errno(EFAULT));
@@ -1536,44 +1565,44 @@ lx_recvmsg(int sock, void *msg, int flags)
 		for (i = 0; i < iovcnt; i++) {
 			ssize32_t iovlen32;
 
-			iovlen32 = aiov32[i].iov_len;
+			iovlen32 = uiov32[i].iov_len;
 			count32 += iovlen32;
 			if (iovlen32 < 0 || count32 < 0) {
 				if (iovsize != 0) {
-					kmem_free(aiov32, iov32size);
-					kmem_free(aiov, iovsize);
+					kmem_free(uiov32, iov32size);
+					kmem_free(uiov, iovsize);
 				}
 
 				return (set_errno(EINVAL));
 			}
 
-			aiov[i].iov_len = iovlen32;
-			aiov[i].iov_base =
-			    (caddr_t)(uintptr_t)aiov32[i].iov_base;
+			uiov[i].iov_len = iovlen32;
+			uiov[i].iov_base =
+			    (caddr_t)(uintptr_t)uiov32[i].iov_base;
 		}
 		len = count32;
 
 		if (iovsize != 0) {
-			kmem_free(aiov32, iov32size);
+			kmem_free(uiov32, iov32size);
 		}
 	} else
 #endif /* defined(_LP64) */
 	{
-		if (copyin(smsg.msg_iov, aiov,
+		if (copyin(smsg.msg_iov, uiov,
 		    iovcnt * sizeof (struct iovec)) != 0) {
 			if (iovsize != 0) {
-				kmem_free(aiov, iovsize);
+				kmem_free(uiov, iovsize);
 			}
 			return (set_errno(EFAULT));
 		}
 
 		len = 0;
 		for (i = 0; i < iovcnt; i++) {
-			ssize_t iovlen = aiov[i].iov_len;
+			ssize_t iovlen = uiov[i].iov_len;
 			len += iovlen;
 			if (iovlen < 0 || len < 0) {
 				if (iovsize != 0) {
-					kmem_free(aiov, iovsize);
+					kmem_free(uiov, iovsize);
 				}
 				return (set_errno(EINVAL));
 			}
@@ -1582,18 +1611,18 @@ lx_recvmsg(int sock, void *msg, int flags)
 	/* Since the iovec is passed via the uio, NULL it out in the msg */
 	smsg.msg_iov = NULL;
 
-	auio.uio_loffset = 0;
-	auio.uio_iov = aiov;
-	auio.uio_iovcnt = iovcnt;
-	auio.uio_resid = len;
-	auio.uio_segflg = UIO_USERSPACE;
-	auio.uio_limit = 0;
+	xuio.xu_uio.uio_loffset = 0;
+	xuio.xu_uio.uio_iov = uiov;
+	xuio.xu_uio.uio_iovcnt = iovcnt;
+	xuio.xu_uio.uio_resid = len;
+	xuio.xu_uio.uio_segflg = UIO_USERSPACE;
+	xuio.xu_uio.uio_limit = 0;
 
-	res = lx_recv_common(sock, &smsg, &auio, flags, namelenp, controllenp,
+	res = lx_recv_common(sock, &smsg, &xuio, flags, namelenp, controllenp,
 	    flagsp);
 
 	if (iovsize != 0) {
-		kmem_free(aiov, iovsize);
+		kmem_free(uiov, iovsize);
 	}
 
 	return (res);
