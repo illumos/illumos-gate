@@ -20,6 +20,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2015 Gary Mills
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -34,13 +35,14 @@
 
 #include "ldap_parse.h"
 #include "nis_parse_ldap_conf.h"
-#include "nis_parse_ldap_err.h"
+#include "nis_parse_ldap_util.h"
 #include "ldap_util.h"
 
-extern __nis_mapping_rule_t **dup_mapping_rules(
-	__nis_mapping_rule_t **rules, int n_rules);
-extern __nis_mapping_rule_t *dup_mapping_rule(
-	__nis_mapping_rule_t *in);
+/* Forward declarations */
+int getfullmapname(char **, const char *);
+int checkfullmapname(const char *, const char *, __nis_table_mapping_t **,
+    __nis_table_mapping_t **);
+int append_domainContext(__nis_table_mapping_t **, char *, char *);
 
 static int	merge_table_mapping(__nis_table_mapping_t *in,
 	__nis_table_mapping_t *out);
@@ -138,7 +140,6 @@ merge_table_mapping(
 	__nis_table_mapping_t *out)
 {
 	int i;
-	int len;
 	int orig_num_rules;
 	int append;
 
@@ -434,15 +435,12 @@ second_parser_pass(__nis_table_mapping_t **table_mapping)
 	__nis_table_mapping_t   *t, *t2;
 	__nis_table_mapping_t   *t_new = NULL, *tg;
 	__nis_table_mapping_t	*prev = NULL;
-	__nis_object_dn_t   *objectDN;
 	char	*objs, *dom;
 	char	*objName = NULL;
 	char	*lasts;
 	char	*tobj, *alias, *dupalias, *tmp;
 	char	*myself = "second_parser_pass";
 	int	i = 0, len;
-	int	remove_t = 0;
-	int	add_t = 0;
 
 	prev = NULL;
 	for (t = *table_mapping; t != NULL; ) {

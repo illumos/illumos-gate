@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2015 Gary Mills
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -515,7 +516,6 @@ ldapInit(char *srv, int port, bool_t use_ssl) {
 	int			derefOption = LDAP_DEREF_ALWAYS;
 	int			timelimit = proxyInfo.search_time_limit;
 	int			sizelimit = proxyInfo.search_size_limit;
-	char			*myself = "ldapInit";
 
 	if (srv == 0)
 		return (0);
@@ -618,7 +618,6 @@ ldapBind(LDAP **ldP, char *who, char *cred, auth_method_t method,
  */
 static int
 freeCon(__nis_ldap_conn_t *lc) {
-	char			*myself = "freeCon";
 
 	if (!assertExclusive(lc))
 		return (LDAP_PARAM_ERROR);
@@ -1034,7 +1033,7 @@ setupConList(char *serverList, char *who, char *cred, auth_method_t method) {
 	}
 
 	/* Remove leading white space */
-	for (0; *sl == ' ' || *sl == '\t'; sl++);
+	for (; *sl == ' ' || *sl == '\t'; sl++);
 
 	/* Create connection for each server on the list */
 	for (s = sl; *s != '\0'; s = e+1) {
@@ -2227,7 +2226,6 @@ ldapModify(char *dn, __nis_rule_value_t *rv, char *objClassAttrs,
 	__nis_ldap_conn_t	*lc;
 	struct timeval		tv;
 	LDAPMessage		*msg = 0;
-	char			*myself = "ldapModify";
 	int			msgid;
 	int			lderr;
 	char			**referralsp = NULL;

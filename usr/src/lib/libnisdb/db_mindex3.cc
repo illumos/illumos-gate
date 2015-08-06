@@ -19,8 +19,11 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2015 Gary Mills
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2015 RackTop Systems.
  */
 
 #include <sys/types.h>
@@ -214,7 +217,7 @@ db_mindex::entriesFromLDAP(__nis_table_mapping_t *t, db_query *qin, db_query *q,
 			logmsg(MSG_NOTIMECHECK, LOG_WARNING,
 			"%s: Error %d creating new thread; using current one",
 				myself, stat);
-			stat = (int)entriesFromLDAPthread(arg);
+			stat = entriesFromLDAPreal(arg);
 			return (stat);
 		}
 
@@ -257,7 +260,7 @@ db_mindex::entriesFromLDAP(__nis_table_mapping_t *t, db_query *qin, db_query *q,
 #endif	/* FORCE_SYNCHRONOUS */
 	} else {
 		(void) mutex_unlock(&table->mapping.enumLock);
-		stat = (int)entriesFromLDAPthread(arg);
+		stat = entriesFromLDAPreal(arg);
 	}
 
 	return (stat);
@@ -273,7 +276,6 @@ extern "C" {
 static void *
 entriesFromLDAPthread(void *voidarg) {
 	__entries_from_ldap_arg_t	*arg;
-	int				stat;
 	db				*dbase;
 	db_table_desc			*tbl = 0;
 	char				*tableName;
@@ -311,7 +313,7 @@ entriesFromLDAPthread(void *voidarg) {
 		tableName = 0;
 	}
 
-	stat = entriesFromLDAPreal(arg);
+	(void) entriesFromLDAPreal(arg);
 
 	(void) __nis_ulock_db_table(arg->tableName, 1, 0,
 					"entriesFromLDAPthread");
@@ -320,7 +322,7 @@ entriesFromLDAPthread(void *voidarg) {
 	if (arg->dirObj != 0)
 		nis_destroy_object(arg->dirObj);
 	sfree(arg);
-	return ((void *)stat);
+	return (NULL);
 }
 
 }

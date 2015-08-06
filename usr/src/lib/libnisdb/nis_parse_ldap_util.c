@@ -20,11 +20,10 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2015 Gary Mills
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <string.h>
@@ -61,6 +60,7 @@ __nis_mapping_format_t *dup_format_mapping(
 	__nis_mapping_format_t *in);
 bool_t dup_mapping_element(__nis_mapping_element_t *in,
 	__nis_mapping_element_t *out);
+bool_t is_string_ok(char *, int);
 
 extern FILE *cons;
 

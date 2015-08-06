@@ -20,11 +20,10 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2015 Gary Mills
  * Copyright (c) 2001 by Sun Microsystems, Inc.
  * All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <rpc/types.h>
@@ -107,8 +106,6 @@ find_reader(pthread_t id, __nisdb_rwlock_t *rw) {
 int
 __nisdb_rw_readlock_ok(__nisdb_rwlock_t *rw) {
 	int		ret;
-	pthread_t	myself = pthread_self();
-	__nisdb_rl_t	*rr;
 
 	if (rw == 0)
 		return (EFAULT);
@@ -139,8 +136,6 @@ __nisdb_rw_readlock_ok(__nisdb_rwlock_t *rw) {
 int
 __nisdb_rw_force_writelock(__nisdb_rwlock_t *rw) {
 	int		ret;
-	pthread_t	myself = pthread_self();
-	__nisdb_rl_t	*rr;
 
 	if (rw == 0 || rw->destroyed != 0)
 		return (ESHUTDOWN);
@@ -206,7 +201,7 @@ __nisdb_wlock_trylock(__nisdb_rwlock_t *rw, int trylock) {
 	 */
 	if (rw->reader_count > 0) {
 		if ((rr = find_reader(myself, rw)) != 0) {
-			if (rr->count)
+			if (rr->count) {
 				/*
 				 * We're already holding a read lock, so
 				 * if the number of readers equals the number
@@ -216,7 +211,7 @@ __nisdb_wlock_trylock(__nisdb_rwlock_t *rw, int trylock) {
 				if (rw->reader_count ==
 						(rw->reader_blocked + 1))
 					all_readers_blocked = 1;
-			else
+			} else {
 				/*
 				 * We're not holding a read lock, so the
 				 * number of readers should equal the number
@@ -225,6 +220,7 @@ __nisdb_wlock_trylock(__nisdb_rwlock_t *rw, int trylock) {
 				 */
 				if (rw->reader_count == rw->reader_blocked)
 					all_readers_blocked = 1;
+			}
 		}
 	}
 
@@ -239,11 +235,11 @@ __nisdb_wlock_trylock(__nisdb_rwlock_t *rw, int trylock) {
 		 *		- N readers, but all blocked on the mutex
 		 */
 		if (
-			(rw->writer_count == 0 && rw->reader_count == 0) ||
-			((rw->writer_count == 0 || rw->writer.id == myself) &&
-				(rw->reader_count == 0) ||
-				(rw->reader_count == 1 &&
-					rw->reader.id == myself))) {
+		    (rw->writer_count == 0 && rw->reader_count == 0) ||
+		    (((rw->writer_count == 0 || rw->writer.id == myself) &&
+		    (rw->reader_count == 0)) ||
+		    (rw->reader_count == 1 &&
+		    rw->reader.id == myself))) {
 			break;
 		}
 		/*
@@ -648,7 +644,6 @@ __nisdb_destroy_lock(__nisdb_rwlock_t *rw) {
 
 	int		ret;
 	pthread_t	myself = pthread_self();
-	__nisdb_rl_t	*rr;
 
 
 	if (rw == 0) {
@@ -674,12 +669,12 @@ __nisdb_destroy_lock(__nisdb_rwlock_t *rw) {
 	 * other than this thread. Also, no nested locks may be in
 	 * effect.
 	 */
-	if ((rw->writer_count > 0 &&
-			(rw->writer.id != myself || rw->writer.count != 1) ||
-		(rw->reader_count > 0 &&
-			!(rw->reader_count == 1 && rw->reader.id == myself &&
-				rw->reader.count == 1))) ||
-		(rw->writer_count > 0 && rw->reader_count > 0)) {
+	if (((rw->writer_count > 0 &&
+	    (rw->writer.id != myself || rw->writer.count != 1)) ||
+	    (rw->reader_count > 0 &&
+	    !(rw->reader_count == 1 && rw->reader.id == myself &&
+	    rw->reader.count == 1))) ||
+	    (rw->writer_count > 0 && rw->reader_count > 0)) {
 #ifdef	NISDB_MT_DEBUG
 		abort();
 #endif	/* NISDB_MT_DEBUG */

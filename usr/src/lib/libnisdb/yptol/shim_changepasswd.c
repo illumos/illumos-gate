@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2015 Gary Mills
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * DESCRIPTION: This is the N2L equivalent of changepasswd.c. The traditional
@@ -69,6 +68,11 @@
 #include "shim.h"
 #include "yptol.h"
 #include "../ldap_util.h"
+
+/*
+ * Undocumented external function in libnsl
+ */
+extern int  getdomainname(char *, int);
 
 /* Constants */
 #define	CRYPTPWSIZE CRYPT_MAXCIPHERTEXTLEN
@@ -433,7 +437,6 @@ proc_map_list(char **map_list, char *domain,
 	char	cmdbuf[BUFSIZ];
 	int	map_name_len = 0;
 	int	index, ans = 0;
-	int	res;
 
 	/* If this is a adjunct list check LDAP had some adjunct info */
 	if ((adjunct_flag) && (!pwd->adjunct)) {
@@ -1054,7 +1057,6 @@ get_old_info(char *name, char *domain)
 {
 	char *myself = "get_old_info";
 	struct passwd_entry *old_passwd;
-	char	*p;
 	datum	key, data;
 	suc_code res;
 

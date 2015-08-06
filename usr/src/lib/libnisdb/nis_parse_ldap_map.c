@@ -20,11 +20,10 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2015 Gary Mills
  * Copyright 2001-2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <string.h>
@@ -36,6 +35,8 @@
 
 #include "ldap_parse.h"
 #include "nis_parse_ldap_conf.h"
+#include "nis_parse_ldap_yp_util.h"
+#include "nis_parse_ldap_util.h"
 
 /* other attribute functions */
 static char *getIndex(const char **s_cur, const char *end_s);
@@ -93,7 +94,6 @@ add_mapping_attribute(
 	const char		*attrib_end;
 	const char		*db_id_end;
 	const char		*begin_token;
-	const char		*end_token;
 	char			*index_string;
 	__nis_object_dn_t	*objectDN;
 	__nis_table_mapping_t	*t_mapping;
@@ -378,9 +378,6 @@ add_ypdomains_attribute(
 	const char 		*s;
 	const char		*attrib_end;
 	int				numDomains = 0;
-	int 			i;
-	char			*tmp_str;
-	int				ret = 0;
 
 	attrib_end = attrib_val + attrib_len;
 	for (s = attrib_val; s < attrib_end; s++) {
@@ -1511,8 +1508,8 @@ get_rhs(
 				}
 
 				if (end_token == begin_token + 1 ||
-				    *begin_token == ESCAPE_CHAR &&
-				    end_token == begin_token + 2) {
+				    (*begin_token == ESCAPE_CHAR &&
+				    end_token == begin_token + 2)) {
 					e->type = me_split;
 					e->element.split.item = item;
 					e->element.split.delim = *begin_token;
@@ -1652,9 +1649,9 @@ get_print_mapping_element(
 			end_token = end_s;
 			s = get_next_token(&begin_token, &end_token, &t);
 			if (s != NULL && t == quoted_string_token &&
-				(end_token == begin_token + 1 ||
-				    *begin_token == ESCAPE_CHAR &&
-				    end_token == begin_token + 2)) {
+			    (end_token == begin_token + 1 ||
+			    (*begin_token == ESCAPE_CHAR &&
+			    end_token == begin_token + 2))) {
 				if (numSubElements != 1 ||
 				    subElement->type == me_extract ||
 				    subElement->type == me_split) {
@@ -2067,8 +2064,8 @@ get_subElement(
 				break;
 			}
 			if (end_token == begin_token + 1 ||
-			    *begin_token == ESCAPE_CHAR &&
-			    end_token == begin_token + 2) {
+			    (*begin_token == ESCAPE_CHAR &&
+			    end_token == begin_token + 2)) {
 					/* me_split */
 				delim = (unsigned char)end_token[-1];
 				s = skip_token(s, end_s, close_paren_token);

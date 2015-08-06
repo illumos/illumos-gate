@@ -19,12 +19,15 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2015 Gary Mills
+ */
+
 /*
  * This is a non-recursive version of XDR routine used for db_index_entry
  * type.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/syslog.h>
@@ -34,6 +37,7 @@
 #include <memory.h>
 #include "db_index_entry_c.h"
 #include "db_table_c.h"
+#include "xdr_nullptr.h"
 
 bool_t
 xdr_db_index_entry(xdrs, objp)
