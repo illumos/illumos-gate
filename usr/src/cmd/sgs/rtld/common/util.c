@@ -3072,7 +3072,6 @@ eprintf(Lm_list *lml, Error error, const char *format, ...)
 	va_end(args);
 }
 
-#if	DEBUG
 /*
  * Provide assfail() for ASSERT() statements.  See <sys/debug.h> for further
  * details.
@@ -3089,11 +3088,11 @@ void
 assfail3(const char *msg, uintmax_t a, const char *op, uintmax_t b,
     const char *f, int l)
 {
-	(void) printf("assertion failed: %s (%llu %s %llu), "
-	    "file: %s, line: %d\n", msg, a, op, b, f, l);
+	(void) printf("assertion failed: %s (0x%llx %s 0x%llx), "
+	    "file: %s, line: %d\n", msg, (unsigned long long)a, op,
+	    (unsigned long long)b, f, l);
 	(void) _lwp_kill(_lwp_self(), SIGABRT);
 }
-#endif
 
 /*
  * Exit.  If we arrive here with a non zero status it's because of a fatal
