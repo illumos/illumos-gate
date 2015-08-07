@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2015 Gary Mills
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -109,7 +110,7 @@ __nis_rule_value_t *
 growRuleValue(int oldCount, int newCount, __nis_rule_value_t *old,
 		__nis_rule_value_t *rvIn) {
 	__nis_rule_value_t	*rv;
-	int			i, j;
+	int			i;
 	char			*myself = "growRuleValue";
 
 	if (newCount <= 0 || newCount <= oldCount)
@@ -425,8 +426,6 @@ __nis_rule_value_t *
 buildNisPlusRuleValue(__nis_table_mapping_t *t, db_query *q,
 			__nis_rule_value_t *rv) {
 	int			i;
-	__nis_single_value_t	*sv;
-	char			*myself = "buildNisPlusRuleValue";
 
 	if (t == 0 || q == 0)
 		return (0);
@@ -436,9 +435,6 @@ buildNisPlusRuleValue(__nis_table_mapping_t *t, db_query *q,
 		return (0);
 
 	for (i = 0; i < q->components.components_len; i++) {
-		int	ic;
-		int	iv, v, dup;
-		int	len;
 
 		/* Ignore out-of-range column index */
 		if (q->components.components_val[i].which_index >=
@@ -617,9 +613,7 @@ addLdapRuleValue(__nis_table_mapping_t *t,
 			__nis_rule_value_t *rv,
 			int doAssign, int *stat) {
 	int			i, j;
-	char			**new;
 	__nis_value_t		*rval, *lval;
-	__nis_buffer_t		b = {0, 0};
 	__nis_mapping_item_t	*litem;
 	int			numItems;
 	char			**dn = 0;
@@ -745,7 +739,7 @@ addLdapRuleValue(__nis_table_mapping_t *t,
 		/* If we're out of values, repeat the last one */
 		if (j >= rval->numVals)
 			j = (rval->numVals > 0) ? rval->numVals-1 : 0;
-		for (0; j < rval->numVals; j++) {
+		for (; j < rval->numVals; j++) {
 			/*
 			 * If this is the 'dn', and the value ends in a
 			 * comma, append the appropriate search base.

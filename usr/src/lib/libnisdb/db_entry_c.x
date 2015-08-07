@@ -22,11 +22,10 @@
 /*
  *	db_entry_c.x
  *
+ * Copyright 2015 Gary Mills
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-%#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Some manifest constants, chosen to maximize flexibility without
@@ -39,6 +38,10 @@
 
 %#include <rpcsvc/nis.h>
 #endif /* RPC_HDR */
+
+#if RPC_XDR
+%#include "nis_clnt.h"
+#endif /* RPC_XDR */
 
 #ifdef USINGC
 enum db_status {DB_SUCCESS, DB_NOTFOUND, DB_NOTUNIQUE,

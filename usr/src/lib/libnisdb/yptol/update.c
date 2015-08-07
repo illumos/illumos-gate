@@ -20,11 +20,10 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2015 Gary Mills
  * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * DESCRIPTION: Contains the map update thread and related code.
@@ -358,6 +357,8 @@ update_thread(void *arg)
 	free_map_ctrl(map);
 
 	thr_exit(ret);
+
+	return (NULL);
 }
 
 /*

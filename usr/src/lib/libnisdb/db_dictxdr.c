@@ -22,13 +22,13 @@
 /*
  *	db_dictxdr.c
  *
+ * Copyright 2015 Gary Mills
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "db_dictionary_c.h"
+#include "db_dictionary.h"
 #include "db_vers_c.h"
 
 extern vers db_update_version;

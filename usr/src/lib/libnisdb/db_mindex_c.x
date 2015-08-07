@@ -21,9 +21,15 @@
 /*
  *	db_mindex_c.x
  *
+ * Copyright 2015 Gary Mills
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+#if RPC_XDR
+%#include "ldap_xdr.h"
+%#include "nis_clnt.h"
+#endif /* RPC_XDR */
 
 #if RPC_HDR
 %#ifndef _DB_MINDEX_H
@@ -89,7 +95,6 @@ struct xdr_nis_object_s {
 };
 typedef struct xdr_nis_object_s	xdr_nis_object_t;
 
-%extern bool_t	xdr_nis_object();
 #endif /* USINGC */
 #endif /* RPC_HDR */
 
@@ -105,8 +110,6 @@ typedef struct xdr_nis_object_s	xdr_nis_object_t;
 %	}				dirEntry;
 %};
 %typedef struct xdr_nis_object_s	xdr_nis_object_t;
-%
-%extern bool_t	xdr_nis_object();
 %
 %class db_mindex {
 %  vers rversion;

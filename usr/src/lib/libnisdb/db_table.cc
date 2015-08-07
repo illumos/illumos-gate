@@ -24,6 +24,8 @@
  *
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2015 RackTop Systems.
  */
 
 #include <stdio.h>
@@ -74,7 +76,7 @@ __setMaxTimeT(void)
 	(void) memcpy(&maxTimeT, b, sizeof (time_t));
 
 	if (maxTimeT < 1)
-		maxTimeT = ~(1<<((8*sizeof (maxTimeT))-1));
+		maxTimeT = ~(1L<<((8*sizeof (maxTimeT))-1));
 }
 #pragma init(__setMaxTimeT)
 }

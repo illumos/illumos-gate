@@ -20,11 +20,10 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2015 Gary Mills
  * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * DESCRIPTION: Contains a front end to the map locking code. These are called
@@ -45,6 +44,7 @@
 #include <ndbm.h>
 #include "ypsym.h"
 #include "shim.h"
+#include "stubs.h"
 
 /*
  * FUNCTION : 	lock_map_ctrl()

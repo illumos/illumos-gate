@@ -20,11 +20,10 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2015 Gary Mills
  * Copyright 2001-2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/systeminfo.h>
 #include <strings.h>
@@ -215,7 +214,7 @@ makeFilter(char *attr) {
 	}
 	for (s = c = 0; s < len; s = e+1) {
 		/* Skip blank space, if any */
-		for (0; str[s] == ' ' || str[s] == '\t'; s++);
+		for (; str[s] == ' ' || str[s] == '\t'; s++);
 		/* Find delimiter (comma) or end of string */
 		for (e = s; str[e] != '\0' && str[e] != ','; e++);
 		str[e] = '\0';
@@ -285,7 +284,7 @@ makeFilterComp(char *filter, int *numComps) {
 			return (0);
 		for (s = 2; s < len; s = e+1) {
 			/* Skip past the '(' */
-			for (0; s < len && str[s] != '('; s++);
+			for (; s < len && str[s] != '('; s++);
 			s++;
 			if (s >= len)
 				break;

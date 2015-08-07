@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2015 Gary Mills
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -41,6 +42,7 @@
 #include "ldap_nisdbquery.h"
 #include "ldap_attr.h"
 #include "ldap_xdr.h"
+#include "ldap_ldap.h"
 
 
 item *
@@ -224,7 +226,7 @@ createQuery(int num, char **index, __nis_table_mapping_t *t,
 		__nis_rule_value_t **rvP, int *numVals) {
 	db_query		**q;
 	db_qcomp		*qc;
-	int			i, j, n, a, nv, niv, stat, sinum;
+	int			i, j, n, a, nv, niv;
 	__nis_rule_value_t	*rvq;
 	__nis_buffer_t		b = {0, 0};
 	char			*table = 0;
@@ -257,7 +259,6 @@ createQuery(int num, char **index, __nis_table_mapping_t *t,
 
 	/* Create a rule-value from the col=val pairs */
 	for (n = 0; n < num; n++) {
-		char	*name;
 		char	*value;
 
 		if ((value = strchr(index[n], '=')) == 0) {
@@ -272,7 +273,6 @@ createQuery(int num, char **index, __nis_table_mapping_t *t,
 
 		for (a = 0; a < t->numColumns; a++) {
 			if (strcmp(index[n], t->column[a]) == 0) {
-				int		i, len = slen(value)+1;
 
 				/* Add col=val pair to 'rvq' */
 				if (addSCol2RuleValue(index[n], value, rvq)) {
@@ -692,7 +692,7 @@ createNisPlusEntry(__nis_table_mapping_t *t, __nis_rule_value_t *rv,
 	__nis_value_t		*rval, *lval;
 	__nis_mapping_item_t	*litem;
 	int			numItems;
-	int			nq, iqc;
+	int			nq;
 	__nis_obj_attr_t	**attr = 0;
 	char			**dn = 0;
 	int			numDN = 0;

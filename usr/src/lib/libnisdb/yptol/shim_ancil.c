@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2015 Gary Mills
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -30,12 +31,6 @@
  * Portions of this source code were derived from Berkeley 4.3 BSD
  * under license from the Regents of the University of California.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#ifndef	lint
-static	char sccsid[] = "%Z%%M% %I%     %E% SMI";
-#endif
 
 #include <stdlib.h>
 #include <dirent.h>

@@ -19,6 +19,7 @@
 # CDDL HEADER END
 #
 #
+# Copyright 2015 Gary Mills
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -134,17 +135,43 @@ LARGEPICS=	$(LARGESYMS:%=pics/%)
 $(LARGEPICS) :=	sparc_C_PICFLAGS = $(C_BIGPICFLAGS)
 $(LARGEPICS) :=	i386_C_PICFLAGS = $(C_BIGPICFLAGS)
 
+# More and stricter semantic checks and lint-like checks
+CFLAGS	+=	$(CCVERBOSE)
+
 CPPFLAGS +=	-D_REENTRANT
 
-CERRWARN +=	-_gcc=-Wno-unused-variable
-CERRWARN +=	-_gcc=-Wno-unused-value
+# Have an unused variable that can't be removed
+UVAR_PICS = \
+pics/db_dictionary_c_xdr.o \
+pics/db_dictlog_c_xdr.o \
+pics/db_entry_c_xdr.o \
+pics/db_index_c_xdr.o \
+pics/db_item_c_xdr.o \
+pics/db_log_entry_c_xdr.o \
+pics/db_mindex_c_xdr.o \
+pics/db_query_c_xdr.o \
+pics/db_scheme_c_xdr.o \
+pics/db_table_c_xdr.o \
+pics/db_vers_c_xdr.o \
+pics/ldap_xdr.o \
+pics/dit_access.o \
+pics/update.o \
+pics/yptol_utils.o \
+pics/map_ctrl.o
+
+$(UVAR_PICS) := CERRWARN += -_gcc=-Wno-unused-variable
+
+# Correcting these might alter logic
 CERRWARN +=	-_gcc=-Wno-uninitialized
-CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
 CERRWARN +=	-_gcc=-Wno-switch
-CERRWARN +=	-_gcc=-Wno-parentheses
 
 # Extra includes, from yp, for yptol files.
 CPPFLAGS += -I$(SRC)/cmd/ypcmd
+
+# Need the path to nis_clnt.h
+CLNT_PICS = pics/db_entry_c_xdr.o pics/ldap_xdr.o pics/db_mindex_c_xdr.o
+
+$(CLNT_PICS) := CPPFLAGS += -I../libnsl/nis/gen
 
 LIBS = $(DYNLIB)
 ZDEFS=

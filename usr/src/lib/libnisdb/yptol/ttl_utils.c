@@ -20,11 +20,10 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2015 Gary Mills
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * DESCRIPTION: Contains utilities relating to TTL calculation.
@@ -285,7 +284,6 @@ update_map_ttl(map_ctrl *map)
 suc_code
 add_to_timeval(struct timeval *t1, int t2)
 {
-	long usec;
 	struct timeval oldval;
 
 	oldval.tv_sec = t1->tv_sec;

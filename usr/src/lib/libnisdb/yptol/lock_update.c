@@ -20,11 +20,10 @@
  */
 
 /*
+ * Copyright 2015 Gary Mills
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * DESCRIPTION: Contains code supporting the 'update in progress' flag. This is
@@ -76,8 +75,8 @@ init_update_locks_mem()
 	 * Initialize cross-process locks in memory-mapped file.
 	 */
 	for (iiter = 0; iiter < MAXHASH; iiter++) {
-		if (rc = mutex_init(&(shmupdatearray->updatenode[iiter]),
-		    USYNC_PROCESS | LOCK_ROBUST, 0)) {
+		if ((rc = mutex_init(&(shmupdatearray->updatenode[iiter]),
+		    USYNC_PROCESS | LOCK_ROBUST, 0)) != 0) {
 			if (rc == EBUSY) {
 				ebusy_cnt++;
 			} else {
