@@ -445,9 +445,8 @@ lx_sched_setparam(uintptr_t pid, uintptr_t param)
 }
 
 long
-lx_sched_rr_get_interval(uintptr_t pid, uintptr_t timespec)
+lx_sched_rr_get_interval(uintptr_t pid, uintptr_t ts)
 {
-	struct timespec ts;
 	pid_t	s_pid;
 
 	if ((pid_t)pid < 0)
@@ -456,11 +455,10 @@ lx_sched_rr_get_interval(uintptr_t pid, uintptr_t timespec)
 	if (lx_lpid_to_spid((pid_t)pid, &s_pid) < 0)
 		return (-ESRCH);
 
-	if (uucopy((struct timespec *)timespec, &ts,
-	    sizeof (struct timespec)) != 0)
+	if (sched_rr_get_interval(s_pid, (struct timespec *)ts) == 0)
+		return (0);
+	else
 		return (-errno);
-
-	return ((sched_rr_get_interval(s_pid, &ts) == -1) ? -errno : 0);
 }
 
 long
