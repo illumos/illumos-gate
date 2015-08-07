@@ -644,6 +644,11 @@ lx_sigaltstack(uintptr_t ssp, uintptr_t oss)
 		    LX_MINSIGSTKSZ) {
 			return (-ENOMEM);
 		}
+
+		if ((ss.ss_flags & LX_SS_DISABLE) != 0) {
+			ss.ss_sp = NULL;
+			ss.ss_size = 0;
+		}
 	}
 
 	if (oss != NULL) {
