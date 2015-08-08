@@ -21,6 +21,7 @@
 
 /*
  * Copyright 2015 OmniTI Computer Consulting, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -145,6 +146,9 @@ typedef struct smb_processor {
 	uint8_t smbpr_threadcount;	/* number of threads per socket */
 	uint16_t smbpr_cflags;	/* cpu characteristics (see <smbios.h>) */
 	uint16_t smbpr_family2;		/* processor family2 (see <smbios.h>) */
+	uint16_t smbpr_corecount2;	/* second number of cores per socket */
+	uint16_t smbpr_coresenabled2;	/* second number of enabled cores */
+	uint16_t smbpr_threadcount2;	/* second number of enabled threads */
 } smb_processor_t;
 
 typedef struct smb_cache {
@@ -505,6 +509,62 @@ extern void smb_free(void *, size_t);
 extern void smb_dprintf(smbios_hdl_t *, const char *, ...);
 
 extern int _smb_debug;
+
+/*
+ * The following series of structures represent the base versions of public
+ * structures that are used inside by the smbios routines. This allows the
+ * common code to properly know how much it should or should not bzero and how
+ * to handle additions to the spec. Types should only be added here if we need
+ * to extend the public structures in sys/smbios.h due to a change in the spec.
+ *
+ * Types here have the name smb_base_%s which corresponds to smbios_%s.
+ */
+typedef struct smb_base_chassis {
+	uint32_t smbbc_oemdata;		/* OEM-specific data */
+	uint8_t smbbc_lock;		/* lock present? */
+	uint8_t smbbc_type;		/* type */
+	uint8_t smbbc_bustate;		/* boot-up state */
+	uint8_t smbbc_psstate;		/* power supply state */
+	uint8_t smbbc_thstate;		/* thermal state */
+	uint8_t smbbc_security;		/* security status */
+	uint8_t smbbc_uheight;		/* enclosure height in U's */
+	uint8_t smbbc_cords;		/* number of power cords */
+	uint8_t smbbc_elems;		/* number of element records (n) */
+	uint8_t smbbc_elemlen;		/* length of contained element (m) */
+} smb_base_chassis_t;
+
+typedef struct smb_base_processor {
+	uint64_t smbbp_cpuid;		/* processor cpuid information */
+	uint32_t smbbp_family;		/* processor family */
+	uint8_t smbbp_type;		/* processor type (SMB_PRT_*) */
+	uint8_t smbbp_voltage;		/* voltage (SMB_PRV_*) */
+	uint8_t smbbp_status;		/* status (SMB_PRS_*) */
+	uint8_t smbbp_upgrade;		/* upgrade (SMB_PRU_*) */
+	uint32_t smbbp_clkspeed;	/* external clock speed in MHz */
+	uint32_t smbbp_maxspeed;	/* maximum speed in MHz */
+	uint32_t smbbp_curspeed;	/* current speed in MHz */
+	id_t smbbp_l1cache;		/* L1 cache handle */
+	id_t smbbp_l2cache;		/* L2 cache handle */
+	id_t smbbp_l3cache;		/* L3 cache handle */
+} smb_base_processor_t;
+
+typedef struct smb_base_memdevice {
+	id_t smbbmd_array;		/* handle of physical memory array */
+	id_t smbbmd_error;		/* handle of memory error data */
+	uint32_t smbbmd_twidth;		/* total width in bits including ecc */
+	uint32_t smbbmd_dwidth;		/* data width in bits */
+	uint64_t smbbmd_size;		/* size in bytes (see note above) */
+	uint8_t smbbmd_form;		/* form factor */
+	uint8_t smbbmd_set;		/* set (0x00=none, 0xFF=unknown) */
+	uint8_t smbbmd_type;		/* memory type */
+	uint8_t smbbmd_pad;		/* padding */
+	uint32_t smbbmd_flags;		/* flags (see below) */
+	uint32_t smbbmd_speed;		/* speed in MHz */
+	const char *smbbmd_dloc;	/* physical device locator string */
+	const char *smbbmd_bloc;	/* physical bank locator string */
+	uint8_t smbbmd_rank;		/* rank */
+} smb_base_memdevice_t;
+
 
 #ifdef	__cplusplus
 }

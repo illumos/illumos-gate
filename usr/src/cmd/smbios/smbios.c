@@ -21,6 +21,7 @@
 
 /*
  * Copyright 2015 OmniTI Computer Consulting, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -439,20 +440,38 @@ print_processor(smbios_hdl_t *shp, id_t id, FILE *fp)
 		    (float)SMB_PRV_VOLTAGE(p.smbp_voltage) / 10);
 	}
 
-	if (p.smbp_corecount != 0)
-		oprintf(fp, "  Core Count: %u\n", p.smbp_corecount);
-	else
+	if (p.smbp_corecount != 0) {
+		if (p.smbp_corecount != 0xff || p.smbp_corecount2 == 0)
+			oprintf(fp, "  Core Count: %u\n", p.smbp_corecount);
+		else
+			oprintf(fp, "  Core Count: %u\n", p.smbp_corecount2);
+	} else {
 		oprintf(fp, "  Core Count: Unknown\n");
+	}
 
-	if (p.smbp_coresenabled != 0)
-		oprintf(fp, "  Cores Enabled: %u\n", p.smbp_coresenabled);
-	else
+	if (p.smbp_coresenabled != 0) {
+		if (p.smbp_coresenabled != 0xff || p.smbp_coresenabled2 == 0) {
+			oprintf(fp, "  Cores Enabled: %u\n",
+			    p.smbp_coresenabled);
+		} else {
+			oprintf(fp, "  Cores Enabled: %u\n",
+			    p.smbp_coresenabled2);
+		}
+	} else {
 		oprintf(fp, "  Cores Enabled: Unknown\n");
+	}
 
-	if (p.smbp_threadcount != 0)
-		oprintf(fp, "  Thread Count: %u\n", p.smbp_threadcount);
-	else
+	if (p.smbp_threadcount != 0) {
+		if (p.smbp_threadcount != 0xff || p.smbp_threadcount2 == 0) {
+			oprintf(fp, "  Thread Count: %u\n",
+			    p.smbp_threadcount);
+		} else {
+			oprintf(fp, "  Thread Count: %u\n",
+			    p.smbp_threadcount2);
+		}
+	} else {
 		oprintf(fp, "  Thread Count: Unknown\n");
+	}
 
 	if (p.smbp_cflags) {
 		flag_printf(fp, "Processor Characteristics",
@@ -590,12 +609,23 @@ print_slot(smbios_hdl_t *shp, id_t id, FILE *fp)
 static void
 print_obdevs_ext(smbios_hdl_t *shp, id_t id, FILE *fp)
 {
+	boolean_t enabled;
 	smbios_obdev_ext_t oe;
+	const char *type;
 
 	(void) smbios_info_obdevs_ext(shp, id, &oe);
 
+	/*
+	 * Bit 7 is always whether or not the device is enabled while bits 0:6
+	 * are the actual device type.
+	 */
+	enabled = oe.smboe_dtype >> 7;
+	type = smbios_onboard_type_desc(oe.smboe_dtype & 0x7f);
+
 	oprintf(fp, "  Reference Designator: %s\n", oe.smboe_name);
-	oprintf(fp, "  Device Type: %u\n", oe.smboe_dtype);
+	oprintf(fp, "  Device Enabled: %s\n", enabled == B_TRUE ? "true" :
+	    "false");
+	oprintf(fp, "  Device Type: %s\n", type);
 	oprintf(fp, "  Device Type Instance: %u\n", oe.smboe_dti);
 	oprintf(fp, "  Segment Group Number: %u\n", oe.smboe_sg);
 	oprintf(fp, "  Bus Number: %u\n", oe.smboe_bus);
