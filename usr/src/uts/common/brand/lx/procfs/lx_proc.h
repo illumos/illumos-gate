@@ -284,7 +284,15 @@ extern ino_t lxpr_parentinode(lxpr_node_t *);
 extern lxpr_node_t *lxpr_getnode(vnode_t *, lxpr_nodetype_t, proc_t *, int);
 extern void lxpr_freenode(lxpr_node_t *);
 
-typedef struct lxpr_uiobuf lxpr_uiobuf_t;
+typedef struct lxpr_uiobuf {
+	uio_t *uiop;
+	char *buffer;
+	uint32_t buffsize;
+	char *pos;
+	size_t beg;
+	int error;
+} lxpr_uiobuf_t;
+
 extern lxpr_uiobuf_t *lxpr_uiobuf_new(uio_t *);
 extern void lxpr_uiobuf_free(lxpr_uiobuf_t *);
 extern int lxpr_uiobuf_flush(lxpr_uiobuf_t *);

@@ -48,6 +48,7 @@ extern int stol_ksiginfo_copyout(k_siginfo_t *, void *);
 #if defined(_SYSCALL32_IMPL)
 extern int stol_ksiginfo32_copyout(k_siginfo_t *, void *);
 #endif
+extern void lx_read_argv_bounds(proc_t *p);
 
 typedef enum lx_if_action {
 	LX_IF_FROMNATIVE,

@@ -27,7 +27,7 @@
  * first hole in the address space.  The number of bytes actually read is
  * returned to the caller via 'rdsz'.
  */
-static int
+int
 prreadbuf(proc_t *p, uintptr_t ustart, uint8_t *buf, size_t sz, size_t *rdsz)
 {
 	int error = 0;

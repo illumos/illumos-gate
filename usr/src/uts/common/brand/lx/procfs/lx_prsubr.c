@@ -44,15 +44,6 @@ static void lxpr_node_destructor(void *, void *);
 
 static kmem_cache_t *lxpr_node_cache;
 
-struct lxpr_uiobuf {
-	uio_t *uiop;
-	char *buffer;
-	uint32_t buffsize;
-	char *pos;
-	size_t beg;
-	int error;
-};
-
 int lx_pr_bufsize = 4000;
 
 struct lxpr_uiobuf *
