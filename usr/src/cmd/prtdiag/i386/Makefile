@@ -19,10 +19,10 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+#
+# Copyright 2015 Joyent, Inc.
 #
 
 SRCDIR		= ..
@@ -30,7 +30,8 @@ SRCDIR		= ..
 include $(SRCDIR)/Makefile.com
 
 OBJS += smbios.o
-LDLIBS += -lsmbios
+LDLIBS += -lsmbios -lnvpair -lpcidb -L$(ROOT)/usr/lib/fm -ltopo
+LDFLAGS += -R/usr/lib/fm
 
 .KEEP_STATE:
 
