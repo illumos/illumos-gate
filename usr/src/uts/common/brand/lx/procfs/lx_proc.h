@@ -207,6 +207,9 @@ typedef enum lxpr_nodetype {
 	LXPR_SYS_KERNEL_RAND_BOOTID, /* /proc/sys/kernel/random/boot_id */
 	LXPR_SYS_KERNEL_SHMMAX,	/* /proc/sys/kernel/shmmax */
 	LXPR_SYS_KERNEL_THREADS_MAX,	/* /proc/sys/kernel/threads-max */
+	LXPR_SYS_NETDIR,		/* /proc/sys/net		*/
+	LXPR_SYS_NET_COREDIR,		/* /proc/sys/net/core		*/
+	LXPR_SYS_NET_CORE_SOMAXCON,	/* /proc/sys/net/core/somaxconn	*/
 	LXPR_SYS_VMDIR,			/* /proc/sys/vm			*/
 	LXPR_SYS_VM_MINFR_KB,		/* /proc/sys/vm/min_free_kbytes	*/
 	LXPR_SYS_VM_NHUGEP,		/* /proc/sys/vm/nr_hugepages	*/

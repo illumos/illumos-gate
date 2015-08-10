@@ -514,13 +514,15 @@ lxpr_getnode(vnode_t *dp, lxpr_nodetype_t type, proc_t *p, int desc)
 		lxpnp->lxpr_mode = 0511;
 		break;
 
+	case LXPR_NETDIR:
 	case LXPR_SYSDIR:
 	case LXPR_SYS_FSDIR:
 	case LXPR_SYS_FS_INOTIFYDIR:
 	case LXPR_SYS_KERNELDIR:
 	case LXPR_SYS_KERNEL_RANDDIR:
+	case LXPR_SYS_NETDIR:
+	case LXPR_SYS_NET_COREDIR:
 	case LXPR_SYS_VMDIR:
-	case LXPR_NETDIR:
 		vp->v_type = VDIR;
 		lxpnp->lxpr_mode = 0555;	/* read-search by all */
 		break;
@@ -536,6 +538,7 @@ lxpr_getnode(vnode_t *dp, lxpr_nodetype_t type, proc_t *p, int desc)
 
 	case LXPR_PID_OOM_SCR_ADJ:
 	case LXPR_PID_TID_OOM_SCR_ADJ:
+	case LXPR_SYS_NET_CORE_SOMAXCON:
 	case LXPR_SYS_VM_OVERCOMMIT_MEM:
 	case LXPR_SYS_VM_SWAPPINESS:
 		vp->v_type = VREG;

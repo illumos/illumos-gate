@@ -69,6 +69,7 @@
 #include <inet/ip6.h>
 #include <inet/ip_if.h>
 #include <inet/tcp.h>
+#include <inet/tcp_impl.h>
 #include <inet/udp_impl.h>
 #include <inet/ipclassifier.h>
 #include <sys/socketvar.h>
@@ -122,6 +123,8 @@ static vnode_t *lxpr_lookup_sys_fsdir(vnode_t *, char *);
 static vnode_t *lxpr_lookup_sys_fs_inotifydir(vnode_t *, char *);
 static vnode_t *lxpr_lookup_sys_kerneldir(vnode_t *, char *);
 static vnode_t *lxpr_lookup_sys_kdir_randdir(vnode_t *, char *);
+static vnode_t *lxpr_lookup_sys_netdir(vnode_t *, char *);
+static vnode_t *lxpr_lookup_sys_net_coredir(vnode_t *, char *);
 static vnode_t *lxpr_lookup_sys_vmdir(vnode_t *, char *);
 static vnode_t *lxpr_lookup_taskdir(vnode_t *, char *);
 static vnode_t *lxpr_lookup_task_tid_dir(vnode_t *, char *);
@@ -136,6 +139,8 @@ static int lxpr_readdir_sys_fsdir(lxpr_node_t *, uio_t *, int *);
 static int lxpr_readdir_sys_fs_inotifydir(lxpr_node_t *, uio_t *, int *);
 static int lxpr_readdir_sys_kerneldir(lxpr_node_t *, uio_t *, int *);
 static int lxpr_readdir_sys_kdir_randdir(lxpr_node_t *, uio_t *, int *);
+static int lxpr_readdir_sys_netdir(lxpr_node_t *, uio_t *, int *);
+static int lxpr_readdir_sys_net_coredir(lxpr_node_t *, uio_t *, int *);
 static int lxpr_readdir_sys_vmdir(lxpr_node_t *, uio_t *, int *);
 static int lxpr_readdir_taskdir(lxpr_node_t *, uio_t *, int *);
 static int lxpr_readdir_task_tid_dir(lxpr_node_t *, uio_t *, int *);
@@ -211,10 +216,14 @@ static void lxpr_read_sys_kernel_pid_max(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_kernel_rand_bootid(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_kernel_shmmax(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_kernel_threads_max(lxpr_node_t *, lxpr_uiobuf_t *);
+static void lxpr_read_sys_net_core_somaxc(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_vm_minfr_kb(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_vm_nhpages(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_vm_overcommit_mem(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_vm_swappiness(lxpr_node_t *, lxpr_uiobuf_t *);
+
+static int lxpr_write_sys_net_core_somaxc(lxpr_node_t *, uio_t *, cred_t *,
+    caller_context_t *);
 
 /*
  * Simple conversion
@@ -409,6 +418,7 @@ static lxpr_dirent_t netdir[] = {
 static lxpr_dirent_t sysdir[] = {
 	{ LXPR_SYS_FSDIR,	"fs" },
 	{ LXPR_SYS_KERNELDIR,	"kernel" },
+	{ LXPR_SYS_NETDIR,	"net" },
 	{ LXPR_SYS_VMDIR,	"vm" },
 };
 
@@ -462,6 +472,25 @@ static lxpr_dirent_t sys_randdir[] = {
 #define	SYS_RANDDIRFILES (sizeof (sys_randdir) / sizeof (sys_randdir[0]))
 
 /*
+ * contents of /proc/sys/net directory
+ */
+static lxpr_dirent_t sys_netdir[] = {
+	{ LXPR_SYS_NET_COREDIR,		"core" },
+};
+
+#define	SYS_NETDIRFILES (sizeof (sys_netdir) / sizeof (sys_netdir[0]))
+
+/*
+ * contents of /proc/sys/net/core directory
+ */
+static lxpr_dirent_t sys_net_coredir[] = {
+	{ LXPR_SYS_NET_CORE_SOMAXCON,	"somaxconn" },
+};
+
+#define	SYS_NET_COREDIRFILES \
+	(sizeof (sys_net_coredir) / sizeof (sys_net_coredir[0]))
+
+/*
  * contents of /proc/sys/vm directory
  */
 static lxpr_dirent_t sys_vmdir[] = {
@@ -490,6 +519,7 @@ lxpr_open(vnode_t **vpp, int flag, cred_t *cr, caller_context_t *ct)
 		switch (type) {
 		case LXPR_PID_OOM_SCR_ADJ:
 		case LXPR_PID_TID_OOM_SCR_ADJ:
+		case LXPR_SYS_NET_CORE_SOMAXCON:
 		case LXPR_SYS_VM_OVERCOMMIT_MEM:
 		case LXPR_SYS_VM_SWAPPINESS:
 			break;
@@ -662,6 +692,9 @@ static void (*lxpr_read_function[LXPR_NFILES])() = {
 	lxpr_read_sys_kernel_rand_bootid, /* /proc/sys/kernel/random/boot_id */
 	lxpr_read_sys_kernel_shmmax,	/* /proc/sys/kernel/shmmax */
 	lxpr_read_sys_kernel_threads_max, /* /proc/sys/kernel/threads-max */
+	lxpr_read_invalid,		/* /proc/sys/net	*/
+	lxpr_read_invalid,		/* /proc/sys/net/core	*/
+	lxpr_read_sys_net_core_somaxc,	/* /proc/sys/net/core/somaxconn	*/
 	lxpr_read_invalid,		/* /proc/sys/vm	*/
 	lxpr_read_sys_vm_minfr_kb,	/* /proc/sys/vm/min_free_kbytes */
 	lxpr_read_sys_vm_nhpages,	/* /proc/sys/vm/nr_hugepages */
@@ -776,6 +809,9 @@ static vnode_t *(*lxpr_lookup_function[LXPR_NFILES])() = {
 	lxpr_lookup_not_a_dir,		/* /proc/sys/kernel/random/boot_id */
 	lxpr_lookup_not_a_dir,		/* /proc/sys/kernel/shmmax */
 	lxpr_lookup_not_a_dir,		/* /proc/sys/kernel/threads-max */
+	lxpr_lookup_sys_netdir,		/* /proc/sys/net */
+	lxpr_lookup_sys_net_coredir,	/* /proc/sys/net/core */
+	lxpr_lookup_not_a_dir,		/* /proc/sys/net/core/somaxconn */
 	lxpr_lookup_sys_vmdir,		/* /proc/sys/vm */
 	lxpr_lookup_not_a_dir,		/* /proc/sys/vm/min_free_kbytes */
 	lxpr_lookup_not_a_dir,		/* /proc/sys/vm/nr_hugepages */
@@ -890,6 +926,9 @@ static int (*lxpr_readdir_function[LXPR_NFILES])() = {
 	lxpr_readdir_not_a_dir,		/* /proc/sys/kernel/random/boot_id */
 	lxpr_readdir_not_a_dir,		/* /proc/sys/kernel/shmmax */
 	lxpr_readdir_not_a_dir,		/* /proc/sys/kernel/threads-max */
+	lxpr_readdir_sys_netdir,	/* /proc/sys/net */
+	lxpr_readdir_sys_net_coredir,	/* /proc/sys/net/core */
+	lxpr_readdir_not_a_dir,		/* /proc/sys/net/core/somaxconn */
 	lxpr_readdir_sys_vmdir,		/* /proc/sys/vm */
 	lxpr_readdir_not_a_dir,		/* /proc/sys/vm/min_free_kbytes */
 	lxpr_readdir_not_a_dir,		/* /proc/sys/vm/nr_hugepages */
@@ -3875,6 +3914,25 @@ lxpr_read_sys_kernel_threads_max(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 }
 
 static void
+lxpr_read_sys_net_core_somaxc(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+{
+	netstack_t *ns;
+	tcp_stack_t	*tcps;
+
+	ASSERT(lxpnp->lxpr_type == LXPR_SYS_NET_CORE_SOMAXCON);
+
+	ns = netstack_get_current();
+	if (ns == NULL) {
+		lxpr_uiobuf_printf(uiobuf, "%d\n", SOMAXCONN);
+		return;
+	}
+
+	tcps = ns->netstack_tcp;
+	lxpr_uiobuf_printf(uiobuf, "%d\n", tcps->tcps_conn_req_max_q);
+	netstack_rele(ns);
+}
+
+static void
 lxpr_read_sys_vm_minfr_kb(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
 	ASSERT(lxpnp->lxpr_type == LXPR_SYS_VM_MINFR_KB);
@@ -4332,6 +4390,7 @@ lxpr_access(vnode_t *vp, int mode, int flags, cred_t *cr, caller_context_t *ct)
 		switch (type) {
 		case LXPR_PID_OOM_SCR_ADJ:
 		case LXPR_PID_TID_OOM_SCR_ADJ:
+		case LXPR_SYS_NET_CORE_SOMAXCON:
 		case LXPR_SYS_VM_OVERCOMMIT_MEM:
 		case LXPR_SYS_VM_SWAPPINESS:
 			break;
@@ -4829,6 +4888,22 @@ lxpr_lookup_sys_kdir_randdir(vnode_t *dp, char *comp)
 	ASSERT(VTOLXP(dp)->lxpr_type == LXPR_SYS_KERNEL_RANDDIR);
 	return (lxpr_lookup_common(dp, comp, NULL, sys_randdir,
 	    SYS_RANDDIRFILES));
+}
+
+static vnode_t *
+lxpr_lookup_sys_netdir(vnode_t *dp, char *comp)
+{
+	ASSERT(VTOLXP(dp)->lxpr_type == LXPR_SYS_NETDIR);
+	return (lxpr_lookup_common(dp, comp, NULL, sys_netdir,
+	    SYS_NETDIRFILES));
+}
+
+static vnode_t *
+lxpr_lookup_sys_net_coredir(vnode_t *dp, char *comp)
+{
+	ASSERT(VTOLXP(dp)->lxpr_type == LXPR_SYS_NET_COREDIR);
+	return (lxpr_lookup_common(dp, comp, NULL, sys_net_coredir,
+	    SYS_NET_COREDIRFILES));
 }
 
 static vnode_t *
@@ -5522,11 +5597,75 @@ lxpr_readdir_sys_kdir_randdir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
 }
 
 static int
+lxpr_readdir_sys_netdir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
+{
+	ASSERT(lxpnp->lxpr_type == LXPR_SYS_NETDIR);
+	return (lxpr_readdir_common(lxpnp, uiop, eofp, sys_netdir,
+	    SYS_NETDIRFILES));
+}
+
+static int
+lxpr_readdir_sys_net_coredir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
+{
+	ASSERT(lxpnp->lxpr_type == LXPR_SYS_NET_COREDIR);
+	return (lxpr_readdir_common(lxpnp, uiop, eofp, sys_net_coredir,
+	    SYS_NET_COREDIRFILES));
+}
+
+static int
 lxpr_readdir_sys_vmdir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
 {
 	ASSERT(lxpnp->lxpr_type == LXPR_SYS_VMDIR);
 	return (lxpr_readdir_common(lxpnp, uiop, eofp, sys_vmdir,
 	    SYS_VMDIRFILES));
+}
+
+static int
+lxpr_write_sys_net_core_somaxc(lxpr_node_t *lxpnp, struct uio *uio,
+    struct cred *cr, caller_context_t *ct)
+{
+	int error;
+	int res = 0;
+	size_t olen;
+	char val[16];	/* big enough for a uint numeric string */
+	netstack_t *ns;
+	mod_prop_info_t *ptbl = NULL;
+	mod_prop_info_t *pinfo = NULL;
+
+	ASSERT(lxpnp->lxpr_type == LXPR_SYS_NET_CORE_SOMAXCON);
+
+	if (uio->uio_loffset != 0)
+		return (EINVAL);
+
+	if (uio->uio_resid == 0)
+		return (0);
+
+	olen = uio->uio_resid;
+	if (olen > sizeof (val) - 1)
+		return (EINVAL);
+
+	bzero(val, sizeof (val));
+	error = uiomove(val, olen, UIO_WRITE, uio);
+	if (error != 0)
+		return (error);
+
+	if (val[olen - 1] == '\n')
+		val[olen - 1] = '\0';
+
+	if (val[0] == '\0') /* no input */
+		return (EINVAL);
+
+	ns = netstack_get_current();
+	if (ns == NULL)
+		return (EINVAL);
+
+	ptbl = ns->netstack_tcp->tcps_propinfo_tbl;
+	pinfo = mod_prop_lookup(ptbl, "_conn_req_max_q", MOD_PROTO_TCP);
+	if (pinfo == NULL || pinfo->mpi_setf(ns, cr, pinfo, NULL, val, 0) != 0)
+		res = EINVAL;
+
+	netstack_rele(ns);
+	return (res);
 }
 
 /*
@@ -5718,11 +5857,19 @@ static int
 lxpr_write(vnode_t *vp, uio_t *uiop, int ioflag, cred_t *cr,
     caller_context_t *ct)
 {
-	/* pretend we wrote the whole thing */
-	uiop->uio_offset += uiop->uio_resid;
-	uiop->uio_resid = 0;
+	lxpr_node_t	*lxpnp = VTOLXP(vp);
+	lxpr_nodetype_t	type = lxpnp->lxpr_type;
 
-	return (0);
+	switch (type) {
+	case LXPR_SYS_NET_CORE_SOMAXCON:
+		return (lxpr_write_sys_net_core_somaxc(lxpnp, uiop, cr, ct));
+
+	default:
+		/* pretend we wrote the whole thing */
+		uiop->uio_offset += uiop->uio_resid;
+		uiop->uio_resid = 0;
+		return (0);
+	}
 }
 
 /*
@@ -5761,6 +5908,7 @@ lxpr_create(struct vnode *dvp, char *nm, struct vattr *vap,
 	 * We're currently restricting O_CREAT to:
 	 * - /proc/<pid>/oom_score_adj
 	 * - /proc/<pid>/task/<tid>/oom_score_adj
+	 * - /proc/sys/net/core/somaxconn
 	 * - /proc/sys/vm/overcommit_memory
 	 * - /proc/sys/vm/swappiness
 	 */
@@ -5773,6 +5921,10 @@ lxpr_create(struct vnode *dvp, char *nm, struct vattr *vap,
 			    PIDDIRFILES);
 		}
 		lxpr_unlock(p);
+	} else if (type == LXPR_SYS_NET_COREDIR &&
+	    strcmp(nm, "somaxconn") == 0) {
+		vp = lxpr_lookup_common(dvp, nm, NULL, sys_net_coredir,
+		    SYS_NET_COREDIRFILES);
 	} else if (type == LXPR_SYS_VMDIR &&
 	    (strcmp(nm, "overcommit_memory") == 0 ||
 	    strcmp(nm, "swappiness") == 0)) {
