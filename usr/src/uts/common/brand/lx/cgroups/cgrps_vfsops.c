@@ -282,14 +282,14 @@ _fini()
 	if (cgrp_mountcount)
 		return (EBUSY);
 
+	if ((error = mod_remove(&modlinkage)) != 0)
+		return (error);
+
 	/* Disable hooks used by the lx brand module. */
 	lx_cgrp_forklwp = NULL;
 	lx_cgrp_proc_exit = NULL;
 	lx_cgrp_initlwp = NULL;
 	lx_cgrp_freelwp = NULL;
-
-	if ((error = mod_remove(&modlinkage)) != 0)
-		return (error);
 
 	/*
 	 * Tear down the operations vectors
