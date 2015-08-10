@@ -431,6 +431,11 @@ typedef struct lx_proc_data {
 
 	lx_rlimit64_t l_fake_limits[LX_RLFAKE_NLIMITS];
 
+	/* original start/end bounds of arg/env string data */
+	uintptr_t l_args_start;
+	uintptr_t l_envs_start;
+	uintptr_t l_envs_end;
+
 	/* Override zone-wide settings for uname release and version */
 	char l_uname_release[LX_KERN_RELEASE_MAX];
 	char l_uname_version[LX_KERN_VERSION_MAX];
