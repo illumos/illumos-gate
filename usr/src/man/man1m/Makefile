@@ -489,8 +489,6 @@ _MANFILES=	6to4relay.1m		\
 		soconfig.1m		\
 		sppptun.1m		\
 		spray.1m		\
-		ssh-keysign.1m		\
-		sshd.1m			\
 		statd.1m		\
 		stmfadm.1m		\
 		stmsboot.1m		\

@@ -280,7 +280,6 @@ COMMON_SUBDIRS = \
 	cmd/split \
 	cmd/srptadm \
 	cmd/srptsvc \
-	cmd/ssh \
 	cmd/stat \
 	cmd/stmfadm \
 	cmd/stmfsvc \

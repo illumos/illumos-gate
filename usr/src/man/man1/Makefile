@@ -355,13 +355,6 @@ MANFILES=	acctcom.1			\
 	 	spell.1				\
 	 	split.1				\
 	 	srchtxt.1			\
-	 	ssh.1				\
-	 	ssh-add.1			\
-	 	ssh-agent.1			\
-	 	ssh-http-proxy-connect.1	\
-	 	ssh-keygen.1			\
-	 	ssh-keyscan.1			\
-	 	ssh-socks5-proxy-connect.1	\
 	 	strchg.1			\
 	 	strings.1			\
 	 	strip.1				\

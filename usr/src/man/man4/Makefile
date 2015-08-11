@@ -188,8 +188,6 @@ _MANFILES=	Intro.4				\
 		sndr.4				\
 		sock2path.d.4			\
 		space.4				\
-		ssh_config.4			\
-		sshd_config.4			\
 		sulog.4				\
 		syslog.conf.4			\
 		system.4			\

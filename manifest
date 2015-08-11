@@ -491,9 +491,6 @@ d etc/sock2path.d 0755 root sys
 f etc/sock2path.d/driver%2Fnetwork%2Fbpf 0644 root sys
 f etc/sock2path.d/driver%2Fnetwork%2Fsdp 0644 root sys
 f etc/sock2path.d/system%2Fkernel 0644 root sys
-d etc/ssh 0755 root sys
-f etc/ssh/moduli 0644 root sys
-f etc/ssh/ssh_config 0644 root sys
 s etc/sulogin=../sbin/sulogin
 d etc/svc 0755 root sys
 d etc/svc/volatile 0755 root sys
@@ -1556,7 +1553,6 @@ d lib/svc/manifest/network/smb 0755 root sys
 f lib/svc/manifest/network/smb/client.xml 0444 root sys
 f lib/svc/manifest/network/smb/server.xml 0444 root sys
 f lib/svc/manifest/network/smtp-sendmail.xml 0444 root sys
-f lib/svc/manifest/network/ssh.xml 0444 root sys
 f lib/svc/manifest/network/tftp-udp6.xml 0444 root sys
 f lib/svc/manifest/network/time.xml 0444 root sys
 f lib/svc/manifest/network/varpd.xml 0444 root sys
@@ -2293,11 +2289,6 @@ h usr/bin/sparc=usr/bin/sun
 f usr/bin/spell 0555 root bin
 f usr/bin/split 0555 root bin
 f usr/bin/srchtxt 0555 root bin
-f usr/bin/ssh 0555 root bin
-f usr/bin/ssh-add 0555 root bin
-f usr/bin/ssh-agent 0555 root bin
-f usr/bin/ssh-keygen 0555 root bin
-f usr/bin/ssh-keyscan 0555 root bin
 s usr/bin/strace=../sbin/strace
 f usr/bin/strchg 0555 root root
 s usr/bin/strclean=../sbin/strclean
@@ -10030,13 +10021,6 @@ f usr/lib/spell/hlistb 0644 root bin
 f usr/lib/spell/hstop 0644 root bin
 f usr/lib/spell/spellin 0555 root bin
 f usr/lib/spell/spellprog 0555 root bin
-d usr/lib/ssh 0755 root bin
-f usr/lib/ssh/sftp-server 0555 root bin
-f usr/lib/ssh/ssh-askpass 0555 root bin
-f usr/lib/ssh/ssh-http-proxy-connect 0555 root bin
-f usr/lib/ssh/ssh-keysign 4555 root bin
-f usr/lib/ssh/ssh-socks5-proxy-connect 0555 root bin
-f usr/lib/ssh/sshd 0555 root bin
 f usr/lib/straddr.so.2 0755 root bin
 s usr/lib/straddr.so=straddr.so.2
 s usr/lib/sunw,rcp=../bin/rcp
@@ -11738,13 +11722,6 @@ s usr/share/man/man1/sparc.1=machid.1
 f usr/share/man/man1/spell.1 0444 root bin
 f usr/share/man/man1/split.1 0444 root bin
 f usr/share/man/man1/srchtxt.1 0444 root bin
-f usr/share/man/man1/ssh-add.1 0444 root bin
-f usr/share/man/man1/ssh-agent.1 0444 root bin
-f usr/share/man/man1/ssh-http-proxy-connect.1 0444 root bin
-f usr/share/man/man1/ssh-keygen.1 0444 root bin
-f usr/share/man/man1/ssh-keyscan.1 0444 root bin
-f usr/share/man/man1/ssh-socks5-proxy-connect.1 0444 root bin
-f usr/share/man/man1/ssh.1 0444 root bin
 f usr/share/man/man1/strchg.1 0444 root bin
 s usr/share/man/man1/strconf.1=strchg.1
 f usr/share/man/man1/strings.1 0444 root bin
@@ -12144,8 +12121,6 @@ f usr/share/man/man1m/snoop.1m 0444 root bin
 f usr/share/man/man1m/soconfig.1m 0444 root bin
 f usr/share/man/man1m/sppptun.1m 0444 root bin
 f usr/share/man/man1m/spray.1m 0444 root bin
-f usr/share/man/man1m/ssh-keysign.1m 0444 root bin
-f usr/share/man/man1m/sshd.1m 0444 root bin
 f usr/share/man/man1m/stmfadm.1m 0444 root bin
 f usr/share/man/man1m/stmsboot.1m 0444 root bin
 f usr/share/man/man1m/strace.1m 0444 root bin
@@ -18201,8 +18176,6 @@ s usr/share/man/man4/snapshot_cache.4=devices.4
 f usr/share/man/man4/sndr.4 0444 root bin
 f usr/share/man/man4/sock2path.d.4 0444 root bin
 f usr/share/man/man4/space.4 0444 root bin
-f usr/share/man/man4/ssh_config.4 0444 root bin
-f usr/share/man/man4/sshd_config.4 0444 root bin
 s usr/share/man/man4/submit.cf.4=sendmail.4
 f usr/share/man/man4/sulog.4 0444 root bin
 f usr/share/man/man4/sysbus.4 0444 root bin
@@ -20144,7 +20117,6 @@ d var/spool/cron/crontabs 0755 root sys
 d var/spool/locks 0755 uucp uucp
 d var/spool/mqueue 0750 root bin
 d var/spool/pkg 1777 root bin
-d var/ssh 0755 root sys
 d var/svc 0755 root sys
 d var/svc/log 0755 root sys
 d var/svc/manifest 0755 root sys

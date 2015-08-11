@@ -382,7 +382,6 @@ COMMON_SUBDIRS=		\
 	srchtxt		\
 	srptadm		\
 	srptsvc		\
-	ssh		\
 	stat		\
 	stmfadm		\
 	stmfproxy	\
@@ -682,7 +681,6 @@ MSGSUBDIRS=		\
 	sort		\
 	split		\
 	srptadm		\
-	ssh		\
 	stat		\
 	stmfadm		\
 	stmsboot	\
