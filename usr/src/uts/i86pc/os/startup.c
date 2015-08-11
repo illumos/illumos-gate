@@ -148,6 +148,7 @@ extern void progressbar_init(void);
 extern void brand_init(void);
 extern void pcf_init(void);
 extern void pg_init(void);
+extern void ssp_init(void);
 
 extern int size_pse_array(pgcnt_t, int);
 
@@ -711,6 +712,7 @@ startup(void)
 		segvn_use_regions = 0;
 	}
 #endif
+	ssp_init();
 	progressbar_init();
 	startup_init();
 #if defined(__xpv)
