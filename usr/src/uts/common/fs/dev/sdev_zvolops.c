@@ -197,8 +197,13 @@ devzvol_objset_check(char *dsname, dmu_objset_type_t *type)
 }
 
 /*
- * returns what the zfs dataset name should be, given the /dev/zvol
- * path and an optional name; otherwise NULL
+ * Returns what the zfs dataset name should be, given the /dev/zvol
+ * path and an optional name (can be NULL).
+ *
+ * Note that if the name param is NULL, then path must be an
+ * actual dataset's directory and not one of the top-level
+ * /dev/zvol/{dsk,rdsk} dirs, as these do not correspond to a
+ * specific dataset.
  */
 char *
 devzvol_make_dsname(const char *path, const char *name)
@@ -218,8 +223,11 @@ devzvol_make_dsname(const char *path, const char *name)
 		ptr += strlen("/rdsk");
 	else
 		return (NULL);
+
 	if (*ptr == '/')
 		ptr++;
+	else if (name == NULL)
+		return (NULL);
 
 	dslen = strlen(ptr);
 	if (dslen)
