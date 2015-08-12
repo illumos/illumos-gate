@@ -202,7 +202,8 @@ UTF_8_LOCALES		= \
 		ug_CN \
 		ur_IN ur_PK \
 		vi_VN \
-		zh_CN zh_HK zh_MO zh_SG zh_TW
+		zh_CN zh_HK zh_MO zh_SG zh_TW \
+		zz_AA
 
 UTF8SRCS	= $(UTF_8_LOCALES:%=data/%.UTF-8.src)
 
@@ -245,11 +246,32 @@ ROOTLOCDIRS	= $(LOCDIRS:%=$(ROOTLIB)/%)
 ROOTCATDIRS	= $(CATDIRS:%=$(ROOTLIB)/%)
 ROOTDATA	= $(DATA:%=$(ROOTLIB)/%)
 
+#
+# This is a list of locales that happen to have translations for them
+# present in the gate.
+#
+TRANSDIR	= translations
+TRANSLOCS	= \
+		zz_AA.UTF-8
+TRANSMOS	= $(TRANSLOCS:%=$(TRANSDIR)/%.mo)
+
+OSTMOFILE	= LC_MESSAGES/SUNW_OST_OSLIB.mo
+
+PRIVTRANSLOCS	= \
+		zz_AA.UTF-8
+PRIVFILE	= LC_MESSAGES/priv_names
+		
+
+ROOTTRANSLATIONS = $(TRANSLOCS:%=$(ROOTLIB)/locale/%/$(OSTMOFILE))
+ROOTPRIVTRANS = $(PRIVTRANSLOCS:%=$(ROOTLIB)/locale/%/$(PRIVFILE))
+
 $(ROOTDATA)	:= FILEMODE=0444
 
 all: $(PROG) $(DATA)
 
-install: all $(ROOTPROG) $(ROOTDATA)
+translate: $(ROOTTRANSLATIONS) $(ROOTPRIVTRANS)
+
+install: all $(ROOTPROG) $(ROOTDATA) $(ROOTTRANSLATIONS) $(ROOTPRIVTRANS)
 
 $(NDIR):
 	mkdir $@
@@ -282,6 +304,7 @@ clobber: clean
 	$(RM) $(CLOBBERFILES)
 	$(RM) -r $(LOCDIRS)
 	$(RM) -r $(NDIR)
+	$(RM) $(TRANSMOS)
 
 $(POFILE):	$(PIFILES)
 	$(RM) $@
@@ -363,4 +386,15 @@ GB18030.cm: data/GB18030.cm
 $(ROOTDATA):	$(ROOTLOCDIRS) $(ROOTCATDIRS) $(DATA)
 	$(RM) $@
 	$(CP) $(@:$(ROOTLIB)/%=%) $@
+	$(CHMOD) 0444 $@
+
+%.mo: %.po
+	$(MSGFMT) -o $@ $<
+
+$(ROOTLIB)/locale/%/$(OSTMOFILE): $(TRANSDIR)/%.mo
+	$(INS.rename)
+	$(CHMOD) 0444 $@
+
+$(ROOTLIB)/locale/%/$(PRIVFILE): $(TRANSDIR)/%.priv
+	$(INS.rename)
 	$(CHMOD) 0444 $@

@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "lint.h"
 #include "mtlib.h"
 #include <sys/types.h>
@@ -64,13 +62,15 @@ _wdinitialize(void)
 	char	wdmodpath[PATH_MAX];
 	char	*loc;
 	size_t	loclen;
+	locale_t	curloc;
 
 	initialized = 1;
 
 	if (modhandle)
 		(void) dlclose(modhandle);
 
-	loc = setlocale(LC_CTYPE, NULL); /* this never return NULL */
+	curloc = uselocale(NULL);
+	loc = current_locale(curloc, LC_CTYPE);
 	loclen = strlen(loc);
 	if (_DFLTLOCPATH_LEN + loclen + _WDMODPATH_LEN >= sizeof (wdmodpath)) {
 		/* pathname too long */

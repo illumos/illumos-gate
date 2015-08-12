@@ -103,6 +103,7 @@ extern size_t strxfrm_l(char *_RESTRICT_KYWD, const char *_RESTRICT_KYWD,
     size_t, locale_t);
 extern int strcasecmp_l(const char *, const char *, locale_t);
 extern int strncasecmp_l(const char *, const char *, size_t, locale_t);
+extern char *strerror_l(int, locale_t);
 
 #endif /* defined(_STRICT_SYMBOLS) || defined(_XPG7) */
 

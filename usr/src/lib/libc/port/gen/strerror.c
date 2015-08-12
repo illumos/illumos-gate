@@ -23,11 +23,12 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2015 Joyent, Inc.
+ */
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "lint.h"
 #include "_libc_gettext.h"
@@ -40,13 +41,20 @@ extern const int _sys_index[];
 extern int _sys_num_err;
 
 char *
-strerror(int errnum)
+strerror_l(int errnum, locale_t loc)
 {
 	if (errnum < _sys_num_err && errnum >= 0)
-		return (_libc_gettext((char *)&_sys_errs[_sys_index[errnum]]));
+		return (_libc_gettext_l(&_sys_errs[_sys_index[errnum]],
+		    loc));
 
 	errno = EINVAL;
-	return (_libc_gettext("Unknown error"));
+	return (_libc_gettext_l("Unknown error", loc));
+}
+
+char *
+strerror(int errnum)
+{
+	return (strerror_l(errnum, uselocale(NULL)));
 }
 
 /*

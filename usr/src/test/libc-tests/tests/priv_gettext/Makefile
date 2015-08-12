@@ -10,21 +10,42 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright 2015 Garrett D'Amore <garrett@damore.org>
+# Copyright 2015 Joyent, Inc.
 #
 
-SUBDIRS = \
-	catopen \
-	fpround \
-	newlocale \
-	nl_langinfo \
-	priv_gettext \
-	random \
-	strerror \
-	symbols \
-	wcsrtombs \
-	wctype
-
 include $(SRC)/Makefile.master
+
+ROOTOPTPKG = $(ROOT)/opt/libc-tests
+TESTDIR = $(ROOTOPTPKG)/tests
+
+PROGS = priv_gettext
+
+include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/test/Makefile.com
+
+CMDS = $(PROGS:%=$(TESTDIR)/%)
+$(CMDS) := FILEMODE = 0555
+
+all: $(PROGS)
+
+install: all $(CMDS)
+
+lint:
+
+clobber: clean
+	-$(RM) $(PROGS)
+
+clean:
+	-$(RM) *.o
+
+$(CMDS): $(TESTDIR) $(PROGS)
+
+
+$(TESTDIR):
+	$(INS.dir)
+
+$(TESTDIR)/%: %
+	$(INS.file)
+
+$(TESTDIR)/%: %
+	$(INS.file)

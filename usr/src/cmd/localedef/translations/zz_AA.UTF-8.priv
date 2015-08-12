@@ -10,21 +10,16 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright 2015 Garrett D'Amore <garrett@damore.org>
+# Copyright 2015 Joyent, Inc.
 #
 
-SUBDIRS = \
-	catopen \
-	fpround \
-	newlocale \
-	nl_langinfo \
-	priv_gettext \
-	random \
-	strerror \
-	symbols \
-	wcsrtombs \
-	wctype
+#
+#
+# This is a dummy version of the privilege names file. It is designed to
+# be used to test priv_gettext which does not use a normal message file.
+# See lib/libc/port/gen/priv_str_xlate.c for how this file is supposed
+# to be formatted.
+#
 
-include $(SRC)/Makefile.master
-include $(SRC)/test/Makefile.com
+dtrace_kernel
+	Ah Elbereth Gilthoniel

@@ -29,6 +29,7 @@ SYMTESTS = \
 	signal_h \
 	stdio_h \
 	stdlib_h \
+	string_h \
 	strings_h \
 	sys_stat_h \
 	sys_time_h \

@@ -187,6 +187,7 @@ UNIQ=		/usr/bin/uniq
 TAR=		/usr/bin/tar
 ASTBINDIR=	/usr/ast/bin
 MSGCC=		$(ASTBINDIR)/msgcc
+MSGFMT=		/usr/bin/msgfmt -s
 
 FILEMODE=	644
 DIRMODE=	755

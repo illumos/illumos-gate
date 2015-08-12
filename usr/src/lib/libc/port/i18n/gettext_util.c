@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "lint.h"
 #include "mtlib.h"
 #include <ctype.h>
@@ -86,7 +84,8 @@ static const int	category_name_len[] = {
 char *
 mk_msgfile(struct msg_pack *mp)
 {
-	char	*p, *q;
+	const char *q;
+	char	*p;
 	const char	*catstr;
 	uint32_t	cblen, loclen, catlen, totallen;
 

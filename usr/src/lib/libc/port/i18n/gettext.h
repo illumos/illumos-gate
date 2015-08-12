@@ -27,8 +27,6 @@
 #ifndef	_LIBC_PORT_I18N_GETTEXT_H
 #define	_LIBC_PORT_I18N_GETTEXT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/param.h>
 #include <iconv.h>
 #include <synch.h>
@@ -149,7 +147,7 @@ struct msg_pack {
 	char	*msgfile;		/* msg catalog file to open */
 	char	*domain;		/* textdomain name */
 	char	*binding;		/* binding */
-	char	*locale;		/* locale */
+	const char	*locale;	/* locale */
 	char	*language;		/* LANGUAGE env */
 	caddr_t	addr;			/* mmap'ed address */
 	size_t	fsz;			/* file size */
@@ -192,7 +190,7 @@ extern Gettext_t	*global_gt;
 extern char	*_textdomain_u(const char *, char *);
 extern char	*_real_bindtextdomain_u(const char *, const char *, int);
 extern char	*_real_gettext_u(const char *, const char *,
-    const char *, unsigned long int, int, int);
+    const char *, unsigned long int, int, int, locale_t);
 extern char	*handle_mo(struct msg_pack *);
 
 extern int	gnu_setmsg(Msg_node *, char *, size_t);

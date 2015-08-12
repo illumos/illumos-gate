@@ -21,7 +21,7 @@ duplocale, freelocale, newlocale \- create, duplicate, and destroy locale object
 .nf
 #include <locale.h>
 
-\fBlocale_t\fR \fBnewlocale\fR(\fBint\fR \fIcategory_mask\fR, \fBconst char *\fR \fIlocale\fR,
+\fBlocale_t\fR \fBnewlocale\fR(\fBint\fR \fIcategory_mask\fR, \fBconst char *\fR\fIlocale\fR,
     \fBlocale_t\fR \fIbase\fR);
 .fi
 .LP
