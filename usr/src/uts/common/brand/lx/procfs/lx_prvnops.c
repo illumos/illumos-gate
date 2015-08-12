@@ -3498,8 +3498,11 @@ nextp:
  *
  * Over the years, /proc/partitions has been made considerably smaller -- to
  * the point that it really is only major number, minor number, number of
- * blocks (which we report as 0), and partition name.  We support this only
- * because some things want to see it to make sense of /proc/diskstats.
+ * blocks (which we report as 0), and partition name.
+ *
+ * We support this because some things want to see it to make sense of
+ * /proc/diskstats, and also because "fdisk -l" and a few other things look
+ * here to find all disks on the system.
  */
 /* ARGSUSED */
 static void
@@ -3510,6 +3513,11 @@ lxpr_read_partitions(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	kstat_t ks0;
 	int nidx, num, i;
 	size_t sidx, size;
+	zfs_cmd_t *zc;
+	nvlist_t *nv = NULL;
+	nvpair_t *elem = NULL;
+	lxpr_mnt_t *mnt;
+	lxpr_zfs_iter_t zfsi;
 
 	ASSERT(lxpnp->lxpr_type == LXPR_PARTITIONS);
 
@@ -3546,6 +3554,36 @@ lxpr_read_partitions(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	}
 
 	kmem_free(ksr, sidx);
+
+	/* If we never got to open the zfs LDI, then stop now. */
+	mnt = (lxpr_mnt_t *)lxpnp->lxpr_vnode->v_vfsp->vfs_data;
+	if (mnt->lxprm_zfs_isopen == B_FALSE)
+		return;
+
+	zc = kmem_zalloc(sizeof (zfs_cmd_t), KM_SLEEP);
+
+	if (lxpr_zfs_list_pools(mnt, zc, &nv) != 0)
+		goto out;
+
+	while ((elem = nvlist_next_nvpair(nv, elem)) != NULL) {
+		char *pool = nvpair_name(elem);
+
+		bzero(&zfsi, sizeof (lxpr_zfs_iter_t));
+		while (lxpr_zfs_next_zvol(mnt, pool, zc, &zfsi) == 0) {
+			major_t	major;
+			minor_t	minor;
+			if (lxpr_zvol_dev(mnt, zc->zc_name, &major, &minor)
+			    != 0)
+				continue;
+
+			lxpr_uiobuf_printf(uiobuf, "%4d %7d %10d zvol/dsk/%s\n",
+			    major, minor, 0, zc->zc_name);
+		}
+	}
+
+	nvlist_free(nv);
+out:
+	kmem_free(zc, sizeof (zfs_cmd_t));
 }
 
 /*

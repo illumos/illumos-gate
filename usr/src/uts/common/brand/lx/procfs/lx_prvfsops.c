@@ -21,9 +21,8 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2015 Joyent, Inc.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * lxprvfsops.c: vfs operations for /lxprocfs.
@@ -121,6 +120,11 @@ _fini(void)
 	lxpr_fininodecache();
 
 	/*
+	 * Clean up any reference to the ZFS module we have.
+	 */
+	lxpr_zfs_fini();
+
+	/*
 	 * clean out the vfsops and vnodeops
 	 */
 	(void) vfs_freevfsops_by_type(lxprocfstype);
@@ -188,6 +192,11 @@ lxpr_init(int fstype, char *name)
 	 */
 	lxpr_initnodecache();
 
+	/*
+	 * Set up a pointer to the ZFS module and some key functions.
+	 */
+	lxpr_zfs_init();
+
 	return (0);
 }
 
@@ -198,6 +207,7 @@ lxpr_mount(vfs_t *vfsp, vnode_t *mvp, mounta_t *uap, cred_t *cr)
 	zone_t *zone = curproc->p_zone;
 	ldi_ident_t li;
 	int err;
+	dev_t zfs_dv;
 
 	/*
 	 * must be root to mount
@@ -233,6 +243,30 @@ lxpr_mount(vfs_t *vfsp, vnode_t *mvp, mounta_t *uap, cred_t *cr)
 	}
 
 	lxpr_mnt->lxprm_li = li;
+
+	/* Construct a root cred for our zone, to use with LDI. */
+	lxpr_mnt->lxprm_rcred = crdup(kcred);
+	crsetzone(lxpr_mnt->lxprm_rcred, zone);
+
+	/*
+	 * Try to open the ZFS LDI handle.
+	 */
+	lxpr_mnt->lxprm_zfs_isopen = B_FALSE;
+
+	if (ldi_open_by_name("/dev/zfs", FREAD | FWRITE,
+	    lxpr_mnt->lxprm_rcred, &lxpr_mnt->lxprm_zfs_lh, li) != 0)
+		goto nozfs;
+
+	if (ldi_get_dev(lxpr_mnt->lxprm_zfs_lh, &zfs_dv) != 0) {
+		ldi_close(lxpr_mnt->lxprm_zfs_lh, FREAD|FWRITE,
+		    lxpr_mnt->lxprm_rcred);
+		goto nozfs;
+	}
+
+	lxpr_mnt->lxprm_zfs_major = getmajor(zfs_dv);
+
+	lxpr_mnt->lxprm_zfs_isopen = B_TRUE;
+nozfs:
 
 	mutex_enter(&lxpr_mount_lock);
 
@@ -322,6 +356,14 @@ lxpr_unmount(vfs_t *vfsp, int flag, cred_t *cr)
 	 */
 	lxpr_freenode(lxpr_mnt->lxprm_node);
 	zone_rele(lxpr_mnt->lxprm_zone);
+
+	if (lxpr_mnt->lxprm_zfs_isopen == B_TRUE) {
+		ldi_close(lxpr_mnt->lxprm_zfs_lh, FREAD|FWRITE,
+		    lxpr_mnt->lxprm_rcred);
+		lxpr_mnt->lxprm_zfs_isopen = B_FALSE;
+	}
+	crfree(lxpr_mnt->lxprm_rcred);
+
 	kmem_free(lxpr_mnt, sizeof (*lxpr_mnt));
 
 	mutex_exit(&lxpr_mount_lock);
