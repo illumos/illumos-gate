@@ -51,6 +51,7 @@ LINTS		= $(LX_PROC_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(USR_FS_DIR)/$(MODULE)
 
 INC_PATH	+= -I$(UTSBASE)/common/brand/lx -I$(LX_CMN)
+INC_PATH	+= -I$(UTSBASE)/common/fs/zfs
 
 #
 #	Include common rules.
