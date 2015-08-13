@@ -4036,11 +4036,11 @@ mac_init_rings(mac_impl_t *mip, mac_ring_type_t rtype)
 		 * Driver must register group->mgi_addmac/remmac() for rx groups
 		 * to support multiple MAC addresses.
 		 */
-		if (rtype == MAC_RING_TYPE_RX) {
-			if ((group_info.mgi_addmac == NULL) ||
-			    (group_info.mgi_addmac == NULL)) {
-				goto bail;
-			}
+		if (rtype == MAC_RING_TYPE_RX &&
+		    ((group_info.mgi_addmac == NULL) ||
+		    (group_info.mgi_remmac == NULL))) {
+			err = EINVAL;
+			goto bail;
 		}
 
 		/* Cache driver-supplied information */
