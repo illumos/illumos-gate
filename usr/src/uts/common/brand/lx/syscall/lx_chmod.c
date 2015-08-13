@@ -13,58 +13,95 @@
  * Copyright 2015 Joyent, Inc.
  */
 
+#include <sys/systm.h>
 #include <sys/fcntl.h>
 #include <sys/thread.h>
 #include <sys/klwp.h>
 #include <sys/lx_brand.h>
 #include <sys/lx_fcntl.h>
 
-/*
- * From "uts/common/syscall/chmod.c":
- */
-extern int fchmodat(int, char *, int, int);
+long
+lx_vn_chmod(vnode_t *vp, int mode)
+{
+	vattr_t vattr;
+
+	vattr.va_mode = mode & MODEMASK;
+	vattr.va_mask = AT_MODE;
+
+	if (vn_is_readonly(vp)) {
+		return (EROFS);
+	}
+	return (VOP_SETATTR(vp, &vattr, 0, CRED(), NULL));
+}
 
 static long
-lx_fchmodat_wrapper(int fd, char *path, int mode, int flag)
+lx_fchmodat_wrapper(int fd, char *path, int mode)
 {
-	long rval;
+	long error;
+	vnode_t *vp;
 
-	if (fd == LX_AT_FDCWD) {
-		fd = AT_FDCWD;
-	}
-
-	if ((rval = fchmodat(fd, path, mode, flag)) != 0) {
+	if ((error = lx_vp_at(fd, path, &vp, 0)) != 0) {
 		lx_proc_data_t *pd = ttolxproc(curthread);
-		klwp_t *lwp = ttolwp(curthread);
 
 		/*
 		 * If the process is in "install mode", return success
 		 * if the operation failed due to an absent file.
 		 */
-		if ((pd->l_flags & LX_PROC_INSTALL_MODE) &&
-		    lwp->lwp_errno == ENOENT) {
-			lwp->lwp_errno = 0;
+		if (error == ENOENT &&
+		    (pd->l_flags & LX_PROC_INSTALL_MODE)) {
 			return (0);
 		}
+		return (set_errno(error));
 	}
 
-	return (rval);
+	error = lx_vn_chmod(vp, mode);
+	VN_RELE(vp);
+
+	if (error != 0) {
+		return (set_errno(error));
+	}
+	return (0);
 }
 
 long
 lx_fchmodat(int fd, char *path, int mode)
 {
-	return (lx_fchmodat_wrapper(fd, path, mode, 0));
+	return (lx_fchmodat_wrapper(fd, path, mode));
 }
 
 long
 lx_fchmod(int fd, int mode)
 {
-	return (lx_fchmodat_wrapper(fd, NULL, mode, 0));
+	file_t *fp;
+	vnode_t *vp;
+	long error;
+
+	/*
+	 * In order to do proper O_PATH handling, lx_fchmod cannot leverage
+	 * lx_fchmodat with a NULL path since the desired behavior differs.
+	 */
+	if ((fp = getf(fd)) == NULL) {
+		return (set_errno(EBADF));
+	}
+	if (LX_IS_O_PATH(fp)) {
+		releasef(fd);
+		return (set_errno(EBADF));
+	}
+	vp = fp->f_vnode;
+	VN_HOLD(vp);
+	releasef(fd);
+
+	error = lx_vn_chmod(vp, mode);
+	VN_RELE(vp);
+
+	if (error != 0) {
+		return (set_errno(error));
+	}
+	return (0);
 }
 
 long
 lx_chmod(char *path, int mode)
 {
-	return (lx_fchmodat_wrapper(AT_FDCWD, path, mode, 0));
+	return (lx_fchmodat_wrapper(LX_AT_FDCWD, path, mode));
 }
