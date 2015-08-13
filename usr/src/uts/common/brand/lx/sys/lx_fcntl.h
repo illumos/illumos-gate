@@ -27,6 +27,8 @@
 #ifndef _SYS_LX_FCNTL_H
 #define	_SYS_LX_FCNTL_H
 
+#include <sys/vnode.h>
+
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -37,6 +39,7 @@ extern "C" {
 #define	LX_O_RDONLY		00
 #define	LX_O_WRONLY		01
 #define	LX_O_RDWR		02
+#define	LX_O_ACCMODE		(LX_O_RDONLY | LX_O_WRONLY | LX_O_RDWR)
 #define	LX_O_CREAT		0100
 #define	LX_O_EXCL		0200
 #define	LX_O_NOCTTY		0400
@@ -51,8 +54,8 @@ extern "C" {
 #define	LX_O_LARGEFILE		0100000
 #define	LX_O_DIRECTORY		0200000
 #define	LX_O_NOFOLLOW		0400000
-/* lx flag for pipe2 */
 #define	LX_O_CLOEXEC		02000000
+#define	LX_O_PATH		010000000
 
 #define	LX_F_DUPFD		0
 #define	LX_F_GETFD		1
@@ -82,6 +85,11 @@ extern "C" {
 #define	LX_F_RDLCK		0
 #define	LX_F_WRLCK		1
 #define	LX_F_UNLCK		2
+
+/* Test for emulated O_PATH setting in file_t flags */
+#define	LX_IS_O_PATH(f)		(((f)->f_flag & (FREAD|FWRITE)) == 0)
+
+extern int lx_vp_at(int, char *, vnode_t **, int);
 
 /*
  * Lx flock codes.

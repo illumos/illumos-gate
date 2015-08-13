@@ -15,53 +15,103 @@
 
 #include <sys/systm.h>
 #include <sys/fcntl.h>
+#include <sys/zone.h>
 #include <sys/lx_brand.h>
 #include <sys/lx_fcntl.h>
 #include <sys/lx_types.h>
 
-/*
- * From "uts/common/syscall/chown.c":
- */
-extern int fchownat(int, char *, uid_t, gid_t, int);
+long
+lx_vn_chown(vnode_t *vp, uid_t uid, gid_t gid)
+{
+	vattr_t vattr;
+	zone_t *zone = crgetzone(CRED());
+
+	if ((uid != (uid_t)-1 && !VALID_UID(uid, zone)) ||
+	    (gid != (gid_t)-1 && !VALID_GID(gid, zone))) {
+		return (EINVAL);
+	}
+	vattr.va_uid = uid;
+	vattr.va_gid = gid;
+	vattr.va_mask = 0;
+	if (vattr.va_uid != -1)
+		vattr.va_mask |= AT_UID;
+	if (vattr.va_gid != -1)
+		vattr.va_mask |= AT_GID;
+
+	if (vn_is_readonly(vp)) {
+		return (EROFS);
+	}
+	return (VOP_SETATTR(vp, &vattr, 0, CRED(), NULL));
+}
 
 long
 lx_fchownat_wrapper(int fd, char *path, uid_t uid, gid_t gid, int native_flag)
 {
-	long rval;
+	long error;
+	vnode_t *vp;
 
-	if (fd == LX_AT_FDCWD) {
-		fd = AT_FDCWD;
-	}
-
-	if ((rval = fchownat(fd, path, uid, gid, native_flag)) != 0) {
+	if ((error = lx_vp_at(fd, path, &vp, native_flag)) != 0) {
 		lx_proc_data_t *pd = ttolxproc(curthread);
-		klwp_t *lwp = ttolwp(curthread);
 
 		/*
 		 * If the process is in "install mode", return success
 		 * if the operation failed due to an absent file.
 		 */
-		if ((pd->l_flags & LX_PROC_INSTALL_MODE) &&
-		    lwp->lwp_errno == ENOENT) {
-			lwp->lwp_errno = 0;
+		if (error == ENOENT &&
+		    (pd->l_flags & LX_PROC_INSTALL_MODE)) {
 			return (0);
 		}
+		return (set_errno(error));
 	}
 
-	return (rval);
+	error = lx_vn_chown(vp, uid, gid);
+	VN_RELE(vp);
+
+	if (error != 0) {
+		return (set_errno(error));
+	}
+	return (0);
+}
+
+long
+lx_fchown_wrapper(int fd, uid_t uid, gid_t gid)
+{
+	file_t *fp;
+	vnode_t *vp;
+	long error;
+
+	/*
+	 * In order to do proper O_PATH handling, lx_fchown cannot leverage
+	 * lx_fchownat with a NULL path since the desired behavior differs.
+	 */
+	if ((fp = getf(fd)) == NULL) {
+		return (set_errno(EBADF));
+	}
+	if (LX_IS_O_PATH(fp)) {
+		releasef(fd);
+		return (set_errno(EBADF));
+	}
+	vp = fp->f_vnode;
+	VN_HOLD(vp);
+	releasef(fd);
+
+	error = lx_vn_chown(vp, uid, gid);
+	VN_RELE(vp);
+
+	if (error != 0) {
+		return (set_errno(error));
+	}
+	return (0);
 }
 
 long
 lx_fchownat(int fd, char *path, uid_t uid, gid_t gid, int flag)
 {
-	char c;
 	int native_flag = 0;
 
-	if (copyin(path, &c, sizeof (c)) != 0) {
-		return (set_errno(EFAULT));
-	}
-
 	if (flag & LX_AT_EMPTY_PATH) {
+		char c;
+
 		/*
 		 * According to fchownat(2), when AT_EMPTY_PATH is set: "if
 		 * path is an empty string, operate on the file referred to by
@@ -69,26 +119,19 @@ lx_fchownat(int fd, char *path, uid_t uid, gid_t gid, int flag)
 		 * causes fchownat() to operate on the fd we passed without an
 		 * additional lookup.
 		 */
+		if (copyin(path, &c, sizeof (c)) != 0) {
+			return (set_errno(EFAULT));
+		}
 		if (c == '\0') {
 			path = NULL;
 		}
 
 		flag &= ~LX_AT_EMPTY_PATH;
-	} else {
-		/*
-		 * Otherwise, a file with no filename obviously cannot be
-		 * present in the directory.
-		 */
-		if (c == '\0') {
-			return (set_errno(ENOENT));
-		}
 	}
-
 	if (flag & LX_AT_SYMLINK_NOFOLLOW) {
 		flag &= ~LX_AT_SYMLINK_NOFOLLOW;
 		native_flag |= AT_SYMLINK_NOFOLLOW;
 	}
-
 	if (flag != 0) {
 		return (set_errno(EINVAL));
 	}
@@ -99,7 +142,7 @@ lx_fchownat(int fd, char *path, uid_t uid, gid_t gid, int flag)
 long
 lx_fchown(int fd, uid_t uid, gid_t gid)
 {
-	return (lx_fchownat_wrapper(fd, NULL, uid, gid, 0));
+	return (lx_fchown_wrapper(fd, uid, gid));
 }
 
 long
@@ -118,8 +161,8 @@ lx_chown(char *path, uid_t uid, gid_t gid)
 long
 lx_fchown16(int fd, lx_uid16_t uid, lx_gid16_t gid)
 {
-	return (lx_fchownat_wrapper(fd, NULL, LX_UID16_TO_UID32(uid),
-	    LX_GID16_TO_GID32(gid), 0));
+	return (lx_fchown_wrapper(fd, LX_UID16_TO_UID32(uid),
+	    LX_GID16_TO_GID32(gid)));
 }
 
 long

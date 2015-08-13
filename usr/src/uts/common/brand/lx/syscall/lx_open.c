@@ -27,10 +27,12 @@
 
 #include <sys/systm.h>
 #include <sys/fcntl.h>
+#include <sys/file.h>
 #include <sys/filio.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/inttypes.h>
+#include <sys/mutex.h>
 
 #include <sys/lx_types.h>
 #include <sys/lx_fcntl.h>
@@ -40,43 +42,44 @@ extern int fcntl(int, int, intptr_t);
 extern int openat(int, char *, int, int);
 extern int open(char *, int, int);
 extern int close(int);
-extern int ioctl(int, int, intptr_t);
+extern int cioctl(file_t *, int, intptr_t, int *);
 extern int lookupnameat(char *, enum uio_seg, int, vnode_t **, vnode_t **,
     vnode_t *);
 
+
 static int
-ltos_open_flags(uintptr_t p2)
+ltos_open_flags(int input)
 {
 	int flags;
 
-	if ((p2 & O_ACCMODE) == LX_O_RDONLY)
-		flags = O_RDONLY;
-	else if ((p2 & O_ACCMODE) == LX_O_WRONLY)
-		flags = O_WRONLY;
-	else
-		flags = O_RDWR;
+	if (input & LX_O_PATH) {
+		input &= (LX_O_DIRECTORY | LX_O_NOFOLLOW | LX_O_CLOEXEC);
+	}
 
-	if (p2 & LX_O_CREAT) {
+	/* This depends on the Linux ACCMODE flags being the same as SunOS. */
+	flags = (input & LX_O_ACCMODE);
+
+	if (input & LX_O_CREAT) {
 		flags |= O_CREAT;
 	}
 
-	if (p2 & LX_O_EXCL)
+	if (input & LX_O_EXCL)
 		flags |= O_EXCL;
-	if (p2 & LX_O_NOCTTY)
+	if (input & LX_O_NOCTTY)
 		flags |= O_NOCTTY;
-	if (p2 & LX_O_TRUNC)
+	if (input & LX_O_TRUNC)
 		flags |= O_TRUNC;
-	if (p2 & LX_O_APPEND)
+	if (input & LX_O_APPEND)
 		flags |= O_APPEND;
-	if (p2 & LX_O_NONBLOCK)
+	if (input & LX_O_NONBLOCK)
 		flags |= O_NONBLOCK;
-	if (p2 & LX_O_SYNC)
+	if (input & LX_O_SYNC)
 		flags |= O_SYNC;
-	if (p2 & LX_O_LARGEFILE)
+	if (input & LX_O_LARGEFILE)
 		flags |= O_LARGEFILE;
-	if (p2 & LX_O_NOFOLLOW)
+	if (input & LX_O_NOFOLLOW)
 		flags |= O_NOFOLLOW;
-	if (p2 & LX_O_CLOEXEC)
+	if (input & LX_O_CLOEXEC)
 		flags |= O_CLOEXEC;
 
 	/*
@@ -97,38 +100,71 @@ ltos_open_flags(uintptr_t p2)
 	 * passing a transfer size is not a multiple of the underlying file
 	 * system block size will be test suites.
 	 */
-	if (p2 & LX_O_DIRECT)
+	if (input & LX_O_DIRECT)
 		flags |= (O_RSYNC|O_SYNC);
 
 	return (flags);
 }
 
+#define	LX_POSTPROCESS_OPTS	(LX_O_DIRECT | LX_O_ASYNC | LX_O_PATH)
+
 static int
 lx_open_postprocess(int fd, int fmode)
 {
-	if (fmode & LX_O_DIRECT) {
-		(void) ioctl(fd, _FIODIRECTIO, DIRECTIO_ON);
+	file_t *fp;
+	int rv, error = 0;
+
+	if ((fmode & LX_POSTPROCESS_OPTS) == 0) {
+		/* Skip out early, if possible */
+		return (0);
 	}
 
-	/*
-	 * Set the ASYNC flag if passsed.
-	 */
-	if (fmode & LX_O_ASYNC) {
-		int res;
+	if ((fp = getf(fd)) == NULL) {
+		/*
+		 * It is possible that this fd was closed by the time we
+		 * arrived here if some one is hammering away with close().
+		 */
+		return (EIO);
+	}
 
-		if ((res = fcntl(fd, F_SETFL, FASYNC)) != 0) {
-			(void) close(fd);
-			return (res);
+	if (fmode & LX_O_DIRECT && error == 0) {
+		(void) VOP_IOCTL(fp->f_vnode, _FIODIRECTIO, DIRECTIO_ON,
+		    fp->f_flag, fp->f_cred, &rv, NULL);
+	}
+
+	if (fmode & LX_O_ASYNC && error == 0) {
+		if ((error = VOP_SETFL(fp->f_vnode, fp->f_flag, FASYNC,
+		    fp->f_cred, NULL)) == 0) {
+			mutex_enter(&fp->f_tlock);
+			fp->f_flag |= FASYNC;
+			mutex_exit(&fp->f_tlock);
 		}
 	}
 
-	return (fd);
+	if (fmode & LX_O_PATH && error == 0) {
+		/*
+		 * While the O_PATH flag has no direct analog in SunOS, it is
+		 * emulated by removing both FREAD and FWRITE from f_flag.
+		 * This causes read(2) and write(2) result in EBADF and can be
+		 * checked for in other syscalls to tigger the correct behavior
+		 * there.
+		 */
+		mutex_enter(&fp->f_tlock);
+		fp->f_flag &= ~(FREAD|FWRITE);
+		mutex_exit(&fp->f_tlock);
+	}
+
+	releasef(fd);
+	if (error != 0) {
+		(void) closeandsetf(fd, NULL);
+	}
+	return (error);
 }
 
 long
 lx_openat(int atfd, char *path, int fmode, int cmode)
 {
-	int flags, fd;
+	int flags, fd, error;
 	mode_t mode = 0;
 
 	if (atfd == LX_AT_FDCWD)
@@ -211,7 +247,10 @@ lx_openat(int atfd, char *path, int fmode, int cmode)
 		return (ttolwp(curthread)->lwp_errno);
 	}
 
-	return (lx_open_postprocess(fd, fmode));
+	if ((error = lx_open_postprocess(fd, fmode)) != 0) {
+		return (set_errno(error));
+	}
+	return (fd);
 }
 
 long

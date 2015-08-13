@@ -44,9 +44,7 @@
 #include <sys/fcntl.h>
 #include <sys/brand.h>
 #include <sys/lx_brand.h>
-
-#define	LX_O_NONBLOCK	04000
-#define	LX_O_CLOEXEC	02000000
+#include <sys/lx_fcntl.h>
 
 /*
  * Based on native pipe(2) system call, except that the pipe is half-duplex.
