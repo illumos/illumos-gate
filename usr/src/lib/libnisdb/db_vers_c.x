@@ -22,11 +22,14 @@
 /*
  *	db_vers_c.x
  *
+ * Copyright 2015 Gary Mills
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-%#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#if RPC_XDR
+%#include "ldap_xdr.h"
+#endif /* RPC_XDR */
 
 #if RPC_HDR
 %#ifndef _DB_VERS_H

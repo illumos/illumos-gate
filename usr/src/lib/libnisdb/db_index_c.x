@@ -21,9 +21,14 @@
 /*
  *	db_index_c.x
  *
+ *  Copyright 2015 Gary Mills
  *  Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  *  Use is subject to license terms.
  */
+
+#if RPC_XDR
+%#include "ldap_xdr.h"
+#endif /* RPC_XDR */
 
 #if RPC_HDR
 %#ifndef _DB_INDEX_H

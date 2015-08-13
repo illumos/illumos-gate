@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2015 Gary Mills
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * DESCRIPTION: Contains the top level shim hook functions. These must have
@@ -51,6 +50,7 @@
 #include "ypdefs.h"
 #include "shim.h"
 #include "yptol.h"
+#include "stubs.h"
 #include "../ldap_parse.h"
 #include "../ldap_util.h"
 

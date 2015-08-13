@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2015 Gary Mills
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -2090,7 +2091,7 @@ __nis_value_t **
 matchMappingItem(__nis_mapping_format_t *f, __nis_value_t *inVal,
 		int *numVals, char *sepset, char **outstr) {
 	__nis_value_t		**v = 0;
-	int			i, n, ni, numItems, nf, nv = 0;
+	int			i, n, ni, numItems, nf;
 	char			*str, *valstr;
 	__nis_mapping_format_t	*ftmp;
 	char			*myself = "matchMappingItem";

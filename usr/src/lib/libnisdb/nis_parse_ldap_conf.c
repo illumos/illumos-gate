@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2015 Gary Mills
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -84,6 +85,11 @@ static int yp_parse_ldap_default_conf(__nis_ldap_proxy_info *proxy_info,
 	__nis_config_t *nis_config, __nis_config_info_t *config_info,
 	__nisdb_table_mapping_t *table_info);
 
+/* Forward declarations */
+int yp_parse_ldap_config_file(const char *, __nis_ldap_proxy_info *,
+    __nis_config_t *, __nis_table_mapping_t **, __nis_config_info_t *,
+    __nisdb_table_mapping_t *, 	__yp_domain_context_t *);
+
 
 /* helper functions */
 static config_key get_attrib_num_cmdline(const char *s,
@@ -128,7 +134,6 @@ parse_ldap_migration(
 					(tls_method_t)NO_VALUE_SET, NULL,
 					NULL, NULL};
 	struct stat		buf;
-	int i = 0;
 
 	p_error = no_parse_error;
 
@@ -412,7 +417,7 @@ yp_parse_ldap_default_conf(
 	char		*attr_val;
 	int		defflags;
 	config_key	attrib_num;
-	int 	i, len, attr_len;
+	int 		i, len;
 	void		*defp;
 
 	if ((defp = defopen_r(YP_ETCCONFFILE)) != NULL) {
@@ -646,7 +651,6 @@ yp_parse_ldap_config_file(
 	__yp_domain_context_t	*ypDomains)
 {
 	int	rc = 0;
-	int	numDomains = 0;
 	config_key	attrib_num;
 	int	fd;
 	char	*attr_val = NULL;
@@ -733,7 +737,6 @@ get_file_attr_val(int fd, char **attr_val)
 	char		*attribute_value;
 	int		ret;
 	config_key	attrib_num = no_more_keys;
-	int		found_quote = 0;
 
 	*attr_val = NULL;
 
@@ -808,7 +811,6 @@ connect_to_ldap_config_server(
 	int			server_port,
 	__nis_config_info_t	*config_info)
 {
-	int		rc		= 0;
 	LDAP		*ld		= NULL;
 	int		ldapVersion	= LDAP_VERSION3;
 	int		derefOption	= LDAP_DEREF_ALWAYS;

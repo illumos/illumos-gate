@@ -20,11 +20,10 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2015 Gary Mills
  * Copyright (c) 2001 by Sun Microsystems, Inc.
  * All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifndef	_LDAP_XDR_H
 #define	_LDAP_XDR_H
@@ -60,6 +59,10 @@ nis_object	*unXdrNisObject(void *buf, int bufLen, entry_obj ***eaP,
 void		freeEntryObjArray(entry_obj **ea, int numEa);
 bool_t		sameNisPlusObj(nis_object *o1, nis_object *o2);
 bool_t		sameNisPlusPseudoObj(nis_object *o1, entry_obj *e2);
+bool_t		xdr___nisdb_rwlock_t(XDR *, void *);
+bool_t		xdr___nisdb_flag_t(XDR *, void *);
+bool_t		xdr___nisdb_ptr_t(XDR *, void *);
+bool_t		xdr___nis_table_mapping_t(XDR *, void *);
 
 #ifdef	__cplusplus
 }

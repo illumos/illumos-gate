@@ -23,6 +23,8 @@
  *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2015 RackTop Systems.
  */
 
 
@@ -144,7 +146,7 @@ extern "C" {
 bool_t
 db_in_dict_file(char *name)
 {
-	return ((bool_t) InUseDictionary->find_table_desc(name));
+	return (InUseDictionary->find_table_desc(name) != NULL);
 
 }
 

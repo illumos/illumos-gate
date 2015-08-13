@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright (C) 2014 Hewlett-Packard Development Company, L.P.
+ * Copyright (C) 2015 Hewlett-Packard Development Company, L.P.
  */
 
 /*
@@ -486,6 +486,126 @@ static cpqary3_bd_t cpqary3_bds[] = {
 		8,
 		0x103c,
 		0x1924,
+		OUTBOUND_LIST_5300_EXISTS,
+		SA_BD_SAS,
+		0,
+		INTR_PERF_MASK,
+		0,
+		1
+	},
+	{
+		"Smart Array P244br Controller",
+		8,
+		0x103c,
+		0x21bd,
+		OUTBOUND_LIST_5300_EXISTS,
+		SA_BD_SAS,
+		0,
+		INTR_PERF_MASK,
+		0,
+		1
+	},
+	{
+		"Smart Array P741m Controller",
+		8,
+		0x103c,
+		0x21be,
+		OUTBOUND_LIST_5300_EXISTS,
+		SA_BD_SAS,
+		0,
+		INTR_PERF_MASK,
+		0,
+		1
+	},
+	{
+		"Smart Array P440ar Controller",
+		8,
+		0x103c,
+		0x21c0,
+		OUTBOUND_LIST_5300_EXISTS,
+		SA_BD_SAS,
+		0,
+		INTR_PERF_MASK,
+		0,
+		1
+	},
+	{
+		"Smart Array P440 Controller",
+		8,
+		0x103c,
+		0x21c2,
+		OUTBOUND_LIST_5300_EXISTS,
+		SA_BD_SAS,
+		0,
+		INTR_PERF_MASK,
+		0,
+		1
+	},
+	{
+		"Smart Array P441 Controller",
+		8,
+		0x103c,
+		0x21c3,
+		OUTBOUND_LIST_5300_EXISTS,
+		SA_BD_SAS,
+		0,
+		INTR_PERF_MASK,
+		0,
+		1
+	},
+	{
+		"Smart Array P841 Controller",
+		8,
+		0x103c,
+		0x21c5,
+		OUTBOUND_LIST_5300_EXISTS,
+		SA_BD_SAS,
+		0,
+		INTR_PERF_MASK,
+		0,
+		1
+	},
+	{
+		"Smart Array P246br Controller",
+		8,
+		0x103c,
+		0x21ca,
+		OUTBOUND_LIST_5300_EXISTS,
+		SA_BD_SAS,
+		0,
+		INTR_PERF_MASK,
+		0,
+		1
+	},
+	{
+		"Smart Array P840 Controller",
+		8,
+		0x103c,
+		0x21cb,
+		OUTBOUND_LIST_5300_EXISTS,
+		SA_BD_SAS,
+		0,
+		INTR_PERF_MASK,
+		0,
+		1
+	},
+	{
+		"Smart Array P542t Controller",
+		8,
+		0x103c,
+		0x21cc,
+		OUTBOUND_LIST_5300_EXISTS,
+		SA_BD_SAS,
+		0,
+		INTR_PERF_MASK,
+		0,
+		1
+	},
+	{
+		"Smart Array P240tr Controller",
+		8,
+		0x103c,
+		0x21cd,
 		OUTBOUND_LIST_5300_EXISTS,
 		SA_BD_SAS,
 		0,

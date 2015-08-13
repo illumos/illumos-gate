@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2015 Gary Mills
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -37,6 +38,7 @@
 #include <ndbm.h>
 #include <strings.h>
 #include <errno.h>
+#include <ctype.h>
 #include "../ldap_util.h"
 #include "../ldap_map.h"
 #include "../ldap_parse.h"
@@ -124,11 +126,9 @@ processSplitField(__nis_table_mapping_t *sf, __nis_value_t *inVal,
 
 	char			*sepset;
 	__nis_rule_value_t	*rvq;
-	__nis_mapping_format_t  *ftmp;
 	__nis_value_t		**valA, *tempVal;
 	int			i, j, res, numVals, oldlen, count;
 	char			*str, *oldstr;
-	char			*myself = "processSplitField";
 
 	/* sf will be non NULL */
 
@@ -254,7 +254,7 @@ datumToRuleValue(datum *key, datum *value, __nis_table_mapping_t *t,
 	__nis_value_t		**valA;
 	__nis_table_mapping_t	*sf;
 	int			valueLen, comLen, numVals, nr, count = 1;
-	int			i, j, k, l, af;
+	int			i, j, k, l;
 	char			*ipaddr, *ipvalue;
 
 	/*  At this point, 't' is always non NULL */
@@ -645,7 +645,7 @@ addSplitFieldValues(__nis_table_mapping_t *t, __nis_rule_value_t *rv,
 suc_code
 buildNISRuleValue(__nis_table_mapping_t *t, __nis_rule_value_t *rv,
 					char *domain) {
-	int			r, i, j, k, l, index, nrq, res, len;
+	int			r, i, j, k, l, nrq, res, len;
 	int			numItems, splitname, count, statP;
 	__nis_value_t		*rval;
 	__nis_mapping_item_t	*litem;
@@ -1010,9 +1010,9 @@ singleReadFromDIT(char *map, char *domain, datum *key, datum *value,
 	__nis_rule_value_t	*rv_request = 0, *rv_result = 0;
 	__nis_ldap_search_t	*ls;
 	__nis_object_dn_t	*objectDN = NULL;
-	int			i, rc, nr = 0, nv = 0;
+	int			i, rc, nr = 0;
 	datum			*datval = 0;
-	char			*skey, *str, *sipkey;
+	char			*skey, *str;
 	char			*myself = "singleReadFromDIT";
 
 	*statP = SUCCESS;

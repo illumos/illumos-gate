@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PORT_ASSOCIATE 3C "Nov 9, 2007"
+.TH PORT_ASSOCIATE 3C "Aug 8, 2015"
 .SH NAME
 port_associate, port_dissociate \- associate or dissociate the object with the
 port
@@ -22,7 +22,6 @@ port
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBport_associate()\fR function associates specific \fIevents\fR of a given
 \fIobject\fR with a \fIport\fR.  Only objects associated with a particular port
@@ -47,8 +46,8 @@ The \fBport_notify_t\fR structure contains the following members:
 .sp
 .in +2
 .nf
-int       portntfy_port;  /* bind request(s) to port */
-void      *portntfy_user; /* user defined cookie */
+int       portnfy_port;  /* bind request(s) to port */
+void      *portnfy_user; /* user defined cookie */
 .fi
 .in -2
 
@@ -151,12 +150,10 @@ owner of the association closes the port .
 On NFS file systems, events from only the client side (local)
 access/modifications to files or directories will be delivered.
 .SH RETURN VALUES
-.sp
 .LP
 Upon succesful completion, 0 is returned. Otherwise, \(mi1 is returned and
 \fBerrno\fR is set to indicate the error.
 .SH ERRORS
-.sp
 .LP
 The \fBport_associate()\fR and \fBport_dissociate()\fR functions will fail if:
 .sp
@@ -406,7 +403,6 @@ my_status = aio_return(aiocbp);
 .in -2
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -426,7 +422,6 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBrctladm\fR(1M), \fBpoll\fR(2), \fBsetrctl\fR(2), \fBport_alert\fR(3C),
 \fBport_create\fR(3C), \fBport_get\fR(3C), \fBport_send\fR(3C),

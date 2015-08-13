@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2015 Gary Mills
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -1240,7 +1241,7 @@ selectTableMapping(__nis_table_mapping_t *t, db_query *q,
 			int wantWrite, int wantObj, char *dbId,
 			int *numMatches) {
 	__nis_table_mapping_t	*r, *x, **tp;
-	int			i, j, k, nm, numap;
+	int			i, nm, numap;
 	char			*myself = "selectTableMapping";
 
 	if (numMatches == 0)
@@ -1419,8 +1420,6 @@ extern bool_t	xdr_nis_object(register XDR *xdrs, nis_object *objp);
 int
 objToLDAP(__nis_table_mapping_t *t, nis_object *o, entry_obj **ea, int numEa) {
 	__nis_table_mapping_t	**tp;
-	XDR			xdr;
-	char			*objName;
 	int			stat, osize, n, numMatches = 0;
 	void			*buf;
 	__nis_rule_value_t	*rv;
@@ -1545,7 +1544,6 @@ int
 objFromLDAP(__nis_table_mapping_t *t, nis_object **obj,
 		entry_obj ***eaP, int *numEaP) {
 	__nis_table_mapping_t	**tp;
-	XDR			xdr;
 	nis_object		*o;
 	__nis_rule_value_t	*rv;
 	__nis_ldap_search_t	*ls;
