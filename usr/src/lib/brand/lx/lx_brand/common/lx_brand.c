@@ -74,6 +74,7 @@
 #include <sys/lx_syscall.h>
 #include <sys/lx_thread.h>
 #include <sys/lx_aio.h>
+#include <lx_auxv.h>
 
 /*
  * There is a block comment in "uts/common/brand/lx/os/lx_brand.c" that
@@ -559,7 +560,7 @@ int
 lx_init(int argc, char *argv[], char *envp[])
 {
 	char		*rele, *vers;
-	auxv_t		*ap;
+	auxv_t		*ap, *oap;
 	long		*p;
 	int		err;
 	lx_elf_data_t	edp;
@@ -666,6 +667,14 @@ lx_init(int argc, char *argv[], char *envp[])
 
 #if defined(_LP64)
 	vdso_hdr = map_vdso();
+	edp.ed_vdso = (uintptr_t)vdso_hdr;
+	/*
+	 * Notify the kernel of this mapping location to keep its
+	 * representation of the auxv consistent with reality.
+	 */
+	(void) syscall(SYS_brand, B_NOTIFY_VDSO_LOC, (void *)vdso_hdr);
+#else
+	edp.ed_vdso = 0;
 #endif
 
 	/*
@@ -679,32 +688,20 @@ lx_init(int argc, char *argv[], char *envp[])
 	 * that is the aux vectors.
 	 */
 	p++;
-	for (ap = (auxv_t *)p; ap->a_type != 0; ap++) {
-		switch (ap->a_type) {
-			case AT_BASE:
-				ap->a_un.a_val = edp.ed_base;
-				break;
-			case AT_ENTRY:
-				ap->a_un.a_val = edp.ed_entry;
-				break;
-			case AT_PHDR:
-				ap->a_un.a_val = edp.ed_phdr;
-				break;
-			case AT_PHENT:
-				ap->a_un.a_val = edp.ed_phent;
-				break;
-			case AT_PHNUM:
-				ap->a_un.a_val = edp.ed_phnum;
-				break;
-#if defined(_LP64)
-			case AT_SUN_BRAND_LX_SYSINFO_EHDR:
-				ap->a_type = AT_SYSINFO_EHDR;
-				ap->a_un.a_val = (long)vdso_hdr;
-				break;
-#endif
-			default:
-				break;
+	for (ap = (auxv_t *)p, oap = ap; ap->a_type != AT_NULL; ap++) {
+		if (lx_auxv_stol(ap, oap, &edp) == 0) {
+			/*
+			 * Copy only auxv entries which Linux programs will
+			 * understand. Other entries will be skipped.
+			 */
+			oap++;
 		}
+	}
+	/* NULL out skipped entries */
+	while (oap < ap) {
+		oap->a_type = AT_NULL;
+		oap->a_un.a_val = 0;
+		oap++;
 	}
 
 	/* Setup signal handler information. */

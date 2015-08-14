@@ -987,10 +987,16 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 		ddi_prop_free(termios);
 		return (0);
 
-	case B_ELFDATA:
+	case B_ELFDATA: {
+		mutex_enter(&p->p_lock);
 		pd = curproc->p_brand_data;
 		if (get_udatamodel() == DATAMODEL_NATIVE) {
-			if (copyout(&pd->l_elf_data, (void *)arg1,
+			lx_elf_data_t led;
+
+			bcopy(&pd->l_elf_data, &led, sizeof (led));
+			mutex_exit(&p->p_lock);
+
+			if (copyout(&led, (void *)arg1,
 			    sizeof (lx_elf_data_t)) != 0) {
 				return (EFAULT);
 			}
@@ -1006,6 +1012,8 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 			led32.ed_entry = (int)pd->l_elf_data.ed_entry;
 			led32.ed_base = (int)pd->l_elf_data.ed_base;
 			led32.ed_ldentry = (int)pd->l_elf_data.ed_ldentry;
+			led32.ed_vdso = 0;
+			mutex_exit(&p->p_lock);
 
 			if (copyout(&led32, (void *)arg1,
 			    sizeof (led32)) != 0) {
@@ -1014,6 +1022,7 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 		}
 #endif
 		return (0);
+	}
 
 	case B_EXEC_NATIVE:
 		return (exec_common((char *)arg1, (const char **)arg2,
@@ -1438,6 +1447,30 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 		}
 
 		return (0);
+	}
+
+	case B_NOTIFY_VDSO_LOC: {
+#if defined(_LP64)
+		if (get_udatamodel() == DATAMODEL_NATIVE) {
+			int i;
+
+			mutex_enter(&p->p_lock);
+			pd = ptolxproc(p);
+			pd->l_elf_data.ed_vdso = arg1;
+			/* overwrite the auxv data too */
+			for (i = 0; i < __KERN_NAUXV_IMPL; i++) {
+				if (p->p_user.u_auxv[i].a_type ==
+				    AT_SUN_BRAND_LX_SYSINFO_EHDR) {
+					p->p_user.u_auxv[i].a_un.a_val = arg1;
+					break;
+				}
+			}
+			mutex_exit(&p->p_lock);
+			return (0);
+		}
+#endif /* defined(_LP64) */
+		/* This is not valid for 32bit processes */
+		return (EINVAL);
 	}
 
 	}
@@ -1866,14 +1899,17 @@ lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 		auxv_t phdr_auxv[4] = {
 		    { AT_SUN_BRAND_LX_PHDR, 0 },
 		    { AT_SUN_BRAND_LX_INTERP, 0 },
-		    { AT_SUN_BRAND_LX_SYSINFO_EHDR, 0 },
-		    { AT_SUN_BRAND_AUX4, 0 }
+		    { AT_SUN_BRAND_LX_CLKTCK, 0 },
+		    { AT_SUN_BRAND_LX_SYSINFO_EHDR, 0 }
 		};
 		phdr_auxv[0].a_un.a_val = edp->ed_phdr;
 		phdr_auxv[1].a_un.a_val = ldaddr;
-		phdr_auxv[2].a_un.a_val = 1;	/* set in lx_init */
-		phdr_auxv[3].a_type = AT_CLKTCK;
-		phdr_auxv[3].a_un.a_val = hz;
+		phdr_auxv[2].a_un.a_val = hz;
+		/*
+		 * The userspace brand library will map in the vDSO and notify
+		 * the kernel of its location during lx_init.
+		 */
+		phdr_auxv[3].a_un.a_val = 1;
 
 		if (copyout(&phdr_auxv, args->auxp_brand,
 		    sizeof (phdr_auxv)) == -1)
@@ -1881,15 +1917,20 @@ lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 	}
 #if defined(_LP64)
 	else {
-		auxv32_t phdr_auxv32[3] = {
+		auxv32_t phdr_auxv32[4] = {
 		    { AT_SUN_BRAND_LX_PHDR, 0 },
 		    { AT_SUN_BRAND_LX_INTERP, 0 },
-		    { AT_SUN_BRAND_AUX3, 0 }
+		    { AT_SUN_BRAND_LX_CLKTCK, 0 },
+		    { AT_SUN_BRAND_LX_SYSINFO_EHDR, 0 }
 		};
 		phdr_auxv32[0].a_un.a_val = edp->ed_phdr;
 		phdr_auxv32[1].a_un.a_val = ldaddr;
-		phdr_auxv32[2].a_type = AT_CLKTCK;
 		phdr_auxv32[2].a_un.a_val = hz;
+		/*
+		 * Unused on i386 due to lack of vDSO.
+		 * It will be cleaned up during lx_init.
+		 */
+		phdr_auxv32[3].a_un.a_val = 0;
 
 		if (copyout(&phdr_auxv32, args->auxp_brand,
 		    sizeof (phdr_auxv32)) == -1)
@@ -1924,6 +1965,10 @@ lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 
 		case AT_SUN_BRAND_LX_INTERP:
 			up->u_auxv[i].a_un.a_val = ldaddr;
+			break;
+
+		case AT_SUN_BRAND_LX_CLKTCK:
+			up->u_auxv[i].a_un.a_val = hz;
 			break;
 
 		default:
