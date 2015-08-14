@@ -237,7 +237,8 @@ enum {
 	VMxo,		/* VMx instruction with optional prefix */
 	SVM,		/* AMD SVM instructions */
 	BLS,		/* BLSR, BLSMSK, BLSI */
-	FMA		/* FMA instructions, all VEX_RMrX */
+	FMA,		/* FMA instructions, all VEX_RMrX */
+	ADX		/* ADX instructions, support REX.w, mod_rm->mod_reg */
 };
 
 /*
@@ -569,7 +570,7 @@ const instable_t dis_op0FC7[8] = {
 const instable_t dis_op0FC7m3[8] = {
 
 /*  [0]  */	INVALID,		INVALID,	INVALID,		INVALID,
-/*  [4]  */	INVALID,		INVALID,	TNS("rdrand",MG9),	INVALID,
+/*  [4]  */	INVALID,		INVALID,	TNS("rdrand",MG9),	TNS("rdseed", MG9),
 };
 
 /*
@@ -1405,6 +1406,15 @@ const instable_t dis_op0F38F1[2] = {
 		TS("movbe",MOVBE),
 };
 
+/*
+ * The following table is used to distinguish between adox and adcx which share
+ * the same opcodes.
+ */
+const instable_t dis_op0F38F6[2] = {
+/*  [00]  */	TNS("adcx",ADX),
+		TNS("adox",ADX),
+};
+
 const instable_t dis_op0F38[256] = {
 /*  [00]  */	TNSZ("pshufb",XMM_66o,16),TNSZ("phaddw",XMM_66o,16),TNSZ("phaddd",XMM_66o,16),TNSZ("phaddsw",XMM_66o,16),
 /*  [04]  */	TNSZ("pmaddubsw",XMM_66o,16),TNSZ("phsubw",XMM_66o,16),	TNSZ("phsubd",XMM_66o,16),TNSZ("phsubsw",XMM_66o,16),
@@ -1481,7 +1491,7 @@ const instable_t dis_op0F38[256] = {
 /*  [E8]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [EC]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [F0]  */	IND(dis_op0F38F0),	IND(dis_op0F38F1),	INVALID,		INVALID,
-/*  [F4]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [F4]  */	INVALID,		INVALID,		IND(dis_op0F38F6),	INVALID,
 /*  [F8]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [FC]  */	INVALID,		INVALID,		INVALID,		INVALID,
 };
@@ -1531,8 +1541,6 @@ const instable_t dis_opAVX660F38[256] = {
 /*  [84]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [88]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [8C]  */	TSaZ("vpmaskmov",VEX_RMrX,16),INVALID,		TSaZ("vpmaskmov",VEX_RRM,16),INVALID,
-
-/* XXX All of the gather things are a bit wrong. We're not properly changing the last character */
 
 /*  [90]  */	TNSZ("vpgatherd",VEX_SbVM,16),TNSZ("vpgatherq",VEX_SbVM,16),TNSZ("vgatherdp",VEX_SbVM,16),TNSZ("vgatherqp",VEX_SbVM,16),
 /*  [94]  */	INVALID,		INVALID,		TNSZ("vfmaddsub132p",FMA,16),TNSZ("vfmsubadd132p",FMA,16),
@@ -1734,6 +1742,15 @@ const instable_t dis_opAVX660F3A[256] = {
 };
 
 /*
+ * 	Decode table for 0x0F0D which uses the first byte of the mod_rm to
+ * 	indicate a sub-code.
+ */
+const instable_t dis_op0F0D[8] = {
+/*  [00]  */	INVALID,		TNS("prefetchw",PREF),	TNS("prefetchwt1",PREF),INVALID,
+/*  [04]  */	INVALID,		INVALID,		INVALID,		INVALID,
+};
+
+/*
  *	Decode table for 0x0F opcodes
  */
 
@@ -1742,7 +1759,7 @@ const instable_t dis_op0F[16][16] = {
 /*  [00]  */	IND(dis_op0F00),	IND(dis_op0F01),	TNS("lar",MR),		TNS("lsl",MR),
 /*  [04]  */	INVALID,		TNS("syscall",NORM),	TNS("clts",NORM),	TNS("sysret",NORM),
 /*  [08]  */	TNS("invd",NORM),	TNS("wbinvd",NORM),	INVALID,		TNS("ud2",NORM),
-/*  [0C]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [0C]  */	INVALID,		IND(dis_op0F0D),	INVALID,		INVALID,
 }, {
 /*  [10]  */	TNSZ("movups",XMMO,16),	TNSZ("movups",XMMOS,16),TNSZ("movlps",XMMO,8),	TNSZ("movlps",XMMOS,8),
 /*  [14]  */	TNSZ("unpcklps",XMMO,16),TNSZ("unpckhps",XMMO,16),TNSZ("movhps",XMMOM,8),TNSZ("movhps",XMMOMS,8),
@@ -3310,11 +3327,49 @@ dtrace_disx86(dis86_t *x, uint_t cpu_mode)
 					dp++;
 				}
 			}
+
+			/*
+			 * The adx family of instructions (adcx and adox)
+			 * continue the classic Intel tradition of abusing
+			 * arbitrary prefixes without actually meaning the
+			 * prefix bit. Therefore, if we find either the
+			 * opnd_size_prefix or rep_prefix we end up zeroing it
+			 * out after making our determination so as to ensure
+			 * that we don't get confused and accidentally print
+			 * repz prefixes and the like on these instructions.
+			 *
+			 * In addition, these instructions are actually much
+			 * closer to AVX instructions in semantics. Importantly,
+			 * they always default to having 32-bit operands.
+			 * However, if the CPU is in 64-bit mode, then and only
+			 * then, does it use REX.w promotes things to 64-bits
+			 * and REX.r allows 64-bit mode to use register r8-r15.
+			 */
+			if (dp->it_indirect == (instable_t *)dis_op0F38F6) {
+				dp = dp->it_indirect;
+				if (opnd_size_prefix == 0 &&
+				    rep_prefix == 0xf3) {
+					/* It is adox */
+					dp++;
+				} else if (opnd_size_prefix != 0x66 &&
+				    rep_prefix != 0) {
+					/* It isn't adcx */
+					goto error;
+				}
+				opnd_size_prefix = 0;
+				rep_prefix = 0;
+				opnd_size = SIZE32;
+				if (rex_prefix & REX_W)
+					opnd_size = SIZE64;
+			}
+
 #ifdef DIS_TEXT
 			if (strcmp(dp->it_name, "INVALID") == 0)
 				goto error;
 #endif
 			switch (dp->it_adrmode) {
+				case ADX:
+					break;
 				case RM_66r:
 				case XMM_66r:
 				case XMMM_66r:
@@ -3719,6 +3774,7 @@ dtrace_disx86(dis86_t *x, uint_t cpu_mode)
 
 	/* memory or register operand to register, with 'w' bit	*/
 	case MRw:
+	case ADX:
 		wbit = WBIT(opcode2);
 		STANDARD_MODRM(x, mode, reg, r_m, rex_prefix, wbit, 0);
 		break;
@@ -4015,6 +4071,18 @@ just_mem:
 			} else if (r_m == 1) {
 #ifdef DIS_TEXT
 				(void) strncpy(x->d86_mnem, "mwait", OPLEN);
+#endif
+				NOMEM;
+				break;
+			} else if (r_m == 2) {
+#ifdef DIS_TEXT
+				(void) strncpy(x->d86_mnem, "clac", OPLEN);
+#endif
+				NOMEM;
+				break;
+			} else if (r_m == 3) {
+#ifdef DIS_TEXT
+				(void) strncpy(x->d86_mnem, "stac", OPLEN);
 #endif
 				NOMEM;
 				break;
