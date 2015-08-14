@@ -48,6 +48,7 @@
 #include <sys/stropts.h>
 #include <sys/cmn_err.h>
 #include <sys/lx_brand.h>
+#include <lx_auxv.h>
 #include <sys/x86_archext.h>
 #include <sys/archsystm.h>
 #include <sys/fp.h>
@@ -1038,6 +1039,9 @@ static void
 lxpr_read_pid_auxv(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
 	proc_t *p;
+	lx_proc_data_t *pd;
+	lx_elf_data_t *edp = NULL;
+	int i, cnt;
 
 	ASSERT(lxpnp->lxpr_type == LXPR_PID_AUXV ||
 	    lxpnp->lxpr_type == LXPR_PID_TID_AUXV);
@@ -1048,30 +1052,59 @@ lxpr_read_pid_auxv(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 		lxpr_uiobuf_seterr(uiobuf, EINVAL);
 		return;
 	}
+	if ((pd = ptolxproc(p)) == NULL) {
+		/* Emit a single AT_NULL record for non-branded processes */
+		auxv_t buf;
 
-	/*
-	 * No attempt is made to translate the native aux vector types and
-	 * values into what Linux expects.  This can be implemented later if
-	 * deemed to be necessary.
-	 */
+		bzero(&buf, sizeof (buf));
+		lxpr_unlock(p);
+		lxpr_uiobuf_write(uiobuf, (char *)&buf, sizeof (buf));
+		return;
+	} else {
+		edp = &pd->l_elf_data;
+	}
+
 	if (p->p_model == DATAMODEL_NATIVE) {
-		lxpr_uiobuf_write(uiobuf, (char *)p->p_user.u_auxv,
-		    sizeof (auxv_t[__KERN_NAUXV_IMPL]));
+		auxv_t buf[__KERN_NAUXV_IMPL];
+
+		/*
+		 * Because a_type is only of size int (not long), the buffer
+		 * contents must be zeroed first to ensure cleanliness.
+		 */
+		bzero(buf, sizeof (buf));
+		for (i = 0, cnt = 0; i < __KERN_NAUXV_IMPL; i++) {
+			if (lx_auxv_stol(&p->p_user.u_auxv[i],
+			    &buf[cnt], edp) == 0) {
+				cnt++;
+			}
+			if (p->p_user.u_auxv[i].a_type == AT_NULL) {
+				break;
+			}
+		}
+		lxpr_uiobuf_write(uiobuf, (char *)buf, cnt * sizeof (buf[0]));
+		lxpr_unlock(p);
 	}
 #if defined(_SYSCALL32_IMPL)
 	else {
 		auxv32_t buf[__KERN_NAUXV_IMPL];
-		int i;
-		for (i = 0; i < __KERN_NAUXV_IMPL; i++) {
-			buf[i].a_type = p->p_user.u_auxv[i].a_type;
-			buf[i].a_un.a_val = p->p_user.u_auxv[i].a_un.a_val;
+
+		for (i = 0, cnt = 0; i < __KERN_NAUXV_IMPL; i++) {
+			auxv_t temp;
+
+			if (lx_auxv_stol(&p->p_user.u_auxv[i],
+			    &temp, edp) == 0) {
+				buf[cnt].a_type = (int)temp.a_type;
+				buf[cnt].a_un.a_val = (int)temp.a_un.a_val;
+				cnt++;
+			}
+			if (p->p_user.u_auxv[i].a_type == AT_NULL) {
+				break;
+			}
 		}
-		lxpr_uiobuf_write(uiobuf, (char *)buf,
-		    sizeof (auxv32_t[__KERN_NAUXV_IMPL]));
+		lxpr_unlock(p);
+		lxpr_uiobuf_write(uiobuf, (char *)buf, cnt * sizeof (buf[0]));
 	}
 #endif /* defined(_SYSCALL32_IMPL) */
-
-	lxpr_unlock(p);
 }
 
 /*
