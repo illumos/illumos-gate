@@ -37,6 +37,7 @@ MANFILES= 	ASSERT.9f				\
 	 	atomic_ops.9f				\
 	 	atomic_or.9f				\
 	 	atomic_swap.9f				\
+		avl.9f					\
 	 	backq.9f				\
 	 	bcanput.9f				\
 	 	bcmp.9f					\
@@ -628,6 +629,21 @@ MANLINKS=	SIZEOF_PTR.9f				\
 	 	atomic_swap_uint.9f			\
 	 	atomic_swap_ulong.9f			\
 	 	atomic_swap_ushort.9f			\
+		avl_add.9f				\
+		avl_create.9f				\
+		avl_destroy.9f				\
+		avl_destroy_nodes.9f			\
+		avl_find.9f 				\
+		avl_first.9f				\
+		avl_insert.9f				\
+		avl_insert_here.9f			\
+		avl_is_empty.9f				\
+		avl_last.9f				\
+		avl_nearest.9f				\
+		avl_numnodes.9f				\
+		avl_swap.9f				\
+		AVL_NEXT.9f				\
+		AVL_PREV.9f				\
 	 	bcanputnext.9f				\
 	 	crgetgid.9f				\
 	 	crgetgroups.9f				\
@@ -1302,6 +1318,22 @@ atomic_swap_uchar.9f			:= LINKSRC = atomic_swap.9f
 atomic_swap_uint.9f			:= LINKSRC = atomic_swap.9f
 atomic_swap_ulong.9f			:= LINKSRC = atomic_swap.9f
 atomic_swap_ushort.9f			:= LINKSRC = atomic_swap.9f
+
+avl_add.9f				:= LINKSRC = avl.9f
+avl_create.9f				:= LINKSRC = avl.9f
+avl_destroy.9f				:= LINKSRC = avl.9f
+avl_destroy_nodes.9f			:= LINKSRC = avl.9f
+avl_find.9f 				:= LINKSRC = avl.9f
+avl_first.9f				:= LINKSRC = avl.9f
+avl_insert.9f				:= LINKSRC = avl.9f
+avl_insert_here.9f			:= LINKSRC = avl.9f
+avl_is_empty.9f				:= LINKSRC = avl.9f
+avl_last.9f				:= LINKSRC = avl.9f
+avl_nearest.9f				:= LINKSRC = avl.9f
+avl_numnodes.9f				:= LINKSRC = avl.9f
+avl_swap.9f				:= LINKSRC = avl.9f
+AVL_NEXT.9f				:= LINKSRC = avl.9f
+AVL_PREV.9f				:= LINKSRC = avl.9f
 
 dev_err.9f				:= LINKSRC = cmn_err.9f
 vcmn_err.9f				:= LINKSRC = cmn_err.9f

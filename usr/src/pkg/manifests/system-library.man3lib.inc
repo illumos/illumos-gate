@@ -16,6 +16,7 @@
 
 file path=usr/share/man/man3lib/libadm.3lib
 file path=usr/share/man/man3lib/libaio.3lib
+file path=usr/share/man/man3lib/libavl.3lib
 file path=usr/share/man/man3lib/libbsdmalloc.3lib
 file path=usr/share/man/man3lib/libbsm.3lib
 file path=usr/share/man/man3lib/libc.3lib

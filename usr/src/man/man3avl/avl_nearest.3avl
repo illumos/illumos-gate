@@ -1,0 +1,93 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 07, 2015
+.Dt AVL_NEAREST 3AVL
+.Os
+.Sh NAME
+.Nm avl_nearest
+.Nd find the nearest node in an AVL tree
+.Sh SYNOPSIS
+.Lb libavl
+.In sys/avl.h
+.Ft void *
+.Fo avl_nearest
+.Fa "avl_tree_t *tree"
+.Fa "avl_index_t where"
+.Fa "int direction"
+.Fc
+.Sh DESCRIPTION
+The
+.Fa avl_nearest
+function returns the closest node in
+.Fa tree
+before or after the insertion point specified by
+.Fa where .
+.Pp
+The value of
+.Fa where
+is obtained when a
+.Pf non- Dv NULL
+pointer is passed in to the
+.Fa where
+argument of
+.Xr avl_find 3AVL
+and it fails to find an entry in the tree.
+.Pp
+If
+.Fa direction
+is set to
+.Dv AVL_AFTER ,
+then the node that would logically have followed it will be returned. If
+.Fa direction
+is instead set to
+.Dv AVL_BEFORE ,
+then the node that would have logically preceded it is returned.
+.Pp
+When there is no nearest node, for example,
+.Dv AVL_AFTER
+is specified and the entry would have been the last node in the tree,
+then
+.Sy NULL is returned .
+.Pp
+If the tree is modified between a call to
+.Xr avl_find 3AVL
+and
+.Fn avl_nearest ,
+then the value of
+.Fa where
+from
+.Xr avl_find 3AVL
+will no longer be valid and
+.Xr avl_find 3AVL
+must be called again.
+.Sh RETURN VALUES
+The
+.Fn avl_nearest
+function returns the node that is closest or
+.Sy NULL
+if there is not a matching one.
+.Sh EXAMPLES
+See the
+.Sy EXAMPLES
+section in
+.Xr libavl 3LIB .
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh MT-Level
+See
+.Sx Locking
+in
+.Xr libavl 3LIB .
+.Sh SEE ALSO
+.Xr libavl 3LIB

@@ -1,0 +1,60 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 07, 2015
+.Dt AVL_IS_EMPTY 3AVL
+.Os
+.Sh NAME
+.Nm avl_is_empty
+.Nd determine if an AVL tree is empty
+.Sh SYNOPSIS
+.Lb libavl
+.In sys/avl.h
+.Ft boolean_t
+.Fo avl_is_empty
+.Fa "avl_tree_t *tree"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn avl_is_empty
+function is used to determine whether or not the AVL tree,
+.Fa tree ,
+is empty. If
+.Fa tree
+has zero nodes in it, then
+.Sy B_TRUE
+is returned, otherwise
+.Sy B_FALSE
+is returned.
+.Sh RETURN VALUES
+The
+.Fn avl_is_empty
+function returns
+.Sy B_TRUE
+when there are no nodes in the tree and
+.Sy B_FALSE
+otherwise.
+.Sh EXAMPLES
+See the
+.Sy EXAMPLES
+section in
+.Xr libavl 3LIB .
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh MT-Level
+See
+.Sx Locking
+in
+.Xr libavl 3LIB .
+.Sh SEE ALSO
+.Xr libavl 3LIB

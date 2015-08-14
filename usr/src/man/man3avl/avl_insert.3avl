@@ -1,0 +1,110 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 07, 2015
+.Dt AVL_INSERT 3AVL
+.Os
+.Sh NAME
+.Nm avl_insert ,
+.Nm avl_insert_here
+.Nd insert items into an AVL tree
+.Sh SYNOPSIS
+.Lb libavl
+.In sys/avl.h
+.Ft void
+.Fo avl_insert
+.Fa "avl_tree_t *tree"
+.Fa "void *new"
+.Fa "avl_index_t where"
+.Fc
+.Ft void
+.Fo avl_insert_here
+.Fa "avl_tree_t *tree"
+.Fa "void *new"
+.Fa "void *here"
+.Fa "int direction"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn avl_insert
+and
+.Fn avl_insert_here
+functions are used to add the entry
+.Fa new
+to the tree rooted at
+.Fa tree .
+.Pp
+The
+.Fn avl_insert
+function uses the
+.Fa where
+value, obtained from a call to
+.Xr avl_find 3AVL ,
+to determine where to insert the new entry into the tree. The tree must
+not have been modified inbetween the call to
+.Xr avl_find 3AVL
+and the call to
+.Fn avl_insert .
+If callers are not using
+.Xr avl_find 3AVL
+to validate the presence of
+.Fa new
+in the tree and only immediately insert it, then
+.Xr avl_add 3AVL
+may be used instead.
+.Pp
+The
+.Fn avl_insert_here
+function is for consumers who are keeping track of recently accessed
+data and wish to avoid an additional call to
+.Xr avl_find 3AVL .
+The new entry,
+.Fa new ,
+will be inserted starting at the node
+.Fa here ,
+which must already exist in the tree. To insert the node in the tree
+before
+.Fa here ,
+then the argument
+.Fa direction
+should have the value
+.Dv AVL_BEFORE .
+Otherwise, to indicate that the new entry should be inserted after
+.Fa here,
+then
+.Fa direction
+should be set to
+.Dv AVL_AFTER .
+It is illegal to set
+.Fa direction
+to anything other than
+.Dv AVL_BEFORE
+or
+.Dv AVL_AFTER .
+If this is done, the behavior is not defined.
+.Sh EXAMPLES
+See the
+.Sy EXAMPLES
+section in
+.Xr libavl 3LIB .
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh MT-Level
+See
+.Sx Locking
+in
+.Xr libavl 3LIB .
+.Sh SEE ALSO
+.Xr libavl 3LIB ,
+.Xr avl_add 3AVL ,
+.Xr avl_find 3AVL
