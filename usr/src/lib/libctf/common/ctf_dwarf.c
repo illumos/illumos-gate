@@ -267,6 +267,7 @@ typedef struct ctf_die {
 	size_t		cd_errlen;	/* error message buffer length */
 	size_t		cd_ptrsz;	/* object's pointer size */
 	boolean_t	cd_bigend;	/* is it big endian */
+	boolean_t	cd_doweaks;	/* should we convert weak symbols? */
 	uint_t		cd_mach;	/* machine type */
 	ctf_id_t	cd_voidtid;	/* void pointer */
 	ctf_id_t	cd_longtid;	/* id for a 'long' */
@@ -2549,14 +2550,16 @@ ctf_dwarf_convert_one(void *arg, void *unused)
 		    "failed to update output ctf container"));
 	}
 
-	if ((ret = ctf_dwarf_conv_weaks(cdp)) != 0) {
-		return (ctf_dwarf_error(cdp, NULL, ret,
-		    "failed to convert weak functions and variables"));
-	}
+	if (cdp->cd_doweaks == B_TRUE) {
+		if ((ret = ctf_dwarf_conv_weaks(cdp)) != 0) {
+			return (ctf_dwarf_error(cdp, NULL, ret,
+			    "failed to convert weak functions and variables"));
+		}
 
-	if (ctf_update(cdp->cd_ctfp) != 0) {
-		return (ctf_dwarf_error(cdp, cdp->cd_ctfp, 0,
-		    "failed to update output ctf container"));
+		if (ctf_update(cdp->cd_ctfp) != 0) {
+			return (ctf_dwarf_error(cdp, cdp->cd_ctfp, 0,
+			    "failed to update output ctf container"));
+		}
 	}
 
 	ctf_phase_dump(cdp->cd_ctfp, "pre-dedup");
@@ -2862,6 +2865,7 @@ ctf_dwarf_convert(int fd, Elf *elf, uint_t nthrs, int *errp, ctf_file_t **fpp,
 			*errp = ret;
 			goto out;
 		}
+		cdp->cd_doweaks = ndies > 1 ? B_FALSE : B_TRUE;
 	}
 
 	ctf_dprintf("found %d DWARF die(s)\n", ndies);
