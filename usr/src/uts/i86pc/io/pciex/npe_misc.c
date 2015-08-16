@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 /*
@@ -55,17 +56,13 @@ void	npe_enable_htmsi_children(dev_info_t *dip);
 
 int	npe_enable_htmsi_flag = 1;
 
-/*
- * Default ecfga base address
- */
-int64_t npe_default_ecfga_base = 0xE0000000;
-
 extern uint32_t npe_aer_uce_mask;
 
 /*
- * Query the MCFG table using ACPI.  If MCFG is found, setup the
- * 'ecfg' property accordingly.  Otherwise, set the values
- * to the default values.
+ * Query the MCFG table using ACPI.  If MCFG is found, setup the 'ecfg'
+ * property accordingly.  If no table is found, the property remains unset; the
+ * system will not make use of memory-mapped access to PCI Express
+ * configuration space.
  */
 void
 npe_query_acpi_mcfg(dev_info_t *dip)
@@ -109,20 +106,7 @@ npe_query_acpi_mcfg(dev_info_t *dip)
 			cfg_baap++;
 		}
 	}
-	if (ecfg_found)
-		return;
-	/*
-	 * If MCFG is not found or ecfga_base is not found in MCFG table,
-	 * set the property to the default values.
-	 */
-	ecfginfo[0] = npe_default_ecfga_base;
-	ecfginfo[1] = 0;		/* segment 0 */
-	ecfginfo[2] = 0;		/* first bus 0 */
-	ecfginfo[3] = 0xff;		/* last bus ff */
-	(void) ndi_prop_update_int64_array(DDI_DEV_T_NONE, dip,
-	    "ecfg", ecfginfo, 4);
 }
-
 
 /*
  * Enable reporting of AER capability next pointer.
