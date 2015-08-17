@@ -29,6 +29,8 @@ NOBJS = $(OBJS:%.o=native/%.o)
 
 HDRS	= localedef.h
 
+SRCS   = $(OBJS:%.o=%.c)
+
 CPPFLAGS	+= -I $(SRC)/lib/libc/port/locale
 NATIVE_CPPFLAGS	+= -I $(SRC)/lib/libc/port/locale
 CERRWARN	+= -_gcc=-Wno-char-subscripts
