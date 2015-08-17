@@ -198,6 +198,7 @@ typedef enum lxpr_nodetype {
 	LXPR_SYS_FS_INOTIFY_MAX_USER_WATCHES,	/* inotify/max_user_watches */
 	LXPR_SYS_KERNELDIR,	/* /proc/sys/kernel/	*/
 	LXPR_SYS_KERNEL_CAPLCAP,	/* /proc/sys/kernel/cap_last_cap */
+	LXPR_SYS_KERNEL_COREPATT,	/* /proc/sys/kernel/core_pattern */
 	LXPR_SYS_KERNEL_HOSTNAME,	/* /proc/sys/kernel/hostname */
 	LXPR_SYS_KERNEL_MSGMNI,	/* /proc/sys/kernel/msgmni */
 	LXPR_SYS_KERNEL_NGROUPS_MAX,	/* /proc/sys/kernel/ngroups_max */
@@ -301,6 +302,9 @@ extern boolean_t lxpr_uiobuf_nonblock(lxpr_uiobuf_t *);
 extern void lxpr_uiobuf_write(lxpr_uiobuf_t *, const char *, size_t);
 extern void lxpr_uiobuf_printf(lxpr_uiobuf_t *, const char *, ...);
 extern void lxpr_uiobuf_seterr(lxpr_uiobuf_t *, int);
+
+extern void lxpr_core_path_l2s(const char *, char *);
+extern void lxpr_core_path_s2l(const char *, char *);
 
 proc_t *lxpr_lock(pid_t);
 void lxpr_unlock(proc_t *);
