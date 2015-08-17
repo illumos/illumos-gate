@@ -65,6 +65,7 @@
 #include <sys/brand.h>
 #include <sys/cred_impl.h>
 #include <sys/tihdr.h>
+#include <sys/corectl.h>
 #include <inet/ip.h>
 #include <inet/ip_ire.h>
 #include <inet/ip6.h>
@@ -210,6 +211,7 @@ static void lxpr_read_sys_fs_inotify_max_user_instances(lxpr_node_t *,
 static void lxpr_read_sys_fs_inotify_max_user_watches(lxpr_node_t *,
     lxpr_uiobuf_t *);
 static void lxpr_read_sys_kernel_caplcap(lxpr_node_t *, lxpr_uiobuf_t *);
+static void lxpr_read_sys_kernel_corepatt(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_kernel_hostname(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_kernel_msgmni(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_kernel_ngroups_max(lxpr_node_t *, lxpr_uiobuf_t *);
@@ -225,6 +227,8 @@ static void lxpr_read_sys_vm_overcommit_mem(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_vm_swappiness(lxpr_node_t *, lxpr_uiobuf_t *);
 
 static int lxpr_write_sys_net_core_somaxc(lxpr_node_t *, uio_t *, cred_t *,
+    caller_context_t *);
+static int lxpr_write_sys_kernel_corepatt(lxpr_node_t *, uio_t *, cred_t *,
     caller_context_t *);
 
 /*
@@ -452,6 +456,7 @@ static lxpr_dirent_t sys_fs_inotifydir[] = {
  */
 static lxpr_dirent_t sys_kerneldir[] = {
 	{ LXPR_SYS_KERNEL_CAPLCAP,	"cap_last_cap" },
+	{ LXPR_SYS_KERNEL_COREPATT,	"core_pattern" },
 	{ LXPR_SYS_KERNEL_HOSTNAME,	"hostname" },
 	{ LXPR_SYS_KERNEL_MSGMNI,	"msgmni" },
 	{ LXPR_SYS_KERNEL_NGROUPS_MAX,	"ngroups_max" },
@@ -521,6 +526,7 @@ lxpr_open(vnode_t **vpp, int flag, cred_t *cr, caller_context_t *ct)
 		switch (type) {
 		case LXPR_PID_OOM_SCR_ADJ:
 		case LXPR_PID_TID_OOM_SCR_ADJ:
+		case LXPR_SYS_KERNEL_COREPATT:
 		case LXPR_SYS_NET_CORE_SOMAXCON:
 		case LXPR_SYS_VM_OVERCOMMIT_MEM:
 		case LXPR_SYS_VM_SWAPPINESS:
@@ -685,6 +691,7 @@ static void (*lxpr_read_function[LXPR_NFILES])() = {
 	lxpr_read_sys_fs_inotify_max_user_watches, /* max_user_watches */
 	lxpr_read_invalid,		/* /proc/sys/kernel	*/
 	lxpr_read_sys_kernel_caplcap,	/* /proc/sys/kernel/cap_last_cap */
+	lxpr_read_sys_kernel_corepatt,	/* /proc/sys/kernel/core_pattern */
 	lxpr_read_sys_kernel_hostname,	/* /proc/sys/kernel/hostname */
 	lxpr_read_sys_kernel_msgmni,	/* /proc/sys/kernel/msgmni */
 	lxpr_read_sys_kernel_ngroups_max, /* /proc/sys/kernel/ngroups_max */
@@ -802,6 +809,7 @@ static vnode_t *(*lxpr_lookup_function[LXPR_NFILES])() = {
 	lxpr_lookup_not_a_dir,		/* .../inotify/max_user_watches */
 	lxpr_lookup_sys_kerneldir,	/* /proc/sys/kernel	*/
 	lxpr_lookup_not_a_dir,		/* /proc/sys/kernel/cap_last_cap */
+	lxpr_lookup_not_a_dir,		/* /proc/sys/kernel/core_pattern */
 	lxpr_lookup_not_a_dir,		/* /proc/sys/kernel/hostname */
 	lxpr_lookup_not_a_dir,		/* /proc/sys/kernel/msgmni */
 	lxpr_lookup_not_a_dir,		/* /proc/sys/kernel/ngroups_max */
@@ -919,6 +927,7 @@ static int (*lxpr_readdir_function[LXPR_NFILES])() = {
 	lxpr_readdir_not_a_dir,		/* .../inotify/max_user_watches	*/
 	lxpr_readdir_sys_kerneldir,	/* /proc/sys/kernel	*/
 	lxpr_readdir_not_a_dir,		/* /proc/sys/kernel/cap_last_cap */
+	lxpr_readdir_not_a_dir,		/* /proc/sys/kernel/core_pattern */
 	lxpr_readdir_not_a_dir,		/* /proc/sys/kernel/hostname */
 	lxpr_readdir_not_a_dir,		/* /proc/sys/kernel/msgmni */
 	lxpr_readdir_not_a_dir,		/* /proc/sys/kernel/ngroups_max */
@@ -3893,6 +3902,38 @@ lxpr_read_sys_kernel_caplcap(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 }
 
 static void
+lxpr_read_sys_kernel_corepatt(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+{
+	zone_t *zone = curproc->p_zone;
+	struct core_globals *cg;
+	refstr_t *rp;
+	corectl_path_t *ccp;
+	char tr[MAXPATHLEN];
+
+	ASSERT(lxpnp->lxpr_type == LXPR_SYS_KERNEL_COREPATT);
+
+	cg = zone_getspecific(core_zone_key, zone);
+	ASSERT(cg != NULL);
+
+	/* If core dumps are disabled, return an empty string. */
+	if ((cg->core_options & CC_PROCESS_PATH) == 0) {
+		lxpr_uiobuf_printf(uiobuf, "\n");
+		return;
+	}
+
+	ccp = cg->core_default_path;
+	mutex_enter(&ccp->ccp_mtx);
+	if ((rp = ccp->ccp_path) != NULL)
+		refstr_hold(rp);
+	mutex_exit(&ccp->ccp_mtx);
+
+	lxpr_core_path_s2l(refstr_value(rp), tr);
+	refstr_rele(rp);
+
+	lxpr_uiobuf_printf(uiobuf, "%s\n", tr);
+}
+
+static void
 lxpr_read_sys_kernel_hostname(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
 	ASSERT(lxpnp->lxpr_type == LXPR_SYS_KERNEL_HOSTNAME);
@@ -4503,6 +4544,7 @@ lxpr_access(vnode_t *vp, int mode, int flags, cred_t *cr, caller_context_t *ct)
 		switch (type) {
 		case LXPR_PID_OOM_SCR_ADJ:
 		case LXPR_PID_TID_OOM_SCR_ADJ:
+		case LXPR_SYS_KERNEL_COREPATT:
 		case LXPR_SYS_NET_CORE_SOMAXCON:
 		case LXPR_SYS_VM_OVERCOMMIT_MEM:
 		case LXPR_SYS_VM_SWAPPINESS:
@@ -5781,6 +5823,63 @@ lxpr_write_sys_net_core_somaxc(lxpr_node_t *lxpnp, struct uio *uio,
 	return (res);
 }
 
+/* ARGSUSED */
+static int
+lxpr_write_sys_kernel_corepatt(lxpr_node_t *lxpnp, struct uio *uio,
+    struct cred *cr, caller_context_t *ct)
+{
+	zone_t *zone = curproc->p_zone;
+	struct core_globals *cg;
+	refstr_t *rp, *nrp;
+	corectl_path_t *ccp;
+	char val[MAXPATHLEN];
+	char valtr[MAXPATHLEN];
+	size_t olen;
+	int error;
+
+	ASSERT(lxpnp->lxpr_type == LXPR_SYS_KERNEL_COREPATT);
+
+	cg = zone_getspecific(core_zone_key, zone);
+	ASSERT(cg != NULL);
+
+	if (secpolicy_coreadm(cr) != 0)
+		return (EPERM);
+
+	if (uio->uio_loffset != 0)
+		return (EINVAL);
+
+	if (uio->uio_resid == 0)
+		return (0);
+
+	olen = uio->uio_resid;
+	if (olen > sizeof (val) - 1)
+		return (EINVAL);
+
+	bzero(val, sizeof (val));
+	error = uiomove(val, olen, UIO_WRITE, uio);
+	if (error != 0)
+		return (error);
+
+	if (val[olen - 1] == '\n')
+		val[olen - 1] = '\0';
+
+	lxpr_core_path_l2s(val, valtr);
+
+	nrp = refstr_alloc(valtr);
+
+	ccp = cg->core_default_path;
+	mutex_enter(&ccp->ccp_mtx);
+	rp = ccp->ccp_path;
+	refstr_hold((ccp->ccp_path = nrp));
+	cg->core_options |= CC_PROCESS_PATH;
+	mutex_exit(&ccp->ccp_mtx);
+
+	if (rp != NULL)
+		refstr_rele(rp);
+
+	return (0);
+}
+
 /*
  * lxpr_readlink(): Vnode operation for VOP_READLINK()
  */
@@ -5974,6 +6073,8 @@ lxpr_write(vnode_t *vp, uio_t *uiop, int ioflag, cred_t *cr,
 	lxpr_nodetype_t	type = lxpnp->lxpr_type;
 
 	switch (type) {
+	case LXPR_SYS_KERNEL_COREPATT:
+		return (lxpr_write_sys_kernel_corepatt(lxpnp, uiop, cr, ct));
 	case LXPR_SYS_NET_CORE_SOMAXCON:
 		return (lxpr_write_sys_net_core_somaxc(lxpnp, uiop, cr, ct));
 
@@ -6021,6 +6122,7 @@ lxpr_create(struct vnode *dvp, char *nm, struct vattr *vap,
 	 * We're currently restricting O_CREAT to:
 	 * - /proc/<pid>/oom_score_adj
 	 * - /proc/<pid>/task/<tid>/oom_score_adj
+	 * - /proc/sys/kernel/core_pattern
 	 * - /proc/sys/net/core/somaxconn
 	 * - /proc/sys/vm/overcommit_memory
 	 * - /proc/sys/vm/swappiness
@@ -6038,6 +6140,10 @@ lxpr_create(struct vnode *dvp, char *nm, struct vattr *vap,
 	    strcmp(nm, "somaxconn") == 0) {
 		vp = lxpr_lookup_common(dvp, nm, NULL, sys_net_coredir,
 		    SYS_NET_COREDIRFILES);
+	} else if (type == LXPR_SYS_KERNELDIR &&
+	    strcmp(nm, "core_pattern") == 0) {
+		vp = lxpr_lookup_common(dvp, nm, NULL, sys_kerneldir,
+		    SYS_KERNELDIRFILES);
 	} else if (type == LXPR_SYS_VMDIR &&
 	    (strcmp(nm, "overcommit_memory") == 0 ||
 	    strcmp(nm, "swappiness") == 0)) {

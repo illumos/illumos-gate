@@ -529,6 +529,7 @@ lxpr_getnode(vnode_t *dp, lxpr_nodetype_t type, proc_t *p, int desc)
 
 	case LXPR_PID_OOM_SCR_ADJ:
 	case LXPR_PID_TID_OOM_SCR_ADJ:
+	case LXPR_SYS_KERNEL_COREPATT:
 	case LXPR_SYS_NET_CORE_SOMAXCON:
 	case LXPR_SYS_VM_OVERCOMMIT_MEM:
 	case LXPR_SYS_VM_SWAPPINESS:
@@ -571,4 +572,116 @@ lxpr_freenode(lxpr_node_t *lxpnp)
 	 * Release the lxprnode.
 	 */
 	kmem_cache_free(lxpr_node_cache, lxpnp);
+}
+
+/*
+ * Translate a Linux core_pattern path to a native Illumos one, by replacing
+ * the appropriate % escape sequences.
+ *
+ * Any % escape sequences that are not recognised are double-escaped so that
+ * they will be inserted literally into the path (to mimic Linux).
+ */
+void
+lxpr_core_path_l2s(const char *inp, char *outp)
+{
+	int i = 0, j = 0;
+	char x;
+
+	while (i < MAXPATHLEN && j < MAXPATHLEN - 1) {
+		x = inp[i++];
+		if (x == '\0')
+			break;
+		if (x != '%') {
+			outp[j++] = x;
+			continue;
+		}
+
+		x = inp[i++];
+		switch (x) {
+		case 'E':
+			outp[j++] = '%';
+			outp[j++] = 'd';
+			outp[j++] = '%';
+			outp[j++] = 'f';
+			break;
+		case 'e':
+			outp[j++] = '%';
+			outp[j++] = 'f';
+			break;
+		case 'p':
+		case 'g':
+		case 'u':
+		case 't':
+		case '%':
+			outp[j++] = '%';
+			outp[j++] = x;
+			break;
+		case 'h':
+			outp[j++] = '%';
+			outp[j++] = 'n';
+			break;
+		default:
+			/* No translation, make it literal. */
+			outp[j++] = '%';
+			outp[j++] = '%';
+			outp[j++] = x;
+			break;
+		}
+	}
+
+	outp[j] = '\0';
+}
+
+/*
+ * Translate an Illumos core pattern path back to Linux format.
+ */
+void
+lxpr_core_path_s2l(const char *inp, char *outp)
+{
+	int i = 0, j = 0;
+	char x;
+
+	while (i < MAXPATHLEN && j < MAXPATHLEN - 1) {
+		x = inp[i++];
+		if (x == '\0')
+			break;
+		if (x != '%') {
+			outp[j++] = x;
+			continue;
+		}
+
+		x = inp[i++];
+		switch (x) {
+		case 'd':
+			/* No Linux equivalent unless it's %d%f. */
+			if (inp[i] == '%' && inp[i + 1] == 'f') {
+				i += 2;
+				outp[j++] = '%';
+				outp[j++] = 'E';
+			}
+			break;
+		case 'f':
+			outp[j++] = '%';
+			outp[j++] = 'e';
+			break;
+		case 'p':
+		case 'P':
+		case 'g':
+		case 'u':
+		case 't':
+		case '%':
+			outp[j++] = '%';
+			outp[j++] = (x == 'P' ? 'p' : x);
+			break;
+		case 'n':
+			outp[j++] = '%';
+			outp[j++] = 'h';
+			break;
+		default:
+			/* No translation. */
+			break;
+		}
+	}
+
+	outp[j] = '\0';
 }
