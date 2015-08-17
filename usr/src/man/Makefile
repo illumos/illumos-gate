@@ -23,6 +23,7 @@ SUBDIRS=	man1		\
 		man1s		\
 		man2		\
 		man3		\
+		man3avl		\
 		man3bsm		\
 		man3c		\
 		man3c_db	\

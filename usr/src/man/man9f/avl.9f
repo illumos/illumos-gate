@@ -1,0 +1,88 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 08, 2015
+.Dt AVL 9F
+.Os
+.Sh NAME
+.Nm avl ,
+.Nm avl_add ,
+.Nm avl_create ,
+.Nm avl_destroy ,
+.Nm avl_destroy_nodes ,
+.Nm avl_find  ,
+.Nm avl_first ,
+.Nm avl_insert ,
+.Nm avl_insert_here ,
+.Nm avl_is_empty ,
+.Nm avl_last ,
+.Nm avl_nearest ,
+.Nm avl_numnodes ,
+.Nm avl_swap ,
+.Nm AVL_NEXT ,
+.Nm AVL_PREV ,
+.Nd AVL tree routines
+.Sh DESCRIPTION
+AVL trees are a general purpose, self-balancing binary tree that can be
+used instead of the standard linked list interfaces --
+.Xr list_create 9F .
+AVL trees are particularly useful either when order is important or
+better lookup performance is required.
+.Pp
+The AVL tree interfaces are identical in both userland and the kernel.
+For more general information on AVL trees, see
+.Xr libavl 3LIB .
+For more information on any of the funtions defined here, please see the
+corresponding manual page in section 3AVL. Please note, that while
+the descriptions in those manual pages are accurate for writers of
+Device Drivers, the examples provided use scaffolding not available in
+the kernel, such as the use of
+.Fn malloc ,
+and need to be adapated.
+.Sh CONTEXT
+All of the AVL routines may be used in user, kernel, and interrupt
+context.
+.Sh EXAMPLES
+See
+.Sy EXAMPLES
+in
+.Xr libavl 3LIB .
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh MT-Safety
+AVL trees do not inherently have any internal locking, it is up to the
+consumer to use locks as appropriate. See
+.Xr mutex 9F
+and
+.Xr rwlock 9F
+for more information on synchronization primitives.
+.Sh SEE ALSO
+.Xr libavl 3LIB ,
+.Xr avl_add 3AVL ,
+.Xr avl_create 3AVL ,
+.Xr avl_destroy 3AVL ,
+.Xr avl_destroy_nodes 3AVL ,
+.Xr avl_find  3AVL ,
+.Xr avl_first 3AVL ,
+.Xr avl_insert 3AVL ,
+.Xr avl_insert_here 3AVL ,
+.Xr avl_is_empty 3AVL ,
+.Xr avl_last 3AVL ,
+.Xr avl_nearest 3AVL ,
+.Xr avl_numnodes 3AVL ,
+.Xr avl_swap 3AVL ,
+.Xr AVL_NEXT 3AVL ,
+.Xr AVL_PREV 3AVL ,
+.Rs
+.%T Writing Device Drivers
+.Re

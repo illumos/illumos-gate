@@ -1,0 +1,107 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 07, 2015
+.Dt AVL_CREATE 3AVL
+.Os
+.Sh NAME
+.Nm avl_create
+.Nd create an AVL tree
+.Sh SYNOPSIS
+.Lb libavl
+.In sys/avl.h
+.Ft void
+.Fo avl_create
+.Fa "avl_tree_t *tree"
+.Fa "int (*compare)(const void *first, const void *second)"
+.Fa "size_t size"
+.Fa "size_t offset"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn avl_create
+function initializes an AVL tree rooted at
+.Fa tree .
+.Pp
+An AVL tree needs to encode information about the type of data
+structures being stored inside of it and needs to be told how to compare
+two different entries in the same tree. The
+.Fa size
+argument represents the total size of the data structure being used in
+the tree. This is a constant that is generally expressed to
+.Fn avl_create
+using the
+.Sy sizeof
+operator.
+.Pp
+The data structure that is being stored in the AVL tree must include an
+.Sy avl_node_t
+as a member of the structure. The structure may have multiple
+.Sy avl_node_t Ns 's,
+one for each AVL tree that it may concurrently be a member of. The
+.Fa offset
+argument indicates what the offset of the
+.Sy avl_node_t
+is for the data structure that this AVL tree contains.
+.Pp
+The
+.Fa compare
+function pointer is used to compare two nodes in the tree. This is used as part
+of all operations on the tree that cause traversal. The function is
+given, as arguments, two pointers to the actual data nodes, which should be
+cast to the corresponding type of actual data. The return value must
+adhere to the following rules:
+.Bl -enum
+.It
+If the first argument,
+.Fa first ,
+is less than the second argument,
+.Fa second ,
+then the
+.Fa compare
+function must return
+.Sy -1 .
+.It
+If the first argument is greater than the second argument, then the
+.Fa compare
+function must return
+.Sy 1 .
+.It
+Otherwise, if they compare to the same value, then it should return
+.Sy 0 .
+.It
+Only the return values, -1, 0, and 1, are valid. Returning values
+other than those will result in undefined behavior.
+.El
+.Pp
+When two nodes in the tree compare equal, then that means that they
+should represent the same data, though they may not always be equivalent
+pointers, due to lookups.
+.Pp
+The life time and storage of the AVL tree is maintained by the caller.
+The library does not perform any allocations as part of creating an AVL
+tree.
+.Sh EXAMPLES
+See the
+.Sy EXAMPLES
+section in
+.Xr libavl 3LIB .
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh MT-Level
+See
+.Sx Locking
+in
+.Xr libavl 3LIB .
+.Sh SEE ALSO
+.Xr libavl 3LIB

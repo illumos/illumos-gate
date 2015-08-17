@@ -33,6 +33,7 @@ file path=usr/share/man/man9f/atomic_inc.9f
 file path=usr/share/man/man9f/atomic_ops.9f
 file path=usr/share/man/man9f/atomic_or.9f
 file path=usr/share/man/man9f/atomic_swap.9f
+file path=usr/share/man/man9f/avl.9f
 file path=usr/share/man/man9f/backq.9f
 file path=usr/share/man/man9f/bcanput.9f
 file path=usr/share/man/man9f/bcmp.9f
@@ -476,6 +477,8 @@ file path=usr/share/man/man9f/ureadc.9f
 file path=usr/share/man/man9f/uwritec.9f
 file path=usr/share/man/man9f/va_arg.9f
 file path=usr/share/man/man9f/vsprintf.9f
+link path=usr/share/man/man9f/AVL_NEXT.9f target=avl.9f
+link path=usr/share/man/man9f/AVL_PREV.9f target=avl.9f
 link path=usr/share/man/man9f/SIZEOF_PTR.9f target=STRUCT_DECL.9f
 link path=usr/share/man/man9f/SIZEOF_STRUCT.9f target=STRUCT_DECL.9f
 link path=usr/share/man/man9f/STRUCT_BUF.9f target=STRUCT_DECL.9f
@@ -595,6 +598,19 @@ link path=usr/share/man/man9f/atomic_swap_uchar.9f target=atomic_swap.9f
 link path=usr/share/man/man9f/atomic_swap_uint.9f target=atomic_swap.9f
 link path=usr/share/man/man9f/atomic_swap_ulong.9f target=atomic_swap.9f
 link path=usr/share/man/man9f/atomic_swap_ushort.9f target=atomic_swap.9f
+link path=usr/share/man/man9f/avl_add.9f target=avl.9f
+link path=usr/share/man/man9f/avl_create.9f target=avl.9f
+link path=usr/share/man/man9f/avl_destroy.9f target=avl.9f
+link path=usr/share/man/man9f/avl_destroy_nodes.9f target=avl.9f
+link path=usr/share/man/man9f/avl_find.9f target=avl.9f
+link path=usr/share/man/man9f/avl_first.9f target=avl.9f
+link path=usr/share/man/man9f/avl_insert.9f target=avl.9f
+link path=usr/share/man/man9f/avl_insert_here.9f target=avl.9f
+link path=usr/share/man/man9f/avl_is_empty.9f target=avl.9f
+link path=usr/share/man/man9f/avl_last.9f target=avl.9f
+link path=usr/share/man/man9f/avl_nearest.9f target=avl.9f
+link path=usr/share/man/man9f/avl_numnodes.9f target=avl.9f
+link path=usr/share/man/man9f/avl_swap.9f target=avl.9f
 link path=usr/share/man/man9f/bcanputnext.9f target=canputnext.9f
 link path=usr/share/man/man9f/crgetgid.9f target=ddi_cred.9f
 link path=usr/share/man/man9f/crgetgroups.9f target=ddi_cred.9f

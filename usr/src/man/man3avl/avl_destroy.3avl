@@ -1,0 +1,62 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 07, 2015
+.Dt AVL_DESTROY 3AVL
+.Os
+.Sh NAME
+.Nm avl_destroy
+.Nd destroy an AVL tree
+.Sh SYNOPSIS
+.Lb libavl
+.In sys/avl.h
+.Ft void
+.Fo avl_destroy
+.Fa "avl_tree_t *tree"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn avl_destroy
+function is used to destroy the AVL tree that is rooted at
+.Fa tree .
+At the time that
+.Fn avl_destroy
+is called,
+.Fa tree
+must be empty. It is a programmer error to call
+.Fn avl_destroy
+otherwise. To efficiently remove all entries in the tree, see
+.Xr avl_destroy_nodes 3AVL .
+.Pp
+After a call to
+.Fn avl_destroy ,
+.Fa tree
+should not be used with any other library functions until a subsequent
+call to
+.Xr avl_create 3AVL .
+.Sh EXAMPLES
+See the
+.Sy EXAMPLES
+section in
+.Xr libavl 3LIB .
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh MT-Level
+See
+.Sx Locking
+in
+.Xr libavl 3LIB .
+.Sh SEE ALSO
+.Xr libavl 3LIB ,
+.Xr avl_create 3AVL ,
+.Xr avl_destroy_nodes 3AVL

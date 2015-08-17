@@ -19,6 +19,7 @@
  * won't be referenced in other man pages.
  */
 LINE("libadm",		"General Administrative Library (libadm, \\-ladm)")
+LINE("libavl",		"AVL Tree Library (libavl, \\-lavl)")
 LINE("libbsdmalloc",	"BSD Memory Allocation Library (libbsdmalloc, -lbsdmalloc)")
 LINE("libbsm",		"Security and Auditing Library (libbsm, \\lbsm)")
 LINE("libc",		"Standard C Library (libc, \\-lc)")

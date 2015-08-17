@@ -27,6 +27,7 @@
 #
 
 <include system-library.man3.inc>
+<include system-library.man3avl.inc>
 <include system-library.man3bsm.inc>
 <include system-library.man3c.inc>
 <include system-library.man3c_db.inc>
@@ -122,6 +123,7 @@ dir path=usr/lib/security
 dir path=usr/lib/security/$(ARCH64)
 dir path=usr/share/man
 dir path=usr/share/man/man3
+dir path=usr/share/man/man3avl
 dir path=usr/share/man/man3bsm
 dir path=usr/share/man/man3c
 dir path=usr/share/man/man3c_db
@@ -597,6 +599,7 @@ license usr/src/uts/common/sys/THIRDPARTYLICENSE.unicode \
     license=usr/src/uts/common/sys/THIRDPARTYLICENSE.unicode
 link path=lib/$(ARCH64)/libadm.so target=libadm.so.1
 link path=lib/$(ARCH64)/libaio.so target=libaio.so.1
+link path=lib/$(ARCH64)/libavl.so target=libavl.so.1
 link path=lib/$(ARCH64)/libbsm.so target=libbsm.so.1
 link path=lib/$(ARCH64)/libc.so reboot-needed=true target=libc.so.1
 link path=lib/$(ARCH64)/libc_db.so target=libc_db.so.1
@@ -660,6 +663,7 @@ link path=lib/crypto/32 target=.
 link path=lib/crypto/64 target=$(ARCH64)
 link path=lib/libadm.so target=libadm.so.1
 link path=lib/libaio.so target=libaio.so.1
+link path=lib/libavl.so target=libavl.so.1
 link path=lib/libbsm.so target=libbsm.so.1
 link path=lib/libc.so target=libc.so.1
 link path=lib/libc_db.so target=libc_db.so.1
@@ -758,6 +762,8 @@ link path=usr/lib/$(ARCH64)/libaio.so \
     target=../../../lib/$(ARCH64)/libaio.so.1
 link path=usr/lib/$(ARCH64)/libaio.so.1 \
     target=../../../lib/$(ARCH64)/libaio.so.1
+link path=usr/lib/$(ARCH64)/libavl.so \
+    target=../../../lib/$(ARCH64)/libavl.so.1
 link path=usr/lib/$(ARCH64)/libavl.so.1 \
     target=../../../lib/$(ARCH64)/libavl.so.1
 link path=usr/lib/$(ARCH64)/libbsdmalloc.so target=libbsdmalloc.so.1
@@ -1036,6 +1042,7 @@ link path=usr/lib/libadm.so.1 target=../../lib/libadm.so.1
 link path=usr/lib/libadutils.so target=./libadutils.so.1
 link path=usr/lib/libaio.so target=../../lib/libaio.so.1
 link path=usr/lib/libaio.so.1 target=../../lib/libaio.so.1
+link path=usr/lib/libavl.so target=../../lib/libavl.so.1
 link path=usr/lib/libavl.so.1 target=../../lib/libavl.so.1
 link path=usr/lib/libbsdmalloc.so target=./libbsdmalloc.so.1
 link path=usr/lib/libbsm.so target=../../lib/libbsm.so.1

@@ -1123,6 +1123,7 @@ f lib/amd64/libadm.so.1 0755 root bin
 s lib/amd64/libadm.so=libadm.so.1
 f lib/amd64/libaio.so.1 0755 root bin
 s lib/amd64/libaio.so=libaio.so.1
+s lib/amd64/libavl.so=libavl.so.1
 f lib/amd64/libavl.so.1 0755 root bin
 s lib/amd64/libavl.so=libavl.so.1
 f lib/amd64/libbsm.so.1 0755 root bin
@@ -12459,6 +12460,23 @@ s usr/share/man/man3/intro.3=Intro.3
 s usr/share/man/man3/libwrap.3=hosts_access.3
 s usr/share/man/man3/request_init.3=hosts_access.3
 s usr/share/man/man3/request_set.3=hosts_access.3
+d usr/share/man/man3avl 0755 root bin
+s usr/share/man/man3avl/AVL_NEXT.3avl=avl_first.3avl
+s usr/share/man/man3avl/AVL_PREV.3avl=avl_first.3avl
+f usr/share/man/man3avl/avl_add.3avl 0444 root bin
+f usr/share/man/man3avl/avl_create.3avl 0444 root bin
+f usr/share/man/man3avl/avl_destroy.3avl 0444 root bin
+f usr/share/man/man3avl/avl_destroy_nodes.3avl 0444 root bin
+f usr/share/man/man3avl/avl_find.3avl 0444 root bin
+f usr/share/man/man3avl/avl_first.3avl 0444 root bin
+f usr/share/man/man3avl/avl_insert.3avl 0444 root bin
+s usr/share/man/man3avl/avl_insert_here.3avl=avl_insert.3avl
+f usr/share/man/man3avl/avl_is_empty.3avl 0444 root bin
+s usr/share/man/man3avl/avl_last.3avl=avl_first.3avl
+f usr/share/man/man3avl/avl_nearest.3avl 0444 root bin
+f usr/share/man/man3avl/avl_numnodes.3avl 0444 root bin
+s usr/share/man/man3avl/avl_remove.3avl=avl_add.3avl
+f usr/share/man/man3avl/avl_swap.3avl 0444 root bin
 d usr/share/man/man3bsm 0755 root bin
 s usr/share/man/man3bsm/au_close.3bsm=au_open.3bsm
 f usr/share/man/man3bsm/au_open.3bsm 0444 root bin
@@ -15645,6 +15663,7 @@ f usr/share/man/man3lib/libMPAPI.3lib 0444 root bin
 f usr/share/man/man3lib/libSMHBAAPI.3lib 0444 root bin
 f usr/share/man/man3lib/libadm.3lib 0444 root bin
 f usr/share/man/man3lib/libaio.3lib 0444 root bin
+f usr/share/man/man3lib/libavl.3lib 0444 root bin
 f usr/share/man/man3lib/libbsdmalloc.3lib 0444 root bin
 f usr/share/man/man3lib/libbsm.3lib 0444 root bin
 f usr/share/man/man3lib/libc.3lib 0444 root bin
@@ -18663,6 +18682,8 @@ s usr/share/man/man9e/tran_unquiesce.9e=tran_quiesce.9e
 f usr/share/man/man9e/write.9e 0444 root bin
 d usr/share/man/man9f 0755 root bin
 f usr/share/man/man9f/ASSERT.9f 0444 root bin
+s usr/share/man/man9f/AVL_NEXT.9f=avl.9f
+s usr/share/man/man9f/AVL_PREV.9f=avl.9f
 f usr/share/man/man9f/Intro.9f 0444 root bin
 f usr/share/man/man9f/OTHERQ.9f 0444 root bin
 f usr/share/man/man9f/RD.9f 0444 root bin
@@ -18799,6 +18820,20 @@ s usr/share/man/man9f/atomic_swap_uchar.9f=atomic_swap.9f
 s usr/share/man/man9f/atomic_swap_uint.9f=atomic_swap.9f
 s usr/share/man/man9f/atomic_swap_ulong.9f=atomic_swap.9f
 s usr/share/man/man9f/atomic_swap_ushort.9f=atomic_swap.9f
+f usr/share/man/man9f/avl.9f 0444 root bin
+s usr/share/man/man9f/avl_add.9f=avl.9f
+s usr/share/man/man9f/avl_create.9f=avl.9f
+s usr/share/man/man9f/avl_destroy.9f=avl.9f
+s usr/share/man/man9f/avl_destroy_nodes.9f=avl.9f
+s usr/share/man/man9f/avl_find.9f=avl.9f
+s usr/share/man/man9f/avl_first.9f=avl.9f
+s usr/share/man/man9f/avl_insert.9f=avl.9f
+s usr/share/man/man9f/avl_insert_here.9f=avl.9f
+s usr/share/man/man9f/avl_is_empty.9f=avl.9f
+s usr/share/man/man9f/avl_last.9f=avl.9f
+s usr/share/man/man9f/avl_nearest.9f=avl.9f
+s usr/share/man/man9f/avl_numnodes.9f=avl.9f
+s usr/share/man/man9f/avl_swap.9f=avl.9f
 f usr/share/man/man9f/backq.9f 0444 root bin
 f usr/share/man/man9f/bcanput.9f 0444 root bin
 s usr/share/man/man9f/bcanputnext.9f=canputnext.9f

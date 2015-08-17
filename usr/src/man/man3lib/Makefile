@@ -22,6 +22,7 @@ MANFILES= 	libMPAPI.3lib		\
 	 	libSMHBAAPI.3lib	\
 	 	libadm.3lib		\
 	 	libaio.3lib		\
+		libavl.3lib		\
 	 	libbsdmalloc.3lib	\
 	 	libbsm.3lib		\
 	 	libc.3lib		\

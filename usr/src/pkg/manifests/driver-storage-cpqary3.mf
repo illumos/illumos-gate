@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2014 Joyent, Inc.  All rights reserved.
+# Copyright 2015 Joyent, Inc.
 # Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 #
 
@@ -34,6 +34,16 @@ driver name=cpqary3 class=scsi \
     alias=pci103c,1924 \
     alias=pci103c,1926 \
     alias=pci103c,1928 \
+    alias=pci103c,21bd \
+    alias=pci103c,21be \
+    alias=pci103c,21c0 \
+    alias=pci103c,21c2 \
+    alias=pci103c,21c3 \
+    alias=pci103c,21c5 \
+    alias=pci103c,21ca \
+    alias=pci103c,21cb \
+    alias=pci103c,21cc \
+    alias=pci103c,21cd \
     alias=pci103c,3211 \
     alias=pci103c,3212 \
     alias=pci103c,3223 \

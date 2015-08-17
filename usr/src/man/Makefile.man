@@ -31,7 +31,10 @@ ROOTMANLINKS=	$(MANLINKS:%=$(ROOTMAN)/man$(MANSECT)/%)
 $(ROOTMAN)/man$(MANSECT) $(ROOTHASMAN)/man$(MANSECT):
 		$(INS.dir)
 
-$(ROOTMAN)/man$(MANSECT)/% $(ROOTHASMAN)/man$(MANSECT)/%: % $(ROOTMAN)/man$(MANSECT) $(ROOTHASMAN)/man$(MANSECT)
+$(ROOTHASMAN)/man$(MANSECT)/%: % $(ROOTHASMAN)/man$(MANSECT)
+		$(INS.file)
+
+$(ROOTMAN)/man$(MANSECT)/% : % $(ROOTMAN)/man$(MANSECT)
 		$(INS.file)
 
 #

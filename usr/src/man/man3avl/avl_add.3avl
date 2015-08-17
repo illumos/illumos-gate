@@ -1,0 +1,95 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd Apr 13, 2015
+.Dt AVL_ADD 3AVL
+.Os
+.Sh NAME
+.Nm avl_add ,
+.Nm avl_remove
+.Nd add and remove nodes from an AVL tree
+.Sh SYNOPSIS
+.Lb libavl
+.In sys/avl.h
+.Ft void
+.Fo avl_add
+.Fa "avl_tree_t *tree"
+.Fa "void *node"
+.Fc
+.Ft void
+.Fo avl_remove
+.Fa "avl_tree_t *tree"
+.Fa "void *node"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn avl_add
+and
+.Fn avl_remove
+functions add and remove objects from the AVL tree rooted at
+.Fa tree .
+.Pp
+The
+.Fn avl_add
+function inserts
+.Fa node
+into the tree.
+.Fa node
+must not already be in the tree, thus implying it must not compare equal
+to any other node in the tree. Adding
+.Fa node
+to
+.Fa tree
+will take
+.Sy O(log(n))
+time, as it implicitly determines where to place it in the tree.
+If
+.Fa node Ns 's
+location has already been determined by
+.Xr avl_find 3AVL ,
+then instead use
+.Xr avl_insert 3AVL .
+.Pp
+The
+.Fn avl_remove
+function removes
+.Fa node
+from the tree rooted at
+.Fa tree .
+.Fa node
+must be present in the tree, otherwise, the behavior is undefined.
+Deleting
+.Fa node
+from
+.Fa tree
+occurs in
+.Sy O(log(n))
+time.
+.Sh EXAMPLES
+See the
+.Sy EXAMPLES
+section in
+.Xr libavl 3LIB .
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh MT-Level
+See
+.Sx Locking
+in
+.Xr libavl 3LIB .
+.Sh SEE ALSO
+.Xr libavl 3LIB ,
+.Xr avl_create 3AVL ,
+.Xr avl_insert 3AVL ,
+.Xr avl_insert_here 3AVL ,
+.Xr avl_destroy 3AVL

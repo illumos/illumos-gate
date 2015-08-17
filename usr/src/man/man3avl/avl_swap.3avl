@@ -1,0 +1,52 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 07, 2015
+.Dt AVL_SWAP 3AVL
+.Os
+.Sh NAME
+.Nm avl_swap
+.Nd swap the entries in two AVL trees
+.Sh SYNOPSIS
+.Lb libavl
+.In sys/avl.h
+.Ft void
+.Fo avl_swap
+.Fa "avl_tree_t *tree1"
+.Fa "avl_tree_t *tree2"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn avl_swap
+function swaps the nodes in the AVL tree
+.Fa tree1
+with those in
+.Fa tree2 .
+The two trees must have hold identical kinds of data, the arguments
+passed to
+.Xr avl_create
+must be identical. The behavior when they are not is undefined.
+.Sh EXAMPLES
+See the
+.Sy EXAMPLES
+section in
+.Xr libavl 3LIB .
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh MT-Level
+See
+.Sx Locking
+in
+.Xr libavl 3LIB .
+.Sh SEE ALSO
+.Xr libavl 3LIB
