@@ -85,13 +85,6 @@ extern "C" {
 #define	CPUID_INTC_EDX_IA64	0x40000000	/* Itanium emulating IA32 */
 #define	CPUID_INTC_EDX_PBE	0x80000000	/* Pending Break Enable */
 
-#define	FMT_CPUID_INTC_EDX					\
-	"\20"							\
-	"\40pbe\37ia64\36tm\35htt\34ss\33sse2\32sse\31fxsr"	\
-	"\30mmx\27acpi\26ds\24clfsh\23psn\22pse36\21pat"	\
-	"\20cmov\17mca\16pge\15mtrr\14sep\12apic\11cx8"		\
-	"\10mce\7pae\6msr\5tsc\4pse\3de\2vme\1fpu"
-
 /*
  * cpuid instruction feature flags in %ecx (standard function 1)
  */
@@ -128,14 +121,6 @@ extern "C" {
 #define	CPUID_INTC_ECX_F16C	0x20000000	/* F16C supported */
 #define	CPUID_INTC_ECX_RDRAND	0x40000000	/* RDRAND supported */
 #define	CPUID_INTC_ECX_HV	0x80000000	/* Hypervisor */
-
-#define	FMT_CPUID_INTC_ECX					\
-	"\20"							\
-	"\37rdrand\36f16c\35avx\34osxsav\33xsave"		\
-	"\32aes\31tscdl"					\
-	"\30popcnt\27movbe\26x2apic\25sse4.2\24sse4.1\23dca"	\
-	"\20\18pdcm\17etprd\16cx16\13cid\12ssse3\11tm2"		\
-	"\10est\7smx\6vmx\5dscpl\4mon\3dtes64\2pclmulqdq\1sse3"
 
 /*
  * cpuid instruction feature flags in %edx (extended function 0x80000001)
@@ -175,13 +160,6 @@ extern "C" {
 #define	CPUID_AMD_EDX_3DNowx	0x40000000	/* AMD: extensions to 3DNow! */
 #define	CPUID_AMD_EDX_3DNow	0x80000000	/* AMD: 3DNow! instructions */
 
-#define	FMT_CPUID_AMD_EDX					\
-	"\20"							\
-	"\40a3d\37a3d+\36lm\34tscp\32ffxsr\31fxsr"		\
-	"\30mmx\27mmxext\25nx\22pse\21pat"			\
-	"\20cmov\17mca\16pge\15mtrr\14syscall\12apic\11cx8"	\
-	"\10mce\7pae\6msr\5tsc\4pse\3de\2vme\1fpu"
-
 #define	CPUID_AMD_ECX_AHF64	0x00000001	/* LAHF and SAHF in long mode */
 #define	CPUID_AMD_ECX_CMP_LGCY	0x00000002	/* AMD: multicore chip */
 #define	CPUID_AMD_ECX_SVM	0x00000004	/* AMD: secure VM */
@@ -205,12 +183,6 @@ extern "C" {
 				/* 0x00100000 - reserved */
 #define	CPUID_AMD_ECX_TBM	0x00200000	/* AMD: trailing bit manips. */
 #define	CPUID_AMD_ECX_TOPOEXT	0x00400000	/* AMD: Topology Extensions */
-
-#define	FMT_CPUID_AMD_ECX					\
-	"\20"							\
-	"\23topoext\22tbm\20nimdsr\17fma4\16lwp"		\
-	"\14wdt\13skinit\12sse5\11ibs\10osvw\93dnp\8mas"	\
-	"\7sse4a\6lzcnt\5cr8d\4eas\3svm\2lcmplgcy\1ahf64"
 
 /*
  * Intel now seems to have claimed part of the "extended" function

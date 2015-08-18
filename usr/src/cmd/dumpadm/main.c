@@ -35,8 +35,9 @@
 #include "utils.h"
 
 static const char USAGE[] = "\
-Usage: %s [-enuy] [-c kernel | curproc | all ] [-d dump-device | swap ]\n\
-	[-m min {k|m|%%} ] [-s savecore-dir] [-r root-dir] [-z on|off]\n";
+Usage: %s [-enuy] [-c kernel | curproc | all ]\n\
+	[-d dump-device | swap | none ] [-m min {k|m|%%} ] [-s savecore-dir]\n\
+	[-r root-dir] [-z on|off]\n";
 
 static const char OPTS[] = "einuyc:d:m:s:r:z:";
 
