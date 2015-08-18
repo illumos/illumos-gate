@@ -449,7 +449,9 @@ lx_netlink_setsockopt(sock_lower_handle_t handle, int level,
 		} else {
 			lxsock->lxns_flags |= LXNLF_RECVUCRED;
 		}
+		return (0);
 	} else if (level == SOL_SOCKET) {
+		/* Punt on the other SOL_SOCKET options */
 		return (0);
 	} else if (level != SOL_LX_NETLINK) {
 		return (EOPNOTSUPP);
