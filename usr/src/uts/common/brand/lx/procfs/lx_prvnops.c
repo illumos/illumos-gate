@@ -3851,16 +3851,28 @@ lxpr_read_stat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 /*
  * lxpr_read_swaps():
  *
- * We don't support swap files or partitions, so just provide a dummy file with
- * the necessary header.
+ * We don't support swap files or partitions, but some programs like to look
+ * here just to check we have some swap on the system, so we lie and show
+ * our entire swap cap as one swap partition.
  */
 /* ARGSUSED */
 static void
 lxpr_read_swaps(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
+	zone_t *zone = curzone;
+	uint64_t totswap, usedswap;
+
+	mutex_enter(&zone->zone_mem_lock);
+	/* Uses units of 1 kb (2^10). */
+	totswap = zone->zone_max_swap_ctl >> 10;
+	usedswap = zone->zone_max_swap >> 10;
+	mutex_exit(&zone->zone_mem_lock);
+
 	lxpr_uiobuf_printf(uiobuf,
 	    "Filename                                "
 	    "Type            Size    Used    Priority\n");
+	lxpr_uiobuf_printf(uiobuf, "%-40s%-16s%-8llu%-8llu%-8d\n",
+	    "/dev/swap", "partition", totswap, usedswap, -1);
 }
 
 /*
