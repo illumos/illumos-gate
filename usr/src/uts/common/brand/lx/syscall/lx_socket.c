@@ -178,10 +178,6 @@ static const int stol_family[LX_AF_MAX + 1] =  {
 #define	ABST_PRFX "/tmp/.ABSK_"
 #define	ABST_PRFX_LEN (sizeof (ABST_PRFX) - 1)
 
-#define	LX_DEV_LOG			"/dev/log"
-#define	LX_DEV_LOG_LEN			(sizeof (LX_DEV_LOG) - 1)
-#define	LX_DEV_LOG_REDIRECT		"/var/run/.dev_log_redirect"
-
 typedef enum {
 	lxa_none,
 	lxa_abstract,
