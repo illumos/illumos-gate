@@ -32,9 +32,14 @@
  * the zcons thread so see the comment header in zcons.c for a general overview.
  * Unlike with zcons, which has a single endpoint within the zone and a single
  * endpoint used by zoneadmd, we setup multiple endpoints within the zone.
- * In the interactive mode we setup fd 0, 1 and 2 for use as stdin, stdout and
- * stderr. In the logging mode we only setup fd 1 and 2 for use as stdout and
- * stderr.
+ *
+ * The mode, which is controlled by the zone attribute "zlog-mode" is somewhat
+ * of a misnomer since its purpose has evolved. The attribute currently
+ * can have four values, with misleading names due to backward compatability,
+ * but which are used to control how many zfd devices are created inside the
+ * zone, and to control if the output on the device(s) is logged in the GZ.
+ * Internally the zfd_mode_t struct holds the number of devs and the logging
+ * state that corresponds to the zone attr value.
  */
 
 #include <sys/types.h>
@@ -87,11 +92,11 @@ static int eventstream[2] = {-1, -1};
 #define	SERVER_SOCKPATH		ZONES_TMPDIR "/%s.server_%s"
 #define	ZTTY_RETRY		5
 
-typedef enum {
-	ZLOG_NONE = 0,
-	ZLOG_LOG,
-	ZLOG_INTERACTIVE,
-} zlog_mode_t;
+typedef struct zfd_mode {
+	int		zmode_ndevs;
+	boolean_t	zmode_logging;
+} zfd_mode_t;
+static zfd_mode_t mode;
 
 /*
  * count_zfd_devs() and its helper count_cb() do a walk of the subtree of the
@@ -267,8 +272,8 @@ make_tty(zlog_t *zlogp, int id)
 /*
  * init_zfd_devs() drives the device-tree configuration of the zone fd devices.
  * The general strategy is to use the libdevice (devctl) interfaces to
- * instantiate 3 new zone fd nodes.  We do a lot of sanity checking, and
- * are careful to reuse a dev if one exists.
+ * instantiate the correct number of new zone fd nodes.  We do a lot of sanity
+ * checking, and are careful to reuse a dev if one exists.
  *
  * Once the devices are in the device tree, we kick devfsadm via
  * di_devlink_init() to ensure that the appropriate symlinks (to the master and
@@ -327,7 +332,7 @@ error:
 }
 
 static int
-init_zfd_devs(zlog_t *zlogp, zlog_mode_t mode)
+init_zfd_devs(zlog_t *zlogp, zfd_mode_t *mode)
 {
 	devctl_hdl_t bus_hdl = NULL;
 	di_devlink_handle_t dl = NULL;
@@ -336,11 +341,7 @@ init_zfd_devs(zlog_t *zlogp, zlog_mode_t mode)
 	int reqdevs;
 	int i;
 
-	/*
-	 * Three zfd devices are required for log mode.
-	 * Interactive mode needs only one.
-	 */
-	reqdevs = (mode != ZLOG_INTERACTIVE) ? 3 : 1;
+	reqdevs = mode->zmode_ndevs;
 
 	/*
 	 * Don't re-setup zone fd devs if they already exist; just
@@ -378,7 +379,7 @@ devlinks:
 	(void) di_devlink_fini(&dl);
 	rv = 0;
 
-	if (mode == ZLOG_INTERACTIVE) {
+	if (mode->zmode_ndevs == 1) {
 		/* We want to look like a tty. */
 		make_tty(zlogp, 0);
 	}
@@ -753,6 +754,9 @@ wr_log_msg(char *buf, int len, int from)
 	char ts[64];
 	char nbuf[BUFSIZ * 2];
 	char obuf[BUFSIZ * 2];
+
+	if (logfd == -1)
+		return;
 
 	escape_json(buf, len, nbuf, sizeof (nbuf));
 
@@ -1171,8 +1175,10 @@ open_logfile()
 void
 hup_handler(int i)
 {
-	(void) close(logfd);
-	open_logfile();
+	if (logfd != -1) {
+		(void) close(logfd);
+		open_logfile();
+	}
 }
 
 /*
@@ -1186,7 +1192,7 @@ hup_handler(int i)
 static void
 srvr(void *modearg)
 {
-	zlog_mode_t mode = (zlog_mode_t)modearg;
+	zfd_mode_t *mode = (zfd_mode_t *)modearg;
 	int gzctlfd = -1;
 	int gzoutfd = -1;
 	int stdinfd = -1;
@@ -1195,9 +1201,8 @@ srvr(void *modearg)
 	int gzerrfd = -1;
 	int stderrfd = -1;
 
-	if (!shutting_down) {
+	if (!shutting_down && mode->zmode_logging)
 		open_logfile();
-	}
 
 	/*
 	 * This thread should receive SIGHUP so that it can close the log
@@ -1233,7 +1238,7 @@ srvr(void *modearg)
 			goto death;
 		}
 
-		if (mode == ZLOG_INTERACTIVE) {
+		if (mode->zmode_ndevs == 1) {
 			if ((stdinfd = open_fd(zlogp, 0, O_RDWR)) == -1) {
 				goto death;
 			}
@@ -1253,7 +1258,7 @@ death:
 		destroy_server_sock(gzoutfd, "out");
 		destroy_server_sock(gzerrfd, "err");
 		(void) close(stdinfd);
-		if (mode != ZLOG_INTERACTIVE) {
+		if (mode->zmode_ndevs == 3) {
 			(void) close(stdoutfd);
 			(void) close(stderrfd);
 		}
@@ -1263,18 +1268,26 @@ death:
 	eventstream[0] = -1;
 	(void) close(eventstream[1]);
 	eventstream[1] = -1;
-	(void) close(logfd);
+	if (logfd != -1)
+		(void) close(logfd);
 }
 
-static zlog_mode_t
-get_logger_mode()
+/*
+ * The value strings we're matching on don't make a lot of sense for how
+ * this is used internally, but we're stuck with these values for legacy
+ * compatability.
+ */
+static void
+get_mode(zfd_mode_t *mode)
 {
-	zlog_mode_t mode = ZLOG_NONE;
 	zone_dochandle_t handle;
 	struct zone_attrtab attr;
 
+	mode->zmode_ndevs = 0;
+	mode->zmode_logging = B_FALSE;
+
 	if ((handle = zonecfg_init_handle()) == NULL)
-		return (mode);
+		return;
 
 	if (zonecfg_get_handle(zone_name, handle) != Z_OK)
 		goto done;
@@ -1284,10 +1297,20 @@ get_logger_mode()
 	while (zonecfg_getattrent(handle, &attr) == Z_OK) {
 		if (strcmp(ZLOG_MODE, attr.zone_attr_name) == 0) {
 			if (strncmp("log", attr.zone_attr_value, 3) == 0) {
-				mode = ZLOG_LOG;
+				mode->zmode_ndevs = 3;
+				mode->zmode_logging = B_TRUE;
+			} else if (strncmp("nolog",
+			    attr.zone_attr_value, 5) == 0) {
+				mode->zmode_ndevs = 3;
+				mode->zmode_logging = B_FALSE;
 			} else if (strncmp("int",
 			    attr.zone_attr_value, 3) == 0) {
-				mode = ZLOG_INTERACTIVE;
+				mode->zmode_ndevs = 1;
+				mode->zmode_logging = B_TRUE;
+			} else if (strncmp("nlint",
+			    attr.zone_attr_value, 5) == 0) {
+				mode->zmode_ndevs = 1;
+				mode->zmode_logging = B_FALSE;
 			}
 			break;
 		}
@@ -1296,29 +1319,27 @@ get_logger_mode()
 
 done:
 	zonecfg_fini_handle(handle);
-	return (mode);
 }
 
 void
 create_log_thread(zlog_t *logp, zoneid_t id)
 {
 	int res;
-	zlog_mode_t mode;
 
 	shutting_down = 0;
 	zlogp = logp;
 
-	mode = get_logger_mode();
-	if (mode == ZLOG_NONE)
+	get_mode(&mode);
+	if (mode.zmode_ndevs == 0)
 		return;
 
-	if (init_zfd_devs(zlogp, mode) == -1) {
+	if (init_zfd_devs(zlogp, &mode) == -1) {
 		zerror(zlogp, B_FALSE,
 		    "zfd setup: device initialization failed");
 		return;
 	}
 
-	res = thr_create(NULL, 0, (void * (*)(void *))srvr, (void *)mode, 0,
+	res = thr_create(NULL, 0, (void * (*)(void *))srvr, (void *)&mode, 0,
 	    &logger_tid);
 	if (res != 0) {
 		zerror(zlogp, B_FALSE, "error %d creating logger thread", res);
