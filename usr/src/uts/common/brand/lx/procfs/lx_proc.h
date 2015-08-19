@@ -327,8 +327,8 @@ extern void lxpr_zfs_end_iter(lxpr_zfs_iter_t *);
 extern int lxpr_zfs_next_zvol(lxpr_mnt_t *, char *, zfs_cmd_t *,
     lxpr_zfs_iter_t *);
 
-extern void lxpr_core_path_l2s(const char *, char *);
-extern void lxpr_core_path_s2l(const char *, char *);
+extern int lxpr_core_path_l2s(const char *, char *, size_t);
+extern int lxpr_core_path_s2l(const char *, char *, size_t);
 
 proc_t *lxpr_lock(pid_t);
 void lxpr_unlock(proc_t *);
