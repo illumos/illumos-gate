@@ -592,13 +592,13 @@ lxpr_freenode(lxpr_node_t *lxpnp)
  * Any % escape sequences that are not recognised are double-escaped so that
  * they will be inserted literally into the path (to mimic Linux).
  */
-void
-lxpr_core_path_l2s(const char *inp, char *outp)
+int
+lxpr_core_path_l2s(const char *inp, char *outp, size_t outsz)
 {
 	int i = 0, j = 0;
 	char x;
 
-	while (i < MAXPATHLEN && j < MAXPATHLEN - 1) {
+	while (j < outsz - 1) {
 		x = inp[i++];
 		if (x == '\0')
 			break;
@@ -608,8 +608,17 @@ lxpr_core_path_l2s(const char *inp, char *outp)
 		}
 
 		x = inp[i++];
+		if (x == '\0')
+			break;
+
+		/* Make sure we have enough space in the output buffer. */
+		if (j + 2 >= outsz - 1)
+			return (EINVAL);
+
 		switch (x) {
 		case 'E':
+			if (j + 4 >= outsz - 1)
+				return (EINVAL);
 			outp[j++] = '%';
 			outp[j++] = 'd';
 			outp[j++] = '%';
@@ -633,6 +642,8 @@ lxpr_core_path_l2s(const char *inp, char *outp)
 			break;
 		default:
 			/* No translation, make it literal. */
+			if (j + 3 >= outsz - 1)
+				return (EINVAL);
 			outp[j++] = '%';
 			outp[j++] = '%';
 			outp[j++] = x;
@@ -641,18 +652,19 @@ lxpr_core_path_l2s(const char *inp, char *outp)
 	}
 
 	outp[j] = '\0';
+	return (0);
 }
 
 /*
  * Translate an Illumos core pattern path back to Linux format.
  */
-void
-lxpr_core_path_s2l(const char *inp, char *outp)
+int
+lxpr_core_path_s2l(const char *inp, char *outp, size_t outsz)
 {
 	int i = 0, j = 0;
 	char x;
 
-	while (i < MAXPATHLEN && j < MAXPATHLEN - 1) {
+	while (j < outsz - 1) {
 		x = inp[i++];
 		if (x == '\0')
 			break;
@@ -662,6 +674,13 @@ lxpr_core_path_s2l(const char *inp, char *outp)
 		}
 
 		x = inp[i++];
+		if (x == '\0')
+			break;
+
+		/* Make sure we have enough space in the output buffer. */
+		if (j + 2 >= outsz - 1)
+			return (EINVAL);
+
 		switch (x) {
 		case 'd':
 			/* No Linux equivalent unless it's %d%f. */
@@ -695,6 +714,7 @@ lxpr_core_path_s2l(const char *inp, char *outp)
 	}
 
 	outp[j] = '\0';
+	return (0);
 }
 
 /*

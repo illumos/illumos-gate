@@ -3977,9 +3977,19 @@ lxpr_read_sys_kernel_corepatt(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 		refstr_hold(rp);
 	mutex_exit(&ccp->ccp_mtx);
 
-	lxpr_core_path_s2l(refstr_value(rp), tr);
-	refstr_rele(rp);
+	if (rp == NULL) {
+		lxpr_uiobuf_printf(uiobuf, "\n");
+		return;
+	}
 
+	bzero(tr, sizeof (tr));
+	if (lxpr_core_path_s2l(refstr_value(rp), tr, sizeof (tr)) != 0) {
+		refstr_rele(rp);
+		lxpr_uiobuf_printf(uiobuf, "\n");
+		return;
+	}
+
+	refstr_rele(rp);
 	lxpr_uiobuf_printf(uiobuf, "%s\n", tr);
 }
 
@@ -5913,7 +5923,11 @@ lxpr_write_sys_kernel_corepatt(lxpr_node_t *lxpnp, struct uio *uio,
 	if (val[olen - 1] == '\n')
 		val[olen - 1] = '\0';
 
-	lxpr_core_path_l2s(val, valtr);
+	if (val[0] == '|')
+		return (EINVAL);
+
+	if ((error = lxpr_core_path_l2s(val, valtr, sizeof (valtr))) != 0)
+		return (error);
 
 	nrp = refstr_alloc(valtr);
 
