@@ -1656,3 +1656,4 @@ Bugid   Risk Synopsis
 4959	completely discarded merged string sections will corrupt output objects
 4996	rtld _init race leads to incorrect symbol values
 5688	ELF tools need to be more careful with dwarf data
+6098	ld(1) should not require symbols which identify group sections be global
