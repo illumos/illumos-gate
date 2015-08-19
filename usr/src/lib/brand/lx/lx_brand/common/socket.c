@@ -473,7 +473,7 @@ static const lx_sockopt_map_t ltos_igmp_sockopts[IGMP_MTRACE + 1] = {
  * SO_PEERSEC            31
  * SO_SNDBUFFORCE        32		SO_SNDBUF (FORCE is a lie)
  * SO_RCVBUFFORCE        33		SO_RCVBUF (FORCE is a lie)
- * SO_PASSSEC            34
+ * SO_PASSSEC            34		ignored by LX emulation
  * SO_TIMESTAMPNS        35
  * SO_MARK               36
  * SO_TIMESTAMPING       37
@@ -501,16 +501,21 @@ static const lx_sockopt_map_t ltos_socket_sockopts[LX_SO_BPF_EXTENSIONS + 1] = {
 	{ SO_RCVBUF, sizeof (int) },
 	{ SO_KEEPALIVE, sizeof (int) },
 	{ SO_OOBINLINE, sizeof (int) },
-	{ OPTNOTSUP, 0 }, { OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
 	{ SO_LINGER, 0 },
-	{ OPTNOTSUP, 0 }, { OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
 	{ SO_RECVUCRED, sizeof (int) },
 	{ OPTNOTSUP, 0 },
 	{ SO_RCVLOWAT, sizeof (int) },
 	{ SO_SNDLOWAT, sizeof (int) },
 	{ SO_RCVTIMEO, 0 },
 	{ SO_SNDTIMEO, 0 },
-	{ OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
 	{ SO_ATTACH_FILTER, 0 },
 	{ SO_DETACH_FILTER, 0 },
 	{ OPTNOTSUP, 0 },
@@ -519,11 +524,20 @@ static const lx_sockopt_map_t ltos_socket_sockopts[LX_SO_BPF_EXTENSIONS + 1] = {
 	{ OPTNOTSUP, 0 },
 	{ SO_SNDBUF, sizeof (int) },
 	{ SO_RCVBUF, sizeof (int) },
-	{ OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
 	{ SO_PROTOTYPE, 0 },
 	{ SO_DOMAIN, 0 },
-	{ OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 },
-	{ OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
 	{ OPTNOTSUP, 0 }
 };
 
@@ -1201,6 +1215,21 @@ lx_setsockopt(int sockfd, int level, int optname, void *optval, int optlen)
 			optval = bp;
 		}
 
+		if (optname == LX_SO_PASSSEC) {
+			/*
+			 * SO_PASSSEC is very similar to SO_PASSCRED
+			 * (emulated by SO_RECVUCRED) in that it requests that
+			 * cmsgs containing identity information be attached to
+			 * recieved messages.  Instead of ucred information,
+			 * security-module-specific information such as selinux
+			 * label is expected
+			 *
+			 * Since LX does not at all support selinux today, the
+			 * option is silently accepted.
+			 */
+			return (0);
+		}
+
 		level = SOL_SOCKET;
 	} else if (level == LX_IPPROTO_RAW) {
 		/*
@@ -1410,8 +1439,26 @@ lx_getsockopt(int sockfd, int level, int optname, void *optval, int *optlenp)
 	}
 	if (level == LX_SOL_PACKET)
 		level = SOL_PACKET;
-	else if (level == LX_SOL_SOCKET)
+	else if (level == LX_SOL_SOCKET) {
 		level = SOL_SOCKET;
+		if (optname == LX_SO_PASSSEC) {
+			int val = 0, len = sizeof (int);
+
+			/*
+			 * Communicate value of 0 since selinux-related
+			 * functionality is not supported.
+			 */
+			if (uucopy(optlenp, &r, sizeof (int)) != 0) {
+				return (-EFAULT);
+			} else if (r < sizeof (int)) {
+				return (-EINVAL);
+			} else if (uucopy(&val, optval, sizeof (int)) != 0 ||
+			    uucopy(&len, optlenp, sizeof (int)) != 0) {
+				return (-EFAULT);
+			}
+			return (0);
+		}
+	}
 
 	orig_optname = optname;
 
