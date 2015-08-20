@@ -31,7 +31,7 @@
  */
 
 /*
- * Copyright (c) 2014, Joyent, Inc. All rights reserved.
+ * Copyright 2015, Joyent, Inc.
  */
 
 #ifndef _SYS_POLL_H
@@ -130,8 +130,8 @@ extern void pollwakeup(pollhead_t *, short);
 /*
  * Internal routines.
  */
-extern void polllock(pollhead_t *, kmutex_t *);
-extern int pollunlock(void);
+extern int polllock(pollhead_t *, kmutex_t *);
+extern int pollunlock(int *);
 extern void pollrelock(int);
 extern void pollcleanup(void);
 extern void pollblockexit(struct fpollinfo *);
