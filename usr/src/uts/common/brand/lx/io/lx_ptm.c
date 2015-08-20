@@ -1078,7 +1078,10 @@ lx_ptm_poll_loop(dev_t dev, short events, int anyyet, short *reventsp,
 		 * locks that we are already holding.  So we need to
 		 * drop those locks here before we do our read.
 		 */
-		lockstate = pollunlock();
+		if (pollunlock(&lockstate) != 0) {
+			*reventsp = POLLNVAL;
+			return (0);
+		}
 		err = lx_ptm_eof_drop(dev, &rval);
 		pollrelock(lockstate);
 		if (err)
