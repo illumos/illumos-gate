@@ -35,6 +35,7 @@ dir path=opt/zfs-tests/tests/functional/atime
 dir path=opt/zfs-tests/tests/functional/bootfs
 dir path=opt/zfs-tests/tests/functional/cache
 dir path=opt/zfs-tests/tests/functional/cachefile
+dir path=opt/zfs-tests/tests/functional/checksum
 dir path=opt/zfs-tests/tests/functional/clean_mirror
 dir path=opt/zfs-tests/tests/functional/cli_root
 dir path=opt/zfs-tests/tests/functional/cli_root/zdb
@@ -328,6 +329,33 @@ file path=opt/zfs-tests/tests/functional/cachefile/cachefile_001_pos mode=0555
 file path=opt/zfs-tests/tests/functional/cachefile/cachefile_002_pos mode=0555
 file path=opt/zfs-tests/tests/functional/cachefile/cachefile_003_pos mode=0555
 file path=opt/zfs-tests/tests/functional/cachefile/cachefile_004_pos mode=0555
+$(i386_ONLY)file path=opt/zfs-tests/tests/functional/checksum/edonr_test.amd64 \
+    mode=0555
+$(i386_ONLY)file path=opt/zfs-tests/tests/functional/checksum/edonr_test.i386 \
+    mode=0555
+$(sparc_ONLY)file \
+    path=opt/zfs-tests/tests/functional/checksum/edonr_test.sparc mode=0555
+$(sparc_ONLY)file \
+    path=opt/zfs-tests/tests/functional/checksum/edonr_test.sparcv9 mode=0555
+file path=opt/zfs-tests/tests/functional/checksum/run_edonr_test mode=0555
+file path=opt/zfs-tests/tests/functional/checksum/run_sha2_test mode=0555
+file path=opt/zfs-tests/tests/functional/checksum/run_skein_test mode=0555
+$(i386_ONLY)file path=opt/zfs-tests/tests/functional/checksum/sha2_test.amd64 \
+    mode=0555
+$(i386_ONLY)file path=opt/zfs-tests/tests/functional/checksum/sha2_test.i386 \
+    mode=0555
+$(sparc_ONLY)file path=opt/zfs-tests/tests/functional/checksum/sha2_test.sparc \
+    mode=0555
+$(sparc_ONLY)file \
+    path=opt/zfs-tests/tests/functional/checksum/sha2_test.sparcv9 mode=0555
+$(i386_ONLY)file path=opt/zfs-tests/tests/functional/checksum/skein_test.amd64 \
+    mode=0555
+$(i386_ONLY)file path=opt/zfs-tests/tests/functional/checksum/skein_test.i386 \
+    mode=0555
+$(sparc_ONLY)file \
+    path=opt/zfs-tests/tests/functional/checksum/skein_test.sparc mode=0555
+$(sparc_ONLY)file \
+    path=opt/zfs-tests/tests/functional/checksum/skein_test.sparcv9 mode=0555
 file path=opt/zfs-tests/tests/functional/clean_mirror/clean_mirror_001_pos \
     mode=0555
 file path=opt/zfs-tests/tests/functional/clean_mirror/clean_mirror_002_pos \

@@ -2,6 +2,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2013 Saso Kiselkov.  All rights reserved.
+ */
 
 /*
  * The basic framework for this code came from the reference
@@ -715,6 +718,26 @@ SHA2Init(uint64_t mech, SHA2_CTX *ctx)
 		ctx->state.s64[6] = 0x1f83d9abfb41bd6bULL;
 		ctx->state.s64[7] = 0x5be0cd19137e2179ULL;
 		break;
+	case SHA512_224_MECH_INFO_TYPE:
+		ctx->state.s64[0] = 0x8C3D37C819544DA2ULL;
+		ctx->state.s64[1] = 0x73E1996689DCD4D6ULL;
+		ctx->state.s64[2] = 0x1DFAB7AE32FF9C82ULL;
+		ctx->state.s64[3] = 0x679DD514582F9FCFULL;
+		ctx->state.s64[4] = 0x0F6D2B697BD44DA8ULL;
+		ctx->state.s64[5] = 0x77E36F7304C48942ULL;
+		ctx->state.s64[6] = 0x3F9D85A86A1D36C8ULL;
+		ctx->state.s64[7] = 0x1112E6AD91D692A1ULL;
+		break;
+	case SHA512_256_MECH_INFO_TYPE:
+		ctx->state.s64[0] = 0x22312194FC2BF72CULL;
+		ctx->state.s64[1] = 0x9F555FA3C84C64C2ULL;
+		ctx->state.s64[2] = 0x2393B86B6F53B151ULL;
+		ctx->state.s64[3] = 0x963877195940EABDULL;
+		ctx->state.s64[4] = 0x96283EE2A88EFFE3ULL;
+		ctx->state.s64[5] = 0xBE5E1E2553863992ULL;
+		ctx->state.s64[6] = 0x2B0199FC2C85B8AAULL;
+		ctx->state.s64[7] = 0x0EB72DDC81C52CA2ULL;
+		break;
 #ifdef _KERNEL
 	default:
 		cmn_err(CE_PANIC,
@@ -901,7 +924,6 @@ SHA2Final(void *digest, SHA2_CTX *ctx)
 		SHA2Update(ctx, PADDING, ((index < 56) ? 56 : 120) - index);
 		SHA2Update(ctx, bitcount_be, sizeof (bitcount_be));
 		Encode(digest, ctx->state.s32, sizeof (ctx->state.s32));
-
 	} else {
 		index  = (ctx->count.c64[1] >> 3) & 0x7f;
 		Encode64(bitcount_be64, ctx->count.c64,
@@ -912,9 +934,25 @@ SHA2Final(void *digest, SHA2_CTX *ctx)
 			ctx->state.s64[6] = ctx->state.s64[7] = 0;
 			Encode64(digest, ctx->state.s64,
 			    sizeof (uint64_t) * 6);
-		} else
+		} else if (algotype == SHA512_224_MECH_INFO_TYPE) {
+			uint8_t last[sizeof (uint64_t)];
+			/*
+			 * Since SHA-512/224 doesn't align well to 64-bit
+			 * boundaries, we must do the encoding in three steps:
+			 * 1) encode the three 64-bit words that fit neatly
+			 * 2) encode the last 64-bit word to a temp buffer
+			 * 3) chop out the lower 32-bits from the temp buffer
+			 *    and append them to the digest
+			 */
+			Encode64(digest, ctx->state.s64, sizeof (uint64_t) * 3);
+			Encode64(last, &ctx->state.s64[3], sizeof (uint64_t));
+			bcopy(last, (uint8_t *)digest + 24, 4);
+		} else if (algotype == SHA512_256_MECH_INFO_TYPE) {
+			Encode64(digest, ctx->state.s64, sizeof (uint64_t) * 4);
+		} else {
 			Encode64(digest, ctx->state.s64,
 			    sizeof (ctx->state.s64));
+		}
 	}
 
 	/* zeroize sensitive information */

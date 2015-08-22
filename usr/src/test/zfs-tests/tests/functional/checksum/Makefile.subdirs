@@ -1,0 +1,57 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright (c) 2015 by Delphix. All rights reserved.
+#
+
+include $(SRC)/cmd/Makefile.cmd
+
+ROOTOPTPKG = $(ROOT)/opt/zfs-tests
+TESTDIR = $(ROOTOPTPKG)/tests/functional/checksum
+
+OBJS = $(PROG:%=%.o)
+SRCS = $(OBJS:%.o=../%.c)
+
+CMD32 = $(PROG:%=$(TESTDIR)/%.$(MACH))
+CMD64 = $(PROG:%=$(TESTDIR)/%.$(MACH64))
+CMDS = $(CMD32) $(CMD64)
+$(CMDS) := FILEMODE = 0555
+
+C99MODE = -xc99=%all
+CFLAGS = -I $(SRC)/uts/common -D_KERNEL
+LDLIBS += -lmd
+LINTFLAGS += -u
+LINTFLAGS64 += -u
+
+all: $(PROG) $(TESTDIR)
+
+lint: lint_SRCS
+
+clobber: clean
+
+clean:
+	$(RM) $(PROG)
+
+include $(SRC)/cmd/Makefile.targ
+
+$(TESTDIR):
+	$(INS.dir)
+
+$(TESTDIR)/%.$(MACH): %
+	$(INS.rename)
+
+$(TESTDIR)/%.$(MACH64): %
+	$(INS.rename)
+
+%: ../%.c
+	$(LINK.c) -o $@ $< $(LDLIBS)
+	$(POST_PROCESS)

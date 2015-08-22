@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2013 Saso Kiselkov. All rights reserved.
 #
 
 #
@@ -305,22 +306,26 @@ file path=kernel/crypto/$(ARCH64)/arcfour group=sys mode=0755
 file path=kernel/crypto/$(ARCH64)/blowfish group=sys mode=0755
 file path=kernel/crypto/$(ARCH64)/des group=sys mode=0755
 file path=kernel/crypto/$(ARCH64)/ecc group=sys mode=0755
+file path=kernel/crypto/$(ARCH64)/edonr group=sys mode=0755
 file path=kernel/crypto/$(ARCH64)/md4 group=sys mode=0755
 file path=kernel/crypto/$(ARCH64)/md5 group=sys mode=0755
 file path=kernel/crypto/$(ARCH64)/rsa group=sys mode=0755
 file path=kernel/crypto/$(ARCH64)/sha1 group=sys mode=0755
 file path=kernel/crypto/$(ARCH64)/sha2 group=sys mode=0755
+file path=kernel/crypto/$(ARCH64)/skein group=sys mode=0755
 file path=kernel/crypto/$(ARCH64)/swrand group=sys mode=0755
 $(i386_ONLY)file path=kernel/crypto/aes group=sys mode=0755
 $(i386_ONLY)file path=kernel/crypto/arcfour group=sys mode=0755
 $(i386_ONLY)file path=kernel/crypto/blowfish group=sys mode=0755
 $(i386_ONLY)file path=kernel/crypto/des group=sys mode=0755
 $(i386_ONLY)file path=kernel/crypto/ecc group=sys mode=0755
+$(i386_ONLY)file path=kernel/crypto/edonr group=sys mode=0755
 $(i386_ONLY)file path=kernel/crypto/md4 group=sys mode=0755
 $(i386_ONLY)file path=kernel/crypto/md5 group=sys mode=0755
 $(i386_ONLY)file path=kernel/crypto/rsa group=sys mode=0755
 $(i386_ONLY)file path=kernel/crypto/sha1 group=sys mode=0755
 $(i386_ONLY)file path=kernel/crypto/sha2 group=sys mode=0755
+$(i386_ONLY)file path=kernel/crypto/skein group=sys mode=0755
 $(i386_ONLY)file path=kernel/crypto/swrand group=sys mode=0755
 $(sparc_ONLY)file path=kernel/dacf/$(ARCH64)/consconfig_dacf group=sys \
     mode=0755
@@ -822,15 +827,21 @@ $(sparc_ONLY)file path=usr/share/man/man7d/dad.7d
 $(i386_ONLY)file path=usr/share/man/man7d/smbios.7d
 # Sadly vuid mouse support is in different packages on different platforms
 # While kstat(7D) is in SUNWcs, the structures are general
+hardlink path=kernel/misc/$(ARCH64)/edonr \
+    target=../../../kernel/crypto/$(ARCH64)/edonr
 hardlink path=kernel/misc/$(ARCH64)/md5 \
     target=../../../kernel/crypto/$(ARCH64)/md5
 hardlink path=kernel/misc/$(ARCH64)/sha1 \
     target=../../../kernel/crypto/$(ARCH64)/sha1
 hardlink path=kernel/misc/$(ARCH64)/sha2 \
     target=../../../kernel/crypto/$(ARCH64)/sha2
+hardlink path=kernel/misc/$(ARCH64)/skein \
+    target=../../../kernel/crypto/$(ARCH64)/skein
+$(i386_ONLY)hardlink path=kernel/misc/edonr target=../../kernel/crypto/edonr
 $(i386_ONLY)hardlink path=kernel/misc/md5 target=../../kernel/crypto/md5
 $(i386_ONLY)hardlink path=kernel/misc/sha1 target=../../kernel/crypto/sha1
 $(i386_ONLY)hardlink path=kernel/misc/sha2 target=../../kernel/crypto/sha2
+$(i386_ONLY)hardlink path=kernel/misc/skein target=../../kernel/crypto/skein
 hardlink path=kernel/socketmod/$(ARCH64)/icmp \
     target=../../../kernel/drv/$(ARCH64)/icmp
 hardlink path=kernel/socketmod/$(ARCH64)/rts \

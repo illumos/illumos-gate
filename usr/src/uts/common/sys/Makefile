@@ -22,6 +22,7 @@
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2013, Joyent, Inc. All rights reserved.
 # Copyright 2013 Garrett D'Amore <garrett@damore.org>
+# Copyright 2013 Saso Kiselkov. All rights reserved.
 #
 
 include $(SRC)/uts/Makefile.uts
@@ -201,6 +202,7 @@ CHKHDRS=			\
 	ecppio.h		\
 	ecppreg.h		\
 	ecppvar.h		\
+	edonr.h			\
 	efi_partition.h		\
 	elf.h			\
 	elf_386.h		\
@@ -504,6 +506,7 @@ CHKHDRS=			\
 	sid.h			\
 	siginfo.h		\
 	signal.h		\
+	skein.h			\
 	sleepq.h		\
 	smbios.h		\
 	smbios_impl.h		\
