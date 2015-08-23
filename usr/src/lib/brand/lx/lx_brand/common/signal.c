@@ -147,6 +147,16 @@ extern int pselect_large_fdset(int nfds, fd_set *in0, fd_set *out0, fd_set *ex0,
  * translates the action to the Linux default, to terminate the process.
  * (Illumos' default action is to ignore SIGPWR.)
  *
+ * A notable behavior of lx_sigdeliver is that it must replace the stack
+ * pointer in the context that will be handed to the Linux signal handler.
+ * There is at least one application (mono) which inspects the SP in the
+ * context it receives and which fails when the SP is not within the thread's
+ * stack range. There is not much else within the context that a signal
+ * handler could depend on, so we only ensure that the SP is from the Linux
+ * stack and not the alternate stack. lx_sigdeliver will restore the correct
+ * SP when setcontext returns into this function as part of returning from
+ * the signal handler.
+ *
  * It is also important to note that when signals are not translated, the brand
  * relies upon code interposing upon the wait(2) system call to translate
  * signals to their proper values for any Linux threads retrieving the status
@@ -1557,6 +1567,8 @@ lx_sigdeliver(int lx_sig, siginfo_t *sip, ucontext_t *ucp, size_t stacksz,
 	int totsz = 0;
 	uintptr_t flags;
 	uintptr_t hargs[3];
+	uintptr_t orig_sp = 0;
+
 	/*
 	 * These variables must be "volatile", as they are modified after the
 	 * getcontext() stores the register state:
@@ -1581,6 +1593,9 @@ lx_sigdeliver(int lx_sig, siginfo_t *sip, ucontext_t *ucp, size_t stacksz,
 	 */
 	bzero(hargs, sizeof (hargs));
 
+	/* Save our SP so we can restore it after coming back in. */
+	orig_sp = LX_REG(ucp, REG_SP);
+
 	/*
 	 * We save a context here so that we can be returned later to complete
 	 * handling the signal.
@@ -1596,6 +1611,11 @@ lx_sigdeliver(int lx_sig, siginfo_t *sip, ucontext_t *ucp, size_t stacksz,
 		 * return system call.
 		 */
 		lx_debug("lx_sigdeliver: WE ARE BACK, VIA UC @ %p!\n", &uc);
+		/*
+		 * Restore the original stack pointer, which we saved on our
+		 * alt. stack, back into the context.
+		 */
+		LX_REG(ucp, REG_SP) = orig_sp;
 		goto after_signal_handler;
 	}
 	signal_delivered = B_TRUE;
@@ -1659,6 +1679,9 @@ lx_sigdeliver(int lx_sig, siginfo_t *sip, ucontext_t *ucp, size_t stacksz,
 			lxfp = MIN(lxtsd->lxtsd_lx_sp, lxfp);
 		}
 	}
+
+	/* Replace the context SP with the one from the Linux context */
+	LX_REG(ucp, REG_SP) = lxfp;
 
 	/*
 	 * Account for a reserved stack region (for amd64, this is 128 bytes),
