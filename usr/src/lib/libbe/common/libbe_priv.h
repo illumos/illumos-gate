@@ -25,6 +25,7 @@
 
 /*
  * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2015 Toomas Soome <tsoome@me.com>
  */
 
 #ifndef	_LIBBE_PRIV_H
@@ -59,8 +60,11 @@ extern "C" {
 #define	BE_WHITE_SPACE		" \t\r\n"
 #define	BE_CAP_FILE		"/boot/grub/capability"
 #define	BE_INSTALL_GRUB		"/sbin/installgrub"
-#define	BE_STAGE_1		"/boot/grub/stage1"
-#define	BE_STAGE_2		"/boot/grub/stage2"
+#define	BE_GRUB_STAGE_1		"/boot/grub/stage1"
+#define	BE_GRUB_STAGE_2		"/boot/grub/stage2"
+#define	BE_INSTALL_BOOT		"/usr/sbin/installboot"
+#define	BE_SPARC_BOOTBLK	"/lib/fs/zfs/bootblk"
+
 #define	ZFS_CLOSE(_zhp) \
 	if (_zhp) { \
 		zfs_close(_zhp); \
@@ -210,6 +214,7 @@ boolean_t be_zone_compare_uuids(char *);
 
 /* check architecture functions */
 char *be_get_default_isa(void);
+char *be_get_platform(void);
 boolean_t be_is_isa(char *);
 boolean_t be_has_grub(void);
 

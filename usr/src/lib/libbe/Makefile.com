@@ -46,7 +46,7 @@ LIBS=		$(DYNLIB) $(LINTLIB)
 
 SRCDIR= 	../common
 
-INCS += -I$(SRCDIR)
+INCS += -I$(SRCDIR) -I$(SRC)/cmd/boot/common
 
 C99MODE= 	$(C99_ENABLE)
 
