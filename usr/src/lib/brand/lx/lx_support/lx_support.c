@@ -296,12 +296,20 @@ lxs_verify(char *xmlfile)
 	zonecfg_fini_handle(handle);
 
 	if (krelease) {
-		if (strlen(krelease) >= LX_KERN_RELEASE_MAX ||
-		    (strncmp(krelease, "2.4", 3) != 0 &&
-		    strncmp(krelease, "2.6", 3) != 0 &&
-		    strncmp(krelease, "3.", 2) != 0))
+		char *pdot, *ep;
+		long major_ver;
+
+		pdot = strchr(krelease, '.');
+		if (pdot != NULL)
+			*pdot = '\0';
+		errno = 0;
+		major_ver = strtol(krelease, &ep, 10);
+		if (major_ver < 2 || errno != 0 || *ep != '\0')
 			lxs_err(gettext("invalid value for zone attribute: %s"),
 			    "kernel-version");
+		if (pdot != NULL)
+			*pdot = '.';
+
 	}
 	return (0);
 }
