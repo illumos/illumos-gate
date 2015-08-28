@@ -26,8 +26,8 @@
  */
 
 /*
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -368,11 +368,48 @@ nlm_gc(struct nlm_globals *g)
 		    clock_t, now);
 
 		/*
+		 * Find all obviously unused vholds and destroy them.
+		 */
+		for (hostp = avl_first(&g->nlm_hosts_tree); hostp != NULL;
+		    hostp = AVL_NEXT(&g->nlm_hosts_tree, hostp)) {
+			struct nlm_vhold *nvp;
+
+			mutex_enter(&hostp->nh_lock);
+
+			nvp = TAILQ_FIRST(&hostp->nh_vholds_list);
+			while (nvp != NULL) {
+				struct nlm_vhold *new_nvp;
+
+				new_nvp = TAILQ_NEXT(nvp, nv_link);
+
+				/*
+				 * If these conditions are met, the vhold is
+				 * obviously unused and we will destroy it.  In
+				 * a case either v_filocks and/or v_shrlocks is
+				 * non-NULL the vhold might still be unused by
+				 * the host, but it is expensive to check that.
+				 * We defer such check until the host is idle.
+				 * The expensive check is done below without
+				 * the global lock held.
+				 */
+				if (nvp->nv_refcnt == 0 &&
+				    nvp->nv_vp->v_filocks == NULL &&
+				    nvp->nv_vp->v_shrlocks == NULL) {
+					nlm_vhold_destroy(hostp, nvp);
+				}
+
+				nvp = new_nvp;
+			}
+
+			mutex_exit(&hostp->nh_lock);
+		}
+
+		/*
 		 * Handle all hosts that are unused at the moment
 		 * until we meet one with idle timeout in future.
 		 */
 		while ((hostp = TAILQ_FIRST(&g->nlm_idle_hosts)) != NULL) {
-			bool_t has_locks = FALSE;
+			bool_t has_locks;
 
 			if (hostp->nh_idle_timeout > now)
 				break;
@@ -406,7 +443,8 @@ nlm_gc(struct nlm_globals *g)
 			 * the host is outdated, and we should take no
 			 * further action.
 			 */
-			if (hostp->nh_idle_timeout > now || hostp->nh_refs > 0)
+			if ((hostp->nh_flags & NLM_NH_INIDLE) == 0 ||
+			    hostp->nh_idle_timeout > now)
 				continue;
 
 			/*
@@ -618,7 +656,7 @@ nlm_suspend_zone(struct nlm_globals *g)
  * (see nlm_suspend_zone) and its main purpose to check
  * whether remote locks owned by hosts are still in consistent
  * state. If they aren't, resume function tries to reclaim
- * reclaim locks (for client side hosts) and clean locks (for
+ * locks (for client side hosts) and clean locks (for
  * server side hosts).
  */
 static void
@@ -1007,6 +1045,20 @@ nlm_vhold_release(struct nlm_host *hostp, struct nlm_vhold *nvp)
 	mutex_enter(&hostp->nh_lock);
 	ASSERT(nvp->nv_refcnt > 0);
 	nvp->nv_refcnt--;
+
+	/*
+	 * If these conditions are met, the vhold is obviously unused and we
+	 * will destroy it.  In a case either v_filocks and/or v_shrlocks is
+	 * non-NULL the vhold might still be unused by the host, but it is
+	 * expensive to check that.  We defer such check until the host is
+	 * idle.  The expensive check is done in the NLM garbage collector.
+	 */
+	if (nvp->nv_refcnt == 0 &&
+	    nvp->nv_vp->v_filocks == NULL &&
+	    nvp->nv_vp->v_shrlocks == NULL) {
+		nlm_vhold_destroy(hostp, nvp);
+	}
+
 	mutex_exit(&hostp->nh_lock);
 }
 
@@ -1026,6 +1078,9 @@ static void
 nlm_vhold_destroy(struct nlm_host *hostp, struct nlm_vhold *nvp)
 {
 	ASSERT(MUTEX_HELD(&hostp->nh_lock));
+
+	ASSERT(nvp->nv_refcnt == 0);
+	ASSERT(TAILQ_EMPTY(&nvp->nv_slreqs));
 
 	VERIFY(mod_hash_remove(hostp->nh_vholds_by_vp,
 	    (mod_hash_key_t)nvp->nv_vp,

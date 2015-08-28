@@ -293,8 +293,7 @@ rctlsys_get(char *name, rctl_opaque_t *old_rblk, rctl_opaque_t *new_rblk,
 		mutex_exit(&rset->rcs_lock);
 		mutex_exit(&curproc->p_lock);
 
-		nblk = kmem_alloc(sizeof (rctl_opaque_t), KM_SLEEP);
-		bzero(nblk, sizeof (rctl_opaque_t));
+		nblk = kmem_zalloc(sizeof (rctl_opaque_t), KM_SLEEP);
 		nblk->rcq_value = usage;
 
 		ret = copyout(nblk, new_rblk, sizeof (rctl_opaque_t));

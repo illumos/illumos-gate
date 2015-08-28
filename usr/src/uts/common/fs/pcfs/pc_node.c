@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/param.h>
 #include <sys/t_lock.h>
 #include <sys/errno.h>
@@ -140,8 +138,7 @@ pc_getnode(
 	 * Cannot find node in active list. Allocate memory for a new node
 	 * initialize it, and put it on the active list.
 	 */
-	pcp = kmem_alloc(sizeof (struct pcnode), KM_SLEEP);
-	bzero(pcp, sizeof (struct pcnode));
+	pcp = kmem_zalloc(sizeof (struct pcnode), KM_SLEEP);
 	vp = vn_alloc(KM_SLEEP);
 	pcp->pc_vn = vp;
 	pcp->pc_entry = *ep;

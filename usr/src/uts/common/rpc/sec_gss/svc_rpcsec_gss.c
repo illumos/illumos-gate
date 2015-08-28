@@ -957,10 +957,9 @@ rpcsec_gss_init(
 	arg = kmem_alloc(sizeof (*arg), KM_SLEEP);
 
 	/* taskq func must free rpc_call_arg & deserialized arguments */
-	arg->rpc_call_arg = kmem_alloc(sizeof (*arg->rpc_call_arg), KM_SLEEP);
+	arg->rpc_call_arg = kmem_zalloc(sizeof (*arg->rpc_call_arg), KM_SLEEP);
 
 	/* deserialize arguments */
-	bzero(arg->rpc_call_arg, sizeof (*arg->rpc_call_arg));
 	if (!SVC_GETARGS(rqst->rq_xprt, __xdr_rpc_gss_init_arg,
 	    (caddr_t)arg->rpc_call_arg)) {
 		ret = RPCSEC_GSS_FAILED;
