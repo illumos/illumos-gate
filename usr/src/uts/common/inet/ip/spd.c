@@ -4520,10 +4520,9 @@ iplatch_free(ipsec_latch_t *ipl)
 ipsec_latch_t *
 iplatch_create()
 {
-	ipsec_latch_t *ipl = kmem_alloc(sizeof (*ipl), KM_NOSLEEP);
+	ipsec_latch_t *ipl = kmem_zalloc(sizeof (*ipl), KM_NOSLEEP);
 	if (ipl == NULL)
 		return (ipl);
-	bzero(ipl, sizeof (*ipl));
 	mutex_init(&ipl->ipl_lock, NULL, MUTEX_DEFAULT, NULL);
 	ipl->ipl_refcnt = 1;
 	return (ipl);

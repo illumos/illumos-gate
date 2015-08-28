@@ -28,8 +28,6 @@
 /*	  All Rights Reserved  	*/
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* from S5R4 1.10 */
-
 /*
  * Description: The pckt module packetizes messages on
  *		its read queue by pre-fixing an M_PROTO
@@ -224,8 +222,7 @@ pcktopen(
 	/*
 	 * Allocate state structure.
 	 */
-	pip = kmem_alloc(sizeof (*pip), KM_SLEEP);
-	bzero(pip, sizeof (*pip));
+	pip = kmem_zalloc(sizeof (*pip), KM_SLEEP);
 
 #ifdef _MULTI_DATAMODEL
 	pip->model = ddi_model_convert_from(get_udatamodel());
