@@ -881,6 +881,7 @@ PORTSYS=			\
 	chmod.o			\
 	chown.o			\
 	corectl.o		\
+	eventfd.o		\
 	exacctsys.o		\
 	execl.o			\
 	execle.o		\

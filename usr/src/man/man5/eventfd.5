@@ -1,0 +1,32 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright (c) 2014, Joyent, Inc. All Rights Reserved.
+.\"
+.Dd Dec 3, 2014
+.Dt EVENTFD 5
+.Os
+.Sh NAME
+.Nm eventfd
+.Nd Linux-compatible user event notification facility
+.Sh SYNOPSIS
+.In sys/eventfd.h
+.Sh DESCRIPTION
+.Nm
+is a Linux-borne facility for sending and receiving user
+events via a file descriptor.  While the facility itself is somewhat dubious
+(it can be mimicked in an entirely portable way with a pipe), it is
+small and straightforward and this implementation is entirely compatible
+with its Linux antecedent; see
+.Xr eventfd 3C
+for details.
+.Sh SEE ALSO
+.Xr eventfd 3C

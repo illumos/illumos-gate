@@ -93,6 +93,13 @@ $if _x86 && _ELF64
 $add amd64
 $endif
 
+SYMBOL_VERSION ILLUMOS_0.13 {	# eventfd
+    protected:
+	eventfd;
+	eventfd_read;
+	eventfd_write;
+} ILLUMOS_0.12;
+
 SYMBOL_VERSION ILLUMOS_0.12 {	# arc4random and friends
     protected:
 	arc4random;

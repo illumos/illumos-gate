@@ -987,6 +987,8 @@ DEVPOLL_OBJS += devpoll.o
 
 DEVPOOL_OBJS += devpool.o
 
+EVENTFD_OBJS +=	eventfd.o
+
 I8042_OBJS +=	i8042.o
 
 KB8042_OBJS +=	\

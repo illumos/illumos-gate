@@ -861,6 +861,7 @@ file path=usr/has/man/man1has/ex.1has
 file path=usr/has/man/man1has/sh.1has
 file path=usr/has/man/man1has/vi.1has
 file path=usr/kernel/drv/$(ARCH64)/dump group=sys
+file path=usr/kernel/drv/$(ARCH64)/eventfd group=sys
 file path=usr/kernel/drv/$(ARCH64)/fssnap group=sys
 file path=usr/kernel/drv/$(ARCH64)/kstat group=sys
 file path=usr/kernel/drv/$(ARCH64)/ksyms group=sys
@@ -869,6 +870,8 @@ file path=usr/kernel/drv/$(ARCH64)/ptm group=sys
 file path=usr/kernel/drv/$(ARCH64)/pts group=sys
 $(i386_ONLY)file path=usr/kernel/drv/dump group=sys
 file path=usr/kernel/drv/dump.conf group=sys
+$(i386_ONLY)file path=usr/kernel/drv/eventfd group=sys
+file path=usr/kernel/drv/eventfd.conf group=sys
 $(i386_ONLY)file path=usr/kernel/drv/fssnap group=sys
 file path=usr/kernel/drv/fssnap.conf group=sys
 $(i386_ONLY)file path=usr/kernel/drv/kstat group=sys

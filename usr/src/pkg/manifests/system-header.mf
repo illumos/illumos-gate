@@ -958,6 +958,7 @@ file path=usr/include/sys/esunddi.h
 file path=usr/include/sys/ethernet.h
 file path=usr/include/sys/euc.h
 file path=usr/include/sys/eucioctl.h
+file path=usr/include/sys/eventfd.h
 file path=usr/include/sys/exacct.h
 file path=usr/include/sys/exacct_catalog.h
 file path=usr/include/sys/exacct_impl.h
