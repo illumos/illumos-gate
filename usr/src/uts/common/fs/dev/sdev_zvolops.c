@@ -41,14 +41,18 @@
 #include <sys/vfs_opreg.h>
 
 struct vnodeops	*devzvol_vnodeops;
+static major_t devzvol_major;
+static taskq_ent_t devzvol_zclist_task;
+
+static kmutex_t devzvol_mtx;
+/* Below are protected by devzvol_mtx */
+static boolean_t devzvol_isopen;
+static boolean_t devzvol_zclist_task_running = B_FALSE;
 static uint64_t devzvol_gen = 0;
 static uint64_t devzvol_zclist;
 static size_t devzvol_zclist_size;
 static ldi_ident_t devzvol_li;
 static ldi_handle_t devzvol_lh;
-static kmutex_t devzvol_mtx;
-static boolean_t devzvol_isopen;
-static major_t devzvol_major;
 
 /*
  * we need to use ddi_mod* since fs/dev gets loaded early on in
@@ -310,19 +314,20 @@ devzvol_validate(struct sdev_node *dv)
 }
 
 /*
- * creates directories as needed in response to a readdir
+ * Taskq callback to update the devzvol_zclist.
+ *
+ * We need to defer this to the taskq to avoid it running with a user
+ * context that might be associated with some non-global zone, and thus
+ * not being able to list all of the pools on the entire system.
  */
-void
-devzvol_create_pool_dirs(struct vnode *dvp)
+/*ARGSUSED*/
+static void
+devzvol_update_zclist_cb(void *arg)
 {
 	zfs_cmd_t	*zc;
-	nvlist_t *nv = NULL;
-	nvpair_t *elem = NULL;
-	size_t size;
-	int pools = 0;
-	int rc;
+	int		rc;
+	size_t		size;
 
-	sdcmn_err13(("devzvol_create_pool_dirs"));
 	zc = kmem_zalloc(sizeof (zfs_cmd_t), KM_SLEEP);
 	mutex_enter(&devzvol_mtx);
 	zc->zc_cookie = devzvol_gen;
@@ -337,22 +342,67 @@ devzvol_create_pool_dirs(struct vnode *dvp)
 				kmem_free((void *)(uintptr_t)devzvol_zclist,
 				    devzvol_zclist_size);
 			devzvol_zclist = zc->zc_nvlist_dst;
+			/* Keep the alloc'd size, not the nvlist size. */
 			devzvol_zclist_size = size;
 			break;
-		case EEXIST:
+		default:
 			/*
-			 * no change in the configuration; still need
-			 * to do lookups in case we did a lookup in
-			 * zvol/rdsk but not zvol/dsk (or vice versa)
+			 * Either there was no change in pool configuration
+			 * since we last asked (rc == EEXIST) or we got a
+			 * catastrophic error.
+			 *
+			 * Give up memory and exit.
 			 */
 			kmem_free((void *)(uintptr_t)zc->zc_nvlist_dst,
 			    size);
 			break;
-		default:
-			kmem_free((void *)(uintptr_t)zc->zc_nvlist_dst,
-			    size);
-			goto out;
 	}
+
+	VERIFY(devzvol_zclist_task_running == B_TRUE);
+	devzvol_zclist_task_running = B_FALSE;
+	mutex_exit(&devzvol_mtx);
+
+	kmem_free(zc, sizeof (zfs_cmd_t));
+}
+
+static void
+devzvol_update_zclist(void)
+{
+	mutex_enter(&devzvol_mtx);
+	if (devzvol_zclist_task_running == B_TRUE) {
+		mutex_exit(&devzvol_mtx);
+		goto wait;
+	}
+
+	devzvol_zclist_task_running = B_TRUE;
+
+	taskq_dispatch_ent(sdev_taskq, devzvol_update_zclist_cb, NULL, 0,
+	    &devzvol_zclist_task);
+
+	mutex_exit(&devzvol_mtx);
+
+wait:
+	taskq_wait(sdev_taskq);
+}
+
+/*
+ * Creates sub-directories for each zpool as needed in response to a
+ * readdir on one of the /dev/zvol/{dsk,rdsk} directories.
+ */
+void
+devzvol_create_pool_dirs(struct vnode *dvp)
+{
+	nvlist_t *nv = NULL;
+	nvpair_t *elem = NULL;
+	int pools = 0;
+	int rc;
+
+	sdcmn_err13(("devzvol_create_pool_dirs"));
+
+	devzvol_update_zclist();
+
+	mutex_enter(&devzvol_mtx);
+
 	rc = nvlist_unpack((char *)(uintptr_t)devzvol_zclist,
 	    devzvol_zclist_size, &nv, 0);
 	if (rc) {
@@ -385,7 +435,6 @@ devzvol_create_pool_dirs(struct vnode *dvp)
 	}
 out:
 	mutex_exit(&devzvol_mtx);
-	kmem_free(zc, sizeof (zfs_cmd_t));
 }
 
 /*ARGSUSED3*/

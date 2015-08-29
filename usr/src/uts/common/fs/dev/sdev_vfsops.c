@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2015 Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -56,6 +57,7 @@
 #include <sys/fs/dv_node.h>
 #include <sys/sunndi.h>
 #include <sys/mntent.h>
+#include <sys/disp.h>
 
 /*
  * /dev vfs operations.
@@ -66,6 +68,7 @@
  */
 struct sdev_data *sdev_origins; /* mount info for origins under /dev */
 kmutex_t sdev_lock; /* used for mount/unmount/rename synchronization */
+taskq_t *sdev_taskq = NULL;
 
 /*
  * static
@@ -252,6 +255,20 @@ sdev_mount(struct vfs *vfsp, struct vnode *mvp, struct mounta *uap,
 	}
 
 	mutex_enter(&sdev_lock);
+
+	/*
+	 * Check that the taskq has been created. We can't do this in our
+	 * _init or devinit because they run too early for ddi_taskq_create.
+	 */
+	if (sdev_taskq == NULL) {
+		sdev_taskq = taskq_create("sdev", 1, minclsyspri, 1, 1, 0);
+		if (sdev_taskq == NULL) {
+			error = ENOMEM;
+			mutex_exit(&sdev_lock);
+			VN_RELE(avp);
+			goto cleanup;
+		}
+	}
 
 	/*
 	 * handling installation
