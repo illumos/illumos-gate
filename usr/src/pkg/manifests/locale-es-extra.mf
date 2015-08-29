@@ -61,6 +61,13 @@ dir path=usr/lib/locale/es_EC.ISO8859-1/LC_MESSAGES
 dir path=usr/lib/locale/es_EC.ISO8859-1/LC_MONETARY
 dir path=usr/lib/locale/es_EC.ISO8859-1/LC_NUMERIC
 dir path=usr/lib/locale/es_EC.ISO8859-1/LC_TIME
+dir path=usr/lib/locale/es_ES.ISO8859-1
+dir path=usr/lib/locale/es_ES.ISO8859-1/LC_COLLATE
+dir path=usr/lib/locale/es_ES.ISO8859-1/LC_CTYPE
+dir path=usr/lib/locale/es_ES.ISO8859-1/LC_MESSAGES
+dir path=usr/lib/locale/es_ES.ISO8859-1/LC_MONETARY
+dir path=usr/lib/locale/es_ES.ISO8859-1/LC_NUMERIC
+dir path=usr/lib/locale/es_ES.ISO8859-1/LC_TIME
 dir path=usr/lib/locale/es_ES.ISO8859-15
 dir path=usr/lib/locale/es_ES.ISO8859-15/LC_COLLATE
 dir path=usr/lib/locale/es_ES.ISO8859-15/LC_CTYPE
@@ -154,6 +161,12 @@ file path=usr/lib/locale/es_EC.ISO8859-1/LC_MESSAGES/LCL_DATA mode=0444
 file path=usr/lib/locale/es_EC.ISO8859-1/LC_MONETARY/LCL_DATA mode=0444
 file path=usr/lib/locale/es_EC.ISO8859-1/LC_NUMERIC/LCL_DATA mode=0444
 file path=usr/lib/locale/es_EC.ISO8859-1/LC_TIME/LCL_DATA mode=0444
+file path=usr/lib/locale/es_ES.ISO8859-1/LC_COLLATE/LCL_DATA mode=0444
+file path=usr/lib/locale/es_ES.ISO8859-1/LC_CTYPE/LCL_DATA mode=0444
+file path=usr/lib/locale/es_ES.ISO8859-1/LC_MESSAGES/LCL_DATA mode=0444
+file path=usr/lib/locale/es_ES.ISO8859-1/LC_MONETARY/LCL_DATA mode=0444
+file path=usr/lib/locale/es_ES.ISO8859-1/LC_NUMERIC/LCL_DATA mode=0444
+file path=usr/lib/locale/es_ES.ISO8859-1/LC_TIME/LCL_DATA mode=0444
 file path=usr/lib/locale/es_ES.ISO8859-15/LC_COLLATE/LCL_DATA mode=0444
 file path=usr/lib/locale/es_ES.ISO8859-15/LC_CTYPE/LCL_DATA mode=0444
 file path=usr/lib/locale/es_ES.ISO8859-15/LC_MESSAGES/LCL_DATA mode=0444
