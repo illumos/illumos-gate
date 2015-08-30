@@ -1,0 +1,105 @@
+\ test file for ficl
+\ test ANSI CORE stuff first...
+-1 set-order
+
+\ set up local variable regressions before { gets redefined!
+: local1 { a b c | clr -- c b a 0 }
+    c b a clr
+;
+
+: local2 { | clr -- 0 } clr ;
+: local3 { a b | c }
+    a to c
+    b to a
+    c to b
+    a b
+;
+
+include tester.fr
+include core.fr
+
+{ -> }
+\ test double stuff
+testing 2>r 2r> 2r@
+: 2r1  2>r r> r> swap ;
+: 2r2  swap >r >r 2r> ;
+: 2r3  2>r 2r@ R> R> 2DUP >R >R SWAP 2r> ;
+
+{ 1 2 2r1 -> 1 2 }
+{ 1 2 2r2 -> 1 2 }
+{ 1 2 2r3 -> 1 2 1 2 1 2 }
+{ -> }
+
+\ Now test ficl extras and optional word-sets
+testing locals
+{ 1 2 3 local1 -> 3 2 1 0 }
+{ local2 -> 0 }
+{ 1 local2 -> 1 0 }
+{ 1 2 local3 -> 2 1 }
+
+testing :noname
+{ :noname 1 ; execute -> 1 }
+{ 1 2 3 -rot -> 3 1 2 }
+
+testing default search order
+{ get-order -> forth-wordlist 1 }
+{ only definitions get-order -> forth-wordlist 1 }
+
+testing forget
+here constant fence
+{ fence forget fence -> here }
+
+testing within
+{ -1 1 0    within -> true }
+{  0 1s 2   within -> true }
+{ -100 0 -1 within -> true }
+{ -1 1 2    within -> false }
+{ -1 1 -2   within -> false }
+{ 1 -5 5    within -> true }
+{ 33000 32000 34000 within -> true }
+{ 0x80000000 0x7f000000 0x81000000 within -> true }
+
+testing exception words
+: exc1 1 throw ;
+: exctest1 [ ' exc1 ] literal catch ;
+: exc2 exctest1 1 = if 2 throw endif ;
+: exctest2 [ ' exc2 ] literal catch ;
+: exctest? ' catch ;
+
+{ exctest1 -> 1 }
+{ exctest2 -> 2 }
+{ exctest? abort -> -1 }
+
+testing refill
+\ from file loading
+0 [if]
+.( Error )
+[else]
+1 [if]
+[else]
+.( Error )
+[then]
+[then]
+
+\ refill from evaluate string
+{ -> }
+{ s" 1 refill 2 " evaluate -> 1 0 2 }
+
+
+testing prefixes
+{ 0x10 -> decimal 16 }
+{ hex 0d10 -> decimal 10 }
+{ hex 100
+-> decimal 256 }
+
+testing number builder
+{ 1 -> 1 }
+{ 3. -> 3 0 }
+
+
+s" ficlwin" environment?
+[if]
+drop
+testing OOP support
+include ooptest.fr
+[endif]

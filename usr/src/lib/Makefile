@@ -27,6 +27,7 @@
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright (c) 2015 Gary Mills
 # Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2016 Toomas Soome <tsoome@me.com>
 #
 
 include ../Makefile.master
@@ -124,6 +125,7 @@ SUBDIRS +=				\
 	libexacct/demo	\
 	libfakekernel	\
 	libfcoe		\
+	libficl		\
 	libfru		\
 	libfruutils	\
 	libfsmgt	\
@@ -606,6 +608,7 @@ libeti:		libcurses
 libexacct/demo:	libexacct libproject
 libfakekernel:	libumem libcryptoutil
 libfcoe:	libdladm
+libficl:	libumem
 libfru:		libfruutils
 libfsmgt:	libkstat
 libgrubmgmt:	libdevinfo libzfs libfstyp libefi

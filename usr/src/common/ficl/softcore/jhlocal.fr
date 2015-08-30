@@ -1,0 +1,226 @@
+S" FICL_WANT_LOCALS" ENVIRONMENT? drop [if]
+\ ** ficl/softwords/jhlocal.fr
+\ ** stack comment style local syntax...
+\ { a b c | cleared -- d e }
+\ variables before the "|" are initialized in reverse order
+\ from the stack. Those after the "|" are zero initialized.
+\ Anything between "--" and "}" is treated as comment
+\ Uses locals...
+\ locstate: 0 = looking for | or -- or }}
+\           1 = found |
+\           2 = found --
+\           3 = found }
+\           4 = end of line
+\
+\ revised 2 June 2000 - { | a -- } now works correctly
+.( loading Johns-Hopkins locals ) cr
+hide
+
+\ What does this do?  It's equivalent to "postpone 0", but faster.
+\ "ficlInstruction0" is the FICL instruction for "push a 0 on the data stack".
+\ --lch
+: compiled-zero ficlInstruction0 , ;
+S" FICL_WANT_FLOAT" ENVIRONMENT? drop [if]
+\ And this is the instruction for a floating-point 0 (0.0e).
+: compiled-float-zero ficlInstructionF0 , ;
+[endif]
+
+: ?--   ( c-addr u -- c-addr u flag )
+    2dup s" --" compare 0= ;
+: ?}    ( c-addr u -- c-addr u flag )
+    2dup s" }"  compare 0= ;
+: ?|    ( c-addr u -- c-addr u flag )
+    2dup s" |"  compare 0= ;
+
+1 constant local-is-double
+2 constant local-is-float
+
+\ parse-local-prefix-flags
+\
+\ Parses single-letter prefix flags from the name of a local, and returns
+\ a bitfield of all flags (local-is-float | local-is-double) appropriate
+\ for the local.  Adjusts the "c-addr u" of the name to remove any prefix.
+\
+\ Handled single-letter prefix flags:
+\	1  single-cell
+\	2  double-cell
+\	d  double-cell
+\	f  floating-point (use floating stack)
+\	i  integer (use data stack)
+\	s  single-cell
+\ Specify as many as you like; later flags have precidence.
+\ Thus, "f2:foo" and "2is2f:foo" are both double-cell floats.
+\
+\ If you don't specify anything after the colon, like "f2:",
+\ there is no legal prefix, so "2f:" becomes the name of the
+\ (single-cell data stack) local.
+\
+\ For convention, the "f" is preferred first.
+
+: parse-local-prefix-flags ( c-addr u -- c-addr u flags )
+    0 0 0 locals| stop-loop colon-offset flags   u c-addr |
+
+    \ if the first character is a colon, remove the colon and return 0.
+    c-addr c@ [char] : =
+    if
+        over over 0  exit
+    endif
+
+    u 0 do
+        c-addr i + c@
+       case
+           [char] 1 of  flags local-is-double invert and  to flags  endof
+           [char] 2 of  flags local-is-double or          to flags  endof
+           [char] d of  flags local-is-double or          to flags  endof
+           [char] f of  flags local-is-float  or          to flags  endof
+           [char] i of  flags local-is-float  invert and  to flags  endof
+           [char] s of  flags local-is-double invert and  to flags  endof
+           [char] : of  i 1+ to colon-offset   1 to stop-loop  endof
+           1 to stop-loop
+       endcase
+    stop-loop  if leave  endif
+    loop
+
+    colon-offset 0=
+    colon-offset u =
+    or
+    if
+\        ." Returning variable name -- " c-addr u type ."  -- No flags." cr
+        c-addr u 0 exit
+    endif
+
+    c-addr colon-offset +
+    u colon-offset -
+\    ." Returning variable name -- " 2dup type ."  -- Flags: " flags . cr
+    flags
+;
+
+: ?delim   ( c-addr u -- state | c-addr u 0 )
+    ?|  if  2drop 1 exit endif
+    ?-- if  2drop 2 exit endif
+    ?}  if  2drop 3 exit endif
+    dup 0=
+        if  2drop 4 exit endif
+    0
+;
+
+
+
+set-current
+
+S" FICL_WANT_FLOAT" ENVIRONMENT? drop [if]
+: {
+    0 0 0 locals| flags local-state nLocals |
+
+    \ stack locals until we hit a delimiter
+    begin
+        parse-word ?delim  dup to local-state
+    0= while
+        nLocals 1+ to nLocals
+    repeat
+
+    \ now unstack the locals
+    nLocals 0 ?do
+            parse-local-prefix-flags to flags
+            flags local-is-double and if
+                flags local-is-float and if (f2local) else (2local) endif
+            else
+                flags local-is-float and if (flocal) else (local) endif
+            endif
+	loop   \ ( )
+
+    \ zero locals until -- or }
+    local-state 1 = if
+        begin
+            parse-word
+            ?delim dup to local-state
+        0= while
+            parse-local-prefix-flags to flags
+            flags local-is-double and if
+                flags local-is-float and if
+                    compiled-float-zero compiled-float-zero (f2local)
+                else
+                    compiled-zero compiled-zero (2local)
+                endif
+            else
+                flags local-is-float and if
+                    compiled-float-zero (flocal)
+                else
+                    compiled-zero (local)
+                endif
+            endif
+        repeat
+    endif
+
+    0 0 (local)
+
+    \ toss words until }
+    \ (explicitly allow | and -- in the comment)
+    local-state 2 = if
+        begin
+            parse-word
+            ?delim dup  to local-state
+        3 < while
+            local-state 0=  if 2drop endif
+        repeat
+    endif
+
+    local-state 3 <> abort" syntax error in { } local line"
+; immediate compile-only
+
+[else]
+
+: {
+    0 0 0 locals| flags local-state nLocals |
+
+    \ stack locals until we hit a delimiter
+    begin
+        parse-word ?delim  dup to local-state
+    0= while
+        nLocals 1+ to nLocals
+    repeat
+
+    \ now unstack the locals
+    nLocals 0 ?do
+            parse-local-prefix-flags to flags
+            flags local-is-double and if
+                (2local)
+            else
+                (local)
+            endif
+	loop   \ ( )
+
+    \ zero locals until -- or }
+    local-state 1 = if
+        begin
+            parse-word
+            ?delim dup to local-state
+        0= while
+            parse-local-prefix-flags to flags
+            flags local-is-double and if
+                compiled-zero compiled-zero (2local)
+            else
+                compiled-zero (local)
+            endif
+        repeat
+    endif
+
+    0 0 (local)
+
+    \ toss words until }
+    \ (explicitly allow | and -- in the comment)
+    local-state 2 = if
+        begin
+            parse-word
+            ?delim dup  to local-state
+        3 < while
+            local-state 0=  if 2drop endif
+        repeat
+    endif
+
+    local-state 3 <> abort" syntax error in { } local line"
+; immediate compile-only
+[endif]
+
+previous
+[endif]

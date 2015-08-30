@@ -1,0 +1,84 @@
+
+
+1 2 3
+.s-simple
+cr
+
+: test-case ( n -- )
+	case
+		0 of
+			." zero"
+			endof
+		1 of
+			." one"
+			endof
+		." something else"
+	endcase
+	cr
+	;
+
+
+see test-case
+
+.( You should see [3] 1 2 3 -> )
+.s-simple
+.( <-) cr
+
+.( You should see "zero": )
+0 test-case
+
+.( You should see "one": )
+1 test-case
+
+.( You should see "something else": )
+324 test-case
+
+.( You should still see [3] 1 2 3 -> )
+.s-simple
+.( <-) cr
+
+
+: test-case-2 ( n -- )
+	case
+		0 of
+			." zero"
+			fallthrough
+		1 of
+			." one"
+			endof
+		2 of
+			." two"
+			fallthrough
+		." something else"
+	endcase
+	cr
+	;
+
+
+see test-case-2
+
+cr
+
+.( You should once more see [3] 1 2 3 -> )
+.s-simple
+.( <-) cr
+
+.( You should see "zeroone": )
+0 test-case-2
+
+.( You should see "one": )
+1 test-case-2
+
+.( You should see "two": )
+2 test-case-2
+
+.( You should see "something else": )
+324 test-case-2
+
+.( You should still see [3] 1 2 3 -> )
+.s-simple
+.( <-) cr
+
+
+
+bye

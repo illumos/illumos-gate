@@ -51,6 +51,7 @@ usr/src/cmd/mandoc/roff_int.h
 usr/src/cmd/mandoc/roff.h
 usr/src/cmd/mandoc/tag.h
 usr/src/cmd/mandoc/term.h
+usr/src/common/ficl/ficltokens.h
 usr/src/grub/grub-0.97/stage2/shared.h
 usr/src/lib/gss_mechs/mech_krb5/et/error_table.h
 usr/src/lib/gss_mechs/mech_krb5/et/internal.h

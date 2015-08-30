@@ -24,6 +24,7 @@
 # Copyright 2012 OmniTI Computer Consulting, Inc.  All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2016 Toomas Soome <tsoome@me.com>
 #
 
 #
@@ -984,3 +985,14 @@ usr/lib/llib-lpcidb.ln
 # debugging program for libadutils
 #
 usr/bin/test-getdc
+#
+# libficl-sys is private
+#
+usr/include/ficllocal.h
+usr/lib/amd64/llib-lficl-sys.ln		i386
+usr/lib/amd64/libficl-sys.so		i386
+usr/lib/sparcv9/llib-lficl-sys.ln	sparc
+usr/lib/sparcv9/libficl-sys.so		sparc
+usr/lib/llib-lficl-sys
+usr/lib/llib-lficl-sys.ln
+usr/lib/libficl-sys.so
