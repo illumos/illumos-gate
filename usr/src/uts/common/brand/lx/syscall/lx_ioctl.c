@@ -712,18 +712,12 @@ static int
 ict_tiocgwinsz(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 {
 	int error, rv;
-	struct winsize winsize;
 
 	error = VOP_IOCTL(fp->f_vnode, cmd, arg, FLUSER(fp), fp->f_cred, &rv,
 	    NULL);
 
-	if (error == EINVAL) {
-		bzero(&winsize, sizeof (winsize));
-		if (copyout(&winsize, (caddr_t)arg, sizeof (winsize)))
-			return (set_errno(EFAULT));
-	} else if (error != 0) {
+	if (error != 0)
 		return (set_errno(error));
-	}
 
 	return (0);
 }
