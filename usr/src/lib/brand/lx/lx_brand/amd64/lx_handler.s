@@ -25,8 +25,6 @@
 #include <sys/lx_syscall.h>
 #endif	/* _ASM */
 
-#include "assym.h"
-
 /* 64-bit signal syscall numbers */
 #define	LX_SYS_rt_sigreturn	15
 

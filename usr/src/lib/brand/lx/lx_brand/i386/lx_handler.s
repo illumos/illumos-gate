@@ -35,8 +35,6 @@
 #include <sys/lx_syscall.h>
 #endif	/* _ASM */
 
-#include "assym.h"
-
 /* 32-bit syscall numbers */
 #define	LX_SYS_sigreturn	119
 #define	LX_SYS_rt_sigreturn	173
