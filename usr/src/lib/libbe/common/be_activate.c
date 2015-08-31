@@ -933,7 +933,7 @@ be_do_installboot_helper(zpool_handle_t *zphp, nvlist_t *child, char *stage1,
 		(void) snprintf(install_cmd, sizeof (install_cmd),
 		    "%s %s %s %s %s", BE_INSTALL_GRUB, flag,
 		    stage1, stage2, diskname);
-	} else {
+	} else if (be_is_isa("sparc")) {
 		if ((flags & BE_INSTALLBOOT_FLAG_FORCE) ==
 		    BE_INSTALLBOOT_FLAG_FORCE)
 			flag = "-f -F zfs";
@@ -942,6 +942,10 @@ be_do_installboot_helper(zpool_handle_t *zphp, nvlist_t *child, char *stage1,
 
 		(void) snprintf(install_cmd, sizeof (install_cmd),
 		    "%s %s %s %s", BE_INSTALL_BOOT, flag, stage2, diskname);
+	} else {
+		be_print_err(gettext("be_do_installboot: unsupported "
+		    "architecture.\n"));
+		return (BE_ERR_BOOTFILE_INST);
 	}
 
 	*be_run_cmd_outbuf = '\0';
