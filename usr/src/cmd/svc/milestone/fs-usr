@@ -24,7 +24,7 @@
 #
 # Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T.
 # All rights reserved.
-#
+# Copyright 2015 Nexenta Systems, Inc. All rights reserved.
 #
 . /lib/svc/share/smf_include.sh
 . /lib/svc/share/fs_include.sh
@@ -112,31 +112,26 @@ fi
 if [ "$rootiszfs" = 0 ] ; then
 	readvfstab /usr < $vfstab
 	if [ "$mountp" ]; then
-		if [ "$fstype" = cachefs ]; then
-			mountfs -O $mountp cachefs $mntopts $special ||
+		checkopt ro $mntopts
+		if [ "x$option" != xro ]; then
+			checkfs $fsckdev $fstype $mountp ||
 			    exit $SMF_EXIT_ERR_FATAL
-		else
-			checkopt ro $mntopts
-			if [ "x$option" != xro ]; then
-				checkfs $fsckdev $fstype $mountp ||
-				    exit $SMF_EXIT_ERR_FATAL
-				if [ "x$mntopts" != x- ]; then
-					mntopts="remount,$mntopts"
-				else
-					mntopts="remount"
-				fi
-
-				# if usr dev is a read-only metadevice then fail
-				case $special in
-				/dev/md/dsk/*)
-					dd if=/dev/null of=$special count=0 \
-					    >/dev/null 2>&1 || exit $SMF_EXIT_ERR_FATAL
-					;;
-				esac
-
-				mountfs - /usr $fstype $mntopts - ||
-				    exit $SMF_EXIT_ERR_FATAL
+			if [ "x$mntopts" != x- ]; then
+				mntopts="remount,$mntopts"
+			else
+				mntopts="remount"
 			fi
+
+			# if usr dev is a read-only metadevice then fail
+			case $special in
+			/dev/md/dsk/*)
+				dd if=/dev/null of=$special count=0 \
+				    >/dev/null 2>&1 || exit $SMF_EXIT_ERR_FATAL
+				;;
+			esac
+
+			mountfs - /usr $fstype $mntopts - ||
+			    exit $SMF_EXIT_ERR_FATAL
 		fi
 	fi
 fi
