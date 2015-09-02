@@ -18,13 +18,15 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ */
+
 /*
  *	Copyright 2006 Sun Microsystems, Inc.
  *	All rights reserved.
  *	Use is subject to license terms.
- */
-/*
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _NFS_NFS_ACL_H
@@ -380,7 +382,9 @@ extern void nfs_acl_free(vsecattr_t *);
 #ifdef _KERNEL
 /* server and client data structures */
 extern kstat_named_t	*aclproccnt_v2_ptr;
+extern kstat_t		**aclprocio_v2_ptr;
 extern kstat_named_t	*aclproccnt_v3_ptr;
+extern kstat_t		**aclprocio_v3_ptr;
 
 extern char		*aclnames_v2[];
 extern uchar_t		acl_call_type_v2[];

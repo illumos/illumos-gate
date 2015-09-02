@@ -530,6 +530,9 @@ struct exportinfo {
 	struct ex_vol_rename	*exi_vol_rename;
 	kmutex_t		exi_vol_rename_lock;
 #endif /* VOLATILE_FH_TEST */
+	int			exi_id;
+	avl_node_t		exi_id_link;
+	struct exp_kstats	*exi_kstats;
 };
 
 typedef struct exportinfo exportinfo_t;
@@ -660,6 +663,12 @@ extern struct exportinfo *exi_public, *exi_root;
 extern fhandle_t nullfh2;	/* for comparing V2 filehandles */
 extern krwlock_t exported_lock;
 extern struct exportinfo *exptable[];
+
+/*
+ * exi_id support
+ */
+extern avl_tree_t exi_id_tree;
+extern int exi_id_get_next(void);
 
 /*
  * Two macros for identifying public filehandles.

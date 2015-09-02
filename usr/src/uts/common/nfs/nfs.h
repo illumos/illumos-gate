@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
  */
@@ -960,6 +960,7 @@ extern kstat_named_t	*global_svstat_ptr[];
 extern krwlock_t	rroklock;
 extern vtype_t		nf_to_vt[];
 extern kstat_named_t	*rfsproccnt_v2_ptr;
+extern kstat_t		**rfsprocio_v2_ptr;
 extern kmutex_t		nfs_minor_lock;
 extern int		nfs_major;
 extern int		nfs_minor;
@@ -971,13 +972,17 @@ extern void		(*nfs_srv_quiesce_func)(void);
 extern int		(*nfs_srv_dss_func)(char *, size_t);
 
 /*
- * Per-zone stats as consumed by nfsstat(1m)
+ * Per-zone stats
  */
 struct nfs_version_stats {
 	kstat_named_t	*aclreqcnt_ptr;		/* nfs_acl:0:aclreqcnt_v? */
 	kstat_named_t	*aclproccnt_ptr;	/* nfs_acl:0:aclproccnt_v? */
+	kstat_t		**aclprocio_ptr;	/* nfs_acl:0:aclprocio_v?_* */
+	kmutex_t	aclprocio_lock;		/* protects aclprocio */
 	kstat_named_t	*rfsreqcnt_ptr;		/* nfs:0:rfsreqcnt_v? */
 	kstat_named_t	*rfsproccnt_ptr;	/* nfs:0:rfsproccnt_v? */
+	kstat_t		**rfsprocio_ptr;	/* nfs:0:rfsprocio_v?_* */
+	kmutex_t	rfsprocio_lock;		/* protects rfsprocio */
 };
 
 /*
@@ -1000,6 +1005,30 @@ extern zone_key_t nfsstat_zone_key;
  */
 extern void	*nfsstat_zone_init(zoneid_t);
 extern void	nfsstat_zone_fini(zoneid_t, void *);
+
+/*
+ * Per-exportinfo stats
+ */
+struct exp_kstats {
+	kstat_t		*share_kstat;		/* Generic share kstat */
+	struct {
+		kstat_named_t	path;		/* Shared path */
+		kstat_named_t	filesystem;	/* pseudo|real */
+	}		share_kstat_data;	/* Generic share kstat data */
+	char		*share_path;		/* Shared path string */
+	kstat_t		**aclprocio_v2_ptr;	/* NFS_ACL version 2 */
+	kstat_t		**aclprocio_v3_ptr;	/* NFS_ACL version 3 */
+	kstat_t		**rfsprocio_v2_ptr;	/* NFS version 2 */
+	kstat_t		**rfsprocio_v3_ptr;	/* NFS version 3 */
+	kstat_t		**rfsprocio_v4_ptr;	/* NFS version 4 */
+	kmutex_t	procio_lock;		/* protects all exp_kstats */
+};
+
+extern struct exp_kstats *exp_kstats_init(zoneid_t, int, const char *, size_t,
+    bool_t);
+extern void exp_kstats_delete(struct exp_kstats *);
+extern void exp_kstats_fini(struct exp_kstats *);
+extern void exp_kstats_reset(struct exp_kstats *, const char *, size_t, bool_t);
 
 #endif	/* _KERNEL */
 
@@ -2281,6 +2310,7 @@ extern int	rfs_pathname(char *, vnode_t **, vnode_t **, vnode_t *,
 
 extern vtype_t		nf3_to_vt[];
 extern kstat_named_t	*rfsproccnt_v3_ptr;
+extern kstat_t		**rfsprocio_v3_ptr;
 extern vfsops_t		*nfs3_vfsops;
 extern struct vnodeops	*nfs3_vnodeops;
 extern const struct fs_operation_def nfs3_vnodeops_template[];
