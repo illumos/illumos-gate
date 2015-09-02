@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 /*
@@ -1682,6 +1682,37 @@ mac_hwring_send_priv(mac_client_handle_t mch, mac_ring_handle_t rh, mblk_t *mp)
 
 	MAC_TX(mip, rh, mp, mcip);
 	return (mp);
+}
+
+/*
+ * Private function that is only used by aggr to update the default transmission
+ * ring. Because aggr exposes a pseudo Tx ring even for ports that may
+ * temporarily be down, it may need to update the default ring that is used by
+ * MAC such that it refers to a link that can actively be used to send traffic.
+ * Note that this is different from the case where the port has been removed
+ * from the group. In those cases, all of the rings will be torn down because
+ * the ring will no longer exist. It's important to give aggr a case where the
+ * rings can still exist such that it may be able to continue to send LACP PDUs
+ * to potentially restore the link.
+ *
+ * Finally, we explicitly don't do anything if the ring hasn't been enabled yet.
+ * This is to help out aggr which doesn't really know the internal state that
+ * MAC does about the rings and can't know that it's not quite ready for use
+ * yet.
+ */
+void
+mac_hwring_set_default(mac_handle_t mh, mac_ring_handle_t rh)
+{
+	mac_impl_t *mip = (mac_impl_t *)mh;
+	mac_ring_t *ring = (mac_ring_t *)rh;
+
+	ASSERT(MAC_PERIM_HELD(mh));
+	VERIFY(mip->mi_state_flags & MIS_IS_AGGR);
+
+	if (ring->mr_state != MR_INUSE)
+		return;
+
+	mip->mi_default_tx_ring = rh;
 }
 
 int
