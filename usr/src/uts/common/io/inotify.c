@@ -1335,6 +1335,7 @@ inotify_close(dev_t dev, int flag, int otyp, cred_t *cred_p)
 
 	*sp = (*sp)->ins_next;
 	crfree(state->ins_cred);
+	vmem_destroy(state->ins_wds);
 
 	ddi_soft_state_free(inotify_softstate, minor);
 	vmem_free(inotify_minor, (void *)(uintptr_t)minor, 1);
