@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright 2014 Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.  All rights reserved.
  */
 
 
@@ -65,6 +65,7 @@
 #include <sys/sunldi.h>
 #include <sys/sysmacros.h>
 #include <sys/types.h>
+#include <sys/sdt.h>
 
 #define	LP_PTM_PATH		"/dev/ptmx"
 #define	LP_PTS_PATH		"/dev/pts/"
@@ -982,6 +983,25 @@ lx_ptm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 	}
 
 	err = ldi_ioctl(lh, cmd, arg, mode, credp, rvalp);
+
+	/*
+	 * On recent versions of Linux some apps issue the following ioctls to
+	 * the master side of the ptm before opening the slave side. Because
+	 * our streams modules (specifically ptem) aren't autopushed until the
+	 * slave side has been opened, these ioctls will fail. To alleviate the
+	 * issue we simply pretend that these ioctls have succeeded.
+	 *
+	 * We could push our own "lx_ptem" module onto the master side of the
+	 * stream in lx_ptm_open if we need better emulation, but that would
+	 * require an "lx_ptem" module which duplicates most of ptem. ptem
+	 * doesn't work properly when pushed on the master side.
+	 */
+	if (err == EINVAL && (cmd == TIOCSWINSZ || cmd == TCSETS) &&
+	    lx_ptm_pts_isopen(dev) == 0) {
+		/* slave side not open, assume we need to succeed */
+		DTRACE_PROBE1(lx_ptm_ioctl__override, int, cmd);
+		return (0);
+	}
 
 	return (err);
 }
