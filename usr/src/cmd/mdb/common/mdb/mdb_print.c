@@ -25,7 +25,7 @@
 
 /*
  * Copyright (c) 2012, 2014 by Delphix. All rights reserved.
- * Copyright (c) 2012 Joyent, Inc. All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  * Copyright (c) 2014 Nexenta Systems, Inc. All rights reserved.
  */
 
@@ -728,19 +728,20 @@ cmd_list(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		char buf[MDB_SYM_NAMLEN];
 		int ret;
 
-		/*
-		 * Check that we were provided 2 arguments: a type name
-		 * and a member of that type.
-		 */
-		if (argc != 2)
-			return (DCMD_USAGE);
-
 		ret = args_to_typename(&argc, &argv, buf, sizeof (buf));
 		if (ret != 0)
 			return (ret);
 
 		argv++;
 		argc--;
+
+		/*
+		 * If we make it here, we were provided a type name. We should
+		 * only continue if we still have arguments left (e.g. member
+		 * name and potentially a variable name).
+		 */
+		if (argc == 0)
+			return (DCMD_USAGE);
 
 		member = argv->a_un.a_str;
 		offset = mdb_ctf_offsetof_by_name(buf, member);
@@ -3109,6 +3110,7 @@ cmd_printf(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	}
 
 	mdb_printf("%s", last);
+	mdb_set_dot(addr + mdb_ctf_type_size(id));
 
 	return (DCMD_OK);
 }

@@ -22,9 +22,8 @@
 /*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2015, Joyent, Inc.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * libctf open/close interposition layer
@@ -100,4 +99,11 @@ void
 mdb_ctf_close(ctf_file_t *fp)
 {
 	ctf_close(fp);
+}
+
+/*ARGSUSED*/
+int
+mdb_ctf_write(const char *file, ctf_file_t *fp)
+{
+	return (ENOTSUP);
 }
