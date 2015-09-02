@@ -291,6 +291,7 @@ extern int aggr_grp_modify(datalink_id_t, uint8_t, uint32_t, boolean_t,
     const uchar_t *, aggr_lacp_mode_t, aggr_lacp_timer_t);
 extern void aggr_grp_multicst_port(aggr_port_t *, boolean_t);
 extern uint_t aggr_grp_count(void);
+extern void aggr_grp_update_default(aggr_grp_t *);
 
 extern void aggr_port_init(void);
 extern void aggr_port_fini(void);

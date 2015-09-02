@@ -136,6 +136,7 @@ extern mblk_t *mac_hwring_tx(mac_ring_handle_t, mblk_t *);
 extern int mac_hwring_getstat(mac_ring_handle_t, uint_t, uint64_t *);
 extern mblk_t *mac_hwring_send_priv(mac_client_handle_t,
     mac_ring_handle_t, mblk_t *);
+extern void mac_hwring_set_default(mac_handle_t, mac_ring_handle_t);
 
 #define	MAC_HWRING_POLL(ring, bytes)			\
 	(((ring)->mr_info.mri_poll)			\
