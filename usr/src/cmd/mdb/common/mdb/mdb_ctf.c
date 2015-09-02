@@ -2159,11 +2159,10 @@ mdb_ctf_synthetics_to_file(const char *file)
 
 	err = mdb_ctf_write(file, fp);
 	if (err != 0) {
-		if (err == CTF_ERR) {
+		if (err == CTF_ERR)
 			(void) set_errno(ctf_to_errno(ctf_errno(fp)));
-		} else {
+		else
 			(void) set_errno(err);
-		}
 		err = DCMD_ERR;
 	} else {
 		err = DCMD_OK;

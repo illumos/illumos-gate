@@ -736,13 +736,13 @@ static char typedef_opts[] =
 "  -c model   create intrinsic types based on the specified data model.\n"
 "             The INTRINSICS section lists the built-in types and typedefs.\n"
 "             The following data models are supported:\n"
-"                 o LP64  - Traditional illumos 64-bit program\n"
+"                 o LP64  - Traditional illumos 64-bit program.\n"
 "                 o LP32  - Traditional illumos 32-bit program.\n"
 "                 o ILP32 - An alternate name for LP32.\n"
 "  -d         delete all synthetic types\n"
 "  -l         list all synthetic types\n"
 "  -r file    import type definitions (CTF) from another ELF file\n"
-"  -w file    write all type definitions out to file\n"
+"  -w file    write all synthetic type definitions out to file\n"
 "\n";
 
 static char typedef_examps[] =
