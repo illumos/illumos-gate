@@ -18,6 +18,11 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ */
+
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -603,6 +608,7 @@ clnt_cots_kcreate(dev_t dev, struct netbuf *addr, int family, rpcprog_t prog,
 	xdrmem_create(&p->cku_outxdr, p->cku_rpchdr, WIRE_HDR_SIZE, XDR_ENCODE);
 
 	if (!xdr_callhdr(&p->cku_outxdr, &call_msg)) {
+		XDR_DESTROY(&p->cku_outxdr);
 		RPCLOG0(1, "clnt_cots_kcreate - Fatal header serialization "
 		    "error\n");
 		auth_destroy(h->cl_auth);
@@ -610,6 +616,7 @@ clnt_cots_kcreate(dev_t dev, struct netbuf *addr, int family, rpcprog_t prog,
 		RPCLOG0(1, "clnt_cots_kcreate: create failed error EINVAL\n");
 		return (EINVAL);		/* XXX */
 	}
+	XDR_DESTROY(&p->cku_outxdr);
 
 	/*
 	 * The zalloc initialized the fields below.
@@ -651,16 +658,13 @@ clnt_cots_kerror(CLIENT *h, struct rpc_err *err)
 	*err = p->cku_err;
 }
 
+/*ARGSUSED*/
 static bool_t
 clnt_cots_kfreeres(CLIENT *h, xdrproc_t xdr_res, caddr_t res_ptr)
 {
-	/* LINTED pointer alignment */
-	cku_private_t *p = htop(h);
-	XDR *xdrs;
+	xdr_free(xdr_res, res_ptr);
 
-	xdrs = &(p->cku_outxdr);
-	xdrs->x_op = XDR_FREE;
-	return ((*xdr_res)(xdrs, res_ptr));
+	return (TRUE);
 }
 
 static bool_t
@@ -1073,6 +1077,7 @@ call_again:
 		if ((!XDR_PUTINT32(xdrs, (int32_t *)&procnum)) ||
 		    (!AUTH_MARSHALL(h->cl_auth, xdrs, p->cku_cred)) ||
 		    (!(*xdr_args)(xdrs, argsp))) {
+			XDR_DESTROY(xdrs);
 			p->cku_err.re_status = RPC_CANTENCODEARGS;
 			p->cku_err.re_errno = EIO;
 			goto cots_done;
@@ -1091,11 +1096,14 @@ call_again:
 		/* Serialize the procedure number and the arguments. */
 		if (!AUTH_WRAP(h->cl_auth, p->cku_rpchdr, WIRE_HDR_SIZE+4,
 		    xdrs, xdr_args, argsp)) {
+			XDR_DESTROY(xdrs);
 			p->cku_err.re_status = RPC_CANTENCODEARGS;
 			p->cku_err.re_errno = EIO;
 			goto cots_done;
 		}
 	}
+
+	XDR_DESTROY(xdrs);
 
 	RPCLOG(2, "clnt_cots_kcallit: connected, sending call, tidu_size %d\n",
 	    tidu_size);
@@ -1365,6 +1373,7 @@ read_again:
 				    "failure\n");
 				freemsg(mp);
 				(void) xdr_rpc_free_verifier(xdrs, &reply_msg);
+				XDR_DESTROY(xdrs);
 				mutex_enter(&call->call_lock);
 				if (call->call_reply == NULL)
 					call->call_status = RPC_TIMEDOUT;
@@ -1402,6 +1411,7 @@ read_again:
 
 				(void) xdr_rpc_free_verifier(xdrs,
 				    &reply_msg);
+				XDR_DESTROY(xdrs);
 
 				if (p->cku_flags & CKU_ONQUEUE) {
 					call_table_remove(call);
@@ -1487,6 +1497,7 @@ read_again:
 	}
 
 	(void) xdr_rpc_free_verifier(xdrs, &reply_msg);
+	XDR_DESTROY(xdrs);
 
 	if (p->cku_flags & CKU_ONQUEUE) {
 		call_table_remove(call);

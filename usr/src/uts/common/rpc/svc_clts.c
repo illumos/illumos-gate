@@ -18,7 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  *  Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -382,6 +384,7 @@ svc_clts_krecv(SVCXPRT *clone_xprt, mblk_t *mp, struct rpc_msg *msg)
 	TRACE_0(TR_FAC_KRPC, TR_XDR_CALLMSG_START,
 	    "xdr_callmsg_start:");
 	if (! xdr_callmsg(xdrs, msg)) {
+		XDR_DESTROY(xdrs);
 		TRACE_1(TR_FAC_KRPC, TR_XDR_CALLMSG_END,
 		    "xdr_callmsg_end:(%S)", "bad");
 		RSSTAT_INCR(stats, rsxdrcall);
@@ -468,7 +471,7 @@ svc_clts_ksend(SVCXPRT *clone_xprt, struct rpc_msg *msg)
 		}
 
 		/*
-		 * Initialize the XDR decode stream.  Additional mblks
+		 * Initialize the XDR encode stream.  Additional mblks
 		 * will be allocated if necessary.  They will be UD_MAXSIZE
 		 * sized.
 		 */
@@ -489,6 +492,7 @@ svc_clts_ksend(SVCXPRT *clone_xprt, struct rpc_msg *msg)
 		if (!(xdr_replymsg(xdrs, msg) &&
 		    (!has_args || SVCAUTH_WRAP(&clone_xprt->xp_auth, xdrs,
 		    xdr_results, xdr_location)))) {
+			XDR_DESTROY(xdrs);
 			TRACE_1(TR_FAC_KRPC, TR_XDR_REPLYMSG_END,
 			    "xdr_replymsg_end:(%S)", "bad");
 			RPCLOG0(1, "xdr_replymsg/SVCAUTH_WRAP failed\n");
@@ -500,9 +504,12 @@ svc_clts_ksend(SVCXPRT *clone_xprt, struct rpc_msg *msg)
 	} else if (!(xdr_replymsg_body(xdrs, msg) &&
 	    (!has_args || SVCAUTH_WRAP(&clone_xprt->xp_auth, xdrs,
 	    xdr_results, xdr_location)))) {
+		XDR_DESTROY(xdrs);
 		RPCLOG0(1, "xdr_replymsg_body/SVCAUTH_WRAP failed\n");
 		goto out;
 	}
+
+	XDR_DESTROY(xdrs);
 
 	msgsz = (int)xmsgsize(ud->ud_resp->b_cont);
 
@@ -635,6 +642,8 @@ svc_clts_kfreeargs(SVCXPRT *clone_xprt, xdrproc_t xdr_args,
 	} else
 		retval = TRUE;
 
+	XDR_DESTROY(xdrs);
+
 	if (ud->ud_inmp) {
 		freemsg(ud->ud_inmp);
 		ud->ud_inmp = NULL;
@@ -658,14 +667,14 @@ svc_clts_kgetres(SVCXPRT *clone_xprt, int size)
 	 */
 	while ((mp = allocb(UD_INITSIZE, BPRI_LO)) == NULL) {
 		if (strwaitbuf(UD_INITSIZE, BPRI_LO)) {
-			return (FALSE);
+			return (NULL);
 		}
 	}
 
 	mp->b_cont = NULL;
 
 	/*
-	 * Initialize the XDR decode stream.  Additional mblks
+	 * Initialize the XDR encode stream.  Additional mblks
 	 * will be allocated if necessary.  They will be UD_MAXSIZE
 	 * sized.
 	 */
@@ -687,16 +696,19 @@ svc_clts_kgetres(SVCXPRT *clone_xprt, int size)
 	rply.acpted_rply.ar_stat = SUCCESS;
 
 	if (!xdr_replymsg_hdr(xdrs, &rply)) {
+		XDR_DESTROY(xdrs);
 		freeb(mp);
 		return (NULL);
 	}
 
 	buf = XDR_INLINE(xdrs, size);
 
-	if (buf == NULL)
+	if (buf == NULL) {
+		XDR_DESTROY(xdrs);
 		freeb(mp);
-	else
+	} else {
 		ud->ud_resp->b_cont = mp;
+	}
 
 	return (buf);
 }
@@ -709,6 +721,8 @@ svc_clts_kfreeres(SVCXPRT *clone_xprt)
 
 	if (ud->ud_resp == NULL || ud->ud_resp->b_cont == NULL)
 		return;
+
+	XDR_DESTROY(&clone_xprt->xp_xdrout);
 
 	/*
 	 * SVC_FREERES() is called whenever the server decides not to
