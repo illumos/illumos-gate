@@ -571,7 +571,7 @@ htable_steal(uint_t cnt, boolean_t reap)
 	htable_t	*list = NULL;
 	htable_t	*ht;
 	uint_t		stolen = 0;
-	uint_t		pass;
+	uint_t		pass, passes;
 	uint_t		threshold;
 
 	/*
@@ -583,11 +583,26 @@ htable_steal(uint_t cnt, boolean_t reap)
 		htable_steal_passes = mmu.ptes_per_table;
 
 	/*
+	 * If we're stealing merely as part of kmem reaping (versus stealing
+	 * to assure forward progress), we don't want to actually steal any
+	 * active htables.  (Stealing active htables merely to give memory
+	 * back to the system can inadvertently kick off an htable crime wave
+	 * as active processes repeatedly steal htables from one another,
+	 * plummeting the system into a kind of HAT lawlessness that can
+	 * become so violent as to impede the one thing that can end it:  the
+	 * freeing of memory via ARC reclaim and other means.)  So if we're
+	 * reaping, we limit ourselves to the first pass that steals cached
+	 * htables that aren't in use -- which gives memory back, but averts
+	 * the entire breakdown of social order.
+	 */
+	passes = reap ? 0 : htable_steal_passes;
+
+	/*
 	 * Loop through all user hats. The 1st pass takes cached htables that
 	 * aren't in use. The later passes steal by removing mappings, too.
 	 */
 	atomic_inc_32(&htable_dont_cache);
-	for (pass = 0; pass <= htable_steal_passes && stolen < cnt; ++pass) {
+	for (pass = 0; pass <= passes && stolen < cnt; ++pass) {
 		threshold = pass * mmu.ptes_per_table / htable_steal_passes;
 
 		mutex_enter(&hat_list_lock);
