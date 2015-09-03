@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH IF_TCP 7P "Sep 14, 2009"
+.TH IF_TCP 7P "Sep 02, 2015"
 .SH NAME
 if_tcp, if \- general properties of Internet Protocol network interfaces
 .SH DESCRIPTION
@@ -60,7 +60,7 @@ struct lifreq {
       int                     lifru_metric;
       uint_t                  lifru_mtu;
       int                     lif_muxid[2];   /* mux id's for arp & ip */
-      struct lif_nd_req       lifru_nd_req;
+      struct lif_nd_req       lifru_nd_req;   /* SIOCLIF*ND */
       struct lif_ifinfo_req   lifru_ifinfo_req;
       zoneid_t                lifru_zone;     /* SIOC[GS]LIFZONE */
    } lifr_lifru;
@@ -869,4 +869,4 @@ specified by \fBlifr_ppa\fR plumbed.
 .LP
 \fBifconfig\fR(1M), \fBin.routed\fR(1M), \fBioctl\fR(2),
 \fBsockaddr\fR(3SOCKET), \fBstreamio\fR(7I), \fBarp\fR(7P), \fBdlpi\fR(7P),
-\fBip\fR(7P), \fBip6\fR(7P)
+\fBip\fR(7P), \fBip6\fR(7P), \fBndp\fR(7P)

@@ -4,40 +4,25 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ARP 7P "Feb 5, 2009"
+.TH ARP 7P "Sep 02, 2015"
 .SH NAME
 arp, ARP \- Address Resolution Protocol
 .SH SYNOPSIS
 .LP
 .nf
 \fB#include <sys/fcntl.h>\fR
-.fi
-
-.LP
-.nf
 \fB#include <sys/socket.h>\fR
-.fi
-
-.LP
-.nf
 \fB#include <net/if_arp.h>\fR
-.fi
-
-.LP
-.nf
 \fB#include <netinet/in.h>\fR
 .fi
-
 .LP
 .nf
-\fBs = socket(AF_INET, SOCK_DGRAM, 0);\fR
+\fBs = socket(PF_INET, SOCK_DGRAM, 0);\fR
 .fi
-
 .LP
 .nf
 \fBd = open ("/dev/arp", \fIoflag\fR);\fR
 .fi
-
 .SH DESCRIPTION
 .LP
 ARP is a protocol used to map  dynamically between Internet Protocol (IP) and
@@ -64,8 +49,8 @@ interface.
 .LP
 To facilitate  communications with  systems that do  not use ARP,  ioctl()
 requests are  provided  to  enter and delete entries  in  the  IP-to-link
-address tables. Ioctls  that change the table  contents require sys_net_config
-privilege. See \fBprivileges\fR(5).
+address tables. Ioctls  that change the table  contents require the
+\fBPRIV_SYS_NET_CONFIG\fR privilege. See \fBprivileges\fR(5).
 .sp
 .in +2
 .nf
@@ -109,10 +94,8 @@ Each \fBioctl()\fR request takes the same structure as an argument.
 entry, and \fBSIOCD[X]ARP\fR deletes an \fBARP\fR entry. These \fBioctl()\fR
 requests may be applied to any Internet family socket descriptor\fIs\fR, or to
 a descriptor for the \fBARP\fR device. Note that \fBSIOCS[X]ARP\fR and
-\fBSIOCD[X]ARP\fR require a privileged user, while \fBSIOCG[X]ARP\fR
-.sp
-.LP
-does not.
+\fBSIOCD[X]ARP\fR require the user to have the \fBPRIV_SYS_NET_CONFIG\fR
+privilege, while \fBSIOCG[X]ARP\fR does not.
 .sp
 .LP
 The \fBarpreq\fR structure contains
@@ -155,8 +138,8 @@ struct xarpreq {
 .sp
 .LP
 The address family for the [x]arp_pa sockaddr must be \fBAF_INET\fR. The
-\fBATF_COM\fR flag bits  ([x]arp_flags) cannot be altered.
-\fBATF_USETRAILERS\fR  is not implemented on Solaris and is retained  for
+\fBATF_COM\fR flag bits  ([x]arp_flags) cannot be altered. \fBATF_USETRAILERS\fR
+is not implemented by the operating system and is retained for
 compatibility only. \fBATF_PERM\fR makes the entry permanent (disables aging)
 if the \fBioctl()\fR request succeeds. \fBATF_PUBL\fR specifies that the system
 should respond to ARP requests for the indicated protocol address coming from
@@ -206,11 +189,11 @@ interface).
 On return from the kernel on a \fBSIOCGXARP\fR ioctl, the kernel fills in the
 name of the interface (excluding terminating NULL) and its hardware address,
 one after another, in the \fBsdl_data/LLADDR\fR area; if the two are larger
-than can be held in the 244 byte \fBsdl_data[\fR] area, an \fBENOSPC\fR error
+than can be held in the 244 byte \fBsdl_data[\fR] area, an \fBEINVAL\fR error
 is returned. Assuming it fits, the kernel will also set \fBsdl_alen\fR with the
-length of hardware address, \fBsdl_nlen\fR with the length of name of the
+length of the hardware address, \fBsdl_nlen\fR with the length of the name of the
 interface (excluding terminating NULL), \fBsdl_type\fR with an IFT_* value to
-indicate the type of the media, \fBsdl_slen\fR with 0, sdl_family with
+indicate the type of the media, \fBsdl_slen\fR with 0, \fBsdl_family\fR with
 \fBAF_LINK\fR and \fBsdl_index\fR (which if not 0) with system given index for
 the interface. The information returned is very similar to that returned via
 routing sockets on an \fBRTM_IFINFO\fR message.
@@ -239,7 +222,7 @@ corresponding IPMP IP interface.
 .TP
 .ie t \(bu
 .el o
-roxy ARP mappings for an IPMP group are automatically managed by the kernel.
+Proxy ARP mappings for an IPMP group are automatically managed by the kernel.
 Specifically, if the  hardware address in a \fBSIOCSARP\fR or \fBSIOCSXARP\fR
 request matches the hardware  address of  an IP interface in an  IPMP group and
 the IP address is not  local to the system, the kernel regards this as a  IPMP
@@ -247,18 +230,6 @@ Proxy ARP entry. This  IPMP Proxy ARP entry  will have its hardware address
 automatically adjusted in  order to keep the IP address reachable  (provided
 the IPMP group has not entirely failed).
 .RE
-.br
-.in +2
-\(em
-.in -2
-.br
-.in +2
-\(em
-.in -2
-.br
-.in +2
-\(emP
-.in -2
 .sp
 .LP
 \fBARP\fR performs duplicate address detection for local addresses. When a
@@ -285,7 +256,7 @@ passing it the value \fBNHF_ARP\fR. Through this interface, two packet events
 are supported:
 .sp
 .LP
-Physical in - ARP packets received via a network  inter face
+Physical in - ARP packets received via a network  interface
 .sp
 .LP
 Physical out - ARP packets to be sent out via a  network interface
@@ -321,7 +292,7 @@ Identifier indicating the outbound  interface  for packets received with the
 .ad
 .sp .6
 .RS 4n
-Pointer to the start of the ARP  header  (not  the ethernet header).
+Pointer to the start of the ARP  header  (not  the Ethernet header).
 .RE
 
 .sp

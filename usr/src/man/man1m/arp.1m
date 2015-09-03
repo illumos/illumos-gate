@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ARP 1M "Jan 5, 2009"
+.TH ARP 1M "Sep 02, 2015"
 .SH NAME
 arp \- address resolution display and control
 .SH SYNOPSIS
@@ -35,7 +35,6 @@ arp \- address resolution display and control
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBarp\fR program displays and modifies the Internet-to-MAC address
 translation tables used by the address resolution protocol (see \fBarp\fR(7P)).
@@ -48,9 +47,8 @@ dot notation.
 .LP
 Options that modify the ARP translation tables (\fB-d\fR, \fB-f\fR, and
 \fB-s\fR) can be used only when the invoked command is granted the
-\fBsys_net_config\fR privilege. See \fBprivileges\fR(5).
+\fBPRIV_SYS_NET_CONFIG\fR privilege. See \fBprivileges\fR(5).
 .SH OPTIONS
-.sp
 .ne 2
 .na
 \fB\fB-a\fR\fR
@@ -244,7 +242,6 @@ kernel and thus cannot be changed.
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBifconfig\fR(1M), \fBnetstat\fR(1M), \fBattributes\fR(5),
+\fBifconfig\fR(1M), \fBnetstat\fR(1M), \fBndp\fR(1M), \fBattributes\fR(5),
 \fBprivileges\fR(5), \fBarp\fR(7P)

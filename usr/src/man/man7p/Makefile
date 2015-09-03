@@ -30,6 +30,7 @@ MANFILES= 	arp.7p		\
 	 	ipsec.7p	\
 	 	ipsecah.7p	\
 	 	ipsecesp.7p	\
+	 	ndp.7p		\
 	 	pf_key.7p	\
 	 	rarp.7p		\
 	 	route.7p	\
@@ -45,6 +46,7 @@ MANLINKS=	AH.7p		\
 		ESP.7p		\
 		ICMP.7p		\
 		IP.7p		\
+		NDP.7p		\
 		RARP.7p		\
 		SCTP.7p		\
 		TCP.7p		\
@@ -62,6 +64,8 @@ IP.7p		:= LINKSRC = ip.7p
 AH.7p		:= LINKSRC = ipsecah.7p
 
 ESP.7p		:= LINKSRC = ipsecesp.7p
+
+NDP.7p		:= LINKSRC = ndp.7p
 
 RARP.7p 	:= LINKSRC = rarp.7p
 

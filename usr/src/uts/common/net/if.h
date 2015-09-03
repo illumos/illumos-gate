@@ -279,7 +279,7 @@ struct ifaddr {
  *	The entry already exists and the link-layer address is the same
  *	The entry already exists and the link-layer address differs
  *
- * Use ND_UNCHANGED and ND_ISROUTER_UNCHANGED to not change any state.
+ * Use ND_UNCHANGED to not change any state.
  */
 #define	ND_MAX_HDW_LEN	64
 typedef struct lif_nd_req {
@@ -380,7 +380,7 @@ struct	lifreq {
 		int	lifru_metric;
 		uint_t	lifru_mtu;
 		int	lif_muxid[2];		/* mux id's for arp and ip */
-		struct lif_nd_req	lifru_nd_req;
+		struct lif_nd_req	lifru_nd_req; /* SIOCLIF*ND */
 		struct lif_ifinfo_req	lifru_ifinfo_req;
 		char	lifru_groupname[LIFGRNAMSIZ]; /* SIOC[GS]LIFGROUPNAME */
 		char	lifru_binding[LIFNAMSIZ]; /* SIOCGLIFBINDING */

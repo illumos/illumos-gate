@@ -1,0 +1,215 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright (c) 2015, Joyent, Inc.  All rights reserved.
+.\"
+.Dd Sep 02, 2015
+.Dt NDP 1M
+.Os
+.Sh NAME
+.Nm ndp
+.Nd manipulate IPv6 Neighbor Discovery Protocol mappings
+.Sh SYNOPSIS
+.Nm
+.Op Fl n
+.Fl a
+.Nm
+.Op Fl n
+.Fl A Ar period
+.Nm
+.Op Fl n
+.Op Fl i Ar iface
+.Ar hostname
+.Nm
+.Op Fl n
+.Op Fl i Ar iface
+.Fl d Ar hostname
+.Nm
+.Op Fl n
+.Op Fl i Ar iface
+.Fl f Ar filename
+.Nm
+.Op Fl n
+.Op Fl i Ar iface
+.Fl s Ar hostname lladdr
+.Op Cm temp
+.Op Cm any
+.Op Cm router
+.Sh DESCRIPTION
+The
+.Nm
+command displays and modifies the IPv6-to-MAC address translation
+tables used by the Neighbor Discovery Protocol
+.Po see Xr ndp 7P Pc .
+.Pp
+Given just a hostname,
+.Nm
+will display the current entry. Note that when getting, setting or deleting,
+if a hostname refers to multiple IPv6 addresses, the operation will apply to
+all of them.
+.Pp
+The NDP translation tables can be modified with
+.Fl d ,
+.Fl s ,
+or
+.Fl f .
+These flags can only be used when
+.Nm
+is given the
+.Sy PRIV_SYS_NET_CONFIG
+privilege. See
+.Xr privileges 5
+for further information.
+.Pp
+Note that NDP entries for IPMP (IP Network Multipathing) data and
+test addresses are managed by the kernel and therefore cannot be
+modified or deleted.
+.Sh OPTIONS
+.Bl -tag -width 6m
+.It Fl a
+Display all NDP entries. Entries can be one of several types:
+.Bl -tag -offset indent -width 7n
+.It Sy dynamic
+This is a normal NDP mapping and will eventually expire. This is the most
+common type of mapping for non-local addresses that will be displayed.
+.It Sy local
+The IPv6 address is local to the machine.
+.It Sy other
+The mapping is a multicast or broadcast address, or the system is acting
+as proxy for the address.
+.It Sy static
+The mapping is static and will not be removed from the machine over time.
+.El
+.Pp
+Entries also exist in one of the following states:
+.Bl -tag -offset indent -width 12m
+.It Sy INCOMPLETE
+Address resolution is in progress
+.It Sy REACHABLE
+This address has recently been reachable
+.It Sy STALE
+This address may be unreachable
+.It Sy DELAY
+Waiting to send out reachability probes
+.It Sy PROBE
+Sending out probes for the address
+.It Sy UNREACHABLE
+The address is unreachable, and will be deleted
+.It Sy UNKNOWN
+The state of the entry is unknown
+.El
+.Pp
+Using the
+.Fl a
+flag is equivalent to:
+.sp
+.Dl # netstat -p -f inet6
+.sp
+If
+.Fl n
+is passed to
+.Nm ,
+then it will be passed along to
+.Nm netstat .
+.It Fl A
+Display all NDP entries every
+.Ar period
+seconds.
+.It Fl d
+Delete NDP mappings for the host called
+.Ar hostname .
+.It Fl f
+Read in the lines from
+.Ar filename
+and use each one to set a mapping. The syntax of each line is the
+same as the arguments to
+.Fl s .
+Lines beginning with `#' will be ignored.
+.It Fl i
+By default,
+.Nm
+will use the routing table to determine the appropriate interface to place the
+mapping on. This flag allows forcing a specific interface
+.Ar iface .
+This argument will be ignored when using the
+.Fl a
+or
+.Fl A
+flags.
+.It Fl n
+Disable the default translation of numeric IP addresses to host names when
+printing.
+.It Fl s
+Add or update an NDP mapping, and set the desired properties for the entry. The
+list of flags should be the full set of flags desired on the entry, i.e., not
+listing a flag will remove it if it already exists. The following flags can be
+used:
+.Bl -tag -offset indent -width Ds
+.It Cm temp
+The entry should be temporary and eventually expire like a normal NDP
+entry. By default, all entries created with the
+.Nm
+command are static, and will not be deleted. To make a static entry temporary,
+it should be deleted and recreated with the
+.Cm temp
+flag.
+.It Cm any
+The address should be treated like an anycast address. This will prevent the
+system from sending Neighbor Advertisements with the Override flag.
+.It Cm router
+The address should be treated like a router address. This cause the system to
+send Neighbor Advertisements with the Router flag.
+.El
+.El
+.Sh EXAMPLES
+.Ss Example 1: Setting a mapping
+To create a temporary mapping for an address:
+.Bd -literal -offset indent
+# ndp -s fd00::1 90:b8:d0:4b:c7:3b temp
+.Ed
+.Ss Example 2: Getting a mapping
+An entry can be fetched via its IP address:
+.Bd -literal -offset indent
+# ndp fd00::1
+fd00::1 (fd00::1) at 90:b8:d0:4b:c7:3b temp
+.Ed
+.sp
+Or via a name that resolves to that address:
+.Bd -literal -offset indent
+# echo fd00::1 epicac >> /etc/hosts
+# echo fd00::2 epicac >> /etc/hosts
+# ndp epicac
+fd00::1 (epicac) at 90:b8:d0:4b:c7:3b temp
+fd00::2 (epicac) -- no entry
+.Ed
+.Ss Example 3: Deleting a mapping
+An entry can be removed with the
+.Fl d
+flag:
+.Bd -literal -offset indent
+# ndp -d fd00::1
+.Ed
+.sp
+Attempting to remove it again will print an error message:
+.Bd -literal -offset indent
+# ndp -d fd00::1
+ndp: No entry for fd00::1
+.Ed
+.Sh STABILITY
+The command line options for this command are stable, but the output format
+and diagnostic messages are not.
+.Sh SEE ALSO
+.Xr arp 1M ,
+.Xr ifconfig 1M ,
+.Xr netstat 1M ,
+.Xr attributes 5 ,
+.Xr privileges 5 ,
+.Xr ndp 7P
