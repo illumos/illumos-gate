@@ -10405,6 +10405,7 @@ f usr/sbin/msgid 0555 root bin
 f usr/sbin/mvdir 0555 root bin
 s usr/sbin/ncheck=ff
 f usr/sbin/ndd 0555 root bin
+f usr/sbin/ndp 0555 root bin
 s usr/sbin/newaliases=../lib/mailwrapper
 s usr/sbin/newfs=../lib/fs/ufs/newfs
 f usr/sbin/newkey 0555 root sys
@@ -12032,6 +12033,7 @@ f usr/share/man/man1m/mvdir.1m 0444 root bin
 f usr/share/man/man1m/ncheck.1m 0444 root bin
 f usr/share/man/man1m/ncheck_ufs.1m 0444 root bin
 f usr/share/man/man1m/ndd.1m 0444 root bin
+f usr/share/man/man1m/ndp.1m 0444 root bin
 f usr/share/man/man1m/netstat.1m 0444 root bin
 f usr/share/man/man1m/netstrategy.1m 0444 root bin
 f usr/share/man/man1m/newaliases.1m 0444 root bin
@@ -18565,6 +18567,7 @@ s usr/share/man/man7p/ARP.7p=arp.7p
 s usr/share/man/man7p/ESP.7p=ipsecesp.7p
 s usr/share/man/man7p/ICMP.7p=icmp.7p
 s usr/share/man/man7p/IP.7p=ip.7p
+s usr/share/man/man7p/NDP.7p=ndp.7p
 s usr/share/man/man7p/RARP.7p=rarp.7p
 s usr/share/man/man7p/SCTP.7p=sctp.7p
 s usr/share/man/man7p/TCP.7p=tcp.7p
@@ -18583,6 +18586,7 @@ f usr/share/man/man7p/ip6.7p 0444 root bin
 f usr/share/man/man7p/ipsec.7p 0444 root bin
 f usr/share/man/man7p/ipsecah.7p 0444 root bin
 f usr/share/man/man7p/ipsecesp.7p 0444 root bin
+f usr/share/man/man7p/ndp.7p 0444 root bin
 f usr/share/man/man7p/pf_key.7p 0444 root bin
 f usr/share/man/man7p/rarp.7p 0444 root bin
 f usr/share/man/man7p/route.7p 0444 root bin

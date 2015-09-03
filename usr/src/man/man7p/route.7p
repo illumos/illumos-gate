@@ -7,7 +7,7 @@
 .\" OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER
 .\" IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 .\" Portions Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved.
-.TH ROUTE 7P "Feb 5, 2009"
+.TH ROUTE 7P "Sep 02, 2015"
 .SH NAME
 route \- kernel packet forwarding database
 .SH SYNOPSIS
@@ -252,8 +252,8 @@ struct rt_msghdr {
   int     rtm_use;        /* from rtentry */
   uint_t  rtm_inits;      /* which values we are initializing */
 
-struct  rt_metrics rtm_rmx;   /* metrics themselves */
-     };
+  struct  rt_metrics rtm_rmx;   /* metrics themselves */
+};
 .fi
 .in -2
 
@@ -274,7 +274,7 @@ struct rt_metrics {
   uint32_t rmx_rtt;        /* estimated round trip time */
   uint32_t rmx_rttvar;     /* estimated rtt variance */
   uint32_t rmx_pksent;     /* packets sent using this route */
- };
+};
 
 /* Flags include the values */
 

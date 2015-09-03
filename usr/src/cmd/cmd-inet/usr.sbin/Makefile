@@ -29,7 +29,7 @@ SYNCPROG=	syncinit syncloop syncstat
 PROG=		6to4relay arp if_mpadm \
 		in.comsat in.fingerd in.rarpd in.rexecd in.rlogind \
 		in.rshd in.rwhod in.telnetd in.tftpd ipaddrsel \
-		ndd $(SYNCPROG) wanbootutil
+		ndd ndp $(SYNCPROG) wanbootutil
 
 MANIFEST=	rarp.xml telnet.xml comsat.xml finger.xml \
 		login.xml shell.xml rexec.xml socket-filter-kssl.xml
@@ -43,10 +43,10 @@ AUDITPROG=	in.rexecd in.rlogind in.rshd in.telnetd
 PAMPROG=	in.rexecd in.rlogind in.rshd in.telnetd
 SOCKETPROG=	6to4relay arp hostconfig if_mpadm in.comsat \
 		in.fingerd in.rarpd in.rexecd in.rlogind in.rshd \
-		in.rwhod in.telnetd in.tftpd ipaddrsel route
+		in.rwhod in.telnetd in.tftpd ipaddrsel ndp route
 NSLPROG=	6to4relay arp hostconfig in.comsat in.rarpd \
 		in.rexecd in.rlogind in.rshd in.rwhod in.telnetd \
-		in.tftpd ipaddrsel route
+		in.tftpd ipaddrsel ndp route
 CMDPROG=	in.telnetd
 K5PROGS=	in.telnetd in.rlogind in.rshd
 TSNETPROG=	route
@@ -74,7 +74,7 @@ MSGSUBDIRS=	bootconfchk ifconfig ilbadm in.routed in.talkd \
 # Eventually this hack should go away, and all in PROG should be
 # lint-clean.
 LINTCLEAN=	6to4relay arp in.rlogind in.rshd in.telnetd in.tftpd \
-		ipaddrsel route \
+		ipaddrsel ndp route \
 		in.rarpd if_mpadm $(SYNCPROG)
 # Likewise, as subdirs get lint-clean, add them here.  Once
 # they're all clean, replace the dependency of the lint target
@@ -268,6 +268,8 @@ lint: $(LINTSUBDIRS)
 	$(LINT.c) syncloop.c $(LDLIBS) -ldlpi
 	$(LINT.c) syncstat.c $(LDLIBS) -ldlpi
 	$(LINT.c) -erroff=E_NAME_USED_NOT_DEF2 in.rarpd.c $(LDLIBS) \
+	    -lsocket -lnsl
+	$(LINT.c) ndp.c $(LDLIBS) \
 	    -lsocket -lnsl
 	$(LINT.c) in.tftpd.c ../usr.bin/tftp/tftpsubs.c $(LDLIBS) \
 	    -lsocket -lnsl

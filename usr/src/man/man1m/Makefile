@@ -335,6 +335,7 @@ _MANFILES=	6to4relay.1m		\
 		ncheck.1m		\
 		ncheck_ufs.1m		\
 		ndd.1m			\
+		ndp.1m			\
 		ndmpadm.1m		\
 		ndmpd.1m		\
 		ndmpstat.1m		\
