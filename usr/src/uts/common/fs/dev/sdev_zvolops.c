@@ -383,10 +383,11 @@ devzvol_update_zclist(void)
 	}
 
 	devzvol_zclist_task_running = B_TRUE;
-	mutex_exit(&devzvol_mtx);
 
 	taskq_dispatch_ent(sdev_taskq, devzvol_update_zclist_cb, NULL, 0,
 	    &devzvol_zclist_task);
+
+	mutex_exit(&devzvol_mtx);
 
 wait:
 	taskq_wait(sdev_taskq);

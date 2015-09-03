@@ -497,7 +497,7 @@ char_loop:
 				 *	ESC [ n ~
 				 *
 				 * where "n" is a numeric character from
-				 * 0 to 9.
+				 * '0' to '9'.
 				 */
 				goto char_loop;
 			}
