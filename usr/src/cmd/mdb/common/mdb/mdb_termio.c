@@ -26,7 +26,7 @@
 
 /*
  * Copyright (c) 2012 by Delphix. All rights reserved.
- * Copyright (c) 2012 Joyent, Inc. All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 /*
@@ -93,8 +93,23 @@
 #define	KEY_ESC	(0x01b)			/* Escape key code */
 #define	KEY_DEL (0x07f)			/* ASCII DEL key code */
 
-#define	META(c)	((c) | 0x080)		/* Convert 'x' to 'M-x' */
-#define	KPAD(c) ((c) | 0x100)		/* Convert 'x' to 'ESC-[-x' */
+/*
+ * These macros support the use of various ranges within the "tio_keymap"
+ * member of "termio_data_t" objects.  This array maps from an input byte, or
+ * special control code, to the appropriate terminal handling callback.  The
+ * array has KEY_MAX (0x1ff) entries, partitioned as follows:
+ *
+ *     0 -  7f		7-bit ASCII byte
+ *    80 -  ff	META()	ASCII byte with Meta key modifier
+ *   100 - 119	KPAD()	Alphabetic character received as part of a single-byte
+ *			cursor control sequence, e.g. ESC [ A
+ *   11a - 123	FKEY()	Numeric character received as part of a function key
+ *			control sequence, e.g. ESC [ 4 ~
+ *   124 - 1ff		Unused
+ */
+#define	META(c)		(((c) & 0x7f) | 0x80)
+#define	KPAD(c)		(((c) < 'A' || (c) > 'Z') ? 0 : ((c) - 'A' + 0x100))
+#define	FKEY(c)		(((c) < '0' || (c) > '9') ? 0 : ((c) - '0' + 0x11a))
 
 /*
  * These macros allow for composition of control sequences for xterm and other
@@ -202,7 +217,7 @@ typedef struct termio_data {
 	mdb_iob_t *tio_out;		/* I/o buffer for terminal output */
 	mdb_iob_t *tio_in;		/* I/o buffer for terminal input */
 	mdb_iob_t *tio_link;		/* I/o buffer to resize on WINCH */
-	keycb_t tio_keymap[KEY_MAX];	/* Keymap (callback functions) */
+	keycb_t tio_keymap[KEY_MAX];	/* Keymap (see comments atop file) */
 	mdb_cmdbuf_t tio_cmdbuf;	/* Editable command-line buffer */
 	struct termios tio_ptios;	/* Parent terminal settings */
 	struct termios tio_ctios;	/* Child terminal settings */
@@ -385,7 +400,7 @@ termio_read(mdb_io_t *io, void *buf, size_t nbytes)
 
 	mdb_bool_t esc = FALSE, pad = FALSE;
 	ssize_t rlen = 0;
-	int c;
+	int c, fkey = 0;
 
 	const char *s;
 	size_t len;
@@ -471,8 +486,42 @@ char_loop:
 		}
 
 		if (pad) {
-			c = KPAD(CTRL(c));
 			pad = FALSE;
+
+			if ((fkey = FKEY(c)) != 0) {
+				/*
+				 * Some terminals send a multibyte control
+				 * sequence for particular function keys.
+				 * These sequences are of the form:
+				 *
+				 *	ESC [ n ~
+				 *
+				 * where "n" is a numeric character from
+				 * '0' to '9'.
+				 */
+				goto char_loop;
+			}
+
+			if ((c = KPAD(c)) == 0) {
+				/*
+				 * This was not a valid keypad control
+				 * sequence.
+				 */
+				goto char_loop;
+			}
+		}
+
+		if (fkey != 0) {
+			if (c == '~') {
+				/*
+				 * This is a valid special function key
+				 * sequence.  Use the value we stashed
+				 * earlier.
+				 */
+				c = fkey;
+			}
+
+			fkey = 0;
 		}
 
 		len = td->tio_cmdbuf.cmd_buflen + td->tio_promptlen;
@@ -1486,10 +1535,20 @@ mdb_termio_create(const char *name, mdb_io_t *rio, mdb_io_t *wio)
 	td->tio_keymap[CTRL('d')] = termio_delchar;
 	td->tio_keymap[CTRL('?')] = termio_widescreen;
 
-	td->tio_keymap[KPAD(CTRL('A'))] = termio_prevhist;
-	td->tio_keymap[KPAD(CTRL('B'))] = termio_nexthist;
-	td->tio_keymap[KPAD(CTRL('C'))] = termio_fwdchar;
-	td->tio_keymap[KPAD(CTRL('D'))] = termio_backchar;
+	td->tio_keymap[KPAD('A')] = termio_prevhist;
+	td->tio_keymap[KPAD('B')] = termio_nexthist;
+	td->tio_keymap[KPAD('C')] = termio_fwdchar;
+	td->tio_keymap[KPAD('D')] = termio_backchar;
+
+	/*
+	 * Many modern terminal emulators treat the "Home" and "End" keys on a
+	 * PC keyboard as cursor keys.  Some others use a multibyte function
+	 * key control sequence.  We handle both styles here:
+	 */
+	td->tio_keymap[KPAD('H')] = termio_home;
+	td->tio_keymap[FKEY('1')] = termio_home;
+	td->tio_keymap[KPAD('F')] = termio_end;
+	td->tio_keymap[FKEY('4')] = termio_end;
 
 	/*
 	 * We default both ASCII BS and DEL to termio_backspace for safety.  We

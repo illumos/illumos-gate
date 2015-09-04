@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -205,6 +205,14 @@ pseudo_exportfs(vnode_t *vp, fid_t *fid, struct exp_visible *vis_head,
 	 * Insert the new entry at the front of the export list
 	 */
 	export_link(exi);
+
+	/*
+	 * Initialize exi_id and exi_kstats
+	 */
+	exi->exi_id = exi_id_get_next();
+	avl_add(&exi_id_tree, exi);
+	exi->exi_kstats = exp_kstats_init(getzoneid(), exi->exi_id,
+	    kex->ex_path, vpathlen, TRUE);
 
 	return (exi);
 }
@@ -771,6 +779,8 @@ treeclimb_export(struct exportinfo *exip)
 			exportinfo_t *e  = tree_head->tree_exi;
 			/* exip will be freed in exportfs() */
 			if (e && e != exip) {
+				exp_kstats_delete(e->exi_kstats);
+				avl_remove(&exi_id_tree, e);
 				export_unlink(e);
 				exi_rele(e);
 			}
@@ -821,6 +831,8 @@ treeclimb_unexport(struct exportinfo *exip)
 		/* Release pseudo export if it has no child */
 		if (TREE_ROOT(tnode) && !TREE_EXPORTED(tnode) &&
 		    tnode->tree_child_first == 0) {
+			exp_kstats_delete(tnode->tree_exi->exi_kstats);
+			avl_remove(&exi_id_tree, tnode->tree_exi);
 			export_unlink(tnode->tree_exi);
 			exi_rele(tnode->tree_exi);
 		}

@@ -18,6 +18,11 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ */
+
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -59,6 +64,7 @@ static void	xdrmblk_destroy(XDR *);
 static bool_t	xdrmblk_control(XDR *, int, void *);
 
 static mblk_t *xdrmblk_alloc(int);
+static void xdrmblk_skip_fully_read_mblks(XDR *);
 
 /*
  * Xdr on mblks operations vector.
@@ -76,38 +82,77 @@ struct	xdr_ops xdrmblk_ops = {
 };
 
 /*
+ * The xdrmblk_params structure holds the internal data for the XDR stream.
+ * The x_private member of the XDR points to this structure.  The
+ * xdrmblk_params structure is dynamically allocated in xdrmblk_init() and
+ * freed in xdrmblk_destroy().
+ *
+ * The apos and rpos members of the xdrmblk_params structure are used to
+ * implement xdrmblk_getpos() and xdrmblk_setpos().
+ *
+ * In addition to the xdrmblk_params structure we store some additional
+ * internal data directly in the XDR stream structure:
+ *
+ * x_base	A pointer to the current mblk (that one we are currently
+ * 		working with).
+ * x_handy	The number of available bytes (either for read or for write) in
+ * 		the current mblk.
+ */
+struct xdrmblk_params {
+	int sz;
+	uint_t apos;	/* Absolute position of the current mblk */
+	uint_t rpos;	/* Relative position in the current mblk */
+};
+
+/*
  * Initialize xdr stream.
  */
 void
 xdrmblk_init(XDR *xdrs, mblk_t *m, enum xdr_op op, int sz)
 {
+	struct xdrmblk_params *p;
+
 	xdrs->x_op = op;
 	xdrs->x_ops = &xdrmblk_ops;
 	xdrs->x_base = (caddr_t)m;
 	xdrs->x_public = NULL;
-	xdrs->x_private = (caddr_t)(uintptr_t)sz;
+	p = kmem_alloc(sizeof (struct xdrmblk_params), KM_SLEEP);
+	xdrs->x_private = (caddr_t)p;
 
-	if (op == XDR_DECODE)
-		xdrs->x_handy = (int)(m->b_wptr - m->b_rptr);
-	else
-		xdrs->x_handy = (int)(m->b_datap->db_lim - m->b_datap->db_base);
+	p->sz = sz;
+	p->apos = 0;
+	p->rpos = 0;
+
+	if (op == XDR_DECODE) {
+		xdrs->x_handy = (int)MBLKL(m);
+	} else {
+		xdrs->x_handy = (int)MBLKTAIL(m);
+		if (p->sz < sizeof (int32_t))
+			p->sz = sizeof (int32_t);
+	}
 }
 
-/* ARGSUSED */
 static void
 xdrmblk_destroy(XDR *xdrs)
 {
+	kmem_free(xdrs->x_private, sizeof (struct xdrmblk_params));
 }
 
 static bool_t
 xdrmblk_getint32(XDR *xdrs, int32_t *int32p)
 {
 	mblk_t *m;
+	struct xdrmblk_params *p;
+
+	xdrmblk_skip_fully_read_mblks(xdrs);
 
 	/* LINTED pointer alignment */
 	m = (mblk_t *)xdrs->x_base;
 	if (m == NULL)
 		return (FALSE);
+
+	p = (struct xdrmblk_params *)xdrs->x_private;
+
 	/*
 	 * If the pointer is not aligned or there is not
 	 * enough bytes, pullupmsg to get enough bytes and
@@ -124,23 +169,17 @@ xdrmblk_getint32(XDR *xdrs, int32_t *int32p)
 				return (FALSE);
 			delay(hz);
 		}
-		xdrs->x_handy = (int)(m->b_wptr - m->b_rptr);
+		p->apos += p->rpos;
+		p->rpos = 0;
+		xdrs->x_handy = (int)MBLKL(m);
 	}
 
 	/* LINTED pointer alignment */
 	*int32p = ntohl(*((int32_t *)(m->b_rptr)));
 	m->b_rptr += sizeof (int32_t);
+	xdrs->x_handy -= sizeof (int32_t);
+	p->rpos += sizeof (int32_t);
 
-	/*
-	 * Instead of leaving handy as 0 causing more pullupmsg's
-	 * simply move to the next mblk.
-	 */
-	if ((xdrs->x_handy -= sizeof (int32_t)) == 0) {
-		m = m->b_cont;
-		xdrs->x_base = (caddr_t)m;
-		if (m != NULL)
-			xdrs->x_handy = (int)(m->b_wptr - m->b_rptr);
-	}
 	return (TRUE);
 }
 
@@ -148,24 +187,30 @@ static bool_t
 xdrmblk_putint32(XDR *xdrs, int32_t *int32p)
 {
 	mblk_t *m;
+	struct xdrmblk_params *p;
 
 	/* LINTED pointer alignment */
 	m = (mblk_t *)xdrs->x_base;
 	if (m == NULL)
 		return (FALSE);
-	if ((xdrs->x_handy -= (int)sizeof (int32_t)) < 0) {
+
+	p = (struct xdrmblk_params *)xdrs->x_private;
+
+	while (!IS_P2ALIGNED(m->b_wptr, sizeof (int32_t)) ||
+	    xdrs->x_handy < sizeof (int32_t)) {
 		if (m->b_cont == NULL) {
-			m->b_cont = xdrmblk_alloc((int)(uintptr_t)
-			    xdrs->x_private);
+			ASSERT(p->sz >= sizeof (int32_t));
+			m->b_cont = xdrmblk_alloc(p->sz);
 		}
 		m = m->b_cont;
 		xdrs->x_base = (caddr_t)m;
+		p->apos += p->rpos;
+		p->rpos = 0;
 		if (m == NULL) {
 			xdrs->x_handy = 0;
 			return (FALSE);
 		}
-		xdrs->x_handy = (int)(m->b_datap->db_lim - m->b_rptr -
-		    sizeof (int32_t));
+		xdrs->x_handy = (int)MBLKTAIL(m);
 		ASSERT(m->b_rptr == m->b_wptr);
 		ASSERT(m->b_rptr >= m->b_datap->db_base);
 		ASSERT(m->b_rptr < m->b_datap->db_lim);
@@ -173,6 +218,8 @@ xdrmblk_putint32(XDR *xdrs, int32_t *int32p)
 	/* LINTED pointer alignment */
 	*(int32_t *)m->b_wptr = htonl(*int32p);
 	m->b_wptr += sizeof (int32_t);
+	xdrs->x_handy -= sizeof (int32_t);
+	p->rpos += sizeof (int32_t);
 	ASSERT(m->b_wptr <= m->b_datap->db_lim);
 	return (TRUE);
 }
@@ -186,12 +233,16 @@ static bool_t
 xdrmblk_getbytes(XDR *xdrs, caddr_t addr, int len)
 {
 	mblk_t *m;
+	struct xdrmblk_params *p;
 	int i;
 
 	/* LINTED pointer alignment */
 	m = (mblk_t *)xdrs->x_base;
 	if (m == NULL)
 		return (FALSE);
+
+	p = (struct xdrmblk_params *)xdrs->x_private;
+
 	/*
 	 * Performance tweak: converted explicit bcopy()
 	 * call to simple in-line. This function is called
@@ -200,9 +251,9 @@ xdrmblk_getbytes(XDR *xdrs, caddr_t addr, int len)
 	 * Overhead of calling bcopy() is obnoxious for such
 	 * small copies.
 	 */
-	while ((xdrs->x_handy -= len) < 0) {
-		if ((xdrs->x_handy += len) > 0) {
-			if (len < XDRMBLK_BCOPY_LIMIT) {
+	while (xdrs->x_handy < len) {
+		if (xdrs->x_handy > 0) {
+			if (xdrs->x_handy < XDRMBLK_BCOPY_LIMIT) {
 				for (i = 0; i < xdrs->x_handy; i++)
 					*addr++ = *m->b_rptr++;
 			} else {
@@ -211,15 +262,22 @@ xdrmblk_getbytes(XDR *xdrs, caddr_t addr, int len)
 				addr += xdrs->x_handy;
 			}
 			len -= xdrs->x_handy;
+			p->rpos += xdrs->x_handy;
 		}
 		m = m->b_cont;
 		xdrs->x_base = (caddr_t)m;
+		p->apos += p->rpos;
+		p->rpos = 0;
 		if (m == NULL) {
 			xdrs->x_handy = 0;
 			return (FALSE);
 		}
-		xdrs->x_handy = (int)(m->b_wptr - m->b_rptr);
+		xdrs->x_handy = (int)MBLKL(m);
 	}
+
+	xdrs->x_handy -= len;
+	p->rpos += len;
+
 	if (len < XDRMBLK_BCOPY_LIMIT) {
 		for (i = 0; i < len; i++)
 			*addr++ = *m->b_rptr++;
@@ -227,6 +285,7 @@ xdrmblk_getbytes(XDR *xdrs, caddr_t addr, int len)
 		bcopy(m->b_rptr, addr, len);
 		m->b_rptr += len;
 	}
+
 	return (TRUE);
 }
 
@@ -242,10 +301,11 @@ bool_t
 xdrmblk_getmblk(XDR *xdrs, mblk_t **mm, uint_t *lenp)
 {
 	mblk_t *m, *nextm;
+	struct xdrmblk_params *p;
 	int len;
-	int32_t llen;
+	uint32_t llen;
 
-	if (!xdrmblk_getint32(xdrs, &llen))
+	if (!xdrmblk_getint32(xdrs, (int32_t *)&llen))
 		return (FALSE);
 
 	*lenp = llen;
@@ -289,6 +349,11 @@ xdrmblk_getmblk(XDR *xdrs, mblk_t **mm, uint_t *lenp)
 	}
 	xdrs->x_base = (caddr_t)m;
 	xdrs->x_handy = m != NULL ? MBLKL(m) : 0;
+
+	p = (struct xdrmblk_params *)xdrs->x_private;
+	p->apos += p->rpos + llen;
+	p->rpos = 0;
+
 	return (TRUE);
 }
 
@@ -296,12 +361,16 @@ static bool_t
 xdrmblk_putbytes(XDR *xdrs, caddr_t addr, int len)
 {
 	mblk_t *m;
-	uint_t i;
+	struct xdrmblk_params *p;
+	int i;
 
 	/* LINTED pointer alignment */
 	m = (mblk_t *)xdrs->x_base;
 	if (m == NULL)
 		return (FALSE);
+
+	p = (struct xdrmblk_params *)xdrs->x_private;
+
 	/*
 	 * Performance tweak: converted explicit bcopy()
 	 * call to simple in-line. This function is called
@@ -310,10 +379,10 @@ xdrmblk_putbytes(XDR *xdrs, caddr_t addr, int len)
 	 * Overhead of calling bcopy() is obnoxious for such
 	 * small copies.
 	 */
-	while ((xdrs->x_handy -= len) < 0) {
-		if ((xdrs->x_handy += len) > 0) {
+	while (xdrs->x_handy < len) {
+		if (xdrs->x_handy > 0) {
 			if (xdrs->x_handy < XDRMBLK_BCOPY_LIMIT) {
-				for (i = 0; i < (uint_t)xdrs->x_handy; i++)
+				for (i = 0; i < xdrs->x_handy; i++)
 					*m->b_wptr++ = *addr++;
 			} else {
 				bcopy(addr, m->b_wptr, xdrs->x_handy);
@@ -321,29 +390,35 @@ xdrmblk_putbytes(XDR *xdrs, caddr_t addr, int len)
 				addr += xdrs->x_handy;
 			}
 			len -= xdrs->x_handy;
+			p->rpos += xdrs->x_handy;
 		}
 
 		/*
 		 * We don't have enough space, so allocate the
-		 * amount we need, or x_private, whichever is larger.
+		 * amount we need, or sz, whichever is larger.
 		 * It is better to let the underlying transport divide
 		 * large chunks than to try and guess what is best.
 		 */
 		if (m->b_cont == NULL)
-			m->b_cont = xdrmblk_alloc(MAX(len,
-			    (int)(uintptr_t)xdrs->x_private));
+			m->b_cont = xdrmblk_alloc(MAX(len, p->sz));
 
 		m = m->b_cont;
 		xdrs->x_base = (caddr_t)m;
+		p->apos += p->rpos;
+		p->rpos = 0;
 		if (m == NULL) {
 			xdrs->x_handy = 0;
 			return (FALSE);
 		}
-		xdrs->x_handy = (int)(m->b_datap->db_lim - m->b_rptr);
+		xdrs->x_handy = (int)MBLKTAIL(m);
 		ASSERT(m->b_rptr == m->b_wptr);
 		ASSERT(m->b_rptr >= m->b_datap->db_base);
 		ASSERT(m->b_rptr < m->b_datap->db_lim);
 	}
+
+	xdrs->x_handy -= len;
+	p->rpos += len;
+
 	if (len < XDRMBLK_BCOPY_LIMIT) {
 		for (i = 0; i < len; i++)
 			*m->b_wptr++ = *addr++;
@@ -366,6 +441,7 @@ xdrmblk_putbytes(XDR *xdrs, caddr_t addr, int len)
 bool_t
 xdrmblk_putmblk(XDR *xdrs, mblk_t *m, uint_t len)
 {
+	struct xdrmblk_params *p;
 	int32_t llen = (int32_t)len;
 
 	if ((DLEN(m) % BYTES_PER_XDR_UNIT) != 0)
@@ -373,59 +449,59 @@ xdrmblk_putmblk(XDR *xdrs, mblk_t *m, uint_t len)
 	if (!xdrmblk_putint32(xdrs, &llen))
 		return (FALSE);
 
+	p = (struct xdrmblk_params *)xdrs->x_private;
+
 	/* LINTED pointer alignment */
 	((mblk_t *)xdrs->x_base)->b_cont = m;
+	p->apos += p->rpos;
 
 	/* base points to the last mblk */
-	while (m->b_cont)
+	while (m->b_cont) {
+		p->apos += MBLKL(m);
 		m = m->b_cont;
+	}
 	xdrs->x_base = (caddr_t)m;
 	xdrs->x_handy = 0;
+	p->rpos = MBLKL(m);
 	return (TRUE);
 }
 
 static uint_t
 xdrmblk_getpos(XDR *xdrs)
 {
-	uint_t tmp;
-	mblk_t *m;
+	struct xdrmblk_params *p = (struct xdrmblk_params *)xdrs->x_private;
 
-	/* LINTED pointer alignment */
-	m = (mblk_t *)xdrs->x_base;
-
-	if (xdrs->x_op == XDR_DECODE)
-		tmp = (uint_t)(m->b_rptr - m->b_datap->db_base);
-	else
-		tmp = (uint_t)(m->b_wptr - m->b_datap->db_base);
-	return (tmp);
-
+	return (p->apos + p->rpos);
 }
 
 static bool_t
 xdrmblk_setpos(XDR *xdrs, uint_t pos)
 {
 	mblk_t *m;
-	unsigned char *newaddr;
+	struct xdrmblk_params *p;
+
+	p = (struct xdrmblk_params *)xdrs->x_private;
+
+	if (pos < p->apos)
+		return (FALSE);
+
+	if (pos > p->apos + p->rpos + xdrs->x_handy)
+		return (FALSE);
+
+	if (pos == p->apos + p->rpos)
+		return (TRUE);
 
 	/* LINTED pointer alignment */
 	m = (mblk_t *)xdrs->x_base;
-	if (m == NULL)
-		return (FALSE);
+	ASSERT(m != NULL);
 
-	/* calculate the new address from the base */
-	newaddr = m->b_datap->db_base + pos;
+	if (xdrs->x_op == XDR_DECODE)
+		m->b_rptr = m->b_rptr - p->rpos + (pos - p->apos);
+	else
+		m->b_wptr = m->b_wptr - p->rpos + (pos - p->apos);
 
-	if (xdrs->x_op == XDR_DECODE) {
-		if (newaddr > m->b_wptr)
-			return (FALSE);
-		m->b_rptr = newaddr;
-		xdrs->x_handy = (int)(m->b_wptr - newaddr);
-	} else {
-		if (newaddr > m->b_datap->db_lim)
-			return (FALSE);
-		m->b_wptr = newaddr;
-		xdrs->x_handy = (int)(m->b_datap->db_lim - newaddr);
-	}
+	xdrs->x_handy = p->rpos + xdrs->x_handy - (pos - p->apos);
+	p->rpos = pos - p->apos;
 
 	return (TRUE);
 }
@@ -441,32 +517,14 @@ xdrmblk_inline(XDR *xdrs, int len)
 {
 	rpc_inline_t *buf;
 	mblk_t *m;
+	unsigned char **mptr;
+	struct xdrmblk_params *p;
 
 	/*
 	 * Can't inline XDR_FREE calls, doesn't make sense.
 	 */
 	if (xdrs->x_op == XDR_FREE)
 		return (NULL);
-
-	/*
-	 * Can't inline if there isn't enough room, don't have an
-	 * mblk pointer, its not 4 byte aligned, or if there is more than
-	 * one reference to the data block associated with this mblk.  This last
-	 * check is used because the caller may want to modified
-	 * the data in the inlined portion and someone else is
-	 * holding a reference to the data who may not want it
-	 * to be modified.
-	 */
-	if (xdrs->x_handy < len ||
-	    /* LINTED pointer alignment */
-	    (m = (mblk_t *)xdrs->x_base) == NULL ||
-	    !IS_P2ALIGNED(m->b_rptr, sizeof (int32_t)) ||
-	    m->b_datap->db_ref != 1) {
-#ifdef DEBUG
-		xdrmblk_inline_misses++;
-#endif
-		return (NULL);
-	}
 
 #ifdef DEBUG
 	if (!do_xdrmblk_inline) {
@@ -475,19 +533,58 @@ xdrmblk_inline(XDR *xdrs, int len)
 	}
 #endif
 
-	xdrs->x_handy -= len;
+	if (xdrs->x_op == XDR_DECODE)
+		xdrmblk_skip_fully_read_mblks(xdrs);
+
+	/*
+	 * Can't inline if there isn't enough room.
+	 */
+	if (len <= 0 || xdrs->x_handy < len) {
+#ifdef DEBUG
+		xdrmblk_inline_misses++;
+#endif
+		return (NULL);
+	}
+
+	/* LINTED pointer alignment */
+	m = (mblk_t *)xdrs->x_base;
+	ASSERT(m != NULL);
+
 	if (xdrs->x_op == XDR_DECODE) {
 		/* LINTED pointer alignment */
-		buf = (rpc_inline_t *)m->b_rptr;
-		m->b_rptr += len;
+		mptr = &m->b_rptr;
 	} else {
 		/* LINTED pointer alignment */
-		buf = (rpc_inline_t *)m->b_wptr;
-		m->b_wptr += len;
+		mptr = &m->b_wptr;
 	}
+
+	/*
+	 * Can't inline if the buffer is not 4 byte aligned, or if there is
+	 * more than one reference to the data block associated with this mblk.
+	 * This last check is used because the caller may want to modify the
+	 * data in the inlined portion and someone else is holding a reference
+	 * to the data who may not want it to be modified.
+	 */
+	if (!IS_P2ALIGNED(*mptr, sizeof (int32_t)) ||
+	    m->b_datap->db_ref != 1) {
+#ifdef DEBUG
+		xdrmblk_inline_misses++;
+#endif
+		return (NULL);
+	}
+
+	buf = (rpc_inline_t *)*mptr;
+
+	p = (struct xdrmblk_params *)xdrs->x_private;
+
+	*mptr += len;
+	xdrs->x_handy -= len;
+	p->rpos += len;
+
 #ifdef DEBUG
 	xdrmblk_inline_hits++;
 #endif
+
 	return (buf);
 }
 
@@ -495,11 +592,14 @@ static bool_t
 xdrmblk_control(XDR *xdrs, int request, void *info)
 {
 	mblk_t *m;
+	struct xdrmblk_params *p;
 	int32_t *int32p;
 	int len;
 
 	switch (request) {
 	case XDR_PEEK:
+		xdrmblk_skip_fully_read_mblks(xdrs);
+
 		/*
 		 * Return the next 4 byte unit in the XDR stream.
 		 */
@@ -508,8 +608,7 @@ xdrmblk_control(XDR *xdrs, int request, void *info)
 
 		/* LINTED pointer alignment */
 		m = (mblk_t *)xdrs->x_base;
-		if (m == NULL)
-			return (FALSE);
+		ASSERT(m != NULL);
 
 		/*
 		 * If the pointer is not aligned, fail the peek
@@ -523,27 +622,39 @@ xdrmblk_control(XDR *xdrs, int request, void *info)
 		return (TRUE);
 
 	case XDR_SKIPBYTES:
-		/* LINTED pointer alignment */
-		m = (mblk_t *)xdrs->x_base;
-		if (m == NULL)
-			return (FALSE);
 		int32p = (int32_t *)info;
 		len = RNDUP((int)(*int32p));
 		if (len < 0)
 			return (FALSE);
-		while ((xdrs->x_handy -= len) < 0) {
-			if ((xdrs->x_handy += len) > 0) {
+		if (len == 0)
+			return (TRUE);
+
+		/* LINTED pointer alignment */
+		m = (mblk_t *)xdrs->x_base;
+		if (m == NULL)
+			return (FALSE);
+
+		p = (struct xdrmblk_params *)xdrs->x_private;
+
+		while (xdrs->x_handy < len) {
+			if (xdrs->x_handy > 0) {
 				m->b_rptr += xdrs->x_handy;
 				len -= xdrs->x_handy;
+				p->rpos += xdrs->x_handy;
 			}
 			m = m->b_cont;
 			xdrs->x_base = (caddr_t)m;
+			p->apos += p->rpos;
+			p->rpos = 0;
 			if (m == NULL) {
 				xdrs->x_handy = 0;
 				return (FALSE);
 			}
-			xdrs->x_handy = (int)(m->b_wptr - m->b_rptr);
+			xdrs->x_handy = (int)MBLKL(m);
 		}
+
+		xdrs->x_handy -= len;
+		p->rpos += len;
 		m->b_rptr += len;
 		return (TRUE);
 
@@ -577,4 +688,36 @@ xdrmblk_alloc(int sz)
 	mp->b_rptr = mp->b_wptr;
 
 	return (mp);
+}
+
+/*
+ * Skip fully read or empty mblks
+ */
+static void
+xdrmblk_skip_fully_read_mblks(XDR *xdrs)
+{
+	mblk_t *m;
+	struct xdrmblk_params *p;
+
+	if (xdrs->x_handy != 0)
+		return;
+
+	/* LINTED pointer alignment */
+	m = (mblk_t *)xdrs->x_base;
+	if (m == NULL)
+		return;
+
+	p = (struct xdrmblk_params *)xdrs->x_private;
+	p->apos += p->rpos;
+	p->rpos = 0;
+
+	do {
+		m = m->b_cont;
+		if (m == NULL)
+			break;
+
+		xdrs->x_handy = (int)MBLKL(m);
+	} while (xdrs->x_handy == 0);
+
+	xdrs->x_base = (caddr_t)m;
 }

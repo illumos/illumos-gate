@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2015 Joyent, Inc.  All rights reserved.
  */
 
 #ifndef _SYS_SDEV_IMPL_H
@@ -35,6 +36,7 @@ extern "C" {
 #include <sys/vfs_opreg.h>
 #include <sys/list.h>
 #include <sys/nvpair.h>
+#include <sys/sunddi.h>
 
 /*
  * sdev_nodes are the file-system specific part of the
@@ -540,6 +542,8 @@ extern int		sdev_reconfig_disable;
 extern int		sdev_nc_disable;
 extern int		sdev_nc_disable_reset;
 extern int		sdev_nc_verbose;
+
+extern taskq_t		*sdev_taskq;
 
 /*
  * misc. defines

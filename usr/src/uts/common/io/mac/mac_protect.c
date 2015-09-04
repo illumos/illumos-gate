@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2015, Joyent, Inc.  All rights reserved.
  */
 /*
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
@@ -1233,9 +1233,16 @@ intercept_dhcpv6_outbound(mac_client_impl_t *mcip, ip6_t *ip6h, uchar_t *end)
 	if (allowed_ips_set(mrp, IPV6_VERSION))
 		return (B_FALSE);
 
+	/*
+	 * We want to act on packets that result in DHCPv6 Reply messages, or
+	 * on packets that give up an IPv6 address. For example, a Request or
+	 * Solicit (w/ the Rapid Commit option) will cause the server to send a
+	 * Reply, ending the transaction.
+	 */
 	mtype = dh6->d6m_msg_type;
-	if (mtype != DHCPV6_MSG_REQUEST && mtype != DHCPV6_MSG_RENEW &&
-	    mtype != DHCPV6_MSG_REBIND && mtype != DHCPV6_MSG_RELEASE)
+	if (mtype != DHCPV6_MSG_SOLICIT && mtype != DHCPV6_MSG_REQUEST &&
+	    mtype != DHCPV6_MSG_RENEW && mtype != DHCPV6_MSG_REBIND &&
+	    mtype != DHCPV6_MSG_RELEASE)
 		return (B_TRUE);
 
 	if ((cid = create_dhcpv6_cid(dh6, end)) == NULL)
