@@ -93,6 +93,13 @@ $if _x86 && _ELF64
 $add amd64
 $endif
 
+SYMBOL_VERSION ILLUMOS_0.16 {	# timerfd
+    protected:
+	timerfd_create;
+	timerfd_gettime;
+	timerfd_settime;
+} ILLUMOS_0.15;
+
 SYMBOL_VERSION ILLUMOS_0.15 {	# epoll(3C)
     protected:
 	epoll_create;

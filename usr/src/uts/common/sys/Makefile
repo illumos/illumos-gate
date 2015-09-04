@@ -587,6 +587,7 @@ CHKHDRS=			\
 	time_std_impl.h		\
 	timeb.h			\
 	timer.h			\
+	timerfd.h		\
 	times.h			\
 	timex.h			\
 	timod.h			\

@@ -468,6 +468,7 @@ file path=usr/share/man/man3c/timer_create.3c
 file path=usr/share/man/man3c/timer_delete.3c
 file path=usr/share/man/man3c/timer_settime.3c
 file path=usr/share/man/man3c/timeradd.3c
+file path=usr/share/man/man3c/timerfd_create.3c
 file path=usr/share/man/man3c/tmpfile.3c
 file path=usr/share/man/man3c/tmpnam.3c
 file path=usr/share/man/man3c/toascii.3c
@@ -1281,6 +1282,8 @@ link path=usr/share/man/man3c/timer_getoverrun.3c target=timer_settime.3c
 link path=usr/share/man/man3c/timer_gettime.3c target=timer_settime.3c
 link path=usr/share/man/man3c/timerclear.3c target=timeradd.3c
 link path=usr/share/man/man3c/timercmp.3c target=timeradd.3c
+link path=usr/share/man/man3c/timerfd_gettime.3c target=timerfd_create.3c
+link path=usr/share/man/man3c/timerfd_settime.3c target=timerfd_create.3c
 link path=usr/share/man/man3c/timerisset.3c target=timeradd.3c
 link path=usr/share/man/man3c/timersub.3c target=timeradd.3c
 link path=usr/share/man/man3c/tmpnam_r.3c target=tmpnam.3c

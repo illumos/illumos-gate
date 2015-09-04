@@ -1,0 +1,47 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright (c) 2015, Joyent, Inc. All Rights Reserved.
+.\"
+.Dd Feb 23, 2015
+.Dt TIMERFD 5
+.Os
+.Sh NAME
+.Nm timerfd
+.Nd Linux-compatible timer notification facility
+.Sh SYNOPSIS
+.In sys/timerfd.h
+.Sh DESCRIPTION
+.Nm
+is a Linux-borne facility for creating POSIX timers and
+receiving their subsequent events via a file descriptor.
+The facility itself is arguably unnecessary:
+portable code can either use the timeout value present in
+.Xr poll 2 /
+.Xr port_get 3C
+or -- if this is deemed of unacceptably poor resolution -- create a POSIX timer
+via
+.Xr timer_create 3C
+and use the resulting signal to induce an
+.Sy EINTR
+to polling threads.  (For code that need not be
+portable, the
+.Sy SIGEV_PORT
+signal notification allows for explicit, event-oriented timer notification to be
+sent to a specified port; see
+.Xr signal.h 3HEAD
+for details.) This facility therefore exists only to accommodate Linux-borne
+applications and binaries; it is compatible with its Linux antecedent in both
+binary interface and in semantics.
+.Sh SEE ALSO
+.Xr timerfd_create 3C ,
+.Xr timerfd_gettime 3C ,
+.Xr timerfd_settime 3C

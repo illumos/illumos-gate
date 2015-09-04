@@ -1516,6 +1516,7 @@ file path=usr/include/sys/time_impl.h
 file path=usr/include/sys/time_std_impl.h
 file path=usr/include/sys/timeb.h
 file path=usr/include/sys/timer.h
+file path=usr/include/sys/timerfd.h
 file path=usr/include/sys/times.h
 file path=usr/include/sys/timex.h
 file path=usr/include/sys/timod.h

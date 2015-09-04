@@ -24,7 +24,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2015, Joyent Inc. All rights reserved.
+ */
 
 #include <sys/timer.h>
 #include <sys/systm.h>
@@ -80,8 +82,7 @@ clock_realtime_fire(void *arg)
 	/*
 	 * First call into the timer subsystem to get the signal going.
 	 */
-	timer_fire(it);
-
+	it->it_fire(it);
 	val = &it->it_itime.it_value;
 	interval = &it->it_itime.it_interval;
 
@@ -171,9 +172,10 @@ clock_realtime_fire_first(void *arg)
 
 /*ARGSUSED*/
 static int
-clock_realtime_timer_create(itimer_t *it, struct sigevent *ev)
+clock_realtime_timer_create(itimer_t *it, void (*fire)(itimer_t *))
 {
 	it->it_arg = kmem_zalloc(sizeof (timeout_id_t), KM_SLEEP);
+	it->it_fire = fire;
 
 	return (0);
 }
@@ -184,7 +186,7 @@ clock_realtime_timer_settime(itimer_t *it, int flags,
 {
 	timeout_id_t tid, *tidp = it->it_arg;
 	timespec_t now;
-	proc_t *p = curproc;
+	proc_t *p = it->it_proc;
 	clock_t ticks;
 
 	gethrestime(&now);
@@ -246,7 +248,7 @@ static int
 clock_realtime_timer_gettime(itimer_t *it, struct itimerspec *when)
 {
 	timespec_t now;
-	proc_t *p = curproc;
+	proc_t *p = it->it_proc;
 
 	/*
 	 * We always keep it_itime up to date, so we just need to snapshot
@@ -276,7 +278,7 @@ clock_realtime_timer_gettime(itimer_t *it, struct itimerspec *when)
 static int
 clock_realtime_timer_delete(itimer_t *it)
 {
-	proc_t *p = curproc;
+	proc_t *p = it->it_proc;
 	timeout_id_t tid, *tidp = it->it_arg;
 
 	mutex_enter(&p->p_lock);

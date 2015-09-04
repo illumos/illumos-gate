@@ -14,6 +14,7 @@
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2014 Nexenta Systems, Inc.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright (c) 2015, Joyent, Inc.  All rights reserved.
 #
 
 include		$(SRC)/Makefile.master
@@ -121,6 +122,7 @@ MANFILES=	Intro.5			\
 		tecla.5			\
 		term.5			\
 		threads.5		\
+		timerfd.5		\
 		trusted_extensions.5	\
 		vgrindefs.5		\
 		zones.5			\

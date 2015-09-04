@@ -1032,6 +1032,8 @@ GEN_DRV_OBJS += gen_drv.o
 
 TCLIENT_OBJS +=	tclient.o
 
+TIMERFD_OBJS +=	timerfd.o
+
 TPHCI_OBJS += tphci.o
 
 TVHCI_OBJS += tvhci.o

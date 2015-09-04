@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
- * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2015, Joyent, Inc. All rights reserved.
  */
 
 #include <regex.h>
@@ -125,6 +125,9 @@ static devfsadm_create_t misc_cbt[] = {
 	{ "pseudo", "ddi_pseudo",
 	    "(^kdmouse$)|(^rootprop$)",
 	    TYPE_EXACT | DRV_RE, ILEVEL_0, node_name
+	},
+	{ "pseudo", "ddi_pseudo", "timerfd",
+	    TYPE_EXACT | DRV_EXACT, ILEVEL_0, minor_name
 	},
 	{ "pseudo", "ddi_pseudo", "tod",
 	    TYPE_EXACT | DRV_EXACT, ILEVEL_0, node_name
