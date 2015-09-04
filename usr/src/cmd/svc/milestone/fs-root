@@ -21,6 +21,7 @@
 #
 #
 # Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2015 Nexenta Systems, Inc. All rights reserved.
 #
 
 # Make sure that the libraries essential to this stage of booting can be found.
@@ -74,32 +75,7 @@ fi
 #
 readvfstab "/usr" < $vfstab
 if [ -n "$mountp" ]; then
-	if [ "$fstype" = cachefs ]; then
-		#
-		# Mount without the cache initially.  We'll enable it
-		# later at remount time.  This lets us avoid
-		# teaching the statically linked mount program about
-		# cachefs.  Here we determine the backfstype.
-		# This is not pretty, but we have no tools for parsing
-		# the option string until we get /usr mounted...
-		#
-		case "$mntopts" in
-		*backfstype=nfs*)
-			cfsbacktype=nfs
-			;;
-		*backfstype=hsfs*)
-			cfsbacktype=hsfs
-			;;
-		*)
-			msg='invalid vfstab entry for /usr'
-			echo $msg
-			echo "$SMF_FMRI:" $msg >/dev/msglog
-			cfsbacktype=nfs
-			;;
-		esac
-		mountfs - /usr $cfsbacktype ro $special ||
-		    exit $SMF_EXIT_ERR_FATAL
-	elif [ "$fstype" = zfs ]; then
+	if [ "$fstype" = zfs ]; then
 		mountfs - /usr $fstype $mntopts - || exit $SMF_EXIT_ERR_FATAL
 	else
 		#

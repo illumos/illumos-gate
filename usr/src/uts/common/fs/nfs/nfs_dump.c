@@ -18,6 +18,11 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ */
+
 /*
  * Copyright 2014 Gary Mills
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
@@ -405,15 +410,18 @@ nd_get_reply(TIUSER *tiptr, XDR *xdrp, uint32_t call_xid, int *badmsg)
 		reply_msg.acpted_rply.ar_results.proc = xdr_WRITE3res;
 		break;
 	default:
+		XDR_DESTROY(xdrp);
 		return (EIO);
 	}
 
 	if (!xdr_replymsg(xdrp, &reply_msg)) {
+		XDR_DESTROY(xdrp);
 		cmn_err(CE_WARN, "\tnfs_dump: xdr_replymsg failed");
 		return (EIO);
 	}
 
 	if (reply_msg.rm_xid != call_xid) {
+		XDR_DESTROY(xdrp);
 		*badmsg = 1;
 		return (0);
 	}
@@ -421,6 +429,7 @@ nd_get_reply(TIUSER *tiptr, XDR *xdrp, uint32_t call_xid, int *badmsg)
 	_seterr_reply(&reply_msg, &rpc_err);
 
 	if (rpc_err.re_status != RPC_SUCCESS) {
+		XDR_DESTROY(xdrp);
 		cmn_err(CE_WARN, "\tnfs_dump: RPC error %d (%s)",
 		    rpc_err.re_status, clnt_sperrno(rpc_err.re_status));
 		return (EIO);
@@ -429,17 +438,20 @@ nd_get_reply(TIUSER *tiptr, XDR *xdrp, uint32_t call_xid, int *badmsg)
 	switch (nfsdump_version) {
 	case NFS_VERSION:
 		if (na.ns_status) {
+			XDR_DESTROY(xdrp);
 			cmn_err(CE_WARN, "\tnfs_dump: status %d", na.ns_status);
 			return (EIO);
 		}
 		break;
 	case NFS_V3:
 		if (wres.status != NFS3_OK) {
+			XDR_DESTROY(xdrp);
 			cmn_err(CE_WARN, "\tnfs_dump: status %d", wres.status);
 			return (EIO);
 		}
 		break;
 	default:
+		XDR_DESTROY(xdrp);
 		return (EIO);
 	}
 
@@ -448,6 +460,8 @@ nd_get_reply(TIUSER *tiptr, XDR *xdrp, uint32_t call_xid, int *badmsg)
 		xdrp->x_op = XDR_FREE;
 		(void) xdr_opaque_auth(xdrp, &(reply_msg.acpted_rply.ar_verf));
 	}
+
+	XDR_DESTROY(xdrp);
 
 	freemsg(rudata.udata.udata_mp);
 

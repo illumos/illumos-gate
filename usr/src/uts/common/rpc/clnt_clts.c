@@ -18,6 +18,11 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ */
+
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -342,9 +347,11 @@ clnt_clts_kcreate(struct knetconfig *config, struct netbuf *addr,
 
 	/* pre-serialize call message header */
 	if (!xdr_callhdr(&p->cku_outxdr, &call_msg)) {
+		XDR_DESTROY(&p->cku_outxdr);
 		error = EINVAL;		/* XXX */
 		goto bad;
 	}
+	XDR_DESTROY(&p->cku_outxdr);
 
 	p->cku_config.knc_rdev = config->knc_rdev;
 	p->cku_config.knc_semantics = config->knc_semantics;
@@ -528,6 +535,7 @@ call_again:
 			if ((!XDR_PUTINT32(xdrs, (int32_t *)&procnum)) ||
 			    (!AUTH_MARSHALL(h->cl_auth, xdrs, p->cku_cred)) ||
 			    (!(*xdr_args)(xdrs, argsp))) {
+				XDR_DESTROY(xdrs);
 				freemsg(mp);
 				p->cku_err.re_status = RPC_CANTENCODEARGS;
 				p->cku_err.re_errno = EIO;
@@ -544,12 +552,15 @@ call_again:
 			/* Serialize the procedure number and the arguments. */
 			if (!AUTH_WRAP(h->cl_auth, (caddr_t)p->cku_rpchdr,
 			    CKU_HDRSIZE+4, xdrs, xdr_args, argsp)) {
+				XDR_DESTROY(xdrs);
 				freemsg(mp);
 				p->cku_err.re_status = RPC_CANTENCODEARGS;
 				p->cku_err.re_errno = EIO;
 				goto done;
 			}
 		}
+
+		XDR_DESTROY(xdrs);
 	} else
 		mp = mpdup;
 
@@ -780,6 +791,7 @@ tryread:
 		p->cku_err.re_status = RPC_CANTDECODERES;
 		p->cku_err.re_errno = EIO;
 		(void) xdr_rpc_free_verifier(xdrs, &reply_msg);
+		XDR_DESTROY(xdrs);
 		goto done1;
 	}
 
@@ -796,6 +808,7 @@ tryread:
 			p->cku_err.re_why = AUTH_INVALIDRESP;
 			RCSTAT_INCR(p->cku_stats, rcbadverfs);
 			(void) xdr_rpc_free_verifier(xdrs, &reply_msg);
+			XDR_DESTROY(xdrs);
 			goto tryread;
 		}
 		if (!AUTH_UNWRAP(h->cl_auth, xdrs, xdr_results, resultsp)) {
@@ -803,6 +816,7 @@ tryread:
 			p->cku_err.re_errno = EIO;
 		}
 		(void) xdr_rpc_free_verifier(xdrs, &reply_msg);
+		XDR_DESTROY(xdrs);
 		goto done1;
 	}
 	/* set errno in case we can't recover */
@@ -820,11 +834,13 @@ tryread:
 	 */
 	if (re_status == RPC_PROCUNAVAIL && p->cku_bcast) {
 		(void) xdr_rpc_free_verifier(xdrs, &reply_msg);
+		XDR_DESTROY(xdrs);
 		goto tryread;
 	}
 	if (re_status == RPC_AUTHERROR) {
 
 		(void) xdr_rpc_free_verifier(xdrs, &reply_msg);
+		XDR_DESTROY(xdrs);
 		call_table_remove(call);
 		if (call->call_reply != NULL) {
 			freemsg(call->call_reply);
@@ -914,6 +930,7 @@ tryread:
 	}
 
 	(void) xdr_rpc_free_verifier(xdrs, &reply_msg);
+	XDR_DESTROY(xdrs);
 
 done1:
 	call_table_remove(call);
@@ -1006,16 +1023,13 @@ clnt_clts_kerror(CLIENT *h, struct rpc_err *err)
 	*err = p->cku_err;
 }
 
+/*ARGSUSED*/
 static bool_t
 clnt_clts_kfreeres(CLIENT *h, xdrproc_t xdr_res, caddr_t res_ptr)
 {
-	/* LINTED pointer alignment */
-	struct cku_private *p = htop(h);
-	XDR *xdrs;
+	xdr_free(xdr_res, res_ptr);
 
-	xdrs = &(p->cku_outxdr);
-	xdrs->x_op = XDR_FREE;
-	return ((*xdr_res)(xdrs, res_ptr));
+	return (TRUE);
 }
 
 /*ARGSUSED*/

@@ -1235,7 +1235,9 @@ intercept_dhcpv6_outbound(mac_client_impl_t *mcip, ip6_t *ip6h, uchar_t *end)
 
 	/*
 	 * We want to act on packets that result in DHCPv6 Reply messages, or
-	 * on packets that give up an IPv6 address.
+	 * on packets that give up an IPv6 address. For example, a Request or
+	 * Solicit (w/ the Rapid Commit option) will cause the server to send a
+	 * Reply, ending the transaction.
 	 */
 	mtype = dh6->d6m_msg_type;
 	if (mtype != DHCPV6_MSG_SOLICIT && mtype != DHCPV6_MSG_REQUEST &&
