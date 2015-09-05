@@ -22,12 +22,14 @@
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2015 PALO, Richard.  All rights reserved.
  */
 
 #ifndef _SYS_KOBJ_LEX_H
 #define	_SYS_KOBJ_LEX_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#include <sys/ctype.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -47,14 +49,6 @@ extern "C" {
 #define	iswhite(ch)	((ch) == ' ' || (ch) == '\t')
 
 #define	isnewline(ch)	((ch) == '\n' || (ch) == '\r' || (ch) == '\f')
-
-#define	isdigit(ch)	((ch) >= '0' && (ch) <= '9')
-
-#define	isxdigit(ch)	(isdigit(ch) || ((ch) >= 'a' && (ch) <= 'f') || \
-			((ch) >= 'A' && (ch) <= 'F'))
-
-#define	isalpha(ch)	(((ch) >= 'a' && (ch) <= 'z') || \
-			((ch) >= 'A' && (ch) <= 'Z'))
 
 #define	isalphanum(ch)	(isalpha(ch) || isdigit(ch))
 
