@@ -24,6 +24,7 @@
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2015, OmniTI Computer Consulting, Inc. All rights reserved.
+# Copyright 2015 Gary Mills
 #
 
 #
@@ -149,7 +150,7 @@ CP=		/usr/bin/cp -f
 MCS=		/usr/ccs/bin/mcs
 CAT=            /usr/bin/cat
 ELFDUMP=	/usr/ccs/bin/elfdump
-M4=		/usr/ccs/bin/m4
+M4=		/usr/bin/m4
 STRIP=		/usr/ccs/bin/strip
 LEX=		/usr/ccs/bin/lex
 FLEX=		/usr/bin/flex

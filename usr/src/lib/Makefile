@@ -25,6 +25,7 @@
 # Copyright (c) 2012, Joyent, Inc. All rights reserved.
 # Copyright (c) 2013 Gary Mills
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright (c) 2015 Gary Mills
 
 include ../Makefile.master
 
@@ -561,7 +562,9 @@ _dc:			$(DCSUBDIRS:%=%-nodepend)
 # Library interdependencies are called out explicitly here
 #
 auditd_plugins: libbsm libnsl libsecdb
+krb5:		gss_mechs/mech_krb5
 gss_mechs/mech_krb5:	libgss libnsl libsocket libresolv pkcs11
+gss_mechs/mech_spnego:	gss_mechs/mech_krb5
 libadt_jni:	libbsm
 libast: 	libsocket libm
 libadutils: 	libldap5 libresolv libsocket libnsl
@@ -569,21 +572,24 @@ nsswitch:	libadutils libidmap
 libbe: 		libzfs
 libbsm:		libtsol
 libcmd: 	libsum libast libsocket libnsl
-libcmdutils:	libavl
+libcmdutils:	libavl libnvpair
 libcontract:	libnvpair
+libcpc:		libdevinfo
 libdevid:	libdevinfo
 libdevinfo:	libnvpair libsec
 libdhcpagent:	libsocket libdhcputil libuuid libdlpi libcontract
 libdhcputil:	libnsl libgen libinetutil libdlpi
 libdladm:	libdevinfo libinetutil libsocket libscf librcm libnvpair \
 		libexacct libnsl libkstat libcurses
+libdevice:	libnvpair
 libdll: 	libast
 libdlpi:	libinetutil libdladm
 libds:		libsysevent
 libdscfg:	libnsctl libunistat libsocket libnsl
-libdtrace:	libproc libgen libctf
+libdtrace:	libproc libgen libctf libmapmalloc
 libdtrace_jni:	libuutil libdtrace
 libefi:		libuuid
+libfcoe:	libdladm
 libfstyp:	libnvpair
 libelfsign:	libcryptoutil libkmf
 libidmap:	libadutils libldap5 libavl libsldap libuutil
@@ -596,24 +602,26 @@ libm1:		libc libm
 libmvec:	libc libm
 libnsl:		libmd5
 libmapid:	libresolv
+libnisdb:	libnsl libldap5
+librcm:		libnvpair
 librdc:		libsocket libnsl libnsctl libunistat libdscfg
 libuuid:	libdlpi
 libinetutil:	libsocket
 libipsecutil:	libtecla libsocket
 libinstzones:	libzonecfg libcontract
 libpkg:		libwanboot libscf libadm
-libnwam:	libscf
+libnwam:	libscf libbsm libdladm
 libsecdb:	libnsl
 libsasl:	libgss libsocket pkcs11 libmd
 sasl_plugins:	pkcs11 libgss libsocket libsasl
 libsctp:	libsocket
 libshell:	libast libcmd libdll libsocket libsecdb libm
 libsip:		libmd5
-libsmbfs:	libcmdutils libsocket libnsl libkrb5
+libsmbfs:	libcmdutils libsocket libnsl libkrb5 libsec libidmap
 libsocket:	libnsl
 libstmfproxy: 	libstmf libsocket libnsl libpthread
 libsum: 	libast
-libsysevent:	libsecdb
+libsysevent:	libsecdb libnvpair
 libldap5:	libsasl libsocket libnsl libmd
 libsldap:	libldap5 libtsol libnsl libc libscf libresolv
 libpool:	libnvpair libexacct
@@ -628,14 +636,16 @@ libwrap:	libnsl libsocket
 libwanboot:	libnvpair libresolv libnsl libsocket libdevinfo libinetutil \
 		libdhcputil
 libwanbootutil:	libnsl
-pam_modules:	libproject passwdutil smbsrv
-libscf:		libuutil libmd libgen libsmbios libnsl
+pam_modules:	libproject passwdutil smbsrv libtsnet
+libscf:		libuutil libmd libgen libsmbios libnsl libnvpair
 libinetsvc:	libscf
-librestart:	libuutil libscf
+librestart:	libuutil libscf libpool libproject libsecdb libnvpair
 libsaveargs:	libdisasm
 ../cmd/sgs/libdl:	../cmd/sgs/libconv
 ../cmd/sgs/libelf:	../cmd/sgs/libconv
-pkcs11:		libcryptoutil
+passwdutil:	libsldap
+pkcs11:		libcryptoutil libmd
+#		Adding libuuid or libdladm results in a circular dependancy
 print:		libldap5
 udapl/udapl_tavor:	udapl/libdat
 libzfs:		libdevid libgen libnvpair libuutil \

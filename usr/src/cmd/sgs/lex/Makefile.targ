@@ -19,10 +19,10 @@
 # CDDL HEADER END
 #
 #
+# Copyright 2015 Gary Mills
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 $(PROG): objs .WAIT $(POBJS)
@@ -89,17 +89,9 @@ $(DYNLINKLIBDIR)/%: %$(VERS)
 clean:
 	$(RM) $(POBJS) $(OBJS) $(PICS) $(CLEANFILES)
 
-lint: $(LINTPOUT) $(LINTLIB)
+$(LINTLIB): $$(SRCS) 
+	$(LINT.c) -o $(LIBNAME) $(SRCS) > $(LINTOUT) 2>&1 
 
-LINT_HDR=	perl ../../tools/lint_hdr.pl
+lintcheck: $$(SRCS)
+	$(LINT.c) $(LINTCHECKFLAGS) $(SRCS) $(LDLIBS)
 
-$(LINTPOUT): $(SRCS)
-	$(LINT_HDR) $(PROG)			 > $(LINTPOUT)
-	$(LINT_HDR) -s lex			>> $(LINTPOUT)
-	$(LINT.c) $(MACHSRCS) $(LDLIBS)		2>&1 | tee -a $(LINTPOUT)
-
-	$(LINT_HDR) -s libl.so.1		>> $(LINTPOUT)
-	$(LINT.c) $(LIBSRCS)  $(LDLIBS)		2>&1 | tee -a $(LINTPOUT)
-
-$(LINTLIB): $(LINTSRCS)
-	$(LINT.c) -o $(LIBNAME) $(LINTSRCS)
