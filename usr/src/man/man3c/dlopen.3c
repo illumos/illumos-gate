@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DLOPEN 3C "Feb 4, 2005"
+.TH DLOPEN 3C "Sep 7, 2015"
 .SH NAME
 dlopen, dlmopen \- gain access to an executable object file
 .SH SYNOPSIS
@@ -12,16 +12,15 @@ dlopen, dlmopen \- gain access to an executable object file
 #include <dlfcn.h>
 #include <link.h>
 
-\fBvoid *\fR \fBdlopen\fR(\fBconst char *\fR\fIpathname\fR, \fBint\fR \fImode\fR);
+\fBvoid *\fR\fBdlopen\fR(\fBconst char *\fR\fIpathname\fR, \fBint\fR \fImode\fR);
 .fi
 
 .LP
 .nf
-\fBvoid *\fR \fBdlmopen\fR(\fBLmid_t\fR \fIlmid\fR, \fBconst char *\fR\fIpathname\fR, \fBint\fR \fImode\fR);
+\fBvoid *\fR\fBdlmopen\fR(\fBLmid_t\fR \fIlmid\fR, \fBconst char *\fR\fIpathname\fR, \fBint\fR \fImode\fR);
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBdlopen()\fR function makes an executable object file available to a
 running process. \fBdlopen()\fR returns to the process a \fIhandle\fR that the
@@ -274,7 +273,6 @@ are opened on a new link-map list must express all of their dependencies.
 .RE
 
 .SH RETURN VALUES
-.sp
 .LP
 The \fBdlopen()\fR function returns \fINULL\fR if \fIpathname\fR cannot be
 found, cannot be opened for reading, or is not a shared object or a relocatable
@@ -283,14 +281,12 @@ process of loading \fIpathname\fR or relocating its symbolic references. See
 \fBNOTES\fR. Additional diagnostic information is available through
 \fBdlerror()\fR.
 .SH USAGE
-.sp
 .LP
 The \fBdlopen()\fR and \fBdlmopen()\fR functions are members of a family of
 functions that give the user direct access to the dynamic linking facilities.
 This family of functions is available only to dynamically-linked processes. See
 the \fILinker and Libraries Guide\fR.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -308,7 +304,6 @@ MT\(miLevel	MT\(miSafe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBld\fR(1), \fBld.so.1\fR(1), \fBdladdr\fR(3C), \fBdlclose\fR(3C),
 \fBdldump\fR(3C), \fBdlerror\fR(3C), \fBdlinfo\fR(3C), \fBdlsym\fR(3C),
@@ -317,7 +312,6 @@ MT\(miLevel	MT\(miSafe
 .LP
 \fILinker and Libraries Guide\fR
 .SH NOTES
-.sp
 .LP
 If \fIpathname\fR has dependencies on other objects, these objects are
 automatically loaded by \fBdlopen()\fR. The directory search path used to find
