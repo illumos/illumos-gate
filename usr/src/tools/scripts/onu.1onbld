@@ -1,0 +1,190 @@
+.\" " CDDL HEADER START
+.\" "
+.\" " The contents of this file are subject to the terms of the
+.\" " Common Development and Distribution License (the "License").
+.\" " You may not use this file except in compliance with the License.
+.\" "
+.\" " You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" " or http://www.opensolaris.org/os/licensing.
+.\" " See the License for the specific language governing permissions
+.\" " and limitations under the License.
+.\" "
+.\" " When distributing Covered Code, include this CDDL HEADER in each
+.\" " file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" " If applicable, add the following below this CDDL HEADER, with the
+.\" " fields enclosed by brackets "[]" replaced with your own identifying
+.\" " information: Portions Copyright [yyyy] [name of copyright owner]
+.\" "
+.\" " CDDL HEADER END
+.\" "
+.\" "Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+.\" "Copyright 2010, Richard Lowe
+.\" "
+.TH onu 1ONBLD "28 August 2010"
+.SH NAME
+.I onu
+\- OS/Net Update
+.SH SYNOPSIS
+\fBonu [opts] [-s <beName>] -t <beName>\fP
+.br
+\fBonu [opts] -r\fP
+.LP
+.SH DESCRIPTION
+.IX "OS-Net build tools" "onu" "" "\fBonu\fP"
+.LP
+.I onu 
+is a replacement for
+.I bfu
+used to update a system with the latest set of IPS packages for the ON
+(OS/Net) consolidation of Solaris, using beadm(1M) to create a new Boot
+Environment (BE) and pkg(1) to update the image.
+.SH OPTIONS
+.LP
+The following global options are supported:
+.TP 4
+.B \-c <consolidation>
+Specifies the consolidation being installed via 
+.IR onu ,
+used to locate the publisher from which that consolidation is currently
+installed.  This is almost always "osnet".
+.TP 4
+.B \-d <dir>
+Specifies that <dir> contains the repo.redist sub-directory;
+.I onu
+will run a depot using this packaging repository.
+Note that -d ignores -u and -U as well
+as the environment variables used by those options.
+.TP 4
+.B \-u <URI>
+Specifies that <URI> should be used as the origin URI for the publisher
+packaging repository.  See \fBONURI\fP below for default values.
+.TP 4
+.B \-U <publisher>
+Specifies that <publisher> should be used as the publisher name for
+the packaging repository.  See \fBONPUB\fP below for default values.
+.TP 4
+.B \-v
+Verbose mode.
+.LP
+The first form of onu creates a new BE and then updates it, and takes
+the following options:
+.TP 4
+.B \-s <beName>
+Specifies that <beName> should be used as the source Boot Environment to
+clone.  The default is the active BE.
+.TP 4
+.B \-t <beName>
+Specifies the target BE name.  This argument is required; there
+is no default value.
+.TP 4
+.B \-Z
+Do not update any installed zones.
+.LP
+The second form of onu takes the following option:
+.TP 4
+.B \-r
+In the current BE configure the requested publisher appropriately, without
+updating.
+.SH EXIT STATUS
+.LP
+The following exit values are returned:
+.TP 4
+.B 0
+The command completed successfully.
+No errors or warnings were reported.
+.LP
+.TP 4
+.B 1
+Incorrect usage.
+.LP
+.TP 4
+.B 2
+One of the commands used by the script failed.
+.SH NOTES
+.LP
+Former users of bfu should note the following ways in which onu behaves
+differently from bfu.  First, as noted above, onu creates a new BE, rather
+than updating an existing BE in-place.  Second, onu will not install packages
+that are older than what is already installed in the source BE.  Third,
+conflicts in system configuration files are automatically resolved according
+to the files' "preserve" attribute, as described in pkg(5).
+.LP
+If the
+.B -d
+option is given to specify a repository directory, the new
+publishers will not be available in the new BE. This can prevent correct
+zone installs or cause issues with installing additional packages
+sourced from the ON repositories. In both cases, the \fB-r\fR option
+can be used in the new BE to re-enable the publishers. See
+\fBEXAMPLES\fR.
+.LP
+Use of
+.I onu
+will prevent use of zone attach for ipkg-brand zones in the new BE,
+since the
+.B entire
+incorporation is removed.
+.LP
+By default,
+.I onu
+will attempt to update any ipkg-brand installed zones on the system; the
+.B -Z
+option may be used to disable this behavior.
+.SH EXAMPLES
+.LP
+\fBExample 1\fR Installing latest ON nightly build
+.LP
+.SP
+.IN +2
+.NF
+# onu -t new-nightly-be
+.FI
+.IN -2
+.SP
+.LP
+\fBExample 2\fR Installing an ON build from a directory
+.LP
+.SP
+.IN +2
+.NF
+# onu -d /path/to/my/ws/packages/`uname -p`/nightly -t new-nightly-be
+.FI
+.IN -2
+.SP
+.LP
+\fBExample 3\fR Installing additional packages in the new BE
+.LP
+.SP
+.IN +2
+.NF
+# onu -d /path/to/my/ws/packages/`uname -p`/nightly -t new-nightly-be
+.br
+# reboot
+.br
+# onu -r -d /path/to/my/ws/packages/`uname -p`/nightly
+.br
+# pkg install netcat
+.br
+#
+.FI
+.IN -2
+.SP
+.SH ENVIRONMENT
+.LP
+ONURI
+.IP
+If the -u option is not provided, and this variable is set, it will be used
+as the origin URI for the publisher packaging repository.  If -u is not
+provided and this variable is not set, http://ipkg.sfbay/on-nightly will
+be used.
+.LP
+ONPUB
+.IP
+If the -U option is not provided, and this variable is set, it will be
+used as the publisher name for the packaging repository.  If -U is not
+provided and this variable is not set, on-nightly will be used.
+.LP
+.SH SEE ALSO
+.BR beadm "(1M), "
+.BR pkg "(1), "
+.BR pkg "(5) "

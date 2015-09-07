@@ -1,0 +1,225 @@
+.\" Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+.\"
+.\" CDDL HEADER START
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.\" CDDL HEADER END
+.\"
+.TH find_elf 1ONBLD "25 March 2010"
+.SH NAME
+find_elf \- Locate ELF shared objects and executables
+.SH SYNOPSIS
+\fBfind_elf [-afrs] path\fP
+.LP
+.SH DESCRIPTION
+.IX "OS-Net build tools" "find_elf" "" "\fBfind_elf\fP"
+The
+.I find_elf
+command descends a directory hierarchy and produces one line
+of output on stdout for each ELF executable or shared object found.
+.LP
+.SH OPTIONS
+.LP
+The following options are supported:
+.TP 4
+.B \-a
+Disable alias processing. Symbolic links are treated as independent
+files, each such link results in a separate OBJECT output line,
+and ALIAS lines are not issued.
+.TP 4
+.B \-f
+Fast Mode. When reading directories, the file name and modes are
+used to eliminate files from consideration and speed up the search:
+Directories with names that start with a '.' character are skipped.
+Executables must have the execute bit set, and
+shared objects must end with a .so extension. Files that do not
+meet these requirements are silently eliminated from consideration without
+further analysis.
+.TP 4
+.B \-r
+Report file names as relative paths, relative to the given file or directory,
+instead of fully qualified.
+.TP 4
+.B \-s
+Only report shared objects.
+.LP
+.SH OUTPUT
+.LP
+.I find_elf
+produces a series of PREFIX, OBJECT, and ALIAS lines, which collectively
+describe the ELF objects located. Whitespace is used within each
+line to delimit the various fields of information provided.
+.P
+If the \fB-r\fP option is used to specify that file names be reported
+as relative paths, a PREFIX line is output to provide the base path from
+which the relative names should be interpreted.
+There can only be one PREFIX line, and it is output first, before any
+OBJECT or ALIAS lines.
+.sp
+.in +4
+.nf
+PREFIX path
+.fi
+.in -4
+.sp
+For each object found, an OBJECT line is produced to describe it:
+.sp
+.in +4
+.nf
+OBJECT [32 | 64] [DYN | EXEC] [VERDEF | NOVERDEF] object-path
+.fi
+.in -4
+.sp
+The first field provides the ELF class of the object, and will be
+either 32 or 64. 
+The second field provides the type of object, either
+a shared object (DYN) or executable (EXEC).
+The third field will be VERDEF if the object contains ELF
+version definitions, and NOVERDEF if the object is not versioned.
+The final field gives the path to the object.
+.P
+Under Unix, a file can have multiple names. In the context of ELF
+objects, this often happens for one of two reasons:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Compilation symlinks, used to provide a non-versioned name for a shared object.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o 
+Symlinks such as '32' and '64' used to provide alternative
+non-machine specific paths to objects.
+.RE
+.sp
+When
+.I find_elf
+identifies an object via such an aliased name, it issues an ALIAS line
+mapping it to the main name for the object:
+.sp
+.in +4
+.nf
+ALIAS object-path alias-path
+.fi
+.in -4
+.sp
+The \fB-a\fP option alters the handling of aliased names. When \fB-a\fP is
+specified, each file results in a separate OBJECT line, as if they were
+independent files rather than the same file with different names.
+.sp
+.PP
+.SH EXAMPLES
+Assume the following hierarchy of files exist under /usr/lib/foo:
+.sp
+.in +4
+.nf
+% /bin/ls -alRF /usr/lib/foo
+/usr/lib/foo:
+total 111
+drwxr-xr-x  3 root root    7 Jul 16 17:35 ./
+drwxr-xr-x 34 root root   42 Jul 16 17:34 ../
+lrwxrwxrwx  1 root bin     1 Jul 16 17:34 32 -> ./
+lrwxrwxrwx  1 root bin     5 Jul 16 17:34 64 -> amd64/
+drwxr-xr-x  2 root bin     4 Jul 16 17:35 amd64/
+lrwxrwxrwx  1 root bin    11 Jul 16 17:35 libfoo.so -> libfoo.so.1*
+-rwxr-xr-x  1 root bin 49132 Jul 16 17:35 libfoo.so.1*
+
+/usr/lib/foo/amd64:
+total 150
+drwxr-xr-x  2 root root   4 Jul 16 17:35 ./
+drwxr-xr-x  3 root root   7 Jul 16 17:35 ../
+lrwxrwxrwx  1 root bin    11 Jul 16 17:35 libfoo.so -> libfoo.so.1*
+-rwxr-xr-x  1 root bin 72536 Jul 16 17:35 libfoo.so.1*
+.fi
+.in -4
+.sp
+This hierarchy contains compilation symlinks (libfoo.so) and
+path alias symlinks (32, 64), as discussed in OUTPUT.
+.p
+.I find_elf
+produces the following output for the above hierarchy:
+.sp
+.in +4
+.nf
+% find_elf -r /usr/lib/foo
+PREFIX /usr/lib/foo
+OBJECT 64 DYN  VERDEF  amd64/libfoo.so.1
+ALIAS                  amd64/libfoo.so.1  64/libfoo.so
+ALIAS                  amd64/libfoo.so.1  64/libfoo.so.1
+ALIAS                  amd64/libfoo.so.1  amd64/libfoo.so
+OBJECT 32 DYN  VERDEF  libfoo.so.1
+ALIAS                  libfoo.so.1        32/libfoo.so
+ALIAS                  libfoo.so.1        32/libfoo.so.1
+ALIAS                  libfoo.so.1        libfoo.so
+.fi
+.in -4
+.sp
+Contrast this with the output when \fB-a\fP is used to treat
+each name as an independent file:
+.sp
+.in +4
+.nf
+% find_elf -ar /usr/lib/foo
+PREFIX /usr/lib/foo
+OBJECT 32 DYN  VERDEF  32/libfoo.so
+OBJECT 32 DYN  VERDEF  32/libfoo.so.1
+OBJECT 64 DYN  VERDEF  64/libfoo.so
+OBJECT 64 DYN  VERDEF  64/libfoo.so.1
+OBJECT 64 DYN  VERDEF  amd64/libfoo.so.1
+OBJECT 64 DYN  VERDEF  amd64/libfoo.so
+OBJECT 32 DYN  VERDEF  libfoo.so.1
+OBJECT 32 DYN  VERDEF  libfoo.so
+.fi
+.in -4
+.sp
+When
+.I find_elf
+is used to process an alias for which no target object is given,
+there will be no output. For example, using /lib/libc.so, which
+is a compilation symlink for /lib/libc.so.1:
+.sp
+.in +4
+.nf
+% find_elf /lib/libc.so
+.fi
+.in -4
+.sp
+In such situations, the \fB-a\fP option can be used to produce
+the desired output:
+.sp
+.in +4
+.nf
+% find_elf -a /lib/libc.so
+OBJECT 32 DYN  VERDEF   /lib/libc.so
+.fi
+.in -4
+.sp
+.PP
+.RS
+.nf
+.SH SEE ALSO
+.BR check_rtime (1ONBLD),
+.BR interface_check (1ONBLD),
+.BR interface_cmp (1ONBLD),
+.BR ld (1),
+.BR ldd (1),
+.BR elfdump (1),
+.BR pvs (1).
+.LP
+.TZ LLM

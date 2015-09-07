@@ -1,0 +1,734 @@
+.\" Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
+.\"
+.\" CDDL HEADER START
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.\" CDDL HEADER END
+.\"
+.TH check_rtime 1ONBLD "09 March 2010"
+.SH NAME
+.I check_rtime
+\- check ELF runtime attributes
+.SH SYNOPSIS
+\fBcheck_rtime [-imosv] [-D depfile | -d depdir] [-E errfile] [-e exfile] [-f listfile] [-I infofile] [-w outdir] file | dir, ...\fP
+.LP
+.SH DESCRIPTION
+.IX "OS-Net build tools" "check_rtime" "" "\fBcheck_rtime\fP"
+.LP
+.I check_rtime
+attempts to check a number of ELF runtime attributes
+for consistency with common build rules.
+These checks involve running \fBldd(1)\fP and
+\fBelfdump(1)\fP against a family of dynamic objects.
+A dynamic object can be defined explicitly as a \fIfile\fP
+or multiple dynamic objects can be located under the directory \fIdir\fP.
+.LP
+.I check_rtime
+is typically called from \fBnightly(1ONBLD)\fP when the \fB-r\fP
+option is in effect. In this case the dynamic objects under
+the associated \fIproto\fP area (\fB$ROOT\fP) are checked.
+.I check_rtime
+can also be run standalone against any set of dynamic objects.
+.LP
+.I check_rtime
+uses \fBldd(1)\fP to verify dependencies. This implies that
+by default any object inspected will bind to its dependencies
+as they are found in the \fBunderlying\fP system.  Use of the \fB-D\fP, \fB-d\fP
+option, or the existence of the environment variables
+\fB$CODEMGR_WS/$ROOT\fP instruct
+.I check_rtime
+to establish an alternative dependency mapping using
+runtime configuration files generated with \fBcrle(1)\fP.
+.LP
+.I check_rtime
+uses \fBldd(1)\fP to completely relocate any dynamic
+object and thus detect missing dependencies, unsatisfied
+symbol relocations, unused and unreferenced dependencies. These checks
+are carried out for the following reasons:
+.TP 4
+\(bu
+An object that cannot find its dependencies may fail to load
+at runtime.  This error condition often goes unnoticed
+because the existing use of the object is as a dependency itself,
+and the objects' dependencies are already satisfied by the
+caller.  However, if the object itself is unable to satisfy its
+dependencies, its use in new environments may be compromised.
+.sp
+A missing or erroneous \fBrunpath\fP is the typical reason why
+an object can not locate its dependencies.  Use of the link-editors
+\fB-zdefs\fP option when building a shared object ensures required
+dependencies are established.  This flag is inherited from
+\fB$(DYNFLAGS)\fP in \fIlib/Makefile.lib\fP. Missing dependencies
+are displayed as:
+.sp
+.RS 6
+foo: bar.so.1 => (file not found)  <no -zdefs?>
+.RE
+.TP
+\(bu
+Unsatisfied symbol relocations indicate that some thread of
+execution through the object will fail when it is unable to
+locate a referenced symbol.
+.sp
+A missing, or mismatched version of a dependency is the typical
+reason for unsatisfied symbol relocations (see missing dependency
+discussion above). Unsatisfied symbol relocations are displayed as:
+.sp
+.RS 6
+foo: symbol not found: bar  <no -zdefs?>
+.RE
+.RS 4
+.sp
+Note: Shared objects can make reference to symbol definitions
+that are expected to be defined by the caller. To indicate that
+such symbols are not undefined in the usual sense, you must
+specify these symbols in a \fImapfile\fP, using the \fBEXTERN\fP
+or \fBPARENT\fP symbol attribute. Without these symbol attributes,
+\fBldd(1)\fP is unable to determine the symbols special nature, and
+.I check_rtime
+will report these symbols as undefined. 
+.RE
+.TP
+\(bu
+Unused dependencies are wasteful at runtime, as they take time to
+load and relocate, but will not be used by the calling object.  They
+also result in unnecessary processing at link-edit time.
+.sp
+Dependency lists (typically defined via \fB$(LDLIBS)\fP)
+that have been yanked-and-put
+between \fIMakefiles\fP without verifying their need, are a typical
+reason why unused dependencies exist.  Unused dependencies are
+displayed as:
+.sp
+.RS 6
+foo: unused object=bar.so.1  <remove lib or -zignore?>
+.RE
+.TP
+\(bu
+Unreferenced dependencies are also wasteful at runtime, although not
+to the extent of unused dependencies.  They also result in unnecessary
+processing at link-edit time.
+.sp
+Unreferenced dependency removal guards against a dependency becoming
+unused when combined with
+different objects, or as the other object dependencies evolve.
+Unreferenced dependencies are displayed as:
+.sp
+.RS 6
+foo: unreferenced object=bar.so.1;  \\
+.br
+    unused dependency of libfoo.so.1  \\
+.br
+    <remove lib or -zignore?>
+.RE
+.RS 4
+.sp
+See also the section ENVIRONMENT VARIABLES.
+.RE
+.TP
+\(bu
+Unused search paths are wasteful at runtime.
+Unused search paths are displayed as:
+.sp
+.RS 6
+foo: unused search path=/usr/foo/lib  \\
+.br
+    (RUNPATH/RPATH from file libfoo.so.1)  \\
+.br
+    <remove search path?>
+.RE
+.LP
+.I check_rtime
+uses \fBelfdump(1)\fP to look for a concatenated relocation
+section in shared objects, the existence of text relocations,
+whether debugging or symbol table information exists, whether
+applications have a non-executable stack defined, duplicate
+entries in the symbol sorting sections, and for direct bindings.
+These checks are carried out for the following reasons:
+.TP 4
+\(bu
+A concatenated relocation section (\fI.SUNW_reloc\fP)
+provides optimal symbol table
+access at runtime, and thus reduces the overhead of relocating
+the shared object.  In past releases, the link-edit of a dynamic object with
+the \fB-z combreloc\fP option was required to generate a combined
+relocation section.  However, with the integration of 6642769, this section
+combination is a default behavior of the link-editor.
+.sp
+In past releases, not inheriting \fB$(DYNFLAGS)\fP from
+\fIlib/Makefile.lib\fP was the typical reason for not having a
+concatenated relocation section. The misguided use of the
+\fB-z nocombreloc\fP option will also prevent the creation of a
+concatenated relocation section. A missing concatenated relocation section
+is displayed as:
+.sp
+.RS 6
+foo: .SUNW_reloc section missing  <no -zcombreloc?>
+.RE
+.TP
+\(bu
+Text relocations result in impure text segments.  As text segments
+are typically read-only, they can be shared between numerous processes.
+If they must be updated as part of the relocation then the updated
+pages become unsharable and swap space must be allocated to back
+these pages.  These events consume unnecessary system resources and
+reduce overall system performance.
+.sp
+Not inheriting the \fB$(PICS)\fP
+rules from \fIlib/Makefile.lib\fP is the typical reason for having
+non-pic code in shared objects.  Text relocations are displayed as:
+.sp
+.RS 6
+foo: TEXTREL .dynamic tag  <no -Kpic?>
+.RE
+.TP
+\(bu
+Debugging information is unnecessary in released objects.  Although
+extensive when compiled \fB-g\fP, small quantities of debugging
+information are stored in \fI.stabs\fP sections under normal
+compilations.  This debugging information is geared towards aiding
+debuggers locate relocatable objects associated with the dynamic
+objects being debugged.  As relocatable objects aren't made available
+as part of a software release this information has no use.
+.sp
+Not inheriting the correct \fB$(LDFLAGS)\fP from \fIcmd/Makefile.cmd\fP
+(which asserts \fP-s\fP), or \fB$(POST_PROCESS_SO)\fP (which asserts
+\fIstrip -x\fP) are typical reasons for not removing debugging
+information.  Note, removal of debugging information is only enabled
+for release builds. The existence of debugging information is displayed as:
+.sp
+.RS 6
+foo: debugging sections should be deleted  \\
+.br
+    <no strip -x?>
+.RE
+.TP
+\(bu
+All objects should retain their full \fI.symtab\fP symbol table.
+Although this consumes disk space, it provides for more extensive stack
+tracing when debugging user applications.
+.sp
+Hard coding a \fI-s\fP flag with \fB$(LDFLAGS)\fP or
+\fB$(DYNFLAGS)\fP is the typical
+reason for symbol tables being removed.
+Objects that do not contain a symbol table are displayed as:
+.sp
+.RS 6
+foo.so.1: symbol table should not be stripped  \\
+.br
+    <remove -s?>
+.RE
+.TP
+\(bu
+Applications should have a non-executable stack defined to make
+them less vulnerable to buffer overflow attacks.
+.sp
+Not inheriting the \fB$(LDFLAGS)\fP macro in \fIcmd/Makefile.cmd\fP
+is the typical reason for not having a non-executable stack definition.
+Applications without this definition are displayed as:
+.sp
+.RS 6
+foo: application requires non-executable stack \\
+.br
+	<no -Mmapfile_noexstk?>
+.RE
+.sp
+.TP
+\(bu
+x86 applications should have a non-executable data segment defined to make
+them less vulnerable to buffer overflow attacks.
+.sp
+Not inheriting the \fB$(LDFLAGS)\fP macro in \fIcmd/Makefile.cmd\fP
+is the typical reason for not having a non-executable data definition.
+Applications without this definition are displayed as:
+.sp
+.RS 6
+foo: application requires non-executable data \\
+.br
+	<no -Mmapfile_noexdata?>
+.RE
+.sp
+.TP
+\(bu
+Solaris ELF files contain symbol sort sections used by DTrace to
+map addresses in memory to the related function or variable symbols. There
+are two such sections, \fI.SUNW_dynsymsort\fP for
+regular symbols, and \fI.SUNW_dyntlssort\fP for thread-local
+symbols. To ensure that the best names are shown for each
+such address, and that the same name is given across Solaris releases,
+.I check_rtime
+enforces the rule that only one symbol can appear in the sort sections for
+any given address.
+There are two common ways in which multiple symbols 
+or a given address occur in the ON distribution. The first is from
+code written in assembly language. The second is as a 
+result of using \fB#pragma weak\fP in C to create weak symbols. The
+best solution to this
+situation is to modify the code to avoid symbol aliasing. Alternatively,
+the \fBNODYNSORT\fP mapfile attribute can be used to eliminate the unwanted
+symbol.
+.sp
+Duplicate entries in a symbol sort section are
+displayed in one of the following ways, depending on
+whether the section is for regular or thread-local symbols:
+.sp
+.RS 6
+foo: .SUNW_dynsymsort: duplicate ADDRESS: sym1, sym2
+.br
+foo: .SUNW_dyntlssort: duplicate OFFSET: sym1, sym2
+.RE
+.sp
+.TP
+\(bu
+\fBOSNet\fP dynamic ELF objects are expected to employ direct bindings whenever
+feasible.  This runtime binding technique helps to avoid accidental
+interposition problems, and provides a more optimal
+runtime symbol search model.
+.sp
+Not inheriting the correct \fB$(LDFLAGS)\fP from \fIcmd/Makefile.cmd\fP,
+or the correct \fB$(DYNFLAGS)\fP from \fIlib/Makefile.lib\fP, are the
+typical reasons for not enabling direct bindings. Dynamic objects that
+do not contain direct binding information are displayed as:
+.sp
+.RS 6
+foo: object has no direct bindings \\
+.br
+	<no -B direct or -z direct?>
+.RE
+
+.sp
+.LP
+.I check_rtime also
+uses \fBelfdump(1)\fP
+to display useful dynamic entry information under the \fB-i\fP option.
+This doesn't necessarily indicate an error condition, but
+provides information that is often useful for gatekeepers to track
+changes in a release.  Presently the information listed is:
+.TP
+\(bu
+Runpaths are printed for any dynamic object.  This is a historic
+sanity check to insure compiler supplied runpaths (typically from \fBCC\fP)
+are not recorded in any objects.  Runpaths are displayed as:
+.sp
+.RS 6
+foo: RPATH=/usr/bar/lib
+.RE
+.TP
+\(bu
+Needed dependencies are printed for any dynamic object.
+In the freeware world this often helps the introducer of a new
+shared object discover that an existing binary has become its
+consumer, and thus that binaries package dependencies may require updating.
+Dependencies are printed as:
+.sp
+.RS 6
+foo: NEEDED=bar.so.1
+.RE
+.sp
+.LP
+.I check_rtime
+uses \fBmcs(1)\fP to inspect an object's \fI.comment\fP section.
+During development, this section contains numerous file identifiers
+marked with the tag "\fB@(#)\fP".  For release builds these sections
+are deleted and rewritten under control of the \fB$(POST_PROCESS)\fP
+macro to produce a common release identifier.  This identifier
+typically consists of three lines including a single comment starting
+with the string "\fB@(#) SunOS\fP".  If this common identifier isn't
+found the following diagnostic is generated:
+.sp
+.RS 6
+foo: non-conforming mcs(1) comment  <no $(POST_PROCESS)?>
+.RE
+.sp
+.LP
+.I check_rtime
+uses \fBpvs(1)\fP to display version definitions under the \fB-v\fP option.
+Each symbol defined by the object is shown along with the version it belongs to.
+Changes to the symbols defined by an object, or the versions they belong to,
+do not necessarily indicate an error condition, but
+provides information that is often useful for gatekeepers to track
+changes in a release.
+.RE
+.sp
+.LP
+.SH OPTIONS
+.LP
+The following options are supported:
+.TP 4
+.B \-D depfile
+Use \fIdepfile\fP to generate an alternative dependency mapping.
+\fIdepfile\fP must be created by '\fBfind_elf -r\fP'.
+The \fB-D\fP and \fB-d\fP options are mutually exclusive.
+.TP
+.B \-d depdir
+Use \fIdepdir\fP to generate an alternative dependency mapping.
+\fBfind_elf(1ONBLD)\fP is used to locate the ELF sharable objects for
+which alternative mappings are required. The \fB-D\fP and \fB-d\fP options
+are mutually exclusive.
+.TP 4
+.B \-E errfile
+Direct error messages for the analyzed objects to \fIerrfile\fP instead 
+of stdout.
+.TP 4
+.B \-e exfile
+An exception file is used to exclude objects from
+the usual rules. See EXCEPTION FILE FORMAT.
+.TP
+.B \-f listfile
+Normally,
+.I interface_check
+runs
+.I find_elf
+to locate the ELF objects to analyze. The \fB-f\fP option can be
+used to instead provide a file containing the list of objects to
+analyze, in the format produced by '\fBfind_elf -r\fP'.
+.TP
+.B -I infofile
+Direct informational messages (\fB-i\fP, and \fB-v\fP options) for the
+analyzed objects to \fIinfofile\fP instead of stdout.
+.TP
+.B \-i
+Provide dynamic entry information.  Presently only dependencies and
+runpaths are printed.
+.TP
+.B \-m
+Enable \fBmcs(1)\fP checking.
+.TP
+.B \-o
+Produce a one-line output for each condition discovered, prefixed
+by the objects name.  This output style is more terse, but is
+more appropriate for sorting and diffing with previous build results.
+.TP
+.B \-s
+Determine whether \fI.stabs\fP sections exist.
+.TP
+.B \-v
+Provide version definition information. Each symbol defined by the object
+is printed along with the version it is assigned to.
+.TP
+.B -w outdir
+Interpret the paths of all input and output files relative to \fIoutdir\fP.
+.LP
+.SH EXCEPTION FILE FORMAT
+Exceptions to the rules enforced by
+.I check_rtime
+are specified using an exception file. The \fB-e\fP option is used to
+specify an explicit exception file. Otherwise, if used in an activated
+workspace, the default exception file is
+$CODEMGR_WS/exception_list/check_rtime
+if that file exists. If not used in an activated workspace, or if
+$CODEMGR_WS/exception_list/check_rtime does not exist,
+.I check_rtime
+will use
+.I /opt/onbld/etc/exception_list/check_rtime
+as a fallback default exception file.
+.p
+To run
+.I check_rtime
+without applying exceptions, specify \fB-e\fP with a value of /dev/null.
+.P
+A '#' character at the beginning of a line, or at any point in
+a line when preceded by whitespace, introduces a comment. Empty lines, 
+and lines containing only comments, are ignored by
+.I check_rtime.
+Exceptions are specified as space separated keyword, and \fBperl(1)\fP
+regular expression:
+.sp
+.in +4
+.nf
+keyword  perl-regex
+.fi
+.in -4
+.sp
+Since whitespace is used as a separator, the regular
+expression cannot itself contain whitespace. Use of the \\s character
+class to represent whitespace within the regular expression is recommended.
+Before the perl regular expression is used, constructs of the form
+MACH(dir) are expanded into a regular expression that matches the directory
+given, as well as any 64-bit architecture subdirectory that
+might be present (i.e. amd64, sparcv9). For instance, MACH(lib) will
+match any of the following:
+.sp
+.in +4
+.nf
+lib
+lib/amd64
+lib/sparcv9
+.fi
+.in -4
+.sp
+The exceptions understood by
+.I check_rtime
+are:
+.sp
+.ne 2
+.mk
+.na
+\fBEXEC_DATA\fR
+.ad
+.RS 17n
+.rt
+.sp
+Executables that are not required to have non-executable writable
+data segments
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBEXEC_STACK\fR
+.ad
+.RS 17n
+.rt
+.sp
+Executables that are not required to have a non-executable stack
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBNOCRLEALT\fR
+.ad
+.RS 17n
+.rt
+.sp
+Objects that should be skipped when building the alternative dependency 
+mapping via the \fB-d\fP option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBNODIRECT\fR
+.ad
+.RS 17n
+.rt
+.sp
+Directories and files that are allowed to have no direct bound symbols.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBNOSYMSORT\fR
+.ad
+.RS 17n
+.rt
+.sp
+Files for which we skip checking of duplicate addresses in the
+symbol sort sections.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBOLDDEP\fR
+.ad
+.RS 17n
+.rt
+.sp
+Objects that used to contain system functionality that has since
+migrated to libc. We preserve these libraries as pure filters for
+backward compatibility but nothing needs to link to them.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBSKIP\fR
+.ad
+.RS 17n
+.rt
+.sp
+Directories and/or individual objects to skip. Note that SKIP should be
+a last resort, used only when one of the other exceptions will not suffice.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBSTAB\fR
+.ad
+.RS 17n
+.rt
+.sp
+Objects that are allowed to contain debugging information (stabs).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBTEXTREL\fR
+.ad
+.RS 17n
+.rt
+.sp
+Objects for which we allow relocations to the text segment.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBUNDEF_OBJ\fR
+.ad
+.RS 17n
+.rt
+.sp
+Objects that are allowed to be unreferenced.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBUNDEF_REF\fR
+.ad
+.RS 17n
+.rt
+.sp
+Objects that are allowed undefined references.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBUNUSED_DEPS\fR
+.ad
+.RS 17n
+.rt
+.sp
+Objects that are allowed to have unused dependencies.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBUNUSED_OBJ\fR
+.ad
+.RS 17n
+.rt
+.sp
+Objects that are always allowed to be unused dependencies.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBUNUSED_RPATH\fR
+.ad
+.RS 17n
+.rt
+.sp
+Objects that are allowed to have unused runpath directories.
+.RE
+
+.LP
+.SH ALTERNATIVE DEPENDENCY MAPPING
+.I check_rtime
+was primarily designed to process a nightly builds \fB$ROOT\fP
+hierarchy. It is often the case that objects within this hierarchy
+must bind to dependencies within the same hierarchy to satisfy
+their requirements.
+.LP
+To achieve this,
+.I check_rtime
+uses the shared objects specified with the \fB-D\fP or \fB-d\fP options.
+If neither option is specified, and the \fB$CODEMGR_WS\fP and \fB$ROOT\fP
+environment variables are defined, the proto area for the workspace
+is used. The objects found are used
+to create runtime configuration files via \fBcrle(1)\fP, that establish
+the new shared objects as alternatives to their underlying system location.
+.I check_rtime
+passes these configuration files as \fBLD_CONFIG\fP environment
+variable settings to \fBldd(1)\fP using its \fB-e\fP option.
+.LP
+The effect of these configuration files is that the execution of an
+object under \fBldd(1)\fP will bind to the dependencies defined as
+alternatives.  Simply put, an object inspected in the \fIproto\fP
+area will bind to its dependencies found in the \fIproto\fP area.
+Dependencies that have no alternative mapping will continue to
+bind to the underlying system.
+.LP
+.SH ENVIRONMENT VARIABLES
+.LP
+When the \fB-D\fP or \fB-d\fP option isn't in use,
+.I check_rtime
+uses the following environment variables to
+establish an alternative dependency mapping:
+.LP
+.B CODEMGR_WS
+.RS 4
+The root of your workspace, which is the directory
+containing \fICodemgr_wsdata\fP. Existence of this environment variable
+indicates that \fB$ROOT\fP should be investigated.
+.RE
+.LP
+.B ROOT
+.RS 4
+Root of the \fIproto\fP area of your workspace. Any shared objects
+under this directory will be used to establish an alternative dependency
+mapping.
+.RE
+.sp
+If \fBldd(1)\fP supports the \fB-U\fP option, it will be used to determine
+any unreferenced dependencies.  Otherwise \fBldd(1)\fP uses the older
+\fB-u\fP option which only detects unused references.  If the following
+environment variable exists, and indicates an earlier release than \fB5.10\fP
+then \fBldd(1)\fP also falls back to using the \fB-u\fP option.
+.RE
+.LP
+.B RELEASE
+.RS 4
+The release version number of the environment being built.
+.RE
+.SH ERROR CONDITIONS
+.LP
+Inspection of an object with \fBldd(1)\fP assumes it is compatible
+with the machine on which
+.I check_rtime
+is being run.  Incompatible objects such as a 64-bit object encountered on
+a 32-bit system, or an i386 object encountered on a sparc system,
+can not be fully inspected.  These objects are displayed as:
+.sp
+.RS 4
+foo: has wrong class or data encoding
+.RE
+.LP
+.SH FILES
+.LP
+.RS 5
+$CODEMGR_WS/exception_list/check_rtime
+/opt/onbld/etc/exception_list/check_rtime
+.SH SEE ALSO
+.B crle(1),
+.B elfdump(1),
+.B find_elf(1ONBLD),
+.B ldd(1),
+.B ld.so.1(1),
+.B mcs(1).

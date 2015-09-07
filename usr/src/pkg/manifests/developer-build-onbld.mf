@@ -57,7 +57,7 @@ dir path=opt/onbld/lib/python2.6/onbld/Checks
 dir path=opt/onbld/lib/python2.6/onbld/Scm
 dir path=opt/onbld/lib/python2.6/onbld/hgext
 dir path=opt/onbld/man
-dir path=opt/onbld/man/man1
+dir path=opt/onbld/man/man1onbld
 dir path=opt/onbld/share
 $(i386_ONLY)file path=opt/onbld/bin/$(ARCH)/aw mode=0555
 $(sparc_ONLY)file path=opt/onbld/bin/$(ARCH)/chk4ubin mode=0555
@@ -185,39 +185,39 @@ file path=opt/onbld/lib/python2.6/onbld/__init__.pyc mode=0444
 file path=opt/onbld/lib/python2.6/onbld/hgext/__init__.py mode=0444
 file path=opt/onbld/lib/python2.6/onbld/hgext/__init__.pyc mode=0444
 file path=opt/onbld/lib/python2.6/onbld/hgext/cdm.py mode=0444
-file path=opt/onbld/man/man1/Install.1
-file path=opt/onbld/man/man1/bldenv.1
-file path=opt/onbld/man/man1/bringovercheck.1
-file path=opt/onbld/man/man1/cddlchk.1
-file path=opt/onbld/man/man1/check_rtime.1
-file path=opt/onbld/man/man1/checkpaths.1
-file path=opt/onbld/man/man1/codereview.1
-file path=opt/onbld/man/man1/cstyle.1
-file path=opt/onbld/man/man1/cw.1
-file path=opt/onbld/man/man1/find_elf.1
-file path=opt/onbld/man/man1/findunref.1
-file path=opt/onbld/man/man1/flg.flp.1
-file path=opt/onbld/man/man1/get_depend_info.1
-file path=opt/onbld/man/man1/git-pbchk.1
-file path=opt/onbld/man/man1/hdrchk.1
-file path=opt/onbld/man/man1/hgsetup.1
-file path=opt/onbld/man/man1/interface_check.1
-file path=opt/onbld/man/man1/interface_cmp.1
-file path=opt/onbld/man/man1/jstyle.1
-file path=opt/onbld/man/man1/lintdump.1
-file path=opt/onbld/man/man1/make_pkg_db.1
-file path=opt/onbld/man/man1/mapfilechk.1
-file path=opt/onbld/man/man1/ndrgen.1
-file path=opt/onbld/man/man1/nightly.1
-file path=opt/onbld/man/man1/onu.1
-file path=opt/onbld/man/man1/sccscheck.1
-file path=opt/onbld/man/man1/signit.1
-file path=opt/onbld/man/man1/signproto.1
-file path=opt/onbld/man/man1/webrev.1
-file path=opt/onbld/man/man1/which_scm.1
-file path=opt/onbld/man/man1/ws.1
-file path=opt/onbld/man/man1/wsdiff.1
-file path=opt/onbld/man/man1/xref.1
+file path=opt/onbld/man/man1onbld/Install.1onbld
+file path=opt/onbld/man/man1onbld/bldenv.1onbld
+file path=opt/onbld/man/man1onbld/bringovercheck.1onbld
+file path=opt/onbld/man/man1onbld/cddlchk.1onbld
+file path=opt/onbld/man/man1onbld/check_rtime.1onbld
+file path=opt/onbld/man/man1onbld/checkpaths.1onbld
+file path=opt/onbld/man/man1onbld/codereview.1onbld
+file path=opt/onbld/man/man1onbld/cstyle.1onbld
+file path=opt/onbld/man/man1onbld/cw.1onbld
+file path=opt/onbld/man/man1onbld/find_elf.1onbld
+file path=opt/onbld/man/man1onbld/findunref.1onbld
+file path=opt/onbld/man/man1onbld/flg.flp.1onbld
+file path=opt/onbld/man/man1onbld/get_depend_info.1onbld
+file path=opt/onbld/man/man1onbld/git-pbchk.1onbld
+file path=opt/onbld/man/man1onbld/hdrchk.1onbld
+file path=opt/onbld/man/man1onbld/hgsetup.1onbld
+file path=opt/onbld/man/man1onbld/interface_check.1onbld
+file path=opt/onbld/man/man1onbld/interface_cmp.1onbld
+file path=opt/onbld/man/man1onbld/jstyle.1onbld
+file path=opt/onbld/man/man1onbld/lintdump.1onbld
+file path=opt/onbld/man/man1onbld/make_pkg_db.1onbld
+file path=opt/onbld/man/man1onbld/mapfilechk.1onbld
+file path=opt/onbld/man/man1onbld/ndrgen.1onbld
+file path=opt/onbld/man/man1onbld/nightly.1onbld
+file path=opt/onbld/man/man1onbld/onu.1onbld
+file path=opt/onbld/man/man1onbld/sccscheck.1onbld
+file path=opt/onbld/man/man1onbld/signit.1onbld
+file path=opt/onbld/man/man1onbld/signproto.1onbld
+file path=opt/onbld/man/man1onbld/webrev.1onbld
+file path=opt/onbld/man/man1onbld/which_scm.1onbld
+file path=opt/onbld/man/man1onbld/ws.1onbld
+file path=opt/onbld/man/man1onbld/wsdiff.1onbld
+file path=opt/onbld/man/man1onbld/xref.1onbld
 file path=opt/onbld/share/make.rules mode=0444
 hardlink path=opt/onbld/bin/$(ARCH)/install.bin target=./install
 legacy pkg=SUNWonbld desc="tools used to build the OS-Net consolidation" \
@@ -231,7 +231,7 @@ license usr/src/tools/onbld/THIRDPARTYLICENSE \
 link path=opt/onbld/bin/$(ARCH)/dmake target=make
 link path=opt/onbld/bin/git-nits target=git-pbchk
 link path=opt/onbld/lib/python target=python2.6
-link path=opt/onbld/man/man1/git-nits.1 target=git-pbchk.1
+link path=opt/onbld/man/man1onbld/git-nits.1onbld target=git-pbchk.1onbld
 # webrev(1) requires ps2pdf
 depend fmri=print/filter/ghostscript type=require
 # nightly(1) uses wget

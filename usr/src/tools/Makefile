@@ -105,7 +105,7 @@ ROOTDIRS= \
 	$(ROOTONBLD)/share \
 	$(ROOTONBLD)/gk \
 	$(ROOTONBLD)/man \
-	$(ROOTONBLD)/man/man1
+	$(ROOTONBLD)/man/man1onbld
 
 all :=		TARGET= install
 install :=	TARGET= install

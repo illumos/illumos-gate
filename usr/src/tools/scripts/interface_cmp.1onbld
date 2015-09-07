@@ -1,0 +1,245 @@
+.\" Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+.\"
+.\" CDDL HEADER START
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.\" CDDL HEADER END
+.\"
+.TH interface_cmp 1ONBLD "25 March 2010"
+.SH NAME
+interface_cmp \- compare shared object interface descriptions
+.SH SYNOPSIS
+\fBinterface_cmp [-dot] [-e exfile] old new\fP
+.LP
+.SH DESCRIPTION
+.IX "OS-Net build tools" "interface_cmp" "" "\fBinterface_cmp\fP"
+The
+.I interface_cmp
+command compares the interface definition files for two workspaces
+and reports versioning inconsistencies. Interface definition
+files are created by
+.IR interface_check.
+.PP
+.I interface_cmp
+is typically called from \fBnightly(1ONBLD)\fP when the \fB-A\fP
+option is in effect following the creation of a new database by
+.IR interface_check .
+To insure symbolic
+interface consistency between successive software releases, existing
+version definitions and their symbol association should remain intact.
+Any discrepancies between the two interface definitions are flagged as
+errors.
+.PP
+Note that version definition inheritance has the effect of causing a
+symbol to be viewed as existing in multiple definitions. This insures
+that both version definitions and their inheritance relationship are
+processed as part of the comparison.
+.LP
+.SH OPTIONS
+.LP
+The following options are supported:
+.TP 4
+.B \-c vertype_module
+By default,
+.I interface_cmp
+is customized for the versioning conventions used by the Solaris
+OSnet code base. This specialized information, which includes
+the recognition of the SUNW_ prefix and other special names, is
+contained in a perl module named onbld_elfmod_vertype.pm, which
+is delivered with the SUNWonbld tools. This module is loaded by
+.I interface_cmp
+at runtime. The \fB-c\fP option can be used to supply
+an alternative module, customized for a different code base, allowing
+.I interface_cmp
+to operate on code from other projects. The alternative module must
+supply the same module and calling interfaces as the standard module.
+.TP 4
+.B \-d
+Asserts that the \fBnew\fP interface is a direct descendant of
+\fBold\fP. If so, the following additional checks are enabled:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The top version of an inheritance chain must not increase
+by more than one.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The new interface must not add new empty versions. Pre-existing empty
+versions represent public interfaces that cannot be changed, but new
+ones should be removed before the product ships.
+.RE
+.sp
+.LP
+.TP 4
+.B \-e exfile
+An exception file is used to exclude objects from
+the usual rules. See EXCEPTION FILE FORMAT.
+.TP 4
+.B \-o
+Produce one-liner output, with each line of diagnostic output 
+prefixed with the object pathname.
+.TP 4
+.B \-t
+If the \fB-t\fP option is present, only one argument is allowed.
+The interface description file is parsed, and then regenerated on
+stdout in the same format used by the
+.I interface_check
+\fB-I\fP option. The \fB-I\fP output from
+.I interface_check
+and the output from
+.I interface_cmp
+\fB-t\fP
+should be identical, excluding header comments. 
+This is a debugging feature, and not intended for general use.
+.LP
+.SH EXCEPTION FILE FORMAT
+Exceptions to the rules enforced by
+.I interface_cmp
+are specified using an exception file. The \fB-e\fP option is used to
+specify an explicit exception file. Otherwise, if used in an activated
+workspace, the default exception file is
+$CODEMGR_WS/exception_list/interface_cmp
+if that file exists. If not used in an activated workspace, or if
+$CODEMGR_WS/exception_list/interface_cmp does not exist,
+.I interface_cmp
+will use
+.I /opt/onbld/etc/exception_list/interface_cmp
+as a fallback default exception file.
+.p
+To run
+.I interface_cmp
+without applying exceptions, specify \fB-e\fP with a value of /dev/null.
+.P
+A '#' character at the beginning of a line, or at any point in
+a line when preceded by whitespace, introduces a comment. Empty lines, 
+and lines containing only comments, are ignored by
+.I interface_cmp.
+Exceptions are specified as space separated keyword, and \fBperl(1)\fP
+regular expressions. The number of regular expressions depends on the
+particular exception in questions:
+.sp
+.in +4
+.nf
+keyword  perl-regex...
+.fi
+.in -4
+.sp
+Since whitespace is used as a separator, the regular
+expression cannot itself contain whitespace. Use of the \\s character
+class to represent whitespace within the regular expression is recommended.
+Before the perl regular expression is used, constructs of the form
+MACH(dir) are expanded into a regular expression that matches the directory
+given, as well as any 64-bit architecture subdirectory that
+might be present (i.e. amd64, sparcv9). For instance, MACH(lib) will
+match any of the following:
+.sp
+.in +4
+.nf
+lib
+lib/amd64
+lib/sparcv9
+.fi
+.in -4
+.sp
+The exceptions understood by
+.I interface_cmp
+are:
+.sp
+.ne 2
+.mk
+.na
+\fBADDSYM\fR sym_re version_re object_re
+.ad
+.RS 17n
+.rt
+.sp
+The interfaces in a given version are not supposed to change. 
+.I interface_cmp
+will normally issue an error if a new interface is added to a previously
+released version. ADDSYM is used to override this
+requirement. If the added symbol, version, and object match
+the regular expressions specified by ADDSYM, the added symbol is ignored.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBDELDYM\fR sym_re version_re object_re
+.ad
+.RS 17n
+.rt
+.sp
+Once released to the public, interfaces are required to remain available
+in subsequent releases. DELSYM is used to override this
+requirement, as can occur when interfaces are EOL'd. Such an action generally
+requires a PSARC case. If the deleted symbol, version, and object match
+the regular expressions specified by DELSYM, the deleted symbol is ignored.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBEMPTY_TOPVERSION\fR version_re object_re
+.ad
+.RS 17n
+.rt
+.sp
+.I
+interface_cmp
+normally issues an error if the old object has an empty top version
+that is non-empty in the new object. Such a situation is normally
+an error, but may legitimately occur as part of a fix to another versioning
+error.  If the version, and object match
+the regular expressions specified by EMPTY_TOPVERSION, the error is suppressed.
+.RE
+
+.PP
+.SH EXAMPLES
+The following example uses
+.I interface_cmp
+to compare this releases interface definition with a previous
+builds results:
+.PP
+.RS
+.nf
+.B % interface_cmp -d -o $SRC/ELF-data.$MACH.ref/interfaces\ \\\\
+.B \ \ \ \ \ \ \ $SRC/ELF-data.$MACH/interfaces
+lib/libadm.so.1: SUNW_1.1: added interface: circf(4)
+lib/libaio.so.1: SUNW_1.1: deleted interface: _aiocancel
+.fi
+.RE
+.sp
+.PP
+Note: the above comparison files were doctored in order to provide
+the example, they do not indicate any real changes that have
+occurred in the associated system libraries.
+.br
+.SH SEE ALSO
+.BR find_elf(1ONBLD),
+.BR interface_check(1ONBLD),
+.BR ld(1),
+.BR ldd(1),
+.BR elfdump(1),
+.BR pvs(1).
+.LP
+.TZ LLM

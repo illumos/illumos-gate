@@ -31,21 +31,21 @@ ETCFILES= \
 	SampleLinks \
 	SamplePkgLinks
 
-MAN1FILES= \
-	get_depend_info.1 \
-	make_pkg_db.1
+MAN1ONBLDFILES= \
+	get_depend_info.1onbld \
+	make_pkg_db.1onbld
 
 include ../Makefile.tools
 
 $(ROOTONBLDETCFILES) := FILEMODE=	644
-$(ROOTONBLDMAN1FILES) := FILEMODE=	644
+$(ROOTONBLDMAN1ONBLDFILES) := FILEMODE=	644
 
 .KEEP_STATE:
 
-all:	$(SHFILES) $(MAN1FILES)
+all:	$(SHFILES) $(MAN1ONBLDFILES)
 
 install: all .WAIT $(ROOTONBLDSHFILES) $(ROOTONBLDETCFILES) \
-	$(ROOTONBLDMAN1FILES)
+	$(ROOTONBLDMAN1ONBLDFILES)
 
 clean:
 	$(RM) $(CLEANFILES)
