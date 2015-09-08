@@ -4201,7 +4201,7 @@ lxpr_read_uptime(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	mutex_enter(&cpu_lock);
 	pools_enabled = pool_pset_enabled();
 
-	cp = cpstart = CPU;
+	cp = cpstart = CPU->cpu_part->cp_cpulist;
 	do {
 		/*
 		 * Don't count CPUs that aren't even in the system
@@ -4330,7 +4330,7 @@ lxpr_read_cpuinfo(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	mutex_enter(&cpu_lock);
 	pools_enabled = pool_pset_enabled();
 
-	cp = cpstart = CPU;
+	cp = cpstart = CPU->cpu_part->cp_cpulist;
 	do {
 		/*
 		 * This returns the maximum eax value for standard cpuid
