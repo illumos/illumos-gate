@@ -235,7 +235,9 @@ modify that file's or directory's permission bits or ACL.
 .ad
 .sp .6
 .RS 4n
-Allow a process to read objects in the filesystem.
+Allow a process to open objects in the filesystem for reading. This
+privilege is not necessary to read from an already open file which was opened
+before dropping the \fBPRIV_FILE_READ\fR privilege.
 .RE
 
 .sp
@@ -275,7 +277,9 @@ Extensions.
 .ad
 .sp .6
 .RS 4n
-Allow a process to modify objects in the filesytem.
+Allow a process to open objects in the filesytem for writing, or otherwise
+modify them. This privilege is not necessary to write to an already open file
+which was opened before dropping the \fBPRIV_FILE_WRITE\fR privilege.
 .RE
 
 .sp
@@ -354,7 +358,9 @@ Segment.
 .ad
 .sp .6
 .RS 4n
-Allow a process to open a TCP, UDP, SDP, or SCTP network endpoint.
+Allow a process to open a TCP, UDP, SDP, or SCTP network endpoint. This
+privilege is not necessary to communicate using an existing endpoint already
+opened before dropping the \fBPRIV_NET_ACCESS\fR privilege.
 .RE
 
 .sp
@@ -1087,7 +1093,8 @@ x86 platforms.
 .sp
 .LP
 Of the privileges listed above, the privileges \fBPRIV_FILE_LINK_ANY\fR,
-\fBPRIV_PROC_INFO\fR, \fBPRIV_PROC_SESSION\fR, \fBPRIV_PROC_FORK\fR and
+\fBPRIV_PROC_INFO\fR, \fBPRIV_PROC_SESSION\fR, \fBPRIV_PROC_FORK\fR,
+\fBPRIV_FILE_READ\fR, \fBPRIV_FILE_WRITE\fR, \fBPRIV_NET_ACCESS\fR and
 \fBPRIV_PROC_EXEC\fR are considered "basic" privileges. These are privileges
 that used to be always available to unprivileged processes. By default,
 processes still have the basic privileges.

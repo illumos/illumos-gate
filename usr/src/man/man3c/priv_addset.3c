@@ -6,8 +6,9 @@
 .TH PRIV_ADDSET 3C "Jan 28, 2005"
 .SH NAME
 priv_addset, priv_allocset, priv_copyset, priv_delset, priv_emptyset,
-priv_fillset, priv_freeset, priv_intersect, priv_inverse, priv_isemptyset,
-priv_isequalset, priv_isfullset, priv_ismember, priv_issubset, priv_union \-
+priv_basicset, priv_fillset, priv_freeset, priv_intersect, priv_inverse,
+priv_isemptyset, priv_isequalset, priv_isfullset, priv_ismember,
+priv_issubset, priv_union \-
 privilege set manipulation functions
 .SH SYNOPSIS
 .LP
@@ -35,6 +36,11 @@ privilege set manipulation functions
 .LP
 .nf
 \fBvoid\fR \fBpriv_emptyset\fR(\fBpriv_set_t *\fR\fIsp\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBpriv_basicset\fR(\fBpriv_set_t *\fR\fIsp\fR);
 .fi
 
 .LP
@@ -112,6 +118,9 @@ The \fBpriv_delset()\fR function removes the named privilege \fIpriv\fR from
 .sp
 .LP
 The \fBpriv_emptyset()\fR function clears all privileges from \fIsp\fR.
+.sp
+.LP
+The \fBpriv_basicset()\fR function copies the basic privilege set to \fIsp\fR.
 .sp
 .LP
 The \fBpriv_fillset()\fR function asserts all privileges in \fIsp\fR, including
