@@ -38,8 +38,10 @@
  * can have four values, with misleading names due to backward compatability,
  * but which are used to control how many zfd devices are created inside the
  * zone, and to control if the output on the device(s) is logged in the GZ.
- * Internally the zfd_mode_t struct holds the number of devs and the logging
- * state that corresponds to the zone attr value.
+ * See the comment in uts/common/io/zfd.c for more details.
+ *
+ * Internally the zfd_mode_t struct holds the number of stdio devs (1 or 3) and
+ * the number of additional devs corresponding to the zone attr value.
  */
 
 #include <sys/types.h>
@@ -93,8 +95,8 @@ static int eventstream[2] = {-1, -1};
 #define	ZTTY_RETRY		5
 
 typedef struct zfd_mode {
-	int		zmode_ndevs;
-	boolean_t	zmode_logging;
+	uint_t		zmode_n_stddevs;
+	uint_t		zmode_n_addl_devs;
 } zfd_mode_t;
 static zfd_mode_t mode;
 
@@ -292,12 +294,12 @@ init_zfd_dev(zlog_t *zlogp, devctl_hdl_t bus_hdl, int id)
 	}
 
 	/*
-	 * Set four properties on this node; the first is the name of the
-	 * zone; the second is a flag which lets pseudo know that it is
-	 * OK to automatically allocate an instance # for this device;
-	 * the third tells the device framework not to auto-detach this
-	 * node-- we need the node to still be there when we ask devfsadmd
-	 * to make links, and when we need to open it.
+	 * Set four properties on this node; the name of the zone, the dev name
+	 * seen inside the zone, a flag which lets pseudo know that it is OK to
+	 * automatically allocate an instance # for this device, and the last
+	 * one tells the device framework not to auto-detach this node - we
+	 * need the node to still be there when we ask devfsadmd to make links,
+	 * and when we need to open it.
 	 */
 	if (devctl_ddef_string(ddef_hdl, "zfd_zname", zone_name) == -1) {
 		zerror(zlogp, B_TRUE, "failed to create zfd_zname property");
@@ -338,20 +340,16 @@ init_zfd_devs(zlog_t *zlogp, zfd_mode_t *mode)
 	di_devlink_handle_t dl = NULL;
 	int rv = -1;
 	int ndevs;
-	int reqdevs;
+	uint_t tot_devs;
 	int i;
 
-	reqdevs = mode->zmode_ndevs;
+	tot_devs = mode->zmode_n_stddevs + mode->zmode_n_addl_devs;
 
 	/*
-	 * Don't re-setup zone fd devs if they already exist; just
-	 * skip ahead to making devlinks, which we do for sanity's sake.
+	 * We have to re-setup zone fd devs if they already exist since we
+	 * might be changing zlog modes.
 	 */
 	ndevs = count_zfd_devs(zlogp);
-
-	if (ndevs == reqdevs)
-		goto devlinks;
-
 	if (ndevs > 0 || ndevs == -1) {
 		if (destroy_zfd_devs(zlogp) == -1)
 			goto error;
@@ -365,12 +363,11 @@ init_zfd_devs(zlog_t *zlogp, zfd_mode_t *mode)
 		goto error;
 	}
 
-	for (i = 0; i < reqdevs; i++) {
+	for (i = 0; i < tot_devs; i++) {
 		if (init_zfd_dev(zlogp, bus_hdl, i) != 0)
 			goto error;
 	}
 
-devlinks:
 	if ((dl = di_devlink_init("zfd", DI_MAKE_LINK)) == NULL) {
 		zerror(zlogp, B_TRUE, "failed to create devlinks");
 		goto error;
@@ -379,8 +376,8 @@ devlinks:
 	(void) di_devlink_fini(&dl);
 	rv = 0;
 
-	if (mode->zmode_ndevs == 1) {
-		/* We want to look like a tty. */
+	if (mode->zmode_n_stddevs == 1) {
+		/* We want the primary stream to look like a tty. */
 		make_tty(zlogp, 0);
 	}
 
@@ -1201,7 +1198,7 @@ srvr(void *modearg)
 	int gzerrfd = -1;
 	int stderrfd = -1;
 
-	if (!shutting_down && mode->zmode_logging)
+	if (!shutting_down && mode->zmode_n_addl_devs == 0)
 		open_logfile();
 
 	/*
@@ -1238,7 +1235,7 @@ srvr(void *modearg)
 			goto death;
 		}
 
-		if (mode->zmode_ndevs == 1) {
+		if (mode->zmode_n_stddevs == 1) {
 			if ((stdinfd = open_fd(zlogp, 0, O_RDWR)) == -1) {
 				goto death;
 			}
@@ -1258,7 +1255,7 @@ death:
 		destroy_server_sock(gzoutfd, "out");
 		destroy_server_sock(gzerrfd, "err");
 		(void) close(stdinfd);
-		if (mode->zmode_ndevs == 3) {
+		if (mode->zmode_n_stddevs == 3) {
 			(void) close(stdoutfd);
 			(void) close(stderrfd);
 		}
@@ -1283,8 +1280,7 @@ get_mode(zfd_mode_t *mode)
 	zone_dochandle_t handle;
 	struct zone_attrtab attr;
 
-	mode->zmode_ndevs = 0;
-	mode->zmode_logging = B_FALSE;
+	bzero(mode, sizeof (zfd_mode_t));
 
 	if ((handle = zonecfg_init_handle()) == NULL)
 		return;
@@ -1297,20 +1293,20 @@ get_mode(zfd_mode_t *mode)
 	while (zonecfg_getattrent(handle, &attr) == Z_OK) {
 		if (strcmp(ZLOG_MODE, attr.zone_attr_name) == 0) {
 			if (strncmp("log", attr.zone_attr_value, 3) == 0) {
-				mode->zmode_ndevs = 3;
-				mode->zmode_logging = B_TRUE;
+				mode->zmode_n_stddevs = 3;
+				mode->zmode_n_addl_devs = 0;
 			} else if (strncmp("nolog",
 			    attr.zone_attr_value, 5) == 0) {
-				mode->zmode_ndevs = 3;
-				mode->zmode_logging = B_FALSE;
+				mode->zmode_n_stddevs = 3;
+				mode->zmode_n_addl_devs = 2;
 			} else if (strncmp("int",
 			    attr.zone_attr_value, 3) == 0) {
-				mode->zmode_ndevs = 1;
-				mode->zmode_logging = B_TRUE;
+				mode->zmode_n_stddevs = 1;
+				mode->zmode_n_addl_devs = 0;
 			} else if (strncmp("nlint",
 			    attr.zone_attr_value, 5) == 0) {
-				mode->zmode_ndevs = 1;
-				mode->zmode_logging = B_FALSE;
+				mode->zmode_n_stddevs = 1;
+				mode->zmode_n_addl_devs = 1;
 			}
 			break;
 		}
@@ -1330,7 +1326,7 @@ create_log_thread(zlog_t *logp, zoneid_t id)
 	zlogp = logp;
 
 	get_mode(&mode);
-	if (mode.zmode_ndevs == 0)
+	if (mode.zmode_n_stddevs == 0)
 		return;
 
 	if (init_zfd_devs(zlogp, &mode) == -1) {

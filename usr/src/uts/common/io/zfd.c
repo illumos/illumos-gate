@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Copyright 2014 Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -36,6 +36,56 @@
  * it will simply be discarded. This is so that if zoneadmd is not holding the
  * master side fd open (i.e. it has died somehow), processes in the zone do not
  * experience any errors and I/O to the fd does not cause the process to hang.
+ *
+ * The driver can also act as a multiplexer so that data written to the
+ * slave side within the zone is also redirected back to another zfd device
+ * inside the zone for consumption (i.e. it can be read). The intention is
+ * that a logging process within the zone can consume data that is being
+ * written by an application onto the primary stream.
+ *
+ * The zone's zfd device configuration is driven by zoneadmd and a zone mode.
+ * The mode, which is controlled by the zone attribute "zlog-mode" is somewhat
+ * of a misnomer since its purpose has evolved. The attribute currently
+ * can have four values, with misleading names due to backward compatability,
+ * but which are used to control how many zfd devices are created inside the
+ * zone, and to control if the output on the device(s) is logged in the GZ by
+ * zoneadmd.
+ *
+ * Here is a summary of how the 4 modes control what zfd devices are created
+ * and how they're used:
+ *
+ *    log:    3 stdio zdevs (0, 1, 2), logging done in the GZ
+ *    int:    1 stdio zdev  (0) configured as a tty, logging done in GZ
+ *    nolog:  3 stdio zdevs (0, 1, 2), 2 additional zdevs (3, 4)
+ *    nlint:  1 stdio zdev  (0) configured as a tty, 1 additional zdev (1)
+ *
+ * When the zone is configured to not log at the GZ level (nolog or nlint)
+ * then it is assumed logging will be done within the zone itself. In this
+ * configuration 1 or 2 additional zfd devices are created within the zone
+ * for use by a logging process. An application can then configure the zfd
+ * streams driver into a multiplexer so that anything written within the zone
+ * to the stdout/stderr zfd's will be teed into the correspond logging zfd's
+ * within the zone.
+ *
+ * The following is a diagram of how this works for a nolog configuration:
+ *
+ *
+ *              zoneadmd (for zlogin -I stdout)
+ * GZ:             ^
+ *                 |
+ *     --------------------------
+ *                 ^
+ * NGZ:            |
+ *      app >1 -> zfd1 -> zfd3 -> logger (for logger to consume app's stdout)
+ *
+ * There would be a similar path for the app's stderr into zfd4 for the logger
+ * to consume stderr.
+ *
+ * In an interactive configuration stdin/out/err is multiplexed onto a single
+ * full-duplex stream which is configured as a tty (ptem, ldterm and ttycompat
+ * are pushed onto the stream). There is only a single zfd dev (0) needed
+ * for the primary stream, and a single zfd dev (1) for the logger to consume
+ * stdout/err.
  */
 
 #include <sys/types.h>
@@ -62,6 +112,9 @@
 #include <sys/vnode.h>
 #include <sys/fs/snode.h>
 #include <sys/zone.h>
+#include <sys/sdt.h>
+
+static kmutex_t zfd_mux_lock;
 
 static int zfd_getinfo(dev_info_t *, ddi_info_cmd_t, void *, void **);
 static int zfd_attach(dev_info_t *, ddi_attach_cmd_t);
@@ -161,6 +214,12 @@ static struct modlinkage modlinkage = {
 	NULL
 };
 
+typedef enum {
+	ZFD_NO_MUX,
+	ZFD_PRIMARY_STREAM,
+	ZFD_LOG_STREAM
+} zfd_mux_type_t;
+
 typedef struct zfd_state {
 	dev_info_t *zfd_devinfo;
 	queue_t *zfd_master_rdq;
@@ -168,6 +227,8 @@ typedef struct zfd_state {
 	vnode_t *zfd_slave_vnode;
 	int zfd_state;
 	int zfd_tty;
+	zfd_mux_type_t zfd_muxt;
+	struct zfd_state *zfd_log_inst;
 } zfd_state_t;
 
 #define	ZFD_STATE_MOPEN	0x01
@@ -176,8 +237,9 @@ typedef struct zfd_state {
 static void *zfd_soft_state;
 
 /*
- * List of STREAMS modules that is pushed onto a slave instance after the
- * ZFD_MAKETTY ioctl has been received.
+ * List of STREAMS modules that are autopushed onto a slave instance when its
+ * opened, but only if the ZFD_MAKETTY ioctl has first been received by the
+ * master.
  */
 static char *zfd_mods[] = {
 	"ptem",
@@ -199,6 +261,7 @@ _init(void)
 	if ((err = mod_install(&modlinkage)) != 0)
 		ddi_soft_state_fini(zfd_soft_state);
 
+	mutex_init(&zfd_mux_lock, NULL, MUTEX_DEFAULT, NULL);
 	return (err);
 }
 
@@ -213,6 +276,7 @@ _fini(void)
 	}
 
 	ddi_soft_state_fini(&zfd_soft_state);
+	mutex_destroy(&zfd_mux_lock);
 	return (0);
 }
 
@@ -256,6 +320,8 @@ zfd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	VERIFY((zfds = ddi_get_soft_state(zfd_soft_state, instance)) != NULL);
 	zfds->zfd_devinfo = dip;
 	zfds->zfd_tty = 0;
+	zfds->zfd_muxt = ZFD_NO_MUX;
+	zfds->zfd_log_inst = NULL;
 	return (DDI_SUCCESS);
 }
 
@@ -429,6 +495,11 @@ zfd_slave_open(zfd_state_t *zfds,
 		ASSERT((rqp != NULL) && (WR(rqp)->q_ptr == zfds));
 		return (0);
 	}
+
+	/* A log stream is read-only */
+	if (zfds->zfd_muxt == ZFD_LOG_STREAM &&
+	    (oflag & (FREAD | FWRITE)) != FREAD)
+		return (EINVAL);
 
 	if (zfds->zfd_tty == 1) {
 		major_t major;
@@ -648,6 +719,11 @@ handle_mflush(queue_t *qp, mblk_t *mp)
  * priority messages, putnext's normal messages if possible, and otherwise
  * enqueues the messages; in the case that something is enqueued, wsrv(9E)
  * will take care of eventually shuttling I/O to the other side.
+ *
+ * When configured as a multiplexer, then anything written to the stream
+ * from inside the zone is also teed off to the corresponding log stream
+ * for consumption within the zone (i.e. the log stream can be read, but never
+ * written to, by an application inside the zone).
  */
 static void
 zfd_wput(queue_t *qp, mblk_t *mp)
@@ -664,53 +740,124 @@ zfd_wput(queue_t *qp, mblk_t *mp)
 	 * Process zfd ioctl messages if qp is the master side's write queue.
 	 */
 	zfds = (zfd_state_t *)qp->q_ptr;
-	if (zfds->zfd_master_rdq != NULL && qp == WR(zfds->zfd_master_rdq) &&
-	    type == M_IOCTL) {
+
+	if (type == M_IOCTL) {
 		iocbp = (struct iocblk *)(void *)mp->b_rptr;
+
 		switch (iocbp->ioc_cmd) {
 		case ZFD_MAKETTY:
-			/*
-			 * The process that passed the ioctl must be running in
-			 * the global zone.
-			 */
-			if (crgetzoneid(iocbp->ioc_cr) != GLOBAL_ZONEID) {
-				miocack(qp, mp, 0, EINVAL);
-				return;
-			}
 			zfds->zfd_tty = 1;
 			miocack(qp, mp, 0, 0);
 			return;
 		case ZFD_EOF:
-			/*
-			 * The process that passed the ioctl must be running in
-			 * the global zone.
-			 */
-			if (crgetzoneid(iocbp->ioc_cr) != GLOBAL_ZONEID) {
-				miocack(qp, mp, 0, EINVAL);
-				return;
-			}
 			if (zfds->zfd_slave_rdq != NULL)
 				(void) putnextctl(zfds->zfd_slave_rdq,
 				    M_HANGUP);
 			miocack(qp, mp, 0, 0);
 			return;
 		case ZFD_HAS_SLAVE:
-			/*
-			 * The process that passed the ioctl must be running in
-			 * the global zone.
-			 */
-			if (crgetzoneid(iocbp->ioc_cr) != GLOBAL_ZONEID) {
-				miocack(qp, mp, 0, EINVAL);
-				return;
-			}
 			if ((zfds->zfd_state & ZFD_STATE_SOPEN) != 0) {
 				miocack(qp, mp, 0, 0);
 			} else {
 				miocack(qp, mp, 0, ENOTTY);
 			}
 			return;
+		case ZFD_MUX: {
+			/*
+			 * Setup the multiplexer configuration for the two
+			 * streams.
+			 *
+			 * We expect to be called on the stream that will
+			 * become the log stream and be passed one data block
+			 * with the minor number of the slave side of the
+			 * primary stream.
+			 */
+			int to;
+			int instance;
+			zfd_state_t *prim_zfds;
+
+			if (iocbp->ioc_count != TRANSPARENT ||
+			    mp->b_cont == NULL) {
+				miocack(qp, mp, 0, EINVAL);
+				return;
+			}
+
+			/* Get the primary slave minor device number */
+			to = *(int *)mp->b_cont->b_rptr;
+			instance = ZFD_INSTANCE(to);
+
+			if ((prim_zfds = ddi_get_soft_state(zfd_soft_state,
+			    instance)) == NULL) {
+				miocack(qp, mp, 0, EINVAL);
+				return;
+			}
+
+			/* Disallow changing primary/log once set. */
+			mutex_enter(&zfd_mux_lock);
+			if (zfds->zfd_muxt != ZFD_NO_MUX ||
+			    prim_zfds->zfd_muxt != ZFD_NO_MUX) {
+				mutex_exit(&zfd_mux_lock);
+				miocack(qp, mp, 0, EINVAL);
+				return;
+			}
+
+			zfds->zfd_muxt = ZFD_LOG_STREAM;
+			prim_zfds->zfd_muxt = ZFD_PRIMARY_STREAM;
+			prim_zfds->zfd_log_inst = zfds;
+			mutex_exit(&zfd_mux_lock);
+			DTRACE_PROBE2(zfd__mux__link, void *, prim_zfds,
+			    void *, zfds);
+
+			miocack(qp, mp, 0, 0);
+			return;
+			}
 		default:
 			break;
+		}
+	}
+
+	/*
+	 * If we're multiplexing to a log stream then we dup the msg and tee
+	 * it into the log stream.
+	 */
+	if (zfds->zfd_muxt == ZFD_PRIMARY_STREAM &&
+	    zfds->zfd_slave_rdq != NULL && qp == WR(zfds->zfd_slave_rdq)) {
+		zfd_state_t *log_zfds = zfds->zfd_log_inst;
+
+		/* Only need to tee if the log zfd is open. */
+		if (log_zfds != NULL &&
+		    (log_zfds->zfd_state & ZFD_STATE_SOPEN) != 0 &&
+		    type == M_DATA) {
+			queue_t *log_qp;
+			mblk_t *lmp;
+
+			ASSERT(log_zfds->zfd_muxt == ZFD_LOG_STREAM);
+
+			log_qp = RD(log_zfds->zfd_slave_rdq);
+			lmp = dupmsg(mp);
+			if (lmp != NULL) {
+				if (log_qp->q_first == NULL &&
+				    bcanputnext(log_qp, lmp->b_band)) {
+					DTRACE_PROBE2(zfd__mux__put,
+					    void *, log_qp,
+					    void *, lmp);
+					putnext(log_qp, lmp);
+				} else {
+					DTRACE_PROBE2(zfd__mux__queue,
+					    void *, log_qp, void *, lmp);
+					if (putq(log_qp, lmp) == 0) {
+						/*
+						 * The logger queue is full,
+						 * drop the msg.
+						 */
+						DTRACE_PROBE2(
+						    zfd__mux__queue__full,
+						    void *, log_qp,
+						    void *, lmp);
+						freemsg(lmp);
+					}
+				}
+			}
 		}
 	}
 
@@ -764,21 +911,56 @@ zfd_wput(queue_t *qp, mblk_t *mp)
 		DBG("wput: putting msg onto queue\n");
 		(void) putq(qp, mp);
 	}
+
 	DBG1("done wput, %s side", zfd_side(qp));
 }
 
 /*
+ * For primary stream:
  * rsrv(9E) is symmetric for master and slave, so zfd_rsrv() handles both
  * without splitting up the codepath.
  *
  * Enable the write side of the partner.  This triggers the partner to send
  * messages queued on its write side to this queue's read side.
+ *
+ * For log stream:
+ * Internally we've queue up the msgs that we've teed off to the log stream
+ * so when we're invoked we need to pass these along.
  */
 static void
 zfd_rsrv(queue_t *qp)
 {
 	zfd_state_t *zfds;
 	zfds = (zfd_state_t *)qp->q_ptr;
+
+	/*
+	 * log stream server
+	 */
+	if (zfds->zfd_muxt == ZFD_LOG_STREAM && zfds->zfd_slave_rdq != NULL) {
+		queue_t *log_qp;
+		mblk_t *mp;
+
+		log_qp = RD(zfds->zfd_slave_rdq);
+
+		if (zfds->zfd_log_inst != NULL &&
+		    (zfds->zfd_log_inst->zfd_state & ZFD_STATE_SOPEN) != 0) {
+			while ((mp = getq(qp)) != NULL) {
+				if (bcanputnext(log_qp, mp->b_band)) {
+					putnext(log_qp, mp);
+				} else {
+					(void) putbq(log_qp, mp);
+					break;
+				}
+			}
+		} else {
+			/* No longer open, drain the queue */
+			while ((mp = getq(qp)) != NULL) {
+				freemsg(mp);
+			}
+			flushq(qp, FLUSHALL);
+		}
+		return;
+	}
 
 	/*
 	 * Care must be taken here, as either of the master or slave side
