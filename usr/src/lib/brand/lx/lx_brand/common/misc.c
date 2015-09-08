@@ -675,24 +675,6 @@ lx_epoll_pwait(int epfd, void *events, int maxevents, int timeout,
 }
 
 long
-lx_epoll_create(int size)
-{
-	int r;
-
-	r = epoll_create(size);
-	return ((r == -1) ? -errno : r);
-}
-
-long
-lx_epoll_create1(int flags)
-{
-	int r;
-
-	r = epoll_create1(flags);
-	return ((r == -1) ? -errno : r);
-}
-
-long
 lx_epoll_wait(int epfd, void *events, int maxevents, int timeout)
 {
 	int r;
