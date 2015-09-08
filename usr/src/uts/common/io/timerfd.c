@@ -340,6 +340,34 @@ timerfd_ioctl(dev_t dev, int cmd, intptr_t arg, int md, cred_t *cr, int *rv)
 			}
 		}
 
+		/*
+		 * Before we set the time, we're going to clear tfd_fired.
+		 * This can potentially race with the (old) timer firing, but
+		 * the window is deceptively difficult to close:  if we were
+		 * to simply clear tfd_fired after the call to the backend
+		 * returned, we would run the risk of plowing a firing of the
+		 * new timer.  Ultimately, the race can only be resolved by
+		 * the backend, which would likely need to be extended with a
+		 * function to call back into when the timer is between states
+		 * (that is, after the timer can no longer fire with the old
+		 * timer value, but before it can fire with the new one).
+		 * This is straightforward enough for backends that set a
+		 * timer's value by deleting the old one and adding the new
+		 * one, but for those that modify the timer value in place
+		 * (e.g., cyclics), the required serialization is necessarily
+		 * delicate:  the function would have to be callable from
+		 * arbitrary interrupt context.  While implementing all of
+		 * this is possible, it does not (for the moment) seem worth
+		 * it: if the timer is firing at essentially the same moment
+		 * that it's being reprogrammed, there is a higher-level race
+		 * with respect to timerfd usage that the progam itself will
+		 * have to properly resolve -- and it seems reasonable to
+		 * simply allow the program to resolve it in this case.
+		 */
+		mutex_enter(&state->tfd_lock);
+		state->tfd_fired = 0;
+		mutex_exit(&state->tfd_lock);
+
 		err = it->it_backend->clk_timer_settime(it,
 		    st.tfd_settime_flags & TFD_TIMER_ABSTIME ?
 		    TIMER_ABSTIME : TIMER_RELTIME, &when);
