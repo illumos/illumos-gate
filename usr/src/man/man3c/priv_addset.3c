@@ -3,11 +3,12 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PRIV_ADDSET 3C "Jan 28, 2005"
+.TH PRIV_ADDSET 3C "Sep 08, 2015"
 .SH NAME
 priv_addset, priv_allocset, priv_copyset, priv_delset, priv_emptyset,
-priv_fillset, priv_freeset, priv_intersect, priv_inverse, priv_isemptyset,
-priv_isequalset, priv_isfullset, priv_ismember, priv_issubset, priv_union \-
+priv_basicset, priv_fillset, priv_freeset, priv_intersect, priv_inverse,
+priv_isemptyset, priv_isequalset, priv_isfullset, priv_ismember,
+priv_issubset, priv_union \-
 privilege set manipulation functions
 .SH SYNOPSIS
 .LP
@@ -35,6 +36,11 @@ privilege set manipulation functions
 .LP
 .nf
 \fBvoid\fR \fBpriv_emptyset\fR(\fBpriv_set_t *\fR\fIsp\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBpriv_basicset\fR(\fBpriv_set_t *\fR\fIsp\fR);
 .fi
 
 .LP
@@ -88,7 +94,6 @@ privilege set manipulation functions
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fIsp\fR, \fIsrc\fR, and \fIdst\fR arguments point to privilege sets. The
 \fIpriv\fR argument points to a named privilege.
@@ -112,6 +117,9 @@ The \fBpriv_delset()\fR function removes the named privilege \fIpriv\fR from
 .sp
 .LP
 The \fBpriv_emptyset()\fR function clears all privileges from \fIsp\fR.
+.sp
+.LP
+The \fBpriv_basicset()\fR function copies the basic privilege set to \fIsp\fR.
 .sp
 .LP
 The \fBpriv_fillset()\fR function asserts all privileges in \fIsp\fR, including
@@ -154,7 +162,6 @@ The \fBpriv_issubset()\fR function checks whether \fIsrc\fR is a subset of
 The \fBpriv_union()\fR function takes the union of \fIsrc\fR and \fIdst\fR and
 places the result in \fIdst\fR.
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, \fBpriv_allocset()\fR returns a pointer to an
 opaque data structure. It returns \fINULL\fR if memory allocation fails and
@@ -169,7 +176,6 @@ return \fBB_TRUE\fR. Otherwise, they return \fBB_FALSE\fR.
 Upon successful completion, \fBpriv_delset()\fR and \fBpriv_addset()\fR return
 0. Otherwise, they return -1 and set \fBerrno\fR to indicate the error.
 .SH ERRORS
-.sp
 .LP
 The \fBpriv_allocset()\fR function will fail if:
 .sp
@@ -205,7 +211,6 @@ The privilege argument is not a valid privilege name.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -223,12 +228,10 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBsetppriv\fR(2), \fBmalloc\fR(3C), \fBpriv_str_to_set\fR(3C),
 \fBattributes\fR(5), \fBprivileges\fR(5)
 .SH NOTES
-.sp
 .LP
 The functions that compare sets operate on all bits of the set, regardless of
 whether the specific privileges are currently defined in the system.

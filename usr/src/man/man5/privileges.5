@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PRIVILEGES 5 "Feb 3, 2015"
+.TH PRIVILEGES 5 "Sep 8, 2015"
 .SH NAME
 privileges \- process privilege model
 .SH DESCRIPTION
@@ -235,7 +235,9 @@ modify that file's or directory's permission bits or ACL.
 .ad
 .sp .6
 .RS 4n
-Allow a process to read objects in the filesystem.
+Allow a process to open objects in the filesystem for reading. This
+privilege is not necessary to read from an already open file which was opened
+before dropping the \fBPRIV_FILE_READ\fR privilege.
 .RE
 
 .sp
@@ -275,7 +277,9 @@ Extensions.
 .ad
 .sp .6
 .RS 4n
-Allow a process to modify objects in the filesytem.
+Allow a process to open objects in the filesytem for writing, or otherwise
+modify them. This privilege is not necessary to write to an already open file
+which was opened before dropping the \fBPRIV_FILE_WRITE\fR privilege.
 .RE
 
 .sp
@@ -344,7 +348,9 @@ Segment.
 .ad
 .sp .6
 .RS 4n
-Allow a process to open a TCP, UDP, SDP, or SCTP network endpoint.
+Allow a process to open a TCP, UDP, SDP, or SCTP network endpoint. This
+privilege is not necessary to communicate using an existing endpoint already
+opened before dropping the \fBPRIV_NET_ACCESS\fR privilege.
 .RE
 
 .sp
@@ -1057,7 +1063,8 @@ x86 platforms.
 .sp
 .LP
 Of the privileges listed above, the privileges \fBPRIV_FILE_LINK_ANY\fR,
-\fBPRIV_PROC_INFO\fR, \fBPRIV_PROC_SESSION\fR, \fBPRIV_PROC_FORK\fR and
+\fBPRIV_PROC_INFO\fR, \fBPRIV_PROC_SESSION\fR, \fBPRIV_PROC_FORK\fR,
+\fBPRIV_FILE_READ\fR, \fBPRIV_FILE_WRITE\fR, \fBPRIV_NET_ACCESS\fR and
 \fBPRIV_PROC_EXEC\fR are considered "basic" privileges. These are privileges
 that used to be always available to unprivileged processes. By default,
 processes still have the basic privileges.
