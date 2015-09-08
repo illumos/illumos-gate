@@ -56,6 +56,12 @@ extern "C" {
  */
 #define	ZFD_HAS_SLAVE		(ZFD_IOC | 2)
 
+/*
+ * This ioctl links two streams into a multiplexer configuration for in-zone
+ * logging.
+ */
+#define	ZFD_MUX			(ZFD_IOC | 3)
+
 #ifdef	__cplusplus
 }
 #endif
