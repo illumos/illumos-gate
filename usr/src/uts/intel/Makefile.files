@@ -295,6 +295,7 @@ LX_BRAND_OBJS  =		\
 	lx_clone.o		\
 	lx_cpu.o		\
 	lx_errno.o		\
+	lx_epoll.o		\
 	lx_fallocate.o		\
 	lx_fcntl.o		\
 	lx_futex.o		\

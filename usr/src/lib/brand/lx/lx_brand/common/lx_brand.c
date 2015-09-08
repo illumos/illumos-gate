@@ -1141,7 +1141,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_io_cancel,			/* 210: io_cancel */
 	NULL,				/* 211: get_thread_area */
 	NULL,				/* 212: lookup_dcookie */
-	lx_epoll_create,		/* 213: epoll_create */
+	NULL,				/* 213: epoll_create */
 	NULL,				/* 214: epoll_ctl_old */
 	NULL,				/* 215: epoll_wait_old */
 	NULL,				/* 216: remap_file_pages */
@@ -1219,7 +1219,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_accept4,			/* 288: accept4 */
 	lx_signalfd4,			/* 289: signalfd4 */
 	lx_eventfd2,			/* 290: eventfd2 */
-	lx_epoll_create1,		/* 291: epoll_create1 */
+	NULL,				/* 291: epoll_create1 */
 	lx_dup3,			/* 292: dup3 */
 	NULL,				/* 293: pipe2 */
 	lx_inotify_init1,		/* 294: inotify_init1 */
@@ -1513,7 +1513,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/* 251: nosys */
 	lx_group_exit,			/* 252: group_exit */
 	NULL,				/* 253: lookup_dcookie */
-	lx_epoll_create,		/* 254: epoll_create */
+	NULL,				/* 254: epoll_create */
 	lx_epoll_ctl,			/* 255: epoll_ctl */
 	lx_epoll_wait,			/* 256: epoll_wait */
 	NULL,				/* 257: remap_file_pages */
@@ -1588,7 +1588,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_timerfd_gettime,		/* 326: timerfd_gettime */
 	lx_signalfd4,			/* 327: signalfd4 */
 	lx_eventfd2,			/* 328: eventfd2 */
-	lx_epoll_create1,		/* 329: epoll_create1 */
+	NULL,				/* 329: epoll_create1 */
 	lx_dup3,			/* 330: dup3 */
 	NULL,				/* 331: pipe2 */
 	lx_inotify_init1,		/* 332: inotify_init1 */

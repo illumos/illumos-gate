@@ -777,7 +777,7 @@ lx_sysent_t lx_sysent32[] = {
 	{"nosys",	NULL,			0,		0}, /* 251 */
 	{"group_exit",	NULL,			0,		1}, /* 252 */
 	{"lookup_dcookie", NULL,		NOSYS_NO_EQUIV,	0}, /* 253 */
-	{"epoll_create", NULL,			0,		1}, /* 254 */
+	{"epoll_create", lx_epoll_create,	0,		1}, /* 254 */
 	{"epoll_ctl",	NULL,			0,		4}, /* 255 */
 	{"epoll_wait",	NULL,			0,		4}, /* 256 */
 	{"remap_file_pages", NULL,		NOSYS_NO_EQUIV,	0}, /* 257 */
@@ -856,7 +856,7 @@ lx_sysent_t lx_sysent32[] = {
 	{"timerfd_gettime", NULL,		0,		2}, /* 326 */
 	{"signalfd4",	NULL,			0,		4}, /* 327 */
 	{"eventfd2",	NULL,			0,		2}, /* 328 */
-	{"epoll_create1", NULL,			0,		1}, /* 329 */
+	{"epoll_create1", lx_epoll_create1,	0,		1}, /* 329 */
 	{"dup3",	NULL,			0,		3}, /* 330 */
 	{"pipe2",	lx_pipe2,		0,		2}, /* 331 */
 	{"inotify_init1", NULL,			0,		1}, /* 332 */
@@ -1107,7 +1107,7 @@ lx_sysent_t lx_sysent64[] = {
 	{"io_cancel",	NULL,			0,		3}, /* 210 */
 	{"get_thread_area", lx_get_thread_area,	0,		1}, /* 211 */
 	{"lookup_dcookie", NULL,		NOSYS_NO_EQUIV,	0}, /* 212 */
-	{"epoll_create", NULL,			0,		1}, /* 213 */
+	{"epoll_create", lx_epoll_create,	0,		1}, /* 213 */
 	{"epoll_ctl_old", NULL,			NOSYS_NULL,	0}, /* 214 */
 	{"epoll_wait_old", NULL,		NOSYS_NULL,	0}, /* 215 */
 	{"remap_file_pages", NULL,		NOSYS_NO_EQUIV,	0}, /* 216 */
@@ -1185,7 +1185,7 @@ lx_sysent_t lx_sysent64[] = {
 	{"accept4",	NULL,			0,		4}, /* 288 */
 	{"signalfd4",	NULL,			0,		4}, /* 289 */
 	{"eventfd2",	NULL,			0,		2}, /* 290 */
-	{"epoll_create1", NULL,			0,		1}, /* 291 */
+	{"epoll_create1", lx_epoll_create1,	0,		1}, /* 291 */
 	{"dup3",	NULL,			0,		3}, /* 292 */
 	{"pipe2",	lx_pipe2,		0,		2}, /* 293 */
 	{"inotify_init1", NULL,			0,		1}, /* 294 */
