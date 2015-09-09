@@ -21,8 +21,8 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2016 Syneto S.R.L.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -376,6 +376,7 @@ void	smb_dispatch_stats_update(smb_server_t *,
 		smb_kstat_req_t *, int, int);
 
 int	smb1sr_newrq(smb_request_t *);
+int	smb1sr_newrq_cancel(smb_request_t *);
 void	smb1sr_work(smb_request_t *);
 
 int	smbsr_encode_empty_result(smb_request_t *);

@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -94,6 +94,17 @@ static void smb_notify_sr(smb_request_t *, uint_t, const char *);
 static uint32_t smb_notify_encode_action(struct smb_request *,
 	mbuf_chain_t *, uint32_t, char *);
 
+/*
+ * Cancel method for smb_notify_common()
+ *
+ * This request is waiting in change notify.
+ */
+static void
+smb_notify_cancel(smb_request_t *sr)
+{
+	cv_signal(&sr->sr_ncr.nc_cv);
+}
+
 uint32_t
 smb_notify_common(smb_request_t *sr, mbuf_chain_t *mbc,
 	uint32_t CompletionFilter)
@@ -130,18 +141,44 @@ smb_notify_common(smb_request_t *sr, mbuf_chain_t *mbc,
 	/*
 	 * Wait for subscribed events to arrive.
 	 * Expect SMB_REQ_STATE_EVENT_OCCURRED
-	 * or SMB_REQ_STATE_CANCELED when signaled.
+	 * or SMB_REQ_STATE_CANCELLED when signaled.
 	 * Note it's possible (though rare) to already
-	 * have SMB_REQ_STATE_CANCELED here.
+	 * have SMB_REQ_STATE_CANCELLED here.
 	 */
 	mutex_enter(&sr->sr_mutex);
-	if (sr->sr_state == SMB_REQ_STATE_ACTIVE)
+	if (sr->sr_state == SMB_REQ_STATE_ACTIVE) {
 		sr->sr_state = SMB_REQ_STATE_WAITING_EVENT;
+		sr->cancel_method = smb_notify_cancel;
+	}
 	while (sr->sr_state == SMB_REQ_STATE_WAITING_EVENT) {
 		cv_wait(&nc->nc_cv, &sr->sr_mutex);
 	}
-	if (sr->sr_state == SMB_REQ_STATE_EVENT_OCCURRED)
+	sr->cancel_method = NULL;
+
+	switch (sr->sr_state) {
+	case SMB_REQ_STATE_WAITING_EVENT:
+	case SMB_REQ_STATE_EVENT_OCCURRED:
+		/* normal wakeup */
 		sr->sr_state = SMB_REQ_STATE_ACTIVE;
+		status = 0;
+		break;
+
+	case SMB_REQ_STATE_CANCEL_PENDING:
+		/* cancelled via smb_notify_cancel */
+		sr->sr_state = SMB_REQ_STATE_CANCELLED;
+		status = NT_STATUS_CANCELLED;
+		break;
+
+	case SMB_REQ_STATE_CANCELLED:
+		/* cancelled before this function ran */
+		status = NT_STATUS_CANCELLED;
+		break;
+
+	default:
+		status = NT_STATUS_INTERNAL_ERROR;
+		break;
+	}
+
 	mutex_exit(&sr->sr_mutex);
 
 	/*
@@ -152,16 +189,8 @@ smb_notify_common(smb_request_t *sr, mbuf_chain_t *mbc,
 	/*
 	 * Why did we wake up?
 	 */
-	switch (sr->sr_state) {
-	case SMB_REQ_STATE_ACTIVE:
-		break;
-	case SMB_REQ_STATE_CANCELED:
-		status = NT_STATUS_CANCELLED;
+	if (status != 0)
 		goto out;
-	default:
-		status = NT_STATUS_INTERNAL_ERROR;
-		goto out;
-	}
 
 	/*
 	 * We have SMB_REQ_STATE_ACTIVE.

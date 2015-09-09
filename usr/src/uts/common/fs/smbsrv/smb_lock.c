@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -581,6 +581,24 @@ smb_lock_range_lckrules(
 }
 
 /*
+ * Cancel method for smb_lock_wait()
+ *
+ * This request is waiting on a lock.  Wakeup everything
+ * waiting on the lock so that the relevant thread regains
+ * control and notices that is has been cancelled.  The
+ * other lock request threads waiting on this lock will go
+ * back to sleep when they discover they are still blocked.
+ */
+static void
+smb_lock_cancel(smb_request_t *sr)
+{
+	smb_lock_t *lock = sr->cancel_arg2;
+
+	ASSERT(lock != NULL);
+	cv_broadcast(&lock->l_cv);
+}
+
+/*
  * smb_lock_wait
  *
  * Wait operation for smb overlapping lock to be released.  Caller must hold
@@ -591,7 +609,7 @@ smb_lock_range_lckrules(
  *
  * return value
  *
- *	0	The request was canceled.
+ *	0	The request was cancelled.
  *	-1	The timeout was reached.
  *	>0	Condition met.
  */
@@ -600,70 +618,81 @@ smb_lock_wait(smb_request_t *sr, smb_lock_t *b_lock, smb_lock_t *c_lock)
 {
 	clock_t		rc = 0;
 
-	ASSERT(sr->sr_awaiting == NULL);
+	mutex_enter(&sr->sr_mutex);
+	if (sr->sr_state != SMB_REQ_STATE_ACTIVE) {
+		mutex_exit(&sr->sr_mutex);
+		return (0); /* cancelled */
+	}
+
+	/*
+	 * Wait up till the timeout time keeping track of actual
+	 * time waited for possible retry failure.
+	 */
+	sr->sr_state = SMB_REQ_STATE_WAITING_LOCK;
+	sr->cancel_method = smb_lock_cancel;
+	sr->cancel_arg2 = c_lock;
+	mutex_exit(&sr->sr_mutex);
+
+	mutex_enter(&c_lock->l_mutex);
+	/*
+	 * The conflict list (l_conflict_list) for a lock contains
+	 * all the locks that are blocked by and in conflict with
+	 * that lock.  Add the new lock to the conflict list for the
+	 * active lock.
+	 *
+	 * l_conflict_list is currently a fancy way of representing
+	 * the references/dependencies on a lock.  It could be
+	 * replaced with a reference count but this approach
+	 * has the advantage that MDB can display the lock
+	 * dependencies at any point in time.  In the future
+	 * we should be able to leverage the list to implement
+	 * an asynchronous locking model.
+	 *
+	 * l_blocked_by is the reverse of the conflict list.  It
+	 * points to the lock that the new lock conflicts with.
+	 * As currently implemented this value is purely for
+	 * debug purposes -- there are windows of time when
+	 * l_blocked_by may be non-NULL even though there is no
+	 * conflict list
+	 */
+	b_lock->l_blocked_by = c_lock;
+	smb_slist_insert_tail(&c_lock->l_conflict_list, b_lock);
+	smb_llist_exit(&c_lock->l_file->f_node->n_lock_list);
+
+	if (SMB_LOCK_INDEFINITE_WAIT(b_lock)) {
+		cv_wait(&c_lock->l_cv, &c_lock->l_mutex);
+	} else {
+		rc = cv_timedwait(&c_lock->l_cv,
+		    &c_lock->l_mutex, b_lock->l_end_time);
+	}
+
+	mutex_exit(&c_lock->l_mutex);
+
+	smb_llist_enter(&c_lock->l_file->f_node->n_lock_list, RW_WRITER);
+	smb_slist_remove(&c_lock->l_conflict_list, b_lock);
 
 	mutex_enter(&sr->sr_mutex);
+	sr->cancel_method = NULL;
+	sr->cancel_arg2 = NULL;
 
 	switch (sr->sr_state) {
-	case SMB_REQ_STATE_ACTIVE:
-		/*
-		 * Wait up till the timeout time keeping track of actual
-		 * time waited for possible retry failure.
-		 */
-		sr->sr_state = SMB_REQ_STATE_WAITING_LOCK;
-		sr->sr_awaiting = c_lock;
-		mutex_exit(&sr->sr_mutex);
+	case SMB_REQ_STATE_WAITING_LOCK:
+		/* normal wakeup, rc from above */
+		sr->sr_state = SMB_REQ_STATE_ACTIVE;
+		break;
 
-		mutex_enter(&c_lock->l_mutex);
-		/*
-		 * The conflict list (l_conflict_list) for a lock contains
-		 * all the locks that are blocked by and in conflict with
-		 * that lock.  Add the new lock to the conflict list for the
-		 * active lock.
-		 *
-		 * l_conflict_list is currently a fancy way of representing
-		 * the references/dependencies on a lock.  It could be
-		 * replaced with a reference count but this approach
-		 * has the advantage that MDB can display the lock
-		 * dependencies at any point in time.  In the future
-		 * we should be able to leverage the list to implement
-		 * an asynchronous locking model.
-		 *
-		 * l_blocked_by is the reverse of the conflict list.  It
-		 * points to the lock that the new lock conflicts with.
-		 * As currently implemented this value is purely for
-		 * debug purposes -- there are windows of time when
-		 * l_blocked_by may be non-NULL even though there is no
-		 * conflict list
-		 */
-		b_lock->l_blocked_by = c_lock;
-		smb_slist_insert_tail(&c_lock->l_conflict_list, b_lock);
-		smb_llist_exit(&c_lock->l_file->f_node->n_lock_list);
+	case SMB_REQ_STATE_CANCEL_PENDING:
+		/* Cancelled via smb_lock_cancel */
+		sr->sr_state = SMB_REQ_STATE_CANCELLED;
+		rc = 0;
+		break;
 
-		if (SMB_LOCK_INDEFINITE_WAIT(b_lock)) {
-			cv_wait(&c_lock->l_cv, &c_lock->l_mutex);
-		} else {
-			rc = cv_timedwait(&c_lock->l_cv,
-			    &c_lock->l_mutex, b_lock->l_end_time);
-		}
-
-		mutex_exit(&c_lock->l_mutex);
-
-		smb_llist_enter(&c_lock->l_file->f_node->n_lock_list,
-		    RW_WRITER);
-		smb_slist_remove(&c_lock->l_conflict_list, b_lock);
-
-		mutex_enter(&sr->sr_mutex);
-		sr->sr_awaiting = NULL;
-		if (sr->sr_state == SMB_REQ_STATE_CANCELED) {
-			rc = 0;
-		} else {
-			sr->sr_state = SMB_REQ_STATE_ACTIVE;
-		}
+	case SMB_REQ_STATE_CANCELLED:
+		/* Cancelled before this function ran. */
+		rc = 0;
 		break;
 
 	default:
-		ASSERT(sr->sr_state == SMB_REQ_STATE_CANCELED);
 		rc = 0;
 		break;
 	}

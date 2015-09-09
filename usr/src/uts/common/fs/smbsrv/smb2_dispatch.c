@@ -113,15 +113,9 @@ smb2_disp_table[SMB2__NCMDS] = {
 	{  "smb2_ioctl", NULL,
 	    smb2_ioctl, NULL, 0, 0 },
 
-	/*
-	 * Note: Cancel gets the "invalid command" handler because
-	 * that's always handled directly in the reader.  We should
-	 * never get to the function using this table, but note:
-	 * We CAN get here if a nasty client adds cancel to some
-	 * compound message, which is a protocol violation.
-	 */
 	{  "smb2_cancel", NULL,
-	    smb2_invalid_cmd, NULL, 0, 0 },
+	    smb2_cancel, NULL, 0, 0,
+	    SDDF_SUPPRESS_UID | SDDF_SUPPRESS_TID },
 
 	{  "smb2_echo", NULL,
 	    smb2_echo, NULL, 0, 0,
@@ -175,31 +169,79 @@ smb2_invalid_cmd(smb_request_t *sr)
 int
 smb2sr_newrq(smb_request_t *sr)
 {
+	struct mbuf_chain *mbc = &sr->command;
 	uint32_t magic;
-	uint16_t command;
-	int rc;
+	int rc, skip;
 
-	magic = LE_IN32(sr->sr_request_buf);
-	if (magic != SMB2_PROTOCOL_MAGIC) {
-		smb_request_free(sr);
-		/* will drop the connection */
-		return (EPROTO);
-	}
+	if (smb_mbc_peek(mbc, 0, "l", &magic) != 0)
+		goto drop;
+
+	if (magic != SMB2_PROTOCOL_MAGIC)
+		goto drop;
 
 	/*
-	 * Execute Cancel requests immediately, (here in the
-	 * reader thread) so they won't wait for any other
-	 * commands we might already have in the task queue.
-	 * Cancel also skips signature verification and
-	 * does not consume a sequence number.
-	 * [MS-SMB2] 3.2.4.24 Cancellation...
+	 * Walk the SMB2 commands in this compound message and
+	 * keep track of the range of message IDs it uses.
 	 */
-	command = LE_IN16((uint8_t *)sr->sr_request_buf + 12);
-	if (command == SMB2_CANCEL) {
-		rc = smb2sr_newrq_cancel(sr);
-		smb_request_free(sr);
-		return (rc);
+	for (;;) {
+		if (smb2_decode_header(sr) != 0)
+			goto drop;
+
+		/*
+		 * Cancel requests are special:  They refer to
+		 * an earlier message ID (or an async. ID),
+		 * never a new ID, and are never compounded.
+		 * This is intentionally not "goto drop"
+		 * because rc may be zero (success).
+		 */
+		if (sr->smb2_cmd_code == SMB2_CANCEL) {
+			rc = smb2_newrq_cancel(sr);
+			smb_request_free(sr);
+			return (rc);
+		}
+
+		/*
+		 * Keep track of the total credits in this compound
+		 * and the first (real) message ID (not: 0, -1)
+		 * While we're looking, verify that all (real) IDs
+		 * are (first <= ID < (first + msg_credits))
+		 */
+		if (sr->smb2_credit_charge == 0)
+			sr->smb2_credit_charge = 1;
+		sr->smb2_total_credits += sr->smb2_credit_charge;
+
+		if (sr->smb2_messageid != 0 &&
+		    sr->smb2_messageid != UINT64_MAX) {
+
+			if (sr->smb2_first_msgid == 0)
+				sr->smb2_first_msgid = sr->smb2_messageid;
+
+			if (sr->smb2_messageid < sr->smb2_first_msgid ||
+			    sr->smb2_messageid >= (sr->smb2_first_msgid +
+			    sr->smb2_total_credits)) {
+				long long id = (long long) sr->smb2_messageid;
+				cmn_err(CE_WARN, "clnt %s msg ID 0x%llx "
+				    "out of sequence in compound",
+				    sr->session->ip_addr_str, id);
+			}
+		}
+
+		/* Normal loop exit on next == zero */
+		if (sr->smb2_next_command == 0)
+			break;
+
+		/* Abundance of caution... */
+		if (sr->smb2_next_command < SMB2_HDR_SIZE)
+			goto drop;
+
+		/* Advance to the next header. */
+		skip = sr->smb2_next_command - SMB2_HDR_SIZE;
+		if (MBC_ROOM_FOR(mbc, skip) == 0)
+			goto drop;
+		mbc->chain_offset += skip;
 	}
+	/* Rewind back to the top. */
+	mbc->chain_offset = 0;
 
 	/*
 	 * Submit the request to the task queue, which calls
@@ -210,8 +252,11 @@ smb2sr_newrq(smb_request_t *sr)
 	smb_srqueue_waitq_enter(sr->session->s_srqueue);
 	(void) taskq_dispatch(sr->sr_server->sv_worker_pool,
 	    smb2_tq_work, sr, TQ_SLEEP);
-
 	return (0);
+
+drop:
+	smb_request_free(sr);
+	return (-1);
 }
 
 static void
@@ -229,10 +274,14 @@ smb2_tq_work(void *arg)
 	sr->sr_time_active = gethrtime();
 
 	/*
-	 * In contrast with SMB1, SMB2 must _always_ dispatch to
-	 * the handler function, because cancelled requests need
-	 * an error reply (NT_STATUS_CANCELLED).
+	 * Always dispatch to the work function, because cancelled
+	 * requests need an error reply (NT_STATUS_CANCELLED).
 	 */
+	mutex_enter(&sr->sr_mutex);
+	if (sr->sr_state == SMB_REQ_STATE_SUBMITTED)
+		sr->sr_state = SMB_REQ_STATE_ACTIVE;
+	mutex_exit(&sr->sr_mutex);
+
 	smb2sr_work(sr);
 
 	smb_srqueue_runq_exit(srq);
@@ -284,22 +333,21 @@ smb2sr_work(struct smb_request *sr)
 	/* temporary until we identify a user */
 	sr->user_cr = zone_kcred();
 
-	mutex_enter(&sr->sr_mutex);
-	switch (sr->sr_state) {
-	case SMB_REQ_STATE_SUBMITTED:
-	case SMB_REQ_STATE_CLEANED_UP:
-		sr->sr_state = SMB_REQ_STATE_ACTIVE;
-		break;
-	default:
-		ASSERT(0);
-		/* FALLTHROUGH */
-	case SMB_REQ_STATE_CANCELED:
-		sr->smb2_status = NT_STATUS_CANCELLED;
-		break;
-	}
-	mutex_exit(&sr->sr_mutex);
-
 cmd_start:
+	/*
+	 * Note that we don't check sr_state here and abort the
+	 * compound if cancelled (etc.) because some SMB2 command
+	 * handlers need to do work even when cancelled.
+	 *
+	 * We treat some status codes as if "sticky", meaning
+	 * once they're set after some command handler returns,
+	 * all remaining commands get this status without even
+	 * calling the command-specific handler.
+	 */
+	if (sr->smb2_status != NT_STATUS_CANCELLED &&
+	    sr->smb2_status != NT_STATUS_INSUFFICIENT_RESOURCES)
+		sr->smb2_status = 0;
+
 	/*
 	 * Decode the request header
 	 *
@@ -307,19 +355,7 @@ cmd_start:
 	 * STATUS_INVALID_PARAMETER.  If the decoding problem
 	 * prevents continuing, we'll close the connection.
 	 * [MS-SMB2] 3.3.5.2.6 Handling Incorrectly Formatted...
-	 *
-	 * We treat some status codes as if "sticky", meaning
-	 * once they're set after some command handler returns,
-	 * all remaining commands get this status without even
-	 * calling the command-specific handler. The cancelled
-	 * status is used above, and insufficient_resources is
-	 * used when smb2sr_go_async declines to "go async".
-	 * Otherwise initialize to zero (success).
 	 */
-	if (sr->smb2_status != NT_STATUS_CANCELLED &&
-	    sr->smb2_status != NT_STATUS_INSUFFICIENT_RESOURCES)
-		sr->smb2_status = 0;
-
 	sr->smb2_cmd_hdr = sr->command.chain_offset;
 	if ((rc = smb2_decode_header(sr)) != 0) {
 		cmn_err(CE_WARN, "clnt %s bad SMB2 header",
@@ -644,6 +680,8 @@ cmd_start:
 		/* NB: not using pre_op */
 		rc = (*sdd->sdt_function)(sr);
 		/* NB: not using post_op */
+	} else {
+		smb2sr_put_error(sr, sr->smb2_status);
 	}
 
 	MBC_FLUSH(&sr->raw_data);
@@ -723,6 +761,10 @@ cmd_done:
 		break;
 	case SDRC_DROP_VC:
 		disconnect = B_TRUE;
+		goto cleanup;
+
+	case SDRC_NO_REPLY:
+		/* will free sr */
 		goto cleanup;
 	}
 

@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -914,9 +914,6 @@ typedef struct smb_session {
 	int			reply_max_bytes;
 	uint16_t		smb_msg_size;
 	uint16_t		smb_max_mpx;
-	uchar_t			*outpipe_data;
-	int			outpipe_datalen;
-	int			outpipe_cookie;
 	smb_srqueue_t		*s_srqueue;
 	uint64_t		start_time;
 	unsigned char		MAC_key[44];
@@ -1502,11 +1499,11 @@ struct smb_async_req;
  * | COMPLETED |                                                        |
  * +-----------+
  *      ^                                                               |
- *      | T15                      +----------+                         v
- * +------------+        T6        |          |                 +--------------+
- * | CLEANED_UP |<-----------------| CANCELED |                 | INITIALIZING |
- * +------------+                  |          |                 +--------------+
- *      |    ^                     +----------+                         |
+ *      | T15                      +-----------+                        v
+ * +------------+        T6        |           |                +--------------+
+ * | CLEANED_UP |<-----------------| CANCELLED |                | INITIALIZING |
+ * +------------+                  |           |                +--------------+
+ *      |    ^                     +-----------+                        |
  *      |    |                        ^  ^ ^ ^                          |
  *      |    |          +-------------+  | | |                          |
  *      |    |    T3    |                | | |               T13        | T1
@@ -1621,7 +1618,8 @@ typedef enum smb_req_state {
 	SMB_REQ_STATE_EVENT_OCCURRED,
 	SMB_REQ_STATE_WAITING_LOCK,
 	SMB_REQ_STATE_COMPLETED,
-	SMB_REQ_STATE_CANCELED,
+	SMB_REQ_STATE_CANCEL_PENDING,
+	SMB_REQ_STATE_CANCELLED,
 	SMB_REQ_STATE_CLEANED_UP,
 	SMB_REQ_STATE_SENTINEL
 } smb_req_state_t;
@@ -1636,6 +1634,8 @@ typedef struct smb_request {
 	int32_t			sr_gmtoff;
 	smb_session_t		*session;
 	smb_kmod_cfg_t		*sr_cfg;
+	void			(*cancel_method)(struct smb_request *);
+	void			*cancel_arg2;
 
 	smb_notify_change_req_t	sr_ncr;
 
@@ -1645,7 +1645,6 @@ typedef struct smb_request {
 	/* Request buffer excluding NBT header */
 	void			*sr_request_buf;
 
-	smb_lock_t		*sr_awaiting;
 	struct mbuf_chain	command;
 	struct mbuf_chain	reply;
 	struct mbuf_chain	raw_data;
@@ -1691,9 +1690,11 @@ typedef struct smb_request {
 	uint16_t		smb2_cmd_code;
 	uint16_t		smb2_credit_request;
 	uint16_t		smb2_credit_response;
+	uint16_t		smb2_total_credits; /* in compound */
 	uint32_t		smb2_hdr_flags;
 	uint32_t		smb2_next_command;
 	uint64_t		smb2_messageid;
+	uint64_t		smb2_first_msgid;
 	/* uint32_t		smb2_pid; use smb_pid */
 	/* uint32_t		smb2_tid; use smb_tid */
 	/* uint64_t		smb2_ssnid; use smb_uid */

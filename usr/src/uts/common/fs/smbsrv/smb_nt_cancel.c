@@ -21,7 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ *
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -57,11 +58,19 @@ smb_post_nt_cancel(smb_request_t *sr)
 	DTRACE_SMB_1(op__NtCancel__done, smb_request_t *, sr);
 }
 
+/*
+ * Dispatch handler for SMB_COM_NT_CANCEL.
+ * Note that Cancel does NOT get a response.
+ *
+ * SMB NT Cancel has an inherent race with the request being
+ * cancelled.  See comments at smb_request_cancel().
+ */
 smb_sdrc_t
 smb_com_nt_cancel(smb_request_t *sr)
 {
 	struct smb_request *req;
 	struct smb_session *session;
+	int cnt = 0;
 
 	session = sr->session;
 
@@ -75,10 +84,30 @@ smb_com_nt_cancel(smb_request_t *sr)
 		    (req->smb_tid == sr->smb_tid) &&
 		    (req->smb_mid == sr->smb_mid)) {
 			smb_request_cancel(req);
+			cnt++;
 		}
 		req = smb_slist_next(&session->s_req_list, req);
+	}
+	if (cnt != 1) {
+		DTRACE_PROBE2(smb__ntcancel__error,
+		    uint16_t, sr->smb_mid, int, cnt);
 	}
 	smb_slist_exit(&session->s_req_list);
 
 	return (SDRC_NO_REPLY);
+}
+
+/*
+ * This handles an SMB_COM_NT_CANCEL request when seen in the reader.
+ * (See smb1sr_newrq)  Handle this immediately, rather than
+ * going through the normal taskq dispatch mechanism.
+ * Note that Cancel does NOT get a response.
+ */
+int
+smb1sr_newrq_cancel(smb_request_t *sr)
+{
+	(void) smb_pre_nt_cancel(sr);
+	(void) smb_com_nt_cancel(sr);
+	smb_post_nt_cancel(sr);
+	return (0);
 }
