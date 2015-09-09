@@ -279,8 +279,19 @@ lx_fcntl_common(int fd, int cmd, ulong_t arg)
 		error = VOP_IOCTL(fp->f_vnode, FIOSETOWN, (intptr_t)&pid,
 		    flag, CRED(), &rv, NULL);
 		releasef(fd);
-		if (error != 0)
-			return (set_errno(error));
+		if (error != 0) {
+			/*
+			 * On illumos F_SETOWN is only defined for sockets, but
+			 * some apps hardcode to do this fcntl on other devices
+			 * (e.g. /dev/tty) to setup signal handling. If the
+			 * app is only setting itself to be the signal
+			 * handler, we pretend to succeed.
+			 */
+			if (error != EINVAL ||
+			    curthread->t_procp->p_pid != pid) {
+				return (set_errno(error));
+			}
+		}
 
 		rc = 0;
 		break;
