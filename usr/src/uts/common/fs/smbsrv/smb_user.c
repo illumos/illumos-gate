@@ -266,6 +266,7 @@ smb_user_logon(
     uint32_t		privileges,
     uint32_t		audit_sid)
 {
+	ksocket_t authsock = NULL;
 
 	ASSERT(user->u_magic == SMB_USER_MAGIC);
 	ASSERT(cr);
@@ -279,7 +280,13 @@ smb_user_logon(
 		return (-1);
 	}
 
-	smb_authsock_close(user);
+	/*
+	 * In the transition from LOGGING_ON to LOGGED_ON,
+	 * we always have an auth. socket to close.
+	 */
+	authsock = user->u_authsock;
+	ASSERT(authsock != NULL);
+	user->u_authsock = NULL;
 
 	user->u_state = SMB_USER_STATE_LOGGED_ON;
 	user->u_flags = flags;
@@ -292,6 +299,9 @@ smb_user_logon(
 	smb_user_setcred(user, cr, privileges);
 
 	mutex_exit(&user->u_mutex);
+
+	/* This close can block, so not under the mutex. */
+	smb_authsock_close(user, authsock);
 
 	return (0);
 }
@@ -306,19 +316,21 @@ void
 smb_user_logoff(
     smb_user_t		*user)
 {
+	ksocket_t authsock = NULL;
+
 	ASSERT(user->u_magic == SMB_USER_MAGIC);
 
 	mutex_enter(&user->u_mutex);
 	ASSERT(user->u_refcnt);
 	switch (user->u_state) {
-	case SMB_USER_STATE_LOGGING_ON: {
-		smb_authsock_close(user);
+	case SMB_USER_STATE_LOGGING_ON:
+		authsock = user->u_authsock;
+		user->u_authsock = NULL;
 		user->u_state = SMB_USER_STATE_LOGGED_OFF;
 		smb_server_dec_users(user->u_server);
 		break;
-	}
 
-	case SMB_USER_STATE_LOGGED_ON: {
+	case SMB_USER_STATE_LOGGED_ON:
 		/*
 		 * The user is moved into a state indicating that the log off
 		 * process has started.
@@ -331,7 +343,7 @@ smb_user_logoff(
 		user->u_state = SMB_USER_STATE_LOGGED_OFF;
 		smb_server_dec_users(user->u_server);
 		break;
-	}
+
 	case SMB_USER_STATE_LOGGED_OFF:
 	case SMB_USER_STATE_LOGGING_OFF:
 		break;
@@ -341,6 +353,11 @@ smb_user_logoff(
 		break;
 	}
 	mutex_exit(&user->u_mutex);
+
+	/* This close can block, so not under the mutex. */
+	if (authsock != NULL) {
+		smb_authsock_close(user, authsock);
+	}
 }
 
 /*

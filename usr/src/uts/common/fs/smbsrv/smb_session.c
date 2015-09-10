@@ -431,6 +431,8 @@ smb_request_cancel(smb_request_t *sr)
 
 	case SMB_REQ_STATE_WAITING_EVENT:
 	case SMB_REQ_STATE_WAITING_LOCK:
+	case SMB_REQ_STATE_WAITING_AUTH:
+	case SMB_REQ_STATE_WAITING_PIPE:
 		/*
 		 * These are states that have a cancel_method.
 		 * Make the state change now, to ensure that

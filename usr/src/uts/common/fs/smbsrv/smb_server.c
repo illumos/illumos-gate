@@ -1412,6 +1412,7 @@ smb_server_shutdown(smb_server_t *sv)
 	/*
 	 * Stop the listeners first, so we don't get any more
 	 * new work while we're trying to shut down.
+	 * Also disconnects all sessions under each.
 	 */
 	smb_server_listener_stop(&sv->sv_nbt_daemon);
 	smb_server_listener_stop(&sv->sv_tcp_daemon);

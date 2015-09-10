@@ -621,7 +621,7 @@ void smb_request_wait(smb_request_t *);
  */
 int smb_authenticate_ext(smb_request_t *);
 int smb_authenticate_old(smb_request_t *);
-void smb_authsock_close(smb_user_t *);
+void smb_authsock_close(smb_user_t *, ksocket_t);
 
 /*
  * session functions (file smb_session.c)
@@ -734,7 +734,6 @@ void smb_odir_resume_at(smb_odir_t *, smb_odir_resume_t *);
 smb_user_t *smb_user_new(smb_session_t *);
 int smb_user_logon(smb_user_t *, cred_t *,
     char *, char *, uint32_t, uint32_t, uint32_t);
-smb_user_t *smb_user_dup(smb_user_t *);
 void smb_user_logoff(smb_user_t *);
 void smb_user_delete(void *);
 boolean_t smb_user_is_admin(smb_user_t *);
