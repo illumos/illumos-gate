@@ -27,6 +27,7 @@ file path=usr/share/man/man5/crypt_sha512.5
 file path=usr/share/man/man5/crypt_sunmd5.5
 file path=usr/share/man/man5/crypt_unix.5
 file path=usr/share/man/man5/environ.5
+file path=usr/share/man/man5/eventfd.5
 file path=usr/share/man/man5/extendedFILE.5
 file path=usr/share/man/man5/fnmatch.5
 file path=usr/share/man/man5/isalist.5

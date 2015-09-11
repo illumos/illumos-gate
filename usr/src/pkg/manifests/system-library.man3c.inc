@@ -107,6 +107,7 @@ file path=usr/share/man/man3c/encrypt.3c
 file path=usr/share/man/man3c/end.3c
 file path=usr/share/man/man3c/err.3c
 file path=usr/share/man/man3c/euclen.3c
+file path=usr/share/man/man3c/eventfd.3c
 file path=usr/share/man/man3c/exit.3c
 file path=usr/share/man/man3c/fattach.3c
 file path=usr/share/man/man3c/fclose.3c
