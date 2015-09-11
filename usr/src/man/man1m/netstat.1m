@@ -2,7 +2,7 @@
 .\" Copyright (C) 2002, Sun Microsystems, Inc. All Rights Reserved
 .\" Copyright 1989 AT&T
 .\" Copyright (c) 1983 Regents of the University of California. All rights reserved. The Berkeley software License Agreement specifies the terms and conditions for redistribution.
-.TH NETSTAT 1M "Jun 16, 2009"
+.TH NETSTAT 1M "Sep 02, 2015"
 .SH NAME
 netstat \- show network status
 .SH SYNOPSIS
@@ -54,11 +54,9 @@ netstat \- show network status
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBnetstat\fR command displays the contents of certain network-related data
 structures in various formats, depending on the options you select.
-.sp
 .LP
 The \fBnetstat\fR command has the several forms shown in the SYNOPSIS section,
 above, listed as follows:
@@ -107,16 +105,13 @@ The eighth form (\fB-M\fR option) displays the multicast routing table.
 The ninth form (\fB-D\fR option) displays the state of \fBDHCP\fR on one or all
 interfaces.
 .RE
-.sp
 .LP
 These forms are described in greater detail below.
-.sp
 .LP
 With no arguments (the first form), \fBnetstat\fR displays connected sockets
 for \fBPF_INET\fR, \fBPF_INET6\fR, and \fBPF_UNIX\fR, unless modified otherwise
 by the \fB-f\fR option.
 .SH OPTIONS
-.sp
 .ne 2
 .na
 \fB\fB-a\fR\fR
@@ -414,7 +409,7 @@ configured with the Solaris Trusted Extensions feature.
 With \fB-r\fR only, this option displays the routing entries' gateway security
 attributes. See \fBroute\fR(1M) for more information on security attributes.
 .sp
-When displaying socket information using the first form of the commmand, this
+When displaying socket information using the first form of the command, this
 option displays additional information for Multi-Level Port(MLP) sockets. This
 includes:
 .RS +4
@@ -447,14 +442,7 @@ The socket is a MLP on zone-private IP addresses.
 .RS 5n
 The socket is a MLP on IP addresses shared between zones.
 .RE
-
-.RE
-
-.RE
-.RE
-
 .SH OPERANDS
-.sp
 .ne 2
 .na
 \fB\fIinterval\fR\fR
@@ -482,12 +470,10 @@ the interval specified by \fIinterval\fR.
 
 .SH DISPLAYS
 .SS "Active Sockets (First Form)"
-.sp
 .LP
 The display for each active socket shows the local and remote address, the send
 and receive queue sizes (in bytes), the send and receive windows (in bytes),
 and the internal state of the protocol.
-.sp
 .LP
 The symbolic format normally used to display socket addresses is either:
 .sp
@@ -497,9 +483,6 @@ The symbolic format normally used to display socket addresses is either:
 .fi
 .in -2
 .sp
-
-.sp
-.LP
 when the name of the host is specified, or
 .sp
 .in +2
@@ -508,29 +491,22 @@ when the name of the host is specified, or
 .fi
 .in -2
 .sp
-
-.sp
-.LP
 if a socket address specifies a network but no specific host.
-.sp
 .LP
 The numeric host address or network number associated with the socket is used
 to look up the corresponding symbolic hostname or network name in the
 \fIhosts\fR or \fInetworks\fR database.
-.sp
 .LP
 If the network or hostname for an address is not known, or if the \fB-n\fR
 option is specified, the numerical network address is shown. Unspecified, or
 "wildcard", addresses and ports appear as an asterisk (\fB*\fR). For more
 information regarding the Internet naming conventions, refer to \fBinet\fR(7P)
 and \fBinet6\fR(7P).
-.sp
 .LP
 For SCTP sockets, because an endpoint can be represented by multiple addresses,
 the verbose option (\fB-v\fR) displays the list of all the local and remote
 addresses.
 .SS "\fITCP Sockets\fR"
-.sp
 .LP
 The possible state values for \fBTCP\fR sockets are as follows:
 .sp
@@ -651,7 +627,6 @@ Wait after close for remote shutdown retransmission.
 .RE
 
 .SS "\fISCTP Sockets\fR"
-.sp
 .LP
 The possible state values for SCTP sockets are as follows:
 .sp
@@ -741,7 +716,6 @@ state. \fBSHUTDOWN_ACK\fR has been sent to the peer.
 .RE
 
 .SS "Network Data Structures (Second Through Fifth Forms)"
-.sp
 .LP
 The form of the display depends upon which of the \fB-g\fR, \fB-m\fR, \fB-p\fR,
 or \fB-s\fR options you select.
@@ -810,7 +784,6 @@ The IPv6 and ICMPv6 protocol layers maintain per-interface statistics. If the
 \fB-a\fR option is specified with the \fB-s\fR option, then the per-interface
 statistics as well as the total sums are displayed. Otherwise, just the sum of
 the statistics are shown.
-.sp
 .LP
 For the second, third, and fourth forms of the command, you must specify at
 least \fB-g\fR, \fB-p\fR, or \fB-s\fR. You can specify any combination of these
@@ -818,12 +791,10 @@ options. You can also specify \fB-m\fR (the fifth form) with any set of the
 \fB-g\fR, \fB-p\fR, and \fB-s\fR options. If you specify more than one of these
 options, \fBnetstat\fR displays the information for each one of them.
 .SS "Interface Status (Sixth Form)"
-.sp
 .LP
 The interface status display lists information for all current interfaces, one
 interface per line. If an interface is specified using the \fB-I\fR option, it
 displays information for only the specified interface.
-.sp
 .LP
 The list consists of the interface name, \fBmtu\fR (maximum transmission unit,
 or maximum packet size)(see \fBifconfig\fR(1M)), the network to which the
@@ -832,22 +803,18 @@ with the interface. The counters show the number of input packets, input
 errors, output packets, output errors, and collisions, respectively. For
 Point-to-Point interfaces, the Net/Dest field is the name or address on the
 other side of the link.
-.sp
 .LP
 If the \fB-a\fR option is specified with either the \fB-i\fR option or the
 \fB-I\fR option, then the output includes names of the physical interface(s),
 counts for input packets and output packets for each logical interface, plus
 additional information.
-.sp
 .LP
 If the \fB-n\fR option is specified, the list displays the IP address instead
 of the interface name.
-.sp
 .LP
 If an optional \fIinterval\fR is specified, the output will be continually
 displayed in \fIinterval\fR seconds until interrupted by the user or until
 \fIcount\fR is reached. See OPERANDS.
-.sp
 .LP
 The physical interface is specified using the \fB-I\fR option. When used with
 the \fIinterval\fR operand, output for the \fB-I\fR option has the following
@@ -864,13 +831,10 @@ packets  errs  packets errs  colls   packets  errs  packets  errs   colls
 .fi
 .in -2
 .sp
-
-.sp
 .LP
 If the input interface is not specified, the first interface of address family
 \fBinet\fR or \fBinet6\fR will be displayed.
 .SS "Routing Table (Seventh Form)"
-.sp
 .LP
 The routing table display lists the available routes and the status of each.
 Each route consists of a destination host or network, and a gateway to use in
@@ -961,35 +925,28 @@ Broadcast addresses.
 Local addresses for the host.
 .RE
 
-.sp
 .LP
 Interface routes are created for each interface attached to the local host; the
 gateway field for such entries shows the address of the outgoing interface.
-.sp
 .LP
 The \fBuse\fR column displays the number of packets sent using a combined
 routing and address resolution (\fBA\fR) or a broadcast (\fBB\fR) route. For a
 local (\fBL\fR) route, this count is the number of packets received, and for
 all other routes it is the number of times the routing entry has been used to
 create a new combined route and address resolution entry.
-.sp
 .LP
 The \fIinterface\fR entry indicates the network interface utilized for the
 route.
 .SS "Multicast Routing Tables (Eighth Form)"
-.sp
 .LP
 The multicast routing table consists of the virtual interface table and the
 actual routing table.
 .SS "DHCP Interface Information (Ninth Form)"
-.sp
 .LP
 The \fBDHCP\fR interface information consists of the interface name, its
 current state, lease information, packet counts, and a list of flags.
-.sp
 .LP
 The states correlate with the specifications set forth in \fIRFC 2131\fR.
-.sp
 .LP
 Lease information includes:
 .RS +4
@@ -1050,7 +1007,6 @@ The interface is the primary interface. See \fBdhcpinfo\fR(1) and
 The interface is in failure state and must be manually restarted.
 .RE
 
-.sp
 .LP
 Packet counts are maintained for the number of packets sent, the number of
 packets received, and the number of lease offers declined by the \fBDHCP\fR
@@ -1061,7 +1017,6 @@ packets sent, received, and declined while obtaining the current lease, or the
 number of packets sent, received, and declined while attempting to obtain a
 future lease.
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/default/inet_type\fR\fR
@@ -1071,7 +1026,6 @@ future lease.
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBarp\fR(1M), \fBdhcpinfo\fR(1), \fBdhcpagent\fR(1M), \fBifconfig\fR(1M),
 \fBiostat\fR(1M), \fBkstat\fR(1M), \fBmibiisa\fR(1M), \fBsavecore\fR(1M),
@@ -1087,35 +1041,29 @@ Group, March 1997.
 Droms, R. \fIRFC 3315, Dynamic Host Configuration Protocol for IPv6
 (DHCPv6)\fR. Cisco Systems. July 2003.
 .SH NOTES
-.sp
 .LP
 When displaying interface information, \fBnetstat\fR honors the
 \fBDEFAULT_IP\fR setting in \fB/etc/default/inet_type\fR. If it is set to
 \fBIP_VERSION4\fR, then \fBnetstat\fR will omit information relating to IPv6
 interfaces, statistics, connections, routes and the like.
-.sp
 .LP
 However, you can override the \fBDEFAULT_IP\fR setting in
 \fB/etc/default/inet_type\fR on the command-line. For example, if you have used
 the command-line to explicitly request IPv6 information by using the
 \fBinet6\fR address family or one of the IPv6 protocols, it will override the
 \fBDEFAULT_IP\fR setting.
-.sp
 .LP
 If you need to examine network status information following a kernel crash, use
 the \fBmdb\fR(1) utility on the \fBsavecore\fR(1M) output.
-.sp
 .LP
 The \fBnetstat\fR utility obtains TCP statistics from the system by opening
 \fB/dev/tcp\fR and issuing queries. Because of this, \fBnetstat\fR might
 display an extra, unused connection in \fBIDLE\fR state when reporting
 connection status.
-.sp
 .LP
 Previous versions of \fBnetstat\fR had undocumented methods for reporting
 kernel statistics published using the \fBkstat\fR(7D) facility. This
 functionality has been removed. Use \fBkstat\fR(1M) instead.
-.sp
 .LP
 \fBnetstat\fR restricts its output to information that is relevant to the zone
 in which \fBnetstat\fR runs. (This is true for both shared-IP and exclusive-IP
