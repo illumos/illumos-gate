@@ -1443,7 +1443,7 @@ nce(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	nce_t nce;
 	nce_cbdata_t nce_cb;
 	int ipversion = 0;
-	const char *opt_P = NULL, *opt_ill;
+	const char *opt_P = NULL, *opt_ill = NULL;
 
 	if (mdb_getopts(argc, argv,
 	    'i', MDB_OPT_STR, &opt_ill,
