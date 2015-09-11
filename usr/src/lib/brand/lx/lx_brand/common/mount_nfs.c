@@ -2002,6 +2002,7 @@ convert_nfs_arg_str(char *srcp, char *mntopts)
 	char *key, *val, *p;
 	char tmpbuf[MAX_MNTOPT_STR];
 	char *tbp = tmpbuf;
+	boolean_t no_sec = B_TRUE;
 
 	(void) strlcpy(tmpbuf, mntopts, sizeof (tmpbuf));
 	*mntopts = '\0';
@@ -2043,6 +2044,8 @@ convert_nfs_arg_str(char *srcp, char *mntopts)
 				 */
 				if (atoi(val) != 4)
 					return (-EINVAL);
+			} else if (strcmp(key, "sec") == 0) {
+				no_sec = B_FALSE;
 			} else {
 				int r;
 
@@ -2058,6 +2061,18 @@ convert_nfs_arg_str(char *srcp, char *mntopts)
 			if (r != 0)
 				return (r);
 		}
+	}
+
+	if (no_sec) {
+		/*
+		 * XXX Temporarily work around missing DES auth by defaulting
+		 * to sec=sys.
+		 */
+		int r;
+
+		r = append_opt(mntopts, MAX_MNTOPT_STR, "sec", "sys");
+		if (r != 0)
+			return (r);
 	}
 
 	return (0);
