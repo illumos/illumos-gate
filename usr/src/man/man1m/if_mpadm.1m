@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH IF_MPADM 1M "Jan 5, 2009"
+.TH IF_MPADM 1M "Sep 02, 2015"
 .SH NAME
 if_mpadm \- administer interfaces in an IP multipathing group
 .SH SYNOPSIS
@@ -13,12 +13,10 @@ if_mpadm \- administer interfaces in an IP multipathing group
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBif_mpadm\fR utility administers IP interfaces that are part of an IP
 Multipathing (IPMP) group. Currently, administration is limited to offlining IP
 interfaces and undoing previous offline operations.
-.sp
 .LP
 When an IP interface is taken offline, all IP data traffic that was flowing
 over the IP interface is moved to another IP interface in the IPMP group. In
@@ -28,7 +26,6 @@ IP interface. As a result, an offline IP interface will not be used for any
 inbound or outbound IP traffic. Only IP interfaces that are in an IPMP group
 may be brought offline. If the IP interface is the last functioning interface
 in the IPMP group, the offline operation will fail.
-.sp
 .LP
 When an offline operation is undone, any IP addresses hosted on that IP
 interface are brought \fBUP\fR and will be considered by \fBin.mpathd\fR for
@@ -41,7 +38,6 @@ The \fBipmpstat\fR utility can be used to determine why an IP interface is
 offline, identify which IP interfaces in a group are being used for inbound and
 outbound IP traffic, and more; see \fBipmpstat\fR(1M).
 .SH OPTIONS
-.sp
 .LP
 The \fBif_mpadm\fR utility supports the following options:
 .sp
@@ -68,7 +64,6 @@ Undo a previous offline of the IP interface specified by \fIifname\fR. If
 .SH EXAMPLES
 .LP
 \fBExample 1 \fROfflining an IP Interface
-.sp
 .LP
 The following command offlines the IP interface \fBunder0\fR, causing any IP
 packets that were being sent and received through it to be handled by another
@@ -84,20 +79,18 @@ example% \fBif_mpadm -d under0\fR
 
 .LP
 \fBExample 2 \fRUndoing a Previous Offline Operation
-.sp
 .LP
 Use the following command to undo the operation in the previous example:
 
 .sp
 .in +2
 .nf
-example% \fBif_mpdadm -r under0\fR
+example% \fBif_mpadm -r under0\fR
 .fi
 .in -2
 .sp
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -113,12 +106,10 @@ Interface Stability	Unstable
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBifconfig\fR(1M), \fBin.mpathd\fR(1M), \fBipmpstat\fR(1M),
 \fBattributes\fR(5)
 .SH DIAGNOSTICS
-.sp
 .LP
 cannot offline: no other functioning interfaces are in its IPMP group.
 .RS +4
