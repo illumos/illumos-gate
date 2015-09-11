@@ -314,6 +314,7 @@ dir path=var/svc/manifest/system/svc group=sys
 dir path=var/svc/profile group=sys
 dir path=var/tmp group=sys mode=1777
 driver name=dump perms="dump 0660 root sys"
+driver name=eventfd perms="* 0666 root sys"
 driver name=fssnap \
     policy="ctl read_priv_set=sys_config write_priv_set=sys_config" \
     perms="* 0640 root sys" perms="ctl 0666 root sys"
