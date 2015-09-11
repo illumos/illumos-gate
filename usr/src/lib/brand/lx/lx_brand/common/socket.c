@@ -1090,6 +1090,10 @@ lx_setsockopt(int sockfd, int level, int optname, void *optval, int optlen)
 		    strcmp(lx_cmd_name, "traceroute") == 0)
 			return (0);
 
+		if (optname == LX_IP_RECVERR &&
+		    strcmp(lx_cmd_name, "mount.nfs") == 0)
+			return (0);
+
 		if (optname == LX_IP_MTU_DISCOVER) {
 			/*
 			 * Native programs such as traceroute use IP_DONTFRAG

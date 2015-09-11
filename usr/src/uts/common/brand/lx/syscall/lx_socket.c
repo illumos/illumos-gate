@@ -48,6 +48,8 @@
 #include <netpacket/packet.h>
 #include <sockcommon.h>
 #include <socktpi_impl.h>
+#include <netinet/udp.h>
+#include <sys/sdt.h>
 
 #include <sys/lx_brand.h>
 #include <sys/lx_socket.h>
@@ -1177,7 +1179,7 @@ lx_connect(long sock, uintptr_t name, socklen_t namelen)
 	}
 
 	/*
-	 * Ensure the name is size appropriately before we alloc memory and
+	 * Ensure the name is sized appropriately before we alloc memory and
 	 * copy it in from userspace.  We need at least the address family to
 	 * make later sizing decisions.
 	 */
@@ -1211,6 +1213,21 @@ lx_connect(long sock, uintptr_t name, socklen_t namelen)
 			sad->lxsad_status = LXSS_CONNECTING;
 		}
 		mutex_exit(&sad->lxsad_lock);
+	}
+
+	/*
+	 * When connecting to a UDP socket, configure it so that future
+	 * sendto/sendmsg operations are allowed to specify a destination
+	 * address. See the Posix spec. for sendto(2). Linux allows this while
+	 * illumos would return EISCONN if the option is not set.
+	 */
+	if (error == 0 && so->so_protocol == IPPROTO_UDP &&
+	    (so->so_family == AF_INET || so->so_family == AF_INET6)) {
+		int val = 1;
+
+		DTRACE_PROBE(lx__connect__udp);
+		(void) socket_setsockopt(so, IPPROTO_UDP, UDP_SND_TO_CONNECTED,
+		    &val, sizeof (val), CRED());
 	}
 
 	releasef(sock);

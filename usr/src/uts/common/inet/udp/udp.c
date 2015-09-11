@@ -1583,6 +1583,11 @@ udp_opt_get(conn_t *connp, t_scalar_t level, t_scalar_t name,
 			*i1 = udp->udp_rcvhdr ? 1 : 0;
 			mutex_exit(&connp->conn_lock);
 			return (sizeof (int));
+		case UDP_SND_TO_CONNECTED:
+			mutex_enter(&connp->conn_lock);
+			*i1 = udp->udp_snd_to_conn ? 1 : 0;
+			mutex_exit(&connp->conn_lock);
+			return (sizeof (int));
 		}
 	}
 	mutex_enter(&connp->conn_lock);
@@ -1716,6 +1721,11 @@ udp_do_opt_set(conn_opt_arg_t *coa, int level, int name,
 		case UDP_RCVHDR:
 			mutex_enter(&connp->conn_lock);
 			udp->udp_rcvhdr = onoff;
+			mutex_exit(&connp->conn_lock);
+			return (0);
+		case UDP_SND_TO_CONNECTED:
+			mutex_enter(&connp->conn_lock);
+			udp->udp_snd_to_conn = onoff;
 			mutex_exit(&connp->conn_lock);
 			return (0);
 		}
@@ -5910,6 +5920,7 @@ udp_send(sock_lower_handle_t proto_handle, mblk_t *mp, struct nmsghdr *msg,
 	ushort_t	ipversion;
 	pid_t		pid = curproc->p_pid;
 	ip_xmit_attr_t	*ixa;
+	boolean_t	snd_to_conn;
 
 	ASSERT(DB_TYPE(mp) == M_DATA);
 
@@ -5947,10 +5958,21 @@ udp_send(sock_lower_handle_t proto_handle, mblk_t *mp, struct nmsghdr *msg,
 		else
 			return (error);
 	}
-	if (udp->udp_state == TS_DATA_XFER) {
+
+	/*
+	 * Check if we're allowed to send to a connection on which we've
+	 * already called 'connect'. The posix spec. allows both behaviors but
+	 * historically we've returned an error if already connected. The
+	 * client can allow this via a sockopt.
+	 */
+	mutex_enter(&connp->conn_lock);
+	snd_to_conn = (udp->udp_snd_to_conn != 0);
+	mutex_exit(&connp->conn_lock);
+	if (udp->udp_state == TS_DATA_XFER && !snd_to_conn) {
 		UDPS_BUMP_MIB(us, udpOutErrors);
 		return (EISCONN);
 	}
+
 	error = proto_verify_ip_addr(connp->conn_family,
 	    (struct sockaddr *)msg->msg_name, msg->msg_namelen);
 	if (error != 0) {

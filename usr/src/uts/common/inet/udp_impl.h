@@ -178,8 +178,9 @@ typedef	struct udp_s {
 		udp_issocket : 1,	/* socket mode; sockfs is on top */
 		udp_nat_t_endpoint : 1,	/* UDP_NAT_T_ENDPOINT option */
 		udp_rcvhdr : 1,		/* UDP_RCVHDR option */
+		udp_snd_to_conn: 1,	/* UDP_SND_TO_CONNECTED option */
 
-		udp_pad_to_bit_31 : 29;
+		udp_pad_to_bit_31 : 28;
 
 	/* Following 2 fields protected by the uf_lock */
 	struct udp_s	*udp_bind_hash; /* Bind hash chain */
