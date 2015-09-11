@@ -1,0 +1,184 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright (c) 2014, Joyent, Inc. All Rights Reserved.
+.\"
+.Dd Dec 3, 2014
+.Dt EVENTFD 3C
+.Os
+.Sh NAME
+.Nm eventfd
+.Nd create a file descriptor for event notification
+.Sh SYNOPSIS
+.In sys/eventfd.h
+.Ft int
+.Fo eventfd
+.Fa "unsigned int initval"
+.Fa "int flags"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn eventfd
+function creates an
+.Xr eventfd 5
+instance that has an associated 64-bit unsigned counter. It returns a file
+descriptor that can be operated upon via
+.Xr read 2 ,
+.Xr write 2
+and the facilities that notify of file descriptor activity (e.g.,
+.Xr poll 2 ,
+.Xr port_get 3C ,
+.Xr epoll_wait 3C Ns ).
+To dispose of the instance,
+.Xr close 2
+should be called on the file descriptor.
+.Pp
+The
+.Fa initval
+argument specifies the initial value of the 64-bit counter associated with the
+instance.  (Note that this limits the initial value to be a 32-bit quantity
+despite the fact that the underlying counter is 64-bit.)
+.Pp
+The \fIflags\fR argument specifies additional parameters for the
+instance, and can have any of the following values:
+.Bl -hang -width Ds
+.It Sy EFD_CLOEXEC
+.Bd -filled -compact
+Instance will be closed upon an
+.Xr exec 2 ;
+see
+.Xr open 2 Ns 's
+description of
+.Sy O_CLOEXEC .
+.Ed
+.It Sy EFD_NONBLOCK
+.Bd -filled -compact
+Instance will be set to be non-blocking.  A
+.Xr read 2
+on an
+.Sy eventfd
+instance that has been initialized with
+.Sy EFD_NONBLOCK
+will return
+.Sy EAGAIN
+in lieu of blocking if the count associated with the instance is zero.
+.Ed
+.It EFD_SEMAPHORE
+.Bd -filled -compact
+Provide counting semaphore semantics whereby a
+.Xr read 2
+will atomically decrement rather than atomically clear the count when it
+becomes non-zero. See below for details on
+.Xr read 2
+semantics.
+.Ed
+.El
+.Pp
+The following operations can be performed upon an
+.Sy eventfd
+instance:
+.Bl -hang -width Ds
+.It Sy read(2)
+.Bd -filled -compact
+Atomically reads and modifies the value of the 64-bit counter associated
+with the instance.  The precise semantics
+of
+.Xr read 2
+depend on the disposition of
+.Sy EFD_SEMAPHORE
+with
+respect to the instance: if
+.Sy EFD_SEMAPTHORE
+was set when the instance was created,
+.Xr read 2
+will
+.Em atomically decrement
+the counter if (and when) it is non-zero, copying the value 1 to the eight
+byte buffer passed to the system call; if
+.Sy EFD_SEMAPHORE
+was not set,
+.Xr read 2
+will
+.Em atomically clear
+the counter if (and when) it is non-zero, copying the former value of the
+counter to the eight byte buffer passed to the
+system call.  In either case,
+.Xr read 2
+will block if the counter is
+zero (or return
+.Sy EAGAIN
+if the instance was created with
+.Sy EFD_NONBLOCK Ns ).
+If the buffer specified to
+.Xr read 2
+is less than
+eight bytes in length,
+.Sy EINVAL
+will be returned.
+.Ed
+.It Sy write(2)
+.Bd -filled -compact
+Atomically adds the 64-bit value pointed to by the buffer to the 64-bit
+counter associated with the instance.  If the resulting value would overflow,
+the
+.Xr write 2
+will block until the value would not overflow
+(or return
+.Sy EAGAIN
+EAGAIN if the instance was created with
+.Sy EFD_NONBLOCK Ns ).
+If the buffer specified to
+.Xr write 2
+is less than eight bytes in length,
+.Sy EINVAL
+will be returned.
+.Ed
+.It Sy poll(2), port_get(3C), epoll_wait(3C)
+.Bd -filled -compact
+Provide notification when the 64-bit counter associated
+with the instance is ready for reading or writing, as specified.
+If the 64-bit value associated with the instance is non-zero,
+.Sy POLLIN
+and
+.Sy POLLRDNORM
+will be set; if the value 1 can be added the value
+without blocking,
+.Sy POLLOUT
+and
+.Sy POLLWRNORM
+will be set.
+.Ed
+.El
+.Sh RETURN VALUES
+Upon succesful completion, a file descriptor associated with the instance
+is returned. Otherwise,
+.Sy -1 is returned and
+.Sy errno
+is set to indicate the error.
+.Sh ERRORS
+The
+.Fn eventfd
+function will fail if:
+.Bl -tag -width Er
+.It Er EINVAL
+The
+.Fa flags
+are invalid.
+.It Er EMFILE
+There are currently
+.Pf { Sy OPEN_MAX Ns }
+file descriptors open in the calling process.
+.El
+.Sh SEE ALSO
+.Xr poll 2 ,
+.Xr port_get 3C ,
+.Xr epoll_wait 3C ,
+.Xr eventfd 5

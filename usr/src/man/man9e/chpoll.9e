@@ -22,11 +22,9 @@ chpoll \- poll entry point for a non-STREAMS character driver
 .fi
 
 .SH INTERFACE LEVEL
-.sp
 .LP
 This entry point is optional. Architecture independent level 1 (DDI/DKI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIdev\fR\fR
@@ -156,7 +154,6 @@ A pointer to a pointer to a \fBpollhead\fR structure.
 .RE
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBchpoll()\fR entry point routine is used by non-STREAMS character device
 drivers that wish to support polling. The driver must implement the polling
@@ -170,7 +167,7 @@ called:
 .sp
 .in +2
 .nf
-if (events_are_satisfied_now) {
+if (specified_events_are_satisfied_now) {
       *reventsp = satisfied_events & events;
 } else {
       *reventsp = 0;
@@ -203,12 +200,10 @@ hold any mutex across the call to \fBpollwakeup\fR(9F) that is acquired in its
 \fBchpoll()\fR entry point, or a deadlock may result.
 .RE
 .SH RETURN VALUES
-.sp
 .LP
 \fBchpoll()\fR should return \fB0\fR for success, or the appropriate error
 number.
 .SH SEE ALSO
-.sp
 .LP
 \fBpoll\fR(2), \fBnochpoll\fR(9F), \fBpollwakeup\fR(9F)
 .sp
