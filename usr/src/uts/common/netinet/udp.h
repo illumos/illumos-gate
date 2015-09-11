@@ -1,6 +1,7 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2015 Joyent, Inc.
  */
 
 /*
@@ -34,6 +35,7 @@ struct udphdr {
 #define	UDP_RCVHDR		0x0102		/* for internal use only */
 #define	UDP_NAT_T_ENDPOINT	0x0103		/* for internal use only */
 #define	UDP_SRCPORT_HASH	0x0104		/* for internal use only */
+#define	UDP_SND_TO_CONNECTED	0x0105		/* for internal use only */
 
 /*
  * Hash definitions for UDP_SRCPORT_HASH that effectively tell UDP how to go

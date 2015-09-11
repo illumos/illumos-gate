@@ -293,7 +293,9 @@ opdes_t	udp_opt_arr[] = {
 	},
 { UDP_NAT_T_ENDPOINT, IPPROTO_UDP, OA_RW, OA_RW, OP_PRIVPORT, 0, sizeof (int),
 	0 },
-{ UDP_SRCPORT_HASH, IPPROTO_UDP, OA_R, OA_RW, OP_CONFIG, 0, sizeof (int), 0 }
+{ UDP_SRCPORT_HASH, IPPROTO_UDP, OA_R, OA_RW, OP_CONFIG, 0, sizeof (int), 0 },
+{ UDP_SND_TO_CONNECTED, IPPROTO_UDP, OA_R, OA_RW, OP_CONFIG, 0, sizeof (int),
+	0 }
 };
 
 /*

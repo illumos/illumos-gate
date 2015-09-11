@@ -182,8 +182,9 @@ typedef	struct udp_s {
 		udp_vxlanhash: 1,	/* UDP_SRCPORT_HASH option */
 					/* Because there's only VXLAN, cheat */
 					/* and only use a single bit */
+		udp_snd_to_conn: 1,	/* UDP_SND_TO_CONNECTED option */
 
-		udp_pad_to_bit_31 : 28;
+		udp_pad_to_bit_31 : 27;
 
 	/* Following 2 fields protected by the uf_lock */
 	struct udp_s	*udp_bind_hash; /* Bind hash chain */
