@@ -23,6 +23,7 @@
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Milan Jurik. All rights reserved.
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 #include <alloca.h>
@@ -127,14 +128,31 @@ static const sas_connector_type_t sas_connector_type_list[] = {
 	{   0x0, "Information unknown"  },
 	{   0x1, "External SAS 4x receptacle (see SAS-2 and SFF-8470)"	},
 	{   0x2, "Exteranl Mini SAS 4x receptacle (see SAS-2 and SFF-8088)" },
+	{   0x3, "QSFP+ receptacle (see SAS-2.1 and SFF-8436)" },
+	{   0x4, "Mini SAS 4x active receptacle (see SAS-2.1 and SFF-8088)" },
+	{   0x5, "Mini SAS HD 4x receptacle (see SAS-2.1 and SFF-8644)" },
+	{   0x6, "Mini SAS HD 8x receptacle (see SAS-2.1 and SFF-8644)" },
+	{   0x7, "Mini SAS HD 16x receptacle (see SAS-2.1 and SFF-8644)" },
 	{   0xF, "Vendor-specific external connector"	},
 	{   0x10, "Internal wide SAS 4i plug (see SAS-2 and SFF-8484)"	},
 	{   0x11,
 	"Internal wide Mini SAS 4i receptacle (see SAS-2 and SFF-8087)"	},
-	{   0x20, "Internal SAS Drive receptacle (see SAS-2 and SFF-8482)"  },
-	{   0x21, "Internal SATA host plug (see SAS-2 and SATA-2)"  },
+	{   0x12, "Mini SAS HD 4i receptacle (see SAS-2.1 and SFF-8643)" },
+	{   0x20, "Internal SAS Drive receptacle (see SAS-2 and SFF-8482)" },
+	{   0x21, "Internal SATA host plug (see SAS-2 and SATA-2)"	},
 	{   0x22, "Internal SAS Drive plug (see SAS-2 and SFF-8482)"	},
 	{   0x23, "Internal SATA device plug (see SAS-2 and SATA-2)"	},
+	{   0x24, "Micro SAS receptacle (see SAS-2.14)"	},
+	{   0x25, "Micro SATA device plug (see SAS-2.1 and SATA)"	},
+	{   0x26, "Micro SAS plug (see SAS-2.1 and SFF-8486)"	},
+	{   0x27, "Micro SAS/SATA plug (see SAS-2.1 and SFF-8486)"	},
+	{   0x28,
+	"12 Gb/s SAS Drive backplane receptacle (see SAS-34 and SFF-8680)" },
+	{   0x29, "12Gb/s SAS Drive Plug (see SAS-3 and SFF-8680)"	},
+	{   0x2A, "Multifunction 12 Gb/s 6x Unshielded receptacle connector "
+		"receptacle (see SAS-3 and SFF-8639)"	},
+	{   0x2B, "Multifunction 12 Gb/s 6x Unshielded receptable connector "
+		"plug (see SAS-3 and SFF-8639)"	},
 	{   0x2F, "Internal SAS virtual connector"  },
 	{   0x3F, "Vendor-specific internal connector"	},
 	{   0x70, "Other Vendor-specific connector"	},
@@ -158,7 +176,7 @@ static const sas_connector_type_t sas_connector_type_list[] = {
 
 #define	SAS_CONNECTOR_TYPE_CODE_NOT_DEFINED  0x80
 #define	SAS_CONNECTOR_TYPE_NOT_DEFINED \
-	"Connector type not definedi by SES-2 standard"
+	"Connector type not defined by SES-2 standard"
 #define	SAS_CONNECTOR_TYPE_RESERVED \
 	"Connector type reserved by SES-2 standard"
 
@@ -1149,7 +1167,8 @@ ses_create_disk(ses_enum_data_t *sdp, tnode_t *pnode, nvlist_t *props)
 	    status != SES_ESC_CRITICAL &&
 	    status != SES_ESC_NONCRITICAL &&
 	    status != SES_ESC_UNRECOVERABLE &&
-	    status != SES_ESC_NO_ACCESS)
+	    status != SES_ESC_NO_ACCESS &&
+	    status != SES_ESC_UNKNOWN)
 		return (0);
 
 	topo_mod_dprintf(mod, "found attached disk");
