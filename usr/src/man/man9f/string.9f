@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH STRING 9F "Jun 4, 2014"
+.TH STRING 9F "Sep 14, 2015"
 .SH NAME
 string, strcasecmp, strncasecmp, strncat, strlcat, strchr, strrchr, strcmp,
 strncmp, strcpy, strncpy, strlcpy, strfree, strspn, strdup, ddi_strdup, strlen,
@@ -98,11 +98,9 @@ strnlen \- string operations
 .fi
 
 .SH INTERFACE LEVEL
-.sp
 .LP
 Solaris DDI specific (Solaris DDI).
 .SH DESCRIPTION
-.sp
 .LP
 The arguments \fIs\fR, \fIs1\fR, and \fIs2\fR point to strings (arrays of
 characters terminated by a null character). The \fBstrcat()\fR,
@@ -111,14 +109,12 @@ characters terminated by a null character). The \fBstrcat()\fR,
 Additionally, the \fBstrcpy()\fR function does not check for overflow of the
 array.
 .SS "\fBstrcasecmp()\fR, \fBstrncasecmp()\fR"
-.sp
 .LP
 The \fBstrcasecmp()\fR and \fBstrncasecmp()\fR functions are case-insensitive
 versions of  \fBstrcmp()\fR and \fBstrncmp()\fR respectively, described below.
 They assume the \fBASCII\fR character set and ignore differences in case when
 comparing lower and upper case characters.
 .SS "\fBstrncat()\fR, \fBstrlcat()\fR"
-.sp
 .LP
 The \fBstrncat()\fR function appends at most \fIn\fR characters of string
 \fIs2\fR, including the terminating null character, to the end of string
@@ -150,7 +146,6 @@ if (strlcat(dst, src, dstsize) >= dstsize)
 .in -2
 
 .SS "\fBstrchr()\fR, \fBstrrchr()\fR"
-.sp
 .LP
 The \fBstrchr()\fR function returns a pointer to the first occurrence of
 \fIc\fR (converted to a  \fBchar\fR) in string \fIs\fR, or a null pointer if
@@ -158,7 +153,6 @@ The \fBstrchr()\fR function returns a pointer to the first occurrence of
 pointer to the last occurrence of \fIc\fR. The null character terminating a
 string is considered to be part of the string.
 .SS "\fBstrcmp()\fR, \fBstrncmp()\fR"
-.sp
 .LP
 The \fBstrcmp()\fR function compares two strings byte-by-byte, according to the
 ordering of your machine's character set.  The function returns an integer
@@ -170,15 +164,15 @@ strings being compared. The \fBstrncmp()\fR function makes the same comparison
 but looks at a maximum of \fIn\fR bytes. Bytes following a null byte are not
 compared.
 .SS "\fBstrcpy()\fR, \fBstrncpy()\fR, \fBstrlcpy()\fR"
-.sp
 .LP
 The \fBstrcpy()\fR function copies string \fIs2\fR to \fIs1\fR, including the
 terminating null character, stopping after the null character has been copied.
 The \fBstrncpy()\fR function copies exactly \fIn\fR bytes, truncating \fIs2\fR
 or adding null characters to \fIs1\fR if necessary. The result will not be
-null-terminated if the length of \fIs2\fR is \fIn\fR or more. Each function
-returns \fIs1\fR.  If copying takes place between objects that overlap, the
-behavior of \fBstrcpy()\fR, \fBstrncpy()\fR, and \fBstrlcpy()\fR is undefined.
+null-terminated if the length of \fIs2\fR is \fIn\fR or more. Both the
+\fBstrcpy()\fR and \fBstrncpy()\fR functions return \fIs1\fR. If copying takes
+place between objects that overlap, the behavior of \fBstrcpy()\fR,
+\fBstrncpy()\fR, and \fBstrlcpy()\fR is undefined.
 .sp
 .LP
 The \fBstrlcpy()\fR function copies  at most \fIdstsize\fR\(mi1 characters
@@ -195,19 +189,16 @@ if (strlcpy(dst, src, dstsize) >= dstsize)
 .in -2
 
 .SS "\fBstrfree()\fR"
-.sp
 .LP
 The \fBstrfree()\fR function frees the memory associated with the string
 pointed to by \fIs\fR.  This memory pointed to by \fIs\fR must be of size
 \fBstrlen\fR(\fIs\fR)+1, and must have been allocated (either directly or
 indirectly) by \fBkmem_alloc\fR(9F) or \fBkmem_zalloc\fR(9F).
 .SS "\fBstrspn()\fR"
-.sp
 .LP
 The \fBstrspn()\fR function returns the length of the initial segment of string
 \fIs1\fR that consists entirely of characters from string \fIs2\fR.
 .SS "\fBstrdup()\fR, \fBddi_strdup()\fR"
-.sp
 .LP
 The \fBddi_strdup()\fR function returns a pointer to a new string that is a
 duplicate of the string pointed to by \fIs1\fR. The returned pointer can be
@@ -223,7 +214,6 @@ The \fBstrdup()\fR function behaves the same as the \fBddi_strdup()\fR when
 called with the \fBKM_SLEEP\fR flag. This means that \fBstrdup()\fR can sleep
 until memory is available and will always succeed.
 .SS "\fBstrlen()\fR, \fBstrnlen()\fR"
-.sp
 .LP
 The \fBstrlen()\fR function returns the number of bytes in \fIs\fR, not
 including the terminating null character.
@@ -234,7 +224,6 @@ bytes in \fIs\fR, not including the terminating null character. The
 \fBstrnlen()\fR function never examines more than \fIn\fR bytes of the string
 pointed to by \fIs\fR.
 .SH CONTEXT
-.sp
 .LP
 The \fBstrdup()\fR and \fBddi_strdup()\fR functions can be called from user or
 kernel context.
@@ -247,7 +236,6 @@ the \fBKM_NOSLEEP\fR flag is set.
 All the other string manipulation functions can be called from user, interrupt,
 or kernel context.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -263,7 +251,6 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBstring\fR(3C), \fBattributes\fR(5), \fBbcopy\fR(9F), \fBddi_copyin\fR(9F),
 \fBkmem_alloc\fR(9F)
@@ -271,7 +258,6 @@ Interface Stability	Committed
 .LP
 \fIWriting Device Drivers\fR
 .SH NOTES
-.sp
 .LP
 If copying takes place between objects that overlap, the behavior of
 \fBstrlcat()\fR, \fBstrncat()\fR, \fBstrcpy()\fR, \fBstrlcpy()\fR, and
