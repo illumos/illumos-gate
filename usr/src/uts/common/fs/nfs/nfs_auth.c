@@ -843,7 +843,7 @@ nfsauth_cache_get(struct exportinfo *exi, struct svc_req *req, int flavor,
 
 	claddr = svc_getrpccaller(req->rq_xprt);
 	addr = *claddr;
-	addr.buf = kmem_alloc(addr.len, KM_SLEEP);
+	addr.buf = kmem_alloc(addr.maxlen, KM_SLEEP);
 	bcopy(claddr->buf, addr.buf, claddr->len);
 
 	SVC_GETADDRMASK(req->rq_xprt, SVC_TATTR_ADDRMASK, (void **)&taddrmask);
@@ -874,9 +874,9 @@ nfsauth_cache_get(struct exportinfo *exi, struct svc_req *req, int flavor,
 		 * Initialize the new auth_cache_clnt
 		 */
 		nc->authc_addr = addr;
-		nc->authc_addr.buf = kmem_alloc(addr.len,
+		nc->authc_addr.buf = kmem_alloc(addr.maxlen,
 		    KM_NOSLEEP | KM_NORMALPRI);
-		if (addr.len != 0 && nc->authc_addr.buf == NULL) {
+		if (addr.maxlen != 0 && nc->authc_addr.buf == NULL) {
 			kmem_free(nc, sizeof (*nc));
 			goto retrieve;
 		}
@@ -897,7 +897,7 @@ nfsauth_cache_get(struct exportinfo *exi, struct svc_req *req, int flavor,
 
 			avl_destroy(&nc->authc_tree);
 			rw_destroy(&nc->authc_lock);
-			kmem_free(nc->authc_addr.buf, nc->authc_addr.len);
+			kmem_free(nc->authc_addr.buf, nc->authc_addr.maxlen);
 			kmem_free(nc, sizeof (*nc));
 		}
 	}
@@ -1057,7 +1057,7 @@ wait:
 
 		p->auth_state = NFS_AUTH_WAITING;
 		mutex_exit(&p->auth_lock);
-		kmem_free(addr.buf, addr.len);
+		kmem_free(addr.buf, addr.maxlen);
 		addr = p->auth_clnt->authc_addr;
 
 		atomic_inc_uint(&nfsauth_cache_miss);
@@ -1206,7 +1206,7 @@ wait:
 		    uint_t, nach,
 		    time_t, refresh);
 
-		kmem_free(addr.buf, addr.len);
+		kmem_free(addr.buf, addr.maxlen);
 	}
 
 	return (access);
@@ -1235,7 +1235,7 @@ retrieve:
 		}
 	}
 
-	kmem_free(addr.buf, addr.len);
+	kmem_free(addr.buf, addr.maxlen);
 
 	return (access);
 }
@@ -1429,7 +1429,7 @@ nfsauth_free_clnt_node(struct auth_cache_clnt *p)
 		nfsauth_free_node(node);
 	avl_destroy(&p->authc_tree);
 
-	kmem_free(p->authc_addr.buf, p->authc_addr.len);
+	kmem_free(p->authc_addr.buf, p->authc_addr.maxlen);
 	rw_destroy(&p->authc_lock);
 
 	kmem_free(p, sizeof (*p));
