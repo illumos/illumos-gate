@@ -83,6 +83,7 @@ SMB_MDF_	smbios_memdevice_flag_desc	uint_t
 SMB_MDFF_	smbios_memdevice_form_desc	uint_t
 SMB_MDT_	smbios_memdevice_type_desc	uint_t
 SMB_MDR_	smbios_memdevice_rank_desc	uint_t
+SMB_OBT_	smbios_onboard_type_desc	uint_t
 SMB_POC_	smbios_port_conn_desc		uint_t
 SMB_POT_	smbios_port_type_desc		uint_t
 SMB_PRC_	smbios_processor_core_flag_desc	uint_t

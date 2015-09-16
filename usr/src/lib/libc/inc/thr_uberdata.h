@@ -23,7 +23,7 @@
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
- * Copyright (c) 2014, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2015, Joyent, Inc.
  */
 
 #ifndef _THR_UBERDATA_H
@@ -1229,6 +1229,8 @@ extern	void	getgregs(ulwp_t *, gregset_t);
 extern	void	setgregs(ulwp_t *, gregset_t);
 extern	void	thr_panic(const char *);
 #pragma rarely_called(thr_panic)
+extern	void	mutex_panic(mutex_t *, const char *);
+#pragma rarely_called(mutex_panic)
 extern	ulwp_t	*find_lwp(thread_t);
 extern	void	finish_init(void);
 extern	void	update_sched(ulwp_t *);

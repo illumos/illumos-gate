@@ -25,6 +25,7 @@
  */
 /*
  * Copyright (c) 2012, 2014 by Delphix. All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 #include "lint.h"
@@ -35,6 +36,8 @@ ulwp_t *panic_thread;
 
 static mutex_t assert_lock = DEFAULTMUTEX;
 static ulwp_t *assert_thread = NULL;
+
+mutex_t *panic_mutex = NULL;
 
 /*
  * Called from __assert() to set panicstr and panic_thread.
@@ -127,6 +130,13 @@ void
 aio_panic(const char *why)
 {
 	common_panic("*** libc aio system failure: ", why);
+}
+
+void
+mutex_panic(mutex_t *mp, const char *why)
+{
+	panic_mutex = mp;
+	common_panic("*** libc mutex system failure: ", why);
 }
 
 /*

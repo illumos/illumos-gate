@@ -13,7 +13,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH STRING 3C "Dec 20, 2014"
+.TH STRING 3C "Sep 14, 2015"
 .SH NAME
 string, strcasecmp, strcasecmp_l, strncasecmp, strncasecmp_l, strcat, strncat,
 strlcat, strchr, strchrnul, strrchr, strcmp, strncmp, stpcpy, stpncpy, strcpy,
@@ -285,9 +285,10 @@ The \fBstrcpy()\fR function copies string \fIs2\fR to \fIs1\fR, including the
 terminating null character, stopping after the null character has been copied.
 The \fBstrncpy()\fR function copies exactly \fIn\fR bytes, truncating \fIs2\fR
 or adding null characters to \fIs1\fR if necessary. The result will not be
-null-terminated if the length of \fIs2\fR is \fIn\fR or more. Each function
-returns \fIs1\fR.  If copying takes place between objects that overlap, the
-behavior of \fBstrcpy()\fR, \fBstrncpy()\fR, and \fBstrlcpy()\fR is undefined.
+null-terminated if the length of \fIs2\fR is \fIn\fR or more. Both the
+\fBstrcpy()\fR and \fBstrncpy()\fR functions return \fIs1\fR. If copying takes
+place between objects that overlap, the behavior of \fBstrcpy()\fR,
+\fBstrncpy()\fR, and \fBstrlcpy()\fR is undefined.
 .LP
 The \fBstrlcpy()\fR function copies  at most \fIdstsize\fR\(mi1 characters
 (\fIdstsize\fR being the  size of the  string buffer \fIdst\fR) from \fIsrc\fR

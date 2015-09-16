@@ -38,17 +38,18 @@ $(ROOTUSRSBIN)/ping	:=	FILEMODE= 04555
 # when IPv6 inspired new interfaces are part of standards.
 LDLIBS +=	-lxnet -lsocket -lnsl -lm -linetutil
 
-# These #defines are required to use UNIX 98 interfaces
-CPPFLAGS += -D_XOPEN_SOURCE=500 -D__EXTENSIONS__
+# These #defines are required to use SUSv3 interfaces
+CPPFLAGS += -D_XOPEN_SOURCE=600 -D__EXTENSIONS__
+
+C99MODE=	-xc99=%all
 
 # Setting the above defines to use the UNIX98 ancillary data feature
 # causes lint to output warnings about lint library declarations conflicting
 # with those in the header files. Since we need these features the best
 # course of action is to switch the types of the resulting warnings off
 # when running lint.
-LINTFLAGS += -erroff=E_INCONS_VAL_TYPE_DECL2 -erroff=E_INCONS_ARG_DECL2 
-
-CERRWARN += -_gcc=-Wno-uninitialized
+LINTFLAGS += -erroff=E_INCONS_VAL_TYPE_DECL2 -erroff=E_INCONS_ARG_DECL2 \
+		-erroff=E_NAME_USED_NOT_DEF2
 
 .KEEP_STATE:
 .PARALLEL:

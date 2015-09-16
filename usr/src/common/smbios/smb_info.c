@@ -21,6 +21,7 @@
 
 /*
  * Copyright 2015 OmniTI Computer Consulting, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -45,6 +46,23 @@
  * also to automatically handle the case of a structure that has been extended.
  * When necessary, this code can use smb_gteq() to determine whether the SMBIOS
  * data is of a particular revision that is supposed to contain a new field.
+ *
+ * Note, when trying to bzero the caller's struct you have to be careful about
+ * versions. One can only bzero the initial version that existed in illumos. In
+ * other words, if someone passes an older library handle that doesn't support a
+ * version you cannot assume that their structures have those additional members
+ * in them. Instead, a 'base' version is introduced for such types that have
+ * differences and instead we only bzero out the base version and then handle
+ * the additional members. In general, because all additional members will be
+ * assigned, there's no reason to zero them out unless they are arrays that
+ * won't be entirely filled in.
+ *
+ * Due to history, anything added after the update from version 2.4, in other
+ * words additions from or after '5094 Update libsmbios with recent items'
+ * (4e901881) is currently being used for this. While we don't allow software
+ * compiling against this to get an older form, this was the first major update
+ * and a good starting point for us to enforce this behavior which is useful for
+ * moving forward to making this more public.
  */
 
 #include <sys/smbios_impl.h>
@@ -423,7 +441,10 @@ smbios_info_chassis(smbios_hdl_t *shp, id_t id, smbios_chassis_t *chp)
 		return (smb_set_errno(shp, ESMB_TYPE));
 
 	smb_info_bcopy(stp->smbst_hdr, ch, sizeof (buf));
-	bzero(chp, sizeof (smbios_chassis_t));
+	bzero(chp, sizeof (smb_base_chassis_t));
+	if (shp->sh_libvers >= SMB_VERSION_27) {
+		bzero(chp->smbc_sku, sizeof (chp->smbc_sku));
+	}
 
 	chp->smbc_oemdata = ch->smbch_oemdata;
 	chp->smbc_lock = (ch->smbch_type & SMB_CHT_LOCK) != 0;
@@ -437,7 +458,7 @@ smbios_info_chassis(smbios_hdl_t *shp, id_t id, smbios_chassis_t *chp)
 	chp->smbc_elems = ch->smbch_cn;
 	chp->smbc_elemlen = ch->smbch_cm;
 
-	if (shp->sh_smbvers >= SMB_VERSION_27) {
+	if (shp->sh_libvers >= SMB_VERSION_27) {
 		(void) strlcpy(chp->smbc_sku, SMB_CH_SKU(ch),
 		    sizeof (chp->smbc_sku));
 	}
@@ -458,7 +479,7 @@ smbios_info_processor(smbios_hdl_t *shp, id_t id, smbios_processor_t *pp)
 		return (smb_set_errno(shp, ESMB_TYPE));
 
 	smb_info_bcopy(stp->smbst_hdr, &p, sizeof (p));
-	bzero(pp, sizeof (smbios_processor_t));
+	bzero(pp, sizeof (smb_base_processor_t));
 
 	pp->smbp_cpuid = p.smbpr_cpuid;
 	pp->smbp_type = p.smbpr_type;
@@ -472,15 +493,21 @@ smbios_info_processor(smbios_hdl_t *shp, id_t id, smbios_processor_t *pp)
 	pp->smbp_l2cache = p.smbpr_l2cache;
 	pp->smbp_l3cache = p.smbpr_l3cache;
 
-	if (shp->sh_smbvers >= SMB_VERSION_25) {
+	if (shp->sh_libvers >= SMB_VERSION_25) {
 		pp->smbp_corecount = p.smbpr_corecount;
 		pp->smbp_coresenabled = p.smbpr_coresenabled;
 		pp->smbp_threadcount = p.smbpr_threadcount;
 		pp->smbp_cflags = p.smbpr_cflags;
 	}
 
-	if (shp->sh_smbvers >= SMB_VERSION_26)
+	if (shp->sh_libvers >= SMB_VERSION_26)
 		pp->smbp_family2 = p.smbpr_family2;
+
+	if (shp->sh_libvers >= SMB_VERSION_30) {
+		pp->smbp_corecount2 = p.smbpr_corecount2;
+		pp->smbp_coresenabled2 = p.smbpr_coresenabled2;
+		pp->smbp_threadcount2 = p.smbpr_threadcount2;
+	}
 
 	return (0);
 }
@@ -787,7 +814,7 @@ smbios_info_memdevice(smbios_hdl_t *shp, id_t id, smbios_memdevice_t *mdp)
 		return (smb_set_errno(shp, ESMB_TYPE));
 
 	smb_info_bcopy(stp->smbst_hdr, &m, sizeof (m));
-	bzero(mdp, sizeof (smbios_memdevice_t));
+	bzero(mdp, sizeof (smb_base_memdevice_t));
 
 	mdp->smbmd_array = m.smbmdev_array;
 	mdp->smbmd_error = m.smbmdev_error;
@@ -814,13 +841,13 @@ smbios_info_memdevice(smbios_hdl_t *shp, id_t id, smbios_memdevice_t *mdp)
 	mdp->smbmd_dloc = smb_strptr(stp, m.smbmdev_dloc);
 	mdp->smbmd_bloc = smb_strptr(stp, m.smbmdev_bloc);
 
-	if (shp->sh_smbvers >= SMB_VERSION_26)
+	if (shp->sh_libvers >= SMB_VERSION_26)
 		mdp->smbmd_rank = m.smbmdev_attrs & 0x0F;
 
-	if (shp->sh_smbvers >= SMB_VERSION_27)
+	if (shp->sh_libvers >= SMB_VERSION_27)
 		mdp->smbmd_clkspeed = m.smbmdev_clkspeed;
 
-	if (shp->sh_smbvers >= SMB_VERSION_28) {
+	if (shp->sh_libvers >= SMB_VERSION_28) {
 		mdp->smbmd_minvolt = m.smbmdev_minvolt;
 		mdp->smbmd_maxvolt = m.smbmdev_maxvolt;
 		mdp->smbmd_confvolt = m.smbmdev_confvolt;

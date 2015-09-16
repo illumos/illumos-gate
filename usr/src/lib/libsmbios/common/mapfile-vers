@@ -120,6 +120,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	smbios_memdevice_type_desc;
 	smbios_memdevice_rank_desc;
 	smbios_open;
+	smbios_onboard_type_desc;
 	smbios_port_conn_desc;
 	smbios_port_type_desc;
 	smbios_processor_family_desc;

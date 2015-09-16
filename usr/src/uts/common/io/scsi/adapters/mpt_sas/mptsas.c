@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2014 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2014, Joyent, Inc. All rights reserved.
  * Copyright 2014 OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright (c) 2014, Tegile Systems Inc. All rights reserved.
@@ -410,7 +410,7 @@ static void mptsas_record_event(void *args);
 static int mptsas_reg_access(mptsas_t *mpt, mptsas_reg_access_t *data,
     int mode);
 
-mptsas_target_t *mptsas_tgt_alloc(mptsas_t *, uint16_t, uint64_t,
+mptsas_target_t *mptsas_tgt_alloc(refhash_t *, uint16_t, uint64_t,
     uint32_t, mptsas_phymask_t, uint8_t);
 static mptsas_smp_t *mptsas_smp_alloc(mptsas_t *, mptsas_smp_t *);
 static int mptsas_online_smp(dev_info_t *pdip, mptsas_smp_t *smp_node,
@@ -782,6 +782,23 @@ mptsas_target_addr_cmp(const void *a, const void *b)
 	return ((int)bap->mta_phymask - (int)aap->mta_phymask);
 }
 
+static uint64_t
+mptsas_tmp_target_hash(const void *tp)
+{
+	return ((uint64_t)(uintptr_t)tp);
+}
+
+static int
+mptsas_tmp_target_cmp(const void *a, const void *b)
+{
+	if (a > b)
+		return (1);
+	if (b < a)
+		return (-1);
+
+	return (0);
+}
+
 static void
 mptsas_target_free(void *op)
 {
@@ -808,6 +825,7 @@ mptsas_destroy_hashes(mptsas_t *mpt)
 	    sp = refhash_next(mpt->m_smp_targets, sp)) {
 		refhash_remove(mpt->m_smp_targets, sp);
 	}
+	refhash_destroy(mpt->m_tmp_targets);
 	refhash_destroy(mpt->m_targets);
 	refhash_destroy(mpt->m_smp_targets);
 	mpt->m_targets = NULL;
@@ -1365,6 +1383,16 @@ mptsas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	    offsetof(mptsas_target_t, m_addr), KM_SLEEP);
 
 	/*
+	 * The refhash for temporary targets uses the address of the target
+	 * struct itself as tag, so the tag offset is 0. See the implementation
+	 * of mptsas_tmp_target_hash() and mptsas_tmp_target_cmp().
+	 */
+	mpt->m_tmp_targets = refhash_create(MPTSAS_TMP_TARGET_BUCKET_COUNT,
+	    mptsas_tmp_target_hash, mptsas_tmp_target_cmp,
+	    mptsas_target_free, sizeof (mptsas_target_t),
+	    offsetof(mptsas_target_t, m_link), 0, KM_SLEEP);
+
+	/*
 	 * Fill in the phy_info structure and get the base WWID
 	 */
 	if (mptsas_get_manufacture_page5(mpt) == DDI_FAILURE) {
@@ -1550,6 +1578,8 @@ fail:
 			mptsas_hba_teardown(mpt);
 		}
 
+		if (mpt->m_tmp_targets)
+			refhash_destroy(mpt->m_tmp_targets);
 		if (mpt->m_targets)
 			refhash_destroy(mpt->m_targets);
 		if (mpt->m_smp_targets)
@@ -6375,10 +6405,15 @@ mptsas_handle_topo_change(mptsas_topo_change_list_t *topo_node,
 				mptsas_log(mpt, CE_NOTE,
 				    "mptsas_handle_topo_change: could not "
 				    "allocate memory. \n");
+			} else if (rval == DEV_INFO_FAIL_GUID) {
+				mptsas_log(mpt, CE_NOTE,
+				    "mptsas_handle_topo_change: could not "
+				    "get SATA GUID for target %d. \n",
+				    topo_node->devhdl);
 			}
 			/*
-			 * If rval is DEV_INFO_PHYS_DISK than there is nothing
-			 * else to do, just leave.
+			 * If rval is DEV_INFO_PHYS_DISK or indicates failure
+			 * then there is nothing else to do, just leave.
 			 */
 			if (rval != DEV_INFO_SUCCESS) {
 				return;
@@ -9876,6 +9911,61 @@ mptsas_watch(void *arg)
 }
 
 static void
+mptsas_watchsubr_tgt(mptsas_t *mpt, mptsas_target_t *ptgt, hrtime_t timestamp)
+{
+	mptsas_cmd_t	*cmd;
+
+	/*
+	 * If we were draining due to a qfull condition,
+	 * go back to full throttle.
+	 */
+	if ((ptgt->m_t_throttle < MAX_THROTTLE) &&
+	    (ptgt->m_t_throttle > HOLD_THROTTLE) &&
+	    (ptgt->m_t_ncmds < ptgt->m_t_throttle)) {
+		mptsas_set_throttle(mpt, ptgt, MAX_THROTTLE);
+		mptsas_restart_hba(mpt);
+	}
+
+	cmd = TAILQ_LAST(&ptgt->m_active_cmdq, mptsas_active_cmdq);
+	if (cmd == NULL)
+		return;
+
+	if (cmd->cmd_active_expiration <= timestamp) {
+		/*
+		 * Earliest command timeout expired. Drain throttle.
+		 */
+		mptsas_set_throttle(mpt, ptgt, DRAIN_THROTTLE);
+
+		/*
+		 * Check for remaining commands.
+		 */
+		cmd = TAILQ_FIRST(&ptgt->m_active_cmdq);
+		if (cmd->cmd_active_expiration > timestamp) {
+			/*
+			 * Wait for remaining commands to complete or
+			 * time out.
+			 */
+			NDBG23(("command timed out, pending drain"));
+			return;
+		}
+
+		/*
+		 * All command timeouts expired.
+		 */
+		mptsas_log(mpt, CE_NOTE, "Timeout of %d seconds "
+		    "expired with %d commands on target %d lun %d.",
+		    cmd->cmd_pkt->pkt_time, ptgt->m_t_ncmds,
+		    ptgt->m_devhdl, Lun(cmd));
+
+		mptsas_cmd_timeout(mpt, ptgt);
+	} else if (cmd->cmd_active_expiration <=
+	    timestamp + (hrtime_t)mptsas_scsi_watchdog_tick * NANOSEC) {
+		NDBG23(("pending timeout"));
+		mptsas_set_throttle(mpt, ptgt, DRAIN_THROTTLE);
+	}
+}
+
+static void
 mptsas_watchsubr(mptsas_t *mpt)
 {
 	int		i;
@@ -9926,54 +10016,12 @@ mptsas_watchsubr(mptsas_t *mpt)
 
 	for (ptgt = refhash_first(mpt->m_targets); ptgt != NULL;
 	    ptgt = refhash_next(mpt->m_targets, ptgt)) {
-		/*
-		 * If we were draining due to a qfull condition,
-		 * go back to full throttle.
-		 */
-		if ((ptgt->m_t_throttle < MAX_THROTTLE) &&
-		    (ptgt->m_t_throttle > HOLD_THROTTLE) &&
-		    (ptgt->m_t_ncmds < ptgt->m_t_throttle)) {
-			mptsas_set_throttle(mpt, ptgt, MAX_THROTTLE);
-			mptsas_restart_hba(mpt);
-		}
+		mptsas_watchsubr_tgt(mpt, ptgt, timestamp);
+	}
 
-		cmd = TAILQ_LAST(&ptgt->m_active_cmdq, mptsas_active_cmdq);
-		if (cmd == NULL)
-			continue;
-
-		if (cmd->cmd_active_expiration <= timestamp) {
-			/*
-			 * Earliest command timeout expired. Drain throttle.
-			 */
-			mptsas_set_throttle(mpt, ptgt, DRAIN_THROTTLE);
-
-			/*
-			 * Check for remaining commands.
-			 */
-			cmd = TAILQ_FIRST(&ptgt->m_active_cmdq);
-			if (cmd->cmd_active_expiration > timestamp) {
-				/*
-				 * Wait for remaining commands to complete or
-				 * time out.
-				 */
-				NDBG23(("command timed out, pending drain"));
-				continue;
-			}
-
-			/*
-			 * All command timeouts expired.
-			 */
-			mptsas_log(mpt, CE_NOTE, "Timeout of %d seconds "
-			    "expired with %d commands on target %d lun %d.",
-			    cmd->cmd_pkt->pkt_time, ptgt->m_t_ncmds,
-			    ptgt->m_devhdl, Lun(cmd));
-
-			mptsas_cmd_timeout(mpt, ptgt);
-		} else if (cmd->cmd_active_expiration <=
-		    timestamp + (hrtime_t)mptsas_scsi_watchdog_tick * NANOSEC) {
-			NDBG23(("pending timeout"));
-			mptsas_set_throttle(mpt, ptgt, DRAIN_THROTTLE);
-		}
+	for (ptgt = refhash_first(mpt->m_tmp_targets); ptgt != NULL;
+	    ptgt = refhash_next(mpt->m_tmp_targets, ptgt)) {
+		mptsas_watchsubr_tgt(mpt, ptgt, timestamp);
 	}
 }
 
@@ -13555,28 +13603,32 @@ mptsas_get_target_device_info(mptsas_t *mpt, uint32_t page_address,
 	 */
 	if (dev_info & (MPI2_SAS_DEVICE_INFO_SATA_DEVICE |
 	    MPI2_SAS_DEVICE_INFO_ATAPI_DEVICE)) {
+		/* alloc a temporary target to send the cmd to */
+		tmp_tgt = mptsas_tgt_alloc(mpt->m_tmp_targets, *dev_handle,
+		    0, dev_info, 0, 0);
 		mutex_exit(&mpt->m_mutex);
-		/* alloc a tmp_tgt to send the cmd */
-		tmp_tgt = kmem_zalloc(sizeof (struct mptsas_target),
-		    KM_SLEEP);
-		tmp_tgt->m_devhdl = *dev_handle;
-		tmp_tgt->m_deviceinfo = dev_info;
-		tmp_tgt->m_qfull_retries = QFULL_RETRIES;
-		tmp_tgt->m_qfull_retry_interval =
-		    drv_usectohz(QFULL_RETRY_INTERVAL * 1000);
-		tmp_tgt->m_t_throttle = MAX_THROTTLE;
+
 		devicename = mptsas_get_sata_guid(mpt, tmp_tgt, 0);
-		kmem_free(tmp_tgt, sizeof (struct mptsas_target));
-		mutex_enter(&mpt->m_mutex);
+
+		if (devicename == -1) {
+			mutex_enter(&mpt->m_mutex);
+			refhash_remove(mpt->m_tmp_targets, tmp_tgt);
+			rval = DEV_INFO_FAIL_GUID;
+			return (rval);
+		}
+
 		if (devicename != 0 && (((devicename >> 56) & 0xf0) == 0x50)) {
 			sas_wwn = devicename;
 		} else if (dev_info & MPI2_SAS_DEVICE_INFO_DIRECT_ATTACH) {
 			sas_wwn = 0;
 		}
+
+		mutex_enter(&mpt->m_mutex);
+		refhash_remove(mpt->m_tmp_targets, tmp_tgt);
 	}
 
 	phymask = mptsas_physport_to_phymask(mpt, physport);
-	*pptgt = mptsas_tgt_alloc(mpt, *dev_handle, sas_wwn,
+	*pptgt = mptsas_tgt_alloc(mpt->m_targets, *dev_handle, sas_wwn,
 	    dev_info, phymask, phynum);
 	if (*pptgt == NULL) {
 		mptsas_log(mpt, CE_WARN, "Failed to allocated target"
@@ -13609,6 +13661,7 @@ inq83_retry:
 	if (rval != DDI_SUCCESS) {
 		mptsas_log(mpt, CE_WARN, "!mptsas request inquiry page "
 		    "0x83 for target:%x, lun:%x failed!", target, lun);
+		sata_guid = -1;
 		goto out;
 	}
 	/* According to SAT2, the first descriptor is logic unit name */
@@ -14442,7 +14495,8 @@ mptsas_update_hashtab(struct mptsas *mpt)
 		rval = mptsas_get_target_device_info(mpt, page_address,
 		    &dev_handle, &ptgt);
 		if ((rval == DEV_INFO_FAIL_PAGE0) ||
-		    (rval == DEV_INFO_FAIL_ALLOC)) {
+		    (rval == DEV_INFO_FAIL_ALLOC) ||
+		    (rval == DEV_INFO_FAIL_GUID)) {
 			break;
 		}
 
@@ -16119,7 +16173,8 @@ mptsas_phy_to_tgt(mptsas_t *mpt, mptsas_phymask_t phymask, uint8_t phy)
 		rval = mptsas_get_target_device_info(mpt, page_address,
 		    &cur_handle, &ptgt);
 		if ((rval == DEV_INFO_FAIL_PAGE0) ||
-		    (rval == DEV_INFO_FAIL_ALLOC)) {
+		    (rval == DEV_INFO_FAIL_ALLOC) ||
+		    (rval == DEV_INFO_FAIL_GUID)) {
 			break;
 		}
 		if ((rval == DEV_INFO_WRONG_DEVICE_TYPE) ||
@@ -16188,7 +16243,8 @@ mptsas_wwid_to_ptgt(mptsas_t *mpt, mptsas_phymask_t phymask, uint64_t wwid)
 		rval = mptsas_get_target_device_info(mpt, page_address,
 		    &cur_handle, &tmp_tgt);
 		if ((rval == DEV_INFO_FAIL_PAGE0) ||
-		    (rval == DEV_INFO_FAIL_ALLOC)) {
+		    (rval == DEV_INFO_FAIL_ALLOC) ||
+		    (rval == DEV_INFO_FAIL_GUID)) {
 			tmp_tgt = NULL;
 			break;
 		}
@@ -16256,7 +16312,7 @@ mptsas_wwid_to_psmp(mptsas_t *mpt, mptsas_phymask_t phymask, uint64_t wwid)
 }
 
 mptsas_target_t *
-mptsas_tgt_alloc(mptsas_t *mpt, uint16_t devhdl, uint64_t wwid,
+mptsas_tgt_alloc(refhash_t *refhash, uint16_t devhdl, uint64_t wwid,
     uint32_t devinfo, mptsas_phymask_t phymask, uint8_t phynum)
 {
 	mptsas_target_t *tmp_tgt = NULL;
@@ -16264,7 +16320,7 @@ mptsas_tgt_alloc(mptsas_t *mpt, uint16_t devhdl, uint64_t wwid,
 
 	addr.mta_wwn = wwid;
 	addr.mta_phymask = phymask;
-	tmp_tgt = refhash_lookup(mpt->m_targets, &addr);
+	tmp_tgt = refhash_lookup(refhash, &addr);
 	if (tmp_tgt != NULL) {
 		NDBG20(("Hash item already exist"));
 		tmp_tgt->m_deviceinfo = devinfo;
@@ -16288,7 +16344,7 @@ mptsas_tgt_alloc(mptsas_t *mpt, uint16_t devhdl, uint64_t wwid,
 	tmp_tgt->m_t_throttle = MAX_THROTTLE;
 	TAILQ_INIT(&tmp_tgt->m_active_cmdq);
 
-	refhash_insert(mpt->m_targets, tmp_tgt);
+	refhash_insert(refhash, tmp_tgt);
 
 	return (tmp_tgt);
 }

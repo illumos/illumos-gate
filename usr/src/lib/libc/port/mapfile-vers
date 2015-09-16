@@ -2915,6 +2915,8 @@ $endif
 	msgctl64;
 	__multi_innetgr;
 	_mutex_destroy		{ FLAGS = NODYNSORT };
+	mutex_enter;
+	mutex_exit;
 	mutex_held;
 	_mutex_init		{ FLAGS = NODYNSORT };
 	_mutex_unlock		{ FLAGS = NODYNSORT };

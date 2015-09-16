@@ -19,7 +19,7 @@
 #
 
 # Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright (c) 2014 Nexenta Systems, Inc. All rights reserved.
+# Copyright (c) 2015 Nexenta Systems, Inc. All rights reserved.
 # Copyright (c) 2013 Andrew Stormont.  All rights reserved.
 
 #
@@ -286,6 +286,7 @@ DRV_KMODS	+= nca
 DRV_KMODS	+= nsmb
 DRV_KMODS	+= nulldriver
 DRV_KMODS	+= nv_sata
+DRV_KMODS	+= nvme
 DRV_KMODS	+= nxge
 DRV_KMODS	+= oce
 DRV_KMODS	+= openeepr

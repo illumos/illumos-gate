@@ -211,6 +211,12 @@ void smt_pause(void);
 
 #endif /* _ASM */
 
+/*
+ * Panicking versions of our favorite friends.
+ */
+void mutex_enter(mutex_t *);
+void mutex_exit(mutex_t *);
+
 #ifdef	__cplusplus
 }
 #endif
