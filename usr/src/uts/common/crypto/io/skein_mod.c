@@ -158,12 +158,11 @@ static crypto_kcf_provider_handle_t skein_prov_handle = NULL;
 typedef struct skein_ctx {
 	skein_mech_type_t		sc_mech_type;
 	size_t				sc_digest_bitlen;
-	/*LINTED(E_ANONYMOUS_UNION_DECL)*/
 	union {
 		Skein_256_Ctxt_t	sc_256;
 		Skein_512_Ctxt_t	sc_512;
 		Skein1024_Ctxt_t	sc_1024;
-	};
+	} sc_u;
 } skein_ctx_t;
 #define	SKEIN_CTX(_ctx_)	((skein_ctx_t *)((_ctx_)->cc_provider_private))
 #define	SKEIN_CTX_LVALUE(_ctx_)	(_ctx_)->cc_provider_private
@@ -173,15 +172,18 @@ typedef struct skein_ctx {
 		switch (sc->sc_mech_type) {				\
 		case SKEIN_256_MECH_INFO_TYPE:				\
 		case SKEIN_256_MAC_MECH_INFO_TYPE:			\
-			(void) Skein_256_ ## _op(&sc->sc_256, __VA_ARGS__);\
+			(void) Skein_256_ ## _op(&sc->sc_u.sc_256,	\
+			    __VA_ARGS__);				\
 			break;						\
 		case SKEIN_512_MECH_INFO_TYPE:				\
 		case SKEIN_512_MAC_MECH_INFO_TYPE:			\
-			(void) Skein_512_ ## _op(&sc->sc_512, __VA_ARGS__);\
+			(void) Skein_512_ ## _op(&sc->sc_u.sc_512,	\
+			    __VA_ARGS__);				\
 			break;						\
 		case SKEIN1024_MECH_INFO_TYPE:				\
 		case SKEIN1024_MAC_MECH_INFO_TYPE:			\
-			(void) Skein1024_ ## _op(&sc->sc_1024, __VA_ARGS__);\
+			(void) Skein1024_ ## _op(&sc->sc_u.sc_1024,	\
+			    __VA_ARGS__);				\
 			break;						\
 		}							\
 		_NOTE(CONSTCOND)					\
