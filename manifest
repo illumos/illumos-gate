@@ -635,6 +635,7 @@ f kernel/drv/amd64/nge 0755 root sys
 f kernel/drv/amd64/ntxn 0755 root sys
 f kernel/drv/amd64/nulldriver 0755 root sys
 f kernel/drv/amd64/nv_sata 0755 root sys
+f kernel/drv/amd64/nvme 0755 root sys
 f kernel/drv/amd64/nxge 0755 root sys
 f kernel/drv/amd64/oce 0755 root sys
 f kernel/drv/amd64/ohci 0755 root sys
@@ -781,6 +782,7 @@ f kernel/drv/mr_sas.conf 0644 root sys
 f kernel/drv/nge.conf 0644 root sys
 f kernel/drv/ntxn.conf 0644 root sys
 f kernel/drv/nv_sata.conf 0644 root sys
+f kernel/drv/nvme.conf 0644 root sys
 f kernel/drv/nxge.conf 0644 root sys
 f kernel/drv/ohci.conf 0644 root sys
 f kernel/drv/openeepr.conf 0644 root sys
@@ -18414,6 +18416,7 @@ f usr/share/man/man7d/ntxn.7d 0444 root bin
 f usr/share/man/man7d/null.7d 0444 root bin
 f usr/share/man/man7d/nulldriver.7d 0444 root bin
 f usr/share/man/man7d/nv_sata.7d 0444 root bin
+f usr/share/man/man7d/nvme.7d 0444 root bin
 f usr/share/man/man7d/nxge.7d 0444 root bin
 f usr/share/man/man7d/ohci.7d 0444 root bin
 f usr/share/man/man7d/openprom.7d 0444 root bin
