@@ -54,9 +54,9 @@ overlay_fm_degrade(overlay_dev_t *odd, const char *msg)
 
 	odd->odd_flags |= OVERLAY_F_DEGRADED;
 	overlay_fm_count++;
+	overlay_link_state_update(odd);
 	if (overlay_fm_count == 1) {
 		ddi_fm_service_impact(overlay_dip, DDI_SERVICE_DEGRADED);
-		mac_link_update(odd->odd_mh, LINK_STATE_DOWN);
 	}
 out:
 	mutex_exit(&odd->odd_lock);
@@ -74,9 +74,9 @@ overlay_fm_restore(overlay_dev_t *odd)
 	odd->odd_fmamsg[0] = '\0';
 	odd->odd_flags &= ~OVERLAY_F_DEGRADED;
 	overlay_fm_count--;
+	overlay_link_state_update(odd);
 	if (overlay_fm_count == 0) {
 		ddi_fm_service_impact(overlay_dip, DDI_SERVICE_RESTORED);
-		mac_link_update(odd->odd_mh, LINK_STATE_UP);
 	}
 out:
 	mutex_exit(&odd->odd_lock);

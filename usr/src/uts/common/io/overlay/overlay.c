@@ -924,6 +924,27 @@ overlay_io_wait(overlay_dev_t *odd, overlay_dev_flag_t flag)
 	}
 }
 
+/*
+ * Update our link state with MAC. Note that it may not actually be changing
+ * from what MAC thinks it is. We compute our state by looking at a combination
+ * of two different flags: OVERLAY_F_DEGRADED and OVERLAY_F_VARPD. For the link
+ * to be up, OVERLAY_F_DEGRADED must be false and OVERLAY_F_VARPD must be true,
+ * eg. the link must not be degraded and varpd must be around.
+ */
+void
+overlay_link_state_update(overlay_dev_t *odd)
+{
+	link_state_t state = LINK_STATE_DOWN;
+
+	ASSERT(MUTEX_HELD(&odd->odd_lock));
+
+	if ((odd->odd_flags & OVERLAY_F_DEGRADED) == 0 &&
+	    (odd->odd_flags & OVERLAY_F_VARPD) != 0)
+		state = LINK_STATE_UP;
+
+	mac_link_update(odd->odd_mh, state);
+}
+
 void
 overlay_dev_iter(overlay_dev_iter_f func, void *arg)
 {
