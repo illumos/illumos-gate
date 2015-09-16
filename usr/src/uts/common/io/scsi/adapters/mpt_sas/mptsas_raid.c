@@ -23,6 +23,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright (c) 2014, Tegile Systems Inc. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*
@@ -92,7 +93,7 @@ static int mptsas_get_raid_wwid(mptsas_t *mpt, mptsas_raidvol_t *raidvol);
 
 extern int mptsas_check_dma_handle(ddi_dma_handle_t handle);
 extern int mptsas_check_acc_handle(ddi_acc_handle_t handle);
-extern mptsas_target_t *mptsas_tgt_alloc(mptsas_t *, uint16_t,
+extern mptsas_target_t *mptsas_tgt_alloc(refhash_t *, uint16_t,
     uint64_t, uint32_t, mptsas_phymask_t, uint8_t);
 
 static int
@@ -216,7 +217,7 @@ mptsas_raidconf_page_0_cb(mptsas_t *mpt, caddr_t page_memp,
 			/*
 			 * RAID uses phymask of 0.
 			 */
-			ptgt = mptsas_tgt_alloc(mpt,
+			ptgt = mptsas_tgt_alloc(mpt->m_targets,
 			    voldevhandle, raidwwn, 0, 0, 0);
 
 			raidconfig->m_raidvol[vol].m_raidtgt =

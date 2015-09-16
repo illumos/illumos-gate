@@ -49,7 +49,8 @@ C99LMODE=	-Xc99=%all
 # with those in the header files. Since we need these features the best
 # course of action is to switch the types of the resulting warnings off
 # when running lint.
-LINTFLAGS += -erroff=E_INCONS_VAL_TYPE_DECL2 -erroff=E_INCONS_ARG_DECL2 
+LINTFLAGS += -erroff=E_INCONS_VAL_TYPE_DECL2 -erroff=E_INCONS_ARG_DECL2 \
+		-erroff=E_NAME_USED_NOT_DEF2
 
 .KEEP_STATE:
 .PARALLEL:

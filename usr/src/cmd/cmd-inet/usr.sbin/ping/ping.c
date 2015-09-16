@@ -176,7 +176,7 @@ static timer_t timer;			/* timer for waiting */
 static volatile boolean_t timer_done = _B_FALSE; /* timer finished? */
 static struct itimerspec interval = { { 0, 0 }, { 1, 0 } }; /* Interval for */
 					/* -I. The default interval is 1s. */
-static hrtime_t mintime = 500000000;	/* minimum time between pings */
+static hrtime_t mintime = NSEC2MSEC(500);	/* minimum time between pings */
 
 /*
  * Globals for our name services warning. See ns_warning_thr() for more on why
@@ -725,16 +725,12 @@ main(int argc, char *argv[])
 	}
 
 	/*
-	 * Finally start up the name services warning thread. Note, we don't
-	 * consider failures of this to be fatal. Importantly, if we're out of
-	 * memory, than we'd really rather let ping keep working, because the
-	 * administrator is probably having a bad day -- let's not make it
-	 * worse.
+	 * Finally start up the name services warning thread.
 	 */
 	if (thr_create(NULL, 0, ns_warning_thr, NULL,
 	    THR_DETACHED | THR_DAEMON, NULL) != 0) {
-		Fprintf(stderr, "%s: %s\n",
-		    progname, strerror(errno));
+		Fprintf(stderr, "%s: failed to create name services "
+		    "thread: %s\n", progname, strerror(errno));
 		exit(EXIT_FAILURE);
 	}
 
