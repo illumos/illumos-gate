@@ -124,6 +124,8 @@ main(int argc, char *argv[])
 		(void) execl("/usr/bin/netstat", "netstat",
 		    (n_flag ? "-np" : "-p"),
 		    "-f", "inet", (char *)0);
+		(void) fprintf(stderr, "failed to exec netstat: %s\n",
+		    strerror(errno));
 		exit(1);
 
 	} else if (s_flag && (argsleft >= 2)) {
