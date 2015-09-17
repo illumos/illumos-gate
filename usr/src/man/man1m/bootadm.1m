@@ -3,7 +3,8 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH BOOTADM 1M "Apr 25, 2008"
+.\" Copyright (c) 2015 Toomas Soome <tsoome@me.com>
+.TH BOOTADM 1M "Jul 26, 2015"
 .SH NAME
 bootadm \- manage bootability of GRUB-enabled operating system
 .SH SYNOPSIS
@@ -15,6 +16,11 @@ bootadm \- manage bootability of GRUB-enabled operating system
 .LP
 .nf
 \fB/sbin/bootadm\fR list-archive [\fB-vn\fR] [\fB-R\fR \fIaltroot\fR [\fB-p\fR \fIplatform\fR]]
+.fi
+
+.LP
+.nf
+\fB/sbin/bootadm\fR install-bootloader [\fB-Mfv\fR] [\fB-R\fR \fIaltroot\fR] [\fB-P\fR \fIpool\fR]
 .fi
 
 .LP
@@ -33,7 +39,6 @@ bootadm \- manage bootability of GRUB-enabled operating system
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBbootadm\fR command manages the boot archive and, with x86 boot
 environments, the GRUB (GRand Unified Bootloader) menu. The
@@ -41,6 +46,18 @@ environments, the GRUB (GRand Unified Bootloader) menu. The
 as a preventative measure or as part of a recovery procedure. The
 \fBset-menu\fR subcommand allows you to switch the \fBauto-boot\fR timeout and
 default boot entry in the GRUB menu.
+.sp
+.LP
+The \fBinstall-bootloader\fR subcommand installs the system boot loader on a
+ZFS pool. If ZFS pool was not specified with the \fB-P\fR option, then the boot
+loader is installed on the ZFS pool that the system booted from. If the
+system did not boot from a ZFS pool (for example, it booted an installer via PXE
+or CD-ROM) then the \fB-P\fR option is required.
+.sp
+This subcommand can be used to install, update, and repair the boot loader on a
+ZFS pool intended for booting. When disks in the ZFS pool used for booting the
+system have been replaced, one should run \fBbootadm install-bootloader\fR to
+ensure that all disks in that pool have the system boot loader installed.
 .sp
 .LP
 The \fBlist-menu\fR subcommand displays the location of the GRUB menu and the
@@ -59,7 +76,6 @@ The \fBbootadm\fR command determines dynamically the options supported by the
 image to be managed, so that \fBbootadm\fR invoked on one platform can be used
 to manage diskless clients of a different platform type.
 .SH SUBCOMMANDS
-.sp
 .LP
 The \fBbootadm\fR command has the following subcommands:
 .sp
@@ -87,6 +103,40 @@ both SPARC and x86 platforms.
 .sp
 .ne 2
 .na
+\fB\fBinstall-bootloader\fR\fR
+.ad
+.sp .6
+.RS 4n
+Applies platform specific method to install the system boot loader to the disks
+that are part of the selected ZFS pool (either specified with \fB-P\fR or
+the default).
+.sp
+On SPARC, the boot loader is installed in the boot area of the disk partition
+used by the ZFS pool.
+.sp
+On x86, disks are formatted using either \fBMBR Partitioning\fR (Master Boot
+Record) or using \fBGPT Partitioning\fR (GUID Partition Tables). The first
+sector on the disk that is used by the \fBBIOS\fR to find a boot loader
+is referred to as the \fBMBR\fR (Master Boot Record) and is always used
+regardless of the partition scheme.
+.sp
+On x86, disks in a ZFS pool may be a combination of either type of partitioning
+scheme.  If an entire disk was added to a ZFS pool (e.g. c0t0d0), then it was
+formatted with \fBGPT\fR partitioning and the fact is recorded. The
+\fBinstall-bootloader\fR subcommand will always update the system boot loader on
+the disks. However, unless the entire disk was given a ZFS pool or the \fB-M\fR
+option is specified, the \fBMBR\fR of the disk will not updated, as the system
+cannot guarantee that the \fBMBR\fR belongs to it. If, for example, the system
+was being dual booted, a different initial boot loader may be installed there.
+.sp
+When \fBGRUB\fR is being used as the system boot loader (currently on x86), to
+reinstall the boot loader on some or all of the disks, the \fB-f\fR option must
+be passed to the \fBinstall-bootloader\fR subcommand.
+.RE
+
+.sp
+.ne 2
+.na
 \fB\fBset-menu\fR\fR
 .ad
 .sp .6
@@ -109,17 +159,17 @@ title of each entry. Applies to x86 platforms only.
 .RE
 
 .SH OPTIONS
-.sp
 .LP
 The \fBbootadm\fR command has the following options:
 .sp
 .ne 2
 .na
-\fB\fB-v\fR\fR
+\fB\fB-f\fR\fR
 .ad
 .sp .6
 .RS 4n
-In an \fBupdate-archive\fR operation, stale files are displayed on stderr.
+In an \fBinstall-bootloader\fR operation, override boot loader versioning
+constraints.
 .RE
 
 .sp
@@ -150,11 +200,55 @@ than the server. Platform must be one of \fBi86pc\fR, \fBsun4u\fR, or
 .sp
 .ne 2
 .na
+\fB\fB-v\fR\fR
+.ad
+.sp .6
+.RS 4n
+In an \fBupdate-archive\fR operation, stale files are displayed on stderr.
+.sp
+In an \fBinstall-bootloader\fR operation, display any output from tasks
+performed.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-M\fR\fR
+.ad
+.sp .6
+.RS 4n
+On x86 systems, in an \fBinstall-bootloader\fR operation, additionally installs
+the system boot loader to the \fBMBR\fR (master boot record). For more
+information, see the discussion of \fBinstall-bootloader\fR in the
+\fBSUBCOMMANDS\fR section.
+.sp
+This option is not supported on non-x86 systems, and it is an error to specify
+it.
+.RE
+
+.sp
+.ne 2
+.na
+\fB-P\fR\ \fIpool\fR
+.ad
+.sp .6
+.RS 4n
+In an \fBinstall-bootloader\fR operation, the boot loader is installed on
+the disks in the ZFS pool \fIpool\fR. If the \fB-P\fR option is not specified,
+then the boot loader is installed on the ZFS pool that the system booted from.
+If the system did not boot from a ZFS pool then the \fB-P\fR option is required.
+.RE
+
+.sp
+.ne 2
+.na
 \fB\fB-R\fR\ \fIaltroot\fR\fR
 .ad
 .sp .6
 .RS 4n
-Operation is applied to an alternate root path.
+Operation is applied to an alternate root path. In an \fBinstall-bootloader\fR
+operation, the boot loader is still installed on the specified pool; however,
+the boot loader itself will come from the alternate root.
 .LP
 Note -
 .sp
@@ -307,7 +401,6 @@ mounted. To access the GRUB menu, mount the device and access the GRUB menu at
 \fB\fI<mountpoint>\fR/boot/grub/menu.lst\fR.
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -331,7 +424,6 @@ The command exited due to an error.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -347,9 +439,9 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBboot\fR(1M), \fBinstallgrub\fR(1M), \fBattributes\fR(5)
+\fBboot\fR(1M), \fBbeadm\fR(1M), \fBinstallgrub\fR(1M), \fBinstallboot\fR(1M),
+\fBattributes\fR(5)
 .sp
 .LP
 Consult the GRUB home page, under:

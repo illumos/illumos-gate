@@ -72,6 +72,11 @@ tests = ['cachefile_001_pos', 'cachefile_002_pos', 'cachefile_003_pos',
 pre =
 post =
 
+[/opt/zfs-tests/tests/functional/checksum]
+tests = ['run_edonr_test', 'run_sha2_test', 'run_skein_test']
+pre =
+post =
+
 [/opt/zfs-tests/tests/functional/clean_mirror]
 tests = [ 'clean_mirror_001_pos', 'clean_mirror_002_pos',
     'clean_mirror_003_pos', 'clean_mirror_004_pos']

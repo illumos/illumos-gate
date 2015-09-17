@@ -21,13 +21,18 @@
 
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2013 Saso Kiselkov. All rights reserved.
 #
 
 LIBS =		$(DYNLIB) $(LINTLIB)
-SRCS =		$(COMDIR)/md4/md4.c \
+SRCS =		$(COMDIR)/edonr/edonr.c \
+		$(COMDIR)/md4/md4.c \
 		$(COMDIR)/md5/md5.c \
 		$(COMDIR)/sha1/sha1.c \
-		$(COMDIR)/sha2/sha2.c
+		$(COMDIR)/sha2/sha2.c \
+		$(COMDIR)/skein/skein.c \
+		$(COMDIR)/skein/skein_block.c \
+		$(COMDIR)/skein/skein_iv.c
 
 COMDIR =	$(SRC)/common/crypto
 SRCDIR =	../common

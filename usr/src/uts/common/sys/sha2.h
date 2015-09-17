@@ -22,6 +22,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/* Copyright 2013 Saso Kiselkov.  All rights reserved. */
 
 #ifndef _SYS_SHA2_H
 #define	_SYS_SHA2_H
@@ -39,6 +40,10 @@ extern "C" {
 #define	SHA384_DIGEST_LENGTH	48	/* SHA384 digest length in bytes */
 #define	SHA512_DIGEST_LENGTH	64	/* SHA512 digest length in bytes */
 
+/* Truncated versions of SHA-512 according to FIPS-180-4, section 5.3.6 */
+#define	SHA512_224_DIGEST_LENGTH	28	/* SHA512/224 digest length */
+#define	SHA512_256_DIGEST_LENGTH	32	/* SHA512/256 digest length */
+
 #define	SHA256_HMAC_BLOCK_SIZE	64	/* SHA256-HMAC block size */
 #define	SHA512_HMAC_BLOCK_SIZE	128	/* SHA512-HMAC block size */
 
@@ -51,6 +56,8 @@ extern "C" {
 #define	SHA512			6
 #define	SHA512_HMAC		7
 #define	SHA512_HMAC_GEN		8
+#define	SHA512_224		9
+#define	SHA512_256		10
 
 /*
  * SHA2 context.
@@ -130,7 +137,9 @@ typedef enum sha2_mech_type {
 	SHA384_HMAC_GEN_MECH_INFO_TYPE,	/* SUN_CKM_SHA384_HMAC_GENERAL */
 	SHA512_MECH_INFO_TYPE,		/* SUN_CKM_SHA512 */
 	SHA512_HMAC_MECH_INFO_TYPE,	/* SUN_CKM_SHA512_HMAC */
-	SHA512_HMAC_GEN_MECH_INFO_TYPE	/* SUN_CKM_SHA512_HMAC_GENERAL */
+	SHA512_HMAC_GEN_MECH_INFO_TYPE,	/* SUN_CKM_SHA512_HMAC_GENERAL */
+	SHA512_224_MECH_INFO_TYPE,	/* SUN_CKM_SHA512_224 */
+	SHA512_256_MECH_INFO_TYPE	/* SUN_CKM_SHA512_256 */
 } sha2_mech_type_t;
 
 #endif /* _SHA2_IMPL */

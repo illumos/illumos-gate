@@ -21,6 +21,9 @@
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+/*
+ * Copyright 2013 Saso Kiselkov.  All rights reserved.
+ */
 
 #ifndef _SYS_CRYPTO_COMMON_H
 #define	_SYS_CRYPTO_COMMON_H
@@ -194,6 +197,8 @@ typedef uint32_t crypto_keysize_unit_t;
 #define	SUN_CKM_SHA512			"CKM_SHA512"
 #define	SUN_CKM_SHA512_HMAC		"CKM_SHA512_HMAC"
 #define	SUN_CKM_SHA512_HMAC_GENERAL	"CKM_SHA512_HMAC_GENERAL"
+#define	SUN_CKM_SHA512_224		"CKM_SHA512_224"
+#define	SUN_CKM_SHA512_256		"CKM_SHA512_256"
 #define	SUN_CKM_DES_CBC			"CKM_DES_CBC"
 #define	SUN_CKM_DES3_CBC		"CKM_DES3_CBC"
 #define	SUN_CKM_DES_ECB			"CKM_DES_ECB"

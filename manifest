@@ -526,11 +526,13 @@ f kernel/crypto/amd64/blowfish 0755 root sys
 f kernel/crypto/amd64/des 0755 root sys
 s kernel/crypto/amd64/dprov=../../../kernel/drv/amd64/dprov
 f kernel/crypto/amd64/ecc 0755 root sys
+f kernel/crypto/amd64/edonr 0755 root sys
 f kernel/crypto/amd64/md4 0755 root sys
 f kernel/crypto/amd64/md5 0755 root sys
 f kernel/crypto/amd64/rsa 0755 root sys
 f kernel/crypto/amd64/sha1 0755 root sys
 f kernel/crypto/amd64/sha2 0755 root sys
+f kernel/crypto/amd64/skein 0755 root sys
 f kernel/crypto/amd64/swrand 0755 root sys
 d kernel/dacf 0755 root sys
 d kernel/dacf/amd64 0755 root sys
@@ -962,6 +964,7 @@ f kernel/misc/amd64/dcopy 0755 root sys
 s kernel/misc/amd64/des=../../../kernel/crypto/amd64/des
 f kernel/misc/amd64/dls 0755 root sys
 f kernel/misc/amd64/drm 0755 root sys
+f kernel/misc/amd64/edonr 0755 root sys
 f kernel/misc/amd64/fctl 0755 root sys
 f kernel/misc/amd64/fssnap_if 0755 root sys
 f kernel/misc/amd64/gda 0755 root sys
@@ -1004,6 +1007,7 @@ f kernel/misc/amd64/scsi 0755 root sys
 f kernel/misc/amd64/sda 0755 root sys
 f kernel/misc/amd64/sha1 0755 root sys
 f kernel/misc/amd64/sha2 0755 root sys
+f kernel/misc/amd64/skein 0755 root sys
 f kernel/misc/amd64/strategy 0755 root sys
 f kernel/misc/amd64/strplumb 0755 root sys
 f kernel/misc/amd64/tem 0755 root sys
@@ -3217,6 +3221,7 @@ f usr/include/setjmp.h 0644 root bin
 f usr/include/sgtty.h 0644 root bin
 f usr/include/sha1.h 0644 root bin
 f usr/include/sha2.h 0644 root bin
+f usr/include/skein.h 0644 root bin
 f usr/include/shadow.h 0644 root bin
 d usr/include/sharefs 0755 root bin
 f usr/include/sharefs/share.h 0644 root bin
@@ -3528,6 +3533,7 @@ f usr/include/sys/ecppio.h 0644 root bin
 f usr/include/sys/ecppreg.h 0644 root bin
 f usr/include/sys/ecppsys.h 0644 root bin
 f usr/include/sys/ecppvar.h 0644 root bin
+f usr/include/sys/edonr.h 0644 root bin
 f usr/include/sys/efi_partition.h 0644 root bin
 f usr/include/sys/elf.h 0644 root bin
 f usr/include/sys/elf_386.h 0644 root bin
@@ -4195,6 +4201,7 @@ f usr/include/sys/sid.h 0644 root bin
 f usr/include/sys/siginfo.h 0644 root bin
 f usr/include/sys/signal.h 0644 root bin
 f usr/include/sys/signalfd.h 0644 root bin
+f usr/include/sys/skein.h 0644 root bin
 f usr/include/sys/sleepq.h 0644 root bin
 f usr/include/sys/smbios.h 0644 root bin
 f usr/include/sys/smbios_impl.h 0644 root bin

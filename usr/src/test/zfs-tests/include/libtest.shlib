@@ -2576,6 +2576,11 @@ function is_mp
 	(($($PSRINFO | $WC -l) > 1))
 }
 
+function get_cpu_freq
+{
+	$PSRINFO -v 0 | $AWK '/processor operates at/ {print $6}'
+}
+
 # Run the given command as the user provided.
 function user_run
 {

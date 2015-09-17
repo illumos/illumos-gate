@@ -24,6 +24,7 @@
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright 2013 Saso Kiselkov. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/system/header@$(PKGVERS)
@@ -766,6 +767,7 @@ file path=usr/include/sharefs/sharetab.h
 file path=usr/include/siginfo.h
 file path=usr/include/signal.h
 file path=usr/include/sip.h
+file path=usr/include/skein.h
 file path=usr/include/smbios.h
 file path=usr/include/spawn.h
 $(i386_ONLY)file path=usr/include/stack_unwind.h
@@ -943,6 +945,7 @@ file path=usr/include/sys/ecppio.h
 file path=usr/include/sys/ecppreg.h
 file path=usr/include/sys/ecppsys.h
 file path=usr/include/sys/ecppvar.h
+file path=usr/include/sys/edonr.h
 file path=usr/include/sys/efi_partition.h
 file path=usr/include/sys/elf.h
 file path=usr/include/sys/elf_386.h
@@ -1428,6 +1431,7 @@ file path=usr/include/sys/shm_impl.h
 file path=usr/include/sys/sid.h
 file path=usr/include/sys/siginfo.h
 file path=usr/include/sys/signal.h
+file path=usr/include/sys/skein.h
 file path=usr/include/sys/sleepq.h
 file path=usr/include/sys/smbios.h
 file path=usr/include/sys/smbios_impl.h

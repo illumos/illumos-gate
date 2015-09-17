@@ -20,6 +20,7 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2013 by Delphix. All rights reserved.
+# Copyright 2013 Saso Kiselkov.  All rights reserved.
 #
 # This file defines the current capabilities of GRUB over and above that
 # supported by the standard distribution

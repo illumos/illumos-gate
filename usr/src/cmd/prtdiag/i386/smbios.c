@@ -287,8 +287,8 @@ do_slots(smbios_hdl_t *shp, const smbios_struct_t *sp, void *arg)
 		 * 0xff. Therefore if we find any of them set there, we just
 		 * ignore it for now.
 		 */
-		if (s.smbl_sg != 0xff || s.smbl_bus != 0xff ||
-		    s.smbl_df != 0xff || arg != NULL)
+		if (s.smbl_sg != 0xff && s.smbl_bus != 0xff &&
+		    s.smbl_df != 0xff && arg != NULL)
 			do_slot_mapping(&s, arg);
 
 		(void) printf(gettext("\n"));
