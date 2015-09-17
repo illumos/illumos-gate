@@ -21,16 +21,16 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2016 Jason King.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <cryptoutil.h>
 
 /*
  * Get the key type for the given mechanism
  *
- * All mechanisms in PKCS #11 v2.20 are listed here.
+ * All mechanisms in PKCS #11 v2.40 are listed here.
  */
 CK_RV
 pkcs11_mech2keytype(CK_MECHANISM_TYPE mech_type, CK_KEY_TYPE *ktype)
@@ -63,7 +63,8 @@ pkcs11_mech2keytype(CK_MECHANISM_TYPE mech_type, CK_KEY_TYPE *ktype)
 	case CKM_SHA1_RSA_X9_31:
 	case CKM_RSA_PKCS_PSS:
 	case CKM_SHA1_RSA_PKCS_PSS:
-	case CKM_DH_PKCS_PARAMETER_GEN:
+	case CKM_RSA_PKCS_TPM_1_1:
+	case CKM_RSA_PKCS_OAEP_TPM_1_1:
 		*ktype = CKK_RSA;
 		break;
 
@@ -72,9 +73,14 @@ pkcs11_mech2keytype(CK_MECHANISM_TYPE mech_type, CK_KEY_TYPE *ktype)
 	case CKM_DSA_SHA1:
 	case CKM_DSA_PARAMETER_GEN:
 	case CKM_FORTEZZA_TIMESTAMP:
+	case CKM_DSA_SHA224:
+	case CKM_DSA_SHA256:
+	case CKM_DSA_SHA384:
+	case CKM_DSA_SHA512:
 		*ktype = CKK_DSA;
 		break;
 
+	case CKM_DH_PKCS_PARAMETER_GEN:
 	case CKM_DH_PKCS_KEY_PAIR_GEN:
 	case CKM_DH_PKCS_DERIVE:
 		*ktype = CKK_DH;
@@ -165,6 +171,27 @@ pkcs11_mech2keytype(CK_MECHANISM_TYPE mech_type, CK_KEY_TYPE *ktype)
 	/* not sure the following 2 should be CKK_DES or not */
 	case CKM_KEY_WRAP_LYNKS: /* wrap/unwrap secret key w/ DES key */
 	case CKM_KEY_WRAP_SET_OAEP:  /* wrap/unwarp DES key w/ RSA key */
+	case CKM_SHA512_224:
+	case CKM_SHA512_224_HMAC:
+	case CKM_SHA512_224_HMAC_GENERAL:
+	case CKM_SHA512_224_KEY_DERIVATION:
+	case CKM_SHA512_256:
+	case CKM_SHA512_256_HMAC:
+	case CKM_SHA512_256_HMAC_GENERAL:
+	case CKM_SHA512_256_KEY_DERIVATION:
+	case CKM_SHA512_T:
+	case CKM_SHA512_T_HMAC:
+	case CKM_SHA512_T_HMAC_GENERAL:
+	case CKM_SHA512_T_KEY_DERIVATION:
+	case CKM_TLS10_MAC_SERVER:
+	case CKM_TLS10_MAC_CLIENT:
+	case CKM_TLS12_MAC:
+	case CKM_TLS12_MASTER_KEY_DERIVE:
+	case CKM_TLS12_KEY_AND_MAC_DERIVE:
+	case CKM_TLS12_MASTER_KEY_DERIVE_DH:
+	case CKM_TLS12_KEY_SAFE_DERIVE:
+	case CKM_TLS_MAC:
+	case CKM_TLS_KDF:
 		*ktype = CKK_GENERIC_SECRET;
 		break;
 
@@ -318,18 +345,35 @@ pkcs11_mech2keytype(CK_MECHANISM_TYPE mech_type, CK_KEY_TYPE *ktype)
 	case CKM_AES_MAC_GENERAL:
 	case CKM_AES_CBC_PAD:
 	case CKM_AES_CTR:
+	case CKM_AES_GCM:
+	case CKM_AES_CCM:
+	case CKM_AES_CTS:
+	case CKM_AES_CMAC:
+	case CKM_AES_CMAC_GENERAL:
+	case CKM_AES_XCBC_MAC:
+	case CKM_AES_XCBC_MAC_96:
+	case CKM_AES_GMAC:
 	case CKM_AES_ECB_ENCRYPT_DATA:
 	case CKM_AES_CBC_ENCRYPT_DATA:
+	case CKM_AES_OFB:
+	case CKM_AES_CFB8:
+	case CKM_AES_CFB64:
+	case CKM_AES_CFB128:
+	case CKM_AES_CFB1:
+	case CKM_AES_KEY_WRAP:
+	case CKM_AES_KEY_WRAP_PAD:
 		*ktype = CKK_AES;
 		break;
 
 	case CKM_BLOWFISH_KEY_GEN:
 	case CKM_BLOWFISH_CBC:
+	case CKM_BLOWFISH_CBC_PAD:
 		*ktype = CKK_BLOWFISH;
 		break;
 
 	case CKM_TWOFISH_KEY_GEN:
 	case CKM_TWOFISH_CBC:
+	case CKM_TWOFISH_CBC_PAD:
 		*ktype = CKK_TWOFISH;
 		break;
 
@@ -369,6 +413,26 @@ pkcs11_mech2keytype(CK_MECHANISM_TYPE mech_type, CK_KEY_TYPE *ktype)
 	case CKM_ARIA_ECB_ENCRYPT_DATA:
 	case CKM_ARIA_CBC_ENCRYPT_DATA:
 		*ktype = CKK_ARIA;
+		break;
+
+	case CKM_GOSTR3410:
+	case CKM_GOSTR3410_WITH_GOSTR3411:
+	case CKM_GOSTR3410_KEY_WRAP:
+	case CKM_GOSTR3410_DERIVE:
+		*ktype = CKK_GOSTR3410;
+		break;
+
+	case CKM_GOSTR3411:
+	case CKM_GOSTR3411_HMAC:
+		*ktype = CKK_GOSTR3411;
+		break;
+
+	case CKM_GOST28147_KEY_GEN:
+	case CKM_GOST28147_ECB:
+	case CKM_GOST28147:
+	case CKM_GOST28147_MAC:
+	case CKM_GOST28147_KEY_WRAP:
+		*ktype = CKK_GOST28147;
 		break;
 
 	default:

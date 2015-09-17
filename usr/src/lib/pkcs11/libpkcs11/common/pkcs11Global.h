@@ -27,8 +27,6 @@
 #ifndef _PKCS11_GLOBAL_H
 #define	_PKCS11_GLOBAL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -48,8 +46,6 @@ extern CK_SLOT_ID fast_slot;
 #define	PKCS11_STRING_LENGTH	32
 
 /* CK_INFO: Information about cryptoki */
-#define	CRYPTOKI_VERSION_MAJOR	2
-#define	CRYPTOKI_VERSION_MINOR	20
 #define	CRYPTOKI_VERSION_WARN_MINOR 10
 #define	MANUFACTURER_ID		"Sun Microsystems, Inc.          "
 #define	LIBRARY_DESCRIPTION	"Sun Crypto PKCS#11 Library      "

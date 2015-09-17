@@ -26,8 +26,6 @@
 #ifndef _KERNELGLOBAL_H
 #define	_KERNELGLOBAL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -53,7 +51,7 @@ extern int kernel_fd;
 
 /* CK_INFO: Information about cryptoki */
 #define	CRYPTOKI_VERSION_MAJOR	2
-#define	CRYPTOKI_VERSION_MINOR	20
+#define	CRYPTOKI_VERSION_MINOR	40
 #define	MANUFACTURER_ID		"Sun Microsystems, Inc.          "
 #define	LIBRARY_DESCRIPTION	"Sun Crypto pkcs11_kernel        "
 #define	LIBRARY_VERSION_MAJOR	1
