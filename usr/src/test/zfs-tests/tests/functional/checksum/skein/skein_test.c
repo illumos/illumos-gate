@@ -165,7 +165,7 @@ const uint8_t	skein_512_test_digests[][64] = {
 	},
 	{
 		/* no test vector for test_msg1 */
-		NULL
+		0
 	},
 	{
 		/* for test_msg2 */
@@ -214,11 +214,11 @@ const uint8_t	skein_1024_test_digests[][128] = {
 	},
 	{
 		/* no test vector for test_msg1 */
-		NULL
+		0
 	},
 	{
 		/* no test vector for test_msg2 */
-		NULL
+		0
 	},
 	{
 		/* for test_msg3 */

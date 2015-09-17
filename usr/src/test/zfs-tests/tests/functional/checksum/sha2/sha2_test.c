@@ -86,7 +86,7 @@ const uint8_t	sha384_test_digests[][48] = {
 	},
 	{
 		/* no test vector for test_msg1 */
-		NULL
+		0
 	},
 	{
 		/* for test_msg2 */
@@ -113,7 +113,7 @@ const uint8_t	sha512_test_digests[][64] = {
 	},
 	{
 		/* no test vector for test_msg1 */
-		NULL
+		0
 	},
 	{
 		/* for test_msg2 */
@@ -138,7 +138,7 @@ const uint8_t	sha512_224_test_digests[][28] = {
 	},
 	{
 		/* no test vector for test_msg1 */
-		NULL
+		0
 	},
 	{
 		/* for test_msg2 */
@@ -159,7 +159,7 @@ const uint8_t	sha512_256_test_digests[][32] = {
 	},
 	{
 		/* no test vector for test_msg1 */
-		NULL
+		0
 	},
 	{
 		/* for test_msg2 */
