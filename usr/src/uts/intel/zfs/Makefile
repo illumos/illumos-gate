@@ -24,6 +24,9 @@
 #
 #	This makefile drives the production of the zfs file system
 #	kernel module.
+#
+# Copyright 2013 Saso Kiselkov. All rights reserved.
+#
 
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
@@ -58,7 +61,8 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTLINK) $(ROOT_CONFFILE)
 #	Overrides and depends_on
 #
 MODSTUBS_DIR	 = $(OBJS_DIR)
-LDFLAGS		+= -dy -Nfs/specfs -Ncrypto/swrand -Nmisc/idmap -Nmisc/sha2
+LDFLAGS		+= -dy -Nfs/specfs -Ncrypto/swrand -Nmisc/idmap -Nmisc/sha2 \
+	-Nmisc/skein -Nmisc/edonr
 
 INC_PATH	+= -I$(UTSBASE)/common/fs/zfs
 INC_PATH	+= -I$(SRC)/common

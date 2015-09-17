@@ -23,8 +23,9 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2015 Joyent, Inc.
+ */
 
 /*
  * x86 System Management BIOS prtdiag
@@ -65,6 +66,12 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <ctype.h>
+#include <pcidb.h>
+#include <fm/libtopo.h>
+#include <fm/topo_hc.h>
+#include <sys/fm/protocol.h>
+
+static pcidb_hdl_t *prt_php;
 
 /*ARGSUSED*/
 static int
@@ -163,6 +170,103 @@ do_obdevs(smbios_hdl_t *shp, const smbios_struct_t *sp, void *arg)
 
 /*ARGSUSED*/
 static int
+do_slot_mapping_cb(topo_hdl_t *thp, tnode_t *node, void *arg)
+{
+	int err, ret;
+	nvlist_t *rsrc = NULL;
+	const char *match = arg;
+	char *s, *fmri = NULL;
+	char *didstr = NULL, *driver = NULL, *vidstr = NULL;
+	boolean_t printed = B_FALSE;
+
+	ret = TOPO_WALK_NEXT;
+	if (topo_node_resource(node, &rsrc, &err) < 0)
+		goto next;
+	if (topo_fmri_nvl2str(thp, rsrc, &fmri, &err) < 0)
+		goto next;
+
+	if ((s = strstr(fmri, match)) == NULL)
+		goto next;
+	if (s[strlen(match)] != '\0')
+		goto next;
+
+	/* At this point we think we've found a match */
+	ret = TOPO_WALK_TERMINATE;
+	if (topo_prop_get_string(node, TOPO_PGROUP_IO, TOPO_IO_DRIVER, &driver,
+	    &err) != 0)
+		driver = NULL;
+
+	if (topo_prop_get_string(node, TOPO_PGROUP_PCI, TOPO_PCI_VENDID,
+	    &vidstr, &err) != 0)
+		goto next;
+
+	if (topo_prop_get_string(node, TOPO_PGROUP_PCI, TOPO_PCI_DEVID,
+	    &didstr, &err) != 0)
+		goto next;
+
+	if (prt_php != NULL) {
+		long vid, did;
+
+		vid = strtol(vidstr, NULL, 16);
+		did = strtol(didstr, NULL, 16);
+		if (vid >= 0 && vid <= UINT16_MAX &&
+		    did >= 0 && did <= UINT16_MAX) {
+			pcidb_device_t *pdev;
+
+			pdev = pcidb_lookup_device(prt_php, vid, did);
+			if (pdev != NULL) {
+				pcidb_vendor_t *pvend;
+				pvend = pcidb_device_vendor(pdev);
+				(void) printf(gettext(", %s %s (%s)"),
+				    pcidb_vendor_name(pvend),
+				    pcidb_device_name(pdev),
+				    driver != NULL ? driver : "<unknown>");
+				printed = B_TRUE;
+			}
+		}
+	}
+
+	if (printed == B_FALSE) {
+		(void) printf(gettext(", pci%s,%s (%s)"), vidstr, didstr,
+		    driver != NULL ? driver : "<unknown>");
+	}
+next:
+	topo_hdl_strfree(thp, didstr);
+	topo_hdl_strfree(thp, driver);
+	topo_hdl_strfree(thp, vidstr);
+	topo_hdl_strfree(thp, fmri);
+	nvlist_free(rsrc);
+	return (ret);
+}
+
+static void
+do_slot_mapping(smbios_slot_t *s, topo_hdl_t *thp)
+{
+	int err;
+	uint_t dev, func;
+	topo_walk_t *twp;
+	char pciex[256];
+
+	/*
+	 * Bits 7:3 are the device number and bits 2:0 are the function.
+	 */
+	dev = s->smbl_df >> 3;
+	func = s->smbl_df & 0x7;
+
+	(void) snprintf(pciex, sizeof (pciex), "%s=%u/%s=%u/%s=%d",
+	    PCIEX_BUS, s->smbl_bus, PCIEX_DEVICE, dev, PCIEX_FUNCTION, func);
+
+	twp = topo_walk_init(thp, FM_FMRI_SCHEME_HC, do_slot_mapping_cb, pciex,
+	    &err);
+	if (twp == NULL)
+		return;
+
+	(void) topo_walk_step(twp, TOPO_WALK_CHILD);
+	topo_walk_fini(twp);
+}
+
+/*ARGSUSED*/
+static int
 do_slots(smbios_hdl_t *shp, const smbios_struct_t *sp, void *arg)
 {
 	smbios_slot_t s;
@@ -173,9 +277,21 @@ do_slots(smbios_hdl_t *shp, const smbios_struct_t *sp, void *arg)
 		const char *t = smbios_slot_type_desc(s.smbl_type);
 		const char *u = smbios_slot_usage_desc(s.smbl_usage);
 
-		(void) printf(gettext("%-3u %-9s %-16s %s\n"),
+		(void) printf(gettext("%-3u %-9s %-16s %s"),
 		    s.smbl_id, u ? u : gettext("Unknown"),
 		    t ? t : gettext("Unknown"), s.smbl_name);
+
+		/*
+		 * If the slot isn't of a type where this makes sense, then
+		 * SMBIOS will populate any of these members with the value
+		 * 0xff. Therefore if we find any of them set there, we just
+		 * ignore it for now.
+		 */
+		if (s.smbl_sg != 0xff && s.smbl_bus != 0xff &&
+		    s.smbl_df != 0xff && arg != NULL)
+			do_slot_mapping(&s, arg);
+
+		(void) printf(gettext("\n"));
 	}
 
 	return (0);
@@ -190,6 +306,8 @@ do_prominfo(int opt_v, char *progname, int opt_l, int opt_p)
 	smbios_bios_t bios;
 	smbios_ipmi_t ipmi;
 	smbios_info_t info;
+	topo_hdl_t *thp;
+	char *uuid;
 
 	const char *s;
 	id_t id;
@@ -229,6 +347,19 @@ do_prominfo(int opt_v, char *progname, int opt_l, int opt_p)
 		    ipmi.smbip_vers.smbv_major, ipmi.smbip_vers.smbv_minor, s);
 	}
 
+	/*
+	 * Silently swallow all libtopo and libpcidb related errors.
+	 */
+	uuid = NULL;
+	if ((thp = topo_open(TOPO_VERSION, NULL, &err)) != NULL) {
+		if ((uuid = topo_snap_hold(thp, NULL, &err)) == NULL) {
+			topo_close(thp);
+			thp = NULL;
+		}
+	}
+
+	prt_php = pcidb_open(PCIDB_VERSION);
+
 	(void) printf(gettext(
 	    "\n==== Processor Sockets ====================================\n"));
 
@@ -260,8 +391,16 @@ do_prominfo(int opt_v, char *progname, int opt_l, int opt_p)
 
 	(void) printf(gettext(
 	    "\n--- --------- ---------------- ----------------------------\n"));
-	(void) smbios_iter(shp, do_slots, NULL);
+	(void) smbios_iter(shp, do_slots, thp);
 
 	smbios_close(shp);
+
+	topo_hdl_strfree(thp, uuid);
+	if (thp != NULL) {
+		topo_snap_release(thp);
+		topo_close(thp);
+	}
+	pcidb_close(prt_php);
+
 	return (0);
 }

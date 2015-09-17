@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2013 Saso Kiselkov. All rights reserved.
 #
 
 #
@@ -50,6 +51,31 @@ $mapfile_version 2
 # ELF section. As a result, ld will put the two main symbols in.
 #
 
+SYMBOL_VERSION ILLUMOS_0.1 {
+    global:
+	Skein1024_Final;
+	Skein1024_Final_Pad;
+	Skein1024_Init;
+	Skein1024_InitExt;
+	Skein1024_Output;
+	Skein1024_Update;
+	Skein_256_Final;
+	Skein_256_Final_Pad;
+	Skein_256_Init;
+	Skein_256_InitExt;
+	Skein_256_Output;
+	Skein_256_Update;
+	Skein_512_Final;
+	Skein_512_Final_Pad;
+	Skein_512_Init;
+	Skein_512_InitExt;
+	Skein_512_Output;
+	Skein_512_Update;
+	EdonRFinal;
+	EdonRHash;
+	EdonRInit;
+	EdonRUpdate;
+} SUNW_1.1;
 
 SYMBOL_VERSION SUNW_1.1 {
     global:

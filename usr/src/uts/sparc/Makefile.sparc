@@ -429,12 +429,14 @@ CRYPTO_KMODS	+= aes
 CRYPTO_KMODS	+= arcfour
 CRYPTO_KMODS	+= blowfish
 CRYPTO_KMODS	+= des
+CRYPTO_KMODS	+= ecc
+CRYPTO_KMODS	+= edonr
 CRYPTO_KMODS	+= md4
 CRYPTO_KMODS	+= md5
-CRYPTO_KMODS	+= ecc
 CRYPTO_KMODS	+= rsa
 CRYPTO_KMODS	+= sha1
 CRYPTO_KMODS	+= sha2
+CRYPTO_KMODS	+= skein
 CRYPTO_KMODS	+= swrand
 
 #

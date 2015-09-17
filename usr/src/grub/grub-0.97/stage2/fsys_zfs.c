@@ -145,12 +145,14 @@ zio_checksum_info_t zio_checksum_table[ZIO_CHECKSUM_FUNCTIONS] = {
 	{{fletcher_4_native,	fletcher_4_byteswap},	1, 0,	"fletcher4"},
 	{{zio_checksum_SHA256,	zio_checksum_SHA256},	1, 0,	"SHA256"},
 	{{NULL,			NULL},			0, 0,	"zilog2"},
+	{{zio_checksum_off,	zio_checksum_off},	0, 0,	"noparity"},
+	{{zio_checksum_SHA512,	NULL},			0, 0,	"SHA512"}
 };
 
 /*
  * zio_checksum_verify: Provides support for checksum verification.
  *
- * Fletcher2, Fletcher4, and SHA256 are supported.
+ * Fletcher2, Fletcher4, SHA-256 and SHA-512/256 are supported.
  *
  * Return:
  * 	-1 = Failure
@@ -1049,6 +1051,7 @@ static const char *spa_feature_names[] = {
 	"com.delphix:extensible_dataset",
 	"com.delphix:embedded_data",
 	"org.open-zfs:large_blocks",
+	"org.illumos:sha512",
 	NULL
 };
 

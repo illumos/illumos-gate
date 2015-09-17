@@ -101,6 +101,7 @@ static int not_this_project(char *);
 static char *mkjobname(time_t);
 static time_t parse_time(char *);
 static time_t gtime(struct tm *);
+static void escapestr(const char *);
 void atabort(char *)__NORETURN;
 void yyerror(void);
 extern int yyparse(void);
@@ -546,6 +547,23 @@ struct	tm *tptr;
 }
 
 /*
+ * Escape a string to be used inside the job shell script.
+ */
+static void
+escapestr(const char *str)
+{
+	char c;
+	(void) putchar('\'');
+	while ((c = *str++) != '\0') {
+		if (c != '\'')
+			(void) putchar(c);
+		else
+			(void) fputs("'\\''", stdout); /* ' -> '\'' */
+	}
+	(void) putchar('\'');
+}
+
+/*
  * make job file from proto + stdin
  */
 static void
@@ -633,12 +651,12 @@ copy(char *jobfile, FILE *inputfile, int when)
 	}
 
 	for (ep = environ; *ep; ep++) {
-		if (strchr(*ep, '\'') != NULL)
-			continue;
 		if ((val = strchr(*ep, '=')) == NULL)
 			continue;
 		*val++ = '\0';
-		printf("export %s; %s='%s'\n", *ep, *ep, val);
+		(void) printf("export %s; %s=", *ep, *ep);
+		escapestr(val);
+		(void) putchar('\n');
 		*--val = '=';
 	}
 	if ((pfp = fopen(pname1, "r")) == NULL &&
@@ -678,7 +696,7 @@ copy(char *jobfile, FILE *inputfile, int when)
 			if (seteuid(effeusr) < 0) {
 				atabort(CANTCHUID);
 			}
-			printf("%s", dirbuf);
+			escapestr(dirbuf);
 			break;
 		case 'm':
 			printf("%o", um);

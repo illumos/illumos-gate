@@ -23,9 +23,11 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2013 Saso Kiselkov.  All rights reserved.
 
+find_files "s.*" usr/src/common/crypto/edonr
 find_files "s.*" usr/src/common/crypto/md4
 find_files "s.*" usr/src/common/crypto/md5
 find_files "s.*" usr/src/common/crypto/sha1
 find_files "s.*" usr/src/common/crypto/sha2
+find_files "s.*" usr/src/common/crypto/skein

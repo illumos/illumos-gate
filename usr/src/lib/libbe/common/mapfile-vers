@@ -49,6 +49,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	be_err_to_str;
 	be_free_list;
 	be_init;
+	be_installboot;
 	be_list;
 	be_mount;
 	be_rename;
