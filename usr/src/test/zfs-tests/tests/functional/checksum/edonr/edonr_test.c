@@ -100,7 +100,7 @@ const uint8_t	edonr_384_test_digests[][48] = {
 	},
 	{
 		/* no test vector for test_msg1 */
-		NULL
+		0
 	},
 	{
 		/* for test_msg2 */
@@ -127,7 +127,7 @@ const uint8_t	edonr_512_test_digests[][64] = {
 	},
 	{
 		/* no test vector for test_msg1 */
-		NULL
+		0
 	},
 	{
 		/* for test_msg2 */

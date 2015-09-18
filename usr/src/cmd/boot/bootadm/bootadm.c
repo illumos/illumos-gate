@@ -72,7 +72,7 @@
 #include <libfdisk.h>
 #endif
 
-#if !defined(_OPB)
+#if !defined(_OBP)
 #include <sys/ucode.h>
 #endif
 
@@ -298,7 +298,7 @@ static int umount_top_dataset(char *pool, zfs_mnted_t mnted, char *mntpt);
 static int ufs_add_to_sign_list(char *sign);
 static error_t synchronize_BE_menu(void);
 
-#if !defined(_OPB)
+#if !defined(_OBP)
 static void ucode_install();
 #endif
 
@@ -458,14 +458,14 @@ usage(void)
 	    "\t%s update-archive [-vn] [-R altroot [-p platform]]\n", prog);
 	(void) fprintf(stderr,
 	    "\t%s list-archive [-R altroot [-p platform]]\n", prog);
-#if defined(_OPB)
+#if defined(_OBP)
 	(void) fprintf(stderr,
 	    "\t%s install-bootloader [-fv] [-R altroot] [-P pool]\n", prog);
 #else
 	(void) fprintf(stderr,
 	    "\t%s install-bootloader [-Mfv] [-R altroot] [-P pool]\n", prog);
 #endif
-#if !defined(_OPB)
+#if !defined(_OBP)
 	/* x86 only */
 	(void) fprintf(stderr, "\t%s set-menu [-R altroot] key=value\n", prog);
 	(void) fprintf(stderr, "\t%s list-menu [-R altroot]\n", prog);
@@ -655,7 +655,7 @@ parse_args_internal(int argc, char *argv[])
 	int c, error;
 	extern char *optarg;
 	extern int optind, opterr;
-#if defined(_OPB)
+#if defined(_OBP)
 	const char *optstring = "a:d:fi:m:no:veFCR:p:P:XZ";
 #else
 	const char *optstring = "a:d:fi:m:no:veFCMR:p:P:XZ";
@@ -704,7 +704,7 @@ parse_args_internal(int argc, char *argv[])
 			bam_cmd = BAM_MENU;
 			bam_subcmd = optarg;
 			break;
-#if !defined(_OPB)
+#if !defined(_OBP)
 		case 'M':
 			bam_mbr = 1;
 			break;
@@ -1566,7 +1566,7 @@ bam_archive(
 	if (strcmp(subcmd, "update_all") == 0)
 		bam_update_all = 1;
 
-#if !defined(_OPB)
+#if !defined(_OBP)
 	ucode_install(bam_root);
 #endif
 
@@ -9937,7 +9937,7 @@ append_to_flist(filelist_t *flistp, char *s)
 	flistp->tail = lp;
 }
 
-#if !defined(_OPB)
+#if !defined(_OBP)
 
 UCODE_VENDORS;
 
