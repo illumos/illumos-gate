@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef	_FUNCS_H
 #define	_FUNCS_H
 
@@ -50,6 +48,10 @@ void addkey_args(char **, int *);
 char *getsetdefval(const char *, char *);
 
 extern int nkeys;
+
+/* create_home() or rm_files() flags */
+#define	MANAGE_ZFS_OPT	"MANAGE_ZFS="
+#define	MANAGE_ZFS	1
 
 #ifdef	__cplusplus
 }

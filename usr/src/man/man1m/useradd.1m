@@ -14,7 +14,7 @@ useradd \- administer a new user login on the system
 \fBuseradd\fR [\fB-A\fR \fIauthorization\fR [,\fIauthorization...\fR]]
      [\fB-b\fR \fIbase_dir\fR] [\fB-c\fR \fIcomment\fR] [\fB-d\fR \fIdir\fR] [\fB-e\fR \fIexpire\fR]
      [\fB-f\fR \fIinactive\fR] [\fB-g\fR \fIgroup\fR] [\fB-G\fR \fIgroup\fR [,\fIgroup\fR]...]
-     [\fB-K\fR \fIkey=value\fR] [\fB-m\fR [\fB-k\fR \fIskel_dir\fR]] [\fB-p\fR \fIprojname\fR]
+     [\fB-K\fR \fIkey=value\fR] [\fB-m\fR [\fB-z|-Z\fR] [\fB-k\fR \fIskel_dir\fR]] [\fB-p\fR \fIprojname\fR]
      [\fB-P\fR \fIprofile\fR [,\fIprofile...\fR]] [\fB-R\fR \fIrole\fR [,\fIrole...\fR]]
      [\fB-s\fR \fIshell\fR] [\fB-u\fR \fIuid\fR [\fB-o\fR]] \fIlogin\fR
 .fi
@@ -28,7 +28,6 @@ useradd \- administer a new user login on the system
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBuseradd\fR adds a new user to the \fB/etc/passwd\fR and \fB/etc/shadow\fR
 and \fB/etc/user_attr\fR files. The \fB-A\fR and \fB-P\fR options respectively
@@ -66,7 +65,6 @@ length limit of eight characters is exceeded, edit the file
 \fB/etc/default/useradd\fR by removing the \fB#\fR (pound sign) before the
 appropriate \fBEXCEED_TRAD=\fR entry, and adding it before the others.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -341,13 +339,23 @@ this purpose.
 .sp
 .ne 2
 .na
-\fB\fB-m\fR\fR
+\fB\fB-m\fR\fR [\fB-z|-Z\fR]
 .ad
 .sp .6
 .RS 4n
 Create the new user's home directory if it does not already exist. If the
 directory already exists, it must have read, write, and execute permissions by
 \fIgroup\fR, where \fIgroup\fR is the user's primary group.
+.sp
+If the parent directory of the user's home directory is located on a separate
+\fBZFS\fR file system and the \fB/etc/default/useradd\fR file contains the
+parameter \fBMANAGE_ZFS\fR set to the value \fBYES\fR, a new \fBZFS\fR
+file system will be created for the user.
+.sp
+If the \fB-z\fR option is specified, \fBuseradd\fR will always try to create
+a new file system for the home directory.
+.sp
+If the \fB-Z\fR option is specified, a new file system will never be created.
 .RE
 
 .sp
@@ -420,7 +428,6 @@ reserved for allocation by the Solaris Operating System.
 .RE
 
 .SH FILES
-.sp
 .LP
 \fB/etc/default/useradd\fR
 .sp
@@ -445,7 +452,6 @@ reserved for allocation by the Solaris Operating System.
 .LP
 \fB/etc/user_attr\fR
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -461,15 +467,13 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBpasswd\fR(1), \fBprofiles\fR(1), \fBroles\fR(1), \fBusers\fR(1B),
 \fBgroupadd\fR(1M), \fBgroupdel\fR(1M), \fBgroupmod\fR(1M), \fBgrpck\fR(1M),
 \fBlogins\fR(1M), \fBpwck\fR(1M), \fBuserdel\fR(1M), \fBusermod\fR(1M),
 \fBgetdate\fR(3C), \fBauth_attr\fR(4), \fBpasswd\fR(4), \fBprof_attr\fR(4),
-\fBproject\fR(4), \fBuser_attr\fR(4), \fBattributes\fR(5)
+\fBproject\fR(4), \fBuser_attr\fR(4), \fBattributes\fR(5), \fBzfs\fR(1M)
 .SH DIAGNOSTICS
-.sp
 .LP
 In case of an error, \fBuseradd\fR prints an error message and exits with a
 non-zero status.
@@ -545,7 +549,6 @@ UX: useradd: ERROR: Cannot update system files - login cannot be created.
 .sp
 
 .SH NOTES
-.sp
 .LP
 The \fBuseradd\fR utility adds definitions to only the local \fB/etc/group\fR,
 \fBetc/passwd\fR, \fB/etc/passwd\fR, \fB/etc/shadow\fR, \fB/etc/project\fR, and

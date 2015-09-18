@@ -14,12 +14,10 @@ userdel \- delete a user's login from the system
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBuserdel\fR utility deletes a user account from the system and makes the
 appropriate account-related changes to the system file and file system.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -31,10 +29,13 @@ The following options are supported:
 Remove the user's home directory from the system. This directory must exist.
 The files and directories under the home directory will no longer be accessible
 following successful execution of the command.
+.sp
+If the user's home directory is located on a separate \fBZFS\fR file system and
+the \fB/etc/default/useradd\fR file contains the parameter \fBMANAGE_ZFS\fR set
+to the value \fBYES\fR, the file system will be destroyed.
 .RE
 
 .SH OPERANDS
-.sp
 .LP
 The following operands are supported:
 .sp
@@ -47,7 +48,6 @@ An existing login name to be deleted.
 .RE
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -107,6 +107,14 @@ Cannot remove or otherwise modify the home directory.
 .RE
 
 .SH FILES
+.ne 2
+.na
+\fB\fB/etc/default/useradd\fR\fR
+.ad
+.RS 18n
+useradd, usermod and userdel configuration file
+.RE
+
 .sp
 .ne 2
 .na
@@ -144,15 +152,13 @@ system file containing additional user attributes
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBauths\fR(1), \fBpasswd\fR(1), \fBprofiles\fR(1), \fBroles\fR(1),
 \fBusers\fR(1B), \fBgroupadd\fR(1M), \fBgroupdel\fR(1M), \fBgroupmod\fR(1M),
 \fBlogins\fR(1M), \fBroleadd\fR(1M), \fBrolemod\fR(1M), \fBuseradd\fR(1M),
 \fBuserdel\fR(1M), \fBusermod\fR(1M), \fBpasswd\fR(4), \fBprof_attr\fR(4),
-\fBuser_attr\fR(4), \fBattributes\fR(5)
+\fBuser_attr\fR(4), \fBattributes\fR(5), \fBzfs\fR(1M)
 .SH NOTES
-.sp
 .LP
 The \fBuserdel\fR utility only deletes an account definition that is in the
 local \fB/etc/group\fR, \fB/etc/passwd\fR, \fB/etc/shadow\fR, and
