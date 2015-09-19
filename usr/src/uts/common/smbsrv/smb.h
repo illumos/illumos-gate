@@ -417,6 +417,23 @@ typedef uint32_t smb_utime_t;
 #define	DIALECT_SMB2XXX		13  /* SMB 2.??? (switch to SMB2) */
 
 /*
+ * SMB_TREE_CONNECT_ANDX  request flags
+ *
+ * The tree specified by TID in the SMB header
+ * should be disconnected - disconnect errors
+ * should be ignored.
+ */
+#define	SMB_TCONX_DISCONECT_TID		0x0001
+/*
+ * Client request for signing key protection.
+ */
+#define	SMB_TCONX_EXTENDED_SIGNATURES	0x0004
+/*
+ * Client request for extended information.
+ */
+#define	SMB_TCONX_EXTENDED_RESPONSE	0x0008
+
+/*
  * SMB_TREE_CONNECT_ANDX OptionalSupport flags
  *
  * SMB_SUPPORT_SEARCH_BITS    The server supports SearchAttributes.
