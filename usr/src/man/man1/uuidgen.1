@@ -1,0 +1,63 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\" Copyright 2015 Nexenta Systems, Inc.
+.\"
+.Dd Sep 13, 2015
+.Dt UUIDGEN 1
+.Os
+.Sh NAME
+.Nm uuidgen
+.Nd command-line utility to generate UUID's
+.Sh SYNOPSIS
+.Nm uuidgen [-r | -t] [-o filename]
+.Sh DESCRIPTION
+The
+.Nm
+command generates and prints a Universally Unique
+IDentifier (UUID). By default
+.Nm
+creates a new UUID based on high-quality randomness from
+arc4random(3C) (DCE version 4). If the \fB-t\fR option is
+provided then a time-based (DCE version 1) UUID will be
+generated.
+.Sh OPTIONS
+.Bl -tag -width indent
+.It Fl r
+Generate a UUID using
+.Nm uuid_generate_random()
+instead of
+.Nm uuid_generate() .
+This derives the new UUID from random data.
+.It Fl t
+Generate a UUID using
+.Nm uuid_generate_time()
+instead of
+.Nm uuid_generate() .
+This uses the current time and either the
+Ethernet address (if available) or system node ID.
+.It Fl o
+Redirect output to
+.Ar filename
+instead of stdout.
+.El
+.Sh EXIT STATUS
+.Bl -tag -width Ds
+.It Dv 0
+Successful completion.
+.It Dv >0
+Failure.
+.El
+.Sh INTERFACE STABILITY
+.Sy Uncommitted .
+.Sh SEE ALSO
+.Xr uuid_generate 3uuid ,
+.Xr uuid_generate_random 3uuid ,
+.Xr uuid_generate_time 3uuidd

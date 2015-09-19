@@ -404,7 +404,8 @@ MANFILES=	acctcom.1			\
 	 	units.1				\
 	 	unix2dos.1			\
 	 	uptime.1			\
-	 	vacation.1			\
+		uuidgen.1			\
+		vacation.1			\
 	 	vgrind.1			\
 	 	volcheck.1			\
 	 	volrmmount.1			\

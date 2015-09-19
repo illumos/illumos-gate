@@ -848,6 +848,7 @@ file path=usr/bin/true mode=0555
 file path=usr/bin/tty mode=0555
 file path=usr/bin/tzselect mode=0555
 file path=usr/bin/userattr mode=0555
+file path=usr/bin/uuidgen mode=0555
 file path=usr/bin/vmstat mode=0555
 file path=usr/bin/which mode=0555
 file path=usr/bin/who mode=0555
