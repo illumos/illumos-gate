@@ -648,13 +648,10 @@ librestart:	libuutil libscf libpool libproject libsecdb libnvpair
 libsaveargs:	libdisasm
 ../cmd/sgs/libdl:	../cmd/sgs/libconv
 ../cmd/sgs/libelf:	../cmd/sgs/libconv
-<<<<<<< HEAD
-=======
 passwdutil:	libsldap
 pkcs11:		libcryptoutil libmd
 #		Adding libuuid or libdladm results in a circular dependancy
 print:		libldap5
->>>>>>> FETCH_HEAD
 udapl/udapl_tavor:	udapl/libdat
 libzfs:		libdevid libgen libnvpair libuutil \
 		libadm libavl libefi libidmap libmd libzfs_core libm
