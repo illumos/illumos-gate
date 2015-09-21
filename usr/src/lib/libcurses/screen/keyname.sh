@@ -20,6 +20,7 @@
 # CDDL HEADER END
 #
 # 
+# Copyright 2015 Gary Mills
 # Copyright 1997 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 # 
@@ -39,11 +40,9 @@
 # contributors.
 #
  
-#ident	"%Z%%M%	%I%	%E% SMI"
-
 rm -f keyname.c
-/usr/bin/echo "#include	\"curses_inc.h\"\n" > keyname.c
-/usr/bin/echo "static	char	*keystrings[] =\n\t\t{" >> keyname.c
+/usr/bin/print "#include	\"curses_inc.h\"\n" > keyname.c
+/usr/bin/print "static	char	*keystrings[] =\n\t\t{" >> keyname.c
 {
     grep -v 'KEY_F(' keycaps | awk '{ print $5, $4 }' | sed -e 's/,//g' -e 's/KEY_//'
     # These three aren't in keycaps

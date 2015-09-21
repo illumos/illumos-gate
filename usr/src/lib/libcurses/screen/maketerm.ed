@@ -308,22 +308,22 @@ e ./tmp/term.h.new
 1;/^#define	auto_left_margin/,/^#define	xon_xoff/s/CURB.*/CUR _b/
 1;/^#define	auto_left_margin/,/^#define	xon_xoff/w ./tmp/tmp.term.h
 1;/^#define	auto_left_margin/,/^#define	xon_xoff/d
-!/usr/bin/echo '{printf "\%s\%d\\n", $0,++i}' > ./tmp/tmp.awk
+!/usr/bin/print '{printf "\%s\%d\\n", $0,++i}' > ./tmp/tmp.awk
 .-1r !awk -f ./tmp/tmp.awk < ./tmp/tmp.term.h
 1;/^#define	columns/,/^#define	width_status_line/s/CURN.*/CUR _c/
 1;/^#define	columns/,/^#define	width_status_line/w ./tmp/tmp.term.h
 1;/^#define	columns/,/^#define	width_status_line/d
-!/usr/bin/echo '{printf "\%s\%d\\n", $0,++i}' > ./tmp/tmp.awk
+!/usr/bin/print '{printf "\%s\%d\\n", $0,++i}' > ./tmp/tmp.awk
 .-1r !awk -f ./tmp/tmp.awk < ./tmp/tmp.term.h
 1;/^#define	back_tab/,/^#define	lab_f8/s/CURS.*/CUR _Vr2_Astrs._s/
 1;/^#define	back_tab/,/^#define	lab_f8/w ./tmp/tmp.term.h
 1;/^#define	back_tab/,/^#define	lab_f8/d
-!/usr/bin/echo '{printf "\%s\%d\\n", $0,++i}' > ./tmp/tmp.awk
+!/usr/bin/print '{printf "\%s\%d\\n", $0,++i}' > ./tmp/tmp.awk
 .-1r !awk -f ./tmp/tmp.awk < ./tmp/tmp.term.h
 1;/^#define	lab_f9/,/^#define	prtr_non/s/CURS.*/CUR _Vr2_Bstrs._s/
 1;/^#define	lab_f9/,/^#define	prtr_non/w ./tmp/tmp.term.h
 1;/^#define	lab_f9/,/^#define	prtr_non/d
-!/usr/bin/echo 'BEGIN{i=100}\n{printf "\%s\%d\\n", $0,++i}' > ./tmp/tmp.awk
+!/usr/bin/print 'BEGIN{i=100}\n{printf "\%s\%d\\n", $0,++i}' > ./tmp/tmp.awk
 .-1r !awk -f ./tmp/tmp.awk < ./tmp/tmp.term.h
 !rm -f ./tmp/tmp.term.h ./tmp/tmp.awk
 w ./tmp/term.h.new
