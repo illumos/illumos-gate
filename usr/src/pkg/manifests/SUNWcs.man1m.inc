@@ -11,7 +11,7 @@
 
 #
 # Copyright 2011, Richard Lowe
-# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2015 Nexenta Systems, Inc. All rights reserved.
 #
 
 file path=usr/share/man/man1m/6to4relay.1m
@@ -30,11 +30,6 @@ file path=usr/share/man/man1m/auditstat.1m
 file path=usr/share/man/man1m/autopush.1m
 file path=usr/share/man/man1m/bootadm.1m
 file path=usr/share/man/man1m/busstat.1m
-file path=usr/share/man/man1m/cachefsd.1m
-file path=usr/share/man/man1m/cachefslog.1m
-file path=usr/share/man/man1m/cachefspack.1m
-file path=usr/share/man/man1m/cachefsstat.1m
-file path=usr/share/man/man1m/cachefswssize.1m
 file path=usr/share/man/man1m/captoinfo.1m
 file path=usr/share/man/man1m/cfgadm.1m
 file path=usr/share/man/man1m/cfgadm_ac.1m
@@ -47,7 +42,6 @@ file path=usr/share/man/man1m/cfgadm_sbd.1m
 file path=usr/share/man/man1m/cfgadm_scsi.1m
 file path=usr/share/man/man1m/cfgadm_sysctrl.1m
 file path=usr/share/man/man1m/cfgadm_usb.1m
-file path=usr/share/man/man1m/cfsadmin.1m
 file path=usr/share/man/man1m/chroot.1m
 file path=usr/share/man/man1m/clear_locks.1m
 file path=usr/share/man/man1m/clinfo.1m
@@ -91,7 +85,6 @@ file path=usr/share/man/man1m/fiocompress.1m
 file path=usr/share/man/man1m/fmthard.1m
 file path=usr/share/man/man1m/format.1m
 file path=usr/share/man/man1m/fsck.1m
-file path=usr/share/man/man1m/fsck_cachefs.1m
 file path=usr/share/man/man1m/fsck_ufs.1m
 file path=usr/share/man/man1m/fsdb.1m
 file path=usr/share/man/man1m/fsdb_ufs.1m
@@ -163,7 +156,6 @@ file path=usr/share/man/man1m/modinfo.1m
 file path=usr/share/man/man1m/modload.1m
 file path=usr/share/man/man1m/modunload.1m
 file path=usr/share/man/man1m/mount.1m
-file path=usr/share/man/man1m/mount_cachefs.1m
 file path=usr/share/man/man1m/mount_hsfs.1m
 file path=usr/share/man/man1m/mount_tmpfs.1m
 file path=usr/share/man/man1m/mount_ufs.1m

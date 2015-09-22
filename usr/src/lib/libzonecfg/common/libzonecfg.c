@@ -22,6 +22,7 @@
 /*
  * Copyright 2014 Gary Mills
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <libsysevent.h>
@@ -5817,8 +5818,7 @@ zonecfg_valid_fs_type(const char *type)
 	if (strcmp(type, "proc") == 0 ||
 	    strcmp(type, "mntfs") == 0 ||
 	    strcmp(type, "autofs") == 0 ||
-	    strncmp(type, "nfs", sizeof ("nfs") - 1) == 0 ||
-	    strcmp(type, "cachefs") == 0)
+	    strncmp(type, "nfs", sizeof ("nfs") - 1) == 0)
 		return (B_FALSE);
 	/*
 	 * The caller may do more detailed verification to make sure other

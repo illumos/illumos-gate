@@ -1,14 +1,14 @@
 '\" te
 .\" Copyright (c) 2001 Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright 1989 AT&T
+.\" Copyright 2015 Nexenta Systems, Inc. All rights reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH VFSTAB 4 "Mar 2, 2007"
+.TH VFSTAB 4 "Sep 8, 2015"
 .SH NAME
 vfstab \- table of file system defaults
 .SH DESCRIPTION
-.sp
 .LP
 The file \fB/etc/vfstab\fR describes defaults for each file system. The
 information is stored in a table with the following column headings:
@@ -46,7 +46,6 @@ area, the \fIdevice-to-mount\fR field contains the name of the swap file or
 device, the \fIFS-type\fR is "swap", \fImount-at-boot\fR is "no" and all other
 fields have no entry.
 .SH EXAMPLES
-.sp
 .LP
 The following are \fBvfstab\fR entries for various file system types supported
 in the Solaris operating environment.
@@ -142,36 +141,7 @@ above) for a \fBpcfs\fR logical drive. See \fBmount_pcfs\fR(1M) for syntax for
 \fBpcfs\fR logical drives and for \fBpcfs\fR-specific mount options.
 
 .LP
-\fBExample 3 \fRCacheFS Mount
-.sp
-.LP
-Below is an example for a CacheFS file system. Because of the length of this
-entry and the fact that \fBvfstab\fR entries cannot be continued to a second
-line, the \fBvfstab\fR fields are presented here in a vertical format. In
-re-creating such an entry in your own \fBvfstab\fR, you would enter values as
-you would for any \fBvfstab\fR entry, on a single line.
-
-.sp
-.in +2
-.nf
-device to mount:  svr1:/export/abc
-device to fsck:  /usr/abc
-mount point:  /opt/cache
-FS type:  cachefs
-fsck pass:  7
-mount at boot:  yes
-mount options:
-local-access,bg,nosuid,demandconst,backfstype=nfs,cachedir=/opt/cache
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-See \fBmount_cachefs\fR(1M) for CacheFS-specific mount options.
-
-.LP
-\fBExample 4 \fRLoopback File System Mount
+\fBExample 3 \fRLoopback File System Mount
 .sp
 .LP
 The following is an example of mounting a loopback (\fBlofs\fR) file system:
@@ -189,9 +159,8 @@ The following is an example of mounting a loopback (\fBlofs\fR) file system:
 See \fBlofs\fR(7FS) for an overview of the loopback file system.
 
 .SH SEE ALSO
-.sp
 .LP
-\fBfsck\fR(1M), \fBmount\fR(1M), \fBmount_cachefs\fR(1M), \fBmount_hsfs\fR(1M),
+\fBfsck\fR(1M), \fBmount\fR(1M), \fBmount_hsfs\fR(1M),
 \fBmount_nfs\fR(1M), \fBmount_tmpfs\fR(1M), \fBmount_ufs\fR(1M),
 \fBswap\fR(1M), \fBgetvfsent\fR(3C)
 .sp

@@ -24,6 +24,7 @@
  *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
 
 
@@ -79,7 +80,7 @@ extern "C" {
 #define	V_VAR		0x07		/* Var partition */
 #define	V_HOME		0x08		/* Home partition */
 #define	V_ALTSCTR	0x09		/* Alternate sector partition */
-#define	V_CACHE		0x0a		/* Cache (cachefs) partition */
+#define	V_CACHE		0x0a		/* CacheFS partition (obsolete) */
 
 /* Tags for EFI/GPT labels */
 #define	V_RESERVED	0x0b		/* SMI reserved data */

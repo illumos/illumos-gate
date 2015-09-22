@@ -1113,15 +1113,6 @@ JAVAEXEC_OBJS +=java.o
 #
 AUTOFS_OBJS +=	auto_vfsops.o auto_vnops.o auto_subr.o auto_xdr.o auto_sys.o
 
-CACHEFS_OBJS +=	cachefs_cnode.o		cachefs_cod.o \
-		cachefs_dir.o		cachefs_dlog.o	cachefs_filegrp.o \
-		cachefs_fscache.o	cachefs_ioctl.o	cachefs_log.o \
-		cachefs_module.o \
-		cachefs_noopc.o		cachefs_resource.o \
-		cachefs_strict.o \
-		cachefs_subr.o		cachefs_vfsops.o \
-		cachefs_vnops.o
-
 DCFS_OBJS +=	dc_vnops.o
 
 DEVFS_OBJS +=	devfs_subr.o	devfs_vfsops.o	devfs_vnops.o

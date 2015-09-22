@@ -177,7 +177,6 @@ dir path=usr/lib/devfsadm/linkmod group=sys
 dir path=usr/lib/fs group=sys
 dir path=usr/lib/fs/autofs group=sys
 dir path=usr/lib/fs/autofs/$(ARCH64) group=sys
-dir path=usr/lib/fs/cachefs group=sys
 dir path=usr/lib/fs/ctfs group=sys
 dir path=usr/lib/fs/dev group=sys
 dir path=usr/lib/fs/fd group=sys
@@ -370,7 +369,6 @@ file path=etc/inet/services group=sys preserve=true
 file path=etc/inet/wanboot.conf.sample group=sys mode=0444
 file path=etc/init.d/PRESERVE group=sys mode=0744 preserve=true
 file path=etc/init.d/README group=sys preserve=true
-file path=etc/init.d/cachefs.daemon group=sys mode=0744 preserve=true
 file path=etc/init.d/sysetup group=sys mode=0744 preserve=true
 file path=etc/inittab group=sys preserve=true
 file path=etc/ioctl.syscon group=sys preserve=true
@@ -949,20 +947,6 @@ $(i386_ONLY)file path=usr/lib/devfsadm/linkmod/SUNW_xen_link.so group=sys
 file path=usr/lib/diffh mode=0555
 file path=usr/lib/expreserve mode=0555
 file path=usr/lib/exrecover mode=0555
-file path=usr/lib/fs/cachefs/cachefsd mode=0555
-file path=usr/lib/fs/cachefs/cachefslog mode=0555
-file path=usr/lib/fs/cachefs/cachefspack mode=0555
-file path=usr/lib/fs/cachefs/cachefsstat mode=0555
-file path=usr/lib/fs/cachefs/cachefswssize mode=0555
-file path=usr/lib/fs/cachefs/cfsadmin mode=0555
-file path=usr/lib/fs/cachefs/cfsfstype mode=0555
-file path=usr/lib/fs/cachefs/cfstagchk mode=0555
-file path=usr/lib/fs/cachefs/dfshares mode=0555
-file path=usr/lib/fs/cachefs/fsck mode=0555
-file path=usr/lib/fs/cachefs/mount mode=0555
-file path=usr/lib/fs/cachefs/share mode=0555
-file path=usr/lib/fs/cachefs/umount mode=0555
-file path=usr/lib/fs/cachefs/unshare mode=0555
 file path=usr/lib/fs/ctfs/mount mode=0555
 file path=usr/lib/fs/fd/mount mode=0555
 file path=usr/lib/fs/hsfs/fstyp.so.1 mode=0555
@@ -1469,8 +1453,6 @@ file path=var/saf/zsmon/log group=sys preserve=true
 file path=var/spool/cron/crontabs/adm group=sys mode=0600 preserve=true
 file path=var/spool/cron/crontabs/root group=sys mode=0600 preserve=true
 hardlink path=etc/rc2.d/S20sysetup target=../../etc/init.d/sysetup
-hardlink path=etc/rc2.d/S73cachefs.daemon \
-    target=../../etc/init.d/cachefs.daemon
 hardlink path=etc/rc2.d/S89PRESERVE target=../../etc/init.d/PRESERVE
 $(sparc_ONLY)hardlink path=etc/svc/profile/platform_SUNW,Sun-Fire-V890.xml \
     target=./platform_SUNW,Sun-Fire-880.xml
@@ -1754,8 +1736,6 @@ link path=sbin/pfsh target=../usr/bin/pfexec
 link path=sbin/sh target=../usr/bin/$(ARCH32)/ksh93
 link path=sbin/su target=../usr/bin/su
 link path=usr/adm target=../var/adm
-link path=usr/bin/cachefspack target=../lib/fs/cachefs/cachefspack
-link path=usr/bin/cachefsstat target=../lib/fs/cachefs/cachefsstat
 link path=usr/bin/df target=../sbin/df
 link path=usr/bin/jsh target=ksh93
 link path=usr/bin/pwconv target=../sbin/pwconv
@@ -1790,9 +1770,6 @@ link path=usr/preserve target=../var/preserve
 link path=usr/pub target=./share/lib/pub
 link path=usr/sbin/autopush target=../../sbin/autopush
 link path=usr/sbin/bootadm target=../../sbin/bootadm
-link path=usr/sbin/cachefslog target=../lib/fs/cachefs/cachefslog
-link path=usr/sbin/cachefswssize target=../lib/fs/cachefs/cachefswssize
-link path=usr/sbin/cfsadmin target=../lib/fs/cachefs/cfsadmin
 link path=usr/sbin/cryptoadm target=../../sbin/cryptoadm
 link path=usr/sbin/dcopy target=./clri
 link path=usr/sbin/devnm target=./df

@@ -24,6 +24,7 @@
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2015 Nexenta Systems, Inc. All rights reserved.
 #
 #	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T
 #	  All Rights Reserved
@@ -409,7 +410,7 @@ if [ -n "$FSType" ]; then
 	exit
 fi
 
-# Some remote filesystems (e.g. cachefs or autofs) shouldn't be be mounted
+# Some remote filesystems (e.g. autofs) shouldn't be mounted
 # with mountall, so the list here is explicit (not from /etc/dfs/fstypes)
 if [ "$RFLAG" ]; then
 	/sbin/mount -a -F nfs

@@ -97,8 +97,6 @@ extern enum snego_stat nfs_sec_nego();
 
 #define	MAXHOSTS	512
 
-#define	MNTTYPE_CACHEFS "cachefs"
-
 /*
  * host cache states
  */
@@ -131,7 +129,7 @@ typedef struct mfs_snego_t mfs_snego_t;
 static struct cache_entry *cache_head = NULL;
 rwlock_t cache_lock;	/* protect the cache chain */
 
-static enum nfsstat nfsmount(struct mapfs *, char *, char *, int, int, uid_t,
+static enum nfsstat nfsmount(struct mapfs *, char *, char *, int, uid_t,
 	action_list *);
 static int is_nfs_port(char *);
 
@@ -236,7 +234,6 @@ mount_nfs(
 {
 	struct mapfs *mfs, *mp;
 	int err = -1;
-	int cached;
 	action_list *alp;
 	char *dir;
 
@@ -278,10 +275,9 @@ mount_nfs(
 		}
 	}
 	if (err) {
-		cached = strcmp(me->map_mounter, MNTTYPE_CACHEFS) == 0;
 		dir = strdup(mfs->mfs_dir);
 		err = nfsmount(mfs, mntpnt, me->map_mntopts,
-		    cached, overlay, uid, alp);
+		    overlay, uid, alp);
 		if (err && trace > 1) {
 			trace_prt(1, "  Couldn't mount %s:%s, err=%d\n",
 			    mfs->mfs_host ? mfs->mfs_host : "",
@@ -639,7 +635,7 @@ static enum nfsstat
 nfsmount(
 	struct mapfs *mfs_in,
 	char *mntpnt, char *opts,
-	int cached, int overlay,
+	int overlay,
 	uid_t uid,
 	action_list *alp)
 {
@@ -712,13 +708,6 @@ nfsmount(
 		if (verbose)
 			syslog(LOG_WARNING,
 		    "mount on %s is not read-only and will not be replicated.",
-			    mntpnt);
-		replicated = 0;
-	}
-	if (replicated && cached) {
-		if (verbose)
-			syslog(LOG_WARNING,
-		    "mount on %s is cached and will not be replicated.",
 			    mntpnt);
 		replicated = 0;
 	}
@@ -1179,50 +1168,6 @@ retry:
 		(void) sprintf(remname, "%s:%s", rhost, dir);
 		if (trace > 4 && replicated)
 			trace_prt(1, "	nfsmount: examining %s\n", remname);
-
-		/*
-		 * If it's cached we need to get cachefs to mount it.
-		 */
-		if (cached) {
-			char *copts = opts;
-
-			/*
-			 * If we started with a URL we need to turn on
-			 * -o public if not on already
-			 */
-			if (use_pubfh == FALSE &&
-			    (mfs->mfs_flags & MFS_FH_VIA_WEBNFS)) {
-
-				copts = malloc(strlen(opts) +
-				    strlen(",public")+1);
-
-				if (copts == NULL) {
-					syslog(LOG_ERR, "nfsmount: no memory");
-					last_error = NFSERR_IO;
-					goto out;
-				}
-
-				strcpy(copts, opts);
-
-				if (strlen(copts) != 0)
-					strcat(copts, ",");
-
-				strcat(copts, "public");
-			}
-
-			last_error = mount_generic(remname, MNTTYPE_CACHEFS,
-			    copts, mntpnt, overlay);
-
-			if (copts != opts)
-				free(copts);
-
-			if (last_error) {
-				skipentry = 1;
-				mfs->mfs_ignore = 1;
-				continue;
-			}
-			goto out;
-		}
 
 		if (mfs->mfs_args == NULL) {
 

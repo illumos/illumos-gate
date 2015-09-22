@@ -19,6 +19,7 @@
 # CDDL HEADER END
 #
 # Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2015 Nexenta Systems, Inc. All rights reserved.
 #
 
 # The filesystem independent utilities clri, fsdb, dcopy, labelit, and mkfs
@@ -39,7 +40,7 @@ DEFAULTFILES=	fs.dfl
 include ../Makefile.cmd
 
 SUBDIR1= lofs zfs
-SUBDIR2= dev fd pcfs nfs hsfs proc ctfs udfs ufs tmpfs cachefs \
+SUBDIR2= dev fd pcfs nfs hsfs proc ctfs udfs ufs tmpfs \
 		autofs mntfs objfs sharefs smbclnt reparsed
 SUBDIRS= $(SUBDIR1) $(SUBDIR2)
 I18NDIRS= $(SUBDIR2)

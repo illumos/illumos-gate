@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
 
 
@@ -104,11 +105,6 @@ struct	fstable	**fs_tab = NULL;
  */
 
 #define	HOST_NM_LN	MNT_LINE_MAX
-
-/* These cachefs definitions should be in mntent.h. Maybe some day. */
-#define	MNTTYPE_CFS		"cachefs"
-#define	MNTOPT_BACKFSTYPE	"backfstype"
-#define	MNTTYPE_AUTO		"autofs"
 
 /*
  * Utilities for getting filesystem information from the mount table.
@@ -227,7 +223,7 @@ get_server_host(uint32_t n)
 	if (n < fs_tab_used) {
 		(void) strcpy(hostname, fs_tab[n]->remote_name);
 		if ((host_end = strchr(hostname, ':')) == NULL) {
-			if ((strcmp(fs_tab[n]->fstype, MNTTYPE_AUTO)) == NULL)
+			if ((strcmp(fs_tab[n]->fstype, MNTTYPE_AUTOFS)) == NULL)
 				return ("automounter");
 			else
 				return (fs_tab[n]->fstype);
@@ -714,7 +710,7 @@ construct_mt(struct mnttab *mt)
 	 * allowed to mount ourself with "NFS", "NFS" must be remote.
 	 * The automount will translate "nfs:self" to a lofs mount.
 	 */
-	if (strcmp(mt->mnt_fstype, MNTTYPE_AUTO) == 0 ||
+	if (strcmp(mt->mnt_fstype, MNTTYPE_AUTOFS) == 0 ||
 	    strcmp(mt->mnt_fstype, MNTTYPE_NFS) == 0 ||
 	    is_remote_src(mt->mnt_special) == REAL_REMOTE)
 		nfte->remote = 1;
@@ -963,9 +959,6 @@ get_mntinfo(int map_client, char *vfstab_file)
 				/*
 				 * We also skip the entry if the vfs_special
 				 * path and the client_path are the same.
-				 * There's no need to mount it, it's just a
-				 * cachefs optimization that mounts a
-				 * directory over itself from this server.
 				 */
 				if ((is_remote == SELF_SERVE) &&
 				    strcmp(path_part(vfs->vfs_special),

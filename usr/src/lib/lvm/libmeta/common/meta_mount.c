@@ -21,9 +21,9 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * return mount association with meta device
@@ -73,7 +73,6 @@ meta_get_mountp(
 		    (strcmp(m.mnt_fstype, "autofs") == 0) ||
 		    (strcmp(m.mnt_fstype, "proc") == 0) ||
 		    (strcmp(m.mnt_fstype, "tmpfs") == 0) ||
-		    (strcmp(m.mnt_fstype, "cachefs") == 0) ||
 		    (strcmp(m.mnt_fstype, "lofs") == 0) ||
 		    (strcmp(m.mnt_fstype, "rfs") == 0) ||
 		    (strcmp(m.mnt_fstype, "fd") == 0))

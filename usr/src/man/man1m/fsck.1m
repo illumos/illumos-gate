@@ -1,10 +1,11 @@
 '\" te
 .\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright 2015 Nexenta Systems, Inc. All rights reserved.
 .\" Copyright 1989 AT&T
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH FSCK 1M "May 7, 2008"
+.TH FSCK 1M "Sep 8, 2015"
 .SH NAME
 fsck \- check and repair file systems
 .SH SYNOPSIS
@@ -20,7 +21,6 @@ fsck \- check and repair file systems
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBfsck\fR audits and interactively repairs inconsistent file system
 conditions. If the file system is inconsistent the default action for each
@@ -60,7 +60,6 @@ file systems eligible for checking may be checked in parallel. Consult the file
 system-specific man page (for example, \fBfsck_ufs\fR(1M)) for more
 information.
 .SH OPTIONS
-.sp
 .LP
 The following generic options are supported:
 .sp
@@ -215,7 +214,6 @@ Check writable file systems only.
 .RE
 
 .SH EXIT STATUS
-.sp
 .ne 2
 .na
 \fB\fB0\fR\fR
@@ -316,12 +314,10 @@ file system is mounted read-only and is OK
 .RE
 
 .SH USAGE
-.sp
 .LP
 The \fBfsck\fR command is \fBlarge file aware\fR for UFS file systems, per the
 \fBlargefile\fR(5) man page.
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/default/fs\fR\fR
@@ -353,7 +349,6 @@ list of default parameters for each file system
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -369,14 +364,12 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBclri\fR(1M), \fBfsck_cachefs\fR(1M), \fBfsck_ufs\fR(1M), \fBfsdb_ufs\fR(1M),
+\fBclri\fR(1M), \fBfsck_ufs\fR(1M), \fBfsdb_ufs\fR(1M),
 \fBfsirand\fR(1M), \fBfstyp\fR(1M), \fBmkfs\fR(1M), \fBmkfs_ufs\fR(1M),
 \fBmountall\fR(1M), \fBnewfs\fR(1M), \fBreboot\fR( 1M), \fBvfstab\fR(4),
 \fBattributes\fR(5), \fBlargefile\fR(5), \fBufs\fR(7FS)
 .SH WARNINGS
-.sp
 .LP
 The operating system buffers file system data. Running \fBfsck\fR on a mounted
 file system can cause the operating system's buffers to become out of date with
@@ -386,10 +379,8 @@ system is quiescent and that it is rebooted immediately after \fBfsck\fR is
 run. Quite often, however, this will not be sufficient. A panic will probably
 occur if running \fBfsck\fR on a file system modifies the file system.
 .SH NOTES
-.sp
 .LP
 This command may not be supported for all \fIFSTypes\fR.
-.sp
 .LP
 Starting with Solaris 9, \fBfsck\fR manages extended attribute data on the
 disk. (See \fBfsattr\fR(5) for a description of extended file attributes.) A

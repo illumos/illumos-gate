@@ -22,6 +22,7 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2013 Saso Kiselkov. All rights reserved.
+# Copyright 2015 Nexenta Systems, Inc. All rights reserved.
 #
 
 #
@@ -584,7 +585,6 @@ file path=kernel/exec/$(ARCH64)/intpexec group=sys mode=0755
 $(i386_ONLY)file path=kernel/exec/elfexec group=sys mode=0755
 $(i386_ONLY)file path=kernel/exec/intpexec group=sys mode=0755
 file path=kernel/fs/$(ARCH64)/autofs group=sys mode=0755
-file path=kernel/fs/$(ARCH64)/cachefs group=sys mode=0755
 file path=kernel/fs/$(ARCH64)/ctfs group=sys mode=0755
 file path=kernel/fs/$(ARCH64)/dcfs group=sys mode=0755
 file path=kernel/fs/$(ARCH64)/dev group=sys mode=0755
@@ -602,7 +602,6 @@ file path=kernel/fs/$(ARCH64)/specfs group=sys mode=0755
 file path=kernel/fs/$(ARCH64)/tmpfs group=sys mode=0755
 file path=kernel/fs/$(ARCH64)/ufs group=sys mode=0755
 $(i386_ONLY)file path=kernel/fs/autofs group=sys mode=0755
-$(i386_ONLY)file path=kernel/fs/cachefs group=sys mode=0755
 $(i386_ONLY)file path=kernel/fs/ctfs group=sys mode=0755
 $(i386_ONLY)file path=kernel/fs/dcfs group=sys mode=0755
 $(i386_ONLY)file path=kernel/fs/dev group=sys mode=0755
