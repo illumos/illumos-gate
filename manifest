@@ -2355,6 +2355,7 @@ h usr/bin/uptime=usr/lib/isaexec
 f usr/bin/userattr 0555 root bin
 f usr/bin/uudecode 0555 root uucp
 f usr/bin/uuencode 0555 root uucp
+f usr/bin/uuidgen 0555 root bin
 h usr/bin/vedit=usr/bin/edit
 f usr/bin/vfsstat 0555 root bin
 f usr/bin/vgrind 0555 root bin
@@ -11772,6 +11773,7 @@ f usr/share/man/man1/units.1 0444 root bin
 f usr/share/man/man1/unix2dos.1 0444 root bin
 s usr/share/man/man1/unpack.1=pack.1
 f usr/share/man/man1/uptime.1 0444 root bin
+f usr/share/man/man1/uuidgen.1 0444 root bin
 f usr/share/man/man1/vacation.1 0444 root bin
 s usr/share/man/man1/valdate.1=ckdate.1
 s usr/share/man/man1/valgid.1=ckgid.1

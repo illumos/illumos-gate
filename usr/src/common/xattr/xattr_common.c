@@ -115,7 +115,7 @@ xattr_view_t
 attr_to_xattr_view(f_attr_t attr)
 {
 	if (attr >= F_ATTR_ALL || attr < 0)
-		return (NULL);
+		return (XATTR_VIEW_INVALID);
 
 	return (xattrs[attr].x_xattr_view);
 }

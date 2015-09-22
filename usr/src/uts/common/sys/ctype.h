@@ -22,12 +22,12 @@
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2015 PALO, Richard.  All rights reserved.
  */
 
 #ifndef	_SYS_CTYPE_H
 #define	_SYS_CTYPE_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 
@@ -57,55 +57,65 @@ extern "C" {
 	(ISALPHA(_c) || \
 	ISDIGIT(_c))
 
+#define	ISPRINT(_c) \
+	((_c) >= ' ' && (_c) <= '~')
+
 #define	ISSPACE(_c) \
 	((_c) == ' ' || \
 	(_c) == '\t' || \
 	(_c) == '\r' || \
 	(_c) == '\n')
 
-static boolean_t
+static __GNU_INLINE boolean_t	/* LINTED E_STATIC_UNUSED */
 isdigit(char c)
 {
 	return (ISDIGIT(c));
 }
 #pragma inline(isdigit)
 
-static boolean_t
+static __GNU_INLINE boolean_t	/* LINTED E_STATIC_UNUSED */
 isxdigit(char c)
 {
 	return (ISXDIGIT(c));
 }
-#pragma inline(isdigit)
+#pragma inline(isxdigit)
 
-static boolean_t
+static __GNU_INLINE boolean_t	/* LINTED E_STATIC_UNUSED */
 islower(char c)
 {
 	return (ISLOWER(c));
 }
 #pragma inline(islower)
 
-static boolean_t
+static __GNU_INLINE boolean_t	/* LINTED E_STATIC_UNUSED */
 isupper(char c)
 {
 	return (ISUPPER(c));
 }
 #pragma inline(isupper)
 
-static boolean_t
+static __GNU_INLINE boolean_t	/* LINTED E_STATIC_UNUSED */
 isalpha(char c)
 {
 	return (ISALPHA(c));
 }
 #pragma inline(isalpha)
 
-static boolean_t
+static __GNU_INLINE boolean_t	/* LINTED E_STATIC_UNUSED */
 isalnum(char c)
 {
 	return (ISALNUM(c));
 }
 #pragma inline(isalnum)
 
-static boolean_t
+static __GNU_INLINE boolean_t	/* LINTED E_STATIC_UNUSED */
+isprint(char c)
+{
+	return (ISPRINT(c));
+}
+#pragma inline(isprint)
+
+static __GNU_INLINE boolean_t	/* LINTED E_STATIC_UNUSED */
 isspace(char c)
 {
 	return (ISSPACE(c));

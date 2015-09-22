@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2015 PALO, Richard
  */
 #include <sys/types.h>
 #include <sys/scsi/generic/smp_frames.h>
@@ -180,7 +181,7 @@ smp_cmd_failed(smp_result_t result)
 {
 	char *smp_result_str = smp_get_result(result);
 
-	if (result == NULL) {
+	if (smp_result_str == NULL) {
 		fatal(-5, "Command failed: Unknown result (0x%x)",
 		    result);
 	} else {
@@ -212,6 +213,7 @@ smp_cleanup()
 	smp_fini();
 }
 
+/* ARGSUSED */
 static void
 smp_handle_report_route_info(int argc, char *argv[])
 {
@@ -751,7 +753,6 @@ main(int argc, char *argv[])
 		    (smp_report_broadcast_resp_t *)smp_resp;
 		smp_broadcast_descr_t *bdp = &brp->srbr_descrs[0];
 		uint16_t bcount, idx;
-		uint8_t bctype;
 
 		bcount = brp->srbr_number_broadcast_descrs;
 
