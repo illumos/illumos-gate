@@ -21,6 +21,7 @@
 
 # Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2013 Andrew Stormont.  All rights reserved.
+# Copyright 2015 Nexenta Systems, Inc. All rights reserved.
 
 
 #
@@ -352,7 +353,7 @@ SCHED_KMODS	+= RT TS RT_DPTBL TS_DPTBL IA FSS FX FX_DPTBL SDC
 #	File System Modules (/kernel/fs):
 #
 FS_KMODS	+= dev devfs fdfs fifofs hsfs lofs namefs nfs pcfs tmpfs zfs
-FS_KMODS	+= zut specfs udfs ufs autofs cachefs procfs sockfs mntfs
+FS_KMODS	+= zut specfs udfs ufs autofs procfs sockfs mntfs
 FS_KMODS	+= ctfs objfs sharefs dcfs smbfs
 
 #

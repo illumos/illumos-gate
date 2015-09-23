@@ -1,10 +1,11 @@
 '\" te
 .\" Copyright (c) 2009 Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright 2015 Nexenta Systems, Inc. All rights reserved.
 .\" Copyright 1989 AT&T
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\" See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH MOUNT_NFS 1M "Jun 3, 2015"
+.TH MOUNT_NFS 1M "Sep 8, 2015"
 .SH NAME
 mount_nfs \- mount remote NFS resources
 .SH SYNOPSIS
@@ -896,10 +897,6 @@ Since the root \fB(\fR/\fB)\fR file system is mounted read-only by the kernel
 during the boot process, only the \fBremount\fR option (and options that can be
 used in conjunction with \fBremount\fR) affect the root (\fB/\fR) entry in the
 \fB/etc/vfstab\fR file.
-.sp
-.LP
-\fBmount_cachefs\fR cannot be used with replicated NFS mounts or any NFS
-Version 4 mount.
 .sp
 .LP
 The NFS client service is managed by the service management facility,

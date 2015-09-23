@@ -21,6 +21,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  *
  *	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T
  *		All Rights Reserved
@@ -43,7 +44,6 @@ extern "C" {
 #define	MNTTYPE_NFS	"nfs"		/* NFS file system */
 #define	MNTTYPE_NFS3	"nfs3"		/* NFS Version 3 file system */
 #define	MNTTYPE_NFS4	"nfs4"		/* NFS Version 4 file system */
-#define	MNTTYPE_CACHEFS	"cachefs"	/* Cache File System */
 #define	MNTTYPE_PCFS	"pcfs"		/* PC (MSDOS) file system */
 #define	MNTTYPE_PC	MNTTYPE_PCFS	/* Deprecated name; use MNTTYPE_PCFS */
 #define	MNTTYPE_LOFS	"lofs"		/* Loop back file system */

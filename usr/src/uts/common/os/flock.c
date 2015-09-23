@@ -2099,6 +2099,25 @@ flk_get_first_blocking_lock(lock_descriptor_t *request)
 		} while (lock->l_vnode == vp);
 	}
 
+	if (blocker == NULL && request->l_flock.l_type == F_RDLCK) {
+		/*
+		 * No active lock is blocking this request, but if a read
+		 * lock is requested, it may also get blocked by a waiting
+		 * writer. So search all sleeping locks and see if there is
+		 * a writer waiting.
+		 */
+		SET_LOCK_TO_FIRST_SLEEP_VP(gp, lock, vp);
+		if (lock) {
+			do {
+				if (BLOCKS(lock, request)) {
+					blocker = lock;
+					break;
+				}
+				lock = lock->l_next;
+			} while (lock->l_vnode == vp);
+		}
+	}
+
 	if (blocker) {
 		report_blocker(blocker, request);
 	} else

@@ -1,14 +1,14 @@
 '\" te
 .\" Copyright (c) 2003 Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 2015 Nexenta Systems, Inc. All rights reserved.
 .\" Copyright 1989 AT&T
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH MNTTAB 4 "Dec 20, 2003"
+.TH MNTTAB 4 "Sep 8, 2015"
 .SH NAME
 mnttab \- mounted file system table
 .SH DESCRIPTION
-.sp
 .LP
 The file \fB/etc/mnttab\fR is really a file system that provides read-only
 access to the table of mounted file systems for the current host.
@@ -21,7 +21,6 @@ mount time. That is, the first mounted file system is first in the list and the
 most recently mounted file system is last. When mounted on a mount point the
 file system appears as a regular file containing the current \fBmnttab\fR
 information.
-.sp
 .LP
 Each entry is a line of fields separated by TABs in the form:
 .sp
@@ -31,7 +30,6 @@ Each entry is a line of fields separated by TABs in the form:
 .fi
 .in -2
 
-.sp
 .LP
 where:
 .sp
@@ -80,14 +78,12 @@ section below.
 The time at which the file system was mounted.
 .RE
 
-.sp
 .LP
 Examples of entries for the \fIspecial\fR field include the pathname of a
 block-special device, the name of a remote file system in the form of
 \fIhost:pathname\fR, or the name of a \fBswap file\fR, for example, a file made
 with \fBmkfile\fR(1M).
 .SH IOCTLS
-.sp
 .LP
 The following \fBioctl\fR(2) calls are supported:
 .sp
@@ -155,7 +151,6 @@ privilege.
 .RE
 
 .SH ERRORS
-.sp
 .ne 2
 .na
 \fB\fBEFAULT\fR\fR
@@ -198,7 +193,6 @@ The calling process does not have \fB{PRIV_SYS_MOUNT}\fR privilege and either a
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/mnttab\fR\fR
@@ -217,31 +211,26 @@ Header file that contains \fBIOCTL\fR definitions
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBmkfile\fR(1M), \fBmount_cachefs\fR(1M), \fBmount_hsfs\fR(1M),
-\fBmount_nfs\fR(1M), \fBmount_pcfs\fR(1M), \fBmount_ufs\fR(1M),
-\fBmount\fR(1M), \fBioctl\fR(2), \fBread\fR(2), \fBpoll\fR(2), \fBstat\fR(2),
+\fBmkfile\fR(1M), \fBmount_hsfs\fR(1M), \fBmount_nfs\fR(1M),
+\fBmount_pcfs\fR(1M), \fBmount_ufs\fR(1M), \fBmount\fR(1M),
+\fBioctl\fR(2), \fBread\fR(2), \fBpoll\fR(2), \fBstat\fR(2),
 \fBgetmntent\fR(3C)
 .SH WARNINGS
-.sp
 .LP
 The \fBmnttab\fR file system provides the previously undocumented
 \fBdev=\fR\fIxxx\fR option in the option string for each mounted file system.
 This is provided for legacy applications that might have been using the
 \fBdev=information\fR option.
-.sp
 .LP
 Using \fBdev=\fR\fIoption\fR in applications is strongly discouraged. The
 device number string represents a 32-bit quantity and might not contain correct
 information in 64-bit environments.
-.sp
 .LP
 Applications requiring device number information for mounted file systems
 should use the \fBgetextmntent\fR(3C) interface, which functions properly in
 either 32- or 64-bit environments.
 .SH NOTES
-.sp
 .LP
 The snapshot of the \fBmnttab\fR information is taken any time a \fBread\fR(2)
 is performed at offset \fB0\fR (the beginning) of the \fBmnttab\fR file. The

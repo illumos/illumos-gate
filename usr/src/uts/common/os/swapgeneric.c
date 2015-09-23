@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1982, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*
@@ -632,8 +633,8 @@ get_fstype_prop(char *fstype)
  * convention that the NFS V2 filesystem name is "nfs" (see vfs_conf.c)
  * we need to map "nfs" => "nfsdyn" and "nfs2" => "nfs".  The dynamic
  * nfs module will map the type back to either "nfs", "nfs3", or "nfs4".
- * This is only for root filesystems, all other uses such as cachefs
- * will expect that "nfs" == NFS V2.
+ * This is only for root filesystems, all other uses will expect
+ * that "nfs" == NFS V2.
  *
  * If the filesystem isn't already loaded, vfs_getvfssw() will load
  * it for us, but if (at the time we call it) modrootloaded is

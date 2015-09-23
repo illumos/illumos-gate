@@ -1,9 +1,10 @@
 '\" te
 .\"  Copyright (c) 1998 Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 2015 Nexenta Systems, Inc. All rights reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH FILESYNC 1 "Nov 6, 2000"
+.TH FILESYNC 1 "Sep 8, 2015"
 .SH NAME
 filesync \- synchronize ordinary, directory or special files
 .SH SYNOPSIS
@@ -19,7 +20,6 @@ filesync \- synchronize ordinary, directory or special files
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBfilesync\fR utility \fIsynchronizes\fR files between multiple computer
 systems, typically a server and a portable computer. \fBfilesync\fR
@@ -40,8 +40,8 @@ There are two forms of the \fBfilesync\fR command. The first form of
 \fBfilesync\fR is invoked without file arguments. This form of \fBfilesync\fR
 reconciles differences between the files and systems specified in the
 \fB$HOME/.packingrules\fR file. \fB$HOME/.packingrules\fR is a packing rules
-list for \fBfilesync\fR and \fBcachefspack\fR, and contains a list of files to
-be kept synchronized. See \fBpackingrules\fR(4) and \fBcachefspack\fR(1M).
+list for \fBfilesync\fR and contains a list of files to
+be kept synchronized. See \fBpackingrules\fR(4).
 .sp
 .LP
 The second form of \fBfilesync\fR copies specific files from a directory on the
@@ -56,7 +56,6 @@ Multiple \fBfilesync\fR commands are cumulative (that is, the specified files
 are added to the already existing packing rules file list). See \fBMultiple
 filesync Commands\fR.
 .SS "Reconciling and Synchronizing Files"
-.sp
 .LP
 \fBfilesync\fR synchronizes files between computer systems by performing the
 following two tasks:
@@ -90,20 +89,17 @@ printed out, asking the user to resolve the conflict manually. See
 \fBResolving filesync Conflicts\fR.
 .RE
 .SS "Resolving filesync Conflicts"
-.sp
 .LP
 In cases where files on both sides have changed,  \fBfilesync\fR attempts to
 determine which version should be chosen. If  \fBfilesync\fR cannot
 automatically determine which version should be selected, it prints out a
 warning message and leaves the two incompatible versions of the file
 unreconciled.
-.sp
 .LP
 In these cases, you must either resolve the differences manually, or tell
 \fBfilesync\fR how to choose which file should win. Use the  \fB-o\fR and
 \fB-f\fR options to tell  \fBfilesync\fR how to resolve conflicts (see
 \fBOPTIONS\fR).
-.sp
 .LP
 Alternatively, for each conflicting file, you can examine the two versions,
 determine which one should be kept, and manually bring the two versions into
@@ -111,17 +107,14 @@ agreement (by copying, deleting, or changing the ownership or protection to be
 correct). You can then re-run  \fBfilesync\fR to see whether or not any other
 conflicts remain.
 .SS "Packing Rules File"
-.sp
 .LP
 The packing rules file \fB$HOME/.packingrules\fR contains a list of files to be
 kept synchronized. The syntax of this file is described in
 \fBpackingrules\fR(4).
-.sp
 .LP
 The \fB$HOME/.packingrules\fR file is automatically created if users invoke
 \fBfilesync\fR with filename arguments. By using \fBfilesync\fR options, users
 can augment the packing rules in \fB$HOME/.packingrules\fR.
-.sp
 .LP
 Many users choose to create the packing rules file manually and edit it by
 hand. Users can edit \fB$HOME/.packingrules\fR (using any editor) to
@@ -130,7 +123,6 @@ more powerful options  that are not available from the command line (such as
 \fBIGNORE\fR commands). It is much easier to enter complex wildcard expressions
 by editing the \fB$HOME/.packingrules\fR file.
 .SS "Baseline File"
-.sp
 .LP
 \fB$HOME/.filesync-base\fR is the \fBfilesync\fR baseline summary file.
 \fBfilesync\fR uses the information in \fB$HOME/.filesync-base\fR to identify
@@ -139,7 +131,6 @@ process. Users do not create or edit the baseline file. It is created
 automatically by \fBfilesync\fR and records the last known state of  agreement
 between all of the files being maintained.
 .SS "Multiple filesync Commands"
-.sp
 .LP
 Over a period of time, the set of files you want to keep synchronized can
 change. It is common, for instance, to want to keep files pertaining to only a
@@ -147,7 +138,6 @@ few active projects on your notebook. If you continue to keep files associated
 with every project you have ever worked on synchronized, your notebook's disk
 will fill up with old files. Each  \fBfilesync\fR command will waste a lot of
 time updating files you no longer care about.
-.sp
 .LP
 If you delete the files from your notebook, \fBfilesync\fR will want to perform
 the corresponding deletes on the server, which would not be what you wanted.
@@ -165,17 +155,14 @@ want to delete.
 Delete \fB$HOME/.packingrules\fR. Use the  \fBfilesync\fR command to specify
 the files that you want synchronized.
 .RE
-.sp
 .LP
 Either way works, and you can choose the one that seems easiest to you. For
 minor changes, it is probably easier to just edit \fB$HOME/.packingrules\fR.
 For major changes it is probably easier to start from scratch.
-.sp
 .LP
 Once  \fBfilesync\fR is no longer synchronizing a set of files, you can delete
 them from your notebook without having any effect on the server.
 .SS "Nomadic Machines"
-.sp
 .LP
 When using \fBfilesync\fR to keep files synchronized between nomadic machines
 and a server, store the packing rules and baseline files on the nomadic
@@ -183,7 +170,6 @@ machines, not the server. If, when logged into your notebook, the \fBHOME\fR
 environment variable does not normally point to a directory on your notebook,
 you can use the \fBFILESYNC\fR environment variable to specify an alternate
 location for the packing rules and baseline files.
-.sp
 .LP
 Each nomadic machine should carry its own packing rules and baseline file.
 Incorrect file synchronization can result if a server carries a baseline file
@@ -191,14 +177,12 @@ and multiple nomadic machines attempt to reconcile against the server's
 baseline file. In this case, a nomadic machine could be using a baseline file
 that does not accurately describe the state of its files. This might result in
 incorrect reconciliations.
-.sp
 .LP
 To safeguard against the dangers associated with a single  baseline file being
 shared by more than two machines,  \fBfilesync\fR adds a default rule to each
 new packing rules file. This default rule prevents the  packing rules and
 baseline files from being copied.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -414,7 +398,6 @@ confirm these prompts.
 .RE
 
 .SH OPERANDS
-.sp
 .LP
 The following operands are supported:
 .sp
@@ -481,7 +464,6 @@ switches).
 .RE
 
 .SH ENVIRONMENT VARIABLES
-.sp
 .ne 2
 .na
 \fB\fBFILESYNC\fR\fR
@@ -505,7 +487,6 @@ itself (in most cases, U.S. English).
 .RE
 
 .SH EXIT STATUS
-.sp
 .LP
 Normally, if all files are already up-to-date, or if all files were
 successfully reconciled, \fBfilesync\fR will exit with a status of \fB0\fR.
@@ -594,7 +575,6 @@ Miscellaneous other failures.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB$HOME/.packingrules\fR\fR
@@ -613,6 +593,5 @@ baseline summary file
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBcachefspack\fR(1M), \fBpackingrules\fR(4), \fBattributes\fR(5)
+\fBpackingrules\fR(4), \fBattributes\fR(5)

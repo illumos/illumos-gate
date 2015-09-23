@@ -32,7 +32,6 @@ i386_PROG=
 
 PROG=		\
 	README		\
-	cachefs.daemon	\
 	sysetup		\
 	uucp		\
 	$($(MACH)_PROG)

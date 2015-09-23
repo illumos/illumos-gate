@@ -153,7 +153,7 @@ static crypto_provider_info_t skein_prov_info = {
 	skein_mech_info_tab
 };
 
-static crypto_kcf_provider_handle_t skein_prov_handle = NULL;
+static crypto_kcf_provider_handle_t skein_prov_handle = 0;
 
 typedef struct skein_ctx {
 	skein_mech_type_t		sc_mech_type;

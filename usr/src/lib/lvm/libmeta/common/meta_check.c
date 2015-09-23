@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*
@@ -66,7 +67,6 @@ static char	*skip_these_mntents[] = {
 	"autofs",
 	"proc",
 	"tmpfs",
-	"cachefs",
 	"rfs",
 	"fd",
 	"mntfs",

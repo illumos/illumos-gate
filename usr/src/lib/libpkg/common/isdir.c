@@ -22,6 +22,7 @@
 /*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
 
 /* Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T */
@@ -345,10 +346,9 @@ _InitRemoteFstypes(void)
 	if ((fp = fopen(REMOTE_FS_DBFILE, "r")) == NULL) {
 		/* no remote type database: use predefined remote types */
 		remoteFstypes = (char **)realloc(remoteFstypes,
-					sizeof (char *) * (numRemoteFstypes+3));
+		    sizeof (char *) * (numRemoteFstypes+2));
 		remoteFstypes[numRemoteFstypes++] = "nfs";	/* +1 */
 		remoteFstypes[numRemoteFstypes++] = "autofs";	/* +2 */
-		remoteFstypes[numRemoteFstypes++] = "cachefs";	/* +3 */
 		return;
 	}
 
@@ -365,7 +365,6 @@ _InitRemoteFstypes(void)
 	 *
 	 *	nfs NFS Utilities
 	 *	autofs AUTOFS Utilities
-	 *	cachefs CACHEFS Utilities
 	 */
 
 	while (fgets(line_buf, sizeof (line_buf), fp) != NULL) {
@@ -375,13 +374,13 @@ _InitRemoteFstypes(void)
 		if (format[0] == '\0') {
 			/* create bounded format: %ns */
 			(void) snprintf(format, sizeof (format),
-				"%%%ds", sizeof (buf)-1);
+			    "%%%ds", sizeof (buf)-1);
 		}
 
 		(void) sscanf(line_buf, format, buf);
 
 		remoteFstypes = realloc(remoteFstypes,
-					sizeof (char *) * (numRemoteFstypes+1));
+		    sizeof (char *) * (numRemoteFstypes+1));
 		remoteFstypes[numRemoteFstypes++] = strdup(buf);
 	}
 

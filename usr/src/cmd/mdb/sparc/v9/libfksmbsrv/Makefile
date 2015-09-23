@@ -1,4 +1,3 @@
-#!/sbin/sh
 #
 # CDDL HEADER START
 #
@@ -21,36 +20,38 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-# Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+#
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2015 Gary Mills
 #
 
-#
-# Start/stop client NFS service
-#
+MODULE = libfksmbsrv.so
+MDBTGT = proc
 
-. /lib/svc/share/smf_include.sh
+MODSRCS = smbsrv.c list.c
 
-stop_nfsclnt()
-{
-	/sbin/umountall -F nfs
-}
+include ../../../../Makefile.cmd
+include ../../../../Makefile.cmd.64
+include ../../Makefile.sparcv9
+include ../../../Makefile.module
 
-case "$1" in
-'start')
+MODSRCS_DIR = ../../../common/modules/smbsrv
+GENUNIX_DIR = ../../../common/modules/genunix
 
-	/sbin/mountall -F nfs
-	/sbin/swapadd
-	;;
+# Note: need our sys includes _before_ ENVCPPFLAGS, proto etc.
+CPPFLAGS.first += -I../../../../../lib/smbsrv/libfksmbsrv/common
+CPPFLAGS.first += -I../../../../../lib/libfakekernel/common
 
-'stop')
-	stop_nfsclnt
-	;;
+CPPFLAGS += -I../../../../../uts/common
 
-*)
-	echo "Usage: $0 { start | stop }"
-	exit 1
-	;;
-esac
-exit $SMF_EXIT_OK
+C99MODE=	-xc99=%all
+C99LMODE=	-Xc99=%all
+
+dmod/%.o: $(GENUNIX_DIR)/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+dmod/%.ln: $(GENUNIX_DIR)/%.c
+	$(LINT.c) -c $<

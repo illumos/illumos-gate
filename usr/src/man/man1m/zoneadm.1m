@@ -1,10 +1,10 @@
 '\" te
-.\" Copyright 2014 Nexenta Systems, Inc. All rights reserved.
+.\" Copyright 2015 Nexenta Systems, Inc. All rights reserved.
 .\" Copyright (c) 2009 Sun Microsystems, Inc. All Rights Reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ZONEADM 1M "Dec 26, 2014"
+.TH ZONEADM 1M "Sep 8, 2015"
 .SH NAME
 zoneadm \- administer zones
 .SH SYNOPSIS
@@ -488,7 +488,7 @@ wrong.
 .RS 4n
 Any \fBfs\fR resources have their \fItype\fR value checked. An error is
 reported if the value is one of \fBproc\fR, \fBmntfs\fR, \fBautofs\fR,
-\fBcachefs\fR, or \fBnfs\fR or the filesystem does not have an associated mount
+or \fBnfs\fR or the filesystem does not have an associated mount
 binary at \fB/usr/lib/fs/\fI<fstype>\fR/mount\fR.
 .sp
 It is an error for the \fIdirectory\fR to be a relative path.

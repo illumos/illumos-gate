@@ -19,6 +19,7 @@
 # CDDL HEADER END
 #
 #
+# Copyright 2015 Gary Mills
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -58,7 +59,12 @@ SRCS=		$(MACHSRCS) $(LIBSRCS)
 
 LIBS =          $(DYNLIB) $(LINTLIB)
 
+# Append to LINTFLAGS and LINTFLAGS64 from lib/Makefile.lib
+LINTFLAGS +=	-erroff=E_NAME_MULTIPLY_DEF2 -erroff=E_FUNC_RET_MAYBE_IGNORED2
+LINTFLAGS64 +=	-erroff=E_NAME_MULTIPLY_DEF2 -erroff=E_FUNC_RET_MAYBE_IGNORED2
+
 LINTSRCS=	../common/llib-l$(LIBNAME)
+$(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
 
 INCLIST=	$(INCLIST_$(MACH)) -I../../include -I../../include/$(MACH)
 DEFLIST=	-DELF
@@ -76,10 +82,9 @@ pics/%_e.o:=	DEFLIST = -DEUC -DJLSLEX  -DEOPTION -D$*=$*_e
 
 CPPFLAGS=	$(INCLIST) $(DEFLIST) $(CPPFLAGS.master)
 BUILD.AR=	$(AR) $(ARFLAGS) $@ `$(LORDER) $(OBJS) | $(TSORT)`
-LINTFLAGS=	-amux
+
 LINTPOUT=	lint.out
 
-$(LINTLIB):=	LINTFLAGS = -nvx
 $(ROOTPROG):=	FILEMODE = 0555
 
 ROOTFORMS=	$(FORMS:%=$(ROOTSHLIBCCS)/%)
@@ -94,7 +99,9 @@ DYNLINKLIB=	$(LIBLINKS:%=$(DYNLINKLIBDIR)/%)
 $(DYNLIB) :=	CFLAGS += $(CCVERBOSE)
 $(DYNLIB) :=	CFLAGS64 += $(CCVERBOSE)
 
-$(DYNLIB) :=	LDLIBS += -lc
+LDLIBS += -lc
 
 CLEANFILES +=	../common/parser.c $(LINTPOUT)
 CLOBBERFILES +=	$(LIBS) $(LIBRARY)
+
+lint: lintcheck

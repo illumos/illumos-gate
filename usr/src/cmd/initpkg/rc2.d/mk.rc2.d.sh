@@ -23,12 +23,12 @@
 #	  All Rights Reserved
 #
 # Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2015 Nexenta Systems, Inc. All rights reserved.
 #
 
 COMMON_STARTLST="\
 20sysetup \
-70uucp \
-73cachefs.daemon"
+70uucp"
 
 INSDIR=${ROOT}/etc/rc2.d
 

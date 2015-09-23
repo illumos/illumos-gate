@@ -12,7 +12,7 @@
 #
 # Copyright 2011, Richard Lowe
 # Copyright (c) 2012, Joyent, Inc.  All rights reserved.
-# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 #
 
 include		$(SRC)//Makefile.master
@@ -53,11 +53,6 @@ _MANFILES=	6to4relay.1m		\
 		bootadm.1m		\
 		bootconfchk.1m		\
 		busstat.1m		\
-		cachefsd.1m		\
-		cachefslog.1m		\
-		cachefspack.1m		\
-		cachefsstat.1m		\
-		cachefswssize.1m	\
 		captoinfo.1m		\
 		catman.1m		\
 		cfgadm.1m		\
@@ -71,7 +66,6 @@ _MANFILES=	6to4relay.1m		\
 		cfgadm_scsi.1m		\
 		cfgadm_sysctrl.1m	\
 		cfgadm_usb.1m		\
-		cfsadmin.1m		\
 		chat.1m			\
 		check-hostname.1m	\
 		check-permissions.1m	\
@@ -141,7 +135,6 @@ _MANFILES=	6to4relay.1m		\
 		format.1m		\
 		fruadm.1m		\
 		fsck.1m			\
-		fsck_cachefs.1m		\
 		fsck_pcfs.1m		\
 		fsck_udfs.1m		\
 		fsck_ufs.1m		\
@@ -325,7 +318,6 @@ _MANFILES=	6to4relay.1m		\
 		modload.1m		\
 		modunload.1m		\
 		mount.1m		\
-		mount_cachefs.1m	\
 		mount_hsfs.1m		\
 		mount_nfs.1m		\
 		mount_pcfs.1m		\

@@ -22,6 +22,7 @@
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2015 Nexenta Systems, Inc. All rights reserved.
 #
 
 smf_present () {
@@ -134,7 +135,7 @@ smf_netstrategy () {
 
 	set -- `/sbin/netstrategy`
 	if [ $? -eq 0 ]; then
-		[ "$1" = "nfs" -o "$1" = "cachefs" ] && \
+		[ "$1" = "nfs" ] && \
 			_INIT_NET_IF="$2" export _INIT_NET_IF
 		_INIT_NET_STRATEGY="$3" export _INIT_NET_STRATEGY
 	else

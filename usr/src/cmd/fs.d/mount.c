@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include	<stdio.h>
@@ -139,15 +139,6 @@ int	exitcode;
 int	aflg, cflg, fflg, Fflg, gflg, oflg, pflg, rflg, vflg, Vflg, mflg, Oflg,
 	dashflg, questflg, dflg, qflg;
 
-/*
- * Currently, mounting cachefs instances simultaneously uncovers various
- * problems.  For the short term, we serialize cachefs activity while we fix
- * these cachefs bugs.
- */
-#define	CACHEFS_BUG
-#ifdef	CACHEFS_BUG
-int	cachefs_running;	/* parallel cachefs not supported yet */
-#endif
 
 /*
  * Each vfsent_t describes a vfstab entry.  It is used to manage and cleanup
@@ -1295,15 +1286,6 @@ do_mounts(void)
 		while (nrun >= maxrun && (dowait() != -1))	/* throttle */
 			;
 
-#ifdef	CACHEFS_BUG
-		if (vp->v.vfs_fstype &&
-		    (strcmp(vp->v.vfs_fstype, "cachefs") == 0)) {
-			while (cachefs_running && (dowait() != -1))
-				;
-			cachefs_running = 1;
-		}
-#endif
-
 		if ((child = fork()) == -1) {
 			perror("fork");
 			cleanup(-1);
@@ -1473,11 +1455,6 @@ cleanupkid(pid_t pid, int wstat)
 		if (ret)
 			lofsfail++;
 	}
-
-#ifdef CACHEFS_BUG
-	if (vp->v.vfs_fstype && (strcmp(vp->v.vfs_fstype, "cachefs") == 0))
-		cachefs_running = 0;
-#endif
 
 	vp->exitcode = ret;
 	return (ret);

@@ -835,6 +835,7 @@ int
 engine_cleanup(int flags)
 {
 	boolean_t		activity = B_TRUE;
+	int			dont_exit;
 	int			r = -1;
 
 	lscf_prep_hndl();
@@ -843,10 +844,16 @@ engine_cleanup(int flags)
 		activity = B_FALSE;
 	}
 
+	dont_exit = est->sc_cmd_flags & SC_CMD_DONT_EXIT;
+	est->sc_cmd_flags |= SC_CMD_DONT_EXIT;
+
 	if (scf_walk_fmri(g_hndl, 0, NULL, SCF_WALK_SERVICE|SCF_WALK_NOINSTANCE,
 	    lscf_service_cleanup, (void *)activity, NULL,
 	    uu_warn) == SCF_SUCCESS)
 		r = 0;
+
+	if (dont_exit == 0)
+		est->sc_cmd_flags &= ~SC_CMD_DONT_EXIT;
 
 	(void) lscf_hash_cleanup();
 

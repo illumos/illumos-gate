@@ -1,20 +1,19 @@
 '\" te
 .\"  Copyright (c) 2007 Sun Microsystems, Inc. All Rights Reserved
 .\" Portions Copyright (c) 1982-2007 AT&T Knowledge Ventures
+.\" Copyright 2015 Nexenta Systems, Inc. All rights reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 .\" or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add
 .\" the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LARGEFILE 5 "Nov 2, 2007"
+.TH LARGEFILE 5 "Sep 8, 2015"
 .SH NAME
 largefile \- large file status of utilities
 .SH DESCRIPTION
-.sp
 .LP
 A \fIlarge file\fR is a regular file whose size is greater than or equal to 2
 Gbyte ( 2^31 bytes). A \fIsmall file\fR is a regular file whose size is less
 than 2 Gbyte.
 .SS "Large file aware utilities"
-.sp
 .LP
 A utility is called \fIlarge file aware\fR if it can process large files in the
 same manner as it does small files. A utility that is large file aware is able
@@ -28,7 +27,6 @@ will accept configuration or support files that are large files. If a large
 file aware utility does not accept configuration or support files that are
 large files, it will cause no data loss or corruption upon encountering such
 files and will return an appropriate error.
-.sp
 .LP
 The following \fB/usr/bin\fR utilities are large file aware:
 .sp
@@ -53,7 +51,6 @@ l l l l l .
 \fBuudcode\fR	\fBuuencode\fR	\fBvacation\fR	\fBwc\fR	\fBzcat\fR
 .TE
 
-.sp
 .LP
 The following \fB/usr/xpg4/bin\fR utilities are large file aware:
 .sp
@@ -68,7 +65,6 @@ l l l l l .
 \fBsh\fR	sort	tail	tr	
 .TE
 
-.sp
 .LP
 The following \fB/usr/xpg6/bin\fR utilities are large file aware:
 .sp
@@ -79,7 +75,6 @@ l l l l l .
 \fBgetconf\fR	\fBls\fR	\fBtr\fR		
 .TE
 
-.sp
 .LP
 The following \fB/usr/sbin\fR utilities are large file aware:
 .sp
@@ -92,7 +87,6 @@ l l l l l .
 \fBmvdir\fR	\fBswap\fR			
 .TE
 
-.sp
 .LP
 The following \fB/usr/lib\fR utilities are large file aware:
 .sp
@@ -103,7 +97,6 @@ l l l l l .
 \fBmail.local\fR	\fBsendmail\fR	\fBsmrsh\fR		
 .TE
 
-.sp
 .LP
 See the USAGE section of the \fBswap\fR(1M) manual page for limitations of
 \fBswap\fR on block devices greater than 2 Gbyte on a 32-bit operating system.
@@ -120,43 +113,13 @@ l l l l l .
 \fBsum\fR	\fBtouch\fR			
 .TE
 
-.sp
 .LP
 The \fB/usr/bin/cpio\fR and \fB/usr/bin/pax\fR utilities are large file aware,
 but cannot archive a file whose size exceeds 8 Gbyte - 1 byte.
-.sp
 .LP
 The \fB/usr/bin/truss\fR utilities has been modified to read a dump file and
 display information relevant to large files, such as offsets.
-.SS "cachefs file systems"
-.sp
-.LP
-The following \fB/usr/bin\fR utilities are large file aware for \fBcachefs\fR
-file systems:
-.sp
-
-.sp
-.TS
-l l l l .
-\fBcachefspack\fR	\fBcachefsstat\fR		
-.TE
-
-.sp
-.LP
-The following \fB/usr/sbin\fR utilities are large file aware for \fBcachefs\fR
-file systems:
-.sp
-
-.sp
-.TS
-l l l l
-l l l l .
-\fBcachefslog\fR	\fBcachefswssize\fR	\fBcfsadmin\fR	\fBfsck\fR
-\fBmount\fR	\fBumount\fR		
-.TE
-
 .SS "nfs file systems"
-.sp
 .LP
 The following utilities are large file aware for \fBnfs\fR file systems:
 .sp
@@ -170,28 +133,21 @@ l l .
 .TE
 
 .SS "ufs file systems"
-.sp
 .LP
 The following \fB/usr/bin\fR utility is large file aware for \fBufs\fR file
 systems:
-.sp
 .LP
 \fBdf\fR
-.sp
 .LP
 The following \fB/usr/lib/nfs\fR utility is large file aware for \fBufs\fR file
 systems:
-.sp
 .LP
 \fBrquotad\fR
-.sp
 .LP
 The following \fB/usr/xpg4/bin\fR utility is large file aware for \fBufs\fR
 file systems:
-.sp
 .LP
 \fBdf\fR
-.sp
 .LP
 The following \fB/usr/sbin\fR utilities are large file aware for \fBufs\fR file
 systems:
@@ -209,12 +165,10 @@ l l l l l .
 .TE
 
 .SS "Large file safe utilities"
-.sp
 .LP
 A utility is called \fBlarge file safe\fR if it causes no data loss or
 corruption when it encounters a large file. A utility that is large file safe
 is unable to process properly a large file, but returns an appropriate error.
-.sp
 .LP
 The following \fB/usr/bin\fR utilities are large file safe:
 .sp
@@ -230,7 +184,6 @@ l l l l l .
 \fBview\fR				
 .TE
 
-.sp
 .LP
 The following \fB/usr/xpg4/bin\fR utilities are large file safe:
 .sp
@@ -241,7 +194,6 @@ l l l l l .
 \fBed\fR	\fBvi\fR	\fBview\fR		
 .TE
 
-.sp
 .LP
 The following \fB/usr/xpg6/bin\fR utility is large file safe:
 .sp
@@ -252,7 +204,6 @@ l l l l l .
 \fBed\fR				
 .TE
 
-.sp
 .LP
 The following \fB/usr/sbin\fR utilities are large file safe:
 .sp
@@ -263,7 +214,6 @@ l l l l l .
 lpfilter		lpforms			
 .TE
 
-.sp
 .LP
 The following \fB/usr/ucb\fR utilities are large file safe:
 .sp
@@ -275,6 +225,5 @@ l l l l l .
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBlf64\fR(5), \fBlfcompile\fR(5), \fBlfcompile64\fR(5)

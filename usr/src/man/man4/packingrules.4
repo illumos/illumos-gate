@@ -1,11 +1,12 @@
 '\" te
 .\"  Copyright (c) 1996 Sun Microsystems, Inc.  All Rights Reserved.
+.\"  Copyright 2015 Nexenta Systems, Inc. All rights reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PACKINGRULES 4 "Dec 23, 1996"
+.TH PACKINGRULES 4 "Sep 8, 2015"
 .SH NAME
-packingrules \- packing rules file for cachefs and filesync
+packingrules \- packing rules file for filesync
 .SH SYNOPSIS
 .LP
 .nf
@@ -13,21 +14,17 @@ packingrules \- packing rules file for cachefs and filesync
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fB$\fR\fBHOME\fR\fB/.packingrules\fR is a packing rules file for
-\fBfilesync\fR and  \fBcachefspack\fR. \fB$\fR\fBHOME\fR\fB/.packingrules\fR
+\fBfilesync\fR. \fB$\fR\fBHOME\fR\fB/.packingrules\fR
 contains a list of directories and files that are to be packed and
 synchronized.  It also contains a list of directories and files that  are to be
-specifically excluded from packing and synchronization. See  \fBfilesync\fR(1)
-and  \fBcachefspack\fR(1M).
-.sp
+specifically excluded from packing and synchronization. See  \fBfilesync\fR(1).
 .LP
 The \fB$\fR\fBHOME\fR\fB/.packingrules\fR file is automatically created if
 users invoke \fBfilesync\fR with filename arguments. By using \fBfilesync\fR
 options, users can augment the packing rules in
 \fB$\fR\fBHOME\fR\fB/.packingrules\fR.
-.sp
 .LP
 Many users choose to manually create the packing rules file and edit it by
 hand. Users can edit \fB$\fR\fBHOME\fR\fB/.packingrules\fR (using any editor)
@@ -35,14 +32,11 @@ to permanently change the \fB$\fR\fBHOME\fR\fB/.packingrules\fR file, or to
 gain access to more powerful options that are not available from the command
 line (such as \fBIGNORE\fR commands). It is much easier to enter complex
 wildcard expressions by editing the \fB$\fR\fBHOME\fR\fB/.packingrules\fR file.
-.sp
 .LP
 Blank lines and lines that begin with a pound sign  (`\fB#\fR') are ignored.
-.sp
 .LP
 Any line can be continued by placing a backslash  (`\fB\e\fR\&') immediately
 before the  \fBNEWLINE.\fR
-.sp
 .LP
 All other lines in the  \fB$\fR\fBHOME\fR\fB/.packingrules\fR file have one of
 the following formats:
@@ -184,6 +178,5 @@ LIST !find . -type f -a -perm -111 -a -print
 .sp
 
 .SH SEE ALSO
-.sp
 .LP
-\fBfile\fR(1), \fBfilesync\fR(1), \fBcachefspack\fR(1M)
+\fBfile\fR(1), \fBfilesync\fR(1)

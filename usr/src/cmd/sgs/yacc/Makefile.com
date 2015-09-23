@@ -19,6 +19,7 @@
 # CDDL HEADER END
 #
 #
+# Copyright 2015 Gary Mills
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -48,18 +49,23 @@ SRCS=		$(COMSRCS) $(LIBSRCS)
 
 LIBS =          $(DYNLIB) $(LINTLIB)
 
+# Append to LINTFLAGS and LINTFLAGS64 from lib/Makefile.lib
+LINTFLAGS +=	-erroff=E_NAME_MULTIPLY_DEF2
+LINTFLAGS64 +=	-erroff=E_NAME_MULTIPLY_DEF2
+
 # Tune ZDEFS to ignore undefined symbols for building the yacc shared library
 # since these symbols (mainly yyparse) are to be resolved elsewhere.
 #
 $(DYNLIB):= ZDEFS = $(ZNODEFS)
 $(DYNLIBCCC):= ZDEFS = $(ZNODEFS)
 LINTSRCS=	../common/llib-l$(LIBNAME)
+$(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
 
 INCLIST=	-I../../include -I../../include/$(MACH)
 CPPFLAGS=	$(INCLIST) $(DEFLIST) $(CPPFLAGS.master)
-LDLIBS=		$(LDLIBS.cmd)
+$(PROG):=	LDLIBS = $(LDLIBS.cmd)
 BUILD.AR=	$(AR) $(ARFLAGS) $@ `$(LORDER) $(OBJS) | $(TSORT)`
-LINTFLAGS=	-amux
+
 LINTPOUT=	lint.out
 
 C99MODE= $(C99_ENABLE)
@@ -68,7 +74,6 @@ CFLAGS64 += $(CCVERBOSE)
 CERRWARN += -_gcc=-Wno-parentheses
 CERRWARN += -_gcc=-Wno-uninitialized
 
-$(LINTLIB):=	LINTFLAGS = -nvx
 $(ROOTPROG):= FILEMODE = 0555
 
 ROOTYACCPAR=	$(YACCPAR:%=$(ROOTSHLIBCCS)/%)
@@ -79,7 +84,9 @@ ROOTLINT=	$(LINTSRCS:../common/%=$(ROOTLINTDIR)/%)
 DYNLINKLIBDIR=	$(ROOTLIBDIR)
 DYNLINKLIB=	$(LIBLINKS:%=$(DYNLINKLIBDIR)/%)
 
-$(DYNLIB) :=	LDLIBS += -lc
+LDLIBS += -lc
 
 CLEANFILES +=	$(LINTPOUT)
 CLOBBERFILES +=	$(LIBS) $(LIBRARY)
+
+lint: lintcheck
