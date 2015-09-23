@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -140,7 +140,7 @@ struct mapfs {
  */
 struct mapent {
 	char	*map_fstype;	/* file system type e.g. "nfs" */
-	char	*map_mounter;	/* base fs e.g. "cachefs" */
+	char	*map_mounter;	/* base fs */
 	char	*map_root;	/* path to mount root */
 	char	*map_mntpnt;	/* path from mount root */
 	char	*map_mntopts;	/* mount options */

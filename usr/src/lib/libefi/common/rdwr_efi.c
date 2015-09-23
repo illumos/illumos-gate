@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2002, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2014 Toomas Soome <tsoome@me.com>
  */
 
@@ -55,7 +55,7 @@ static struct uuid_to_ptag {
 	{ EFI_VAR },
 	{ EFI_HOME },
 	{ EFI_ALTSCTR },
-	{ 0 },			/* CACHE (cachefs) is never used */
+	{ 0 },			/* CACHE is never used */
 	{ EFI_RESERVED },
 	{ EFI_SYSTEM },
 	{ EFI_LEGACY_MBR },

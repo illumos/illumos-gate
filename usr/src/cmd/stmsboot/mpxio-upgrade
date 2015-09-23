@@ -21,6 +21,7 @@
 #
 #
 # Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2015 Nexenta Systems, Inc. All rights reserved.
 #
 
 . /lib/svc/share/fs_include.sh
@@ -173,59 +174,39 @@ mpxio_mount_usr()
 			;;
 		esac
 		
-		if [ "$fstype" = "cachefs" ]; then
-			# Mount read-only without the cache.
-			case "$mntopts" in
-			*backfstype=nfs*)
-				cfsbacktype=nfs
-				;;
-			*backfstype=hsfs*)
-				cfsbacktype=hsfs
-				;;
-			*)
-				cecho 'stmsboot: invalid vfstab entry for /usr'
-				cfsbacktype=nfs
-				;;
-			esac
-			# see the comment below for /dev/null
-			$MOUNT -m -F $cfsbacktype -o ro $new_special $mountp \
->/dev/null 2>&1
-			ret_val=$?
+		#
+		# Must use -o largefiles here to ensure the read-only
+		# mount does not fail as a result of having a large
+		# file present on /usr.
+		#
+		if [ "$mntopts" = "-" ]; then
+			mntopts='ro,largefiles'
 		else
-			#
-			# Must use -o largefiles here to ensure the read-only
-			# mount does not fail as a result of having a large
-			# file present on /usr.
-			#
-			if [ "$mntopts" = "-" ]; then
-				mntopts='ro,largefiles'
-			else
-				checkopt largefiles $mntopts
-				if [ "$option" != "largefiles" ]; then
-					mntopts="largefiles,$mntopts"
-				fi
-
-				checkopt ro $mntopts
-				if [ "$option" != "ro" ]; then
-					mntopts="ro,$mntopts"
-				fi
-
-				# Requesting logging on a read-only mount
-				# causes errors to be displayed, so remove
-				# "logging" from the list of options.
-				checkopt logging $mntopts
-				if [ "$option" = "logging" ]; then
-					mntopts="$otherops"
-				fi
+			checkopt largefiles $mntopts
+			if [ "$option" != "largefiles" ]; then
+				mntopts="largefiles,$mntopts"
 			fi
 
-			# In case of a manual restart of the service, mount
-			# will emit messages if /usr is already mounted.
-			# So redirect the output to /dev/null.
-			$MOUNT -m -F $fstype -o $mntopts $new_special /usr \
->/dev/null 2>&1
-			ret_val=$?
+			checkopt ro $mntopts
+			if [ "$option" != "ro" ]; then
+				mntopts="ro,$mntopts"
+			fi
+
+			# Requesting logging on a read-only mount
+			# causes errors to be displayed, so remove
+			# "logging" from the list of options.
+			checkopt logging $mntopts
+			if [ "$option" = "logging" ]; then
+				mntopts="$otherops"
+			fi
 		fi
+
+		# In case of a manual restart of the service, mount
+		# will emit messages if /usr is already mounted.
+		# So redirect the output to /dev/null.
+		$MOUNT -m -F $fstype -o $mntopts $new_special /usr \
+>/dev/null 2>&1
+		ret_val=$?
 		if [ $ret_val -eq 0 ]; then
 			usrmounted=1
 		fi

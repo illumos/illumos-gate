@@ -21,6 +21,7 @@
 #
 #
 # Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2015 Nexenta Systems, Inc. All rights reserved.
 #
 #
 PATH=/usr/bin:/usr/sbin:$PATH; export PATH
@@ -549,12 +550,8 @@ $STMSBOOTUTIL -i
 
 
 if [ "$cmd" = "enable" -o "$cmd" = "disable" -o "$cmd" = "update" ]; then
-	#
-	# The bootup script doesn't work on cache-only-clients as the script
-	# is executed before the plumbing for cachefs mounting of root is done.
-	#
-	if $MOUNT -v | $EGREP -s " on / type (nfs|cachefs) "; then
-		gettext "This command option is not supported on systems with an nfs or cachefs mounted root filesystem.\n" 1>&2
+	if $MOUNT -v | $EGREP -s " on / type nfs "; then
+		gettext "This command option is not supported on systems with an nfs mounted root filesystem.\n" 1>&2
 		exit 1
 	fi
 

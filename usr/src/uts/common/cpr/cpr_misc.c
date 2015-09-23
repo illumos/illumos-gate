@@ -21,6 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -1085,7 +1086,7 @@ cpr_is_zfs(struct vfs *vfsp)
  * This is a list of file systems that are allowed to be writeable when a
  * reusable statefile checkpoint is taken.  They must not have any state that
  * cannot be restored to consistency by simply rebooting using the checkpoint.
- * (In contrast to ufs, cachefs and pcfs which have disk state that could get
+ * (In contrast to ufs and pcfs which have disk state that could get
  * out of sync with the in-kernel data).
  */
 int

@@ -21,6 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -77,17 +78,6 @@ int	lofscnt;		/* presence of lofs prohibits parallel */
 int	exitcode;
 char	resolve[MAXPATHLEN];
 static  char ibuf[BUFSIZ];
-
-/*
- * Currently, mounting cachefs's simultaneous uncovers various problems.
- * For the short term, we serialize cachefs activity while we fix
- * these cachefs bugs.
- */
-#define	CACHEFS_BUG
-#ifdef	CACHEFS_BUG
-#include	<sys/fs/cachefs_fs.h>	/* for BACKMNT_NAME */
-int	cachefs_running;	/* parallel cachefs not supported yet */
-#endif
 
 /*
  * The basic mount struct that describes an mnttab entry.
@@ -818,23 +808,6 @@ do_umounts(mountent_t **mntarray)
 		while (nrun >= maxrun && (dowait() != -1))	/* throttle */
 			;
 
-#ifdef CACHEFS_BUG
-		/*
-		 * If this is the back file system, then let cachefs/umount
-		 * unmount it.
-		 */
-		if (strstr(mp->ment.mnt_mountp, BACKMNT_NAME))
-			continue;
-
-
-		if (mp->ment.mnt_fstype &&
-		    (strcmp(mp->ment.mnt_fstype, "cachefs") == 0)) {
-			while (cachefs_running && (dowait() != -1))
-					;
-			cachefs_running = 1;
-		}
-#endif
-
 		if ((pid = fork()) == -1) {
 			perror("fork");
 			cleanup(-1);
@@ -943,12 +916,6 @@ dowait(void)
 	if (mp->ment.mnt_fstype &&
 	    (strcmp(mp->ment.mnt_fstype, MNTTYPE_LOFS) == 0))
 		lofscnt--;
-
-#ifdef CACHEFS_BUG
-	if (mp->ment.mnt_fstype &&
-	    (strcmp(mp->ment.mnt_fstype, "cachefs") == 0))
-		cachefs_running = 0;
-#endif
 
 	return (ret);
 }

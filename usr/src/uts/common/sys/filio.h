@@ -21,6 +21,7 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -86,11 +87,6 @@ extern "C" {
 #define	_FIOISBUSY	_IO('f', 75)		/* networker/ufs protocol */
 #define	_FIODIRECTIO	_IO('f', 76)		/* directio */
 #define	_FIOTUNE	_IO('f', 77)		/* tuning */
-
-/*
- * WARNING: These 'f' ioctls are also defined in sys/fs/cachefs_fs.h
- * It currently defines 78-86.
- */
 
 /*
  * Internal Logging UFS

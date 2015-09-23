@@ -23,8 +23,8 @@
 #
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2015 Nexenta Systems, Inc. All rights reserved.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 #
 # Start/stop client NFS service
@@ -34,7 +34,6 @@
 
 stop_nfsclnt()
 {
-	/sbin/umountall -F cachefs
 	/sbin/umountall -F nfs
 }
 
@@ -42,7 +41,6 @@ case "$1" in
 'start')
 
 	/sbin/mountall -F nfs
-	/sbin/mountall -F cachefs
 	/sbin/swapadd
 	;;
 

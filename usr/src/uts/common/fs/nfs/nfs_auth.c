@@ -1027,13 +1027,14 @@ wait:
 			 * data.
 			 */
 			if (p->auth_clnt_ngids != 0 &&
-			    p->auth_clnt_gids == NULL)
+			    p->auth_clnt_gids == NULL) {
 				p->auth_clnt_ngids = 0;
 				mutex_exit(&p->auth_lock);
 
 				p = NULL;
 
 				goto retrieve;
+			}
 		}
 
 		/*

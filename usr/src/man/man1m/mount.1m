@@ -1,9 +1,10 @@
 '\" te
 .\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright 2015 Nexenta Systems, Inc. All rights reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH MOUNT 1M "May 29, 2008"
+.TH MOUNT 1M "Sep 8, 2015"
 .SH NAME
 mount, umount \- mount or unmount file systems and remote resources
 .SH SYNOPSIS
@@ -41,25 +42,21 @@ mount, umount \- mount or unmount file systems and remote resources
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBmount\fR attaches a file system to the file system hierarchy at the
 \fImount_point\fR, which is the pathname of a directory. If \fImount_point\fR
 has any contents prior to the \fBmount\fR operation, these are hidden until the
 file system is unmounted.
-.sp
 .LP
 \fBumount\fR unmounts a currently mounted file system, which may be specified
 either as a \fImount_point\fR or as \fIspecial\fR, the device on which the file
 system resides.
-.sp
 .LP
 The table of currently mounted file systems can be found by examining the
 mounted file system information file. This is provided by a file system that is
 usually mounted on \fB/etc/mnttab\fR. The mounted file system information is
 described in \fBmnttab\fR(4). Mounting a file system adds an entry to the mount
 table; a \fBumount\fR removes an entry from the table.
-.sp
 .LP
 When invoked with both the \fIspecial\fR and \fImount_point\fR arguments and
 the \fB-F\fR option, \fBmount\fR validates all arguments except for
@@ -75,7 +72,6 @@ will be used. Otherwise the default remote file system type will be used. The
 default remote file system type is determined by the first entry in the
 \fB/etc/dfs/fstypes\fR file. After filling in missing arguments, \fBmount\fR
 will invoke the \fIFSType\fR-specific \fBmount\fR module.
-.sp
 .LP
 For file system types that support it, a file can be mounted directly as a file
 system by specifying the full path to the file as the special argument.  In
@@ -83,13 +79,11 @@ such a case, the \fBnosuid\fR option is enforced. If specific file system
 support for such loopback file mounts is not present, you can still use
 \fBlofiadm\fR(1M) to mount a file system image. In this case, no special
 options are enforced.
-.sp
 .LP
 Only a user with sufficient privilege (at least \fBPRIV_SYS_MOUNT\fR) can mount
 or unmount file systems using \fBmount\fR and \fBumount\fR. However, any user
 can use \fBmount\fR to list mounted file systems and resources.
 .SH OPTIONS
-.sp
 .ne 2
 .na
 \fB\fB-F\fR \fIFSType\fR\fR
@@ -390,13 +384,11 @@ The following commands mount and unmount a DVD image.
 .sp
 
 .SH USAGE
-.sp
 .LP
 See \fBlargefile\fR(5) for the description of the behavior of \fBmount\fR and
 \fBumount\fR when encountering files greater than or equal to 2 Gbyte ( 2^31
 bytes).
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/mnttab\fR\fR
@@ -438,21 +430,15 @@ List of default parameters for each file system.
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBlofiadm\fR(1M), \fBmount_cachefs\fR(1M), \fBmount_hsfs\fR(1M),
-\fBmount_nfs\fR(1M), \fBmount_pcfs\fR(1M),  \fBmount_smbfs\fR(1M),
-\fBmount_tmpfs\fR(1M),  \fBmount_udfs\fR(1M), \fBmount_ufs\fR(1M),
-\fBmountall\fR(1M), \fBumountall\fR(1M), \fBfcntl\fR(2), \fBmmap\fR(2),
-\fBmnttab\fR(4), \fBvfstab\fR(4), \fBattributes\fR( 5), \fBlargefile\fR(5),
+\fBlofiadm\fR(1M), \fBmount_hsfs\fR(1M), \fBmount_nfs\fR(1M),
+\fBmount_pcfs\fR(1M),  \fBmount_smbfs\fR(1M), \fBmount_tmpfs\fR(1M),
+\fBmount_udfs\fR(1M), \fBmount_ufs\fR(1M), \fBmountall\fR(1M),
+\fBumountall\fR(1M), \fBfcntl\fR(2), \fBmmap\fR(2), \fBmnttab\fR(4),
+\fBvfstab\fR(4), \fBattributes\fR(5), \fBlargefile\fR(5),
 \fBprivileges\fR(5), \fBlofs\fR(7FS), \fBpcfs\fR(7FS)
 .SH NOTES
-.sp
 .LP
 If the directory on which a file system is to be mounted is a symbolic link,
 the file system is mounted on the directory to which the symbolic link refers,
 rather than on top of the symbolic link itself.
-.SH BUGS
-.sp
-.LP
-The \fBmount\fR \fB-p\fR output is incorrect for \fBcachefs\fR.

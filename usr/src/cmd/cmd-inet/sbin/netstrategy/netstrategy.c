@@ -22,9 +22,9 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This program does the following:
@@ -36,7 +36,7 @@
  * b) If the program is successful, it prints three tokens to
  *    stdout: <root fs type> <interface name> <net config strategy>.
  *    where:
- *	<root fs type>		-	"nfs" or "ufs"
+ *	<root fs type>		-	"nfs", "ufs" or "zfs"
  *	<interface name>	-	"hme0" or "none"
  *	<net config strategy>	-	"dhcp", "rarp", "bootprops"
  *					or "none"
@@ -308,14 +308,14 @@ main(int argc, char *argv[])
 	 * "ufs rarp" (consumers are coded to deal with this reality), so
 	 * there are three possible situations:
 	 *
-	 *	1. We're "ufs dhcp" if there are any interfaces which have
-	 *	   obtained their addresses through DHCP.  That is, if there
-	 *	   are any IFF_UP and non-IFF_VIRTUAL interfaces also have
-	 *	   IFF_DHCPRUNNING set.
+	 *	1. We're either "ufs dhcp" or "zfs dhcp" if there are any
+	 *	   interfaces which have obtained their addresses through DHCP.
+	 *	   That is, if there are any IFF_UP and non-IFF_VIRTUAL
+	 *	   interfaces also have IFF_DHCPRUNNING set.
 	 *
-	 *	2. We're "ufs none" if our filesystem is local and there
-	 *	   are no interfaces which have obtained their addresses
-	 *	   through DHCP.
+	 *	2. We're either "ufs none" or "zfs none" if our filesystem
+	 *	   is local and there are no interfaces which have obtained
+	 *	   their addresses through DHCP.
 	 *
 	 *	3. We're "nfs rarp" if our filesystem is remote and there's
 	 *	   at least IFF_UP non-IFF_VIRTUAL interface (which there
@@ -329,7 +329,7 @@ main(int argc, char *argv[])
 	if (dhcp_running)
 		strategy = "dhcp";
 
-	if (strcmp(root, "nfs") == 0 || strcmp(root, "cachefs") == 0) {
+	if (strcmp(root, "nfs") == 0) {
 		if (interface == NULL) {
 			(void) fprintf(stderr,
 			    "%s: cannot identify root interface.\n", program);

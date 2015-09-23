@@ -23,6 +23,7 @@
  *
  *	Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  *	Use is subject to license terms.
+ *      Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <stdio.h>
@@ -561,8 +562,6 @@ push_options(hiernode *node, char *defaultopts, char *mapopts, int err)
 	return (rc);
 }
 
-#define	BACKFSTYPE "backfstype" /* used in cachefs options */
-#define	BACKFSTYPE_EQ "backfstype="
 #define	FSTYPE "fstype"
 #define	FSTYPE_EQ "fstype="
 #define	NO_OPTS ""
@@ -608,33 +607,6 @@ set_mapent_opts(struct mapent *me, char *opts, char *defaultopts,
 	strcpy(mounter,	fstype);
 
 	/*
-	 * The following ugly chunk of code crept in as a result of
-	 * cachefs.  If it's a cachefs mount of an nfs filesystem, then
-	 * it's important to parse the nfs special field.  Otherwise,
-	 * just hand the special field to the fs-specific mount
-	 */
-	if (strcmp(fstype, MNTTYPE_CACHEFS) ==  0) {
-		struct mnttab m;
-		char *p;
-
-		m.mnt_mntopts = entryopts;
-		if ((p = hasmntopt(&m, BACKFSTYPE)) != NULL) {
-			int len = strlen(MNTTYPE_NFS);
-
-			p += strlen(BACKFSTYPE_EQ);
-
-			if (strncmp(p, MNTTYPE_NFS, len) ==  0 &&
-			    (p[len] == '\0' || p[len] == ',')) {
-				/*
-				 * Cached nfs mount
-				 */
-				(void) strcpy(fstype, MNTTYPE_NFS);
-				(void) strcpy(mounter, MNTTYPE_CACHEFS);
-			}
-		}
-	}
-
-	/*
 	 * child options are exactly fstype = somefs, we need to do some
 	 * more option pushing work.
 	 */
@@ -664,9 +636,9 @@ done:
  * and the option string with the fstype
  * option removed, e.g.
  *
- *  input:  "fstype=cachefs,ro,nosuid"
+ *  input:  "fstype=nfs,ro,nosuid"
  *  opts:   "ro,nosuid"
- *  fstype: "cachefs"
+ *  fstype: "nfs"
  *
  * Also indicates if the fstype option was present
  * by setting a flag, if the pointer to the flag
@@ -710,7 +682,6 @@ static int
 fstype_opts(struct mapent *me, char *opts, char *defaultopts,
 				char *mapopts)
 {
-	char pushopts[AUTOFS_MAXOPTSLEN];
 	char pushentryopts[AUTOFS_MAXOPTSLEN];
 	char pushfstype[MAX_FSLEN];
 
@@ -726,16 +697,11 @@ fstype_opts(struct mapent *me, char *opts, char *defaultopts,
 		if (*mapopts == '-')
 			mapopts++;
 		get_opts(mapopts, pushentryopts, pushfstype, NULL);
-		strcpy(pushopts, mapopts);
 	} else {
 		get_opts(defaultopts, pushentryopts, pushfstype, NULL);
-		strcpy(pushopts, defaultopts);
 	}
 
-	if (strcmp(pushfstype, MNTTYPE_CACHEFS) == 0)
-		me->map_mntopts = strdup(pushopts);
-	else
-		me->map_mntopts = strdup(pushentryopts);
+	me->map_mntopts = strdup(pushentryopts);
 
 	if (!me->map_mntopts) {
 		syslog(LOG_ERR, "fstype_opts: No memory");
@@ -1989,34 +1955,9 @@ retry:
 	}
 	exlist = texlist;
 
-	/*
-	 * The following ugly chunk of code crept in as
-	 * a result of cachefs.  If it's a cachefs mount
-	 * of an nfs filesystem, then have it handled as
-	 * an nfs mount but have cachefs do the mount.
-	 */
 	(void) strcpy(fstype, MNTTYPE_NFS);
 	get_opts(mapopts, entryopts, fstype, NULL);
 	(void) strcpy(mounter, fstype);
-	if (strcmp(fstype, MNTTYPE_CACHEFS) == 0) {
-		struct mnttab m;
-		char *p;
-
-		m.mnt_mntopts = entryopts;
-		if ((p = hasmntopt(&m, "backfstype")) != NULL) {
-			int len = strlen(MNTTYPE_NFS);
-
-			p += 11;
-			if (strncmp(p, MNTTYPE_NFS, len) == 0 &&
-			    (p[len] == '\0' || p[len] == ',')) {
-				/*
-				 * Cached nfs mount
-				 */
-				(void) strcpy(fstype, MNTTYPE_NFS);
-				(void) strcpy(mounter, MNTTYPE_CACHEFS);
-			}
-		}
-	}
 
 	/* Now create a mapent from the export list */
 	ms = NULL;

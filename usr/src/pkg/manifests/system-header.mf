@@ -22,7 +22,7 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2015 Nexenta Systems, Inc. All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2013 Saso Kiselkov. All rights reserved.
 #
@@ -1010,13 +1010,6 @@ $(sparc_ONLY)file path=usr/include/sys/fpu/globals.h
 $(sparc_ONLY)file path=usr/include/sys/fpu/ieee.h
 file path=usr/include/sys/frame.h
 file path=usr/include/sys/fs/autofs.h
-file path=usr/include/sys/fs/cachefs_dir.h
-file path=usr/include/sys/fs/cachefs_dlog.h
-file path=usr/include/sys/fs/cachefs_filegrp.h
-file path=usr/include/sys/fs/cachefs_fs.h
-file path=usr/include/sys/fs/cachefs_fscache.h
-file path=usr/include/sys/fs/cachefs_ioctl.h
-file path=usr/include/sys/fs/cachefs_log.h
 file path=usr/include/sys/fs/decomp.h
 file path=usr/include/sys/fs/dv_node.h
 file path=usr/include/sys/fs/fifonode.h

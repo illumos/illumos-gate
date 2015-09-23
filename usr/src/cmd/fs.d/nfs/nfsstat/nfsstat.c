@@ -25,6 +25,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*
@@ -1115,33 +1116,9 @@ mi_print(void)
 		list = mrp;
 	}
 
-	/*
-	 * If something got ignored, go to the beginning of the mnttab
-	 * and look for the cachefs entries since they are the one
-	 * causing this. The mount point saved for the ignored entries
-	 * is matched against the special to get the actual mount point.
-	 * We are interested in the acutal mount point so that the output
-	 * look nice too.
-	 */
+	(void) fclose(mt);
+
 	if (ignored) {
-		rewind(mt);
-		resetmnttab(mt);
-		while (getextmntent(mt, &m, sizeof (struct extmnttab)) == 0) {
-
-			/* ignore non "cachefs" */
-			if (strcmp(m.mnt_fstype, MNTTYPE_CACHEFS) != 0)
-				continue;
-
-			for (mrp = list; mrp; mrp = mrp->next) {
-				if (mrp->ig_path == 0)
-					continue;
-				if (strcmp(mrp->ig_path, m.mnt_special) == 0) {
-					mrp->ig_path = 0;
-					(void) strcpy(mrp->my_dir,
-					    m.mnt_mountp);
-				}
-			}
-		}
 		/*
 		 * Now ignored entries which do not have
 		 * the my_dir initialized are really ignored; This never
@@ -1156,9 +1133,6 @@ mi_print(void)
 				list = mrp->next;
 		}
 	}
-
-	(void) fclose(mt);
-
 
 	for (ksp = kc->kc_chain; ksp; ksp = ksp->ks_next) {
 		int i;

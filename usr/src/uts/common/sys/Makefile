@@ -24,6 +24,7 @@
 # Copyright 2013 Garrett D'Amore <garrett@damore.org>
 # Copyright 2015, Joyent, Inc. All rights reserved.
 # Copyright 2013 Saso Kiselkov. All rights reserved.
+# Copyright 2015 Nexenta Systems, Inc. All rights reserved.
 #
 
 include $(SRC)/uts/Makefile.uts
@@ -861,13 +862,6 @@ FMIOHDRS=			\
 
 FSHDRS=				\
 	autofs.h		\
-	cachefs_dir.h		\
-	cachefs_dlog.h		\
-	cachefs_filegrp.h	\
-	cachefs_fs.h		\
-	cachefs_fscache.h	\
-	cachefs_ioctl.h		\
-	cachefs_log.h		\
 	decomp.h		\
 	dv_node.h		\
 	fifonode.h		\
