@@ -21,51 +21,32 @@
 #
 
 #
+# Copyright (c) 2015, Toomas Soome <tsoome@me.com>
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 PATH="/usr/bin:/usr/sbin:${PATH}"; export PATH
-ARCH=$(uname -p)
-KARCH=$(uname -m)
-
-if [ "$ARCH" != "i386" -a "$ARCH" != "sparc" ] ; then
-	echo "Unknown architecture: $ARCH"
-	exit 1
-fi
+LOGGER="/bin/logger -t $0 -p daemon.notice"
 
 POOL="$1"
 DEV=$(echo "$2" | sed -e 's+/dsk/+/rdsk/+')
 
 if [ -z "${POOL}" -o -z "${DEV}" ]; then
-	echo "Invalid usage"
+	$LOGGER "Invalid usage"
 	exit 1
 fi
 
 CURPOOL=$(df -k / | awk 'NR == 2 {print $1}' | sed 's,/.*,,')
 
 if [ "$CURPOOL" != "$POOL" ] ; then
-	echo "Modified pool must be current root pool"
+	$LOGGER "Modified pool must be current root pool"
 	exit 1
 fi
 
-#
-# 
-
-if [ "${ARCH}" = "i386" ]; then
-	STAGE1=/boot/grub/stage1
-	STAGE2=/boot/grub/stage2
-	/sbin/installgrub ${STAGE1} ${STAGE2} ${DEV}
-	if [ $? != 0 ]; then
-		echo "Failure installing GRUB on ${DEV}"
-		exit 1
-	fi
-else
-	BOOTBLK=/usr/platform/${KARCH}/lib/fs/zfs/bootblk
-	/usr/sbin/installboot -F zfs ${BOOTBLK} ${DEV}
-	if [ $? != 0 ]; then
-		echo "Failure installing boot block on ${DEV}"
-		exit 
-	fi
+/sbin/bootadm install-bootloader -f
+if [ $? != 0 ]; then
+	$LOGGER "Failure installing boot block on ${DEV}"
+	exit 1
 fi
 
 exit 0
