@@ -716,6 +716,32 @@ ict_tiocgwinsz(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 	error = VOP_IOCTL(fp->f_vnode, cmd, arg, FLUSER(fp), fp->f_cred, &rv,
 	    NULL);
 
+	/*
+	 * A few Linux libc's (e.g. musl) have chosen to implement isatty()
+	 * using the TIOCGWINSZ ioctl. Some apps also do the same thing
+	 * directly. On Linux that ioctl will return a size of 0x0 for dumb
+	 * terminals but on illumos see the handling for TIOCGWINSZ in ptem's
+	 * ptioc(). We fail if the winsize is all zeros. To emulate the Linux
+	 * behavior use the native ioctl check that we do for isatty and return
+	 * a size of 0x0 if that succeeds.
+	 */
+	if (error == EINVAL) {
+		int err;
+		struct termio s_tio;
+
+		err = VOP_IOCTL(fp->f_vnode, TCGETA, (intptr_t)&s_tio,
+		    FLFAKE(fp), fp->f_cred, &rv, NULL);
+
+		if (err == 0) {
+			struct winsize w;
+
+			bzero(&w, sizeof (w));
+			if (copyout(&w, (struct winsize *)arg, sizeof (w)) != 0)
+				return (set_errno(EFAULT));
+			return (0);
+		}
+	}
+
 	if (error != 0)
 		return (set_errno(error));
 
