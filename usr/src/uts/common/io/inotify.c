@@ -416,7 +416,6 @@ inotify_watch_event(inotify_watch_t *watch, uint64_t mask, char *name)
 	inotify_kevent_t *event, *tail;
 	inotify_state_t *state = watch->inw_state;
 	uint32_t wd = watch->inw_wd, cookie = 0, len;
-	int align = sizeof (uintptr_t) - 1;
 	boolean_t removal = mask & IN_REMOVAL ? B_TRUE : B_FALSE;
 	inotify_watch_t *source = watch;
 
@@ -435,6 +434,7 @@ inotify_watch_event(inotify_watch_t *watch, uint64_t mask, char *name)
 
 		name = watch->inw_name;
 		watch = watch->inw_parent;
+		wd = watch->inw_wd;
 	}
 
 	if (!removal) {
@@ -488,8 +488,8 @@ inotify_watch_event(inotify_watch_t *watch, uint64_t mask, char *name)
 	}
 
 	if (name != NULL) {
-		if ((len = strlen(name) + 1) & align)
-			len += (align + 1) - (len & align);
+		len = strlen(name) + 1;
+		len = roundup(len, sizeof (struct inotify_event));
 	} else {
 		len = 0;
 	}
