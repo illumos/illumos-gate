@@ -64,11 +64,6 @@
 #define	ABST_PRFX "/tmp/.ABSK_"
 #define	ABST_PRFX_LEN 11
 
-#define	LX_DEV_LOG			"/dev/log"
-#define	LX_DEV_LOG_REDIRECT		"/var/run/.dev_log_redirect"
-#define	LX_DEV_LOG_REDIRECT_LEN		18 /* len appended to /dev/log len */
-#define	LX_DEV_LOG_REDIRECT_TOT_LEN	26
-
 typedef enum {
 	lxa_none,
 	lxa_abstract,

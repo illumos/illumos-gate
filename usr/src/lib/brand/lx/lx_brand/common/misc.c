@@ -59,6 +59,7 @@
 #include <priv.h>
 #include <procfs.h>
 #include <lx_syscall.h>
+#include <sys/lx_socket.h>
 
 extern int sethostname(char *, int);
 
@@ -877,7 +878,21 @@ lx_symlink(const char *name1, const char *name2)
 {
 	int r;
 
-	r = symlink(name1, name2);
+	/*
+	 * Newer versions of systemd setup the logging socket in a different
+	 * location and expect to symlink /dev/log to that location. We already
+	 * handle redirecting /dev/log in the socket connect/bind code so we
+	 * can allow the symlink here and the rest of the socket code will
+	 * work correctly. Note the small window for a race between unlink and
+	 * symlink, although this is not an issue in practice because its
+	 * normally only done by systemd during early boot.
+	 */
+	if (strcmp(name2, LX_DEV_LOG) == 0) {
+		(void) unlink(LX_DEV_LOG_REDIRECT);
+		r = symlink(name1, LX_DEV_LOG_REDIRECT);
+	} else {
+		r = symlink(name1, name2);
+	}
 	return ((r == -1) ? -errno : r);
 }
 
