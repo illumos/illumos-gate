@@ -371,6 +371,13 @@ ltos_sockaddr_ux(const struct sockaddr *inaddr, const socklen_t inlen,
 		 *
 		 * Since this path should be reusable after being closed (but
 		 * not unlinked), it is implicitly cleaned up during bind().
+		 *
+		 * Note that newer versions of systemd actually setup the
+		 * log socket in a different location and then expect to
+		 * symlink /dev/log to that location. We handle that in the
+		 * lx_symlink emulation, so the existing socket code to handle
+		 * LX_DEV_LOG_REDIRECT continues to work for old and new
+		 * images.
 		 */
 
 		(void) strcpy(buf.sun_path, LX_DEV_LOG_REDIRECT);
