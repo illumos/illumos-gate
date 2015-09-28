@@ -14,16 +14,8 @@
 #
 
 include $(SRC)/Makefile.master
-include $(SRC)/test/Makefile.com
 
 SUBDIRS = $(MACH)
 $(BUILD64) SUBDIRS += $(MACH64)
 
-all: $(SUBDIRS)
-
-clean clobber lint: $(SUBDIRS)
-
-install: $(SUBDIRS)
-
-$(SUBDIRS):
-	@cd $@; pwd; $(MAKE) $(TARGET)
+include $(SRC)/test/Makefile.com
