@@ -174,6 +174,15 @@ struct lx_termios {
 #define	LX_VLNEXT	15
 #define	LX_VEOL2	16
 
+/*
+ * Defaults needed for SunOS to Linux format conversion.
+ * See INIT_C_CC in linux-stable/include/asm-generic/termios.h
+ */
+#define	LX_DEF_VTIME	0
+#define	LX_DEF_VMIN	1
+#define	LX_DEF_VEOF	'\004'
+#define	LX_DEF_VEOL	0
+
 /* VSD key for lx_cc information */
 static uint_t lx_ioctl_vsd = 0;
 
@@ -280,12 +289,27 @@ s2l_termios(struct termios *s_tios, struct lx_termios *l_tios)
 	l_tios->c_cflag = s_tios->c_cflag;
 	l_tios->c_lflag = s_tios->c_lflag;
 
+	/*
+	 * Since use of the VMIN/VTIME and VEOF/VEOL control characters is
+	 * mutually exclusive (determined by ICANON), SunOS aliases them in the
+	 * c_cc field in termio/termios.  Linux does not perform this aliasing,
+	 * so it expects that the default values are present regardless of
+	 * ICANON status.
+	 *
+	 * These defaults can be overridden later by any values stored via the
+	 * lx_cc mechanism.
+	 */
 	if (s_tios->c_lflag & ICANON) {
 		l_tios->c_cc[LX_VEOF] = s_tios->c_cc[VEOF];
 		l_tios->c_cc[LX_VEOL] = s_tios->c_cc[VEOL];
+		l_tios->c_cc[LX_VTIME] = LX_DEF_VTIME;
+		l_tios->c_cc[LX_VMIN] = LX_DEF_VMIN;
+
 	} else {
 		l_tios->c_cc[LX_VMIN] = s_tios->c_cc[VMIN];
 		l_tios->c_cc[LX_VTIME] = s_tios->c_cc[VTIME];
+		l_tios->c_cc[LX_VEOF] = LX_DEF_VEOF;
+		l_tios->c_cc[LX_VEOL] = LX_DEF_VEOL;
 	}
 
 	l_tios->c_cc[LX_VEOL2] = s_tios->c_cc[VEOL2];
@@ -317,9 +341,12 @@ s2l_termio(struct termio *s_tio, struct lx_termio *l_tio)
 
 	if (s_tio->c_lflag & ICANON) {
 		l_tio->c_cc[LX_VEOF] = s_tio->c_cc[VEOF];
+		l_tio->c_cc[LX_VTIME] = LX_DEF_VTIME;
+		l_tio->c_cc[LX_VMIN] = LX_DEF_VMIN;
 	} else {
 		l_tio->c_cc[LX_VMIN] = s_tio->c_cc[VMIN];
 		l_tio->c_cc[LX_VTIME] = s_tio->c_cc[VTIME];
+		l_tio->c_cc[LX_VEOF] = LX_DEF_VEOF;
 	}
 
 	l_tio->c_cc[LX_VINTR] = s_tio->c_cc[VINTR];
