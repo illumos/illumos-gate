@@ -877,6 +877,7 @@ long
 lx_symlink(const char *name1, const char *name2)
 {
 	int r;
+	char nm2[MAXPATHLEN];
 
 	/*
 	 * Newer versions of systemd setup the logging socket in a different
@@ -887,7 +888,8 @@ lx_symlink(const char *name1, const char *name2)
 	 * symlink, although this is not an issue in practice because its
 	 * normally only done by systemd during early boot.
 	 */
-	if (strcmp(name2, LX_DEV_LOG) == 0) {
+	if (uucopystr((void *)name2, nm2, sizeof (nm2)) == 0 &&
+	    strcmp(nm2, LX_DEV_LOG) == 0) {
 		(void) unlink(LX_DEV_LOG_REDIRECT);
 		r = symlink(name1, LX_DEV_LOG_REDIRECT);
 	} else {
