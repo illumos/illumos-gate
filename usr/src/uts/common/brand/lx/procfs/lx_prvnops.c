@@ -2423,16 +2423,14 @@ lxpr_read_net_if_inet6(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 		    ipif = ipif->ipif_next) {
 			uint_t index = ill->ill_phyint->phyint_ifindex;
 			int plen = ip_mask_to_plen_v6(&ipif->ipif_v6net_mask);
-			in6addr_scope_t scope = ip_addr_scope_v6(
+			unsigned int scope = lx_ipv6_scope_convert(
 			    &ipif->ipif_v6lcl_addr);
 			/* Always report PERMANENT flag */
 			int flag = 0x80;
 
-			ipif_get_name(ipif, ifname, sizeof (ifname));
+			(void) snprintf(ifname, LIFNAMSIZ, "%s", ill->ill_name);
 			lx_ifname_convert(ifname, LX_IF_FROMNATIVE);
 			lxpr_inet6_out(&ipif->ipif_v6lcl_addr, ip6out);
-			/* Scope output is shifted on Linux */
-			scope = scope << 4;
 
 			lxpr_uiobuf_printf(uiobuf, "%32s %02x %02x %02x %02x"
 			    " %8s\n", ip6out, index, plen, scope, flag, ifname);

@@ -913,6 +913,41 @@ lx_netlink_parse_msg_attrs(mblk_t *mp, void **msgp, unsigned int msg_size,
 	return (0);
 }
 
+/*
+ * Takes an IPv4 address (in network byte order) and returns the address scope.
+ */
+static uint8_t
+lx_ipv4_rtscope(in_addr_t nbo_addr) {
+	in_addr_t addr = ntohl(nbo_addr);
+	if ((addr >> IN_CLASSA_NSHIFT) == IN_LOOPBACKNET) {
+		return (LX_RTSCOPE_HOST);
+	} else if ((addr & IN_AUTOCONF_MASK) == IN_AUTOCONF_NET) {
+		return (LX_RTSCOPE_LINK);
+	} else if ((addr & IN_PRIVATE8_MASK) == IN_PRIVATE8_NET ||
+	    (addr & IN_PRIVATE12_MASK) == IN_PRIVATE12_NET ||
+	    (addr & IN_PRIVATE16_MASK) == IN_PRIVATE16_NET) {
+		return (LX_RTSCOPE_SITE);
+	} else {
+		return (LX_RTSCOPE_UNIVERSE);
+	}
+}
+
+/*
+ * Takes an IPv6 address and returns the address scope.
+ */
+static uint8_t
+lx_ipv6_rtscope(const in6_addr_t *addr) {
+	if (IN6_ARE_ADDR_EQUAL(addr, &ipv6_loopback)) {
+		return (LX_RTSCOPE_HOST);
+	} else if (IN6_IS_ADDR_LINKLOCAL(addr)) {
+		return (LX_RTSCOPE_LINK);
+	} else if (IN6_IS_ADDR_SITELOCAL(addr)) {
+		return (LX_RTSCOPE_SITE);
+	} else {
+		return (LX_RTSCOPE_UNIVERSE);
+	}
+}
+
 static void
 lx_netlink_getlink_lifreq(lx_netlink_reply_t *reply, struct lifreq *lifr)
 {
@@ -941,6 +976,16 @@ lx_netlink_getlink_lifreq(lx_netlink_reply_t *reply, struct lifreq *lifr)
 		{ IFF_MULTICAST, LX_IFF_MULTICAST },
 		{ 0 }
 	};
+
+	/*
+	 * illumos interfaces that contain a ':' are non-zero logical
+	 * interfaces. We should only emit the name of the zeroth logical
+	 * interface, since RTM_GETLINK only expects to see the name of
+	 * devices. The addresses of all logical devices will be
+	 * returned via an RTM_GETADDR.
+	 */
+	if (strchr(lifr->lifr_name, ':') != NULL)
+		return;
 
 	/*
 	 * Most of the lx_netlink module is architected to emit information in
@@ -1148,10 +1193,12 @@ lx_netlink_getaddr_lifreq(lx_netlink_reply_t *reply, struct lifreq *lifr)
 
 			ifa.lxnl_ifa_family = LX_AF_INET;
 
+			sin = (struct sockaddr_in *)&lifr->lifr_addr;
+			ifa.lxnl_ifa_scope = lx_ipv4_rtscope(
+			    sin->sin_addr.s_addr);
+
 			lx_netlink_reply_msg(reply, &ifa,
 			    sizeof (lx_netlink_ifaddrmsg_t));
-
-			sin = (struct sockaddr_in *)&lifr->lifr_addr;
 
 			lx_netlink_reply_attr_int32(reply,
 			    LX_NETLINK_IFA_ADDRESS, sin->sin_addr.s_addr);
@@ -1160,10 +1207,11 @@ lx_netlink_getaddr_lifreq(lx_netlink_reply_t *reply, struct lifreq *lifr)
 
 			ifa.lxnl_ifa_family = LX_AF_INET6;
 
+			sin = (struct sockaddr_in6 *)&lifr->lifr_addr;
+			ifa.lxnl_ifa_scope = lx_ipv6_rtscope(&sin->sin6_addr);
+
 			lx_netlink_reply_msg(reply, &ifa,
 			    sizeof (lx_netlink_ifaddrmsg_t));
-
-			sin = (struct sockaddr_in6 *)&lifr->lifr_addr;
 
 			lx_netlink_reply_attr(reply, LX_NETLINK_IFA_ADDRESS,
 			    &sin->sin6_addr, sizeof (sin->sin6_addr));

@@ -20,6 +20,8 @@
 extern "C" {
 #endif
 
+#include <inet/ip.h>
+#include <inet/ip6.h>
 #include <sys/siginfo.h>
 #include <sys/lx_brand.h>
 
@@ -69,8 +71,15 @@ typedef enum lx_if_action {
 #define	LX_ARPHRD_LOOPBACK	772	/* Loopback */
 #define	LX_ARPHRD_VOID		0xffff	/* Unknown */
 
+/* IPv6 address scope values used in /proc/net/if_inet6 */
+#define	LX_IPV6_ADDR_LOOPBACK	0x0010U
+#define	LX_IPV6_ADDR_LINKLOCAL	0x0020U
+#define	LX_IPV6_ADDR_SITELOCAL	0x0040U
+#define	LX_IPV6_ADDR_COMPATv4	0x0080U
+
 extern void lx_ifname_convert(char *, lx_if_action_t);
 extern void lx_ifflags_convert(uint64_t *, lx_if_action_t);
+extern unsigned int lx_ipv6_scope_convert(const in6_addr_t *);
 extern void lx_stol_hwaddr(const struct sockaddr_dl *, struct sockaddr *,
     int *);
 

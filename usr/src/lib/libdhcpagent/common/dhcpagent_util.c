@@ -36,6 +36,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <zone.h>
 
 #include "dhcpagent_ipc.h"
 #include "dhcpagent_util.h"
@@ -125,6 +126,12 @@ dhcp_start_agent(int timeout)
 	int			ctfd;
 	pid_t			childpid;
 	ctid_t			ct;
+	char			dhcpcmd[MAXPATHLEN];
+	const char		*zroot = zone_get_nroot();
+
+	/* Prepend the root of the native code in the brand to the command */
+	(void) snprintf(dhcpcmd, sizeof (dhcpcmd), "%s%s", zroot != NULL ?
+	    zroot : "", DHCP_AGENT_PATH);
 
 	/*
 	 * just send a dummy request to the agent to find out if it's
@@ -160,7 +167,7 @@ dhcp_start_agent(int timeout)
 		goto fail;
 
 	case  0:
-		(void) execl(DHCP_AGENT_PATH, DHCP_AGENT_PATH, (char *)0);
+		(void) execl(dhcpcmd, dhcpcmd, (char *)0);
 		_exit(EXIT_FAILURE);
 
 	default:

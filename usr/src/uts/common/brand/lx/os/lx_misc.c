@@ -50,6 +50,7 @@
 #include <sys/proc.h>
 #include <sys/procfs.h>
 #include <net/if.h>
+#include <inet/ip6.h>
 #include <sys/sunddi.h>
 #include <sys/dlpi.h>
 #include <sys/sysmacros.h>
@@ -816,6 +817,25 @@ lx_ifflags_convert(uint64_t *flags, lx_if_action_t act)
 			buf |= 0x1000;
 	}
 	*flags = buf;
+}
+
+/*
+ * Convert an IPv6 address into the numbers used by /proc/net/if_inet6
+ */
+unsigned int
+lx_ipv6_scope_convert(const in6_addr_t *addr)
+{
+	if (IN6_IS_ADDR_V4COMPAT(addr)) {
+		return (LX_IPV6_ADDR_COMPATv4);
+	} else if (IN6_ARE_ADDR_EQUAL(addr, &ipv6_loopback)) {
+		return (LX_IPV6_ADDR_LOOPBACK);
+	} else if (IN6_IS_ADDR_LINKLOCAL(addr)) {
+		return (LX_IPV6_ADDR_LINKLOCAL);
+	} else if (IN6_IS_ADDR_SITELOCAL(addr)) {
+		return (LX_IPV6_ADDR_SITELOCAL);
+	} else {
+		return (0x0000U);
+	}
 }
 
 
