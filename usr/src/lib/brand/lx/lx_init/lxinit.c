@@ -37,6 +37,7 @@
 #include <fcntl.h>
 #include <libgen.h>
 #include <limits.h>
+#include <net/if.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -55,6 +56,10 @@
 #include <locale.h>
 #include <libcmdutils.h>
 
+#include <netinet/dhcp.h>
+#include <dhcpagent_util.h>
+#include <dhcpagent_ipc.h>
+
 #include <arpa/inet.h>
 #include <net/route.h>
 #include <libipadm.h>
@@ -68,6 +73,7 @@ static void lxi_err(char *msg, ...) __NORETURN;
 static void lxi_err(char *msg, ...);
 
 #define	IPMGMTD_PATH	"/lib/inet/ipmgmtd"
+#define	IN_NDPD_PATH	"/usr/lib/inet/in.ndpd"
 
 #define	PREFIX_LOG_WARN	"lx_init warn: "
 #define	PREFIX_LOG_ERR	"lx_init err: "
@@ -197,16 +203,16 @@ zone_find_attr(struct zone_res_attrtab *attrs, const char *name,
 }
 
 void
-lxi_net_ipmgmtd_start()
+lxi_svc_start(char *name, char *path, char *fmri)
 {
 	pid_t pid;
 	int status;
 	char *const argv[] = {
-		"ipmgmtd",
+		name,
 		NULL
 	};
 	char *const envp[] = {
-		"SMF_FMRI=svc:/network/ip-interface-management:default",
+		fmri,
 		NULL
 	};
 
@@ -221,11 +227,11 @@ lxi_net_ipmgmtd_start()
 		char cmd[MAXPATHLEN];
 
 		/*
-		 * Construct the full path to ipmgmtd, including the native
+		 * Construct the full path to the binary, including the native
 		 * system root (e.g. "/native") if in use for this zone:
 		 */
 		(void) snprintf(cmd, sizeof (cmd), "%s%s", zroot != NULL ?
-		    zroot : "", IPMGMTD_PATH);
+		    zroot : "", path);
 
 		execve(cmd, argv, envp);
 
@@ -240,17 +246,32 @@ lxi_net_ipmgmtd_start()
 
 	if (WIFEXITED(status)) {
 		if (WEXITSTATUS(status) != 0) {
-			lxi_err("ipmgmtd[%d] exited: %d",
+			lxi_err("%s[%d] exited: %d", name,
 			    (int)pid, WEXITSTATUS(status));
 		}
 	} else if (WIFSIGNALED(status)) {
-		lxi_err("ipmgmtd[%d] died on signal: %d",
+		lxi_err("%s[%d] died on signal: %d", name,
 		    (int)pid, WTERMSIG(status));
 	} else {
-		lxi_err("ipmgmtd[%d] failed in unknown way",
+		lxi_err("%s[%d] failed in unknown way", name,
 		    (int)pid);
 	}
 }
+
+void
+lxi_net_ipmgmtd_start()
+{
+	lxi_svc_start("ipmgmtd", IPMGMTD_PATH,
+	    "SMF_FMRI=svc:/network/ip-interface-management:default");
+}
+
+void
+lxi_net_ndpd_start()
+{
+	lxi_svc_start("in.ndpd", IN_NDPD_PATH,
+	    "SMF_FMRI=svc:/network/routing/ndp:default");
+}
+
 
 static void
 lxi_net_ipadm_open()
@@ -292,59 +313,158 @@ lxi_net_plumb(const char *iface)
 }
 
 static int
-lxi_iface_ipv4(const char *iface, const char *addr, const char *netmask)
+lxi_getif(int af, char *iface, int len, boolean_t first_ipv4_configured)
 {
-	ipadm_status_t status;
-	ipadm_addrobj_t ipaddr;
-	char cidraddr[BUFSIZ];
-	int prefixlen;
-	struct sockaddr_in mask_sin;
-
-	mask_sin.sin_family = AF_INET;
-	if (inet_pton(AF_INET, netmask, &mask_sin.sin_addr) != 1) {
-		lxi_warn("invalid netmask address: %s\n", strerror(errno));
+	struct lifreq lifr;
+	int s = socket(af, SOCK_DGRAM, 0);
+	if (s < 0) {
+		lxi_warn("socket error %d: bringing up %s: %s",
+		    errno, iface, strerror(errno));
 		return (-1);
 	}
 
-	prefixlen = mask2plen((struct sockaddr *)&mask_sin);
-	(void) snprintf(cidraddr, sizeof (cidraddr), "%s/%d",
-	    addr, prefixlen);
+	/*
+	 * We need a new logical interface for every IP address we add, except
+	 * for the very first IPv4 address.
+	 */
+	if (af == AF_INET6 || first_ipv4_configured) {
+		(void) strncpy(lifr.lifr_name, iface, sizeof (lifr.lifr_name));
+		(void) memset(&lifr.lifr_addr, 0, sizeof (lifr.lifr_addr));
+		if (ioctl(s, SIOCLIFADDIF, (caddr_t)&lifr) < 0) {
+			if (close(s) != 0) {
+				lxi_warn("failed to close socket: %s\n",
+				    strerror(errno));
+			}
+			return (-1);
+		}
+		(void) strncpy(iface, lifr.lifr_name, len);
+	}
 
-	if ((status = ipadm_create_addrobj(IPADM_ADDR_STATIC, iface, &ipaddr))
-	    != IPADM_SUCCESS) {
-		lxi_warn("ipadm_create_addrobj error %d: addr %s (%s), "
-		    "interface %s: %s\n", status, addr, cidraddr, iface,
+	if (close(s) != 0) {
+		lxi_warn("failed to close socket: %s\n",
+		    strerror(errno));
+	}
+	return (0);
+}
+
+static int
+lxi_iface_ip(const char *origiface, const char *addr,
+    boolean_t *first_ipv4_configured)
+{
+	static int addrnum = 0;
+	ipadm_status_t status;
+	ipadm_addrobj_t ipaddr = NULL;
+	char iface[LIFNAMSIZ];
+	char aobjname[IPADM_AOBJSIZ];
+	int af, err = 0;
+
+	(void) strncpy(iface, origiface, sizeof (iface));
+
+	af = strstr(addr, ":") == NULL ? AF_INET : AF_INET6;
+	if (lxi_getif(af, iface, sizeof (iface), *first_ipv4_configured) != 0) {
+		lxi_warn("failed to create new logical interface "
+		    "on %s: %s", origiface, strerror(errno));
+		return (-1);
+	}
+
+	(void) snprintf(aobjname, IPADM_AOBJSIZ, "%s/addr%d", iface,
+	    addrnum++);
+
+	if ((status = ipadm_create_addrobj(IPADM_ADDR_STATIC, aobjname,
+	    &ipaddr)) != IPADM_SUCCESS) {
+		lxi_warn("ipadm_create_addrobj error %d: addr %s, "
+		    "interface %s: %s\n", status, addr, iface,
 		    ipadm_status2str(status));
 		return (-2);
 	}
 
-	if ((status = ipadm_set_addr(ipaddr, cidraddr, AF_INET))
+	if ((status = ipadm_set_addr(ipaddr, addr, AF_UNSPEC))
 	    != IPADM_SUCCESS) {
-		lxi_warn("ipadm_set_addr error %d: addr %s (%s)"
-		    ", interface %s: %s\n", status, addr, cidraddr,
+		lxi_warn("ipadm_set_addr error %d: addr %s"
+		    ", interface %s: %s\n", status, addr,
 		    iface, ipadm_status2str(status));
-		return (-3);
+		err = -3;
+		goto done;
 	}
 
 	if ((status = ipadm_create_addr(iph, ipaddr,
 	    IPADM_OPT_ACTIVE | IPADM_OPT_UP)) != IPADM_SUCCESS) {
 		lxi_warn("ipadm_create_addr error for %s: %s\n", iface,
 		    ipadm_status2str(status));
-		ipadm_destroy_addrobj(ipaddr);
-		return (-4);
+		err = -4;
+		goto done;
 	}
 
+	if (af == AF_INET) {
+		*first_ipv4_configured = B_TRUE;
+	}
+
+done:
 	ipadm_destroy_addrobj(ipaddr);
-	return (0);
+	return (err);
 }
 
 static int
-lxi_iface_ipv6(const char *iface)
+lxi_iface_dhcp(const char *origiface, boolean_t *first_ipv4_configured)
+{
+	dhcp_ipc_request_t *dhcpreq = NULL;
+	dhcp_ipc_reply_t *dhcpreply = NULL;
+	int err = 0, timeout = 5;
+	char iface[LIFNAMSIZ];
+
+	(void) strncpy(iface, origiface, sizeof (iface));
+
+	if (lxi_getif(AF_INET, iface, sizeof (iface), *first_ipv4_configured)
+	    != 0) {
+		lxi_warn("failed to create new logical interface "
+		    "on %s: %s", origiface, strerror(errno));
+		return (-1);
+	}
+
+	if (dhcp_start_agent(timeout) != 0) {
+		lxi_err("Failed to start dhcpagent\n");
+		/* NOTREACHED */
+	}
+
+	dhcpreq = dhcp_ipc_alloc_request(DHCP_START, iface,
+	    NULL, 0, DHCP_TYPE_NONE);
+	if (dhcpreq == NULL) {
+		lxi_warn("Unable to allocate memory "
+		    "to start DHCP on %s\n", iface);
+		return (-1);
+	}
+
+	err = dhcp_ipc_make_request(dhcpreq, &dhcpreply, timeout);
+	if (err != 0) {
+		free(dhcpreq);
+		lxi_warn("Failed to start DHCP on %s: %s\n", iface,
+		    dhcp_ipc_strerror(err));
+		return (-1);
+	}
+	err = dhcpreply->return_code;
+	if (err != 0) {
+		lxi_warn("Failed to start DHCP on %s: %s\n", iface,
+		    dhcp_ipc_strerror(err));
+		goto done;
+	}
+
+	*first_ipv4_configured = B_TRUE;
+
+done:
+	free(dhcpreq);
+	free(dhcpreply);
+	return (err);
+}
+
+/*
+ * Initialize an IPv6 link-local address on a given interface
+ */
+static int
+lxi_iface_ipv6_link_local(const char *iface)
 {
 	struct lifreq lifr;
 	int s;
 
-	/* XXX: Just perform link-local init for now */
 	s = socket(AF_INET6, SOCK_DGRAM, 0);
 	if (s == -1) {
 		lxi_warn("socket error %d: bringing up %s: %s",
@@ -445,42 +565,136 @@ static void
 lxi_net_loopback()
 {
 	const char *iface = "lo0";
+	boolean_t first_ipv4_configured = B_FALSE;
 
 	lxi_net_plumb(iface);
-	(void) lxi_iface_ipv4(iface, "127.0.0.1", "255.0.0.0");
-	(void) lxi_iface_ipv6(iface);
+	(void) lxi_iface_ip(iface, "127.0.0.1/8", &first_ipv4_configured);
+	(void) lxi_iface_ipv6_link_local(iface);
+}
+
+
+/*
+ * This function is used when the "ips" property doesn't exist in a zone's
+ * configuration. It may be an older configuration, so we should search for
+ * "ip" and "netmask" and convert them into the new format.
+ */
+static int
+lxi_get_old_ip(struct zone_res_attrtab *attrs, const char **ipaddrs,
+    char *cidraddr, int len)
+{
+
+	const char *netmask;
+	int prefixlen;
+	struct sockaddr_in mask_sin;
+
+	lxi_warn("Could not find \"ips\" property for zone. Looking "
+	    "for older \"ip\" and \"netmask\" properties, instead.");
+
+	if (zone_find_attr(attrs, "ip", ipaddrs) != 0) {
+		return (-1);
+	}
+
+	if (strcmp(*ipaddrs, "dhcp") == 0) {
+		return (0);
+	}
+
+	if (zone_find_attr(attrs, "netmask", &netmask) != 0) {
+		lxi_err("could not find netmask for interface");
+		/* NOTREACHED */
+	}
+
+	/* Convert the netmask to a number */
+	mask_sin.sin_family = AF_INET;
+	if (inet_pton(AF_INET, netmask, &mask_sin.sin_addr) != 1) {
+		lxi_err("invalid netmask address: %s\n",
+		    strerror(errno));
+		/* NOTREACHED */
+	}
+	prefixlen = mask2plen((struct sockaddr *)&mask_sin);
+
+	/*
+	 * Write out the IP address in the new format and use
+	 * that instead
+	 */
+	(void) snprintf(cidraddr, len, "%s/%d", *ipaddrs, prefixlen);
+
+	*ipaddrs = cidraddr;
+	return (0);
 }
 
 static void
 lxi_net_setup(zone_dochandle_t handle)
 {
 	struct zone_nwiftab lookup;
+	boolean_t do_addrconf = B_FALSE;
 
 	if (zonecfg_setnwifent(handle) != Z_OK)
 		return;
 	while (zonecfg_getnwifent(handle, &lookup) == Z_OK) {
 		const char *iface = lookup.zone_nwif_physical;
 		struct zone_res_attrtab *attrs = lookup.zone_nwif_attrp;
-		const char *ipaddr, *netmask, *primary, *gateway;
+		const char *ipaddrs, *primary, *gateway;
+		char ipaddrs_copy[MAXNAMELEN], cidraddr[BUFSIZ],
+		    *ipaddr, *tmp, *lasts;
+		boolean_t first_ipv4_configured = B_FALSE;
+		boolean_t *ficp = &first_ipv4_configured;
 
 		lxi_net_plumb(iface);
-		if (zone_find_attr(attrs, "ip", &ipaddr) != 0) {
+		if (zone_find_attr(attrs, "ips", &ipaddrs) != 0 &&
+		    lxi_get_old_ip(attrs, &ipaddrs, cidraddr, BUFSIZ) != 0) {
+			lxi_warn("Could not find a valid network configuration "
+			    "for the %s interface", iface);
 			continue;
 		}
-		if (zone_find_attr(attrs, "netmask", &netmask) != 0) {
-			lxi_err("could not find netmask for interface");
-			/* NOTREACHED */
+
+		if (lxi_iface_ipv6_link_local(iface) != 0) {
+			lxi_warn("unable to bring up link-local address on "
+			    "interface %s", iface);
 		}
-		if (lxi_iface_ipv4(iface, ipaddr, netmask) != 0 ||
-		    lxi_iface_ipv6(iface) != 0) {
-			continue;
+
+		/*
+		 * If we're going to be doing DHCP, we have to do it first since
+		 * dhcpagent doesn't like to operate on non-zero logical
+		 * interfaces.
+		 */
+		if (strstr(ipaddrs, "dhcp") != NULL &&
+		    lxi_iface_dhcp(iface, ficp) != 0) {
+			lxi_warn("Failed to start DHCP on %s\n", iface);
 		}
+
+		/*
+		 * Copy the ipaddrs string, since strtok_r will write NUL
+		 * characters into it.
+		 */
+		(void) strlcpy(ipaddrs_copy, ipaddrs, MAXNAMELEN);
+		tmp = ipaddrs_copy;
+
+		/*
+		 * Iterate over each IP and then set it up on the interface.
+		 */
+		while ((ipaddr = strtok_r(tmp, ",", &lasts)) != NULL) {
+			tmp = NULL;
+			if (strcmp(ipaddr, "addrconf") == 0) {
+				do_addrconf = B_TRUE;
+			} else if (strcmp(ipaddr, "dhcp") == 0) {
+				continue;
+			} else if (lxi_iface_ip(iface, ipaddr, ficp) < 0) {
+				lxi_warn("Unable to add new IP address (%s) "
+				    "to interface %s", ipaddr, iface);
+			}
+		}
+
 		if (zone_find_attr(attrs, "primary", &primary) == 0 &&
 		    strncmp(primary, "true", MAXNAMELEN) == 0 &&
 		    zone_find_attr(attrs, "gateway", &gateway) == 0) {
 			lxi_iface_gateway(iface, NULL, 0, gateway);
 		}
 	}
+
+	if (do_addrconf) {
+		lxi_net_ndpd_start();
+	}
+
 	(void) zonecfg_endnwifent(handle);
 }
 

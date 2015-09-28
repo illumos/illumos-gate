@@ -45,7 +45,7 @@ UTSBASE =	$(SRC)/uts
 
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-D_REENTRANT -I$(UTSBASE)/common/brand/lx
-LDLIBS +=	-lzonecfg -lipadm -lsocket -linetutil -lnsl -lcmdutils
+LDLIBS +=	-lzonecfg -lipadm -lsocket -linetutil -lnsl -lcmdutils -ldhcpagent
 
 .KEEP_STATE:
 
