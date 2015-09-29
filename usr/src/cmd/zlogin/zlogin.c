@@ -1878,7 +1878,8 @@ zlog_mode_logging(char *zonename)
 		goto done;
 	while (zonecfg_getattrent(handle, &attr) == Z_OK) {
 		if (strcmp("zlog-mode", attr.zone_attr_name) == 0) {
-			if (strncmp("log", attr.zone_attr_value, 3) == 0)
+			if (strncmp("log", attr.zone_attr_value, 3) == 0 ||
+			    strncmp("nolog", attr.zone_attr_value, 5) == 0)
 				lm = B_TRUE;
 			break;
 		}
