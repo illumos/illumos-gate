@@ -23,6 +23,7 @@
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Josef 'Jeff' Sipek <jeffpc@josefsipek.net>
  */
 
 #ifndef _ASM_ATOMIC_H
@@ -82,7 +83,9 @@ fxn(volatile type *target)						\
 {									\
 	__asm__ __volatile__(						\
 	    "lock; " op " %0"						\
-	    : "+m" (*target));						\
+	    : "+m" (*target)						\
+	    : /* no inputs */						\
+	    : "cc");							\
 }
 
 __ATOMIC_OPXX(atomic_inc_8,      uint8_t,  "inc" SUF_8)
@@ -112,7 +115,8 @@ fxn(volatile type1 *target, type2 delta)				\
 	__asm__ __volatile__(						\
 	    "lock; " op " %1,%0"					\
 	    : "+m" (*target)						\
-	    : "i" reg (delta));						\
+	    : "i" reg (delta)						\
+	    : "cc");							\
 }
 
 __ATOMIC_OPXX(atomic_add_8,     uint8_t,  int8_t,      "add" SUF_8,    "q")
@@ -137,7 +141,8 @@ atomic_add_ptr(volatile void *target, ssize_t delta)
 	__asm__ __volatile__(
 	    "lock; add" SUF_PTR " %1,%0"
 	    : "+m" (*tmp)
-	    : "ir" (delta));
+	    : "ir" (delta)
+	    : "cc");
 }
 
 __ATOMIC_OPXX(atomic_or_8,       uint8_t,  uint8_t,  "or" SUF_8,    "q")
