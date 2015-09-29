@@ -8698,6 +8698,20 @@ finish:
 	return (NFS4_OK);
 }
 
+/*
+ * The NFSv4.0 LOCK operation does not support the blocking lock (at the
+ * NFSv4.0 protocol level) so the client needs to resend the LOCK request in a
+ * case the lock is denied by the NFSv4.0 server.  NFSv4.0 clients are prepared
+ * for that (obviously); they are sending the LOCK requests with some delays
+ * between the attempts.  See nfs4frlock() and nfs4_block_and_wait() for the
+ * locking and delay implementation at the client side.
+ *
+ * To make the life of the clients easier, the NFSv4.0 server tries to do some
+ * fast retries on its own (the for loop below) in a hope the lock will be
+ * available soon.  And if not, the client won't need to resend the LOCK
+ * requests so fast to check the lock availability.  This basically saves some
+ * network traffic and tries to make sure the client gets the lock ASAP.
+ */
 static int
 setlock(vnode_t *vp, struct flock64 *flock, int flag, cred_t *cred)
 {
@@ -8706,6 +8720,7 @@ setlock(vnode_t *vp, struct flock64 *flock, int flag, cred_t *cred)
 	int i;
 	clock_t delaytime;
 	int cmd;
+	int spin_cnt = 0;
 
 	cmd = nbl_need_check(vp) ? F_SETLK_NBMAND : F_SETLK;
 retry:
@@ -8729,15 +8744,53 @@ retry:
 		/* Get the owner of the lock */
 		flk = *flock;
 		LOCK_PRINT(rfs4_debug, "setlock", F_GETLK, &flk);
-		if (VOP_FRLOCK(vp, F_GETLK, &flk, flag,
-		    (u_offset_t)0, NULL, cred, NULL) == 0) {
+		if (VOP_FRLOCK(vp, F_GETLK, &flk, flag, 0, NULL, cred,
+		    NULL) == 0) {
+			/*
+			 * There's a race inherent in the current VOP_FRLOCK
+			 * design where:
+			 * a: "other guy" takes a lock that conflicts with a
+			 * lock we want
+			 * b: we attempt to take our lock (non-blocking) and
+			 * the attempt fails.
+			 * c: "other guy" releases the conflicting lock
+			 * d: we ask what lock conflicts with the lock we want,
+			 * getting F_UNLCK (no lock blocks us)
+			 *
+			 * If we retry the non-blocking lock attempt in this
+			 * case (restart at step 'b') there's some possibility
+			 * that many such attempts might fail.  However a test
+			 * designed to actually provoke this race shows that
+			 * the vast majority of cases require no retry, and
+			 * only a few took as many as three retries.  Here's
+			 * the test outcome:
+			 *
+			 *	   number of retries    how many times we needed
+			 *				that many retries
+			 *	   0			79461
+			 *	   1			  862
+			 *	   2			   49
+			 *	   3			    5
+			 *
+			 * Given those empirical results, we arbitrarily limit
+			 * the retry count to ten.
+			 *
+			 * If we actually make to ten retries and give up,
+			 * nothing catastrophic happens, but we're unable to
+			 * return the information about the conflicting lock to
+			 * the NFS client.  That's an acceptable trade off vs.
+			 * letting this retry loop run forever.
+			 */
 			if (flk.l_type == F_UNLCK) {
-				/* No longer locked, retry */
-				goto retry;
+				if (spin_cnt++ < 10) {
+					/* No longer locked, retry */
+					goto retry;
+				}
+			} else {
+				*flock = flk;
+				LOCK_PRINT(rfs4_debug, "setlock(blocking lock)",
+				    F_GETLK, &flk);
 			}
-			*flock = flk;
-			LOCK_PRINT(rfs4_debug, "setlock(blocking lock)",
-			    F_GETLK, &flk);
 		}
 	}
 
