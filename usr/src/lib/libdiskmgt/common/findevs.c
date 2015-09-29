@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  * Copyright (c) 2011 by Delphix. All rights reserved.
  * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #include <fcntl.h>
@@ -64,6 +65,10 @@
 #define	WWN_PROP		"node-wwn"
 
 static char *ctrltypes[] = {
+	DDI_NT_NVME_NEXUS,
+	DDI_NT_NVME_ATTACHMENT_POINT,
+	DDI_NT_SATA_NEXUS,
+	DDI_NT_SATA_ATTACHMENT_POINT,
 	DDI_NT_SCSI_NEXUS,
 	DDI_NT_SCSI_ATTACHMENT_POINT,
 	DDI_NT_FC_ATTACHMENT_POINT,
@@ -1120,9 +1125,19 @@ ctype(di_node_t node, di_minor_t minor)
 		return (DM_CTYPE_USB);
 	}
 
+	if (libdiskmgt_str_eq(type, DDI_NT_NVME_NEXUS) ||
+	    libdiskmgt_str_eq(type, DDI_NT_NVME_ATTACHMENT_POINT)) {
+		return (DM_CTYPE_NVME);
+	}
+
+	if (libdiskmgt_str_eq(type, DDI_NT_SATA_NEXUS) ||
+	    libdiskmgt_str_eq(type, DDI_NT_SATA_ATTACHMENT_POINT)) {
+		return (DM_CTYPE_SATA);
+	}
+
 	if (libdiskmgt_str_eq(type, DDI_NT_SCSI_NEXUS) ||
 	    libdiskmgt_str_eq(type, DDI_NT_SCSI_ATTACHMENT_POINT)) {
-			return (DM_CTYPE_SCSI);
+		return (DM_CTYPE_SCSI);
 	}
 
 	if (libdiskmgt_str_eq(type, DDI_NT_FC_ATTACHMENT_POINT)) {

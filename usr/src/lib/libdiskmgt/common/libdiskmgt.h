@@ -22,8 +22,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  * Copyright 2016 Nexenta Systems, Inc.
+ * Copyright (c) 2017, Joyent, Inc. All rights reserved.
  */
 
 #ifndef _LIBDISKMGT_H
@@ -351,9 +351,11 @@ typedef enum {
 #define	DM_PATH_STATE		"path_state"
 
 #define	DM_CTYPE_ATA		"ata"
+#define	DM_CTYPE_SATA		"sata"
 #define	DM_CTYPE_SCSI		"scsi"
 #define	DM_CTYPE_FIBRE		"fibre channel"
 #define	DM_CTYPE_USB		"usb"
+#define	DM_CTYPE_NVME		"nvme"
 #define	DM_CTYPE_UNKNOWN	"unknown"
 
 /* media */
