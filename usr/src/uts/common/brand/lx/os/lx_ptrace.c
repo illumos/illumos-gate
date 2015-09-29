@@ -500,7 +500,7 @@ lx_ptrace_restart_lwp(klwp_t *lwp)
 }
 
 static void
-lx_winfo(lx_lwp_data_t *remote, k_siginfo_t *ip, boolean_t waitflag,
+lx_ptrace_winfo(lx_lwp_data_t *remote, k_siginfo_t *ip, boolean_t waitflag,
     pid_t *event_ppid, pid_t *event_pid)
 {
 	int signo;
@@ -651,7 +651,7 @@ lx_stop_notify(proc_t *p, klwp_t *lwp, ushort_t why, ushort_t what)
 	 */
 	if (!(lwpd->br_ptrace_flags & LX_PTF_PARENT_WAIT) && pp != NULL) {
 		cldpost = B_TRUE;
-		lx_winfo(lwpd, &sqp->sq_info, B_FALSE, NULL, NULL);
+		lx_ptrace_winfo(lwpd, &sqp->sq_info, B_FALSE, NULL, NULL);
 	}
 
 	/*
@@ -2005,7 +2005,7 @@ lx_sigcld_repost(proc_t *pp, sigqueue_t *sqp)
 	/*
 	 * Generate siginfo for this tracee LWP.
 	 */
-	lx_winfo(remote, &sqp->sq_info, B_FALSE, NULL, NULL);
+	lx_ptrace_winfo(remote, &sqp->sq_info, B_FALSE, NULL, NULL);
 	remote->br_ptrace_flags &= ~LX_PTF_CLDPEND;
 	mutex_exit(&rproc->p_lock);
 
@@ -2179,7 +2179,7 @@ lx_waitid_helper(idtype_t idtype, id_t id, k_siginfo_t *ip, int options,
 	/*
 	 * Populate the signal information.
 	 */
-	lx_winfo(remote, ip, waitflag, &event_ppid, &event_pid);
+	lx_ptrace_winfo(remote, ip, waitflag, &event_ppid, &event_pid);
 
 	/*
 	 * Unlock the tracee.
