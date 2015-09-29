@@ -1657,3 +1657,4 @@ Bugid   Risk Synopsis
 4996	rtld _init race leads to incorrect symbol values
 5688	ELF tools need to be more careful with dwarf data
 6098	ld(1) should not require symbols which identify group sections be global
+6252	ld should merge function/data-sections in the same manner as GNU ld
