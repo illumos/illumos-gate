@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DETACH 9E "Dec 7, 2003"
+.TH DETACH 9E "Jul 25, 2015"
 .SH NAME
 detach \- detach or suspend a device
 .SH SYNOPSIS
@@ -14,7 +14,7 @@ detach \- detach or suspend a device
 
 
 
-\fBint prefix\fR \fBdetach\fR(\fBdev_info_t *\fR \fIdip\fR, \fBddi_detach_cmd_t\fR \fIcmd\fR);
+\fBint prefix\fR\fBdetach\fR(\fBdev_info_t *\fR \fIdip\fR, \fBddi_detach_cmd_t\fR \fIcmd\fR);
 .fi
 
 .SH INTERFACE LEVEL

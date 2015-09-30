@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DLDUMP 3C "Mar 1, 2004"
+.TH DLDUMP 3C "Sep 7, 2015"
 .SH NAME
 dldump \- create a new file from a dynamic object component of the calling
 process
@@ -12,11 +12,10 @@ process
 .nf
 #include <dlfcn.h>
 
-\fBint\fR \fBdldump\fR(\fBconst char *\fR \fIipath\fR, \fBconst char *\fR \fIopath\fR, \fBint\fR \fIflags\fR);
+\fBint\fR \fBdldump\fR(\fBconst char *\fR\fIipath\fR, \fBconst char *\fR\fIopath\fR, \fBint\fR \fIflags\fR);
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBdldump()\fR function creates a new dynamic object \fIopath\fR from an
 existing dynamic object \fIipath\fR that is bound to the current process. An
@@ -223,7 +222,6 @@ for example, will not start where the original executable called
 \fBdldump()\fR. It will gain control at the executable's normal entry point.
 See \fBEXAMPLES\fR.
 .SH RETURN VALUES
-.sp
 .LP
 On successful creation of the new object, \fBdldump()\fR returns \fB0\fR.
 Otherwise, a non-zero value is returned and more detailed diagnostic
@@ -395,13 +393,11 @@ this may invalidate the calling image; thus, following the call to
 \fBdldump()\fR, only a call to \fB_Exit\fR(2) should be made.
 
 .SH USAGE
-.sp
 .LP
 The \fBdldump()\fR function is one of a family of functions that give the user
 direct access to the dynamic linking facilities. These facilities are available
 to dynamically-linked processes only. See \fILinker and Libraries Guide\fR).
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -417,7 +413,6 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBld\fR(1), \fBld.so.1\fR(1), \fBstrip\fR(1), \fB_Exit\fR(2), \fBbrk\fR(2),
 \fBexec\fR(2), \fB_exithandle\fR(3C), \fBdladdr\fR(3C), \fBdlclose\fR(3C),
@@ -427,7 +422,6 @@ MT-Level	MT-Safe
 .LP
 \fILinker and Libraries Guide\fR
 .SH NOTES
-.sp
 .LP
 These functions are available to dynamically-linked processes only.
 .sp
