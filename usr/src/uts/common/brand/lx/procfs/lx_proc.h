@@ -293,6 +293,8 @@ extern ino_t lxpr_inode(lxpr_nodetype_t, pid_t, int);
 extern ino_t lxpr_parentinode(lxpr_node_t *);
 extern lxpr_node_t *lxpr_getnode(vnode_t *, lxpr_nodetype_t, proc_t *, int);
 extern void lxpr_freenode(lxpr_node_t *);
+extern vnode_t *lxpr_lookup_fdnode(vnode_t *, const char *);
+extern int lxpr_readlink_fdnode(lxpr_node_t *, char *, size_t);
 
 typedef struct lxpr_uiobuf {
 	uio_t *uiop;

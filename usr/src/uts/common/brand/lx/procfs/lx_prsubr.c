@@ -586,6 +586,126 @@ lxpr_freenode(lxpr_node_t *lxpnp)
 }
 
 /*
+ * Attempt to locate vnode for /proc/<pid>/fd/<#>.
+ */
+vnode_t *
+lxpr_lookup_fdnode(vnode_t *dvp, const char *name)
+{
+	lxpr_node_t *lxdp = VTOLXP(dvp);
+	lxpr_node_t *lxfp;
+	char *endptr = NULL;
+	long num;
+	int fd;
+	proc_t *p;
+	vnode_t *vp = NULL;
+	file_t *fp;
+	uf_entry_t *ufp;
+	uf_info_t *fip;
+
+	ASSERT(lxdp->lxpr_type == LXPR_PID_FDDIR ||
+	    lxdp->lxpr_type == LXPR_PID_TID_FDDIR);
+
+	if (ddi_strtol(name, &endptr, 10, &num) != 0) {
+		return (NULL);
+	} else if (name[0] < '0' || name[0] > '9' || *endptr != '\0') {
+		/*
+		 * ddi_strtol allows leading spaces and trailing garbage
+		 * We do not tolerate such foolishness.
+		 */
+		return (NULL);
+	} else if ((fd = (int)num) < 0) {
+		return (NULL);
+	}
+
+	/* Lock the owner process */
+	p = lxpr_lock(lxdp->lxpr_pid);
+	if ((p == NULL))
+		return (NULL);
+	if ((p->p_stat == SZOMB) || (p->p_flag & SSYS) || (p->p_as == &kas)) {
+		/* Not applicable to kernel or system processes */
+		lxpr_unlock(p);
+		return (NULL);
+	}
+
+	lxfp = lxpr_getnode(dvp, LXPR_PID_FD_FD, p, fd);
+
+	/*
+	 * Drop p_lock, but keep the process P_PR_LOCK'd to prevent it from
+	 * going away while we dereference into fi_list.
+	 */
+	fip = P_FINFO(p);
+	mutex_exit(&p->p_lock);
+	mutex_enter(&fip->fi_lock);
+	if (fd < fip->fi_nfiles) {
+		UF_ENTER(ufp, fip, fd);
+		if ((fp = ufp->uf_file) != NULL) {
+			vp = fp->f_vnode;
+			VN_HOLD(vp);
+		}
+		UF_EXIT(ufp);
+	}
+	mutex_exit(&fip->fi_lock);
+	mutex_enter(&p->p_lock);
+
+	if (vp == NULL) {
+		lxpr_unlock(p);
+		lxpr_freenode(lxfp);
+		return (NULL);
+	} else {
+		/*
+		 * Fill in the lxpr_node so future references will be able to
+		 * find the underlying vnode. The vnode is held on the realvp.
+		 */
+		lxfp->lxpr_realvp = vp;
+
+		/*
+		 * For certain entries (sockets, pipes, etc), Linux expects a
+		 * bogus-named symlink.  If that's the case, report the type as
+		 * VNON to bypass link-following elsewhere in the vfs system.
+		 *
+		 * See lxpr_readlink for more details.
+		 */
+		if (lxpr_readlink_fdnode(lxfp, NULL, 0) == 0)
+			LXPTOV(lxfp)->v_type = VNON;
+	}
+
+	lxpr_unlock(p);
+	ASSERT(LXPTOV(lxfp) != NULL);
+	return (LXPTOV(lxfp));
+}
+
+/*
+ * Attempt to create Linux-proc-style fake symlinks contents for supported
+ * /proc/<pid>/fd/<#> entries.
+ */
+int
+lxpr_readlink_fdnode(lxpr_node_t *lxpnp, char *bp, size_t len)
+{
+	const char *format;
+	vnode_t *rvp = lxpnp->lxpr_realvp;
+	vattr_t attr;
+
+	switch (rvp->v_type) {
+	case VSOCK:
+		format = "socket:[%lu]";
+		break;
+	case VFIFO:
+		format = "pipe:[%lu]";
+		break;
+	default:
+		return (-1);
+	}
+
+	/* Fetch the inode of the underlying vnode */
+	if (VOP_GETATTR(rvp, &attr, 0, CRED(), NULL) != 0)
+		return (-1);
+
+	if (bp != NULL)
+		(void) snprintf(bp, len, format, (ino_t)attr.va_nodeid);
+	return (0);
+}
+
+/*
  * Translate a Linux core_pattern path to a native Illumos one, by replacing
  * the appropriate % escape sequences.
  *
