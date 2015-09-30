@@ -110,7 +110,6 @@ static int lxpr_lookup(vnode_t *, char *, vnode_t **,
 static int lxpr_readdir(vnode_t *, uio_t *, cred_t *, int *,
     caller_context_t *, int);
 static int lxpr_readlink(vnode_t *, uio_t *, cred_t *, caller_context_t *);
-static int lxpr_readlink_pid_fd(lxpr_node_t *lxpnp, char *bp, size_t len);
 static int lxpr_cmp(vnode_t *, vnode_t *, caller_context_t *);
 static int lxpr_realvp(vnode_t *, vnode_t **, caller_context_t *);
 static int lxpr_sync(void);
@@ -530,6 +529,8 @@ lxpr_open(vnode_t **vpp, int flag, cred_t *cr, caller_context_t *ct)
 		case LXPR_SYS_NET_CORE_SOMAXCON:
 		case LXPR_SYS_VM_OVERCOMMIT_MEM:
 		case LXPR_SYS_VM_SWAPPINESS:
+		case LXPR_PID_FD_FD:
+		case LXPR_PID_TID_FD_FD:
 			break;
 		default:
 			return (EPERM);
@@ -4608,6 +4609,8 @@ lxpr_access(vnode_t *vp, int mode, int flags, cred_t *cr, caller_context_t *ct)
 		case LXPR_SYS_NET_CORE_SOMAXCON:
 		case LXPR_SYS_VM_OVERCOMMIT_MEM:
 		case LXPR_SYS_VM_SWAPPINESS:
+		case LXPR_PID_FD_FD:
+		case LXPR_PID_TID_FD_FD:
 			break;
 		default:
 			return (EROFS);
@@ -4617,7 +4620,7 @@ lxpr_access(vnode_t *vp, int mode, int flags, cred_t *cr, caller_context_t *ct)
 	/*
 	 * If this is a restricted file, check access permissions.
 	 */
-	switch (lxpnp->lxpr_type) {
+	switch (type) {
 	case LXPR_PIDDIR:
 		return (0);
 	case LXPR_PID_CURDIR:
@@ -4905,119 +4908,11 @@ static vnode_t *
 lxpr_lookup_fddir(vnode_t *dp, char *comp)
 {
 	lxpr_node_t *dlxpnp = VTOLXP(dp);
-	lxpr_node_t *lxpnp;
-	vnode_t *vp = NULL;
-	proc_t *p;
-	file_t *fp;
-	uint_t fd;
-	int c;
-	uf_entry_t *ufp;
-	uf_info_t *fip;
 
 	ASSERT(dlxpnp->lxpr_type == LXPR_PID_FDDIR ||
 	    dlxpnp->lxpr_type == LXPR_PID_TID_FDDIR);
 
-	/*
-	 * convert the string rendition of the filename
-	 * to a file descriptor
-	 */
-	fd = 0;
-	while ((c = *comp++) != '\0') {
-		int ofd;
-		if (c < '0' || c > '9')
-			return (NULL);
-
-		ofd = fd;
-		fd = 10*fd + c - '0';
-		/* integer overflow */
-		if (fd / 10 != ofd)
-			return (NULL);
-	}
-
-	/*
-	 * get the proc to work with and lock it
-	 */
-	p = lxpr_lock(dlxpnp->lxpr_pid);
-	if ((p == NULL))
-		return (NULL);
-
-	/*
-	 * If the process is a zombie or system process
-	 * it can't have any open files.
-	 */
-	if ((p->p_stat == SZOMB) || (p->p_flag & SSYS) || (p->p_as == &kas)) {
-		lxpr_unlock(p);
-		return (NULL);
-	}
-
-	/*
-	 * get us a fresh node/vnode
-	 */
-	lxpnp = lxpr_getnode(dp, LXPR_PID_FD_FD, p, fd);
-
-	/*
-	 * Drop p_lock, but keep the process P_PR_LOCK'd to prevent it from
-	 * going away while we dereference into fi_list.
-	 */
-	mutex_exit(&p->p_lock);
-
-	/*
-	 * get open file info
-	 */
-	fip = (&(p)->p_user.u_finfo);
-	mutex_enter(&fip->fi_lock);
-
-	if (fd < fip->fi_nfiles) {
-		UF_ENTER(ufp, fip, fd);
-		/*
-		 * ensure the fd is still kosher.
-		 * it may have gone between the readdir and
-		 * the lookup
-		 */
-		if (fip->fi_list[fd].uf_file == NULL) {
-			mutex_exit(&fip->fi_lock);
-			UF_EXIT(ufp);
-			mutex_enter(&p->p_lock);
-			lxpr_unlock(p);
-			lxpr_freenode(lxpnp);
-			return (NULL);
-		}
-
-		if ((fp = ufp->uf_file) != NULL)
-			vp = fp->f_vnode;
-		UF_EXIT(ufp);
-	}
-	mutex_exit(&fip->fi_lock);
-
-	if (vp == NULL) {
-		mutex_enter(&p->p_lock);
-		lxpr_unlock(p);
-		lxpr_freenode(lxpnp);
-		return (NULL);
-	} else {
-		/*
-		 * Fill in the lxpr_node so future references will be able to
-		 * find the underlying vnode. The vnode is held on the realvp.
-		 */
-		lxpnp->lxpr_realvp = vp;
-		VN_HOLD(lxpnp->lxpr_realvp);
-		/*
-		 * For certain entries (sockets, pipes, etc), Linux expects a
-		 * bogus-named symlink.  If that's the case, report the type as
-		 * VNON to bypass link-following elsewhere in the vfs system.
-		 *
-		 * See lxpr_readlink for more details.
-		 */
-		if (lxpr_readlink_pid_fd(lxpnp, NULL, 0) == 0)
-			LXPTOV(lxpnp)->v_type = VNON;
-	}
-
-	mutex_enter(&p->p_lock);
-	lxpr_unlock(p);
-	dp = LXPTOV(lxpnp);
-	ASSERT(dp != NULL);
-
-	return (dp);
+	return (lxpr_lookup_fdnode(dp, comp));
 }
 
 static vnode_t *
@@ -5989,7 +5884,7 @@ lxpr_readlink(vnode_t *vp, uio_t *uiop, cred_t *cr, caller_context_t *ct)
 			 * Generate <type>:[<inode>] links, if allowed.
 			 */
 			if (lxpnp->lxpr_type != LXPR_PID_FD_FD ||
-			    lxpr_readlink_pid_fd(lxpnp, bp, buflen) != 0) {
+			    lxpr_readlink_fdnode(lxpnp, bp, buflen) != 0) {
 				return (error);
 			}
 		}
@@ -6033,36 +5928,6 @@ lxpr_readlink(vnode_t *vp, uio_t *uiop, cred_t *cr, caller_context_t *ct)
 	return (uiomove(bp, strlen(bp), UIO_READ, uiop));
 }
 
-/*
- * Attempt to create Linux-proc-style fake symlinks contents for supported
- * /proc/<pid>/fd/<#> entries.
- */
-static int
-lxpr_readlink_pid_fd(lxpr_node_t *lxpnp, char *bp, size_t len)
-{
-	const char *format;
-	vnode_t *rvp = lxpnp->lxpr_realvp;
-	vattr_t attr;
-
-	switch (rvp->v_type) {
-	case VSOCK:
-		format = "socket:[%lu]";
-		break;
-	case VFIFO:
-		format = "pipe:[%lu]";
-		break;
-	default:
-		return (-1);
-	}
-
-	/* Fetch the inode of the underlying vnode */
-	if (VOP_GETATTR(rvp, &attr, 0, CRED(), NULL) != 0)
-		return (-1);
-
-	if (bp != NULL)
-		(void) snprintf(bp, len, format, (ino_t)attr.va_nodeid);
-	return (0);
-}
 
 /*
  * lxpr_inactive(): Vnode operation for VOP_INACTIVE()
@@ -6184,35 +6049,59 @@ lxpr_create(struct vnode *dvp, char *nm, struct vattr *vap,
 
 	/*
 	 * We're currently restricting O_CREAT to:
+	 * - /proc/<pid>/fd/<num>
 	 * - /proc/<pid>/oom_score_adj
+	 * - /proc/<pid>/task/<tid>/fd/<num>
 	 * - /proc/<pid>/task/<tid>/oom_score_adj
 	 * - /proc/sys/kernel/core_pattern
 	 * - /proc/sys/net/core/somaxconn
 	 * - /proc/sys/vm/overcommit_memory
 	 * - /proc/sys/vm/swappiness
 	 */
-	if ((type == LXPR_PIDDIR || type == LXPR_PID_TASK_IDDIR) &&
-	    strcmp(nm, "oom_score_adj") == 0) {
-		proc_t *p;
-		p = lxpr_lock(lxpnp->lxpr_pid);
-		if (p != NULL) {
-			vp = lxpr_lookup_common(dvp, nm, p, piddir,
-			    PIDDIRFILES);
+	switch (type) {
+	case LXPR_PIDDIR:
+	case LXPR_PID_TASK_IDDIR:
+		if (strcmp(nm, "oom_score_adj") == 0) {
+			proc_t *p;
+			p = lxpr_lock(lxpnp->lxpr_pid);
+			if (p != NULL) {
+				vp = lxpr_lookup_common(dvp, nm, p, piddir,
+				    PIDDIRFILES);
+			}
+			lxpr_unlock(p);
 		}
-		lxpr_unlock(p);
-	} else if (type == LXPR_SYS_NET_COREDIR &&
-	    strcmp(nm, "somaxconn") == 0) {
-		vp = lxpr_lookup_common(dvp, nm, NULL, sys_net_coredir,
-		    SYS_NET_COREDIRFILES);
-	} else if (type == LXPR_SYS_KERNELDIR &&
-	    strcmp(nm, "core_pattern") == 0) {
-		vp = lxpr_lookup_common(dvp, nm, NULL, sys_kerneldir,
-		    SYS_KERNELDIRFILES);
-	} else if (type == LXPR_SYS_VMDIR &&
-	    (strcmp(nm, "overcommit_memory") == 0 ||
-	    strcmp(nm, "swappiness") == 0)) {
-		vp = lxpr_lookup_common(dvp, nm, NULL, sys_vmdir,
-		    SYS_VMDIRFILES);
+		break;
+
+	case LXPR_SYS_NET_COREDIR:
+		if (strcmp(nm, "somaxconn") == 0) {
+			vp = lxpr_lookup_common(dvp, nm, NULL, sys_net_coredir,
+			    SYS_NET_COREDIRFILES);
+		}
+		break;
+
+	case LXPR_SYS_KERNELDIR:
+		if (strcmp(nm, "core_pattern") == 0) {
+			vp = lxpr_lookup_common(dvp, nm, NULL, sys_kerneldir,
+			    SYS_KERNELDIRFILES);
+		}
+		break;
+
+	case LXPR_SYS_VMDIR:
+		if (strcmp(nm, "overcommit_memory") == 0 ||
+		    strcmp(nm, "swappiness") == 0) {
+			vp = lxpr_lookup_common(dvp, nm, NULL, sys_vmdir,
+			    SYS_VMDIRFILES);
+		}
+		break;
+
+	case LXPR_PID_FDDIR:
+	case LXPR_PID_TID_FDDIR:
+		vp = lxpr_lookup_fdnode(dvp, nm);
+		break;
+
+	default:
+		vp = NULL;
+		break;
 	}
 
 	if (vp != NULL) {
