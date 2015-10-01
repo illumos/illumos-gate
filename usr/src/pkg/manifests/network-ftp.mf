@@ -21,11 +21,13 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2015 Nexenta Systems, Inc. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/network/ftp@$(PKGVERS)
-set name=pkg.description value="Basic IP commands (/usr/sbin/ping, /bin/ftp)"
-set name=pkg.summary value="Basic IP commands"
+set name=pkg.description \
+    value="The ftp command is the user interface to the Internet standard File Transfer Protocol (FTP)"
+set name=pkg.summary value="FTP client command"
 set name=info.classification \
     value="org.opensolaris.category.2008:Applications/System Utilities"
 set name=variant.arch value=$(ARCH)
@@ -33,21 +35,16 @@ dir path=etc group=sys
 dir path=etc/default group=sys
 dir path=usr group=sys
 dir path=usr/bin
-dir path=usr/sbin
 dir path=usr/share/man
 dir path=usr/share/man/man1
-dir path=usr/share/man/man1m
 dir path=usr/share/man/man4
 file path=etc/default/ftp group=sys original_name=SUNWbip:etc/default/ftp \
     preserve=true
 file path=usr/bin/ftp mode=0555
-file path=usr/sbin/ping mode=4555
 file path=usr/share/man/man1/ftp.1
-file path=usr/share/man/man1m/ping.1m
 file path=usr/share/man/man4/ftp.4
 file path=usr/share/man/man4/netrc.4
-legacy pkg=SUNWbip desc="Basic IP commands (/usr/sbin/ping, /bin/ftp)" \
-    name="Basic IP commands (Usr)"
+legacy pkg=SUNWbip desc="Basic IP commands" name="Basic IP commands (Usr)"
 legacy pkg=SUNWbipr desc="Basic IP commands (Root)" \
     name="Basic IP commands (Root)"
 license cr_ATT license=cr_ATT
