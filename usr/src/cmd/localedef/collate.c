@@ -30,7 +30,7 @@
 #include <limits.h>
 #include "localedef.h"
 #include "parser.tab.h"
-#include "collate.h"
+#include "collatefile.h"
 
 /*
  * Design notes.
