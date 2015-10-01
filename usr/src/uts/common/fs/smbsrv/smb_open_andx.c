@@ -480,6 +480,7 @@ smb_com_trans2_open2(smb_request_t *sr, smb_xa_t *xa)
 	struct open_param *op = &sr->arg.open;
 	uint32_t	creation_time;
 	uint32_t	alloc_size;
+	uint32_t	ea_list_size;
 	uint16_t	flags;
 	uint16_t	file_attr;
 	uint32_t	status;
@@ -492,6 +493,24 @@ smb_com_trans2_open2(smb_request_t *sr, smb_xa_t *xa)
 	    &creation_time, &op->ofun, &alloc_size, &op->fqi.fq_path.pn_path);
 	if (rc != 0)
 		return (SDRC_ERROR);
+
+	/*
+	 * The data part of this transaction may contain an EA list.
+	 * See: SMB_FEA_LIST ExtendedAttributeList
+	 *
+	 * If we find a non-empty EA list payload, return the special
+	 * error that tells the caller this FS does not suport EAs.
+	 *
+	 * Note: the first word is the size of the whole data segment,
+	 * INCLUDING the size of that length word.  That means if
+	 * the length word specifies a size less than four, it's
+	 * invalid (and probably a client trying something fishy).
+	 */
+	rc = smb_mbc_decodef(&xa->req_data_mb, "l", &ea_list_size);
+	if (rc == 0 && ea_list_size > 4) {
+		smbsr_status(sr, NT_STATUS_EAS_NOT_SUPPORTED, 0, 0);
+		return (SDRC_ERROR);
+	}
 
 	if ((creation_time != 0) && (creation_time != UINT_MAX))
 		op->crtime.tv_sec = smb_time_local_to_gmt(sr, creation_time);
