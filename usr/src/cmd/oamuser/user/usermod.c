@@ -50,7 +50,8 @@
 #include "funcs.h"
 
 /*
- *  usermod [-u uid [-o] | -g group | -G group [[,group]...] | -d dir [-m]
+ *  usermod [-u uid [-o] | -g group | -G group [[,group]...]
+ *		| -d dir [-m [-z|Z]]
  *		| -s shell | -c comment | -l new_logname]
  *		| -f inactive | -e expire ]
  *		[ -A authorization [, authorization ...]]
@@ -82,7 +83,7 @@
  *
  */
 
-extern int **valid_lgroup(), isbusy();
+extern int **valid_lgroup(), isbusy(), get_default_zfs_flags();
 extern int valid_uid(), check_perm(), create_home(), move_dir();
 extern int valid_expire(), edit_group(), call_passmgmt();
 extern projid_t **valid_lproject();
@@ -145,8 +146,8 @@ main(argc, argv)
 int argc;
 char **argv;
 {
-	int ch, ret = EX_SUCCESS, call_pass = 0, oflag = 0;
-	int tries, mflag = 0, inact, **gidlist, flag = 0;
+	int ch, ret = EX_SUCCESS, call_pass = 0, oflag = 0, zfs_flags = 0;
+	int tries, mflag = 0, inact, **gidlist, flag = 0, zflag = 0, Zflag = 0;
 	boolean_t fail_if_busy = B_FALSE;
 	char *ptr;
 	struct passwd *pstruct;		/* password struct for login */
@@ -176,7 +177,7 @@ char **argv;
 	usertype = getusertype(argv[0]);
 
 	while ((ch = getopt(argc, argv,
-				"c:d:e:f:G:g:l:mop:s:u:A:P:R:K:")) != EOF)
+				"c:d:e:f:G:g:l:mzZop:s:u:A:P:R:K:")) != EOF)
 		switch (ch) {
 		case 'c':
 			comment = optarg;
@@ -232,6 +233,12 @@ char **argv;
 			flag++;
 			fail_if_busy = B_TRUE;
 			break;
+		case 'Z':
+			Zflag++;
+			break;
+		case 'z':
+			zflag++;
+			break;
 		case 'A':
 			change_key(USERATTR_AUTHS_KW, optarg);
 			flag++;
@@ -256,6 +263,16 @@ char **argv;
 				errmsg(M_MUSAGE);
 			exit(EX_SYNTAX);
 		}
+
+	if (((!mflag) && (zflag || Zflag)) || (zflag && Zflag) ||
+	    (mflag > 1 && (zflag || Zflag))) {
+		if (is_role(usertype))
+			errmsg(M_ARUSAGE);
+		else
+			errmsg(M_AUSAGE);
+		exit(EX_SYNTAX);
+	}
+
 
 	if (optind != argc - 1 || flag == 0) {
 		if (is_role(usertype))
@@ -490,10 +507,18 @@ char **argv;
 				exit(EX_NO_PERM);
 			}
 
-		} else ret = create_home(dir, NULL, uid, gid);
+		} else {
+			zfs_flags = get_default_zfs_flags();
+			if (zflag || mflag > 1)
+				zfs_flags |= MANAGE_ZFS;
+			else if (Zflag)
+				zfs_flags &= ~MANAGE_ZFS;
+			ret = create_home(dir, NULL, uid, gid, zfs_flags);
+		}
 
 		if (ret == EX_SUCCESS)
-			ret = move_dir(pstruct->pw_dir, dir, logname);
+			ret = move_dir(pstruct->pw_dir, dir,
+			    logname, zfs_flags);
 
 		if (ret != EX_SUCCESS)
 			exit(ret);

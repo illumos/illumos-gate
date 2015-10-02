@@ -29,8 +29,6 @@
 /*	  All Rights Reserved  	*/
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <stdio.h>
 #include <userdefs.h>
@@ -49,10 +47,11 @@ static char cmdbuf[SBUFSZ];	/* buffer for system call */
  *	Move directory contents from one place to another
  */
 int
-move_dir(char *from, char *to, char *login)
+move_dir(char *from, char *to, char *login, int flags)
 		/* directory to move files from */
 		/* dirctory to move files to */
 		/* login id of owner */
+		/* miscellaneous flags */
 {
 	size_t len = 0;
 	int rc = EX_SUCCESS;
@@ -92,7 +91,7 @@ move_dir(char *from, char *to, char *login)
 		}
 
 		/* Remove the files in the old place */
-		rc = rm_files(from, login);
+		rc = rm_files(from, login, flags);
 
 	}
 
