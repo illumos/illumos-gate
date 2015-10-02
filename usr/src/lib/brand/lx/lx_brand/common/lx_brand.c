@@ -963,7 +963,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_dup,				/*  32: dup */
 	lx_dup2,			/*  33: dup2 */
 	lx_pause,			/*  34: pause */
-	lx_nanosleep,			/*  35: nanosleep */
+	NULL,				/*  35: nanosleep */
 	lx_getitimer,			/*  36: getitimer */
 	lx_alarm,			/*  37: alarm */
 	lx_setitimer,			/*  38: setitimer */
@@ -1160,7 +1160,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/* 229: clock_getres */
 	lx_clock_nanosleep,		/* 230: clock_nanosleep */
 	lx_group_exit,			/* 231: exit_group */
-	lx_epoll_wait,			/* 232: epoll_wait */
+	NULL,				/* 232: epoll_wait */
 	lx_epoll_ctl,			/* 233: epoll_ctl */
 	NULL,				/* 234: tgkill */
 	lx_utimes,			/* 235: utimes */
@@ -1209,7 +1209,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/* 278: vmsplice */
 	NULL,				/* 279: move_pages */
 	lx_utimensat,			/* 280: utimensat */
-	lx_epoll_pwait,			/* 281: epoll_pwait */
+	NULL,				/* 281: epoll_pwait */
 	lx_signalfd,			/* 282: signalfd */
 	lx_timerfd_create,		/* 283: timerfd_create */
 	lx_eventfd,			/* 284: eventfd */
@@ -1421,7 +1421,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_sched_get_priority_max,	/* 159: sched_get_priority_max */
 	lx_sched_get_priority_min,	/* 160: sched_get_priority_min */
 	lx_sched_rr_get_interval,	/* 161: sched_rr_get_interval */
-	lx_nanosleep,			/* 162: nanosleep */
+	NULL,				/* 162: nanosleep */
 	lx_remap,			/* 163: mremap */
 	NULL,				/* 164: setresuid16 */
 	lx_getresuid16,			/* 165: getresuid16 */
@@ -1515,7 +1515,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/* 253: lookup_dcookie */
 	NULL,				/* 254: epoll_create */
 	lx_epoll_ctl,			/* 255: epoll_ctl */
-	lx_epoll_wait,			/* 256: epoll_wait */
+	NULL,				/* 256: epoll_wait */
 	NULL,				/* 257: remap_file_pages */
 	NULL,				/* 258: set_tid_address */
 	lx_timer_create,		/* 259: timer_create */
@@ -1578,7 +1578,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/* 316: vmsplice */
 	NULL,				/* 317: move_pages */
 	NULL,				/* 318: getcpu */
-	lx_epoll_pwait,			/* 319: epoll_pwait */
+	NULL,				/* 319: epoll_pwait */
 	lx_utimensat,			/* 320: utimensat */
 	lx_signalfd,			/* 321: signalfd */
 	lx_timerfd_create,		/* 322: timerfd_create */
