@@ -602,8 +602,8 @@ struct taskq_kstat {
 	{ "executed",		KSTAT_DATA_UINT64 },
 	{ "maxtasks",		KSTAT_DATA_UINT64 },
 	{ "totaltime",		KSTAT_DATA_UINT64 },
-	{ "nactive",		KSTAT_DATA_UINT64 },
 	{ "nalloc",		KSTAT_DATA_UINT64 },
+	{ "nactive",		KSTAT_DATA_UINT64 },
 	{ "priority",		KSTAT_DATA_UINT64 },
 	{ "threads",		KSTAT_DATA_UINT64 },
 };
