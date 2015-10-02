@@ -212,6 +212,7 @@ int
 smb_opipe_open(smb_request_t *sr, uint32_t uniqid)
 {
 	smb_arg_open_t	*op = &sr->sr_open;
+	smb_attr_t *ap = &op->fqi.fq_fattr;
 	smb_ofile_t *ofile;
 	smb_opipe_t *opipe;
 	smb_error_t err;
@@ -248,14 +249,19 @@ smb_opipe_open(smb_request_t *sr, uint32_t uniqid)
 	/* An "up" pointer, for debug. */
 	opipe->p_ofile = ofile;
 
-	op->dsize = 0x01000;
-	op->dattr = FILE_ATTRIBUTE_NORMAL;
+	/*
+	 * Caller expects attributes in op->fqi
+	 */
+	(void) smb_opipe_getattr(ofile, &op->fqi.fq_fattr);
+
+	op->dsize = 0;
+	op->dattr = ap->sa_dosattr;
+	op->fileid = ap->sa_vattr.va_nodeid;
 	op->ftype = SMB_FTYPE_MESG_PIPE;
-	op->action_taken = SMB_OACT_LOCK | SMB_OACT_OPENED; /* 0x8001 */
+	op->action_taken = SMB_OACT_OPLOCK | SMB_OACT_OPENED;
 	op->devstate = SMB_PIPE_READMODE_MESSAGE
 	    | SMB_PIPE_TYPE_MESSAGE
 	    | SMB_PIPE_UNLIMITED_INSTANCES; /* 0x05ff */
-	op->fileid = ofile->f_fid;
 
 	sr->smb_fid = ofile->f_fid;
 	sr->fid_ofile = ofile;
@@ -440,8 +446,9 @@ smb_opipe_getattr(smb_ofile_t *of, smb_attr_t *ap)
 
 	ap->sa_vattr.va_type = VFIFO;
 	ap->sa_vattr.va_nlink = 1;
+	ap->sa_vattr.va_nodeid = (uintptr_t)of->f_pipe;
 	ap->sa_dosattr = FILE_ATTRIBUTE_NORMAL;
-	ap->sa_allocsz = 0x1000LL;
+	ap->sa_allocsz = SMB_PIPE_MAX_MSGSIZE;
 
 	return (0);
 }

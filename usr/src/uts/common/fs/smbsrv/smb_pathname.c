@@ -907,10 +907,10 @@ smb_pathname_validate(smb_request_t *sr, smb_pathname_t *pn)
 		return (B_FALSE);
 	}
 
-	/* If fname is "." -> INVALID_OBJECT_NAME */
+	/* If fname is "." -> OBJECT_NAME_INVALID */
 	if (pn->pn_fname && (strcmp(pn->pn_fname, ".") == 0)) {
 		smbsr_error(sr, NT_STATUS_OBJECT_NAME_INVALID,
-		    ERRDOS, ERROR_PATH_NOT_FOUND);
+		    ERRDOS, ERROR_INVALID_NAME);
 		return (B_FALSE);
 	}
 

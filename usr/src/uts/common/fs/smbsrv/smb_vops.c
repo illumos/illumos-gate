@@ -678,6 +678,20 @@ smb_vop_create(vnode_t *dvp, char *name, smb_attr_t *attr, vnode_t **vpp,
 	error = VOP_CREATE(dvp, np, vap, EXCL, attr->sa_vattr.va_mode,
 	    vpp, cr, option_flags, &smb_ct, vsap);
 
+	/*
+	 * One could argue that filesystems should obey the size
+	 * if specified in the create attributes.  Unfortunately,
+	 * they only appear to let you truncate the size to zero.
+	 * SMB needs to set a non-zero size, so work-around.
+	 */
+	if (error == 0 && *vpp != NULL &&
+	    (vap->va_mask & AT_SIZE) != 0 &&
+	    vap->va_size > 0) {
+		vattr_t ta = *vap;
+		ta.va_mask = AT_SIZE;
+		(void) VOP_SETATTR(*vpp, &ta, 0, cr, &smb_ct);
+	}
+
 	return (error);
 }
 

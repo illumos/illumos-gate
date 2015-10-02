@@ -202,7 +202,15 @@ typedef uint32_t smb_utime_t;
 #define	NT_CREATE_FLAG_REQUEST_OPLOCK		0x02
 #define	NT_CREATE_FLAG_REQUEST_OPBATCH		0x04
 #define	NT_CREATE_FLAG_OPEN_TARGET_DIR		0x08
+#define	NT_CREATE_FLAG_EXTENDED_RESPONSE	0x10
 
+/*
+ * The option flags valid in the SMB nt_create_andx call are a subset of
+ * those defined in ntifs.h (ditto SMB nt_transact_create)
+ */
+#define	SMB_NTCREATE_VALID_OPTIONS (FILE_VALID_OPTION_FLAGS & ~( \
+	FILE_SYNCHRONOUS_IO_ALERT | FILE_SYNCHRONOUS_IO_NONALERT |\
+	FILE_RESERVE_OPFILTER))
 
 /*
  * Define the filter flags for NtNotifyChangeDirectoryFile
@@ -654,11 +662,9 @@ typedef uint32_t smb_utime_t;
  *        3 - The file existed and was truncated
  */
 
-#define	SMB_OACT_LOCK			0x8000
 #define	SMB_OACT_OPENED			0x01
 #define	SMB_OACT_CREATED		0x02
 #define	SMB_OACT_TRUNCATED		0x03
-
 #define	SMB_OACT_OPLOCK			0x8000
 
 #define	SMB_FTYPE_DISK			0
