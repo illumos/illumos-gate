@@ -685,7 +685,7 @@ lx_sysent_t lx_sysent32[] = {
 	{"sched_get_priority_max", NULL, 	0,		1}, /* 159 */
 	{"sched_get_priority_min", NULL, 	0,		1}, /* 160 */
 	{"sched_rr_get_interval", NULL, 	0,		2}, /* 161 */
-	{"nanosleep",	NULL,			0,		2}, /* 162 */
+	{"nanosleep",	lx_nanosleep,		0,		2}, /* 162 */
 	{"mremap",	NULL,			0,		5}, /* 163 */
 	{"setresuid16",	lx_setresuid16,		0,		3}, /* 164 */
 	{"getresuid16",	NULL,			0,		3}, /* 165 */
@@ -779,7 +779,7 @@ lx_sysent_t lx_sysent32[] = {
 	{"lookup_dcookie", NULL,		NOSYS_NO_EQUIV,	0}, /* 253 */
 	{"epoll_create", lx_epoll_create,	0,		1}, /* 254 */
 	{"epoll_ctl",	NULL,			0,		4}, /* 255 */
-	{"epoll_wait",	NULL,			0,		4}, /* 256 */
+	{"epoll_wait",	lx_epoll_wait,		0,		4}, /* 256 */
 	{"remap_file_pages", NULL,		NOSYS_NO_EQUIV,	0}, /* 257 */
 	{"set_tid_address", lx_set_tid_address,	0,		1}, /* 258 */
 	{"timer_create", NULL,			0,		3}, /* 259 */
@@ -846,7 +846,7 @@ lx_sysent_t lx_sysent32[] = {
 	{"vmsplice",	NULL,			NOSYS_NULL,	0}, /* 316 */
 	{"move_pages",	NULL,			NOSYS_NULL,	0}, /* 317 */
 	{"getcpu",	lx_getcpu,		0,		3}, /* 318 */
-	{"epoll_pwait",	NULL,			0,		5}, /* 319 */
+	{"epoll_pwait",	lx_epoll_pwait,		0,		5}, /* 319 */
 	{"utimensat",	NULL,			0,		4}, /* 320 */
 	{"signalfd",	NULL,			0,		3}, /* 321 */
 	{"timerfd_create", NULL,		0,		2}, /* 322 */
@@ -929,7 +929,7 @@ lx_sysent_t lx_sysent64[] = {
 	{"dup",		NULL,			0,		1}, /* 32 */
 	{"dup2",	NULL,			0,		2}, /* 33 */
 	{"pause",	NULL,			0,		0}, /* 34 */
-	{"nanosleep",	NULL,			0,		2}, /* 35 */
+	{"nanosleep",	lx_nanosleep,		0,		2}, /* 35 */
 	{"getitimer",	NULL,			0,		2}, /* 36 */
 	{"alarm",	NULL,			0,		1}, /* 37 */
 	{"setitimer",	NULL,			0,		3}, /* 38 */
@@ -1126,7 +1126,7 @@ lx_sysent_t lx_sysent64[] = {
 	{"clock_getres", lx_clock_getres,	0,		2}, /* 229 */
 	{"clock_nanosleep", NULL,		0,		4}, /* 230 */
 	{"exit_group",	NULL,			0,		1}, /* 231 */
-	{"epoll_wait",	NULL,			0,		4}, /* 232 */
+	{"epoll_wait",	lx_epoll_wait,		0,		4}, /* 232 */
 	{"epoll_ctl",	NULL,			0,		4}, /* 233 */
 	{"tgkill",	lx_tgkill,		0,		3}, /* 234 */
 	{"utimes",	NULL,			0,		2}, /* 235 */
@@ -1175,7 +1175,7 @@ lx_sysent_t lx_sysent64[] = {
 	{"vmsplice",	NULL,			NOSYS_NULL,	0}, /* 278 */
 	{"move_pages",	NULL,			NOSYS_NULL,	0}, /* 279 */
 	{"utimensat",	NULL,			0,		4}, /* 280 */
-	{"epoll_pwait",	NULL,			0,		5}, /* 281 */
+	{"epoll_pwait",	lx_epoll_pwait,		0,		5}, /* 281 */
 	{"signalfd",	NULL,			0,		3}, /* 282 */
 	{"timerfd_create", NULL,		0,		2}, /* 283 */
 	{"eventfd",	NULL,			0,		1}, /* 284 */

@@ -40,6 +40,7 @@
 extern int clock_settime(clockid_t, timespec_t *);
 extern int clock_gettime(clockid_t, timespec_t *);
 extern int clock_getres(clockid_t, timespec_t *);
+extern int nanosleep(timespec_t *, timespec_t *);
 
 
 static int lx_emul_clock_getres(clockid_t, timespec_t *);
@@ -369,4 +370,10 @@ lx_time(time_t *tp)
 		return (tv32.tv_sec);
 	}
 #endif
+}
+
+long
+lx_nanosleep(timespec_t *rqtp, timespec_t *rmtp)
+{
+	return (nanosleep(rqtp, rmtp));
 }

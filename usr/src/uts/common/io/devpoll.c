@@ -1079,7 +1079,14 @@ dpioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 			dpsize = STRUCT_SIZE(dvpoll);
 		}
 
-		error = copyin((caddr_t)arg, STRUCT_BUF(dvpoll), dpsize);
+		if ((mode & FKIOCTL) != 0) {
+			/* Kernel-internal ioctl call */
+			bcopy((caddr_t)arg, STRUCT_BUF(dvpoll), dpsize);
+			error = 0;
+		} else {
+			error = copyin((caddr_t)arg, STRUCT_BUF(dvpoll),
+			    dpsize);
+		}
 
 		if (error) {
 			DP_REFRELE(dpep);
