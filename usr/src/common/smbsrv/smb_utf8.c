@@ -22,7 +22,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -53,12 +53,13 @@
 #if defined(_KERNEL) || defined(_FAKE_KERNEL)
 #include <sys/types.h>
 #include <sys/sunddi.h>
-#else
+#else	/* _KERNEL || _FAKE_KERNEL */
 #include <stdio.h>
 #include <stdlib.h>
-#include <assert.h>
 #include <strings.h>
-#endif
+#include <iconv.h>
+#include <assert.h>
+#endif	/* _KERNEL || _FAKE_KERNEL */
 #include <smbsrv/string.h>
 
 
@@ -275,7 +276,7 @@ smb_wcequiv_strlen(const char *mbs)
 
 /*
  * Returns the number of bytes that would be written if the multi-
- * byte string mbs was converted to a single byte character string,
+ * byte string mbs was converted to an OEM character string,
  * not counting the terminating null character.
  */
 size_t
@@ -290,10 +291,13 @@ smb_sbequiv_strlen(const char *mbs)
 		if (nbytes == ((size_t)-1))
 			return ((size_t)-1);
 
-		if (wide_char & 0xFF00)
-			len += sizeof (smb_wchar_t);
-		else
-			++len;
+		/*
+		 * Assume OEM characters are 1-byte (for now).
+		 * That's true for cp850, which is the only
+		 * codeset this currently supports.  See:
+		 * smb_oem.c : smb_oem_codeset
+		 */
+		++len;
 
 		mbs += nbytes;
 	}
@@ -301,106 +305,174 @@ smb_sbequiv_strlen(const char *mbs)
 	return (len);
 }
 
+/*
+ * Convert OEM strings to/from internal (UTF-8) form.
+ *
+ * We rarely encounter these anymore because all modern
+ * SMB clients use Unicode (UTF-16). The few cases where
+ * this IS still called are normally using ASCII, i.e.
+ * tag names etc. so short-cut those cases.  If we get
+ * something non-ASCII we have to call iconv.
+ *
+ * If we were to really support OEM code pages, we would
+ * need to have a way to set the OEM code page from some
+ * configuration value.  For now it's always CP850.
+ * See also ./smb_oem.c
+ */
+static char smb_oem_codepage[32] = "CP850";
 
 /*
- * stombs
+ * smb_oemtombs
  *
- * Convert a regular null terminated string 'string' to a UTF-8 encoded
- * null terminated multi-byte string 'mbstring'. Only full converted
- * UTF-8 characters will be written 'mbstring'. If a character will not
- * fit within the remaining buffer space or 'mbstring' will overflow
- * max_mblen, the conversion process will be terminated and 'mbstring'
- * will be null terminated.
+ * Convert a null terminated OEM string 'string' to a UTF-8 string
+ * no longer than max_mblen (null terminated if space).
  *
- * Returns the number of bytes written to 'mbstring', excluding the
- * terminating null character.
+ * If the input string contains invalid OEM characters, a value
+ * of -1 will be returned. Otherwise returns the length of 'mbs',
+ * excluding the terminating null character.
  *
  * If either mbstring or string is a null pointer, -1 is returned.
  */
 int
-smb_stombs(char *mbstring, char *string, int max_mblen)
+smb_oemtombs(char *mbs, const uint8_t *oems, int max_mblen)
 {
-	char *start = mbstring;
-	unsigned char *p = (unsigned char *)string;
-	int space_left = max_mblen;
-	int	len;
-	smb_wchar_t	wide_char;
-	char buf[4];
+	uchar_t *p;
+	int	oemlen;
+	int	rlen;
+	boolean_t need_iconv = B_FALSE;
 
-	if (!mbstring || !string)
+	if (mbs == NULL || oems == NULL)
 		return (-1);
 
-	while (*p && space_left > 2) {
-		wide_char = *p++;
-		len = smb_wctomb(mbstring, wide_char);
-		mbstring += len;
-		space_left -= len;
+	/*
+	 * Check if the oems is all ASCII (and get the length
+	 * while we're at it) so we know if we need to iconv.
+	 * We usually can avoid the iconv calls.
+	 */
+	oemlen = 0;
+	p = (uchar_t *)oems;
+	while (*p != '\0') {
+		oemlen++;
+		if (*p & 0x80)
+			need_iconv = B_TRUE;
+		p++;
 	}
 
-	if (*p) {
-		wide_char = *p;
-		if ((len = smb_wctomb(buf, wide_char)) < 2) {
-			*mbstring = *buf;
-			mbstring += len;
-			space_left -= len;
-		}
+	if (need_iconv) {
+		int	rc;
+		char	*obuf = mbs;
+		size_t	olen = max_mblen;
+		size_t	ilen = oemlen;
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
+		char *ibuf = (char *)oems;
+		kiconv_t ic;
+		int	err;
+
+		ic = kiconv_open("UTF-8", smb_oem_codepage);
+		if (ic == (kiconv_t)-1)
+			goto just_copy;
+		rc = kiconv(ic, &ibuf, &ilen, &obuf, &olen, &err);
+		(void) kiconv_close(ic);
+#else	/* _KERNEL || _FAKE_KERNEL */
+		const char *ibuf = (char *)oems;
+		iconv_t	ic;
+		ic = iconv_open("UTF-8", smb_oem_codepage);
+		if (ic == (iconv_t)-1)
+			goto just_copy;
+		rc = iconv(ic, &ibuf, &ilen, &obuf, &olen);
+		(void) iconv_close(ic);
+#endif	/* _KERNEL || _FAKE_KERNEL */
+		if (rc < 0)
+			return (-1);
+		/* Return val. is output bytes. */
+		rlen = (max_mblen - olen);
+	} else {
+	just_copy:
+		rlen = oemlen;
+		if (rlen > max_mblen)
+			rlen = max_mblen;
+		bcopy(oems, mbs, rlen);
 	}
+	if (rlen < max_mblen)
+		mbs[rlen] = '\0';
 
-	*mbstring = '\0';
-
-	/*LINTED E_PTRDIFF_OVERFLOW*/
-	return (mbstring - start);
+	return (rlen);
 }
 
-
 /*
- * mbstos
+ * smb_mbstooem
  *
- * Convert a null terminated multi-byte string 'mbstring' to a regular
- * null terminated string 'string'.  A 1-byte character in 'mbstring'
- * maps to a 1-byte character in 'string'. A 2-byte character in
- * 'mbstring' will be mapped to 2-bytes, if the upper byte is non-null.
- * Otherwise the upper byte null will be discarded to ensure that the
- * output stream does not contain embedded null characters.
+ * Convert a null terminated multi-byte string 'mbs' to an OEM string
+ * no longer than max_oemlen (null terminated if space).
  *
- * If the input stream contains invalid multi-byte characters, a value
- * of -1 will be returned. Otherwise the length of 'string', excluding
- * the terminating null character, is returned.
+ * If the input string contains invalid multi-byte characters, a value
+ * of -1 will be returned. Otherwise returns the length of 'oems',
+ * excluding the terminating null character.
  *
  * If either mbstring or string is a null pointer, -1 is returned.
  */
 int
-smb_mbstos(char *string, const char *mbstring)
+smb_mbstooem(uint8_t *oems, const char *mbs, int max_oemlen)
 {
-	smb_wchar_t wc;
-	unsigned char *start = (unsigned char *)string;
-	int len;
+	uchar_t *p;
+	int	mbslen;
+	int	rlen;
+	boolean_t need_iconv = B_FALSE;
 
-	if (string == NULL || mbstring == NULL)
+	if (oems == NULL || mbs == NULL)
 		return (-1);
 
-	while (*mbstring) {
-		if ((len = smb_mbtowc(&wc, mbstring, MTS_MB_CHAR_MAX)) < 0) {
-			*string = 0;
-			return (-1);
-		}
-
-		if (wc & 0xFF00) {
-			/*LINTED E_BAD_PTR_CAST_ALIGN*/
-			*((smb_wchar_t *)string) = wc;
-			string += sizeof (smb_wchar_t);
-		}
-		else
-		{
-			*string = (unsigned char)wc;
-			string++;
-		}
-
-		mbstring += len;
+	/*
+	 * Check if the mbs is all ASCII (and get the length
+	 * while we're at it) so we know if we need to iconv.
+	 * We usually can avoid the iconv calls.
+	 */
+	mbslen = 0;
+	p = (uchar_t *)mbs;
+	while (*p != '\0') {
+		mbslen++;
+		if (*p & 0x80)
+			need_iconv = B_TRUE;
+		p++;
 	}
 
-	*string = 0;
+	if (need_iconv) {
+		int	rc;
+		char	*obuf = (char *)oems;
+		size_t	olen = max_oemlen;
+		size_t	ilen = mbslen;
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
+		char *ibuf = (char *)mbs;
+		kiconv_t ic;
+		int	err;
 
-	/*LINTED E_PTRDIFF_OVERFLOW*/
-	return ((unsigned char *)string - start);
+		ic = kiconv_open(smb_oem_codepage, "UTF-8");
+		if (ic == (kiconv_t)-1)
+			goto just_copy;
+		rc = kiconv(ic, &ibuf, &ilen, &obuf, &olen, &err);
+		(void) kiconv_close(ic);
+#else	/* _KERNEL || _FAKE_KERNEL */
+		const char *ibuf = mbs;
+		iconv_t	ic;
+		ic = iconv_open(smb_oem_codepage, "UTF-8");
+		if (ic == (iconv_t)-1)
+			goto just_copy;
+		rc = iconv(ic, &ibuf, &ilen, &obuf, &olen);
+		(void) iconv_close(ic);
+#endif	/* _KERNEL || _FAKE_KERNEL */
+		if (rc < 0)
+			return (-1);
+		/* Return val. is output bytes. */
+		rlen = (max_oemlen - olen);
+	} else {
+	just_copy:
+		rlen = mbslen;
+		if (rlen > max_oemlen)
+			rlen = max_oemlen;
+		bcopy(mbs, oems, rlen);
+	}
+	if (rlen < max_oemlen)
+		oems[rlen] = '\0';
+
+	return (rlen);
 }
