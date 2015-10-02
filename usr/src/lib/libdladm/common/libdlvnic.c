@@ -550,8 +550,7 @@ done:
 	if (status == DLADM_STATUS_OK && proplist != NULL) {
 		uint32_t flg;
 
-		flg = (flags & DLADM_OPT_PERSIST) ?
-		    DLADM_OPT_PERSIST : DLADM_OPT_ACTIVE;
+		flg = flags & (DLADM_OPT_PERSIST | DLADM_OPT_ACTIVE);
 
 		for (i = 0; i < proplist->al_count; i++) {
 			dladm_arg_info_t	*aip = &proplist->al_info[i];

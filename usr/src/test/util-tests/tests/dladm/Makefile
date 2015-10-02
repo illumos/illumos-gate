@@ -17,7 +17,7 @@ include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/test/Makefile.com
 
 ROOTOPTPKG = $(ROOT)/opt/util-tests/tests
-PROG = allowed-ips
+PROG = allowed-ips vnic-mtu
 
 ROOTPROG = $(PROG:%=$(ROOTOPTPKG)/%)
 
