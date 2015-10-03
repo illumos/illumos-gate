@@ -1111,12 +1111,26 @@ function destroy_pool #pool
 	if is_global_zone ; then
 		if poolexists "$pool" ; then
 			mtpt=$(get_prop mountpoint "$pool")
-			log_must $ZPOOL destroy -f $pool
+
+			# At times, syseventd activity can cause attempts to
+			# destroy a pool to fail with EBUSY. We retry a few
+			# times allowing failures before requiring the destroy
+			# to succeed.
+			typeset -i wait_time=10 ret=1 count=0
+			must=""
+			while [[ $ret -ne 0 ]]; do
+				$must $ZPOOL destroy -f $pool
+				ret=$?
+				[[ $ret -eq 0 ]] && break
+				log_note "zpool destroy failed with $ret"
+				[[ count++ -ge 7 ]] && must=log_must
+				$SLEEP $wait_time
+			done
 
 			[[ -d $mtpt ]] && \
 				log_must $RM -rf $mtpt
 		else
-			log_note "Pool not exist. ($pool)"
+			log_note "Pool does not exist. ($pool)"
 			return 1
 		fi
 	fi
