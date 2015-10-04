@@ -19,7 +19,7 @@
 .\"
 .\" Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 .\" Use is subject to license terms.
-.TH codereview 1ONBLD "August 5, 2008"
+.TH CODEREVIEW 1ONBLD "Aug 5, 2008"
 .UC
 .SH NAME
 codereview \- Diff list generator
@@ -73,7 +73,9 @@ in the output tray of printers like the Apple LaserWriter.
 The default is not to perform page reversal,
 which is correct for printers like the NEC Silentwriter LC-890.
 .SH FILES
+.nf
 /tmp/lwlpXXXXXX		\- temporary file used for page reversal
+.fi
 .SH LIMITATIONS
 The maximum input line length is 1024 characters.
 This should not present a problem
@@ -82,7 +84,6 @@ The program silently truncates input lines that are too long.
 .SH NOTES
 The command
 .sp 0.5v
-.ti +0.4i
 pageview -right -h 17 -w 11 -Ws 1100 850 -dpi 100 out.ps
 .sp 0.5v
 is useful for displaying the results of

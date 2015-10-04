@@ -22,7 +22,7 @@
 .\" Use is subject to license terms.
 .\"
 .\"
-.TH webrev 1ONBLD "7 Feb 2014"
+.TH WEBREV 1ONBLD "Feb 7, 2014"
 .SH NAME
 webrev \- Generate HTML codereview materials
 .SH SYNOPSIS
@@ -110,7 +110,7 @@ is formatted according to the following color coding:
 .SH SCM INTERACTIONS
 .PP
 .B webrev
-attempts to interact with the source code management system currently in use.  
+attempts to interact with the source code management system currently in use.
 .B webrev
 needs to be able locate the code under review (i.e. the workspace) and
 the basis for comparison (i.e. the parent).  The method for doing so
@@ -251,7 +251,7 @@ needs to be told or to discover which files have changed in a
 given workspace.  By default,
 .B webrev
 will attempt to autodetect the
-list of changed files by first consulting 
+list of changed files by first consulting
 .BR wx "(1)."
 If this information is not available, webrev tries to consult the SCM (Source
 Code Manager) currently in use.  If that fails, the user must intervene by
@@ -446,5 +446,7 @@ building webrev.
 
 Have fun!
 .br
+.nf
 		Brent Callaghan  11/28/96
+.fi
 

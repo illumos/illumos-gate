@@ -19,19 +19,16 @@
 .\"
 .\" CDDL HEADER END
 .\"
-.TH find_elf 1ONBLD "25 March 2010"
+.TH FIND_ELF 1ONBLD "Mar 25, 2010"
 .SH NAME
 find_elf \- Locate ELF shared objects and executables
 .SH SYNOPSIS
 \fBfind_elf [-afrs] path\fP
-.LP
 .SH DESCRIPTION
-.IX "OS-Net build tools" "find_elf" "" "\fBfind_elf\fP"
 The
 .I find_elf
 command descends a directory hierarchy and produces one line
 of output on stdout for each ELF executable or shared object found.
-.LP
 .SH OPTIONS
 .LP
 The following options are supported:
@@ -56,7 +53,6 @@ instead of fully qualified.
 .TP 4
 .B \-s
 Only report shared objects.
-.LP
 .SH OUTPUT
 .LP
 .I find_elf
@@ -85,7 +81,7 @@ OBJECT [32 | 64] [DYN | EXEC] [VERDEF | NOVERDEF] object-path
 .in -4
 .sp
 The first field provides the ELF class of the object, and will be
-either 32 or 64. 
+either 32 or 64.
 The second field provides the type of object, either
 a shared object (DYN) or executable (EXEC).
 The third field will be VERDEF if the object contains ELF
@@ -103,7 +99,7 @@ Compilation symlinks, used to provide a non-versioned name for a shared object.
 .RS +4
 .TP
 .ie t \(bu
-.el o 
+.el o
 Symlinks such as '32' and '64' used to provide alternative
 non-machine specific paths to objects.
 .RE
@@ -123,7 +119,6 @@ The \fB-a\fP option alters the handling of aliased names. When \fB-a\fP is
 specified, each file results in a separate OBJECT line, as if they were
 independent files rather than the same file with different names.
 .sp
-.PP
 .SH EXAMPLES
 Assume the following hierarchy of files exist under /usr/lib/foo:
 .sp
@@ -151,7 +146,7 @@ lrwxrwxrwx  1 root bin    11 Jul 16 17:35 libfoo.so -> libfoo.so.1*
 .sp
 This hierarchy contains compilation symlinks (libfoo.so) and
 path alias symlinks (32, 64), as discussed in OUTPUT.
-.p
+.P
 .I find_elf
 produces the following output for the above hierarchy:
 .sp
@@ -221,5 +216,4 @@ OBJECT 32 DYN  VERDEF   /lib/libc.so
 .BR ldd (1),
 .BR elfdump (1),
 .BR pvs (1).
-.LP
-.TZ LLM
+

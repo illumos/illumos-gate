@@ -19,15 +19,13 @@
 .\"
 .\" Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 .\" Use is subject to license terms.
-.TH findunref 1ONBLD "Oct 30, 2012"
+.TH FINDUNREF 1ONBLD "Oct 30, 2012"
 .I findunref
 \- find unused files in a source tree
 .SH SYNOPSIS
 findunref [\fB-s\fP \fIsubtree\fP] [\fB-t\fP \fItstampfile\fP]
 [\fB-S\fP \fBhg\fP|\fBtw\fP|\fBgit\fP] \fIsrcroot\fP \fIexceptfile\fP
-.LP
 .SH DESCRIPTION
-.IX "OS-Net build tools" "findunref" "" "\fBfindunref\fP"
 .LP
 The findunref utility lists the files in a source tree which have not been
 accessed more recently than a particular timestamp file.  Although
