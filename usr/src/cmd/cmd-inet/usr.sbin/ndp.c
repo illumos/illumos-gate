@@ -40,6 +40,7 @@
 #include <inet/ip.h>
 #include <net/if_dl.h>
 #include <net/route.h>
+#include <zone.h>
 
 typedef	struct	sockaddr_in6	sin6_t;
 
@@ -95,7 +96,6 @@ static	int	ndp_set_nce(char *, char *, char *[], int);
 static	int	ndp_set_file(char *);
 
 static	char		*ndp_iface = NULL;
-static	char		*netstat_path = "/usr/bin/netstat";
 static	pid_t		ndp_pid;
 static	boolean_t	ndp_noresolve = B_FALSE; /* Don't lookup addresses */
 static	boolean_t	ndp_run = B_TRUE;
@@ -103,6 +103,7 @@ static	boolean_t	ndp_run = B_TRUE;
 #define	MAX_ATTEMPTS 5
 #define	MAX_OPTS 5
 #define	WORDSEPS " \t\r\n"
+#define	NETSTAT_PATH	"/usr/bin/netstat"
 
 /*
  * Macros borrowed from route(1M) for working with PF_ROUTE messages
@@ -767,6 +768,12 @@ ndp_get(int fd, struct lifreq *lifrp, void *unused)
 static void
 ndp_get_all(void)
 {
+	char netstat_path[MAXPATHLEN];
+	const char *zroot = zone_get_nroot();
+
+	(void) snprintf(netstat_path, sizeof (netstat_path), "%s%s", zroot != NULL ?
+	    zroot : "", NETSTAT_PATH);
+
 	(void) execl(netstat_path, "netstat",
 	    (ndp_noresolve ? "-np" : "-p"),
 	    "-f", "inet6", (char *)0);

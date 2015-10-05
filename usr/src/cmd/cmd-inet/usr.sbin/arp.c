@@ -58,6 +58,7 @@
 #include <arpa/inet.h>
 #include <net/if_types.h>
 #include <net/if_dl.h>
+#include <zone.h>
 
 static int file(char *);
 static int set(int, char *[]);
@@ -118,11 +119,15 @@ main(int argc, char *argv[])
 		 * is to let netstat, which prints it as part of
 		 * the MIB statistics, do it.
 		 */
-		(void) execl("/usr/bin/netstat", "netstat",
+		char netstat_path[MAXPATHLEN];
+		const char *zroot = zone_get_nroot();
+		(void) snprintf(netstat_path, sizeof (netstat_path), "%s%s", zroot != NULL ?
+		    zroot : "", "/usr/bin/netstat");
+		(void) execl(netstat_path, "netstat",
 		    (n_flag ? "-np" : "-p"),
 		    "-f", "inet", (char *)0);
-		(void) fprintf(stderr, "failed to exec netstat: %s\n",
-		    strerror(errno));
+		(void) fprintf(stderr, "failed to exec %s: %s\n",
+		    netstat_path, strerror(errno));
 		exit(1);
 
 	} else if (s_flag && (argsleft >= 2)) {
