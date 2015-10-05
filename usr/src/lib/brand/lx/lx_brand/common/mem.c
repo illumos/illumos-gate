@@ -30,6 +30,7 @@
 #include <procfs.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <sys/mman.h>
 #include <sys/param.h>
 #include <sys/lx_debug.h>
@@ -62,6 +63,8 @@ int pagesize;	/* needed for mmap2() */
 #define	LX_MADV_NOHUGEPAGE	15
 #define	LX_MADV_DONTDUMP	16
 #define	LX_MADV_DODUMP		17
+
+static void lx_remap_anoncache_invalidate(uintptr_t, size_t);
 
 static int
 ltos_mmap_flags(int flags)
@@ -147,6 +150,12 @@ mmap_common(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 
 	if (flags & LX_MAP_LOCKED)
 		(void) mlock(ret, len);
+
+	/*
+	 * We have a new mapping; invalidate any cached anonymous regions that
+	 * overlap(ped) with it.
+	 */
+	lx_remap_anoncache_invalidate((uintptr_t)ret, len);
 
 	return (ret);
 }
@@ -314,6 +323,245 @@ lx_mprotect(uintptr_t start, uintptr_t len, uintptr_t prot)
 #define	LX_MREMAP_FIXED		2	/* address is fixed */
 
 /*
+ * Unfortunately, the Linux mremap() manpage contains a statement that is, at
+ * best, grossly oversimplified: that mremap() "can be used to implement a
+ * very efficient realloc(3)."  To the degree this is true at all, it is only
+ * true narrowly (namely, when large buffers are being expanded but can't be
+ * expanded in place due to virtual address space restrictions) -- but
+ * apparently, someone took this very literally, because variants of glibc
+ * appear to simply implement realloc() in terms of mremap().  This is
+ * unfortunate because absent intelligent usage, it forces realloc() to have
+ * an unncessary interaction with the VM system for small expansions -- and if
+ * realloc() is itself abused (e.g., if a consumer repeatedly expands and
+ * contracts the same memory buffer), the net result can be less efficient
+ * than a much more naive realloc() implementation.  And if native Linux is
+ * suboptimal in this case, we are deeply pathological, having not
+ * historically supported mremap() for anonymous mappings at all.  To make
+ * this at least palatable, we not only support remap for anonymous mappings
+ * (see lx_remap_anon(), below), we also cache the metadata associated with
+ * these mappings to save both the reads from /proc and the libmapmalloc
+ * alloc/free.  We implement the anonymous metadata cache with
+ * lx_remap_anoncache, an LRU cache of prmap_t's that correspond to anonymous
+ * segments that have been resized.
+ */
+#define	LX_REMAP_ANONCACHE_NENTRIES	4
+
+static prmap_t	lx_remap_anoncache[LX_REMAP_ANONCACHE_NENTRIES];
+static int	lx_remap_anoncache_nentries = LX_REMAP_ANONCACHE_NENTRIES;
+static offset_t	lx_remap_anoncache_generation;
+static mutex_t	lx_remap_anoncache_lock = DEFAULTMUTEX;
+
+static void
+lx_remap_anoncache_invalidate(uintptr_t addr, size_t size)
+{
+	int i;
+
+	if (lx_remap_anoncache_generation == 0)
+		return;
+
+	mutex_lock(&lx_remap_anoncache_lock);
+
+	for (i = 0; i < LX_REMAP_ANONCACHE_NENTRIES; i++) {
+		prmap_t *map = &lx_remap_anoncache[i];
+
+		/*
+		 * If the ranges overlap at all, we zap it by clearing the
+		 * pr_vaddr.
+		 */
+		if (addr < map->pr_vaddr + map->pr_size &&
+		    map->pr_vaddr < addr + size) {
+			map->pr_vaddr = 0;
+		}
+	}
+
+	mutex_unlock(&lx_remap_anoncache_lock);
+}
+
+static void
+lx_remap_anoncache_evict(prmap_t *map)
+{
+	if (map >= &lx_remap_anoncache[0] &&
+	    map < &lx_remap_anoncache[LX_REMAP_ANONCACHE_NENTRIES]) {
+		/*
+		 * We're already in the cache; we just need to zap our pr_vaddr
+		 * to indicate that this has been evicted.
+		 */
+		map->pr_vaddr = 0;
+	} else {
+		/*
+		 * We need to invalidate this by address and size.
+		 */
+		lx_remap_anoncache_invalidate(map->pr_vaddr, map->pr_size);
+	}
+}
+
+static void
+lx_remap_anoncache_load(prmap_t *map, size_t size)
+{
+	offset_t oldest = 0;
+	prmap_t *evict = NULL;
+	int i;
+
+	if (map >= &lx_remap_anoncache[0] &&
+	    map < &lx_remap_anoncache[LX_REMAP_ANONCACHE_NENTRIES]) {
+		/*
+		 * We're already in the cache -- we just need to update
+		 * our LRU field (pr_offset) to reflect the hit.
+		 */
+		map->pr_offset = lx_remap_anoncache_generation++;
+		map->pr_size = size;
+		return;
+	}
+
+	mutex_lock(&lx_remap_anoncache_lock);
+
+	for (i = 0; i < lx_remap_anoncache_nentries; i++) {
+		if (lx_remap_anoncache[i].pr_vaddr == 0) {
+			evict = &lx_remap_anoncache[i];
+			break;
+		}
+
+		if (oldest == 0 || lx_remap_anoncache[i].pr_offset < oldest) {
+			oldest = lx_remap_anoncache[i].pr_offset;
+			evict = &lx_remap_anoncache[i];
+		}
+	}
+
+	if (evict != NULL) {
+		*evict = *map;
+		evict->pr_offset = lx_remap_anoncache_generation++;
+		evict->pr_size = size;
+	}
+
+	mutex_unlock(&lx_remap_anoncache_lock);
+}
+
+/*
+ * As part of lx_remap() (see below) and to accommodate heavy realloc() use
+ * cases (see the discussion of the lx_remap_anoncache, above), we allow
+ * anonymous segments to be "remapped" in that we are willing to truncate them
+ * or append to them (as much as that's allowed by virtual address space
+ * usage).  If we fall out of these cases, we take the more expensive option
+ * of actually copying the data to a new segment -- but we locate the address
+ * in a portion of the address space that should give us plenty of VA space to
+ * expand.
+ */
+static long
+lx_remap_anon(prmap_t *map, prmap_t *maps, int nmap,
+    uintptr_t new_size, uintptr_t flags, uintptr_t new_address)
+{
+	int mflags = MAP_ANON;
+	int prot = 0, i;
+	void *addr, *hint = NULL;
+
+	/*
+	 * If our new size is less than our old size and we're either not
+	 * being ordered to move it or the address we're being ordered to
+	 * move it to is our current address, we can just act as Procrustes
+	 * and chop off anything larger than the new size.
+	 */
+	if (new_size < map->pr_size && (!(flags & LX_MREMAP_FIXED) ||
+	    new_address == map->pr_vaddr)) {
+		if (munmap((void *)(map->pr_vaddr + new_size),
+		    map->pr_size - new_size) != 0) {
+			return (-EINVAL);
+		}
+
+		lx_remap_anoncache_load(map, new_size);
+
+		return (map->pr_vaddr);
+	}
+
+	if (map->pr_mflags & (MA_SHM | MA_ISM))
+		return (-EINVAL);
+
+	if (map->pr_mflags & MA_WRITE)
+		prot |= PROT_WRITE;
+
+	if (map->pr_mflags & MA_READ)
+		prot |= PROT_READ;
+
+	if (map->pr_mflags & MA_EXEC)
+		prot |= PROT_EXEC;
+
+	mflags |= (map->pr_mflags & MA_SHARED) ? MAP_SHARED : MAP_PRIVATE;
+
+	if (map->pr_mflags & MA_NORESERVE)
+		mflags |= MAP_NORESERVE;
+
+	/*
+	 * If we're not being told where to move it, or the address matches
+	 * where we already are, let's try to expand our mapping in place
+	 * by adding a fixed mapping after it.
+	 */
+	if (!(flags & LX_MREMAP_FIXED) || new_address == map->pr_vaddr) {
+		addr = mmap((void *)(map->pr_vaddr + map->pr_size),
+		    new_size - map->pr_size, prot, mflags, -1, 0);
+
+		if (addr == (void *)-1)
+			return (-EINVAL);
+
+		if (addr == (void *)(map->pr_vaddr + map->pr_size)) {
+			lx_remap_anoncache_load(map, new_size);
+			return (map->pr_vaddr);
+		}
+
+		/*
+		 * Our advisory address was not followed -- which, as a
+		 * practical matter, means that the range conflicted with an
+		 * extant mapping.  Unmap wherever we landed, and drop into
+		 * the relocation case.
+		 */
+		(void) munmap(addr, new_size - map->pr_size);
+	}
+
+	lx_remap_anoncache_evict(map);
+
+	/*
+	 * If we're here, we actually need to move this mapping -- so if we
+	 * can't move it, we're done.
+	 */
+	if (!(flags & LX_MREMAP_MAYMOVE))
+		return (-ENOMEM);
+
+	/*
+	 * If this is a shared private mapping, we can't remap it.
+	 */
+	if (map->pr_mflags & MA_SHARED)
+		return (-EINVAL);
+
+	if (new_address != NULL && (flags & LX_MREMAP_FIXED)) {
+		mflags |= MAP_FIXED;
+		hint = (void *)new_address;
+	} else {
+		/*
+		 * We're going to start at the bottom of the address space;
+		 * once we hit an address above 2G, we'll treat that as the
+		 * bottom of the top of the address space, and set our address
+		 * hint below that.  To give ourselves plenty of room for
+		 * further mremap() expansion, we'll multiply our new size by
+		 * 16 and leave that much room between our lowest high address
+		 * and our hint.
+		 */
+		for (i = 0; i < nmap; i++) {
+			if (maps[i].pr_vaddr < (uintptr_t)(1 << 3UL))
+				continue;
+
+			hint = (void *)(maps[i].pr_vaddr - (new_size << 4UL));
+			break;
+		}
+	}
+
+	if ((addr = mmap(hint, new_size, prot, mflags, -1, 0)) == (void *)-1)
+		return (-errno);
+
+	bcopy((void *)map->pr_vaddr, addr, map->pr_size);
+	(void) munmap((void *)map->pr_vaddr, map->pr_size);
+
+	return ((long)addr);
+}
+
+/*
  * We don't have a native mremap() (and nor do we particularly want one), so
  * we emulate it strictly in user-land.  The idea is simple: we just want to
  * mmap() the underlying object with the new size and rip down the old mapping.
@@ -331,12 +579,57 @@ lx_remap(uintptr_t old_address, uintptr_t old_size,
     uintptr_t new_size, uintptr_t flags, uintptr_t new_address)
 {
 	int prot = 0, oflags, mflags = 0, len, fd = -1, i, nmap;
-	prmap_t map, *maps;
-	uintptr_t rval;
+	prmap_t *map = NULL, *maps;
+	long rval;
 	char path[256], buf[MAXPATHLEN + 1];
 	struct stat st;
 	ssize_t n;
-	boolean_t found = B_FALSE;
+	static uintptr_t pagesize = 0;
+
+	if (pagesize == 0)
+		pagesize = sysconf(_SC_PAGESIZE);
+
+	if ((flags & (LX_MREMAP_MAYMOVE | LX_MREMAP_FIXED)) == LX_MREMAP_FIXED)
+		return (-EINVAL);
+
+	if (old_address & (pagesize - 1))
+		return (-EINVAL);
+
+	if (new_size == 0)
+		return (-EINVAL);
+
+	if ((flags & LX_MREMAP_FIXED) && (new_address & (pagesize - 1)))
+		return (-EINVAL);
+
+	if (new_size == old_size && !(flags & LX_MREMAP_FIXED))
+		return (old_address);
+
+	/*
+	 * First consult the anoncache; if we find the segment there, we'll
+	 * drop straight into lx_remap_anon() and save ourself the pain of
+	 * the /proc reads.
+	 */
+	mutex_lock(&lx_remap_anoncache_lock);
+
+	for (i = 0; i < lx_remap_anoncache_nentries; i++) {
+		map = &lx_remap_anoncache[i];
+
+		if (map->pr_vaddr != old_address)
+			continue;
+
+		if (map->pr_size != old_size)
+			continue;
+
+		if (lx_remap_anon(map, NULL,
+		    0, new_size, 0, new_address) == old_address) {
+			mutex_unlock(&lx_remap_anoncache_lock);
+			return (old_address);
+		}
+
+		break;
+	}
+
+	mutex_unlock(&lx_remap_anoncache_lock);
 
 	/*
 	 * We need to search the mappings to find our specified mapping.  Note
@@ -373,9 +666,10 @@ lx_remap(uintptr_t old_address, uintptr_t old_size,
 		lx_debug("\rread of /proc/self/map failed: %s",
 		    strerror(errno));
 		(void) close(fd);
-		free(maps);
-		return (-EINVAL);
+		rval = -EINVAL;
+		goto out;
 	}
+
 	nmap = n / sizeof (prmap_t);
 	lx_debug("\tfound %d mappings", nmap);
 
@@ -385,33 +679,49 @@ lx_remap(uintptr_t old_address, uintptr_t old_size,
 	for (i = 0; i < nmap; i++) {
 		if (maps[i].pr_vaddr == old_address &&
 		    maps[i].pr_size == old_size) {
-			map = maps[i];
-			found = B_TRUE;
+			map = &maps[i];
 			break;
+		}
+
+		if (maps[i].pr_vaddr <= old_address &&
+		    old_address + old_size < maps[i].pr_vaddr +
+		    maps[i].pr_size) {
+			/*
+			 * We have a mismatch, but our specified range is
+			 * a subset of the actual segment; this is EINVAL.
+			 */
+			rval = -EINVAL;
+			goto out;
 		}
 	}
 
 	(void) close(fd);
-	free(maps);
 
-	if (!found) {
+	if (i == nmap) {
 		lx_debug("\tno matching mapping found");
-		return (-EINVAL);
+		rval = -EFAULT;
+		goto out;
 	}
 
-	if (!(map.pr_mflags & MA_SHARED)) {
-		/*
-		 * If this is a private mapping, we're not going to remap it.
-		 */
-		return (-EINVAL);
-	}
-
-	if (map.pr_mflags & (MA_ISM | MA_SHM)) {
+	if (map->pr_mflags & (MA_ISM | MA_SHM)) {
 		/*
 		 * If this is either ISM or System V shared memory, we're not
 		 * going to remap it.
 		 */
-		return (-EINVAL);
+		rval = -EINVAL;
+		goto out;
+	}
+
+	oflags = (map->pr_mflags & MA_WRITE) ? O_RDWR : O_RDONLY;
+
+	if (map->pr_mflags & MA_ANON) {
+		/*
+		 * This is an anonymous mapping -- which is the one case in
+		 * which we perform something that approaches a true remap.
+		 */
+		rval = lx_remap_anon(map, maps, nmap,
+		    new_size, flags, new_address);
+		goto out;
 	}
 
 	if (!(flags & LX_MREMAP_MAYMOVE)) {
@@ -419,28 +729,30 @@ lx_remap(uintptr_t old_address, uintptr_t old_size,
 		 * If we're not allowed to move this mapping, we're going to
 		 * act as if we can't expand it.
 		 */
-		return (-ENOMEM);
+		rval = -ENOMEM;
+		goto out;
 	}
 
-	oflags = (map.pr_mflags & MA_WRITE) ? O_RDWR : O_RDONLY;
-
-	if (map.pr_mapname[0] == '\0') {
+	if (!(map->pr_mflags & MA_SHARED)) {
 		/*
-		 * This is likely an anonymous mapping.
+		 * If this is a private mapping, we're not going to remap it.
 		 */
-		return (-EINVAL);
+		rval = -EINVAL;
+		goto out;
 	}
 
 	(void) snprintf(path, sizeof (path),
-	    "/native/proc/self/path/%s", map.pr_mapname);
+	    "/native/proc/self/path/%s", map->pr_mapname);
 
 	if ((len = readlink(path, buf, sizeof (buf))) == -1 ||
 	    len == sizeof (buf)) {
 		/*
 		 * If we failed to read the link, the path might not exist.
 		 */
-		return (-EINVAL);
+		rval = -EINVAL;
+		goto out;
 	}
+
 	buf[len] = '\0';
 
 	if ((fd = open(buf, oflags)) == -1) {
@@ -450,16 +762,17 @@ lx_remap(uintptr_t old_address, uintptr_t old_size,
 		 * don't have permissions.  Either way, we're going to kick
 		 * it back with EINVAL.
 		 */
-		return (-EINVAL);
+		rval = -EINVAL;
+		goto out;
 	}
 
-	if (map.pr_mflags & MA_WRITE)
+	if (map->pr_mflags & MA_WRITE)
 		prot |= PROT_WRITE;
 
-	if (map.pr_mflags & MA_READ)
+	if (map->pr_mflags & MA_READ)
 		prot |= PROT_READ;
 
-	if (map.pr_mflags & MA_EXEC)
+	if (map->pr_mflags & MA_EXEC)
 		prot |= PROT_EXEC;
 
 	mflags = MAP_SHARED;
@@ -470,17 +783,20 @@ lx_remap(uintptr_t old_address, uintptr_t old_size,
 		new_address = NULL;
 	}
 
-	rval = (uintptr_t)mmap((void *)new_address, new_size,
-	    prot, mflags, fd, map.pr_offset);
+	rval = (long)mmap((void *)new_address, new_size,
+	    prot, mflags, fd, map->pr_offset);
 	(void) close(fd);
 
-	if ((void *)rval == MAP_FAILED)
-		return ((long)-ENOMEM);
+	if ((void *)rval == MAP_FAILED) {
+		rval = -ENOMEM;
+		goto out;
+	}
 
 	/*
 	 * Our mapping succeeded; we're now going to rip down the old mapping.
 	 */
 	(void) munmap((void *)old_address, old_size);
-
+out:
+	free(maps);
 	return (rval);
 }
