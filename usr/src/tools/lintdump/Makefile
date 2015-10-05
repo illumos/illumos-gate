@@ -25,18 +25,18 @@
 #
 
 PROG      = lintdump
-MAN1FILES = lintdump.1
+MAN1ONBLDFILES = lintdump.1onbld
 CFLAGS   += $(CCVERBOSE)
 
 include ../Makefile.tools
 
-$(ROOTONBLDMAN1FILES) := FILEMODE=	644
+$(ROOTONBLDMAN1ONBLDFILES) := FILEMODE=	644
 
 .KEEP_STATE:
 
 all:    $(PROG)
 
-install: all .WAIT $(ROOTONBLDMACHPROG) $(ROOTONBLDMAN1FILES)
+install: all .WAIT $(ROOTONBLDMACHPROG) $(ROOTONBLDMAN1ONBLDFILES)
 
 lint:	lint_PROG
 

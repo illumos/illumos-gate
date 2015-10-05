@@ -156,7 +156,10 @@ smb_sid_split(smb_sid_t *sid, uint32_t *rid)
 	if (!smb_sid_isvalid(sid) || (sid->sid_subauthcnt == 0))
 		return (NULL);
 
-	/* We will reduce sid_subauthcnt by one. */
+	/*
+	 * We will reduce sid_subauthcnt by one, because
+	 * the domain SID does not include the RID.
+	 */
 	size = smb_sid_len(sid) - sizeof (uint32_t);
 	if ((domsid = smb_sid_alloc(size)) == NULL)
 		return (NULL);
@@ -165,7 +168,7 @@ smb_sid_split(smb_sid_t *sid, uint32_t *rid)
 	domsid->sid_subauthcnt = sid->sid_subauthcnt - 1;
 
 	if (rid)
-		*rid = domsid->sid_subauth[domsid->sid_subauthcnt];
+		*rid = sid->sid_subauth[sid->sid_subauthcnt - 1];
 
 	return (domsid);
 }

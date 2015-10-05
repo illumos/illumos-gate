@@ -1,0 +1,325 @@
+.\" " CDDL HEADER START
+.\" "
+.\" " The contents of this file are subject to the terms of the
+.\" " Common Development and Distribution License (the "License").
+.\" " You may not use this file except in compliance with the License.
+.\" "
+.\" " You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" " or http://www.opensolaris.org/os/licensing.
+.\" " See the License for the specific language governing permissions
+.\" " and limitations under the License.
+.\" "
+.\" " When distributing Covered Code, include this CDDL HEADER in each
+.\" " file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" " If applicable, add the following below this CDDL HEADER, with the
+.\" " fields enclosed by brackets "[]" replaced with your own identifying
+.\" " information: Portions Copyright [yyyy] [name of copyright owner]
+.\" "
+.\" " CDDL HEADER END
+.\" "
+.\" "Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+.\" "Use is subject to license terms.
+.TH lintdump 1ONBLD "28 Mar 2008"
+.I lintdump
+\- dump the contents of one or more lint objects
+.SH SYNOPSIS
+\fBlintdump [-i] [-p 1|2|3] [-r] \fIlintobj\fP [ \fIlintobj\fP ... ]
+.LP
+.SH DESCRIPTION
+.IX "OS-Net build tools" "lintdump" "" "\fBlintdump\fP"
+.LP
+The lintdump utility dumps the contents of one or more lint
+objects.  This is chiefly useful when trying to understand the cause of
+unexpected or obtuse lint warnings (see EXAMPLES), but can also be used to
+find differences between lint objects across builds or releases, or to
+debug problems in lint itself.
+.LP
+A lint object is a binary file (typically suffixed with ".ln") constructed
+from a C source file via the "-c" option to lint(1).  Multiple lint
+objects may be combined into a lint library object (typically prefixed
+with "llib-l" and suffixed with ".ln") using the "-o" option to lint.  (As
+a convenience, lint "-o" allows a lint library object to be built directly
+from C source files). The lintdump utility is capable of dumping both
+traditional lint objects and lint library objects.
+.LP
+The format of a lint object is unstable and subject to change at any time,
+but its current structure is summarized here in order to aid in
+understanding the current output of lintdump.  A lint object consists of
+one or more lint modules (one per C source file).  Each lint module
+consists of a header and four sections, called PASS1, PASS2, PASS3, and
+STRINGS.  Generally speaking, PASS1 contains definitions, PASS2 contains
+declarations, and PASS3 contains information on whether or how functions
+or variables are used.  The STRINGS section holds the strings for
+printf(3C)/scanf(3C) checking.
+.LP
+Each PASS section consists of a sequence of binary records of assorted
+types.  The sequence of records is further partitioned by FILE records,
+which indicate the source or header file that is responsible for the
+records that follow.  The remaining record types provide lint with
+information about the functions, variables, and structures defined or used
+by the object. 
+.SH OPTIONS
+.TP 10
+.B -i
+Do not output structure tag IDs (see EXAMPLES).
+.TP 10
+.B -p 1|2|3
+Just output the PASS1, PASS2, or PASS3 section.
+.TP 10
+.B -r
+Output records using relative paths (see EXAMPLES).
+.LP
+.SH OUTPUT
+.LP
+The contents of each specified \fIlintobj\fP is dumped in command-line
+order.  For each \fIlintobj\fP, lintdump outputs a single line beginning
+with "LINTOBJ:" that provides its name.  For each lint module within that
+object, lintdump outputs a single line beginning with "LINTMOD:" that
+provides its module ID, the size of its PASS1, PASS2, PASS3, STRING
+sections, and its total size, in that order.
+.LP
+Next, unless the -p option is used, the contents of the PASS1, PASS2, and
+PASS3 sections are dumped, in order.  Before each section is dumped,
+lintdump outputs a single line beginning with "SECTION:" that
+provides the name and size of the section.  For each section,
+lintdump outputs each record in order.  The display format of each
+record depends on its type:
+.LP
+.B FILE RECORDS
+.RS 4
+Each FILE record is displayed on a single line beginning with "FILE:".
+Note that FILE records are often found in pairs, the first providing the
+absolute path to the file.  FILE records containing absolute paths are
+omitted if -r is used.  Other record types following a FILE record are
+indented to show their relationship to the FILE record.
+.RE
+.LP
+.B FUNCTION AND VARIABLE RECORDS
+.RS 4
+Each function or variable record is displayed on a single line using an
+extended version of the format used in The C Programming Language, Second
+Edition.  In particular, properties contained in the record that cannot be
+conveyed in C are displayed in angle brackets following definition or
+declaration; a full list of these and their meanings are given below in
+RECORD PROPERTIES.  In addition, note that some structures or unions may
+only be known by a numeric \fIID\fP, and thus output as "struct <tag
+\fIID\fP>".  This ID can be used to pair the structure with its definition
+via structure records.  If -i is used, then "struct <anon>" is printed
+instead.
+.RE
+.LP
+.B STRUCTURE AND UNION RECORDS
+.RS 4
+Each structure or union record is displayed using an extended version of
+the standard multi-line format used in The C Programming Language, Second
+Edition.  In particular, to facilitate problem analysis, unless -i is
+used, each structure or union definition includes a numeric ID enclosed in
+angle-brackets, such as "struct FILE <tag 1298> {".
+.RE
+.LP
+To illustrate each of the common record formats, suppose the following
+lint library is built:
+.LP
+.nf
+$ cat > liba.c
+/* LINTLIBRARY */
+/* PROTOLIB1 */
+int af(int);
+struct as {
+        char as_name[32];
+        int  as_flag;
+} as;
+$ lint -oa liba.c
+.fi
+.LP
+Then lintdump will produce the following output:
+.LP
+.nf
+LINTOBJ: llib-la.ln
+LINTMOD: 6484: 268+24+130+9 = 431 bytes
+SECTION: PASS1: 268 bytes
+   FILE: /home/meem/hacks/liba.c
+   FILE: liba.c
+         extern int af(int);
+         struct as as;
+         struct as <tag 98> {
+             char as_name[];
+             int as_flag;
+         };
+SECTION: PASS2: 24 bytes
+SECTION: PASS3: 130 bytes
+   FILE: /home/meem/hacks/liba.c
+   FILE: liba.c
+         int af(void) <returns value>;
+.fi
+.LP
+.SH RECORD PROPERTIES
+.LP
+As discussed in OUTPUT, some records are displayed using an extended
+format to convey information that cannot be expressed in C.  The following
+extended information may be displayed:
+.RE
+.LP
+.B <PRINTFLIKE\fIn\fP>
+.RS 4
+Indicates to lint that argument \fIn\fP to the variable-argument function
+is a format string in printf(3C) format, which enhances lint's argument
+checking.
+.RE
+.LP
+.B <SCANFLIKE\fIn\fP>
+.RS 4
+Indicates to lint that argument \fIn\fP to the variable-argument function
+is a format string in scanf(3C) format, which enhances lint's argument
+checking.
+.RE
+.LP
+.B <definition>
+.RS 4
+Indicates to lint that this record represents the definition of the given
+variable or function (rather than a declaration).
+.RE
+.LP
+.B <use: side-effects context>
+.RS 4
+Indicates to lint that the associated function is called in a context that
+suggests it has side effects.
+.RE
+.LP
+.B <use: return value context>
+.RS 4
+Indicates to lint that the associated function is called in a context where
+its return value is used.
+.RE
+.LP
+.B <use: unspecified context>
+.RS 4
+Indicates to lint that the associated function is used in an unspecified
+manner.
+.RE
+.LP
+.B <returns value>
+.RS 4
+Indicates to lint that the function returns a value.
+.RE
+.LP
+.SH EXAMPLES
+.LP
+One common problem is that lint does not always provide sufficient
+information to understand the reason for a type mismatch.  For instance,
+sometimes lint will confusingly report a type mismatch between
+apparently-identical types:
+.LP
+.nf
+$ lint msghdr.c -lsocket
+function argument ( number ) used inconsistently
+    recvmsg (arg 2) llib-lsocket:socket.h(437) struct msghdr * ::
+                                 msghdr.c(12)  struct msghdr *
+.fi
+.LP
+By using lintdump, we can pinpoint the problem by examining both
+definitions for \fIstruct msghdr\fP:
+.LP
+.nf
+$ lintdump /lib/llib-lsocket.ln
+   \fI[ ... ]\fP
+   FILE: llib-lsocket:socket.h
+         struct msghdr <tag 4532> {
+             void *msg_name;
+             unsigned int msg_namelen;
+             struct iovec *msg_iov;
+             int msg_iovlen;
+             \fBchar *msg_accrights;\fP
+             \fBint msg_accrightslen;\fP
+         };
+.fi
+.LP
+.nf
+$ lint -omsghdr msghdr.c -lsocket
+$ lintdump llib-lmsghdr.ln
+   \fI[ ... ]\fP
+   FILE: socket.h
+         struct msghdr <tag 1315> {
+             void *msg_name;
+             unsigned int msg_namelen;
+             struct iovec *msg_iov;
+             int msg_iovlen;
+             \fBvoid *msg_control;\fP
+             \fBunsigned int msg_controllen;\fP
+             \fBint msg_flags;\fP
+         };
+.fi
+.LP
+Looking at <sys/socket.h>, the problem becomes apparent: the structure
+changes depending on compile-time options, which clearly differ between
+the application and the library:
+.LP
+.nf
+struct msghdr {
+        void            *msg_name;
+        socklen_t       msg_namelen;
+        struct iovec    *msg_iov;
+        int             msg_iovlen;
+
+#if defined(_XPG4_2) || defined(_KERNEL)
+        void            *msg_control;
+        socklen_t       msg_controllen;
+        int             msg_flags;
+#else
+        caddr_t         msg_accrights;
+        int             msg_accrightslen;
+#endif  /* defined(_XPG4_2) || defined(_KERNEL) */
+};
+.fi
+.LP
+Another use of lintdump is to compare two versions of a lint object to
+see whether anything of significance has changed.  For instance, lintdump
+can be used to understand why a lint library is different between a
+project gate and a patch gate, and thus to determine whether the library
+will need to be redelivered in the patch including the project:
+.LP
+.nf
+$ PATCHROOT=/ws/on10-patch/proto/root_i386
+$ diff llib-lkstat.ln $PATCHROOT/lib/llib-lkstat.ln
+Binary files llib-lkstat.ln and
+             /ws/on10-patch/proto/root_i386/lib/llib-lkstat.ln differ
+$ lintdump -ir llib-lkstat.ln > /tmp/proj-kstat.out
+$ lintdump -ir $PATCHROOT/lib/llib-lkstat.ln > /tmp/patch-kstat.out
+.fi
+.LP
+.nf
+$ diff /tmp/patch-kstat.out /tmp/proj-kstat.out
+1,2c1,2
+< LINTMOD: 3675: 4995+26812+1045+9 = 32861 bytes
+< SECTION: PASS1: 4995 bytes
+---
+> LINTMOD: 39982: 5144+27302+1057+9 = 33512 bytes
+> SECTION: PASS1: 5144 bytes
+19c19
+<              unsigned char _file;
+---
+>              unsigned char _magic;
+22a23,24
+>              unsigned int __extendedfd;
+>              unsigned int __xf_nocheck;
+\fI[ ... ]\fP
+.fi
+.LP
+Note that -r option removes spurious differences that would otherwise
+arise from different absolute paths to the same source file, and the -i
+option removes spurious differences due to ID generation inside lint.
+.LP
+.SH SEE ALSO
+.LP
+.IR lint(1),
+.IR printf(3C),
+.IR scanf(3C)
+.SH NOTES
+This utility is provided as an interim solution until a stable utility
+can be bundled with Sun Studio.  As such, any use of this utility in
+scripts or embedded inside programs should be done with knowledge that
+subsequent changes will be required in order to transition to the stable
+solution.
+.LP
+The lint object file format does not have a way to represent bitfields. As
+such, bitfield size information cannot be displayed by lintdump.

@@ -34,9 +34,9 @@ include ../Makefile.tools
 
 CERRWARN += -_gcc=-Wno-parentheses
 
-MAN1FILES= codereview.1
+MAN1ONBLDFILES= codereview.1onbld
 
-$(ROOTONBLDMAN1FILES) := FILEMODE=      644
+$(ROOTONBLDMAN1ONBLDFILES) := FILEMODE=      644
 
 COPTS=	-O
 
@@ -50,7 +50,7 @@ $(PROG): $(OBJS)
 	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
 	$(POST_PROCESS)
 
-install: all .WAIT  $(ROOTONBLDMACHPROG) $(ROOTONBLDMAN1FILES)
+install: all .WAIT  $(ROOTONBLDMACHPROG) $(ROOTONBLDMAN1ONBLDFILES)
 
 clean:
 	$(RM) $(CLEANFILES)

@@ -34,8 +34,6 @@
 #include <smbsrv/string.h>
 #include <smbsrv/netbios.h>
 
-static int domainname_is_valid(char *domain_name);
-
 /*
  * Routines than support name compression.
  *
@@ -221,7 +219,7 @@ netbios_first_level_name_encode(unsigned char *name, unsigned char *scope,
 int
 netbios_first_level_name_decode(char *in, char *name, char *scope)
 {
-	unsigned int	length, bytes;
+	unsigned int	length;
 	char		c1, c2;
 	char		*cp;
 	char		*out;
@@ -247,51 +245,15 @@ netbios_first_level_name_decode(char *in, char *name, char *scope)
 		length -= 2;
 	}
 
-	out = scope;
-	bytes = 0;
-	for (length = *cp++; length != 0; length = *cp++) {
-		if ((length & 0xc0) != 0x00) {
-			/*
-			 * This is a pointer or a reserved field. If it's
-			 * a pointer (16-bits) we have to skip the next byte.
-			 */
-			if ((length & 0xc0) == 0xc0) {
-				cp++;
-				continue;
-			}
-		}
-
-		/*
-		 * Replace the length with a '.', except for the first one.
-		 */
-		if (out != scope) {
-			*out++ = '.';
-			bytes++;
-		}
-
-		while (length-- > 0) {
-			if (bytes++ >= (NETBIOS_DOMAIN_NAME_MAX - 1)) {
-				return (-1);
-			}
-			*out++ = *cp++;
-		}
-	}
-	*out = 0;
-
 	/*
-	 * We are supposed to preserve all 8-bits of the domain name
-	 * but due to the single byte representation in the name cache
-	 * and UTF-8 encoding everywhere else, we restrict domain names
-	 * to Appendix 1 - Domain Name Syntax Specification in RFC883.
+	 * Don't bother decoding the scope.  Not supported.
 	 */
-	if (domainname_is_valid(scope))	{
-		(void) smb_strupr(scope);
-		/*LINTED E_PTRDIFF_OVERFLOW*/
-		return (cp - in);
-	}
-
+	if ((length = *cp++) != 0)
+		return (-1);
 	scope[0] = '\0';
-	return (-1);
+
+	/*LINTED E_PTRDIFF_OVERFLOW*/
+	return (cp - in);
 }
 
 /*
@@ -316,78 +278,6 @@ netbios_name_isvalid(char *in, char *out)
 
 	if (out)
 		(void) strlcpy(out, name, NETBIOS_NAME_SZ);
-
-	return (1);
-}
-
-/*
- * Characters that we allow in DNS domain names, in addition to
- * alphanumeric characters. This is not quite consistent with
- * RFC883. This is global so that it can be patched if there is
- * a need to change the valid characters in the field.
- */
-static const char dns_allowed[] = "-_";
-
-/*
- * dns_is_allowed
- *
- * Check the dns_allowed characters and return true (1) if the character
- * is in the table. Otherwise return false (0).
- */
-static int
-dns_is_allowed(unsigned char c)
-{
-	const char *p = dns_allowed;
-
-	while (*p) {
-		if ((char)c == *p++)
-			return (1);
-	}
-
-	return (0);
-}
-
-
-/*
- * domainname_is_valid
- *
- * Check the specified domain name for mostly compliance with RFC883
- * Appendix 1. Names may contain alphanumeric characters, hyphens,
- * underscores and dots. The first character after a dot must be an
- * alphabetic character. RFC883 doesn't mention underscores but we
- * allow it due to common use, and we don't check that labels end
- * with an alphanumeric character.
- *
- * Returns true (1) if the name is valid. Otherwise returns false (0).
- */
-static int
-domainname_is_valid(char *domain_name)
-{
-	char *name;
-	int first_char = 1;
-
-	if (domain_name == 0)
-		return (0);
-
-	for (name = domain_name; *name != 0; ++name) {
-		if (*name == '.') {
-			first_char = 1;
-			continue;
-		}
-
-		if (first_char)	{
-			if (smb_isalpha_ascii(*name) == 0)
-				return (0);
-
-			first_char = 0;
-			continue;
-		}
-
-		if (smb_isalnum_ascii(*name) || dns_is_allowed(*name))
-			continue;
-
-		return (0);
-	}
 
 	return (1);
 }

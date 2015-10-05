@@ -19,7 +19,7 @@
  * CDDL HEADER END
  *
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*
@@ -287,6 +287,12 @@ smb_shr_sa_enter(void)
 		return (NULL);
 	}
 
+	if (smb_sa_handle.sa_handle != NULL &&
+	    sa_needs_refresh(smb_sa_handle.sa_handle)) {
+		sa_fini(smb_sa_handle.sa_handle);
+		smb_sa_handle.sa_handle = NULL;
+	}
+
 	if (smb_sa_handle.sa_handle == NULL) {
 		smb_sa_handle.sa_handle = sa_init(SA_INIT_SHARE_API);
 		if (smb_sa_handle.sa_handle == NULL) {
@@ -380,6 +386,7 @@ smb_shr_iterate(smb_shriter_t *shi)
 uint32_t
 smb_shr_add(smb_share_t *si)
 {
+	struct stat st;
 	smb_share_t *cached_si;
 	nvlist_t *shrlist;
 	uint32_t status;
@@ -403,6 +410,18 @@ smb_shr_add(smb_share_t *si)
 		}
 		smb_shr_cache_unlock();
 		return (status);
+	}
+
+	if (STYPE_ISDSK(si->shr_type)) {
+		/*
+		 * If share type is STYPE_DISKTREE then the path to the
+		 * share should exist so that we can add the share to cache.
+		 */
+		rc = stat(si->shr_path, &st);
+		if (rc != 0) {
+			smb_shr_cache_unlock();
+			return (NERR_ItemNotFound);
+		}
 	}
 
 	if ((status = smb_shr_cache_addent(si)) != NERR_Success) {
@@ -471,7 +490,7 @@ smb_shr_remove(char *sharename)
 		return (NERR_NetNameNotFound);
 	}
 
-	if (si->shr_type & STYPE_IPC) {
+	if (STYPE_ISIPC(si->shr_type)) {
 		/* IPC$ share cannot be removed */
 		smb_shr_cache_unlock();
 		return (ERROR_ACCESS_DENIED);
@@ -537,7 +556,7 @@ smb_shr_rename(char *from_name, char *to_name)
 		return (NERR_NetNameNotFound);
 	}
 
-	if (from_si->shr_type & STYPE_IPC) {
+	if (STYPE_ISIPC(from_si->shr_type)) {
 		/* IPC$ share cannot be renamed */
 		smb_shr_cache_unlock();
 		return (ERROR_ACCESS_DENIED);
@@ -630,7 +649,7 @@ smb_shr_modify(smb_share_t *new_si)
 		return (NERR_NetNameNotFound);
 	}
 
-	if (si->shr_type & STYPE_IPC) {
+	if (STYPE_ISIPC(si->shr_type)) {
 		/* IPC$ share cannot be modified */
 		smb_shr_cache_unlock();
 		return (ERROR_ACCESS_DENIED);
@@ -982,7 +1001,7 @@ smb_shr_list(int offset, smb_shrlist_t *list)
 			continue;
 
 		if ((si->shr_flags & SMB_SHRF_TRANS) &&
-		    ((si->shr_type & STYPE_IPC) == 0)) {
+		    (!STYPE_ISIPC(si->shr_type))) {
 			bcopy(si, &list->sl_shares[n], sizeof (smb_share_t));
 			if (++n == LMSHARES_PER_REQUEST)
 				break;
@@ -1366,10 +1385,6 @@ smb_shr_cache_addent(smb_share_t *si)
 		return (ERROR_NOT_ENOUGH_MEMORY);
 
 	(void) smb_strlwr(si->shr_name);
-
-	if (((si->shr_type & STYPE_PRINTQ) == 0) &&
-	    (si->shr_type & STYPE_IPC) == 0)
-		si->shr_type = STYPE_DISKTREE;
 
 	si->shr_type |= smb_shr_is_special(cache_ent->shr_name);
 

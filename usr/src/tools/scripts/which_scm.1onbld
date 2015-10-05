@@ -1,0 +1,77 @@
+.\"
+.\" CDDL HEADER START
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.\" CDDL HEADER END
+.\"
+.\" Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+.\" Use is subject to license terms.
+.\"
+.TH which_scm 1ONBLD "18 September 2009"
+.SH NAME
+which_scm \- Report Source Code Management system
+.SH SYNOPSIS
+.B which_scm
+
+.SH DESCRIPTION
+.B which_scm
+detects the Source Code Management (SCM) system in use, and prints a
+single line of text containing a one-word name for the SCM, followed
+by a space, and then the top-level directory path for the workspace.
+
+The typical usage within a ksh script is:
+.nf
+        which_scm | read SCM_TYPE CODEMGR_WS || exit 1
+.fi
+
+If CODEMGR_WS is set in the environment, then \fBwhich_scm\fR
+checks only that directory, assuming that it is the top of the tree.
+
+If CODEMGR_WS is not set, then \fBwhich_scm\fR searches upwards to
+find the containing workspace path, and reports that path.
+
+.B which_scm
+can detect the following types of SCM systems (these are the keywords
+used in the output format):
+.nf
+	cvs
+	git
+	mercurial
+	rcs
+	sccs
+	subversion
+	teamware
+.fi
+
+If the type of SCM in use is not known, then the string "unknown" is
+printed, and the path returned is $CODEMGR_WS (if set) or the current
+working directory.  The command may exit with an error if the SCM
+could be detected, but is unusable.
+
+.SH ENVIRONMENT VARIABLES
+The following environment variable is used by \fBwhich_scm\fR:
+
+.PP
+\fBCODEMGR_WS\fR path to current workspace.
+
+.SH SEE ALSO
+.IR cvs(1) ,
+.IR git(1) ,
+.IR hg(1) ,
+.IR sccs(1)
+.IR svn(1) ,
+.IR workspace(1)
