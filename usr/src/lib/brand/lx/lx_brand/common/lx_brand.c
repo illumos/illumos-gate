@@ -760,22 +760,34 @@ lx_exit_common(void)
 
 	switch (lxtsd->lxtsd_exit) {
 	case LX_ET_EXIT:
-		lx_debug("lx_exit_common(LX_ET_EXIT, %d)\n", ev);
+		lx_debug("lx_exit_common(LX_ET_EXIT, %d, %d)\n", thr_self(),
+		    ev);
 
-		/*
-		 * If the thread is exiting, but not the entire process, we
-		 * must free the stack we allocated for usermode emulation.
-		 * This is safe to do here because the setcontext() put us
-		 * back on the BRAND stack for this process.  This function
-		 * also frees the thread-specific data object for this thread.
-		 */
-		lx_free_stack();
+		if (thr_self() == 1) {
+			/*
+			 * Modern versions of glibc will call the exit_group
+			 * syscall when exit(3) is called, but if the primary
+			 * thread explicitly invokes the exit syscall we now
+			 * need to exit with the proper value.
+			 */
+			exit(ev);
+		} else {
+			/*
+			 * If the thread is exiting, but not the entire process,
+			 * we must free the stack we allocated for usermode
+			 * emulation. This is safe to do here because the
+			 * setcontext() put us back on the BRAND stack for this
+			 * process.  This function also frees the
+			 * thread-specific data object for this thread.
+			 */
+			lx_free_stack();
 
-		/*
-		 * The native thread return value is never seen so we pass
-		 * NULL.
-		 */
-		thr_exit(NULL);
+			/*
+			 * The native thread return value is never seen so we
+			 * pass NULL.
+			 */
+			thr_exit(NULL);
+		}
 		break;
 
 	case LX_ET_EXIT_GROUP:
