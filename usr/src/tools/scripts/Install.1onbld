@@ -1,0 +1,362 @@
+.\"
+.\" Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+.\" Use is subject to license terms.
+.\"
+.\" CDDL HEADER START
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.\" CDDL HEADER END
+.\"
+.TH Install 1ONBLD "14 Jan 2010"
+.SH NAME
+Install \- install a kernel from an ON workspace
+.SH SYNOPSIS
+.TP 8n
+.B Install
+.RB [ " \-w "
+.IR workspace " ]"
+.RB [ " \-s "
+.IR "source dir" " ]"
+.br
+.RB [ " \-k  "
+.IR "kernel arch" " ]"
+.RB "[ " \-n " | " \-t|T
+.IR target " ]"
+.br
+.RB [ " \-u|m|a " ]
+.RB [ " \-v|V|q " ]
+.RB [ " \-c|p " ]
+.br
+.RB [ " \-l "
+.IR "library file" " ]"
+.RB [ " \-L " ]
+.RB [ " \-3 " ]
+.RB [ " \-6 " ]
+.RB [ " \-K " ]
+.br
+.RB [ " \-o "
+{
+.BR obj " | "
+.B debug
+}
+]
+.RB [ " \-d "
+.IR "work dir" " ]"
+.br
+.RB [ " \-D "
+.IR "library dir" " ]"
+.RB [ " \-G "
+.IB glomname " ]"
+.RI [ " module ... " ]
+.LP
+or
+.LP
+.BR "Install \-R " "[ options ]"
+.SH DESCRIPTION
+.LP
+.B Install
+is a utility which simplifies the process of installing a 5.0 system.
+.B Install
+goes into a built ON workspace (or any kernel source tree),
+looks at the Makefiles,
+and figures out how to construct the /kernel and /usr/kernel directories.
+It then creates a tarfile
+.RB "(see " tar "(1))"
+containing /kernel, /usr/kernel, and a few related /etc files.  If a
+.I target ([user@]machine:/dir)
+is specified, the tarfile is either copied to
+.IR machine:/dir " (-T) or untarred on " "machine" " in " "/dir" " (-t),"
+using the remote user id
+.IR user ,
+if specified.
+With no options,
+.B Install
+creates a sun4c system from files in the current workspace (as indicated
+by $SRC) and places the tarfile in /tmp/Install.username/Install.sun4c.tar.
+
+.SH OPTIONS
+.TP 20n
+.BI "-w" " ws"
+Install the system built in the ON workspace
+.I ws.  ws
+must be a built ON workspace \(em
+.B Install
+will not automatically invoke
+.BR make "(1).  If " \-w " is not specified, " Install " uses the current
+workspace (as indicated by $CODEMGR_WS).  If there is no current workspace,
+.B Install
+checks to see if you are in an appropriate source directory, e.g. uts/sun4c;
+if so,
+.B Install
+takes files from there.  Otherwise,
+.B Install
+looks for files under $SRC/uts.
+.TP
+.BI "-s" " source directory"
+where to look for files [default: $SRC/uts].
+.TP
+.BI "-k" " kernel arch"
+the type of kernel to install.  The default is sun4c; however, if you invoke
+.B Install
+from $SRC/uts/sun4z,
+.B Install
+assumes you want a sun4z kernel.
+.TP
+.B "-n"
+No target; just create the tarfile in
+/tmp/Install.username/Install.sun4c.tar [default].
+.BR "-n" " implies " "-p" .
+.TP
+.BI "-t" " target"
+Install the system on
+.I target ([user@]machine:/dir).
+This means that kernel/unix is copied to
+.I machine:/dir/kernel/unix,
+etc.
+.IR /dir " is typically either " / " or " /mnt.
+.BR "-t" " implies " "-c" .
+The default remote user id is the same as the local one ($LOGNAME).
+.TP
+.BI "-T" " target"
+Copy the tarfile to
+.I target ([user@]machine:/dir).
+This creates the file
+.I /dir/Install.tar
+on
+.I machine.
+To finish the install, log on to
+.I machine
+as root, and type
+.RB `` "cd /; tar xvf /dir/Install.tar" "''."
+.BR "-T" " implies " "-c" .
+.TP
+.B "-u"
+Install unix only.
+.TP
+.B "-m"
+Install modules only.
+.TP
+.B "-a"
+Install unix and all modules [default].
+.TP
+.B "-v"
+Verbose mode.
+.TP
+.B "-V"
+REALLY verbose mode.  Useful mainly for debugging.
+.TP
+.B "-q"
+Quiet mode [default].  Only fatal messages are printed.
+.TP
+.B "-c"
+Clean up.  After a successful install, delete the files created in
+/tmp/Install.username.  This is the default behavior if a
+.I target
+is specified with
+.BR "-t" " or " "-T" .
+.TP
+.B "-p"
+Preserve temp files.  This is the default behavior when no
+.I target
+is specified
+.RB ( "-n" ).
+.TP
+.B "-R"
+Recover from a failed
+.BR Install .
+This is not required, it's just faster than restarting.
+A typical scenario is for
+.B Install
+to run smoothly right up to the very end, but then die with
+"Permission denied" when it tries to rsh/rcp to the target machine.
+At this point, you log on to the target machine, diddle the permissions,
+log off, and type
+.RB `` "Install -R" "''."
+.B Install
+will only have to retry the rsh/rcp,
+rather than rebuild the tarfile from scratch.
+.TP
+.BI "-d" " temp directory"
+specifies where
+.B Install
+should create its temp files [default: /tmp/Install.username].  This is
+useful if you have limited space in /tmp (\fBInstall\fR can take as
+much as 100MB).
+The suffix "Install.username" is always appended.
+.TP
+.B "-L"
+add a system to your library.  This allows you to build a personal
+collection of installable systems from various environments and for
+various architectures.  When you type
+.RB `` "Install -w /ws/ws_name -k arch -L" "'', " Install
+creates a tarfile called
+.I ws_name.arch.tar
+in your library directory (~/LibInstall by default).
+.BR "-L" " implies " "-c" .
+.TP
+.BI "-l" " library file"
+Installs the system contained in
+.I library file.
+You may omit the ``.tar'' suffix.  For example,
+.RB `` "Install -l my_ws.sun4c -t machine:/" ''
+installs a system you previously built with
+.B "-L"
+(from sun4c files in my_ws) on 
+.IR machine:/ .
+This is equivalent to typing
+.RB `` "rsh machine '(cd /; tar xvf -)' <~/LibInstall/my_ws.sun4c.tar" '',
+but it's easier to remember.
+.TP
+.BI "-D" " lib directory"
+specifies the library directory [default: $HOME/LibInstall].
+.TP
+.BI "-G " glomname
+gloms /kernel and /usr/kernel together into a single /kernel directory.
+Useful for development work, e.g. use "Install -G good [...]" to create a
+"/kernel.good".
+.TP
+.BR "-o " "{ \fBobj\fP | \fBdebug\fP }"
+object directory. The default is "debug".
+.TP
+.B \-3
+32-bit modules only
+.TP
+.B \-6
+64-bit modules only
+.TP
+.B \-K
+Do not include kmdb misc module or dmods
+.TP
+.B "-h"
+Help.  Prints a brief summary of
+.BR Install "'s"
+options.
+.LP
+If you are in a directory like $SRC/uts/sun4z when you invoke
+.BR Install ,
+it will infer that you want to install a sun4z system
+from the current workspace.
+.LP
+If you supply a list of modules, it overrides any of the
+.B "-uma"
+options.  You only need to specify the basename of the
+module(s), e.g. ``\fBInstall ufs nfs le\fR''.
+``\fBInstall unix\fR'' is equivalent to ``\fBInstall -u\fR'', and
+``\fBInstall modules\fR'' is equivalent to ``\fBInstall -m\fR''.
+.LP
+You can customize
+.B Install
+by creating a .Installrc file in your home directory.  .Installrc
+should consist of a list of command-line-style options, e.g:
+.LP
+.B
+	-w /ws/foo
+.br
+.B
+	-t labmachine:/mnt -pv
+.LP
+.B Install
+processes default options first, then .Installrc
+options, then command-line options.  In the case of
+conflicting options (e.g. \fB-uma\fR), the last one wins.
+.LP
+In order to use the most convenient form of
+.BR Install " (``" "Install -t machine:/" "''),"
+you will need to do the following on the target machine:
+.LP
+.br
+	(1) add your machine name to the /etc/hosts.equiv file
+.br
+	(2) add your username to the /etc/{passwd,shadow} files
+.br
+	(3) chown -R yourself /kernel /usr/kernel
+.br
+	(4) chmod -R u+w /kernel /usr/kernel
+.SH "ENVIRONMENT"
+.LP
+You can set the following variables in your environment:
+.LP
+ON_CRYPTO_BINS
+.IP
+file containing signed cryptographic binaries.  This is only needed if
+you are not building the closed-source tree.
+.LP
+INSTALL_RC [default: $HOME/.Installrc]
+.IP
+file containing default options for \fBInstall\fR
+.LP
+INSTALL_STATE [default: $HOME/.Install.state]
+.IP
+where \fBInstall\fR keeps its state information
+.LP
+INSTALL_DIR [default: /tmp/Install.username]
+.IP
+where \fBInstall\fR does its work.  This can be overridden on
+the command line with \fB\-d\fR.
+.LP
+INSTALL_LIB [default: $HOME/LibInstall]
+.IP
+where \fBInstall\fR gets/puts library files.  This can be overridden on
+the command line with \fB\-D\fR.
+.LP
+INSTALL_CP [default: cp -p]
+.IP
+the command to copy files locally
+.LP
+INSTALL_RCP [default: rcp -p]
+.IP
+the command to copy files remotely
+.bp
+.SH "EXAMPLES"
+.LP
+.B
+Install -w /ws/blort -t machine:/
+.IP
+.RI "installs the system built in workspace " /ws/blort " on " machine:/
+.LP
+.B
+Install -w /ws/blort -T machine:/tmp
+.br
+.B
+rsh machine -l root "cd /; tar xvf /tmp/Install.tar"
+.IP
+is an equivalent way to do the previous example
+.LP
+.B Install
+.IP
+makes a tarfile containing a sun4c kernel,
+and places it in /tmp/Install.username/Install.sun4c.tar.  However, if you
+are in one of the arch directories (e.g. $SRC/uts/sun4m) when you invoke
+.BR Install ,
+you will get a tarfile for that architecture instead.
+.LP
+.B
+Install -k sun4m -w /ws/on493 -t mpbox:/ ufs
+.IP
+installs a new sun4m ufs module from workspace /ws/on493 on mpbox:/
+.SH "FILES"
+$HOME/.Installrc, $HOME/.Install.state
+.SH "SEE ALSO"
+.BR tar "(1), " rsh "(1), " rcp "(1)"
+.SH "BUGS"
+.BR tar "(1) and " rsh "(1)"
+do not have particularly useful exit codes.  To compensate,
+.B Install
+feeds stderr through grep -v and throws away error messages which it
+considers harmless.  If there's anything left,
+.B Install
+assumes it is fatal.  It's a hack, but it works.

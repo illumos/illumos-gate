@@ -174,6 +174,7 @@ file path=usr/share/man/man1m/nscd.1m
 file path=usr/share/man/man1m/nwamd.1m
 file path=usr/share/man/man1m/passmgmt.1m
 file path=usr/share/man/man1m/pbind.1m
+file path=usr/share/man/man1m/ping.1m
 file path=usr/share/man/man1m/pmadm.1m
 file path=usr/share/man/man1m/ports.1m
 file path=usr/share/man/man1m/praudit.1m

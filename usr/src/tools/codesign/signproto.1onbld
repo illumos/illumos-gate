@@ -1,0 +1,74 @@
+.\"
+.\" CDDL HEADER START
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.\" CDDL HEADER END
+.\"
+.\" Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+.\" Use is subject to license terms.
+.\"
+.TH signproto 1ONBLD "13 June 2007"
+.SH NAME
+.I signproto
+\- sign ELF objects in proto area
+.SH SYNOPSIS
+\fBsignproto \fIcred_file\fP
+.LP
+.SH DESCRIPTION
+.IX "OS-Net build tools" "signproto" "" "\fBsignproto\fP"
+.LP
+.I signproto
+finds ELF objects in the ON proto area and re-signs them
+using 
+.IR signit (1ONBLD).
+This operation is normally invoked only for
+release builds, as it replaces the internal development
+signatures with official Sun signatures. The actual signing using
+Sun's private key is performed by a code signing server which
+is accessed via
+.IR signit .
+.LP
+Cryptographic modules are identified by examining the signature
+embedded by
+.IR elfsign (1)
+during the build process. 
+.I signproto
+requires a single command-line argument, which is a file containing
+the mapping between each signing server credential name and the Subject
+Distinguished Name (DN) of the certificate used to 
+sign the ELF file. Each line in the file contains a credential name
+followed by a regular expression. The first regular expression that
+matches the Subject DN embedded in the ELF file determines the 
+credential name passed to
+.I signit
+to re-sign the file.
+.LP
+.SH ENVIRONMENT
+.LP
+.TP 4
+.B CODESIGN_USER
+Login name for the code signing server passed to
+.I signit .
+If this variable is not set, the value in LOGNAME is used instead.
+.LP
+.TP 4
+.B ROOT
+Location of ON proto area containing files to be signed.
+.LP
+.SH SEE ALSO
+.LP
+signit(1ONBLD), elfsign(1)

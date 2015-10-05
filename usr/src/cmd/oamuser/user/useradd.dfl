@@ -31,3 +31,8 @@ EXCEED_TRAD=warning
 #EXCEED_TRAD=error
 #EXCEED_TRAD=silent
 
+# The MANAGE_ZFS indicates if ZFS create/destroy operations
+# should be performed by default when user passes -m flag to
+# userdel/usermod or -r flag to userdel
+MANAGE_ZFS=NO
+#MANAGE_ZFS=YES

@@ -152,4 +152,11 @@ extern void errmsg(int, ...);
 /* ERROR: %s is too long.  Choose another. */
 #define	M_TOO_LONG	38
 
+/*
+ * WARNING: Avoided creating ZFS filesystem as parent directory
+ * %s is not a ZFS mount point.
+ */
+#define	M_NO_ZFS_MOUNTPOINT	39
+
+
 #endif /* _MESSAGES_H */

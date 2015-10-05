@@ -25,7 +25,7 @@
 
 PROG=	ndrgen ndrgen1
 
-MAN1FILES=	ndrgen.1
+MAN1ONBLDFILES=	ndrgen.1onbld
 
 OBJS=	ndr_main.o ndr_lex.o ndr_anal.o \
 	ndr_gen.o ndr_parse.o ndr_print.o
@@ -39,15 +39,15 @@ CERRWARN += -_gcc=-Wno-unused
 
 CLEANFILES += $(OBJS) y.tab.c y.tab.h
 
-$(ROOTONBLDMAN1FILES) := FILEMODE=      644
+$(ROOTONBLDMAN1ONBLDFILES) := FILEMODE=      644
 
 .KEEP_STATE:
 
 .PARALLEL: $(OBJS)
 
-all:	$(PROG) $(MAN1FILES)
+all:	$(PROG) $(MAN1ONBLDFILES)
 
-install: all .WAIT $(ROOTONBLDMACHPROG) $(ROOTONBLDMAN1FILES)
+install: all .WAIT $(ROOTONBLDMACHPROG) $(ROOTONBLDMAN1ONBLDFILES)
 
 lint:	lint_SRCS
 

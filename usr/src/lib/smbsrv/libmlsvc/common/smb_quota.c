@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <stdio.h>
@@ -194,7 +195,10 @@ static uint32_t smb_quota_query_list(smb_quota_tree_t *,
 #define	SMB_QUOTA_CNTRL_DIR		".$EXTEND"
 #define	SMB_QUOTA_CNTRL_FILE		"$QUOTA"
 #define	SMB_QUOTA_CNTRL_INDEX_XATTR	"SUNWsmb:$Q:$INDEX_ALLOCATION"
-#define	SMB_QUOTA_CNTRL_PERM		"everyone@:rwpaARWc::allow"
+/*
+ * Note: this line needs to have the same format as what acl_totext() returns.
+ */
+#define	SMB_QUOTA_CNTRL_PERM		"everyone@:rw-p--aARWc--s:-------:allow"
 
 /*
  * smb_quota_init
@@ -1122,9 +1126,10 @@ static void
 smb_quota_add_ctrldir(const char *path)
 {
 	int newfd, dirfd, afd;
-	nvlist_t *request;
-	char dir[MAXPATHLEN], file[MAXPATHLEN];
-	acl_t *aclp;
+	nvlist_t *attr;
+	char dir[MAXPATHLEN], file[MAXPATHLEN], *acl_text;
+	acl_t *aclp, *existing_aclp;
+	boolean_t qdir_created, prop_hidden = B_FALSE, prop_sys = B_FALSE;
 	struct stat statbuf;
 
 	assert(path != NULL);
@@ -1133,28 +1138,59 @@ smb_quota_add_ctrldir(const char *path)
 	(void) snprintf(file, MAXPATHLEN, "%s/%s", dir, SMB_QUOTA_CNTRL_FILE);
 	if ((mkdir(dir, 0750) < 0) && (errno != EEXIST))
 		return;
+	qdir_created = (errno == EEXIST) ? B_FALSE : B_TRUE;
 
 	if ((dirfd = open(dir, O_RDONLY)) < 0) {
-		(void) remove(dir);
+		if (qdir_created)
+			(void) remove(dir);
 		return;
 	}
 
-	if (nvlist_alloc(&request, NV_UNIQUE_NAME, 0) == 0) {
-		if ((nvlist_add_boolean_value(request, A_HIDDEN, 1) != 0) ||
-		    (nvlist_add_boolean_value(request, A_SYSTEM, 1) != 0) ||
-		    (fsetattr(dirfd, XATTR_VIEW_READWRITE, request))) {
-			nvlist_free(request);
-			(void) close(dirfd);
+	if (fgetattr(dirfd, XATTR_VIEW_READWRITE, &attr) != 0) {
+		(void) close(dirfd);
+		if (qdir_created)
 			(void) remove(dir);
-			return;
-		}
+		return;
 	}
-	nvlist_free(request);
+
+	if ((nvlist_lookup_boolean_value(attr, A_HIDDEN, &prop_hidden) != 0) ||
+	    (nvlist_lookup_boolean_value(attr, A_SYSTEM, &prop_sys) != 0)) {
+		nvlist_free(attr);
+		(void) close(dirfd);
+		if (qdir_created)
+			(void) remove(dir);
+		return;
+	}
+	nvlist_free(attr);
+
+	/*
+	 * Before setting attr or acl we check if the they have already been
+	 * set to what we want. If so we could be dealing with a received
+	 * snapshot and setting these is not needed.
+	 */
+
+	if (!prop_hidden || !prop_sys) {
+		if (nvlist_alloc(&attr, NV_UNIQUE_NAME, 0) == 0) {
+			if ((nvlist_add_boolean_value(
+			    attr, A_HIDDEN, 1) != 0) ||
+			    (nvlist_add_boolean_value(attr, A_SYSTEM, 1) != 0)
+			    || (fsetattr(dirfd, XATTR_VIEW_READWRITE, attr))) {
+				nvlist_free(attr);
+				(void) close(dirfd);
+				if (qdir_created)
+					(void) remove(dir);
+				return;
+			}
+		}
+		nvlist_free(attr);
+	}
+
 	(void) close(dirfd);
 
 	if (stat(file, &statbuf) != 0) {
 		if ((newfd = creat(file, 0640)) < 0) {
-			(void) remove(dir);
+			if (qdir_created)
+				(void) remove(dir);
 			return;
 		}
 		(void) close(newfd);
@@ -1164,23 +1200,46 @@ smb_quota_add_ctrldir(const char *path)
 	    0640);
 	if (afd == -1) {
 		(void) unlink(file);
-		(void) remove(dir);
+		if (qdir_created)
+			(void) remove(dir);
 		return;
 	}
 	(void) close(afd);
 
-	if (acl_fromtext(SMB_QUOTA_CNTRL_PERM, &aclp) != 0) {
+	if (acl_get(file, 0, &existing_aclp) == -1) {
 		(void) unlink(file);
-		(void) remove(dir);
+		if (qdir_created)
+			(void) remove(dir);
 		return;
 	}
 
-	if (acl_set(file, aclp) == -1) {
+	acl_text = acl_totext(existing_aclp, ACL_COMPACT_FMT);
+	acl_free(existing_aclp);
+	if (acl_text == NULL) {
 		(void) unlink(file);
-		(void) remove(dir);
-		acl_free(aclp);
+		if (qdir_created)
+			(void) remove(dir);
 		return;
 	}
+
+	if (strcmp(acl_text, SMB_QUOTA_CNTRL_PERM) != 0) {
+		if (acl_fromtext(SMB_QUOTA_CNTRL_PERM, &aclp) != 0) {
+			free(acl_text);
+			(void) unlink(file);
+			if (qdir_created)
+				(void) remove(dir);
+			return;
+		}
+		if (acl_set(file, aclp) == -1) {
+			free(acl_text);
+			(void) unlink(file);
+			if (qdir_created)
+				(void) remove(dir);
+			acl_free(aclp);
+			return;
+		}
+	}
+	free(acl_text);
 	acl_free(aclp);
 }
 

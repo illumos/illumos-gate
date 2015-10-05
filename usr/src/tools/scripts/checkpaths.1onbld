@@ -1,0 +1,83 @@
+.\" Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+.\" Use is subject to license terms.
+.\"
+.\" CDDL HEADER START
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License, Version 1.0 only
+.\" (the "License").  You may not use this file except in compliance
+.\" with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.\" CDDL HEADER END
+.\"
+.TH checkpaths 1ONBLD "25 September 2003"
+.SH NAME
+.I checkpaths
+\- check file path containing files
+.SH SYNOPSIS
+\fBcheckpaths [-b] [root_paths...]\fP
+.LP
+.SH DESCRIPTION
+.IX "OS-Net build tools" "checkpaths" "" "\fBcheckpaths\fP"
+.LP
+.I checkpaths
+inspects the contents of various files within an OS-Net workspace to
+ensure that the file paths listed in those files are valid.  This
+provides an integrity check of the workspace to catch cases where a
+file was removed or renamed without updating the corresponding
+\fIinc.flg\fP, \fIcry_files\fP, or \fIexception_list\fP entry.
+.LP
+.I checkpaths
+is typically called from \fBnightly(1ONBLD)\fP.  It may be invoked
+interactively within a workspace, and requires that at least
+\fI$CODEMGR_WS\fP is set to a valid workspace.  It is not necessary
+that a full build has been performed in the workspace to be tested,
+but if full build(s) are not available under the
+\fI$CODEMGR_WS/proto/\fP directory, then the corresponding exclusion
+lists are not verified.
+.LP
+.SH OPTIONS
+.LP
+The following options are supported:
+.TP 4
+.B \-b
+Disable processing of files that list derived (built) objects.  This
+should be set if the \fI$CODEMGR_WS/proto/\fP directory exists, but
+the contents are known to be bad.  \fBnightly(1ONBLD)\fP will typically set
+this flag if the build fails.
+.LP
+.TP 4
+.B root_paths...
+By default, checkpaths validates all of the proto areas for known
+architectures that exist in the \fI$CODEMGR_WS/proto/\fP directory.
+To specify other root directories, list them as arguments on the
+command line.  It is an error if any of the root paths specified does
+not end with a known architecture.
+.LP
+.SH ENVIRONMENT VARIABLES
+.LP
+.B CODEMGR_WS
+.RS 4
+The root of your TeamWare workspace, which is the directory
+containing \fICodemgr_wsdata\fP.
+.RE
+.LP
+.B SRC
+.RS 4
+The location of your ON source tree.  Defaults to
+\fI$CODEMGR_WS/usr/src/\fP if not specified.
+.RE
+.LP
+.SH SEE ALSO
+.B nightly(1ONBLD).

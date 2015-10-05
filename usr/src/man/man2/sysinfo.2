@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SYSINFO 2 "Jan 29, 2009"
+.TH SYSINFO 2 "Sep 7, 2015"
 .SH NAME
 sysinfo \- get and set system information strings
 .SH SYNOPSIS
@@ -16,7 +16,6 @@ sysinfo \- get and set system information strings
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBsysinfo()\fR function copies information relating to the operating
 system on which the process is executing into the buffer pointed to by
@@ -38,7 +37,7 @@ The values for \fIcommand\fR are as follows:
 .sp .6
 .RS 4n
 Copy into the array pointed to by \fIbuf\fR the string that would be returned
-by \fBuname\fR(2) in the \fIsysname\fRfield. This is the name of the
+by \fBuname\fR(2) in the \fIsysname\fR field. This is the name of the
 implementation of the operating system, for example, \fBSunOS\fR or \fBUTS\fR.
 .RE
 
@@ -51,7 +50,7 @@ implementation of the operating system, for example, \fBSunOS\fR or \fBUTS\fR.
 .RS 4n
 Copy into the array pointed to by \fIbuf\fR a string that names the present
 host machine. This is the string that would be returned by \fBuname()\fR in the
-\fInodename\fRfield. This hostname or nodename is often the name the machine is
+\fInodename\fR field. This hostname or nodename is often the name the machine is
 known by locally. The \fIhostname\fR is the name of this machine as a node in
 some network. Different networks might have different names for the node, but
 presenting the nodename to the appropriate network directory or name-to-address
@@ -94,7 +93,7 @@ or \fB4.1\fR.
 .sp .6
 .RS 4n
 Copy into the array pointed to by \fIbuf\fR the string that would be returned
-by \fBuname\fR(2) in the \fIversion\fRfield. The syntax and semantics of this
+by \fBuname\fR(2) in the \fIversion\fR field. The syntax and semantics of this
 string are defined by the system provider.
 .RE
 
@@ -288,7 +287,6 @@ purpose of adopting the DHCP maintenance of the interface configured by
 .RE
 
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, the value returned indicates the buffer size in
 bytes required to hold the complete value and the terminating null character.
@@ -300,7 +298,6 @@ null character.
 .LP
 Otherwise, \(mi1 is returned and \fBerrno\fR is set to indicate the error.
 .SH ERRORS
-.sp
 .LP
 The \fBsysinfo()\fR function will fail if:
 .sp
@@ -333,7 +330,6 @@ process.
 .RE
 
 .SH USAGE
-.sp
 .LP
 In many cases there is no corresponding programming interface to set these
 values; such strings are typically settable only by the system administrator
@@ -345,7 +341,6 @@ hard-coded in the version of the operating system.
 A good estimation for \fIcount\fR is 257, which is likely to cover all strings
 returned by this interface in typical installations.
 .SH SEE ALSO
-.sp
 .LP
 \fBboot\fR(1M), \fBdhcpagent\fR(1M), \fBgetisax\fR(2), \fBuname\fR(2),
 \fBgethostid\fR(3C), \fBgethostname\fR(3C), \fBsysconf\fR(3C),

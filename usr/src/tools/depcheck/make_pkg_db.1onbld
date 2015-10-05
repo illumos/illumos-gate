@@ -1,0 +1,196 @@
+'\" t
+.\"
+.\" CDDL HEADER START
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License, Version 1.0 only
+.\" (the "License").  You may not use this file except in compliance
+.\" with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.\" CDDL HEADER END
+.\"
+.\"
+.\" Copyright (c) 2005 Sun Microsystems, Inc. All rights reserved.
+.\" Use is subject to license terms.
+.\"
+.TH MAKE_PKG_DB 1ONBLD "Nov 2, 2000"
+.SH "NAME"
+make_pkg_db \- create a Perl DBM database of installed software
+.SH "SYNOPSIS"
+.PP
+.nf
+\fBmake_pkg_db\fR \-\fBdbdir\fR \fIdbm_database_pathname\fR\ [-\fBh\fR]
+            [-\fBifiles\fR \fIfilename\fR\&...]
+            [-\fBpkgdef\fR \fIpackage_pool_pathname\fR]
+.fi
+.SH "DESCRIPTION"
+.PP
+The \fBmake_pkg_db\fR command (a Perl script) generates a Perl DBM database of
+software installed on a system based on \fB/var/sadm/install/contents\fR or the
+contents of a package pool directory\&. The Perl DBM database files are used by
+\fBget_depend_info\fR(1ONBLD)\&.
+.PP
+The Perl DBM database files contain information keyed on a file name\&. Some
+files, for example, list the package in which a file is included and the
+permissions of the file\&.
+.PP
+If you run \fBmake_pkg_db\ -dbdir\ \fIdbm_database_pathname\fR\fR, an error
+message such as:
+.PP
+\fB***CANNOT RESOLVE ABSOLUTE PATH /usr/java/bin/appletviewer\fR
+.PP
+is generated because the script cannot resolve symbolic links based on the
+information in \fB/var/sadm/install/contents\fR\&. In
+\fB/var/sadm/install/contents\fR, for example, \fBappletviewer\fR is specified
+as a symbolic link:
+.sp
+.nf
+\f(CW/usr/bin/appletviewer=\&.\&./java/bin/appletviewer s none SUNWj2dev\fR
+.fi
+.sp
+.PP
+Unfortunately, \fB/usr/java\fR is a symbolic link to \fB/usr/java1\&.2\fR\&.
+The correct file entry in \fB/var/sadm/install/contents\fR is therefore
+\fB/usr/java1\&.2/bin/appletviewer\fR\&. It is impossible for this script to
+resolve this link based on the information in
+\fB/var/sadm/install/contents\fR\&.
+.PP
+To correct this problem, create a file named \fBMyLinkResolution\fR and add
+this entry:
+.sp
+.nf
+\f(CW/usr/bin/appletviewer=\&.\&./java1\&.2/bin/appletviewer s none SUNWj2dev\fR
+.fi
+.sp
+.PP
+Then enter this command:
+.PP
+.sp
+.nf
+\f(CWmake_pkg_db -dbdir \fIdbm_database_pathname\fR -ifiles MyLinkResolution\fR
+.fi
+.sp
+When you execute this command, the following message is displayed:
+.sp
+.nf
+\f(CW\&.\&.\&.OVERRIDDEN: /usr/bin/appletviewer=
+\&.\&./java/bin/appletviewer s none SUNWj2dev\fR
+.fi
+.sp
+.PP
+This message indicates that the original entry in
+\fB/var/sadm/install/contents\fR is ignored and your new entry in
+\fBMyLinkResolution\fR is used instead\&.
+.PP
+\fBSampleLinks\fR is a file you can use to resolve links in
+\fB/var/sadm/install/contents\fR for Solaris (Intel Platform Edition)\&.
+\fBSamplePkgLinks\fR is a file you can use to resolve some of the links used on
+the Solaris 8 Software 1 of 2 Intel Platform Edition CD\&. You might want to
+modify these two preceding files for SPARC or for your particular environment\&.
+.PP
+The \fBmake_pkg_db\fR script verifies the files it finds against the software
+that is actually installed on the system\&. The more complete the information,
+the more accurate the output of the script\&.
+.SH "OPTIONS"
+.PP
+The following options are supported:
+.sp
+.ne 2
+\fB-\fBdbdir\fR\fR
+.in +16n
+Specifies the directory in which you want to place the output Perl DBM
+databases\&.
+.sp
+.sp 1
+.in -16n
+.sp
+.ne 2
+\fB-\fBh\fR\fR
+.in +16n
+Displays help\&.
+.sp
+.sp 1
+.in -16n
+.sp
+.ne 2
+\fB-\fBifiles\fR\fR
+.in +16n
+Specifies the name of an input file you want to use to help in resolving
+symbolic links\&.
+.sp
+.sp 1
+.in -16n
+.sp
+.ne 2
+\fB-\fBpkgdef\fR\fR
+.in +16n
+Specifies the path name of the package pool you want to use instead of
+\fB/var/sadm/install/contents\fR\&.
+.sp
+.sp 1
+.in -16n
+.SH "OPERANDS"
+.PP
+The following operands are supported:
+.sp
+.ne 2
+\fB\fIdbm_database_pathname\fR\fR
+.in +24n
+Specifies the directory in which you want to place the output Perl DBM
+databases\&.
+.sp
+.sp 1
+.in -24n
+.sp
+.ne 2
+\fB\fIfilename\fR\fR
+.in +24n
+Specifies the name of a file or files that contain data in the format used in
+\fB/var/sadm/install/contents\fR\&.
+.sp
+.sp 1
+.in -24n
+.sp
+.ne 2
+\fB\fIpackage_pool_pathname\fR\fR
+.in +24n
+Specifies the path name of the package pool you want to use instead of
+\fB/var/sadm/install/contents\fR\&.
+.sp
+.sp 1
+.in -24n
+.SH "ATTRIBUTES"
+.PP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+.TS
+box;
+cw | cw
+lw | lw .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+Availability	SUNWonbld
+CSI	Enabled
+Interface Stability	Evolving
+MT-Level	Unsafe
+.TE
+.sp
+.SH "SEE ALSO"
+.PP
+\fBget_depend_info\fR(1ONBLD), \fBattributes\fR(5)
+.SH "NOTES"
+.PP
+DBM database files are platform dependent\&. DBM database files you generate on
+a SPARC machine, for example, do not work on an IA machine (and vice-versa)\&.
+.PP
+This script might not resolve all symbolic links\&.

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH K5SRVUTIL 1M "Aug 29, 2006"
+.TH K5SRVUTIL 1M "Jul 25, 2015"
 .SH NAME
 k5srvutil \- host key table (keytab) manipulation utility
 .SH SYNOPSIS
@@ -13,7 +13,6 @@ k5srvutil \- host key table (keytab) manipulation utility
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBk5srvutil\fR command allows a system manager to list or change keys
 currently in his keytab or to add new keys to the keytab.
@@ -67,14 +66,13 @@ Deletes particular keys in the keytab, interactively prompting for each key.
 
 .sp
 .LP
-In all cases, the default keytab file is \fB/etc/krb5.keytab\fR file unless
-this is overridden by the \fB-f\fR option.
+In all cases, the default keytab file is \fB/etc/krb5/krb5.keytab\fR unless
+overridden by the \fB-f\fR option.
 .sp
 .LP
 \fBk5srvutil\fR uses the \fBkadmin\fR(1M) program to edit the keytab in place.
 However, old keys are retained, so they are available in case of failure.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -83,7 +81,7 @@ The following options are supported:
 \fB\fB-f\fR \fIfilename\fR\fR
 .ad
 .RS 15n
-Specify a keytab file other than the default file, \fB/etc/krb5.keytab\fR.
+Specify a keytab file other than the default file, \fB/etc/krb5/krb5.keytab\fR.
 .RE
 
 .sp
@@ -106,7 +104,6 @@ Displays old and new keys when using the \fBchange\fR operand.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -122,6 +119,5 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBktutil\fR(1), \fBkadmin\fR(1M), \fBattributes\fR(5)

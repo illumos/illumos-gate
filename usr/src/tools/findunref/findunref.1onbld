@@ -1,0 +1,101 @@
+.\" CDDL HEADER START
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.\" CDDL HEADER END
+.\"
+.\" Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+.\" Use is subject to license terms.
+.TH findunref 1ONBLD "Oct 30, 2012"
+.I findunref
+\- find unused files in a source tree
+.SH SYNOPSIS
+findunref [\fB-s\fP \fIsubtree\fP] [\fB-t\fP \fItstampfile\fP]
+[\fB-S\fP \fBhg\fP|\fBtw\fP|\fBgit\fP] \fIsrcroot\fP \fIexceptfile\fP
+.LP
+.SH DESCRIPTION
+.IX "OS-Net build tools" "findunref" "" "\fBfindunref\fP"
+.LP
+The findunref utility lists the files in a source tree which have not been
+accessed more recently than a particular timestamp file.  Although
+findunref may be used on its own, it is usually invoked by
+\fBnightly\fP(1ONBLD) to find files that are never referenced during a given
+build (see \fB-f\fP in \fBnightly\fP(1ONBLD)).
+.LP
+The root of the source tree to examine is specified by \fIsrcroot\fP.  To
+simplify comparing findunref output from different source trees, findunref
+outputs all filenames relative to \fIsrcroot\fP.
+.LP
+Some files in a source tree may be intentionally unreferenced (e.g.,
+documentation) or only referenced during specialized types of builds.
+Accordingly, \fIexceptfile\fP names a file containing a list of pathname
+globs that will be ignored by findunref.  Within \fIexceptfile\fP, any
+lines consisting solely of whitespace or starting with \fB#\fP will be
+ignored.  Directory globs may also be specified, which will cause any
+matching directories to be skipped entirely.  If no exceptions are
+desired, \fIexceptfile\fP can be \fB/dev/null\fP.
+.LP
+Depending on how findunref is invoked, it can either check all files, or
+limit its checks to files under control of a specific source code
+management (SCM) system.
+.LP
+To limit checks to files managed by Mercurial, the \fBhg\fP(1) utility must be
+present in \fB$PATH\fP and any relevant repositories must be located at or
+under \fIsrcroot\fP.  Nested Mercurial repositories are supported.
+.LP
+To limit checks to files managed by Git, the \fBgit\fP(1) utility must be
+present in \fB$PATH\fP and any relevant repositories must be located at or
+under \fIsrcroot\fP.  Nested Git repositories are \fInot\fR supported.
+.SH OPTIONS
+.TP 10
+.B -s \fIsubtree\fP
+Only look under \fIsubtree\fP for unreferenced files.  By default, all
+directories under \fIsrcroot\fP are examined.
+.TP 10
+.B -t \fItstampfile\fP
+Consider files older than \fItstampfile\fP to be unreferenced.
+By default, \fIsrcroot\fB/.build.tstamp\fR is used.
+.TP 10
+.B -S \fBhg\fP|\fBtw\fP|\fBgit\fP
+Only check files that are managed by the specified SCM.  To simplify
+interaction with \fBwhich_scm\fP(1ONBLD), the SCM names "mercurial" and
+"teamware" may also be specified for "hg" and "tw", respectively.
+By default, all files are checked.
+.SH SEE ALSO
+.LP
+\fBgit\fP(1),
+\fBhg\fP(1),
+\fBnightly\fP(1ONBLD),
+\fBwhich_scm\fP(1ONBLD)
+.SH NOTES
+Since many files are only used when building for a particular ISA (e.g.,
+Makefiles that are specific to x86 or SPARC), builds must be done on all
+applicable ISAs and the results merged.  For instance, if nightly builds
+(with \fB-f\fP) are done on both SPARC and x86, \fBusr/src\fP will be
+populated with a corresponding \fBunref-\fIisa\fB.out\fR file, which can
+be merged with \fBcomm\fP(1):
+.LP
+.nf
+comm -12 /path/to/unref-i386.out
+         /path/to/unref-sparc.out > unref.out
+.fi
+.LP
+This merged file can then be compared against the gate's latest
+unreferenced file list (e.g. \fB/ws/onnv-gate/usr/src/unrefmaster.out\fP).
+.LP
+Different gates have different unreferenced file policies.  Any changes to
+\fIexceptfile\fP that would define new unreferenced file policies for a
+given gate must be cleared with the appropriate gatekeepers.

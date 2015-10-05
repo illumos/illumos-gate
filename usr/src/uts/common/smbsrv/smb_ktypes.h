@@ -906,7 +906,6 @@ typedef struct smb_session {
 	uint16_t		s_local_port;
 	smb_inaddr_t		ipaddr;
 	smb_inaddr_t		local_ipaddr;
-	char 			workstation[SMB_PI_MAX_HOST];
 	int			dialect;
 	int			native_os;
 	int			native_lm;
@@ -944,6 +943,8 @@ typedef struct smb_session {
 	int			outpipe_datalen;
 	int			outpipe_cookie;
 	smb_srqueue_t		*s_srqueue;
+	char			ip_addr_str[INET6_ADDRSTRLEN];
+	char 			workstation[SMB_PI_MAX_HOST];
 } smb_session_t;
 
 #define	SMB_USER_MAGIC 0x55534552	/* 'USER' */

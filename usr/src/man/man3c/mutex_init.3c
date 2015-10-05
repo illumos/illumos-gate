@@ -10,7 +10,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH MUTEX_INIT 3C "Oct 22, 2014"
+.TH MUTEX_INIT 3C "Sep 7, 2015"
 .SH NAME
 mutex_init, mutex_lock, mutex_trylock, mutex_unlock, mutex_consistent,
 mutex_destroy \- mutual exclusion locks
@@ -21,7 +21,7 @@ cc -mt [ \fIflag\fR... ] \fIfile\fR... [ \fIlibrary\fR... ]
 #include <thread.h>
 #include <synch.h>
 
-\fBint\fR \fBmutex_init\fR(\fBmutex_t *\fR\fImp\fR, \fBint\fR \fItype\fR, \fBvoid *\fR \fIarg\fR);
+\fBint\fR \fBmutex_init\fR(\fBmutex_t *\fR\fImp\fR, \fBint\fR \fItype\fR, \fBvoid *\fR\fIarg\fR);
 .fi
 
 .LP
@@ -50,7 +50,6 @@ cc -mt [ \fIflag\fR... ] \fIfile\fR... [ \fIlibrary\fR... ]
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 Mutual exclusion locks (mutexes) prevent multiple threads from simultaneously
 executing critical sections of code that access shared data (that is, mutexes
@@ -66,7 +65,6 @@ Mutexes can be used to synchronize threads between processes if the mutexes are
 allocated in writable memory and shared among the cooperating processes (see
 \fBmmap\fR(2)), and have been initialized for this task.
 .SS "Initialize"
-.sp
 .LP
 Mutexes are either intra-process or inter-process, depending  upon the argument
 passed implicitly or explicitly  to the initialization of that mutex. A
@@ -325,7 +323,6 @@ Same as (\fBUSYNC_THREAD\fR | \fBLOCK_RECURSIVE\fR | \fBLOCK_ERRORCHECK\fR)
 .RE
 
 .SS "Lock and Unlock"
-.sp
 .LP
 A critical section of code is enclosed by  a the call to lock the mutex and the
 call to unlock the mutex to protect it from simultaneous access by multiple
@@ -371,18 +368,15 @@ policy will determine which thread gets the mutex. If the calling thread is not
 the owner of the lock, no error status is returned, and the behavior of the
 program is undefined.
 .SS "Destroy"
-.sp
 .LP
 The \fBmutex_destroy()\fR function destroys the mutex object referenced by
 \fImp\fR. The mutex object becomes uninitialized. The space used by the
 destroyed mutex variable is not freed. It needs to be explicitly reclaimed.
 .SH RETURN VALUES
-.sp
 .LP
 If successful, these functions return \fB0\fR. Otherwise, an error number is
 returned.
 .SH ERRORS
-.sp
 .LP
 The \fBmutex_init()\fR function will fail if:
 .sp
@@ -535,7 +529,6 @@ having an inconsistent state (\fBEOWNERDEAD\fR).
 
 .SH EXAMPLES
 .SS "Single Gate"
-.sp
 .LP
 The following example uses one global mutex as a gate-keeper to permit each
 thread exclusive sequential access to the code within the user-defined
@@ -572,7 +565,6 @@ void * change_global_data(void *null){
 .in -2
 
 .SS "Multiple Instruction Single Data"
-.sp
 .LP
 The previous example, the mutex, the code it owns, and the data it protects was
 enclosed in one function. The next example uses C++ features to accommodate
@@ -638,7 +630,6 @@ void * change_global_data(void *)	{
 .in -2
 
 .SS "Interprocess Locking"
-.sp
 .LP
 A mutex can protect data that is shared among processes. The mutex would need
 to be initialized as  \fBUSYNC_PROCESS\fR. One process initializes the
@@ -751,7 +742,6 @@ void test_argv(char argv1[])   {
 .in -2
 
 .SS "Solaris Interprocess Robust Locking"
-.sp
 .LP
 A mutex can protect data that is shared among processes robustly. The mutex
 would need to be initialized as \fBUSYNC_PROCESS\fR | \fBLOCK_ROBUST\fR. One
@@ -854,7 +844,6 @@ void create_shared_memory() {
 .in -2
 
 .SS "Dynamically Allocated Mutexes"
-.sp
 .LP
 The following example allocates and frees memory in which a mutex is embedded.
 .sp
@@ -913,7 +902,6 @@ free(r);                /* then free memory */
 .LP
 If the mutex is not destroyed, the program could have memory leaks.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -931,7 +919,6 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBmmap\fR(2), \fBshmop\fR(2), \fBpthread_mutexattr_getprioceiling\fR(3C),
 \fBpthread_mutexattr_getprotocol\fR(3C), \fBpthread_mutexattr_getrobust\fR(3C),
@@ -939,7 +926,6 @@ MT-Level	MT-Safe
 \fBpthread_mutex_init\fR(3C), \fBattributes\fR(5), \fBmutex\fR(5),
 \fBstandards\fR(5)
 .SH NOTES
-.sp
 .LP
 Previous releases of Solaris provided the \fBUSYNC_PROCESS_ROBUST\fR mutex
 type. This type is now deprecated but is still supported for source and binary

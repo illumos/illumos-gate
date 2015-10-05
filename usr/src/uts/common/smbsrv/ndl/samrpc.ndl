@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _MLSVC_SAM_NDL_
@@ -635,25 +635,31 @@ struct samr_QueryInfoDomain2 {
 	OUT	DWORD		status;
 };
 
-#define SAMR_QUERY_ALIAS_INFO_1			1
-#define SAMR_QUERY_ALIAS_INFO_3			3
+#define SAMR_QUERY_ALIAS_INFO_GENERAL		1
+#define SAMR_QUERY_ALIAS_INFO_NAME		2
+#define SAMR_QUERY_ALIAS_INFO_COMMENT		3
 
-
-struct samr_QueryAliasInfo1 {
+struct samr_QueryAliasInfoGeneral {
 	WORD level;
 	samr_string_t name;
-	DWORD unknown;
+	DWORD member_count;
 	samr_string_t desc;
 };
 
-struct samr_QueryAliasInfo3 {
+struct samr_QueryAliasInfoName {
+	WORD level;
+	samr_string_t name;
+};
+
+struct samr_QueryAliasInfoComment {
 	WORD level;
 	samr_string_t desc;
 };
 
 union samr_QueryAliasInfo_ru {
-	UNION_INFO_ENT(1,samr_QueryAliasInfo);
-	UNION_INFO_ENT(3,samr_QueryAliasInfo);
+	CASE(1) struct samr_QueryAliasInfoGeneral info1;
+	CASE(2) struct samr_QueryAliasInfoName    info2;
+	CASE(3) struct samr_QueryAliasInfoComment info3;
 	DEFAULT	char *nullptr;
 };
 

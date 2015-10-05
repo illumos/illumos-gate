@@ -46,17 +46,17 @@
 #include "messages.h"
 #include "funcs.h"
 
-/*******************************************************************************
- *  userdel [-r] login
+/*
+ *  userdel [-r ] login
  *
  *	This command deletes user logins.  Arguments are:
  *
  *	-r - when given, this option removes home directory & its contents
  *
  *	login - a string of printable chars except colon (:)
- ******************************************************************************/
+ */
 
-extern int check_perm(), isbusy();
+extern int check_perm(), isbusy(), get_default_zfs_flags();
 extern int rm_files(), call_passmgmt(), edit_group();
 
 static char *logname;			/* login name to delete */
@@ -67,7 +67,8 @@ char *cmdname;
 int
 main(int argc, char **argv)
 {
-	int ch, ret = 0, rflag = 0, argindex, tries;
+	int ch, ret = 0, rflag = 0;
+	int zfs_flags = 0, argindex, tries;
 	struct passwd *pstruct;
 	struct stat statbuf;
 #ifndef att
@@ -78,34 +79,34 @@ main(int argc, char **argv)
 
 	cmdname = argv[0];
 
-	if( geteuid() != 0 ) {
-		errmsg( M_PERM_DENIED );
-		exit( EX_NO_PERM );
+	if (geteuid() != 0) {
+		errmsg(M_PERM_DENIED);
+		exit(EX_NO_PERM);
 	}
 
 	opterr = 0;			/* no print errors from getopt */
 	usertype = getusertype(argv[0]);
-	
-	while( (ch = getopt(argc, argv, "r")) != EOF ) {
-		switch(ch) {
+
+	while ((ch = getopt(argc, argv, "r")) != EOF) {
+		switch (ch) {
 			case 'r':
 				rflag++;
 				break;
 			case '?':
 				if (is_role(usertype))
-					errmsg( M_DRUSAGE );
+					errmsg(M_DRUSAGE);
 				else
-					errmsg( M_DUSAGE );
-				exit( EX_SYNTAX );
+					errmsg(M_DUSAGE);
+				exit(EX_SYNTAX);
 		}
 	}
 
-	if( optind != argc - 1 ) {
+	if (optind != argc - 1) {
 		if (is_role(usertype))
-			errmsg( M_DRUSAGE );
+			errmsg(M_DRUSAGE);
 		else
-			errmsg( M_DUSAGE );
-		exit( EX_SYNTAX );
+			errmsg(M_DUSAGE);
+		exit(EX_SYNTAX);
 	}
 
 	logname = argv[optind];
@@ -118,7 +119,7 @@ main(int argc, char **argv)
 	 * system (since passmgmt only works on local system).
 	 */
 	if ((pwf = fopen("/etc/passwd", "r")) == NULL) {
-		errmsg( M_OOPS, "open", "/etc/passwd");
+		errmsg(M_OOPS, "open", "/etc/passwd");
 		exit(EX_FAILURE);
 	}
 	while ((pstruct = fgetpwent(pwf)) != NULL)
@@ -129,13 +130,13 @@ main(int argc, char **argv)
 #endif
 
 	if (pstruct == NULL) {
-		errmsg( M_EXIST, logname );
-		exit( EX_NAME_NOT_EXIST );
+		errmsg(M_EXIST, logname);
+		exit(EX_NAME_NOT_EXIST);
 	}
 
-	if( isbusy(logname) ) {
-		errmsg( M_BUSY, logname, "remove" );
-		exit( EX_BUSY );
+	if (isbusy(logname)) {
+		errmsg(M_BUSY, logname, "remove");
+		exit(EX_BUSY);
 	}
 
 	/* that's it for validations - now do the work */
@@ -151,72 +152,75 @@ main(int argc, char **argv)
 	nargv[argindex++] = NULL;
 
 	/* remove home directory */
-	if( rflag ) {
+	if (rflag) {
 		/* Check Permissions */
-		if( stat( pstruct->pw_dir, &statbuf ) ) {
-			errmsg(M_OOPS, "find status about home directory", 
+		if (stat(pstruct->pw_dir, &statbuf)) {
+			errmsg(M_OOPS, "find status about home directory",
 			    strerror(errno));
-			exit( EX_HOMEDIR );
-		}
-			
-		if( check_perm( statbuf, pstruct->pw_uid, pstruct->pw_gid,
-		    S_IWOTH|S_IXOTH ) != 0 ) {
-			errmsg( M_NO_PERM, logname, pstruct->pw_dir );
-			exit( EX_HOMEDIR );
+			exit(EX_HOMEDIR);
 		}
 
-		if( rm_files(pstruct->pw_dir, logname) != EX_SUCCESS ) 
-			exit( EX_HOMEDIR );
+		if (check_perm(statbuf, pstruct->pw_uid, pstruct->pw_gid,
+		    S_IWOTH|S_IXOTH) != 0) {
+			errmsg(M_NO_PERM, logname, pstruct->pw_dir);
+			exit(EX_HOMEDIR);
+		}
+		zfs_flags = get_default_zfs_flags();
+
+		if (rm_files(pstruct->pw_dir, logname, zfs_flags) != EX_SUCCESS)
+			exit(EX_HOMEDIR);
 	}
 
 	/* now call passmgmt */
 	ret = PEX_FAILED;
-	for( tries = 3; ret != PEX_SUCCESS && tries--; ) {
-		switch( ret = call_passmgmt( nargv ) ) {
+	for (tries = 3; ret != PEX_SUCCESS && tries--; ) {
+		switch (ret = call_passmgmt(nargv)) {
 		case PEX_SUCCESS:
-			ret = edit_group( logname, (char *)0, (int **)0, 1 );
-			if( ret != EX_SUCCESS )
-				errmsg( M_UPDATE, "deleted" );
+			ret = edit_group(logname, (char *)0, (int **)0, 1);
+			if (ret != EX_SUCCESS)
+				errmsg(M_UPDATE, "deleted");
 			break;
 
 		case PEX_BUSY:
 			break;
 
 		case PEX_HOSED_FILES:
-			errmsg( M_HOSED_FILES );
-			exit( EX_INCONSISTENT );
+			errmsg(M_HOSED_FILES);
+			exit(EX_INCONSISTENT);
 			break;
 
 		case PEX_SYNTAX:
 		case PEX_BADARG:
 			/* should NEVER occur that passmgmt usage is wrong */
 			if (is_role(usertype))
-				errmsg( M_DRUSAGE );
+				errmsg(M_DRUSAGE);
 			else
-				errmsg( M_DUSAGE );
-			exit( EX_SYNTAX );
+				errmsg(M_DUSAGE);
+			exit(EX_SYNTAX);
 			break;
 
 		case PEX_BADUID:
-			/* uid is used - shouldn't happen but print message anyway */
-			errmsg( M_UID_USED, pstruct->pw_uid );
-			exit( EX_ID_EXISTS );
+		/*
+		 * uid is used - shouldn't happen but print message anyway
+		 */
+			errmsg(M_UID_USED, pstruct->pw_uid);
+			exit(EX_ID_EXISTS);
 			break;
 
 		case PEX_BADNAME:
 			/* invalid loname */
-			errmsg( M_USED, logname);
-			exit( EX_NAME_EXISTS );
+			errmsg(M_USED, logname);
+			exit(EX_NAME_EXISTS);
 			break;
 
 		default:
-			errmsg( M_UPDATE, "deleted" );
-			exit( ret );
+			errmsg(M_UPDATE, "deleted");
+			exit(ret);
 			break;
 		}
 	}
-	if( tries == 0 ) 
-		errmsg( M_UPDATE, "deleted" );
+	if (tries == 0)
+		errmsg(M_UPDATE, "deleted");
 
 /*
  * Now, remove this user from all project entries
@@ -227,7 +231,7 @@ main(int argc, char **argv)
 		errmsg(M_UPDATE, "modified");
 		exit(rc);
 	}
-	
-	exit( ret );
+
+	exit(ret);
 	/*NOTREACHED*/
 }

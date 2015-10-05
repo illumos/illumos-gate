@@ -35,7 +35,8 @@ char *errmsgs[] = {
 	"ERROR: invalid syntax.\n"
 	    "usage:  useradd [-u uid [-o] | -g group | -G group[[,group]...] |"
 	    "-d dir | -b base_dir |\n"
-	    "\t\t-s shell | -c comment | -m [-k skel_dir] | -f inactive |\n"
+	    "\t\t-s shell | -c comment | -m [-z|Z] [-k skel_dir] |"
+	    "-f inactive |\n"
 	    "\t\t-e expire | -A authorization [, authorization ...] |\n"
 	    "\t\t-P profile [, profile ...] | -R role [, role ...] |\n"
 	    "\t\t-K key=value | -p project [, project ...]] login\n"
@@ -46,7 +47,7 @@ char *errmsgs[] = {
 	"ERROR: Invalid syntax.\nusage:  userdel [-r] login\n",
 	"ERROR: Invalid syntax.\n"
 	    "usage:  usermod -u uid [-o] | -g group | -G group[[,group]...] |\n"
-	    "\t\t-d dir [-m] | -s shell | -c comment |\n"
+	    "\t\t-d dir [-m [-z|Z]] | -s shell | -c comment |\n"
 	    "\t\t-l new_logname | -f inactive | -e expire |\n"
 	    "\t\t-A authorization [, authorization ...] | -K key=value ... |\n"
 	    "\t\t-P profile [, profile ...] | -R role [, role ...] login\n",
@@ -100,6 +101,8 @@ char *errmsgs[] = {
 	"ERROR: Failed to read /etc/group file due to invalid entry or"
 	    " read error.\n",
 	"ERROR: %s is too long.  Choose another.\n",
+	"WARNING: Avoided creating ZFS filesystem as parent directory %s is not"
+	    " a ZFS mount point.\n",
 };
 
 int lasterrmsg = sizeof (errmsgs) / sizeof (char *);

@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <mdb/mdb_modapi.h>
@@ -580,8 +581,12 @@ mdb_walk(const char *name, mdb_walk_cb_t func, void *data)
 static int
 walk_dcmd(uintptr_t addr, const void *ignored, dcmd_walk_arg_t *dwp)
 {
-	int status = mdb_call_idcmd(dwp->dw_dcmd, addr, 1, dwp->dw_flags,
+	int status;
+
+	mdb.m_frame->f_cbactive = B_TRUE;
+	status = mdb_call_idcmd(dwp->dw_dcmd, addr, 1, dwp->dw_flags,
 	    &dwp->dw_argv, NULL, NULL);
+	mdb.m_frame->f_cbactive = B_FALSE;
 
 	if (status == DCMD_USAGE || status == DCMD_ABORT)
 		return (WALK_ERR);
