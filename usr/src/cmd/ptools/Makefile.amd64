@@ -23,8 +23,6 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 include ../../../Makefile.cmd
 include ../../../Makefile.cmd.64
@@ -33,6 +31,7 @@ CPPFLAGS += -D_SYSCALL32
 CFLAGS64 += $(CCVERBOSE)
 
 ROOTISAPROG=$(ROOTBIN64)/$(PROG)
+ROOTISALN=$(LN_$(PROG):%=$(ROOTBIN64)/%)
 
 include ../../Makefile.bld
 

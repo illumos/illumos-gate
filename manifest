@@ -1910,7 +1910,9 @@ f usr/bin/amd64/moe 0555 root bin
 f usr/bin/amd64/newtask 4555 root sys
 f usr/bin/amd64/nohup 0555 root bin
 f usr/bin/amd64/pargs 0555 root bin
+h usr/bin/amd64/pauxv=usr/bin/amd64/pargs
 f usr/bin/amd64/pcred 0555 root bin
+h usr/bin/amd64/penv=usr/bin/amd64/pargs
 f usr/bin/amd64/pfiles 0555 root bin
 f usr/bin/amd64/pflags 0555 root bin
 f usr/bin/amd64/pldd 0555 root bin
@@ -2194,10 +2196,12 @@ h usr/bin/pargs=usr/lib/isaexec
 f usr/bin/passwd 6555 root sys
 h usr/bin/paste=usr/bin/alias
 f usr/bin/pathchk 0555 root bin
+h usr/bin/pauxv=usr/lib/isaexec
 f usr/bin/pax 0555 root bin
 s usr/bin/pcat=unpack
 h usr/bin/pcred=usr/lib/isaexec
 s usr/bin/perl=/opt/local/bin/perl
+h usr/bin/penv=usr/lib/isaexec
 h usr/bin/pfbash=usr/bin/pfexec
 h usr/bin/pfcsh=usr/bin/pfexec
 f usr/bin/pfexec 0555 root bin
@@ -11639,9 +11643,11 @@ f usr/share/man/man1/pargs.1 0444 root bin
 f usr/share/man/man1/passwd.1 0444 root bin
 f usr/share/man/man1/paste.1 0444 root bin
 f usr/share/man/man1/pathchk.1 0444 root bin
+s usr/share/man/man1/pauxv.1=pargs.1
 f usr/share/man/man1/pax.1 0444 root bin
 s usr/share/man/man1/pcat.1=pack.1
 s usr/share/man/man1/pcred.1=proc.1
+s usr/share/man/man1/penv.1=pargs.1
 s usr/share/man/man1/pfcsh.1=pfexec.1
 f usr/share/man/man1/pfexec.1 0444 root bin
 s usr/share/man/man1/pfiles.1=proc.1

@@ -20,8 +20,6 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -31,6 +29,7 @@ include ../../../Makefile.cmd
 CFLAGS += $(CCVERBOSE)
 
 ROOTISAPROG=$(ROOTBIN32)/$(PROG)
+ROOTISALN=$(LN_$(PROG):%=$(ROOTBIN32)/%)
 
 include ../../Makefile.bld
 
