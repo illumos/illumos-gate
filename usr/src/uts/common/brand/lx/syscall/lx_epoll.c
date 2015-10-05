@@ -98,7 +98,7 @@ lx_epoll_wait(int fd, void *events, int maxevents, int timeout)
 {
 	struct dvpoll arg;
 	file_t *fp;
-	int rv = 0, error;
+	int rv = 0, error, flag;
 
 	if (maxevents <= 0) {
 		return (set_errno(EINVAL));
@@ -110,8 +110,9 @@ lx_epoll_wait(int fd, void *events, int maxevents, int timeout)
 	arg.dp_nfds = maxevents;
 	arg.dp_timeout = timeout;
 	arg.dp_fds = (pollfd_t *)events;
-	error = VOP_IOCTL(fp->f_vnode, DP_POLL, (uintptr_t)&arg,
-	    (fp->f_flag | FKIOCTL), fp->f_cred, &rv, NULL);
+	flag = fp->f_flag | DATAMODEL_NATIVE | FKIOCTL;
+	error = VOP_IOCTL(fp->f_vnode, DP_POLL, (uintptr_t)&arg, flag,
+	    fp->f_cred, &rv, NULL);
 
 	releasef(fd);
 	if (error != 0) {
@@ -125,7 +126,7 @@ lx_epoll_pwait(int fd, void *events, int maxevents, int timeout, void *sigmask)
 {
 	struct dvpoll arg;
 	file_t *fp;
-	int rv = 0, error;
+	int rv = 0, error, flag;
 
 	if (maxevents <= 0) {
 		return (set_errno(EINVAL));
@@ -138,8 +139,9 @@ lx_epoll_pwait(int fd, void *events, int maxevents, int timeout, void *sigmask)
 	arg.dp_timeout = timeout;
 	arg.dp_fds = (pollfd_t *)events;
 	arg.dp_setp = (sigset_t *)sigmask;
-	error = VOP_IOCTL(fp->f_vnode, DP_PPOLL, (uintptr_t)&arg,
-	    (fp->f_flag | FKIOCTL), fp->f_cred, &rv, NULL);
+	flag = fp->f_flag | DATAMODEL_NATIVE | FKIOCTL;
+	error = VOP_IOCTL(fp->f_vnode, DP_PPOLL, (uintptr_t)&arg, flag,
+	    fp->f_cred, &rv, NULL);
 
 	releasef(fd);
 	if (error != 0) {
