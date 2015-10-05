@@ -109,6 +109,7 @@ extern "C" {
 #define	ZONE_ATTR_INITNORESTART	20
 #define	ZONE_ATTR_PG_FLT_DELAY	21
 #define	ZONE_ATTR_RSS		22
+#define	ZONE_ATTR_APP_SVC_CT	23
 
 /* Start of the brand-specific attribute namespace */
 #define	ZONE_ATTR_BRAND_ATTRS	32768
@@ -595,6 +596,7 @@ typedef struct zone {
 
 	boolean_t	zone_restart_init;	/* Restart init if it dies? */
 	boolean_t	zone_reboot_on_init_exit; /* Reboot if init dies? */
+	boolean_t	zone_setup_app_contract; /* setup contract? */
 	struct brand	*zone_brand;		/* zone's brand */
 	void 		*zone_brand_data;	/* store brand specific data */
 	id_t		zone_defaultcid;	/* dflt scheduling class id */

@@ -4156,6 +4156,17 @@ zone_start_init(void)
 	 */
 	z->zone_proc_initpid = p->p_pid;
 
+	if (z->zone_setup_app_contract == B_TRUE) {
+		/*
+		 * Normally a process cannot modify its own contract, but we're
+		 * just starting the zone's init process and its contract is
+		 * always initialized from the sys_process_tmpl template, so
+		 * this is the simplest way to setup init's contract to kill
+		 * the process if any other process in the contract exits.
+		 */
+		p->p_ct_process->conp_ev_fatal |= CT_PR_EV_EXIT;
+	}
+
 	/*
 	 * We maintain zone_boot_err so that we can return the cause of the
 	 * failure back to the caller of the zone_boot syscall.
@@ -6137,6 +6148,14 @@ zone_setattr(zoneid_t zoneid, int attr, void *buf, size_t bufsize)
 		}
 		err = zone_set_network(zoneid, zbuf);
 		kmem_free(zbuf, bufsize);
+		break;
+	case ZONE_ATTR_APP_SVC_CT:
+		if (bufsize != sizeof (boolean_t)) {
+			err = EINVAL;
+		} else {
+			zone->zone_setup_app_contract = (boolean_t)buf;
+			err = 0;
+		}
 		break;
 	default:
 		if ((attr >= ZONE_ATTR_BRAND_ATTRS) && ZONE_IS_BRANDED(zone))

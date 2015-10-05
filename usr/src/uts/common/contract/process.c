@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2015 Joyent, Inc.
  */
 
 #include <sys/mutex.h>
@@ -955,6 +956,18 @@ contract_process_exit(cont_process_t *ctp, proc_t *p, int exitstatus)
 		(void) cte_publish_all(ct, event, nvl, NULL);
 		mutex_enter(&ct->ct_lock);
 	}
+
+	/*
+	 * CT_PR_EV_EXIT is not part of the CT_PR_ALLFATAL definition since
+	 * we never allow including this in the fatal set via a user-land
+	 * application, but we do allow CT_PR_EV_EXIT in the contract's fatal
+	 * set for a process setup for zone init. See zone_start_init().
+	 */
+	if (EVFATALP(ctp, CT_PR_EV_EXIT)) {
+		ASSERT(MUTEX_HELD(&ct->ct_lock));
+		contract_process_kill(ct, p, B_TRUE);
+	}
+
 	if (empty) {
 		/*
 		 * Send EMPTY message.

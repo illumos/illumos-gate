@@ -1003,6 +1003,30 @@ restartinit(brand_handle_t bh)
 	return (brand_restartinit(bh));
 }
 
+/*
+ * Get the app-svc-dependent flag for this zone's init process. This is a
+ * zone-specific attr which controls the type of contract we create for the
+ * zone's init. When true, the contract will include CT_PR_EV_EXIT in the fatal
+ * set, so that when any service which is in the same contract exits, the init
+ * application will be terminated.
+ */
+static boolean_t
+is_app_svc_dep(brand_handle_t bh)
+{
+	struct zone_attrtab a;
+
+	bzero(&a, sizeof (a));
+	(void) strlcpy(a.zone_attr_name, "app-svc-dependent",
+	    sizeof (a.zone_attr_name));
+
+	if (zonecfg_lookup_attr(snap_hndl, &a) == Z_OK &&
+	    strcmp(a.zone_attr_value, "true") == 0) {
+		return (B_TRUE);
+	}
+
+	return (B_FALSE);
+}
+
 static int
 zone_bootup(zlog_t *zlogp, const char *bootargs, int zstate, boolean_t debug)
 {
@@ -1018,6 +1042,7 @@ zone_bootup(zlog_t *zlogp, const char *bootargs, int zstate, boolean_t debug)
 	char errmsg[DLADM_STRSIZE];
 	int err;
 	boolean_t restart_init;
+	boolean_t app_svc_dep;
 
 	if (brand_prestatechg(zlogp, zstate, Z_BOOT, debug) != 0)
 		return (-1);
@@ -1071,6 +1096,12 @@ zone_bootup(zlog_t *zlogp, const char *bootargs, int zstate, boolean_t debug)
 
 	/* See if we should restart init if it dies. */
 	restart_init = restartinit(bh);
+
+	/*
+	 * See if we need to setup contract dependencies between the zone's
+	 * primary application and any of its services.
+	 */
+	app_svc_dep = is_app_svc_dep(bh);
 
 	brand_close(bh);
 
@@ -1142,6 +1173,12 @@ zone_bootup(zlog_t *zlogp, const char *bootargs, int zstate, boolean_t debug)
 	if (!restart_init && zone_setattr(zoneid, ZONE_ATTR_INITNORESTART,
 	    NULL, 0) == -1) {
 		zerror(zlogp, B_TRUE, "could not set zone init-no-restart");
+		goto bad;
+	}
+
+	if (app_svc_dep && zone_setattr(zoneid, ZONE_ATTR_APP_SVC_CT,
+	    (void *)B_TRUE, sizeof (boolean_t)) == -1) {
+		zerror(zlogp, B_TRUE, "could not set zone app-die");
 		goto bad;
 	}
 
