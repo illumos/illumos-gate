@@ -540,6 +540,7 @@ segvn_setvnode_mpss(vnode_t *vp)
 int
 segvn_create(struct seg *seg, void *argsp)
 {
+	extern lgrp_mem_policy_t lgrp_mem_default_policy;
 	struct segvn_crargs *a = (struct segvn_crargs *)argsp;
 	struct segvn_data *svd;
 	size_t swresv = 0;
@@ -547,7 +548,7 @@ segvn_create(struct seg *seg, void *argsp)
 	struct anon_map *amp;
 	int error = 0;
 	size_t pgsz;
-	lgrp_mem_policy_t mpolicy = LGRP_MEM_POLICY_DEFAULT;
+	lgrp_mem_policy_t mpolicy = lgrp_mem_default_policy;
 	int use_rgn = 0;
 	int trok = 0;
 
@@ -694,7 +695,6 @@ segvn_create(struct seg *seg, void *argsp)
 		struct segvn_data *psvd, *nsvd;
 		lgrp_mem_policy_t ppolicy, npolicy;
 		uint_t	lgrp_mem_policy_flags = 0;
-		extern lgrp_mem_policy_t lgrp_mem_default_policy;
 
 		/*
 		 * Memory policy flags (lgrp_mem_policy_flags) is valid when
