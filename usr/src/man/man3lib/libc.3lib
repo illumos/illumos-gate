@@ -6,7 +6,7 @@
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
 .\" Copyright 2011 by Delphix.  All rights reserved.
-.TH LIBC 3LIB "Jan 14, 2014"
+.TH LIBC 3LIB "Sep 02, 2015"
 .SH NAME
 libc \- C library
 .SH DESCRIPTION
@@ -681,7 +681,7 @@ l l .
 \fBstrcmp\fR	\fBstrcoll\fR
 \fBstrcpy\fR	\fBstrcspn\fR
 \fBstrdup\fR	\fBstrerror\fR
-\fBstrerror_r\fR
+\fBstrerror_l\fR	\fBstrerror_r\fR
 \fBstrfmon\fR	\fBstrfmon_l\fR
 \fBstrftime\fR	\fBstrftime_l\fR
 \fBstring_to_decimal\fR

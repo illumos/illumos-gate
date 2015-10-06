@@ -27,8 +27,6 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* __gtxt(): Common part to gettxt() and pfmt()	*/
 
 #pragma	weak _setcat = setcat
@@ -260,6 +258,7 @@ __gtxt(const char *catname, int id, const char *dflt)
 	char	*curloc;
 	struct db_info *db;
 	int	err;
+	locale_t loc;
 
 	/* Check for invalid message id */
 	if (id < 0)
@@ -281,7 +280,8 @@ __gtxt(const char *catname, int id, const char *dflt)
 		lrw_unlock(&_rw_cur_cat);
 	}
 
-	curloc = setlocale(LC_MESSAGES, NULL);
+	loc = uselocale(NULL);
+	curloc = current_locale(loc, LC_MESSAGES);
 
 	/* First look up the cache */
 	db = lookup_cache(NULL, curloc, catname);

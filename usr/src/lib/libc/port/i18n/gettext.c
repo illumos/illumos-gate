@@ -23,8 +23,9 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2015 Joyent, Inc.
+ */
 
 #pragma weak _bindtextdomain = bindtextdomain
 #pragma weak _textdomain = textdomain
@@ -125,7 +126,7 @@ gettext(const char *msg_id)
 
 	callout_lock_enter();
 	INIT_GT((char *)msg_id);
-	res = _real_gettext_u(NULL, msg_id, NULL, 0, LC_MESSAGES, 0);
+	res = _real_gettext_u(NULL, msg_id, NULL, 0, LC_MESSAGES, 0, NULL);
 	callout_lock_exit();
 	errno = errno_save;
 	return (res);
@@ -143,7 +144,21 @@ dgettext(const char *domain, const char *msg_id)
 
 	callout_lock_enter();
 	INIT_GT((char *)msg_id);
-	res = _real_gettext_u(domain, msg_id, NULL, 0, LC_MESSAGES, 0);
+	res = _real_gettext_u(domain, msg_id, NULL, 0, LC_MESSAGES, 0, NULL);
+	callout_lock_exit();
+	errno = errno_save;
+	return (res);
+}
+
+char *
+dgettext_l(const char *domain, const char *msg_id, locale_t loc)
+{
+	char	*res;
+	int	errno_save = errno;
+
+	callout_lock_enter();
+	INIT_GT((char *)msg_id);
+	res = _real_gettext_u(domain, msg_id, NULL, 0, LC_MESSAGES, 0, loc);
 	callout_lock_exit();
 	errno = errno_save;
 	return (res);
@@ -157,7 +172,7 @@ dcgettext(const char *domain, const char *msg_id, const int category)
 
 	callout_lock_enter();
 	INIT_GT((char *)msg_id);
-	res = _real_gettext_u(domain, msg_id, NULL, 0, category, 0);
+	res = _real_gettext_u(domain, msg_id, NULL, 0, category, 0, NULL);
 	callout_lock_exit();
 	errno = errno_save;
 	return (res);
@@ -171,7 +186,7 @@ ngettext(const char *msgid1, const char *msgid2, unsigned long int n)
 
 	callout_lock_enter();
 	INIT_GT((char *)msgid1);
-	res = _real_gettext_u(NULL, msgid1, msgid2, n, LC_MESSAGES, 1);
+	res = _real_gettext_u(NULL, msgid1, msgid2, n, LC_MESSAGES, 1, NULL);
 	callout_lock_exit();
 	errno = errno_save;
 	return (res);
@@ -186,7 +201,7 @@ dngettext(const char *domain, const char *msgid1, const char *msgid2,
 
 	callout_lock_enter();
 	INIT_GT((char *)msgid1);
-	res = _real_gettext_u(domain, msgid1, msgid2, n, LC_MESSAGES, 1);
+	res = _real_gettext_u(domain, msgid1, msgid2, n, LC_MESSAGES, 1, NULL);
 	callout_lock_exit();
 	errno = errno_save;
 	return (res);
@@ -201,7 +216,7 @@ dcngettext(const char *domain, const char *msgid1, const char *msgid2,
 
 	callout_lock_enter();
 	INIT_GT((char *)msgid1);
-	res = _real_gettext_u(domain, msgid1, msgid2, n, category, 1);
+	res = _real_gettext_u(domain, msgid1, msgid2, n, category, 1, NULL);
 	callout_lock_exit();
 	errno = errno_save;
 	return (res);

@@ -27,15 +27,17 @@
 #ifndef	_LIBC_GETTEXT_H
 #define	_LIBC_GETTEXT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <libintl.h>
+#include <locale.h>
+
+extern char *dgettext_l(const char *, const char *, locale_t);
 
 /* Header file for _libc_gettext() macro. */
 #if !defined(TEXT_DOMAIN)	/* Should be defined thru -D flag. */
 #define	TEXT_DOMAIN	"SYS_TEST"
 #endif
 
-#define	_libc_gettext(msg_id)	dgettext(TEXT_DOMAIN, msg_id)
+#define	_libc_gettext(msg_id)		dgettext(TEXT_DOMAIN, (msg_id))
+#define	_libc_gettext_l(msg_id, loc)	dgettext_l(TEXT_DOMAIN, (msg_id), (loc))
 
 #endif	/* _LIBC_GETTEXT_H */

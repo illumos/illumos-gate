@@ -93,6 +93,11 @@ $if _x86 && _ELF64
 $add amd64
 $endif
 
+SYMBOL_VERSION ILLUMOS_0.14 {	# strerror_l
+    protected:
+	strerror_l;
+} ILLUMOS_0.13;
+
 SYMBOL_VERSION ILLUMOS_0.13 {	# eventfd
     protected:
 	eventfd;
