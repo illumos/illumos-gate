@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright (c) 2014, Joyent, Inc. All rights reserved.
+ * Copyright 2015, Joyent, Inc.
  */
 
 #ifndef	_SYS_DEVPOLL_H
@@ -88,9 +88,6 @@ typedef struct dp_entry {
 	mutex_enter(&(dpep)->dpe_lock);		\
 	ASSERT((dpep)->dpe_refcnt > 0);		\
 	(dpep)->dpe_refcnt--;			\
-	if ((dpep)->dpe_refcnt == 0) {		\
-		cv_broadcast(&(dpep)->dpe_cv);	\
-	}					\
 	mutex_exit(&(dpep)->dpe_lock);		\
 }
 #endif	/* _KERNEL */

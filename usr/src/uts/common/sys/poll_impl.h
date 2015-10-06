@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright (c) 2014, Joyent, Inc. All rights reserved.
+ * Copyright 2015, Joyent, Inc.
  */
 
 #ifndef _SYS_POLL_IMPL_H
@@ -36,7 +36,7 @@
  *
  * Each kernel thread (1), if engaged in poll system call, has a reference to
  * a pollstate_t (2), which contains relevant flags and locks.  The pollstate_t
- * contains a pointer to a pcache_t (3), which caches the state of previous
+ * contains a pointer to a pollcache_t (3), which caches the state of previous
  * calls to poll.  A bitmap (4) is stored inside the poll cache, where each
  * bit represents a file descriptor.  The bits are set if the corresponding
  * device has a polled event pending.  Only fds with their bit set will be
@@ -45,7 +45,7 @@
  * structures keep track of the pollfd_t arrays (6) passed in from userland.
  * Each polled file descriptor has a corresponding polldat_t which can be
  * chained onto a device's pollhead, and these are kept in a hash table (7)
- * inside the pcache_t.  The hash table allows efficient conversion of a
+ * inside the pollcache_t.  The hash table allows efficient conversion of a
  * given fd to its corresponding polldat_t.
  *
  * (1)              (2)
@@ -76,7 +76,7 @@
  * Both poll system call and /dev/poll use the pollcache_t structure
  * definition and the routines managing the structure. But poll(2) and
  * /dev/poll have their own copy of the structures. The /dev/poll driver
- * table (1a) contains an array of pointers, each pointing at a pcache_t
+ * table (1a) contains an array of pointers, each pointing at a pollcache_t
  * struct (3). A device minor number is used as an device table index.
  *
  */
@@ -86,10 +86,24 @@
 
 #include <sys/thread.h>
 #include <sys/file.h>
+#include <sys/port_kernel.h>
 
 #ifdef	__cplusplus
 extern "C" {
 #endif
+
+/*
+ * Typedefs
+ */
+struct pollcache;
+struct pollstate;
+struct pcachelink;
+struct polldat;
+
+typedef struct pollcache pollcache_t;
+typedef struct pollstate pollstate_t;
+typedef struct pcachelink pcachelink_t;
+typedef struct polldat polldat_t;
 
 /*
  * description of pollcacheset structure
@@ -104,18 +118,40 @@ typedef struct pollcacheset {
 #define	POLLFDSETS	2
 
 /*
+ * Maximum depth for recusive poll operations.
+ */
+#define	POLLMAXDEPTH	5
+
+/*
  * State information kept by each polling thread
  */
-typedef struct pollstate {
+struct pollstate {
 	pollfd_t	*ps_pollfd;	/* hold the current poll list */
 	size_t		ps_nfds;	/* size of ps_pollfd */
 	kmutex_t	ps_lock;	/* mutex for sleep/wakeup */
-	struct pollcache *ps_pcache;	/* cached poll fd set */
+	pollcache_t	*ps_pcache;	/* cached poll fd set */
 	pollcacheset_t	*ps_pcacheset;	/* cached poll lists */
 	int		ps_nsets;	/* no. of cached poll sets */
 	pollfd_t	*ps_dpbuf;	/* return pollfd buf used by devpoll */
 	size_t		ps_dpbufsize;	/* size of ps_dpbuf */
-} pollstate_t;
+	int		ps_depth;	/* epoll recursion depth */
+	pollcache_t	*ps_pc_stack[POLLMAXDEPTH]; /* epoll recursion state */
+	pollcache_t	*ps_contend_pc;		/* pollcache waited on */
+	pollstate_t	*ps_contend_nextp;	/* next in contender list */
+	pollstate_t	**ps_contend_pnextp;	/* pointer-to-previous-next */
+	int		ps_flags;	/* state flags */
+};
+
+/* pollstate flags */
+#define	POLLSTATE_STALEMATE	0x1
+#define	POLLSTATE_ULFAIL	0x2
+
+/* pollstate_enter results */
+#define	PSE_SUCCESS		0
+#define	PSE_FAIL_DEPTH		1
+#define	PSE_FAIL_LOOP		2
+#define	PSE_FAIL_DEADLOCK	3
+#define	PSE_FAIL_POLLSTATE	4
 
 /*
  * poll cache size defines
@@ -143,27 +179,54 @@ typedef struct xref {
 #define	POLLPOSINVAL	(-1L)	/* xf_position is invalid */
 #define	POLLPOSTRANS	(-2L)	/* xf_position is transient state */
 
+
+typedef enum pclstate {
+	PCL_INIT = 0,	/* just allocated/zeroed, prior */
+	PCL_VALID,	/* linked with both parent and child pollcaches */
+	PCL_STALE,	/* still linked but marked stale, pending refresh */
+	PCL_INVALID,	/* dissociated from one pollcache, awaiting cleanup */
+	PCL_FREE	/* only meant to indicate use-after-free */
+} pclstate_t;
+
+/*
+ * The pcachelink struct creates an association between parent and child
+ * pollcaches in a recursive /dev/poll operation.  Fields are protected by
+ * pcl_lock although manipulation of pcl_child_next or pcl_parent_next also
+ * requires holding pc_lock in the respective pcl_parent_pc or pcl_child_pc
+ * pollcache.
+ */
+struct pcachelink {
+	kmutex_t	pcl_lock;		/* protects contents */
+	pclstate_t	pcl_state;		/* status of link entry */
+	int		pcl_refcnt;		/* ref cnt of linked pcaches */
+	pollcache_t	*pcl_child_pc;		/* child pollcache */
+	pollcache_t	*pcl_parent_pc;		/* parent pollcache */
+	pcachelink_t	*pcl_child_next;	/* next in child list */
+	pcachelink_t	*pcl_parent_next;	/* next in parents list */
+};
+
+
 /*
  * polldat is an entry for a cached poll fd. A polldat struct can be in
  * poll cache table as well as on pollhead ph_list, which is used by
  * pollwakeup to wake up a sleeping poller. There should be one polldat
  * per polled fd hanging off pollstate struct.
  */
-typedef struct polldat {
+struct polldat {
 	int		pd_fd;		/* cached poll fd */
 	int		pd_events;	/* union of all polled events */
 	file_t		*pd_fp;		/* used to detect fd reuse */
 	pollhead_t	*pd_php;	/* used to undo poll registration */
 	kthread_t	*pd_thread;	/* used for waking up a sleep thrd */
-	struct pollcache *pd_pcache;	/* a ptr to the pollcache of this fd */
-	struct polldat	*pd_next;	/* next on pollhead's ph_list */
-	struct polldat	*pd_hashnext;	/* next on pollhead's ph_list */
+	pollcache_t	*pd_pcache;	/* a ptr to the pollcache of this fd */
+	polldat_t	*pd_next;	/* next on pollhead's ph_list */
+	polldat_t	*pd_hashnext;	/* next on pollhead's ph_list */
 	int		pd_count;	/* total count from all ref'ed sets */
 	int		pd_nsets;	/* num of xref sets, used by poll(2) */
 	xref_t		*pd_ref;	/* ptr to xref info, 1 for each set */
-	struct port_kevent *pd_portev;	/* associated port event struct */
+	port_kevent_t	*pd_portev;	/* associated port event struct */
 	uint64_t	pd_epolldata;	/* epoll data, if any */
-} polldat_t;
+};
 
 /*
  * One cache for each thread that polls. Points to a bitmap (used by pollwakeup)
@@ -172,7 +235,7 @@ typedef struct polldat {
  * of port_fdcache_t, both structs implement pc_lock with offset 0 (see also
  * pollrelock()).
  */
-typedef struct pollcache {
+struct pollcache {
 	kmutex_t	pc_lock;	/* lock to protect pollcache */
 	ulong_t		*pc_bitmap;	/* point to poll fd bitmap */
 	polldat_t	**pc_hash;	/* points to a hash table of ptrs */
@@ -187,11 +250,12 @@ typedef struct pollcache {
 	kcondvar_t	pc_cv;		/* cv to wait on if needed */
 	pid_t		pc_pid;		/* for check acc rights, devpoll only */
 	int		pc_mapstart;	/* where search start, devpoll only */
-} pollcache_t;
+	pcachelink_t	*pc_parents;	/* linked list of epoll parents */
+	pcachelink_t	*pc_children;	/* linked list of epoll children */
+};
 
 /* pc_flag */
 #define	PC_POLLWAKE	0x02	/* pollwakeup() occurred */
-#define	PC_WRITEWANTED	0x04	/* writer wishes to modify the pollcache_t */
 
 #if defined(_KERNEL)
 /*
@@ -218,11 +282,15 @@ extern void pollhead_delete(pollhead_t *, polldat_t *);
 /*
  * poll state interfaces:
  *
- *  pollstate_create    creates per-thread pollstate
- *  pollstate_destroy   cleans up per-thread pollstate
+ *  pollstate_create	initializes per-thread pollstate
+ *  pollstate_destroy	cleans up per-thread pollstate
+ *  pollstate_enter	safely lock pollcache for pollstate
+ *  pollstate_exit	unlock pollcache from pollstate
  */
 extern pollstate_t *pollstate_create(void);
 extern void pollstate_destroy(pollstate_t *);
+extern int pollstate_enter(pollcache_t *);
+extern void pollstate_exit(pollcache_t *);
 
 /*
  * public pcache interfaces:
@@ -254,6 +322,7 @@ extern void pcache_destroy(pollcache_t *);
  *  pcache_grow_map	grows the pollcache bitmap
  *  pcache_update_xref	update cross ref (from polldat back to cacheset) info
  *  pcache_clean_entry	cleanup an entry in pcache and more...
+ *  pcache_wake_parents	wake linked parent pollcaches
  */
 extern polldat_t *pcache_lookup_fd(pollcache_t *, int);
 extern polldat_t *pcache_alloc_fd(int);
@@ -263,6 +332,7 @@ extern void pcache_grow_hashtbl(pollcache_t *, nfds_t);
 extern void pcache_grow_map(pollcache_t *, int);
 extern void pcache_update_xref(pollcache_t *, int, ssize_t, int);
 extern void pcache_clean_entry(pollstate_t *, int);
+extern void pcache_wake_parents(pollcache_t *);
 
 /*
  * pcacheset interfaces:

@@ -123,6 +123,12 @@ static struct modlinkage modlinkage = {
 	NULL
 };
 
+static void pcachelink_assoc(pollcache_t *, pollcache_t *);
+static void pcachelink_mark_stale(pollcache_t *);
+static void pcachelink_purge_stale(pollcache_t *);
+static void pcachelink_purge_all(pollcache_t *);
+
+
 /*
  * Locking Design
  *
@@ -157,7 +163,6 @@ _init()
 	mutex_init(&devpoll_lock, NULL, MUTEX_DEFAULT, NULL);
 	devpoll_init = 1;
 	if ((error = mod_install(&modlinkage)) != 0) {
-		mutex_destroy(&devpoll_lock);
 		kmem_free(devpolltbl, sizeof (caddr_t) * dptblsize);
 		devpoll_init = 0;
 	}
@@ -255,6 +260,7 @@ dp_pcache_poll(dp_entry_t *dpep, void *dpbuf,
 	epoll_event_t	*epoll;
 	int		error = 0;
 	short		mask = POLLRDHUP | POLLWRBAND;
+	boolean_t	is_epoll = (dpep->dpe_flag & DP_ISEPOLLCOMPAT) != 0;
 
 	ASSERT(MUTEX_HELD(&pcp->pc_lock));
 	if (pcp->pc_bitmap == NULL) {
@@ -265,7 +271,7 @@ dp_pcache_poll(dp_entry_t *dpep, void *dpbuf,
 		return (error);
 	}
 
-	if (dpep->dpe_flag & DP_ISEPOLLCOMPAT) {
+	if (is_epoll) {
 		pfdp = NULL;
 		epoll = (epoll_event_t *)dpbuf;
 	} else {
@@ -331,7 +337,7 @@ repoll:
 				 * polling a closed fd. Hope this will remind
 				 * user to do a POLLREMOVE.
 				 */
-				if (pfdp != NULL) {
+				if (!is_epoll && pfdp != NULL) {
 					pfdp[fdcnt].fd = fd;
 					pfdp[fdcnt].revents = POLLNVAL;
 					fdcnt++;
@@ -343,18 +349,18 @@ repoll:
 				 * perform the implicit removal to remain
 				 * closer to the epoll semantics.
 				 */
-				ASSERT(epoll != NULL);
+				if (is_epoll) {
+					pdp->pd_fp = NULL;
+					pdp->pd_events = 0;
 
-				pdp->pd_fp = NULL;
-				pdp->pd_events = 0;
+					if (php != NULL) {
+						pollhead_delete(php, pdp);
+						pdp->pd_php = NULL;
+					}
 
-				if (php != NULL) {
-					pollhead_delete(php, pdp);
-					pdp->pd_php = NULL;
+					BT_CLEAR(pcp->pc_bitmap, fd);
+					continue;
 				}
-
-				BT_CLEAR(pcp->pc_bitmap, fd);
-				continue;
 			}
 
 			if (fp != pdp->pd_fp) {
@@ -394,6 +400,7 @@ repoll:
 			if (error != 0) {
 				break;
 			}
+
 			/*
 			 * layered devices (e.g. console driver)
 			 * may change the vnode and thus the pollhead
@@ -416,7 +423,7 @@ repoll:
 					pfdp[fdcnt].fd = fd;
 					pfdp[fdcnt].events = pdp->pd_events;
 					pfdp[fdcnt].revents = revent;
-				} else {
+				} else if (epoll != NULL) {
 					epoll_event_t *ep = &epoll[fdcnt];
 
 					ASSERT(epoll != NULL);
@@ -448,6 +455,35 @@ repoll:
 					if ((revent & POLLOUT) &&
 					    (pdp->pd_events & EPOLLWRNORM)) {
 						ep->events |= EPOLLWRNORM;
+					}
+				} else {
+					pollstate_t *ps =
+					    curthread->t_pollstate;
+					/*
+					 * The devpoll handle itself is being
+					 * polled.  Notify the caller of any
+					 * readable event(s), leaving as much
+					 * state as possible untouched.
+					 */
+					VERIFY(fdcnt == 0);
+					VERIFY(ps != NULL);
+
+					/*
+					 * If a call to pollunlock() fails
+					 * during VOP_POLL, skip over the fd
+					 * and continue polling.
+					 *
+					 * Otherwise, report that there is an
+					 * event pending.
+					 */
+					if ((ps->ps_flags & POLLSTATE_ULFAIL)
+					    != 0) {
+						ps->ps_flags &=
+						    ~POLLSTATE_ULFAIL;
+						continue;
+					} else {
+						fdcnt++;
+						break;
 					}
 				}
 
@@ -608,6 +644,7 @@ dpwrite(dev_t dev, struct uio *uiop, cred_t *credp)
 	polldat_t	*pdp;
 	int		fd;
 	file_t		*fp;
+	boolean_t	is_epoll, fds_added = B_FALSE;
 
 	minor = getminor(dev);
 
@@ -616,20 +653,19 @@ dpwrite(dev_t dev, struct uio *uiop, cred_t *credp)
 	dpep = devpolltbl[minor];
 	ASSERT(dpep != NULL);
 	mutex_exit(&devpoll_lock);
-	pcp = dpep->dpe_pcache;
 
-	if (!(dpep->dpe_flag & DP_ISEPOLLCOMPAT) &&
-	    curproc->p_pid != pcp->pc_pid) {
-		if (pcp->pc_pid != -1)
+	mutex_enter(&dpep->dpe_lock);
+	pcp = dpep->dpe_pcache;
+	is_epoll = (dpep->dpe_flag & DP_ISEPOLLCOMPAT) != 0;
+	size = (is_epoll) ? sizeof (dvpoll_epollfd_t) : sizeof (pollfd_t);
+	mutex_exit(&dpep->dpe_lock);
+
+	if (!is_epoll && curproc->p_pid != pcp->pc_pid) {
+		if (pcp->pc_pid != -1) {
 			return (EACCES);
+		}
 
 		pcp->pc_pid = curproc->p_pid;
-	}
-
-	if (dpep->dpe_flag & DP_ISEPOLLCOMPAT) {
-		size = sizeof (dvpoll_epollfd_t);
-	} else {
-		size = sizeof (pollfd_t);
 	}
 
 	uiosize = uiop->uio_resid;
@@ -640,7 +676,7 @@ dpwrite(dev_t dev, struct uio *uiop, cred_t *credp)
 		(void) rctl_action(rctlproc_legacy[RLIMIT_NOFILE],
 		    curproc->p_rctls, curproc, RCA_SAFE);
 		mutex_exit(&curproc->p_lock);
-		return (set_errno(EINVAL));
+		return (EINVAL);
 	}
 	mutex_exit(&curproc->p_lock);
 	/*
@@ -665,44 +701,44 @@ dpwrite(dev_t dev, struct uio *uiop, cred_t *credp)
 	/*
 	 * We are about to enter the core portion of dpwrite(). Make sure this
 	 * write has exclusive access in this portion of the code, i.e., no
-	 * other writers in this code and no other readers in dpioctl.
+	 * other writers in this code.
+	 *
+	 * Waiting for all readers to drop their references to the dpe is
+	 * unecessary since the pollcache itself is protected by pc_lock.
 	 */
 	mutex_enter(&dpep->dpe_lock);
 	dpep->dpe_writerwait++;
-	while (dpep->dpe_refcnt != 0) {
-		/*
-		 * We need to do a bit of a dance here:  we need to drop
-		 * our dpe_lock and grab the pc_lock to broadcast the pc_cv to
-		 * kick any DP_POLL/DP_PPOLL sleepers.
-		 */
-		mutex_exit(&dpep->dpe_lock);
-		mutex_enter(&pcp->pc_lock);
-		pcp->pc_flag |= PC_WRITEWANTED;
-		cv_broadcast(&pcp->pc_cv);
-		mutex_exit(&pcp->pc_lock);
-		mutex_enter(&dpep->dpe_lock);
-
-		if (dpep->dpe_refcnt == 0)
-			break;
+	while ((dpep->dpe_flag & DP_WRITER_PRESENT) != 0) {
+		ASSERT(dpep->dpe_refcnt != 0);
 
 		if (!cv_wait_sig_swap(&dpep->dpe_cv, &dpep->dpe_lock)) {
 			dpep->dpe_writerwait--;
 			mutex_exit(&dpep->dpe_lock);
-			mutex_enter(&pcp->pc_lock);
-			pcp->pc_flag &= ~PC_WRITEWANTED;
-			mutex_exit(&pcp->pc_lock);
 			kmem_free(pollfdp, uiosize);
-			return (set_errno(EINTR));
+			return (EINTR);
 		}
 	}
 	dpep->dpe_writerwait--;
 	dpep->dpe_flag |= DP_WRITER_PRESENT;
 	dpep->dpe_refcnt++;
 
+	if (!is_epoll && (dpep->dpe_flag & DP_ISEPOLLCOMPAT) != 0) {
+		/*
+		 * The epoll compat mode was enabled while we were waiting to
+		 * establish write access. It is not safe to continue since
+		 * state was prepared for non-epoll operation.
+		 */
+		error = EBUSY;
+		goto bypass;
+	}
 	mutex_exit(&dpep->dpe_lock);
 
-	mutex_enter(&pcp->pc_lock);
-	pcp->pc_flag &= ~PC_WRITEWANTED;
+	/*
+	 * Since the dpwrite() may recursively walk an added /dev/poll handle,
+	 * pollstate_enter() deadlock and loop detection must be used.
+	 */
+	(void) pollstate_create();
+	VERIFY(pollstate_enter(pcp) == PSE_SUCCESS);
 
 	if (pcp->pc_bitmap == NULL) {
 		pcache_create(pcp, pollfdnum);
@@ -715,7 +751,7 @@ dpwrite(dev_t dev, struct uio *uiop, cred_t *credp)
 			 * epoll semantics demand that we return EBADF if our
 			 * specified fd is invalid.
 			 */
-			if (dpep->dpe_flag & DP_ISEPOLLCOMPAT) {
+			if (is_epoll) {
 				error = EBADF;
 				break;
 			}
@@ -736,7 +772,7 @@ dpwrite(dev_t dev, struct uio *uiop, cred_t *credp)
 				 * we return EBADF if our specified fd is
 				 * invalid.
 				 */
-				if (dpep->dpe_flag & DP_ISEPOLLCOMPAT) {
+				if (is_epoll) {
 					if ((fp = getf(fd)) == NULL) {
 						error = EBADF;
 						break;
@@ -771,7 +807,7 @@ dpwrite(dev_t dev, struct uio *uiop, cred_t *credp)
 				 * then, the file descriptor must be closed and
 				 * reused in a relatively tight time span.)
 				 */
-				if (dpep->dpe_flag & DP_ISEPOLLCOMPAT) {
+				if (is_epoll) {
 					if (pdp->pd_fp != NULL &&
 					    (fp = getf(fd)) != NULL &&
 					    fp == pdp->pd_fp &&
@@ -794,7 +830,7 @@ dpwrite(dev_t dev, struct uio *uiop, cred_t *credp)
 				}
 			}
 
-			if (dpep->dpe_flag & DP_ISEPOLLCOMPAT) {
+			if (is_epoll) {
 				epfdp = (dvpoll_epollfd_t *)pfdp;
 				pdp->pd_epolldata = epfdp->dpep_data;
 			}
@@ -886,12 +922,12 @@ dpwrite(dev_t dev, struct uio *uiop, cred_t *credp)
 						pdp->pd_php = php;
 					}
 				}
-
 			}
+			fds_added = B_TRUE;
 			releasef(fd);
 		} else {
 			if (pdp == NULL || pdp->pd_fp == NULL) {
-				if (dpep->dpe_flag & DP_ISEPOLLCOMPAT) {
+				if (is_epoll) {
 					/*
 					 * As with the add case (above), epoll
 					 * semantics demand that we error out
@@ -914,10 +950,19 @@ dpwrite(dev_t dev, struct uio *uiop, cred_t *credp)
 			BT_CLEAR(pcp->pc_bitmap, fd);
 		}
 	}
-	mutex_exit(&pcp->pc_lock);
+	/*
+	 * Any fds added to an recursive-capable pollcache could themselves be
+	 * /dev/poll handles. To ensure that proper event propagation occurs,
+	 * parent pollcaches are woken so that they can create any needed
+	 * pollcache links.
+	 */
+	if (fds_added) {
+		pcache_wake_parents(pcp);
+	}
+	pollstate_exit(pcp);
 	mutex_enter(&dpep->dpe_lock);
+bypass:
 	dpep->dpe_flag &= ~DP_WRITER_PRESENT;
-	ASSERT(dpep->dpe_refcnt == 1);
 	dpep->dpe_refcnt--;
 	cv_broadcast(&dpep->dpe_cv);
 	mutex_exit(&dpep->dpe_lock);
@@ -945,6 +990,7 @@ dpioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 	pollcache_t	*pcp;
 	hrtime_t	now;
 	int		error = 0;
+	boolean_t	is_epoll;
 	STRUCT_DECL(dvpoll, dvpoll);
 
 	if (cmd == DP_POLL || cmd == DP_PPOLL) {
@@ -961,6 +1007,7 @@ dpioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 	pcp = dpep->dpe_pcache;
 
 	mutex_enter(&dpep->dpe_lock);
+	is_epoll = (dpep->dpe_flag & DP_ISEPOLLCOMPAT) != 0;
 
 	if (cmd == DP_EPOLLCOMPAT) {
 		if (dpep->dpe_refcnt != 0) {
@@ -982,8 +1029,7 @@ dpioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 		return (0);
 	}
 
-	if (!(dpep->dpe_flag & DP_ISEPOLLCOMPAT) &&
-	    curproc->p_pid != pcp->pc_pid) {
+	if (!is_epoll && curproc->p_pid != pcp->pc_pid) {
 		if (pcp->pc_pid != -1) {
 			mutex_exit(&dpep->dpe_lock);
 			return (EACCES);
@@ -992,7 +1038,8 @@ dpioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 		pcp->pc_pid = curproc->p_pid;
 	}
 
-	while ((dpep->dpe_flag & DP_WRITER_PRESENT) ||
+	/* Wait until all writers have cleared the handle before continuing */
+	while ((dpep->dpe_flag & DP_WRITER_PRESENT) != 0 ||
 	    (dpep->dpe_writerwait != 0)) {
 		if (!cv_wait_sig_swap(&dpep->dpe_cv, &dpep->dpe_lock)) {
 			mutex_exit(&dpep->dpe_lock);
@@ -1128,7 +1175,7 @@ dpioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 			return (error == 0 ? EINTR : 0);
 		}
 
-		if (dpep->dpe_flag & DP_ISEPOLLCOMPAT) {
+		if (is_epoll) {
 			size = nfds * (fdsize = sizeof (epoll_event_t));
 		} else {
 			size = nfds * (fdsize = sizeof (pollfd_t));
@@ -1139,10 +1186,7 @@ dpioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 		 * requires another per thread structure hook. This can be
 		 * implemented later if data suggests that it's necessary.
 		 */
-		if ((ps = curthread->t_pollstate) == NULL) {
-			curthread->t_pollstate = pollstate_create();
-			ps = curthread->t_pollstate;
-		}
+		ps = pollstate_create();
 
 		if (ps->ps_dpbufsize < size) {
 			/*
@@ -1169,14 +1213,24 @@ dpioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 			}
 		}
 
-		mutex_enter(&pcp->pc_lock);
+		VERIFY(pollstate_enter(pcp) == PSE_SUCCESS);
 		for (;;) {
 			pcp->pc_flag &= ~PC_POLLWAKE;
+
+			/*
+			 * Mark all child pcachelinks as stale.
+			 * Those which are still part of the tree will be
+			 * marked as valid during the poll.
+			 */
+			pcachelink_mark_stale(pcp);
 
 			error = dp_pcache_poll(dpep, ps->ps_dpbuf,
 			    pcp, nfds, &fdcnt);
 			if (fdcnt > 0 || error != 0)
 				break;
+
+			/* Purge still-stale child pcachelinks */
+			pcachelink_purge_stale(pcp);
 
 			/*
 			 * A pollwake has happened since we polled cache.
@@ -1192,42 +1246,12 @@ dpioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 				break;
 			}
 
-			if (!(pcp->pc_flag & PC_WRITEWANTED)) {
-				error = cv_timedwait_sig_hrtime(&pcp->pc_cv,
-				    &pcp->pc_lock, deadline);
-			} else {
-				error = 1;
-			}
-
-			if (error > 0 && (pcp->pc_flag & PC_WRITEWANTED)) {
-				/*
-				 * We've been kicked off of our cv because a
-				 * writer wants in.  We're going to drop our
-				 * reference count and then wait until the
-				 * writer is gone -- at which point we'll
-				 * reacquire the pc_lock and call into
-				 * dp_pcache_poll() to get the updated state.
-				 */
-				mutex_exit(&pcp->pc_lock);
-
-				mutex_enter(&dpep->dpe_lock);
-				dpep->dpe_refcnt--;
-				cv_broadcast(&dpep->dpe_cv);
-
-				while ((dpep->dpe_flag & DP_WRITER_PRESENT) ||
-				    (dpep->dpe_writerwait != 0)) {
-					error = cv_wait_sig_swap(&dpep->dpe_cv,
-					    &dpep->dpe_lock);
-				}
-
-				dpep->dpe_refcnt++;
-				mutex_exit(&dpep->dpe_lock);
-				mutex_enter(&pcp->pc_lock);
-			}
+			error = cv_timedwait_sig_hrtime(&pcp->pc_cv,
+			    &pcp->pc_lock, deadline);
 
 			/*
-			 * If we were awakened by a signal or timeout
-			 * then break the loop, else poll again.
+			 * If we were awakened by a signal or timeout then
+			 * break the loop, else poll again.
 			 */
 			if (error <= 0) {
 				error = (error == 0) ? EINTR : 0;
@@ -1236,7 +1260,7 @@ dpioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 				error = 0;
 			}
 		}
-		mutex_exit(&pcp->pc_lock);
+		pollstate_exit(pcp);
 
 		DP_SIGMASK_RESTORE(ksetp);
 
@@ -1299,6 +1323,66 @@ dpioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 	return (error);
 }
 
+/*
+ * Overview of Recursive Polling
+ *
+ * It is possible for /dev/poll to poll for events on file descriptors which
+ * themselves are /dev/poll handles.  Pending events in the child handle are
+ * represented as readable data via the POLLIN flag.  To limit surface area,
+ * this recursion is presently allowed on only /dev/poll handles which have
+ * been placed in epoll mode via the DP_EPOLLCOMPAT ioctl.  Recursion depth is
+ * limited to 5 in order to be consistent with Linux epoll.
+ *
+ * Extending dppoll() for VOP_POLL:
+ *
+ * The recursive /dev/poll implementation begins by extending dppoll() to
+ * report when resources contained in the pollcache have relevant event state.
+ * At the highest level, it means calling dp_pcache_poll() so it indicates if
+ * fd events are present without consuming them or altering the pollcache
+ * bitmap.  This ensures that a subsequent DP_POLL operation on the bitmap will
+ * yield the initiating event.  Additionally, the VOP_POLL should return in
+ * such a way that dp_pcache_poll() does not clear the parent bitmap entry
+ * which corresponds to the child /dev/poll fd.  This means that child
+ * pollcaches will be checked during every poll which facilitates wake-up
+ * behavior detailed below.
+ *
+ * Pollcache Links and Wake Events:
+ *
+ * Recursive /dev/poll avoids complicated pollcache locking constraints during
+ * pollwakeup events by eschewing the traditional pollhead mechanism in favor
+ * of a different approach.  For each pollcache at the root of a recursive
+ * /dev/poll "tree", pcachelink_t structures are established to all child
+ * /dev/poll pollcaches.  During pollnotify() in a child pollcache, the
+ * linked list of pcachelink_t entries is walked, where those marked as valid
+ * incur a cv_broadcast to their parent pollcache.  Most notably, these
+ * pcachelink_t cv wakeups are performed without acquiring pc_lock on the
+ * parent pollcache (which would require careful deadlock avoidance).  This
+ * still allows the woken poll on the parent to discover the pertinent events
+ * due to the fact that bitmap entires for the child pollcache are always
+ * maintained by the dppoll() logic above.
+ *
+ * Depth Limiting and Loop Prevention:
+ *
+ * As each pollcache is encountered (either via DP_POLL or dppoll()), depth and
+ * loop constraints are enforced via pollstate_enter().  The pollcache_t
+ * pointer is compared against any existing entries in ps_pc_stack and is added
+ * to the end if no match (and therefore loop) is found.  Once poll operations
+ * for a given pollcache_t are complete, pollstate_exit() clears the pointer
+ * from the list.  The pollstate_enter() and pollstate_exit() functions are
+ * responsible for acquiring and releasing pc_lock, respectively.
+ *
+ * Deadlock Safety:
+ *
+ * Descending through a tree of recursive /dev/poll handles involves the tricky
+ * business of sequentially entering multiple pollcache locks.  This tree
+ * topology cannot define a lock acquisition order in such a way that it is
+ * immune to deadlocks between threads.  The pollstate_enter() and
+ * pollstate_exit() functions provide an interface for recursive /dev/poll
+ * operations to safely lock pollcaches while failing gracefully in the face of
+ * deadlocking topologies. (See pollstate_contend() for more detail about how
+ * deadlocks are detected and resolved.)
+ */
+
 /*ARGSUSED*/
 static int
 dppoll(dev_t dev, short events, int anyyet, short *reventsp,
@@ -1306,24 +1390,63 @@ dppoll(dev_t dev, short events, int anyyet, short *reventsp,
 {
 	minor_t		minor;
 	dp_entry_t	*dpep;
+	pollcache_t	*pcp;
+	int		res, rc = 0;
 
 	minor = getminor(dev);
-
 	mutex_enter(&devpoll_lock);
+	ASSERT(minor < dptblsize);
 	dpep = devpolltbl[minor];
 	ASSERT(dpep != NULL);
 	mutex_exit(&devpoll_lock);
 
-	/*
-	 * Polling on a /dev/poll fd is not fully supported yet.
-	 */
-	if (dpep->dpe_flag & DP_ISEPOLLCOMPAT) {
-		/* no error in epoll compat. mode */
-		*reventsp = 0;
-	} else {
+	mutex_enter(&dpep->dpe_lock);
+	if ((dpep->dpe_flag & DP_ISEPOLLCOMPAT) == 0) {
+		/* Poll recursion is not yet supported for non-epoll handles */
 		*reventsp = POLLERR;
+		mutex_exit(&dpep->dpe_lock);
+		return (0);
+	} else {
+		dpep->dpe_refcnt++;
+		pcp = dpep->dpe_pcache;
+		mutex_exit(&dpep->dpe_lock);
 	}
-	return (0);
+
+	res = pollstate_enter(pcp);
+	if (res == PSE_SUCCESS) {
+		nfds_t		nfds = 1;
+		int		fdcnt = 0;
+		pollstate_t	*ps = curthread->t_pollstate;
+
+		rc = dp_pcache_poll(dpep, NULL, pcp, nfds, &fdcnt);
+		if (rc == 0) {
+			*reventsp = (fdcnt > 0) ? POLLIN : 0;
+		}
+		pcachelink_assoc(pcp, ps->ps_pc_stack[0]);
+		pollstate_exit(pcp);
+	} else {
+		switch (res) {
+		case PSE_FAIL_DEPTH:
+			rc = EINVAL;
+			break;
+		case PSE_FAIL_LOOP:
+		case PSE_FAIL_DEADLOCK:
+			rc = ELOOP;
+			break;
+		default:
+			/*
+			 * If anything else has gone awry, such as being polled
+			 * from an unexpected context, fall back to the
+			 * recursion-intolerant response.
+			 */
+			*reventsp = POLLERR;
+			rc = 0;
+			break;
+		}
+	}
+
+	DP_REFRELE(dpep);
+	return (rc);
 }
 
 /*
@@ -1376,8 +1499,190 @@ dpclose(dev_t dev, int flag, int otyp, cred_t *credp)
 	while (pcp->pc_busy > 0)
 		cv_wait(&pcp->pc_busy_cv, &pcp->pc_no_exit);
 	mutex_exit(&pcp->pc_no_exit);
+
+	/* Clean up any pollcache links created via recursive /dev/poll */
+	if (pcp->pc_parents != NULL || pcp->pc_children != NULL) {
+		/*
+		 * Because of the locking rules for pcachelink manipulation,
+		 * acquring pc_lock is required for this step.
+		 */
+		mutex_enter(&pcp->pc_lock);
+		pcachelink_purge_all(pcp);
+		mutex_exit(&pcp->pc_lock);
+	}
+
 	pcache_destroy(pcp);
 	ASSERT(dpep->dpe_refcnt == 0);
 	kmem_free(dpep, sizeof (dp_entry_t));
 	return (0);
+}
+
+static void
+pcachelink_locked_rele(pcachelink_t *pl)
+{
+	ASSERT(MUTEX_HELD(&pl->pcl_lock));
+	VERIFY(pl->pcl_refcnt >= 1);
+
+	pl->pcl_refcnt--;
+	if (pl->pcl_refcnt == 0) {
+		VERIFY(pl->pcl_state == PCL_INVALID);
+		ASSERT(pl->pcl_parent_pc == NULL);
+		ASSERT(pl->pcl_child_pc == NULL);
+		ASSERT(pl->pcl_parent_next == NULL);
+		ASSERT(pl->pcl_child_next == NULL);
+
+		pl->pcl_state = PCL_FREE;
+		mutex_destroy(&pl->pcl_lock);
+		kmem_free(pl, sizeof (pcachelink_t));
+	} else {
+		mutex_exit(&pl->pcl_lock);
+	}
+}
+
+/*
+ * Associate parent and child pollcaches via a pcachelink_t.  If an existing
+ * link (stale or valid) between the two is found, it will be reused.  If a
+ * suitable link is not found for reuse, a new one will be allocated.
+ */
+static void
+pcachelink_assoc(pollcache_t *child, pollcache_t *parent)
+{
+	pcachelink_t	*pl, **plpn;
+
+	ASSERT(MUTEX_HELD(&child->pc_lock));
+	ASSERT(MUTEX_HELD(&parent->pc_lock));
+
+	/* Search for an existing link we can reuse. */
+	plpn = &child->pc_parents;
+	for (pl = child->pc_parents; pl != NULL; pl = *plpn) {
+		mutex_enter(&pl->pcl_lock);
+		if (pl->pcl_state == PCL_INVALID) {
+			/* Clean any invalid links while walking the list */
+			*plpn = pl->pcl_parent_next;
+			pl->pcl_child_pc = NULL;
+			pl->pcl_parent_next = NULL;
+			pcachelink_locked_rele(pl);
+		} else if (pl->pcl_parent_pc == parent) {
+			/* Successfully found parent link */
+			ASSERT(pl->pcl_state == PCL_VALID ||
+			    pl->pcl_state == PCL_STALE);
+			pl->pcl_state = PCL_VALID;
+			mutex_exit(&pl->pcl_lock);
+			return;
+		} else {
+			plpn = &pl->pcl_parent_next;
+			mutex_exit(&pl->pcl_lock);
+		}
+	}
+
+	/* No existing link to the parent was found.  Create a fresh one. */
+	pl = kmem_zalloc(sizeof (pcachelink_t), KM_SLEEP);
+	mutex_init(&pl->pcl_lock,  NULL, MUTEX_DEFAULT, NULL);
+
+	pl->pcl_parent_pc = parent;
+	pl->pcl_child_next = parent->pc_children;
+	parent->pc_children = pl;
+	pl->pcl_refcnt++;
+
+	pl->pcl_child_pc = child;
+	pl->pcl_parent_next = child->pc_parents;
+	child->pc_parents = pl;
+	pl->pcl_refcnt++;
+
+	pl->pcl_state = PCL_VALID;
+}
+
+/*
+ * Mark all child links in a pollcache as stale.  Any invalid child links found
+ * during iteration are purged.
+ */
+static void
+pcachelink_mark_stale(pollcache_t *pcp)
+{
+	pcachelink_t	*pl, **plpn;
+
+	ASSERT(MUTEX_HELD(&pcp->pc_lock));
+
+	plpn = &pcp->pc_children;
+	for (pl = pcp->pc_children; pl != NULL; pl = *plpn) {
+		mutex_enter(&pl->pcl_lock);
+		if (pl->pcl_state == PCL_INVALID) {
+			/*
+			 * Remove any invalid links while we are going to the
+			 * trouble of walking the list.
+			 */
+			*plpn = pl->pcl_child_next;
+			pl->pcl_parent_pc = NULL;
+			pl->pcl_child_next = NULL;
+			pcachelink_locked_rele(pl);
+		} else {
+			pl->pcl_state = PCL_STALE;
+			plpn = &pl->pcl_child_next;
+			mutex_exit(&pl->pcl_lock);
+		}
+	}
+}
+
+/*
+ * Purge all stale (or invalid) child links from a pollcache.
+ */
+static void
+pcachelink_purge_stale(pollcache_t *pcp)
+{
+	pcachelink_t	*pl, **plpn;
+
+	ASSERT(MUTEX_HELD(&pcp->pc_lock));
+
+	plpn = &pcp->pc_children;
+	for (pl = pcp->pc_children; pl != NULL; pl = *plpn) {
+		mutex_enter(&pl->pcl_lock);
+		switch (pl->pcl_state) {
+		case PCL_STALE:
+			pl->pcl_state = PCL_INVALID;
+			/* FALLTHROUGH */
+		case PCL_INVALID:
+			*plpn = pl->pcl_child_next;
+			pl->pcl_parent_pc = NULL;
+			pl->pcl_child_next = NULL;
+			pcachelink_locked_rele(pl);
+			break;
+		default:
+			plpn = &pl->pcl_child_next;
+			mutex_exit(&pl->pcl_lock);
+		}
+	}
+}
+
+/*
+ * Purge all child and parent links from a pollcache, regardless of status.
+ */
+static void
+pcachelink_purge_all(pollcache_t *pcp)
+{
+	pcachelink_t	*pl, **plpn;
+
+	ASSERT(MUTEX_HELD(&pcp->pc_lock));
+
+	plpn = &pcp->pc_parents;
+	for (pl = pcp->pc_parents; pl != NULL; pl = *plpn) {
+		mutex_enter(&pl->pcl_lock);
+		pl->pcl_state = PCL_INVALID;
+		*plpn = pl->pcl_parent_next;
+		pl->pcl_child_pc = NULL;
+		pl->pcl_parent_next = NULL;
+		pcachelink_locked_rele(pl);
+	}
+
+	plpn = &pcp->pc_children;
+	for (pl = pcp->pc_children; pl != NULL; pl = *plpn) {
+		mutex_enter(&pl->pcl_lock);
+		pl->pcl_state = PCL_INVALID;
+		*plpn = pl->pcl_child_next;
+		pl->pcl_parent_pc = NULL;
+		pl->pcl_child_next = NULL;
+		pcachelink_locked_rele(pl);
+	}
+
+	ASSERT(pcp->pc_parents == NULL);
+	ASSERT(pcp->pc_children == NULL);
 }

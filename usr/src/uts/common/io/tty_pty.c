@@ -1,6 +1,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2015, Joyent, Inc.
  */
 
 /*
@@ -988,7 +989,10 @@ ptcpoll(dev_t dev,
 #ifdef lint
 	anyyet = anyyet;
 #endif
-	polllock(php, &pty->ptc_lock);
+	if (polllock(php, &pty->ptc_lock) != 0) {
+		*reventsp = POLLNVAL;
+		return (0);
+	}
 
 	ASSERT(MUTEX_HELD(&pty->ptc_lock));
 

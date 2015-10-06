@@ -28,7 +28,7 @@
  */
 
 /*
- * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
+ * Copyright 2015, Joyent, Inc.
  */
 
 /*
@@ -1775,7 +1775,10 @@ fifo_poll(vnode_t *vp, short events, int anyyet, short *reventsp,
 	fn_dest		= fnp->fn_dest;
 	fn_lock		= fnp->fn_lock;
 
-	polllock(&stp->sd_pollist, &fn_lock->flk_lock);
+	if (polllock(&stp->sd_pollist, &fn_lock->flk_lock) != 0) {
+		*reventsp = POLLNVAL;
+		return (0);
+	}
 
 	/*
 	 * see if FIFO/pipe open

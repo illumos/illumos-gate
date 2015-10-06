@@ -5939,7 +5939,11 @@ prpoll(vnode_t *vp, short events, int anyyet, short *reventsp,
 		return (0);
 	}
 
-	lockstate = pollunlock();	/* avoid deadlock with prnotify() */
+	/* avoid deadlock with prnotify() */
+	if (pollunlock(&lockstate) != 0) {
+		*reventsp = POLLNVAL;
+		return (0);
+	}
 
 	if ((error = prlock(pnp, ZNO)) != 0) {
 		pollrelock(lockstate);
