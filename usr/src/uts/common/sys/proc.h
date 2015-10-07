@@ -763,7 +763,7 @@ extern	void	pokelwps(proc_t *);
 extern	void	continuelwps(proc_t *);
 extern	int	exitlwps(int);
 extern	void	lwp_ctmpl_copy(klwp_t *, klwp_t *);
-extern	void	lwp_ctmpl_clear(klwp_t *);
+extern	void	lwp_ctmpl_clear(klwp_t *, boolean_t);
 extern	klwp_t	*forklwp(klwp_t *, proc_t *, id_t);
 extern	void	lwp_load(klwp_t *, gregset_t, uintptr_t);
 extern	void	lwp_setrval(klwp_t *, int, int);

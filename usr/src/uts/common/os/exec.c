@@ -367,7 +367,7 @@ exec_common(const char *fname, const char **argp, const char **envp,
 	/*
 	 * Clear contract template state
 	 */
-	lwp_ctmpl_clear(lwp);
+	lwp_ctmpl_clear(lwp, B_TRUE);
 
 	/*
 	 * Save the directory in which we found the executable for expanding

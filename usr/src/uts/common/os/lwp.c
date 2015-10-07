@@ -57,6 +57,8 @@
 #include <sys/lgrp.h>
 #include <sys/rctl.h>
 #include <sys/contract_impl.h>
+#include <sys/contract/process.h>
+#include <sys/contract/process_impl.h>
 #include <sys/cpc_impl.h>
 #include <sys/sdt.h>
 #include <sys/cmn_err.h>
@@ -874,6 +876,7 @@ lwp_ctmpl_copy(klwp_t *dst, klwp_t *src)
 
 		dst->lwp_ct_active[i] = ctmpl_dup(tmpl);
 		dst->lwp_ct_latest[i] = NULL;
+
 	}
 }
 
@@ -881,20 +884,32 @@ lwp_ctmpl_copy(klwp_t *dst, klwp_t *src)
  * Clear an LWP's contract template state.
  */
 void
-lwp_ctmpl_clear(klwp_t *lwp)
+lwp_ctmpl_clear(klwp_t *lwp, boolean_t is_exec)
 {
 	ct_template_t *tmpl;
 	int i;
 
 	for (i = 0; i < ct_ntypes; i++) {
-		if ((tmpl = lwp->lwp_ct_active[i]) != NULL) {
-			ctmpl_free(tmpl);
-			lwp->lwp_ct_active[i] = NULL;
-		}
-
 		if (lwp->lwp_ct_latest[i] != NULL) {
 			contract_rele(lwp->lwp_ct_latest[i]);
 			lwp->lwp_ct_latest[i] = NULL;
+		}
+
+		if ((tmpl = lwp->lwp_ct_active[i]) != NULL) {
+			/*
+			 * If we're exec-ing a new program and the process
+			 * contract template is setup to be preserved across
+			 * exec, then don't clear it.
+			 */
+			if (is_exec && i == CTT_PROCESS) {
+				ctmpl_process_t *ctp = tmpl->ctmpl_data;
+
+				if ((ctp->ctp_params & CT_PR_KEEP_EXEC) != 0)
+					continue;
+			}
+
+			ctmpl_free(tmpl);
+			lwp->lwp_ct_active[i] = NULL;
 		}
 	}
 }
@@ -1151,7 +1166,7 @@ lwp_cleanup(void)
 	}
 	kpreempt_enable();
 
-	lwp_ctmpl_clear(ttolwp(t));
+	lwp_ctmpl_clear(ttolwp(t), B_FALSE);
 }
 
 int

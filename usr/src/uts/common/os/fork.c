@@ -746,7 +746,7 @@ forklwp_fail(proc_t *p)
 			kmem_free(t->t_door, sizeof (door_data_t));
 			t->t_door = NULL;
 		}
-		lwp_ctmpl_clear(ttolwp(t));
+		lwp_ctmpl_clear(ttolwp(t), B_FALSE);
 
 		/*
 		 * Remove the thread from the all threads list.

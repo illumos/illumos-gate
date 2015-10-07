@@ -230,7 +230,7 @@ restart_init(int what, int why)
 		siginfofree(lwp->lwp_curinfo);
 		lwp->lwp_curinfo = NULL;
 	}
-	lwp_ctmpl_clear(lwp);
+	lwp_ctmpl_clear(lwp, B_FALSE);
 
 	/*
 	 * Reset both the process root directory and the current working
