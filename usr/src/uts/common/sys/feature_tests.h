@@ -395,12 +395,21 @@ extern "C" {
 /*
  * The following macro defines a value for the ISO C99 restrict
  * keyword so that _RESTRICT_KYWD resolves to "restrict" if
- * an ISO C99 compiler is used and "" (null string) if any other
- * compiler is used. This allows for the use of single prototype
- * declarations regardless of compiler version.
+ * an ISO C99 compiler is used, "__restrict" for c++ and "" (null string)
+ * if any other compiler is used. This allows for the use of single
+ * prototype declarations regardless of compiler version.
  */
-#if (defined(__STDC__) && defined(_STDC_C99)) && !defined(__cplusplus)
-#define	_RESTRICT_KYWD	restrict
+#if (defined(__STDC__) && defined(_STDC_C99))
+#ifdef __cplusplus
+#define	_RESTRICT_KYWD	__restrict
+#else
+/*
+ * NOTE: The whitespace between the '#' and 'define' is significant.
+ * It foils gcc's fixincludes from defining a redundant 'restrict'.
+ */
+/* CSTYLED */
+# define	_RESTRICT_KYWD	restrict
+#endif
 #else
 #define	_RESTRICT_KYWD
 #endif

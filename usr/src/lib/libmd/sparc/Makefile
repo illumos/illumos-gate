@@ -21,6 +21,7 @@
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2013 Saso Kiselkov. All rights reserved.
+# Copyright 2015 Gary Mills
 #
 
 LIBRARY =	libmd.a
@@ -36,6 +37,9 @@ include		../Makefile.com
 # Symbol capabilities objects are added for sun4u and sun4v.
 EXTPICS =	../capabilities/sun4u/sparc/pics/symcap.o \
 		../capabilities/sun4v/sparc/pics/symcap.o
+
+# Suppress error for edonr.c __asm__ code
+pics/edonr.o := CERRWARN +=	-_gcc=-Wno-uninitialized
 
 .KEEP_STATE:
 
