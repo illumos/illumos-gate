@@ -20,35 +20,29 @@
 .\" Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 .\" Use is subject to license terms.
 .\"
-.TH hdrchk 1ONBLD "02 July 2008"
+.TH HDRCHK 1ONBLD "Jul 02, 2008"
 .SH NAME
 hdrchk \- check that header files conform to ON standards
 .SH SYNOPSIS
 .nf
 \fBhdrchk\fR [\fB-a\fP] \fIfile\fR [\fIfile ...\fR]\fP
 .fi
-.LP
 .SH DESCRIPTION
-.IX "OS-Net build tools" "hdrchk" "" "\fBhdrchk\fP"
 .LP
 .I hdrchk
 verifies that C header files (*.h) conform to the standards of the ON
 consolidation.
 See HEADER STANDARDS for details.
-.LP
 .SH OPTIONS
-.LP
 .TP 10
 .B -a
 Apply (more lenient) application header rules.
-.LP
 .SH HEADER STANDARDS
 .LP
 Standards for all header files:
 .TP 4
 .B 1.
 Begin with a comment containing a copyright message.
-.LP
 .TP 4
 .B 2.
 Enclosed in a guard of the form:
@@ -63,7 +57,6 @@ Enclosed in a guard of the form:
 The preferred form is without the bang character, but either is
 acceptable.
 .RE
-.LP
 .TP 4
 .B 3.
 Has a valid ident declaration.
@@ -76,11 +69,9 @@ The file guard must take the form '_\fBFILENAME\fP_H[_]', where
 If it is installed in a subdirectory, it should be of the
 form '_\fBDIR\fP_\fBFILENAME\fP_H[_]', though this is not currently enforced.
 The form without the trailing underscore is preferred in both cases.
-.LP
 .TP 4
 .B 2.
 All #include directives must use the <> form.
-.LP
 .TP 4
 .B 3.
 If the header file contains anything besides comments and preprocessor

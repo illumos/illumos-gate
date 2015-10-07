@@ -23,8 +23,9 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2015 Joyent, Inc.
+ */
 
 #include "lint.h"
 #include "mtlib.h"
@@ -55,12 +56,13 @@ static char	*replace_nls_option(char *, const char *, char *,
 
 char *
 _real_gettext_u(const char *domain, const char *msgid1, const char *msgid2,
-    unsigned long int ln, int category, int plural)
+    unsigned long int ln, int category, int plural, locale_t loc)
 {
 	char	msgfile[MAXPATHLEN]; 	/* 1024 */
 	char	mydomain[TEXTDOMAINMAX + 1]; /* 256 + 1 */
 	char	*cur_binding;	/* points to current binding in list */
-	char	*cur_locale, *cur_domain, *result, *nlspath;
+	const char *cur_locale;
+	char	*cur_domain, *result, *nlspath;
 	char	*msgloc, *cb, *cur_domain_binding;
 	char	*language;
 	unsigned int	n = (unsigned int)ln;	/* we don't need long for n */
@@ -86,7 +88,9 @@ _real_gettext_u(const char *domain, const char *msgid1, const char *msgid2,
 	 * category may be LC_MESSAGES or LC_TIME
 	 * locale contains the value of 'category'
 	 */
-	cur_locale = setlocale(category, NULL);
+	if (loc == NULL)
+		loc = uselocale(NULL);
+	cur_locale = current_locale(loc, category);
 
 	language = getenv("LANGUAGE"); /* for GNU */
 	if (language) {
@@ -142,7 +146,7 @@ _real_gettext_u(const char *domain, const char *msgid1, const char *msgid2,
 		/* NLSPATH is set */
 		int	ret;
 
-		msgloc = setlocale(LC_MESSAGES, NULL);
+		msgloc = current_locale(loc, LC_MESSAGES);
 
 		ret = process_nlspath(cur_domain, msgloc,
 		    (const char *)nlspath, &cur_binding);

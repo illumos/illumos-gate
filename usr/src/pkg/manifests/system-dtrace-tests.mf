@@ -2088,6 +2088,8 @@ file path=opt/SUNWdtrt/tst/common/usdt/tst.noreapring.ksh mode=0444
 file path=opt/SUNWdtrt/tst/common/usdt/tst.onlyenabled.ksh mode=0444
 file path=opt/SUNWdtrt/tst/common/usdt/tst.reap.ksh mode=0444
 file path=opt/SUNWdtrt/tst/common/usdt/tst.reeval.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/usdt/tst.sameprovmulti.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/usdt/tst.sameprovmulti.ksh.out mode=0444
 file path=opt/SUNWdtrt/tst/common/usdt/tst.static.ksh mode=0444
 file path=opt/SUNWdtrt/tst/common/usdt/tst.static.ksh.out mode=0444
 file path=opt/SUNWdtrt/tst/common/usdt/tst.static2.ksh mode=0444

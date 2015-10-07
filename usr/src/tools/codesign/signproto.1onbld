@@ -21,19 +21,17 @@
 .\" Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 .\" Use is subject to license terms.
 .\"
-.TH signproto 1ONBLD "13 June 2007"
+.TH SIGNPROTO 1ONBLD "Jun 13, 2007"
 .SH NAME
 .I signproto
 \- sign ELF objects in proto area
 .SH SYNOPSIS
 \fBsignproto \fIcred_file\fP
-.LP
 .SH DESCRIPTION
-.IX "OS-Net build tools" "signproto" "" "\fBsignproto\fP"
 .LP
 .I signproto
 finds ELF objects in the ON proto area and re-signs them
-using 
+using
 .IR signit (1ONBLD).
 This operation is normally invoked only for
 release builds, as it replaces the internal development
@@ -45,30 +43,26 @@ is accessed via
 Cryptographic modules are identified by examining the signature
 embedded by
 .IR elfsign (1)
-during the build process. 
+during the build process.
 .I signproto
 requires a single command-line argument, which is a file containing
 the mapping between each signing server credential name and the Subject
-Distinguished Name (DN) of the certificate used to 
+Distinguished Name (DN) of the certificate used to
 sign the ELF file. Each line in the file contains a credential name
 followed by a regular expression. The first regular expression that
-matches the Subject DN embedded in the ELF file determines the 
+matches the Subject DN embedded in the ELF file determines the
 credential name passed to
 .I signit
 to re-sign the file.
-.LP
 .SH ENVIRONMENT
-.LP
 .TP 4
 .B CODESIGN_USER
 Login name for the code signing server passed to
 .I signit .
 If this variable is not set, the value in LOGNAME is used instead.
-.LP
 .TP 4
 .B ROOT
 Location of ON proto area containing files to be signed.
-.LP
 .SH SEE ALSO
 .LP
 signit(1ONBLD), elfsign(1)

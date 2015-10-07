@@ -770,8 +770,10 @@ find_compiler(void)
 			break;
 		case 52:	/* GCC */
 			test_debugf(t, "Found GNU C");
-			c89flags = "-Wall -Werror -std=c89 " MFLAG;
-			c99flags = "-Wall -Werror -std=c99 " MFLAG;
+			c89flags = "-Wall -Werror -std=c89 -nostdinc "
+			    "-isystem /usr/include " MFLAG;
+			c99flags = "-Wall -Werror -std=c99 -nostdinc "
+			    "-isystem /usr/include " MFLAG;
 			if (extra_debug) {
 				test_debugf(t, "c89flags: %s", c89flags);
 				test_debugf(t, "c99flags: %s", c99flags);

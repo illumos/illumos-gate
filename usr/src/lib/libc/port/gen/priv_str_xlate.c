@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  *	priv_str_xlate.c - Privilege translation routines.
  */
@@ -432,6 +430,7 @@ char *
 priv_gettext(const char *priv)
 {
 	char file[MAXPATHLEN];
+	locale_t curloc;
 	const char *loc;
 	char	*ret;
 
@@ -439,8 +438,8 @@ priv_gettext(const char *priv)
 	if (priv_getbyname(priv) < 0)
 		return (NULL);
 
-	if ((loc = setlocale(LC_MESSAGES, NULL)) == NULL)
-		loc = "C";
+	curloc = uselocale(NULL);
+	loc = current_locale(curloc, LC_MESSAGES);
 
 	if (snprintf(file, sizeof (file),
 	    _DFLT_LOC_PATH "%s/LC_MESSAGES/priv_names", loc) < sizeof (file)) {

@@ -51,6 +51,10 @@ outputdir = /var/tmp/test_results
 [/opt/libc-tests/tests/random/arc4random_preforksig]
 [/opt/libc-tests/tests/random/arc4key.ksh]
 
+[/opt/libc-tests/tests/catopen]
+[/opt/libc-tests/tests/priv_gettext]
+[/opt/libc-tests/tests/strerror]
+
 [/opt/libc-tests/tests/symbols]
 pre = setup
 tests = [
@@ -64,6 +68,7 @@ tests = [
 	'signal_h',
 	'stdio_h',
 	'stdlib_h',
+	'string_h',
 	'strings_h',
 	'sys_stat_h',
 	'sys_time_h',

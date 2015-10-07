@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * catopen.c
  *
@@ -103,10 +101,12 @@ process_nls_path(char *name, int oflag)
 	 *
 	 * Chose XPG4. If oflag == NL_CAT_LOCALE, use LC_MESSAGES.
 	 */
-	if (oflag == NL_CAT_LOCALE)
-		locale = setlocale(LC_MESSAGES, NULL);
-	else
+	if (oflag == NL_CAT_LOCALE) {
+		locale_t loc = uselocale(NULL);
+		locale = current_locale(loc, LC_MESSAGES);
+	} else {
 		locale = getenv("LANG");
+	}
 
 	nlspath = getenv("NLSPATH");
 	lang = NULL;

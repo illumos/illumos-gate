@@ -19,14 +19,12 @@
 .\" "
 .\" " Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 .\" "
-.TH wsdiff 1ONBLD "15 Jul 2010"
+.TH WSDIFF 1ONBLD "Jul 15, 2010"
 .I wsdiff
 \- report differences between proto area objects
 .SH SYNOPSIS
 \fBwsdiff [-dvVst] [-r \fIresults\fP] [-i \fIfilelist\fP] \fIold\fP \fInew\fP
-.LP
 .SH DESCRIPTION
-.IX "OS-Net build tools" "wsdiff" "" "\fBwsdiff\fP"
 .LP
 The wsdiff utility detects and reports on object differences found between
 two proto areas constructed from the same workspace. This can be useful
@@ -71,13 +69,11 @@ and changed objects, as well as diffs signifying what wsdiff found to be differe
 .B -i
 Specify which objects should be compared by wsdiff via an input file list (See
 EXAMPLES).
-.LP
 .SH OUTPUT
 .LP
 The list of objects appearing to differ between \fIold\fP and \fInew\fP is
 printed to stdout. If -r was specified, the list of differing objects and
 their differrences are logged to \fIresults\fP.
-.LP
 .SH EXAMPLES
 .PP
 \fBExample 1: Using wsdiff to determine patch deliverables\fR
@@ -149,7 +145,6 @@ NOTE: ELF .text difference detected.
 >     lgrp_cpu_init+0x168:    d6 04 e0 00  ld        [%l3], %o3
 >     lgrp_cpu_init+0x16c:    80 a2 e0 00  cmp       %o3, 0x0
 
-...
 
 .fi
 .PP
@@ -191,7 +186,6 @@ $ DMAKE_MAX_JOBS=24 wsdiff proto_base proto_patch
 .PP
 Note that this variable is also used for nightly(1ONBLD) so when run from
 nightly(1ONBLD), wsdiff will honor the setting.
-.LP
 .SH SEE ALSO
 .LP
 .IR nightly(1ONBLD),

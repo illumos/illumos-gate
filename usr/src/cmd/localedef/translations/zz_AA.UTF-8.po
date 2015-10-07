@@ -1,0 +1,7 @@
+#
+# The zz_AA locale is purely a test locale. These translations are
+# currently used for the strerror tests, to verify that strerror_l and
+# the various locale aware aspects of it are working correctly.
+#
+msgid "No such file or directory"
+msgstr "It's a trap!"

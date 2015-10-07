@@ -21,7 +21,7 @@
 .\"
 .\" CDDL HEADER END
 .\"
-.TH Install 1ONBLD "14 Jan 2010"
+.TH INSTALL 1ONBLD "Jan 14, 2010"
 .SH NAME
 Install \- install a kernel from an ON workspace
 .SH SYNOPSIS
@@ -96,7 +96,10 @@ Install the system built in the ON workspace
 must be a built ON workspace \(em
 .B Install
 will not automatically invoke
-.BR make "(1).  If " \-w " is not specified, " Install " uses the current
+.BR make (1) .
+If \-w is not specified,
+.B Install
+uses the current
 workspace (as indicated by $CODEMGR_WS).  If there is no current workspace,
 .B Install
 checks to see if you are in an appropriate source directory, e.g. uts/sun4c;
@@ -215,7 +218,7 @@ You may omit the ``.tar'' suffix.  For example,
 .RB `` "Install -l my_ws.sun4c -t machine:/" ''
 installs a system you previously built with
 .B "-L"
-(from sun4c files in my_ws) on 
+(from sun4c files in my_ws) on
 .IR machine:/ .
 This is equivalent to typing
 .RB `` "rsh machine '(cd /; tar xvf -)' <~/LibInstall/my_ws.sun4c.tar" '',
@@ -263,11 +266,15 @@ You can customize
 by creating a .Installrc file in your home directory.  .Installrc
 should consist of a list of command-line-style options, e.g:
 .LP
+.nf
 .B
 	-w /ws/foo
+.fi
 .br
+.nf
 .B
 	-t labmachine:/mnt -pv
+.fi
 .LP
 .B Install
 processes default options first, then .Installrc
@@ -279,13 +286,21 @@ In order to use the most convenient form of
 you will need to do the following on the target machine:
 .LP
 .br
+.nf
 	(1) add your machine name to the /etc/hosts.equiv file
+.fi
 .br
+.nf
 	(2) add your username to the /etc/{passwd,shadow} files
+.fi
 .br
+.nf
 	(3) chown -R yourself /kernel /usr/kernel
+.fi
 .br
+.nf
 	(4) chmod -R u+w /kernel /usr/kernel
+.fi
 .SH "ENVIRONMENT"
 .LP
 You can set the following variables in your environment:
@@ -320,7 +335,6 @@ the command to copy files locally
 INSTALL_RCP [default: rcp -p]
 .IP
 the command to copy files remotely
-.bp
 .SH "EXAMPLES"
 .LP
 .B

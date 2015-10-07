@@ -27,8 +27,6 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #pragma weak _gettxt = gettxt
 
 #include "lint.h"
@@ -91,6 +89,7 @@ gettxt(const char *msg_id, const char *dflt_str)
 	char	*tokp;
 	size_t	name_len;
 	char	*curloc;
+	locale_t	loc;
 
 	if ((msg_id == NULL) || (*msg_id == '\0')) {
 		return (handle_return(dflt_str));
@@ -121,7 +120,8 @@ gettxt(const char *msg_id, const char *dflt_str)
 			return (handle_return(dflt_str));
 	}
 	msgnum = atoi(msg_id + name_len + 1);
-	curloc = setlocale(LC_MESSAGES, NULL);
+	loc = uselocale(NULL);
+	curloc = current_locale(loc, LC_MESSAGES);
 
 	lmutex_lock(&gettxt_lock);
 

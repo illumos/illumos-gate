@@ -1,4 +1,5 @@
 '\" te
+.\" Copyright 2015, Joyent, Inc.
 .\" Copyright (c) 2005, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Copyright 1989 AT&T
 .\" Portions Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
@@ -9,9 +10,9 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH STRERROR 3C "Mar 31, 2005"
+.TH STRERROR 3C "Aug 17, 2015"
 .SH NAME
-strerror, strerror_r \- get error message string
+strerror, strerror_r, strerror_l \- get error message string
 .SH SYNOPSIS
 .LP
 .nf
@@ -25,8 +26,11 @@ strerror, strerror_r \- get error message string
 \fBint\fR \fBstrerror_r\fR(\fBint\fR \fIerrnum\fR, \fBchar *\fR\fIstrerrbuf\fR, \fBsize_t\fR  \fIbuflen\fR);
 .fi
 
+.LP
+.nf
+\fBchar *\fR\fBstrerror_l\fR(\fBint\fR \fIerrnum\fR, \fBlocale_t\fR \fIloc\fR);
+
 .SH DESCRIPTION
-.sp
 .LP
 The \fBstrerror()\fR function maps the error number in \fIerrnum\fR to an error
 message string, and returns a pointer to that string. It uses the same set of
@@ -35,23 +39,35 @@ overwritten.
 .sp
 .LP
 The \fBstrerror_r()\fR function maps the error number in \fIerrnum\fR to
-anerror message string and returns the string in the buffer pointed to by
+an error message string and returns the string in the buffer pointed to by
 \fIstrerrbuf\fR with length \fIbuflen\fR.
-.SH RETURN VALUES
 .sp
 .LP
-Upon successful completion, \fBstrerror()\fR returns a pointer to the generated
-message string. Otherwise, it sets \fBerrno\fR and returns a pointer to an
-error message string. It returns the string "Unknown error" if \fIerrnum\fR is
-not a valid error number.
+The \fBstrerror_l()\fR function maps the error number in \fIerrnum\fR to
+an error message string in the locale indicated by \fIloc\fR.  The
+returned string should not be overwritten. If \fIloc\fR is passed the
+\fBNULL\fR pointer, then the locale of the calling thread's current locale
+will be used instead.
+.sp
+.LP
+Because the \fBstrerror()\fR and \fBstrerror_l()\fR functions, return localized
+strings in the event of an unknown error, one must use the value of \fBerrno\fR
+to detect an error. Callers should first set \fBerrno\fR to \fB0\fR before the
+call to either function and then check the value of \fBerrno\fR after the call.
+If the value of \fBerrno\fR is non-zero then an error has occurred.
+.SH RETURN VALUES
+.LP
+Upon successful completion, \fBstrerror()\fR and \fBstrerror_l()\fR return a
+pointer to the generated message string. Otherwise, they set \fBerrno\fR and
+returns a pointer to an error message string. They return the localized string
+"Unknown error" if \fIerrnum\fR is not a valid error number.
 .sp
 .LP
 Upon successful completion, \fBstrerror_r()\fR returns 0.  Otherwise it sets
 \fBerrno\fR and returns the value of \fBerrno\fR to indicate the error. It
-returns the string "Unknown error" in the buffer pointed to by \fIstrerrbuf\fR
-if \fIerrnum\fR is not a valid error number.
+returns the localized string "Unknown error" in the buffer pointed to by
+\fIstrerrbuf\fR if \fIerrnum\fR is not a valid error number.
 .SH ERRORS
-.sp
 .LP
 These functions may fail if:
 .sp
@@ -77,12 +93,11 @@ generated message string.
 .RE
 
 .SH USAGE
-.sp
 .LP
 Messages returned from these functions are in the native language specified by
-the \fBLC_MESSAGES\fR locale category. See \fBsetlocale\fR(3C).
+the \fBLC_MESSAGES\fR locale category. See \fBsetlocale\fR(3C) and
+\fBuselocale\fR(3C).
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -100,7 +115,6 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBgettext\fR(3C), \fBperror\fR(3C), \fBsetlocale\fR(3C), \fBattributes\fR(5),
-\fBstandards\fR(5)
+\fBgettext\fR(3C), \fBperror\fR(3C), \fBsetlocale\fR(3C), \fBuselocale\fR(3C),
+\fBattributes\fR(5), \fBstandards\fR(5)

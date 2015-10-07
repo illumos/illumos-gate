@@ -311,6 +311,11 @@ extern wint_t _putwc(wint_t, FILE *);
  */
 extern wint_t	__ungetwc_xpg5(wint_t, FILE *);
 
+/*
+ * Defined in setlocale.c.
+ */
+extern char *current_locale(locale_t, int);
+
 #ifdef	__cplusplus
 }
 #endif

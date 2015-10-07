@@ -22,7 +22,7 @@
 .\" Use is subject to license terms.
 .\"
 '\" te
-.TH ndrgen 1ONBLD "22 October 2007" "SunOS 5.11" "User Commands"
+.TH NDRGEN 1ONBLD "Oct 22, 2007"
 .SH NAME
 ndrgen \- NDL RPC protocol compiler
 .SH SYNOPSIS
@@ -32,7 +32,6 @@ ndrgen \- NDL RPC protocol compiler
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBndrgen\fR utility is a tool that generates C code to implement a DCERPC/MSRPC Network Data Representation (NDR) protocol. The input to \fBndrgen\fR is a language similar to C known as Network Data Language (NDL).
 .sp
@@ -132,7 +131,6 @@ ONC RPC uses \fBmalloc()\fR liberally throughout its run-time system. To free re
 The following terminology is used in the subsequent discussion of NDR.
 .sp
 .ne 2
-.mk
 .na
 \fBSize\fR
 .ad
@@ -143,7 +141,6 @@ The size of an array in elements, such as the amount to \fBmalloc()\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fBLength\fR
 .ad
@@ -154,7 +151,6 @@ The number of significant elements of an array.
 
 .sp
 .ne 2
-.mk
 .na
 \fBKnown\fR
 .ad
@@ -165,7 +161,6 @@ Size or Length is known at build time.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDetermined\fR
 .ad
@@ -176,7 +171,6 @@ Size or Length is determined at run time.
 
 .sp
 .ne 2
-.mk
 .na
 \fBFixed\fR
 .ad
@@ -197,7 +191,6 @@ char array[] = "A constant Size/Length";
 The following DCE RPC terminology is used in the subsequent discussion.
 .sp
 .ne 2
-.mk
 .na
 \fBConformant\fR
 .ad
@@ -207,10 +200,9 @@ The Size is Determined. The Length is the same as Size.
 .sp
 
 .RE
-
 .sp
 .ne 2
-.mk
+
 .na
 \fBVarying\fR
 .ad
@@ -229,7 +221,6 @@ strcpy(array, "very short string");
 
 .sp
 .ne 2
-.mk
 .na
 \fBVarying and Conformant\fR
 .ad
@@ -247,7 +238,6 @@ strcpy(array, "short string");
 .RE
 
 .SS "Strings"
-.sp
 .LP
 DCE RPC strings are represented as varying or varying and conformant one-dimensional arrays. Characters can be single-byte or multi-byte as long as all characters conform to a fixed element size. For instance, UCS-2 is valid, but UTF-8 is not a valid DCE RPC string format. The string is terminated by a null character of the appropriate element size.
 .sp
@@ -305,7 +295,6 @@ typedef struct msrpc_string {
 .LP
 Here, \fIlength\fR is the array length in bytes excluding any terminating null bytes and \fImaxlen\fR is the array length in bytes including the terminating null bytes.
 .SS "NDL Syntax"
-.sp
 .LP
 The \fBndrgen\fR input must be a valid C header file. Thus, NDL is defined by using macros to map to DCE RPC IDL. The following shows the mappings:
 .sp
@@ -350,22 +339,18 @@ LPDWORD         unsigned long *
 .in -2
 
 .SH OPTIONS
-.sp
 .LP
 The \fBsmbutil\fR command supports the following global option:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-Y\fR\fR
 .ad
 .RS 13n
-.rt  
 Specifies the path to the \fBcpp\fR program.
 .RE
 
 .SH EXAMPLES
-.sp
 .LP
 The following is an example NDL header file:
 .sp
@@ -461,53 +446,43 @@ EXTERNTYPEINFO(svc_interface)
 .in -2
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB0\fR
 .ad
 .RS 13n
-.rt  
 Successful operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB>0\fR
 .ad
 .RS 13n
-.rt  
 An error occurred.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See the \fBattributes\fR(5) man page for descriptions of the following attributes:
 .sp
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+cw | cw
+lw | lw .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-AvailabilitySUNWbtool
+Availability	SUNWbtool
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBcpp\fR(1), \fBrpcgen\fR(1), \fBcc\fR(1B), \fBattributes\fR(5)
 .SH BUGS
-.sp
 .LP
 Some \fBcpp\fR(1) macros used by \fBndrgen\fR are not understood by \fB/usr/bin/cpp\fR or \fB/usr/sfw/bin/cpp\fR. Simple NDL files generally do not pose a problem. If problems occur, for example, when using unions, use \fB/usr/libexec/cpp\fR or \fBcw\fR.

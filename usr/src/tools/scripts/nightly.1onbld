@@ -19,15 +19,13 @@
 .\" "Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
 .\" "Copyright 2012 Joshua M. Clulow <josh@sysmgr.org>
 .\" "
-.TH nightly 1ONBLD "Jan 28, 2014"
+.TH NIGHTLY 1ONBLD "Jan 28, 2014"
 .SH NAME
 .I nightly
 \- build an OS-Net consolidation overnight
 .SH SYNOPSIS
 \fBnightly [-in] [-V VERS] <env_file>\fP
-.LP
 .SH DESCRIPTION
-.IX "OS-Net build tools" "nightly" "" "\fBnightly\fP"
 .LP
 .I nightly,
 the mother of all build scripts,
@@ -102,7 +100,7 @@ The actions of the script are almost completely determined by
 the environment variables in the
 .I env
 file, the only necessary argument.  Ths only thing you really
-need to use 
+need to use
 .I nightly
 is an
 .I env
@@ -114,7 +112,6 @@ OS/Net with a version of nightly significantly older than your source
 tree.  It has what is effectively a Consolidation Private relationship
 to other build tools and with many parts of the OS/Net makefiles,
 although it may also be used to build other consolidations.
-.LP
 .SH NIGHTLY_OPTIONS
 The environment variable NIGHTLY_OPTIONS controls the actions
 .I nightly
@@ -229,19 +226,16 @@ Default group of options for building a release (-mp)
 .B \-V VERS
 set the build version string to VERS, overriding VERSION
 
-.LP
 .SH ENVIRONMENT VARIABLES
 .LP
-Here is a list of prominent environment variables that 
+Here is a list of prominent environment variables that
 .I nightly
 references and the meaning of each variable.
-.LP
-.RE
 .B CODEMGR_WS
 .RS 5
 The root of your workspace, including whatever metadata is kept by
 the source code management system.  This is the workspace in which the
-build will be done. 
+build will be done.
 .RE
 .LP
 .B PARENT_WS
@@ -249,7 +243,7 @@ build will be done.
 The root of the workspace that is the parent of the
 one being built.  This is particularly relevant for configurations
 with a main
-workspace and build workspaces underneath it; see the 
+workspace and build workspaces underneath it; see the
 \-u and \-U
 options as well as the PKGARCHIVE environment variable, for more
 information.
@@ -385,7 +379,7 @@ $(LC_ALL=C date +"%B %Y"); e.g., "October 2009".
 .LP
 .B RELEASE_BUILD
 .RS 5
-Define this to build a release with a non-DEBUG kernel. 
+Define this to build a release with a non-DEBUG kernel.
 Generally, let
 .I nightly
 set this for you based on its options.
@@ -461,7 +455,7 @@ to be installed in the default path.
 .B ON_CLOSED_BINS
 .RS 5
 OpenSolaris builds do not contain the closed source tree.  Instead,
-the developer downloads a closed binaries tree and unpacks it.  
+the developer downloads a closed binaries tree and unpacks it.
 .B ON_CLOSED_BINS
 tells nightly
 where to find these closed binaries, so that it can add them into the
@@ -485,13 +479,12 @@ version of dmake to be used.
 .LP
 .B MULTI_PROTO
 .RS 5
-If "no" (the default), 
+If "no" (the default),
 .I nightly
 will reuse $ROOT for both the DEBUG and non-DEBUG builds.  If "yes",
 the DEBUG build will go in $ROOT and the non-DEBUG build will go in
 $ROOT-nd.  Other values will be treated as "no".
 .RE
-.LP
 .SH NIGHTLY HOOK ENVIRONMENT VARIABLES
 .LP
 Several optional environment variables may specify commands to run at
@@ -534,7 +527,6 @@ environment variable NIGHTLY_STATUS.
 This is reserved for per-build-machine customizations, and runs
 immedately after POST_NIGHTLY.
 .RE
-.LP
 .SH FILES
 .LP
 .RS 5
@@ -543,7 +535,7 @@ immedately after POST_NIGHTLY.
 .LP
 If present, nightly executes this file just prior to executing the
 .I env
-file.  
+file.
 .SH EXAMPLES
 .LP
 Start with the example file in usr/src/tools/env/developer.sh
@@ -558,6 +550,5 @@ export NIGHTLY_OPTIONS
 .LP
 # /opt/onbld/bin/nightly -i myenv
 .PD
-.LP
 .SH SEE ALSO
 .BR bldenv (1ONBLD)

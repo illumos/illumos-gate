@@ -19,15 +19,13 @@
 .\" "
 .\" "Copyright 2009 Sun Microsystems, Inc.  All rights reserved."
 .\" "Use is subject to license terms."
-.TH xref 1ONBLD "10 Aug 2009"
+.TH XREF 1ONBLD "Aug 10, 2009"
 .SH NAME
 .I xref
 \- build and maintain source cross-references
 .SH SYNOPSIS
 \fBxref [-cfp] [-m <makefile>] [-x cscope|ctags|etags[,...]] [<subtree> ...]\fP
-.LP
 .SH DESCRIPTION
-.IX "OS-Net build tools" "xref" "" "\fBxref\fP"
 .LP
 .I xref
 is a simple tool for building and maintaining source cross-references for
@@ -38,7 +36,9 @@ files reported by flg.flp(1ONBLD).  File eligibility is determined by pattern
 matching -- by default, files matching the following patterns are
 eligible:
 
+.nf
 	*.[Ccdshlxy] Makefile* *.il* *.cc llib-* *.xml *.dtd.* *.ndl
+.fi
 
 However, this default behavior can be changed, either through command-line
 options or by setting the cross-reference customization macros (see
@@ -143,14 +143,12 @@ $ cat > /tmp/zfs.mk
 XRDIRS=uts/common/fs/zfs common/zfs lib/libzfs cmd/zfs cmd/zpool
 .fi
 $ xref -f -x cscope -m /tmp/zfs.mk
-.LP
 .SH ENVIRONMENT VARIABLES
 Because xref uses xref.mk to carry out the requested operations and
 invokes make(1) with the -e option, the value of any macros used by
-xref.mk can be overridden through environment variables.  This is 
+xref.mk can be overridden through environment variables.  This is
 chiefly useful for customizing the programs used to build the cross
 references; see \fIEXAMPLES\fP.
-.LP
 .SH SEE ALSO
 .LP
 .IR make(1),

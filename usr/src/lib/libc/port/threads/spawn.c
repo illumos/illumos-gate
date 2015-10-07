@@ -280,8 +280,8 @@ posix_spawn(
 	const char *path,
 	const posix_spawn_file_actions_t *file_actions,
 	const posix_spawnattr_t *attrp,
-	char *const argv[],
-	char *const envp[])
+	char *const *argv,
+	char *const *envp)
 {
 	spawn_attr_t *sap = attrp? attrp->__spawn_attrp : NULL;
 	file_attr_t *fap = file_actions? file_actions->__file_attrp : NULL;
@@ -374,8 +374,8 @@ posix_spawnp(
 	const char *file,
 	const posix_spawn_file_actions_t *file_actions,
 	const posix_spawnattr_t *attrp,
-	char *const argv[],
-	char *const envp[])
+	char *const *argv,
+	char *const *envp)
 {
 	spawn_attr_t *sap = attrp? attrp->__spawn_attrp : NULL;
 	file_attr_t *fap = file_actions? file_actions->__file_attrp : NULL;

@@ -29,6 +29,7 @@ CFGS = README \
 	symbols/signal_h.cfg \
 	symbols/stdio_h.cfg \
 	symbols/stdlib_h.cfg \
+	symbols/string_h.cfg \
 	symbols/strings_h.cfg \
 	symbols/sys_stat_h.cfg \
 	symbols/sys_time_h.cfg \
