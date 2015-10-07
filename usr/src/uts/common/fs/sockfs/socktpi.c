@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ * Copyright 2015, Joyent, Inc.
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
@@ -532,6 +532,13 @@ sotpi_init(struct sonode *so, struct sonode *tso, struct cred *cr, int flags)
 		if (error = so_strinit(so, tso)) {
 			(void) sotpi_close(so, flags, cr);
 			return (error);
+		}
+
+		/* Enable sendfile() on AF_UNIX streams */
+		if (so->so_family == AF_UNIX && so->so_type == SOCK_STREAM) {
+			mutex_enter(&so->so_lock);
+			so->so_mode |= SM_SENDFILESUPP;
+			mutex_exit(&so->so_lock);
 		}
 
 		/* Wildcard */
@@ -4581,8 +4588,15 @@ sotpi_sendmblk(struct sonode *so, struct nmsghdr *msg, int fflag,
 {
 	int error;
 
-	if (so->so_family != AF_INET && so->so_family != AF_INET6)
+	switch (so->so_family) {
+	case AF_INET:
+	case AF_INET6:
+	case AF_UNIX:
+		break;
+	default:
 		return (EAFNOSUPPORT);
+
+	}
 
 	if (so->so_state & SS_CANTSENDMORE)
 		return (EPIPE);
