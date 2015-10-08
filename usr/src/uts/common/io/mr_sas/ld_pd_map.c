@@ -21,6 +21,9 @@
  *
  * **********************************************************************
  */
+/*
+ * Copyright 2015 Garrett D'Amore <garrett@damore.org>
+ */
 
 #include <sys/scsi/scsi.h>
 #include "mr_sas.h"
@@ -209,6 +212,7 @@ MR_GetPhyParams(struct mrsas_instance *instance, U32 ld, U64 stripRow,
 	U32		rowMod;
 	U32		armQ;
 	U32		arm;
+	U16		devid = instance->device_id;
 
 	ASSERT(raid->rowDataSize != 0);
 
@@ -251,8 +255,9 @@ MR_GetPhyParams(struct mrsas_instance *instance, U32 ld, U64 stripRow,
 	} else {
 		*pDevHandle = MR_PD_INVALID; /* set dev handle as invalid. */
 		if ((raid->level >= 5) &&
-		    ((instance->device_id != PCI_DEVICE_ID_LSI_INVADER) ||
-		    (instance->device_id == PCI_DEVICE_ID_LSI_INVADER &&
+		    ((devid != PCI_DEVICE_ID_LSI_INVADER) ||
+		    ((devid == PCI_DEVICE_ID_LSI_INVADER ||
+		    (devid == PCI_DEVICE_ID_LSI_FURY)) &&
 		    raid->regTypeReqOnRead != REGION_TYPE_UNUSED))) {
 			pRAID_Context->regLockFlags = REGION_TYPE_EXCLUSIVE;
 		} else if (raid->level == 1) {
@@ -398,7 +403,8 @@ MR_BuildRaidContext(struct mrsas_instance *instance,
 
 	pRAID_Context->timeoutValue = map->raidMap.fpPdIoTimeoutSec;
 
-	if (instance->device_id == PCI_DEVICE_ID_LSI_INVADER) {
+	if ((instance->device_id == PCI_DEVICE_ID_LSI_INVADER) ||
+	    (instance->device_id == PCI_DEVICE_ID_LSI_FURY)) {
 		pRAID_Context->regLockFlags = (isRead) ?
 		    raid->regTypeReqOnRead : raid->regTypeReqOnWrite;
 	} else {
