@@ -21,15 +21,13 @@
 .\"
 .\" CDDL HEADER END
 .\"
-.TH checkpaths 1ONBLD "25 September 2003"
+.TH CHECKPATHS 1ONBLD "Sep 25, 2003"
 .SH NAME
 .I checkpaths
 \- check file path containing files
 .SH SYNOPSIS
 \fBcheckpaths [-b] [root_paths...]\fP
-.LP
 .SH DESCRIPTION
-.IX "OS-Net build tools" "checkpaths" "" "\fBcheckpaths\fP"
 .LP
 .I checkpaths
 inspects the contents of various files within an OS-Net workspace to
@@ -46,7 +44,6 @@ that a full build has been performed in the workspace to be tested,
 but if full build(s) are not available under the
 \fI$CODEMGR_WS/proto/\fP directory, then the corresponding exclusion
 lists are not verified.
-.LP
 .SH OPTIONS
 .LP
 The following options are supported:
@@ -56,7 +53,6 @@ Disable processing of files that list derived (built) objects.  This
 should be set if the \fI$CODEMGR_WS/proto/\fP directory exists, but
 the contents are known to be bad.  \fBnightly(1ONBLD)\fP will typically set
 this flag if the build fails.
-.LP
 .TP 4
 .B root_paths...
 By default, checkpaths validates all of the proto areas for known
@@ -64,7 +60,6 @@ architectures that exist in the \fI$CODEMGR_WS/proto/\fP directory.
 To specify other root directories, list them as arguments on the
 command line.  It is an error if any of the root paths specified does
 not end with a known architecture.
-.LP
 .SH ENVIRONMENT VARIABLES
 .LP
 .B CODEMGR_WS
@@ -78,6 +73,5 @@ containing \fICodemgr_wsdata\fP.
 The location of your ON source tree.  Defaults to
 \fI$CODEMGR_WS/usr/src/\fP if not specified.
 .RE
-.LP
 .SH SEE ALSO
 .B nightly(1ONBLD).

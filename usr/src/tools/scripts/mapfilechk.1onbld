@@ -19,25 +19,20 @@
 .\"
 .\" Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 .\" Use is subject to license terms.
-.TH mapfilechk 1ONBLD "27 January 2009"
+.TH MAPFILECHK 1ONBLD "Jan 27, 2009"
 .SH NAME
 mapfilechk \- Check for valid link-editor mapfile header blocks
 .SH SYNOPSIS
 .nf
 \fBmapfilechk \fR [\fB-v\fR] [\fB-x\fR \fIexceptions_file\fR] [\fIpath\fR...]
 .fi
-.LP
 .SH DESCRIPTION
-.IX "OS-Net build tools" "mapfilechk" "" "\fBmapfilechk\fP"
 mapfilechk inspects link-editor mapfiles for missing, obsolete,
 or corrupt mapfile header blocks.
-.LP
 .SH OPTIONS
-.LP
 .TP 4
 .B \-v
 Report on all files, not just those with invalid headers
-.LP
 .TP 4
 .B \-x \fIexceptions_file\fR
 Load an exceptions file containing a list of files, directories and
@@ -61,18 +56,15 @@ Directories, specified with a trailing '/'
 .el o
 File extensions, specified with a leading '*.'
 .RE
-.LP
 .SH EXIT STATUS
 .TP 4
 .B 0
 The command completed successfully.
 No errors or warnings were reported
-.LP
 .TP 4
 .B 1
 The command completed unsuccessfully.
 One or more errors or warnings were reported.
-.LP
 .TP 4
 .B 2
 Invalid command-line arguments were specified to the command.

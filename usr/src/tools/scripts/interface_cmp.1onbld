@@ -19,14 +19,12 @@
 .\"
 .\" CDDL HEADER END
 .\"
-.TH interface_cmp 1ONBLD "25 March 2010"
+.TH INTERFACE_CMP 1ONBLD "Mar 25, 2010"
 .SH NAME
 interface_cmp \- compare shared object interface descriptions
 .SH SYNOPSIS
 \fBinterface_cmp [-dot] [-e exfile] old new\fP
-.LP
 .SH DESCRIPTION
-.IX "OS-Net build tools" "interface_cmp" "" "\fBinterface_cmp\fP"
 The
 .I interface_cmp
 command compares the interface definition files for two workspaces
@@ -48,9 +46,7 @@ Note that version definition inheritance has the effect of causing a
 symbol to be viewed as existing in multiple definitions. This insures
 that both version definitions and their inheritance relationship are
 processed as part of the comparison.
-.LP
 .SH OPTIONS
-.LP
 The following options are supported:
 .TP 4
 .B \-c vertype_module
@@ -87,14 +83,13 @@ versions represent public interfaces that cannot be changed, but new
 ones should be removed before the product ships.
 .RE
 .sp
-.LP
 .TP 4
 .B \-e exfile
 An exception file is used to exclude objects from
 the usual rules. See EXCEPTION FILE FORMAT.
 .TP 4
 .B \-o
-Produce one-liner output, with each line of diagnostic output 
+Produce one-liner output, with each line of diagnostic output
 prefixed with the object pathname.
 .TP 4
 .B \-t
@@ -107,9 +102,8 @@ stdout in the same format used by the
 and the output from
 .I interface_cmp
 \fB-t\fP
-should be identical, excluding header comments. 
+should be identical, excluding header comments.
 This is a debugging feature, and not intended for general use.
-.LP
 .SH EXCEPTION FILE FORMAT
 Exceptions to the rules enforced by
 .I interface_cmp
@@ -123,13 +117,13 @@ $CODEMGR_WS/exception_list/interface_cmp does not exist,
 will use
 .I /opt/onbld/etc/exception_list/interface_cmp
 as a fallback default exception file.
-.p
+.P
 To run
 .I interface_cmp
 without applying exceptions, specify \fB-e\fP with a value of /dev/null.
 .P
 A '#' character at the beginning of a line, or at any point in
-a line when preceded by whitespace, introduces a comment. Empty lines, 
+a line when preceded by whitespace, introduces a comment. Empty lines,
 and lines containing only comments, are ignored by
 .I interface_cmp.
 Exceptions are specified as space separated keyword, and \fBperl(1)\fP
@@ -164,14 +158,12 @@ The exceptions understood by
 are:
 .sp
 .ne 2
-.mk
 .na
 \fBADDSYM\fR sym_re version_re object_re
 .ad
 .RS 17n
-.rt
 .sp
-The interfaces in a given version are not supposed to change. 
+The interfaces in a given version are not supposed to change.
 .I interface_cmp
 will normally issue an error if a new interface is added to a previously
 released version. ADDSYM is used to override this
@@ -181,12 +173,10 @@ the regular expressions specified by ADDSYM, the added symbol is ignored.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDELDYM\fR sym_re version_re object_re
 .ad
 .RS 17n
-.rt
 .sp
 Once released to the public, interfaces are required to remain available
 in subsequent releases. DELSYM is used to override this
@@ -197,12 +187,10 @@ the regular expressions specified by DELSYM, the deleted symbol is ignored.
 
 .sp
 .ne 2
-.mk
 .na
 \fBEMPTY_TOPVERSION\fR version_re object_re
 .ad
 .RS 17n
-.rt
 .sp
 .I
 interface_cmp
@@ -213,7 +201,6 @@ error.  If the version, and object match
 the regular expressions specified by EMPTY_TOPVERSION, the error is suppressed.
 .RE
 
-.PP
 .SH EXAMPLES
 The following example uses
 .I interface_cmp
@@ -241,5 +228,3 @@ occurred in the associated system libraries.
 .BR ldd(1),
 .BR elfdump(1),
 .BR pvs(1).
-.LP
-.TZ LLM

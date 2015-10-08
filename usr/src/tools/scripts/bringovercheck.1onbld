@@ -20,7 +20,7 @@
 .\" Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 .\" Use is subject to license terms.
 .\"
-.TH bringovercheck 1ONBLD "7 April 2006"
+.TH BRINGOVERCHECK 1ONBLD "Apr 7, 2006"
 .SH NAME
 .I bringovercheck
 \- Repair misordered workspace timestamps

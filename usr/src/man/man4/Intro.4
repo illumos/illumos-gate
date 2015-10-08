@@ -1,17 +1,49 @@
-'\" te
-.\"  Copyright 1989 AT&T  Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved.
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH INTRO 4 "Apr 16, 2003"
-.SH NAME
-Intro, intro \- introduction to file formats
-.SH DESCRIPTION
-.sp
-.LP
-This section outlines the formats of various files. The C structure
-declarations for the file formats are given where applicable. Usually, the
-headers containing these structure declarations can be found in the directories
-\fB/usr/include\fR or \fB/usr/include/sys\fR. For inclusion in C language
-programs, however, the syntax \fB#include\fR <\fIfilename.h\fR> or
-\fB#include\fR <\fBsys/\fR\fIfilename.h\fR> should be used.
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.\"
+.\" Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+.\" Copyright 1989 AT&T
+.\" Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved.
+.\"
+.Dd Mar 18, 2015
+.Dt INTRO 4
+.Os
+.Sh NAME
+.Nm Intro ,
+.Nm intro
+.Nd introduction to file formats and configurations
+.Sh DESCRIPTION
+This section outlines the formats of various files and configurations of
+various subsystems.  The C structure declarations for the file formats are
+given where applicable.  Usually, the headers containing these structure
+declarations can be found in the directories
+.Pa /usr/include
+or
+.Pa /usr/include/sys .
+For inclusion in C language programs, however, the syntax
+.Sy #include
+.Sm off
+<
+.Em filename.h No >
+.Sm on
+or
+.Sy #include
+.Sm off
+<
+.Sy sys/ Em filename.h No >
+.Sm on
+should be used.

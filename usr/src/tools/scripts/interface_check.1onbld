@@ -19,14 +19,12 @@
 .\"
 .\" CDDL HEADER END
 .\"
-.TH interface_check 1ONBLD "25 March 2010"
+.TH INTERFACE_CHECK 1ONBLD "Mar 25, 2010"
 .SH NAME
 interface_check \- check shared object interfaces
 .SH SYNOPSIS
 \fBinterface_check [-hIo] [-c vertype_module] [-E errfile] [-e exfile] [-f listfile] [-i intffile] [-w outdir] file | dir, ...\fP
-.LP
 .SH DESCRIPTION
-.IX "OS-Net build tools" "interface_check" "" "\fBinterface_check\fP"
 The
 .I interface_check
 command attempts to check a number of ELF versioning attributes
@@ -50,7 +48,7 @@ can also be run standalone against any set of dynamic objects.
 .LP
 .I interface_check
 uses \fBelfdump(1)\fP and \fBpvs(1)\fP to
-check file naming standardization, and versioning consistency. These 
+check file naming standardization, and versioning consistency. These
 check are carried out for the following reasons:
 .TP 4
 \(bu
@@ -108,7 +106,7 @@ foo.so.1: scoped object contains no versions
 When used with the \fI-i\fP option
 .I interface_check
 produces a more detailed breakdown of a shared objects versioning.
-This interface description file provides for the release-to-release 
+This interface description file provides for the release-to-release
 auditing of interfaces,
 and monitoring the evolution of the share objects interfaces.
 .LP
@@ -119,7 +117,6 @@ addition, deletion or regrouping of versioning information can be
 detected by inspecting this database with
 .I interface_cmp.
 .sp
-.LP
 .SH OPTIONS
 .LP
 The following options are supported:
@@ -140,7 +137,7 @@ to operate on code from other projects. The alternative module must
 supply the same module and calling interfaces as the standard module.
 .TP 4
 .B \-E errfile
-Direct error messages for the analyzed objects to \fIerrfile\fP instead 
+Direct error messages for the analyzed objects to \fIerrfile\fP instead
 of stdout.
 .TP 4
 .B \-e exfile
@@ -157,7 +154,7 @@ used to instead provide a file containing the list of objects to
 analyze, in the format produced by '\fBfind_elf -r\fP'.
 .TP 4
 .B \-h
-Prevent the generation of the CDDL license and Sun copyright header 
+Prevent the generation of the CDDL license and Sun copyright header
 normally produced at the start of output.
 .TP 4
 .B \-I
@@ -175,12 +172,11 @@ to audit versioning between gates, or prior to integration within
 a single gate. See INTERFACE DESCRIPTION FILE FORMAT.
 .TP 4
 .B \-o
-Produce one-liner output, with each line of diagnostic output 
+Produce one-liner output, with each line of diagnostic output
 prefixed with the object pathname.
 .TP
 .B -w outdir
 Interpret the paths of all input and output files relative to \fIoutdir\fP.
-.LP
 .SH EXCEPTION FILE FORMAT
 Exceptions to the rules enforced by
 .I interface_check
@@ -194,13 +190,13 @@ $CODEMGR_WS/exception_list/interface_check does not exist,
 will use
 .I /opt/onbld/etc/exception_list/interface_check
 as a fallback default exception file.
-.p
+.P
 To run
 .I interface_check
 without applying exceptions, specify \fB-e\fP with a value of /dev/null.
 .P
 A '#' character at the beginning of a line, or at any point in
-a line when preceded by whitespace, introduces a comment. Empty lines, 
+a line when preceded by whitespace, introduces a comment. Empty lines,
 and lines containing only comments, are ignored by
 .I interface_check.
 Exceptions are specified as space separated keyword, and \fBperl(1)\fP
@@ -234,24 +230,20 @@ The exceptions understood by
 are:
 .sp
 .ne 2
-.mk
 .na
 \fBNONSTD_VERNAME\fR
 .ad
 .RS 17n
-.rt
 .sp
 Objects that are allowed to deviate from our standard version names.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBNOVERDEF\fR
 .ad
 .RS 17n
-.rt
 Objects that are not expected to contain versioning information.
 Note that PLUGIN objects are automatically exempt from this,
 so these directives are generally applied to non-plugin objects
@@ -259,22 +251,19 @@ so these directives are generally applied to non-plugin objects
 
 .sp
 .ne 2
-.mk
 .na
 \fBPLUGIN\fR
 .ad
 .RS 17n
-.rt
 Sharable objects underneath these parts of the tree are taken to be plugins.
 Plugins are not required to have versioned file names, and are not required
 to be internally versioned.
 .RE
-.LP
 .SH INTERFACE DESCRIPTION FILE FORMAT
 When the \fB-i\fP option is used
 .I interface_check
 produces an \fIInterface Description File\fP that captures a description of
-the interfaces provided by each ELF object processed. 
+the interfaces provided by each ELF object processed.
 .P
 Unless the \fB-h\fP option is used,
 .I interface_check
@@ -290,7 +279,6 @@ form shown below, using /lib/amd64/libadm.so.1 as an example:
 .sp
 .in +4
 .nf
-.CR
 OBJECT	lib/amd64/libadm.so.1
 CLASS	ELFCLASS64
 TYPE	ET_DYN
@@ -330,7 +318,6 @@ defined in the version, and INHERIT for those that are inherited. Using
 .sp
 .in +4
 .nf
-.CR
 OBJECT  lib/amd64/libadm.so.1
 CLASS   ELFCLASS64
 TYPE    ET_DYN
@@ -362,7 +349,6 @@ The \fB-I\fP option is primary used for debugging
 .I interface_check
 and
 .I interface_cmp.
-.LP
 .SH EXAMPLES
 The following example uses
 .I interface_check
@@ -389,5 +375,5 @@ $CODEMGR_WS/exception_list/interface_check
 .BR ldd(1),
 .BR elfdump(1),
 .BR pvs(1).
-.LP
-.TZ LLM
+
+

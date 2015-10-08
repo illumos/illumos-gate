@@ -21,25 +21,23 @@
 .\" "Copyright 2004 Sun Microsystems, Inc."
 .\" "All rights reserved"
 .\" "Use is subject to license terms."
-.TH WS 1ONBLD "28 January 1992"
+.TH WS 1ONBLD "Jan 28, 1992"
 .SH NAME
-.I ws 
+.I ws
 \- enable SunOS avocet environments
 .SH SYNOPSIS
 .B ws
 [-e] [workspace_name]
-.LP
 .SH DESCRIPTION
-.IX "Avocet" "ws" "" "\fBws\fP"
 .LP
-.I Ws 
+.I Ws
 will configure your environment to build the SunOS
 source base from an
 .I avocet
 workspace.  The
 .I ws
 script sets up the environment variables for a SunOS avocet
-workspace and spawns a shell for the environment 
+workspace and spawns a shell for the environment
 that has been setup.  In configuring the environment
 .I ws
 sets up the environment variables to define in which proto areas
@@ -76,22 +74,22 @@ the script will access the environment through the /net automounter
 maps.  If <workspace> is is a relative pathname not found
 in the current directory, check for it in those
 directories listed in the CODEMGR_WSPATH variable (refer to the
-workspace(1) man page for more info on CODEMGR_WSPATH).  
+workspace(1) man page for more info on CODEMGR_WSPATH).
 .LP
 Note that if a workspace argument is not given ws will try to determine
 if the current directory is in a workspace and set the environment for
 that workspace.
 .LP
 .I ws
-will also check for the presense of the ONBLD construction set 
-(/opt/onbld), if it is found it will prepend the 
+will also check for the presense of the ONBLD construction set
+(/opt/onbld), if it is found it will prepend the
 ONBLD construction set directory to the front of your PATH.
 If you set your path in your shell
 start-up file (eg: .cshrc) then that will undo what what
 .I ws
 has done.  If you do this in your shell start-up script,
 conditionally protect
-.I ws 
+.I ws
 from your modification with something like this:
 .LP
 .RS 5
@@ -103,21 +101,18 @@ endif
 .RE
 .LP
 NOTE: this is a csh example, the code would vary with the shell type.
-.LP
 .SH OPTIONS
-.LP
 .TP
 .B \-e
 prevent ws from calling exit or exec, useful for setting environment in
 another Bourne (sh) compatible shell (hint: source ws -e)
-.LP
 .SH USAGE
 .LP
-At start-up time 
-.I ws 
+At start-up time
+.I ws
 will determine the number of proto areas to
 be searched and in what order.  This information is configured
-during the first invocation of 
+during the first invocation of
 .I ws
 for each workspace in the protodefs
 file.  This file is located under the avocet directory
@@ -129,11 +124,11 @@ $CODEMGR_WS/avocet/sunos/protodefs
 .fi
 .RE
 .LP
-In this file you may configure from one to four proto 
-variables (PROTO1, PROTO2, PROTO3, TERMPROTO).  
+In this file you may configure from one to four proto
+variables (PROTO1, PROTO2, PROTO3, TERMPROTO).
 These variables define the order in
 which the proto areas will be searched, starting with the PROTO1
-directory and ending in the PROTO3 directory.  
+directory and ending in the PROTO3 directory.
 .LP
 When you define the PROTO hierarchy you are defining a list of proto
 directories in which to search for header files and libraries during
@@ -143,10 +138,10 @@ definitions.
 .LP
 Also, your initial value for ROOT will be assigned to PROTO1.  This
 means that if you do any install builds in the SunOS source tree;
-they will install in the proto area pointed to by PROTO1. 
+they will install in the proto area pointed to by PROTO1.
 .LP
 The format for the protodefs file is very simple, it follows the
-shell script formats for assigning variables.  Here is an 
+shell script formats for assigning variables.  Here is an
 example of some definitions
 you might find in a protodefs file:
 .LP
@@ -157,14 +152,14 @@ PROTO2=/parents_path/proto
 .fi
 .RE
 .LP
-The above example would specify 
+The above example would specify
 that the current workspaces proto area is
 to be searched first, and then the parent workspace's proto area will be
 searched for included files and libraries.  In that order.
 .LP
 The TERMPROTO variable is a special case from PROTO{1-3}, it is
 used to specify a terminating search path for your compiling
-and linking.  If you specify a TERMPROTO directory then during 
+and linking.  If you specify a TERMPROTO directory then during
 your compile and link your search path for libraries and include
 files will terminate there.  If you do not specify the
 TERMPROTO variable, then the terminating point for searches will
@@ -173,25 +168,24 @@ and /usr/lib.
 .LP
 The default values for PROTO1 and PROTO2 will be set by
 .I ws
-initially to point to your current workspaces proto area and 
+initially to point to your current workspaces proto area and
 the proto area
 of the workspace's parent, if the parent is an Avocet
-workspace.  
+workspace.
 .LP
 The PROTO{1-3} variables will then be used to set your ROOT variable and
 to set the ENVCPPFLAGS{1-4} and the ENVDLLIBS{1-3} environment variables.
 These will be set to an architecture specific directory under
 each PROTO* directory.  If, for example, PROTO1 had been set
-to PROTO1=/ws/train/proto then ROOT would be set to 
+to PROTO1=/ws/train/proto then ROOT would be set to
 ROOT=/ws/train/proto/root_${MACH}.  MACH would be equal to the
 architecture of the machine you are running on (ie: `uname -p`).
 .LP
 The exception to this is if there is already an existing non-architecture
-specific populated proto area 
+specific populated proto area
 under one of the PROTO{1-3} variables.  If this is the case then the
 ROOT and other flags will be based on that instead of an architecture
 specific sub-directory.
-.LP
 .SH ISSUES
 .LP
 The use of Constrained Files is very different between an NSE
@@ -205,11 +199,11 @@ environment they should be aware of the differences.
 In an NSE environment the user was isolated from updates to both
 constrained files and source files
 alike in the parent environment.  You did not see updates
-to constrained files until you 
-.I resynced 
+to constrained files until you
+.I resynced
 a command or object which depended on the
-constrained file in question.  
-This is no longer the case under Avocet.  
+constrained file in question.
+This is no longer the case under Avocet.
 .LP
 If you are using
 .I ws
@@ -228,7 +222,7 @@ these updates as you were in the NSE.
 If you would like to be isolated from updates in the
 world around you there are a couple of approaches you can take.  First,
 if you bringover a full copy of the SunOS source base you could
-build your own PROTO area which you would link against.  
+build your own PROTO area which you would link against.
 Secondly, you could link against a private
 PROTO area which is a stable snapshot of a global proto area.
 This proto area could be a subset
@@ -237,28 +231,27 @@ about.  Both of these methods would protect you from updates to files
 because you would be in full control of the proto areas you are linking
 against.  It would be your responsiblity to update your proto area
 as your work progressed.
-.LP
 .SH EXAMPLES
 .LP
-In the following examples you will modify the 
+In the following examples you will modify the
 ${CODEMGR_WS}/avocet/sunos/protodefs file to define PROTO{1-3}
 to configure a proto hierarchy to be associated with your
 avocet workspace.  I have selected the four
 most common examples that will be used with avocet workspaces,
 there can be many other combinations.
 .LP
-In the first example we will 
-configure a workspace named 
+In the first example we will
+configure a workspace named
 caltrans:/bld/child,
 and it is a child of an avocet workspace named dunk:/build/parent.  The
 parent workspace (dunk:/build/parent)
 is a complete copy of the usr/src source tree, while the
 current workspace(caltrans:/bld/child) is a subset of the full
-source base.  The current(child) workspace only contains the usr/src/cmd 
+source base.  The current(child) workspace only contains the usr/src/cmd
 directories.  The proto areas that
 we want to search are the current workspaces proto area(/bld/child/proto)
 and then the proto area of the parent(/net/dunk/build/parent/proto), in that
-order.  
+order.
 Actually, this example is the default behavior if the workspace
 is not a child of an NSE parent.  No modification would actually have
 to have been done to the protodefs file.
@@ -274,10 +267,10 @@ PROTO2=/net/dunk/build/ws/proto
 This example represents a model where the current workspaces needs
 to reference a superset of its own proto area in order to build.
 .LP
-Secondly, let us consider a workspace you have named 
+Secondly, let us consider a workspace you have named
 polyslo:/charlie/tuna.  Your
 workspace only contains the source code for the usr/src/cmd
-directories.  Secondly, your avocet parent(dunk:/build/popeye) is not a 
+directories.  Secondly, your avocet parent(dunk:/build/popeye) is not a
 full copy of
 the source base, but it does have some files in the proto area which
 you want to refer to.  Lastly, you have a global proto area which you
@@ -291,7 +284,7 @@ would look like:
 PROTO1=/charlie/tuna/proto
 PROTO2=/net/dunk/build/popeye/proto
 PROTO3=/net/rainman/space/I-team-protoarea
-.fi 
+.fi
 .RE
 .LP
 The above model is meant to show you some of the configurability that can
@@ -299,7 +292,7 @@ be done
 .I ws.
 Here you have three proto areas that are searched one after the other.  You
 might configure an environment like this if needed to refer to some
-files that are in the PROTO2 area, but these files are not 
+files that are in the PROTO2 area, but these files are not
 easily placed into the 'global' I-Team proto area of PROTO3.  It should
 also be noted that there is a performance penalty for such a configuration.
 During each compile the compiler is now potentially searching through
@@ -316,7 +309,7 @@ to a Global 'I-Team' proto area for all of our files.  This area is
 located at rainman:/space/global_proto_area.  In the protodefs file
 we will only need to define PROTO1 for this example:
 .RS 5
-.nf 
+.nf
 PROTO1=/net/rainman/space/global_proto_area
 .fi
 .RE
@@ -327,14 +320,14 @@ or libraries.  All of the
 include files and libraries will be pulled from the I-TEAM proto area.
 The advantage to this model is speed, there is only one area in which
 the compiler is going to search for include files and libraries, this
-will help the compilers performance.  Also, you should be aware that 
+will help the compilers performance.  Also, you should be aware that
 ROOT is equal to PROTO1.  If you attempt to do an install build it
 will attempt to modify the I-Team proto area that you are pointing at!
 .LP
-Lastly, we have an avocet workspace named 
-caltrans:/bld/nse_child which is the child of an NSE environment.  
+Lastly, we have an avocet workspace named
+caltrans:/bld/nse_child which is the child of an NSE environment.
 Because the parent of the workspace is an NSE environment, that parent
-does not have a PROTO area associated with it that we can 
+does not have a PROTO area associated with it that we can
 refer to.  Instead there is a global PROTO area that is maintained
 by our 'I-Team' leader that we will refer to.  That global area
 is located at rainman:/space/I-team-protoarea.  Here is what
@@ -348,18 +341,16 @@ PROTO2=/net/rainman/space/I-team-protoarea
 .RE
 .LP
 This model differs from the one above in that we can not reference
-the parents proto area because the parent in an NSE environment.  
+the parents proto area because the parent in an NSE environment.
 Instead for our second proto area we point to a stable proto
 area outside of the NSE.
-.LP
 .SH ENVIRONMENT VARIABLES
 .LP
-Here is a list of the environment variables that 
+Here is a list of the environment variables that
 .I ws
 will set and how they are used:
 .LP
-CODEMGR_WS         
-.fi
+CODEMGR_WS
 .RS 5
 Absolute pathname to the Avocet workspace.  This environment variable
 is referenced by the
@@ -377,32 +368,32 @@ Root of SunOS source code, referenced by SunOS Makefiles.
 .RE
 ROOT
 .RS 5
-Initial proto area for this workspace.  Again this is used by the 
+Initial proto area for this workspace.  Again this is used by the
 SunOS Makefiles.  This value is set based on PROTO1 as defined in
-the protodefs file.  ROOT is also the destination of 
-.I install 
+the protodefs file.  ROOT is also the destination of
+.I install
 operations.
 .RE
 PARENT_ROOT
 .RS 5
-Parent proto area for this workspace.  This is used by the 
+Parent proto area for this workspace.  This is used by the
 SunOS Makefiles.  This value is set based on PROTO2 as defined in
-the protodefs file. 
+the protodefs file.
 .RE
 PATH
 .RS 5
-If the construction set exists (/opt/onbld) it will  be prepended to 
+If the construction set exists (/opt/onbld) it will  be prepended to
 the search path.
 .RE
 MAKEFLAGS
 .RS 5
-Default MAKEFLAGS used by 
+Default MAKEFLAGS used by
 .I make,
 set to 'e' for higher environment precedence.
 .RE
 ENVCPPFLAGS{1-4}
 .RS 5
-This set of environment variables is used to set the 
+This set of environment variables is used to set the
 CPPFLAGS.master macro within the SunOS source tree.  These values
 usually point to a hierarchy of Include directories for the build
 to search through.
@@ -413,20 +404,17 @@ This set of environment variables is used to set the LDLIBS.master
 macro within the SunOS source tree.  These values usually point
 to a hierarchy of directories to search for libraries.
 .RE
-.LP
 .SH FILES
 .LP
 .nf
 $CODEMGR_WS/avocet/sunos/protodefs
 .fi
-.LP
 .SH "SEE ALSO"
 .LP
 .IR workspace (1),
 .IR bringover (1ONBLD),
 .IR putback (1),
 .IR protodefs(5)
-.LP
 .SH BUGS
 .LP
 TERMPROTO is broken.
@@ -436,7 +424,7 @@ for the -Y I, option.
 .LP
 .I ws
 can have problems with the automounter.  If you refer to a workspace
-using a relative path, and that workspace is mounted via the automounter, 
+using a relative path, and that workspace is mounted via the automounter,
 then that workspace will be refered to via the /tmp_mnt/*
 location.  It's best to deal with automounted workspaces through
 an absolute pathname when running

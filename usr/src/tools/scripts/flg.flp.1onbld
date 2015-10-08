@@ -20,15 +20,13 @@
 .\" "
 .\" "Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
 .\" "Use is subject to license terms."
-.TH flg.flp 1ONBLD "18 Oct 2002"
+.TH FLG.FLP 1ONBLD "Oct 18, 2002"
 .I flg.flp
 \- list the files that bringover would bring over due to inc.flg and
 req.flg files
 .SH SYNOPSIS
 \fBflg.flp [-r] [<dir>]
-.LP
 .SH DESCRIPTION
-.IX "OS-Net build tools" "flg.flp" "" "\fBflg.flp\fP"
 .LP
 .I flg.flp
 uses the inc.flg and req.flg files contained within a workspace to
@@ -39,10 +37,10 @@ files, specified relative to \fICODEMGR_WS\fP, is sent to standard output.
 At most one directory may be specified; if none is specified, the current
 working directory is assumed.  A relative directory is assumed to be
 relative to the current directory or relative to \fICODEMGR_WS\fP, in that
-order.  
+order.
 .SH OPTIONS
 .TP 10
-.B -r	
+.B -r
 Output the list of files relative to the current working directory, rather
 than \fICODEMGR_WS\fP.
 .SH SEE ALSO

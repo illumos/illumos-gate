@@ -20,32 +20,26 @@
 .\" Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 .\" Use is subject to license terms.
 .\"
-.TH cddlchk 1ONBLD "1 June 2008"
+.TH CDDLCHK 1ONBLD "Jun 1, 2008"
 .SH NAME
 cddlchk \- Check for valid CDDL header blocks
 .SH SYNOPSIS
 .nf
 \fBcddlchk \fR [\fB-av\fR] [\fB-x\fR \fIexceptions_file\fR] [\fIpath\fR...]
 .fi
-.LP
 .SH DESCRIPTION
-.IX "OS-Net build tools" "cddlchk" "" "\fBcddlchk\fP"
 cddlchk inspects files for missing, obsolete, or corrupt Common
 Development and Distribution License (CDDL) header blocks.
-.LP
 .SH OPTIONS
-.LP
 .TP 4
 .B \-a
 Check that all the specified files have a CDDL block, and report a
 warning if any do not.
 If this flag is not specified, only files containing an existing CDDL
 block are validated.
-.LP
 .TP 4
 .B \-v
 Report on all files, not just those with invalid headers
-.LP
 .TP 4
 .B \-x \fIexceptions_file\fR
 Load an exceptions file containing a list of files, directories and
@@ -69,18 +63,15 @@ Directories, specified with a trailing '/'
 .el o
 File extensions, specified with a leading '*.'
 .RE
-.LP
 .SH EXIT STATUS
 .TP 4
 .B 0
 The command completed successfully.
 No errors or warnings were reported
-.LP
 .TP 4
 .B 1
 The command completed unsuccessfully.
 One or more errors or warnings were reported.
-.LP
 .TP 4
 .B 2
 Invalid command-line arguments were specified to the command.

@@ -20,7 +20,7 @@
 .\" "Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 .\" "Copyright 2010, Richard Lowe
 .\" "
-.TH onu 1ONBLD "28 August 2010"
+.TH ONU 1ONBLD "Aug 28, 2010"
 .SH NAME
 .I onu
 \- OS/Net Update
@@ -28,11 +28,9 @@
 \fBonu [opts] [-s <beName>] -t <beName>\fP
 .br
 \fBonu [opts] -r\fP
-.LP
 .SH DESCRIPTION
-.IX "OS-Net build tools" "onu" "" "\fBonu\fP"
 .LP
-.I onu 
+.I onu
 is a replacement for
 .I bfu
 used to update a system with the latest set of IPS packages for the ON
@@ -43,7 +41,7 @@ Environment (BE) and pkg(1) to update the image.
 The following global options are supported:
 .TP 4
 .B \-c <consolidation>
-Specifies the consolidation being installed via 
+Specifies the consolidation being installed via
 .IR onu ,
 used to locate the publisher from which that consolidation is currently
 installed.  This is almost always "osnet".
@@ -92,11 +90,9 @@ The following exit values are returned:
 .B 0
 The command completed successfully.
 No errors or warnings were reported.
-.LP
 .TP 4
 .B 1
 Incorrect usage.
-.LP
 .TP 4
 .B 2
 One of the commands used by the script failed.
@@ -134,29 +130,14 @@ option may be used to disable this behavior.
 .LP
 \fBExample 1\fR Installing latest ON nightly build
 .LP
-.SP
-.IN +2
-.NF
 # onu -t new-nightly-be
-.FI
-.IN -2
-.SP
 .LP
 \fBExample 2\fR Installing an ON build from a directory
 .LP
-.SP
-.IN +2
-.NF
 # onu -d /path/to/my/ws/packages/`uname -p`/nightly -t new-nightly-be
-.FI
-.IN -2
-.SP
 .LP
 \fBExample 3\fR Installing additional packages in the new BE
 .LP
-.SP
-.IN +2
-.NF
 # onu -d /path/to/my/ws/packages/`uname -p`/nightly -t new-nightly-be
 .br
 # reboot
@@ -166,9 +147,6 @@ option may be used to disable this behavior.
 # pkg install netcat
 .br
 #
-.FI
-.IN -2
-.SP
 .SH ENVIRONMENT
 .LP
 ONURI
@@ -183,7 +161,6 @@ ONPUB
 If the -U option is not provided, and this variable is set, it will be
 used as the publisher name for the packaging repository.  If -U is not
 provided and this variable is not set, on-nightly will be used.
-.LP
 .SH SEE ALSO
 .BR beadm "(1M), "
 .BR pkg "(1), "

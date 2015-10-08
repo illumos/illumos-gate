@@ -19,15 +19,13 @@
 .\"
 .\" CDDL HEADER END
 .\"
-.TH check_rtime 1ONBLD "09 March 2010"
+.TH CHECK_RTIME 1ONBLD "Mar 09, 2010"
 .SH NAME
 .I check_rtime
 \- check ELF runtime attributes
 .SH SYNOPSIS
 \fBcheck_rtime [-imosv] [-D depfile | -d depdir] [-E errfile] [-e exfile] [-f listfile] [-I infofile] [-w outdir] file | dir, ...\fP
-.LP
 .SH DESCRIPTION
-.IX "OS-Net build tools" "check_rtime" "" "\fBcheck_rtime\fP"
 .LP
 .I check_rtime
 attempts to check a number of ELF runtime attributes
@@ -100,7 +98,7 @@ specify these symbols in a \fImapfile\fP, using the \fBEXTERN\fP
 or \fBPARENT\fP symbol attribute. Without these symbol attributes,
 \fBldd(1)\fP is unable to determine the symbols special nature, and
 .I check_rtime
-will report these symbols as undefined. 
+will report these symbols as undefined.
 .RE
 .TP
 \(bu
@@ -244,7 +242,9 @@ Applications without this definition are displayed as:
 .RS 6
 foo: application requires non-executable stack \\
 .br
+.nf
 	<no -Mmapfile_noexstk?>
+.fi
 .RE
 .sp
 .TP
@@ -259,7 +259,9 @@ Applications without this definition are displayed as:
 .RS 6
 foo: application requires non-executable data \\
 .br
+.nf
 	<no -Mmapfile_noexdata?>
+.fi
 .RE
 .sp
 .TP
@@ -273,9 +275,9 @@ such address, and that the same name is given across Solaris releases,
 .I check_rtime
 enforces the rule that only one symbol can appear in the sort sections for
 any given address.
-There are two common ways in which multiple symbols 
+There are two common ways in which multiple symbols
 or a given address occur in the ON distribution. The first is from
-code written in assembly language. The second is as a 
+code written in assembly language. The second is as a
 result of using \fB#pragma weak\fP in C to create weak symbols. The
 best solution to this
 situation is to modify the code to avoid symbol aliasing. Alternatively,
@@ -307,7 +309,9 @@ do not contain direct binding information are displayed as:
 .RS 6
 foo: object has no direct bindings \\
 .br
+.nf
 	<no -B direct or -z direct?>
+.fi
 .RE
 
 .sp
@@ -362,9 +366,7 @@ Changes to the symbols defined by an object, or the versions they belong to,
 do not necessarily indicate an error condition, but
 provides information that is often useful for gatekeepers to track
 changes in a release.
-.RE
 .sp
-.LP
 .SH OPTIONS
 .LP
 The following options are supported:
@@ -381,7 +383,7 @@ which alternative mappings are required. The \fB-D\fP and \fB-d\fP options
 are mutually exclusive.
 .TP 4
 .B \-E errfile
-Direct error messages for the analyzed objects to \fIerrfile\fP instead 
+Direct error messages for the analyzed objects to \fIerrfile\fP instead
 of stdout.
 .TP 4
 .B \-e exfile
@@ -422,7 +424,6 @@ is printed along with the version it is assigned to.
 .TP
 .B -w outdir
 Interpret the paths of all input and output files relative to \fIoutdir\fP.
-.LP
 .SH EXCEPTION FILE FORMAT
 Exceptions to the rules enforced by
 .I check_rtime
@@ -436,13 +437,13 @@ $CODEMGR_WS/exception_list/check_rtime does not exist,
 will use
 .I /opt/onbld/etc/exception_list/check_rtime
 as a fallback default exception file.
-.p
+.P
 To run
 .I check_rtime
 without applying exceptions, specify \fB-e\fP with a value of /dev/null.
 .P
 A '#' character at the beginning of a line, or at any point in
-a line when preceded by whitespace, introduces a comment. Empty lines, 
+a line when preceded by whitespace, introduces a comment. Empty lines,
 and lines containing only comments, are ignored by
 .I check_rtime.
 Exceptions are specified as space separated keyword, and \fBperl(1)\fP
@@ -476,12 +477,10 @@ The exceptions understood by
 are:
 .sp
 .ne 2
-.mk
 .na
 \fBEXEC_DATA\fR
 .ad
 .RS 17n
-.rt
 .sp
 Executables that are not required to have non-executable writable
 data segments
@@ -489,49 +488,41 @@ data segments
 
 .sp
 .ne 2
-.mk
 .na
 \fBEXEC_STACK\fR
 .ad
 .RS 17n
-.rt
 .sp
 Executables that are not required to have a non-executable stack
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBNOCRLEALT\fR
 .ad
 .RS 17n
-.rt
 .sp
-Objects that should be skipped when building the alternative dependency 
+Objects that should be skipped when building the alternative dependency
 mapping via the \fB-d\fP option.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBNODIRECT\fR
 .ad
 .RS 17n
-.rt
 .sp
 Directories and files that are allowed to have no direct bound symbols.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBNOSYMSORT\fR
 .ad
 .RS 17n
-.rt
 .sp
 Files for which we skip checking of duplicate addresses in the
 symbol sort sections.
@@ -539,12 +530,10 @@ symbol sort sections.
 
 .sp
 .ne 2
-.mk
 .na
 \fBOLDDEP\fR
 .ad
 .RS 17n
-.rt
 .sp
 Objects that used to contain system functionality that has since
 migrated to libc. We preserve these libraries as pure filters for
@@ -553,12 +542,10 @@ backward compatibility but nothing needs to link to them.
 
 .sp
 .ne 2
-.mk
 .na
 \fBSKIP\fR
 .ad
 .RS 17n
-.rt
 .sp
 Directories and/or individual objects to skip. Note that SKIP should be
 a last resort, used only when one of the other exceptions will not suffice.
@@ -566,89 +553,74 @@ a last resort, used only when one of the other exceptions will not suffice.
 
 .sp
 .ne 2
-.mk
 .na
 \fBSTAB\fR
 .ad
 .RS 17n
-.rt
 .sp
 Objects that are allowed to contain debugging information (stabs).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTEXTREL\fR
 .ad
 .RS 17n
-.rt
 .sp
 Objects for which we allow relocations to the text segment.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUNDEF_OBJ\fR
 .ad
 .RS 17n
-.rt
 .sp
 Objects that are allowed to be unreferenced.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUNDEF_REF\fR
 .ad
 .RS 17n
-.rt
 .sp
 Objects that are allowed undefined references.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUNUSED_DEPS\fR
 .ad
 .RS 17n
-.rt
 .sp
 Objects that are allowed to have unused dependencies.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUNUSED_OBJ\fR
 .ad
 .RS 17n
-.rt
 .sp
 Objects that are always allowed to be unused dependencies.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUNUSED_RPATH\fR
 .ad
 .RS 17n
-.rt
 .sp
 Objects that are allowed to have unused runpath directories.
 .RE
 
-.LP
 .SH ALTERNATIVE DEPENDENCY MAPPING
 .I check_rtime
 was primarily designed to process a nightly builds \fB$ROOT\fP
@@ -674,7 +646,6 @@ alternatives.  Simply put, an object inspected in the \fIproto\fP
 area will bind to its dependencies found in the \fIproto\fP area.
 Dependencies that have no alternative mapping will continue to
 bind to the underlying system.
-.LP
 .SH ENVIRONMENT VARIABLES
 .LP
 When the \fB-D\fP or \fB-d\fP option isn't in use,
@@ -701,7 +672,6 @@ any unreferenced dependencies.  Otherwise \fBldd(1)\fP uses the older
 \fB-u\fP option which only detects unused references.  If the following
 environment variable exists, and indicates an earlier release than \fB5.10\fP
 then \fBldd(1)\fP also falls back to using the \fB-u\fP option.
-.RE
 .LP
 .B RELEASE
 .RS 4
@@ -719,7 +689,6 @@ can not be fully inspected.  These objects are displayed as:
 .RS 4
 foo: has wrong class or data encoding
 .RE
-.LP
 .SH FILES
 .LP
 .RS 5

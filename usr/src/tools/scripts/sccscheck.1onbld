@@ -20,15 +20,15 @@
 .\" Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 .\" Use is subject to license terms.
 .\"
-.TH sccscheck 1ONBLD "7 April 2006"
+.TH SCCSCHECK 1ONBLD "Apr 7, 2006"
 .SH NAME
 .I sccscheck
-\- 
+\-
 .SH SYNOPSIS
 .B sccscheck
 filename
 .SH DESCRIPTION
-The standard solaris 
+The standard solaris
 .I make(1)
 is SCCS-aware, automatically checking out files if they are out of
 date with respect to the SCCS file; however, this is of little value

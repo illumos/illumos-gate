@@ -19,14 +19,12 @@
 .\" "
 .\" "Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 .\" "Use is subject to license terms.
-.TH lintdump 1ONBLD "28 Mar 2008"
+.TH LINTDUMP 1ONBLD "Mar 28, 2008"
 .I lintdump
 \- dump the contents of one or more lint objects
 .SH SYNOPSIS
 \fBlintdump [-i] [-p 1|2|3] [-r] \fIlintobj\fP [ \fIlintobj\fP ... ]
-.LP
 .SH DESCRIPTION
-.IX "OS-Net build tools" "lintdump" "" "\fBlintdump\fP"
 .LP
 The lintdump utility dumps the contents of one or more lint
 objects.  This is chiefly useful when trying to understand the cause of
@@ -57,7 +55,7 @@ types.  The sequence of records is further partitioned by FILE records,
 which indicate the source or header file that is responsible for the
 records that follow.  The remaining record types provide lint with
 information about the functions, variables, and structures defined or used
-by the object. 
+by the object.
 .SH OPTIONS
 .TP 10
 .B -i
@@ -68,7 +66,6 @@ Just output the PASS1, PASS2, or PASS3 section.
 .TP 10
 .B -r
 Output records using relative paths (see EXAMPLES).
-.LP
 .SH OUTPUT
 .LP
 The contents of each specified \fIlintobj\fP is dumped in command-line
@@ -152,13 +149,11 @@ SECTION: PASS3: 130 bytes
    FILE: liba.c
          int af(void) <returns value>;
 .fi
-.LP
 .SH RECORD PROPERTIES
 .LP
 As discussed in OUTPUT, some records are displayed using an extended
 format to convey information that cannot be expressed in C.  The following
 extended information may be displayed:
-.RE
 .LP
 .B <PRINTFLIKE\fIn\fP>
 .RS 4
@@ -202,7 +197,6 @@ manner.
 .RS 4
 Indicates to lint that the function returns a value.
 .RE
-.LP
 .SH EXAMPLES
 .LP
 One common problem is that lint does not always provide sufficient
@@ -308,7 +302,6 @@ $ diff /tmp/patch-kstat.out /tmp/proj-kstat.out
 Note that -r option removes spurious differences that would otherwise
 arise from different absolute paths to the same source file, and the -i
 option removes spurious differences due to ID generation inside lint.
-.LP
 .SH SEE ALSO
 .LP
 .IR lint(1),
