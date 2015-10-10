@@ -290,10 +290,19 @@ static int
 futex_wait(memid_t *memid, caddr_t addr,
     int val, timespec_t *timeout, uint32_t bits)
 {
+	kthread_t *t = curthread;
 	int err, ret;
 	int32_t curval;
 	fwaiter_t fw;
 	int index;
+
+	/*
+	 * The LMS_USER_LOCK micro state becomes valid if we sleep; otherwise
+	 * our time will accrue against LMS_SYSTEM.  Use of this micro state
+	 * is modelled on lwp_mutex_timedlock(), a native analogue of
+	 * futex_wait().
+	 */
+	(void) new_mstate(t, LMS_USER_LOCK);
 
 	fw.fw_woken = 0;
 	fw.fw_bits = bits;
@@ -326,7 +335,7 @@ futex_wait(memid_t *memid, caddr_t addr,
 			 * According to signal(7), a futex(2) call with the
 			 * FUTEX_WAIT operation is restartable.
 			 */
-			ttolxlwp(curthread)->br_syscall_restart = B_TRUE;
+			ttolxlwp(t)->br_syscall_restart = B_TRUE;
 			err = set_errno(EINTR);
 		}
 	}
