@@ -139,6 +139,8 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zfs_save_arguments;
 	zfs_send;
 	zfs_send_one;
+	zfs_send_resume;
+	zfs_send_resume_token_to_nvlist;
 	zfs_share;
 	zfs_shareall;
 	zfs_share_nfs;

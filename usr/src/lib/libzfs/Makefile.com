@@ -20,7 +20,7 @@
 #
 #
 # Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2011, 2014 by Delphix. All rights reserved.
 #
 
 LIBRARY= libzfs.a
@@ -71,6 +71,9 @@ C99LMODE=	-Xc99=%all
 LDLIBS +=	-lc -lm -ldevid -lgen -lnvpair -luutil -lavl -lefi \
 	-ladm -lidmap -ltsol -lmd -lumem -lzfs_core
 CPPFLAGS +=	$(INCS) -D_LARGEFILE64_SOURCE=1 -D_REENTRANT
+
+# There's no lint library for zlib, so only include this when building
+$(DYNLIB) := LDLIBS +=	-lz
 
 CERRWARN +=	-_gcc=-Wno-switch
 CERRWARN +=	-_gcc=-Wno-parentheses
