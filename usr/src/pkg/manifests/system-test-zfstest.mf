@@ -2007,6 +2007,11 @@ file path=opt/zfs-tests/tests/functional/rsend/rsend_011_pos mode=0555
 file path=opt/zfs-tests/tests/functional/rsend/rsend_012_pos mode=0555
 file path=opt/zfs-tests/tests/functional/rsend/rsend_013_pos mode=0555
 file path=opt/zfs-tests/tests/functional/rsend/rsend_014_pos mode=0555
+file path=opt/zfs-tests/tests/functional/rsend/rsend_019_pos mode=0555
+file path=opt/zfs-tests/tests/functional/rsend/rsend_020_pos mode=0555
+file path=opt/zfs-tests/tests/functional/rsend/rsend_021_pos mode=0555
+file path=opt/zfs-tests/tests/functional/rsend/rsend_022_pos mode=0555
+file path=opt/zfs-tests/tests/functional/rsend/rsend_024_pos mode=0555
 file path=opt/zfs-tests/tests/functional/rsend/setup mode=0555
 file path=opt/zfs-tests/tests/functional/scrub_mirror/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/scrub_mirror/default.cfg mode=0555
