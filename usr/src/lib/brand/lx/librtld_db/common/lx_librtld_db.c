@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright 2014 Joyent, Inc. All rights reserved.
+ * Copyright 2015 Joyent, Inc. All rights reserved.
  */
 
 #include <stdio.h>
@@ -133,6 +133,7 @@
 #define	Elf32_Dyn			Elf64_Dyn
 #define	Elf32_Ehdr			Elf64_Ehdr
 #define	Elf32_Phdr			Elf64_Phdr
+#define	Elf32_Sym			Elf64_Sym
 #endif /* _ELF64 */
 #endif /* _LP64 */
 
