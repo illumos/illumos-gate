@@ -21,6 +21,8 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2015 Garrett D'Amore <garrett@damore.org>
  */
 
 #include <stdlib.h>
@@ -223,7 +225,7 @@ dladm_ether_spdx2str(char *buf, size_t buflen, dladm_ether_info_t *eattr,
 		if (j < i)
 			continue;
 
-		if (speed >= 1000) {
+		if ((speed % 1000) == 0) {
 			speed = speed/1000;
 			speed_unit = 'G';
 		} else {
