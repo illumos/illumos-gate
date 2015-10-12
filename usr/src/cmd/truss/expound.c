@@ -22,7 +22,7 @@
 /*
  * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2013 by Delphix. All rights reserved.
+ * Copyright (c) 2012, 2014 by Delphix. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -4976,7 +4976,7 @@ show_zfs_ioc(private_t *pri, long addr)
 
 	if (memcmp(&zc.zc_begin_record, &zero_drrbegin,
 	    sizeof (zc.zc_begin_record))) {
-		struct drr_begin *drr = &zc.zc_begin_record;
+		struct drr_begin *drr = &zc.zc_begin_record.drr_u.drr_begin;
 		(void) printf("    zc_begin_record:\n");
 		if (drr->drr_magic) {
 			(void) printf("\tdrr_magic=%llu\n",

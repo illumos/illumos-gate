@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 /*
@@ -572,6 +573,38 @@ aggr_grp_add_port(aggr_grp_t *grp, datalink_id_t port_linkid, boolean_t force,
 }
 
 /*
+ * This is called in response to either our LACP state machine or a MAC
+ * notification that the link has gone down via aggr_send_port_disable(). At
+ * this point, we may need to update our default ring. To that end, we go
+ * through the set of ports (underlying datalinks in an aggregation) that are
+ * currently enabled to transmit data. If all our links have been disabled for
+ * transmit, then we don't do anything.
+ *
+ * Note, because we only have a single TX group, we don't have to worry about
+ * the rings moving between groups and the chance that mac will reassign it
+ * unless someone removes a port, at which point, we play it safe and call this
+ * again.
+ */
+void
+aggr_grp_update_default(aggr_grp_t *grp)
+{
+	aggr_port_t *port;
+	ASSERT(MAC_PERIM_HELD(grp->lg_mh));
+
+	rw_enter(&grp->lg_tx_lock, RW_WRITER);
+
+	if (grp->lg_ntx_ports == 0) {
+		rw_exit(&grp->lg_tx_lock);
+		return;
+	}
+
+	port = grp->lg_tx_ports[0];
+	ASSERT(port->lp_tx_ring_cnt > 0);
+	mac_hwring_set_default(grp->lg_mh, port->lp_pseudo_tx_rings[0]);
+	rw_exit(&grp->lg_tx_lock);
+}
+
+/*
  * Add a pseudo RX ring for the given HW ring handle.
  */
 static int
@@ -817,6 +850,7 @@ aggr_add_pseudo_tx_ring(aggr_port_t *port,
 			    mac_find_ring(tx_grp->atg_gh, i));
 		}
 	}
+
 	return (err);
 }
 
@@ -919,6 +953,7 @@ aggr_add_pseudo_tx_group(aggr_port_t *port, aggr_pseudo_tx_group_t *tx_grp)
 		    aggr_tx_ring_update, port);
 	}
 	mac_perim_exit(pmph);
+	aggr_grp_update_default(grp);
 	return (err);
 }
 
@@ -952,6 +987,7 @@ aggr_rem_pseudo_tx_group(aggr_port_t *port, aggr_pseudo_tx_group_t *tx_grp)
 	port->lp_tx_ring_cnt = 0;
 	(void) mac_client_tx_notify(port->lp_mch, NULL, port->lp_tx_notify_mh);
 	port->lp_tx_grp_added = B_FALSE;
+	aggr_grp_update_default(grp);
 done:
 	mac_perim_exit(pmph);
 }

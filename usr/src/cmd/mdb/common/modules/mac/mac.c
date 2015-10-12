@@ -42,6 +42,7 @@
 #define	LAYERED_WALKER_FOR_FLOW	"flow_entry_cache"
 #define	LAYERED_WALKER_FOR_SRS	"mac_srs_cache"
 #define	LAYERED_WALKER_FOR_RING	"mac_ring_cache"
+#define	LAYERED_WALKER_FOR_GROUP	"mac_impl_cache"
 
 /* arguments passed to mac_flow dee-command */
 #define	MAC_FLOW_NONE	0x01
@@ -69,6 +70,12 @@
 #define	MAC_SRS_TXCPUVERBOSE	(MAC_SRS_TXCPU|MAC_SRS_VERBOSE)
 #define	MAC_SRS_RXINTR		(MAC_SRS_RX|MAC_SRS_INTR)
 #define	MAC_SRS_TXINTR		(MAC_SRS_TX|MAC_SRS_INTR)
+
+/* arguments passed to mac_group dcmd */
+#define	MAC_GROUP_NONE		0x00
+#define	MAC_GROUP_RX		0x01
+#define	MAC_GROUP_TX		0x02
+#define	MAC_GROUP_UNINIT	0x04
 
 static char *
 mac_flow_proto2str(uint8_t protocol)
@@ -369,7 +376,8 @@ mac_flow_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    'r', MDB_OPT_SETBITS, MAC_FLOW_RX, &args,
 	    't', MDB_OPT_SETBITS, MAC_FLOW_TX, &args,
 	    's', MDB_OPT_SETBITS, MAC_FLOW_STATS, &args,
-	    'u', MDB_OPT_SETBITS, MAC_FLOW_USER, &args) != argc)) {
+	    'u', MDB_OPT_SETBITS, MAC_FLOW_USER, &args,
+	    NULL) != argc)) {
 		return (DCMD_USAGE);
 	}
 	if (argc > 2 || (argc == 2 && !(args & MAC_FLOW_USER)))
@@ -551,7 +559,8 @@ mac_srs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    'c', MDB_OPT_SETBITS, MAC_SRS_CPU, &args,
 	    'v', MDB_OPT_SETBITS, MAC_SRS_VERBOSE, &args,
 	    'i', MDB_OPT_SETBITS, MAC_SRS_INTR, &args,
-	    's', MDB_OPT_SETBITS, MAC_SRS_STAT, &args) != argc) {
+	    's', MDB_OPT_SETBITS, MAC_SRS_STAT, &args,
+	    NULL) != argc) {
 		return (DCMD_USAGE);
 	}
 
@@ -1002,10 +1011,214 @@ mac_ring_help(void)
 	    "hardware rings in the system are printed.\n");
 }
 
+/*
+ * To walk groups we have to have our own somewhat-complicated state machine. We
+ * basically start by walking the mac_impl_t walker as all groups are stored off
+ * of the various mac_impl_t in the system. The tx and rx rings are kept
+ * separately. So we'll need to walk through all the rx rings and then all of
+ * the tx rings.
+ */
+static int
+mac_group_walk_init(mdb_walk_state_t *wsp)
+{
+	int ret;
+
+	if (wsp->walk_addr != NULL) {
+		mdb_warn("non-global walks are not supported\n");
+		return (WALK_ERR);
+	}
+
+	if ((ret = mdb_layered_walk(LAYERED_WALKER_FOR_GROUP, wsp)) == -1) {
+		mdb_warn("couldn't walk '%s'", LAYERED_WALKER_FOR_GROUP);
+		return (ret);
+	}
+
+	return (WALK_NEXT);
+}
+
+static int
+mac_group_walk_step(mdb_walk_state_t *wsp)
+{
+	int ret;
+	mac_impl_t mi;
+	mac_group_t mg;
+	uintptr_t mgp;
+
+	/*
+	 * Nothing to do if we can't find the layer above us. But the kmem
+	 * walkers are a bit unsporting, they don't actually read in the data
+	 * for us.
+	 */
+	if (wsp->walk_addr == NULL)
+		return (WALK_DONE);
+
+	if (mdb_vread(&mi, sizeof (mac_impl_t), wsp->walk_addr) == -1) {
+		mdb_warn("failed to read mac_impl_t at %p", wsp->walk_addr);
+		return (DCMD_ERR);
+	}
+
+	/*
+	 * First go for rx groups, then tx groups.
+	 */
+	mgp = (uintptr_t)mi.mi_rx_groups;
+	while (mgp != NULL) {
+		if (mdb_vread(&mg, sizeof (mac_group_t), mgp) == -1) {
+			mdb_warn("failed to read mac_group_t at %p", mgp);
+			return (WALK_ERR);
+		}
+
+		ret = wsp->walk_callback(mgp, &mg, wsp->walk_cbdata);
+		if (ret != WALK_NEXT)
+			return (ret);
+		mgp = (uintptr_t)mg.mrg_next;
+	}
+
+	mgp = (uintptr_t)mi.mi_tx_groups;
+	while (mgp != NULL) {
+		if (mdb_vread(&mg, sizeof (mac_group_t), mgp) == -1) {
+			mdb_warn("failed to read mac_group_t at %p", mgp);
+			return (WALK_ERR);
+		}
+
+		ret = wsp->walk_callback(mgp, &mg, wsp->walk_cbdata);
+		if (ret != WALK_NEXT)
+			return (ret);
+		mgp = (uintptr_t)mg.mrg_next;
+	}
+
+	return (WALK_NEXT);
+}
+
+static int
+mac_group_count_clients(mac_group_t *mgp)
+{
+	int clients = 0;
+	uintptr_t mcp = (uintptr_t)mgp->mrg_clients;
+
+	while (mcp != NULL) {
+		mac_grp_client_t c;
+
+		if (mdb_vread(&c, sizeof (c), mcp) == -1) {
+			mdb_warn("failed to read mac_grp_client_t at %p", mcp);
+			return (-1);
+		}
+		clients++;
+		mcp = (uintptr_t)c.mgc_next;
+	}
+
+	return (clients);
+}
+
+static const char *
+mac_group_type(mac_group_t *mgp)
+{
+	const char *ret;
+
+	switch (mgp->mrg_type) {
+	case MAC_RING_TYPE_RX:
+		ret = "RECEIVE";
+		break;
+	case MAC_RING_TYPE_TX:
+		ret = "TRANSMIT";
+		break;
+	default:
+		ret = "UNKNOWN";
+		break;
+	}
+
+	return (ret);
+}
+
+static const char *
+mac_group_state(mac_group_t *mgp)
+{
+	const char *ret;
+
+	switch (mgp->mrg_state) {
+	case MAC_GROUP_STATE_UNINIT:
+		ret = "UNINT";
+		break;
+	case MAC_GROUP_STATE_REGISTERED:
+		ret = "REGISTERED";
+		break;
+	case MAC_GROUP_STATE_RESERVED:
+		ret = "RESERVED";
+		break;
+	case MAC_GROUP_STATE_SHARED:
+		ret = "SHARED";
+		break;
+	default:
+		ret = "UNKNOWN";
+		break;
+	}
+
+	return (ret);
+}
+
+static int
+mac_group_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	uint_t		args = MAC_SRS_NONE;
+	mac_group_t	mg;
+	int		clients;
+
+	if (!(flags & DCMD_ADDRSPEC)) {
+		if (mdb_walk_dcmd("mac_group", "mac_group", argc, argv) == -1) {
+			mdb_warn("failed to walk 'mac_group'");
+			return (DCMD_ERR);
+		}
+
+		return (DCMD_OK);
+	}
+
+	if (mdb_getopts(argc, argv,
+	    'r', MDB_OPT_SETBITS, MAC_GROUP_RX, &args,
+	    't', MDB_OPT_SETBITS, MAC_GROUP_TX, &args,
+	    'u', MDB_OPT_SETBITS, MAC_GROUP_UNINIT, &args,
+	    NULL) != argc)
+		return (DCMD_USAGE);
+
+	if (mdb_vread(&mg, sizeof (mac_group_t), addr) == -1) {
+		mdb_warn("failed to read mac_group_t at %p", addr);
+		return (DCMD_ERR);
+	}
+
+	if (DCMD_HDRSPEC(flags) && !(flags & DCMD_PIPE_OUT)) {
+		mdb_printf("%<u>%-?s %-8s %-10s %6s %8s %-?s%</u>\n",
+		    "ADDR", "TYPE", "STATE", "NRINGS", "NCLIENTS", "RINGS");
+	}
+
+	if ((args & MAC_GROUP_RX) != 0 && mg.mrg_type != MAC_RING_TYPE_RX)
+		return (DCMD_OK);
+	if ((args & MAC_GROUP_TX) != 0 && mg.mrg_type != MAC_RING_TYPE_TX)
+		return (DCMD_OK);
+
+	/*
+	 * By default, don't show uninitialized groups. They're not very
+	 * interesting. They have no rings and no clients.
+	 */
+	if (mg.mrg_state == MAC_GROUP_STATE_UNINIT &&
+	    (args & MAC_GROUP_UNINIT) == 0)
+		return (DCMD_OK);
+
+	if (flags & DCMD_PIPE_OUT) {
+		mdb_printf("%lr\n", addr);
+		return (DCMD_OK);
+	}
+
+	clients = mac_group_count_clients(&mg);
+	mdb_printf("%?p %-8s %-10s %6d %8d %?p\n", addr, mac_group_type(&mg),
+	    mac_group_state(&mg), mg.mrg_cur_count, clients, mg.mrg_rings);
+
+	return (DCMD_OK);
+}
+
 /* Supported dee-commands */
 static const mdb_dcmd_t dcmds[] = {
 	{"mac_flow", "?[-u] [-aprtsm]", "display Flow Entry structures",
 	    mac_flow_dcmd, mac_flow_help},
+	{"mac_group", "?[-rtu]", "display MAC Ring Groups", mac_group_dcmd,
+	    NULL },
 	{"mac_srs", "?[ -r[i|s|c[v]] | -t[i|s|c[v]] ]",
 	    "display MAC Soft Ring Set" " structures", mac_srs_dcmd,
 	    mac_srs_help},
@@ -1018,6 +1231,8 @@ static const mdb_dcmd_t dcmds[] = {
 static const mdb_walker_t walkers[] = {
 	{"mac_flow", "walk list of flow entry structures", mac_flow_walk_init,
 	    mac_common_walk_step, NULL, NULL},
+	{"mac_group", "walk list of ring group structures", mac_group_walk_init,
+	    mac_group_walk_step, NULL, NULL},
 	{"mac_srs", "walk list of mac soft ring set structures",
 	    mac_srs_walk_init, mac_common_walk_step, NULL, NULL},
 	{"mac_ring", "walk list of mac ring structures", mac_ring_walk_init,

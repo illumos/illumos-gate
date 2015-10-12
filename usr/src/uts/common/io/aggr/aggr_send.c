@@ -274,6 +274,8 @@ aggr_send_port_enable(aggr_port_t *port)
 	rw_exit(&grp->lg_tx_lock);
 
 	port->lp_tx_enabled = B_TRUE;
+
+	aggr_grp_update_default(grp);
 }
 
 /*
@@ -316,4 +318,6 @@ aggr_send_port_disable(aggr_port_t *port)
 	rw_exit(&grp->lg_tx_lock);
 
 	port->lp_tx_enabled = B_FALSE;
+
+	aggr_grp_update_default(grp);
 }

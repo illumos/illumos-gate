@@ -9,7 +9,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH TIMER_CREATE 3C "Feb 5, 2008"
+.TH TIMER_CREATE 3C "Sep 15, 2015"
 .SH NAME
 timer_create \- create a timer
 .SH SYNOPSIS
@@ -23,7 +23,6 @@ timer_create \- create a timer
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBtimer_create()\fR function creates a timer using the specified clock,
 \fIclock_id\fR, as the timing base. The \fBtimer_create()\fR function returns,
@@ -32,8 +31,7 @@ in the location referenced by \fItimerid\fR, a timer \fBID\fR of type
 will be unique within the calling process until the timer is deleted. The
 particular clock, \fIclock_id\fR, is defined in <\fBtime.h\fR>. The timer whose
 \fBID\fR is returned will be in a disarmed state upon return from
-\fBtimer_create()\fR.
-.sp
+\fBtimer_create()\fR, and can be started using \fBtimer_settime\fR(3C).
 .LP
 The \fIevp\fR argument, if non-null, points to a \fBsigevent\fR structure. This
 structure, allocated by the application, defines the asynchronous notification
@@ -41,9 +39,8 @@ that will occur when the timer expires (see \fBsignal.h\fR(3HEAD) for event
 notification details). If the \fIevp\fR argument is \fINULL\fR, the effect is
 as if the \fIevp\fR argument pointed to a \fBsigevent\fR structure with the
 \fBsigev_notify\fR member having the value \fBSIGEV_SIGNAL\fR, the
-\fBsigev_signo\fR having the value \fBSIGALARM\fR, and the \fBsigev_value\fR
+\fBsigev_signo\fR having the value \fBSIGALRM\fR, and the \fBsigev_value\fR
 member having the value of the timer \fBID\fR.
-.sp
 .LP
 The system defines a set of clocks that can be used as timing bases for
 per-process timers. The following values for \fIclock_id\fR are supported:
@@ -93,14 +90,12 @@ example, if the caller that created the timer were to change its processor
 binding or its processor set, the system may elect to drive the timer with a
 hardware source  that better reflects the new binding. Timers based on a
 \fIclock_id\fR of \fBCLOCK_HIGHRES\fR are ideally suited for interval timers
-that have minimal jitter tolerence.
-.sp
+that have minimal jitter tolerance.
 .LP
 Timers are not inherited by a child process across a \fBfork\fR(2) and are
 disarmed and deleted by a call to one of the \fBexec\fR functions (see
 \fBexec\fR(2)).
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, \fBtimer_create()\fR returns \fB0\fR and updates
 the location referenced by \fItimerid\fR to a \fBtimer_t\fR, which can be
@@ -108,7 +103,6 @@ passed to the per-process timer calls. If an error occurs, the function returns
 \fB\(mi1\fR and sets \fBerrno\fR to indicate the error. The value of
 \fItimerid\fR is undefined if an error occurs.
 .SH ERRORS
-.sp
 .LP
 The \fBtimer_create()\fR function will fail if:
 .sp
@@ -143,7 +137,6 @@ calling process.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -163,7 +156,6 @@ Standard	See \fBstandards\fR(5).
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBexec\fR(2), \fBfork\fR(2), \fBtime\fR(2), \fBclock_settime\fR(3C),
 \fBsignal\fR(3C), \fBsignal.h\fR(3HEAD), \fBtimer_delete\fR(3C),

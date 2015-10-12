@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH GETADDRINFO 3SOCKET "May 22, 2014"
+.TH GETADDRINFO 3SOCKET "Oct 3, 2015"
 .SH NAME
 getaddrinfo, getnameinfo, freeaddrinfo, gai_strerror \- translate between node
 name and address
@@ -63,7 +63,11 @@ string. The \fInodename\fR can also be an IPv6 zone-id in the form:
 The address is the literal IPv6 link-local address or host name of the
 destination. The zone-id is the interface ID of the IPv6 link used to send the
 packet. The zone-id can either be a numeric value, indicating a literal zone
-value, or an interface name such as \fBhme0\fR.
+value, or an interface name such as \fBhme0\fR. If the zone-id is an interface
+name, the interface's index will be stored in the \fIsin6_scope_id\fR field of
+the \fBstruct sockaddr_in6\fR. If the interface does not exist, the error
+\fBEAI_NONAME\fR will be returned. If the zone-id is a numeric value, it will
+be placed in \fIsin6_scope_id\fR.
 .sp
 .LP
 A non-null \fIservname\fR string can be either a service name or a decimal port

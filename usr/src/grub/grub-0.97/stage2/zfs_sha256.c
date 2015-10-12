@@ -22,6 +22,7 @@
  */
 /*
  * Copyright 2013 Saso Kiselkov.  All rights reserved.
+ * Copyright 2015 Toomas Soome <tsoome@me.com>
  */
 
 #include "fsys_zfs.h"
@@ -162,7 +163,8 @@ SHA512Transform(uint64_t *H, const uint8_t *cp)
 	for (t = 0; t < 16; t++, cp += sizeof (uint64_t))
 		W[t] = ((uint64_t)cp[0] << 56) | ((uint64_t)cp[1] << 48) |
 		    ((uint64_t)cp[2] << 40) | ((uint64_t)cp[3] << 32) |
-		    (cp[4] << 24) | (cp[5] << 16) | (cp[6] << 8) | cp[7];
+		    ((uint64_t)cp[4] << 24) | ((uint64_t)cp[5] << 16) |
+		    ((uint64_t)cp[6] << 8) | (uint64_t)cp[7];
 
 	/* extend the first 16 words into the remaining 64 words */
 	for (t = 16; t < 80; t++)
@@ -223,6 +225,25 @@ SHA256(uint32_t *H, const void *buf, uint64_t size, zio_cksum_t *zcp)
 }
 
 /*
+ * encode 64bit data in big-endian format.
+ */
+static void
+Encode64(uint8_t *output, uint64_t *input, size_t len)
+{
+	size_t i, j;
+	for (i = 0, j = 0; j < len; i++, j += 8) {
+		output[j]	= (input[i] >> 56) & 0xff;
+		output[j + 1]	= (input[i] >> 48) & 0xff;
+		output[j + 2]	= (input[i] >> 40) & 0xff;
+		output[j + 3]	= (input[i] >> 32) & 0xff;
+		output[j + 4]	= (input[i] >> 24) & 0xff;
+		output[j + 5]	= (input[i] >> 16) & 0xff;
+		output[j + 6]	= (input[i] >>  8) & 0xff;
+		output[j + 7]	= input[i] & 0xff;
+	}
+}
+
+/*
  * Implements the SHA-384, SHA-512 and SHA-512/t hash algos - to select
  * between them pass the appropriate initial values for 'H'. The output
  * of this function is truncated to the first 256 bits that fit into 'zcp'.
@@ -230,29 +251,37 @@ SHA256(uint32_t *H, const void *buf, uint64_t size, zio_cksum_t *zcp)
 static void
 SHA512(uint64_t *H, const void *buf, uint64_t size, zio_cksum_t *zcp)
 {
+	uint64_t	c64[2];
 	uint8_t		pad[256];
 	unsigned	padsize = size & 127;
-	unsigned	i;
+	unsigned	i, k;
 
 	/* process all blocks up to the last one */
 	for (i = 0; i < size - padsize; i += 128)
 		SHA512Transform(H, (uint8_t *)buf + i);
 
 	/* process the last block and padding */
-	for (i = 0; i < padsize; i++)
-		pad[i] = ((uint8_t *)buf)[i];
+	for (k = 0; k < padsize; k++)
+		pad[k] = ((uint8_t *)buf)[k+i];
 
-	for (pad[padsize++] = 0x80; (padsize & 127) != 120; padsize++)
-		pad[padsize] = 0;
+	if (padsize < 112) {
+		for (pad[padsize++] = 0x80; padsize < 112; padsize++)
+			pad[padsize] = 0;
+	} else {
+		for (pad[padsize++] = 0x80; padsize < 240; padsize++)
+			pad[padsize] = 0;
+	}
 
-	for (i = 0; i < 8; i++)
-		pad[padsize++] = (size << 3) >> (120 - 8 * i);
+	c64[0] = 0;
+	c64[1] = size << 3;
+	Encode64(pad+padsize, c64, sizeof (c64));
+	padsize += sizeof (c64);
 
 	for (i = 0; i < padsize; i += 128)
 		SHA512Transform(H, pad + i);
 
 	/* truncate the output to the first 256 bits which fit into 'zcp' */
-	ZIO_SET_CHECKSUM(zcp, H[0], H[1], H[2], H[3]);
+	Encode64((uint8_t *)zcp, H, sizeof (uint64_t) * 4);
 }
 
 void

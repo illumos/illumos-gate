@@ -25,7 +25,7 @@
 #
 
 #
-# Copyright (c) 2013 by Delphix. All rights reserved.
+# Copyright (c) 2013, 2015 by Delphix. All rights reserved.
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -200,15 +200,15 @@ function cmp_ds_prop
 	typeset dtst2=$2
 
 	for item in "type" "origin" "volblocksize" "aclinherit" "aclmode" \
-		"atime" "canmount" "checksum" "compression" "copies" "devices" \
-		"exec" "quota" "readonly" "recordsize" "reservation" "setuid" \
-		"sharenfs" "snapdir" "version" "volsize" "xattr" "zoned" \
-		"mountpoint";
+	    "atime" "canmount" "checksum" "compression" "copies" "devices" \
+	    "exec" "quota" "readonly" "recordsize" "reservation" "setuid" \
+	    "sharenfs" "snapdir" "version" "volsize" "xattr" "zoned" \
+	    "mountpoint";
 	do
 		$ZFS get -H -o property,value,source $item $dtst1 >> \
-			$BACKDIR/dtst1
+		    $BACKDIR/dtst1
 		$ZFS get -H -o property,value,source $item $dtst2 >> \
-			$BACKDIR/dtst2
+		    $BACKDIR/dtst2
 	done
 
 	eval $SED -e 's:$dtst1:PREFIX:g' < $BACKDIR/dtst1 > $BACKDIR/dtst1
@@ -323,7 +323,7 @@ function getds_with_suffix
 	typeset suffix=$2
 
 	typeset list=$($ZFS list -r -H -t filesystem,snapshot,volume -o name $ds \
-		| $GREP "$suffix$")
+	    | $GREP "$suffix$")
 
 	$ECHO $list
 }
@@ -336,14 +336,14 @@ function fs_inherit_prop
 	typeset fs_prop
 	if is_global_zone ; then
 		fs_prop=$($ZFS inherit 2>&1 | \
-			$AWK '$2=="YES" && $3=="YES" {print $1}')
+		    $AWK '$2=="YES" && $3=="YES" {print $1}')
 		if ! is_te_enabled ; then
 		        fs_prop=$(echo $fs_prop | $GREP -v "mlslabel")
 		fi
 	else
 		fs_prop=$($ZFS inherit 2>&1 | \
-			$AWK '$2=="YES" && $3=="YES" {print $1}'|
-			$EGREP -v "devices|mlslabel|sharenfs|sharesmb|zoned")
+		    $AWK '$2=="YES" && $3=="YES" {print $1}'|
+		    $EGREP -v "devices|mlslabel|sharenfs|sharesmb|zoned")
 	fi
 
 	$ECHO $fs_prop
@@ -373,4 +373,179 @@ function get_dst_ds
 	fi
 
 	$ECHO $dstfs
+}
+
+#
+# Make test files
+#
+# $1 Number of files to create
+# $2 Maximum file size
+# $3 File ID offset
+# $4 File system to create the files on
+#
+function mk_files
+{
+	nfiles=$1
+	maxsize=$2
+	file_id_offset=$3
+	fs=$4
+
+	for ((i=0; i<$nfiles; i=i+1)); do
+		$DD if=/dev/urandom \
+		    of=/$fs/file-$maxsize-$((i+$file_id_offset)) \
+		    bs=$(($RANDOM * $RANDOM % $maxsize)) \
+		    count=1 >/dev/null 2>&1 || log_fail \
+		    "Failed to create /$fs/file-$maxsize-$((i+$file_id_offset))"
+	done
+	$ECHO Created $nfiles files of random sizes up to $maxsize bytes
+}
+
+#
+# Remove test files
+#
+# $1 Number of files to remove
+# $2 Maximum file size
+# $3 File ID offset
+# $4 File system to remove the files from
+#
+function rm_files
+{
+	nfiles=$1
+	maxsize=$2
+	file_id_offset=$3
+	fs=$4
+
+	for ((i=0; i<$nfiles; i=i+1)); do
+		$RM -f /$fs/file-$maxsize-$((i+$file_id_offset))
+	done
+	$ECHO Removed $nfiles files of random sizes up to $maxsize bytes
+}
+
+#
+# Mess up file contents
+#
+# $1 The file path
+#
+function mess_file
+{
+	file=$1
+
+	filesize=$($STAT -c '%s' $file)
+	offset=$(($RANDOM * $RANDOM % $filesize))
+	if (($RANDOM % 7 <= 1)); then
+		#
+		# We corrupt 2 bytes to minimize the chance that we
+		# write the same value that's already there.
+		#
+		log_must eval "$DD if=/dev/random of=$file conv=notrunc " \
+		    "bs=1 count=2 oseek=$offset >/dev/null 2>&1"
+	else
+		log_must $TRUNCATE -s $offset $file
+	fi
+}
+
+#
+# Diff the send/receive filesystems
+#
+# $1 The sent filesystem
+# $2 The received filesystem
+#
+function file_check
+{
+	sendfs=$1
+	recvfs=$2
+
+	if [[ -d /$recvfs/.zfs/snapshot/a && -d \
+	    /$sendfs/.zfs/snapshot/a ]]; then
+		$DIFF -r /$recvfs/.zfs/snapshot/a /$sendfs/.zfs/snapshot/a
+		[[ $? -eq 0 ]] || log_fail "Differences found in snap a"
+	fi
+	if [[ -d /$recvfs/.zfs/snapshot/b && -d \
+	    /$sendfs/.zfs/snapshot/b ]]; then
+		$DIFF -r /$recvfs/.zfs/snapshot/b /$sendfs/.zfs/snapshot/b
+		[[ $? -eq 0 ]] || log_fail "Differences found in snap b"
+	fi
+}
+
+#
+# Resume test helper
+#
+# $1 The ZFS send command
+# $2 The filesystem where the streams are sent
+# $3 The receive filesystem
+#
+function resume_test
+{
+	sendcmd=$1
+	streamfs=$2
+	recvfs=$3
+
+	stream_num=1
+	log_must eval "$sendcmd >/$streamfs/$stream_num"
+
+	for ((i=0; i<2; i=i+1)); do
+		mess_file /$streamfs/$stream_num
+		log_mustnot $ZFS recv -sv $recvfs </$streamfs/$stream_num
+		stream_num=$((stream_num+1))
+
+		token=$($ZFS get -Hp -o value receive_resume_token $recvfs)
+		log_must eval "$ZFS send -v -t $token >/$streamfs/$stream_num"
+		[[ -f /$streamfs/$stream_num ]] || \
+		    log_fail "NO FILE /$streamfs/$stream_num"
+	done
+	log_must $ZFS recv -sv $recvfs </$streamfs/$stream_num
+}
+
+#
+# Setup filesystems for the resumable send/receive tests
+#
+# $1 The pool to set up with the "send" filesystems
+# $2 The pool for receive
+#
+function test_fs_setup
+{
+	sendpool=$1
+	recvpool=$2
+
+	sendfs=$sendpool/sendfs
+	recvfs=$recvpool/recvfs
+	streamfs=$sendpool/stream
+
+	if datasetexists $recvfs; then
+		log_must $ZFS destroy -r $recvfs
+	fi
+	if datasetexists $sendfs; then
+		log_must $ZFS destroy -r $sendfs
+	fi
+	if $($ZFS create -o compress=lz4 $sendfs); then
+		mk_files 1000 256 0 $sendfs &
+		mk_files 1000 131072 0 $sendfs &
+		mk_files 100 1048576 0 $sendfs &
+		mk_files 10 10485760 0 $sendfs &
+		mk_files 1 104857600 0 $sendfs &
+		log_must $WAIT
+		log_must $ZFS snapshot $sendfs@a
+
+		rm_files 200 256 0 $sendfs &
+		rm_files 200 131072 0 $sendfs &
+		rm_files 20 1048576 0 $sendfs &
+		rm_files 2 10485760 0 $sendfs &
+		log_must $WAIT
+
+		mk_files 400 256 0 $sendfs &
+		mk_files 400 131072 0 $sendfs &
+		mk_files 40 1048576 0 $sendfs &
+		mk_files 4 10485760 0 $sendfs &
+		log_must $WAIT
+
+		log_must $ZFS snapshot $sendfs@b
+		log_must eval "$ZFS send -v $sendfs@a >/$sendpool/initial.zsend"
+		log_must eval "$ZFS send -v -i @a $sendfs@b " \
+		    ">/$sendpool/incremental.zsend"
+	fi
+
+	if datasetexists $streamfs; then
+		log_must $ZFS destroy -r $streamfs
+	fi
+	log_must $ZFS create -o compress=lz4 $sendpool/stream
 }

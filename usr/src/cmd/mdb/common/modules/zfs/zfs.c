@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
- * Copyright (c) 2011, 2014 by Delphix. All rights reserved.
+ * Copyright (c) 2011, 2015 by Delphix. All rights reserved.
  */
 
 /* Portions Copyright 2010 Robert Milkowski */
@@ -467,9 +467,11 @@ dbuf(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	char objectname[32];
 	char blkidname[32];
 	char path[MAXNAMELEN];
+	int ptr_width = (int)(sizeof (void *)) * 2;
 
 	if (DCMD_HDRSPEC(flags))
-		mdb_printf("        addr object lvl blkid holds os\n");
+		mdb_printf("%*s %8s %3s %9s %5s %s\n",
+		    ptr_width, "addr", "object", "lvl", "blkid", "holds", "os");
 
 	if (mdb_ctf_vread(&db, ZFS_STRUCT "dmu_buf_impl", "mdb_dmu_buf_impl_t",
 	    addr, 0) == -1)
@@ -491,7 +493,7 @@ dbuf(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_ERR);
 	}
 
-	mdb_printf("%p %8s %1u %9s %2llu %s\n", addr,
+	mdb_printf("%*p %8s %3u %9s %5llu %s\n", ptr_width, addr,
 	    objectname, (int)db.db_level, blkidname,
 	    db.db_holds.rc_count, path);
 
