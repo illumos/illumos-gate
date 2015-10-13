@@ -1179,43 +1179,47 @@ lx_netlink_getaddr_lifreq(lx_netlink_reply_t *reply, struct lifreq *lifr)
 	if (lx_netlink_reply_ioctl(reply, SIOCGLIFFLAGS, lifr) != 0)
 		return;
 
-	if (!(lifr->lifr_flags & IFF_NOLOCAL)) {
-		if (lx_netlink_reply_ioctl(reply, SIOCGLIFSUBNET, lifr) != 0)
-			return;
+	/*
+	 * Don't report on-link subnets
+	 */
+	if ((lifr->lifr_flags & IFF_NOLOCAL) != 0)
+		return;
 
-		ifa.lxnl_ifa_prefixlen = lifr->lifr_addrlen;
+	if (lx_netlink_reply_ioctl(reply, SIOCGLIFSUBNET, lifr) != 0)
+		return;
 
-		if (lx_netlink_reply_ioctl(reply, SIOCGLIFADDR, lifr) != 0)
-			return;
+	ifa.lxnl_ifa_prefixlen = lifr->lifr_addrlen;
 
-		if (lifr->lifr_addr.ss_family == AF_INET) {
-			struct sockaddr_in *sin;
+	if (lx_netlink_reply_ioctl(reply, SIOCGLIFADDR, lifr) != 0)
+		return;
 
-			ifa.lxnl_ifa_family = LX_AF_INET;
+	if (lifr->lifr_addr.ss_family == AF_INET) {
+		struct sockaddr_in *sin;
 
-			sin = (struct sockaddr_in *)&lifr->lifr_addr;
-			ifa.lxnl_ifa_scope = lx_ipv4_rtscope(
-			    sin->sin_addr.s_addr);
+		ifa.lxnl_ifa_family = LX_AF_INET;
 
-			lx_netlink_reply_msg(reply, &ifa,
-			    sizeof (lx_netlink_ifaddrmsg_t));
+		sin = (struct sockaddr_in *)&lifr->lifr_addr;
+		ifa.lxnl_ifa_scope = lx_ipv4_rtscope(
+		    sin->sin_addr.s_addr);
 
-			lx_netlink_reply_attr_int32(reply,
-			    LX_NETLINK_IFA_ADDRESS, sin->sin_addr.s_addr);
-		} else {
-			struct sockaddr_in6 *sin;
+		lx_netlink_reply_msg(reply, &ifa,
+		    sizeof (lx_netlink_ifaddrmsg_t));
 
-			ifa.lxnl_ifa_family = LX_AF_INET6;
+		lx_netlink_reply_attr_int32(reply,
+		    LX_NETLINK_IFA_ADDRESS, sin->sin_addr.s_addr);
+	} else {
+		struct sockaddr_in6 *sin;
 
-			sin = (struct sockaddr_in6 *)&lifr->lifr_addr;
-			ifa.lxnl_ifa_scope = lx_ipv6_rtscope(&sin->sin6_addr);
+		ifa.lxnl_ifa_family = LX_AF_INET6;
 
-			lx_netlink_reply_msg(reply, &ifa,
-			    sizeof (lx_netlink_ifaddrmsg_t));
+		sin = (struct sockaddr_in6 *)&lifr->lifr_addr;
+		ifa.lxnl_ifa_scope = lx_ipv6_rtscope(&sin->sin6_addr);
 
-			lx_netlink_reply_attr(reply, LX_NETLINK_IFA_ADDRESS,
-			    &sin->sin6_addr, sizeof (sin->sin6_addr));
-		}
+		lx_netlink_reply_msg(reply, &ifa,
+		    sizeof (lx_netlink_ifaddrmsg_t));
+
+		lx_netlink_reply_attr(reply, LX_NETLINK_IFA_ADDRESS,
+		    &sin->sin6_addr, sizeof (sin->sin6_addr));
 	}
 
 	lx_netlink_reply_send(reply);
