@@ -26,7 +26,7 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2012, 2015 by Delphix. All rights reserved.
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -45,6 +45,7 @@
 #		* The target clone already exists.
 #		* Null target clone argument.
 #		* Too many arguments.
+#               * Invalid record sizes.
 #
 # STRATEGY:
 #	1. Create an array of parameters
@@ -66,7 +67,9 @@ set -A args "" \
 	"$SNAPFS $TESTPOOL//$TESTFS1" "$SNAPFS1 $TESTPOOL//$TESTFS1" \
 	"$SNAPFS $NONEXISTPOOLNAME/$TESTFS" "$SNAPFS1 $NONEXISTPOOLNAME/$TESTFS" \
 	"$SNAPFS" "$SNAPFS1" \
-	"$SNAPFS $target1 $target2" "$SNAPFS1 $target1 $target2"
+	"$SNAPFS $target1 $target2" "$SNAPFS1 $target1 $target2" \
+        "-o recordsize=2M $SNAPFS1 $target1" \
+        "-o recordsize=128B $SNAPFS1 $target1"
 typeset -i argsnum=${#args[*]}
 typeset -i j=0
 while (( j < argsnum )); do

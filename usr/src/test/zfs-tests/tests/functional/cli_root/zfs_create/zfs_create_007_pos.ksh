@@ -26,7 +26,7 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2012, 2015 by Delphix. All rights reserved.
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -49,6 +49,8 @@ verify_runnable "global"
 
 function cleanup
 {
+        datasetexists $TESTPOOL/$TESTVOL && \
+                log_must $ZFS destroy -f $TESTPOOL/$TESTVOL
 	datasetexists $TESTPOOL/$TESTVOL1 && \
 		log_must $ZFS destroy -f $TESTPOOL/$TESTVOL1
 }
