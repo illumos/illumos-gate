@@ -5091,7 +5091,7 @@ seekdisk(blkcnt_t blocks)
 	/* read those extra blocks */
 noseek:
 	if (nxb) {
-		dlog("reading extra blocks\n", 0, 0);
+		dlog("reading extra blocks\n");
 		if (read(mt, tbuf, TBLOCK*nblock) < 0) {
 			(void) fprintf(stderr, gettext(
 			    "tar: read error while skipping file\n"));
