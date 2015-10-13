@@ -1006,6 +1006,7 @@ SATAGENHDRS=		\
 
 SYSEVENTHDRS=		\
 	ap_driver.h     \
+	datalink.h	\
 	dev.h		\
 	domain.h        \
 	dr.h            \

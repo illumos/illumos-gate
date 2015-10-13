@@ -21,7 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2011 Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 #ifndef	_SYS_DLS_H
@@ -126,6 +126,7 @@ extern int		dls_devnet_hold_by_dev(dev_t, dls_dl_handle_t *);
 extern void		dls_devnet_rele(dls_dl_handle_t);
 extern void		dls_devnet_prop_task_wait(dls_dl_handle_t);
 
+extern const char	*dls_devnet_link(dls_dl_handle_t);
 extern const char	*dls_devnet_mac(dls_dl_handle_t);
 extern uint16_t		dls_devnet_vid(dls_dl_handle_t);
 extern datalink_id_t	dls_devnet_linkid(dls_dl_handle_t);

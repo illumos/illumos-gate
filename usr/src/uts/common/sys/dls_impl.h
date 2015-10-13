@@ -21,7 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2011 Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 #ifndef	_SYS_DLS_IMPL_H
@@ -47,11 +47,12 @@ typedef struct dls_multicst_addr_s {
 } dls_multicst_addr_t;
 
 struct dls_link_s {				/* Protected by */
-	char			dl_name[MAXNAMELEN];	/* SL */
+	char			dl_name[MAXNAMELEN];	/* RO */
 	uint_t			dl_ddi_instance;	/* SL */
 	mac_handle_t		dl_mh;			/* SL */
 	mac_client_handle_t	dl_mch;			/* SL */
 	mac_unicast_handle_t	dl_mah;			/* SL */
+	mac_notify_handle_t	dl_mnh;			/* SL */
 	const mac_info_t	*dl_mip;		/* SL */
 	uint_t			dl_ref;			/* SL */
 	mod_hash_t		*dl_str_hash;		/* SL, modhash lock */
@@ -106,6 +107,8 @@ extern int		dls_devnet_open_by_dev(dev_t, dls_link_t **,
 extern int		dls_devnet_hold_link(datalink_id_t, dls_dl_handle_t *,
 			    dls_link_t **);
 extern void		dls_devnet_rele_link(dls_dl_handle_t, dls_link_t *);
+extern int		dls_devnet_hold_tmp_by_link(dls_link_t *,
+			    dls_dl_handle_t *);
 
 extern void		dls_init(void);
 extern int		dls_fini(void);

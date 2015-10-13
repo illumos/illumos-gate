@@ -21,7 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright (c) 2013 Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 /*
@@ -1091,6 +1091,39 @@ dls_devnet_unset(const char *macname, datalink_id_t *id, boolean_t wait)
 	return (0);
 }
 
+/*
+ * This is a private hold routine used when we already have the dls_link_t, thus
+ * we know that it cannot go away.
+ */
+int
+dls_devnet_hold_tmp_by_link(dls_link_t *dlp, dls_dl_handle_t *ddhp)
+{
+	int err;
+	dls_devnet_t *ddp = NULL;
+
+	rw_enter(&i_dls_devnet_lock, RW_WRITER);
+	if ((err = mod_hash_find(i_dls_devnet_hash,
+	    (mod_hash_key_t)dlp->dl_name, (mod_hash_val_t *)&ddp)) != 0) {
+		ASSERT(err == MH_ERR_NOTFOUND);
+		rw_exit(&i_dls_devnet_lock);
+		return (ENOENT);
+	}
+
+	mutex_enter(&ddp->dd_mutex);
+	ASSERT(ddp->dd_ref > 0);
+	if (ddp->dd_flags & DD_CONDEMNED) {
+		mutex_exit(&ddp->dd_mutex);
+		rw_exit(&i_dls_devnet_lock);
+		return (ENOENT);
+	}
+	ddp->dd_tref++;
+	mutex_exit(&ddp->dd_mutex);
+	rw_exit(&i_dls_devnet_lock);
+
+	*ddhp = ddp;
+	return (0);
+}
+
 static int
 dls_devnet_hold_common(datalink_id_t linkid, dls_devnet_t **ddpp,
     boolean_t tmp_hold)
@@ -1910,6 +1943,12 @@ i_dls_devnet_destroy_iptun(datalink_id_t linkid)
 	if ((err = iptun_delete(linkid, zone_kcred())) == 0)
 		(void) dls_mgmt_destroy(linkid, B_FALSE);
 	return (err);
+}
+
+const char *
+dls_devnet_link(dls_dl_handle_t ddh)
+{
+	return (ddh->dd_linkname);
 }
 
 const char *

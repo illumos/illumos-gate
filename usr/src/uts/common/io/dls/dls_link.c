@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2015 Joyent, Inc.
  */
 
 /*
@@ -34,6 +35,9 @@
 #include	<sys/dld_impl.h>
 #include	<sys/sdt.h>
 #include	<sys/atomic.h>
+#include	<sys/sysevent.h>
+#include	<sys/sysevent/eventdefs.h>
+#include	<sys/sysevent/datalink.h>
 
 static kmem_cache_t	*i_dls_link_cachep;
 mod_hash_t		*i_dls_link_hash;
@@ -579,6 +583,67 @@ drop:
 	freemsg(mp);
 }
 
+/*
+ * We'd like to notify via sysevents that a link state change has occurred.
+ * There are a couple of challenges associated with this. The first is that if
+ * the link is flapping a lot, we may not see an accurate state when we launch
+ * the notification, we're told it changed, not what it changed to.
+ *
+ * The next problem is that all of the information that a user has associated
+ * with this device is the exact opposite of what we have on the dls_link_t. We
+ * have the name of the mac device, which has no bearing on what users see.
+ * Likewise, we don't have the datalink id either. So we're going to have to get
+ * this from dls.
+ *
+ * This is all further complicated by the fact that this could be going on in
+ * another thread at the same time as someone is tearing down the dls_link_t
+ * that we're associated with. We need to be careful not to grab the mac
+ * perimeter, otherwise we stand a good chance of deadlock.
+ */
+static void
+dls_link_notify(void *arg, mac_notify_type_t type)
+{
+	dls_link_t 	*dlp = arg;
+	dls_dl_handle_t	dhp;
+	nvlist_t	*nvp;
+	sysevent_t	*event;
+	sysevent_id_t	eid;
+
+	if (type != MAC_NOTE_LINK && type != MAC_NOTE_LOWLINK)
+		return;
+
+	/*
+	 * If we can't find a devnet handle for this link, then there is no user
+	 * knowable device for this at the moment and there's nothing we can
+	 * really share with them that will make sense.
+	 */
+	if (dls_devnet_hold_tmp_by_link(dlp, &dhp) != 0)
+		return;
+
+	/*
+	 * Because we're attaching this nvlist_t to the sysevent, it'll get
+	 * cleaned up when we call sysevent_free.
+	 */
+	VERIFY(nvlist_alloc(&nvp, NV_UNIQUE_NAME, KM_SLEEP) == 0);
+	VERIFY(nvlist_add_int32(nvp, DATALINK_EV_LINK_ID,
+	    dls_devnet_linkid(dhp)) == 0);
+	VERIFY(nvlist_add_string(nvp, DATALINK_EV_LINK_NAME,
+	    dls_devnet_link(dhp)) == 0);
+	VERIFY(nvlist_add_int32(nvp, DATALINK_EV_ZONE_ID,
+	    dls_devnet_getzid(dhp)) == 0);
+
+	dls_devnet_rele_tmp(dhp);
+
+	event = sysevent_alloc(EC_DATALINK, ESC_DATALINK_LINK_STATE,
+	    ILLUMOS_KERN_PUB"dls", SE_SLEEP);
+	VERIFY(event != NULL);
+	(void) sysevent_attach_attributes(event, (sysevent_attr_list_t *)nvp);
+
+	(void) log_sysevent(event, SE_SLEEP, &eid);
+	sysevent_free(event);
+
+}
+
 static void
 i_dls_link_destroy(dls_link_t *dlp)
 {
@@ -589,6 +654,9 @@ i_dls_link_destroy(dls_link_t *dlp)
 	/*
 	 * Free the structure back to the cache.
 	 */
+	if (dlp->dl_mnh != NULL)
+		mac_notify_remove(dlp->dl_mnh, B_TRUE);
+
 	if (dlp->dl_mch != NULL)
 		mac_client_close(dlp->dl_mch, 0);
 
@@ -600,6 +668,7 @@ i_dls_link_destroy(dls_link_t *dlp)
 	dlp->dl_mh = NULL;
 	dlp->dl_mch = NULL;
 	dlp->dl_mip = NULL;
+	dlp->dl_mnh = NULL;
 	dlp->dl_unknowns = 0;
 	dlp->dl_nonip_cnt = 0;
 	dlp->dl_exclusive = B_FALSE;
@@ -640,6 +709,8 @@ i_dls_link_create(const char *name, dls_link_t **dlpp)
 	    MAC_OPEN_FLAGS_USE_DATALINK_NAME);
 	if (err != 0)
 		goto bail;
+
+	dlp->dl_mnh = mac_notify_add(dlp->dl_mh, dls_link_notify, dlp);
 
 	DTRACE_PROBE2(dls__primary__client, char *, dlp->dl_name, void *,
 	    dlp->dl_mch);

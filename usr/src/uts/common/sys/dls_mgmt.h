@@ -229,6 +229,7 @@ typedef struct dlmgmt_getattr_retval_s {
 	char			lr_attrval[MAXLINKATTRVALLEN];
 } dlmgmt_getattr_retval_t;
 
+
 #ifdef	__cplusplus
 }
 #endif

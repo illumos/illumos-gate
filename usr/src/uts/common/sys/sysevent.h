@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2000, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 #ifndef	_SYS_SYSEVENT_H
@@ -74,10 +75,12 @@ extern "C" {
 #define	SE_KERN_PID	0
 
 #define	SUNW_VENDOR	"SUNW"
+#define	ILLUMOS_VENDOR	"ILLUMOS"
 #define	SE_USR_PUB	"usr:"
 #define	SE_KERN_PUB	"kern:"
 #define	SUNW_KERN_PUB	SUNW_VENDOR":"SE_KERN_PUB
 #define	SUNW_USR_PUB	SUNW_VENDOR":"SE_USR_PUB
+#define	ILLUMOS_KERN_PUB	ILLUMOS_VENDOR":"SE_KERN_PUB
 
 /*
  * Event header and attribute value limits
