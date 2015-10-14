@@ -21,11 +21,12 @@
 /* LINTLIBRARY */
 
 /*
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ */
+
+/*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- */
-/*
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -178,12 +179,14 @@ int skip;
 
 	retp = p;
 	while (*p) {
-		if (isspace(*p))
+		if (isspace(*p)) {
 			if (skip == TRUE) {
 				shift1left(p);
 				continue;
 			} else
 				break;
+		}
+
 		/*
 		 *	Only process the escape of the space separator;
 		 *	since the token may contain other separators,

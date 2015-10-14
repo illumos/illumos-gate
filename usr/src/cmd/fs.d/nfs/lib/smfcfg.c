@@ -20,9 +20,10 @@
  */
 
 /*
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <syslog.h>
@@ -115,7 +116,6 @@ fs_smf_set_prop(smf_fstype_t fstype, char *prop_name, char *valbuf,
 	scf_instance_t *inst;
 	scf_value_t *val;
 	int valint;
-	int index = 0;
 	int ret = 0;
 	char *p = NULL;
 	char *svcname, srv[MAXPATHLEN];

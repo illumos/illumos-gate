@@ -20,11 +20,13 @@
  */
 
 /*
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ */
+
+/*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -142,7 +144,8 @@ netgroup_check(struct nd_hostservlist *clnames, char  *glist, int grc)
 		 * can be grouped together for a single check.
 		 */
 		for (n = 0; i < grc; i++, n++, gr += strlen(gr) + 1) {
-			if (response && *gr == '-' || !response && *gr != '-')
+			if ((response && *gr == '-') ||
+			    (!response && *gr != '-'))
 				break;
 
 			grl[n] = response ? gr : gr + 1;
@@ -160,9 +163,9 @@ netgroup_check(struct nd_hostservlist *clnames, char  *glist, int grc)
 				host = clnames->h_hostservs[j].h_host;
 
 				if (__multi_innetgr(n, grl,
-					1, &host,
-					0, NULL,
-					1, &domain))
+				    1, &host,
+				    0, NULL,
+				    1, &domain))
 					belong = 1;
 			}
 
