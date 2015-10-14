@@ -26,7 +26,7 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2012, 2015 by Delphix. All rights reserved.
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -57,8 +57,8 @@ set -A args "ab" "-?" "-cV" "-Vc" "-c -V" "c" "V" "--c" "-e" "-s" \
     "-blah" "-cV 12k" "-s -cV 1P" "-sc" "-Vs 5g" "-o" "--o" "-O" "--O" \
     "-o QuOta=none" "-o quota=non" "-o quota=abcd" "-o quota=0" "-o quota=" \
     "-o ResErVaTi0n=none" "-o reserV=none" "-o reservation=abcd" "-o reserv=" \
-    "-o recorDSize=64k" "-o recordsize=256K" "-o recordsize=256" \
-    "-o recsize=" "-o recsize=zero" "-o recordsize=0" \
+    "-o recorDSize=64k" "-o recordsize=2048K" "-o recordsize=2M" \
+    "-o recordsize=256" "-o recsize=" "-o recsize=zero" "-o recordsize=0" \
     "-o mountPoint=/tmp/tmpfile$$" "-o mountpoint=non0" "-o mountpoint=" \
     "-o mountpoint=LEGACY" "-o mounpoint=none" \
     "-o sharenfs=ON" "-o ShareNFS=off" "-o sharenfs=sss" \
