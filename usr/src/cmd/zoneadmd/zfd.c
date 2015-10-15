@@ -27,7 +27,7 @@
 
 /*
  * Zone file descriptor support is used as a mechanism for a process inside the
- * zone to either log messages to the GZ zoneadmd or as a way to interact
+ * zone to log messages to the GZ zoneadmd and also as a way to interact
  * directly with the process (via zlogin -I). The zfd thread is modeled on
  * the zcons thread so see the comment header in zcons.c for a general overview.
  * Unlike with zcons, which has a single endpoint within the zone and a single
@@ -37,7 +37,8 @@
  * of a misnomer since its purpose has evolved. The attribute currently
  * can have four values, with misleading names due to backward compatability,
  * but which are used to control how many zfd devices are created inside the
- * zone, and to control if the output on the device(s) is logged in the GZ.
+ * zone, and to control if the output on the device(s) is also teed into
+ * another stream within the zone. All output is always logged in the GZ.
  * See the comment in uts/common/io/zfd.c for more details.
  *
  * Internally the zfd_mode_t struct holds the number of stdio devs (1 or 3) and
@@ -1197,8 +1198,11 @@ srvr(void *modearg)
 	sigset_t blockset;
 	int gzerrfd = -1;
 	int stderrfd = -1;
+	int flags;
+	int len;
+	char ibuf[BUFSIZ + 1];
 
-	if (!shutting_down && mode->zmode_n_addl_devs == 0)
+	if (!shutting_down)
 		open_logfile();
 
 	/*
@@ -1254,12 +1258,39 @@ death:
 		destroy_server_sock(gzctlfd, "ctl");
 		destroy_server_sock(gzoutfd, "out");
 		destroy_server_sock(gzerrfd, "err");
-		(void) close(stdinfd);
-		if (mode->zmode_n_stddevs == 3) {
-			(void) close(stdoutfd);
-			(void) close(stderrfd);
+
+		/* when shutting down, leave open until drained */
+		if (!shutting_down) {
+			(void) close(stdinfd);
+			if (mode->zmode_n_stddevs == 3) {
+				(void) close(stdoutfd);
+				(void) close(stderrfd);
+			}
 		}
 	}
+
+	/*
+	 * Attempt to drain remaining log output from the zone prior to closing
+	 * the file descriptors. This helps ensure that complete logs are
+	 * captured during shutdown.
+	 */
+	flags = fcntl(stdoutfd, F_GETFL, 0);
+	if (fcntl(stdoutfd, F_SETFL, flags | O_NONBLOCK) != -1) {
+		while ((len = read(stdoutfd, ibuf, BUFSIZ)) > 0)
+			wr_log_msg(ibuf, len, 1);
+	}
+	(void) close(stdoutfd);
+
+	if (mode->zmode_n_stddevs > 1) {
+		(void) close(stdinfd);
+		flags = fcntl(stderrfd, F_GETFL, 0);
+		if (fcntl(stderrfd, F_SETFL, flags | O_NONBLOCK) != -1) {
+			while ((len = read(stderrfd, ibuf, BUFSIZ)) > 0)
+				wr_log_msg(ibuf, len, 2);
+		}
+		(void) close(stderrfd);
+	}
+
 
 	(void) close(eventstream[0]);
 	eventstream[0] = -1;
