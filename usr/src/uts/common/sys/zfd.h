@@ -62,6 +62,15 @@ extern "C" {
  */
 #define	ZFD_MUX			(ZFD_IOC | 3)
 
+/*
+ * This ioctl controls the flow control setting for the log multiplexer stream
+ * (1 = true, 0 = false). The default is false which implies teeing into the
+ * log stream is "best-effort" but data will be discarded if the stream
+ * becomes full. If set and the log stream begins to fill up, the primary
+ * stream will stop flowing.
+ */
+#define	ZFD_MUX_FLOWCON		(ZFD_IOC | 4)
+
 #ifdef	__cplusplus
 }
 #endif

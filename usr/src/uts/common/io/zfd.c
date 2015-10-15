@@ -41,31 +41,37 @@
  * slave side within the zone is also redirected back to another zfd device
  * inside the zone for consumption (i.e. it can be read). The intention is
  * that a logging process within the zone can consume data that is being
- * written by an application onto the primary stream.
+ * written by an application onto the primary stream. This is essentially
+ * a tee off of the primary stream into a log stream. This tee can also be
+ * configured to be flow controlled via an ioctl. Flow control happens on the
+ * primary stream and is used to ensure that the log stream receives all of
+ * the messages off the primary stream when consumption of the data off of
+ * the log stream gets behind. Configuring for flow control implies that the
+ * application writing to the primary stream will be blocked when the log
+ * consumer gets behind. Note that closing the log stream (e.g. when the zone
+ * halts) will cause the loss of all messages queued in the stream.
  *
  * The zone's zfd device configuration is driven by zoneadmd and a zone mode.
  * The mode, which is controlled by the zone attribute "zlog-mode" is somewhat
  * of a misnomer since its purpose has evolved. The attribute currently
  * can have four values, with misleading names due to backward compatability,
  * but which are used to control how many zfd devices are created inside the
- * zone, and to control if the output on the device(s) is logged in the GZ by
- * zoneadmd.
+ * zone.
  *
  * Here is a summary of how the 4 modes control what zfd devices are created
  * and how they're used:
  *
- *    log:    3 stdio zdevs (0, 1, 2), logging done in the GZ
- *    int:    1 stdio zdev  (0) configured as a tty, logging done in GZ
+ *    log:    3 stdio zdevs (0, 1, 2), not configured as a tty
+ *    int:    1 stdio zdev  (0) configured as a tty
  *    nolog:  3 stdio zdevs (0, 1, 2), 2 additional zdevs (3, 4)
  *    nlint:  1 stdio zdev  (0) configured as a tty, 1 additional zdev (1)
  *
- * When the zone is configured to not log at the GZ level (nolog or nlint)
- * then it is assumed logging will be done within the zone itself. In this
- * configuration 1 or 2 additional zfd devices are created within the zone
- * for use by a logging process. An application can then configure the zfd
- * streams driver into a multiplexer so that anything written within the zone
- * to the stdout/stderr zfd's will be teed into the correspond logging zfd's
- * within the zone.
+ * When the zone is configured for nolog or nlint then it is assumed logging
+ * will be done within the zone itself. In this configuration 1 or 2 additional
+ * zfd devices are created within the zone for use by a logging process. An
+ * application can then configure the zfd streams driver into a multiplexer so
+ * that anything written within the zone to the stdout/stderr zfd's will be
+ * teed into the correspond logging zfd's within the zone.
  *
  * The following is a diagram of how this works for a nolog configuration:
  *
@@ -221,14 +227,16 @@ typedef enum {
 } zfd_mux_type_t;
 
 typedef struct zfd_state {
-	dev_info_t *zfd_devinfo;
-	queue_t *zfd_master_rdq;
-	queue_t *zfd_slave_rdq;
-	vnode_t *zfd_slave_vnode;
-	int zfd_state;
-	int zfd_tty;
-	zfd_mux_type_t zfd_muxt;
-	struct zfd_state *zfd_log_inst;
+	dev_info_t *zfd_devinfo;	/* instance info */
+	queue_t *zfd_master_rdq;	/* GZ read queue */
+	queue_t *zfd_slave_rdq;		/* in-zone read queue */
+	int zfd_state;			/* ZFD_STATE_MOPEN, ZFD_STATE_SOPEN */
+	int zfd_tty;			/* ZFD_MAKETTY - strm mods will push */
+	boolean_t zfd_is_flowcon;	/* primary stream flow stopped */
+	boolean_t zfd_allow_flowcon;	/* use flow control */
+	zfd_mux_type_t zfd_muxt;	/* state type: none, primary, log */
+	struct zfd_state *zfd_inst_pri; /* log state's primary ptr */
+	struct zfd_state *zfs_inst_log;	/* primary state's log ptr */
 } zfd_state_t;
 
 #define	ZFD_STATE_MOPEN	0x01
@@ -321,7 +329,7 @@ zfd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	zfds->zfd_devinfo = dip;
 	zfds->zfd_tty = 0;
 	zfds->zfd_muxt = ZFD_NO_MUX;
-	zfds->zfd_log_inst = NULL;
+	zfds->zfs_inst_log = NULL;
 	return (DDI_SUCCESS);
 }
 
@@ -586,6 +594,17 @@ zfd_open(queue_t *rqp,		/* pointer to the read side queue */
 		break;
 	case ZFD_SLAVE_MINOR:
 		ret = zfd_slave_open(zfds, rqp, devp, oflag, sflag, credp);
+		/*
+		 * If we just opened the log stream and flow control has
+		 * been enabled, we want to make sure the primary stream can
+		 * start flowing.
+		 */
+		if (ret == 0 && zfds->zfd_muxt == ZFD_LOG_STREAM &&
+		    zfds->zfd_inst_pri->zfd_allow_flowcon) {
+			zfds->zfd_inst_pri->zfd_is_flowcon = B_FALSE;
+			if (zfds->zfd_inst_pri->zfd_master_rdq != NULL)
+				qenable(RD(zfds->zfd_inst_pri->zfd_master_rdq));
+		}
 		break;
 	default:
 		ret = ENXIO;
@@ -650,6 +669,16 @@ zfd_close(queue_t *rqp, int flag, cred_t *credp)
 		if (zfds->zfd_master_rdq != NULL)
 			qenable(WR(zfds->zfd_master_rdq));
 
+		/*
+		 * Qenable primary stream if necessary.
+		 */
+		if (zfds->zfd_muxt == ZFD_LOG_STREAM &&
+		    zfds->zfd_inst_pri->zfd_allow_flowcon) {
+			zfds->zfd_inst_pri->zfd_is_flowcon = B_FALSE;
+			if (zfds->zfd_inst_pri->zfd_master_rdq != NULL)
+				qenable(RD(zfds->zfd_inst_pri->zfd_master_rdq));
+		}
+
 		qprocsoff(rqp);
 		WR(rqp)->q_ptr = rqp->q_ptr = NULL;
 
@@ -709,6 +738,80 @@ handle_mflush(queue_t *qp, mblk_t *mp)
 }
 
 /*
+ * Evaluate the various conditionals to determine if we're teeing into a log
+ * stream, if that should be flow controlled, and if we can perform the tee.
+ * This function can set the zfd_is_flowcon flag as a side effect.
+ */
+static void
+zfd_tee_handler(queue_t *qp, zfd_state_t *zfds, unsigned char type, mblk_t *mp)
+{
+	queue_t *log_qp;
+	zfd_state_t *log_zfds;
+	mblk_t *lmp;
+
+	if (zfds->zfd_muxt != ZFD_PRIMARY_STREAM)
+		return;
+
+	if (type != M_DATA)
+		return;
+
+	log_zfds = zfds->zfs_inst_log;
+	if (log_zfds == NULL)
+		return;
+
+	ASSERT(log_zfds->zfd_muxt == ZFD_LOG_STREAM);
+
+	if ((log_zfds->zfd_state & ZFD_STATE_SOPEN) == 0) {
+		if (zfds->zfd_allow_flowcon)
+			zfds->zfd_is_flowcon = B_TRUE;
+		return;
+	}
+
+	/* The zfd_slave_rdq is null until the log dev is opened in the zone */
+	log_qp = RD(log_zfds->zfd_slave_rdq);
+	DTRACE_PROBE2(zfd__tee__check, void *, log_qp, void *, zfds);
+
+	if (zfds->zfd_allow_flowcon) {
+		/*
+		 * If we're supposed to tee with flow control and the tee is
+		 * over the high water mark then we want the primary stream to
+		 * stop flowing. We'll resume teeing out of the read side of
+		 * the primary stream when the log stream has drained.
+		 */
+		if (log_qp->q_count > log_qp->q_hiwat) {
+			zfds->zfd_is_flowcon = B_TRUE;
+			log_qp = NULL;
+		}
+	} else {
+		/*
+		 * We're not supposed to tee with flow control and the tee is
+		 * full so we skip teeing into the log stream.
+		 */
+		if ((log_qp->q_flag & QFULL) != 0)
+			log_qp = NULL;
+	}
+
+	if (log_qp == NULL)
+		return;
+
+	/*
+	 * Tee the message into the log stream.
+	 */
+	lmp = dupmsg(mp);
+	if (lmp == NULL)
+		return;
+
+	if (log_qp->q_first == NULL && bcanputnext(log_qp, lmp->b_band)) {
+		putnext(log_qp, lmp);
+	} else {
+		if (putq(log_qp, lmp) == 0) {
+			/* The logger queue is full, free the msg. */
+			freemsg(lmp);
+		}
+	}
+}
+
+/*
  * wput(9E) is symmetric for master and slave sides, so this handles both
  * without splitting the codepath.  (The only exception to this is the
  * processing of zfd ioctls, which is restricted to the master side.)
@@ -731,6 +834,7 @@ zfd_wput(queue_t *qp, mblk_t *mp)
 	unsigned char type = mp->b_datap->db_type;
 	zfd_state_t *zfds;
 	struct iocblk *iocbp;
+	boolean_t must_queue = B_FALSE;
 
 	ASSERT(qp->q_ptr);
 
@@ -802,12 +906,50 @@ zfd_wput(queue_t *qp, mblk_t *mp)
 			}
 
 			zfds->zfd_muxt = ZFD_LOG_STREAM;
+			zfds->zfd_inst_pri = prim_zfds;
 			prim_zfds->zfd_muxt = ZFD_PRIMARY_STREAM;
-			prim_zfds->zfd_log_inst = zfds;
+			prim_zfds->zfs_inst_log = zfds;
 			mutex_exit(&zfd_mux_lock);
 			DTRACE_PROBE2(zfd__mux__link, void *, prim_zfds,
 			    void *, zfds);
 
+			miocack(qp, mp, 0, 0);
+			return;
+			}
+		case ZFD_MUX_FLOWCON: {
+			/*
+			 * We expect this ioctl to be issued against the
+			 * log stream. We don't use the primary stream since
+			 * there can be other streams modules pushed onto that
+			 * stream which would interfere with the ioctl.
+			 */
+			int val;
+			zfd_state_t *prim_zfds;
+
+			if (iocbp->ioc_count != TRANSPARENT ||
+			    mp->b_cont == NULL) {
+				miocack(qp, mp, 0, EINVAL);
+				return;
+			}
+
+			if (zfds->zfd_muxt != ZFD_LOG_STREAM) {
+				miocack(qp, mp, 0, EINVAL);
+				return;
+			}
+			prim_zfds = zfds->zfd_inst_pri;
+
+			/* Get the flow control setting */
+			val = *(int *)mp->b_cont->b_rptr;
+			if (val != 0 && val != 1) {
+				miocack(qp, mp, 0, EINVAL);
+				return;
+			}
+
+			prim_zfds->zfd_allow_flowcon = (boolean_t)val;
+			if (!prim_zfds->zfd_allow_flowcon)
+				prim_zfds->zfd_is_flowcon = B_FALSE;
+
+			DTRACE_PROBE1(zfd__mux__flowcon, void *, prim_zfds);
 			miocack(qp, mp, 0, 0);
 			return;
 			}
@@ -816,50 +958,15 @@ zfd_wput(queue_t *qp, mblk_t *mp)
 		}
 	}
 
-	/*
-	 * If we're multiplexing to a log stream then we dup the msg and tee
-	 * it into the log stream.
-	 */
-	if (zfds->zfd_muxt == ZFD_PRIMARY_STREAM &&
-	    zfds->zfd_slave_rdq != NULL && qp == WR(zfds->zfd_slave_rdq)) {
-		zfd_state_t *log_zfds = zfds->zfd_log_inst;
-
-		/* Only need to tee if the log zfd is open. */
-		if (log_zfds != NULL &&
-		    (log_zfds->zfd_state & ZFD_STATE_SOPEN) != 0 &&
-		    type == M_DATA) {
-			queue_t *log_qp;
-			mblk_t *lmp;
-
-			ASSERT(log_zfds->zfd_muxt == ZFD_LOG_STREAM);
-
-			log_qp = RD(log_zfds->zfd_slave_rdq);
-			lmp = dupmsg(mp);
-			if (lmp != NULL) {
-				if (log_qp->q_first == NULL &&
-				    bcanputnext(log_qp, lmp->b_band)) {
-					DTRACE_PROBE2(zfd__mux__put,
-					    void *, log_qp,
-					    void *, lmp);
-					putnext(log_qp, lmp);
-				} else {
-					DTRACE_PROBE2(zfd__mux__queue,
-					    void *, log_qp, void *, lmp);
-					if (putq(log_qp, lmp) == 0) {
-						/*
-						 * The logger queue is full,
-						 * drop the msg.
-						 */
-						DTRACE_PROBE2(
-						    zfd__mux__queue__full,
-						    void *, log_qp,
-						    void *, lmp);
-						freemsg(lmp);
-					}
-				}
-			}
-		}
+	/* if on the write side, may need to tee */
+	if (zfds->zfd_slave_rdq != NULL && qp == WR(zfds->zfd_slave_rdq)) {
+		/* tee output to any attached log stream */
+		zfd_tee_handler(qp, zfds, type, mp);
 	}
+
+	/* high-priority msgs are not subject to flow control */
+	if (zfds->zfd_is_flowcon && type == M_DATA)
+		must_queue = B_TRUE;
 
 	if (zfd_switch(RD(qp)) == NULL) {
 		DBG1("wput to %s side (no one listening)", zfd_side(qp));
@@ -900,31 +1007,37 @@ zfd_wput(queue_t *qp, mblk_t *mp)
 	}
 
 	/*
-	 * Only putnext if there isn't already something in the queue.
-	 * otherwise things would wind up out of order.
+	 * If the primary stream has been stopped for flow control then
+	 * enqueue the msg, otherwise only putnext if there isn't already
+	 * something in the queue. If we don't do this then things would wind
+	 * up out of order. We may tee into the mux here based on the
+	 * conditionals evaluated above.
 	 */
-	if (qp->q_first == NULL &&
+	if (!must_queue && qp->q_first == NULL &&
 	    bcanputnext(RD(zfd_switch(qp)), mp->b_band)) {
-		DBG("wput: putting message to other side\n");
 		putnext(RD(zfd_switch(qp)), mp);
 	} else {
-		DBG("wput: putting msg onto queue\n");
-		(void) putq(qp, mp);
+		(void) putq(RD(zfd_switch(qp)), mp);
 	}
 
 	DBG1("done wput, %s side", zfd_side(qp));
 }
 
 /*
- * For primary stream:
- * rsrv(9E) is symmetric for master and slave, so zfd_rsrv() handles both
- * without splitting up the codepath.
+ * Read server
  *
- * Enable the write side of the partner.  This triggers the partner to send
+ * For primary stream:
+ * Under normal execution rsrv(9E) is symmetric for master and slave, so
+ * zfd_rsrv() can handle both without splitting up the codepath. We do this by
+ * enabling the write side of the partner.  This triggers the partner to send
  * messages queued on its write side to this queue's read side.
  *
+ * However, once we've flow controlled the write side, messages will be enqueued
+ * in the read queue (see zfd_wput). Once flow control is turned off on the
+ * write side, we need to drain these queued messages out to the reader.
+ *
  * For log stream:
- * Internally we've queue up the msgs that we've teed off to the log stream
+ * Internally we've queued up the msgs that we've teed off to the log stream
  * so when we're invoked we need to pass these along.
  */
 static void
@@ -942,8 +1055,9 @@ zfd_rsrv(queue_t *qp)
 
 		log_qp = RD(zfds->zfd_slave_rdq);
 
-		if (zfds->zfd_log_inst != NULL &&
-		    (zfds->zfd_log_inst->zfd_state & ZFD_STATE_SOPEN) != 0) {
+		if ((zfds->zfd_state & ZFD_STATE_SOPEN) != 0) {
+			zfd_state_t *pzfds = zfds->zfd_inst_pri;
+
 			while ((mp = getq(qp)) != NULL) {
 				if (bcanputnext(log_qp, mp->b_band)) {
 					putnext(log_qp, mp);
@@ -951,6 +1065,13 @@ zfd_rsrv(queue_t *qp)
 					(void) putbq(log_qp, mp);
 					break;
 				}
+			}
+
+			if (log_qp->q_count < log_qp->q_lowat) {
+				DTRACE_PROBE(zfd__flow__on);
+				pzfds->zfd_is_flowcon = B_FALSE;
+				if (pzfds->zfd_master_rdq != NULL)
+					qenable(RD(pzfds->zfd_master_rdq));
 			}
 		} else {
 			/* No longer open, drain the queue */
@@ -960,6 +1081,44 @@ zfd_rsrv(queue_t *qp)
 			flushq(qp, FLUSHALL);
 		}
 		return;
+	}
+
+	/*
+	 * If the master read side has data queued up due to flow control we
+	 * try to drain that out now. This is subtly different from the code in
+	 * zfd_wsrv since we're not switching sides for the zfd queues, instead
+	 * we're just passing data out of this driver
+	 */
+	if (zfds->zfd_muxt == ZFD_PRIMARY_STREAM &&
+	    qp == zfds->zfd_master_rdq &&
+	    qp->q_count > 0) {
+		/* serve the reader */
+		mblk_t *mp;
+
+		while ((mp = getq(qp)) != NULL) {
+			unsigned char type = mp->b_datap->db_type;
+			boolean_t must_queue;
+
+			/* high-priority msgs are not subject to flow control */
+			if (zfds->zfd_is_flowcon && type == M_DATA) {
+				must_queue = B_TRUE;
+			} else {
+				must_queue = B_FALSE;
+			}
+
+			/*
+			 * Note that we're not switching sides here!
+			 */
+			if (!must_queue && bcanputnext(qp, mp->b_band)) {
+				putnext(qp, mp);
+
+				/* tee output to any attached log stream */
+				zfd_tee_handler(qp, zfds, type, mp);
+			} else {
+				(void) putbq(qp, mp);
+				break;
+			}
+		}
 	}
 
 	/*
@@ -975,6 +1134,8 @@ zfd_rsrv(queue_t *qp)
 }
 
 /*
+ * Write server
+ *
  * This routine is symmetric for master and slave, so it handles both without
  * splitting up the codepath.
  *
