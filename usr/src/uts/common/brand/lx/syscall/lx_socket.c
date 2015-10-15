@@ -1670,6 +1670,7 @@ lx_socket_sendmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop,
 	}
 
 	error = SOP_SENDMSG(so, msg, uiop, cr);
+
 	switch (error) {
 	case EINTR:
 	case ENOMEM:
@@ -1682,10 +1683,18 @@ lx_socket_sendmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop,
 		break;
 
 	case ENOTCONN:
+		/*
+		 * The rules are different for non-blocking sockets which are
+		 * still in the process of making a connection
+		 */
+		if ((msg->msg_flags & MSG_DONTWAIT) != 0) {
+			error = EAGAIN;
+			break;
+		}
+
 		/* Appease LTP and match behavior detailed in the man page */
 		error = EPIPE;
 		/* FALLTHROUGH */
-
 	case EPIPE:
 		if (nosig == B_FALSE) {
 			tsignal(curthread, SIGPIPE);
