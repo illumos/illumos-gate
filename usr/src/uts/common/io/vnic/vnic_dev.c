@@ -1094,7 +1094,6 @@ vnic_m_setprop(void *m_driver, const char *pr_name, mac_prop_id_t pr_num,
 		break;
 	}
 	case MAC_PROP_PRIVATE: {
-		link_state_t ls;
 		long val, i;
 		const char *v;
 
