@@ -145,6 +145,7 @@ struct virtio_softc {
 	int			sc_intr_num;
 	boolean_t		sc_intr_config;
 	int			sc_intr_cap;
+	int			sc_int_type;
 };
 
 struct virtio_int_handler {
