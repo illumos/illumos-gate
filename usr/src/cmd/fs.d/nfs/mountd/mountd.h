@@ -60,18 +60,35 @@ extern struct sh_list *share_list;
 extern rwlock_t sharetab_lock;
 extern void check_sharetab(void);
 
+struct cln;
 extern void log_cant_reply(SVCXPRT *);
+extern void log_cant_reply_cln(struct cln *);
 
 extern void *exmalloc(size_t);
 
 extern struct share *findentry(char *);
-extern int check_client(struct share *, struct netbuf *,
-    struct nd_hostservlist *, int, uid_t, gid_t, uint_t, gid_t *, uid_t *,
-    gid_t *, uint_t *, gid_t **);
-extern struct nd_hostservlist *anon_client(char *host);
+extern int check_client(struct share *, struct cln *, int, uid_t, gid_t, uint_t,
+    gid_t *, uid_t *, gid_t *, uint_t *, gid_t **);
 
-extern int in_access_list(SVCXPRT *, struct netbuf **,
-    struct nd_hostservlist **, char *);
+extern int in_access_list(struct cln *, char *);
+
+struct cln {
+	SVCXPRT *transp;
+	char *netid;
+	struct netconfig *nconf;
+	struct netbuf *nbuf;
+	struct nd_hostservlist *clnames;
+	char *host;
+	int flags;
+};
+
+extern void cln_init(struct cln *, SVCXPRT *);
+extern void cln_init_lazy(struct cln *, char *, struct netbuf *);
+extern void cln_fini(struct cln *);
+extern struct netbuf *cln_getnbuf(struct cln *);
+extern struct nd_hostservlist *cln_getclientsnames(struct cln *);
+extern boolean_t cln_havehost(struct cln *);
+extern char *cln_gethost(struct cln *);
 
 /*
  * These functions are defined here due to the fact
