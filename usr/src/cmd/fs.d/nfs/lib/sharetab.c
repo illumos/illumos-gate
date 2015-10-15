@@ -20,6 +20,10 @@
  */
 
 /*
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ */
+
+/*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -31,8 +35,6 @@
  * Portions of this source code were derived from Berkeley 4.3 BSD
  * under license from the Regents of the University of California.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -175,9 +177,9 @@ getshareopt(char *optlist, char *opt)
 	if (b == NULL)
 		return (NULL);
 
-	while (p = (char *)strtok_r(b, ",", &lasts)) {
+	while ((p = strtok_r(b, ",", &lasts)) != NULL) {
 		b = NULL;
-		if (pe = strchr(p, '=')) {
+		if ((pe = strchr(p, '=')) != NULL) {
 			*pe = '\0';
 			if (strcmp(opt, p) == 0) {
 				val = strdup(pe + 1);
