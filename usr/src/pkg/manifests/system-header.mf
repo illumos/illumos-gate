@@ -1428,6 +1428,7 @@ file path=usr/include/sys/shm_impl.h
 file path=usr/include/sys/sid.h
 file path=usr/include/sys/siginfo.h
 file path=usr/include/sys/signal.h
+file path=usr/include/sys/signalfd.h
 file path=usr/include/sys/skein.h
 file path=usr/include/sys/sleepq.h
 file path=usr/include/sys/smbios.h

@@ -47,6 +47,7 @@
 #include <sys/list.h>
 #include <sys/avl.h>
 #include <sys/door_impl.h>
+#include <sys/signalfd.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -197,6 +198,7 @@ typedef struct	proc {
 	k_sigset_t p_extsig;		/* signals sent from another contract */
 	k_sigset_t p_ignore;		/* ignore when generated */
 	k_sigset_t p_siginfo;		/* gets signal info with signal */
+	void *p_sigfd;			/* signalfd support state */
 	struct sigqueue *p_sigqueue;	/* queued siginfo structures */
 	struct sigqhdr *p_sigqhdr;	/* hdr to sigqueue structure pool */
 	struct sigqhdr *p_signhdr;	/* hdr to signotify structure pool */

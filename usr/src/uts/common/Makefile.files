@@ -993,6 +993,8 @@ DEVPOOL_OBJS += devpool.o
 
 EVENTFD_OBJS +=	eventfd.o
 
+SIGNALFD_OBJS += signalfd.o
+
 I8042_OBJS +=	i8042.o
 
 KB8042_OBJS +=	\

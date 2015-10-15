@@ -60,6 +60,7 @@
 #include <sys/cyclic.h>
 #include <sys/dtrace.h>
 #include <sys/sdt.h>
+#include <sys/signalfd.h>
 
 const k_sigset_t nullsmask = {0, 0, 0};
 
@@ -93,6 +94,12 @@ const k_sigset_t holdvfork =
 
 static	int	isjobstop(int);
 static	void	post_sigcld(proc_t *, sigqueue_t *);
+
+
+/*
+ * signalfd helper function which is set when the signalfd driver loads.
+ */
+void (*sigfd_exit_helper)();
 
 /*
  * Internal variables for counting number of user thread stop requests posted.
@@ -307,6 +314,11 @@ sigtoproc(proc_t *p, kthread_t *t, int sig)
 		(void) eat_signal(t, sig);
 		thread_unlock(t);
 		DTRACE_PROC2(signal__send, kthread_t *, t, int, sig);
+		if (p->p_sigfd != NULL && ((sigfd_proc_state_t *)
+		    (p->p_sigfd))->sigfd_pollwake_cb != NULL)
+			(*((sigfd_proc_state_t *)(p->p_sigfd))->
+			    sigfd_pollwake_cb)(p, sig);
+
 	} else if ((tt = p->p_tlist) != NULL) {
 		/*
 		 * Make sure that some lwp that already exists
@@ -345,6 +357,10 @@ sigtoproc(proc_t *p, kthread_t *t, int sig)
 		}
 
 		DTRACE_PROC2(signal__send, kthread_t *, tt, int, sig);
+		if (p->p_sigfd != NULL && ((sigfd_proc_state_t *)
+		    (p->p_sigfd))->sigfd_pollwake_cb != NULL)
+			(*((sigfd_proc_state_t *)(p->p_sigfd))->
+			    sigfd_pollwake_cb)(p, sig);
 	}
 }
 

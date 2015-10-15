@@ -164,7 +164,7 @@ typedef struct _kthread {
 	k_sigset_t	t_sig;		/* signals pending to this process */
 	k_sigset_t	t_extsig;	/* signals sent from another contract */
 	k_sigset_t	t_hold;		/* hold signal bit mask */
-	k_sigset_t	t_sigwait;	/* sigtimedwait() is accepting these */
+	k_sigset_t	t_sigwait;	/* sigtimedwait/sigfd accepting these */
 	struct	_kthread *t_forw;	/* process's forward thread link */
 	struct	_kthread *t_back;	/* process's backward thread link */
 	struct	_kthread *t_thlink;	/* tid (lwpid) lookup hash link */

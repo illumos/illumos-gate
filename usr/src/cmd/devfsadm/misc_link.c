@@ -92,6 +92,9 @@ static devfsadm_create_t misc_cbt[] = {
 	{ "pseudo", "ddi_pseudo", "eventfd",
 	    TYPE_EXACT | DRV_EXACT, ILEVEL_0, minor_name
 	},
+	{ "pseudo", "ddi_pseudo", "signalfd",
+	    TYPE_EXACT | DRV_EXACT, ILEVEL_0, minor_name
+	},
 	{ "pseudo", "ddi_pseudo", "rsm",
 	    TYPE_EXACT | DRV_EXACT, ILEVEL_0, minor_name
 	},
