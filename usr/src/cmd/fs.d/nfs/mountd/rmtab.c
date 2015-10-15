@@ -20,6 +20,10 @@
  */
 
 /*
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ */
+
+/*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -155,7 +159,7 @@ mntlist_delete(char *host, char *path)
 
 	(void) rw_wrlock(&rmtab_lock);
 
-	if (m = (struct mntentry *)h_get(mntlist, &mm)) {
+	if ((m = (struct mntentry *)h_get(mntlist, &mm)) != NULL) {
 		rmtab_delete(m->m_pos);
 
 		(void) h_delete(mntlist, m);
@@ -184,7 +188,7 @@ mntlist_delete_all(char *host)
 
 	iterator = h_iterator(mntlist);
 
-	while (m = (struct mntentry *)h_next(iterator)) {
+	while ((m = (struct mntentry *)h_next(iterator)) != NULL) {
 		if (strcasecmp(m->m_host, host))
 			continue;
 
@@ -321,7 +325,7 @@ rmtab_rewrite()
 		(void) fclose(rmtabf);
 
 	/* Rewrite the file. */
-	if (rmtabf = fopen(RMTAB, "w+")) {
+	if ((rmtabf = fopen(RMTAB, "w+")) != NULL) {
 		HASHSET_ITERATOR iterator;
 		struct mntentry *m;
 
@@ -331,7 +335,7 @@ rmtab_rewrite()
 
 		iterator = h_iterator(mntlist);
 
-		while (m = (struct mntentry *)h_next(iterator))
+		while ((m = (struct mntentry *)h_next(iterator)) != NULL)
 			m->m_pos = rmtab_insert(m->m_host, m->m_path);
 		if (iterator != NULL)
 			free(iterator);
@@ -432,7 +436,7 @@ rmtab_load()
 	 */
 	mntlist = h_create(mntentry_hash, mntentry_equal, 101, 0.75);
 
-	if (fp = fopen(RMTAB, "r")) {
+	if ((fp = fopen(RMTAB, "r")) != NULL) {
 		char buf[RMTAB_LOADLEN+1];
 		size_t len;
 
