@@ -196,9 +196,67 @@ dis_disassemble(dis_handle_t *dhp, uint64_t addr, char *buf, size_t buflen)
 	return (dhp->dh_arch->da_disassemble(dhp, addr, buf, buflen));
 }
 
+/*
+ * On some instruction sets (e.g., x86), we have no choice except to
+ * disassemble everything from the start of the symbol, and stop when we
+ * have reached our instruction address.  If we're not in the middle of a
+ * known symbol, then we return the same address to indicate failure.
+ */
+static uint64_t
+dis_generic_previnstr(dis_handle_t *dhp, uint64_t pc, int n)
+{
+	uint64_t *hist, addr, start;
+	int cur, nseen;
+	uint64_t res = pc;
+
+	if (n <= 0)
+		return (pc);
+
+	if (dhp->dh_lookup(dhp->dh_data, pc, NULL, 0, &start, NULL) != 0 ||
+	    start == pc)
+		return (res);
+
+	hist = dis_zalloc(sizeof (uint64_t) * n);
+
+	for (cur = 0, nseen = 0, addr = start; addr < pc; addr = dhp->dh_addr) {
+		hist[cur] = addr;
+		cur = (cur + 1) % n;
+		nseen++;
+
+		/* if we cannot make forward progress, give up */
+		if (dis_disassemble(dhp, addr, NULL, 0) != 0)
+			goto done;
+	}
+
+	if (addr != pc) {
+		/*
+		 * We scanned past %pc, but didn't find an instruction that
+		 * started at %pc.  This means that either the caller specified
+		 * an invalid address, or we ran into something other than code
+		 * during our scan.  Virtually any combination of bytes can be
+		 * construed as a valid Intel instruction, so any non-code bytes
+		 * we encounter will have thrown off the scan.
+		 */
+		goto done;
+	}
+
+	res = hist[(cur + n - MIN(n, nseen)) % n];
+
+done:
+	dis_free(hist, sizeof (uint64_t) * n);
+	return (res);
+}
+
+/*
+ * Return the nth previous instruction's address.  Return the same address
+ * to indicate failure.
+ */
 uint64_t
 dis_previnstr(dis_handle_t *dhp, uint64_t pc, int n)
 {
+	if (dhp->dh_arch->da_previnstr == NULL)
+		return (dis_generic_previnstr(dhp, pc, n));
+
 	return (dhp->dh_arch->da_previnstr(dhp, pc, n));
 }
 

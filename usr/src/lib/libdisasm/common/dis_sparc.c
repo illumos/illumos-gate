@@ -197,11 +197,6 @@ dis_sparc_min_instrlen(dis_handle_t *dhp)
 	return (4);
 }
 
-/*
- * The dis_i386.c comment for this says it returns the previous instruction,
- * however, I'm fairly sure it's actually returning the _address_ of the
- * nth previous instruction.
- */
 /* ARGSUSED */
 static uint64_t
 dis_sparc_previnstr(dis_handle_t *dhp, uint64_t pc, int n)

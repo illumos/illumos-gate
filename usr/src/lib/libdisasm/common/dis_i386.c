@@ -172,57 +172,6 @@ dis_i386_min_instrlen(dis_handle_t *dhp)
 	return (1);
 }
 
-/*
- * Return the previous instruction.  On x86, we have no choice except to
- * disassemble everything from the start of the symbol, and stop when we have
- * reached our instruction address.  If we're not in the middle of a known
- * symbol, then we return the same address to indicate failure.
- */
-static uint64_t
-dis_i386_previnstr(dis_handle_t *dhp, uint64_t pc, int n)
-{
-	uint64_t *hist, addr, start;
-	int cur, nseen;
-	uint64_t res = pc;
-
-	if (n <= 0)
-		return (pc);
-
-	if (dhp->dh_lookup(dhp->dh_data, pc, NULL, 0, &start, NULL) != 0 ||
-	    start == pc)
-		return (res);
-
-	hist = dis_zalloc(sizeof (uint64_t) * n);
-
-	for (cur = 0, nseen = 0, addr = start; addr < pc; addr = dhp->dh_addr) {
-		hist[cur] = addr;
-		cur = (cur + 1) % n;
-		nseen++;
-
-		/* if we cannot make forward progress, give up */
-		if (dis_disassemble(dhp, addr, NULL, 0) != 0)
-			goto done;
-	}
-
-	if (addr != pc) {
-		/*
-		 * We scanned past %pc, but didn't find an instruction that
-		 * started at %pc.  This means that either the caller specified
-		 * an invalid address, or we ran into something other than code
-		 * during our scan.  Virtually any combination of bytes can be
-		 * construed as a valid Intel instruction, so any non-code bytes
-		 * we encounter will have thrown off the scan.
-		 */
-		goto done;
-	}
-
-	res = hist[(cur + n - MIN(n, nseen)) % n];
-
-done:
-	dis_free(hist, sizeof (uint64_t) * n);
-	return (res);
-}
-
 static int
 dis_i386_supports_flags(int flags)
 {
@@ -249,7 +198,6 @@ dis_arch_t dis_arch_i386 = {
 	.da_handle_attach	= dis_i386_handle_attach,
 	.da_handle_detach	= dis_i386_handle_detach,
 	.da_disassemble		= dis_i386_disassemble,
-	.da_previnstr		= dis_i386_previnstr,
 	.da_min_instrlen	= dis_i386_min_instrlen,
 	.da_max_instrlen	= dis_i386_max_instrlen,
 	.da_instrlen		= dis_i386_instrlen,
