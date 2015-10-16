@@ -22,7 +22,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 ISASRCDIR=../$(MACH)/
 
@@ -35,5 +34,3 @@ INSTALL_DEPS_library = $(ROOTLINKS64) $(ROOTLINT64) $(ROOTLIBS64)
 INSTALL_DEPS_standalone = $(ROOTLIBS64)
 
 include ../Makefile.targ
-
-C99MODE = $(C99_ENABLE)
