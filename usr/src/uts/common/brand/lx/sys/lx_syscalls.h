@@ -46,6 +46,7 @@ extern long lx_clock_settime();
 extern long lx_connect();
 extern long lx_epoll_create();
 extern long lx_epoll_create1();
+extern long lx_epoll_ctl();
 extern long lx_epoll_pwait();
 extern long lx_epoll_wait();
 extern long lx_fallocate();

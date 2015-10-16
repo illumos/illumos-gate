@@ -23,11 +23,24 @@
 #include <sys/devpoll.h>
 #include <sys/fcntl.h>
 #include <sys/file.h>
+#include <sys/ddi.h>
 #include <sys/sunddi.h>
 #include <sys/sunldi.h>
 #include <sys/vnode.h>
 #include <sys/lx_brand.h>
 #include <sys/lx_types.h>
+
+static major_t devpoll_major = 0;
+
+static boolean_t
+lx_epoll_isvalid(file_t *fp)
+{
+	vnode_t *vp = fp->f_vnode;
+
+	if (vp->v_type == VCHR && getmajor(vp->v_rdev) == devpoll_major)
+		return (B_TRUE);
+	return (B_FALSE);
+}
 
 long
 lx_epoll_create1(int flags)
@@ -64,6 +77,8 @@ lx_epoll_create1(int flags)
 		goto error;
 	}
 
+	devpoll_major = getmajor(vp->v_rdev);
+
 	fp->f_vnode = vp;
 	mutex_exit(&fp->f_tlock);
 	setf(fd, fp);
@@ -93,6 +108,93 @@ lx_epoll_create(int size)
 	return (lx_epoll_create1(0));
 }
 
+
+/* Match values from libc implementation */
+#define	EPOLLIGNORED 	(EPOLLMSG | EPOLLWAKEUP)
+#define	EPOLLSWIZZLED	\
+	(EPOLLRDHUP | EPOLLONESHOT | EPOLLET | EPOLLWRBAND | EPOLLWRNORM)
+
+long
+lx_epoll_ctl(int fd, int op, int pfd, void *event)
+{
+	epoll_event_t epevent;
+	dvpoll_epollfd_t dpevent[2];
+	file_t *fp;
+	iovec_t aiov;
+	uio_t auio;
+	uint32_t events, ev = 0;
+	int error = 0, i = 0;
+
+	dpevent[i].dpep_pollfd.fd = pfd;
+	switch (op) {
+	case EPOLL_CTL_DEL:
+		dpevent[i].dpep_pollfd.events = POLLREMOVE;
+		break;
+
+	case EPOLL_CTL_MOD:
+		/*
+		 * In the modify case, we pass down two events:  one to
+		 * remove the event and another to add it back.
+		 */
+		dpevent[i++].dpep_pollfd.events = POLLREMOVE;
+		dpevent[i].dpep_pollfd.fd = pfd;
+		/* FALLTHROUGH */
+
+	case EPOLL_CTL_ADD:
+		if (copyin(event, &epevent, sizeof (epevent)) != 0)
+			return (set_errno(EFAULT));
+
+		/*
+		 * Mask off the events that we ignore, and then swizzle the
+		 * events for which our values differ from their epoll(7)
+		 * equivalents.
+		 */
+		events = epevent.events;
+		ev = events & ~(EPOLLIGNORED | EPOLLSWIZZLED);
+
+		if (events & EPOLLRDHUP)
+			ev |= POLLRDHUP;
+		if (events & EPOLLET)
+			ev |= POLLET;
+		if (events & EPOLLONESHOT)
+			ev |= POLLONESHOT;
+		if (events & EPOLLWRNORM)
+			ev |= POLLWRNORM;
+		if (events & EPOLLWRBAND)
+			ev |= POLLWRBAND;
+
+		dpevent[i].dpep_data = epevent.data.u64;
+		dpevent[i].dpep_pollfd.events = ev;
+		break;
+
+	default:
+		return (set_errno(EINVAL));
+	}
+
+	if ((fp = getf(fd)) == NULL) {
+		return (set_errno(EBADF));
+	} else if (!lx_epoll_isvalid(fp)) {
+		releasef(fd);
+		return (set_errno(EINVAL));
+	}
+
+	aiov.iov_base = (void *)dpevent;
+	aiov.iov_len = sizeof (dvpoll_epollfd_t) * (i + 1);
+	auio.uio_iov = &aiov;
+	auio.uio_iovcnt = 1;
+	auio.uio_resid = aiov.iov_len;
+	auio.uio_segflg = UIO_SYSSPACE;
+	auio.uio_loffset = 0;
+	auio.uio_fmode = fp->f_flag;
+
+	error = VOP_WRITE(fp->f_vnode, &auio, 1, fp->f_cred, NULL);
+
+	releasef(fd);
+	if (error)
+		return (set_errno(error));
+	return (0);
+}
+
 long
 lx_epoll_wait(int fd, void *events, int maxevents, int timeout)
 {
@@ -105,6 +207,9 @@ lx_epoll_wait(int fd, void *events, int maxevents, int timeout)
 	}
 	if ((fp = getf(fd)) == NULL) {
 		return (set_errno(EBADF));
+	} else if (!lx_epoll_isvalid(fp)) {
+		releasef(fd);
+		return (set_errno(EINVAL));
 	}
 
 	arg.dp_nfds = maxevents;
@@ -133,6 +238,9 @@ lx_epoll_pwait(int fd, void *events, int maxevents, int timeout, void *sigmask)
 	}
 	if ((fp = getf(fd)) == NULL) {
 		return (set_errno(EBADF));
+	} else if (!lx_epoll_isvalid(fp)) {
+		releasef(fd);
+		return (set_errno(EINVAL));
 	}
 
 	arg.dp_nfds = maxevents;
