@@ -1081,8 +1081,6 @@ $(sparc_ONLY)file path=platform/sun4u/kernel/misc/$(ARCH64)/sbd group=sys \
     mode=0755
 $(sparc_ONLY)file path=platform/sun4u/kernel/misc/$(ARCH64)/vis group=sys \
     mode=0755
-$(sparc_ONLY)file path=platform/sun4u/kernel/misc/$(ARCH64)/zuluvm group=sys \
-    mode=0755
 $(sparc_ONLY)file path=platform/sun4u/kernel/strmod/$(ARCH64)/kb group=sys \
     mode=0755
 $(sparc_ONLY)file path=platform/sun4u/kernel/tod/$(ARCH64)/todblade group=sys \

@@ -575,7 +575,9 @@ plat_get_cpu_unum(int cpuid, char *buf, int buflen, int *lenp)
 }
 
 /*
- * The zuluvm module requires a dmv interrupt for each installed zulu board.
+ * The zuluvm module required a dmv interrupt for each installed
+ * Zulu/XVR-4000 board.  The following has not been updated during the
+ * removal of zuluvm and therefore it may be suboptimal.
  */
 void
 plat_dmv_params(uint_t *hwint, uint_t *swint)
