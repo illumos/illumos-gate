@@ -272,9 +272,21 @@ dis_max_instrlen(dis_handle_t *dhp)
 	return (dhp->dh_arch->da_max_instrlen(dhp));
 }
 
+static int
+dis_generic_instrlen(dis_handle_t *dhp, uint64_t pc)
+{
+	if (dis_disassemble(dhp, pc, NULL, 0) != 0)
+		return (-1);
+
+	return (dhp->dh_addr - pc);
+}
+
 int
 dis_instrlen(dis_handle_t *dhp, uint64_t pc)
 {
+	if (dhp->dh_arch->da_instrlen == NULL)
+		return (dis_generic_instrlen(dhp, pc));
+
 	return (dhp->dh_arch->da_instrlen(dhp, pc));
 }
 

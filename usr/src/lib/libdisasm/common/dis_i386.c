@@ -184,15 +184,6 @@ dis_i386_supports_flags(int flags)
 	return (0);
 }
 
-static int
-dis_i386_instrlen(dis_handle_t *dhp, uint64_t pc)
-{
-	if (dis_disassemble(dhp, pc, NULL, 0) != 0)
-		return (-1);
-
-	return (dhp->dh_addr - pc);
-}
-
 dis_arch_t dis_arch_i386 = {
 	.da_supports_flags	= dis_i386_supports_flags,
 	.da_handle_attach	= dis_i386_handle_attach,
@@ -200,5 +191,4 @@ dis_arch_t dis_arch_i386 = {
 	.da_disassemble		= dis_i386_disassemble,
 	.da_min_instrlen	= dis_i386_min_instrlen,
 	.da_max_instrlen	= dis_i386_max_instrlen,
-	.da_instrlen		= dis_i386_instrlen,
 };
