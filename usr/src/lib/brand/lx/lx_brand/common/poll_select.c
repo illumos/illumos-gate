@@ -40,7 +40,6 @@
 #include <sys/brand.h>
 #include <sys/poll.h>
 #include <sys/syscall.h>
-#include <sys/epoll.h>
 #include <sys/lx_debug.h>
 #include <sys/lx_poll.h>
 #include <sys/lx_syscall.h>
@@ -287,36 +286,4 @@ err:
 	if (sfds != NULL)
 		free(sfds);
 	return (res);
-}
-
-long
-lx_epoll_ctl(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4)
-{
-	int epfd = (int)p1;
-	int op = (int)p2;
-	int fd = (int)p3;
-	int rval;
-	struct epoll_event ev;
-
-	/*
-	 * Linux limits the max number of open files to 1m so we can also test
-	 * for this.
-	 */
-	if (epfd < 0 || fd < 0 || epfd > (1024 * 1024) || fd > (1024 * 1024))
-		return (-EBADF);
-
-	if (epfd == fd)
-		return (-EINVAL);
-
-	/*
-	 * Unlike the base epoll_ctl, we need to return a fault if the
-	 * event pointer is invalid.
-	 */
-	if (op != EPOLL_CTL_DEL) {
-		if (uucopy((void *)p4, &ev, sizeof (ev)) != 0)
-			return (-errno);
-	}
-
-	rval = epoll_ctl(epfd, op, fd, (struct epoll_event *)p4);
-	return ((rval < 0) ? -errno : rval);
 }

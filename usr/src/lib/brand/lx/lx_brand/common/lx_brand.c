@@ -1173,7 +1173,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_clock_nanosleep,		/* 230: clock_nanosleep */
 	lx_group_exit,			/* 231: exit_group */
 	NULL,				/* 232: epoll_wait */
-	lx_epoll_ctl,			/* 233: epoll_ctl */
+	NULL,				/* 233: epoll_ctl */
 	NULL,				/* 234: tgkill */
 	lx_utimes,			/* 235: utimes */
 	NULL,				/* 236: vserver */
@@ -1526,7 +1526,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_group_exit,			/* 252: group_exit */
 	NULL,				/* 253: lookup_dcookie */
 	NULL,				/* 254: epoll_create */
-	lx_epoll_ctl,			/* 255: epoll_ctl */
+	NULL,				/* 255: epoll_ctl */
 	NULL,				/* 256: epoll_wait */
 	NULL,				/* 257: remap_file_pages */
 	NULL,				/* 258: set_tid_address */

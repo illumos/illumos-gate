@@ -778,7 +778,7 @@ lx_sysent_t lx_sysent32[] = {
 	{"group_exit",	NULL,			0,		1}, /* 252 */
 	{"lookup_dcookie", NULL,		NOSYS_NO_EQUIV,	0}, /* 253 */
 	{"epoll_create", lx_epoll_create,	0,		1}, /* 254 */
-	{"epoll_ctl",	NULL,			0,		4}, /* 255 */
+	{"epoll_ctl",	lx_epoll_ctl,		0,		4}, /* 255 */
 	{"epoll_wait",	lx_epoll_wait,		0,		4}, /* 256 */
 	{"remap_file_pages", NULL,		NOSYS_NO_EQUIV,	0}, /* 257 */
 	{"set_tid_address", lx_set_tid_address,	0,		1}, /* 258 */
@@ -1127,7 +1127,7 @@ lx_sysent_t lx_sysent64[] = {
 	{"clock_nanosleep", NULL,		0,		4}, /* 230 */
 	{"exit_group",	NULL,			0,		1}, /* 231 */
 	{"epoll_wait",	lx_epoll_wait,		0,		4}, /* 232 */
-	{"epoll_ctl",	NULL,			0,		4}, /* 233 */
+	{"epoll_ctl",	lx_epoll_ctl,		0,		4}, /* 233 */
 	{"tgkill",	lx_tgkill,		0,		3}, /* 234 */
 	{"utimes",	NULL,			0,		2}, /* 235 */
 	{"vserver",	NULL,			NOSYS_NULL,	0}, /* 236 */
