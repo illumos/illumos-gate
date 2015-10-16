@@ -35,14 +35,17 @@
  *
  * The mode, which is controlled by the zone attribute "zlog-mode" is somewhat
  * of a misnomer since its purpose has evolved. The attribute currently
- * can have four values, with misleading names due to backward compatability,
- * but which are used to control how many zfd devices are created inside the
- * zone, and to control if the output on the device(s) is also teed into
- * another stream within the zone. All output is always logged in the GZ.
- * See the comment in uts/common/io/zfd.c for more details.
+ * can have six values which are used to control:
+ *    - how many zfd devices are created inside the zone
+ *    - if the output on the device(s) is also teed into another stream within
+ *      the zone
+ *    - if we do logging in the GZ
+ * See the comment on get_mode() in this file, and the comment in
+ * uts/common/io/zfd.c for more details.
  *
- * Internally the zfd_mode_t struct holds the number of stdio devs (1 or 3) and
- * the number of additional devs corresponding to the zone attr value.
+ * Internally the zfd_mode_t struct holds the number of stdio devs (1 or 3),
+ * the number of additional devs corresponding to the zone attr value and the
+ * GZ logging flag.
  */
 
 #include <sys/types.h>
@@ -98,6 +101,7 @@ static int eventstream[2] = {-1, -1};
 typedef struct zfd_mode {
 	uint_t		zmode_n_stddevs;
 	uint_t		zmode_n_addl_devs;
+	boolean_t	zmode_gzlogging;
 } zfd_mode_t;
 static zfd_mode_t mode;
 
@@ -1202,7 +1206,7 @@ srvr(void *modearg)
 	int len;
 	char ibuf[BUFSIZ + 1];
 
-	if (!shutting_down)
+	if (!shutting_down && mode->zmode_gzlogging)
 		open_logfile();
 
 	/*
@@ -1301,9 +1305,22 @@ death:
 }
 
 /*
- * The value strings we're matching on don't make a lot of sense for how
- * this is used internally, but we're stuck with these values for legacy
- * compatability.
+ * The meaning of the original legacy values for the zlog-mode evolved over
+ * time, to the point where the old names no longer made sense. The current
+ * values are simply positional letters used to indicate various capabilities.
+ * The following table shows the meaning of the mode values, along with the
+ * legacy name which we continue to support for compatability. Any future
+ * capability can add a letter to the left and '-' is implied for existing
+ * strings.
+ *
+ * zlog-mode    gz log - tty - ngz log
+ * ---------    ------   ---   -------
+ * gt- (int)       y      y       n
+ * g-- (log)       y      n       n
+ * gtn (nlint)     y      y       y
+ * g-n (nolog)     y      n       y
+ * -t-             n      y       n
+ * ---             n      n       n
  */
 static void
 get_mode(zfd_mode_t *mode)
@@ -1323,21 +1340,34 @@ get_mode(zfd_mode_t *mode)
 		goto done;
 	while (zonecfg_getattrent(handle, &attr) == Z_OK) {
 		if (strcmp(ZLOG_MODE, attr.zone_attr_name) == 0) {
-			if (strncmp("log", attr.zone_attr_value, 3) == 0) {
+			if (strcmp("g--", attr.zone_attr_value) == 0 ||
+			    strncmp("log", attr.zone_attr_value, 3) == 0) {
+				mode->zmode_gzlogging = B_TRUE;
 				mode->zmode_n_stddevs = 3;
 				mode->zmode_n_addl_devs = 0;
-			} else if (strncmp("nolog",
-			    attr.zone_attr_value, 5) == 0) {
+			} else if (strcmp("g-n", attr.zone_attr_value) == 0 ||
+			    strncmp("nolog", attr.zone_attr_value, 5) == 0) {
+				mode->zmode_gzlogging = B_TRUE;
 				mode->zmode_n_stddevs = 3;
 				mode->zmode_n_addl_devs = 2;
-			} else if (strncmp("int",
-			    attr.zone_attr_value, 3) == 0) {
+			} else if (strcmp("gt-", attr.zone_attr_value) == 0 ||
+			    strncmp("int", attr.zone_attr_value, 3) == 0) {
+				mode->zmode_gzlogging = B_TRUE;
 				mode->zmode_n_stddevs = 1;
 				mode->zmode_n_addl_devs = 0;
-			} else if (strncmp("nlint",
-			    attr.zone_attr_value, 5) == 0) {
+			} else if (strcmp("gtn", attr.zone_attr_value) == 0 ||
+			    strncmp("nlint", attr.zone_attr_value, 5) == 0) {
+				mode->zmode_gzlogging = B_TRUE;
 				mode->zmode_n_stddevs = 1;
 				mode->zmode_n_addl_devs = 1;
+			} else if (strcmp("-t-", attr.zone_attr_value) == 0) {
+				mode->zmode_gzlogging = B_FALSE;
+				mode->zmode_n_stddevs = 1;
+				mode->zmode_n_addl_devs = 0;
+			} else if (strcmp("---", attr.zone_attr_value) == 0) {
+				mode->zmode_gzlogging = B_FALSE;
+				mode->zmode_n_stddevs = 3;
+				mode->zmode_n_addl_devs = 0;
 			}
 			break;
 		}
