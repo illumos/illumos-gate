@@ -245,12 +245,12 @@ dis_i386_instrlen(dis_handle_t *dhp, uint64_t pc)
 }
 
 dis_arch_t dis_arch_i386 = {
-	dis_i386_supports_flags,
-	dis_i386_handle_attach,
-	dis_i386_handle_detach,
-	dis_i386_disassemble,
-	dis_i386_previnstr,
-	dis_i386_min_instrlen,
-	dis_i386_max_instrlen,
-	dis_i386_instrlen,
+	.da_supports_flags	= dis_i386_supports_flags,
+	.da_handle_attach	= dis_i386_handle_attach,
+	.da_handle_detach	= dis_i386_handle_detach,
+	.da_disassemble		= dis_i386_disassemble,
+	.da_previnstr		= dis_i386_previnstr,
+	.da_min_instrlen	= dis_i386_min_instrlen,
+	.da_max_instrlen	= dis_i386_max_instrlen,
+	.da_instrlen		= dis_i386_instrlen,
 };
