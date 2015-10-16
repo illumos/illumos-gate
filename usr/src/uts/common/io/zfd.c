@@ -53,27 +53,31 @@
  *
  * The zone's zfd device configuration is driven by zoneadmd and a zone mode.
  * The mode, which is controlled by the zone attribute "zlog-mode" is somewhat
- * of a misnomer since its purpose has evolved. The attribute currently
- * can have four values, with misleading names due to backward compatability,
- * but which are used to control how many zfd devices are created inside the
- * zone.
+ * of a misnomer since its purpose has evolved. The attribute can have a
+ * variety of values, but the lowest two positions are used to control how many
+ * zfd devices are created inside the zone and if the primary stream is a tty.
  *
  * Here is a summary of how the 4 modes control what zfd devices are created
  * and how they're used:
  *
- *    log:    3 stdio zdevs (0, 1, 2), not configured as a tty
- *    int:    1 stdio zdev  (0) configured as a tty
- *    nolog:  3 stdio zdevs (0, 1, 2), 2 additional zdevs (3, 4)
- *    nlint:  1 stdio zdev  (0) configured as a tty, 1 additional zdev (1)
+ *    t-:  1 stdio zdev  (0) configured as a tty
+ *    --:  3 stdio zdevs (0, 1, 2), not configured as a tty
+ *    tn:  1 stdio zdev  (0) configured as a tty, 1 additional zdev (1)
+ *    -n:  3 stdio zdevs (0, 1, 2), not tty, 2 additional zdevs (3, 4)
  *
- * When the zone is configured for nolog or nlint then it is assumed logging
- * will be done within the zone itself. In this configuration 1 or 2 additional
- * zfd devices are created within the zone for use by a logging process. An
- * application can then configure the zfd streams driver into a multiplexer so
- * that anything written within the zone to the stdout/stderr zfd's will be
- * teed into the correspond logging zfd's within the zone.
+ * With the 't' flag set, stdin/out/err is multiplexed onto a single full-duplex
+ * stream which is configured as a tty. That is, ptem, ldterm and ttycompat are
+ * autopushed onto the stream when the slave side is opened. There is only a
+ * single zfd dev (0) needed for the primary stream.
  *
- * The following is a diagram of how this works for a nolog configuration:
+ * When the 'n' flag is set, it is assumed that output logging will be done
+ * within the zone itself. In this configuration 1 or 2 additional zfd devices,
+ * depending on tty mode ('t' flag) are created within the zone. An application
+ * can then configure the zfd streams driver into a multiplexer. Output from
+ * the stdout/stderr zfd(s) will be teed into the correspond logging zfd(s)
+ * within the zone.
+ *
+ * The following is a diagram of how this works for a '-n' configuration:
  *
  *
  *              zoneadmd (for zlogin -I stdout)
@@ -86,12 +90,6 @@
  *
  * There would be a similar path for the app's stderr into zfd4 for the logger
  * to consume stderr.
- *
- * In an interactive configuration stdin/out/err is multiplexed onto a single
- * full-duplex stream which is configured as a tty (ptem, ldterm and ttycompat
- * are pushed onto the stream). There is only a single zfd dev (0) needed
- * for the primary stream, and a single zfd dev (1) for the logger to consume
- * stdout/err.
  */
 
 #include <sys/types.h>
@@ -236,7 +234,7 @@ typedef struct zfd_state {
 	boolean_t zfd_allow_flowcon;	/* use flow control */
 	zfd_mux_type_t zfd_muxt;	/* state type: none, primary, log */
 	struct zfd_state *zfd_inst_pri; /* log state's primary ptr */
-	struct zfd_state *zfs_inst_log;	/* primary state's log ptr */
+	struct zfd_state *zfd_inst_log;	/* primary state's log ptr */
 } zfd_state_t;
 
 #define	ZFD_STATE_MOPEN	0x01
@@ -329,7 +327,7 @@ zfd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	zfds->zfd_devinfo = dip;
 	zfds->zfd_tty = 0;
 	zfds->zfd_muxt = ZFD_NO_MUX;
-	zfds->zfs_inst_log = NULL;
+	zfds->zfd_inst_log = NULL;
 	return (DDI_SUCCESS);
 }
 
@@ -755,7 +753,7 @@ zfd_tee_handler(queue_t *qp, zfd_state_t *zfds, unsigned char type, mblk_t *mp)
 	if (type != M_DATA)
 		return;
 
-	log_zfds = zfds->zfs_inst_log;
+	log_zfds = zfds->zfd_inst_log;
 	if (log_zfds == NULL)
 		return;
 
@@ -908,7 +906,7 @@ zfd_wput(queue_t *qp, mblk_t *mp)
 			zfds->zfd_muxt = ZFD_LOG_STREAM;
 			zfds->zfd_inst_pri = prim_zfds;
 			prim_zfds->zfd_muxt = ZFD_PRIMARY_STREAM;
-			prim_zfds->zfs_inst_log = zfds;
+			prim_zfds->zfd_inst_log = zfds;
 			mutex_exit(&zfd_mux_lock);
 			DTRACE_PROBE2(zfd__mux__link, void *, prim_zfds,
 			    void *, zfds);
