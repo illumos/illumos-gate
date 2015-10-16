@@ -143,7 +143,9 @@ dis_flags_clear(dis_handle_t *dhp, int f)
 void
 dis_handle_destroy(dis_handle_t *dhp)
 {
-	dhp->dh_arch->da_handle_detach(dhp);
+	if (dhp->dh_arch->da_handle_detach != NULL)
+		dhp->dh_arch->da_handle_detach(dhp);
+
 	dis_free(dhp, sizeof (dis_handle_t));
 }
 
@@ -181,7 +183,8 @@ dis_handle_create(int flags, void *data, dis_lookup_f lookup_func,
 	 * Allow the architecture-specific code to allocate
 	 * its private data.
 	 */
-	if (arch->da_handle_attach(dhp) != 0) {
+	if (arch->da_handle_attach != NULL &&
+	    arch->da_handle_attach(dhp) != 0) {
 		dis_free(dhp, sizeof (dis_handle_t));
 		/* dis errno already set */
 		return (NULL);
