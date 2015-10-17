@@ -41,9 +41,6 @@
 
 	To do:
 	- display resolved TXTRecord
-
-ident	"%Z%%M%	%I%	%E% SMI"
-
  */
 
 
@@ -57,7 +54,7 @@ import javax.swing.event.*;
 import com.apple.dnssd.*;
 
 
-class	BrowserApp implements ListSelectionListener, ResolveListener
+class	BrowserApp implements ListSelectionListener, ResolveListener, Runnable
 {
 	static BrowserApp	app;
 	JFrame				frame;
@@ -66,6 +63,8 @@ class	BrowserApp implements ListSelectionListener, ResolveListener
 	JList				domainPane, servicesPane, servicePane;
 	DNSSDService		servicesBrowser, serviceBrowser, domainBrowser;
 	JLabel				hostLabel, portLabel;
+	String				hostNameForUpdate;
+	int					portForUpdate;
 
 	public		BrowserApp()
 	{
@@ -173,22 +172,43 @@ class	BrowserApp implements ListSelectionListener, ResolveListener
 										serviceList.getNthServiceName( newSel), 
 										serviceList.getNthRegType( newSel), 
 										serviceList.getNthDomain( newSel), 
-										new SwingResolveListener( this));
+										this);
 				}
 			}
 		}
 		catch ( Exception ex) { terminateWithException( ex); }
 	}
 
+	public void run()
+	{
+		hostLabel.setText( hostNameForUpdate);
+		portLabel.setText( String.valueOf( portForUpdate));		
+	}
+
 	public void	serviceResolved( DNSSDService resolver, int flags, int ifIndex, String fullName, 
 								String hostName, int port, TXTRecord txtRecord)
 	{
-		hostLabel.setText( hostName);
-		portLabel.setText( String.valueOf( port));
+		// We want to update GUI on the AWT event dispatching thread, but we can't stop
+		// the resolve from that thread, since stop() is synchronized with this callback.
+		// So, we stop the resolve on this thread, then invokeAndWait on the AWT event thread.
+
+		resolver.stop();
+
+		hostNameForUpdate = hostName;
+		portForUpdate = port;
+
+		try {
+			SwingUtilities.invokeAndWait(this);
+		}
+		catch ( Exception e)
+		{
+			e.printStackTrace();
+		}
 	}
 
 	public void	operationFailed( DNSSDService service, int errorCode)
 	{
+		service.stop();
 		// handle failure here
 	}
 

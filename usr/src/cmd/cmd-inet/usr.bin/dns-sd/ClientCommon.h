@@ -1,6 +1,6 @@
-/* -*- Mode: Java; tab-width: 4 -*-
+/* -*- Mode: C; tab-width: 4 -*-
  *
- * Copyright (c) 2004 Apple Computer, Inc. All rights reserved.
+ * Copyright (c) 2008 Apple Inc. All rights reserved.
  *
  * Disclaimer: IMPORTANT:  This Apple software is supplied to you by Apple Computer, Inc.
  * ("Apple") in consideration of your agreement to the following terms, and your
@@ -38,79 +38,4 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-
-import javax.swing.*;
-import com.apple.dnssd.*;
-
-
-/**	Use this to schedule DomainListener callbacks via SwingUtilities.invokeAndWait(). */
-
-public class SwingDomainListener implements Runnable, DomainListener
-{
-	/** Create a listener for DNSSD that will call your listener on the Swing/AWT event thread. */
-	public	SwingDomainListener( DomainListener listener)
-	{ fListener = listener; fErrorCode = 0; }
-
-	/** (Clients should not call this method directly.) */
-	public void	operationFailed( DNSSDService service, int errorCode)
-	{
-		fEnumerator = service;
-		fErrorCode = errorCode;
-		this.schedule();
-	}
-
-	/** (Clients should not call this method directly.) */
-	public void		domainFound( DNSSDService domainEnum, int flags, int ifIndex, String domain)
-
-	{
-		fEnumerator = domainEnum;
-		fIsAdd = true;
-		fFlags = flags;
-		fIndex = ifIndex;
-		fDomain = domain;
-		this.schedule();
-	}
-
-	/** (Clients should not call this method directly.) */
-	public void		domainLost( DNSSDService domainEnum, int flags, int ifIndex, String domain)
-	{
-		fEnumerator = domainEnum;
-		fIsAdd = false;
-		fFlags = flags;
-		fIndex = ifIndex;
-		fDomain = domain;
-		this.schedule();
-	}
-
-	/** (Clients should not call this method directly.) */
-	public void		run()
-	{
-		if ( fErrorCode != 0)
-			fListener.operationFailed( fEnumerator, fErrorCode);
-		else if ( fIsAdd)
-			fListener.domainFound( fEnumerator, fFlags, fIndex, fDomain);
-		else
-			fListener.domainLost( fEnumerator, fFlags, fIndex, fDomain);
-	}
-
-	protected void	schedule()
-	{		
-		try {
-			SwingUtilities.invokeAndWait( this);
-		}
-		catch ( Exception e)
-		{
-			e.printStackTrace();
-		}
-	}
-
-	protected DomainListener	fListener;
-
-	protected boolean			fIsAdd;
-	protected DNSSDService		fEnumerator;
-	protected int				fFlags;
-	protected int				fIndex;
-	protected int				fErrorCode;
-	protected String			fDomain;
-}
-
+extern const char *GetNextLabel(const char *cstr, char label[64]);

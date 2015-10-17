@@ -13,21 +13,6 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
-
-    Change History (most recent first):
-
-$Log: QueryListener.java,v $
-Revision 1.3  2006/08/14 23:25:08  cheshire
-Re-licensed mDNSResponder daemon source code under Apache License, Version 2.0
-
-Revision 1.2  2004/04/30 21:48:27  rpantos
-Change line endings for CVS.
-
-Revision 1.1  2004/04/30 16:29:35  rpantos
-First checked in.
-
-ident	"%Z%%M%	%I%	%E% SMI"
-
  */
 
 
@@ -38,13 +23,16 @@ package	com.apple.dnssd;
 
 public interface QueryListener extends BaseListener
 {
-	/** Called when a record query has been completed.<P> 
+	/** Called when a record query has been completed. Inspect flags 
+	    parameter to determine nature of query event.<P> 
 
 		@param	query
 					The active query object.
 		<P>
 		@param	flags
-					Possible values are DNSSD.MORE_COMING.
+					If kDNSServiceFlagsAdd bit is set, this is a newly discovered answer; 
+					otherwise this is a previously discovered answer which has expired.
+					Other possible values are DNSSD.MORE_COMING.
 		<P>
 		@param	ifIndex
 					The interface on which the query was resolved. (The index for a given 

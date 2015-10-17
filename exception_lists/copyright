@@ -30,6 +30,11 @@ exception_lists/closed-bins
 exception_lists/copyright
 exception_lists/cstyle
 exception_lists/hdrchk
+usr/src/cmd/cmd-inet/usr.bin/dns-sd/ClientCommon.c
+usr/src/cmd/cmd-inet/usr.bin/dns-sd/ClientCommon.h
+usr/src/cmd/cmd-inet/usr.bin/dns-sd/dns-sd.c
+usr/src/cmd/cmd-inet/usr.lib/mdnsd/THIRDPARTYLICENSE
+usr/src/cmd/cmd-inet/usr.lib/mdnsd/*.[ch]
 usr/src/cmd/dtrace/test/tst/common/*/*.out
 usr/src/cmd/krb5/kadmin/cli/kadmin_ct.c
 usr/src/cmd/krb5/kadmin/cli/kadmin.h
@@ -340,6 +345,11 @@ usr/src/lib/krb5/ss/mit-sipb-copyright.h
 usr/src/lib/krb5/ss/options.c
 usr/src/lib/krb5/ss/std_rqs.c
 usr/src/lib/krb5/ss/utils.c
+usr/src/lib/libdns_sd/THIRDPARTYLICENSE
+usr/src/lib/libdns_sd/common/*.[ch]
+usr/src/lib/libdns_sd/java/common/JNISupport.c
+usr/src/lib/libdns_sd/java/com/apple/dnssd/*.java
+usr/src/lib/libdns_sd/java/com/apple/dnssd/docs/examples/src/*
 usr/src/lib/librstp/common/*.[ch]
 usr/src/lib/librstp/common/[CRT]*
 # these have copyrights that the nit checker doesn't grok

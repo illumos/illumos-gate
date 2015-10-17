@@ -1,6 +1,6 @@
-/* -*- Mode: Java; tab-width: 4 -*-
+/* -*- Mode: C; tab-width: 4 -*-
  *
- * Copyright (c) 2004 Apple Computer, Inc. All rights reserved.
+ * Copyright (c) 2008 Apple Inc. All rights reserved.
  *
  * Disclaimer: IMPORTANT:  This Apple software is supplied to you by Apple Computer, Inc.
  * ("Apple") in consideration of your agreement to the following terms, and your
@@ -38,79 +38,38 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <ctype.h>
+#include <stdio.h>          // For stdout, stderr
 
-import javax.swing.*;
-import com.apple.dnssd.*;
+#include "ClientCommon.h"
 
-
-/**	Use this to schedule DomainListener callbacks via SwingUtilities.invokeAndWait(). */
-
-public class SwingDomainListener implements Runnable, DomainListener
+const char *GetNextLabel(const char *cstr, char label[64])
 {
-	/** Create a listener for DNSSD that will call your listener on the Swing/AWT event thread. */
-	public	SwingDomainListener( DomainListener listener)
-	{ fListener = listener; fErrorCode = 0; }
-
-	/** (Clients should not call this method directly.) */
-	public void	operationFailed( DNSSDService service, int errorCode)
-	{
-		fEnumerator = service;
-		fErrorCode = errorCode;
-		this.schedule();
-	}
-
-	/** (Clients should not call this method directly.) */
-	public void		domainFound( DNSSDService domainEnum, int flags, int ifIndex, String domain)
-
-	{
-		fEnumerator = domainEnum;
-		fIsAdd = true;
-		fFlags = flags;
-		fIndex = ifIndex;
-		fDomain = domain;
-		this.schedule();
-	}
-
-	/** (Clients should not call this method directly.) */
-	public void		domainLost( DNSSDService domainEnum, int flags, int ifIndex, String domain)
-	{
-		fEnumerator = domainEnum;
-		fIsAdd = false;
-		fFlags = flags;
-		fIndex = ifIndex;
-		fDomain = domain;
-		this.schedule();
-	}
-
-	/** (Clients should not call this method directly.) */
-	public void		run()
-	{
-		if ( fErrorCode != 0)
-			fListener.operationFailed( fEnumerator, fErrorCode);
-		else if ( fIsAdd)
-			fListener.domainFound( fEnumerator, fFlags, fIndex, fDomain);
-		else
-			fListener.domainLost( fEnumerator, fFlags, fIndex, fDomain);
-	}
-
-	protected void	schedule()
-	{		
-		try {
-			SwingUtilities.invokeAndWait( this);
-		}
-		catch ( Exception e)
-		{
-			e.printStackTrace();
-		}
-	}
-
-	protected DomainListener	fListener;
-
-	protected boolean			fIsAdd;
-	protected DNSSDService		fEnumerator;
-	protected int				fFlags;
-	protected int				fIndex;
-	protected int				fErrorCode;
-	protected String			fDomain;
+    char *ptr = label;
+    while (*cstr && *cstr != '.')               // While we have characters in the label...
+    {
+        char c = *cstr++;
+        if (c == '\\' && *cstr)                 // If we have a backslash, and it's not the last character of the string
+        {
+            c = *cstr++;
+            if (isdigit(cstr[-1]) && isdigit(cstr[0]) && isdigit(cstr[1]))
+            {
+                int v0 = cstr[-1] - '0';                        // then interpret as three-digit decimal
+                int v1 = cstr[ 0] - '0';
+                int v2 = cstr[ 1] - '0';
+                int val = v0 * 100 + v1 * 10 + v2;
+                // If valid three-digit decimal value, use it
+                // Note that although ascii nuls are possible in DNS labels
+                // we're building a C string here so we have no way to represent that
+                if (val == 0) val = '-';
+                if (val <= 255) { c = (char)val; cstr += 2; }
+            }
+        }
+        *ptr++ = c;
+        if (ptr >= label+64) { label[63] = 0; return(NULL); }   // Illegal label more than 63 bytes
+    }
+    *ptr = 0;                                                   // Null-terminate label text
+    if (ptr == label) return(NULL);                             // Illegal empty label
+    if (*cstr) cstr++;                                          // Skip over the trailing dot (if present)
+    return(cstr);
 }
-
