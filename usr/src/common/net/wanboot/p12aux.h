@@ -24,10 +24,12 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2015 by Delphix. All rights reserved.
+ */
+
 #ifndef	_P12AUX_H
 #define	_P12AUX_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <openssl/pkcs12.h>
 
@@ -42,7 +44,8 @@ extern "C" {
  *
  * My apologies.
  */
-DECLARE_STACK_OF(EVP_PKEY)
+/* LINTED */
+DECLARE_STACK_OF(EVP_PKEY);
 
 #define	sk_EVP_PKEY_new_null() SKM_sk_new_null(EVP_PKEY)
 #define	sk_EVP_PKEY_free(st) SKM_sk_free(EVP_PKEY, (st))
