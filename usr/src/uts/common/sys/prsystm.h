@@ -108,9 +108,9 @@ extern int  pr_watch_emul(struct regs *, caddr_t, enum seg_rw);
 extern void pr_free_watched_pages(proc_t *);
 extern int  pr_allstopped(proc_t *, int);
 #if defined(__sparc)
-struct _gwindows;
+struct gwindows;
 extern	int	prnwindows(klwp_t *);
-extern	void	prgetwindows(klwp_t *, struct _gwindows *);
+extern	void	prgetwindows(klwp_t *, struct gwindows *);
 #if defined(__sparcv9) /* 32-bit adb macros should not see these defs */
 extern	void	prgetasregs(klwp_t *, asrset_t);
 extern	void	prsetasregs(klwp_t *, asrset_t);

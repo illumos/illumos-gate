@@ -20,8 +20,6 @@
  */
 
 /*
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
- *
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -35,7 +33,7 @@
 #include <sys/feature_tests.h>
 
 #include <sys/types.h>
-#include <sys/mcontext.h>
+#include <sys/regset.h>
 #if !defined(_XPG4_2) || defined(__EXTENSIONS__)
 #include <sys/signal.h>
 #endif

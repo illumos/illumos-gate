@@ -208,7 +208,7 @@ call_user_handler(int sig, siginfo_t *sip, ucontext_t *ucp)
 
 		if (--fp->fpu_qcnt > 0) {
 			unsigned char i;
-			struct _fq *fqp;
+			struct fq *fqp;
 
 			fqp = fp->fpu_q;
 			for (i = 0; i < fp->fpu_qcnt; i++)

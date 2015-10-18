@@ -28,9 +28,6 @@
 
 #include <sys/regset.h>
 #include <sys/segments.h>
-#ifndef _ASM
-#include <sys/fp.h>	/* kfpu_t */
-#endif
 
 #ifdef	__cplusplus
 extern "C" {

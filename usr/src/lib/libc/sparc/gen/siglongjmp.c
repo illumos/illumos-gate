@@ -27,13 +27,14 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 #pragma weak _siglongjmp = siglongjmp
 
 #include "lint.h"
 #include <sys/types.h>
 #include <sys/stack.h>
 #include <sys/frame.h>
-#include <sys/regset.h>
 #include <memory.h>
 #include <ucontext.h>
 #include <setjmp.h>

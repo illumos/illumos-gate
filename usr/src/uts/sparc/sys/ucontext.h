@@ -20,8 +20,6 @@
  */
 
 /*
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
- *
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -35,7 +33,7 @@
 #include <sys/feature_tests.h>
 
 #include <sys/types.h>
-#include <sys/mcontext.h>
+#include <sys/regset.h>
 #if !defined(_XPG4_2) || defined(__EXTENSIONS__)
 #include <sys/signal.h>
 #endif
@@ -107,7 +105,7 @@ typedef struct ucontext32 {
 
 #ifdef _KERNEL
 extern void ucontext_32ton(const ucontext32_t *, ucontext_t *,
-    const struct fq32 *, struct _fq *);
+    const struct fq32 *, struct fq *);
 extern void fpuregset_nto32(const fpregset_t *, fpregset32_t *, struct fq32 *);
 #endif
 

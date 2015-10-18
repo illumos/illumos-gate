@@ -24,6 +24,8 @@
  * Use is subject to license terms.
  */
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/signal.h>
@@ -289,7 +291,7 @@ fp_disabled(struct regs *rp)
 		}
 		if (ftt = fp_emulator(&fpsd, (fp_inst_type *)rp->r_pc,
 		    rp, (ulong_t *)rp->r_sp, fp)) {
-			fp->fpu_q_entrysize = sizeof (struct _fpq);
+			fp->fpu_q_entrysize = sizeof (struct fpq);
 			fp_traps(&fpsd, ftt, rp);
 		}
 	}
@@ -318,7 +320,7 @@ void
 fp_runq(struct regs *rp)
 {
 	kfpu_t *fp = lwptofpu(curthread->t_lwp);
-	struct _fq *fqp = fp->fpu_q;
+	struct fq *fqp = fp->fpu_q;
 	fp_simd_type fpsd;
 	uint64_t gsr = get_gsr(fp);
 
@@ -343,7 +345,7 @@ fp_runq(struct regs *rp)
 			 */
 			if (fqp != fp->fpu_q) {
 				int i;
-				struct _fq *fqdp;
+				struct fq *fqdp;
 
 				/*
 				 * We need to normalize the floating queue so
@@ -357,7 +359,7 @@ fp_runq(struct regs *rp)
 				}
 				fqp = fp->fpu_q;
 			}
-			fp->fpu_q_entrysize = sizeof (struct _fpq);
+			fp->fpu_q_entrysize = sizeof (struct fpq);
 
 			/*
 			 * fpu_simulator uses the fp registers directly but it
@@ -465,14 +467,14 @@ fp_precise(struct regs *rp)
 		 * problem for a restorecontext of a v8 fp queue on a
 		 * v9 system, which seems like the .000000001% case (on v9)!
 		 */
-		struct _fpq *pfpq = &fp->fpu_q->FQu.fpq;
+		struct fpq *pfpq = &fp->fpu_q->FQu.fpq;
 		fp_simd_type	fpsd;
 		int fptrap;
 
 		pfpq->fpq_addr = (uint_t *)rp->r_pc;
 		pfpq->fpq_instr = kluge.i;
 		fp->fpu_qcnt = 1;
-		fp->fpu_q_entrysize = sizeof (struct _fpq);
+		fp->fpu_q_entrysize = sizeof (struct fpq);
 
 		kpreempt_disable();
 		(void) flush_user_windows_to_stack(NULL);

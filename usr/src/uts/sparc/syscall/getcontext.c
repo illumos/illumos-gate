@@ -176,7 +176,7 @@ int
 getsetcontext(int flag, void *arg)
 {
 	ucontext_t uc;
-	struct _fq fpu_q[MAXFPQ]; /* to hold floating queue */
+	struct fq fpu_q[MAXFPQ]; /* to hold floating queue */
 	fpregset_t *fpp;
 	gwindows_t *gwin = NULL;	/* to hold windows */
 	caddr_t xregs = NULL;
@@ -214,7 +214,7 @@ getsetcontext(int flag, void *arg)
 		 * a later setcontext(2).
 		 */
 		uc.uc_mcontext.fpregs.fpu_qcnt = 0;
-		uc.uc_mcontext.fpregs.fpu_q = (struct _fq *)NULL;
+		uc.uc_mcontext.fpregs.fpu_q = (struct fq *)NULL;
 
 		if (copyout(&uc, arg, sizeof (ucontext_t)))
 			return (set_errno(EFAULT));
@@ -255,7 +255,7 @@ getsetcontext(int flag, void *arg)
 			if ((fpp->fpu_q) && (fpp->fpu_qcnt)) {
 				if (fpp->fpu_qcnt > MAXFPQ ||
 				    fpp->fpu_q_entrysize <= 0 ||
-				    fpp->fpu_q_entrysize > sizeof (struct _fq))
+				    fpp->fpu_q_entrysize > sizeof (struct fq))
 					return (set_errno(EINVAL));
 				if (copyin(fpp->fpu_q, fpu_q,
 				    fpp->fpu_qcnt * fpp->fpu_q_entrysize))
@@ -424,7 +424,7 @@ getsetcontext32(int flag, void *arg)
 {
 	ucontext32_t uc;
 	ucontext_t   ucnat;
-	struct _fq fpu_qnat[MAXFPQ]; /* to hold "native" floating queue */
+	struct fq fpu_qnat[MAXFPQ]; /* to hold "native" floating queue */
 	struct fq32 fpu_q[MAXFPQ]; /* to hold 32 bit floating queue */
 	fpregset32_t *fpp;
 	gwindows32_t *gwin = NULL;	/* to hold windows */

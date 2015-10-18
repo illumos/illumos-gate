@@ -72,7 +72,7 @@ typedef struct machpcb {
 	int	mpcb_wbcnt;	/* number of saved windows in pcb_wbuf */
 	uint_t	mpcb_wstate;	/* per-lwp %wstate */
 	kfpu_t	*mpcb_fpu; /* fpu state */
-	struct	_fq mpcb_fpu_q[_MAXFPQ]; /* fpu exception queue */
+	struct	fq mpcb_fpu_q[MAXFPQ]; /* fpu exception queue */
 	caddr_t	mpcb_illexcaddr; /* address of last illegal instruction */
 	uint_t	mpcb_illexcinsn; /* last illegal instruction */
 	uint_t	mpcb_illexccnt; /* count of illegal instruction attempts */

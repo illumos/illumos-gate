@@ -19,8 +19,6 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
- *
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -170,91 +168,6 @@ extern "C" {
 	"\20\20fz\17ru\16rd\15pm\14um\13om\12zm\11dm"	\
 	"\10im\7daz\6pe\5ue\4oe\3ze\2de\1ie"
 
-/*
- * This structure is written to memory by an 'fnsave' instruction
- */
-struct fnsave_state {
-	uint16_t	f_fcw;
-	uint16_t	__f_ign0;
-	uint16_t	f_fsw;
-	uint16_t	__f_ign1;
-	uint16_t	f_ftw;
-	uint16_t	__f_ign2;
-	uint32_t	f_eip;
-	uint16_t	f_cs;
-	uint16_t	f_fop;
-	uint32_t	f_dp;
-	uint16_t	f_ds;
-	uint16_t	__f_ign3;
-	union {
-		uint16_t fpr_16[5];	/* 80-bits of x87 state */
-	} f_st[8];
-};	/* 108 bytes */
-
-/*
- * This structure is written to memory by an 'fxsave' instruction
- * Note the variant behaviour of this instruction between long mode
- * and legacy environments!
- */
-struct fxsave_state {
-	uint16_t	fx_fcw;
-	uint16_t	fx_fsw;
-	uint16_t	fx_fctw;	/* compressed tag word */
-	uint16_t	fx_fop;
-#if defined(__amd64)
-	uint64_t	fx_rip;
-	uint64_t	fx_rdp;
-#else
-	uint32_t	fx_eip;
-	uint16_t	fx_cs;
-	uint16_t	__fx_ign0;
-	uint32_t	fx_dp;
-	uint16_t	fx_ds;
-	uint16_t	__fx_ign1;
-#endif
-	uint32_t	fx_mxcsr;
-	uint32_t	fx_mxcsr_mask;
-	union {
-		uint16_t fpr_16[5];	/* 80-bits of x87 state */
-		u_longlong_t fpr_mmx;	/* 64-bit mmx register */
-		uint32_t __fpr_pad[4];	/* (pad out to 128-bits) */
-	} fx_st[8];
-#if defined(__amd64)
-	upad128_t	fx_xmm[16];	/* 128-bit registers */
-	upad128_t	__fx_ign2[6];
-#else
-	upad128_t	fx_xmm[8];	/* 128-bit registers */
-	upad128_t	__fx_ign2[14];
-#endif
-};	/* 512 bytes */
-
-/*
- * This structure is written to memory by an 'xsave' instruction.
- * First 512 byte is compatible with the format of an 'fxsave' area.
- */
-struct xsave_state {
-	struct fxsave_state	xs_fxsave;
-	uint64_t		xs_xstate_bv;	/* 512 */
-	uint64_t		xs_rsv_mbz[2];
-	uint64_t		xs_reserved[5];
-	upad128_t		xs_ymm[16];	/* avx - 576 */
-};	/* 832 bytes, asserted in fpnoextflt() */
-
-/*
- * Kernel's FPU save area
- */
-typedef struct {
-	union _kfpu_u {
-		struct fxsave_state kfpu_fx;
-#if defined(__i386)
-		struct fnsave_state kfpu_fn;
-#endif
-		struct xsave_state kfpu_xs;
-	} kfpu_u;
-	uint32_t kfpu_status;		/* saved at #mf exception */
-	uint32_t kfpu_xstatus;		/* saved at #xm exception */
-} kfpu_t;
-
 extern int fp_kind;		/* kind of fp support			*/
 extern int fp_save_mech;	/* fp save/restore mechanism		*/
 extern int fpu_exists;		/* FPU hw exists			*/
@@ -275,6 +188,9 @@ extern void fpxsave_ctxt(void *);
 extern void xsave_ctxt(void *);
 extern void (*fpsave_ctxt)(void *);
 
+struct fnsave_state;
+struct fxsave_state;
+struct xsave_state;
 extern void fxsave_insn(struct fxsave_state *);
 extern void fpsave(struct fnsave_state *);
 extern void fprestore(struct fnsave_state *);

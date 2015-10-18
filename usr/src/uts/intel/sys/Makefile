@@ -56,7 +56,6 @@ HDRS	=			\
 	mc_intel.h		\
 	mca_amd.h		\
 	mca_x86.h		\
-	mcontext.h		\
 	mutex_impl.h		\
 	obpdefs.h		\
 	old_procfs.h		\

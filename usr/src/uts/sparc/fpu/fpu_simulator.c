@@ -29,7 +29,6 @@
 #include <sys/fpu/globals.h>
 #include <sys/fpu/fpusystm.h>
 #include <sys/proc.h>
-#include <sys/regset.h>
 #include <sys/signal.h>
 #include <sys/siginfo.h>
 #include <sys/thread.h>

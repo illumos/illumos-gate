@@ -27,6 +27,8 @@
 #ifndef _SYS_FPU_FPUSYSTM_H
 #define	_SYS_FPU_FPUSYSTM_H
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 /*
  * ISA-dependent FPU interfaces
  */
@@ -37,7 +39,7 @@ extern "C" {
 
 #ifdef _KERNEL
 
-struct _fpu;
+struct fpu;
 struct regs;
 
 #if !defined(DEBUG) && !defined(NEED_FPU_EXISTS)

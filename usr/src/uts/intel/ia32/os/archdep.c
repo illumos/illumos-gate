@@ -193,7 +193,7 @@ fpregset_to_fxsave(const fpregset_t *fp, struct fxsave_state *fx)
 #if defined(__amd64)
 	bcopy(fp, fx, sizeof (*fx));
 #else
-	const struct _fpchip_state *fc = &fp->fp_reg_set.fpchip_state;
+	const struct fpchip_state *fc = &fp->fp_reg_set.fpchip_state;
 
 	fnsave_to_fxsave((const struct fnsave_state *)fc, fx);
 	fx->fx_mxcsr = fc->mxcsr;
@@ -214,7 +214,7 @@ fxsave_to_fpregset(const struct fxsave_state *fx, fpregset_t *fp)
 #if defined(__amd64)
 	bcopy(fx, fp, sizeof (*fx));
 #else
-	struct _fpchip_state *fc = &fp->fp_reg_set.fpchip_state;
+	struct fpchip_state *fc = &fp->fp_reg_set.fpchip_state;
 
 	fxsave_to_fnsave(fx, (struct fnsave_state *)fc);
 	fc->mxcsr = fx->fx_mxcsr;

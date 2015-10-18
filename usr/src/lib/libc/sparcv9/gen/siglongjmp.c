@@ -32,7 +32,6 @@
 #include <sys/types.h>
 #include <sys/stack.h>
 #include <sys/frame.h>
-#include <sys/regset.h>
 #include <memory.h>
 #include <ucontext.h>
 #include <setjmp.h>

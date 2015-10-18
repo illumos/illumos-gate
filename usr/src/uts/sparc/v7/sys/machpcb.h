@@ -26,6 +26,8 @@
 #ifndef _SYS_MACHPCB_H
 #define	_SYS_MACHPCB_H
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 #include <sys/stack.h>
 #include <sys/regset.h>
 #include <sys/privregs.h>
@@ -69,8 +71,8 @@ typedef struct machpcb {
 	int	mpcb_uwm;	/* user window mask */
 	int	mpcb_swm;	/* shared user/kernel window mask */
 	int	mpcb_wbcnt;	/* number of saved windows in pcb_wbuf */
-	struct	_fpu mpcb_fpu;	/* fpu state */
-	struct	_fq mpcb_fpu_q[_MAXFPQ]; /* fpu exception queue */
+	struct	fpu mpcb_fpu;	/* fpu state */
+	struct	fq mpcb_fpu_q[MAXFPQ]; /* fpu exception queue */
 	int	mpcb_flags;	/* various state flags */
 	int	mpcb_wocnt;	/* window overflow count */
 	int	mpcb_wucnt;	/* window underflow count */

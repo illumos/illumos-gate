@@ -455,7 +455,7 @@ extern enum ftt_type fp_emulator(
 	fp_inst_type	*pinst,    /* Pointer to FPU instruction to simulate. */
 	struct regs	*pregs,    /* Pointer to PCB image of registers. */
 	struct rwindow	*pwindow,  /* Pointer to locals and ins. */
-	struct _fpu	*pfpu);	   /* Pointer to FPU register block. */
+	struct fpu	*pfpu);	   /* Pointer to FPU register block. */
 
 /*
  * fp_traps handles passing exception conditions to the kernel.

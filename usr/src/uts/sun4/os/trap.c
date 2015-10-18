@@ -1366,7 +1366,7 @@ fpu_trap(struct regs *rp, caddr_t addr, uint32_t type, uint32_t code)
 	int mstate;
 	char *badaddr;
 	kfpu_t *fp;
-	struct _fpq *pfpq;
+	struct fpq *pfpq;
 	uint32_t inst;
 	utrap_handler_t *utrapp;
 
@@ -1431,7 +1431,7 @@ fpu_trap(struct regs *rp, caddr_t addr, uint32_t type, uint32_t code)
 			pfpq->fpq_addr = (uint32_t *)rp->r_pc;
 			pfpq->fpq_instr = inst;
 			fp->fpu_qcnt = 1;
-			fp->fpu_q_entrysize = sizeof (struct _fpq);
+			fp->fpu_q_entrysize = sizeof (struct fpq);
 #ifdef SF_V9_TABLE_28
 			/*
 			 * Spitfire and blackbird followed the SPARC V9 manual

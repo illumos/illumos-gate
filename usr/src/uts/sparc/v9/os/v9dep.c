@@ -73,7 +73,7 @@ static uint_t mkpsr(uint64_t tstate, uint32_t fprs);
 
 #ifdef _SYSCALL32_IMPL
 static void fpuregset_32ton(const fpregset32_t *src, fpregset_t *dest,
-    const struct fq32 *sfq, struct _fq *dfq);
+    const struct fq32 *sfq, struct fq *dfq);
 #endif /* _SYSCALL32_IMPL */
 
 /*
@@ -122,7 +122,7 @@ setfpregs(klwp_t *lwp, fpregset_t *fp)
 		 */
 		if (fp->fpu_qcnt > MAXFPQ) 	/* plug security holes */
 			fp->fpu_qcnt = MAXFPQ;
-		fp->fpu_q_entrysize = sizeof (struct _fq);
+		fp->fpu_q_entrysize = sizeof (struct fq);
 
 		/*
 		 * For v9 kernel, copy all of the fp regs.
@@ -1098,7 +1098,7 @@ sendsig(int sig, k_siginfo_t *sip, void (*hdlr)())
 		sulword_noerr(&fp->uc.uc_mcontext.gwins, (ulong_t)NULL);
 
 	if (fpq_size != 0) {
-		struct _fq *fqp = (struct _fq *)sp;
+		struct fq *fqp = (struct fq *)sp;
 		sulword_noerr(&fp->uc.uc_mcontext.fpregs.fpu_q, (ulong_t)fqp);
 		copyout_noerr(mpcb->mpcb_fpu_q, fqp, fpq_size);
 
@@ -1730,7 +1730,7 @@ fpuregset_nto32(const fpregset_t *src, fpregset32_t *dest, struct fq32 *dfq)
 	dest->fpu_en = src->fpu_en;
 
 	if ((src->fpu_qcnt) && (dfq != NULL)) {
-		struct _fq *sfq = src->fpu_q;
+		struct fq *sfq = src->fpu_q;
 		for (i = 0; i < src->fpu_qcnt; i++, dfq++, sfq++) {
 			dfq->FQu.fpq.fpq_addr =
 			    (caddr32_t)(uintptr_t)sfq->FQu.fpq.fpq_addr;
@@ -1748,7 +1748,7 @@ fpuregset_nto32(const fpregset_t *src, fpregset32_t *dest, struct fq32 *dfq)
  */
 static void
 fpuregset_32ton(const fpregset32_t *src, fpregset_t *dest,
-    const struct fq32 *sfq, struct _fq *dfq)
+    const struct fq32 *sfq, struct fq *dfq)
 {
 	int i;
 
@@ -1758,7 +1758,7 @@ fpuregset_32ton(const fpregset32_t *src, fpregset_t *dest,
 	dest->fpu_q = dfq;
 	dest->fpu_fsr = (uint64_t)src->fpu_fsr;
 	if ((dest->fpu_qcnt = src->fpu_qcnt) > 0)
-		dest->fpu_q_entrysize = sizeof (struct _fpq);
+		dest->fpu_q_entrysize = sizeof (struct fpq);
 	else
 		dest->fpu_q_entrysize = 0;
 	dest->fpu_en = src->fpu_en;
@@ -1774,7 +1774,7 @@ fpuregset_32ton(const fpregset32_t *src, fpregset_t *dest,
 
 void
 ucontext_32ton(const ucontext32_t *src, ucontext_t *dest,
-    const struct fq32 *sfq, struct _fq *dfq)
+    const struct fq32 *sfq, struct fq *dfq)
 {
 	int i;
 

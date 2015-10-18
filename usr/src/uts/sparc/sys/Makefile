@@ -22,6 +22,8 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
 
 include ../../../Makefile.master
 
@@ -39,7 +41,6 @@ HDRS=  \
 	machlock.h	\
 	machsig.h	\
 	machtypes.h	\
-	mcontext.h	\
 	old_procfs.h	\
 	pcb.h		\
 	procfs_isa.h	\
