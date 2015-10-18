@@ -1,6 +1,15 @@
-/*	$Id: st.c,v 1.11 2014/08/10 23:54:41 schwarze Exp $ */
+#include "config.h"
+
+#if HAVE_REALLOCARRAY
+
+int dummy;
+
+#else
+
+/*	$Id: compat_reallocarray.c,v 1.4 2014/12/11 09:05:01 schwarze Exp $	*/
+/*	$OpenBSD: reallocarray.c,v 1.2 2014/12/08 03:45:00 bcook Exp $	*/
 /*
- * Copyright (c) 2009 Kristaps Dzonsons <kristaps@bsd.lv>
+ * Copyright (c) 2008 Otto Moerbeek <otto@drijf.net>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -14,23 +23,27 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
-#include "config.h"
 
 #include <sys/types.h>
+#include <errno.h>
+#include <stdint.h>
+#include <stdlib.h>
 
-#include <string.h>
+/*
+ * This is sqrt(SIZE_MAX+1), as s1*s2 <= SIZE_MAX
+ * if both s1 < MUL_NO_OVERFLOW and s2 < MUL_NO_OVERFLOW
+ */
+#define MUL_NO_OVERFLOW	((size_t)1 << (sizeof(size_t) * 4))
 
-#include "mdoc.h"
-#include "libmdoc.h"
-
-#define LINE(x, y) \
-	if (0 == strcmp(p, x)) return(y);
-
-const char *
-mdoc_a2st(const char *p)
+void *
+reallocarray(void *optr, size_t nmemb, size_t size)
 {
-
-#include "st.in"
-
-	return(NULL);
+	if ((nmemb >= MUL_NO_OVERFLOW || size >= MUL_NO_OVERFLOW) &&
+	    nmemb > 0 && SIZE_MAX / nmemb < size) {
+		errno = ENOMEM;
+		return NULL;
+	}
+	return realloc(optr, size * nmemb);
 }
+
+#endif /*!HAVE_REALLOCARRAY*/

@@ -22,8 +22,8 @@
 /*
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012, Josef 'Jeff' Sipek <jeffpc@31bits.net>. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989  AT&T.	*/
@@ -1193,7 +1193,6 @@ format(char *path, char *dir, char *name, char *pg)
 	char		manpname[MAXPATHLEN], catpname[MAXPATHLEN];
 	char		cmdbuf[BUFSIZ], tmpbuf[BUFSIZ];
 	char		*cattool;
-	int		utf8 = 0;
 	struct stat	sbman, sbcat;
 
 	found++;
@@ -1227,22 +1226,16 @@ format(char *path, char *dir, char *name, char *pg)
 	else
 		cattool = "cat";
 
-	/* Preprocess UTF-8 input with preconv (could be smarter) */
-	if (strstr(path, "UTF-8") != NULL)
-		utf8 = 1;
-
 	if (psoutput) {
 		(void) snprintf(cmdbuf, BUFSIZ,
-		    "cd %s; %s %s%s | mandoc -Tps | lp -Tpostscript",
-		    path, cattool, manpname,
-		    utf8 ? " | " PRECONV " -e UTF-8" : "");
+		    "cd %s; %s %s | mandoc -Tps | lp -Tpostscript",
+		    path, cattool, manpname);
 		DPRINTF("-- Using manpage: %s\n", manpname);
 		goto cmd;
 	} else if (lintout) {
 		(void) snprintf(cmdbuf, BUFSIZ,
-		    "cd %s; %s %s%s | mandoc -Tlint",
-		    path, cattool, manpname,
-		    utf8 ? " | " PRECONV " -e UTF-8" : "");
+		    "cd %s; %s %s | mandoc -Tlint",
+		    path, cattool, manpname);
 		DPRINTF("-- Linting manpage: %s\n", manpname);
 		goto cmd;
 	}
@@ -1262,10 +1255,8 @@ format(char *path, char *dir, char *name, char *pg)
 	DPRINTF("-- Using manpage: %s\n", manpname);
 	if (manwidth > 0)
 		(void) snprintf(tmpbuf, BUFSIZ, "-Owidth=%d ", manwidth);
-	(void) snprintf(cmdbuf, BUFSIZ, "cd %s; %s %s%s | mandoc -T%s %s| %s",
-	    path, cattool, manpname,
-	    utf8 ? " | " PRECONV " -e UTF-8 " : "",
-	    utf8 ? "utf8" : "ascii", (manwidth > 0) ? tmpbuf : "", pager);
+	(void) snprintf(cmdbuf, BUFSIZ, "cd %s; %s %s | mandoc %s| %s",
+	    path, cattool, manpname, (manwidth > 0) ? tmpbuf : "", pager);
 
 cmd:
 	DPRINTF("-- Command: %s\n", cmdbuf);

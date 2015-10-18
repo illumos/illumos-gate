@@ -1,6 +1,7 @@
-/*	$Id: vol.in,v 1.6 2010/06/19 20:46:28 kristaps Exp $ */
+/*	$Id: mandoc_aux.h,v 1.3 2014/12/01 04:05:32 schwarze Exp $ */
 /*
- * Copyright (c) 2009 Kristaps Dzonsons <kristaps@bsd.lv>
+ * Copyright (c) 2009, 2011 Kristaps Dzonsons <kristaps@bsd.lv>
+ * Copyright (c) 2014 Ingo Schwarze <schwarze@openbsd.org>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -15,21 +16,14 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-/*
- * This file defines volume titles for .Dt.
- *
- * Be sure to escape strings.
- */
+__BEGIN_DECLS
 
-LINE("USD",		"User\'s Supplementary Documents")
-LINE("PS1",		"Programmer\'s Supplementary Documents")
-LINE("AMD",		"Ancestral Manual Documents")
-LINE("SMM",		"System Manager\'s Manual")
-LINE("URM",		"User\'s Reference Manual")
-LINE("PRM",		"Programmer\'s Manual")
-LINE("KM",		"Kernel Manual")
-LINE("IND",		"Manual Master Index")
-LINE("MMI",		"Manual Master Index")
-LINE("LOCAL",		"Local Manual")
-LINE("LOC",		"Local Manual")
-LINE("CON",		"Contributed Software Manual")
+int		  mandoc_asprintf(char **, const char *, ...);
+void		 *mandoc_calloc(size_t, size_t);
+void		 *mandoc_malloc(size_t);
+void		 *mandoc_realloc(void *, size_t);
+void		 *mandoc_reallocarray(void *, size_t, size_t);
+char		 *mandoc_strdup(const char *);
+char		 *mandoc_strndup(const char *, size_t);
+
+__END_DECLS
