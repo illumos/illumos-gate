@@ -567,7 +567,7 @@ dmu_read(dnode_phys_t *dn, uint64_t blkid, void *buf, char *stack)
  */
 static int
 mzap_lookup(mzap_phys_t *zapobj, int objsize, const char *name,
-	uint64_t *value)
+    uint64_t *value)
 {
 	int i, chunks;
 	mzap_ent_phys_t *mzap_ent = zapobj->mz_chunk;
@@ -855,7 +855,7 @@ zap_iterate(dnode_phys_t *zap_dnode, zap_cb_t *cb, void *arg, char *stack)
  */
 static int
 dnode_get(dnode_phys_t *mdn, uint64_t objnum, uint8_t type, dnode_phys_t *buf,
-	char *stack)
+    char *stack)
 {
 	uint64_t blkid, blksz; /* the block id this object dnode is in */
 	int epbs; /* shift of number of dnodes in a block */

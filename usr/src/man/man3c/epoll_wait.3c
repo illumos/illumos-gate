@@ -29,7 +29,6 @@ epoll_wait, epoll_pwait \- wait for epoll events
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBepoll_wait()\fR function waits for events on the \fBepoll\fR(5)
 instance specified by \fIepfd\fR.  The \fIevents\fR parameter must point to
@@ -46,7 +45,6 @@ signal mask upon return, and is therefore similar to the relationship
 between \fBselect\fR(3C) and \fBpselect\fR(3C).
 
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, \fBepoll_wait()\fR and \fBepoll_pwait()\fR return
 the number of events, or 0 if none was pending and \fItimeout\fR milliseconds
@@ -54,7 +52,6 @@ elapsed.  If an error occurs, -1 is returned and errno is set to indicate
 the error.
 
 .SH ERRORS
-.sp
 .LP
 The \fBepoll_wait()\fR and \fBepoll_pwait()\fR functions will fail if:
 .sp
@@ -96,7 +93,6 @@ is not greater than zero.
 
 .sp
 .SH NOTES
-.sp
 .LP
 
 The \fBepoll\fR(5) facility is implemented for purposes of offering
@@ -106,7 +102,6 @@ applications should continue to prefer using event ports via the
 interfaces.  See \fBepoll\fR(5) for compatibility details and restrictions.
 
 .SH SEE ALSO
-.sp
 .LP
 \fBepoll_create\fR(3C), \fBepoll_ctl\fR(3C),
 \fBport_create\fR(3C), \fBport_associate\fR(3C), \fBport_get\fR(3C),

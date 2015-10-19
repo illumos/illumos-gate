@@ -57,6 +57,11 @@ CFLAGS		+= $(CCVERBOSE)
 CERRWARN	+= -_gcc=-Wno-uninitialized
 
 #
+# See uts/intel/poll/Makefile for why this is necessary.
+#
+LINTTAGS      += -erroff=E_BAD_PTR_CAST_ALIGN
+
+#
 #	Default build targets.
 #
 .KEEP_STATE:

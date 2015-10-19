@@ -431,10 +431,20 @@ timerfd_close(dev_t dev, int flag, int otyp, cred_t *cred_p)
 	return (0);
 }
 
-/*ARGSUSED*/
 static int
 timerfd_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 {
+	switch (cmd) {
+	case DDI_ATTACH:
+		break;
+
+	case DDI_RESUME:
+		return (DDI_SUCCESS);
+
+	default:
+		return (DDI_FAILURE);
+	}
+
 	mutex_enter(&timerfd_lock);
 
 	if (ddi_soft_state_init(&timerfd_softstate,

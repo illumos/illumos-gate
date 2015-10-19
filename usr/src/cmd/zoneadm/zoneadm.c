@@ -23,6 +23,7 @@
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2014 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2015, Joyent Inc. All rights reserved.
+ * Copyright (c) 2015 by Delphix. All rights reserved.
  */
 
 /*
@@ -3230,7 +3231,7 @@ done:
 
 static void
 warn_dev_match(zone_dochandle_t s_handle, char *source_zone,
-	zone_dochandle_t t_handle, char *target_zone)
+    zone_dochandle_t t_handle, char *target_zone)
 {
 	int err;
 	struct zone_devtab s_devtab;
@@ -3352,7 +3353,7 @@ print_fs_warnings(struct zone_fstab *s_fstab, struct zone_fstab *t_fstab)
 
 static void
 warn_fs_match(zone_dochandle_t s_handle, char *source_zone,
-	zone_dochandle_t t_handle, char *target_zone)
+    zone_dochandle_t t_handle, char *target_zone)
 {
 	int err;
 	struct zone_fstab s_fstab;
@@ -3396,7 +3397,7 @@ warn_fs_match(zone_dochandle_t s_handle, char *source_zone,
  */
 static void
 warn_ip_match(zone_dochandle_t s_handle, char *source_zone,
-	zone_dochandle_t t_handle, char *target_zone)
+    zone_dochandle_t t_handle, char *target_zone)
 {
 	int err;
 	struct zone_nwiftab s_nwiftab;
@@ -3451,7 +3452,7 @@ warn_ip_match(zone_dochandle_t s_handle, char *source_zone,
 
 static void
 warn_dataset_match(zone_dochandle_t s_handle, char *source,
-	zone_dochandle_t t_handle, char *target)
+    zone_dochandle_t t_handle, char *target)
 {
 	int err;
 	struct zone_dstab s_dstab;
@@ -3615,7 +3616,8 @@ copy_zone(char *src, char *dst)
 
 /* ARGSUSED */
 int
-zfm_print(const struct mnttab *p, void *r) {
+zfm_print(const struct mnttab *p, void *r)
+{
 	zerror("  %s\n", p->mnt_mountp);
 	return (0);
 }

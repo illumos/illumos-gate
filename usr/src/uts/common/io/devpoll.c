@@ -457,7 +457,8 @@ repoll:
 						ep->events |= EPOLLWRNORM;
 					}
 				} else {
-					pollstate_t *ps;
+					pollstate_t *ps =
+					    curthread->t_pollstate;
 					/*
 					 * The devpoll handle itself is being
 					 * polled.  Notify the caller of any
@@ -465,7 +466,7 @@ repoll:
 					 * state as possible untouched.
 					 */
 					VERIFY(fdcnt == 0);
-					VERIFY(ps = curthread->t_pollstate);
+					VERIFY(ps != NULL);
 
 					/*
 					 * If a call to pollunlock() fails
@@ -736,7 +737,7 @@ dpwrite(dev_t dev, struct uio *uiop, cred_t *credp)
 	 * Since the dpwrite() may recursively walk an added /dev/poll handle,
 	 * pollstate_enter() deadlock and loop detection must be used.
 	 */
-	pollstate_create();
+	(void) pollstate_create();
 	VERIFY(pollstate_enter(pcp) == PSE_SUCCESS);
 
 	if (pcp->pc_bitmap == NULL) {
@@ -830,7 +831,6 @@ dpwrite(dev_t dev, struct uio *uiop, cred_t *credp)
 			}
 
 			if (is_epoll) {
-				/* LINTED pointer alignment */
 				epfdp = (dvpoll_epollfd_t *)pfdp;
 				pdp->pd_epolldata = epfdp->dpep_data;
 			}

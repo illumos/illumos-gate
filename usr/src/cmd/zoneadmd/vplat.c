@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2015, Joyent Inc. All rights reserved.
+ * Copyright (c) 2015 by Delphix. All rights reserved.
  */
 
 /*
@@ -4220,7 +4221,8 @@ remove_mlps(zlog_t *zlogp, zoneid_t zoneid)
 }
 
 int
-prtmount(const struct mnttab *fs, void *x) {
+prtmount(const struct mnttab *fs, void *x)
+{
 	zerror((zlog_t *)x, B_FALSE, "  %s", fs->mnt_mountp);
 	return (0);
 }

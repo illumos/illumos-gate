@@ -441,8 +441,8 @@ av1394_async_create_minor_node(av1394_inst_t *avp)
 	int	ret;
 
 	ret = ddi_create_minor_node(avp->av_dip, "async",
-		S_IFCHR, AV1394_ASYNC_INST2MINOR(avp->av_instance),
-		DDI_NT_AV_ASYNC, NULL);
+	    S_IFCHR, AV1394_ASYNC_INST2MINOR(avp->av_instance),
+	    DDI_NT_AV_ASYNC, NULL);
 	if (ret != DDI_SUCCESS) {
 		TNF_PROBE_0(av1394_async_create_minor_node_error,
 		    AV1394_TNF_ASYNC_ERROR, "");

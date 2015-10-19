@@ -26,7 +26,6 @@ epoll_create, epoll_create1 \- create an epoll instance
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBepoll_create()\fR and \fBepoll_create1()\fR functions both create an
 \fBepoll\fR(5) instance that can be operated upon via \fBepoll_ctl\fR(3C),
@@ -50,12 +49,10 @@ Instance should be closed upon an
 .RE
 
 .SH RETURN VALUES
-.sp
 .LP
 Upon succesful completion, 0 is returned. Otherwise, -1 is returned and errno
 is set to indicate the error.
 .SH ERRORS
-.sp
 .LP
 The \fBepoll_create()\fR and \fBepoll_create1()\fR functions will fail if:
 .sp
@@ -89,7 +86,6 @@ The maximum allowable number of files is currently open in the system.
 
 .sp
 .SH NOTES
-.sp
 .LP
 
 The \fBepoll\fR(5) facility is implemented for purposes of offering
@@ -99,6 +95,5 @@ applications should continue to prefer using event ports via the
 interfaces.  See \fBepoll\fR(5) for compatibility details and restrictions.
 
 .SH SEE ALSO
-.sp
 .LP
 \fBepoll_ctl\fR(3C), \fBepoll_wait\fR(3C), \fBepoll\fR(5)

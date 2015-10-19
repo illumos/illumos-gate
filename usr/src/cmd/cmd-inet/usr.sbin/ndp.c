@@ -538,6 +538,7 @@ static int
 ndp_initialize_lifreq(int route, struct lifreq *lifrp, struct sockaddr *sap)
 {
 	struct sockaddr_storage *lnr_addr;
+	/* LINTED E_BAD_PTR_CAST_ALIGN */
 	struct sockaddr_in6 *sin6p = (sin6_t *)sap;
 	char *lifr_name = lifrp->lifr_name;
 
