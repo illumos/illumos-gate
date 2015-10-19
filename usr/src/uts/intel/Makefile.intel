@@ -21,6 +21,7 @@
 # Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2015 Nexenta Systems, Inc. All rights reserved.
 # Copyright (c) 2013 Andrew Stormont.  All rights reserved.
+# Copyright (c) 2015, Joyent, Inc.  All rights reserved.
 
 #
 #	This makefile contains the common definitions for all intel
@@ -338,6 +339,7 @@ DRV_KMODS	+= sysevent
 DRV_KMODS	+= sysmsg
 DRV_KMODS	+= tcp
 DRV_KMODS	+= tcp6
+DRV_KMODS	+= timerfd
 DRV_KMODS	+= tl
 DRV_KMODS	+= tnf
 DRV_KMODS	+= tpm

@@ -1,0 +1,345 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright (c) 2015, Joyent, Inc.  All rights reserved.
+.\"
+.Dd Sep 02, 2015
+.Dt NDP 7P
+.Os
+.Sh NAME
+.Nm ndp ,
+.Nm NDP
+.Nd Neighbor Discovery Protocol
+.Sh SYNOPSIS
+.In sys/socket.h
+.In sys/sockio.h
+.In netinet/in.h
+.In net/if.h
+.Bd -literal
+s = socket(PF_INET6, SOCK_DGRAM, 0);
+
+struct lifreq lifr;
+ioctl(s, SIOCLIFGETND, &lifr);
+ioctl(s, SIOCLIFSETND, &lifr);
+ioctl(s, SIOCLIFDELND, &lifr);
+.Ed
+.Sh DESCRIPTION
+The Neighbor Discovery Protocol (NDP) is a protocol used to distribute and request
+information about neighboring IPv6 systems on the local network, much like
+.Xr ARP 7P
+for IPv4. NDP is also responsible for spreading information about the network
+gateway and how hosts should configure themselves
+.Pq see Xr in.ndpd 1M for more on how this happens .
+.Sh APPLICATION PROGRAMMING INTERFACE
+The operating system provides several ioctls to help manipulate the mappings
+obtained through NDP. They are
+.Sy SIOCLIFGETND ,
+.Sy SIOCLIFSETND ,
+and
+.Sy SIOCLIFDELND ,
+for getting, setting, and deleting respectively. Each of these ioctls takes a
+.Vt struct lifreq
+.Pq see Xr if 7P for details ,
+where the
+.Fa lifr_lifru
+field is of type
+.Vt struct lif_nd_req :
+.Bd -literal -offset 2m
+typedef struct lif_nd_req {
+        struct sockaddr_storage lnr_addr;
+        uint8_t                 lnr_state_create;
+        uint8_t                 lnr_state_same_lla;
+        uint8_t                 lnr_state_diff_lla;
+        int                     lnr_hdw_len;
+        int                     lnr_flags;
+        int                     lnr_pad0;
+        char                    lnr_hdw_addr[ND_MAX_HDW_LEN];
+} lif_nd_req_t;
+.Ed
+.Pp
+The
+.Fa lnr_addr
+field should be filled in with an IPv6 address
+.Pq see Xr sockaddr_in6 3SOCKET ,
+and the
+.Fa lnr_hdw_addr
+is the link-layer address of length
+.Fa lnr_hdw_len .
+.Pp
+State flags for
+.Fa lnr_state_create ,
+.Fa lnr_state_same_lla ,
+and
+.Fa lnr_state_diff_lla
+can be set to one of the following values:
+.Bl -tag -offset indent -width 16m
+.It Sy ND_UNCHANGED
+For ioctls that don't modify state
+.It Sy ND_INCOMPLETE
+Address resolution is currently in progress
+.It Sy ND_REACHABLE
+The link-layer address has recently been reachable
+.It Sy ND_STALE
+The link-layer address may be unreachable, and the system shouldn't do anything
+.It Sy ND_DELAY
+This entry hasn't yet started sending Neighbor Solicitations
+.It Sy ND_PROBE
+The operating system is currently sending out Neighbor Solicitations for the address
+.It Sy ND_UNREACHABLE
+The link-layer address is unreachable, and this entry is going to be deleted.
+.El
+.sp
+When creating a new entry, the only valid values for
+.Fa lnr_state_create
+are
+.Sy ND_REACHABLE
+and
+.Sy ND_STALE .
+Any other value will return
+.Sy EINVAL .
+The
+.Fa lnr_state_same_lla
+and
+.Fa lnr_state_diff_lla
+fields are reserved for future use and can be safely set to
+.Sy ND_UNCHANGED
+and
+.Sy ND_STALE
+respectively.
+.Pp
+Flags that can be placed in
+.Fa lnr_flags
+are:
+.Bl -tag -offset indent -width 16m
+.It Sy NDF_ISROUTER_ON
+Mark this entry as being a router. This will cause Neighbor Advertisements for
+this address to be sent with the R-bit (Router).
+.It Sy NDF_ISROUTER_OFF
+If this entry was flagged as being a router, remove the flag.
+.It Sy NDF_ANYCAST_ON
+Mark this entry as being for an anycast address. This prevents sending Neighbor
+Advertisements with the O-bit (Override).
+.It Sy NDF_ANYCAST_OFF
+If this entry was flagged as an anycast address, remove the flag.
+.It Sy NDF_STATIC
+Prevent this entry from being deleted by the system.
+.El
+.sp
+When using
+.Sy SIOCLIFGETND ,
+these flags represent the current state of the corresponding Neighbor Cache
+Entry. When using
+.Sy SIOCLIFSETND ,
+these flags represent what changes should be applied to the underlying entry.
+.Pp
+The only fields that need to be set for the
+.Sy SIOCLIFGETND
+or
+.Sy SIOCLIFDELND
+ioctls are
+.Fa lifr_name
+and
+.Fa lnr_addr .
+All other fields should be zeroed out. After successfully getting an entry, the
+other fields will be filled in. When using
+.Sy SIOCLIFSETND ,
+all fields should be set to an appropriate value, as described above, with the
+exception of
+.Fa lnr_pad0 ,
+which is unused and only exists for padding purposes.
+.Pp
+After performing the ioctl, the following errors may be returned through the
+global
+.Sy errno
+variable:
+.Bl -tag -offset indent -width 16m
+.It Sy EAFNOSUPPORT
+A non-IPv6 socket was used to perform the ioctl.
+.It Sy EINVAL
+The request contents were bad. This could be because conflicting flags were
+used, the specified interface wasn't logical unit zero, or another reason.
+.It Sy ENOMEM
+The system ran out of memory for internal data structures.
+.It Sy ENXIO
+The specified interface does not exist.
+.It Sy EPERM
+The caller does not have permission to modify the Neighbor Cache Entries
+associated with this interface. They may be lacking the
+.Sy PRIV_SYS_NET_CONFIG
+privilege
+.Po see Xr privileges 5 Pc ,
+or the interface is managed by IPMP (IP Network Multipathing).
+.It Sy ESRCH
+There is no entry matching the specified address.
+.El
+.Sh EXAMPLES
+The following examples demonstrate how to get and set NDP mappings using the
+provided ioctls. They can be compiled by using a C compiler and linking against
+the sockets library.
+.Ss Example 1: Getting a mapping
+.Bd -literal -offset indent
+$ gcc -Wall -lsocket -o get get.c
+$ cat get.c
+/*
+ * Example of getting a mapping for a node name.
+ */
+#include <strings.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/socket.h>
+#include <sys/sockio.h>
+#include <unistd.h>
+#include <netdb.h>
+#include <net/if.h>
+
+int get(char *host) {
+	struct lifreq lifr;
+	struct addrinfo hints, *serverinfo, *p;
+	int err, s;
+
+	bzero(&hints, sizeof (struct addrinfo));
+	hints.ai_family = PF_INET6;
+	hints.ai_protocol = IPPROTO_IPV6;
+
+	if ((err = getaddrinfo(host, NULL, &hints, &serverinfo)) != 0) {
+		(void) fprintf(stderr, "Unable to lookup %s: %s\\n", host,
+		    gai_strerror(err));
+		return (1);
+	}
+
+	s = socket(AF_INET6, SOCK_DGRAM, 0);
+	if (s < 0) {
+		perror("Failed to open IPv6 socket");
+		return (1);
+	}
+
+	for (p = serverinfo; p != NULL; p = p->ai_next) {
+		/* Zero out structure */
+		bzero(&lifr, sizeof (struct lifreq));
+		(void) strlcpy(lifr.lifr_name, "net0",
+		    sizeof (lifr.lifr_name));
+		(void) memcpy(&lifr.lifr_nd.lnr_addr, p->ai_addr,
+		    sizeof (struct sockaddr_storage));
+
+		/* Get mapping */
+		if (ioctl(s, SIOCLIFGETND, &lifr) < 0) {
+			perror("Unable to get NDP mapping");
+			continue;
+		}
+
+		/*
+		 * lifr.lifr_nd.lnr_hdw_addr now contains the MAC address,
+		 * and can be used as desired.
+		 */
+	}
+
+	/*
+	 * Clean up linked list.
+	 */
+	freeaddrinfo(serverinfo);
+	return (0);
+}
+
+int main(int argc, char *argv[]) {
+	if (argc < 2)
+		exit(1);
+	return (get(argv[1]));
+}
+.Ed
+.sp
+Deleting a mapping would work similarly, except that instead of using
+.Sy SIOCLIFGETND ,
+you would instead use the
+.Sy SIOCLIFDELND
+ioctl.
+.Ss Example 2: Adding a mapping
+.Bd -literal -offset indent
+$ gcc -Wall -lsocket -o set set.c
+$ cat set.c
+/*
+ * Example of setting a mapping to an all-zero Ethernet address.
+ */
+#include <strings.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/socket.h>
+#include <sys/sockio.h>
+#include <unistd.h>
+#include <netdb.h>
+#include <net/if.h>
+
+int set(char *host) {
+	struct lifreq lifr;
+	struct addrinfo hints, *serverinfo, *p;
+	int err, s;
+
+	bzero(&hints, sizeof (struct addrinfo));
+	hints.ai_family = PF_INET6;
+	hints.ai_protocol = IPPROTO_IPV6;
+
+	if ((err = getaddrinfo(host, NULL, &hints, &serverinfo)) != 0) {
+		(void) fprintf(stderr, "Unable to lookup %s: %s\\n", host,
+		    gai_strerror(err));
+		return (1);
+	}
+
+	s = socket(AF_INET6, SOCK_DGRAM, 0);
+	if (s < 0) {
+		perror("Failed to open IPv6 socket");
+		return (1);
+	}
+
+	for (p = serverinfo; p != NULL; p = p->ai_next) {
+		/* Zero out structure */
+		bzero(&lifr, sizeof (struct lifreq));
+		(void) strlcpy(lifr.lifr_name, "net0",
+		    sizeof (lifr.lifr_name));
+		(void) memcpy(&lifr.lifr_nd.lnr_addr, p->ai_addr,
+		    sizeof (struct sockaddr_storage));
+
+		lifr.lifr_nd.lnr_state_create = ND_REACHABLE;
+		lifr.lifr_nd.lnr_flags = NDF_STATIC;
+
+		/* Get mapping */
+		if (ioctl(s, SIOCLIFSETND, &lifr) < 0) {
+			perror("Unable to set NDP mapping");
+			continue;
+		}
+	}
+
+	/*
+	 * Clean up linked list.
+	 */
+	freeaddrinfo(serverinfo);
+	return (0);
+}
+
+int main(int argc, char *argv[]) {
+	if (argc < 2)
+		exit(1);
+	return (set(argv[1]));
+}
+.Ed
+.Sh SEE ALSO
+.Xr in.ndpd 1M ,
+.Xr ndp 1M ,
+.Xr ifconfig 1M ,
+.Xr sockaddr_in6 3SOCKET ,
+.Xr privileges 5
+.Rs
+.%A Narten, T.
+.%A Nordmark, E.
+.%A Simpson, W.
+.%A Soliman, H.
+.%R Neighbor Discovery for IP version 6
+.%T RFC 4861
+.%D September 2007
+.Re

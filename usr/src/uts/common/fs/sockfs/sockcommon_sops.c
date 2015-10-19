@@ -953,6 +953,13 @@ so_poll(struct sonode *so, short events, int anyyet, short *reventsp,
 	if (!list_is_empty(&so->so_acceptq_list))
 		*reventsp |= (POLLIN|POLLRDNORM) & events;
 
+	/*
+	 * If we're looking for POLLRDHUP, indicate it if we have sent the
+	 * last rx signal for the socket.
+	 */
+	if ((events & POLLRDHUP) && (state & SS_SENTLASTREADSIG))
+		*reventsp |= POLLRDHUP;
+
 	/* Data */
 	/* so_downcalls is null for sctp */
 	if (so->so_downcalls != NULL && so->so_downcalls->sd_poll != NULL) {
@@ -988,14 +995,20 @@ so_poll(struct sonode *so, short events, int anyyet, short *reventsp,
 			*reventsp |= POLLHUP;
 	}
 
-	if (!*reventsp && !anyyet) {
+	if ((!*reventsp && !anyyet) || (events & POLLET)) {
 		/* Check for read events again, but this time under lock */
 		if (events & (POLLIN|POLLRDNORM)) {
 			mutex_enter(&so->so_lock);
 			if (SO_HAVE_DATA(so) ||
 			    !list_is_empty(&so->so_acceptq_list)) {
+				if (events & POLLET) {
+					so->so_pollev |= SO_POLLEV_IN;
+					*phpp = &so->so_poll_list;
+				}
+
 				mutex_exit(&so->so_lock);
 				*reventsp |= (POLLIN|POLLRDNORM) & events;
+
 				return (0);
 			} else {
 				so->so_pollev |= SO_POLLEV_IN;

@@ -1097,6 +1097,8 @@ ndp_query(ill_t *ill, struct lif_nd_req *lnr)
 		lnr->lnr_flags = NDF_ISROUTER_ON;
 	if (ncec->ncec_flags & NCE_F_ANYCAST)
 		lnr->lnr_flags |= NDF_ANYCAST_ON;
+	if (ncec->ncec_flags & NCE_F_STATIC)
+		lnr->lnr_flags |= NDF_STATIC;
 	ncec_refrele(ncec);
 	return (0);
 }

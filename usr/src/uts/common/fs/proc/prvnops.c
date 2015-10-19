@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2014, Joyent, Inc. All rights reserved.
  */
 
 /*	Copyright (c) 1984,	 1986, 1987, 1988, 1989 AT&T	*/
@@ -5939,7 +5939,11 @@ prpoll(vnode_t *vp, short events, int anyyet, short *reventsp,
 		return (0);
 	}
 
-	lockstate = pollunlock();	/* avoid deadlock with prnotify() */
+	/* avoid deadlock with prnotify() */
+	if (pollunlock(&lockstate) != 0) {
+		*reventsp = POLLNVAL;
+		return (0);
+	}
 
 	if ((error = prlock(pnp, ZNO)) != 0) {
 		pollrelock(lockstate);
@@ -6010,7 +6014,7 @@ prpoll(vnode_t *vp, short events, int anyyet, short *reventsp,
 	}
 
 	*reventsp = revents;
-	if (!anyyet && revents == 0) {
+	if ((!anyyet && revents == 0) || (events & POLLET)) {
 		/*
 		 * Arrange to wake up the polling lwp when
 		 * the target process/lwp stops or terminates

@@ -24,6 +24,9 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2014, Joyent, Inc. All rights reserved.
+ */
 
 #include <sys/types.h>
 #include <sys/file.h>
@@ -2456,7 +2459,7 @@ vcc_chpoll(dev_t dev, short events, int anyyet,  short *reventsp,
 		*reventsp |= (events & POLLIN);
 	}
 
-	if (((*reventsp) == 0) && (!anyyet)) {
+	if ((((*reventsp) == 0) && (!anyyet)) || (events & POLLET)) {
 		*phpp = &vport->poll;
 		if (events & POLLIN) {
 			mutex_enter(&vport->lock);

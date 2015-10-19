@@ -110,6 +110,9 @@ MANFILES= 	__fbufsize.3c					\
 	 	enable_extended_FILE_stdio.3c			\
 	 	encrypt.3c					\
 	 	end.3c						\
+	 	epoll_create.3c					\
+	 	epoll_ctl.3c					\
+	 	epoll_wait.3c					\
 	 	err.3c						\
 	 	euclen.3c					\
 		eventfd.3c					\
@@ -470,6 +473,7 @@ MANFILES= 	__fbufsize.3c					\
 	 	timer_delete.3c					\
 	 	timer_settime.3c				\
 	 	timeradd.3c					\
+		timerfd_create.3c				\
 	 	tmpfile.3c					\
 	 	tmpnam.3c					\
 	 	toascii.3c					\
@@ -733,6 +737,8 @@ MANLINKS=	FD_CLR.3c				\
 	 	endusershell.3c				\
 	 	endutent.3c				\
 	 	endutxent.3c				\
+	 	epoll_create1.3c			\
+	 	epoll_pwait.3c				\
 	 	erand48.3c				\
 	 	errno.3c				\
 	 	errx.3c					\
@@ -1206,6 +1212,8 @@ MANLINKS=	FD_CLR.3c				\
 	 	timer_gettime.3c			\
 	 	timerclear.3c				\
 	 	timercmp.3c				\
+		timerfd_gettime.3c			\
+		timerfd_settime.3c			\
 	 	timerisset.3c				\
 	 	timersub.3c				\
 	 	tmpnam_r.3c				\
@@ -1581,6 +1589,9 @@ _end.3c					:= LINKSRC = end.3c
 _etext.3c				:= LINKSRC = end.3c
 edata.3c				:= LINKSRC = end.3c
 etext.3c				:= LINKSRC = end.3c
+
+epoll_create1.3c			:= LINKSRC = epoll_create.3c
+epoll_pwait.3c				:= LINKSRC = epoll_wait.3c
 
 errx.3c					:= LINKSRC = err.3c
 verr.3c					:= LINKSRC = err.3c
@@ -2241,6 +2252,9 @@ timerclear.3c				:= LINKSRC = timeradd.3c
 timercmp.3c				:= LINKSRC = timeradd.3c
 timerisset.3c				:= LINKSRC = timeradd.3c
 timersub.3c				:= LINKSRC = timeradd.3c
+
+timerfd_gettime.3c				:= LINKSRC = timerfd_create.3c
+timerfd_settime.3c				:= LINKSRC = timerfd_create.3c
 
 tempnam.3c				:= LINKSRC = tmpnam.3c
 tmpnam_r.3c				:= LINKSRC = tmpnam.3c

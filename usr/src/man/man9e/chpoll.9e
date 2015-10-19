@@ -121,6 +121,17 @@ The same as \fBPOLLOUT\fR.
 Priority data (priority band > 0) may be written.
 .RE
 
+.sp
+.ne 2
+.na
+\fB\fBPOLLET\fR\fR
+.ad
+.RS 14n
+The desired event is to be edge-triggered; calls to \fBpollwakeup\fR(9F)
+should not be suppressed, even if the event is pending at the time of
+call to the \fBchpoll()\fR function.
+.RE
+
 .RE
 
 .sp
@@ -197,7 +208,11 @@ be called with multiple events at one time. The \fBpollwakup()\fR can be called
 regardless of whether or not the \fBchpoll()\fR entry is called; it should be
 called every time the driver detects the pollable event. The driver must not
 hold any mutex across the call to \fBpollwakeup\fR(9F) that is acquired in its
-\fBchpoll()\fR entry point, or a deadlock may result.
+\fBchpoll()\fR entry point, or a deadlock may result.  Note that if
+\fBPOLLET\fR is set in the specified events, the driver must call
+\fBpollwakeup\fR(9F) on subsequent events, even if events are pending at
+the time of the call to \fBchpoll()\fR.
+
 .RE
 .SH RETURN VALUES
 .LP

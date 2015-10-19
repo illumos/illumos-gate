@@ -376,11 +376,27 @@ write_elfnotes(proc_t *p, int sig, vnode_t *vp, offset_t offset,
 		(void) vnodetopath(vroot, fvp, fdinfo.pr_path,
 		    sizeof (fdinfo.pr_path), credp);
 
-		error = VOP_GETATTR(fvp, &vattr, 0, credp, NULL);
-		if (error != 0) {
+		if (VOP_GETATTR(fvp, &vattr, 0, credp, NULL) != 0) {
+			/*
+			 * Try to write at least a subset of information
+			 */
+			fdinfo.pr_major = 0;
+			fdinfo.pr_minor = 0;
+			fdinfo.pr_ino = 0;
+			fdinfo.pr_mode = 0;
+			fdinfo.pr_uid = -1;
+			fdinfo.pr_gid = -1;
+			fdinfo.pr_rmajor = 0;
+			fdinfo.pr_rminor = 0;
+			fdinfo.pr_size = -1;
+
+			error = elfnote(vp, &offset, NT_FDINFO,
+			    sizeof (fdinfo), &fdinfo, rlimit, credp);
 			VN_RELE(fvp);
 			VN_RELE(vroot);
-			goto done;
+			if (error)
+				goto done;
+			continue;
 		}
 
 		if (fvp->v_type == VSOCK)

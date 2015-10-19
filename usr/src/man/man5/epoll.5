@@ -1,0 +1,110 @@
+'\" te
+.\"  Copyright (c) 2014, Joyent, Inc. All Rights Reserved.
+.\"  This file and its contents are supplied under the terms of the
+.\"  Common Development and Distribution License ("CDDL"), version 1.0.
+.\"  You may only use this file in accordance with the terms of version
+.\"  1.0 of the CDDL.
+.\" 
+.\"  A full copy of the text of the CDDL should have accompanied this
+.\"  source.  A copy of the CDDL is also available via the Internet at
+.\"  http://www.illumos.org/license/CDDL.
+.TH EPOLL 5 "Apr 17, 2014"
+.SH NAME
+epoll \- Linux-compatible I/O event notification facility
+.SH SYNOPSIS
+
+.LP
+.nf
+#include <sys/epoll.h>
+.fi
+
+.SH DESCRIPTION
+.LP
+
+\fBepoll\fR is a facility for efficient event-oriented I/O that has a
+similar model to \fBpoll\fR(2), but does not necessitate rescanning a
+set of file descriptors to wait for an event.  \fBepoll\fR is of Linux
+origins, and this facility is designed to be binary-compatible with
+the Linux facility, including the following interfaces:
+
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBepoll_create\fR(3C) creates an \fBepoll\fR instance, returning a file
+descriptor. It contains a size arugment which is meaningful only in as
+much as it cannot be 0.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBepoll_create1\fR(3C) also creates an \fBepoll\fR instance, but eliminates
+the meaningless size argument -- replacing it instead with a flags
+argument.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBepoll_ctl\fR(3C) allows file descriptors to be added
+(via \fBEPOLL_CTL_ADD\fR), deleted (via \fBEPOLL_CTL_DEL\fR) or
+modified (via \fBEPOLL_CTL_MOD\fR) with respect to the \fBepoll\fR'd set
+of file descriptors.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBepoll_wait\fR(3C) fetches pending events for file descriptors added
+via \fBepoll_ctl\fR(3C), blocking the caller if no such events are pending.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBepoll_pwait\fR(3C) opeates in a similar manner to \fBepoll_wait\fR(3C), but
+allows the caller to specify a signal mask to be set atomically with respect
+to waiting for events.
+.RE
+
+.sp
+.SH NOTES
+.LP
+
+The \fBepoll\fR facility is implemented
+for purposes of offering compatibility to and portability of Linux-borne
+applications; native applications should continue to prefer using event ports
+via the \fBport_create\fR(3C),
+\fBport_associate\fR(3C) and \fBport_getn\fR(3C) interfaces.
+In particular, use of \fBepoll\fR in a multithreaded environment is fraught
+with peril; even when using \fBEPOLLONESHOT\fR for one-shot events,
+there are race conditions with respect to \fBclose\fR(2) that are unresolvable.
+(For more details, see the aborted effort in Linux to resolve this via the
+proposed
+\fBEPOLL_CTL_DISABLE\fR operation.)
+The event port facility -- like the BSD kqueue facility that inspired it --
+is designed to deal with such issues via explicit event source dissociation.
+
+While a best effort has been made to mimic the Linux semantics, there
+are some semantics that are too peculiar or ill-conceived to merit
+accommodation.  In particular, the Linux \fBepoll\fR facility will -- by
+design -- continue to generate events for closed file descriptors where/when
+the underlying file description remains open.  For example, if one were
+to \fBfork\fR(2) and subsequently close an actively \fBepoll\fR'd file
+descriptor in the parent,
+any events generated in the child on the implicitly duplicated file descriptor
+will continue to be delivered to the parent -- despite the fact that the
+parent itself no longer has any notion of the file description!
+This \fBepoll\fR facility refuses to honor
+these semantics; closing the \fBEPOLL_CTL_ADD\fR'd file descriptor
+will always result in no further
+events being generated for that event description.
+
+.SH SEE ALSO
+.LP
+\fBepoll_create\fR(3C), \fBepoll_create1\fR(3C), \fBepoll_ctl\fR(3C),
+\fBepoll_wait\fR(3C), \fBepoll_pwait\fR(3C),
+\fBport_create\fR(3C), \fBport_associate\fR(3C), \fBport_dissociate\fR(3C),
+\fBport_get\fR(3C),
+\fBpselect\fR(3C)

@@ -1,0 +1,108 @@
+'\" te
+.\"  Copyright (c) 2014, Joyent, Inc. All Rights Reserved.
+.\"  This file and its contents are supplied under the terms of the
+.\"  Common Development and Distribution License ("CDDL"), version 1.0.
+.\"  You may only use this file in accordance with the terms of version
+.\"  1.0 of the CDDL.
+.\" 
+.\"  A full copy of the text of the CDDL should have accompanied this
+.\"  source.  A copy of the CDDL is also available via the Internet at
+.\"  http://www.illumos.org/license/CDDL.
+.TH EPOLL_WAIT 3C "Apr 17, 2014"
+.SH NAME
+epoll_wait, epoll_pwait \- wait for epoll events
+.SH SYNOPSIS
+
+.LP
+.nf
+#include <sys/epoll.h>
+
+\fBint\fR \fBepoll_wait\fR(\fBint\fR \fIepfd\fR, \fBstruct epoll_event *\fR\fIevents\fR, 
+     \fBint\fR \fImaxevents\fR, \fBint\fR \fItimeout\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBepoll_pwait\fR(\fBint\fR \fIepfd\fR, \fBstruct epoll_event *\fR\fIevents\fR, 
+     \fBint\fR \fImaxevents\fR, \fBint\fR \fItimeout\fR,
+     \fBconst sigset_t *\fR\fIsigmask\fR);
+.fi
+
+.SH DESCRIPTION
+.LP
+The \fBepoll_wait()\fR function waits for events on the \fBepoll\fR(5)
+instance specified by \fIepfd\fR.  The \fIevents\fR parameter must point to
+an array of \fImaxevents\fR \fIepoll_event\fR structures to be
+filled in with pending events.  The \fItimeout\fR argument specifies the
+number of milliseconds to wait for an event if none is pending.  A
+\fItimeout\fR of -1 denotes an infinite timeout.
+
+The \fBepoll_pwait()\fR is similar to \fBepoll_wait()\fR, but takes an
+additional \fIsigmask\fR argument that specifies the desired signal mask
+when \fBepoll_pwait()\fR is blocked.  It is equivalent to atomically
+setting the signal mask, calling \fBepoll_wait()\fR, and restoring the
+signal mask upon return, and is therefore similar to the relationship
+between \fBselect\fR(3C) and \fBpselect\fR(3C).
+
+.SH RETURN VALUES
+.LP
+Upon successful completion, \fBepoll_wait()\fR and \fBepoll_pwait()\fR return
+the number of events, or 0 if none was pending and \fItimeout\fR milliseconds
+elapsed.  If an error occurs, -1 is returned and errno is set to indicate
+the error.
+
+.SH ERRORS
+.LP
+The \fBepoll_wait()\fR and \fBepoll_pwait()\fR functions will fail if:
+.sp
+.ne 2
+.na
+\fB\fBEBADF\fR\fR
+.ad
+.RS 10n
+\fIepfd\fR is not a valid file descriptor.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBEFAULT\fR\fR
+.ad
+.RS 10n
+The memory associated with \fIevents\fR was not mapped or was not writable.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBEINTR\fR\fR
+.ad
+.RS 10n
+A signal was received during the \fBepoll_wait()\fR or \fBepoll_pwait()\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+Either \fIepfd\fR is not a valid \fBepoll\fR(5) instance or \fImaxevents\fR
+is not greater than zero.
+.RE
+
+.sp
+.SH NOTES
+.LP
+
+The \fBepoll\fR(5) facility is implemented for purposes of offering
+compatibility for Linux-borne applications; native
+applications should continue to prefer using event ports via the
+\fBport_create\fR(3C), \fBport_associate\fR(3C) and \fBport_get\fR(3C)
+interfaces.  See \fBepoll\fR(5) for compatibility details and restrictions.
+
+.SH SEE ALSO
+.LP
+\fBepoll_create\fR(3C), \fBepoll_ctl\fR(3C),
+\fBport_create\fR(3C), \fBport_associate\fR(3C), \fBport_get\fR(3C),
+\fBpselect\fR(3C), \fBepoll\fR(5)

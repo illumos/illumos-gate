@@ -269,6 +269,15 @@ clock_add_backend(clockid_t clock, clock_backend_t *backend)
 	clock_backend[clock] = backend;
 }
 
+clock_backend_t *
+clock_get_backend(clockid_t clock)
+{
+	if (clock < 0 || clock >= CLOCK_MAX)
+		return (NULL);
+
+	return (clock_backend[clock]);
+}
+
 int
 clock_settime(clockid_t clock, timespec_t *tp)
 {
@@ -398,7 +407,7 @@ timer_signal(sigqueue_t *sigq)
 /*
  * This routine is called from the clock backend.
  */
-void
+static void
 timer_fire(itimer_t *it)
 {
 	proc_t *p;
@@ -672,7 +681,7 @@ timer_create(clockid_t clock, struct sigevent *evp, timer_t *tid)
 	 * Call on the backend to verify the event argument (or return
 	 * EINVAL if this clock type does not support timers).
 	 */
-	if ((error = backend->clk_timer_create(it, &ev)) != 0)
+	if ((error = backend->clk_timer_create(it, timer_fire)) != 0)
 		goto err;
 
 	it->it_lwp = ttolwp(curthread);

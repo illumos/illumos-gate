@@ -324,6 +324,7 @@ driver name=logindmux
 driver name=ptm clone_perms="ptmx 0666 root sys"
 driver name=pts perms="* 0644 root sys" perms="0 0620 root tty" \
     perms="1 0620 root tty" perms="2 0620 root tty" perms="3 0620 root tty"
+driver name=timerfd perms="* 0666 root sys"
 file path=etc/.login group=sys preserve=renamenew
 file path=etc/cron.d/.proto group=sys mode=0744
 file path=etc/cron.d/at.deny group=sys preserve=true
@@ -872,6 +873,7 @@ file path=usr/kernel/drv/$(ARCH64)/ksyms group=sys
 file path=usr/kernel/drv/$(ARCH64)/logindmux group=sys
 file path=usr/kernel/drv/$(ARCH64)/ptm group=sys
 file path=usr/kernel/drv/$(ARCH64)/pts group=sys
+file path=usr/kernel/drv/$(ARCH64)/timerfd group=sys
 $(i386_ONLY)file path=usr/kernel/drv/dump group=sys
 file path=usr/kernel/drv/dump.conf group=sys
 $(i386_ONLY)file path=usr/kernel/drv/eventfd group=sys
@@ -888,6 +890,8 @@ $(i386_ONLY)file path=usr/kernel/drv/ptm group=sys
 file path=usr/kernel/drv/ptm.conf group=sys
 $(i386_ONLY)file path=usr/kernel/drv/pts group=sys
 file path=usr/kernel/drv/pts.conf group=sys
+$(i386_ONLY)file path=usr/kernel/drv/timerfd group=sys
+file path=usr/kernel/drv/timerfd.conf group=sys
 file path=usr/kernel/exec/$(ARCH64)/javaexec group=sys mode=0755
 file path=usr/kernel/exec/$(ARCH64)/shbinexec group=sys mode=0755
 $(i386_ONLY)file path=usr/kernel/exec/javaexec group=sys mode=0755
@@ -1352,6 +1356,7 @@ file path=usr/sbin/mountall group=sys mode=0555
 file path=usr/sbin/msgid mode=0555
 file path=usr/sbin/mvdir mode=0555
 file path=usr/sbin/ndd mode=0555
+file path=usr/sbin/ndp mode=0555
 file path=usr/sbin/nlsadmin group=adm mode=0755
 file path=usr/sbin/nscd mode=0555
 file path=usr/sbin/nwamadm mode=0555

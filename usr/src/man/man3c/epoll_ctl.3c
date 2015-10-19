@@ -1,0 +1,309 @@
+'\" te
+.\"  Copyright (c) 2014, Joyent, Inc. All Rights Reserved.
+.\"  This file and its contents are supplied under the terms of the
+.\"  Common Development and Distribution License ("CDDL"), version 1.0.
+.\"  You may only use this file in accordance with the terms of version
+.\"  1.0 of the CDDL.
+.\" 
+.\"  A full copy of the text of the CDDL should have accompanied this
+.\"  source.  A copy of the CDDL is also available via the Internet at
+.\"  http://www.illumos.org/license/CDDL.
+.TH EPOLL_CTL 3C "Apr 17, 2014"
+.SH NAME
+epoll_ctl \- control an epoll instance
+.SH SYNOPSIS
+
+.LP
+.nf
+#include <sys/epoll.h>
+
+\fBint\fR \fBepoll_ctl\fR(\fBint\fR \fIepfd\fR, \fBint\fR \fIop\fR, \fBint\fR \fIfd\fR, \fBstruct epoll_event *\fR\fIevent\fR);
+.fi
+
+.SH DESCRIPTION
+.LP
+The \fBepoll_ctl()\fR function executes the operation specified by
+\fIop\fR (as parameterized by \fIevent\fR) on the \fIepfd\fR epoll instance.
+Valid values for \fIop\fR:
+
+.sp
+.ne 2
+.na
+\fBEPOLL_CTL_ADD\fR
+.ad
+.RS 12n
+For the \fBepoll\fR(5) instance specified by \fIepfd\fR,
+associate the file descriptor specified by \fIfd\fR with the event specified
+by \fIevent\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fBEPOLL_CTL_DEL\fR
+.ad
+.RS 12n
+For the \fBepoll\fR(5) instance specified by \fIepfd\fR,
+remove all event associations for the file descriptor specified by \fIfd\fR.
+\fIevent\fR is ignored, and may be NULL.
+.RE
+
+.sp
+.ne 2
+.na
+\fBEPOLL_CTL_MOD\fR
+.ad
+.RS 12n
+For the \fBepoll\fR(5) instance specified by \fIepfd\fR, modify the event
+association for the file descriptor specified by \fIfd\fR to be that
+specified by \fIevent\fR.
+
+.RE
+
+The \fIevent\fR parameter has the following structure:
+
+.in +4
+.nf
+typedef union epoll_data {
+	void    *ptr;
+	int      fd;
+	uint32_t u32;
+	uint64_t u64;
+} epoll_data_t;
+
+struct epoll_event {
+	uint32_t     events;
+	epoll_data_t data;
+};
+.fi
+.in -4
+
+The \fIdata\fR field specifies the datum to
+be associated with the event and
+will be returned via \fBepoll_wait\fR(3C).
+The \fIevents\fR field denotes both the desired events (when specified via
+\fBepoll_ctl()\fR) and the events that have occurred (when returned via
+\fBepoll_wait\fR(3C)).
+In either case, the
+\fIevents\fR field is a bitmask constructed by a logical \fBOR\fR operation
+of any combination of the following event flags:
+
+.sp
+.ne 2
+.na
+\fBEPOLLIN\fR
+.ad
+.RS 14n
+Data other than high priority data may be read without blocking. For streams,
+this flag is set in the returned \fIevents\fR even if the message is of
+zero length.
+.RE
+
+.sp
+.ne 2
+.na
+\fBEPOLLPRI\fR
+.ad
+.RS 14n
+Normal data (priority band equals 0) may be read without blocking. For streams,
+this flag is set in the returned \fIevents\fR even if the message is of zero
+length.
+.RE
+
+.sp
+.ne 2
+.na
+\fBEPOLLOUT\fR
+.ad
+.RS 14n
+Normal data (priority band equals 0) may be written without blocking.
+.RE
+
+.sp
+.ne 2
+.na
+\fBEPOLLRDNORM\fR
+.ad
+.RS 14n
+Normal data (priority band equals 0) may be read without blocking. For streams,
+this flag is set in the returned \fIrevents\fR even if the message is of
+zero length.
+.RE
+
+.sp
+.ne 2
+.na
+\fBEPOLLRDBAND\fR
+.ad
+.RS 14n
+Data from a non-zero priority band may be read without blocking. For streams,
+this flag is set in the returned \fIrevents\fR even if the message is of
+zero length.
+.RE
+
+.sp
+.ne 2
+.na
+\fBEPOLLWRNORM\fR
+.ad
+.RS 14n
+The same as \fBEPOLLOUT\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fBEPOLLWRBAND\fR
+.ad
+.RS 14n
+Priority data (priority band > 0) may be written.  This event only examines
+bands that have been written to at least once.
+.RE
+
+.sp
+.ne 2
+.na
+\fBEPOLLMSG\fR
+.ad
+.RS 14n
+This exists only for backwards binary and source compatibility with Linux;
+it has no meaning and is ignored.
+.RE
+
+.sp
+.ne 2
+.na
+\fBEPOLLERR\fR
+.ad
+.RS 14n
+An error has occurred on the device or stream.  This flag is only valid in the
+returned \fIevents\fR field.
+.RE
+
+.sp
+.ne 2
+.na
+\fBEPOLLHUP\fR
+.ad
+.RS 14n
+A hangup has occurred on the stream. This event and \fBEPOLLOUT\fR are mutually
+exclusive; a stream can never be writable if a hangup has occurred. However,
+this event and  \fBEPOLLIN\fR, \fBEPOLLRDNORM\fR, \fBEPOLLRDBAND\fR,
+\fBEPOLLRDHUP\fR or
+\fBEPOLLPRI\fR are not mutually exclusive. This flag is only valid in the
+the \fIevents\fR field returned from \fBepoll_wait\fR(3C); it is not used
+in the \fIevents\fR field specified via \fBepoll_ctl()\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fBEPOLLRDHUP\fR
+.ad
+.RS 14n
+The stream socket peer shutdown the writing half of the connection and no
+further data will be readable via the socket.  This event is not mutually
+exclusive with \fBEPOLLIN\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fBEPOLLWAKEUP\fR
+.ad
+.RS 14n
+This exists only for backwards binary and source compatibility with Linux;
+it has no meaning and is ignored.
+.RE
+
+.sp
+.ne 2
+.na
+\fBEPOLLONESHOT\fR
+.ad
+.RS 14n
+Sets the specified event to be in one-shot mode, whereby the event association
+with the \fBepoll\fR(5) instance specified by \fIepfd\fR is removed atomically
+as the event is returned via \fBepoll_wait\fR(3C).  Use of this mode allows
+for resolution of some of the
+races inherent in multithreaded use of \fBepoll_wait\fR(3C).
+.RE
+
+.sp
+.ne 2
+.na
+\fBEPOLLET\fR
+.ad
+.RS 14n
+Sets the specified event to be edge-triggered mode instead of the default
+mode of level-triggered.  In this mode, events will be induced by
+transitions on an event source rather than the state of the event source.
+While perhaps superficially appealing, this mode introduces several new
+potential failure modes for user-level software and should be used
+with caution.
+.RE
+
+.SH RETURN VALUES
+.LP
+Upon succesful completion, \fBepoll_ctl()\fR returns 0.
+If an error occurs, -1 is returned and errno is set to indicate
+the error.
+
+.SH ERRORS
+.LP
+\fBepoll_ctl()\fR will fail if:
+.sp
+.ne 2
+.na
+\fB\fBEBADF\fR\fR
+.ad
+.RS 10n
+\fIepfd\fR is not a valid file descriptor.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBEFAULT\fR\fR
+.ad
+.RS 10n
+The memory associated with \fIevent\fR was not mapped.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBEEXIST\fR\fR
+.ad
+.RS 10n
+The operation specified was \fBEPOLL_CTL_ADD\fR and the specified file
+descriptor is already associated with an event for the specified
+\fBepoll\fR(5) instance.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBENOENT\fR\fR
+.ad
+.RS 10n
+The operation specified was \fBEPOLL_CTL_MOD\fR or \fBEPOLL_CTL_DEL\fR and
+the specified file descriptor is not associated with an event for the
+specified \fBepoll\fR(5) instance.
+.RE
+
+.sp
+.SH NOTES
+.LP
+
+The \fBepoll\fR(5) facility is implemented for purposes of offering
+compatibility for Linux-borne applications; native
+applications should continue to prefer using event ports via the
+\fBport_create\fR(3C), \fBport_associate\fR(3C) and \fBport_get\fR(3C)
+interfaces.  See \fBepoll\fR(5) for compatibility details and restrictions.
+
+.SH SEE ALSO
+.LP
+\fBepoll_create\fR(3C), \fBepoll_wait\fR(3C),
+\fBport_create\fR(3C), \fBport_associate\fR(3C), \fBport_get\fR(3C),
+\fBepoll\fR(5)

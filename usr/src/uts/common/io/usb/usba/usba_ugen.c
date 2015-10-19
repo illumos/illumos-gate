@@ -23,6 +23,10 @@
  */
 
 /*
+ * Copyright (c) 2014, Joyent, Inc. All rights reserved.
+ */
+
+/*
  * UGEN: USB Generic Driver support code
  *
  * This code provides entry points called by the ugen driver or other
@@ -1082,7 +1086,10 @@ usb_ugen_poll(usb_ugen_hdl_t usb_ugen_hdl, dev_t dev, short events,
 				    ((epp->ep_state &
 				    UGEN_EP_STATE_INTR_IN_POLLING_ON) == 0)) {
 					*reventsp |= POLLIN;
-				} else if (!anyyet) {
+				}
+
+				if ((!*reventsp && !anyyet) ||
+				    (events & POLLET)) {
 					*phpp = &epp->ep_pollhead;
 					epp->ep_state |=
 					    UGEN_EP_STATE_INTR_IN_POLL_PENDING;
@@ -1101,7 +1108,10 @@ usb_ugen_poll(usb_ugen_hdl_t usb_ugen_hdl, dev_t dev, short events,
 				    ((epp->ep_state &
 				    UGEN_EP_STATE_ISOC_IN_POLLING_ON) == 0)) {
 					*reventsp |= POLLIN;
-				} else if (!anyyet) {
+				}
+
+				if ((!*reventsp && !anyyet) ||
+				    (events & POLLET)) {
 					*phpp = &epp->ep_pollhead;
 					epp->ep_state |=
 					    UGEN_EP_STATE_ISOC_IN_POLL_PENDING;
@@ -1115,9 +1125,10 @@ usb_ugen_poll(usb_ugen_hdl_t usb_ugen_hdl, dev_t dev, short events,
 
 			break;
 		case UGEN_MINOR_DEV_STAT_NODE:
-			if (ugenp->ug_ds.dev_stat & UGEN_DEV_STATUS_CHANGED) {
+			if (ugenp->ug_ds.dev_stat & UGEN_DEV_STATUS_CHANGED)
 				*reventsp |= POLLIN;
-			} else if (!anyyet) {
+
+			if ((!*reventsp && !anyyet) || (events & POLLET)) {
 				*phpp = &ugenp->ug_ds.dev_pollhead;
 				ugenp->ug_ds.dev_stat |=
 				    UGEN_DEV_STATUS_POLL_PENDING;
@@ -1131,9 +1142,10 @@ usb_ugen_poll(usb_ugen_hdl_t usb_ugen_hdl, dev_t dev, short events,
 			break;
 		}
 	} else {
-		if (ugenp->ug_ds.dev_stat & UGEN_DEV_STATUS_CHANGED) {
+		if (ugenp->ug_ds.dev_stat & UGEN_DEV_STATUS_CHANGED)
 			*reventsp |= POLLHUP|POLLIN;
-		} else if (!anyyet) {
+
+		if ((!*reventsp && !anyyet) || (events & POLLET)) {
 			*phpp = &ugenp->ug_ds.dev_pollhead;
 			ugenp->ug_ds.dev_stat |=
 			    UGEN_DEV_STATUS_POLL_PENDING;

@@ -1,0 +1,201 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright (c) 2015, Joyent, Inc. All Rights Reserved.
+.\"
+.Dd Feb 23, 2105
+.Dt TIMERFD 3C
+.Os
+.Sh NAME
+.Nm timerfd_create ,
+.Nm timerfd_settime ,
+.Nm timerfd_gettime
+.Nd create and manipulate timers via a file descriptor interface
+.Sh SYNOPSIS
+.In sys/timerfd.h
+.Ft int
+.Fo timerfd_create
+.Fa "int clockid"
+.Fa "int flags"
+.Fc
+.Ft int
+.Fo timerfd_settime
+.Fa "int fd"
+.Fa "int flags"
+.Fa "const struct itimerspec *restrict value"
+.Fa "struct itimterspec *restrict ovalue"
+.Fc
+.Ft int
+.Fo timerfd_gettime
+.Fa "int fd"
+.Fa "struct itimerspec *value"
+.Fc
+.Sh DESCRIPTION
+These routines create and manipulate timers in which events are associated
+with a file descriptor, allowing for timer-based events to be used
+in file-descriptor based facilities like
+.Xr poll 2 ,
+.Xr port_get 3C
+or
+.Xr epoll_wait 3C .
+The
+.Fn timerfd_create
+function creates a timer with the clock
+type specified by
+.Fa clockid .
+The
+.Sy CLOCK_REALTIME
+and
+.Sy CLOCK_HIGHRES
+clock types, as defined in
+.Xr timer_create 3C ,
+are supported by
+.Fn timerfd_create .
+(Note that
+.Sy CLOCK_MONOTONIC
+may be used as an alias for
+.Sy CLOCK_HIGHRES Ns .)
+.Pp
+The
+.Fa flags
+argument specifies additional parameters for the timer instance, and can have
+any of the following values:
+.Bl -hang -width Ds
+.It Sy TFD_CLOEXEC
+.Bd -filled -compact
+Instance will be closed upon an
+.Xr exec 2 ;
+see
+.Xr open 2 Ns 's
+description of
+.Sy O_CLOEXEC .
+.Ed
+.It Sy TFD_NONBLOCK
+.Bd -filled -compact
+Instance will be set to be non-blocking.  A
+.Xr read 2
+on a
+.Sy timerfd
+instance that has been initialized with
+.Sy TFD_NONBLOCK
+will return
+.Sy EAGAIN
+in lieu of blocking if the
+timer has not expired since the last
+.Fn timerfd_settime
+or successful
+.Fn read .
+.Ed
+.El
+.Pp
+The following operations can be performed upon a
+.Sy timerfd
+instance:
+.Bl -hang -width Ds
+.It Sy read(2)
+.Bd -filled -compact
+Atomically reads and clears the number of timer expirations since the
+last successful
+.Xr read 2
+or
+.Fn timerfd_settime .
+Upon success,
+the number of expirations will be copied into the eight byte buffer
+passed to the system call. If there have been no expirations of the
+timer since the last successful
+.Xr read 2
+or
+.Fn timerfd_sttime ,
+.Xr read 2
+will block until at least the next expiration,
+or return
+.Sy EAGAIN
+if the instance was created with
+.Sy TFD_NONBLOCK .
+Note that if multiple threads are blocked in
+.Xr read 2
+for the same timer, only one of them will return upon
+a single timer expiration.
+.Pp
+If the buffer specified to
+.Xr read 2
+is less than
+eight bytes in length,
+.Sy EINAVL
+will be returned.
+.Ed
+.It Sy poll(2), port_get(3C), epoll_wait(3C)
+.Bd -filled -compact
+Provide notification when the timer expires or has expired in the past without
+a more recent
+.Xr read 2 .
+Note that threads being simultaneously
+blocked in
+.Xr read 2
+and
+.Xr poll 2
+(or equivalents) for the same
+timer constitute an application-level race; on a timer expiration,
+the thread blocked in
+.Xr poll 2
+may or may not return depending on how
+it is scheduled with respect to the thread blocked in
+.Xr read 2 .
+.Ed
+.It Sy timerfd_gettime()
+.Bd -filled -compact
+Returns the amount of time until the next timer expiration, with the
+same functional signature and semantics as
+.Xr timer_gettime 3C .
+.Ed
+.It Sy timerfd_settime()
+.Bd -filled -compact
+Sets or disarms the timer, with the
+same functional signature and semantics as
+.Xr timer_settime 3C .
+.Ed
+.El
+.Sh RETURN VALUES
+Upon succesful completion, a file descriptor associated with the instance
+is returned. Otherwise,
+.Sy -1
+is returned and errno is set to indicate the error.
+.Sh ERRORS
+The
+.Fn timerfd_create()
+function will fail if:
+.Bl -tag -width Er
+.It Er EINAL
+The
+.Fa flags
+are invalid.
+.It Er EMFILE
+There are currently
+.Pf { Sy OPEN_MAX Ns }
+file descriptors open in the calling process.
+.It Er EPERM
+The
+.Fa clock_id ,
+is
+.Sy CLOCK_HIGHRES
+and the
+.Pf { Sy PRIV_PROC_CLOCK_HIGHRES Ns }
+is not asserted in the effective set of the calling process.
+.El
+.Sh SEE ALSO
+.Xr poll 2 ,
+.Xr port_get 3C ,
+.Xr epoll_wait 3C ,
+.Xr timer_create 3C ,
+.Xr timer_gettime 3C ,
+.Xr timer_settime 3C ,
+.Xr privileages 5 ,
+.Xr timerfd 5

@@ -1,0 +1,99 @@
+'\" te
+.\"  Copyright (c) 2014, Joyent, Inc. All Rights Reserved.
+.\"  This file and its contents are supplied under the terms of the
+.\"  Common Development and Distribution License ("CDDL"), version 1.0.
+.\"  You may only use this file in accordance with the terms of version
+.\"  1.0 of the CDDL.
+.\" 
+.\"  A full copy of the text of the CDDL should have accompanied this
+.\"  source.  A copy of the CDDL is also available via the Internet at
+.\"  http://www.illumos.org/license/CDDL.
+.TH EPOLL_CREATE 3C "Apr 17, 2014"
+.SH NAME
+epoll_create, epoll_create1 \- create an epoll instance
+.SH SYNOPSIS
+
+.LP
+.nf
+#include <sys/epoll.h>
+
+\fBint\fR \fBepoll_create\fR(\fBint\fR \fIsize\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBepoll_create1\fR(\fBint\fR \fIflags\fR);
+.fi
+
+.SH DESCRIPTION
+.LP
+The \fBepoll_create()\fR and \fBepoll_create1()\fR functions both create an
+\fBepoll\fR(5) instance that can be operated upon via \fBepoll_ctl\fR(3C),
+\fBepoll_wait\fR(3C) and \fBepoll_pwait\fR(3C).  \fBepoll\fR instances are
+represented as file descriptors, and should be closed via \fBclose\fR(2).
+
+The only difference between the two functions is their signature;
+\fBepoll_create()\fR takes a size argument that
+is vestigal and is only meaningful in as much as it must be greater than
+zero, while \fBepoll_create1()\fR takes a flags argument that can have
+any of the following values:
+
+.sp
+.ne 2
+.na
+\fBEPOLL_CLOEXEC\fR
+.ad
+.RS 12n
+Instance should be closed upon an
+\fBexec\fR(2); see \fBopen\fR(2)'s description of \fBO_CLOEXEC\fR.
+.RE
+
+.SH RETURN VALUES
+.LP
+Upon succesful completion, 0 is returned. Otherwise, -1 is returned and errno
+is set to indicate the error.
+.SH ERRORS
+.LP
+The \fBepoll_create()\fR and \fBepoll_create1()\fR functions will fail if:
+.sp
+.ne 2
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+Either the \fIsize\fR is zero (\fBepoll_create()\fR) or the \fIflags\fR
+are invalid (\fBepoll_create1()\fR).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBEMFILE\fR\fR
+.ad
+.RS 10n
+There are currently {\fBOPEN_MAX\fR} file descriptors open in the calling
+process.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBENFILE\fR\fR
+.ad
+.RS 10n
+The maximum allowable number of files is currently open in the system.
+.RE
+
+.sp
+.SH NOTES
+.LP
+
+The \fBepoll\fR(5) facility is implemented for purposes of offering
+compatibility for Linux-borne applications; native
+applications should continue to prefer using event ports via the
+\fBport_create\fR(3C), \fBport_associate\fR(3C) and \fBport_get\fR(3C)
+interfaces.  See \fBepoll\fR(5) for compatibility details and restrictions.
+
+.SH SEE ALSO
+.LP
+\fBepoll_ctl\fR(3C), \fBepoll_wait\fR(3C), \fBepoll\fR(5)

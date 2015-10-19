@@ -166,6 +166,7 @@ file path=usr/share/man/man1m/mvdir.1m
 file path=usr/share/man/man1m/ncheck.1m
 file path=usr/share/man/man1m/ncheck_ufs.1m
 file path=usr/share/man/man1m/ndd.1m
+file path=usr/share/man/man1m/ndp.1m
 file path=usr/share/man/man1m/netstat.1m
 file path=usr/share/man/man1m/netstrategy.1m
 file path=usr/share/man/man1m/newfs.1m

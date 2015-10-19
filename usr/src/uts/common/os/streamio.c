@@ -24,6 +24,7 @@
 
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2014, Joyent, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -8217,7 +8218,11 @@ strpoll(
 		tq = qp->q_next->q_nfsrv;
 		ASSERT(tq != NULL);
 
-		polllock(&stp->sd_pollist, QLOCK(tq));
+		if (polllock(&stp->sd_pollist, QLOCK(tq)) != 0) {
+			releasestr(qp);
+			*reventsp = POLLNVAL;
+			return (0);
+		}
 		if (events & POLLWRNORM) {
 			queue_t *sqp;
 
@@ -8227,7 +8232,12 @@ strpoll(
 			else if ((sqp = stp->sd_struiowrq) != NULL) {
 				/* Check sync stream barrier write q */
 				mutex_exit(QLOCK(tq));
-				polllock(&stp->sd_pollist, QLOCK(sqp));
+				if (polllock(&stp->sd_pollist,
+				    QLOCK(sqp)) != 0) {
+					releasestr(qp);
+					*reventsp = POLLNVAL;
+					return (0);
+				}
 				if (sqp->q_flag & QFULL)
 					/* ensure pollwakeup() is done */
 					sqp->q_flag |= QWANTWSYNC;
@@ -8240,7 +8250,12 @@ strpoll(
 					goto chkrd;
 				}
 				mutex_exit(QLOCK(sqp));
-				polllock(&stp->sd_pollist, QLOCK(tq));
+				if (polllock(&stp->sd_pollist,
+				    QLOCK(tq)) != 0) {
+					releasestr(qp);
+					*reventsp = POLLNVAL;
+					return (0);
+				}
 			} else
 				retevents |= POLLOUT;
 		}
@@ -8272,7 +8287,10 @@ chkrd:
 		 * Note: Need to do polllock() here since ps_lock may be
 		 * held. See bug 4191544.
 		 */
-		polllock(&stp->sd_pollist, &stp->sd_lock);
+		if (polllock(&stp->sd_pollist, &stp->sd_lock) != 0) {
+			*reventsp = POLLNVAL;
+			return (0);
+		}
 		headlocked = 1;
 		mp = qp->q_first;
 		while (mp) {
@@ -8311,7 +8329,7 @@ chkrd:
 	}
 
 	*reventsp = (short)retevents;
-	if (retevents) {
+	if (retevents && !(events & POLLET)) {
 		if (headlocked)
 			mutex_exit(&stp->sd_lock);
 		return (0);
@@ -8325,7 +8343,10 @@ chkrd:
 	if (!anyyet) {
 		*phpp = &stp->sd_pollist;
 		if (headlocked == 0) {
-			polllock(&stp->sd_pollist, &stp->sd_lock);
+			if (polllock(&stp->sd_pollist, &stp->sd_lock) != 0) {
+				*reventsp = POLLNVAL;
+				return (0);
+			}
 			headlocked = 1;
 		}
 		stp->sd_rput_opt |= SR_POLLIN;
