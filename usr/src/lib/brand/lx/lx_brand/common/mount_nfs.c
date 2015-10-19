@@ -1019,12 +1019,15 @@ make_secure(struct nfs_args *args, char *hostname, struct netconfig *nconf,
 			flags |= AUTH_F_RPCTIMESYNC;
 		} else {
 			/*
-			 * TBD netdir_getbyname wants to lookup the timeserver
-			 * entry in the /etc/services file (but our libnsl to do
-			 * this won't work in Linux). That entry is:
+			 * TBD:
+			 * For AUTH_DH (AUTH_DES) netdir_getbyname wants to
+			 * lookup the timeserver entry in the /etc/services
+			 * file (but our libnsl to do this won't work in Linux).
+			 * That entry is:
 			 *	timed    525/udp    timeserver
-			 * Since we haven't implemented the emulation for
-			 * netdir_getbyname yet, we'll simply return an error.
+			 * Since we haven't implemented the emulation for that
+			 * aspect of netdir_getbyname yet, we'll simply return
+			 * an error.
 			 */
 			struct nd_hostserv hs;
 			int error;
@@ -1032,8 +1035,7 @@ make_secure(struct nfs_args *args, char *hostname, struct netconfig *nconf,
 			hs.h_host = hostname;
 			hs.h_serv = "timserver";
 
-			/* XXX */
-			if (1)
+			if (nmdp->nmd_nfs_sec.sc_rpcnum == AUTH_DH)
 				return (-1);
 
 			error = netdir_getbyname(nconf, &hs, &retaddrs);
@@ -1127,13 +1129,46 @@ get_the_addr(char *hostname, rpcprog_t prog, rpcvers_t vers,
 		goto done;
 
 	if (vers == NFS_V4) {
-		/* SET_ERR_RET(error, ERR_NOHOST, 1); */
-		goto done;
-	}
+		struct nd_hostserv hs;
+		struct nd_addrlist *retaddrs;
+		int retval;
+		hs.h_host = hostname;
 
-	if (rpcb_getaddr(prog, vers, nconf, &tbind->addr,
-	    hostname) == FALSE) {
-		goto done;
+		/* NFS where vers==4 does not support UDP */
+		if (strncasecmp(nconf->nc_proto, NC_UDP,
+		    strlen(NC_UDP)) == 0) {
+			SET_ERR_RET(error, ERR_PROTO_UNSUPP, 0);
+			goto done;
+		}
+
+		if (port == 0)
+			hs.h_serv = "nfs";
+		else
+			hs.h_serv = NULL;
+
+		if ((retval = netdir_getbyname(nconf, &hs, &retaddrs))
+		    != ND_OK) {
+			/*
+			 * Carefully set the error value here. Want to signify
+			 * that the error was an unknown host.
+			 */
+			if (retval == ND_NOHOST) {
+				SET_ERR_RET(error, ERR_NOHOST, retval);
+			}
+
+			goto done;
+		}
+		memcpy(tbind->addr.buf, retaddrs->n_addrs->buf,
+		    retaddrs->n_addrs->len);
+		tbind->addr.len = retaddrs->n_addrs->len;
+		netdir_free((void *)retaddrs, ND_ADDRLIST);
+		(void) netdir_options(nconf, ND_SET_RESERVEDPORT, fd, NULL);
+
+	} else {
+		if (rpcb_getaddr(prog, vers, nconf, &tbind->addr,
+		    hostname) == FALSE) {
+			goto done;
+		}
 	}
 
 	if (port) {
