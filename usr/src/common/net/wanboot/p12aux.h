@@ -44,8 +44,8 @@ extern "C" {
  *
  * My apologies.
  */
-/* LINTED */
-DECLARE_STACK_OF(EVP_PKEY);
+/* CSTYLED */
+DECLARE_STACK_OF(EVP_PKEY)
 
 #define	sk_EVP_PKEY_new_null() SKM_sk_new_null(EVP_PKEY)
 #define	sk_EVP_PKEY_free(st) SKM_sk_free(EVP_PKEY, (st))
