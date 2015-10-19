@@ -2862,11 +2862,6 @@ $endif
 	_dgettext;
 	_doprnt;
 	_doscan;
-	epoll_create;
-	epoll_create1;
-	epoll_ctl;
-	epoll_wait;
-	epoll_pwait;
 	_errfp;
 	_errxfp;
 	exportfs;
@@ -3061,9 +3056,6 @@ $endif
 	_thr_suspend_mutator;
 	thr_wait_mutator;
 	_thr_wait_mutator;
-	timerfd_create;
-	timerfd_gettime;
-	timerfd_settime;
 	__tls_get_addr;
 	_tmem_get_base;
 	_tmem_get_nentries;
