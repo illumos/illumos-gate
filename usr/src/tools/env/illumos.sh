@@ -47,21 +47,9 @@
 #
 export NIGHTLY_OPTIONS='-FnCDAlmprt'
 
-#
-# -- PLEASE READ THIS --
-#
-# The variables  GATE and CODEMGR_WS must always be customised to
-# match your workspace/gate location!!
-#
-# -- PLEASE READ THIS --
-#
-
-# This is a variable for the rest of the script - GATE doesn't matter to
-# nightly itself
-export GATE='testws'
-
-# CODEMGR_WS - where is your workspace at (or what should nightly name it)
-export CODEMGR_WS="$HOME/ws/$GATE"
+# CODEMGR_WS - where is your workspace at
+#export CODEMGR_WS="$HOME/ws/illumos-gate"
+export CODEMGR_WS="`git rev-parse --show-toplevel`"
 
 # Maximum number of dmake jobs.  The recommended number is 2 + NCPUS,
 # where NCPUS is the number of logical CPUs on your build system.
@@ -160,7 +148,7 @@ export MULTI_PROTO="no"
 # when the release slips (nah) or you move an environment file to a new
 # release
 #
-export VERSION="$GATE"
+export VERSION="`git describe --long --all HEAD | cut -d/ -f2-`"
 
 #
 # the RELEASE and RELEASE_DATE variables are set in Makefile.master;
