@@ -384,8 +384,8 @@ write_elfnotes(proc_t *p, int sig, vnode_t *vp, offset_t offset,
 			fdinfo.pr_minor = 0;
 			fdinfo.pr_ino = 0;
 			fdinfo.pr_mode = 0;
-			fdinfo.pr_uid = -1;
-			fdinfo.pr_gid = -1;
+			fdinfo.pr_uid = (uid_t)-1;
+			fdinfo.pr_gid = (gid_t)-1;
 			fdinfo.pr_rmajor = 0;
 			fdinfo.pr_rminor = 0;
 			fdinfo.pr_size = -1;
