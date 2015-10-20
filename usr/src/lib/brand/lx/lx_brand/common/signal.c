@@ -1574,6 +1574,7 @@ lx_sigdeliver(int lx_sig, siginfo_t *sip, ucontext_t *ucp, size_t stacksz,
 	 * getcontext() stores the register state:
 	 */
 	volatile boolean_t signal_delivered = B_FALSE;
+	volatile boolean_t sp_modified = B_FALSE;
 	volatile uintptr_t lxfp = 0;
 	volatile uintptr_t old_tsd_sp = 0;
 	volatile int newstack = 0;
@@ -1611,11 +1612,15 @@ lx_sigdeliver(int lx_sig, siginfo_t *sip, ucontext_t *ucp, size_t stacksz,
 		 * return system call.
 		 */
 		lx_debug("lx_sigdeliver: WE ARE BACK, VIA UC @ %p!\n", &uc);
-		/*
-		 * Restore the original stack pointer, which we saved on our
-		 * alt. stack, back into the context.
-		 */
-		LX_REG(ucp, REG_SP) = orig_sp;
+
+		if (sp_modified) {
+			/*
+			 * Restore the original stack pointer, which we saved
+			 * on our alt. stack, back into the context.
+			 */
+			LX_REG(ucp, REG_SP) = orig_sp;
+		}
+
 		goto after_signal_handler;
 	}
 	signal_delivered = B_TRUE;
@@ -1678,10 +1683,11 @@ lx_sigdeliver(int lx_sig, siginfo_t *sip, ucontext_t *ucp, size_t stacksz,
 			 */
 			lxfp = MIN(lxtsd->lxtsd_lx_sp, lxfp);
 		}
-	}
 
-	/* Replace the context SP with the one from the Linux context */
-	LX_REG(ucp, REG_SP) = lxfp;
+		/* Replace the context SP with the one from the Linux context */
+		LX_REG(ucp, REG_SP) = lxfp;
+		sp_modified = B_TRUE;
+	}
 
 	/*
 	 * Account for a reserved stack region (for amd64, this is 128 bytes),
