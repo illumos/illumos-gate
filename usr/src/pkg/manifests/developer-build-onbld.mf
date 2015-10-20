@@ -129,6 +129,8 @@ file path=opt/onbld/bin/wsdiff mode=0555
 file path=opt/onbld/bin/xref mode=0555
 file path=opt/onbld/bin/xref.mk
 file path=opt/onbld/env/illumos
+file path=opt/onbld/env/omnios-illumos-gate
+file path=opt/onbld/env/omnios-illumos-omnios
 file path=opt/onbld/etc/SampleLinks
 file path=opt/onbld/etc/SamplePkgLinks
 file path=opt/onbld/etc/exception_lists/check_rtime

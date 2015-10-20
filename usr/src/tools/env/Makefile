@@ -22,7 +22,7 @@
 #
 
 ENVFILES= \
-	illumos
+	illumos omnios-illumos-omnios omnios-illumos-gate
 
 include ../Makefile.tools
 
