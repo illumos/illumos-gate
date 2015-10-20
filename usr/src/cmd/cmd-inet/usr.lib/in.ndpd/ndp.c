@@ -1554,7 +1554,7 @@ update_ra_flag(const struct phyint *pi, const struct sockaddr_in6 *from,
 		if (errno == ESRCH) {
 			if (debug & D_IFSCAN) {
 				logmsg(LOG_DEBUG,
-"update_ra_flag: SIOCLIFGETND: nce doesn't exist, not setting IFF_ROUTER");
+"update_ra_flag: SIOCLIFGETND: nce doesn't exist, not setting IFF_ROUTER\n");
 			}
 		} else {
 			logperror_pi(pi, "update_ra_flag: SIOCLIFGETND");
