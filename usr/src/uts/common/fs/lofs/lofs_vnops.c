@@ -21,9 +21,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2015 Joyent, Inc.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -698,7 +697,47 @@ lo_create(
 			else
 				*vpp = svp;
 		}
+	} else if (error == ENOSYS && exclusive == NONEXCL &&
+	    dvp == vtoli(dvp->v_vfsp)->li_rootvp &&
+	    realvp(dvp)->v_type == VREG) {
+		/*
+		 * We have a single regular file lofs mounted, thus the file is
+		 * the root vnode (the directory vp is the file vp). Some
+		 * underlying file systems (e.g. tmpfs or ufs) properly handle
+		 * this style of create but at least zfs won't support create
+		 * this way (see zfs_fvnodeops_template which has fs_nosys for
+		 * the vop_create entry because zfs_create doesn't work
+		 * properly for this case).
+		 */
+		if ((error = VOP_ACCESS(dvp, mode, 0, cr, NULL)) == 0) {
+			/*
+			 * Since we already know the vnode for the existing
+			 * file we can handle create as a no-op, as expected,
+			 * truncating the file if necessary.
+			 */
+			struct vattr vattr;
+
+			vattr.va_size = 0;
+			vattr.va_mask = AT_SIZE;
+
+			if ((va->va_mask & AT_SIZE) != 0 && va->va_size == 0 &&
+			    VOP_SETATTR(dvp, &vattr, 0, CRED(), NULL) != 0)
+				return (error);
+
+			/*
+			 * vn_createat will do a vn_rele on the file if it is
+			 * pre-existing, which it is in the case of a single
+			 * file mounted as the root. Thus, when we eventually
+			 * close the file the count will already be 1 so the
+			 * vnode would be freed. To prevent that, we add an
+			 * extra hold here.
+			 */
+			VN_HOLD(dvp);
+			*vpp = dvp;
+			error = 0;
+		}
 	}
+
 	return (error);
 }
 
