@@ -21,8 +21,7 @@
 #
 
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
+# Copyright 2015 Toomas Soome <tsoome@me.com>
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -98,7 +97,11 @@ if ($#ARGV >= 0) {
 exit $err_stat;
 
 sub err($) {
-	printf $fmt, $filename, $., $_[0], $line;
+	if ($verbose) {
+		printf $fmt, $filename, $., $_[0], $line;
+	} else {
+		printf $fmt, $filename, $., $_[0];
+	}
 	$err_stat = 1;
 }
 
@@ -428,7 +431,7 @@ if (0) {
 	if (/^\s*\(void\)[^ ]/) {
 		err("missing space after (void) cast");
 	}
-	if (/\S{/ && !/{{/) {
+	if (/\S\{/ && !/\{\{/) {
 		err("missing space before left brace");
 	}
 	if ($in_class && /^\s+{/ && ($prev =~ /\)\s*$/)) {

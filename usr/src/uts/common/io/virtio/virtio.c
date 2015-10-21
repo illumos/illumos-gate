@@ -920,13 +920,11 @@ virtio_register_msi(struct virtio_softc *sc,
 		}
 	}
 
-	/* We know we are using MSI, so set the config offset. */
-	sc->sc_config_offset = VIRTIO_CONFIG_DEVICE_CONFIG_MSI;
-
 	ret = ddi_intr_get_cap(sc->sc_intr_htable[0], &sc->sc_intr_cap);
-	/* Just in case. */
-	if (ret != DDI_SUCCESS)
-		sc->sc_intr_cap = 0;
+	if (ret == DDI_SUCCESS) {
+		sc->sc_int_type = int_type;
+		return (DDI_SUCCESS);
+	}
 
 out_add_handlers:
 out_msi_prio:
@@ -934,7 +932,8 @@ out_msi_available:
 	for (i = 0; i < actual; i++)
 		(void) ddi_intr_free(sc->sc_intr_htable[i]);
 out_msi_alloc:
-	kmem_free(sc->sc_intr_htable, sizeof (ddi_intr_handle_t) * count);
+	kmem_free(sc->sc_intr_htable,
+	    sizeof (ddi_intr_handle_t) * handler_count);
 
 	return (ret);
 }
@@ -1037,8 +1036,7 @@ virtio_register_intx(struct virtio_softc *sc,
 		goto out_add_handlers;
 	}
 
-	/* We know we are not using MSI, so set the config offset. */
-	sc->sc_config_offset = VIRTIO_CONFIG_DEVICE_CONFIG_NOMSI;
+	sc->sc_int_type = DDI_INTR_TYPE_FIXED;
 
 	return (DDI_SUCCESS);
 
@@ -1064,6 +1062,9 @@ virtio_register_ints(struct virtio_softc *sc,
 {
 	int ret;
 	int intr_types;
+
+	/* Default offset until MSI-X is enabled, if ever. */
+	sc->sc_config_offset = VIRTIO_CONFIG_DEVICE_CONFIG_NOMSIX;
 
 	/* Determine which types of interrupts are supported */
 	ret = ddi_intr_get_supported_types(sc->sc_dev, &intr_types);
@@ -1106,7 +1107,7 @@ virtio_enable_msi(struct virtio_softc *sc)
 	if (sc->sc_intr_config)
 		vq_handler_count--;
 
-	/* Enable the iterrupts. Either the whole block, or one by one. */
+	/* Enable the interrupts. Either the whole block, or one by one. */
 	if (sc->sc_intr_cap & DDI_INTR_FLAG_BLOCK) {
 		ret = ddi_intr_block_enable(sc->sc_intr_htable,
 		    sc->sc_intr_num);
@@ -1178,6 +1179,12 @@ virtio_enable_msi(struct virtio_softc *sc)
 		}
 	}
 
+	/* Configuration offset depends on whether MSI-X is used. */
+	if (sc->sc_int_type == DDI_INTR_TYPE_MSIX)
+		sc->sc_config_offset = VIRTIO_CONFIG_DEVICE_CONFIG_MSIX;
+	else
+		ASSERT(sc->sc_int_type == DDI_INTR_TYPE_MSI);
+
 	return (DDI_SUCCESS);
 
 out_bind:
@@ -1198,6 +1205,26 @@ out_bind:
 	/* LINTED E_BAD_PTR_CAST_ALIGN */
 	ddi_put16(sc->sc_ioh, (uint16_t *)(sc->sc_io_addr +
 	    VIRTIO_CONFIG_CONFIG_VECTOR), VIRTIO_MSI_NO_VECTOR);
+
+	/* Disable the interrupts. Either the whole block, or one by one. */
+	if (sc->sc_intr_cap & DDI_INTR_FLAG_BLOCK) {
+		ret = ddi_intr_block_disable(sc->sc_intr_htable,
+		    sc->sc_intr_num);
+		if (ret != DDI_SUCCESS) {
+			dev_err(sc->sc_dev, CE_WARN,
+			    "Failed to disable MSIs, won't be able to "
+			    "reuse next time");
+		}
+	} else {
+		for (i = 0; i < sc->sc_intr_num; i++) {
+			ret = ddi_intr_disable(sc->sc_intr_htable[i]);
+			if (ret != DDI_SUCCESS) {
+				dev_err(sc->sc_dev, CE_WARN,
+				    "Failed to disable interrupt %d, "
+				    "won't be able to reuse", i);
+			}
+		}
+	}
 
 	ret = DDI_FAILURE;
 
@@ -1227,12 +1254,14 @@ int
 virtio_enable_ints(struct virtio_softc *sc)
 {
 
+	ASSERT(sc->sc_config_offset == VIRTIO_CONFIG_DEVICE_CONFIG_NOMSIX);
+
 	/* See if we are using MSI. */
-	if (sc->sc_config_offset == VIRTIO_CONFIG_DEVICE_CONFIG_MSI)
+	if (sc->sc_int_type == DDI_INTR_TYPE_MSIX ||
+	    sc->sc_int_type == DDI_INTR_TYPE_MSI)
 		return (virtio_enable_msi(sc));
 
-	ASSERT(sc->sc_config_offset == VIRTIO_CONFIG_DEVICE_CONFIG_NOMSI);
-
+	ASSERT(sc->sc_int_type == DDI_INTR_TYPE_FIXED);
 	return (virtio_enable_intx(sc));
 }
 
@@ -1243,7 +1272,8 @@ virtio_release_ints(struct virtio_softc *sc)
 	int ret;
 
 	/* We were running with MSI, unbind them. */
-	if (sc->sc_config_offset == VIRTIO_CONFIG_DEVICE_CONFIG_MSI) {
+	if (sc->sc_int_type == DDI_INTR_TYPE_MSIX ||
+	    sc->sc_int_type == DDI_INTR_TYPE_MSI) {
 		/* Unbind all vqs */
 		for (i = 0; i < sc->sc_nvqs; i++) {
 			ddi_put16(sc->sc_ioh,
@@ -1265,7 +1295,7 @@ virtio_release_ints(struct virtio_softc *sc)
 
 	}
 
-	/* Disable the iterrupts. Either the whole block, or one by one. */
+	/* Disable the interrupts. Either the whole block, or one by one. */
 	if (sc->sc_intr_cap & DDI_INTR_FLAG_BLOCK) {
 		ret = ddi_intr_block_disable(sc->sc_intr_htable,
 		    sc->sc_intr_num);
@@ -1296,8 +1326,8 @@ virtio_release_ints(struct virtio_softc *sc)
 	kmem_free(sc->sc_intr_htable, sizeof (ddi_intr_handle_t) *
 	    sc->sc_intr_num);
 
-	/* After disabling interrupts, the config offset is non-MSI. */
-	sc->sc_config_offset = VIRTIO_CONFIG_DEVICE_CONFIG_NOMSI;
+	/* After disabling interrupts, the config offset is non-MSI-X. */
+	sc->sc_config_offset = VIRTIO_CONFIG_DEVICE_CONFIG_NOMSIX;
 }
 
 /*
