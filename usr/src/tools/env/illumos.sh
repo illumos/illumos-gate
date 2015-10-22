@@ -123,13 +123,11 @@ export LOGFILE="$ATLOG/nightly.log"
 export MACH="$(uname -p)"
 
 #
-#  The following two macros are the closed/crypto binaries.  Once
-#  Illumos has totally freed itself, we can remove these references.
+#  The following macro points to the closed binaries.  Once illumos has
+#  totally freed itself, we can remove this reference.
 #
 # Location of encumbered binaries.
 export ON_CLOSED_BINS="$CODEMGR_WS/closed"
-# Location of signed cryptographic binaries.
-export ON_CRYPTO_BINS="$CODEMGR_WS/on-crypto.$MACH.tar.bz2"
 
 # REF_PROTO_LIST - for comparing the list of stuff in your proto area
 # with. Generally this should be left alone, since you want to see differences
