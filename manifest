@@ -9503,6 +9503,7 @@ f usr/lib/mdb/kvm/amd64/mac.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/md.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/mdb_kb.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/mdb_ks.so 0555 root sys
+f usr/lib/mdb/kvm/amd64/mm.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/mpt.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/mpt_sas.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/mr_sas.so 0555 root sys
@@ -9559,6 +9560,7 @@ f usr/lib/mdb/kvm/mac.so 0555 root sys
 f usr/lib/mdb/kvm/md.so 0555 root sys
 f usr/lib/mdb/kvm/mdb_kb.so 0555 root sys
 f usr/lib/mdb/kvm/mdb_ks.so 0555 root sys
+f usr/lib/mdb/kvm/mm.so 0555 root sys
 f usr/lib/mdb/kvm/mpt.so 0555 root sys
 f usr/lib/mdb/kvm/mpt_sas.so 0555 root sys
 f usr/lib/mdb/kvm/mr_sas.so 0555 root sys
