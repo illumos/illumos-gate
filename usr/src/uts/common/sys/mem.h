@@ -23,6 +23,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2015, Joyent, Inc.  All rights reserved.
+ */
+
 #ifndef _SYS_MEM_H
 #define	_SYS_MEM_H
 
@@ -127,6 +131,15 @@ typedef struct mem_info {
 extern pfn_t impl_obmem_pfnum(pfn_t);
 
 extern int plat_mem_do_mmio(struct uio *, enum uio_rw);
+
+typedef struct mm_logentry {
+	uintptr_t	mle_vaddr;	/* vaddr being written to */
+	size_t		mle_len;	/* length of write */
+	timespec_t	mle_hrestime;	/* hrestime at time of write */
+	hrtime_t	mle_hrtime;	/* hrtime at time of write */
+	pid_t		mle_pid;	/* pid of writing process */
+	char		mle_psargs[80];	/* psargs of writing process */
+} mm_logentry_t;
 
 #endif	/* _KERNEL */
 
