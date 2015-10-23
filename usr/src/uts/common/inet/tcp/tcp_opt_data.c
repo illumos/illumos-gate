@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -62,7 +63,8 @@ opdes_t	tcp_opt_arr[] = {
 { SO_USELOOPBACK, SOL_SOCKET, OA_RW, OA_RW, OP_NP, 0, sizeof (int), 0
 	},
 { SO_BROADCAST,	SOL_SOCKET, OA_RW, OA_RW, OP_NP, 0, sizeof (int), 0 },
-{ SO_REUSEADDR, SOL_SOCKET, OA_RW, OA_RW, OP_NP, 0, sizeof (int), 0 },
+{ SO_REUSEADDR,	SOL_SOCKET, OA_RW, OA_RW, OP_NP, 0, sizeof (int), 0 },
+{ SO_REUSEPORT,	SOL_SOCKET, OA_RW, OA_RW, OP_NP, 0, sizeof (int), 0 },
 { SO_OOBINLINE, SOL_SOCKET, OA_RW, OA_RW, OP_NP, 0, sizeof (int), 0 },
 { SO_TYPE,	SOL_SOCKET, OA_R, OA_R, OP_NP, 0, sizeof (int), 0 },
 { SO_SNDBUF,	SOL_SOCKET, OA_RW, OA_RW, OP_NP, 0, sizeof (int), 0 },
@@ -483,6 +485,42 @@ tcp_opt_get(conn_t *connp, int level, int name, uchar_t *ptr)
 	return (retval);
 }
 
+static int
+tcp_set_reuseport(conn_t *connp, boolean_t do_enable)
+{
+	tcp_t *tcp = connp->conn_tcp;
+	struct tcp_rg_s *rg;
+
+	if (do_enable && !IPCL_IS_NONSTR(connp)) {
+		/*
+		 * SO_REUSEPORT cannot be enabled on sockets which have fallen
+		 * back to the STREAMS API.
+		 */
+		return (EINVAL);
+	}
+	if (connp->conn_reuseport == 0 && do_enable) {
+		/* disabled -> enabled */
+		if (tcp->tcp_rg_bind != NULL) {
+			tcp_rg_setactive(tcp->tcp_rg_bind, do_enable);
+		} else {
+			if (tcp->tcp_state >= TCPS_BOUND ||
+			    tcp->tcp_state <= TCPS_CLOSED)
+				return (EINVAL);
+			if ((rg = tcp_rg_init(tcp)) == NULL)
+				return (ENOMEM);
+			tcp->tcp_rg_bind = rg;
+		}
+		connp->conn_reuseport = 1;
+	} else if (connp->conn_reuseport != 0 && !do_enable) {
+		/* enabled -> disabled */
+		if (tcp->tcp_rg_bind != NULL) {
+			tcp_rg_setactive(tcp->tcp_rg_bind, do_enable);
+		}
+		connp->conn_reuseport = 0;
+	}
+	return (0);
+}
+
 /*
  * We declare as 'int' rather than 'void' to satisfy pfi_t arg requirements.
  * Parameters are assumed to be verified by the caller.
@@ -652,6 +690,11 @@ tcp_opt_set(conn_t *connp, uint_t optset_context, int level, int name,
 				tcp->tcp_snd_zcopy_aware = 1;
 			}
 			*outlenp = inlen;
+			return (0);
+		case SO_REUSEPORT:
+			if (!checkonly) {
+				return (tcp_set_reuseport(connp, *i1 != 0));
+			}
 			return (0);
 		}
 		break;

@@ -20,9 +20,9 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2011, Joyent Inc. All rights reserved.
  * Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright (c) 2013, 2014 by Delphix. All rights reserved.
+ * Copyright 2015 Joyent Inc.
  */
 
 #ifndef	_INET_TCP_IMPL_H
@@ -375,6 +375,22 @@ typedef struct tcp_listen_cnt_s {
 	uint32_t	tlc_drop;
 } tcp_listen_cnt_t;
 
+/*
+ * Track tcp_t entities bound to the same port/address tuple via SO_REUSEPORT.
+ * - tcprg_lock:	Protects the other fields
+ * - tcprg_size:	Allocated size (in entries) of tcprg_members array
+ * - tcprg_count:	Count of occupied tcprg_members slots
+ * - tcprg_active:	Count of members which still have SO_REUSEPORT set
+ * - tcprg_members:	Connections associated with address/port group
+ */
+typedef struct tcp_rg_s {
+	kmutex_t	tcprg_lock;
+	unsigned int	tcprg_size;
+	unsigned int	tcprg_count;
+	unsigned int	tcprg_active;
+	tcp_t		**tcprg_members;
+} tcp_rg_t;
+
 #define	TCP_TLC_REPORT_INTERVAL	(30 * MINUTES)
 
 #define	TCP_DECR_LISTEN_CNT(tcp)					\
@@ -618,6 +634,10 @@ extern in_port_t	tcp_bindi(tcp_t *, in_port_t, const in6_addr_t *,
 			    int, boolean_t, boolean_t, boolean_t);
 extern in_port_t	tcp_update_next_port(in_port_t, const tcp_t *,
 			    boolean_t);
+extern tcp_rg_t *tcp_rg_init(tcp_t *);
+extern boolean_t tcp_rg_remove(tcp_rg_t *, tcp_t *);
+extern void tcp_rg_destroy(tcp_rg_t *);
+extern void tcp_rg_setactive(tcp_rg_t *, boolean_t);
 
 /*
  * Fusion related functions in tcp_fusion.c.

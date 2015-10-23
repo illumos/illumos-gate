@@ -198,6 +198,7 @@ struct so_snd_bufinfo {
 #define	SO_SRCADDR	0x2001		/* Internal: AF_UNIX source address */
 #define	SO_FILEP	0x2002		/* Internal: AF_UNIX file pointer */
 #define	SO_UNIX_CLOSE	0x2003		/* Internal: AF_UNIX peer closed */
+#define	SO_REUSEPORT	0x2004		/* allow simultaneous port reuse */
 #endif	/* _KERNEL */
 
 /*

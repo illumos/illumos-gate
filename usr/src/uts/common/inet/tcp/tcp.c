@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2011, Joyent Inc. All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  * Copyright (c) 2011 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2013,2014 by Delphix. All rights reserved.
  * Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
@@ -1423,6 +1423,21 @@ tcp_free(tcp_t *tcp)
 	tcp_close_mpp(&tcp->tcp_conn.tcp_eager_conn_ind);
 
 	/*
+	 * Destroy any association with SO_REUSEPORT group.
+	 */
+	if (tcp->tcp_rg_bind != NULL) {
+		/*
+		 * This is only necessary for connections which enabled
+		 * SO_REUSEPORT but were never bound.  Such connections should
+		 * be the one and only member of the tcp_rg_tp to which they
+		 * have been associated.
+		 */
+		VERIFY(tcp_rg_remove(tcp->tcp_rg_bind, tcp));
+		tcp_rg_destroy(tcp->tcp_rg_bind);
+		tcp->tcp_rg_bind = NULL;
+	}
+
+	/*
 	 * If this is a non-STREAM socket still holding on to an upper
 	 * handle, release it. As a result of fallback we might also see
 	 * STREAMS based conns with upper handles, in which case there is
@@ -2054,8 +2069,7 @@ tcp_reinit(tcp_t *tcp)
  * structure!
  */
 static void
-tcp_reinit_values(tcp)
-	tcp_t *tcp;
+tcp_reinit_values(tcp_t *tcp)
 {
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
 	conn_t		*connp = tcp->tcp_connp;

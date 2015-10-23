@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -55,6 +56,7 @@ static uint32_t tcp_random_anon_port = 1;
 static int	tcp_bind_select_lport(tcp_t *, in_port_t *, boolean_t,
 		    cred_t *cr);
 static in_port_t	tcp_get_next_priv_port(const tcp_t *);
+static int tcp_rg_insert(tcp_rg_t *, struct tcp_s *);
 
 /*
  * Hash list insertion routine for tcp_t structures. Each hash bucket
@@ -172,6 +174,16 @@ tcp_bind_hash_remove(tcp_t *tcp)
 
 	ASSERT(lockp != NULL);
 	mutex_enter(lockp);
+
+	/* destroy any association with SO_REUSEPORT group */
+	if (tcp->tcp_rg_bind != NULL) {
+		if (tcp_rg_remove(tcp->tcp_rg_bind, tcp)) {
+			/* Last one out turns off the lights */
+			tcp_rg_destroy(tcp->tcp_rg_bind);
+		}
+		tcp->tcp_rg_bind = NULL;
+	}
+
 	if (tcp->tcp_ptpbhn) {
 		tcpnext = tcp->tcp_bind_hash_port;
 		if (tcpnext != NULL) {
@@ -636,13 +648,12 @@ tcp_bind_check(conn_t *connp, struct sockaddr *sa, socklen_t len, cred_t *cr,
 }
 
 /*
- * If the "bind_to_req_port_only" parameter is set, if the requested port
- * number is available, return it, If not return 0
+ * If the "bind_to_req_port_only" parameter is set and the requested port
+ * number is available, return it (else return 0).
  *
- * If "bind_to_req_port_only" parameter is not set and
- * If the requested port number is available, return it.  If not, return
- * the first anonymous port we happen across.  If no anonymous ports are
- * available, return 0. addr is the requested local address, if any.
+ * If "bind_to_req_port_only" parameter is not set and the requested port
+ * number is available, return it.  If not, return the first anonymous port we
+ * happen across.  If no anonymous ports are available, return 0.
  *
  * In either case, when succeeding update the tcp_t to record the port number
  * and insert it in the bind hash table.
@@ -662,6 +673,7 @@ tcp_bindi(tcp_t *tcp, in_port_t port, const in6_addr_t *laddr,
 	int loopmax;
 	conn_t *connp = tcp->tcp_connp;
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
+	boolean_t reuseport = connp->conn_reuseport;
 
 	/*
 	 * Lookup for free addresses is done in a loop and "loopmax"
@@ -698,6 +710,7 @@ tcp_bindi(tcp_t *tcp, in_port_t port, const in6_addr_t *laddr,
 		tf_t		*tbf;
 		tcp_t		*ltcp;
 		conn_t		*lconnp;
+		boolean_t	attempt_reuse = B_FALSE;
 
 		lport = htons(port);
 
@@ -724,6 +737,7 @@ tcp_bindi(tcp_t *tcp, in_port_t port, const in6_addr_t *laddr,
 		for (; ltcp != NULL; ltcp = ltcp->tcp_bind_hash_port) {
 			boolean_t not_socket;
 			boolean_t exclbind;
+			boolean_t addrmatch;
 
 			lconnp = ltcp->tcp_connp;
 
@@ -829,22 +843,34 @@ tcp_bindi(tcp_t *tcp, in_port_t port, const in6_addr_t *laddr,
 			    &lconnp->conn_faddr_v6)))
 				continue;
 
+			addrmatch = IN6_ARE_ADDR_EQUAL(laddr,
+			    &lconnp->conn_bound_addr_v6);
+
+			if (addrmatch && reuseport && bind_to_req_port_only &&
+			    (ltcp->tcp_state == TCPS_BOUND ||
+			    ltcp->tcp_state == TCPS_LISTEN)) {
+				/*
+				 * This entry is bound to the exact same
+				 * address and port.  If SO_REUSEPORT is set on
+				 * the calling socket, attempt to reuse this
+				 * binding if it too appears to be willing.
+				 */
+				attempt_reuse = B_TRUE;
+				break;
+			}
+
 			if (!reuseaddr) {
 				/*
-				 * No socket option SO_REUSEADDR.
-				 * If existing port is bound to
-				 * a non-wildcard IP address
-				 * and the requesting stream is
-				 * bound to a distinct
-				 * different IP addresses
-				 * (non-wildcard, also), keep
-				 * going.
+				 * No socket option SO_REUSEADDR.  If an
+				 * existing port is bound to a non-wildcard IP
+				 * address and the requesting stream is bound
+				 * to a distinct different IP address
+				 * (non-wildcard, also), keep going.
 				 */
 				if (!V6_OR_V4_INADDR_ANY(*laddr) &&
 				    !V6_OR_V4_INADDR_ANY(
 				    lconnp->conn_bound_addr_v6) &&
-				    !IN6_ARE_ADDR_EQUAL(laddr,
-				    &lconnp->conn_bound_addr_v6))
+				    !addrmatch)
 					continue;
 				if (ltcp->tcp_state >= TCPS_BOUND) {
 					/*
@@ -859,27 +885,47 @@ tcp_bindi(tcp_t *tcp, in_port_t port, const in6_addr_t *laddr,
 				 * socket option SO_REUSEADDR is set on the
 				 * binding tcp_t.
 				 *
-				 * If two streams are bound to
-				 * same IP address or both addr
-				 * and bound source are wildcards
-				 * (INADDR_ANY), we want to stop
-				 * searching.
-				 * We have found a match of IP source
-				 * address and source port, which is
-				 * refused regardless of the
-				 * SO_REUSEADDR setting, so we break.
+				 * If two streams are bound to the same IP
+				 * address or both addr and bound source are
+				 * wildcards (INADDR_ANY), we want to stop
+				 * searching.  We have found a match of IP
+				 * source address and source port, which is
+				 * refused regardless of the SO_REUSEADDR
+				 * setting, so we break.
 				 */
-				if (IN6_ARE_ADDR_EQUAL(laddr,
-				    &lconnp->conn_bound_addr_v6) &&
+				if (addrmatch &&
 				    (ltcp->tcp_state == TCPS_LISTEN ||
 				    ltcp->tcp_state == TCPS_BOUND))
 					break;
 			}
 		}
-		if (ltcp != NULL) {
+		if (ltcp != NULL && !attempt_reuse) {
 			/* The port number is busy */
 			mutex_exit(&tbf->tf_lock);
 		} else {
+			if (attempt_reuse) {
+				int err;
+
+				ASSERT(ltcp != NULL);
+				ASSERT(ltcp->tcp_rg_bind != NULL);
+				ASSERT(tcp->tcp_rg_bind != NULL);
+				ASSERT(ltcp->tcp_rg_bind != tcp->tcp_rg_bind);
+
+				err = tcp_rg_insert(ltcp->tcp_rg_bind, tcp);
+				if (err != 0) {
+					mutex_exit(&tbf->tf_lock);
+					return (0);
+				}
+				/*
+				 * Now that the newly-binding socket has joined
+				 * the existing reuseport group on ltcp, it
+				 * should clean up its own (empty) group.
+				 */
+				VERIFY(tcp_rg_remove(tcp->tcp_rg_bind, tcp));
+				tcp_rg_destroy(tcp->tcp_rg_bind);
+				tcp->tcp_rg_bind = ltcp->tcp_rg_bind;
+			}
+
 			/*
 			 * This port is ours. Insert in fanout and mark as
 			 * bound to prevent others from getting the port
@@ -943,4 +989,126 @@ tcp_bindi(tcp_t *tcp, in_port_t port, const in6_addr_t *laddr,
 		 */
 	} while (++count < loopmax);
 	return (0);
+}
+
+/* Max number of members in TCP SO_REUSEPORT group */
+#define	TCP_RG_SIZE_MAX		64
+/* Step size when expanding members array */
+#define	TCP_RG_SIZE_STEP	2
+
+
+tcp_rg_t *
+tcp_rg_init(tcp_t *tcp)
+{
+	tcp_rg_t *rg;
+	rg = kmem_alloc(sizeof (tcp_rg_t), KM_NOSLEEP|KM_NORMALPRI);
+	if (rg == NULL)
+		return (NULL);
+	rg->tcprg_members = kmem_zalloc(2 * sizeof (tcp_t *),
+	    KM_NOSLEEP|KM_NORMALPRI);
+	if (rg->tcprg_members == NULL) {
+		kmem_free(rg, sizeof (tcp_rg_t));
+		return (NULL);
+	}
+
+	mutex_init(&rg->tcprg_lock, NULL, MUTEX_DEFAULT, NULL);
+	rg->tcprg_size = 2;
+	rg->tcprg_count = 1;
+	rg->tcprg_active = 1;
+	rg->tcprg_members[0] = tcp;
+	return (rg);
+}
+
+void
+tcp_rg_destroy(tcp_rg_t *rg)
+{
+	mutex_enter(&rg->tcprg_lock);
+	ASSERT(rg->tcprg_count == 0);
+	ASSERT(rg->tcprg_active == 0);
+	kmem_free(rg->tcprg_members, rg->tcprg_size * sizeof (tcp_t *));
+	mutex_destroy(&rg->tcprg_lock);
+	kmem_free(rg, sizeof (struct tcp_rg_s));
+}
+
+static int
+tcp_rg_insert(tcp_rg_t *rg, tcp_t *tcp)
+{
+	mutex_enter(&rg->tcprg_lock);
+
+	VERIFY(rg->tcprg_size > 0);
+	VERIFY(rg->tcprg_count <= rg->tcprg_size);
+	if (rg->tcprg_count != 0) {
+		cred_t *oldcred = rg->tcprg_members[0]->tcp_connp->conn_cred;
+		cred_t *newcred = tcp->tcp_connp->conn_cred;
+
+		if (crgetuid(oldcred) != crgetuid(newcred) ||
+		    crgetzoneid(oldcred) != crgetzoneid(newcred)) {
+			mutex_exit(&rg->tcprg_lock);
+			return (EPERM);
+		}
+	}
+
+	if (rg->tcprg_count == rg->tcprg_size) {
+		unsigned int oldalloc = rg->tcprg_size * sizeof (tcp_t *);
+		unsigned int newsize = rg->tcprg_size + TCP_RG_SIZE_STEP;
+		tcp_t **newmembers;
+
+		if (newsize > TCP_RG_SIZE_MAX) {
+			mutex_exit(&rg->tcprg_lock);
+			return (EINVAL);
+		}
+		newmembers = kmem_zalloc(newsize * sizeof (tcp_t *),
+		    KM_NOSLEEP|KM_NORMALPRI);
+		if (newmembers == NULL) {
+			mutex_exit(&rg->tcprg_lock);
+			return (ENOMEM);
+		}
+		bcopy(rg->tcprg_members, newmembers, oldalloc);
+		kmem_free(rg->tcprg_members, oldalloc);
+		rg->tcprg_members = newmembers;
+		rg->tcprg_size = newsize;
+	}
+
+	rg->tcprg_members[rg->tcprg_count] = tcp;
+	rg->tcprg_count++;
+	rg->tcprg_active++;
+
+	mutex_exit(&rg->tcprg_lock);
+	return (0);
+}
+
+boolean_t
+tcp_rg_remove(tcp_rg_t *rg, tcp_t *tcp)
+{
+	int i;
+	boolean_t is_empty;
+
+	mutex_enter(&rg->tcprg_lock);
+	for (i = 0; i < rg->tcprg_count; i++) {
+		if (rg->tcprg_members[i] == tcp)
+			break;
+	}
+	/* The item should be present */
+	ASSERT(i < rg->tcprg_count);
+	/* Move the last member into this position */
+	rg->tcprg_count--;
+	rg->tcprg_members[i] = rg->tcprg_members[rg->tcprg_count];
+	rg->tcprg_members[rg->tcprg_count] = NULL;
+	if (tcp->tcp_connp->conn_reuseport != 0)
+		rg->tcprg_active--;
+	is_empty = (rg->tcprg_count == 0);
+	mutex_exit(&rg->tcprg_lock);
+	return (is_empty);
+}
+
+void
+tcp_rg_setactive(tcp_rg_t *rg, boolean_t is_active)
+{
+	mutex_enter(&rg->tcprg_lock);
+	if (is_active) {
+		rg->tcprg_active++;
+	} else {
+		rg->tcprg_active--;
+	}
+	mutex_exit(&rg->tcprg_lock);
 }

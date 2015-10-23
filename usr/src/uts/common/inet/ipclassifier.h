@@ -21,6 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2015 Joyent, Inc.
  */
 
 #ifndef	_INET_IPCLASSIFIER_H
@@ -293,7 +294,8 @@ struct conn_s {
 		conn_ipv6_recvpathmtu : 1,	/* IPV6_RECVPATHMTU */
 		conn_mcbc_bind : 1,		/* Bound to multi/broadcast */
 
-		conn_pad_to_bit_31 : 12;
+		conn_reuseport : 1,		/* SO_REUSEPORT state */
+		conn_pad_to_bit_31 : 11;
 
 	boolean_t	conn_blocked;		/* conn is flow-controlled */
 

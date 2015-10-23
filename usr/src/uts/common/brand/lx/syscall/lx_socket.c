@@ -2409,7 +2409,7 @@ static const lx_sockopt_map_t ltos_socket_sockopts[LX_SO_BPF_EXTENSIONS + 1] = {
 	{ OPTNOTSUP, 0 },		/* SO_PRIORITY			*/
 	{ SO_LINGER, 0 },		/* SO_LINGER			*/
 	{ OPTNOTSUP, 0 },		/* SO_BSDCOMPAT			*/
-	{ OPTNOTSUP, 0 },		/* SO_REUSEPORT			*/
+	{ SO_REUSEPORT, sizeof (int) },	/* SO_REUSEPORT			*/
 	{ SO_RECVUCRED, sizeof (int) },	/* SO_PASSCRED			*/
 	{ OPTNOTSUP, 0 },		/* SO_PEERCRED			*/
 	{ SO_RCVLOWAT, sizeof (int) },	/* SO_RCVLOWAT			*/
