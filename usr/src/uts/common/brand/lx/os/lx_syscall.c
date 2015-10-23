@@ -935,7 +935,7 @@ lx_sysent_t lx_sysent64[] = {
 	{"setitimer",	NULL,			0,		3}, /* 38 */
 	{"getpid",	lx_getpid,		0,		0}, /* 39 */
 	{"sendfile",	NULL,			0,		4}, /* 40 */
-	{"socket",	NULL,			0,		3}, /* 41 */
+	{"socket",	lx_socket,		0,		3}, /* 41 */
 	{"connect",	lx_connect,		0,		3}, /* 42 */
 	{"accept",	NULL,			0,		3}, /* 43 */
 	{"sendto",	lx_sendto,		0,		6}, /* 44 */

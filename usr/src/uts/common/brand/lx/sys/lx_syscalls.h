@@ -110,6 +110,7 @@ extern long lx_setresgid16();
 extern long lx_setresuid();
 extern long lx_setresuid16();
 extern long lx_setrlimit();
+extern long lx_socket();
 extern long lx_socketcall();
 extern long lx_syncfs();
 extern long lx_sysinfo32();

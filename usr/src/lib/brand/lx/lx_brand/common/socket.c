@@ -72,7 +72,6 @@ typedef enum {
 
 #ifdef __i386
 
-static int lx_socket32(ulong_t *);
 static int lx_listen32(ulong_t *);
 static int lx_accept32(ulong_t *);
 static int lx_getsockname32(ulong_t *);
@@ -91,7 +90,7 @@ static struct {
 	sockfn_t s_fn;	/* Function implementing the subcommand */
 	int s_nargs;	/* Number of arguments the function takes */
 } sockfns[] = {
-	lx_socket32, 3,
+	NULL, 3,
 	NULL, 3,
 	NULL, 3,
 	lx_listen32, 2,
@@ -740,31 +739,6 @@ convert_sock_args(int in_dom, int in_type, int in_protocol, int *out_dom,
 	*out_options = options;
 	*out_protocol = in_protocol;
 	return (0);
-}
-
-long
-lx_socket(int domain, int type, int protocol)
-{
-	int options;
-	int fd;
-	int err;
-
-	err = convert_sock_args(domain, type, protocol,
-	    &domain, &type, &options, &protocol);
-	if (err != 0)
-		return (err);
-
-	lx_debug("\tsocket(%d, %d, %d)", domain, type, protocol);
-
-	fd = socket(domain, type | options, protocol);
-
-	if (fd >= 0)
-		return (fd);
-
-	if (errno == EPROTONOSUPPORT)
-		return (-ESOCKTNOSUPPORT);
-
-	return (-errno);
 }
 
 long
@@ -1547,12 +1521,6 @@ lx_accept4(int sockfd, void *np, int *nlp, int lx_flags)
 }
 
 #ifdef __i386
-
-static int
-lx_socket32(ulong_t *args)
-{
-	return (lx_socket((int)args[0], (int)args[1], (int)args[2]));
-}
 
 static int
 lx_listen32(ulong_t *args)

@@ -95,7 +95,6 @@ extern long lx_getsockopt(int, int, int, void *, int *);
 extern long lx_listen(int, int);
 extern long lx_setsockopt(int, int, int, void *, int);
 extern long lx_shutdown(int, int);
-extern long lx_socket(int, int, int);
 extern long lx_socketpair(int, int, int, int *);
 
 extern long lx_select(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t);
