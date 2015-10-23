@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright 2016 Toomas Soome <tsoome@me.com>
  * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -3289,7 +3290,7 @@ rm_parent_dir_if_empty(char *pathname)
  */
 void
 devfsadm_rm_stale_links(char *dir_re, char *valid_link, di_node_t node,
-			di_minor_t minor)
+    di_minor_t minor)
 {
 	link_t *link;
 	linkhead_t *head;
@@ -4837,7 +4838,7 @@ get_component(char *str, const char *comp_str)
  */
 int
 devfsadm_enumerate_int(char *devfs_path, int index, char **buf,
-			devfsadm_enumerate_t rules[], int nrules)
+    devfsadm_enumerate_t rules[], int nrules)
 {
 	return (find_enum_id(rules, nrules,
 	    devfs_path, index, "0", INTEGER, buf, 0));
@@ -4857,7 +4858,7 @@ disk_enumerate_int(char *devfs_path, int index, char **buf,
  */
 static int
 devfsadm_enumerate_int_start(char *devfs_path, int index, char **buf,
-		devfsadm_enumerate_t rules[], int nrules, char *start)
+    devfsadm_enumerate_t rules[], int nrules, char *start)
 {
 	return (find_enum_id(rules, nrules,
 	    devfs_path, index, start, INTEGER, buf, 0));
@@ -4869,7 +4870,7 @@ devfsadm_enumerate_int_start(char *devfs_path, int index, char **buf,
  */
 int
 devfsadm_enumerate_char(char *devfs_path, int index, char **buf,
-			devfsadm_enumerate_t rules[], int nrules)
+    devfsadm_enumerate_t rules[], int nrules)
 {
 	return (find_enum_id(rules, nrules,
 	    devfs_path, index, "a", LETTER, buf, 0));
@@ -4881,7 +4882,7 @@ devfsadm_enumerate_char(char *devfs_path, int index, char **buf,
  */
 int
 devfsadm_enumerate_char_start(char *devfs_path, int index, char **buf,
-	devfsadm_enumerate_t rules[], int nrules, char *start)
+    devfsadm_enumerate_t rules[], int nrules, char *start)
 {
 	return (find_enum_id(rules, nrules,
 	    devfs_path, index, start, LETTER, buf, 0));
@@ -4898,8 +4899,8 @@ devfsadm_enumerate_char_start(char *devfs_path, int index, char **buf,
  */
 static int
 find_enum_id(devfsadm_enumerate_t rules[], int nrules,
-	char *devfs_path, int index, char *min, int type, char **buf,
-	int multiple)
+    char *devfs_path, int index, char *min, int type, char **buf,
+    int multiple)
 {
 	numeral_t *matchnp;
 	numeral_t *numeral;
@@ -4999,7 +5000,7 @@ find_enum_id(devfsadm_enumerate_t rules[], int nrules,
  */
 static int
 lookup_enum_cache(numeral_set_t *set, char *cmp_str,
-	devfsadm_enumerate_t rules[], int index, numeral_t **matchnpp)
+    devfsadm_enumerate_t rules[], int index, numeral_t **matchnpp)
 {
 	int matchcount = 0, rv = -1;
 	int uncached;
@@ -5390,7 +5391,7 @@ new_id(numeral_t *numeral, int type, char *min)
 
 static int
 enumerate_parse(char *rsvstr, char *path_left, numeral_set_t *setp,
-	    devfsadm_enumerate_t rules[], int index)
+    devfsadm_enumerate_t rules[], int index)
 {
 	char	*slash1 = NULL;
 	char	*slash2 = NULL;
@@ -5506,7 +5507,7 @@ out:
  */
 static void
 enumerate_recurse(char *current_dir, char *path_left, numeral_set_t *setp,
-	    devfsadm_enumerate_t rules[], int index)
+    devfsadm_enumerate_t rules[], int index)
 {
 	char *slash;
 	char *new_path;
@@ -5661,7 +5662,7 @@ create_reserved_numeral(numeral_set_t *setp, char *numeral_id)
  */
 static void
 create_cached_numeral(char *path, numeral_set_t *setp, char *numeral_id,
-	devfsadm_enumerate_t rules[], int index)
+    devfsadm_enumerate_t rules[], int index)
 {
 	char linkbuf[PATH_MAX + 1];
 	char lpath[PATH_MAX + 1];
@@ -5838,7 +5839,7 @@ devfsadm_copy(void)
 /*ARGSUSED*/
 static int
 devfsadm_copy_file(const char *file, const struct stat *stat,
-		    int flags, struct FTW *ftw)
+    int flags, struct FTW *ftw)
 {
 	struct stat sp;
 	dev_t newdev;
@@ -6290,7 +6291,7 @@ read_devlinktab_file(void)
  */
 static int
 split_devlinktab_entry(char *entry, char **selector, char **p_link,
-			char **s_link)
+    char **s_link)
 {
 	char *tab;
 
@@ -6726,7 +6727,7 @@ get_anchored_re(char *link, char *anchored_re, char *pattern)
 
 static int
 construct_devlink(char *link, link_list_t *link_build, char *contents,
-			di_minor_t minor, di_node_t node, char *pattern)
+    di_minor_t minor, di_node_t node, char *pattern)
 {
 	int counter_offset = -1;
 	devfsadm_enumerate_t rules[1] = {NULL};
@@ -7133,7 +7134,7 @@ dequote(char *src)
  */
 static void
 getattr(char *phy_path, char *aminor, int spectype, dev_t dev, mode_t *mode,
-	uid_t *uid, gid_t *gid)
+    uid_t *uid, gid_t *gid)
 {
 	char devname[PATH_MAX + 1];
 	char *node_name;
@@ -8219,6 +8220,26 @@ build_event_attributes(char *class, char *subclass, char *node_path,
 		goto out;
 
 	if (strcmp(subclass, ESC_DISK) == 0) {
+		/*
+		 * While we're removing labeled lofi device, we will receive
+		 * event for every registered minor device and lastly,
+		 * an event with minor set to NULL, as in following example:
+		 * class: EC_dev_remove subclass: disk
+		 * node_path: /pseudo/lofi@1 driver: lofi minor: u,raw
+		 * class: EC_dev_remove subclass: disk
+		 * node_path: /pseudo/lofi@1 driver: lofi minor: NULL
+		 *
+		 * When we receive this last event with minor set to NULL,
+		 * all lofi minor devices are already removed and the call to
+		 * lookup_disk_dev_name() would result in error.
+		 * To prevent name lookup error messages for this case, we
+		 * need to filter out that last event.
+		 */
+		if (strcmp(class, EC_DEV_REMOVE) == 0 &&
+		    strcmp(driver_name, "lofi") ==  0 && minor == NULL) {
+			nvlist_free(nvl);
+			return (NULL);
+		}
 		if ((dev_name = lookup_disk_dev_name(node_path)) == NULL) {
 			dev_name_lookup_err = 1;
 			goto out;
@@ -8239,11 +8260,26 @@ build_event_attributes(char *class, char *subclass, char *node_path,
 		 * The raw minor node is created or removed after the block
 		 * node.  Lofi devfs events are dependent on this behavior.
 		 * Generate the sysevent only for the raw minor node.
+		 *
+		 * If the lofi mapping is created, we will receive the following
+		 * event: class: EC_dev_add subclass: lofi minor: NULL
+		 *
+		 * As in case of EC_dev_add, the minor is NULL pointer,
+		 * to get device links created, we will need to provide the
+		 * type of minor node for lookup_lofi_dev_name()
+		 *
+		 * If the lofi device is unmapped, we will receive following
+		 * events:
+		 * class: EC_dev_remove subclass: lofi minor: disk
+		 * class: EC_dev_remove subclass: lofi minor: disk,raw
+		 * class: EC_dev_remove subclass: lofi minor: NULL
 		 */
-		if (strstr(minor, "raw") == NULL) {
-			if (nvl) {
-				nvlist_free(nvl);
-			}
+
+		if (strcmp(class, EC_DEV_ADD) == 0 && minor == NULL)
+			minor = "disk,raw";
+
+		if (minor == NULL || strstr(minor, "raw") == NULL) {
+			nvlist_free(nvl);
 			return (NULL);
 		}
 		if ((dev_name = lookup_lofi_dev_name(node_path, minor)) ==
@@ -8374,7 +8410,7 @@ process_syseventq()
 
 static void
 build_and_enq_event(char *class, char *subclass, char *node_path,
-	di_node_t node, char *minor)
+    di_node_t node, char *minor)
 {
 	nvlist_t *nvl;
 

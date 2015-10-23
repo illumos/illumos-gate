@@ -25,6 +25,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2016 Toomas Soome <tsoome@me.com>
  */
 
 
@@ -272,15 +273,15 @@ struct vtoc32 {
 #define	vtoctovtoc32(v, v32)				\
 	{						\
 	int i;						\
-	v32.v_bootinfo[0]	= v.v_bootinfo[0];	\
-	v32.v_bootinfo[1]	= v.v_bootinfo[1];	\
-	v32.v_bootinfo[2]	= v.v_bootinfo[2];	\
-	v32.v_sanity		= v.v_sanity;		\
-	v32.v_version		= v.v_version;		\
+	v32.v_bootinfo[0]	= (uint32_t)v.v_bootinfo[0];	\
+	v32.v_bootinfo[1]	= (uint32_t)v.v_bootinfo[1];	\
+	v32.v_bootinfo[2]	= (uint32_t)v.v_bootinfo[2];	\
+	v32.v_sanity		= (uint32_t)v.v_sanity;		\
+	v32.v_version		= (uint32_t)v.v_version;		\
 	bcopy(v.v_volume, v32.v_volume, LEN_DKL_VVOL);	\
 	v32.v_sectorsz		= v.v_sectorsz;		\
 	v32.v_nparts		= v.v_nparts;		\
-	v32.v_version		= v.v_version;		\
+	v32.v_version		= (uint32_t)v.v_version;		\
 	for (i = 0; i < 10; i++)			\
 		v32.v_reserved[i] = v.v_reserved[i];	\
 	for (i = 0; i < V_NUMPAR; i++) {		\
