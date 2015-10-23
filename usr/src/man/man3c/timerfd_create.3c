@@ -170,7 +170,7 @@ is returned. Otherwise,
 is returned and errno is set to indicate the error.
 .Sh ERRORS
 The
-.Fn timerfd_create()
+.Fn timerfd_create
 function will fail if:
 .Bl -tag -width Er
 .It Er EINAL
@@ -192,8 +192,8 @@ is not asserted in the effective set of the calling process.
 .El
 .Sh SEE ALSO
 .Xr poll 2 ,
-.Xr port_get 3C ,
 .Xr epoll_wait 3C ,
+.Xr port_get 3C ,
 .Xr timer_create 3C ,
 .Xr timer_gettime 3C ,
 .Xr timer_settime 3C ,

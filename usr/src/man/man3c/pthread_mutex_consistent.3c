@@ -77,10 +77,10 @@ state.
 .Sh MT-LEVEL
 .Sy MT-Safe
 .Sh SEE ALSO
-.Xr pthread_mutexattr_getrobust 3C ,
 .Xr pthread_mutex_destroy 3C ,
-.Xr pthread_mutex_lock 3C ,
 .Xr pthread_mutex_init 3C ,
+.Xr pthread_mutex_lock 3C ,
+.Xr pthread_mutexattr_getrobust 3C ,
 .Xr pthread 3HEAD ,
 .Xr libpthread 3LIB ,
 .Xr attributes 5 ,

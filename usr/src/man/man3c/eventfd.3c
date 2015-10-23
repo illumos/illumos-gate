@@ -179,6 +179,6 @@ file descriptors open in the calling process.
 .El
 .Sh SEE ALSO
 .Xr poll 2 ,
-.Xr port_get 3C ,
 .Xr epoll_wait 3C ,
+.Xr port_get 3C ,
 .Xr eventfd 5
