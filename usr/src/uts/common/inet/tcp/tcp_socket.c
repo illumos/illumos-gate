@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 /* This file contains all TCP kernel socket related functions. */
@@ -1019,6 +1020,16 @@ tcp_fallback(sock_lower_handle_t proto_handle, queue_t *q,
 		freeb(stropt_mp);
 		freeb(ordrel_mp);
 		return (ENOMEM);
+	}
+
+	/*
+	 * Do not allow fallback on connections making use of SO_REUSEPORT.
+	 */
+	if (tcp->tcp_rg_bind != NULL) {
+		freeb(stropt_mp);
+		freeb(ordrel_mp);
+		squeue_synch_exit(connp);
+		return (EINVAL);
 	}
 
 	/*

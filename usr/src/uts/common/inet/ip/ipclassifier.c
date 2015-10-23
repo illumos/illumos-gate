@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 /*
@@ -868,67 +869,91 @@ ipcl_hash_remove_locked(conn_t *connp, connf_t	*connfp)
 	mutex_exit(&(connfp)->connf_lock);				\
 }
 
-#define	IPCL_HASH_INSERT_BOUND(connfp, connp) {				\
-	conn_t *pconnp = NULL, *nconnp;					\
-	IPCL_HASH_REMOVE((connp));					\
-	mutex_enter(&(connfp)->connf_lock);				\
-	nconnp = (connfp)->connf_head;					\
-	while (nconnp != NULL &&					\
-	    !_IPCL_V4_MATCH_ANY(nconnp->conn_laddr_v6)) {		\
-		pconnp = nconnp;					\
-		nconnp = nconnp->conn_next;				\
-	}								\
-	if (pconnp != NULL) {						\
-		pconnp->conn_next = (connp);				\
-		(connp)->conn_prev = pconnp;				\
-	} else {							\
-		(connfp)->connf_head = (connp);				\
-	}								\
-	if (nconnp != NULL) {						\
-		(connp)->conn_next = nconnp;				\
-		nconnp->conn_prev = (connp);				\
-	}								\
-	(connp)->conn_fanout = (connfp);				\
-	(connp)->conn_flags = ((connp)->conn_flags & ~IPCL_REMOVED) |	\
-	    IPCL_BOUND;							\
-	CONN_INC_REF(connp);						\
-	mutex_exit(&(connfp)->connf_lock);				\
-}
+/*
+ * When inserting bound or wildcard entries into the hash, ordering rules are
+ * used to facilitate timely and correct lookups.  The order is as follows:
+ * 1. Entries bound to a specific address
+ * 2. Entries bound to INADDR_ANY
+ * 3. Entries bound to ADDR_UNSPECIFIED
+ * Entries in a category which share conn_lport (such as those using
+ * SO_REUSEPORT) will be ordered such that the newest inserted is first.
+ */
 
-#define	IPCL_HASH_INSERT_WILDCARD(connfp, connp) {			\
-	conn_t **list, *prev, *next;					\
-	boolean_t isv4mapped =						\
-	    IN6_IS_ADDR_V4MAPPED(&(connp)->conn_laddr_v6);		\
-	IPCL_HASH_REMOVE((connp));					\
-	mutex_enter(&(connfp)->connf_lock);				\
-	list = &(connfp)->connf_head;					\
-	prev = NULL;							\
-	while ((next = *list) != NULL) {				\
-		if (isv4mapped &&					\
-		    IN6_IS_ADDR_UNSPECIFIED(&next->conn_laddr_v6) &&	\
-		    connp->conn_zoneid == next->conn_zoneid) {		\
-			(connp)->conn_next = next;			\
-			if (prev != NULL)				\
-				prev = next->conn_prev;			\
-			next->conn_prev = (connp);			\
-			break;						\
-		}							\
-		list = &next->conn_next;				\
-		prev = next;						\
-	}								\
-	(connp)->conn_prev = prev;					\
-	*list = (connp);						\
-	(connp)->conn_fanout = (connfp);				\
-	(connp)->conn_flags = ((connp)->conn_flags & ~IPCL_REMOVED) |	\
-	    IPCL_BOUND;							\
-	CONN_INC_REF((connp));						\
-	mutex_exit(&(connfp)->connf_lock);				\
+void
+ipcl_hash_insert_bound(connf_t *connfp, conn_t *connp)
+{
+	conn_t *pconnp, *nconnp;
+
+	IPCL_HASH_REMOVE(connp);
+	mutex_enter(&connfp->connf_lock);
+	nconnp = connfp->connf_head;
+	pconnp = NULL;
+	while (nconnp != NULL) {
+		/*
+		 * Walk though entries associated with the fanout until one is
+		 * found which fulfills any of these conditions:
+		 * 1. Listen address of ADDR_ANY/ADDR_UNSPECIFIED
+		 * 2. Listen port the same as connp
+		 */
+		if (_IPCL_V4_MATCH_ANY(nconnp->conn_laddr_v6) ||
+		    connp->conn_lport == nconnp->conn_lport)
+			break;
+		pconnp = nconnp;
+		nconnp = nconnp->conn_next;
+	}
+	if (pconnp != NULL) {
+		pconnp->conn_next = connp;
+		connp->conn_prev = pconnp;
+	} else {
+		connfp->connf_head = connp;
+	}
+	if (nconnp != NULL) {
+		connp->conn_next = nconnp;
+		nconnp->conn_prev = connp;
+	}
+	connp->conn_fanout = connfp;
+	connp->conn_flags = (connp->conn_flags & ~IPCL_REMOVED) | IPCL_BOUND;
+	CONN_INC_REF(connp);
+	mutex_exit(&connfp->connf_lock);
 }
 
 void
 ipcl_hash_insert_wildcard(connf_t *connfp, conn_t *connp)
 {
-	IPCL_HASH_INSERT_WILDCARD(connfp, connp);
+	conn_t **list, *prev, *next;
+	conn_t *pconnp = NULL, *nconnp;
+	boolean_t isv4mapped = IN6_IS_ADDR_V4MAPPED(&connp->conn_laddr_v6);
+
+	IPCL_HASH_REMOVE(connp);
+	mutex_enter(&connfp->connf_lock);
+	nconnp = connfp->connf_head;
+	pconnp = NULL;
+	while (nconnp != NULL) {
+		if (IN6_IS_ADDR_V4MAPPED_ANY(&nconnp->conn_laddr_v6) &&
+		    isv4mapped && connp->conn_lport == nconnp->conn_lport)
+			break;
+		if (IN6_IS_ADDR_UNSPECIFIED(&nconnp->conn_laddr_v6) &&
+		    (isv4mapped ||
+		    connp->conn_lport == nconnp->conn_lport))
+			break;
+
+		pconnp = nconnp;
+		nconnp = nconnp->conn_next;
+	}
+	if (pconnp != NULL) {
+		pconnp->conn_next = connp;
+		connp->conn_prev = pconnp;
+	} else {
+		connfp->connf_head = connp;
+	}
+	if (nconnp != NULL) {
+		connp->conn_next = nconnp;
+		nconnp->conn_prev = connp;
+	}
+	connp->conn_fanout = connfp;
+	connp->conn_flags = (connp->conn_flags & ~IPCL_REMOVED) | IPCL_BOUND;
+	CONN_INC_REF(connp);
+	mutex_exit(&connfp->connf_lock);
 }
 
 /*
@@ -1034,9 +1059,9 @@ ipcl_sctp_hash_insert(conn_t *connp, in_port_t lport)
 	    IN6_IS_ADDR_V4MAPPED_ANY(&connp->conn_faddr_v6)) {
 		if (IN6_IS_ADDR_UNSPECIFIED(&connp->conn_laddr_v6) ||
 		    IN6_IS_ADDR_V4MAPPED_ANY(&connp->conn_laddr_v6)) {
-			IPCL_HASH_INSERT_WILDCARD(connfp, connp);
+			ipcl_hash_insert_wildcard(connfp, connp);
 		} else {
-			IPCL_HASH_INSERT_BOUND(connfp, connp);
+			ipcl_hash_insert_bound(connfp, connp);
 		}
 	} else {
 		IPCL_HASH_INSERT_CONNECTED(connfp, connp);
@@ -1205,9 +1230,9 @@ ipcl_bind_insert_v4(conn_t *connp)
 		if (connp->conn_faddr_v4 != INADDR_ANY) {
 			IPCL_HASH_INSERT_CONNECTED(connfp, connp);
 		} else if (connp->conn_laddr_v4 != INADDR_ANY) {
-			IPCL_HASH_INSERT_BOUND(connfp, connp);
+			ipcl_hash_insert_bound(connfp, connp);
 		} else {
-			IPCL_HASH_INSERT_WILDCARD(connfp, connp);
+			ipcl_hash_insert_wildcard(connfp, connp);
 		}
 		if (protocol == IPPROTO_RSVP)
 			ill_set_inputfn_all(ipst);
@@ -1219,9 +1244,9 @@ ipcl_bind_insert_v4(conn_t *connp)
 		connfp = &ipst->ips_ipcl_bind_fanout[
 		    IPCL_BIND_HASH(lport, ipst)];
 		if (connp->conn_laddr_v4 != INADDR_ANY) {
-			IPCL_HASH_INSERT_BOUND(connfp, connp);
+			ipcl_hash_insert_bound(connfp, connp);
 		} else {
-			IPCL_HASH_INSERT_WILDCARD(connfp, connp);
+			ipcl_hash_insert_wildcard(connfp, connp);
 		}
 		if (cl_inet_listen != NULL) {
 			ASSERT(connp->conn_ipversion == IPV4_VERSION);
@@ -1271,9 +1296,9 @@ ipcl_bind_insert_v6(conn_t *connp)
 		if (!IN6_IS_ADDR_UNSPECIFIED(&connp->conn_faddr_v6)) {
 			IPCL_HASH_INSERT_CONNECTED(connfp, connp);
 		} else if (!IN6_IS_ADDR_UNSPECIFIED(&connp->conn_laddr_v6)) {
-			IPCL_HASH_INSERT_BOUND(connfp, connp);
+			ipcl_hash_insert_bound(connfp, connp);
 		} else {
-			IPCL_HASH_INSERT_WILDCARD(connfp, connp);
+			ipcl_hash_insert_wildcard(connfp, connp);
 		}
 		break;
 
@@ -1283,9 +1308,9 @@ ipcl_bind_insert_v6(conn_t *connp)
 		connfp = &ipst->ips_ipcl_bind_fanout[
 		    IPCL_BIND_HASH(lport, ipst)];
 		if (!IN6_IS_ADDR_UNSPECIFIED(&connp->conn_laddr_v6)) {
-			IPCL_HASH_INSERT_BOUND(connfp, connp);
+			ipcl_hash_insert_bound(connfp, connp);
 		} else {
-			IPCL_HASH_INSERT_WILDCARD(connfp, connp);
+			ipcl_hash_insert_wildcard(connfp, connp);
 		}
 		if (cl_inet_listen != NULL) {
 			sa_family_t	addr_family;
@@ -1416,9 +1441,9 @@ ipcl_conn_insert_v4(conn_t *connp)
 		if (connp->conn_faddr_v4 != INADDR_ANY) {
 			IPCL_HASH_INSERT_CONNECTED(connfp, connp);
 		} else if (connp->conn_laddr_v4 != INADDR_ANY) {
-			IPCL_HASH_INSERT_BOUND(connfp, connp);
+			ipcl_hash_insert_bound(connfp, connp);
 		} else {
-			IPCL_HASH_INSERT_WILDCARD(connfp, connp);
+			ipcl_hash_insert_wildcard(connfp, connp);
 		}
 		break;
 	}
@@ -1504,9 +1529,9 @@ ipcl_conn_insert_v6(conn_t *connp)
 		if (!IN6_IS_ADDR_UNSPECIFIED(&connp->conn_faddr_v6)) {
 			IPCL_HASH_INSERT_CONNECTED(connfp, connp);
 		} else if (!IN6_IS_ADDR_UNSPECIFIED(&connp->conn_laddr_v6)) {
-			IPCL_HASH_INSERT_BOUND(connfp, connp);
+			ipcl_hash_insert_bound(connfp, connp);
 		} else {
-			IPCL_HASH_INSERT_WILDCARD(connfp, connp);
+			ipcl_hash_insert_wildcard(connfp, connp);
 		}
 		break;
 	}
