@@ -47,6 +47,7 @@
 #include "collate.h"
 #include "lnumeric.h"	/* for struct lc_numeric */
 #include "lctype.h"	/* for struct lc_ctype */
+#include "runetype.h"
 #include "setlocale.h"
 #include "../i18n/_loc_path.h"
 #include "localeimpl.h"

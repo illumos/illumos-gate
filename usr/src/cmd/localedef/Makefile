@@ -25,7 +25,7 @@ include ../Makefile.cmd
 
 OBJS = 	charmap.o collate.o ctype.o messages.o monetary.o numeric.o time.o \
 	scanner.o localedef.o wide.o parser.tab.o
-NOBJS = $(OBJS:%.o=native/%.o)
+NOBJS = $(OBJS:%.o=native/%.o) native/avl.o native/mkdirp.o
 
 HDRS	= localedef.h
 
@@ -38,16 +38,9 @@ CERRWARN	+= -_gcc=-Wno-uninitialized
 CERRWARN	+= -_gcc=-Wno-unused-label
 LDLIBS		+= -lgen
 LDLIBS 		+= -lavl
-NATIVELDLIBS	+= -lgen
 
-#
-# Unfortunately, we have a chicken and an egg problem. libavl is becoming
-# public, which means that all of its symbols are in a version that the build
-# machine doesn't have and traditionally there has been no libavl compilation
-# symlink. Therefore, because we know that we only support building on illumos,
-# we regrettably have to link explicitly against the full library path. Sorry.
-#
-NATIVELDLIBS	+= /usr/lib/libavl.so.1
+NATIVELDLIBS=
+
 YFLAGS		= -d -b parser
 
 CLEANFILES	= $(NOBJS) $(OBJS) parser.tab.c parser.tab.h
@@ -278,7 +271,14 @@ $(NDIR):
 
 $(NDIR)/%.o: %.c
 	$(NATIVECC) $(NATIVE_CFLAGS) $(NATIVE_CPPFLAGS) -o $@ -c $<
-	$(POST_PROCESS_O)
+
+$(NDIR)/avl.o : ../../common/avl/avl.c
+	$(NATIVECC) $(NATIVE_CFLAGS) $(NATIVE_CPPFLAGS) -o $@ -c \
+	  ../../common/avl/avl.c
+
+$(NDIR)/mkdirp.o : ../../lib/libgen/common/mkdirp.c
+	$(NATIVECC) $(NATIVE_CFLAGS) $(NATIVE_CPPFLAGS) -o $@ -c \
+	  ../../lib/libgen/common/mkdirp.c
 
 $(NPROG): $(NDIR) .WAIT $(NOBJS)
 	$(LINK.c) $(NOBJS) -o $@ $(NATIVELDLIBS)

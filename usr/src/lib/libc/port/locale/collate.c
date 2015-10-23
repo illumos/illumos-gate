@@ -44,7 +44,12 @@
 #include <sys/mman.h>
 
 #include "collate.h"
-#include "setlocale.h"
+#include "localeimpl.h"
+
+/* Check file format vs libc runtime. (See collatefile.h) */
+#if COLL_WEIGHTS_MAX != COLLATE_WEIGHTS_MAX
+#error "COLL_WEIGHTS_MAX != COLLATE_WEIGHTS_MAX"
+#endif
 
 /*
  * See the comments in usr/src/cmd/localedef/collate.c for further
