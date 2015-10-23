@@ -144,6 +144,33 @@ extern "C" {
 #define	LX_SO_BPF_EXTENSIONS			48
 
 /*
+ * Linux socket type definitions
+ */
+#define	LX_SOCK_STREAM		1	/* Connection-based byte streams */
+#define	LX_SOCK_DGRAM		2	/* Connectionless, datagram */
+#define	LX_SOCK_RAW		3	/* Raw protocol interface */
+#define	LX_SOCK_RDM		4	/* Reliably-delivered message */
+#define	LX_SOCK_SEQPACKET	5	/* Sequenced packet stream */
+#define	LX_SOCK_PACKET		10	/* Linux specific */
+#define	LX_SOCK_MAX		11
+
+/*
+ * The Linux socket type can be or-ed with other flags (e.g. SOCK_CLOEXEC).
+ */
+#define	LX_SOCK_TYPE_MASK	0xf
+
+/*
+ * Linux flags for socket, socketpair and accept4. These are or-ed into the
+ * socket type value. In the Linux net.h header these come from fcntl.h (note
+ * that they are in octal in the Linux header).
+ */
+#define	LX_SOCK_CLOEXEC		0x80000
+#define	LX_SOCK_NONBLOCK	0x800
+
+#define	SOCK_NOTSUPPORTED	-1
+#define	SOCK_INVAL		-2
+
+/*
  * PF_PACKET protocol definitions.
  */
 #define	LX_ETH_P_802_3	0x0001

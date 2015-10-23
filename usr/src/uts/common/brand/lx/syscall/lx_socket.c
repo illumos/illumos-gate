@@ -172,6 +172,23 @@ static const int stol_family[LX_AF_MAX + 1] =  {
 #define	STOL_FAMILY(d) ((d) <= LX_AF_MAX ? stol_family[(d)] : AF_INVAL)
 
 
+static const int ltos_socktype[LX_SOCK_PACKET + 1] = {
+	SOCK_NOTSUPPORTED, SOCK_STREAM, SOCK_DGRAM, SOCK_RAW,
+	SOCK_RDM, SOCK_SEQPACKET, SOCK_NOTSUPPORTED, SOCK_NOTSUPPORTED,
+	SOCK_NOTSUPPORTED, SOCK_NOTSUPPORTED, SOCK_NOTSUPPORTED
+};
+
+static const int stol_socktype[SOCK_SEQPACKET + 1] = {
+	SOCK_NOTSUPPORTED, LX_SOCK_DGRAM, LX_SOCK_STREAM, SOCK_NOTSUPPORTED,
+	LX_SOCK_RAW, LX_SOCK_RDM, LX_SOCK_SEQPACKET
+};
+
+#define	LTOS_SOCKTYPE(t)	\
+	((t) <= LX_SOCK_PACKET ? ltos_socktype[(t)] : SOCK_INVAL)
+#define	STOL_SOCKTYPE(t)	\
+	((t) <= SOCK_SEQPACKET ? ltos_socktype[(t)] : SOCK_INVAL)
+
+
 /*
  * This string is used to prefix all abstract namespace Unix sockets, ie all
  * abstract namespace sockets are converted to regular sockets in the /tmp
@@ -1095,6 +1112,132 @@ lx_sad_acquire(vnode_t *vp)
 	return (cur);
 }
 
+static int
+lx_convert_pkt_proto(int protocol)
+{
+	switch (ntohs(protocol)) {
+	case LX_ETH_P_802_2:
+		return (ETH_P_802_2);
+	case LX_ETH_P_IP:
+		return (ETH_P_IP);
+	case LX_ETH_P_ARP:
+		return (ETH_P_ARP);
+	case LX_ETH_P_IPV6:
+		return (ETH_P_IPV6);
+	case LX_ETH_P_ALL:
+	case LX_ETH_P_802_3:
+		return (ETH_P_ALL);
+	default:
+		return (-1);
+	}
+}
+
+static int
+lx_convert_sock_args(int in_dom, int in_type, int in_proto, int *out_dom,
+    int *out_type, int *out_options, int *out_proto)
+{
+	int domain, type, options;
+
+	if (in_dom < 0 || in_type < 0 || in_proto < 0)
+		return (EINVAL);
+
+	domain = LTOS_FAMILY(in_dom);
+	if (domain == AF_NOTSUPPORTED || domain == AF_UNSPEC)
+		return (EAFNOSUPPORT);
+	if (domain == AF_INVAL)
+		return (EINVAL);
+
+	type = LTOS_SOCKTYPE(in_type & LX_SOCK_TYPE_MASK);
+	if (type == SOCK_NOTSUPPORTED)
+		return (ESOCKTNOSUPPORT);
+	if (type == SOCK_INVAL)
+		return (EINVAL);
+
+	/*
+	 * Linux does not allow the app to specify IP Protocol for raw sockets.
+	 * SunOS does, so bail out here.
+	 */
+	if (domain == AF_INET && type == SOCK_RAW && in_proto == IPPROTO_IP)
+		return (ESOCKTNOSUPPORT);
+
+	options = 0;
+	in_type &= ~(LX_SOCK_TYPE_MASK);
+	if (in_type & LX_SOCK_NONBLOCK) {
+		in_type ^= LX_SOCK_NONBLOCK;
+		options |= SOCK_NONBLOCK;
+	}
+	if (in_type & LX_SOCK_CLOEXEC) {
+		in_type ^= LX_SOCK_CLOEXEC;
+		options |= SOCK_CLOEXEC;
+	}
+	if (in_type != 0) {
+		return (EINVAL);
+	}
+
+	/* Protocol definitions for PF_PACKET differ between Linux and SunOS */
+	if (domain == PF_PACKET &&
+	    (in_proto = lx_convert_pkt_proto(in_proto)) < 0)
+		return (EINVAL);
+
+	*out_dom = domain;
+	*out_type = type;
+	*out_options = options;
+	*out_proto = in_proto;
+	return (0);
+}
+
+long
+lx_socket(int domain, int type, int protocol)
+{
+	int fd, error, options;
+	sonode_t *so;
+	vnode_t *vp;
+	struct file *fp;
+
+	if ((error = lx_convert_sock_args(domain, type, protocol, &domain,
+	    &type, &options, &protocol)) != 0) {
+		return (set_errno(error));
+	}
+
+	/* logic cloned from so_socket */
+	so = socket_create(domain, type, protocol, NULL, NULL, SOCKET_SLEEP,
+	    SOV_DEFAULT, CRED(), &error);
+
+	if (so == NULL) {
+		if (error == EPROTOTYPE || error == EPROTONOSUPPORT) {
+			error = ESOCKTNOSUPPORT;
+		}
+		return (set_errno(error));
+	}
+
+	/* Allocate a file descriptor for the socket */
+	vp = SOTOV(so);
+	if ((error = falloc(vp, FWRITE|FREAD, &fp, &fd)) != 0) {
+		(void) socket_close(so, 0, CRED());
+		socket_destroy(so);
+		return (set_errno(error));
+	}
+
+	/*
+	 * Linux programs do not tolerate errors appearing from asynchronous
+	 * events (such as ICMP messages arriving).  Setting SM_DEFERERR will
+	 * prevent checking/delivery of such errors.
+	 */
+	so->so_mode |= SM_DEFERERR;
+
+	/* Now fill in the entries that falloc reserved */
+	if (options & SOCK_NONBLOCK) {
+		so->so_state |= SS_NONBLOCK;
+		fp->f_flag |= FNONBLOCK;
+	}
+	mutex_exit(&fp->f_tlock);
+	setf(fd, fp);
+	if ((options & SOCK_CLOEXEC) != 0) {
+		f_setfd(fd, FD_CLOEXEC);
+	}
+	return (fd);
+}
+
 long
 lx_bind(long sock, uintptr_t name, socklen_t namelen)
 {
@@ -1991,7 +2134,7 @@ static struct {
 	lx_sockfn_t s_fn;	/* Function implementing the subcommand */
 	int s_nargs;		/* Number of arguments the function takes */
 } lx_socketcall_fns[] = {
-	NULL,		3,	/* socket */
+	lx_socket,	3,	/* socket */
 	lx_bind,	3,	/* bind */
 	lx_connect,	3,	/* connect */
 	NULL,		2,	/* listen */
