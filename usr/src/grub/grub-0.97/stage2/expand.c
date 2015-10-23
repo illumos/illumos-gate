@@ -108,18 +108,18 @@ detect_target_operating_mode(void)
 	 * call left CF clear, nonzero otherwise.
 	 */
 	ret = get_target_operating_mode();
-	ah = ret & 0xff;
-	ret >>= 8;
+	ah = ret >> 8;
+	ret &= 0xff;
 
 	if (ah == 0x86 && ret != 0) {
 		grub_printf("[BIOS 'Detect Target Operating Mode' "
 		    "callback unsupported on this platform]\n");
-		return (1);     /* unsupported, ignore */
+		return (1);	/* unsupported, ignore */
 	}
 
 	if (ah == 0 && ret == 0) {
 		grub_printf("[BIOS accepted mixed-mode target setting!]\n");
-		return (1);     /* told the bios what we're up to */
+		return (1);	/* told the bios what we're up to */
 	}
 
 	if (ah == 0 && ret != 0) {
@@ -190,7 +190,7 @@ amd64_config_cpu(void)
 	}
 
 	if (maxeax < 1)
-		return (0);     /* no additional functions, not an AMD64 */
+		return (0);	/* no additional functions, not an AMD64 */
 	else {
 		uint_t family, model, step;
 
@@ -232,7 +232,7 @@ amd64_config_cpu(void)
 		}
 	}
 
-	if (BITX(xtdfeatures, 29, 29))          /* long mode */
+	if (BITX(xtdfeatures, 29, 29))		/* long mode */
 		isamd64++;
 	else
 		grub_printf("amd64: CPU does NOT support long mode\n");

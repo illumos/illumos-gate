@@ -97,6 +97,7 @@ extern struct lc_messages lc_messages_posix;
 extern struct lc_time lc_time_posix;
 extern struct lc_ctype lc_ctype_posix;
 extern struct lc_collate lc_collate_posix;
+extern struct _RuneLocale _DefaultRuneLocale;
 
 static struct _locale posix_locale = {
 	/* locdata */

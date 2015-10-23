@@ -25,6 +25,7 @@
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2015, OmniTI Computer Consulting, Inc. All rights reserved.
 # Copyright 2015 Gary Mills
+# Copyright 2015 Igor Kozhukhov <ikozhukhov@gmail.com>
 #
 
 #
@@ -146,6 +147,7 @@ ELFWRAP=	/usr/bin/elfwrap
 KSH93=		/usr/bin/ksh93
 SED=		/usr/bin/sed
 NAWK=		/usr/bin/nawk
+AWK=		/usr/bin/awk
 CP=		/usr/bin/cp -f
 MCS=		/usr/ccs/bin/mcs
 CAT=            /usr/bin/cat
@@ -1079,7 +1081,7 @@ PKGPUBLISHER_NONREDIST=	on-extra
 		  -e "x"					\
 		  -e "s/\(.*\)gettext *\"[^\"]*\"\(.*\)/\1\2/"	\
 		  -e "t a"					\
-	       $< | sort -u | awk '{ print "msgid\t" $$0 "\nmsgstr" }' > $@
+	       $< | sort -u | $(AWK) '{ print "msgid\t" $$0 "\nmsgstr" }' > $@
 
 #
 # Python and Perl executable and message catalog build rules.

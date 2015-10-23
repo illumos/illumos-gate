@@ -25,6 +25,7 @@
 # Use is subject to license terms.
 #
 # Copyright 2013 Garrett D'Amore <garrett@damore.org>
+# Copyright 2015 Igor Kozhukhov <ikozhukhov@gmail.com>
 #
 # head/Makefile
 #
@@ -334,8 +335,6 @@ ROOTHDRS= $(HDRS:%=$(ROOT)/usr/include/%)  \
 DIRS= iso arpa audio rpcsvc protocols security uuid kerberosv5
 ROOTDIRS= $(DIRS:%=$(ROOT)/usr/include/%)
 
-SED=	sed
-
 # check files really don't exist
 #
 # should do something with the rpcsvc headers
@@ -455,52 +454,52 @@ rpcsvc/nis.h:	rpcsvc/nis.x
 
 meta_basic.h:	../uts/common/sys/lvm/meta_basic.x
 	$(RPCGEN) $(RPCGENFLAGS)  ../uts/common/sys/lvm/meta_basic.x | \
-	awk '/<synch.h>/ { print "#ifdef _REENTRANT"; print $$0; print "#endif\t/* _REENTRANT */"; next } \
+	$(AWK) '/<synch.h>/ { print "#ifdef _REENTRANT"; print $$0; print "#endif\t/* _REENTRANT */"; next } \
 	/<thread.h>/ { print "#ifdef _REENTRANT"; print $$0; print "#endif\t/* _REENTRANT */"; next } \
 	{ print $0 } \
 	' > $@
 
 metad.h:	metad.x
 	$(RPCGEN) $(RPCGENFLAGS)  metad.x | \
-	awk '/<synch.h>/ { print "#ifdef _REENTRANT"; print $$0; print "#endif\t/* _REENTRANT */"; next } \
+	$(AWK) '/<synch.h>/ { print "#ifdef _REENTRANT"; print $$0; print "#endif\t/* _REENTRANT */"; next } \
 	/<thread.h>/ { print "#ifdef _REENTRANT"; print $$0; print "#endif\t/* _REENTRANT */"; next } \
 	{ print $0 } \
 	' > $@
 
 mhdx.h:	../uts/common/sys/lvm/mhdx.x
 	$(RPCGEN) $(RPCGENFLAGS) ../uts/common/sys/lvm/mhdx.x | \
-	awk '/<synch.h>/ { print "#ifdef _REENTRANT"; print $$0; print "#endif\t/* _REENTRANT */"; next } \
+	$(AWK) '/<synch.h>/ { print "#ifdef _REENTRANT"; print $$0; print "#endif\t/* _REENTRANT */"; next } \
 	/<thread.h>/ { print "#ifdef _REENTRANT"; print $$0; print "#endif\t/* _REENTRANT */"; next } \
 	{ print $0 } \
 	' > $@
 
 mdiox.h:	../uts/common/sys/lvm/mdiox.x
 	$(RPCGEN) $(RPCGENFLAGS) ../uts/common/sys/lvm/mdiox.x | \
-	nawk '{sub(/sys\/lvm\/md_mhdx/, "mhdx"); print $$0}' | \
-	nawk '{sub(/sys\/lvm\/md_basic/, "meta_basic"); print $$0}' | \
-	awk '/<synch.h>/ { print "#ifdef _REENTRANT"; print $$0; print "#endif\t/* _REENTRANT */"; next } \
+	$(NAWK) '{sub(/sys\/lvm\/md_mhdx/, "mhdx"); print $$0}' | \
+	$(NAWK) '{sub(/sys\/lvm\/md_basic/, "meta_basic"); print $$0}' | \
+	$(AWK) '/<synch.h>/ { print "#ifdef _REENTRANT"; print $$0; print "#endif\t/* _REENTRANT */"; next } \
 	/<thread.h>/ { print "#ifdef _REENTRANT"; print $$0; print "#endif\t/* _REENTRANT */"; next } \
 	{ print $0 } \
 	' > $@
 
 metamed.h:	../uts/common/sys/lvm/metamed.x
 	$(RPCGEN) $(RPCGENFLAGS) ../uts/common/sys/lvm/metamed.x | \
-	nawk '{sub(/sys\/lvm\/md_basic/, "meta_basic"); print $$0}' | \
-	awk '/<synch.h>/ { print "#ifdef _REENTRANT"; print $$0; print "#endif\t/* _REENTRANT */"; next } \
+	$(NAWK) '{sub(/sys\/lvm\/md_basic/, "meta_basic"); print $$0}' | \
+	$(AWK) '/<synch.h>/ { print "#ifdef _REENTRANT"; print $$0; print "#endif\t/* _REENTRANT */"; next } \
 	/<thread.h>/ { print "#ifdef _REENTRANT"; print $$0; print "#endif\t/* _REENTRANT */"; next } \
 	{ print $0 } \
 	' > $@
 
 metamhd.h:	metamhd.x
 	$(RPCGEN) $(RPCGENFLAGS) metamhd.x | \
-	awk '/<synch.h>/ { print "#ifdef _REENTRANT"; print $$0; print "#endif\t/* _REENTRANT */"; next } \
+	$(AWK) '/<synch.h>/ { print "#ifdef _REENTRANT"; print $$0; print "#endif\t/* _REENTRANT */"; next } \
 	/<thread.h>/ { print "#ifdef _REENTRANT"; print $$0; print "#endif\t/* _REENTRANT */"; next } \
 	{ print $0 } \
 	' > $@
 
 metacl.h:	metacl.x
 	$(RPCGEN) $(RPCGENFLAGS) metacl.x | \
-	awk '/<synch.h>/ { print "#ifdef _REENTRANT"; print $$0; print "#endif\t/* _REENTRANT */"; next } \
+	$(AWK) '/<synch.h>/ { print "#ifdef _REENTRANT"; print $$0; print "#endif\t/* _REENTRANT */"; next } \
 	/<thread.h>/ { print "#ifdef _REENTRANT"; print $$0; print "#endif\t/* _REENTRANT */"; next } \
 	{ print $0 } \
 	' > $@
