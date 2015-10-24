@@ -21,8 +21,7 @@
 #
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2015 Igor Kozhukhov <ikozhukhov@gmail.com>
 #
 
 LIBRARY=       	libmeta.a 
@@ -160,11 +159,11 @@ objs/%.o profs/%.o pics/%.o: $(COMMON)/%.c
 
 mdiox_xdr.c: $(SRC)/uts/common/sys/lvm/mdiox.x
 	$(RPCGEN) $(RPCGENFLAGS) -c -i 100 $(SRC)/uts/common/sys/lvm/mdiox.x | \
-	nawk '{sub(/uts\/common\/sys\/lvm/, "head"); print $$0}' >$@
+	$(AWK) '{sub(/uts\/common\/sys\/lvm/, "head"); print $$0}' >$@
 
 meta_basic_xdr.c: $(SRC)/uts/common/sys/lvm/meta_basic.x
 	$(RPCGEN) $(RPCGENFLAGS) -c $(SRC)/uts/common/sys/lvm/meta_basic.x | \
-	nawk '{sub(/uts\/common\/sys\/lvm/, "head"); print $$0}' >$@
+	$(AWK) '{sub(/uts\/common\/sys\/lvm/, "head"); print $$0}' >$@
 
 metad_clnt.c: $(SRC)/head/metad.x 
 	$(RPCGEN) $(RPCGENFLAGS) -l $(SRC)/head/metad.x -o $@
@@ -174,11 +173,11 @@ metad_xdr.c: $(SRC)/head/metad.x
 
 metamed_clnt.c: $(SRC)/uts/common/sys/lvm/metamed.x
 	$(RPCGEN) $(RPCGENFLAGS) -l $(SRC)/uts/common/sys/lvm/metamed.x | \
-	nawk '{sub(/uts\/common\/sys\/lvm/, "head"); print $$0}' >$@
+	$(AWK) '{sub(/uts\/common\/sys\/lvm/, "head"); print $$0}' >$@
 
 metamed_xdr.c: $(SRC)/uts/common/sys/lvm/metamed.x 
 	$(RPCGEN) $(RPCGENFLAGS) -c $(SRC)/uts/common/sys/lvm/metamed.x | \
-	nawk '{sub(/uts\/common\/sys\/lvm/, "head"); print $$0}' >$@
+	$(AWK) '{sub(/uts\/common\/sys\/lvm/, "head"); print $$0}' >$@
 
 metamhd_clnt.c: $(SRC)/head/metamhd.x 
 	$(RPCGEN) $(RPCGENFLAGS) -l $(SRC)/head/metamhd.x -o $@
@@ -188,7 +187,7 @@ metamhd_xdr.c: $(SRC)/head/metamhd.x
 
 mhdx_xdr.c: $(SRC)/uts/common/sys/lvm/mhdx.x
 	$(RPCGEN) $(RPCGENFLAGS) -c $(SRC)/uts/common/sys/lvm/mhdx.x | \
-	nawk '{sub(/uts\/common\/sys\/lvm/, "head"); print $$0}' >$@
+	$(AWK) '{sub(/uts\/common\/sys\/lvm/, "head"); print $$0}' >$@
 
 mdmn_commd_xdr.c: $(SRC)/uts/common/sys/lvm/mdmn_commd.x
 	$(RPCGEN) -c $(SRC)/uts/common/sys/lvm/mdmn_commd.x -o $@

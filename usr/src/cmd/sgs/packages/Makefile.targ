@@ -20,9 +20,11 @@
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2015 Igor Kozhukhov <ikozhukhov@gmail.com>
+#
 
 pkginfo: ../common/pkginfo.tmpl awk_pkginfo
-	$(RM) $@; nawk -f awk_pkginfo ../common/$@.tmpl > $@
+	$(RM) $@; $(AWK) -f awk_pkginfo ../common/$@.tmpl > $@
 
 pkg: FRC
 	@ $(RM) -r $(PACKAGE)

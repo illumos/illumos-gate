@@ -1,6 +1,7 @@
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2015 Igor Kozhukhov <ikozhukhov@gmail.com>
 #
 
 # Make the SO name unlikely to conflict with any other
@@ -219,7 +220,7 @@ opcodes.h: $(SRCDIR)/vdbe.c
 	 echo '/* Automatically generated file.  Do not edit */' > $@ ; \
 	 grep '^case OP_' $(SRCDIR)/vdbe.c | \
 	    sed -e 's/://' | \
-	    awk '{printf "#define %-30s %3d\n", $$2, ++cnt}' >> $@
+	    $(AWK) '{printf "#define %-30s %3d\n", $$2, ++cnt}' >> $@
 
 opcodes.c: $(SRCDIR)/vdbe.c
 	@echo "Generating $@"; \
