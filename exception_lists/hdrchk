@@ -181,6 +181,7 @@ usr/src/lib/librstp/common/vector.h
 usr/src/lib/libsmbfs/netsmb/spnego.h
 usr/src/lib/libsmbfs/smb/derparse.h
 usr/src/lib/libsmbfs/smb/spnegoparse.h
+usr/src/tools/btxld/*
 usr/src/uts/common/gssapi/mechs/krb5/include/aes_s2k.h
 usr/src/uts/common/gssapi/mechs/krb5/include/auth_con.h
 usr/src/uts/common/gssapi/mechs/krb5/include/cksumtypes.h

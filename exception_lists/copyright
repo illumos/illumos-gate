@@ -358,6 +358,12 @@ usr/src/lib/libsmbfs/smb/spnego.c
 usr/src/lib/libsmbfs/smb/spnegoparse.[ch]
 usr/src/test/zfs-tests/tests/functional/history/*Z
 usr/src/test/zfs-tests/tests/functional/history/*txt
+usr/src/tools/btxld/btx.h
+usr/src/tools/btxld/btxld.8
+usr/src/tools/btxld/btxld.c
+usr/src/tools/btxld/elfh.c
+usr/src/tools/btxld/elfh.h
+usr/src/tools/btxld/imgact_aout.h
 usr/src/uts/intel/nsmb/ioc_check.ref
 usr/src/uts/intel/os/splashimage.xpm
 usr/src/uts/common/gssapi/mechs/krb5/crypto/block_size.c
