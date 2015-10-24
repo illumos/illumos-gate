@@ -1,3 +1,4 @@
+usr/src/boot/*
 usr/src/cmd/cmd-inet/usr.bin/dns-sd/ClientCommon.[ch]
 usr/src/cmd/cmd-inet/usr.bin/dns-sd/dns-sd.c
 usr/src/cmd/cmd-inet/usr.lib/mdnsd/CryptoAlg.[ch]

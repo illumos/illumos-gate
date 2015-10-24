@@ -20,6 +20,7 @@
 #
 
 #
+# Copyright 2016 Toomas Soome <tsoome@me.com>
 # Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
@@ -36,6 +37,7 @@
 
 syntax: glob
 exception_lists/mapfilechk
+usr/src/boot/*
 usr/src/cmd/lp/filter/postscript/font/devpost/charlib/*
 usr/src/cmd/mdb/common/kmdb/mapfile_skel
 usr/src/cmd/sgs/libconv/common/map.msg

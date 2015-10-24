@@ -30,6 +30,7 @@ exception_lists/closed-bins
 exception_lists/copyright
 exception_lists/cstyle
 exception_lists/hdrchk
+usr/src/boot/*
 usr/src/cmd/cmd-inet/usr.bin/dns-sd/ClientCommon.c
 usr/src/cmd/cmd-inet/usr.bin/dns-sd/ClientCommon.h
 usr/src/cmd/cmd-inet/usr.bin/dns-sd/dns-sd.c

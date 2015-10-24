@@ -24,6 +24,7 @@
 # Copyright (c) 2013 Gary Mills
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2016 Toomas Soome <tsoome@me.com>
 #
 
 <include SUNWcs.man1.inc>
@@ -1839,6 +1840,10 @@ depend fmri=runtime/perl$(PERL_PKGVERS) type=require
 # intrd uses sun-solaris Perl modules
 #
 depend fmri=runtime/perl$(PERL_PKGVERS)/module/sun-solaris type=require
+#
+# The boot loader package
+#
+depend fmri=system/boot/loader type=require
 #
 # The loadkeys binary needs the keytables.
 #
