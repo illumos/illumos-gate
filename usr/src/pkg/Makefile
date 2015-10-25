@@ -228,13 +228,13 @@ CLOBBERFILES= $(PDIR) proto_list_$(PKGMACH) install-$(PKGMACH).out \
 # to the SPECIAL_MANIFESTS vaiable.  It can contain wildcards in
 # regexp form, i.e. SUNW.* as one useful example.
 #
-SPECIAL_MANIFESTS = print-lp-ipp-ipp-listener.mf
+SPECIAL_MANIFESTS = "SUNWippl print-lp-ipp-ipp-listener.mf"
 LIST_MANIFESTS_CMD = (cd manifests ; /usr/bin/ls -1 *.mf |\
 	$(SED) $(SPECIAL_MANIFESTS:%=-e '/^%$$/d') )
 MANIFESTS = $(LIST_MANIFESTS_CMD:sh)
 
 # Conditionally add back lp-ipp
-$(ENABLE_IPP_PRINTING) MANIFESTS += print-lp-ipp-ipp-listener.mf
+$(ENABLE_IPP_PRINTING) MANIFESTS += "print-lp-ipp-ipp-listener.mf SUNWippl"
 
 PKGS= $(MANIFESTS:%.mf=%)
 DEP_PKGS= $(PKGS:%=$(PDIR)/%.dep)
