@@ -53,4 +53,3 @@ legacy pkg=SUNWxvmipau desc="xVM PV IP address agent" \
     name="xVM PV IP address agent (Usr)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
-depend fmri=system/xvm/xvmstore type=require
