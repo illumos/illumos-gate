@@ -139,7 +139,6 @@ static void pciex_slot_names_prop(dev_info_t *, ushort_t);
 static void populate_bus_res(uchar_t bus);
 static void memlist_remove_list(struct memlist **list,
     struct memlist *remove_list);
-static boolean_t is_pcie_platform(void);
 static void ck804_fix_aer_ptr(dev_info_t *, pcie_req_id_t);
 
 static void pci_scan_bbn(void);
@@ -3343,22 +3342,6 @@ pciex_slot_names_prop(dev_info_t *dip, ushort_t slot_num)
 	len += len % 4;
 	(void) ndi_prop_update_int_array(DDI_DEV_T_NONE, dip, "slot-names",
 	    (int *)slotprop, len / sizeof (int));
-}
-
-/*
- * This is currently a hack, a better way is needed to determine if it
- * is a PCIE platform.
- */
-static boolean_t
-is_pcie_platform()
-{
-	uint8_t bus;
-
-	for (bus = 0; bus < pci_bios_maxbus; bus++) {
-		if (look_for_any_pciex_device(bus))
-			return (B_TRUE);
-	}
-	return (B_FALSE);
 }
 
 /*
