@@ -28,7 +28,6 @@
 #include <locale.h>
 #include <xlocale.h>
 #include "setlocale.h"
-#include "runetype.h"
 
 /* private locale structures */
 
@@ -70,7 +69,7 @@ struct _locale {
 	const struct lc_monetary	*monetary;
 	const struct lc_numeric		*numeric;
 	const struct lc_time		*time;
-	const _RuneLocale		*runelocale;
+	const struct _RuneLocale	*runelocale;
 
 	/*
 	 * The loaded value is used for localeconv.  In paticular, when

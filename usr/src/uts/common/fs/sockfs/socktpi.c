@@ -6272,6 +6272,13 @@ sotpi_poll(
 	if (sti->sti_conn_ind_head != NULL)
 		*reventsp |= (POLLIN|POLLRDNORM) & events;
 
+	if (so->so_state & SS_CANTRCVMORE) {
+		*reventsp |= POLLRDHUP & events;
+
+		if (so->so_state & SS_CANTSENDMORE)
+			*reventsp |= POLLHUP;
+	}
+
 	if (so->so_state & SS_OOBPEND)
 		*reventsp |= POLLRDBAND & events;
 
