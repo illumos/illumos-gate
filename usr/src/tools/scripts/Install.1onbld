@@ -305,11 +305,6 @@ you will need to do the following on the target machine:
 .LP
 You can set the following variables in your environment:
 .LP
-ON_CRYPTO_BINS
-.IP
-file containing signed cryptographic binaries.  This is only needed if
-you are not building the closed-source tree.
-.LP
 INSTALL_RC [default: $HOME/.Installrc]
 .IP
 file containing default options for \fBInstall\fR

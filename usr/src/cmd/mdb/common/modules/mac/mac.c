@@ -328,22 +328,42 @@ mac_flow_dcmd_output(uintptr_t addr, uint_t flags, uint_t args)
 		uint64_t  		totibytes = 0;
 		uint64_t  		totobytes = 0;
 		mac_soft_ring_set_t	*mac_srs;
-		mac_rx_stats_t		*mac_rx_stat;
-		mac_tx_stats_t		*mac_tx_stat;
+		mac_rx_stats_t		mac_rx_stat;
+		mac_tx_stats_t		mac_tx_stat;
 		int			i;
 
+		/*
+		 * Sum bytes for all Rx SRS.
+		 */
 		for (i = 0; i < fe.fe_rx_srs_cnt; i++) {
 			mac_srs = (mac_soft_ring_set_t *)(fe.fe_rx_srs[i]);
-			mac_rx_stat = &mac_srs->srs_rx.sr_stat;
-			totibytes += mac_rx_stat->mrs_intrbytes +
-			    mac_rx_stat->mrs_pollbytes +
-			    mac_rx_stat->mrs_lclbytes;
+			if (mdb_vread(&mac_rx_stat, sizeof (mac_rx_stats_t),
+			    (uintptr_t)&mac_srs->srs_rx.sr_stat) == -1) {
+				mdb_warn("failed to read mac_rx_stats_t at %p",
+				    &mac_srs->srs_rx.sr_stat);
+				return (DCMD_ERR);
+			}
+
+			totibytes += mac_rx_stat.mrs_intrbytes +
+			    mac_rx_stat.mrs_pollbytes +
+			    mac_rx_stat.mrs_lclbytes;
 		}
+
+		/*
+		 * Sum bytes for Tx SRS.
+		 */
 		mac_srs = (mac_soft_ring_set_t *)(fe.fe_tx_srs);
 		if (mac_srs != NULL) {
-			mac_tx_stat = &mac_srs->srs_tx.st_stat;
-			totobytes = mac_tx_stat->mts_obytes;
+			if (mdb_vread(&mac_tx_stat, sizeof (mac_tx_stats_t),
+			    (uintptr_t)&mac_srs->srs_tx.st_stat) == -1) {
+				mdb_warn("failed to read max_tx_stats_t at %p",
+				    &mac_srs->srs_tx.st_stat);
+				return (DCMD_ERR);
+			}
+
+			totobytes = mac_tx_stat.mts_obytes;
 		}
+
 		mdb_printf("%?p %-32s %16llu %16llu\n",
 		    addr, fe.fe_flow_name, totibytes, totobytes);
 
