@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2002, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -175,6 +176,12 @@ krb5_send_tgs2(krb5_context context, krb5_flags kdcoptions,
      */
     if (!in_cred->ticket.length)
         return(KRB5_NO_TKT_SUPPLIED);
+
+    /* Solaris Kerberos (illumos) */
+    if (krb5_getenv("MS_INTEROP")) {
+        /* Don't bother with UDP. */
+        tcp_only = 1;
+    }
 
     memset((char *)&tgsreq, 0, sizeof(tgsreq));
 

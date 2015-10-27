@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _SMBSRV_SMB_KRB_H
@@ -40,6 +41,7 @@ extern "C" {
 #define	SMB_PN_SALT			0x0008 /* w/  REALM */
 
 #define	SMB_PN_SVC_HOST			"host"
+#define	SMB_PN_SVC_CIFS			"cifs"
 #define	SMB_PN_SVC_NFS			"nfs"
 #define	SMB_PN_SVC_HTTP			"HTTP"
 #define	SMB_PN_SVC_ROOT			"root"
@@ -47,7 +49,11 @@ extern "C" {
 /* Assign an identifier for each principal name format */
 typedef enum smb_krb5_pn_id {
 	SMB_KRB5_PN_ID_SALT,
-	SMB_KRB5_PN_ID_HOST_FQHN,
+	SMB_KRB5_PN_ID_HOST_FQHN,	/* fully qualified name */
+	SMB_KRB5_PN_ID_HOST_SHORT,	/* short name */
+	SMB_KRB5_PN_ID_CIFS_FQHN,
+	SMB_KRB5_PN_ID_CIFS_SHORT,
+	SMB_KRB5_PN_ID_MACHINE,		/* the machine account */
 	SMB_KRB5_PN_ID_NFS_FQHN,
 	SMB_KRB5_PN_ID_HTTP_FQHN,
 	SMB_KRB5_PN_ID_ROOT_FQHN,
@@ -78,7 +84,7 @@ typedef struct smb_krb5_pn_set {
 	char		**s_pns;
 } smb_krb5_pn_set_t;
 
-int smb_kinit(char *, char *);
+int smb_kinit(char *, char *, char *);
 int smb_krb5_ctx_init(krb5_context *);
 void smb_krb5_ctx_fini(krb5_context);
 int smb_krb5_get_kprincs(krb5_context, char **, size_t, krb5_principal **);

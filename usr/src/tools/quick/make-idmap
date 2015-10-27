@@ -97,6 +97,7 @@ fi
 
 # Need some library headers too...
 for lib in \
+  libads \
   libbsm \
   libcmdutils \
   libcryptoutil \
@@ -135,6 +136,7 @@ for lib in \
   libadutils \
   libuutil \
   libidmap \
+  libads \
   libsmbfs \
   libsqlite \
   nsswitch/ad
@@ -186,6 +188,8 @@ do_tar() {
 	files="
 lib/svc/manifest/system/idmap.xml
 usr/lib/idmapd
+usr/lib/libads.so.1
+usr/lib/$arch64/libads.so.1
 usr/lib/libadutils.so.1
 usr/lib/$arch64/libadutils.so.1
 usr/lib/libidmap.so.1

@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef	_LIBMLSVC_H
@@ -59,7 +59,10 @@ uint32_t lsa_lookup_sid(smb_sid_t *, smb_account_t *);
  * information.
  */
 
-extern boolean_t smb_locate_dc(char *, char *, smb_domainex_t *);
+extern boolean_t smb_locate_dc(char *, smb_domainex_t *);
+uint32_t smb_ddiscover_dns(char *, smb_domainex_t *);
+extern void smb_ddiscover_bad_dc(char *);
+extern void smb_ddiscover_refresh(void);
 extern int smb_ddiscover_wait(void);
 
 extern int dssetup_check_service(void);
@@ -68,7 +71,11 @@ extern void mlsvc_disconnect(const char *);
 extern int mlsvc_init(void);
 extern void mlsvc_fini(void);
 extern DWORD mlsvc_netlogon(char *, char *);
-extern DWORD mlsvc_join(smb_domainex_t *, char *, char *);
+extern void mlsvc_join(smb_joininfo_t *, smb_joinres_t *);
+
+extern void smb_logon_domain(smb_logon_t *, smb_token_t *);
+extern uint32_t smb_decode_krb5_pac(smb_token_t *, char *, uint_t);
+extern boolean_t smb_token_setup_common(smb_token_t *);
 
 
 /*
@@ -154,7 +161,7 @@ typedef struct mlsvc_handle {
 
 void ndr_rpc_init(void);
 void ndr_rpc_fini(void);
-int ndr_rpc_bind(mlsvc_handle_t *, char *, char *, char *, const char *);
+uint32_t ndr_rpc_bind(mlsvc_handle_t *, char *, char *, char *, const char *);
 void ndr_rpc_unbind(mlsvc_handle_t *);
 int ndr_rpc_call(mlsvc_handle_t *, int, void *);
 void ndr_rpc_set_nonull(mlsvc_handle_t *);

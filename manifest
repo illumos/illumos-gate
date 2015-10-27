@@ -2434,6 +2434,8 @@ f usr/has/man/man1has/edit.1has 0444 root bin
 f usr/has/man/man1has/vi.1has 0444 root bin
 d usr/include 0755 root bin
 f usr/include/aclutils.h 0644 root bin
+d usr/include/ads 0755 root bin
+f usr/include/ads/dsgetdc.h 0644 root bin
 f usr/include/aio.h 0644 root bin
 f usr/include/alloca.h 0644 root bin
 d usr/include/amd64 0755 root bin
@@ -2806,6 +2808,7 @@ f usr/include/iso646.h 0644 root bin
 d usr/include/kerberosv5 0755 root bin
 f usr/include/kerberosv5/com_err.h 0644 root bin
 f usr/include/kerberosv5/krb5.h 0644 root bin
+f usr/include/kerberosv5/locate_plugin.h 0644 root bin
 f usr/include/kerberosv5/mit-sipb-copyright.h 0644 root bin
 f usr/include/kerberosv5/mit_copyright.h 0644 root bin
 f usr/include/klpd.h 0644 root bin
@@ -4681,6 +4684,8 @@ f usr/lib/amd64/libSMHBAAPI.so.1 0755 root bin
 s usr/lib/amd64/libSMHBAAPI.so=libSMHBAAPI.so.1
 s usr/lib/amd64/libadm.so.1=../../../lib/amd64/libadm.so.1
 s usr/lib/amd64/libadm.so=../../../lib/amd64/libadm.so.1
+f usr/lib/amd64/libads.so.1 0755 root bin
+s usr/lib/amd64/libads.so=libads.so.1
 f usr/lib/amd64/libadt_jni.so.1 0755 root bin
 s usr/lib/amd64/libadt_jni.so=libadt_jni.so.1
 f usr/lib/amd64/libadutils.so.1 0755 root bin
@@ -6072,6 +6077,8 @@ f usr/lib/libSMHBAAPI.so.1 0755 root bin
 s usr/lib/libSMHBAAPI.so=libSMHBAAPI.so.1
 s usr/lib/libadm.so.1=../../lib/libadm.so.1
 s usr/lib/libadm.so=../../lib/libadm.so.1
+f usr/lib/libads.so.1 0755 root bin
+s usr/lib/libads.so=libads.so.1
 f usr/lib/libadt_jni.so.1 0755 root bin
 s usr/lib/libadt_jni.so=libadt_jni.so.1
 f usr/lib/libadutils.so.1 0755 root bin
@@ -9992,6 +9999,13 @@ s usr/lib/smbsrv/amd64/libsmb.so=libsmb.so.1
 f usr/lib/smbsrv/amd64/libsmbns.so.1 0755 root bin
 s usr/lib/smbsrv/amd64/libsmbns.so=libsmbns.so.1
 d usr/lib/smbsrv/dtrace 0755 root bin
+f usr/lib/smbsrv/dtrace/smbd-all.d 0555 root bin
+f usr/lib/smbsrv/dtrace/smbd-authsvc.d 0555 root bin
+f usr/lib/smbsrv/dtrace/smbd-doorsvc.d 0555 root bin
+f usr/lib/smbsrv/dtrace/smbd-pipesvc.d 0555 root bin
+f usr/lib/smbsrv/dtrace/smbnode.d 0555 root bin
+f usr/lib/smbsrv/dtrace/smbsrv.d 0555 root bin
+f usr/lib/smbsrv/dtrace/smbvfs.d 0555 root bin
 f usr/lib/smbsrv/libmlrpc.so.1 0755 root bin
 s usr/lib/smbsrv/libmlrpc.so=libmlrpc.so.1
 f usr/lib/smbsrv/libmlsvc.so.1 0755 root bin
@@ -10412,6 +10426,7 @@ s usr/sbin/newfs=../lib/fs/ufs/newfs
 f usr/sbin/newkey 0555 root sys
 f usr/sbin/nfsref 0555 root bin
 f usr/sbin/nlsadmin 0755 root adm
+f usr/sbin/nltest 0555 root bin
 f usr/sbin/nscd 0555 root bin
 f usr/sbin/nwamadm 0555 root bin
 f usr/sbin/nwamcfg 0555 root bin

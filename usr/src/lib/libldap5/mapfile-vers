@@ -20,7 +20,7 @@
 #
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 #
 
 #
@@ -179,6 +179,7 @@ SYMBOL_VERSION SUNW_5.1 {
 	ldap_parse_sort_control;
 	ldap_parse_virtuallist_control;
 	ldap_perror;
+	ldap_put_filter;
 	ldap_rename;
 	ldap_rename_s;
 	ldap_result;

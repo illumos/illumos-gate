@@ -19,12 +19,12 @@
 # CDDL HEADER END
 #
 
-# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2015, Joyent, Inc.
 # Copyright (c) 2013 Gary Mills
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 # Copyright (c) 2015 Gary Mills
 
 include ../Makefile.master
@@ -251,6 +251,7 @@ SUBDIRS += \
 	libshare	\
 	libsqlite	\
 	libidmap	\
+	libads		\
 	libadutils	\
 	libipmi		\
 	libexacct/demo	\
@@ -375,6 +376,7 @@ i386_MSGSUBDIRS= libfdisk
 
 HDRSUBDIRS=		\
 	auditd_plugins	\
+	libads		\
 	libast		\
 	libbrand	\
 	libbsm		\
@@ -665,7 +667,8 @@ libexacct/demo:	libexacct libproject libsocket libnsl
 libtsalarm:	libpcp
 smbsrv:		libsocket libnsl libmd libxnet libpthread librt \
 		libshare libidmap pkcs11 libsqlite libcryptoutil \
-		libreparse libcmdutils libfakekernel
+		libreparse libcmdutils libresolv libsmbfs libuuid \
+		libfakekernel libads
 libv12n:	libds libuuid
 libvrrpadm:	libsocket libdladm libscf
 libvscan:	libscf

@@ -55,9 +55,13 @@ To run it under mdb (with mdb modules build here):
   mdb -L $ROOT/usr/lib/mdb/proc:/usr/lib/mdb/proc ...
 where ... is one of: fksmbd, core.nnn, -p $PID
 
-There are also a couple dtrace scripts in here for watching
-either all activity or only selected areas.  (see *.d)
+There are also some dtrace scripts in here, and in ../dtrace
+for watching either all activity or only selected areas.
 Run these like:  dtrace -s Watch-all.d -p $PID -o output
+
+These two (from over in ../dtrace) also work with fksmbd:
+	dtrace -s smbd-authsvc.d -p `pgrep fksmbd`  -o output
+	dtrace -s smbd-pipesvc.d -p `pgrep fksmbd`  -o output
 
 
 Here are a couple simple, handy tests you can try:

@@ -21,6 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _LSALIB_H
@@ -61,8 +63,8 @@ DWORD lsa_enum_trusted_domains_ex(char *, char *, smb_trusted_domains_t *);
 /*
  * lsar_open.c
  */
-int lsar_open(char *, char *, char *, mlsvc_handle_t *);
-int lsar_open_policy2(char *, char *, char *, mlsvc_handle_t *);
+DWORD lsar_open(char *, char *, char *, mlsvc_handle_t *);
+DWORD lsar_open_policy2(char *, char *, char *, mlsvc_handle_t *);
 int lsar_open_account(mlsvc_handle_t *, struct mslsa_sid *, mlsvc_handle_t *);
 int lsar_close(mlsvc_handle_t *);
 
@@ -74,7 +76,7 @@ DWORD lsar_query_info_policy(mlsvc_handle_t *, WORD, smb_domain_t *);
 uint32_t lsar_lookup_names(mlsvc_handle_t *, char *, smb_account_t *);
 uint32_t lsar_lookup_sids(mlsvc_handle_t *, smb_sid_t *, smb_account_t *);
 
-int lsar_enum_accounts(mlsvc_handle_t *, DWORD *,
+DWORD lsar_enum_accounts(mlsvc_handle_t *, DWORD *,
     struct mslsa_EnumAccountBuf *);
 DWORD lsar_enum_trusted_domains(mlsvc_handle_t *, DWORD *,
     smb_trusted_domains_t *);

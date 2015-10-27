@@ -21,6 +21,8 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -154,15 +156,6 @@ smb_posix_grps_helper_xdr(XDR *xdrs, char **identity)
 	return (TRUE);
 }
 
-static bool_t
-smb_session_key_xdr(XDR *xdrs, smb_session_key_t *objp)
-{
-	if (!xdr_vector(xdrs, (char *)objp->data, 16,
-	    sizeof (uint8_t), (xdrproc_t)xdr_uint8_t))
-		return (FALSE);
-	return (TRUE);
-}
-
 bool_t
 smb_logon_xdr(XDR *xdrs, smb_logon_t *objp)
 {
@@ -189,6 +182,8 @@ smb_logon_xdr(XDR *xdrs, smb_logon_t *objp)
 	if (!smb_buf32_xdr(xdrs, &objp->lg_nt_password))
 		return (FALSE);
 	if (!smb_buf32_xdr(xdrs, &objp->lg_lm_password))
+		return (FALSE);
+	if (!xdr_uint32_t(xdrs, &objp->lg_ntlm_flags))
 		return (FALSE);
 	if (!xdr_int(xdrs, &objp->lg_native_os))
 		return (FALSE);
@@ -278,8 +273,7 @@ smb_token_xdr(XDR *xdrs, smb_token_t *objp)
 		return (FALSE);
 	if (!xdr_uint32_t(xdrs, &objp->tkn_audit_sid))
 		return (FALSE);
-	if (!xdr_pointer(xdrs, (char **)&objp->tkn_session_key,
-	    sizeof (smb_session_key_t), (xdrproc_t)smb_session_key_xdr))
+	if (!smb_buf32_xdr(xdrs, &objp->tkn_ssnkey))
 		return (FALSE);
 	if (!smb_posix_grps_helper_xdr(xdrs, (char **)&objp->tkn_posix_grps))
 		return (FALSE);

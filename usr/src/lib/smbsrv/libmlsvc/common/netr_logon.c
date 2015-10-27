@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -61,6 +61,8 @@ static void netr_setup_identity(ndr_heap_t *, smb_logon_t *,
 static boolean_t netr_isadmin(struct netr_validation_info3 *);
 static uint32_t netr_setup_domain_groups(struct netr_validation_info3 *,
     smb_ids_t *);
+static uint32_t netr_setup_token_info3(struct netr_validation_info3 *,
+    smb_token_t *);
 static uint32_t netr_setup_token_wingrps(struct netr_validation_info3 *,
     smb_token_t *);
 
@@ -73,6 +75,83 @@ static mutex_t netlogon_mutex;
 static cond_t netlogon_cv;
 static boolean_t netlogon_busy = B_FALSE;
 static boolean_t netlogon_abort = B_FALSE;
+
+/*
+ * Helper for Kerberos authentication
+ */
+uint32_t
+smb_decode_krb5_pac(smb_token_t *token, char *data, uint_t len)
+{
+	struct krb5_validation_info info;
+	ndr_buf_t *nbuf;
+	uint32_t status = NT_STATUS_NO_MEMORY;
+	int rc;
+
+	bzero(&info, sizeof (info));
+
+	/* Need to keep this until we're done with &info */
+	nbuf = ndr_buf_init(&TYPEINFO(netr_interface));
+	if (nbuf == NULL)
+		goto out;
+
+	rc = ndr_buf_decode(nbuf, NDR_PTYPE_PAC,
+	    NETR_OPNUM_decode_krb5_pac, data, len, &info);
+	if (rc != NDR_DRC_OK) {
+		status = RPC_NT_PROTOCOL_ERROR;
+		goto out;
+	}
+
+	status = netr_setup_token_info3(&info.info3, token);
+
+	/* Deal with the "resource groups"? */
+
+
+out:
+	if (nbuf != NULL)
+		ndr_buf_fini(nbuf);
+
+	return (status);
+}
+
+/*
+ * Code factored out of netr_setup_token()
+ */
+static uint32_t
+netr_setup_token_info3(struct netr_validation_info3 *info3,
+    smb_token_t *token)
+{
+	smb_sid_t *domsid;
+
+	domsid = (smb_sid_t *)info3->LogonDomainId;
+
+	token->tkn_user.i_sid = smb_sid_splice(domsid,
+	    info3->UserId);
+	if (token->tkn_user.i_sid == NULL)
+		goto errout;
+
+	token->tkn_primary_grp.i_sid = smb_sid_splice(domsid,
+	    info3->PrimaryGroupId);
+	if (token->tkn_primary_grp.i_sid == NULL)
+		goto errout;
+
+	if (info3->EffectiveName.str) {
+		token->tkn_account_name =
+		    strdup((char *)info3->EffectiveName.str);
+		if (token->tkn_account_name == NULL)
+			goto errout;
+	}
+
+	if (info3->LogonDomainName.str) {
+		token->tkn_domain_name =
+		    strdup((char *)info3->LogonDomainName.str);
+		if (token->tkn_domain_name == NULL)
+			goto errout;
+	}
+
+	return (netr_setup_token_wingrps(info3, token));
+errout:
+	return (NT_STATUS_INSUFF_SERVER_RESOURCES);
+}
 
 /*
  * Abort impending domain logon requests.
@@ -148,7 +227,7 @@ static uint32_t
 netlogon_logon(smb_logon_t *user_info, smb_token_t *token)
 {
 	char resource_domain[SMB_PI_MAX_DOMAIN];
-	char server[NETBIOS_NAME_SZ * 2];
+	char server[MAXHOSTNAMELEN];
 	mlsvc_handle_t netr_handle;
 	smb_domainex_t di;
 	uint32_t status;
@@ -164,13 +243,14 @@ netlogon_logon(smb_logon_t *user_info, smb_token_t *token)
 	}
 
 	do {
-		if (netr_open(di.d_dc, di.d_primary.di_nbname, &netr_handle)
-		    != 0)
+		if (netr_open(di.d_dci.dc_name, di.d_primary.di_nbname,
+		    &netr_handle) != 0)
 			return (NT_STATUS_OPEN_FAILED);
 
-		if (di.d_dc && (*netr_global_info.server != '\0')) {
+		if (di.d_dci.dc_name[0] != '\0' &&
+		    (*netr_global_info.server != '\0')) {
 			(void) snprintf(server, sizeof (server),
-			    "\\\\%s", di.d_dc);
+			    "\\\\%s", di.d_dci.dc_name);
 			if (strncasecmp(netr_global_info.server,
 			    server, strlen(server)) != 0)
 				netr_invalidate_chain();
@@ -178,7 +258,7 @@ netlogon_logon(smb_logon_t *user_info, smb_token_t *token)
 
 		if ((netr_global_info.flags & NETR_FLG_VALID) == 0 ||
 		    !smb_match_netlogon_seqnum()) {
-			status = netlogon_auth(di.d_dc, &netr_handle,
+			status = netlogon_auth(di.d_dci.dc_name, &netr_handle,
 			    NETR_FLG_NULL);
 
 			if (status != 0) {
@@ -190,7 +270,7 @@ netlogon_logon(smb_logon_t *user_info, smb_token_t *token)
 		}
 
 		status = netr_server_samlogon(&netr_handle,
-		    &netr_global_info, di.d_dc, user_info, token);
+		    &netr_global_info, di.d_dci.dc_name, user_info, token);
 
 		(void) netr_close(&netr_handle);
 	} while (status == NT_STATUS_INSUFFICIENT_LOGON_INFO && retries++ < 3);
@@ -254,13 +334,14 @@ netr_setup_token(struct netr_validation_info3 *info3, smb_logon_t *user_info,
 	 * exclusively ored with the 16 byte UserSessionKey to recover
 	 * the the clear form.
 	 */
-	if ((token->tkn_session_key = malloc(SMBAUTH_SESSION_KEY_SZ)) == NULL)
+	if ((token->tkn_ssnkey.val = malloc(SMBAUTH_SESSION_KEY_SZ)) == NULL)
 		return (NT_STATUS_NO_MEMORY);
+	token->tkn_ssnkey.len = SMBAUTH_SESSION_KEY_SZ;
 	bzero(rc4key, SMBAUTH_SESSION_KEY_SZ);
 	bcopy(netr_info->session_key.key, rc4key, netr_info->session_key.len);
-	bcopy(info3->UserSessionKey.data, token->tkn_session_key,
+	bcopy(info3->UserSessionKey.data, token->tkn_ssnkey.val,
 	    SMBAUTH_SESSION_KEY_SZ);
-	rand_hash((unsigned char *)token->tkn_session_key,
+	rand_hash((unsigned char *)token->tkn_ssnkey.val,
 	    SMBAUTH_SESSION_KEY_SZ, rc4key, SMBAUTH_SESSION_KEY_SZ);
 
 	return (NT_STATUS_SUCCESS);
@@ -603,7 +684,14 @@ netr_setup_identity(ndr_heap_t *heap, smb_logon_t *user_info,
 
 	(void) mutex_unlock(&logon_id_mutex);
 
-	identity->parameter_control = 0;
+	/*
+	 * [MS-APDS] 3.1.5.2 "NTLM Network Logon" says to set
+	 * ParameterControl to the 'E' + 'K' bits.  Those are:
+	 * (1 << 5) | (1 << 11), a.k.a
+	 */
+	identity->parameter_control =
+	    MSV1_0_ALLOW_SERVER_TRUST_ACCOUNT |
+	    MSV1_0_ALLOW_WORKSTATION_TRUST_ACCOUNT;
 	identity->logon_id.LowPart = logon_id;
 	identity->logon_id.HighPart = 0;
 

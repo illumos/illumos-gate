@@ -51,6 +51,7 @@ OBJS_LOCAL = \
 OBJS_FS_SMBSRV = \
 		smb_acl.o				\
 		smb_alloc.o				\
+		smb_authenticate.o			\
 		smb_close.o				\
 		smb_common_open.o			\
 		smb_common_transact.o			\

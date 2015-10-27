@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <unistd.h>
@@ -44,7 +45,6 @@ static rwlock_t smb_logoninit_rwl;
 
 typedef void (*smb_logonop_t)(smb_logon_t *, smb_token_t *);
 
-extern void smb_logon_domain(smb_logon_t *, smb_token_t *);
 static void smb_logon_local(smb_logon_t *, smb_token_t *);
 static void smb_logon_guest(smb_logon_t *, smb_token_t *);
 static void smb_logon_anon(smb_logon_t *, smb_token_t *);
@@ -158,8 +158,8 @@ smb_token_sids2ids(smb_token_t *token)
 	}
 
 	stat = smb_idmap_batch_getmappings(&sib);
-	smb_idmap_batch_destroy(&sib);
 	smb_idmap_check("smb_idmap_batch_getmappings", stat);
+	smb_idmap_batch_destroy(&sib);
 
 	return (stat == IDMAP_SUCCESS ? 0 : -1);
 }
@@ -253,7 +253,7 @@ smb_token_destroy(smb_token_t *token)
 		free(token->tkn_posix_grps);
 		free(token->tkn_account_name);
 		free(token->tkn_domain_name);
-		free(token->tkn_session_key);
+		free(token->tkn_ssnkey.val);
 		bzero(token, sizeof (smb_token_t));
 		free(token);
 	}
@@ -344,8 +344,10 @@ smb_token_set_flags(smb_token_t *token)
  * has been done.
  *
  * Note that the order of calls in this function are important.
+ *
+ * Returns B_TRUE for success.
  */
-static boolean_t
+boolean_t
 smb_token_setup_common(smb_token_t *token)
 {
 	smb_token_set_flags(token);
@@ -475,7 +477,6 @@ smb_logon_local(smb_logon_t *user_info, smb_token_t *token)
 	char guest[SMB_USERNAME_MAXLEN];
 	smb_passwd_t smbpw;
 	uint32_t status;
-	boolean_t isguest;
 
 	if (user_info->lg_secmode == SMB_SECMODE_DOMAIN) {
 		if ((user_info->lg_domain_type != SMB_DOMAIN_LOCAL) &&
@@ -483,16 +484,18 @@ smb_logon_local(smb_logon_t *user_info, smb_token_t *token)
 			return;
 	}
 
+	/*
+	 * If the requested account name is "guest" (or whatever
+	 * our guest account is named) then don't handle it here.
+	 * Let this request fall through to smb_logon_guest().
+	 */
 	smb_guest_account(guest, SMB_USERNAME_MAXLEN);
-	isguest = (smb_strcasecmp(guest, user_info->lg_e_username, 0) == 0);
+	if (smb_strcasecmp(guest, user_info->lg_e_username, 0) == 0)
+		return;
 
 	status = smb_token_auth_local(user_info, token, &smbpw);
-	if (status == NT_STATUS_SUCCESS) {
-		if (isguest)
-			status = smb_token_setup_guest(user_info, token);
-		else
-			status = smb_token_setup_local(&smbpw, token);
-	}
+	if (status == NT_STATUS_SUCCESS)
+		status = smb_token_setup_local(&smbpw, token);
 
 	user_info->lg_status = status;
 }
@@ -514,23 +517,31 @@ smb_logon_guest(smb_logon_t *user_info, smb_token_t *token)
 	char guest[SMB_USERNAME_MAXLEN];
 	smb_passwd_t smbpw;
 	char *temp;
-	uint32_t status;
 
 	if (user_info->lg_status != NT_STATUS_NO_SUCH_USER)
 		return;
 
+	/* Get the name of the guest account. */
 	smb_guest_account(guest, SMB_USERNAME_MAXLEN);
+
+	/* Does the guest account exist? */
+	if (smb_pwd_getpwnam(guest, &smbpw) == NULL)
+		return;
+
+	/* Is it enabled? (empty p/w is OK) */
+	if (smbpw.pw_flags & SMB_PWF_DISABLE)
+		return;
+
+	/*
+	 * OK, give the client a guest logon.  Note that on entry,
+	 * lg_e_username is typically something other than "guest"
+	 * so we need to set the effective username when createing
+	 * the guest token.
+	 */
 	temp = user_info->lg_e_username;
 	user_info->lg_e_username = guest;
-
-	status = smb_token_auth_local(user_info, token, &smbpw);
-	if ((status == NT_STATUS_SUCCESS) ||
-	    (status == NT_STATUS_NO_SUCH_USER)) {
-		status = smb_token_setup_guest(user_info, token);
-	}
-
+	user_info->lg_status = smb_token_setup_guest(user_info, token);
 	user_info->lg_e_username = temp;
-	user_info->lg_status = status;
 }
 
 /*
@@ -552,7 +563,7 @@ static uint32_t
 smb_token_auth_local(smb_logon_t *user_info, smb_token_t *token,
     smb_passwd_t *smbpw)
 {
-	boolean_t lm_ok, nt_ok;
+	boolean_t ok;
 	uint32_t status = NT_STATUS_SUCCESS;
 
 	if (smb_pwd_getpwnam(user_info->lg_e_username, smbpw) == NULL)
@@ -561,41 +572,42 @@ smb_token_auth_local(smb_logon_t *user_info, smb_token_t *token,
 	if (smbpw->pw_flags & SMB_PWF_DISABLE)
 		return (NT_STATUS_ACCOUNT_DISABLED);
 
-	nt_ok = lm_ok = B_FALSE;
-	if ((smbpw->pw_flags & SMB_PWF_LM) &&
-	    (user_info->lg_lm_password.len != 0)) {
-		lm_ok = smb_auth_validate_lm(
-		    user_info->lg_challenge_key.val,
-		    user_info->lg_challenge_key.len,
-		    smbpw,
-		    user_info->lg_lm_password.val,
-		    user_info->lg_lm_password.len,
-		    user_info->lg_domain,
-		    user_info->lg_username);
-		token->tkn_session_key = NULL;
+	if ((smbpw->pw_flags & (SMB_PWF_LM | SMB_PWF_NT)) == 0) {
+		/*
+		 * The SMB passwords have not been set.
+		 * Return an error that suggests the
+		 * password needs to be set.
+		 */
+		return (NT_STATUS_PASSWORD_EXPIRED);
 	}
 
-	if (!lm_ok && (user_info->lg_nt_password.len != 0)) {
-		token->tkn_session_key = malloc(SMBAUTH_SESSION_KEY_SZ);
-		if (token->tkn_session_key == NULL)
-			return (NT_STATUS_NO_MEMORY);
-		nt_ok = smb_auth_validate_nt(
-		    user_info->lg_challenge_key.val,
-		    user_info->lg_challenge_key.len,
-		    smbpw,
-		    user_info->lg_nt_password.val,
-		    user_info->lg_nt_password.len,
-		    user_info->lg_domain,
-		    user_info->lg_username,
-		    (uchar_t *)token->tkn_session_key);
-	}
+	token->tkn_ssnkey.val = malloc(SMBAUTH_SESSION_KEY_SZ);
+	if (token->tkn_ssnkey.val == NULL)
+		return (NT_STATUS_NO_MEMORY);
+	token->tkn_ssnkey.len = SMBAUTH_SESSION_KEY_SZ;
 
-	if (!nt_ok && !lm_ok) {
-		status = NT_STATUS_WRONG_PASSWORD;
-		syslog(LOG_NOTICE, "logon[%s\\%s]: %s",
-		    user_info->lg_e_domain, user_info->lg_e_username,
-		    xlate_nt_status(status));
-	}
+	ok = smb_auth_validate(
+	    smbpw,
+	    user_info->lg_domain,
+	    user_info->lg_username,
+	    user_info->lg_challenge_key.val,
+	    user_info->lg_challenge_key.len,
+	    user_info->lg_nt_password.val,
+	    user_info->lg_nt_password.len,
+	    user_info->lg_lm_password.val,
+	    user_info->lg_lm_password.len,
+	    token->tkn_ssnkey.val);
+	if (ok)
+		return (NT_STATUS_SUCCESS);
+
+	free(token->tkn_ssnkey.val);
+	token->tkn_ssnkey.val = NULL;
+	token->tkn_ssnkey.len = 0;
+
+	status = NT_STATUS_WRONG_PASSWORD;
+	syslog(LOG_NOTICE, "logon[%s\\%s]: %s",
+	    user_info->lg_e_domain, user_info->lg_e_username,
+	    xlate_nt_status(status));
 
 	return (status);
 }

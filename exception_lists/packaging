@@ -22,8 +22,8 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2012 OmniTI Computer Consulting, Inc.  All rights reserved.
-# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 #
 
 #
@@ -344,6 +344,7 @@ etc/sfw
 # Entries for the libmech_krb5 symlink, which has been included
 # for build purposes only, not delivered to customers.
 #
+usr/include/gssapi/gssapi_krb5.h
 usr/lib/gss/libmech_krb5.so
 usr/lib/amd64/gss/libmech_krb5.so	i386
 usr/lib/sparcv9/gss/libmech_krb5.so	sparc
@@ -747,10 +748,6 @@ usr/lib/amd64/libfakekernel.so.1		i386
 usr/lib/sparcv9/libfakekernel.so		sparc
 usr/lib/sparcv9/libfakekernel.so.1		sparc
 #
-# Private/Internal dtrace scripts of smbsrv. Do not ship.
-#
-usr/lib/smbsrv/dtrace
-#
 # Private/Internal libraries of smbsrv. Do not ship.
 #
 usr/lib/mdb/proc/libfksmbsrv.so
@@ -993,3 +990,8 @@ usr/lib/sparcv9/llib-lpcidb.ln		sparc
 usr/lib/libpcidb.so
 usr/lib/llib-lpcidb
 usr/lib/llib-lpcidb.ln
+
+#
+# debugging program for libadutils
+#
+usr/bin/test-getdc

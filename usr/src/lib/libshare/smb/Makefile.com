@@ -22,7 +22,7 @@
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
 #
 
 LIBRARY =	libshare_smb.a
@@ -45,8 +45,7 @@ LIBSRCS = $(LIBOBJS:%.o=$(SRCDIR)/%.c)
 lintcheck := SRCS = $(LIBSRCS)
 
 LIBS =		$(DYNLIB)
-LDLIBS +=	-lshare -ldlpi -lnsl -lnvpair -lscf -lumem -lc
-all install := LDLIBS += -lxml2
+LDLIBS +=	-lshare -lscf -luuid -ldlpi -lnsl -lnvpair -lxml2 -lumem -lc
 
 CFLAGS +=	$(CCVERBOSE)
 CERRWARN +=	-_gcc=-Wno-char-subscripts

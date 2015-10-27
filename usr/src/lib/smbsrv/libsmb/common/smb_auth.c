@@ -21,14 +21,69 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ *
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <strings.h>
 #include <stdlib.h>
+#include <syslog.h>
+#include <sys/md5.h>
 #include <smbsrv/string.h>
 #include <smbsrv/libsmb.h>
+#include <netsmb/spnego.h>	/* libsmbfs */
 #include <assert.h>
+
+#define	NTLM_CHAL_SZ	SMBAUTH_CHAL_SZ	/* challenge size */
+
+/*
+ * Compute the combined (server+client) challenge per. [MS-NLMP 3.3.1]
+ * MD5(concat(ServerChallenge,ClientChallenge))
+ */
+void
+smb_auth_ntlm2_mkchallenge(char *result,
+	const char *srv_chal, const char *clnt_chal)
+{
+	MD5_CTX context;
+	uchar_t challenges[2 * NTLM_CHAL_SZ];
+	uchar_t digest[SMBAUTH_HASH_SZ];
+
+	/*
+	 * challenges = ConcatenationOf(ServerChallenge, ClientChallenge)
+	 */
+	(void) memcpy(challenges, srv_chal, NTLM_CHAL_SZ);
+	(void) memcpy(challenges + NTLM_CHAL_SZ, clnt_chal, NTLM_CHAL_SZ);
+
+	/*
+	 * digest = MD5(challenges)
+	 */
+	MD5Init(&context);
+	MD5Update(&context, challenges, sizeof (challenges));
+	MD5Final(digest, &context);
+
+	/*
+	 * result = digest[0..7]
+	 */
+	(void) memcpy(result, digest, NTLM_CHAL_SZ);
+}
+
+void
+smb_auth_ntlm2_kxkey(unsigned char *result, const char *srv_chal,
+	const char *clnt_chal, unsigned char *ssn_base_key)
+{
+	uchar_t challenges[2 * NTLM_CHAL_SZ];
+
+	/*
+	 * challenges = ConcatenationOf(ServerChallenge, ClientChallenge)
+	 */
+	(void) memcpy(challenges, srv_chal, NTLM_CHAL_SZ);
+	(void) memcpy(challenges + NTLM_CHAL_SZ, clnt_chal, NTLM_CHAL_SZ);
+
+	/* HMAC_MD5(SessionBaseKey, concat(...)) */
+	/* SMBAUTH_HMACT64 args: D, Dsz, K, Ksz, digest */
+	(void) SMBAUTH_HMACT64(challenges, sizeof (challenges),
+	    ssn_base_key, SMBAUTH_HASH_SZ, result);
+}
 
 /*
  * smb_auth_qnd_unicode
@@ -117,7 +172,7 @@ smb_auth_lm_hash(const char *password, unsigned char *lm_hash)
  */
 static int
 smb_auth_lm_response(unsigned char *hash,
-    unsigned char *challenge, int clen,
+    unsigned char *challenge, /* NTLM_CHAL_SZ */
     unsigned char *lm_rsp)
 {
 	unsigned char S21[21];
@@ -131,7 +186,7 @@ smb_auth_lm_response(unsigned char *hash,
 
 	/* padded LM Hash -> LM Response */
 	return (smb_auth_DES(lm_rsp, SMBAUTH_LM_RESP_SZ, S21, 21,
-	    challenge, clen));
+	    challenge, NTLM_CHAL_SZ));
 }
 
 /*
@@ -174,7 +229,7 @@ smb_auth_ntlm_hash(const char *password, unsigned char *hash)
  */
 static int
 smb_auth_ntlm_response(unsigned char *hash,
-    unsigned char *challenge, int clen,
+    unsigned char *challenge, /* NTLM_CHAL_SZ */
     unsigned char *ntlm_rsp)
 {
 	unsigned char S21[21];
@@ -182,7 +237,7 @@ smb_auth_ntlm_response(unsigned char *hash,
 	bcopy(hash, S21, SMBAUTH_HASH_SZ);
 	bzero(&S21[SMBAUTH_HASH_SZ], 5);
 	if (smb_auth_DES((unsigned char *)ntlm_rsp, SMBAUTH_LM_RESP_SZ,
-	    S21, 21, challenge, clen) == SMBAUTH_FAILURE)
+	    S21, 21, challenge, NTLM_CHAL_SZ) == SMBAUTH_FAILURE)
 		return (0);
 	return (SMBAUTH_LM_RESP_SZ);
 }
@@ -253,13 +308,14 @@ smb_auth_ntlmv2_hash(unsigned char *ntlm_hash,
 static int
 smb_auth_v2_response(
 	unsigned char *hash,
-	unsigned char *srv_challenge, int slen,
+	unsigned char *srv_challenge, /* NTLM_CHAL_SZ */
 	unsigned char *clnt_data, int clen,
 	unsigned char *v2_rsp)
 {
 	unsigned char *hmac_data;
+	int slen = NTLM_CHAL_SZ;
 
-	hmac_data = (unsigned char *)malloc((slen + clen) * sizeof (char));
+	hmac_data = malloc(NTLM_CHAL_SZ + clen);
 	if (!hmac_data) {
 		return (-1);
 	}
@@ -275,70 +331,39 @@ smb_auth_v2_response(
 	return (SMBAUTH_HASH_SZ + clen);
 }
 
-/*
- * smb_auth_gen_session_key
- *
- * Generate the NTLM user session key if LMCompatibilityLevel is 2 or
- * NTLMv2 user session key if LMCompatibilityLevel is 3 or above.
- *
- * NTLM_Session_Key = MD4(NTLM_Hash);
- *
- * NTLMv2_Session_Key = HMAC_MD5(NTLMv2Hash, 16, NTLMv2_HMAC, 16)
- *
- * Prior to calling this function, the auth instance should be set
- * via smb_auth_set_info().
- *
- * Returns the appropriate session key.
- */
-int
-smb_auth_gen_session_key(smb_auth_info_t *auth, unsigned char *session_key)
-{
-	int rc;
-
-	if (auth->lmcompatibility_lvl == 2)
-		rc = smb_auth_md4(session_key, auth->hash, SMBAUTH_HASH_SZ);
-	else
-		rc = SMBAUTH_HMACT64((unsigned char *)auth->cs,
-		    SMBAUTH_HASH_SZ, (unsigned char *)auth->hash_v2,
-		    SMBAUTH_SESSION_KEY_SZ, session_key);
-
-	return (rc);
-}
 
 static boolean_t
 smb_lm_password_ok(
     unsigned char *challenge,
-    uint32_t clen,
     unsigned char *lm_hash,
-    unsigned char *passwd)
+    unsigned char *lm_resp)
 {
-	unsigned char lm_resp[SMBAUTH_LM_RESP_SZ];
+	unsigned char ok_resp[SMBAUTH_LM_RESP_SZ];
 	int rc;
 
-	rc = smb_auth_lm_response(lm_hash, challenge, clen, lm_resp);
+	rc = smb_auth_lm_response(lm_hash, challenge, ok_resp);
 	if (rc != SMBAUTH_SUCCESS)
 		return (B_FALSE);
 
-	return (bcmp(lm_resp, passwd, SMBAUTH_LM_RESP_SZ) == 0);
+	return (bcmp(ok_resp, lm_resp, SMBAUTH_LM_RESP_SZ) == 0);
 }
 
 static boolean_t
 smb_ntlm_password_ok(
     unsigned char *challenge,
-    uint32_t clen,
     unsigned char *ntlm_hash,
-    unsigned char *passwd,
+    unsigned char *nt_resp,
     unsigned char *session_key)
 {
-	unsigned char ntlm_resp[SMBAUTH_LM_RESP_SZ];
+	unsigned char ok_resp[SMBAUTH_LM_RESP_SZ];
 	int rc;
 	boolean_t ok;
 
-	rc = smb_auth_ntlm_response(ntlm_hash, challenge, clen, ntlm_resp);
+	rc = smb_auth_ntlm_response(ntlm_hash, challenge, ok_resp);
 	if (rc != SMBAUTH_LM_RESP_SZ)
 		return (B_FALSE);
 
-	ok = (bcmp(ntlm_resp, passwd, SMBAUTH_LM_RESP_SZ) == 0);
+	ok = (bcmp(ok_resp, nt_resp, SMBAUTH_LM_RESP_SZ) == 0);
 	if (ok && (session_key)) {
 		rc = smb_auth_md4(session_key, ntlm_hash, SMBAUTH_HASH_SZ);
 		if (rc != SMBAUTH_SUCCESS)
@@ -350,7 +375,6 @@ smb_ntlm_password_ok(
 static boolean_t
 smb_ntlmv2_password_ok(
     unsigned char *challenge,
-    uint32_t clen,
     unsigned char *ntlm_hash,
     unsigned char *passwd,
     int pwdlen,
@@ -404,7 +428,7 @@ smb_ntlmv2_password_ok(
 			break;
 
 		if (smb_auth_v2_response(ntlmv2_hash, challenge,
-		    clen, clnt_blob, clnt_blob_len, ntlmv2_resp) < 0)
+		    clnt_blob, clnt_blob_len, ntlmv2_resp) < 0)
 			break;
 
 		ok = (bcmp(passwd, ntlmv2_resp, pwdlen) == 0);
@@ -426,8 +450,7 @@ smb_ntlmv2_password_ok(
 
 static boolean_t
 smb_lmv2_password_ok(
-    unsigned char *challenge,
-    uint32_t clen,
+    unsigned char *srv_challenge,
     unsigned char *ntlm_hash,
     unsigned char *passwd,
     char *domain,
@@ -469,8 +492,8 @@ smb_lmv2_password_ok(
 		    ntlmv2_hash) != SMBAUTH_SUCCESS)
 			break;
 
-		if (smb_auth_v2_response(ntlmv2_hash, challenge,
-		    clen, clnt_challenge, SMBAUTH_V2_CLNT_CHALLENGE_SZ,
+		if (smb_auth_v2_response(ntlmv2_hash, srv_challenge,
+		    clnt_challenge, SMBAUTH_CHAL_SZ,
 		    lmv2_resp) < 0)
 			break;
 
@@ -484,81 +507,83 @@ smb_lmv2_password_ok(
 }
 
 /*
- * smb_auth_validate_lm
+ * smb_auth_validate
  *
- * Validates given LM/LMv2 client response, passed in passwd arg, against
- * stored user's password, passed in smbpw
- *
- * If LM level <=3 server accepts LM responses, otherwise LMv2
+ * Validates given NTLMv2 (or NTLM, LMv2, LM) client responses against
+ * the stored user's password, passed in smbpw.  Try those in the order
+ * strongest to weakest, stopping at a point determined by the configured
+ * lmauth_level (LM Compatibility Level).
  */
 boolean_t
-smb_auth_validate_lm(
-    unsigned char *challenge,
-    uint32_t clen,
+smb_auth_validate(
     smb_passwd_t *smbpw,
-    unsigned char *passwd,
-    int pwdlen,
-    char *domain,
-    char *username)
-{
-	boolean_t ok = B_FALSE;
-	int64_t lmlevel;
-
-	if (pwdlen != SMBAUTH_LM_RESP_SZ)
-		return (B_FALSE);
-
-	if (smb_config_getnum(SMB_CI_LM_LEVEL, &lmlevel) != SMBD_SMF_OK)
-		return (B_FALSE);
-
-	if (lmlevel <= 3) {
-		ok = smb_lm_password_ok(challenge, clen, smbpw->pw_lmhash,
-		    passwd);
-	}
-
-	if (!ok)
-		ok = smb_lmv2_password_ok(challenge, clen, smbpw->pw_nthash,
-		    passwd, domain, username);
-
-	return (ok);
-}
-
-/*
- * smb_auth_validate_nt
- *
- * Validates given NTLM/NTLMv2 client response, passed in passwd arg, against
- * stored user's password, passed in smbpw
- *
- * If LM level <=4 server accepts NTLM/NTLMv2 responses, otherwise only NTLMv2
- */
-boolean_t
-smb_auth_validate_nt(
-    unsigned char *challenge,
-    uint32_t clen,
-    smb_passwd_t *smbpw,
-    unsigned char *passwd,
-    int pwdlen,
     char *domain,
     char *username,
+    unsigned char *challenge,
+    uint_t clen,
+    unsigned char *nt_resp,
+    uint_t nt_len,
+    unsigned char *lm_resp,
+    uint_t lm_len,
     uchar_t *session_key)
 {
 	int64_t lmlevel;
-	boolean_t ok;
+	boolean_t ok = B_FALSE;
 
 	if (smb_config_getnum(SMB_CI_LM_LEVEL, &lmlevel) != SMBD_SMF_OK)
 		return (B_FALSE);
 
-	if ((lmlevel == 5) && (pwdlen <= SMBAUTH_LM_RESP_SZ))
+	if (lmlevel > 5)
 		return (B_FALSE);
 
-	if (pwdlen > SMBAUTH_LM_RESP_SZ)
-		ok = smb_ntlmv2_password_ok(challenge, clen,
-		    smbpw->pw_nthash, passwd, pwdlen,
-		    domain, username, session_key);
-	else
-		ok = smb_ntlm_password_ok(challenge, clen,
-		    smbpw->pw_nthash, passwd, session_key);
+	if (clen != NTLM_CHAL_SZ)
+		return (B_FALSE);
 
-	return (ok);
+	/*
+	 * Accept NTLMv2 at any LM level (0-5).
+	 */
+	if (nt_len > SMBAUTH_LM_RESP_SZ) {
+		ok = smb_ntlmv2_password_ok(challenge,
+		    smbpw->pw_nthash, nt_resp, nt_len,
+		    domain, username, session_key);
+		if (ok)
+			return (ok);
+	}
+
+	if (lmlevel == 5)
+		return (B_FALSE);
+
+	/*
+	 * Accept NTLM at levels 0-4
+	 */
+	if (nt_len == SMBAUTH_LM_RESP_SZ) {
+		ok = smb_ntlm_password_ok(challenge, smbpw->pw_nthash,
+		    nt_resp, session_key);
+		if (ok)
+			return (ok);
+	}
+
+	if (lmlevel == 4)
+		return (B_FALSE);
+
+
+	/*
+	 * Accept LM/LMv2 auth at levels 0-3
+	 */
+	if (lm_len != SMBAUTH_LM_RESP_SZ)
+		return (B_FALSE);
+	if (session_key)
+		(void) smb_auth_md4(session_key, smbpw->pw_nthash,
+		    SMBAUTH_HASH_SZ);
+	ok = smb_lmv2_password_ok(challenge, smbpw->pw_nthash,
+	    lm_resp, domain, username);
+	if (ok)
+		return (ok);
+	ok = smb_lm_password_ok(challenge, smbpw->pw_lmhash, lm_resp);
+	if (ok)
+		return (ok);
+
+	return (B_FALSE);
 }
 
 /*

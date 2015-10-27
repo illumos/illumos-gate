@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _IDMAPD_H
@@ -104,9 +104,15 @@ typedef struct idmapd_state {
 	adutils_ad_t	**gcs;
 	int		num_dcs;
 	adutils_ad_t	**dcs;
+	mutex_t		addisc_lk;
+	cond_t		addisc_cv;
+	int		addisc_st;
 	int		debug[IDMAPD_DEBUG_MAX+1];
 } idmapd_state_t;
 extern idmapd_state_t	_idmapdstate;
+
+#define	ADDISC_ST_REQUESTED	1
+#define	ADDISC_ST_RUNNING	2
 
 #define	RDLOCK_CONFIG() \
 	(void) rw_rdlock(&_idmapdstate.rwlk_cfg);
@@ -308,6 +314,7 @@ extern void	reload_ad();
 extern void	idmap_init_tsd_key(void);
 extern void	degrade_svc(int, const char *);
 extern void	restore_svc(void);
+extern void	notify_dc_changed(void);
 
 
 extern int		init_dbs();

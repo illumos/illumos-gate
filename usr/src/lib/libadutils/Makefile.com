@@ -22,11 +22,13 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+#
 
 LIBRARY =	libadutils.a
 VERS =		.1
-OBJECTS =	adutils.o addisc.o adutils_threadfuncs.o
-LINT_OBJECTS =	adutils.o addisc.o adutils_threadfuncs.o
+OBJECTS =	adutils.o addisc.o adutils_threadfuncs.o \
+		ldap_ping.o srv_query.o
 
 include ../../Makefile.lib
 
@@ -34,17 +36,16 @@ C99MODE=	-xc99=%all
 C99LMODE=	-Xc99=%all
 
 LIBS =		$(DYNLIB) $(LINTLIB)
-LDLIBS +=	-lc -lldap -lresolv -lsocket -lnsl
+LDLIBS +=	-lldap -lresolv -lsocket -lnsl -lc
 SRCDIR =	../common
 $(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
 
 CFLAGS +=	$(CCVERBOSE)
-CPPFLAGS +=	-D_REENTRANT -I$(SRCDIR) -I$(SRC)/lib/libldap5/include/ldap
+CPPFLAGS +=	-D_REENTRANT -I$(SRCDIR)
+CPPFLAGS +=	-I$(SRC)/lib/libldap5/include/ldap
 
 CERRWARN +=	-_gcc=-Wno-type-limits
 CERRWARN +=	-_gcc=-Wno-uninitialized
-
-lint := OBJECTS = $(LINT_OBJECTS)
 
 .KEEP_STATE:
 

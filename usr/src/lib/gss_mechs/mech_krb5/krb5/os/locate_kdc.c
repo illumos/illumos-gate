@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -70,6 +71,10 @@
 #endif /* T_SRV */
 #include <syslog.h>
 #include <locale.h>
+
+#if USE_DLOPEN
+#include <dlfcn.h>
+#endif
 
 /* for old Unixes and friends ... */
 #ifndef MAXHOSTNAMELEN
@@ -446,6 +451,72 @@ module_locate_server (krb5_context ctx, const krb5_data *realm,
     return 0;
 }
 
+/* XXX - move to locate_plugin.h? */
+typedef krb5_error_code (*krb5_lookup_func)(
+    void *,
+    enum locate_service_type svc, const char *realm,
+    int socktype, int family,
+    int (*cbfunc)(void *,int,struct sockaddr *),
+    void *cbdata);
+
+/*
+ * Solaris Kerberos (illumos)
+ *
+ * Allow main programs to provide an override function for _locate_server,
+ * named _krb5_override_service_locator().  If that function is found in
+ * the main program, it's called like a service locator plugin function.
+ * If it returns KRB5_PLUGIN_NO_HANDLE, continue with other _locate_server
+ * functions.  If it returns anything else (zero or some other error),
+ * that return is "final" (no other _locate_server functions are called).
+ * This mechanism is used by programs like "idmapd" that want to completely
+ * control service location.
+ */
+static krb5_error_code
+override_locate_server (krb5_context ctx, const krb5_data *realm,
+		      struct addrlist *addrlist,
+		      enum locate_service_type svc, int socktype, int family)
+{
+    struct module_callback_data cbdata = { 0, };
+    krb5_error_code code;
+    void *dlh;
+    krb5_lookup_func lookup_func;
+
+    Tprintf("in override_locate_server\n");
+    cbdata.lp = addrlist;
+
+    if ((dlh = dlopen(0, RTLD_FIRST | RTLD_LAZY)) == NULL) {
+	Tprintf("dlopen failed\n");
+	return KRB5_PLUGIN_NO_HANDLE;
+    }
+    lookup_func = (krb5_lookup_func) dlsym(
+	dlh, "_krb5_override_service_locator");
+    dlclose(dlh);
+    if (lookup_func == NULL) {
+	Tprintf("dlsym failed\n");
+	return KRB5_PLUGIN_NO_HANDLE;
+    }
+
+    code = lookup_func(ctx, svc, realm->data, socktype, family,
+		       module_callback, &cbdata);
+    if (code == KRB5_PLUGIN_NO_HANDLE) {
+	Tprintf("override lookup routine returned KRB5_PLUGIN_NO_HANDLE\n");
+	return code;
+    }
+    if (code != 0) {
+	/* Module encountered an actual error.  */
+	Tprintf("override lookup routine returned error %d: %s\n",
+		    code, error_message(code));
+	return code;
+    }
+
+    /* Got something back, yippee.  */
+    Tprintf("now have %d addrs in list %p\n", addrlist->naddrs, addrlist);
+    print_addrlist(addrlist);
+
+    return 0;
+}
+/* Solaris Kerberos (illumos) */
+
 static krb5_error_code
 prof_locate_server (krb5_context context, const krb5_data *realm,
 		    char ***hostlist,
@@ -798,6 +869,20 @@ krb5int_locate_server (krb5_context context, const krb5_data *realm,
     struct srv_dns_entry *dns_list_head = NULL;
 
     *addrlist = al;
+
+    /*
+     * Solaris Kerberos (illumos)
+     * Allow main programs to override _locate_server()
+     */
+    code = override_locate_server(context, realm, &al, svc, socktype, family);
+    if (code != KRB5_PLUGIN_NO_HANDLE) {
+    	if (code == 0) 
+	    *addrlist = al;
+	else if (al.space)
+	    free_list (&al);
+	return (code);
+    }
+    /* Solaris Kerberos (illumos) */
 
     code = module_locate_server(context, realm, &al, svc, socktype, family);
     Tprintf("module_locate_server returns %d\n", code);

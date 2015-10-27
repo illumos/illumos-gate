@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 #
 
 #
@@ -53,13 +54,14 @@ SYMBOL_VERSION SUNWprivate {
 	smb_ads_fini;
 	smb_ads_init;
 	smb_ads_join;
-	smb_ads_join_errmsg;
+	smb_ads_log_errmsg;
 	smb_ads_lookup_msdcs;
 	smb_ads_lookup_share;
 	smb_ads_open;
 	smb_ads_publish_share;
 	smb_ads_refresh;
 	smb_ads_remove_share;
+	smb_ads_strerror;
 	smb_browser_netlogon;
 	smb_browser_reconfig;
 	smb_ccache_init;

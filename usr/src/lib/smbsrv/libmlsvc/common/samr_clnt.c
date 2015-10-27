@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -84,7 +84,7 @@ samr_open(char *server, char *domain, char *username, DWORD access_mask,
 	if (server == NULL || domain == NULL) {
 		if (!smb_domain_getinfo(&di))
 			return (NT_STATUS_INTERNAL_ERROR);
-		server = di.d_dc;
+		server = di.d_dci.dc_name;
 		domain = di.d_primary.di_nbname;
 	}
 

@@ -27,6 +27,7 @@
 #define	_SMBSRV_SMBINFO_H
 
 #include <sys/types.h>
+#include <sys/uuid.h>
 #include <smbsrv/netbios.h>
 #include <netinet/in.h>
 #include <smbsrv/smb_inet.h>
@@ -93,6 +94,7 @@ extern "C" {
 #define	SMB_PI_MAX_COMMENT	58
 #define	SMB_PI_MAX_NATIVE_OS	32
 #define	SMB_PI_MAX_LANMAN	32
+#define	SMB_PI_MAX_NEGTOK	256	/* GUID and SMB negotiate token */
 
 #define	SMB_PI_KEEP_ALIVE_MIN		(90 * 60)
 /*
@@ -115,6 +117,7 @@ typedef struct smb_version {
 	uint32_t	sv_platform_id;
 } smb_version_t;
 
+/* See also: smb_ioc_cfg_t */
 typedef struct smb_kmod_cfg {
 	uint32_t skc_maxworkers;
 	uint32_t skc_maxconnections;
@@ -130,7 +133,13 @@ typedef struct smb_kmod_cfg {
 	int32_t skc_print_enable;
 	int32_t skc_traverse_mounts;
 	uint32_t skc_execflags;
+	uint32_t skc_negtok_len;
 	smb_version_t skc_version;
+	/* SMB negotiate protocol response. */
+	uuid_t skc_machine_uuid;
+	uchar_t skc_negtok[SMB_PI_MAX_NEGTOK];
+	char skc_native_os[SMB_PI_MAX_NATIVE_OS];
+	char skc_native_lm[SMB_PI_MAX_LANMAN];
 	char skc_nbdomain[NETBIOS_NAME_SZ];
 	char skc_fqdn[SMB_PI_MAX_DOMAIN];
 	char skc_hostname[SMB_PI_MAX_HOST];

@@ -12,7 +12,7 @@
 #
 
 #
-# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 #
 
 # Helper program to run fksmbd (user-space smbd for debugging)
@@ -31,6 +31,23 @@ then
   echo "chmod -R a+rw  /var/smb /var/run/smb"
   exit 1;
 fi
+
+if [[ ! -r /var/smb/smbpasswd ]]
+then
+  echo "Need readable /var/smb/smbpasswd, i.e."
+  echo 'chgrp staff /var/smb/smbpasswd'
+  echo 'chmod 440   /var/smb/smbpasswd'
+  exit 1;
+fi
+
+if [[ -e /var/smb/.pwd.lock && ! -w /var/smb/.pwd.lock ]]
+then
+  echo "Need to cleanup /var/smb/.pwd.lock, i.e."
+  echo "rm -f /var/smb/.pwd.lock"
+  exit 1;
+fi
+
+# OK, setup env. to run it.
 
 export SMBD_DOOR_NAME="/tmp/fksmbd_door"
 export SMB_SHARE_DNAME="/tmp/fksmbshare_door"

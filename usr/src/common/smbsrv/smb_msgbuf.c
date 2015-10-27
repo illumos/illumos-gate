@@ -52,7 +52,6 @@ static int buf_decode(smb_msgbuf_t *, char *, va_list ap);
 static int buf_encode(smb_msgbuf_t *, char *, va_list ap);
 static void *smb_msgbuf_malloc(smb_msgbuf_t *, size_t);
 static int smb_msgbuf_chkerc(char *text, int erc);
-static void buf_decode_wcs(smb_wchar_t *, smb_wchar_t *, int wcstrlen);
 
 /*
  * Returns the offset or number of bytes used within the buffer.
@@ -216,16 +215,19 @@ buf_decode(smb_msgbuf_t *mb, char *fmt, va_list ap)
 {
 	uint32_t ival;
 	uint8_t c;
-	uint8_t *cvalp;
-	uint8_t **cvalpp;
+	uint8_t *bvalp;
 	uint16_t *wvalp;
 	uint32_t *lvalp;
 	uint64_t *llvalp;
-	smb_wchar_t *wcs;
+	char *cvalp;
+	char **cvalpp;
+	smb_wchar_t wchar;
+	boolean_t repc_specified;
 	int repc;
 	int rc;
 
 	while ((c = *fmt++) != 0) {
+		repc_specified = B_FALSE;
 		repc = 1;
 
 		if (c == ' ' || c == '\t')
@@ -247,9 +249,11 @@ buf_decode(smb_msgbuf_t *mb, char *fmt, va_list ap)
 				repc = repc * 10 + c - '0';
 				c = *fmt++;
 			} while ('0' <= c && c <= '9');
+			repc_specified = B_TRUE;
 		} else if (c == '#') {
 			repc = va_arg(ap, int);
 			c = *fmt++;
+			repc_specified = B_TRUE;
 		}
 
 		switch (c) {
@@ -260,26 +264,26 @@ buf_decode(smb_msgbuf_t *mb, char *fmt, va_list ap)
 			mb->scan += repc;
 			break;
 
-		case 'c':
+		case 'c': /* get char */
 			if (smb_msgbuf_has_space(mb, repc) == 0)
 				return (SMB_MSGBUF_UNDERFLOW);
 
-			cvalp = va_arg(ap, uint8_t *);
-			bcopy(mb->scan, cvalp, repc);
+			bvalp = va_arg(ap, uint8_t *);
+			bcopy(mb->scan, bvalp, repc);
 			mb->scan += repc;
 			break;
 
-		case 'b':
+		case 'b': /* get byte */
 			if (smb_msgbuf_has_space(mb, repc) == 0)
 				return (SMB_MSGBUF_UNDERFLOW);
 
-			cvalp = va_arg(ap, uint8_t *);
+			bvalp = va_arg(ap, uint8_t *);
 			while (repc-- > 0) {
-				*cvalp++ = *mb->scan++;
+				*bvalp++ = *mb->scan++;
 			}
 			break;
 
-		case 'w':
+		case 'w': /* get word */
 			rc = smb_msgbuf_has_space(mb, repc * sizeof (uint16_t));
 			if (rc == 0)
 				return (SMB_MSGBUF_UNDERFLOW);
@@ -291,7 +295,7 @@ buf_decode(smb_msgbuf_t *mb, char *fmt, va_list ap)
 			}
 			break;
 
-		case 'l':
+		case 'l': /* get long */
 			rc = smb_msgbuf_has_space(mb, repc * sizeof (int32_t));
 			if (rc == 0)
 				return (SMB_MSGBUF_UNDERFLOW);
@@ -303,7 +307,7 @@ buf_decode(smb_msgbuf_t *mb, char *fmt, va_list ap)
 			}
 			break;
 
-		case 'q':
+		case 'q': /* get quad */
 			rc = smb_msgbuf_has_space(mb, repc * sizeof (int64_t));
 			if (rc == 0)
 				return (SMB_MSGBUF_UNDERFLOW);
@@ -320,26 +324,30 @@ buf_decode(smb_msgbuf_t *mb, char *fmt, va_list ap)
 				goto unicode_translation;
 			/*FALLTHROUGH*/
 
-		case 's':
-			ival = strlen((const char *)mb->scan) + 1;
-			if (smb_msgbuf_has_space(mb, ival) == 0)
+		case 's': /* get string */
+			if (!repc_specified)
+				repc = strlen((const char *)mb->scan) + 1;
+			if (smb_msgbuf_has_space(mb, repc) == 0)
 				return (SMB_MSGBUF_UNDERFLOW);
-
-			if ((cvalp = smb_msgbuf_malloc(mb, ival * 2)) == 0)
+			if ((cvalp = smb_msgbuf_malloc(mb, repc * 2)) == 0)
 				return (SMB_MSGBUF_UNDERFLOW);
-
-			if ((ival = smb_stombs((char *)cvalp,
-			    (char *)mb->scan, ival * 2)) ==
-			    (uint32_t)-1) {
-				return (SMB_MSGBUF_DATA_ERROR);
-			}
-
-			cvalpp = va_arg(ap, uint8_t **);
+			cvalpp = va_arg(ap, char **);
 			*cvalpp = cvalp;
-			mb->scan += (ival+1);
+			/* Translate OEM to mbs */
+			while (repc > 0) {
+				wchar = *mb->scan++;
+				repc--;
+				if (wchar == 0)
+					break;
+				ival = smb_wctomb(cvalp, wchar);
+				cvalp += ival;
+			}
+			*cvalp = '\0';
+			if (repc > 0)
+				mb->scan += repc;
 			break;
 
-		case 'U': /* Convert from unicode */
+		case 'U': /* get unicode string */
 unicode_translation:
 			/*
 			 * Unicode strings are always word aligned.
@@ -348,35 +356,43 @@ unicode_translation:
 			 * may be longer than the wide-chars.
 			 */
 			smb_msgbuf_word_align(mb);
-			/*LINTED E_BAD_PTR_CAST_ALIGN*/
-			wcs = (smb_wchar_t *)mb->scan;
-
-			/* count the null wchar */
-			repc = sizeof (smb_wchar_t);
-			while (*wcs++)
-				repc += sizeof (smb_wchar_t);
-
+			if (!repc_specified) {
+				/*
+				 * Count bytes, including the null.
+				 */
+				uint8_t *tmp_scan = mb->scan;
+				repc = 2; /* the null */
+				while ((wchar = LE_IN16(tmp_scan)) != 0) {
+					tmp_scan += 2;
+					repc += 2;
+				}
+			}
 			if (smb_msgbuf_has_space(mb, repc) == 0)
 				return (SMB_MSGBUF_UNDERFLOW);
-
-			/* Decode wchar string into host byte-order */
-			if ((wcs = smb_msgbuf_malloc(mb, repc)) == 0)
-				return (SMB_MSGBUF_UNDERFLOW);
-
-			/*LINTED E_BAD_PTR_CAST_ALIGN*/
-			buf_decode_wcs(wcs, (smb_wchar_t *)mb->scan,
-			    repc / sizeof (smb_wchar_t));
-
-			/* Get space for translated string */
+			/*
+			 * Get space for translated string
+			 * Allocates worst-case size.
+			 */
 			if ((cvalp = smb_msgbuf_malloc(mb, repc * 2)) == 0)
 				return (SMB_MSGBUF_UNDERFLOW);
-
-			/* Translate string */
-			(void) smb_wcstombs((char *)cvalp, wcs, repc * 2);
-
-			cvalpp = va_arg(ap, uint8_t **);
+			cvalpp = va_arg(ap, char **);
 			*cvalpp = cvalp;
-			mb->scan += repc;
+			/*
+			 * Translate unicode to mbs, stopping after
+			 * null or repc limit.
+			 */
+			while (repc >= 2) {
+				wchar = LE_IN16(mb->scan);
+				mb->scan += 2;
+				repc -= 2;
+				if (wchar == 0)
+					break;
+				ival = smb_wctomb(cvalp, wchar);
+				cvalp += ival;
+			}
+			*cvalp = '\0';
+			if (repc > 0)
+				mb->scan += repc;
 			break;
 
 		case 'M':
@@ -447,15 +463,17 @@ buf_encode(smb_msgbuf_t *mb, char *fmt, va_list ap)
 	uint16_t wval;
 	uint32_t lval;
 	uint64_t llval;
-	uint32_t ival;
-	uint8_t *cvalp;
+	uint8_t *bvalp;
+	char *cvalp;
 	uint8_t c;
-	smb_wchar_t wcval;
+	smb_wchar_t wchar;
 	int count;
-	int repc = 1;
+	boolean_t repc_specified;
+	int repc;
 	int rc;
 
 	while ((c = *fmt++) != 0) {
+		repc_specified = B_FALSE;
 		repc = 1;
 
 		if (c == ' ' || c == '\t')
@@ -477,9 +495,11 @@ buf_encode(smb_msgbuf_t *mb, char *fmt, va_list ap)
 				repc = repc * 10 + c - '0';
 				c = *fmt++;
 			} while ('0' <= c && c <= '9');
+			repc_specified = B_TRUE;
 		} else if (c == '#') {
 			repc = va_arg(ap, int);
 			c = *fmt++;
+			repc_specified = B_TRUE;
 		}
 
 		switch (c) {
@@ -491,16 +511,16 @@ buf_encode(smb_msgbuf_t *mb, char *fmt, va_list ap)
 				*mb->scan++ = 0;
 			break;
 
-		case 'c':
+		case 'c': /* put char */
 			if (smb_msgbuf_has_space(mb, repc) == 0)
 				return (SMB_MSGBUF_OVERFLOW);
 
-			cvalp = va_arg(ap, uint8_t *);
-			bcopy(cvalp, mb->scan, repc);
+			bvalp = va_arg(ap, uint8_t *);
+			bcopy(bvalp, mb->scan, repc);
 			mb->scan += repc;
 			break;
 
-		case 'b':
+		case 'b': /* put byte */
 			if (smb_msgbuf_has_space(mb, repc) == 0)
 				return (SMB_MSGBUF_OVERFLOW);
 
@@ -510,7 +530,7 @@ buf_encode(smb_msgbuf_t *mb, char *fmt, va_list ap)
 			}
 			break;
 
-		case 'w':
+		case 'w': /* put word */
 			rc = smb_msgbuf_has_space(mb, repc * sizeof (uint16_t));
 			if (rc == 0)
 				return (SMB_MSGBUF_OVERFLOW);
@@ -522,7 +542,7 @@ buf_encode(smb_msgbuf_t *mb, char *fmt, va_list ap)
 			}
 			break;
 
-		case 'l':
+		case 'l': /* put long */
 			rc = smb_msgbuf_has_space(mb, repc * sizeof (int32_t));
 			if (rc == 0)
 				return (SMB_MSGBUF_OVERFLOW);
@@ -534,7 +554,7 @@ buf_encode(smb_msgbuf_t *mb, char *fmt, va_list ap)
 			}
 			break;
 
-		case 'q':
+		case 'q': /* put quad */
 			rc = smb_msgbuf_has_space(mb, repc * sizeof (int64_t));
 			if (rc == 0)
 				return (SMB_MSGBUF_OVERFLOW);
@@ -551,66 +571,79 @@ buf_encode(smb_msgbuf_t *mb, char *fmt, va_list ap)
 				goto unicode_translation;
 			/* FALLTHROUGH */
 
-		case 's':
-			cvalp = va_arg(ap, uint8_t *);
-			ival = strlen((const char *)cvalp) + 1;
-
-			if (smb_msgbuf_has_space(mb, ival) == 0)
+		case 's': /* put string */
+			cvalp = va_arg(ap, char *);
+			if (!repc_specified) {
+				repc = smb_sbequiv_strlen(cvalp);
+				if (repc == -1)
+					return (SMB_MSGBUF_OVERFLOW);
+				if (!(mb->flags & SMB_MSGBUF_NOTERM))
+					repc++;
+			}
+			if (smb_msgbuf_has_space(mb, repc) == 0)
 				return (SMB_MSGBUF_OVERFLOW);
-
-			ival =
-			    smb_mbstos((char *)mb->scan, (const char *)cvalp);
-			mb->scan += ival + 1;
+			while (repc > 0) {
+				count = smb_mbtowc(&wchar, cvalp,
+				    MTS_MB_CHAR_MAX);
+				if (count < 0)
+					return (SMB_MSGBUF_DATA_ERROR);
+				cvalp += count;
+				if (wchar == 0)
+					break;
+				*mb->scan++ = (uint8_t)wchar;
+				repc--;
+				if (wchar & 0xff00) {
+					*mb->scan++ = wchar >> 8;
+					repc--;
+				}
+			}
+			if (*cvalp == '\0' && repc > 0 &&
+			    (mb->flags & SMB_MSGBUF_NOTERM) == 0) {
+				*mb->scan++ = 0;
+				repc--;
+			}
+			while (repc > 0) {
+				*mb->scan++ = 0;
+				repc--;
+			}
 			break;
 
-		case 'U': /* unicode */
+		case 'U': /* put unicode string */
 unicode_translation:
 			/*
 			 * Unicode strings are always word aligned.
 			 */
 			smb_msgbuf_word_align(mb);
-			cvalp = va_arg(ap, uint8_t *);
-
-			for (;;) {
-				rc = smb_msgbuf_has_space(mb,
-				    sizeof (smb_wchar_t));
-				if (rc == 0)
-					return (SMB_MSGBUF_OVERFLOW);
-
-				count = smb_mbtowc(&wcval, (const char *)cvalp,
+			cvalp = va_arg(ap, char *);
+			if (!repc_specified) {
+				repc = smb_wcequiv_strlen(cvalp);
+				if (!(mb->flags & SMB_MSGBUF_NOTERM))
+					repc += 2;
+			}
+			if (!smb_msgbuf_has_space(mb, repc))
+				return (SMB_MSGBUF_OVERFLOW);
+			while (repc >= 2) {
+				count = smb_mbtowc(&wchar, cvalp,
 				    MTS_MB_CHAR_MAX);
-
-				if (count < 0) {
+				if (count < 0)
 					return (SMB_MSGBUF_DATA_ERROR);
-				} else if (count == 0) {
-					/*
-					 * No longer need to do this now that
-					 * mbtowc correctly writes the null
-					 * before returning zero but paranoia
-					 * wins.
-					 */
-					wcval = 0;
-					count = 1;
-				}
-
-				/* Write wchar in wire-format */
-				LE_OUT16(mb->scan, wcval);
-
-				if (*cvalp == 0) {
-					/*
-					 * End of string. Check to see whether
-					 * or not to include the null
-					 * terminator.
-					 */
-					if ((mb->flags & SMB_MSGBUF_NOTERM) ==
-					    0)
-						mb->scan +=
-						    sizeof (smb_wchar_t);
-					break;
-				}
-
-				mb->scan += sizeof (smb_wchar_t);
 				cvalp += count;
+				if (wchar == 0)
+					break;
+
+				LE_OUT16(mb->scan, wchar);
+				mb->scan += 2;
+				repc -= 2;
+			}
+			if (*cvalp == '\0' && repc >= 2 &&
+			    (mb->flags & SMB_MSGBUF_NOTERM) == 0) {
+				LE_OUT16(mb->scan, 0);
+				mb->scan += 2;
+				repc -= 2;
+			}
+			while (repc > 0) {
+				*mb->scan++ = 0;
+				repc--;
 			}
 			break;
 
@@ -694,16 +727,4 @@ smb_msgbuf_chkerc(char *text, int erc)
 		}
 	}
 	return (erc);
-}
-
-static void
-buf_decode_wcs(smb_wchar_t *dst_wcstr, smb_wchar_t *src_wcstr, int wcstrlen)
-{
-	int i;
-
-	for (i = 0; i < wcstrlen; i++) {
-		*dst_wcstr = LE_IN16(src_wcstr);
-		dst_wcstr++;
-		src_wcstr++;
-	}
 }
