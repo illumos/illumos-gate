@@ -407,8 +407,14 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 	 * and interpreted using the normal system call table; however, the
 	 * execution of a non-illumos binary in the form of /bin/ls will still
 	 * be branded and be subject to all of the normal actions of the brand.
+	 *
+	 * The level checks associated with brand handling below are used to
+	 * prevent a loop since the brand elfexec function typically comes back
+	 * through this function. We must check <= here since the nested
+	 * handling in the #! interpreter code will increment the level before
+	 * calling gexec to run the final elfexec interpreter.
 	 */
-	if ((level < 2) && (*brand_action != EBA_NATIVE) &&
+	if ((level <= INTP_MAXDEPTH) && (*brand_action != EBA_NATIVE) &&
 	    (PROC_IS_BRANDED(p)) && (BROP(p)->b_native_exec != NULL)) {
 		if (BROP(p)->b_native_exec(ehdrp->e_ident[EI_OSABI],
 		    &args->brand_nroot) == B_TRUE) {
@@ -420,7 +426,7 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 		}
 	}
 
-	if ((level < 2) &&
+	if ((level <= INTP_MAXDEPTH) &&
 	    (*brand_action != EBA_NATIVE) && (PROC_IS_BRANDED(p))) {
 		error = BROP(p)->b_elfexec(vp, uap, args,
 		    idatap, level + 1, execsz, setid, exec_file, cred,
