@@ -1692,13 +1692,13 @@ lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 	orig_sigaltstack.ss_flags = lwp->lwp_sigaltstack.ss_flags;
 
 	if (args->to_model == DATAMODEL_NATIVE) {
-		error = elfexec(nvp, uap, args, idata, level + 1, execsz,
-		    setid, exec_file, cred, brand_action);
+		error = elfexec(nvp, uap, args, idata, INTP_MAXDEPTH + 1,
+		    execsz, setid, exec_file, cred, brand_action);
 	}
 #if defined(_LP64)
 	else {
-		error = elf32exec(nvp, uap, args, idata, level + 1, execsz,
-		    setid, exec_file, cred, brand_action);
+		error = elf32exec(nvp, uap, args, idata, INTP_MAXDEPTH + 1,
+		    execsz, setid, exec_file, cred, brand_action);
 	}
 #endif
 	VN_RELE(nvp);
