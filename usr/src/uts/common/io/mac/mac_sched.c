@@ -2632,7 +2632,7 @@ again:
 		}
 		if (MAC_PROTECT_ENABLED(mcip, MPT_IPNOSPOOF)) {
 			mutex_exit(&mac_srs->srs_lock);
-			mac_protect_intercept_dhcp(mcip, head);
+			mac_protect_intercept_dynamic(mcip, head);
 			mutex_enter(&mac_srs->srs_lock);
 		}
 	}
@@ -2910,7 +2910,7 @@ again:
 		}
 		if (MAC_PROTECT_ENABLED(mcip, MPT_IPNOSPOOF)) {
 			mutex_exit(&mac_srs->srs_lock);
-			mac_protect_intercept_dhcp(mcip, head);
+			mac_protect_intercept_dynamic(mcip, head);
 			mutex_enter(&mac_srs->srs_lock);
 		}
 	}

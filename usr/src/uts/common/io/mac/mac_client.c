@@ -858,10 +858,10 @@ mac_unicast_update_client_flow(mac_client_impl_t *mcip)
 	mac_flow_set_desc(flent, &flow_desc);
 
 	/*
-	 * The v6 local addr (used by mac protection) needs to be
+	 * The v6 local and SLAAC addrs (used by mac protection) need to be
 	 * regenerated because our mac address has changed.
 	 */
-	mac_protect_update_v6_local_addr(mcip);
+	mac_protect_update_mac_token(mcip);
 
 	/*
 	 * A MAC client could have one MAC address but multiple
@@ -2956,7 +2956,7 @@ mac_client_datapath_teardown(mac_client_handle_t mch, mac_unicast_impl_t *muip,
 	if (muip != NULL)
 		kmem_free(muip, sizeof (mac_unicast_impl_t));
 	mac_protect_cancel_timer(mcip);
-	mac_protect_flush_dhcp(mcip);
+	mac_protect_flush_dynamic(mcip);
 
 	bzero(&mcip->mci_misc_stat, sizeof (mcip->mci_misc_stat));
 	/*
