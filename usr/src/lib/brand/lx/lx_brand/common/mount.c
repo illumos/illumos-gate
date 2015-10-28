@@ -781,7 +781,6 @@ lx_mount(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 		}
 	} else if (strcmp(fstype, "tmpfs") == 0) {
 		char	idstr[64];
-		int	idval;
 
 		/* Copy in Linux mount options. */
 		if (datap != NULL) {
