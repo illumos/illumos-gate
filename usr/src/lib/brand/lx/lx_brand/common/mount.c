@@ -88,6 +88,8 @@ mount_opt_t lx_sysfs_options[] = {
 mount_opt_t lx_tmpfs_options[] = {
 	{ "size",		MOUNT_OPT_BYTESIZE },
 	{ "mode",		MOUNT_OPT_UINT },
+	{ "uid",		MOUNT_OPT_UINT },
+	{ "gid",		MOUNT_OPT_UINT },
 	{ NULL,			MOUNT_OPT_INVALID }
 };
 
@@ -296,6 +298,73 @@ i_lx_opt_verify(char *opts, mount_opt_t *mop)
 	};
 
 	/* We verified all the options. */
+	return (0);
+}
+
+/*
+ * Remove an option from the string and save it in the provided buffer.
+ * The option string should have already been verified as valid.
+ * Return 0 if not present, -1 if error, and 1 if present and fine.
+ */
+static int
+opt_rm(char *opts, char *rmopt, char *retstr, int retlen)
+{
+	int	opts_len = strlen(opts);
+	char	*optstart, *optend;
+	int	optlen;
+
+	assert((opts != NULL) && (rmopt != NULL));
+
+	retstr[0] = '\0';
+
+	/* If no options were specified, there's no problem. */
+	if (opts_len == 0)
+		return (0);
+
+	if ((optstart = strstr(opts, rmopt)) == NULL)
+		return (0);
+
+	for (optend = optstart; *optend != ',' && *optend != '\0'; optend++)
+		;
+
+	optlen = optend - optstart;
+	if (optlen >= retlen)
+		return (-1);
+	strncpy(retstr, optstart, optlen);
+	retstr[optlen] = '\0';
+
+	if (*optend == ',')
+		optend++;
+
+	optlen = strlen(optend) + 1;
+	bcopy(optend, optstart, optlen);
+
+	if (*optstart == '\0' && optstart != opts) {
+		/* removed last opt and it had a preceeding opt, remove comma */
+		*(optstart - 1) = '\0';
+	}
+
+	return (1);
+}
+
+static int
+opt_id_val(char *opt, int *valp)
+{
+	char *vp;
+	long lval;
+
+	if ((vp = strchr(opt, '=')) == NULL)
+		return (-1);
+
+	vp++;
+	if (!isdigit(*vp))
+		return (-1);
+
+	lval = strtol(vp, &vp, 10);
+	if (*vp != '\0' || lval > INT_MAX)
+		return (-1);
+
+	*valp = (int)lval;
 	return (0);
 }
 
@@ -644,7 +713,12 @@ lx_mount(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 	char			fstype[MAXPATHLEN], options[MAX_MNTOPT_STR];
 	int			sflags, rv;
 	long			res;
+	boolean_t		is_tmpfs = B_FALSE;
 	boolean_t		is_cgrp = B_FALSE;
+
+	/* Variable for tmpfs mounts. */
+	int			uid = -1;
+	int			gid = -1;
 
 	/* Variables needed for nfs mounts. */
 	lx_nfs_mount_data_t	lx_nmd;
@@ -706,6 +780,8 @@ lx_mount(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 			return (-errno);
 		}
 	} else if (strcmp(fstype, "tmpfs") == 0) {
+		char	idstr[64];
+		int	idval;
 
 		/* Copy in Linux mount options. */
 		if (datap != NULL) {
@@ -732,6 +808,29 @@ lx_mount(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 			(void) strlcat(options, "mode=1777", sizeof (options));
 		}
 
+		switch (opt_rm(options, "uid=", idstr, sizeof (idstr))) {
+		case 0:
+			uid = -1;
+			break;
+		case 1:
+			if (opt_id_val(idstr, &uid) < 0)
+				return (-EINVAL);
+			break;
+		default:
+			return (-E2BIG);
+		}
+		switch (opt_rm(options, "gid=", idstr, sizeof (idstr))) {
+		case 0:
+			gid = -1;
+			break;
+		case 1:
+			if (opt_id_val(idstr, &gid) < 0)
+				return (-EINVAL);
+			break;
+		default:
+			return (-E2BIG);
+		}
+
 		/*
 		 * Linux seems to always allow overlay mounts. We allow this
 		 * everywhere except under /dev where it interferes with device
@@ -740,6 +839,8 @@ lx_mount(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 		if (strcmp(targetp, "/dev") != 0 &&
 		    strncmp(targetp, "/dev/", 5) != 0)
 			sflags |= MS_OVERLAY;
+
+		is_tmpfs = B_TRUE;
 
 	} else if (strcmp(fstype, "proc") == 0) {
 		struct stat64	sb;
@@ -955,6 +1056,12 @@ lx_mount(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 			 */
 			(void) umount(target);
 			return (-ENOMEM);
+		} else if (is_tmpfs) {
+			/* Handle uid/gid mount options. */
+			if (uid != -1 || gid != -1)
+				(void) chown(target, uid, gid);
+			return (0);
+
 		} else {
 			return (0);
 		}
