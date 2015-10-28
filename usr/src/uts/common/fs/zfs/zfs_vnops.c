@@ -3667,6 +3667,18 @@ top:
 		}
 	}
 
+	vnevent_pre_rename_src(ZTOV(szp), sdvp, snm, ct);
+	if (tzp)
+		vnevent_pre_rename_dest(ZTOV(tzp), tdvp, tnm, ct);
+
+	/*
+	 * notify the target directory if it is not the same
+	 * as source directory.
+	 */
+	if (tdvp != sdvp) {
+		vnevent_pre_rename_dest_dir(tdvp, ZTOV(szp), tnm, ct);
+	}
+
 	tx = dmu_tx_create(zfsvfs->z_os);
 	dmu_tx_hold_sa(tx, szp->z_sa_hdl, B_FALSE);
 	dmu_tx_hold_sa(tx, sdzp->z_sa_hdl, B_FALSE);

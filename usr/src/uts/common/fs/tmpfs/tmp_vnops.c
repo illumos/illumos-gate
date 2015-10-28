@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright (c) 2014, Joyent, Inc. All rights reserved.
+ * Copyright 2015, Joyent, Inc.
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
@@ -1271,6 +1271,12 @@ tmp_rename(
 		if (error == ESAME)
 			error = 0;
 		goto done;
+	}
+
+	vnevent_pre_rename_src(TNTOV(fromtp), odvp, onm, ct);
+	/* Notify the target dir. if not the same as the source dir. */
+	if (ndvp != odvp) {
+		vnevent_pre_rename_dest_dir(ndvp, TNTOV(fromtp), nnm, ct);
 	}
 
 	/*

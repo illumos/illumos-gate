@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2015 Joyent, Inc.
  */
 
 #include <sys/systm.h>
@@ -366,11 +367,11 @@ deleg_rd_vnevent(femarg_t *arg, vnevent_t vnevent, vnode_t *dvp, char *name,
 
 	switch (vnevent) {
 	case VE_REMOVE:
-	case VE_RENAME_DEST:
+	case VE_PRE_RENAME_DEST:
 		trunc = TRUE;
 		/*FALLTHROUGH*/
 
-	case VE_RENAME_SRC:
+	case VE_PRE_RENAME_SRC:
 		fp = (rfs4_file_t *)arg->fa_fnode->fn_available;
 		rfs4_recall_deleg(fp, trunc, NULL);
 
@@ -404,11 +405,11 @@ deleg_wr_vnevent(femarg_t *arg, vnevent_t vnevent, vnode_t *dvp, char *name,
 
 	switch (vnevent) {
 	case VE_REMOVE:
-	case VE_RENAME_DEST:
+	case VE_PRE_RENAME_DEST:
 		trunc = TRUE;
 		/*FALLTHROUGH*/
 
-	case VE_RENAME_SRC:
+	case VE_PRE_RENAME_SRC:
 		fp = (rfs4_file_t *)arg->fa_fnode->fn_available;
 		rfs4_recall_deleg(fp, trunc, NULL);
 		rfs4_dbe_lock(fp->rf_dbe);

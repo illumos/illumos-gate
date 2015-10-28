@@ -336,6 +336,9 @@ inotify_fop_vnevent(femarg_t *vf, vnevent_t vnevent, vnode_t *dvp, char *name,
 	case VE_SUPPORT:
 	case VE_MOUNTEDOVER:
 	case VE_TRUNCATE:
+	case VE_PRE_RENAME_SRC:
+	case VE_PRE_RENAME_DEST:
+	case VE_PRE_RENAME_DEST_DIR:
 		break;
 	}
 

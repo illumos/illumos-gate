@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1984, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2014, Joyent, Inc. All rights reserved.
+ * Copyright 2015, Joyent, Inc.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -3367,6 +3367,7 @@ ufs_rename(
 	struct inode *ip = NULL;	/* check inode */
 	struct inode *sdp;		/* old (source) parent inode */
 	struct inode *tdp;		/* new (target) parent inode */
+	struct vnode *svp = NULL;	/* source vnode */
 	struct vnode *tvp = NULL;	/* target vnode, if it exists */
 	struct vnode *realvp;
 	struct ufsvfs *ufsvfsp;
@@ -3379,7 +3380,7 @@ ufs_rename(
 	krwlock_t *first_lock;
 	krwlock_t *second_lock;
 	krwlock_t *reverse_lock;
-	int terr;
+	int serr, terr;
 
 	sdp = VTOI(sdvp);
 	slot.fbp = NULL;
@@ -3390,6 +3391,25 @@ ufs_rename(
 
 	/* Must do this before taking locks in case of DNLC miss */
 	terr = ufs_eventlookup(tdvp, tnm, cr, &tvp);
+	serr = ufs_eventlookup(sdvp, snm, cr, &svp);
+
+	if ((serr == 0) && ((terr == 0) || (terr == ENOENT))) {
+		if (tvp != NULL)
+			vnevent_pre_rename_dest(tvp, tdvp, tnm, ct);
+
+		/*
+		 * Notify the target directory of the rename event
+		 * if source and target directories are not the same.
+		 */
+		if (sdvp != tdvp)
+			vnevent_pre_rename_dest_dir(tdvp, svp, tnm, ct);
+
+		if (svp != NULL)
+			vnevent_pre_rename_src(svp, sdvp, snm, ct);
+	}
+
+	if (svp != NULL)
+		VN_RELE(svp);
 
 retry_rename:
 	error = ufs_lockfs_begin(ufsvfsp, &ulp, ULOCKFS_RENAME_MASK);

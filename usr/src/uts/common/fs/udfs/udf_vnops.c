@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright 2015, Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -995,6 +995,7 @@ udf_rename(
 		rw_exit(&tdp->i_rwlock);
 		goto errout;
 	}
+	vnevent_pre_rename_src(ITOV(sip), sdvp, snm, ct);
 	rw_exit(&tdp->i_rwlock);
 
 	rw_enter(&sdp->i_rwlock, RW_WRITER);
