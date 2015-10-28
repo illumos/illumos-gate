@@ -898,9 +898,7 @@ static int
 lx_ptrace_detach(lx_ptrace_accord_t *accord, lx_lwp_data_t *remote, int signo,
     boolean_t *release_hold)
 {
-	klwp_t *rlwp;
-
-	rlwp = remote->br_lwp;
+	klwp_t *rlwp = remote->br_lwp;
 
 	/*
 	 * The tracee LWP was in "ptrace-stop" and we now hold its p_lock.
@@ -916,6 +914,11 @@ lx_ptrace_detach(lx_ptrace_accord_t *accord, lx_lwp_data_t *remote, int signo,
 	remote->br_ptrace_tracer = NULL;
 	remote->br_ptrace_flags = 0;
 	*release_hold = B_TRUE;
+
+	/*
+	 * Decrement traced-lwp count for the process.
+	 */
+	VERIFY(ptolxproc(rlwp->lwp_procp)->l_ptrace-- >= 1);
 
 	/*
 	 * The tracer may, as described in lx_ptrace_cont(), choose to suppress
@@ -1054,10 +1057,10 @@ lx_ptrace_attach(pid_t lx_pid)
 		sigtoproc(rproc, rthr, SIGSTOP);
 
 		/*
-		 * Set the in-kernel process-wide ptrace(2) enable flag.
+		 * Bump traced-lwp count for the remote process.
 		 */
 		rprocd = ttolxproc(rthr);
-		rprocd->l_ptrace = 1;
+		rprocd->l_ptrace++;
 
 		error = 0;
 	}
@@ -1326,10 +1329,9 @@ lx_ptrace_traceme(void)
 			lx_ptrace_accord_exit(accord);
 
 			/*
-			 * Set the in-kernel process-wide ptrace(2) enable
-			 * flag.
+			 * Bump traced-lwp count for the process.
 			 */
-			procd->l_ptrace = 1;
+			procd->l_ptrace++;
 
 			return (0);
 		}
@@ -1788,6 +1790,11 @@ lx_ptrace_exit_tracer(proc_t *p, lx_lwp_data_t *lwpd,
 		mutex_exit(&accord->lxpa_tracees_lock);
 
 		/*
+		 * Decrement traced-lwp count for the remote process.
+		 */
+		VERIFY(ptolxproc(rproc)->l_ptrace-- >= 1);
+
+		/*
 		 * Ensure that the LWP is not stopped on our account.
 		 */
 		lx_ptrace_restart_lwp(rlwp);
@@ -1857,6 +1864,12 @@ lx_ptrace_exit_tracee(proc_t *p, lx_lwp_data_t *lwpd,
 	 * Wake up any tracers waiting for us to detach from the accord.
 	 */
 	cv_broadcast(&lx_ptrace_busy_cv);
+
+	/*
+	 * Decrement traced-lwp count for the process.
+	 */
+	VERIFY(ptolxproc(p)->l_ptrace-- >= 1);
+
 	mutex_exit(&p->p_lock);
 	mutex_exit(&accord->lxpa_tracees_lock);
 

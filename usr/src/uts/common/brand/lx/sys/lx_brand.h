@@ -282,7 +282,7 @@ typedef struct {
 typedef struct lx_proc_data {
 	uintptr_t l_handler;	/* address of user-space handler */
 	pid_t l_ppid;		/* pid of originating parent proc */
-	uint64_t l_ptrace;	/* process being observed with ptrace */
+	int64_t l_ptrace;	/* count of process lwps observed by ptrace */
 	lx_elf_data_t l_elf_data; /* ELF data for linux executable */
 	/* signal to deliver to parent when this thread group dies */
 	int l_signal;
