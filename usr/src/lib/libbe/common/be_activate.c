@@ -881,11 +881,27 @@ be_do_installboot_helper(zpool_handle_t *zphp, nvlist_t *child, char *stage1,
 	char *path, *dsk_ptr;
 	char *flag = "";
 	int ret;
+	vdev_stat_t *vs;
+	uint_t vsc;
 
 	if (nvlist_lookup_string(child, ZPOOL_CONFIG_PATH, &path) != 0) {
 		be_print_err(gettext("be_do_installboot: "
 		    "failed to get device path\n"));
 		return (BE_ERR_NODEV);
+	}
+
+	if ((nvlist_lookup_uint64_array(child, ZPOOL_CONFIG_VDEV_STATS,
+	    (uint64_t **)&vs, &vsc) != 0) ||
+	    vs->vs_state < VDEV_STATE_DEGRADED) {
+		/*
+		 * Don't try to run installgrub on a vdev that is not ONLINE
+		 * or DEGRADED. Try to print a warning for each such vdev.
+		 */
+		be_print_err(gettext("be_do_installboot: "
+		    "vdev %s is %s, can't install boot loader\n"),
+		    path, zpool_state_to_name(vs->vs_state, vs->vs_aux));
+		free(path);
+		return (BE_SUCCESS);
 	}
 
 	/*
