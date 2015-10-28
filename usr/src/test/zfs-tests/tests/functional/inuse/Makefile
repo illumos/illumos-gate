@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright (c) 2013 by Delphix. All rights reserved.
+# Copyright (c) 2013, 2015 by Delphix. All rights reserved.
 #
 
 include $(SRC)/Makefile.master
@@ -20,7 +20,6 @@ TESTDIR = $(ROOTOPTPKG)/tests/functional/inuse
 
 PROGS = cleanup \
 	inuse_001_pos \
-	inuse_002_pos \
 	inuse_003_pos \
 	inuse_004_pos \
 	inuse_005_pos \

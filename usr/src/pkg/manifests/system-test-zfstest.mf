@@ -99,7 +99,6 @@ dir path=opt/zfs-tests/tests/functional/grow_replicas
 dir path=opt/zfs-tests/tests/functional/history
 dir path=opt/zfs-tests/tests/functional/holes
 dir path=opt/zfs-tests/tests/functional/inheritance
-dir path=opt/zfs-tests/tests/functional/interop
 dir path=opt/zfs-tests/tests/functional/inuse
 dir path=opt/zfs-tests/tests/functional/large_files
 dir path=opt/zfs-tests/tests/functional/largest_pool
@@ -1057,9 +1056,6 @@ file \
     path=opt/zfs-tests/tests/functional/cli_root/zpool_create/zpool_create_012_neg \
     mode=0555
 file \
-    path=opt/zfs-tests/tests/functional/cli_root/zpool_create/zpool_create_013_neg \
-    mode=0555
-file \
     path=opt/zfs-tests/tests/functional/cli_root/zpool_create/zpool_create_014_neg \
     mode=0555
 file \
@@ -1788,13 +1784,8 @@ file path=opt/zfs-tests/tests/functional/inheritance/state021.cfg mode=0555
 file path=opt/zfs-tests/tests/functional/inheritance/state022.cfg mode=0555
 file path=opt/zfs-tests/tests/functional/inheritance/state023.cfg mode=0555
 file path=opt/zfs-tests/tests/functional/inheritance/state024.cfg mode=0555
-file path=opt/zfs-tests/tests/functional/interop/cleanup mode=0555
-file path=opt/zfs-tests/tests/functional/interop/interop.cfg mode=0555
-file path=opt/zfs-tests/tests/functional/interop/interop_001_pos mode=0555
-file path=opt/zfs-tests/tests/functional/interop/setup mode=0555
 file path=opt/zfs-tests/tests/functional/inuse/inuse.cfg mode=0555
 file path=opt/zfs-tests/tests/functional/inuse/inuse_001_pos mode=0555
-file path=opt/zfs-tests/tests/functional/inuse/inuse_002_pos mode=0555
 file path=opt/zfs-tests/tests/functional/inuse/inuse_003_pos mode=0555
 file path=opt/zfs-tests/tests/functional/inuse/inuse_004_pos mode=0555
 file path=opt/zfs-tests/tests/functional/inuse/inuse_005_pos mode=0555
