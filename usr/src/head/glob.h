@@ -152,12 +152,23 @@ typedef	struct	glob_t	{
 #define	GLOB_ABORTED	(-1)		/* GLOB_ERR set or errfunc return!=0 */
 #define	GLOB_ABEND	GLOB_ABORTED	/* backward compatibility */
 
+
 #ifdef __PRAGMA_REDEFINE_EXTNAME
+#if !defined(_LP64) && _FILE_OFFSET_BITS == 64
+#pragma	redefine_extname	glob	_glob_ext64
+#pragma	redefine_extname	globfree	_globfree_ext64
+#else
 #pragma	redefine_extname	glob	_glob_ext
 #pragma	redefine_extname	globfree	_globfree_ext
+#endif /* !_LP64 && _FILE_OFFSET_BITS == 64 */
 #else /* __PRAGMA_REDEFINE_EXTNAME */
+#if !defined(_LP64) && _FILE_OFFSET_BITS == 64
+#define	glob	_glob_ext64
+#define	globfree	_globfree_ext64
+#else
 #define	glob	_glob_ext
 #define	globfree	_globfree_ext
+#endif /* !_LP64 && _FILE_OFFSET_BITS == 64 */
 #endif /* __PRAGMA_REDEFINE_EXTNAME */
 
 extern int glob(const char *_RESTRICT_KYWD, int, int(*)(const char *, int),

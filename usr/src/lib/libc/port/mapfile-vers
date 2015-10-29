@@ -93,6 +93,14 @@ $if _x86 && _ELF64
 $add amd64
 $endif
 
+SYMBOL_VERSION ILLUMOS_0.17 {	# glob(3C) LFS
+$if lf64
+    protected:
+	_glob_ext64;
+	_globfree_ext64;
+$endif
+} ILLUMOS_0.16;
+
 SYMBOL_VERSION ILLUMOS_0.16 {	# timerfd
     protected:
 	timerfd_create;
