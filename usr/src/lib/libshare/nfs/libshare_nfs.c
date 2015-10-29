@@ -1095,6 +1095,7 @@ get_rootnames(seconfig_t *sec, char *list, int *count)
 	if (a == NULL) {
 		(void) printf(dgettext(TEXT_DOMAIN,
 		    "get_rootnames: no memory\n"));
+		*count = 0;
 	} else {
 		for (i = 0; i < c; i++) {
 			host = strtok(list, ":");
@@ -1103,6 +1104,7 @@ get_rootnames(seconfig_t *sec, char *list, int *count)
 					free(a[--i]);
 				free(a);
 				a = NULL;
+				*count = 0;
 				break;
 			}
 			list = NULL;

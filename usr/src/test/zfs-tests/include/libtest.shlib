@@ -25,7 +25,7 @@
 #
 
 #
-# Copyright (c) 2012, 2014 by Delphix. All rights reserved.
+# Copyright (c) 2012, 2015 by Delphix. All rights reserved.
 #
 
 . ${STF_TOOLS}/contrib/include/logapi.shlib
@@ -1368,22 +1368,6 @@ function get_disklist # pool
 	$ECHO $disklist
 }
 
-#
-# Destroy all existing metadevices and state database
-#
-function destroy_metas
-{
-	typeset metad
-
-	for metad in $($METASTAT -p | $AWK '{print $1}'); do
-		log_must $METACLEAR -rf $metad
-	done
-
-	for metad in $($METADB | $CUT -f6 | $GREP dev | $UNIQ); do
-		log_must $METADB -fd $metad
-	done
-}
-
 # /**
 #  This function kills a given list of processes after a time period. We use
 #  this in the stress tests instead of STF_TIMEOUT so that we can have processes
@@ -1679,8 +1663,7 @@ function get_remote_pkgpath
 #/**
 # A function to find and locate free disks on a system or from given
 # disks as the parameter. It works by locating disks that are in use
-# as swap devices, SVM devices, and dump devices, and also disks
-# listed in /etc/vfstab
+# as swap devices and dump devices, and also disks listed in /etc/vfstab
 #
 # $@ given disks to find which are free, default is all disks in
 # the test system
@@ -1690,12 +1673,10 @@ function get_remote_pkgpath
 function find_disks
 {
 	sfi=/tmp/swaplist.$$
-	msi=/tmp/metastat.$$
 	dmpi=/tmp/dumpdev.$$
 	max_finddisksnum=${MAX_FINDDISKSNUM:-6}
 
 	$SWAP -l > $sfi
-	$METASTAT -c > $msi 2>/dev/null
 	$DUMPADM > $dmpi 2>/dev/null
 
 # write an awk script that can process the output of format
@@ -1736,9 +1717,6 @@ EOF
 	# Check for swap
 		$GREP "${disk}[sp]" $sfi >/dev/null
 		(($? == 0)) && continue
-	# Check for SVM
-		$GREP "${disk}" $msi >/dev/null
-		(($? == 0)) && continue
 	# check for dump device
 		$GREP "${disk}[sp]" $dmpi >/dev/null
 		(($? == 0)) && continue
@@ -1749,7 +1727,6 @@ EOF
 		unused_candidates="$unused_candidates $disk"
 	done
 	$RM $sfi
-	$RM $msi
 	$RM $dmpi
 
 # now just check to see if those disks do actually exist
