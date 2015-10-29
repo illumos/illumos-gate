@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 /*
  * Copyright 1990 by the Massachusetts Institute of Technology.
@@ -59,8 +60,9 @@
 #include <smbns_krb.h>
 
 int
-smb_kinit(char *principal_name, char *principal_passwd)
+smb_kinit(char *domain_name, char *principal_name, char *principal_passwd)
 {
+	char default_realm[MAXHOSTNAMELEN];
 	krb5_context ctx = NULL;
 	krb5_ccache cc = NULL;
 	krb5_principal me = NULL;
@@ -68,6 +70,7 @@ smb_kinit(char *principal_name, char *principal_passwd)
 	krb5_error_code code;
 	const char *errmsg = NULL;
 	const char *doing = NULL;
+	smb_ads_status_t err;
 
 	assert(principal_name != NULL);
 	assert(principal_passwd != NULL);
@@ -81,12 +84,21 @@ smb_kinit(char *principal_name, char *principal_passwd)
 
 	code = krb5_init_context(&ctx);
 	if (code) {
+		err = SMB_ADS_KRB5_INIT_CTX;
 		doing = "smbns_krb: initializing context";
 		goto cleanup;
 	}
 
+	/*
+	 * In case krb5.conf is not configured, set the default realm.
+	 */
+	(void) strlcpy(default_realm, domain_name, sizeof (default_realm));
+	(void) smb_strupr(default_realm);
+	(void) krb5_set_default_realm(ctx, default_realm);
+
 	code = krb5_cc_default(ctx, &cc);
 	if (code != 0) {
+		err = SMB_ADS_KRB5_CC_DEFAULT;
 		doing = "smbns_krb: resolve default credentials cache";
 		goto cleanup;
 	}
@@ -94,6 +106,7 @@ smb_kinit(char *principal_name, char *principal_passwd)
 	/* Use specified name */
 	code = krb5_parse_name(ctx, principal_name, &me);
 	if (code != 0) {
+		err = SMB_ADS_KRB5_PARSE_PRINCIPAL;
 		doing = "smbns_krb: parsing principal name";
 		goto cleanup;
 	}
@@ -102,6 +115,7 @@ smb_kinit(char *principal_name, char *principal_passwd)
 	    principal_passwd, NULL, 0, (krb5_deltat)0,
 	    NULL, NULL);
 	if (code != 0) {
+		err = SMB_ADS_KRB5_GET_INIT_CREDS_PW;
 		doing = "smbns_krb: getting initial credentials";
 
 		if (code == KRB5KRB_AP_ERR_BAD_INTEGRITY) {
@@ -113,17 +127,20 @@ smb_kinit(char *principal_name, char *principal_passwd)
 
 	code = krb5_cc_initialize(ctx, cc, me);
 	if (code != 0) {
+		err = SMB_ADS_KRB5_CC_INITIALIZE;
 		doing = "smbns_krb: initializing cache";
 		goto cleanup;
 	}
 
 	code = krb5_cc_store_cred(ctx, cc, &my_creds);
 	if (code != 0) {
+		err = SMB_ADS_KRB5_CC_STORE_CRED;
 		doing = "smbns_krb: storing credentials";
 		goto cleanup;
 	}
 
 	/* SUCCESS! */
+	err = SMB_ADS_SUCCESS;
 
 cleanup:
 	if (code != 0) {
@@ -145,7 +162,7 @@ cleanup:
 	if (ctx)
 		krb5_free_context(ctx);
 
-	return (code == 0);
+	return (err);
 }
 
 /*

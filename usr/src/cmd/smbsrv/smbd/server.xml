@@ -181,7 +181,7 @@ file.
 		<propval name='restrict_anonymous' type='boolean'
 			value='false' override='true'/>
 		<propval name='signing_enabled' type='boolean'
-			value='false' override='true'/>
+			value='true' override='true'/>
 		<propval name='signing_required' type='boolean'
 			value='false' override='true'/>
 		<propval name='signing_check' type='boolean'

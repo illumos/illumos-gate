@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -58,7 +58,9 @@ typedef struct smb_cfg_param {
 /* idmap SMF fmri and Property Group */
 #define	IDMAP_FMRI_PREFIX		"system/idmap"
 #define	MACHINE_SID			"machine_sid"
+#define	MACHINE_UUID			"machine_uuid"
 #define	IDMAP_DOMAIN			"domain_name"
+#define	IDMAP_PREF_DC			"preferred_dc"
 #define	IDMAP_PG_NAME			"config"
 
 #define	SMB_SECMODE_WORKGRP_STR 	"workgroup"
@@ -121,14 +123,12 @@ static smb_cfg_param_t smb_cfg_table[] =
 
 	{SMB_CI_MACHINE_PASSWD, "machine_passwd", SCF_TYPE_ASTRING,
 	    SMB_CF_PROTECTED},
-	{SMB_CI_KPASSWD_SRV, "kpasswd_server", SCF_TYPE_ASTRING,
-	    0},
-	{SMB_CI_KPASSWD_DOMAIN, "kpasswd_domain", SCF_TYPE_ASTRING,
-	    0},
-	{SMB_CI_KPASSWD_SEQNUM, "kpasswd_seqnum", SCF_TYPE_INTEGER,
-	    0},
-	{SMB_CI_NETLOGON_SEQNUM, "netlogon_seqnum", SCF_TYPE_INTEGER,
-	    0},
+
+	{SMB_CI_MACHINE_UUID, "machine_uuid", SCF_TYPE_ASTRING, 0},
+	{SMB_CI_KPASSWD_SRV, "kpasswd_server", SCF_TYPE_ASTRING, 0},
+	{SMB_CI_KPASSWD_DOMAIN, "kpasswd_domain", SCF_TYPE_ASTRING, 0},
+	{SMB_CI_KPASSWD_SEQNUM, "kpasswd_seqnum", SCF_TYPE_INTEGER, 0},
+	{SMB_CI_NETLOGON_SEQNUM, "netlogon_seqnum", SCF_TYPE_INTEGER, 0},
 	{SMB_CI_IPV6_ENABLE, "ipv6_enable", SCF_TYPE_BOOLEAN, 0},
 	{SMB_CI_PRINT_ENABLE, "print_enable", SCF_TYPE_BOOLEAN, 0},
 	{SMB_CI_MAP, "map", SCF_TYPE_ASTRING, SMB_CF_EXEC},
@@ -136,6 +136,7 @@ static smb_cfg_param_t smb_cfg_table[] =
 	{SMB_CI_DISPOSITION, "disposition", SCF_TYPE_ASTRING, SMB_CF_EXEC},
 	{SMB_CI_DFS_STDROOT_NUM, "dfs_stdroot_num", SCF_TYPE_INTEGER, 0},
 	{SMB_CI_TRAVERSE_MOUNTS, "traverse_mounts", SCF_TYPE_BOOLEAN, 0},
+
 	/* SMB_CI_MAX */
 };
 
@@ -144,6 +145,8 @@ static smb_cfg_param_t *smb_config_getent(smb_cfg_id_t);
 static boolean_t smb_is_base64(unsigned char c);
 static char *smb_base64_encode(char *str_to_encode);
 static char *smb_base64_decode(char *encoded_str);
+static int smb_config_get_idmap_preferred_dc(char *, int);
+static int smb_config_set_idmap_preferred_dc(char *);
 
 char *
 smb_config_getname(smb_cfg_id_t id)
@@ -365,6 +368,9 @@ smb_config_getstr(smb_cfg_id_t id, char *cbuf, int bufsz)
 	cfg = smb_config_getent(id);
 	assert(cfg->sc_type == SCF_TYPE_ASTRING);
 
+	if (id == SMB_CI_DOMAIN_SRV)
+		return (smb_config_get_idmap_preferred_dc(cbuf, bufsz));
+
 	handle = smb_smf_scf_init(SMBD_FMRI_PREFIX);
 	if (handle == NULL)
 		return (SMBD_SMF_SYSTEM_ERR);
@@ -567,6 +573,9 @@ smb_config_setstr(smb_cfg_id_t id, char *value)
 
 	cfg = smb_config_getent(id);
 	assert(cfg->sc_type == SCF_TYPE_ASTRING);
+
+	if (id == SMB_CI_DOMAIN_SRV)
+		return (smb_config_set_idmap_preferred_dc(value));
 
 	protected = B_FALSE;
 
@@ -792,7 +801,7 @@ smb_config_get_ads_enable(void)
 		rc = smb_smf_get_boolean_property(handle, "use_ads", &vbool);
 	smb_smf_scf_fini(handle);
 
-	return ((rc == SMBD_SMF_OK) ? (vbool == 1) : B_FALSE);
+	return ((rc == SMBD_SMF_OK) ? (vbool == 1) : B_TRUE);
 }
 
 /*
@@ -800,13 +809,63 @@ smb_config_get_ads_enable(void)
  *
  * Returns value of the "config/machine_sid" parameter
  * from the IDMAP SMF configuration repository.
- *
+ * Result is allocated; caller should free.
  */
 char *
 smb_config_get_localsid(void)
 {
 	return (smb_config_getenv_generic(MACHINE_SID, IDMAP_FMRI_PREFIX,
 	    IDMAP_PG_NAME));
+}
+
+/*
+ * smb_config_get_localuuid
+ *
+ * Returns value of the "config/machine_uuid" parameter
+ * from the IDMAP SMF configuration repository.
+ *
+ */
+int
+smb_config_get_localuuid(uuid_t uu)
+{
+	char *s;
+
+	uuid_clear(uu);
+	s = smb_config_getenv_generic(MACHINE_UUID, IDMAP_FMRI_PREFIX,
+	    IDMAP_PG_NAME);
+	if (s == NULL)
+		return (-1);
+
+	if (uuid_parse(s, uu) < 0) {
+		free(s);
+		return (-1);
+	}
+
+	return (0);
+}
+
+static int
+smb_config_get_idmap_preferred_dc(char *cbuf, int bufsz)
+{
+	char *s;
+	int len, rc = -1;
+
+	s = smb_config_getenv_generic(IDMAP_PREF_DC,
+	    IDMAP_FMRI_PREFIX, IDMAP_PG_NAME);
+	if (s != NULL) {
+		len = strlcpy(cbuf, s, bufsz);
+		if (len < bufsz)
+			rc = 0;
+		free(s);
+	}
+	return (rc);
+}
+
+static int
+smb_config_set_idmap_preferred_dc(char *value)
+{
+	return (smb_config_setenv_generic(IDMAP_FMRI_PREFIX, IDMAP_PG_NAME,
+	    IDMAP_PREF_DC, value));
 }
 
 /*

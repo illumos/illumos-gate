@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 #
 
 #
@@ -66,6 +67,8 @@ SYMBOL_VERSION SUNWprivate {
 	ad_disc_init;
 	ad_disc_get_DomainName;
 	ad_disc_set_DomainName;
+	ad_disc_get_DomainGUID;
+	ad_disc_set_DomainGUID;
 	ad_disc_compare_ds;
 	ad_disc_compare_trusteddomains;
 	ad_disc_compare_domainsinforest;
@@ -78,9 +81,14 @@ SYMBOL_VERSION SUNWprivate {
 	ad_disc_get_ForestName;
 	ad_disc_get_DomainController;
 	ad_disc_set_DomainController;
+	ad_disc_get_PreferredDC;
+	ad_disc_set_PreferredDC;
+	ad_disc_get_SiteName;
 	ad_disc_set_SiteName;
 	ad_disc_refresh;
-	ad_disc_get_SiteName;
+	ad_disc_unset;
+	ad_disc_getnameinfo;
+	ad_disc_set_StatusFP;
 	ad_disc_get_TrustedDomains;
 	ad_disc_get_DomainsInForest;
 	domain_eq;

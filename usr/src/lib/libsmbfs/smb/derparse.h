@@ -1,3 +1,4 @@
+// Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
 // Copyright (C) 2002 Microsoft Corporation
 // All rights reserved.
 //
@@ -20,8 +21,6 @@
 // SPNEGO DER encoding.
 //
 /////////////////////////////////////////////////////////////
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifndef __DERPARSE_H__
 #define __DERPARSE_H__
@@ -178,12 +177,13 @@ int ASNDerCheckOID( unsigned char* pbTokenData, SPNEGO_MECH_OID nMechOID, long n
 int ASNDerCalcNumLengthBytes( long nLength );
 long ASNDerCalcTokenLength( long nLength, long nDataLength );
 long ASNDerCalcElementLength( long nDataLength, long* pnInternalLength );
-long ASNDerCalcMechListLength( SPNEGO_MECH_OID mechoid, long* pnInternalLength );
+long ASNDerCalcMechListLength( SPNEGO_MECH_OID *mechOidLst, int mechOidCnt,
+				 long* pnInternalLength );
 int ASNDerWriteLength( unsigned char* pbData, long nLength );
 int ASNDerWriteToken( unsigned char* pbData, unsigned char ucType,
                      unsigned char* pbTokenValue, long nLength );
 int ASNDerWriteOID( unsigned char* pbData, SPNEGO_MECH_OID eMechOID );
-long ASNDerWriteMechList( unsigned char* pbData, SPNEGO_MECH_OID mechoid );
+long ASNDerWriteMechList( unsigned char* pbData, SPNEGO_MECH_OID *mechOidLst, int mechOidCnt );
 int ASNDerWriteElement( unsigned char* pbData, unsigned char ucElementSequence,
                         unsigned char ucType, unsigned char* pbTokenValue, long nLength );
 

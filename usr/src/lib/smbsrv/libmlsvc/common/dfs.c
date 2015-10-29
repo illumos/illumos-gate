@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <strings.h>
@@ -151,15 +152,13 @@ static uint32_t dfs_modinfo(uint32_t, dfs_info_t *, dfs_info_t *, uint32_t);
 void
 dfs_init(void)
 {
-	smb_domain_t di;
-
 	smb_cache_create(&dfs_nscache, 0, dfs_cache_cmp, free, bcopy,
 	    sizeof (dfs_nscnode_t));
 
-	if (!smb_domain_lookup_type(SMB_DOMAIN_LOCAL, &di))
+	if (smb_getnetbiosname(dfs_nbname, sizeof (dfs_nbname)) != 0) {
+		syslog(LOG_ERR, "dfs: can't get machine name");
 		return;
-
-	(void) strlcpy(dfs_nbname, di.di_nbname, NETBIOS_NAME_SZ);
+	}
 
 	bzero((void *)&dfs_intr_ops, sizeof (dfs_intr_ops));
 

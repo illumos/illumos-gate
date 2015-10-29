@@ -47,7 +47,6 @@ static void smb_session_cancel(smb_session_t *);
 static int smb_session_message(smb_session_t *);
 static int smb_session_xprt_puthdr(smb_session_t *, smb_xprt_t *,
     uint8_t *, size_t);
-static smb_user_t *smb_session_lookup_user(smb_session_t *, char *, char *);
 static smb_tree_t *smb_session_get_tree(smb_session_t *, smb_tree_t *);
 static void smb_session_logoff(smb_session_t *);
 static void smb_request_init_command_mbuf(smb_request_t *sr);
@@ -706,10 +705,15 @@ smb_session_delete(smb_session_t *session)
 
 	ASSERT(session->s_magic == SMB_SESSION_MAGIC);
 
-	session->s_magic = 0;
-
 	if (session->sign_fini != NULL)
 		session->sign_fini(session);
+
+	if (session->signing.mackey != NULL) {
+		kmem_free(session->signing.mackey,
+		    session->signing.mackey_len);
+	}
+
+	session->s_magic = 0;
 
 	smb_rwx_destroy(&session->s_lock);
 	smb_net_txl_destructor(&session->s_txlst);
@@ -828,63 +832,18 @@ smb_session_worker(void	*arg)
 }
 
 /*
- * smb_session_lookup_user
- */
-static smb_user_t *
-smb_session_lookup_user(smb_session_t *session, char *domain, char *name)
-{
-	smb_user_t	*user;
-	smb_llist_t	*ulist;
-
-	ulist = &session->s_user_list;
-	smb_llist_enter(ulist, RW_READER);
-	user = smb_llist_head(ulist);
-	while (user) {
-		ASSERT(user->u_magic == SMB_USER_MAGIC);
-		if (!smb_strcasecmp(user->u_name, name, 0) &&
-		    !smb_strcasecmp(user->u_domain, domain, 0)) {
-			if (smb_user_hold(user))
-				break;
-		}
-		user = smb_llist_next(ulist, user);
-	}
-	smb_llist_exit(ulist);
-
-	return (user);
-}
-
-/*
- * If a user attempts to log in subsequently from the specified session,
- * duplicates the existing SMB user instance such that all SMB user
- * instances that corresponds to the same user on the given session
- * reference the same user's cred.
- *
- * Returns NULL if the given user hasn't yet logged in from this
- * specified session.  Otherwise, returns a user instance that corresponds
- * to this subsequent login.
- */
-smb_user_t *
-smb_session_dup_user(smb_session_t *session, char *domain, char *account_name)
-{
-	smb_user_t *orig_user = NULL;
-	smb_user_t *user = NULL;
-
-	orig_user = smb_session_lookup_user(session, domain,
-	    account_name);
-
-	if (orig_user) {
-		user = smb_user_dup(orig_user);
-		smb_user_release(orig_user);
-	}
-
-	return (user);
-}
-
-/*
  * Find a user on the specified session by SMB UID.
  */
 smb_user_t *
 smb_session_lookup_uid(smb_session_t *session, uint16_t uid)
+{
+	return (smb_session_lookup_uid_st(session, uid,
+	    SMB_USER_STATE_LOGGED_ON));
+}
+
+smb_user_t *
+smb_session_lookup_uid_st(smb_session_t *session, uint16_t uid,
+    smb_user_state_t st)
 {
 	smb_user_t	*user;
 	smb_llist_t	*user_list;
@@ -899,19 +858,16 @@ smb_session_lookup_uid(smb_session_t *session, uint16_t uid)
 		SMB_USER_VALID(user);
 		ASSERT(user->u_session == session);
 
-		if (user->u_uid == uid) {
-			if (!smb_user_hold(user))
-				break;
-
-			smb_llist_exit(user_list);
-			return (user);
+		if (user->u_uid == uid && user->u_state == st) {
+			smb_user_hold_internal(user);
+			break;
 		}
 
 		user = smb_llist_next(user_list, user);
 	}
 
 	smb_llist_exit(user_list);
-	return (NULL);
+	return (user);
 }
 
 void
@@ -1233,9 +1189,21 @@ smb_session_logoff(smb_session_t *session)
 		SMB_USER_VALID(user);
 		ASSERT(user->u_session == session);
 
-		if (smb_user_hold(user)) {
+		switch (user->u_state) {
+		case SMB_USER_STATE_LOGGING_ON:
+		case SMB_USER_STATE_LOGGED_ON:
+			smb_user_hold_internal(user);
 			smb_user_logoff(user);
 			smb_user_release(user);
+			break;
+
+		case SMB_USER_STATE_LOGGED_OFF:
+		case SMB_USER_STATE_LOGGING_OFF:
+			break;
+
+		default:
+			ASSERT(0);
+			break;
 		}
 
 		user = smb_llist_next(&session->s_user_list, user);

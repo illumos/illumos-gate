@@ -23,11 +23,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "misc.h"
 
-#define	UMEM_OBJNAME "libumem.so"
+#define	UMEM_OBJNAME "libumem.so.1"
 
 int umem_debug_level = 0;
 int umem_is_standalone = 0;

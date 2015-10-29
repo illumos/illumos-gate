@@ -21,7 +21,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ *
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _MLSVC_NETR_NDL_
@@ -69,6 +70,12 @@
 #define NETR_OPNUM_DsrGetSiteName		0x1C
 #define NETR_OPNUM_LogonGetDomainInfo		0x1D
 #define NETR_OPNUM_ServerPasswordSet2		0x1E
+
+/*
+ * This is not a real NETR OPNUM.  It's used to unpack the
+ * struct krb5_validation_info found in the Kerberos PAC.
+ */
+#define	NETR_OPNUM_decode_krb5_pac		1000
 
 
 struct netr_sid {
@@ -349,6 +356,15 @@ struct netr_validation_info3 {
 	struct netr_sid_and_attributes *ExtraSids;
 };
 
+/* NETR_OPNUM_decode_krb5_pac */
+struct krb5_validation_info {
+	struct netr_validation_info3 info3;
+	/* Kerberos PAC "resource group" stuff. */
+	struct netr_sid *rg_dom_sid;
+	DWORD rg_rid_cnt;
+  SIZE_IS(rg_rid_cnt)
+	struct netr_group_membership *rg_rids;
+};
 
 union netr_validation_u {
 	CASE(3) struct netr_validation_info3 *info3;
@@ -431,6 +447,10 @@ union netr_interface {
 		struct netr_PasswordSet			PasswordSet;
 	CASE(NETR_OPNUM_ServerPasswordSet2)
 		struct netr_PasswordSet2		PasswordSet2;
+
+	/* Special, for smb_decode_krb5_pac() */
+	CASE(NETR_OPNUM_decode_krb5_pac)
+		struct krb5_validation_info		krb5pac;
 };
 typedef union netr_interface netr_interface_t;
 EXTERNTYPEINFO(netr_interface)

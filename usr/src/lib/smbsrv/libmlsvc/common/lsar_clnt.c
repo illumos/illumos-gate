@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -87,19 +87,23 @@ static void lsar_set_trusted_domains(struct mslsa_EnumTrustedDomainBuf *,
  * If username argument is NULL, an anonymous connection will be established.
  * Otherwise, an authenticated connection will be established.
  *
- * On success 0 is returned. Otherwise a -ve error code.
+ * Returns 0 or NT status (Raw, not LSA-ized)
  */
-int
+DWORD
 lsar_open(char *server, char *domain, char *username,
     mlsvc_handle_t *domain_handle)
 {
+	DWORD status;
+
 	if (server == NULL || domain == NULL)
-		return (-1);
+		return (NT_STATUS_INTERNAL_ERROR);
 
 	if (username == NULL)
 		username = MLSVC_ANON_USER;
 
-	return (lsar_open_policy2(server, domain, username, domain_handle));
+	status = lsar_open_policy2(server, domain, username, domain_handle);
+
+	return (status);
 }
 
 /*
@@ -111,20 +115,20 @@ lsar_open(char *server, char *domain, char *username,
  * function via lsar_open to ensure that the appropriate connection is
  * in place.
  *
- * Returns 0 on success. Otherwise non-zero to indicate a failure.
+ * Returns 0 or NT status (Raw, not LSA-ized)
  */
-int
-lsar_open_policy2(char *server, char *domain, char *username,
+DWORD
+lsar_open_policy2(char *server, char *domain, char *user,
     mlsvc_handle_t *lsa_handle)
 {
 	struct mslsa_OpenPolicy2 arg;
+	DWORD status;
 	int opnum;
 	int len;
-	int rc;
 
-	rc = ndr_rpc_bind(lsa_handle, server, domain, username, "LSARPC");
-	if (rc != 0)
-		return (-1);
+	status = ndr_rpc_bind(lsa_handle, server, domain, user, "LSARPC");
+	if (status != 0)
+		return (status);
 
 	opnum = LSARPC_OPNUM_OpenPolicy2;
 	bzero(&arg, sizeof (struct mslsa_OpenPolicy2));
@@ -132,34 +136,33 @@ lsar_open_policy2(char *server, char *domain, char *username,
 	len = strlen(server) + 4;
 	arg.servername = ndr_rpc_malloc(lsa_handle, len);
 	if (arg.servername == NULL) {
-		ndr_rpc_unbind(lsa_handle);
-		return (-1);
+		status = NT_STATUS_NO_MEMORY;
+		goto out;
 	}
 
 	(void) snprintf((char *)arg.servername, len, "\\\\%s", server);
 	arg.attributes.length = sizeof (struct mslsa_object_attributes);
 	arg.desiredAccess = MAXIMUM_ALLOWED;
 
-	if ((rc = ndr_rpc_call(lsa_handle, opnum, &arg)) != 0) {
-		ndr_rpc_unbind(lsa_handle);
-		return (-1);
+	if (ndr_rpc_call(lsa_handle, opnum, &arg) != 0) {
+		status = RPC_NT_CALL_FAILED;
+		goto out;
 	}
-
-	if (arg.status != 0) {
-		rc = -1;
-	} else {
+	status = arg.status;
+	if (status == NT_STATUS_SUCCESS) {
 		(void) memcpy(&lsa_handle->handle, &arg.domain_handle,
 		    sizeof (ndr_hdid_t));
 
 		if (ndr_is_null_handle(lsa_handle))
-			rc = -1;
+			status = NT_STATUS_INVALID_PARAMETER;
 	}
 
 	ndr_rpc_release(lsa_handle);
 
-	if (rc != 0)
+out:
+	if (status != NT_STATUS_SUCCESS)
 		ndr_rpc_unbind(lsa_handle);
-	return (rc);
+	return (status);
 }
 
 /*
@@ -946,7 +949,7 @@ lsar_lookup_sids3(mlsvc_handle_t *lsa_handle, lsa_sid_t *sid,
  * This list is dynamically allocated using malloc, it should be freed
  * by the caller when it is no longer required.
  */
-int
+DWORD
 lsar_enum_accounts(mlsvc_handle_t *lsa_handle, DWORD *enum_context,
     struct mslsa_EnumAccountBuf *accounts)
 {
@@ -954,12 +957,13 @@ lsar_enum_accounts(mlsvc_handle_t *lsa_handle, DWORD *enum_context,
 	struct mslsa_AccountInfo	*info;
 	int	opnum;
 	int	rc;
+	DWORD	status;
 	DWORD	n_entries;
 	DWORD	i;
 	int	nbytes;
 
 	if (lsa_handle == NULL || enum_context == NULL || accounts == NULL)
-		return (-1);
+		return (NT_STATUS_INTERNAL_ERROR);
 
 	accounts->entries_read = 0;
 	accounts->info = 0;
@@ -973,12 +977,12 @@ lsar_enum_accounts(mlsvc_handle_t *lsa_handle, DWORD *enum_context,
 
 	rc = ndr_rpc_call(lsa_handle, opnum, &arg);
 	if (rc == 0) {
+		status = arg.status;
 		if (arg.status != 0) {
 			if (arg.status == NT_STATUS_NO_MORE_ENTRIES) {
 				*enum_context = arg.enum_context;
 			} else {
 				ndr_rpc_status(lsa_handle, opnum, arg.status);
-				rc = -1;
 			}
 		} else if (arg.enum_buf->entries_read != 0) {
 			n_entries = arg.enum_buf->entries_read;
@@ -986,7 +990,7 @@ lsar_enum_accounts(mlsvc_handle_t *lsa_handle, DWORD *enum_context,
 
 			if ((info = malloc(nbytes)) == NULL) {
 				ndr_rpc_release(lsa_handle);
-				return (-1);
+				return (NT_STATUS_NO_MEMORY);
 			}
 
 			for (i = 0; i < n_entries; ++i)
@@ -997,10 +1001,12 @@ lsar_enum_accounts(mlsvc_handle_t *lsa_handle, DWORD *enum_context,
 			accounts->info = info;
 			*enum_context = arg.enum_context;
 		}
+	} else {
+		status = NT_STATUS_INVALID_PARAMETER;
 	}
 
 	ndr_rpc_release(lsa_handle);
-	return (rc);
+	return (status);
 }
 
 /*

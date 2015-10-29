@@ -1,4 +1,5 @@
 /*
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -258,10 +259,12 @@ gss_krb5int_extract_authz_data_from_sec_context(
    const gss_OID desired_object,
    gss_buffer_set_t *data_set)
 {
+    gss_buffer_desc ad_data;
     OM_uint32 major_status;
+    krb5_error_code code;
     krb5_gss_ctx_id_rec *ctx;
     int ad_type = 0;
-    size_t i;
+    int i, j;
 
     *data_set = GSS_C_NO_BUFFER_SET;
 
@@ -280,7 +283,6 @@ gss_krb5int_extract_authz_data_from_sec_context(
     if (ctx->authdata != NULL) {
         for (i = 0; ctx->authdata[i] != NULL; i++) {
             if (ctx->authdata[i]->ad_type == ad_type) {
-                gss_buffer_desc ad_data;
 
                 ad_data.length = ctx->authdata[i]->length;
                 ad_data.value = ctx->authdata[i]->contents;
@@ -289,10 +291,39 @@ gss_krb5int_extract_authz_data_from_sec_context(
                                                                  &ad_data, data_set);
                 if (GSS_ERROR(major_status))
                     break;
+            } else if (ctx->authdata[i]->ad_type == KRB5_AUTHDATA_IF_RELEVANT) {
+                /*
+                 * Solaris Kerberos (illumos)
+                 * Unwrap the AD-IF-RELEVANT object and look inside.
+                 */
+                krb5_authdata **ad_if_relevant = NULL;
+                code = krb5_decode_authdata_container(ctx->k5_context,
+                                                      KRB5_AUTHDATA_IF_RELEVANT,
+                                                      ctx->authdata[i],
+                                                      &ad_if_relevant);
+                if (code != 0)
+                    continue;
+
+                for (j = 0; ad_if_relevant[j] != NULL; j++) {
+                    if (ad_if_relevant[j]->ad_type == ad_type) {
+                        ad_data.length = ad_if_relevant[j]->length;
+                        ad_data.value = ad_if_relevant[j]->contents;
+
+                        major_status = generic_gss_add_buffer_set_member(minor_status,
+                                                                         &ad_data, data_set);
+                        if (GSS_ERROR(major_status)) {
+                            krb5_free_authdata(ctx->k5_context, ad_if_relevant);
+                            goto break2;
+                        }
+                    }
+                }
+                krb5_free_authdata(ctx->k5_context, ad_if_relevant);
+                /* Solaris Kerberos (illumos) */
             }
         }
     }
 
+break2:
     if (GSS_ERROR(major_status)) {
         OM_uint32 tmp;
 

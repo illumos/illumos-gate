@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
@@ -36,6 +37,10 @@
  *   Authentication Protocol Specification
  * http://msdn.microsoft.com/en-us/library/cc236621(PROT.10).aspx
  */
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /*
  * NTLMSSP Message Types
@@ -81,5 +86,29 @@
 #define	NTLMSSP_NEGOTIATE_128				0x20000000
 #define	NTLMSSP_NEGOTIATE_KEY_EXCH			0x40000000
 #define	NTLMSSP_NEGOTIATE_56				0x80000000
+
+/*
+ * NTLMSSP AV_PAIR types
+ * [MS-NLMP] sec. 2.2.2.1
+ *
+ * The names are all LE-Unicode.
+ */
+typedef enum ntlmssp_AvId {
+	MsvAvEOL = 0,		/* End Of List */
+	MsvAvNbComputerName,	/* server's NetBIOS name */
+	MsvAvNbDomainName,	/* server's NetBIOS domain */
+	MsvAvDnsComputerName,	/* server's DNS name */
+	MsvAvDnsDomainName,	/* server's DNS domain */
+	MsvAvDnsTreeName,	/* server's Forest name */
+	MsvAvFlags,		/* 32-bit (LE) flags */
+	MsvAvTimestamp,		/* 64-bit time, [MS-DTYP] sec. 2.3.1 */
+	MsvAvRestrictions,	/* struct, [MS-NLMP] sec. 2.2.2.2 */
+	MsvAvTargetName,	/* SPN of the server */
+	MsvChannelBindings,	/* MD5 hash of GSS challen bindings */
+} ntlmssp_AvId_t;
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _NTLMSSP_H */

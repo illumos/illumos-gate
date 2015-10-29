@@ -22,9 +22,9 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright 2015 Nexenta Systems, Inc. All rights reserved.
-# Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2013 Saso Kiselkov. All rights reserved.
+# Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright 2015 Nexenta Systems, Inc. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/system/header@$(PKGVERS)
@@ -37,6 +37,7 @@ dir path=usr group=sys
 dir path=usr/include
 $(i386_ONLY)dir path=usr/include/$(ARCH64)
 $(i386_ONLY)dir path=usr/include/$(ARCH64)/sys
+dir path=usr/include/ads
 dir path=usr/include/arpa
 dir path=usr/include/asm
 dir path=usr/include/ast
@@ -192,6 +193,7 @@ dir path=usr/xpg4/include
 $(i386_ONLY)file path=usr/include/$(ARCH64)/sys/kdi_regs.h
 $(i386_ONLY)file path=usr/include/$(ARCH64)/sys/privmregs.h
 $(i386_ONLY)file path=usr/include/$(ARCH64)/sys/privregs.h
+file path=usr/include/ads/dsgetdc.h
 file path=usr/include/aio.h
 file path=usr/include/alloca.h
 file path=usr/include/apptrace.h
@@ -461,6 +463,7 @@ file path=usr/include/iso/wctype_iso.h
 file path=usr/include/iso646.h
 file path=usr/include/kerberosv5/com_err.h
 file path=usr/include/kerberosv5/krb5.h
+file path=usr/include/kerberosv5/locate_plugin.h
 file path=usr/include/kerberosv5/mit-sipb-copyright.h
 file path=usr/include/kerberosv5/mit_copyright.h
 file path=usr/include/klpd.h

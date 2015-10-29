@@ -19,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -47,7 +47,7 @@ dssetup_get_domain_info(ds_primary_domain_info_t *ds_info)
 	if (!smb_domain_getinfo(&di))
 		return (-1);
 
-	if (ndr_rpc_bind(&handle, di.d_dc, di.d_primary.di_nbname,
+	if (ndr_rpc_bind(&handle, di.d_dci.dc_name, di.d_primary.di_nbname,
 	    MLSVC_ANON_USER, "DSSETUP") != 0)
 		return (-1);
 

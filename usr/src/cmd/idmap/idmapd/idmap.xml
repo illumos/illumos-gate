@@ -2,6 +2,7 @@
 <!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
 <!--
  Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 
  CDDL HEADER START
 
@@ -104,6 +105,22 @@
 			name='name_cache_timeout'
 			type='count'
 			value='604800' />
+		<propval
+			name='preferred_dc'
+			type='astring'
+			value='' />
+		<propval
+			name='rediscovery_interval'
+			type='count'
+			value='3600' />
+		<propval
+			name='use_ads'
+			type='boolean'
+			value='true' />
+		<propval
+			name='use_lsa'
+			type='boolean'
+			value='true' />
 	</property_group>
 
 	<property_group name='debug' type='application' >

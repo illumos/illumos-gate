@@ -21,6 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <malloc.h>
@@ -96,7 +98,7 @@ nssad_cfg_reload_ad(nssad_prop_t *props, adutils_ad_t **ad)
 
 static
 int
-update_dirs(idmap_ad_disc_ds_t **value, idmap_ad_disc_ds_t **new)
+update_dirs(ad_disc_ds_t **value, ad_disc_ds_t **new)
 {
 	if (*value == *new)
 		return (0);

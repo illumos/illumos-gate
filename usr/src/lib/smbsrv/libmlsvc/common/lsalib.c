@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -43,7 +44,8 @@ static uint32_t lsa_lookup_name_domain(char *, smb_account_t *);
 static uint32_t lsa_lookup_sid_builtin(smb_sid_t *, smb_account_t *);
 static uint32_t lsa_lookup_sid_domain(smb_sid_t *, smb_account_t *);
 
-static int lsa_list_accounts(mlsvc_handle_t *);
+static uint32_t lsa_list_accounts(mlsvc_handle_t *);
+static uint32_t lsa_map_status(uint32_t);
 
 /*
  * Lookup the given account and returns the account information
@@ -133,20 +135,21 @@ lsa_lookup_sid(smb_sid_t *sid, smb_account_t *info)
  *
  * The requested information will be returned via 'info' argument.
  *
- * Returns NT status codes.
+ * Returns NT status codes. (Raw, not LSA-ized)
  */
 DWORD
 lsa_query_primary_domain_info(char *server, char *domain,
     smb_domain_t *info)
 {
 	mlsvc_handle_t domain_handle;
-	DWORD status;
 	char user[SMB_USERNAME_MAXLEN];
+	DWORD status;
 
 	smb_ipc_get_user(user, SMB_USERNAME_MAXLEN);
 
-	if ((lsar_open(server, domain, user, &domain_handle)) != 0)
-		return (NT_STATUS_CANT_ACCESS_DOMAIN_INFO);
+	status = lsar_open(server, domain, user, &domain_handle);
+	if (status != 0)
+		return (status);
 
 	status = lsar_query_info_policy(&domain_handle,
 	    MSLSA_POLICY_PRIMARY_DOMAIN_INFO, info);
@@ -161,20 +164,21 @@ lsa_query_primary_domain_info(char *server, char *domain,
  *
  * The requested information will be returned via 'info' argument.
  *
- * Returns NT status codes.
+ * Returns NT status codes. (Raw, not LSA-ized)
  */
 DWORD
 lsa_query_account_domain_info(char *server, char *domain,
     smb_domain_t *info)
 {
 	mlsvc_handle_t domain_handle;
-	DWORD status;
 	char user[SMB_USERNAME_MAXLEN];
+	DWORD status;
 
 	smb_ipc_get_user(user, SMB_USERNAME_MAXLEN);
 
-	if ((lsar_open(server, domain, user, &domain_handle)) != 0)
-		return (NT_STATUS_CANT_ACCESS_DOMAIN_INFO);
+	status = lsar_open(server, domain, user, &domain_handle);
+	if (status != 0)
+		return (status);
 
 	status = lsar_query_info_policy(&domain_handle,
 	    MSLSA_POLICY_ACCOUNT_DOMAIN_INFO, info);
@@ -191,19 +195,20 @@ lsa_query_account_domain_info(char *server, char *domain,
  *
  * The requested information will be returned via 'info' argument.
  *
- * Returns NT status codes.
+ * Returns NT status codes. (Raw, not LSA-ized)
  */
 DWORD
 lsa_query_dns_domain_info(char *server, char *domain, smb_domain_t *info)
 {
 	mlsvc_handle_t domain_handle;
-	DWORD status;
 	char user[SMB_USERNAME_MAXLEN];
+	DWORD status;
 
 	smb_ipc_get_user(user, SMB_USERNAME_MAXLEN);
 
-	if ((lsar_open(server, domain, user, &domain_handle)) != 0)
-		return (NT_STATUS_CANT_ACCESS_DOMAIN_INFO);
+	status = lsar_open(server, domain, user, &domain_handle);
+	if (status != 0)
+		return (status);
 
 	status = lsar_query_info_policy(&domain_handle,
 	    MSLSA_POLICY_DNS_DOMAIN_INFO, info);
@@ -219,21 +224,22 @@ lsa_query_dns_domain_info(char *server, char *domain, smb_domain_t *info)
  *
  * The requested information will be returned via 'info' argument.
  *
- * Returns NT status codes.
+ * Returns NT status codes.  (Raw, not LSA-ized)
  */
 DWORD
 lsa_enum_trusted_domains(char *server, char *domain,
     smb_trusted_domains_t *info)
 {
 	mlsvc_handle_t domain_handle;
+	char user[SMB_USERNAME_MAXLEN];
 	DWORD enum_context;
 	DWORD status;
-	char user[SMB_USERNAME_MAXLEN];
 
 	smb_ipc_get_user(user, SMB_USERNAME_MAXLEN);
 
-	if ((lsar_open(server, domain, user, &domain_handle)) != 0)
-		return (NT_STATUS_CANT_ACCESS_DOMAIN_INFO);
+	status = lsar_open(server, domain, user, &domain_handle);
+	if (status != 0)
+		return (status);
 
 	enum_context = 0;
 
@@ -258,21 +264,22 @@ lsa_enum_trusted_domains(char *server, char *domain,
  *
  * The requested information will be returned via 'info' argument.
  *
- * Returns NT status codes.
+ * Returns NT status codes. (Raw, not LSA-ized)
  */
 DWORD
 lsa_enum_trusted_domains_ex(char *server, char *domain,
     smb_trusted_domains_t *info)
 {
 	mlsvc_handle_t domain_handle;
+	char user[SMB_USERNAME_MAXLEN];
 	DWORD enum_context;
 	DWORD status;
-	char user[SMB_USERNAME_MAXLEN];
 
 	smb_ipc_get_user(user, SMB_USERNAME_MAXLEN);
 
-	if ((lsar_open(server, domain, user, &domain_handle)) != 0)
-		return (NT_STATUS_CANT_ACCESS_DOMAIN_INFO);
+	status = lsar_open(server, domain, user, &domain_handle);
+	if (status != 0)
+		return (status);
 
 	enum_context = 0;
 
@@ -333,28 +340,31 @@ lsa_lookup_name_builtin(char *domain, char *name, smb_account_t *info)
 }
 
 /*
- * Lookup the given account in domain.
+ * Lookup a domain account by its name.
  *
  * The information is returned in the user_info structure.
  * The caller is responsible for allocating and releasing
  * this structure.
+ *
+ * Returns NT status codes. (LSA-ized)
  */
 static uint32_t
 lsa_lookup_name_domain(char *account_name, smb_account_t *info)
 {
 	mlsvc_handle_t domain_handle;
 	smb_domainex_t dinfo;
-	uint32_t status;
 	char user[SMB_USERNAME_MAXLEN];
+	uint32_t status;
 
 	smb_ipc_get_user(user, SMB_USERNAME_MAXLEN);
 
 	if (!smb_domain_getinfo(&dinfo))
 		return (NT_STATUS_CANT_ACCESS_DOMAIN_INFO);
 
-	if (lsar_open(dinfo.d_dc, dinfo.d_primary.di_nbname, user,
-	    &domain_handle) != 0)
-		return (NT_STATUS_INVALID_PARAMETER);
+	status = lsar_open(dinfo.d_dci.dc_name, dinfo.d_primary.di_nbname,
+	    user, &domain_handle);
+	if (status != 0)
+		return (lsa_map_status(status));
 
 	status = lsar_lookup_names(&domain_handle, account_name, info);
 
@@ -373,29 +383,30 @@ lsa_lookup_name_domain(char *account_name, smb_account_t *info)
  * privileges are returned in the user_info structure. The caller is
  * responsible for allocating and releasing this structure.
  *
- * On success 0 is returned. Otherwise a -ve error code.
+ * Returns NT status codes. (LSA-ized)
  */
 /*ARGSUSED*/
-int
+DWORD
 lsa_lookup_privs(char *account_name, char *target_name, smb_account_t *ainfo)
 {
 	mlsvc_handle_t domain_handle;
-	int rc;
 	smb_domainex_t dinfo;
 	char user[SMB_USERNAME_MAXLEN];
+	DWORD status;
 
 	smb_ipc_get_user(user, SMB_USERNAME_MAXLEN);
 
 	if (!smb_domain_getinfo(&dinfo))
-		return (-1);
+		return (NT_STATUS_CANT_ACCESS_DOMAIN_INFO);
 
-	if ((lsar_open(dinfo.d_dc, dinfo.d_primary.di_nbname, user,
-	    &domain_handle)) != 0)
-		return (-1);
+	status = lsar_open(dinfo.d_dci.dc_name, dinfo.d_primary.di_nbname,
+	    user, &domain_handle);
+	if (status != 0)
+		return (lsa_map_status(status));
 
-	rc = lsa_list_accounts(&domain_handle);
+	status = lsa_list_accounts(&domain_handle);
 	(void) lsar_close(&domain_handle);
-	return (rc);
+	return (status);
 }
 
 /*
@@ -404,7 +415,7 @@ lsa_lookup_privs(char *account_name, char *target_name, smb_account_t *ainfo)
  * List the privileges supported by the specified server.
  * This function is only intended for diagnostics.
  *
- * Returns NT status codes.
+ * Returns NT status codes. (LSA-ized)
  */
 DWORD
 lsa_list_privs(char *server, char *domain)
@@ -412,15 +423,16 @@ lsa_list_privs(char *server, char *domain)
 	static char name[128];
 	static struct ms_luid luid;
 	mlsvc_handle_t domain_handle;
+	char user[SMB_USERNAME_MAXLEN];
+	DWORD status;
 	int rc;
 	int i;
-	char user[SMB_USERNAME_MAXLEN];
 
 	smb_ipc_get_user(user, SMB_USERNAME_MAXLEN);
 
-	rc = lsar_open(server, domain, user, &domain_handle);
-	if (rc != 0)
-		return (NT_STATUS_INVALID_PARAMETER);
+	status = lsar_open(server, domain, user, &domain_handle);
+	if (status != 0)
+		return (lsa_map_status(status));
 
 	for (i = 0; i < 30; ++i) {
 		luid.low_part = i;
@@ -443,9 +455,9 @@ lsa_list_privs(char *server, char *domain)
  * This function can be used to list the accounts in the specified
  * domain. For now the SIDs are just listed in the system log.
  *
- * On success 0 is returned. Otherwise a -ve error code.
+ * Returns NT status
  */
-static int
+static DWORD
 lsa_list_accounts(mlsvc_handle_t *domain_handle)
 {
 	mlsvc_handle_t account_handle;
@@ -453,16 +465,16 @@ lsa_list_accounts(mlsvc_handle_t *domain_handle)
 	struct mslsa_sid *sid;
 	smb_account_t ainfo;
 	DWORD enum_context = 0;
-	int rc;
+	DWORD status;
 	int i;
 
 	bzero(&accounts, sizeof (struct mslsa_EnumAccountBuf));
 
 	do {
-		rc = lsar_enum_accounts(domain_handle, &enum_context,
+		status = lsar_enum_accounts(domain_handle, &enum_context,
 		    &accounts);
-		if (rc != 0)
-			return (rc);
+		if (status != 0)
+			return (status);
 
 		for (i = 0; i < accounts.entries_read; ++i) {
 			sid = accounts.info[i].sid;
@@ -479,7 +491,7 @@ lsa_list_accounts(mlsvc_handle_t *domain_handle)
 
 		if (accounts.info)
 			free(accounts.info);
-	} while (rc == 0 && accounts.entries_read != 0);
+	} while (status == 0 && accounts.entries_read != 0);
 
 	return (0);
 }
@@ -522,25 +534,66 @@ lsa_lookup_sid_builtin(smb_sid_t *sid, smb_account_t *ainfo)
 	return (NT_STATUS_SUCCESS);
 }
 
+/*
+ * Lookup a domain account by its SID.
+ *
+ * The information is returned in the user_info structure.
+ * The caller is responsible for allocating and releasing
+ * this structure.
+ *
+ * Returns NT status codes. (LSA-ized)
+ */
 static uint32_t
 lsa_lookup_sid_domain(smb_sid_t *sid, smb_account_t *ainfo)
 {
 	mlsvc_handle_t domain_handle;
-	uint32_t status;
 	smb_domainex_t dinfo;
 	char user[SMB_USERNAME_MAXLEN];
+	uint32_t status;
 
 	smb_ipc_get_user(user, SMB_USERNAME_MAXLEN);
 
 	if (!smb_domain_getinfo(&dinfo))
 		return (NT_STATUS_CANT_ACCESS_DOMAIN_INFO);
 
-	if (lsar_open(dinfo.d_dc, dinfo.d_primary.di_nbname, user,
-	    &domain_handle) != 0)
-		return (NT_STATUS_INVALID_PARAMETER);
+	status = lsar_open(dinfo.d_dci.dc_name, dinfo.d_primary.di_nbname,
+	    user, &domain_handle);
+	if (status != 0)
+		return (lsa_map_status(status));
 
 	status = lsar_lookup_sids(&domain_handle, sid, ainfo);
 
 	(void) lsar_close(&domain_handle);
+	return (status);
+}
+
+/*
+ * Most functions that call the local security authority expect
+ * only a limited set of status returns.  This function maps the
+ * status we get from talking to our domain controller into one
+ * that LSA functions can return.  Most common errors become:
+ * NT_STATUS_CANT_ACCESS_DOMAIN_INFO (when no DC etc.)
+ */
+static uint32_t
+lsa_map_status(uint32_t status)
+{
+	switch (status) {
+	case NT_STATUS_SUCCESS:
+		break;
+	case NT_STATUS_INVALID_PARAMETER:	/* rpc bind */
+		break;
+	case NT_STATUS_NO_MEMORY:
+		break;
+	case NT_STATUS_DOMAIN_CONTROLLER_NOT_FOUND:
+	case NT_STATUS_BAD_NETWORK_PATH:	/* get server addr */
+	case NT_STATUS_NETWORK_ACCESS_DENIED:	/* authentication */
+	case NT_STATUS_BAD_NETWORK_NAME:	/* tree connect */
+	case NT_STATUS_ACCESS_DENIED:		/* open pipe */
+		status = NT_STATUS_CANT_ACCESS_DOMAIN_INFO;
+		break;
+	default:
+		status = NT_STATUS_UNSUCCESSFUL;
+		break;
+	}
 	return (status);
 }

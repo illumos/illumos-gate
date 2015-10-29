@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -94,6 +94,7 @@ netlogon_auth(char *server, mlsvc_handle_t *netr_handle, DWORD flags)
 	if (rc != 0)
 		return (NT_STATUS_UNSUCCESSFUL);
 
+	/* server is our DC.  Note: normally an FQDN. */
 	(void) snprintf(netr_info->server, sizeof (netr_info->server),
 	    "\\\\%s", server);
 
@@ -128,18 +129,20 @@ netlogon_auth(char *server, mlsvc_handle_t *netr_handle, DWORD flags)
  *
  * We store the remote server information, which is used to drive Windows
  * version specific behavior.
+ *
+ * Returns 0 or NT status
  */
-int
+DWORD
 netr_open(char *server, char *domain, mlsvc_handle_t *netr_handle)
 {
 	char user[SMB_USERNAME_MAXLEN];
+	DWORD status;
 
 	smb_ipc_get_user(user, SMB_USERNAME_MAXLEN);
 
-	if (ndr_rpc_bind(netr_handle, server, domain, user, "NETR") < 0)
-		return (-1);
+	status = ndr_rpc_bind(netr_handle, server, domain, user, "NETR");
 
-	return (0);
+	return (status);
 }
 
 /*
@@ -195,9 +198,10 @@ static int
 netr_server_authenticate2(mlsvc_handle_t *netr_handle, netr_info_t *netr_info)
 {
 	struct netr_ServerAuthenticate2 arg;
+	/* sizeof netr_info->hostname, + 1 for the '$' */
+	char account_name[(NETBIOS_NAME_SZ * 2) + 1];
 	int opnum;
 	int rc;
-	char account_name[NETBIOS_NAME_SZ * 2];
 
 	bzero(&arg, sizeof (struct netr_ServerAuthenticate2));
 	opnum = NETR_OPNUM_ServerAuthenticate2;

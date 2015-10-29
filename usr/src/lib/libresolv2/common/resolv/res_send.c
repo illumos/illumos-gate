@@ -1,6 +1,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 
@@ -94,6 +96,7 @@ static const char rcsid[] = "$Id: res_send.c,v 1.22 2009/01/22 23:49:23 tbox Exp
 #include <sys/uio.h>
 
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <arpa/nameser.h>
 #include <arpa/inet.h>
 
@@ -671,6 +674,29 @@ send_vc(res_state statp,
 		 */
 		(void)setsockopt(statp->_vcsock, SOL_SOCKET, SO_NOSIGPIPE, &on,
 				 sizeof(on));
+#endif
+#ifdef TCP_CONN_ABORT_THRESHOLD
+		/*
+		 * The default connection timeout is over two minutes.
+		 * We need something more reasonable here.  The default
+		 * retrans value is 5 sec., then 10, 20, 40, on retries.
+		 * TCP connect does its own retries, so we want just one
+		 * reasonable timeout value.  Using 2X retrans, which
+		 * gives us a 10 sec. connect timeout.  If we're waiting
+		 * that long to connect, we probably want to give up and
+		 * try the next DNS server in our list.
+		 *
+		 * It might be reasonable to do this for all callers,
+		 * but for now do it only when we see MS_INTEROP in the
+		 * environment (set in smbd and idmapd)
+		 */
+		if (getenv("MS_INTEROP") != NULL) {
+			int conn_tmo;
+			conn_tmo = statp->retrans * 2000; /* mSec */
+			(void)setsockopt(statp->_vcsock, IPPROTO_TCP,
+			    TCP_CONN_ABORT_THRESHOLD, &conn_tmo,
+			     sizeof(conn_tmo));
+		}
 #endif
 		errno = 0;
 		if (connect(statp->_vcsock, nsap, nsaplen) < 0) {

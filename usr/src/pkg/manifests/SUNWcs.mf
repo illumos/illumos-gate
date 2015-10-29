@@ -21,9 +21,9 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2015 Nexenta Systems, Inc. All rights reserved.
 # Copyright (c) 2013 Gary Mills
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright 2015 Nexenta Systems, Inc. All rights reserved.
 #
 
 <include SUNWcs.man1.inc>
@@ -1354,6 +1354,7 @@ file path=usr/sbin/mvdir mode=0555
 file path=usr/sbin/ndd mode=0555
 file path=usr/sbin/ndp mode=0555
 file path=usr/sbin/nlsadmin group=adm mode=0755
+file path=usr/sbin/nltest mode=0555
 file path=usr/sbin/nscd mode=0555
 file path=usr/sbin/nwamadm mode=0555
 file path=usr/sbin/nwamcfg mode=0555

@@ -97,7 +97,8 @@ smb_doorhdr_opname(uint32_t op)
 		{ SMB_DR_QUOTA_SET,		"quota_set" },
 		{ SMB_DR_DFS_GET_REFERRALS,	"dfs_get_referrals" },
 		{ SMB_DR_SHR_HOSTACCESS,	"share_hostaccess" },
-		{ SMB_DR_SHR_EXEC,		"share_exec" }
+		{ SMB_DR_SHR_EXEC,		"share_exec" },
+		{ SMB_DR_NOTIFY_DC_CHANGED,	"notify_dc_changed" }
 	};
 	int	i;
 
