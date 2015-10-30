@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -293,14 +293,14 @@ netr_change_password(
 	uint8_t old_nt_hash[SAMR_PWHASH_LEN];
 	uint8_t new_nt_hash[SAMR_PWHASH_LEN];
 	mlsvc_handle_t handle;
-	DWORD rc;
+	DWORD status;
 
 	/*
 	 * Create an RPC handle to this server, bound to SAMR.
 	 */
-	rc = ndr_rpc_bind(&handle, server, "", "", "SAMR");
-	if (rc)
-		return (RPC_NT_SERVER_UNAVAILABLE);
+	status = ndr_rpc_bind(&handle, server, "", "", "SAMR");
+	if (status != NT_STATUS_SUCCESS)
+		return (status);
 
 	/*
 	 * Encrypt the new p/w (plus random filler) with the
@@ -319,7 +319,7 @@ netr_change_password(
 	/*
 	 * Finally, ready to try the OtW call.
 	 */
-	rc = samr_change_password(
+	status = samr_change_password(
 	    &handle, server, account,
 	    &epw, &old_hash);
 
@@ -328,7 +328,7 @@ netr_change_password(
 	(void) memset(new_nt_hash, 0, sizeof (new_nt_hash));
 
 	ndr_rpc_unbind(&handle);
-	return (rc);
+	return (status);
 }
 
 /*

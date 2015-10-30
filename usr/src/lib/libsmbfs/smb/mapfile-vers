@@ -18,8 +18,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 # Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
 #
 
 #
@@ -151,6 +151,20 @@ SYMBOL_VERSION SUNWprivate {
 	smbfs_set_default_user;
 
 	smbutil_std_opts;
+
+	spnegoCreateNegTokenHint;
+	spnegoCreateNegTokenInit;
+	spnegoCreateNegTokenTarg;
+	spnegoFreeData;
+	spnegoGetContextFlags;
+	spnegoGetMechListMIC;
+	spnegoGetMechToken;
+	spnegoGetNegotiationResult;
+	spnegoGetSupportedMechType;
+	spnegoGetTokenType;
+	spnegoInitFromBinary;
+	spnegoIsMechTypeAvailable;
+	spnegoTokenGetBinary;
     local:
 	*;
 };

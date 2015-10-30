@@ -972,7 +972,8 @@ smb_dcmd_request(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 static const char *smb_user_state[SMB_USER_STATE_SENTINEL] =
 {
-	"LOGGED_IN",
+	"LOGGING_ON",
+	"LOGGED_ON",
 	"LOGGING_OFF",
 	"LOGGED_OFF"
 };

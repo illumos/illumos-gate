@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/param.h>
@@ -81,6 +82,9 @@ smb_autohome_add(const smb_token_t *token)
 	char		buf[NSS_LINELEN_PASSWD];
 	uid_t		uid;
 	gid_t		gid;
+
+	if (token->tkn_flags & SMB_ATF_ANON)
+		return;
 
 	uid = token->tkn_user.i_id;
 	gid = token->tkn_primary_grp.i_id;

@@ -22,6 +22,8 @@
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+#
 
 PROG=	smbadm
 SRCS=	smbadm.c
@@ -29,7 +31,7 @@ SRCS=	smbadm.c
 include ../../Makefile.cmd
 include ../Makefile.smbsrv.defs
 
-LDLIBS += -L$(ROOT)/usr/lib/smbsrv -lsmb -lsecdb -lumem
+LDLIBS += -L$(ROOT)/usr/lib/smbsrv -lsmb -lsmbns -lsecdb -lumem
 LDFLAGS += -R/usr/lib/smbsrv
 
 .KEEP_STATE:

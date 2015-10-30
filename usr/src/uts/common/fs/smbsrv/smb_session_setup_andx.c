@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -32,95 +32,54 @@
 #include <smbsrv/smb_kproto.h>
 #include <smbsrv/smb_token.h>
 
-static int smb_authenticate(smb_request_t *, smb_arg_sessionsetup_t *);
-static int smb_authenticate_core(smb_request_t *, smb_arg_sessionsetup_t *);
-static uint32_t smb_priv_xlate(smb_token_t *);
-#ifdef	_KERNEL
-static void smb_cred_set_sid(smb_id_t *id, ksid_t *ksid);
-static ksidlist_t *smb_cred_set_sidlist(smb_ids_t *token_grps);
-#endif	/* _KERNEL */
-
-/*
- * In NTLM 0.12, the padding between the Native OS and Native LM is a bit
- * strange.  On NT4.0, there is a 2 byte pad between the OS (Windows NT 1381)
- * and LM (Windows NT 4.0).  On Windows 2000, there is no padding between
- * the OS (Windows 2000 2195) and LM (Windows 2000 5.0).
- * If the padding is removed from the decode string the NT4.0 LM comes out
- * as an empty string.  So if the client's native OS is Win NT we consider
- * the padding otherwise we don't.
- *
- * For Pre-NTLM 0.12, despite the CIFS/1.0 spec, the user and domain are
- * not always present in the message.  We try to get the account name and
- * the primary domain but we don't care about the the native OS or native
- * LM fields.
- *
- * If the Native LM cannot be determined, default to Windows NT.
- */
 smb_sdrc_t
 smb_pre_session_setup_andx(smb_request_t *sr)
 {
 	smb_arg_sessionsetup_t	*sinfo;
 	char			*native_os;
 	char			*native_lm;
-	uint32_t		junk_sesskey;
-	uint16_t		maxbufsize;
-	uint16_t		vcnumber;
 	int			rc = 0;
 
 	sinfo = smb_srm_zalloc(sr, sizeof (smb_arg_sessionsetup_t));
 	sr->sr_ssetup = sinfo;
 
-	if (sr->session->dialect >= NT_LM_0_12) {
-		rc = smbsr_decode_vwv(sr, "b.wwwwlww4.l", &sr->andx_com,
-		    &sr->andx_off, &maxbufsize,
-		    &sinfo->ssi_maxmpxcount, &vcnumber,
-		    &junk_sesskey, &sinfo->ssi_cipwlen,
-		    &sinfo->ssi_cspwlen, &sinfo->ssi_capabilities);
+	/*
+	 * Enforce the minimum word count seen in the old protocol,
+	 * to make sure we have enough to decode the common stuff.
+	 * Further wcnt checks below.
+	 */
+	if (sr->smb_wct < 10) {
+		rc = -1;
+		goto done;
+	}
+
+	/*
+	 * Parse common part of SMB session setup.
+	 * skip: vcnumber(2), sesskey(4)
+	 */
+	rc = smbsr_decode_vwv(sr, "b.www6.",
+	    &sr->andx_com, &sr->andx_off,
+	    &sinfo->ssi_maxbufsize, &sinfo->ssi_maxmpxcount);
+	if (rc != 0)
+		goto done;
+
+	if (sr->session->dialect < NT_LM_0_12) {
+
+		sinfo->ssi_type = SMB_SSNSETUP_PRE_NTLM012;
+		sinfo->ssi_capabilities = 0;
+
+		rc = smbsr_decode_vwv(sr, "w4.",
+		    &sinfo->ssi_lmpwlen);
 		if (rc != 0)
-			goto pre_session_setup_andx_done;
+			goto done;
 
-		sinfo->ssi_cipwd = smb_srm_zalloc(sr, sinfo->ssi_cipwlen + 1);
-		sinfo->ssi_cspwd = smb_srm_zalloc(sr, sinfo->ssi_cspwlen + 1);
-
-		rc = smbsr_decode_data(sr, "%#c#cuuu",
-		    sr,
-		    sinfo->ssi_cipwlen, sinfo->ssi_cipwd,
-		    sinfo->ssi_cspwlen, sinfo->ssi_cspwd,
-		    &sinfo->ssi_user,
-		    &sinfo->ssi_domain,
-		    &native_os);
+		sinfo->ssi_lmpwd = smb_srm_zalloc(sr, sinfo->ssi_lmpwlen + 1);
+		rc = smbsr_decode_data(sr, "%#c", sr, sinfo->ssi_lmpwlen,
+		    sinfo->ssi_lmpwd);
 		if (rc != 0)
-			goto pre_session_setup_andx_done;
+			goto done;
 
-		sinfo->ssi_cipwd[sinfo->ssi_cipwlen] = 0;
-		sinfo->ssi_cspwd[sinfo->ssi_cspwlen] = 0;
-
-		sr->session->native_os = smbnative_os_value(native_os);
-
-		if (sr->session->native_os == NATIVE_OS_WINNT)
-			rc = smbsr_decode_data(sr, "%,u", sr, &native_lm);
-		else
-			rc = smbsr_decode_data(sr, "%u", sr, &native_lm);
-
-		if (rc != 0 || native_lm == NULL)
-			native_lm = "NT LAN Manager 4.0";
-
-		sr->session->native_lm = smbnative_lm_value(native_lm);
-	} else {
-		rc = smbsr_decode_vwv(sr, "b.wwwwlw4.", &sr->andx_com,
-		    &sr->andx_off, &maxbufsize,
-		    &sinfo->ssi_maxmpxcount, &vcnumber,
-		    &junk_sesskey, &sinfo->ssi_cipwlen);
-		if (rc != 0)
-			goto pre_session_setup_andx_done;
-
-		sinfo->ssi_cipwd = smb_srm_zalloc(sr, sinfo->ssi_cipwlen + 1);
-		rc = smbsr_decode_data(sr, "%#c", sr, sinfo->ssi_cipwlen,
-		    sinfo->ssi_cipwd);
-		if (rc != 0)
-			goto pre_session_setup_andx_done;
-
-		sinfo->ssi_cipwd[sinfo->ssi_cipwlen] = 0;
+		sinfo->ssi_lmpwd[sinfo->ssi_lmpwlen] = 0;
 
 		if (smbsr_decode_data(sr, "%u", sr, &sinfo->ssi_user) != 0)
 			sinfo->ssi_user = "";
@@ -128,15 +87,108 @@ smb_pre_session_setup_andx(smb_request_t *sr)
 		if (smbsr_decode_data(sr, "%u", sr, &sinfo->ssi_domain) != 0)
 			sinfo->ssi_domain = "";
 
-		native_lm = "NT LAN Manager 4.0";
-		sr->session->native_os = NATIVE_OS_WINNT;
-		sr->session->native_lm = smbnative_lm_value(native_lm);
+		goto part2;
 	}
 
-	sr->session->vcnumber = vcnumber;
-	sr->session->smb_msg_size = maxbufsize;
+	/*
+	 * We have dialect >= NT_LM_0_12
+	 */
+	if (sr->smb_wct == 13) {
+		/* Old style (non-extended) request. */
+		sinfo->ssi_type = SMB_SSNSETUP_NTLM012_NOEXT;
 
-pre_session_setup_andx_done:
+		rc = smbsr_decode_vwv(sr, "ww4.l",
+		    &sinfo->ssi_lmpwlen,
+		    &sinfo->ssi_ntpwlen,
+		    &sinfo->ssi_capabilities);
+		if (rc != 0)
+			goto done;
+
+		/* paranoid: ignore cap. ext. sec. here */
+		sinfo->ssi_capabilities &= ~CAP_EXTENDED_SECURITY;
+
+		sinfo->ssi_lmpwd = smb_srm_zalloc(sr, sinfo->ssi_lmpwlen + 1);
+		sinfo->ssi_ntpwd = smb_srm_zalloc(sr, sinfo->ssi_ntpwlen + 1);
+
+		rc = smbsr_decode_data(sr, "%#c#cuu", sr,
+		    sinfo->ssi_lmpwlen, sinfo->ssi_lmpwd,
+		    sinfo->ssi_ntpwlen, sinfo->ssi_ntpwd,
+		    &sinfo->ssi_user, &sinfo->ssi_domain);
+		if (rc != 0)
+			goto done;
+
+		sinfo->ssi_lmpwd[sinfo->ssi_lmpwlen] = 0;
+		sinfo->ssi_ntpwd[sinfo->ssi_ntpwlen] = 0;
+
+		goto part2;
+	}
+
+	if (sr->smb_wct == 12) {
+		/* New style (extended) request. */
+		sinfo->ssi_type = SMB_SSNSETUP_NTLM012_EXTSEC;
+
+		rc = smbsr_decode_vwv(sr, "w4.l",
+		    &sinfo->ssi_iseclen,
+		    &sinfo->ssi_capabilities);
+		if (rc != 0)
+			goto done;
+
+		if ((sinfo->ssi_capabilities & CAP_EXTENDED_SECURITY) == 0) {
+			rc = -1;
+			goto done;
+		}
+
+		sinfo->ssi_isecblob = smb_srm_zalloc(sr, sinfo->ssi_iseclen);
+		rc = smbsr_decode_data(sr, "%#c", sr,
+		    sinfo->ssi_iseclen, sinfo->ssi_isecblob);
+		if (rc != 0)
+			goto done;
+
+		goto part2;
+	}
+
+	/* Invalid message */
+	rc = -1;
+	goto done;
+
+part2:
+	/*
+	 * Get the "Native OS" and "Native LanMan" strings.
+	 * These are not critical to protocol function, so
+	 * if we can't parse them, just guess "NT".
+	 * These strings are free'd with the sr.
+	 *
+	 * In NTLM 0.12, the padding between the Native OS and Native LM
+	 * is a bit strange.  On NT4.0, there is a 2 byte pad between the
+	 * OS (Windows NT 1381) and LM (Windows NT 4.0).  On Windows 2000,
+	 * there is no padding between the OS (Windows 2000 2195) and LM
+	 * (Windows 2000 5.0). If the padding is removed from the decode
+	 * string the NT4.0 LM comes out as an empty string.  So if the
+	 * client's native OS is Win NT, assume extra padding.
+	 */
+	rc = smbsr_decode_data(sr, "%u", sr, &native_os);
+	if (rc != 0 || native_os == NULL)
+		sinfo->ssi_native_os = NATIVE_OS_WINNT;
+	else
+		sinfo->ssi_native_os = smbnative_os_value(native_os);
+
+	if (sinfo->ssi_native_os == NATIVE_OS_WINNT)
+		rc = smbsr_decode_data(sr, "%,u", sr, &native_lm);
+	else
+		rc = smbsr_decode_data(sr, "%u", sr, &native_lm);
+	if (rc != 0 || native_lm == NULL)
+		sinfo->ssi_native_lm = NATIVE_LM_NT;
+	else
+		sinfo->ssi_native_lm = smbnative_lm_value(native_lm);
+	rc = 0;
+
+done:
+	if (rc != 0) {
+		cmn_err(CE_NOTE,
+		    "SmbSessonSetupX: client %s invalid request",
+		    sr->session->ip_addr_str);
+	}
+
 	DTRACE_SMB_2(op__SessionSetupX__start, smb_request_t *, sr,
 	    smb_arg_sessionsetup_t, sinfo);
 	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
@@ -150,18 +202,14 @@ smb_post_session_setup_andx(smb_request_t *sr)
 	DTRACE_SMB_2(op__SessionSetupX__done, smb_request_t *, sr,
 	    smb_arg_sessionsetup_t, sinfo);
 
-	if (sinfo->ssi_cipwd != NULL)
-		bzero(sinfo->ssi_cipwd, sinfo->ssi_cipwlen + 1);
+	if (sinfo->ssi_lmpwd != NULL)
+		bzero(sinfo->ssi_lmpwd, sinfo->ssi_lmpwlen);
 
-	if (sinfo->ssi_cspwd != NULL)
-		bzero(sinfo->ssi_cspwd, sinfo->ssi_cspwlen + 1);
+	if (sinfo->ssi_ntpwd != NULL)
+		bzero(sinfo->ssi_ntpwd, sinfo->ssi_ntpwlen);
 }
 
 /*
- * If signing has not already been enabled on this session check to see if
- * it should be enabled.  The first authenticated logon provides the MAC
- * key and sequence numbers for signing all subsequent sessions on the same
- * connection.
  *
  * NT systems use different native OS and native LanMan values dependent on
  * whether they are acting as a client or a server.  NT 4.0 server responds
@@ -174,329 +222,117 @@ smb_sdrc_t
 smb_com_session_setup_andx(smb_request_t *sr)
 {
 	smb_arg_sessionsetup_t	*sinfo = sr->sr_ssetup;
+	uint32_t		status;
+	uint16_t		action;
 	int			rc;
 
-	if (smb_authenticate(sr, sinfo) != 0)
+	/*
+	 * Some stuff we do only in the first in a (possible)
+	 * sequence of session setup requests.
+	 */
+	if (sinfo->ssi_type != SMB_SSNSETUP_NTLM012_EXTSEC ||
+	    sr->smb_uid == 0 || sr->smb_uid == 0xFFFF) {
+
+		/* This is a first (or only) call */
+		sr->session->smb_msg_size = sinfo->ssi_maxbufsize;
+		sr->session->smb_max_mpx = sinfo->ssi_maxmpxcount;
+		sr->session->capabilities = sinfo->ssi_capabilities;
+
+		if (!smb_oplock_levelII)
+			sr->session->capabilities &= ~CAP_LEVEL_II_OPLOCKS;
+
+		sr->session->native_os = sinfo->ssi_native_os;
+		sr->session->native_lm = sinfo->ssi_native_lm;
+	}
+
+	/*
+	 * The "meat" of authentication happens here.
+	 */
+	if (sinfo->ssi_type == SMB_SSNSETUP_NTLM012_EXTSEC)
+		status = smb_authenticate_ext(sr);
+	else
+		status = smb_authenticate_old(sr);
+
+	switch (status) {
+
+	case NT_STATUS_SUCCESS:
+		break;
+
+	/*
+	 * This is not really an error, but tells the client
+	 * it should send another session setup request.
+	 */
+	case NT_STATUS_MORE_PROCESSING_REQUIRED:
+		smbsr_error(sr, status, 0, 0);
+		break;
+
+	case NT_STATUS_ACCESS_DENIED:
+		smbsr_error(sr, status, ERRDOS, ERROR_ACCESS_DENIED);
 		return (SDRC_ERROR);
 
-	if (sr->session->native_lm == NATIVE_LM_WIN2000)
-		sinfo->ssi_capabilities |= CAP_LARGE_FILES |
-		    CAP_LARGE_READX | CAP_LARGE_WRITEX;
+	case NT_STATUS_TOO_MANY_SESSIONS:
+		smbsr_error(sr, status, ERRSRV, ERRtoomanyuids);
+		return (SDRC_ERROR);
 
-	if (!smb_oplock_levelII)
-		sr->session->capabilities &= ~CAP_LEVEL_II_OPLOCKS;
+	case NT_STATUS_NO_LOGON_SERVERS:
+		smbsr_error(sr, status, ERRDOS, ERROR_NO_LOGON_SERVERS);
+		return (SDRC_ERROR);
 
-	sr->session->capabilities = sinfo->ssi_capabilities;
+	case NT_STATUS_NETLOGON_NOT_STARTED:
+		smbsr_error(sr, status, ERRDOS, ERROR_NETLOGON_NOT_STARTED);
+		return (SDRC_ERROR);
 
-	rc = smbsr_encode_result(sr, 3, VAR_BCC, "bb.www%uuu",
-	    3,
-	    sr->andx_com,
-	    -1,			/* andx_off */
-	    sinfo->ssi_guest ? 1 : 0,
-	    VAR_BCC,
-	    sr,
-	    smbnative_os_str(&sr->sr_cfg->skc_version),
-	    smbnative_lm_str(&sr->sr_cfg->skc_version),
-	    sr->sr_cfg->skc_nbdomain);
+	case NT_STATUS_USER_SESSION_DELETED:
+		smbsr_error(sr, status, ERRSRV, ERRbaduid);
+		return (SDRC_ERROR);
+
+	case NT_STATUS_INSUFF_SERVER_RESOURCES:
+		smbsr_error(sr, status, ERRSRV, ERRnoresource);
+		return (SDRC_ERROR);
+
+	case NT_STATUS_INTERNAL_ERROR:
+	default:
+		smbsr_error(sr, status, ERRSRV, ERRsrverror);
+		return (SDRC_ERROR);
+	}
+
+	action = SMB_USER_IS_GUEST(sr->uid_user) ? 1 : 0;
+
+	switch (sinfo->ssi_type) {
+
+	default:
+	case SMB_SSNSETUP_PRE_NTLM012:
+	case SMB_SSNSETUP_NTLM012_NOEXT:
+
+		rc = smbsr_encode_result(sr, 3, VAR_BCC, "bb.www%uuu",
+		    3,
+		    sr->andx_com,
+		    -1,			/* andx_off */
+		    action,
+		    VAR_BCC,
+		    sr,
+		    sr->sr_cfg->skc_native_os,
+		    sr->sr_cfg->skc_native_lm,
+		    sr->sr_cfg->skc_nbdomain);
+		break;
+
+	case SMB_SSNSETUP_NTLM012_EXTSEC:
+
+		rc = smbsr_encode_result(sr, 4, VAR_BCC, "bb.wwww%#cuuu",
+		    4,
+		    sr->andx_com,
+		    -1,			/* andx_off */
+		    action,
+		    sinfo->ssi_oseclen,
+		    VAR_BCC,
+		    sr,
+		    sinfo->ssi_oseclen,
+		    sinfo->ssi_osecblob,
+		    sr->sr_cfg->skc_native_os,
+		    sr->sr_cfg->skc_native_lm,
+		    sr->sr_cfg->skc_nbdomain);
+		break;
+	}
 
 	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
-}
-
-static int
-smb_authenticate(smb_request_t *sr, smb_arg_sessionsetup_t *sinfo)
-{
-	int		rc;
-	smb_server_t	*sv = sr->sr_server;
-
-	if (smb_threshold_enter(&sv->sv_ssetup_ct) != 0) {
-		smbsr_error(sr, RPC_NT_SERVER_TOO_BUSY, 0, 0);
-		return (-1);
-	}
-
-	rc = smb_authenticate_core(sr, sinfo);
-	smb_threshold_exit(&sv->sv_ssetup_ct);
-	return (rc);
-}
-
-/*
- * Authenticate a user.  If the user has already been authenticated on
- * this session, we can simply dup the user and return.
- *
- * Otherwise, the user information is passed to smbd for authentication.
- * If smbd can authenticate the user an access token is returned and we
- * generate a cred and new user based on the token.
- */
-static int
-smb_authenticate_core(smb_request_t *sr, smb_arg_sessionsetup_t *sinfo)
-{
-	char		*hostname = sr->sr_cfg->skc_hostname;
-	int		security = sr->sr_cfg->skc_secmode;
-	smb_token_t	*token = NULL;
-	smb_user_t	*user = NULL;
-	smb_logon_t	user_info;
-	boolean_t	need_lookup = B_FALSE;
-	uint32_t	privileges;
-	cred_t		*cr;
-	char		*buf = NULL;
-	char		*p;
-
-	bzero(&user_info, sizeof (smb_logon_t));
-	user_info.lg_e_domain = sinfo->ssi_domain;
-
-	if ((*sinfo->ssi_user == '\0') &&
-	    (sinfo->ssi_cspwlen == 0) &&
-	    (sinfo->ssi_cipwlen == 0 ||
-	    (sinfo->ssi_cipwlen == 1 && *sinfo->ssi_cipwd == '\0'))) {
-		user_info.lg_e_username = "anonymous";
-		user_info.lg_flags |= SMB_ATF_ANON;
-	} else {
-		user_info.lg_e_username = sinfo->ssi_user;
-	}
-
-	/*
-	 * Handle user@domain format.  We need to retain the original
-	 * data as this is important in some forms of authentication.
-	 */
-	if (*sinfo->ssi_domain == '\0') {
-		buf = smb_srm_strdup(sr, sinfo->ssi_user);
-		if ((p = strchr(buf, '@')) != NULL) {
-			*p = '\0';
-			user_info.lg_e_username = buf;
-			user_info.lg_e_domain = p + 1;
-		}
-	}
-
-	/*
-	 * If no domain name has been provided in domain mode we cannot
-	 * determine if this is a local user or a domain user without
-	 * obtaining an access token.  So we postpone the lookup until
-	 * after authentication.
-	 */
-	if (security == SMB_SECMODE_WORKGRP) {
-		user = smb_session_dup_user(sr->session, hostname,
-		    user_info.lg_e_username);
-	} else if (*user_info.lg_e_domain != '\0') {
-		user = smb_session_dup_user(sr->session, user_info.lg_e_domain,
-		    user_info.lg_e_username);
-	} else {
-		need_lookup = B_TRUE;
-	}
-
-	if (user != NULL) {
-		sinfo->ssi_guest = SMB_USER_IS_GUEST(user);
-		sr->user_cr = user->u_cred;
-		sr->smb_uid = user->u_uid;
-		sr->uid_user = user;
-		return (0);
-	}
-
-	user_info.lg_level = NETR_NETWORK_LOGON;
-	user_info.lg_domain = sinfo->ssi_domain;
-	user_info.lg_username = sinfo->ssi_user;
-	user_info.lg_workstation = sr->session->workstation;
-	user_info.lg_clnt_ipaddr = sr->session->ipaddr;
-	user_info.lg_local_ipaddr = sr->session->local_ipaddr;
-	user_info.lg_local_port = sr->session->s_local_port;
-	user_info.lg_challenge_key.val = sr->session->challenge_key;
-	user_info.lg_challenge_key.len = sr->session->challenge_len;
-	user_info.lg_nt_password.val = sinfo->ssi_cspwd;
-	user_info.lg_nt_password.len = sinfo->ssi_cspwlen;
-	user_info.lg_lm_password.val = sinfo->ssi_cipwd;
-	user_info.lg_lm_password.len = sinfo->ssi_cipwlen;
-	user_info.lg_native_os = sr->session->native_os;
-	user_info.lg_native_lm = sr->session->native_lm;
-
-	DTRACE_PROBE1(smb__sessionsetup__clntinfo, smb_logon_t *, &user_info);
-
-	if ((token = smb_get_token(sr->session, &user_info)) == NULL) {
-		smbsr_error(sr, 0, ERRSRV, ERRbadpw);
-		return (-1);
-	}
-
-	if (need_lookup) {
-		user = smb_session_dup_user(sr->session,
-		    token->tkn_domain_name, token->tkn_account_name);
-		if (user != NULL) {
-			sinfo->ssi_guest = SMB_USER_IS_GUEST(user);
-			sr->user_cr = user->u_cred;
-			sr->smb_uid = user->u_uid;
-			sr->uid_user = user;
-			smb_token_free(token);
-			return (0);
-		}
-	}
-
-	if ((cr = smb_cred_create(token)) == NULL) {
-		smb_token_free(token);
-		smbsr_error(sr, 0, ERRDOS, ERROR_INVALID_HANDLE);
-		return (-1);
-	}
-
-	privileges = smb_priv_xlate(token);
-
-	user = smb_user_login(sr->session, cr,
-	    token->tkn_domain_name, token->tkn_account_name,
-	    token->tkn_flags, privileges, token->tkn_audit_sid);
-	crfree(cr);
-
-	/*
-	 * Save the session key, and (maybe) enable signing,
-	 * but only for real logon (not ANON or GUEST).
-	 */
-	if ((token->tkn_flags & (SMB_ATF_GUEST | SMB_ATF_ANON)) == 0)
-		(void) smb_sign_begin(sr, token);
-
-	smb_token_free(token);
-
-	if (user == NULL) {
-		smbsr_error(sr, 0, ERRDOS, ERROR_INVALID_HANDLE);
-		return (-1);
-	}
-
-	sinfo->ssi_guest = SMB_USER_IS_GUEST(user);
-	sr->user_cr = user->u_cred;
-	sr->smb_uid = user->u_uid;
-	sr->uid_user = user;
-	return (0);
-}
-
-#ifdef	_KERNEL
-/*
- * Allocate a Solaris cred and initialize it based on the access token.
- *
- * If the user can be mapped to a non-ephemeral ID, the cred gid is set
- * to the Solaris user's primary group.
- *
- * If the mapped UID is ephemeral, or the primary group could not be
- * obtained, the cred gid is set to whatever Solaris group is mapped
- * to the token's primary group.
- */
-cred_t *
-smb_cred_create(smb_token_t *token)
-{
-	ksid_t			ksid;
-	ksidlist_t		*ksidlist = NULL;
-	smb_posix_grps_t	*posix_grps;
-	cred_t			*cr;
-	gid_t			gid;
-
-	ASSERT(token);
-	ASSERT(token->tkn_posix_grps);
-	posix_grps = token->tkn_posix_grps;
-
-	cr = crget();
-	ASSERT(cr != NULL);
-
-	if (!IDMAP_ID_IS_EPHEMERAL(token->tkn_user.i_id) &&
-	    (posix_grps->pg_ngrps != 0)) {
-		gid = posix_grps->pg_grps[0];
-	} else {
-		gid = token->tkn_primary_grp.i_id;
-	}
-
-	if (crsetugid(cr, token->tkn_user.i_id, gid) != 0) {
-		crfree(cr);
-		return (NULL);
-	}
-
-	if (crsetgroups(cr, posix_grps->pg_ngrps, posix_grps->pg_grps) != 0) {
-		crfree(cr);
-		return (NULL);
-	}
-
-	smb_cred_set_sid(&token->tkn_user, &ksid);
-	crsetsid(cr, &ksid, KSID_USER);
-	smb_cred_set_sid(&token->tkn_primary_grp, &ksid);
-	crsetsid(cr, &ksid, KSID_GROUP);
-	smb_cred_set_sid(&token->tkn_owner, &ksid);
-	crsetsid(cr, &ksid, KSID_OWNER);
-	ksidlist = smb_cred_set_sidlist(&token->tkn_win_grps);
-	crsetsidlist(cr, ksidlist);
-
-	/*
-	 * In the AD world, "take ownership privilege" is very much
-	 * like having Unix "root" privileges.  It's normally given
-	 * to members of the "Administrators" group, which normally
-	 * includes the the local Administrator (like root) and when
-	 * joined to a domain, "Domain Admins".
-	 */
-	if (smb_token_query_privilege(token, SE_TAKE_OWNERSHIP_LUID)) {
-		(void) crsetpriv(cr,
-		    PRIV_FILE_CHOWN,
-		    PRIV_FILE_DAC_READ,
-		    PRIV_FILE_DAC_SEARCH,
-		    PRIV_FILE_DAC_WRITE,
-		    PRIV_FILE_OWNER,
-		    NULL);
-	}
-
-	return (cr);
-}
-
-/*
- * Initialize the ksid based on the given smb_id_t.
- */
-static void
-smb_cred_set_sid(smb_id_t *id, ksid_t *ksid)
-{
-	char sidstr[SMB_SID_STRSZ];
-	int rc;
-
-	ASSERT(id);
-	ASSERT(id->i_sid);
-
-	ksid->ks_id = id->i_id;
-	smb_sid_tostr(id->i_sid, sidstr);
-	rc = smb_sid_splitstr(sidstr, &ksid->ks_rid);
-	ASSERT(rc == 0);
-
-	ksid->ks_attr = id->i_attrs;
-	ksid->ks_domain = ksid_lookupdomain(sidstr);
-}
-
-/*
- * Allocate and initialize the ksidlist based on the access token group list.
- */
-static ksidlist_t *
-smb_cred_set_sidlist(smb_ids_t *token_grps)
-{
-	int i;
-	ksidlist_t *lp;
-
-	lp = kmem_zalloc(KSIDLIST_MEM(token_grps->i_cnt), KM_SLEEP);
-	lp->ksl_ref = 1;
-	lp->ksl_nsid = token_grps->i_cnt;
-	lp->ksl_neid = 0;
-
-	for (i = 0; i < lp->ksl_nsid; i++) {
-		smb_cred_set_sid(&token_grps->i_ids[i], &lp->ksl_sids[i]);
-		if (lp->ksl_sids[i].ks_id > IDMAP_WK__MAX_GID)
-			lp->ksl_neid++;
-	}
-
-	return (lp);
-}
-#endif	/* _KERNEL */
-
-/*
- * Convert access token privileges to local definitions.
- */
-static uint32_t
-smb_priv_xlate(smb_token_t *token)
-{
-	uint32_t	privileges = 0;
-
-	if (smb_token_query_privilege(token, SE_BACKUP_LUID))
-		privileges |= SMB_USER_PRIV_BACKUP;
-
-	if (smb_token_query_privilege(token, SE_RESTORE_LUID))
-		privileges |= SMB_USER_PRIV_RESTORE;
-
-	if (smb_token_query_privilege(token, SE_TAKE_OWNERSHIP_LUID))
-		privileges |= SMB_USER_PRIV_TAKE_OWNERSHIP;
-
-	if (smb_token_query_privilege(token, SE_SECURITY_LUID))
-		privileges |= SMB_USER_PRIV_SECURITY;
-
-	return (privileges);
 }

@@ -1,3 +1,4 @@
+// Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
 // Copyright (C) 2002 Microsoft Corporation
 // All rights reserved.
 //
@@ -451,29 +452,37 @@ long ASNDerCalcElementLength( long nDataLength, long* pnInternalLength )
 // Comments :
 //    Helper function to calculate a MechList length.  A mechlist consists
 //    of a NegTokenInit sequence token, a sequence token for the MechList
-//    and finally a list of OIDs.  In our case, we only really have one
-//    OID.
+//    and finally a list of OIDs.
 //
 ////////////////////////////////////////////////////////////////////////////
 
-long ASNDerCalcMechListLength( SPNEGO_MECH_OID mechoid, long* pnInternalLength )
+long ASNDerCalcMechListLength( SPNEGO_MECH_OID *mechOidLst, int mechOidCnt,
+   long* pnInternalLength )
 {
-   // First the OID
-   long  nTotalLength = g_stcMechOIDList[mechoid].iLen;
+	// First the OID
+	SPNEGO_MECH_OID oid_idx;
+	long  nTotalLength;
+	int i;
 
-   // Next add in a sequence token
-   nTotalLength += ASNDerCalcTokenLength( nTotalLength, 0L );
+	nTotalLength = 0;
+	for (i = 0; i < mechOidCnt; i++) {
+		oid_idx = mechOidLst[i];
+		nTotalLength += g_stcMechOIDList[oid_idx].iLen;
+	}
 
-   // Internal length is the length without the element sequence token
-   if ( NULL != pnInternalLength )
-   {
-      *pnInternalLength = nTotalLength;
-   }
+	// Next add in a sequence token
+	nTotalLength += ASNDerCalcTokenLength( nTotalLength, 0L );
 
-   // Finally add in the element's sequence token
-   nTotalLength += ASNDerCalcTokenLength( nTotalLength, 0L );
+	// Internal length is the length without the element sequence token
+	if ( NULL != pnInternalLength )
+	{
+		*pnInternalLength = nTotalLength;
+	}
 
-   return nTotalLength;
+	// Finally add in the element's sequence token
+	nTotalLength += ASNDerCalcTokenLength( nTotalLength, 0L );
+
+	return nTotalLength;
 }
 
 
@@ -646,9 +655,12 @@ int ASNDerWriteToken( unsigned char* pbData, unsigned char ucType,
 int ASNDerWriteOID( unsigned char* pbData, SPNEGO_MECH_OID eMechOID )
 {
 
-   memcpy( pbData, g_stcMechOIDList[eMechOID].ucOid, g_stcMechOIDList[eMechOID].iLen );
+	if (pbData != NULL) {
+		memcpy( pbData, g_stcMechOIDList[eMechOID].ucOid,
+		    g_stcMechOIDList[eMechOID].iLen );
+	}
 
-   return g_stcMechOIDList[eMechOID].iLen;
+	return g_stcMechOIDList[eMechOID].iLen;
 }
 
 
@@ -671,27 +683,35 @@ int ASNDerWriteOID( unsigned char* pbData, SPNEGO_MECH_OID eMechOID )
 //
 ////////////////////////////////////////////////////////////////////////////
 
-long ASNDerWriteMechList( unsigned char* pbData, SPNEGO_MECH_OID mechoid )
+long ASNDerWriteMechList( unsigned char* pbData, SPNEGO_MECH_OID *mechOidLst, int mechOidCnt )
 {
-   // First get the length
-   long  nInternalLength = 0L;
-   long  nMechListLength = ASNDerCalcMechListLength( mechoid, &nInternalLength );
-   long  nTempLength = 0L;
+	// First get the length
+	long  nInternalLength = 0L;
+	long  nMechListLength;
+	long  nTempLength = 0L;
+	int   i;
 
-   nTempLength = ASNDerWriteToken( pbData, SPNEGO_NEGINIT_ELEMENT_MECHTYPES,
+	nMechListLength = ASNDerCalcMechListLength(mechOidLst, mechOidCnt, &nInternalLength);
+	nTempLength = ASNDerWriteToken( pbData, SPNEGO_NEGINIT_ELEMENT_MECHTYPES,
                                     NULL, nInternalLength );
 
-   // Adjust the data pointer
-   pbData += nTempLength;
+	// Adjust the data pointer
+	pbData += nTempLength;
+	nInternalLength	-= nTempLength;
 
-   // Now write the Sequence token and the OID (the OID is a BLOB in the global
-   // structure.
+	// Now write the Sequence token and the OID (the OID is a BLOB in the global
+	// structure.
 
-   nTempLength = ASNDerWriteToken( pbData, SPNEGO_CONSTRUCTED_SEQUENCE,
-                                    g_stcMechOIDList[mechoid].ucOid,
-                                    g_stcMechOIDList[mechoid].iLen );
+	nTempLength = ASNDerWriteToken( pbData, SPNEGO_CONSTRUCTED_SEQUENCE,
+					NULL, nInternalLength);
+	pbData += nTempLength;
 
-   return nMechListLength;
+	for (i = 0; i < mechOidCnt; i++) {
+		nTempLength = ASNDerWriteOID( pbData, mechOidLst[i] );
+		pbData += nTempLength;
+	}
+
+	return nMechListLength;
 }
 
 

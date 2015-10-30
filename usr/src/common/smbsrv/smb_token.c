@@ -165,17 +165,4 @@ smb_logon_free(smb_logon_t *obj)
 	xdr_free(smb_logon_xdr, (char *)obj);
 	free(obj);
 }
-#else /* _KERNEL */
-/*
- * Tokens are allocated in the kernel via XDR.
- * Call xdr_free before freeing the token structure.
- */
-void
-smb_token_free(smb_token_t *token)
-{
-	if (token != NULL) {
-		xdr_free(smb_token_xdr, (char *)token);
-		kmem_free(token, sizeof (smb_token_t));
-	}
-}
 #endif /* _KERNEL */

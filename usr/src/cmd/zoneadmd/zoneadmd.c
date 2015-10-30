@@ -2052,6 +2052,13 @@ main(int argc, char *argv[])
 	(void) sigaddset(&block_cld, SIGCHLD);
 	(void) sigprocmask(SIG_BLOCK, &block_cld, NULL);
 
+	/*
+	 * The parent only needs stderr after the fork, so close other fd's
+	 * that we inherited from zoneadm so that the parent doesn't have those
+	 * open while waiting. The child will close the rest after the fork.
+	 */
+	closefrom(3);
+
 	if ((ctfd = init_template()) == -1) {
 		zerror(zlogp, B_TRUE, "failed to create contract");
 		return (1);

@@ -24,6 +24,7 @@
 # All rights reserved.
 #
 # Copyright 2012 Milan Jurik. All rights reserved.
+# Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 #
 # uts/common/gssd/Makefile
 #
@@ -31,7 +32,7 @@
 include ../../../Makefile.master
 
 
-INSTALLED_HDRS=	gssapi.h gssapi_ext.h
+INSTALLED_HDRS=	gssapi.h gssapi_ext.h gssapi_krb5.h
 PRIVATE_HDRS=	gssd.x gssd_prot.h
 HDRS=	$(INSTALLED_HDRS) $(PRIVATE_HDRS)
 
@@ -47,9 +48,15 @@ CHECKHDRS= $(INSTALLED_HDRS:%.h=%.check)
 # cstyle so it is unchecked
 UNCHECKED_HDRS=	gss_prot.h
 
-# install rule
+# install rules
 $(GSSDDIRS)/%: %
 	$(INS.file)
+
+$(GSSDDIRS)/%: mechs/krb5/include/%
+	$(INS.file)
+
+# This is 3rd party code, so just skip hdrchk.
+gssapi_krb5.check:
 
 .KEEP_STATE:
 

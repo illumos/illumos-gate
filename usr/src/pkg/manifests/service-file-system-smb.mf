@@ -20,8 +20,8 @@
 #
 
 #
-# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/service/file-system/smb@$(PKGVERS)
@@ -52,6 +52,7 @@ dir path=usr/lib/mdb/kvm/$(ARCH64) group=sys
 dir path=usr/lib/reparse
 dir path=usr/lib/security
 dir path=usr/lib/smbsrv
+dir path=usr/lib/smbsrv/dtrace
 dir path=usr/sbin
 dir path=usr/share/man
 dir path=usr/share/man/man1m
@@ -78,6 +79,13 @@ file path=usr/lib/mdb/kvm/$(ARCH64)/smbsrv.so group=sys mode=0555
 $(i386_ONLY)file path=usr/lib/mdb/kvm/smbsrv.so group=sys mode=0555
 file path=usr/lib/reparse/libreparse_smb.so.1
 file path=usr/lib/security/pam_smb_passwd.so.1
+file path=usr/lib/smbsrv/dtrace/smbd-all.d mode=0555
+file path=usr/lib/smbsrv/dtrace/smbd-authsvc.d mode=0555
+file path=usr/lib/smbsrv/dtrace/smbd-doorsvc.d mode=0555
+file path=usr/lib/smbsrv/dtrace/smbd-pipesvc.d mode=0555
+file path=usr/lib/smbsrv/dtrace/smbnode.d mode=0555
+file path=usr/lib/smbsrv/dtrace/smbsrv.d mode=0555
+file path=usr/lib/smbsrv/dtrace/smbvfs.d mode=0555
 file path=usr/lib/smbsrv/libmlrpc.so.1
 file path=usr/lib/smbsrv/libmlsvc.so.1
 file path=usr/lib/smbsrv/libsmb.so.1
