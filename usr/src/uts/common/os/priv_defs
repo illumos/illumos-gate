@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013, Joyent, Inc. All rights reserved.
+ * Copyright 2015, Joyent, Inc. All rights reserved.
  *
 INSERT COMMENT
  */
@@ -290,6 +290,10 @@ basic privilege PRIV_PROC_INFO
 privilege PRIV_PROC_LOCK_MEMORY
 
 	Allows a process to lock pages in physical memory.
+
+privilege PRIV_PROC_MEMINFO
+
+	Allows a process to access physical memory information.
 
 privilege PRIV_PROC_OWNER
 
