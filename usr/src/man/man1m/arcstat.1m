@@ -10,6 +10,7 @@
 .\"
 .\"
 .\" Copyright 2014 Adam Stevko.  All rights reserved.
+.\" Copyright (c) 2015 by Delphix. All rights reserved.
 .\"
 .TH ARCSTAT 1M "Feb 4, 2014"
 .SH NAME
@@ -22,7 +23,6 @@ arcstat \- report ZFS ARC and L2ARC statistics
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBarcstat\fR utility print various ZFS ARC and L2ARC statistics in
 vmstat-like fashion.
@@ -227,15 +227,6 @@ Total ARC accesses per second
 .sp
 .ne 2
 .na
-\fBrmis \fR
-.ad
-.RS 14n
-recycle_miss per second
-.RE
-
-.sp
-.ne 2
-.na
 \fBtime \fR
 .ad
 .RS 14n
@@ -379,7 +370,6 @@ Actual (compressed) size of the L2ARC
 .\"
 
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 
@@ -426,7 +416,7 @@ Display data with a specified separator (default: 2 spaces).
 
 .ad
 .RS 12n
-Print extended stats (same as -f time,mfu,mru,mfug,mrug,eskip,mtxmis,rmis,dread,pread,read).
+Print extended stats (same as -f time,mfu,mru,mfug,mrug,eskip,mtxmis,dread,pread,read).
 .RE
 
 .sp
@@ -439,7 +429,6 @@ Show field headers and definitions
 .RE
 
 .SH OPERANDS
-.sp
 .LP
 The following operands are supported:
 .sp
@@ -461,7 +450,6 @@ Specify the sampling interval in seconds.
 .RE
 
 .SH AUTHORS
-.sp
 .LP
 arcstat was originally written by Neelakanth Nadgir and supported only ZFS ARC statistics.
 Mike Harsch updated it to support L2ARC statistics.

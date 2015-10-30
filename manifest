@@ -10836,7 +10836,7 @@ d usr/share/lib/zoneinfo/America 0755 root bin
 h usr/share/lib/zoneinfo/America/Adak=usr/share/lib/zoneinfo/US/Aleutian
 f usr/share/lib/zoneinfo/America/Anchorage 0644 root bin
 f usr/share/lib/zoneinfo/America/Anguilla 0644 root bin
-f usr/share/lib/zoneinfo/America/Antigua 0644 root bin
+h usr/share/lib/zoneinfo/America/Antigua=usr/share/lib/zoneinfo/America/Port_of_Spain
 f usr/share/lib/zoneinfo/America/Araguaina 0644 root bin
 d usr/share/lib/zoneinfo/America/Argentina 0755 root bin
 f usr/share/lib/zoneinfo/America/Argentina/Buenos_Aires 0644 root bin
@@ -10890,6 +10890,7 @@ f usr/share/lib/zoneinfo/America/Edmonton 0644 root bin
 f usr/share/lib/zoneinfo/America/Eirunepe 0644 root bin
 f usr/share/lib/zoneinfo/America/El_Salvador 0644 root bin
 h usr/share/lib/zoneinfo/America/Ensenada=usr/share/lib/zoneinfo/America/Tijuana
+f usr/share/lib/zoneinfo/America/Fort_Nelson 0644 root bin
 h usr/share/lib/zoneinfo/America/Fort_Wayne=usr/share/lib/zoneinfo/US/East-Indiana
 f usr/share/lib/zoneinfo/America/Fortaleza 0644 root bin
 f usr/share/lib/zoneinfo/America/Glace_Bay 0644 root bin
@@ -10945,7 +10946,7 @@ f usr/share/lib/zoneinfo/America/Miquelon 0644 root bin
 f usr/share/lib/zoneinfo/America/Moncton 0644 root bin
 f usr/share/lib/zoneinfo/America/Monterrey 0644 root bin
 f usr/share/lib/zoneinfo/America/Montevideo 0644 root bin
-f usr/share/lib/zoneinfo/America/Montreal 0644 root bin
+h usr/share/lib/zoneinfo/America/Montreal=usr/share/lib/zoneinfo/America/Toronto
 f usr/share/lib/zoneinfo/America/Montserrat 0644 root bin
 f usr/share/lib/zoneinfo/America/Nassau 0644 root bin
 f usr/share/lib/zoneinfo/America/New_York 0644 root bin
@@ -11336,7 +11337,7 @@ f usr/share/lib/zoneinfo/Pacific/Kosrae 0644 root bin
 f usr/share/lib/zoneinfo/Pacific/Kwajalein 0644 root bin
 f usr/share/lib/zoneinfo/Pacific/Majuro 0644 root bin
 f usr/share/lib/zoneinfo/Pacific/Marquesas 0644 root bin
-f usr/share/lib/zoneinfo/Pacific/Midway 0644 root bin
+h usr/share/lib/zoneinfo/Pacific/Midway=usr/share/lib/zoneinfo/Pacific/Pago_Pago
 f usr/share/lib/zoneinfo/Pacific/Nauru 0644 root bin
 f usr/share/lib/zoneinfo/Pacific/Niue 0644 root bin
 f usr/share/lib/zoneinfo/Pacific/Norfolk 0644 root bin
@@ -11348,7 +11349,7 @@ f usr/share/lib/zoneinfo/Pacific/Pohnpei 0644 root bin
 f usr/share/lib/zoneinfo/Pacific/Ponape 0644 root bin
 f usr/share/lib/zoneinfo/Pacific/Port_Moresby 0644 root bin
 f usr/share/lib/zoneinfo/Pacific/Rarotonga 0644 root bin
-f usr/share/lib/zoneinfo/Pacific/Saipan 0644 root bin
+h usr/share/lib/zoneinfo/Pacific/Saipan=usr/share/lib/zoneinfo/Pacific/Guam
 h usr/share/lib/zoneinfo/Pacific/Samoa=usr/share/lib/zoneinfo/US/Samoa
 f usr/share/lib/zoneinfo/Pacific/Tahiti 0644 root bin
 f usr/share/lib/zoneinfo/Pacific/Tarawa 0644 root bin
