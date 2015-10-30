@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 #
 
 #
@@ -53,6 +54,9 @@ SYMBOL_VERSION SUNWprivate {
 	mlsvc_netlogon;
 	smb_autohome_add;
 	smb_autohome_remove;
+	smb_ddiscover_bad_dc;
+	smb_ddiscover_refresh;
+	smb_decode_krb5_pac;
 	smb_locate_dc;
 	smb_logon;
 	smb_logon_abort;
@@ -76,6 +80,7 @@ SYMBOL_VERSION SUNWprivate {
 	smb_shr_stop;
 	smb_token_destroy;
 	smb_token_log;
+	smb_token_setup_common;
 	spoolss_register_copyfile;
     local:
 	*;

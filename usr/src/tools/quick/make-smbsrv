@@ -20,7 +20,8 @@ make=${MAKE:-dmake}
 CLOSED_IS_PRESENT=no
 export CLOSED_IS_PRESENT
 
-export SOURCEDEBUG=yes
+# Do this if you want to use dbx or gdb
+# export SOURCEDEBUG=yes
 
 [ -n "$SRC" ] || {
   echo "SRC not set.  Run 'ws' or 'bldenv' first."
@@ -88,20 +89,23 @@ then
     (cd $SRC/head && $make install_h)
 
   # always update the smbsrv headers to be safe
-  # test -f $ROOT/usr/include/smbsrv/wintypes.h ||
-    (cd $SRC/uts/common/sys && $make -k install_h)
-    (cd $SRC/uts/common/smb && $make -k install_h)
-    (cd $SRC/uts/common/smbsrv && $make -k install_h)
+  (cd $SRC/uts/common/gssapi && $make -k install_h)
+  (cd $SRC/uts/common/sys && $make -k install_h)
+  (cd $SRC/uts/common/smb && $make -k install_h)
+  (cd $SRC/uts/common/smbsrv && $make -k install_h)
 
 fi
 
 # Need some library headers too...
 for lib in \
+  libads \
   libbsm \
   libcmdutils \
   libcryptoutil \
   libdevid \
   libfakekernel	\
+  libgss \
+  libkrb5 \
   libidmap \
   libpam \
   libsec \
@@ -140,6 +144,8 @@ do_lib1() {
 
 for lib in \
   libavl \
+  libgss \
+  libkrb5 \
   libcmdutils \
   libsqlite \
   libuutil
@@ -155,6 +161,7 @@ do_lib2() {
 
 for lib in \
   libfakekernel \
+  libads \
   libsmbfs
 do
   (cd $SRC/lib/$lib && $make $1)
@@ -241,8 +248,12 @@ do_tags() {
 	find uts/common/smbsrv -name '*.ndl' -print |sort
 	find uts/common/smbsrv -name '*.[ch]' -print |sort
 	find uts/common/fs/smbsrv -name '*.[ch]' -print |sort
-	find lib/libsmbfs -name '*.[ch]' -print |sort
+	find uts/common/gssapi -name '*.[ch]' -print |sort
+	find head -name '*.h' -print |sort
 	find lib/smbsrv -name '*.[ch]' -print |sort
+	find lib/libsmbfs -name '*.[ch]' -print |sort
+	find lib/libads -name '*.[ch]' -print |sort
+	find lib/libgss -name '*.[ch]' -print |sort
 	find cmd/smbsrv -name '*.[ch]' -print |sort
 	find common/smbsrv -name '*.[ch]' -print |sort
 	) > $SRC/cscope.files
@@ -256,7 +267,9 @@ do_tags() {
 # This creates a tarfile one can use to update a test machine.
 
 do_tar() {
+	git_rev=`git rev-parse --short=8 HEAD`
 	files="
+lib/svc/manifest/network/smb/server.xml
 usr/kernel/drv/$arch64/smbsrv
 usr/kernel/drv/smbsrv
 usr/kernel/kmdb/$arch64/smbsrv
@@ -268,6 +281,7 @@ usr/lib/mdb/kvm/$arch64/smbsrv.so
 usr/lib/mdb/kvm/smbsrv.so
 usr/lib/reparse/libreparse_smb.so.1
 usr/lib/security/pam_smb_passwd.so.1
+usr/lib/smbsrv/dtrace
 usr/lib/smbsrv/libmlrpc.so.1
 usr/lib/smbsrv/libmlsvc.so.1
 usr/lib/smbsrv/libsmb.so.1
@@ -278,7 +292,7 @@ usr/sbin/smbadm
 usr/sbin/smbstat
 "
 
-	(cd $ROOT && tar cfj ../../smbsrv.tar.bz2 $files)
+	(cd $ROOT && tar cfj ../../smbsrv-${git_rev}.tar.bz2 $files)
 }
 
 ################################################################

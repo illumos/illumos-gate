@@ -21,6 +21,8 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <syslog.h>
@@ -262,10 +264,13 @@ smb_pwd_getpwnam(const char *name, smb_passwd_t *smbpw)
 		return (smb_pwd_ops.pwop_getpwnam(name, smbpw));
 
 	err = smb_pwd_lock();
-	if (err != SMB_PWE_SUCCESS)
+	if (err != SMB_PWE_SUCCESS) {
+		syslog(LOG_WARNING, "smb_pwdutil: lock failed, err=%d", err);
 		return (NULL);
+	}
 
 	if ((fp = fopen(SMB_PASSWD, "rF")) == NULL) {
+		syslog(LOG_WARNING, "smb_pwdutil: open failed, %m");
 		(void) smb_pwd_unlock();
 		return (NULL);
 	}
@@ -274,8 +279,7 @@ smb_pwd_getpwnam(const char *name, smb_passwd_t *smbpw)
 
 	while (smb_pwd_fgetent(fp, &pwbuf, SMB_PWD_GETF_ALL) != NULL) {
 		if (strcmp(name, smbpw->pw_name) == 0) {
-			if ((smbpw->pw_flags & (SMB_PWF_LM | SMB_PWF_NT)))
-				found = B_TRUE;
+			found = B_TRUE;
 			break;
 		}
 	}
@@ -311,10 +315,13 @@ smb_pwd_getpwuid(uid_t uid, smb_passwd_t *smbpw)
 		return (smb_pwd_ops.pwop_getpwuid(uid, smbpw));
 
 	err = smb_pwd_lock();
-	if (err != SMB_PWE_SUCCESS)
+	if (err != SMB_PWE_SUCCESS) {
+		syslog(LOG_WARNING, "smb_pwdutil: lock failed, err=%d", err);
 		return (NULL);
+	}
 
 	if ((fp = fopen(SMB_PASSWD, "rF")) == NULL) {
+		syslog(LOG_WARNING, "smb_pwdutil: open failed, %m");
 		(void) smb_pwd_unlock();
 		return (NULL);
 	}
@@ -323,8 +330,7 @@ smb_pwd_getpwuid(uid_t uid, smb_passwd_t *smbpw)
 
 	while (smb_pwd_fgetent(fp, &pwbuf, SMB_PWD_GETF_ALL) != NULL) {
 		if (uid == smbpw->pw_uid) {
-			if ((smbpw->pw_flags & (SMB_PWF_LM | SMB_PWF_NT)))
-				found = B_TRUE;
+			found = B_TRUE;
 			break;
 		}
 	}
@@ -1002,10 +1008,13 @@ smb_lucache_do_update(void)
 	void *cookie = NULL;
 	FILE *fp;
 
-	if ((rc = smb_pwd_lock()) != SMB_PWE_SUCCESS)
+	if ((rc = smb_pwd_lock()) != SMB_PWE_SUCCESS) {
+		syslog(LOG_WARNING, "smb_pwdutil: lock failed, err=%d", rc);
 		return (rc);
+	}
 
 	if ((fp = fopen(SMB_PASSWD, "rF")) == NULL) {
+		syslog(LOG_WARNING, "smb_pwdutil: open failed, %m");
 		(void) smb_pwd_unlock();
 		return (SMB_PWE_OPEN_FAILED);
 	}

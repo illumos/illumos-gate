@@ -25,7 +25,7 @@
 
 include ../../Makefile.cmd
 
-SUBDIRS= cli dbutil ktutil kpasswd server kclient kdcmgr gui
+SUBDIRS= cli dbutil ktutil kpasswd server kclient kdcmgr
 
 all :=		TARGET= all
 clean :=	TARGET= clean

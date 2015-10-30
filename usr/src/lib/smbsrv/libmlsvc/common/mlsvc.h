@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _SMBSRV_MLSVC_H
@@ -32,6 +32,8 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+struct netr_info;
 
 int smb_dclocator_init(void);
 void smbrdr_initialize(void);
@@ -54,12 +56,13 @@ void svcctl_finalize(void);
 void spoolss_finalize(void);
 void netdfs_finalize(void);
 
-int netr_open(char *, char *, mlsvc_handle_t *);
+/* netr_auth.c */
+DWORD netr_open(char *, char *, mlsvc_handle_t *);
 int netr_close(mlsvc_handle_t *);
 DWORD netlogon_auth(char *, mlsvc_handle_t *, DWORD);
-int netr_setup_authenticator(netr_info_t *, struct netr_authenticator *,
+int netr_setup_authenticator(struct netr_info *, struct netr_authenticator *,
     struct netr_authenticator *);
-DWORD netr_validate_chain(netr_info_t *, struct netr_authenticator *);
+DWORD netr_validate_chain(struct netr_info *, struct netr_authenticator *);
 
 void ndr_srvsvc_timecheck(char *, char *);
 
@@ -81,9 +84,9 @@ void smb_quota_fini(void);
 void smb_quota_add_fs(const char *);
 void smb_quota_remove_fs(const char *);
 
+uint32_t smb_ddiscover_main(char *, smb_domainex_t *);
+
 #ifdef __cplusplus
 }
 #endif
-
-
 #endif /* _SMBSRV_MLSVC_H */

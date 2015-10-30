@@ -1,3 +1,4 @@
+// Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
 // Copyright (C) 2002 Microsoft Corporation
 // All rights reserved.
 //
@@ -20,8 +21,6 @@
 // SPNEGO token using ASN.1 DER helpers.
 //
 /////////////////////////////////////////////////////////////
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifndef __SPNEGOPARSE_H__
 #define __SPNEGOPARSE_H__
@@ -136,13 +135,13 @@ int FindMechOIDInMechList( SPNEGO_ELEMENT* pSpnegoElement, SPNEGO_MECH_OID MechO
                            int * piMechTypeIndex );
 int ValidateMechList( unsigned char* pbMechListData, long nBoundaryLength );
 int CalculateMinSpnegoInitTokenSize( long nMechTokenLength, long nMechListMICLength,
-                                    SPNEGO_MECH_OID mechOid, int nReqFlagsAvailable,
+         SPNEGO_MECH_OID *mechOid, int mechOidCnt, int nReqFlagsAvailable,
                                     long* plTokenSize, long* plInternalLength );
 int CalculateMinSpnegoTargTokenSize( SPNEGO_MECH_OID MechType, SPNEGO_NEGRESULT spnegoNegResult, 
                                     long nMechTokenLen,
                                     long nMechTokenMIC, long* pnTokenSize,
                                     long* pnInternalTokenLength );
-int CreateSpnegoInitToken( SPNEGO_MECH_OID MechType,
+int CreateSpnegoInitToken( SPNEGO_MECH_OID *MechTypeList, long nMechTypes,
           unsigned char ucContextFlags, unsigned char* pbMechToken,
           unsigned long ulMechTokenLen, unsigned char* pbMechListMIC,
           unsigned long ulMechListMICLen, unsigned char* pbTokenData,

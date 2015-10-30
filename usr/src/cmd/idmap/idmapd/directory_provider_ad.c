@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -144,6 +145,7 @@ directory_provider_ad_get(
 
 	/*
 	 * If we don't have any AD servers handy, we can't find anything.
+	 * XXX: this should be using our DC, not the GC.
 	 */
 	if (_idmapdstate.num_gcs < 1) {
 		return (NULL);

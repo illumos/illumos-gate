@@ -36,7 +36,6 @@ SUBDIRS = acl \
 	history \
 	holes \
 	inheritance \
-	interop \
 	inuse \
 	large_files \
 	largest_pool \

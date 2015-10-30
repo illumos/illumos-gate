@@ -21,6 +21,8 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _SMBSRV_NETRAUTH_H
@@ -34,6 +36,7 @@
 #include <smbsrv/wintypes.h>
 #include <smbsrv/netbios.h>
 #include <smbsrv/smbinfo.h>
+#include <netdb.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -69,6 +72,32 @@ extern "C" {
 #define	NETR_VALIDATION_LEVEL3			0x03
 
 /*
+ * Most of these are from: "MSV1_0_LM20_LOGON structure"
+ * http://msdn.microsoft.com/en-us/library/windows/desktop/aa378762
+ * and a few are from the ntddk (ntmsv1_0.h) found many places.
+ */
+#define	MSV1_0_CLEARTEXT_PASSWORD_ALLOWED	0x00000002
+#define	MSV1_0_UPDATE_LOGON_STATISTICS		0x00000004
+#define	MSV1_0_RETURN_USER_PARAMETERS		0x00000008
+#define	MSV1_0_DONT_TRY_GUEST_ACCOUNT		0x00000010
+#define	MSV1_0_ALLOW_SERVER_TRUST_ACCOUNT	0x00000020
+#define	MSV1_0_RETURN_PASSWORD_EXPIRY		0x00000040
+/*
+ * MSV1_0_USE_CLIENT_CHALLENGE means the LM response field contains the
+ * "client challenge" in the first 8 bytes instead of the LM response.
+ */
+#define	MSV1_0_USE_CLIENT_CHALLENGE		0x00000080
+#define	MSV1_0_TRY_GUEST_ACCOUNT_ONLY		0x00000100
+#define	MSV1_0_RETURN_PROFILE_PATH		0x00000200
+#define	MSV1_0_TRY_SPECIFIED_DOMAIN_ONLY	0x00000400
+#define	MSV1_0_ALLOW_WORKSTATION_TRUST_ACCOUNT	0x00000800
+#define	MSV1_0_DISABLE_PERSONAL_FALLBACK	0x00001000
+#define	MSV1_0_ALLOW_FORCE_GUEST		0x00002000
+#define	MSV1_0_CLEARTEXT_PASSWORD_SUPPLIED	0x00004000
+#define	MSV1_0_USE_DOMAIN_FOR_ROUTING_ONLY	0x00008000
+#define	MSV1_0_SUBAUTHENTICATION_DLL_EX		0x00100000
+
+/*
  * This is a duplicate of the netr_credential
  * from netlogon.ndl.
  */
@@ -92,8 +121,8 @@ typedef struct netr_session_key {
 
 typedef struct netr_info {
 	DWORD flags;
-	char server[NETBIOS_NAME_SZ * 2];
-	char hostname[NETBIOS_NAME_SZ * 2];
+	char server[MAXHOSTNAMELEN];		/* Current DC, FQDN */
+	char hostname[NETBIOS_NAME_SZ * 2];	/* local "flat" name */
 	netr_cred_t client_challenge;
 	netr_cred_t server_challenge;
 	netr_cred_t client_credential;

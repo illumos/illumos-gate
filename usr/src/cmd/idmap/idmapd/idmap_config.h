@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _IDMAP_CONFIG_H
@@ -31,6 +31,7 @@
 #include "addisc.h"
 #include <libscf.h>
 #include <synch.h>
+#include <sys/uuid.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -66,8 +67,7 @@ typedef struct idmap_cfg_handles {
  */
 typedef struct idmap_trustedforest {
 	char		*forest_name;
-	idmap_ad_disc_ds_t
-			*global_catalog;	/* global catalog hosts */
+	ad_disc_ds_t	*global_catalog;	/* global catalog hosts */
 	ad_disc_domainsinforest_t
 			*domains_in_forest;
 } idmap_trustedforest_t;
@@ -77,19 +77,21 @@ typedef struct idmap_pg_config {
 	uint64_t	list_size_limit;
 	uint64_t	id_cache_timeout;
 	uint64_t	name_cache_timeout;
+	uint64_t	rediscovery_interval;
+	char		*machine_uuid;		/* machine uuid */
 	char		*machine_sid;		/* machine sid */
 	char		*default_domain;	/* default domain name */
 	char		*domain_name;		/* AD domain name */
-	boolean_t		domain_name_auto_disc;
-	idmap_ad_disc_ds_t
-			*domain_controller;	/* domain controller hosts */
+	boolean_t	domain_name_auto_disc;
+	char		*domain_guid;		/* GUID (string) */
+	boolean_t	domain_guid_auto_disc;
+	ad_disc_ds_t	*domain_controller;	/* domain controller hosts */
 	boolean_t	domain_controller_auto_disc;
 	char		*forest_name;		/* forest name */
 	boolean_t	forest_name_auto_disc;
 	char		*site_name;		/* site name */
 	boolean_t	site_name_auto_disc;
-	idmap_ad_disc_ds_t
-			*global_catalog;	/* global catalog hosts */
+	ad_disc_ds_t	*global_catalog;	/* global catalog hosts */
 	boolean_t	global_catalog_auto_disc;
 	ad_disc_domainsinforest_t
 			*domains_in_forest;
@@ -98,6 +100,9 @@ typedef struct idmap_pg_config {
 	int		num_trusted_forests;
 	idmap_trustedforest_t
 			*trusted_forests;	/* Array of trusted forests */
+
+	ad_disc_ds_t	*preferred_dc;
+	boolean_t	preferred_dc_auto_disc;
 
 	/*
 	 * Following properties are associated with directory-based
@@ -127,10 +132,12 @@ extern int		idmap_cfg_fini(idmap_cfg_t *);
 extern int		idmap_cfg_upgrade(idmap_cfg_t *);
 extern int		idmap_cfg_start_updates(void);
 extern void		idmap_cfg_poke_updates(void);
+extern void		idmap_cfg_force_rediscovery(void);
 extern void		idmap_cfg_hup_handler(int);
 
-#define	CFG_DISCOVER		0x1
-#define	CFG_LOG			0x2
+#define	CFG_DISCOVER		0x1	/* Run discovery */
+#define	CFG_FORGET_DC		0x2	/* Forget current DC. */
+#define	CFG_LOG			0x4
 
 #ifdef __cplusplus
 }

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH KDC.CONF 4 "Nov 12, 2008"
+.TH KDC.CONF 4 "Oct 29, 2015"
 .SH NAME
 kdc.conf \- Key Distribution Center (KDC) configuration file
 .SH SYNOPSIS
@@ -202,8 +202,8 @@ a minus (\fB-\fR) or a plus (\fB+\fR) character, indicating that the option
 that follows should be enabled or disabled.
 .sp
 Flags below marked with an asterisk (\fB*\fR) are flags that are best applied
-on an individual principal basis through the \fBkadmin\fR or \fBgkadmin\fR
-interface rather than as a blanket attribute to be applied to all principals.
+on an individual principal basis through the \fBkadmin\fR interface rather
+than as a blanket attribute to be applied to all principals.
 .sp
 .ne 2
 .na
@@ -1074,6 +1074,6 @@ All of the keywords, except for the \fBPKINIT\fR keywords are Committed. The
 .SH SEE ALSO
 .sp
 .LP
-\fBkpasswd\fR(1), \fBgkadmin\fR(1M), \fBkadmind\fR(1M), \fBkadmin.local\fR(1M),
+\fBkpasswd\fR(1), \fBkadmind\fR(1M), \fBkadmin.local\fR(1M),
 \fBkdb5_util\fR(1M), \fBkpropd\fR(1M), \fBlibpkcs11\fR(3LIB), \fBsyslog\fR(3C),
 \fBkadm5.acl\fR(4), \fBkrb5.conf\fR(4), \fBattributes\fR(5), \fBkerberos\fR(5)

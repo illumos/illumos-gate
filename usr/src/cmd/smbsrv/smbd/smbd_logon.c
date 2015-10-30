@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -84,6 +85,7 @@ smbd_user_auth_logon(smb_logon_t *user_info)
 	smb_audit_t *entry;
 	adt_session_data_t *ah;
 	adt_event_data_t *event;
+	smb_logon_t tmp_user;
 	au_tid_addr_t termid;
 	char sidbuf[SMB_SID_STRSZ];
 	char *username;
@@ -94,12 +96,27 @@ smbd_user_auth_logon(smb_logon_t *user_info)
 	int status;
 	int retval;
 
-	if ((token = smb_logon(user_info)) == NULL) {
+	if (user_info->lg_username == NULL ||
+	    user_info->lg_domain == NULL ||
+	    user_info->lg_workstation == NULL) {
+		return (NULL);
+	}
+
+	tmp_user = *user_info;
+	if (tmp_user.lg_username[0] == '\0') {
+		tmp_user.lg_flags |= SMB_ATF_ANON;
+		tmp_user.lg_e_username = "anonymous";
+	} else {
+		tmp_user.lg_e_username = tmp_user.lg_username;
+	}
+	tmp_user.lg_e_domain = tmp_user.lg_domain;
+
+	if ((token = smb_logon(&tmp_user)) == NULL) {
 		uid = ADT_NO_ATTRIB;
 		gid = ADT_NO_ATTRIB;
 		sid = NT_NULL_SIDSTR;
-		username = user_info->lg_e_username;
-		domain = user_info->lg_e_domain;
+		username = tmp_user.lg_e_username;
+		domain = tmp_user.lg_e_domain;
 		status = ADT_FAILURE;
 		retval = ADT_FAIL_VALUE_AUTH;
 	} else {

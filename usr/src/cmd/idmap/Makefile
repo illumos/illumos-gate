@@ -21,15 +21,12 @@
 #
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 #
 # Makefile for native identity mapping service
 #
 
-SUBDIR_CMD=	idmap
-SUBDIR_DAEMON=	idmapd
-SUBDIRS=	$(SUBDIR_CMD) $(SUBDIR_DAEMON)
+SUBDIRS=	idmap idmapd nltest test-getdc
 
 all :=		TARGET = all
 install :=	TARGET = install

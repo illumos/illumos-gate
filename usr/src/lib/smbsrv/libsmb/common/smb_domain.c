@@ -22,7 +22,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -74,7 +74,7 @@ typedef struct smb_domain_cache {
 	cond_t		dc_cv;
 	uint32_t	dc_state;
 	uint32_t	dc_nops;
-	char		dc_server[MAXHOSTNAMELEN];
+	smb_dcinfo_t	dc_dci;
 } smb_domain_cache_t;
 
 static smb_domain_cache_t smb_dcache;
@@ -90,8 +90,8 @@ static uint32_t smb_dcache_lock(int);
 static void smb_dcache_unlock(void);
 static void smb_dcache_remove(smb_domain_t *);
 static uint32_t smb_dcache_add(smb_domain_t *);
-static void smb_dcache_getdc(char *, size_t);
-static void smb_dcache_setdc(char *);
+static boolean_t smb_dcache_getdc(smb_dcinfo_t *);
+static void smb_dcache_setdc(const smb_dcinfo_t *);
 static boolean_t smb_dcache_wait(void);
 static uint32_t smb_dcache_updating(void);
 static void smb_dcache_ready(void);
@@ -293,13 +293,14 @@ smb_domain_lookup_type(smb_domain_type_t type, smb_domain_t *di)
 boolean_t
 smb_domain_getinfo(smb_domainex_t *dxi)
 {
-	boolean_t success;
+	boolean_t rv;
 
-	success = smb_domain_lookup_type(SMB_DOMAIN_PRIMARY, &dxi->d_primary);
-	if (success)
-		smb_dcache_getdc(dxi->d_dc, sizeof (dxi->d_dc));
+	/* Note: this waits for the dcache lock. */
+	rv = smb_domain_lookup_type(SMB_DOMAIN_PRIMARY, &dxi->d_primary);
+	if (rv)
+		rv = smb_dcache_getdc(&dxi->d_dci);
 
-	return (success);
+	return (rv);
 }
 
 /*
@@ -307,9 +308,9 @@ smb_domain_getinfo(smb_domainex_t *dxi)
  * Does NOT block.
  */
 void
-smb_domain_current_dc(char *buf, size_t len)
+smb_domain_current_dc(smb_dcinfo_t *dci)
 {
-	smb_dcache_getdc(buf, len);
+	(void) smb_dcache_getdc(dci);
 }
 
 /*
@@ -364,7 +365,7 @@ smb_domain_update(smb_domainex_t *dxi)
 		for (i = 0; i < dxi->d_trusted.td_num; i++)
 			(void) smb_dcache_add(&dxi->d_trusted.td_domains[i]);
 
-		smb_dcache_setdc(dxi->d_dc);
+		smb_dcache_setdc(&dxi->d_dci);
 	}
 
 	smb_dcache_unlock();
@@ -594,7 +595,7 @@ smb_dcache_create(void)
 	    offsetof(smb_domain_t, di_lnd));
 
 	smb_dcache.dc_nops = 0;
-	*smb_dcache.dc_server = '\0';
+	bzero(&smb_dcache.dc_dci, sizeof (smb_dcache.dc_dci));
 	smb_dcache.dc_state = SMB_DCACHE_STATE_READY;
 	(void) mutex_unlock(&smb_dcache.dc_mtx);
 }
@@ -727,19 +728,23 @@ smb_dcache_remove(smb_domain_t *di)
 }
 
 static void
-smb_dcache_setdc(char *dc)
+smb_dcache_setdc(const smb_dcinfo_t *dci)
 {
 	(void) mutex_lock(&smb_dcache.dc_mtx);
-	(void) strlcpy(smb_dcache.dc_server, dc, sizeof (smb_dcache.dc_server));
+	smb_dcache.dc_dci = *dci; /* struct assignment! */
 	(void) mutex_unlock(&smb_dcache.dc_mtx);
 }
 
-static void
-smb_dcache_getdc(char *buf, size_t buflen)
+/*
+ * Return B_TRUE if we have DC information.
+ */
+static boolean_t
+smb_dcache_getdc(smb_dcinfo_t *dci)
 {
 	(void) mutex_lock(&smb_dcache.dc_mtx);
-	(void) strlcpy(buf, smb_dcache.dc_server, buflen);
+	*dci = smb_dcache.dc_dci; /* struct assignment! */
 	(void) mutex_unlock(&smb_dcache.dc_mtx);
+	return (dci->dc_name[0] != '\0');
 }
 
 /*

@@ -54,7 +54,6 @@ OBJS_COMMON = 			\
 	smb_info.o		\
 	smb_kmod.o		\
 	smb_lgrp.o		\
-	smb_mac.o		\
 	smb_nic.o		\
 	smb_pwdutil.o		\
 	smb_privilege.o		\
@@ -73,14 +72,16 @@ include ../../../Makefile.lib
 include ../../Makefile.lib
 
 INCS += -I$(SRC)/common/smbsrv
+INCS += -I$(SRC)/lib/libsmbfs/smb
 
 LINTCHECKFLAGS += -erroff=E_INCONS_ARG_DECL2
 LINTCHECKFLAGS += -erroff=E_BAD_FORMAT_STR2
 
 LDLIBS +=	$(MACH_LDLIBS)
+# perfer to keep libs ordered by dependence
 LDLIBS +=	-lscf -lmd -luuid -lpkcs11 -lcryptoutil
-LDLIBS +=	-lsec -lidmap -lnsl -lsocket -lresolv
-LDLIBS +=	-lreparse -lnvpair -lcmdutils -lavl -lc
+LDLIBS +=	-lsec -lidmap -lreparse -lcmdutils -lavl
+LDLIBS +=	-lnvpair -lresolv -lsocket -lnsl -lc
 CPPFLAGS +=	$(INCS) -D_REENTRANT
 CPPFLAGS +=	-Dsyslog=smb_syslog
 CERRWARN +=	-_gcc=-Wno-uninitialized

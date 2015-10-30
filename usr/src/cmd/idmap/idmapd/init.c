@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -44,8 +44,6 @@ init_mapping_system()
 {
 	int rc = 0;
 
-	if (rwlock_init(&_idmapdstate.rwlk_cfg, USYNC_THREAD, NULL) != 0)
-		return (-1);
 	if ((rc = load_config()) < 0)
 		return (rc);
 
@@ -139,7 +137,7 @@ reload_gcs()
 		 * If that stops working we'll go into degraded mode anyways
 		 * when it does.
 		 */
-		degrade_svc(0,
+		idmapdlog(LOG_INFO,
 		    "Global Catalog servers not configured/discoverable");
 		return;
 	}
@@ -272,7 +270,7 @@ reload_dcs(void)
 		 * If that stops working we'll go into degraded mode anyways
 		 * when it does.
 		 */
-		degrade_svc(0,
+		idmapdlog(LOG_INFO,
 		    "Domain controller servers not configured/discoverable");
 		return;
 	}

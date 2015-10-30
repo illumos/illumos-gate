@@ -1,5 +1,7 @@
 /*
- * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved. */
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ */
 /*
  * lib/krb5/krb/get_in_tkt.c
  *
@@ -129,6 +131,12 @@ send_as_request2(krb5_context 		context,
     krb5_timestamp time_now;
 
     reply.data = 0;
+
+    /* Solaris Kerberos (illumos) */
+    if (krb5_getenv("MS_INTEROP")) {
+        /* Don't bother with UDP. */
+        tcp_only = 1;
+    }
 
     /* set the nonce if the caller expects us to do it */
     if (request->nonce == 0) {

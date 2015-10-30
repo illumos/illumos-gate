@@ -83,7 +83,7 @@ include ../../Makefile.lib
 INCS += -I$(SRC)/common/smbsrv
 
 LDLIBS +=	$(MACH_LDLIBS)
-LDLIBS += -lmlrpc -lsmb -lsmbns -lshare -lsmbfs -lresolv -lnsl -lpkcs11 \
+LDLIBS += -lmlrpc -lsmb -lsmbns -lshare -lsmbfs -lnsl -lpkcs11 \
 	-lscf -lcmdutils -lsec -lavl -lnvpair -luutil -luuid -lgen -lzfs -lc
 
 CPPFLAGS += $(INCS) -D_REENTRANT

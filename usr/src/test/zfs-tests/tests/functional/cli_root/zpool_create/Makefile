@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2012, 2015 by Delphix. All rights reserved.
 #
 
 include $(SRC)/Makefile.master
@@ -32,7 +32,6 @@ PROGS = cleanup \
 	zpool_create_010_neg \
 	zpool_create_011_neg \
 	zpool_create_012_neg \
-	zpool_create_013_neg \
 	zpool_create_014_neg \
 	zpool_create_015_neg \
 	zpool_create_016_pos \

@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef	_ADUTILS_IMPL_H
@@ -31,7 +32,6 @@
 #include <ldap.h>
 #include <pthread.h>
 #include "addisc.h"
-#include <rpcsvc/idmap_prot.h>
 #include "libadutils.h"
 
 #ifdef	__cplusplus
