@@ -11337,7 +11337,7 @@ f usr/share/lib/zoneinfo/Pacific/Kosrae 0644 root bin
 f usr/share/lib/zoneinfo/Pacific/Kwajalein 0644 root bin
 f usr/share/lib/zoneinfo/Pacific/Majuro 0644 root bin
 f usr/share/lib/zoneinfo/Pacific/Marquesas 0644 root bin
-h usr/share/lib/zoneinfo/Pacific/Midway=usr/share/lib/zoneinfo/Pacific/Pago_Pago
+h usr/share/lib/zoneinfo/Pacific/Midway=usr/share/lib/zoneinfo/US/Samoa
 f usr/share/lib/zoneinfo/Pacific/Nauru 0644 root bin
 f usr/share/lib/zoneinfo/Pacific/Niue 0644 root bin
 f usr/share/lib/zoneinfo/Pacific/Norfolk 0644 root bin
