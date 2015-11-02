@@ -22,7 +22,7 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2014 Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.  All rights reserved.
  */
 
 #include <errno.h>
@@ -33,7 +33,12 @@
 #include <sys/lx_types.h>
 #include <sys/resource.h>
 #include <sys/lx_misc.h>
+#include <sched.h>
 
+/*
+ * The Linux syscall returns priorities in the range (lowest) 40-1 (highest)
+ * and then glibc adjusts these to the range -20 - 19.
+ */
 long
 lx_getpriority(uintptr_t p1, uintptr_t p2)
 {
@@ -57,6 +62,23 @@ lx_getpriority(uintptr_t p1, uintptr_t p2)
 
 	ret = getpriority(which, who);
 	if (ret == -1 && errno != 0) {
+		pid_t mypid = getpid();
+
+		if (which == PRIO_PROCESS &&
+		    (who == mypid || who == 0 || who == P_MYID) &&
+		    sched_getscheduler(mypid) == SCHED_RR) {
+			/*
+			 * The getpriority kernel handling will always return
+			 * an error if we're in the RT class. The zone itself
+			 * won't be able to put itself or any of its processes
+			 * into RT but if we put the whole zone into RT via
+			 * the scheduling-class property, then getpriority will
+			 * always fail. This breaks pam and prevents any login.
+			 * Just pretend to be the highest priority.
+			 */
+			return (1);
+		}
+
 		/*
 		 * Linux does not return EINVAL for invalid 'who' values, it
 		 * returns ESRCH instead. We already validated 'which' above.
