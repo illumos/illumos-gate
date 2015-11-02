@@ -58,6 +58,9 @@ case "\$1" in
     [ "\$EUID" != "0" ] && exit 4
 
     if [ ! -e /etc/resolv.conf ]; then
+        if [ -h /etc/resolv.conf ]; then
+            rm -f /etc/resolv.conf
+        fi
         echo "# AUTOMATIC ZONE CONFIG" > /etc/resolv.conf
 $(zonecfg -z $ZONENAME info attr name=resolvers |
 awk '
@@ -109,6 +112,21 @@ if [[ -f $fnm || -h $fnm ]]; then
 	chmod 755 $fnm
 fi
 
+# This is specific to a systemd-based image
+sysdir=$ZONEROOT/etc/systemd/system
+if [[ -d $ZONEROOT/etc && ! -h $ZONEROOT/etc && -d $ZONEROOT/etc/systemd &&
+    ! -h $ZONEROOT/etc/systemd && -d $sysdir && ! -h $sysdir ]]; then
+    # don't use NetworkManager
+    rm -f $sysdir/dbus-org.freedesktop.nm-dispatcher.service
+    rm -f $sysdir/multi-user.target.wants/NetworkManager.service
+    rm -f $sysdir/dbus-org.freedesktop.NetworkManager.service
+    # our network setup needs to run
+    fnm=$sysdir/multi-user.target.wants/network.service
+    if [[ ! -f $fnm ]]; then
+        ln -s /etc/rc.d/init.d/network \
+            $sysdir/multi-user.target.wants/network.service
+    fi
+fi
 
 #
 # The default /etc/inittab only sets the runlevel. Make sure it's runlevel 3
