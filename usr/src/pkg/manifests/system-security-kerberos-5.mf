@@ -22,6 +22,7 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2014 Garrett D'Amore <garrett@damore.org>
 #
 
 set name=pkg.fmri value=pkg:/system/security/kerberos-5@$(PKGVERS)
@@ -41,7 +42,6 @@ dir path=lib/svc/manifest/network/security group=sys
 dir path=usr group=sys
 dir path=usr/lib
 dir path=usr/lib/krb5
-dir path=usr/lib/krb5/ListResourceBundle
 dir path=usr/lib/security
 dir path=usr/sbin
 dir path=usr/share
@@ -60,12 +60,8 @@ file path=etc/krb5/kdc.conf group=sys original_name=SUNWkdc:etc/krb5/kdc.conf \
 file path=etc/krb5/kpropd.acl group=sys \
     original_name=SUNWkdc:etc/krb5/kpropd.acl preserve=true
 file path=lib/svc/manifest/network/security/krb5_prop.xml group=sys mode=0444
-file path=usr/lib/krb5/HelpIndex.html mode=0444
-file path=usr/lib/krb5/ListResourceBundle/GuiResource.java mode=0444
-file path=usr/lib/krb5/ListResourceBundle/HelpData.java mode=0444
 file path=usr/lib/krb5/README.db2 mode=0444
 file path=usr/lib/krb5/db2.so.1
-file path=usr/lib/krb5/gkadmin.jar mode=0444
 file path=usr/lib/krb5/kadmind mode=0500
 file path=usr/lib/krb5/kconf mode=0555
 file path=usr/lib/krb5/kdyndns mode=0555
@@ -80,14 +76,11 @@ file path=usr/lib/krb5/ksmb mode=0555
 file path=usr/lib/krb5/libdb2.so.1
 file path=usr/lib/krb5/libdyn.so.1
 file path=usr/lib/krb5/libkadm5srv.so.1
-file path=usr/lib/krb5/libkadmin.so.1
 file path=usr/lib/krb5/libkdb.so.1
 file path=usr/lib/krb5/libkdb_ldap.so.1
-file path=usr/lib/krb5/visualrt.jar mode=0444
 file path=usr/lib/security/pam_krb5_first mode=0444
 file path=usr/lib/security/pam_krb5_only mode=0444
 file path=usr/lib/security/pam_krb5_optional mode=0444
-file path=usr/sbin/gkadmin mode=0555
 file path=usr/sbin/k5srvutil mode=0555
 file path=usr/sbin/kadmin mode=0555
 file path=usr/sbin/kadmin.local mode=0555
@@ -128,7 +121,6 @@ link path=usr/lib/krb5/kldap.so target=kldap.so.1
 link path=usr/lib/krb5/libdb2.so target=libdb2.so.1
 link path=usr/lib/krb5/libdyn.so target=libdyn.so.1
 link path=usr/lib/krb5/libkadm5srv.so target=libkadm5srv.so.1
-link path=usr/lib/krb5/libkadmin.so target=libkadmin.so.1
 link path=usr/lib/krb5/libkdb.so target=libkdb.so.1
 link path=usr/lib/krb5/libkdb_ldap.so target=libkdb_ldap.so.1
 link path=usr/share/man/man1m/kadmin.local.1m target=kadmin.1m

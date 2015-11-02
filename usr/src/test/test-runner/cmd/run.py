@@ -18,6 +18,7 @@
 import ConfigParser
 import os
 import logging
+from logging.handlers import WatchedFileHandler
 from datetime import datetime
 from optparse import OptionParser
 from pwd import getpwnam
@@ -35,6 +36,32 @@ KILL = '/usr/bin/kill'
 TRUE = '/usr/bin/true'
 SUDO = '/usr/bin/sudo'
 
+# Custom class to reopen the log file in case it is forcibly closed by a test.
+class WatchedFileHandlerClosed(WatchedFileHandler):
+    """Watch files, including closed files.
+    Similar to (and inherits from) logging.handler.WatchedFileHandler,
+    except that IOErrors are handled by reopening the stream and retrying.
+    This will be retried up to a configurable number of times before
+    giving up, default 5.
+    """
+
+    def __init__(self, filename, mode='a', encoding=None, delay=0, max_tries=5):
+        self.max_tries = max_tries
+        self.tries = 0
+        WatchedFileHandler.__init__(self, filename, mode, encoding, delay)
+
+    def emit(self, record):
+        while True:
+            try:
+                WatchedFileHandler.emit(self, record)
+                self.tries = 0
+                return
+            except IOError as err:
+                if self.tries == self.max_tries:
+                    raise
+                self.stream.close()
+                self.stream = self._open()
+                self.tries += 1
 
 class Result(object):
     total = 0
@@ -637,7 +664,7 @@ class TestRun(object):
                 fail('%s' % e)
             filename = os.path.join(self.outputdir, 'log')
 
-            logfile = logging.FileHandler(filename)
+            logfile = WatchedFileHandlerClosed(filename)
             logfile.setLevel(logging.DEBUG)
             logfilefmt = logging.Formatter('%(message)s')
             logfile.setFormatter(logfilefmt)
