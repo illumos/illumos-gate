@@ -262,7 +262,6 @@ main(int argc, char *argv[])
 	}
 
 	send_stream = stdin;
-	pcksum = zc;
 	while (read_hdr(drr, &zc)) {
 
 		/*

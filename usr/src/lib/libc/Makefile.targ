@@ -127,6 +127,12 @@ pics/%64.o: $(LIBCBASE)/../port/print/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
 
+pics/%64.o: $(LIBCBASE)/../port/regex/%.c
+	$(COMPILE.c) -DM_I18N_MB -DI18N \
+	-I$(LIBCBASE)/../port/regex \
+	-I$(LIBCBASE)/../port/gen -o $@ $<
+	$(POST_PROCESS_O)
+
 pics/%64.o: $(LIBCBASE)/../port/stdio/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)

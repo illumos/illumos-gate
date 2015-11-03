@@ -475,8 +475,8 @@ mhdx.h:	../uts/common/sys/lvm/mhdx.x
 
 mdiox.h:	../uts/common/sys/lvm/mdiox.x
 	$(RPCGEN) $(RPCGENFLAGS) ../uts/common/sys/lvm/mdiox.x | \
-	$(NAWK) '{sub(/sys\/lvm\/md_mhdx/, "mhdx"); print $$0}' | \
-	$(NAWK) '{sub(/sys\/lvm\/md_basic/, "meta_basic"); print $$0}' | \
+	$(AWK) '{sub(/sys\/lvm\/md_mhdx/, "mhdx"); print $$0}' | \
+	$(AWK) '{sub(/sys\/lvm\/md_basic/, "meta_basic"); print $$0}' | \
 	$(AWK) '/<synch.h>/ { print "#ifdef _REENTRANT"; print $$0; print "#endif\t/* _REENTRANT */"; next } \
 	/<thread.h>/ { print "#ifdef _REENTRANT"; print $$0; print "#endif\t/* _REENTRANT */"; next } \
 	{ print $0 } \
@@ -484,7 +484,7 @@ mdiox.h:	../uts/common/sys/lvm/mdiox.x
 
 metamed.h:	../uts/common/sys/lvm/metamed.x
 	$(RPCGEN) $(RPCGENFLAGS) ../uts/common/sys/lvm/metamed.x | \
-	$(NAWK) '{sub(/sys\/lvm\/md_basic/, "meta_basic"); print $$0}' | \
+	$(AWK) '{sub(/sys\/lvm\/md_basic/, "meta_basic"); print $$0}' | \
 	$(AWK) '/<synch.h>/ { print "#ifdef _REENTRANT"; print $$0; print "#endif\t/* _REENTRANT */"; next } \
 	/<thread.h>/ { print "#ifdef _REENTRANT"; print $$0; print "#endif\t/* _REENTRANT */"; next } \
 	{ print $0 } \

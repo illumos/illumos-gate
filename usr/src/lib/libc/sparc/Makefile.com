@@ -996,6 +996,9 @@ PORTREGEX=			\
 	regex.o			\
 	wordexp.o
 
+PORTREGEX64=			\
+	glob64.o
+
 VALUES=	values-Xa.o
 
 MOSTOBJS=			\
@@ -1021,6 +1024,7 @@ MOSTOBJS=			\
 	$(PORTPRINT_C89)	\
 	$(PORTPRINT_W)		\
 	$(PORTREGEX)		\
+	$(PORTREGEX64)		\
 	$(PORTSTDIO)		\
 	$(PORTSTDIO64)		\
 	$(PORTSTDIO_C89)	\
@@ -1278,6 +1282,9 @@ $(SYSOBJS64:%=pics/%) := \
 	CPPFLAGS += -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
 
 $(PORTGEN64:%=pics/%) := \
+	CPPFLAGS += -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
+
+$(PORTREGEX64:%=pics/%) := \
 	CPPFLAGS += -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
 
 $(PORTSTDIO64:%=pics/%) := \

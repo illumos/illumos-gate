@@ -22,6 +22,7 @@
 # uts/i86pc/gfx_private/Makefile
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2015 Igor Kozhukhov <ikozhukhov@gmail.com>
 #
 
 #
@@ -100,7 +101,7 @@ install:	$(INSTALL_DEPS)
 # Custom targets and rules
 
 $(OBJS_DIR)/$(VGATEXT_FONT).c:	$(VGATEXT_SRC)/$(VGATEXT_FONT).bdf
-	awk -f $(VGATEXT_SRC)/bdf_to_c.awk	\
+	$(AWK) -f $(VGATEXT_SRC)/bdf_to_c.awk	\
 		$(VGATEXT_SRC)/$(VGATEXT_FONT).bdf > $@
 
 $(OBJS_DIR)/$(VGATEXT_FONT).o:	$(OBJS_DIR)/$(VGATEXT_FONT).c

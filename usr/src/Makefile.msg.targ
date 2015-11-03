@@ -21,6 +21,7 @@
 #
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2015 Igor Kozhukhov <ikozhukhov@gmail.com>
 #
 # Makefile.msg.targ
 #
@@ -53,7 +54,7 @@ BUILDPO.msgfiles = \
 
 BUILDPO.pofiles = \
 	$(RM) $(POFILE); \
-	$(NAWK) '\
+	$(AWK) '\
 	    FNR == 1		{ print "\# Messages from " FILENAME; } \
 	    /^domain/		{ next; } \
 	    /^msgid/, /^msgstr/	{ msg = msg "\n" $$0; \
