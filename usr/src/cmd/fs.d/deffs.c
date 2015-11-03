@@ -19,14 +19,17 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ */
+
 /* Copyright (c) 1984, 1986, 1987, 1988, 1989, 1990, 1991, 1997 SMI	*/
 /* All Rights Reserved							*/
 
-#ident	"%Z%%M%	%I%	%E% SMI"
-
-#include	<stdio.h>
-#include        <deflt.h>
-#include        <string.h>
+#include <stdio.h>
+#include <deflt.h>
+#include <string.h>
 
 #define	LOCAL		"/etc/default/fs"
 #define	REMOTE		"/etc/dfs/fstypes"
@@ -43,34 +46,24 @@
 char	*
 default_fstype(char *special)
 {
-	char	*deffs;
+	char	*deffs = NULL;
 	static	char	buf[BUFSIZ];
 	FILE	*fp;
 
 	if (*special == '/') {
-		if (defopen(LOCAL) != 0)
-			return ("ufs");
-		else {
-			if ((deffs = defread("LOCAL=")) == NULL) {
-				defopen(NULL);	/* close default file */
-				return ("ufs");
-			} else {
-				defopen(NULL);	/* close default file */
-				return (deffs);
-			}
+		if (defopen(LOCAL) == 0) {
+			deffs = defread("LOCAL=");
+			defopen(NULL);	/* close default file */
 		}
 	} else {
-		if ((fp = fopen(REMOTE, "r")) == NULL)
-			return ("nfs");
-		else {
-			if (fgets(buf, sizeof (buf), fp) == NULL) {
-				fclose(fp);
-				return ("nfs");
-			} else {
+		if ((fp = fopen(REMOTE, "r")) != NULL) {
+			if (fgets(buf, sizeof (buf), fp) != NULL)
 				deffs = strtok(buf, " \t\n");
-				fclose(fp);
-				return (deffs);
-			}
+			fclose(fp);
 		}
+		if (deffs == NULL)
+			deffs = "nfs";
 	}
+
+	return (deffs != NULL ? deffs : "ufs");
 }

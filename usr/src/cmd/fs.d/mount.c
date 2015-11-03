@@ -18,6 +18,11 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
@@ -25,9 +30,6 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- */
-/*
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include	<stdio.h>
@@ -1572,6 +1574,12 @@ check_fields(char *fstype, char *mountp)
 {
 	struct stat64 stbuf;
 
+	if (fstype == NULL) {
+		fprintf(stderr,
+		    gettext("%s: FSType cannot be determined\n"),
+		    myname);
+		return (1);
+	}
 	if (strlen(fstype) > (size_t)FSTYPE_MAX) {
 		fprintf(stderr,
 		    gettext("%s: FSType %s exceeds %d characters\n"),
