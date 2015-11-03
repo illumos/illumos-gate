@@ -529,7 +529,7 @@ lx_sysent_t lx_sysent32[] = {
 	{"read",	lx_read,		0,		3}, /*  3 */
 	{"write",	lx_write,		0,		3}, /*  4 */
 	{"open",	lx_open,		0,		3}, /*  5 */
-	{"close",	NULL,			0,		1}, /*  6 */
+	{"close",	lx_close,		0,		1}, /*  6 */
 	{"waitpid",	lx_waitpid,		0,		3}, /*  7 */
 	{"creat",	NULL,			0,		2}, /*  8 */
 	{"link",	NULL,			0,		2}, /*  9 */
@@ -768,7 +768,7 @@ lx_sysent_t lx_sysent32[] = {
 	{"sched_getaffinity", NULL, 		0,		3}, /* 242 */
 	{"set_thread_area", lx_set_thread_area,	0,		1}, /* 243 */
 	{"get_thread_area", lx_get_thread_area,	0,		1}, /* 244 */
-	{"io_setup",	NULL,			0,		2}, /* 245 */
+	{"io_setup",	lx_io_setup,		0,		2}, /* 245 */
 	{"io_destroy",	NULL,			0,		1}, /* 246 */
 	{"io_getevents", NULL,			0,		5}, /* 247 */
 	{"io_submit",	NULL,			0,		3}, /* 248 */
@@ -897,7 +897,7 @@ lx_sysent_t lx_sysent64[] = {
 	{"read",	lx_read,		0,		3}, /* 0 */
 	{"write",	lx_write,		0,		3}, /* 1 */
 	{"open",	lx_open,		0,		3}, /* 2 */
-	{"close",	NULL,			0,		1}, /* 3 */
+	{"close",	lx_close,		0,		1}, /* 3 */
 	{"stat",	NULL,			0,		2}, /* 4 */
 	{"fstat",	NULL,			0,		2}, /* 5 */
 	{"lstat",	NULL,			0,		2}, /* 6 */
@@ -1100,7 +1100,7 @@ lx_sysent_t lx_sysent64[] = {
 	{"sched_setaffinity", NULL,		0,		3}, /* 203 */
 	{"sched_getaffinity", NULL,		0,		3}, /* 204 */
 	{"set_thread_area", lx_set_thread_area, 0,		1}, /* 205 */
-	{"io_setup",	NULL,			0,		2}, /* 206 */
+	{"io_setup",	lx_io_setup,		0,		2}, /* 206 */
 	{"io_destroy",	NULL,			0,		1}, /* 207 */
 	{"io_getevents", NULL,			0,		5}, /* 208 */
 	{"io_submit",	NULL,			0,		3}, /* 209 */

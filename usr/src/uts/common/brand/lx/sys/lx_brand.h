@@ -243,7 +243,8 @@ typedef enum lx_proc_flags {
 	LX_PROC_INSTALL_MODE	= 0x01,
 	LX_PROC_STRICT_MODE	= 0x02,
 	/* internal flags */
-	LX_PROC_CHILD_DEATHSIG	= 0x04
+	LX_PROC_CHILD_DEATHSIG	= 0x04,
+	LX_PROC_AIO_USED	= 0x08
 } lx_proc_flags_t;
 
 #define	LX_PROC_ALL	(LX_PROC_INSTALL_MODE | LX_PROC_STRICT_MODE)
