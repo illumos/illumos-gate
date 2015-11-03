@@ -282,6 +282,7 @@ IOMMULIB_OBJS = iommulib.o
 SN1_BRAND_OBJS	=	sn1_brand.o sn1_brand_asm.o
 S10_BRAND_OBJS	=	s10_brand.o s10_brand_asm.o
 LX_BRAND_OBJS  =		\
+	lx_aio.o		\
 	lx_archdep.o		\
 	lx_auxv.o		\
 	lx_brand.o		\
@@ -289,6 +290,7 @@ LX_BRAND_OBJS  =		\
 	lx_chmod.o		\
 	lx_chown.o		\
 	lx_clone.o		\
+	lx_close.o		\
 	lx_cpu.o		\
 	lx_errno.o		\
 	lx_epoll.o		\
