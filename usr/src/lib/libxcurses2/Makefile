@@ -21,6 +21,7 @@
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2015 Igor Kozhukhov <ikozhukhov@gmail.com>
 #
 
 include	../Makefile.lib
@@ -83,13 +84,13 @@ $(SUBDIRS):	$(GENERATED)
 # mknames.awk defines functions so needs nawk
 $(NAMES) : src/libc/xcurses/mknames.awk src/libc/xcurses/caps
 	$(RM) $(NAMES)
-	cd src/libc/xcurses; $(NAWK) -f mknames.awk caps
+	cd src/libc/xcurses; $(AWK) -f mknames.awk caps
 
 h/term.h : src/libc/xcurses/mkterm.awk src/libc/xcurses/caps
 	$(RM) $@
-	cd src/libc/xcurses; $(NAWK) -f mkterm.awk caps > term.h
+	cd src/libc/xcurses; $(AWK) -f mkterm.awk caps > term.h
 	$(MV) src/libc/xcurses/term.h h/term.h
 
 src/libc/xcurses/keyindex.c : src/libc/xcurses/mkkey.awk src/libc/xcurses/caps
 	$(RM) $@
-	cd src/libc/xcurses; $(NAWK) -f mkkey.awk caps > keyindex.c
+	cd src/libc/xcurses; $(AWK) -f mkkey.awk caps > keyindex.c

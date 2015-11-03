@@ -23,6 +23,7 @@
 # Use is subject to license terms.
 #
 # Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2015 Igor Kozhukhov <ikozhukhov@gmail.com>
 #
 
 # Path to the base of the uts directory tree (usually /usr/src/uts).
@@ -50,7 +51,7 @@ clobber: clean
 
 %_xdr.c:	$(MD_XDR_XSRC)/%.x
 	$(RPCGEN) $(RPCGENFLAGS) -c -i 100 $(MD_XDR_XSRC)/$*.x | \
-$(NAWK) '/^#include/ {\
+$(AWK) '/^#include/ {\
     sub(/(\.\.\/)*common\//,"");\
     sub(/meta_basic.h/, "md_basic.h");\
     sub(/metamed.h/, "mdmed.h");\

@@ -21,6 +21,7 @@
 # uts/intel/Makefile
 #
 # Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2015 Igor Kozhukhov <ikozhukhov@gmail.com>
 #
 #	This makefile drives the production of all implementation architecture
 #	independent modules for Intel processors.
@@ -78,7 +79,7 @@ clobber: clobber.targ
 PRIVS_C = $(SRC)/uts/common/os/priv_const.c
 
 $(PRIVS_C): $(PRIVS_AWK) $(PRIVS_DEF)
-	$(NAWK) -f $(PRIVS_AWK) < $(PRIVS_DEF) cfile=$@
+	$(AWK) -f $(PRIVS_AWK) < $(PRIVS_DEF) cfile=$@
 
 CLOBBERFILES += $(PRIVS_C)
 

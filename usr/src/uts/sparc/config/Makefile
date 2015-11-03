@@ -22,6 +22,7 @@
 # uts/sparc/config/Makefile
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2015 Igor Kozhukhov <ikozhukhov@gmail.com>
 #
 #	This makefile drives the production of the kernel configuration files.
 #
@@ -77,7 +78,7 @@ $(ROOTETCSEC)/%: $(SRCDIR)/%
 	$(INS.file)
 
 $(SRCDIR)/priv_names: $(PRIVS_DEF) $(PRIVS_AWK)
-	$(NAWK) -f $(PRIVS_AWK) < $(PRIVS_DEF) -v pnamesfile=$@
+	$(AWK) -f $(PRIVS_AWK) < $(PRIVS_DEF) -v pnamesfile=$@
 
 clean lint:
 clobber: clobber.targ

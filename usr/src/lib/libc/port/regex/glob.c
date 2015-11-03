@@ -106,6 +106,19 @@ extern int old_glob(const char *, int, int (*)(const char *, int),
     old_glob_t *);
 extern void old_globfree(old_glob_t *);
 
+/*
+ * The various extensions to glob(3C) allow for stat and dirent structures to
+ * show up whose size may change in a largefile environment. If libc defines
+ * _FILE_OFFSET_BITS to be 64 that is the key to indicate that we're building
+ * the LFS version of this file. As such, we rename the public functions here,
+ * _glob_ext() and _globfree_ext() to have a 64 suffix. When building the LFS
+ * version, we do not include the old versions.
+ */
+#if !defined(_LP64) && _FILE_OFFSET_BITS == 64
+#define	_glob_ext	_glob_ext64
+#define	_globfree_ext	_globfree_ext64
+#endif	/* !_LP64 && _FILE_OFFSET_BITS == 64 */
+
 #define	DOLLAR		'$'
 #define	DOT		'.'
 #define	EOS		'\0'
@@ -1261,6 +1274,8 @@ g_Ctoc(const wcat_t *str, char *buf, uint_t len)
 	return (1);
 }
 
+#if defined(_LP64) || _FILE_OFFSET_BITS != 64
+
 /* glob() function with legacy glob structure */
 int
 old_glob(const char *pattern, int flags, int (*errfunc)(const char *, int),
@@ -1333,4 +1348,4 @@ old_globfree(old_glob_t *pglob)
 
 }
 
-/* End */
+#endif	/* _LP64 || _FILE_OFFSET_BITS != 64 */

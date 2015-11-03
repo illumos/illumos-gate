@@ -22,6 +22,7 @@
 #
 # Copyright 1996, 2001-2003 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2015 Igor Kozhukhov <ikozhukhov@gmail.com>
 #
 #
 # Makefile for logical volume management 
@@ -124,4 +125,4 @@ metamhd_xdr.c: $(SRC)/head/metamhd.x
 
 mhdx_xdr.c: $(SRC)/uts/common/sys/lvm/mhdx.x
 	$(RPCGEN) $(RPCGENFLAGS) -c $(SRC)/uts/common/sys/lvm/mhdx.x | \
-	nawk '{sub(/uts\/common\/sys\/lvm/, "head") ; print $$0}' >$@
+	$(AWK) '{sub(/uts\/common\/sys\/lvm/, "head") ; print $$0}' >$@

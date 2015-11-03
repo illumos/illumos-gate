@@ -22,6 +22,7 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2015, OmniTI Computer Consulting, Inc. All rights reserved.
+# Copyright 2015 Igor Kozhukhov <ikozhukhov@gmail.com>
 #
 
 include $(SRC)/Makefile.master
@@ -624,7 +625,7 @@ $(PKGLISTS): $(PROC_PKGS)
 	r=$${sdotr%.+(?)}; s=$${sdotr#+(?).}; \
 	print "Generating $$r $$s package list"; \
 	$(RM) $(@); $(TOUCH) $(@); \
-	$(NAWK) 'BEGIN { \
+	$(AWK) 'BEGIN { \
 		if (ARGC < 2) { \
 			exit; \
 		} \
@@ -677,7 +678,7 @@ license-list: makesilent
 stage-licenses: license-list FRC
 	$(PKGDEBUG)$(MAKE) -e -f Makefile.lic \
 		PKGDEBUG=$(PKGDEBUG) LICROOT=$(PKGROOT)/licenses \
-		`$(NAWK) '{ \
+		`$(AWK) '{ \
 			print "$(PKGROOT)/licenses/" $$0; \
 			print "$(PKGROOT)/licenses/" $$0 ".descrip"; \
 		}' license-list` > /dev/null;

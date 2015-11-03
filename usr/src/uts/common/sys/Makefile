@@ -25,6 +25,7 @@
 # Copyright 2015, Joyent, Inc. All rights reserved.
 # Copyright 2013 Saso Kiselkov. All rights reserved.
 # Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2015 Igor Kozhukhov <ikozhukhov@gmail.com>
 #
 
 include $(SRC)/uts/Makefile.uts
@@ -1358,13 +1359,13 @@ install_h:			\
 all_h: $(GENHDRS)
 
 priv_const.h: $(PRIVS_AWK) $(PRIVS_DEF)
-	$(NAWK) -f $(PRIVS_AWK) < $(PRIVS_DEF) -v privhfile=$@
+	$(AWK) -f $(PRIVS_AWK) < $(PRIVS_DEF) -v privhfile=$@
 
 priv_names.h: $(PRIVS_AWK) $(PRIVS_DEF)
-	$(NAWK) -f $(PRIVS_AWK) < $(PRIVS_DEF) -v pubhfile=$@
+	$(AWK) -f $(PRIVS_AWK) < $(PRIVS_DEF) -v pubhfile=$@
 
 usb/usbdevs.h: $(USBDEVS_AWK) $(USBDEVS_DATA)
-	$(NAWK) -f $(USBDEVS_AWK) $(USBDEVS_DATA) -H > $@
+	$(AWK) -f $(USBDEVS_AWK) $(USBDEVS_DATA) -H > $@
 
 LVMDERIVED_H:
 	cd $(SRC)/uts/common/sys/lvm; pwd; $(MAKE) all_h
