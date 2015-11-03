@@ -45,11 +45,12 @@
 
 /*
  * Because the Linux dirent has an extra field (d_type), it's possible that
- * each entry will be 8 bytes larger due to padding.  To prevent overrun during
- * translation, the illumos-native buffer is sized pessimistically.
+ * each entry will be 8 bytes larger (and aligned to 8 bytes) due to padding.
+ * To prevent overrun during translation, the illumos-native buffer is sized
+ * pessimistically.
  */
 #define	LTOS_GETDENTS_BUFSZ(bufsz, datasz)	\
-	(((bufsz) / (datasz + 8)) * sizeof (struct dirent))
+	(((bufsz) / (((datasz) + 15) & ~7)) * sizeof (struct dirent))
 
 /*
  * Record must be long enough to house d_name string, null terminator and
