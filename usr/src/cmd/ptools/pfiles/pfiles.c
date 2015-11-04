@@ -296,7 +296,7 @@ show_file(void *data, prfdinfo_t *info)
 				if (dev == NULL)
 					dev = strrchr(info->pr_path, '/');
 				if (dev != NULL) {
-					dev++; /* skip past the `:' */
+					dev++; /* skip past the `:' or '/' */
 
 					for (i = 0; tlidevs[i] != NULL; i++) {
 						if (strcmp(dev, tlidevs[i]) ==
@@ -805,7 +805,7 @@ dotli(struct ps_prochandle *Pr, int fd)
 
 	strcmd.sc_cmd = TI_GETMYNAME;
 	if (pr_ioctl(Pr, fd, _I_CMD, &strcmd, sizeof (strcmd)) == 0)
-		show_sockaddr("sockname", (void *)&strcmd.sc_buf, 
+		show_sockaddr("sockname", (void *)&strcmd.sc_buf,
 		    (size_t)strcmd.sc_len);
 
 	strcmd.sc_cmd = TI_GETPEERNAME;

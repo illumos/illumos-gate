@@ -128,5 +128,5 @@ See
 in
 .Xr libavl 3LIB .
 .Sh SEE ALSO
-.Xr libavl 3LIB ,
-.Xr avl_create 3AVL
+.Xr avl_create 3AVL ,
+.Xr libavl 3LIB

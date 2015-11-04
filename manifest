@@ -9482,7 +9482,6 @@ f usr/lib/mail.local 0555 root bin
 f usr/lib/mailwrapper 0555 root bin
 f usr/lib/makekey 0555 root bin
 h usr/lib/makewhatis=usr/bin/man
-f usr/lib/mandoc_preconv 0555 root bin
 d usr/lib/mdb 0755 root sys
 d usr/lib/mdb/kvm 0755 root sys
 d usr/lib/mdb/kvm/amd64 0755 root sys

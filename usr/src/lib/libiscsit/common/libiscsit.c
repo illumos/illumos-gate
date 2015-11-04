@@ -22,7 +22,7 @@
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -35,6 +35,7 @@
 #include <strings.h>
 #include <libintl.h>
 #include <libscf.h>
+#include <assert.h>
 
 #include <libstmf.h>
 #include <libiscsit.h>
@@ -93,6 +94,9 @@ iqnstr(char *s);
 
 static void
 euistr(char *s);
+
+static void
+free_empty_errlist(nvlist_t **errlist);
 
 /*
  * Function:  it_config_load()
@@ -484,6 +488,9 @@ it_config_setprop(it_config_t *cfg, nvlist_t *proplist, nvlist_t **errlist)
 		}
 	}
 
+	if (ret == 0)
+		free_empty_errlist(errlist);
+
 	return (ret);
 }
 
@@ -703,6 +710,8 @@ it_tgt_setprop(it_config_t *cfg, it_tgt_t *tgt, nvlist_t *proplist,
 		nvlist_free(tgt->tgt_properties);
 	}
 	tgt->tgt_properties = tprops;
+
+	free_empty_errlist(errlist);
 
 	return (0);
 }
@@ -1451,6 +1460,8 @@ it_ini_setprop(it_ini_t *ini, nvlist_t *proplist, nvlist_t **errlist)
 	}
 	ini->ini_properties = iprops;
 
+	free_empty_errlist(errlist);
+
 	return (0);
 }
 
@@ -2040,5 +2051,15 @@ euistr(char *s)
 			*l = toupper(*l);
 			l++;
 		}
+	}
+}
+
+static void
+free_empty_errlist(nvlist_t **errlist)
+{
+	if (errlist != NULL && *errlist != NULL) {
+		assert(fnvlist_num_pairs(*errlist) == 0);
+		nvlist_free(*errlist);
+		*errlist = NULL;
 	}
 }

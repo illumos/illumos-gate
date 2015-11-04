@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -57,69 +57,31 @@
 static void
 nfsauth_access(auth_req *argp, auth_res *result)
 {
-	struct netconfig *nconf;
-	struct nd_hostservlist *clnames = NULL;
 	struct netbuf nbuf;
 	struct share *sh;
-	char tmp[MAXIPADDRLEN];
-	char *host = NULL;
+
+	struct cln cln;
 
 	result->auth_perm = NFSAUTH_DENIED;
-
-	/*
-	 * Convert the client's address to a hostname
-	 */
-	nconf = getnetconfigent(argp->req_netid);
-	if (nconf == NULL) {
-		syslog(LOG_ERR, "No netconfig entry for %s", argp->req_netid);
-		return;
-	}
 
 	nbuf.len = argp->req_client.n_len;
 	nbuf.buf = argp->req_client.n_bytes;
 
 	if (nbuf.len == 0 || nbuf.buf == NULL)
-		goto done;
-
-	if (netdir_getbyaddr(nconf, &clnames, &nbuf)) {
-		host = &tmp[0];
-		if (strcmp(nconf->nc_protofmly, NC_INET) == 0) {
-			struct sockaddr_in *sa;
-
-			/* LINTED pointer alignment */
-			sa = (struct sockaddr_in *)nbuf.buf;
-			(void) inet_ntoa_r(sa->sin_addr, tmp);
-		} else if (strcmp(nconf->nc_protofmly, NC_INET6) == 0) {
-			struct sockaddr_in6 *sa;
-			/* LINTED pointer */
-			sa = (struct sockaddr_in6 *)nbuf.buf;
-			(void) inet_ntop(AF_INET6, sa->sin6_addr.s6_addr,
-			    tmp, INET6_ADDRSTRLEN);
-		}
-		clnames = anon_client(host);
-	}
-	/*
-	 * Both netdir_getbyaddr() and anon_client() can return a NULL
-	 * clnames.  This has been seen when the DNS entry for the client
-	 * name does not have the correct format or a reverse lookup DNS
-	 * entry cannot be found for the client's IP address.
-	 */
-	if (clnames == NULL) {
-		syslog(LOG_ERR, "Could not find DNS entry for %s",
-		    argp->req_netid);
-		goto done;
-	}
+		return;
 
 	/*
-	 * Now find the export
+	 * Find the export
 	 */
 	sh = findentry(argp->req_path);
 	if (sh == NULL) {
 		syslog(LOG_ERR, "%s not exported", argp->req_path);
-		goto done;
+		return;
 	}
 
-	result->auth_perm = check_client(sh, &nbuf, clnames, argp->req_flavor,
+	cln_init_lazy(&cln, argp->req_netid, &nbuf);
+
+	result->auth_perm = check_client(sh, &cln, argp->req_flavor,
 	    argp->req_clnt_uid, argp->req_clnt_gid, argp->req_clnt_gids.len,
 	    argp->req_clnt_gids.val, &result->auth_srv_uid,
 	    &result->auth_srv_gid, &result->auth_srv_gids.len,
@@ -128,14 +90,13 @@ nfsauth_access(auth_req *argp, auth_res *result)
 	sharefree(sh);
 
 	if (result->auth_perm == NFSAUTH_DENIED) {
-		syslog(LOG_ERR, "%s denied access to %s",
-		    clnames->h_hostservs[0].h_host, argp->req_path);
+		char *host = cln_gethost(&cln);
+		if (host != NULL)
+			syslog(LOG_ERR, "%s denied access to %s", host,
+			    argp->req_path);
 	}
 
-done:
-	freenetconfigent(nconf);
-	if (clnames)
-		netdir_free(clnames, ND_HOSTSERVLIST);
+	cln_fini(&cln);
 }
 
 void

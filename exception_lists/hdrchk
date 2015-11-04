@@ -26,6 +26,9 @@ usr/src/cmd/mandoc/libroff.h
 usr/src/cmd/mandoc/main.h
 usr/src/cmd/mandoc/man.h
 usr/src/cmd/mandoc/mandoc.h
+usr/src/cmd/mandoc/mandoc_aux.h
+usr/src/cmd/mandoc/manpath.h
+usr/src/cmd/mandoc/mansearch.h
 usr/src/cmd/mandoc/mdoc.h
 usr/src/cmd/mandoc/out.h
 usr/src/cmd/mandoc/term.h

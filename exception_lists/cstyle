@@ -61,9 +61,10 @@ usr/src/cmd/krb5/ldap_util/kdb5_ldap_util.h
 usr/src/cmd/krb5/slave/kprop.c
 usr/src/cmd/krb5/slave/kprop.h
 usr/src/cmd/krb5/slave/kpropd.c
-usr/src/cmd/mandoc/arch.c
 usr/src/cmd/mandoc/att.c
 usr/src/cmd/mandoc/chars.c
+usr/src/cmd/mandoc/compat_fgetln.c
+usr/src/cmd/mandoc/compat_reallocarray.c
 usr/src/cmd/mandoc/config.h
 usr/src/cmd/mandoc/eqn.c
 usr/src/cmd/mandoc/eqn_html.c
@@ -86,6 +87,8 @@ usr/src/cmd/mandoc/man_term.c
 usr/src/cmd/mandoc/man_validate.c
 usr/src/cmd/mandoc/mandoc.c
 usr/src/cmd/mandoc/mandoc.h
+usr/src/cmd/mandoc/mandoc_aux.c
+usr/src/cmd/mandoc/manpath.c
 usr/src/cmd/mandoc/mdoc.c
 usr/src/cmd/mandoc/mdoc.h
 usr/src/cmd/mandoc/mdoc_argv.c
@@ -113,7 +116,6 @@ usr/src/cmd/mandoc/term.h
 usr/src/cmd/mandoc/term_ascii.c
 usr/src/cmd/mandoc/term_ps.c
 usr/src/cmd/mandoc/tree.c
-usr/src/cmd/mandoc/vol.c
 usr/src/common/bzip2/bzlib.h
 usr/src/common/bzip2/crctable.c
 usr/src/common/bzip2/randtable.c

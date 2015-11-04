@@ -1,6 +1,7 @@
-/*	$Id: vol.c,v 1.9 2011/03/22 14:33:05 kristaps Exp $ */
+/*	$Id: manpath.h,v 1.7 2014/12/01 04:05:32 schwarze Exp $ */
 /*
- * Copyright (c) 2009 Kristaps Dzonsons <kristaps@bsd.lv>
+ * Copyright (c) 2011 Ingo Schwarze <schwarze@openbsd.org>
+ * Copyright (c) 2011 Kristaps Dzonsons <kristaps@bsd.lv>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -14,26 +15,20 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
-#ifdef HAVE_CONFIG_H
-#include "config.h"
-#endif
 
-#include <stdlib.h>
-#include <string.h>
-#include <time.h>
+/*
+ * Unsorted list of unique, absolute paths to be searched for manual
+ * databases.
+ */
+struct	manpaths {
+	size_t	  sz;
+	char	**paths;
+};
 
-#include "mdoc.h"
-#include "mandoc.h"
-#include "libmdoc.h"
+__BEGIN_DECLS
 
-#define LINE(x, y) \
-	if (0 == strcmp(p, x)) return(y);
+void	 manpath_manconf(struct manpaths *, const char *);
+void	 manpath_parse(struct manpaths *, const char *, char *, char *);
+void	 manpath_free(struct manpaths *);
 
-const char *
-mdoc_a2vol(const char *p)
-{
-
-#include "vol.in"
-
-	return(NULL);
-}
+__END_DECLS
