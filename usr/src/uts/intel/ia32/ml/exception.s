@@ -1039,6 +1039,9 @@ make_frame:
 	 */
 	ENTRY_NP(stktrap)
 	TRAP_ERR(T_STKFLT)	/* $12 already have error code on stack */
+#if defined(__amd64)
+	SET_CPU_GSBASE
+#endif
 	jmp	cmntrap
 	SET_SIZE(stktrap)
 
