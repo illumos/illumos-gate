@@ -28,8 +28,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989, 1990 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/proc.h>
 #include <sys/priocntl.h>
 #include <sys/class.h>
@@ -69,8 +67,6 @@ _info(struct modinfo *modinfop)
 {
 	return (mod_info(&modlinkage, modinfop));
 }
-
-#define	RTGPPRIO0	100	/* Global priority for RT priority 0 */
 
 rtdpent_t	config_rt_dptbl[] = {
 

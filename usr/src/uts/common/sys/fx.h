@@ -21,12 +21,11 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2015 Joyent, Inc.
  */
 
 #ifndef _SYS_FX_H
 #define	_SYS_FX_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/thread.h>
@@ -145,7 +144,14 @@ typedef struct	fxkparms {
 	uint_t	fx_cflags;
 } fxkparms_t;
 
+/*
+ * control flags (kparms->fx_cflags).
+ */
+#define	FX_DOUPRILIM	0x01	/* change user priority limit */
+#define	FX_DOUPRI	0x02	/* change user priority */
+#define	FX_DOTQ		0x04	/* change FX time quantum */
 
+#define	FXMAXUPRI	60	/* maximum user priority setting */
 
 /*
  * Interface for partner private code. This is not a public interface.

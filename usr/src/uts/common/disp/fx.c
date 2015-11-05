@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013, Joyent, Inc. All rights reserved.
+ * Copyright 2015, Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -70,16 +70,6 @@ static struct modlinkage modlinkage = {
 	MODREV_1, (void *)&modlsched, NULL
 };
 
-
-/*
- * control flags (kparms->fx_cflags).
- */
-#define	FX_DOUPRILIM	0x01    /* change user priority limit */
-#define	FX_DOUPRI	0x02    /* change user priority */
-#define	FX_DOTQ		0x04    /* change FX time quantum */
-
-
-#define	FXMAXUPRI 60		/* maximum user priority setting */
 
 #define	FX_MAX_UNPRIV_PRI	0	/* maximum unpriviledge priority */
 
