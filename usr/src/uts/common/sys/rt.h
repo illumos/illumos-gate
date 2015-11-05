@@ -22,6 +22,7 @@
 /*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2015 Joyent, Inc.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -30,8 +31,6 @@
 
 #ifndef _SYS_RT_H
 #define	_SYS_RT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.4 */
 
 #include <sys/types.h>
 #include <sys/thread.h>
@@ -77,6 +76,16 @@ typedef struct	rtkparms {
 	int	rt_tqsig;	/* real-time time quantum signal */
 	uint_t	rt_cflags;	/* real-time control flags */
 } rtkparms_t;
+
+#define	RTGPPRIO0	100	/* Global priority for RT priority 0 */
+
+/*
+ * control flags (kparms->rt_cflags).
+ */
+#define	RT_DOPRI	0x01	/* change priority */
+#define	RT_DOTQ		0x02	/* change RT time quantum */
+#define	RT_DOSIG	0x04	/* change RT time quantum signal */
+
 #endif	/* _KERNEL */
 
 #ifdef	__cplusplus

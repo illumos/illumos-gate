@@ -22,7 +22,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2013 Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -102,13 +102,6 @@ _info(struct modinfo *modinfop)
 
 pri_t rt_maxpri = RTMAXPRI;	/* maximum real-time priority */
 rtdpent_t *rt_dptbl;	  /* real-time dispatcher parameter table */
-
-/*
- * control flags (kparms->rt_cflags).
- */
-#define	RT_DOPRI	0x01	/* change priority */
-#define	RT_DOTQ		0x02	/* change RT time quantum */
-#define	RT_DOSIG	0x04	/* change RT time quantum signal */
 
 static int	rt_admin(caddr_t, cred_t *);
 static int	rt_enterclass(kthread_t *, id_t, void *, cred_t *, void *);

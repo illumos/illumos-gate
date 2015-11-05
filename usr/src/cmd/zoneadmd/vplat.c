@@ -4454,7 +4454,34 @@ setup_zone_rm(zlog_t *zlogp, char *zone_name, zoneid_t zoneid)
 			zerror(zlogp, B_TRUE, "WARNING: unable to set the "
 			    "default scheduling class");
 
-	} else if (zonecfg_get_aliased_rctl(handle, ALIAS_SHARES, &tmp)
+		if (strcmp(sched, "FX") == 0) {
+			/*
+			 * When FX is specified then by default all processes
+			 * will start at the lowest priority level (0) and
+			 * stay there. We support an optional attr which
+			 * indicates that all the processes should be "high
+			 * priority". We set this on the zone so that starting
+			 * init will set the priority high.
+			 */
+			struct zone_attrtab a;
+
+			bzero(&a, sizeof (a));
+			(void) strlcpy(a.zone_attr_name, "fixed-hi-prio",
+			    sizeof (a.zone_attr_name));
+
+			if (zonecfg_lookup_attr(snap_hndl, &a) == Z_OK &&
+			    strcmp(a.zone_attr_value, "true") == 0) {
+				boolean_t hi = B_TRUE;
+
+				if (zone_setattr(zoneid,
+				    ZONE_ATTR_SCHED_FIXEDHI, (void *)hi,
+				    sizeof (hi)) == -1)
+					zerror(zlogp, B_TRUE, "WARNING: unable "
+					    "to set high priority");
+			}
+		}
+
+	} else if (zonecfg_get_aliased_rctl(snap_hndl, ALIAS_SHARES, &tmp)
 	    == Z_OK) {
 		/*
 		 * If the zone has the zone.cpu-shares rctl set then we want to

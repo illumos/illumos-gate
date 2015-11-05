@@ -250,6 +250,8 @@
 #include <sys/cpucaps.h>
 #include <vm/seg.h>
 #include <sys/mac.h>
+#include <sys/rt.h>
+#include <sys/fx.h>
 
 /*
  * This constant specifies the number of seconds that threads waiting for
@@ -3974,9 +3976,54 @@ zone_start_init(void)
 			lwp_exit();
 		}
 	} else {
+		id_t cid = curthread->t_cid;
+
 		if (zone_status_get(z) == ZONE_IS_BOOTING)
 			zone_status_set(z, ZONE_IS_RUNNING);
 		mutex_exit(&zone_status_lock);
+
+		mutex_enter(&class_lock);
+		ASSERT(cid < loaded_classes);
+		if (strcmp(sclass[cid].cl_name, "FX") == 0 &&
+		    z->zone_fixed_hipri) {
+			/*
+			 * If the zone is using FX then by default all
+			 * processes start at the lowest priority and stay
+			 * there. We provide a mechanism for the zone to
+			 * indicate that it should run at "high priority". In
+			 * this case we setup init to run at the highest FX
+			 * priority (which is one level higher than the
+			 * non-fixed scheduling classes can use).
+			 */
+			pcparms_t pcparms;
+
+			pcparms.pc_cid = cid;
+			((fxkparms_t *)pcparms.pc_clparms)->fx_upri = FXMAXUPRI;
+			((fxkparms_t *)pcparms.pc_clparms)->fx_uprilim =
+			    FXMAXUPRI;
+			((fxkparms_t *)pcparms.pc_clparms)->fx_cflags =
+			    FX_DOUPRILIM | FX_DOUPRI;
+
+			mutex_enter(&pidlock);
+			mutex_enter(&curproc->p_lock);
+
+			(void) parmsset(&pcparms, curthread);
+
+			mutex_exit(&curproc->p_lock);
+			mutex_exit(&pidlock);
+		} else if (strcmp(sclass[cid].cl_name, "RT") == 0) {
+			/*
+			 * zsched always starts the init lwp at priority
+			 * minclsyspri - 1. This priority gets set in t_pri and
+			 * is invalid for RT, but RT never uses t_pri. However
+			 * t_pri is used by procfs, so we always see processes
+			 * within an RT zone with an invalid priority value.
+			 * We fix that up now.
+			 */
+			curthread->t_pri = RTGPPRIO0;
+		}
+		mutex_exit(&class_lock);
+
 		/* cause the process to return to userland. */
 		lwp_rtt();
 	}
@@ -5790,6 +5837,15 @@ zone_getattr(zoneid_t zoneid, int attr, void *buf, size_t bufsize)
 		}
 		kmem_free(zbuf, bufsize);
 		break;
+	case ZONE_ATTR_SCHED_FIXEDHI:
+		size = sizeof (boolean_t);
+		if (bufsize > size)
+			bufsize = size;
+
+		if (buf != NULL && copyout(&zone->zone_fixed_hipri, buf,
+		    bufsize) != 0)
+			error = EFAULT;
+		break;
 	default:
 		if ((attr >= ZONE_ATTR_BRAND_ATTRS) && ZONE_IS_BRANDED(zone)) {
 			size = bufsize;
@@ -5910,6 +5966,14 @@ zone_setattr(zoneid_t zoneid, int attr, void *buf, size_t bufsize)
 			err = EINVAL;
 		} else {
 			zone->zone_setup_app_contract = (boolean_t)buf;
+			err = 0;
+		}
+		break;
+	case ZONE_ATTR_SCHED_FIXEDHI:
+		if (bufsize != sizeof (boolean_t)) {
+			err = EINVAL;
+		} else {
+			zone->zone_fixed_hipri = (boolean_t)buf;
 			err = 0;
 		}
 		break;

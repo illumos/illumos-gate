@@ -110,6 +110,7 @@ extern "C" {
 #define	ZONE_ATTR_PG_FLT_DELAY	21
 #define	ZONE_ATTR_RSS		22
 #define	ZONE_ATTR_APP_SVC_CT	23
+#define	ZONE_ATTR_SCHED_FIXEDHI	24
 
 /* Start of the brand-specific attribute namespace */
 #define	ZONE_ATTR_BRAND_ATTRS	32768
@@ -569,6 +570,7 @@ typedef struct zone {
 	struct brand	*zone_brand;		/* zone's brand */
 	void 		*zone_brand_data;	/* store brand specific data */
 	id_t		zone_defaultcid;	/* dflt scheduling class id */
+	boolean_t	zone_fixed_hipri;	/* fixed sched. hi prio */
 	kstat_t		*zone_swapresv_kstat;
 	kstat_t		*zone_lockedmem_kstat;
 	/*
