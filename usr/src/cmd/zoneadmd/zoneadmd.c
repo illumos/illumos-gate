@@ -348,14 +348,22 @@ filter_bootargs(zlog_t *zlogp, const char *inargs, char *outargs,
 	}
 
 	/*
-	 * We preserve compatibility with the Solaris system boot behavior,
+	 * We preserve compatibility with the illumos system boot behavior,
 	 * which allows:
 	 *
 	 * 	# reboot kernel/unix -s -m verbose
 	 *
-	 * In this example, kernel/unix tells the booter what file to
-	 * boot.  We don't want reboot in a zone to be gratuitously different,
-	 * so we silently ignore the boot file, if necessary.
+	 * In this example, kernel/unix tells the booter what file to boot. The
+	 * original intent of this was that we didn't want reboot in a zone to
+	 * be gratuitously different, so we would silently ignore the boot
+	 * file, if necessary. However, this usage is archaic and has never
+	 * been common, since it is impossible to boot a zone onto a different
+	 * kernel. Ignoring the first argument breaks for non-native brands
+	 * which pass boot arguments in a different style. e.g.
+	 *	systemd.log_level=debug
+	 * Thus, for backward compatibility we only ignore the first argument
+	 * if it appears to be in the illumos form and attempting to specify a
+	 * kernel.
 	 */
 	if (argv[0] == NULL)
 		goto done;
@@ -363,7 +371,7 @@ filter_bootargs(zlog_t *zlogp, const char *inargs, char *outargs,
 	assert(argv[0][0] != ' ');
 	assert(argv[0][0] != '\t');
 
-	if (argv[0][0] != '-' && argv[0][0] != '\0') {
+	if (strncmp(argv[0], "kernel/", 7) == 0) {
 		argv = &argv[1];
 		argc--;
 	}

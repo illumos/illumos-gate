@@ -818,12 +818,13 @@ lxi_config_close(zone_dochandle_t handle)
 }
 
 static void
-lxi_init_exec()
+lxi_init_exec(char **argv)
 {
 	const char *cmd = "/sbin/init";
-	char *const argv[] = { "init", NULL };
 	char *const envp[] = { "container=zone", NULL };
 	int e;
+
+	argv[0] = "init";
 
 	/*
 	 * systemd uses the 'container' env var to determine it is running
@@ -864,7 +865,7 @@ main(int argc, char *argv[])
 
 	lxi_log_close();
 
-	lxi_init_exec();
+	lxi_init_exec(argv);
 
 	/* NOTREACHED */
 	return (0);
