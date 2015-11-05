@@ -29,9 +29,23 @@
 #include <sys/stack.h>
 #include <sys/sdt.h>
 #include <sys/sysmacros.h>
+#include <sys/psw.h>
 #include <lx_errno.h>
 
+/*
+ * Argument constants for fix_segreg.
+ * See usr/src/uts/intel/ia32/os/archdep.c for the originals.
+ */
+#define	IS_CS		1
+#define	IS_NOT_CS	0
+
+extern greg_t fix_segreg(greg_t, int, model_t);
+
+
 #define	LX_REG(ucp, r)	((ucp)->uc_mcontext.gregs[(r)])
+
+#define	PSLMERGE(oldval, newval)	\
+	(((oldval) & ~PSL_USERMASK) | ((newval) & PSL_USERMASK))
 
 #ifdef __amd64
 /* 64-bit native user_regs_struct */
@@ -444,15 +458,20 @@ lx_set_user_regs32_uc(klwp_t *lwp, void *ucp, lx_user_regs32_t *lxrp)
 	LX_REG(&uc, ESI) = lxrp->lxur_esi;
 	LX_REG(&uc, EDI) = lxrp->lxur_edi;
 	LX_REG(&uc, EIP) = lxrp->lxur_eip;
-	LX_REG(&uc, EFL) = lxrp->lxur_eflags;
+	LX_REG(&uc, EFL) = PSLMERGE(LX_REG(&uc, EFL), lxrp->lxur_eflags);
 	LX_REG(&uc, UESP) = lxrp->lxur_esp;
-	LX_REG(&uc, SS) = lxrp->lxur_xss;
+	LX_REG(&uc, SS) = fix_segreg(lxrp->lxur_xss, IS_NOT_CS,
+	    DATAMODEL_ILP32);
 
 	/* %cs is ignored because of our lies */
-	LX_REG(&uc, DS) = lxrp->lxur_xds;
-	LX_REG(&uc, ES) = lxrp->lxur_xes;
-	LX_REG(&uc, FS) = lxrp->lxur_xfs;
-	LX_REG(&uc, GS) = lxrp->lxur_xgs;
+	LX_REG(&uc, DS) = fix_segreg(lxrp->lxur_xds, IS_NOT_CS,
+	    DATAMODEL_ILP32);
+	LX_REG(&uc, ES) = fix_segreg(lxrp->lxur_xes, IS_NOT_CS,
+	    DATAMODEL_ILP32);
+	LX_REG(&uc, FS) = fix_segreg(lxrp->lxur_xfs, IS_NOT_CS,
+	    DATAMODEL_ILP32);
+	LX_REG(&uc, GS) = fix_segreg(lxrp->lxur_xgs, IS_NOT_CS,
+	    DATAMODEL_ILP32);
 
 	if (lx_write_uc(p, ucp, &uc, sizeof (uc)) != 0) {
 		return (-1);
@@ -498,16 +517,17 @@ lx_set_user_regs32(lx_lwp_data_t *lwpd, lx_user_regs32_t *lxrp)
 	rp->r_rax = (int32_t)lxrp->lxur_eax;
 	lwpd->br_syscall_num = (int)lxrp->lxur_orig_eax;
 	rp->r_rip = (int32_t)lxrp->lxur_eip;
-	rp->r_rfl = (int32_t)lxrp->lxur_eflags;
+	rp->r_rfl = (int32_t)PSLMERGE(rp->r_rfl, lxrp->lxur_eflags);
 	rp->r_rsp = (int32_t)lxrp->lxur_esp;
-	rp->r_ss = (int32_t)lxrp->lxur_xss;
+	rp->r_ss = (int32_t)fix_segreg(lxrp->lxur_xss, IS_NOT_CS,
+	    DATAMODEL_ILP32);
 
 	kpreempt_disable();
 	pcb->pcb_rupdate = 1;
-	pcb->pcb_ds = lxrp->lxur_xds;
-	pcb->pcb_es = lxrp->lxur_xes;
-	pcb->pcb_fs = lxrp->lxur_xfs;
-	pcb->pcb_gs = lxrp->lxur_xgs;
+	pcb->pcb_ds = fix_segreg(lxrp->lxur_xds, IS_NOT_CS, DATAMODEL_ILP32);
+	pcb->pcb_es = fix_segreg(lxrp->lxur_xes, IS_NOT_CS, DATAMODEL_ILP32);
+	pcb->pcb_fs = fix_segreg(lxrp->lxur_xfs, IS_NOT_CS, DATAMODEL_ILP32);
+	pcb->pcb_gs = fix_segreg(lxrp->lxur_xgs, IS_NOT_CS, DATAMODEL_ILP32);
 	kpreempt_enable();
 #else /* __i386 */
 	rp->r_ebx = lxrp->lxur_ebx;
@@ -519,14 +539,14 @@ lx_set_user_regs32(lx_lwp_data_t *lwpd, lx_user_regs32_t *lxrp)
 	rp->r_eax = lxrp->lxur_eax;
 	lwpd->br_syscall_num = (int)lxrp->lxur_orig_eax;
 	rp->r_eip = lxrp->lxur_eip;
-	rp->r_efl = lxrp->lxur_eflags;
+	rp->r_efl = PSLMERGE(rp->r_efl, lxrp->lxur_eflags);
 	rp->r_esp = lxrp->lxur_esp;
-	rp->r_ss = lxrp->lxur_xss;
+	rp->r_ss = fix_segreg(lxrp->lxur_xss, IS_NOT_CS, DATAMODEL_ILP32);
 
-	rp->r_ds = lxrp->lxur_xds;
-	rp->r_es = lxrp->lxur_xes;
-	rp->r_fs = lxrp->lxur_xfs;
-	rp->r_gs = lxrp->lxur_xgs;
+	rp->r_ds = fix_segreg(lxrp->lxur_xds, IS_NOT_CS, DATAMODEL_ILP32);
+	rp->r_es = fix_segreg(lxrp->lxur_xes, IS_NOT_CS, DATAMODEL_ILP32);
+	rp->r_fs = fix_segreg(lxrp->lxur_xfs, IS_NOT_CS, DATAMODEL_ILP32);
+	rp->r_gs = fix_segreg(lxrp->lxur_xgs, IS_NOT_CS, DATAMODEL_ILP32);
 #endif /* __amd64 */
 
 	return (0);
@@ -774,17 +794,23 @@ lx_set_user_regs64_uc(klwp_t *lwp, void *ucp, lx_user_regs64_t *lxrp)
 		LX_REG(&uc, REG_RSI) = lxrp->lxur_rsi;
 		LX_REG(&uc, REG_RDI) = lxrp->lxur_rdi;
 		LX_REG(&uc, REG_RIP) = lxrp->lxur_rip;
-		LX_REG(&uc, REG_RFL) = lxrp->lxur_rflags;
+		LX_REG(&uc, REG_RFL) = PSLMERGE(LX_REG(&uc, REG_RFL),
+		    lxrp->lxur_rflags);
 		LX_REG(&uc, REG_RSP) = lxrp->lxur_rsp;
-		LX_REG(&uc, REG_SS) = lxrp->lxur_xss;
+		LX_REG(&uc, REG_SS) = fix_segreg(lxrp->lxur_xss, IS_NOT_CS,
+		    DATAMODEL_LP64);
 		LX_REG(&uc, REG_FSBASE) = lxrp->lxur_xfs_base;
 		LX_REG(&uc, REG_GSBASE) = lxrp->lxur_xgs_base;
 
 		/* %cs is ignored because of our lies */
-		LX_REG(&uc, REG_DS) = lxrp->lxur_xds;
-		LX_REG(&uc, REG_ES) = lxrp->lxur_xes;
-		LX_REG(&uc, REG_FS) = lxrp->lxur_xfs;
-		LX_REG(&uc, REG_GS) = lxrp->lxur_xgs;
+		LX_REG(&uc, REG_DS) = fix_segreg(lxrp->lxur_xds, IS_NOT_CS,
+		    DATAMODEL_LP64);
+		LX_REG(&uc, REG_ES) = fix_segreg(lxrp->lxur_xes, IS_NOT_CS,
+		    DATAMODEL_LP64);
+		LX_REG(&uc, REG_FS) = fix_segreg(lxrp->lxur_xfs, IS_NOT_CS,
+		    DATAMODEL_LP64);
+		LX_REG(&uc, REG_GS) = fix_segreg(lxrp->lxur_xgs, IS_NOT_CS,
+		    DATAMODEL_LP64);
 
 		if (lx_write_uc(p, ucp, &uc, sizeof (uc)) != 0) {
 			return (-1);
@@ -812,15 +838,21 @@ lx_set_user_regs64_uc(klwp_t *lwp, void *ucp, lx_user_regs64_t *lxrp)
 		LX_REG(&uc, ESI) = (int32_t)lxrp->lxur_rsi;
 		LX_REG(&uc, EDI) = (int32_t)lxrp->lxur_rdi;
 		LX_REG(&uc, EIP) = (int32_t)lxrp->lxur_rip;
-		LX_REG(&uc, EFL) = (int32_t)lxrp->lxur_rflags;
+		LX_REG(&uc, EFL) = (int32_t)PSLMERGE(LX_REG(&uc, EFL),
+		    lxrp->lxur_rflags);
 		LX_REG(&uc, UESP) = (int32_t)lxrp->lxur_rsp;
-		LX_REG(&uc, SS) = (int32_t)lxrp->lxur_xss;
+		LX_REG(&uc, SS) = (int32_t)fix_segreg(lxrp->lxur_xss,
+		    IS_NOT_CS, DATAMODEL_ILP32);
 
 		/* %cs is ignored because of our lies */
-		LX_REG(&uc, DS) = (int32_t)lxrp->lxur_xds;
-		LX_REG(&uc, ES) = (int32_t)lxrp->lxur_xes;
-		LX_REG(&uc, FS) = (int32_t)lxrp->lxur_xfs;
-		LX_REG(&uc, GS) = (int32_t)lxrp->lxur_xgs;
+		LX_REG(&uc, DS) = (int32_t)fix_segreg(lxrp->lxur_xds,
+		    IS_NOT_CS, DATAMODEL_ILP32);
+		LX_REG(&uc, ES) = (int32_t)fix_segreg(lxrp->lxur_xes,
+		    IS_NOT_CS, DATAMODEL_ILP32);
+		LX_REG(&uc, FS) = (int32_t)fix_segreg(lxrp->lxur_xfs,
+		    IS_NOT_CS, DATAMODEL_ILP32);
+		LX_REG(&uc, GS) = (int32_t)fix_segreg(lxrp->lxur_xgs,
+		    IS_NOT_CS, DATAMODEL_ILP32);
 
 		if (lx_write_uc(p, ucp, &uc, sizeof (uc)) != 0) {
 			return (-1);
@@ -842,6 +874,8 @@ lx_set_user_regs64(lx_lwp_data_t *lwpd, lx_user_regs64_t *lxrp)
 	struct regs *rp = lwptoregs(lwp);
 	struct pcb *pcb = &lwp->lwp_pcb;
 	void *ucp;
+
+	VERIFY(lwp_getdatamodel(lwp) == DATAMODEL_LP64);
 
 	switch (lx_regs_location(lwpd, &ucp, B_TRUE)) {
 	case LX_REG_LOC_UNAVAIL:
@@ -876,18 +910,18 @@ lx_set_user_regs64(lx_lwp_data_t *lwpd, lx_user_regs64_t *lxrp)
 	rp->r_rdi = lxrp->lxur_rdi;
 	lwpd->br_syscall_num = (int)lxrp->lxur_orig_rax;
 	rp->r_rip = lxrp->lxur_rip;
-	rp->r_rfl = lxrp->lxur_rflags;
+	rp->r_rfl = PSLMERGE(rp->r_rfl, lxrp->lxur_rflags);
 	rp->r_rsp = lxrp->lxur_rsp;
-	rp->r_ss = lxrp->lxur_xss;
+	rp->r_ss = fix_segreg(lxrp->lxur_xss, IS_NOT_CS, DATAMODEL_LP64);
 	pcb->pcb_fsbase = lxrp->lxur_xfs_base;
 	pcb->pcb_gsbase = lxrp->lxur_xgs_base;
 
 	kpreempt_disable();
 	pcb->pcb_rupdate = 1;
-	pcb->pcb_ds = lxrp->lxur_xds;
-	pcb->pcb_es = lxrp->lxur_xes;
-	pcb->pcb_fs = lxrp->lxur_xfs;
-	pcb->pcb_gs = lxrp->lxur_xgs;
+	pcb->pcb_ds = fix_segreg(lxrp->lxur_xds, IS_NOT_CS, DATAMODEL_LP64);
+	pcb->pcb_es = fix_segreg(lxrp->lxur_xes, IS_NOT_CS, DATAMODEL_LP64);
+	pcb->pcb_fs = fix_segreg(lxrp->lxur_xfs, IS_NOT_CS, DATAMODEL_LP64);
+	pcb->pcb_gs = fix_segreg(lxrp->lxur_xgs, IS_NOT_CS, DATAMODEL_LP64);
 	kpreempt_enable();
 
 	return (0);
