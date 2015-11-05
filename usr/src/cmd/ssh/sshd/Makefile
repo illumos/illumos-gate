@@ -25,7 +25,7 @@
 
 PROG= sshd
 
-DIRS= $(ROOTLIBSSH)
+DIRS= $(ROOTLIBSSH) $(ROOTLIBSUNSSH)
 
 OBJS	= sshd.o \
 	  altprivsep.o \
@@ -98,10 +98,13 @@ $(PROG): $(OBJS) $(EXTOBJS) $(MAPFILES) ../libssh/$(MACH)/libssh.a \
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
 
-install: all $(DIRS) $(ROOTLIBSSHPROG) $(ROOTLIBSSH)
+install: all $(DIRS) $(ROOTLIBSSHPROG) $(ROOTLIBSSH) $(ROOTLIBSUNSSH)
 
 
 $(ROOTLIBSSHPROG)/%: %
+	$(INS.file)
+
+$(ROOTLIBSUNSSHPROG)/%: %
 	$(INS.file)
 
 $(DIRS):

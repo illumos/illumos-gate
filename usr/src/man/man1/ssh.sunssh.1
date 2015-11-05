@@ -22,7 +22,6 @@ ssh \- secure shell client (remote login program)
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBssh\fR (Secure Shell) is a program for logging into a remote machine and for
 executing commands on a remote machine. It is intended to replace \fBrlogin\fR
@@ -35,7 +34,6 @@ ports can also be forwarded over the secure channel.
 his or her identity to the remote machine using one of several methods
 depending on the protocol version used:
 .SS "SSH Protocol Version 1"
-.sp
 .LP
 First, if the machine the user logs in from is listed in \fB/etc/hosts.equiv\fR
 or \fB/etc/shosts.equiv\fR on the remote machine, and the user names are the
@@ -101,7 +99,6 @@ password. The password is sent to the remote host for checking. However, since
 all communications are encrypted, the password cannot be seen by someone
 listening on the network.
 .SS "SSH Protocol Version 2"
-.sp
 .LP
 The SSH version 2 protocol supports multiple user authentication methods, some
 of which are similar to those available with the SSH protocol version 1. These
@@ -144,7 +141,6 @@ encrypted using 3DES, Blowfish, CAST128 or Arcfour) and integrity
 (\fBhmac-sha1\fR, \fBhmac-md5\fR). Protocol 1 lacks a strong mechanism for
 ensuring the integrity of the connection.
 .SS "Login Session and Remote Execution"
-.sp
 .LP
 When the user's identity has been accepted by the server, the server either
 executes the specified command, or logs into the machine and gives the user a
@@ -177,7 +173,6 @@ The session terminates when the command or shell on the remote machine exits
 and all X11 and TCP/IP connections have been closed. The exit status of the
 remote program is returned as the exit status of \fBssh\fR.
 .SS "Escape Characters"
-.sp
 .LP
 When a pseudo-terminal has been requested, \fBssh\fR supports a number of
 functions through the use of an escape character.
@@ -268,7 +263,6 @@ if the peer supports it.
 .RE
 
 .SS "X11 and TCP Forwarding"
-.sp
 .LP
 If the \fBForwardX11\fR variable is set to ``\fByes\fR'' (or, see the
 description of the \fB-X\fR and \fB-x\fR options described later) and the user
@@ -306,7 +300,6 @@ specified either on the command line or in a configuration file. One possible
 application of TCP/IP forwarding is a secure connection to an electronic purse.
 Another possible application is firewall traversal.
 .SS "Server Authentication"
-.sp
 .LP
 \fBssh\fR automatically maintains and checks a database containing
 identifications for all hosts it has ever been used with. Host keys are stored
@@ -332,7 +325,6 @@ When the user's GSS-API credentials expire, the client continues to be able to
 rekey the session using the server's public host key to protect the key
 exchanges.
 .SS "GSS-API User and Server Authentication"
-.sp
 .LP
 \fBssh\fR uses the user's GSS-API credentials to authenticate the client to the
 server wherever possible, if \fBGssKeyEx\fR and/or \fBGssAuthentication\fR are
@@ -362,7 +354,6 @@ GSS-API user authorization is covered in \fBgss_auth_rules\fR(5).
 Rekeying can be used to redelegate credentials when \fBGssKeyEx\fR is
 "\fByes\fR". (See \fB~R\fR under \fBEscape Characters\fR above.)
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -811,7 +802,6 @@ means that they have full access to the original X11 display.
 .RE
 
 .SH ENVIRONMENT VARIABLES
-.sp
 .LP
 \fBssh\fR normally sets the following environment variables:
 .sp
@@ -886,13 +876,11 @@ See the \fBENVIRONMENT VARIABLES\fR section in the \fBsshd\fR(1M) man page for
 more information on how locale setting can be further changed depending on
 server side configuration.
 .SH EXIT STATUS
-.sp
 .LP
 The status of the remote program is returned as the exit status of \fBssh\fR.
 \fB255\fR is returned if an error occurred at anytime during the \fBssh\fR
 connection, including the initial key exchange.
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB$HOME/.ssh/known_hosts\fR\fR
@@ -958,7 +946,6 @@ VARIABLES.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -978,7 +965,6 @@ Interface Stability	See below.
 The command line syntax is Committed. The remote locale selection through
 passing \fBLC_*\fR environment variables is Uncommitted.
 .SH SEE ALSO
-.sp
 .LP
 \fBrlogin\fR(1), \fBrsh\fR(1), \fBscp\fR(1), \fBssh-add\fR(1),
 \fBssh-agent\fR(1), \fBssh-keygen\fR(1), \fBssh-http-proxy-connect\fR(1),

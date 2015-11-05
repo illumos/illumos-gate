@@ -36,28 +36,24 @@ dir path=usr group=sys
 dir path=usr/bin
 dir path=usr/lib
 dir path=usr/lib/ssh
+dir path=usr/lib/sunssh
 dir path=usr/share/man
 dir path=usr/share/man/man1
-dir path=usr/share/man/man4
-file path=etc/ssh/moduli group=sys
-file path=etc/ssh/ssh_config group=sys \
-    original_name=SUNWssh:etc/ssh/ssh_config preserve=true
-file path=usr/bin/scp mode=0555
-file path=usr/bin/sftp mode=0555
-file path=usr/bin/ssh mode=0555
-file path=usr/bin/ssh-add mode=0555
-file path=usr/bin/ssh-agent mode=0555
-file path=usr/lib/ssh/ssh-askpass mode=0555
-file path=usr/lib/ssh/ssh-http-proxy-connect mode=0555
-file path=usr/lib/ssh/ssh-socks5-proxy-connect mode=0555
-file path=usr/share/man/man1/scp.1
-file path=usr/share/man/man1/sftp.1
-file path=usr/share/man/man1/ssh-add.1
-file path=usr/share/man/man1/ssh-agent.1
-file path=usr/share/man/man1/ssh-http-proxy-connect.1
-file path=usr/share/man/man1/ssh-socks5-proxy-connect.1
-file path=usr/share/man/man1/ssh.1
-file path=usr/share/man/man4/ssh_config.4
+file path=usr/lib/sunssh/scp mode=0555
+file path=usr/lib/sunssh/sftp mode=0555
+file path=usr/lib/sunssh/ssh mode=0555
+file path=usr/lib/sunssh/ssh-add mode=0555
+file path=usr/lib/sunssh/ssh-agent mode=0555
+file path=usr/lib/sunssh/ssh-askpass mode=0555
+file path=usr/lib/sunssh/ssh-http-proxy-connect mode=0555
+file path=usr/lib/sunssh/ssh-socks5-proxy-connect mode=0555
+file path=usr/share/man/man1/scp.sunssh.1
+file path=usr/share/man/man1/sftp.sunssh.1
+file path=usr/share/man/man1/ssh-add.sunssh.1
+file path=usr/share/man/man1/ssh-agent.sunssh.1
+file path=usr/share/man/man1/ssh-http-proxy-connect.sunssh.1
+file path=usr/share/man/man1/ssh-socks5-proxy-connect.sunssh.1
+file path=usr/share/man/man1/ssh.sunssh.1
 legacy pkg=SUNWsshr \
     desc="Secure Shell protocol Client and associated Utilities" \
     name="SSH Client and utilities, (Root)"
@@ -66,3 +62,34 @@ legacy pkg=SUNWsshu \
     name="SSH Client and utilities, (Usr)"
 license usr/src/cmd/ssh/THIRDPARTYLICENSE \
     license=usr/src/cmd/ssh/THIRDPARTYLICENSE
+link path=usr/bin/scp mediator=ssh mediator-implementation=sunssh \
+    target=../lib/sunssh/scp
+link path=usr/bin/sftp mediator=ssh mediator-implementation=sunssh \
+    target=../lib/sunssh/sftp
+link path=usr/bin/ssh mediator=ssh mediator-implementation=sunssh \
+    target=../lib/sunssh/ssh
+link path=usr/bin/ssh-add mediator=ssh mediator-implementation=sunssh \
+    target=../lib/sunssh/ssh-add
+link path=usr/bin/ssh-agent mediator=ssh mediator-implementation=sunssh \
+    target=../lib/sunssh/ssh-agent
+link path=usr/lib/ssh/ssh-askpass mediator=ssh mediator-implementation=sunssh \
+    target=../sunssh/ssh-askpass
+link path=usr/lib/ssh/ssh-http-proxy-connect mediator=ssh \
+    mediator-implementation=sunssh target=../sunssh/ssh-http-proxy-connect
+link path=usr/lib/ssh/ssh-socks5-proxy-connect mediator=ssh \
+    mediator-implementation=sunssh target=../sunssh/ssh-socks5-proxy-connect
+link path=usr/share/man/man1/scp.1 mediator=ssh mediator-implementation=sunssh \
+    target=scp.sunssh.1
+link path=usr/share/man/man1/sftp.1 mediator=ssh \
+    mediator-implementation=sunssh target=sftp.sunssh.1
+link path=usr/share/man/man1/ssh-add.1 mediator=ssh \
+    mediator-implementation=sunssh target=ssh-add.sunssh.1
+link path=usr/share/man/man1/ssh-agent.1 mediator=ssh \
+    mediator-implementation=sunssh target=ssh-agent.sunssh.1
+link path=usr/share/man/man1/ssh-http-proxy-connect.1 mediator=ssh \
+    mediator-implementation=sunssh target=ssh-http-proxy-connect.sunssh.1
+link path=usr/share/man/man1/ssh-socks5-proxy-connect.1 mediator=ssh \
+    mediator-implementation=sunssh target=socks5-proxy-connect.sunssh.1
+link path=usr/share/man/man1/ssh.1 mediator=ssh mediator-implementation=sunssh \
+    target=ssh.sunssh.1
+depend fmri=service/network/ssh-common type=require

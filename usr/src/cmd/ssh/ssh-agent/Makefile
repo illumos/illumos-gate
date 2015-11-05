@@ -32,6 +32,8 @@ SRCS	= $(OBJS:.o=.c)
 include ../../Makefile.cmd
 include ../Makefile.ssh-common
 
+DIRS= $(ROOTLIBSUNSSH)
+
 LDLIBS += $(SSH_COMMON_LDLIBS) -lsocket -lcrypto
 
 POFILE_DIR= ..
@@ -45,6 +47,12 @@ all: $(PROG)
 $(PROG): $(OBJS) ../libssh/$(MACH)/libssh.a ../libopenbsd-compat/$(MACH)/libopenbsd-compat.a
 	$(LINK.c) $(OBJS) -o $@ $(LDLIBS) $(DYNFLAGS)
 	$(POST_PROCESS)
+
+$(DIRS):
+	$(INS.dir)
+
+$(ROOTBIN)/ssh-agent: $(ROOTLIBSUNSSH)/ssh-agent
+	-$(RM) $@; $(SYMLINK) ../lib/sunssh/ssh-agent $@
 
 install: all $(ROOTPROG)
 

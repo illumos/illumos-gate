@@ -33,15 +33,28 @@ dir path=usr group=sys
 dir path=usr/bin
 dir path=usr/lib
 dir path=usr/lib/ssh
+dir path=usr/lib/sunssh
 dir path=usr/share/man/man1
 dir path=usr/share/man/man1m
-file path=usr/bin/ssh-keygen mode=0555
-file path=usr/bin/ssh-keyscan mode=0555
-file path=usr/lib/ssh/ssh-keysign mode=4555
-file path=usr/share/man/man1/ssh-keygen.1
-file path=usr/share/man/man1/ssh-keyscan.1
-file path=usr/share/man/man1m/ssh-keysign.1m
+file path=usr/lib/sunssh/ssh-keygen mode=0555
+file path=usr/lib/sunssh/ssh-keyscan mode=0555
+file path=usr/lib/sunssh/ssh-keysign mode=4555
+file path=usr/share/man/man1/ssh-keygen.sunssh.1
+file path=usr/share/man/man1/ssh-keyscan.sunssh.1
+file path=usr/share/man/man1m/ssh-keysign.sunssh.1m
 legacy pkg=SUNWsshcu desc="Secure Shell protocol common Utilities" \
     name="SSH Common, (Usr)"
 license usr/src/cmd/ssh/THIRDPARTYLICENSE \
     license=usr/src/cmd/ssh/THIRDPARTYLICENSE
+link path=usr/bin/ssh-keygen mediator=ssh mediator-implementation=sunssh \
+    target=../lib/sunssh/ssh-keygen
+link path=usr/bin/ssh-keyscan mediator=ssh mediator-implementation=sunssh \
+    target=../lib/sunssh/ssh-keyscan
+link path=usr/lib/ssh/ssh-keysign mediator=ssh mediator-implementation=sunssh \
+    target=../sunssh/ssh-keysign
+link path=usr/share/man/man1/ssh-keygen.1 mediator=ssh \
+    mediator-implementation=sunssh target=ssh-keygen.sunssh.1
+link path=usr/share/man/man1/ssh-keyscan.1 mediator=ssh \
+    mediator-implementation=sunssh target=ssh-keyscan.sunssh.1
+link path=usr/share/man/man1m/ssh-keysign.1m mediator=ssh \
+    mediator-implementation=sunssh target=ssh-keysign.sunssh.1m
