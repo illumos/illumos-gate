@@ -204,7 +204,7 @@ meminfo(int addr_count, struct meminfo *mip)
 			pfn = hat_getpfnum(hat, (caddr_t)vaddr);
 			if (pfn != PFN_INVALID) {
 				paddr = (uint64_t)((pfn << PAGESHIFT) |
-					(addr & PAGEOFFSET));
+				    (addr & PAGEOFFSET));
 				for (j = 0; j < info_count; j++) {
 					switch (req_array[j] & MEMINFO_MASK) {
 					case MEMINFO_VPHYSICAL:
@@ -225,9 +225,9 @@ meminfo(int addr_count, struct meminfo *mip)
 						lgrp = lgrp_pfn_to_lgrp(pfn);
 						if (lgrp) {
 							out_array[out_idx + j] =
-								lgrp->lgrp_id;
+							    lgrp->lgrp_id;
 							val_array[i] |=
-								VALID_REQ << j;
+							    VALID_REQ << j;
 						}
 						break;
 					case MEMINFO_VPAGESIZE:
@@ -237,12 +237,12 @@ meminfo(int addr_count, struct meminfo *mip)
 						 * input virtual address
 						 */
 						pgsz = hat_getpagesize(hat,
-							(caddr_t)vaddr);
+						    (caddr_t)vaddr);
 						if (pgsz != -1) {
 							out_array[out_idx + j] =
-									pgsz;
+							    pgsz;
 							val_array[i] |=
-								VALID_REQ << j;
+							    VALID_REQ << j;
 						}
 						break;
 					case MEMINFO_VREPLCNT:
@@ -291,7 +291,7 @@ meminfo(int addr_count, struct meminfo *mip)
 
 	/* copy out the results and validity bits and free the buffers */
 	if ((copyout(out_array, minfo.mi_outdata, out_size) != 0) ||
-		(copyout(val_array, minfo.mi_validity, val_size) != 0))
+	    (copyout(val_array, minfo.mi_validity, val_size) != 0))
 		ret = set_errno(EFAULT);
 
 	kmem_free(in_array, in_size);
@@ -1417,7 +1417,7 @@ lgrp_snapshot(void)
 
 	lgrp_snap->ss_latencies = lgrp_lats =
 	    (int **)((uintptr_t)lgrp_rsets + (LGRP_RSRC_COUNT *
-		snap_nlgrpsmax * bitmask_size));
+	    snap_nlgrpsmax * bitmask_size));
 
 	/*
 	 * Fill in lgroup information
@@ -1836,7 +1836,7 @@ lgrp_snapshot_copy32(caddr32_t buf, size32_t bufsize)
 	info_size = P2ROUNDUP(snap_nlgrpsmax * sizeof (lgrp_info32_t),
 	    sizeof (processorid_t));
 	cpuids_size = P2ROUNDUP(snap_ncpus * sizeof (processorid_t),
-		    sizeof (ulong_t));
+	    sizeof (ulong_t));
 
 	bitmask_size = BT_SIZEOFMAP32(snap_nlgrpsmax);
 
@@ -1855,7 +1855,7 @@ lgrp_snapshot_copy32(caddr32_t buf, size32_t bufsize)
 	    (snap_nlgrpsmax * snap_nlgrpsmax * sizeof (int));
 
 	snap_size = snap_hdr_size + info_size + cpuids_size + bitmasks_size +
-		lats_size;
+	    lats_size;
 
 	if (buf == NULL || bufsize <= 0) {
 		return (snap_size);
