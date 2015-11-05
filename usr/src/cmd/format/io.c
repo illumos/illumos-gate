@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*
@@ -2514,15 +2515,18 @@ void
 print_efi_string(char *vendor, char *product, char *revision,
     uint64_t capacity)
 {
-	char new_vendor[9];
-	char new_product[17];
-	char new_revision[5];
+	char *new_vendor;
+	char *new_product;
+	char *new_revision;
 	char capacity_string[10];
 	float scaled;
 	int i;
 
 	/* Strip whitespace from the end of inquiry strings */
-	(void) strlcpy(new_vendor, vendor, sizeof (new_vendor));
+	new_vendor = strdup(vendor);
+	if (new_vendor == NULL)
+		return;
+
 	for (i = (strlen(new_vendor) - 1); i >= 0; i--) {
 		if (new_vendor[i] != 0x20) {
 			new_vendor[i+1] = '\0';
@@ -2530,7 +2534,12 @@ print_efi_string(char *vendor, char *product, char *revision,
 		}
 	}
 
-	(void) strlcpy(new_product, product, sizeof (new_product));
+	new_product = strdup(product);
+	if (new_product == NULL) {
+		free(new_vendor);
+		return;
+	}
+
 	for (i = (strlen(new_product) - 1); i >= 0; i--) {
 		if (new_product[i] != 0x20) {
 			new_product[i+1] = '\0';
@@ -2538,7 +2547,13 @@ print_efi_string(char *vendor, char *product, char *revision,
 		}
 	}
 
-	(void) strlcpy(new_revision, revision, sizeof (new_revision));
+	new_revision = strdup(revision);
+	if (new_product == NULL) {
+		free(new_vendor);
+		free(new_product);
+		return;
+	}
+
 	for (i = (strlen(new_revision) - 1); i >= 0; i--) {
 		if (new_revision[i] != 0x20) {
 			new_revision[i+1] = '\0';
@@ -2561,4 +2576,8 @@ print_efi_string(char *vendor, char *product, char *revision,
 
 	fmt_print("<%s-%s-%s-%s>",
 	    new_vendor, new_product, new_revision, capacity_string);
+
+	free(new_revision);
+	free(new_product);
+	free(new_vendor);
 }

@@ -13,7 +13,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2014 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2015 Nexenta Systems, Inc. All rights reserved.
 #
 # uts/intel/skd/Makefile
 #
@@ -53,6 +53,15 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 # Driver depends on blkdev
 #
 LDFLAGS		+= -dy -N drv/blkdev
+
+#
+# Overrides
+#
+# For now, disable these compiler warnigns; maintainers should endeavor
+# to investigate and remove these for maximum lint coverage.
+# Please do not carry these forward to new Makefiles.
+CERRWARN	+= -_gcc=-Wno-format
+CERRWARN	+= -_gcc=-Wno-format-extra-args
 
 #
 #	Default build targets.

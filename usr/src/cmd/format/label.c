@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*
@@ -36,6 +37,7 @@
 #include <sys/uuid.h>
 #include <errno.h>
 #include <devid.h>
+#include <libdevinfo.h>
 #include "global.h"
 #include "label.h"
 #include "misc.h"
@@ -496,14 +498,99 @@ read_label(int fd, struct dk_label *label)
 }
 
 int
-get_disk_info_from_devid(int fd, struct efi_info *label)
+get_disk_inquiry_prop(char *devpath, char **vid, char **pid, char **rid)
+{
+	char *v, *p, *r;
+	di_node_t node;
+	int ret = -1;
+
+	node = di_init(devpath, DINFOCPYALL);
+
+	if (node == DI_NODE_NIL)
+		goto out;
+
+	if (di_prop_lookup_strings(DDI_DEV_T_ANY, node,
+	    "inquiry-vendor-id", &v) != 1)
+		goto out;
+
+	if (di_prop_lookup_strings(DDI_DEV_T_ANY, node,
+	    "inquiry-product-id", &p) != 1)
+		goto out;
+
+	if (di_prop_lookup_strings(DDI_DEV_T_ANY, node,
+	    "inquiry-revision-id", &r) != 1)
+		goto out;
+
+	*vid = strdup(v);
+	*pid = strdup(p);
+	*rid = strdup(r);
+
+	if (*vid == NULL || *pid == NULL || *rid == NULL) {
+		free(*vid);
+		free(*pid);
+		free(*rid);
+		goto out;
+	}
+
+	ret = 0;
+
+out:
+	di_fini(node);
+	return (ret);
+}
+
+int
+get_disk_inquiry_uscsi(int fd, char **vid, char **pid, char **rid)
+{
+	struct scsi_inquiry inquiry;
+
+	if (uscsi_inquiry(fd, (char *)&inquiry, sizeof (inquiry)))
+		return (-1);
+
+	*vid = strndup(inquiry.inq_vid, 8);
+	*pid = strndup(inquiry.inq_pid, 16);
+	*rid = strndup(inquiry.inq_revision, 4);
+
+	if (*vid == NULL || *pid == NULL || *rid == NULL) {
+		free(*vid);
+		free(*pid);
+		free(*rid);
+		return (-1);
+	}
+
+	return (0);
+}
+
+int
+get_disk_capacity(int fd, uint64_t *capacity)
+{
+	struct dk_minfo	minf;
+	struct scsi_capacity_16	cap16;
+
+	if (ioctl(fd, DKIOCGMEDIAINFO, &minf) == 0) {
+		*capacity = minf.dki_capacity * minf.dki_lbsize / cur_blksz;
+		return (0);
+	}
+
+	if (uscsi_read_capacity(fd, &cap16) == 0) {
+		*capacity = cap16.sc_capacity;
+
+		/* Since we are counting from zero, add 1 to capacity */
+		(*capacity)++;
+
+		return (0);
+	}
+
+	err_print("Fetch Capacity failed\n");
+	return (-1);
+}
+
+int
+get_disk_inquiry_devid(int fd, char **vid, char **pid, char **rid)
 {
 	ddi_devid_t	devid;
 	char		*s;
-	int		n;
-	char		*vid, *pid;
-	int		nvid, npid;
-	struct dk_minfo	minf;
+	char		*v, *p;
 	struct dk_cinfo	dkinfo;
 
 	if (devid_get(fd, &devid)) {
@@ -512,7 +599,6 @@ get_disk_info_from_devid(int fd, struct efi_info *label)
 		return (-1);
 	}
 
-	n = devid_sizeof(devid);
 	s = (char *)devid;
 
 	if (ioctl(fd, DKIOCINFO, &dkinfo) == -1) {
@@ -524,31 +610,23 @@ get_disk_info_from_devid(int fd, struct efi_info *label)
 	if (dkinfo.dki_ctype != DKC_DIRECT)
 		return (-1);
 
-	vid = s+12;
-	if (!(pid = strchr(vid, '=')))
+	v = s+12;
+	if (!(p = strchr(v, '=')))
 		return (-1);
-	nvid = pid - vid;
-	pid += 1;
-	npid = n - nvid - 13;
+	p += 1;
 
-	if (nvid > 9)
-		nvid = 9;
-	if (npid > 17) {
-		pid = pid + npid - 17;
-		npid = 17;
-	}
-
-	if (ioctl(fd, DKIOCGMEDIAINFO, &minf) == -1) {
-		devid_free(devid);
-		return (-1);
-	}
-
-	(void) strlcpy(label->vendor, vid, nvid);
-	(void) strlcpy(label->product, pid, npid);
-	(void) strlcpy(label->revision, "0001", 5);
-	label->capacity = minf.dki_capacity * minf.dki_lbsize / 512;
-
+	*vid = strdup(v);
+	*pid = strdup(p);
+	*rid = strdup("0001");
 	devid_free(devid);
+
+	if (*vid == NULL || *pid == NULL || *rid == NULL) {
+		free(*vid);
+		free(*pid);
+		free(*rid);
+		return (-1);
+	}
+
 	return (0);
 }
 
@@ -558,44 +636,36 @@ get_disk_info_from_devid(int fd, struct efi_info *label)
  * Capacity information.
  */
 int
-get_disk_info(int fd, struct efi_info *label)
+get_disk_info(int fd, struct efi_info *label, struct disk_info *disk_info)
 {
-	struct scsi_inquiry	inquiry;
-	struct scsi_capacity_16	capacity;
-	struct dk_minfo		minf;
+	(void) get_disk_capacity(fd, &label->capacity);
 
-	if (!get_disk_info_from_devid(fd, label))
-		return (0);
-
-	if (uscsi_inquiry(fd, (char *)&inquiry, sizeof (inquiry))) {
-		(void) strlcpy(label->vendor, "Unknown", 8);
-		(void) strlcpy(label->product, "Unknown", 8);
-		(void) strlcpy(label->revision, "0001", 5);
-	} else {
-		(void) strlcpy(label->vendor, inquiry.inq_vid, 9);
-		(void) strlcpy(label->product, inquiry.inq_pid, 17);
-		(void) strlcpy(label->revision, inquiry.inq_revision, 5);
-	}
-
-	if (uscsi_read_capacity(fd, &capacity)) {
-		if (ioctl(fd, DKIOCGMEDIAINFO, &minf) == -1) {
-			err_print("Fetch Capacity failed\n");
-			return (-1);
+	if (get_disk_inquiry_prop(disk_info->devfs_name,
+	    &label->vendor, &label->product, &label->revision) != 0) {
+		if (get_disk_inquiry_devid(fd, &label->vendor, &label->product,
+		    &label->revision) != 0) {
+			if (get_disk_inquiry_uscsi(fd, &label->vendor,
+			    &label->product, &label->revision) != 0) {
+				label->vendor = strdup("Unknown");
+				label->product = strdup("Unknown");
+				label->revision = strdup("0001");
+				if (label->vendor == NULL ||
+				    label->product == NULL ||
+				    label->revision == NULL) {
+					free(label->vendor);
+					free(label->product);
+					free(label->revision);
+					return (-1);
+				}
+			}
 		}
-		label->capacity =
-		    minf.dki_capacity * minf.dki_lbsize / cur_blksz;
-	} else {
-		label->capacity = capacity.sc_capacity;
-
-		/* Since we are counting from zero, add 1 to capacity */
-		label->capacity++;
 	}
 
 	return (0);
 }
 
 int
-read_efi_label(int fd, struct efi_info *label)
+read_efi_label(int fd, struct efi_info *label, struct disk_info *disk_info)
 {
 	struct dk_gpt	*vtoc64;
 
@@ -608,7 +678,7 @@ read_efi_label(int fd, struct efi_info *label)
 		return (-1);
 	}
 	efi_free(vtoc64);
-	if (get_disk_info(fd, label) != 0) {
+	if (get_disk_info(fd, label, disk_info) != 0) {
 		return (-1);
 	}
 	return (0);

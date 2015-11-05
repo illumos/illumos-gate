@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2014, Joyent, Inc. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*
@@ -637,7 +638,7 @@ default_kstat_update(kstat_t *ksp, int rw)
 	 * way of determining how much space is needed to hold the snapshot:
 	 */
 	if (ksp->ks_data != NULL && ksp->ks_type == KSTAT_TYPE_NAMED &&
-	    (ksp->ks_flags & KSTAT_FLAG_VAR_SIZE)) {
+	    (ksp->ks_flags & (KSTAT_FLAG_VAR_SIZE | KSTAT_FLAG_LONGSTRINGS))) {
 
 		/*
 		 * Add in the space required for the strings
@@ -1152,32 +1153,21 @@ kstat_install(kstat_t *ksp)
 	}
 
 	if (ksp->ks_type == KSTAT_TYPE_NAMED && ksp->ks_data != NULL) {
-		int has_long_strings = 0;
 		uint_t i;
 		kstat_named_t *knp = KSTAT_NAMED_PTR(ksp);
 
 		for (i = 0; i < ksp->ks_ndata; i++, knp++) {
 			if (knp->data_type == KSTAT_DATA_STRING) {
-				has_long_strings = 1;
+				ksp->ks_flags |= KSTAT_FLAG_LONGSTRINGS;
 				break;
 			}
-		}
-		/*
-		 * It is an error for a named kstat with fields of
-		 * KSTAT_DATA_STRING to be non-virtual.
-		 */
-		if (has_long_strings && !(ksp->ks_flags & KSTAT_FLAG_VIRTUAL)) {
-			panic("kstat_install('%s', %d, '%s'): "
-			    "named kstat containing KSTAT_DATA_STRING "
-			    "is not virtual",
-			    ksp->ks_module, ksp->ks_instance,
-			    ksp->ks_name);
 		}
 		/*
 		 * The default snapshot routine does not handle KSTAT_WRITE
 		 * for long strings.
 		 */
-		if (has_long_strings && (ksp->ks_flags & KSTAT_FLAG_WRITABLE) &&
+		if ((ksp->ks_flags & KSTAT_FLAG_LONGSTRINGS) &&
+		    (ksp->ks_flags & KSTAT_FLAG_WRITABLE) &&
 		    (ksp->ks_snapshot == default_kstat_snapshot)) {
 			panic("kstat_install('%s', %d, '%s'): "
 			    "named kstat containing KSTAT_DATA_STRING "

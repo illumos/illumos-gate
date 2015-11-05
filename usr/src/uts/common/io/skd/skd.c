@@ -22,7 +22,7 @@
 
 /*
  * Copyright 2013 STEC, Inc.  All rights reserved.
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include	<sys/types.h>
@@ -50,6 +50,7 @@
 #include 	<sys/devops.h>
 #include	<sys/blkdev.h>
 #include	<sys/queue.h>
+#include	<sys/scsi/impl/inquiry.h>
 
 #include	"skd_s1120.h"
 #include	"skd.h"
@@ -1476,7 +1477,6 @@ skd_complete_internal(struct skd_device *skdev,
 {
 	uint8_t *buf = skspcl->data_buf;
 	uint8_t status = 2;
-	int i;
 	/* Instead of 64-bytes in, use 8-(64-bit-words) for linted alignment. */
 	struct skd_scsi_request *scsi =
 	    (struct skd_scsi_request *)&skspcl->msg_buf64[8];
@@ -1565,17 +1565,10 @@ skd_complete_internal(struct skd_device *skdev,
 
 				bcopy(&buf[8], tmp, 8);
 				tmp[8] = '\0';
-				for (i = 7; i >= 0 && tmp[i] != '\0'; i--)
-					if (tmp[i] == ' ')
-						tmp[i] = '\0';
 
 				tmp = skdev->inq_product_id;
 				bcopy(&buf[16], tmp, 16);
 				tmp[16] = '\0';
-
-				for (i = 15; i >= 0 && tmp[i] != '\0'; i--)
-					if (tmp[i] == ' ')
-						tmp[i] = '\0';
 
 				tmp = skdev->inq_product_rev;
 				bcopy(&buf[32], tmp, 4);
@@ -4576,12 +4569,15 @@ skd_setup_devid(skd_device_t *skdev, ddi_devid_t *devid)
 {
 	int  rc, sz_model, sz_sn, sz;
 
-	sz_model = strlen(skdev->inq_product_id);
-	sz_sn = strlen(skdev->inq_serial_num);
+	sz_model = scsi_ascii_inquiry_len(skdev->inq_product_id,
+	    strlen(skdev->inq_product_id));
+	sz_sn = scsi_ascii_inquiry_len(skdev->inq_serial_num,
+	    strlen(skdev->inq_serial_num));
 	sz = sz_model + sz_sn + 1;
 
-	(void) snprintf(skdev->devid_str, sizeof (skdev->devid_str), "%s=%s",
-	    skdev->inq_product_id, skdev->inq_serial_num);
+	(void) snprintf(skdev->devid_str, sizeof (skdev->devid_str),
+	    "%.*s=%.*s", sz_model, skdev->inq_product_id, sz_sn,
+	    skdev->inq_serial_num);
 	rc = ddi_devid_init(skdev->dip, DEVID_SCSI_SERIAL, sz,
 	    skdev->devid_str, devid);
 
@@ -5115,6 +5111,20 @@ skd_bd_driveinfo(void *arg, bd_drive_t *drive)
 	drive->d_hotpluggable	= B_FALSE;
 	drive->d_target		= 0;
 	drive->d_lun		= 0;
+
+	if (skdev->inquiry_is_valid != 0) {
+		drive->d_vendor = skdev->inq_vendor_id;
+		drive->d_vendor_len = strlen(drive->d_vendor);
+
+		drive->d_product = skdev->inq_product_id;
+		drive->d_product_len = strlen(drive->d_product);
+
+		drive->d_serial = skdev->inq_serial_num;
+		drive->d_serial_len = strlen(drive->d_serial);
+
+		drive->d_revision = skdev->inq_product_rev;
+		drive->d_revision_len = strlen(drive->d_revision);
+	}
 }
 
 /*

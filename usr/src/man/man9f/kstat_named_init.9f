@@ -24,11 +24,9 @@ kstat_named_init, kstat_named_setstr \- initialize a named kstat
 .fi
 
 .SH INTERFACE LEVEL
-.sp
 .LP
 Solaris DDI specific (Solaris DDI)
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIknp\fR\fR
@@ -120,7 +118,6 @@ Pointer to a \fBNULL\fR-terminated string.
 .RE
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBkstat_named_init()\fR associates a name and a type with a
 \fBkstat_named\fR(9S) structure.
@@ -129,19 +126,18 @@ Pointer to a \fBNULL\fR-terminated string.
 \fBkstat_named_setstr()\fR associates \fIstr\fR with the named kstat \fBknp\fR.
 It is an error for \fBknp\fR to be of type other than \fBKSTAT_DATA_STRING\fR.
 The string argument must remain valid even after the function that is calling
-\fBkstat_named_setstr()\fR is returned. This is the only supported method of
-changing the value of long strings.
+\fBkstat_named_setstr()\fR is returned. If \fBKSTAT_DATA_STRING\fR is used in a
+persistent kstat the string argument must remain valid even after the module
+that created the kstat is unloaded. This is the only supported method of changing
+the value of long strings.
 .SH RETURN VALUES
-.sp
 .LP
 None.
 .SH CONTEXT
-.sp
 .LP
 \fBkstat_named_init()\fR and \fBkstat_named_setstr()\fR can be called from user
 or kernel context.
 .SH SEE ALSO
-.sp
 .LP
 \fBkstat_create\fR(9F), \fBkstat_install\fR(9F), \fBkstat\fR(9S),
 \fBkstat_named\fR(9S)
