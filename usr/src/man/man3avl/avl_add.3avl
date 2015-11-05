@@ -88,8 +88,8 @@ See
 in
 .Xr libavl 3LIB .
 .Sh SEE ALSO
-.Xr libavl 3LIB ,
 .Xr avl_create 3AVL ,
+.Xr avl_destroy 3AVL ,
 .Xr avl_insert 3AVL ,
 .Xr avl_insert_here 3AVL ,
-.Xr avl_destroy 3AVL
+.Xr libavl 3LIB

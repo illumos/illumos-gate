@@ -67,7 +67,6 @@ and
 .Xr rwlock 9F
 for more information on synchronization primitives.
 .Sh SEE ALSO
-.Xr libavl 3LIB ,
 .Xr avl_add 3AVL ,
 .Xr avl_create 3AVL ,
 .Xr avl_destroy 3AVL ,
@@ -79,10 +78,11 @@ for more information on synchronization primitives.
 .Xr avl_is_empty 3AVL ,
 .Xr avl_last 3AVL ,
 .Xr avl_nearest 3AVL ,
-.Xr avl_numnodes 3AVL ,
-.Xr avl_swap 3AVL ,
 .Xr AVL_NEXT 3AVL ,
+.Xr avl_numnodes 3AVL ,
 .Xr AVL_PREV 3AVL ,
+.Xr avl_swap 3AVL ,
+.Xr libavl 3LIB
 .Rs
 .%T Writing Device Drivers
 .Re

@@ -106,6 +106,31 @@ functions
 .fi
 
 .SH DESCRIPTION
+.LP
+These functions provide a generic doubly-linked list implementation. To
+utilize it, simply embed a \fBlist_node_t\fR field in the structures
+that will constitute the linked list elements and pass the
+\fBlist_node_t\fR field offset to \fBlist_create()\fR in the appropriate
+parameter (see below). A single \fBlist_node_t\fR field can only be used
+in a single list simultaneously, so to add a structure to multiple
+lists, embed multiple \fBlist_node_t\fR fields in your user structure.
+.sp
+.LP
+Please note that a \fBlist_node_t\fR contains pointers back to its
+parent \fBlist_t\fR so you cannot copy the \fBlist_t\fR around once it
+has been initialized. In particular, this kind of construct won't work:
+.sp
+.in +2
+.nf
+struct { list_t l; } a, b;
+list_create(&a.l, ...);
+b = a;    <= This will break the list in `b', as the `l' element
+             in `a' got copied to a different memory address.
+.fi
+.in -2
+.sp
+To do this you must move the list items to the new list using functions
+such as \fBlist_move_tail()\fR.
 .sp
 .LP
 The \fBlist_create()\fR function initializes a new list. The driver supplies
@@ -171,7 +196,6 @@ the items need not be on the same list, but extreme care must be used to ensure
 that both lists are protected from concurrent accesses and that the lists were
 initialized with identical size and offset parameters.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -187,6 +211,5 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBattributes\fR(5)

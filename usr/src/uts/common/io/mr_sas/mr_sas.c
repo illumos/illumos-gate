@@ -46,6 +46,7 @@
  * Copyright (c) 2011 Bayard G. Bell. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2015 Citrus IT Limited. All rights reserved.
+ * Copyright 2015 Garrett D'Amore <garrett@damore.org>
  */
 
 #include <sys/types.h>
@@ -566,6 +567,7 @@ mrsas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		switch (device_id) {
 		case PCI_DEVICE_ID_LSI_TBOLT:
 		case PCI_DEVICE_ID_LSI_INVADER:
+		case PCI_DEVICE_ID_LSI_FURY:
 			dev_err(dip, CE_CONT, "?TBOLT device detected\n");
 
 			instance->func_ptr =

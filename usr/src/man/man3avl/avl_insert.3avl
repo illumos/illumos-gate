@@ -80,7 +80,7 @@ then the argument
 should have the value
 .Dv AVL_BEFORE .
 Otherwise, to indicate that the new entry should be inserted after
-.Fa here,
+.Fa here ,
 then
 .Fa direction
 should be set to
@@ -105,6 +105,6 @@ See
 in
 .Xr libavl 3LIB .
 .Sh SEE ALSO
-.Xr libavl 3LIB ,
 .Xr avl_add 3AVL ,
-.Xr avl_find 3AVL
+.Xr avl_find 3AVL ,
+.Xr libavl 3LIB

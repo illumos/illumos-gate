@@ -44,6 +44,7 @@
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Garrett D'Amore <garrett@damore.org>
  */
 
 #ifndef	_MR_SAS_H_
@@ -95,6 +96,7 @@ extern "C" {
 #define	PCI_DEVICE_ID_LSI_SKINNY_NEW		0x0073
 #define	PCI_DEVICE_ID_LSI_TBOLT			0x005b
 #define	PCI_DEVICE_ID_LSI_INVADER		0x005d
+#define	PCI_DEVICE_ID_LSI_FURY			0x005f
 
 /*
  * Register Index for 2108 Controllers.

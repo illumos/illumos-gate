@@ -10,40 +10,24 @@
 #
 
 #
-# Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 #
-
-PROGS=		mandoc mandoc_preconv
-
-# We place preconv in /usr/lib.  This is done to avoid conflicting with
-# GNU groff, which puts it into /usr/bin.  We also rename it so that it
-# will only be seen by mandoc -- it isn't intended for general end-user use.
-
-ROOTPROGS =	$(ROOTBIN)/mandoc $(ROOTLIB)/mandoc_preconv
-
-OBJS=		$(preconv_OBJS) $(mandoc_OBJS)
-
-CLOBBERFILES +=	$(PROGS)
 
 include		$(SRC)/cmd/Makefile.cmd
 include		$(SRC)/cmd/mandoc/Makefile.common
 
 .KEEP_STATE:
 
-all:		$(PROGS)
+all:		$(PROG)
 
-mandoc_preconv:	$(preconv_OBJS)
-		$(LINK.c) $(preconv_OBJS) -o $@ $(LDLIBS)
-		$(POST_PROCESS)
-
-mandoc:		$(mandoc_OBJS)
-		$(LINK.c) $(mandoc_OBJS) -o $@ $(LDLIBS)
+$(PROG):	$(OBJS)
+		$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
 		$(POST_PROCESS)
 
 clean:
 		$(RM) $(OBJS)
 
-install:	all $(ROOTPROGS)
+install:	all $(ROOTPROG)
 
 include		$(SRC)/cmd/Makefile.targ
