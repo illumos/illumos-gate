@@ -636,7 +636,7 @@ getuserpc()
 #define	IS_NOT_CS	0
 
 /*ARGSUSED*/
-static greg_t
+greg_t
 fix_segreg(greg_t sr, int iscs, model_t datamodel)
 {
 	kthread_t *t = curthread;
