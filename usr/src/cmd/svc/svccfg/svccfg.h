@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015, Joyent, Inc. All rights reserved.
  */
 
 #ifndef	_CMD_SVCCFG_H
@@ -319,15 +320,9 @@ typedef struct scf_callback {
  */
 typedef struct tmpl_errors tmpl_errors_t;
 
-#ifndef NDEBUG
-#define	bad_error(func, err)	{					\
-	(void) fprintf(stderr, "%s:%d: %s() failed with unexpected "	\
-	    "error %d.  Aborting.\n", __FILE__, __LINE__, (func), (err)); \
-	abort();							\
-}
-#else
-#define	bad_error(func, err)	abort()
-#endif
+#define	bad_error(func, err)						\
+	uu_panic("%s:%d: %s() failed with unexpected "			\
+	    "error %d.  Aborting.\n", __FILE__, __LINE__, (func), (err));
 
 #define	SC_CMD_LINE		0x0
 #define	SC_CMD_FILE		0x1
