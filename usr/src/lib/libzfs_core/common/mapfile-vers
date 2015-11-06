@@ -52,6 +52,7 @@ SYMBOL_VERSION ILLUMOS_0.1 {
 	lzc_hold;
 	lzc_receive;
 	lzc_receive_resumable;
+	lzc_receive_with_header;
 	lzc_release;
 	lzc_rollback;
 	lzc_send;
