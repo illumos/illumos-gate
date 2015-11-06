@@ -180,6 +180,7 @@
 #include <sys/blkdev.h>
 #include <sys/atomic.h>
 #include <sys/archsystm.h>
+#include <sys/sata/sata_hba.h>
 
 #include "nvme_reg.h"
 #include "nvme_var.h"
@@ -763,6 +764,8 @@ nvme_check_unknown_cmd_status(nvme_cmd_t *cmd)
 	    cqe->cqe_sqid, cqe->cqe_cid, cqe->cqe_sf.sf_sc, cqe->cqe_sf.sf_sct,
 	    cqe->cqe_sf.sf_dnr, cqe->cqe_sf.sf_m);
 
+	bd_error(cmd->nc_xfer, BD_ERR_ILLRQ);
+
 	if (cmd->nc_nvme->n_strict_version) {
 		cmd->nc_nvme->n_dead = B_TRUE;
 		ddi_fm_service_impact(cmd->nc_nvme->n_dip, DDI_SERVICE_LOST);
@@ -798,11 +801,13 @@ nvme_check_integrity_cmd_status(nvme_cmd_t *cmd)
 	case NVME_CQE_SC_INT_NVM_WRITE:
 		/* write fail */
 		/* TODO: post ereport */
+		bd_error(cmd->nc_xfer, BD_ERR_MEDIA);
 		return (EIO);
 
 	case NVME_CQE_SC_INT_NVM_READ:
 		/* read fail */
 		/* TODO: post ereport */
+		bd_error(cmd->nc_xfer, BD_ERR_MEDIA);
 		return (EIO);
 
 	default:
@@ -859,6 +864,7 @@ nvme_check_generic_cmd_status(nvme_cmd_t *cmd)
 		/* Data Transfer Error (DMA) */
 		/* TODO: post ereport */
 		atomic_inc_32(&cmd->nc_nvme->n_data_xfr_err);
+		bd_error(cmd->nc_xfer, BD_ERR_NTRDY);
 		return (EIO);
 
 	case NVME_CQE_SC_GEN_INTERNAL_ERR:
@@ -869,6 +875,7 @@ nvme_check_generic_cmd_status(nvme_cmd_t *cmd)
 		 * in the async event handler.
 		 */
 		atomic_inc_32(&cmd->nc_nvme->n_internal_err);
+		bd_error(cmd->nc_xfer, BD_ERR_NTRDY);
 		return (EIO);
 
 	case NVME_CQE_SC_GEN_ABORT_REQUEST:
@@ -894,11 +901,13 @@ nvme_check_generic_cmd_status(nvme_cmd_t *cmd)
 	case NVME_CQE_SC_GEN_NVM_CAP_EXC:
 		/* Capacity Exceeded */
 		atomic_inc_32(&cmd->nc_nvme->n_nvm_cap_exc);
+		bd_error(cmd->nc_xfer, BD_ERR_MEDIA);
 		return (EIO);
 
 	case NVME_CQE_SC_GEN_NVM_NS_NOTRDY:
 		/* Namespace Not Ready */
 		atomic_inc_32(&cmd->nc_nvme->n_nvm_ns_notrdy);
+		bd_error(cmd->nc_xfer, BD_ERR_NTRDY);
 		return (EIO);
 
 	default:
@@ -959,12 +968,14 @@ nvme_check_specific_cmd_status(nvme_cmd_t *cmd)
 		/* Invalid Log Page */
 		ASSERT(cmd->nc_sqe.sqe_opc == NVME_OPC_GET_LOG_PAGE);
 		atomic_inc_32(&cmd->nc_nvme->n_inv_log_page);
+		bd_error(cmd->nc_xfer, BD_ERR_ILLRQ);
 		return (EINVAL);
 
 	case NVME_CQE_SC_SPC_INV_FORMAT:
 		/* Invalid Format */
 		ASSERT(cmd->nc_sqe.sqe_opc == NVME_OPC_NVM_FORMAT);
 		atomic_inc_32(&cmd->nc_nvme->n_inv_format);
+		bd_error(cmd->nc_xfer, BD_ERR_ILLRQ);
 		return (EINVAL);
 
 	case NVME_CQE_SC_SPC_INV_Q_DEL:
@@ -979,6 +990,7 @@ nvme_check_specific_cmd_status(nvme_cmd_t *cmd)
 		    cmd->nc_sqe.sqe_opc == NVME_OPC_NVM_READ ||
 		    cmd->nc_sqe.sqe_opc == NVME_OPC_NVM_WRITE);
 		atomic_inc_32(&cmd->nc_nvme->n_cnfl_attr);
+		bd_error(cmd->nc_xfer, BD_ERR_ILLRQ);
 		return (EINVAL);
 
 	case NVME_CQE_SC_SPC_NVM_INV_PROT:
@@ -987,12 +999,14 @@ nvme_check_specific_cmd_status(nvme_cmd_t *cmd)
 		    cmd->nc_sqe.sqe_opc == NVME_OPC_NVM_READ ||
 		    cmd->nc_sqe.sqe_opc == NVME_OPC_NVM_WRITE);
 		atomic_inc_32(&cmd->nc_nvme->n_inv_prot);
+		bd_error(cmd->nc_xfer, BD_ERR_ILLRQ);
 		return (EINVAL);
 
 	case NVME_CQE_SC_SPC_NVM_READONLY:
 		/* Write to Read Only Range */
 		ASSERT(cmd->nc_sqe.sqe_opc == NVME_OPC_NVM_WRITE);
 		atomic_inc_32(&cmd->nc_nvme->n_readonly);
+		bd_error(cmd->nc_xfer, BD_ERR_ILLRQ);
 		return (EROFS);
 
 	default:
@@ -1731,6 +1745,8 @@ nvme_init(nvme_t *nvme)
 	nvme_reg_csts_t csts;
 	int i = 0;
 	int nqueues;
+	char model[sizeof (nvme->n_idctl->id_model) + 1];
+	char *vendor, *product;
 
 	/* Setup fixed interrupt for admin queue. */
 	if (nvme_setup_interrupts(nvme, DDI_INTR_TYPE_FIXED, 1)
@@ -1892,6 +1908,20 @@ nvme_init(nvme_t *nvme)
 		    "!failed to identify controller");
 		goto fail;
 	}
+
+	/*
+	 * Get Vendor & Product ID
+	 */
+	bcopy(nvme->n_idctl->id_model, model, sizeof (nvme->n_idctl->id_model));
+	model[sizeof (nvme->n_idctl->id_model)] = '\0';
+	sata_split_model(model, &vendor, &product);
+
+	if (vendor == NULL)
+		nvme->n_vendor = strdup("NVMe");
+	else
+		nvme->n_vendor = strdup(vendor);
+
+	nvme->n_product = strdup(product);
 
 	/*
 	 * Get controller limits.
@@ -2560,6 +2590,12 @@ nvme_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		ddi_fm_fini(nvme->n_dip);
 	}
 
+	if (nvme->n_vendor != NULL)
+		strfree(nvme->n_vendor);
+
+	if (nvme->n_product != NULL)
+		strfree(nvme->n_product);
+
 	ddi_soft_state_free(nvme_state, instance);
 
 	return (DDI_SUCCESS);
@@ -2729,6 +2765,17 @@ nvme_bd_driveinfo(void *arg, bd_drive_t *drive)
 
 	drive->d_target = ns->ns_id;
 	drive->d_lun = 0;
+
+	drive->d_model = nvme->n_idctl->id_model;
+	drive->d_model_len = sizeof (nvme->n_idctl->id_model);
+	drive->d_vendor = nvme->n_vendor;
+	drive->d_vendor_len = strlen(nvme->n_vendor);
+	drive->d_product = nvme->n_product;
+	drive->d_product_len = strlen(nvme->n_product);
+	drive->d_serial = nvme->n_idctl->id_serial;
+	drive->d_serial_len = sizeof (nvme->n_idctl->id_serial);
+	drive->d_revision = nvme->n_idctl->id_fwrev;
+	drive->d_revision_len = sizeof (nvme->n_idctl->id_fwrev);
 }
 
 static int

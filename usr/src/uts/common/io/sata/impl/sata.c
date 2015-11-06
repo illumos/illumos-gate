@@ -23,7 +23,7 @@
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -1952,6 +1952,58 @@ sata_register_pmult(dev_info_t *dip, sata_device_t *sd, sata_pmult_gscr_t *sg)
 }
 
 /*
+ * sata_split_model splits the model ID into vendor and product IDs.
+ * It assumes that a vendor ID cannot be longer than 8 characters, and
+ * that vendor and product ID are separated by a whitespace.
+ */
+void
+sata_split_model(char *model, char **vendor, char **product)
+{
+	int i, modlen;
+	char *vid, *pid;
+
+	/*
+	 * remove whitespace at the end of model
+	 */
+	for (i = SATA_ID_MODEL_LEN; i > 0; i--)
+		if (model[i] == ' ' || model[i] == '\t' || model[i] == '\0')
+			model[i] = '\0';
+		else
+			break;
+
+	/*
+	 * try to split model into into vid/pid
+	 */
+	modlen = strlen(model);
+	for (i = 0, pid = model; i < modlen; i++, pid++)
+		if ((*pid == ' ') || (*pid == '\t'))
+			break;
+
+	/*
+	 * only use vid if it is less than 8 chars (as in SCSI)
+	 */
+	if (i < modlen && i <= 8) {
+		vid = model;
+		/*
+		 * terminate vid, establish pid
+		 */
+		*pid++ = '\0';
+	} else {
+		/*
+		 * vid will stay "ATA     "
+		 */
+		vid = NULL;
+		/*
+		 * model is all pid
+		 */
+		pid = model;
+	}
+
+	*vendor = vid;
+	*product = pid;
+}
+
+/*
  * sata_name_child is for composing the name of the node
  * the format of the name is "target,0".
  */
@@ -1995,7 +2047,6 @@ sata_scsi_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 	char			model[SATA_ID_MODEL_LEN + 1];
 	char			fw[SATA_ID_FW_LEN + 1];
 	char			*vid, *pid;
-	int			i;
 
 	/*
 	 * Fail tran_tgt_init for .conf stub node
@@ -2060,17 +2111,7 @@ sata_scsi_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 	model[SATA_ID_MODEL_LEN] = 0;
 	fw[SATA_ID_FW_LEN] = 0;
 
-	/* split model into into vid/pid */
-	for (i = 0, pid = model; i < SATA_ID_MODEL_LEN; i++, pid++)
-		if ((*pid == ' ') || (*pid == '\t'))
-			break;
-	if (i < SATA_ID_MODEL_LEN) {
-		vid = model;
-		*pid++ = 0;		/* terminate vid, establish pid */
-	} else {
-		vid = NULL;		/* vid will stay "ATA     " */
-		pid = model;		/* model is all pid */
-	}
+	sata_split_model(model, &vid, &pid);
 
 	if (vid)
 		(void) scsi_device_prop_update_inqstring(sd, INQUIRY_VENDOR_ID,

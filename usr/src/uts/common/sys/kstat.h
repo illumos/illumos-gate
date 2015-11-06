@@ -22,7 +22,7 @@
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef	_SYS_KSTAT_H
@@ -296,6 +296,13 @@ typedef struct kstat32 {
  *		e.g. between kstat_create() and kstat_install().
  *		kstat clients must not attempt to access the kstat's data
  *		if this flag is set.
+ *
+ *	KSTAT_FLAG_LONGSTRINGS:
+ *
+ *		Indicates that this kstat contains long strings (which
+ *		are stored outside of the kstat data section). When copied
+ *		out to user space the string data will be held in the data
+ *		section provided by the user.
  */
 
 #define	KSTAT_FLAG_VIRTUAL		0x01
@@ -304,6 +311,7 @@ typedef struct kstat32 {
 #define	KSTAT_FLAG_PERSISTENT		0x08
 #define	KSTAT_FLAG_DORMANT		0x10
 #define	KSTAT_FLAG_INVALID		0x20
+#define	KSTAT_FLAG_LONGSTRINGS		0x40
 
 /*
  * Dynamic update support

@@ -28,6 +28,7 @@
  */
 /*
  * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <stdio.h>
@@ -1015,18 +1016,28 @@ show_disk_errors(void *v1, void *v2, void *d)
 
 		switch (knp[i].data_type) {
 			case KSTAT_DATA_CHAR:
+			case KSTAT_DATA_STRING:
 				if ((strcmp(knp[i].name, "Serial No") == 0) &&
 				    do_devid) {
 					if (disk->is_devid) {
 						push_out("Device Id: %s ",
 						    disk->is_devid);
 						col += strlen(disk->is_devid);
-					} else
+					} else {
 						push_out("Device Id: ");
-				} else {
+					}
+
+					break;
+				}
+				if (knp[i].data_type == KSTAT_DATA_CHAR) {
 					push_out("%s: %-.16s ", knp[i].name,
 					    &knp[i].value.c[0]);
-					col += strlen(&knp[i].value.c[0]);
+					col += strnlen(&knp[i].value.c[0], 16);
+				} else {
+					push_out("%s: %s ", knp[i].name,
+					    KSTAT_NAMED_STR_PTR(&knp[i]));
+					col +=
+					    KSTAT_NAMED_STR_BUFLEN(&knp[i]) - 1;
 				}
 				break;
 			case KSTAT_DATA_ULONG:
@@ -1036,11 +1047,13 @@ show_disk_errors(void *v1, void *v2, void *d)
 				break;
 			case KSTAT_DATA_ULONGLONG:
 				if (strcmp(knp[i].name, "Size") == 0) {
-					push_out("%s: %2.2fGB <%llu bytes>\n",
+					do_newline();
+					push_out("%s: %2.2fGB <%llu bytes>",
 					    knp[i].name,
 					    (float)knp[i].value.ui64 /
 					    DISK_GIGABYTE,
 					    knp[i].value.ui64);
+					do_newline();
 					col = 0;
 					break;
 				}

@@ -21,6 +21,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
 
 
@@ -105,14 +106,15 @@ read_kstat_data(int *rvalp, void *user_ksp, int flag)
 	/*
 	 * If it's a fixed-size kstat, allocate the buffer now, so we
 	 * don't have to do it under the kstat's data lock.  (If it's a
-	 * var-size kstat, we don't know the size until after the update
-	 * routine is called, so we can't do this optimization.)
+	 * var-size kstat or one with long strings, we don't know the size
+	 * until after the update routine is called, so we can't do this
+	 * optimization.)
 	 * The allocator relies on this behavior to prevent recursive
 	 * mutex_enter in its (fixed-size) kstat update routine.
 	 * It's a zalloc to prevent unintentional exposure of random
 	 * juicy morsels of (old) kernel data.
 	 */
-	if (!(ksp->ks_flags & KSTAT_FLAG_VAR_SIZE)) {
+	if (!(ksp->ks_flags & (KSTAT_FLAG_VAR_SIZE | KSTAT_FLAG_LONGSTRINGS))) {
 		kbufsize = ksp->ks_data_size;
 		kbuf = kmem_zalloc(kbufsize + 1, KM_NOSLEEP);
 		if (kbuf == NULL) {
@@ -159,183 +161,213 @@ read_kstat_data(int *rvalp, void *user_ksp, int flag)
 	KSTAT_EXIT(ksp);
 	kstat_rele(ksp);
 
+	if (kbuf == NULL)
+		goto out;
+
 	/*
 	 * Copy the buffer containing the kstat back to userland.
 	 */
 	copysize = kbufsize;
-	if (kbuf != NULL) {
+
+	switch (model) {
+	int i;
 #ifdef _MULTI_DATAMODEL
-		kstat32_t *k32;
-		kstat_t *k;
-#endif
-		int i;
+	kstat32_t *k32;
+	kstat_t *k;
 
-		switch (model) {
-#ifdef _MULTI_DATAMODEL
-		case DDI_MODEL_ILP32:
+	case DDI_MODEL_ILP32:
 
-			if (ksp->ks_type == KSTAT_TYPE_NAMED) {
-				kstat_named_t *kn = kbuf;
+		if (ksp->ks_type == KSTAT_TYPE_NAMED) {
+			kstat_named_t *kn = kbuf;
+			char *strbuf = (char *)((kstat_named_t *)kn +
+			    ksp->ks_ndata);
 
-				for (i = 0; i < user_kstat.ks_ndata; kn++, i++)
-					switch (kn->data_type) {
-					/*
-					 * Named statistics have fields of type
-					 * 'long'.  For a 32-bit application
-					 * looking at a 64-bit kernel,
-					 * forcibly truncate these 64-bit
-					 * quantities to 32-bit values.
-					 */
-					case KSTAT_DATA_LONG:
-						kn->value.i32 =
-						    (int32_t)kn->value.l;
-						kn->data_type =
-						    KSTAT_DATA_INT32;
+			for (i = 0; i < user_kstat.ks_ndata; kn++, i++)
+				switch (kn->data_type) {
+				/*
+				 * Named statistics have fields of type 'long'.
+				 * For a 32-bit application looking at a 64-bit
+				 * kernel, forcibly truncate these 64-bit
+				 * quantities to 32-bit values.
+				 */
+				case KSTAT_DATA_LONG:
+					kn->value.i32 = (int32_t)kn->value.l;
+					kn->data_type = KSTAT_DATA_INT32;
+					break;
+				case KSTAT_DATA_ULONG:
+					kn->value.ui32 = (uint32_t)kn->value.ul;
+					kn->data_type = KSTAT_DATA_UINT32;
+					break;
+				/*
+				 * Long strings must be massaged before being
+				 * copied out to userland.  Do that here.
+				 */
+				case KSTAT_DATA_STRING:
+					if (KSTAT_NAMED_STR_PTR(kn) == NULL)
 						break;
-					case KSTAT_DATA_ULONG:
-						kn->value.ui32 =
-						    (uint32_t)kn->value.ul;
-						kn->data_type =
-						    KSTAT_DATA_UINT32;
-						break;
 					/*
-					 * Long strings must be massaged before
-					 * being copied out to userland.  Do
-					 * that here.
+					 * If the string lies outside of kbuf
+					 * copy it there and update the pointer.
 					 */
-					case KSTAT_DATA_STRING:
-						if (KSTAT_NAMED_STR_PTR(kn)
-						    == NULL)
-							break;
-						/*
-						 * The offsets within the
-						 * buffers are the same, so add
-						 * the offset to the beginning
-						 * of the new buffer to fix the
-						 * pointer.
-						 */
+					if (KSTAT_NAMED_STR_PTR(kn) <
+					    (char *)kbuf ||
+					    KSTAT_NAMED_STR_PTR(kn) +
+					    KSTAT_NAMED_STR_BUFLEN(kn) >
+					    (char *)kbuf + kbufsize + 1) {
+						bcopy(KSTAT_NAMED_STR_PTR(kn),
+						    strbuf,
+						    KSTAT_NAMED_STR_BUFLEN(kn));
+
 						KSTAT_NAMED_STR_PTR(kn) =
-						    (char *)user_kstat.ks_data +
-						    (KSTAT_NAMED_STR_PTR(kn) -
-						    (char *)kbuf);
-						/*
-						 * Make sure the string pointer
-						 * lies within the allocated
-						 * buffer.
-						 */
-						ASSERT(KSTAT_NAMED_STR_PTR(kn) +
-						    KSTAT_NAMED_STR_BUFLEN(kn)
-						    <=
-						    ((char *)
-						    user_kstat.ks_data +
-						    ubufsize));
-						ASSERT(KSTAT_NAMED_STR_PTR(kn)
-						    >=
-						    (char *)
-						    ((kstat_named_t *)
-						    user_kstat.ks_data +
-						    user_kstat.ks_ndata));
-						/*
-						 * Cast 64-bit ptr to 32-bit.
-						 */
-						kn->value.str.addr.ptr32 =
-						    (caddr32_t)(uintptr_t)
-						    KSTAT_NAMED_STR_PTR(kn);
-						break;
-					default:
-						break;
+						    strbuf;
+						strbuf +=
+						    KSTAT_NAMED_STR_BUFLEN(kn);
+						ASSERT(strbuf <=
+						    (char *)kbuf +
+						    kbufsize + 1);
 					}
-			}
-
-			if (user_kstat.ks_kid != 0)
-				break;
-
-			/*
-			 * This is the special case of the kstat header
-			 * list for the entire system.  Reshape the
-			 * array in place, then copy it out.
-			 */
-			k32 = kbuf;
-			k = kbuf;
-			for (i = 0; i < user_kstat.ks_ndata; k32++, k++, i++) {
-				k32->ks_crtime		= k->ks_crtime;
-				k32->ks_next		= 0;
-				k32->ks_kid		= k->ks_kid;
-				(void) strcpy(k32->ks_module, k->ks_module);
-				k32->ks_resv		= k->ks_resv;
-				k32->ks_instance	= k->ks_instance;
-				(void) strcpy(k32->ks_name, k->ks_name);
-				k32->ks_type		= k->ks_type;
-				(void) strcpy(k32->ks_class, k->ks_class);
-				k32->ks_flags		= k->ks_flags;
-				k32->ks_data		= 0;
-				k32->ks_ndata		= k->ks_ndata;
-				if (k->ks_data_size > UINT32_MAX) {
-					error = EOVERFLOW;
+					/*
+					 * The offsets within the buffers are
+					 * the same, so add the offset to the
+					 * beginning of the new buffer to fix
+					 * the pointer.
+					 */
+					KSTAT_NAMED_STR_PTR(kn) =
+					    (char *)user_kstat.ks_data +
+					    (KSTAT_NAMED_STR_PTR(kn) -
+					    (char *)kbuf);
+					/*
+					 * Make sure the string pointer lies
+					 * within the allocated buffer.
+					 */
+					ASSERT(KSTAT_NAMED_STR_PTR(kn) +
+					    KSTAT_NAMED_STR_BUFLEN(kn) <=
+					    ((char *)user_kstat.ks_data +
+					    ubufsize));
+					ASSERT(KSTAT_NAMED_STR_PTR(kn) >=
+					    (char *)((kstat_named_t *)
+					    user_kstat.ks_data +
+					    user_kstat.ks_ndata));
+					/*
+					 * Cast 64-bit ptr to 32-bit.
+					 */
+					kn->value.str.addr.ptr32 =
+					    (caddr32_t)(uintptr_t)
+					    KSTAT_NAMED_STR_PTR(kn);
+					break;
+				default:
 					break;
 				}
-				k32->ks_data_size = (size32_t)k->ks_data_size;
-				k32->ks_snaptime	= k->ks_snaptime;
-			}
-
-			/*
-			 * XXX	In this case we copy less data than is
-			 *	claimed in the header.
-			 */
-			copysize = user_kstat.ks_ndata * sizeof (kstat32_t);
-			break;
-#endif	/* _MULTI_DATAMODEL */
-		default:
-		case DDI_MODEL_NONE:
-			if (ksp->ks_type == KSTAT_TYPE_NAMED) {
-				kstat_named_t *kn = kbuf;
-
-				for (i = 0; i < user_kstat.ks_ndata; kn++, i++)
-					switch (kn->data_type) {
-#ifdef _LP64
-					case KSTAT_DATA_LONG:
-						kn->data_type =
-						    KSTAT_DATA_INT64;
-						break;
-					case KSTAT_DATA_ULONG:
-						kn->data_type =
-						    KSTAT_DATA_UINT64;
-						break;
-#endif	/* _LP64 */
-					case KSTAT_DATA_STRING:
-						if (KSTAT_NAMED_STR_PTR(kn)
-						    == NULL)
-							break;
-						KSTAT_NAMED_STR_PTR(kn) =
-						    (char *)user_kstat.ks_data +
-						    (KSTAT_NAMED_STR_PTR(kn) -
-						    (char *)kbuf);
-						ASSERT(KSTAT_NAMED_STR_PTR(kn) +
-						    KSTAT_NAMED_STR_BUFLEN(kn)
-						    <=
-						    ((char *)
-						    user_kstat.ks_data +
-						    ubufsize));
-						ASSERT(KSTAT_NAMED_STR_PTR(kn)
-						    >=
-						    (char *)
-						    ((kstat_named_t *)
-						    user_kstat.ks_data +
-						    user_kstat.ks_ndata));
-						break;
-					default:
-						break;
-					}
-			}
-			break;
 		}
 
-		if (error == 0 &&
-		    copyout(kbuf, user_kstat.ks_data, copysize))
-			error = EFAULT;
-		kmem_free(kbuf, kbufsize + 1);
+		if (user_kstat.ks_kid != 0)
+			break;
+
+		/*
+		 * This is the special case of the kstat header
+		 * list for the entire system.  Reshape the
+		 * array in place, then copy it out.
+		 */
+		k32 = kbuf;
+		k = kbuf;
+		for (i = 0; i < user_kstat.ks_ndata; k32++, k++, i++) {
+			k32->ks_crtime		= k->ks_crtime;
+			k32->ks_next		= 0;
+			k32->ks_kid		= k->ks_kid;
+			(void) strcpy(k32->ks_module, k->ks_module);
+			k32->ks_resv		= k->ks_resv;
+			k32->ks_instance	= k->ks_instance;
+			(void) strcpy(k32->ks_name, k->ks_name);
+			k32->ks_type		= k->ks_type;
+			(void) strcpy(k32->ks_class, k->ks_class);
+			k32->ks_flags		= k->ks_flags;
+			k32->ks_data		= 0;
+			k32->ks_ndata		= k->ks_ndata;
+			if (k->ks_data_size > UINT32_MAX) {
+				error = EOVERFLOW;
+				break;
+			}
+			k32->ks_data_size = (size32_t)k->ks_data_size;
+			k32->ks_snaptime	= k->ks_snaptime;
+		}
+
+		/*
+		 * XXX	In this case we copy less data than is
+		 *	claimed in the header.
+		 */
+		copysize = user_kstat.ks_ndata * sizeof (kstat32_t);
+		break;
+#endif	/* _MULTI_DATAMODEL */
+	default:
+	case DDI_MODEL_NONE:
+		if (ksp->ks_type == KSTAT_TYPE_NAMED) {
+			kstat_named_t *kn = kbuf;
+			char *strbuf = (char *)((kstat_named_t *)kn +
+			    ksp->ks_ndata);
+
+			for (i = 0; i < user_kstat.ks_ndata; kn++, i++)
+				switch (kn->data_type) {
+#ifdef _LP64
+				case KSTAT_DATA_LONG:
+					kn->data_type =
+					    KSTAT_DATA_INT64;
+					break;
+				case KSTAT_DATA_ULONG:
+					kn->data_type =
+					    KSTAT_DATA_UINT64;
+					break;
+#endif	/* _LP64 */
+				case KSTAT_DATA_STRING:
+					if (KSTAT_NAMED_STR_PTR(kn) == NULL)
+						break;
+					/*
+					 * If the string lies outside of kbuf
+					 * copy it there and update the pointer.
+					 */
+					if (KSTAT_NAMED_STR_PTR(kn) <
+					    (char *)kbuf ||
+					    KSTAT_NAMED_STR_PTR(kn) +
+					    KSTAT_NAMED_STR_BUFLEN(kn) >
+					    (char *)kbuf + kbufsize + 1) {
+						bcopy(KSTAT_NAMED_STR_PTR(kn),
+						    strbuf,
+						    KSTAT_NAMED_STR_BUFLEN(kn));
+
+						KSTAT_NAMED_STR_PTR(kn) =
+						    strbuf;
+						strbuf +=
+						    KSTAT_NAMED_STR_BUFLEN(kn);
+						ASSERT(strbuf <=
+						    (char *)kbuf +
+						    kbufsize + 1);
+					}
+
+					KSTAT_NAMED_STR_PTR(kn) =
+					    (char *)user_kstat.ks_data +
+					    (KSTAT_NAMED_STR_PTR(kn) -
+					    (char *)kbuf);
+					ASSERT(KSTAT_NAMED_STR_PTR(kn) +
+					    KSTAT_NAMED_STR_BUFLEN(kn) <=
+					    ((char *)user_kstat.ks_data +
+					    ubufsize));
+					ASSERT(KSTAT_NAMED_STR_PTR(kn) >=
+					    (char *)((kstat_named_t *)
+					    user_kstat.ks_data +
+					    user_kstat.ks_ndata));
+					break;
+				default:
+					break;
+				}
+		}
+		break;
 	}
 
+	if (error == 0 &&
+	    copyout(kbuf, user_kstat.ks_data, copysize))
+		error = EFAULT;
+	kmem_free(kbuf, kbufsize + 1);
+
+out:
 	/*
 	 * We have modified the ks_ndata, ks_data_size, ks_flags, and
 	 * ks_snaptime fields of the user kstat; now copy it back to userland.
@@ -427,7 +459,7 @@ write_kstat_data(int *rvalp, void *user_ksp, int flag, cred_t *cred)
 	}
 
 	/*
-	 * With KSTAT_FLAG_VARIABLE, one must call the kstat's update callback
+	 * With KSTAT_FLAG_VAR_SIZE, one must call the kstat's update callback
 	 * routine to ensure ks_data_size is up to date.
 	 * In this case it makes sense to do it anyhow, as it will be shortly
 	 * followed by a KSTAT_SNAPSHOT().
