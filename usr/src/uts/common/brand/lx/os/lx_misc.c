@@ -464,23 +464,30 @@ lx_initlwp(klwp_t *lwp, void *lwpbd)
 	lwp->lwp_brand_syscall = lx_syscall_enter;
 
 	/*
-	 * If the parent LWP has a ptrace(2) tracer, the new LWP may
-	 * need to inherit that same tracer.
-	 * In addition the new LPW inherits the parent LWP cgroup ID.
+	 * The new LWP inherits the parent LWP cgroup ID.
 	 */
 	if (plwpd != NULL) {
-		lx_ptrace_inherit_tracer(plwpd, lwpd);
 		lwpd->br_cgroupid = plwpd->br_cgroupid;
 	}
-
-	/* cgroup integration */
 	lxzdata = ztolxzd(p->p_zone);
 	if (lxzdata->lxzd_cgroup != NULL) {
 		ASSERT(lx_cgrp_initlwp != NULL);
 		(*lx_cgrp_initlwp)(lxzdata->lxzd_cgroup,
 		    lwpd->br_cgroupid, lwptot(lwp)->t_tid, lwpd->br_pid);
 	}
+}
 
+void
+lx_initlwp_post(klwp_t *lwp)
+{
+	lx_lwp_data_t *plwpd = ttolxlwp(curthread);
+	/*
+	 * If the parent LWP has a ptrace(2) tracer, the new LWP may
+	 * need to inherit that same tracer.
+	 */
+	if (plwpd != NULL) {
+		lx_ptrace_inherit_tracer(plwpd, lwptolxlwp(lwp));
+	}
 }
 
 /*

@@ -117,7 +117,7 @@ struct execa;
  * b_proc_exit - Perform process brand exit processing
  * b_exec - Reset branded process state on exec
  * b_lwp_setrval - Set return code for forked child
- * b_initlwp - Initialize lwp brand data
+ * b_initlwp - Initialize lwp brand data (cannot drop p->p_lock)
  * b_forklwp - Copy lwp brand data during fork
  * b_freelwp - Free lwp brand data
  * b_lwpexit - Perform lwp-specific brand exit processing
@@ -131,6 +131,7 @@ struct execa;
  * b_lwpdata_alloc - Speculatively allocate data for use in b_initlwp
  * b_lwpdata_free - Free data from allocated by b_lwpdata_alloc if errors occur
  *                  during lwp creation before b_initlwp could be called.
+ * b_initlwp_post - Complete lwp branding (can temporarily drop p->p_lock)
  * b_exit_with_sig - Instead of sending SIGCLD, exit with custom behavior
  * b_psig_to_proc - Custom additional behavior during psig
  * b_wait_filter - Filter processes from being matched by waitid
@@ -163,6 +164,7 @@ struct brand_ops {
 	void	*(*b_lwpdata_alloc)(struct proc *);
 	void	(*b_lwpdata_free)(void *);
 	void	(*b_initlwp)(klwp_t *, void *);
+	void	(*b_initlwp_post)(klwp_t *);
 	void	(*b_forklwp)(klwp_t *, klwp_t *);
 	void	(*b_freelwp)(klwp_t *);
 	void	(*b_lwpexit)(klwp_t *);

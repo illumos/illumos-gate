@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -531,6 +532,20 @@ sprunlock(proc_t *p)
 	cv_signal(&pr_pid_cv[p->p_slot]);
 	p->p_proc_flag &= ~P_PR_LOCK;
 	mutex_exit(&p->p_lock);
+	THREAD_KPRI_RELEASE();
+}
+
+/*
+ * Undo effects of sprlock but without dropping p->p_lock
+ */
+void
+sprunprlock(proc_t *p)
+{
+	ASSERT(p->p_proc_flag & P_PR_LOCK);
+	ASSERT(MUTEX_HELD(&p->p_lock));
+
+	cv_signal(&pr_pid_cv[p->p_slot]);
+	p->p_proc_flag &= ~P_PR_LOCK;
 	THREAD_KPRI_RELEASE();
 }
 

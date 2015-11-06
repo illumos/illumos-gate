@@ -647,6 +647,7 @@ extern int sprtrylock_proc(proc_t *);
 extern void sprwaitlock_proc(proc_t *);
 extern void sprlock_proc(proc_t *);
 extern void sprunlock(proc_t *);
+extern void sprunprlock(proc_t *);
 extern void pid_init(void);
 extern proc_t *pid_entry(int);
 extern int pid_slot(proc_t *);

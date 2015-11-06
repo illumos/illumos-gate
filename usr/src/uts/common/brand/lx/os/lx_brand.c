@@ -257,6 +257,7 @@ struct brand_ops lx_brops = {
 	lx_lwpdata_alloc,		/* b_lwpdata_alloc */
 	lx_lwpdata_free,		/* b_lwpdata_free */
 	lx_initlwp,			/* b_initlwp */
+	lx_initlwp_post,		/* b_initlwp_post */
 	lx_forklwp,			/* b_forklwp */
 	lx_freelwp,			/* b_freelwp */
 	lx_exitlwp,			/* b_lwpexit */
@@ -333,6 +334,7 @@ lx_proc_exit(proc_t *p)
 
 	mutex_enter(&p->p_lock);
 	VERIFY(lxpd = ptolxproc(p));
+	VERIFY(lxpd->l_ptrace == 0);
 	if ((lxpd->l_flags & LX_PROC_CHILD_DEATHSIG) == 0) {
 		mutex_exit(&p->p_lock);
 		return;
@@ -1549,6 +1551,13 @@ lx_copy_procdata(proc_t *cp, proc_t *pp)
 
 	bcopy(ppd, cpd, sizeof (lx_proc_data_t));
 	mutex_exit(&pp->p_lock);
+
+	/*
+	 * The l_ptrace count is normally manipulated only while under holding
+	 * p_lock.  Since this is a freshly created process, it's safe to zero
+	 * out.  If it is to be inherited, the attach will occur later.
+	 */
+	cpd->l_ptrace = 0;
 
 	cpd->l_fake_limits[LX_RLFAKE_LOCKS].rlim_cur = LX_RLIM64_INFINITY;
 	cpd->l_fake_limits[LX_RLFAKE_LOCKS].rlim_max = LX_RLIM64_INFINITY;

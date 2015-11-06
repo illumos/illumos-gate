@@ -80,6 +80,7 @@ struct brand_ops s10_brops = {
 	NULL,				/* b_lwpdata_alloc */
 	NULL,				/* b_lwpdata_free */
 	s10_initlwp,			/* b_initlwp */
+	NULL,				/* b_initlwp_post */
 	s10_forklwp,			/* b_forklwp */
 	s10_freelwp,			/* b_freelwp */
 	s10_lwpexit,			/* b_lwpexit */
