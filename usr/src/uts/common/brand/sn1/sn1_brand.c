@@ -75,6 +75,7 @@ struct brand_ops sn1_brops = {
 	NULL,				/* b_lwpdata_alloc */
 	NULL,				/* b_lwpdata_free */
 	sn1_initlwp,			/* b_initlwp */
+	NULL,				/* b_initlwp_post */
 	sn1_forklwp,			/* b_forklwp */
 	sn1_freelwp,			/* b_freelwp */
 	sn1_lwpexit,			/* b_lwpexit */

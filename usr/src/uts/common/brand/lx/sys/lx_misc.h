@@ -34,6 +34,7 @@ extern void lx_freelwp(klwp_t *);
 extern void *lx_lwpdata_alloc(proc_t *);
 extern void lx_lwpdata_free(void *);
 extern void lx_initlwp(klwp_t *, void *);
+extern void lx_initlwp_post(klwp_t *);
 extern void lx_forklwp(klwp_t *, klwp_t *);
 
 extern void lx_set_gdt(int, user_desc_t *);

@@ -695,7 +695,14 @@ grow:
 	t->t_pre_sys = 1;
 	t->t_post_sys = 1;
 
-	/* Complete branded lwp initialization */
+	/*
+	 * Perform lwp branding
+	 *
+	 * The b_initlwp hook is _not_ allowed to drop p->p_lock as it must be
+	 * continuously held between when the tidhash is sized and when the lwp
+	 * is inserted into it.  Operations requiring p->p_lock to be
+	 * temporarily dropped can be performed in b_initlwp_post.
+	 */
 	if (PROC_IS_BRANDED(p)) {
 		BROP(p)->b_initlwp(lwp, brand_data);
 		/*
@@ -729,6 +736,13 @@ grow:
 	lep->le_lwpid = t->t_tid;
 	lep->le_start = t->t_start;
 	lwp_hash_in(p, lep, p->p_tidhash, p->p_tidhash_sz, 1);
+
+	/*
+	 * Complete lwp branding
+	 */
+	if (PROC_IS_BRANDED(p) && BROP(p)->b_initlwp_post != NULL) {
+		BROP(p)->b_initlwp_post(lwp);
+	}
 
 	if (state == TS_RUN) {
 		/*
