@@ -90,6 +90,7 @@ umask 002;
 	"logadm18",
 	"logadm19",
 	"logadm20",
+	"logadm21"
 );
 
 use Getopt::Std;
@@ -2107,5 +2108,27 @@ EOF
 $envsetup
 $bindir/logadm -f logadm.conf -F logadm.timestamps -w /a/b/c -p 1w -l -b "/bin/echo \\"She can't take anymore, Cap'n!\\"" >std.out 2>std.err
 echo exit=\$? >>std.err
+EOF
+}
+
+#############################################################################
+#
+#         logadm21 -- test of busted configuration file
+#
+#############################################################################
+sub logadm21 {
+	set_file('logadm.conf', <<'EOF');
+poop
+EOF
+	set_file('checktest', <<'EOF');
+[ -s std.err ] || exit 1
+grep Warning std.err > /dev/null
+EOF
+
+        set_file('runtest', <<"EOF");
+# test "logadm21"
+$envsetup
+$bindir/logadm -f logadm.conf 2>std.err
+exit 0
 EOF
 }
