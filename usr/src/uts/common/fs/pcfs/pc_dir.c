@@ -645,7 +645,7 @@ top:
 		newisdir = tpcp->pc_entry.pcd_attr & PCA_DIR;
 
 		brelse(slot.sl_bp);
-		vnevent_rename_dest(PCTOV(tpcp), PCTOV(tdp), tnm, ctp);
+		vnevent_pre_rename_dest(PCTOV(tpcp), PCTOV(tdp), tnm, ctp);
 		VN_RELE(PCTOV(tpcp));
 
 		/*
@@ -774,6 +774,12 @@ top:
 			VN_RELE(PCTOV(pcp));
 			return (error);
 		}
+
+		if (dp != tdp)
+			vnevent_pre_rename_dest_dir(PCTOV(tdp), PCTOV(pcp),
+			    tnm, ctp);
+		vnevent_pre_rename_src(PCTOV(pcp), PCTOV(dp), snm, ctp);
+
 		error = pc_makedirentry(tdp, direntries, ndirentries, NULL,
 		    offset);
 		kmem_free(direntries, ndirentries * sizeof (struct pcdir));
