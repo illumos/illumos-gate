@@ -52,6 +52,9 @@ extern dis_arch_t dis_arch_i386;
 #if !defined(DIS_STANDALONE) || defined(__sparc)
 extern dis_arch_t dis_arch_sparc;
 #endif
+#if !defined(DIS_STANDALONE) || defined(__s390) || defined(__s390x)
+extern dis_arch_t dis_arch_s390;
+#endif
 
 static dis_arch_t *dis_archs[] = {
 #if !defined(DIS_STANDALONE) || defined(__i386) || defined(__amd64)
@@ -59,6 +62,9 @@ static dis_arch_t *dis_archs[] = {
 #endif
 #if !defined(DIS_STANDALONE) || defined(__sparc)
 	&dis_arch_sparc,
+#endif
+#if !defined(DIS_STANDALONE) || defined(__s390) || defined(__s390x)
+	&dis_arch_s390,
 #endif
 	NULL
 };

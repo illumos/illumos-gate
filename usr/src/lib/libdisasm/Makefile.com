@@ -57,12 +57,14 @@ SRCS_i386=		$(COMDIR)/dis_i386.c \
 SRCS_sparc=		$(COMDIR)/dis_sparc.c \
 			$(COMDIR)/dis_sparc_fmt.c \
 			$(COMDIR)/dis_sparc_instr.c
+SRCS_s390x=		$(COMDIR)/dis_s390x.c
 
 OBJECTS_i386=		dis_i386.o \
 			dis_tables.o
 OBJECTS_sparc=		dis_sparc.o \
 			dis_sparc_fmt.o \
 			dis_sparc_instr.o
+OBJECTS_s390x=		dis_s390x.o
 
 #
 # We build the regular shared library with support for all architectures.
@@ -71,7 +73,8 @@ OBJECTS_sparc=		dis_sparc.o \
 #
 OBJECTS_library=	$(OBJECTS_common) \
 			$(OBJECTS_i386) \
-			$(OBJECTS_sparc)
+			$(OBJECTS_sparc) \
+			$(OBJECTS_s390x)
 OBJECTS_standalone=	$(OBJECTS_common) \
 			$(OBJECTS_$(MACH))
 OBJECTS=		$(OBJECTS_$(CURTYPE))
@@ -80,7 +83,8 @@ include $(SRC)/lib/Makefile.lib
 
 SRCS_library=		$(SRCS_common) \
 			$(SRCS_i386) \
-			$(SRCS_sparc)
+			$(SRCS_sparc) \
+			$(SRCS_s390x)
 SRCS_standalone=	$(SRCS_common) \
 			$(SRCS_$(MACH))
 SRCS=			$(SRCS_$(CURTYPE))
