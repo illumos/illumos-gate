@@ -16,6 +16,13 @@
 #ifndef _SMB_SIGNING_H_
 #define	_SMB_SIGNING_H_
 
+/*
+ * SMB signing routines used in {smb,smb2}_signing.c
+ * Two implementations of these (kernel/user) in:
+ *	uts/common/fs/smbsrv/smb_sign_kcf.c
+ *	lib/smbsrv/libfksmbsrv/common/fksmb_sign_pkcs.c
+ */
+
 #ifdef	_KERNEL
 #include <sys/crypto/api.h>
 #else
@@ -28,6 +35,8 @@ extern "C" {
 #endif
 
 #define	MD5_DIGEST_LENGTH	16	/* MD5 digest length in bytes */
+#define	SHA256_DIGEST_LENGTH	32	/* SHA256 digest length in bytes */
+#define	SMB2_SIG_SIZE		16
 
 #ifdef	_KERNEL
 /* KCF variant */
@@ -40,16 +49,22 @@ typedef CK_SESSION_HANDLE	smb_sign_ctx_t;
 #endif	/* _KERNEL */
 
 /*
- * SMB1 signing routines used in smb_signing.c
- * Two implementations of these (kernel/user) in:
- *	uts/common/fs/smbsrv/smb_sign_kcf.c
- *	lib/smbsrv/libfksmbsrv/common/fksmb_sign_pkcs.c
+ * SMB signing routines used in smb_signing.c
  */
 
 int smb_md5_getmech(smb_sign_mech_t *);
 int smb_md5_init(smb_sign_ctx_t *, smb_sign_mech_t *);
 int smb_md5_update(smb_sign_ctx_t, void *, size_t);
 int smb_md5_final(smb_sign_ctx_t, uint8_t *);
+
+/*
+ * SMB2 signing routines used in smb2_signing.c
+ */
+
+int smb2_hmac_getmech(smb_sign_mech_t *);
+int smb2_hmac_init(smb_sign_ctx_t *, smb_sign_mech_t *, uint8_t *, size_t);
+int smb2_hmac_update(smb_sign_ctx_t, uint8_t *, size_t);
+int smb2_hmac_final(smb_sign_ctx_t, uint8_t *);
 
 #ifdef __cplusplus
 }

@@ -19,7 +19,6 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
@@ -82,12 +81,17 @@ typedef struct smb_buf32 {
 	(sizeof (smb_posix_grps_t) + (n - 1) * sizeof (gid_t))
 /*
  * It consists of the primary and supplementary POSIX groups.
+ * See also: smb_posix_grps_xdr()
  */
 typedef struct smb_posix_grps {
 	uint32_t	pg_ngrps;
 	gid_t		pg_grps[ANY_SIZE_ARRAY];
 } smb_posix_grps_t;
 
+/*
+ * An NT-style logon "token" (NT terminology)
+ * See also: smb_token_xdr()
+ */
 typedef struct smb_token {
 	smb_id_t	tkn_user;
 	smb_id_t	tkn_owner;
@@ -104,6 +108,7 @@ typedef struct smb_token {
 
 /*
  * Details required to authenticate a user.
+ * See also: smb_logon_xdr()
  */
 typedef struct smb_logon {
 	uint16_t	lg_level;

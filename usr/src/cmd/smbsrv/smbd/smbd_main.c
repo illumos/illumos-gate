@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -472,6 +472,11 @@ smbd_service_init(void)
 			smbd_report("unable to set KRB5CCNAME");
 		return (-1);
 	}
+
+#ifndef	FKSMBD
+	/* Upgrade SMF settings, if necessary. */
+	smb_config_upgrade();
+#endif
 
 	smb_codepage_init();
 

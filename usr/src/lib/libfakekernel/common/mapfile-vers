@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 #
 
 #
@@ -180,6 +180,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	tick_per_msec;
 	tsignal;
 	uiomove;
+	uioskip;
 	usec_per_tick;
 	vcmn_err;
 	vmem_qcache_reap;

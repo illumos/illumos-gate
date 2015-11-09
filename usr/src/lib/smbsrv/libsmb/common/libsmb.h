@@ -151,6 +151,10 @@ typedef enum {
 	SMB_CI_DISPOSITION,
 	SMB_CI_DFS_STDROOT_NUM,
 	SMB_CI_TRAVERSE_MOUNTS,
+	SMB_CI_SMB2_ENABLE_OLD, /* obsolete */
+	SMB_CI_INITIAL_CREDITS,
+	SMB_CI_MAXIMUM_CREDITS,
+	SMB_CI_MAX_PROTOCOL,
 
 	SMB_CI_MAX
 } smb_cfg_id_t;
@@ -172,6 +176,7 @@ extern int smb_smf_set_opaque_property(smb_scfhandle_t *, char *,
 extern int smb_smf_get_opaque_property(smb_scfhandle_t *, char *,
     void *, size_t);
 extern int smb_smf_create_service_pgroup(smb_scfhandle_t *, char *);
+extern int smb_smf_delete_property(smb_scfhandle_t *, char *);
 extern int smb_smf_restart_service(void);
 extern int smb_smf_maintenance_mode(void);
 
@@ -205,6 +210,10 @@ extern int smb_config_getip(smb_cfg_id_t, smb_inaddr_t *);
 extern void smb_config_get_version(smb_version_t *);
 uint32_t smb_config_get_execinfo(char *, char *, size_t);
 extern void smb_config_get_negtok(uchar_t *, uint32_t *);
+
+extern int smb_config_check_protocol(char *);
+extern uint32_t smb_config_get_max_protocol(void);
+extern void smb_config_upgrade(void);
 
 extern void smb_load_kconfig(smb_kmod_cfg_t *kcfg);
 extern uint32_t smb_crc_gen(uint8_t *, size_t);

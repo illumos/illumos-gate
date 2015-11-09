@@ -14,6 +14,7 @@
 # Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 #
 
+file path=usr/share/man/man7fs/bootfs.7fs
 file path=usr/share/man/man7fs/ctfs.7fs
 file path=usr/share/man/man7fs/dcfs.7fs
 file path=usr/share/man/man7fs/dev.7fs

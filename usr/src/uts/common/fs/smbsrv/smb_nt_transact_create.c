@@ -102,7 +102,7 @@ smb_pre_nt_transact_create(smb_request_t *sr, smb_xa_t *xa)
 	}
 
 	if (sd_len) {
-		status = smb_decode_sd(xa, &sd);
+		status = smb_decode_sd(&xa->req_data_mb, &sd);
 		if (status != NT_STATUS_SUCCESS) {
 			smbsr_error(sr, status, 0, 0);
 			return (SDRC_ERROR);
@@ -143,6 +143,7 @@ smb_nt_transact_create(smb_request_t *sr, smb_xa_t *xa)
 	uint8_t			DirFlag;
 	smb_attr_t		attr;
 	smb_ofile_t		*of;
+	uint32_t		status;
 	int			rc;
 
 	if ((op->create_options & FILE_DELETE_ON_CLOSE) &&
@@ -184,8 +185,11 @@ smb_nt_transact_create(smb_request_t *sr, smb_xa_t *xa)
 
 	op->op_oplock_levelII = B_TRUE;
 
-	if (smb_common_open(sr) != NT_STATUS_SUCCESS)
+	status = smb_common_open(sr);
+	if (status != NT_STATUS_SUCCESS) {
+		smbsr_status(sr, status, 0, 0);
 		return (SDRC_ERROR);
+	}
 
 	/*
 	 * NB: after the above smb_common_open() success,
@@ -209,7 +213,7 @@ smb_nt_transact_create(smb_request_t *sr, smb_xa_t *xa)
 			goto errout;
 		}
 
-		(void) smb_mbc_encodef(&xa->rep_param_mb, "b.wllTTTTlqqwwb",
+		rc = smb_mbc_encodef(&xa->rep_param_mb, "b.wllTTTTlqqwwb",
 		    op->op_oplock_level,
 		    sr->smb_fid,
 		    op->action_taken,
@@ -228,7 +232,7 @@ smb_nt_transact_create(smb_request_t *sr, smb_xa_t *xa)
 
 	case STYPE_IPC:
 		bzero(&attr, sizeof (smb_attr_t));
-		(void) smb_mbc_encodef(&xa->rep_param_mb, "b.wllTTTTlqqwwb",
+		rc = smb_mbc_encodef(&xa->rep_param_mb, "b.wllTTTTlqqwwb",
 		    0,
 		    sr->smb_fid,
 		    op->action_taken,

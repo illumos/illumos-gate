@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -32,6 +32,7 @@
 #include <sys/ksocket.h>
 #include <sys/debug.h>
 #include <sys/kmem.h>
+#include <limits.h>
 #include <unistd.h>
 #include <errno.h>
 #include <umem.h>
@@ -293,7 +294,8 @@ int
 ksocket_sendmsg(ksocket_t ks, struct nmsghdr *msg, int flags,
     size_t *sent, struct cred *cr)
 {
-	ssize_t error;
+	uio_t uio;
+	ssize_t len;
 
 	/* All Solaris components should pass a cred for this operation. */
 	ASSERT(cr != NULL);
@@ -304,15 +306,35 @@ ksocket_sendmsg(ksocket_t ks, struct nmsghdr *msg, int flags,
 		return (ENOTSOCK);
 	}
 
-	error = sendmsg(KSTOSO(ks), msg, flags);
-	if (error < 0) {
+	/* socksyscalls.c uses MSG_MAXIOVLEN (local macro), both are 16 */
+	ASSERT3U(msg->msg_iovlen, <=, IOV_MAX);
+	len = sendmsg(KSTOSO(ks), msg, flags);
+	if (len < 0) {
 		if (sent != NULL)
 			*sent = 0;
 		return (errno);
 	}
 
+	/*
+	 * The user-level sendmsg() does NOT update msg->iov like
+	 * ksocket_sendmsg().  It's unclear whether that's a bug
+	 * or if that was intentional.  Anyway, update it here.
+	 */
+	if (msg->msg_iov != NULL) {
+		bzero(&uio, sizeof (uio));
+		uio.uio_iov = msg->msg_iov;
+		uio.uio_iovcnt = msg->msg_iovlen;
+		uio.uio_resid = len;
+
+		uioskip(&uio, len);
+		ASSERT(uio.uio_resid == 0);
+
+		msg->msg_iov = uio.uio_iov;
+		msg->msg_iovlen = uio.uio_iovcnt;
+	}
+
 	if (sent != NULL)
-		*sent = (size_t)error;
+		*sent = (size_t)len;
 	return (0);
 }
 

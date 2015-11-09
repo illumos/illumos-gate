@@ -282,11 +282,11 @@ smb_delete_single_file(smb_request_t *sr, smb_error_t *err)
 static int
 smb_delete_multiple_files(smb_request_t *sr, smb_error_t *err)
 {
-	int rc, deleted = 0;
-	smb_fqi_t *fqi;
-	uint16_t odid;
-	smb_odir_t *od;
 	char namebuf[MAXNAMELEN];
+	smb_fqi_t *fqi;
+	smb_odir_t *od;
+	uint32_t status;
+	int rc, deleted = 0;
 
 	fqi = &sr->arg.dirop.fqi;
 
@@ -294,13 +294,12 @@ smb_delete_multiple_files(smb_request_t *sr, smb_error_t *err)
 	 * Specify all search attributes (SMB_SEARCH_ATTRIBUTES) so that
 	 * delete-specific checking can be done (smb_delete_check_dosattr).
 	 */
-	odid = smb_odir_open(sr, fqi->fq_path.pn_path,
-	    SMB_SEARCH_ATTRIBUTES, 0);
-	if (odid == 0)
+	status = smb_odir_openpath(sr, fqi->fq_path.pn_path,
+	    SMB_SEARCH_ATTRIBUTES, 0, &od);
+	if (status != 0) {
+		err->status = status;
 		return (-1);
-
-	if ((od = smb_tree_lookup_odir(sr, odid)) == NULL)
-		return (-1);
+	}
 
 	for (;;) {
 		rc = smb_delete_find_fname(sr, od, namebuf, MAXNAMELEN);
@@ -379,10 +378,7 @@ smb_delete_find_fname(smb_request_t *sr, smb_odir_t *od, char *namebuf, int len)
 
 	rc = smb_odir_read(sr, od, odirent, &eos);
 	if (rc == 0) {
-		if (eos)
-			rc = ENOENT;
-		else
-			(void) strlcpy(namebuf, odirent->od_name, len);
+		(void) strlcpy(namebuf, odirent->od_name, len);
 	}
 	kmem_free(odirent, sizeof (smb_odirent_t));
 	return (rc);

@@ -20,10 +20,10 @@
 #
 
 #
+# Copyright 2015 Gary Mills
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/SUNWuwb@0.5.11,5.11-0.133
-set name=pkg.renamed value=true
+set name=pkg.obsolete value=true
 set name=variant.arch value=$(ARCH)
-depend fmri=pkg:/system/kernel/ultra-wideband@0.5.11,5.11-0.133 type=require

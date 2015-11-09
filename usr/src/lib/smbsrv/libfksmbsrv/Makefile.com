@@ -30,6 +30,7 @@ VERS =		.1
 
 OBJS_LOCAL = \
 		fksmb_cred.o \
+		fksmb_dt.o \
 		fksmb_fem.o \
 		fksmb_idmap.o \
 		fksmb_init.o \
@@ -53,13 +54,17 @@ OBJS_FS_SMBSRV = \
 		smb_alloc.o				\
 		smb_authenticate.o			\
 		smb_close.o				\
+		smb_cmn_rename.o			\
+		smb_cmn_setfile.o			\
 		smb_common_open.o			\
 		smb_common_transact.o			\
 		smb_create.o				\
 		smb_delete.o				\
+		smb_dfs.o				\
 		smb_directory.o				\
 		smb_dispatch.o				\
 		smb_echo.o				\
+		smb_errno.o				\
 		smb_find.o				\
 		smb_flush.o				\
 		smb_fsinfo.o				\
@@ -76,6 +81,7 @@ OBJS_FS_SMBSRV = \
 		smb_negotiate.o				\
 		smb_net.o				\
 		smb_node.o				\
+		smb_notify.o				\
 		smb_nt_cancel.o				\
 		smb_nt_create_andx.o			\
 		smb_nt_transact_create.o		\
@@ -92,6 +98,7 @@ OBJS_FS_SMBSRV = \
 		smb_print.o				\
 		smb_process_exit.o			\
 		smb_query_fileinfo.o			\
+		smb_quota.o				\
 		smb_read.o				\
 		smb_rename.o				\
 		smb_sd.o				\
@@ -112,7 +119,38 @@ OBJS_FS_SMBSRV = \
 		smb_vfs.o				\
 		smb_vops.o				\
 		smb_vss.o				\
-		smb_write.o
+		smb_write.o				\
+		\
+		smb2_dispatch.o \
+		smb2_cancel.o \
+		smb2_change_notify.o \
+		smb2_close.o \
+		smb2_create.o \
+		smb2_echo.o \
+		smb2_flush.o \
+		smb2_ioctl.o \
+		smb2_lock.o \
+		smb2_logoff.o \
+		smb2_negotiate.o \
+		smb2_ofile.o \
+		smb2_oplock.o \
+		smb2_qinfo_file.o \
+		smb2_qinfo_fs.o \
+		smb2_qinfo_sec.o \
+		smb2_qinfo_quota.o \
+		smb2_query_dir.o \
+		smb2_query_info.o \
+		smb2_read.o \
+		smb2_session_setup.o \
+		smb2_set_info.o \
+		smb2_setinfo_file.o \
+		smb2_setinfo_fs.o \
+		smb2_setinfo_quota.o \
+		smb2_setinfo_sec.o \
+		smb2_signing.o \
+		smb2_tree_connect.o \
+		smb2_tree_disconn.o \
+		smb2_write.o
 
 # Can't just link with -lsmb because of user vs kernel API
 # i.e. can't call free with mem from kmem_alloc, which is
@@ -135,6 +173,7 @@ OBJS_MISC = \
 		acl_common.o \
 		pathname.o \
 		refstr.o \
+		smb_status2winerr.o \
 		xattr_common.o
 
 OBJECTS = \
@@ -188,6 +227,10 @@ pics/%.o:	$(SRC)/uts/common/fs/smbsrv/%.c
 
 pics/acl_common.o:	   $(SRC)/common/acl/acl_common.c
 	$(COMPILE.c) -o $@ $(SRC)/common/acl/acl_common.c
+	$(POST_PROCESS_O)
+
+pics/smb_status2winerr.o:  $(SRC)/common/smbclnt/smb_status2winerr.c
+	$(COMPILE.c) -o $@ $(SRC)/common/smbclnt/smb_status2winerr.c
 	$(POST_PROCESS_O)
 
 pics/pathname.o:	   $(SRC)/uts/common/fs/pathname.c

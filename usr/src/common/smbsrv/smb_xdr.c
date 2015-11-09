@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <sys/sunddi.h>
@@ -447,6 +447,9 @@ smb_gmttoken_snapname_xdr(XDR *xdrs, smb_gmttoken_snapname_t *objp)
 		return (FALSE);
 	}
 	if (!xdr_string(xdrs, &objp->gts_gmttoken, SMB_VSS_GMT_SIZE)) {
+		return (FALSE);
+	}
+	if (!xdr_uint64_t(xdrs, &objp->gts_toktime)) {
 		return (FALSE);
 	}
 	return (TRUE);

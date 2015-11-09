@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 
@@ -72,11 +72,11 @@ gethrtime_unscaled(void)
 void
 gethrestime(timespec_t *ts)
 {
-	hrtime_t hrt;
+	struct timeval tv;
 
-	hrt = gethrtime();
-	ts->tv_sec = hrt / NANOSEC;
-	ts->tv_nsec = hrt % NANOSEC;
+	(void) gettimeofday(&tv, NULL);
+	ts->tv_sec = tv.tv_sec;
+	ts->tv_nsec = tv.tv_usec * 1000;
 }
 
 time_t

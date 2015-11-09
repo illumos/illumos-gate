@@ -27,8 +27,6 @@
 #ifndef	_COMMON_UTIL_STRING_H
 #define	_COMMON_UTIL_STRING_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 
 #ifdef __cplusplus

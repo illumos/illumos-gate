@@ -12,7 +12,7 @@
 #
 # Copyright 2011, Richard Lowe
 # Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
-# Copyright 2014 Joyent, Inc. All rights reserved.
+# Copyright 2014 Joyent, Inc.
 #
 
 include		$(SRC)/Makefile.master

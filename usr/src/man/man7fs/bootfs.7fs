@@ -40,7 +40,6 @@ indicate that this has occurred. In both cases, diagnostic information
 is available through the kstats facility.
 
 .SH FILES
-.sp
 .ne 2
 .na
 .B /system/boot

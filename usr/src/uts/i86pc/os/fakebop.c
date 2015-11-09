@@ -67,6 +67,7 @@
 #include <sys/kobj.h>
 #include <sys/kobj_lex.h>
 #include <sys/pci_cfgspace_impl.h>
+#include <sys/fastboot_impl.h>
 #include "acpi_fw.h"
 
 static int have_console = 0;	/* set once primitive console is initialized */
@@ -665,7 +666,7 @@ boot_prop_finish(void)
 	}
 done:
 	if (fd >= 0)
-		BRD_CLOSE(bfs_ops, fd);
+		(void) BRD_CLOSE(bfs_ops, fd);
 
 	/*
 	 * Check if we have to limit the boot time allocator
@@ -1214,6 +1215,14 @@ build_boot_properties(void)
 			bsetprop64("ramdisk_end",
 			    (uint64_t)(uintptr_t)rdbm->bm_addr + rdbm->bm_size);
 		}
+	}
+
+	/*
+	 * If there are any boot time modules or hashes present, then disable
+	 * fast reboot.
+	 */
+	if (xbootp->bi_module_cnt > 1) {
+		fastreboot_disable(FBNS_BOOTMOD);
 	}
 
 	DBG_MSG("Parsing command line for boot properties\n");

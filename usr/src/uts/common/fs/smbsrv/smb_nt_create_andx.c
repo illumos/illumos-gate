@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -192,8 +192,8 @@ smb_pre_nt_create_andx(smb_request_t *sr)
 	if (rc == 0) {
 		if (NameLength == 0) {
 			op->fqi.fq_path.pn_path = "\\";
-		} else if (NameLength >= MAXPATHLEN) {
-			smbsr_error(sr, NT_STATUS_OBJECT_PATH_NOT_FOUND,
+		} else if (NameLength >= SMB_MAXPATHLEN) {
+			smbsr_error(sr, NT_STATUS_OBJECT_NAME_INVALID,
 			    ERRDOS, ERROR_PATH_NOT_FOUND);
 			rc = -1;
 		} else {
@@ -235,6 +235,7 @@ smb_com_nt_create_andx(struct smb_request *sr)
 	smb_ofile_t		*of;
 	int			rc;
 	unsigned char		DirFlag;
+	uint32_t		status;
 
 	if ((op->create_options & FILE_DELETE_ON_CLOSE) &&
 	    !(op->desired_access & DELETE)) {
@@ -275,8 +276,11 @@ smb_com_nt_create_andx(struct smb_request *sr)
 
 	op->op_oplock_levelII = B_TRUE;
 
-	if (smb_common_open(sr) != NT_STATUS_SUCCESS)
+	status = smb_common_open(sr);
+	if (status != NT_STATUS_SUCCESS) {
+		smbsr_status(sr, status, 0, 0);
 		return (SDRC_ERROR);
+	}
 
 	/*
 	 * NB: after the above smb_common_open() success,

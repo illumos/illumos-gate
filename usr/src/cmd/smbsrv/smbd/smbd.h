@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _SMBD_H
@@ -67,7 +67,7 @@ void smbd_load_printers(void);
 int smbd_vss_get_count(const char *, uint32_t *);
 void smbd_vss_get_snapshots(const char *, uint32_t, uint32_t *,
     uint32_t *, char **);
-int smbd_vss_map_gmttoken(const char *, char *, char *);
+int smbd_vss_map_gmttoken(const char *, char *, time_t, char *);
 
 typedef struct smbd {
 	const char	*s_version;	/* smbd version string */

@@ -20,7 +20,6 @@
  */
 
 /*
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
@@ -127,6 +126,7 @@ typedef struct smb_hdrbuf {
  */
 
 #define	SMB_PROTOCOL_MAGIC	0x424d53ff
+#define	SMB2_PROTOCOL_MAGIC	0x424d53fe
 
 /*
  * Time and date encoding (CIFS Section 3.6). The date is encoded such
@@ -234,6 +234,17 @@ typedef uint32_t smb_utime_t;
 #define	FILE_ACTION_ADDED_STREAM	0x00000006
 #define	FILE_ACTION_REMOVED_STREAM	0x00000007
 #define	FILE_ACTION_MODIFIED_STREAM	0x00000008
+/*
+ * Note: These action values are not from MS-FSCC.
+ * FILE_ACTION_SUBDIR_CHANGED is used internally for
+ * "watch tree" support, posted to all parents of a
+ * directory that had one of the changes above.
+ * FILE_ACTION_DELETE_PENDING is used internally to tell
+ * notify change requests when the "delete-on-close" flag
+ * has been set on the directory being watched.
+ */
+#define	FILE_ACTION_SUBDIR_CHANGED	0x00000009
+#define	FILE_ACTION_DELETE_PENDING	0x0000000a
 
 
 /* Lock type flags */
@@ -402,6 +413,8 @@ typedef uint32_t smb_utime_t;
 #define	LANMAN2_1		 9  /* OS/2 LANMAN2.1 */
 #define	Windows_for_Workgroups_3_1a 10 /* Windows for Workgroups Version 1.0 */
 #define	NT_LM_0_12		11  /* The SMB protocol designed for NT */
+#define	DIALECT_SMB2002		12  /* SMB 2.002 (switch to SMB2) */
+#define	DIALECT_SMB2XXX		13  /* SMB 2.??? (switch to SMB2) */
 
 /*
  * SMB_TREE_CONNECT_ANDX OptionalSupport flags
@@ -922,6 +935,20 @@ typedef uint32_t smb_utime_t;
 #define	FILE_REMOTE_DEVICE		0x00000010
 #define	FILE_DEVICE_IS_MOUNTED		0x00000020
 #define	FILE_VIRTUAL_VOLUME		0x00000040
+
+/*
+ * File System Control Flags for smb_com_trans2_query|set_fs_information
+ * level SMB_FILE_FS_CONTROL_INFORMATION
+ */
+#define	FILE_VC_QUOTA_TRACK		0x00000001
+#define	FILE_VC_QUOTA_ENFORCE		0x00000002
+#define	FILE_VC_CONTENT_INDEX_DISABLED	0x00000008
+#define	FILE_VC_LOG_QUOTA_THRESHOLD	0x00000010
+#define	FILE_VC_LOG_QUOTA_LIMIT		0x00000020
+#define	FILE_VC_LOG_VOLUME_THRESHOLD	0x00000040
+#define	FILE_VC_LOG_VOLUME_LIMIT	0x00000080
+#define	FILE_VC_QUOTAS_INCOMPLETE	0x00000100
+#define	FILE_VC_QUOTAS_REBUILDING	0x00000200
 
 /*
  * CREATE_ANDX ShareAccess Flags

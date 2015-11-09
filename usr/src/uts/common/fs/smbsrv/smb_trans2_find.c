@@ -22,7 +22,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 
@@ -282,10 +282,11 @@ smb_sdrc_t
 smb_com_trans2_find_first2(smb_request_t *sr, smb_xa_t *xa)
 {
 	int		count;
-	uint16_t	sattr, odid;
+	uint16_t	sattr;
 	smb_pathname_t	*pn;
 	smb_odir_t	*od;
 	smb_find_args_t	args;
+	uint32_t	status;
 	uint32_t	odir_flags = 0;
 
 	bzero(&args, sizeof (smb_find_args_t));
@@ -324,16 +325,11 @@ smb_com_trans2_find_first2(smb_request_t *sr, smb_xa_t *xa)
 	if (args.fa_maxdata == 0)
 		return (SDRC_ERROR);
 
-	odid = smb_odir_open(sr, pn->pn_path, sattr, odir_flags);
-	if (odid == 0) {
-		if (sr->smb_error.status == NT_STATUS_OBJECT_PATH_NOT_FOUND) {
-			smbsr_error(sr, NT_STATUS_OBJECT_NAME_NOT_FOUND,
-			    ERRDOS, ERROR_FILE_NOT_FOUND);
-		}
+	status = smb_odir_openpath(sr, pn->pn_path, sattr, odir_flags, &od);
+	if (status != 0) {
+		smbsr_error(sr, status, 0, 0);
 		return (SDRC_ERROR);
 	}
-
-	od = smb_tree_lookup_odir(sr, odid);
 	if (od == NULL)
 		return (SDRC_ERROR);
 
@@ -357,14 +353,14 @@ smb_com_trans2_find_first2(smb_request_t *sr, smb_xa_t *xa)
 		smb_odir_close(od);
 	} /* else leave odir open for trans2_find_next2 */
 
-	smb_odir_release(od);
-
 	(void) smb_mbc_encodef(&xa->rep_param_mb, "wwwww",
-	    odid,	/* Search ID */
+	    od->d_odid,	/* Search ID */
 	    count,	/* Search Count */
 	    args.fa_eos, /* End Of Search */
 	    0,		/* EA Error Offset */
 	    args.fa_lno); /* Last Name Offset */
+
+	smb_odir_release(od);
 
 	return (SDRC_SUCCESS);
 }
@@ -540,6 +536,7 @@ smb_trans2_find_entries(smb_request_t *sr, smb_xa_t *xa, smb_odir_t *od,
 	smb_odir_resume_t odir_resume;
 	uint16_t	count, maxcount;
 	int		rc = -1;
+	boolean_t	need_rewind = B_FALSE;
 
 	if ((maxcount = args->fa_maxcount) == 0)
 		maxcount = 1;
@@ -549,17 +546,17 @@ smb_trans2_find_entries(smb_request_t *sr, smb_xa_t *xa, smb_odir_t *od,
 
 	count = 0;
 	while (count < maxcount) {
-		if (smb_odir_read_fileinfo(sr, od, &fileinfo, &args->fa_eos)
-		    != 0)
-			return (-1);
-		if (args->fa_eos != 0)
+		rc = smb_odir_read_fileinfo(sr, od, &fileinfo, &args->fa_eos);
+		if (rc != 0 || args->fa_eos != 0)
 			break;
 
 		rc = smb_trans2_find_mbc_encode(sr, xa, &fileinfo, args);
 		if (rc == -1)
-			return (-1);
-		if (rc == 1)
-			break;
+			return (-1); /* fatal encoding error */
+		if (rc == 1) {
+			need_rewind = B_TRUE;
+			break; /* output space exhausted */
+		}
 
 		/*
 		 * Save the info about the last file returned.
@@ -569,6 +566,8 @@ smb_trans2_find_entries(smb_request_t *sr, smb_xa_t *xa, smb_odir_t *od,
 
 		++count;
 	}
+	if (args->fa_eos != 0 && rc == ENOENT)
+		rc = 0;
 
 	/* save the last cookie returned to client */
 	if (count != 0)
@@ -579,8 +578,15 @@ smb_trans2_find_entries(smb_request_t *sr, smb_xa_t *xa, smb_odir_t *od,
 	 * and eos has not already been detected, check if there are
 	 * any more entries. eos will be set if there are no more.
 	 */
-	if ((rc == 0) && (args->fa_eos == 0))
-		(void) smb_odir_read_fileinfo(sr, od, &fileinfo, &args->fa_eos);
+	if ((rc == 0) && (args->fa_eos == 0)) {
+		rc = smb_odir_read_fileinfo(sr, od, &fileinfo, &args->fa_eos);
+		/*
+		 * If rc == ENOENT, we did not read any additional data.
+		 * if rc != 0, there's no need to rewind.
+		 */
+		if (rc == 0)
+			need_rewind = B_TRUE;
+	}
 
 	/*
 	 * When the last entry we read from the directory did not
@@ -589,10 +595,12 @@ smb_trans2_find_entries(smb_request_t *sr, smb_xa_t *xa, smb_odir_t *od,
 	 * check for EOS just above both can leave the directory
 	 * position incorrect for the next call.  Fix that now.
 	 */
-	bzero(&odir_resume, sizeof (odir_resume));
-	odir_resume.or_type = SMB_ODIR_RESUME_COOKIE;
-	odir_resume.or_cookie = args->fa_lastkey;
-	smb_odir_resume_at(od, &odir_resume);
+	if (need_rewind) {
+		bzero(&odir_resume, sizeof (odir_resume));
+		odir_resume.or_type = SMB_ODIR_RESUME_COOKIE;
+		odir_resume.or_cookie = args->fa_lastkey;
+		smb_odir_resume_at(od, &odir_resume);
+	}
 
 	return (count);
 }

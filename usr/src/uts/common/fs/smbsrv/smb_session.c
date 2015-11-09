@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/atomic.h>
@@ -29,9 +29,12 @@
 #include <sys/sdt.h>
 #include <sys/random.h>
 #include <smbsrv/netbios.h>
-#include <smbsrv/smb_kproto.h>
+#include <smbsrv/smb2_kproto.h>
 #include <smbsrv/string.h>
 #include <netinet/tcp.h>
+
+/* How many iovec we'll handle as a local array (no allocation) */
+#define	SMB_LOCAL_IOV_MAX	16
 
 #define	SMB_NEW_KID()	atomic_inc_64_nv(&smb_kids)
 
@@ -43,10 +46,13 @@ static volatile uint64_t smb_kids;
  */
 uint32_t smb_keep_alive = SMB_PI_KEEP_ALIVE_MIN / 60;
 
+static int  smbsr_newrq_initial(smb_request_t *);
+
 static void smb_session_cancel(smb_session_t *);
-static int smb_session_message(smb_session_t *);
-static int smb_session_xprt_puthdr(smb_session_t *, smb_xprt_t *,
-    uint8_t *, size_t);
+static int smb_session_reader(smb_session_t *);
+static int smb_session_xprt_puthdr(smb_session_t *,
+    uint8_t msg_type, uint32_t msg_len,
+    uint8_t *dst, size_t dstlen);
 static smb_tree_t *smb_session_get_tree(smb_session_t *, smb_tree_t *);
 static void smb_session_logoff(smb_session_t *);
 static void smb_request_init_command_mbuf(smb_request_t *sr);
@@ -108,58 +114,95 @@ smb_session_correct_keep_alive_values(smb_llist_t *ll, uint32_t new_keep_alive)
 
 /*
  * Send a session message - supports SMB-over-NBT and SMB-over-TCP.
+ * If an mbuf chain is provided (optional), it will be freed and
+ * set to NULL -- unconditionally!  (error or not)
  *
- * The mbuf chain is copied into a contiguous buffer so that the whole
- * message is submitted to smb_sosend as a single request.  This should
- * help Ethereal/Wireshark delineate the packets correctly even though
- * TCP_NODELAY has been set on the socket.
- *
- * If an mbuf chain is provided, it will be freed and set to NULL here.
+ * Builds a I/O vector (uio/iov) to do the send from mbufs, plus one
+ * segment for the 4-byte NBT header.
  */
 int
-smb_session_send(smb_session_t *session, uint8_t type, mbuf_chain_t *mbc)
+smb_session_send(smb_session_t *session, uint8_t nbt_type, mbuf_chain_t *mbc)
 {
-	smb_txreq_t	*txr;
-	smb_xprt_t	hdr;
+	uio_t		uio;
+	iovec_t		local_iov[SMB_LOCAL_IOV_MAX];
+	iovec_t		*alloc_iov = NULL;
+	int		alloc_sz = 0;
+	mbuf_t		*m;
+	uint8_t		nbt_hdr[NETBIOS_HDR_SZ];
+	uint32_t	nbt_len;
+	int		i, nseg;
 	int		rc;
 
 	switch (session->s_state) {
 	case SMB_SESSION_STATE_DISCONNECTED:
 	case SMB_SESSION_STATE_TERMINATED:
-		if ((mbc != NULL) && (mbc->chain != NULL)) {
-			m_freem(mbc->chain);
-			mbc->chain = NULL;
-			mbc->flags = 0;
-		}
-		return (ENOTCONN);
+		rc = ENOTCONN;
+		goto out;
 	default:
 		break;
 	}
 
-	txr = smb_net_txr_alloc();
+	/*
+	 * Setup the IOV.  First, count the number of IOV segments
+	 * (plus one for the NBT header) and decide whether we
+	 * need to allocate an iovec or can use local_iov;
+	 */
+	bzero(&uio, sizeof (uio));
+	nseg = 1;
+	m = (mbc != NULL) ? mbc->chain : NULL;
+	while (m != NULL) {
+		nseg++;
+		m = m->m_next;
+	}
+	if (nseg <= SMB_LOCAL_IOV_MAX) {
+		uio.uio_iov = local_iov;
+	} else {
+		alloc_sz = nseg * sizeof (iovec_t);
+		alloc_iov = kmem_alloc(alloc_sz, KM_SLEEP);
+		uio.uio_iov = alloc_iov;
+	}
+	uio.uio_iovcnt = nseg;
+	uio.uio_segflg = UIO_SYSSPACE;
+	uio.uio_extflg = UIO_COPY_DEFAULT;
 
+	/*
+	 * Build the iov list, meanwhile computing the length of
+	 * the SMB payload (to put in the NBT header).
+	 */
+	uio.uio_iov[0].iov_base = (void *)nbt_hdr;
+	uio.uio_iov[0].iov_len = sizeof (nbt_hdr);
+	i = 1;
+	nbt_len = 0;
+	m = (mbc != NULL) ? mbc->chain : NULL;
+	while (m != NULL) {
+		uio.uio_iov[i].iov_base = m->m_data;
+		uio.uio_iov[i++].iov_len = m->m_len;
+		nbt_len += m->m_len;
+		m = m->m_next;
+	}
+	ASSERT3S(i, ==, nseg);
+
+	/*
+	 * Set the NBT header, set uio_resid
+	 */
+	uio.uio_resid = nbt_len + NETBIOS_HDR_SZ;
+	rc = smb_session_xprt_puthdr(session, nbt_type, nbt_len,
+	    nbt_hdr, NETBIOS_HDR_SZ);
+	if (rc != 0)
+		goto out;
+
+	smb_server_add_txb(session->s_server, (int64_t)uio.uio_resid);
+	rc = smb_net_send_uio(session, &uio);
+
+out:
+	if (alloc_iov != NULL)
+		kmem_free(alloc_iov, alloc_sz);
 	if ((mbc != NULL) && (mbc->chain != NULL)) {
-		rc = mbc_moveout(mbc, (caddr_t)&txr->tr_buf[NETBIOS_HDR_SZ],
-		    sizeof (txr->tr_buf) - NETBIOS_HDR_SZ, &txr->tr_len);
-		if (rc != 0) {
-			smb_net_txr_free(txr);
-			return (rc);
-		}
+		m_freem(mbc->chain);
+		mbc->chain = NULL;
+		mbc->flags = 0;
 	}
-
-	hdr.xh_type = type;
-	hdr.xh_length = (uint32_t)txr->tr_len;
-
-	rc = smb_session_xprt_puthdr(session, &hdr, txr->tr_buf,
-	    NETBIOS_HDR_SZ);
-
-	if (rc != 0) {
-		smb_net_txr_free(txr);
-		return (rc);
-	}
-	txr->tr_len += NETBIOS_HDR_SZ;
-	smb_server_add_txb(session->s_server, (int64_t)txr->tr_len);
-	return (smb_net_txr_send(session->sock, &session->s_txlst, txr));
+	return (rc);
 }
 
 /*
@@ -175,7 +218,7 @@ smb_session_send(smb_session_t *session, uint8_t type, mbuf_chain_t *mbc)
  * if the client is behind a NAT server.
  */
 static int
-smb_session_request(struct smb_session *session)
+smb_netbios_session_request(struct smb_session *session)
 {
 	int			rc;
 	char			*calling_name;
@@ -308,30 +351,40 @@ smb_session_xprt_gethdr(smb_session_t *session, smb_xprt_t *ret_hdr)
 
 /*
  * Encode a transport session packet header into a 4-byte buffer.
- * See smb_xprt_t definition for header format information.
  */
 static int
-smb_session_xprt_puthdr(smb_session_t *session, smb_xprt_t *hdr,
+smb_session_xprt_puthdr(smb_session_t *session,
+    uint8_t msg_type, uint32_t msg_length,
     uint8_t *buf, size_t buflen)
 {
-	if (session == NULL || hdr == NULL ||
-	    buf == NULL || buflen < NETBIOS_HDR_SZ) {
+	if (buf == NULL || buflen < NETBIOS_HDR_SZ) {
 		return (-1);
 	}
 
 	switch (session->s_local_port) {
 	case IPPORT_NETBIOS_SSN:
-		buf[0] = hdr->xh_type;
-		buf[1] = ((hdr->xh_length >> 16) & 1);
-		buf[2] = (hdr->xh_length >> 8) & 0xff;
-		buf[3] = hdr->xh_length & 0xff;
+		/* Per RFC 1001, 1002: msg. len < 128KB */
+		if (msg_length >= (1 << 17))
+			return (-1);
+		buf[0] = msg_type;
+		buf[1] = ((msg_length >> 16) & 1);
+		buf[2] = (msg_length >> 8) & 0xff;
+		buf[3] = msg_length & 0xff;
 		break;
 
 	case IPPORT_SMB:
-		buf[0] = hdr->xh_type;
-		buf[1] = (hdr->xh_length >> 16) & 0xff;
-		buf[2] = (hdr->xh_length >> 8) & 0xff;
-		buf[3] = hdr->xh_length & 0xff;
+		/*
+		 * SMB over TCP is like NetBIOS but the one byte
+		 * message type is always zero, and the length
+		 * part is three bytes.  It could actually use
+		 * longer messages, but this is conservative.
+		 */
+		if (msg_length >= (1 << 24))
+			return (-1);
+		buf[0] = msg_type;
+		buf[1] = (msg_length >> 16) & 0xff;
+		buf[2] = (msg_length >> 8) & 0xff;
+		buf[3] = msg_length & 0xff;
 		break;
 
 	default:
@@ -429,7 +482,7 @@ smb_session_receiver(smb_session_t *session)
 	session->s_thread = curthread;
 
 	if (session->s_local_port == IPPORT_NETBIOS_SSN) {
-		rc = smb_session_request(session);
+		rc = smb_netbios_session_request(session);
 		if (rc != 0) {
 			smb_rwx_rwenter(&session->s_lock, RW_WRITER);
 			session->s_state = SMB_SESSION_STATE_DISCONNECTED;
@@ -442,7 +495,7 @@ smb_session_receiver(smb_session_t *session)
 	session->s_state = SMB_SESSION_STATE_ESTABLISHED;
 	smb_rwx_rwexit(&session->s_lock);
 
-	(void) smb_session_message(session);
+	(void) smb_session_reader(session);
 
 	smb_rwx_rwenter(&session->s_lock, RW_WRITER);
 	session->s_state = SMB_SESSION_STATE_DISCONNECTED;
@@ -476,7 +529,6 @@ smb_session_disconnect(smb_session_t *session)
 	case SMB_SESSION_STATE_CONNECTED:
 	case SMB_SESSION_STATE_ESTABLISHED:
 	case SMB_SESSION_STATE_NEGOTIATED:
-	case SMB_SESSION_STATE_OPLOCK_BREAKING:
 		smb_soshutdown(session->sock);
 		session->s_state = SMB_SESSION_STATE_DISCONNECTED;
 		_NOTE(FALLTHRU)
@@ -500,7 +552,7 @@ smb_session_disconnect(smb_session_t *session)
  *	6	Unable to read SMB data
  */
 static int
-smb_session_message(smb_session_t *session)
+smb_session_reader(smb_session_t *session)
 {
 	smb_server_t	*sv;
 	smb_request_t	*sr = NULL;
@@ -535,44 +587,38 @@ smb_session_message(smb_session_t *session)
 			return (EPROTO);
 		}
 
+		if (hdr.xh_length == 0) {
+			/* zero length is another form of keep alive */
+			session->keep_alive = smb_keep_alive;
+			continue;
+		}
+
 		if (hdr.xh_length < SMB_HEADER_LEN)
+			return (EPROTO);
+		if (hdr.xh_length > session->cmd_max_bytes)
 			return (EPROTO);
 
 		session->keep_alive = smb_keep_alive;
+
 		/*
-		 * Allocate a request context, read the SMB header and validate
-		 * it. The sr includes a buffer large enough to hold the SMB
-		 * request payload.  If the header looks valid, read any
-		 * remaining data.
+		 * Allocate a request context, read the whole message.
 		 */
 		sr = smb_request_alloc(session, hdr.xh_length);
 
 		req_buf = (uint8_t *)sr->sr_request_buf;
 		resid = hdr.xh_length;
 
-		rc = smb_sorecv(session->sock, req_buf, SMB_HEADER_LEN);
+		rc = smb_sorecv(session->sock, req_buf, resid);
 		if (rc) {
 			smb_request_free(sr);
-			return (rc);
+			break;
 		}
 
-		if (SMB_PROTOCOL_MAGIC_INVALID(sr)) {
-			smb_request_free(sr);
-			return (EPROTO);
-		}
-
-		if (resid > SMB_HEADER_LEN) {
-			req_buf += SMB_HEADER_LEN;
-			resid -= SMB_HEADER_LEN;
-
-			rc = smb_sorecv(session->sock, req_buf, resid);
-			if (rc) {
-				smb_request_free(sr);
-				return (rc);
-			}
-		}
+		/* accounting: requests, received bytes */
+		smb_server_inc_req(sv);
 		smb_server_add_rxb(sv,
 		    (int64_t)(hdr.xh_length + NETBIOS_HDR_SZ));
+
 		/*
 		 * Initialize command MBC to represent the received data.
 		 */
@@ -580,23 +626,52 @@ smb_session_message(smb_session_t *session)
 
 		DTRACE_PROBE1(session__receive__smb, smb_request_t *, sr);
 
-		if (sr->session->signing.flags & SMB_SIGNING_ENABLED) {
-			if (SMB_IS_NT_CANCEL(sr)) {
-				sr->session->signing.seqnum++;
-				sr->sr_seqnum = sr->session->signing.seqnum + 1;
-				sr->reply_seqnum = 0;
-			} else {
-				sr->session->signing.seqnum += 2;
-				sr->sr_seqnum = sr->session->signing.seqnum;
-				sr->reply_seqnum = sr->sr_seqnum + 1;
-			}
-		}
-		sr->sr_time_submitted = gethrtime();
-		sr->sr_state = SMB_REQ_STATE_SUBMITTED;
-		smb_srqueue_waitq_enter(session->s_srqueue);
-		(void) taskq_dispatch(session->s_server->sv_worker_pool,
-		    smb_session_worker, sr, TQ_SLEEP);
+		rc = session->newrq_func(sr);
+		sr = NULL;	/* enqueued or freed */
+		if (rc != 0)
+			break;
 	}
+	return (rc);
+}
+
+/*
+ * This is the initial handler for new smb requests, called from
+ * from smb_session_reader when we have not yet seen any requests.
+ * The first SMB request must be "negotiate", which determines
+ * which protocol and dialect we'll be using.  That's the ONLY
+ * request type handled here, because with all later requests,
+ * we know the protocol and handle those with either the SMB1 or
+ * SMB2 handlers:  smb1sr_post() or smb2sr_post().
+ * Those do NOT allow SMB negotiate, because that's only allowed
+ * as the first request on new session.
+ *
+ * This and other "post a request" handlers must either enqueue
+ * the new request for the session taskq, or smb_request_free it
+ * (in case we've decided to drop this connection).  In this
+ * (special) new request handler, we always free the request.
+ */
+static int
+smbsr_newrq_initial(smb_request_t *sr)
+{
+	uint32_t magic;
+	int rc = EPROTO;
+
+	mutex_enter(&sr->sr_mutex);
+	sr->sr_state = SMB_REQ_STATE_ACTIVE;
+	mutex_exit(&sr->sr_mutex);
+
+	magic = SMB_READ_PROTOCOL(sr->sr_request_buf);
+	if (magic == SMB_PROTOCOL_MAGIC)
+		rc = smb1_newrq_negotiate(sr);
+	if (magic == SMB2_PROTOCOL_MAGIC)
+		rc = smb2_newrq_negotiate(sr);
+
+	mutex_enter(&sr->sr_mutex);
+	sr->sr_state = SMB_REQ_STATE_COMPLETED;
+	mutex_exit(&sr->sr_mutex);
+
+	smb_request_free(sr);
+	return (rc);
 }
 
 /*
@@ -611,6 +686,7 @@ smb_session_create(ksocket_t new_so, uint16_t port, smb_server_t *sv,
 	struct sockaddr_in6	sin6;
 	smb_session_t		*session;
 	int64_t			now;
+	uint16_t		rport;
 
 	session = kmem_cache_alloc(smb_cache_session, KM_SLEEP);
 	bzero(session, sizeof (smb_session_t));
@@ -635,6 +711,8 @@ smb_session_create(ksocket_t new_so, uint16_t port, smb_server_t *sv,
 	session->activity_timestamp = now;
 
 	smb_session_genkey(session);
+
+	mutex_init(&session->s_credits_mutex, NULL, MUTEX_DEFAULT, NULL);
 
 	smb_slist_constructor(&session->s_req_list, sizeof (smb_request_t),
 	    offsetof(smb_request_t, sr_session_lnd));
@@ -666,6 +744,7 @@ smb_session_create(ksocket_t new_so, uint16_t port, smb_server_t *sv,
 			bcopy(&sin.sin_addr,
 			    &session->ipaddr.au_addr.au_ipv4,
 			    sizeof (in_addr_t));
+			rport = sin.sin_port;
 		} else {
 			slen = sizeof (sin6);
 			(void) ksocket_getsockname(new_so,
@@ -679,10 +758,12 @@ smb_session_create(ksocket_t new_so, uint16_t port, smb_server_t *sv,
 			bcopy(&sin6.sin6_addr,
 			    &session->ipaddr.au_addr.au_ipv6,
 			    sizeof (in6_addr_t));
+			rport = sin6.sin6_port;
 		}
 		session->ipaddr.a_family = family;
 		session->local_ipaddr.a_family = family;
 		session->s_local_port = port;
+		session->s_remote_port = ntohs(rport);
 		session->sock = new_so;
 		(void) smb_inet_ntop(&session->ipaddr,
 		    session->ip_addr_str, INET6_ADDRSTRLEN);
@@ -694,6 +775,16 @@ smb_session_create(ksocket_t new_so, uint16_t port, smb_server_t *sv,
 	session->s_server = sv;
 	smb_server_get_cfg(sv, &session->s_cfg);
 	session->s_srqueue = &sv->sv_srqueue;
+
+	/*
+	 * The initial new request handler is special,
+	 * and only accepts negotiation requests.
+	 */
+	session->newrq_func = smbsr_newrq_initial;
+
+	/* These may increase in SMB2 negotiate. */
+	session->cmd_max_bytes = SMB_REQ_MAX_SIZE;
+	session->reply_max_bytes = SMB_REQ_MAX_SIZE;
 
 	session->s_magic = SMB_SESSION_MAGIC;
 	return (session);
@@ -717,6 +808,8 @@ smb_session_delete(smb_session_t *session)
 
 	smb_rwx_destroy(&session->s_lock);
 	smb_net_txl_destructor(&session->s_txlst);
+
+	mutex_destroy(&session->s_credits_mutex);
 
 	smb_slist_destructor(&session->s_req_list);
 	smb_llist_destructor(&session->s_tree_list);
@@ -794,41 +887,6 @@ smb_session_cancel_requests(
 	}
 
 	smb_slist_exit(&session->s_req_list);
-}
-
-void
-smb_session_worker(void	*arg)
-{
-	smb_request_t	*sr;
-	smb_srqueue_t	*srq;
-
-	sr = (smb_request_t *)arg;
-	SMB_REQ_VALID(sr);
-
-	srq = sr->session->s_srqueue;
-	smb_srqueue_waitq_to_runq(srq);
-	sr->sr_worker = curthread;
-	mutex_enter(&sr->sr_mutex);
-	sr->sr_time_active = gethrtime();
-	switch (sr->sr_state) {
-	case SMB_REQ_STATE_SUBMITTED:
-		mutex_exit(&sr->sr_mutex);
-		if (smb_dispatch_request(sr)) {
-			mutex_enter(&sr->sr_mutex);
-			sr->sr_state = SMB_REQ_STATE_COMPLETED;
-			mutex_exit(&sr->sr_mutex);
-			smb_request_free(sr);
-		}
-		break;
-
-	default:
-		ASSERT(sr->sr_state == SMB_REQ_STATE_CANCELED);
-		sr->sr_state = SMB_REQ_STATE_COMPLETED;
-		mutex_exit(&sr->sr_mutex);
-		smb_request_free(sr);
-		break;
-	}
-	smb_srqueue_runq_exit(srq);
 }
 
 /*
@@ -1008,7 +1066,7 @@ smb_session_lookup_volume(
 void
 smb_session_close_pid(
     smb_session_t	*session,
-    uint16_t		pid)
+    uint32_t		pid)
 {
 	smb_tree_t	*tree;
 
@@ -1270,6 +1328,7 @@ smb_request_alloc(smb_session_t *session, int req_length)
 	smb_request_t	*sr;
 
 	ASSERT(session->s_magic == SMB_SESSION_MAGIC);
+	ASSERT(req_length <= session->cmd_max_bytes);
 
 	sr = kmem_cache_alloc(smb_cache_request, KM_SLEEP);
 
@@ -1288,7 +1347,7 @@ smb_request_alloc(smb_session_t *session, int req_length)
 	sr->sr_gmtoff = session->s_server->si_gmtoff;
 	sr->sr_cfg = &session->s_cfg;
 	sr->command.max_bytes = req_length;
-	sr->reply.max_bytes = smb_maxbufsize;
+	sr->reply.max_bytes = session->reply_max_bytes;
 	sr->sr_req_length = req_length;
 	if (req_length)
 		sr->sr_request_buf = kmem_alloc(req_length, KM_SLEEP);
@@ -1357,51 +1416,44 @@ boolean_t
 smb_session_levelII_oplocks(smb_session_t *session)
 {
 	SMB_SESSION_VALID(session);
-	return (session->capabilities & CAP_LEVEL_II_OPLOCKS);
+
+	/* Clients using SMB2 and later always know about oplocks. */
+	if (session->dialect > NT_LM_0_12)
+		return (B_TRUE);
+
+	/* Older clients only do Level II oplocks if negotiated. */
+	if ((session->capabilities & CAP_LEVEL_II_OPLOCKS) != 0)
+		return (B_TRUE);
+
+	return (B_FALSE);
 }
 
 /*
  * smb_session_oplock_break
  *
- * The session lock must NOT be held by the caller of this thread;
- * as this would cause a deadlock.
+ * Send an oplock break request to the client,
+ * recalling some cache delegation.
  */
 void
-smb_session_oplock_break(smb_session_t *session,
-    uint16_t tid, uint16_t fid, uint8_t brk)
+smb_session_oplock_break(smb_request_t *sr, uint8_t brk)
 {
-	mbuf_chain_t	*mbc;
+	smb_session_t	*session = sr->session;
+	mbuf_chain_t	*mbc = &sr->reply;
 
 	SMB_SESSION_VALID(session);
 
-	mbc = smb_mbc_alloc(MLEN);
-
-	(void) smb_mbc_encodef(mbc, "Mb19.wwwwbb3.wbb10.",
-	    SMB_COM_LOCKING_ANDX,
-	    tid,
-	    0xFFFF, 0, 0xFFFF, 8, 0xFF,
-	    fid,
-	    LOCKING_ANDX_OPLOCK_RELEASE,
-	    (brk == SMB_OPLOCK_BREAK_TO_LEVEL_II) ? 1 : 0);
-
-	smb_rwx_rwenter(&session->s_lock, RW_WRITER);
-	switch (session->s_state) {
-	case SMB_SESSION_STATE_NEGOTIATED:
-	case SMB_SESSION_STATE_OPLOCK_BREAKING:
-		session->s_state = SMB_SESSION_STATE_OPLOCK_BREAKING;
-		(void) smb_session_send(session, 0, mbc);
-		smb_mbc_free(mbc);
-		break;
-
-	case SMB_SESSION_STATE_DISCONNECTED:
-	case SMB_SESSION_STATE_TERMINATED:
-		smb_mbc_free(mbc);
-		break;
-
-	default:
-		SMB_PANIC();
+	/*
+	 * Build the break message in sr->reply and then send it.
+	 * The mbc is free'd later, in smb_request_free().
+	 */
+	mbc->max_bytes = MLEN;
+	if (session->dialect <= NT_LM_0_12) {
+		smb1_oplock_break_notification(sr, brk);
+	} else {
+		smb2_oplock_break_notification(sr, brk);
 	}
-	smb_rwx_rwexit(&session->s_lock);
+
+	(void) smb_session_send(session, 0, mbc);
 }
 
 static void
