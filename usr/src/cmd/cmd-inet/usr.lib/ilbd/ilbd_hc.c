@@ -23,6 +23,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2012 Milan Jurik. All rights reserved.
+ * Copyright 2015 OmniTI Computer Consulting, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -1288,20 +1289,20 @@ ilbd_run_probe(ilbd_hc_srv_t *srv)
 	/* Set our side of the pipe to be non-blocking */
 	if ((fdflags = fcntl(fds[0], F_GETFL, 0)) == -1) {
 		logdebug("ilbd_run_probe: fcntl(F_GETFL)");
-		goto cleanup;
+		goto cleanup_noactions;
 	}
 	if (fcntl(fds[0], F_SETFL, fdflags | O_NONBLOCK) == -1) {
 		logdebug("ilbd_run_probe: fcntl(F_SETFL)");
-		goto cleanup;
+		goto cleanup_noactions;
 	}
 
 	if (posix_spawn_file_actions_init(&fd_actions) != 0) {
 		logdebug("ilbd_run_probe: posix_spawn_file_actions_init");
-		goto cleanup;
+		goto cleanup_noactions;
 	}
 	if (posix_spawnattr_init(&attr) != 0) {
 		logdebug("ilbd_run_probe: posix_spawnattr_init");
-		goto cleanup;
+		goto cleanup_noattr;
 	}
 	if (posix_spawn_file_actions_addclose(&fd_actions, fds[0]) != 0) {
 		logdebug("ilbd_run_probe: posix_spawn_file_actions_addclose");
@@ -1355,6 +1356,8 @@ ilbd_run_probe(ilbd_hc_srv_t *srv)
 		goto cleanup;
 	}
 
+	(void) posix_spawnattr_destroy(&attr);
+	(void) posix_spawn_file_actions_destroy(&fd_actions);
 	(void) close(fds[1]);
 	destroy_argv(child_argv);
 	srv->shc_child_pid = pid;
@@ -1372,12 +1375,17 @@ ilbd_run_probe(ilbd_hc_srv_t *srv)
 		 */
 		ilbd_hc_kill_probe(srv);
 		probe_ev = NULL;
-		goto cleanup;
+		/* posix_spawn attrs & actions already destroyed. */
+		goto cleanup_noactions;
 	}
 
 	return (B_TRUE);
 
 cleanup:
+	(void) posix_spawnattr_destroy(&attr);
+cleanup_noattr:
+	(void) posix_spawn_file_actions_destroy(&fd_actions);
+cleanup_noactions:
 	(void) close(fds[0]);
 	(void) close(fds[1]);
 	destroy_argv(child_argv);
