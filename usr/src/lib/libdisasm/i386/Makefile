@@ -33,5 +33,3 @@ INSTALL_DEPS_library =		$(ROOTLINKS) $(ROOTLINT) $(ROOTLIBS)
 INSTALL_DEPS_standalone =	$(ROOTLIBS)
 
 include ../Makefile.targ
-
-C99MODE = $(C99_ENABLE)

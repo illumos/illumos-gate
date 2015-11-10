@@ -23,6 +23,7 @@
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2012 Joshua M. Clulow <josh@sysmgr.org>
+ * Copyright 2015 Josef 'Jeff' Sipek <jeffpc@josefsipek.net>
  */
 
 #ifndef	_LIBDISASM_H
@@ -49,13 +50,19 @@ typedef struct dis_handle dis_handle_t;
 #define	DIS_X86_SIZE32		0x010
 #define	DIS_X86_SIZE64		0x020
 
+/* s390 disassembler flags */
+#define	DIS_S370		0x200
+#define	DIS_S390_31		0x400
+#define	DIS_S390_64		0x800
+
 /* generic disassembler flags */
 #define	DIS_OCTAL		0x040
 #define	DIS_NOIMMSYM		0x080
 
 #define	DIS_ARCH_MASK		(DIS_SPARC_V8 | \
 		DIS_SPARC_V9 | DIS_SPARC_V9_SGI | DIS_SPARC_V9_OPL | \
-		DIS_X86_SIZE16 | DIS_X86_SIZE32 | DIS_X86_SIZE64)
+		DIS_X86_SIZE16 | DIS_X86_SIZE32 | DIS_X86_SIZE64 | \
+		DIS_S370 | DIS_S390_31 | DIS_S390_64)
 
 typedef int (*dis_lookup_f)(void *, uint64_t, char *, size_t, uint64_t *,
     size_t *);
