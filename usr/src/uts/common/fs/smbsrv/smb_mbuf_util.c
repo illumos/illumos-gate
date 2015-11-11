@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -62,6 +62,8 @@
 #include <smbsrv/smb_kstat.h>
 
 static kmem_cache_t	*smb_mbc_cache = NULL;
+static kmem_cache_t	*smb_mbuf_cache = NULL;
+static kmem_cache_t	*smb_mbufcl_cache = NULL;
 
 void
 smb_mbc_init(void)
@@ -70,6 +72,12 @@ smb_mbc_init(void)
 		return;
 	smb_mbc_cache = kmem_cache_create(SMBSRV_KSTAT_MBC_CACHE,
 	    sizeof (mbuf_chain_t), 8, NULL, NULL, NULL, NULL, NULL, 0);
+
+	smb_mbuf_cache = kmem_cache_create("smb_mbuf_cache",
+	    sizeof (mbuf_t), 8, NULL, NULL, NULL, NULL, NULL, 0);
+
+	smb_mbufcl_cache = kmem_cache_create("smb_mbufcl_cache",
+	    MCLBYTES, 8, NULL, NULL, NULL, NULL, NULL, 0);
 }
 
 void
@@ -78,6 +86,14 @@ smb_mbc_fini(void)
 	if (smb_mbc_cache != NULL) {
 		kmem_cache_destroy(smb_mbc_cache);
 		smb_mbc_cache = NULL;
+	}
+	if (smb_mbuf_cache != NULL) {
+		kmem_cache_destroy(smb_mbuf_cache);
+		smb_mbuf_cache = NULL;
+	}
+	if (smb_mbufcl_cache != NULL) {
+		kmem_cache_destroy(smb_mbufcl_cache);
+		smb_mbufcl_cache = NULL;
 	}
 }
 
@@ -150,45 +166,47 @@ smb_mbuf_get(uchar_t *buf, int nbytes)
 	return (mhead);
 }
 
+static int
+smb_mbuf_kmem_ref(void *p, uint_t sz, int incr)
+{
+	if (incr < 0)
+		kmem_free(p, sz);
+	return (0);
+}
+
 /*
- * Allocate enough mbufs to accommodate the residual count in a uio.
+ * Allocate enough mbufs to accommodate the residual count in uio,
+ * and setup the uio_iov to point to them.
+ *
+ * This is used by the various SMB read code paths.  That code is
+ * going to do a disk read into this buffer, so we'd like it to be
+ * large and contiguous.  Use an external (M_EXT) buffer.
  */
 struct mbuf *
 smb_mbuf_allocate(struct uio *uio)
 {
-	struct iovec *iovp;
-	struct mbuf	*mhead = 0;
-	struct mbuf	*m = 0;
-	int	count, iovs, resid;
+	mbuf_t	*m = 0;
+	int	len = uio->uio_resid;
 
-	iovp = uio->uio_iov;
-	iovs = uio->uio_iovcnt;
-	resid = uio->uio_resid;
-
-	while ((resid > 0) && (iovs > 0)) {
-		count = (resid > MCLBYTES) ? MCLBYTES : resid;
-		resid -= count;
-
-		if (mhead == 0) {
-			MGET(mhead, M_WAIT, MT_DATA);
-			m = mhead;
-		} else {
-			MGET(m->m_next, M_WAIT, MT_DATA);
-			m = m->m_next;
-		}
-
-		if (count > MLEN) {
-			MCLGET(m, M_WAIT);
-		}
-
-		iovp->iov_base = m->m_data;
-		iovp->iov_len = m->m_len = count;
-		iovs--;
-		iovp++;
+	MGET(m, M_WAIT, MT_DATA);
+	if (len > MCLBYTES) {
+		/* Like MCLGET(), but bigger buf. */
+		m->m_ext.ext_buf = kmem_zalloc(len, KM_SLEEP);
+		m->m_data = m->m_ext.ext_buf;
+		m->m_flags |= M_EXT;
+		m->m_ext.ext_size = len;
+		m->m_ext.ext_ref = smb_mbuf_kmem_ref;
+	} else if (len > MLEN) {
+		/* Use the kmem cache. */
+		MCLGET(m, M_WAIT);
 	}
+	m->m_len = len;
 
-	uio->uio_iovcnt -= iovs;
-	return (mhead);
+	uio->uio_iov->iov_base = m->m_data;
+	uio->uio_iov->iov_len = m->m_len;
+	uio->uio_iovcnt = 1;
+
+	return (m);
 }
 
 /*
@@ -295,6 +313,11 @@ MBC_APPEND_MBUF(struct mbuf_chain *MBC, struct mbuf *MBUF)
 	}
 }
 
+static int /*ARGSUSED*/
+mclrefnoop(caddr_t p, int size, int adj)
+{
+	return (0);
+}
 
 void
 MBC_ATTACH_BUF(struct mbuf_chain *MBC, unsigned char *BUF, int LEN)
@@ -312,46 +335,20 @@ MBC_ATTACH_BUF(struct mbuf_chain *MBC, unsigned char *BUF, int LEN)
 
 
 int
-MBC_SHADOW_CHAIN(struct mbuf_chain *SUBMBC, struct mbuf_chain *MBC,
-    int OFF, int LEN)
+MBC_SHADOW_CHAIN(struct mbuf_chain *submbc, struct mbuf_chain *mbc,
+    int off, int len)
 {
-	if (((OFF) + (LEN)) > (MBC)->max_bytes)
+	int x = off + len;
+
+	if (off < 0 || len < 0 || x < 0 ||
+	    off > mbc->max_bytes || x > mbc->max_bytes)
 		return (EMSGSIZE);
 
-	*(SUBMBC) = *(MBC);
-	(SUBMBC)->chain_offset = (OFF);
-	(SUBMBC)->max_bytes = (OFF) + (LEN);
-	(SUBMBC)->shadow_of = (MBC);
+	*submbc = *mbc;
+	submbc->chain_offset = off;
+	submbc->max_bytes = x;
+	submbc->shadow_of = mbc;
 	return (0);
-}
-
-int
-mbc_moveout(mbuf_chain_t *mbc, caddr_t buf, int buflen, int *tlen)
-{
-	int	rc = 0;
-	int	len = 0;
-
-	if ((mbc != NULL) && (mbc->chain != NULL)) {
-		mbuf_t	*m;
-
-		m = mbc->chain;
-		while (m) {
-			if ((len + m->m_len) <= buflen) {
-				bcopy(m->m_data, buf, m->m_len);
-				buf += m->m_len;
-				len += m->m_len;
-				m = m->m_next;
-				continue;
-			}
-			rc = EMSGSIZE;
-			break;
-		}
-		m_freem(mbc->chain);
-		mbc->chain = NULL;
-		mbc->flags = 0;
-	}
-	*tlen = len;
-	return (rc);
 }
 
 /*
@@ -392,15 +389,43 @@ m_freem(struct mbuf *m)
  * Mbuffer utility routines.
  */
 
-int /*ARGSUSED*/
-mclref(caddr_t p, int size, int adj) /* size, adj are unused */
+mbuf_t *
+smb_mbuf_alloc(void)
 {
-	MEM_FREE("mbuf", p);
-	return (0);
+	mbuf_t *m;
+
+	m = kmem_cache_alloc(smb_mbuf_cache, KM_SLEEP);
+	bzero(m, sizeof (*m));
+	return (m);
 }
 
-int /*ARGSUSED*/
-mclrefnoop(caddr_t p, int size, int adj) /* p, size, adj are unused */
+void
+smb_mbuf_free(mbuf_t *m)
 {
+	kmem_cache_free(smb_mbuf_cache, m);
+}
+
+void *
+smb_mbufcl_alloc(void)
+{
+	void *p;
+
+	p = kmem_cache_alloc(smb_mbufcl_cache, KM_SLEEP);
+	bzero(p, MCLBYTES);
+	return (p);
+}
+
+void
+smb_mbufcl_free(void *p)
+{
+	kmem_cache_free(smb_mbufcl_cache, p);
+}
+
+int
+smb_mbufcl_ref(void *p, uint_t sz, int incr)
+{
+	ASSERT3S(sz, ==, MCLBYTES);
+	if (incr < 0)
+		kmem_cache_free(smb_mbufcl_cache, p);
 	return (0);
 }

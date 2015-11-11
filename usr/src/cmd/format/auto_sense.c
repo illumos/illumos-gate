@@ -23,6 +23,7 @@
  *
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*
@@ -257,10 +258,27 @@ auto_efi_sense(int fd, struct efi_info *label)
 	struct dk_cinfo dkinfo;
 	struct partition_info *part;
 
+	if (ioctl(fd, DKIOCINFO, &dkinfo) == -1) {
+		if (option_msg && diag_msg) {
+			err_print("DKIOCINFO failed\n");
+		}
+		return (NULL);
+	}
+	if ((cur_ctype != NULL) && (cur_ctype->ctype_ctype == DKC_DIRECT)) {
+		ctlr = find_direct_ctlr_info(&dkinfo);
+		disk_info = find_direct_disk_info(&dkinfo);
+	} else if ((cur_ctype != NULL) && (cur_ctype->ctype_ctype == DKC_VBD)) {
+		ctlr = find_vbd_ctlr_info(&dkinfo);
+		disk_info = find_vbd_disk_info(&dkinfo);
+	} else {
+		ctlr = find_scsi_ctlr_info(&dkinfo);
+		disk_info = find_scsi_disk_info(&dkinfo);
+	}
+
 	/*
 	 * get vendor, product, revision and capacity info.
 	 */
-	if (get_disk_info(fd, label) == -1) {
+	if (get_disk_info(fd, label, disk_info) == -1) {
 		return ((struct disk_type *)NULL);
 	}
 	/*
@@ -304,22 +322,6 @@ auto_efi_sense(int fd, struct efi_info *label)
 	 * Now stick all of it into the disk_type struct
 	 */
 
-	if (ioctl(fd, DKIOCINFO, &dkinfo) == -1) {
-		if (option_msg && diag_msg) {
-			err_print("DKIOCINFO failed\n");
-		}
-		return (NULL);
-	}
-	if ((cur_ctype != NULL) && (cur_ctype->ctype_ctype == DKC_DIRECT)) {
-		ctlr = find_direct_ctlr_info(&dkinfo);
-		disk_info = find_direct_disk_info(&dkinfo);
-	} else if ((cur_ctype != NULL) && (cur_ctype->ctype_ctype == DKC_VBD)) {
-		ctlr = find_vbd_ctlr_info(&dkinfo);
-		disk_info = find_vbd_disk_info(&dkinfo);
-	} else {
-		ctlr = find_scsi_ctlr_info(&dkinfo);
-		disk_info = find_scsi_disk_info(&dkinfo);
-	}
 	disk = (struct disk_type *)zalloc(sizeof (struct disk_type));
 	assert(disk_info->disk_ctlr == ctlr);
 	dp = ctlr->ctlr_ctype->ctype_dlist;
@@ -333,12 +335,20 @@ auto_efi_sense(int fd, struct efi_info *label)
 	}
 	disk->dtype_next = NULL;
 
-	(void) strlcpy(disk->vendor, label->vendor,
-	    sizeof (disk->vendor));
-	(void) strlcpy(disk->product, label->product,
-	    sizeof (disk->product));
-	(void) strlcpy(disk->revision, label->revision,
-	    sizeof (disk->revision));
+	disk->vendor = strdup(label->vendor);
+	disk->product = strdup(label->product);
+	disk->revision = strdup(label->revision);
+
+	if (disk->vendor == NULL ||
+	    disk->product == NULL ||
+	    disk->revision == NULL) {
+		free(disk->vendor);
+		free(disk->product);
+		free(disk->revision);
+		free(disk);
+		return (NULL);
+	}
+
 	disk->capacity = label->capacity;
 
 	part = (struct partition_info *)
@@ -2022,6 +2032,9 @@ delete_disk_type(
 		if (cur_label == L_TYPE_EFI)
 			free(disk->dtype_plist->etoc);
 		free(disk->dtype_plist);
+		free(disk->vendor);
+		free(disk->product);
+		free(disk->revision);
 		free(disk);
 		return (0);
 	} else {
@@ -2032,6 +2045,9 @@ delete_disk_type(
 				if (cur_label == L_TYPE_EFI)
 					free(dp->dtype_plist->etoc);
 				free(dp->dtype_plist);
+				free(dp->vendor);
+				free(dp->product);
+				free(dp->revision);
 				free(dp);
 				return (0);
 			}

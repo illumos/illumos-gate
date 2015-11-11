@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _SMB_SID_H
@@ -223,6 +224,7 @@ extern "C" {
  * structure (SID_IDENTIFIER_AUTHORITY) containing a literal
  * definition of a 6 byte vector but the effect is the same
  * as defining it as a member value.
+ * See also: smb_sid_xdr()
  */
 typedef struct smb_sid {
 	uint8_t sid_revision;
@@ -256,6 +258,7 @@ typedef struct smb_sid {
 /*
  * smb_id_t consists of both the Windows security identifier
  * and its corresponding POSIX/ephemeral ID.
+ * See also: smb_id_xdr()
  */
 typedef struct smb_id {
 	uint32_t	i_attrs;
@@ -263,6 +266,10 @@ typedef struct smb_id {
 	uid_t		i_id;
 } smb_id_t;
 
+/*
+ * Array of smb_id_t
+ * See also: smb_ids_xdr()
+ */
 typedef struct smb_ids {
 	uint32_t	i_cnt;
 	smb_id_t	*i_ids;

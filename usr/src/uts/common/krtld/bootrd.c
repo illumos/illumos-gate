@@ -21,6 +21,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2013 Joyent, Inc.  All rights reserved.
  */
 
 
@@ -36,16 +37,94 @@
 extern void (*_kobj_printf)(void *, const char *fmt, ...);
 extern int get_weakish_int(int *);
 extern struct bootops *ops;
-extern struct boot_fs_ops bufs_ops, bhsfs_ops;
+extern struct boot_fs_ops bufs_ops, bhsfs_ops, bbootfs_ops;
 extern int kmem_ready;
 
 static uint64_t rd_start, rd_end;
 struct boot_fs_ops *bfs_ops;
-struct boot_fs_ops *bfs_tab[] = {&bufs_ops, &bhsfs_ops, NULL};
+struct boot_fs_ops *bfs_tab[] = {&bufs_ops, &bhsfs_ops, &bbootfs_ops, NULL};
 
 static uintptr_t scratch_max = 0;
 
 #define	_kmem_ready	get_weakish_int(&kmem_ready)
+
+int
+BRD_MOUNTROOT(struct boot_fs_ops *ops, char *str)
+{
+	return (ops->fsw_mountroot(str));
+}
+
+int
+BRD_UNMOUNTROOT(struct boot_fs_ops *ops)
+{
+	if (bfs_ops != &bbootfs_ops)
+		bbootfs_ops.fsw_closeall(1);
+
+	return (ops->fsw_unmountroot());
+}
+
+int
+BRD_OPEN(struct boot_fs_ops *ops, char *file, int flags)
+{
+	int len = strlen(SYSTEM_BOOT_PATH);
+	int fd;
+
+	/*
+	 * Our policy is that we try bootfs first.  If bootfs is the only
+	 * filesystem, that's the end of it.  Otherwise we will fall back to
+	 * the normal root (i.e., ramdisk) filesystem at this point and try
+	 * again if the file does not exist in bootfs.
+	 */
+	fd = bbootfs_ops.fsw_open(file, flags);
+
+	if (bfs_ops == &bbootfs_ops)
+		return (fd);
+
+	if (strncmp(file, SYSTEM_BOOT_PATH, len) == 0 || fd >= 0)
+		return ((fd < 0) ? fd : (fd | BFD_F_SYSTEM_BOOT));
+
+	return (ops->fsw_open(file, flags));
+}
+
+int
+BRD_CLOSE(struct boot_fs_ops *ops, int fd)
+{
+	if (fd & BFD_F_SYSTEM_BOOT)
+		return (bbootfs_ops.fsw_close(fd & ~BFD_F_SYSTEM_BOOT));
+
+	return (ops->fsw_close(fd));
+}
+
+ssize_t
+BRD_READ(struct boot_fs_ops *ops, int fd, caddr_t buf, size_t len)
+{
+	if (fd & BFD_F_SYSTEM_BOOT) {
+		return (bbootfs_ops.fsw_read(fd & ~BFD_F_SYSTEM_BOOT,
+		    buf, len));
+	}
+
+	return (ops->fsw_read(fd, buf, len));
+}
+
+off_t
+BRD_SEEK(struct boot_fs_ops *ops, int fd, off_t addr, int whence)
+{
+	if (fd & BFD_F_SYSTEM_BOOT) {
+		return (bbootfs_ops.fsw_lseek(fd & ~BFD_F_SYSTEM_BOOT,
+		    addr, whence));
+	}
+
+	return (ops->fsw_lseek(fd, addr, whence));
+}
+
+int
+BRD_FSTAT(struct boot_fs_ops *ops, int fd, struct bootstat *bsp)
+{
+	if (fd & BFD_F_SYSTEM_BOOT)
+		return (bbootfs_ops.fsw_fstat(fd & ~BFD_F_SYSTEM_BOOT, bsp));
+
+	return (ops->fsw_fstat(fd, bsp));
+}
 
 /*
  * This one reads the ramdisk. If fi_memp is set, we copy the

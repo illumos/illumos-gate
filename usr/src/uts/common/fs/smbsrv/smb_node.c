@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 /*
  * SMB Node State Machine
@@ -592,6 +592,7 @@ smb_node_root_init(smb_server_t *sv, smb_node_t **svrootp)
 
 	return (error);
 }
+
 /*
  * Helper function for smb_node_set_delete_on_close(). Assumes node is a dir.
  * Return 0 if this is an empty dir. Otherwise return a NT_STATUS code.
@@ -687,6 +688,13 @@ smb_node_set_delete_on_close(smb_node_t *node, cred_t *cr, uint32_t flags)
 	node->n_delete_on_close_flags = flags;
 	node->flags |= NODE_FLAGS_DELETE_ON_CLOSE;
 	mutex_exit(&node->n_mutex);
+
+	/*
+	 * Tell any change notify calls to close their handles
+	 * and get out of the way.  FILE_ACTION_DELETE_PENDING
+	 * is a special, internal-only action for this purpose.
+	 */
+	smb_notify_event(node, FILE_ACTION_DELETE_PENDING, NULL);
 
 	return (NT_STATUS_SUCCESS);
 }
@@ -901,7 +909,7 @@ smb_node_notify_parents(smb_node_t *dnode)
 
 	while (pnode != NULL) {
 		SMB_NODE_VALID(pnode);
-		smb_notify_event(pnode, 0, dnode->od_name);
+		smb_notify_event(pnode, FILE_ACTION_SUBDIR_CHANGED, NULL);
 		/* cd .. */
 		dnode = pnode;
 		pnode = dnode->n_dnode;

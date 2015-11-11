@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH KADMIND 1M "Feb 29, 2008"
+.TH KADMIND 1M "Oct 29, 2015"
 .SH NAME
 kadmind \- Kerberos administration daemon
 .SH SYNOPSIS
@@ -20,10 +20,10 @@ kadmind \- Kerberos administration daemon
 \fBkadmind\fR runs on the master key distribution center (\fBKDC\fR), which
 stores the principal and policy databases. \fBkadmind\fR accepts remote
 requests to administer the information in these databases. Remote requests are
-sent, for example, by \fBkpasswd\fR(1), \fBgkadmin\fR(1M), and \fBkadmin\fR(1M)
-commands, all of which are clients of \fBkadmind\fR. When you install a
-\fBKDC\fR, \fBkadmind\fR is set up in the \fBinit\fR scripts to start
-automatically when the \fBKDC\fR is rebooted.
+sent, for example, by \fBkpasswd\fR(1) and \fBkadmin\fR(1M) commands, both of
+which are clients of \fBkadmind\fR. When you install a \fBKDC\fR,
+\fBkadmind\fR is set up in the \fBinit\fR scripts to start automatically
+when the \fBKDC\fR is rebooted.
 .sp
 .LP
 \fBkadmind\fR requires a number of configuration files to be set up for it to
@@ -369,7 +369,7 @@ Interface Stability	Evolving
 .SH SEE ALSO
 .sp
 .LP
-\fBkpasswd\fR(1), \fBsvcs\fR(1), \fBgkadmin\fR(1M), \fBkadmin\fR(1M),
+\fBkpasswd\fR(1), \fBsvcs\fR(1), \fBkadmin\fR(1M),
 \fBkadmin.local\fR(1M), \fBkdb5_util\fR(1M), \fBkdb5_ldap_util\fR(1M),
 \fBkproplog\fR(1M), \fBsvcadm\fR(1M), \fBpam_acct_mgmt\fR(3PAM),
 \fBpam_authenticate\fR(3PAM), \fBkadm5.acl\fR(4), \fBkdc.conf\fR(4),

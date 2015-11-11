@@ -22,6 +22,7 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2013 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2015 Garrett D'Amore <garrett@damore.org>
 #
 
 #
@@ -46,6 +47,7 @@ $(sparc_ONLY)driver name=mr_sas class=scsi-self-identifying \
     alias=pci1000,79 \
     alias=pciex1000,5b \
     alias=pciex1000,5d \
+    alias=pciex1000,5f \
     alias=pciex1000,71 \
     alias=pciex1000,73 \
     alias=pciex1000,78 \
@@ -53,6 +55,7 @@ $(sparc_ONLY)driver name=mr_sas class=scsi-self-identifying \
 $(i386_ONLY)driver name=mr_sas class=scsi-self-identifying \
     alias=pciex1000,5b \
     alias=pciex1000,5d \
+    alias=pciex1000,5f \
     alias=pciex1000,71 \
     alias=pciex1000,73 \
     alias=pciex1000,78 \

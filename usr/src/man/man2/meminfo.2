@@ -1,9 +1,10 @@
 '\" te
 .\" Copyright (c) 2003, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 2015, Joyent, Inc.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH MEMINFO 2 "Feb 21, 2003"
+.TH MEMINFO 2 "Mar 10, 2015"
 .SH NAME
 meminfo \- provide information about memory
 .SH SYNOPSIS
@@ -18,7 +19,6 @@ meminfo \- provide information about memory
 .fi
 
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIinaddr\fR\fR
@@ -77,7 +77,6 @@ to first member of \fIinfo_req\fR, and so on
 .RE
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBmeminfo()\fR function provides information about virtual and physical
 memory particular to the calling process.  The user or developer of performance
@@ -151,13 +150,16 @@ lgrp of \fIn\fRth physical replica of specified virtual address
 locality group of specified physical address
 .RE
 
-.SH RETURN VALUES
 .sp
+.LP
+All but \fBMEMINFO_VLGRP\fR and \fBMEMINFO_VPAGESIZE\fR require the
+\fBPRIV_PROC_MEMINFO\fR privilege.
+
+.SH RETURN VALUES
 .LP
 Upon successful completion \fBmeminfo()\fR returns 0. Otherwise \(mi1 is
 returned and \fBerrno\fR is set to indicate the error.
 .SH ERRORS
-.sp
 .LP
 The \fBmeminfo()\fR function will fail if:
 .sp
@@ -243,7 +245,6 @@ print_info(void **addrvec, int how_many)
 .in -2
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -261,8 +262,7 @@ MT-Level	Async-Signal-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBmemcntl\fR(2), \fBmmap\fR(2), \fBgethomelgroup\fR(3C),
 \fBgetpagesize\fR(3C), \fBmadvise\fR(3C), \fBsysconf\fR(3C),
-\fBattributes\fR(5)
+\fBattributes\fR(5), \fBprivileges\fR(5)

@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2015 Igor Kozhukhov <ikozhukhov@gmail.com>
 #
 
 #	This Makefile defines the build rules for the directory uts/i86pc
@@ -220,7 +221,7 @@ DBOOT_DEFS	= -D_BOOT $(DBOOT_MACH_$(CLASS))
 DBOOT_DEFS	+= -D_MACHDEP -D_KMEMUSER -U_KERNEL -D_I32LPx
 DBOOT_FLAGS	= $(CCVERBOSE) $(CERRWARN) $(CCNOAUTOINLINE)
 
-DBOOT_CC_INCL	= -I$(SRC)/common $(INCLUDE_PATH)
+DBOOT_CC_INCL	= -I$(SRC)/common -I$(SRC)/common/util $(INCLUDE_PATH)
 DBOOT_AS_INCL	= $(AS_INC_PATH)
 
 DBOOT_AS	= $(ONBLD_TOOLS)/bin/$(MACH)/aw
@@ -306,7 +307,7 @@ $(OBJS_DIR)/%.o:		$(SRC)/common/atomic/$(ATOMIC_SUBDIR)/%.s
 
 $(OBJS_DIR)/dtracestubs.s:	$(UNIX_O) $(LIBS)
 	$(NM) -u $(UNIX_O) $(LIBS) | $(GREP) __dtrace_probe_ | $(SORT) | \
-	    $(UNIQ) | $(NAWK) '{ \
+	    $(UNIQ) | $(AWK) '{ \
 	    printf("\t.globl %s\n\t.type %s,@function\n%s:\n", \
 	    $$1, $$1, $$1); }' > $(OBJS_DIR)/dtracestubs.s
 

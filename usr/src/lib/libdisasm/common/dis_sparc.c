@@ -197,11 +197,6 @@ dis_sparc_min_instrlen(dis_handle_t *dhp)
 	return (4);
 }
 
-/*
- * The dis_i386.c comment for this says it returns the previous instruction,
- * however, I'm fairly sure it's actually returning the _address_ of the
- * nth previous instruction.
- */
 /* ARGSUSED */
 static uint64_t
 dis_sparc_previnstr(dis_handle_t *dhp, uint64_t pc, int n)
@@ -348,12 +343,12 @@ dis_sparc_supports_flags(int flags)
 }
 
 const dis_arch_t dis_arch_sparc = {
-	dis_sparc_supports_flags,
-	dis_sparc_handle_attach,
-	dis_sparc_handle_detach,
-	dis_sparc_disassemble,
-	dis_sparc_previnstr,
-	dis_sparc_min_instrlen,
-	dis_sparc_max_instrlen,
-	dis_sparc_instrlen
+	.da_supports_flags	= dis_sparc_supports_flags,
+	.da_handle_attach	= dis_sparc_handle_attach,
+	.da_handle_detach	= dis_sparc_handle_detach,
+	.da_disassemble		= dis_sparc_disassemble,
+	.da_previnstr		= dis_sparc_previnstr,
+	.da_min_instrlen	= dis_sparc_min_instrlen,
+	.da_max_instrlen	= dis_sparc_max_instrlen,
+	.da_instrlen		= dis_sparc_instrlen
 };

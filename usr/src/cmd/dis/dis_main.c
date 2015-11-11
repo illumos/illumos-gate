@@ -25,6 +25,7 @@
  *
  * Copyright 2011 Jason King.  All rights reserved.
  * Copyright 2012 Joshua M. Clulow <josh@sysmgr.org>
+ * Copyright 2015 Josef 'Jeff' Sipek <jeffpc@josefsipek.net>
  */
 
 #include <ctype.h>
@@ -544,6 +545,38 @@ dis_file(const char *filename)
 
 		case EM_AMD64:
 			g_flags |= DIS_X86_SIZE64;
+			break;
+
+		case EM_S370:
+			g_flags |= DIS_S370;
+
+			if (ehdr.e_ident[EI_CLASS] != ELFCLASS32 ||
+			    ehdr.e_ident[EI_DATA] != ELFDATA2MSB) {
+				warn("invalid E_IDENT field for S370 object");
+				return;
+			}
+			break;
+
+		case EM_S390:
+			/*
+			 * Both 390 and z/Architecture use EM_S390, the only
+			 * differences is the class: ELFCLASS32 for plain
+			 * old s390 and ELFCLASS64 for z/Architecture (aka.
+			 * s390x).
+			 */
+			if (ehdr.e_ident[EI_CLASS] == ELFCLASS32) {
+				g_flags |= DIS_S390_31;
+			} else if (ehdr.e_ident[EI_CLASS] == ELFCLASS64) {
+				g_flags |= DIS_S390_64;
+			} else {
+				warn("invalid E_IDENT field for S390 object");
+				return;
+			}
+
+			if (ehdr.e_ident[EI_DATA] != ELFDATA2MSB) {
+				warn("invalid E_IDENT field for S390 object");
+				return;
+			}
 			break;
 
 		default:

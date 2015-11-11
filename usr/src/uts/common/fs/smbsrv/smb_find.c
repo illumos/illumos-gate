@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <smbsrv/smb_kproto.h>
@@ -231,6 +231,7 @@ smb_com_search(smb_request_t *sr)
 	smb_odir_t		*od;
 	smb_fileinfo_t		fileinfo;
 	smb_odir_resume_t	odir_resume;
+	uint32_t		status;
 	uint16_t		eos;
 
 	to_upper = B_FALSE;
@@ -292,9 +293,9 @@ smb_com_search(smb_request_t *sr)
 	client_key = 0;
 
 	if (find_first) {
-		odid = smb_odir_open(sr, pn->pn_path, sattr, 0);
-		if (odid == 0) {
-			if (sr->smb_error.status == NT_STATUS_ACCESS_DENIED)
+		status = smb_odir_openpath(sr, pn->pn_path, sattr, 0, &od);
+		if (status != 0) {
+			if (status == NT_STATUS_ACCESS_DENIED)
 				smbsr_warn(sr, NT_STATUS_NO_MORE_FILES,
 				    ERRDOS, ERROR_NO_MORE_FILES);
 			return (SDRC_ERROR);
@@ -304,9 +305,9 @@ smb_com_search(smb_request_t *sr)
 		    &resume_char, &index, &odid, &client_key) != 0) {
 			return (SDRC_ERROR);
 		}
+		od = smb_tree_lookup_odir(sr, odid);
 	}
 
-	od = smb_tree_lookup_odir(sr, odid);
 	if (od == NULL) {
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE,
 		    ERRDOS, ERROR_INVALID_HANDLE);
@@ -314,9 +315,13 @@ smb_com_search(smb_request_t *sr)
 	}
 
 	if (!find_first) {
-		odir_resume.or_type = SMB_ODIR_RESUME_IDX;
-		odir_resume.or_idx = index;
-		smb_odir_resume_at(od, &odir_resume);
+		if ((od->d_flags & SMB_ODIR_FLAG_WILDCARDS) == 0) {
+			od->d_eof = B_TRUE;
+		} else {
+			odir_resume.or_type = SMB_ODIR_RESUME_IDX;
+			odir_resume.or_idx = index;
+			smb_odir_resume_at(od, &odir_resume);
+		}
 	}
 
 	(void) smb_mbc_encodef(&sr->reply, "bwwbw", 1, 0, VAR_BCC, 5, 0);
@@ -354,6 +359,8 @@ smb_com_search(smb_request_t *sr)
 		count++;
 		index++;
 	}
+	if (eos && rc == ENOENT)
+		rc = 0;
 
 	if (rc != 0) {
 		smb_odir_close(od);
@@ -408,6 +415,7 @@ smb_com_find(smb_request_t *sr)
 	char			name83[SMB_SHORTNAMELEN];
 	smb_odir_t		*od;
 	smb_fileinfo_t		fileinfo;
+	uint32_t		status;
 	uint16_t		eos;
 
 	smb_pathname_t		*pn;
@@ -442,17 +450,19 @@ smb_com_find(smb_request_t *sr)
 	client_key = 0;
 
 	if (find_first) {
-		odid = smb_odir_open(sr, pn->pn_path, sattr, 0);
-		if (odid == 0)
+		status = smb_odir_openpath(sr, pn->pn_path, sattr, 0, &od);
+		if (status != 0) {
+			smbsr_error(sr, status, 0, 0);
 			return (SDRC_ERROR);
+		}
 	} else {
 		if (smb_mbc_decodef(&sr->smb_data, "b12.wwl",
 		    &resume_char, &index, &odid, &client_key) != 0) {
 			return (SDRC_ERROR);
 		}
+		od = smb_tree_lookup_odir(sr, odid);
 	}
 
-	od = smb_tree_lookup_odir(sr, odid);
 	if (od == NULL) {
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE,
 		    ERRDOS, ERROR_INVALID_HANDLE);
@@ -460,9 +470,13 @@ smb_com_find(smb_request_t *sr)
 	}
 
 	if (!find_first) {
-		odir_resume.or_type = SMB_ODIR_RESUME_IDX;
-		odir_resume.or_idx = index;
-		smb_odir_resume_at(od, &odir_resume);
+		if ((od->d_flags & SMB_ODIR_FLAG_WILDCARDS) == 0) {
+			od->d_eof = B_TRUE;
+		} else {
+			odir_resume.or_type = SMB_ODIR_RESUME_IDX;
+			odir_resume.or_idx = index;
+			smb_odir_resume_at(od, &odir_resume);
+		}
 	}
 
 	(void) smb_mbc_encodef(&sr->reply, "bwwbw", 1, 0, VAR_BCC, 5, 0);
@@ -498,6 +512,8 @@ smb_com_find(smb_request_t *sr)
 		count++;
 		index++;
 	}
+	if (eos && rc == ENOENT)
+		rc = 0;
 
 	if (rc != 0) {
 		smb_odir_close(od);
@@ -612,13 +628,14 @@ smb_com_find_unique(struct smb_request *sr)
 {
 	int			rc;
 	uint16_t		count, maxcount, index;
-	uint16_t		sattr, odid;
+	uint16_t		sattr;
 	smb_pathname_t		*pn;
 	unsigned char		resume_char = '\0';
 	uint32_t		client_key = 0;
 	char			name83[SMB_SHORTNAMELEN];
 	smb_odir_t		*od;
 	smb_fileinfo_t		fileinfo;
+	uint32_t		status;
 	uint16_t		eos;
 	smb_vdb_t		*vdb;
 
@@ -646,10 +663,11 @@ smb_com_find_unique(struct smb_request *sr)
 
 	(void) smb_mbc_encodef(&sr->reply, "bwwbw", 1, 0, VAR_BCC, 5, 0);
 
-	odid = smb_odir_open(sr, pn->pn_path, sattr, 0);
-	if (odid == 0)
+	status = smb_odir_openpath(sr, pn->pn_path, sattr, 0, &od);
+	if (status != 0) {
+		smbsr_error(sr, status, 0, 0);
 		return (SDRC_ERROR);
-	od = smb_tree_lookup_odir(sr, odid);
+	}
 	if (od == NULL)
 		return (SDRC_ERROR);
 
@@ -673,8 +691,8 @@ smb_com_find_unique(struct smb_request *sr)
 		smb_name83(fileinfo.fi_shortname, name83, SMB_SHORTNAMELEN);
 
 		(void) smb_mbc_encodef(&sr->reply, "b11c.wwlbYl13c",
-		    resume_char, name83, index, odid, client_key,
-		    fileinfo.fi_dosattr & 0xff,
+		    resume_char, name83, index, od->d_odid,
+		    client_key, fileinfo.fi_dosattr & 0xff,
 		    smb_time_gmt_to_local(sr, fileinfo.fi_mtime.tv_sec),
 		    (int32_t)fileinfo.fi_size,
 		    fileinfo.fi_shortname);
@@ -682,6 +700,8 @@ smb_com_find_unique(struct smb_request *sr)
 		count++;
 		index++;
 	}
+	if (eos && rc == ENOENT)
+		rc = 0;
 
 	smb_odir_close(od);
 	smb_odir_release(od);

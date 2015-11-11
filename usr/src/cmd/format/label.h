@@ -21,6 +21,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
 
 #ifndef	_LABEL_H
@@ -33,17 +34,18 @@ extern "C" {
 /*
  *	Prototypes for ANSI C compilers
  */
-int	checklabel(struct dk_label *label);
-int	checksum(struct dk_label *label, int mode);
-int	trim_id(char *id);
+int	checklabel(struct dk_label *);
+int	checksum(struct dk_label *, int);
+int	trim_id(char *);
 int	write_label(void);
-int	read_label(int fd, struct dk_label *label);
-int	read_efi_label(int fd, struct efi_info *label);
-int	get_disk_info(int fd, struct efi_info *label);
-int	label_to_vtoc(struct extvtoc *vtoc, struct dk_label *label);
-int	SMI_vtoc_to_EFI(int fd, struct dk_gpt **new_vtoc);
-void	err_check(struct dk_gpt *vtoc);
-extern int	is_efi_type(int fd);
+int	read_label(int, struct dk_label *);
+int	read_efi_label(int, struct efi_info *, struct disk_info *);
+int	get_disk_inquiry_prop(char *, char **, char **, char **);
+int	get_disk_info(int, struct efi_info *, struct disk_info *);
+int	label_to_vtoc(struct extvtoc *, struct dk_label *);
+int	SMI_vtoc_to_EFI(int, struct dk_gpt **);
+void	err_check(struct dk_gpt *);
+extern int	is_efi_type(int);
 
 #ifdef	__cplusplus
 }

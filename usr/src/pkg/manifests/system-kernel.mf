@@ -585,6 +585,7 @@ file path=kernel/exec/$(ARCH64)/intpexec group=sys mode=0755
 $(i386_ONLY)file path=kernel/exec/elfexec group=sys mode=0755
 $(i386_ONLY)file path=kernel/exec/intpexec group=sys mode=0755
 file path=kernel/fs/$(ARCH64)/autofs group=sys mode=0755
+file path=kernel/fs/$(ARCH64)/bootfs group=sys mode=0755
 file path=kernel/fs/$(ARCH64)/ctfs group=sys mode=0755
 file path=kernel/fs/$(ARCH64)/dcfs group=sys mode=0755
 file path=kernel/fs/$(ARCH64)/dev group=sys mode=0755
@@ -602,6 +603,7 @@ file path=kernel/fs/$(ARCH64)/specfs group=sys mode=0755
 file path=kernel/fs/$(ARCH64)/tmpfs group=sys mode=0755
 file path=kernel/fs/$(ARCH64)/ufs group=sys mode=0755
 $(i386_ONLY)file path=kernel/fs/autofs group=sys mode=0755
+$(i386_ONLY)file path=kernel/fs/bootfs group=sys mode=0755
 $(i386_ONLY)file path=kernel/fs/ctfs group=sys mode=0755
 $(i386_ONLY)file path=kernel/fs/dcfs group=sys mode=0755
 $(i386_ONLY)file path=kernel/fs/dev group=sys mode=0755

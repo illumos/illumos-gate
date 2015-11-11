@@ -16,7 +16,7 @@
 #
 
 set name=pkg.fmri \
-    value=pkg:/system/data/zoneinfo@2015.1,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
+    value=pkg:/system/data/zoneinfo@2015.7,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
 set name=pkg.description value="timezone information"
 set name=pkg.summary value="Timezone Information"
 set name=info.classification value=org.opensolaris.category.2008:System/Core
@@ -71,7 +71,6 @@ file path=usr/share/lib/zoneinfo/Africa/Windhoek
 file path=usr/share/lib/zoneinfo/America/Adak
 file path=usr/share/lib/zoneinfo/America/Anchorage
 file path=usr/share/lib/zoneinfo/America/Anguilla
-file path=usr/share/lib/zoneinfo/America/Antigua
 file path=usr/share/lib/zoneinfo/America/Araguaina
 file path=usr/share/lib/zoneinfo/America/Argentina/Buenos_Aires
 file path=usr/share/lib/zoneinfo/America/Argentina/Catamarca
@@ -118,6 +117,7 @@ file path=usr/share/lib/zoneinfo/America/Dominica
 file path=usr/share/lib/zoneinfo/America/Edmonton
 file path=usr/share/lib/zoneinfo/America/Eirunepe
 file path=usr/share/lib/zoneinfo/America/El_Salvador
+file path=usr/share/lib/zoneinfo/America/Fort_Nelson
 file path=usr/share/lib/zoneinfo/America/Fortaleza
 file path=usr/share/lib/zoneinfo/America/Glace_Bay
 file path=usr/share/lib/zoneinfo/America/Godthab
@@ -162,7 +162,6 @@ file path=usr/share/lib/zoneinfo/America/Miquelon
 file path=usr/share/lib/zoneinfo/America/Moncton
 file path=usr/share/lib/zoneinfo/America/Monterrey
 file path=usr/share/lib/zoneinfo/America/Montevideo
-file path=usr/share/lib/zoneinfo/America/Montreal
 file path=usr/share/lib/zoneinfo/America/Montserrat
 file path=usr/share/lib/zoneinfo/America/Nassau
 file path=usr/share/lib/zoneinfo/America/New_York
@@ -432,7 +431,6 @@ file path=usr/share/lib/zoneinfo/Pacific/Kosrae
 file path=usr/share/lib/zoneinfo/Pacific/Kwajalein
 file path=usr/share/lib/zoneinfo/Pacific/Majuro
 file path=usr/share/lib/zoneinfo/Pacific/Marquesas
-file path=usr/share/lib/zoneinfo/Pacific/Midway
 file path=usr/share/lib/zoneinfo/Pacific/Nauru
 file path=usr/share/lib/zoneinfo/Pacific/Niue
 file path=usr/share/lib/zoneinfo/Pacific/Norfolk
@@ -443,7 +441,6 @@ file path=usr/share/lib/zoneinfo/Pacific/Pitcairn
 file path=usr/share/lib/zoneinfo/Pacific/Pohnpei
 file path=usr/share/lib/zoneinfo/Pacific/Port_Moresby
 file path=usr/share/lib/zoneinfo/Pacific/Rarotonga
-file path=usr/share/lib/zoneinfo/Pacific/Saipan
 file path=usr/share/lib/zoneinfo/Pacific/Tahiti
 file path=usr/share/lib/zoneinfo/Pacific/Tarawa
 file path=usr/share/lib/zoneinfo/Pacific/Tongatapu
@@ -510,6 +507,8 @@ hardlink path=usr/share/lib/zoneinfo/Africa/Ouagadougou \
 hardlink path=usr/share/lib/zoneinfo/Africa/Porto-Novo target=../Africa/Lagos
 hardlink path=usr/share/lib/zoneinfo/Africa/Sao_Tome target=../Africa/Abidjan
 hardlink path=usr/share/lib/zoneinfo/Africa/Timbuktu target=../Africa/Abidjan
+hardlink path=usr/share/lib/zoneinfo/America/Antigua \
+    target=../America/Port_of_Spain
 hardlink path=usr/share/lib/zoneinfo/America/Argentina/ComodRivadavia \
     target=../../America/Argentina/Catamarca
 hardlink path=usr/share/lib/zoneinfo/America/Atka target=../America/Adak
@@ -541,6 +540,8 @@ hardlink path=usr/share/lib/zoneinfo/America/Marigot \
     target=../America/Guadeloupe
 hardlink path=usr/share/lib/zoneinfo/America/Mendoza \
     target=../America/Argentina/Mendoza
+hardlink path=usr/share/lib/zoneinfo/America/Montreal \
+    target=../America/Toronto
 hardlink path=usr/share/lib/zoneinfo/America/Porto_Acre \
     target=../America/Rio_Branco
 hardlink path=usr/share/lib/zoneinfo/America/Rosario \
@@ -681,7 +682,10 @@ hardlink path=usr/share/lib/zoneinfo/NZ target=Pacific/Auckland
 hardlink path=usr/share/lib/zoneinfo/NZ-CHAT target=Pacific/Chatham
 hardlink path=usr/share/lib/zoneinfo/Navajo target=America/Denver
 hardlink path=usr/share/lib/zoneinfo/PRC target=Asia/Shanghai
+hardlink path=usr/share/lib/zoneinfo/Pacific/Midway \
+    target=../Pacific/Pago_Pago
 hardlink path=usr/share/lib/zoneinfo/Pacific/Ponape target=../Pacific/Pohnpei
+hardlink path=usr/share/lib/zoneinfo/Pacific/Saipan target=../Pacific/Guam
 hardlink path=usr/share/lib/zoneinfo/Pacific/Samoa target=../Pacific/Pago_Pago
 hardlink path=usr/share/lib/zoneinfo/Pacific/Truk target=../Pacific/Chuuk
 hardlink path=usr/share/lib/zoneinfo/Pacific/Yap target=../Pacific/Chuuk

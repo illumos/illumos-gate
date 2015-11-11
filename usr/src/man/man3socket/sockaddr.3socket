@@ -559,4 +559,4 @@ main(void)
 .Xr inet 7P ,
 .Xr inet6 7P ,
 .Xr ip 7P ,
-.Xr ip6 7P ,
+.Xr ip6 7P

@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _SMB_DFS_H
@@ -99,6 +100,9 @@ extern "C" {
 
 #define	DFS_MOVE_FLAG_REPLACE_IF_EXISTS		1
 
+/*
+ * See also: dfs_target_pclass_xdr()
+ */
 typedef enum {
 	DfsInvalidPriorityClass		= -1,
 	DfsSiteCostNormalPriorityClass	= 0,
@@ -130,6 +134,7 @@ typedef enum {
 
 /*
  * Referral Request Types
+ * See also: dfs_reftype_xdr()
  */
 typedef enum {
 	DFS_REFERRAL_INVALID = 0,
@@ -140,6 +145,9 @@ typedef enum {
 	DFS_REFERRAL_LINK
 } dfs_reftype_t;
 
+/*
+ * See also: dfs_target_priority_xdr()
+ */
 typedef struct dfs_target_priority {
 	dfs_target_pclass_t	p_class;
 	uint16_t		p_rank;
@@ -158,6 +166,8 @@ typedef struct dfs_target_priority {
  * 		lmdfs.h)
  *
  * t_priority	priority class and rank
+ *
+ * See also: dfs_target_xdr()
  */
 typedef struct dfs_target {
 	char			t_server[DFS_SRVNAME_MAX];
@@ -166,6 +176,10 @@ typedef struct dfs_target {
 	dfs_target_priority_t	t_priority;
 } dfs_target_t;
 
+/*
+ * DFS referral response
+ * See also: dfs_info_xdr()
+ */
 typedef struct dfs_info {
 	char		i_uncpath[DFS_PATH_MAX];
 	char		i_comment[DFS_COMMENT_MAX];

@@ -46,7 +46,7 @@ WLCMD_DIR       = $(UTSBASE)/common/io/warlock
 #
 # 	Kernel Module Dependencies
 #
-LDFLAGS += -dy -Nmisc/scsi -Ndrv/scsi_vhci
+LDFLAGS += -dy -Nmisc/scsi -Ndrv/scsi_vhci -Nmisc/sata
 
 #
 #	Define targets

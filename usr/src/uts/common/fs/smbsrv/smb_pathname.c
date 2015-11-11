@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <smbsrv/smb_kproto.h>
@@ -184,10 +184,11 @@ smb_pathname_reduce(
 	if (*path == '\0')
 		return (ENOENT);
 
-	usepath = kmem_alloc(MAXPATHLEN, KM_SLEEP);
+	usepath = kmem_alloc(SMB_MAXPATHLEN, KM_SLEEP);
 
-	if ((len = strlcpy(usepath, path, MAXPATHLEN)) >= MAXPATHLEN) {
-		kmem_free(usepath, MAXPATHLEN);
+	len = strlcpy(usepath, path, SMB_MAXPATHLEN);
+	if (len >= SMB_MAXPATHLEN) {
+		kmem_free(usepath, SMB_MAXPATHLEN);
 		return (ENAMETOOLONG);
 	}
 
@@ -204,27 +205,43 @@ smb_pathname_reduce(
 	local_cur_node = cur_node;
 	local_root_node = root_node;
 
-	if (SMB_TREE_IS_DFSROOT(sr) && (sr->smb_flg2 & SMB_FLAGS2_DFS)) {
-		err = smb_pathname_dfs_preprocess(sr, usepath, MAXPATHLEN);
-		if (err != 0) {
-			kmem_free(usepath, MAXPATHLEN);
-			return (err);
+	if (SMB_TREE_IS_DFSROOT(sr)) {
+		int is_dfs;
+		if (sr->session->dialect >= SMB_VERS_2_BASE)
+			is_dfs = sr->smb2_hdr_flags &
+			    SMB2_FLAGS_DFS_OPERATIONS;
+		else
+			is_dfs = sr->smb_flg2 & SMB_FLAGS2_DFS;
+		if (is_dfs != 0) {
+			err = smb_pathname_dfs_preprocess(sr, usepath,
+			    SMB_MAXPATHLEN);
+			if (err != 0) {
+				kmem_free(usepath, SMB_MAXPATHLEN);
+				return (err);
+			}
+			len = strlen(usepath);
 		}
-		len = strlen(usepath);
 	}
 
-	if (sr && (sr->smb_flg2 & SMB_FLAGS2_REPARSE_PATH)) {
-		err = smb_vss_lookup_nodes(sr, root_node, cur_node,
-		    usepath, &vss_cur_node, &vss_root_node);
+	if (sr != NULL) {
+		boolean_t chk_vss;
+		if (sr->session->dialect >= SMB_VERS_2_BASE)
+			chk_vss = sr->arg.open.create_timewarp;
+		else
+			chk_vss = (sr->smb_flg2 &
+			    SMB_FLAGS2_REPARSE_PATH) != 0;
+		if (chk_vss) {
+			err = smb_vss_lookup_nodes(sr, root_node, cur_node,
+			    usepath, &vss_cur_node, &vss_root_node);
+			if (err != 0) {
+				kmem_free(usepath, SMB_MAXPATHLEN);
+				return (err);
+			}
 
-		if (err != 0) {
-			kmem_free(usepath, MAXPATHLEN);
-			return (err);
+			len = strlen(usepath);
+			local_cur_node = vss_cur_node;
+			local_root_node = vss_root_node;
 		}
-
-		len = strlen(usepath);
-		local_cur_node = vss_cur_node;
-		local_root_node = vss_root_node;
 	}
 
 	if (usepath[len - 1] == '/')
@@ -232,11 +249,11 @@ smb_pathname_reduce(
 
 	(void) strcanon(usepath, "/");
 
-	(void) pn_alloc(&ppn);
+	(void) pn_alloc_sz(&ppn, SMB_MAXPATHLEN);
 
 	if ((err = pn_set(&ppn, usepath)) != 0) {
 		(void) pn_free(&ppn);
-		kmem_free(usepath, MAXPATHLEN);
+		kmem_free(usepath, SMB_MAXPATHLEN);
 		if (vss_cur_node != NULL)
 			(void) smb_node_release(vss_cur_node);
 		if (vss_root_node != NULL)
@@ -268,7 +285,7 @@ smb_pathname_reduce(
 	}
 
 	(void) pn_free(&ppn);
-	kmem_free(usepath, MAXPATHLEN);
+	kmem_free(usepath, SMB_MAXPATHLEN);
 
 	/*
 	 * Prevent traversal to another file system if mount point
@@ -366,7 +383,7 @@ smb_pathname(smb_request_t *sr, char *path, int flags,
 	if (dir_node)
 		*dir_node = NULL;
 
-	(void) pn_alloc(&upn);
+	(void) pn_alloc_sz(&upn, SMB_MAXPATHLEN);
 
 	if ((err = pn_set(&upn, path)) != 0) {
 		(void) pn_free(&upn);
@@ -865,6 +882,8 @@ smb_pathname_strcat(smb_request_t *sr, char *s1, const char *s2)
  *
  * Returns: B_TRUE if pn is valid,
  *          otherwise returns B_FALSE and sets error status in sr.
+ *
+ * XXX: Get rid of smbsr_error calls for SMB2
  */
 boolean_t
 smb_pathname_validate(smb_request_t *sr, smb_pathname_t *pn)

@@ -101,42 +101,29 @@ charmap_search(struct netbuf *nbuf, char *opts)
 	char *next;
 	char *name;
 	char *result = NULL;
-	struct netconfig *nconf;
-	struct nd_hostservlist  *hl = NULL;
+	char *netid;
 	struct sockaddr *sa;
+
+	struct cln cln;
 
 	sa = (struct sockaddr *)nbuf->buf;
 
 	switch (sa->sa_family) {
 	case AF_INET:
-		nconf = getnetconfigent("tcp");
+		netid = "tcp";
 		break;
 	case AF_INET6:
-		nconf = getnetconfigent("tcp6");
+		netid = "tcp6";
 		break;
 	default:
 		return (NULL);
 	}
 
-	if (nconf == NULL) {
-		return (NULL);
-	}
-
-	/*
-	 * Use the this API instead of the netdir_getbyaddr()
-	 * to avoid service lookup.
-	 */
-	if (__netdir_getbyaddr_nosrv(nconf, &hl, nbuf)) {
-		syslog(LOG_ERR, "netdir: %s\n", netdir_sperror());
-		freenetconfigent(nconf);
-		return (NULL);
-	}
-
 	copts = strdup(opts);
-	if (copts == NULL) {
-		freenetconfigent(nconf);
+	if (copts == NULL)
 		return (NULL);
-	}
+
+	cln_init_lazy(&cln, netid, nbuf);
 
 	next = copts;
 	while (*next != '\0') {
@@ -152,7 +139,7 @@ charmap_search(struct netbuf *nbuf, char *opts)
 			cp = strchr(name, '=');
 			if (cp != NULL)
 				*cp = '\0';
-			if (in_access_list(NULL, &nbuf, &hl, val)) {
+			if (in_access_list(&cln, val) > 0) {
 				result = name;
 				break;
 			}
@@ -162,8 +149,8 @@ charmap_search(struct netbuf *nbuf, char *opts)
 	if (result != NULL)
 		result = strdup(result);
 
+	cln_fini(&cln);
 	free(copts);
-	freenetconfigent(nconf);
 
 	return (result);
 }

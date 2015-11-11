@@ -19,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -52,17 +52,17 @@
 
 static boolean_t smb_vss_is_gmttoken(const char *);
 static const char *smb_vss_find_gmttoken(const char *);
-static uint32_t smb_vss_encode_gmttokens(smb_request_t *, smb_xa_t *,
+static uint32_t smb_vss_encode_gmttokens(smb_request_t *, smb_fsctl_t *,
     int32_t, smb_gmttoken_response_t *);
 static void smb_vss_remove_first_token_from_path(char *);
 
 static uint32_t smb_vss_get_count(smb_tree_t *, char *);
-static void smb_vss_map_gmttoken(smb_tree_t *, char *, char *, char *);
+static void smb_vss_map_gmttoken(smb_tree_t *, char *, char *, time_t, char *);
 static void smb_vss_get_snapshots(smb_tree_t *, char *,
     uint32_t, smb_gmttoken_response_t *);
 static void smb_vss_get_snapshots_free(smb_gmttoken_response_t *);
 static int smb_vss_lookup_node(smb_request_t *sr, smb_node_t *, vnode_t *,
-    char *, smb_node_t *, char *, smb_node_t **);
+    char *, smb_node_t *, smb_node_t **);
 
 /*
  * This is to respond to the nt_transact_ioctl to either respond with the
@@ -73,18 +73,18 @@ static int smb_vss_lookup_node(smb_request_t *sr, smb_node_t *, vnode_t *,
  * snapshot).
  */
 uint32_t
-smb_vss_ioctl_enumerate_snaps(smb_request_t *sr, smb_xa_t *xa)
+smb_vss_enum_snapshots(smb_request_t *sr, smb_fsctl_t *fsctl)
 {
 	uint32_t count = 0;
 	char *root_path;
 	uint32_t status = NT_STATUS_SUCCESS;
 	smb_node_t *tnode;
-	smb_gmttoken_response_t gmttokens;
+	smb_gmttoken_response_t snaps;
 
 	ASSERT(sr->tid_tree);
 	ASSERT(sr->tid_tree->t_snode);
 
-	if (xa->smb_mdrcnt < SMB_VSS_COUNT_SIZE)
+	if (fsctl->MaxOutputResp < SMB_VSS_COUNT_SIZE)
 		return (NT_STATUS_INVALID_PARAMETER);
 
 	tnode = sr->tid_tree->t_snode;
@@ -92,22 +92,22 @@ smb_vss_ioctl_enumerate_snaps(smb_request_t *sr, smb_xa_t *xa)
 	if (smb_node_getmntpath(tnode, root_path, MAXPATHLEN) != 0)
 		return (NT_STATUS_INVALID_PARAMETER);
 
-	if (xa->smb_mdrcnt == SMB_VSS_COUNT_SIZE) {
+	if (fsctl->MaxOutputResp == SMB_VSS_COUNT_SIZE) {
 		count = smb_vss_get_count(sr->tid_tree, root_path);
-		if (smb_mbc_encodef(&xa->rep_data_mb, "lllw", count, 0,
+		if (smb_mbc_encodef(fsctl->out_mbc, "lllw", count, 0,
 		    (count * SMB_VSS_GMT_NET_SIZE(sr) +
 		    smb_ascii_or_unicode_null_len(sr)), 0) != 0) {
 			status = NT_STATUS_INVALID_PARAMETER;
 		}
 	} else {
-		count = xa->smb_mdrcnt / SMB_VSS_GMT_NET_SIZE(sr);
+		count = fsctl->MaxOutputResp / SMB_VSS_GMT_NET_SIZE(sr);
 
 		smb_vss_get_snapshots(sr->tid_tree, root_path,
-		    count, &gmttokens);
+		    count, &snaps);
 
-		status = smb_vss_encode_gmttokens(sr, xa, count, &gmttokens);
+		status = smb_vss_encode_gmttokens(sr, fsctl, count, &snaps);
 
-		smb_vss_get_snapshots_free(&gmttokens);
+		smb_vss_get_snapshots_free(&snaps);
 	}
 
 	kmem_free(root_path, MAXPATHLEN);
@@ -142,12 +142,15 @@ smb_vss_lookup_nodes(smb_request_t *sr, smb_node_t *root_node,
     smb_node_t *cur_node, char *buf, smb_node_t **vss_cur_node,
     smb_node_t **vss_root_node)
 {
-	const char	*p;
+	smb_arg_open_t	*op = &sr->arg.open;
 	smb_node_t	*tnode;
 	char		*snapname, *path;
-	char		gmttoken[SMB_VSS_GMT_SIZE];
+	char		*gmttoken;
+	char		gmttok_buf[SMB_VSS_GMT_SIZE];
 	vnode_t		*fsrootvp = NULL;
+	time_t		toktime;
 	int		err = 0;
+	boolean_t	smb1;
 
 	if (sr->tid_tree == NULL)
 		return (ESTALE);
@@ -158,12 +161,23 @@ smb_vss_lookup_nodes(smb_request_t *sr, smb_node_t *root_node,
 	ASSERT(tnode->vp);
 	ASSERT(tnode->vp->v_vfsp);
 
-	/* get gmttoken from buf and find corresponding snapshot name */
-	if ((p = smb_vss_find_gmttoken(buf)) == NULL)
-		return (ENOENT);
+	smb1 = (sr->session->dialect < SMB_VERS_2_BASE);
+	if (smb1) {
+		const char *p;
 
-	bcopy(p, gmttoken, SMB_VSS_GMT_SIZE);
-	gmttoken[SMB_VSS_GMT_SIZE - 1] = '\0';
+		/* get gmttoken from buf */
+		if ((p = smb_vss_find_gmttoken(buf)) == NULL)
+			return (ENOENT);
+
+		bcopy(p, gmttok_buf, SMB_VSS_GMT_SIZE);
+		gmttok_buf[SMB_VSS_GMT_SIZE - 1] = '\0';
+		gmttoken = gmttok_buf;
+		toktime = 0;
+	} else {
+		/* SMB2 and later */
+		gmttoken = NULL;
+		toktime = op->timewarp.tv_sec;
+	}
 
 	path = smb_srm_alloc(sr, MAXPATHLEN);
 	snapname = smb_srm_alloc(sr, MAXPATHLEN);
@@ -172,9 +186,14 @@ smb_vss_lookup_nodes(smb_request_t *sr, smb_node_t *root_node,
 	if (err != 0)
 		return (err);
 
+	/*
+	 * Find the corresponding snapshot name.  If snapname is
+	 * empty after the map call, no such snapshot was found.
+	 */
 	*snapname = '\0';
-	smb_vss_map_gmttoken(sr->tid_tree, path, gmttoken, snapname);
-	if (!*snapname)
+	smb_vss_map_gmttoken(sr->tid_tree, path, gmttoken, toktime,
+	    snapname);
+	if (*snapname == '\0')
 		return (ENOENT);
 
 	/* find snapshot nodes */
@@ -184,18 +203,20 @@ smb_vss_lookup_nodes(smb_request_t *sr, smb_node_t *root_node,
 
 	/* find snapshot node corresponding to root_node */
 	err = smb_vss_lookup_node(sr, root_node, fsrootvp,
-	    snapname, cur_node, gmttoken, vss_root_node);
+	    snapname, cur_node, vss_root_node);
 	if (err == 0) {
 		/* find snapshot node corresponding to cur_node */
 		err = smb_vss_lookup_node(sr, cur_node, fsrootvp,
-		    snapname, cur_node, gmttoken, vss_cur_node);
+		    snapname, cur_node, vss_cur_node);
 		if (err != 0)
 			smb_node_release(*vss_root_node);
 	}
 
 	VN_RELE(fsrootvp);
 
-	smb_vss_remove_first_token_from_path(buf);
+	if (smb1)
+		smb_vss_remove_first_token_from_path(buf);
+
 	return (err);
 }
 
@@ -208,7 +229,7 @@ smb_vss_lookup_nodes(smb_request_t *sr, smb_node_t *root_node,
  */
 static int
 smb_vss_lookup_node(smb_request_t *sr, smb_node_t *node, vnode_t *fsrootvp,
-    char *snapname, smb_node_t *dnode, char *odname, smb_node_t **vss_node)
+    char *snapname, smb_node_t *dnode, smb_node_t **vss_node)
 {
 	char *p, *path;
 	int err, len;
@@ -226,7 +247,7 @@ smb_vss_lookup_node(smb_request_t *sr, smb_node_t *node, vnode_t *fsrootvp,
 		vp = smb_lookuppathvptovp(sr, path, fsrootvp, fsrootvp);
 		if (vp) {
 			*vss_node = smb_node_lookup(sr, NULL, zone_kcred(),
-			    vp, odname, dnode, NULL);
+			    vp, snapname, dnode, NULL);
 			VN_RELE(vp);
 		}
 	}
@@ -277,7 +298,7 @@ smb_vss_find_gmttoken(const char *path)
 	p = path;
 
 	while (*p) {
-		if (smb_vss_is_gmttoken(p))
+		if (*p == '@' && smb_vss_is_gmttoken(p))
 			return (p);
 		p++;
 	}
@@ -285,7 +306,7 @@ smb_vss_find_gmttoken(const char *path)
 }
 
 static uint32_t
-smb_vss_encode_gmttokens(smb_request_t *sr, smb_xa_t *xa,
+smb_vss_encode_gmttokens(smb_request_t *sr, smb_fsctl_t *fsctl,
     int32_t count, smb_gmttoken_response_t *snap_data)
 {
 	uint32_t i;
@@ -305,13 +326,13 @@ smb_vss_encode_gmttokens(smb_request_t *sr, smb_xa_t *xa,
 	data_size = returned_count * SMB_VSS_GMT_NET_SIZE(sr) +
 	    smb_ascii_or_unicode_null_len(sr);
 
-	if (smb_mbc_encodef(&xa->rep_data_mb, "lll", returned_count,
+	if (smb_mbc_encodef(fsctl->out_mbc, "lll", returned_count,
 	    num_gmttokens, data_size) != 0)
 		return (NT_STATUS_INVALID_PARAMETER);
 
 	if (status == NT_STATUS_SUCCESS) {
 		for (i = 0; i < num_gmttokens; i++) {
-			if (smb_mbc_encodef(&xa->rep_data_mb, "%u", sr,
+			if (smb_mbc_encodef(fsctl->out_mbc, "%u", sr,
 			    *gmttokens) != 0)
 				status = NT_STATUS_INVALID_PARAMETER;
 			gmttokens++;
@@ -405,7 +426,7 @@ smb_vss_get_snapshots_free(smb_gmttoken_response_t *reply)
  */
 static void
 smb_vss_map_gmttoken(smb_tree_t *tree, char *path, char *gmttoken,
-    char *snapname)
+	time_t toktime, char *snapname)
 {
 	smb_gmttoken_snapname_t	request;
 	smb_string_t		result;
@@ -415,6 +436,7 @@ smb_vss_map_gmttoken(smb_tree_t *tree, char *path, char *gmttoken,
 
 	request.gts_path = path;
 	request.gts_gmttoken = gmttoken;
+	request.gts_toktime = toktime;
 
 	(void) smb_kdoor_upcall(tree->t_server, SMB_DR_VSS_MAP_GMTTOKEN,
 	    &request, smb_gmttoken_snapname_xdr,

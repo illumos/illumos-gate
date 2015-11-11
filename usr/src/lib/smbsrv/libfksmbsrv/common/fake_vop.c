@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -261,7 +261,7 @@ fop_setattr(
 	cred_t *cr,
 	caller_context_t *ct)
 {
-	struct timeval times[2];
+	timespec_t times[2];
 
 	if (vap->va_mask & AT_SIZE) {
 		if (ftruncate(vp->v_fd, vap->va_size) == -1)
@@ -274,20 +274,20 @@ fop_setattr(
 		(void) fop__setxvattr(vp, (xvattr_t *)vap);
 
 	if (vap->va_mask & (AT_ATIME | AT_MTIME)) {
-		times[0].tv_sec = 0;
-		times[0].tv_usec = UTIME_OMIT;
-		times[1].tv_sec = 0;
-		times[1].tv_usec = UTIME_OMIT;
 		if (vap->va_mask & AT_ATIME) {
-			times[0].tv_sec = vap->va_atime.tv_sec;
-			times[0].tv_usec = vap->va_atime.tv_nsec / 1000;
+			times[0] = vap->va_atime;
+		} else {
+			times[0].tv_sec = 0;
+			times[0].tv_nsec = UTIME_OMIT;
 		}
 		if (vap->va_mask & AT_MTIME) {
-			times[1].tv_sec = vap->va_mtime.tv_sec;
-			times[1].tv_usec = vap->va_mtime.tv_nsec / 1000;
+			times[1] = vap->va_mtime;
+		} else {
+			times[1].tv_sec = 0;
+			times[1].tv_nsec = UTIME_OMIT;
 		}
 
-		(void) futimesat(vp->v_fd, NULL, times);
+		(void) futimens(vp->v_fd, times);
 	}
 
 	return (0);
@@ -449,11 +449,9 @@ fop_create(
 	}
 
 	/*
-	 * Truncate (if requested).
+	 * Might need to set attributes.
 	 */
-	if ((vap->va_mask & AT_SIZE) && vap->va_size == 0) {
-		(void) ftruncate(vp->v_fd, 0);
-	}
+	(void) fop_setattr(vp, vap, 0, cr, ct);
 
 	*vpp = vp;
 	return (0);
@@ -562,6 +560,11 @@ fop_mkdir(
 	}
 
 	*vpp = vncache_enter(&st, dvp, name, fd);
+
+	/*
+	 * Might need to set attributes.
+	 */
+	(void) fop_setattr(*vpp, vap, 0, cr, ct);
 
 	return (0);
 }

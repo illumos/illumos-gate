@@ -206,6 +206,7 @@ DIRS= \
 	/root  \
 	/sbin  \
 	/system \
+	/system/boot \
 	/system/contract \
 	/system/object \
 	/tmp \
@@ -583,6 +584,7 @@ $(ROOT)/var/mail:=	DIRMODE=1777
 
 $(ROOT)/proc:=		DIRMODE= 555
 
+$(ROOT)/system/boot:=		DIRMODE= 555
 $(ROOT)/system/contract:=	DIRMODE= 555
 $(ROOT)/system/object:=		DIRMODE= 555
 

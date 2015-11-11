@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH KRB5_AUTH_RULES 5 "Apr 07, 2006"
+.TH KRB5_AUTH_RULES 5 "Oct 29, 2015"
 .SH NAME
 krb5_auth_rules \- overview of Kerberos V5 authorization
 .SH DESCRIPTION
@@ -27,8 +27,8 @@ such as \fBjdb@ENG.ACME.COM\fR and \fBjdb/happy.eng.acme.com@ENG.ACME.COM\fR
 would each be legal, though not equivalent, Kerberos principals. The client is
 granted access if the \fB~/.k5login\fR file is located in the login directory
 of the remote user account and if the originating user can be authenticated to
-one of the principals named in the file. See \fBgkadmin\fR(1M) and
-\fBkadm5.acl\fR(4) for more information on Kerberos principal names.
+one of the principals named in the file. See \fBkadm5.acl\fR(4) for more
+information on Kerberos principal names.
 .sp
 .LP
 When no \fB~/.k5login\fR file is found in the remote user's login account, the
@@ -123,6 +123,6 @@ Interface Stability	Evolving
 .sp
 .LP
 \fBftp\fR(1), \fBrcp\fR(1), \fBrdist\fR(1), \fBrlogin\fR(1), \fBrsh\fR(1),
-\fBtelnet\fR(1), \fBgkadmin\fR(1M), \fBgsscred\fR(1M), \fBkadm5.acl\fR(4),
+\fBtelnet\fR(1), \fBgsscred\fR(1M), \fBkadm5.acl\fR(4),
 \fBkrb5.conf\fR(4), \fBpasswd\fR(4), \fBattributes\fR(5),
 \fBgss_auth_rules\fR(5)

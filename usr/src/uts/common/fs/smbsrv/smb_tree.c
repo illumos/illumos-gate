@@ -171,15 +171,15 @@
 
 int smb_tcon_mute = 0;
 
-static smb_tree_t *smb_tree_connect_core(smb_request_t *);
-static smb_tree_t *smb_tree_connect_disk(smb_request_t *, const char *);
-static smb_tree_t *smb_tree_connect_printq(smb_request_t *, const char *);
-static smb_tree_t *smb_tree_connect_ipc(smb_request_t *, const char *);
+uint32_t	smb_tree_connect_core(smb_request_t *);
+uint32_t	smb_tree_connect_disk(smb_request_t *, smb_arg_tcon_t *);
+uint32_t	smb_tree_connect_printq(smb_request_t *, smb_arg_tcon_t *);
+uint32_t	smb_tree_connect_ipc(smb_request_t *, smb_arg_tcon_t *);
 static smb_tree_t *smb_tree_alloc(smb_request_t *, const smb_kshare_t *,
     smb_node_t *, uint32_t, uint32_t);
 static boolean_t smb_tree_is_connected_locked(smb_tree_t *);
 static boolean_t smb_tree_is_disconnected(smb_tree_t *);
-static const char *smb_tree_get_sharename(const char *);
+static char *smb_tree_get_sharename(char *);
 static int smb_tree_getattr(const smb_kshare_t *, smb_node_t *, smb_tree_t *);
 static void smb_tree_get_volname(vfs_t *, smb_tree_t *);
 static void smb_tree_get_flags(const smb_kshare_t *, vfs_t *, smb_tree_t *);
@@ -193,20 +193,19 @@ static int smb_tree_netinfo_encode(smb_tree_t *, uint8_t *, size_t, uint32_t *);
 static void smb_tree_netinfo_init(smb_tree_t *tree, smb_netconnectinfo_t *);
 static void smb_tree_netinfo_fini(smb_netconnectinfo_t *);
 
-smb_tree_t *
+uint32_t
 smb_tree_connect(smb_request_t *sr)
 {
-	smb_tree_t	*tree;
 	smb_server_t	*sv = sr->sr_server;
+	uint32_t status;
 
 	if (smb_threshold_enter(&sv->sv_tcon_ct) != 0) {
-		smbsr_error(sr, RPC_NT_SERVER_TOO_BUSY, 0, 0);
-		return (NULL);
+		return (NT_STATUS_INSUFF_SERVER_RESOURCES);
 	}
 
-	tree = smb_tree_connect_core(sr);
+	status = smb_tree_connect_core(sr);
 	smb_threshold_exit(&sv->sv_tcon_ct);
-	return (tree);
+	return (status);
 }
 
 /*
@@ -221,56 +220,56 @@ smb_tree_connect(smb_request_t *sr)
  *	COMM    Communications device
  *	?????   Any type of device (wildcard)
  */
-static smb_tree_t *
+uint32_t
 smb_tree_connect_core(smb_request_t *sr)
 {
-	char		*unc_path = sr->sr_tcon.path;
-	smb_tree_t	*tree = NULL;
+	smb_arg_tcon_t	*tcon = &sr->sr_tcon;
 	smb_kshare_t	*si;
-	const char	*name;
+	char		*name;
+	uint32_t	status;
 
-	(void) smb_strlwr(unc_path);
+	(void) smb_strlwr(tcon->path);
 
-	if ((name = smb_tree_get_sharename(unc_path)) == NULL) {
-		smb_tree_log(sr, unc_path, "invalid UNC path");
-		smbsr_error(sr, 0, ERRSRV, ERRinvnetname);
-		return (NULL);
+	if ((name = smb_tree_get_sharename(tcon->path)) == NULL) {
+		smb_tree_log(sr, tcon->path, "invalid UNC path");
+		return (NT_STATUS_BAD_NETWORK_NAME);
 	}
 
 	si = smb_kshare_lookup(sr->sr_server, name);
 	if (si == NULL) {
 		smb_tree_log(sr, name, "share not found");
-		smbsr_error(sr, 0, ERRSRV, ERRinvnetname);
-		return (NULL);
+		return (NT_STATUS_BAD_NETWORK_NAME);
 	}
 
 	if (!strcasecmp(SMB_SHARE_PRINT, name)) {
 		smb_kshare_release(sr->sr_server, si);
 		smb_tree_log(sr, name, "access not permitted");
-		smbsr_error(sr, NT_STATUS_ACCESS_DENIED, ERRSRV, ERRaccess);
-		return (NULL);
+		return (NT_STATUS_ACCESS_DENIED);
 	}
 
+	/* NB: name points into tcon->path - don't free it. */
+	tcon->name = name;
 	sr->sr_tcon.si = si;
 
 	switch (si->shr_type & STYPE_MASK) {
 	case STYPE_DISKTREE:
-		tree = smb_tree_connect_disk(sr, name);
+		status = smb_tree_connect_disk(sr, &sr->sr_tcon);
 		break;
 	case STYPE_IPC:
-		tree = smb_tree_connect_ipc(sr, name);
+		status = smb_tree_connect_ipc(sr, &sr->sr_tcon);
 		break;
 	case STYPE_PRINTQ:
-		tree = smb_tree_connect_printq(sr, name);
+		status = smb_tree_connect_printq(sr, &sr->sr_tcon);
 		break;
 	default:
-		smbsr_error(sr, NT_STATUS_BAD_DEVICE_TYPE,
-		    ERRDOS, ERROR_BAD_DEV_TYPE);
+		status = NT_STATUS_BAD_DEVICE_TYPE;
 		break;
 	}
 
 	smb_kshare_release(sr->sr_server, si);
-	return (tree);
+	sr->sr_tcon.si = NULL;
+
+	return (status);
 }
 
 /*
@@ -326,8 +325,7 @@ boolean_t
 smb_tree_hold(
     smb_tree_t		*tree)
 {
-	ASSERT(tree);
-	ASSERT(tree->t_magic == SMB_TREE_MAGIC);
+	SMB_TREE_VALID(tree);
 
 	mutex_enter(&tree->t_mutex);
 
@@ -339,6 +337,25 @@ smb_tree_hold(
 
 	mutex_exit(&tree->t_mutex);
 	return (B_FALSE);
+}
+
+/*
+ * Bump the hold count regardless of the tree state.  This is used in
+ * some internal code paths where we've already checked that we had a
+ * valid tree connection, and don't want to deal with the possiblity
+ * that the tree state might have changed to disconnecting after our
+ * original hold was taken.  It's correct to continue processing a
+ * request even when new requests cannot lookup that tree anymore.
+ */
+void
+smb_tree_hold_internal(
+    smb_tree_t		*tree)
+{
+	SMB_TREE_VALID(tree);
+
+	mutex_enter(&tree->t_mutex);
+	tree->t_refcnt++;
+	mutex_exit(&tree->t_mutex);
 }
 
 /*
@@ -397,7 +414,7 @@ smb_tree_post_odir(smb_tree_t *tree, smb_odir_t *od)
 void
 smb_tree_close_pid(
     smb_tree_t		*tree,
-    uint16_t		pid)
+    uint32_t		pid)
 {
 	ASSERT(tree);
 	ASSERT(tree->t_magic == SMB_TREE_MAGIC);
@@ -584,7 +601,7 @@ smb_tree_chkaccess(smb_request_t *sr, smb_kshare_t *shr, vnode_t *vp)
 	uint32_t acl_access;
 	uint32_t access;
 
-	if (user->u_flags & SMB_USER_FLAG_IPC) {
+	if (user->u_flags & SMB_USER_FLAG_ANON) {
 		smb_tree_log(sr, sharename, "access denied: IPC only");
 		return (0);
 	}
@@ -624,15 +641,16 @@ smb_tree_chkaccess(smb_request_t *sr, smb_kshare_t *shr, vnode_t *vp)
 /*
  * Connect a share for use with files and directories.
  */
-static smb_tree_t *
-smb_tree_connect_disk(smb_request_t *sr, const char *sharename)
+uint32_t
+smb_tree_connect_disk(smb_request_t *sr, smb_arg_tcon_t *tcon)
 {
+	char			*sharename = tcon->path;
 	const char		*any = "?????";
 	smb_user_t		*user = sr->uid_user;
 	smb_node_t		*dnode = NULL;
 	smb_node_t		*snode = NULL;
-	smb_kshare_t 		*si = sr->sr_tcon.si;
-	char			*service = sr->sr_tcon.service;
+	smb_kshare_t 		*si = tcon->si;
+	char			*service = tcon->service;
 	char			last_component[MAXNAMELEN];
 	smb_tree_t		*tree;
 	int			rc;
@@ -642,11 +660,11 @@ smb_tree_connect_disk(smb_request_t *sr, const char *sharename)
 	ASSERT(user);
 	ASSERT(user->u_cred);
 
-	if ((strcmp(service, any) != 0) && (strcasecmp(service, "A:") != 0)) {
+	if (service != NULL &&
+	    strcmp(service, any) != 0 &&
+	    strcasecmp(service, "A:") != 0) {
 		smb_tree_log(sr, sharename, "invalid service (%s)", service);
-		smbsr_error(sr, NT_STATUS_BAD_DEVICE_TYPE,
-		    ERRDOS, ERROR_BAD_DEV_TYPE);
-		return (NULL);
+		return (NT_STATUS_BAD_DEVICE_TYPE);
 	}
 
 	/*
@@ -654,7 +672,6 @@ smb_tree_connect_disk(smb_request_t *sr, const char *sharename)
 	 */
 	rc = smb_pathname_reduce(sr, user->u_cred, si->shr_path, 0, 0, &dnode,
 	    last_component);
-
 	if (rc == 0) {
 		rc = smb_fsop_lookup(sr, user->u_cred, SMB_FOLLOW_LINKS,
 		    sr->sr_server->si_root_smb_node, dnode, last_component,
@@ -668,30 +685,28 @@ smb_tree_connect_disk(smb_request_t *sr, const char *sharename)
 			smb_node_release(snode);
 
 		smb_tree_log(sr, sharename, "bad path: %s", si->shr_path);
-		smbsr_error(sr, 0, ERRSRV, ERRinvnetname);
-		return (NULL);
+		return (NT_STATUS_BAD_NETWORK_NAME);
 	}
 
 	if ((access = smb_tree_chkaccess(sr, si, snode->vp)) == 0) {
-		smbsr_error(sr, NT_STATUS_ACCESS_DENIED, ERRSRV, ERRaccess);
 		smb_node_release(snode);
-		return (NULL);
+		return (NT_STATUS_ACCESS_DENIED);
 	}
 
 	/*
 	 * Set up the OptionalSupport for this share.
 	 */
-	sr->sr_tcon.optional_support = SMB_SUPPORT_SEARCH_BITS;
+	tcon->optional_support = SMB_SUPPORT_SEARCH_BITS;
 
 	switch (si->shr_flags & SMB_SHRF_CSC_MASK) {
 	case SMB_SHRF_CSC_DISABLED:
-		sr->sr_tcon.optional_support |= SMB_CSC_CACHE_NONE;
+		tcon->optional_support |= SMB_CSC_CACHE_NONE;
 		break;
 	case SMB_SHRF_CSC_AUTO:
-		sr->sr_tcon.optional_support |= SMB_CSC_CACHE_AUTO_REINT;
+		tcon->optional_support |= SMB_CSC_CACHE_AUTO_REINT;
 		break;
 	case SMB_SHRF_CSC_VDO:
-		sr->sr_tcon.optional_support |= SMB_CSC_CACHE_VDO;
+		tcon->optional_support |= SMB_CSC_CACHE_VDO;
 		break;
 	case SMB_SHRF_CSC_MANUAL:
 	default:
@@ -703,11 +718,11 @@ smb_tree_connect_disk(smb_request_t *sr, const char *sharename)
 
 	/* ABE support */
 	if (si->shr_flags & SMB_SHRF_ABE)
-		sr->sr_tcon.optional_support |=
+		tcon->optional_support |=
 		    SHI1005_FLAGS_ACCESS_BASED_DIRECTORY_ENUM;
 
 	if (si->shr_flags & SMB_SHRF_DFSROOT)
-		sr->sr_tcon.optional_support |= SMB_SHARE_IS_IN_DFS;
+		tcon->optional_support |= SMB_SHARE_IS_IN_DFS;
 
 	/* if 'smb' zfs property: shortnames=disabled */
 	if (!smb_shortnames)
@@ -717,25 +732,25 @@ smb_tree_connect_disk(smb_request_t *sr, const char *sharename)
 
 	smb_node_release(snode);
 
-	if (tree) {
-		if (tree->t_execflags & SMB_EXEC_MAP) {
-			smb_tree_set_execinfo(tree, &execinfo, SMB_EXEC_MAP);
+	if (tree == NULL)
+		return (NT_STATUS_INSUFF_SERVER_RESOURCES);
 
-			rc = smb_kshare_exec(tree->t_server, &execinfo);
+	if (tree->t_execflags & SMB_EXEC_MAP) {
+		smb_tree_set_execinfo(tree, &execinfo, SMB_EXEC_MAP);
 
-			if ((rc != 0) && (tree->t_execflags & SMB_EXEC_TERM)) {
-				smb_tree_disconnect(tree, B_FALSE);
-				smb_tree_release(tree);
-				smbsr_error(sr, NT_STATUS_ACCESS_DENIED, ERRSRV,
-				    ERRaccess);
-				return (NULL);
-			}
+		rc = smb_kshare_exec(tree->t_server, &execinfo);
+
+		if ((rc != 0) && (tree->t_execflags & SMB_EXEC_TERM)) {
+			smb_tree_disconnect(tree, B_FALSE);
+			smb_tree_release(tree);
+			return (NT_STATUS_ACCESS_DENIED);
 		}
-	} else {
-		smbsr_error(sr, NT_STATUS_ACCESS_DENIED, ERRSRV, ERRaccess);
 	}
 
-	return (tree);
+	sr->tid_tree = tree;
+	sr->smb_tid  = tree->t_tid;
+
+	return (0);
 }
 
 /*
@@ -744,15 +759,16 @@ smb_tree_connect_disk(smb_request_t *sr, const char *sharename)
  * (permissions allowed by host based access) and aclaccess (from the
  * share ACL).
  */
-static smb_tree_t *
-smb_tree_connect_printq(smb_request_t *sr, const char *sharename)
+uint32_t
+smb_tree_connect_printq(smb_request_t *sr, smb_arg_tcon_t *tcon)
 {
+	char			*sharename = tcon->path;
 	const char		*any = "?????";
 	smb_user_t		*user = sr->uid_user;
 	smb_node_t		*dnode = NULL;
 	smb_node_t		*snode = NULL;
-	smb_kshare_t 		*si = sr->sr_tcon.si;
-	char			*service = sr->sr_tcon.service;
+	smb_kshare_t 		*si = tcon->si;
+	char			*service = tcon->service;
 	char			last_component[MAXNAMELEN];
 	smb_tree_t		*tree;
 	int			rc;
@@ -763,16 +779,14 @@ smb_tree_connect_printq(smb_request_t *sr, const char *sharename)
 
 	if (sr->sr_server->sv_cfg.skc_print_enable == 0) {
 		smb_tree_log(sr, sharename, "printing disabled");
-		smbsr_error(sr, 0, ERRSRV, ERRinvnetname);
-		return (NULL);
+		return (NT_STATUS_BAD_NETWORK_NAME);
 	}
 
-	if ((strcmp(service, any) != 0) &&
-	    (strcasecmp(service, "LPT1:") != 0)) {
+	if (service != NULL &&
+	    strcmp(service, any) != 0 &&
+	    strcasecmp(service, "LPT1:") != 0) {
 		smb_tree_log(sr, sharename, "invalid service (%s)", service);
-		smbsr_error(sr, NT_STATUS_BAD_DEVICE_TYPE,
-		    ERRDOS, ERROR_BAD_DEV_TYPE);
-		return (NULL);
+		return (NT_STATUS_BAD_DEVICE_TYPE);
 	}
 
 	/*
@@ -793,65 +807,67 @@ smb_tree_connect_printq(smb_request_t *sr, const char *sharename)
 			smb_node_release(snode);
 
 		smb_tree_log(sr, sharename, "bad path: %s", si->shr_path);
-		smbsr_error(sr, 0, ERRSRV, ERRinvnetname);
-		return (NULL);
+		return (NT_STATUS_BAD_NETWORK_NAME);
 	}
 
 	if ((access = smb_tree_chkaccess(sr, si, snode->vp)) == 0) {
-		smbsr_error(sr, NT_STATUS_ACCESS_DENIED, ERRSRV, ERRaccess);
 		smb_node_release(snode);
-		return (NULL);
+		return (NT_STATUS_ACCESS_DENIED);
 	}
 
-	sr->sr_tcon.optional_support = SMB_SUPPORT_SEARCH_BITS;
+	tcon->optional_support = SMB_SUPPORT_SEARCH_BITS;
 
 	tree = smb_tree_alloc(sr, si, snode, access, sr->sr_cfg->skc_execflags);
 
 	smb_node_release(snode);
 
 	if (tree == NULL)
-		smbsr_error(sr, NT_STATUS_ACCESS_DENIED, ERRSRV, ERRaccess);
+		return (NT_STATUS_INSUFF_SERVER_RESOURCES);
 
-	return (tree);
+	sr->tid_tree = tree;
+	sr->smb_tid  = tree->t_tid;
+
+	return (0);
 }
 
 /*
  * Connect an IPC share for use with named pipes.
  */
-static smb_tree_t *
-smb_tree_connect_ipc(smb_request_t *sr, const char *name)
+uint32_t
+smb_tree_connect_ipc(smb_request_t *sr, smb_arg_tcon_t *tcon)
 {
+	char		*name = tcon->path;
 	const char	*any = "?????";
 	smb_user_t	*user = sr->uid_user;
 	smb_tree_t	*tree;
-	smb_kshare_t	*si = sr->sr_tcon.si;
-	char		*service = sr->sr_tcon.service;
+	smb_kshare_t	*si = tcon->si;
+	char		*service = tcon->service;
 
 	ASSERT(user);
 
-	if ((user->u_flags & SMB_USER_FLAG_IPC) &&
+	if (service != NULL &&
+	    strcmp(service, any) != 0 &&
+	    strcasecmp(service, "IPC") != 0) {
+		smb_tree_log(sr, name, "invalid service (%s)", service);
+		return (NT_STATUS_BAD_DEVICE_TYPE);
+	}
+
+	if ((user->u_flags & SMB_USER_FLAG_ANON) &&
 	    sr->sr_cfg->skc_restrict_anon) {
 		smb_tree_log(sr, name, "access denied: restrict anonymous");
-		smbsr_error(sr, NT_STATUS_ACCESS_DENIED, ERRSRV, ERRaccess);
-		return (NULL);
+		return (NT_STATUS_ACCESS_DENIED);
 	}
 
-	if ((strcmp(service, any) != 0) && (strcasecmp(service, "IPC") != 0)) {
-		smb_tree_log(sr, name, "invalid service (%s)", service);
-		smbsr_error(sr, NT_STATUS_BAD_DEVICE_TYPE,
-		    ERRDOS, ERROR_BAD_DEV_TYPE);
-		return (NULL);
-	}
-
-	sr->sr_tcon.optional_support = SMB_SUPPORT_SEARCH_BITS;
+	tcon->optional_support = SMB_SUPPORT_SEARCH_BITS;
 
 	tree = smb_tree_alloc(sr, si, NULL, ACE_ALL_PERMS, 0);
-	if (tree == NULL) {
-		smb_tree_log(sr, name, "access denied");
-		smbsr_error(sr, NT_STATUS_ACCESS_DENIED, ERRSRV, ERRaccess);
-	}
+	if (tree == NULL)
+		return (NT_STATUS_INSUFF_SERVER_RESOURCES);
 
-	return (tree);
+	sr->tid_tree = tree;
+	sr->smb_tid  = tree->t_tid;
+
+	return (0);
 }
 
 /*
@@ -1036,10 +1052,10 @@ smb_tree_is_disconnected(smb_tree_t *tree)
  * (\\server\share) or simply the share name.  We validate the UNC
  * format but we don't look at the server name.
  */
-static const char *
-smb_tree_get_sharename(const char *unc_path)
+static char *
+smb_tree_get_sharename(char *unc_path)
 {
-	const char *sharename = unc_path;
+	char *sharename = unc_path;
 
 	if (sharename[0] == '\\') {
 		/*
@@ -1088,6 +1104,10 @@ smb_tree_getattr(const smb_kshare_t *si, smb_node_t *node, smb_tree_t *tree)
 static void
 smb_tree_get_volname(vfs_t *vfsp, smb_tree_t *tree)
 {
+#ifdef	_FAKE_KERNEL
+	_NOTE(ARGUNUSED(vfsp))
+	(void) strlcpy(tree->t_volume, "fake", SMB_VOLNAMELEN);
+#else	/* _FAKE_KERNEL */
 	refstr_t *vfs_mntpoint;
 	const char *s;
 	char *name;
@@ -1102,9 +1122,11 @@ smb_tree_get_volname(vfs_t *vfsp, smb_tree_t *tree)
 
 	name = tree->t_volume;
 	(void) strsep((char **)&name, "/");
+#endif	/* _FAKE_KERNEL */
 }
 
 /*
+ * Always set "unicode on disk" because we always use utf8 names locally.
  * Always set ACL support because the VFS will fake ACLs for file systems
  * that don't support them.
  *
@@ -1124,15 +1146,16 @@ smb_tree_get_flags(const smb_kshare_t *si, vfs_t *vfsp, smb_tree_t *tree)
 	} smb_mtype_t;
 
 	static smb_mtype_t smb_mtype[] = {
-		{ "zfs",    3,	SMB_TREE_UNICODE_ON_DISK |
-		    SMB_TREE_QUOTA | SMB_TREE_SPARSE},
-		{ "ufs",    3,	SMB_TREE_UNICODE_ON_DISK },
+		{ "zfs",    3,	SMB_TREE_QUOTA | SMB_TREE_SPARSE},
+		{ "ufs",    3,	0 },
 		{ "nfs",    3,	SMB_TREE_NFS_MOUNTED },
 		{ "tmpfs",  5,	SMB_TREE_NO_EXPORT }
 	};
 	smb_mtype_t	*mtype;
 	char		*name;
-	uint32_t	flags = SMB_TREE_SUPPORTS_ACLS;
+	uint32_t	flags =
+	    SMB_TREE_SUPPORTS_ACLS |
+	    SMB_TREE_UNICODE_ON_DISK;
 	int		i;
 
 	if (si->shr_flags & SMB_SHRF_DFSROOT)

@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <smbsrv/smb_kproto.h>
@@ -244,6 +244,7 @@ smb_com_open(smb_request_t *sr)
 	struct open_param *op = &sr->arg.open;
 	smb_ofile_t *of;
 	smb_attr_t attr;
+	uint32_t status;
 	uint16_t file_attr;
 	int rc;
 
@@ -271,8 +272,11 @@ smb_com_open(smb_request_t *sr)
 		return (SDRC_ERROR);
 	}
 
-	if (smb_common_open(sr) != NT_STATUS_SUCCESS)
+	status = smb_common_open(sr);
+	if (status != NT_STATUS_SUCCESS) {
+		smbsr_status(sr, status, 0, 0);
 		return (SDRC_ERROR);
+	}
 
 	/*
 	 * NB: after the above smb_common_open() success,
@@ -322,6 +326,7 @@ smb_pre_open_andx(smb_request_t *sr)
 {
 	struct open_param *op = &sr->arg.open;
 	uint16_t flags;
+	uint32_t alloc_size;
 	uint32_t creation_time;
 	uint16_t file_attr, sattr;
 	int rc;
@@ -330,12 +335,13 @@ smb_pre_open_andx(smb_request_t *sr)
 
 	rc = smbsr_decode_vwv(sr, "b.wwwwwlwll4.", &sr->andx_com,
 	    &sr->andx_off, &flags, &op->omode, &sattr,
-	    &file_attr, &creation_time, &op->ofun, &op->dsize, &op->timeo);
+	    &file_attr, &creation_time, &op->ofun, &alloc_size, &op->timeo);
 
 	if (rc == 0) {
 		rc = smbsr_decode_data(sr, "%u", sr, &op->fqi.fq_path.pn_path);
 
 		op->dattr = file_attr;
+		op->dsize = alloc_size;
 
 		if (flags & 2)
 			op->op_oplock_level = SMB_OPLOCK_EXCLUSIVE;
@@ -369,6 +375,7 @@ smb_com_open_andx(smb_request_t *sr)
 {
 	struct open_param	*op = &sr->arg.open;
 	smb_ofile_t		*of;
+	uint32_t		status;
 	uint16_t		file_attr;
 	smb_attr_t		attr;
 	int rc;
@@ -393,8 +400,11 @@ smb_com_open_andx(smb_request_t *sr)
 		return (SDRC_ERROR);
 	}
 
-	if (smb_common_open(sr) != NT_STATUS_SUCCESS)
+	status = smb_common_open(sr);
+	if (status != NT_STATUS_SUCCESS) {
+		smbsr_status(sr, status, 0, 0);
 		return (SDRC_ERROR);
+	}
 
 	/*
 	 * NB: after the above smb_common_open() success,
@@ -472,6 +482,7 @@ smb_com_trans2_open2(smb_request_t *sr, smb_xa_t *xa)
 	uint32_t	alloc_size;
 	uint16_t	flags;
 	uint16_t	file_attr;
+	uint32_t	status;
 	int		rc;
 
 	bzero(op, sizeof (sr->arg.open));
@@ -511,8 +522,11 @@ smb_com_trans2_open2(smb_request_t *sr, smb_xa_t *xa)
 	}
 	op->op_oplock_levelII = B_FALSE;
 
-	if (smb_common_open(sr) != NT_STATUS_SUCCESS)
+	status = smb_common_open(sr);
+	if (status != NT_STATUS_SUCCESS) {
+		smbsr_status(sr, status, 0, 0);
 		return (SDRC_ERROR);
+	}
 
 	if (op->op_oplock_level != SMB_OPLOCK_NONE)
 		op->action_taken |= SMB_OACT_LOCK;

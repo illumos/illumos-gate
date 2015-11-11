@@ -118,6 +118,9 @@ struct nvme {
 	int n_intr_type;
 	int n_intr_types;
 
+	char *n_product;
+	char *n_vendor;
+
 	boolean_t n_dead;
 	boolean_t n_strict_version;
 	boolean_t n_ignore_unknown_vendor_status;

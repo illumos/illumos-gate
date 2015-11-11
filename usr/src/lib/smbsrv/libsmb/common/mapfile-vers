@@ -19,7 +19,7 @@
 #
 #
 # Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 #
 
 #
@@ -97,6 +97,7 @@ SYMBOL_VERSION SUNWprivate {
 	smb_codepage_init;
 	smb_common_decode;
 	smb_common_encode;
+	smb_config_check_protocol;
 	smb_config_get;
 	smb_config_get_ads_enable;
 	smb_config_get_debug;
@@ -121,6 +122,7 @@ SYMBOL_VERSION SUNWprivate {
 	smb_config_setdomaininfo;
 	smb_config_setnum;
 	smb_config_setstr;
+	smb_config_upgrade;
 	smb_crc_gen;
 	smb_ctxbuf_init;
 	smb_ctxbuf_len;

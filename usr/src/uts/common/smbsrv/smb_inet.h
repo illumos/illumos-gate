@@ -22,7 +22,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -40,6 +40,10 @@ extern "C" {
 #include <sys/socket.h>
 #include <netinet/in.h>
 
+/*
+ * SMB (internal) representation of an IP address.
+ * See also: smb_inaddr_xdr()
+ */
 typedef struct smb_inaddr {
 	union {
 		in_addr_t au_ipv4;

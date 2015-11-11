@@ -22,8 +22,7 @@
 #
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2015 Igor Kozhukhov <ikozhukhov@gmail.com>
 #
 
 include		$(SRC)/Makefile.master
@@ -98,10 +97,10 @@ $(MACH64)_gcc_map.noexeglobs :=	LINK =	$(LINK64.c)
 %map.noexeglobs:main.c $(TEMPLATE1) $(TEMPLATE2)
 	$(LINK) -o $(MAIN1) -M$(TEMPLATE1) main.c
 	$(ELFDUMP) -s -N.dynsym $(MAIN1) | $(EGREP) "WEAK|GLOB" | \
-	    $(GREP) -v UNDEF | $(NAWK) '{print $$9 }' | $(SORT) > $(SYMS1)
+	    $(GREP) -v UNDEF | $(AWK) '{print $$9 }' | $(SORT) > $(SYMS1)
 	$(LINK) -o $(MAIN2) -M$(TEMPLATE2) main.c
 	$(ELFDUMP) -s -N.dynsym $(MAIN2) | $(EGREP) "WEAK|GLOB" | \
-	    $(GREP) -v UNDEF | $(NAWK) '{print $$9 }' | $(SORT) > $(SYMS2)
+	    $(GREP) -v UNDEF | $(AWK) '{print $$9 }' | $(SORT) > $(SYMS2)
 	$(ECHO) "# GENERATED FILE - DO NOT EDIT"	>  $@
 	$(GREP) MAP-HEAD $(TEMPLATE2) | \
 	    $(SED) -e "s/	*# MAP-HEAD//"		>> $@

@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <smbsrv/smb_kproto.h>
@@ -206,6 +207,9 @@ smb_common_create(smb_request_t *sr)
 		sr->smb_flg &=
 		    ~(SMB_FLAGS_OPLOCK | SMB_FLAGS_OPLOCK_NOTIFY_ANY);
 	}
+
+	if (status)
+		smbsr_status(sr, status, 0, 0);
 
 	return (status);
 }

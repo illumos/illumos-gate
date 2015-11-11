@@ -329,9 +329,9 @@ int main(int argc, char *argv[]) {
 }
 .Ed
 .Sh SEE ALSO
+.Xr ifconfig 1M ,
 .Xr in.ndpd 1M ,
 .Xr ndp 1M ,
-.Xr ifconfig 1M ,
 .Xr sockaddr_in6 3SOCKET ,
 .Xr privileges 5
 .Rs

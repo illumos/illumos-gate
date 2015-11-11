@@ -30,6 +30,7 @@
 #include <smbsrv/string.h>
 #include <smbsrv/nmpipes.h>
 #include <smbsrv/mailslot.h>
+#include <smbsrv/winioctl.h>
 
 /*
  * count of bytes in server response packet
@@ -75,6 +76,11 @@ smb_com_transaction(smb_request_t *sr)
 	struct smb_xa *xa;
 	char *stn;
 	int ready;
+
+	if (!STYPE_ISIPC(sr->tid_tree->t_res_type)) {
+		smbsr_error(sr, 0, ERRDOS, ERRnoaccess);
+		return (SDRC_ERROR);
+	}
 
 	rc = smbsr_decode_vwv(sr, SMB_TRANSHDR_ED_FMT,
 	    &tpscnt, &tdscnt, &mprcnt, &mdrcnt, &msrcnt, &flags,
@@ -771,6 +777,8 @@ smb_encode_SHARE_INFO_2(struct mbuf_chain *output, struct mbuf_chain *text,
 int
 smb_trans_net_share_enum(struct smb_request *sr, struct smb_xa *xa)
 {
+	uint16_t pid_hi, pid_lo;
+
 	/*
 	 * Number of data bytes that will
 	 * be sent in the current response
@@ -905,6 +913,9 @@ smb_trans_net_share_enum(struct smb_request *sr, struct smb_xa *xa)
 		tot_packet_bytes = param_pad + param_scnt + data_pad +
 		    data_scnt;
 
+		pid_hi = sr->smb_pid >> 16;
+		pid_lo = (uint16_t)sr->smb_pid;
+
 		MBC_FLUSH(&reply);
 		(void) smb_mbc_encodef(&reply, SMB_HEADER_ED_FMT,
 		    sr->first_smb_com,
@@ -913,10 +924,10 @@ smb_trans_net_share_enum(struct smb_request *sr, struct smb_xa *xa)
 		    sr->smb_err,
 		    sr->smb_flg | SMB_FLAGS_REPLY,
 		    sr->smb_flg2,
-		    sr->smb_pid_high,
+		    pid_hi,
 		    sr->smb_sig,
 		    sr->smb_tid,
-		    sr->smb_pid,
+		    pid_lo,
 		    sr->smb_uid,
 		    sr->smb_mid);
 
@@ -1398,9 +1409,8 @@ is_supported_mailslot(const char *mailslot)
 static smb_sdrc_t
 smb_trans_nmpipe(smb_request_t *sr, smb_xa_t *xa)
 {
-	smb_vdb_t	vdb;
-	struct mbuf	*mb;
-	int rc;
+	smb_fsctl_t fsctl;
+	uint32_t status;
 
 	smbsr_lookup_file(sr);
 	if (sr->fid_ofile == NULL) {
@@ -1409,56 +1419,25 @@ smb_trans_nmpipe(smb_request_t *sr, smb_xa_t *xa)
 		return (SDRC_ERROR);
 	}
 
-	rc = smb_mbc_decodef(&xa->req_data_mb, "#B",
-	    xa->smb_tdscnt, &vdb);
-	if (rc != 0) {
-		/* Not enough data sent. */
-		smbsr_error(sr, 0, ERRSRV, ERRerror);
-		return (SDRC_ERROR);
-	}
-
-	rc = smb_opipe_write(sr, &vdb.vdb_uio);
-	if (rc != 0) {
-		smbsr_errno(sr, rc);
-		return (SDRC_ERROR);
-	}
-
-	vdb.vdb_tag = 0;
-	vdb.vdb_uio.uio_iov = &vdb.vdb_iovec[0];
-	vdb.vdb_uio.uio_iovcnt = MAX_IOVEC;
-	vdb.vdb_uio.uio_segflg = UIO_SYSSPACE;
-	vdb.vdb_uio.uio_extflg = UIO_COPY_DEFAULT;
-	vdb.vdb_uio.uio_loffset = (offset_t)0;
-	vdb.vdb_uio.uio_resid = xa->smb_mdrcnt;
-	mb = smb_mbuf_allocate(&vdb.vdb_uio);
-
-	rc = smb_opipe_read(sr, &vdb.vdb_uio);
-	if (rc != 0) {
-		m_freem(mb);
-		smbsr_errno(sr, rc);
-		return (SDRC_ERROR);
-	}
-
-	smb_mbuf_trim(mb, xa->smb_mdrcnt - vdb.vdb_uio.uio_resid);
-	MBC_ATTACH_MBUF(&xa->rep_data_mb, mb);
-
 	/*
-	 * If the output buffer holds a partial pipe message,
-	 * we're supposed to return NT_STATUS_BUFFER_OVERFLOW.
-	 * As we don't have message boundary markers, the best
-	 * we can do is return that status when we have ALL of:
-	 *	Output buffer was < SMB_PIPE_MAX_MSGSIZE
-	 *	We filled the output buffer (resid==0)
-	 *	There's more data (ioctl FIONREAD)
+	 * A little confusing perhaps, but the fsctl "input" is what we
+	 * write to the pipe (from the transaction "send" data), and the
+	 * fsctl "output" is what we read from the pipe (and becomes the
+	 * transaction receive data).
 	 */
-	if (xa->smb_mdrcnt < SMB_PIPE_MAX_MSGSIZE &&
-	    vdb.vdb_uio.uio_resid == 0) {
-		int nread = 0;
-		rc = smb_opipe_get_nread(sr, &nread);
-		if (rc == 0 && nread != 0) {
-			smbsr_status(sr, NT_STATUS_BUFFER_OVERFLOW,
-			    ERRDOS, ERROR_MORE_DATA);
-		}
+	fsctl.CtlCode = FSCTL_PIPE_TRANSCEIVE;
+	fsctl.InputCount = xa->smb_tdscnt; /* write count */
+	fsctl.OutputCount = 0; /* minimum to read from the pipe */
+	fsctl.MaxOutputResp = xa->smb_mdrcnt;	/* max to read */
+	fsctl.in_mbc = &xa->req_data_mb; /* write from here */
+	fsctl.out_mbc = &xa->rep_data_mb; /* read into here */
+
+	status = smb_opipe_fsctl(sr, &fsctl);
+	if (status) {
+		smbsr_status(sr, status, 0, 0);
+		if (NT_SC_SEVERITY(status) == NT_STATUS_SEVERITY_ERROR)
+			return (SDRC_ERROR);
+		/* Warnings like NT_STATUS_BUFFER_OVERFLOW are OK */
 	}
 
 	return (SDRC_SUCCESS);
@@ -1475,7 +1454,7 @@ smb_trans_dispatch(smb_request_t *sr, smb_xa_t *xa)
 	char		*req_fmt;
 	char		*rep_fmt;
 
-	if (xa->smb_suwcnt > 0 && STYPE_ISIPC(sr->tid_tree->t_res_type)) {
+	if (xa->smb_suwcnt > 0) {
 		rc = smb_mbc_decodef(&xa->req_setup_mb, "ww", &opcode,
 		    &sr->smb_fid);
 		if (rc != 0)
@@ -2051,7 +2030,7 @@ smb_xa_complete(smb_xa_t *xa)
 smb_xa_t *
 smb_xa_find(
     smb_session_t	*session,
-    uint16_t		pid,
+    uint32_t		pid,
     uint16_t		mid)
 {
 	smb_xa_t	*xa;

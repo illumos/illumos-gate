@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2015 Igor Kozhukhov <ikozhukhov@gmail.com>
 #
 
 #
@@ -162,7 +163,7 @@ $(OBJS_DIR)/%.o:		$(SRC)/common/crypto/arcfour/sun4v/%.c
 
 $(OBJS_DIR)/dtracestubs.s:	$(UNIX_O) $(LIBS)
 	$(NM) -u $(UNIX_O) $(LIBS) | $(GREP) __dtrace_probe_ | $(SORT) | \
-	    $(UNIQ) | $(NAWK) '{ \
+	    $(UNIQ) | $(AWK) '{ \
 	    printf("\t.global %s\n\t.type %s, #function\n%s:\n", \
 	    $$1, $$1, $$1); }' > $(OBJS_DIR)/dtracestubs.s
 
