@@ -23,7 +23,7 @@
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2014 Gary Mills
- * Copyright 2013, Joyent Inc. All rights reserved.
+ * Copyright 2015, Joyent Inc.
  */
 
 /*
@@ -558,6 +558,7 @@ static brand_handle_t brand;
 
 /* set in modifying functions, checked in read_input() */
 static boolean_t need_to_commit = B_FALSE;
+static boolean_t is_create = B_FALSE;
 boolean_t saw_error;
 
 /* set in yacc parser, checked in read_input() */
@@ -1812,6 +1813,7 @@ create_func(cmd_t *cmd)
 	}
 
 	need_to_commit = B_TRUE;
+	is_create = B_TRUE;
 	zonecfg_fini_handle(handle);
 	handle = tmphandle;
 	got_handle = B_TRUE;
@@ -6595,6 +6597,11 @@ verify_func(cmd_t *cmd)
 				need_to_commit = B_FALSE;
 				(void) strlcpy(revert_zone, zone,
 				    sizeof (revert_zone));
+
+				if (is_create) {
+					zonecfg_notify_create(handle);
+					is_create = B_FALSE;
+				}
 			}
 
 			/*

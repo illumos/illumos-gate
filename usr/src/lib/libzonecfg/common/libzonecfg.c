@@ -239,6 +239,8 @@ static int zone_lock_cnt = 0;
 static char zoneadm_lock_held[] = LOCK_ENV_VAR"=1";
 static char zoneadm_lock_not_held[] = LOCK_ENV_VAR"=0";
 
+static void zonecfg_notify_delete(const char *);
+
 char *zonecfg_root = "";
 
 /*
@@ -428,8 +430,10 @@ zonecfg_destroy(const char *zonename, boolean_t force)
 	 * Treat failure to find the XML file silently, since, well, it's
 	 * gone, and with the index file cleaned up, we're done.
 	 */
-	if (err == Z_OK || err == Z_NO_ZONE)
+	if (err == Z_OK || err == Z_NO_ZONE) {
+		zonecfg_notify_delete(zonename);
 		return (Z_OK);
+	}
 	return (err);
 }
 
@@ -1488,6 +1492,73 @@ zonecfg_rm_detached(zone_dochandle_t handle, boolean_t forced)
 		(void) unlink(attached);
 		(void) unlink(detached);
 	}
+}
+
+void
+zonecfg_notify_create(zone_dochandle_t handle)
+{
+	char zname[ZONENAME_MAX];
+	evchan_t *ze_chan;
+	struct timeval now;
+	uint64_t t;
+	nvlist_t *nvl = NULL;
+
+	if (zonecfg_check_handle(handle) != Z_OK)
+		return;
+
+	if (zonecfg_get_name(handle, zname, sizeof (zname)) != Z_OK)
+		return;
+
+	if (sysevent_evc_bind(ZONE_EVENT_CHANNEL, &ze_chan, 0) != 0)
+		return;
+
+	/* Current time since Jan 1 1970 but consumers expect NS */
+	gettimeofday(&now, NULL);
+	t = (now.tv_sec * NANOSEC) + (now.tv_usec * 1000);
+
+	if (nvlist_alloc(&nvl, NV_UNIQUE_NAME, KM_SLEEP) == 0 &&
+	    nvlist_add_string(nvl, ZONE_CB_NAME, zname) == 0 &&
+	    nvlist_add_string(nvl, ZONE_CB_NEWSTATE, "configured") == 0 &&
+	    nvlist_add_string(nvl, ZONE_CB_OLDSTATE, "") == 0 &&
+	    nvlist_add_int32(nvl, ZONE_CB_ZONEID, -1) == 0 &&
+	    nvlist_add_uint64(nvl, ZONE_CB_TIMESTAMP, t) == 0) {
+		(void) sysevent_evc_publish(ze_chan, ZONE_EVENT_STATUS_CLASS,
+		    ZONE_EVENT_STATUS_SUBCLASS, "sun.com", "zonecfg", nvl,
+		    EVCH_SLEEP);
+	}
+
+	nvlist_free(nvl);
+	(void) sysevent_evc_unbind(ze_chan);
+}
+
+static void
+zonecfg_notify_delete(const char *zname)
+{
+	evchan_t *ze_chan;
+	struct timeval now;
+	uint64_t t;
+	nvlist_t *nvl = NULL;
+
+	if (sysevent_evc_bind(ZONE_EVENT_CHANNEL, &ze_chan, 0) != 0)
+		return;
+
+	/* Current time since Jan 1 1970 but consumers expect NS */
+	gettimeofday(&now, NULL);
+	t = (now.tv_sec * NANOSEC) + (now.tv_usec * 1000);
+
+	if (nvlist_alloc(&nvl, NV_UNIQUE_NAME, KM_SLEEP) == 0 &&
+	    nvlist_add_string(nvl, ZONE_CB_NAME, zname) == 0 &&
+	    nvlist_add_string(nvl, ZONE_CB_NEWSTATE, "") == 0 &&
+	    nvlist_add_string(nvl, ZONE_CB_OLDSTATE, "configured") == 0 &&
+	    nvlist_add_int32(nvl, ZONE_CB_ZONEID, -1) == 0 &&
+	    nvlist_add_uint64(nvl, ZONE_CB_TIMESTAMP, t) == 0) {
+		(void) sysevent_evc_publish(ze_chan, ZONE_EVENT_STATUS_CLASS,
+		    ZONE_EVENT_STATUS_SUBCLASS, "sun.com", "zonecfg", nvl,
+		    EVCH_SLEEP);
+	}
+
+	nvlist_free(nvl);
+	(void) sysevent_evc_unbind(ze_chan);
 }
 
 /*

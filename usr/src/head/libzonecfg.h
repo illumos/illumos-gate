@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2011, Joyent, Inc.  All rights reserved.
+ * Copyright 2015, Joyent, Inc.
  */
 
 #ifndef _LIBZONECFG_H
@@ -313,6 +313,7 @@ extern	boolean_t zonecfg_valid_importance(char *);
 extern	int	zonecfg_str_to_bytes(char *, uint64_t *);
 extern	boolean_t zonecfg_valid_memlimit(char *, uint64_t *);
 extern	boolean_t zonecfg_valid_alias_limit(char *, char *, uint64_t *);
+extern	void	zonecfg_notify_create(zone_dochandle_t);
 
 /*
  * Zone name, path to zone directory, autoboot setting, pool, boot

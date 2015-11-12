@@ -20,7 +20,7 @@
 #
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright (c) 2011, Joyent Inc. All rights reserved.
+# Copyright 2015, Joyent Inc.
 #
 
 #
@@ -175,6 +175,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zonecfg_modify_pset;
 	zonecfg_modify_rctl;
 	zonecfg_notify_bind;
+	zonecfg_notify_create;
 	zonecfg_notify_critical_abort;
 	zonecfg_notify_critical_enter;
 	zonecfg_notify_critical_exit;
