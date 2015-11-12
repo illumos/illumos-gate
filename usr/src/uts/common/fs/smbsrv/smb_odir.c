@@ -142,16 +142,21 @@
  *
  * Odir Interface
  * ---------------
- * odid = smb_odir_open(pathname)
+ * smb_odir_open(char *pathname)
  *	Create an odir representing the directory specified in pathname and
  *	add it into the tree's list of odirs.
- *	Return an identifier (odid) uniquely identifying the created odir.
+ *	Returns NT status.
+ *
+ * smb_odir_openfh(smb_ofile_t *of)
+ *	Create an odir representing the directory specified by the
+ *	existing open handle (from a prior open of the directory).
+ *	Returns NT status.
  *
  * smb_odir_openat(smb_node_t *unode)
  *	Create an odir representing the extended attribute directory
  *	associated with the file (or directory) represented by unode
  *	and add it into the tree's list of odirs.
- *	Return an identifier (odid) uniquely identifying the created odir.
+ *	Returns NT status.
  *
  * smb_odir_t *odir = smb_tree_lookup_odir(..., odid)
  *	Find the odir corresponding to the specified odid in the tree's
@@ -249,8 +254,8 @@
 #include <sys/extdirent.h>
 
 /* static functions */
-static uint16_t smb_odir_create(smb_request_t *, smb_node_t *,
-    char *, uint16_t, cred_t *);
+static smb_odir_t *smb_odir_create(smb_request_t *, smb_node_t *,
+    const char *, uint16_t, uint16_t, cred_t *);
 static int smb_odir_single_fileinfo(smb_request_t *, smb_odir_t *,
     smb_fileinfo_t *);
 static int smb_odir_wildcard_fileinfo(smb_request_t *, smb_odir_t *,
@@ -262,16 +267,16 @@ static boolean_t smb_odir_match_name(smb_odir_t *, smb_odirent_t *);
 
 
 /*
- * smb_odir_open
+ * smb_odir_openpath
  *
  * Create an odir representing the directory specified in pathname.
  *
  * Returns:
- * odid - Unique identifier of newly created odir.
- *    0 - error, error details set in sr.
+ *    NT Status
  */
-uint16_t
-smb_odir_open(smb_request_t *sr, char *path, uint16_t sattr, uint32_t flags)
+uint32_t
+smb_odir_openpath(smb_request_t *sr, char *path, uint16_t sattr,
+	uint32_t flags, smb_odir_t **odp)
 {
 	int		rc;
 	smb_tree_t	*tree;
@@ -284,6 +289,7 @@ smb_odir_open(smb_request_t *sr, char *path, uint16_t sattr, uint32_t flags)
 	ASSERT(sr->sr_magic == SMB_REQ_MAGIC);
 	ASSERT(sr->tid_tree);
 	ASSERT(sr->tid_tree->t_magic == SMB_TREE_MAGIC);
+	*odp = NULL;
 
 	tree = sr->tid_tree;
 
@@ -292,23 +298,22 @@ smb_odir_open(smb_request_t *sr, char *path, uint16_t sattr, uint32_t flags)
 
 	rc = smb_pathname_reduce(sr, sr->user_cr, path,
 	    tree->t_snode, tree->t_snode, &dnode, pattern);
-	if (rc != 0) {
-		smbsr_errno(sr, rc);
-		return (0);
-	}
+	if (rc != 0)
+		return (smb_errno2status(rc));
 
 	if (!smb_node_is_dir(dnode)) {
-		smbsr_error(sr, NT_STATUS_OBJECT_PATH_NOT_FOUND,
-		    ERRDOS, ERROR_PATH_NOT_FOUND);
 		smb_node_release(dnode);
-		return (0);
+		return (NT_STATUS_OBJECT_PATH_NOT_FOUND);
 	}
 
 	if (smb_fsop_access(sr, sr->user_cr, dnode, FILE_LIST_DIRECTORY) != 0) {
-		smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
-		    ERRDOS, ERROR_ACCESS_DENIED);
 		smb_node_release(dnode);
-		return (0);
+		return (NT_STATUS_ACCESS_DENIED);
+	}
+
+	if (smb_idpool_alloc(&tree->t_odid_pool, &odid)) {
+		smb_node_release(dnode);
+		return (NT_STATUS_TOO_MANY_OPENED_FILES);
 	}
 
 	if (flags & SMB_ODIR_OPENF_BACKUP_INTENT)
@@ -316,9 +321,37 @@ smb_odir_open(smb_request_t *sr, char *path, uint16_t sattr, uint32_t flags)
 	else
 		cr = sr->uid_user->u_cred;
 
-	odid = smb_odir_create(sr, dnode, pattern, sattr, cr);
+	*odp = smb_odir_create(sr, dnode, pattern, sattr, odid, cr);
 	smb_node_release(dnode);
-	return (odid);
+
+	return (0);
+}
+
+/*
+ * smb_odir_openfh
+ *
+ * Create an odir representing the directory already opened on "of".
+ *
+ * Returns:
+ *    NT status
+ */
+uint32_t
+smb_odir_openfh(smb_request_t *sr, const char *pattern, uint16_t sattr,
+	smb_odir_t **odp)
+{
+	smb_ofile_t	*of = sr->fid_ofile;
+
+	*odp = NULL;
+
+	if (of->f_node == NULL || !smb_node_is_dir(of->f_node))
+		return (NT_STATUS_INVALID_PARAMETER);
+
+	if ((of->f_granted_access & FILE_LIST_DIRECTORY) == 0)
+		return (NT_STATUS_ACCESS_DENIED);
+
+	*odp = smb_odir_create(sr, of->f_node, pattern, sattr, 0, of->f_cr);
+
+	return (0);
 }
 
 /*
@@ -328,55 +361,47 @@ smb_odir_open(smb_request_t *sr, char *path, uint16_t sattr, uint32_t flags)
  * associated with the file (or directory) represented by unode.
  *
  * Returns:
- * odid - Unique identifier of newly created odir.
- *    0 - error, error details set in sr.
+ *    NT status
  */
-uint16_t
-smb_odir_openat(smb_request_t *sr, smb_node_t *unode)
+uint32_t
+smb_odir_openat(smb_request_t *sr, smb_node_t *unode, smb_odir_t **odp)
 {
-	int		rc;
-	vnode_t		*xattr_dvp;
-	uint16_t	odid;
-	cred_t		*cr;
 	char		pattern[SMB_STREAM_PREFIX_LEN + 2];
-
+	vnode_t		*xattr_dvp;
+	cred_t		*cr;
 	smb_node_t	*xattr_dnode;
+	int		rc;
 
 	ASSERT(sr);
 	ASSERT(sr->sr_magic == SMB_REQ_MAGIC);
 	ASSERT(unode);
 	ASSERT(unode->n_magic == SMB_NODE_MAGIC);
+	*odp = NULL;
 
 	if (SMB_TREE_CONTAINS_NODE(sr, unode) == 0 ||
-	    SMB_TREE_HAS_ACCESS(sr, ACE_LIST_DIRECTORY) == 0) {
-		smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
-		    ERRDOS, ERROR_ACCESS_DENIED);
-		return (0);
-	}
+	    SMB_TREE_HAS_ACCESS(sr, ACE_LIST_DIRECTORY) == 0)
+		return (NT_STATUS_ACCESS_DENIED);
+
 	cr = zone_kcred();
 
 	/* find the xattrdir vnode */
 	rc = smb_vop_lookup_xattrdir(unode->vp, &xattr_dvp, LOOKUP_XATTR, cr);
-	if (rc != 0) {
-		smbsr_errno(sr, rc);
-		return (0);
-	}
+	if (rc != 0)
+		return (smb_errno2status(rc));
 
 	/* lookup the xattrdir's smb_node */
 	xattr_dnode = smb_node_lookup(sr, NULL, cr, xattr_dvp, XATTR_DIR,
 	    unode, NULL);
 	VN_RELE(xattr_dvp);
-	if (xattr_dnode == NULL) {
-		smbsr_error(sr, NT_STATUS_NO_MEMORY,
-		    ERRDOS, ERROR_NOT_ENOUGH_MEMORY);
-		return (0);
-	}
+	if (xattr_dnode == NULL)
+		return (NT_STATUS_NO_MEMORY);
 
 	(void) snprintf(pattern, sizeof (pattern), "%s*", SMB_STREAM_PREFIX);
-	odid = smb_odir_create(sr, xattr_dnode, pattern, SMB_SEARCH_ATTRIBUTES,
-	    cr);
+	*odp = smb_odir_create(sr, xattr_dnode, pattern,
+	    SMB_SEARCH_ATTRIBUTES, 0, cr);
+
 	smb_node_release(xattr_dnode);
-	return (odid);
+	return (0);
 }
 
 /*
@@ -483,8 +508,9 @@ smb_odir_close(smb_odir_t *od)
  *  0 - success.
  *      - If a matching entry was found eof will be B_FALSE and
  *        odirent will be populated.
- *      - If there are no matching entries eof will be B_TRUE.
- * -1 - error, error details set in sr.
+ * ENOENT
+ *      - If we've scanned to the end, eof will be B_TRUE.
+ * errno - other errors
  */
 int
 smb_odir_read(smb_request_t *sr, smb_odir_t *od,
@@ -509,7 +535,7 @@ smb_odir_read(smb_request_t *sr, smb_odir_t *od,
 	case SMB_ODIR_STATE_CLOSED:
 	default:
 		mutex_exit(&od->d_mutex);
-		return (-1);
+		return (EBADF);
 	}
 
 	for (;;) {
@@ -527,10 +553,9 @@ smb_odir_read(smb_request_t *sr, smb_odir_t *od,
 		return (0);
 	case ENOENT:
 		*eof = B_TRUE;
-		return (0);
+		/* FALLTHROUGH */
 	default:
-		smbsr_errno(sr, rc);
-		return (-1);
+		return (rc);
 	}
 }
 
@@ -554,8 +579,9 @@ smb_odir_read(smb_request_t *sr, smb_odir_t *od,
  *  0 - success.
  *      - If a matching entry was found eof will be B_FALSE and
  *        fileinfo will be populated.
- *      - If there are no matching entries eof will be B_TRUE.
- * -1 - error, error details set in sr.
+ * ENOENT
+ *      - If at end of dir, eof will be B_TRUE.
+ * errno - other error
  */
 int
 smb_odir_read_fileinfo(smb_request_t *sr, smb_odir_t *od,
@@ -581,7 +607,7 @@ smb_odir_read_fileinfo(smb_request_t *sr, smb_odir_t *od,
 	case SMB_ODIR_STATE_CLOSED:
 	default:
 		mutex_exit(&od->d_mutex);
-		return (-1);
+		return (EBADF);
 	}
 
 	if ((od->d_flags & SMB_ODIR_FLAG_WILDCARDS) == 0) {
@@ -621,10 +647,9 @@ smb_odir_read_fileinfo(smb_request_t *sr, smb_odir_t *od,
 		return (0);
 	case ENOENT:
 		*eof = 1;	/* per. FindFirst, FindNext spec. */
-		return (0);
+		/* FALLTHROUGH */
 	default:
-		smbsr_errno(sr, rc);
-		return (-1);
+		return (rc);
 	}
 }
 
@@ -641,13 +666,14 @@ smb_odir_read_fileinfo(smb_request_t *sr, smb_odir_t *od,
  *      - If a matching entry was found eof will be B_FALSE and
  *        sinfo will be populated.
  *      - If there are no matching entries eof will be B_TRUE.
- * -1 - error, error details set in sr.
+ * errno - error
  */
 int
 smb_odir_read_streaminfo(smb_request_t *sr, smb_odir_t *od,
     smb_streaminfo_t *sinfo, boolean_t *eof)
 {
 	int		rc;
+	cred_t		*kcr;
 	smb_odirent_t	*odirent;
 	smb_node_t	*fnode;
 	smb_attr_t	attr;
@@ -657,6 +683,8 @@ smb_odir_read_streaminfo(smb_request_t *sr, smb_odir_t *od,
 	ASSERT(od);
 	ASSERT(od->d_magic == SMB_ODIR_MAGIC);
 	ASSERT(sinfo);
+
+	kcr = zone_kcred();
 
 	mutex_enter(&od->d_mutex);
 	ASSERT(od->d_refcnt > 0);
@@ -669,7 +697,7 @@ smb_odir_read_streaminfo(smb_request_t *sr, smb_odir_t *od,
 	case SMB_ODIR_STATE_CLOSED:
 	default:
 		mutex_exit(&od->d_mutex);
-		return (-1);
+		return (EBADF);
 	}
 
 	/* Check that odir represents an xattr directory */
@@ -695,9 +723,13 @@ smb_odir_read_streaminfo(smb_request_t *sr, smb_odir_t *od,
 		rc = smb_fsop_lookup(sr, od->d_cred, 0, od->d_tree->t_snode,
 		    od->d_dnode, odirent->od_name, &fnode);
 		if (rc == 0) {
+			/*
+			 * We just need the file sizes, and don't want
+			 * EACCES failures here, so use kcred and pass
+			 * NULL as the sr to skip sr->fid-ofile checks.
+			 */
 			attr.sa_mask = SMB_AT_SIZE | SMB_AT_ALLOCSZ;
-			rc = smb_node_getattr(sr, fnode, od->d_cred,
-			    NULL, &attr);
+			rc = smb_node_getattr(NULL, fnode, kcr, NULL, &attr);
 			smb_node_release(fnode);
 		}
 
@@ -722,8 +754,7 @@ smb_odir_read_streaminfo(smb_request_t *sr, smb_odir_t *od,
 		*eof = B_TRUE;
 		return (0);
 	default:
-		smbsr_errno(sr, rc);
-		return (-1);
+		return (rc);
 	}
 }
 
@@ -770,8 +801,8 @@ smb_odir_save_fname(smb_odir_t *od, uint32_t cookie, const char *fname)
 /*
  * smb_odir_resume_at
  *
- * If SMB_ODIR_FLAG_WILDCARDS is not set the search is for a single
- * file and should not be resumed.
+ * If SMB_ODIR_FLAG_WILDCARDS is not set, and we're rewinding,
+ * assume we're no longer at EOF.
  *
  * Wildcard searching can be resumed from:
  * - the cookie saved at a specified index (SMBsearch, SMBfind).
@@ -787,18 +818,20 @@ smb_odir_save_fname(smb_odir_t *od, uint32_t cookie, const char *fname)
 void
 smb_odir_resume_at(smb_odir_t *od, smb_odir_resume_t *resume)
 {
+	uint64_t save_offset;
+
 	ASSERT(od);
 	ASSERT(od->d_magic == SMB_ODIR_MAGIC);
 	ASSERT(resume);
 
-	mutex_enter(&od->d_mutex);
-
 	if ((od->d_flags & SMB_ODIR_FLAG_WILDCARDS) == 0) {
-		od->d_eof = B_TRUE;
-		mutex_exit(&od->d_mutex);
+		if (resume->or_type == SMB_ODIR_RESUME_COOKIE)
+			od->d_eof = B_FALSE;
 		return;
 	}
+	mutex_enter(&od->d_mutex);
 
+	save_offset = od->d_offset;
 	switch (resume->or_type) {
 
 	default:
@@ -841,9 +874,11 @@ smb_odir_resume_at(smb_odir_t *od, smb_odir_resume_t *resume)
 		break;
 	}
 
-	/* Force a vop_readdir to refresh d_buf */
-	od->d_bufptr = NULL;
-	od->d_eof = B_FALSE;
+	if (od->d_offset != save_offset) {
+		/* Force a vop_readdir to refresh d_buf */
+		od->d_bufptr = NULL;
+		od->d_eof = B_FALSE;
+	}
 
 	mutex_exit(&od->d_mutex);
 }
@@ -855,13 +890,12 @@ smb_odir_resume_at(smb_odir_t *od, smb_odir_resume_t *resume)
  * smb_odir_create
  * Allocate and populate an odir obect and add it to the tree's list.
  */
-static uint16_t
+static smb_odir_t *
 smb_odir_create(smb_request_t *sr, smb_node_t *dnode,
-    char *pattern, uint16_t sattr, cred_t *cr)
+	const char *pattern, uint16_t sattr, uint16_t odid, cred_t *cr)
 {
 	smb_odir_t	*od;
 	smb_tree_t	*tree;
-	uint16_t	odid;
 
 	ASSERT(sr);
 	ASSERT(sr->sr_magic == SMB_REQ_MAGIC);
@@ -872,18 +906,17 @@ smb_odir_create(smb_request_t *sr, smb_node_t *dnode,
 
 	tree = sr->tid_tree;
 
-	if (smb_idpool_alloc(&tree->t_odid_pool, &odid)) {
-		smbsr_error(sr, NT_STATUS_TOO_MANY_OPENED_FILES,
-		    ERRDOS, ERROR_TOO_MANY_OPEN_FILES);
-		return (0);
-	}
-
 	od = kmem_cache_alloc(smb_cache_odir, KM_SLEEP);
 	bzero(od, sizeof (smb_odir_t));
 
 	mutex_init(&od->d_mutex, NULL, MUTEX_DEFAULT, NULL);
-	od->d_refcnt = 0;
-	od->d_state = SMB_ODIR_STATE_OPEN;
+
+	/*
+	 * Return this to the caller as if they had done
+	 * smb_tree_lookup_odir() to obtain the odir.
+	 */
+	od->d_refcnt = 1;
+	od->d_state = SMB_ODIR_STATE_IN_USE;
 	od->d_magic = SMB_ODIR_MAGIC;
 	od->d_opened_by_pid = sr->smb_pid;
 	od->d_session = tree->t_session;
@@ -922,7 +955,32 @@ smb_odir_create(smb_request_t *sr, smb_node_t *dnode,
 	smb_llist_exit(&tree->t_odir_list);
 
 	atomic_inc_32(&tree->t_session->s_dir_cnt);
-	return (odid);
+	return (od);
+}
+
+/*
+ * Set a new pattern, attributes, and rewind.
+ */
+void
+smb_odir_reopen(smb_odir_t *od, const char *pattern, uint16_t sattr)
+{
+
+	SMB_ODIR_VALID(od);
+
+	mutex_enter(&od->d_mutex);
+	od->d_sattr = sattr;
+	(void) strlcpy(od->d_pattern, pattern, sizeof (od->d_pattern));
+	if (smb_contains_wildcards(od->d_pattern))
+		od->d_flags |= SMB_ODIR_FLAG_WILDCARDS;
+	else
+		od->d_flags &= ~SMB_ODIR_FLAG_WILDCARDS;
+
+	/* Internal smb_odir_resume_at */
+	od->d_offset = 0;
+	od->d_bufptr = NULL;
+	od->d_eof = B_FALSE;
+
+	mutex_exit(&od->d_mutex);
 }
 
 /*
@@ -944,7 +1002,8 @@ smb_odir_delete(void *arg)
 	tree = od->d_tree;
 	smb_llist_enter(&tree->t_odir_list, RW_WRITER);
 	smb_llist_remove(&tree->t_odir_list, od);
-	smb_idpool_free(&tree->t_odid_pool, od->d_odid);
+	if (od->d_odid != 0)
+		smb_idpool_free(&tree->t_odid_pool, od->d_odid);
 	atomic_dec_32(&tree->t_session->s_dir_cnt);
 	smb_llist_exit(&tree->t_odir_list);
 
@@ -1134,7 +1193,7 @@ smb_odir_single_fileinfo(smb_request_t *sr, smb_odir_t *od,
 
 	bzero(&attr, sizeof (attr));
 	attr.sa_mask = SMB_AT_ALL;
-	rc = smb_node_getattr(sr, fnode, zone_kcred(), NULL, &attr);
+	rc = smb_node_getattr(NULL, fnode, zone_kcred(), NULL, &attr);
 	if (rc != 0) {
 		smb_node_release(fnode);
 		return (rc);
@@ -1147,7 +1206,7 @@ smb_odir_single_fileinfo(smb_request_t *sr, smb_odir_t *od,
 		smb_node_release(fnode);
 		fnode = tgt_node;
 		attr.sa_mask = SMB_AT_ALL;
-		rc = smb_node_getattr(sr, fnode, zone_kcred(), NULL, &attr);
+		rc = smb_node_getattr(NULL, fnode, zone_kcred(), NULL, &attr);
 		if (rc != 0) {
 			smb_node_release(fnode);
 			return (rc);

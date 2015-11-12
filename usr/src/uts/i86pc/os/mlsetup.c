@@ -60,6 +60,7 @@
 #include <sys/archsystm.h>
 #include <sys/promif.h>
 #include <sys/pci_cfgspace.h>
+#include <sys/bootvfs.h>
 #ifdef __xpv
 #include <sys/hypervisor.h>
 #else
@@ -478,6 +479,10 @@ mach_modpath(char *path, const char *filename)
 	char *p;
 	const char isastr[] = "/amd64";
 	size_t isalen = strlen(isastr);
+
+	len = strlen(SYSTEM_BOOT_PATH "/kernel");
+	(void) strcpy(path, SYSTEM_BOOT_PATH "/kernel ");
+	path += len + 1;
 
 	if ((p = strrchr(filename, '/')) == NULL)
 		return;

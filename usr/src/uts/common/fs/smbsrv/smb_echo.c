@@ -21,6 +21,8 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <smbsrv/smb_kproto.h>
@@ -57,6 +59,10 @@ smb_com_echo(struct smb_request *sr)
 	unsigned short i;
 	struct mbuf_chain reply;
 	char *data;
+	uint16_t	pid_hi, pid_lo;
+
+	pid_hi = sr->smb_pid >> 16;
+	pid_lo = (uint16_t)sr->smb_pid;
 
 	if (smbsr_decode_vwv(sr, "w", &necho) != 0)
 		return (SDRC_ERROR);
@@ -92,10 +98,10 @@ smb_com_echo(struct smb_request *sr)
 		    sr->smb_err,
 		    sr->smb_flg | SMB_FLAGS_REPLY,
 		    sr->smb_flg2,
-		    sr->smb_pid_high,
+		    pid_hi,
 		    sr->smb_sig,
 		    sr->smb_tid,
-		    sr->smb_pid,
+		    pid_lo,
 		    sr->smb_uid,
 		    sr->smb_mid);
 

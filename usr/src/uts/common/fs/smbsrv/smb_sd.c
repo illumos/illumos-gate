@@ -21,6 +21,8 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -125,7 +127,6 @@ uint32_t
 smb_sd_read(smb_request_t *sr, smb_sd_t *sd, uint32_t secinfo)
 {
 	smb_fssd_t fs_sd;
-	smb_error_t smb_err;
 	smb_node_t *node;
 	uint32_t status = NT_STATUS_SUCCESS;
 	uint32_t sd_flags;
@@ -136,10 +137,8 @@ smb_sd_read(smb_request_t *sr, smb_sd_t *sd, uint32_t secinfo)
 	smb_fssd_init(&fs_sd, secinfo, sd_flags);
 
 	error = smb_fsop_sdread(sr, sr->user_cr, node, &fs_sd);
-	if (error) {
-		smbsr_map_errno(error, &smb_err);
-		return (smb_err.status);
-	}
+	if (error)
+		return (smb_errno2status(error));
 
 	status = smb_sd_fromfs(&fs_sd, sd);
 	smb_fssd_term(&fs_sd);
@@ -159,7 +158,6 @@ smb_sd_write(smb_request_t *sr, smb_sd_t *sd, uint32_t secinfo)
 {
 	smb_node_t *node;
 	smb_fssd_t fs_sd;
-	smb_error_t smb_err;
 	uint32_t status;
 	uint32_t sd_flags;
 	int error;
@@ -180,8 +178,7 @@ smb_sd_write(smb_request_t *sr, smb_sd_t *sd, uint32_t secinfo)
 	if (error) {
 		if (error == EBADE)
 			return (NT_STATUS_INVALID_OWNER);
-		smbsr_map_errno(error, &smb_err);
-		return (smb_err.status);
+		return (smb_errno2status(error));
 	}
 
 	return (NT_STATUS_SUCCESS);

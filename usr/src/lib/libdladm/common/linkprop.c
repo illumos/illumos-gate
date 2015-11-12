@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2014, Joyent, Inc. All rights reserved.
+ * Copyright 2015 Garrett D'Amore <garrett@damore.org>
  */
 
 #include <stdlib.h>
@@ -255,6 +256,22 @@ static link_attr_t link_attr[] = {
 	{ MAC_PROP_ZONE,	sizeof (dld_ioc_zid_t),	"zone"},
 
 	{ MAC_PROP_AUTOPUSH,	sizeof (struct dlautopush), "autopush"},
+
+	{ MAC_PROP_ADV_5000FDX_CAP, sizeof (uint8_t),	"adv_5000fdx_cap"},
+
+	{ MAC_PROP_EN_5000FDX_CAP, sizeof (uint8_t),	"en_5000fdx_cap"},
+
+	{ MAC_PROP_ADV_2500FDX_CAP, sizeof (uint8_t),	"adv_2500fdx_cap"},
+
+	{ MAC_PROP_EN_2500FDX_CAP, sizeof (uint8_t),	"en_2500fdx_cap"},
+
+	{ MAC_PROP_ADV_100GFDX_CAP, sizeof (uint8_t),	"adv_100gfdx_cap"},
+
+	{ MAC_PROP_EN_100GFDX_CAP, sizeof (uint8_t),	"en_100gfdx_cap"},
+
+	{ MAC_PROP_ADV_40GFDX_CAP, sizeof (uint8_t),	"adv_40gfdx_cap"},
+
+	{ MAC_PROP_EN_40GFDX_CAP, sizeof (uint8_t),	"en_40gfdx_cap"},
 
 	{ MAC_PROP_ADV_10GFDX_CAP, sizeof (uint8_t),	"adv_10gfdx_cap"},
 
@@ -522,12 +539,52 @@ static prop_desc_t	prop_table[] = {
 	    get_secondary_macs, check_secondary_macs, PD_CHECK_ALLOC,
 	    DATALINK_CLASS_VNIC, DL_ETHER },
 
+	{ "adv_100gfdx_cap", { "", 0 },
+	    link_01_vals, VALCNT(link_01_vals),
+	    NULL, NULL, get_binary, NULL,
+	    0, DATALINK_CLASS_PHYS, DL_ETHER },
+
+	{ "en_100gfdx_cap", { "", 0 },
+	    link_01_vals, VALCNT(link_01_vals),
+	    set_public_prop, NULL, get_binary, NULL,
+	    0, DATALINK_CLASS_PHYS, DL_ETHER },
+
+	{ "adv_40gfdx_cap", { "", 0 },
+	    link_01_vals, VALCNT(link_01_vals),
+	    NULL, NULL, get_binary, NULL,
+	    0, DATALINK_CLASS_PHYS, DL_ETHER },
+
+	{ "en_40gfdx_cap", { "", 0 },
+	    link_01_vals, VALCNT(link_01_vals),
+	    set_public_prop, NULL, get_binary, NULL,
+	    0, DATALINK_CLASS_PHYS, DL_ETHER },
+
 	{ "adv_10gfdx_cap", { "", 0 },
 	    link_01_vals, VALCNT(link_01_vals),
 	    NULL, NULL, get_binary, NULL,
 	    0, DATALINK_CLASS_PHYS, DL_ETHER },
 
 	{ "en_10gfdx_cap", { "", 0 },
+	    link_01_vals, VALCNT(link_01_vals),
+	    set_public_prop, NULL, get_binary, NULL,
+	    0, DATALINK_CLASS_PHYS, DL_ETHER },
+
+	{ "adv_5000fdx_cap", { "", 0 },
+	    link_01_vals, VALCNT(link_01_vals),
+	    NULL, NULL, get_binary, NULL,
+	    0, DATALINK_CLASS_PHYS, DL_ETHER },
+
+	{ "en_5000fdx_cap", { "", 0 },
+	    link_01_vals, VALCNT(link_01_vals),
+	    set_public_prop, NULL, get_binary, NULL,
+	    0, DATALINK_CLASS_PHYS, DL_ETHER },
+
+	{ "adv_2500fdx_cap", { "", 0 },
+	    link_01_vals, VALCNT(link_01_vals),
+	    NULL, NULL, get_binary, NULL,
+	    0, DATALINK_CLASS_PHYS, DL_ETHER },
+
+	{ "en_2500fdx_cap", { "", 0 },
 	    link_01_vals, VALCNT(link_01_vals),
 	    set_public_prop, NULL, get_binary, NULL,
 	    0, DATALINK_CLASS_PHYS, DL_ETHER },

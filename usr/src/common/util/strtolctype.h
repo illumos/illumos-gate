@@ -44,7 +44,7 @@ extern "C" {
  * safe in probe context.
  */
 
-#if	defined(_KERNEL) && !defined(_BOOT)
+#if	defined(_KERNEL) || defined(_BOOT)
 
 #define	isalnum(ch)	(isalpha(ch) || isdigit(ch))
 #define	isalpha(ch)	(isupper(ch) || islower(ch))
@@ -56,7 +56,7 @@ extern "C" {
 #define	isxdigit(ch)	(isdigit(ch) || ((ch) >= 'a' && (ch) <= 'f') || \
 			((ch) >= 'A' && (ch) <= 'F'))
 
-#endif	/* _KERNEL && !_BOOT */
+#endif	/* _KERNEL || _BOOT */
 
 #define	DIGIT(x)	\
 	(isdigit(x) ? (x) - '0' : islower(x) ? (x) + 10 - 'a' : (x) + 10 - 'A')

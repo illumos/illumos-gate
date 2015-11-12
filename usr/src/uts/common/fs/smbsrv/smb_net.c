@@ -22,7 +22,7 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -42,52 +42,6 @@
 #include <smbsrv/smb.h>
 #include <smbsrv/smb_kproto.h>
 #include <smbsrv/smb_kstat.h>
-
-static	kmem_cache_t	*smb_txr_cache = NULL;
-
-/*
- * smb_net_init
- *
- *	This function initializes the resources necessary to access the
- *	network. It assumes it won't be called simultaneously by multiple
- *	threads.
- *
- * Return Value
- *
- *	0	Initialization successful
- *	ENOMEM	Initialization failed
- */
-void
-smb_net_init(void)
-{
-
-	if (smb_txr_cache != NULL)
-		return;
-
-	smb_txr_cache = kmem_cache_create(SMBSRV_KSTAT_TXRCACHE,
-	    sizeof (smb_txreq_t), 8, NULL, NULL, NULL, NULL, NULL, 0);
-}
-
-/*
- * smb_net_fini
- *
- *	This function releases the resources allocated by smb_net_init(). It
- *	assumes it won't be called simultaneously by multiple threads.
- *	This function can safely be called even if smb_net_init() hasn't been
- *	called previously.
- *
- * Return Value
- *
- *	None
- */
-void
-smb_net_fini(void)
-{
-	if (smb_txr_cache) {
-		kmem_cache_destroy(smb_txr_cache);
-		smb_txr_cache = NULL;
-	}
-}
 
 /*
  * SMB Network Socket API
@@ -170,8 +124,7 @@ smb_net_txl_constructor(smb_txlst_t *txl)
 	ASSERT(txl->tl_magic != SMB_TXLST_MAGIC);
 
 	mutex_init(&txl->tl_mutex, NULL, MUTEX_DEFAULT, NULL);
-	list_create(&txl->tl_list, sizeof (smb_txreq_t),
-	    offsetof(smb_txreq_t, tr_lnd));
+	cv_init(&txl->tl_wait_cv, NULL, CV_DEFAULT, NULL);
 	txl->tl_active = B_FALSE;
 	txl->tl_magic = SMB_TXLST_MAGIC;
 }
@@ -187,106 +140,71 @@ smb_net_txl_destructor(smb_txlst_t *txl)
 	ASSERT(txl->tl_magic == SMB_TXLST_MAGIC);
 
 	txl->tl_magic = 0;
-	list_destroy(&txl->tl_list);
+	cv_destroy(&txl->tl_wait_cv);
 	mutex_destroy(&txl->tl_mutex);
 }
 
 /*
- * smb_net_txr_alloc
+ * smb_net_send_uio
  *
- *	Transmit buffer allocator
- */
-smb_txreq_t *
-smb_net_txr_alloc(void)
-{
-	smb_txreq_t	*txr;
-
-	txr = kmem_cache_alloc(smb_txr_cache, KM_SLEEP);
-	txr->tr_len = 0;
-	bzero(&txr->tr_lnd, sizeof (txr->tr_lnd));
-	txr->tr_magic = SMB_TXREQ_MAGIC;
-	return (txr);
-}
-
-/*
- * smb_net_txr_free
- *
- *	Transmit buffer deallocator
- */
-void
-smb_net_txr_free(smb_txreq_t *txr)
-{
-	ASSERT(txr->tr_magic == SMB_TXREQ_MAGIC);
-	ASSERT(!list_link_active(&txr->tr_lnd));
-
-	txr->tr_magic = 0;
-	kmem_cache_free(smb_txr_cache, txr);
-}
-
-/*
- * smb_net_txr_send
- *
- *	This routine puts the transmit buffer passed in on the wire. If another
- *	thread is already draining the transmit list, the transmit buffer is
- *	queued and the routine returns immediately.
+ * This routine puts the transmit buffer passed in on the wire.
+ * If another thread is already sending, block on the CV.
  */
 int
-smb_net_txr_send(ksocket_t so, smb_txlst_t *txl, smb_txreq_t *txr)
+smb_net_send_uio(smb_session_t *s, struct uio *uio)
 {
-	list_t		local;
-	int		rc = 0;
-	size_t		sent = 0;
-	size_t		len;
+	struct msghdr msg;
+	size_t sent;
+	smb_txlst_t *txl = &s->s_txlst;
+	int rc = 0;
 
-	ASSERT(txl->tl_magic == SMB_TXLST_MAGIC);
+	DTRACE_PROBE1(send__wait__start, struct smb_session_t *, s);
 
+	/*
+	 * Wait for our turn to send.
+	 */
 	mutex_enter(&txl->tl_mutex);
-	list_insert_tail(&txl->tl_list, txr);
-	if (txl->tl_active) {
-		mutex_exit(&txl->tl_mutex);
-		return (0);
-	}
-	txl->tl_active = B_TRUE;
+	while (txl->tl_active)
+		cv_wait(&txl->tl_wait_cv, &txl->tl_mutex);
 
-	list_create(&local, sizeof (smb_txreq_t),
-	    offsetof(smb_txreq_t, tr_lnd));
-
-	while (!list_is_empty(&txl->tl_list)) {
-		list_move_tail(&local, &txl->tl_list);
-		mutex_exit(&txl->tl_mutex);
-		while ((txr = list_head(&local)) != NULL) {
-			ASSERT(txr->tr_magic == SMB_TXREQ_MAGIC);
-			list_remove(&local, txr);
-
-			len = txr->tr_len;
-			rc = ksocket_send(so, txr->tr_buf, txr->tr_len,
-			    MSG_WAITALL, &sent, CRED());
-			smb_net_txr_free(txr);
-			if ((rc == 0) && (sent == len))
-				continue;
-
-			if (rc == 0)
-				rc = -1;
-
-			while ((txr = list_head(&local)) != NULL) {
-				ASSERT(txr->tr_magic == SMB_TXREQ_MAGIC);
-				list_remove(&local, txr);
-				smb_net_txr_free(txr);
-			}
-			break;
-		}
-		mutex_enter(&txl->tl_mutex);
-		if (rc == 0)
-			continue;
-
-		while ((txr = list_head(&txl->tl_list)) != NULL) {
-			ASSERT(txr->tr_magic == SMB_TXREQ_MAGIC);
-			list_remove(&txl->tl_list, txr);
-			smb_net_txr_free(txr);
-		}
+	/*
+	 * Did the connection close while we waited?
+	 */
+	switch (s->s_state) {
+	case SMB_SESSION_STATE_DISCONNECTED:
+	case SMB_SESSION_STATE_TERMINATED:
+		rc = ENOTCONN;
+		break;
+	default:
+		txl->tl_active = B_TRUE;
 		break;
 	}
-	txl->tl_active = B_FALSE;
 	mutex_exit(&txl->tl_mutex);
+
+	DTRACE_PROBE1(send__wait__done, struct smb_session_t *, s);
+	if (rc != 0)
+		return (rc);
+
+	/*
+	 * OK, try to send.
+	 *
+	 * This should block until we've sent it all,
+	 * or given up due to errors (socket closed).
+	 */
+	bzero(&msg, sizeof (msg));
+	msg.msg_iov = uio->uio_iov;
+	msg.msg_iovlen = uio->uio_iovcnt;
+	while (uio->uio_resid > 0) {
+		rc = ksocket_sendmsg(s->sock, &msg, 0, &sent, CRED());
+		if (rc != 0)
+			break;
+		uio->uio_resid -= sent;
+	}
+
+	mutex_enter(&txl->tl_mutex);
+	txl->tl_active = B_FALSE;
+	cv_signal(&txl->tl_wait_cv);
+	mutex_exit(&txl->tl_mutex);
+
 	return (rc);
 }

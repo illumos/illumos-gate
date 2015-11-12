@@ -136,13 +136,6 @@ extern "C" {
 #define	DEFAULT_TTL			(600 * SECONDS)
 #define	SSN_RETRY_COUNT			4
 #define	SSN_CLOSE_TIMEOUT		(30 * SECONDS)
-/*
- * K.L. The keep alive time out use to be default to
- * 900 seconds. It is not long enough for some applications
- * i.e. MS Access. Therefore, the timeout is increased to
- * 5400 seconds.
- */
-#define	SSN_KEEP_ALIVE_TIMEOUT	(90 * 60) /* seconds */
 #define	FRAGMENT_TIMEOUT	(2 * SECONDS)
 
 /* smb_netbios_util.c */

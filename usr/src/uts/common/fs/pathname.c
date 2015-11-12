@@ -37,8 +37,6 @@
  */
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -74,9 +72,14 @@
 void
 pn_alloc(struct pathname *pnp)
 {
-	pnp->pn_path = pnp->pn_buf = kmem_alloc(MAXPATHLEN, KM_SLEEP);
+	pn_alloc_sz(pnp, MAXPATHLEN);
+}
+void
+pn_alloc_sz(struct pathname *pnp, size_t sz)
+{
+	pnp->pn_path = pnp->pn_buf = kmem_alloc(sz, KM_SLEEP);
 	pnp->pn_pathlen = 0;
-	pnp->pn_bufsize = MAXPATHLEN;
+	pnp->pn_bufsize = sz;
 }
 
 /*

@@ -32,6 +32,13 @@ extern "C" {
 #endif
 
 /*
+ * This is used by bootfs and dboot.  It should be at least as large as the
+ * number of modules that bootloaders (e.g., grub) can support.  This figure
+ * has been chosen to match grub's value exactly.
+ */
+#define	MAX_BOOT_MODULES	99
+
+/*
  * The 32-bit kernel loader code needs to build several structures that the
  * kernel is expecting. They will contain native sized pointers for the
  * target kernel.
@@ -51,6 +58,12 @@ typedef void *native_ptr_t;
 
 #endif
 
+typedef enum boot_module_type {
+	BMT_ROOTFS,
+	BMT_FILE,
+	BMT_HASH
+} boot_module_type_t;
+
 struct boot_memlist {
 	uint64_t	addr;
 	uint64_t	size;
@@ -62,9 +75,11 @@ struct boot_memlist {
  * The kernel needs to know how to find its modules.
  */
 struct boot_modules {
-	native_ptr_t	bm_addr;
-	uint32_t	bm_size;
-	uint32_t	bm_padding;
+	native_ptr_t		bm_addr;
+	native_ptr_t		bm_name;
+	native_ptr_t		bm_hash;
+	uint32_t		bm_size;
+	boot_module_type_t	bm_type;
 };
 
 /*

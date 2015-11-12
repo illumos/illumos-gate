@@ -21,6 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _SMB_PRIVILEGE_H
@@ -135,18 +137,28 @@ extern "C" {
  */
 #define	PRIVILEGE_SET_ALL_NECESSARY		1
 
+/*
+ * Local User ID (an NT thing, not a Unix UID)
+ * See also: smb_luid_xdr()
+ */
 typedef struct smb_luid {
 	uint32_t lo_part;
 	uint32_t hi_part;
 } smb_luid_t;
 
-
+/*
+ * Local User ID and attributes (again, an NT thing)
+ * See also: smb_luid_attrs_xdr()
+ */
 typedef struct smb_luid_attrs {
 	smb_luid_t luid;
 	uint32_t attrs;
 } smb_luid_attrs_t;
 
-
+/*
+ * An (NT-style) collection of privileges.
+ * See also: smb_privset_xdr()
+ */
 typedef struct smb_privset {
 	uint32_t priv_cnt;
 	uint32_t control;

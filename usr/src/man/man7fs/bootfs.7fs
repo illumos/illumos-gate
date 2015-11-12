@@ -1,0 +1,89 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright (c) 2014 Joyent, Inc.  All rights reserved.
+.\"
+
+.TH BOOTFS 7FS "May 8, 2014"
+.SH NAME
+bootfs \- boot-time module file system
+
+.SH DESCRIPTION
+
+The
+.B bootfs
+file system is a read-only file system that provides access to any
+boot-time modules that were passed in to the system loader which were
+tagged with the type
+.IR file .
+.B bootfs
+does not display any boot-time modules that were tagged as type
+.I hash
+or type
+.IR rootfs .
+
+If modules with duplicate names and paths are specified, only the first
+such entry will be present in the file system and a counter will be
+incremented to indicate that a duplicate entry was found, but is not
+present into the file system. If a module's name only consists of
+invalid characters, such as '.', '..', or '/', then the module will not
+be present in the file system and a counter will be incremented to
+indicate that this has occurred. In both cases, diagnostic information
+is available through the kstats facility.
+
+.SH FILES
+.ne 2
+.na
+.B /system/boot
+.ad
+.RS 8n
+The mount point for the
+.B bootfs
+file system in the global zone.
+
+.SH EXAMPLES
+
+.LP
+Example 1 Determining if collisions or invalid names are present
+.sp
+.LP
+To determine if any boot-time modules were not created due to collisions
+or invalid names, enter the following command:
+
+.sp
+.in +2
+.nf
+# kstat -m bootfs
+module: bootfs                          instance: 1     
+name:   bootfs                          class:    fs
+        crtime                          236063.651324041
+        nbytes                          8749355
+        ndirs                           3
+        ndiscard                        0
+        ndup                            0
+        nfiles                          2
+        snaptime                        236063.651324041
+.fi
+.in -2
+.sp
+.LP
+The field
+.B ndiscard
+lists the number of boot-time modules that were discarded due to naming conflicts. The field
+.B ndup
+lists the number of duplicate entries that were found and therefore not displayed in the file system.
+.sp
+.LP
+This information is provided for informational purposes only, it is not to be construed as a stable interface.
+
+.SH SEE ALSO
+.BR kstat (1M),
+.BR grub (5)

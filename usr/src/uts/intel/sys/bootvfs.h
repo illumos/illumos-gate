@@ -26,8 +26,6 @@
 #ifndef	_SYS_BOOTVFS_H
 #define	_SYS_BOOTVFS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -69,6 +67,18 @@ struct boot_fs_ops {
 
 extern struct boot_fs_ops *bfs_ops;
 
+#ifdef _KERNEL
+
+extern int BRD_MOUNTROOT(struct boot_fs_ops *, char *);
+extern int BRD_UNMOUNTROOT(struct boot_fs_ops *);
+extern int BRD_OPEN(struct boot_fs_ops *, char *, int);
+extern int BRD_CLOSE(struct boot_fs_ops *, int);
+extern ssize_t BRD_READ(struct boot_fs_ops *, int, caddr_t, size_t);
+extern off_t BRD_SEEK(struct boot_fs_ops *, int, off_t, int);
+extern int BRD_FSTAT(struct boot_fs_ops *, int, struct bootstat *);
+
+#else
+
 #define	BRD_MOUNTROOT(ops, str)		((ops)->fsw_mountroot)(str)
 #define	BRD_UNMOUNTROOT(ops)		((ops)->fsw_unmountroot)()
 #define	BRD_OPEN(ops, file, flag)	((ops)->fsw_open)(file, flag)
@@ -76,6 +86,11 @@ extern struct boot_fs_ops *bfs_ops;
 #define	BRD_READ(ops, fd, buf, s)	((ops)->fsw_read)(fd, buf, s)
 #define	BRD_SEEK(ops, fd, addr, w)	((ops)->fsw_lseek)(fd, addr, w)
 #define	BRD_FSTAT(ops, fd, stp)		((ops)->fsw_fstat)(fd, stp)
+
+#endif
+
+#define	SYSTEM_BOOT_PATH	"/system/boot"
+#define	BFD_F_SYSTEM_BOOT	0x40000000
 
 #ifdef _BOOT
 

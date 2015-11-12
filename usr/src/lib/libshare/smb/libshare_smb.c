@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -84,6 +84,7 @@ static int hostname_validator(int, char *);
 static int path_validator(int, char *);
 static int cmd_validator(int, char *);
 static int disposition_validator(int, char *);
+static int max_protocol_validator(int, char *);
 
 static int smb_enable_resource(sa_resource_t);
 static int smb_disable_resource(sa_resource_t);
@@ -875,7 +876,9 @@ struct smb_proto_option_defs {
 } smb_proto_options[] = {
 	{ SMB_CI_SYS_CMNT, 0, MAX_VALUE_BUFLEN,
 	    string_length_check_validator, SMB_REFRESH_REFRESH },
-	{ SMB_CI_MAX_WORKERS, 64, 1024, range_check_validator,
+	{ SMB_CI_MAX_WORKERS, SMB_PI_MAX_WORKERS_MIN, SMB_PI_MAX_WORKERS_MAX,
+	    range_check_validator, SMB_REFRESH_REFRESH },
+	{ SMB_CI_NETBIOS_ENABLE, 0, 0, true_false_validator,
 	    SMB_REFRESH_REFRESH },
 	{ SMB_CI_NBSCOPE, 0, MAX_VALUE_BUFLEN,
 	    string_length_check_validator, 0 },
@@ -911,7 +914,7 @@ struct smb_proto_option_defs {
 	    SMB_REFRESH_REFRESH },
 	{ SMB_CI_DISPOSITION, 0, MAX_VALUE_BUFLEN,
 	    disposition_validator, SMB_REFRESH_REFRESH },
-	{ SMB_CI_NETBIOS_ENABLE, 0, 0, true_false_validator,
+	{ SMB_CI_MAX_PROTOCOL, 0, MAX_VALUE_BUFLEN, max_protocol_validator,
 	    SMB_REFRESH_REFRESH },
 };
 
@@ -2340,6 +2343,23 @@ disposition_validator(int index, char *value)
 		return (SA_OK);
 
 	return (SA_BAD_VALUE);
+}
+
+/*ARGSUSED*/
+static int
+max_protocol_validator(int index, char *value)
+{
+	if (value == NULL)
+		return (SA_BAD_VALUE);
+
+	if (*value == '\0')
+		return (SA_OK);
+
+	if (smb_config_check_protocol(value) == 0)
+		return (SA_OK);
+
+	return (SA_BAD_VALUE);
+
 }
 
 /*

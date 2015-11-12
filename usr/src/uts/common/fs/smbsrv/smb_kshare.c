@@ -323,7 +323,7 @@ smb_kshare_init(smb_server_t *sv)
 int
 smb_kshare_start(smb_server_t *sv)
 {
-	smb_thread_init(&sv->sv_export.e_unexport_thread, "smb_thread_unexport",
+	smb_thread_init(&sv->sv_export.e_unexport_thread, "smb_kshare_unexport",
 	    smb_kshare_unexport_thread, sv, smbsrv_base_pri);
 
 	return (smb_thread_start(&sv->sv_export.e_unexport_thread));

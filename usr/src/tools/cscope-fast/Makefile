@@ -33,7 +33,7 @@ OBJS= 	main.o dir.o crossref.o scanner.o lookup.o command.o display.o \
 	mouse.o mygetenv.o mygetwd.o mypopen.o \
 	vpaccess.o vpfopen.o vpinit.o vpopen.o vpstat.o
 SRCS=	$(OBJS:%.o=%.c)
-CLEANFILES += $(OBJS)
+CLEANFILES += $(OBJS) scanner.c
 TMPDIR= /tmp
 
 include ../Makefile.tools

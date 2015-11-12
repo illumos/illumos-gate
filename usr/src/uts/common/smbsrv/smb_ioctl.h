@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _SMB_IOCTL_H_
@@ -166,9 +166,12 @@ typedef struct smb_ioc_cfg {
 	int32_t		ipv6_enable;
 	int32_t		print_enable;
 	int32_t		traverse_mounts;
+	uint32_t	max_protocol;
 	uint32_t	exec_flags;
 	uint32_t	negtok_len;
 	smb_version_t	version;
+	uint16_t	initial_credits;
+	uint16_t	maximum_credits;
 	/* SMB negotiate protocol response. */
 	uuid_t		machine_uuid;
 	uchar_t		negtok[SMB_PI_MAX_NEGTOK];

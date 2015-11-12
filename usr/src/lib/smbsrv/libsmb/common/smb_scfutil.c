@@ -22,7 +22,7 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /* helper functions for using libscf with CIFS */
@@ -155,6 +155,7 @@ int
 smb_smf_end_transaction(smb_scfhandle_t *handle)
 {
 	int ret = SMBD_SMF_OK;
+	int rc;
 
 	if (handle == NULL)
 		return (SMBD_SMF_SYSTEM_ERR);
@@ -162,9 +163,16 @@ smb_smf_end_transaction(smb_scfhandle_t *handle)
 	if (handle->scf_trans == NULL) {
 		ret = SMBD_SMF_SYSTEM_ERR;
 	} else {
-		if (scf_transaction_commit(handle->scf_trans) < 0) {
+		rc = scf_transaction_commit(handle->scf_trans);
+		if (rc == 1) {
+			ret = SMBD_SMF_OK;
+		} else if (rc == 0) {
+			ret = SMBD_SMF_INVALID_ARG;
+			smb_smf_scf_log_error("Failed to commit, old pg: "
+			    "transaction: %s");
+		} else {
 			ret = SMBD_SMF_SYSTEM_ERR;
-			smb_smf_scf_log_error("Failed to commit "
+			smb_smf_scf_log_error("Failed to commit, error: "
 			    "transaction: %s");
 		}
 		scf_transaction_destroy_children(handle->scf_trans);
@@ -558,6 +566,54 @@ smb_smf_get_opaque_property(smb_scfhandle_t *handle, char *propname,
 		scf_value_destroy(value);
 	if (prop != NULL)
 		scf_property_destroy(prop);
+	return (ret);
+}
+
+/*
+ * Delete a property (for properties obsoleted during an upgrade).
+ */
+int
+smb_smf_delete_property(smb_scfhandle_t *handle, char *propname)
+{
+	scf_transaction_entry_t *entry;
+	int ret = SMBD_SMF_OK;
+
+	if (handle == NULL)
+		return (SMBD_SMF_SYSTEM_ERR);
+	if (handle->scf_trans == NULL)
+		return (SMBD_SMF_SYSTEM_ERR);
+
+	/*
+	 * properties must be set in transactions and don't take
+	 * effect until the transaction has been ended/committed.
+	 */
+	entry = scf_entry_create(handle->scf_handle);
+	if (entry == NULL) {
+		ret = SMBD_SMF_SYSTEM_ERR;
+		goto out;
+	}
+
+	if (scf_transaction_property_delete(handle->scf_trans,
+	    entry, propname) == 0) {
+		/* the entry is in the transaction */
+		entry = NULL;
+	} else {
+		switch (scf_error()) {
+		case SCF_ERROR_NOT_FOUND:
+			/* Did not exist.  We're done. */
+			ret = SMBD_SMF_OK;
+			goto out;
+		case SCF_ERROR_PERMISSION_DENIED:
+			ret = SMBD_SMF_NO_PERMISSION;
+			goto out;
+		default:
+			ret = SMBD_SMF_SYSTEM_ERR;
+			goto out;
+		}
+	}
+
+out:
+	scf_entry_destroy(entry);
 	return (ret);
 }
 

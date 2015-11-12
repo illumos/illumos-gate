@@ -22,6 +22,7 @@
  * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2013 Joyent, Inc.  All rights reserved.
  */
 /*
  * Copyright (c) 2010, Intel Corporation.
@@ -121,6 +122,7 @@
 #include <sys/ddi_periodic.h>
 #include <sys/systeminfo.h>
 #include <sys/multiboot.h>
+#include <sys/ramdisk.h>
 
 #ifdef	__xpv
 
@@ -2348,6 +2350,20 @@ pp_in_range(page_t *pp, uint64_t low_addr, uint64_t high_addr)
 	    (pp->p_pagenum < btopr(high_addr)));
 }
 
+static int
+pp_in_module(page_t *pp, const rd_existing_t *modranges)
+{
+	uint_t i;
+
+	for (i = 0; modranges[i].phys != 0; i++) {
+		if (pp_in_range(pp, modranges[i].phys,
+		    modranges[i].phys + modranges[i].size))
+			return (1);
+	}
+
+	return (0);
+}
+
 void
 release_bootstrap(void)
 {
@@ -2355,9 +2371,39 @@ release_bootstrap(void)
 	page_t *pp;
 	extern void kobj_boot_unmountroot(void);
 	extern dev_t rootdev;
+	uint_t i;
+	char propname[32];
+	rd_existing_t *modranges;
 #if !defined(__xpv)
 	pfn_t	pfn;
 #endif
+
+	/*
+	 * Save the bootfs module ranges so that we can reserve them below
+	 * for the real bootfs.
+	 */
+	modranges = kmem_alloc(sizeof (rd_existing_t) * MAX_BOOT_MODULES,
+	    KM_SLEEP);
+	for (i = 0; ; i++) {
+		uint64_t start, size;
+
+		modranges[i].phys = 0;
+
+		(void) snprintf(propname, sizeof (propname),
+		    "module-addr-%u", i);
+		if (do_bsys_getproplen(NULL, propname) <= 0)
+			break;
+		(void) do_bsys_getprop(NULL, propname, &start);
+
+		(void) snprintf(propname, sizeof (propname),
+		    "module-size-%u", i);
+		if (do_bsys_getproplen(NULL, propname) <= 0)
+			break;
+		(void) do_bsys_getprop(NULL, propname, &size);
+
+		modranges[i].phys = start;
+		modranges[i].size = size;
+	}
 
 	/* unmount boot ramdisk and release kmem usage */
 	kobj_boot_unmountroot();
@@ -2399,9 +2445,8 @@ release_bootstrap(void)
 			continue;
 		}
 
-
 		if (root_is_ramdisk && pp_in_range(pp, ramdisk_start,
-		    ramdisk_end)) {
+		    ramdisk_end) || pp_in_module(pp, modranges)) {
 			pp->p_next = rd_pages;
 			rd_pages = pp;
 			continue;
@@ -2412,6 +2457,8 @@ release_bootstrap(void)
 		page_free(pp, 1);
 	}
 	PRM_POINT("Boot pages released");
+
+	kmem_free(modranges, sizeof (rd_existing_t) * 99);
 
 #if !defined(__xpv)
 /* XXPV -- note this following bunch of code needs to be revisited in Xen 3.0 */

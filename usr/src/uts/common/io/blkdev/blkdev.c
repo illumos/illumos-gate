@@ -1833,7 +1833,7 @@ bd_detach_handle(bd_handle_t hdl)
 	}
 
 	ndi_devi_exit(hdl->h_parent, circ);
-	return (rv = NDI_SUCCESS ? DDI_SUCCESS : DDI_FAILURE);
+	return (rv == NDI_SUCCESS ? DDI_SUCCESS : DDI_FAILURE);
 }
 
 void

@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <mdb/mdb_modapi.h>
@@ -363,6 +363,29 @@ static smb_com_entry_t	smb_com[256] =
 	SMB_COM_ENTRY(0xFF, "?")
 };
 
+static const char *smb2_cmd_names[SMB2__NCMDS] = {
+	"smb2_negotiate",
+	"smb2_session_setup",
+	"smb2_logoff",
+	"smb2_tree_connect",
+	"smb2_tree_disconn",
+	"smb2_create",
+	"smb2_close",
+	"smb2_flush",
+	"smb2_read",
+	"smb2_write",
+	"smb2_lock",
+	"smb2_ioctl",
+	"smb2_cancel",
+	"smb2_echo",
+	"smb2_query_dir",
+	"smb2_change_notify",
+	"smb2_query_info",
+	"smb2_set_info",
+	"smb2_oplock_break",
+	"smb2_invalid_cmd"
+};
+
 static int smb_dcmd_list(uintptr_t, uint_t, int, const mdb_arg_t *);
 static void smb_dcmd_list_help(void);
 static int smb_dcmd_server(uintptr_t, uint_t, int, const mdb_arg_t *);
@@ -682,7 +705,6 @@ static const char *smb_session_state[SMB_SESSION_STATE_SENTINEL] =
 	"CONNECTED",
 	"ESTABLISHED",
 	"NEGOTIATED",
-	"OPLOCK_BREAKING",
 	"TERMINATED"
 };
 
@@ -740,6 +762,9 @@ smb_dcmd_session(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	if (((opts & SMB_OPT_WALK) && (opts & SMB_OPT_SESSION)) ||
 	    !(opts & SMB_OPT_WALK)) {
+		char	cipaddr[INET6_ADDRSTRLEN];
+		char	lipaddr[INET6_ADDRSTRLEN];
+		int	ipaddrstrlen;
 		smb_session_t	*se;
 		const char	*state;
 
@@ -755,31 +780,42 @@ smb_dcmd_session(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		else
 			state = smb_session_state[se->s_state];
 
+		switch (se->ipaddr.a_family) {
+		case AF_INET:
+			ipaddrstrlen = INET_ADDRSTRLEN;
+			(void) mdb_snprintf(cipaddr, sizeof (cipaddr),
+			    "%I", se->ipaddr.a_ipv4);
+			(void) mdb_snprintf(lipaddr, sizeof (lipaddr),
+			    "%I", se->local_ipaddr.a_ipv4);
+			break;
+		case AF_INET6:
+			ipaddrstrlen = INET6_ADDRSTRLEN;
+			(void) mdb_snprintf(cipaddr, sizeof (cipaddr),
+			    "%N", &(se->ipaddr.a_ipv6));
+			(void) mdb_snprintf(lipaddr, sizeof (lipaddr),
+			    "%N", &(se->local_ipaddr.a_ipv6));
+			break;
+		default:
+			ipaddrstrlen = INET_ADDRSTRLEN;
+			(void) mdb_snprintf(cipaddr, sizeof (cipaddr),
+			    "unknown");
+			(void) mdb_snprintf(lipaddr, sizeof (lipaddr),
+			    "unknown");
+		}
+
 		if (opts & SMB_OPT_VERBOSE) {
 			mdb_printf("%<b>%<u>SMB session information "
 			    "(%p): %</u>%</b>\n", addr);
-			switch (se->ipaddr.a_family) {
-			case AF_INET:
-				mdb_printf("Client IP address: %I\n",
-				    se->ipaddr.a_ipv4);
-				mdb_printf("Local IP Address: %I\n",
-				    se->local_ipaddr.a_ipv4);
-				break;
-			case AF_INET6:
-				mdb_printf("Client IP address: %N\n",
-				    &(se->ipaddr.a_ipv6));
-				mdb_printf("Local IP Address: %N\n",
-				    &(se->local_ipaddr.a_ipv6));
-				break;
-			default:
-				mdb_printf("Client IP address: unknown\n");
-				mdb_printf("Local IP Address: unknown\n");
-			}
+			mdb_printf("Client IP address: %s %d\n",
+			    cipaddr, se->s_remote_port);
+			mdb_printf("Local IP Address: %s %d\n",
+			    lipaddr, se->s_local_port);
 			mdb_printf("Session KID: %u\n", se->s_kid);
 			mdb_printf("Workstation Name: %s\n",
 			    se->workstation);
 			mdb_printf("Session state: %u (%s)\n", se->s_state,
 			    state);
+			mdb_printf("Session dialect: %#x\n", se->dialect);
 			mdb_printf("Number of Users: %u\n",
 			    se->s_user_list.ll_count);
 			mdb_printf("Number of Trees: %u\n", se->s_tree_cnt);
@@ -788,41 +824,15 @@ smb_dcmd_session(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			mdb_printf("Number of active Transact.: %u\n\n",
 			    se->s_xa_list.ll_count);
 		} else {
-			char	cipaddr[INET6_ADDRSTRLEN];
-			char	lipaddr[INET6_ADDRSTRLEN];
-			int	ipaddrstrlen;
-
-			switch (se->ipaddr.a_family) {
-			case AF_INET:
-				ipaddrstrlen = INET_ADDRSTRLEN;
-				(void) mdb_snprintf(cipaddr, sizeof (cipaddr),
-				    "%I", se->ipaddr.a_ipv4);
-				(void) mdb_snprintf(lipaddr, sizeof (lipaddr),
-				    "%I", se->local_ipaddr.a_ipv4);
-				break;
-			case AF_INET6:
-				ipaddrstrlen = INET6_ADDRSTRLEN;
-				(void) mdb_snprintf(cipaddr, sizeof (cipaddr),
-				    "%N", &(se->ipaddr.a_ipv6));
-				(void) mdb_snprintf(lipaddr, sizeof (lipaddr),
-				    "%N", &(se->local_ipaddr.a_ipv6));
-				break;
-			default:
-				ipaddrstrlen = INET_ADDRSTRLEN;
-				(void) mdb_snprintf(cipaddr, sizeof (cipaddr),
-				    "unknown");
-				(void) mdb_snprintf(lipaddr, sizeof (lipaddr),
-				    "unknown");
-			}
-
 			if (DCMD_HDRSPEC(flags)) {
 				mdb_printf(
-				    "%<b>%<u>%-?s %-*s %-*s %-16s%</u>%</b>\n",
-				    "SESSION", ipaddrstrlen, "CLIENT_IP_ADDR",
-				    ipaddrstrlen, "LOCAL_IP_ADDR", "STATE");
+			"%<b>%<u>%-?s %-*s %-8s %-8s %-12s%</u>%</b>\n",
+				    "SESSION", ipaddrstrlen, "IP_ADDR",
+				    "PORT", "DIALECT", "STATE");
 			}
-			mdb_printf("%-?p %-*s %-*s %s\n", addr, ipaddrstrlen,
-			    cipaddr, ipaddrstrlen, lipaddr, state);
+			mdb_printf("%-?p %-*s %-8d %-8#x %s\n",
+			    addr, ipaddrstrlen, cipaddr,
+			    se->s_remote_port, se->dialect, state);
 		}
 	}
 	if (smb_obj_expand(addr, opts, smb_session_exp, indent))
@@ -873,6 +883,8 @@ smb_dcmd_request(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    !(opts & SMB_OPT_WALK)) {
 		smb_request_t	*sr;
 		const char	*state;
+		const char	*cur_cmd_name;
+		uint_t		cur_cmd_code;
 		uint64_t	waiting;
 		uint64_t	running;
 
@@ -911,35 +923,76 @@ smb_dcmd_request(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		else
 			state = smb_request_state[sr->sr_state];
 
+		if (sr->smb2_cmd_code != 0) {
+			/* SMB2 request */
+			cur_cmd_code = sr->smb2_cmd_code;
+			if (cur_cmd_code > SMB2_INVALID_CMD)
+				cur_cmd_code = SMB2_INVALID_CMD;
+			cur_cmd_name = smb2_cmd_names[cur_cmd_code];
+		} else {
+			/* SMB1 request */
+			cur_cmd_code = sr->smb_com & 0xFF;
+			cur_cmd_name = smb_com[cur_cmd_code].smb_com;
+		}
+
 		if (opts & SMB_OPT_VERBOSE) {
 			mdb_printf(
 			    "%</b>%</u>SMB request information (%p):"
 			    "%</u>%</b>\n\n", addr);
 
+			if (sr->smb2_cmd_code == 0) {
+				/* SMB1 request */
+				mdb_printf(
+				    "first SMB COM: %u (%s)\n",
+				    sr->first_smb_com,
+				    smb_com[sr->first_smb_com].smb_com);
+			}
+
 			mdb_printf(
-			    "first SMB COM: %u (%s)\n"
-			    "current SMB COM: %u (%s)\n"
-			    "state: %u (%s)\n"
-			    "TID(tree): %u (%p)\n"
-			    "UID(user): %u (%p)\n"
-			    "FID(file): %u (%p)\n"
-			    "PID: %u\n"
-			    "MID: %u\n\n"
-			    "waiting time: %lld\n"
+			    "current SMB COM: %u (%s)\n",
+			    cur_cmd_code, cur_cmd_name);
+
+			mdb_printf(
+			    "state: %u (%s)\n",
+			    sr->sr_state, state);
+
+			mdb_printf(
+			    "TID(tree): %u (%p)\n",
+			    sr->smb_tid, sr->tid_tree);
+
+			mdb_printf(
+			    "UID(user): %u (%p)\n",
+			    sr->smb_uid, sr->uid_user);
+
+			mdb_printf(
+			    "FID(file): %u (%p)\n",
+			    sr->smb_fid, sr->fid_ofile);
+
+			mdb_printf(
+			    "PID: %u\n",
+			    sr->smb_pid);
+
+			if (sr->smb2_messageid != 0) {
+				mdb_printf(
+				    "MID: 0x%llx\n\n",
+				    sr->smb2_messageid);
+			} else {
+				mdb_printf(
+				    "MID: %u\n\n",
+				    sr->smb_mid);
+			}
+
+			mdb_printf(
+			    "waiting time: %lld\n",
+			    waiting);
+
+			mdb_printf(
 			    "running time: %lld\n",
-			    sr->first_smb_com,
-			    smb_com[sr->first_smb_com].smb_com,
-			    sr->smb_com,
-			    smb_com[sr->smb_com].smb_com,
-			    sr->sr_state, state,
-			    sr->smb_tid, sr->tid_tree,
-			    sr->smb_uid, sr->uid_user,
-			    sr->smb_fid, sr->fid_ofile,
-			    sr->smb_pid,
-			    sr->smb_mid,
-			    waiting,
 			    running);
 
+			mdb_printf(
+			    "worker thread: %p\n",
+			    sr->sr_worker);
 			smb_worker_findstack((uintptr_t)sr->sr_worker);
 		} else {
 			if (DCMD_HDRSPEC(flags))
@@ -952,13 +1005,14 @@ smb_dcmd_request(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 				    "STATE",
 				    "COMMAND");
 
-			mdb_printf(SMB_REQUEST_FORMAT,
+			mdb_printf(
+			    SMB_REQUEST_FORMAT,
 			    addr,
 			    sr->sr_worker,
 			    waiting,
 			    running,
 			    state,
-			    smb_com[sr->smb_com].smb_com);
+			    cur_cmd_name);
 		}
 	}
 	return (DCMD_OK);

@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/sid.h>
@@ -785,13 +785,13 @@ smb_fsop_remove(
  *
  * It is assumed that fnode is not a link.
  */
-int
+uint32_t
 smb_fsop_remove_streams(smb_request_t *sr, cred_t *cr, smb_node_t *fnode)
 {
 	int rc, flags = 0;
-	uint16_t odid;
 	smb_odir_t *od;
 	smb_odirent_t *odirent;
+	uint32_t status;
 	boolean_t eos;
 
 	ASSERT(sr);
@@ -800,15 +800,11 @@ smb_fsop_remove_streams(smb_request_t *sr, cred_t *cr, smb_node_t *fnode)
 	ASSERT(fnode->n_magic == SMB_NODE_MAGIC);
 	ASSERT(fnode->n_state != SMB_NODE_STATE_DESTROYING);
 
-	if (SMB_TREE_CONTAINS_NODE(sr, fnode) == 0) {
-		smbsr_errno(sr, EACCES);
-		return (-1);
-	}
+	if (SMB_TREE_CONTAINS_NODE(sr, fnode) == 0)
+		return (NT_STATUS_ACCESS_DENIED);
 
-	if (SMB_TREE_IS_READONLY(sr)) {
-		smbsr_errno(sr, EROFS);
-		return (-1);
-	}
+	if (SMB_TREE_IS_READONLY(sr))
+		return (NT_STATUS_ACCESS_DENIED);
 
 	if (SMB_TREE_IS_CASEINSENSITIVE(sr))
 		flags = SMB_IGNORE_CASE;
@@ -816,14 +812,16 @@ smb_fsop_remove_streams(smb_request_t *sr, cred_t *cr, smb_node_t *fnode)
 	if (SMB_TREE_SUPPORTS_CATIA(sr))
 		flags |= SMB_CATIA;
 
-	if ((odid = smb_odir_openat(sr, fnode)) == 0) {
-		smbsr_errno(sr, ENOENT);
-		return (-1);
-	}
-
-	if ((od = smb_tree_lookup_odir(sr, odid)) == NULL) {
-		smbsr_errno(sr, ENOENT);
-		return (-1);
+	status = smb_odir_openat(sr, fnode, &od);
+	switch (status) {
+	case 0:
+		break;
+	case NT_STATUS_NO_SUCH_FILE:
+	case NT_STATUS_NOT_SUPPORTED:
+		/* No streams to remove. */
+		return (0);
+	default:
+		return (status);
 	}
 
 	odirent = kmem_alloc(sizeof (smb_odirent_t), KM_SLEEP);
@@ -835,10 +833,14 @@ smb_fsop_remove_streams(smb_request_t *sr, cred_t *cr, smb_node_t *fnode)
 		    flags, cr);
 	}
 	kmem_free(odirent, sizeof (smb_odirent_t));
+	if (eos && rc == ENOENT)
+		rc = 0;
 
 	smb_odir_close(od);
 	smb_odir_release(od);
-	return (rc);
+	if (rc)
+		status = smb_errno2status(rc);
+	return (status);
 }
 
 /*
@@ -1310,6 +1312,78 @@ smb_fsop_setattr(
 }
 
 /*
+ * Support for SMB2 setinfo FileValidDataLengthInformation.
+ * Free data from the specified offset to EoF.
+ *
+ * This can effectively truncate data.  It truncates the data
+ * leaving the file size as it was, leaving zeros after the
+ * offset specified here.  That is effectively modifying the
+ * file content, so for access control this is a write.
+ */
+int
+smb_fsop_set_data_length(
+    smb_request_t	*sr,
+    cred_t		*cr,
+    smb_node_t		*node,
+    offset_t		end_of_data)
+{
+	flock64_t flk;
+	uint32_t status;
+	uint32_t access = FILE_WRITE_DATA;
+	int rc;
+
+	ASSERT(cr);
+	ASSERT(node);
+	ASSERT(node->n_magic == SMB_NODE_MAGIC);
+	ASSERT(node->n_state != SMB_NODE_STATE_DESTROYING);
+
+	if (SMB_TREE_CONTAINS_NODE(sr, node) == 0)
+		return (EACCES);
+
+	if (SMB_TREE_IS_READONLY(sr))
+		return (EROFS);
+
+	if (SMB_TREE_HAS_ACCESS(sr, access) == 0)
+		return (EACCES);
+
+	/*
+	 * The file system cannot detect pending READDONLY
+	 * (i.e. if the file has been opened readonly but
+	 * not yet closed) so we need to test READONLY here.
+	 *
+	 * Note that file handle that were opened before the
+	 * READONLY flag was set in the node (or the FS) are
+	 * immune to that change, and remain writable.
+	 */
+	if (sr->fid_ofile) {
+		if (SMB_OFILE_IS_READONLY(sr->fid_ofile))
+			return (EACCES);
+	} else {
+		/* This requires an open file. */
+		return (EACCES);
+	}
+
+	/*
+	 * SMB checks access on open and retains an access granted
+	 * mask for use while the file is open.  ACL changes should
+	 * not affect access to an open file.
+	 *
+	 * If the setattr is being performed on an ofile:
+	 * - Check the ofile's access granted mask to see if this
+	 *   modification should be permitted (FILE_WRITE_DATA)
+	 */
+	status = smb_ofile_access(sr->fid_ofile, cr, access);
+	if (status != NT_STATUS_SUCCESS)
+		return (EACCES);
+
+	bzero(&flk, sizeof (flk));
+	flk.l_start = end_of_data;
+
+	rc = smb_vop_space(node->vp, F_FREESP, &flk, FWRITE, 0LL, cr);
+	return (rc);
+}
+
+/*
  * smb_fsop_read
  *
  * All SMB functions should use this wrapper to ensure that
@@ -1531,10 +1605,6 @@ smb_fsop_access(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 	ASSERT(snode);
 	ASSERT(snode->n_magic == SMB_NODE_MAGIC);
 	ASSERT(snode->n_state != SMB_NODE_STATE_DESTROYING);
-
-	/* Requests for no access should be denied. */
-	if (faccess == 0)
-		return (NT_STATUS_ACCESS_DENIED);
 
 	if (SMB_TREE_IS_READONLY(sr)) {
 		if (faccess & (FILE_WRITE_DATA|FILE_APPEND_DATA|

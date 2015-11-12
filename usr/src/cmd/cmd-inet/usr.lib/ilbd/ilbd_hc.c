@@ -23,7 +23,6 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2012 Milan Jurik. All rights reserved.
- * Copyright 2015 OmniTI Computer Consulting, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -1265,7 +1264,9 @@ static boolean_t
 ilbd_run_probe(ilbd_hc_srv_t *srv)
 {
 	posix_spawn_file_actions_t	fd_actions;
+	boolean_t			init_fd_actions = B_FALSE;
 	posix_spawnattr_t		attr;
+	boolean_t			init_attr = B_FALSE;
 	sigset_t			child_sigset;
 	int				fds[2];
 	int				fdflags;
@@ -1289,21 +1290,23 @@ ilbd_run_probe(ilbd_hc_srv_t *srv)
 	/* Set our side of the pipe to be non-blocking */
 	if ((fdflags = fcntl(fds[0], F_GETFL, 0)) == -1) {
 		logdebug("ilbd_run_probe: fcntl(F_GETFL)");
-		goto cleanup_noactions;
+		goto cleanup;
 	}
 	if (fcntl(fds[0], F_SETFL, fdflags | O_NONBLOCK) == -1) {
 		logdebug("ilbd_run_probe: fcntl(F_SETFL)");
-		goto cleanup_noactions;
+		goto cleanup;
 	}
 
 	if (posix_spawn_file_actions_init(&fd_actions) != 0) {
 		logdebug("ilbd_run_probe: posix_spawn_file_actions_init");
-		goto cleanup_noactions;
+		goto cleanup;
 	}
+	init_fd_actions = B_TRUE;
 	if (posix_spawnattr_init(&attr) != 0) {
 		logdebug("ilbd_run_probe: posix_spawnattr_init");
-		goto cleanup_noattr;
+		goto cleanup;
 	}
+	init_attr = B_TRUE;
 	if (posix_spawn_file_actions_addclose(&fd_actions, fds[0]) != 0) {
 		logdebug("ilbd_run_probe: posix_spawn_file_actions_addclose");
 		goto cleanup;
@@ -1356,10 +1359,7 @@ ilbd_run_probe(ilbd_hc_srv_t *srv)
 		goto cleanup;
 	}
 
-	(void) posix_spawnattr_destroy(&attr);
-	(void) posix_spawn_file_actions_destroy(&fd_actions);
 	(void) close(fds[1]);
-	destroy_argv(child_argv);
 	srv->shc_child_pid = pid;
 	srv->shc_child_fd = fds[0];
 	srv->shc_ev = probe_ev;
@@ -1375,20 +1375,22 @@ ilbd_run_probe(ilbd_hc_srv_t *srv)
 		 */
 		ilbd_hc_kill_probe(srv);
 		probe_ev = NULL;
-		/* posix_spawn attrs & actions already destroyed. */
-		goto cleanup_noactions;
+		goto cleanup;
 	}
 
+	destroy_argv(child_argv);
+	(void) posix_spawn_file_actions_destroy(&fd_actions);
+	(void) posix_spawnattr_destroy(&attr);
 	return (B_TRUE);
 
 cleanup:
-	(void) posix_spawnattr_destroy(&attr);
-cleanup_noattr:
-	(void) posix_spawn_file_actions_destroy(&fd_actions);
-cleanup_noactions:
+	destroy_argv(child_argv);
+	if (init_fd_actions == B_TRUE)
+		(void) posix_spawn_file_actions_destroy(&fd_actions);
+	if (init_attr == B_TRUE)
+		(void) posix_spawnattr_destroy(&attr);
 	(void) close(fds[0]);
 	(void) close(fds[1]);
-	destroy_argv(child_argv);
 	if (probe_ev != NULL)
 		free(probe_ev);
 	return (B_FALSE);

@@ -148,7 +148,8 @@ smb_lock_range(
 	smb_lock_t	*lock;
 	smb_lock_t	*clock = NULL;
 	uint32_t	result = NT_STATUS_SUCCESS;
-	boolean_t	lock_has_timeout = (timeout != 0);
+	boolean_t	lock_has_timeout =
+	    (timeout != 0 && timeout != UINT_MAX);
 
 	lock = smb_lock_create(sr, start, length, locktype, timeout);
 
@@ -194,8 +195,10 @@ smb_lock_range(
 		/*
 		 * Under certain conditions NT_STATUS_FILE_LOCK_CONFLICT
 		 * should be returned instead of NT_STATUS_LOCK_NOT_GRANTED.
+		 * All of this appears to be specific to SMB1
 		 */
-		if (result == NT_STATUS_LOCK_NOT_GRANTED) {
+		if (sr->session->dialect <= NT_LM_0_12 &&
+		    result == NT_STATUS_LOCK_NOT_GRANTED) {
 			/*
 			 * Locks with timeouts always return
 			 * NT_STATUS_FILE_LOCK_CONFLICT

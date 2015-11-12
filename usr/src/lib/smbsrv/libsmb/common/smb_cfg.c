@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -48,6 +48,11 @@ typedef struct smb_cfg_param {
 	int sc_type;
 	uint32_t sc_flags;
 } smb_cfg_param_t;
+
+struct str_val {
+	char *str;
+	uint32_t val;
+};
 
 /*
  * config parameter flags
@@ -136,6 +141,10 @@ static smb_cfg_param_t smb_cfg_table[] =
 	{SMB_CI_DISPOSITION, "disposition", SCF_TYPE_ASTRING, SMB_CF_EXEC},
 	{SMB_CI_DFS_STDROOT_NUM, "dfs_stdroot_num", SCF_TYPE_INTEGER, 0},
 	{SMB_CI_TRAVERSE_MOUNTS, "traverse_mounts", SCF_TYPE_BOOLEAN, 0},
+	{SMB_CI_SMB2_ENABLE_OLD, "smb2_enable", SCF_TYPE_BOOLEAN, 0},
+	{SMB_CI_INITIAL_CREDITS, "initial_credits", SCF_TYPE_INTEGER, 0},
+	{SMB_CI_MAXIMUM_CREDITS, "maximum_credits", SCF_TYPE_INTEGER, 0},
+	{SMB_CI_MAX_PROTOCOL, "max_protocol", SCF_TYPE_ASTRING, 0},
 
 	/* SMB_CI_MAX */
 };
@@ -1076,4 +1085,166 @@ smb_config_getent(smb_cfg_id_t id)
 
 	assert(0);
 	return (NULL);
+}
+
+
+/*
+ * We store the max SMB protocol version in SMF as a string,
+ * (for convenience of svccfg etc) but the programmatic get/set
+ * interfaces use the numeric form.
+ *
+ * The numeric values are as defined in the [MS-SMB2] spec.
+ * except for how we represent "1" (for SMB1) which is an
+ * arbitrary value below SMB2_VERS_BASE.
+ */
+static struct str_val
+smb_versions[] = {
+	{ "3.0",	SMB_VERS_3_0 },
+	{ "2.1",	SMB_VERS_2_1 },
+	{ "2.002",	SMB_VERS_2_002 },
+	{ "1",		SMB_VERS_1 },
+	{ NULL,		0 }
+};
+
+/*
+ * This really should be the latest (SMB_VERS_3_0)
+ * but we're being cautious with SMB3 for a while.
+ */
+uint32_t max_protocol_default = SMB_VERS_2_1;
+
+uint32_t
+smb_config_get_max_protocol(void)
+{
+	char str[SMB_VERSTR_LEN];
+	int i, rc;
+
+	rc = smb_config_getstr(SMB_CI_MAX_PROTOCOL, str, sizeof (str));
+	if (rc == SMBD_SMF_OK) {
+		for (i = 0; smb_versions[i].str != NULL; i++) {
+			if (strcmp(str, smb_versions[i].str) == 0)
+				return (smb_versions[i].val);
+		}
+		if (str[0] != '\0') {
+			syslog(LOG_ERR, "smbd/max_protocol value invalid");
+		}
+	}
+
+	return (max_protocol_default);
+}
+
+int
+smb_config_check_protocol(char *value)
+{
+	int i;
+
+	for (i = 0; smb_versions[i].str != NULL; i++) {
+		if (strcmp(value, smb_versions[i].str) == 0)
+			return (0);
+	}
+
+	return (-1);
+}
+
+/*
+ * If smb2_enable is present and max_protocol is empty,
+ * set max_protocol.  Delete smb2_enable.
+ */
+static void
+upgrade_smb2_enable()
+{
+	smb_scfhandle_t *handle;
+	char *s2e_name = "smb2_enable";
+	char *s2e_sval;
+	uint8_t	s2e_bval;
+	char *maxp_name = "max_protocol";
+	char *maxp_sval;
+	char verstr[SMB_VERSTR_LEN];
+	int rc;
+
+	handle = smb_smf_scf_init(SMBD_FMRI_PREFIX);
+	if (handle == NULL)
+		return;
+	rc = smb_smf_create_service_pgroup(handle, SMBD_PG_NAME);
+	if (rc != SMBD_SMF_OK)
+		goto out;
+
+	/* Is there an "smb2_enable" property? */
+	rc = smb_smf_get_boolean_property(handle, s2e_name, &s2e_bval);
+	if (rc != SMBD_SMF_OK) {
+		syslog(LOG_DEBUG, "upgrade: smb2_enable not found");
+		goto out;
+	}
+
+	/*
+	 * We will try to delete the smb2_enable property, so we need
+	 * the transaction to start now, before we modify max_protocol
+	 */
+	if ((rc = smb_smf_start_transaction(handle)) != 0) {
+		syslog(LOG_DEBUG, "upgrade_smb2_enable: start trans (%d)", rc);
+		goto out;
+	}
+
+	/*
+	 * Old (smb2_enable) property exists.
+	 * Does the new one? (max_protocol)
+	 */
+	rc = smb_smf_get_string_property(handle, maxp_name,
+	    verstr, sizeof (verstr));
+	if (rc == SMBD_SMF_OK && !smb_config_check_protocol(verstr)) {
+		syslog(LOG_DEBUG, "upgrade: found %s = %s",
+		    maxp_name, verstr);
+		/* Leave existing max_protocol as we found it. */
+	} else {
+		/*
+		 * New property missing or invalid.
+		 * Upgrade from "smb2_enable".
+		 */
+		if (s2e_bval == 0) {
+			s2e_sval = "false";
+			maxp_sval = "1";
+		} else {
+			s2e_sval = "true";
+			maxp_sval = "2.1";
+		}
+		/*
+		 * Note: Need this in the same transaction as the
+		 * delete of smb2_enable below.
+		 */
+		rc = smb_smf_set_string_property(handle, maxp_name, maxp_sval);
+		if (rc != SMBD_SMF_OK) {
+			syslog(LOG_ERR, "failed to set smbd/%d (%d)",
+			    maxp_name, rc);
+			goto out;
+		}
+		syslog(LOG_INFO, "upgrade smbd/smb2_enable=%s "
+		    "converted to smbd/max_protocol=%s",
+		    s2e_sval, maxp_sval);
+	}
+
+	/*
+	 * Delete the old smb2_enable property.
+	 */
+	if ((rc = smb_smf_delete_property(handle, s2e_name)) != 0) {
+		syslog(LOG_DEBUG, "upgrade_smb2_enable: delete prop (%d)", rc);
+	} else if ((rc = smb_smf_end_transaction(handle)) != 0) {
+		syslog(LOG_DEBUG, "upgrade_smb2_enable: end trans (%d)", rc);
+	}
+	if (rc != 0) {
+		syslog(LOG_ERR, "failed to delete property smbd/%d (%d)",
+		    s2e_name, rc);
+	}
+
+out:
+	(void) smb_smf_end_transaction(handle);
+	smb_smf_scf_fini(handle);
+}
+
+
+/*
+ * Run once at startup convert old SMF settings to current.
+ */
+void
+smb_config_upgrade(void)
+{
+	upgrade_smb2_enable();
 }

@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/list.h>
@@ -806,7 +806,7 @@ smbd_dop_vss_map_gmttoken(smbd_arg_t *arg)
 	}
 
 	if ((smbd_vss_map_gmttoken(request.gts_path, request.gts_gmttoken,
-	    snapname) != 0)) {
+	    request.gts_toktime, snapname) != 0)) {
 		*snapname = '\0';
 	}
 

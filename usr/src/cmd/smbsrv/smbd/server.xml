@@ -22,7 +22,7 @@ information: Portions Copyright [yyyy] [name of copyright owner]
 CDDL HEADER END
 
 Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
-Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 
 NOTE:  This service manifest is not editable; its contents will
 be overwritten by package or patch operations, including
@@ -216,8 +216,16 @@ file.
 			value='5.0' override='true'/>
 		<propval name='dfs_stdroot_num' type='integer'
 			value='0' override='true'/>
+		<propval name='print_enable' type='boolean'
+			value='false' override='true'/>
 		<propval name='traverse_mounts' type='boolean'
 			value='true' override='true'/>
+		<propval name='max_protocol' type='astring'
+			value='' override='true'/>
+		<propval name='initial_credits' type='integer'
+			value='20' override='true'/>
+		<propval name='maximum_credits' type='integer'
+			value='1000' override='true'/>
 	</property_group>
 
 	<!-- SMB service-specific shares exec configuration defaults -->

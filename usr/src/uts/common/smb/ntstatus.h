@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _SMB_NTSTATUS_H
@@ -631,6 +632,7 @@ extern "C" {
 #define	NT_STATUS_NOLOGON_SERVER_TRUST_ACCOUNT		0xC000019A
 #define	NT_STATUS_DOMAIN_TRUST_INCONSISTENT		0xC000019B
 #define	NT_STATUS_FS_DRIVER_REQUIRED			0xC000019C
+#define	NT_STATUS_SHORT_NAMES_NOT_ENABLED_ON_VOLUME	0xC000019F
 #define	NT_STATUS_NO_USER_SESSION_KEY			0xC0000202
 #define	NT_STATUS_USER_SESSION_DELETED			0xC0000203
 #define	NT_STATUS_RESOURCE_LANG_NOT_FOUND		0xC0000204

@@ -499,6 +499,17 @@ smb_vop_setattr(vnode_t *vp, vnode_t *unnamed_vp, smb_attr_t *attr,
 	return (error);
 }
 
+int
+smb_vop_space(vnode_t *vp, int cmd, flock64_t *bfp, int flags,
+	offset_t offset, cred_t *cr)
+{
+	int error;
+
+	error = VOP_SPACE(vp, cmd, bfp, flags, offset, cr, &smb_ct);
+
+	return (error);
+}
+
 /*
  * smb_vop_access
  *
