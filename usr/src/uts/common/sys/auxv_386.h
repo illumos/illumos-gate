@@ -89,10 +89,12 @@ extern "C" {
 #define	AV_386_2_BMI2		0x00008 /* BMI2 insns */
 #define	AV_386_2_FMA		0x00010	/* FMA insns */
 #define	AV_386_2_AVX2		0x00020	/* AVX2 insns */
+#define	AV_386_2_ADX		0x00040	/* ADX insns */
+#define	AV_386_2_RDSEED		0x00080	/* RDSEED insn */
 
 #define	FMT_AV_386_2							\
 	"\020"								\
-	"\06avx2\05fma\04bmi2\03bmi1\02rdrand\01f16c"
+	"\10rdseed\07adx\06avx2\05fma\04bmi2\03bmi1\02rdrand\01f16c"
 
 #ifdef __cplusplus
 }
