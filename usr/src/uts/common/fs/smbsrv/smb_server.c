@@ -1348,6 +1348,12 @@ smb_server_kstat_fini(smb_server_t *sv)
 }
 
 /*
+ * Verify the defines in smb_kstat.h used by ks_reqs1 ks_reqs2
+ */
+CTASSERT(SMBSRV_KS_NREQS1 == SMB_COM_NUM);
+CTASSERT(SMBSRV_KS_NREQS2 == SMB2__NCMDS);
+
+/*
  * smb_server_kstat_update
  */
 static int
