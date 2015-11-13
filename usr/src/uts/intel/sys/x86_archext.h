@@ -203,7 +203,9 @@ extern "C" {
 #define	CPUID_INTC_EBX_7_0_BMI1		0x00000008	/* BMI1 instrs */
 #define	CPUID_INTC_EBX_7_0_AVX2		0x00000020	/* AVX2 supported */
 #define	CPUID_INTC_EBX_7_0_SMEP		0x00000080	/* SMEP in CR4 */
-#define	CPUID_INTC_EBX_7_0_BMI2		0x00000100	/* BMI2 Instrs */
+#define	CPUID_INTC_EBX_7_0_BMI2		0x00000100	/* BMI2 instrs */
+#define	CPUID_INTC_EBX_7_0_RDSEED	0x00040000	/* RDSEED instr */
+#define	CPUID_INTC_EBX_7_0_ADX		0x00080000	/* ADX instrs */
 #define	CPUID_INTC_EBX_7_0_SMAP		0x00100000	/* SMAP in CR 4 */
 
 #define	P5_MCHADDR	0x0
@@ -381,6 +383,8 @@ extern "C" {
 #define	X86FSET_FMA		44
 #define	X86FSET_SMEP		45
 #define	X86FSET_SMAP		46
+#define	X86FSET_ADX		47
+#define	X86FSET_RDSEED		48
 
 /*
  * Intel Deep C-State invariant TSC in leaf 0x80000007.
@@ -633,7 +637,7 @@ extern "C" {
 
 #if defined(_KERNEL) || defined(_KMEMUSER)
 
-#define	NUM_X86_FEATURES	47
+#define	NUM_X86_FEATURES	49
 extern uchar_t x86_featureset[];
 
 extern void free_x86_featureset(void *featureset);
