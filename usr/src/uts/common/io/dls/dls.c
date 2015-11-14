@@ -250,29 +250,50 @@ dls_promisc(dld_str_t *dsp, uint32_t new_flags)
 {
 	int err = 0;
 	uint32_t old_flags = dsp->ds_promisc;
+	const uint32_t option_flags = DLS_PROMISC_RX_ONLY;
+	uint32_t old_type = old_flags & ~option_flags;
+	uint32_t new_type = new_flags & ~option_flags;
 	mac_client_promisc_type_t mptype = MAC_CLIENT_PROMISC_ALL;
+	uint16_t mac_flags = 0;
 
 	ASSERT(MAC_PERIM_HELD(dsp->ds_mh));
 	ASSERT(!(new_flags & ~(DLS_PROMISC_SAP | DLS_PROMISC_MULTI |
-	    DLS_PROMISC_PHYS)));
+	    DLS_PROMISC_PHYS | option_flags)));
 
 	/*
 	 * If the user has only requested DLS_PROMISC_MULTI then we need to make
 	 * sure that they don't see all packets.
 	 */
-	if (new_flags == DLS_PROMISC_MULTI)
+	if (new_type == DLS_PROMISC_MULTI)
 		mptype = MAC_CLIENT_PROMISC_MULTI;
 
-	if (dsp->ds_promisc == 0 && new_flags != 0) {
+	/*
+	 * Look at new flags and figure out the correct mac promisc flags.
+	 * If we've only requested DLS_PROMISC_SAP and not _MULTI or _PHYS,
+	 * don't turn on physical promisc mode.
+	 */
+	if (new_flags & DLS_PROMISC_RX_ONLY)
+		mac_flags |= MAC_PROMISC_FLAGS_NO_TX_LOOP;
+	if (new_type == DLS_PROMISC_SAP)
+		mac_flags |= MAC_PROMISC_FLAGS_NO_PHYS;
+
+	/*
+	 * There are three cases we care about here with respect to MAC. Going
+	 * from nothing to something, something to nothing, something to
+	 * something where we need to change how we're getting stuff from mac.
+	 * In the last case, as long as they're not equal, we need to assume
+	 * something has changed and do something about it.
+	 */
+	if (old_type == 0 && new_type == 0) {
 		/*
-		 * If only DLS_PROMISC_SAP, we don't turn on the
-		 * physical promisc mode
+		 * If there are only option flags in the old and new flags
+		 * then there is no need to talk to MAC. Just update the flags.
 		 */
 		dsp->ds_promisc = new_flags;
+	} else if (old_type == 0 && new_type != 0) {
+		dsp->ds_promisc = new_flags;
 		err = mac_promisc_add(dsp->ds_mch, mptype,
-		    dls_rx_promisc, dsp, &dsp->ds_mph,
-		    (new_flags != DLS_PROMISC_SAP) ? 0 :
-		    MAC_PROMISC_FLAGS_NO_PHYS);
+		    dls_rx_promisc, dsp, &dsp->ds_mph, mac_flags);
 		if (err != 0) {
 			dsp->ds_promisc = old_flags;
 			return (err);
@@ -283,7 +304,7 @@ dls_promisc(dld_str_t *dsp, uint32_t new_flags)
 			mac_promisc_remove(dsp->ds_vlan_mph);
 			dsp->ds_vlan_mph = NULL;
 		}
-	} else if (dsp->ds_promisc != 0 && new_flags == 0) {
+	} else if (old_type != 0 && new_type == 0) {
 		ASSERT(dsp->ds_mph != NULL);
 
 		mac_promisc_remove(dsp->ds_mph);
@@ -298,24 +319,15 @@ dls_promisc(dld_str_t *dsp, uint32_t new_flags)
 			    MAC_CLIENT_PROMISC_ALL, dls_rx_vlan_promisc, dsp,
 			    &dsp->ds_vlan_mph, MAC_PROMISC_FLAGS_NO_PHYS);
 		}
-	} else if (dsp->ds_promisc == DLS_PROMISC_SAP && new_flags != 0 &&
-	    new_flags != dsp->ds_promisc) {
-		/*
-		 * If the old flag is PROMISC_SAP, but the current flag has
-		 * changed to some new non-zero value, we need to turn the
-		 * physical promiscuous mode.
-		 */
+	} else if (new_flags != old_flags) {
 		ASSERT(dsp->ds_mph != NULL);
 		mac_promisc_remove(dsp->ds_mph);
 		/* Honors both after-remove and before-add semantics! */
 		dsp->ds_promisc = new_flags;
 		err = mac_promisc_add(dsp->ds_mch, mptype,
-		    dls_rx_promisc, dsp, &dsp->ds_mph, 0);
+		    dls_rx_promisc, dsp, &dsp->ds_mph, mac_flags);
 		if (err != 0)
 			dsp->ds_promisc = old_flags;
-	} else {
-		/* No adding or removing, but record the new flags anyway. */
-		dsp->ds_promisc = new_flags;
 	}
 
 	return (err);

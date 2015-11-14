@@ -62,7 +62,7 @@ typedef struct dl_ipnetinfo {
 	uint32_t	dli_pktlen;	/* length of dl_ipnetinfo_t */
 	uint32_t	dli_ifindex;
 	uint32_t	dli_grifindex;
-	uint32_t	dli_zsrc; 	/* packet source zone ID (if any) */
+	uint32_t	dli_zsrc;	/* packet source zone ID (if any) */
 	uint32_t	dli_zdst;	/* packet dest zone ID (if any) */
 } dl_ipnetinfo_t;
 
@@ -389,6 +389,7 @@ typedef struct dl_ipnetinfo {
 #define	DL_PROMISC_PHYS		0x01	/* promiscuous mode at phys level */
 #define	DL_PROMISC_SAP		0x02	/* promiscuous mode at sap level */
 #define	DL_PROMISC_MULTI	0x03	/* promiscuous mode for multicast */
+#define	DL_PROMISC_RX_ONLY	0x04	/* above only enabled for rx */
 
 /*
  * DLPI notification codes for DL_NOTIFY_REQ primitives.
