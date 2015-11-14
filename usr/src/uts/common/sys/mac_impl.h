@@ -331,7 +331,7 @@ struct mac_group_s {
 	if ((src_mcip)->mci_state_flags & MCIS_SHARE_BOUND)		\
 		rhandle = (mip)->mi_default_tx_ring;			\
 	if (mip->mi_promisc_list != NULL)				\
-		mac_promisc_dispatch(mip, mp, src_mcip);		\
+		mac_promisc_dispatch(mip, mp, src_mcip, B_TRUE);	\
 	/*								\
 	 * Grab the proper transmit pointer and handle. Special 	\
 	 * optimization: we can test mi_bridge_link itself atomically,	\

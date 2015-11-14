@@ -3263,6 +3263,11 @@ mac_promisc_add(mac_client_handle_t mch, mac_client_promisc_type_t type,
 	mac_cb_info_t	*mcbi;
 	int rc;
 
+	if ((flags & MAC_PROMISC_FLAGS_NO_COPY) &&
+	    (flags & MAC_PROMISC_FLAGS_DO_FIXUPS)) {
+		return (EINVAL);
+	}
+
 	i_mac_perim_enter(mip);
 
 	if ((rc = mac_start((mac_handle_t)mip)) != 0) {
@@ -3309,6 +3314,7 @@ mac_promisc_add(mac_client_handle_t mch, mac_client_promisc_type_t type,
 	mpip->mpi_strip_vlan_tag =
 	    ((flags & MAC_PROMISC_FLAGS_VLAN_TAG_STRIP) != 0);
 	mpip->mpi_no_copy = ((flags & MAC_PROMISC_FLAGS_NO_COPY) != 0);
+	mpip->mpi_do_fixups = ((flags & MAC_PROMISC_FLAGS_DO_FIXUPS) != 0);
 
 	mcbi = &mip->mi_promisc_cb_info;
 	mutex_enter(mcbi->mcbi_lockp);
@@ -3945,14 +3951,21 @@ mac_client_get_effective_resources(mac_client_handle_t mch,
 
 static void
 mac_promisc_dispatch_one(mac_promisc_impl_t *mpip, mblk_t *mp,
-    boolean_t loopback)
+    boolean_t loopback, boolean_t local)
 {
 	mblk_t *mp_copy, *mp_next;
 
-	if (!mpip->mpi_no_copy || mpip->mpi_strip_vlan_tag) {
+	if (!mpip->mpi_no_copy || mpip->mpi_strip_vlan_tag ||
+	    (mpip->mpi_do_fixups && local)) {
 		mp_copy = copymsg(mp);
 		if (mp_copy == NULL)
 			return;
+
+		if (mpip->mpi_do_fixups && local) {
+			mp_copy = mac_fix_cksum(mp_copy);
+			if (mp_copy == NULL)
+				return;
+		}
 
 		if (mpip->mpi_strip_vlan_tag) {
 			mp_copy = mac_strip_vlan_tag_chain(mp_copy);
@@ -4010,7 +4023,7 @@ mac_is_mcast(mac_impl_t *mip, mblk_t *mp)
  */
 void
 mac_promisc_dispatch(mac_impl_t *mip, mblk_t *mp_chain,
-    mac_client_impl_t *sender)
+    mac_client_impl_t *sender, boolean_t local)
 {
 	mac_promisc_impl_t *mpip;
 	mac_cb_t *mcb;
@@ -4050,8 +4063,10 @@ mac_promisc_dispatch(mac_impl_t *mip, mblk_t *mp_chain,
 
 			if (is_sender ||
 			    mpip->mpi_type == MAC_CLIENT_PROMISC_ALL ||
-			    is_mcast)
-				mac_promisc_dispatch_one(mpip, mp, is_sender);
+			    is_mcast) {
+				mac_promisc_dispatch_one(mpip, mp, is_sender,
+				    local);
+			}
 		}
 	}
 	MAC_PROMISC_WALKER_DCR(mip);
@@ -4080,7 +4095,8 @@ mac_promisc_client_dispatch(mac_client_impl_t *mcip, mblk_t *mp_chain)
 			mpip = (mac_promisc_impl_t *)mcb->mcb_objp;
 			if (mpip->mpi_type == MAC_CLIENT_PROMISC_FILTERED &&
 			    !is_mcast) {
-				mac_promisc_dispatch_one(mpip, mp, B_FALSE);
+				mac_promisc_dispatch_one(mpip, mp, B_FALSE,
+				    B_FALSE);
 			}
 		}
 	}

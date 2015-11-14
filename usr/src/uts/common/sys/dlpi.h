@@ -390,6 +390,7 @@ typedef struct dl_ipnetinfo {
 #define	DL_PROMISC_SAP		0x02	/* promiscuous mode at sap level */
 #define	DL_PROMISC_MULTI	0x03	/* promiscuous mode for multicast */
 #define	DL_PROMISC_RX_ONLY	0x04	/* above only enabled for rx */
+#define	DL_PROMISC_FIXUPS	0x05	/* above will be fixed up */
 
 /*
  * DLPI notification codes for DL_NOTIFY_REQ primitives.

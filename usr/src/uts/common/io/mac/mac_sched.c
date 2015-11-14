@@ -2310,7 +2310,7 @@ check_again:
 				if (smcip->mci_mip->mi_promisc_list != NULL) {
 					mutex_exit(lock);
 					mac_promisc_dispatch(smcip->mci_mip,
-					    head, NULL);
+					    head, NULL, B_FALSE);
 					mutex_enter(lock);
 				}
 			}
@@ -4450,8 +4450,10 @@ mac_tx_send(mac_client_handle_t mch, mac_ring_handle_t ring, mblk_t *mp_chain,
 				 * check is done inside the MAC_TX()
 				 * macro.
 				 */
-				if (mip->mi_promisc_list != NULL)
-					mac_promisc_dispatch(mip, mp, src_mcip);
+				if (mip->mi_promisc_list != NULL) {
+					mac_promisc_dispatch(mip, mp, src_mcip,
+					    B_TRUE);
+				}
 
 				do_switch = ((src_mcip->mci_state_flags &
 				    dst_mcip->mci_state_flags &

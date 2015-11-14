@@ -1451,6 +1451,16 @@ copyb(mblk_t *bp)
 	ndp = nbp->b_datap;
 
 	/*
+	 * Copy the various checksum information that came in
+	 * originally.
+	 */
+	ndp->db_cksumstart = dp->db_cksumstart;
+	ndp->db_cksumend = dp->db_cksumend;
+	ndp->db_cksumstuff = dp->db_cksumstuff;
+	bcopy(dp->db_struioun.data, ndp->db_struioun.data,
+	    sizeof (dp->db_struioun.data));
+
+	/*
 	 * Well, here is a potential issue.  If we are trying to
 	 * trace a flow, and we copy the message, we might lose
 	 * information about where this message might have been.

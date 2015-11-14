@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright (c) 2014 Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 /*
@@ -176,7 +176,7 @@
  *   |    +--------------------------+
  *   +--<-| VNS_S_MULTI_PROMISC_SENT |       In this state we verify that we
  *   |    +--------------------------+       have enabled DL_PROMISC_MULTI and
- *   v             |                         move onto the final promiscuous
+ *   v             |                         move onto the second promiscuous
  *   |             |                         mode request.
  *   |             v
  *   |    +----------------------------+
@@ -185,10 +185,19 @@
  *   |             |                         We specifically do this as we don't
  *   v             |                         want to receive our own traffic
  *   |             |                         that we'll send out. We leave this
- *   |             |                         state by requesting the set of
+ *   |             |                         state by enabling the final flag
+ *   |             |                         DL_PROMISC_FIXUPS.
+ *   |             v
+ *   |    +--------------------------+
+ *   +--<-| VNS_S_FIXUP_PROMISC_SENT |       In this state we verify that we
+ *   |    +--------------------------+       enabled FIXUP promiscuous mode.
+ *   |             |                         We specifically do this as we need
+ *   v             |                         to ensure that traffic which is
+ *   |             |                         received by being looped back to us
+ *   |             |                         correctly has checksums fixed. We
+ *   |             |                         leave this state by requesting the
  *   |             |                         dld/dls capabilities that we can
  *   v             |                         process.
- *   |             |
  *   |             v
  *   |    +--------------------+
  *   +--<-| VNS_S_CAPAB_Q_SENT |             We loop over the set of
@@ -932,6 +941,7 @@ typedef enum vnd_str_state {
 	VNS_S_SAP_PROMISC_SENT,
 	VNS_S_MULTI_PROMISC_SENT,
 	VNS_S_RX_ONLY_PROMISC_SENT,
+	VNS_S_FIXUP_PROMISC_SENT,
 	VNS_S_CAPAB_Q_SENT,
 	VNS_S_CAPAB_E_SENT,
 	VNS_S_ONLINE,
@@ -2492,6 +2502,16 @@ vnd_str_state_transition(void *arg)
 		}
 		break;
 	case VNS_S_RX_ONLY_PROMISC_SENT:
+		VERIFY(vsp->vns_dlpi_inc != NULL);
+		if (vnd_st_promisc(vsp) == 0) {
+			if (vnd_st_spromisc(vsp, DL_PROMISC_FIXUPS,
+			    VNS_S_FIXUP_PROMISC_SENT) != 0)
+				died = B_TRUE;
+		} else {
+			died = B_TRUE;
+		}
+		break;
+	case VNS_S_FIXUP_PROMISC_SENT:
 		VERIFY(vsp->vns_dlpi_inc != NULL);
 		if (vnd_st_promisc(vsp) == 0) {
 			if (vnd_st_scapabq(vsp) != 0)
