@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright (c) 2012, 2014 by Delphix. All rights reserved.
+# Copyright (c) 2012, 2015 by Delphix. All rights reserved.
 # Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
 # Copyright 2015, Nexenta Systems Inc. All rights reserved.
 #
@@ -661,6 +661,9 @@ file \
     mode=0555
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zfs_receive/zfs_receive_009_neg \
+    mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/cli_root/zfs_receive/zfs_receive_010_pos \
     mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_rename/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_rename/setup mode=0555
