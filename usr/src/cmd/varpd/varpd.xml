@@ -52,7 +52,7 @@ Copyright 2015, Joyent, Inc.
 
 		<template>
 			<common_name>
-				<loctext xml:lang="C">virutal ARP daemon
+				<loctext xml:lang="C">virtual ARP daemon
 				</loctext>
 			</common_name>
 		</template>
