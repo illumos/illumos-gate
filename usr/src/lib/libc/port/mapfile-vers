@@ -3037,7 +3037,6 @@ $endif
 	_so_shutdown;
 	_so_socket;
 	_so_socketpair;
-	signalfd;
 	str2group;
 	str2passwd;
 	str2spwd;
