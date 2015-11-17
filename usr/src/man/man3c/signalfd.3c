@@ -1,0 +1,192 @@
+.\"
+.\"  This file and its contents are supplied under the terms of the
+.\"  Common Development and Distribution License ("CDDL"), version 1.0.
+.\"  You may only use this file in accordance with the terms of version
+.\"  1.0 of the CDDL.
+.\" 
+.\"  A full copy of the text of the CDDL should have accompanied this
+.\"  source.  A copy of the CDDL is also available via the Internet at
+.\"  http://www.illumos.org/license/CDDL.
+.\"
+.\"  Copyright 2015, Joyent, Inc.
+.\"
+.Dd "Jun 15, 2015"
+.Dt SIGNALFD 3C
+.Os
+.Sh NAME
+.Nm signalfd
+.Nd create or modify a file descriptor for signal handling
+.Sh SYNOPSIS
+.In sys/signalfd.h
+.
+.Ft int
+.Fo signalfd
+.Fa "int fd"
+.Fa "const sigset_t *mask"
+.Fa "int flags"
+.Fc
+.
+.Sh DESCRIPTION
+The
+.Fn signalfd
+function returns a file descriptor that can be used
+for synchronous consumption of signals. The file descriptor can be operated
+upon via
+.Xr read 2
+and the facilities that notify of file descriptor activity (e.g.
+.Xr poll 2 ,
+.Xr port_get 3C ,
+.Xr epoll_wait 3C
+). To dispose of the instance
+.Xr close 2
+should be called on the file descriptor.
+.Pp
+If the
+.Va fd
+argument is -1, a new signalfd file descriptor will be
+returned, otherwise the
+.Va fd
+argument should be an existing signalfd file descriptor whose signal mask will
+be updated.
+.Pp
+The
+.Va mask
+argument specifies the set of signals that are relevant to the file descriptor.
+It may be manipulated with the standard signal set manipulation functions
+documented in
+.Xr sigsetops 3C .
+Signals in the mask which cannot be caught (e.g.
+.Fa SIGKILL )
+are ignored.
+.Pp
+The
+.Va flags
+argument specifies additional parameters for the instance, and can have any of
+the following values:
+.Bl -tag -width Dv
+.It Sy SFD_CLOEXEC
+Instance will be closed upon an
+.Xr exec 2 ;
+see description for
+.Fa O_CLOEXEC
+in
+.Xr open 2 .
+.It Sy SFD_NONBLOCK
+Instance will be set to be non-blocking. A
+.Xr read 2
+on a signalfd instance that has been initialized with
+.Fa SFD_NONBLOCK ,
+or made non-blocking in other ways, will return
+.Er EAGAIN
+in lieu of blocking if there are no signals from the
+.Va mask
+that are pending.
+.El
+.Pp
+As with
+.Xr sigwait 2 ,
+reading a signal from the file descriptor will consume the signal. The signals
+used with signalfd file descriptors are normally first blocked so that their
+handler does not run when a signal arrives. If the signal is not blocked the
+behavior matches that of
+.Xr sigwait 2 ;
+if a
+.Xr read 2
+is pending then the signal is consumed by the read, otherwise the signal is
+consumed by the handler.
+.Pp
+The following operations can be performed upon a signalfd file descriptor:
+.Bl -tag -width Dv
+.It Sy read(2)
+Reads and consumes one or more of the pending signals that match the file
+descriptor's
+.Va mask .
+The read buffer must be large enough to hold one or more
+.Vt signalfd_siginfo
+structures, which is described below.
+.Xr read 2
+will block if there are no matching signals pending, or return
+.Er EAGAIN
+if the instance was created with
+.Fa SFD_NONBLOCK .
+After a
+.Xr fork 2 ,
+if the child reads from the descriptor it will only consume signals from itself.
+.It Sy poll(2)
+Provide notification when one of the signals from the
+.Va mask
+arrives.
+.Fa POLLIN
+and
+.Fa POLLRDNORM
+will be set.
+.It Sy close(2)
+Closes the desriptor.
+.El
+.Pp
+The
+.Vt signalfd_siginfo
+structure returned from
+.Xr read 2
+is a fixed size 128 byte structure defined as follows:
+.Bd -literal
+typedef struct signalfd_siginfo {
+        uint32_t ssi_signo;     /* signal from signal.h */
+        int32_t  ssi_errno;     /* error from errno.h */
+        int32_t  ssi_code;      /* signal code */
+        uint32_t ssi_pid;       /* PID of sender */
+        uint32_t ssi_uid;       /* real UID of sender */
+        int32_t  ssi_fd;        /* file descriptor (SIGIO) */
+        uint32_t ssi_tid;       /* unused */
+        uint32_t ssi_band;      /* band event (SIGIO) */
+        uint32_t ssi_overrun;   /* unused */
+        uint32_t ssi_trapno;    /* trap number that caused signal */
+        int32_t  ssi_status;    /* exit status or signal (SIGCHLD) */
+        int32_t  ssi_int;       /* unused */
+        uint64_t ssi_ptr;       /* unused */
+        uint64_t ssi_utime;     /* user CPU time consumed (SIGCHLD) */
+        uint64_t ssi_stime;     /* system CPU time consumed (SIGCHLD) */
+        uint64_t ssi_addr;      /* address that generated signal */
+        uint8_t  ssi_pad[48];   /* pad size to 128 bytes */
+} signalfd_siginfo_t;
+.Ed
+.Sh RETURN VALUES
+Upon succesful completion, a file descriptor associated with the instance
+is returned. Otherwise, -1 is returned and errno is set to indicate the error.
+When
+.Va fd
+is not -1 and there is no error, the value of
+.Va fd
+is returned.
+.Sh ERRORS
+The
+.Fn signalfd function
+will fail if:
+.Bl -tag -width Er
+.It Er EBADF
+The
+.Va fd
+descriptor is invalid.
+.It Er EFAULT
+The
+.Va mask
+address is invalid.
+.It Er EINVAL
+The
+.Va fd
+descriptor is not a signalfd descriptor or the
+.Va flags
+are invalid.
+.It Er EMFILE
+There are currently
+.Va  OPEN_MAX
+file descriptors open in the calling process.
+.It Er ENODEV
+Unable to allocate state for the file descriptor.
+.El
+.Sh SEE ALSO
+.Xr poll 2 ,
+.Xr sigwait 2 ,
+.Xr sigsetops 3C ,
+.Xr sigwaitinfo 3C ,
+.Xr signal.h 3HEAD

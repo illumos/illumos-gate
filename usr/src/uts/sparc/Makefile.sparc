@@ -239,6 +239,7 @@ DRV_KMODS	+= bridge trill
 DRV_KMODS	+= bpf
 DRV_KMODS	+= dca
 DRV_KMODS	+= eventfd
+DRV_KMODS	+= signalfd
 
 #
 #       Hardware Drivers in common space

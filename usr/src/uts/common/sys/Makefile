@@ -509,6 +509,7 @@ CHKHDRS=			\
 	sid.h			\
 	siginfo.h		\
 	signal.h		\
+	signalfd.h		\
 	skein.h			\
 	sleepq.h		\
 	smbios.h		\

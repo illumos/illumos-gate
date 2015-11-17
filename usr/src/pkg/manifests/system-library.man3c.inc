@@ -406,6 +406,7 @@ file path=usr/share/man/man3c/shm_unlink.3c
 file path=usr/share/man/man3c/sigfpe.3c
 file path=usr/share/man/man3c/siginterrupt.3c
 file path=usr/share/man/man3c/signal.3c
+file path=usr/share/man/man3c/signalfd.3c
 file path=usr/share/man/man3c/sigqueue.3c
 file path=usr/share/man/man3c/sigsetops.3c
 file path=usr/share/man/man3c/sigstack.3c

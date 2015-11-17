@@ -455,6 +455,14 @@ proc_exit(int why, int what)
 		(*dtrace_helpers_cleanup)();
 	}
 
+	/*
+	 * Clean up any signalfd state for the process.
+	 */
+	if (p->p_sigfd != NULL) {
+		VERIFY(sigfd_exit_helper != NULL);
+		(*sigfd_exit_helper)();
+	}
+
 	/* untimeout the realtime timers */
 	if (p->p_itimer != NULL)
 		timer_exit();
