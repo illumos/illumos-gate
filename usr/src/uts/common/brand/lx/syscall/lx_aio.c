@@ -18,14 +18,8 @@
 #include <sys/brand.h>
 
 #include <sys/lx_brand.h>
+#include <sys/lx_syscalls.h>
 
-
-#if defined(_LP64)
-#define	LX_SYS_IO_SETUP		206
-#define	LX_SYS32_IO_SETUP	245
-#else
-#define	LX_SYS_IO_SETUP		245
-#endif
 
 long
 lx_io_setup(unsigned int nr_events, void **ctxp)
@@ -40,11 +34,11 @@ lx_io_setup(unsigned int nr_events, void **ctxp)
 	ttolxlwp(curthread)->br_eosys = JUSTRETURN;
 #if defined(_LP64)
 	if (get_udatamodel() != DATAMODEL_NATIVE) {
-		lx_emulate_user32(ttolwp(curthread), LX_SYS32_IO_SETUP, uargs);
+		lx_emulate_user32(ttolwp(curthread), LX_SYS32_io_setup, uargs);
 	} else
 #endif
 	{
-		lx_emulate_user(ttolwp(curthread), LX_SYS_IO_SETUP, uargs);
+		lx_emulate_user(ttolwp(curthread), LX_SYS_io_setup, uargs);
 	}
 	/* NOTREACHED */
 	return (0);

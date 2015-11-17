@@ -506,6 +506,22 @@ noprod_sys_syscall:
 
 	ENABLE_INTR_FLAGS
 
+	/*
+	 * If our LWP has a branded syscall_fast handler, execute it.  A return
+	 * code of zero indicates that the handler completely processed the syscall
+	 * and we can return directly to userspace.
+	 */
+	movq	LWP_BRAND_SYSCALL_FAST(%r14), %rdi
+	testq	%rdi, %rdi
+	jz	_syscall_no_brand_fast
+	call	*%rdi
+	testl	%eax, %eax
+	jnz	_syscall_no_brand_fast
+	incq	LWP_RU_SYSC(%r14)
+	incq	%gs:CPU_STATS_SYS_SYSCALL
+	jmp	_sys_rtt
+
+_syscall_no_brand_fast:
 	MSTATE_TRANSITION(LMS_USER, LMS_SYSTEM)
 	movl	REGOFF_RAX(%rsp), %eax	/* (%rax damaged by mstate call) */
 
@@ -812,6 +828,22 @@ _syscall32_save:
 
 	ENABLE_INTR_FLAGS
 
+	/*
+	 * If our LWP has a branded syscall_fast handler, execute it.  A return
+	 * code of zero indicates that the handler completely processed the syscall
+	 * and we can return directly to userspace.
+	 */
+	movq	LWP_BRAND_SYSCALL_FAST(%r14), %rdi
+	testq	%rdi, %rdi
+	jz	_syscall32_no_brand_fast
+	call	*%rdi
+	testl	%eax, %eax
+	jnz	_syscall32_no_brand_fast
+	incq	LWP_RU_SYSC(%r14)
+	incq	%gs:CPU_STATS_SYS_SYSCALL
+	jmp	_sys_rtt
+
+_syscall32_no_brand_fast:
 	MSTATE_TRANSITION(LMS_USER, LMS_SYSTEM)
 	movl	REGOFF_RAX(%rsp), %eax	/* (%rax damaged by mstate call) */
 

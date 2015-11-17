@@ -18,16 +18,10 @@
 #include <sys/brand.h>
 
 #include <sys/lx_brand.h>
+#include <sys/lx_syscalls.h>
 
 
 extern int close(int);
-
-#if defined(_LP64)
-#define	LX_SYS_CLOSE	3
-#define	LX_SYS32_CLOSE	6
-#else
-#define	LX_SYS_CLOSE	6
-#endif
 
 long
 lx_close(int fdes)
@@ -52,11 +46,11 @@ lx_close(int fdes)
 	ttolxlwp(curthread)->br_eosys = JUSTRETURN;
 #if defined(_LP64)
 	if (get_udatamodel() != DATAMODEL_NATIVE) {
-		lx_emulate_user32(ttolwp(curthread), LX_SYS32_CLOSE, uargs);
+		lx_emulate_user32(ttolwp(curthread), LX_SYS32_close, uargs);
 	} else
 #endif
 	{
-		lx_emulate_user(ttolwp(curthread), LX_SYS_CLOSE, uargs);
+		lx_emulate_user(ttolwp(curthread), LX_SYS_close, uargs);
 	}
 	/* NOTREACHED */
 	return (0);

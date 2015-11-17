@@ -191,8 +191,18 @@ typedef struct _klwp {
 	struct ct_template *lwp_ct_active[CTT_MAXTYPE]; /* active templates */
 	struct contract	*lwp_ct_latest[CTT_MAXTYPE]; /* last created contract */
 
-	void	*lwp_brand;		/* per-lwp brand data */
-	int	(*lwp_brand_syscall)(void); /* brand syscall interposer */
+	/*
+	 * Branding:
+	 * lwp_brand			- per-lwp brand data
+	 * lwp_brand_syscall		- brand syscall interposer
+	 * lwp_brand_syscall_fast	- brand "fast path" syscall interposer
+	 *
+	 * The lwp_brand_syscall_fast handler should only be used if an
+	 * lwp_brand_syscall handler is also in place.
+	 */
+	void	*lwp_brand;
+	int	(*lwp_brand_syscall)(void);
+	int	(*lwp_brand_syscall_fast)(void);
 
 	struct psinfo *lwp_spymaster;	/* if an agent LWP, our spymaster */
 } klwp_t;
