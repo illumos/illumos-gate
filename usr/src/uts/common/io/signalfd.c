@@ -139,7 +139,6 @@ struct signalfd_state {
  */
 static kmutex_t		signalfd_lock;		/* lock protecting state */
 static dev_info_t	*signalfd_devi;		/* device info */
-static major_t		signalfd_major;
 static id_space_t	*signalfd_minor;	/* minor number arena */
 static void		*signalfd_softstate;	/* softstate pointer */
 static signalfd_state_t	*signalfd_state;	/* global list of state */
@@ -222,7 +221,7 @@ signalfd_wake_list_cleanup(proc_t *p)
 }
 
 static void
-signalfd_exit_helper()
+signalfd_exit_helper(void)
 {
 	proc_t *p = curproc;
 	list_t *lst;
@@ -288,7 +287,7 @@ signalfd_pollwake_cb(void *arg0, int sig)
 	}
 }
 
-/*ARGSUSED*/
+_NOTE(ARGSUSED(1))
 static int
 signalfd_open(dev_t *devp, int flag, int otyp, cred_t *cred_p)
 {
@@ -440,7 +439,7 @@ consume_signal(k_sigset_t set, uio_t *uio, boolean_t block)
  * signal within our specified set is posted. We consume as many available
  * signals within our set as we can.
  */
-/*ARGSUSED*/
+_NOTE(ARGSUSED(2))
 static int
 signalfd_read(dev_t dev, uio_t *uio, cred_t *cr)
 {
@@ -499,7 +498,7 @@ signalfd_sig_pending(proc_t *p, kthread_t *t, k_sigset_t set)
 	    set.__sigbits[2]) & FILLSET2));
 }
 
-/*ARGSUSED*/
+_NOTE(ARGSUSED(4))
 static int
 signalfd_poll(dev_t dev, short events, int anyyet, short *reventsp,
     struct pollhead **phpp)
@@ -559,7 +558,7 @@ signalfd_poll(dev_t dev, short events, int anyyet, short *reventsp,
 	return (0);
 }
 
-/*ARGSUSED*/
+_NOTE(ARGSUSED(4))
 static int
 signalfd_ioctl(dev_t dev, int cmd, intptr_t arg, int md, cred_t *cr, int *rv)
 {
@@ -571,7 +570,8 @@ signalfd_ioctl(dev_t dev, int cmd, intptr_t arg, int md, cred_t *cr, int *rv)
 
 	switch (cmd) {
 	case SIGNALFDIOC_MASK:
-		if (copyin((caddr_t)arg, (caddr_t)&mask, sizeof (sigset_t)))
+		if (ddi_copyin((caddr_t)arg, (caddr_t)&mask, sizeof (sigset_t),
+		    md) != 0)
 			return (set_errno(EFAULT));
 
 		mutex_enter(&state->sfd_lock);
@@ -587,7 +587,7 @@ signalfd_ioctl(dev_t dev, int cmd, intptr_t arg, int md, cred_t *cr, int *rv)
 	return (ENOTTY);
 }
 
-/*ARGSUSED*/
+_NOTE(ARGSUSED(1))
 static int
 signalfd_close(dev_t dev, int flag, int otyp, cred_t *cred_p)
 {
@@ -623,7 +623,6 @@ signalfd_close(dev_t dev, int flag, int otyp, cred_t *cred_p)
 	return (0);
 }
 
-/*ARGSUSED*/
 static int
 signalfd_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 {
@@ -633,12 +632,15 @@ signalfd_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	mutex_enter(&signalfd_lock);
 
 	signalfd_minor = id_space_create("signalfd_minor", 1, L_MAXMIN32 + 1);
-	if (!signalfd_minor)
+	if (signalfd_minor == NULL) {
+		cmn_err(CE_WARN, "signalfd couldn't create id space");
+		mutex_exit(&signalfd_lock);
 		return (DDI_FAILURE);
+	}
 
 	if (ddi_soft_state_init(&signalfd_softstate,
 	    sizeof (signalfd_state_t), 0) != 0) {
-		cmn_err(CE_NOTE, "/dev/signalfd failed to create soft state");
+		cmn_err(CE_WARN, "signalfd failed to create soft state");
 		id_space_destroy(signalfd_minor);
 		mutex_exit(&signalfd_lock);
 		return (DDI_FAILURE);
@@ -655,7 +657,6 @@ signalfd_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 
 	ddi_report_dev(devi);
 	signalfd_devi = devi;
-	signalfd_major = ddi_driver_major(signalfd_devi);
 
 	sigfd_exit_helper = signalfd_exit_helper;
 
@@ -664,16 +665,13 @@ signalfd_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	return (DDI_SUCCESS);
 }
 
-/*ARGSUSED*/
+_NOTE(ARGSUSED(0))
 static int
 signalfd_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
 	switch (cmd) {
 	case DDI_DETACH:
 		break;
-
-	case DDI_SUSPEND:
-		return (DDI_SUCCESS);
 
 	default:
 		return (DDI_FAILURE);
@@ -695,7 +693,7 @@ signalfd_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	return (DDI_SUCCESS);
 }
 
-/*ARGSUSED*/
+_NOTE(ARGSUSED(0))
 static int
 signalfd_info(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg, void **result)
 {

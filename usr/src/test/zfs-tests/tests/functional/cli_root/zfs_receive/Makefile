@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2012, 2015 by Delphix. All rights reserved.
 #
 
 include $(SRC)/Makefile.master
@@ -28,7 +28,8 @@ PROGS = cleanup \
 	zfs_receive_006_pos \
 	zfs_receive_007_neg \
 	zfs_receive_008_pos \
-	zfs_receive_009_neg
+	zfs_receive_009_neg \
+	zfs_receive_010_pos
 
 CMDS = $(PROGS:%=$(TESTDIR)/%)
 $(CMDS) := FILEMODE = 0555
