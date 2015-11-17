@@ -313,6 +313,7 @@ lx_freelwp(klwp_t *lwp)
 	 * Remove our system call interposer.
 	 */
 	lwp->lwp_brand_syscall = NULL;
+	lwp->lwp_brand_syscall_fast = NULL;
 
 	(void) removectx(lwptot(lwp), lwp, lx_save, lx_restore, NULL, NULL,
 	    lx_save, NULL);
@@ -459,9 +460,10 @@ lx_initlwp(klwp_t *lwp, void *lwpbd)
 	    lx_save, NULL);
 
 	/*
-	 * Install branded system call hook for this LWP:
+	 * Install branded system call hooks for this LWP:
 	 */
 	lwp->lwp_brand_syscall = lx_syscall_enter;
+	lwp->lwp_brand_syscall_fast = lx_syscall_fast_enter;
 
 	/*
 	 * The new LWP inherits the parent LWP cgroup ID.

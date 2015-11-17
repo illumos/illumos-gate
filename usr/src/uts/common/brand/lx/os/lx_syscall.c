@@ -519,6 +519,99 @@ lx_vsyscall_iscall(klwp_t *lwp, uintptr_t addr, int *scnum)
 #endif
 
 /*
+ * This function is used to provide a fasttrap-like interface for emulated
+ * syscalls.  By skipping housekeeping such as mstate transitions, it should
+ * cut down on overhead for syscalls which would normally be fasttraps in a
+ * native process.
+ */
+int
+lx_syscall_fast_enter(void)
+{
+	klwp_t *lwp = ttolwp(curthread);
+	lx_lwp_data_t *lwpd = lwptolxlwp(lwp);
+	struct regs *rp = lwptoregs(lwp);
+	int syscall_num, error;
+	lx_sysent_t *s;
+	uintptr_t args[6];
+	long ret = 0;
+
+	/*
+	 * If we got here, we should have an LWP-specific brand data structure.
+	 */
+	VERIFY(lwpd != NULL);
+
+	if (lwpd->br_stack_mode != LX_STACK_MODE_BRAND) {
+		/*
+		 * The lwp is not in in BRAND execution mode, so we return to
+		 * the regular native system call path.
+		 */
+		DTRACE_PROBE(brand__lx__syscall__hook__skip);
+		return (1);
+	}
+	if (lwpd->br_ptrace_tracer != NULL) {
+		/*
+		 * Given that ptrace is the antithesis of "fast", return to the
+		 * regular system call path if we are being traced.
+		 */
+		return (1);
+	}
+
+	syscall_num = (int)rp->r_r0;
+#if defined(_LP64)
+	if (get_udatamodel() != DATAMODEL_NATIVE) {
+		switch (syscall_num) {
+		case LX_SYS32_gettimeofday:
+		case LX_SYS32_time:
+		case LX_SYS32_clock_gettime:
+		case LX_SYS32_getcpu:
+			s = &lx_sysent32[syscall_num];
+			break;
+		default:
+			return (1);
+		}
+	} else
+#endif
+	{
+		switch (syscall_num) {
+		case LX_SYS_gettimeofday:
+		case LX_SYS_time:
+		case LX_SYS_clock_gettime:
+		case LX_SYS_getcpu:
+#if defined(_LP64)
+			s = &lx_sysent64[syscall_num];
+#else
+			s = &lx_sysent32[syscall_num];
+#endif
+			break;
+		default:
+			return (1);
+		}
+	}
+
+	/*
+	 * The above syscall restrictions should ensure that we do not arrive
+	 * at this point without a suitable syscall planned.  Since the
+	 * lx_emulate_args routine can only fail for 6-arg syscalls, none of
+	 * which would be performed as a fasttrap, it is assumed to succeed.
+	 */
+	VERIFY(s->sy_callc != NULL);
+	VERIFY(s->sy_narg < 6);
+	(void) lx_emulate_args(lwp, s, args);
+	lx_trace_sysenter(syscall_num, args);
+	ret = s->sy_callc(args[0], args[1], args[2], args[3], args[4],
+	    args[5]);
+
+	if ((error = lwp->lwp_errno) != 0) {
+		ret = -lx_errno(error, EINVAL);
+		lwp->lwp_errno = 0;
+	}
+	rp->r_r0 = ret;
+	lx_trace_sysreturn(syscall_num, ret);
+	lwp->lwp_eosys = JUSTRETURN;
+	return (0);
+}
+
+/*
  * Linux defines system call numbers for 32-bit x86 in the file:
  *   arch/x86/syscalls/syscall_32.tbl
  */

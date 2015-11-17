@@ -152,6 +152,7 @@ _klwp
 	lwp_procp
 	lwp_brand
 	lwp_brand_syscall
+	lwp_brand_syscall_fast
 	lwp_eosys
 	lwp_regs
 	lwp_arg
