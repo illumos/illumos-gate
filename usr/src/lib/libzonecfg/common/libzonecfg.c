@@ -1130,7 +1130,7 @@ zonecfg_set_sched(zone_dochandle_t handle, char *sched)
  * In general, the operation of this function should succeed or fail as
  * a unit.
  */
-int
+static int
 zonecfg_refresh_index_file(zone_dochandle_t handle)
 {
 	char name[ZONENAME_MAX], zonepath[MAXPATHLEN];
@@ -1151,6 +1151,15 @@ zonecfg_refresh_index_file(zone_dochandle_t handle)
 		return (err);
 	(void) strlcpy(ze.zone_path, zonepath + strlen(zonecfg_root),
 	    sizeof (ze.zone_path));
+
+	if ((err = zonecfg_get_brand(handle, ze.zone_brand,
+	    sizeof (ze.zone_brand))) != 0)
+		return (err);
+
+	if ((err = zonecfg_get_iptype(handle, &ze.zone_iptype)) != Z_OK)
+		return (err);
+
+	ze.zone_did = zonecfg_get_did(handle);
 
 	if (is_renaming(handle)) {
 		opcode = PZE_MODIFY;

@@ -128,6 +128,8 @@ getzoneent_private(FILE *cookie)
 			/* skip comment lines */
 			continue;
 		}
+
+		/* zonename */
 		p = gettok(&cp);
 		if (*p == '\0' || strlen(p) >= ZONENAME_MAX) {
 			/*
@@ -137,6 +139,7 @@ getzoneent_private(FILE *cookie)
 		}
 		(void) strlcpy(ze->zone_name, p, ZONENAME_MAX);
 
+		/* state */
 		p = gettok(&cp);
 		if (*p == '\0') {
 			/* state field should not be empty */
@@ -153,6 +156,7 @@ getzoneent_private(FILE *cookie)
 			continue;
 		}
 
+		/* zonepath */
 		p = gettok(&cp);
 		if (strlen(p) >= MAXPATHLEN) {
 			/* very long paths are not allowed */
@@ -160,9 +164,34 @@ getzoneent_private(FILE *cookie)
 		}
 		(void) strlcpy(ze->zone_path, p, MAXPATHLEN);
 
+		/* uuid */
 		p = gettok(&cp);
 		if (uuid_parse(p, ze->zone_uuid) == -1)
 			uuid_clear(ze->zone_uuid);
+
+		/* brand [optional] */
+		p = gettok(&cp);
+		if (strlen(p) >= MAXNAMELEN) {
+			/* very long names are not allowed */
+			continue;
+		}
+		(void) strlcpy(ze->zone_brand, p, MAXNAMELEN);
+
+		/* IP type [optional] */
+		p = gettok(&cp);
+		if (strlen(p) >= MAXNAMELEN) {
+			/* very long names are not allowed */
+			continue;
+		}
+		ze->zone_iptype = ZS_SHARED;
+		if (*p == 'e') {
+			ze->zone_iptype = ZS_EXCLUSIVE;
+		}
+
+		/* debug ID [optional] */
+		p = gettok(&cp);
+		if (*p != '\0')
+			ze->zone_did = atoi(p);
 
 		break;
 	}
@@ -294,12 +323,14 @@ putzoneent(struct zoneent *ze, zoneent_op_t operation)
 	char buf[MAX_INDEX_LEN];
 	int tmp_file_desc, lock_fd, err;
 	boolean_t exist, need_quotes;
-	char *cp;
+	char *cp, *tmpp;
 	char tmp_path[MAXPATHLEN];
 	char path[MAXPATHLEN];
 	char uuidstr[UUID_PRINTABLE_STRING_LENGTH];
 	size_t namelen;
-	const char *zone_name, *zone_state, *zone_path, *zone_uuid;
+	const char *zone_name, *zone_state, *zone_path, *zone_uuid,
+	    *zone_brand = "", *zone_iptype;
+	zoneid_t zone_did;
 
 	assert(ze != NULL);
 
@@ -352,6 +383,9 @@ putzoneent(struct zoneent *ze, zoneent_op_t operation)
 	exist = B_FALSE;
 	zone_name = ze->zone_name;
 	namelen = strlen(zone_name);
+	zone_brand = ze->zone_brand;
+	zone_iptype = (ze->zone_iptype == ZS_SHARED ? "sh" : "ex");
+	zone_did = ze->zone_did;
 	for (;;) {
 		if (fgets(buf, sizeof (buf), index_file) == NULL) {
 			if (operation == PZE_ADD && !exist) {
@@ -406,6 +440,11 @@ putzoneent(struct zoneent *ze, zoneent_op_t operation)
 		}
 		zone_path = gettok(&cp);
 		zone_uuid = gettok(&cp);
+		zone_brand = gettok(&cp);
+		zone_iptype = gettok(&cp);
+		tmpp = gettok(&cp);
+		if (*tmpp != '\0')
+			zone_did = atoi(tmpp);
 
 		switch (operation) {
 		case PZE_ADD:
@@ -434,6 +473,21 @@ putzoneent(struct zoneent *ze, zoneent_op_t operation)
 				uuid_unparse(ze->zone_uuid, uuidstr);
 				zone_uuid = uuidstr;
 			}
+
+			/* If a brand is supplied, use it. */
+			if (ze->zone_brand[0] != '\0') {
+				zone_brand = ze->zone_brand;
+
+				/*
+				 * Since the brand, iptype and did are optional,
+				 * we we only reset the iptype and did if the
+				 * brand is provided.
+				 */
+				zone_iptype = (ze->zone_iptype == ZS_SHARED ?
+				    "sh" : "ex");
+				zone_did = ze->zone_did;
+			}
+
 			break;
 
 		case PZE_REMOVE:
@@ -465,9 +519,17 @@ putzoneent(struct zoneent *ze, zoneent_op_t operation)
 		 * method for escaping them.
 		 */
 		need_quotes = (strchr(zone_path, ':') != NULL);
-		(void) fprintf(tmp_file, "%s:%s:%s%s%s:%s\n", zone_name,
-		    zone_state, need_quotes ? "\"" : "", zone_path,
-		    need_quotes ? "\"" : "", zone_uuid);
+
+		if (*zone_brand != '\0') {
+			(void) fprintf(tmp_file, "%s:%s:%s%s%s:%s:%s:%s:%d\n",
+			    zone_name, zone_state, need_quotes ? "\"" : "",
+			    zone_path, need_quotes ? "\"" : "", zone_uuid,
+			    zone_brand, zone_iptype, zone_did);
+		} else {
+			(void) fprintf(tmp_file, "%s:%s:%s%s%s:%s\n", zone_name,
+			    zone_state, need_quotes ? "\"" : "", zone_path,
+			    need_quotes ? "\"" : "", zone_uuid);
+		}
 		exist = B_TRUE;
 	}
 

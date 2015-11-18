@@ -107,9 +107,6 @@ typedef struct zone_entry {
 
 #define	CLUSTER_BRAND_NAME	"cluster"
 
-static zone_entry_t *zents;
-static size_t nzents;
-
 #define	LOOPBACK_IF	"lo0"
 #define	SOCKET_AF(af)	(((af) == AF_UNSPEC) ? AF_INET : (af))
 
@@ -408,19 +405,6 @@ zerror(const char *fmt, ...)
 	va_end(alist);
 }
 
-static void *
-safe_calloc(size_t nelem, size_t elsize)
-{
-	void *r = calloc(nelem, elsize);
-
-	if (r == NULL) {
-		zerror(gettext("failed to allocate %lu bytes: %s"),
-		    (ulong_t)nelem * elsize, strerror(errno));
-		exit(Z_ERR);
-	}
-	return (r);
-}
-
 static void
 zone_print(zone_entry_t *zent, boolean_t verbose, boolean_t parsable)
 {
@@ -492,6 +476,9 @@ lookup_zone_info(const char *zone_name, zoneid_t zid, zone_entry_t *zent)
 	(void) strlcpy(zent->zbrand, "???", sizeof (zent->zbrand));
 	zent->zstate_str = "???";
 
+	if (strcmp(zone_name, GLOBAL_ZONENAME) == 0)
+		zid = zent->zdid = GLOBAL_ZONEID;
+
 	zent->zid = zid;
 
 	if (zonecfg_get_uuid(zone_name, uuid) == Z_OK &&
@@ -536,8 +523,8 @@ lookup_zone_info(const char *zone_name, zoneid_t zid, zone_entry_t *zent)
 	zent->zstate_str = zone_state_str(zent->zstate_num);
 
 	/*
-	 * A zone's brand is only available in the .xml file describing it,
-	 * which is only visible to the global zone.  This causes
+	 * A zone's brand might only be available in the .xml file describing
+	 * it, which is only visible to the global zone.  This causes
 	 * zone_get_brand() to fail when called from within a non-global
 	 * zone.  Fortunately we only do this on labeled systems, where we
 	 * know all zones are native.
@@ -607,165 +594,63 @@ lookup_zone_info(const char *zone_name, zoneid_t zid, zone_entry_t *zent)
 	return (Z_OK);
 }
 
-/*
- * fetch_zents() calls zone_list(2) to find out how many zones are running
- * (which is stored in the global nzents), then calls zone_list(2) again
- * to fetch the list of running zones (stored in the global zents).  This
- * function may be called multiple times, so if zents is already set, we
- * return immediately to save work.
- *
- * Note that the data about running zones can change while this function
- * is running, so its possible that the list of zones will have empty slots
- * at the end.
- */
-
-static int
-fetch_zents(void)
-{
-	zoneid_t *zids = NULL;
-	uint_t nzents_saved;
-	int i, retv;
-	FILE *fp;
-	boolean_t inaltroot;
-	zone_entry_t *zentp;
-	const char *altroot;
-
-	if (nzents > 0)
-		return (Z_OK);
-
-	if (zone_list(NULL, &nzents) != 0) {
-		zperror(gettext("failed to get zoneid list"), B_FALSE);
-		return (Z_ERR);
-	}
-
-again:
-	if (nzents == 0)
-		return (Z_OK);
-
-	zids = safe_calloc(nzents, sizeof (zoneid_t));
-	nzents_saved = nzents;
-
-	if (zone_list(zids, &nzents) != 0) {
-		zperror(gettext("failed to get zone list"), B_FALSE);
-		free(zids);
-		return (Z_ERR);
-	}
-	if (nzents != nzents_saved) {
-		/* list changed, try again */
-		free(zids);
-		goto again;
-	}
-
-	zents = safe_calloc(nzents, sizeof (zone_entry_t));
-
-	inaltroot = zonecfg_in_alt_root();
-	if (inaltroot) {
-		fp = zonecfg_open_scratch("", B_FALSE);
-		altroot = zonecfg_get_root();
-	} else {
-		fp = NULL;
-	}
-	zentp = zents;
-	retv = Z_OK;
-	for (i = 0; i < nzents; i++) {
-		char name[ZONENAME_MAX];
-		char altname[ZONENAME_MAX];
-		char rev_altroot[MAXPATHLEN];
-
-		if (getzonenamebyid(zids[i], name, sizeof (name)) < 0) {
-			/*
-			 * There is a race condition where the zone may have
-			 * shutdown since we retrieved the number of running
-			 * zones above.  This is not an error, there will be
-			 * an empty slot at the end of the list.
-			 */
-			continue;
-		}
-		if (zonecfg_is_scratch(name)) {
-			/* Ignore scratch zones by default */
-			if (!inaltroot)
-				continue;
-			if (fp == NULL ||
-			    zonecfg_reverse_scratch(fp, name, altname,
-			    sizeof (altname), rev_altroot,
-			    sizeof (rev_altroot)) == -1) {
-				zerror(gettext("could not resolve scratch "
-				    "zone %s"), name);
-				retv = Z_ERR;
-				continue;
-			}
-			/* Ignore zones in other alternate roots */
-			if (strcmp(rev_altroot, altroot) != 0)
-				continue;
-			(void) strcpy(name, altname);
-		} else {
-			/* Ignore non-scratch when in an alternate root */
-			if (inaltroot && strcmp(name, GLOBAL_ZONENAME) != 0)
-				continue;
-		}
-		if (lookup_zone_info(name, zids[i], zentp) != Z_OK) {
-			/*
-			 * There is a race condition where the zone may have
-			 * shutdown since we retrieved the number of running
-			 * zones above.  This is not an error, there will be
-			 * an empty slot at the end of the list.
-			 */
-			continue;
-		}
-		zentp++;
-	}
-	nzents = zentp - zents;
-	if (fp != NULL)
-		zonecfg_close_scratch(fp);
-
-	free(zids);
-	return (retv);
-}
-
 static int
 zone_print_list(zone_state_t min_state, boolean_t verbose, boolean_t parsable)
 {
-	int i;
 	zone_entry_t zent;
 	FILE *cookie;
-	char *name;
+	struct zoneent *ze;
 
 	/*
-	 * First get the list of running zones from the kernel and print them.
-	 * If that is all we need, then return.
-	 */
-	if ((i = fetch_zents()) != Z_OK) {
-		/*
-		 * No need for error messages; fetch_zents() has already taken
-		 * care of this.
-		 */
-		return (i);
-	}
-	for (i = 0; i < nzents; i++)
-		zone_print(&zents[i], verbose, parsable);
-	if (min_state >= ZONE_STATE_RUNNING)
-		return (Z_OK);
-	/*
-	 * Next, get the full list of zones from the configuration, skipping
-	 * any we have already printed.
+	 * Get the full list of zones from the configuration.
 	 */
 	cookie = setzoneent();
-	while ((name = getzoneent(cookie)) != NULL) {
-		for (i = 0; i < nzents; i++) {
-			if (strcmp(zents[i].zname, name) == 0)
-				break;
+	while ((ze = getzoneent_private(cookie)) != NULL) {
+		char *name = ze->zone_name;
+		zoneid_t zid;
+
+		zid = getzoneidbyname(name);
+
+		if (ze->zone_brand[0] == '\0') {
+			/* old, incomplete index entry */
+			if (lookup_zone_info(name, zid, &zent) != Z_OK) {
+				free(ze);
+				continue;
+			}
+		} else {
+			/* new, full index entry */
+			(void) strlcpy(zent.zname, name, sizeof (zent.zname));
+			(void) strlcpy(zent.zroot, ze->zone_path,
+			    sizeof (zent.zroot));
+			uuid_unparse(ze->zone_uuid, zent.zuuid);
+			(void) strlcpy(zent.zbrand, ze->zone_brand,
+			    sizeof (zent.zbrand));
+			zent.ziptype = ze->zone_iptype;
+			zent.zdid = ze->zone_did;
+			zent.zid = zid;
+
+			if (zid != -1) {
+				int err;
+
+				err = zone_get_state(name,
+				    (zone_state_t *)&ze->zone_state);
+				if (err != Z_OK) {
+					errno = err;
+					zperror2(name, gettext("could not get "
+					    "state"));
+					free(ze);
+					continue;
+				}
+			}
+
+			zent.zstate_num = ze->zone_state;
+			zent.zstate_str = zone_state_str(zent.zstate_num);
 		}
-		if (i < nzents) {
-			free(name);
-			continue;
-		}
-		if (lookup_zone_info(name, ZONE_ID_UNDEFINED, &zent) != Z_OK) {
-			free(name);
-			continue;
-		}
-		free(name);
+
 		if (zent.zstate_num >= min_state)
 			zone_print(&zent, verbose, parsable);
+
+		free(ze);
 	}
 	endzoneent(cookie);
 	return (Z_OK);
@@ -1641,10 +1526,10 @@ auth_check(char *user, char *zone, int cmd_num)
  *     not already running (or ready).
  */
 static int
-sanity_check(char *zone, int cmd_num, boolean_t running,
+sanity_check(char *zone, int cmd_num, boolean_t need_running,
     boolean_t unsafe_when_running, boolean_t force)
 {
-	zone_entry_t *zent;
+	boolean_t is_running = B_FALSE;
 	priv_set_t *privset;
 	zone_state_t state, min_state;
 	char kernzone[ZONENAME_MAX];
@@ -1715,51 +1600,54 @@ sanity_check(char *zone, int cmd_num, boolean_t running,
 	}
 
 	if (!zonecfg_in_alt_root()) {
-		zent = lookup_running_zone(zone);
-	} else if ((fp = zonecfg_open_scratch("", B_FALSE)) == NULL) {
-		zent = NULL;
-	} else {
-		if (zonecfg_find_scratch(fp, zone, zonecfg_get_root(),
-		    kernzone, sizeof (kernzone)) == 0)
-			zent = lookup_running_zone(kernzone);
-		else
-			zent = NULL;
+		/* Avoid the xml read overhead of lookup_running_zone */
+		if (getzoneidbyname(zone) != -1)
+			is_running = B_TRUE;
+
+	} else if ((fp = zonecfg_open_scratch("", B_FALSE)) != NULL) {
+		if (zonecfg_find_scratch(fp, zone, zonecfg_get_root(), kernzone,
+		    sizeof (kernzone)) == 0 && getzoneidbyname(kernzone) != -1)
+			is_running = B_TRUE;
+
 		zonecfg_close_scratch(fp);
 	}
 
 	/*
 	 * Look up from the kernel for 'running' zones.
 	 */
-	if (running && !force) {
-		if (zent == NULL) {
+	if (need_running && !force) {
+		if (!is_running) {
 			zerror(gettext("not running"));
 			return (Z_ERR);
 		}
 	} else {
 		int err;
 
-		if (unsafe_when_running && zent != NULL) {
+		err = zone_get_state(zone, &state);
+
+		if (unsafe_when_running && is_running) {
 			/* check whether the zone is ready or running */
-			if ((err = zone_get_state(zent->zname,
-			    &zent->zstate_num)) != Z_OK) {
+			char *zstate_str;
+
+			if (err != Z_OK) {
 				errno = err;
-				zperror2(zent->zname,
-				    gettext("could not get state"));
+				zperror2(zone, gettext("could not get state"));
 				/* can't tell, so hedge */
-				zent->zstate_str = "ready/running";
+				zstate_str = "ready/running";
 			} else {
-				zent->zstate_str =
-				    zone_state_str(zent->zstate_num);
+				zstate_str = zone_state_str(state);
 			}
 			zerror(gettext("%s operation is invalid for %s zones."),
-			    cmd_to_str(cmd_num), zent->zstate_str);
+			    cmd_to_str(cmd_num), zstate_str);
 			return (Z_ERR);
 		}
-		if ((err = zone_get_state(zone, &state)) != Z_OK) {
+
+		if (err != Z_OK) {
 			errno = err;
 			zperror2(zone, gettext("could not get state"));
 			return (Z_ERR);
 		}
+
 		switch (cmd_num) {
 		case CMD_UNINSTALL:
 			if (state == ZONE_STATE_CONFIGURED) {
@@ -2832,9 +2720,8 @@ static boolean_t
 verify_fix_did(zone_dochandle_t handle)
 {
 	zoneid_t mydid;
-	zone_entry_t zent;
+	struct zoneent *ze;
 	FILE *cookie;
-	char *name;
 	boolean_t fix = B_FALSE;
 
 	mydid = zonecfg_get_did(handle);
@@ -2845,20 +2732,34 @@ verify_fix_did(zone_dochandle_t handle)
 
 	/* Get the full list of zones from the configuration. */
 	cookie = setzoneent();
-	while ((name = getzoneent(cookie)) != NULL) {
-		if (strcmp(target_zone, name) == 0) {
-			free(name);
-			break;	/* Once we find our entry, stop. */
-		}
+	while ((ze = getzoneent_private(cookie)) != NULL) {
+		char *name;
+		zoneid_t did;
 
-		if (strcmp(name, "global") == 0 ||
-		    lookup_zone_info(name, ZONE_ID_UNDEFINED, &zent) != Z_OK) {
-			free(name);
+		name = ze->zone_name;
+		if (strcmp(name, GLOBAL_ZONENAME) == 0 ||
+		    strcmp(name, target_zone) == 0) {
+			free(ze);
 			continue;
 		}
 
-		free(name);
-		if (zent.zdid == mydid) {
+		if (ze->zone_brand[0] == '\0') {
+			/* old, incomplete index entry */
+			zone_entry_t zent;
+
+			if (lookup_zone_info(name, ZONE_ID_UNDEFINED,
+			    &zent) != Z_OK) {
+				free(ze);
+				continue;
+			}
+			did = zent.zdid;
+		} else {
+			/* new, full index entry */
+			did = ze->zone_did;
+		}
+		free(ze);
+
+		if (did == mydid) {
 			fix = B_TRUE;
 			break;
 		}
