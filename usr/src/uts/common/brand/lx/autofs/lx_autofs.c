@@ -477,6 +477,8 @@ lx_autofs_fifo_lookup(pid_t pgrp, int fd, file_t **fpp_wr, file_t **fpp_rd)
 	 */
 	vp_rd = lx_autofs_fifo_peer_vp(fp_wr->f_vnode);
 	for (i = 0; i < fip->fi_nfiles; i++) {
+		if (i == fd)
+			continue;
 		UF_ENTER(ufp_rd, fip, i);
 		if (((fp_rd = ufp_rd->uf_file) != NULL) &&
 		    (fp_rd->f_vnode == vp_rd))
