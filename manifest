@@ -12053,8 +12053,10 @@ f usr/share/man/man1m/netstrategy.1m 0444 root bin
 f usr/share/man/man1m/newaliases.1m 0444 root bin
 f usr/share/man/man1m/newfs.1m 0444 root bin
 f usr/share/man/man1m/newkey.1m 0444 root bin
+f usr/share/man/man1m/nfs4cbd.1m 0444 root bin
 f usr/share/man/man1m/nfsd.1m 0444 root bin
 f usr/share/man/man1m/nfslogd.1m 0444 root bin
+f usr/share/man/man1m/nfsmapid.1m 0444 root bin
 f usr/share/man/man1m/nfsstat.1m 0444 root bin
 f usr/share/man/man1m/nlsadmin.1m 0444 root bin
 f usr/share/man/man1m/nscd.1m 0444 root bin
@@ -12146,6 +12148,7 @@ f usr/share/man/man1m/snoop.1m 0444 root bin
 f usr/share/man/man1m/soconfig.1m 0444 root bin
 f usr/share/man/man1m/sppptun.1m 0444 root bin
 f usr/share/man/man1m/spray.1m 0444 root bin
+f usr/share/man/man1m/statd.1m 0444 root bin
 f usr/share/man/man1m/stmfadm.1m 0444 root bin
 f usr/share/man/man1m/stmsboot.1m 0444 root bin
 f usr/share/man/man1m/strace.1m 0444 root bin
