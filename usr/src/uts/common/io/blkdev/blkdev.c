@@ -1819,6 +1819,16 @@ bd_attach_handle(dev_info_t *dip, bd_handle_t hdl)
 	dev_info_t	*child;
 	bd_drive_t	drive = { 0 };
 
+	/*
+	 * It's not an error if bd_attach_handle() is called on a handle that
+	 * already is attached. We just ignore the request to attach and return.
+	 * This way drivers using blkdev don't have to keep track about blkdev
+	 * state, they can just call this function to make sure it attached.
+	 */
+	if (hdl->h_child != NULL) {
+		return (DDI_SUCCESS);
+	}
+
 	/* if drivers don't override this, make it assume none */
 	drive.d_lun = -1;
 	hdl->h_ops.o_drive_info(hdl->h_private, &drive);
@@ -1882,6 +1892,12 @@ bd_detach_handle(bd_handle_t hdl)
 	int	rv;
 	char	*devnm;
 
+	/*
+	 * It's not an error if bd_detach_handle() is called on a handle that
+	 * already is detached. We just ignore the request to detach and return.
+	 * This way drivers using blkdev don't have to keep track about blkdev
+	 * state, they can just call this function to make sure it detached.
+	 */
 	if (hdl->h_child == NULL) {
 		return (DDI_SUCCESS);
 	}
