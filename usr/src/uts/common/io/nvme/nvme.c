@@ -1448,7 +1448,7 @@ nvme_get_logpage(nvme_t *nvme, uint8_t logpage, ...)
 
 	va_end(ap);
 
-	getlogpage.b.lp_numd = bufsize / sizeof (uint32_t);
+	getlogpage.b.lp_numd = bufsize / sizeof (uint32_t) - 1;
 
 	cmd->nc_sqe.sqe_cdw10 = getlogpage.r;
 
