@@ -1761,8 +1761,9 @@ nvme_init(nvme_t *nvme)
 	dev_err(nvme->n_dip, CE_CONT, "?NVMe spec version %d.%d",
 	    vs.b.vs_mjr, vs.b.vs_mnr);
 
-	if (nvme_version_major < vs.b.vs_mjr &&
-	    nvme_version_minor < vs.b.vs_mnr) {
+	if (nvme_version_major < vs.b.vs_mjr ||
+	    (nvme_version_major == vs.b.vs_mjr &&
+	    nvme_version_minor < vs.b.vs_mnr)) {
 		dev_err(nvme->n_dip, CE_WARN, "!no support for version > %d.%d",
 		    nvme_version_major, nvme_version_minor);
 		if (nvme->n_strict_version)
