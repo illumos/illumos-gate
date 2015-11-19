@@ -1,0 +1,48 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2015 Alexander Pyhalov
+#
+
+set name=pkg.fmri value=pkg:/service/network/ssh-common@$(PKGVERS)
+set name=pkg.description \
+    value="Provides configuration files and server support for the Secure Shell (SSH) service which creates RSA and DSA host keys if they are not available and start or stop the sshd (Secure Shell daemon)."
+set name=pkg.summary \
+    value="Secure Shell (SSH) service and configuration files"
+set name=info.classification \
+    value=org.opensolaris.category.2008:System/Security
+set name=variant.arch value=$(ARCH)
+dir path=etc group=sys
+dir path=etc/ssh group=sys
+dir path=lib
+dir path=lib/svc
+dir path=lib/svc/manifest group=sys
+dir path=lib/svc/manifest/network group=sys
+dir path=lib/svc/method
+dir path=usr group=sys
+dir path=usr/share/man
+dir path=usr/share/man/man4
+file path=etc/ssh/moduli group=sys preserve=true
+file path=etc/ssh/ssh_config group=sys \
+    original_name=network/ssh:etc/ssh/ssh_config preserve=true
+file path=etc/ssh/sshd_config group=sys \
+    original_name=service/network/ssh:etc/ssh/sshd_config preserve=true
+file path=lib/svc/manifest/network/ssh.xml group=sys mode=0444
+file path=lib/svc/method/sshd mode=0555
+file path=usr/share/man/man4/ssh_config.sunssh.4
+file path=usr/share/man/man4/sshd_config.sunssh.4
+license usr/src/cmd/ssh/THIRDPARTYLICENSE \
+    license=usr/src/cmd/ssh/THIRDPARTYLICENSE
+link path=usr/share/man/man4/ssh_config.4 mediator=ssh \
+    mediator-implementation=sunssh target=ssh_config.sunssh.4
+link path=usr/share/man/man4/sshd_config.4 mediator=ssh \
+    mediator-implementation=sunssh target=sshd_config.sunssh.4

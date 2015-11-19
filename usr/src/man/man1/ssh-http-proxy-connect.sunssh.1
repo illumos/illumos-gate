@@ -1,73 +1,65 @@
 '\" te
-.\" Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved
+.\" Copyright (c) 2001, Sun Microsystems, Inc.  All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SSH-SOCKS5-PROXY-CONNECT 1 "Oct 30, 2002"
+.TH SSH-HTTP-PROXY-CONNECT 1 "Oct 24, 2001"
 .SH NAME
-ssh-socks5-proxy-connect \- Secure Shell proxy for SOCKS5
+ssh-http-proxy-connect \- Secure Shell proxy for HTTP
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/lib/ssh/ssh-socks5-proxy-connect\fR
-     [\fB-h\fR \fIsocks5_proxy_host\fR]
-     [\fB-p\fR \fIsocks5_proxy_port\fR] \fIconnect_host\fR \fIconnect_port\fR
+\fB/usr/lib/ssh/ssh-http-proxy-connect\fR [\fB-h\fR \fIhttp_proxy_host\fR]
+     [\fB-p\fR \fIhttp_proxy_port\fR] \fIconnect_host\fR \fIconnect_port\fR
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
-A proxy command for \fBssh\fR(1) that uses SOCKS5 (RFC 1928). Typical use is
-where connections external to a network are only allowed via a socks gateway
-server.
-.sp
-.LP
-This proxy command does not provide any of the SOCKS5 authentication mechanisms
-defined in RFC 1928. Only anonymous connections are possible.
+A proxy command for \fBssh\fR(1) that uses HTTP CONNECT. Typical use is where
+connections external to a network are only allowed via a proxy web server.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
 .ne 2
 .na
-\fB\fB-h\fR \fIsocks5_proxy_host\fR\fR
+\fB\fB-h\fR \fIhttp_proxy_host\fR\fR
 .ad
-.RS 24n
+.RS 22n
 Specifies the proxy web server through which to connect. Overrides the
-\fBSOCKS5_SERVER\fR environment variable.
+\fBHTTPPROXY\fR and \fBhttp_proxy\fR environment variables if they are set.
 .RE
 
 .sp
 .ne 2
 .na
-\fB\fB-p\fR \fIsocks5_proxy_port\fR\fR
+\fB\fB-p\fR \fIhttp_proxy_port\fR\fR
 .ad
-.RS 24n
+.RS 22n
 Specifies the port on which the proxy web server runs. If not specified, port
-80 is assumed. Overrides the \fBSOCKS5_PORT\fR environment variable.
+80 is assumed. Overrides the \fBHTTPPROXYPORT\fR and \fBhttp_proxy\fR
+environment variables if they are set.
 .RE
 
 .SH OPERANDS
-.sp
 .LP
 The following operands are supported:
 .sp
 .ne 2
 .na
-\fB\fIsocks5_proxy_host\fR\fR
+\fB\fIhttp_proxy_host\fR\fR
 .ad
-.RS 21n
+.RS 19n
 The host name or IP address (IPv4 or IPv6) of the proxy.
 .RE
 
 .sp
 .ne 2
 .na
-\fB\fIsocks5_proxy_port\fR\fR
+\fB\fIhttp_proxy_port\fR\fR
 .ad
-.RS 21n
-The numeric port number to connect to on \fIsocks5_proxy_host\fR.
+.RS 19n
+The numeric port number to connect to on \fIhttp_proxy_host\fR.
 .RE
 
 .sp
@@ -75,8 +67,8 @@ The numeric port number to connect to on \fIsocks5_proxy_host\fR.
 .na
 \fB\fIconnect_host\fR\fR
 .ad
-.RS 21n
-The name of the remote host to which the socks gateway is to connect you.
+.RS 19n
+The name of the remote host to which the proxy web server is to connect you.
 .RE
 
 .sp
@@ -84,13 +76,12 @@ The name of the remote host to which the socks gateway is to connect you.
 .na
 \fB\fIconnect_port\fR\fR
 .ad
-.RS 21n
-The numeric port number of the socks gateway to connect you to on
-\fIconnect_host\fR.
+.RS 19n
+The numeric port number of the proxy web server to connect you to on
+\fIhttp_proxy_host\fR.
 .RE
 
 .SH EXAMPLES
-.sp
 .LP
 The recommended way to use a proxy connection command is to configure the
 \fBProxyCommand\fR in \fBssh_config\fR(4) (see Example 1 and Example 2).
@@ -100,14 +91,14 @@ running \fBssh\fR(1).
 \fBExample 1 \fRSetting the proxy from the environment
 .sp
 .LP
-The following example uses \fBssh-socks5-proxy-connect\fR in
-\fBssh_config\fR(4) when the proxy is set from the environment:
+The following example uses \fBssh-http-proxy-connect\fR in \fBssh_config\fR(4)
+when the proxy is set from the environment:
 
 .sp
 .in +2
 .nf
 \fBHost playtime.foo.com
-    ProxyCommand /usr/lib/ssh/ssh-socks5-proxy-connect \e
+    ProxyCommand /usr/lib/ssh/ssh-http-proxy-connect \e
         playtime.foo.com 22\fR
 .fi
 .in -2
@@ -117,15 +108,15 @@ The following example uses \fBssh-socks5-proxy-connect\fR in
 \fBExample 2 \fROverriding proxy environment variables
 .sp
 .LP
-The following example uses \fBssh-socks5-proxy-connect\fR in
-\fBssh_config\fR(4) to override (or if not set) proxy environment variables:
+The following example uses \fBssh-http-proxy-connect\fR in \fBssh_config\fR(4)
+to override (or if not set) proxy environment variables:
 
 .sp
 .in +2
 .nf
 \fBHost playtime.foo.com
-    ProxyCommand /usr/lib/ssh/ssh-socks5-proxy-connect -h socks-gw \e
-        -p 1080 playtime.foo.com 22\fR
+    ProxyCommand /usr/lib/ssh/ssh-http-proxy-connect -h webcache \e
+        -p 8080 playtime.foo.com 22\fR
 .fi
 .in -2
 .sp
@@ -134,39 +125,48 @@ The following example uses \fBssh-socks5-proxy-connect\fR in
 \fBExample 3 \fRUsing the command line
 .sp
 .LP
-The following example uses \fBssh-socks5-proxy-connect\fR from the \fBssh\fR(1)
+The following example uses \fBssh-http-proxy-connect\fR from the \fBssh\fR(1)
 command line:
 
 .sp
 .in +2
 .nf
-example$ \fBssh -o'ProxyCommand=/usr/lib/ssh/ssh-socks5-proxy-connect \e
-    -h socks-gw -p 1080 playtime.foo.com 22' playtime.foo.com\fR
+example$ \fBssh -o'ProxyCommand="/usr/lib/ssh/ssh-http-proxy-connect \e
+    -h webcache -p 8080 playtime.foo.com 22"' playtime.foo.com\fR
 .fi
 .in -2
 .sp
 
 .SH ENVIRONMENT VARIABLES
-.sp
 .ne 2
 .na
-\fB\fBSOCKS5_SERVER\fR\fR
+\fB\fBHTTPPROXY\fR\fR
 .ad
 .RS 17n
-Takes \fIsocks5_proxy_host\fR operand to specify the default proxy host.
+Takes the \fIhttp_proxy_host\fR operand to specify the default proxy host.
+Overrides \fBhttp_proxy\fR if both are set.
 .RE
 
 .sp
 .ne 2
 .na
-\fB\fBSOCKS5_PORT\fR\fR
+\fB\fBHTTPPROXYPORT\fR\fR
 .ad
 .RS 17n
-Takes \fIsocks5_proxy_port \fR operand to specify the default proxy port.
+Takes the \fIhttp_proxy_port\fR operand to specify the default proxy port.
+Ignored if \fBHTTPPROXY\fR is not set.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBhttp_proxy\fR\fR
+.ad
+.RS 17n
+\fBURL\fR format for specifying proxy host and port.
 .RE
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -188,7 +188,6 @@ An error occurred.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -204,7 +203,6 @@ Interface Stability	Stable
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBssh\fR(1), \fBssh-http-proxy-connect\fR(1), \fBssh_config\fR(4),
+\fBssh\fR(1), \fBssh-socks5-proxy-connect\fR(1), \fBssh_config\fR(4),
 \fBattributes\fR(5)

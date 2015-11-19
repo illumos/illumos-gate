@@ -30,7 +30,7 @@ include ../Makefile.ssh-common
 
 SSHASKPASS=	$(ROOTLIBSSH)/ssh-askpass
 ETCSSHDIR=	$(ROOTETC)/ssh
-DIRS=		$(ETCSSHDIR) $(ROOTLIBSSH)
+DIRS=		$(ETCSSHDIR) $(ROOTLIBSSH) $(ROOTLIBSUNSSH)
 
 FILES= sshd_config ssh_config moduli
 

@@ -25,8 +25,7 @@
 
 PROG= ssh-keysign
 
-DIRS= $(ROOTLIBSSH)
-
+DIRS= $(ROOTLIBSSH) $(ROOTLIBSUNSSH)
 
 OBJS	= ssh-keysign.o
 SRCS	= $(OBJS:.o=.c)

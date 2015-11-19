@@ -22,8 +22,6 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # cmd/ssh/scp/Makefile
 
 PROG= scp
@@ -34,6 +32,8 @@ SRCS	= $(OBJS:.o=.c)
 
 include ../../Makefile.cmd
 include ../Makefile.ssh-common
+
+DIRS= $(ROOTLIBSUNSSH)
 
 LDLIBS += $(SSH_COMMON_LDLIBS) -lsocket
 
@@ -48,6 +48,12 @@ all: $(PROG)
 $(PROG): $(OBJS) ../libssh/$(MACH)/libssh.a ../libopenbsd-compat/$(MACH)/libopenbsd-compat.a
 	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
+
+$(DIRS):
+	$(INS.dir)
+
+$(ROOTBIN)/scp: $(ROOTLIBSUNSSH)/scp
+	-$(RM) $@; $(SYMLINK) ../lib/sunssh/scp $@
 
 install: all $(ROOTPROG)
 

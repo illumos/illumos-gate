@@ -12,7 +12,6 @@ ssh-add \- add RSA or DSA identities to the authentication agent
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBssh-add\fR utility adds \fBRSA\fR or \fBDSA\fR identities to the
 authentication agent, \fBssh-agent\fR(1). When run without arguments, it
@@ -26,7 +25,6 @@ The passphrase is read from the user's tty or by running the program defined in
 .LP
 The authentication agent must be running.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -96,7 +94,6 @@ Unlocks the agent.
 .RE
 
 .SH ENVIRONMENT VARIABLES
-.sp
 .ne 2
 .na
 \fB\fBDISPLAY\fR\fR
@@ -126,7 +123,6 @@ Identifies the path of a unix-domain socket used to communicate with the agent.
 .RE
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -148,7 +144,6 @@ An error occurred.
 .RE
 
 .SH FILES
-.sp
 .LP
 These files should not be readable by anyone but the user. Notice that
 \fBssh-add\fR ignores a file if it is accessible by others. It is possible to
@@ -230,7 +225,6 @@ Contains the default value for SSH_ASKPASS.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -246,7 +240,6 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBssh\fR(1), \fBssh-agent\fR(1), \fBssh-keygen\fR(1), \fBsshd\fR(1M),
 \fBattributes\fR(5)
