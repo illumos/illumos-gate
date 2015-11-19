@@ -14,7 +14,6 @@ ssh-keyscan \- gather public ssh host keys of a number of hosts
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBssh-keyscan\fR is a utility for gathering the public ssh host keys of a
 number of hosts. It was designed to aid in building and verifying
@@ -30,7 +29,6 @@ down or do not run ssh. For scanning, one does not need login access to the
 machines that are being scanned, nor does the scanning process involve any
 encryption.
 .SS "File Format"
-.sp
 .LP
 Input format:
 .sp
@@ -66,7 +64,6 @@ Output format for \fBrsa\fR and \fBdsa\fR keys, where \fIkeytype\fR is either
 .sp
 
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -141,7 +138,6 @@ Forces to use IPv6 addresses only.
 .RE
 
 .SH SECURITY
-.sp
 .LP
 If a \fBssh_known_hosts\fR file is constructed using \fBssh-keyscan\fR without
 verifying the keys, users are vulnerable to man-in-the-middle attacks. If the
@@ -181,7 +177,6 @@ $ ssh-keyscan -t rsa,dsa -f ssh_hosts | \e
 .sp
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/ssh_known_hosts\fR \fR
@@ -191,7 +186,6 @@ $ ssh-keyscan -t rsa,dsa -f ssh_hosts | \e
 .RE
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -214,7 +208,6 @@ Usage error.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -230,16 +223,13 @@ Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBssh\fR(1), \fBsshd\fR(1M), \fBattributes\fR(5)
 .SH AUTHORS
-.sp
 .LP
 David Mazieres wrote the initial version, and Wayne Davison added suppport for
 protocol version 2.
 .SH BUGS
-.sp
 .LP
 \fBssh\(emkeyscan\fR generates
 .sp

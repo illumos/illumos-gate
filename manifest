@@ -11728,14 +11728,16 @@ f usr/share/man/man1/runat.1 0444 root bin
 f usr/share/man/man1/rup.1 0444 root bin
 f usr/share/man/man1/ruptime.1 0444 root bin
 f usr/share/man/man1/rusers.1 0444 root bin
-f usr/share/man/man1/scp.1 0444 root bin
+s usr/share/man/man1/scp.1=scp.sunssh.1
+f usr/share/man/man1/scp.sunssh.1 0444 root bin
 f usr/share/man/man1/script.1 0444 root bin
 f usr/share/man/man1/sdiff.1 0444 root bin
 f usr/share/man/man1/sed.1 0444 root bin
 f usr/share/man/man1/setfacl.1 0444 root bin
 f usr/share/man/man1/setpgrp.1 0444 root bin
 s usr/share/man/man1/settime.1=touch.1
-f usr/share/man/man1/sftp.1 0444 root bin
+s usr/share/man/man1/sftp.1=sftp.sunssh.1
+f usr/share/man/man1/sftp.sunssh.1 0444 root bin
 s usr/share/man/man1/sh.1=ksh93.1
 f usr/share/man/man1/shcomp.1 0444 root bin
 f usr/share/man/man1/size.1 044 root bin
@@ -12130,7 +12132,8 @@ f usr/share/man/man1m/savecore.1m 0444 root bin
 f usr/share/man/man1m/sbdadm.1m 0444 root bin
 f usr/share/man/man1m/sendmail.1m 0444 root bin
 f usr/share/man/man1m/setuname.1m 0444 root bin
-f usr/share/man/man1m/sftp-server.1m 0444 root bin
+s usr/share/man/man1m/sftp-server.1m=sftp-server.sunssh.1m
+f usr/share/man/man1m/sftp-server.sunssh.1m 0444 root bin
 f usr/share/man/man1m/share.1m 0444 root bin
 f usr/share/man/man1m/share_nfs.1m 0444 root bin
 f usr/share/man/man1m/shareall.1m 0444 root bin

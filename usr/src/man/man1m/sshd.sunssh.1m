@@ -14,7 +14,6 @@ sshd \- secure shell daemon
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBsshd\fR (Secure Shell daemon) is the daemon program for \fBssh\fR(1).
 Together these programs replace \fBrlogin\fR and \fBrsh\fR, and provide secure
@@ -37,7 +36,6 @@ instructions in \fBsshd_config\fR(4).
 Support for v1 is provided to help sites with existing \fBssh\fR v1 clients and
 servers to transition to v2. v1 might not be supported in a future release.
 .SS "SSH Protocol Version 1"
-.sp
 .LP
 Each host has a host-specific RSA key (normally 1024 bits) used to identify the
 host. Additionally, when the daemon starts, it generates a server RSA key
@@ -68,7 +66,6 @@ System security is not improved unless \fBrshd\fR(1M), \fBrlogind\fR(1M),
 \fBrexecd\fR(1M), and \fBrexd\fR(1M) are disabled (thus completely disabling
 \fBrlogin\fR(1) and \fBrsh\fR(1) into the machine).
 .SS "SSH Protocol Version 2"
-.sp
 .LP
 Version 2 works similarly to version 1: Each host has a host-specific DSA/RSA
 key. However, when the daemon starts, it does not generate a server key.
@@ -85,7 +82,6 @@ Protocol version 2 provides a public key based user authentication method
 authentication, and a generic prompt/reply protocol for password-based
 authentication.
 .SS "Command Execution and Data Forwarding"
-.sp
 .LP
 If the client successfully authenticates itself, a dialog for preparing the
 session is entered. At this time the client can request things like allocating
@@ -113,7 +109,6 @@ options override values specified in the configuration file.
 \fBSIGHUP\fR, by executing itself with the name it was started as, that is,
 \fB/usr/lib/ssh/sshd\fR.
 .SS "Host Access Control"
-.sp
 .LP
 The \fBsshd\fR daemon uses TCP Wrappers to restrict access to hosts. It uses
 the service name of \fBsshd\fR for \fBhosts_access()\fR. For more information
@@ -122,7 +117,6 @@ are part of the \fBSUNWsfman\fR package (they are not SunOS man pages). TCP
 wrappers binaries, including \fBlibwrap\fR, are in \fBSUNWtcpd\fR, a required
 package for \fBSUNWsshdu\fR, the package containing \fBsshd\fR.
 .SH OPTIONS
-.sp
 .LP
 The options for \fBsshd\fR are as follows:
 .sp
@@ -308,7 +302,6 @@ Forces \fBsshd\fR to use IPv6 addresses only.
 
 .SH EXTENDED DESCRIPTION
 .SS "\fBauthorized_keys\fR File Format"
-.sp
 .LP
 The \fB$HOME/.ssh/authorized_keys\fR file lists the public keys that are
 permitted for RSA authentication in protocol version 1 and for public key
@@ -482,7 +475,6 @@ or addresses.
 .RE
 
 .SS "\fBssh_known_hosts\fR File Format"
-.sp
 .LP
 The \fB/etc/ssh/ssh_known_hosts\fR and \fB$HOME/.ssh/known_hosts\fR files
 contain host public keys for all known hosts. The global file should be
@@ -556,7 +548,6 @@ definitely not type in the host keys by hand. Rather, generate them by a script
 or by taking \fB/etc/ssh/ssh_host_rsa_key.pub\fR and adding the host names at
 the front.
 .SH ENVIRONMENT VARIABLES
-.sp
 .LP
 \fBsshd\fR sets the following environment variables for commands executed by
 \fBssh\fR users:
@@ -752,7 +743,6 @@ Set to the name of the user logging in.
 Additionally, \fBsshd\fR reads \fB$HOME/.ssh/environment\fR and adds lines of
 the format \fBVARNAME=\fIvalue\fR\fR to the environment.
 .SH EXAMPLES
-.sp
 .LP
 In the following examples, certain lines might wrap due to line length limits
 in your display. You should nevertheless consider the wrapped line as a single
@@ -822,7 +812,6 @@ closenet,closenet.hut.fi,...,130.233.208.41 ssh-rsa AA..8= closenet.hut.fi
 .sp
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -844,7 +833,6 @@ An error occurred.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/default/login\fR\fR
@@ -1207,7 +1195,6 @@ and should be world-readable.
 .RE
 
 .SH SECURITY
-.sp
 .LP
 \fBsshd\fR supports the use of several user authentication mechanisms: a public
 key system where keys are associated with users (through users'
@@ -1302,7 +1289,6 @@ if \fBpam_acct_mgmt()\fR once again returns \fBPAM_NEW_AUTHTOK_REQD\fR. By this
 means, administrators are able to control what authentication methods are
 allowed for SSHv2 on a per-user basis.
 .SS "Setting up Host-based Authentication"
-.sp
 .LP
 To establish host-based authentication, you must perform the following steps:
 .RS +4
@@ -1395,7 +1381,6 @@ For the vast majority of network environments, \fB\&.shosts\fR is preferred
 over \fB\&.rhosts\fR.
 .RE
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -1414,7 +1399,6 @@ Interface Stability	Evolving
 .LP
 The interface stability of \fB/etc/ssh/moduli\fR is Private.
 .SH SEE ALSO
-.sp
 .LP
 \fBlogin\fR(1), \fBscp\fR(1), \fBssh\fR(1), \fBssh-add\fR(1),
 \fBssh-agent\fR(1), \fBssh-keygen\fR(1), \fBsvcs\fR(1),
@@ -1426,7 +1410,6 @@ The interface stability of \fB/etc/ssh/moduli\fR is Private.
 .LP
 \fI\fR
 .SH NOTES
-.sp
 .LP
 The \fBsshd\fR service is managed by the service management facility,
 \fBsmf\fR(5), under the service identifier:
