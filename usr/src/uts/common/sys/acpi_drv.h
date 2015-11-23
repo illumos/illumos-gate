@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2015 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
+ */
+
 #ifndef _ACPI_DRV_H
 #define	_ACPI_DRV_H
 
@@ -230,6 +234,23 @@ struct acpi_drv_output_status {
 
 #define	ACPI_DRV_OK			0
 #define	ACPI_DRV_ERR			-1
+
+#ifdef _KERNEL
+
+#define	MINOR_SHIFT			8
+#define	IDX_MASK			((1 << MINOR_SHIFT) - 1)
+#define	MINOR_BATT(idx)			(ACPI_DRV_TYPE_CBAT << MINOR_SHIFT | \
+					(idx))
+#define	MINOR_AC(idx)			(ACPI_DRV_TYPE_AC << MINOR_SHIFT | \
+					(idx))
+#define	MINOR_LID(idx)			(ACPI_DRV_TYPE_LID << MINOR_SHIFT | \
+					(idx))
+#define	MINOR_HOTKEY(idx)		(ACPI_DRV_TYPE_HOTKEY << MINOR_SHIFT \
+					| (idx))
+#define	MINOR2IDX(minor)		((minor) & IDX_MASK)
+#define	MINOR2TYPE(minor)		((minor) >> MINOR_SHIFT)
+
+#endif /* _KERNEL */
 
 #ifdef	__cplusplus
 }
