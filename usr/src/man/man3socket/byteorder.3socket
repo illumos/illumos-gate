@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH BYTEORDER 3SOCKET "Sep 10, 2008"
+.TH BYTEORDER 3SOCKET "Nov 23, 2015"
 .SH NAME
 byteorder, htonl, htonll, htons, ntohl, ntohll, ntohs \- convert values between
 host and network byte order
@@ -36,7 +36,7 @@ host and network byte order
 
 .LP
 .nf
-\fBuint64_t\fR \fBntonll\fR(\fBuint64_t\fR \fIhostlonglong\fR);
+\fBuint64_t\fR \fBntohll\fR(\fBuint64_t\fR \fIhostlonglong\fR);
 .fi
 
 .LP
@@ -45,7 +45,6 @@ host and network byte order
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 These functions convert 16-bit, 32-bit, and 64-bit quantities between network
 byte order and host byte order. On some architectures these routines are
@@ -58,7 +57,6 @@ These functions are most often used in conjunction with Internet addresses and
 ports as returned by \fBgethostent()\fR and \fBgetservent()\fR. See
 \fBgethostbyname\fR(3NSL) and \fBgetservbyname\fR(3SOCKET).
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -74,7 +72,6 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBgethostbyname\fR(3NSL), \fBgetservbyname\fR(3SOCKET), \fBinet.h\fR(3HEAD),
 \fBattributes\fR(5)
