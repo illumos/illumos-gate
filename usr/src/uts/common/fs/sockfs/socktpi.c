@@ -166,6 +166,8 @@ extern int do_useracc;
 extern clock_t sock_test_timelimit;
 #endif /* SOCK_TEST */
 
+extern uint32_t ucredsize;
+
 /*
  * Some X/Open added checks might have to be backed out to keep SunOS 4.X
  * applications working. Turn on this flag to disable these checks.
@@ -3752,6 +3754,13 @@ sosend_dgramcmsg(struct sonode *so, struct sockaddr *name, socklen_t namelen,
 		error = fdbuf_create(fds, fdlen, &fdbuf);
 		if (error)
 			return (error);
+
+		/*
+		 * Pre-allocate enough additional space for lower level modules
+		 * to append an option (e.g. see tl_unitdata). The following
+		 * is enough extra space for the largest option we might append.
+		 */
+		size += sizeof (struct T_opthdr) + ucredsize;
 		mp = fdbuf_allocmsg(size, fdbuf);
 	} else {
 		mp = soallocproto(size, _ALLOC_INTR, CRED());
@@ -3794,8 +3803,10 @@ sosend_dgramcmsg(struct sonode *so, struct sockaddr *name, socklen_t namelen,
 	}
 	ASSERT(mp->b_wptr <= mp->b_datap->db_lim);
 	so_cmsg2opt(control, controllen, !(flags & MSG_XPG4_2), mp);
-	/* At most 3 bytes left in the message */
-	ASSERT(MBLKL(mp) > (ssize_t)(size - __TPI_ALIGN_SIZE));
+	/*
+	 * Normally at most 3 bytes left in the message, but we might have
+	 * allowed for extra space if we're passing fd's through.
+	 */
 	ASSERT(MBLKL(mp) <= (ssize_t)size);
 
 	ASSERT(mp->b_wptr <= mp->b_datap->db_lim);
@@ -3885,6 +3896,14 @@ sosend_svccmsg(struct sonode *so, struct uio *uiop, int more, void *control,
 			error = fdbuf_create(fds, fdlen, &fdbuf);
 			if (error)
 				return (error);
+
+			/*
+			 * Pre-allocate enough additional space for lower level
+			 * modules to append an option (e.g. see tl_unitdata).
+			 * The following is enough extra space for the largest
+			 * option we might append.
+			 */
+			size += sizeof (struct T_opthdr) + ucredsize;
 			mp = fdbuf_allocmsg(size, fdbuf);
 		} else {
 			mp = soallocproto(size, _ALLOC_INTR, CRED());
@@ -3910,8 +3929,10 @@ sosend_svccmsg(struct sonode *so, struct uio *uiop, int more, void *control,
 			ASSERT(__TPI_TOPT_ISALIGNED(mp->b_wptr));
 		}
 		so_cmsg2opt(control, controllen, !(flags & MSG_XPG4_2), mp);
-		/* At most 3 bytes left in the message */
-		ASSERT(MBLKL(mp) > (ssize_t)(size - __TPI_ALIGN_SIZE));
+		/*
+		 * Normally at most 3 bytes left in the message, but we might
+		 * have allowed for extra space if we're passing fd's through.
+		 */
 		ASSERT(MBLKL(mp) <= (ssize_t)size);
 
 		ASSERT(mp->b_wptr <= mp->b_datap->db_lim);
