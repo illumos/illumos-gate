@@ -23,7 +23,7 @@
  * Copyright (c) 2013 Gary Mills
  *
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright 2015, Joyent, Inc.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -551,6 +551,8 @@ static time_t	init_boot_time;		/* Substitute for kernel boot time. */
 
 #define	NSTARTD_FAILURE_TIMES	3		/* trigger after 3 failures */
 #define	STARTD_FAILURE_RATE_NS	5000000000LL	/* 1 failure/5 seconds */
+#define	STARTD_THROTTLE_RETRY	60	/* space failure retry after 60 secs */
+#define	ROOT_MIN_FREE		524288	/* 512KB min. space needed in root */
 
 static hrtime_t	startd_failure_time[NSTARTD_FAILURE_TIMES];
 static uint_t	startd_failure_index;
@@ -4466,6 +4468,28 @@ startd_run(const char *cline, int tmpl, ctid_t old_ctid)
 
 	if (pid == 0) {
 		/* child */
+		struct statvfs64 sbuf;
+
+		/*
+		 * svc.configd needs some space (a few hundred KB) in / for its
+		 * database. One common cause for startd failure is when
+		 * configd dies because / is full. We don't want to go into the
+		 * fast restart loop (startd_failure_rate_critical) and enter
+		 * maintenance so we check for this case and slow down the
+		 * failure rate so as to keep retrying in the hope space will
+		 * free up.
+		 */
+		if (statvfs64("/", &sbuf) != -1 &&
+		    (sbuf.f_bsize * sbuf.f_bfree) < ROOT_MIN_FREE) {
+			syslog(LOG_ERR, "Insufficent space (%ld) in / to "
+			    "start svc.startd.\n",
+			    (long)(sbuf.f_bsize * sbuf.f_bfree));
+			console(B_TRUE, "Insufficent space (%ld) in / to "
+			    "start svc.startd.\n",
+			    (long)(sbuf.f_bsize * sbuf.f_bfree));
+			sleep(STARTD_THROTTLE_RETRY);
+			exit(1);
+		}
 
 		/* See the comment in efork() */
 		for (i = SIGHUP; i <= SIGRTMAX; ++i) {
