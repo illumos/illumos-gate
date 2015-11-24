@@ -23,6 +23,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2015, Joyent, Inc.
+ */
+
 
 /*
  *	dosys.cc
@@ -47,6 +51,7 @@
 #include <sys/wait.h>		/* wait() */
 #include <ulimit.h>		/* ulimit() */
 #include <unistd.h>		/* close(), dup2() */
+#include <stdlib.h>		/* closefrom() */
 #include <libintl.h>
 
 /*
@@ -85,16 +90,10 @@ my_open(const char *path, int oflag, mode_t mode) {
  */
 void
 redirect_io(char *stdout_file, char *stderr_file)
-{        
-	long		descriptor_limit;
-	int		i;
+{
+	int	i;
 
-	if ((descriptor_limit = ulimit(UL_GDESLIM)) < 0) {
-		fatal_mksh(gettext("ulimit() failed: %s"), errmsg(errno));
-	}
-	for (i = 3; i < descriptor_limit; i++) {
-		(void) close(i);
-	}
+	(void) closefrom(3);
 	if ((i = my_open(stdout_file,
 	         O_WRONLY | O_CREAT | O_TRUNC | O_DSYNC,
 	         S_IREAD | S_IWRITE)) < 0) {

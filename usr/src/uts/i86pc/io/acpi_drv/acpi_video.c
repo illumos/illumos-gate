@@ -21,6 +21,9 @@
 /*
  *  Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+/*
+ * Copyright 2015 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
+ */
 
 /*
  * Solaris x86 Generic ACPI Video Extensions Hotkey driver
@@ -831,6 +834,14 @@ hotkey_init(hotkey_drv_t *htkp)
 		modp->mod_loadflags |= MOD_NOAUTOUNLOAD;
 		mutex_exit(&mod_lock);
 		mod_release_mod(modp);
+	}
+
+	/* Create minor node for hotkey device. */
+	if (ddi_create_minor_node(htkp->dip, "hotkey", S_IFCHR,
+	    MINOR_HOTKEY(0), DDI_PSEUDO, 0) == DDI_FAILURE) {
+		if (hotkey_drv_debug & HOTKEY_DBG_WARN)
+			cmn_err(CE_WARN, "hotkey: minor node create failed");
+		goto fail;
 	}
 
 	return (ACPI_DRV_OK);

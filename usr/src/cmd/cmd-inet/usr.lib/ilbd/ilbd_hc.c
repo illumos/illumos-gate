@@ -1264,7 +1264,9 @@ static boolean_t
 ilbd_run_probe(ilbd_hc_srv_t *srv)
 {
 	posix_spawn_file_actions_t	fd_actions;
+	boolean_t			init_fd_actions = B_FALSE;
 	posix_spawnattr_t		attr;
+	boolean_t			init_attr = B_FALSE;
 	sigset_t			child_sigset;
 	int				fds[2];
 	int				fdflags;
@@ -1299,10 +1301,12 @@ ilbd_run_probe(ilbd_hc_srv_t *srv)
 		logdebug("ilbd_run_probe: posix_spawn_file_actions_init");
 		goto cleanup;
 	}
+	init_fd_actions = B_TRUE;
 	if (posix_spawnattr_init(&attr) != 0) {
 		logdebug("ilbd_run_probe: posix_spawnattr_init");
 		goto cleanup;
 	}
+	init_attr = B_TRUE;
 	if (posix_spawn_file_actions_addclose(&fd_actions, fds[0]) != 0) {
 		logdebug("ilbd_run_probe: posix_spawn_file_actions_addclose");
 		goto cleanup;
@@ -1356,7 +1360,6 @@ ilbd_run_probe(ilbd_hc_srv_t *srv)
 	}
 
 	(void) close(fds[1]);
-	destroy_argv(child_argv);
 	srv->shc_child_pid = pid;
 	srv->shc_child_fd = fds[0];
 	srv->shc_ev = probe_ev;
@@ -1375,12 +1378,19 @@ ilbd_run_probe(ilbd_hc_srv_t *srv)
 		goto cleanup;
 	}
 
+	destroy_argv(child_argv);
+	(void) posix_spawn_file_actions_destroy(&fd_actions);
+	(void) posix_spawnattr_destroy(&attr);
 	return (B_TRUE);
 
 cleanup:
+	destroy_argv(child_argv);
+	if (init_fd_actions == B_TRUE)
+		(void) posix_spawn_file_actions_destroy(&fd_actions);
+	if (init_attr == B_TRUE)
+		(void) posix_spawnattr_destroy(&attr);
 	(void) close(fds[0]);
 	(void) close(fds[1]);
-	destroy_argv(child_argv);
 	if (probe_ev != NULL)
 		free(probe_ev);
 	return (B_FALSE);

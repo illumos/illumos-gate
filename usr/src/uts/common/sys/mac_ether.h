@@ -21,6 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2015 Garrett D'Amore <garrett@damore.org>
  */
 
 #ifndef	_SYS_MAC_ETHER_H
@@ -105,9 +107,26 @@ enum ether_stat {
 	ETHER_STAT_CAP_10GFDX,
 	ETHER_STAT_ADV_CAP_10GFDX,
 	ETHER_STAT_LP_CAP_10GFDX,
+
+	ETHER_STAT_CAP_40GFDX,
+	ETHER_STAT_ADV_CAP_40GFDX,
+	ETHER_STAT_LP_CAP_40GFDX,
+
+	ETHER_STAT_CAP_100GFDX,
+	ETHER_STAT_ADV_CAP_100GFDX,
+	ETHER_STAT_LP_CAP_100GFDX,
+
+	ETHER_STAT_CAP_2500FDX,
+	ETHER_STAT_ADV_CAP_2500FDX,
+	ETHER_STAT_LP_CAP_2500FDX,
+
+	ETHER_STAT_CAP_5000FDX,
+	ETHER_STAT_ADV_CAP_5000FDX,
+	ETHER_STAT_LP_CAP_5000FDX,
 };
 
-#define	ETHER_NSTAT	(ETHER_STAT_LP_CAP_10GFDX - ETHER_STAT_ALIGN_ERRORS + 1)
+#define	ETHER_NSTAT	\
+	(ETHER_STAT_LP_CAP_5000FDX - ETHER_STAT_ALIGN_ERRORS + 1)
 
 #define	ETHER_STAT_ISACOUNTER(_ether_stat)				\
 	    ((_ether_stat) == ETHER_STAT_ALIGN_ERRORS ||		\
@@ -124,52 +143,6 @@ enum ether_stat {
 		(_ether_stat) == ETHER_STAT_TOOSHORT_ERRORS ||		\
 		(_ether_stat) == ETHER_STAT_JABBER_ERRORS ||		\
 		(_ether_stat) == ETHER_STAT_MACRCV_ERRORS)
-
-/*
- * Some drivers have a need to determine if a particular stat is a MII/GMII
- * physical layer 802.3 stat.
- */
-#define	ETHER_STAT_ISMII(_ether_stat)					\
-	((_ether_stat) == ETHER_STAT_XCVR_ADDR ||			\
-	    (_ether_stat) == ETHER_STAT_XCVR_ID ||			\
-	    (_ether_stat) == ETHER_STAT_XCVR_INUSE ||			\
-	    (_ether_stat) == ETHER_STAT_CAP_1000FDX ||			\
-	    (_ether_stat) == ETHER_STAT_CAP_1000HDX ||			\
-	    (_ether_stat) == ETHER_STAT_CAP_100FDX ||			\
-	    (_ether_stat) == ETHER_STAT_CAP_100HDX ||			\
-	    (_ether_stat) == ETHER_STAT_CAP_10FDX ||			\
-	    (_ether_stat) == ETHER_STAT_CAP_10HDX ||			\
-	    (_ether_stat) == ETHER_STAT_CAP_ASMPAUSE ||			\
-	    (_ether_stat) == ETHER_STAT_CAP_PAUSE ||			\
-	    (_ether_stat) == ETHER_STAT_CAP_AUTONEG ||			\
-	    (_ether_stat) == ETHER_STAT_CAP_REMFAULT ||			\
-	    (_ether_stat) == ETHER_STAT_CAP_100T4 ||			\
-	    (_ether_stat) == ETHER_STAT_ADV_CAP_1000FDX ||		\
-	    (_ether_stat) == ETHER_STAT_ADV_CAP_1000HDX ||		\
-	    (_ether_stat) == ETHER_STAT_ADV_CAP_100FDX ||		\
-	    (_ether_stat) == ETHER_STAT_ADV_CAP_100HDX ||		\
-	    (_ether_stat) == ETHER_STAT_ADV_CAP_10FDX ||		\
-	    (_ether_stat) == ETHER_STAT_ADV_CAP_10HDX ||		\
-	    (_ether_stat) == ETHER_STAT_ADV_CAP_ASMPAUSE ||		\
-	    (_ether_stat) == ETHER_STAT_ADV_CAP_PAUSE ||		\
-	    (_ether_stat) == ETHER_STAT_ADV_CAP_AUTONEG ||		\
-	    (_ether_stat) == ETHER_STAT_ADV_REMFAULT ||			\
-	    (_ether_stat) == ETHER_STAT_ADV_CAP_100T4 ||		\
-	    (_ether_stat) == ETHER_STAT_LP_CAP_1000FDX ||		\
-	    (_ether_stat) == ETHER_STAT_LP_CAP_1000HDX ||		\
-	    (_ether_stat) == ETHER_STAT_LP_CAP_100FDX ||		\
-	    (_ether_stat) == ETHER_STAT_LP_CAP_100HDX ||		\
-	    (_ether_stat) == ETHER_STAT_LP_CAP_10FDX ||			\
-	    (_ether_stat) == ETHER_STAT_LP_CAP_10HDX ||			\
-	    (_ether_stat) == ETHER_STAT_LP_CAP_ASMPAUSE ||		\
-	    (_ether_stat) == ETHER_STAT_LP_CAP_PAUSE ||			\
-	    (_ether_stat) == ETHER_STAT_LP_CAP_AUTONEG ||		\
-	    (_ether_stat) == ETHER_STAT_LP_REMFAULT ||			\
-	    (_ether_stat) == ETHER_STAT_LP_CAP_100T4 ||			\
-	    (_ether_stat) == ETHER_STAT_LINK_ASMPAUSE ||		\
-	    (_ether_stat) == ETHER_STAT_LINK_PAUSE ||			\
-	    (_ether_stat) == ETHER_STAT_LINK_AUTONEG ||			\
-	    (_ether_stat) == ETHER_STAT_LINK_DUPLEX)
 
 #endif	/* _KERNEL */
 

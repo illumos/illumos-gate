@@ -324,6 +324,7 @@ DRV_KMODS	+= sd
 DRV_KMODS	+= sdhost
 DRV_KMODS	+= sgen
 DRV_KMODS	+= si3124
+DRV_KMODS	+= signalfd
 DRV_KMODS	+= smbios
 DRV_KMODS	+= skd
 DRV_KMODS	+= softmac

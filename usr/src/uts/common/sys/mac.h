@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2015 Garrett D'Amore <garrett@damore.org>
  */
 
 #ifndef	_SYS_MAC_H
@@ -214,6 +215,14 @@ typedef enum {
 	MAC_PROP_MAX_TXHWCLNT_AVAIL,
 	MAC_PROP_IB_LINKMODE,
 	MAC_PROP_SECONDARY_ADDRS,
+	MAC_PROP_ADV_40GFDX_CAP,
+	MAC_PROP_EN_40GFDX_CAP,
+	MAC_PROP_ADV_100GFDX_CAP,
+	MAC_PROP_EN_100GFDX_CAP,
+	MAC_PROP_ADV_2500FDX_CAP,
+	MAC_PROP_EN_2500FDX_CAP,
+	MAC_PROP_ADV_5000FDX_CAP,
+	MAC_PROP_EN_5000FDX_CAP,
 	MAC_PROP_PRIVATE = -1
 } mac_prop_id_t;
 

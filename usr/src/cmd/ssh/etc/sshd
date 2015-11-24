@@ -73,8 +73,11 @@ create_ipf_rules()
 case $1 in 
 	# sysidconfig/sys-unconfig arguments (-c and -u)
 '-c')
-	create_key $SSHDIR/ssh_host_rsa_key rsa
-	create_key $SSHDIR/ssh_host_dsa_key dsa
+	/usr/bin/ssh-keygen -A
+	if [ $? -ne 0 ]; then
+		create_key $SSHDIR/ssh_host_rsa_key rsa
+		create_key $SSHDIR/ssh_host_dsa_key dsa
+	fi
 	;;
 
 '-u')
@@ -95,8 +98,11 @@ case $1 in
 	# them; sysidconfig is not run in every situation (such as on
 	# the install media).
 	# 
-	create_key $SSHDIR/ssh_host_rsa_key rsa
-	create_key $SSHDIR/ssh_host_dsa_key dsa
+	/usr/bin/ssh-keygen -A
+	if [ $? -ne 0 ]; then
+		create_key $SSHDIR/ssh_host_rsa_key rsa
+		create_key $SSHDIR/ssh_host_dsa_key dsa
+	fi
 
 	/usr/lib/ssh/sshd
 	;;

@@ -411,6 +411,7 @@ MANFILES= 	__fbufsize.3c					\
 	 	sigfpe.3c					\
 	 	siginterrupt.3c					\
 	 	signal.3c					\
+		signalfd.3c					\
 	 	sigqueue.3c					\
 	 	sigsetops.3c					\
 	 	sigstack.3c					\
