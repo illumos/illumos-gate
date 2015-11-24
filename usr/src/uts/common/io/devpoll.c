@@ -670,15 +670,26 @@ dpwrite(dev_t dev, struct uio *uiop, cred_t *credp)
 
 	uiosize = uiop->uio_resid;
 	pollfdnum = uiosize / size;
-	mutex_enter(&curproc->p_lock);
-	if (pollfdnum > (uint_t)rctl_enforced_value(
-	    rctlproc_legacy[RLIMIT_NOFILE], curproc->p_rctls, curproc)) {
-		(void) rctl_action(rctlproc_legacy[RLIMIT_NOFILE],
-		    curproc->p_rctls, curproc, RCA_SAFE);
+
+	/*
+	 * We want to make sure that pollfdnum isn't large enough to DoS us,
+	 * but we also don't want to grab p_lock unnecessarily -- so we
+	 * perform the full check against our resource limits if and only if
+	 * pollfdnum is larger than the known-to-be-sane value of UINT8_MAX.
+	 */
+	if (pollfdnum > UINT8_MAX) {
+		mutex_enter(&curproc->p_lock);
+		if (pollfdnum >
+		    (uint_t)rctl_enforced_value(rctlproc_legacy[RLIMIT_NOFILE],
+		    curproc->p_rctls, curproc)) {
+			(void) rctl_action(rctlproc_legacy[RLIMIT_NOFILE],
+			    curproc->p_rctls, curproc, RCA_SAFE);
+			mutex_exit(&curproc->p_lock);
+			return (EINVAL);
+		}
 		mutex_exit(&curproc->p_lock);
-		return (EINVAL);
 	}
-	mutex_exit(&curproc->p_lock);
+
 	/*
 	 * Copy in the pollfd array.  Walk through the array and add
 	 * each polled fd to the cached set.
