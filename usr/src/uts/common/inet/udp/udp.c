@@ -6061,7 +6061,6 @@ udp_send(sock_lower_handle_t proto_handle, mblk_t *mp, struct nmsghdr *msg,
 	ushort_t	ipversion;
 	pid_t		pid = curproc->p_pid;
 	ip_xmit_attr_t	*ixa;
-	boolean_t	snd_to_conn;
 
 	ASSERT(DB_TYPE(mp) == M_DATA);
 
@@ -6106,10 +6105,7 @@ udp_send(sock_lower_handle_t proto_handle, mblk_t *mp, struct nmsghdr *msg,
 	 * historically we've returned an error if already connected. The
 	 * client can allow this via a sockopt.
 	 */
-	mutex_enter(&connp->conn_lock);
-	snd_to_conn = (udp->udp_snd_to_conn != 0);
-	mutex_exit(&connp->conn_lock);
-	if (udp->udp_state == TS_DATA_XFER && !snd_to_conn) {
+	if (udp->udp_state == TS_DATA_XFER && !udp->udp_snd_to_conn) {
 		UDPS_BUMP_MIB(us, udpOutErrors);
 		return (EISCONN);
 	}
