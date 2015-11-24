@@ -234,19 +234,37 @@ typedef struct futex_robust_list32 {
 #define	MEMID_EQUAL(s, d) \
 	((d)->val[0] == (s)->val[0] && (d)->val[1] == (s)->val[1])
 
-/* Borrowed from the page freelist hash code.  */
-#define	HASH_SHIFT_SZ	7
+/*
+ * Because collisions on this hash table can be a source of negative
+ * scalability, we make it pretty large: 4,096 entries -- 64K.  If this
+ * size is found to be insufficient, the size should be made dynamic.
+ * (Making it dynamic will be delicate because the per-chain locking will
+ * necessitate memory retiring or similar; see the 2008 ACM Queue article
+ * "Real-world concurrency" for details on this technique.)
+ */
+#define	HASH_SHIFT_SZ	12
 #define	HASH_SIZE	(1 << HASH_SHIFT_SZ)
 #define	HASH_FUNC(id)						\
-	((((uintptr_t)((id)->val[1]) >> PAGESHIFT) +			\
-	((uintptr_t)((id)->val[1]) >> (PAGESHIFT + HASH_SHIFT_SZ)) +	\
+	((((uintptr_t)((id)->val[1]) >> 3) +			\
+	((uintptr_t)((id)->val[1]) >> (3 + HASH_SHIFT_SZ)) +		\
+	((uintptr_t)((id)->val[1]) >> (3 + 2 * HASH_SHIFT_SZ)) +	\
 	((uintptr_t)((id)->val[0]) >> 3) +				\
 	((uintptr_t)((id)->val[0]) >> (3 + HASH_SHIFT_SZ)) +		\
 	((uintptr_t)((id)->val[0]) >> (3 + 2 * HASH_SHIFT_SZ))) &	\
 	(HASH_SIZE - 1))
 
-static fwaiter_t *futex_hash[HASH_SIZE];
-static kmutex_t futex_hash_lock[HASH_SIZE];
+/*
+ * We place the per-chain lock next to the pointer to the chain itself.
+ * When compared to an array of orthogonal locks, this reduces false sharing
+ * (though adjacent entries can still be falsely shared -- just not as many),
+ * while having the additional bonus of increasing locality.
+ */
+typedef struct futex_hash {
+	kmutex_t fh_lock;
+	fwaiter_t *fh_waiters;
+} futex_hash_t;
+
+static futex_hash_t futex_hash[HASH_SIZE];
 
 static void
 futex_hashin(fwaiter_t *fwp)
@@ -254,13 +272,13 @@ futex_hashin(fwaiter_t *fwp)
 	int index;
 
 	index = HASH_FUNC(&fwp->fw_memid);
-	ASSERT(MUTEX_HELD(&futex_hash_lock[index]));
+	ASSERT(MUTEX_HELD(&futex_hash[index].fh_lock));
 
 	fwp->fw_prev = NULL;
-	fwp->fw_next = futex_hash[index];
+	fwp->fw_next = futex_hash[index].fh_waiters;
 	if (fwp->fw_next)
 		fwp->fw_next->fw_prev = fwp;
-	futex_hash[index] = fwp;
+	futex_hash[index].fh_waiters = fwp;
 }
 
 static void
@@ -269,14 +287,14 @@ futex_hashout(fwaiter_t *fwp)
 	int index;
 
 	index = HASH_FUNC(&fwp->fw_memid);
-	ASSERT(MUTEX_HELD(&futex_hash_lock[index]));
+	ASSERT(MUTEX_HELD(&futex_hash[index].fh_lock));
 
 	if (fwp->fw_prev)
 		fwp->fw_prev->fw_next = fwp->fw_next;
 	if (fwp->fw_next)
 		fwp->fw_next->fw_prev = fwp->fw_prev;
-	if (futex_hash[index] == fwp)
-		futex_hash[index] = fwp->fw_next;
+	if (futex_hash[index].fh_waiters == fwp)
+		futex_hash[index].fh_waiters = fwp->fw_next;
 
 	fwp->fw_prev = NULL;
 	fwp->fw_next = NULL;
@@ -311,7 +329,7 @@ futex_wait(memid_t *memid, caddr_t addr,
 	cv_init(&fw.fw_cv, NULL, CV_DEFAULT, NULL);
 
 	index = HASH_FUNC(&fw.fw_memid);
-	mutex_enter(&futex_hash_lock[index]);
+	mutex_enter(&futex_hash[index].fh_lock);
 
 	if (fuword32(addr, (uint32_t *)&curval)) {
 		err = set_errno(EFAULT);
@@ -326,7 +344,7 @@ futex_wait(memid_t *memid, caddr_t addr,
 
 	err = 0;
 	while ((fw.fw_woken == 0) && (err == 0)) {
-		ret = cv_waituntil_sig(&fw.fw_cv, &futex_hash_lock[index],
+		ret = cv_waituntil_sig(&fw.fw_cv, &futex_hash[index].fh_lock,
 		    timeout, timechanged);
 		if (ret < 0) {
 			err = set_errno(ETIMEDOUT);
@@ -348,7 +366,7 @@ futex_wait(memid_t *memid, caddr_t addr,
 		futex_hashout(&fw);
 
 out:
-	mutex_exit(&futex_hash_lock[index]);
+	mutex_exit(&futex_hash[index].fh_lock);
 
 	return (err);
 }
@@ -365,9 +383,10 @@ futex_wake(memid_t *memid, int wake_threads, uint32_t mask)
 
 	index = HASH_FUNC(memid);
 
-	mutex_enter(&futex_hash_lock[index]);
+	mutex_enter(&futex_hash[index].fh_lock);
 
-	for (fwp = futex_hash[index]; fwp && ret < wake_threads; fwp = next) {
+	for (fwp = futex_hash[index].fh_waiters;
+	    fwp != NULL && ret < wake_threads; fwp = next) {
 		next = fwp->fw_next;
 		if (MEMID_EQUAL(&fwp->fw_memid, memid) &&
 		    (fwp->fw_bits & mask)) {
@@ -378,7 +397,7 @@ futex_wake(memid_t *memid, int wake_threads, uint32_t mask)
 		}
 	}
 
-	mutex_exit(&futex_hash_lock[index]);
+	mutex_exit(&futex_hash[index].fh_lock);
 
 	return (ret);
 }
@@ -478,14 +497,14 @@ futex_wake_op(memid_t *memid, caddr_t addr2, memid_t *memid2,
 	index2 = HASH_FUNC(memid2);
 
 	if (index1 == index2) {
-		l1 = &futex_hash_lock[index1];
+		l1 = &futex_hash[index1].fh_lock;
 		l2 = NULL;
 	} else if (index1 < index2) {
-		l1 = &futex_hash_lock[index1];
-		l2 = &futex_hash_lock[index2];
+		l1 = &futex_hash[index1].fh_lock;
+		l2 = &futex_hash[index2].fh_lock;
 	} else {
-		l1 = &futex_hash_lock[index2];
-		l2 = &futex_hash_lock[index1];
+		l1 = &futex_hash[index2].fh_lock;
+		l2 = &futex_hash[index1].fh_lock;
 	}
 
 	mutex_enter(l1);
@@ -496,7 +515,7 @@ futex_wake_op(memid_t *memid, caddr_t addr2, memid_t *memid2,
 	if ((wake = futex_wake_op_execute((int32_t *)addr2, val3)) < 0)
 		goto out;
 
-	for (fwp = futex_hash[index1]; fwp; fwp = next) {
+	for (fwp = futex_hash[index1].fh_waiters; fwp != NULL; fwp = next) {
 		next = fwp->fw_next;
 		if (!MEMID_EQUAL(&fwp->fw_memid, memid))
 			continue;
@@ -512,7 +531,7 @@ futex_wake_op(memid_t *memid, caddr_t addr2, memid_t *memid2,
 	if (!wake)
 		goto out;
 
-	for (fwp = futex_hash[index2]; fwp; fwp = next) {
+	for (fwp = futex_hash[index2].fh_waiters; fwp != NULL; fwp = next) {
 		next = fwp->fw_next;
 		if (!MEMID_EQUAL(&fwp->fw_memid, memid2))
 			continue;
@@ -559,14 +578,14 @@ futex_requeue(memid_t *memid, memid_t *requeue_memid, int wake_threads,
 	index2 = HASH_FUNC(requeue_memid);
 
 	if (index1 == index2) {
-		l1 = &futex_hash_lock[index1];
+		l1 = &futex_hash[index1].fh_lock;
 		l2 = NULL;
 	} else if (index1 < index2) {
-		l1 = &futex_hash_lock[index1];
-		l2 = &futex_hash_lock[index2];
+		l1 = &futex_hash[index1].fh_lock;
+		l2 = &futex_hash[index2].fh_lock;
 	} else {
-		l1 = &futex_hash_lock[index2];
-		l2 = &futex_hash_lock[index1];
+		l1 = &futex_hash[index2].fh_lock;
+		l2 = &futex_hash[index1].fh_lock;
 	}
 
 	mutex_enter(l1);
@@ -584,7 +603,7 @@ futex_requeue(memid_t *memid, memid_t *requeue_memid, int wake_threads,
 		}
 	}
 
-	for (fwp = futex_hash[index1]; fwp; fwp = next) {
+	for (fwp = futex_hash[index1].fh_waiters; fwp != NULL; fwp = next) {
 		next = fwp->fw_next;
 		if (!MEMID_EQUAL(&fwp->fw_memid, memid))
 			continue;
@@ -1066,8 +1085,7 @@ lx_futex_init(void)
 	int i;
 
 	for (i = 0; i < HASH_SIZE; i++)
-		mutex_init(&futex_hash_lock[i], NULL, MUTEX_DEFAULT, NULL);
-	bzero(futex_hash, sizeof (futex_hash));
+		mutex_init(&futex_hash[i].fh_lock, NULL, MUTEX_DEFAULT, NULL);
 }
 
 int
@@ -1077,10 +1095,10 @@ lx_futex_fini(void)
 
 	err = 0;
 	for (i = 0; (err == 0) && (i < HASH_SIZE); i++) {
-		mutex_enter(&futex_hash_lock[i]);
-		if (futex_hash[i] != NULL)
+		mutex_enter(&futex_hash[i].fh_lock);
+		if (futex_hash[i].fh_waiters != NULL)
 			err = EBUSY;
-		mutex_exit(&futex_hash_lock[i]);
+		mutex_exit(&futex_hash[i].fh_lock);
 	}
 	return (err);
 }
