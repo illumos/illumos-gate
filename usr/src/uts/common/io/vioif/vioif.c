@@ -12,6 +12,7 @@
 /*
  * Copyright 2013 Nexenta Inc.  All rights reserved.
  * Copyright (c) 2014, 2015 by Delphix. All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 /* Based on the NetBSD virtio driver by Minoura Makoto. */
@@ -285,6 +286,13 @@ struct vioif_softc {
 	unsigned int		sc_tx_csum:1;
 	unsigned int		sc_tx_tso4:1;
 
+	/*
+	 * For debugging, it is useful to know whether the MAC address we
+	 * are using came from the host (via VIRTIO_NET_CONFIG_MAC) or
+	 * was otherwise generated or set from within the guest.
+	 */
+	unsigned int		sc_mac_from_host:1;
+
 	int			sc_mtu;
 	uint8_t			sc_mac[ETHERADDRL];
 	/*
@@ -312,7 +320,10 @@ struct vioif_softc {
 	/* Copying small packets turns out to be faster then mapping them. */
 	unsigned long		sc_rxcopy_thresh;
 	unsigned long		sc_txcopy_thresh;
-	/* Some statistic coming here */
+
+	/*
+	 * Statistics visible through mac:
+	 */
 	uint64_t		sc_ipackets;
 	uint64_t		sc_opackets;
 	uint64_t		sc_rbytes;
@@ -325,6 +336,18 @@ struct vioif_softc {
 	uint64_t		sc_notxbuf;
 	uint64_t		sc_ierrors;
 	uint64_t		sc_oerrors;
+
+	/*
+	 * Internal debugging statistics:
+	 */
+	uint64_t		sc_rxfail_dma_handle;
+	uint64_t		sc_rxfail_dma_buffer;
+	uint64_t		sc_rxfail_dma_bind;
+	uint64_t		sc_rxfail_chain_undersize;
+	uint64_t		sc_rxfail_no_descriptors;
+	uint64_t		sc_txfail_dma_handle;
+	uint64_t		sc_txfail_dma_bind;
+	uint64_t		sc_txfail_indirect_limit;
 };
 
 #define	ETHER_HEADER_LEN		sizeof (struct ether_header)
@@ -474,8 +497,7 @@ vioif_rx_construct(void *buffer, void *user_arg, int kmflags)
 
 	if (ddi_dma_alloc_handle(sc->sc_dev, &vioif_mapped_buf_dma_attr,
 	    DDI_DMA_SLEEP, NULL, &buf->rb_mapping.vbm_dmah)) {
-		dev_err(sc->sc_dev, CE_WARN,
-		    "Can't allocate dma handle for rx buffer");
+		sc->sc_rxfail_dma_handle++;
 		goto exit_handle;
 	}
 
@@ -483,8 +505,7 @@ vioif_rx_construct(void *buffer, void *user_arg, int kmflags)
 	    VIOIF_RX_SIZE + sizeof (struct virtio_net_hdr),
 	    &vioif_bufattr, DDI_DMA_STREAMING, DDI_DMA_SLEEP,
 	    NULL, &buf->rb_mapping.vbm_buf, &len, &buf->rb_mapping.vbm_acch)) {
-		dev_err(sc->sc_dev, CE_WARN,
-		    "Can't allocate rx buffer");
+		sc->sc_rxfail_dma_buffer++;
 		goto exit_alloc;
 	}
 	ASSERT(len >= VIOIF_RX_SIZE);
@@ -493,8 +514,7 @@ vioif_rx_construct(void *buffer, void *user_arg, int kmflags)
 	    buf->rb_mapping.vbm_buf, len, DDI_DMA_READ | DDI_DMA_STREAMING,
 	    DDI_DMA_SLEEP, NULL, &buf->rb_mapping.vbm_dmac,
 	    &buf->rb_mapping.vbm_ncookies)) {
-		dev_err(sc->sc_dev, CE_WARN, "Can't bind tx buffer");
-
+		sc->sc_rxfail_dma_bind++;
 		goto exit_bind;
 	}
 
@@ -716,27 +736,24 @@ vioif_add_rx(struct vioif_softc *sc, int kmflag)
 	struct vioif_rx_buf *buf;
 
 	ve = vq_alloc_entry(sc->sc_rx_vq);
-	if (!ve) {
+	if (ve == NULL) {
 		/*
 		 * Out of free descriptors - ring already full.
-		 * It would be better to update sc_norxdescavail
-		 * but MAC does not ask for this info, hence we
-		 * update sc_norecvbuf.
 		 */
+		sc->sc_rxfail_no_descriptors++;
 		sc->sc_norecvbuf++;
 		goto exit_vq;
 	}
 	buf = sc->sc_rxbufs[ve->qe_index];
 
-	if (!buf) {
+	if (buf == NULL) {
 		/* First run, allocate the buffer. */
 		buf = kmem_cache_alloc(sc->sc_rxbuf_cache, kmflag);
 		sc->sc_rxbufs[ve->qe_index] = buf;
 	}
 
 	/* Still nothing? Bye. */
-	if (!buf) {
-		dev_err(sc->sc_dev, CE_WARN, "Can't allocate rx buffer");
+	if (buf == NULL) {
 		sc->sc_norecvbuf++;
 		goto exit_buf;
 	}
@@ -789,20 +806,19 @@ static int
 vioif_populate_rx(struct vioif_softc *sc, int kmflag)
 {
 	int i = 0;
-	int ret;
 
 	for (;;) {
-		ret = vioif_add_rx(sc, kmflag);
-		if (ret)
+		if (vioif_add_rx(sc, kmflag) != DDI_SUCCESS) {
 			/*
 			 * We could not allocate some memory. Try to work with
 			 * what we've got.
 			 */
 			break;
+		}
 		i++;
 	}
 
-	if (i)
+	if (i != 0)
 		virtio_sync_vq(sc->sc_rx_vq);
 
 	return (i);
@@ -823,8 +839,7 @@ vioif_process_rx(struct vioif_softc *sc)
 		ASSERT(buf);
 
 		if (len < sizeof (struct virtio_net_hdr)) {
-			dev_err(sc->sc_dev, CE_WARN, "RX: Cnain too small: %u",
-			    len - (uint32_t)sizeof (struct virtio_net_hdr));
+			sc->sc_rxfail_chain_undersize++;
 			sc->sc_ierrors++;
 			virtio_free_chain(ve);
 			continue;
@@ -838,7 +853,7 @@ vioif_process_rx(struct vioif_softc *sc)
 		 */
 		if (len < sc->sc_rxcopy_thresh) {
 			mp = allocb(len, 0);
-			if (!mp) {
+			if (mp == NULL) {
 				sc->sc_norecvbuf++;
 				sc->sc_ierrors++;
 
@@ -855,7 +870,7 @@ vioif_process_rx(struct vioif_softc *sc)
 			    buf->rb_mapping.vbm_buf +
 			    sizeof (struct virtio_net_hdr) +
 			    VIOIF_IP_ALIGN, len, 0, &buf->rb_frtn);
-			if (!mp) {
+			if (mp == NULL) {
 				sc->sc_norecvbuf++;
 				sc->sc_ierrors++;
 
@@ -901,31 +916,32 @@ vioif_reclaim_used_tx(struct vioif_softc *sc)
 	struct vioif_tx_buf *buf;
 	uint32_t len;
 	mblk_t *mp;
-	int i = 0;
+	unsigned chains = 0;
 
 	while ((ve = virtio_pull_chain(sc->sc_tx_vq, &len))) {
 		/* We don't chain descriptors for tx, so don't expect any. */
-		ASSERT(!ve->qe_next);
+		ASSERT(ve->qe_next == NULL);
 
 		buf = &sc->sc_txbufs[ve->qe_index];
 		mp = buf->tb_mp;
 		buf->tb_mp = NULL;
 
-		if (mp) {
-			for (i = 0; i < buf->tb_external_num; i++)
+		if (mp != NULL) {
+			for (int i = 0; i < buf->tb_external_num; i++) {
 				(void) ddi_dma_unbind_handle(
 				    buf->tb_external_mapping[i].vbm_dmah);
+			}
 		}
 
 		virtio_free_chain(ve);
 
 		/* External mapping used, mp was not freed in vioif_send() */
-		if (mp)
+		if (mp != NULL)
 			freemsg(mp);
-		i++;
+		chains++;
 	}
 
-	if (sc->sc_tx_stopped && i) {
+	if (sc->sc_tx_stopped != 0 && chains > 0) {
 		sc->sc_tx_stopped = 0;
 		mac_tx_update(sc->sc_mac_handle);
 	}
@@ -962,8 +978,7 @@ vioif_tx_lazy_handle_alloc(struct vioif_softc *sc, struct vioif_tx_buf *buf,
 		    &vioif_mapped_buf_dma_attr, DDI_DMA_SLEEP, NULL,
 		    &buf->tb_external_mapping[i].vbm_dmah);
 		if (ret != DDI_SUCCESS) {
-			dev_err(sc->sc_dev, CE_WARN,
-			    "Can't allocate dma handle for external tx buffer");
+			sc->sc_txfail_dma_handle++;
 		}
 	}
 
@@ -1017,17 +1032,14 @@ vioif_tx_external(struct vioif_softc *sc, struct vq_entry *ve, mblk_t *mp,
 		    DDI_DMA_SLEEP, NULL, &dmac, &ncookies);
 
 		if (ret != DDI_SUCCESS) {
+			sc->sc_txfail_dma_bind++;
 			sc->sc_oerrors++;
-			dev_err(sc->sc_dev, CE_NOTE,
-			    "TX: Failed to bind external handle");
 			goto exit_bind;
 		}
 
 		/* Check if we still fit into the indirect table. */
 		if (virtio_ve_indirect_available(ve) < ncookies) {
-			dev_err(sc->sc_dev, CE_NOTE,
-			    "TX: Indirect descriptor table limit reached."
-			    " It took %d fragments.", i);
+			sc->sc_txfail_indirect_limit++;
 			sc->sc_notxbuf++;
 			sc->sc_oerrors++;
 
@@ -1086,7 +1098,7 @@ vioif_send(struct vioif_softc *sc, mblk_t *mp)
 
 	ve = vq_alloc_entry(sc->sc_tx_vq);
 
-	if (!ve) {
+	if (ve == NULL) {
 		sc->sc_notxbuf++;
 		/* Out of free descriptors - try later. */
 		return (B_FALSE);
@@ -1138,9 +1150,9 @@ vioif_send(struct vioif_softc *sc, mblk_t *mp)
 	/* meanwhile update the statistic */
 	if (mp->b_rptr[0] & 0x1) {
 		if (bcmp(mp->b_rptr, vioif_broadcast, ETHERADDRL) != 0)
-				sc->sc_multixmt++;
-			else
-				sc->sc_brdcstxmt++;
+			sc->sc_multixmt++;
+		else
+			sc->sc_brdcstxmt++;
 	}
 
 	/*
@@ -1202,8 +1214,7 @@ vioif_start(void *arg)
 {
 	struct vioif_softc *sc = arg;
 
-	mac_link_update(sc->sc_mac_handle,
-	    vioif_link_state(sc));
+	mac_link_update(sc->sc_mac_handle, vioif_link_state(sc));
 
 	virtio_start_vq_intr(sc->sc_rx_vq);
 
@@ -1404,10 +1415,8 @@ vioif_propinfo(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 	case MAC_PROP_PRIVATE:
 		bzero(valstr, sizeof (valstr));
 		if (strcmp(pr_name, vioif_txcopy_thresh) == 0) {
-
 			value = sc->sc_txcopy_thresh;
-		} else	if (strcmp(pr_name,
-		    vioif_rxcopy_thresh) == 0) {
+		} else if (strcmp(pr_name, vioif_rxcopy_thresh) == 0) {
 			value = sc->sc_rxcopy_thresh;
 		} else {
 			return;
@@ -1483,7 +1492,6 @@ vioif_show_features(struct vioif_softc *sc, const char *prefix,
 	bufp += virtio_show_features(features, bufp, bufend - bufp);
 	*bufp = '\0';
 
-
 	/* Using '!' to only CE_NOTE this to the system log. */
 	dev_err(sc->sc_dev, CE_NOTE, "!%s Vioif (%b)", buf, features,
 	    VIRTIO_NET_FEATURE_BITS);
@@ -1512,8 +1520,8 @@ vioif_dev_features(struct vioif_softc *sc)
 	    sc->sc_virtio.sc_features);
 
 	if (!(sc->sc_virtio.sc_features & VIRTIO_F_RING_INDIRECT_DESC)) {
-		dev_err(sc->sc_dev, CE_NOTE,
-		    "Host does not support RING_INDIRECT_DESC, bye.");
+		dev_err(sc->sc_dev, CE_WARN,
+		    "Host does not support RING_INDIRECT_DESC. Cannot attach.");
 		return (DDI_FAILURE);
 	}
 
@@ -1535,6 +1543,7 @@ vioif_set_mac(struct vioif_softc *sc)
 		virtio_write_device_config_1(&sc->sc_virtio,
 		    VIRTIO_NET_CONFIG_MAC + i, sc->sc_mac[i]);
 	}
+	sc->sc_mac_from_host = 0;
 }
 
 /* Get the mac address out of the hardware, or make up one. */
@@ -1548,8 +1557,7 @@ vioif_get_mac(struct vioif_softc *sc)
 			    &sc->sc_virtio,
 			    VIRTIO_NET_CONFIG_MAC + i);
 		}
-		dev_err(sc->sc_dev, CE_NOTE, "Got MAC address from host: %s",
-		    ether_sprintf((struct ether_addr *)sc->sc_mac));
+		sc->sc_mac_from_host = 1;
 	} else {
 		/* Get a few random bytes */
 		(void) random_get_pseudo_bytes(sc->sc_mac, ETHERADDRL);
@@ -1561,7 +1569,7 @@ vioif_get_mac(struct vioif_softc *sc)
 		vioif_set_mac(sc);
 
 		dev_err(sc->sc_dev, CE_NOTE,
-		    "Generated a random MAC address: %s",
+		    "!Generated a random MAC address: %s",
 		    ether_sprintf((struct ether_addr *)sc->sc_mac));
 	}
 }
@@ -1624,7 +1632,7 @@ vioif_check_features(struct vioif_softc *sc)
 		if (!vioif_has_feature(sc, VIRTIO_NET_F_GUEST_CSUM)) {
 			sc->sc_rx_csum = 0;
 		}
-		cmn_err(CE_NOTE, "Csum enabled.");
+		dev_err(sc->sc_dev, CE_NOTE, "!Csum enabled.");
 
 		if (vioif_has_feature(sc, VIRTIO_NET_F_HOST_TSO4)) {
 
@@ -1638,11 +1646,11 @@ vioif_check_features(struct vioif_softc *sc)
 			 */
 			if (!vioif_has_feature(sc, VIRTIO_NET_F_HOST_ECN)) {
 				dev_err(sc->sc_dev, CE_NOTE,
-				    "TSO4 supported, but not ECN. "
+				    "!TSO4 supported, but not ECN. "
 				    "Not using LSO.");
 				sc->sc_tx_tso4 = 0;
 			} else {
-				cmn_err(CE_NOTE, "LSO enabled");
+				dev_err(sc->sc_dev, CE_NOTE, "!LSO enabled");
 			}
 		}
 	}
@@ -1766,7 +1774,7 @@ vioif_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 
 	vioif_check_features(sc);
 
-	if (vioif_alloc_mems(sc))
+	if (vioif_alloc_mems(sc) != 0)
 		goto exit_alloc_mems;
 
 	if ((macp = mac_alloc(MAC_VERSION)) == NULL) {
@@ -1854,7 +1862,7 @@ vioif_detach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 		return (DDI_FAILURE);
 	}
 
-	if (sc->sc_rxloan) {
+	if (sc->sc_rxloan > 0) {
 		dev_err(devinfo, CE_WARN, "!Some rx buffers are still upstream,"
 		    " not detaching.");
 		return (DDI_FAILURE);
