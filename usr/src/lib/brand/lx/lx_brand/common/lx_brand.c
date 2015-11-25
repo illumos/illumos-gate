@@ -994,8 +994,8 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_getsockname,			/*  51: getsockname */
 	lx_getpeername,			/*  52: getpeername */
 	lx_socketpair,			/*  53: socketpair */
-	lx_setsockopt,			/*  54: setsockopt */
-	lx_getsockopt,			/*  55: getsockopt */
+	NULL,				/*  54: setsockopt */
+	NULL,				/*  55: getsockopt */
 	lx_clone,			/*  56: clone */
 	lx_fork,			/*  57: fork */
 	lx_vfork,			/*  58: vfork */

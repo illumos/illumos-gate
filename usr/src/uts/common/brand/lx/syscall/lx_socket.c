@@ -50,11 +50,16 @@
 #include <socktpi_impl.h>
 #include <netinet/udp.h>
 #include <sys/sdt.h>
+#include <netinet/tcp.h>
+#include <netinet/igmp.h>
+#include <netinet/icmp6.h>
+#include <lx_errno.h>
 
 #include <sys/lx_brand.h>
 #include <sys/lx_socket.h>
 #include <sys/lx_types.h>
 #include <sys/lx_impl.h>
+
 
 typedef struct lx_ucred {
 	pid_t		lxu_pid;
@@ -265,13 +270,13 @@ static lx_flag_map_t lx_flag_map_tbl[] = {
 #define	LX_FLAG_MAP_MAX	\
 	(sizeof (lx_flag_map_tbl) / sizeof (lx_flag_map_tbl[0]))
 
-#define	LX_FLAG_BUFSZ	64
+#define	LX_UNSUP_BUFSZ	64
 
 static int
 lx_xlate_sock_flags(int inflags, lx_xlate_dir_t dir)
 {
 	int i, outflags = 0;
-	char buf[LX_FLAG_BUFSZ];
+	char buf[LX_UNSUP_BUFSZ];
 
 	VERIFY(dir == SUNOS_TO_LX || dir == LX_TO_SUNOS);
 
@@ -300,14 +305,14 @@ lx_xlate_sock_flags(int inflags, lx_xlate_dir_t dir)
 			break;
 		case LXFM_UNSUP:
 			if (match != 0) {
-				snprintf(buf, LX_FLAG_BUFSZ,
+				snprintf(buf, LX_UNSUP_BUFSZ,
 				    "unsupported sock flag %s", map->lxfm_name);
 				lx_unsupported(buf);
 			}
 		}
 	}
 	if (inflags != 0) {
-		snprintf(buf, LX_FLAG_BUFSZ, "unsupported sock flags 0x%08x",
+		snprintf(buf, LX_UNSUP_BUFSZ, "unsupported sock flags 0x%08x",
 		    inflags);
 		lx_unsupported(buf);
 	}
@@ -2123,6 +2128,1061 @@ lx_sendmsg(int sock, void *msg, int flags)
 	return (res);
 }
 
+/*
+ * Linux socket option type definitions
+ *
+ * The protocol `levels` are well defined (see in.h) The option values are
+ * not so well defined. Linux often uses different values vs. Illumos
+ * although they mean the same thing. For example, IP_TOS in Linux is
+ * defined as value 1 but in Illumos it is defined as value 3. This table
+ * maps all the Protocol levels to their options and maps them between
+ * Linux and Illumos and vice versa.  Hence the reason for the complexity.
+ *
+ * For a certain subset of sockopts, Linux will implicitly truncate optval
+ * input, so long as optlen meets a minimum size.  Because illumos is strict
+ * about optlen, we must cap optlen for those options.
+ */
+
+typedef struct lx_sockopt_map {
+	const int lsm_opt;	/* Illumos-native equivalent */
+	const int lsm_lcap;	/* Cap optlen to this size. (Ignored if 0) */
+} lx_sockopt_map_t;
+
+typedef struct lx_proto_opts {
+	const lx_sockopt_map_t	*lpo_entries;	/* Linux->SunOS map entries */
+	unsigned int		lpo_max;	/* max entries in table */
+} lx_proto_opts_t;
+
+#define	OPTNOTSUP	-1	/* we don't support it */
+
+#define	PROTO_SOCKOPTS(opts)    \
+	{ (opts), sizeof ((opts)) / sizeof ((opts)[0]) }
+
+static const lx_sockopt_map_t ltos_ip_sockopts[LX_IP_UNICAST_IF + 1] = {
+	{ OPTNOTSUP, 0 },
+	{ IP_TOS, sizeof (int) },		/* IP_TOS		*/
+	{ IP_TTL, sizeof (int) },		/* IP_TTL		*/
+	{ IP_HDRINCL, sizeof (int) },		/* IP_HDRINCL		*/
+	{ IP_OPTIONS, 0 },			/* IP_OPTIONS		*/
+	{ OPTNOTSUP, 0 },			/* IP_ROUTER_ALERT	*/
+	{ IP_RECVOPTS, sizeof (int) },		/* IP_RECVOPTS		*/
+	{ IP_RETOPTS, sizeof (int) },		/* IP_RETOPTS		*/
+	{ IP_PKTINFO, sizeof (int) },		/* IP_PKTINFO		*/
+	{ OPTNOTSUP, 0 },			/* IP_PKTOPTIONS	*/
+	{ OPTNOTSUP, 0 },			/* IP_MTUDISCOVER	*/
+	{ OPTNOTSUP, 0 },			/* IP_RECVERR		*/
+	{ IP_RECVTTL, sizeof (int) },		/* IP_RECVTTL		*/
+	{ OPTNOTSUP, 0 },			/* IP_RECVTOS		*/
+	{ OPTNOTSUP, 0 },			/* IP_MTU		*/
+	{ OPTNOTSUP, 0 },			/* IP_FREEBIND		*/
+	{ OPTNOTSUP, 0 },			/* IP_IPSEC_POLICY	*/
+	{ OPTNOTSUP, 0 },			/* IP_XFRM_POLICY	*/
+	{ OPTNOTSUP, 0 },			/* IP_PASSSEC		*/
+	{ OPTNOTSUP, 0 },			/* IP_TRANSPARENT	*/
+	{ OPTNOTSUP, 0 },			/* IP_ORIGDSTADDR	*/
+	{ OPTNOTSUP, 0 },			/* IP_MINTTL		*/
+	{ OPTNOTSUP, 0 },			/* IP_NODEFRAG		*/
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ IP_MULTICAST_IF, sizeof (int) },	/* IP_MULTICAST_IF	*/
+	{ IP_MULTICAST_TTL, sizeof (int) },	/* IP_MULTICAST_TTL	*/
+	{ IP_MULTICAST_LOOP, sizeof (int) },	/* IP_MULTICAST_LOOP	*/
+	{ IP_ADD_MEMBERSHIP, 0 },		/* IP_ADD_MEMBERSHIP	*/
+	{ IP_DROP_MEMBERSHIP, 0 },		/* IP_DROP_MEMBERSHIP	*/
+	{ IP_UNBLOCK_SOURCE, 0 },		/* IP_UNBLOCK_SOURCE	*/
+	{ IP_BLOCK_SOURCE, 0 },			/* IP_BLOCK_SOURCE	*/
+	{ IP_ADD_SOURCE_MEMBERSHIP, 0 },	/* IP_ADD_SOURCE_MEMBERSHIP */
+	{ OPTNOTSUP, 0 },			/* IP_DROP_SOURCE_MEMBERSHIP */
+	{ OPTNOTSUP, 0 },			/* IP_MSFILTER		*/
+	{ OPTNOTSUP, 0 },			/* MCAST_JOIN_GROUP	*/
+	{ OPTNOTSUP, 0 },			/* MCAST_BLOCK_SOURCE	*/
+	{ OPTNOTSUP, 0 },			/* MCAST_UNBLOCK_SOURCE	*/
+	{ OPTNOTSUP, 0 },			/* MCAST_LEAVE_GROUP	*/
+	{ OPTNOTSUP, 0 },			/* MCAST_JOIN_SOURCE_GROUP */
+	{ OPTNOTSUP, 0 },			/* MCAST_LEAVE_SOURCE_GROUP */
+	{ OPTNOTSUP, 0 },			/* MCAST_MSFILTER	*/
+	{ OPTNOTSUP, 0 },			/* IP_MULTICAST_ALL	*/
+	{ OPTNOTSUP, 0 }			/* IP_UNICAST_IF	*/
+};
+
+static const lx_sockopt_map_t ltos_ipv6_sockopts[LX_IPV6_TCLASS + 1] = {
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },			/* IPV6_ADDRFORM	*/
+	{ OPTNOTSUP, 0 },			/* IPV6_2292PKTINFO	*/
+	{ OPTNOTSUP, 0 },			/* IPV6_2292HOPOPTS	*/
+	{ OPTNOTSUP, 0 },			/* IPV6_2292DSTOPTS	*/
+	{ OPTNOTSUP, 0 },			/* IPV6_2292RTHDR	*/
+	{ OPTNOTSUP, 0 },			/* IPV6_2292PKTOPTIONS	*/
+	{ IPV6_CHECKSUM, sizeof (int) },	/* IPV6_CHECKSUM	*/
+	{ OPTNOTSUP, 0 },			/* IPV6_2292HOPLIMIT	*/
+	{ OPTNOTSUP, 0 },			/* IPV6_NEXTHOP		*/
+	{ OPTNOTSUP, 0 },			/* IPV6_AUTHHDR		*/
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ IPV6_UNICAST_HOPS, sizeof (int) },	/* IPV6_UNICAST_HOPS	*/
+	{ IPV6_MULTICAST_IF, sizeof (int) },	/* IPV6_MULTICAST_IF	*/
+	{ IPV6_MULTICAST_HOPS, sizeof (int) },	/* IPV6_MULTICAST_HOPS	*/
+	{ IPV6_MULTICAST_LOOP, sizeof (int) },	/* IPV6_MULTICAST_LOOP	*/
+	{ OPTNOTSUP, 0 },			/* IPV6_JOIN_GROUP	*/
+	{ OPTNOTSUP, 0 },			/* IPV6_LEAVE_GROUP	*/
+	{ OPTNOTSUP, 0 },			/* IPV6_ROUTER_ALERT	*/
+	{ OPTNOTSUP, 0 },			/* IPV6_MTU_DISCOVER	*/
+	{ OPTNOTSUP, 0 },			/* IPV6_MTU		*/
+	{ OPTNOTSUP, 0 },			/* IPV6_RECVERR		*/
+	{ IPV6_V6ONLY, sizeof (int) },		/* IPV6_V6ONLY		*/
+	{ OPTNOTSUP, 0 },			/* IPV6_JOIN_ANYCAST	*/
+	{ OPTNOTSUP, 0 },			/* IPV6_LEAVE_ANYCAST	*/
+	{ OPTNOTSUP, 0 },			/* IPV6_IPSEC_POLICY	*/
+	{ OPTNOTSUP, 0 },			/* IPV6_XFRM_POLICY	*/
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ IPV6_RECVPKTINFO, sizeof (int) },	/* IPV6_RECVPKTINFO	*/
+	{ IPV6_PKTINFO, 0 },			/* IPV6_PKTINFO		*/
+	{ IPV6_RECVHOPLIMIT, sizeof (int) },	/* IPV6_RECVHOPLIMIT	*/
+	{ IPV6_HOPLIMIT, 0 },			/* IPV6_HOPLIMIT	*/
+	{ OPTNOTSUP, 0 },			/* IPV6_RECVHOPOPTS	*/
+	{ OPTNOTSUP, 0 },			/* IPV6_HOPOPTS		*/
+	{ OPTNOTSUP, 0 },			/* IPV6_RTHDRDSTOPTS	*/
+	{ OPTNOTSUP, 0 },			/* IPV6_RECVRTHDR	*/
+	{ OPTNOTSUP, 0 },			/* IPV6_RTHDR		*/
+	{ OPTNOTSUP, 0 },			/* IPV6_RECVDSTOPTS	*/
+	{ OPTNOTSUP, 0 },			/* IPV6_DSTOPTS		*/
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },			/* IPV6_RECVTCLASS	*/
+	{ IPV6_TCLASS, sizeof (int) }		/* IPV6_TCLASS		*/
+};
+
+static const lx_sockopt_map_t ltos_icmpv6_sockopts[LX_ICMP6_FILTER + 1] = {
+	{ OPTNOTSUP, 0 },
+	{ ICMP6_FILTER, 0 }	/* ICMP6_FILTER	*/
+};
+
+static const lx_sockopt_map_t ltos_tcp_sockopts[LX_TCP_NOTSENT_LOWAT + 1] = {
+	{ OPTNOTSUP, 0 },
+	{ TCP_NODELAY, sizeof (int) },		/* TCP_NODELAY		*/
+	{ TCP_MAXSEG, sizeof (int) },		/* TCP_MAXSEG		*/
+	{ TCP_CORK, sizeof (int) },		/* TCP_CORK		*/
+	{ TCP_KEEPIDLE, sizeof (int) },		/* TCP_KEEPIDLE		*/
+	{ TCP_KEEPINTVL, sizeof (int) },	/* TCP_KEEPINTVL	*/
+	{ TCP_KEEPCNT, sizeof (int) },		/* TCP_KEEPCNT		*/
+	{ OPTNOTSUP, 0 },			/* TCP_SYNCNT		*/
+	{ TCP_LINGER2, sizeof (int) },		/* TCP_LINGER2		*/
+	{ OPTNOTSUP, 0 },			/* TCP_DEFER_ACCEPT	*/
+	{ OPTNOTSUP, 0 },			/* TCP_WINDOW_CLAMP	*/
+	{ OPTNOTSUP, 0 },			/* TCP_INFO		*/
+	{ OPTNOTSUP, 0 },			/* TCP_QUICKACK		*/
+	{ OPTNOTSUP, 0 },			/* TCP_CONGESTION	*/
+	{ OPTNOTSUP, 0 },			/* TCP_MD5SIG		*/
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },			/* TCP_THIN_LINEAR_TIMEOUTS */
+	{ OPTNOTSUP, 0 },			/* TCP_THIN_DUPACK	*/
+	{ OPTNOTSUP, 0 },			/* TCP_USER_TIMEOUT	*/
+	{ OPTNOTSUP, 0 },			/* TCP_REPAIR		*/
+	{ OPTNOTSUP, 0 },			/* TCP_REPAIR_QUEUE	*/
+	{ OPTNOTSUP, 0 },			/* TCP_QUEUE_SEQ	*/
+	{ OPTNOTSUP, 0 },			/* TCP_REPAIR_OPTIONS	*/
+	{ OPTNOTSUP, 0 },			/* TCP_FASTOPEN		*/
+	{ OPTNOTSUP, 0 },			/* TCP_TIMESTAMP	*/
+	{ OPTNOTSUP, 0 }			/* TCP_NOTSENT_LOWAT	*/
+};
+
+static const lx_sockopt_map_t ltos_igmp_sockopts[IGMP_MTRACE + 1] = {
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ IGMP_MINLEN, 0 },		/* IGMP_MINLEN			*/
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ IGMP_MEMBERSHIP_QUERY, 0 },	/* IGMP_HOST_MEMBERSHIP_QUERY	*/
+	{ IGMP_V1_MEMBERSHIP_REPORT, 0 }, /* IGMP_HOST_MEMBERSHIP_REPORT */
+	{ IGMP_DVMRP, 0 },		/* IGMP_DVMRP			*/
+	{ IGMP_PIM, 0 },		/* IGMP_PIM			*/
+	{ OPTNOTSUP, 0 },		/* IGMP_TRACE			*/
+	{ IGMP_V2_MEMBERSHIP_REPORT, 0 }, /* IGMPV2_HOST_MEMBERSHIP_REPORT */
+	{ IGMP_V2_LEAVE_GROUP, 0 },	/* IGMP_HOST_LEAVE_MESSAGE	*/
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },
+	{ IGMP_MTRACE_RESP, 0 },	/* IGMP_MTRACE_RESP		*/
+	{ IGMP_MTRACE, 0 }		/* IGMP_MTRACE			*/
+};
+
+static const lx_sockopt_map_t ltos_socket_sockopts[LX_SO_BPF_EXTENSIONS + 1] = {
+	{ OPTNOTSUP, 0 },
+	{ SO_DEBUG, sizeof (int) },	/* SO_DEBUG			*/
+	{ SO_REUSEADDR, sizeof (int) },	/* SO_REUSEADDR			*/
+	{ SO_TYPE, 0 },			/* SO_TYPE			*/
+	{ SO_ERROR, 0 },		/* SO_ERROR			*/
+	{ SO_DONTROUTE, sizeof (int) },	/* SO_DONTROUTE			*/
+	{ SO_BROADCAST, sizeof (int) },	/* SO_BROADCAST			*/
+	{ SO_SNDBUF, sizeof (int) },	/* SO_SNDBUF			*/
+	{ SO_RCVBUF, sizeof (int) },	/* SO_RCVBUF			*/
+	{ SO_KEEPALIVE, sizeof (int) },	/* SO_KEEPALIVE			*/
+	{ SO_OOBINLINE, sizeof (int) },	/* SO_OOBINLINE			*/
+	{ OPTNOTSUP, 0 },		/* SO_NO_CHECK			*/
+	{ OPTNOTSUP, 0 },		/* SO_PRIORITY			*/
+	{ SO_LINGER, 0 },		/* SO_LINGER			*/
+	{ OPTNOTSUP, 0 },		/* SO_BSDCOMPAT			*/
+	{ OPTNOTSUP, 0 },		/* SO_REUSEPORT			*/
+	{ SO_RECVUCRED, sizeof (int) },	/* SO_PASSCRED			*/
+	{ OPTNOTSUP, 0 },		/* SO_PEERCRED			*/
+	{ SO_RCVLOWAT, sizeof (int) },	/* SO_RCVLOWAT			*/
+	{ SO_SNDLOWAT, sizeof (int) },	/* SO_SNDLOWAT			*/
+	{ SO_RCVTIMEO, 0 },		/* SO_RCVTIMEO			*/
+	{ SO_SNDTIMEO, 0 },		/* SO_SNDTIMEO			*/
+	{ OPTNOTSUP, 0 },		/* SO_SECURITY_AUTHENTICATION	*/
+	{ OPTNOTSUP, 0 },		/* SO_SECURITY_ENCRYPTION_TRANSPORT */
+	{ OPTNOTSUP, 0 },		/* SO_SECURITY_ENCRYPTION_NETWORK */
+	{ OPTNOTSUP, 0 },		/* SO_BINDTODEVICE		*/
+	{ SO_ATTACH_FILTER, 0 },	/* SO_ATTACH_FILTER		*/
+	{ SO_DETACH_FILTER, 0 },	/* SO_DETACH_FILTER		*/
+	{ OPTNOTSUP, 0 },		/* SO_PEERNAME			*/
+	{ SO_TIMESTAMP, sizeof (int) },	/* SO_TIMESTAMP			*/
+	{ SO_ACCEPTCONN, 0 },		/* SO_ACCEPTCONN		*/
+	{ OPTNOTSUP, 0 },		/* SO_PEERSEC			*/
+	{ SO_SNDBUF, sizeof (int) },	/* SO_SNDBUFFORCE		*/
+	{ SO_RCVBUF, sizeof (int) },	/* SO_RCVBUFFORCE		*/
+	{ OPTNOTSUP, 0 },		/* SO_PASSSEC			*/
+	{ OPTNOTSUP, 0 },		/* SO_TIMESTAMPNS		*/
+	{ OPTNOTSUP, 0 },		/* SO_MARK			*/
+	{ OPTNOTSUP, 0 },		/* SO_TIMESTAMPING		*/
+	{ SO_PROTOTYPE, 0 },		/* SO_PROTOCOL			*/
+	{ SO_DOMAIN, 0 },		/* SO_DOMAIN			*/
+	{ OPTNOTSUP, 0 },		/* SO_RXQ_OVFL			*/
+	{ OPTNOTSUP, 0 },		/* SO_WIFI_STATUS		*/
+	{ OPTNOTSUP, 0 },		/* SO_PEEK_OFF			*/
+	{ OPTNOTSUP, 0 },		/* SO_NOFCS			*/
+	{ OPTNOTSUP, 0 },		/* SO_LOCK_FILTER		*/
+	{ OPTNOTSUP, 0 },		/* SO_SELECT_ERR_QUEUE		*/
+	{ OPTNOTSUP, 0 },		/* SO_BUSY_POLL			*/
+	{ OPTNOTSUP, 0 },		/* SO_MAX_PACING_RATE		*/
+	{ OPTNOTSUP, 0 }		/* SO_BPF_EXTENSIONS		*/
+};
+
+static const lx_sockopt_map_t ltos_raw_sockopts[LX_ICMP_FILTER + 1] = {
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 }		/* ICMP_FILTER		*/
+};
+
+static const lx_sockopt_map_t ltos_packet_sockopts[LX_PACKET_STATISTICS + 1] = {
+	{ OPTNOTSUP, 0 },
+	{ PACKET_ADD_MEMBERSHIP, 0 },	/* PACKET_ADD_MEMBERSHIP	*/
+	{ PACKET_DROP_MEMBERSHIP, 0 },	/* PACKET_DROP_MEMBERSHIP	*/
+	{ OPTNOTSUP, 0 },		/* PACKET_RECV_OUTPUT		*/
+	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },		/* PACKET_RX_RING		*/
+	{ PACKET_STATISTICS, 0 }	/* PACKET_STATISTICS		*/
+};
+
+/* Needed for SO_ATTACH_FILTER */
+struct lx_bpf_program {
+    unsigned short bf_len;
+    caddr_t bf_insns;
+};
+
+/* Invert filter fields as Linux expects */
+#define	LX_ICMP6_FILTER_INVERT(filterp) ( \
+	((filterp)->__icmp6_filt[0] ^= 0xFFFFFFFFU), \
+	((filterp)->__icmp6_filt[1] ^= 0xFFFFFFFFU), \
+	((filterp)->__icmp6_filt[2] ^= 0xFFFFFFFFU), \
+	((filterp)->__icmp6_filt[3] ^= 0xFFFFFFFFU), \
+	((filterp)->__icmp6_filt[4] ^= 0xFFFFFFFFU), \
+	((filterp)->__icmp6_filt[5] ^= 0xFFFFFFFFU), \
+	((filterp)->__icmp6_filt[6] ^= 0xFFFFFFFFU), \
+	((filterp)->__icmp6_filt[7] ^= 0xFFFFFFFFU))
+
+static boolean_t
+lx_sockopt_lookup(lx_proto_opts_t tbl, int *optname, socklen_t *optlen)
+{
+	const lx_sockopt_map_t *entry;
+
+	if (*optname > tbl.lpo_max) {
+		return (B_FALSE);
+	}
+	entry = &tbl.lpo_entries[*optname];
+	if (entry->lsm_opt == OPTNOTSUP) {
+		return (B_FALSE);
+	}
+	*optname = entry->lsm_opt;
+	/* Truncate the optlen if needed/allowed */
+	if (entry->lsm_lcap != 0 && *optlen > entry->lsm_lcap) {
+		*optlen = entry->lsm_lcap;
+	}
+	return (B_TRUE);
+}
+
+static int
+lx_setsockopt_ip(sonode_t *so, int optname, void *optval, socklen_t optlen)
+{
+	int error;
+	int *intval = (int *)optval;
+	lx_proto_opts_t sockopts_tbl = PROTO_SOCKOPTS(ltos_ip_sockopts);
+
+	switch (optname) {
+	case LX_IP_RECVERR:
+		/*
+		 * Ping sets this option to receive errors on raw sockets.
+		 * Currently we just ignore it to make ping happy. From the
+		 * Linux ip.7 man page:
+		 *
+		 *   For raw sockets, IP_RECVERR enables passing of all
+		 *   received ICMP errors to the application.
+		 *
+		 * Programs known to depend upon this:
+		 * - ping
+		 * - traceroute
+		 * - mount.nfs
+		 */
+		return (0);
+
+	case LX_IP_MTU_DISCOVER:
+		/*
+		 * Native programs such as traceroute use IP_DONTFRAG to
+		 * achieve this functionality.  Set that option instead.
+		 */
+		optlen = MIN(optlen, sizeof (int));
+		error = socket_setsockopt(so, IPPROTO_IP, IP_DONTFRAG, optval,
+		    optlen, CRED());
+		return (error);
+
+	case LX_IP_MULTICAST_TTL:
+	case LX_IP_MULTICAST_LOOP:
+		/*
+		 * For IP_MULTICAST_TTL and IP_MULTICAST_LOOP, Linux defines
+		 * the option value to be an integer while we define it to be
+		 * an unsigned character.  To prevent the kernel from spitting
+		 * back an error on an illegal length, verify that the option
+		 * value is less than UCHAR_MAX before truncating optlen.
+		 */
+		if (optlen <= 0 || optlen > sizeof (int) ||
+		    *intval > UINT8_MAX) {
+			return (EINVAL);
+		}
+		optlen = sizeof (uchar_t);
+		break;
+
+	default:
+		break;
+	}
+
+	if (!lx_sockopt_lookup(sockopts_tbl, &optname, &optlen)) {
+		return (ENOPROTOOPT);
+	}
+
+	error = socket_setsockopt(so, IPPROTO_IP, optname, optval, optlen,
+	    CRED());
+	return (error);
+}
+
+static int
+lx_setsockopt_ipv6(sonode_t *so, int optname, void *optval, socklen_t optlen)
+{
+	int error;
+	lx_proto_opts_t sockopts_tbl = PROTO_SOCKOPTS(ltos_ipv6_sockopts);
+
+	if (optname == LX_IPV6_MTU) {
+		/*
+		 * There isn't a good translation for IPV6_MTU and certain apps
+		 * such as bind9 will bail if it cannot be set.
+		 * We just lie about the success for now.
+		 */
+		return (0);
+	}
+
+	if (!lx_sockopt_lookup(sockopts_tbl, &optname, &optlen)) {
+		return (ENOPROTOOPT);
+	}
+	error = socket_setsockopt(so, IPPROTO_IPV6, optname, optval, optlen,
+	    CRED());
+	return (error);
+}
+
+static int
+lx_setsockopt_icmpv6(sonode_t *so, int optname, void *optval, socklen_t optlen)
+{
+	int error;
+	lx_proto_opts_t sockopts_tbl = PROTO_SOCKOPTS(ltos_ipv6_sockopts);
+
+	if (optname == LX_ICMP6_FILTER && optval != NULL) {
+		/*
+		 * Surprise! The input to ICMP6_FILTER on Linux is inverted
+		 * when compared to illumos.
+		 */
+		if (optlen != sizeof (icmp6_filter_t)) {
+			return (EINVAL);
+		}
+		LX_ICMP6_FILTER_INVERT((icmp6_filter_t *)optval);
+	}
+
+	if (!lx_sockopt_lookup(sockopts_tbl, &optname, &optlen)) {
+		return (ENOPROTOOPT);
+	}
+	error = socket_setsockopt(so, IPPROTO_ICMPV6, optname, optval, optlen,
+	    CRED());
+	return (error);
+}
+
+static int
+lx_setsockopt_tcp(sonode_t *so, int optname, void *optval, socklen_t optlen)
+{
+	int error;
+	lx_proto_opts_t sockopts_tbl = PROTO_SOCKOPTS(ltos_tcp_sockopts);
+
+	if (optname == LX_TCP_DEFER_ACCEPT) {
+		int *intval;
+
+		/*
+		 * Emulate TCP_DEFER_ACCEPT using the datafilt(7M) socket
+		 * filter but we can't emulate the timeout aspect so treat any
+		 * non-zero value as enabling and zero as disabling.
+		 */
+		if (optlen != sizeof (int)) {
+			return (EINVAL);
+		}
+		intval = (int *)optval;
+
+
+		if (*intval > 0) {
+			error = socket_setsockopt(so, SOL_FILTER, FIL_ATTACH,
+			    "datafilt", 9, CRED());
+			if (error == EEXIST) {
+				error = 0;
+			}
+		} else {
+			error = socket_setsockopt(so, SOL_FILTER, FIL_DETACH,
+			    "datafilt", 9, CRED());
+			if (error == ENXIO) {
+				error = 0;
+			}
+		}
+		return (error);
+	}
+
+	if (!lx_sockopt_lookup(sockopts_tbl, &optname, &optlen)) {
+		return (ENOPROTOOPT);
+	}
+
+	error = socket_setsockopt(so, IPPROTO_TCP, optname, optval, optlen,
+	    CRED());
+	return (error);
+}
+
+static int
+lx_setsockopt_socket(sonode_t *so, int optname, void *optval, socklen_t optlen)
+{
+	int error;
+	lx_proto_opts_t sockopts_tbl = PROTO_SOCKOPTS(ltos_socket_sockopts);
+	struct lx_bpf_program *lbp;
+	struct bpf_program bp;
+
+	switch (optname) {
+	case LX_SO_BSDCOMPAT:
+		/* Linux ignores this option. */
+		return (0);
+
+	case LX_SO_TIMESTAMP:
+		/*
+		 * SO_TIMESTAMP is not supported on AF_UNIX sockets but we have
+		 * some of those which apps use for logging, etc., so pretend
+		 * this worked.
+		 */
+		if (so->so_family == AF_UNIX) {
+			return (0);
+		}
+		break;
+
+	case LX_SO_ATTACH_FILTER:
+		/*
+		 * Convert bpf program struct
+		 */
+		if (optlen != sizeof (struct lx_bpf_program)) {
+			return (EINVAL);
+		}
+		lbp = (struct lx_bpf_program *)optval;
+		bp.bf_len = lbp->bf_len;
+		bp.bf_insns = (struct bpf_insn *)lbp->bf_insns;
+		optval = &bp;
+		break;
+
+	case LX_SO_PASSSEC:
+		/*
+		 * SO_PASSSEC is very similar to SO_PASSCRED (emulated by
+		 * SO_RECVUCRED) in that it requests that cmsgs containing
+		 * identity information be attached to recieved messages.
+		 * Instead of ucred information, security-module-specific
+		 * information such as selinux label is expected
+		 *
+		 * Since LX does not at all support selinux today, the
+		 * option is silently accepted.
+		 */
+		return (0);
+	}
+
+	if (!lx_sockopt_lookup(sockopts_tbl, &optname, &optlen)) {
+		return (ENOPROTOOPT);
+	}
+
+	error = socket_setsockopt(so, SOL_SOCKET, optname, optval, optlen,
+	    CRED());
+	return (error);
+}
+
+static int
+lx_setsockopt_raw(sonode_t *so, int optname, void *optval, socklen_t optlen)
+{
+	int error;
+	lx_proto_opts_t sockopts_tbl = PROTO_SOCKOPTS(ltos_raw_sockopts);
+
+	switch (optname) {
+	case LX_ICMP_FILTER:
+		/*
+		 * This option is currently ignored to appease ping.
+		 */
+		return (0);
+
+	case LX_IPV6_CHECKSUM:
+		/*
+		 * Ping6 tries to set the IPV6_CHECKSUM offset in a way that
+		 * illumos won't allow.  Quietly ignore this to prevent it from
+		 * complaining.
+		 */
+		return (0);
+
+	default:
+		break;
+	}
+
+	if (!lx_sockopt_lookup(sockopts_tbl, &optname, &optlen)) {
+		return (ENOPROTOOPT);
+	}
+
+	error = socket_setsockopt(so, IPPROTO_TCP, optname, optval, optlen,
+	    CRED());
+	return (error);
+}
+
+static int
+lx_setsockopt_packet(sonode_t *so, int optname, void *optval, socklen_t optlen)
+{
+	int error;
+	lx_proto_opts_t sockopts_tbl = PROTO_SOCKOPTS(ltos_packet_sockopts);
+	struct packet_mreq *mr;
+
+	switch (optname) {
+	case LX_PACKET_ADD_MEMBERSHIP:
+	case LX_PACKET_DROP_MEMBERSHIP:
+		/* Convert Linux mr_type to illumos */
+		if (optlen != sizeof (struct packet_mreq)) {
+			return (EINVAL);
+		}
+		mr = (struct packet_mreq *)optval;
+		if (--mr->mr_type > PACKET_MR_ALLMULTI)
+			return (EINVAL);
+		optval = mr;
+		break;
+
+	default:
+		break;
+	}
+
+	if (!lx_sockopt_lookup(sockopts_tbl, &optname, &optlen)) {
+		return (ENOPROTOOPT);
+	}
+
+	error = socket_setsockopt(so, IPPROTO_TCP, optname, optval, optlen,
+	    CRED());
+	return (error);
+}
+
+static int
+lx_setsockopt_igmp(sonode_t *so, int optname, void *optval, socklen_t optlen)
+{
+	int error;
+	lx_proto_opts_t sockopts_tbl = PROTO_SOCKOPTS(ltos_igmp_sockopts);
+
+	if (!lx_sockopt_lookup(sockopts_tbl, &optname, &optlen)) {
+		return (ENOPROTOOPT);
+	}
+
+	error = socket_setsockopt(so, IPPROTO_IGMP, optname, optval, optlen,
+	    CRED());
+	return (error);
+}
+
+static int
+lx_getsockopt_ip(sonode_t *so, int optname, void *optval, socklen_t *optlen)
+{
+	int error = 0;
+	lx_proto_opts_t sockopts_tbl = PROTO_SOCKOPTS(ltos_ip_sockopts);
+
+	if (!lx_sockopt_lookup(sockopts_tbl, &optname, optlen)) {
+		return (ENOPROTOOPT);
+	}
+
+	error = socket_getsockopt(so, IPPROTO_IP, optname, optval, optlen, 0,
+	    CRED());
+	return (error);
+}
+
+static int
+lx_getsockopt_ipv6(sonode_t *so, int optname, void *optval, socklen_t *optlen)
+{
+	int error = 0;
+	lx_proto_opts_t sockopts_tbl = PROTO_SOCKOPTS(ltos_ipv6_sockopts);
+
+	if (!lx_sockopt_lookup(sockopts_tbl, &optname, optlen)) {
+		return (ENOPROTOOPT);
+	}
+
+	error = socket_getsockopt(so, IPPROTO_IPV6, optname, optval, optlen, 0,
+	    CRED());
+	return (error);
+}
+
+static int
+lx_getsockopt_icmpv6(sonode_t *so, int optname, void *optval,
+    socklen_t *optlen)
+{
+	int error = 0;
+	lx_proto_opts_t sockopts_tbl = PROTO_SOCKOPTS(ltos_tcp_sockopts);
+
+	if (optname == LX_ICMP6_FILTER) {
+		error = socket_getsockopt(so, IPPROTO_ICMPV6, ICMP6_FILTER,
+		    optval, optlen, 0, CRED());
+
+		/*
+		 * ICMP6_FILTER is inverted on Linux. Make it so before copying
+		 * back to caller's buffer.
+		 */
+		if (error == 0) {
+			LX_ICMP6_FILTER_INVERT((icmp6_filter_t *)optval);
+		}
+		return (error);
+	}
+
+	if (!lx_sockopt_lookup(sockopts_tbl, &optname, optlen)) {
+		return (ENOPROTOOPT);
+	}
+
+	error = socket_getsockopt(so, IPPROTO_ICMPV6, optname, optval, optlen,
+	    0, CRED());
+	return (error);
+}
+
+static int
+lx_getsockopt_tcp(sonode_t *so, int optname, void *optval, socklen_t *optlen)
+{
+	int error = 0;
+	int *intval = (int *)optval;
+	lx_proto_opts_t sockopts_tbl = PROTO_SOCKOPTS(ltos_tcp_sockopts);
+
+	switch (optname) {
+	case LX_TCP_CORK:
+		/*
+		 * We do not support TCP_CORK but some apps rely on it.  Rather
+		 * than return an error we just return 0.  This isn't exactly a
+		 * lie, since this option really isn't set, but it's not the
+		 * whole truth either. Fortunately, we aren't under oath.
+		 */
+		if (*optlen < sizeof (int)) {
+			error = EINVAL;
+		} else {
+			*intval = 0;
+		}
+		*optlen = sizeof (int);
+		return (error);
+
+	case LX_TCP_DEFER_ACCEPT:
+		/*
+		 * We do support TCP_DEFER_ACCEPT using the datafilt(7M) socket
+		 * filter but we don't emulate the timeout aspect so treat the
+		 * existence as 1 and absence as 0.
+		 */
+		if (*optlen < sizeof (int)) {
+			error = EINVAL;
+		} else {
+			struct fil_info fi[10];
+			int i;
+			socklen_t len = sizeof (fi);
+
+			if ((error = socket_getsockopt(so, SOL_FILTER,
+			    FIL_LIST, fi, &len, 0, CRED()) != 0)) {
+				*optlen = sizeof (int);
+				return (error);
+			}
+
+			*intval = 0;
+			len = len / sizeof (struct fil_info);
+			for (i = 0; i < len; i++) {
+				if (fi[i].fi_flags == FILF_PROG &&
+				    strcmp(fi[i].fi_name, "datafilt") == 0) {
+					*intval = 1;
+					break;
+				}
+			}
+		}
+		*optlen = sizeof (int);
+		return (error);
+	default:
+		break;
+	}
+
+	if (!lx_sockopt_lookup(sockopts_tbl, &optname, optlen)) {
+		return (ENOPROTOOPT);
+	}
+
+	error = socket_getsockopt(so, IPPROTO_TCP, optname, optval, optlen, 0,
+	    CRED());
+	return (error);
+}
+
+static int
+lx_getsockopt_socket(sonode_t *so, int optname, void *optval,
+    socklen_t *optlen)
+{
+	int error = 0;
+	int *intval = (int *)optval;
+	lx_proto_opts_t sockopts_tbl = PROTO_SOCKOPTS(ltos_socket_sockopts);
+
+	switch (optname) {
+	case LX_SO_PASSSEC:
+		/*
+		 * Communicate value of 0 since selinux-related functionality
+		 * is not supported.
+		 */
+		if (*optlen < sizeof (int)) {
+			error = EINVAL;
+		} else {
+			*intval = 0;
+		}
+		*optlen = sizeof (int);
+		return (error);
+
+	case LX_SO_PEERCRED:
+		if (*optlen < sizeof (struct lx_ucred)) {
+			error = EINVAL;
+		} else {
+			struct lx_ucred *lcred = (struct lx_ucred *)optval;
+
+			mutex_enter(&so->so_lock);
+			if ((so->so_mode & SM_CONNREQUIRED) == 0) {
+				error = ENOTSUP;
+			} else if (so->so_peercred == NULL) {
+				error = EINVAL;
+			} else {
+				lcred->lxu_uid = crgetuid(so->so_peercred);
+				lcred->lxu_gid = crgetgid(so->so_peercred);
+				lcred->lxu_pid = so->so_cpid;
+			}
+			mutex_exit(&so->so_lock);
+		}
+		*optlen = sizeof (struct lx_ucred);
+		return (error);
+
+	default:
+		break;
+	}
+
+	if (!lx_sockopt_lookup(sockopts_tbl, &optname, optlen)) {
+		return (ENOPROTOOPT);
+	}
+
+	error = socket_getsockopt(so, SOL_SOCKET, optname, optval, optlen, 0,
+	    CRED());
+
+	if (error == 0) {
+		switch (optname) {
+		case SO_TYPE:
+			/* translate our type back to Linux */
+			*intval = STOL_SOCKTYPE(*intval);
+			break;
+
+		case SO_ERROR:
+			*intval = lx_errno(*intval, EINVAL);
+			break;
+		default:
+			break;
+		}
+	}
+	return (error);
+}
+
+static int
+lx_getsockopt_raw(sonode_t *so, int optname, void *optval, socklen_t *optlen)
+{
+	int error = 0;
+	lx_proto_opts_t sockopts_tbl = PROTO_SOCKOPTS(ltos_raw_sockopts);
+
+	if (!lx_sockopt_lookup(sockopts_tbl, &optname, optlen)) {
+		return (ENOPROTOOPT);
+	}
+
+	error = socket_getsockopt(so, IPPROTO_RAW, optname, optval, optlen, 0,
+	    CRED());
+	return (error);
+}
+
+static int
+lx_getsockopt_packet(sonode_t *so, int optname, void *optval,
+    socklen_t *optlen)
+{
+	int error = 0;
+	lx_proto_opts_t sockopts_tbl = PROTO_SOCKOPTS(ltos_packet_sockopts);
+
+	if (!lx_sockopt_lookup(sockopts_tbl, &optname, optlen)) {
+		return (ENOPROTOOPT);
+	}
+
+	error = socket_getsockopt(so, SOL_PACKET, optname, optval, optlen, 0,
+	    CRED());
+	return (error);
+}
+
+static int
+lx_getsockopt_igmp(sonode_t *so, int optname, void *optval, socklen_t *optlen)
+{
+	int error = 0;
+	lx_proto_opts_t sockopts_tbl = PROTO_SOCKOPTS(ltos_igmp_sockopts);
+
+	if (!lx_sockopt_lookup(sockopts_tbl, &optname, optlen)) {
+		return (ENOPROTOOPT);
+	}
+
+	error = socket_getsockopt(so, IPPROTO_IGMP, optname, optval, optlen, 0,
+	    CRED());
+	return (error);
+}
+
+long
+lx_setsockopt(int sock, int level, int optname, void *optval, socklen_t optlen)
+{
+	struct sonode *so;
+	file_t *fp;
+	int buflen = 0;
+	intptr_t stkbuf[2];
+	void *optbuf = stkbuf;
+	int error = 0;
+
+	if (optlen != 0) {
+		if (optlen > SO_MAXARGSIZE) {
+			return (set_errno(EINVAL));
+		}
+		if (optlen > sizeof (stkbuf)) {
+			buflen = optlen;
+			optbuf = kmem_alloc(optlen, KM_SLEEP);
+		}
+		if (copyin(optval, optbuf, optlen) != 0) {
+			if (buflen != 0) {
+				kmem_free(optbuf, buflen);
+			}
+			return (set_errno(EFAULT));
+		}
+	}
+	if ((so = getsonode(sock, &error, &fp)) == NULL) {
+		if (buflen != 0) {
+			kmem_free(optbuf, buflen);
+		}
+		return (set_errno(error));
+	}
+
+	switch (level) {
+	case LX_IPPROTO_IP:
+		error = lx_setsockopt_ip(so, optname, optbuf, optlen);
+		break;
+	case LX_IPPROTO_IPV6:
+		error = lx_setsockopt_ipv6(so, optname, optbuf, optlen);
+		break;
+	case LX_IPPROTO_ICMPV6:
+		error = lx_setsockopt_icmpv6(so, optname, optbuf, optlen);
+		break;
+	case LX_IPPROTO_TCP:
+		error = lx_setsockopt_tcp(so, optname, optbuf, optlen);
+		break;
+	case LX_SOL_SOCKET:
+		error = lx_setsockopt_socket(so, optname, optbuf, optlen);
+		break;
+	case LX_IPPROTO_RAW:
+		error = lx_setsockopt_raw(so, optname, optbuf, optlen);
+		break;
+	case LX_SOL_PACKET:
+		error = lx_setsockopt_packet(so, optname, optbuf, optlen);
+		break;
+	case LX_IPPROTO_IGMP:
+		error = lx_setsockopt_igmp(so, optname, optbuf, optlen);
+		break;
+	case LX_SOL_NETLINK:
+		/*
+		 * Since our netlink implmentation is modeled after Linux,
+		 * sockopts can be passed directly through.
+		 */
+		error = socket_setsockopt(so, LX_SOL_NETLINK, optname, optval,
+		    optlen, CRED());
+		break;
+	default:
+		error = ENOPROTOOPT;
+		break;
+	}
+
+	if (error == ENOPROTOOPT) {
+		char buf[LX_UNSUP_BUFSZ];
+
+		snprintf(buf, LX_UNSUP_BUFSZ, "setsockopt(%d, %d)", level,
+		    optname);
+		lx_unsupported(buf);
+	}
+	if (buflen != 0) {
+		kmem_free(optbuf, buflen);
+	}
+	releasef(sock);
+	if (error != 0) {
+		return (set_errno(error));
+	}
+	return (0);
+}
+
+long
+lx_getsockopt(int sock, int level, int optname, void *optval,
+    socklen_t *optlenp)
+{
+	struct sonode *so;
+	file_t *fp;
+	int error = 0, buflen = 0;
+	socklen_t optlen;
+	intptr_t stkbuf[2];
+	void *optbuf = stkbuf;
+
+	if (copyin(optlenp, &optlen, sizeof (optlen)) != 0) {
+		return (set_errno(EFAULT));
+	}
+	if (optlen != 0) {
+		if (optlen > SO_MAXARGSIZE) {
+			return (set_errno(EINVAL));
+		}
+		if (optlen > sizeof (stkbuf)) {
+			buflen = optlen;
+			optbuf = kmem_zalloc(optlen, KM_SLEEP);
+		} else {
+			/* zero the on-stack buffer, just in case */
+			stkbuf[0] = 0;
+			stkbuf[1] = 0;
+		}
+	}
+	if ((so = getsonode(sock, &error, &fp)) == NULL) {
+		if (buflen != 0) {
+			kmem_free(optbuf, buflen);
+		}
+		return (set_errno(error));
+	}
+
+	switch (level) {
+	case LX_IPPROTO_IP:
+		error = lx_getsockopt_ip(so, optname, optbuf, &optlen);
+		break;
+	case LX_IPPROTO_IPV6:
+		error = lx_getsockopt_ipv6(so, optname, optbuf, &optlen);
+		break;
+	case LX_IPPROTO_ICMPV6:
+		error = lx_getsockopt_icmpv6(so, optname, optbuf, &optlen);
+		break;
+	case LX_IPPROTO_TCP:
+		error = lx_getsockopt_tcp(so, optname, optbuf, &optlen);
+		break;
+	case LX_SOL_SOCKET:
+		error = lx_getsockopt_socket(so, optname, optbuf, &optlen);
+		break;
+	case LX_IPPROTO_RAW:
+		error = lx_getsockopt_raw(so, optname, optbuf, &optlen);
+		break;
+	case LX_SOL_PACKET:
+		error = lx_getsockopt_packet(so, optname, optbuf, &optlen);
+		break;
+	case LX_IPPROTO_IGMP:
+		error = lx_getsockopt_igmp(so, optname, optbuf, &optlen);
+		break;
+	case LX_SOL_NETLINK:
+		/*
+		 * Since our netlink implmentation is modeled after Linux,
+		 * sockopts can be passed directly through.
+		 */
+		error = socket_getsockopt(so, LX_SOL_NETLINK, optname, optval,
+		    &optlen, 0, CRED());
+		break;
+	default:
+		error = EOPNOTSUPP;
+		break;
+	}
+
+	if (error == ENOPROTOOPT) {
+		char buf[LX_UNSUP_BUFSZ];
+
+		snprintf(buf, LX_UNSUP_BUFSZ, "getsockopt(%d, %d)", level,
+		    optname);
+		lx_unsupported(buf);
+	}
+	if (copyout(&optlen, optlenp, sizeof (optlen)) != 0) {
+		error = EFAULT;
+	}
+	if (error == 0 && optlen > 0) {
+		VERIFY(optlen <= sizeof (stkbuf) || optlen <= buflen);
+		if (copyout(optbuf, optval, optlen) != 0) {
+			error = EFAULT;
+		}
+	}
+	if (buflen != 0) {
+		kmem_free(optbuf, buflen);
+	}
+	releasef(sock);
+	if (error != 0) {
+		return (set_errno(error));
+	}
+	return (0);
+}
+
 #if defined(_SYSCALL32_IMPL)
 
 #define	LX_SYS_SOCKETCALL		102
@@ -2147,8 +3207,8 @@ static struct {
 	lx_sendto,	6,	/* sendto */
 	lx_recvfrom,	6,	/* recvfrom */
 	NULL,		2,	/* shutdown */
-	NULL,		5,	/* getsockopt */
-	NULL,		5,	/* getsockopt */
+	lx_getsockopt,	5,	/* getsockopt */
+	lx_setsockopt,	5,	/* getsockopt */
 	lx_sendmsg,	3,	/* sendmsg */
 	lx_recvmsg,	3,	/* recvmsg */
 	NULL,		4,	/* accept4 */

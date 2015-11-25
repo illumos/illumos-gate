@@ -89,9 +89,7 @@ extern long lx_accept(int, void *, int *);
 extern long lx_accept4(int, void *, int *, int);
 extern long lx_getpeername(int, void *, int *);
 extern long lx_getsockname(int, void *, int *);
-extern long lx_getsockopt(int, int, int, void *, int *);
 extern long lx_listen(int, int);
-extern long lx_setsockopt(int, int, int, void *, int);
 extern long lx_shutdown(int, int);
 extern long lx_socketpair(int, int, int, int *);
 
