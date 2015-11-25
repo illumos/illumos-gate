@@ -92,6 +92,7 @@ extern long lx_prctl();
 extern long lx_prlimit64();
 extern long lx_ptrace();
 extern long lx_read();
+extern long lx_readv();
 extern long lx_recv();
 extern long lx_recvmsg();
 extern long lx_recvfrom();
@@ -125,6 +126,7 @@ extern long lx_wait4();
 extern long lx_waitid();
 extern long lx_waitpid();
 extern long lx_write();
+extern long lx_writev();
 extern long lx_xattr();
 
 #if defined(_LP64)

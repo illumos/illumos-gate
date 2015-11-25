@@ -959,8 +959,8 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/*  16: ioctl */
 	lx_pread,			/*  17: pread64 */
 	lx_pwrite,			/*  18: pwrite64 */
-	lx_readv,			/*  19: readv */
-	lx_writev,			/*  20: writev */
+	NULL,				/*  19: readv */
+	NULL,				/*  20: writev */
 	lx_access,			/*  21: access */
 	NULL,				/*  22: pipe */
 	lx_select,			/*  23: select */
@@ -1416,8 +1416,8 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_select,			/* 142: select */
 	lx_flock,			/* 143: flock */
 	lx_msync,			/* 144: msync */
-	lx_readv,			/* 145: readv */
-	lx_writev,			/* 146: writev */
+	NULL,				/* 145: readv */
+	NULL,				/* 146: writev */
 	lx_getsid,			/* 147: getsid */
 	lx_fdatasync,			/* 148: fdatasync */
 	lx_sysctl,			/* 149: sysctl */
