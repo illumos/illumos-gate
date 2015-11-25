@@ -761,8 +761,8 @@ lx_sysent_t lx_sysent32[] = {
 	{"select",	NULL,			0,		5}, /* 142 */
 	{"flock",	NULL,			0,		2}, /* 143 */
 	{"msync",	NULL,			0,		3}, /* 144 */
-	{"readv",	NULL,			0,		3}, /* 145 */
-	{"writev",	NULL,			0,		3}, /* 146 */
+	{"readv",	lx_readv,		0,		3}, /* 145 */
+	{"writev",	lx_writev,		0,		3}, /* 146 */
 	{"getsid",	NULL,			0,		1}, /* 147 */
 	{"fdatasync",	NULL,			0,		1}, /* 148 */
 	{"sysctl",	NULL,			0,		1}, /* 149 */
@@ -1006,8 +1006,8 @@ lx_sysent_t lx_sysent64[] = {
 	{"ioctl",	lx_ioctl,		0,		3}, /* 16 */
 	{"pread64",	NULL,			0,		4}, /* 17 */
 	{"pwrite64",	NULL,			0,		4}, /* 18 */
-	{"readv",	NULL,			0,		3}, /* 19 */
-	{"writev",	NULL,			0,		3}, /* 20 */
+	{"readv",	lx_readv,		0,		3}, /* 19 */
+	{"writev",	lx_writev,		0,		3}, /* 20 */
 	{"access",	NULL,			0,		2}, /* 21 */
 	{"pipe",	lx_pipe,		0,		1}, /* 22 */
 	{"select",	NULL,			0,		5}, /* 23 */
