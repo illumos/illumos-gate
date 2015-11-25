@@ -144,6 +144,30 @@ extern "C" {
 #define	LX_SO_BPF_EXTENSIONS			48
 
 /*
+ * Options for use with [gs]etsockopt at the RAW level.
+ * IPPROTO_RAW
+ */
+#define	LX_ICMP_FILTER				1
+
+/*
+ * Options for use with [gs]etsockopt at the PACKET level.
+ * SOL_PACKET
+ */
+#define	LX_SOL_PACKET				263
+
+#define	LX_PACKET_ADD_MEMBERSHIP		1
+#define	LX_PACKET_DROP_MEMBERSHIP		2
+#define	LX_PACKET_RECV_OUTPUT			3
+#define	LX_PACKET_RX_RING			5
+#define	LX_PACKET_STATISTICS			6
+
+/*
+ * Options for use with [gs]etsockopt at the NETLINK level.
+ * SOL_NETLINK
+ */
+#define	LX_SOL_NETLINK				270
+
+/*
  * Linux socket type definitions
  */
 #define	LX_SOCK_STREAM		1	/* Connection-based byte streams */
@@ -283,6 +307,58 @@ extern "C" {
 #define	LX_IPV6_DSTOPTS		59
 #define	LX_IPV6_RECVTCLASS	66
 #define	LX_IPV6_TCLASS		67
+
+/*
+ * Options for use with [gs]etsockopt at the IP level.
+ * IPPROTO_ICMPV6
+ */
+
+#define	LX_ICMP6_FILTER		1
+
+/*
+ * Options for use with [gs]etsockopt at the TCP level.
+ * IPPROTO_TCP
+ */
+#define	LX_TCP_NODELAY		1  /* Don't delay send to coalesce packets  */
+#define	LX_TCP_MAXSEG		2  /* Set maximum segment size  */
+#define	LX_TCP_CORK		3  /* Control sending of partial frames  */
+#define	LX_TCP_KEEPIDLE		4  /* Start keeplives after this period */
+#define	LX_TCP_KEEPINTVL	5  /* Interval between keepalives */
+#define	LX_TCP_KEEPCNT		6  /* Number of keepalives before death */
+#define	LX_TCP_SYNCNT		7  /* Number of SYN retransmits */
+#define	LX_TCP_LINGER2		8  /* Life time of orphaned FIN-WAIT-2 state */
+#define	LX_TCP_DEFER_ACCEPT	9  /* Wake up listener only when data arrive */
+#define	LX_TCP_WINDOW_CLAMP	10 /* Bound advertised window */
+#define	LX_TCP_INFO		11 /* Information about this connection. */
+#define	LX_TCP_QUICKACK		12 /* Bock/reenable quick ACKs.  */
+#define	LX_TCP_CONGESTION	13 /* Congestion control algorithm */
+#define	LX_TCP_MD5SIG		14 /* TCP MD5 Signature (RFC2385) */
+#define	LX_TCP_THIN_LINEAR_TIMEOUTS 16 /* Use linear timeouts on thin streams */
+#define	LX_TCP_THIN_DUPACK	17 /* Fast retrans. after 1 dupack */
+#define	LX_TCP_USER_TIMEOUT	18 /* How long for loss retry before timeout */
+#define	LX_TCP_REPAIR		19 /* TCP socket under repair */
+#define	LX_TCP_REPAIR_QUEUE	20
+#define	LX_TCP_QUEUE_SEQ	21
+#define	LX_TCP_REPAIR_OPTIONS	22
+#define	LX_TCP_FASTOPEN		23 /* Enable FastOpen on listeners */
+#define	LX_TCP_TIMESTAMP	24
+#define	LX_TCP_NOTSENT_LOWAT	25 /* limit number of unsent bytes */
+
+/*
+ * Options for use with [gs]etsockopt at the IGMP level.
+ * IPPROTO_IGMP
+ */
+#define	LX_IGMP_MINLEN				8
+#define	LX_IGMP_MAX_HOST_REPORT_DELAY		10
+#define	LX_IGMP_HOST_MEMBERSHIP_QUERY		0x11
+#define	LX_IGMP_HOST_MEMBERSHIP_REPORT		0x12
+#define	LX_IGMP_DVMRP				0x13
+#define	LX_IGMP_PIM				0x14
+#define	LX_IGMP_TRACE				0x15
+#define	LX_IGMP_HOST_NEW_MEMBERSHIP_REPORT	0x16
+#define	LX_IGMP_HOST_LEAVE_MESSAGE		0x17
+#define	LX_IGMP_MTRACE_RESP			0x1e
+#define	LX_IGMP_MTRACE				0x1f
 
 /*
  * Linux socket flags for use with recv(2)/send(2)/recvmsg(2)/sendmsg(2)

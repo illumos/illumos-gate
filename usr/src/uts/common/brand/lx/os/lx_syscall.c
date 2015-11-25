@@ -1041,8 +1041,8 @@ lx_sysent_t lx_sysent64[] = {
 	{"getsockname",	NULL,			0,		3}, /* 51 */
 	{"getpeername",	NULL,			0,		3}, /* 52 */
 	{"socketpair",	NULL,			0,		4}, /* 53 */
-	{"setsockopt",	NULL,			0,		5}, /* 54 */
-	{"getsockopt",	NULL,			0,		5}, /* 55 */
+	{"setsockopt",	lx_setsockopt,		0,		5}, /* 54 */
+	{"getsockopt",	lx_getsockopt,		0,		5}, /* 55 */
 	{"clone",	NULL,			0,		5}, /* 56 */
 	{"fork",	NULL,			0,		0}, /* 57 */
 	{"vfork",	NULL,			0,		0}, /* 58 */
