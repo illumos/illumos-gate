@@ -31,7 +31,7 @@ dir path=lib/svc/method
 dir path=usr group=sys
 dir path=usr/share/man
 dir path=usr/share/man/man4
-file path=etc/ssh/moduli group=sys preserve=true
+file path=etc/ssh/moduli.sunssh group=sys preserve=true
 file path=etc/ssh/ssh_config group=sys \
     original_name=network/ssh:etc/ssh/ssh_config preserve=true
 file path=etc/ssh/sshd_config group=sys \
@@ -42,6 +42,8 @@ file path=usr/share/man/man4/ssh_config.sunssh.4
 file path=usr/share/man/man4/sshd_config.sunssh.4
 license usr/src/cmd/ssh/THIRDPARTYLICENSE \
     license=usr/src/cmd/ssh/THIRDPARTYLICENSE
+link path=etc/ssh/moduli mediator=ssh mediator-implementation=sunssh \
+    target=moduli.sunssh
 link path=usr/share/man/man4/ssh_config.4 mediator=ssh \
     mediator-implementation=sunssh target=ssh_config.sunssh.4
 link path=usr/share/man/man4/sshd_config.4 mediator=ssh \
