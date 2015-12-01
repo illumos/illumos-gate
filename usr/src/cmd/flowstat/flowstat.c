@@ -191,7 +191,7 @@ static dladm_handle_t handle = NULL;
 
 const char *usage_ermsg = "flowstat [-r | -t] [-i interval] "
 	    "[-l link] [flow]\n"
-	    "       flowstat [-S] [-A] [-i interval] [-p] [ -o field[,...]]\n"
+	    "       flowstat [-A] [-i interval] [-p] [ -o field[,...]]\n"
 	    "                [-u R|K|M|G|T|P] [-l link] [flow]\n"
 	    "       flowstat -h [-a] [-d] [-F format]"
 	    " [-s <DD/MM/YYYY,HH:MM:SS>]\n"
@@ -546,7 +546,6 @@ main(int argc, char *argv[])
 	boolean_t		o_arg = B_FALSE;
 	boolean_t		u_arg = B_FALSE;
 	boolean_t		A_arg = B_FALSE;
-	boolean_t		S_arg = B_FALSE;
 	boolean_t		flow_arg = B_FALSE;
 	datalink_id_t		linkid = DATALINK_ALL_LINKID;
 	char			linkname[MAXLINKNAMELEN];
@@ -585,7 +584,7 @@ main(int argc, char *argv[])
 	bzero(&state, sizeof (state));
 
 	opterr = 0;
-	while ((option = getopt_long(argc, argv, ":rtApSi:o:u:l:h",
+	while ((option = getopt_long(argc, argv, ":rtApi:o:u:l:h",
 	    NULL, NULL)) != -1) {
 		switch (option) {
 		case 'r':
@@ -611,11 +610,6 @@ main(int argc, char *argv[])
 				die_optdup(option);
 
 			p_arg = B_TRUE;
-			break;
-		case 'S':
-			if (S_arg)
-				die_optdup(option);
-			S_arg = B_TRUE;
 			break;
 		case 'i':
 			if (i_arg)
@@ -648,9 +642,9 @@ main(int argc, char *argv[])
 			break;
 		case 'h':
 			if (r_arg || t_arg || p_arg || o_arg || u_arg ||
-			    i_arg || S_arg || A_arg) {
+			    i_arg || A_arg) {
 				die("the option -h is not compatible with "
-				    "-r, -t, -p, -o, -u, -i, -S, -A");
+				    "-r, -t, -p, -o, -u, -i, -A");
 			}
 			do_show_history(argc, argv);
 			return (0);
@@ -673,11 +667,6 @@ main(int argc, char *argv[])
 	if (p_arg && strcasecmp(o_fields_str, "all") == 0)
 		die("\"-o all\" is invalid with -p");
 
-	if (S_arg &&
-	    (r_arg || t_arg || p_arg || o_arg || u_arg))
-		die("the option -S is not compatible with "
-		    "-r, -t, -p, -o, -u");
-
 	if (A_arg &&
 	    (r_arg || t_arg || p_arg || o_arg || u_arg || i_arg))
 		die("the option -A is not compatible with "
@@ -691,12 +680,6 @@ main(int argc, char *argv[])
 		flow_arg = B_TRUE;
 	} else if (optind != argc) {
 		usage();
-	}
-
-	if (S_arg) {
-		dladm_continuous(handle, linkid, (flow_arg ? flowname : NULL),
-		    interval, FLOW_REPORT);
-		return (0);
 	}
 
 	if (flow_arg &&

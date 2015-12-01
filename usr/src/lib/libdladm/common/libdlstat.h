@@ -261,9 +261,6 @@ typedef struct pktsum_s {
 	uint64_t	oerrors;
 } pktsum_t;
 
-extern void		dladm_continuous(dladm_handle_t, datalink_id_t,
-			    const char *, int, int);
-
 extern kstat_t		*dladm_kstat_lookup(kstat_ctl_t *, const char *, int,
 			    const char *, const char *);
 extern void		dladm_get_stats(kstat_ctl_t *, kstat_t *, pktsum_t *);
