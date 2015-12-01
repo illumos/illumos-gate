@@ -28,7 +28,8 @@
 #include <sys/file.h>
 #include <sys/fcntl.h>
 
-int flock(fd, operation)
+int
+flock(fd, operation)
 int fd, operation;
 {
 	struct flock fl;
@@ -44,7 +45,7 @@ int fd, operation;
 		fl.l_type |= F_RDLCK;
 	if (operation & LOCK_EX)
 		fl.l_type |= F_WRLCK;
-	if (operation & LOCK_NB) 
+	if (operation & LOCK_NB)
 		cmd = F_FLOCK;
-	return(bc_fcntl(fd, cmd, &fl));
+	return (bc_fcntl(fd, cmd, &fl));
 }

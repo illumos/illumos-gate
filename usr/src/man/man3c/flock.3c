@@ -26,7 +26,6 @@ flock \- OFD(open file description)-style file locking
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBflock()\fR function allows advisory locks to be applied to and removed
 from a file. Calls to \fBflock()\fR from callers that attempt to lock
@@ -79,12 +78,10 @@ Sleeping on a resource is interrupted with any signal. The \fBalarm\fR(2)
 function may be used to provide a timeout facility in applications that require
 this facility.
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, \fB0\fR is returned.  Otherwise, \fB\(mi1\fR is
 returned and \fBerrno\fR is set to indicate the error.
 .SH ERRORS
-.sp
 .LP
 The \fBflock()\fR function will fail if:
 .sp
@@ -165,7 +162,6 @@ supported.
 .RE
 
 .SH USAGE
-.sp
 .LP
 File-locking should not be used in combination with the \fBfopen\fR(3C),
 \fBfread\fR(3C), \fBfwrite\fR(3C) and other \fBstdio\fR functions.  Instead,
@@ -184,7 +180,6 @@ Locks created by this facility conflict with those created by the
 removed OFD-style locks; see \fBfcntl\fR(2) for information about the
 interaction between OFD-style and POSIX-style file locks.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -202,7 +197,6 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBIntro\fR(2), \fBalarm\fR(2), \fBchmod\fR(2), \fBclose\fR(2), \fBcreat\fR(2),
 \fBfcntl\fR(2), \fBmmap\fR(2), \fBopen\fR(2), \fBread\fR(2), \fBwrite\fR(2),

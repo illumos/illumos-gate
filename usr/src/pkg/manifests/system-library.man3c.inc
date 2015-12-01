@@ -126,6 +126,7 @@ file path=usr/share/man/man3c/fgetc.3c
 file path=usr/share/man/man3c/fgetpos.3c
 file path=usr/share/man/man3c/fgetwc.3c
 file path=usr/share/man/man3c/floating_to_decimal.3c
+file path=usr/share/man/man3c/flock.3c
 file path=usr/share/man/man3c/flockfile.3c
 file path=usr/share/man/man3c/fmtmsg.3c
 file path=usr/share/man/man3c/fnmatch.3c

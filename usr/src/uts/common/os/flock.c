@@ -525,7 +525,7 @@ ofdcleanlock(file_t *fp)
  *
  * Because these locks are only assoiciated with a pid they are per-process.
  * This is why any close will drop the lock and is also why once the process
- * forks then the lock is no long related to the new process. These locks can
+ * forks then the lock is no longer related to the new process. These locks can
  * be considered as pid-ful.
  *
  * See ofdlock() for the implementation of a similar but improved locking
