@@ -460,7 +460,7 @@ bootfs_map(vnode_t *vp, offset_t off, struct as *as, caddr_t *addrp,
 	if (vp->v_type != VREG)
 		return (ENODEV);
 
-	if (prot & PROT_WRITE)
+	if ((prot & PROT_WRITE) && (flags & MAP_SHARED))
 		return (ENOTSUP);
 
 	as_rangelock(as);
