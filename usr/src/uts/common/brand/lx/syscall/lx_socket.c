@@ -3022,6 +3022,8 @@ lx_setsockopt(int sock, int level, int optname, void *optval, socklen_t optlen)
 			}
 			return (set_errno(EFAULT));
 		}
+	} else {
+		optbuf = NULL;
 	}
 	if ((so = getsonode(sock, &error, &fp)) == NULL) {
 		if (buflen != 0) {
@@ -3111,6 +3113,8 @@ lx_getsockopt(int sock, int level, int optname, void *optval,
 			stkbuf[0] = 0;
 			stkbuf[1] = 0;
 		}
+	} else {
+		optbuf = NULL;
 	}
 	if ((so = getsonode(sock, &error, &fp)) == NULL) {
 		if (buflen != 0) {
