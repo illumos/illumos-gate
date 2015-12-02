@@ -1397,6 +1397,48 @@ lx_connect(long sock, uintptr_t name, socklen_t namelen)
 	return (0);
 }
 
+/*
+ * Custom version of socket_recvmsg for error-handling overrides.
+ */
+static int
+lx_socket_recvmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop,
+    cred_t *cr)
+{
+	int error;
+	ssize_t orig_resid = uiop->uio_resid;
+
+	/*
+	 * Do not bypass the cache when reading data, as the application
+	 * is likely to access the data shortly.
+	 */
+	uiop->uio_extflg |= UIO_COPY_CACHED;
+
+	error = SOP_RECVMSG(so, msg, uiop, cr);
+
+	switch (error) {
+	case EINTR:
+	/* EAGAIN is EWOULDBLOCK */
+	case EWOULDBLOCK:
+		/* We did a partial read */
+		if (uiop->uio_resid != orig_resid)
+			error = 0;
+		break;
+	case ENOTCONN:
+		/*
+		 * The rules are different for non-blocking sockets which are
+		 * still in the process of making a connection
+		 */
+		if ((msg->msg_flags & MSG_DONTWAIT) != 0 ||
+		    (uiop->uio_fmode & (FNONBLOCK|FNDELAY)) != 0) {
+			error = EAGAIN;
+		}
+		break;
+	default:
+		break;
+	}
+	return (error);
+}
+
 static long
 lx_recv_common(int sock, struct nmsghdr *msg, xuio_t *xuiop, int flags,
     void *namelenp, void *controllenp, void *flagsp)
@@ -1458,7 +1500,7 @@ lx_recv_common(int sock, struct nmsghdr *msg, xuio_t *xuiop, int flags,
 	/* Default to XPG4.2 operation */
 	msg->msg_flags |= MSG_XPG4_2;
 
-	error = socket_recvmsg(so, msg, (struct uio *)xuiop, CRED());
+	error = lx_socket_recvmsg(so, msg, (struct uio *)xuiop, CRED());
 	if (error) {
 		releasef(sock);
 		return (set_errno(error));
@@ -1797,9 +1839,7 @@ lx_recvmsg(int sock, void *msg, int flags)
 }
 
 /*
- * Custom version of socket_sendmsg.
- * This facilitates support of LX_MSG_NOSIGNAL with a parameter to override
- * SIGPIPE behavior on EPIPE.
+ * Custom version of socket_sendmsg for error-handling overrides.
  */
 static int
 lx_socket_sendmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop,
@@ -1835,7 +1875,8 @@ lx_socket_sendmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop,
 		 * The rules are different for non-blocking sockets which are
 		 * still in the process of making a connection
 		 */
-		if ((msg->msg_flags & MSG_DONTWAIT) != 0) {
+		if ((msg->msg_flags & MSG_DONTWAIT) != 0 ||
+		    (uiop->uio_fmode & (FNONBLOCK|FNDELAY)) != 0) {
 			error = EAGAIN;
 			break;
 		}
