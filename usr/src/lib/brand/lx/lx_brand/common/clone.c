@@ -105,7 +105,7 @@ struct clone_state {
  * Counter incremented when we vfork(2) ourselves, and decremented when the
  * vfork(2)ed child exit(2)s or exec(2)s.
  */
-static int is_vforked = 0;
+int lx_is_vforked = 0;
 
 long
 lx_exit(uintptr_t p1)
@@ -117,8 +117,8 @@ lx_exit(uintptr_t p1)
 	 * If we are a vfork(2)ed child, we need to exit as quickly and
 	 * cleanly as possible to avoid corrupting our parent.
 	 */
-	if (is_vforked != 0) {
-		is_vforked--;
+	if (lx_is_vforked != 0) {
+		lx_is_vforked--;
 		_exit(status);
 	}
 
@@ -155,8 +155,8 @@ lx_group_exit(uintptr_t p1)
 	 * If we are a vfork(2)ed child, we need to exit as quickly and
 	 * cleanly as possible to avoid corrupting our parent.
 	 */
-	if (is_vforked != 0) {
-		is_vforked--;
+	if (lx_is_vforked != 0) {
+		lx_is_vforked--;
 		_exit(status);
 	}
 
@@ -422,10 +422,10 @@ lx_clone(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 			 * concurrently with our child.
 			 */
 			lx_sighandlers_save(&saved);
-			is_vforked++;
+			lx_is_vforked++;
 			rval = vforkx(fork_flags);
 			if (rval != 0) {
-				is_vforked--;
+				lx_is_vforked--;
 				lx_sighandlers_restore(&saved);
 			}
 		} else {

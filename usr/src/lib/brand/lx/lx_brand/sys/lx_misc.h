@@ -50,6 +50,7 @@ extern "C" {
 extern char lx_release[LX_KERN_RELEASE_MAX];
 extern char lx_cmd_name[MAXNAMLEN];
 extern pid_t zoneinit_pid;
+extern int lx_is_vforked;
 
 /*
  * Values Linux expects for init
