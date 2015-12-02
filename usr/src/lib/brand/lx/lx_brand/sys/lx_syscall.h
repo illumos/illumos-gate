@@ -312,8 +312,10 @@ extern long lx_utimes(const char *, const struct timeval *);
 
 #if defined(_LP64)
 #define	LX_SYS_clone		56
+#define	LX_SYS_vfork		58
 #else
 #define	LX_SYS_clone		120
+#define	LX_SYS_vfork		190
 #endif
 
 #ifdef	__cplusplus

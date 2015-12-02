@@ -27,6 +27,11 @@
 
 #include <errno.h>
 #include <unistd.h>
+#include <sys/fork.h>
+#include <sys/syscall.h>
+#include <sys/debug.h>
+#include <strings.h>
+#include <sys/lx_debug.h>
 #include <sys/lx_misc.h>
 #include <sys/lx_syscall.h>
 
@@ -37,24 +42,18 @@
  * initialization or else bad things will happen (i.e. ending up with a bad
  * schedctl page).  On Linux, there is no such thing as forkall(), so we use
  * fork1() here.
- *
- * For vfork(), we have a serious problem because the child is not allowed to
- * return from the current frame because it will corrupt the parent's stack.
- * Since the semantics of vfork() are rather ill-defined (other than "it's
- * faster than fork"), we should theoretically be safe by falling back to
- * fork1().
  */
-static long
-lx_fork_common(boolean_t is_vfork)
+
+long
+lx_fork(void)
 {
 	int ret;
-	int ptopt = is_vfork ? LX_PTRACE_O_TRACEVFORK : LX_PTRACE_O_TRACEFORK;
 
 	/*
 	 * Inform the in-kernel ptrace(2) subsystem that we are about to
 	 * emulate fork(2).
 	 */
-	lx_ptrace_clone_begin(ptopt, B_FALSE);
+	lx_ptrace_clone_begin(LX_PTRACE_O_TRACEFORK, B_FALSE);
 
 	/*
 	 * Suspend signal delivery, run the stack management prefork handler
@@ -78,7 +77,8 @@ lx_fork_common(boolean_t is_vfork)
 		 */
 		lx_free_other_stacks();
 
-		lx_ptrace_stop_if_option(ptopt, B_TRUE, 0, NULL);
+		lx_ptrace_stop_if_option(LX_PTRACE_O_TRACEFORK, B_TRUE, 0,
+		    NULL);
 
 		/*
 		 * Re-enable signal delivery in the child and return to the
@@ -88,7 +88,8 @@ lx_fork_common(boolean_t is_vfork)
 		return (0);
 
 	default:
-		lx_ptrace_stop_if_option(ptopt, B_FALSE, (ulong_t)ret, NULL);
+		lx_ptrace_stop_if_option(LX_PTRACE_O_TRACEFORK, B_FALSE,
+		    (ulong_t)ret, NULL);
 
 		/*
 		 * Re-enable signal delivery in the parent and return from
@@ -100,13 +101,76 @@ lx_fork_common(boolean_t is_vfork)
 }
 
 long
-lx_fork(void)
-{
-	return (lx_fork_common(B_FALSE));
-}
-
-long
 lx_vfork(void)
 {
-	return (lx_fork_common(B_TRUE));
+	int ret;
+	lx_sighandlers_t saved;
+	ucontext_t vforkuc;
+	ucontext_t *ucp;
+
+	ucp = lx_syscall_regs();
+
+	/*
+	 * Inform the in-kernel ptrace(2) subsystem that we are about to
+	 * emulate vfork(2).
+	 */
+	lx_ptrace_clone_begin(LX_PTRACE_O_TRACEVFORK, B_FALSE);
+
+	/*
+	 * Suspend signal delivery, run the stack management prefork handler
+	 * and perform the vfork operation. We use the same approach as in
+	 * lx_clone for signal handling and child return across vfork. See
+	 * the comments in lx_clone for more detail.
+	 */
+
+	_sigoff();
+	lx_stack_prefork();
+	lx_sighandlers_save(&saved);
+	lx_is_vforked++;
+	ret = vfork();
+	if (ret != 0) {
+		/* parent/error */
+		lx_is_vforked--;
+		lx_sighandlers_restore(&saved);
+	}
+
+	switch (ret) {
+	case -1:
+		lx_stack_postfork();
+		_sigon();
+		return (-errno);
+
+	case 0:
+		/* child */
+		lx_stack_postfork();
+
+		bcopy(ucp, &vforkuc, sizeof (vforkuc));
+		vforkuc.uc_brand_data[1] -= LX_NATIVE_STACK_VFORK_GAP;
+		vforkuc.uc_link = NULL;
+
+		lx_debug("\tvfork native stack sp %p",
+		    vforkuc.uc_brand_data[1]);
+
+		/* Stop for ptrace if required. */
+		lx_ptrace_stop_if_option(LX_PTRACE_O_TRACEVFORK, B_TRUE, 0,
+		    NULL);
+
+		/*
+		 * Return to the child via the specially constructed vfork(2)
+		 * context.
+		 */
+		LX_EMULATE_RETURN(&vforkuc, LX_SYS_vfork, 0, 0);
+		(void) syscall(SYS_brand, B_EMULATION_DONE, &vforkuc,
+		    LX_SYS_vfork, 0, 0);
+
+		VERIFY(0);
+		return (0);
+
+	default:
+		/* parent - child should have exited or exec-ed by now */
+		lx_ptrace_stop_if_option(LX_PTRACE_O_TRACEVFORK, B_FALSE,
+		    (ulong_t)ret, NULL);
+		_sigon();
+		return (ret);
+	}
 }
