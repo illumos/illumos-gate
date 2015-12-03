@@ -36,6 +36,9 @@ extern int flock_check(vnode_t *, flock64_t *, offset_t, offset_t);
 	LX_FALLOC_FL_NO_HIDE_STALE | LX_FALLOC_FL_COLLAPSE_RANGE | \
 	LX_FALLOC_FL_ZERO_RANGE)
 
+#define	LX_FALLOC_UNSUPP	(LX_FALLOC_FL_NO_HIDE_STALE | \
+	LX_FALLOC_FL_COLLAPSE_RANGE)
+
 long
 lx_fallocate(int fd, int mode, off_t offset, off_t len)
 {
@@ -56,7 +59,7 @@ lx_fallocate(int fd, int mode, off_t offset, off_t len)
 	if (tot > (LLONG_MAX / (int64_t)1024))
 		return (set_errno(EFBIG));
 
-	if (mode & LX_FALLOC_FL_COLLAPSE_RANGE)
+	if (mode & LX_FALLOC_UNSUPP)
 		return (set_errno(EOPNOTSUPP));
 
 	if ((fp = getf(fd)) == NULL)
