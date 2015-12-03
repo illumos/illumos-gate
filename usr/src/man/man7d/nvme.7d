@@ -48,7 +48,7 @@ to attach to devices supporting newer version of the NVMe
 specification.
 The default value is 1, limiting
 .Nm
-to work with devices up to specification version 1.0.
+to work with devices up to specification version 1.1.
 .It Va ignore-unknown-vendor-status
 This can be set to 1 to allow
 .Nm
@@ -95,8 +95,9 @@ A controller number, typically one for each
 device found.
 Controller numbers are dynamically assigned by the system.
 .It Va tn
-The target number, this corresponds to the namespace ID used by the
-hardware.
+The target number.
+This is the namespace EUI64 if available, or the namespace ID used by
+the hardware.
 Namespace ID 0 is reserved, hence target numbers start with 1.
 .It Va sn
 This is the
