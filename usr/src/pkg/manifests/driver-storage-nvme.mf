@@ -14,7 +14,7 @@
 #
 
 #
-# Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2016 Nexenta Systems, Inc. All rights reserved.
 #
 
 #
@@ -25,7 +25,7 @@
 <include global_zone_only_component>
 set name=pkg.fmri value=pkg:/driver/storage/nvme@$(PKGVERS)
 set name=pkg.description \
-    value="Driver for Intel NVMe 1.0e compliant storage devices"
+    value="Driver for Intel NVMe 1.1b compliant storage devices"
 set name=pkg.summary value="NVMe driver"
 set name=info.classification \
     value=org.opensolaris.category.2008:System/Hardware
@@ -37,7 +37,7 @@ dir path=usr group=sys
 dir path=usr/share
 dir path=usr/share/man
 dir path=usr/share/man/man7d
-driver name=nvme alias=pciex8086,953 class=disk perms="* 0600 root sys"
+driver name=nvme alias=pciexclass,010802 class=disk perms="* 0600 root sys"
 file path=kernel/drv/$(ARCH64)/nvme group=sys
 file path=kernel/drv/nvme group=sys
 file path=kernel/drv/nvme.conf group=sys

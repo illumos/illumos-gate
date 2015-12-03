@@ -18,7 +18,7 @@
 /*
  * blkdev driver for NVMe compliant storage devices
  *
- * This driver was written to conform to version 1.0e of the NVMe specification.
+ * This driver was written to conform to version 1.1b of the NVMe specification.
  * It may work with newer versions, but that is completely untested and disabled
  * by default.
  *
@@ -78,6 +78,11 @@
  * thin provisioning and protection information. This driver does not support
  * any of this and ignores namespaces that have these attributes.
  *
+ * As of NVMe 1.1 namespaces can have an 64bit Extended Unique Identifier
+ * (EUI64). This driver uses the EUI64 if present to generate the devid and
+ * passes it to blkdev to use it in the device node names. As this is currently
+ * untested namespaces with EUI64 are ignored by default.
+ *
  *
  * Blkdev Interface:
  *
@@ -93,8 +98,9 @@
  * Blkdev also supports querying device/media information and generating a
  * devid. The driver reports the best block size as determined by the namespace
  * format back to blkdev as physical block size to support partition and block
- * alignment. The devid is composed using the device vendor ID, model number,
- * serial number, and the namespace ID.
+ * alignment. The devid is either based on the namespace EUI64, if present, or
+ * composed using the device vendor ID, model number, serial number, and the
+ * namespace ID.
  *
  *
  * Error Handling:
@@ -140,7 +146,7 @@
  * The following driver properties can be changed to control some aspects of the
  * drivers operation:
  * - strict-version: can be set to 0 to allow devices conforming to newer
- *   versions to be used
+ *   versions or namespaces with EUI64 to be used
  * - ignore-unknown-vendor-status: can be set to 1 to not handle any vendor
  *   specific command status as a fatal error leading device faulting
  * - admin-queue-len: the maximum length of the admin queue (16-4096)
@@ -163,6 +169,11 @@
  * - support for media formatting and hard partitioning into namespaces
  * - support for big-endian systems
  * - support for fast reboot
+ * - support for firmware updates
+ * - support for NVMe Subsystem Reset (1.1)
+ * - support for Scatter/Gather lists (1.1)
+ * - support for Reservations (1.1)
+ * - support for power management
  */
 
 #include <sys/byteorder.h>
@@ -192,7 +203,7 @@
 
 /* NVMe spec version supported */
 static const int nvme_version_major = 1;
-static const int nvme_version_minor = 0;
+static const int nvme_version_minor = 1;
 
 /* tunable for admin command timeout in seconds, default is 1s */
 static volatile int nvme_admin_cmd_timeout = 1;
@@ -360,7 +371,7 @@ static struct dev_ops nvme_dev_ops = {
 
 static struct modldrv nvme_modldrv = {
 	.drv_modops	= &mod_driverops,
-	.drv_linkinfo	= "NVMe v1.0e",
+	.drv_linkinfo	= "NVMe v1.1b",
 	.drv_dev_ops	= &nvme_dev_ops
 };
 
@@ -1828,6 +1839,14 @@ nvme_shutdown(nvme_t *nvme, int mode, boolean_t quiesce)
 static void
 nvme_prepare_devid(nvme_t *nvme, uint32_t nsid)
 {
+	/*
+	 * Section 7.7 of the spec describes how to get a unique ID for
+	 * the controller: the vendor ID, the model name and the serial
+	 * number shall be unique when combined.
+	 *
+	 * If a namespace has no EUI64 we use the above and add the hex
+	 * namespace ID to get a unique ID for the namespace.
+	 */
 	char model[sizeof (nvme->n_idctl->id_model) + 1];
 	char serial[sizeof (nvme->n_idctl->id_serial) + 1];
 
@@ -1838,8 +1857,7 @@ nvme_prepare_devid(nvme_t *nvme, uint32_t nsid)
 	model[sizeof (nvme->n_idctl->id_model)] = '\0';
 	serial[sizeof (nvme->n_idctl->id_serial)] = '\0';
 
-	(void) snprintf(nvme->n_ns[nsid - 1].ns_devid,
-	    sizeof (nvme->n_ns[0].ns_devid), "%4X-%s-%s-%X",
+	nvme->n_ns[nsid - 1].ns_devid = kmem_asprintf("%4X-%s-%s-%X",
 	    nvme->n_idctl->id_vid, model, serial, nsid);
 }
 
@@ -1860,12 +1878,13 @@ nvme_init(nvme_t *nvme)
 
 	/* Check controller version */
 	vs.r = nvme_get32(nvme, NVME_REG_VS);
+	nvme->n_version.v_major = vs.b.vs_mjr;
+	nvme->n_version.v_minor = vs.b.vs_mnr;
 	dev_err(nvme->n_dip, CE_CONT, "?NVMe spec version %d.%d",
-	    vs.b.vs_mjr, vs.b.vs_mnr);
+	    nvme->n_version.v_major, nvme->n_version.v_minor);
 
-	if (nvme_version_major < vs.b.vs_mjr ||
-	    (nvme_version_major == vs.b.vs_mjr &&
-	    nvme_version_minor < vs.b.vs_mnr)) {
+	if (NVME_VERSION_HIGHER(&nvme->n_version,
+	    nvme_version_major, nvme_version_minor)) {
 		dev_err(nvme->n_dip, CE_WARN, "!no support for version > %d.%d",
 		    nvme_version_major, nvme_version_minor);
 		if (nvme->n_strict_version)
@@ -2164,7 +2183,26 @@ nvme_init(nvme_t *nvme)
 		    1 << idns->id_lbaf[idns->id_flbas.lba_format].lbaf_lbads;
 		nvme->n_ns[i].ns_best_block_size = nvme->n_ns[i].ns_block_size;
 
-		nvme_prepare_devid(nvme, nvme->n_ns[i].ns_id);
+		/*
+		 * Get the EUI64 if present. If not present prepare the devid
+		 * from other device data.
+		 */
+		if (NVME_VERSION_ATLEAST(&nvme->n_version, 1, 1))
+			bcopy(idns->id_eui64, nvme->n_ns[i].ns_eui64,
+			    sizeof (nvme->n_ns[i].ns_eui64));
+
+		/*LINTED: E_BAD_PTR_CAST_ALIGN*/
+		if (*(uint64_t *)nvme->n_ns[i].ns_eui64 == 0) {
+			nvme_prepare_devid(nvme, nvme->n_ns[i].ns_id);
+		} else {
+			/*
+			 * Until EUI64 support is tested on real hardware we
+			 * will ignore namespaces with an EUI64. This can
+			 * be overriden by setting strict-version=0 in nvme.conf
+			 */
+			if (nvme->n_strict_version)
+				nvme->n_ns[i].ns_ignore = B_TRUE;
+		}
 
 		/*
 		 * Find the LBA format with no metadata and the best relative
@@ -2662,6 +2700,8 @@ nvme_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 			if (nvme->n_ns[i].ns_idns)
 				kmem_free(nvme->n_ns[i].ns_idns,
 				    sizeof (nvme_identify_nsid_t));
+			if (nvme->n_ns[i].ns_devid)
+				strfree(nvme->n_ns[i].ns_devid);
 		}
 
 		kmem_free(nvme->n_ns, sizeof (nvme_namespace_t) *
@@ -2889,6 +2929,7 @@ nvme_bd_driveinfo(void *arg, bd_drive_t *drive)
 	drive->d_removable = B_FALSE;
 	drive->d_hotpluggable = B_FALSE;
 
+	bcopy(ns->ns_eui64, drive->d_eui64, sizeof (drive->d_eui64));
 	drive->d_target = ns->ns_id;
 	drive->d_lun = 0;
 
@@ -2992,6 +3033,12 @@ nvme_bd_devid(void *arg, dev_info_t *devinfo, ddi_devid_t *devid)
 {
 	nvme_namespace_t *ns = arg;
 
-	return (ddi_devid_init(devinfo, DEVID_ENCAP, strlen(ns->ns_devid),
-	    ns->ns_devid, devid));
+	/*LINTED: E_BAD_PTR_CAST_ALIGN*/
+	if (*(uint64_t *)ns->ns_eui64 != 0) {
+		return (ddi_devid_init(devinfo, DEVID_SCSI3_WWN,
+		    sizeof (ns->ns_eui64), ns->ns_eui64, devid));
+	} else {
+		return (ddi_devid_init(devinfo, DEVID_ENCAP,
+		    strlen(ns->ns_devid), ns->ns_devid, devid));
+	}
 }
