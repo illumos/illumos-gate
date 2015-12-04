@@ -1503,20 +1503,13 @@ zonecfg_rm_detached(zone_dochandle_t handle, boolean_t forced)
 	}
 }
 
-void
-zonecfg_notify_create(zone_dochandle_t handle)
+static void
+zonecfg_notify_conf_change(const char *zname, char *os, char *ns)
 {
-	char zname[ZONENAME_MAX];
 	evchan_t *ze_chan;
 	struct timeval now;
 	uint64_t t;
 	nvlist_t *nvl = NULL;
-
-	if (zonecfg_check_handle(handle) != Z_OK)
-		return;
-
-	if (zonecfg_get_name(handle, zname, sizeof (zname)) != Z_OK)
-		return;
 
 	if (sysevent_evc_bind(ZONE_EVENT_CHANNEL, &ze_chan, 0) != 0)
 		return;
@@ -1527,8 +1520,8 @@ zonecfg_notify_create(zone_dochandle_t handle)
 
 	if (nvlist_alloc(&nvl, NV_UNIQUE_NAME, KM_SLEEP) == 0 &&
 	    nvlist_add_string(nvl, ZONE_CB_NAME, zname) == 0 &&
-	    nvlist_add_string(nvl, ZONE_CB_NEWSTATE, "configured") == 0 &&
-	    nvlist_add_string(nvl, ZONE_CB_OLDSTATE, "") == 0 &&
+	    nvlist_add_string(nvl, ZONE_CB_NEWSTATE, ns) == 0 &&
+	    nvlist_add_string(nvl, ZONE_CB_OLDSTATE, os) == 0 &&
 	    nvlist_add_int32(nvl, ZONE_CB_ZONEID, -1) == 0 &&
 	    nvlist_add_uint64(nvl, ZONE_CB_TIMESTAMP, t) == 0) {
 		(void) sysevent_evc_publish(ze_chan, ZONE_EVENT_STATUS_CLASS,
@@ -1540,34 +1533,24 @@ zonecfg_notify_create(zone_dochandle_t handle)
 	(void) sysevent_evc_unbind(ze_chan);
 }
 
+void
+zonecfg_notify_create(zone_dochandle_t handle)
+{
+	char zname[ZONENAME_MAX];
+
+	if (zonecfg_check_handle(handle) != Z_OK)
+		return;
+
+	if (zonecfg_get_name(handle, zname, sizeof (zname)) != Z_OK)
+		return;
+
+	zonecfg_notify_conf_change(zname, "", ZONE_STATE_STR_CONFIGURED);
+}
+
 static void
 zonecfg_notify_delete(const char *zname)
 {
-	evchan_t *ze_chan;
-	struct timeval now;
-	uint64_t t;
-	nvlist_t *nvl = NULL;
-
-	if (sysevent_evc_bind(ZONE_EVENT_CHANNEL, &ze_chan, 0) != 0)
-		return;
-
-	/* Current time since Jan 1 1970 but consumers expect NS */
-	gettimeofday(&now, NULL);
-	t = (now.tv_sec * NANOSEC) + (now.tv_usec * 1000);
-
-	if (nvlist_alloc(&nvl, NV_UNIQUE_NAME, KM_SLEEP) == 0 &&
-	    nvlist_add_string(nvl, ZONE_CB_NAME, zname) == 0 &&
-	    nvlist_add_string(nvl, ZONE_CB_NEWSTATE, "") == 0 &&
-	    nvlist_add_string(nvl, ZONE_CB_OLDSTATE, "configured") == 0 &&
-	    nvlist_add_int32(nvl, ZONE_CB_ZONEID, -1) == 0 &&
-	    nvlist_add_uint64(nvl, ZONE_CB_TIMESTAMP, t) == 0) {
-		(void) sysevent_evc_publish(ze_chan, ZONE_EVENT_STATUS_CLASS,
-		    ZONE_EVENT_STATUS_SUBCLASS, "sun.com", "zonecfg", nvl,
-		    EVCH_SLEEP);
-	}
-
-	nvlist_free(nvl);
-	(void) sysevent_evc_unbind(ze_chan);
+	zonecfg_notify_conf_change(zname, ZONE_STATE_STR_CONFIGURED, "");
 }
 
 /*
@@ -6191,16 +6174,27 @@ int
 zone_set_state(char *zone, zone_state_t state)
 {
 	struct zoneent ze;
+	int res;
+	zone_state_t oldst = (zone_state_t)-1;
 
 	if (state != ZONE_STATE_CONFIGURED && state != ZONE_STATE_INSTALLED &&
 	    state != ZONE_STATE_INCOMPLETE)
 		return (Z_INVAL);
 
+	(void) zone_get_state(zone, &oldst);
+
 	bzero(&ze, sizeof (ze));
 	(void) strlcpy(ze.zone_name, zone, sizeof (ze.zone_name));
 	ze.zone_state = state;
 	(void) strlcpy(ze.zone_path, "", sizeof (ze.zone_path));
-	return (putzoneent(&ze, PZE_MODIFY));
+	res = putzoneent(&ze, PZE_MODIFY);
+
+	if (res == Z_OK) {
+		zonecfg_notify_conf_change(zone, zone_state_str(oldst),
+		    zone_state_str(state));
+	}
+
+	return (res);
 }
 
 /*
