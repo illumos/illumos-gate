@@ -1628,8 +1628,22 @@ mapelfexec(
 			break;
 
 		case PT_INTERP:
-			if (ptload)
-				goto bad;
+			/*
+			 * The ELF specification is unequivocal about the
+			 * PT_INTERP program header with respect to any PT_LOAD
+			 * program header:  "If it is present, it must precede
+			 * any loadable segment entry." Linux, however, makes
+			 * no attempt to enforce this -- which has allowed some
+			 * binary editing tools to get away with generating
+			 * invalid ELF binaries in the respect that PT_INTERP
+			 * occurs after the first PT_LOAD program header.  This
+			 * is unfortunate (and of course, disappointing) but
+			 * it's no worse than that: there is no reason that we
+			 * can't process the PT_INTERP entry (if present) after
+			 * one or more PT_LOAD entries.  We therefore
+			 * deliberately do not check ptload here and always
+			 * store dyphdr to be the PT_INTERP program header.
+			 */
 			*dyphdr = phdr;
 			break;
 
