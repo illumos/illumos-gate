@@ -25,6 +25,7 @@
  *
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
+ * Copyright (c) 2015, Joyent, Inc. All rights reserved.
  */
 
 #ifndef	_CONV_H
@@ -277,7 +278,7 @@ typedef union {
 } Conv_bnd_obj_buf_t;
 
 /* conv_phdr_flags() */
-#define	CONV_PHDR_FLAGS_BUFSIZE		88
+#define	CONV_PHDR_FLAGS_BUFSIZE		244
 typedef union {
 	Conv_inv_buf_t			inv_buf;
 	char				buf[CONV_PHDR_FLAGS_BUFSIZE];

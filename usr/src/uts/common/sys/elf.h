@@ -20,7 +20,7 @@
  */
 /*
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
- * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2015, Joyent, Inc. All rights reserved.
  */
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
@@ -348,6 +348,11 @@ typedef struct {
 #define	PT_GNU_STACK	0x6474e551	/* Indicates stack executability */
 #define	PT_GNU_RELRO	0x6474e552	/* Read-only after relocation */
 
+/*
+ * Linux specific program headers not even used by Linux (!!)
+ */
+#define	PT_PAX_FLAGS	0x65041580	/* PaX flags (see below) */
+
 #define	PT_LOSUNW	0x6ffffffa
 #define	PT_SUNWBSS	0x6ffffffa	/* Sun Specific segment (unused) */
 #define	PT_SUNWSTACK	0x6ffffffb	/* describes the stack segment */
@@ -362,6 +367,45 @@ typedef struct {
 #define	PF_R		0x4		/* p_flags */
 #define	PF_W		0x2
 #define	PF_X		0x1
+
+/*
+ * PaX is a regrettable series of never-integrated Linux patches for a
+ * facility to provide additional protections on memory pages for purposes of
+ * increasing security, and for allowing binaries to demand (or refuse) those
+ * protections via the PT_PAX_FLAGS program header.  (Portents of its
+ * rudderless existence, "PaX" is a term of indefinite origin written by an
+ * unknown group of people.)  This facility is unfortunate in any number of
+ * ways, and was largely obviated by the broad adoption of non-executable
+ * stacks at any rate -- but it lives on in binaries that continue to mark
+ * themselves to explicitly refuse the (never-integrated, now-obviated)
+ * facility.  One might cringe that PaX overloads the meaning of the p_flags
+ * to specify protections, but that is the least of its transgressions:
+ * instead of using one p_type constant to explicitly enable a series of
+ * protections and another to explicitly disable others, it insists on
+ * conflating both actions into PT_PAX_FLAGS.  The resulting doubling of
+ * constant definitions (two constant definitions for every protection instead
+ * of merely one) assures that the values can't even fit in the eight
+ * PF_MASKOS bits putatively defined to provide a modicum of cleanliness for
+ * such filthy functionality.  And were all of this not enough, there is one
+ * final nomenclature insult to be added to this semantic injury:  the
+ * constants for the p_flags don't even embed "_PAX_" in their name -- despite
+ * the fact that this is their only purpose!  We resist the temptation to
+ * right this final wrong here; we grit our teeth and provide exactly the
+ * Linux definitions -- or rather, what would have been the Linux definitions
+ * had this belching jalopy ever been permitted to crash itself into mainline.
+ */
+#define	PF_PAGEEXEC	0x00000010	/* PaX: enable PAGEEXEC */
+#define	PF_NOPAGEEXEC	0x00000020	/* PaX: disable PAGEEXEC */
+#define	PF_SEGMEXEC	0x00000040	/* PaX: enable SEGMEXEC */
+#define	PF_NOSEGMEXEC	0x00000080	/* PaX: disable SEGMEXEC */
+#define	PF_MPROTECT	0x00000100	/* PaX: enable MPROTECT */
+#define	PF_NOMPROTECT	0x00000200	/* PaX: disable MPROTECT */
+#define	PF_RANDEXEC	0x00000400	/* PaX: enable RANDEXEC */
+#define	PF_NORANDEXEC	0x00000800	/* PaX: disable RANDEXEC */
+#define	PF_EMUTRAMP	0x00001000	/* PaX: enable EMUTRAMP */
+#define	PF_NOEMUTRAMP	0x00002000	/* PaX: disable EMUTRAMP */
+#define	PF_RANDMMAP	0x00004000	/* PaX: enable RANDMMAP */
+#define	PF_NORANDMMAP	0x00008000	/* PaX: disable RANDMMAP */
 
 #define	PF_MASKOS	0x0ff00000	/* OS specific values */
 #define	PF_MASKPROC	0xf0000000	/* processor specific values */
