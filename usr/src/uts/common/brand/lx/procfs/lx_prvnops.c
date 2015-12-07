@@ -1745,6 +1745,7 @@ lxpr_get_thread(proc_t *p, uint_t lookup_id)
 	lx_lwp_data_t *lwpd;
 	pid_t pid = p->p_pid;
 	pid_t init_pid = curproc->p_zone->zone_proc_initpid;
+	boolean_t branded = (p->p_brand == &lx_brand);
 
 	/* get specified thread  */
 	if ((t = p->p_tlist) == NULL)
@@ -1757,14 +1758,18 @@ lxpr_get_thread(proc_t *p, uint_t lookup_id)
 		}
 
 		lwpd = ttolxlwp(t);
-		if (lwpd == NULL) {
-			emul_tid = t->t_tid;
-		} else {
+		if (branded && lwpd != NULL) {
 			if (pid == init_pid && lookup_id == 1) {
 				emul_tid = t->t_tid;
 			} else {
 				emul_tid = lwpd->br_pid;
 			}
+		} else {
+			/*
+			 * Make only the first (assumed to be main) thread
+			 * visible for non-branded processes.
+			 */
+			emul_tid = p->p_pid;
 		}
 		if (emul_tid == lookup_id) {
 			thread_lock(t);
@@ -4687,8 +4692,8 @@ lxpr_lookup_not_a_dir(vnode_t *dp, char *comp)
 /* ARGSUSED */
 static int
 lxpr_lookup(vnode_t *dp, char *comp, vnode_t **vpp, pathname_t *pathp,
-	int flags, vnode_t *rdir, cred_t *cr, caller_context_t *ct,
-	int *direntflags, pathname_t *realpnp)
+    int flags, vnode_t *rdir, cred_t *cr, caller_context_t *ct,
+    int *direntflags, pathname_t *realpnp)
 {
 	lxpr_node_t *lxpnp = VTOLXP(dp);
 	lxpr_nodetype_t type = lxpnp->lxpr_type;
@@ -4823,7 +4828,19 @@ lxpr_lookup_taskdir(vnode_t *dp, char *comp)
 		return (NULL);
 	}
 
-	t = lxpr_get_thread(p, tid);
+	if (p->p_brand == &lx_brand) {
+		t = lxpr_get_thread(p, tid);
+	} else {
+		/*
+		 * Only the main thread is visible for non-branded processes.
+		 */
+		t = p->p_tlist;
+		if (tid != p->p_pid || t == NULL) {
+			t = NULL;
+		} else {
+			thread_lock(t);
+		}
+	}
 	if (t == NULL) {
 		lxpr_unlock(p);
 		return (NULL);
@@ -5044,7 +5061,7 @@ lxpr_lookup_sys_fs_inotifydir(vnode_t *dp, char *comp)
 /* ARGSUSED */
 static int
 lxpr_readdir(vnode_t *dp, uio_t *uiop, cred_t *cr, int *eofp,
-	caller_context_t *ct, int flags)
+    caller_context_t *ct, int flags)
 {
 	lxpr_node_t *lxpnp = VTOLXP(dp);
 	lxpr_nodetype_t type = lxpnp->lxpr_type;
@@ -5387,6 +5404,7 @@ lxpr_readdir_taskdir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
 	int tasknum;
 	pid_t real_pid;
 	kthread_t *t;
+	boolean_t branded = B_FALSE;
 
 	ASSERT(lxpnp->lxpr_type == LXPR_PID_TASKDIR);
 
@@ -5407,6 +5425,7 @@ lxpr_readdir_taskdir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
 	if ((p->p_stat == SZOMB) || (p->p_flag & SSYS) || (p->p_as == &kas))
 		tiddirsize = 0;
 
+	branded = (p->p_brand == &lx_brand);
 	/*
 	 * Drop p_lock, but keep the process P_PR_LOCK'd to prevent it from
 	 * going away while we iterate over its threads.
@@ -5459,10 +5478,17 @@ lxpr_readdir_taskdir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
 		if (i != tasknum)
 			goto next;
 
-		lwpd = ttolxlwp(t);
-		if (lwpd == NULL) {
-			emul_tid = t->t_tid;
+		if (!branded) {
+			/*
+			 * Emulating the goofy linux task model is impossible
+			 * to do for native processes.  We can compromise by
+			 * presenting only the main thread to the consumer.
+			 */
+			emul_tid = p->p_pid;
 		} else {
+			if ((lwpd = ttolxlwp(t)) == NULL) {
+				goto next;
+			}
 			emul_tid = lwpd->br_pid;
 			/*
 			 * Convert pid to Linux default of 1 if we're the
@@ -5505,7 +5531,7 @@ lxpr_readdir_taskdir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
 next:
 		uiop->uio_offset = uoffset + LXPR_SDSIZE;
 
-		if ((t = t->t_forw) == p->p_tlist) {
+		if ((t = t->t_forw) == p->p_tlist || !branded) {
 			if (eofp != NULL)
 				*eofp = 1;
 			goto out;
