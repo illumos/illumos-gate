@@ -187,6 +187,7 @@ SUBDIRS +=				\
 	libreparse	\
 	libresolv	\
 	libresolv2	\
+	libresolv2_joy	\
 	librestart	\
 	librpcsvc	\
 	librsm		\
@@ -247,7 +248,6 @@ SUBDIRS +=				\
 	libzoneinfo	\
 	libzonestat	\
 	libzpool	\
-	lvm		\
 	madv		\
 	mpapi		\
 	mpss		\
@@ -259,9 +259,6 @@ SUBDIRS +=				\
 	pkcs11		\
 	policykit	\
 	print		\
-	pylibbe		\
-	pysolaris	\
-	pyzfs		\
 	raidcfg_plugins	\
 	rpcsec_gss	\
 	sasl_plugins	\
@@ -298,8 +295,7 @@ sparc_SUBDIRS=		\
 #
 NOWAIT_SUBDIRS= $(SUBDIRS:.WAIT=)
 
-DCSUBDIRS =		\
-	lvm
+DCSUBDIRS =
 
 MSGSUBDIRS=		\
 	abi		\
@@ -358,12 +354,9 @@ MSGSUBDIRS=		\
 	libzfs		\
 	libzonecfg	\
 	libzdoor	\
-	lvm		\
 	madv		\
 	mpss		\
 	pam_modules	\
-	pysolaris	\
-	pyzfs		\
 	rpcsec_gss	\
 	$($(MACH)_MSGSUBDIRS)
 
@@ -500,7 +493,6 @@ HDRSUBDIRS=				\
 	libzfs_jni	\
 	libzoneinfo	\
 	libzonestat	\
-	lvm		\
 	mpapi		\
 	passwdutil	\
 	pkcs11		\
