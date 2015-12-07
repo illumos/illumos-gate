@@ -1,4 +1,5 @@
 '\" te
+.\"  Copyright 2015 Joyent, Inc.
 .\"  Copyright 1989 AT&T  Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved  Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
 .\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
@@ -7,9 +8,9 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LOCKF 3C "May 27, 2014"
+.TH LOCKF 3C "Feb 16, 2015"
 .SH NAME
-lockf \- record locking on files
+lockf \- POSIX-style record locking on files
 .SH SYNOPSIS
 .LP
 .nf
@@ -19,10 +20,9 @@ lockf \- record locking on files
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBlockf()\fR function allows sections of a file to be locked; advisory or
-mandatory write locks depending  on the mode bits of the file (see
+mandatory write locks depending on the mode bits of the file (see
 \fBchmod\fR(2)). Calls to \fBlockf()\fR from other threads that attempt to lock
 the locked file section will either return an error value or be put to sleep
 until the resource becomes unlocked. All the locks for a process are removed
@@ -54,10 +54,10 @@ All other values of \fIfunction\fR are reserved for future extensions and will
 result in an error if not implemented.
 .sp
 .LP
-\fBF_TEST\fR is used to detect if a lock by another process is present on the
-specified section. \fBF_LOCK\fR and \fBF_TLOCK\fR both lock a section of a file
-if the section is available. \fBF_ULOCK\fR removes locks from a section of the
-file.
+\fBF_TEST\fR is used to detect if a lock by another process or open file handle
+is present on the specified section. \fBF_LOCK\fR and \fBF_TLOCK\fR both lock
+a section of a file if the section is available. \fBF_ULOCK\fR removes locks
+from a section of the file.
 .sp
 .LP
 The \fIsize\fR argument is the number of contiguous bytes to be locked or
@@ -119,12 +119,10 @@ Sleeping on a resource is interrupted with any signal. The \fBalarm\fR(2)
 function may be used to provide a timeout facility in applications that require
 this facility.
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, \fB0\fR is returned.  Otherwise, \fB\(mi1\fR is
 returned and \fBerrno\fR is set to indicate the error.
 .SH ERRORS
-.sp
 .LP
 The \fBlockf()\fR function will fail if:
 .sp
@@ -233,7 +231,6 @@ supported.
 .RE
 
 .SH USAGE
-.sp
 .LP
 Record-locking should not be used in combination with the \fBfopen\fR(3C),
 \fBfread\fR(3C), \fBfwrite\fR(3C) and other \fBstdio\fR functions.  Instead,
@@ -250,7 +247,6 @@ applications requiring it.
 The \fBlockf()\fR function has a transitional interface for 64-bit file
 offsets.  See \fBlf64\fR(5).
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -268,7 +264,6 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBIntro\fR(2), \fBalarm\fR(2), \fBchmod\fR(2), \fBclose\fR(2), \fBcreat\fR(2),
 \fBfcntl\fR(2), \fBmmap\fR(2), \fBopen\fR(2), \fBread\fR(2), \fBwrite\fR(2),

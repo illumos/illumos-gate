@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2012, Joyent Inc. All rights reserved.
+ * Copyright 2015, Joyent Inc.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -40,6 +40,7 @@
 #include <sys/vnode.h>
 #include <sys/pathname.h>
 #include <sys/file.h>
+#include <sys/flock.h>
 #include <sys/proc.h>
 #include <sys/var.h>
 #include <sys/cpuvar.h>
@@ -952,6 +953,8 @@ closef(file_t *fp)
 		return (error);
 	}
 	ASSERT(fp->f_count == 0);
+	/* Last reference, remove any OFD style lock for the file_t */
+	ofdcleanlock(fp);
 	mutex_exit(&fp->f_tlock);
 
 	/*

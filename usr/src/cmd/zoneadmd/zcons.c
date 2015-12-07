@@ -511,7 +511,7 @@ destroy_console_sock(int servfd)
  */
 static int
 get_client_ident(int clifd, pid_t *pid, char *locale, size_t locale_len,
-	int *disconnect)
+    int *disconnect)
 {
 	char buf[BUFSIZ], *bufp;
 	size_t buflen = sizeof (buf);
@@ -575,7 +575,7 @@ get_client_ident(int clifd, pid_t *pid, char *locale, size_t locale_len,
 
 static int
 accept_client(int servfd, pid_t *pid, char *locale, size_t locale_len,
-	int *disconnect)
+    int *disconnect)
 {
 	int connfd;
 	struct sockaddr_un cliaddr;

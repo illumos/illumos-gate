@@ -131,6 +131,7 @@ MANFILES= 	__fbufsize.3c					\
 	 	fgetpos.3c					\
 	 	fgetwc.3c					\
 	 	floating_to_decimal.3c				\
+		flock.3c					\
 	 	flockfile.3c					\
 	 	fmtmsg.3c					\
 	 	fnmatch.3c					\

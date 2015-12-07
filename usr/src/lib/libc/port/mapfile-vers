@@ -93,6 +93,11 @@ $if _x86 && _ELF64
 $add amd64
 $endif
 
+SYMBOL_VERSION ILLUMOS_0.19 {	# flock
+    protected:
+	flock;
+} ILLUMOS_0.18;
+
 SYMBOL_VERSION ILLUMOS_0.18 {	# signalfd
     protected:
 	signalfd;

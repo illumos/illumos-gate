@@ -32,7 +32,9 @@ SSHASKPASS=	$(ROOTLIBSSH)/ssh-askpass
 ETCSSHDIR=	$(ROOTETC)/ssh
 DIRS=		$(ETCSSHDIR) $(ROOTLIBSSH) $(ROOTLIBSUNSSH)
 
-FILES= sshd_config ssh_config moduli
+FILES= sshd_config ssh_config moduli.sunssh
+
+ETCSSHLINKS= $(ETCSSHDIR)/moduli
 
 ETCSSHFILES=	$(FILES:%=$(ETCSSHDIR)/%)
 
@@ -46,6 +48,9 @@ $(ETCSSHDIR)/% : %
 $(DIRS):
 	$(INS.dir)
 
+$(ETCSSHDIR)/moduli: $(ETCSSHDIR)/moduli.sunssh
+	-$(RM) $@; $(SYMLINK) moduli.sunssh $@
+
 $(ROOTLIBSSH)/%: %
 	$(INS.file)
 
@@ -53,7 +58,7 @@ $(POFILE):
 
 all lint clean clobber _msg:
 
-install: all $(DIRS) $(ETCSSHFILES) $(ROOTMANIFEST) $(ROOTSVCMETHOD) \
+install: all $(DIRS) $(ETCSSHFILES) $(ETCSSHLINKS) $(ROOTMANIFEST) $(ROOTSVCMETHOD) \
 	$(SSHASKPASS)
 
 check: $(CHKMANIFEST)

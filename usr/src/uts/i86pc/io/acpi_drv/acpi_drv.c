@@ -23,6 +23,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2015 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
+ */
 
 /*
  * Driver for ACPI Battery, Lid, and Hotkey Control
@@ -32,19 +35,6 @@
 
 
 #define	ACPI_DRV_MOD_STRING		"ACPI driver"
-
-#define	MINOR_SHIFT			8
-#define	IDX_MASK			((1 << MINOR_SHIFT) - 1)
-#define	MINOR_BATT(idx)			(ACPI_DRV_TYPE_CBAT << MINOR_SHIFT | \
-					(idx))
-#define	MINOR_AC(idx)			(ACPI_DRV_TYPE_AC << MINOR_SHIFT | \
-					(idx))
-#define	MINOR_LID(idx)			(ACPI_DRV_TYPE_LID << MINOR_SHIFT | \
-					(idx))
-#define	MINOR_HOTKEY(idx)		(ACPI_DRV_TYPE_HOTKEY << MINOR_SHIFT \
-					| (idx))
-#define	MINOR2IDX(minor)		((minor) & IDX_MASK)
-#define	MINOR2TYPE(minor)		((minor) >> MINOR_SHIFT)
 
 #define	ACPI_DRV_MAX_BAT_NUM		8
 #define	ACPI_DRV_MAX_AC_NUM		10
@@ -102,6 +92,7 @@ static int acpi_drv_dev_present(struct acpi_drv_dev *);
 static dev_info_t *acpi_drv_dip = NULL;
 static kmutex_t acpi_drv_mutex;
 static struct pollhead acpi_drv_pollhead;
+static timeout_id_t acpi_drv_cbat_rescan_timeout;
 
 /* Control Method Battery state */
 struct acpi_drv_cbat_state {
@@ -274,6 +265,11 @@ static void acpi_drv_acpi_fini(void);
 static int acpi_drv_kstat_init(void);
 static void acpi_drv_kstat_fini(void);
 
+static int acpi_drv_kstat_bif_update(kstat_t *, int);
+static int acpi_drv_kstat_bst_update(kstat_t *, int);
+
+static void acpi_drv_cbat_rescan(void *);
+
 static struct cb_ops acpi_drv_cb_ops = {
 	acpi_drv_open,		/* open */
 	acpi_drv_close,		/* close */
@@ -365,10 +361,6 @@ _info(struct modinfo *mp)
 static int
 acpi_drv_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 {
-	char name[20];
-	int i;
-	struct acpi_drv_cbat_state *bp;
-
 	switch (cmd) {
 	case DDI_ATTACH:
 		/* Limit to one instance of driver */
@@ -395,43 +387,8 @@ acpi_drv_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		goto error;
 	}
 
-	/* Create minor node for hotkey device. */
-	if (ddi_create_minor_node(devi, "hotkey", S_IFCHR, MINOR_HOTKEY(0),
-	    DDI_PSEUDO, 0) == DDI_FAILURE) {
-		ACPI_DRV_DBG(CE_WARN, NULL, "hotkey: "
-		    "minor node create failed");
-		goto error;
-	}
-	/* Create minor node for lid. */
-	if (ddi_create_minor_node(devi, "lid", S_IFCHR, MINOR_LID(0),
-	    DDI_PSEUDO, 0) == DDI_FAILURE) {
-		ACPI_DRV_DBG(CE_WARN, NULL, "lid: minor node create failed");
-		goto error;
-	}
-	/* Create minor node for each battery and ac */
-	for (bp = &acpi_drv_cbat[0]; bp < &acpi_drv_cbat[ACPI_DRV_MAX_BAT_NUM];
-	    bp++) {
-		if (bp->dev.valid) {
-			(void) snprintf(name, sizeof (name), "battery%d",
-			    bp->dev.index);
-			if (ddi_create_minor_node(devi, name, S_IFCHR,
-			    MINOR_BATT(bp->dev.index), DDI_PSEUDO, 0) ==
-			    DDI_FAILURE) {
-				ACPI_DRV_DBG(CE_WARN, NULL,
-				    "%s: minor node create failed", name);
-				goto error;
-			}
-		}
-	}
-	for (i = 0; i < nac; i++) {
-		(void) snprintf(name, sizeof (name), "ac%d", i);
-		if (ddi_create_minor_node(devi, name, S_IFCHR,
-		    MINOR_AC(i), DDI_PSEUDO, 0) == DDI_FAILURE) {
-			ACPI_DRV_DBG(CE_WARN, NULL,
-			    "%s: minor node create failed", name);
-			goto error;
-		}
-	}
+	acpi_drv_cbat_rescan_timeout = timeout(acpi_drv_cbat_rescan, NULL,
+	    drv_usectohz(MICROSEC));
 
 	return (DDI_SUCCESS);
 
@@ -446,9 +403,22 @@ error:
 static int
 acpi_drv_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 {
+	timeout_id_t tmp_rescan_timeout;
+
 	if (cmd != DDI_DETACH) {
 		return (DDI_FAILURE);
 	}
+
+	/*
+	 * Clear the timeout id to indicate that the handler should not
+	 * reschedule itself.
+	 */
+	mutex_enter(&acpi_drv_mutex);
+	tmp_rescan_timeout = acpi_drv_cbat_rescan_timeout;
+	acpi_drv_cbat_rescan_timeout = 0;
+	mutex_exit(&acpi_drv_mutex);
+
+	(void) untimeout(tmp_rescan_timeout);
 
 	mutex_enter(&acpi_drv_mutex);
 	ddi_remove_minor_node(devi, NULL);
@@ -1436,6 +1406,8 @@ done:
 		pollwakeup(&acpi_drv_pollhead, ACPI_DRV_EVENTS);
 		break;
 
+	/* battery has been removed completely */
+	case 0x03:
 	/* BIF has changed */
 	case 0x81:
 		/*
@@ -1543,6 +1515,7 @@ acpi_drv_obj_init(struct acpi_drv_dev *p)
 	ACPI_DEVICE_INFO *info;
 	ACPI_NOTIFY_HANDLER ntf_handler = NULL;
 	ACPI_STATUS ret;
+	char name[KSTAT_STRLEN];
 
 	ASSERT(p != NULL && p->hdl != NULL);
 
@@ -1583,6 +1556,7 @@ acpi_drv_obj_init(struct acpi_drv_dev *p)
 	if (strcmp(p->hid, ACPI_DEVNAME_CBAT) == 0) {
 		struct acpi_drv_cbat_state *bp =
 		    (struct acpi_drv_cbat_state *)p;
+		kstat_t *ksp;
 
 		p->type = ACPI_DRV_TYPE_CBAT;
 		p->index = nbat - 1;
@@ -1601,6 +1575,62 @@ acpi_drv_obj_init(struct acpi_drv_dev *p)
 		ntf_handler = acpi_drv_cbat_notify;
 		ACPI_DRV_DBG(CE_NOTE, p, "battery %s",
 		    (p->present ? "present" : "absent"));
+
+		/* Create minor node for battery */
+		(void) snprintf(name, sizeof (name), "battery%d", p->index);
+		if (ddi_create_minor_node(acpi_drv_dip, name, S_IFCHR,
+		    MINOR_BATT(p->index), DDI_PSEUDO, 0) == DDI_FAILURE)
+			ACPI_DRV_DBG(CE_WARN, NULL,
+			    "%s: minor node create failed", name);
+
+		/*
+		 * Allocate, initialize and install BIF and BST kstat
+		 */
+		/* BIF kstat */
+		(void) snprintf(name, KSTAT_STRLEN-1, "%s%d",
+		    ACPI_DRV_BIF_KSTAT_NAME, bp->dev.index);
+		ksp = kstat_create(ACPI_DRV_NAME, 0, name, "misc",
+		    KSTAT_TYPE_NAMED,
+		    sizeof (acpi_drv_bif_kstat) / sizeof (kstat_named_t),
+		    KSTAT_FLAG_VIRTUAL);
+		if (ksp != NULL) {
+			ACPI_DRV_DBG(CE_NOTE, NULL, "kstat_create(%s) ok",
+			    name);
+
+			bp->bat_bif_ksp = ksp;
+			ksp->ks_data = &acpi_drv_bif_kstat;
+			ksp->ks_update = acpi_drv_kstat_bif_update;
+			ksp->ks_data_size += MAXNAMELEN * 4;
+			ksp->ks_private = bp;
+
+			kstat_install(ksp);
+		} else {
+			ACPI_DRV_DBG(CE_WARN, NULL,
+			    "kstat_create(%s) fail", name);
+		}
+
+		/* BST kstat */
+		(void) snprintf(name, KSTAT_STRLEN-1, "%s%d",
+		    ACPI_DRV_BST_KSTAT_NAME, bp->dev.index);
+		ksp = kstat_create(ACPI_DRV_NAME, 0, name, "misc",
+		    KSTAT_TYPE_NAMED,
+		    sizeof (acpi_drv_bst_kstat) / sizeof (kstat_named_t),
+		    KSTAT_FLAG_VIRTUAL);
+		if (ksp != NULL) {
+			ACPI_DRV_DBG(CE_NOTE, NULL, "kstat_create(%s) ok",
+			    name);
+
+			bp->bat_bst_ksp = ksp;
+			ksp->ks_data = &acpi_drv_bst_kstat;
+			ksp->ks_update = acpi_drv_kstat_bst_update;
+			ksp->ks_data_size += MAXNAMELEN * 4;
+			ksp->ks_private = bp;
+
+			kstat_install(ksp);
+		} else {
+			ACPI_DRV_DBG(CE_WARN, NULL,
+			    "kstat_create(%s) fail", name);
+		}
 	} else if (strcmp(p->hid, ACPI_DEVNAME_AC) == 0) {
 		p->type = ACPI_DRV_TYPE_AC;
 		p->index = nac - 1;
@@ -1614,6 +1644,13 @@ acpi_drv_obj_init(struct acpi_drv_dev *p)
 		ntf_handler = acpi_drv_ac_notify;
 		ACPI_DRV_DBG(CE_NOTE, p, "AC %s",
 		    (p->present ? "on-line" : "off-line"));
+
+		/* Create minor node for AC */
+		(void) snprintf(name, sizeof (name), "ac%d", p->index);
+		if (ddi_create_minor_node(acpi_drv_dip, name, S_IFCHR,
+		    MINOR_AC(p->index), DDI_PSEUDO, 0) == DDI_FAILURE)
+			ACPI_DRV_DBG(CE_WARN, NULL,
+			    "%s: minor node create failed", name);
 	} else if (strcmp(p->hid, ACPI_DEVNAME_LID) == 0) {
 		p->type = ACPI_DRV_TYPE_LID;
 		p->index = 0;
@@ -1621,6 +1658,12 @@ acpi_drv_obj_init(struct acpi_drv_dev *p)
 		(void) acpi_drv_update_lid(p);
 		ntf_handler = acpi_drv_lid_notify;
 		ACPI_DRV_DBG(CE_NOTE, p, "added");
+
+		/* Create minor node for lid. */
+		if (ddi_create_minor_node(acpi_drv_dip, "lid", S_IFCHR,
+		    MINOR_LID(p->index), DDI_PSEUDO, 0) == DDI_FAILURE)
+			ACPI_DRV_DBG(CE_WARN, NULL,
+			    "lid: minor node create failed");
 	} else {
 		ACPI_DRV_DBG(CE_NOTE, p, "unknown device");
 		p->valid = 0;
@@ -1651,6 +1694,12 @@ acpi_drv_find_cb(ACPI_HANDLE ObjHandle, UINT32 NestingLevel, void *Context,
 	if (*type == ACPI_DRV_TYPE_CBAT) {
 		struct acpi_drv_cbat_state *bp;
 
+		for (bp = acpi_drv_cbat;
+		    bp != &acpi_drv_cbat[ACPI_DRV_MAX_BAT_NUM];
+		    bp++)
+			if (bp->dev.hdl == ObjHandle)
+				return (AE_OK);
+
 		if (nbat == ACPI_DRV_MAX_BAT_NUM) {
 			ACPI_DRV_DBG(CE_WARN, NULL,
 			    "Need to support more batteries: "
@@ -1662,6 +1711,12 @@ acpi_drv_find_cb(ACPI_HANDLE ObjHandle, UINT32 NestingLevel, void *Context,
 	} else if (*type == ACPI_DRV_TYPE_AC) {
 		struct acpi_drv_ac_state *ap;
 
+		for (ap = acpi_drv_ac;
+		    ap != &acpi_drv_ac[ACPI_DRV_MAX_AC_NUM];
+		    ap++)
+			if (ap->dev.hdl == ObjHandle)
+				return (AE_OK);
+
 		if (nac == ACPI_DRV_MAX_AC_NUM) {
 			ACPI_DRV_DBG(CE_WARN, NULL, "Need to support more ACs: "
 			    "AC_MAX = %d", ACPI_DRV_MAX_AC_NUM);
@@ -1672,8 +1727,11 @@ acpi_drv_find_cb(ACPI_HANDLE ObjHandle, UINT32 NestingLevel, void *Context,
 	} else if (*type == ACPI_DRV_TYPE_LID) {
 		struct acpi_drv_lid_state *lp;
 
-		nlid++;
 		lp = &lid;
+		if (lp->dev.hdl == ObjHandle)
+			return (AE_OK);
+
+		nlid++;
 		devp = (struct acpi_drv_dev *)lp;
 	} else {
 		ACPI_DRV_DBG(CE_WARN, NULL, "acpi_drv_find_cb(): "
@@ -1688,8 +1746,34 @@ acpi_drv_find_cb(ACPI_HANDLE ObjHandle, UINT32 NestingLevel, void *Context,
 	return (AE_OK);
 }
 
+/*ARGSUSED*/
+static void
+acpi_drv_cbat_rescan(void *arg)
+{
+	int *retp, type = ACPI_DRV_TYPE_CBAT;
+
+	mutex_enter(&acpi_drv_mutex);
+
+	/*
+	 * The detach routine clears the timeout id to tell us not to
+	 * reschedule ourselves. If thats the case there's also no point
+	 * in looking for new ACPI battery devices, so just return.
+	 */
+	if (acpi_drv_cbat_rescan_timeout == 0) {
+		mutex_exit(&acpi_drv_mutex);
+		return;
+	}
+
+	(void) AcpiGetDevices(ACPI_DEVNAME_CBAT, acpi_drv_find_cb, &type,
+	    (void *)&retp);
+
+	acpi_drv_cbat_rescan_timeout = timeout(acpi_drv_cbat_rescan, NULL,
+	    drv_usectohz(MICROSEC));
+	mutex_exit(&acpi_drv_mutex);
+}
+
 static int
-acpi_drv_acpi_init()
+acpi_drv_acpi_init(void)
 {
 	int *retp, type;
 	int status = ACPI_DRV_ERR;
@@ -1904,9 +1988,6 @@ acpi_drv_kstat_bst_update(kstat_t *ksp, int flag)
 static int
 acpi_drv_kstat_init(void)
 {
-	char name[KSTAT_STRLEN];
-	struct acpi_drv_cbat_state *bp;
-
 	/*
 	 * Allocate, initialize and install powerstatus and
 	 * supported_battery_count kstat.
@@ -1944,64 +2025,6 @@ acpi_drv_kstat_init(void)
 	acpi_drv_warn_ksp->ks_data = &acpi_drv_warn_kstat;
 	acpi_drv_warn_ksp->ks_update = acpi_drv_kstat_warn_update;
 	kstat_install(acpi_drv_warn_ksp);
-
-	/*
-	 * Allocate, initialize and install BIF and BST kstat
-	 * for each battery.
-	 */
-	for (bp = &acpi_drv_cbat[0]; bp < &acpi_drv_cbat[ACPI_DRV_MAX_BAT_NUM];
-	    bp++) {
-		if (bp->dev.valid) {
-			kstat_t *ksp;
-
-			/* BIF kstat */
-			(void) snprintf(name, KSTAT_STRLEN-1, "%s%d",
-			    ACPI_DRV_BIF_KSTAT_NAME, bp->dev.index);
-			ksp = kstat_create(ACPI_DRV_NAME, 0,
-			    name, "misc", KSTAT_TYPE_NAMED,
-			    sizeof (acpi_drv_bif_kstat) /
-			    sizeof (kstat_named_t), KSTAT_FLAG_VIRTUAL);
-			if (ksp == NULL) {
-				ACPI_DRV_DBG(CE_WARN, NULL,
-				    "kstat_create(%s) fail", name);
-				return (ACPI_DRV_ERR);
-			}
-			ACPI_DRV_DBG(CE_NOTE, NULL, "kstat_create(%s) ok",
-			    name);
-
-			bp->bat_bif_ksp = ksp;
-			ksp->ks_data = &acpi_drv_bif_kstat;
-			ksp->ks_update = acpi_drv_kstat_bif_update;
-			ksp->ks_data_size += MAXNAMELEN * 4;
-			ksp->ks_private = bp;
-
-			kstat_install(ksp);
-
-			/* BST kstat */
-			(void) snprintf(name, KSTAT_STRLEN-1, "%s%d",
-			    ACPI_DRV_BST_KSTAT_NAME, bp->dev.index);
-			ksp = kstat_create(ACPI_DRV_NAME, 0, name, "misc",
-			    KSTAT_TYPE_NAMED,
-			    sizeof (acpi_drv_bst_kstat) /
-			    sizeof (kstat_named_t),
-			    KSTAT_FLAG_VIRTUAL);
-			if (ksp == NULL) {
-				ACPI_DRV_DBG(CE_WARN, NULL,
-				    "kstat_create(%s) fail", name);
-				return (ACPI_DRV_ERR);
-			}
-			ACPI_DRV_DBG(CE_NOTE, NULL, "kstat_create(%s) ok",
-			    name);
-
-			bp->bat_bst_ksp = ksp;
-			ksp->ks_data = &acpi_drv_bst_kstat;
-			ksp->ks_update = acpi_drv_kstat_bst_update;
-			ksp->ks_data_size += MAXNAMELEN * 4;
-			ksp->ks_private = bp;
-
-			kstat_install(ksp);
-		}
-	}
 
 	return (ACPI_DRV_OK);
 }

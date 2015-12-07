@@ -19,13 +19,15 @@
 # CDDL HEADER END
 #
 
+#
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright (c) 2012, Joyent, Inc. All rights reserved.
 # Copyright (c) 2013 Gary Mills
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
-# Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 # Copyright (c) 2015 Gary Mills
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+#
 
 include ../Makefile.master
 
@@ -34,250 +36,246 @@ include ../Makefile.master
 #	Note also that a few extra libraries are kept in cmd source.
 #
 # Certain libraries are linked with, hence depend on, other libraries.
-#
-# Although we have historically used .WAIT to express dependencies, it
-# reduces the amount of parallelism and thus lengthens the time it
-# takes to build the libraries.  Thus, we now require that any new
-# libraries explicitly call out their dependencies.  Eventually, all
-# the library dependencies will be called out explicitly.  See
-# "Library interdependencies" near the end of this file.
-#
-# Aside from explicit dependencies (and legacy .WAITs), all libraries
-# are built in parallel.
-#
+# Library dependencies are called out explicitly, see "Library
+# interdependencies" below.
 .PARALLEL:
 
-SUBDIRS= \
-	common			.WAIT	\
-	../cmd/sgs/libconv		\
-	../cmd/sgs/libdl	.WAIT
+# Build libc and its dependencies
+SUBDIRS=			\
+	common			\
+	../cmd/sgs/libconv	\
+	../cmd/sgs/libdl	\
+	libc			\
+	.WAIT
 
-SUBDIRS += \
-	libc			.WAIT	\
-	../cmd/sgs/libelf	.WAIT	\
-	c_synonyms			\
-	libmd				\
-	libmd5				\
-	librsm				\
-	libmp			.WAIT	\
-	libnsl			\
-	libsecdb		.WAIT	\
-	librpcsvc			\
-	libsocket		.WAIT	\
-	libsctp			\
-	libsip			\
-	libcommputil		\
-	libresolv			\
-	libresolv2		.WAIT	\
-	libw			.WAIT	\
-	libintl			.WAIT	\
+# Build libraries with lots of dependents
+SUBDIRS +=		\
+	libm		\
+	libmd		\
+	libmp		\
+	libnsl		\
+	libnvpair	\
+	libsocket	\
+	.WAIT
+
+# Build everything else. Aside from explicit dependencies, all libraries
+# are built in parallel.
+SUBDIRS +=				\
+	../cmd/sendmail/libmilter	\
+	../cmd/sgs/libelf	\
 	../cmd/sgs/librtld_db	\
-	libaio			\
-	libast			\
-	libdll			\
-	libcmd			\
-	libshell		\
-	libsum			\
-	librt			\
-	libadm			\
-	libctf			\
-	libdtrace		\
-	libdtrace_jni		\
-	libcurses		\
-	libtermcap		\
-	libgen			\
-	libgss			\
-	libpam			\
-	libuuid			\
-	libthread		\
-	libpthread	.WAIT	\
-	libslp		\
+	abi		\
+	auditd_plugins	\
+	brand		\
+	c_synonyms	\
+	cfgadm_plugins	\
+	crypt_modules	\
+	extendedFILE	\
+	fm		\
+	getloginx	\
+	gss_mechs/mech_dh	\
+	gss_mechs/mech_dummy	\
+	gss_mechs/mech_krb5	\
+	gss_mechs/mech_spnego	\
+	hal		\
+	hbaapi		\
+	krb5		\
+	libadm		\
+	libads		\
+	libadt_jni	\
+	libadutils	\
+	libaio		\
+	libast		\
+	libavl		\
+	libbe		\
+	libbrand	\
 	libbsdmalloc	\
-	libdoor		\
-	libdevinfo	\
-	libdladm	\
-	libdlpi		\
-	libeti		\
+	libbsm		\
+	libc_db		\
+	libcfgadm	\
+	libcmd		\
+	libcmdutils	\
+	libcommputil	\
+	libcontract	\
+	libcpc		\
 	libcrypt	\
-	libdns_sd	\
-	libefi		\
-	libfstyp	\
-	libwanboot	\
-	libwanbootutil	\
 	libcryptoutil	\
+	libctf		\
+	libcurses	\
+	libdevice	\
+	libdevid	\
+	libdevinfo	\
+	libdhcpagent	\
+	libdhcputil	\
+	libdisasm	\
+	libdiskmgt	\
+	libdladm	\
+	libdll		\
+	libdlpi		\
+	libdns_sd	\
+	libdoor		\
+	libdscfg	\
+	libdtrace	\
+	libdtrace_jni	\
+	libefi		\
+	libelfsign	\
+	libeti		\
+	libexacct	\
+	libexacct/demo	\
+	libfakekernel	\
+	libfcoe		\
+	libfru		\
+	libfruutils	\
+	libfsmgt	\
+	libfstyp	\
+	libgen		\
+	libgrubmgmt	\
+	libgss		\
+	libhotplug	\
+	libidmap	\
+	libilb		\
+	libima		\
+	libinetsvc	\
 	libinetutil	\
+	libinstzones	\
+	libintl		\
 	libipadm	\
 	libipd		\
+	libipmi		\
 	libipmp		\
+	libipp		\
+	libipsecutil	\
 	libiscsit	\
 	libkmf		\
+	libkrb5		\
 	libkstat	\
 	libkvm		\
-	liblm		\
-	libmalloc	\
-	libmapmalloc	\
-	libmtmalloc	\
-	libnls		\
-	libnwam		\
-	libsmbios	\
-	libtecla	\
-	libumem		\
-	libnvpair	.WAIT	\
-	libexacct	\
-	libsasl		\
 	libldap5	\
-	libsldap	.WAIT	\
-	libbsm		\
-	libsys		\
-	libsysevent	\
+	liblgrp		\
+	liblm		\
+	libm1		\
+	libmail		\
+	libmalloc	\
+	libmapid	\
+	libmapmalloc	\
+	libmd5		\
+	libmtmalloc	\
+	libmvec		\
+	libndmp		\
 	libnisdb	\
+	libnls		\
+	libnsctl	\
+	libnwam		\
+	libpam		\
+	libpcidb	\
+	libpctx		\
+	libpicl		\
+	libpicltree	\
+	libpkg		\
 	libpool		\
 	libpp		\
 	libproc		\
 	libproject	\
+	libpthread	\
+	libraidcfg	\
+	librcm		\
+	librdc		\
+	libreparse	\
+	libresolv	\
+	libresolv2	\
+	librestart	\
+	librpcsvc	\
+	librsm		\
+	librstp		\
+	librt		\
+	libsasl		\
+	libscf		\
+	libsched	\
+	libsctp		\
+	libsec		\
+	libsecdb	\
 	libsendfile	\
-	nametoaddr	\
-	ncad_addr	\
-	hbaapi		\
-	smhba		\
-	sun_fc		\
-	sun_sas		\
-	gss_mechs/mech_krb5	.WAIT	\
-	libkrb5	.WAIT	\
-	krb5	.WAIT	\
+	libshare	\
+	libshell	\
+	libsip		\
+	libsldap	\
+	libslp		\
 	libsmbfs	\
-	libfcoe		\
+	libsmbios	\
+	libsmedia	\
+	libsqlite	\
 	libsrpt		\
 	libstmf		\
 	libstmfproxy	\
-	libnsctl	\
-	libunistat	\
-	libdscfg	\
-	librdc		\
-	libinstzones	\
-	libpkg		\
-	libpcidb	\
-	libm1		\
-	libm		\
-	libmvec
-
-
-SUBDIRS += \
-	passwdutil	\
-	pam_modules	\
-	crypt_modules	\
-	libadt_jni	\
-	abi		\
-	auditd_plugins	\
-	libvolmgt	\
-	libdevice	\
-	libdevid	\
-	libc_db		\
-	libndmp		\
-	libsec		\
-	libtnfprobe	\
+	libsum		\
+	libsun_ima	\
+	libsys		\
+	libsysevent	\
+	libtecla	\
+	libtermcap	\
+	libthread	\
 	libtnf		\
 	libtnfctl	\
-	libdhcpagent	\
-	libdhcputil	\
-	libxnet		\
-	libipsecutil	\
-	nsswitch	\
-	print		\
+	libtnfprobe	\
+	libtsnet	\
+	libtsol		\
+	libumem		\
+	libunistat	\
+	libuuid		\
 	libuutil	\
-	libscf		\
-	libinetsvc	\
-	librestart	\
-	libsched	\
-	libelfsign	\
-	pkcs11		.WAIT	\
-	libpctx		.WAIT	\
-	libcpc		\
-	getloginx	\
-	watchmalloc	\
-	extendedFILE	\
-	madv		\
-	mpss		\
-	libdisasm	\
+	libvolmgt	\
+	libvrrpadm	\
+	libvscan	\
+	libw		\
+	libwanboot	\
+	libwanbootutil	\
 	libwrap		\
 	libxcurses	\
 	libxcurses2	\
-	libbrand	.WAIT   \
+	libxnet		\
+	libzfs		\
+	libzfs_core	\
+	libzfs_jni	\
 	libzonecfg	\
 	libzoneinfo	\
 	libzonestat	\
-	libtsnet	\
-	libtsol		\
-	gss_mechs/mech_spnego	\
-	gss_mechs/mech_dummy	\
-	gss_mechs/mech_dh	\
-	rpcsec_gss	\
-	libraidcfg	.WAIT	\
-	librcm		.WAIT	\
-	libcfgadm	.WAIT	\
-	libpicl		.WAIT	\
-	libpicltree	.WAIT \
-	raidcfg_plugins	\
-	cfgadm_plugins	\
-	libmail		\
-	lvm		\
-	libsmedia	\
-	libipp		\
-	libdiskmgt	\
-	liblgrp		\
-	libfsmgt	\
-	fm		\
-	libavl		\
-	libcmdutils	\
-	libcontract	\
-	../cmd/sendmail/libmilter	\
-	sasl_plugins	\
-	udapl		\
 	libzpool	\
-	libzfs_core	\
-	libzfs		\
-	libbe		\
-	pylibbe		\
-	libzfs_jni	\
-	pyzfs		\
-	pysolaris	\
-	libmapid	\
-	brand		\
-	policykit	\
-	hal		\
-	libshare	\
-	libsqlite	\
-	libidmap	\
-	libads		\
-	libadutils	\
-	libipmi		\
-	libexacct/demo	\
-	libvrrpadm	\
-	libvscan	\
-	libgrubmgmt	\
-	libfakekernel	\
-	smbsrv		\
-	libilb		\
-	scsi		\
-	libima		\
-	libsun_ima	\
+	lvm		\
+	madv		\
 	mpapi		\
-	librstp		\
-	libreparse	\
-	libhotplug	\
-	libfruutils	.WAIT	\
-	libfru		\
+	mpss		\
+	nametoaddr	\
+	ncad_addr	\
+	nsswitch	\
+	pam_modules	\
+	passwdutil	\
+	pkcs11		\
+	policykit	\
+	print		\
+	pylibbe		\
+	pysolaris	\
+	pyzfs		\
+	raidcfg_plugins	\
+	rpcsec_gss	\
+	sasl_plugins	\
+	scsi		\
+	smbsrv		\
+	smhba		\
+	sun_fc		\
+	sun_sas		\
+	udapl		\
+	watchmalloc	\
 	$($(MACH)_SUBDIRS)
 
 i386_SUBDIRS=		\
 	libfdisk	\
 	libsaveargs
 
-sparc_SUBDIRS= .WAIT	\
+sparc_SUBDIRS=		\
 	efcode		\
 	libds		\
 	libdscp		\
-	libprtdiag	.WAIT	\
+	libprtdiag	\
 	libprtdiag_psr	\
 	libpri		\
 	librsc		\
@@ -285,15 +283,6 @@ sparc_SUBDIRS= .WAIT	\
 	libpcp		\
 	libtsalarm	\
 	libv12n
-
-FM_sparc_DEPLIBS= libpri
-
-fm:			\
-	libexacct	\
-	libipmi		\
-	libzfs		\
-	scsi		\
-	$(FM_$(MACH)_DEPLIBS)
 
 #
 # Create a special version of $(SUBDIRS) with no .WAIT's, for use with the
@@ -320,28 +309,29 @@ MSGSUBDIRS=		\
 	libcontract	\
 	libcurses	\
 	libdhcputil	\
-	libipsecutil	\
 	libdiskmgt	\
 	libdladm	\
 	libdll		\
 	libgrubmgmt	\
 	libgss		\
 	libidmap	\
-	libipmp		\
 	libilb		\
 	libinetutil	\
 	libinstzones	\
 	libipadm	\
+	libipmp		\
+	libipsecutil	\
+	libldap5	\
 	libnsl		\
 	libnwam		\
 	libpam		\
 	libpicl		\
-	libpool		\
 	libpkg		\
+	libpool		\
 	libpp		\
-	libscf		\
+	libreparse	\
 	libsasl		\
-	libldap5	\
+	libscf		\
 	libsecdb	\
 	libshare	\
 	libshell	\
@@ -362,11 +352,9 @@ MSGSUBDIRS=		\
 	madv		\
 	mpss		\
 	pam_modules	\
-	pyzfs		\
 	pysolaris	\
+	pyzfs		\
 	rpcsec_gss	\
-	libreparse
-MSGSUBDIRS += \
 	$($(MACH)_MSGSUBDIRS)
 
 sparc_MSGSUBDIRS=	\
@@ -375,8 +363,12 @@ sparc_MSGSUBDIRS=	\
 
 i386_MSGSUBDIRS= libfdisk
 
-HDRSUBDIRS=		\
+HDRSUBDIRS=				\
+	../cmd/sendmail/libmilter	\
 	auditd_plugins	\
+	fm		\
+	hal		\
+	hbaapi		\
 	libads		\
 	libast		\
 	libbrand	\
@@ -387,20 +379,19 @@ HDRSUBDIRS=		\
 	libcommputil	\
 	libcontract	\
 	libcpc		\
+	libcryptoutil	\
 	libctf		\
 	libcurses	\
-	libtermcap	\
-	libcryptoutil	\
 	libdevice	\
 	libdevid	\
 	libdevinfo	\
+	libdhcpagent	\
+	libdhcputil	\
+	libdisasm	\
 	libdiskmgt	\
 	libdladm	\
 	libdll		\
 	libdlpi		\
-	libdhcpagent	\
-	libdhcputil	\
-	libdisasm	\
 	libdns_sd	\
 	libdscfg	\
 	libdtrace	\
@@ -408,28 +399,35 @@ HDRSUBDIRS=		\
 	libelfsign	\
 	libeti		\
 	libfakekernel	\
+	libfcoe		\
 	libfru		\
 	libfstyp	\
 	libgen		\
-	libipadm	\
-	libipd		\
-	libipsecutil	\
+	libgrubmgmt	\
+	libidmap	\
+	libilb		\
+	libima		\
 	libinetsvc	\
 	libinetutil	\
 	libinstzones	\
+	libipadm	\
+	libipd		\
 	libipmi		\
 	libipmp		\
 	libipp		\
+	libipsecutil	\
 	libiscsit	\
+	libkrb5		\
 	libkstat	\
 	libkvm		\
 	libmail		\
+	libmapid	\
 	libmd		\
 	libmtmalloc	\
 	libndmp		\
-	libnvpair	\
 	libnsctl	\
 	libnsl		\
+	libnvpair	\
 	libnwam		\
 	libpam		\
 	libpcidb	\
@@ -442,37 +440,42 @@ HDRSUBDIRS=		\
 	libraidcfg	\
 	librcm		\
 	librdc		\
-	libscf		\
-	libsip		\
-	libsmbios	\
+	libreparse	\
 	librestart	\
 	librpcsvc	\
 	librsm		\
 	librstp		\
 	libsasl		\
+	libscf		\
 	libsec		\
+	libshare	\
 	libshell	\
+	libsip		\
 	libslp		\
+	libsmbfs	\
+	libsmbios	\
 	libsmedia	\
 	libsocket	\
 	libsqlite	\
-	libfcoe		\
 	libsrpt		\
 	libstmf		\
 	libstmfproxy	\
 	libsum		\
+	libsun_ima	\
 	libsysevent	\
 	libtecla	\
+	libtermcap	\
 	libtnf		\
 	libtnfctl	\
 	libtnfprobe	\
 	libtsnet	\
 	libtsol		\
-	libvrrpadm	\
-	libvolmgt	\
 	libumem		\
 	libunistat	\
 	libuutil	\
+	libvolmgt	\
+	libvrrpadm	\
+	libvscan	\
 	libwanboot	\
 	libwanbootutil	\
 	libwrap		\
@@ -482,30 +485,15 @@ HDRSUBDIRS=		\
 	libzfs_jni	\
 	libzoneinfo	\
 	libzonestat	\
-	hal		\
-	policykit	\
 	lvm		\
-	pkcs11		\
-	passwdutil	\
-	../cmd/sendmail/libmilter	\
-	fm		\
-	udapl		\
-	libmapid	\
-	libkrb5		\
-	libsmbfs	\
-	libshare	\
-	libidmap	\
-	libvscan	\
-	libgrubmgmt	\
-	smbsrv		\
-	libilb		\
-	scsi		\
-	hbaapi		\
-	smhba		\
-	libima		\
-	libsun_ima	\
 	mpapi		\
-	libreparse	\
+	passwdutil	\
+	pkcs11		\
+	policykit	\
+	scsi		\
+	smbsrv		\
+	smhba		\
+	udapl		\
 	$($(MACH)_HDRSUBDIRS)
 
 i386_HDRSUBDIRS=	\
@@ -560,135 +548,154 @@ _msg:			$(MSGSUBDIRS:%=%-nodepend) .WAIT _dc
 
 _dc:			$(DCSUBDIRS:%=%-nodepend)
 
-#
-# Library interdependencies are called out explicitly here
-#
-auditd_plugins: libbsm libnsl libsecdb
-krb5:		gss_mechs/mech_krb5
-gss_mechs/mech_krb5:	libgss libnsl libsocket libresolv pkcs11
-gss_mechs/mech_spnego:	gss_mechs/mech_krb5
+# Library interdependencies are called out explicitly here.
+../cmd/sgs/libconv: common
+../cmd/sgs/libdl: common
+libc:		../cmd/sgs/libconv ../cmd/sgs/libdl
+
+libm:		libc
+libmd:		libc
+libmp:		libc
+libnsl:		libc libmd libmp
+libnvpair:	libc libnsl
+libsocket:	libc libnsl
+
+basedeps:	libc libm libmd libmp libnsl libnvpair libsocket
+basedeps :=	TARGET=install
+
+# The following dependencies don't need to be listed below as they are built
+# before everything else:
+# libc libm libmd libmp libnsl libnvpair libsocket
+abi:		libctf libmapmalloc libproc
+auditd_plugins: libbsm libsecdb libgss libmtmalloc
+brand:		libzonecfg libmapmalloc
+cfgadm_plugins:	libdevice libdevinfo libhotplug librcm hbaapi libkstat libscf
+fm:		libexacct libipmi libzfs scsi libdevinfo libdevid libcfgadm \
+		libcontract libsysevent ../cmd/sgs/libelf
+$(SPARC_BLD)fm:	libpri
+gss_mechs/mech_dh: libgss
+gss_mechs/mech_dummy: libgss
+gss_mechs/mech_krb5: libgss libresolv2 pkcs11 libkstat
+gss_mechs/mech_spnego: gss_mechs/mech_krb5
+krb5:		gss_mechs/mech_krb5 libtecla libldap5
 libadt_jni:	libbsm
-libast: 	libsocket libm
-libadutils: 	libldap5 libresolv libsocket libnsl
-nsswitch:	libadutils libidmap
-libbe: 		libzfs
-libbsm:		libtsol
-libcmd: 	libsum libast libsocket libnsl
-libcmdutils:	libavl libnvpair
-libcontract:	libnvpair
-libcpc:		libdevinfo
+libadutils: 	libldap5 libresolv2
+libbe: 		libzfs libinstzones libuuid libgen libdevinfo libefi
+libbsm:		libinetutil libscf libsecdb libtsol
+libcfgadm:	libdevinfo
+libcmd: 	libsum libast
+libcmdutils:	libavl
+libcpc:		libpctx
+libcrypt:	libgen
 libdevid:	libdevinfo
-libdevinfo:	libnvpair libsec
-libdhcpagent:	libsocket libdhcputil libuuid libdlpi libcontract
-libdhcputil:	libnsl libgen libinetutil libdlpi
-libdladm:	libdevinfo libinetutil libsocket libscf librcm libnvpair \
-		libexacct libnsl libkstat libcurses
-libdevice:	libnvpair
+libdevinfo:	libsec libgen
+libdhcpagent:	libdhcputil libuuid libdlpi libcontract
+libdhcputil:	libgen libinetutil libdlpi
+libdiskmgt:	libdevid libdevinfo libadm libefi libkstat libsysevent
+$(INTEL_BLD)libdiskmgt: libfdisk
+libdladm:	libdevinfo libinetutil libscf librcm libexacct libkstat \
+		libpool
 libdll: 	libast
 libdlpi:	libinetutil libdladm
 libds:		libsysevent
-libdscfg:	libnsctl libunistat libsocket libnsl
+libdscfg:	libnsctl libunistat libadm
 libdtrace:	libproc libgen libctf libmapmalloc
 libdtrace_jni:	libuutil libdtrace
 libefi:		libuuid
+libelfsign:	libcryptoutil libkmf ../cmd/sgs/libelf
+libeti:		libcurses
+libexacct/demo:	libexacct libproject
+libfakekernel:	libumem libcryptoutil
 libfcoe:	libdladm
-libfstyp:	libnvpair
-libelfsign:	libcryptoutil libkmf
-libidmap:	libadutils libldap5 libavl libsldap libuutil
-libipadm:	libnsl libinetutil libsocket libdlpi libnvpair libdhcpagent \
-		libdladm libsecdb
-libiscsit:	libc libnvpair libstmf libuuid libnsl
-libkmf:		libcryptoutil pkcs11
-libm:		libc
-libm1:		libc libm
-libmvec:	libc libm
-libnsl:		libmd5
-libmapid:	libresolv
-libnisdb:	libnsl libldap5
-librcm:		libnvpair
-librdc:		libsocket libnsl libnsctl libunistat libdscfg
-libuuid:	libdlpi
-libinetutil:	libsocket
-libipsecutil:	libtecla libsocket
-libinstzones:	libzonecfg libcontract
-libpkg:		libwanboot libscf libadm
-libnwam:	libscf libbsm libdladm
-libsecdb:	libnsl
-libsasl:	libgss libsocket pkcs11 libmd
-sasl_plugins:	pkcs11 libgss libsocket libsasl
-libsctp:	libsocket
-libshell:	libast libcmd libdll libsocket libsecdb libm
-libsip:		libmd5
-libsmbfs:	libcmdutils libsocket libnsl libkrb5 libsec libidmap
-libsocket:	libnsl
-libstmfproxy: 	libstmf libsocket libnsl libpthread
-libsum: 	libast
-libsysevent:	libsecdb libnvpair
-libldap5:	libsasl libsocket libnsl libmd
-libsldap:	libldap5 libtsol libnsl libc libscf libresolv
-libpool:	libnvpair libexacct
-libpp:		libast
-libzonecfg:	libc libsocket libnsl libuuid libnvpair libsysevent libsec \
-		libbrand libpool libscf
-libproc:	../cmd/sgs/librtld_db ../cmd/sgs/libelf libctf libsaveargs
-libproject:	libpool libproc libsecdb
-libtermcap:	libcurses
-libtsnet:	libnsl libtsol libsecdb
-libwrap:	libnsl libsocket
-libwanboot:	libnvpair libresolv libnsl libsocket libdevinfo libinetutil \
-		libdhcputil
-libwanbootutil:	libnsl
-pam_modules:	libproject passwdutil smbsrv libtsnet
-libscf:		libuutil libmd libgen libsmbios libnsl libnvpair
-libinetsvc:	libscf
-librestart:	libuutil libscf libpool libproject libsecdb libnvpair
-libsaveargs:	libdisasm
-../cmd/sgs/libdl:	../cmd/sgs/libconv
-../cmd/sgs/libelf:	../cmd/sgs/libconv
-passwdutil:	libsldap
-pkcs11:		libcryptoutil libmd
-#		Adding libuuid or libdladm results in a circular dependancy
-print:		libldap5
-udapl/udapl_tavor:	udapl/libdat
-libzfs:		libdevid libgen libnvpair libuutil \
-		libadm libavl libefi libidmap libmd libzfs_core libm
-libzfs_core:	libnvpair
-libzfs_jni:	libdiskmgt libnvpair libzfs
-libzpool:	libavl libumem libnvpair libcmdutils
-libsec:		libavl libidmap
-brand:		libc libsocket
-libshare:	libscf libzfs libuuid libfsmgt libsecdb libumem libsmbfs
-libexacct/demo:	libexacct libproject libsocket libnsl
-libtsalarm:	libpcp
-smbsrv:		libsocket libnsl libmd libxnet libpthread librt \
-		libshare libidmap pkcs11 libsqlite libcryptoutil \
-		libreparse libcmdutils libresolv libsmbfs libuuid \
-		libfakekernel libads
-libv12n:	libds libuuid
-libvrrpadm:	libsocket libdladm libscf
-libvscan:	libscf
 libfru:		libfruutils
-scsi:		libnvpair libfru
-mpapi:		libpthread libdevinfo libsysevent libnvpair
-sun_fc:		libdevinfo libsysevent libnvpair
-libsun_ima:	libdevinfo libsysevent libnsl
-sun_sas:	libdevinfo libsysevent libnvpair libkstat libdevid
-libgrubmgmt:	libdevinfo libzfs libfstyp
+libfsmgt:	libkstat
+libgrubmgmt:	libdevinfo libzfs libfstyp libefi
+$(INTEL_BLD)libgrubmgmt: libfdisk
+libidmap:	libavl libuutil
+libinetsvc:	libscf
+libinstzones:	libzonecfg libcontract
+libipadm:	libinetutil libdlpi libdhcpagent libdladm libsecdb
+libipmp:	libinetutil
+libipsecutil:	libtecla libtsol
+libiscsit:	libstmf libuuid
+libkmf:		libcryptoutil pkcs11
+libkvm:		../cmd/sgs/libelf
+libldap5:	libsasl
+libmapid:	libresolv2 libscf
+libndmp:	libscf
+libnisdb:	libldap5
+libnwam:	libscf libbsm libdladm
+libpcp:		libumem libdevinfo
+libpctx:	libproc
+libpkg:		libwanboot libscf libadm
+libpool:	libscf libexacct
+libpp:		libast
+libproc:	../cmd/sgs/librtld_db ../cmd/sgs/libelf libctf
+$(INTEL_BLD)libproc: libsaveargs
+libproject:	libpool libproc libsecdb
+libprtdiag:	libkstat
+libprtdiag_psr:	libprtdiag
+libraidcfg:	libdevinfo
+librdc:		libnsctl libunistat libdscfg
+librestart:	libuutil libscf libpool libproject libsecdb libsysevent
+libsasl:	libgss pkcs11
+libsaveargs:	libdisasm
+libscf:		libuutil libgen libsmbios
+libsec:		libavl libidmap
+libshare:	libscf libzfs libuuid libfsmgt libsecdb libumem libsmbfs
+libshell:	libast libcmd libdll libsecdb
+libsip:		libmd5
+libsldap:	libldap5 libscf
+libsmbfs:	libkrb5 libsec libidmap pkcs11
+libsrpt:	libstmf
+libstmf:	libscf
+libstmfproxy: 	libstmf libpthread
+libsum: 	libast
+libsun_ima:	libdevinfo libsysevent
+libsysevent:	libsecdb
+libtecla:	libcurses
+libtermcap:	libcurses
+libtnfctl:	../cmd/sgs/libelf
+libtsalarm:	libpcp
+libtsnet:	libtsol libsecdb
+libtsol:	libsecdb
+libuuid:	libdlpi
+libv12n:	libds libuuid
+libvolmgt:	libadm
+libvrrpadm:	libdladm libscf
+libvscan:	libscf libsecdb
+libwanboot:	libresolv2 libdevinfo libinetutil libdhcputil
+libzfs:		libdevid libgen libuutil libadm libavl libefi libidmap \
+		libumem libtsol libzfs_core
+libzfs_jni:	libdiskmgt libzfs
+libzonecfg:	libuuid libsysevent libsec libbrand libpool libscf libproc \
+		libuutil libbsm libsecdb
+libzonestat:	libcmdutils libumem
+libzpool:	libavl libumem libcmdutils libsysevent
+lvm:		libadm libdevid libdevinfo libefi libgen libscf
+madv:		libgen
+mpapi:		libpthread libdevinfo libsysevent
+mpss:		libgen
+nsswitch:	libadutils libidmap libdns_sd libscf libldap5 libsldap
+pam_modules:	libproject passwdutil smbsrv libtsnet libpam libbsm libsecdb
+passwdutil:	libsldap
+pkcs11:		libcryptoutil libgen libuuid
+policykit:	libsecdb
+print:		libldap5 libmd5 libsendfile
 pylibbe: 	libbe libzfs
-pyzfs:		libnvpair libzfs
 pysolaris:	libsec libidmap
-libreparse:	libnvpair
-libhotplug:	libnvpair
-cfgadm_plugins:	libhotplug
-libilb:		libsocket
-libipmi:	libm
-libprtdiag:	libm
-libsqlite:	libm
-libstmf:	libm
-libvscan: 	libm
-
-
-$(INTEL_BUILD)libdiskmgt:libfdisk
+pyzfs:		libzfs
+raidcfg_plugins: libraidcfg librcm libcfgadm libpicl libpicltree
+rpcsec_gss:	libgss
+sasl_plugins:	pkcs11 libgss libsasl
+scsi:		libfru libumem
+smbsrv:		libxnet libpthread librt libshare libidmap pkcs11 libsqlite \
+		libcryptoutil libreparse libcmdutils libresolv2 libsmbfs \
+		libuuid libfakekernel libads libgss libldap5 krb5
+storage:	libdevice libdevinfo libdevid
+sun_fc:		libdevinfo libsysevent
+sun_sas:	libdevinfo libsysevent libkstat libdevid
+udapl:		libdevinfo libdladm
 
 #
 # The reason this rule checks for the existence of the

@@ -29,6 +29,7 @@
 
 /*
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 #include <sys/flock_impl.h>
@@ -243,9 +244,293 @@ flk_get_lockmgr_status(void)
 }
 
 /*
- * Routine called from fs_frlock in fs/fs_subr.c
+ * This implements Open File Description (not descriptor) style record locking.
+ * These locks can also be thought of as pid-less since they are not tied to a
+ * specific process, thus they're preserved across fork.
+ *
+ * Called directly from fcntl.
+ *
+ * See reclock() for the implementation of the traditional POSIX style record
+ * locking scheme (pid-ful). This function is derived from reclock() but
+ * simplified and modified to work for OFD style locking.
+ *
+ * The two primary advantages of OFD style of locking are:
+ * 1) It is per-file description, so closing a file descriptor that refers to a
+ *    different file description for the same file will not drop the lock (i.e.
+ *    two open's of the same file get different descriptions but a dup or fork
+ *    will refer to the same description).
+ * 2) Locks are preserved across fork(2).
+ *
+ * Because these locks are per-description a lock ptr lives at the f_filocks
+ * member of the file_t and the lock_descriptor includes a file_t pointer
+ * to enable unique lock identification and management.
+ *
+ * Since these locks are pid-less we cannot do deadlock detection with the
+ * current process-oriented implementation. This is consistent with OFD locking
+ * behavior on other operating systems such as Linux. Since we don't do
+ * deadlock detection we never interact with the process graph that is
+ * maintained for deadlock detection on the traditional POSIX-style locks.
+ *
+ * Future Work:
+ *
+ * The current implementation does not support record locks. That is,
+ * currently the single lock must cover the entire file. This is validated in
+ * fcntl. To support record locks the f_filock pointer in the file_t needs to
+ * be changed to a list of pointers to the locks. That list needs to be
+ * managed independently of the lock list on the vnode itself and it needs to
+ * be maintained as record locks are created, split, coalesced and deleted.
+ *
+ * The current implementation does not support remote file systems (e.g.
+ * NFS or CIFS). This is handled in fs_frlock(). The design of how OFD locks
+ * interact with the NLM is not clear since the NLM protocol/implementation
+ * appears to be oriented around locks associated with a process. A further
+ * problem is that a design is needed for what nlm_send_siglost() should do and
+ * where it will send SIGLOST. More recent versions of Linux apparently try to
+ * emulate OFD locks on NFS by converting them to traditional POSIX style locks
+ * that work with the NLM. It is not clear that this provides the correct
+ * semantics in all cases.
  */
+int
+ofdlock(file_t *fp, int fcmd, flock64_t *lckdat, int flag, u_offset_t offset)
+{
+	int cmd = 0;
+	vnode_t *vp;
+	lock_descriptor_t	stack_lock_request;
+	lock_descriptor_t	*lock_request;
+	int error = 0;
+	graph_t	*gp;
+	int serialize = 0;
 
+	if (fcmd != F_OFD_GETLK)
+		cmd = SETFLCK;
+
+	if (fcmd == F_OFD_SETLKW || fcmd == F_FLOCKW)
+		cmd |= SLPFLCK;
+
+	/* see block comment */
+	VERIFY(lckdat->l_whence == 0);
+	VERIFY(lckdat->l_start == 0);
+	VERIFY(lckdat->l_len == 0);
+
+	vp = fp->f_vnode;
+
+	/*
+	 * For reclock fs_frlock() would normally have set these in a few
+	 * places but for us it's cleaner to centralize it here. Note that
+	 * IGN_PID is -1. We use 0 for our pid-less locks.
+	 */
+	lckdat->l_pid = 0;
+	lckdat->l_sysid = 0;
+
+	/*
+	 * Check access permissions
+	 */
+	if ((fcmd == F_OFD_SETLK || fcmd == F_OFD_SETLKW) &&
+	    ((lckdat->l_type == F_RDLCK && (flag & FREAD) == 0) ||
+	    (lckdat->l_type == F_WRLCK && (flag & FWRITE) == 0)))
+		return (EBADF);
+
+	/*
+	 * for query and unlock we use the stack_lock_request
+	 */
+	if (lckdat->l_type == F_UNLCK || !(cmd & SETFLCK)) {
+		lock_request = &stack_lock_request;
+		(void) bzero((caddr_t)lock_request,
+		    sizeof (lock_descriptor_t));
+
+		/*
+		 * following is added to make the assertions in
+		 * flk_execute_request() pass
+		 */
+		lock_request->l_edge.edge_in_next = &lock_request->l_edge;
+		lock_request->l_edge.edge_in_prev = &lock_request->l_edge;
+		lock_request->l_edge.edge_adj_next = &lock_request->l_edge;
+		lock_request->l_edge.edge_adj_prev = &lock_request->l_edge;
+		lock_request->l_status = FLK_INITIAL_STATE;
+	} else {
+		lock_request = flk_get_lock();
+		fp->f_filock = (struct filock *)lock_request;
+	}
+	lock_request->l_state = 0;
+	lock_request->l_vnode = vp;
+	lock_request->l_zoneid = getzoneid();
+	lock_request->l_ofd = fp;
+
+	/*
+	 * Convert the request range into the canonical start and end
+	 * values then check the validity of the lock range.
+	 */
+	error = flk_convert_lock_data(vp, lckdat, &lock_request->l_start,
+	    &lock_request->l_end, offset);
+	if (error)
+		goto done;
+
+	error = flk_check_lock_data(lock_request->l_start, lock_request->l_end,
+	    MAXEND);
+	if (error)
+		goto done;
+
+	ASSERT(lock_request->l_end >= lock_request->l_start);
+
+	lock_request->l_type = lckdat->l_type;
+	if (cmd & SLPFLCK)
+		lock_request->l_state |= WILLING_TO_SLEEP_LOCK;
+
+	if (!(cmd & SETFLCK)) {
+		if (lock_request->l_type == F_RDLCK ||
+		    lock_request->l_type == F_WRLCK)
+			lock_request->l_state |= QUERY_LOCK;
+	}
+	lock_request->l_flock = (*lckdat);
+
+	/*
+	 * We are ready for processing the request
+	 */
+
+	if (fcmd != F_OFD_GETLK && lock_request->l_type != F_UNLCK &&
+	    nbl_need_check(vp)) {
+		nbl_start_crit(vp, RW_WRITER);
+		serialize = 1;
+	}
+
+	/* Get the lock graph for a particular vnode */
+	gp = flk_get_lock_graph(vp, FLK_INIT_GRAPH);
+
+	mutex_enter(&gp->gp_mutex);
+
+	lock_request->l_state |= REFERENCED_LOCK;
+	lock_request->l_graph = gp;
+
+	switch (lock_request->l_type) {
+	case F_RDLCK:
+	case F_WRLCK:
+		if (IS_QUERY_LOCK(lock_request)) {
+			flk_get_first_blocking_lock(lock_request);
+			if (lock_request->l_ofd != NULL)
+				lock_request->l_flock.l_pid = -1;
+			(*lckdat) = lock_request->l_flock;
+		} else {
+			/* process the request now */
+			error = flk_process_request(lock_request);
+		}
+		break;
+
+	case F_UNLCK:
+		/* unlock request will not block so execute it immediately */
+		error = flk_execute_request(lock_request);
+		break;
+
+	default:
+		error = EINVAL;
+		break;
+	}
+
+	if (lock_request == &stack_lock_request) {
+		flk_set_state(lock_request, FLK_DEAD_STATE);
+	} else {
+		lock_request->l_state &= ~REFERENCED_LOCK;
+		if ((error != 0) || IS_DELETED(lock_request)) {
+			flk_set_state(lock_request, FLK_DEAD_STATE);
+			flk_free_lock(lock_request);
+		}
+	}
+
+	mutex_exit(&gp->gp_mutex);
+	if (serialize)
+		nbl_end_crit(vp);
+
+	return (error);
+
+done:
+	flk_set_state(lock_request, FLK_DEAD_STATE);
+	if (lock_request != &stack_lock_request)
+		flk_free_lock(lock_request);
+	return (error);
+}
+
+/*
+ * Remove any lock on the vnode belonging to the given file_t.
+ * Called from closef on last close, file_t is locked.
+ *
+ * This is modeled on the cleanlocks() function but only removes the single
+ * lock associated with fp.
+ */
+void
+ofdcleanlock(file_t *fp)
+{
+	lock_descriptor_t *fplock, *lock, *nlock;
+	vnode_t *vp;
+	graph_t	*gp;
+
+	ASSERT(MUTEX_HELD(&fp->f_tlock));
+
+	if ((fplock = (lock_descriptor_t *)fp->f_filock) == NULL)
+		return;
+
+	fp->f_filock = NULL;
+	vp = fp->f_vnode;
+
+	gp = flk_get_lock_graph(vp, FLK_USE_GRAPH);
+
+	if (gp == NULL)
+		return;
+	mutex_enter(&gp->gp_mutex);
+
+	CHECK_SLEEPING_LOCKS(gp);
+	CHECK_ACTIVE_LOCKS(gp);
+
+	SET_LOCK_TO_FIRST_SLEEP_VP(gp, lock, vp);
+
+	if (lock) {
+		do {
+			nlock = lock->l_next;
+			if (fplock == lock) {
+				CANCEL_WAKEUP(lock);
+				break;
+			}
+			lock = nlock;
+		} while (lock->l_vnode == vp);
+	}
+
+	SET_LOCK_TO_FIRST_ACTIVE_VP(gp, lock, vp);
+
+	if (lock) {
+		do {
+			nlock = lock->l_next;
+			if (fplock == lock) {
+				flk_delete_active_lock(lock, 0);
+				flk_wakeup(lock, 1);
+				flk_free_lock(lock);
+				break;
+			}
+			lock = nlock;
+		} while (lock->l_vnode == vp);
+	}
+
+	CHECK_SLEEPING_LOCKS(gp);
+	CHECK_ACTIVE_LOCKS(gp);
+	mutex_exit(&gp->gp_mutex);
+}
+
+/*
+ * Routine called from fs_frlock in fs/fs_subr.c
+ *
+ * This implements traditional POSIX style record locking. The two primary
+ * drawbacks to this style of locking are:
+ * 1) It is per-process, so any close of a file descriptor that refers to the
+ *    file will drop the lock (e.g. lock /etc/passwd, call a library function
+ *    which opens /etc/passwd to read the file, when the library closes it's
+ *    file descriptor the application loses its lock and does not know).
+ * 2) Locks are not preserved across fork(2).
+ *
+ * Because these locks are only assoiciated with a pid they are per-process.
+ * This is why any close will drop the lock and is also why once the process
+ * forks then the lock is no longer related to the new process. These locks can
+ * be considered as pid-ful.
+ *
+ * See ofdlock() for the implementation of a similar but improved locking
+ * scheme.
+ */
 int
 reclock(vnode_t		*vp,
 	flock64_t	*lckdat,
@@ -424,6 +709,8 @@ reclock(vnode_t		*vp,
 	case F_WRLCK:
 		if (IS_QUERY_LOCK(lock_request)) {
 			flk_get_first_blocking_lock(lock_request);
+			if (lock_request->l_ofd != NULL)
+				lock_request->l_flock.l_pid = -1;
 			(*lckdat) = lock_request->l_flock;
 			break;
 		}
@@ -712,7 +999,13 @@ flk_get_lock(void)
 void
 flk_free_lock(lock_descriptor_t	*lock)
 {
+	file_t *fp;
+
 	ASSERT(IS_DEAD(lock));
+
+	if ((fp = lock->l_ofd) != NULL)
+		fp->f_filock = NULL;
+
 	if (IS_REFERENCED(lock)) {
 		lock->l_state |= DELETED_LOCK;
 		return;
@@ -1214,7 +1507,7 @@ flk_add_edge(lock_descriptor_t *from_lock, lock_descriptor_t *to_lock,
 	from_lock->l_edge.edge_adj_next = edge;
 
 	/*
-	 * put in in list of to vertex
+	 * put in list of to vertex
 	 */
 
 	to_lock->l_edge.edge_in_next->edge_in_prev = edge;
@@ -2620,9 +2913,11 @@ flk_canceled(lock_descriptor_t *request)
 }
 
 /*
- * Remove all the locks for the vnode belonging to the given pid and sysid.
+ * Remove all non-OFD locks for the vnode belonging to the given pid and sysid.
+ * That is, since OFD locks are pid-less we'll never match on the incoming
+ * pid. OFD locks are removed earlier in the close() path via closef() and
+ * ofdcleanlock().
  */
-
 void
 cleanlocks(vnode_t *vp, pid_t pid, int sysid)
 {
@@ -2788,6 +3083,14 @@ flk_check_deadlock(lock_descriptor_t *lock)
 	proc_edge_t *pep, *ppep;
 	edge_t	*ep, *nep;
 	proc_vertex_t *process_stack;
+
+	/*
+	 * OFD style locks are not associated with any process so there is
+	 * no proc graph for these. Thus we cannot, and do not, do deadlock
+	 * detection.
+	 */
+	if (lock->l_ofd != NULL)
+		return (0);
 
 	STACK_INIT(process_stack);
 
@@ -3081,6 +3384,16 @@ flk_update_proc_graph(edge_t *ep, int delete)
 	proc_edge_t *pep, *prevpep;
 
 	mutex_enter(&flock_lock);
+
+	/*
+	 * OFD style locks are not associated with any process so there is
+	 * no proc graph for these.
+	 */
+	if (ep->from_vertex->l_ofd != NULL) {
+		mutex_exit(&flock_lock);
+		return;
+	}
+
 	toproc = flk_get_proc_vertex(ep->to_vertex);
 	fromproc = flk_get_proc_vertex(ep->from_vertex);
 
@@ -3910,6 +4223,7 @@ report_blocker(lock_descriptor_t *blocker, lock_descriptor_t *request)
 	flrp->l_type = blocker->l_type;
 	flrp->l_pid = blocker->l_flock.l_pid;
 	flrp->l_sysid = blocker->l_flock.l_sysid;
+	request->l_ofd = blocker->l_ofd;
 
 	if (IS_LOCKMGR(request)) {
 		flrp->l_start = blocker->l_start;
@@ -4224,6 +4538,10 @@ static void
 check_owner_locks(graph_t *gp, pid_t pid, int sysid, vnode_t *vp)
 {
 	lock_descriptor_t *lock;
+
+	/* Ignore OFD style locks since they're not process-wide. */
+	if (pid == 0)
+		return;
 
 	SET_LOCK_TO_FIRST_ACTIVE_VP(gp, lock, vp);
 

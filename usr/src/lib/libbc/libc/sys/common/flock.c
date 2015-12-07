@@ -22,18 +22,18 @@
 /*
  * Copyright 1990 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2015 Joyent, Inc.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/file.h>
 #include <sys/fcntl.h>
 
-int flock(fd, operation)
+int
+flock(fd, operation)
 int fd, operation;
 {
 	struct flock fl;
-	int cmd = F_SETLKW;
+	int cmd = F_FLOCKW;
 
 	fl.l_whence = 0;
 	fl.l_start = 0;
@@ -45,7 +45,7 @@ int fd, operation;
 		fl.l_type |= F_RDLCK;
 	if (operation & LOCK_EX)
 		fl.l_type |= F_WRLCK;
-	if (operation & LOCK_NB) 
-		cmd = F_SETLK;
-	return(bc_fcntl(fd, cmd, &fl));
+	if (operation & LOCK_NB)
+		cmd = F_FLOCK;
+	return (bc_fcntl(fd, cmd, &fl));
 }
