@@ -27,7 +27,7 @@
  */
 
 /*
- * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -286,7 +286,7 @@ static	int	nzoneid = 0;
 static	int	kbytes_per_page;
 static	int	pidwidth;
 
-static	char	*procdir = "/proc";	/* standard /proc directory */
+static	char	procdir[MAXPATHLEN];	/* standard /proc directory */
 
 static struct ughead	euid_tbl;	/* table to store selected euid's */
 static struct ughead	ruid_tbl;	/* table to store selected real uid's */
@@ -339,6 +339,14 @@ int
 main(int argc, char **argv)
 {
 	const char *me;
+	const char *zroot = zone_get_nroot();
+
+	/*
+	 * If this is a branded zone, the native procfs may mounted in a
+	 * non-standard location.  Apply such a path prefix if it exists.
+	 */
+	(void) snprintf(procdir, sizeof (procdir), "%s/proc", zroot != NULL ?
+	    zroot : "");
 
 	/*
 	 * The original two ps'es are linked in a single binary;
@@ -2077,7 +2085,7 @@ print_zombie_field(psinfo_t *psinfo, struct field *f, const char *ttyp)
 
 static void
 pr_fields(psinfo_t *psinfo, const char *ttyp,
-	void (*print_fld)(psinfo_t *, struct field *, const char *))
+    void (*print_fld)(psinfo_t *, struct field *, const char *))
 {
 	struct field *f;
 
