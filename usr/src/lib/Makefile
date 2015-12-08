@@ -567,7 +567,7 @@ basedeps :=	TARGET=install
 # libc libm libmd libmp libnsl libnvpair libsocket
 abi:		libctf libmapmalloc libproc
 auditd_plugins: libbsm libsecdb libgss libmtmalloc
-brand:		libzonecfg libmapmalloc
+brand:		libzonecfg libmapmalloc libipadm libcmdutils libproc librpcsvc
 cfgadm_plugins:	libdevice libdevinfo libhotplug librcm hbaapi libkstat libscf
 fm:		libexacct libipmi libzfs scsi libdevinfo libdevid libcfgadm \
 		libcontract libsysevent ../cmd/sgs/libelf
