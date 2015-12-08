@@ -3916,6 +3916,7 @@ f usr/include/sys/mc_amd.h 0644 root bin
 f usr/include/sys/mc_intel.h 0644 root bin
 f usr/include/sys/mca_amd.h 0644 root bin
 f usr/include/sys/mca_x86.h 0644 root bin
+f usr/include/sys/mcontext.h 0644 root bin
 f usr/include/sys/md4.h 0644 root bin
 f usr/include/sys/md5.h 0644 root bin
 f usr/include/sys/md5_consts.h 0644 root bin

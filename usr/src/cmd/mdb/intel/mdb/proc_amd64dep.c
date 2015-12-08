@@ -448,7 +448,7 @@ pt_fpregs(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	mdb_tgt_t *t = mdb.m_target;
 	mdb_tgt_tid_t tid;
 	prfpregset_t fprs;
-	struct fpchip_state fps;
+	struct _fpchip_state fps;
 	char buf[256];
 	uint_t top;
 	int i;
