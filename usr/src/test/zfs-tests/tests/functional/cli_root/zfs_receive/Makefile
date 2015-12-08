@@ -29,7 +29,8 @@ PROGS = cleanup \
 	zfs_receive_007_neg \
 	zfs_receive_008_pos \
 	zfs_receive_009_neg \
-	zfs_receive_010_pos
+	zfs_receive_010_pos \
+	zfs_receive_011_pos
 
 CMDS = $(PROGS:%=$(TESTDIR)/%)
 $(CMDS) := FILEMODE = 0555

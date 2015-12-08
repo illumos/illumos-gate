@@ -416,7 +416,7 @@ fpnoextflt(struct regs *rp)
 	ASSERT(sizeof (struct xsave_state) >= AVX_XSAVE_SIZE);
 
 #if defined(__i386)
-	ASSERT(sizeof (struct fpu) == sizeof (struct __old_fpu));
+	ASSERT(sizeof (struct _fpu) == sizeof (struct __old_fpu));
 #endif	/* __i386 */
 #endif	/* !__lint */
 

@@ -35,6 +35,7 @@
 #include <sys/cpuvar.h>
 #include <sys/cmn_err.h>
 #include <sys/atomic.h>
+#include <sys/regset.h>
 #include <sys/privregs.h>
 #include <sys/vis_simulator.h>
 
