@@ -20,7 +20,6 @@
  */
 
 /*
-<<<<<<< HEAD
  * Copyright 2015 Joyent, Inc.
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  *
