@@ -947,7 +947,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_stat64,			/*   4: stat */
 	lx_fstat64,			/*   5: fstat */
 	lx_lstat64,			/*   6: lstat */
-	lx_poll,			/*   7: poll */
+	NULL,				/*   7: poll */
 	lx_lseek,			/*   8: lseek */
 	lx_mmap,			/*   9: mmap */
 	lx_mprotect,			/*  10: mprotect */
@@ -963,7 +963,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/*  20: writev */
 	lx_access,			/*  21: access */
 	NULL,				/*  22: pipe */
-	lx_select,			/*  23: select */
+	NULL,				/*  23: select */
 	NULL,				/*  24: sched_yield */
 	lx_remap,			/*  25: mremap */
 	lx_msync,			/*  26: msync */
@@ -1210,8 +1210,8 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_readlinkat,			/* 267: readlinkat */
 	NULL,				/* 268: fchmodat */
 	lx_faccessat,			/* 269: faccessat */
-	lx_pselect6,			/* 270: pselect6 */
-	lx_ppoll,			/* 271: ppoll */
+	NULL,				/* 270: pselect6 */
+	NULL,				/* 271: ppoll */
 	NULL,				/* 272: unshare */
 	NULL,				/* 273: set_robust_list */
 	NULL,				/* 274: get_robust_list */
@@ -1413,7 +1413,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_setfsgid16,			/* 139: setfsgid16 */
 	lx_llseek,			/* 140: llseek */
 	NULL,				/* 141: getdents */
-	lx_select,			/* 142: select */
+	NULL,				/* 142: select */
 	lx_flock,			/* 143: flock */
 	lx_msync,			/* 144: msync */
 	NULL,				/* 145: readv */
@@ -1439,7 +1439,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_getresuid16,			/* 165: getresuid16 */
 	NULL,				/* 166: vm86 */
 	lx_query_module,		/* 167: query_module */
-	lx_poll,			/* 168: poll */
+	NULL,				/* 168: poll */
 	NULL,				/* 169: nfsservctl */
 	NULL,				/* 170: setresgid16 */
 	lx_getresgid16,			/* 171: getresgid16 */
@@ -1579,8 +1579,8 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_readlinkat,			/* 305: readlinkat */
 	NULL,				/* 306: fchmodat */
 	lx_faccessat,			/* 307: faccessat */
-	lx_pselect6,			/* 308: pselect6 */
-	lx_ppoll,			/* 309: ppoll */
+	NULL,				/* 308: pselect6 */
+	NULL,				/* 309: ppoll */
 	NULL,				/* 310: unshare */
 	NULL,				/* 311: set_robust_list */
 	NULL,				/* 312: get_robust_list */

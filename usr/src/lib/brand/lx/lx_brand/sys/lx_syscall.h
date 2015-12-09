@@ -93,11 +93,6 @@ extern long lx_listen(int, int);
 extern long lx_shutdown(int, int);
 extern long lx_socketpair(int, int, int, int *);
 
-extern long lx_select(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t);
-extern long lx_pselect6(uintptr_t, uintptr_t, uintptr_t, uintptr_t,
-    uintptr_t, uintptr_t);
-extern long lx_poll(uintptr_t, uintptr_t, uintptr_t);
-extern long lx_ppoll(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 extern long lx_settimeofday(uintptr_t, uintptr_t);
 extern long lx_getrusage(uintptr_t, uintptr_t);
 extern long lx_mknod(uintptr_t, uintptr_t, uintptr_t);

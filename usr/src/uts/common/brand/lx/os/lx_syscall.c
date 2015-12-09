@@ -758,7 +758,7 @@ lx_sysent_t lx_sysent32[] = {
 	{"setfsgid16",	NULL,			0,		1}, /* 139 */
 	{"llseek",	NULL,			0,		5}, /* 140 */
 	{"getdents",	lx_getdents_32,		0,		3}, /* 141 */
-	{"select",	NULL,			0,		5}, /* 142 */
+	{"select",	lx_select,		0,		5}, /* 142 */
 	{"flock",	NULL,			0,		2}, /* 143 */
 	{"msync",	NULL,			0,		3}, /* 144 */
 	{"readv",	lx_readv,		0,		3}, /* 145 */
@@ -784,7 +784,7 @@ lx_sysent_t lx_sysent32[] = {
 	{"getresuid16",	NULL,			0,		3}, /* 165 */
 	{"vm86",	NULL,			NOSYS_NO_EQUIV,	0}, /* 166 */
 	{"query_module", NULL,			0,		5}, /* 167 */
-	{"poll",	NULL,			0,		3}, /* 168 */
+	{"poll",	lx_poll,		0,		3}, /* 168 */
 	{"nfsservctl",	NULL,			NOSYS_KERNEL,	0}, /* 169 */
 	{"setresgid16",	lx_setresgid16,		0,		3}, /* 170 */
 	{"getresgid16",	NULL,			0,		3}, /* 171 */
@@ -928,8 +928,8 @@ lx_sysent_t lx_sysent32[] = {
 	{"readlinkat",	NULL,			0,		4}, /* 305 */
 	{"fchmodat",	lx_fchmodat,		0,		3}, /* 306 */
 	{"faccessat",	NULL,			0,		4}, /* 307 */
-	{"pselect6",	NULL,			LX_SYS_EBPARG6,	6}, /* 308 */
-	{"ppoll",	NULL,			0,		5}, /* 309 */
+	{"pselect6",	lx_pselect,		LX_SYS_EBPARG6,	6}, /* 308 */
+	{"ppoll",	lx_ppoll,		0,		5}, /* 309 */
 	{"unshare",	NULL,			NOSYS_NULL,	0}, /* 310 */
 	{"set_robust_list", lx_set_robust_list,	0,		2}, /* 311 */
 	{"get_robust_list", lx_get_robust_list,	0,		3}, /* 312 */
@@ -994,7 +994,7 @@ lx_sysent_t lx_sysent64[] = {
 	{"stat",	NULL,			0,		2}, /* 4 */
 	{"fstat",	NULL,			0,		2}, /* 5 */
 	{"lstat",	NULL,			0,		2}, /* 6 */
-	{"poll",	NULL,			0,		3}, /* 7 */
+	{"poll",	lx_poll,		0,		3}, /* 7 */
 	{"lseek",	NULL,			0,		3}, /* 8 */
 	{"mmap",	NULL,			0,		6}, /* 9 */
 	{"mprotect",	NULL,			0,		3}, /* 10 */
@@ -1010,7 +1010,7 @@ lx_sysent_t lx_sysent64[] = {
 	{"writev",	lx_writev,		0,		3}, /* 20 */
 	{"access",	NULL,			0,		2}, /* 21 */
 	{"pipe",	lx_pipe,		0,		1}, /* 22 */
-	{"select",	NULL,			0,		5}, /* 23 */
+	{"select",	lx_select,		0,		5}, /* 23 */
 	{"sched_yield",	lx_sched_yield,		0,		0}, /* 24 */
 	{"mremap",	NULL,			0,		5}, /* 25 */
 	{"msync",	NULL,			0,		3}, /* 26 */
@@ -1257,8 +1257,8 @@ lx_sysent_t lx_sysent64[] = {
 	{"readlinkat",	NULL,			0,		4}, /* 267 */
 	{"fchmodat",	lx_fchmodat,		0,		3}, /* 268 */
 	{"faccessat",	NULL,			0,		4}, /* 269 */
-	{"pselect6",	NULL,			0,		6}, /* 270 */
-	{"ppoll",	NULL,			0,		5}, /* 271 */
+	{"pselect6",	lx_pselect,		0,		6}, /* 270 */
+	{"ppoll",	lx_ppoll,		0,		5}, /* 271 */
 	{"unshare",	NULL,			NOSYS_NULL,	0}, /* 272 */
 	{"set_robust_list", lx_set_robust_list,	0,		2}, /* 273 */
 	{"get_robust_list", lx_get_robust_list,	0,		3}, /* 274 */
