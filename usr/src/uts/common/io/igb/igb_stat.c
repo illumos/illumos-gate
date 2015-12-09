@@ -161,7 +161,7 @@ igb_init_stats(igb_t *igb)
 	    sizeof (igb_stat_t) / sizeof (kstat_named_t), 0);
 
 	if (ks == NULL) {
-		igb_error(igb,
+		igb_log(igb, IGB_LOG_ERROR,
 		    "Could not create kernel statistics");
 		return (IGB_FAILURE);
 	}
