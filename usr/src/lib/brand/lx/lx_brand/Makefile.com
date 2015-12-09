@@ -46,7 +46,6 @@ COBJS	=	aio.o			\
 		mount.o			\
 		mount_nfs.o		\
 		pgrp.o			\
-		poll_select.o		\
 		priority.o		\
 		ptrace.o		\
 		sched.o			\

@@ -79,6 +79,34 @@ extern int lx_ltos_signo(int, int);
 extern int lx_stol_status(int, int);
 extern int lx_stol_sigcode(int);
 
+/*
+ * NOTE:  Linux uses different definitions for 'sigset_t's and 'sigaction_t's
+ *	  depending on whether the definition is for user space or the kernel.
+ *
+ *	  The definitions below MUST correspond to the Linux kernel versions,
+ *	  as glibc will do the necessary translation from the Linux user
+ *	  versions.
+ */
+#if defined(_LP64)
+#define	LX_NSIG_WORDS	1
+#define	LX_WSHIFT	6
+#elif defined(_ILP32)
+#define	LX_NSIG_WORDS	2
+#define	LX_WSHIFT	5
+#else
+#error "LX only supports LP64 and ILP32"
+#endif
+
+typedef struct {
+	ulong_t	__bits[LX_NSIG_WORDS];
+} lx_sigset_t;
+
+#define	LX_NBITS		(sizeof (ulong_t) * NBBY)
+#define	lx_sigmask(n)		(1UL << (((n) - 1) % LX_NBITS))
+#define	lx_sigword(n)		(((ulong_t)((n) - 1)) >> LX_WSHIFT)
+#define	lx_sigismember(s, n)	(lx_sigmask(n) & (s)->__bits[lx_sigword(n)])
+#define	lx_sigaddset(s, n)	((s)->__bits[lx_sigword(n)] |= lx_sigmask(n))
+
 #ifdef	__cplusplus
 }
 #endif

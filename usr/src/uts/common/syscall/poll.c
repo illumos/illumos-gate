@@ -317,20 +317,58 @@ polllock(pollhead_t *php, kmutex_t *lp)
 	return (0);
 }
 
-static int
-poll_common(pollfd_t *fds, nfds_t nfds, timespec_t *tsp, k_sigset_t *ksetp)
+int
+poll_copyin(pollstate_t *ps, pollfd_t *fds, nfds_t nfds)
+{
+	pollfd_t *pollfdp;
+	nfds_t old_nfds;
+
+	/*
+	 * NOTE: for performance, buffers are saved across poll() calls.
+	 * The theory is that if a process polls heavily, it tends to poll
+	 * on the same set of descriptors.  Therefore, we only reallocate
+	 * buffers when nfds changes.  There is no hysteresis control,
+	 * because there is no data to suggest that this is necessary;
+	 * the penalty of reallocating is not *that* great in any event.
+	 */
+	old_nfds = ps->ps_nfds;
+	if (nfds != old_nfds) {
+		kmem_free(ps->ps_pollfd, old_nfds * sizeof (pollfd_t));
+		pollfdp = kmem_alloc(nfds * sizeof (pollfd_t), KM_SLEEP);
+		ps->ps_pollfd = pollfdp;
+		ps->ps_nfds = nfds;
+	}
+
+	pollfdp = ps->ps_pollfd;
+	if (copyin(fds, pollfdp, nfds * sizeof (pollfd_t))) {
+		return (EFAULT);
+	}
+
+	if (fds == NULL) {
+		/*
+		 * If the process has page 0 mapped, then the copyin() above
+		 * will succeed even if fds is NULL.  However, our cached
+		 * poll lists are keyed by the address of the passed-in fds
+		 * structure, and we use the value NULL to indicate an unused
+		 * poll cache list entry.  As such, we elect not to support
+		 * NULL as a valid (user) memory address and fail the poll()
+		 * call.
+		 */
+		return (EFAULT);
+	}
+	return (0);
+}
+
+int
+poll_common(pollstate_t *ps, pollfd_t *fds, nfds_t nfds, timespec_t *tsp,
+    int *fdcnt)
 {
 	kthread_t *t = curthread;
-	klwp_t *lwp = ttolwp(t);
 	proc_t *p = ttoproc(t);
-	int fdcnt = 0;
-	int i;
 	hrtime_t deadline; /* hrtime value when we want to return */
 	pollfd_t *pollfdp;
-	pollstate_t *ps;
 	pollcache_t *pcp;
 	int error = 0;
-	nfds_t old_nfds;
 	int cacheindex = 0;	/* which cache set is used */
 
 	/*
@@ -348,29 +386,7 @@ poll_common(pollfd_t *fds, nfds_t nfds, timespec_t *tsp, k_sigset_t *ksetp)
 	}
 
 	/*
-	 * Reset our signal mask, if requested.
-	 */
-	if (ksetp != NULL) {
-		mutex_enter(&p->p_lock);
-		schedctl_finish_sigblock(t);
-		lwp->lwp_sigoldmask = t->t_hold;
-		t->t_hold = *ksetp;
-		t->t_flag |= T_TOMASK;
-		/*
-		 * Call cv_reltimedwait_sig() just to check for signals.
-		 * We will return immediately with either 0 or -1.
-		 */
-		if (!cv_reltimedwait_sig(&t->t_delay_cv, &p->p_lock, 0,
-		    TR_CLOCK_TICK)) {
-			mutex_exit(&p->p_lock);
-			error = EINTR;
-			goto pollout;
-		}
-		mutex_exit(&p->p_lock);
-	}
-
-	/*
-	 * Check to see if this guy just wants to use poll() as a timeout.
+	 * Check to see if the caller just wants to use poll() as a timeout.
 	 * If yes then bypass all the other stuff and make him sleep.
 	 */
 	if (nfds == 0) {
@@ -385,66 +401,14 @@ poll_common(pollfd_t *fds, nfds_t nfds, timespec_t *tsp, k_sigset_t *ksetp)
 			    &t->t_delay_lock, deadline)) > 0)
 				continue;
 			mutex_exit(&t->t_delay_lock);
-			error = (error == 0) ? EINTR : 0;
 		}
-		goto pollout;
+		*fdcnt = 0;
+		return ((error == 0) ? EINTR : 0);
 	}
 
-	if (nfds > p->p_fno_ctl) {
-		mutex_enter(&p->p_lock);
-		(void) rctl_action(rctlproc_legacy[RLIMIT_NOFILE],
-		    p->p_rctls, p, RCA_SAFE);
-		mutex_exit(&p->p_lock);
-		error = EINVAL;
-		goto pollout;
-	}
-
-	/*
-	 * Need to allocate memory for pollstate before anything because
-	 * the mutex and cv are created in this space
-	 */
-	ps = pollstate_create();
-
-	if (ps->ps_pcache == NULL)
-		ps->ps_pcache = pcache_alloc();
-	pcp = ps->ps_pcache;
-
-	/*
-	 * NOTE: for performance, buffers are saved across poll() calls.
-	 * The theory is that if a process polls heavily, it tends to poll
-	 * on the same set of descriptors.  Therefore, we only reallocate
-	 * buffers when nfds changes.  There is no hysteresis control,
-	 * because there is no data to suggest that this is necessary;
-	 * the penalty of reallocating is not *that* great in any event.
-	 */
-	old_nfds = ps->ps_nfds;
-	if (nfds != old_nfds) {
-
-		kmem_free(ps->ps_pollfd, old_nfds * sizeof (pollfd_t));
-		pollfdp = kmem_alloc(nfds * sizeof (pollfd_t), KM_SLEEP);
-		ps->ps_pollfd = pollfdp;
-		ps->ps_nfds = nfds;
-	}
-
+	VERIFY(ps != NULL);
 	pollfdp = ps->ps_pollfd;
-	if (copyin(fds, pollfdp, nfds * sizeof (pollfd_t))) {
-		error = EFAULT;
-		goto pollout;
-	}
-
-	if (fds == NULL) {
-		/*
-		 * If the process has page 0 mapped, then the copyin() above
-		 * will succeed even if fds is NULL.  However, our cached
-		 * poll lists are keyed by the address of the passed-in fds
-		 * structure, and we use the value NULL to indicate an unused
-		 * poll cache list entry.  As such, we elect not to support
-		 * NULL as a valid (user) memory address and fail the poll()
-		 * call.
-		 */
-		error = EINVAL;
-		goto pollout;
-	}
+	VERIFY(pollfdp != NULL);
 
 	/*
 	 * If this thread polls for the first time, allocate ALL poll
@@ -460,10 +424,10 @@ poll_common(pollfd_t *fds, nfds_t nfds, timespec_t *tsp, k_sigset_t *ksetp)
 		/*
 		 * poll and cache this poll fd list in ps_pcacheset[0].
 		 */
-		error = pcacheset_cache_list(ps, fds, &fdcnt, cacheindex);
-		if (fdcnt || error) {
+		error = pcacheset_cache_list(ps, fds, fdcnt, cacheindex);
+		if (error || *fdcnt) {
 			mutex_exit(&ps->ps_lock);
-			goto pollout;
+			return (error);
 		}
 	} else {
 		pollcacheset_t	*pcset = ps->ps_pcacheset;
@@ -488,11 +452,11 @@ poll_common(pollfd_t *fds, nfds_t nfds, timespec_t *tsp, k_sigset_t *ksetp)
 				 * the callee will guarantee the consistency
 				 * of cached poll list and cache content.
 				 */
-				error = pcacheset_resolve(ps, nfds, &fdcnt,
+				error = pcacheset_resolve(ps, nfds, fdcnt,
 				    cacheindex);
 				if (error) {
 					mutex_exit(&ps->ps_lock);
-					goto pollout;
+					return (error);
 				}
 				break;
 			}
@@ -509,11 +473,11 @@ poll_common(pollfd_t *fds, nfds_t nfds, timespec_t *tsp, k_sigset_t *ksetp)
 				 * found an unused entry. Use it to cache
 				 * this poll list.
 				 */
-				error = pcacheset_cache_list(ps, fds, &fdcnt,
+				error = pcacheset_cache_list(ps, fds, fdcnt,
 				    cacheindex);
-				if (fdcnt || error) {
+				if (error || *fdcnt) {
 					mutex_exit(&ps->ps_lock);
-					goto pollout;
+					return (error);
 				}
 				break;
 			}
@@ -527,10 +491,10 @@ poll_common(pollfd_t *fds, nfds_t nfds, timespec_t *tsp, k_sigset_t *ksetp)
 			cacheindex = pcacheset_replace(ps);
 			ASSERT(cacheindex < ps->ps_nsets);
 			pcset[cacheindex].pcs_usradr = (uintptr_t)fds;
-			error = pcacheset_resolve(ps, nfds, &fdcnt, cacheindex);
+			error = pcacheset_resolve(ps, nfds, fdcnt, cacheindex);
 			if (error) {
 				mutex_exit(&ps->ps_lock);
-				goto pollout;
+				return (error);
 			}
 		}
 	}
@@ -548,8 +512,8 @@ poll_common(pollfd_t *fds, nfds_t nfds, timespec_t *tsp, k_sigset_t *ksetp)
 	mutex_enter(&pcp->pc_lock);
 	for (;;) {
 		pcp->pc_flag = 0;
-		error = pcache_poll(pollfdp, ps, nfds, &fdcnt, cacheindex);
-		if (fdcnt || error) {
+		error = pcache_poll(pollfdp, ps, nfds, fdcnt, cacheindex);
+		if (error || *fdcnt) {
 			mutex_exit(&pcp->pc_lock);
 			mutex_exit(&ps->ps_lock);
 			break;
@@ -595,56 +559,7 @@ poll_common(pollfd_t *fds, nfds_t nfds, timespec_t *tsp, k_sigset_t *ksetp)
 		mutex_enter(&pcp->pc_lock);
 	}
 
-pollout:
-	/*
-	 * If we changed the signal mask but we received
-	 * no signal then restore the signal mask.
-	 * Otherwise psig() will deal with the signal mask.
-	 */
-	if (ksetp != NULL) {
-		mutex_enter(&p->p_lock);
-		if (lwp->lwp_cursig == 0) {
-			t->t_hold = lwp->lwp_sigoldmask;
-			t->t_flag &= ~T_TOMASK;
-		}
-		mutex_exit(&p->p_lock);
-	}
-
-	if (error)
-		return (set_errno(error));
-
-	/*
-	 * Copy out the events and return the fdcnt to the user.
-	 */
-	if (nfds != 0 &&
-	    copyout(pollfdp, fds, nfds * sizeof (pollfd_t)))
-		return (set_errno(EFAULT));
-
-#ifdef DEBUG
-	/*
-	 * Another sanity check:
-	 */
-	if (fdcnt) {
-		int	reventcnt = 0;
-
-		for (i = 0; i < nfds; i++) {
-			if (pollfdp[i].fd < 0) {
-				ASSERT(pollfdp[i].revents == 0);
-				continue;
-			}
-			if (pollfdp[i].revents) {
-				reventcnt++;
-			}
-		}
-		ASSERT(fdcnt == reventcnt);
-	} else {
-		for (i = 0; i < nfds; i++) {
-			ASSERT(pollfdp[i].revents == 0);
-		}
-	}
-#endif	/* DEBUG */
-
-	return (fdcnt);
+	return (error);
 }
 
 /*
@@ -655,17 +570,23 @@ pollout:
 int
 pollsys(pollfd_t *fds, nfds_t nfds, timespec_t *timeoutp, sigset_t *setp)
 {
+	kthread_t *t = curthread;
+	klwp_t *lwp = ttolwp(t);
+	proc_t *p = ttoproc(t);
 	timespec_t ts;
 	timespec_t *tsp;
-	sigset_t set;
 	k_sigset_t kset;
-	k_sigset_t *ksetp;
-	model_t datamodel = get_udatamodel();
+	pollstate_t *ps = NULL;
+	pollfd_t *pollfdp = NULL;
+	int error = 0, fdcnt = 0;
 
-	if (timeoutp == NULL)
+	/*
+	 * Copy in timeout
+	 */
+	if (timeoutp == NULL) {
 		tsp = NULL;
-	else {
-		if (datamodel == DATAMODEL_NATIVE) {
+	} else {
+		if (get_udatamodel() == DATAMODEL_NATIVE) {
 			if (copyin(timeoutp, &ts, sizeof (ts)))
 				return (set_errno(EFAULT));
 		} else {
@@ -681,16 +602,116 @@ pollsys(pollfd_t *fds, nfds_t nfds, timespec_t *timeoutp, sigset_t *setp)
 		tsp = &ts;
 	}
 
-	if (setp == NULL)
-		ksetp = NULL;
-	else {
+	/*
+	 * Copy in and reset signal mask, if requested.
+	 */
+	if (setp != NULL) {
+		sigset_t set;
+
 		if (copyin(setp, &set, sizeof (set)))
 			return (set_errno(EFAULT));
 		sigutok(&set, &kset);
-		ksetp = &kset;
+
+		mutex_enter(&p->p_lock);
+		schedctl_finish_sigblock(t);
+		lwp->lwp_sigoldmask = t->t_hold;
+		t->t_hold = kset;
+		t->t_flag |= T_TOMASK;
+		/*
+		 * Call cv_reltimedwait_sig() just to check for signals.
+		 * We will return immediately with either 0 or -1.
+		 */
+		if (!cv_reltimedwait_sig(&t->t_delay_cv, &p->p_lock, 0,
+		    TR_CLOCK_TICK)) {
+			mutex_exit(&p->p_lock);
+			error = EINTR;
+			goto pollout;
+		}
+		mutex_exit(&p->p_lock);
 	}
 
-	return (poll_common(fds, nfds, tsp, ksetp));
+	/*
+	 * Initialize pollstate and copy in pollfd data if present.
+	 * If nfds == 0, we will skip all of the copying and check steps and
+	 * proceed directly into poll_common to process the supplied timeout.
+	 */
+	if (nfds != 0) {
+		if (nfds > p->p_fno_ctl) {
+			mutex_enter(&p->p_lock);
+			(void) rctl_action(rctlproc_legacy[RLIMIT_NOFILE],
+			    p->p_rctls, p, RCA_SAFE);
+			mutex_exit(&p->p_lock);
+			error = EINVAL;
+			goto pollout;
+		}
+
+		/*
+		 * Need to allocate memory for pollstate before anything
+		 * because the mutex and cv are created in this space
+		 */
+		ps = pollstate_create();
+		if (ps->ps_pcache == NULL)
+			ps->ps_pcache = pcache_alloc();
+
+		if ((error = poll_copyin(ps, fds, nfds)) != 0)
+			goto pollout;
+		pollfdp = ps->ps_pollfd;
+	}
+
+	/*
+	 * Perform the actual poll.
+	 */
+	error = poll_common(ps, fds, nfds, tsp, &fdcnt);
+
+pollout:
+	/*
+	 * If we changed the signal mask but we received no signal then restore
+	 * the signal mask.  Otherwise psig() will deal with the signal mask.
+	 */
+	if (setp != NULL) {
+		mutex_enter(&p->p_lock);
+		if (lwp->lwp_cursig == 0) {
+			t->t_hold = lwp->lwp_sigoldmask;
+			t->t_flag &= ~T_TOMASK;
+		}
+		mutex_exit(&p->p_lock);
+	}
+
+	if (error)
+		return (set_errno(error));
+	/*
+	 * Copy out the events and return the fdcnt to the user.
+	 */
+	if (nfds != 0 && copyout(pollfdp, fds, nfds * sizeof (pollfd_t)))
+		return (set_errno(EFAULT));
+
+#ifdef DEBUG
+	/*
+	 * Another sanity check:
+	 */
+	if (fdcnt) {
+		int i, reventcnt = 0;
+
+		for (i = 0; i < nfds; i++) {
+			if (pollfdp[i].fd < 0) {
+				ASSERT(pollfdp[i].revents == 0);
+				continue;
+			}
+			if (pollfdp[i].revents) {
+				reventcnt++;
+			}
+		}
+		ASSERT(fdcnt == reventcnt);
+	} else {
+		int i;
+
+		for (i = 0; i < nfds; i++) {
+			ASSERT(pollfdp[i].revents == 0);
+		}
+	}
+#endif	/* DEBUG */
+
+	return (fdcnt);
 }
 
 /*
