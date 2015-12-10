@@ -948,6 +948,8 @@ lx_mount(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 		 */
 		int vers;
 
+		if (datap == NULL)
+			return (-EINVAL);
 		if (uucopy((void *)datap, &vers, sizeof (int)) < 0)
 			return (-errno);
 
