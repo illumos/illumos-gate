@@ -19,23 +19,22 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright (c) 1997-2000 by Sun Microsystems, Inc.
 # All rights reserved.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# cmd/abi/appcert/static_prof/Makefile
+# Copyright 2015 RackTop Systems.
 #
 
 $(PROG): $(SRCS)
-		$(LINK.c) -o $@ $(SRCS)
+		$(LINK.c) -o $@ $(SRCS) $(LDLIBS)
 		$(POST_PROCESS)
 
 #
 # clean - (apparently needs an explicit directive)
 #
-clean:	
+clean:
 	-$(RM) $(PROG)
 
 #

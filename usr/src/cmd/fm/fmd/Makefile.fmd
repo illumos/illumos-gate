@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2015 RackTop Systems.
 #
 
 .KEEP_STATE:
@@ -160,7 +161,7 @@ $(PROG): $(OBJS)
 	$(POST_PROCESS)
 
 $(DMOD): $(DMOD_OBJS)
-	$(LINK.c) $(DMOD_OBJS) -o $@ -lc
+	$(LINK.c) $(DMOD_OBJS) -o $@ $(LDLIBS) -lc
 	$(POST_PROCESS)
 
 %.o: ../common/%.c

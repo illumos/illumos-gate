@@ -18,9 +18,11 @@
 #
 # CDDL HEADER END
 #
-# Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
+
 #
-# cmd/fs.d/autofs/Makefile
+# Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2015 RackTop Systems.
+#
 
 FSTYPE=		autofs
 AUTO=		automount
@@ -125,11 +127,11 @@ $(TYPEPROG):	webnfs.h $(TYPEOBJS)
 		$(POST_PROCESS)
 
 $(SHARE):	$(SHAREOBJS)
-		$(LINK.c) -o $@ $(SHAREOBJS)
+		$(LINK.c) -o $@ $(SHAREOBJS) $(LDLIBS)
 		$(POST_PROCESS)
 
 $(UNSHARE):	$(UNSHAREOBJS)
-		$(LINK.c) -o $@ $(UNSHAREOBJS)
+		$(LINK.c) -o $@ $(UNSHAREOBJS) $(LDLIBS)
 		$(POST_PROCESS)
 
 $(ROOTSVCSYSTEM)/filesystem/%: %

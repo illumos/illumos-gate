@@ -22,6 +22,8 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2015 RackTop Systems.
+#
 
 PROG= vtdaemon vtinfo vtxlock
 
@@ -33,7 +35,8 @@ include ../Makefile.cmd
 CFLAGS += $(CCVERBOSE)
 CERRWARN += -_gcc=-Wno-uninitialized
 
-LDLIBS += -lpam -lbsm
+vtdaemon := LDLIBS += -lpam -lbsm
+lint_vtdaemon := LDLIBS += -lpam -lbsm
 
 .KEEP_STATE:
 
@@ -44,15 +47,19 @@ vtdaemon: $(VTDAEMON_SRC)
 	$(POST_PROCESS)
 
 vtinfo: $(VTINFO_SRC)
-	$(LINK.c) -o $@ $(VTINFO_SRC)
+	$(LINK.c) -o $@ $(VTINFO_SRC) $(LDLIBS)
 	$(POST_PROCESS)
 
 install: all $(ROOTLIBPROG)
 
 clean:
 
-lint:
+lint: lint_vtdaemon lint_vtinfo
+
+lint_vtdaemon:
 	$(LINT.c) $(VTDAEMON_SRC) $(LDLIBS)
-	$(LINT.c) $(VTINFO_SRC)
+
+lint_vtinfo:
+	$(LINT.c) $(VTINFO_SRC) $(LDLIBS)
 
 include ../Makefile.targ

@@ -21,10 +21,9 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2015 Nexenta Systems, Inc. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/SUNWsacom@0.5.11,5.11-0.133
-set name=pkg.renamed value=true
+set name=pkg.obsolete value=true
 set name=variant.arch value=$(ARCH)
-depend fmri=pkg:/system/management/snmp/sea/sea-config@0.5.11,5.11-0.133 \
-    type=require

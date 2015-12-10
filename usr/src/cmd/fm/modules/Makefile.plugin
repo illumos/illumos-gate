@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2015 RackTop Systems.
 #
 
 .KEEP_STATE:
@@ -100,7 +101,7 @@ $(PROG): $(OBJS) $(APIMAP)
 
 $(DMODPROG): $(DMOD_OBJS) $(MAPFILE-DMOD)
 	-@mkdir -p $(@D)
-	$(LINK.c) $(DMOD_OBJS) $(MAPFILE-DMOD:%=-M%) -o $@ -lc
+	$(LINK.c) $(DMOD_OBJS) $(MAPFILE-DMOD:%=-M%) -o $@ $(LDLIBS) -lc
 	$(POST_PROCESS)
 
 %.o: %.c

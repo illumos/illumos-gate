@@ -22,6 +22,8 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2015 RackTop Systems.
+#
 
 PROG=		rpc.rexd on
 # where under
@@ -112,7 +114,7 @@ include ../Makefile.targ
 #rex_xdr.o \
 #rex_svc.o \
 #rex_clnt.o:	rex.h rex.c
-#	$(LINK.c) -c -o $@ rex.c
+#	$(LINK.c) -c -o $@ rex.c $(LDLIBS)
 
 on.o:		rex.h
 

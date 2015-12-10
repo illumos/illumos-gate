@@ -27,6 +27,7 @@
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright (c) 2013, Joyent, Inc. All rights reserved.
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 #
 
 #
@@ -75,7 +76,7 @@ nfs/tst.call3.exe: nfs/tst.call3.o nfs/$(RPCSVCOBJS)
 	$(POST_PROCESS) ; $(STRIP_STABS)
 
 pid/tst.gcc.exe: pid/tst.gcc.c
-	$(GCC) -o pid/tst.gcc.exe pid/tst.gcc.c $(LDFLAGS)
+	$(GCC) -o pid/tst.gcc.exe pid/tst.gcc.c $(LDFLAGS) $(LDLIBS)
 	$(POST_PROCESS) ; $(STRIP_STABS)
 
 json/tst.usdt.o: json/usdt.h

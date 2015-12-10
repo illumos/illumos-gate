@@ -21,32 +21,9 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2015 Nexenta Systems, Inc. All rights reserved.
 #
 
-#
-# This package is left in place solely to satisfy a dependency from
-# the SFW net-snmp package.  There is an argument to be made that the
-# dependency is actually "soft".  That is, that the net-snmp doesn't
-# really *need* the files that were formerly delivered by this
-# package.  Unfortunately, the packaging system doesn't realize this
-# and would refuse to install net-snmp, which would create problems
-# for FMA, if this package doesn't exist.
-#
-# There may be some fallout from this delivery for now, until the
-# net-snmp package is updated to remove the SEA hacks that Sun had
-# originally added to it.  For now it just deliveres a (duplicate)
-# reference to /etc.
-#
-# Once that is done, this package can be obsoleted.  Note that the
-# previous package, named SUNWsacom, would need to be removed at the
-# same time.
-#
 set name=pkg.fmri value=pkg:/system/management/snmp/sea/sea-config@$(PKGVERS)
-set name=pkg.description \
-    value="Solstice Enterprise Agents 1.0.3 files for root file system"
-set name=pkg.summary \
-    value="Solstice Enterprise Agents 1.0.3 files for root file system"
-set name=info.classification \
-    value="org.opensolaris.category.2008:System/Enterprise Management"
+set name=pkg.obsolete value=true
 set name=variant.arch value=$(ARCH)
-dir path=etc group=sys
