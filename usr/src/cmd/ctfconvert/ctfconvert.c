@@ -184,7 +184,7 @@ ctfconvert_fixup_genunix(ctf_file_t *fp)
 	 */
 	mcpu = ctf_lookup_by_name(fp, "struct machcpu");
 	if (mcpu == CTF_ERR) {
-		mcpu = ctf_add_forward(fp, CTF_ADD_NONROOT, "struct machcpu",
+		mcpu = ctf_add_forward(fp, CTF_ADD_NONROOT, "machcpu",
 		    CTF_K_STRUCT);
 		if (mcpu == CTF_ERR) {
 			ctfconvert_fatal("failed to add 'struct machcpu' "

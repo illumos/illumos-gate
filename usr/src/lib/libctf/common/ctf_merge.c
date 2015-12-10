@@ -56,6 +56,7 @@ typedef struct ctf_merge_types {
 	ctf_file_t *cm_src;		/* Input CTF file */
 	ctf_merge_tinfo_t *cm_tmap;	/* Type state information */
 	boolean_t cm_dedup;		/* Are we doing a dedup? */
+	boolean_t cm_unique;		/* are we doing a uniquify? */
 } ctf_merge_types_t;
 
 typedef struct ctf_merge_objmap {
@@ -124,6 +125,23 @@ ctf_merge_diffcb(ctf_file_t *ifp, ctf_id_t iid, boolean_t same, ctf_file_t *ofp,
 		if (ctf_type_kind(ifp, iid) == CTF_K_FORWARD &&
 		    ctf_type_kind(ofp, oid) != CTF_K_FORWARD) {
 			VERIFY(cmt[oid].cmt_map == 0);
+
+			/*
+			 * If we're uniquifying types, it's possible for the
+			 * container that we're uniquifying against to have a
+			 * forward which exists in the container being reduced.
+			 * For example, genunix has the machcpu structure as a
+			 * forward which is actually in unix and we uniquify
+			 * unix against genunix. In such cases, we explicitly do
+			 * not do any mapping of the forward information, lest
+			 * we risk losing the real definition. Instead, mark
+			 * that it's missing.
+			 */
+			if (cmp->cm_unique == B_TRUE) {
+				cmt[oid].cmt_missing = B_TRUE;
+				return;
+			}
+
 			cmt[oid].cmt_map = iid;
 			cmt[oid].cmt_forward = B_TRUE;
 			ctf_dprintf("merge diff forward mapped %d->%d\n", oid,
@@ -779,6 +797,7 @@ ctf_merge_types(void *arg, void *arg2, void **outp, void *unsued)
 	cm.cm_out = out;
 	cm.cm_src = source;
 	cm.cm_dedup = B_FALSE;
+	cm.cm_unique = B_FALSE;
 	ret = ctf_merge_types_init(&cm);
 	if (ret != 0) {
 		ctf_diff_fini(cdp);
@@ -874,6 +893,7 @@ ctf_uniquify_types(ctf_merge_t *cmh, ctf_file_t *src, ctf_file_t **outp)
 	cm.cm_out = parent;
 	cm.cm_src = src;
 	cm.cm_dedup = B_FALSE;
+	cm.cm_unique = B_TRUE;
 	ret = ctf_merge_types_init(&cm);
 	if (ret != 0) {
 		ctf_close(out);
@@ -1462,6 +1482,7 @@ ctf_merge_dedup(ctf_merge_t *cmp, ctf_file_t **outp)
 	cm.cm_src = ifp;
 	cm.cm_out = ofp;
 	cm.cm_dedup = B_TRUE;
+	cm.cm_unique = B_FALSE;
 
 	if ((ret = ctf_merge_types_init(&cm)) != 0) {
 		return (ret);
