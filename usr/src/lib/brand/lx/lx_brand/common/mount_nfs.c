@@ -2138,6 +2138,9 @@ lx_nfs_mount(char *srcp, char *mntp, char *fst, int lx_flags, char *opts)
 	 */
 	convert_nfs_arg_str(srcp, opts);
 
+	/* Linux seems to always allow overlay mounts */
+	il_flags |= MS_OVERLAY;
+
 	/* Convert some Linux flags to Illumos flags. */
 	if (lx_flags & LX_MS_RDONLY)
 		il_flags |= MS_RDONLY;
