@@ -515,6 +515,7 @@ int smb_node_setattr(smb_request_t *, smb_node_t *, cred_t *,
     smb_ofile_t *, smb_attr_t *);
 uint32_t smb_node_set_delete_on_close(smb_node_t *, cred_t *, uint32_t);
 void smb_node_reset_delete_on_close(smb_node_t *);
+void smb_node_delete_on_close(smb_node_t *);
 boolean_t smb_node_file_is_readonly(smb_node_t *);
 int smb_node_getpath(smb_node_t *, vnode_t *, char *, uint32_t);
 int smb_node_getmntpath(smb_node_t *, char *, uint32_t);

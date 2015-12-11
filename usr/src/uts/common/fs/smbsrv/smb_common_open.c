@@ -595,11 +595,23 @@ smb_open_subr(smb_request_t *sr)
 		/*
 		 * Oplock break is done prior to sharing checks as the break
 		 * may cause other clients to close the file which would
-		 * affect the sharing checks. This may block, so set the
-		 * file opening count before oplock stuff.
+		 * affect the sharing checks, and may delete the file due to
+		 * DELETE_ON_CLOSE. This may block, so set the file opening
+		 * count before oplock stuff.
 		 */
 		smb_node_inc_opening_count(node);
 		smb_open_oplock_break(sr, node);
+
+		if ((node->flags & NODE_FLAGS_DELETE_COMMITTED) != 0) {
+			/*
+			 * Breaking the oplock caused the file to be deleted,
+			 * so let's bail and pretend the file wasn't found
+			 */
+			smb_node_dec_opening_count(node);
+			smb_node_release(node);
+			last_comp_found = B_FALSE;
+			goto create;
+		}
 
 		smb_node_wrlock(node);
 
@@ -684,6 +696,7 @@ smb_open_subr(smb_request_t *sr)
 			break;
 		}
 	} else {
+create:
 		/* Last component was not found. */
 		dnode = op->fqi.fq_dnode;
 

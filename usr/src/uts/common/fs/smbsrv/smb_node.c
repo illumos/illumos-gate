@@ -99,7 +99,6 @@
 #include <fs/fs_reparse.h>
 
 uint32_t smb_is_executable(char *);
-static void smb_node_delete_on_close(smb_node_t *);
 static void smb_node_create_audit_buf(smb_node_t *, int);
 static void smb_node_destroy_audit_buf(smb_node_t *);
 static void smb_node_audit(smb_node_t *);
@@ -482,7 +481,9 @@ smb_node_release(smb_node_t *node)
 			/*
 			 * Check if the file was deleted
 			 */
-			smb_node_delete_on_close(node);
+			if (node->flags & NODE_FLAGS_DELETE_ON_CLOSE) {
+				smb_node_delete_on_close(node);
+			}
 
 			if (node->n_dnode) {
 				ASSERT(node->n_dnode->n_magic ==
@@ -507,7 +508,7 @@ smb_node_release(smb_node_t *node)
 	mutex_exit(&node->n_mutex);
 }
 
-static void
+void
 smb_node_delete_on_close(smb_node_t *node)
 {
 	smb_node_t	*d_snode;
@@ -515,19 +516,23 @@ smb_node_delete_on_close(smb_node_t *node)
 	uint32_t	flags = 0;
 
 	d_snode = node->n_dnode;
-	if (node->flags & NODE_FLAGS_DELETE_ON_CLOSE) {
-		node->flags &= ~NODE_FLAGS_DELETE_ON_CLOSE;
-		flags = node->n_delete_on_close_flags;
-		ASSERT(node->od_name != NULL);
 
-		if (smb_node_is_dir(node))
-			rc = smb_fsop_rmdir(0, node->delete_on_close_cred,
-			    d_snode, node->od_name, flags);
-		else
-			rc = smb_fsop_remove(0, node->delete_on_close_cred,
-			    d_snode, node->od_name, flags);
-		crfree(node->delete_on_close_cred);
-	}
+	ASSERT((node->flags & NODE_FLAGS_DELETE_ON_CLOSE) != 0);
+
+	node->flags &= ~NODE_FLAGS_DELETE_ON_CLOSE;
+	node->flags |= NODE_FLAGS_DELETE_COMMITTED;
+	flags = node->n_delete_on_close_flags;
+	ASSERT(node->od_name != NULL);
+
+	if (smb_node_is_dir(node))
+		rc = smb_fsop_rmdir(0, node->delete_on_close_cred,
+		    d_snode, node->od_name, flags);
+	else
+		rc = smb_fsop_remove(0, node->delete_on_close_cred,
+		    d_snode, node->od_name, flags);
+	crfree(node->delete_on_close_cred);
+	node->delete_on_close_cred = NULL;
+
 	if (rc != 0)
 		cmn_err(CE_WARN, "File %s could not be removed, rc=%d\n",
 		    node->od_name, rc);
