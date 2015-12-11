@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SNDRD 1M "Oct 2, 2007"
+.TH SNDRD 1M "Dec 11, 2015"
 .SH NAME
 sndrd \- Remote Mirror daemon
 .SH SYNOPSIS
@@ -13,7 +13,6 @@ sndrd \- Remote Mirror daemon
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBsndrd\fR daemon processes client Remote Mirror requests. Only the root
 user or a user with equivalent privileges can run this daemon. The daemon is
@@ -25,7 +24,6 @@ Administrators wanting to change startup parameters for \fBsndrd\fR should, as
 root or equivalent, make changes in the \fB/etc/default/sndr\fR file rather
 than editing the \fB/lib/svc/method/svc-rdcsyncd\fR file. See \fBsndr\fR(4).
 .SH OPTIONS
-.sp
 .LP
 The \fBsndrd\fR daemon supports the following options:
 .sp
@@ -51,7 +49,6 @@ transport. The default value is 10 entries.
 .RE
 
 .SH EXIT STATUS
-.sp
 .ne 2
 .na
 \fB\fB0\fR\fR
@@ -73,7 +70,6 @@ Daemon failed to start.
 .LP
 Error information is reported to \fBsyslog\fR at level \fBLOG_ERR\fR.
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/lib/svc/method/svc-rdcsyncd\fR\fR
@@ -94,7 +90,6 @@ Shell script for stopping \fBsndrd\fR.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -110,13 +105,11 @@ Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBsvcadm\fR(1M), \fBsyslogd\fR(1M), \fBds.log\fR(4), \fBattributes\fR(5)
 .SH NOTES
-.sp
 .LP
-Do not manually stop the sndrd deamon. If you need to manually stop sndrd
+Do not manually stop the sndrd daemon. If you need to manually stop sndrd
 perform these steps. This stops both the \fBsndrd\fR and \fBsndrsyncd\fR
 daemons.
 .sp
@@ -135,7 +128,7 @@ daemons.
 
 .sp
 .LP
-Do not manually start or restart the sndrd deamon. If you need to manually
+Do not manually start or restart the sndrd daemon. If you need to manually
 start sndrd perform these steps. This starts both the sndrd and sndrsyncd
 daemons.
 .sp

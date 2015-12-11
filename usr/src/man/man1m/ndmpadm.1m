@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\" See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH NDMPADM 1M "Feb 24, 2014"
+.TH NDMPADM 1M "Dec 11, 2015"
 .SH NAME
 ndmpadm \- administer Network Data Management Protocol activities
 .SH SYNOPSIS
@@ -14,7 +14,6 @@ ndmpadm \- administer Network Data Management Protocol activities
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBndmpadm\fR command can be used to query the \fBndmpd\fR(1M) daemon to
 get the status of active sessions, terminate a session, query backup devices,
@@ -97,7 +96,6 @@ Display the details of active NDMP sessions.
 .RE
 
 .SH OPTIONS
-.sp
 .LP
 The following option is supported:
 .sp
@@ -110,11 +108,9 @@ Display a list of all subcommands and options.
 .RE
 
 .SH SUB-COMMANDS
-.sp
 .LP
 The \fBndmpadm\fR command supports the subcommands described below.
 .SS "\fBdisable\fR Subcommand"
-.sp
 .LP
 The syntax for the \fBdisable\fR subcommand is:
 .sp
@@ -131,7 +127,6 @@ This subcommand disables the authentication type specified by \fIauth-type\fR
 for an NDMP client's remote access. Valid values for \fIauth-type\fR are
 \fBcram-md5\fR or \fBcleartext\fR.
 .SS "\fBenable\fR Subcommand"
-.sp
 .LP
 The syntax for the \fBenable\fR subcommand is:
 .sp
@@ -149,7 +144,6 @@ activates the specified authentication type with the given username and
 password for NDMP client access. Valid values for \fIauth-type\fR are
 \fBcram-md5\fR or \fBcleartext\fR.
 .SS "\fBget\fR Subcommand"
-.sp
 .LP
 The syntax for the \fBget\fR subcommand is:
 .sp
@@ -166,7 +160,6 @@ The property names are the same as used for the \fBset\fR subcommand and are
 described below. If you do not specify a property, the \fBget\fR subcommand
 returns all configuration properties.
 .SS "\fBkill-sessions\fR Subcommand"
-.sp
 .LP
 The \fBkill-sessions\fR subcommand allows you to terminate the session number
 \fIID\fR.
@@ -182,7 +175,6 @@ The syntax for the \fBkill-sessions\fR subcommand is:
 .sp
 
 .SS "\fBset\fR Subcommand"
-.sp
 .LP
 The syntax for the \fBset\fR subcommand is:
 .sp
@@ -198,7 +190,6 @@ The syntax for the \fBset\fR subcommand is:
 The properties you can set with the \fBset\fR subcommand are described in the
 \fBndmp\fR(4) man page.
 .SS "\fBshow-devices\fR Subcommand"
-.sp
 .LP
 The syntax for the \fBshow-devices\fR subcommand is:
 .sp
@@ -214,7 +205,6 @@ The syntax for the \fBshow-devices\fR subcommand is:
 This subcommand lists the name, vendor, serial number, and other information
 about the current tape drive and libraries connected to the system.
 .SS "\fBshow-sessions\fR Subcommand"
-.sp
 .LP
 The \fBshow-sessions\fR subcommand displays details of a session. The syntax
 for the \fBshow-sessions\fR subcommand is:
@@ -384,7 +374,6 @@ The following command disables clear text password authentication.
 .sp
 
 .SH EXIT STATUS
-.sp
 .ne 2
 .na
 \fB\fB0\fR\fR
@@ -400,7 +389,7 @@ Successful completion.
 .ad
 .RS 5n
 An error occurred, such as the \fBndmpd\fR daemon is not running, that
-prevented \fBndmpadm\fR from contacting the demon.
+prevented \fBndmpadm\fR from contacting the daemon.
 .RE
 
 .sp
@@ -413,7 +402,6 @@ Invalid command-line options were specified.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -429,13 +417,11 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBdump\fR(1), \fBtar\fR(1), \fBndmpd\fR(1M), \fBndmpstat\fR(1M),
 \fBsvccfg\fR(1M), \fBsyslogd\fR(1M), \fBndmp\fR(4), \fBattributes\fR(5),
 \fBsmf\fR(5)
 .SH NOTES
-.sp
 .LP
 The \fBndmpd\fR(1M) daemon is managed by the service management facility
 (\fBsmf\fR(5)), under the service identifier:
