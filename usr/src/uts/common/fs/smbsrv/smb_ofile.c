@@ -427,6 +427,12 @@ smb_ofile_close(smb_ofile_t *of, int32_t mtime_sec)
 				pa->sa_mask |= SMB_AT_DOSATTR;
 			/* Let's leave this zero when not in use. */
 			of->f_node->n_allocsz = 0;
+			mutex_enter(&of->f_node->n_mutex);
+			if (of->f_node->flags & NODE_FLAGS_DELETE_ON_CLOSE) {
+				smb_node_delete_on_close(of->f_node);
+				pa->sa_mask = 0;
+			}
+			mutex_exit(&of->f_node->n_mutex);
 		}
 		if (pa->sa_mask != 0) {
 			/*

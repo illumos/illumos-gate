@@ -1128,7 +1128,7 @@ fop_pathconf(
 		break;
 
 	case _PC_ACL_ENABLED:
-		val = 0;
+		val = _ACL_ACE_ENABLED;
 		break;
 
 	case _PC_CASE_BEHAVIOR:
