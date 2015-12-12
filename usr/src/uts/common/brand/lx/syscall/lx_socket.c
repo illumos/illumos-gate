@@ -3252,8 +3252,8 @@ static struct {
 	lx_sendto,	6,	/* sendto */
 	lx_recvfrom,	6,	/* recvfrom */
 	NULL,		2,	/* shutdown */
+	lx_setsockopt,	5,	/* setsockopt */
 	lx_getsockopt,	5,	/* getsockopt */
-	lx_setsockopt,	5,	/* getsockopt */
 	lx_sendmsg,	3,	/* sendmsg */
 	lx_recvmsg,	3,	/* recvmsg */
 	NULL,		4,	/* accept4 */
