@@ -521,9 +521,6 @@ extern "C" {
 	"command <%s> executed: pid <%d> errno <0x%04x> status <0x%04x> " \
 	"final status <0x%04x> output <%s>")
 
-#define	MSG_LOCK_GENUID_MAKEUUID	gettext(\
-	"generated new unique key using makeuuid: %s")
-
 #define	MSG_LOCK_GENUID_INTERNAL	gettext(\
 	"generated new unique key using date: %s")
 
