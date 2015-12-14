@@ -229,6 +229,7 @@ _MANLINKS=	addresses.4			\
 		hosts.deny.4			\
 		intro.4				\
 		ipf.conf.4			\
+		ipf6.conf.4			\
 		ipmon.conf.4			\
 		ipnat.conf.4			\
 		ippool.conf.4			\
@@ -273,6 +274,7 @@ hosts.allow.4			:= LINKSRC = hosts_access.4
 hosts.deny.4			:= LINKSRC = hosts_access.4
 
 ipf.conf.4			:= LINKSRC = ipf.4
+ipf6.conf.4			:= LINKSRC = ipf.4
 
 ipmon.conf.4			:= LINKSRC = ipmon.4
 
