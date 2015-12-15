@@ -2,6 +2,7 @@
 <!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
 <!--
  Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+ Copyright 2015 Nexenta Systems, Inc. All rights reserved.
 
  CDDL HEADER START
 
@@ -391,7 +392,7 @@ Start no services.
 				</value>
 				</constraints>
 			</prop_pattern>
-			<prop_pattern name='info_event_all' type='boolean'
+			<prop_pattern name='info_events_all' type='boolean'
 			    required='false'>
 				<description>
 					<loctext xml:lang='C'>

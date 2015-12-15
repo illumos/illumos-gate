@@ -19,9 +19,12 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright (c) 1997-1999 by Sun Microsystems, Inc.
 # All rights reserved.
+#
+# Copyright 2015 Nexenta Systems, Inc.  All right reserved.
 #
 
 .KEEP_STATE:
@@ -46,8 +49,3 @@ CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-switch
 CERRWARN +=	-_gcc=-Wno-unused-variable
 CERRWARN +=	-_gcc=-Wno-unused-label
-
-parseproto := RM = @echo keeping	# do not remove generated C code
-parseproto := COPTFLAG = -g -DDEBUG -DMEM_DEBUG -DTRACE
-parseproto:	parseproto.o
-	$(LINK.c) -o parseproto parseproto.o

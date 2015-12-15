@@ -23,6 +23,8 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2015 RackTop Systems.
+#
 
 PROG= link 
 XPG4PROG= link
@@ -41,7 +43,7 @@ CERRWARN += -_gcc=-Wno-parentheses
 all: $(PROG) $(XPG4)
 
 $(PROG) $(XPG4): $$(OBJS)
-	$(LINK.c) -o $@ $(OBJS)
+	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
 	$(POST_PROCESS)
 
 install: all $(ROOTUSRSBINPROG) $(ROOTXPG4PROG)

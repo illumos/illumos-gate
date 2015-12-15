@@ -22,6 +22,8 @@
 #
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+#
+# Copyright 2015 RackTop Systems.
 # 
 
 PROG=	ncab2clf 
@@ -55,7 +57,7 @@ CPPFLAGS +=	-I$(INC_PATH)
 all: $(PROG)
 
 $(PROG): $(OBJS)
-	$(LINK.c) $(OBJS) -o $@
+	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 
 #
