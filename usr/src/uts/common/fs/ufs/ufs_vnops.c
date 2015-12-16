@@ -3710,9 +3710,6 @@ retry_firstlock:
 		goto errout;
 	}
 
-	if (terr == 0 && tvp != NULL)
-		vnevent_rename_dest(tvp, tdvp, tnm, ct);
-
 	/*
 	 * Unlink the source.
 	 * Remove the source entry.  ufs_dirremove() checks that the entry
@@ -3724,8 +3721,12 @@ retry_firstlock:
 	    DR_RENAME, cr)) == ENOENT)
 		error = 0;
 
-	vnevent_rename_src(ITOV(sip), sdvp, snm, ct);
-	vnevent_rename_dest_dir(tdvp, ITOV(sip), tnm, ct);
+	if (error == 0) {
+		vnevent_rename_src(ITOV(sip), sdvp, snm, ct);
+		if (tvp != NULL)
+			vnevent_rename_dest(tvp, tdvp, tnm, ct);
+		vnevent_rename_dest_dir(tdvp, ITOV(sip), tnm, ct);
+	}
 
 errout:
 	if (slot.fbp)

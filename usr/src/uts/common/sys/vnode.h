@@ -1309,7 +1309,7 @@ void	vnevent_pre_rename_src(vnode_t *, vnode_t *, char *,
 void	vnevent_pre_rename_dest(vnode_t *, vnode_t *, char *,
 	    caller_context_t *);
 void	vnevent_pre_rename_dest_dir(vnode_t *, vnode_t *, char *,
-	    caller_context_t *ct);
+	    caller_context_t *);
 
 /* Vnode specific data */
 void vsd_create(uint_t *, void (*)(void *));

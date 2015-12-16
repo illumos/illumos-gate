@@ -3716,12 +3716,8 @@ top:
 		return (error);
 	}
 
-	if (tzp) {
-		/* Attempt to remove the existing target */
+	if (tzp)	/* Attempt to remove the existing target */
 		error = zfs_link_destroy(tdl, tzp, tx, zflg, NULL);
-		if (error == 0)
-			vnevent_rename_dest(ZTOV(tzp), tdvp, tnm, ct);
-	}
 
 	if (error == 0) {
 		error = zfs_link_create(tdl, szp, tx, ZRENAMING);
@@ -3766,6 +3762,8 @@ top:
 
 	if (error == 0) {
 		vnevent_rename_src(ZTOV(szp), sdvp, snm, ct);
+		if (tzp)
+			vnevent_rename_dest(ZTOV(tzp), tdvp, tnm, ct);
 		vnevent_rename_dest_dir(tdvp, ZTOV(szp), tnm, ct);
 	}
 out:

@@ -1195,8 +1195,9 @@ tmp_rename(
 	struct tmpnode *fromparent;
 	struct tmpnode *toparent;
 	struct tmpnode *fromtp = NULL;	/* source tmpnode */
+	struct tmpnode *totp = NULL;	/* target tmpnode */
 	struct tmount *tm = (struct tmount *)VTOTM(odvp);
-	int error, err;
+	int error;
 	int samedir = 0;	/* set if odvp == ndvp */
 	struct vnode *realvp;
 
@@ -1253,6 +1254,14 @@ tmp_rename(
 			goto done;
 	}
 
+	if (tdirlookup(toparent, nnm, &totp, cred) == 0)
+		vnevent_pre_rename_dest(TNTOV(totp), ndvp, nnm, ct);
+
+	/* Notify the target dir. if not the same as the source dir. */
+	if (ndvp != odvp) {
+		vnevent_pre_rename_dest_dir(ndvp, TNTOV(fromtp), nnm, ct);
+	}
+
 	/*
 	 * Link source to new target
 	 */
@@ -1274,10 +1283,6 @@ tmp_rename(
 	}
 
 	vnevent_pre_rename_src(TNTOV(fromtp), odvp, onm, ct);
-	/* Notify the target dir. if not the same as the source dir. */
-	if (ndvp != odvp) {
-		vnevent_pre_rename_dest_dir(ndvp, TNTOV(fromtp), nnm, ct);
-	}
 
 	/*
 	 * Unlink from source.
@@ -1285,7 +1290,7 @@ tmp_rename(
 	rw_enter(&fromparent->tn_rwlock, RW_WRITER);
 	rw_enter(&fromtp->tn_rwlock, RW_WRITER);
 
-	error = err = tdirdelete(fromparent, fromtp, onm, DR_RENAME, cred);
+	error = tdirdelete(fromparent, fromtp, onm, DR_RENAME, cred);
 
 	/*
 	 * The following handles the case where our source tmpnode was
@@ -1301,13 +1306,16 @@ tmp_rename(
 	rw_exit(&fromtp->tn_rwlock);
 	rw_exit(&fromparent->tn_rwlock);
 
-	if (err == 0) {
+	if (error == 0) {
 		vnevent_rename_src(TNTOV(fromtp), odvp, onm, ct);
+		/* vnevent_rename_dest event emitted in tdirenter(). */
 		vnevent_rename_dest_dir(ndvp, TNTOV(fromtp), nnm, ct);
 	}
 
 done:
 	tmpnode_rele(fromtp);
+	if (totp != NULL)
+		tmpnode_rele(totp);
 	mutex_exit(&tm->tm_renamelck);
 
 	TRACE_5(TR_FAC_TMPFS, TR_TMPFS_RENAME,

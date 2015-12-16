@@ -911,9 +911,10 @@ udf_rename(
 	caller_context_t *ct,
 	int flags)
 {
-	int32_t error = 0, err;
+	int32_t error = 0;
 	struct udf_vfs *udf_vfsp;
 	struct ud_inode *sip;		/* source inode */
+	struct ud_inode *tip = NULL;	/* target inode */
 	struct ud_inode *sdp, *tdp;	/* source and target parent inode */
 	struct vnode *realvp;
 
@@ -974,6 +975,14 @@ udf_rename(
 		rw_exit(&sdp->i_contents);
 		goto errout;
 	}
+
+	if (ud_dirlook(tdp, tnm, &tip, cr, 0) == 0)
+		vnevent_pre_rename_dest(ITOV(tip), tdvp, tnm, ct);
+
+	/* Notify the target dir. if not the same as the source dir. */
+	if (sdvp != tdvp)
+		vnevent_pre_rename_dest_dir(tdvp, ITOV(sip), tnm, ct);
+
 	rw_exit(&sip->i_contents);
 	rw_exit(&sdp->i_contents);
 
@@ -1006,19 +1015,24 @@ udf_rename(
 	 * If the entry has changed just forget about it.  Release
 	 * the source inode.
 	 */
-	if ((error = err = ud_dirremove(sdp, snm, sip, (struct vnode *)0,
+	if ((error = ud_dirremove(sdp, snm, sip, (struct vnode *)0,
 	    DR_RENAME, cr, ct)) == ENOENT) {
 		error = 0;
 	}
 	rw_exit(&sdp->i_rwlock);
 
-	if (err == 0)
+	if (error == 0) {
 		vnevent_rename_src(ITOV(sip), sdvp, snm, ct);
+		/* vnevent_rename_dest event emitted in ud_direnter() */
+		vnevent_rename_dest_dir(tdvp, ITOV(sip), tnm, ct);
+	}
 
 errout:
 	ITIMES(sdp);
 	ITIMES(tdp);
 	VN_RELE(ITOV(sip));
+	if (tip != NULL)
+		VN_RELE(ITOV(tip));
 	mutex_exit(&udf_vfsp->udf_rename_lck);
 
 	return (error);
