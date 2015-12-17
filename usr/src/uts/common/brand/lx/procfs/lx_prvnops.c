@@ -3693,24 +3693,27 @@ static void
 lxpr_read_version(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
 	lx_zone_data_t *lxzd = ztolxzd(LXPTOZ(lxpnp));
+	lx_proc_data_t *lxpd = ptolxproc(curproc);
+	const char *release = lxzd->lxzd_kernel_release;
+	const char *version = lxzd->lxzd_kernel_version;
+
+	/* Use per-process overrides, if specified */
+	if (lxpd != NULL && lxpd->l_uname_release[0] != '\0') {
+		release = lxpd->l_uname_release;
+	}
+	if (lxpd != NULL && lxpd->l_uname_version[0] != '\0') {
+		version = lxpd->l_uname_version;
+	}
 
 	lxpr_uiobuf_printf(uiobuf,
-	    "%s version %s (%s version %d.%d.%d) "
-	    "#%s SMP %s\n",
-	    LX_UNAME_SYSNAME, lxzd->lxzd_kernel_release,
+	    "%s version %s (%s version %d.%d.%d) %s\n",
+	    LX_UNAME_SYSNAME, release,
 #if defined(__GNUC__)
-	    "gcc",
-	    __GNUC__,
-	    __GNUC_MINOR__,
-	    __GNUC_PATCHLEVEL__,
+	    "gcc", __GNUC__, __GNUC_MINOR__, __GNUC_PATCHLEVEL__,
 #else
-	    "Sun C",
-	    __SUNPRO_C / 0x100,
-	    (__SUNPRO_C & 0xff) / 0x10,
-	    __SUNPRO_C & 0xf,
+	    "cc", 1, 0, 0,
 #endif
-	    lxzd->lxzd_kernel_version,
-	    "00:00:00 00/00/00");
+	    version);
 }
 
 /*
