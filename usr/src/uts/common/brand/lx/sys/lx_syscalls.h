@@ -117,6 +117,7 @@ extern long lx_setrlimit();
 extern long lx_setsockopt();
 extern long lx_socket();
 extern long lx_socketcall();
+extern long lx_sync_file_range();
 extern long lx_syncfs();
 extern long lx_sysinfo32();
 extern long lx_sysinfo64();
