@@ -934,7 +934,7 @@ lx_sysent_t lx_sysent32[] = {
 	{"set_robust_list", lx_set_robust_list,	0,		2}, /* 311 */
 	{"get_robust_list", lx_get_robust_list,	0,		3}, /* 312 */
 	{"splice",	NULL,			NOSYS_NULL,	0}, /* 313 */
-	{"sync_file_range", NULL,		NOSYS_NULL,	0}, /* 314 */
+	{"sync_file_range", lx_sync_file_range,	0,		4}, /* 314 */
 	{"tee",		NULL,			NOSYS_NULL,	0}, /* 315 */
 	{"vmsplice",	NULL,			NOSYS_NULL,	0}, /* 316 */
 	{"move_pages",	NULL,			NOSYS_NULL,	0}, /* 317 */
@@ -1264,7 +1264,7 @@ lx_sysent_t lx_sysent64[] = {
 	{"get_robust_list", lx_get_robust_list,	0,		3}, /* 274 */
 	{"splice",	NULL,			NOSYS_NULL,	0}, /* 275 */
 	{"tee",		NULL,			NOSYS_NULL,	0}, /* 276 */
-	{"sync_file_range", NULL,		NOSYS_NULL,	0}, /* 277 */
+	{"sync_file_range", lx_sync_file_range,	0,		4}, /* 277 */
 	{"vmsplice",	NULL,			NOSYS_NULL,	0}, /* 278 */
 	{"move_pages",	NULL,			NOSYS_NULL,	0}, /* 279 */
 	{"utimensat",	NULL,			0,		4}, /* 280 */
