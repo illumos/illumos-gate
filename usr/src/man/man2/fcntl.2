@@ -1,4 +1,5 @@
 '\" te
+.\" Copyright 2015 Joyent, Inc.
 .\" Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved.
 .\" Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Copyright 1989 AT&T
@@ -10,7 +11,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH FCNTL 2 "Apr 19, 2013"
+.TH FCNTL 2 "Feb 16, 2015"
 .SH NAME
 fcntl \- file control
 .SH SYNOPSIS
@@ -24,7 +25,6 @@ fcntl \- file control
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBfcntl()\fR function provides for control over open files. The
 \fIfildes\fR argument is an open file descriptor.
@@ -227,20 +227,25 @@ results are unspecified.
 
 .sp
 .LP
-The following commands are available for advisory record locking. Record
-locking is supported for regular files, and may be supported for other files.
+The following commands are available for POSIX advisory or mandatory record
+locking. POSIX record locking is supported for regular files, and may be
+supported for other files. See the FILE LOCKING section of this manual page for
+information about the types of file locks available and their interaction.
 .sp
 .ne 2
 .na
 \fB\fBF_GETLK\fR\fR
 .ad
 .RS 14n
-Get the first lock which blocks the lock description pointed to by the third
-argument, \fIarg\fR, taken as a pointer to type \fBstruct flock\fR, defined in
-<\fBfcntl.h\fR>. The information retrieved overwrites the information passed to
-\fBfcntl()\fR in the structure \fBflock\fR. If no lock is found that would
-prevent this lock from being created, then the structure will be left unchanged
-except for the lock type which will be set to \fBF_UNLCK\fR.
+Get the first lock which blocks the POSIX lock description pointed to by the
+third argument, \fIarg\fR, taken as a pointer to type \fBstruct flock\fR,
+defined in <\fBfcntl.h\fR>. The information retrieved overwrites the
+information passed to \fBfcntl()\fR in the structure \fBflock\fR. If no lock is
+found that would prevent this lock from being created, then the structure will
+be left unchanged except for the lock type which will be set to \fBF_UNLCK\fR.
+If multiple locks exist that would prevent this lock from being created, which
+one is returned is unspecified. If the blocking lock is an OFD-style lock,
+\fB\(mi1\fR\& will be returned for the lock's pid value.
 .RE
 
 .sp
@@ -250,7 +255,7 @@ except for the lock type which will be set to \fBF_UNLCK\fR.
 .ad
 .RS 14n
 Equivalent to \fBF_GETLK\fR, but takes a \fBstruct flock64\fR argument rather
-than a \fBstruct flock\fR argument.
+than a \fBstruct flock\fR argument.  See \fBlf64\fR(5).
 .RE
 
 .sp
@@ -259,7 +264,7 @@ than a \fBstruct flock\fR argument.
 \fB\fBF_SETLK\fR\fR
 .ad
 .RS 14n
-Set or clear a file segment lock according to the lock description pointed to
+Set or clear a POSIX record lock according to the lock description pointed to
 by the third argument, \fIarg\fR, taken as a pointer to type \fBstruct
 flock\fR, defined in <\fBfcntl.h\fR>. \fBF_SETLK\fR is used to establish shared
 (or read) locks (\fBF_RDLCK\fR) or exclusive (or write) locks (\fBF_WRLCK\fR),
@@ -276,7 +281,7 @@ return value of \fB\(mi1\fR\&.
 .ad
 .RS 14n
 Equivalent to \fBF_SETLK\fR, but takes a \fBstruct flock64\fR argument rather
-than a \fBstruct flock\fR argument.
+than a \fBstruct flock\fR argument. See \fBlf64\fR(5).
 .RE
 
 .sp
@@ -300,22 +305,193 @@ set to \fBEINTR\fR, and the lock operation will not be done.
 .ad
 .RS 14n
 Equivalent to \fBF_SETLKW\fR, but takes a \fBstruct flock64\fR argument rather
-than a \fBstruct flock\fR argument.
+than a \fBstruct flock\fR argument. See \fBlf64\fR(5).
 .RE
 
 .sp
 .LP
-When a shared lock is set on a segment of a file, other processes will be able
-to set shared locks on that segment or a portion of it. A shared lock prevents
-any other process from setting an exclusive lock on any portion of the
-protected area. A request for a shared lock will fail if the file descriptor
-was not opened with read access.
+The following commands are available for OFD (open file description) advisory
+record locking. OFD record locking is supported for regular files, and may be
+supported for other files. See the FILE LOCKING section of this manual page for
+information about the types of file locks available and their interaction.
+OFD-style record locks are currently limited to spanning the entire file and
+these locks are currently not supported over remote file systems (e.g.
+\fBnfs\fR(4)) which use the Network Lock Manager.
+.sp
+.ne 2
+.na
+\fB\fBF_OFD_GETLK\fR\fR
+.ad
+.RS 14n
+Get the first lock which blocks the OFD lock description pointed to by the
+third argument, \fIarg\fR, taken as a pointer to type \fBstruct flock\fR,
+defined in <\fBfcntl.h\fR>. The information retrieved overwrites the
+information passed to \fBfcntl()\fR in the structure \fBflock\fR. If no lock is
+found that would prevent this lock from being created, then the structure will
+be left unchanged except for the lock type which will be set to \fBF_UNLCK\fR.
+If multiple locks exist that would prevent this lock from being created, which
+one is returned is unspecified. If the blocking lock is an OFD-style lock,
+\fB\(mi1\fR\& will be returned for the lock's pid value.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBF_OFD_GETLK64\fR\fR
+.ad
+.RS 14n
+Equivalent to \fBF_OFD_GETLK\fR, but takes a \fBstruct flock64\fR argument
+rather than a \fBstruct flock\fR argument. See \fBlf64\fR(5). This command
+exists solely to allow the use of OFD locks with the transitional 64-bit file
+interfaces.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBF_OFD_SETLK\fR\fR
+.ad
+.RS 14n
+Set or clear a OFD record lock according to the lock description pointed to
+by the third argument, \fIarg\fR, taken as a pointer to type \fBstruct
+flock\fR, defined in <\fBfcntl.h\fR>. \fBF_OFD_SETLK\fR is used to establish
+shared (or read) locks (\fBF_RDLCK\fR) or exclusive (or write) locks
+(\fBF_WRLCK\fR), as well as to remove either type of lock (\fBF_UNLCK\fR).
+\fBF_RDLCK\fR, \fBF_WRLCK\fR and \fBF_UNLCK\fR are defined in <\fBfcntl.h\fR>.
+If a shared or exclusive lock cannot be set, \fBfcntl()\fR will return
+immediately with a return value of \fB\(mi1\fR\&.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBF_OFD_SETLK64\fR\fR
+.ad
+.RS 14n
+Equivalent to \fBF_OFD_SETLK\fR, but takes a \fBstruct flock64\fR argument
+rather than a \fBstruct flock\fR argument. See \fBlf64\fR(5). This command
+exists solely to allow the use of OFD locks with the transitional 64-bit file
+interfaces.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBF_OFD_SETLKW\fR\fR
+.ad
+.RS 14n
+This command is the same as \fBF_OFD_SETLK\fR except that if a shared or
+exclusive lock is blocked by other locks, the process will wait until the
+request can be satisfied. If a signal that is to be caught is received while
+\fBfcntl()\fR is waiting for a region, \fBfcntl()\fR will be interrupted. Upon
+return from the process' signal handler, \fBfcntl()\fR will return \fB\(mi1\fR
+with \fBerrno\fR set to \fBEINTR\fR, and the lock operation will not be done.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBF_OFD_SETLKW64\fR\fR
+.ad
+.RS 14n
+Equivalent to \fBF_OFD_SETLKW\fR, but takes a \fBstruct flock64\fR argument
+rather than a \fBstruct flock\fR argument. See \fBlf64\fR(5).  This command
+exists solely to allow the use of OFD locks with the transitional 64-bit file
+interfaces.
+.RE
+
 .sp
 .LP
-An exclusive lock will prevent any other process from setting a shared lock or
-an exclusive lock on any portion of the protected area. A request for an
-exclusive lock will fail if the file descriptor was not opened with write
-access.
+The following values for \fIcmd\fR are used for file share reservations. A
+share reservation is placed on an entire file to allow cooperating processes to
+control access to the file.  See the SHARE RESERVATIONS section of this manual
+page below for additional information.
+.sp
+.ne 2
+.na
+\fB\fBF_SHARE\fR\fR
+.ad
+.RS 13n
+Sets a share reservation on a file with the specified access mode and
+designates which types of access to deny.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBF_UNSHARE\fR\fR
+.ad
+.RS 13n
+Remove an existing share reservation.
+.RE
+
+.SH FILE LOCKING
+.LP
+Two types of file locks are supported: POSIX-style and OFD-style. OFD-style
+locks are associated with the open file description (not descriptor) instead
+of with a process. Either type is advisory by default, but POSIX-style locks
+can be mandatory if, and only if, mandatory locking has been enabled on the
+file being locked.  Each type of lock may be created through two different
+interfaces. POSIX-style locks are created via the \fBF_SETLK\fR,
+\fBF_SETLK64\fR, \fBF_SETLKW\fR, or \fBF_SETLKW64\fR commands to this system
+call or by use of the \fBlockf\fR(3C) routine. There is no difference between
+locks created via one mechanism or the other. Likewise, OFD-style locks are
+created via the \fBF_OFD_SETLK\fR, \fBF_OFD_SETLK64\fR, \fBF_OFD_SETLKW\fR, or
+\fBF_OFD_SETLKW64\fR commands to this system call or by use of the
+Linux/BSD-compatible \fBflock\fR(3C) routine. Note that this system call
+supports the creation of range-specified OFD-style file locks, while
+\fBflock\fR(3C) does not. However, the current implementation of OFD-style
+locking is limited to locking the entire file. This limitation might be
+removed in the future.
+.sp
+.LP
+The essential distinction between POSIX-style locks and OFD-style locks lie
+in how ownership of a lock is scoped. POSIX locks are scoped to a process. All
+POSIX locks associated with a file for a given process are removed when any
+file descriptor for that file is closed by that process or the process holding
+that file descriptor terminates. POSIX-style locks are not inherited by a child
+process created using \fBfork\fR(2). An OFD-style lock is scoped to the file
+description for a file, not the process or open file descriptor. Thus all file
+descriptors referring to the same description (i.e. those created via the
+\fBF_DUPFD\fR, \fBF_DUP2FD\fR, \fBF_DUPFD_CLOEXEC\fR, or \fBF_DUP2FD_CLOEXEC\fR
+commands to the \fBfcntl\fR(2) system call, or those created via the
+\fBdup\fR(2) system call, or those inherited by a child process created via
+\fBfork\fR(2)) reference the same lock, but a file descriptor obtained via a
+separate \fBopen\fR(2) call on the same file will reference a different lock.
+A lock is removed only on the last \fBclose\fR(2) of the description, or when
+the lock is explicitly unlocked.
+.sp
+.LP
+Locks of both styles are compatible. A file that has been locked with one
+style of lock will be regarded as locked when creation of a lock of either
+style is attempted, and information about the lock will be provided via
+any of the \fBF_GETLK\fR, \fBF_GETLK64\fR, \fBF_OFD_GETLK\fR, or
+\fBF_OFD_GETLK64\fR commands to this system call if that lock would conflict
+with an attempt to create the specified lock regardless of whether the
+specified lock is of the same style as the conflicting extant lock.
+Because ownership of OFD-style locks is scoped to the open description rather
+than the calling process, the \fBl_pid\fR field of a lock descriptor for any
+such lock will always be set to \fB\(mi1\fR\&.
+.sp
+.LP
+When a shared lock is set on a segment of a file, other callers (regardless
+of whether in the same or different process and of whether referenced via the
+same open file) will be able to set shared locks on that segment or a portion
+of it. A POSIX-style shared lock prevents any other process from setting an
+exclusive lock on any portion of the protected area. A OFD-style shared lock
+prevents any caller (even callers in the same process) from setting an
+exclusive lock on any portion of the protected area, unless the caller makes
+the request against a file descriptor referencing the same open file against
+which the shared lock was created, in which case the lock will be downgraded
+to a shared lock with respect to the specified region. A request for a shared
+lock of either style will fail if the file descriptor was not opened with
+read access.
+.sp
+.LP
+A POSIX-style exclusive lock will prevent any other process from setting a
+shared lock or an exclusive lock (of either style) on any portion of the
+protected area. A request for an exclusive lock will fail if the file
+descriptor was not opened with write access.
 .sp
 .LP
 The \fBflock\fR structure contains at least the following elements:
@@ -340,13 +516,17 @@ be measured from the start of the file, current position or end of the file,
 respectively. The value of \fBl_len\fR is the number of consecutive bytes to be
 locked. The value of \fBl_len\fR may be negative (where the definition of
 \fBoff_t\fR permits negative values of \fBl_len\fR). After a successful
-\fBF_GETLK\fR or \fBF_GETLK64\fR request, that is, one in which a lock was
-found, the value of \fBl_whence\fR will be \fBSEEK_SET\fR.
+\fBF_GETLK\fR, \fBF_GETLK64\fR, \fBF_OFD_GETLK\fR, or \fBF_OFD_GETLK64\fR
+request, that is, one in which a lock was found, the value of \fBl_whence\fR
+will be \fBSEEK_SET\fR.
 .sp
 .LP
 The \fBl_pid\fR and \fBl_sysid\fR fields are used only with \fBF_GETLK\fR or
 \fBF_GETLK64\fR to return the process \fBID\fR of the process holding a
-blocking lock and to indicate which system is running that process.
+POSIX-style blocking lock and to indicate which system is running that process,
+or \fB\(mi1\fR\& if it is an OFD-style lock. These fields must both be
+initialized to 0 prior to issuing a OFD-style locking command
+(\fBF_OFD_GETLK\fR or \fBF_OFD_GETLK64\fR).
 .sp
 .LP
 If \fBl_len\fR is positive, the area affected starts at \fBl_start\fR and ends
@@ -359,62 +539,48 @@ to the largest possible value of the file offset for that file by setting
 \fBl_whence\fR is set to \fBSEEK_SET\fR, the whole file will be locked.
 .sp
 .LP
-If a process has an existing lock in which \fBl_len\fR is 0 and which includes
-the last byte of the requested segment, and an unlock (\fBF_UNLCK\fR) request
-is made in which \fBl_len\fR is non-zero and the offset of the last byte of the
-requested segment is the maximum value for an object of type \fBoff_t\fR, then
-the \fBF_UNLCK\fR request will be treated as a request to unlock from the start
+If a lock exists for which \fBl_len\fR is 0 and which includes the last byte of
+the requested segment, and an unlock (\fBF_UNLCK\fR) request is made in which
+\fBl_len\fR is non-zero and the offset of the last byte of the requested
+segment is the maximum value for an object of type \fBoff_t\fR, then the
+\fBF_UNLCK\fR request will be treated as a request to unlock from the start
 of the requested segment with an \fBl_len\fR equal to 0. Otherwise, the request
 will attempt to unlock only the requested segment.
 .sp
 .LP
-There will be at most one type of lock set for each byte in the file. Before a
-successful return from an \fBF_SETLK\fR, \fBF_SETLK64\fR, \fBF_SETLKW\fR, or
-\fBF_SETLKW64\fR request when the calling process has previously existing locks
-on bytes in the region specified by the request, the previous lock type for
-each byte in the specified region will be replaced by the new lock type. As
-specified above under the descriptions of shared locks and exclusive locks, an
-\fBF_SETLK\fR, \fBF_SETLK64\fR, \fBF_SETLKW\fR, or \fBF_SETLKW64\fR request
-will (respectively) fail or block when another process has existing locks on
-bytes in the specified region and the type of any of those locks conflicts with
-the type specified in the request.
+There will be at most one type of lock set for each byte in the
+file. Before a successful return from an \fBF_SETLK\fR, \fBF_SETLK64\fR,
+\fBF_SETLKW\fR, or \fBF_SETLKW64\fR request when the calling process has
+previously existing POSIX-style locks on bytes in the region specified by the
+request, the previous POSIX-style lock type for each byte in the specified
+region will be replaced by the new lock type. As specified above under the
+descriptions of shared locks and exclusive locks, an \fBF_SETLK\fR,
+\fBF_SETLK64\fR, \fBF_SETLKW\fR, or \fBF_SETLKW64\fR request will
+(respectively) fail or block when locks exist on bytes in the specified region
+and the type of any of those locks conflicts with the type specified in the
+request.
 .sp
 .LP
-All locks associated with a file for a given process are removed when a file
-descriptor for that file is closed by that process or the process holding that
-file descriptor terminates. Locks are not inherited by a child process created
-using \fBfork\fR(2).
+Similarly, before a successful return from an \fBF_OFD_SETLK\fR,
+\fBF_OFD_SETLK64\fR, \fBF_OFD_SETLKW\fR, or \fBF_OFD_SETLKW64\fR request when
+previously-created OFD-style locks associated with the open file apply to
+bytes in the region specified by the request, the previous OFD-style lock type
+for each byte in the specified region will be replaced by the new lock type.
+As specified above under the descriptions of shared locks and exclusive locks,
+an \fBF_OFD_SETLK\fR, \fBF_OFD_SETLK64\fR, \fBF_OFD_SETLKW\fR, or
+\fBF_OFD_SETLKW64\fR request will (respectively) fail or block when locks exist
+on bytes in the specified region and the type of any of those locks conflicts
+with the type specified in the request.
 .sp
 .LP
 A potential for deadlock occurs if a process controlling a locked region is put
 to sleep by attempting to lock another process' locked region. If the system
 detects that sleeping until a locked region is unlocked would cause a deadlock,
-\fBfcntl()\fR will fail with an \fBEDEADLK\fR error.
-.sp
-.LP
-The following values for \fIcmd\fR are used for file share reservations. A
-share reservation is placed on an entire file to allow cooperating processes to
-control access to the file.
-.sp
-.ne 2
-.na
-\fB\fBF_SHARE\fR\fR
-.ad
-.RS 13n
-Sets a share reservation on a file with the specified access mode and
-designates which types of access to deny.
-.RE
+\fBfcntl()\fR will fail with an \fBEDEADLK\fR error. This deadlock detection
+and error value apply only to POSIX-style locks.  No deadlock detection is
+performed when attempting to set an OFD-style lock.
 
-.sp
-.ne 2
-.na
-\fB\fBF_UNSHARE\fR\fR
-.ad
-.RS 13n
-Remove an existing share reservation.
-.RE
-
-.sp
+.SH SHARE RESERVATIONS
 .LP
 File share reservations are an advisory form of access control among
 cooperating processes, on both local and remote machines. They are most often
@@ -526,7 +692,6 @@ Do not deny read or write access to any other process.
 .RE
 
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, the value returned depends on \fIcmd\fR as follows:
 .sp
@@ -603,6 +768,60 @@ Value of the socket owner process or process group; this will not be
 .RS 14n
 Value of file status flags, access modes, and creation and assignment flags.
 The return value will not be negative.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBF_OFD_GETLK\fR\fR
+.ad
+.RS 14n
+Value other then \fB\(mi1\fR\&.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBF_OFD_GETLK64\fR\fR
+.ad
+.RS 14n
+Value other then \fB\(mi1\fR\&.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBF_OFD_SETLK\fR\fR
+.ad
+.RS 14n
+Value other then \fB\(mi1\fR\&.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBF_OFD_SETLK64\fR\fR
+.ad
+.RS 14n
+Value other then \fB\(mi1\fR\&.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBF_OFD_SETLKW\fR\fR
+.ad
+.RS 14n
+Value other then \fB\(mi1\fR\&.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBF_OFD_SETLKW64\fR\fR
+.ad
+.RS 14n
+Value other then \fB\(mi1\fR\&.
 .RE
 
 .sp
@@ -691,7 +910,6 @@ Value other than \fB\(mi1\fR\&.
 Otherwise, \fB\(mi1\fR is returned and \fBerrno\fR is set to indicate the
 error.
 .SH ERRORS
-.sp
 .LP
 The \fBfcntl()\fR function will fail if:
 .sp
@@ -700,12 +918,13 @@ The \fBfcntl()\fR function will fail if:
 \fB\fBEAGAIN\fR\fR
 .ad
 .RS 13n
-The \fIcmd\fR argument is \fBF_SETLK\fR or \fBF_SETLK64\fR, the type of lock
-\fB(l_type)\fR is a shared (\fBF_RDLCK\fR) or exclusive (\fBF_WRLCK\fR) lock,
-and the segment of a file to be locked is already exclusive-locked by another
-process; or the type is an exclusive lock and some portion of the segment of a
-file to be locked is already shared-locked or exclusive-locked by another
-process.
+The \fIcmd\fR argument is \fBF_SETLK\fR, \fBF_SETLK64\fR, \fBF_OFD_SETLK\fR,
+or \fBF_OFD_SETLK64\fR, the type of lock \fB(l_type)\fR is a shared
+(\fBF_RDLCK\fR) or exclusive (\fBF_WRLCK\fR) lock, and the segment of a file
+to be locked is already exclusive-locked by another process or open file; or
+the type is an exclusive lock and some portion of the segment of a file to be
+locked is already shared-locked or exclusive-locked by another process or open
+file.
 .sp
 The \fIcmd\fR argument is \fBF_FREESP\fR, the file exists, mandatory
 file/record locking is set, and there are outstanding record locks on the file;
@@ -724,8 +943,9 @@ existing \fBf_deny\fR share reservation.
 .ad
 .RS 13n
 The \fIfildes\fR argument is not a valid open file descriptor; or the \fIcmd\fR
-argument is \fBF_SETLK\fR, \fBF_SETLK64\fR, \fBF_SETLKW\fR, or
-\fBF_SETLKW64\fR, the type of lock, \fBl_type\fR, is a shared lock
+argument is \fBF_SETLK\fR, \fBF_SETLK64\fR, \fBF_SETLKW\fR, \fBF_SETLKW64\fR,
+\fBF_OFD_SETLK\fR, \fBF_OFD_SETLK64\fR, \fBF_OFD_SETLKW\fR, or
+\fBF_OFD_SETLKW64\fR, the type of lock, \fBl_type\fR, is a shared lock
 (\fBF_RDLCK\fR), and \fIfildes\fR is not a valid file descriptor open for
 reading; or the type of lock \fBl_type\fR is an exclusive lock (\fBF_WRLCK\fR)
 and \fIfildes\fR is not a valid file descriptor open for writing.
@@ -752,11 +972,10 @@ reading.
 .ad
 .RS 13n
 The \fIcmd\fR argument is \fBF_GETLK\fR, \fBF_GETLK64\fR, \fBF_SETLK\fR,
-\fBF_SETLK64\fR, \fBF_SETLKW\fR, \fBF_SETLKW64\fR, or \fBF_FREESP\fR and the
+\fBF_SETLK64\fR, \fBF_SETLKW\fR, \fBF_SETLKW64\fR, \fBF_OFD_GETLK\fR,
+\fBF_OFD_GETLK64\fR, \fBF_OFD_SETLK\fR, \fBF_OFD_SETLK64\fR, \fBF_OFD_SETLKW\fR,
+\fBF_OFD_SETLKW64\fB, \fBF_SHARE\fR, \fBF_UNSHARE\fR, or \fBF_FREESP\fR and the
 \fIarg\fR argument points to an illegal address.
-.sp
-The \fIcmd\fR argument is \fBF_SHARE\fR or \fBF_UNSHARE\fR and \fIarg\fR points
-to an illegal address.
 .RE
 
 .sp
@@ -765,8 +984,8 @@ to an illegal address.
 \fB\fBEINTR\fR\fR
 .ad
 .RS 13n
-The \fIcmd\fR argument is \fBF_SETLKW\fR or \fBF_SETLKW64\fR and the function
-was interrupted by a signal.
+The \fIcmd\fR argument is \fBF_SETLKW\fR, \fBF_SETLKW64\fR, \fBF_OFD_SETLKW\fR,
+or \fBF_OFD_SETLKW64\fR, and the function was interrupted by a signal.
 .RE
 
 .sp
@@ -778,9 +997,11 @@ was interrupted by a signal.
 The \fIcmd\fR argument is invalid or not supported by the file system; or the
 \fIcmd\fR argument is \fBF_DUPFD\fR and \fIarg\fR is negative or greater than
 or equal to \fBOPEN_MAX\fR; or the \fIcmd\fR argument is \fBF_GETLK\fR,
-\fBF_GETLK64\fR, \fBF_SETLK\fR, \fBF_SETLK64\fR, \fBF_SETLKW\fR, or
-\fBF_SETLKW64\fR and the data pointed to by \fIarg\fR is not valid; or
-\fIfildes\fR refers to a file that does not support locking.
+\fBF_GETLK64\fR, \fBF_SETLK\fR, \fBF_SETLK64\fR, \fBF_SETLKW\fR,
+\fBF_SETLKW64\fR, \fBF_OFD_GETLK\fR, \fBF_OFD_GETLK64\fR, \fBF_OFD_SETLK\fR,
+\fBF_OFD_SETLK64\fR, \fBF_OFD_SETLKW\fR, or \fBF_OFD_SETLKW64\fR, and the data
+pointed to by \fIarg\fR is not valid; or \fIfildes\fR refers to a file that
+does not support locking.
 .sp
 The \fIcmd\fR argument is \fBF_UNSHARE\fR and a reservation with this
 \fBf_id\fR for this process does not exist.
@@ -815,9 +1036,11 @@ greater than or equal to \fIarg\fR are available.
 \fB\fBENOLCK\fR\fR
 .ad
 .RS 13n
-The \fIcmd\fR argument is \fBF_SETLK\fR, \fBF_SETLK64\fR, \fBF_SETLKW\fR, or
-\fBF_SETLKW64\fR and satisfying the lock or unlock request would result in the
-number of locked regions in the system exceeding a system-imposed limit.
+The \fIcmd\fR argument is \fBF_SETLK\fR, \fBF_SETLK64\fR, \fBF_SETLKW\fR,
+\fBF_SETLKW64\fR, \fBF_OFD_SETLK\fR, \fBF_OFD_SETLK64\fR, \fBF_OFD_SETLKW\fR,
+or \fBF_OFD_SETLKW64\fR, and satisfying the lock or unlock request would
+result in the number of locked regions in the system exceeding a
+system-imposed limit.
 .RE
 
 .sp
@@ -839,12 +1062,14 @@ file is on a remote machine, and the link to that machine is no longer active.
 .RS 13n
 One of the values to be returned cannot be represented correctly.
 .sp
-The \fIcmd\fR argument is \fBF_GETLK\fR, \fBF_SETLK\fR, or \fBF_SETLKW\fR and
+The \fIcmd\fR argument is \fBF_GETLK\fR, \fBF_SETLK\fR, \fBF_SETLKW\fR,
+\fBF_OFD_GETLK\fR, \fBF_OFD_SETLK\fR, or \fBF_OFD_SETLKW\fR, and
 the smallest or, if \fBl_len\fR is non-zero, the largest, offset of any byte in
 the requested segment cannot be represented correctly in an object of type
 \fBoff_t\fR.
 .sp
-The \fIcmd\fR argument is \fBF_GETLK64\fR, \fBF_SETLK64\fR, or \fBF_SETLKW64\fR
+The \fIcmd\fR argument is \fBF_GETLK64\fR, \fBF_SETLK64\fR, \fBF_SETLKW64\fR,
+\fBF_OFD_GETLK64\fR, \fBF_OFD_SETLK64\fR, or \fBF_OFD_SETLKW64\fR,
 and the smallest or, if \fBl_len\fR is non-zero, the largest, offset of any
 byte in the requested segment cannot be represented correctly in an object of
 type \fBoff64_t\fR.
@@ -859,8 +1084,9 @@ The \fBfcntl()\fR function may fail if:
 \fB\fBEAGAIN\fR\fR
 .ad
 .RS 11n
-The \fIcmd\fR argument is \fBF_SETLK\fR, \fBF_SETLK64\fR, \fBF_SETLKW\fR, or
-\fBF_SETLKW64\fR, and the file is currently being mapped to virtual memory
+The \fIcmd\fR argument is \fBF_SETLK\fR, \fBF_SETLK64\fR, \fBF_SETLKW\fR,
+\fBF_SETLKW64\fR, \fBF_OFD_SETLK\fR, \fBF_OFD_SETLK64\fR, \fBF_OFD_SETLKW\fR,
+or \fBF_OFD_SETLKW64\fR and the file is currently being mapped to virtual memory
 using \fBmmap\fR(2).
 .RE
 
@@ -880,7 +1106,6 @@ detected.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -898,17 +1123,16 @@ MT-Level	Async-Signal Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBlockd\fR(1M), \fBchmod\fR(2), \fBclose\fR(2), \fBcreat\fR(2), \fBdup\fR(2),
 \fBexec\fR(2), \fBfork\fR(2), \fBmmap\fR(2), \fBopen\fR(2), \fBpipe\fR(2),
 \fBread\fR(2), \fBsigaction\fR(2), \fBwrite\fR(2), \fBdup2\fR(3C),
-\fBfcntl.h\fR(3HEAD), \fBattributes\fR(5), \fBstandards\fR(5)
+\fBflock\fR(3C), \fBlockf\fR(3C), \fBfcntl.h\fR(3HEAD), \fBattributes\fR(5),
+\fBlf64\fR(5), \fBstandards\fR(5)
 .sp
 .LP
 \fIProgramming Interfaces Guide\fR
 .SH NOTES
-.sp
 .LP
 In the past, the variable \fBerrno\fR was set to \fBEACCES\fR rather than
 \fBEAGAIN\fR when a section of a file is already locked by another process.

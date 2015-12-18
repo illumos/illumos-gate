@@ -23,7 +23,7 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2015 RackTop Systems.
 #
 
 PROGS = adbgen1 adbgen3 adbgen4
@@ -54,7 +54,7 @@ install: $$(ROOTPROGS) $$(ROOTOBJS) $$(ROOTSCRIPTS)
 clean:
 
 adbgen%: ../common/adbgen%.c
-	$(LINK.c) -o $@ $<
+	$(LINK.c) -o $@ $< $(LDLIBS)
 	$(POST_PROCESS)
 
 %.o: ../common/%.c

@@ -3389,7 +3389,6 @@ do_show_link(int argc, char *argv[], const char *use)
 {
 	int		option;
 	boolean_t	s_arg = B_FALSE;
-	boolean_t	S_arg = B_FALSE;
 	boolean_t	i_arg = B_FALSE;
 	uint32_t	flags = DLADM_OPT_ACTIVE;
 	boolean_t	p_arg = B_FALSE;
@@ -3411,7 +3410,7 @@ do_show_link(int argc, char *argv[], const char *use)
 	bzero(&state, sizeof (state));
 
 	opterr = 0;
-	while ((option = getopt_long(argc, argv, ":pPsSi:o:",
+	while ((option = getopt_long(argc, argv, ":pPsi:o:",
 	    show_lopts, NULL)) != -1) {
 		switch (option) {
 		case 'p':
@@ -3432,12 +3431,6 @@ do_show_link(int argc, char *argv[], const char *use)
 
 			flags = DLADM_OPT_PERSIST;
 			break;
-		case 'S':
-			if (S_arg)
-				die_optdup(option);
-
-			S_arg = B_TRUE;
-			break;
 		case 'o':
 			o_arg = B_TRUE;
 			fields_str = optarg;
@@ -3456,17 +3449,11 @@ do_show_link(int argc, char *argv[], const char *use)
 		}
 	}
 
-	if (i_arg && !(s_arg || S_arg))
-		die("the option -i can be used only with -s or -S");
-
-	if (s_arg && S_arg)
-		die("the -s option cannot be used with -S");
+	if (i_arg && !s_arg)
+		die("the option -i can be used only with -s");
 
 	if (s_arg && flags != DLADM_OPT_ACTIVE)
 		die("the option -P cannot be used with -s");
-
-	if (S_arg && (p_arg || flags != DLADM_OPT_ACTIVE))
-		die("the option -%c cannot be used with -S", p_arg ? 'p' : 'P');
 
 	/* get link name (optional last argument) */
 	if (optind == (argc-1)) {
@@ -3491,11 +3478,6 @@ do_show_link(int argc, char *argv[], const char *use)
 
 	if (p_arg && !o_arg)
 		die("-p requires -o");
-
-	if (S_arg) {
-		dladm_continuous(handle, linkid, NULL, interval, LINK_REPORT);
-		return;
-	}
 
 	if (p_arg && strcasecmp(fields_str, "all") == 0)
 		die("\"-o all\" is invalid with -p");

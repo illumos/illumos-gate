@@ -206,7 +206,6 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 
 	dladm_parselink;
 
-	dladm_continuous;
 	dladm_kstat_lookup;
 	dladm_get_stats;
 	dladm_kstat_value;

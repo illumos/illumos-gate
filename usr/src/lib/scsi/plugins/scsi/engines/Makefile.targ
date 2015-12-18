@@ -23,7 +23,8 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2015 RackTop Systems.
+#
 
 all: $(PROG) $(DMODPROG)
 
@@ -37,7 +38,7 @@ $(PROG): $(OBJS) $(APIMAP)
 
 $(DMODPROG): $(DMOD_OBJS)
 	-@mkdir -p $(@D)
-	$(LINK.c) $(DMOD_OBJS) -o $@
+	$(LINK.c) $(DMOD_OBJS) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 
 %.o: %.c

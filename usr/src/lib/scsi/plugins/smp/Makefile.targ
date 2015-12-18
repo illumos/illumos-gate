@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2015 RackTop Systems.
 #
 
 all: $(PROG) $(DMODPROG)
@@ -35,7 +36,7 @@ $(PROG): $(OBJS) $(APIMAP)
 
 $(DMODPROG): $(DMOD_OBJS)
 	-@mkdir -p $(@D)
-	$(LINK.c) $(DMOD_OBJS) -o $@
+	$(LINK.c) $(DMOD_OBJS) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 
 %.o: %.c

@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2015 Joyent, Inc.
 .\"
-.Dd May 07, 2015
+.Dd Dec 04, 2015
 .Dt LIBAVL 3LIB
 .Os
 .Sh NAME
@@ -84,7 +84,7 @@ time.
 Deleting all nodes from a linked list is
 .Sy O(n) .
 With an AVL tree, if using the
-.Xr avl_delete_nodes 3AVL
+.Xr avl_destroy_nodes 3AVL
 function then deleting all nodes
 is
 .Sy O(n) .

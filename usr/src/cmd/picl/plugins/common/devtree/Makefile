@@ -19,14 +19,14 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2015 RackTop Systems.
 #
-# cmd/picl/plugins/common/devtree/Makefile
-#
+
 LIBRARY=	libpicldevtree.a
 VERS=		.1
 
@@ -97,7 +97,7 @@ lint :
 	$(LINT.c) $(SRCS)
 
 %.so: %.o
-	$(LINK.c) -o $@ $(GSHARED) -h $@ $<
+	$(LINK.c) -o $@ $(GSHARED) -h $@ $< $(LDLIBS)
 
 %.o: %.c
 	$(COMPILE.c) -o $@ $<

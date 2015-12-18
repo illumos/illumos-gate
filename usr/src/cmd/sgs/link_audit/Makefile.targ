@@ -22,7 +22,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2015 RackTop Systems.
 #
 
 %:	../common/%.ksh
@@ -67,7 +67,7 @@ $(WHOLIB): $(WHOPICS)
 		$(POST_PROCESS_SO)
 
 dumpbind: $(OBJDIR)/dumpbind.o
-		$(LINK.c) -o $@ $(OBJDIR)/dumpbind.o
+		$(LINK.c) -o $@ $(OBJDIR)/dumpbind.o $(LDLIBS)
 		$(POST_PROCESS)
 
 $(ROOTUSRBIN)/%: %

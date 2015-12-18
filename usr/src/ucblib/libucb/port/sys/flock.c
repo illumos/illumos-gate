@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2015 Joyent, Inc.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -51,12 +52,11 @@ flock(int fd, int operation)
 	fl.l_len = 0;
 	fl.l_type = 0;
 
-	/* In non-blocking lock, use F_SETLK for cmd, F_SETLKW otherwise */
 	if (operation & LOCK_NB) {
-		cmd = F_SETLK;
+		cmd = F_FLOCK;
 		operation &= ~LOCK_NB;	/* turn off this bit */
 	} else
-		cmd = F_SETLKW;
+		cmd = F_FLOCKW;
 
 	switch (operation) {
 	case LOCK_UN:

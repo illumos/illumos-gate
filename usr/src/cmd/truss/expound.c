@@ -23,6 +23,7 @@
  * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012, 2014 by Delphix. All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -1872,6 +1873,11 @@ show_fcntl(private_t *pri)
 	case F_FREESP:
 	case F_ALLOCSP:
 	case F_SETLK_NBMAND:
+	case F_OFD_GETLK:
+	case F_OFD_SETLK:
+	case F_OFD_SETLKW:
+	case F_FLOCK:
+	case F_FLOCKW:
 		if (data_model == PR_MODEL_LP64)
 			show_flock64(pri, offset);
 		else
@@ -1883,6 +1889,11 @@ show_fcntl(private_t *pri)
 	case 27:	/* F_FREESP64 */
 	case 28:	/* F_ALLOCSP64 */
 	case 44:	/* F_SETLK64_NBMAND */
+	case 50:	/* F_OFD_GETLK64 */
+	case 51:	/* F_OFD_SETLK64 */
+	case 52:	/* F_OFD_SETLKW64 */
+	case 55:	/* F_FLOCK64 */
+	case 56:	/* F_FLOCKW64 */
 		show_flock64(pri, offset);
 		break;
 #else	/* _LP64 */
@@ -1900,6 +1911,11 @@ show_fcntl(private_t *pri)
 	case F_FREESP64:
 	case F_ALLOCSP64:
 	case F_SETLK64_NBMAND:
+	case F_OFD_GETLK64:
+	case F_OFD_SETLK64:
+	case F_OFD_SETLKW64:
+	case F_FLOCK64:
+	case F_FLOCKW64:
 		show_flock64(pri, offset);
 		break;
 #endif	/* _LP64 */

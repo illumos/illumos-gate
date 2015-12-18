@@ -2881,6 +2881,8 @@ ucopystr(const char *ufrom, char *uto, size_t umaxlength, size_t *lencopied)
 	SET_SIZE(ucopy)
 
 	ENTRY(ucopystr)
+	pushq	%rbp
+	movq	%rsp, %rbp
 	movq	kernelbase(%rip), %rax
 	cmpq	%rax, %rdi
 	cmovaeq	%rax, %rdi	/* force fault at kernelbase */
