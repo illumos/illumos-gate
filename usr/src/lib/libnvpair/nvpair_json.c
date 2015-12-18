@@ -38,7 +38,7 @@ nvlist_rasnprintf(char **bufp, size_t *blen, off_t *boff, char *input, ...)
 {
 	int ret;
 	va_list ap;
-	size_t size, asize;
+	size_t size;
 	char *b;
 
 	if (*bufp == NULL) {
@@ -56,13 +56,12 @@ nvlist_rasnprintf(char **bufp, size_t *blen, off_t *boff, char *input, ...)
 	/* E_SEC_PRINTF_VAR_FMT */
 	ret = vsnprintf(*bufp + *boff, size, input, ap);
 	va_end(ap);
-	if (ret < 0) {
-		va_end(ap);
+	if (ret < 0)
 		return (-1);
-	}
+
 	if (ret >= size) {
-		asize = *blen;
-		while (ret >= asize)
+		size_t asize = *blen;
+		while (ret + *boff >= asize)
 			asize += 1024;
 		if ((b = realloc(*bufp, asize)) == NULL)
 			return (-1);
