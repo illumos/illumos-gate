@@ -38,7 +38,8 @@ depend() {
 start() {
     if [ ! -e /etc/resolv.conf ]; then
         echo "# AUTOMATIC ZONE CONFIG" > /etc/resolv.conf
-$(zonecfg -z $ZONENAME info attr name=resolvers |
+EOF
+zonecfg -z $ZONENAME info attr name=resolvers |
 awk '
     {
         if ($1 == "value:") {
@@ -51,7 +52,19 @@ awk '
                 "/etc/resolv.conf")
         }
     }
-')
+' >> $tmpfile
+zonecfg -z $ZONENAME info attr name=dns-domain |
+awk '
+    {
+        if ($1 == "value:") {
+            dom = $2
+        }
+    }
+    END {
+        printf("        echo \"search %s\" >> %s\n", dom, "/etc/resolv.conf")
+    }
+' >> $tmpfile
+cat >> $tmpfile <<EOF
     fi
     return 0
 }

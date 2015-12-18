@@ -41,6 +41,14 @@ $1 == "value:" {
 	}
 }
 ' > $tmpfile
+zonecfg -z $ZONENAME info attr name=dns-domain | awk '
+$1 == "value:" {
+	dom = $2
+}
+END {
+	print("search", dom);
+}
+' >> $tmpfile
 fnm=$ZONEROOT/etc/resolvconf/resolv.conf.d/tail
 if [[ -f $fnm || -h $fnm || ! -e $fnm ]]; then
 	mv -f $tmpfile $fnm
