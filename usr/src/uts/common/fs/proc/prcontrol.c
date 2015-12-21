@@ -2513,7 +2513,7 @@ pr_cancel_watch(prnode_t *pnp)
 			tree = &as->a_wpage;
 
 		mutex_exit(&p->p_lock);
-		AS_LOCK_ENTER(as, &as->a_lock, RW_WRITER);
+		AS_LOCK_ENTER(as, RW_WRITER);
 
 		for (pwp = avl_first(tree); pwp != NULL;
 		    pwp = AVL_NEXT(tree, pwp)) {
@@ -2528,7 +2528,7 @@ pr_cancel_watch(prnode_t *pnp)
 			}
 		}
 
-		AS_LOCK_EXIT(as, &as->a_lock);
+		AS_LOCK_EXIT(as);
 		mutex_enter(&p->p_lock);
 	}
 

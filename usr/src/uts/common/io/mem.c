@@ -288,10 +288,10 @@ mmpagelock(struct as *as, caddr_t va)
 	struct seg *seg;
 	int i;
 
-	AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
+	AS_LOCK_ENTER(as, RW_READER);
 	seg = as_segat(as, va);
 	i = (seg != NULL)? SEGOP_CAPABLE(seg, S_CAPABILITY_NOMINFLT) : 0;
-	AS_LOCK_EXIT(as, &as->a_lock);
+	AS_LOCK_EXIT(as);
 
 	return (i);
 }
@@ -496,7 +496,7 @@ mmioctl_vtop(intptr_t data)
 		as = p->p_as;
 		if (as == mem_vtop.m_as) {
 			mutex_exit(&p->p_lock);
-			AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
+			AS_LOCK_ENTER(as, RW_READER);
 			for (seg = AS_SEGFIRST(as); seg != NULL;
 			    seg = AS_SEGNEXT(as, seg))
 				if ((uintptr_t)mem_vtop.m_va -
@@ -504,7 +504,7 @@ mmioctl_vtop(intptr_t data)
 					break;
 			if (seg != NULL)
 				pfn = hat_getpfnum(as->a_hat, mem_vtop.m_va);
-			AS_LOCK_EXIT(as, &as->a_lock);
+			AS_LOCK_EXIT(as);
 			mutex_enter(&p->p_lock);
 		}
 		sprunlock(p);

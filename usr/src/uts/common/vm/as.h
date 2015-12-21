@@ -240,19 +240,19 @@ extern struct as kas;		/* kernel's address space */
  * in rwlock.c for more information on the semantics of and motivation behind
  * RW_READER_STARVEWRITER.)
  */
-#define	AS_LOCK_ENTER(as, lock, type)		rw_enter((lock), \
+#define	AS_LOCK_ENTER(as, type)		rw_enter(&(as)->a_lock, \
 	(type) == RW_READER ? RW_READER_STARVEWRITER : (type))
-#define	AS_LOCK_EXIT(as, lock)			rw_exit((lock))
-#define	AS_LOCK_DESTROY(as, lock)		rw_destroy((lock))
-#define	AS_LOCK_TRYENTER(as, lock, type)	rw_tryenter((lock), \
+#define	AS_LOCK_EXIT(as)		rw_exit(&(as)->a_lock)
+#define	AS_LOCK_DESTROY(as)		rw_destroy(&(as)->a_lock)
+#define	AS_LOCK_TRYENTER(as, type)	rw_tryenter(&(as)->a_lock, \
 	(type) == RW_READER ? RW_READER_STARVEWRITER : (type))
 
 /*
  * Macros to test lock states.
  */
-#define	AS_LOCK_HELD(as, lock)		RW_LOCK_HELD((lock))
-#define	AS_READ_HELD(as, lock)		RW_READ_HELD((lock))
-#define	AS_WRITE_HELD(as, lock)		RW_WRITE_HELD((lock))
+#define	AS_LOCK_HELD(as)		RW_LOCK_HELD(&(as)->a_lock)
+#define	AS_READ_HELD(as)		RW_READ_HELD(&(as)->a_lock)
+#define	AS_WRITE_HELD(as)		RW_WRITE_HELD(&(as)->a_lock)
 
 /*
  * macros to walk thru segment lists

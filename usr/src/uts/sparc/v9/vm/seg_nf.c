@@ -31,8 +31,6 @@
  * under license from the Regents of the University of California.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * VM - segment for non-faulting loads.
  */
@@ -188,7 +186,7 @@ segnf_create(struct seg *seg, void *argsp)
 	size_t size;
 	struct as *as = seg->s_as;
 
-	ASSERT(as && AS_WRITE_HELD(as, &as->a_lock));
+	ASSERT(as && AS_WRITE_HELD(as));
 
 	/*
 	 * Need a page per virtual color or just 1 if no vac.
@@ -306,7 +304,7 @@ segnf_dup(struct seg *seg, struct seg *newseg)
 static int
 segnf_unmap(struct seg *seg, caddr_t addr, size_t len)
 {
-	ASSERT(seg->s_as && AS_WRITE_HELD(seg->s_as, &seg->s_as->a_lock));
+	ASSERT(seg->s_as && AS_WRITE_HELD(seg->s_as));
 
 	/*
 	 * Check for bad sizes.
@@ -375,7 +373,7 @@ segnf_unmap(struct seg *seg, caddr_t addr, size_t len)
 static void
 segnf_free(struct seg *seg)
 {
-	ASSERT(seg->s_as && AS_WRITE_HELD(seg->s_as, &seg->s_as->a_lock));
+	ASSERT(seg->s_as && AS_WRITE_HELD(seg->s_as));
 }
 
 /*
@@ -391,7 +389,7 @@ segnf_nomap(void)
 static int
 segnf_setprot(struct seg *seg, caddr_t addr, size_t len, uint_t prot)
 {
-	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as, &seg->s_as->a_lock));
+	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as));
 	return (EACCES);
 }
 
@@ -400,7 +398,7 @@ static int
 segnf_checkprot(struct seg *seg, caddr_t addr, size_t len, uint_t prot)
 {
 	uint_t sprot;
-	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as, &seg->s_as->a_lock));
+	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as));
 
 	sprot = seg->s_as == &kas ?  PROT_READ : PROT_READ|PROT_USER;
 	return ((prot & sprot) == prot ? 0 : EACCES);
@@ -424,7 +422,7 @@ segnf_getprot(struct seg *seg, caddr_t addr, size_t len, uint_t *protv)
 {
 	size_t pgno = seg_page(seg, addr + len) - seg_page(seg, addr) + 1;
 	size_t p;
-	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as, &seg->s_as->a_lock));
+	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as));
 
 	for (p = 0; p < pgno; ++p)
 		protv[p] = PROT_READ;
@@ -435,7 +433,7 @@ segnf_getprot(struct seg *seg, caddr_t addr, size_t len, uint_t *protv)
 static u_offset_t
 segnf_getoffset(struct seg *seg, caddr_t addr)
 {
-	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as, &seg->s_as->a_lock));
+	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as));
 
 	return ((u_offset_t)0);
 }
@@ -444,7 +442,7 @@ segnf_getoffset(struct seg *seg, caddr_t addr)
 static int
 segnf_gettype(struct seg *seg, caddr_t addr)
 {
-	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as, &seg->s_as->a_lock));
+	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as));
 
 	return (MAP_SHARED);
 }
@@ -453,7 +451,7 @@ segnf_gettype(struct seg *seg, caddr_t addr)
 static int
 segnf_getvp(struct seg *seg, caddr_t addr, struct vnode **vpp)
 {
-	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as, &seg->s_as->a_lock));
+	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as));
 
 	*vpp = &nfvp;
 	return (0);
