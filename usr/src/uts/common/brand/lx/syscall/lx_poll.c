@@ -481,11 +481,11 @@ lx_select_copyout(pollfd_t *pollfdp, lx_select_buf_t *sbuf, int nfds,
 			pfd++;
 		}
 		if (rfds != NULL)
-			sbuf->lsb_rfds[n] = in;
+			sbuf->lsb_rfds[n / LX_FD_SET_BITS] = in;
 		if (wfds != NULL)
-			sbuf->lsb_wfds[n] = out;
+			sbuf->lsb_wfds[n / LX_FD_SET_BITS] = out;
 		if (efds != NULL)
-			sbuf->lsb_efds[n] = ex;
+			sbuf->lsb_efds[n / LX_FD_SET_BITS] = ex;
 	}
 
 copyout:
