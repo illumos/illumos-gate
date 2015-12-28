@@ -4515,7 +4515,6 @@ d usr/kernel 0755 root sys
 d usr/kernel/brand 0755 root sys
 d usr/kernel/brand/amd64 0755 root sys
 f usr/kernel/brand/amd64/lx_brand 0755 root sys
-f usr/kernel/brand/amd64/sngl_brand 0755 root sys
 d usr/kernel/drv 0755 root sys
 d usr/kernel/drv/amd64 0755 root sys
 f usr/kernel/drv/amd64/bpf 0755 root sys
@@ -5032,7 +5031,6 @@ f usr/lib/amd64/passwdutil.so.1 0755 root bin
 d usr/lib/amd64/pkgconfig 0755 root other
 f usr/lib/amd64/rpcsec.so.1 0755 root bin
 s usr/lib/amd64/rpcsec.so=rpcsec.so.1
-f usr/lib/amd64/sngl_brand.so.1 0755 root bin
 f usr/lib/amd64/straddr.so.2 0755 root bin
 s usr/lib/amd64/straddr.so=straddr.so.2
 f usr/lib/amd64/udapl_tavor.so.1 0755 root bin
@@ -5075,12 +5073,6 @@ d usr/lib/brand/shared 0755 root sys
 f usr/lib/brand/shared/common.ksh 0444 root bin
 f usr/lib/brand/shared/query 0755 root bin
 f usr/lib/brand/shared/uninstall.ksh 0444 root bin
-d usr/lib/brand/sngl 0755 root bin
-f usr/lib/brand/sngl/config.xml 0444 root bin
-f usr/lib/brand/sngl/ld.sys.config 0444 root bin
-f usr/lib/brand/sngl/ld.sys64.config 0444 root bin
-f usr/lib/brand/sngl/platform.xml 0444 root bin
-f usr/lib/brand/sngl/sinstall 0755 root bin
 f usr/lib/bridged 0555 root bin
 f usr/lib/calprog 0555 root bin
 d usr/lib/cfgadm 0755 root bin
@@ -10033,7 +10025,6 @@ s usr/lib/smtp/sendmail/newaliases=sendmail
 f usr/lib/smtp/sendmail/sendmail 2555 root smmsp
 f usr/lib/sndrd 0555 root bin
 f usr/lib/sndrsyncd 0555 root bin
-f usr/lib/sngl_brand.so.1 0755 root bin
 d usr/lib/snmp 0755 root bin
 d usr/lib/spell 0755 root bin
 f usr/lib/spell/compress 0555 root bin

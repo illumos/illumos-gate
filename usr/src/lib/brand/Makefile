@@ -33,7 +33,7 @@ include ../../Makefile.master
 i386_SUBDIRS= lx
 i386_MSGSUBDIRS= lx
 
-SUBDIRS= shared .WAIT sn1 sngl solaris10 ipkg labeled $($(MACH)_SUBDIRS)
+SUBDIRS= shared .WAIT sn1 solaris10 ipkg labeled $($(MACH)_SUBDIRS)
 MSGSUBDIRS= solaris10 shared $($(MACH)_MSGSUBDIRS)
 
 all :=		TARGET= all
