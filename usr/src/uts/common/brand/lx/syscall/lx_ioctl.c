@@ -50,6 +50,14 @@
 #include <inet/ip_if.h>
 
 /*
+ * Linux ioctl types
+ */
+#define	LX_IOC_TYPE_FD		0x54
+#define	LX_IOC_TYPE_DTRACE	0x68
+#define	LX_IOC_TYPE_SOCK	0x89
+#define	LX_IOC_TYPE_AUTOFS	0x93
+
+/*
  * Supported ioctls
  */
 #define	LX_TCGETS		0x5401
@@ -1173,111 +1181,121 @@ ict_siocgifconf(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 }
 
 /* Structure used to define an ioctl translator. */
-typedef struct ioc_cmd_translator {
-	int	ict_lxcmd;
-	int	ict_cmd;
-	int	(*ict_func)(file_t *fp, int cmd, intptr_t arg, int lxcmd);
-} ioc_cmd_translator_t;
+typedef struct lx_ioc_cmd_translator {
+	int	lict_lxcmd;
+	int	lict_cmd;
+	int	(*lict_func)(file_t *fp, int cmd, intptr_t arg, int lxcmd);
+} lx_ioc_cmd_translator_t;
 
-#define	IOC_CMD_TRANSLATOR_PASS(ioc_cmd_sym)				\
+#define	LX_IOC_CMD_TRANSLATOR_PASS(ioc_cmd_sym)				\
 	{ (int)LX_##ioc_cmd_sym, (int)ioc_cmd_sym, ict_pass },
 
-#define	IOC_CMD_TRANSLATOR_FILTER(ioc_cmd_sym, ioct_handler)		\
+#define	LX_IOC_CMD_TRANSLATOR_FILTER(ioc_cmd_sym, ioct_handler)		\
 	{ (int)LX_##ioc_cmd_sym, (int)ioc_cmd_sym, ioct_handler },
 
-#define	IOC_CMD_TRANSLATOR_CUSTOM(ioc_cmd_sym, ioct_handler)		\
+#define	LX_IOC_CMD_TRANSLATOR_CUSTOM(ioc_cmd_sym, ioct_handler)		\
 	{ (int)ioc_cmd_sym, (int)ioc_cmd_sym, ioct_handler },
 
-#define	IOC_CMD_TRANSLATOR_PTHRU(ioc_cmd_sym)				\
+#define	LX_IOC_CMD_TRANSLATOR_PTHRU(ioc_cmd_sym)			\
 	{ (int)ioc_cmd_sym, (int)ioc_cmd_sym, ict_pass },
 
-#define	IOC_CMD_TRANSLATOR_END						\
+#define	LX_IOC_CMD_TRANSLATOR_END					\
 	{0, 0, NULL}
 
-static ioc_cmd_translator_t ioc_translators[] = {
-	IOC_CMD_TRANSLATOR_FILTER(FIONBIO,	ict_fionbio)
-	IOC_CMD_TRANSLATOR_FILTER(FIONREAD,	ict_fionread)
-	IOC_CMD_TRANSLATOR_PASS(FIOGETOWN)
-	IOC_CMD_TRANSLATOR_PASS(FIOASYNC)
+static lx_ioc_cmd_translator_t lx_ioc_xlate_fd[] = {
+	LX_IOC_CMD_TRANSLATOR_FILTER(FIONBIO,	ict_fionbio)
+	LX_IOC_CMD_TRANSLATOR_FILTER(FIONREAD,	ict_fionread)
+	LX_IOC_CMD_TRANSLATOR_PASS(FIOASYNC)
 
 	/* streams related */
-	IOC_CMD_TRANSLATOR_PASS(TCXONC)
-	IOC_CMD_TRANSLATOR_PASS(TCFLSH)
-	IOC_CMD_TRANSLATOR_PASS(TIOCEXCL)
-	IOC_CMD_TRANSLATOR_PASS(TIOCNXCL)
-	IOC_CMD_TRANSLATOR_PASS(TIOCSTI)
-	IOC_CMD_TRANSLATOR_PASS(TIOCSWINSZ)
-	IOC_CMD_TRANSLATOR_PASS(TIOCMBIS)
-	IOC_CMD_TRANSLATOR_PASS(TIOCMBIC)
-	IOC_CMD_TRANSLATOR_PASS(TIOCMSET)
-	IOC_CMD_TRANSLATOR_PASS(TIOCSETD)
-	IOC_CMD_TRANSLATOR_PASS(TCSBRK)
+	LX_IOC_CMD_TRANSLATOR_PASS(TCXONC)
+	LX_IOC_CMD_TRANSLATOR_PASS(TCFLSH)
+	LX_IOC_CMD_TRANSLATOR_PASS(TIOCEXCL)
+	LX_IOC_CMD_TRANSLATOR_PASS(TIOCNXCL)
+	LX_IOC_CMD_TRANSLATOR_PASS(TIOCSTI)
+	LX_IOC_CMD_TRANSLATOR_PASS(TIOCSWINSZ)
+	LX_IOC_CMD_TRANSLATOR_PASS(TIOCMBIS)
+	LX_IOC_CMD_TRANSLATOR_PASS(TIOCMBIC)
+	LX_IOC_CMD_TRANSLATOR_PASS(TIOCMSET)
+	LX_IOC_CMD_TRANSLATOR_PASS(TIOCSETD)
+	LX_IOC_CMD_TRANSLATOR_PASS(TCSBRK)
 
 	/* terminal related */
-	IOC_CMD_TRANSLATOR_PASS(TIOCGETD)
-	IOC_CMD_TRANSLATOR_PASS(TIOCGSID)
-	IOC_CMD_TRANSLATOR_PASS(TIOCNOTTY)
-	IOC_CMD_TRANSLATOR_PASS(TIOCPKT)
+	LX_IOC_CMD_TRANSLATOR_PASS(TIOCGETD)
+	LX_IOC_CMD_TRANSLATOR_PASS(TIOCGSID)
+	LX_IOC_CMD_TRANSLATOR_PASS(TIOCNOTTY)
+	LX_IOC_CMD_TRANSLATOR_PASS(TIOCPKT)
 
-	IOC_CMD_TRANSLATOR_FILTER(TCSETS,		ict_tcsets)
-	IOC_CMD_TRANSLATOR_FILTER(TCSETSW,		ict_tcsets)
-	IOC_CMD_TRANSLATOR_FILTER(TCSETSF,		ict_tcsets)
-	IOC_CMD_TRANSLATOR_FILTER(TCSETA,		ict_tcseta)
-	IOC_CMD_TRANSLATOR_FILTER(TCSETAW,		ict_tcseta)
-	IOC_CMD_TRANSLATOR_FILTER(TCSETAF,		ict_tcseta)
-	IOC_CMD_TRANSLATOR_FILTER(TCGETS,		ict_tcgets)
-	IOC_CMD_TRANSLATOR_FILTER(TCGETA,		ict_tcgeta)
-	IOC_CMD_TRANSLATOR_FILTER(TIOCGWINSZ,		ict_tiocgwinsz)
-	IOC_CMD_TRANSLATOR_CUSTOM(LX_TCSBRKP,		ict_tcsbrkp)
-	IOC_CMD_TRANSLATOR_FILTER(TIOCSPGRP,		ict_tiocspgrp)
-	IOC_CMD_TRANSLATOR_FILTER(TIOCGPGRP,		ict_tiocgpgrp)
-	IOC_CMD_TRANSLATOR_CUSTOM(LX_TIOCSPTLCK,	ict_sptlock)
-	IOC_CMD_TRANSLATOR_CUSTOM(LX_TIOCGPTN,		ict_gptn)
-	IOC_CMD_TRANSLATOR_FILTER(TIOCSCTTY,		ict_tiocsctty)
+	LX_IOC_CMD_TRANSLATOR_FILTER(TCSETS,		ict_tcsets)
+	LX_IOC_CMD_TRANSLATOR_FILTER(TCSETSW,		ict_tcsets)
+	LX_IOC_CMD_TRANSLATOR_FILTER(TCSETSF,		ict_tcsets)
+	LX_IOC_CMD_TRANSLATOR_FILTER(TCSETA,		ict_tcseta)
+	LX_IOC_CMD_TRANSLATOR_FILTER(TCSETAW,		ict_tcseta)
+	LX_IOC_CMD_TRANSLATOR_FILTER(TCSETAF,		ict_tcseta)
+	LX_IOC_CMD_TRANSLATOR_FILTER(TCGETS,		ict_tcgets)
+	LX_IOC_CMD_TRANSLATOR_FILTER(TCGETA,		ict_tcgeta)
+	LX_IOC_CMD_TRANSLATOR_FILTER(TIOCGWINSZ,	ict_tiocgwinsz)
+	LX_IOC_CMD_TRANSLATOR_CUSTOM(LX_TCSBRKP,	ict_tcsbrkp)
+	LX_IOC_CMD_TRANSLATOR_FILTER(TIOCSPGRP,		ict_tiocspgrp)
+	LX_IOC_CMD_TRANSLATOR_FILTER(TIOCGPGRP,		ict_tiocgpgrp)
+	LX_IOC_CMD_TRANSLATOR_CUSTOM(LX_TIOCSPTLCK,	ict_sptlock)
+	LX_IOC_CMD_TRANSLATOR_CUSTOM(LX_TIOCGPTN,	ict_gptn)
+	LX_IOC_CMD_TRANSLATOR_FILTER(TIOCSCTTY,		ict_tiocsctty)
 
-	/* socket related */
-	IOC_CMD_TRANSLATOR_PASS(SIOCSPGRP)
-	IOC_CMD_TRANSLATOR_PASS(SIOCGPGRP)
-	IOC_CMD_TRANSLATOR_PASS(SIOCGSTAMP)
-	IOC_CMD_TRANSLATOR_FILTER(SIOCATMARK,		ict_siocatmark)
-	IOC_CMD_TRANSLATOR_FILTER(SIOCGIFFLAGS,		ict_siolifreq)
-	IOC_CMD_TRANSLATOR_FILTER(SIOCSIFFLAGS,		ict_siolifreq)
-	IOC_CMD_TRANSLATOR_FILTER(SIOCGIFADDR,		ict_siolifreq)
-	IOC_CMD_TRANSLATOR_FILTER(SIOCSIFADDR,		ict_siolifreq)
-	IOC_CMD_TRANSLATOR_FILTER(SIOCGIFDSTADDR,	ict_siolifreq)
-	IOC_CMD_TRANSLATOR_FILTER(SIOCSIFDSTADDR,	ict_siolifreq)
-	IOC_CMD_TRANSLATOR_FILTER(SIOCGIFBRDADDR,	ict_siolifreq)
-	IOC_CMD_TRANSLATOR_FILTER(SIOCSIFBRDADDR,	ict_siolifreq)
-	IOC_CMD_TRANSLATOR_FILTER(SIOCGIFNETMASK,	ict_siolifreq)
-	IOC_CMD_TRANSLATOR_FILTER(SIOCSIFNETMASK,	ict_siolifreq)
-	IOC_CMD_TRANSLATOR_FILTER(SIOCGIFMETRIC,	ict_siolifreq)
-	IOC_CMD_TRANSLATOR_FILTER(SIOCSIFMETRIC,	ict_siolifreq)
-	IOC_CMD_TRANSLATOR_FILTER(SIOCGIFMTU,		ict_siolifreq)
-	IOC_CMD_TRANSLATOR_FILTER(SIOCSIFMTU,		ict_siolifreq)
-	IOC_CMD_TRANSLATOR_FILTER(SIOCGIFHWADDR,	ict_siolifreq)
-	IOC_CMD_TRANSLATOR_CUSTOM(LX_SIOCSIFHWADDR,	ict_siolifreq)
-	IOC_CMD_TRANSLATOR_FILTER(SIOCGIFINDEX,		ict_siolifreq)
-	IOC_CMD_TRANSLATOR_CUSTOM(LX_SIOCGIFTXQLEN,	ict_siolifreq)
-	IOC_CMD_TRANSLATOR_FILTER(SIOCGIFCONF,		ict_siocgifconf)
-	IOC_CMD_TRANSLATOR_CUSTOM(LX_SIOCGIFNAME,	ict_siocgifname)
+	LX_IOC_CMD_TRANSLATOR_END
+};
 
-	/* dtrace related */
-	IOC_CMD_TRANSLATOR_PTHRU(DTRACEHIOC_ADD)
-	IOC_CMD_TRANSLATOR_PTHRU(DTRACEHIOC_REMOVE)
-	IOC_CMD_TRANSLATOR_PTHRU(DTRACEHIOC_ADDDOF)
+static lx_ioc_cmd_translator_t lx_ioc_xlate_socket[] = {
+	LX_IOC_CMD_TRANSLATOR_PASS(FIOGETOWN)
 
-	/* lxautofs related - included here since no fd interpretation */
-	IOC_CMD_TRANSLATOR_PTHRU(LX_AUTOFS_IOC_READY)
-	IOC_CMD_TRANSLATOR_PTHRU(LX_AUTOFS_IOC_FAIL)
-	IOC_CMD_TRANSLATOR_PTHRU(LX_AUTOFS_IOC_CATATONIC)
-	IOC_CMD_TRANSLATOR_PTHRU(LX_AUTOFS_IOC_PROTOVER)
-	IOC_CMD_TRANSLATOR_PTHRU(LX_AUTOFS_IOC_SETTIMEOUT)
-	IOC_CMD_TRANSLATOR_PTHRU(LX_AUTOFS_IOC_EXPIRE)
-	IOC_CMD_TRANSLATOR_PTHRU(LX_AUTOFS_IOC_EXPIRE_MULTI)
-	IOC_CMD_TRANSLATOR_PTHRU(LX_AUTOFS_IOC_PROTOSUBVER)
-	IOC_CMD_TRANSLATOR_PTHRU(LX_AUTOFS_IOC_ASKUMOUNT)
+	LX_IOC_CMD_TRANSLATOR_PASS(SIOCSPGRP)
+	LX_IOC_CMD_TRANSLATOR_PASS(SIOCGPGRP)
+	LX_IOC_CMD_TRANSLATOR_PASS(SIOCGSTAMP)
+	LX_IOC_CMD_TRANSLATOR_FILTER(SIOCATMARK,	ict_siocatmark)
+	LX_IOC_CMD_TRANSLATOR_FILTER(SIOCGIFFLAGS,	ict_siolifreq)
+	LX_IOC_CMD_TRANSLATOR_FILTER(SIOCSIFFLAGS,	ict_siolifreq)
+	LX_IOC_CMD_TRANSLATOR_FILTER(SIOCGIFADDR,	ict_siolifreq)
+	LX_IOC_CMD_TRANSLATOR_FILTER(SIOCSIFADDR,	ict_siolifreq)
+	LX_IOC_CMD_TRANSLATOR_FILTER(SIOCGIFDSTADDR,	ict_siolifreq)
+	LX_IOC_CMD_TRANSLATOR_FILTER(SIOCSIFDSTADDR,	ict_siolifreq)
+	LX_IOC_CMD_TRANSLATOR_FILTER(SIOCGIFBRDADDR,	ict_siolifreq)
+	LX_IOC_CMD_TRANSLATOR_FILTER(SIOCSIFBRDADDR,	ict_siolifreq)
+	LX_IOC_CMD_TRANSLATOR_FILTER(SIOCGIFNETMASK,	ict_siolifreq)
+	LX_IOC_CMD_TRANSLATOR_FILTER(SIOCSIFNETMASK,	ict_siolifreq)
+	LX_IOC_CMD_TRANSLATOR_FILTER(SIOCGIFMETRIC,	ict_siolifreq)
+	LX_IOC_CMD_TRANSLATOR_FILTER(SIOCSIFMETRIC,	ict_siolifreq)
+	LX_IOC_CMD_TRANSLATOR_FILTER(SIOCGIFMTU,	ict_siolifreq)
+	LX_IOC_CMD_TRANSLATOR_FILTER(SIOCSIFMTU,	ict_siolifreq)
+	LX_IOC_CMD_TRANSLATOR_FILTER(SIOCGIFHWADDR,	ict_siolifreq)
+	LX_IOC_CMD_TRANSLATOR_CUSTOM(LX_SIOCSIFHWADDR,	ict_siolifreq)
+	LX_IOC_CMD_TRANSLATOR_FILTER(SIOCGIFINDEX,	ict_siolifreq)
+	LX_IOC_CMD_TRANSLATOR_CUSTOM(LX_SIOCGIFTXQLEN,	ict_siolifreq)
+	LX_IOC_CMD_TRANSLATOR_FILTER(SIOCGIFCONF,	ict_siocgifconf)
+	LX_IOC_CMD_TRANSLATOR_CUSTOM(LX_SIOCGIFNAME,	ict_siocgifname)
 
-	IOC_CMD_TRANSLATOR_END
+	LX_IOC_CMD_TRANSLATOR_END
+};
+
+static lx_ioc_cmd_translator_t lx_ioc_xlate_dtrace[] = {
+	LX_IOC_CMD_TRANSLATOR_PTHRU(DTRACEHIOC_ADD)
+	LX_IOC_CMD_TRANSLATOR_PTHRU(DTRACEHIOC_REMOVE)
+	LX_IOC_CMD_TRANSLATOR_PTHRU(DTRACEHIOC_ADDDOF)
+
+	LX_IOC_CMD_TRANSLATOR_END
+};
+
+static lx_ioc_cmd_translator_t lx_ioc_xlate_autofs[] = {
+	LX_IOC_CMD_TRANSLATOR_PTHRU(LX_AUTOFS_IOC_READY)
+	LX_IOC_CMD_TRANSLATOR_PTHRU(LX_AUTOFS_IOC_FAIL)
+	LX_IOC_CMD_TRANSLATOR_PTHRU(LX_AUTOFS_IOC_CATATONIC)
+	LX_IOC_CMD_TRANSLATOR_PTHRU(LX_AUTOFS_IOC_PROTOVER)
+	LX_IOC_CMD_TRANSLATOR_PTHRU(LX_AUTOFS_IOC_SETTIMEOUT)
+	LX_IOC_CMD_TRANSLATOR_PTHRU(LX_AUTOFS_IOC_EXPIRE)
+	LX_IOC_CMD_TRANSLATOR_PTHRU(LX_AUTOFS_IOC_EXPIRE_MULTI)
+	LX_IOC_CMD_TRANSLATOR_PTHRU(LX_AUTOFS_IOC_PROTOSUBVER)
+	LX_IOC_CMD_TRANSLATOR_PTHRU(LX_AUTOFS_IOC_ASKUMOUNT)
+
+	LX_IOC_CMD_TRANSLATOR_END
 };
 
 static void
@@ -1303,7 +1321,7 @@ lx_ioctl(int fdes, int cmd, intptr_t arg)
 {
 	file_t *fp;
 	int res = 0;
-	ioc_cmd_translator_t *ict;
+	lx_ioc_cmd_translator_t *ict = NULL;
 
 	if (cmd == LX_FIOCLEX || cmd == LX_FIONCLEX) {
 		res = f_setfd_error(fdes, (cmd == LX_FIOCLEX) ? FD_CLOEXEC : 0);
@@ -1313,6 +1331,28 @@ lx_ioctl(int fdes, int cmd, intptr_t arg)
 	if ((fp = getf(fdes)) == NULL)
 		return (set_errno(EBADF));
 
+	switch ((cmd & 0xff00) >> 8) {
+	case LX_IOC_TYPE_FD:
+		ict = lx_ioc_xlate_fd;
+		break;
+
+	case LX_IOC_TYPE_DTRACE:
+		ict = lx_ioc_xlate_dtrace;
+		break;
+
+	case LX_IOC_TYPE_SOCK:
+		ict = lx_ioc_xlate_socket;
+		break;
+
+	case LX_IOC_TYPE_AUTOFS:
+		ict = lx_ioc_xlate_autofs;
+		break;
+
+	default:
+		releasef(fdes);
+		return (set_errno(ENOTTY));
+	}
+
 	/*
 	 * Today, none of the ioctls supported by the emulation possess
 	 * overlapping cmd values.  Because of that, no type interrogation of
@@ -1320,19 +1360,18 @@ lx_ioctl(int fdes, int cmd, intptr_t arg)
 	 * assumed that the vnode-specific logic called by the emulation
 	 * function will reject ioctl commands not supported by the fd.
 	 */
-	ict = ioc_translators;
-	while (ict->ict_func != NULL) {
-		if (ict->ict_lxcmd == cmd)
+	VERIFY(ict != NULL);
+	while (ict->lict_func != NULL) {
+		if (ict->lict_lxcmd == cmd)
 			break;
 		ict++;
 	}
-
-	if (ict->ict_func != NULL) {
-		res = ict->ict_func(fp, ict->ict_cmd, arg, ict->ict_lxcmd);
-	} else {
-		res = set_errno(EINVAL);
+	if (ict->lict_func == NULL) {
+		releasef(fdes);
+		return (set_errno(ENOTTY));
 	}
 
+	res = ict->lict_func(fp, ict->lict_cmd, arg, ict->lict_lxcmd);
 	releasef(fdes);
 	return (res);
 }
