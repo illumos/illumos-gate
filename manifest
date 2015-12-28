@@ -4571,6 +4571,7 @@ d usr/kernel/fs/amd64 0755 root sys
 f usr/kernel/fs/amd64/fdfs 0755 root sys
 f usr/kernel/fs/amd64/lxautofs 0755 root sys
 f usr/kernel/fs/amd64/lx_cgroup 0755 root sys
+f usr/kernel/fs/amd64/lx_devfs 0755 root sys
 f usr/kernel/fs/amd64/lx_proc 0755 root sys
 f usr/kernel/fs/amd64/lx_sysfs 0755 root sys
 f usr/kernel/fs/amd64/pcfs 0755 root sys
