@@ -533,7 +533,7 @@ SCHED_KMODS	+= IA RT TS RT_DPTBL TS_DPTBL FSS FX FX_DPTBL SDC
 FS_KMODS	+= autofs ctfs dcfs dev devfs fdfs fifofs hsfs lofs
 FS_KMODS	+= lxautofs lx_proc lxprocfs mntfs namefs nfs objfs zfs zut
 FS_KMODS	+= pcfs procfs sockfs specfs tmpfs udfs ufs sharefs lx_sysfs
-FS_KMODS	+= smbfs bootfs lx_cgroup
+FS_KMODS	+= smbfs bootfs lx_cgroup lx_devfs
 
 #
 #	Streams Modules (/kernel/strmod):

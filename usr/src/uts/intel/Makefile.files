@@ -105,6 +105,11 @@ LX_CGROUP_OBJS +=	\
 	cgrps_vfsops.o	\
 	cgrps_vnops.o
 
+LX_DEVFS_OBJS +=	\
+	lxd_node.o	\
+	lxd_vfsops.o	\
+	lxd_vnops.o
+
 LX_PROC_OBJS +=	\
 	lx_prsubr.o	\
 	lx_prvfsops.o	\
