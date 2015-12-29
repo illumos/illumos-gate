@@ -2,7 +2,7 @@
 .\" Copyright 1989 AT&T
 .\" Copyright (c) 1980 Regents of the University of California.  All rights reserved.  The Berkeley software License Agreement specifies the terms and conditions for redistribution.
 .\"   Copyright (c) 2000, Sun Microsystems, Inc.  All Rights Reserved.
-.TH FINGER 1 "Nov 6, 2000"
+.TH FINGER 1 "Nov 9, 2015"
 .SH NAME
 finger \- display information about local and remote users
 .SH SYNOPSIS
@@ -23,7 +23,6 @@ finger \- display information about local and remote users
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 By default, the \fBfinger\fR command displays in multi-column format the
 following information about each logged-in user:
@@ -135,7 +134,6 @@ allows all characters greater than decimal 126 \fBASCII\fR. \fBPASS=low,high\fR
 or \fBPASS=high,low\fR allows both characters less than 32 and greater than 126
 to pass through.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported, except that the  \fIusername@hostname\fR
 form supports only the \fB-l\fR option:
@@ -234,7 +232,6 @@ Suppresses printing the full name in a short format printout.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB$HOME/.plan    \fR \fR
@@ -273,7 +270,7 @@ password file
 .sp
 .ne 2
 .na
-\fB\fB/var/adm/lastlog\fR \fR
+\fB\fB/var/adm/lastlog.v2\fR \fR
 .ad
 .RS 24n
 time of last login
@@ -289,7 +286,6 @@ accounting
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBpasswd\fR(1), \fBwho\fR(1), \fBwhois\fR(1), \fBpasswd\fR(4),
 \fBattributes\fR(5)
@@ -299,7 +295,6 @@ Zimmerman, D., \fIThe Finger User Information Protocol\fR, RFC 1288, Center for
 Discrete Mathematics and Theoretical Computer Science (DIMACS), Rutgers
 University, December 1991.
 .SH NOTES
-.sp
 .LP
 The \fBfinger user information protocol\fR limits the options that may be used
 with the remote form of this command.
