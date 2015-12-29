@@ -190,7 +190,7 @@ static nfs_map_opt_t nmo_tab[] = {
 	{"rsize",	NULL,		MOUNT_OPT_PASTHRU},
 	{"sec",		NULL,		MOUNT_OPT_PASTHRU},
 	{"sharecache",	NULL,		MOUNT_OPT_IGNORE},
-	{"sloppy",	NULL,		MOUNT_OPT_INVALID},
+	{"sloppy",	NULL,		MOUNT_OPT_IGNORE},
 	{"soft",	NULL,		MOUNT_OPT_PASTHRU},
 	{"tcp",		"proto=tcp",	MOUNT_OPT_TOKEN},
 	{"timeo",	NULL,		MOUNT_OPT_PASTHRU},
@@ -1968,6 +1968,8 @@ append_opt(char *optstr, int len, char *k, char *v)
 		if (strcmp(k, nmo_tab[i].nmo_lx_opt) == 0) {
 			switch (nmo_tab[i].nmo_argtyp) {
 			case MOUNT_OPT_INVALID:
+				lx_unsupported("invalid NFS mount option: %s",
+				    k);
 				return (-EINVAL);
 
 			case MOUNT_OPT_PASTHRU:
@@ -2038,6 +2040,11 @@ get_nfs_kv(char *vs, char **kp, char **vp)
  * the explicit options:
  *     nolock,addr=127.0.0.1,vers=3,proto=tcp,mountvers=3,mountproto=tcp,
  *     mountport=1892
+ *
+ * This is an example emitted by the Ubuntu 14.04 automounter for an explicit
+ * v3 mount:
+ *	timeo=60,soft,intr,sloppy,addr=10.88.88.200,vers=3,proto=tcp,
+ *	mountvers=3,mountproto=tcp,mountport=63484
  */
 static int
 convert_nfs_arg_str(char *srcp, char *mntopts)
