@@ -541,15 +541,38 @@ lx_start(uintptr_t sp, uintptr_t entry)
 	LX_REG(&jump_uc, REG_SP) = sp;
 	LX_REG(&jump_uc, REG_PC) = entry;
 
-#if defined(_LP64)
 	/*
 	 * The AMD64 ABI states that at process entry, %rdx contains "a
 	 * function pointer that the application should register with
-	 * atexit()".  We make sure to pass NULL explicitly so that
-	 * no function is registered.
+	 * atexit()".  This behavior has been observed in statically linked
+	 * i386 programs as well.  As a precaution, all of the registers are
+	 * zeroed prior to initial execution.
 	 */
+#if defined(_LP64)
+	LX_REG(&jump_uc, REG_RAX) = NULL;
+	LX_REG(&jump_uc, REG_RCX) = NULL;
 	LX_REG(&jump_uc, REG_RDX) = NULL;
-#endif
+	LX_REG(&jump_uc, REG_RBX) = NULL;
+	LX_REG(&jump_uc, REG_RBP) = NULL;
+	LX_REG(&jump_uc, REG_RSI) = NULL;
+	LX_REG(&jump_uc, REG_RDI) = NULL;
+	LX_REG(&jump_uc, REG_R8) = NULL;
+	LX_REG(&jump_uc, REG_R9) = NULL;
+	LX_REG(&jump_uc, REG_R10) = NULL;
+	LX_REG(&jump_uc, REG_R11) = NULL;
+	LX_REG(&jump_uc, REG_R12) = NULL;
+	LX_REG(&jump_uc, REG_R13) = NULL;
+	LX_REG(&jump_uc, REG_R14) = NULL;
+	LX_REG(&jump_uc, REG_R15) = NULL;
+#else
+	LX_REG(&jump_uc, EAX) = NULL;
+	LX_REG(&jump_uc, ECX) = NULL;
+	LX_REG(&jump_uc, EDX) = NULL;
+	LX_REG(&jump_uc, EBX) = NULL;
+	LX_REG(&jump_uc, EBP) = NULL;
+	LX_REG(&jump_uc, ESI) = NULL;
+	LX_REG(&jump_uc, EDI) = NULL;
+#endif /* defined(_LP64) */
 
 	lx_debug("starting Linux program sp %p ldentry %p", sp, entry);
 	lx_jump_to_linux(&jump_uc);
