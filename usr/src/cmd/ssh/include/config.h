@@ -170,7 +170,7 @@ extern "C" {
 /* #undef DISABLE_PUTUTXLINE */
 
 /* Define if you don't want to use lastlog */
-/* #undef DISABLE_LASTLOG */
+#define	DISABLE_LASTLOG
 
 /* Define if you don't want to use lastlog in session.c */
 /* #undef NO_SSH_LASTLOG */

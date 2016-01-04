@@ -198,7 +198,6 @@ int wtmpx_write_entry(struct logininfo *li);
 int lastlog_write_entry(struct logininfo *li);
 int syslogin_write_entry(struct logininfo *li);
 
-int getlast_entry(struct logininfo *li);
 int lastlog_get_entry(struct logininfo *li);
 int wtmp_get_entry(struct logininfo *li);
 int wtmpx_get_entry(struct logininfo *li);
@@ -271,47 +270,6 @@ login_get_lastlog_time(const int uid)
 		return 0;
 }
 #endif
-
-/* login_get_lastlog(struct logininfo *, int)   - Retrieve a lastlog entry
- *
- * Retrieve a logininfo structure populated (only partially) with
- * information from the system lastlog data, or from wtmp/wtmpx if no
- * system lastlog information exists.
- *
- * Note this routine must be given a pre-allocated logininfo.
- *
- * Returns:
- *  >0: A pointer to your struct logininfo if successful
- *  0  on failure (will use OpenSSH's logging facilities for diagnostics)
- *
- */
-struct logininfo *
-login_get_lastlog(struct logininfo *li, const int uid)
-{
-	struct passwd *pw;
-
-	(void) memset(li, '\0', sizeof(*li));
-	li->uid = uid;
-
-	/*
-	 * If we don't have a 'real' lastlog, we need the username to
-	 * reliably search wtmp(x) for the last login (see
-	 * wtmp_get_entry().)
-	 */
-	pw = getpwuid(uid);
-	if (pw == NULL)
-		fatal("login_get_lastlog: Cannot find account for uid %i", uid);
-
-	/* No MIN_SIZEOF here - we absolutely *must not* truncate the
-	 * username */
-	(void) strlcpy(li->username, pw->pw_name, sizeof(li->username));
-
-	if (getlast_entry(li))
-		return li;
-	else
-		return NULL;
-}
-
 
 /* login_alloc_entry()    - Allocate and initialise a logininfo
  *                           structure
@@ -456,44 +414,6 @@ login_write (struct logininfo *li)
 #endif
 	return 0;
 }
-
-/**
- ** getlast_entry: Call low-level functions to retrieve the last login
- **                time.
- **/
-
-/* take the uid in li and return the last login time */
-int
-getlast_entry(struct logininfo *li)
-{
-#ifdef USE_LASTLOG
-	return(lastlog_get_entry(li));
-#else /* !USE_LASTLOG */
-
-#ifdef DISABLE_LASTLOG
-	/* On some systems we shouldn't even try to obtain last login
-	 * time, e.g. AIX */
-	return 0;
-# else /* DISABLE_LASTLOG */
-	/* Try to retrieve the last login time from wtmp */
-#  if defined(USE_WTMP) && (defined(HAVE_TIME_IN_UTMP) || defined(HAVE_TV_IN_UTMP))
-	/* retrieve last login time from utmp */
-	return (wtmp_get_entry(li));
-#  else /* defined(USE_WTMP) && (defined(HAVE_TIME_IN_UTMP) || defined(HAVE_TV_IN_UTMP)) */
-	/* If wtmp isn't available, try wtmpx */
-#   if defined(USE_WTMPX) && (defined(HAVE_TIME_IN_UTMPX) || defined(HAVE_TV_IN_UTMPX))
-	/* retrieve last login time from utmpx */
-	return (wtmpx_get_entry(li));
-#   else
-	/* Give up: No means of retrieving last login time */
-	return 0;
-#   endif /* USE_WTMPX && (HAVE_TIME_IN_UTMPX || HAVE_TV_IN_UTMPX) */
-#  endif /* USE_WTMP && (HAVE_TIME_IN_UTMP || HAVE_TV_IN_UTMP) */
-# endif /* DISABLE_LASTLOG */
-#endif /* USE_LASTLOG */
-}
-
-
 
 /*
  * 'line' string utility functions

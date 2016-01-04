@@ -717,7 +717,6 @@ do_exec(Session *s, const char *command)
 void
 do_login(Session *s, const char *command)
 {
-	char *time_string;
 #ifndef ALTPRIVSEP
 	struct passwd * pw = s->pw;
 #endif /* ALTPRIVSEP*/
@@ -739,20 +738,6 @@ do_login(Session *s, const char *command)
 	if (aixloginmsg && *aixloginmsg)
 		printf("%s\n", aixloginmsg);
 #endif /* WITH_AIXAUTHENTICATE */
-
-#ifndef NO_SSH_LASTLOG
-	if (options.print_lastlog && s->last_login_time != 0) {
-		time_string = ctime(&s->last_login_time);
-		if (strchr(time_string, '\n'))
-			*strchr(time_string, '\n') = 0;
-		if (strcmp(s->hostname, "") == 0)
-			printf("Last login: %s\r\n", time_string);
-		else
-			printf("Last login: %s from %s\r\n", time_string,
-			    s->hostname);
-	}
-#endif /* NO_SSH_LASTLOG */
-
 }
 
 /*
@@ -1661,46 +1646,6 @@ session_pty_req(Session *s)
 		packet_disconnect("Protocol error: you already have a pty.");
 		return 0;
 	}
-	/* Get the time and hostname when the user last logged in. */
-	if (options.print_lastlog) {
-		s->hostname[0] = '\0';
-		s->last_login_time = get_last_login_time(s->pw->pw_uid,
-		    s->pw->pw_name, s->hostname, sizeof(s->hostname));
-		
-		/*
-		 * PAM may update the last login date.
-		 *
-		 * Ideally PAM would also show the last login date as a
-		 * PAM_TEXT_INFO conversation message, and then we could just
-		 * always force the use of keyboard-interactive just so we can
-		 * pass any such PAM prompts and messages from the account and
-		 * session stacks, but skip pam_authenticate() if other userauth
-		 * has succeeded and the user's password isn't expired.
-		 *
-		 * Unfortunately this depends on support for keyboard-
-		 * interactive in the client, and support for lastlog messages
-		 * in some PAM module.
-		 *
-		 * As it is Solaris updates the lastlog in PAM, but does
-		 * not show the lastlog date in PAM.  If and when this state of
-		 * affairs changes this hack can be reconsidered, and, maybe,
-		 * removed.
-		 *
-		 * So we're stuck with a crude hack: get the lastlog
-		 * time before calling pam_open_session() and store it
-		 * in the Authctxt and then use it here once.  After
-		 * that, if the client opens any more pty sessions we'll
-		 * show the last lastlog entry since userauth.
-		 */
-		if (s->authctxt != NULL && s->authctxt->last_login_time > 0) {
-			s->last_login_time = s->authctxt->last_login_time;
-			(void) strlcpy(s->hostname,
-				       s->authctxt->last_login_host,
-				       sizeof(s->hostname));
-			s->authctxt->last_login_time = 0;
-			s->authctxt->last_login_host[0] = '\0';
-		}
-	}
 
 	s->term = packet_get_string(&len);
 
@@ -2499,12 +2444,9 @@ session_do_pam(Session *s, int do_open)
 	if (pam_retval != PAM_SUCCESS)
 		goto done;
 
-	/* Call pam_open/close_session() */
-	if (do_open) {
-		where = "calling pam_open_session()";
-		pam_retval = pam_open_session(s->authctxt->pam->h, 0);
-	}
-	else {
+	/* Call pam_close_session(). pam_open_session was already called during
+	 * authentication, so don't do it again */
+	if (!do_open) {
 		where = "calling pam_close_session()";
 		pam_retval = pam_close_session(s->authctxt->pam->h, 0);
 	}

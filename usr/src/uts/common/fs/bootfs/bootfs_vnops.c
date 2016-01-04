@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright (c) 2014 Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2015 Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -424,6 +424,9 @@ bootfs_getpage(vnode_t *vp, offset_t off, size_t len, uint_t *protp,
 	if (off + len > bnp->bvn_size + PAGEOFFSET)
 		return (EFAULT);
 
+	if (protp != NULL)
+		*protp = PROT_ALL;
+
 	if (len <= PAGESIZE)
 		err = bootfs_getapage(vp, (u_offset_t)off, len, protp, pl,
 		    plsz, seg, addr, rw, cr);
@@ -457,7 +460,7 @@ bootfs_map(vnode_t *vp, offset_t off, struct as *as, caddr_t *addrp,
 	if (vp->v_type != VREG)
 		return (ENODEV);
 
-	if (prot & PROT_WRITE)
+	if ((prot & PROT_WRITE) && (flags & MAP_SHARED))
 		return (ENOTSUP);
 
 	as_rangelock(as);
