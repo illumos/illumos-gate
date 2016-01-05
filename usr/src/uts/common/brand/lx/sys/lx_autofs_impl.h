@@ -22,7 +22,7 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #ifndef	_LX_AUTOFS_IMPL_H
@@ -54,6 +54,12 @@ extern "C" {
 #define	LX_AUTOFS_VFS_PATH_HASH_SIZE	15
 #define	LX_AUTOFS_VFS_VN_HASH_SIZE	15
 
+typedef struct lx_autofs_mntent {
+	list_node_t	lxafme_lst;
+	uint_t		lxafme_len;
+	char		*lxafme_path;
+} lx_autofs_mntent_t;
+
 /*
  * VFS data object.
  */
@@ -69,9 +75,22 @@ typedef struct lx_autofs_vfs {
 	file_t		*lav_fifo_wr;
 	file_t		*lav_fifo_rd;
 
+	/* The mount's dev and ino values for v5 protocol msg */
+	uint64_t	lav_dev;
+	u_longlong_t	lav_ino;
+
 	/* options from the mount */
 	boolean_t	lav_indirect;
 	int		lav_min_proto;
+
+	/*
+	 * ioctl-set timeout value. Currently unused, but the automounter will
+	 * perform an expire ioctl every timeout/4 seconds. In the future we
+	 * might consider only returning an expired mount if it is inactive
+	 * for the full timeout. This could reduce overly aggressive
+	 * umount/mount activity.
+	 */
+	ulong_t		lav_timeout;
 
 	/* Each automount requests needs a unique id. */
 	id_space_t	*lav_ids;
@@ -86,27 +105,34 @@ typedef struct lx_autofs_vfs {
 	/* We need to keep track of all our vnodes. */
 	vnode_t		*lav_root;
 	mod_hash_t	*lav_vn_hash;
+
+	/* list of current mounts */
+	list_t		lav_mnt_list;
 } lx_autofs_vfs_t;
 
+enum lx_autofs_callres	{ LXACR_NONE, LXACR_READY, LXACR_FAIL };
+
 /*
- * Structure to keep track of requests sent to the automounter.
+ * Structure to keep track of automounter requests sent to user-land.
  */
-typedef struct lx_autofs_lookup_req {
+typedef struct lx_autofs_automnt_req {
 	/* Packet that gets sent to the automounter. */
-	union lx_autofs_pkt lalr_pkt;
-	int		lalr_pkt_size;
+	union lx_autofs_pkt laar_pkt;
+	int		laar_pkt_size;
 
 	/* Reference count.  Always updated atomically. */
-	uint_t		lalr_ref;
+	uint_t		laar_ref;
 
 	/*
 	 * Fields to keep track and sync threads waiting on a lookup.
 	 * Fields are protected by lalr_lock.
 	 */
-	kmutex_t	lalr_lock;
-	kcondvar_t	lalr_cv;
-	int		lalr_complete;
-} lx_autofs_lookup_req_t;
+	kmutex_t	laar_lock;
+	kcondvar_t	laar_cv;
+	int		laar_complete;
+
+	enum lx_autofs_callres laar_result;
+} lx_autofs_automnt_req_t;
 
 /*
  * Generic stack structure.

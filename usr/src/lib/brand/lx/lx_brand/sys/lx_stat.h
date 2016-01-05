@@ -34,11 +34,6 @@ extern "C" {
 #include <sys/lx_types.h>
 #include <sys/stat.h>
 
-#define	LX_MAJORSHIFT		8
-#define	LX_MINORMASK		((1 << LX_MAJORSHIFT) - 1)
-#define	LX_MAKEDEVICE(lx_maj, lx_min)	\
-	((lx_dev_t)((lx_maj) << LX_MAJORSHIFT | ((lx_min) & LX_MINORMASK)))
-
 #define	LX_GETMAJOR(lx_dev)	((lx_dev) >> LX_MAJORSHIFT)
 #define	LX_GETMINOR(lx_dev)	((lx_dev) & LX_MINORMASK)
 

@@ -21,7 +21,7 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2015 Joyent, Inc.  All rights reserved.
+ * Copyright 2016 Joyent, Inc.  All rights reserved.
  */
 
 #ifndef _SYS_LX_TYPES_H
@@ -70,6 +70,11 @@ typedef	uint32_t	lx_blkcnt_t;
 typedef	uint64_t	lx_blkcnt64_t;
 typedef	uint32_t	lx_mode_t;
 typedef	uint16_t	lx_mode16_t;
+
+#define	LX_MAJORSHIFT	8
+#define	LX_MINORMASK	((1 << LX_MAJORSHIFT) - 1)
+#define	LX_MAKEDEVICE(lx_maj, lx_min) \
+	((lx_dev_t)((lx_maj) << LX_MAJORSHIFT | ((lx_min) & LX_MINORMASK)))
 
 #define	LX_UID16_TO_UID32(uid16)	\
 	(((uid16) == (lx_uid16_t)-1) ? ((lx_uid_t)-1) : (lx_uid_t)(uid16))

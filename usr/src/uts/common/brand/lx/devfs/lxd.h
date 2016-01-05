@@ -184,11 +184,6 @@ typedef struct lxd_dirent {
 enum de_op	{ DE_CREATE, DE_MKDIR, DE_RENAME };	/* direnter ops */
 enum dr_op	{ DR_REMOVE, DR_RMDIR, DR_RENAME };	/* dirremove ops */
 
-#define	LX_MAJORSHIFT		8
-#define	LX_MINORMASK		((1 << LX_MAJORSHIFT) - 1)
-#define	LX_MAKEDEVICE(lx_maj, lx_min)	\
-	((lx_dev_t)((lx_maj) << LX_MAJORSHIFT | ((lx_min) & LX_MINORMASK)))
-
 typedef struct lxd_minor_translator {
 	char	*lxd_mt_path;		/* illumos minor node path */
 	minor_t	lxd_mt_minor;		/* illumos minor node number */
