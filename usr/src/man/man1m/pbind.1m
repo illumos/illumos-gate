@@ -1,4 +1,5 @@
 '\" te
+.\"  Copyright 2015 Ryan Zezeski
 .\"  Copyright (c) 2008, Sun Microsystems, Inc.
 .\"  All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
@@ -11,6 +12,11 @@ pbind \- control and query bindings of processes or LWPs
 .LP
 .nf
 \fBpbind\fR \fB-b\fR \fIprocessor_id\fR \fIpid\fR [\fI/lwpid\fR]...
+.fi
+
+.LP
+.nf
+\fBpbind\fR \fB-e\fR \fIprocessor_id\fR \fIcmd\fR [\fIargs\fR...]
 .fi
 
 .LP
@@ -34,7 +40,6 @@ pbind \- control and query bindings of processes or LWPs
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBpbind\fR controls and queries bindings of processes and LWPs (lightweight
 processes) to processors. \fBpbind\fR can also remove processor bindings that
@@ -52,11 +57,15 @@ have the same binding. Binding an interactive shell to a processor, for
 example, binds all commands executed by the shell.
 .sp
 .LP
+The \fIprocessor_id\fR must be present and on-line. Use the
+\fBpsrinfo(1M)\fR command to determine which processors are
+available.
+.sp
+.LP
 Superusers may bind or unbind any process or LWP, while other users can bind or
 unbind any process or LWP for which they have permission to signal, that is,
 any process that has the same effective user ID as the user.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -66,11 +75,18 @@ The following options are supported:
 .ad
 .sp .6
 .RS 4n
-Binds all or a subset of the LWPs of the specified processes to the processor
-\fIprocessor_id\fR. Specify \fIprocessor_id\fR as the processor \fBID\fR of the
-processor to be controlled or queried. \fIprocessor_id\fR must be present and
-on-line. Use the \fBpsrinfo\fR command to determine whether or not
-\fIprocessor_id\fR is present and on-line. See \fBpsrinfo\fR(1M).
+Binds all or a subset of the LWPs of the specified processes to
+\fIprocessor_id\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB-e\fR \fIprocessor_id\fR
+.ad
+.sp .6
+.RS 4n
+Execute a command while bound to \fIprocessor_id\fR.
 .RE
 
 .sp
@@ -123,7 +139,6 @@ to any processor if no argument is specified.
 .RE
 
 .SH OPERANDS
-.sp
 .LP
 The following operands are supported:
 .sp
@@ -164,6 +179,16 @@ syntax for selecting \fBLWP\fR \fBID\fRs is as follows:
 .sp .6
 .RS 4n
 The processor \fBID\fR of the processor to be controlled or queried.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIcmd\fR \fI[args...]\fR
+.ad
+.sp .6
+.RS 4n
+The command to execute along with optional arguments.
 .RE
 
 .SH EXAMPLES
@@ -249,8 +274,21 @@ lwp id 149/5: 2
 .in -2
 .sp
 
-.SH EXIT STATUS
+.LP
+\fBExample 6 \fRExecuting a bound command:
 .sp
+.LP
+The following example executes ls while bound to processor 6:
+
+.sp
+.in +2
+.nf
+example% \fBpbind -e 6 ls -la
+.fi
+.in -2
+.sp
+
+.SH EXIT STATUS
 .LP
 The following exit values are returned:
 .sp
@@ -274,12 +312,10 @@ An error occurred.
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBpsradm\fR(1M), \fBpsrinfo\fR(1M), \fBpsrset\fR(1M), \fBprocessor_bind\fR(2),
 \fBprocessor_info\fR(2), \fBsysconf\fR(3C), \fBattributes\fR(5)
 .SH DIAGNOSTICS
-.sp
 .ne 2
 .na
 \fB\fBpbind: cannot query pid 31: No such process\fR\fR
@@ -309,3 +345,12 @@ The user does not have permission to bind the process.
 The specified processor is not on-line.
 .RE
 
+.sp
+.ne 2
+.na
+\fBpbind: failed to exec\fR \fIcmd\fR
+.ad
+.sp .6
+.RS 4n
+Could not resolve the \fIcmd\fR from \fBPATH\fR.
+.RE
