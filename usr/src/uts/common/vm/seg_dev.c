@@ -368,7 +368,7 @@ segdev_create(struct seg *seg, void *argsp)
 	 * Since the address space is "write" locked, we
 	 * don't need the segment lock to protect "segdev" data.
 	 */
-	ASSERT(seg->s_as && AS_WRITE_HELD(seg->s_as, &seg->s_as->a_lock));
+	ASSERT(seg->s_as && AS_WRITE_HELD(seg->s_as));
 
 	hat_map(seg->s_as->a_hat, seg->s_base, seg->s_size, HAT_MAP);
 
@@ -474,7 +474,7 @@ segdev_dup(struct seg *seg, struct seg *newseg)
 	 * Since the address space is "write" locked, we
 	 * don't need the segment lock to protect "segdev" data.
 	 */
-	ASSERT(seg->s_as && AS_WRITE_HELD(seg->s_as, &seg->s_as->a_lock));
+	ASSERT(seg->s_as && AS_WRITE_HELD(seg->s_as));
 
 	newsdp = sdp_alloc();
 
@@ -646,7 +646,7 @@ segdev_unmap(struct seg *seg, caddr_t addr, size_t len)
 	 * Since the address space is "write" locked, we
 	 * don't need the segment lock to protect "segdev" data.
 	 */
-	ASSERT(seg->s_as && AS_WRITE_HELD(seg->s_as, &seg->s_as->a_lock));
+	ASSERT(seg->s_as && AS_WRITE_HELD(seg->s_as));
 
 	if ((sz = sdp->softlockcnt) > 0) {
 		/*
@@ -1135,7 +1135,7 @@ segdev_free(struct seg *seg)
 	 * Since the address space is "write" locked, we
 	 * don't need the segment lock to protect "segdev" data.
 	 */
-	ASSERT(seg->s_as && AS_WRITE_HELD(seg->s_as, &seg->s_as->a_lock));
+	ASSERT(seg->s_as && AS_WRITE_HELD(seg->s_as));
 
 	while (dhp != NULL)
 		dhp = devmap_handle_unmap(dhp);
@@ -1617,7 +1617,7 @@ segdev_fault(
 	    "addr %p len %lx type %x\n",
 	    (void *)dhp_head, (void *)seg, (void *)addr, len, type));
 
-	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as, &seg->s_as->a_lock));
+	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as));
 
 	/* Handle non-devmap case */
 	if (dhp_head == NULL)
@@ -2057,7 +2057,7 @@ segdev_faulta(struct seg *seg, caddr_t addr)
 {
 	TRACE_2(TR_FAC_DEVMAP, TR_DEVMAP_FAULTA,
 	    "segdev_faulta: seg=%p addr=%p", (void *)seg, (void *)addr);
-	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as, &seg->s_as->a_lock));
+	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as));
 
 	return (0);
 }
@@ -2075,7 +2075,7 @@ segdev_setprot(struct seg *seg, caddr_t addr, size_t len, uint_t prot)
 	TRACE_4(TR_FAC_DEVMAP, TR_DEVMAP_SETPROT,
 	    "segdev_setprot:start seg=%p addr=%p len=%lx prot=%x",
 	    (void *)seg, (void *)addr, len, prot);
-	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as, &seg->s_as->a_lock));
+	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as));
 
 	if ((sz = sdp->softlockcnt) > 0 && dhp_head != NULL) {
 		/*
@@ -2198,7 +2198,7 @@ segdev_checkprot(struct seg *seg, caddr_t addr, size_t len, uint_t prot)
 	TRACE_4(TR_FAC_DEVMAP, TR_DEVMAP_CHECKPROT,
 	    "segdev_checkprot:start seg=%p addr=%p len=%lx prot=%x",
 	    (void *)seg, (void *)addr, len, prot);
-	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as, &seg->s_as->a_lock));
+	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as));
 
 	/*
 	 * If segment protection can be used, simply check against them
@@ -2235,7 +2235,7 @@ segdev_getprot(struct seg *seg, caddr_t addr, size_t len, uint_t *protv)
 	TRACE_4(TR_FAC_DEVMAP, TR_DEVMAP_GETPROT,
 	    "segdev_getprot:start seg=%p addr=%p len=%lx protv=%p",
 	    (void *)seg, (void *)addr, len, (void *)protv);
-	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as, &seg->s_as->a_lock));
+	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as));
 
 	pgno = seg_page(seg, addr + len) - seg_page(seg, addr) + 1;
 	if (pgno != 0) {
@@ -2266,7 +2266,7 @@ segdev_getoffset(register struct seg *seg, caddr_t addr)
 	TRACE_2(TR_FAC_DEVMAP, TR_DEVMAP_GETOFFSET,
 	    "segdev_getoffset:start seg=%p addr=%p", (void *)seg, (void *)addr);
 
-	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as, &seg->s_as->a_lock));
+	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as));
 
 	return ((u_offset_t)sdp->offset + (addr - seg->s_base));
 }
@@ -2280,7 +2280,7 @@ segdev_gettype(register struct seg *seg, caddr_t addr)
 	TRACE_2(TR_FAC_DEVMAP, TR_DEVMAP_GETTYPE,
 	    "segdev_gettype:start seg=%p addr=%p", (void *)seg, (void *)addr);
 
-	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as, &seg->s_as->a_lock));
+	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as));
 
 	return (sdp->type);
 }
@@ -2295,7 +2295,7 @@ segdev_getvp(register struct seg *seg, caddr_t addr, struct vnode **vpp)
 	TRACE_2(TR_FAC_DEVMAP, TR_DEVMAP_GETVP,
 	    "segdev_getvp:start seg=%p addr=%p", (void *)seg, (void *)addr);
 
-	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as, &seg->s_as->a_lock));
+	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as));
 
 	/*
 	 * Note that this vp is the common_vp of the device, where the
@@ -2325,7 +2325,7 @@ segdev_sync(struct seg *seg, caddr_t addr, size_t len, int attr, uint_t flags)
 {
 	TRACE_0(TR_FAC_DEVMAP, TR_DEVMAP_SYNC, "segdev_sync:start");
 
-	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as, &seg->s_as->a_lock));
+	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as));
 
 	return (0);
 }
@@ -2341,7 +2341,7 @@ segdev_incore(struct seg *seg, caddr_t addr, size_t len, char *vec)
 
 	TRACE_0(TR_FAC_DEVMAP, TR_DEVMAP_INCORE, "segdev_incore:start");
 
-	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as, &seg->s_as->a_lock));
+	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as));
 
 	for (len = (len + PAGEOFFSET) & PAGEMASK; len; len -= PAGESIZE,
 	    v += PAGESIZE)
@@ -2360,7 +2360,7 @@ segdev_lockop(struct seg *seg, caddr_t addr,
 {
 	TRACE_0(TR_FAC_DEVMAP, TR_DEVMAP_LOCKOP, "segdev_lockop:start");
 
-	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as, &seg->s_as->a_lock));
+	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as));
 
 	return (0);
 }
@@ -2375,7 +2375,7 @@ segdev_advise(struct seg *seg, caddr_t addr, size_t len, uint_t behav)
 {
 	TRACE_0(TR_FAC_DEVMAP, TR_DEVMAP_ADVISE, "segdev_advise:start");
 
-	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as, &seg->s_as->a_lock));
+	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as));
 
 	return (0);
 }
@@ -3080,7 +3080,7 @@ devmap_load(devmap_cookie_t dhc, offset_t offset, size_t len, uint_t type,
 	 *	the as lock is held. Verify here and return error if drivers
 	 *	inadvertently call devmap_load on a wrong devmap handle.
 	 */
-	if ((asp != &kas) && !AS_LOCK_HELD(asp, &asp->a_lock))
+	if ((asp != &kas) && !AS_LOCK_HELD(asp))
 		return (FC_MAKE_ERR(EINVAL));
 
 	soff = (ssize_t)(offset - dhp->dh_uoff);

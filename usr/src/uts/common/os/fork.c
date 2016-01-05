@@ -231,13 +231,13 @@ cfork(int isvfork, int isfork1, int flags)
 		 */
 		as = p->p_as;
 		if (avl_numnodes(&as->a_wpage) != 0) {
-			AS_LOCK_ENTER(as, &as->a_lock, RW_WRITER);
+			AS_LOCK_ENTER(as, RW_WRITER);
 			as_clearwatch(as);
 			p->p_wpage = as->a_wpage;
 			avl_create(&as->a_wpage, wp_compare,
 			    sizeof (struct watched_page),
 			    offsetof(struct watched_page, wp_link));
-			AS_LOCK_EXIT(as, &as->a_lock);
+			AS_LOCK_EXIT(as);
 		}
 		cp->p_as = as;
 		cp->p_flag |= SVFORK;
@@ -592,13 +592,13 @@ forklwperr:
 		if (avl_numnodes(&p->p_wpage) != 0) {
 			/* restore watchpoints to parent */
 			as = p->p_as;
-			AS_LOCK_ENTER(as, &as->a_lock, RW_WRITER);
+			AS_LOCK_ENTER(as, RW_WRITER);
 			as->a_wpage = p->p_wpage;
 			avl_create(&p->p_wpage, wp_compare,
 			    sizeof (struct watched_page),
 			    offsetof(struct watched_page, wp_link));
 			as_setwatch(as);
-			AS_LOCK_EXIT(as, &as->a_lock);
+			AS_LOCK_EXIT(as);
 		}
 	} else {
 		if (cp->p_segacct)
@@ -1450,9 +1450,9 @@ vfwait(pid_t pid)
 	/* restore watchpoints to parent */
 	if (pr_watch_active(pp)) {
 		struct as *as = pp->p_as;
-		AS_LOCK_ENTER(as, &as->a_lock, RW_WRITER);
+		AS_LOCK_ENTER(as, RW_WRITER);
 		as_setwatch(as);
-		AS_LOCK_EXIT(as, &as->a_lock);
+		AS_LOCK_EXIT(as);
 	}
 
 	mutex_enter(&pp->p_lock);

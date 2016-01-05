@@ -853,7 +853,7 @@ segmap_getprot(struct seg *seg, caddr_t addr, size_t len, uint_t *protv)
 	struct segmap_data *smd = (struct segmap_data *)seg->s_data;
 	size_t pgno = seg_page(seg, addr + len) - seg_page(seg, addr) + 1;
 
-	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as, &seg->s_as->a_lock));
+	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as));
 
 	if (pgno != 0) {
 		do {

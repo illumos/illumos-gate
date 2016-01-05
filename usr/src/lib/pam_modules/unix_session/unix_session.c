@@ -23,6 +23,7 @@
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2015 Lauri Tirkkonen.
+ * Copyright 2016 Toomas Soome <tsoome@me.com>
  */
 
 #include <strings.h>
@@ -70,7 +71,7 @@ struct lastlog_legacy {
 /*ARGSUSED*/
 int
 pam_sm_close_session(pam_handle_t *pamh, int flags, int argc,
-	const char **argv)
+    const char **argv)
 {
 	int	i;
 	int	debug = 0;
@@ -201,7 +202,7 @@ rewrite:
 /*ARGSUSED*/
 int
 pam_sm_open_session(pam_handle_t *pamh, int flags, int argc,
-	const char **argv)
+    const char **argv)
 {
 	int	error;
 	char    *ttyn, *rhost, *user;
@@ -219,6 +220,8 @@ pam_sm_open_session(pam_handle_t *pamh, int flags, int argc,
 	for (i = 0; i < argc; i++) {
 		if (strcasecmp(argv[i], "debug") == 0)
 			debug = 1;
+		else if (strcasecmp(argv[i], "nowarn") == 0)
+			flags = flags | PAM_SILENT;
 		else
 			syslog(LOG_ERR, "illegal option %s", argv[i]);
 	}

@@ -662,12 +662,12 @@ uioainit(uio_t *uiop, uioa_t *uioap)
 			}
 			locked->uioa_ppp = (void **)pfnp;
 			locked->uioa_pfncnt = pcnt;
-			AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
+			AS_LOCK_ENTER(as, RW_READER);
 			while (pcnt-- > 0) {
 				*pfnp++ = hat_getpfnum(as->a_hat, addr);
 				addr += PAGESIZE;
 			}
-			AS_LOCK_EXIT(as, &as->a_lock);
+			AS_LOCK_EXIT(as);
 		} else {
 			/* Have a page_t list, save it */
 			locked->uioa_ppp = (void **)pages;

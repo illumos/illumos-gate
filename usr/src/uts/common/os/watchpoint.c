@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/t_lock.h>
 #include <sys/param.h>
@@ -196,14 +194,14 @@ startover:
 	 */
 
 	mutex_enter(&p->p_maplock);
-	AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
+	AS_LOCK_ENTER(as, RW_READER);
 
 	tpw.wp_vaddr = (caddr_t)((uintptr_t)addr & (uintptr_t)PAGEMASK);
 	if ((pwp = avl_find(&as->a_wpage, &tpw, &where)) == NULL)
 		pwp = avl_nearest(&as->a_wpage, where, AVL_AFTER);
 
 	for (; pwp != NULL && pwp->wp_vaddr < eaddr;
-		pwp = AVL_NEXT(&as->a_wpage, pwp)) {
+	    pwp = AVL_NEXT(&as->a_wpage, pwp)) {
 
 		/*
 		 * If the requested protection has not been
@@ -235,7 +233,7 @@ startover:
 				 * Release as lock while in holdwatch()
 				 * in case other threads need to grab it.
 				 */
-				AS_LOCK_EXIT(as, &as->a_lock);
+				AS_LOCK_EXIT(as);
 				mutex_exit(&p->p_maplock);
 				if (holdwatch() != 0) {
 					/*
@@ -246,7 +244,7 @@ startover:
 					goto startover;
 				}
 				mutex_enter(&p->p_maplock);
-				AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
+				AS_LOCK_ENTER(as, RW_READER);
 			}
 			p->p_mapcnt++;
 		}
@@ -306,8 +304,8 @@ startover:
 			uint_t oprot;
 			int err, retrycnt = 0;
 
-			AS_LOCK_EXIT(as, &as->a_lock);
-			AS_LOCK_ENTER(as, &as->a_lock, RW_WRITER);
+			AS_LOCK_EXIT(as);
+			AS_LOCK_ENTER(as, RW_WRITER);
 		retry:
 			seg = as_segat(as, addr);
 			ASSERT(seg != NULL);
@@ -320,9 +318,9 @@ startover:
 					goto retry;
 				}
 			}
-			AS_LOCK_EXIT(as, &as->a_lock);
+			AS_LOCK_EXIT(as);
 		} else
-			AS_LOCK_EXIT(as, &as->a_lock);
+			AS_LOCK_EXIT(as);
 
 		/*
 		 * When all pages are mapped back to their normal state,
@@ -340,10 +338,10 @@ startover:
 			}
 		}
 
-		AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
+		AS_LOCK_ENTER(as, RW_READER);
 	}
 
-	AS_LOCK_EXIT(as, &as->a_lock);
+	AS_LOCK_EXIT(as);
 	mutex_exit(&p->p_maplock);
 
 	return (rv);
@@ -394,7 +392,7 @@ setallwatch(void)
 
 	ASSERT(MUTEX_NOT_HELD(&curproc->p_lock));
 
-	AS_LOCK_ENTER(as, &as->a_lock, RW_WRITER);
+	AS_LOCK_ENTER(as, RW_WRITER);
 
 	pwp = p->p_wprot;
 	while (pwp != NULL) {
@@ -431,7 +429,7 @@ setallwatch(void)
 	}
 	p->p_wprot = NULL;
 
-	AS_LOCK_EXIT(as, &as->a_lock);
+	AS_LOCK_EXIT(as);
 }
 
 
@@ -469,15 +467,15 @@ pr_is_watchpage_as(caddr_t addr, enum seg_rw rw, struct as *as)
 				switch (rw) {
 				case S_READ:
 					rv = ((prot & (PROT_USER|PROT_READ))
-						!= (PROT_USER|PROT_READ));
+					    != (PROT_USER|PROT_READ));
 					break;
 				case S_WRITE:
 					rv = ((prot & (PROT_USER|PROT_WRITE))
-						!= (PROT_USER|PROT_WRITE));
+					    != (PROT_USER|PROT_WRITE));
 					break;
 				case S_EXEC:
 					rv = ((prot & (PROT_USER|PROT_EXEC))
-						!= (PROT_USER|PROT_EXEC));
+					    != (PROT_USER|PROT_EXEC));
 					break;
 				default:
 					/* can't happen! */
@@ -505,9 +503,9 @@ pr_is_watchpage(caddr_t addr, enum seg_rw rw)
 		return (0);
 
 	/* Grab the lock because of XHAT (see comment in pr_mappage()) */
-	AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
+	AS_LOCK_ENTER(as, RW_READER);
 	rv = pr_is_watchpage_as(addr, rw, as);
-	AS_LOCK_EXIT(as, &as->a_lock);
+	AS_LOCK_EXIT(as);
 
 	return (rv);
 }
@@ -1026,7 +1024,7 @@ watch_copyinstr(
 			kaddr += size;
 			resid -= size;
 			if (error == ENAMETOOLONG && resid > 0)
-			    error = 0;
+				error = 0;
 			if (error != 0 || (watchcode &&
 			    (uaddr < vaddr || kaddr[-1] == '\0')))
 				break;	/* didn't reach the watched area */
@@ -1056,7 +1054,7 @@ watch_copyinstr(
 			kaddr += size;
 			resid -= size;
 			if (error == ENAMETOOLONG && resid > 0)
-			    error = 0;
+				error = 0;
 		}
 
 		/* if we hit a watched address, do the watchpoint logic */
@@ -1133,7 +1131,7 @@ watch_copyoutstr(
 			kaddr += size;
 			resid -= size;
 			if (error == ENAMETOOLONG && resid > 0)
-			    error = 0;
+				error = 0;
 			if (error != 0 || (watchcode &&
 			    (uaddr < vaddr || kaddr[-1] == '\0')))
 				break;	/* didn't reach the watched area */
@@ -1163,7 +1161,7 @@ watch_copyoutstr(
 			kaddr += size;
 			resid -= size;
 			if (error == ENAMETOOLONG && resid > 0)
-			    error = 0;
+				error = 0;
 		}
 
 		/* if we hit a watched address, do the watchpoint logic */

@@ -1533,12 +1533,12 @@ vmu_calculate_proc(proc_t *p)
 	ASSERT(entities != NULL);
 	/* process all segs in process's address space */
 	as = p->p_as;
-	AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
+	AS_LOCK_ENTER(as, RW_READER);
 	for (seg = AS_SEGFIRST(as); seg != NULL;
 	    seg = AS_SEGNEXT(as, seg)) {
 		vmu_calculate_seg(entities, seg);
 	}
-	AS_LOCK_EXIT(as, &as->a_lock);
+	AS_LOCK_EXIT(as);
 }
 
 /*

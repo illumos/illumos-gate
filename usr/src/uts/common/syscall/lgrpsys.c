@@ -190,7 +190,7 @@ meminfo(int addr_count, struct meminfo *mip)
 		/* get the corresponding memory info for each virtual address */
 		as = curproc->p_as;
 
-		AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
+		AS_LOCK_ENTER(as, RW_READER);
 		hat = as->a_hat;
 		for (i = out_idx = 0; i < addr_count; i++, out_idx +=
 		    info_count) {
@@ -286,7 +286,7 @@ meminfo(int addr_count, struct meminfo *mip)
 				}
 			}
 		}
-		AS_LOCK_EXIT(as, &as->a_lock);
+		AS_LOCK_EXIT(as);
 	}
 
 	/* copy out the results and validity bits and free the buffers */

@@ -5653,7 +5653,7 @@ retry_map:
 	 * deadlock between ufs_read/ufs_map/pagefault when a quiesce is
 	 * pending.
 	 */
-	while (!AS_LOCK_TRYENTER(as, &as->a_lock, RW_WRITER)) {
+	while (!AS_LOCK_TRYENTER(as, RW_WRITER)) {
 		ufs_map_alock_retry_cnt++;
 		delay(RETRY_LOCK_DELAY);
 	}
@@ -5669,7 +5669,7 @@ retry_map:
 		 * as->a_lock and wait for ulp->ul_fs_lock status to change.
 		 */
 		ufs_map_lockfs_retry_cnt++;
-		AS_LOCK_EXIT(as, &as->a_lock);
+		AS_LOCK_EXIT(as);
 		as_rangeunlock(as);
 		if (error == EIO)
 			goto out;

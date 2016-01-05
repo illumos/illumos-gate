@@ -3020,9 +3020,9 @@ door_copy(struct as *as, caddr_t src, caddr_t dest, uint_t len)
 		pfn_t	pfnum;
 
 		/* MMU mapping is already locked down */
-		AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
+		AS_LOCK_ENTER(as, RW_READER);
 		pfnum = hat_getpfnum(as->a_hat, rdest);
-		AS_LOCK_EXIT(as, &as->a_lock);
+		AS_LOCK_EXIT(as);
 
 		/*
 		 * TODO: The pfn step should not be necessary - need

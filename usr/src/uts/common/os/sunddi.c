@@ -8370,7 +8370,7 @@ umem_lockmemory(caddr_t addr, size_t len, int flags, ddi_umem_cookie_t *cookie,
 	if (flags & DDI_UMEMLOCK_LONGTERM) {
 		extern  struct seg_ops segspt_shmops;
 		extern	struct seg_ops segdev_ops;
-		AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
+		AS_LOCK_ENTER(as, RW_READER);
 		for (seg = as_segat(as, addr); ; seg = AS_SEGNEXT(as, seg)) {
 			if (seg == NULL || seg->s_base > addr + len)
 				break;
@@ -8383,14 +8383,14 @@ umem_lockmemory(caddr_t addr, size_t len, int flags, ddi_umem_cookie_t *cookie,
 			    (SEGOP_GETTYPE(seg, addr) & MAP_SHARED))) {
 				as_pageunlock(as, p->pparray,
 				    addr, len, p->s_flags);
-				AS_LOCK_EXIT(as, &as->a_lock);
+				AS_LOCK_EXIT(as);
 				umem_decr_devlockmem(p);
 				kmem_free(p, sizeof (struct ddi_umem_cookie));
 				*cookie = (ddi_umem_cookie_t)NULL;
 				return (EFAULT);
 			}
 		}
-		AS_LOCK_EXIT(as, &as->a_lock);
+		AS_LOCK_EXIT(as);
 	}
 
 

@@ -360,7 +360,7 @@ as_findseg(struct as *as, caddr_t addr, int tail)
 	struct seg *seg = as->a_seglast;
 	avl_index_t where;
 
-	ASSERT(AS_LOCK_HELD(as, &as->a_lock));
+	ASSERT(AS_LOCK_HELD(as));
 
 	if (seg != NULL &&
 	    seg->s_base <= addr &&
@@ -422,7 +422,7 @@ as_addseg(struct as  *as, struct seg *newseg)
 	caddr_t eaddr;
 	avl_index_t where;
 
-	ASSERT(AS_WRITE_HELD(as, &as->a_lock));
+	ASSERT(AS_WRITE_HELD(as));
 
 	as->a_updatedir = 1;	/* inform /proc */
 	gethrestime(&as->a_updatetime);
@@ -504,7 +504,7 @@ as_removeseg(struct as *as, struct seg *seg)
 {
 	avl_tree_t *t;
 
-	ASSERT(AS_WRITE_HELD(as, &as->a_lock));
+	ASSERT(AS_WRITE_HELD(as));
 
 	as->a_updatedir = 1;	/* inform /proc */
 	gethrestime(&as->a_updatetime);
@@ -544,7 +544,7 @@ as_segat(struct as *as, caddr_t addr)
 {
 	struct seg *seg = as->a_seglast;
 
-	ASSERT(AS_LOCK_HELD(as, &as->a_lock));
+	ASSERT(AS_LOCK_HELD(as));
 
 	if (seg != NULL && seg->s_base <= addr &&
 	    addr < seg->s_base + seg->s_size)
@@ -667,9 +667,9 @@ as_alloc(void)
 	as->a_lastgaphl		= NULL;
 	as->a_callbacks		= NULL;
 
-	AS_LOCK_ENTER(as, &as->a_lock, RW_WRITER);
+	AS_LOCK_ENTER(as, RW_WRITER);
 	as->a_hat = hat_alloc(as);	/* create hat for default system mmu */
-	AS_LOCK_EXIT(as, &as->a_lock);
+	AS_LOCK_EXIT(as);
 
 	as->a_xhat = NULL;
 
@@ -703,7 +703,7 @@ top:
 	if (!called)
 		AS_SETBUSY(as);
 	mutex_exit(&as->a_contents);
-	AS_LOCK_ENTER(as, &as->a_lock, RW_WRITER);
+	AS_LOCK_ENTER(as, RW_WRITER);
 
 	if (!called) {
 		called = 1;
@@ -720,7 +720,7 @@ retry:
 		if (err == EAGAIN) {
 			mutex_enter(&as->a_contents);
 			if (as->a_callbacks) {
-				AS_LOCK_EXIT(as, &as->a_lock);
+				AS_LOCK_EXIT(as);
 			} else if (!AS_ISNOUNMAPWAIT(as)) {
 				/*
 				 * Memory is currently locked. Wait for a
@@ -730,7 +730,7 @@ retry:
 				if (AS_ISUNMAPWAIT(as) == 0)
 					cv_broadcast(&as->a_cv);
 				AS_SETUNMAPWAIT(as);
-				AS_LOCK_EXIT(as, &as->a_lock);
+				AS_LOCK_EXIT(as);
 				while (AS_ISUNMAPWAIT(as))
 					cv_wait(&as->a_cv, &as->a_contents);
 			} else {
@@ -761,7 +761,7 @@ retry:
 	hat_free_end(hat);
 	if (as->a_xhat != NULL)
 		xhat_free_end_all(as);
-	AS_LOCK_EXIT(as, &as->a_lock);
+	AS_LOCK_EXIT(as);
 
 	/* /proc stuff */
 	ASSERT(avl_numnodes(&as->a_wpage) == 0);
@@ -786,13 +786,13 @@ as_dup(struct as *as, struct proc *forkedproc)
 	size_t	purgesize = 0;
 	int error;
 
-	AS_LOCK_ENTER(as, &as->a_lock, RW_WRITER);
+	AS_LOCK_ENTER(as, RW_WRITER);
 	as_clearwatch(as);
 	newas = as_alloc();
 	newas->a_userlimit = as->a_userlimit;
 	newas->a_proc = forkedproc;
 
-	AS_LOCK_ENTER(newas, &newas->a_lock, RW_WRITER);
+	AS_LOCK_ENTER(newas, RW_WRITER);
 
 	/* This will prevent new XHATs from attaching */
 	mutex_enter(&as->a_contents);
@@ -813,12 +813,12 @@ as_dup(struct as *as, struct proc *forkedproc)
 
 		newseg = seg_alloc(newas, seg->s_base, seg->s_size);
 		if (newseg == NULL) {
-			AS_LOCK_EXIT(newas, &newas->a_lock);
+			AS_LOCK_EXIT(newas);
 			as_setwatch(as);
 			mutex_enter(&as->a_contents);
 			AS_CLRBUSY(as);
 			mutex_exit(&as->a_contents);
-			AS_LOCK_EXIT(as, &as->a_lock);
+			AS_LOCK_EXIT(as);
 			as_free(newas);
 			return (-1);
 		}
@@ -832,9 +832,9 @@ as_dup(struct as *as, struct proc *forkedproc)
 			mutex_enter(&as->a_contents);
 			AS_CLRBUSY(as);
 			mutex_exit(&as->a_contents);
-			AS_LOCK_EXIT(as, &as->a_lock);
+			AS_LOCK_EXIT(as);
 			seg_free(newseg);
-			AS_LOCK_EXIT(newas, &newas->a_lock);
+			AS_LOCK_EXIT(newas);
 			as_free(newas);
 			return (error);
 		}
@@ -849,13 +849,13 @@ as_dup(struct as *as, struct proc *forkedproc)
 	mutex_enter(&newas->a_contents);
 	AS_CLRBUSY(newas);
 	mutex_exit(&newas->a_contents);
-	AS_LOCK_EXIT(newas, &newas->a_lock);
+	AS_LOCK_EXIT(newas);
 
 	as_setwatch(as);
 	mutex_enter(&as->a_contents);
 	AS_CLRBUSY(as);
 	mutex_exit(&as->a_contents);
-	AS_LOCK_EXIT(as, &as->a_lock);
+	AS_LOCK_EXIT(as);
 	if (error != 0) {
 		as_free(newas);
 		return (error);
@@ -959,7 +959,7 @@ retry:
 		seg = segkmap;
 		as_lock_held = 0;
 	} else {
-		AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
+		AS_LOCK_ENTER(as, RW_READER);
 		if (is_xhat && avl_numnodes(&as->a_wpage) != 0) {
 			/*
 			 * Grab and hold the writers' lock on the as
@@ -973,13 +973,13 @@ retry:
 			 * is within a watched page and only then grab
 			 * the writer lock, but this is simpler.
 			 */
-			AS_LOCK_EXIT(as, &as->a_lock);
-			AS_LOCK_ENTER(as, &as->a_lock, RW_WRITER);
+			AS_LOCK_EXIT(as);
+			AS_LOCK_ENTER(as, RW_WRITER);
 		}
 
 		seg = as_segat(as, raddr);
 		if (seg == NULL) {
-			AS_LOCK_EXIT(as, &as->a_lock);
+			AS_LOCK_EXIT(as);
 			if ((lwp != NULL) && (!is_xhat))
 				lwp->lwp_nostop--;
 			return (FC_NOMAP);
@@ -1060,7 +1060,7 @@ retry:
 		}
 	}
 	if (as_lock_held)
-		AS_LOCK_EXIT(as, &as->a_lock);
+		AS_LOCK_EXIT(as);
 	if ((lwp != NULL) && (!is_xhat))
 		lwp->lwp_nostop--;
 
@@ -1108,10 +1108,10 @@ retry:
 	rsize = (((size_t)(addr + size) + PAGEOFFSET) & PAGEMASK) -
 	    (size_t)raddr;
 
-	AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
+	AS_LOCK_ENTER(as, RW_READER);
 	seg = as_segat(as, raddr);
 	if (seg == NULL) {
-		AS_LOCK_EXIT(as, &as->a_lock);
+		AS_LOCK_EXIT(as);
 		if (lwp != NULL)
 			lwp->lwp_nostop--;
 		return (FC_NOMAP);
@@ -1129,7 +1129,7 @@ retry:
 		if (res != 0)
 			break;
 	}
-	AS_LOCK_EXIT(as, &as->a_lock);
+	AS_LOCK_EXIT(as);
 	if (lwp != NULL)
 		lwp->lwp_nostop--;
 	/*
@@ -1189,16 +1189,16 @@ setprot_top:
 	 * want to only lock as a writer when necessary.
 	 */
 	if (writer || avl_numnodes(&as->a_wpage) != 0) {
-		AS_LOCK_ENTER(as, &as->a_lock, RW_WRITER);
+		AS_LOCK_ENTER(as, RW_WRITER);
 	} else {
-		AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
+		AS_LOCK_ENTER(as, RW_READER);
 	}
 
 	as_clearwatchprot(as, raddr, rsize);
 	seg = as_segat(as, raddr);
 	if (seg == NULL) {
 		as_setwatch(as);
-		AS_LOCK_EXIT(as, &as->a_lock);
+		AS_LOCK_EXIT(as);
 		return (ENOMEM);
 	}
 
@@ -1223,7 +1223,7 @@ retry:
 		}
 
 		if (error == IE_RETRY) {
-			AS_LOCK_EXIT(as, &as->a_lock);
+			AS_LOCK_EXIT(as);
 			writer = 1;
 			goto setprot_top;
 		}
@@ -1233,7 +1233,7 @@ retry:
 			 * Make sure we have a_lock as writer.
 			 */
 			if (writer == 0) {
-				AS_LOCK_EXIT(as, &as->a_lock);
+				AS_LOCK_EXIT(as);
 				writer = 1;
 				goto setprot_top;
 			}
@@ -1274,13 +1274,13 @@ retry:
 			if (as->a_callbacks &&
 			    (cb = as_find_callback(as, AS_SETPROT_EVENT,
 			    seg->s_base, seg->s_size))) {
-				AS_LOCK_EXIT(as, &as->a_lock);
+				AS_LOCK_EXIT(as);
 				as_execute_callback(as, cb, AS_SETPROT_EVENT);
 			} else if (!AS_ISNOUNMAPWAIT(as)) {
 				if (AS_ISUNMAPWAIT(as) == 0)
 					cv_broadcast(&as->a_cv);
 				AS_SETUNMAPWAIT(as);
-				AS_LOCK_EXIT(as, &as->a_lock);
+				AS_LOCK_EXIT(as);
 				while (AS_ISUNMAPWAIT(as))
 					cv_wait(&as->a_cv, &as->a_contents);
 			} else {
@@ -1308,7 +1308,7 @@ retry:
 	} else {
 		as_setwatchprot(as, saveraddr, saversize, prot);
 	}
-	AS_LOCK_EXIT(as, &as->a_lock);
+	AS_LOCK_EXIT(as);
 	return (error);
 }
 
@@ -1342,14 +1342,14 @@ as_checkprot(struct as *as, caddr_t addr, size_t size, uint_t prot)
 	 * the benefit of as_clearwatchprot() and as_setwatchprot().
 	 */
 	if (avl_numnodes(&as->a_wpage) != 0)
-		AS_LOCK_ENTER(as, &as->a_lock, RW_WRITER);
+		AS_LOCK_ENTER(as, RW_WRITER);
 	else
-		AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
+		AS_LOCK_ENTER(as, RW_READER);
 	as_clearwatchprot(as, raddr, rsize);
 	seg = as_segat(as, raddr);
 	if (seg == NULL) {
 		as_setwatch(as);
-		AS_LOCK_EXIT(as, &as->a_lock);
+		AS_LOCK_EXIT(as);
 		return (ENOMEM);
 	}
 
@@ -1371,7 +1371,7 @@ as_checkprot(struct as *as, caddr_t addr, size_t size, uint_t prot)
 			break;
 	}
 	as_setwatch(as);
-	AS_LOCK_EXIT(as, &as->a_lock);
+	AS_LOCK_EXIT(as);
 	return (error);
 }
 
@@ -1389,7 +1389,7 @@ top:
 	eaddr = (caddr_t)(((uintptr_t)(addr + size) + PAGEOFFSET) &
 	    (uintptr_t)PAGEMASK);
 
-	AS_LOCK_ENTER(as, &as->a_lock, RW_WRITER);
+	AS_LOCK_ENTER(as, RW_WRITER);
 
 	as->a_updatedir = 1;	/* inform /proc */
 	gethrestime(&as->a_updatetime);
@@ -1470,13 +1470,13 @@ retry:
 			if (as->a_callbacks &&
 			    (cb = as_find_callback(as, AS_UNMAP_EVENT,
 			    seg->s_base, seg->s_size))) {
-				AS_LOCK_EXIT(as, &as->a_lock);
+				AS_LOCK_EXIT(as);
 				as_execute_callback(as, cb, AS_UNMAP_EVENT);
 			} else if (!AS_ISNOUNMAPWAIT(as)) {
 				if (AS_ISUNMAPWAIT(as) == 0)
 					cv_broadcast(&as->a_cv);
 				AS_SETUNMAPWAIT(as);
-				AS_LOCK_EXIT(as, &as->a_lock);
+				AS_LOCK_EXIT(as);
 				while (AS_ISUNMAPWAIT(as))
 					cv_wait(&as->a_cv, &as->a_contents);
 			} else {
@@ -1497,11 +1497,11 @@ retry:
 			mutex_exit(&as->a_contents);
 			goto top;
 		} else if (err == IE_RETRY) {
-			AS_LOCK_EXIT(as, &as->a_lock);
+			AS_LOCK_EXIT(as);
 			goto top;
 		} else if (err) {
 			as_setwatch(as);
-			AS_LOCK_EXIT(as, &as->a_lock);
+			AS_LOCK_EXIT(as);
 			return (-1);
 		}
 
@@ -1510,7 +1510,7 @@ retry:
 			as->a_resvsize -= rsize;
 		raddr += ssize;
 	}
-	AS_LOCK_EXIT(as, &as->a_lock);
+	AS_LOCK_EXIT(as);
 	return (0);
 }
 
@@ -1529,7 +1529,7 @@ as_map_segvn_segs(struct as *as, caddr_t addr, size_t size, uint_t szcvec,
 	int do_off = (vn_a->vp != NULL || vn_a->amp != NULL);
 	uint_t save_szcvec;
 
-	ASSERT(AS_WRITE_HELD(as, &as->a_lock));
+	ASSERT(AS_WRITE_HELD(as));
 	ASSERT(IS_P2ALIGNED(addr, PAGESIZE));
 	ASSERT(IS_P2ALIGNED(size, PAGESIZE));
 	ASSERT(vn_a->vp == NULL || vn_a->amp == NULL);
@@ -1643,7 +1643,7 @@ as_map_vnsegs(struct as *as, caddr_t addr, size_t size,
 	size_t save_size = 0;
 	extern size_t textrepl_size_thresh;
 
-	ASSERT(AS_WRITE_HELD(as, &as->a_lock));
+	ASSERT(AS_WRITE_HELD(as));
 	ASSERT(IS_P2ALIGNED(addr, PAGESIZE));
 	ASSERT(IS_P2ALIGNED(size, PAGESIZE));
 	ASSERT(vn_a->vp != NULL);
@@ -1732,7 +1732,7 @@ as_map_ansegs(struct as *as, caddr_t addr, size_t size,
 	szcvec = map_pgszcvec(addr, size, vn_a->amp == NULL ?
 	    (uintptr_t)addr : (uintptr_t)P2ROUNDUP(vn_a->offset, PAGESIZE),
 	    (vn_a->flags & MAP_TEXT), type, 0);
-	ASSERT(AS_WRITE_HELD(as, &as->a_lock));
+	ASSERT(AS_WRITE_HELD(as));
 	ASSERT(IS_P2ALIGNED(addr, PAGESIZE));
 	ASSERT(IS_P2ALIGNED(size, PAGESIZE));
 	ASSERT(vn_a->vp == NULL);
@@ -1744,7 +1744,7 @@ as_map_ansegs(struct as *as, caddr_t addr, size_t size,
 int
 as_map(struct as *as, caddr_t addr, size_t size, int (*crfp)(), void *argsp)
 {
-	AS_LOCK_ENTER(as, &as->a_lock, RW_WRITER);
+	AS_LOCK_ENTER(as, RW_WRITER);
 	return (as_map_locked(as, addr, size, crfp, argsp));
 }
 
@@ -1768,7 +1768,7 @@ as_map_locked(struct as *as, caddr_t addr, size_t size, int (*crfp)(),
 	 * check for wrap around
 	 */
 	if ((raddr + rsize < raddr) || (as->a_size > (ULONG_MAX - size))) {
-		AS_LOCK_EXIT(as, &as->a_lock);
+		AS_LOCK_EXIT(as);
 		return (ENOMEM);
 	}
 
@@ -1776,7 +1776,7 @@ as_map_locked(struct as *as, caddr_t addr, size_t size, int (*crfp)(),
 	gethrestime(&as->a_updatetime);
 
 	if (as != &kas && as->a_size + rsize > (size_t)p->p_vmem_ctl) {
-		AS_LOCK_EXIT(as, &as->a_lock);
+		AS_LOCK_EXIT(as);
 
 		(void) rctl_action(rctlproc_legacy[RLIMIT_VMEM], p->p_rctls, p,
 		    RCA_UNSAFE_ALL);
@@ -1788,7 +1788,7 @@ as_map_locked(struct as *as, caddr_t addr, size_t size, int (*crfp)(),
 		crargs = *(struct segvn_crargs *)argsp;
 		error = as_map_vnsegs(as, raddr, rsize, crfp, &crargs, &unmap);
 		if (error != 0) {
-			AS_LOCK_EXIT(as, &as->a_lock);
+			AS_LOCK_EXIT(as);
 			if (unmap) {
 				(void) as_unmap(as, addr, size);
 			}
@@ -1798,7 +1798,7 @@ as_map_locked(struct as *as, caddr_t addr, size_t size, int (*crfp)(),
 		crargs = *(struct segvn_crargs *)argsp;
 		error = as_map_ansegs(as, raddr, rsize, crfp, &crargs, &unmap);
 		if (error != 0) {
-			AS_LOCK_EXIT(as, &as->a_lock);
+			AS_LOCK_EXIT(as);
 			if (unmap) {
 				(void) as_unmap(as, addr, size);
 			}
@@ -1807,14 +1807,14 @@ as_map_locked(struct as *as, caddr_t addr, size_t size, int (*crfp)(),
 	} else {
 		seg = seg_alloc(as, addr, size);
 		if (seg == NULL) {
-			AS_LOCK_EXIT(as, &as->a_lock);
+			AS_LOCK_EXIT(as);
 			return (ENOMEM);
 		}
 
 		error = (*crfp)(seg, argsp);
 		if (error != 0) {
 			seg_free(seg);
-			AS_LOCK_EXIT(as, &as->a_lock);
+			AS_LOCK_EXIT(as);
 			return (error);
 		}
 		/*
@@ -1833,13 +1833,13 @@ as_map_locked(struct as *as, caddr_t addr, size_t size, int (*crfp)(),
 	mutex_enter(&as->a_contents);
 	if (AS_ISPGLCK(as)) {
 		mutex_exit(&as->a_contents);
-		AS_LOCK_EXIT(as, &as->a_lock);
+		AS_LOCK_EXIT(as);
 		error = as_ctl(as, addr, size, MC_LOCK, 0, 0, NULL, 0);
 		if (error != 0)
 			(void) as_unmap(as, addr, size);
 	} else {
 		mutex_exit(&as->a_contents);
-		AS_LOCK_EXIT(as, &as->a_lock);
+		AS_LOCK_EXIT(as);
 	}
 	return (error);
 }
@@ -1864,7 +1864,7 @@ as_purge(struct as *as)
 	if ((as->a_flags & AS_NEEDSPURGE) == 0)
 		return;
 
-	AS_LOCK_ENTER(as, &as->a_lock, RW_WRITER);
+	AS_LOCK_ENTER(as, RW_WRITER);
 	next_seg = NULL;
 	seg = AS_SEGFIRST(as);
 	while (seg != NULL) {
@@ -1873,7 +1873,7 @@ as_purge(struct as *as)
 			SEGOP_UNMAP(seg, seg->s_base, seg->s_size);
 		seg = next_seg;
 	}
-	AS_LOCK_EXIT(as, &as->a_lock);
+	AS_LOCK_EXIT(as);
 
 	mutex_enter(&as->a_contents);
 	as->a_flags &= ~AS_NEEDSPURGE;
@@ -1936,14 +1936,14 @@ as_gap_aligned(struct as *as, size_t minlen, caddr_t *basep, size_t *lenp,
 	minlen += 2 * redzone;
 	redzone = 0;
 
-	AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
+	AS_LOCK_ENTER(as, RW_READER);
 	if (AS_SEGFIRST(as) == NULL) {
 		if (valid_va_range_aligned(basep, lenp, minlen, flags & AH_DIR,
 		    align, redzone, off)) {
-			AS_LOCK_EXIT(as, &as->a_lock);
+			AS_LOCK_EXIT(as);
 			return (0);
 		} else {
-			AS_LOCK_EXIT(as, &as->a_lock);
+			AS_LOCK_EXIT(as);
 			*basep = save_base;
 			*lenp = save_len;
 			return (-1);
@@ -2024,7 +2024,7 @@ retry:
 				as->a_lastgaphl = hseg;
 			else
 				as->a_lastgaphl = lseg;
-			AS_LOCK_EXIT(as, &as->a_lock);
+			AS_LOCK_EXIT(as);
 			return (0);
 		}
 	cont:
@@ -2051,7 +2051,7 @@ retry:
 	}
 	*basep = save_base;
 	*lenp = save_len;
-	AS_LOCK_EXIT(as, &as->a_lock);
+	AS_LOCK_EXIT(as);
 	return (-1);
 }
 
@@ -2093,7 +2093,7 @@ as_memory(struct as *as, caddr_t *basep, size_t *lenp)
 	caddr_t addr, eaddr;
 	caddr_t segend;
 
-	AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
+	AS_LOCK_ENTER(as, RW_READER);
 
 	addr = *basep;
 	eaddr = addr + *lenp;
@@ -2104,7 +2104,7 @@ as_memory(struct as *as, caddr_t *basep, size_t *lenp)
 
 	for (;;) {
 		if (seg == NULL || addr >= eaddr || eaddr <= seg->s_base) {
-			AS_LOCK_EXIT(as, &as->a_lock);
+			AS_LOCK_EXIT(as);
 			return (EINVAL);
 		}
 
@@ -2136,7 +2136,7 @@ as_memory(struct as *as, caddr_t *basep, size_t *lenp)
 	else
 		*lenp = segend - addr;
 
-	AS_LOCK_EXIT(as, &as->a_lock);
+	AS_LOCK_EXIT(as);
 	return (0);
 }
 
@@ -2164,7 +2164,7 @@ as_swapout(struct as *as)
 	if (as == NULL)
 		return (0);
 
-	AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
+	AS_LOCK_ENTER(as, RW_READER);
 
 	/* Prevent XHATs from attaching */
 	mutex_enter(&as->a_contents);
@@ -2203,7 +2203,7 @@ as_swapout(struct as *as)
 		if ((ov != NULL) && (ov->swapout != NULL))
 			swpcnt += SEGOP_SWAPOUT(seg);
 	}
-	AS_LOCK_EXIT(as, &as->a_lock);
+	AS_LOCK_EXIT(as);
 	return (swpcnt);
 }
 
@@ -2230,10 +2230,10 @@ as_incore(struct as *as, caddr_t addr,
 	if (raddr + rsize < raddr)		/* check for wraparound */
 		return (ENOMEM);
 
-	AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
+	AS_LOCK_ENTER(as, RW_READER);
 	seg = as_segat(as, raddr);
 	if (seg == NULL) {
-		AS_LOCK_EXIT(as, &as->a_lock);
+		AS_LOCK_EXIT(as);
 		return (-1);
 	}
 
@@ -2256,7 +2256,7 @@ as_incore(struct as *as, caddr_t addr,
 		}
 		vec += btopr(ssize);
 	}
-	AS_LOCK_EXIT(as, &as->a_lock);
+	AS_LOCK_EXIT(as);
 	return (error);
 }
 
@@ -2326,9 +2326,9 @@ as_ctl(struct as *as, caddr_t addr, size_t size, int func, int attr,
 				/* pages. */
 retry:
 	if (error == IE_RETRY)
-		AS_LOCK_ENTER(as, &as->a_lock, RW_WRITER);
+		AS_LOCK_ENTER(as, RW_WRITER);
 	else
-		AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
+		AS_LOCK_ENTER(as, RW_READER);
 
 	/*
 	 * If these are address space lock/unlock operations, loop over
@@ -2346,13 +2346,13 @@ retry:
 			mutex_exit(&as->a_contents);
 		}
 		if ((arg & MCL_CURRENT) == 0) {
-			AS_LOCK_EXIT(as, &as->a_lock);
+			AS_LOCK_EXIT(as);
 			return (0);
 		}
 
 		seg = AS_SEGFIRST(as);
 		if (seg == NULL) {
-			AS_LOCK_EXIT(as, &as->a_lock);
+			AS_LOCK_EXIT(as);
 			return (0);
 		}
 
@@ -2366,7 +2366,7 @@ retry:
 		mlock_size = BT_BITOUL(btopr(rlen));
 		if ((mlock_map = (ulong_t *)kmem_zalloc(mlock_size *
 		    sizeof (ulong_t), KM_NOSLEEP)) == NULL) {
-				AS_LOCK_EXIT(as, &as->a_lock);
+				AS_LOCK_EXIT(as);
 				return (EAGAIN);
 		}
 
@@ -2392,7 +2392,7 @@ retry:
 		}
 
 		kmem_free(mlock_map, mlock_size * sizeof (ulong_t));
-		AS_LOCK_EXIT(as, &as->a_lock);
+		AS_LOCK_EXIT(as);
 		goto lockerr;
 	} else if (func == MC_UNLOCKAS) {
 		mutex_enter(&as->a_contents);
@@ -2406,7 +2406,7 @@ retry:
 				break;
 		}
 
-		AS_LOCK_EXIT(as, &as->a_lock);
+		AS_LOCK_EXIT(as);
 		goto lockerr;
 	}
 
@@ -2418,7 +2418,7 @@ retry:
 	    (size_t)raddr;
 
 	if (raddr + rsize < raddr) {		/* check for wraparound */
-		AS_LOCK_EXIT(as, &as->a_lock);
+		AS_LOCK_EXIT(as);
 		return (ENOMEM);
 	}
 
@@ -2426,7 +2426,7 @@ retry:
 	 * Get initial segment.
 	 */
 	if ((seg = as_segat(as, raddr)) == NULL) {
-		AS_LOCK_EXIT(as, &as->a_lock);
+		AS_LOCK_EXIT(as);
 		return (ENOMEM);
 	}
 
@@ -2434,7 +2434,7 @@ retry:
 		mlock_size = BT_BITOUL(btopr(rsize));
 		if ((mlock_map = (ulong_t *)kmem_zalloc(mlock_size *
 		    sizeof (ulong_t), KM_NOSLEEP)) == NULL) {
-				AS_LOCK_EXIT(as, &as->a_lock);
+				AS_LOCK_EXIT(as);
 				return (EAGAIN);
 		}
 	}
@@ -2459,7 +2459,7 @@ retry:
 					kmem_free(mlock_map,
 					    mlock_size * sizeof (ulong_t));
 				}
-				AS_LOCK_EXIT(as, &as->a_lock);
+				AS_LOCK_EXIT(as);
 				return (ENOMEM);
 			}
 		}
@@ -2480,7 +2480,7 @@ retry:
 		case MC_SYNC:
 			if (error = SEGOP_SYNC(seg, raddr, ssize,
 			    attr, (uint_t)arg)) {
-				AS_LOCK_EXIT(as, &as->a_lock);
+				AS_LOCK_EXIT(as);
 				return (error);
 			}
 			break;
@@ -2495,7 +2495,7 @@ retry:
 				    initrsize - rsize + ssize);
 				kmem_free(mlock_map, mlock_size *
 				    sizeof (ulong_t));
-				AS_LOCK_EXIT(as, &as->a_lock);
+				AS_LOCK_EXIT(as);
 				goto lockerr;
 			}
 			break;
@@ -2524,7 +2524,7 @@ retry:
 					 * have to drop readers lock and start
 					 * all over again
 					 */
-					AS_LOCK_EXIT(as, &as->a_lock);
+					AS_LOCK_EXIT(as);
 					goto retry;
 				} else if (error == IE_REATTACH) {
 					/*
@@ -2534,14 +2534,14 @@ retry:
 					 */
 					seg = as_segat(as, raddr);
 					if (seg == NULL) {
-						AS_LOCK_EXIT(as, &as->a_lock);
+						AS_LOCK_EXIT(as);
 						return (ENOMEM);
 					}
 				} else {
 					/*
 					 * Regular error
 					 */
-					AS_LOCK_EXIT(as, &as->a_lock);
+					AS_LOCK_EXIT(as);
 					return (error);
 				}
 			}
@@ -2555,7 +2555,7 @@ retry:
 				    SEGP_INH_ZERO);
 			}
 			if (error != 0) {
-				AS_LOCK_EXIT(as, &as->a_lock);
+				AS_LOCK_EXIT(as);
 				return (error);
 			}
 			break;
@@ -2574,7 +2574,7 @@ retry:
 
 	if (func == MC_LOCK)
 		kmem_free(mlock_map, mlock_size * sizeof (ulong_t));
-	AS_LOCK_EXIT(as, &as->a_lock);
+	AS_LOCK_EXIT(as);
 	return (0);
 lockerr:
 
@@ -2639,7 +2639,7 @@ as_pagelock_segs(struct as *as, struct seg *seg, struct page ***ppp,
 	pgcnt_t pl_off;
 	extern struct seg_ops segspt_shmops;
 
-	ASSERT(AS_LOCK_HELD(as, &as->a_lock));
+	ASSERT(AS_LOCK_HELD(as));
 	ASSERT(seg != NULL);
 	ASSERT(addr >= seg->s_base && addr < seg->s_base + seg->s_size);
 	ASSERT(addr + size > seg->s_base + seg->s_size);
@@ -2656,7 +2656,7 @@ as_pagelock_segs(struct as *as, struct seg *seg, struct page ***ppp,
 
 			seg = AS_SEGNEXT(as, seg);
 			if (seg == NULL || addr != seg->s_base) {
-				AS_LOCK_EXIT(as, &as->a_lock);
+				AS_LOCK_EXIT(as);
 				return (EFAULT);
 			}
 			/*
@@ -2668,11 +2668,11 @@ as_pagelock_segs(struct as *as, struct seg *seg, struct page ***ppp,
 
 				if (SEGOP_GETVP(seg, addr, &vp) != 0 ||
 				    vp != NULL) {
-					AS_LOCK_EXIT(as, &as->a_lock);
+					AS_LOCK_EXIT(as);
 					goto slow;
 				}
 			} else if (seg->s_ops != &segspt_shmops) {
-				AS_LOCK_EXIT(as, &as->a_lock);
+				AS_LOCK_EXIT(as);
 				goto slow;
 			}
 			segcnt++;
@@ -2717,7 +2717,7 @@ as_pagelock_segs(struct as *as, struct seg *seg, struct page ***ppp,
 	}
 
 	if (size == 0) {
-		AS_LOCK_EXIT(as, &as->a_lock);
+		AS_LOCK_EXIT(as);
 		ASSERT(cnt == segcnt - 1);
 		*ppp = plist;
 		return (0);
@@ -2751,7 +2751,7 @@ as_pagelock_segs(struct as *as, struct seg *seg, struct page ***ppp,
 		    L_PAGEUNLOCK, rw);
 	}
 
-	AS_LOCK_EXIT(as, &as->a_lock);
+	AS_LOCK_EXIT(as);
 
 	kmem_free(plist, (npages + segcnt) * sizeof (page_t *));
 
@@ -2800,11 +2800,11 @@ as_pagelock(struct as *as, struct page ***ppp, caddr_t addr,
 	 * if the request crosses two segments let
 	 * as_fault handle it.
 	 */
-	AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
+	AS_LOCK_ENTER(as, RW_READER);
 
 	seg = as_segat(as, raddr);
 	if (seg == NULL) {
-		AS_LOCK_EXIT(as, &as->a_lock);
+		AS_LOCK_EXIT(as);
 		return (EFAULT);
 	}
 	ASSERT(raddr >= seg->s_base && raddr < seg->s_base + seg->s_size);
@@ -2812,7 +2812,7 @@ as_pagelock(struct as *as, struct page ***ppp, caddr_t addr,
 		return (as_pagelock_segs(as, seg, ppp, raddr, rsize, rw));
 	}
 	if (raddr + rsize <= raddr) {
-		AS_LOCK_EXIT(as, &as->a_lock);
+		AS_LOCK_EXIT(as);
 		return (EFAULT);
 	}
 
@@ -2826,7 +2826,7 @@ as_pagelock(struct as *as, struct page ***ppp, caddr_t addr,
 
 	TRACE_0(TR_FAC_PHYSIO, TR_PHYSIO_SEG_LOCK_END, "seg_lock_1_end");
 
-	AS_LOCK_EXIT(as, &as->a_lock);
+	AS_LOCK_EXIT(as);
 
 	if (err == 0 || (err != ENOTSUP && err != EFAULT)) {
 		return (err);
@@ -2864,7 +2864,7 @@ as_pageunlock_segs(struct as *as, struct seg *seg, caddr_t addr, size_t size,
 	size_t ssize;
 	page_t **pl;
 
-	ASSERT(AS_LOCK_HELD(as, &as->a_lock));
+	ASSERT(AS_LOCK_HELD(as));
 	ASSERT(seg != NULL);
 	ASSERT(addr >= seg->s_base && addr < seg->s_base + seg->s_size);
 	ASSERT(addr + size > seg->s_base + seg->s_size);
@@ -2889,7 +2889,7 @@ as_pageunlock_segs(struct as *as, struct seg *seg, caddr_t addr, size_t size,
 		    L_PAGEUNLOCK, rw);
 	}
 	ASSERT(cnt > 0);
-	AS_LOCK_EXIT(as, &as->a_lock);
+	AS_LOCK_EXIT(as);
 
 	cnt++;
 	kmem_free(plist, (npages + cnt) * sizeof (page_t *));
@@ -2922,7 +2922,7 @@ as_pageunlock(struct as *as, struct page **pp, caddr_t addr, size_t size,
 	rsize = (((size_t)(addr + size) + PAGEOFFSET) & PAGEMASK) -
 	    (size_t)raddr;
 
-	AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
+	AS_LOCK_ENTER(as, RW_READER);
 	seg = as_segat(as, raddr);
 	ASSERT(seg != NULL);
 
@@ -2936,7 +2936,7 @@ as_pageunlock(struct as *as, struct page **pp, caddr_t addr, size_t size,
 		as_pageunlock_segs(as, seg, raddr, rsize, pp, rw);
 		return;
 	}
-	AS_LOCK_EXIT(as, &as->a_lock);
+	AS_LOCK_EXIT(as);
 	TRACE_0(TR_FAC_PHYSIO, TR_PHYSIO_AS_UNLOCK_END, "as_pageunlock_end");
 }
 
@@ -2962,12 +2962,12 @@ setpgsz_top:
 	if (raddr + rsize < raddr)		/* check for wraparound */
 		return (ENOMEM);
 
-	AS_LOCK_ENTER(as, &as->a_lock, RW_WRITER);
+	AS_LOCK_ENTER(as, RW_WRITER);
 	as_clearwatchprot(as, raddr, rsize);
 	seg = as_segat(as, raddr);
 	if (seg == NULL) {
 		as_setwatch(as);
-		AS_LOCK_EXIT(as, &as->a_lock);
+		AS_LOCK_EXIT(as);
 		return (ENOMEM);
 	}
 
@@ -2994,7 +2994,7 @@ retry:
 		}
 
 		if (error == IE_RETRY) {
-			AS_LOCK_EXIT(as, &as->a_lock);
+			AS_LOCK_EXIT(as);
 			goto setpgsz_top;
 		}
 
@@ -3034,7 +3034,7 @@ retry:
 					cv_broadcast(&as->a_cv);
 				}
 				AS_SETUNMAPWAIT(as);
-				AS_LOCK_EXIT(as, &as->a_lock);
+				AS_LOCK_EXIT(as);
 				while (AS_ISUNMAPWAIT(as)) {
 					cv_wait(&as->a_cv, &as->a_contents);
 				}
@@ -3060,7 +3060,7 @@ retry:
 		}
 	}
 	as_setwatch(as);
-	AS_LOCK_EXIT(as, &as->a_lock);
+	AS_LOCK_EXIT(as);
 	return (error);
 }
 
@@ -3076,7 +3076,7 @@ as_iset3_default_lpsize(struct as *as, caddr_t raddr, size_t rsize, uint_t szc,
 	size_t ssize;
 	int error;
 
-	ASSERT(AS_WRITE_HELD(as, &as->a_lock));
+	ASSERT(AS_WRITE_HELD(as));
 
 	seg = as_segat(as, raddr);
 	if (seg == NULL) {
@@ -3133,7 +3133,7 @@ as_iset2_default_lpsize(struct as *as, caddr_t addr, size_t size, uint_t szc,
 	int error;
 	int retry;
 
-	ASSERT(AS_WRITE_HELD(as, &as->a_lock));
+	ASSERT(AS_WRITE_HELD(as));
 
 	for (;;) {
 		error = as_iset3_default_lpsize(as, addr, size, szc, &retry);
@@ -3165,7 +3165,7 @@ as_iset1_default_lpsize(struct as *as, caddr_t raddr, size_t rsize, uint_t szc,
 	int set;
 	int error;
 
-	ASSERT(AS_WRITE_HELD(as, &as->a_lock));
+	ASSERT(AS_WRITE_HELD(as));
 
 	seg = as_segat(as, raddr);
 	if (seg == NULL) {
@@ -3233,7 +3233,7 @@ as_iset_default_lpsize(struct as *as, caddr_t addr, size_t size, int flags,
 	size_t pgsz;
 	uint_t save_szcvec;
 
-	ASSERT(AS_WRITE_HELD(as, &as->a_lock));
+	ASSERT(AS_WRITE_HELD(as));
 	ASSERT(IS_P2ALIGNED(addr, PAGESIZE));
 	ASSERT(IS_P2ALIGNED(size, PAGESIZE));
 
@@ -3325,7 +3325,7 @@ as_set_default_lpsize(struct as *as, caddr_t addr, size_t size)
 	if (size == 0)
 		return (0);
 
-	AS_LOCK_ENTER(as, &as->a_lock, RW_WRITER);
+	AS_LOCK_ENTER(as, RW_WRITER);
 again:
 	error = 0;
 
@@ -3334,14 +3334,14 @@ again:
 	    (size_t)raddr;
 
 	if (raddr + rsize < raddr) {		/* check for wraparound */
-		AS_LOCK_EXIT(as, &as->a_lock);
+		AS_LOCK_EXIT(as);
 		return (ENOMEM);
 	}
 	as_clearwatchprot(as, raddr, rsize);
 	seg = as_segat(as, raddr);
 	if (seg == NULL) {
 		as_setwatch(as);
-		AS_LOCK_EXIT(as, &as->a_lock);
+		AS_LOCK_EXIT(as);
 		return (ENOMEM);
 	}
 	if (seg->s_ops == &segvn_ops) {
@@ -3426,12 +3426,12 @@ again:
 				cv_broadcast(&as->a_cv);
 			}
 			AS_SETUNMAPWAIT(as);
-			AS_LOCK_EXIT(as, &as->a_lock);
+			AS_LOCK_EXIT(as);
 			while (AS_ISUNMAPWAIT(as)) {
 				cv_wait(&as->a_cv, &as->a_contents);
 			}
 			mutex_exit(&as->a_contents);
-			AS_LOCK_ENTER(as, &as->a_lock, RW_WRITER);
+			AS_LOCK_ENTER(as, RW_WRITER);
 		} else {
 			/*
 			 * We may have raced with
@@ -3449,7 +3449,7 @@ again:
 	}
 
 	as_setwatch(as);
-	AS_LOCK_EXIT(as, &as->a_lock);
+	AS_LOCK_EXIT(as);
 	return (error);
 }
 
@@ -3468,7 +3468,7 @@ as_setwatch(struct as *as)
 	if (avl_numnodes(&as->a_wpage) == 0)
 		return;
 
-	ASSERT(AS_WRITE_HELD(as, &as->a_lock));
+	ASSERT(AS_WRITE_HELD(as));
 
 	for (pwp = avl_first(&as->a_wpage); pwp != NULL;
 	    pwp = AVL_NEXT(&as->a_wpage, pwp)) {
@@ -3515,7 +3515,7 @@ as_clearwatch(struct as *as)
 	if (avl_numnodes(&as->a_wpage) == 0)
 		return;
 
-	ASSERT(AS_WRITE_HELD(as, &as->a_lock));
+	ASSERT(AS_WRITE_HELD(as));
 
 	for (pwp = avl_first(&as->a_wpage); pwp != NULL;
 	    pwp = AVL_NEXT(&as->a_wpage, pwp)) {
@@ -3557,7 +3557,7 @@ as_setwatchprot(struct as *as, caddr_t addr, size_t size, uint_t prot)
 	if (avl_numnodes(&as->a_wpage) == 0)
 		return;
 
-	ASSERT(AS_WRITE_HELD(as, &as->a_lock));
+	ASSERT(AS_WRITE_HELD(as));
 
 	tpw.wp_vaddr = (caddr_t)((uintptr_t)addr & (uintptr_t)PAGEMASK);
 	if ((pwp = avl_find(&as->a_wpage, &tpw, &where)) == NULL)
@@ -3616,7 +3616,7 @@ as_clearwatchprot(struct as *as, caddr_t addr, size_t size)
 	if ((pwp = avl_find(&as->a_wpage, &tpw, &where)) == NULL)
 		pwp = avl_nearest(&as->a_wpage, where, AVL_AFTER);
 
-	ASSERT(AS_WRITE_HELD(as, &as->a_lock));
+	ASSERT(AS_WRITE_HELD(as));
 
 	while (pwp != NULL && pwp->wp_vaddr < eaddr) {
 
@@ -3671,22 +3671,22 @@ as_getmemid(struct as *as, caddr_t addr, memid_t *memidp)
 	struct seg	*seg;
 	int		sts;
 
-	AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
+	AS_LOCK_ENTER(as, RW_READER);
 	seg = as_segat(as, addr);
 	if (seg == NULL) {
-		AS_LOCK_EXIT(as, &as->a_lock);
+		AS_LOCK_EXIT(as);
 		return (EFAULT);
 	}
 	/*
 	 * catch old drivers which may not support getmemid
 	 */
 	if (seg->s_ops->getmemid == NULL) {
-		AS_LOCK_EXIT(as, &as->a_lock);
+		AS_LOCK_EXIT(as);
 		return (ENODEV);
 	}
 
 	sts = SEGOP_GETMEMID(seg, addr, memidp);
 
-	AS_LOCK_EXIT(as, &as->a_lock);
+	AS_LOCK_EXIT(as);
 	return (sts);
 }

@@ -5655,7 +5655,7 @@ as_can_change_zones(void)
 	int allow = 1;
 
 	ASSERT(pp->p_as != &kas);
-	AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
+	AS_LOCK_ENTER(as, RW_READER);
 	for (seg = AS_SEGFIRST(as); seg != NULL; seg = AS_SEGNEXT(as, seg)) {
 
 		/*
@@ -5678,7 +5678,7 @@ as_can_change_zones(void)
 			break;
 		}
 	}
-	AS_LOCK_EXIT(as, &as->a_lock);
+	AS_LOCK_EXIT(as);
 	return (allow);
 }
 
@@ -5694,7 +5694,7 @@ as_swresv(void)
 	size_t swap = 0;
 
 	ASSERT(pp->p_as != &kas);
-	ASSERT(AS_WRITE_HELD(as, &as->a_lock));
+	ASSERT(AS_WRITE_HELD(as));
 	for (seg = AS_SEGFIRST(as); seg != NULL; seg = AS_SEGNEXT(as, seg))
 		swap += seg_swresv(seg);
 
@@ -5899,7 +5899,7 @@ zone_enter(zoneid_t zoneid)
 	 * memory and reserve swap via MCL_FUTURE and MAP_NORESERVE
 	 * segments respectively.
 	 */
-	AS_LOCK_ENTER(pp->as, &pp->p_as->a_lock, RW_WRITER);
+	AS_LOCK_ENTER(pp->p_as, RW_WRITER);
 	swap = as_swresv();
 	mutex_enter(&pp->p_lock);
 	zone_proj0 = zone->zone_zsched->p_task->tk_proj;
@@ -5946,7 +5946,7 @@ zone_enter(zoneid_t zoneid)
 	pp->p_flag |= SZONETOP;
 	pp->p_zone = zone;
 	mutex_exit(&pp->p_lock);
-	AS_LOCK_EXIT(pp->p_as, &pp->p_as->a_lock);
+	AS_LOCK_EXIT(pp->p_as);
 
 	/*
 	 * Joining the zone cannot fail from now on.
