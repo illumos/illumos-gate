@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include <sys/param.h>
@@ -1056,7 +1056,6 @@ lxd_readdir(vnode_t *vp, struct uio *uiop, struct cred *cr, int *eofp,
 	lxd_node_t *ldn = VTOLDN(vp);
 	vnode_t *rvp;
 	int res;
-	caddr_t base;
 	off_t req_off;
 
 	if (uiop->uio_iovcnt != 1)
@@ -1065,7 +1064,6 @@ lxd_readdir(vnode_t *vp, struct uio *uiop, struct cred *cr, int *eofp,
 	if (vp->v_type != VDIR)
 		return (ENOTDIR);
 
-	base = uiop->uio_iov->iov_base;
 	req_off = uiop->uio_offset;
 
 	/* First read the back node (if it is one) */
