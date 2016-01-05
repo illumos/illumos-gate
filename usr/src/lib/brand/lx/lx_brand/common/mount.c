@@ -22,7 +22,7 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include <alloca.h>
@@ -100,6 +100,7 @@ mount_opt_t lx_autofs_options[] = {
 	{ LX_MNTOPT_MAXPROTO,	MOUNT_OPT_UINT },
 	{ LX_MNTOPT_INDIRECT,	MOUNT_OPT_NORMAL },
 	{ LX_MNTOPT_DIRECT,	MOUNT_OPT_NORMAL },
+	{ LX_MNTOPT_OFFSET,	MOUNT_OPT_NORMAL },
 	{ NULL,			MOUNT_OPT_INVALID }
 };
 
