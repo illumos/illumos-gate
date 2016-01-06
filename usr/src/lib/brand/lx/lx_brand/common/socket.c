@@ -438,19 +438,6 @@ lx_getsockname(int sockfd, void *np, int *nlp)
 		return (-errno);
 
 	/*
-	 * See our other handling for LX_DEV_LOG_REDIRECT. We need to change
-	 * the name back to /dev/log since some code depends on that.
-	 */
-	if (namelen == (LX_DEV_LOG_REDIRECT_TOT_LEN + sizeof (ushort_t) + 1) &&
-	    namelen_orig >=
-	    (LX_DEV_LOG_REDIRECT_TOT_LEN + sizeof (ushort_t) + 1) &&
-	    strcmp(name->sa_data, LX_DEV_LOG_REDIRECT) == 0) {
-		/* we don't check len since we know /dev/log is shorter */
-		(void) strcpy(name->sa_data, LX_DEV_LOG);
-		namelen = strlen(LX_DEV_LOG) + sizeof (ushort_t) + 1;
-	}
-
-	/*
 	 * If the name that getsockname() wants to return is larger
 	 * than namelen, getsockname() will copy out the maximum amount
 	 * of data possible and then update namelen to indicate the

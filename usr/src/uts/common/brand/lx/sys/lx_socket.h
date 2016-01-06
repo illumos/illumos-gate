@@ -417,10 +417,6 @@ typedef struct lx_sockaddr_in6 {
 	/* one 32-bit field shorter than illumos */
 } lx_sockaddr_in6_t;
 
-#define	LX_DEV_LOG			"/dev/log"
-#define	LX_DEV_LOG_LEN			(sizeof (LX_DEV_LOG) - 1)
-#define	LX_DEV_LOG_REDIRECT		"/var/run/.dev_log_redirect"
-
 #ifdef	__cplusplus
 }
 #endif

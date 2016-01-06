@@ -33,11 +33,6 @@ extern "C" {
 
 #include <sys/lx_types.h>
 
-#define	LX_DEV_LOG			"/dev/log"
-#define	LX_DEV_LOG_REDIRECT		"/var/run/.dev_log_redirect"
-#define	LX_DEV_LOG_REDIRECT_LEN		18 /* len appended to /dev/log len */
-#define	LX_DEV_LOG_REDIRECT_TOT_LEN	26
-
 /*
  * Linux address family definitions
  * Some of these are not supported

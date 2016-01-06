@@ -143,12 +143,10 @@
 	<symlink source="stdout" target="../proc/self/fd/1" />
 	<symlink source="systty" target="console" />
 	<symlink source="kmsg" target="console" />
-	<symlink source="conslog" target="log" />
+	<symlink source="conslog" target="console" />
 
 	<!-- Create a mount point for the /dev/initctl fifo -->
 	<device match="null" name="initctl" />
-	<!-- Create a dummy for the /dev/log socket -->
-	<device match="null" name="log" />
 	<!-- Create a mount point for /dev/shm tmpfs (see shm_overview(7)) -->
 	<!-- We need to force a dir for the Linux mount to work ok -->
 	<symlink source="shm/loop" target="." />
