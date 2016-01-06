@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright 2015 Joyent, Inc. All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*
@@ -761,7 +761,7 @@ lxpr_read_pid_maps(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	mutex_exit(&p->p_lock);
 
 	/* Iterate over all segments in the address space */
-	AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
+	AS_LOCK_ENTER(as, RW_READER);
 	for (seg = AS_SEGFIRST(as); seg != NULL; seg = AS_SEGNEXT(as, seg)) {
 		vnode_t *vp;
 		uint_t protbits;
@@ -800,7 +800,7 @@ lxpr_read_pid_maps(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 		*print_tail = pbuf;
 		print_tail = &pbuf->next;
 	}
-	AS_LOCK_EXIT(as, &as->a_lock);
+	AS_LOCK_EXIT(as);
 	mutex_enter(&p->p_lock);
 	lxpr_unlock(p);
 
@@ -872,10 +872,10 @@ lxpr_read_pid_statm(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 
 	mutex_exit(&p->p_lock);
 
-	AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
+	AS_LOCK_ENTER(as, RW_READER);
 	vsize = btopr(as->a_resvsize);
 	rss = rm_asrss(as);
-	AS_LOCK_EXIT(as, &as->a_lock);
+	AS_LOCK_EXIT(as);
 
 	mutex_enter(&p->p_lock);
 	lxpr_unlock(p);
@@ -1006,10 +1006,10 @@ lxpr_read_pid_status(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	as = p->p_as;
 	if ((p->p_stat != SZOMB) && !(p->p_flag & SSYS) && (as != &kas)) {
 		mutex_exit(&p->p_lock);
-		AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
+		AS_LOCK_ENTER(as, RW_READER);
 		vsize = as->a_resvsize;
 		rss = rm_asrss(as);
-		AS_LOCK_EXIT(as, &as->a_lock);
+		AS_LOCK_EXIT(as);
 		mutex_enter(&p->p_lock);
 
 		lxpr_uiobuf_printf(uiobuf,
@@ -1171,10 +1171,10 @@ lxpr_read_pid_stat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	}
 	as = p->p_as;
 	mutex_exit(&p->p_lock);
-	AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
+	AS_LOCK_ENTER(as, RW_READER);
 	vsize = as->a_resvsize;
 	rss = rm_asrss(as);
-	AS_LOCK_EXIT(as, &as->a_lock);
+	AS_LOCK_EXIT(as);
 	mutex_enter(&p->p_lock);
 
 	lxpr_uiobuf_printf(uiobuf,
