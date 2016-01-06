@@ -22,7 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2015 Joyent, Inc.  All rights reserved.
+ * Copyright 2016 Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -40,7 +40,7 @@
  *    - if the output on the device(s) is also teed into another stream within
  *      the zone
  *    - if we do logging in the GZ
- * See the comment on get_mode() in this file, and the comment in
+ * See the comment on get_mode_logmax() in this file, and the comment in
  * uts/common/io/zfd.c for more details.
  *
  * Internally the zfd_mode_t struct holds the number of stdio devs (1 or 3),
@@ -84,6 +84,10 @@ static zlog_t	*zlogp;
 static int	shutting_down = 0;
 static thread_t logger_tid;
 static int	logfd = -1;
+static size_t	log_sz = 0;
+static size_t	log_rot_sz = 0;
+
+static void rotate_log();
 
 /*
  * The eventstream is a simple one-directional flow of messages implemented
@@ -93,6 +97,7 @@ static int eventstream[2] = {-1, -1};
 
 #define	LOGNAME			"stdio.log"
 #define	ZLOG_MODE		"zlog-mode"
+#define	LOG_MAXSZ		"zlog-max-size"
 #define	ZFDNEX_DEVTREEPATH	"/pseudo/zfdnex@2"
 #define	ZFDNEX_FILEPATH		"/devices/pseudo/zfdnex@2"
 #define	SERVER_SOCKPATH		ZONES_TMPDIR "/%s.server_%s"
@@ -747,6 +752,9 @@ escape_json(char *sbuf, int slen, char *dbuf, int dlen)
  *    {"log":"msg\n","stream":"stdout","time":"2014-10-24T20:12:11.101973117Z"}
  *
  * We use ns in the last field of the timestamp for compatability.
+ *
+ * We keep track of the size of the log file and rotate it when we exceed
+ * the log size limit (if one is set).
  */
 static void
 wr_log_msg(char *buf, int len, int from)
@@ -756,6 +764,7 @@ wr_log_msg(char *buf, int len, int from)
 	char ts[64];
 	char nbuf[BUFSIZ * 2];
 	char obuf[BUFSIZ * 2];
+	static boolean_t log_wr_err = B_FALSE;
 
 	if (logfd == -1)
 		return;
@@ -770,7 +779,17 @@ wr_log_msg(char *buf, int len, int from)
 	    "{\"log\":\"%s\",\"stream\":\"%s\",\"time\":\"%s.%ldZ\"}\n",
 	    nbuf, (from == 1) ? "stdout" : "stderr", ts, tv.tv_usec * 1000);
 
-	(void) write(logfd, obuf, olen);
+	if (write(logfd, obuf, olen) != olen) {
+		if (!log_wr_err) {
+			zerror(zlogp, B_TRUE, "log file write error");
+			log_wr_err = B_TRUE;
+		}
+		return;
+	}
+
+	log_sz += olen;
+	if (log_rot_sz > 0 && log_sz >= log_rot_sz)
+		rotate_log();
 }
 
 /*
@@ -1162,6 +1181,7 @@ open_logfile()
 	char logpath[MAXPATHLEN];
 
 	logfd = -1;
+	log_sz = 0;
 
 	(void) snprintf(logpath, sizeof (logpath), "%s/logs", zonepath);
 	(void) mkdir(logpath, 0700);
@@ -1169,9 +1189,41 @@ open_logfile()
 	(void) snprintf(logpath, sizeof (logpath), "%s/logs/%s", zonepath,
 	    LOGNAME);
 
-	if ((logfd = open(logpath, O_WRONLY | O_APPEND | O_CREAT, 0600)) == -1)
+	if ((logfd = open(logpath, O_WRONLY | O_APPEND | O_CREAT,
+	    0600)) == -1) {
 		zerror(zlogp, B_TRUE, "failed to open log file");
+	} else {
+		struct stat64 sb;
+
+		if (fstat64(logfd, &sb) == 0)
+			log_sz = sb.st_size;
+	}
 }
+
+static void
+rotate_log()
+{
+	time_t t;
+	struct tm gtm;
+	char onm[MAXPATHLEN], rnm[MAXPATHLEN];
+
+	if ((t = time(NULL)) == (time_t)-1 || gmtime_r(&t, &gtm) == NULL) {
+		zerror(zlogp, B_TRUE, "failed to format time");
+		return;
+	}
+
+	(void) snprintf(rnm, sizeof (rnm),
+	    "%s/logs/%s.%d%02d%02dT%02d%02d%02dZ",
+	    zonepath, LOGNAME, gtm.tm_year + 1900, gtm.tm_mon + 1, gtm.tm_mday,
+	    gtm.tm_hour, gtm.tm_min, gtm.tm_sec);
+	(void) snprintf(onm, sizeof (onm), "%s/logs/%s", zonepath, LOGNAME);
+
+	(void) close(logfd);
+	if (rename(onm, rnm) != 0)
+		zerror(zlogp, B_TRUE, "failed to rotate log file");
+	open_logfile();
+}
+
 
 /* ARGSUSED */
 void
@@ -1321,9 +1373,12 @@ death:
  * g-n (nolog)     y      n       y
  * -t-             n      y       n
  * ---             n      n       n
+ *
+ * This function also obtains a maximum log size while it is reading the
+ * zone configuration.
  */
 static void
-get_mode(zfd_mode_t *mode)
+get_mode_logmax(zfd_mode_t *mode)
 {
 	zone_dochandle_t handle;
 	struct zone_attrtab attr;
@@ -1369,7 +1424,15 @@ get_mode(zfd_mode_t *mode)
 				mode->zmode_n_stddevs = 3;
 				mode->zmode_n_addl_devs = 0;
 			}
-			break;
+
+		} else if (strcmp(LOG_MAXSZ, attr.zone_attr_name) == 0) {
+			char *p;
+			long lval;
+
+			p = attr.zone_attr_value;
+			lval = strtol(p, &p, 10);
+			if (*p == '\0')
+				log_rot_sz = (size_t)lval;
 		}
 	}
 	(void) zonecfg_endattrent(handle);
@@ -1386,7 +1449,7 @@ create_log_thread(zlog_t *logp, zoneid_t id)
 	shutting_down = 0;
 	zlogp = logp;
 
-	get_mode(&mode);
+	get_mode_logmax(&mode);
 	if (mode.zmode_n_stddevs == 0)
 		return;
 
