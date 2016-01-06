@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright (c) 2014, Joyent, Inc. All rights reserved.
+ * Copyright 2016, Joyent, Inc.
  */
 
 /*
@@ -2238,9 +2238,9 @@ again:
 	/* P_PR_LOCK is now set */
 	mutex_exit(&p->p_lock);
 
-	AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
+	AS_LOCK_ENTER(as, RW_READER);
 	if ((seg = as_segat(as, addr)) == NULL) {
-		AS_LOCK_EXIT(as, &as->a_lock);
+		AS_LOCK_EXIT(as);
 		mutex_enter(&p->p_lock);
 		sprunlock(p);
 		return (set_errno(ENOMEM));
@@ -2250,7 +2250,7 @@ again:
 	 * The invalidation behavior only makes sense for vnode-backed segments.
 	 */
 	if (seg->s_ops != &segvn_ops) {
-		AS_LOCK_EXIT(as, &as->a_lock);
+		AS_LOCK_EXIT(as);
 		mutex_enter(&p->p_lock);
 		sprunlock(p);
 		return (0);
@@ -2260,7 +2260,7 @@ again:
 	 * If the mapping is out of bounds of the segement return an error.
 	 */
 	if ((addr + size) > (seg->s_base + seg->s_size)) {
-		AS_LOCK_EXIT(as, &as->a_lock);
+		AS_LOCK_EXIT(as);
 		mutex_enter(&p->p_lock);
 		sprunlock(p);
 		return (set_errno(EINVAL));
@@ -2280,7 +2280,7 @@ again:
 		 */
 		map_inval(p, seg, addr, size);
 	}
-	AS_LOCK_EXIT(as, &as->a_lock);
+	AS_LOCK_EXIT(as);
 
 	mutex_enter(&p->p_lock);
 	sprunlock(p);
