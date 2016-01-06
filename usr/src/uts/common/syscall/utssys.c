@@ -29,8 +29,6 @@
 /*	  All Rights Reserved	*/
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/param.h>
 #include <sys/inttypes.h>
 #include <sys/types.h>
@@ -534,7 +532,7 @@ dofusers(vnode_t *fvp, int flags)
 			struct seg	*seg;
 			struct as	*as = prp->p_as;
 
-			AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
+			AS_LOCK_ENTER(as, RW_READER);
 			for (seg = AS_SEGFIRST(as); seg;
 			    seg = AS_SEGNEXT(as, seg)) {
 				/*
@@ -598,7 +596,7 @@ dofusers(vnode_t *fvp, int flags)
 					break;
 				}
 			}
-			AS_LOCK_EXIT(as, &as->a_lock);
+			AS_LOCK_EXIT(as);
 		}
 
 		if (use_flag) {

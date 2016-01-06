@@ -40,13 +40,15 @@
 	.file	"crti.s"
 
 /*
- * Note that when _init and _fini are called we have 16-byte alignment per the
- * ABI. We need to make sure that our asm leaves it such that subsequent calls
- * will be aligned. gcc expects stack alignment before the call instruction is
- * executed. Specifically if we call function foo(), the stack pointer will be
- * 0xc aligned after executing the call instruction and before executing foo's
- * prologue. Note that because 16-byte alignment also ensures 4-byte alignment
- * we will not be breaking compatibility with older applications.
+ * Note that when _init and _fini are called the stack needs to be 16-byte
+ * aligned with a 4-byte bias.  See comment in lib/libc/i386/gen/makectxt.c.
+ *
+ * Note: If you change it, you need to change it in the following files as
+ * well:
+ *
+ *  - lib/libc/i386/threads/machdep.c
+ *  - lib/libc/i386/gen/makectxt.c
+ *  - lib/common/i386/crt1.s
  */
 
 /*

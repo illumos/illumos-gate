@@ -789,12 +789,12 @@ xpvtap_segmf_register(xpvtap_state_t *state)
 		return (DDI_FAILURE);
 	}
 
-	AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
+	AS_LOCK_ENTER(as, RW_READER);
 
 	seg = as_findseg(as, state->bt_map.um_guest_pages, 0);
 	if ((seg == NULL) || ((uaddr + state->bt_map.um_guest_size) >
 	    (seg->s_base + seg->s_size))) {
-		AS_LOCK_EXIT(as, &as->a_lock);
+		AS_LOCK_EXIT(as);
 		return (DDI_FAILURE);
 	}
 
@@ -815,7 +815,7 @@ xpvtap_segmf_register(xpvtap_state_t *state)
 
 	state->bt_map.um_registered = B_TRUE;
 
-	AS_LOCK_EXIT(as, &as->a_lock);
+	AS_LOCK_EXIT(as);
 
 	return (DDI_SUCCESS);
 }
@@ -850,11 +850,11 @@ xpvtap_segmf_unregister(struct as *as, void *arg, uint_t event)
 
 	/* Unlock the gref pages */
 	for (i = 0; i < pgcnt; i++) {
-		AS_LOCK_ENTER(as, &as->a_lock, RW_WRITER);
+		AS_LOCK_ENTER(as, RW_WRITER);
 		hat_prepare_mapping(as->a_hat, uaddr, NULL);
 		hat_unload(as->a_hat, uaddr, PAGESIZE, HAT_UNLOAD_UNLOCK);
 		hat_release_mapping(as->a_hat, uaddr);
-		AS_LOCK_EXIT(as, &as->a_lock);
+		AS_LOCK_EXIT(as);
 		uaddr += PAGESIZE;
 	}
 
@@ -1228,11 +1228,11 @@ xpvtap_user_request_map(xpvtap_state_t *state, blkif_request_t *req,
 	/* get the apps gref address */
 	uaddr = XPVTAP_GREF_REQADDR(state->bt_map.um_guest_pages, *uid);
 
-	AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
+	AS_LOCK_ENTER(as, RW_READER);
 	seg = as_findseg(as, state->bt_map.um_guest_pages, 0);
 	if ((seg == NULL) || ((uaddr + mmu_ptob(req->nr_segments)) >
 	    (seg->s_base + seg->s_size))) {
-		AS_LOCK_EXIT(as, &as->a_lock);
+		AS_LOCK_EXIT(as);
 		return (DDI_FAILURE);
 	}
 
@@ -1249,7 +1249,7 @@ xpvtap_user_request_map(xpvtap_state_t *state, blkif_request_t *req,
 	(void) segmf_add_grefs(seg, uaddr, flags, gref, req->nr_segments,
 	    domid);
 
-	AS_LOCK_EXIT(as, &as->a_lock);
+	AS_LOCK_EXIT(as);
 
 	return (DDI_SUCCESS);
 }
@@ -1314,11 +1314,11 @@ xpvtap_user_request_unmap(xpvtap_state_t *state, uint_t uid)
 	    (req->operation != BLKIF_OP_FLUSH_DISKCACHE) &&
 	    (req->nr_segments != 0)) {
 		uaddr = XPVTAP_GREF_REQADDR(state->bt_map.um_guest_pages, uid);
-		AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
+		AS_LOCK_ENTER(as, RW_READER);
 		seg = as_findseg(as, state->bt_map.um_guest_pages, 0);
 		if ((seg == NULL) || ((uaddr + mmu_ptob(req->nr_segments)) >
 		    (seg->s_base + seg->s_size))) {
-			AS_LOCK_EXIT(as, &as->a_lock);
+			AS_LOCK_EXIT(as);
 			xpvtap_rs_free(state->bt_map.um_rs, uid);
 			return;
 		}
@@ -1328,7 +1328,7 @@ xpvtap_user_request_unmap(xpvtap_state_t *state, uint_t uid)
 			cmn_err(CE_WARN, "unable to release grefs");
 		}
 
-		AS_LOCK_EXIT(as, &as->a_lock);
+		AS_LOCK_EXIT(as);
 	}
 
 	/* free up the user ring id */

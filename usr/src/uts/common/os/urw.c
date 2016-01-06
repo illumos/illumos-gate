@@ -26,8 +26,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T */
 /*	  All Rights Reserved   */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/atomic.h>
 #include <sys/errno.h>
 #include <sys/stat.h>
@@ -148,8 +146,7 @@ mapin(struct as *as, caddr_t addr, int writing)
 		if (pp != NULL) {
 			ASSERT(PAGE_LOCKED(pp));
 			kaddr = ppmapin(pp, writing ?
-				(PROT_READ | PROT_WRITE) : PROT_READ,
-				(caddr_t)-1);
+			    (PROT_READ | PROT_WRITE) : PROT_READ, (caddr_t)-1);
 			return (kaddr + ((uintptr_t)addr & PAGEOFFSET));
 		}
 	}
@@ -162,7 +159,7 @@ mapin(struct as *as, caddr_t addr, int writing)
 	kaddr = vmem_alloc(heap_arena, PAGESIZE, VM_SLEEP);
 
 	hat_devload(kas.a_hat, kaddr, PAGESIZE, pfnum,
-		writing ? (PROT_READ | PROT_WRITE) : PROT_READ, HAT_LOAD_LOCK);
+	    writing ? (PROT_READ | PROT_WRITE) : PROT_READ, HAT_LOAD_LOCK);
 
 	return (kaddr + ((uintptr_t)addr & PAGEOFFSET));
 }
@@ -202,11 +199,11 @@ urw(proc_t *p, int writing, void *buf, size_t len, uintptr_t a)
 	 */
 	page = (caddr_t)(uintptr_t)((uintptr_t)addr & PAGEMASK);
 	retrycnt = 0;
-	AS_LOCK_ENTER(as, &as->a_lock, RW_WRITER);
+	AS_LOCK_ENTER(as, RW_WRITER);
 retry:
 	if ((seg = as_segat(as, page)) == NULL ||
 	    !page_valid(seg, page)) {
-		AS_LOCK_EXIT(as, &as->a_lock);
+		AS_LOCK_EXIT(as);
 		return (ENXIO);
 	}
 	SEGOP_GETPROT(seg, page, 0, &prot);
@@ -224,7 +221,7 @@ retry:
 		}
 
 		if (err != 0) {
-			AS_LOCK_EXIT(as, &as->a_lock);
+			AS_LOCK_EXIT(as);
 			return (ENXIO);
 		}
 	}
@@ -247,7 +244,7 @@ retry:
 	if (SEGOP_FAULT(as->a_hat, seg, page, PAGESIZE, F_SOFTLOCK, rw)) {
 		if (protchanged)
 			(void) SEGOP_SETPROT(seg, page, PAGESIZE, prot);
-		AS_LOCK_EXIT(as, &as->a_lock);
+		AS_LOCK_EXIT(as);
 		return (ENXIO);
 	}
 	CPU_STATS_ADD_K(vm, softlock, 1);
@@ -308,7 +305,7 @@ retry:
 	if (protchanged)
 		(void) SEGOP_SETPROT(seg, page, PAGESIZE, prot);
 
-	AS_LOCK_EXIT(as, &as->a_lock);
+	AS_LOCK_EXIT(as);
 
 	return (error);
 }

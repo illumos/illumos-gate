@@ -28,8 +28,6 @@
 /*	  All Rights Reserved	*/
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/inttypes.h>
@@ -141,7 +139,7 @@ ulimit(int cmd, long arg)
 		 */
 		retval = (long)brkend;
 
-		AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
+		AS_LOCK_ENTER(as, RW_READER);
 		for (seg = as_findseg(as, brkend, 0); seg != NULL;
 		    seg = AS_SEGNEXT(as, seg)) {
 			if (seg->s_base >= brkend) {
@@ -212,7 +210,7 @@ ulimit(int cmd, long arg)
 				    (size_t)(brkendpg + size));
 		}
 
-		AS_LOCK_EXIT(as, &as->a_lock);
+		AS_LOCK_EXIT(as);
 
 		/* truncate to same boundary as sbrk */
 

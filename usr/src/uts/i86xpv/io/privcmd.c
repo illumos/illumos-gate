@@ -169,14 +169,14 @@ do_privcmd_mmap(void *uarg, int mode, cred_t *cr)
 		 * Find the segment we want to mess with, then add
 		 * the mfn range to the segment.
 		 */
-		AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
+		AS_LOCK_ENTER(as, RW_READER);
 		if ((seg = as_findseg(as, addr, 0)) == NULL ||
 		    addr + mmu_ptob(mme->npages) > seg->s_base + seg->s_size)
 			error = EINVAL;
 		else
 			error = segmf_add_mfns(seg, addr,
 			    mme->mfn, mme->npages, mmc->dom);
-		AS_LOCK_EXIT(as, &as->a_lock);
+		AS_LOCK_EXIT(as);
 
 		if (error != 0)
 			break;
@@ -219,7 +219,7 @@ do_privcmd_mmapbatch(void *uarg, int mode, cred_t *cr)
 	    caddr_t, mmb->addr);
 
 	addr = (caddr_t)mmb->addr;
-	AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
+	AS_LOCK_ENTER(as, RW_READER);
 	if ((seg = as_findseg(as, addr, 0)) == NULL ||
 	    addr + ptob(mmb->num) > seg->s_base + seg->s_size) {
 		error = EINVAL;
@@ -260,7 +260,7 @@ do_privcmd_mmapbatch(void *uarg, int mode, cred_t *cr)
 	}
 
 done:
-	AS_LOCK_EXIT(as, &as->a_lock);
+	AS_LOCK_EXIT(as);
 
 	DTRACE_XPV3(mmapbatch__end, int, error, struct seg *, seg, caddr_t,
 	    mmb->addr);

@@ -1007,7 +1007,7 @@ rootnex_map_fault(dev_info_t *dip, dev_info_t *rdip, struct hat *hat,
 			 * the hat of the system MMU.  At alternative
 			 * would be to panic .. this might well be better ..
 			 */
-			ASSERT(AS_READ_HELD(seg->s_as, &seg->s_as->a_lock));
+			ASSERT(AS_READ_HELD(seg->s_as));
 			hat = seg->s_as->a_hat;
 			cmn_err(CE_NOTE, "rootnex_map_fault: nil hat");
 		}

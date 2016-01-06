@@ -210,7 +210,7 @@ faultcode_t
 segkpm_fault(struct hat *hat, struct seg *seg, caddr_t addr, size_t len,
 	enum fault_type type, enum seg_rw rw)
 {
-	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as, &seg->s_as->a_lock));
+	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as));
 
 	switch (type) {
 	case F_INVAL:

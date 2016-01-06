@@ -161,8 +161,19 @@ __do_exit_code_ptr:
 	leal	16(%ebp,%eax,4),%edx	/* envp */
 	movl	%edx,_environ		/* copy to _environ */
 1:
+	/*
+	 * The stack needs to be 16-byte aligned with a 4-byte bias.  See
+	 * comment in lib/libc/i386/gen/makectxt.c.
+	 *
+	 * Note: If you change it, you need to change it in the following
+	 * files as well:
+	 *
+	 *  - lib/libc/i386/threads/machdep.c
+	 *  - lib/libc/i386/gen/makectxt.c
+	 *  - lib/common/i386/crti.s
+	 */
 	andl	$-16,%esp	/* make main() and exit() be called with */
-	subl	$4,%esp		/* a 16-byte aligned stack pointer */
+	subl	$4,%esp		/* a properly aligned stack pointer */
 	pushl	%edx
 	leal	12(%ebp),%edx	/* argv */
 	movl	%edx,___Argv
