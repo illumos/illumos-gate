@@ -659,12 +659,9 @@ typedef struct sfmmu_ctx {
  * mappings will potentially be undersized. To compensate for the potential
  * underaccounting in this case we always add 1/4 of the region size to the 8K
  * ttecnt.
- *
- * Note that sfmmu_xhat_provider MUST be the first element.
  */
 
 struct hat {
-	void		*sfmmu_xhat_provider;	/* NULL for CPU hat */
 	cpuset_t	sfmmu_cpusran;	/* cpu bit mask for efficient xcalls */
 	struct	as	*sfmmu_as;	/* as this hat provides mapping for */
 	/* per pgsz private ttecnt + shme rgns ttecnt for rgns not in SCD */
@@ -1241,16 +1238,11 @@ struct hblk_lockcnt_audit {
  * the counts can be high and there are not enough bits in the tte. When
  * physio is fixed to not lock the translations we should be able to move
  * the lock cnt back to the tte.  See bug id 1198554.
- *
- * Note that xhat_hme_blk's layout follows this structure: hme_blk_misc
- * and sf_hment are at the same offsets in both structures. Whenever
- * hme_blk is changed, xhat_hme_blk may need to be updated as well.
  */
 
 struct hme_blk_misc {
-	uint_t	notused:25;
+	uint_t	notused:26;
 	uint_t	shared_bit:1;	/* set for SRD shared hmeblk */
-	uint_t	xhat_bit:1;	/* set for an xhat hme_blk */
 	uint_t	shadow_bit:1;	/* set for a shadow hme_blk */
 	uint_t	nucleus_bit:1;	/* set for a nucleus hme_blk */
 	uint_t	ttesize:3;	/* contains ttesz of hmeblk */
@@ -1290,7 +1282,6 @@ struct hme_blk {
 };
 
 #define	hblk_shared	hblk_misc.shared_bit
-#define	hblk_xhat_bit   hblk_misc.xhat_bit
 #define	hblk_shw_bit	hblk_misc.shadow_bit
 #define	hblk_nuc_bit	hblk_misc.nucleus_bit
 #define	hblk_ttesz	hblk_misc.ttesize
@@ -2315,9 +2306,6 @@ extern int	sfmmu_get_addrvcolor(caddr_t);
 extern int	sfmmu_hat_lock_held(sfmmu_t *);
 extern int	sfmmu_alloc_ctx(sfmmu_t *, int, struct cpu *, int);
 
-/*
- * Functions exported to xhat_sfmmu.c
- */
 extern kmutex_t *sfmmu_mlist_enter(page_t *);
 extern void	sfmmu_mlist_exit(kmutex_t *);
 extern int	sfmmu_mlist_held(struct page *);

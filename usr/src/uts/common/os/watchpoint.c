@@ -180,11 +180,7 @@ startover:
 	/*
 	 * as->a_wpage can only be changed while the process is totally stopped.
 	 * Don't grab p_lock here.  Holding p_lock while grabbing the address
-	 * space lock leads to deadlocks with the clock thread.  Note that if an
-	 * as_fault() is servicing a fault to a watched page on behalf of an
-	 * XHAT provider, watchpoint will be temporarily cleared (and wp_prot
-	 * will be set to wp_oprot).  Since this is done while holding as writer
-	 * lock, we need to grab as lock (reader lock is good enough).
+	 * space lock leads to deadlocks with the clock thread.
 	 *
 	 * p_maplock prevents simultaneous execution of this function.  Under
 	 * normal circumstances, holdwatch() will stop all other threads, so the
@@ -194,7 +190,6 @@ startover:
 	 */
 
 	mutex_enter(&p->p_maplock);
-	AS_LOCK_ENTER(as, RW_READER);
 
 	tpw.wp_vaddr = (caddr_t)((uintptr_t)addr & (uintptr_t)PAGEMASK);
 	if ((pwp = avl_find(&as->a_wpage, &tpw, &where)) == NULL)
@@ -229,11 +224,6 @@ startover:
 			 * all other lwps are held in the kernel.
 			 */
 			if (p->p_mapcnt == 0) {
-				/*
-				 * Release as lock while in holdwatch()
-				 * in case other threads need to grab it.
-				 */
-				AS_LOCK_EXIT(as);
 				mutex_exit(&p->p_maplock);
 				if (holdwatch() != 0) {
 					/*
@@ -244,7 +234,6 @@ startover:
 					goto startover;
 				}
 				mutex_enter(&p->p_maplock);
-				AS_LOCK_ENTER(as, RW_READER);
 			}
 			p->p_mapcnt++;
 		}
@@ -304,7 +293,6 @@ startover:
 			uint_t oprot;
 			int err, retrycnt = 0;
 
-			AS_LOCK_EXIT(as);
 			AS_LOCK_ENTER(as, RW_WRITER);
 		retry:
 			seg = as_segat(as, addr);
@@ -319,8 +307,7 @@ startover:
 				}
 			}
 			AS_LOCK_EXIT(as);
-		} else
-			AS_LOCK_EXIT(as);
+		}
 
 		/*
 		 * When all pages are mapped back to their normal state,
@@ -337,11 +324,8 @@ startover:
 				mutex_enter(&p->p_maplock);
 			}
 		}
-
-		AS_LOCK_ENTER(as, RW_READER);
 	}
 
-	AS_LOCK_EXIT(as);
 	mutex_exit(&p->p_maplock);
 
 	return (rv);
@@ -434,7 +418,6 @@ setallwatch(void)
 
 
 
-/* Must be called with as lock held */
 int
 pr_is_watchpage_as(caddr_t addr, enum seg_rw rw, struct as *as)
 {
@@ -497,17 +480,11 @@ int
 pr_is_watchpage(caddr_t addr, enum seg_rw rw)
 {
 	struct as *as = curproc->p_as;
-	int rv;
 
 	if ((as == &kas) || avl_numnodes(&as->a_wpage) == 0)
 		return (0);
 
-	/* Grab the lock because of XHAT (see comment in pr_mappage()) */
-	AS_LOCK_ENTER(as, RW_READER);
-	rv = pr_is_watchpage_as(addr, rw, as);
-	AS_LOCK_EXIT(as);
-
-	return (rv);
+	return (pr_is_watchpage_as(addr, rw, as));
 }
 
 

@@ -64,7 +64,6 @@ CORE_OBJS +=	memscrub_asm.o
 CORE_OBJS +=	ppage.o
 CORE_OBJS +=	sfmmu_kdi.o
 CORE_OBJS +=	swtch.o
-CORE_OBJS +=	xhat_sfmmu.o
 
 #
 #	Some objects must be linked at the front of the image (or

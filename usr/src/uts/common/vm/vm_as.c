@@ -59,7 +59,6 @@
 #include <sys/vtrace.h>
 
 #include <vm/hat.h>
-#include <vm/xhat.h>
 #include <vm/as.h>
 #include <vm/seg.h>
 #include <vm/seg_vn.h>
@@ -671,8 +670,6 @@ as_alloc(void)
 	as->a_hat = hat_alloc(as);	/* create hat for default system mmu */
 	AS_LOCK_EXIT(as);
 
-	as->a_xhat = NULL;
-
 	return (as);
 }
 
@@ -687,7 +684,7 @@ as_free(struct as *as)
 {
 	struct hat *hat = as->a_hat;
 	struct seg *seg, *next;
-	int called = 0;
+	boolean_t free_started = B_FALSE;
 
 top:
 	/*
@@ -699,17 +696,12 @@ top:
 	while (as->a_callbacks && as_do_callbacks(as, AS_ALL_EVENT, 0, 0))
 		;
 
-	/* This will prevent new XHATs from attaching to as */
-	if (!called)
-		AS_SETBUSY(as);
 	mutex_exit(&as->a_contents);
 	AS_LOCK_ENTER(as, RW_WRITER);
 
-	if (!called) {
-		called = 1;
+	if (!free_started) {
+		free_started = B_TRUE;
 		hat_free_start(hat);
-		if (as->a_xhat != NULL)
-			xhat_free_start_all(as);
 	}
 	for (seg = AS_SEGFIRST(as); seg != NULL; seg = next) {
 		int err;
@@ -759,8 +751,6 @@ retry:
 		}
 	}
 	hat_free_end(hat);
-	if (as->a_xhat != NULL)
-		xhat_free_end_all(as);
 	AS_LOCK_EXIT(as);
 
 	/* /proc stuff */
@@ -794,14 +784,6 @@ as_dup(struct as *as, struct proc *forkedproc)
 
 	AS_LOCK_ENTER(newas, RW_WRITER);
 
-	/* This will prevent new XHATs from attaching */
-	mutex_enter(&as->a_contents);
-	AS_SETBUSY(as);
-	mutex_exit(&as->a_contents);
-	mutex_enter(&newas->a_contents);
-	AS_SETBUSY(newas);
-	mutex_exit(&newas->a_contents);
-
 	(void) hat_dup(as->a_hat, newas->a_hat, NULL, 0, HAT_DUP_SRD);
 
 	for (seg = AS_SEGFIRST(as); seg != NULL; seg = AS_SEGNEXT(as, seg)) {
@@ -815,9 +797,6 @@ as_dup(struct as *as, struct proc *forkedproc)
 		if (newseg == NULL) {
 			AS_LOCK_EXIT(newas);
 			as_setwatch(as);
-			mutex_enter(&as->a_contents);
-			AS_CLRBUSY(as);
-			mutex_exit(&as->a_contents);
 			AS_LOCK_EXIT(as);
 			as_free(newas);
 			return (-1);
@@ -829,9 +808,6 @@ as_dup(struct as *as, struct proc *forkedproc)
 			 * completely; i.e. it has no ops.
 			 */
 			as_setwatch(as);
-			mutex_enter(&as->a_contents);
-			AS_CLRBUSY(as);
-			mutex_exit(&as->a_contents);
 			AS_LOCK_EXIT(as);
 			seg_free(newseg);
 			AS_LOCK_EXIT(newas);
@@ -843,18 +819,10 @@ as_dup(struct as *as, struct proc *forkedproc)
 	newas->a_resvsize = as->a_resvsize - purgesize;
 
 	error = hat_dup(as->a_hat, newas->a_hat, NULL, 0, HAT_DUP_ALL);
-	if (as->a_xhat != NULL)
-		error |= xhat_dup_all(as, newas, NULL, 0, HAT_DUP_ALL);
 
-	mutex_enter(&newas->a_contents);
-	AS_CLRBUSY(newas);
-	mutex_exit(&newas->a_contents);
 	AS_LOCK_EXIT(newas);
 
 	as_setwatch(as);
-	mutex_enter(&as->a_contents);
-	AS_CLRBUSY(as);
-	mutex_exit(&as->a_contents);
 	AS_LOCK_EXIT(as);
 	if (error != 0) {
 		as_free(newas);
@@ -880,57 +848,44 @@ as_fault(struct hat *hat, struct as *as, caddr_t addr, size_t size,
 	struct seg *segsav;
 	int as_lock_held;
 	klwp_t *lwp = ttolwp(curthread);
-	int is_xhat = 0;
-	int holding_wpage = 0;
-	extern struct seg_ops   segdev_ops;
 
 
-
-	if (as->a_hat != hat) {
-		/* This must be an XHAT then */
-		is_xhat = 1;
-
-		if ((type != F_INVAL) || (as == &kas))
-			return (FC_NOSUPPORT);
-	}
 
 retry:
-	if (!is_xhat) {
-		/*
-		 * Indicate that the lwp is not to be stopped while waiting
-		 * for a pagefault.  This is to avoid deadlock while debugging
-		 * a process via /proc over NFS (in particular).
-		 */
-		if (lwp != NULL)
-			lwp->lwp_nostop++;
+	/*
+	 * Indicate that the lwp is not to be stopped while waiting for a
+	 * pagefault.  This is to avoid deadlock while debugging a process
+	 * via /proc over NFS (in particular).
+	 */
+	if (lwp != NULL)
+		lwp->lwp_nostop++;
 
-		/*
-		 * same length must be used when we softlock and softunlock.
-		 * We don't support softunlocking lengths less than
-		 * the original length when there is largepage support.
-		 * See seg_dev.c for more comments.
-		 */
-		switch (type) {
+	/*
+	 * same length must be used when we softlock and softunlock.  We
+	 * don't support softunlocking lengths less than the original length
+	 * when there is largepage support.  See seg_dev.c for more
+	 * comments.
+	 */
+	switch (type) {
 
-		case F_SOFTLOCK:
-			CPU_STATS_ADD_K(vm, softlock, 1);
-			break;
+	case F_SOFTLOCK:
+		CPU_STATS_ADD_K(vm, softlock, 1);
+		break;
 
-		case F_SOFTUNLOCK:
-			break;
+	case F_SOFTUNLOCK:
+		break;
 
-		case F_PROT:
-			CPU_STATS_ADD_K(vm, prot_fault, 1);
-			break;
+	case F_PROT:
+		CPU_STATS_ADD_K(vm, prot_fault, 1);
+		break;
 
-		case F_INVAL:
-			CPU_STATS_ENTER_K();
-			CPU_STATS_ADDQ(CPU, vm, as_fault, 1);
-			if (as == &kas)
-				CPU_STATS_ADDQ(CPU, vm, kernel_asflt, 1);
-			CPU_STATS_EXIT_K();
-			break;
-		}
+	case F_INVAL:
+		CPU_STATS_ENTER_K();
+		CPU_STATS_ADDQ(CPU, vm, as_fault, 1);
+		if (as == &kas)
+			CPU_STATS_ADDQ(CPU, vm, kernel_asflt, 1);
+		CPU_STATS_EXIT_K();
+		break;
 	}
 
 	/* Kernel probe */
@@ -952,35 +907,15 @@ retry:
 	 */
 	if (as == &kas && segkmap && segkmap->s_base <= raddr &&
 	    raddr + size < segkmap->s_base + segkmap->s_size) {
-		/*
-		 * if (as==&kas), this can't be XHAT: we've already returned
-		 * FC_NOSUPPORT.
-		 */
 		seg = segkmap;
 		as_lock_held = 0;
 	} else {
 		AS_LOCK_ENTER(as, RW_READER);
-		if (is_xhat && avl_numnodes(&as->a_wpage) != 0) {
-			/*
-			 * Grab and hold the writers' lock on the as
-			 * if the fault is to a watched page.
-			 * This will keep CPUs from "peeking" at the
-			 * address range while we're temporarily boosting
-			 * the permissions for the XHAT device to
-			 * resolve the fault in the segment layer.
-			 *
-			 * We could check whether faulted address
-			 * is within a watched page and only then grab
-			 * the writer lock, but this is simpler.
-			 */
-			AS_LOCK_EXIT(as);
-			AS_LOCK_ENTER(as, RW_WRITER);
-		}
 
 		seg = as_segat(as, raddr);
 		if (seg == NULL) {
 			AS_LOCK_EXIT(as);
-			if ((lwp != NULL) && (!is_xhat))
+			if (lwp != NULL)
 				lwp->lwp_nostop--;
 			return (FC_NOMAP);
 		}
@@ -1004,35 +939,9 @@ retry:
 		else
 			ssize = rsize;
 
-		if (!is_xhat || (seg->s_ops != &segdev_ops)) {
-
-			if (is_xhat && avl_numnodes(&as->a_wpage) != 0 &&
-			    pr_is_watchpage_as(raddr, rw, as)) {
-				/*
-				 * Handle watch pages.  If we're faulting on a
-				 * watched page from an X-hat, we have to
-				 * restore the original permissions while we
-				 * handle the fault.
-				 */
-				as_clearwatch(as);
-				holding_wpage = 1;
-			}
-
-			res = SEGOP_FAULT(hat, seg, raddr, ssize, type, rw);
-
-			/* Restore watchpoints */
-			if (holding_wpage) {
-				as_setwatch(as);
-				holding_wpage = 0;
-			}
-
-			if (res != 0)
-				break;
-		} else {
-			/* XHAT does not support seg_dev */
-			res = FC_NOSUPPORT;
+		res = SEGOP_FAULT(hat, seg, raddr, ssize, type, rw);
+		if (res != 0)
 			break;
-		}
 	}
 
 	/*
@@ -1061,7 +970,7 @@ retry:
 	}
 	if (as_lock_held)
 		AS_LOCK_EXIT(as);
-	if ((lwp != NULL) && (!is_xhat))
+	if (lwp != NULL)
 		lwp->lwp_nostop--;
 
 	/*
@@ -2166,12 +2075,6 @@ as_swapout(struct as *as)
 
 	AS_LOCK_ENTER(as, RW_READER);
 
-	/* Prevent XHATs from attaching */
-	mutex_enter(&as->a_contents);
-	AS_SETBUSY(as);
-	mutex_exit(&as->a_contents);
-
-
 	/*
 	 * Free all mapping resources associated with the address
 	 * space.  The segment-level swapout routines capitalize
@@ -2179,12 +2082,6 @@ as_swapout(struct as *as)
 	 * unmapped here.
 	 */
 	hat_swapout(as->a_hat);
-	if (as->a_xhat != NULL)
-		xhat_swapout_all(as);
-
-	mutex_enter(&as->a_contents);
-	AS_CLRBUSY(as);
-	mutex_exit(&as->a_contents);
 
 	/*
 	 * Call the swapout routines of all segments in the address
