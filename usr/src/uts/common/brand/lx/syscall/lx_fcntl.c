@@ -47,21 +47,6 @@ lx_vp_at(int fd, char *upath, vnode_t **vpp, int flag)
 
 	if (upath != NULL) {
 		uio_seg_t seg = UIO_USERSPACE;
-		char buf[LX_DEV_LOG_LEN + 1];
-
-		/*
-		 * Because sockets listening on /dev/log are redirected to a
-		 * different path due to devfs restrictions, filesystem
-		 * operations acting on that path must also be redirected.
-		 * This ensures that things such as syslog are able to chown
-		 * their AF_UNIX socket during initialization.
-		 */
-		if (copyin(upath, &buf, sizeof (buf)) == 0) {
-			if (strncmp(LX_DEV_LOG, buf, sizeof (buf)) == 0) {
-				seg = UIO_SYSSPACE;
-				upath = LX_DEV_LOG_REDIRECT;
-			}
-		}
 
 		error = lookupnameat(upath, seg,
 		    (flag == AT_SYMLINK_NOFOLLOW) ?  NO_FOLLOW : FOLLOW,

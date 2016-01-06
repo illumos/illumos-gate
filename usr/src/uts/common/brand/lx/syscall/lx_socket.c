@@ -323,7 +323,6 @@ lx_xlate_sock_flags(int inflags, lx_xlate_dir_t dir)
 typedef enum lx_sun_type {
 	LX_SUN_NORMAL,
 	LX_SUN_ABSTRACT,
-	LX_SUN_DEVLOG
 } lx_sun_type_t;
 
 static void
@@ -381,31 +380,6 @@ ltos_sockaddr_ux(const struct sockaddr *inaddr, const socklen_t inlen,
 
 		if (sun_type != NULL) {
 			*sun_type = LX_SUN_ABSTRACT;
-		}
-	} else if ((len == LX_DEV_LOG_LEN &&
-	    strncmp(inaddr->sa_data, LX_DEV_LOG, LX_DEV_LOG_LEN) == 0) ||
-	    (len > LX_DEV_LOG_LEN &&
-	    strcmp(inaddr->sa_data, LX_DEV_LOG) == 0)) {
-		/*
-		 * In order to support /dev/log -- a Unix domain socket used
-		 * for logging that has had its path hard-coded far and wide --
-		 * we need to relocate the socket into a writable filesystem.
-		 *
-		 * Since this path should be reusable after being closed (but
-		 * not unlinked), it is implicitly cleaned up during bind().
-		 *
-		 * Note that newer versions of systemd actually setup the
-		 * log socket in a different location and then expect to
-		 * symlink /dev/log to that location. We handle that in the
-		 * lx_symlink emulation, so the existing socket code to handle
-		 * LX_DEV_LOG_REDIRECT continues to work for old and new
-		 * images.
-		 */
-
-		(void) strcpy(buf.sun_path, LX_DEV_LOG_REDIRECT);
-
-		if (sun_type != NULL) {
-			*sun_type = LX_SUN_DEVLOG;
 		}
 	} else {
 		/* Copy the address directly, minding termination */
@@ -1288,8 +1262,7 @@ lx_bind(long sock, uintptr_t name, socklen_t namelen)
 			 * ltos_sockaddr_copyin for details about why these
 			 * socket types act differently.
 			 */
-			if (sun_type == LX_SUN_ABSTRACT ||
-			    sun_type == LX_SUN_DEVLOG) {
+			if (sun_type == LX_SUN_ABSTRACT) {
 				(void) vn_removeat(NULL, addr->sa_data,
 				    UIO_SYSSPACE, RMFILE);
 			}
