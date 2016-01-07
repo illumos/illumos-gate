@@ -193,12 +193,10 @@
  *	autofs protocol. The partial v5 support is around the 'expire' ioctls
  *	and discussed below under "v5 expire protocol".
  *
- *	1.3) We currently do not support 'direct' mounts and expiration.
- *
- *	1.4) We currently do not support 'offset' mounts and expiration
+ *	1.3) We currently do not support 'offset' mounts and expiration
  *	(since this is a variation on direct mounts).
  *
- *	1.5) We currently do not implement the dev ioctls for automounter
+ *	1.4) We currently do not implement the dev ioctls for automounter
  *	restart recovery.
  *
  * 2) In general, the approach taken for lxautofs is to keep it as simple
@@ -280,12 +278,12 @@
  * fashion so that the automounter can unmount user file systems that aren't in
  * use.
  *
- * Expiring 'direct' mounts will also be complex because there will be a mount
- * over the autofs mount. This will need to be considered when direct mount
- * support is implemented.
+ * Expiring 'direct' mounts is similar, but since there is only a single mount,
+ * the lav_mnt_list only will have at most one entry if there is a filesystem
+ * mounted overtop of the autofs mount.
  *
  * Expiring 'offset' mounts is also more complicated and offset mounts do not
- * currently work correctly (because the lower-level offset mount is like a
+ * currently work correctly (because each lower-level offset mount is like a
  * direct mount).
  *
  * For example, if /net was an autofs 'offset' mount and the host 'jurassic'

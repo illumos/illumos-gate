@@ -56,6 +56,7 @@ extern "C" {
 
 typedef struct lx_autofs_mntent {
 	list_node_t	lxafme_lst;
+	uint64_t	lxafme_ts;	/* time stamp */
 	uint_t		lxafme_len;
 	char		*lxafme_path;
 } lx_autofs_mntent_t;
@@ -84,11 +85,9 @@ typedef struct lx_autofs_vfs {
 	int		lav_min_proto;
 
 	/*
-	 * ioctl-set timeout value. Currently unused, but the automounter will
-	 * perform an expire ioctl every timeout/4 seconds. In the future we
-	 * might consider only returning an expired mount if it is inactive
-	 * for the full timeout. This could reduce overly aggressive
-	 * umount/mount activity.
+	 * ioctl-set timeout value. The automounter will perform an expire
+	 * ioctl every timeout/4 seconds. We use this to expire a mount once
+	 * it is inactive for the full timeout.
 	 */
 	ulong_t		lav_timeout;
 
