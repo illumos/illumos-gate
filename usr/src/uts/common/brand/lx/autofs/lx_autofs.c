@@ -1043,6 +1043,7 @@ lx_autofs_automounter_call(vnode_t *dvp, char *nm)
 		mp = kmem_zalloc(sizeof (lx_autofs_mntent_t), KM_SLEEP);
 		mp->lxafme_len = strlen(nm) + 1;
 		mp->lxafme_path = kmem_zalloc(mp->lxafme_len, KM_SLEEP);
+		mp->lxafme_ts = TICK_TO_SEC(ddi_get_lbolt64());
 		(void) strlcpy(mp->lxafme_path, nm, mp->lxafme_len);
 
 		mutex_enter(&data->lav_lock);
@@ -1104,8 +1105,12 @@ lx_autofs_get_mountvfs(char *fs_mntpt)
 	}
 
 	do {
-		/* Skip mounts we shouldn't show */
-		if (!(vfsp->vfs_flag & VFS_NOMNTTAB)) {
+		/*
+		 * Skip mounts we shouldn't show and mounts that are actually
+		 * autofs (i.e. autofs direct mount).
+		 */
+		if (!(vfsp->vfs_flag & VFS_NOMNTTAB) &&
+		    vfsp->vfs_op != lx_autofs_vfsops) {
 			char *mntpt;
 
 			mntpt = (char *)refstr_value(vfsp->vfs_mntpt);
@@ -1150,8 +1155,30 @@ lx_autofs_expire(vfs_t *vfsp, struct cred *cr)
 	if (mp == NULL)
 		return;
 
-	(void) snprintf(exp_path, sizeof (exp_path), "%s/%s",
-	    (char *)refstr_value(vfsp->vfs_mntpt), mp->lxafme_path);
+	/*
+	 * We only return an expired mount if it is inactive for the full
+	 * timeout. This reduces overly aggressive umount/mount activity.
+	 */
+	if (data->lav_timeout > 0) {
+		uint64_t now = TICK_TO_SEC(ddi_get_lbolt64());
+
+		if ((now - mp->lxafme_ts) < data->lav_timeout) {
+			/* put it back at the end of the line */
+			mutex_enter(&data->lav_lock);
+			list_insert_tail(&data->lav_mnt_list, mp);
+			mutex_exit(&data->lav_lock);
+			return;
+		}
+	}
+
+	if (data->lav_indirect) {
+		(void) snprintf(exp_path, sizeof (exp_path), "%s/%s",
+		    (char *)refstr_value(vfsp->vfs_mntpt), mp->lxafme_path);
+	} else {
+		(void) strlcpy(exp_path, (char *)refstr_value(vfsp->vfs_mntpt),
+		    sizeof (exp_path));
+	}
+
 	if ((fnd_vfs = lx_autofs_get_mountvfs(exp_path)) != NULL) {
 		boolean_t skip_v3 = B_FALSE;
 		vfssw_t *vfssw;
@@ -1196,6 +1223,7 @@ lx_autofs_expire(vfs_t *vfsp, struct cred *cr)
 		 * list and return. The caller will return EAGAIN for the
 		 * expire ioctl and the automounter will check again later.
 		 */
+		mp->lxafme_ts = TICK_TO_SEC(ddi_get_lbolt64());
 		mutex_enter(&data->lav_lock);
 		list_insert_tail(&data->lav_mnt_list, mp);
 		mutex_exit(&data->lav_lock);
@@ -1256,6 +1284,7 @@ lx_autofs_expire(vfs_t *vfsp, struct cred *cr)
 	 */
 	if ((fnd_vfs = lx_autofs_get_mountvfs(exp_path)) != NULL) {
 		VFS_RELE(fnd_vfs);
+		mp->lxafme_ts = TICK_TO_SEC(ddi_get_lbolt64());
 		mutex_enter(&data->lav_lock);
 		list_insert_tail(&data->lav_mnt_list, mp);
 		mutex_exit(&data->lav_lock);
@@ -1534,8 +1563,15 @@ lx_autofs_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 
 	/* Create root vnode */
 	data->lav_root = lx_autofs_vn_alloc(vfsp, data->lav_bs_vp);
-	data->lav_root->v_flag |=
-	    VROOT | VNOCACHE | VNOMAP | VNOSWAP | VNOMOUNT;
+
+	data->lav_root->v_flag |= VROOT | VNOCACHE | VNOMAP | VNOSWAP;
+
+	/*
+	 * For a direct mountpoint we need to allow a filesystem to be
+	 * mounted overtop of this autofs mount. Otherwise, disallow that.
+	 */
+	if (data->lav_indirect)
+		data->lav_root->v_flag |= VNOMOUNT;
 
 	return (0);
 }
@@ -1693,12 +1729,95 @@ lx_autofs_rwunlock(struct vnode *vp, int write_lock, caller_context_t *ctp)
 	VOP_RWUNLOCK(uvp, write_lock, ctp);
 }
 
+/*
+ * Check if attempting to access a 'direct' mount and if so, call the
+ * automounter to perform the mount. Once the mount occurs, the new filesystem
+ * will be mounted overtop of this autofs mountpoint and we will no longer
+ * come through this path.
+ */
+static vnode_t *
+lx_autofs_do_direct(vnode_t *vp)
+{
+	vfs_t	*vfsp = vp->v_vfsp;
+	lx_autofs_vfs_t *data = vfsp->vfs_data;
+	vnode_t *nvp;
+	boolean_t skip_am_call = B_FALSE;
+
+	if (data->lav_indirect == B_TRUE)
+		return (NULL);
+
+	/*
+	 * Check if the current process is in the automounter's process group.
+	 * If it is, the current process is either the automounter itself or
+	 * one of it's children. If so, don't call back into the automounter.
+	 */
+	mutex_enter(&pidlock);
+	if (data->lav_pgrp == curproc->p_pgrp) {
+		skip_am_call = B_TRUE;
+	}
+	mutex_exit(&pidlock);
+
+	/*
+	 * It is possible there is already a new fs mounted on top of our vnode.
+	 * This can happen if the caller first did a lookup of a file name
+	 * using our vnode as the directory vp. The lookup would trigger the
+	 * autofs mount on top of ourself, but if the caller then uses our
+	 * vnode to do a getattr on the directory, it will use the autofs
+	 * vnode and not the newly mounted vnode. We need to skip re-calling
+	 * the automounter for this case.
+	 */
+	if (!skip_am_call && vn_mountedvfs(vp) == NULL) {
+		char tbuf[MAXPATHLEN];
+		char *nm;
+
+		(void) strlcpy(tbuf, (char *)refstr_value(vfsp->vfs_mntpt),
+		    sizeof (tbuf));
+		nm = tbuf + strlen(tbuf);
+		while (*nm != '/' && nm != tbuf)
+			nm--;
+		if (*nm == '/')
+			nm++;
+		(void) lx_autofs_automounter_call(vp, nm);
+	}
+
+	/*
+	 * We need to take an extra hold on our vp (which is the autofs
+	 * root vp) to account for the rele done in traverse. traverse will
+	 * take a hold on the new vp so the caller is responsible for calling
+	 * VN_RELE on the returned vp.
+	 */
+	VN_HOLD(vp);
+	nvp = vp;
+	if (traverse(&nvp) != 0) {
+		VN_RELE(nvp);
+		return (NULL);
+	}
+
+	/* Confirm that we have a non-autofs fs mounted now */
+	if (nvp->v_op == lx_autofs_vn_ops) {
+		VN_RELE(nvp);
+		return (NULL);
+	}
+
+	return (nvp);
+}
+
 /*ARGSUSED*/
 static int
 lx_autofs_rmdir(vnode_t *dvp, char *nm, vnode_t *cdir, cred_t *cr,
     caller_context_t *ctp, int flags)
 {
 	vnode_t *udvp = dvp->v_data;
+	vnode_t		*nvp;
+
+	/* handle direct mount here */
+	if ((nvp = lx_autofs_do_direct(dvp)) != NULL) {
+		int error;
+
+		error = VOP_RMDIR(nvp, nm, cdir, cr, ctp, flags);
+		VN_RELE(nvp);
+		return (error);
+	}
 
 	/*
 	 * cdir is the calling processes current directory.
@@ -1730,6 +1849,8 @@ lx_autofs_open(vnode_t **vpp, int flag, cred_t *cr, caller_context_t *ctp)
 	vnode_t		*uvp = ovp->v_data;
 	int		error;
 
+	/* direct mounts were handled by the lookup to get *vpp */
+
 	if ((error = VOP_OPEN(&uvp, flag, cr, ctp)) != 0)
 		return (error);
 
@@ -1748,14 +1869,24 @@ lx_autofs_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
     caller_context_t *ctp)
 {
 	vnode_t		*uvp = vp->v_data;
+	vnode_t		*dvp;
 	int		error;
 
-	if ((error = VOP_GETATTR(uvp, vap, flags, cr, ctp)) != 0)
-		return (error);
+	if ((dvp = lx_autofs_do_direct(vp)) != NULL) {
+		uvp = dvp;
+	}
 
-	/* Update the attributes with our filesystem id. */
-	vap->va_fsid = vp->v_vfsp->vfs_dev;
-	return (0);
+	error = VOP_GETATTR(uvp, vap, flags, cr, ctp);
+
+	if (dvp != NULL) {
+		/* we operated on the direct mounted fs */
+		VN_RELE(dvp);
+	} else if (error == 0) {
+		/* Update the attributes with our filesystem id. */
+		vap->va_fsid = vp->v_vfsp->vfs_dev;
+	}
+
+	return (error);
 }
 
 static int
@@ -1763,19 +1894,30 @@ lx_autofs_mkdir(vnode_t *dvp, char *nm, struct vattr *vap, vnode_t **vpp,
     cred_t *cr, caller_context_t *ctp, int flags, vsecattr_t *vsecp)
 {
 	vnode_t		*udvp = dvp->v_data;
-	vnode_t		*uvp = NULL;
+	vnode_t		*nvp;
 	int		error;
 
-	if ((error = VOP_MKDIR(udvp, nm, vap, &uvp, cr,
-	    ctp, flags, vsecp)) != 0)
-		return (error);
+	if ((nvp = lx_autofs_do_direct(dvp)) != NULL) {
+		udvp = nvp;
+	}
 
-	/* Update the attributes with our filesystem id. */
-	vap->va_fsid = dvp->v_vfsp->vfs_dev;
+	error = VOP_MKDIR(udvp, nm, vap, vpp, cr, ctp, flags, vsecp);
 
-	/* Allocate a new vnode. */
-	*vpp = lx_autofs_vn_alloc(dvp->v_vfsp, uvp);
-	return (0);
+	if (nvp != NULL) {
+		/* we operated on the direct mounted fs */
+		VN_RELE(nvp);
+	} else if (error == 0) {
+		vnode_t		*uvp = NULL;
+
+		/* Update the attributes with our filesystem id. */
+		vap->va_fsid = dvp->v_vfsp->vfs_dev;
+
+		/* Allocate our new vnode. */
+		uvp = *vpp;
+		*vpp = lx_autofs_vn_alloc(dvp->v_vfsp, uvp);
+	}
+
+	return (error);
 }
 
 /*
@@ -1821,13 +1963,19 @@ lx_autofs_lookup(vnode_t *dvp, char *nm, vnode_t **vpp, struct pathname *pnp,
 {
 	vnode_t			*udvp = dvp->v_data;
 	vnode_t			*uvp = NULL;
-	int			error;
+	lx_autofs_vfs_t		*data = dvp->v_vfsp->vfs_data;
+	int			error = ENOENT;
 
-	/* First try to lookup if this path component already exitst. */
-	if ((error = VOP_LOOKUP(udvp, nm, &uvp, pnp, flags, rdir, cr, ctp,
-	    direntflags, realpnp)) == 0) {
-		*vpp = lx_autofs_vn_alloc(dvp->v_vfsp, uvp);
-		return (0);
+	/*
+	 * For an indirect mount first try to lookup if this path component
+	 * already exists.
+	 */
+	if (data->lav_indirect) {
+		if ((error = VOP_LOOKUP(udvp, nm, &uvp, pnp, flags, rdir, cr,
+		    ctp, direntflags, realpnp)) == 0) {
+			*vpp = lx_autofs_vn_alloc(dvp->v_vfsp, uvp);
+			return (0);
+		}
 	}
 
 	/* Only query the automounter if the path does not exist. */
@@ -1838,11 +1986,38 @@ lx_autofs_lookup(vnode_t *dvp, char *nm, vnode_t **vpp, struct pathname *pnp,
 	if ((error = lx_autofs_automounter_call(dvp, nm)) != 0)
 		return (error);
 
-	/* Retry the lookup operation. */
-	if ((error = VOP_LOOKUP(udvp, nm, &uvp, pnp, flags, rdir, cr, ctp,
-	    direntflags, realpnp)) == 0) {
-		*vpp = lx_autofs_vn_alloc(dvp->v_vfsp, uvp);
-		return (0);
+	if (data->lav_indirect) {
+		/*
+		 * Indirect mount. The automounter call should have mounted
+		 * something on nm. Retry the lookup operation.
+		 */
+		if ((error = VOP_LOOKUP(udvp, nm, &uvp, pnp, flags, rdir, cr,
+		    ctp, direntflags, realpnp)) == 0) {
+			*vpp = lx_autofs_vn_alloc(dvp->v_vfsp, uvp);
+			return (0);
+		}
+	} else {
+		/*
+		 * Direct mount. The automounter call should have covered our
+		 * 'dvp' with a new filesystem. Traverse into the new mount and
+		 * retry the lookup.
+		 *
+		 * We need to take an extra hold on our vp (which is the autofs
+		 * root vp) to acount for the rele done in traverse. Our caller
+		 * will also do a rele on the original dvp and that would leave
+		 * us one ref short on our autofs root vnode.
+		 */
+		VN_HOLD(dvp);
+		if ((error = traverse(&dvp)) != 0) {
+			VN_RELE(dvp);
+			return (error);
+		}
+
+		error = VOP_LOOKUP(dvp, nm, vpp, pnp, flags, rdir, cr, ctp,
+		    direntflags, realpnp);
+
+		/* release the traverse hold */
+		VN_RELE(dvp);
 	}
 	return (error);
 }
@@ -1966,7 +2141,7 @@ static vfsdef_t vfw = {
 extern struct mod_ops mod_fsops;
 
 static struct modlfs modlfs = {
-	&mod_fsops, "linux autofs filesystem", &vfw
+	&mod_fsops, "lx autofs filesystem", &vfw
 };
 
 static struct modlinkage modlinkage = {
