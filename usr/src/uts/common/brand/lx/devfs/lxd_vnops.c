@@ -581,43 +581,102 @@ lxd_create(vnode_t *dvp, char *nm, struct vattr *va, enum vcexcl exclusive,
     vsecattr_t *vsecp)
 {
 	int error;
-	vnode_t *vp = NULL;
 	lxd_node_t *parent = VTOLDN(dvp);
+	lxd_node_t *lnp = NULL;
 
+	rw_enter(&parent->lxdn_rwlock, RW_READER);
+	error = lxd_dirlookup(parent, nm, &lnp, cr);
+	rw_exit(&parent->lxdn_rwlock);
 	/*
-	 * We currently don't support creating simple files under lx devfs
-	 * (i.e. Create front nodes. We only allow directories and symlinks).
+	 * If this vnode already exists in lx devfs, we should pass the create
+	 * operation through to the underlying resource it represents.  For
+	 * existing back nodes, the VOP_CREATE is done directly against the
+	 * returned lxd node with an empty name (to avoid a redunant lookup).
+	 * For existing front nodes, an appropriate error must be chosen since
+	 * they cannot represent regular files
 	 */
-	if (parent->lxdn_type == LXDNT_FRONT) {
-		return (EINVAL);
+	if (error == 0) {
+		if (lnp->lxdn_type == LXDNT_BACK) {
+			error = VOP_CREATE(lnp->lxdn_real_vp, "\0", va,
+			    exclusive, mode, vpp, cr, flag, ct, vsecp);
+		} else {
+			if (exclusive == EXCL) {
+				error = EEXIST;
+			} else if (LDNTOV(lnp)->v_type == VDIR &&
+			    (mode & S_IWRITE)) {
+				error = EISDIR;
+			} else {
+				error = ENOTSUP;
+			}
+		}
+		if (error != 0) {
+			ldnode_rele(lnp);
+		}
+		return (error);
 	}
 
 	/*
 	 * We cannot create files in the back devfs but we want to allow for
-	 * o_creat on existing files, so pass this through and let the back
-	 * file system allow or deny it.
+	 * O_CREAT on existing files.  Pass this through and let the back file
+	 * system allow or deny it.
 	 */
+	if (parent->lxdn_type == LXDNT_BACK) {
+		vnode_t *vp = NULL;
 
-	ASSERT(parent->lxdn_type == LXDNT_BACK);
-	if (*nm == '\0') {
-		ASSERT(vpp && dvp == *vpp);
-		vp = REALVP(*vpp);
+		if (*nm == '\0') {
+			ASSERT(vpp && dvp == *vpp);
+			vp = REALVP(*vpp);
+		}
+		if ((error = VOP_CREATE(REALVP(dvp), nm, va, exclusive, mode,
+		    &vp, cr, flag, ct, vsecp)) == 0) {
+			*vpp = lxd_make_back_node(vp, VFSTOLXDM(dvp->v_vfsp));
+			if (IS_DEVVP(*vpp)) {
+				vnode_t *svp;
+
+				svp = specvp(*vpp, (*vpp)->v_rdev,
+				    (*vpp)->v_type, cr);
+				VN_RELE(*vpp);
+				if (svp == NULL) {
+					return (ENOSYS);
+				}
+				*vpp = svp;
+			}
+			return (0);
+		}
+		/*
+		 * If we were unable to perform the VOP_CREATE for any reason
+		 * other than sdev being read-only, we should bail.
+		 */
+		if (error != ENOTSUP && error != EROFS) {
+			return (error);
+		}
 	}
 
-	error = VOP_CREATE(REALVP(dvp), nm, va, exclusive, mode, &vp, cr, flag,
-	    ct, vsecp);
-	if (!error) {
-		*vpp = lxd_make_back_node(vp, VFSTOLXDM(dvp->v_vfsp));
-		if (IS_DEVVP(*vpp)) {
-			vnode_t *svp;
+	/*
+	 * While we don't allow create data-containing files under LX devfs, we
+	 * must allow VSOCK front nodes to be created so that paths such as
+	 * /dev/log can be used as AF_UNIX sockets.
+	 */
+	if (va->va_type == VSOCK) {
+		lxd_mnt_t *lxdm = VTOLXDM(parent->lxdn_vnode);
 
-			svp = specvp(*vpp, (*vpp)->v_rdev, (*vpp)->v_type, cr);
-			VN_RELE(*vpp);
-			if (svp == NULL)
-				error = ENOSYS;
-			else
-				*vpp = svp;
+		lnp = NULL;
+		rw_enter(&parent->lxdn_rwlock, RW_WRITER);
+		error = lxd_direnter(lxdm, parent, nm, DE_CREATE, NULL, NULL,
+		    va, &lnp, cr, ct);
+		rw_exit(&parent->lxdn_rwlock);
+
+		if (error == 0) {
+			*vpp = LDNTOV(lnp);
+		} else if (lnp != NULL) {
+			/*
+			 * It's possible that a racing process created an entry
+			 * at this name since we last performed the lookup.
+			 */
+			ldnode_rele(lnp);
 		}
+	} else {
+		error = ENOTSUP;
 	}
 
 	return (error);
