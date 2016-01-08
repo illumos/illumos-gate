@@ -52,7 +52,7 @@
  */
 
 /*
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #define	NFSCLIENT
@@ -2116,7 +2116,7 @@ convert_nfs_arg_str(char *srcp, char *mntopts)
 		} else {
 			int r;
 
-			r = append_opt(mntopts, MAX_MNTOPT_STR, key, val);
+			r = append_opt(mntopts, MAX_MNTOPT_STR, key, NULL);
 			if (r != 0)
 				return (r);
 		}
