@@ -3899,6 +3899,9 @@ lxpr_read_stat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
  * We don't support swap files or partitions, but some programs like to look
  * here just to check we have some swap on the system, so we lie and show
  * our entire swap cap as one swap partition.
+ *
+ * It is important to use formatting identical to the Linux implementation
+ * so that consumers do not break. See swap_show() in mm/swapfile.c.
  */
 /* ARGSUSED */
 static void
@@ -3914,9 +3917,8 @@ lxpr_read_swaps(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	mutex_exit(&zone->zone_mem_lock);
 
 	lxpr_uiobuf_printf(uiobuf,
-	    "Filename                                "
-	    "Type            Size    Used    Priority\n");
-	lxpr_uiobuf_printf(uiobuf, "%-40s%-16s%-8llu%-8llu%-8d\n",
+	    "Filename\t\t\t\tType\t\tSize\tUsed\tPriority\n");
+	lxpr_uiobuf_printf(uiobuf, "%-40s%s\t%llu\t%llu\t%d\n",
 	    "/dev/swap", "partition", totswap, usedswap, -1);
 }
 
