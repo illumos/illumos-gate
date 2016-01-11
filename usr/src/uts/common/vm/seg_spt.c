@@ -241,7 +241,7 @@ segspt_free(struct seg	*seg)
 {
 	struct spt_data *sptd = (struct spt_data *)seg->s_data;
 
-	ASSERT(seg->s_as && AS_WRITE_HELD(seg->s_as, &seg->s_as->a_lock));
+	ASSERT(seg->s_as && AS_WRITE_HELD(seg->s_as));
 
 	if (sptd != NULL) {
 		if (sptd->spt_realsize)
@@ -263,7 +263,7 @@ static int
 segspt_shmsync(struct seg *seg, caddr_t addr, size_t len, int attr,
 	uint_t flags)
 {
-	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as, &seg->s_as->a_lock));
+	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as));
 
 	return (0);
 }
@@ -278,7 +278,7 @@ segspt_shmincore(struct seg *seg, caddr_t addr, size_t len, char *vec)
 	struct seg	*sptseg;
 	struct spt_data *sptd;
 
-	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as, &seg->s_as->a_lock));
+	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as));
 #ifdef lint
 	seg = seg;
 #endif
@@ -342,7 +342,7 @@ segspt_unmap(struct seg *seg, caddr_t raddr, size_t ssize)
 {
 	size_t share_size;
 
-	ASSERT(seg->s_as && AS_WRITE_HELD(seg->s_as, &seg->s_as->a_lock));
+	ASSERT(seg->s_as && AS_WRITE_HELD(seg->s_as));
 
 	/*
 	 * seg.s_size may have been rounded up to the largest page size
@@ -393,7 +393,7 @@ segspt_create(struct seg *seg, caddr_t argsp)
 	 * We are holding the a_lock on the underlying dummy as,
 	 * so we can make calls to the HAT layer.
 	 */
-	ASSERT(seg->s_as && AS_WRITE_HELD(seg->s_as, &seg->s_as->a_lock));
+	ASSERT(seg->s_as && AS_WRITE_HELD(seg->s_as));
 	ASSERT(sp != NULL);
 
 #ifdef DEBUG
@@ -629,7 +629,7 @@ segspt_free_pages(struct seg *seg, caddr_t addr, size_t len)
 	kproject_t	*proj;
 	kshmid_t	*sp;
 
-	ASSERT(seg->s_as && AS_WRITE_HELD(seg->s_as, &seg->s_as->a_lock));
+	ASSERT(seg->s_as && AS_WRITE_HELD(seg->s_as));
 
 	len = P2ROUNDUP(len, PAGESIZE);
 
@@ -838,7 +838,7 @@ segspt_dismpagelock(struct seg *seg, caddr_t addr, size_t len,
 	pgcnt_t claim_availrmem = 0;
 	uint_t	szc;
 
-	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as, &seg->s_as->a_lock));
+	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as));
 	ASSERT(type == L_PAGELOCK || type == L_PAGEUNLOCK);
 
 	/*
@@ -1193,7 +1193,7 @@ segspt_shmpagelock(struct seg *seg, caddr_t addr, size_t len,
 	struct vnode *vp;
 	u_offset_t off;
 
-	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as, &seg->s_as->a_lock));
+	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as));
 	ASSERT(type == L_PAGELOCK || type == L_PAGEUNLOCK);
 
 
@@ -1451,7 +1451,7 @@ segspt_reclaim(void *ptag, caddr_t addr, size_t len, struct page **pplist,
 	ASSERT(sptd->spt_pcachecnt != 0);
 	ASSERT(sptd->spt_ppa == pplist);
 	ASSERT(npages == btopr(sptd->spt_amp->size));
-	ASSERT(async || AS_LOCK_HELD(seg->s_as, &seg->s_as->a_lock));
+	ASSERT(async || AS_LOCK_HELD(seg->s_as));
 
 	/*
 	 * Acquire the lock on the dummy seg and destroy the
@@ -1585,7 +1585,7 @@ segspt_softunlock(struct seg *seg, caddr_t sptseg_addr,
 	struct anon *ap = NULL;
 	pgcnt_t npages;
 
-	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as, &seg->s_as->a_lock));
+	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as));
 
 	sptseg = shmd->shm_sptseg;
 	sptd = sptseg->s_data;
@@ -1609,9 +1609,9 @@ segspt_softunlock(struct seg *seg, caddr_t sptseg_addr,
 	 * underlying dummy as. This is mostly to satisfy the
 	 * underlying HAT layer.
 	 */
-	AS_LOCK_ENTER(sptseg->s_as, &sptseg->s_as->a_lock, RW_READER);
+	AS_LOCK_ENTER(sptseg->s_as, RW_READER);
 	hat_unlock(sptseg->s_as->a_hat, sptseg_addr, len);
-	AS_LOCK_EXIT(sptseg->s_as, &sptseg->s_as->a_lock);
+	AS_LOCK_EXIT(sptseg->s_as);
 
 	amp = sptd->spt_amp;
 	ASSERT(amp != NULL);
@@ -1676,7 +1676,7 @@ segspt_shmattach(struct seg *seg, caddr_t *argsp)
 	struct spt_data *sptd;
 	int error = 0;
 
-	ASSERT(seg->s_as && AS_WRITE_HELD(seg->s_as, &seg->s_as->a_lock));
+	ASSERT(seg->s_as && AS_WRITE_HELD(seg->s_as));
 
 	shmd = kmem_zalloc((sizeof (*shmd)), KM_NOSLEEP);
 	if (shmd == NULL)
@@ -1735,7 +1735,7 @@ segspt_shmunmap(struct seg *seg, caddr_t raddr, size_t ssize)
 	struct shm_data *shmd = (struct shm_data *)seg->s_data;
 	int reclaim = 1;
 
-	ASSERT(seg->s_as && AS_WRITE_HELD(seg->s_as, &seg->s_as->a_lock));
+	ASSERT(seg->s_as && AS_WRITE_HELD(seg->s_as));
 retry:
 	if (shmd->shm_softlockcnt > 0) {
 		if (reclaim == 1) {
@@ -1769,7 +1769,7 @@ segspt_shmfree(struct seg *seg)
 	struct shm_data *shmd = (struct shm_data *)seg->s_data;
 	struct anon_map *shm_amp = shmd->shm_amp;
 
-	ASSERT(seg->s_as && AS_WRITE_HELD(seg->s_as, &seg->s_as->a_lock));
+	ASSERT(seg->s_as && AS_WRITE_HELD(seg->s_as));
 
 	(void) segspt_shmlockop(seg, seg->s_base, shm_amp->size, 0,
 	    MC_UNLOCK, NULL, 0);
@@ -1802,7 +1802,7 @@ segspt_shmfree(struct seg *seg)
 int
 segspt_shmsetprot(struct seg *seg, caddr_t addr, size_t len, uint_t prot)
 {
-	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as, &seg->s_as->a_lock));
+	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as));
 
 	/*
 	 * Shared page table is more than shared mapping.
@@ -1840,7 +1840,7 @@ segspt_dismfault(struct hat *hat, struct seg *seg, caddr_t addr,
 #ifdef lint
 	hat = hat;
 #endif
-	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as, &seg->s_as->a_lock));
+	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as));
 
 	/*
 	 * Because of the way spt is implemented
@@ -1909,7 +1909,7 @@ segspt_dismfault(struct hat *hat, struct seg *seg, caddr_t addr,
 			}
 			goto dism_err;
 		}
-		AS_LOCK_ENTER(sptseg->s_as, &sptseg->s_as->a_lock, RW_READER);
+		AS_LOCK_ENTER(sptseg->s_as, RW_READER);
 		a = segspt_addr;
 		pidx = 0;
 		if (type == F_SOFTLOCK) {
@@ -1970,7 +1970,7 @@ segspt_dismfault(struct hat *hat, struct seg *seg, caddr_t addr,
 				}
 			}
 		}
-		AS_LOCK_EXIT(sptseg->s_as, &sptseg->s_as->a_lock);
+		AS_LOCK_EXIT(sptseg->s_as);
 dism_err:
 		kmem_free(ppa, npages * sizeof (page_t *));
 		return (err);
@@ -2037,7 +2037,7 @@ segspt_shmfault(struct hat *hat, struct seg *seg, caddr_t addr,
 	hat = hat;
 #endif
 
-	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as, &seg->s_as->a_lock));
+	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as));
 
 	if (sptd->spt_flags & SHM_PAGEABLE) {
 		return (segspt_dismfault(hat, seg, addr, len, type, rw));
@@ -2169,7 +2169,7 @@ segspt_shmfault(struct hat *hat, struct seg *seg, caddr_t addr,
 		 * underlying dummy as. This is mostly to satisfy the
 		 * underlying HAT layer.
 		 */
-		AS_LOCK_ENTER(sptseg->s_as, &sptseg->s_as->a_lock, RW_READER);
+		AS_LOCK_ENTER(sptseg->s_as, RW_READER);
 		a = sptseg_addr;
 		pidx = 0;
 		if (type == F_SOFTLOCK) {
@@ -2214,7 +2214,7 @@ segspt_shmfault(struct hat *hat, struct seg *seg, caddr_t addr,
 			for (i = 0; i < npages; i++)
 				page_unlock(ppa[i]);
 		}
-		AS_LOCK_EXIT(sptseg->s_as, &sptseg->s_as->a_lock);
+		AS_LOCK_EXIT(sptseg->s_as);
 
 		kmem_free(ppa, sizeof (page_t *) * npages);
 		return (0);
@@ -2284,7 +2284,7 @@ segspt_shmdup(struct seg *seg, struct seg *newseg)
 	struct spt_data		*sptd = spt_seg->s_data;
 	int			error = 0;
 
-	ASSERT(seg->s_as && AS_WRITE_HELD(seg->s_as, &seg->s_as->a_lock));
+	ASSERT(seg->s_as && AS_WRITE_HELD(seg->s_as));
 
 	shmd_new = kmem_zalloc((sizeof (*shmd_new)), KM_SLEEP);
 	newseg->s_data = (void *)shmd_new;
@@ -2326,7 +2326,7 @@ segspt_shmcheckprot(struct seg *seg, caddr_t addr, size_t size, uint_t prot)
 	struct shm_data *shmd = (struct shm_data *)seg->s_data;
 	struct spt_data *sptd = (struct spt_data *)shmd->shm_sptseg->s_data;
 
-	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as, &seg->s_as->a_lock));
+	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as));
 
 	/*
 	 * ISM segment is always rw.
@@ -2677,7 +2677,7 @@ segspt_shmlockop(struct seg *seg, caddr_t addr, size_t len,
 	struct proc	*p = curproc;
 	kproject_t	*proj;
 
-	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as, &seg->s_as->a_lock));
+	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as));
 	ASSERT(sp != NULL);
 
 	if ((sptd->spt_flags & SHM_PAGEABLE) == 0) {
@@ -2807,7 +2807,7 @@ segspt_shmgetprot(struct seg *seg, caddr_t addr, size_t len, uint_t *protv)
 	struct spt_data *sptd = (struct spt_data *)shmd->shm_sptseg->s_data;
 	spgcnt_t pgno = seg_page(seg, addr+len) - seg_page(seg, addr) + 1;
 
-	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as, &seg->s_as->a_lock));
+	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as));
 
 	/*
 	 * ISM segment is always rw.
@@ -2821,7 +2821,7 @@ segspt_shmgetprot(struct seg *seg, caddr_t addr, size_t len, uint_t *protv)
 u_offset_t
 segspt_shmgetoffset(struct seg *seg, caddr_t addr)
 {
-	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as, &seg->s_as->a_lock));
+	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as));
 
 	/* Offset does not matter in ISM memory */
 
@@ -2835,7 +2835,7 @@ segspt_shmgettype(struct seg *seg, caddr_t addr)
 	struct shm_data *shmd = (struct shm_data *)seg->s_data;
 	struct spt_data *sptd = (struct spt_data *)shmd->shm_sptseg->s_data;
 
-	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as, &seg->s_as->a_lock));
+	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as));
 
 	/*
 	 * The shared memory mapping is always MAP_SHARED, SWAP is only
@@ -2852,7 +2852,7 @@ segspt_shmgetvp(struct seg *seg, caddr_t addr, struct vnode **vpp)
 	struct shm_data *shmd = (struct shm_data *)seg->s_data;
 	struct spt_data *sptd = (struct spt_data *)shmd->shm_sptseg->s_data;
 
-	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as, &seg->s_as->a_lock));
+	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as));
 
 	*vpp = sptd->spt_vp;
 	return (0);
@@ -2878,7 +2878,7 @@ segspt_shmadvise(struct seg *seg, caddr_t addr, size_t len, uint_t behav)
 	int writer;
 	page_t **ppa;
 
-	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as, &seg->s_as->a_lock));
+	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as));
 
 	if (behav == MADV_FREE) {
 		if ((sptd->spt_flags & SHM_PAGEABLE) == 0)
@@ -2912,9 +2912,9 @@ segspt_shmadvise(struct seg *seg, caddr_t addr, size_t len, uint_t behav)
 		 * kicked out of the seg_pcache.  We bump the shm_softlockcnt
 		 * to keep this segment resident.
 		 */
-		writer = AS_WRITE_HELD(seg->s_as, &seg->s_as->a_lock);
+		writer = AS_WRITE_HELD(seg->s_as);
 		atomic_inc_ulong((ulong_t *)(&(shmd->shm_softlockcnt)));
-		AS_LOCK_EXIT(seg->s_as, &seg->s_as->a_lock);
+		AS_LOCK_EXIT(seg->s_as);
 
 		mutex_enter(&sptd->spt_lock);
 
@@ -2935,8 +2935,7 @@ segspt_shmadvise(struct seg *seg, caddr_t addr, size_t len, uint_t behav)
 		mutex_exit(&sptd->spt_lock);
 
 		/* Regrab the AS_LOCK and release our hold on the segment */
-		AS_LOCK_ENTER(seg->s_as, &seg->s_as->a_lock,
-		    writer ? RW_WRITER : RW_READER);
+		AS_LOCK_ENTER(seg->s_as, writer ? RW_WRITER : RW_READER);
 		atomic_dec_ulong((ulong_t *)(&(shmd->shm_softlockcnt)));
 		if (shmd->shm_softlockcnt <= 0) {
 			if (AS_ISUNMAPWAIT(seg->s_as)) {

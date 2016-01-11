@@ -260,7 +260,7 @@ hat_alloc(struct as *as)
 	if (can_steal_post_boot == 0)
 		can_steal_post_boot = 1;
 
-	ASSERT(AS_WRITE_HELD(as, &as->a_lock));
+	ASSERT(AS_WRITE_HELD(as));
 	hat = kmem_cache_alloc(hat_cache, KM_SLEEP);
 	hat->hat_as = as;
 	mutex_init(&hat->hat_mutex, NULL, MUTEX_DEFAULT, NULL);
@@ -393,7 +393,7 @@ init_done:
 void
 hat_free_start(hat_t *hat)
 {
-	ASSERT(AS_WRITE_HELD(hat->hat_as, &hat->hat_as->a_lock));
+	ASSERT(AS_WRITE_HELD(hat->hat_as));
 
 	/*
 	 * If the hat is currently a stealing victim, wait for the stealing
@@ -726,12 +726,12 @@ hat_init()
 	/*
 	 * Set up the kernel's hat
 	 */
-	AS_LOCK_ENTER(&kas, &kas.a_lock, RW_WRITER);
+	AS_LOCK_ENTER(&kas, RW_WRITER);
 	kas.a_hat = kmem_cache_alloc(hat_cache, KM_NOSLEEP);
 	mutex_init(&kas.a_hat->hat_mutex, NULL, MUTEX_DEFAULT, NULL);
 	kas.a_hat->hat_as = &kas;
 	kas.a_hat->hat_flags = 0;
-	AS_LOCK_EXIT(&kas, &kas.a_lock);
+	AS_LOCK_EXIT(&kas);
 
 	CPUSET_ZERO(khat_cpuset);
 	CPUSET_ADD(khat_cpuset, CPU->cpu_id);
@@ -1157,7 +1157,7 @@ hat_swapout(hat_t *hat)
 	 */
 	ASSERT(IS_PAGEALIGNED(vaddr));
 	ASSERT(IS_PAGEALIGNED(eaddr));
-	ASSERT(AS_LOCK_HELD(hat->hat_as, &hat->hat_as->a_lock));
+	ASSERT(AS_LOCK_HELD(hat->hat_as));
 	if ((uintptr_t)hat->hat_as->a_userlimit < eaddr)
 		eaddr = (uintptr_t)hat->hat_as->a_userlimit;
 
@@ -1438,8 +1438,7 @@ hati_load_common(
 	++curthread->t_hatdepth;
 	ASSERT(curthread->t_hatdepth < 16);
 
-	ASSERT(hat == kas.a_hat ||
-	    AS_LOCK_HELD(hat->hat_as, &hat->hat_as->a_lock));
+	ASSERT(hat == kas.a_hat || AS_LOCK_HELD(hat->hat_as));
 
 	if (flags & HAT_LOAD_SHARE)
 		hat->hat_flags |= HAT_SHARED;
@@ -1587,8 +1586,7 @@ hat_memload(
 	XPV_DISALLOW_MIGRATE();
 	ASSERT(IS_PAGEALIGNED(va));
 	ASSERT(hat == kas.a_hat || va < _userlimit);
-	ASSERT(hat == kas.a_hat ||
-	    AS_LOCK_HELD(hat->hat_as, &hat->hat_as->a_lock));
+	ASSERT(hat == kas.a_hat || AS_LOCK_HELD(hat->hat_as));
 	ASSERT((flags & supported_memload_flags) == flags);
 
 	ASSERT(!IN_VA_HOLE(va));
@@ -1645,8 +1643,7 @@ hat_memload_array(
 	XPV_DISALLOW_MIGRATE();
 	ASSERT(IS_PAGEALIGNED(va));
 	ASSERT(hat == kas.a_hat || va + len <= _userlimit);
-	ASSERT(hat == kas.a_hat ||
-	    AS_LOCK_HELD(hat->hat_as, &hat->hat_as->a_lock));
+	ASSERT(hat == kas.a_hat || AS_LOCK_HELD(hat->hat_as));
 	ASSERT((flags & supported_memload_flags) == flags);
 
 	/*
@@ -1781,8 +1778,7 @@ hat_devload(
 	XPV_DISALLOW_MIGRATE();
 	ASSERT(IS_PAGEALIGNED(va));
 	ASSERT(hat == kas.a_hat || eva <= _userlimit);
-	ASSERT(hat == kas.a_hat ||
-	    AS_LOCK_HELD(hat->hat_as, &hat->hat_as->a_lock));
+	ASSERT(hat == kas.a_hat || AS_LOCK_HELD(hat->hat_as));
 	ASSERT((flags & supported_devload_flags) == flags);
 
 	/*
@@ -1890,7 +1886,7 @@ hat_unlock(hat_t *hat, caddr_t addr, size_t len)
 		panic("hat_unlock() address out of range - above _userlimit");
 
 	XPV_DISALLOW_MIGRATE();
-	ASSERT(AS_LOCK_HELD(hat->hat_as, &hat->hat_as->a_lock));
+	ASSERT(AS_LOCK_HELD(hat->hat_as));
 	while (vaddr < eaddr) {
 		(void) htable_walk(hat, &ht, &vaddr, eaddr);
 		if (ht == NULL)
@@ -2645,8 +2641,7 @@ hat_updateattr(hat_t *hat, caddr_t addr, size_t len, uint_t attr, int what)
 	XPV_DISALLOW_MIGRATE();
 	ASSERT(IS_PAGEALIGNED(vaddr));
 	ASSERT(IS_PAGEALIGNED(eaddr));
-	ASSERT(hat == kas.a_hat ||
-	    AS_LOCK_HELD(hat->hat_as, &hat->hat_as->a_lock));
+	ASSERT(hat == kas.a_hat || AS_LOCK_HELD(hat->hat_as));
 	for (; vaddr < eaddr; vaddr += LEVEL_SIZE(ht->ht_level)) {
 try_again:
 		oldpte = htable_walk(hat, &ht, &vaddr, eaddr);
@@ -2856,8 +2851,7 @@ hat_probe(hat_t *hat, caddr_t addr)
 	pgcnt_t		pg_off;
 
 	ASSERT(hat == kas.a_hat || vaddr <= _userlimit);
-	ASSERT(hat == kas.a_hat ||
-	    AS_LOCK_HELD(hat->hat_as, &hat->hat_as->a_lock));
+	ASSERT(hat == kas.a_hat || AS_LOCK_HELD(hat->hat_as));
 	if (IN_VA_HOLE(vaddr))
 		return (0);
 

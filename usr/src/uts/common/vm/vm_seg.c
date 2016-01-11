@@ -1649,7 +1649,7 @@ seg_unmap(struct seg *seg)
 	int ret;
 #endif /* DEBUG */
 
-	ASSERT(seg->s_as && AS_WRITE_HELD(seg->s_as, &seg->s_as->a_lock));
+	ASSERT(seg->s_as && AS_WRITE_HELD(seg->s_as));
 
 	/* Shouldn't have called seg_unmap if mapping isn't yet established */
 	ASSERT(seg->s_data != NULL);

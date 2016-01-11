@@ -1484,7 +1484,7 @@ check_exec_addrs(int loadable, mmapobj_result_t *mrp, caddr_t start_addr)
 			 * segdev and the type is neither MAP_SHARED
 			 * nor MAP_PRIVATE.
 			 */
-			AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
+			AS_LOCK_ENTER(as, RW_READER);
 			seg = as_findseg(as, myaddr, 0);
 			MOBJ_STAT_ADD(exec_addr_mapped);
 			if (seg && seg->s_ops == &segdev_ops &&
@@ -1494,7 +1494,7 @@ check_exec_addrs(int loadable, mmapobj_result_t *mrp, caddr_t start_addr)
 			    myaddr + mylen <=
 			    seg->s_base + seg->s_size) {
 				MOBJ_STAT_ADD(exec_addr_devnull);
-				AS_LOCK_EXIT(as, &as->a_lock);
+				AS_LOCK_EXIT(as);
 				(void) as_unmap(as, myaddr, mylen);
 				ret = as_map(as, myaddr, mylen, segvn_create,
 				    &crargs);
@@ -1507,7 +1507,7 @@ check_exec_addrs(int loadable, mmapobj_result_t *mrp, caddr_t start_addr)
 					return (ret);
 				}
 			} else {
-				AS_LOCK_EXIT(as, &as->a_lock);
+				AS_LOCK_EXIT(as);
 				as_rangeunlock(as);
 				mmapobj_unmap_exec(mrp, i, start_addr);
 				MOBJ_STAT_ADD(exec_addr_in_use);

@@ -5381,7 +5381,7 @@ page_mark_migrate(struct seg *seg, caddr_t addr, size_t len,
 	ulong_t		an_idx;
 	anon_sync_obj_t	cookie;
 
-	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as, &seg->s_as->a_lock));
+	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as));
 
 	/*
 	 * Don't do anything if don't need to do lgroup optimizations
@@ -5559,7 +5559,7 @@ page_migrate(
 	spgcnt_t	i;
 	uint_t		pszc;
 
-	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as, &seg->s_as->a_lock));
+	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as));
 
 	while (npages > 0) {
 		pp = *ppa;

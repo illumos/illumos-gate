@@ -1087,7 +1087,7 @@ simulate_unimp(struct regs *rp, caddr_t *badaddr)
 
 	as = p->p_as;
 
-	AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
+	AS_LOCK_ENTER(as, RW_READER);
 	mapseg = as_findseg(as, (caddr_t)rp->r_pc, 0);
 	ASSERT(mapseg != NULL);
 	svd = (struct segvn_data *)mapseg->s_data;
@@ -1098,11 +1098,11 @@ simulate_unimp(struct regs *rp, caddr_t *badaddr)
 	SEGVN_LOCK_ENTER(as, &svd->lock, RW_READER);
 	if ((svd->type & MAP_TYPE) & MAP_SHARED) {
 		SEGVN_LOCK_EXIT(as, &svd->lock);
-		AS_LOCK_EXIT(as, &as->a_lock);
+		AS_LOCK_EXIT(as);
 		return (SIMU_ILLEGAL);
 	}
 	SEGVN_LOCK_EXIT(as, &svd->lock);
-	AS_LOCK_EXIT(as, &as->a_lock);
+	AS_LOCK_EXIT(as);
 
 	/*
 	 * A "flush" instruction using the user PC's vaddr will not work
@@ -1114,9 +1114,9 @@ simulate_unimp(struct regs *rp, caddr_t *badaddr)
 	    F_SOFTLOCK, S_READ))
 		return (SIMU_FAULT);
 
-	AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
+	AS_LOCK_ENTER(as, RW_READER);
 	pfnum = hat_getpfnum(as->a_hat, (caddr_t)rp->r_pc);
-	AS_LOCK_EXIT(as, &as->a_lock);
+	AS_LOCK_EXIT(as);
 	if (pf_is_memory(pfnum)) {
 		pp = page_numtopp_nolock(pfnum);
 		ASSERT(pp == NULL || PAGE_LOCKED(pp));
@@ -1126,12 +1126,12 @@ simulate_unimp(struct regs *rp, caddr_t *badaddr)
 		return (SIMU_FAULT);
 	}
 
-	AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
+	AS_LOCK_ENTER(as, RW_READER);
 	ka = ppmapin(pp, PROT_READ|PROT_WRITE, (caddr_t)rp->r_pc);
 	*(uint_t *)(ka + (uintptr_t)(rp->r_pc % PAGESIZE)) = inst;
 	doflush(ka + (uintptr_t)(rp->r_pc % PAGESIZE));
 	ppmapout(ka);
-	AS_LOCK_EXIT(as, &as->a_lock);
+	AS_LOCK_EXIT(as);
 
 	(void) as_fault(as->a_hat, as, (caddr_t)(rp->r_pc & PAGEMASK),
 	    PAGESIZE, F_SOFTUNLOCK, S_READ);

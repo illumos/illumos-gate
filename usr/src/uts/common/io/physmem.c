@@ -647,7 +647,7 @@ physmem_getpage(struct vnode *vp, offset_t off, size_t len, uint_t *protp,
 	page_t *pp;
 
 	ASSERT(len == PAGESIZE);
-	ASSERT(AS_READ_HELD(seg->s_as, &seg->s_as->a_lock));
+	ASSERT(AS_READ_HELD(seg->s_as));
 
 	/*
 	 * If the page is in the hash, then we successfully claimed this

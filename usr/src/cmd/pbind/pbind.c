@@ -20,11 +20,10 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2015 Ryan Zezeski
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * pbind - bind a process to a processor (non-exclusively)
@@ -54,6 +53,7 @@
 
 static char	*progname;
 static char	bflag;
+static char	eflag;
 static char	qflag;
 static char	Qflag;
 static char	uflag;
@@ -165,17 +165,17 @@ bind_out(id_t pid, id_t lwpid, processorid_t old, processorid_t new)
 	if (old == PBIND_NONE) {
 		if (new == PBIND_NONE)
 			(void) printf(gettext("%s id %s: was not bound, "
-				"now not bound\n"), proclwp, pidstr);
+			    "now not bound\n"), proclwp, pidstr);
 		else
 			(void) printf(gettext("%s id %s: was not bound, "
-				"now %d\n"), proclwp, pidstr, new);
+			    "now %d\n"), proclwp, pidstr, new);
 	} else {
 		if (new == PBIND_NONE)
 			(void) printf(gettext("%s id %s: was %d, "
-				"now not bound\n"), proclwp, pidstr, old);
+			    "now not bound\n"), proclwp, pidstr, old);
 		else
 			(void) printf(gettext("%s id %s: was %d, "
-				"now %d\n"), proclwp, pidstr, old, new);
+			    "now %d\n"), proclwp, pidstr, old, new);
 	}
 }
 
@@ -345,11 +345,45 @@ query_all_lwp(psinfo_t *psinfo, lwpsinfo_t *lwpsinfo, void *arg)
 	return (0);
 }
 
+/*
+ * Execute the cmd with args while bound to cpu. Does not return:
+ * either executes cmd successfully or dies trying.
+ */
+static void
+exec_cmd(processorid_t cpu, char *cmd, char **args)
+{
+	if (processor_bind(P_PID, P_MYID, cpu, NULL) == -1) {
+		bind_err(cpu, getpid(), -1, errno);
+		exit(ERR_FAIL);
+	}
+
+	if (execvp(cmd, args) == -1)
+		die(gettext("failed to exec %s\n"), cmd);
+}
+
+/*
+ * Attempt to parse str as a CPU identifier. Return the identifier or
+ * die.
+ */
+static processorid_t
+parse_cpu(char *str)
+{
+	processorid_t cpu;
+	char *endstr;
+
+	cpu = strtol(str, &endstr, 10);
+	if (endstr != NULL && *endstr != '\0' || cpu < 0)
+		die(gettext("invalid processor ID %s\n"), optarg);
+
+	return (cpu);
+}
+
 static int
 usage(void)
 {
 	(void) fprintf(stderr,
 	    gettext("usage: \n\t%1$s -b processor_id pid[/lwpids] ...\n"
+	    "\t%1$s -e processor_id cmd [args...]\n"
 	    "\t%1$s -U [processor_id] ...\n"
 	    "\t%1$s -Q [processor_id] ...\n"
 	    "\t%1$s -u pid[/lwpids] ...\n"
@@ -372,15 +406,17 @@ main(int argc, char *argv[])
 	(void) setlocale(LC_ALL, "");	/* setup localization */
 	(void) textdomain(TEXT_DOMAIN);
 
-	while ((c = getopt(argc, argv, "b:qQuU")) != EOF) {
+	while ((c = getopt(argc, argv, "b:e:qQuU")) != EOF) {
 		switch (c) {
 
 		case 'b':
 			bflag = 1;
-			cpu = strtol(optarg, &endstr, 10);
-			if (endstr != NULL && *endstr != '\0' || cpu < 0)
-				die(gettext("invalid processor ID %s\n"),
-				    optarg);
+			cpu = parse_cpu(optarg);
+			break;
+
+		case 'e':
+			eflag = 1;
+			cpu = parse_cpu(optarg);
 			break;
 
 		case 'q':
@@ -409,15 +445,15 @@ main(int argc, char *argv[])
 
 
 	/*
-	 * Make sure that at most one of the options b, q, Q, u, or U
-	 * was specified.
+	 * Make sure that at most one of the options b, e, q, Q, u, or
+	 * U was specified.
 	 */
-	c = bflag + qflag + Qflag + uflag + Uflag;
+	c = bflag + eflag + qflag + Qflag + uflag + Uflag;
 	if (c < 1) {				/* nothing specified */
 		qflag = 1;			/* default to query */
 		cpu = PBIND_QUERY;
 	} else if (c > 1) {
-		warn(gettext("options -b, -q, -Q, -u and -U "
+		warn(gettext("options -b, -e, -q, -Q, -u and -U "
 		    "are mutually exclusive\n"));
 		return (usage());
 	}
@@ -434,6 +470,10 @@ main(int argc, char *argv[])
 			warn(gettext("must specify at least one pid\n"));
 			return (usage());
 		}
+		if (eflag) {
+			warn(gettext("must specify command\n"));
+			return (usage());
+		}
 		if (Uflag) {
 			if (processor_bind(P_ALL, 0, PBIND_NONE, &old_cpu) != 0)
 				die(gettext("failed to unbind some LWPs"));
@@ -446,6 +486,9 @@ main(int argc, char *argv[])
 			return (errors);
 		}
 	}
+
+	if (eflag)
+		exec_cmd(cpu, argv[0], argv);
 
 	if (Qflag || Uflag) {
 		/*

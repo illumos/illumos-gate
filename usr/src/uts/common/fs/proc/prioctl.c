@@ -962,9 +962,9 @@ startover:
 			n = 0;
 		else {
 			mutex_exit(&p->p_lock);
-			AS_LOCK_ENTER(as, &as->a_lock, RW_WRITER);
+			AS_LOCK_ENTER(as, RW_WRITER);
 			n = prnsegs(as, 0);
-			AS_LOCK_EXIT(as, &as->a_lock);
+			AS_LOCK_EXIT(as);
 			mutex_enter(&p->p_lock);
 		}
 		prunlock(pnp);
@@ -983,9 +983,9 @@ startover:
 			prunlock(pnp);
 		} else {
 			mutex_exit(&p->p_lock);
-			AS_LOCK_ENTER(as, &as->a_lock, RW_WRITER);
+			AS_LOCK_ENTER(as, RW_WRITER);
 			error = oprgetmap(p, &iolhead);
-			AS_LOCK_EXIT(as, &as->a_lock);
+			AS_LOCK_EXIT(as);
 			mutex_enter(&p->p_lock);
 			prunlock(pnp);
 
@@ -1657,11 +1657,11 @@ oprgetpsinfo32(proc_t *p, prpsinfo32_t *psp, kthread_t *tp)
 			psp->pr_pctmem = 0;
 		} else {
 			mutex_exit(&p->p_lock);
-			AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
+			AS_LOCK_ENTER(as, RW_READER);
 			psp->pr_size = (size32_t)btopr(as->a_resvsize);
 			psp->pr_rssize = (size32_t)rm_asrss(as);
 			psp->pr_pctmem = rm_pctmemory(as);
-			AS_LOCK_EXIT(as, &as->a_lock);
+			AS_LOCK_EXIT(as);
 			mutex_enter(&p->p_lock);
 		}
 	}
@@ -2589,9 +2589,9 @@ startover:
 			n = 0;
 		else {
 			mutex_exit(&p->p_lock);
-			AS_LOCK_ENTER(as, &as->a_lock, RW_WRITER);
+			AS_LOCK_ENTER(as, RW_WRITER);
 			n = prnsegs(as, 0);
-			AS_LOCK_EXIT(as, &as->a_lock);
+			AS_LOCK_EXIT(as);
 			mutex_enter(&p->p_lock);
 		}
 		prunlock(pnp);
@@ -2613,9 +2613,9 @@ startover:
 			prunlock(pnp);
 		} else {
 			mutex_exit(&p->p_lock);
-			AS_LOCK_ENTER(as, &as->a_lock, RW_WRITER);
+			AS_LOCK_ENTER(as, RW_WRITER);
 			error = oprgetmap32(p, &iolhead);
-			AS_LOCK_EXIT(as, &as->a_lock);
+			AS_LOCK_EXIT(as);
 			mutex_enter(&p->p_lock);
 			prunlock(pnp);
 
@@ -3142,7 +3142,7 @@ propenm(prnode_t *pnp, caddr_t cmaddr, caddr_t va, int *rvalp, cred_t *cr)
 		 * change because it is marked P_PR_LOCK.
 		 */
 		mutex_exit(&p->p_lock);
-		AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
+		AS_LOCK_ENTER(as, RW_READER);
 		seg = as_segat(as, va);
 		if (seg != NULL &&
 		    seg->s_ops == &segvn_ops &&
@@ -3153,7 +3153,7 @@ propenm(prnode_t *pnp, caddr_t cmaddr, caddr_t va, int *rvalp, cred_t *cr)
 		} else {
 			error = EINVAL;
 		}
-		AS_LOCK_EXIT(as, &as->a_lock);
+		AS_LOCK_EXIT(as);
 		mutex_enter(&p->p_lock);
 	} else if ((xvp = p->p_exec) == NULL) {
 		error = EINVAL;
@@ -3496,11 +3496,11 @@ oprgetpsinfo(proc_t *p, prpsinfo_t *psp, kthread_t *tp)
 			psp->pr_pctmem = 0;
 		} else {
 			mutex_exit(&p->p_lock);
-			AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
+			AS_LOCK_ENTER(as, RW_READER);
 			psp->pr_size = btopr(as->a_resvsize);
 			psp->pr_rssize = rm_asrss(as);
 			psp->pr_pctmem = rm_pctmemory(as);
-			AS_LOCK_EXIT(as, &as->a_lock);
+			AS_LOCK_EXIT(as);
 			mutex_enter(&p->p_lock);
 		}
 	}
@@ -3523,7 +3523,7 @@ oprgetmap(proc_t *p, list_t *iolhead)
 	struct seg *brkseg, *stkseg;
 	uint_t prot;
 
-	ASSERT(as != &kas && AS_WRITE_HELD(as, &as->a_lock));
+	ASSERT(as != &kas && AS_WRITE_HELD(as));
 
 	/*
 	 * Request an initial buffer size that doesn't waste memory
@@ -3583,7 +3583,7 @@ oprgetmap32(proc_t *p, list_t *iolhead)
 	struct seg *brkseg, *stkseg;
 	uint_t prot;
 
-	ASSERT(as != &kas && AS_WRITE_HELD(as, &as->a_lock));
+	ASSERT(as != &kas && AS_WRITE_HELD(as));
 
 	/*
 	 * Request an initial buffer size that doesn't waste memory
@@ -3643,7 +3643,7 @@ oprpdsize(struct as *as)
 	struct seg *seg;
 	size_t size;
 
-	ASSERT(as != &kas && AS_WRITE_HELD(as, &as->a_lock));
+	ASSERT(as != &kas && AS_WRITE_HELD(as));
 
 	if ((seg = AS_SEGFIRST(as)) == NULL)
 		return (0);
@@ -3673,7 +3673,7 @@ oprpdsize32(struct as *as)
 	struct seg *seg;
 	size_t size;
 
-	ASSERT(as != &kas && AS_WRITE_HELD(as, &as->a_lock));
+	ASSERT(as != &kas && AS_WRITE_HELD(as));
 
 	if ((seg = AS_SEGFIRST(as)) == NULL)
 		return (0);
@@ -3711,15 +3711,15 @@ oprpdread(struct as *as, uint_t hatid, struct uio *uiop)
 	int error;
 
 again:
-	AS_LOCK_ENTER(as, &as->a_lock, RW_WRITER);
+	AS_LOCK_ENTER(as, RW_WRITER);
 
 	if ((seg = AS_SEGFIRST(as)) == NULL) {
-		AS_LOCK_EXIT(as, &as->a_lock);
+		AS_LOCK_EXIT(as);
 		return (0);
 	}
 	size = oprpdsize(as);
 	if (uiop->uio_resid < size) {
-		AS_LOCK_EXIT(as, &as->a_lock);
+		AS_LOCK_EXIT(as);
 		return (E2BIG);
 	}
 
@@ -3765,7 +3765,7 @@ again:
 			 */
 			if (next > (uintptr_t)buf + size) {
 				pr_getprot_done(&tmp);
-				AS_LOCK_EXIT(as, &as->a_lock);
+				AS_LOCK_EXIT(as);
 
 				kmem_free(buf, size);
 
@@ -3797,7 +3797,7 @@ again:
 		ASSERT(tmp == NULL);
 	} while ((seg = AS_SEGNEXT(as, seg)) != NULL);
 
-	AS_LOCK_EXIT(as, &as->a_lock);
+	AS_LOCK_EXIT(as);
 
 	ASSERT((uintptr_t)pmp <= (uintptr_t)buf + size);
 	error = uiomove(buf, (caddr_t)pmp - buf, UIO_READ, uiop);
@@ -3818,15 +3818,15 @@ oprpdread32(struct as *as, uint_t hatid, struct uio *uiop)
 	int error;
 
 again:
-	AS_LOCK_ENTER(as, &as->a_lock, RW_WRITER);
+	AS_LOCK_ENTER(as, RW_WRITER);
 
 	if ((seg = AS_SEGFIRST(as)) == NULL) {
-		AS_LOCK_EXIT(as, &as->a_lock);
+		AS_LOCK_EXIT(as);
 		return (0);
 	}
 	size = oprpdsize32(as);
 	if (uiop->uio_resid < size) {
-		AS_LOCK_EXIT(as, &as->a_lock);
+		AS_LOCK_EXIT(as);
 		return (E2BIG);
 	}
 
@@ -3872,7 +3872,7 @@ again:
 			 */
 			if (next > (uintptr_t)buf + size) {
 				pr_getprot_done(&tmp);
-				AS_LOCK_EXIT(as, &as->a_lock);
+				AS_LOCK_EXIT(as);
 
 				kmem_free(buf, size);
 
@@ -3904,7 +3904,7 @@ again:
 		ASSERT(tmp == NULL);
 	} while ((seg = AS_SEGNEXT(as, seg)) != NULL);
 
-	AS_LOCK_EXIT(as, &as->a_lock);
+	AS_LOCK_EXIT(as);
 
 	ASSERT((uintptr_t)pmp == (uintptr_t)buf + size);
 	error = uiomove(buf, (caddr_t)pmp - buf, UIO_READ, uiop);

@@ -1318,9 +1318,9 @@ hat_init(void)
 	/*
 	 * We grab the first hat for the kernel,
 	 */
-	AS_LOCK_ENTER(&kas, &kas.a_lock, RW_WRITER);
+	AS_LOCK_ENTER(&kas, RW_WRITER);
 	kas.a_hat = hat_alloc(&kas);
-	AS_LOCK_EXIT(&kas, &kas.a_lock);
+	AS_LOCK_EXIT(&kas);
 
 	/*
 	 * Initialize hblk_reserve.
@@ -1463,7 +1463,7 @@ hat_alloc(struct as *as)
 	uint64_t cnum;
 	extern uint_t get_color_start(struct as *);
 
-	ASSERT(AS_WRITE_HELD(as, &as->a_lock));
+	ASSERT(AS_WRITE_HELD(as));
 	sfmmup = kmem_cache_alloc(sfmmuid_cache, KM_SLEEP);
 	sfmmup->sfmmu_as = as;
 	sfmmup->sfmmu_flags = 0;
@@ -1917,7 +1917,7 @@ hat_setup(struct hat *sfmmup, int allocflag)
 void
 hat_free_start(struct hat *sfmmup)
 {
-	ASSERT(AS_WRITE_HELD(sfmmup->sfmmu_as, &sfmmup->sfmmu_as->a_lock));
+	ASSERT(AS_WRITE_HELD(sfmmup->sfmmu_as));
 	ASSERT(sfmmup != ksfmmup);
 	ASSERT(sfmmup->sfmmu_xhat_provider == NULL);
 
@@ -2247,8 +2247,7 @@ hat_do_memload(struct hat *hat, caddr_t addr, struct page *pp,
 		return;
 	}
 
-	ASSERT((hat == ksfmmup) ||
-	    AS_LOCK_HELD(hat->sfmmu_as, &hat->sfmmu_as->a_lock));
+	ASSERT((hat == ksfmmup) || AS_LOCK_HELD(hat->sfmmu_as));
 
 	if (flags & ~SFMMU_LOAD_ALLFLAG)
 		cmn_err(CE_NOTE, "hat_memload: unsupported flags %d",
@@ -2303,8 +2302,7 @@ hat_devload(struct hat *hat, caddr_t addr, size_t len, pfn_t pfn,
 
 	ASSERT(!(flags & ~SFMMU_LOAD_ALLFLAG));
 	ASSERT(!(attr & ~SFMMU_LOAD_ALLATTR));
-	ASSERT((hat == ksfmmup) ||
-	    AS_LOCK_HELD(hat->sfmmu_as, &hat->sfmmu_as->a_lock));
+	ASSERT((hat == ksfmmup) || AS_LOCK_HELD(hat->sfmmu_as));
 	if (len == 0)
 		panic("hat_devload: zero len");
 	if (flags & ~SFMMU_LOAD_ALLFLAG)
@@ -3973,8 +3971,7 @@ hat_unlock(struct hat *sfmmup, caddr_t addr, size_t len)
 	ASSERT(sfmmup != NULL);
 	ASSERT(sfmmup->sfmmu_xhat_provider == NULL);
 
-	ASSERT((sfmmup == ksfmmup) ||
-	    AS_LOCK_HELD(sfmmup->sfmmu_as, &sfmmup->sfmmu_as->a_lock));
+	ASSERT((sfmmup == ksfmmup) || AS_LOCK_HELD(sfmmup->sfmmu_as));
 	ASSERT((len & MMU_PAGEOFFSET) == 0);
 	endaddr = addr + len;
 	hblktag.htag_id = sfmmup;
@@ -4770,8 +4767,7 @@ hat_probe(struct hat *sfmmup, caddr_t addr)
 	ASSERT(sfmmup != NULL);
 	ASSERT(sfmmup->sfmmu_xhat_provider == NULL);
 
-	ASSERT((sfmmup == ksfmmup) ||
-	    AS_LOCK_HELD(sfmmup->sfmmu_as, &sfmmup->sfmmu_as->a_lock));
+	ASSERT((sfmmup == ksfmmup) || AS_LOCK_HELD(sfmmup->sfmmu_as));
 
 	if (sfmmup == ksfmmup) {
 		while ((pfn = sfmmu_vatopfn(addr, sfmmup, &tte))
@@ -4920,8 +4916,7 @@ sfmmu_chgattr(struct hat *sfmmup, caddr_t addr, size_t len, uint_t attr,
 
 	CPUSET_ZERO(cpuset);
 
-	ASSERT((sfmmup == ksfmmup) ||
-	    AS_LOCK_HELD(sfmmup->sfmmu_as, &sfmmup->sfmmu_as->a_lock));
+	ASSERT((sfmmup == ksfmmup) || AS_LOCK_HELD(sfmmup->sfmmu_as));
 	ASSERT((len & MMU_PAGEOFFSET) == 0);
 	ASSERT(((uintptr_t)addr & MMU_PAGEOFFSET) == 0);
 
@@ -5714,7 +5709,7 @@ hat_unload_callback(
 	}
 
 	ASSERT((sfmmup == ksfmmup) || (flags & HAT_UNLOAD_OTHER) || \
-	    AS_LOCK_HELD(sfmmup->sfmmu_as, &sfmmup->sfmmu_as->a_lock));
+	    AS_LOCK_HELD(sfmmup->sfmmu_as));
 
 	ASSERT(sfmmup != NULL);
 	ASSERT((len & MMU_PAGEOFFSET) == 0);
@@ -6332,8 +6327,7 @@ hat_sync(struct hat *sfmmup, caddr_t addr, size_t len, uint_t clearflag)
 	cpuset_t cpuset;
 
 	ASSERT(sfmmup->sfmmu_xhat_provider == NULL);
-	ASSERT((sfmmup == ksfmmup) ||
-	    AS_LOCK_HELD(sfmmup->sfmmu_as, &sfmmup->sfmmu_as->a_lock));
+	ASSERT((sfmmup == ksfmmup) || AS_LOCK_HELD(sfmmup->sfmmu_as));
 	ASSERT((len & MMU_PAGEOFFSET) == 0);
 	ASSERT((clearflag == HAT_SYNC_DONTZERO) ||
 	    (clearflag == HAT_SYNC_ZERORM));
@@ -7976,7 +7970,7 @@ hat_getpfnum(struct hat *hat, caddr_t addr)
 
 	/*
 	 * We would like to
-	 * ASSERT(AS_LOCK_HELD(as, &as->a_lock));
+	 * ASSERT(AS_LOCK_HELD(as));
 	 * but we can't because the iommu driver will call this
 	 * routine at interrupt time and it can't grab the as lock
 	 * or it will deadlock: A thread could have the as lock
@@ -14031,7 +14025,7 @@ hat_join_region(struct hat *sfmmup,
 
 	ASSERT(sfmmup->sfmmu_xhat_provider == NULL);
 	ASSERT(sfmmup != ksfmmup);
-	ASSERT(AS_WRITE_HELD(sfmmup->sfmmu_as, &sfmmup->sfmmu_as->a_lock));
+	ASSERT(AS_WRITE_HELD(sfmmup->sfmmu_as));
 	ASSERT(srdp->srd_refcnt > 0);
 	ASSERT(!(flags & ~HAT_REGION_TYPE_MASK));
 	ASSERT(flags == HAT_REGION_TEXT || flags == HAT_REGION_ISM);
@@ -14334,7 +14328,7 @@ hat_leave_region(struct hat *sfmmup, hat_region_cookie_t rcookie, uint_t flags)
 	ASSERT(rgnp->rgn_id == rid);
 	ASSERT((rgnp->rgn_flags & SFMMU_REGION_TYPE_MASK) == r_type);
 	ASSERT(!(rgnp->rgn_flags & SFMMU_REGION_FREE));
-	ASSERT(AS_LOCK_HELD(sfmmup->sfmmu_as, &sfmmup->sfmmu_as->a_lock));
+	ASSERT(AS_LOCK_HELD(sfmmup->sfmmu_as));
 
 	ASSERT(sfmmup->sfmmu_xhat_provider == NULL);
 	if (r_type == SFMMU_REGION_HME && sfmmup->sfmmu_as->a_xhat != NULL) {
@@ -15130,7 +15124,7 @@ sfmmu_join_scd(sf_scd_t *scdp, sfmmu_t *sfmmup)
 	ASSERT(srdp != NULL);
 	ASSERT(scdp != NULL);
 	ASSERT(scdp->scd_refcnt > 0);
-	ASSERT(AS_WRITE_HELD(sfmmup->sfmmu_as, &sfmmup->sfmmu_as->a_lock));
+	ASSERT(AS_WRITE_HELD(sfmmup->sfmmu_as));
 
 	if ((old_scdp = sfmmup->sfmmu_scdp) != NULL) {
 		ASSERT(old_scdp != scdp);
@@ -15242,7 +15236,7 @@ sfmmu_find_scd(sfmmu_t *sfmmup)
 	int ret;
 
 	ASSERT(srdp != NULL);
-	ASSERT(AS_WRITE_HELD(sfmmup->sfmmu_as, &sfmmup->sfmmu_as->a_lock));
+	ASSERT(AS_WRITE_HELD(sfmmup->sfmmu_as));
 
 	mutex_enter(&srdp->srd_scd_mutex);
 	for (scdp = srdp->srd_scdp; scdp != NULL;
@@ -15348,7 +15342,7 @@ sfmmu_leave_scd(sfmmu_t *sfmmup, uchar_t r_type)
 	ASSERT(scdp->scd_refcnt);
 	ASSERT(!sfmmup->sfmmu_free);
 	ASSERT(sfmmu_hat_lock_held(sfmmup));
-	ASSERT(AS_LOCK_HELD(sfmmup->sfmmu_as, &sfmmup->sfmmu_as->a_lock));
+	ASSERT(AS_LOCK_HELD(sfmmup->sfmmu_as));
 
 	/*
 	 * Wait for ISM maps to be updated.

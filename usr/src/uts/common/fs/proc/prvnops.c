@@ -889,7 +889,7 @@ readmap_common:
 		return (0);
 	}
 
-	if (!AS_LOCK_TRYENTER(as, &as->a_lock, RW_WRITER)) {
+	if (!AS_LOCK_TRYENTER(as, RW_WRITER)) {
 		prunlock(pnp);
 		delay(1);
 		goto readmap_common;
@@ -908,7 +908,7 @@ readmap_common:
 		break;
 	}
 
-	AS_LOCK_EXIT(as, &as->a_lock);
+	AS_LOCK_EXIT(as);
 	mutex_enter(&p->p_lock);
 	prunlock(pnp);
 
@@ -2005,7 +2005,7 @@ readmap32_common:
 		return (EOVERFLOW);
 	}
 
-	if (!AS_LOCK_TRYENTER(as, &as->a_lock, RW_WRITER)) {
+	if (!AS_LOCK_TRYENTER(as, RW_WRITER)) {
 		prunlock(pnp);
 		delay(1);
 		goto readmap32_common;
@@ -2023,7 +2023,7 @@ readmap32_common:
 		error = prgetmap32(p, 0, &iolhead);
 		break;
 	}
-	AS_LOCK_EXIT(as, &as->a_lock);
+	AS_LOCK_EXIT(as);
 	mutex_enter(&p->p_lock);
 	prunlock(pnp);
 
@@ -2930,11 +2930,11 @@ prgetattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 			vap->va_size = 2 * PRSDSIZE;
 		else {
 			mutex_exit(&p->p_lock);
-			AS_LOCK_ENTER(as, &as->a_lock, RW_WRITER);
+			AS_LOCK_ENTER(as, RW_WRITER);
 			if (as->a_updatedir)
 				rebuild_objdir(as);
 			vap->va_size = (as->a_sizedir + 2) * PRSDSIZE;
-			AS_LOCK_EXIT(as, &as->a_lock);
+			AS_LOCK_EXIT(as);
 			mutex_enter(&p->p_lock);
 		}
 		vap->va_nlink = 2;
@@ -2944,12 +2944,12 @@ prgetattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 			vap->va_size = (P_FINFO(p)->fi_nfiles + 4) * PRSDSIZE;
 		else {
 			mutex_exit(&p->p_lock);
-			AS_LOCK_ENTER(as, &as->a_lock, RW_WRITER);
+			AS_LOCK_ENTER(as, RW_WRITER);
 			if (as->a_updatedir)
 				rebuild_objdir(as);
 			vap->va_size = (as->a_sizedir + 4 +
 			    P_FINFO(p)->fi_nfiles) * PRSDSIZE;
-			AS_LOCK_EXIT(as, &as->a_lock);
+			AS_LOCK_EXIT(as);
 			mutex_enter(&p->p_lock);
 		}
 		vap->va_nlink = 2;
@@ -3015,7 +3015,7 @@ prgetattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 			vap->va_size = 0;
 		else {
 			mutex_exit(&p->p_lock);
-			AS_LOCK_ENTER(as, &as->a_lock, RW_WRITER);
+			AS_LOCK_ENTER(as, RW_WRITER);
 			if (type == PR_MAP)
 				vap->va_mtime = as->a_updatetime;
 			if (type == PR_XMAP)
@@ -3024,7 +3024,7 @@ prgetattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 			else
 				vap->va_size = prnsegs(as, type == PR_RMAP) *
 				    PR_OBJSIZE(prmap32_t, prmap_t);
-			AS_LOCK_EXIT(as, &as->a_lock);
+			AS_LOCK_EXIT(as);
 			mutex_enter(&p->p_lock);
 		}
 		break;
@@ -3073,14 +3073,14 @@ prgetattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 			 * change while the process is marked P_PR_LOCK.
 			 */
 			mutex_exit(&p->p_lock);
-			AS_LOCK_ENTER(as, &as->a_lock, RW_WRITER);
+			AS_LOCK_ENTER(as, RW_WRITER);
 #ifdef _LP64
 			vap->va_size = iam32bit?
 			    prpdsize32(as) : prpdsize(as);
 #else
 			vap->va_size = prpdsize(as);
 #endif
-			AS_LOCK_EXIT(as, &as->a_lock);
+			AS_LOCK_EXIT(as);
 			mutex_enter(&p->p_lock);
 		}
 		break;
@@ -3089,14 +3089,14 @@ prgetattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 			vap->va_size = 0;
 		else {
 			mutex_exit(&p->p_lock);
-			AS_LOCK_ENTER(as, &as->a_lock, RW_WRITER);
+			AS_LOCK_ENTER(as, RW_WRITER);
 #ifdef _LP64
 			vap->va_size = iam32bit?
 			    oprpdsize32(as) : oprpdsize(as);
 #else
 			vap->va_size = oprpdsize(as);
 #endif
-			AS_LOCK_EXIT(as, &as->a_lock);
+			AS_LOCK_EXIT(as);
 			mutex_enter(&p->p_lock);
 		}
 		break;
@@ -3693,7 +3693,7 @@ pr_lookup_objectdir(vnode_t *dp, char *comp)
 	 * will not change because it is marked P_PR_LOCK.
 	 */
 	mutex_exit(&p->p_lock);
-	AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
+	AS_LOCK_ENTER(as, RW_READER);
 	if ((seg = AS_SEGFIRST(as)) == NULL) {
 		vp = NULL;
 		goto out;
@@ -3726,7 +3726,7 @@ out:
 	if (vp != NULL) {
 		VN_HOLD(vp);
 	}
-	AS_LOCK_EXIT(as, &as->a_lock);
+	AS_LOCK_EXIT(as);
 	mutex_enter(&p->p_lock);
 	prunlock(dpnp);
 
@@ -4150,7 +4150,7 @@ pr_lookup_pathdir(vnode_t *dp, char *comp)
 				type = NAME_OBJECT;
 			}
 		} else {
-			AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
+			AS_LOCK_ENTER(as, RW_READER);
 			if ((seg = AS_SEGFIRST(as)) != NULL) {
 				do {
 					/*
@@ -4184,7 +4184,7 @@ pr_lookup_pathdir(vnode_t *dp, char *comp)
 				type = NAME_OBJECT;
 			}
 
-			AS_LOCK_EXIT(as, &as->a_lock);
+			AS_LOCK_EXIT(as);
 		}
 	}
 
@@ -4838,7 +4838,7 @@ rebuild_objdir(struct as *as)
 	int i, j;
 	ulong_t nold, nnew;
 
-	ASSERT(AS_WRITE_HELD(as, &as->a_lock));
+	ASSERT(AS_WRITE_HELD(as));
 
 	if (as->a_updatedir == 0 && as->a_objectdir != NULL)
 		return;
@@ -4943,7 +4943,7 @@ rebuild_objdir(struct as *as)
 static vnode_t *
 obj_entry(struct as *as, int slot)
 {
-	ASSERT(AS_LOCK_HELD(as, &as->a_lock));
+	ASSERT(AS_LOCK_HELD(as));
 	if (as->a_objectdir == NULL)
 		return (NULL);
 	ASSERT(slot < as->a_sizedir);
@@ -5007,7 +5007,7 @@ pr_readdir_objectdir(prnode_t *pnp, uio_t *uiop, int *eofp)
 		 * space via mmap/munmap calls.
 		 */
 		if (as != NULL) {
-			AS_LOCK_ENTER(as, &as->a_lock, RW_WRITER);
+			AS_LOCK_ENTER(as, RW_WRITER);
 			if (as->a_updatedir)
 				rebuild_objdir(as);
 			objdirsize = as->a_sizedir;
@@ -5025,7 +5025,7 @@ pr_readdir_objectdir(prnode_t *pnp, uio_t *uiop, int *eofp)
 		}
 
 		if (as != NULL)
-			AS_LOCK_EXIT(as, &as->a_lock);
+			AS_LOCK_EXIT(as);
 
 		/*
 		 * Stop when all objects have been reported.
@@ -5299,11 +5299,11 @@ pr_readdir_pathdir(prnode_t *pnp, uio_t *uiop, int *eofp)
 		as = NULL;
 		objdirsize = 0;
 	} else {
-		AS_LOCK_ENTER(as, &as->a_lock, RW_WRITER);
+		AS_LOCK_ENTER(as, RW_WRITER);
 		if (as->a_updatedir)
 			rebuild_objdir(as);
 		objdirsize = as->a_sizedir;
-		AS_LOCK_EXIT(as, &as->a_lock);
+		AS_LOCK_EXIT(as);
 		as = NULL;
 	}
 
@@ -5363,7 +5363,7 @@ pr_readdir_pathdir(prnode_t *pnp, uio_t *uiop, int *eofp)
 			 */
 			if (as == NULL) {
 				as = p->p_as;
-				AS_LOCK_ENTER(as, &as->a_lock, RW_WRITER);
+				AS_LOCK_ENTER(as, RW_WRITER);
 			}
 
 			if (as->a_updatedir) {
@@ -5401,11 +5401,11 @@ pr_readdir_pathdir(prnode_t *pnp, uio_t *uiop, int *eofp)
 		 * Drop the address space lock to do the uiomove().
 		 */
 		if (as != NULL)
-			AS_LOCK_EXIT(as, &as->a_lock);
+			AS_LOCK_EXIT(as);
 
 		error = uiomove((caddr_t)dirent, reclen, UIO_READ, uiop);
 		if (as != NULL)
-			AS_LOCK_ENTER(as, &as->a_lock, RW_WRITER);
+			AS_LOCK_ENTER(as, RW_WRITER);
 
 		if (error)
 			break;
@@ -5417,7 +5417,7 @@ pr_readdir_pathdir(prnode_t *pnp, uio_t *uiop, int *eofp)
 	if (fip != NULL)
 		mutex_exit(&fip->fi_lock);
 	if (as != NULL)
-		AS_LOCK_EXIT(as, &as->a_lock);
+		AS_LOCK_EXIT(as);
 	mutex_enter(&p->p_lock);
 	prunlock(pnp);
 	return (error);

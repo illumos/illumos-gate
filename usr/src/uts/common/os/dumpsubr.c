@@ -1407,7 +1407,7 @@ dump_as(struct as *as)
 {
 	struct seg *seg;
 
-	AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
+	AS_LOCK_ENTER(as, RW_READER);
 	for (seg = AS_SEGFIRST(as); seg; seg = AS_SEGNEXT(as, seg)) {
 		if (seg->s_as != as)
 			break;
@@ -1415,7 +1415,7 @@ dump_as(struct as *as)
 			continue;
 		SEGOP_DUMP(seg);
 	}
-	AS_LOCK_EXIT(as, &as->a_lock);
+	AS_LOCK_EXIT(as);
 
 	if (seg != NULL)
 		cmn_err(CE_WARN, "invalid segment %p in address space %p",

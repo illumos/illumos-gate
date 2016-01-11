@@ -1273,12 +1273,12 @@ execmap(struct vnode *vp, caddr_t addr, size_t len, size_t zfodlen,
 			 * other return values from as_setprot.
 			 */
 
-			AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
+			AS_LOCK_ENTER(as, RW_READER);
 			seg = as_segat(curproc->p_as, (caddr_t)end);
 			if (seg != NULL)
 				SEGOP_GETPROT(seg, (caddr_t)end, zfoddiff - 1,
 				    &zprot);
-			AS_LOCK_EXIT(as, &as->a_lock);
+			AS_LOCK_EXIT(as);
 
 			if (seg != NULL && (zprot & PROT_WRITE) == 0) {
 				if (as_setprot(as, (caddr_t)end, zfoddiff - 1,
