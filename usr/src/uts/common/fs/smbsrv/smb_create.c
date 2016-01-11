@@ -162,7 +162,7 @@ smb_com_create_temporary(smb_request_t *sr)
 	if (smb_common_create(sr) != NT_STATUS_SUCCESS)
 		return (SDRC_ERROR);
 
-	if (smbsr_encode_result(sr, 1, VAR_BCC, "bww%S", 1, sr->smb_fid,
+	if (smbsr_encode_result(sr, 1, VAR_BCC, "bww%s", 1, sr->smb_fid,
 	    VAR_BCC, sr, name))
 		return (SDRC_ERROR);
 
