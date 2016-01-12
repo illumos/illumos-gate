@@ -54,6 +54,8 @@ extern "C" {
 #define	LX_AUTOFS_VFS_PATH_HASH_SIZE	15
 #define	LX_AUTOFS_VFS_VN_HASH_SIZE	15
 
+enum lx_autofs_mnttype	{ LXAMT_NONE, LXAMT_INDIR, LXAMT_DIRECT, LXAMT_OFFSET };
+
 typedef struct lx_autofs_mntent {
 	list_node_t	lxafme_lst;
 	uint64_t	lxafme_ts;	/* time stamp */
@@ -81,7 +83,7 @@ typedef struct lx_autofs_vfs {
 	u_longlong_t	lav_ino;
 
 	/* options from the mount */
-	boolean_t	lav_indirect;
+	enum lx_autofs_mnttype lav_mnttype;
 	int		lav_min_proto;
 
 	/*
