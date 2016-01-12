@@ -22,7 +22,7 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #ifndef _SYS_LINUX_SYSCALLS_H
@@ -59,6 +59,9 @@ extern long lx_fchown16();
 extern long lx_fchownat();
 extern long lx_fcntl();
 extern long lx_fcntl64();
+extern long lx_fstat32();
+extern long lx_fstat64();
+extern long lx_fstatat64();
 extern long lx_futex();
 extern long lx_get_robust_list();
 extern long lx_get_thread_area();
@@ -80,6 +83,8 @@ extern long lx_ioprio_set();
 extern long lx_kill();
 extern long lx_lchown();
 extern long lx_lchown16();
+extern long lx_lstat32();
+extern long lx_lstat64();
 extern long lx_mkdir();
 extern long lx_mkdirat();
 extern long lx_modify_ldt();
@@ -121,6 +126,8 @@ extern long lx_setrlimit();
 extern long lx_setsockopt();
 extern long lx_socket();
 extern long lx_socketcall();
+extern long lx_stat32();
+extern long lx_stat64();
 extern long lx_sync_file_range();
 extern long lx_syncfs();
 extern long lx_sysinfo32();

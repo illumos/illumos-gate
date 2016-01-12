@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright (c) 2015 Joyent, Inc.  All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include <sys/syscall.h>
@@ -28,7 +28,6 @@
 #include <stdlib.h>
 #include <sys/lx_types.h>
 #include <sys/lx_debug.h>
-#include <sys/lx_stat.h>
 #include <sys/lx_syscall.h>
 #include <sys/lx_misc.h>
 #include <sys/lx_aio.h>
