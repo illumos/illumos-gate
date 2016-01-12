@@ -81,12 +81,40 @@
  *
  * Since we're mimicking the behavior of the Linux autofs filesystem it's
  * important to document some of it's observed behavior here. There are
- * multiple versions if the autofs kernel API protocol and most modern
- * implemenations of the user-land automount daemon depend on v5, but these
- * comments start by describing the general behavior available with v2.
- * The lookup/mounting behavior is similar for v2 vs. v5 although the ioctl and
- * protocol format is different. The key enhancement is the v5 protocol has
- * support for the automounter to determine when it can unmount file systems.
+ * multiple versions of the autofs kernel API protocol and modern
+ * implementations of the user-land automount daemon depend on v5.
+ *
+ * Our original autofs implementation was developed in the mid-2000s around
+ * the v2 protocol, but that is currently obsolete. Our current implementation
+ * is based around the v5 protocol API.
+ *
+ * The autoumounter supports 3 different, mutually exclusive, mount options for
+ * each mountpoint:
+ *   - indirect (this was all you got with the v2 support)
+ *   - direct
+ *   - offset
+ *
+ * An 'indirect' mountpoint is managed with dynamic mounts below that
+ * mountpoint. For example, if '/home' were an indirect autofs mount, then
+ * accessing a username under /home would traverse the 'lookup' code described
+ * below, cause a local subdirectory to be created, and a mount, usually NFS,
+ * onto that username subdirectory.
+ *
+ * A 'direct' mountpoint is an autofs mountpoint which will trigger the
+ * mounting of another filesystem overtop that mountpoint when accessed.
+ *
+ * An 'offset' mountpoint behaves like a 'direct' mountpoint but it is
+ * created dynamically by the automounter underneath an 'indirect' mountpoint.
+ * For example, if '/net' were an indirect autosfs mountpoint and the host
+ * 'jurassic' exported two NFS filesystems; '/var/crash' and '/var/core', then
+ * accessing '/net/jurassic' would trigger the automounter to create two
+ * subdirectories; '/net/jurassic/var/crash' and '/net/jurassic/var/core'. The
+ * automounter would then mount an autofs offset mount onto each one of these
+ * directories. Accessing either of those directories would then trigger
+ * automounter to perform another mount on top, as is done with a 'direct'
+ * mount.
+ *
+ * General behavior
  *
  * A) Autofs allows root owned, non-automounter processes to create
  * directories in the autofs filesystem.  The autofs filesystem treats the
@@ -118,40 +146,36 @@
  * process gets a redirected lookup request, it determines _all_ the
  * possible remote mountpoints for that request, creates directory paths
  * via mkdir, and mounts the remote filesystems on the newly created paths.
- * So for example (for an offset mount), if a machine called mcescher exported
- * /var/crash and /var/core, an "ls /net/mcescher" would result in the
- * following actions being done by the automounter:
- * 	mkdir /net/mcescher
- * 	mkdir /net/mcescher/var
- * 	mkdir /net/mcescher/var/crash
- * 	mkdir /net/mcescher/var/core
- * 	mount mcescher:/var/crash /var/crash
- * 	mount mcescher:/var/crash /var/core
- * once the automounter completed the work above it would signal the autofs
- * filesystem (via an ioctl) that the lookup could continue.
+ * This is described in the offset mount example above. Once the automounter
+ * completed the mounts it would signal the autofs filesystem (via an ioctl)
+ * that the lookup could continue.
  *
  * E.1) Autofs only redirects vop lookup operations for path entries that
  * don't already exist in the autofs filesystem.  So for the example above,
- * an initial (after the start of the automounter) "ls /net/mcescher" would
- * result in a request to the automounter.  A subsequest "ls /net/mcescher"
+ * an initial (after the start of the automounter) "ls /net/jurassic" would
+ * result in a request to the automounter.  A subsequest "ls /net/jurassic"
  * would not result in a request to the automounter.  Even if
- * /net/mcescher/var/crash and /net/mcescher/var/core were manually unmounted
- * after the initial "ls /net/mcescher", a subsequest "ls /net/mcescher"
+ * /net/jurassic/var/crash and /net/jurassic/var/core were manually unmounted
+ * after the initial "ls /net/jurassic", a subsequest "ls /net/jurassic"
  * would not result in a new request to the automounter.
  *
  * E.2) Autofs lookup requests that are sent to the automounter only include
  * the root directory path component.  So for example, after starting up
- * the automounter if a user were to do a "ls /net/mcescher/var/crash", the
- * lookup request actually sent to the automounter would just be for
- * "mcescher".  (The same request as if the user had done "ls /net/mcescher".)
+ * the automounter if a user were to do a "ls /net/jurassic/var/crash", the
+ * initial lookup request actually sent to the automounter would just be for
+ * "jurassic" (the same request as if the user had done "ls /net/jurassic").
+ * After the initial mounting of the two offset mounts onto crash and core the
+ * lookup would continue and a final lookup request would be sent to the
+ * automounter for "crash" (but this would be on a different vfs from the
+ * /net vfs).
  *
  * E.3) The two statements above aren't entirely entirely true.  The Linux
  * autofs filesystem will also redirect lookup operations for leaf
  * directories that don't have a filesystem mounted on them.  Using the
- * example above, if a user did a "ls /net/mcescher", then manually
- * unmounted /net/mcescher/var/crash, and then did an "ls
- * /net/mcescher/var/crash", this would result in a request for
- * "mcescher/var/crash" being sent to the automounter.  The strange thing
+ * example above, if a user did a "ls /net/jurassic", then manually
+ * unmounted /net/jurassic/var/crash, and then did an "ls
+ * /net/jurassic/var/crash", this would result in a request for
+ * "jurassic/var/crash" being sent to the automounter.  The strange thing
  * (a Linux bug perhaps) is that the automounter won't do anything with this
  * request and the lookup will fail.
  *
@@ -175,11 +199,9 @@
  *	refer to the mount option type that the automounter performed and
  *	correlate to an automounter direct or indirect map mointpoint.
  *
- * G) The automounter can also do an 'offset' mount instead of a 'direct' or
- * 'indirect' mount. An offset mount is used in cases such as the /net/{host}
- * map to mount all exported file systems under the /net/{host} entry. Offset
- * mounts are similar to 'direct' mounts, except that unmount support is more
- * complex and discussed below.
+ * G) The automounter periodically issues an 'expire' ioctl to autofs to
+ * obtain the name of a mountpoint which the automounter can unmount.
+ * Unmounting is dicussed in more detail below.
  *
  * +++ lxautofs notes
  *
@@ -189,15 +211,7 @@
  * 	1.1) We don't bother to implement the E.3 functionality listed above
  * 	since it doesn't appear to be of any use.
  *
- * 	1.2) We only fully implement v2 and partially implement v5 of the
- *	autofs protocol. The partial v5 support is around the 'expire' ioctls
- *	and discussed below under "v5 expire protocol".
- *
- *	1.3) We currently do not support 'offset' mounts and expiration
- *	(since this is a variation on direct mounts).
- *
- *	1.4) We currently do not implement the dev ioctls for automounter
- *	restart recovery.
+ * 	1.2) We only fully implement v2 and v5 of the autofs protocol.
  *
  * 2) In general, the approach taken for lxautofs is to keep it as simple
  * as possible and to minimize it's memory usage.  To do this all information
@@ -247,19 +261,23 @@
  * For more information on gfs take a look at the block comments in the
  * top of gfs.c
  *
- * 4) v5 protocol expire handling.
+ * 4) Unmounting
  *
  * The automounter has a timeout associated with each mount. It informs autofs
  * of this timeout using the LX_AUTOFS_IOC_SETTIMEOUT ioctl after autofs has
  * been mounted on the mountpoint.
  *
- * Periodically (<timeout>/4 seconds) the automounter will issue the
+ * After the automounter has mounted something associated with the mountpoint
+ * then periodically (<timeout>/4 seconds) the automounter will issue the
  * LX_AUTOFS_IOC_EXPIRE_MULTI ioctl on the autofs mount. autofs is expected to
  * respond with one or more underlying mountpoint entries which are candidates
  * for unmounting. The automounter will attempt to unmount the filesystem
  * (which may fail if it is busy, since this is obviously racy) and then
  * acknowledge the expire ioctl. The successful acknowledgement is independent
  * of the success of unmounting the underlying filesystem.
+ *
+ * Unmount handling varies based on which type of mount the autofs was mounted
+ * with (indirect, direct or offset).
  *
  * To support 'indirect' mount expiration, the autofs vfs keeps track of the
  * filesystems mounted immediately under the autofs mountpoint (in
@@ -282,45 +300,39 @@
  * the lav_mnt_list only will have at most one entry if there is a filesystem
  * mounted overtop of the autofs mount.
  *
- * Expiring 'offset' mounts is also more complicated and offset mounts do not
- * currently work correctly (because each lower-level offset mount is like a
- * direct mount).
+ * Expiring 'offset' mounts is more complicated because there are at least
+ * two different autofs VFSs involved (the top-level and one for each offset
+ * mount underneath). The actual offset mount is handled exactly like a 'direct'
+ * mount. The top-level is an indirect mount and is handled in a similar way
+ * as described above for indirect mounts, but special handling is needed for
+ * each offset mount below.
  *
- * For example, if /net was an autofs 'offset' mount and the host 'jurassic'
- * had two exported file systems (/var/crash and /var/core) then accessing
- * /net/jurassic would cause the lookup to the automounter to create the
- * following two autofs mounts (these are like direct autofs mounts):
- *	/net/jurassic/var/crash
- *	/net/jurassic/var/core
+ * This can be explained using the same 'jurassic' example described earlier
+ * (/net is an autofs 'indirect' mount and the host 'jurassic' has two exported
+ * file systems; /var/crash and /var/core). If the user accesses
+ * /net/jurassic/var/crash then the automounter would setup the system so that
+ * the following mounts exist:
+ *   - /net (the original autofs indirect mount which triggers everything)
+ *   - /net/jurassic/var/crash (autofs offset mount)
+ *   - /net/jurassic/var/crash (NFS mount on top of the autofs offset mount)
+ *   - /net/jurassic/var/core (autofs offset mount)
  *
  * For expiration the automounter will issue the LX_AUTOFS_IOC_EXPIRE_MULTI
- * ioctl on /net but because there are no immediate mountpoints under /net
- * (the underlying autofs mountpoints are jurassic/var/crash and
- * jurassic/var/core) the indirect technique described above will fail.
+ * ioctl on each autofs vfs for which something is mounted, so we would receive
+ * an expire ioctl on /net and another on /net/jusrassic/var/crash. The vfs for
+ * /net will be tracking "jurassic", but we detect it is busy and won't do
+ * anything at first. The vfs for "crash" will work like a direct mount and
+ * acknowledge the expire ioctl to the automounter once that filesystem times
+ * out and is no longer busy. The automounter will then unmount the "crash"
+ * NFS mount.
  *
- * Here's one possibility for how this functionality could be implemented,
- * although the details will depend on how direct mount expiration is
- * implemented:
- *
- * Coalesce underlying mountpoints to a common ancester and don't do any in-use
- * detection. Simply tell the automounter we expired the ancestor every time
- * its turn comes around. If one of the underlying filesystems is in use then
- * that unmount will fail. This technique can break down for a remote host with
- * multiple mounts. For example, if the automounter had mounted the following
- * autofs filesystems, and then NFS mounted over those:
- *	/net/jurassic/var/crash
- *	/net/jurassic/var/core
- * and the user was looking at a core file when the timeout expired, the
- * automounter would receive notification to expire 'jurassic'. It would
- * unmount jurassic/var/crash (which would succeed) and then to try unmount
- * jurassic/var/core (which would fail). After that, since the automounter only
- * performs mounts for failed lookups in the root autofs directory, future
- * access to /net/jurassic/var/crash would result in access to an empty autofs
- * directory. We might be able to work around this by resending lookups to the
- * automounter, assuming it ignores mount failures.
- *
- * There are likely other solutions to expiring offset mounts and one of these
- * might be the eventual solution.
+ * Once the "crash" NFS mount has been unmounted by the automounter, we're left
+ * with the two autofs offset mounts under jurassic. The automounter will not
+ * try to unmount either of those, so we have to do that. Once we get another
+ * expire ioctl on /net and check "jurassic", we'll see there are only autofs
+ * mounts under /net/jurassic. We umount those using the lx_autofs_umount_offset
+ * function and respond to the automounter expire ioctl with "jurassic", in the
+ * same way as we would for any other indirect mount.
  */
 
 #ifdef	__cplusplus
@@ -348,8 +360,8 @@ extern "C" {
 /*
  * Version/subversion of the Linux kernel automount protocol we support.
  *
- * We only fully support v2, but we also support the v5 mount requests. We'll
- * return ENOTSUP for all of the v3-v5 ioctls we don't yet handle.
+ * We fully support v2 and v5. We'll return ENOTSUP for all of the ioctls we
+ * don't yet handle.
  */
 #define	LX_AUTOFS_PROTO_VERS5		5
 #define	LX_AUTOFS_PROTO_SUBVERSION	2

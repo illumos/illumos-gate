@@ -55,6 +55,7 @@
  */
 extern uintptr_t		space_fetch(char *key);
 extern int			space_store(char *key, uintptr_t ptr);
+extern int			umount2_engine(vfs_t *, int, cred_t *, int);
 
 /*
  * Globals
@@ -248,7 +249,7 @@ lx_autofs_la_alloc(lx_autofs_vfs_t *data, boolean_t *is_dup, boolean_t expire,
 	if (data->lav_min_proto == 5) {
 		laar->laar_pkt.lap_protover = LX_AUTOFS_PROTO_VERS5;
 
-		if (data->lav_indirect == B_TRUE) {
+		if (data->lav_mnttype == LXAMT_INDIR) {
 			if (expire) {
 				laar->laar_pkt.lap_type =
 				    LX_AUTOFS_PTYPE_EXPIRE_INDIR;
@@ -1087,12 +1088,13 @@ lx_autofs_may_unmount(vfs_t *vfsp, struct cred *cr)
 }
 
 static vfs_t *
-lx_autofs_get_mountvfs(char *fs_mntpt)
+lx_autofs_get_mountvfs(char *fs_mntpt, int *cnt)
 {
 	struct vfs *vfsp;
 	struct vfs *vfslist;
 	vfs_t *fnd_vfs = NULL;
 	int fsmplen;
+	int acnt = 0;
 
 	fsmplen = strlen(fs_mntpt);
 
@@ -1101,23 +1103,29 @@ lx_autofs_get_mountvfs(char *fs_mntpt)
 	vfsp = vfslist = curzone->zone_vfslist;
 	if (vfslist == NULL) {
 		vfs_list_unlock();
+		*cnt = 0;
 		return (NULL);
 	}
 
 	do {
-		/*
-		 * Skip mounts we shouldn't show and mounts that are actually
-		 * autofs (i.e. autofs direct mount).
-		 */
-		if (!(vfsp->vfs_flag & VFS_NOMNTTAB) &&
-		    vfsp->vfs_op != lx_autofs_vfsops) {
+		/* Skip mounts we shouldn't show. */
+		if (!(vfsp->vfs_flag & VFS_NOMNTTAB)) {
 			char *mntpt;
 
 			mntpt = (char *)refstr_value(vfsp->vfs_mntpt);
-			if (strncmp(fs_mntpt, mntpt, fsmplen) == 0) {
-				fnd_vfs = vfsp;
-				VFS_HOLD(fnd_vfs)
-				break;
+			if (strncmp(fs_mntpt, mntpt, fsmplen) == 0 &&
+			    (mntpt[fsmplen] == '\0' || mntpt[fsmplen] == '/')) {
+				/*
+				 * We'll return the first one we find but don't
+				 * return a mount that is actually autofs (i.e.
+				 * autofs direct or offset mount).
+				 */
+				if (vfsp->vfs_op == lx_autofs_vfsops) {
+					acnt++;
+				} else if (fnd_vfs == NULL) {
+					fnd_vfs = vfsp;
+					VFS_HOLD(fnd_vfs)
+				}
 			}
 		}
 		vfsp = vfsp->vfs_zone_next;
@@ -1125,8 +1133,94 @@ lx_autofs_get_mountvfs(char *fs_mntpt)
 
 	vfs_list_unlock();
 
+	*cnt = acnt;
 	return (fnd_vfs);
 }
+
+/*
+ * Unmount all autofs offset mounts below the given path.
+ */
+static boolean_t
+lx_autofs_umount_offset(char *fs_mntpt, struct cred *cr)
+{
+	struct vfs *vfsp;
+	struct vfs *vfslist;
+	boolean_t busy = B_FALSE;
+	int fsmplen = strlen(fs_mntpt);
+
+restart:
+	vfs_list_read_lock();
+
+	vfsp = vfslist = curzone->zone_vfslist;
+	if (vfslist == NULL) {
+		vfs_list_unlock();
+		return (B_FALSE);
+	}
+
+	do {
+		char *mntpt;
+		lx_autofs_vfs_t *data;
+
+		/* Skip mounts we should ignore. */
+		if ((vfsp->vfs_flag & VFS_NOMNTTAB)) {
+			vfsp = vfsp->vfs_zone_next;
+			continue;
+		}
+
+		mntpt = (char *)refstr_value(vfsp->vfs_mntpt);
+		if (strncmp(fs_mntpt, mntpt, fsmplen) != 0 ||
+		    (mntpt[fsmplen] != '\0' && mntpt[fsmplen] != '/')) {
+			vfsp = vfsp->vfs_zone_next;
+			continue;
+		}
+
+		if (vfsp->vfs_op != lx_autofs_vfsops) {
+			/*
+			 * Something got mounted over the autofs mountpoint
+			 * after we checked that this inidrect hierarchy was
+			 * not busy.
+			 */
+			busy = B_TRUE;
+			break;
+		}
+
+		data = (lx_autofs_vfs_t *)vfsp->vfs_data;
+		if (data->lav_mnttype != LXAMT_OFFSET) {
+			/*
+			 * Something mounted a non-offset autofs fs under this
+			 * indirect mnt!
+			 */
+			busy = B_TRUE;
+			break;
+		}
+
+		/*
+		 * Attempt to umount - set busy if fails.
+		 *
+		 * umount2_engine will call VFS_RELE, so we need to take an
+		 * extra hold to match the behavior during the normal umount
+		 * path.
+		 *
+		 * We also need to drop the list lock to prevent deadlock
+		 * during umount.
+		 */
+		VFS_HOLD(vfsp);
+		vfs_list_unlock();
+		if (umount2_engine(vfsp, 0, cr, 0) != 0) {
+			busy = B_TRUE;
+			goto errexit;
+		}
+
+		/* Retake list lock and look for more. */
+		goto restart;
+	} while (vfsp != vfslist);
+
+	vfs_list_unlock();
+
+errexit:
+	return (busy);
+}
+
 
 /*
  * Note that lx_autofs_automounter_call() only supports queries in the root
@@ -1140,6 +1234,7 @@ lx_autofs_expire(vfs_t *vfsp, struct cred *cr)
 	lx_autofs_automnt_req_t	*laar;
 	boolean_t is_dup;
 	vfs_t *fnd_vfs;
+	int autofs_cnt;
 	boolean_t busy = B_FALSE;
 	char exp_path[MAXPATHLEN];
 
@@ -1171,7 +1266,7 @@ lx_autofs_expire(vfs_t *vfsp, struct cred *cr)
 		}
 	}
 
-	if (data->lav_indirect) {
+	if (data->lav_mnttype == LXAMT_INDIR) {
 		(void) snprintf(exp_path, sizeof (exp_path), "%s/%s",
 		    (char *)refstr_value(vfsp->vfs_mntpt), mp->lxafme_path);
 	} else {
@@ -1179,9 +1274,20 @@ lx_autofs_expire(vfs_t *vfsp, struct cred *cr)
 		    sizeof (exp_path));
 	}
 
-	if ((fnd_vfs = lx_autofs_get_mountvfs(exp_path)) != NULL) {
-		boolean_t skip_v3 = B_FALSE;
+	fnd_vfs = lx_autofs_get_mountvfs(exp_path, &autofs_cnt);
+	if (fnd_vfs != NULL) {
+		boolean_t skip = B_FALSE;
 		vfssw_t *vfssw;
+		char *vfsmp = (char *)refstr_value(fnd_vfs->vfs_mntpt);
+
+		/*
+		 * Check if we found a sub-mount. This happens with an offset
+		 * mount below an indirect mount subdirectory.
+		 */
+		if (strcmp(exp_path, vfsmp) != 0) {
+			busy = B_TRUE;
+			skip = B_TRUE;
+		}
 
 		/*
 		 * If it's an NFS file system (typical) then we check in
@@ -1195,17 +1301,17 @@ lx_autofs_expire(vfs_t *vfsp, struct cred *cr)
 		 * versions of NFS, so we need to check the vfs_op member to
 		 * determine which version of NFS we're dealing with.
 		 */
-		if ((vfssw = vfs_getvfssw("nfs4")) != NULL) {
+		if (!skip && (vfssw = vfs_getvfssw("nfs4")) != NULL) {
 			if (vfs_matchops(fnd_vfs, &vfssw->vsw_vfsops)) {
 				(void) dnlc_purge_vfsp(fnd_vfs, 0);
 				if (check_rtable4(fnd_vfs))
 					busy = B_TRUE;
-				skip_v3 = B_TRUE;
+				skip = B_TRUE;
 			}
 			vfs_unrefvfssw(vfssw);
 		}
 
-		if (!skip_v3 && (vfssw = vfs_getvfssw("nfs3")) != NULL) {
+		if (!skip && (vfssw = vfs_getvfssw("nfs3")) != NULL) {
 			if (vfs_matchops(fnd_vfs, &vfssw->vsw_vfsops)) {
 				(void) dnlc_purge_vfsp(fnd_vfs, 0);
 				if (check_rtable(fnd_vfs))
@@ -1215,6 +1321,26 @@ lx_autofs_expire(vfs_t *vfsp, struct cred *cr)
 		}
 
 		VFS_RELE(fnd_vfs);
+
+	} else if (autofs_cnt > 0) {
+		/*
+		 * The automounter is asking us to expire and we pulled this
+		 * name from our vfs mountpoint list, but if
+		 * lx_autofs_get_mountvfs returns null then that means we
+		 * didn't find a non-autofs mount under this name. Thus, the
+		 * name could be a subdirectory under an autofs toplevel
+		 * indirect mount with one or more offset mounts below.
+		 * autofs_cnt will indicate how many autofs mounts exist below
+		 * this subdirectory name.
+		 *
+		 * The automounter will take care of unmounting any fs mounted
+		 * over one of these offset mounts (i.e. offset is like a
+		 * direct mount which the automounter will manage) but the
+		 * automounter will not unmount the actual autofs offset mount
+		 * itself, so we have to do that before we can expire the
+		 * top-level subrectory name.
+		 */
+		busy = lx_autofs_umount_offset(exp_path, cr);
 	}
 
 	if (busy) {
@@ -1277,13 +1403,17 @@ lx_autofs_expire(vfs_t *vfsp, struct cred *cr)
 	mutex_exit(&laar->laar_lock);
 
 	/*
-	 * Check if the file system is still mounted after we get the response
-	 * from our expire msg. If it is, that means the automounter tried to
-	 * unmount it but failed because the file system is busy, so we put
+	 * If it failed or if the file system is still mounted after we get the
+	 * response from our expire msg, then that means the automounter tried
+	 * to unmount it but failed because the file system is busy, so we put
 	 * this entry back on our list to try to expire it again later.
 	 */
-	if ((fnd_vfs = lx_autofs_get_mountvfs(exp_path)) != NULL) {
-		VFS_RELE(fnd_vfs);
+	fnd_vfs = NULL;
+	if (laar->laar_result == LXACR_FAIL ||
+	    (fnd_vfs = lx_autofs_get_mountvfs(exp_path, &autofs_cnt)) != NULL ||
+	    autofs_cnt > 0) {
+		if (fnd_vfs != NULL)
+			VFS_RELE(fnd_vfs);
 		mp->lxafme_ts = TICK_TO_SEC(ddi_get_lbolt64());
 		mutex_enter(&data->lav_lock);
 		list_insert_tail(&data->lav_mnt_list, mp);
@@ -1438,8 +1568,22 @@ lx_autofs_parse_mntopt(vfs_t *vfsp, lx_autofs_vfs_t *data)
 			return (EINVAL);
 	}
 
-	if (vfs_optionisset(vfsp, LX_MNTOPT_INDIRECT, NULL))
-		data->lav_indirect = B_TRUE;
+	if (vfs_optionisset(vfsp, LX_MNTOPT_INDIRECT, NULL)) {
+		data->lav_mnttype = LXAMT_INDIR;
+	}
+	if (vfs_optionisset(vfsp, LX_MNTOPT_DIRECT, NULL)) {
+		if (data->lav_mnttype != LXAMT_NONE)
+			return (EINVAL);
+		data->lav_mnttype = LXAMT_DIRECT;
+	}
+	if (vfs_optionisset(vfsp, LX_MNTOPT_OFFSET, NULL)) {
+		if (data->lav_mnttype != LXAMT_NONE)
+			return (EINVAL);
+		data->lav_mnttype = LXAMT_OFFSET;
+	}
+	/* The automounter does test mounts with none of the options */
+	if (data->lav_mnttype == LXAMT_NONE)
+		data->lav_mnttype = LXAMT_DIRECT;
 
 	/* Save the mount options and fifo pointers. */
 	data->lav_fd = fd;
@@ -1570,7 +1714,7 @@ lx_autofs_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 	 * For a direct mountpoint we need to allow a filesystem to be
 	 * mounted overtop of this autofs mount. Otherwise, disallow that.
 	 */
-	if (data->lav_indirect)
+	if (data->lav_mnttype == LXAMT_INDIR)
 		data->lav_root->v_flag |= VNOMOUNT;
 
 	return (0);
@@ -1743,7 +1887,7 @@ lx_autofs_do_direct(vnode_t *vp)
 	vnode_t *nvp;
 	boolean_t skip_am_call = B_FALSE;
 
-	if (data->lav_indirect == B_TRUE)
+	if (data->lav_mnttype == LXAMT_INDIR)
 		return (NULL);
 
 	/*
@@ -1970,7 +2114,7 @@ lx_autofs_lookup(vnode_t *dvp, char *nm, vnode_t **vpp, struct pathname *pnp,
 	 * For an indirect mount first try to lookup if this path component
 	 * already exists.
 	 */
-	if (data->lav_indirect) {
+	if (data->lav_mnttype == LXAMT_INDIR) {
 		if ((error = VOP_LOOKUP(udvp, nm, &uvp, pnp, flags, rdir, cr,
 		    ctp, direntflags, realpnp)) == 0) {
 			*vpp = lx_autofs_vn_alloc(dvp->v_vfsp, uvp);
@@ -1986,7 +2130,7 @@ lx_autofs_lookup(vnode_t *dvp, char *nm, vnode_t **vpp, struct pathname *pnp,
 	if ((error = lx_autofs_automounter_call(dvp, nm)) != 0)
 		return (error);
 
-	if (data->lav_indirect) {
+	if (data->lav_mnttype == LXAMT_INDIR) {
 		/*
 		 * Indirect mount. The automounter call should have mounted
 		 * something on nm. Retry the lookup operation.
@@ -1998,9 +2142,9 @@ lx_autofs_lookup(vnode_t *dvp, char *nm, vnode_t **vpp, struct pathname *pnp,
 		}
 	} else {
 		/*
-		 * Direct mount. The automounter call should have covered our
-		 * 'dvp' with a new filesystem. Traverse into the new mount and
-		 * retry the lookup.
+		 * Direct or offset mount. The automounter call should have
+		 * covered our 'dvp' with a new filesystem. Traverse into the
+		 * new mount and retry the lookup.
 		 *
 		 * We need to take an extra hold on our vp (which is the autofs
 		 * root vp) to acount for the rele done in traverse. Our caller
