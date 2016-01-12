@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*
@@ -617,7 +617,8 @@ lxd_freevfs(vfs_t *vfsp)
 		 * count above.
 		 */
 		vp = LDNTOV(ldn);
-		ASSERT(vp->v_type == VLNK || vp->v_type == VDIR);
+		ASSERT(vp->v_type == VLNK || vp->v_type == VDIR ||
+		    vp->v_type == VSOCK);
 		VN_RELE(vp);
 		mutex_enter(&lxdm->lxdm_contents);
 		/*
