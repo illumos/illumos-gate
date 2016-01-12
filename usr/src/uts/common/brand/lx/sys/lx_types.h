@@ -74,7 +74,7 @@ typedef	uint16_t	lx_mode16_t;
 #define	LX_MAJORSHIFT	8
 #define	LX_MINORMASK	((1 << LX_MAJORSHIFT) - 1)
 #define	LX_MAKEDEVICE(lx_maj, lx_min) \
-	((lx_dev_t)((lx_maj) << LX_MAJORSHIFT | ((lx_min) & LX_MINORMASK)))
+	((dev_t)((lx_maj) << LX_MAJORSHIFT | ((lx_min) & LX_MINORMASK)))
 
 #define	LX_UID16_TO_UID32(uid16)	\
 	(((uid16) == (lx_uid16_t)-1) ? ((lx_uid_t)-1) : (lx_uid_t)(uid16))
@@ -98,11 +98,6 @@ typedef	uint16_t	lx_mode16_t;
 #define	LX_GID32_TO_GID16(gid32)	\
 	((((gid32) & 0xffff0000) == 0)  ? ((lx_gid16_t)(gid32)) : \
 	    (((gid32) == ((lx_gid_t)-1)) ? ((lx_gid16_t)-1) : GID16_OVERFLOW))
-
-struct lx_timespec {
-	time_t	ts_sec;
-	long	ts_nsec;
-};
 
 #define	LX_32TO64(lo, hi)	\
 	((uint64_t)((uint64_t)(lo) | ((uint64_t)(hi) << 32)))

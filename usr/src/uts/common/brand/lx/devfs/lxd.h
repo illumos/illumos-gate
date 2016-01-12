@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #ifndef	_LXD_H
@@ -204,7 +204,7 @@ typedef struct lxd_devt_translator {
 	union {
 		uintptr_t		lxd_xl_foo; /* required to compile */
 		lxd_minor_translator_t	*lxd_xl_list;
-		int			(*lxd_xl_custom)(dev_t, lx_dev_t *);
+		void			(*lxd_xl_custom)(dev_t, dev_t *);
 	} lxd_xl_minor;
 } lxd_devt_translator_t;
 

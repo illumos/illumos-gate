@@ -21,7 +21,7 @@
 
 #
 # Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2015, Joyent, Inc.
+# Copyright 2016, Joyent, Inc.
 #
 
 #
@@ -324,6 +324,7 @@ LX_BRAND_OBJS  =		\
 	lx_signal.o		\
 	lx_signum.o		\
 	lx_socket.o		\
+	lx_stat.o		\
 	lx_sync.o		\
 	lx_syscall.o		\
 	lx_sysinfo.o		\

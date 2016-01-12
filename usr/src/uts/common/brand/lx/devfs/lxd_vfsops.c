@@ -67,6 +67,7 @@
 #include <sys/ddi.h>
 #include <sys/lx_brand.h>
 #include <sys/lx_ptm.h>
+#include <sys/lx_impl.h>
 
 #include "lxd.h"
 
@@ -139,13 +140,11 @@ static struct modlinkage modlinkage = {
 /*
  * Definitions and translators for devt's.
  */
-static int lxd_pts_devt_translator(dev_t, lx_dev_t *);
-static int lxd_ptm_devt_translator(dev_t, lx_dev_t *);
+static void lxd_pts_devt_translator(dev_t, dev_t *);
+static void lxd_ptm_devt_translator(dev_t, dev_t *);
 
 #define	LX_PTS_MAJOR_MIN	136
 #define	LX_PTS_MAJOR_MAX	143
-#define	LX_PTS_MAX		\
-	((LX_PTS_MAJOR_MAX - LX_PTS_MAJOR_MIN + 1) * LX_MINORMASK)
 
 #define	LX_PTM_MAJOR		5
 #define	LX_PTM_MINOR		2
@@ -751,32 +750,33 @@ lxd_statvfs(struct vfs *vfsp, statvfs64_t *sbp)
 	return (0);
 }
 
-static int
-lxd_pts_devt_translator(dev_t dev, lx_dev_t *jdev)
+static void
+lxd_pts_devt_translator(dev_t dev, dev_t *jdev)
 {
 	minor_t	min = getminor(dev);
-	int	lx_maj;
-	int	lx_min;
+	int	lx_maj, lx_min;
 
 	/*
-	 * linux has a really small minor number name space (8 bits).
-	 * so if pts devices are limited to one major number you could
-	 * only have 256 of them.  linux addresses this issue by using
-	 * multiple major numbers for pts devices.
+	 * Linux uses a range of major numbers for pts devices to address the
+	 * relatively small minor number space (8 bits).
 	 */
-	if (min >= LX_PTS_MAX)
-		return (EOVERFLOW);
 
 	lx_maj = LX_PTS_MAJOR_MIN + (min / LX_MINORMASK);
 	lx_min = min % LX_MINORMASK;
+	if (lx_maj > LX_PTS_MAJOR_MAX) {
+		/*
+		 * The major is outside the acceptable range but there's little
+		 * we can presently do about it short of overhauling the
+		 * translation logic.
+		 */
+		lx_unsupported("pts major out of translation range");
+	}
 
 	*jdev = LX_MAKEDEVICE(lx_maj, lx_min);
-	return (0);
 }
 
-static int
-lxd_ptm_devt_translator(dev_t dev, lx_dev_t *jdev)
+static void
+lxd_ptm_devt_translator(dev_t dev, dev_t *jdev)
 {
 	*jdev = LX_MAKEDEVICE(LX_PTM_MAJOR, LX_PTM_MINOR);
-	return (0);
 }

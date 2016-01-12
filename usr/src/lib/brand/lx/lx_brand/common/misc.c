@@ -21,7 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2015 Joyent, Inc.  All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include <stdlib.h>
@@ -44,7 +44,6 @@
 #include <sys/lx_types.h>
 #include <sys/lx_debug.h>
 #include <sys/lx_misc.h>
-#include <sys/lx_stat.h>
 #include <sys/lx_syscall.h>
 #include <sys/lx_fcntl.h>
 #include <sys/lx_thread.h>
@@ -373,6 +372,9 @@ lx_personality(uintptr_t p1)
 #define	LX_S_IFIFO	0010000
 #define	LX_S_IFLNK	0120000
 #define	LX_S_IFSOCK	0140000
+
+#define	LX_GETMAJOR(lx_dev)	((lx_dev) >> LX_MAJORSHIFT)
+#define	LX_GETMINOR(lx_dev)	((lx_dev) & LX_MINORMASK)
 
 /*ARGSUSED*/
 long

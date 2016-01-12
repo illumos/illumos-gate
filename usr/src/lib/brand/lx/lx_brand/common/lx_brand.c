@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright 2015 Joyent, Inc. All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -68,7 +68,6 @@
 #include <sys/lx_debug.h>
 #include <sys/lx_brand.h>
 #include <sys/lx_types.h>
-#include <sys/lx_stat.h>
 #include <sys/lx_statfs.h>
 #include <sys/lx_signal.h>
 #include <sys/lx_syscall.h>
@@ -680,9 +679,6 @@ lx_init(int argc, char *argv[], char *envp[])
 	if (syscall(SYS_brand, B_ELFDATA, (void *)&edp))
 		lx_err_fatal("failed to get required ELF data from the kernel");
 
-	if (lx_stat_init() != 0)
-		lx_err_fatal("failed to setup the stat translator");
-
 	if (lx_statfs_init() != 0)
 		lx_err_fatal("failed to setup the statfs translator");
 
@@ -967,9 +963,9 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/*   1: write */
 	NULL,				/*   2: open */
 	lx_close,			/*   3: close */
-	lx_stat64,			/*   4: stat */
-	lx_fstat64,			/*   5: fstat */
-	lx_lstat64,			/*   6: lstat */
+	NULL,				/*   4: stat */
+	NULL,				/*   5: fstat */
+	NULL,				/*   6: lstat */
 	NULL,				/*   7: poll */
 	lx_lseek,			/*   8: lseek */
 	lx_mmap,			/*   9: mmap */
@@ -1225,7 +1221,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_mknodat,			/* 259: mknodat */
 	NULL,				/* 260: fchownat */
 	lx_futimesat,			/* 261: futimesat */
-	lx_fstatat64,			/* 262: fstatat64 */
+	NULL,				/* 262: fstatat64 */
 	lx_unlinkat,			/* 263: unlinkat */
 	lx_renameat,			/* 264: renameat */
 	lx_linkat,			/* 265: linkat */
@@ -1400,9 +1396,9 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_syslog,			/* 103: syslog */
 	lx_setitimer,			/* 104: setitimer */
 	lx_getitimer,			/* 105: getitimer */
-	lx_stat,			/* 106: stat */
-	lx_lstat,			/* 107: lstat */
-	lx_fstat,			/* 108: fstat */
+	NULL,				/* 106: stat */
+	NULL,				/* 107: lstat */
+	NULL,				/* 108: fstat */
 	NULL,				/* 109: uname */
 	NULL,				/* 110: oldiopl */
 	lx_vhangup,			/* 111: vhangup */
@@ -1489,9 +1485,9 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_mmap2,			/* 192: mmap2 */
 	lx_truncate64,			/* 193: truncate64 */
 	lx_ftruncate64,			/* 194: ftruncate64 */
-	lx_stat64,			/* 195: stat64 */
-	lx_lstat64,			/* 196: lstat64 */
-	lx_fstat64,			/* 197: fstat64 */
+	NULL,				/* 195: stat64 */
+	NULL,				/* 196: lstat64 */
+	NULL,				/* 197: fstat64 */
 	NULL,				/* 198: lchown */
 	lx_getuid,			/* 199: getuid */
 	lx_getgid,			/* 200: getgid */
@@ -1594,7 +1590,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_mknodat,			/* 297: mknodat */
 	NULL,				/* 298: fchownat */
 	lx_futimesat,			/* 299: futimesat */
-	lx_fstatat64,			/* 300: fstatat64 */
+	NULL,				/* 300: fstatat64 */
 	lx_unlinkat,			/* 301: unlinkat */
 	lx_renameat,			/* 302: renameat */
 	lx_linkat,			/* 303: linkat */

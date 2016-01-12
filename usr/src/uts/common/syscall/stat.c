@@ -61,7 +61,7 @@
  * to VOP_GETATTR
  */
 
-static int
+int
 cstatat_getvp(int fd, char *name, int follow, vnode_t **vp, cred_t **cred)
 {
 	vnode_t *startvp;

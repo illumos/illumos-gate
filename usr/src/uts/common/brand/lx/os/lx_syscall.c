@@ -22,7 +22,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include <sys/kmem.h>
@@ -722,9 +722,9 @@ lx_sysent_t lx_sysent32[] = {
 	{"syslog",	NULL,			0,		3}, /* 103 */
 	{"setitimer",	NULL,			0,		3}, /* 104 */
 	{"getitimer",	NULL,			0,		2}, /* 105 */
-	{"stat",	NULL,			0,		2}, /* 106 */
-	{"lstat",	NULL,			0,		2}, /* 107 */
-	{"fstat",	NULL,			0,		2}, /* 108 */
+	{"stat",	lx_stat32,		0,		2}, /* 106 */
+	{"lstat",	lx_lstat32,		0,		2}, /* 107 */
+	{"fstat",	lx_fstat32,		0,		2}, /* 108 */
 	{"uname",	NULL,			NOSYS_OBSOLETE,	0}, /* 109 */
 	{"oldiopl",	NULL,			NOSYS_NO_EQUIV,	0}, /* 110 */
 	{"vhangup",	NULL,			0,		0}, /* 111 */
@@ -811,9 +811,9 @@ lx_sysent_t lx_sysent32[] = {
 	{"mmap2",	NULL,			LX_SYS_EBPARG6,	6}, /* 192 */
 	{"truncate64",	NULL,			0,		3}, /* 193 */
 	{"ftruncate64",	NULL,			0,		3}, /* 194 */
-	{"stat64",	NULL,			0,		2}, /* 195 */
-	{"lstat64",	NULL,			0,		2}, /* 196 */
-	{"fstat64",	NULL,			0,		2}, /* 197 */
+	{"stat64",	lx_stat64,		0,		2}, /* 195 */
+	{"lstat64",	lx_lstat64,		0,		2}, /* 196 */
+	{"fstat64",	lx_fstat64,		0,		2}, /* 197 */
 	{"lchown",	lx_lchown,		0,		3}, /* 198 */
 	{"getuid",	NULL,			0,		0}, /* 199 */
 	{"getgid",	NULL,			0,		0}, /* 200 */
@@ -920,7 +920,7 @@ lx_sysent_t lx_sysent32[] = {
 	{"mknodat",	NULL,			0,		4}, /* 297 */
 	{"fchownat",	lx_fchownat,		0,		5}, /* 298 */
 	{"futimesat",	NULL,			0,		3}, /* 299 */
-	{"fstatat64",	NULL,			0,		4}, /* 300 */
+	{"fstatat64",	lx_fstatat64,		0,		4}, /* 300 */
 	{"unlinkat",	NULL,			0,		3}, /* 301 */
 	{"renameat",	NULL,			0,		4}, /* 302 */
 	{"linkat",	NULL,			0,		5}, /* 303 */
@@ -991,9 +991,9 @@ lx_sysent_t lx_sysent64[] = {
 	{"write",	lx_write,		0,		3}, /* 1 */
 	{"open",	lx_open,		0,		3}, /* 2 */
 	{"close",	lx_close,		0,		1}, /* 3 */
-	{"stat",	NULL,			0,		2}, /* 4 */
-	{"fstat",	NULL,			0,		2}, /* 5 */
-	{"lstat",	NULL,			0,		2}, /* 6 */
+	{"stat",	lx_stat64,		0,		2}, /* 4 */
+	{"fstat",	lx_fstat64,		0,		2}, /* 5 */
+	{"lstat",	lx_lstat64,		0,		2}, /* 6 */
 	{"poll",	lx_poll,		0,		3}, /* 7 */
 	{"lseek",	NULL,			0,		3}, /* 8 */
 	{"mmap",	NULL,			0,		6}, /* 9 */
@@ -1249,7 +1249,7 @@ lx_sysent_t lx_sysent64[] = {
 	{"mknodat",	NULL,			0,		4}, /* 259 */
 	{"fchownat",	lx_fchownat,		0,		5}, /* 260 */
 	{"futimesat",	NULL,			0,		3}, /* 261 */
-	{"fstatat64",	NULL,			0,		4}, /* 262 */
+	{"fstatat64",	lx_fstatat64,		0,		4}, /* 262 */
 	{"unlinkat",	NULL,			0,		3}, /* 263 */
 	{"renameat",	NULL,			0,		4}, /* 264 */
 	{"linkat",	NULL,			0,		5}, /* 265 */

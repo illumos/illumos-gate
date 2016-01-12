@@ -29,6 +29,7 @@
 #include <vm/as.h>
 #include <vm/seg.h>
 #include <sys/lx_brand.h>
+#include <sys/brand.h>
 
 #include "lxd.h"
 
@@ -152,8 +153,8 @@ lxd_setfl(vnode_t *vp, int oflags, int nflags, cred_t *cr, caller_context_t *ct)
 /*
  * Translate SunOS devt to Linux devt.
  */
-static int
-lxd_s2l_devt(dev_t dev, lx_dev_t *rdev)
+static void
+lxd_s2l_devt(dev_t dev, dev_t *rdev)
 {
 	lxd_minor_translator_t	*mt;
 	int			i, j;
@@ -184,19 +185,19 @@ lxd_s2l_devt(dev_t dev, lx_dev_t *rdev)
 					*rdev = LX_MAKEDEVICE(
 					    mt[j].lxd_mt_lx_major,
 					    mt[j].lxd_mt_lx_minor);
-					return (0);
+					return;
 				}
 			}
 			break;
 
 		case DTT_CUSTOM:
-			return (lxd_devt_translators[i].xl_custom(dev, rdev));
+			lxd_devt_translators[i].xl_custom(dev, rdev);
+			return;
 		}
 	}
 
 	/* we don't have a translator for this device */
 	*rdev = LX_MAKEDEVICE(maj, min);
-	return (0);
 }
 
 static int
@@ -237,30 +238,16 @@ lxd_getattr(vnode_t *vp, struct vattr *vap, int flags, struct cred *cr,
 		return (error);
 
 	/* Skip devt translation for native programs */
-	if (curproc->p_brand != &lx_brand)
+	if (curproc->p_brand != &lx_brand) {
 		return (0);
+	}
 
 	if (rvp->v_type == VCHR) {
-		major_t major;
-		int i;
+		dev_t ldev;
 
-		major = getmajor(vap->va_rdev);
-		for (i = 0; lxd_devt_translators[i].lxd_xl_driver != NULL;
-		    i++) {
-			if (lxd_devt_translators[i].lxd_xl_major == major) {
-				lx_dev_t ldev;
-
-				(void) lxd_s2l_devt(vap->va_rdev, &ldev);
-				DTRACE_PROBE3(lxd__devxl, void *, rvp,
-				    void *, vap, int, ldev);
-				/*
-				 * TBD: enable device translation for back
-				 * nodes.
-				 */
-				/* vap->va_rdev = ldev; */
-				break;
-			}
-		}
+		lxd_s2l_devt(vap->va_rdev, &ldev);
+		DTRACE_PROBE3(lxd__devxl, void *, rvp, void *, vap, int, ldev);
+		vap->va_rdev = ldev;
 	}
 
 	return (0);
