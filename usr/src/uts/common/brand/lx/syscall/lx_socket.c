@@ -22,7 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2015 Joyent, Inc. All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include <sys/errno.h>
@@ -75,7 +75,10 @@ typedef struct lx_socket_aux_data
 		LXSS_CONNECTING,
 		LXSS_CONNECTED
 	} lxsad_status;
+	boolean_t lxsad_stream_cred;
 } lx_socket_aux_data_t;
+
+static lx_socket_aux_data_t *lx_sad_acquire(vnode_t *);
 
 /* VSD key for lx-specific socket information */
 static uint_t lx_socket_vsd = 0;
@@ -650,9 +653,12 @@ typedef struct {
 	int32_t	cmsg_type;
 } lx_cmsghdr64_t;
 
-/* The alignment/padding for 64bit Linux cmsghdr is the same. */
-#define	ISALIGNED_LX_CMSG64(addr)	ISALIGNED_cmsghdr(addr)
-#define	ROUNDUP_LX_CMSG64_LEN(len)	ROUNDUP_cmsglen(len)
+/* The alignment/padding for 64bit Linux cmsghdr is not the same. */
+#define	LX_CMSG64_ALIGNMENT	8
+#define	ISALIGNED_LX_CMSG64(addr)					\
+	(((uintptr_t)(addr) & (LX_CMSG64_ALIGNMENT - 1)) == 0)
+#define	ROUNDUP_LX_CMSG64_LEN(len)					\
+	(((len) + LX_CMSG64_ALIGNMENT - 1) & ~(LX_CMSG64_ALIGNMENT - 1))
 
 #define	LX_CMSG64_IS_ALIGNED(m)			\
 	(((uintptr_t)(m) & (_CMSG_DATA_ALIGNMENT - 1)) == 0)
@@ -683,10 +689,6 @@ typedef struct {
 static int
 stol_conv_ucred(struct cmsghdr *inmsg, struct cmsghdr *omsg)
 {
-	int len;
-
-	len = sizeof (struct cmsghdr) + sizeof (lx_ucred_t);
-
 	/*
 	 * Format the data correctly in the omsg buffer.
 	 */
@@ -707,19 +709,12 @@ stol_conv_ucred(struct cmsghdr *inmsg, struct cmsghdr *omsg)
 		bcopy(&lcred, CMSG_CONTENT(omsg), sizeof (lx_ucred_t));
 	}
 
-	return (len);
+	return (sizeof (struct cmsghdr) + sizeof (lx_ucred_t));
 }
 
 static int
 ltos_conv_ucred(struct cmsghdr *inmsg, struct cmsghdr *omsg)
 {
-	int len;
-	size_t data_len;
-
-	data_len = sizeof (struct ucred_s) + sizeof (prcred_t);
-
-	len = sizeof (struct cmsghdr) + data_len;
-
 	if (omsg != NULL) {
 		struct ucred_s *uc;
 		prcred_t *pc;
@@ -737,7 +732,9 @@ ltos_conv_ucred(struct cmsghdr *inmsg, struct cmsghdr *omsg)
 		pc->pr_egid = lcred->lxu_gid;
 	}
 
-	return (len);
+	return (sizeof (struct cmsghdr) + sizeof (struct ucred_s) +
+	    sizeof (prcred_t));
+
 }
 
 static int
@@ -912,8 +909,11 @@ stol_cmsgs_copyout(void *input, socklen_t inlen, void *addr,
 {
 	void *obuf;
 	struct cmsghdr *inmsg, *omsg;
-	int error = 0, count = 0;
+	int error = 0;
 	socklen_t lx_len = 0;
+#if defined(_LP64)
+	model_t model = get_udatamodel();
+#endif
 
 	if (inlen == 0) {
 		/* Simply output the zero controllen */
@@ -936,20 +936,31 @@ stol_cmsgs_copyout(void *input, socklen_t inlen, void *addr,
 			/* unsupported msg */
 			return (-sz);
 		}
-		count++;
-		lx_len += sz;
-	}
 
 #if defined(_LP64)
-	if (get_udatamodel() == DATAMODEL_NATIVE) {
-		/*
-		 * Account for the extra header space needed here so we can
-		 * fail out now if the orig_outlen is too short.
-		 */
-
-		lx_len += count * LX_CMSG64_DIFF;
-	}
+		if (model == DATAMODEL_NATIVE) {
+			/*
+			 * The converted 64-bit cmsgs require an additional 4
+			 * bytes of header space and must be aligned to 8 bytes
+			 * (instead of the typical 4 for x86)
+			 */
+			sz = ROUNDUP_LX_CMSG64_LEN(sz + LX_CMSG64_DIFF);
+		} else
 #endif /* defined(_LP64) */
+		{
+			/*
+			 * The converted 32-bit cmsgs do not require additional
+			 * header space or padding for Linux conversion.
+			 */
+			sz = ROUNDUP_cmsglen(sz);
+		}
+
+		/*
+		 * Unlike SunOS, Linux requires that the last cmsg be
+		 * adequately padded for alignment.
+		 */
+		lx_len += sz;
+	}
 
 	if (lx_len > orig_outlen || addr == NULL) {
 		/* This will be interpreted by the caller */
@@ -974,7 +985,7 @@ stol_cmsgs_copyout(void *input, socklen_t inlen, void *addr,
 	}
 
 #if defined(_LP64)
-	if (get_udatamodel() == DATAMODEL_NATIVE) {
+	if (model == DATAMODEL_NATIVE) {
 		/* Linux cmsg headers are longer than illumos under x86_64. */
 		struct cmsghdr *smsg;
 		lx_cmsghdr64_t *lmsg;
@@ -1014,7 +1025,7 @@ stol_cmsgs_copyout(void *input, socklen_t inlen, void *addr,
 finish:
 	if (outlenp != NULL) {
 #if defined(_LP64)
-		if (get_udatamodel() != DATAMODEL_NATIVE) {
+		if (model != DATAMODEL_NATIVE) {
 			int32_t len32 = (int32_t)lx_len;
 			if (copyout(&len32, outlenp, sizeof (len32)) != 0) {
 				return (EFAULT);
@@ -1059,6 +1070,78 @@ lx_cmsg_set_cloexec(void *input, socklen_t inlen)
 			}
 		}
 	}
+}
+
+static int
+lx_cmsg_try_ucred(sonode_t *so, struct nmsghdr *msg, socklen_t origlen)
+{
+	lx_socket_aux_data_t *sad;
+	struct cmsghdr *cmsg = NULL;
+	int msgsize;
+
+	if (origlen == 0) {
+		return (0);
+	}
+	sad = lx_sad_acquire(SOTOV(so));
+	if (!sad->lxsad_stream_cred) {
+		mutex_exit(&sad->lxsad_lock);
+		return (0);
+	}
+	mutex_exit(&sad->lxsad_lock);
+
+	msgsize = ucredminsize(so->so_peercred) + sizeof (struct cmsghdr);
+	if (msg->msg_control == NULL) {
+		msg->msg_controllen = msgsize;
+		msg->msg_control = cmsg = kmem_zalloc(msgsize, KM_SLEEP);
+	} else {
+		/*
+		 * The so_recvmsg operation may have allocated a msg_control
+		 * buffer which precisely fits all returned cmsgs.  We must
+		 * manually verify the length of that cmsg data and reallocate
+		 * the buffer if it lacks the necessary space.
+		 */
+		uintptr_t start = (uintptr_t)msg->msg_control;
+		uintptr_t end = start + msg->msg_controllen;
+
+		ASSERT(msg->msg_controllen > 0);
+		cmsg = (struct cmsghdr *)msg->msg_control;
+		while (CMSG_VALID(cmsg, start, end) != 0) {
+			if (cmsg->cmsg_level == SOL_SOCKET &&
+			    cmsg->cmsg_type == SCM_UCRED) {
+				/*
+				 * If some later code change results in a ucred
+				 * being attached anyways, there is no need for
+				 * us to do it manually
+				 */
+				return (0);
+			}
+			cmsg = CMSG_NEXT(cmsg);
+		}
+		if (((uintptr_t)cmsg + msgsize) > end) {
+			socklen_t offset = (uintptr_t)cmsg - start;
+			socklen_t newsize = offset + msgsize;
+			void *newbuf;
+
+			if (newsize < msg->msg_controllen) {
+				/* size overflow, bail */
+				return (-1);
+			}
+			newbuf = kmem_alloc(newsize, KM_SLEEP);
+			bcopy(msg->msg_control, newbuf, msg->msg_controllen);
+			kmem_free(msg->msg_control, msg->msg_controllen);
+
+			msg->msg_control = newbuf;
+			msg->msg_controllen = newsize;
+			cmsg = (struct cmsghdr *)((uintptr_t)newbuf + offset);
+		}
+	}
+
+	cmsg->cmsg_level = SOL_SOCKET;
+	cmsg->cmsg_type = SCM_UCRED;
+	cmsg->cmsg_len = msgsize;
+	(void) cred2ucred(so->so_peercred, so->so_cpid, CMSG_CONTENT(cmsg),
+	    CRED());
+	return (0);
 }
 
 static lx_socket_aux_data_t *
@@ -1508,6 +1591,19 @@ lx_recv_common(int sock, struct nmsghdr *msg, xuio_t *xuiop, int flags,
 			 */
 			lx_cmsg_set_cloexec(msg->msg_control,
 			    msg->msg_controllen);
+		}
+		if (so->so_family == AF_UNIX &&
+		    (so->so_mode & SM_CONNREQUIRED) != 0) {
+			/*
+			 * It may be necessary to append a SCM_UCRED cmsg to
+			 * the controls if SO_PASSCRED is set on a
+			 * connection-oriented AF_UNIX socket.
+			 *
+			 * See lx_setsockopt_socket for more details.
+			 */
+			if (lx_cmsg_try_ucred(so, msg, controllen) != 0) {
+				msg->msg_flags |= MSG_CTRUNC;
+			}
 		}
 
 		error = stol_cmsgs_copyout(msg->msg_control,
@@ -2632,6 +2728,7 @@ lx_setsockopt_socket(sonode_t *so, int optname, void *optval, socklen_t optlen)
 	int error;
 	lx_proto_opts_t sockopts_tbl = PROTO_SOCKOPTS(ltos_socket_sockopts);
 	struct lx_bpf_program *lbp;
+	int *intval;
 	struct bpf_program bp;
 
 	switch (optname) {
@@ -2675,6 +2772,31 @@ lx_setsockopt_socket(sonode_t *so, int optname, void *optval, socklen_t optlen)
 		 * option is silently accepted.
 		 */
 		return (0);
+
+	case LX_SO_PASSCRED:
+		/*
+		 * In many cases, the Linux SO_PASSCRED is mapped to the SunOS
+		 * SO_RECVUCRED to enable the passing of peer credential
+		 * information via received cmsgs.  One exception is for
+		 * connection-oriented AF_UNIX sockets which do not yet support
+		 * that option.  Instead, we track the setting internally and,
+		 * when there is appropriate cmsg space, emulate the credential
+		 * passing by querying the STREAMS ioctl.
+		 */
+		if (so->so_family == AF_UNIX &&
+		    (so->so_mode & SM_CONNREQUIRED) != 0) {
+			lx_socket_aux_data_t *sad;
+
+			if (optlen != sizeof (int)) {
+				return (EINVAL);
+			}
+			intval = (int *)optval;
+			sad = lx_sad_acquire(SOTOV(so));
+			sad->lxsad_stream_cred = !(*intval == 0);
+			mutex_exit(&sad->lxsad_lock);
+			return (0);
+		}
+		break;
 	}
 
 	if (!lx_sockopt_lookup(sockopts_tbl, &optname, &optlen)) {
@@ -2916,6 +3038,26 @@ lx_getsockopt_socket(sonode_t *so, int optname, void *optval,
 		}
 		*optlen = sizeof (int);
 		return (error);
+
+	case LX_SO_PASSCRED:
+		/*
+		 * Special handling for connection-oriented AF_UNIX sockets.
+		 * See lx_setsockopt_socket for more details.
+		 */
+		if (so->so_family == AF_UNIX &&
+		    (so->so_mode & SM_CONNREQUIRED) != 0) {
+			lx_socket_aux_data_t *sad;
+
+			if (*optlen < sizeof (int)) {
+				return (EINVAL);
+			}
+			sad = lx_sad_acquire(SOTOV(so));
+			*intval = sad->lxsad_stream_cred;
+			*optlen = sizeof (int);
+			mutex_exit(&sad->lxsad_lock);
+			return (0);
+		}
+		break;
 
 	case LX_SO_PEERCRED:
 		if (*optlen < sizeof (struct lx_ucred)) {
