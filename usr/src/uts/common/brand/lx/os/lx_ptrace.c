@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*
@@ -1451,6 +1451,18 @@ lx_ptrace_stop_for_option(int option, boolean_t child, ulong_t msg,
 		 * until the matching parent event is dispatched, and only if
 		 * it is a "child" event.  This is not a child event, so we
 		 * clear the wait flag.
+		 */
+		lwpd->br_ptrace_flags &= ~LX_PTF_PARENT_WAIT;
+
+	} else if (option == LX_PTRACE_O_TRACEVFORK) {
+		/*
+		 * For a child, we have to handle vfork as a special case. In
+		 * lx_ptrace_inherit_tracer() we set LX_PTF_PARENT_WAIT to
+		 * force events to be delayed until the parent posts its event.
+		 * This flag is cleared in lx_waitid_helper() to enforce a
+		 * "happens after" relationship. However, this obviously cannot
+		 * work for the vfork case. Thus, we clear our flag now so that
+		 * we can deliver the signal in lx_stop_notify(), if necessary.
 		 */
 		lwpd->br_ptrace_flags &= ~LX_PTF_PARENT_WAIT;
 	}
