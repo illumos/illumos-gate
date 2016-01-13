@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2014, Joyent, Inc. All rights reserved.
  * Copyright 2014 OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright (c) 2014, Tegile Systems Inc. All rights reserved.
@@ -9274,11 +9274,17 @@ mptsas_flush_hba(mptsas_t *mpt)
 	mutex_exit(&mpt->m_tx_waitq_mutex);
 
 	/*
-	 * Drain the taskqs prior to reallocating resources.
+	 * Drain the taskqs prior to reallocating resources. The thread
+	 * passing through here could be launched from either (dr)
+	 * or (event) taskqs so only wait on the 'other' queue since
+	 * waiting on 'this' queue is a deadlock condition.
 	 */
 	mutex_exit(&mpt->m_mutex);
-	ddi_taskq_wait(mpt->m_event_taskq);
-	ddi_taskq_wait(mpt->m_dr_taskq);
+	if (!taskq_member((taskq_t *)mpt->m_event_taskq, curthread))
+		ddi_taskq_wait(mpt->m_event_taskq);
+	if (!taskq_member((taskq_t *)mpt->m_dr_taskq, curthread))
+		ddi_taskq_wait(mpt->m_dr_taskq);
+
 	mutex_enter(&mpt->m_mutex);
 }
 

@@ -79,7 +79,7 @@ pam_sm_close_session(pam_handle_t *pamh, int flags, int argc,
 	for (i = 0; i < argc; i++) {
 		if (strcasecmp(argv[i], "debug") == 0)
 			debug = 1;
-		else
+		else if (strcasecmp(argv[i], "nowarn") != 0)
 			syslog(LOG_ERR, "illegal option %s", argv[i]);
 	}
 
