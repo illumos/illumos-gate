@@ -1045,7 +1045,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/*  83: mkdir */
 	lx_rmdir,			/*  84: rmdir */
 	lx_creat,			/*  85: creat */
-	lx_link,			/*  86: link */
+	NULL,				/*  86: link */
 	lx_unlink,			/*  87: unlink */
 	lx_symlink,			/*  88: symlink */
 	lx_readlink,			/*  89: readlink */
@@ -1224,7 +1224,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/* 262: fstatat64 */
 	lx_unlinkat,			/* 263: unlinkat */
 	lx_renameat,			/* 264: renameat */
-	lx_linkat,			/* 265: linkat */
+	NULL,				/* 265: linkat */
 	lx_symlinkat,			/* 266: symlinkat */
 	lx_readlinkat,			/* 267: readlinkat */
 	NULL,				/* 268: fchmodat */
@@ -1299,7 +1299,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_close,			/*   6: close */
 	NULL,				/*   7: waitpid */
 	lx_creat,			/*   8: creat */
-	lx_link,			/*   9: link */
+	NULL,				/*   9: link */
 	lx_unlink,			/*  10: unlink */
 	lx_execve,			/*  11: execve */
 	lx_chdir,			/*  12: chdir */
@@ -1593,7 +1593,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/* 300: fstatat64 */
 	lx_unlinkat,			/* 301: unlinkat */
 	lx_renameat,			/* 302: renameat */
-	lx_linkat,			/* 303: linkat */
+	NULL,				/* 303: linkat */
 	lx_symlinkat,			/* 304: symlinkat */
 	lx_readlinkat,			/* 305: readlinkat */
 	NULL,				/* 306: fchmodat */
