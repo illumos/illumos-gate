@@ -625,7 +625,7 @@ lx_sysent_t lx_sysent32[] = {
 	{"close",	lx_close,		0,		1}, /*  6 */
 	{"waitpid",	lx_waitpid,		0,		3}, /*  7 */
 	{"creat",	NULL,			0,		2}, /*  8 */
-	{"link",	NULL,			0,		2}, /*  9 */
+	{"link",	lx_link,		0,		2}, /*  9 */
 	{"unlink",	NULL,			0,		1}, /* 10 */
 	{"execve",	NULL,			0,		3}, /* 11 */
 	{"chdir",	NULL,			0,		1}, /* 12 */
@@ -923,7 +923,7 @@ lx_sysent_t lx_sysent32[] = {
 	{"fstatat64",	lx_fstatat64,		0,		4}, /* 300 */
 	{"unlinkat",	NULL,			0,		3}, /* 301 */
 	{"renameat",	NULL,			0,		4}, /* 302 */
-	{"linkat",	NULL,			0,		5}, /* 303 */
+	{"linkat",	lx_linkat,		0,		5}, /* 303 */
 	{"symlinkat",	NULL,			0,		3}, /* 304 */
 	{"readlinkat",	NULL,			0,		4}, /* 305 */
 	{"fchmodat",	lx_fchmodat,		0,		3}, /* 306 */
@@ -1073,7 +1073,7 @@ lx_sysent_t lx_sysent64[] = {
 	{"mkdir",	lx_mkdir,		0,		2}, /* 83 */
 	{"rmdir",	NULL,			0,		1}, /* 84 */
 	{"creat",	NULL,			0,		2}, /* 85 */
-	{"link",	NULL,			0,		2}, /* 86 */
+	{"link",	lx_link,		0,		2}, /* 86 */
 	{"unlink",	NULL,			0,		1}, /* 87 */
 	{"symlink",	NULL,			0,		2}, /* 88 */
 	{"readlink",	NULL,			0,		3}, /* 89 */
@@ -1252,7 +1252,7 @@ lx_sysent_t lx_sysent64[] = {
 	{"fstatat64",	lx_fstatat64,		0,		4}, /* 262 */
 	{"unlinkat",	NULL,			0,		3}, /* 263 */
 	{"renameat",	NULL,			0,		4}, /* 264 */
-	{"linkat",	NULL,			0,		5}, /* 265 */
+	{"linkat",	lx_linkat,		0,		5}, /* 265 */
 	{"symlinkat",	NULL,			0,		3}, /* 266 */
 	{"readlinkat",	NULL,			0,		4}, /* 267 */
 	{"fchmodat",	lx_fchmodat,		0,		3}, /* 268 */

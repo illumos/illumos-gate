@@ -22,7 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2015 Joyent, Inc.  All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include <sys/fstyp.h>
@@ -118,23 +118,6 @@ ltos_at_flag(int lflag, int allow, boolean_t enforce)
 /*
  * Miscellaneous file-related system calls.
  */
-
-/*
- * On Linux, even root cannot create a link to a directory, so we have to
- * add an explicit check.
- */
-long
-lx_link(uintptr_t p1, uintptr_t p2)
-{
-	char *from = (char *)p1;
-	char *to = (char *)p2;
-	struct stat64 statbuf;
-
-	if ((stat64(from, &statbuf) == 0) && S_ISDIR(statbuf.st_mode))
-		return (-EPERM);
-
-	return (link(from, to) ? -errno : 0);
-}
 
 /*
  * On Linux, an unlink of a directory returns EISDIR, not EPERM.
@@ -630,61 +613,6 @@ lx_symlinkat(uintptr_t p1, uintptr_t ext1, uintptr_t p2)
 	}
 
 	return (symlink((char *)p1, pathbuf) ? -errno : 0);
-}
-
-long
-lx_linkat(uintptr_t ext1, uintptr_t p1, uintptr_t ext2, uintptr_t p2,
-    uintptr_t p3)
-{
-	int atfd1 = (int)ext1;
-	int atfd2 = (int)ext2;
-	char pathbuf1[MAXPATHLEN];
-	char pathbuf2[MAXPATHLEN];
-	int ret;
-
-	/*
-	 * The flag specifies whether the hardlink will point to a symlink or
-	 * not, on solaris the default behaviour of link() is to dereference a
-	 * symlink and there is no obvious way to trigger the other behaviour.
-	 * So for now we just ignore this flag and act like link().
-	 */
-	int flag = p3;
-
-	/* return proper error for invalid flags */
-	if ((flag & ~(LX_AT_SYMLINK_FOLLOW | LX_AT_EMPTY_PATH)) != 0)
-		return (-EINVAL);
-
-	ret = getpathat(atfd1, p1, pathbuf1, sizeof (pathbuf1));
-	if (ret < 0) {
-		if (ret == -EBADF) {
-			/*
-			 * Try to figure out correct Linux errno. We know path
-			 * is relative. Check if we have a fd for a dir which
-			 * has been removed.
-			 */
-			if (atfd1 != -1 && lx_fd_to_path(atfd1, pathbuf1,
-			    sizeof (pathbuf1)) == NULL)
-				ret = -ENOENT;
-		}
-		return (ret);
-	}
-
-	ret = getpathat(atfd2, p2, pathbuf2, sizeof (pathbuf2));
-	if (ret < 0) {
-		if (ret == -EBADF) {
-			/*
-			 * Try to figure out correct Linux errno. We know path
-			 * is relative. Check if we have a fd for a dir which
-			 * has been removed.
-			 */
-			if (atfd2 != -1 && lx_fd_to_path(atfd2, pathbuf2,
-			    sizeof (pathbuf2)) == NULL)
-				ret = -ENOENT;
-		}
-		return (ret);
-	}
-
-	return (lx_link((uintptr_t)pathbuf1, (uintptr_t)pathbuf2));
 }
 
 long

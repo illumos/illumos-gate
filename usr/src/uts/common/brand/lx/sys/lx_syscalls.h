@@ -83,6 +83,8 @@ extern long lx_ioprio_set();
 extern long lx_kill();
 extern long lx_lchown();
 extern long lx_lchown16();
+extern long lx_link();
+extern long lx_linkat();
 extern long lx_lstat32();
 extern long lx_lstat64();
 extern long lx_mkdir();
