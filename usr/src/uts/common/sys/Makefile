@@ -26,6 +26,7 @@
 # Copyright 2013 Saso Kiselkov. All rights reserved.
 # Copyright 2015 Igor Kozhukhov <ikozhukhov@gmail.com>
 # Copyright 2016 Nexenta Systems, Inc.
+# Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 #
 
 include $(SRC)/uts/Makefile.uts
@@ -50,6 +51,7 @@ i386_HDRS=			\
 	fd_debug.h		\
 	fdc.h			\
 	fdmedia.h		\
+	firmload.h		\
 	mouse.h			\
 	ucode.h
 

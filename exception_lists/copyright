@@ -443,6 +443,8 @@ usr/src/uts/common/io/ixgbe/core/ixgbe_x540.h
 usr/src/uts/common/io/ixgbe/core/ixgbe_x550.c
 usr/src/uts/common/io/ixgbe/core/ixgbe_x550.h
 usr/src/uts/common/fs/zfs/THIRDPARTYLICENSE.lz4.descrip
+usr/src/uts/common/sys/THIRDPARTYLICENSE.firmload
+usr/src/uts/common/sys/THIRDPARTYLICENSE.firmload.descrip
 usr/src/uts/common/sys/scsi/adapters/mpt_sas/mpi/THIRDPARTYLICENSE.descrip
 usr/src/uts/common/sys/scsi/adapters/mpt_sas/mpi/THIRDPARTYLICENSE
 usr/src/uts/common/sys/scsi/adapters/mpt_sas/mpi/mpi2.h

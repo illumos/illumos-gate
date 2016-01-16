@@ -27,6 +27,7 @@
 # Copyright 2016 Garrett D'Amore <garrett@damore.org>
 # Copyright 2016 Joyent, Inc.
 # Copyright 2016 OmniTI Computer Consulting, Inc.  All rights reserved.
+# Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 #
 
 #
@@ -178,6 +179,7 @@ GENUNIX_OBJS +=	\
 		fem.o		\
 		ffs.o		\
 		fio.o		\
+		firmload.o	\
 		flock.o		\
 		fm.o		\
 		fork.o		\

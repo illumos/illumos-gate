@@ -23,6 +23,7 @@
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2013 Saso Kiselkov. All rights reserved.
 # Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 #
 
 #
@@ -69,6 +70,7 @@ dir path=kernel/drv group=sys
 dir path=kernel/drv/$(ARCH64) group=sys
 dir path=kernel/exec group=sys
 dir path=kernel/exec/$(ARCH64) group=sys
+dir path=kernel/firmware group=sys
 dir path=kernel/fs group=sys
 dir path=kernel/fs/$(ARCH64) group=sys
 dir path=kernel/ipp group=sys
@@ -921,6 +923,8 @@ license usr/src/uts/common/inet/tcp/THIRDPARTYLICENSE \
     license=usr/src/uts/common/inet/tcp/THIRDPARTYLICENSE
 license usr/src/uts/common/io/THIRDPARTYLICENSE.etheraddr \
     license=usr/src/uts/common/io/THIRDPARTYLICENSE.etheraddr
+license usr/src/uts/common/sys/THIRDPARTYLICENSE.firmload \
+    license=usr/src/uts/common/sys/THIRDPARTYLICENSE.firmload
 license usr/src/uts/common/sys/THIRDPARTYLICENSE.icu \
     license=usr/src/uts/common/sys/THIRDPARTYLICENSE.icu
 license usr/src/uts/common/sys/THIRDPARTYLICENSE.unicode \
