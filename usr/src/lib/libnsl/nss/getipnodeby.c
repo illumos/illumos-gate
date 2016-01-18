@@ -23,6 +23,8 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
+ * Copyright 2016 Joyent, Inc.
+ *
  * This file defines and implements the re-entrant getipnodebyname(),
  * getipnodebyaddr(), and freehostent() routines for IPv6. These routines
  * follow use the netdir_getbyYY() (see netdir_inet.c).
@@ -107,7 +109,7 @@ static struct hostent *__filter_addresses(int, struct hostent *);
 static int __find_mapped(struct hostent *, int);
 static nss_XbyY_buf_t *__IPv6_alloc(int);
 static void __IPv6_cleanup(nss_XbyY_buf_t *);
-static int __ai_addrconfig(int);
+static int __ai_addrconfig(int, boolean_t);
 
 
 #ifdef PIC
@@ -145,15 +147,35 @@ getipnodebyname_processflags(const char *name, int af, int flags)
 	boolean_t	ipv4configured = B_FALSE;
 
 	/*
-	 * If AI_ADDRCONFIG is specified, we need to determine the number
-	 * of addresses of each address family configured on the system as
+	 * If AI_ADDRCONFIG is specified, we need to determine the number of
+	 * addresses of each address family configured on the system as
 	 * appropriate.
+	 *
+	 * When trying to determine which addresses should be used for
+	 * addrconfig, we first ignore loopback devices. This generally makes
+	 * sense as policy, as most of these queries will be trying to go
+	 * off-box and one should not have an IPv6 loopback address suggest that
+	 * we can now send IPv6 traffic off the box or the equivalent with IPv4.
+	 * However, it's possible that no non-loopback interfaces are up on the
+	 * box. In those cases, we then check which interfaces are up and
+	 * consider loopback devices. While this isn't to the letter of RFC 3493
+	 * (which itself is a bit vague in this case, as is SUS), it matches
+	 * expected user behavior in these situations.
 	 */
 	if (flags & AI_ADDRCONFIG) {
-		ipv6configured = (af == AF_INET6 &&
-		    __ai_addrconfig(AF_INET6) > 0);
-		ipv4configured = ((af == AF_INET || (flags & AI_V4MAPPED)) &&
-		    __ai_addrconfig(AF_INET) > 0);
+		boolean_t hv4, hv6;
+
+		hv4 = __ai_addrconfig(AF_INET, B_FALSE) > 0;
+		hv6 = __ai_addrconfig(AF_INET6, B_FALSE) > 0;
+
+		if (hv4 == B_FALSE && hv6 == B_FALSE) {
+			hv4 = __ai_addrconfig(AF_INET, B_TRUE) > 0;
+			hv6 = __ai_addrconfig(AF_INET6, B_TRUE) > 0;
+		}
+
+		ipv6configured = (af == AF_INET6 && hv6);
+		ipv4configured = (af == AF_INET || (flags & AI_V4MAPPED)) &&
+		    hv4;
 	}
 
 	/*
@@ -656,7 +678,7 @@ freehostent(struct hostent *hent)
 }
 
 static int
-__ai_addrconfig(int af)
+__ai_addrconfig(int af, boolean_t loopback)
 {
 	struct lifnum	lifn;
 	struct lifconf	lifc;
@@ -664,8 +686,8 @@ __ai_addrconfig(int af)
 	size_t		bufsize;
 	hrtime_t	now, *then;
 	static hrtime_t	then4, then6; /* the last time we updated ifnum# */
-	static int	ifnum4 = -1, ifnum6 = -1;
-	int		*num;
+	static int	ifnum4 = -1, ifnum6 = -1, iflb4 = 0, iflb6 = 0;
+	int		*num, *lb;
 	int 		nlifr, count = 0;
 
 
@@ -673,10 +695,12 @@ __ai_addrconfig(int af)
 	case AF_INET:
 		num = &ifnum4;
 		then = &then4;
+		lb = &iflb4;
 		break;
 	case AF_INET6:
 		num = &ifnum6;
 		then = &then6;
+		lb = &iflb6;
 		break;
 	default:
 		return (0);
@@ -705,6 +729,7 @@ again:
 			goto fail;
 
 		if (lifn.lifn_count == 0) {
+			*lb = 0;
 			*num = 0;
 			*then = now;
 			return (*num);
@@ -735,7 +760,8 @@ again:
 		 * Do not include any loopback addresses, 127.0.0.1 for AF_INET
 		 * and ::1 for AF_INET6, while counting the number of available
 		 * IPv4 or IPv6 addresses. (RFC 3493 requires this, whenever
-		 * AI_ADDRCONFIG flag is set)
+		 * AI_ADDRCONFIG flag is set) However, if the loopback flag is
+		 * set to true we'll include it in the output.
 		 */
 		for (lifp = buf; lifp < buf + nlifr; lifp++) {
 			switch (af) {
@@ -760,10 +786,14 @@ again:
 			}
 		}
 		*num = nlifr - count;
+		*lb = count;
 		*then = now;
 		free(buf);
 	}
-	return (*num);
+	if (loopback == B_TRUE)
+		return (*num + *lb);
+	else
+		return (*num);
 fail:
 	free(buf);
 	/*
