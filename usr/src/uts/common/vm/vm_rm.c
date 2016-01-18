@@ -65,7 +65,7 @@
  * physical page is present and the hardware translation is missing;
  * and it can overestimate the rss, eg, if there are active
  * translations to a frame buffer with page structs.
- * Also, it does not take sharing and XHATs into account.
+ * Also, it does not take sharing into account.
  */
 size_t
 rm_asrss(as)

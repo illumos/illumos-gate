@@ -3856,7 +3856,6 @@ segvn_fault_vnodepages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 	int alloc_failed = 0;
 	int adjszc_chk;
 	struct vattr va;
-	int xhat = 0;
 	page_t *pplist;
 	pfn_t pfn;
 	int physcontig;
@@ -3904,10 +3903,6 @@ segvn_fault_vnodepages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 	} else {
 		prot = svd->prot;
 		/* caller has already done segment level protection check. */
-	}
-
-	if (seg->s_as->a_hat != hat) {
-		xhat = 1;
 	}
 
 	if (rw == S_WRITE && segtype == MAP_PRIVATE) {
@@ -4265,25 +4260,9 @@ segvn_fault_vnodepages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 				}
 				SEGVN_UPDATE_MODBITS(ppa, pages, rw,
 				    prot, vpprot);
-				if (!xhat) {
-					hat_memload_array_region(hat, a, pgsz,
-					    ppa, prot & vpprot, hat_flag,
-					    svd->rcookie);
-				} else {
-					/*
-					 * avoid large xhat mappings to FS
-					 * pages so that hat_page_demote()
-					 * doesn't need to check for xhat
-					 * large mappings.
-					 * Don't use regions with xhats.
-					 */
-					for (i = 0; i < pages; i++) {
-						hat_memload(hat,
-						    a + (i << PAGESHIFT),
-						    ppa[i], prot & vpprot,
-						    hat_flag);
-					}
-				}
+				hat_memload_array_region(hat, a, pgsz,
+				    ppa, prot & vpprot, hat_flag,
+				    svd->rcookie);
 
 				if (!(hat_flag & HAT_LOAD_LOCK)) {
 					for (i = 0; i < pages; i++) {
@@ -4337,7 +4316,7 @@ segvn_fault_vnodepages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 			 * check if we should use smallest mapping size.
 			 */
 			upgrdfail = 0;
-			if (szc == 0 || xhat ||
+			if (szc == 0 ||
 			    (pszc >= szc &&
 			    !IS_P2ALIGNED(pfn, pages)) ||
 			    (pszc < szc &&
@@ -4369,7 +4348,7 @@ segvn_fault_vnodepages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 					ierr = -1;
 					break;
 				}
-				if (szc != 0 && !xhat && !upgrdfail) {
+				if (szc != 0 && !upgrdfail) {
 					segvn_faultvnmpss_align_err5++;
 				}
 				SEGVN_VMSTAT_FLTVNPAGES(34);

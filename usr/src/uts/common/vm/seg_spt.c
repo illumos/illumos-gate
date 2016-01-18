@@ -1925,27 +1925,17 @@ segspt_dismfault(struct hat *hat, struct seg *seg, caddr_t addr,
 				    HAT_LOAD_LOCK | HAT_LOAD_SHARE);
 			}
 		} else {
-			if (hat == seg->s_as->a_hat) {
+			/*
+			 * Migrate pages marked for migration
+			 */
+			if (lgrp_optimizations())
+				page_migrate(seg, shm_addr, ppa, npages);
 
-				/*
-				 * Migrate pages marked for migration
-				 */
-				if (lgrp_optimizations())
-					page_migrate(seg, shm_addr, ppa,
-					    npages);
-
-				/* CPU HAT */
-				for (; pidx < npages;
-				    a += pgsz, pidx += pgcnt) {
-					hat_memload_array(sptseg->s_as->a_hat,
-					    a, pgsz, &ppa[pidx],
-					    sptd->spt_prot,
-					    HAT_LOAD_SHARE);
-				}
-			} else {
-				/* XHAT. Pass real address */
-				hat_memload_array(hat, shm_addr,
-				    size, ppa, sptd->spt_prot, HAT_LOAD_SHARE);
+			for (; pidx < npages; a += pgsz, pidx += pgcnt) {
+				hat_memload_array(sptseg->s_as->a_hat,
+				    a, pgsz, &ppa[pidx],
+				    sptd->spt_prot,
+				    HAT_LOAD_SHARE);
 			}
 
 			/*
@@ -2185,28 +2175,17 @@ segspt_shmfault(struct hat *hat, struct seg *seg, caddr_t addr,
 				    HAT_LOAD_LOCK | HAT_LOAD_SHARE);
 			}
 		} else {
-			if (hat == seg->s_as->a_hat) {
+			/*
+			 * Migrate pages marked for migration.
+			 */
+			if (lgrp_optimizations())
+				page_migrate(seg, shm_addr, ppa, npages);
 
-				/*
-				 * Migrate pages marked for migration.
-				 */
-				if (lgrp_optimizations())
-					page_migrate(seg, shm_addr, ppa,
-					    npages);
-
-				/* CPU HAT */
-				for (; pidx < npages;
-				    a += pgsz, pidx += pgcnt) {
-					sz = MIN(pgsz, ptob(npages - pidx));
-					hat_memload_array(sptseg->s_as->a_hat,
-					    a, sz, &ppa[pidx],
-					    sptd->spt_prot, HAT_LOAD_SHARE);
-				}
-			} else {
-				/* XHAT. Pass real address */
-				hat_memload_array(hat, shm_addr,
-				    ptob(npages), ppa, sptd->spt_prot,
-				    HAT_LOAD_SHARE);
+			for (; pidx < npages; a += pgsz, pidx += pgcnt) {
+				sz = MIN(pgsz, ptob(npages - pidx));
+				hat_memload_array(sptseg->s_as->a_hat,
+				    a, sz, &ppa[pidx],
+				    sptd->spt_prot, HAT_LOAD_SHARE);
 			}
 
 			/*

@@ -125,7 +125,6 @@ struct as {
 	vnode_t	**a_objectdir;	/* object directory (procfs) */
 	size_t	a_sizedir;	/* size of object directory */
 	struct as_callback *a_callbacks; /* callback list */
-	void *a_xhat;		/* list of xhat providers */
 	proc_t	*a_proc;	/* back pointer to proc */
 	size_t	a_resvsize;	/* size of reserved part of address space */
 };
@@ -135,24 +134,20 @@ struct as {
 #define	AS_UNMAPWAIT		0x20
 #define	AS_NEEDSPURGE		0x10	/* mostly for seg_nf, see as_purge() */
 #define	AS_NOUNMAPWAIT		0x02
-#define	AS_BUSY			0x01	/* needed by XHAT framework */
 
 #define	AS_ISPGLCK(as)		((as)->a_flags & AS_PAGLCK)
 #define	AS_ISCLAIMGAP(as)	((as)->a_flags & AS_CLAIMGAP)
 #define	AS_ISUNMAPWAIT(as)	((as)->a_flags & AS_UNMAPWAIT)
-#define	AS_ISBUSY(as)		((as)->a_flags & AS_BUSY)
 #define	AS_ISNOUNMAPWAIT(as)	((as)->a_flags & AS_NOUNMAPWAIT)
 
 #define	AS_SETPGLCK(as)		((as)->a_flags |= AS_PAGLCK)
 #define	AS_SETCLAIMGAP(as)	((as)->a_flags |= AS_CLAIMGAP)
 #define	AS_SETUNMAPWAIT(as)	((as)->a_flags |= AS_UNMAPWAIT)
-#define	AS_SETBUSY(as)		((as)->a_flags |= AS_BUSY)
 #define	AS_SETNOUNMAPWAIT(as)	((as)->a_flags |= AS_NOUNMAPWAIT)
 
 #define	AS_CLRPGLCK(as)		((as)->a_flags &= ~AS_PAGLCK)
 #define	AS_CLRCLAIMGAP(as)	((as)->a_flags &= ~AS_CLAIMGAP)
 #define	AS_CLRUNMAPWAIT(as)	((as)->a_flags &= ~AS_UNMAPWAIT)
-#define	AS_CLRBUSY(as)		((as)->a_flags &= ~AS_BUSY)
 #define	AS_CLRNOUNMAPWAIT(as)	((as)->a_flags &= ~AS_NOUNMAPWAIT)
 
 #define	AS_TYPE_64BIT(as)	\
