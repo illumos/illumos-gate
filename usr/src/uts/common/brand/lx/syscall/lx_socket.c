@@ -2268,6 +2268,9 @@ typedef struct lx_proto_opts {
 #define	PROTO_SOCKOPTS(opts)    \
 	{ (opts), sizeof ((opts)) / sizeof ((opts)[0]) }
 
+/* Shorten name so the columns can line up */
+#define	IP_MREQ_SZ	sizeof (struct ip_mreq)
+
 static const lx_sockopt_map_t ltos_ip_sockopts[LX_IP_UNICAST_IF + 1] = {
 	{ OPTNOTSUP, 0 },
 	{ IP_TOS, sizeof (int) },		/* IP_TOS		*/
@@ -2304,8 +2307,8 @@ static const lx_sockopt_map_t ltos_ip_sockopts[LX_IP_UNICAST_IF + 1] = {
 	{ IP_MULTICAST_IF, sizeof (int) },	/* IP_MULTICAST_IF	*/
 	{ IP_MULTICAST_TTL, sizeof (int) },	/* IP_MULTICAST_TTL	*/
 	{ IP_MULTICAST_LOOP, sizeof (int) },	/* IP_MULTICAST_LOOP	*/
-	{ IP_ADD_MEMBERSHIP, 0 },		/* IP_ADD_MEMBERSHIP	*/
-	{ IP_DROP_MEMBERSHIP, 0 },		/* IP_DROP_MEMBERSHIP	*/
+	{ IP_ADD_MEMBERSHIP, IP_MREQ_SZ },	/* IP_ADD_MEMBERSHIP	*/
+	{ IP_DROP_MEMBERSHIP, IP_MREQ_SZ },	/* IP_DROP_MEMBERSHIP	*/
 	{ IP_UNBLOCK_SOURCE, 0 },		/* IP_UNBLOCK_SOURCE	*/
 	{ IP_BLOCK_SOURCE, 0 },			/* IP_BLOCK_SOURCE	*/
 	{ IP_ADD_SOURCE_MEMBERSHIP, 0 },	/* IP_ADD_SOURCE_MEMBERSHIP */
