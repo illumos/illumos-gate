@@ -217,7 +217,9 @@ static void lxpr_read_sys_kernel_ngroups_max(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_kernel_osrel(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_kernel_pid_max(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_kernel_rand_bootid(lxpr_node_t *, lxpr_uiobuf_t *);
+static void lxpr_read_sys_kernel_sem(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_kernel_shmmax(lxpr_node_t *, lxpr_uiobuf_t *);
+static void lxpr_read_sys_kernel_shmmni(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_kernel_threads_max(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_net_core_somaxc(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_vm_minfr_kb(lxpr_node_t *, lxpr_uiobuf_t *);
@@ -238,8 +240,13 @@ static int lxpr_write_sys_kernel_corepatt(lxpr_node_t *, uio_t *, cred_t *,
 
 #define	ttolxlwp(t)	((struct lx_lwp_data *)ttolwpbrand(t))
 
+extern rctl_hndl_t rc_process_semmsl;
+extern rctl_hndl_t rc_process_semopm;
+extern rctl_hndl_t rc_zone_semmni;
+
 extern rctl_hndl_t rc_zone_msgmni;
 extern rctl_hndl_t rc_zone_shmmax;
+extern rctl_hndl_t rc_zone_shmmni;
 #define	FOURGB	4294967295
 
 /*
@@ -462,7 +469,9 @@ static lxpr_dirent_t sys_kerneldir[] = {
 	{ LXPR_SYS_KERNEL_OSREL,	"osrelease" },
 	{ LXPR_SYS_KERNEL_PID_MAX,	"pid_max" },
 	{ LXPR_SYS_KERNEL_RANDDIR,	"random" },
+	{ LXPR_SYS_KERNEL_SEM,		"sem" },
 	{ LXPR_SYS_KERNEL_SHMMAX,	"shmmax" },
+	{ LXPR_SYS_KERNEL_SHMMNI,	"shmmni" },
 	{ LXPR_SYS_KERNEL_THREADS_MAX,	"threads-max" },
 };
 
@@ -700,7 +709,9 @@ static void (*lxpr_read_function[LXPR_NFILES])() = {
 	lxpr_read_sys_kernel_pid_max,	/* /proc/sys/kernel/pid_max */
 	lxpr_read_invalid,		/* /proc/sys/kernel/random */
 	lxpr_read_sys_kernel_rand_bootid, /* /proc/sys/kernel/random/boot_id */
+	lxpr_read_sys_kernel_sem,	/* /proc/sys/kernel/sem */
 	lxpr_read_sys_kernel_shmmax,	/* /proc/sys/kernel/shmmax */
+	lxpr_read_sys_kernel_shmmni,	/* /proc/sys/kernel/shmmni */
 	lxpr_read_sys_kernel_threads_max, /* /proc/sys/kernel/threads-max */
 	lxpr_read_invalid,		/* /proc/sys/net	*/
 	lxpr_read_invalid,		/* /proc/sys/net/core	*/
@@ -818,7 +829,9 @@ static vnode_t *(*lxpr_lookup_function[LXPR_NFILES])() = {
 	lxpr_lookup_not_a_dir,		/* /proc/sys/kernel/pid_max */
 	lxpr_lookup_sys_kdir_randdir,	/* /proc/sys/kernel/random */
 	lxpr_lookup_not_a_dir,		/* /proc/sys/kernel/random/boot_id */
+	lxpr_lookup_not_a_dir,		/* /proc/sys/kernel/sem */
 	lxpr_lookup_not_a_dir,		/* /proc/sys/kernel/shmmax */
+	lxpr_lookup_not_a_dir,		/* /proc/sys/kernel/shmmni */
 	lxpr_lookup_not_a_dir,		/* /proc/sys/kernel/threads-max */
 	lxpr_lookup_sys_netdir,		/* /proc/sys/net */
 	lxpr_lookup_sys_net_coredir,	/* /proc/sys/net/core */
@@ -936,7 +949,9 @@ static int (*lxpr_readdir_function[LXPR_NFILES])() = {
 	lxpr_readdir_not_a_dir,		/* /proc/sys/kernel/pid_max */
 	lxpr_readdir_sys_kdir_randdir,	/* /proc/sys/kernel/random */
 	lxpr_readdir_not_a_dir,		/* /proc/sys/kernel/random/boot_id */
+	lxpr_readdir_not_a_dir,		/* /proc/sys/kernel/sem */
 	lxpr_readdir_not_a_dir,		/* /proc/sys/kernel/shmmax */
+	lxpr_readdir_not_a_dir,		/* /proc/sys/kernel/shmmni */
 	lxpr_readdir_not_a_dir,		/* /proc/sys/kernel/threads-max */
 	lxpr_readdir_sys_netdir,	/* /proc/sys/net */
 	lxpr_readdir_sys_net_coredir,	/* /proc/sys/net/core */
@@ -4112,6 +4127,34 @@ lxpr_read_sys_kernel_rand_bootid(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 }
 
 static void
+lxpr_read_sys_kernel_sem(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+{
+	proc_t *pp = curproc;
+	rctl_qty_t vmsl, vopm, vmni, vmns;
+
+	ASSERT(lxpnp->lxpr_type == LXPR_SYS_KERNEL_SEM);
+
+	mutex_enter(&pp->p_lock);
+	vmsl = rctl_enforced_value(rc_process_semmsl, pp->p_rctls, pp);
+	vopm = rctl_enforced_value(rc_process_semopm, pp->p_rctls, pp);
+	vmni = rctl_enforced_value(rc_zone_semmni, pp->p_zone->zone_rctls, pp);
+	mutex_exit(&pp->p_lock);
+	vmns = vmsl * vmni;
+	if (vmns < vmsl || vmns < vmni) {
+		vmns = ULLONG_MAX;
+	}
+	/*
+	 * Format: semmsl semmns semopm semmni
+	 *  - semmsl: Limit semaphores in a sempahore set.
+	 *  - semmns: Limit semaphores in all semaphore sets
+	 *  - semopm: Limit operations in a single semop call
+	 *  - semmni: Limit number of semaphore sets
+	 */
+	lxpr_uiobuf_printf(uiobuf, "%llu\t%llu\t%llu\t%llu\n",
+	    vmsl, vmns, vopm, vmni);
+}
+
+static void
 lxpr_read_sys_kernel_shmmax(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
 	rctl_qty_t val;
@@ -4120,6 +4163,24 @@ lxpr_read_sys_kernel_shmmax(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 
 	mutex_enter(&curproc->p_lock);
 	val = rctl_enforced_value(rc_zone_shmmax,
+	    curproc->p_zone->zone_rctls, curproc);
+	mutex_exit(&curproc->p_lock);
+
+	if (val > FOURGB)
+		val = FOURGB;
+
+	lxpr_uiobuf_printf(uiobuf, "%u\n", (uint_t)val);
+}
+
+static void
+lxpr_read_sys_kernel_shmmni(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+{
+	rctl_qty_t val;
+
+	ASSERT(lxpnp->lxpr_type == LXPR_SYS_KERNEL_SHMMNI);
+
+	mutex_enter(&curproc->p_lock);
+	val = rctl_enforced_value(rc_zone_shmmni,
 	    curproc->p_zone->zone_rctls, curproc);
 	mutex_exit(&curproc->p_lock);
 

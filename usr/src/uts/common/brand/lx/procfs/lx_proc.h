@@ -21,7 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #ifndef	_LX_PROC_H
@@ -208,7 +208,9 @@ typedef enum lxpr_nodetype {
 	LXPR_SYS_KERNEL_PID_MAX,	/* /proc/sys/kernel/pid_max */
 	LXPR_SYS_KERNEL_RANDDIR,	/* /proc/sys/kernel/random */
 	LXPR_SYS_KERNEL_RAND_BOOTID, /* /proc/sys/kernel/random/boot_id */
-	LXPR_SYS_KERNEL_SHMMAX,	/* /proc/sys/kernel/shmmax */
+	LXPR_SYS_KERNEL_SEM,		/* /proc/sys/kernel/sem		*/
+	LXPR_SYS_KERNEL_SHMMAX,		/* /proc/sys/kernel/shmmax	*/
+	LXPR_SYS_KERNEL_SHMMNI,		/* /proc/sys/kernel/shmmni	*/
 	LXPR_SYS_KERNEL_THREADS_MAX,	/* /proc/sys/kernel/threads-max */
 	LXPR_SYS_NETDIR,		/* /proc/sys/net		*/
 	LXPR_SYS_NET_COREDIR,		/* /proc/sys/net/core		*/
