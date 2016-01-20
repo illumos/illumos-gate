@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright 2015 Joyent, Inc.  All rights reserved.
+ * Copyright 2016 Joyent, Inc.  All rights reserved.
  */
 
 
@@ -636,7 +636,7 @@ lx_ptm_open(dev_t *devp, int flag, int otyp, cred_t *credp)
 	/*
 	 * we're layered on top of the ptm driver so open that driver
 	 * first.  (note that we're opening /dev/ptmx in the global
-	 * zone, not ourselves in the Linux zone.)
+	 * zone, not ourselves in the lx zone.)
 	 */
 	err = ldi_open_by_name(LP_PTM_PATH, flag, credp, &lh, lps.lps_li);
 	if (err != 0)
@@ -650,7 +650,7 @@ lx_ptm_open(dev_t *devp, int flag, int otyp, cred_t *credp)
 	}
 
 	/*
-	 * we're a cloning driver so here's well change the devt that we
+	 * we're a cloning driver so here's where we'll change the devt that we
 	 * return.  the ptmx is also a cloning driver so we'll just use
 	 * it's minor number as our minor number (it already manages it's
 	 * minor name space so no reason to duplicate the effort.)
@@ -683,7 +683,7 @@ lx_ptm_open(dev_t *devp, int flag, int otyp, cred_t *credp)
 	lastmin = 0;
 	err = kstr_autopush(SET_AUTOPUSH, &maj, &min, &lastmin,
 	    &anchor, lx_pts_mods);
-	if (err != 0) {
+	if (err != 0 && err != EEXIST) {
 		(void) ldi_close(lh, flag, credp);
 		return (EIO); /* XXX return something else here? */
 	}
