@@ -31,6 +31,7 @@
 #include <stdio.h>
 #include <sys/stat.h>
 #include <libnvpair.h>
+#include <zone.h>
 
 #include "common.h"
 #include "defaults.h"
@@ -62,6 +63,32 @@ static struct dhcp_default defaults[] = {
 	{ "PARAM_IGNORE_LIST",	 NULL,	 0,   0   }
 };
 
+
+/*
+ * df_find_defaults(): builds the path to the default configuration file
+ *
+ *   input: void
+ *  output: void
+ */
+
+static const char *
+df_find_defaults(void)
+{
+	static char agent_defaults_path[MAXPATHLEN] = { 0 };
+	const char	*zroot = NULL;
+
+	if (agent_defaults_path[0] != '\0') {
+		return agent_defaults_path;
+	}
+
+	zroot = zone_get_nroot();
+
+	(void) snprintf(agent_defaults_path, MAXPATHLEN, "%s%s",
+	    zroot != NULL ?  zroot : "", DHCP_AGENT_DEFAULTS);
+
+	return agent_defaults_path;
+}
+
 /*
  * df_build_cache(): builds the defaults nvlist cache
  *
@@ -72,6 +99,7 @@ static struct dhcp_default defaults[] = {
 static nvlist_t *
 df_build_cache(void)
 {
+	const char	*agent_defaults_path = df_find_defaults();
 	char		entry[1024];
 	int		i;
 	char		*param, *pastv6, *value, *end;
@@ -79,7 +107,7 @@ df_build_cache(void)
 	nvlist_t 	*nvlist;
 	struct dhcp_default *defp;
 
-	if ((fp = fopen(DHCP_AGENT_DEFAULTS, "r")) == NULL)
+	if ((fp = fopen(agent_defaults_path, "r")) == NULL)
 		return (NULL);
 
 	if (nvlist_alloc(&nvlist, NV_UNIQUE_NAME, 0) != 0) {
@@ -159,6 +187,7 @@ df_build_cache(void)
 const char *
 df_get_string(const char *if_name, boolean_t isv6, uint_t param)
 {
+	const char		*agent_defaults_path = df_find_defaults();
 	char			*value;
 	char			paramstr[256];
 	char			name[256];
@@ -170,10 +199,11 @@ df_get_string(const char *if_name, boolean_t isv6, uint_t param)
 	if (param >= (sizeof (defaults) / sizeof (*defaults)))
 		return (NULL);
 
-	if (stat(DHCP_AGENT_DEFAULTS, &statbuf) != 0) {
+
+	if (stat(agent_defaults_path, &statbuf) != 0) {
 		if (!df_unavail_msg) {
 			dhcpmsg(MSG_WARNING, "cannot access %s; using "
-			    "built-in defaults", DHCP_AGENT_DEFAULTS);
+			    "built-in defaults", agent_defaults_path);
 			df_unavail_msg = B_TRUE;
 		}
 		return (defaults[param].df_default);
