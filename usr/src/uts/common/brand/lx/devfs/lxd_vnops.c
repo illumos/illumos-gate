@@ -240,6 +240,15 @@ lxd_getattr(vnode_t *vp, struct vattr *vap, int flags, struct cred *cr,
 	/* Skip devt translation for native programs */
 	if (curproc->p_brand != &lx_brand) {
 		return (0);
+	} else {
+		/*
+		 * We also skip translation when called from the user-land
+		 * emulation code.
+		 */
+		lx_lwp_data_t *lwpd = ttolxlwp(curthread);
+
+		if (lwpd == NULL || lwpd->br_stack_mode != LX_STACK_MODE_BRAND)
+			return (0);
 	}
 
 	if (rvp->v_type == VCHR) {
