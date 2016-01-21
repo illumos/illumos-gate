@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include <sys/errno.h>
@@ -19,6 +19,7 @@
 #include <sys/vnode.h>
 #include <sys/brand.h>
 #include <sys/lx_brand.h>
+#include <sys/lx_types.h>
 #include <sys/nbmlock.h>
 #include <sys/limits.h>
 
@@ -226,14 +227,10 @@ lx_write_common(file_t *fp, uio_t *uiop, size_t *nwrite, boolean_t positioned)
 		ioflag = uiop->uio_fmode & (FAPPEND|FSYNC|FDSYNC|FRSYNC);
 	} else {
 		/*
-		 * The SUSv4 POSIX specification states:
-		 * The pwrite() function shall be equivalent to write(), except
-		 * that it writes into a given position and does not change
-		 * the file offset (regardless of whether O_APPEND is set).
-		 *
-		 * To make this be true, we omit the FAPPEND flag from ioflag.
+		 * In a senseless departure from POSIX, positioned write calls
+		 * on Linux do _not_ ignore the O_APPEND flag.
 		 */
-		ioflag = uiop->uio_fmode & (FSYNC|FDSYNC|FRSYNC);
+		ioflag = uiop->uio_fmode & (FAPPEND|FSYNC|FDSYNC|FRSYNC);
 	}
 	if (vp->v_type == VREG) {
 		u_offset_t fileoff = (u_offset_t)(ulong_t)uiop->uio_loffset;
@@ -553,4 +550,167 @@ out:
 	if (error != 0 && nwrite == 0)
 		return (set_errno(error));
 	return (nwrite);
+}
+
+ssize_t
+lx_pread(int fdes, void *cbuf, size_t ccount, off64_t offset)
+{
+	struct uio auio;
+	struct iovec aiov;
+	file_t *fp;
+	ssize_t count = (ssize_t)ccount;
+	size_t nread = 0;
+	int fflag, error = 0;
+
+	if (count < 0)
+		return (set_errno(EINVAL));
+	if ((fp = getf(fdes)) == NULL)
+		return (set_errno(EBADF));
+	if (((fflag = fp->f_flag) & FREAD) == 0) {
+		error = EBADF;
+		goto out;
+	}
+	if (fp->f_vnode->v_type == VREG) {
+		u_offset_t fileoff = (u_offset_t)offset;
+
+		if (count == 0)
+			goto out;
+		/*
+		 * Return EINVAL if an invalid offset comes to pread.
+		 * Negative offset from user will cause this error.
+		 */
+		if (fileoff > MAXOFFSET_T) {
+			error = EINVAL;
+			goto out;
+		}
+		/*
+		 * Limit offset such that we don't read or write
+		 * a file beyond the maximum offset representable in
+		 * an off_t structure.
+		 */
+		if (fileoff + count > MAXOFFSET_T)
+			count = (ssize_t)((offset_t)MAXOFFSET_T - fileoff);
+	} else if (fp->f_vnode->v_type == VFIFO) {
+		error = ESPIPE;
+		goto out;
+	} else if (fp->f_vnode->v_type == VDIR) {
+		error = EISDIR;
+		goto out;
+	}
+
+	aiov.iov_base = cbuf;
+	aiov.iov_len = count;
+	auio.uio_iov = &aiov;
+	auio.uio_iovcnt = 1;
+	auio.uio_loffset = offset;
+	auio.uio_resid = count;
+	auio.uio_segflg = UIO_USERSPACE;
+	auio.uio_llimit = MAXOFFSET_T;
+	auio.uio_fmode = fflag;
+	auio.uio_extflg = UIO_COPY_CACHED;
+
+	error = lx_read_common(fp, &auio, &nread, B_TRUE);
+
+	if (error == EINTR && nread != 0)
+		error = 0;
+out:
+	releasef(fdes);
+	if (error)
+		return (set_errno(error));
+	return ((ssize_t)nread);
+
+}
+
+ssize_t
+lx_pwrite(int fdes, void *cbuf, size_t ccount, off64_t offset)
+{
+	struct uio auio;
+	struct iovec aiov;
+	file_t *fp;
+	ssize_t count = (ssize_t)ccount;
+	size_t nwrite = 0;
+	int fflag, error = 0;
+
+	if (count < 0)
+		return (set_errno(EINVAL));
+	if ((fp = getf(fdes)) == NULL)
+		return (set_errno(EBADF));
+	if (((fflag = fp->f_flag) & (FWRITE)) == 0) {
+		error = EBADF;
+		goto out;
+	}
+	if (fp->f_vnode->v_type == VREG) {
+		u_offset_t fileoff = (u_offset_t)offset;
+
+		if (count == 0)
+			goto out;
+		/*
+		 * return EINVAL for offsets that cannot be
+		 * represented in an off_t.
+		 */
+		if (fileoff > MAXOFFSET_T) {
+			error = EINVAL;
+			goto out;
+		}
+		/*
+		 * Take appropriate action if we are trying to write above the
+		 * resource limit.
+		 */
+		if (fileoff >= curproc->p_fsz_ctl) {
+			mutex_enter(&curproc->p_lock);
+			(void) rctl_action(rctlproc_legacy[RLIMIT_FSIZE],
+			    curproc->p_rctls, curproc, RCA_UNSAFE_SIGINFO);
+			mutex_exit(&curproc->p_lock);
+
+			error = EFBIG;
+			goto out;
+		}
+		/*
+		 * Don't allow pwrite to cause file sizes to exceed maxoffset.
+		 */
+		if (fileoff == MAXOFFSET_T) {
+			error = EFBIG;
+			goto out;
+		}
+		if (fileoff + count > MAXOFFSET_T)
+			count = (ssize_t)((u_offset_t)MAXOFFSET_T - fileoff);
+	} else if (fp->f_vnode->v_type == VFIFO) {
+		error = ESPIPE;
+		goto out;
+	}
+
+	aiov.iov_base = cbuf;
+	aiov.iov_len = count;
+	auio.uio_iov = &aiov;
+	auio.uio_iovcnt = 1;
+	auio.uio_loffset = offset;
+	auio.uio_resid = count;
+	auio.uio_segflg = UIO_USERSPACE;
+	auio.uio_llimit = curproc->p_fsz_ctl;
+	auio.uio_fmode = fflag;
+	auio.uio_extflg = UIO_COPY_CACHED;
+
+	error = lx_write_common(fp, &auio, &nwrite, B_TRUE);
+
+	if (error == EINTR && nwrite != 0)
+		error = 0;
+out:
+	releasef(fdes);
+	if (error)
+		return (set_errno(error));
+	return (nwrite);
+}
+
+ssize_t
+lx_pread32(int fdes, void *cbuf, size_t ccount, uint32_t off_lo,
+    uint32_t off_hi)
+{
+	return (lx_pread(fdes, cbuf, ccount, LX_32TO64(off_lo, off_hi)));
+}
+
+ssize_t
+lx_pwrite32(int fdes, void *cbuf, size_t ccount, uint32_t off_lo,
+    uint32_t off_hi)
+{
+	return (lx_pwrite(fdes, cbuf, ccount, LX_32TO64(off_lo, off_hi)));
 }
