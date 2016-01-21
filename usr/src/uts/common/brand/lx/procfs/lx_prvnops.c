@@ -1298,6 +1298,7 @@ lxpr_read_pid_env(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	proc_t *p;
 	char *buf;
 	size_t asz = lxpr_maxenvvlen, sz;
+	int r;
 
 	ASSERT(lxpnp->lxpr_type == LXPR_PID_ENV);
 
@@ -1310,13 +1311,15 @@ lxpr_read_pid_env(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 		return;
 	}
 
-	if (prreadenvv(p, buf, asz, &sz) != 0) {
+	r = prreadenvv(p, buf, asz, &sz);
+	lxpr_unlock(p);
+
+	if (r != 0) {
 		lxpr_uiobuf_seterr(uiobuf, EINVAL);
 	} else {
 		lxpr_uiobuf_write(uiobuf, buf, sz);
 	}
 
-	lxpr_unlock(p);
 	kmem_free(buf, asz);
 }
 
