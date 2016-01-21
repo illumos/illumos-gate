@@ -976,8 +976,8 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_rt_sigprocmask,		/*  14: rt_sigprocmask */
 	lx_rt_sigreturn,		/*  15: rt_sigreturn */
 	NULL,				/*  16: ioctl */
-	lx_pread,			/*  17: pread64 */
-	lx_pwrite,			/*  18: pwrite64 */
+	NULL,				/*  17: pread64 */
+	NULL,				/*  18: pwrite64 */
 	NULL,				/*  19: readv */
 	NULL,				/*  20: writev */
 	lx_access,			/*  21: access */
@@ -1470,8 +1470,8 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_rt_sigtimedwait,		/* 177: rt_sigtimedwait */
 	lx_rt_sigqueueinfo,		/* 178: rt_sigqueueinfo */
 	lx_rt_sigsuspend,		/* 179: rt_sigsuspend */
-	lx_pread64,			/* 180: pread64 */
-	lx_pwrite64,			/* 181: pwrite64 */
+	NULL,				/* 180: pread64 */
+	NULL,				/* 181: pwrite64 */
 	NULL,				/* 182: chown16 */
 	lx_getcwd,			/* 183: getcwd */
 	lx_capget,			/* 184: capget */

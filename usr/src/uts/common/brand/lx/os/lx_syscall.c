@@ -796,8 +796,8 @@ lx_sysent_t lx_sysent32[] = {
 	{"rt_sigtimedwait", NULL,		0,		4}, /* 177 */
 	{"rt_sigqueueinfo", NULL,		0,		3}, /* 178 */
 	{"rt_sigsuspend", NULL,			0,		2}, /* 179 */
-	{"pread64",	NULL,			0,		5}, /* 180 */
-	{"pwrite64",	NULL,			0,		5}, /* 181 */
+	{"pread64",	lx_pread32,		0,		5}, /* 180 */
+	{"pwrite64",	lx_pwrite32,		0,		5}, /* 181 */
 	{"chown16",	lx_chown16,		0,		3}, /* 182 */
 	{"getcwd",	NULL,			0,		2}, /* 183 */
 	{"capget",	NULL,			0,		2}, /* 184 */
@@ -1004,8 +1004,8 @@ lx_sysent_t lx_sysent64[] = {
 	{"rt_sigprocmask", NULL,		0,		4}, /* 14 */
 	{"rt_sigreturn", NULL,			0,		0}, /* 15 */
 	{"ioctl",	lx_ioctl,		0,		3}, /* 16 */
-	{"pread64",	NULL,			0,		4}, /* 17 */
-	{"pwrite64",	NULL,			0,		4}, /* 18 */
+	{"pread64",	lx_pread,		0,		4}, /* 17 */
+	{"pwrite64",	lx_pwrite,		0,		4}, /* 18 */
 	{"readv",	lx_readv,		0,		3}, /* 19 */
 	{"writev",	lx_writev,		0,		3}, /* 20 */
 	{"access",	NULL,			0,		2}, /* 21 */
