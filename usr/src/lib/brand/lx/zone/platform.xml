@@ -47,6 +47,8 @@
 	    opt="ro" type="lofs" />
 	<global_mount special="/usr/lib/brand/lx/etc_default_nfs"
 	    directory="/native/etc/default/nfs" type="lofs" opt="ro" />
+	<global_mount special="/etc/default/dhcpagent"
+	    directory="/native/etc/default/dhcpagent" type="lofs" opt="ro" />
 	<global_mount special="/etc/netconfig"
 	    directory="/native/etc/netconfig" type="lofs" opt="ro" />
 	<global_mount special="/sbin"
