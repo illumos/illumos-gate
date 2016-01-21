@@ -366,8 +366,8 @@ static lxpr_dirent_t tiddir[] = {
 #define	LX_RLIM_INFINITY	0xFFFFFFFFFFFFFFFF
 
 #define	RCTL_INFINITE(x) \
-	((x->rcv_flagaction & RCTL_LOCAL_MAXIMAL) && \
-	(x->rcv_flagaction & RCTL_GLOBAL_INFINITE))
+	((x.rcv_flagaction & RCTL_LOCAL_MAXIMAL) && \
+	(x.rcv_flagaction & RCTL_GLOBAL_INFINITE))
 
 typedef struct lxpr_rlimtab {
 	char	*rlim_name;	/* limit name */
@@ -389,9 +389,10 @@ static lxpr_rlimtab_t lxpr_rlimtab[] = {
 	{ "Max file locks",	"locks",	NULL },
 	{ "Max pending signals",	"signals",
 		"process.max-sigqueue-size" },
-	{ "Max msgqueue size",	"bytes",	"process.max-msg-messages" },
-	{ NULL, NULL, NULL }
+	{ "Max msgqueue size",	"bytes",	"process.max-msg-messages" }
 };
+
+#define	LX_RLIM_TAB_LEN	(sizeof (lxpr_rlimtab) / sizeof (lxpr_rlimtab[0]))
 
 
 /*
@@ -1106,8 +1107,8 @@ lxpr_read_pid_auxv(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 				break;
 			}
 		}
-		lxpr_uiobuf_write(uiobuf, (char *)buf, cnt * sizeof (buf[0]));
 		lxpr_unlock(p);
+		lxpr_uiobuf_write(uiobuf, (char *)buf, cnt * sizeof (buf[0]));
 	}
 #if defined(_SYSCALL32_IMPL)
 	else {
@@ -1148,11 +1149,10 @@ lxpr_read_pid_cgroup(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 		lxpr_uiobuf_seterr(uiobuf, EINVAL);
 		return;
 	}
+	lxpr_unlock(p);
 
 	/* basic stub, 3rd field will need to be populated */
 	lxpr_uiobuf_printf(uiobuf, "1:name=systemd:/\n");
-
-	lxpr_unlock(p);
 }
 
 static void
@@ -1187,7 +1187,6 @@ lxpr_copy_cmdline(proc_t *p, lx_proc_data_t *pd, lxpr_uiobuf_t *uiobuf)
 			env_overflow = B_TRUE;
 		}
 	}
-
 
 	/* Data between astart and estart-1 can be copied freely. */
 	while (pos < estart && uiop->uio_resid > 0 && err == 0) {
@@ -1254,15 +1253,19 @@ lxpr_read_pid_cmdline(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	    pd->l_envs_start != 0 && pd->l_envs_end != 0) {
 		/* Use Linux-style argv bounds if possible. */
 		lxpr_copy_cmdline(p, pd, uiobuf);
+		lxpr_unlock(p);
 	} else {
-		if (prreadargv(p, buf, asz, &sz) != 0) {
+		int r;
+
+		r = prreadargv(p, buf, asz, &sz);
+		lxpr_unlock(p);
+
+		if (r != 0) {
 			lxpr_uiobuf_seterr(uiobuf, EINVAL);
 		} else {
 			lxpr_uiobuf_write(uiobuf, buf, sz);
 		}
 	}
-
-	lxpr_unlock(p);
 	kmem_free(buf, asz);
 }
 
@@ -1273,6 +1276,7 @@ static void
 lxpr_read_pid_comm(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
 	proc_t *p;
+	char buf[MAXCOMLEN + 1];
 
 	VERIFY(lxpnp->lxpr_type == LXPR_PID_COMM ||
 	    lxpnp->lxpr_type == LXPR_PID_TID_COMM);
@@ -1285,8 +1289,9 @@ lxpr_read_pid_comm(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 		lxpr_uiobuf_seterr(uiobuf, EINVAL);
 		return;
 	}
-	lxpr_uiobuf_printf(uiobuf, "%s\n", p->p_user.u_comm);
+	strlcpy(buf, p->p_user.u_comm, sizeof (buf));
 	lxpr_unlock(p);
+	lxpr_uiobuf_printf(uiobuf, "%s\n", buf);
 }
 
 /*
@@ -1319,7 +1324,6 @@ lxpr_read_pid_env(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	} else {
 		lxpr_uiobuf_write(uiobuf, buf, sz);
 	}
-
 	kmem_free(buf, asz);
 }
 
@@ -1330,67 +1334,62 @@ static void
 lxpr_read_pid_limits(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
 	proc_t *p;
-	rctl_qty_t cur, max;
-	rctl_val_t *oval, *nval;
-	rctl_hndl_t hndl;
-	char *kname;
+	rctl_qty_t cur[LX_RLIM_TAB_LEN], max[LX_RLIM_TAB_LEN];
 	int i;
 
 	ASSERT(lxpnp->lxpr_type == LXPR_PID_LIMITS ||
 	    lxpnp->lxpr_type == LXPR_PID_TID_LIMITS);
 
-	nval = kmem_alloc(sizeof (rctl_val_t), KM_SLEEP);
-
 	p = lxpr_lock(lxpnp->lxpr_pid);
 	if (p == NULL) {
-		kmem_free(nval, sizeof (rctl_val_t));
 		lxpr_uiobuf_seterr(uiobuf, EINVAL);
 		return;
 	}
 
-	lxpr_uiobuf_printf(uiobuf, "%-25s %-20s %-20s %-10s\n",
-	    "Limit", "Soft Limit", "Hard Limit", "Units");
-	for (i = 0; lxpr_rlimtab[i].rlim_name != NULL; i++) {
-		kname = lxpr_rlimtab[i].rlim_rctl;
+	for (i = 0; i < LX_RLIM_TAB_LEN; i++) {
+		char *kname = lxpr_rlimtab[i].rlim_rctl;
+		rctl_val_t nval, *oval = NULL;
+		rctl_hndl_t hndl;
+
 		/* default to unlimited for resources without an analog */
-		cur = RLIM_INFINITY;
-		max = RLIM_INFINITY;
-		if (kname != NULL) {
-			hndl = rctl_hndl_lookup(kname);
-			oval = NULL;
-			while ((hndl != -1) &&
-			    rctl_local_get(hndl, oval, nval, p) == 0) {
-				oval = nval;
-				switch (nval->rcv_privilege) {
-				case RCPRIV_BASIC:
-					if (!RCTL_INFINITE(nval))
-						cur = nval->rcv_value;
-					break;
-				case RCPRIV_PRIVILEGED:
-					if (!RCTL_INFINITE(nval))
-						max = nval->rcv_value;
-					break;
-				}
+		cur[i] = RLIM_INFINITY;
+		max[i] = RLIM_INFINITY;
+		if (kname == NULL || (hndl = rctl_hndl_lookup(kname)) == -1) {
+			continue;
+		}
+		while (rctl_local_get(hndl, oval, &nval, p) == 0) {
+			oval = &nval;
+			switch (nval.rcv_privilege) {
+			case RCPRIV_BASIC:
+				if (!RCTL_INFINITE(nval))
+					cur[i] = nval.rcv_value;
+				break;
+			case RCPRIV_PRIVILEGED:
+				if (!RCTL_INFINITE(nval))
+					max[i] = nval.rcv_value;
+				break;
 			}
 		}
+	}
+	lxpr_unlock(p);
 
+	lxpr_uiobuf_printf(uiobuf, "%-25s %-20s %-20s %-10s\n",
+	    "Limit", "Soft Limit", "Hard Limit", "Units");
+	for (i = 0; i < LX_RLIM_TAB_LEN; i++) {
 		lxpr_uiobuf_printf(uiobuf, "%-25s", lxpr_rlimtab[i].rlim_name);
-		if (cur == RLIM_INFINITY || cur == LX_RLIM_INFINITY) {
+		if (cur[i] == RLIM_INFINITY || cur[i] == LX_RLIM_INFINITY) {
 			lxpr_uiobuf_printf(uiobuf, " %-20s", "unlimited");
 		} else {
-			lxpr_uiobuf_printf(uiobuf, " %-20lu", cur);
+			lxpr_uiobuf_printf(uiobuf, " %-20lu", cur[i]);
 		}
-		if (max == RLIM_INFINITY || max == LX_RLIM_INFINITY) {
+		if (max[i] == RLIM_INFINITY || max[i] == LX_RLIM_INFINITY) {
 			lxpr_uiobuf_printf(uiobuf, " %-20s", "unlimited");
 		} else {
-			lxpr_uiobuf_printf(uiobuf, " %-20lu", max);
+			lxpr_uiobuf_printf(uiobuf, " %-20lu", max[i]);
 		}
 		lxpr_uiobuf_printf(uiobuf, " %-10s\n",
 		    lxpr_rlimtab[i].rlim_unit);
 	}
-
-	lxpr_unlock(p);
-	kmem_free(nval, sizeof (rctl_val_t));
 }
 
 /*
@@ -1705,11 +1704,10 @@ lxpr_read_pid_oom_scr_adj(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 		lxpr_uiobuf_seterr(uiobuf, EINVAL);
 		return;
 	}
+	lxpr_unlock(p);
 
 	/* always 0 */
 	lxpr_uiobuf_printf(uiobuf, "0\n");
-
-	lxpr_unlock(p);
 }
 
 
@@ -1826,18 +1824,21 @@ static void
 lxpr_read_status_common(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf,
     uint_t lookup_id)
 {
-	proc_t *p;
-	kthread_t *t;
-	user_t *up;
-	cred_t *cr;
-	const gid_t *groups;
-	int    ngroups;
-	struct as *as;
-	char *status;
-	pid_t pid, ppid;
-	k_sigset_t current, ignore, handle;
-	int    i, lx_sig;
-	pid_t real_pid;
+	proc_t		*p;
+	kthread_t	*t;
+	user_t		*up;
+	cred_t		*cr;
+	const gid_t	*groups;
+	struct as	*as;
+	char		*status;
+	pid_t		pid, ppid;
+	k_sigset_t	current, ignore, handle;
+	int		i, lx_sig, lwpcnt, ngroups;
+	pid_t		real_pid;
+	char		buf_comm[MAXCOMLEN + 1];
+	rlim64_t	fdlim;
+	size_t		vsize = 0, nlocked = 0, rss = 0, stksize = 0;
+	boolean_t	printsz = B_FALSE;
 
 	real_pid = get_real_pid(lxpnp->lxpr_pid);
 	p = lxpr_lock(real_pid);
@@ -1916,73 +1917,33 @@ lxpr_read_status_common(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf,
 	crhold(cr = p->p_cred);
 	mutex_exit(&p->p_crlock);
 
-	lxpr_uiobuf_printf(uiobuf,
-	    "Name:\t%s\n"
-	    "State:\t%s\n"
-	    "Tgid:\t%d\n"
-	    "Pid:\t%d\n"
-	    "PPid:\t%d\n"
-	    "TracerPid:\t%d\n"
-	    "Uid:\t%u\t%u\t%u\t%u\n"
-	    "Gid:\t%u\t%u\t%u\t%u\n"
-	    "FDSize:\t%d\n"
-	    "Groups:\t",
-	    up->u_comm,
-	    status,
-	    pid, /* thread group id - same as pid */
-	    (lookup_id == 0) ? pid : lxpnp->lxpr_desc,
-	    ppid,
-	    0,
-	    crgetruid(cr), crgetuid(cr), crgetsuid(cr), crgetuid(cr),
-	    crgetrgid(cr), crgetgid(cr), crgetsgid(cr), crgetgid(cr),
-	    p->p_fno_ctl);
+	strlcpy(buf_comm, up->u_comm, sizeof (buf_comm));
+	fdlim = p->p_fno_ctl;
+	lwpcnt = p->p_lwpcnt;
 
-
-	ngroups = crgetngroups(cr);
-	groups  = crgetgroups(cr);
-	for (i = 0; i < ngroups; i++) {
-		lxpr_uiobuf_printf(uiobuf,
-		    "%u ",
-		    groups[i]);
-	}
-	crfree(cr);
-
+	/*
+	 * Gather memory information
+	 */
 	as = p->p_as;
 	if ((p->p_stat != SZOMB) && !(p->p_flag & SSYS) && (as != &kas)) {
-		size_t vsize, nlocked, rss;
-
 		mutex_exit(&p->p_lock);
 		AS_LOCK_ENTER(as, RW_READER);
 		vsize = as->a_resvsize;
 		rss = rm_asrss(as);
 		AS_LOCK_EXIT(as);
 		mutex_enter(&p->p_lock);
-		nlocked = p->p_locked_mem;
 
-		lxpr_uiobuf_printf(uiobuf,
-		    "\n"
-		    "VmSize:\t%8lu kB\n"
-		    "VmLck:\t%8lu kB\n"
-		    "VmRSS:\t%8lu kB\n"
-		    "VmData:\t%8lu kB\n"
-		    "VmStk:\t%8lu kB\n"
-		    "VmExe:\t%8lu kB\n"
-		    "VmLib:\t%8lu kB",
-		    btok(vsize),
-		    btok(nlocked),
-		    ptok(rss),
-		    0l,
-		    btok(p->p_stksize),
-		    ptok(rss),
-		    0l);
+		nlocked = p->p_locked_mem;
+		stksize = p->p_stksize;
+		printsz = B_TRUE;
 	}
 
-	lxpr_uiobuf_printf(uiobuf, "\nThreads:\t%u", p->p_lwpcnt);
-
+	/*
+	 * Gather signal information
+	 */
 	sigemptyset(&current);
 	sigemptyset(&ignore);
 	sigemptyset(&handle);
-
 	for (i = 1; i < NSIG; i++) {
 		lx_sig = stol_signo[i];
 
@@ -1996,31 +1957,71 @@ lxpr_read_status_common(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf,
 				sigaddset(&handle, lx_sig);
 		}
 	}
+	lxpr_unlock(p);
 
 	lxpr_uiobuf_printf(uiobuf,
-	    "\n"
+	    "Name:\t%s\n"
+	    "State:\t%s\n"
+	    "Tgid:\t%d\n"
+	    "Pid:\t%d\n"
+	    "PPid:\t%d\n"
+	    "TracerPid:\t%d\n"
+	    "Uid:\t%u\t%u\t%u\t%u\n"
+	    "Gid:\t%u\t%u\t%u\t%u\n"
+	    "FDSize:\t%d\n"
+	    "Groups:\t",
+	    buf_comm,
+	    status,
+	    pid, /* thread group id - same as pid */
+	    (lookup_id == 0) ? pid : lxpnp->lxpr_desc,
+	    ppid,
+	    0,
+	    crgetruid(cr), crgetuid(cr), crgetsuid(cr), crgetuid(cr),
+	    crgetrgid(cr), crgetgid(cr), crgetsgid(cr), crgetgid(cr),
+	    fdlim);
+	ngroups = crgetngroups(cr);
+	groups  = crgetgroups(cr);
+	for (i = 0; i < ngroups; i++) {
+		lxpr_uiobuf_printf(uiobuf,
+		    "%u ",
+		    groups[i]);
+	}
+	crfree(cr);
+	if (printsz) {
+		lxpr_uiobuf_printf(uiobuf,
+		    "\n"
+		    "VmSize:\t%8lu kB\n"
+		    "VmLck:\t%8lu kB\n"
+		    "VmRSS:\t%8lu kB\n"
+		    "VmData:\t%8lu kB\n"
+		    "VmStk:\t%8lu kB\n"
+		    "VmExe:\t%8lu kB\n"
+		    "VmLib:\t%8lu kB",
+		    btok(vsize),
+		    btok(nlocked),
+		    ptok(rss),
+		    0l,
+		    btok(stksize),
+		    ptok(rss),
+		    0l);
+	}
+	lxpr_uiobuf_printf(uiobuf, "\nThreads:\t%u\n", lwpcnt);
+	lxpr_uiobuf_printf(uiobuf,
 	    "SigPnd:\t%08x%08x\n"
 	    "SigBlk:\t%08x%08x\n"
 	    "SigIgn:\t%08x%08x\n"
-	    "SigCgt:\t%08x%08x\n"
-	    "CapInh:\t%016x\n"
-	    "CapPrm:\t%016x\n"
-	    "CapEff:\t%016x\n",
+	    "SigCgt:\t%08x%08x\n",
 	    current.__sigbits[1], current.__sigbits[0],
 	    0, 0, /* signals blocked on per thread basis */
 	    ignore.__sigbits[1], ignore.__sigbits[0],
-	    handle.__sigbits[1], handle.__sigbits[0],
-	    /* Can't do anything with linux capabilities */
-	    0,
-	    0,
-	    0);
-
+	    handle.__sigbits[1], handle.__sigbits[0]);
+	/* Report only the full bounding set for now */
 	lxpr_uiobuf_printf(uiobuf,
+	    "CapInh:\t%016x\n"
+	    "CapPrm:\t%016x\n"
+	    "CapEff:\t%016x\n"
 	    "CapBnd:\t%016llx\n",
-	    /* We report the full capability bounding set */
-	    0x1fffffffffLL);
-
-	lxpr_unlock(p);
+	    0, 0, 0, 0x1fffffffffLL);
 }
 
 /*
@@ -2059,10 +2060,13 @@ lxpr_read_stat_common(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf,
 	gid_t psgid;
 	dev_t psdev;
 	size_t rss, vsize;
-	int nice, pri;
+	int nice, pri, lwpcnt;
 	caddr_t wchan;
 	processorid_t cpu;
 	pid_t real_pid;
+	clock_t utime, stime, cutime, cstime, ticks;
+	char buf_comm[MAXCOMLEN + 1];
+	rlim64_t vmem_ctl;
 
 	real_pid = get_real_pid(lxpnp->lxpr_pid);
 	p = lxpr_lock(real_pid);
@@ -2124,16 +2128,21 @@ lxpr_read_stat_common(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf,
 	if (t != NULL) {
 		switch (t->t_state) {
 		case TS_SLEEP:
-			stat = 'S'; break;
+			stat = 'S';
+			break;
 		case TS_RUN:
 		case TS_ONPROC:
-			stat = 'R'; break;
+			stat = 'R';
+			break;
 		case TS_ZOMB:
-			stat = 'Z'; break;
+			stat = 'Z';
+			break;
 		case TS_STOPPED:
-			stat = 'T'; break;
+			stat = 'T';
+			break;
 		default:
-			stat = '!'; break;
+			stat = '!';
+			break;
 		}
 
 		if (CL_DONICE(t, NULL, 0, &nice) != 0)
@@ -2166,6 +2175,16 @@ lxpr_read_stat_common(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf,
 	AS_LOCK_EXIT(as);
 	mutex_enter(&p->p_lock);
 
+	utime = p->p_utime;
+	stime = p->p_stime;
+	cutime = p->p_cutime;
+	cstime = p->p_cstime;
+	lwpcnt = p->p_lwpcnt;
+	vmem_ctl = p->p_vmem_ctl;
+	strlcpy(buf_comm, p->p_user.u_comm, sizeof (buf_comm));
+	ticks = p->p_user.u_ticks;
+	lxpr_unlock(p);
+
 	lxpr_uiobuf_printf(uiobuf,
 	    "%d (%s) %c %d %d %d %d %d "
 	    "%lu %lu %lu %lu %lu "
@@ -2183,13 +2202,13 @@ lxpr_read_stat_common(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf,
 	    "%d"
 	    "\n",
 	    (lookup_id == 0) ? pid : lxpnp->lxpr_desc,
-	    PTOU(p)->u_comm, stat, ppid, pgpid, spid, psdev, psgid,
+	    buf_comm, stat, ppid, pgpid, spid, psdev, psgid,
 	    0l, 0l, 0l, 0l, 0l, /* flags, minflt, cminflt, majflt, cmajflt */
-	    p->p_utime, p->p_stime, p->p_cutime, p->p_cstime,
-	    pri, nice, p->p_lwpcnt,
+	    utime, stime, cutime, cstime,
+	    pri, nice, lwpcnt,
 	    0l, /* itrealvalue (time before next SIGALRM) */
-	    PTOU(p)->u_ticks,
-	    vsize, rss, p->p_vmem_ctl,
+	    ticks,
+	    vsize, rss, vmem_ctl,
 	    0l, 0l, USRSTACK, /* startcode, endcode, startstack */
 	    0l, 0l, /* kstkesp, kstkeip */
 	    0l, 0l, 0l, 0l, /* signal, blocked, sigignore, sigcatch */
@@ -2197,8 +2216,6 @@ lxpr_read_stat_common(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf,
 	    0l, 0l, /* nswap, cnswap */
 	    0, /* exit_signal */
 	    cpu);
-
-	lxpr_unlock(p);
 }
 
 /*
