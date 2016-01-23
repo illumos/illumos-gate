@@ -27,15 +27,15 @@
 
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 #
 
-. $STF_SUITE/include/libtest.shlib
 . $STF_SUITE/tests/functional/cli_root/zpool_upgrade/zpool_upgrade.kshlib
 
 #
 # DESCRIPTION:
 #
-# Zpool upgrade should be able to upgrade pools to a given version using -V
+# zpool upgrade should be able to upgrade pools to a given version using -V
 #
 # STRATEGY:
 # 1. For all versions pools that can be upgraded on a given OS version
@@ -50,30 +50,30 @@ verify_runnable "global"
 
 function cleanup
 {
-	destroy_upgraded_pool $config
+	destroy_upgraded_pool $ver_old
 }
 
-log_assert \
- "Zpool upgrade should be able to upgrade pools to a given version using -V"
+log_assert "zpool upgrade should be able to upgrade pools to a given version" \
+    "using -V"
 
 log_onexit cleanup
 
 # We're just using the single disk version of the pool, which should be
 # enough to determine if upgrade works correctly. Also set a MAX_VER
 # variable, which specifies the highest version that we should expect
-# a zpool upgrade operation to succeed from. (latest version - 1)
-CONFIGS="1 2 3 4 5 6 7 8 9 10 11 12 13 14 15"
+# a zpool upgrade operation to succeed from.
+VERSIONS="1 2 3 4 5 6 7 8 9 10 11 12 13 14 15"
 MAX_VER=15
 
-for config in $CONFIGS
-do
-        create_old_pool $config
-	pool=$(eval $ECHO \$ZPOOL_VERSION_${config}_NAME)
-	NEXT=$(random $config $MAX_VER)
-	log_must $ZPOOL upgrade -V $NEXT $pool
-        check_poolversion $pool $NEXT
-        destroy_upgraded_pool $config
+for ver_old in $VERSIONS; do
+	typeset -n pool_name=ZPOOL_VERSION_${ver_old}_NAME
+	typeset ver_new=$(random $ver_old $MAX_VER)
+
+	create_old_pool $ver_old
+	log_must $ZPOOL upgrade -V $ver_new $pool_name > /dev/null
+	check_poolversion $pool_name $ver_new
+	destroy_upgraded_pool $ver_old
 done
 
-log_pass "zpool upgrade should be able to upgrade pools to a given version " \
+log_pass "zpool upgrade should be able to upgrade pools to a given version" \
     "using -V"

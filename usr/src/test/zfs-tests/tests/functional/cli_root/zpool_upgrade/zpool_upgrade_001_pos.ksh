@@ -27,10 +27,10 @@
 
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 #
 
-. $STF_SUITE/include/libtest.shlib
-. $STF_SUITE/tests/functional/cli_root/zpool_upgrade/zpool_upgrade.cfg
+. $STF_SUITE/tests/functional/cli_root/zpool_upgrade/zpool_upgrade.kshlib
 
 #
 # DESCRIPTION:
@@ -45,7 +45,7 @@
 
 verify_runnable "global"
 
-log_assert "Executing 'zpool upgrade -v' command succeeds."
+log_assert "Executing 'zpool upgrade -v' command succeeds"
 
 log_must $ZPOOL upgrade -v
 
@@ -63,9 +63,9 @@ $ZPOOL upgrade -v > /tmp/zpool-versions.$$
 #  10  Cache devices
 #
 for version in {1..28}; do
-	log_note "Checking for a description of pool version $version."
+	log_note "Checking for a description of pool version $version"
 	log_must eval "$AWK '/^ $version / { print $1 }' /tmp/zpool-versions.$$ | $GREP $version"
 done
 $RM /tmp/zpool-versions.$$
 
-log_pass "Executing 'zpool upgrade -v' command succeeds."
+log_pass "Executing 'zpool upgrade -v' command succeeds"
