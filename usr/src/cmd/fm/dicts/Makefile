@@ -101,7 +101,7 @@ $(ROOTLCDIR)/%: %
 	$(INS.file)
 
 %.mo: %.po
-	msgfmt -s -o $@ $<
+	$(MSGFMT) -o $@ $<
 
 lint:
 	@for name in $(DCNAMES); do\
