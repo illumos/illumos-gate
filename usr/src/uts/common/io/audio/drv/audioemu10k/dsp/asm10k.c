@@ -437,7 +437,6 @@ compile_mono(char **tokens, int cnt)
 {
 	char *parm, *def;
 	int n, num;
-	char tmp[128];
 
 	CHECK_COUNT(tokens, cnt, 3, 3);
 
@@ -605,7 +604,6 @@ compile_directive(char **tokens, int cnt)
 static void
 compile_asm(char **tokens, int cnt)
 {
-	char *parms[4];
 	sym_t *symbols[4];
 #define	EMIT(o, r, a, x, y) \
 	fle.code[pc*2] =  ((x) << 10) | (y);			\
@@ -614,7 +612,7 @@ compile_asm(char **tokens, int cnt)
 	fle.code[pc*2] =  ((x) << 12) | (y);			\
 	fle.code[pc*2+1] = ((o) << 24) | ((r) << 12) | a; pc++
 
-	int i, n = 0, nerr = 0;
+	int i, nerr = 0;
 	int ninputs = 0;
 
 	CHECK_COUNT(tokens, cnt, 5, 5);
@@ -813,7 +811,6 @@ init_compiler(void)
 static void
 produce_map(char *name)
 {
-	char fname[1024];
 	int i;
 	FILE *f;
 
@@ -957,8 +954,7 @@ done:
 int
 main(int argc, char *argv[])
 {
-	char line[4096], *p, *s, *outfile;
-	char *iline;
+	char *outfile;
 	int i;
 	FILE *input;
 	char *tokens[10];

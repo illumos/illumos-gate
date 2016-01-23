@@ -77,7 +77,7 @@ proctab.c: maketab
 	rm -f $@; ./maketab > $@
 
 maketab: maketab.c
-	$(NATIVECC) -O maketab.c -o $@ $(LDLIBS)
+	$(NATIVECC) $(NATIVE_CFLAGS) maketab.c -o $@ $(LDLIBS)
 
 install: all $(ROOTPROG) $(ROOTLINK)
 

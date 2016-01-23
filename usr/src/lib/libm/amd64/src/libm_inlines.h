@@ -45,7 +45,7 @@ extern "C" {
 #include <sys/types.h>
 #include <sys/ieeefp.h>
 
-extern __inline__ float
+extern __GNU_INLINE float
 __inline_sqrtf(float a)
 {
 	float ret;
@@ -54,7 +54,7 @@ __inline_sqrtf(float a)
 	return (ret);
 }
 
-extern __inline__ double
+extern __GNU_INLINE double
 __inline_sqrt(double a)
 {
 	double ret;
@@ -63,7 +63,7 @@ __inline_sqrt(double a)
 	return (ret);
 }
 
-extern __inline__ double
+extern __GNU_INLINE double
 __ieee754_sqrt(double a)
 {
 	return (__inline_sqrt(a));
@@ -75,7 +75,7 @@ __ieee754_sqrt(double a)
  * 10 - 53 bits
  * 11 - 64 bits
  */
-extern __inline__ int
+extern __GNU_INLINE int
 __swapRP(int i)
 {
 	int ret;
@@ -97,7 +97,7 @@ __swapRP(int i)
  * 10 - Round up
  * 11 - Chop
  */
-extern __inline__ enum fp_direction_type
+extern __GNU_INLINE enum fp_direction_type
 __swap87RD(enum fp_direction_type i)
 {
 	int ret;
@@ -113,7 +113,7 @@ __swap87RD(enum fp_direction_type i)
 	return (ret);
 }
 
-extern __inline__ int
+extern __GNU_INLINE int
 abs(int i)
 {
 	int ret;
@@ -127,7 +127,7 @@ abs(int i)
 	return (ret);
 }
 
-extern __inline__ double
+extern __GNU_INLINE double
 copysign(double d1, double d2)
 {
 	double tmpd;
@@ -143,7 +143,7 @@ copysign(double d1, double d2)
 	return (d1);
 }
 
-extern __inline__ double
+extern __GNU_INLINE double
 fabs(double d)
 {
 	double tmp;
@@ -157,7 +157,7 @@ fabs(double d)
 	return (d);
 }
 
-extern __inline__ float
+extern __GNU_INLINE float
 fabsf(float d)
 {
 	__asm__ __volatile__(
@@ -168,7 +168,7 @@ fabsf(float d)
 	return (d);
 }
 
-extern __inline__ int
+extern __GNU_INLINE int
 finite(double d)
 {
 	long ret = 0x7fffffffffffffff;
@@ -187,7 +187,7 @@ finite(double d)
 	return (ret);
 }
 
-extern __inline__ int
+extern __GNU_INLINE int
 signbit(double d)
 {
 	long ret;
@@ -200,13 +200,13 @@ signbit(double d)
 	return (ret);
 }
 
-extern __inline__ double
+extern __GNU_INLINE double
 sqrt(double d)
 {
 	return (__inline_sqrt(d));
 }
 
-extern __inline__ float
+extern __GNU_INLINE float
 sqrtf(float f)
 {
 	return (__inline_sqrtf(f));

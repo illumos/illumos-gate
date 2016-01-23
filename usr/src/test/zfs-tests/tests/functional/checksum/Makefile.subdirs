@@ -26,8 +26,8 @@ CMD64 = $(PROG:%=$(TESTDIR)/%.$(MACH64))
 CMDS = $(CMD32) $(CMD64)
 $(CMDS) := FILEMODE = 0555
 
-C99MODE = -xc99=%all
-CFLAGS = -I $(SRC)/uts/common -D_KERNEL
+C99MODE = $(C99_ENABLE)
+CFLAGS += -I $(SRC)/uts/common -D_KERNEL
 LDLIBS += -lmd
 LINTFLAGS += -u
 LINTFLAGS64 += -u

@@ -20,12 +20,10 @@
 # CDDL HEADER END
 #
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# cmd/sgs/tools/Makefile.targ
 
 
 $(ROOTDIR)/bin/%:	%
@@ -35,22 +33,22 @@ $(ROOTDIR)/lib/%:	%
 		$(INS.file)
 
 sgsmsg:		$(SGSMSG_OBJS)
-		$(NATIVECC) $(DEBUG) $(NATIVECC_CFLAGS) \
+		$(NATIVECC) $(DEBUG) $(NATIVE_CFLAGS) \
 			-o $@ $(SGSMSG_OBJS)
 
 sgsmsg.o:	../common/sgsmsg.c
-		$(NATIVECC) $(DEBUG) $(NATIVECC_CFLAGS) -c ../common/sgsmsg.c
+		$(NATIVECC) $(DEBUG) $(NATIVE_CFLAGS) -c ../common/sgsmsg.c
 
 string_table.o:	../common/string_table.c
-		$(NATIVECC) $(DEBUG) $(NATIVECC_CFLAGS) -c \
+		$(NATIVECC) $(DEBUG) $(NATIVE_CFLAGS) -c \
 		    ../common/string_table.c
 
 avl.o:		$(VAR_AVLDIR)/avl.c
-		$(NATIVECC) $(DEBUG) $(NATIVECC_CFLAGS) -c \
+		$(NATIVECC) $(DEBUG) $(NATIVE_CFLAGS) -c \
 		    $(VAR_AVLDIR)/avl.c
 
 piglatin:	../common/piglatin.c
-		$(NATIVECC) $(NATIVECC_CFLAGS) -o $@ ../common/piglatin.c
+		$(NATIVECC) $(NATIVE_CFLAGS) -o $@ ../common/piglatin.c
 
 %:		%.o
 		$(LINK.c) -o $@ $< $(LDLIBS)

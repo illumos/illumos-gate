@@ -46,7 +46,7 @@ extern "C" {
 #define	_HI_WORD(x)	((uint32_t *)&x)[1]
 #define	_HIER_WORD(x)	((uint32_t *)&x)[2]
 
-extern __inline__ double
+extern __GNU_INLINE double
 __inline_sqrt(double a)
 {
 	double ret;
@@ -55,13 +55,13 @@ __inline_sqrt(double a)
 	return (ret);
 }
 
-extern __inline__ double
+extern __GNU_INLINE double
 __ieee754_sqrt(double a)
 {
 	return (__inline_sqrt(a));
 }
 
-extern __inline__ float
+extern __GNU_INLINE float
 __inline_sqrtf(float a)
 {
 	float ret;
@@ -70,7 +70,7 @@ __inline_sqrtf(float a)
 	return (ret);
 }
 
-extern __inline__ double
+extern __GNU_INLINE double
 __inline_rint(double a)
 {
 	__asm__ __volatile__(
@@ -92,7 +92,7 @@ __inline_rint(double a)
  * 10 - 53 bits
  * 11 - 64 bits
  */
-extern __inline__ int
+extern __GNU_INLINE int
 __swapRP(int i)
 {
 	int ret;
@@ -114,7 +114,7 @@ __swapRP(int i)
  * 10 - Round up
  * 11 - Chop
  */
-extern __inline__ enum fp_direction_type
+extern __GNU_INLINE enum fp_direction_type
 __swap87RD(enum fp_direction_type i)
 {
 	int ret;
@@ -130,7 +130,7 @@ __swap87RD(enum fp_direction_type i)
 	return (ret);
 }
 
-extern __inline__ double
+extern __GNU_INLINE double
 ceil(double d)
 {
 	/*
@@ -157,7 +157,7 @@ ceil(double d)
 	return (d);
 }
 
-extern __inline__ double
+extern __GNU_INLINE double
 copysign(double d1, double d2)
 {
 	__asm__ __volatile__(
@@ -171,28 +171,28 @@ copysign(double d1, double d2)
 	return (d1);
 }
 
-extern __inline__ double
+extern __GNU_INLINE double
 fabs(double d)
 {
 	__asm__ __volatile__("fabs\n\t" : "+t" (d) : : "cc");
 	return (d);
 }
 
-extern __inline__ float
+extern __GNU_INLINE float
 fabsf(float d)
 {
 	__asm__ __volatile__("fabs\n\t" : "+t" (d) : : "cc");
 	return (d);
 }
 
-extern __inline__ long double
+extern __GNU_INLINE long double
 fabsl(long double d)
 {
 	__asm__ __volatile__("fabs\n\t" : "+t" (d) : : "cc");
 	return (d);
 }
 
-extern __inline__ int
+extern __GNU_INLINE int
 finite(double d)
 {
 	int ret = _HI_WORD(d);
@@ -208,7 +208,7 @@ finite(double d)
 	return (ret);
 }
 
-extern __inline__ double
+extern __GNU_INLINE double
 floor(double d)
 {
 	short rd = __swap87RD(fp_negative);
@@ -223,29 +223,29 @@ floor(double d)
  *      branchless __isnan
  *      ((0x7ff00000-[((lx|-lx)>>31)&1]|ahx)>>31)&1 = 1 iff x is NaN
  */
-extern __inline__ int
+extern __GNU_INLINE int
 isnan(double d)
 {
 	int ret;
 
 	__asm__ __volatile__(
-		"movl %1,%%ecx\n\t"
-		"negl %%ecx\n\t"			/* ecx <-- -lo_32(x) */
-		"orl  %%ecx,%1\n\t"
-		"shrl $31,%1\n\t"			/* 1 iff lx != 0 */
-		"andl $0x7fffffff,%2\n\t"	/* ecx <-- hi_32(abs(x)) */
-		"orl  %2,%1\n\t"
-		"subl $0x7ff00000,%1\n\t"
-		"negl %1\n\t"
-		"shrl $31,%1\n\t"
-		: "=r" (ret)
-		: "0" (_HI_WORD(d)), "r" (_LO_WORD(d))
-		: "ecx");
+	    "movl %1,%%ecx\n\t"
+	    "negl %%ecx\n\t"			/* ecx <-- -lo_32(x) */
+	    "orl  %%ecx,%1\n\t"
+	    "shrl $31,%1\n\t"			/* 1 iff lx != 0 */
+	    "andl $0x7fffffff,%2\n\t"	/* ecx <-- hi_32(abs(x)) */
+	    "orl  %2,%1\n\t"
+	    "subl $0x7ff00000,%1\n\t"
+	    "negl %1\n\t"
+	    "shrl $31,%1\n\t"
+	    : "=r" (ret)
+	    : "0" (_HI_WORD(d)), "r" (_LO_WORD(d))
+	    : "ecx");
 
 	return (ret);
 }
 
-extern __inline__ int
+extern __GNU_INLINE int
 isnanf(float f)
 {
 	__asm__ __volatile__(
@@ -260,12 +260,12 @@ isnanf(float f)
 	return (f);
 }
 
-extern __inline__ double
+extern __GNU_INLINE double
 rint(double a) {
     return (__inline_rint(a));
 }
 
-extern __inline__ double
+extern __GNU_INLINE double
 scalbn(double d, int n)
 {
 	double dummy;
@@ -281,38 +281,38 @@ scalbn(double d, int n)
 	return (d);
 }
 
-extern __inline__ int
+extern __GNU_INLINE int
 signbit(double d)
 {
 	return (_HI_WORD(d) >> 31);
 }
 
-extern __inline__ int
+extern __GNU_INLINE int
 signbitf(float f)
 {
 	return ((*(uint32_t *)&f) >> 31);
 }
 
-extern __inline__ double
+extern __GNU_INLINE double
 sqrt(double d)
 {
 	return (__inline_sqrt(d));
 }
 
-extern __inline__ float
+extern __GNU_INLINE float
 sqrtf(float f)
 {
 	return (__inline_sqrtf(f));
 }
 
-extern __inline__ long double
+extern __GNU_INLINE long double
 sqrtl(long double ld)
 {
 	__asm__ __volatile__("fsqrt" : "+t" (ld) : : "cc");
 	return (ld);
 }
 
-extern __inline__ int
+extern __GNU_INLINE int
 isnanl(long double ld)
 {
 	int ret = _HIER_WORD(ld);

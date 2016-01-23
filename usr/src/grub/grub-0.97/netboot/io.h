@@ -1,6 +1,7 @@
+#include <sys/ccompile.h>
+
 #ifndef	IO_H
 #define IO_H
-
 
 /* Amount of relocation etherboot is experiencing */
 extern unsigned long virt_offset;
@@ -107,7 +108,7 @@ static inline void iounmap(void *virt_addr __unused)
  * Some non intel clones support out of order store. wmb() ceases to be a
  * nop for these.
  */
- 
+
 #define mb() 	__asm__ __volatile__ ("lock; addl $0,0(%%esp)": : :"memory")
 #define rmb()	mb()
 #define wmb()	mb();
@@ -119,7 +120,8 @@ static inline void iounmap(void *virt_addr __unused)
 
 #define __OUT1(s,x) \
 extern void __out##s(unsigned x value, unsigned short port); \
-extern inline void __out##s(unsigned x value, unsigned short port) {
+extern __GNU_INLINE \
+void __out##s(unsigned x value, unsigned short port) {
 
 #define __OUT2(s,s1,s2) \
 __asm__ __volatile__ ("out" #s " %" s1 "0,%" s2 "1"
@@ -132,7 +134,8 @@ __OUT1(s##c_p,x) __OUT2(s,s1,"") : : "a" (value), "id" (port)); SLOW_DOWN_IO; }
 
 #define __IN1(s,x) \
 extern unsigned x __in##s(unsigned short port); \
-extern inline unsigned x __in##s(unsigned short port) { unsigned x _v;
+extern __GNU_INLINE \
+unsigned x __in##s(unsigned short port) { unsigned x _v;
 
 #define __IN2(s,s1,s2) \
 __asm__ __volatile__ ("in" #s " %" s2 "1,%" s1 "0"
@@ -145,13 +148,15 @@ __IN1(s##c_p,x) __IN2(s,s1,"") : "=a" (_v) : "id" (port) ,##i ); SLOW_DOWN_IO; r
 
 #define __INS(s) \
 extern void ins##s(unsigned short port, void * addr, unsigned long count); \
-extern inline void ins##s(unsigned short port, void * addr, unsigned long count) \
+extern __GNU_INLINE \
+void ins##s(unsigned short port, void * addr, unsigned long count)	\
 { __asm__ __volatile__ ("cld ; rep ; ins" #s \
 : "=D" (addr), "=c" (count) : "d" (port),"0" (addr),"1" (count)); }
 
 #define __OUTS(s) \
 extern void outs##s(unsigned short port, const void * addr, unsigned long  count); \
-extern inline void outs##s(unsigned short port, const void * addr, unsigned long count) \
+extern __GNU_INLINE \
+void outs##s(unsigned short port, const void * addr, unsigned long count) \
 { __asm__ __volatile__ ("cld ; rep ; outs" #s \
 : "=S" (addr), "=c" (count) : "d" (port),"0" (addr),"1" (count)); }
 

@@ -245,7 +245,7 @@ parse.h parse.c : $(SRCDIR)/parse.y $(TOOLDIR)/lemon.c $(TOOLDIR)/lempar.c
 	-$(RM) parse_tmp.y lempar.c
 	$(CP) $(SRCDIR)/parse.y parse_tmp.y
 	$(CP) $(TOOLDIR)/lempar.c lempar.c
-	$(NATIVECC) -o lemon $(TOOLDIR)/lemon.c
+	$(NATIVECC) $(NATIVE_CFLAGS) -o lemon $(TOOLDIR)/lemon.c
 	./lemon parse_tmp.y
 	-$(RM) parse.c parse.h
 	$(CP) parse_tmp.h parse.h

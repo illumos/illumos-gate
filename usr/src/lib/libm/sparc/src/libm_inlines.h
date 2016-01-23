@@ -42,7 +42,7 @@
 extern "C" {
 #endif
 
-extern __inline__ double
+extern __GNU_INLINE double
 __inline_sqrt(double d)
 {
 	double ret;
@@ -51,7 +51,7 @@ __inline_sqrt(double d)
 	return (ret);
 }
 
-extern __inline__ float
+extern __GNU_INLINE float
 __inline_sqrtf(float f)
 {
 	float ret;
@@ -60,7 +60,7 @@ __inline_sqrtf(float f)
 	return (ret);
 }
 
-extern __inline__ enum fp_class_type
+extern __GNU_INLINE enum fp_class_type
 fp_classf(float f)
 {
 	enum fp_class_type ret;
@@ -113,7 +113,7 @@ fp_classf(float f)
 #define	_HI_WORD(x)	((uint32_t *)&x)[0]
 #define	_LO_WORD(x)	((uint32_t *)&x)[1]
 
-extern __inline__ enum fp_class_type
+extern __GNU_INLINE enum fp_class_type
 fp_class(double d)
 {
 	enum fp_class_type ret;
@@ -169,7 +169,7 @@ fp_class(double d)
 	return (ret);
 }
 
-extern __inline__ int
+extern __GNU_INLINE int
 __swapEX(int i)
 {
 	int ret;
@@ -201,13 +201,13 @@ __swapEX(int i)
  * compatibility
  */
 /* ARGSUSED */
-extern __inline__ enum fp_precision_type
+extern __GNU_INLINE enum fp_precision_type
 __swapRP(enum fp_precision_type i)
 {
 	return (0);
 }
 
-extern __inline__ enum fp_direction_type
+extern __GNU_INLINE enum fp_direction_type
 __swapRD(enum fp_direction_type d)
 {
 	enum fp_direction_type ret;
@@ -235,7 +235,7 @@ __swapRD(enum fp_direction_type d)
 	return (ret);
 }
 
-extern __inline__ int
+extern __GNU_INLINE int
 __swapTE(int i)
 {
 	int ret;
@@ -262,19 +262,19 @@ __swapTE(int i)
 	return (ret);
 }
 
-extern __inline__ double
+extern __GNU_INLINE double
 sqrt(double d)
 {
 	return (__inline_sqrt(d));
 }
 
-extern __inline__ float
+extern __GNU_INLINE float
 sqrtf(float f)
 {
 	return (__inline_sqrtf(f));
 }
 
-extern __inline__ double
+extern __GNU_INLINE double
 fabs(double d)
 {
 	double ret;
@@ -283,7 +283,7 @@ fabs(double d)
 	return (ret);
 }
 
-extern __inline__ float
+extern __GNU_INLINE float
 fabsf(float f)
 {
 	float ret;
