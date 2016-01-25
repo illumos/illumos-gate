@@ -22,6 +22,7 @@
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Milan Jurik. All rights reserved.
  * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2016 Toomas Soome <tsoome@me.com>
  */
 
 #include <stdio.h>
@@ -670,7 +671,7 @@ init_device(ig_device_t *device, char *path)
 		return (BC_ERROR);
 	}
 
-	if (efi_alloc_and_read(device->disk_fd, &vtoc) > 0) {
+	if (efi_alloc_and_read(device->disk_fd, &vtoc) >= 0) {
 		device->type = IG_DEV_EFI;
 		efi_free(vtoc);
 	}
@@ -737,7 +738,7 @@ get_start_sector(ig_device_t *device)
 	if (is_efi(device->type)) {
 		struct dk_gpt *vtoc;
 
-		if (efi_alloc_and_read(device->disk_fd, &vtoc) <= 0)
+		if (efi_alloc_and_read(device->disk_fd, &vtoc) < 0)
 			return (BC_ERROR);
 
 		device->start_sector = vtoc->efi_parts[device->slice].p_start;
