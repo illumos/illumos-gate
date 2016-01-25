@@ -1684,8 +1684,6 @@ sfmmu_kpm_vac_conflict(page_t *pp, caddr_t vaddr)
 		if (IS_PAHME(sfhmep))
 			continue;
 		hmeblkp = sfmmu_hmetohblk(sfhmep);
-		if (hmeblkp->hblk_xhat_bit)
-			continue;
 		tmphat = hblktosfmmu(hmeblkp);
 		sfmmu_copytte(&sfhmep->hme_tte, &tte);
 		ASSERT(TTE_IS_VALID(&tte));
@@ -1709,8 +1707,6 @@ sfmmu_kpm_vac_conflict(page_t *pp, caddr_t vaddr)
 		if (IS_PAHME(sfhmep))
 			continue;
 		hmeblkp = sfmmu_hmetohblk(sfhmep);
-		if (hmeblkp->hblk_xhat_bit)
-			continue;
 		(void) sfmmu_pageunload(pp, sfhmep, TTE8K);
 	}
 

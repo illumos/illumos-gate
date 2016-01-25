@@ -402,7 +402,6 @@ GENUNIX_OBJS +=	\
 		xdr.o		\
 		xdr_array.o	\
 		xdr_refer.o	\
-		xhat.o		\
 		zone.o
 
 #

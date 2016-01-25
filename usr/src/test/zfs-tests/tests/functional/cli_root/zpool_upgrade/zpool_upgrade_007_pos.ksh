@@ -27,9 +27,9 @@
 
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 #
 
-. $STF_SUITE/include/libtest.shlib
 . $STF_SUITE/tests/functional/cli_root/zpool_upgrade/zpool_upgrade.kshlib
 . $STF_SUITE/tests/functional/cli_root/zfs_upgrade/zfs_upgrade.kshlib
 
@@ -53,17 +53,16 @@ function cleanup
 	destroy_upgraded_pool $config
 }
 
-log_assert "Import pools of all versions - 'zfs upgrade' on each pools works"
+log_assert "Import pools of all versions - 'zfs upgrade' on each pool works"
 log_onexit cleanup
 
 # $CONFIGS gets set in the .cfg script
-for config in $CONFIGS
-do
-	create_old_pool $config
-	POOL_NAME=$(eval $ECHO \$ZPOOL_VERSION_${config}_NAME)
+for config in $CONFIGS; do
+	typeset -n pool_name=ZPOOL_VERSION_${config}_NAME
 
-	default_check_zfs_upgrade $pool
+	create_old_pool $config
+	default_check_zfs_upgrade $pool_name
 	destroy_upgraded_pool $config
 done
 
-log_pass "Import pools of all versions - 'zfs upgrade' on each pools works"
+log_pass "Import pools of all versions - 'zfs upgrade' on each pool works"

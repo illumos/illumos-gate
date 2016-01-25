@@ -20,15 +20,11 @@
 # CDDL HEADER END
 #
 # Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 #
 
 IPFILTER_FMRI="svc:/network/ipfilter:default"
 ETC_IPF_DIR=/etc/ipf
-IP6FILCONF=`/usr/bin/svcprop -p config/ipf6_config_file $IPFILTER_FMRI \
-    2>/dev/null`
-if [ $? -eq 1 ]; then
-	IP6FILCONF=$ETC_IPF_DIR/ipf6.conf
-fi
 IPNATCONF=`/usr/bin/svcprop -p config/ipnat_config_file $IPFILTER_FMRI \
     2>/dev/null`
 if [ $? -eq 1 ]; then
@@ -41,11 +37,15 @@ if [ $? -eq 1 ]; then
 fi
 VAR_IPF_DIR=/var/run/ipf
 IPFILCONF=$VAR_IPF_DIR/ipf.conf
+IP6FILCONF=$VAR_IPF_DIR/ipf6.conf
 IPFILOVRCONF=$VAR_IPF_DIR/ipf_ovr.conf
+IP6FILOVRCONF=$VAR_IPF_DIR/ipf6_ovr.conf
 IPF_LOCK=/var/run/ipflock
 CONF_FILES=""
+CONF6_FILES=""
 NAT_FILES=""
 IPF_SUFFIX=".ipf"
+IPF6_SUFFIX=".ipf6"
 NAT_SUFFIX=".nat"
 
 # version for configuration upgrades
@@ -65,11 +65,17 @@ METHOD_PROP="ipf_method"
 FW_CONFIG_PG="firewall_config"
 POLICY_PROP="policy"
 APPLY2_PROP="apply_to"
+APPLY2_6_PROP="apply_to_6"
 EXCEPTIONS_PROP="exceptions"
+EXCEPTIONS_6_PROP="exceptions_6"
+TARGET_PROP="target"
+TARGET_6_PROP="target_6"
+BLOCKPOL_PROP="block_policy"
 
 FW_CONFIG_DEF_PG="firewall_config_default"
 FW_CONFIG_OVR_PG="firewall_config_override"
 CUSTOM_FILE_PROP="custom_policy_file"
+CUSTOM_FILE_6_PROP="custom_policy_file_6"
 OPEN_PORTS_PROP="open_ports"
 
 PREFIX_HOST="host:"
@@ -79,6 +85,7 @@ PREFIX_IF="if:"
 
 GLOBAL_CONFIG=""
 GLOBAL_POLICY=""
+GLOBAL_BLOCK_POLICY=""
 
 SERVINFO=/usr/lib/servinfo
 
@@ -129,10 +136,11 @@ global_get_prop_value()
 # service method, it's best to read all relevant configuration via one svcprop
 # invocation and cache it for later use.
 #
-# This function reads and store relevant configuration into GLOBAL_CONFIG and
-# initializes GLOBAL_POLICY variable. GLOBAL_CONFIG is a string containing pg/prop
-# and their corresponding values (i.e. svcprop -p pg fmri output). To get values
-# for a certain pg/prop, use global_get_prop_value().
+# This function reads and stores relevant configuration into GLOBAL_CONFIG and
+# initializes the GLOBAL_POLICY and GLOBAL_BLOCK_POLICY variables. GLOBAL_CONFIG
+# is a string containing pg/prop and their corresponding values (i.e. svcprop -p
+# pg fmri output). To get values for a certain pg/prop, use
+# global_get_prop_value().
 #
 global_init()
 {
@@ -140,6 +148,8 @@ global_init()
         $IPF_FMRI 2>/dev/null | awk '{$2=" "; print $0}'`
 
 	GLOBAL_POLICY=`global_get_prop_value $FW_CONFIG_DEF_PG $POLICY_PROP`
+        GLOBAL_BLOCK_POLICY=`global_get_prop_value $FW_CONFIG_DEF_PG \
+	   $BLOCKPOL_PROP`
 }
 
 #
@@ -165,21 +175,76 @@ get_policy()
 }
 
 #
-# Given a service, gets its firewall policy
+# block policy can be set to "return", which will expand into
+# separate block rules for tcp (block return-rst ...) and all other
+# protocols (block return-icmp-as-dest ...)
+#
+get_block_policy()
+{
+	config_pg=`get_config_pg $1`
+	svcprop -p $config_pg/${BLOCKPOL_PROP} $1 2>/dev/null
+}
+
+#
+# Given a service, gets its source address exceptions for IPv4
 #
 get_exceptions()
 {
 	config_pg=`get_config_pg $1`
-	svcprop -p $config_pg/${EXCEPTIONS_PROP} $1 2>/dev/null
+	exceptions=`svcprop -p $config_pg/${EXCEPTIONS_PROP} $1 2>/dev/null`
+        echo $exceptions | sed -e 's/\\//g'
 }
 
 #
-# Given a service, gets its firewall policy
+# Given a service, gets its source address exceptions for IPv6
+#
+get_exceptions_6()
+{
+	config_pg=`get_config_pg $1`
+	exceptions6=`svcprop -p $config_pg/${EXCEPTIONS_6_PROP} $1 2>/dev/null`
+        echo $exceptions6 | sed -e 's/\\//g'
+}
+
+#
+# Given a service, gets its firewalled source addresses for IPv4
 #
 get_apply2_list()
 {
 	config_pg=`get_config_pg $1`
-	svcprop -p $config_pg/${APPLY2_PROP} $1 2>/dev/null
+	apply2=`svcprop -p $config_pg/${APPLY2_PROP} $1 2>/dev/null`
+        echo $apply2 | sed -e 's/\\//g'
+}
+
+#
+# Given a service, gets its firewalled source addresses for IPv6
+#
+get_apply2_6_list()
+{
+	config_pg=`get_config_pg $1`
+	apply2_6=`svcprop -p $config_pg/${APPLY2_6_PROP} $1 2>/dev/null`
+        echo $apply2_6 | sed -e 's/\\//g'
+}
+
+#
+# Given a service, gets its firewalled target addresses for IPv4
+#
+get_target_list()
+{
+	config_pg=`get_config_pg $1`
+	target=`svcprop -p $config_pg/${TARGET_PROP} $1 2>/dev/null`
+	[ -z "$target" -o "$target" = '""' ] && target=any
+	echo $target | sed -e 's/\\//g'
+}
+
+#
+# Given a service, gets its firewalled target addresses for IPv6
+#
+get_target_6_list()
+{
+	config_pg=`get_config_pg $1`
+	target6=`svcprop -p $config_pg/${TARGET_6_PROP} $1 2>/dev/null`
+	[ -z "$target6" -o "$target6" = '""' ] && target6=any
+	echo $target6 | sed -e 's/\\//g'
 }
 
 check_ipf_dir()
@@ -244,15 +309,16 @@ service_check_state()
 get_IP()
 {
 	value_is_interface $1 && return 1
-	echo "$1" | sed -n -e 's,^pool:\(.*\),pool/\1,p' \
-	    -e 's,^host:\(.*\),\1,p' \
-	    -e 's,^network:\(.*\),\1,p'
+	echo "$1" | sed -n -e "s,^${PREFIX_POOL}\(.*\),pool/\1,p" \
+	    -e "s,^${PREFIX_HOST}\(.*\),\1,p" \
+	    -e "s,^${PREFIX_NET}\(.*\),\1,p" \
+	    -e "s,^any,any,p"
 }
 
 get_interface()
 {
 	value_is_interface $1 || return 1
-	scratch=`echo "$1" | sed -e 's/^if://'`
+	scratch=`echo "$1" | sed -e "s/^${PREFIX_IF}//"`
 
 	ifconfig $scratch >/dev/null 2>&1 || return 1
 	echo $scratch | sed -e 's/:.*//'
@@ -264,7 +330,7 @@ get_interface()
 value_is_interface()
 {
 	[ -z "$1" ] && return 1
-	echo $1 | grep "^if:" >/dev/null 2>&1
+	echo $1 | grep "^${PREFIX_IF}" >/dev/null 2>&1
 }
 
 #
@@ -272,7 +338,7 @@ value_is_interface()
 #
 remove_rules()
 {
-	[ -f "$1" ] && ipf -r -f $1 >/dev/null 2>&1
+	[ -f "$1" ] && ipf $2 -r -f $1 >/dev/null 2>&1
 }
 
 remove_nat_rules()
@@ -282,7 +348,7 @@ remove_nat_rules()
 
 check_ipf_syntax()
 {
-	ipf -n -f $1 >/dev/null 2>&1
+	ipf $2 -n -f $1 >/dev/null 2>&1
 }
 
 check_nat_syntax()
@@ -290,16 +356,21 @@ check_nat_syntax()
 	ipnat -n -f $1 >/dev/null 2>&1
 }
 
+unique_ports()
+{
+	echo $* | xargs -n 1 echo | sort -u
+}
+
 file_get_ports()
 {
-	ipf -n -v -f $1 2>/dev/null | sed -n -e \
+	ipf $2 -n -v -f $1 2>/dev/null | sed -n -e \
 	    's/.*to.* port = \([a-z0-9]*\).*/\1/p' | uniq | \
 	    awk '{if (length($0) > 1) {printf("%s ", $1)}}'
 }
 
 get_active_ports()
 {
-	ipfstat -io 2>/dev/null | sed -n -e \
+	ipfstat $1 -io 2>/dev/null | sed -n -e \
 	    's/.*to.* port = \([a-z0-9]*\).*/\1/p' | uniq | \
 	    awk '{if (length($0) > 1) {printf("%s ",$1)}}'
 }
@@ -330,42 +401,51 @@ sets_check_duplicate()
 #
 update_check_ipf_rules()
 {
-	check_ipf_syntax $1 || return 1
+	check_ipf_syntax $1 $2 || return 1
 
-	lports=`file_get_ports $1`
-	lactive_ports=`get_active_ports`
+	lports=`file_get_ports $1 $2`
+	lactive_ports=`get_active_ports $2`
 
 	sets_check_duplicate "$lports" "$lactive_ports" || return 1
 }
 
 server_port_list=""
+server_port_list_6=""
 
 #
 # Given a file containing ipf rules, check the syntax and verify
 # the rules don't conflict with already processed services.
 #
 # The list of processed services' ports are maintained in the global
-# variable 'server_port_list'.
+# variables 'server_port_list' and 'server_port_list_6'.
 #
 check_ipf_rules()
 {
-	check_ipf_syntax $1 || return 1
 
-	lports=`file_get_ports $1`
-	sets_check_duplicate "$lports" "$server_port_list" || return 1
-	server_port_list="$server_port_list $lports"
+	check_ipf_syntax $1 $2 || return 1
+
+	lports=`file_get_ports $1 $2`
+
+	if [ "$2" = "-6" ]; then
+		sets_check_duplicate "$lports" "$server_port_list_6" || return 1
+	        server_port_list_6="$server_port_list_6 $lports"
+	else
+		sets_check_duplicate "$lports" "$server_port_list" || return 1
+	        server_port_list="$server_port_list $lports"
+	fi
+
 	return 0
 }
 
 prepend_new_rules()
 {
-	check_ipf_syntax $1 && tail -r $1 | sed -e 's/^[a-z]/@0 &/' | \
-	    ipf -f - >/dev/null 2>&1
+	check_ipf_syntax $1 $2 && tail -r $1 | sed -e 's/^[a-z]/@0 &/' | \
+	    ipf $2 -f - >/dev/null 2>&1
 }
 
 append_new_rules()
 {
-	check_ipf_syntax $1 && ipf -f $1 >/dev/null 2>&1
+	check_ipf_syntax $1 $2 && ipf $2 -f $1 >/dev/null 2>&1
 }
 
 append_new_nat_rules()
@@ -494,7 +574,6 @@ replace_file()
 process_server_svc()
 {
 	service=$1
-	ip="any"
         policy=`get_policy ${service}`
 
 	#
@@ -502,8 +581,10 @@ process_server_svc()
 	# we fail here.
 	#
 	file=`fmri_to_file $service $IPF_SUFFIX`
+	file6=`fmri_to_file $service $IPF6_SUFFIX`
 	[ -z "$file" ] && return 1
 	echo "# $service" >${file}
+	echo "# $service" >${file6}
 
 	#
 	# Nothing to do if policy is "use_global"
@@ -530,19 +611,39 @@ process_server_svc()
 	# RPC services
 	#
 	if [ "$isrpc" = "true" ]; then
+		# The ports used for IPv6 are usually also reachable
+		# through IPv4, so generate IPv4 rules for them, too.
 		tports=`$SERVINFO -R -p -t -s $iana_name 2>/dev/null`
-		if [ -n "$tports" ]; then
+		tports6=`$SERVINFO -R -p -t6 -s $iana_name 2>/dev/null`
+		if [ -n "$tports" -o -n "$tports6" ]; then
+			tports=`unique_ports $tports $tports6`
 			for tport in $tports; do 
 				generate_rules $service $policy "tcp" \
-				    $ip $tport $file
+				    $tport $file
+			done
+		fi
+
+		if [ -n "$tports6" ]; then
+			for tport6 in $tports6; do
+				generate_rules $service $policy "tcp" \
+				    $tport6 $file6 _6
 			done
 		fi
 
 		uports=`$SERVINFO -R -p -u -s $iana_name 2>/dev/null`
+		uports6=`$SERVINFO -R -p -u6 -s $iana_name 2>/dev/null`
 		if [ -n "$uports" ]; then
+			uports=`unique_ports $uports $uports6`
 			for uport in $uports; do 
 				generate_rules $service $policy "udp" \
-				    $ip $uport $file
+				    $uport $file
+			done
+		fi
+
+		if [ -n "$uports6" ]; then
+			for uport6 in $uports6; do
+				generate_rules $service $policy "udp" \
+				    $uport6 $file6 _6
 			done
 		fi
 
@@ -551,16 +652,25 @@ process_server_svc()
 
 	#
 	# Get the IANA port and supported protocols(tcp and udp)
-	# No support for IPv6 at this point.
 	#
 	tport=`$SERVINFO -p -t -s $iana_name 2>&1`
 	if [ $? -eq 0 -a -n "$tport" ]; then
-		generate_rules $service $policy "tcp" $ip $tport $file
+		generate_rules $service $policy "tcp" $tport $file
+	fi
+
+	tport6=`$SERVINFO -p -t6 -s $iana_name 2>&1`
+	if [ $? -eq 0 -a -n "$tport6" ]; then
+		generate_rules $service $policy "tcp" $tport6 $file6 _6
 	fi
 
 	uport=`$SERVINFO -p -u -s $iana_name 2>&1`
 	if [ $? -eq 0 -a -n "$uport" ]; then
-		generate_rules $service $policy "udp" $ip $uport $file
+		generate_rules $service $policy "udp" $uport $file
+	fi
+
+	uport6=`$SERVINFO -p -u6 -s $iana_name 2>&1`
+	if [ $? -eq 0 -a -n "$uport6" ]; then
+		generate_rules $service $policy "udp" $uport6 $file6 _6
 	fi
 
 	return 0
@@ -583,9 +693,9 @@ generate_rules()
 	service=$1
 	mypolicy=$2
 	proto=$3
-	ip=$4
-	port=$5
-	out=$6
+	port=$4
+	out=$5
+	_6=$6
 
 	#
 	# Default mode is to inherit from global's policy
@@ -595,57 +705,95 @@ generate_rules()
 	tcp_opts=""
 	[ "$proto" = "tcp" ] && tcp_opts="flags S keep state keep frags"
 
+	block_policy=`get_block_policy $1`
+        if [ "$block_policy" = "use_global" ]; then
+		block_policy=${GLOBAL_BLOCK_POLICY}
+        fi
+
+	if [ "$block_policy" = "return" ]; then
+		[ "$proto" = "tcp" ] && block_policy="return-rst"
+		[ "$proto" != "tcp" ] && block_policy="return-icmp-as-dest"
+	else
+		block_policy=""
+        fi
+
+	iplist=`get_target${_6}_list $service`
+
 	#
 	# Allow all if policy is 'none'
 	#
 	if [ "$mypolicy" = "none" ]; then
-		echo "pass in log quick proto ${proto} from any to ${ip}" \
-		    "port = ${port} ${tcp_opts}" >>${out}
+		for ip in $iplist; do
+			daddr=`get_IP ${ip}`
+			[ -z "$daddr" -o "$daddr" = '""' ] && continue
+			echo "pass in log quick proto ${proto} from any to ${daddr}" \
+			    "port = ${port} ${tcp_opts}" >>${out}
+		done
 		return 0
 	fi
 
 	#
-	# For now, let's concern only with incoming traffic.
+	# For now, let's concern ourselves only with incoming traffic.
 	#
-	[ "$mypolicy" = "deny" ] && { ecmd="pass"; acmd="block"; }
-	[ "$mypolicy" = "allow" ] && { ecmd="block"; acmd="pass"; }
+	[ "$mypolicy" = "deny" ] && { ecmd="pass"; acmd="block ${block_policy}"; }
+	[ "$mypolicy" = "allow" ] && { ecmd="block ${block_policy}"; acmd="pass"; }
 
-	for name in `get_exceptions $service`; do
+	for name in `get_exceptions${_6} $service`; do
 		[ -z "$name" -o "$name" = '""' ] && continue
 
 		ifc=`get_interface $name`
 		if [ $? -eq 0 -a -n "$ifc" ]; then
-			echo "${ecmd} in log quick on ${ifc} from any to" \
-			    "${ip} port = ${port}" >>${out}
+			for ip in $iplist; do
+				daddr=`get_IP ${ip}`
+				[ -z "$daddr" -o "$daddr" = '""' ] && continue
+				echo "${ecmd} in log quick on ${ifc} from any to" \
+				    "${daddr} port = ${port}" >>${out}
+			done
 			continue
 		fi
 
-		addr=`get_IP ${name}`
-		if [ $? -eq 0 -a -n "$addr" ]; then
-			echo "${ecmd} in log quick proto ${proto} from ${addr}" \
-			    "to ${ip} port = ${port} ${tcp_opts}" >>${out}
+		saddr=`get_IP ${name}`
+		if [ $? -eq 0 -a -n "$saddr" ]; then
+			for ip in $iplist; do
+				daddr=`get_IP ${ip}`
+				[ -z "$daddr" -o "$daddr" = '""' ] && continue
+				echo "${ecmd} in log quick proto ${proto} from ${saddr}" \
+				    "to ${daddr} port = ${port} ${tcp_opts}" >>${out}
+			done
 		fi
 	done
 
-	for name in `get_apply2_list $service`; do
+	for name in `get_apply2${_6}_list $service`; do
 		[ -z "$name" -o "$name" = '""' ] && continue
 
 		ifc=`get_interface $name`
 		if [ $? -eq 0 -a -n "$ifc" ]; then
-			echo "${acmd} in log quick on ${ifc} from any to" \
-			    "${ip} port = ${port}" >>${out}
+			for ip in $iplist; do
+				daddr=`get_IP ${ip}`
+				[ -z "$daddr" -o "$daddr" = '""' ] && continue
+				echo "${acmd} in log quick on ${ifc} from any to" \
+				    "${daddr} port = ${port}" >>${out}
+			done
 			continue
 		fi
 
-		addr=`get_IP ${name}`
-		if [ $? -eq 0 -a -n "$addr" ]; then
-			echo "${acmd} in log quick proto ${proto} from ${addr}" \
-			    "to ${ip} port = ${port} ${tcp_opts}" >>${out}
+		saddr=`get_IP ${name}`
+		if [ $? -eq 0 -a -n "$saddr" ]; then
+			for ip in $iplist; do
+				daddr=`get_IP ${ip}`
+				[ -z "$daddr" -o "$daddr" = '""' ] && continue
+				echo "${acmd} in log quick proto ${proto} from ${saddr}" \
+				    "to ${daddr} port = ${port} ${tcp_opts}" >>${out}
+			done
 		fi
 	done
 
-	echo "${ecmd} in log quick proto ${proto} from any to ${ip}" \
-	    "port = ${port} ${tcp_opts}" >>${out}
+	for ip in $iplist; do
+		daddr=`get_IP ${ip}`
+		[ -z "$daddr" -o "$daddr" = '""' ] && continue
+		echo "${ecmd} in log quick proto ${proto} from any to ${daddr}" \
+		    "port = ${port} ${tcp_opts}" >>${out}
+	done
 
 	return 0
 }
@@ -732,23 +880,31 @@ create_global_rules()
 {
 	if [ "$GLOBAL_POLICY" = "custom" ]; then
 		file=`global_get_prop_value $FW_CONFIG_DEF_PG $CUSTOM_FILE_PROP`
+		file6=`global_get_prop_value $FW_CONFIG_DEF_PG $CUSTOM_FILE_6_PROP`
 
 		[ -n "$file" ] && custom_set_symlink $file
+		[ -n "$file6" ] && custom_set_symlink $file6
+
 		return 0
 	fi
 
 	TEMP=`mktemp /var/run/ipf.conf.pid$$.XXXXXX`
+	TEMP6=`mktemp /var/run/ipf6.conf.pid$$.XXXXXX`
 	process_nonsvc_progs $TEMP
+	process_nonsvc_progs $TEMP6
 
 	echo "# Global Default rules" >>${TEMP}
+	echo "# Global Default rules" >>${TEMP6}
 	if [ "$GLOBAL_POLICY" != "none" ]; then
 		echo "pass out log quick all keep state" >>${TEMP}
+		echo "pass out log quick all keep state" >>${TEMP6}
 	fi
 
 	case "$GLOBAL_POLICY" in
 	'none')
 		# No rules
 		replace_file ${IPFILCONF} ${TEMP}
+		replace_file ${IP6FILCONF} ${TEMP6}
 		return $?
 		;;
 	
@@ -782,6 +938,22 @@ create_global_rules()
 
 	done
 
+	for name in `global_get_prop_value $FW_CONFIG_DEF_PG $EXCEPTIONS_6_PROP`; do
+		[ -z "$name" -o "$name" = '""' ] && continue
+
+		ifc=`get_interface $name`
+		if [ $? -eq 0 -a -n "$ifc" ]; then
+			echo "${ecmd} in log quick on ${ifc} all" >>${TEMP6}
+			continue
+		fi
+
+		addr=`get_IP ${name}`
+		if [ $? -eq 0 -a -n "$addr" ]; then
+			echo "${ecmd} in log quick from ${addr} to any" >>${TEMP6}
+		fi
+
+	done
+
 	for name in `global_get_prop_value $FW_CONFIG_DEF_PG $APPLY2_PROP`; do
 		[ -z "$name" -o "$name" = '""' ] && continue
 
@@ -797,23 +969,41 @@ create_global_rules()
 		fi
 	done
 
+	for name in `global_get_prop_value $FW_CONFIG_DEF_PG $APPLY2_6_PROP`; do
+		[ -z "$name" -o "$name" = '""' ] && continue
+
+		ifc=`get_interface $name`
+		if [ $? -eq 0 -a -n "$ifc" ]; then
+			echo "${acmd} in log quick on ${ifc} all" >>${TEMP6}
+			continue
+		fi
+
+		addr=`get_IP ${name}`
+		if [ $? -eq 0 -a -n "$addr" ]; then
+			echo "${acmd} in log quick from ${addr} to any" >>${TEMP6}
+		fi
+	done
+
 	if [ "$GLOBAL_POLICY" = "allow" ]; then
 		#
-		# Allow DHCP traffic if running as a DHCP client 
+		# Allow DHCP(v6) traffic if running as a DHCP client
 		#
 		/sbin/netstrategy | grep dhcp >/dev/null 2>&1
 		if [ $? -eq 0 ]; then
 			echo "pass out log quick from any port = 68" \
 			    "keep state" >>${TEMP}
-			echo "pass out log quick from any port = 546" \
-			    "keep state" >>${TEMP}
 			echo "pass in log quick from any to any port = 68" >>${TEMP}
-			echo "pass in log quick from any to any port = 546" >>${TEMP}
+
+			echo "pass out log quick from any port = 546" \
+			    "keep state" >>${TEMP6}
+			echo "pass in log quick from any to any port = 546" >>${TEMP6}
 		fi
 		echo "block in log all" >>${TEMP}
+		echo "block in log all" >>${TEMP6}
 	fi
 
 	replace_file ${IPFILCONF} ${TEMP}
+	replace_file ${IP6FILCONF} ${TEMP6}
 	return $?
 }
 
@@ -833,6 +1023,7 @@ create_global_ovr_rules()
 	#
 	if [ "$GLOBAL_POLICY" = "custom" ]; then 
 		echo "# 'custom' global policy" >$IPFILOVRCONF
+		echo "# 'custom' global policy" >$IP6FILOVRCONF
 		return 0
 	fi
 
@@ -842,6 +1033,7 @@ create_global_ovr_rules()
 	ovr_policy=`global_get_prop_value $FW_CONFIG_OVR_PG $POLICY_PROP`
 	if [ "$ovr_policy" = "none" ]; then 
 		echo "# global override policy is 'none'" >$IPFILOVRCONF
+		echo "# global override policy is 'none'" >$IP6FILOVRCONF
 		return 0
 	fi
 
@@ -865,7 +1057,24 @@ create_global_ovr_rules()
 		fi
 	done
 
+	apply2_6_list=`global_get_prop_value $FW_CONFIG_OVR_PG $APPLY2_6_PROP`
+	for name in $apply2_6_list; do
+		[ -z "$name" -o "$name" = '""' ] && continue
+
+		ifc=`get_interface $name`
+		if [ $? -eq 0 -a -n "$ifc" ]; then
+			echo "${acmd} on ${ifc} all" >>${TEMP6}
+			continue
+		fi
+
+		addr=`get_IP ${name}`
+		if [ $? -eq 0 -a -n "$addr" ]; then
+			echo "${acmd} from ${addr} to any" >>${TEMP6}
+		fi
+	done
+
 	replace_file ${IPFILOVRCONF} ${TEMP}
+	replace_file ${IP6FILOVRCONF} ${TEMP6}
 	return $?
 }
 
@@ -887,6 +1096,8 @@ svc_mark_maintenance()
 	#
 	ipfile=`fmri_to_file $1 $IPF_SUFFIX`
 	[ -f "$ipfile" ] && mv $ipfile "$ipfile.bak"
+	ip6file=`fmri_to_file $1 $IPF6_SUFFIX`
+	[ -f "$ip6file" ] && mv $ip6file "$ip6file.bak"
 
 	natfile=`fmri_to_file $1 $NAT_SUFFIX`
 	[ -f "$natfile" ] && mv $natfile "$natfile.bak"
@@ -945,6 +1156,25 @@ create_services_rules()
 			CONF_FILES="$CONF_FILES $ipfile"
 		fi
 
+		ip6file=`fmri_to_file $s $IPF6_SUFFIX`
+		if [ -n "$ip6file" -a -r "$ip6file" ]; then
+			check_ipf_syntax $ip6file -6
+			if [ $? -ne 0 ]; then
+				svc_mark_maintenance $s
+				continue
+			fi
+
+			svc_is_server $s
+			if [ $? -eq 0 ]; then
+				check_ipf_rules $ip6file -6
+				if [ $? -ne 0 ]; then
+					svc_mark_maintenance $s
+					continue
+				fi
+			fi
+			CONF6_FILES="$CONF6_FILES $ip6file"
+		fi
+
 		natfile=`fmri_to_file $s $NAT_SUFFIX`
 		if [ -n "$natfile" -a -r "$natfile" ]; then
 			check_nat_syntax $natfile
@@ -971,9 +1201,11 @@ service_update_rules()
 	svc=$1
 
 	ipfile=`fmri_to_file $svc $IPF_SUFFIX`
-	[ -z "$ipfile" ] && return 0
+	ip6file=`fmri_to_file $svc $IPF6_SUFFIX`
+	[ -n "$ipfile" ] && remove_rules $ipfile
+	[ -n "$ip6file" ] && remove_rules $ip6file -6
 
-	remove_rules $ipfile
+	[ -z "$ipfile" -a -z "$ip6file" ] && return 0
 
 	natfile=`fmri_to_file $svc $NAT_SUFFIX`
 	[ -n "$natfile" ] && remove_nat_rules $natfile
@@ -987,6 +1219,14 @@ service_update_rules()
 	process_service $svc || return 1
 	if [ -f "$ipfile" ]; then
 		check_ipf_syntax $ipfile
+		if [ $? -ne 0 ]; then
+			svc_mark_maintenance $svc
+			return 1
+		fi
+	fi
+
+	if [ -f "$ip6file" ]; then
+		check_ipf_syntax $ip6file -6
 		if [ $? -ne 0 ]; then
 			svc_mark_maintenance $svc
 			return 1
@@ -1019,6 +1259,26 @@ service_update_rules()
 		#
 		remove_rules $IPFILOVRCONF
 		prepend_new_rules $IPFILOVRCONF
+	fi
+
+	if [ -f "$ip6file" ]; then
+		svc_is_server $svc
+		if [ $? -eq 0 ]; then
+			update_check_ipf_rules $ip6file -6
+			if [ $? -ne 0 ]; then
+				svc_mark_maintenance $svc
+				return 1
+			fi
+		fi
+
+		prepend_new_rules $ip6file -6
+
+		#
+		# reload Global Override rules to
+		# maintain correct ordering.
+		#
+		remove_rules $IP6FILOVRCONF -6
+		prepend_new_rules $IP6FILOVRCONF -6
 	fi
 
 	[ -f "$natfile" ] && append_new_nat_rules $natfile
