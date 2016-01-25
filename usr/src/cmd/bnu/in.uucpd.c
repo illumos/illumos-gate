@@ -23,6 +23,8 @@
  * Use is subject to license terms.
  */
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 /*
  * 4.2BSD, 2.9BSD, or ATTSVR4 TCP/IP server for uucico
  * uucico's TCP channel causes this server to be run at the remote end.
@@ -48,6 +50,7 @@
 #ifdef ATTSVR4
 #include <shadow.h>
 #endif
+#include <lastlog.h>
 
 #include <security/pam_appl.h>
 
@@ -62,6 +65,7 @@ pam_handle_t    *pamh;
 --- You may not have both BSD4_2 and BSD2_9 defined for this to work
 #endif	/* check for stupidity */
 
+char lastlog[] = "/var/adm/lastlog";
 struct	passwd nouser = {
 	"", "nope", (uid_t)-1, (gid_t)-1, "", "", "", "", "" };
 #ifdef ATTSVR4

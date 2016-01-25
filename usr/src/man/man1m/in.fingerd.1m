@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH IN.FINGERD 1M "Nov 9, 2015"
+.TH IN.FINGERD 1M "Jul 31, 2004"
 .SH NAME
 in.fingerd, fingerd \- remote user information server
 .SH SYNOPSIS
@@ -14,6 +14,7 @@ in.fingerd, fingerd \- remote user information server
 .fi
 
 .SH DESCRIPTION
+.sp
 .LP
 \fBfingerd\fR implements the server side of the Name/Finger protocol, specified
 in \fIRFC 742\fR. The Name/Finger protocol provides a remote interface to
@@ -28,6 +29,7 @@ reads a single command line terminated by RETURN-LINEFEED and passes the
 arguments to \fBfinger\fR(1), prepended with \fB-s\fR. \fBfingerd\fR closes its
 connections as soon as the output is finished.
 .SH FILES
+.sp
 .ne 2
 .na
 \fB\fB/var/adm/utmpx\fR\fR
@@ -48,7 +50,7 @@ System password file.
 .sp
 .ne 2
 .na
-\fB\fB/var/adm/lastlog.v2\fR\fR
+\fB\fB/var/adm/lastlog\fR\fR
 .ad
 .RS 20n
 Last login times.
@@ -73,9 +75,11 @@ User's projects.
 .RE
 
 .SH USAGE
+.sp
 .LP
 \fBfingerd\fR and \fBin.fingerd\fR are IPv6-enabled. See \fBip6\fR(7P).
 .SH SEE ALSO
+.sp
 .LP
 \fBfinger\fR(1), \fBsvcs\fR(1), \fBinetadm\fR(1M), \fBinetd\fR(1M),
 \fBsvcadm\fR(1M), \fBattributes\fR(5), \fBsmf\fR(5), \fBip6\fR(7P)
@@ -84,6 +88,7 @@ User's projects.
 Harrenstien, Ken, \fIRFC 742, NAME/FINGER\fR,  Network Information Center, SRI
 International, Menlo Park, Calif., December 1977.
 .SH NOTES
+.sp
 .LP
 Connecting directly to the server from a \fBTIP\fR or an equally narrow-minded
 TELNET-protocol user program can result in meaningless attempts at option

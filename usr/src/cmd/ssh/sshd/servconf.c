@@ -1019,11 +1019,8 @@ parse_flag:
 		goto parse_flag;
 
 	case sPrintLastLog:
-		log("%s line %d: ignoring PrintLastLog option value."
-		    " This option is always on.", filename, linenum);
-		while (arg)
-			arg = strdelim(&cp);
-		break;
+		intptr = &options->print_lastlog;
+		goto parse_flag;
 
 	case sX11Forwarding:
 		intptr = &options->x11_forwarding;
