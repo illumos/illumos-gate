@@ -2,7 +2,8 @@
 .\" To view license terms, attribution, and copyright for IP Filter, the default path is /usr/lib/ipf/IPFILTER.LICENCE. If the Solaris operating environment has been installed anywhere other than the default, modify the given path to access the file at the installed
 .\" location.
 .\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
-.TH SVC.IPFD 1M "Jan 13, 2009"
+.\" Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
+.TH SVC.IPFD 1M "Dec 30, 2015"
 .SH NAME
 svc.ipfd \- IP Filter firewall monitoring daemon
 .SH SYNOPSIS
@@ -17,7 +18,6 @@ svc.ipfd \- IP Filter firewall monitoring daemon
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBsvc.ipfd\fR daemon monitors actions on services that use firewall
 configuration and initiates update services' IP Filter configuration. The
@@ -37,7 +37,6 @@ This daemon is started by the \fBnetwork/ipfilter\fR service either through the
 variables and credentials from the method and runs as root with all zone
 privileges.
 .SS "Firewall Static Configuration"
-.sp
 .LP
 A static definition describes a service's network resource configuration that
 is used to generate service-specific IPF rules. The per-service
@@ -103,7 +102,6 @@ The service static configuration is delivered by the service developer and not
 intended to be modified by users. These properties are only modified upon
 installation of an updated service definition.
 .SS "Firewall Policy Configuration"
-.sp
 .LP
 A per-service property group, \fBfirewall_config\fR, stores the services'
 firewall policy configuration. Because \fBnetwork/ipfilter:default\fR is
@@ -161,21 +159,77 @@ except those specified in the \fBapply_to\fR property.
 .sp
 .ne 2
 .na
+\fB\fBblock-policy\fR\fR
+.ad
+.sp .6
+.RS 4n
+The \fBblock-policy\fR property defines the handling of packets that
+are blocked by the filter. It has the following modes:
+.sp
+.ne 2
+.na
+\fB\fBnone\fR block-policy mode\fR
+.ad
+.sp .6
+.RS 4n
+Block by dropping packets.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBreturn\fR block-policy mode\fR
+.ad
+.sp .6
+.RS 4n
+Block by returning RST (for TCP) or ICMP messages (for other
+protocols) to the sender of the blocked packets.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
 \fB\fBapply_to\fR\fR
 .ad
 .sp .6
 .RS 4n
-A multi-value property listing network entities to enforce the chosen policy
-mode. Entities listed in \fBapply_to\fR property will be denied if policy is
-\fBdeny\fR and allowed if policy is \fBallow\fR. The syntax for possible values
-are:
+A multi-value property listing IPv4 network source entities to enforce the
+chosen policy mode. Packets coming from the entities listed in \fBapply_to\fR
+property will be denied if policy is \fBdeny\fR and allowed if policy is
+\fBallow\fR. The syntax for possible values are:
 .sp
 .in +2
 .nf
-host:           host:\fIIP\fR                 "host:192.168.84.14"
-subnet:         network:\fIIP/netmask\fR      "network:129.168.1.5/24"
-ippool:         pool:\fIpool number\fR        "pool:77"
-interface:      if:\fIinterface_name\fR       "if:e1000g0"
+host:         host:\fIIP\fR              "host:192.168.84.14"
+subnet:       network:\fIIP/netmask\fR   "network:129.168.1.5/24"
+ippool:       pool:\fIpool number\fR     "pool:77"
+interface:    if:\fIinterface_name\fR    "if:e1000g0"
+.fi
+.in -2
+.sp
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBapply_to_6\fR\fR
+.ad
+.sp .6
+.RS 4n
+A multi-value property listing IPv6 network source entities to enforce the
+chosen policy mode. Packets coming from the entities listed in \fBapply_to_6\fR
+property will be denied if policy is \fBdeny\fR and allowed if policy is
+\fBallow\fR. The syntax for possible values are:
+.sp
+.in +2
+.nf
+host:         host:\fIIP\fR              "host:2001:DB8::12ff:fe34:5678"
+subnet:       network:\fIIP/netmask\fR   "network:2001:DB8::/32"
+ippool:       pool:\fIpool number\fR     "pool:77"
+interface:    if:\fIinterface_name\fR    "if:e1000g0"
 .fi
 .in -2
 .sp
@@ -189,11 +243,55 @@ interface:      if:\fIinterface_name\fR       "if:e1000g0"
 .ad
 .sp .6
 .RS 4n
-A multi-value property listing network entities to be excluded from the
-\fBapply_to\fR list. For example, when \fBdeny\fR policy is applied to a
+A multi-value property listing IPv4 network source entities to be excluded from
+the \fBapply_to\fR list. For example, when \fBdeny\fR policy is applied to a
 subnet, exceptions can be made to some hosts in that subnet by specifying them
 in the \fBexceptions\fR property. This property has the same value syntax as
 \fBapply_to\fR property.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBexceptions_6\fR\fR
+.ad
+.sp .6
+.RS 4n
+A multi-value property listing IPv6 network source entities to be excluded from
+the \fBapply_to_6\fR list. For example, when \fBdeny\fR policy is applied to a
+subnet, exceptions can be made to some hosts in that subnet by specifying them
+in the \fBexceptions_6\fR property. This property has the same value syntax as
+\fBapply_to_6\fR property.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBtarget\fR\fR
+.ad
+.sp .6
+.RS 4n
+A multi-value property listing IPv4 network destination entities to enforce the
+chosen policy mode. Packets directed to the destination entities listed in
+\fBtarget\fR property will be denied if policy is \fBdeny\fR and allowed if
+policy is \fBallow\fR. This property has the same value syntax as \fBapply_to\fR
+property, with the notable exception that specifying network interfaces is not
+supported.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBtarget_6\fR\fR
+.ad
+.sp .6
+.RS 4n
+A multi-value property listing IPv6 network destination entities to enforce the
+chosen policy mode. Packets directed to the destination entities listed in
+\fBtarget_6\fR property will be denied if policy is \fBdeny\fR and allowed if
+policy is \fBallow\fR. This property has the same value syntax as
+\fBapply_to_6\fR property, with the notable exception that specifying network
+interfaces is not supported.
 .RE
 
 .sp
@@ -207,7 +305,19 @@ For individual network services only:
 .sp .6
 .RS 4n
 A service's policy can also be set to \fBuse_global\fR. Services with
-\fBuse_global\fR policy mode inherits the Global Default firewall policy.
+\fBuse_global\fR policy mode inherit the Global Default firewall policy.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBfirewall_config/block_policy\fR\fR
+.ad
+.sp .6
+.RS 4n
+A service's block policy can also be set to \fBuse_global\fR. Services with
+\fBuse_global\fR block policy mode inherit the Global Default firewall block
+policy.
 .RE
 
 .sp
@@ -324,7 +434,6 @@ firewall administration privilege to users. Users with Service Operator
 privileges will need this new authorization to be able to configure firewall
 policy.
 .SS "Firewall Availability"
-.sp
 .LP
 During boot, a firewall is configured for enabled services prior to the
 starting of those services. Thus, services are protected on boot. While the
@@ -342,7 +451,6 @@ ephemeral addresses, which are not known until the services are actually
 running. Thus RPC services are subjected to similar exposure since their
 firewalls are not configured until the services are running.
 .SS "Developer Documentation"
-.sp
 .LP
 Services providing remote capabilities are encouraged to participate in the
 firewall framework to control network access to the service. While framework
@@ -490,7 +598,6 @@ svc:/network/ntp:default
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -506,7 +613,6 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBsvcprop\fR(1), \fBsvcs\fR(1), \fBipf\fR(1M), \fBsvcadm\fR(1M),
 \fBsvccfg\fR(1M), \fBgetservbyname\fR(3SOCKET), \fBrpc\fR(4),

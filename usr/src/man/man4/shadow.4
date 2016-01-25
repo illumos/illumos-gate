@@ -3,10 +3,11 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SHADOW 4 "Nov 9, 2015"
+.TH SHADOW 4 "Sep 15, 2005"
 .SH NAME
 shadow \- shadow password file
 .SH DESCRIPTION
+.sp
 .LP
 \fB/etc/shadow\fR is an access-restricted ASCII system file that stores users'
 encrypted passwords and related information. The shadow file can be used in
@@ -149,6 +150,7 @@ includes ``+'' and ``-'' entries if the \fBcompat\fR source is being used (see
 Values for the various time-related fields are interpreted as Greenwich Mean
 Time.
 .SH FILES
+.sp
 .ne 2
 .na
 \fB\fB/etc/shadow\fR\fR
@@ -178,13 +180,14 @@ name-service switch configuration file
 .sp
 .ne 2
 .na
-\fB\fB/var/adm/lastlog.v2\fR\fR
+\fB\fB/var/adm/lastlog\fR\fR
 .ad
 .RS 22n
 time of last login
 .RE
 
 .SH ATTRIBUTES
+.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -200,6 +203,7 @@ Interface Stability	Stable
 .TE
 
 .SH SEE ALSO
+.sp
 .LP
 \fBlogin\fR(1), \fBpasswd\fR(1), \fBuseradd\fR(1M), \fBuserdel\fR(1M),
 \fBusermod\fR(1M), \fBstrtol\fR(3C), \fBcrypt\fR(3C), \fBcrypt_gensalt\fR(3C),
@@ -207,6 +211,7 @@ Interface Stability	Stable
 \fBpasswd\fR(4), \fBattributes\fR(5), \fBpam_unix_account\fR(5),
 \fBpam_unix_auth\fR(5)
 .SH NOTES
+.sp
 .LP
 If password aging is turned on in any name service the \fIpasswd:\fR line in
 the \fB/etc/nsswitch.conf\fR file must have a format specified in the

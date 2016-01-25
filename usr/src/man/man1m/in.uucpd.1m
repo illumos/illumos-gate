@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH IN.UUCPD 1M "Nov 9, 2015"
+.TH IN.UUCPD 1M "Aug 12, 2004"
 .SH NAME
 in.uucpd, uucpd \- UUCP server
 .SH SYNOPSIS
@@ -13,6 +13,7 @@ in.uucpd, uucpd \- UUCP server
 .fi
 
 .SH DESCRIPTION
+.sp
 .LP
 \fBin.uucpd\fR is the server for supporting \fBUUCP\fR connections over
 networks.
@@ -43,10 +44,12 @@ Otherwise, \fBuucico\fR is run, with the user \fBID\fR, group \fBID\fR, group
 set, and home directory for that account, with the environment variables
 \fBUSER\fR and \fB LOGNAME\fR set to the specified username, and with a
 \fB-u\fR flag specifying the username. Unless the \fB-n\fR flag is specified,
-entries are made in \fB/var/adm/utmpx\fR and \fB/var/adm/wtmpx\fR for the
-username. \fBin.uucpd\fR must be invoked by a user with appropriate privilege
-(usually root) in order to be able to verify that the password is correct.
+entries are made in \fB/var/adm/utmpx\fR, \fB/var/adm/wtmpx\fR, and
+\fB/var/adm/lastlog\fR for the username. \fBin.uucpd\fR must be invoked by a
+user with appropriate privilege (usually root) in order to be able to verify
+that the password is correct.
 .SH SECURITY
+.sp
 .LP
 \fBin.uucpd\fR uses \fBpam\fR(3PAM) for authentication, account management, and
 session management.  The \fBPAM\fR configuration policy, listed through
@@ -74,6 +77,7 @@ If there are no entries for the \fBuucp\fR service, then the entries for the
 "other" service will be used. If multiple authentication modules are listed,
 then the peer may be prompted for multiple passwords.
 .SH FILES
+.sp
 .ne 2
 .na
 \fB\fB/var/adm/utmpx\fR\fR
@@ -91,7 +95,17 @@ accounting
 accounting
 .RE
 
+.sp
+.ne 2
+.na
+\fB\fB/var/adm/lastlog\fR\fR
+.ad
+.RS 20n
+time of last login
+.RE
+
 .SH SEE ALSO
+.sp
 .LP
 \fBsvcs\fR(1), \fBinetadm\fR(1M), \fBinetd\fR(1M), \fBsvcadm\fR(1M),
 \fBuucico\fR(1M), \fBpam\fR(3PAM), \fBpam.conf\fR(4), \fBservices\fR(4),
@@ -100,6 +114,7 @@ accounting
 \fBpam_unix_account\fR(5), \fBpam_unix_auth\fR(5), \fBpam_unix_session\fR(5),
 \fBsmf\fR(5)
 .SH DIAGNOSTICS
+.sp
 .LP
 All diagnostic messages are returned on the connection, after which the
 connection is closed.
@@ -133,6 +148,7 @@ account.
 .RE
 
 .SH NOTES
+.sp
 .LP
 The \fBin.uucpd\fR service is managed by the service management facility,
 \fBsmf\fR(5), under the service identifier:

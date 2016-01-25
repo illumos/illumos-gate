@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LOGIN 1 "Nov 9, 2015"
+.TH LOGIN 1 "Jan 7, 2008"
 .SH NAME
 login \- sign on to the system
 .SH SYNOPSIS
@@ -17,6 +17,7 @@ login \- sign on to the system
 .fi
 
 .SH DESCRIPTION
+.sp
 .LP
 The \fBlogin\fR command is used at the beginning of each terminal session to
 identify oneself to the system. \fBlogin\fR is invoked by the system when a
@@ -199,6 +200,7 @@ To enable remote logins by root, edit the \fB/etc/default/login\fR file by
 inserting a \fB#\fR (pound sign) before the \fBCONSOLE=/dev/console\fR entry.
 See FILES.
 .SH SECURITY
+.sp
 .LP
 For accounts in name services which support automatic account locking, the
 account can be configured to be automatically locked (see \fBuser_attr\fR(4)
@@ -252,6 +254,7 @@ can be prompted for multiple passwords.
 When \fBlogin\fR is invoked through \fBrlogind\fR or \fBtelnetd\fR, the service
 name used by \fBPAM\fR is \fBrlogin\fR or \fBtelnet\fR, respectively.
 .SH OPTIONS
+.sp
 .LP
 The following options are supported:
 .sp
@@ -348,6 +351,7 @@ line parameter. Normally (non-Kerberos authenticated \fBrlogin\fR), the
 .RE
 
 .SH EXIT STATUS
+.sp
 .LP
 The following exit values are returned:
 .sp
@@ -369,6 +373,7 @@ Error.
 .RE
 
 .SH FILES
+.sp
 .ne 2
 .na
 \fB\fB$HOME/.cshrc\fR\fR
@@ -516,7 +521,7 @@ User's default command interpreter.
 .sp
 .ne 2
 .na
-\fB\fB/var/adm/lastlog.v2\fR\fR
+\fB\fB/var/adm/lastlog\fR\fR
 .ad
 .RS 23n
 Time of last login.
@@ -729,6 +734,7 @@ before a failed login message is logged, using the \fBsyslog\fR(3C)
 .RE
 
 .SH ATTRIBUTES
+.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -744,6 +750,7 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
+.sp
 .LP
 \fBcsh\fR(1), \fBexit\fR(1), \fBksh\fR(1), \fBksh93\fR(1), \fBmail\fR(1),
 \fBmailx\fR(1), \fBnewgrp\fR(1), \fBpasswd\fR(1), \fBrlogin\fR(1),
@@ -761,6 +768,7 @@ Interface Stability	Committed
 \fBpam_authtok_store\fR(5), \fBpam_dhkeys\fR(5), \fBpam_passwd_auth\fR(5),
 \fBtermio\fR(7I)
 .SH DIAGNOSTICS
+.sp
 .ne 2
 .na
 \fB\fBLogin incorrect\fR\fR
@@ -813,6 +821,7 @@ The machine is in the process of being shut down and logins have been disabled.
 .RE
 
 .SH WARNINGS
+.sp
 .LP
 Users with a \fBUID\fR greater than 76695844 are not subject to password aging,
 and the system does not record their last login time.
@@ -822,6 +831,7 @@ If you use the \fBCONSOLE\fR setting to disable root logins, you should arrange
 that remote command execution by root is also disabled. See \fBrsh\fR(1),
 \fBrcmd\fR(3SOCKET), and \fBhosts.equiv\fR(4) for further details.
 .SH NOTES
+.sp
 .LP
 The \fBpam_unix\fR(5) module is no longer supported. Similar functionality is
 provided by \fBpam_unix_account\fR(5), \fBpam_unix_auth\fR(5),

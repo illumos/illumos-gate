@@ -81,7 +81,6 @@ CORE_OBJS +=	sfmmu_kdi.o
 CORE_OBJS +=	suspend.o
 CORE_OBJS +=	swtch.o
 CORE_OBJS +=	wdt.o
-CORE_OBJS +=	xhat_sfmmu.o
 
 CORE_OBJS +=	mdesc_diff.o
 CORE_OBJS +=	mdesc_findname.o

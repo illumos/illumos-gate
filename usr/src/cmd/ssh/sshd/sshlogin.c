@@ -56,6 +56,22 @@ extern u_int utmp_len;
 extern ServerOptions options;
 
 /*
+ * Returns the time when the user last logged in.  Returns 0 if the
+ * information is not available.  This must be called before record_login.
+ * The host the user logged in from will be returned in buf.
+ */
+u_long
+get_last_login_time(uid_t uid, const char *logname,
+    char *buf, u_int bufsize)
+{
+  struct logininfo li;
+
+  (void) login_get_lastlog(&li, uid);
+  (void) strlcpy(buf, li.hostname, bufsize);
+  return li.tv_sec;
+}
+
+/*
  * Records that the user has logged in.  If only these parts of operating
  * systems were more standardized.
  */

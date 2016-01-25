@@ -339,6 +339,17 @@ finish_userauth_do_pam(Authctxt *authctxt)
 #endif /* GSSAPI */
 	}
 
+	/*
+	 * On Solaris pam_unix_session.so updates the lastlog, but does
+	 * not converse a PAM_TEXT_INFO message about it.  So we need to
+	 * fetch the lastlog entry here and save it for use later.
+	 */
+	authctxt->last_login_time =
+		get_last_login_time(authctxt->pw->pw_uid,
+			authctxt->pw->pw_name,
+			authctxt->last_login_host,
+			sizeof(authctxt->last_login_host));
+
 	if (!(authctxt->pam->state & PAM_S_DONE_OPEN_SESSION)) {
 		retval = pam_open_session(authctxt->pam->h, 0);
 		authctxt->pam->last_pam_retval = retval;
@@ -512,7 +523,7 @@ auth_pam_password(Authctxt *authctxt, const char *password)
 int
 do_pam_non_initial_userauth(Authctxt *authctxt)
 {
-	new_start_pam(authctxt, &conv);
+	new_start_pam(authctxt, NULL);
 	return (finish_userauth_do_pam(authctxt) == PAM_SUCCESS);
 }
 

@@ -3,6 +3,8 @@
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
+#
 
 . /lib/svc/share/ipf_include.sh
 . /lib/svc/share/smf_include.sh
@@ -49,6 +51,7 @@ create_ipf_rules()
 {
 	FMRI=$1
 	ipf_file=`fmri_to_file ${FMRI} $IPF_SUFFIX`
+	ipf6_file=`fmri_to_file ${FMRI} $IPF6_SUFFIX`
 	policy=`get_policy ${FMRI}`
 
 	#
@@ -58,8 +61,10 @@ create_ipf_rules()
 	    awk '{print $2}'`
 
 	echo "# $FMRI" >$ipf_file
+	echo "# $FMRI" >$ipf6_file
 	for port in $tports; do
-		generate_rules $FMRI $policy "tcp" "any" $port $ipf_file
+		generate_rules $FMRI $policy "tcp" $port $ipf_file
+		generate_rules $FMRI $policy "tcp" $port $ipf6_file _6
 	done
 }
 
