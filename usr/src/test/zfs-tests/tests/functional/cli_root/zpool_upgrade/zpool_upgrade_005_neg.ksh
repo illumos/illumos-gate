@@ -27,10 +27,10 @@
 
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 #
 
-. $STF_SUITE/include/libtest.shlib
-. $STF_SUITE/tests/functional/cli_root/zpool_upgrade/zpool_upgrade.cfg
+. $STF_SUITE/tests/functional/cli_root/zpool_upgrade/zpool_upgrade.kshlib
 
 #
 # DESCRIPTION:
@@ -43,19 +43,12 @@
 
 verify_runnable "global"
 
-set -A args "/tmp" "-?" "-va" "-v fakepool" "-a fakepool"
+log_assert "Variations of upgrade -v print usage message," \
+    "return with non-zero status"
 
-log_assert "Variations of upgrade -v print usage message, \
- return with non-zero status"
-
-typeset -i i=0
-
-while [[ $i -lt ${#args[*]} ]]; do
-
-        log_mustnot $ZPOOL upgrade ${args[$i]} > /dev/null
-
-        (( i = i + 1 ))
+for arg in "/tmp" "-?" "-va" "-v fakepool" "-a fakepool" ; do
+        log_mustnot $ZPOOL upgrade $arg
 done
 
-log_pass "Variations of upgrade -v print usage message, \
- return with non-zero status"
+log_pass "Variations of upgrade -v print usage message," \
+    "return with non-zero status"

@@ -27,34 +27,31 @@
 
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 #
 
-. $STF_SUITE/include/libtest.shlib
-. $STF_SUITE/tests/functional/cli_root/zpool_upgrade/zpool_upgrade.cfg
+. $STF_SUITE/tests/functional/cli_root/zpool_upgrade/zpool_upgrade.kshlib
 
 #
 # DESCRIPTION:
 # Attempting to upgrade a non-existent pool will return an error
 #
 # STRATEGY:
-# 1. Verify a pool doesn't exist, then try to upgrade it
-# 2. Verify a 0 exit status
+# 1. Compose non-existent pool name, try to upgrade it
+# 2. Verify non-zero exit status
 #
 
 log_assert "Attempting to upgrade a non-existent pool will return an error"
-NO_POOL=notapool
-FOUND=""
 
-while [ -z "$FOUND" ]
-do
-   $ZPOOL list $NO_POOL 2>&1 > /dev/null
-   if [ $? -ne 0 ]
-   then
-      FOUND="true"
-      log_mustnot $ZPOOL upgrade $NO_POOL
-   else
-      NO_POOL="${NO_POOL}x"
-   fi
+NO_POOL=notapool
+
+while true ; do
+	if poolexists $NO_POOL ; then
+		NO_POOL="${NO_POOL}x"
+	else
+		log_mustnot $ZPOOL upgrade $NO_POOL
+		break
+	fi
 done
 
 log_pass "Attempting to upgrade a non-existent pool will return an error"

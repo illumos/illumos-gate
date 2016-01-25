@@ -21,6 +21,7 @@
 #
 #
 # Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 #
 
 . /lib/svc/share/smf_include.sh
@@ -32,6 +33,7 @@ create_client_ipf_rules()
 {
 	FMRI=$1
 	file=`fmri_to_file $FMRI $IPF_SUFFIX`
+	file6=`fmri_to_file $FMRI $IPF6_SUFFIX`
 	iana_name=`svcprop -p $FW_CONTEXT_PG/name $FMRI`
 	domain=`domainname`
 
@@ -43,44 +45,76 @@ create_client_ipf_rules()
 		return
 	fi
 	echo "# $FMRI" >$file
+	echo "# $FMRI" >$file6
 
 	ypfile="/var/yp/binding/$domain/ypservers"
 	if [ -f $ypfile ]; then
 		tports=`$SERVINFO -R -p -t -s $iana_name 2>/dev/null`
 		uports=`$SERVINFO -R -p -u -s $iana_name 2>/dev/null`
+		tports_6=`$SERVINFO -R -p -t6 -s $iana_name 2>/dev/null`
+		uports_6=`$SERVINFO -R -p -u6 -s $iana_name 2>/dev/null`
 
 		server_addrs=""
+                server_addrs_6=""
 		for ypsvr in `grep -v '^[ ]*#' $ypfile`; do
 			#
-			# Get corresponding IPv4 address in /etc/hosts
+			# Get corresponding IPv4/IPv6 addresses
 			#
-			servers=`grep -v '^[ ]*#' /etc/hosts | awk ' {
-			    if ($1 !~/:/) {
-				for (i=2; i<=NF; i++) {
-				    if (s == $i) printf("%s ", $1);
-				} }
-			    }' s="$ypsvr"`
+			servers=`getent ipnodes $ypsvr | awk '/^:/{ print $1 }'`
+			servers_6=`getent ipnodes $ypsvr | awk '/:/{ print $1 }'`
 
-			[ -z "$servers"  ] && continue
-			server_addrs="$server_addrs $servers"
-		done
-
-		[ -z "$server_addrs"  ] && return 0
-		for s in $server_addrs; do
-			if [ -n "$tports" ]; then
-				for tport in $tports; do
-					echo "pass in log quick proto tcp" \
-					    "from $s to any port = $tport" >>$file
-				done
+			if [ -n "$servers" ]; then
+				server_addrs="$server_addrs $servers"
 			fi
 
-			if [ -n "$uports" ]; then
-				for uport in $uports; do
-					echo "pass in log quick proto udp" \
-					    "from $s to any port = $uport" >>$file
-				done
+			if [ -n "$servers_6" ]; then
+				server_addrs_6="$server_addrs_6 $servers"
 			fi
 		done
+
+		if [ -n "$server_addrs"  ]; then
+			for s in $server_addrs; do
+				if [ -n "$tports" ]; then
+					for tport in $tports; do
+						echo "pass in log quick" \
+						    "proto tcp from $s" \
+						    "to any port = $tport" \
+						    >>$file
+					done
+				fi
+
+				if [ -n "$uports" ]; then
+					for uport in $uports; do
+						echo "pass in log quick" \
+						    "proto udp from $s" \
+						    "to any port = $uport" \
+						     >>$file
+					done
+				fi
+			done
+		fi
+
+		if [ -n "$server_addrs_6"  ]; then
+			for s in $server_addrs_6; do
+				if [ -n "$tports_6" ]; then
+					for tport in $tports_6; do
+						echo "pass in log quick" \
+						    "proto tcp from $s" \
+						    "to any port = $tport" \
+						    >>$file6
+					done
+				fi
+
+				if [ -n "$uports_6" ]; then
+					for uport in $uports_6; do
+						echo "pass in log quick" \
+						    "proto udp from $s" \
+						    "to any port = $uport" \
+						     >>$file6
+					done
+				fi
+			done
+		fi
 	else
 		#
 		# How do we handle the client broadcast case? Server replies
@@ -93,6 +127,8 @@ create_client_ipf_rules()
 		#
 		echo "pass in log quick proto udp from any to any" \
 		    "port > 32768" >>$file
+		echo "pass in log quick proto udp from any to any" \
+		    "port > 32768" >>$file6
 	fi
 }
 

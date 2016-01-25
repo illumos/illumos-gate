@@ -4,6 +4,8 @@
  Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  Use is subject to license terms.
 
+ Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
+
  CDDL HEADER START
 
  The contents of this file are subject to the terms of the
@@ -92,11 +94,17 @@
 
 	<property_group name='firewall_config' type='com.sun,fw_configuration'>
 		<propval name='policy' type='astring' value='use_global' />
+		<propval name='block_policy' type='astring'
+			value='use_global' />
 		<propval name='apply_to' type='astring' value='' />
+		<propval name='apply_to_6' type='astring' value='' />
 		<propval name='exceptions' type='astring' value='' />
+		<propval name='exceptions_6' type='astring' value='' />
+		<propval name='target' type='astring' value='' />
+		<propval name='target_6' type='astring' value='' />
 		<propval name='value_authorization' type='astring'
 			value='solaris.smf.value.firewall.config' />
-        </property_group>
+	</property_group>
 
 	<stability value='Unstable' />
 

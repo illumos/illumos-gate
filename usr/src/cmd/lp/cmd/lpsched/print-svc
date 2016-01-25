@@ -23,6 +23,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 #
 
 . /lib/svc/share/smf_include.sh
@@ -121,23 +122,27 @@ fi
 	IPP_FMRI="svc:/application/print/ipp-listener:default"
 	RFC1179_FMRI="svc:/application/print/rfc1179:default"
 	IPP_CONF=/etc/lp/ipp/httpd-standalone-ipp.conf
-	ip="any"
 
 	policy=`get_policy $FMRI`
 
 	file=`fmri_to_file $RFC1179_FMRI $IPF_SUFFIX`
+	file6=`fmri_to_file $RFC1179_FMRI $IPF6_SUFFIX`
 	echo "# $RFC1179_FMRI" >$file
+	echo "# $RFC1179_FMRI" >$file6
         service_is_enabled ${RFC1179_FMRI}
         if [ $? -eq 0 ]; then
 		rfc_name=`svcprop -p inetd/name ${RFC1179_FMRI} 2>/dev/null`
 		rfc_proto=`svcprop -p inetd/proto ${RFC1179_FMRI} 2>/dev/null | \
 		    sed 's/6/ /'`
 		rfc_port=`$SERVINFO -p -t -s $rfc_name`
-		generate_rules $FMRI $policy $rfc_proto $ip $rfc_port $file
+		generate_rules $FMRI $policy $rfc_proto $rfc_port $file
+		generate_rules $FMRI $policy $rfc_proto $rfc_port $file6 _6
         fi
 
 	file=`fmri_to_file $IPP_FMRI $IPF_SUFFIX`
+	file6=`fmri_to_file $IPP_FMRI $IPF6_SUFFIX`
 	echo "# $IPP_FMRI" >$file
+	echo "# $IPP_FMRI" >$file6
         service_is_enabled ${IPP_FMRI}
         if [ $? -eq 0 ]; then
 		#
@@ -153,7 +158,8 @@ fi
 		fi
 
 		for port in $ipp_ports; do
-			generate_rules $FMRI $policy "tcp" $ip $port $file
+			generate_rules $FMRI $policy "tcp" $port $file
+			generate_rules $FMRI $policy "tcp" $port $file6 _6
 		done
 	fi
 

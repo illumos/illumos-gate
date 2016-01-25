@@ -23,6 +23,8 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
+#
 
 . /lib/svc/share/smf_include.sh
 . /lib/svc/share/routing_include.sh
@@ -51,11 +53,11 @@ create_ipf_rules()
 	uport=`$SERVINFO -p -u -s $iana_name 2>/dev/null`
 
 	if [ -n "$tport" ]; then
-		generate_rules $FMRI $policy "tcp" "any" $tport $file
+		generate_rules $FMRI $policy "tcp" $tport $file
 	fi
 
 	if [ -n "$uport" ]; then
-		generate_rules $FMRI $policy "udp" "any" $uport $file
+		generate_rules $FMRI $policy "udp" $uport $file
 	fi
 }
 

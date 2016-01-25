@@ -24,9 +24,11 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+
+#
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 #
 
-. $STF_SUITE/include/libtest.shlib
 . $STF_SUITE/tests/functional/cli_root/zpool_upgrade/zpool_upgrade.kshlib
 
 #
@@ -45,13 +47,13 @@ function cleanup
 	destroy_upgraded_pool 1
 }
 
-log_assert "Upgrading a pool that has already been upgraded succeeds."
+log_assert "Upgrading a pool that has already been upgraded succeeds"
 log_onexit cleanup
 
-# we just create a version 1 pool here
+# Create a version 1 pool
 create_old_pool 1
 check_upgrade 1
 check_upgrade 1
 destroy_upgraded_pool 1
 
-log_pass "Upgrading a pool that has already been upgraded succeeds."
+log_pass "Upgrading a pool that has already been upgraded succeeds"
