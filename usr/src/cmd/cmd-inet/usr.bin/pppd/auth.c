@@ -35,7 +35,6 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #define RCSID	"$Id: auth.c,v 1.65 2000/04/15 01:27:10 masputra Exp $"
 
 /* Pull in crypt() definition. */
@@ -1370,22 +1369,6 @@ plogin(user, passwd, msg)
     if (strncmp(tty, "/dev/", 5) == 0)
 	tty += 5;
     logwtmp(tty, user, remote_name);		/* Add wtmp login entry */
-
-#ifdef _PATH_LASTLOG
-    if (!use_pam && pw != (struct passwd *)NULL) {
-	struct lastlog ll;
-	int fd;
-
-	if ((fd = open(_PATH_LASTLOG, O_RDWR, 0)) >= 0) {
-	   (void)lseek(fd, (off_t)(pw->pw_uid * sizeof(ll)), SEEK_SET);
-	    BZERO((void *)&ll, sizeof(ll));
-	    (void)time(&ll.ll_time);
-	    (void)strncpy(ll.ll_line, tty, sizeof(ll.ll_line));
-	    (void)write(fd, (char *)&ll, sizeof(ll));
-	    (void)close(fd);
-	}
-    }
-#endif /* _PATH_LASTLOG */
 
     info("user %s logged in", user);
     logged_in = 1;

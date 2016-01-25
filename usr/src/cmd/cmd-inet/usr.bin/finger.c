@@ -128,7 +128,6 @@ struct person {				/* one for each person fingered */
 	struct person *link;		/* link to next person */
 };
 
-char LASTLOG[] = "/var/adm/lastlog";	/* last login info */
 char PLAN[] = "/.plan";			/* what plan file is */
 char PROJ[] = "/.project";		/* what project file */
 
@@ -733,8 +732,9 @@ decode(struct person *pers)
 void
 fwopen(void)
 {
-	if ((lf = fopen(LASTLOG, "r")) == NULL)
-		(void) fprintf(stderr, "finger: %s open error\n", LASTLOG);
+	if ((lf = fopen(_PATH_LASTLOG, "r")) == NULL)
+		(void) fprintf(stderr, "finger: %s open error\n",
+		    _PATH_LASTLOG);
 }
 
 void
@@ -759,14 +759,15 @@ findwhen(struct person *pers)
 			} else {
 				if (ferror(lf))
 					(void) fprintf(stderr,
-					    "finger: %s read error\n", LASTLOG);
+					    "finger: %s read error\n",
+					    _PATH_LASTLOG);
 				pers->tty[0] = 0;
 				pers->host[0] = 0;
 				pers->loginat = 0L;
 			}
 		} else {
 			(void) fprintf(stderr, "finger: %s fseeko error\n",
-			    LASTLOG);
+			    _PATH_LASTLOG);
 		}
 	} else {
 		pers->tty[0] = 0;

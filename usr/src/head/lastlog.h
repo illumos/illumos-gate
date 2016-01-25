@@ -34,26 +34,21 @@
 
 #ifndef _LASTLOG_H
 #define	_LASTLOG_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#include <utmpx.h>
 
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
-#ifdef _LP64
-#include <sys/types32.h>
-#endif
+#include <sys/types.h>
 
 struct lastlog {
-#ifdef _LP64
-	time32_t ll_time;
-#else
-	time_t	ll_time;
-#endif
-	char	ll_line[8];
-	char	ll_host[16];		/* same as in utmp */
+	int64_t	ll_time;
+	char	ll_line[sizeof (((struct utmpx *)0)->ut_line)];
+	char	ll_host[sizeof (((struct utmpx *)0)->ut_host)];
 };
+
+#define	_PATH_LASTLOG	"/var/adm/lastlog.v2"
 
 #ifdef	__cplusplus
 }

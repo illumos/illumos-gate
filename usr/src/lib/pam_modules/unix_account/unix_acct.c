@@ -53,7 +53,6 @@
 #include <libintl.h>
 #include <passwdutil.h>
 
-#define	LASTLOG		"/var/adm/lastlog"
 #define	LOGINADMIN	"/etc/default/login"
 #define	UNIX_AUTH_DATA		"SUNW-UNIX-AUTH-DATA"
 #define	UNIX_AUTHTOK_DATA	"SUNW-UNIX-AUTHTOK-DATA"
@@ -89,13 +88,16 @@ check_for_login_inactivity(
 	struct 	spwd 	*shpwd)
 {
 	int		fdl;
-	struct lastlog	ll;
 	int		retval;
 	offset_t	offset;
+	time_t		lltime = 0;
 
-	offset = (offset_t)pw_uid * (offset_t)sizeof (struct lastlog);
+	if (!(shpwd->sp_inact > 0))
+		return (0);
 
-	if ((fdl = open(LASTLOG, O_RDWR|O_CREAT, 0444)) >= 0) {
+	if ((fdl = open(_PATH_LASTLOG, O_RDONLY)) >= 0) {
+		struct lastlog	ll;
+		offset = (offset_t)(pw_uid * sizeof (struct lastlog));
 		/*
 		 * Read the last login (ll) time
 		 */
@@ -110,31 +112,29 @@ check_for_login_inactivity(
 
 		retval = read(fdl, (char *)&ll, sizeof (ll));
 
-		/* Check for login inactivity */
-
-		if ((shpwd->sp_inact > 0) && (retval == sizeof (ll)) &&
-		    ll.ll_time) {
-			/*
-			 * account inactive too long.
-			 * and no update password set
-			 * and no last pwd change date in shadow file
-			 * and last pwd change more than inactive time
-			 * then account inactive too long and no access.
-			 */
-			if (((time_t)((ll.ll_time / DAY) + shpwd->sp_inact)
-			    < DAY_NOW) &&
-			    (shpwd->sp_lstchg != 0) &&
-			    (shpwd->sp_lstchg != -1) &&
-			    ((shpwd->sp_lstchg + shpwd->sp_inact) < DAY_NOW)) {
-				/*
-				 * Account inactive for too long
-				 */
-				(void) close(fdl);
-				return (1);
-			}
-		}
+		if (retval == sizeof (ll))
+			lltime = ll.ll_time;
 
 		(void) close(fdl);
+	}
+	/* Check for login inactivity */
+	if (lltime) {
+		/*
+		 * account inactive too long.
+		 * and no update password set
+		 * and no last pwd change date in shadow file
+		 * and last pwd change more than inactive time
+		 * then account inactive too long and no access.
+		 */
+		if ((((lltime / DAY) + shpwd->sp_inact) < DAY_NOW) &&
+		    (shpwd->sp_lstchg != 0) &&
+		    (shpwd->sp_lstchg != -1) &&
+		    ((shpwd->sp_lstchg + shpwd->sp_inact) < DAY_NOW)) {
+			/*
+			 * Account inactive for too long
+			 */
+			return (1);
+		}
 	}
 	return (0);
 }

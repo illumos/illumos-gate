@@ -643,7 +643,8 @@ Multiple options of this type are permitted. See also \fBListenAddress\fR.
 .sp .6
 .RS 4n
 Specifies whether \fBsshd\fR should display the date and time when the user
-last logged in. The default is \fByes\fR.
+last logged in. On illumos this is always ignored, because pam_unix_session(5)
+reports the last login time.
 .RE
 
 .sp

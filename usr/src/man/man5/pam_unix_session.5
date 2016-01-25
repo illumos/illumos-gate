@@ -15,15 +15,15 @@ pam_unix_session \- session management PAM module for UNIX
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBpam_unix_session\fR module implements \fBpam_sm_open_session\fR(3PAM)
 and \fBpam_sm_close_session\fR(3PAM).
 .sp
 .LP
-\fBpam_sm_open_session()\fR updates the \fB/var/adm/lastlog\fR file with the
-information contained in the \fBPAM_USER\fR, \fBPAM_TTY\fR, and
-\fBPAM_RHOSTS\fR items. \fBpam_unix_account\fR(5) uses this account to
+\fBpam_sm_open_session()\fR reads \fB/var/adm/lastlog.v2\fR to report the
+user's last login time via a PAM_TEXT_INFO message as well as updates the file
+with information contained in the \fBPAM_USER\fR, \fBPAM_TTY\fR, and
+\fBPAM_RHOSTS\fR items.  \fBpam_unix_account\fR(5) also uses this file to
 determine the previous time the user logged in.
 .sp
 .LP
@@ -50,7 +50,6 @@ Turn off last login PAM_TEXT_INFO message.
 .RE
 
 .SH ERRORS
-.sp
 .LP
 Upon successful completion, \fBPAM_SUCCESS\fR is returned. The following error
 codes are returned upon error:
@@ -64,7 +63,6 @@ Cannot make or remove the entry for the specified session (PAM_TTY is not
 present).
 .RE
 
-.sp
 .ne 2
 .na
 \fB\fBPAM_USER_UNKNOWN\fR\fR
@@ -74,7 +72,6 @@ No account is present for \fIuser\fR.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -92,7 +89,6 @@ MT Level	MT-Safe with exceptions
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBpam\fR(3PAM), \fBpam_authenticate\fR(3PAM), \fBsyslog\fR(3C),
 \fBlibpam\fR(3LIB), \fBpam.conf\fR(4), \fBnsswitch.conf\fR(4),
@@ -100,7 +96,6 @@ MT Level	MT-Safe with exceptions
 \fBpam_authtok_store\fR(5), \fBpam_dhkeys\fR(5), \fBpam_passwd_auth\fR(5),
 \fBpam_unix_account\fR(5),\fBpam_unix_auth\fR(5),
 .SH NOTES
-.sp
 .LP
 The interfaces in \fBlibpam\fR(3LIB) are MT-Safe only if each thread within the
 multi-threaded application uses its own PAM handle.
