@@ -120,6 +120,12 @@ umount03
 utime06
 utimes01
 
+# These tests are broken on 32-bit (including on "real" Linux)
+preadv01
+preadv02
+pwritev01
+pwritev02
+
 # tests functionality not implemented yet
 access06
 add_key01

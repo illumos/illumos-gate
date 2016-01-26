@@ -953,8 +953,8 @@ lx_sysent_t lx_sysent32[] = {
 	{"dup3",	NULL,			0,		3}, /* 330 */
 	{"pipe2",	lx_pipe2,		0,		2}, /* 331 */
 	{"inotify_init1", NULL,			0,		1}, /* 332 */
-	{"preadv",	NULL,			0,		4}, /* 333 */
-	{"pwritev",	NULL,			0,		4}, /* 334 */
+	{"preadv",	lx_preadv32,		0,		5}, /* 333 */
+	{"pwritev",	lx_pwritev32,		0,		5}, /* 334 */
 	{"rt_tgsigqueueinfo", NULL,		0,		4}, /* 335 */
 	{"perf_event_open", NULL,		NOSYS_NULL,	0}, /* 336 */
 	{"recvmmsg",	NULL,			NOSYS_NULL,	0}, /* 337 */
@@ -1282,8 +1282,8 @@ lx_sysent_t lx_sysent64[] = {
 	{"dup3",	NULL,			0,		3}, /* 292 */
 	{"pipe2",	lx_pipe2,		0,		2}, /* 293 */
 	{"inotify_init1", NULL,			0,		1}, /* 294 */
-	{"preadv",	NULL,			0,		4}, /* 295 */
-	{"pwritev",	NULL,			0,		4}, /* 296 */
+	{"preadv",	lx_preadv,		0,		4}, /* 295 */
+	{"pwritev",	lx_pwritev,		0,		4}, /* 296 */
 	{"rt_tgsigqueueinfo", NULL, 		0,		4}, /* 297 */
 	{"perf_event_open", NULL,		NOSYS_NULL,	0}, /* 298 */
 	{"recvmmsg",	NULL,			NOSYS_NULL,	0}, /* 299 */

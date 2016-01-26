@@ -38,7 +38,6 @@ COBJS	=	aio.o			\
 		fcntl.o			\
 		fork.o			\
 		id.o			\
-		iovec.o			\
 		lx_brand.o		\
 		mem.o			\
 		misc.o			\
