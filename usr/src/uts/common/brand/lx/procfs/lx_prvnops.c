@@ -3729,15 +3729,22 @@ lxpr_read_version(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
 	lx_zone_data_t *lxzd = ztolxzd(LXPTOZ(lxpnp));
 	lx_proc_data_t *lxpd = ptolxproc(curproc);
-	const char *release = lxzd->lxzd_kernel_release;
-	const char *version = lxzd->lxzd_kernel_version;
+	char release[LX_KERN_RELEASE_MAX];
+	char version[LX_KERN_VERSION_MAX];
+
+	mutex_enter(&lxzd->lxzd_lock);
+	(void) strlcpy(release, lxzd->lxzd_kernel_release, sizeof (release));
+	(void) strlcpy(version, lxzd->lxzd_kernel_version, sizeof (version));
+	mutex_exit(&lxzd->lxzd_lock);
 
 	/* Use per-process overrides, if specified */
 	if (lxpd != NULL && lxpd->l_uname_release[0] != '\0') {
-		release = lxpd->l_uname_release;
+		(void) strlcpy(release, lxpd->l_uname_release,
+		    sizeof (release));
 	}
 	if (lxpd != NULL && lxpd->l_uname_version[0] != '\0') {
-		version = lxpd->l_uname_version;
+		(void) strlcpy(version, lxpd->l_uname_version,
+		    sizeof (version));
 	}
 
 	lxpr_uiobuf_printf(uiobuf,
@@ -4070,12 +4077,17 @@ static void
 lxpr_read_sys_kernel_osrel(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
 	lx_zone_data_t *br_data;
+	char version[LX_KERN_VERSION_MAX];
 
 	ASSERT(lxpnp->lxpr_type == LXPR_SYS_KERNEL_OSREL);
 	br_data = ztolxzd(curproc->p_zone);
 	if (curproc->p_zone->zone_brand == &lx_brand) {
-		lxpr_uiobuf_printf(uiobuf, "%s\n",
-		    br_data->lxzd_kernel_version);
+		mutex_enter(&br_data->lxzd_lock);
+		(void) strlcpy(version, br_data->lxzd_kernel_version,
+		    sizeof (version));
+		mutex_exit(&br_data->lxzd_lock);
+
+		lxpr_uiobuf_printf(uiobuf, "%s\n", version);
 	} else {
 		lxpr_uiobuf_printf(uiobuf, "\n");
 	}
@@ -4106,6 +4118,7 @@ lxpr_read_sys_kernel_rand_bootid(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	 * uuid, we don't worry about that.
 	 */
 	lx_zone_data_t *br_data;
+	char bootid[LX_BOOTID_LEN];
 
 	ASSERT(lxpnp->lxpr_type == LXPR_SYS_KERNEL_RAND_BOOTID);
 
@@ -4115,6 +4128,7 @@ lxpr_read_sys_kernel_rand_bootid(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	}
 
 	br_data = ztolxzd(curproc->p_zone);
+	mutex_enter(&br_data->lxzd_lock);
 	if (br_data->lxzd_bootid[0] == '\0') {
 		extern int getrandom(void *, size_t, int);
 		int i;
@@ -4142,8 +4156,11 @@ lxpr_read_sys_kernel_rand_bootid(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 			    sizeof (br_data->lxzd_bootid));
 		}
 	}
+	(void) strlcpy(bootid, br_data->lxzd_bootid, sizeof (bootid));
+	mutex_exit(&br_data->lxzd_lock);
 
-	lxpr_uiobuf_printf(uiobuf, "%s\n", br_data->lxzd_bootid);
+	lxpr_uiobuf_printf(uiobuf, "%s\n", bootid);
+
 }
 
 static void

@@ -851,7 +851,21 @@ ict_if_ioctl(vnode_t *vn, int cmd, intptr_t arg, int flags, cred_t *cred)
 	ksocket_t ks;
 
 	ASSERT(lxzd != NULL);
+
+	mutex_enter(&lxzd->lxzd_lock);
 	ks = lxzd->lxzd_ioctl_sock;
+	if (ks == NULL) {
+		/*
+		 * Linux is not at all picky about address family when it comes
+		 * to supporting interface-related ioctls. To mimic this
+		 * behavior, we'll attempt those ioctls against a ksocket
+		 * configured for that purpose.
+		 */
+		(void) ksocket_socket(&lxzd->lxzd_ioctl_sock, AF_INET,
+		    SOCK_DGRAM, 0, 0, curproc->p_zone->zone_kcred);
+		ks = lxzd->lxzd_ioctl_sock;
+	}
+	mutex_exit(&lxzd->lxzd_lock);
 
 	/*
 	 * For ioctls of this type, Illumos is strict about address family

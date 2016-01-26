@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #ifndef _LX_BRAND_H
@@ -529,6 +529,7 @@ struct lx_lwp_data {
  * enhanced to support different mounts with different subsystem controllers.
  */
 typedef struct lx_zone_data {
+	kmutex_t lxzd_lock;			/* protects all members */
 	char lxzd_kernel_release[LX_KERN_RELEASE_MAX];
 	char lxzd_kernel_version[LX_KERN_VERSION_MAX];
 	ksocket_t lxzd_ioctl_sock;

@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*
@@ -395,13 +395,6 @@ cgrp_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 		return (EINVAL);
 
 	/*
-	 * We currently only support one mount per zone.
-	 */
-	lxzdata = ztolxzd(curproc->p_zone);
-	if (lxzdata->lxzd_cgroup != NULL)
-		return (EINVAL);
-
-	/*
 	 * Ensure we don't allow overlaying mounts
 	 */
 	mutex_enter(&mvp->v_lock);
@@ -443,6 +436,16 @@ cgrp_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 	if (error != 0)
 		goto out;
 
+	/*
+	 * We currently only support one mount per zone.
+	 */
+	lxzdata = ztolxzd(curproc->p_zone);
+	mutex_enter(&lxzdata->lxzd_lock);
+	if (lxzdata->lxzd_cgroup != NULL) {
+		mutex_exit(&lxzdata->lxzd_lock);
+		return (EINVAL);
+	}
+
 	cgm = kmem_zalloc(sizeof (*cgm), KM_SLEEP);
 
 	/* Set but don't bother entering the mutex (not on mount list yet) */
@@ -451,6 +454,8 @@ cgrp_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 	cv_init(&cgm->cg_evnt_cv, NULL, CV_DRIVER, NULL);
 
 	cgm->cg_vfsp = lxzdata->lxzd_cgroup = vfsp;
+	mutex_exit(&lxzdata->lxzd_lock);
+
 	cgm->cg_lxzdata = lxzdata;
 	cgm->cg_ssid = ssid;
 
@@ -612,7 +617,9 @@ retry:
 		}
 	}
 
+	mutex_enter(&cgm->cg_lxzdata->lxzd_lock);
 	cgm->cg_lxzdata->lxzd_cgroup = NULL;
+	mutex_exit(&cgm->cg_lxzdata->lxzd_lock);
 	kmem_free(cgm->cg_grp_hash, sizeof (cgrp_node_t *) * CGRP_HASH_SZ);
 	list_destroy(&cgm->cg_evnt_list);
 	cv_destroy(&cgm->cg_evnt_cv);

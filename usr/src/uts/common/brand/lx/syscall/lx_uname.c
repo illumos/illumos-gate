@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -44,6 +44,9 @@ lx_uname(void *uptr)
 	(void) strlcpy(un.lxu_sysname, LX_UNAME_SYSNAME, LX_SYS_UTS_LN);
 	(void) strlcpy(un.lxu_nodename, p->p_zone->zone_nodename,
 	    LX_SYS_UTS_LN);
+
+	mutex_enter(&lxzd->lxzd_lock);
+
 	if (lxpd->l_uname_release[0] != '\0') {
 		(void) strlcpy(un.lxu_release, lxpd->l_uname_release,
 		    LX_SYS_UTS_LN);
@@ -58,6 +61,9 @@ lx_uname(void *uptr)
 		(void) strlcpy(un.lxu_version, lxzd->lxzd_kernel_version,
 		    LX_SYS_UTS_LN);
 	}
+
+	mutex_exit(&lxzd->lxzd_lock);
+
 	if (get_udatamodel() == DATAMODEL_LP64) {
 		(void) strlcpy(un.lxu_machine, LX_UNAME_MACHINE64,
 		    LX_SYS_UTS_LN);
