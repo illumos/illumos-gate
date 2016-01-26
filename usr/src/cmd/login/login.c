@@ -69,6 +69,7 @@
 #include <deflt.h>
 #include <grp.h>
 #include <fcntl.h>
+#include <lastlog.h>
 #include <termio.h>
 #include <utmpx.h>
 #include <stdlib.h>
@@ -158,6 +159,7 @@ static int	retry = MAXTRYS;
 #define	SHELL		"/usr/bin/sh"
 #define	SHELL2		"/sbin/sh"
 #define	SUBLOGIN	"<!sublogin>"
+#define	LASTLOG		"/var/adm/lastlog"
 #define	PROG_NAME	"login"
 #define	HUSHLOGIN	".hushlogin"
 
@@ -272,6 +274,8 @@ static	struct	passwd nouser = { "", "no:password", (uid_t)-1 };
  */
 static	char	*log_entry[LOGTRYS];
 static	int	writelog = 0;
+static	int	lastlogok = 0;
+static	struct lastlog ll;
 static	int	dosyslog = 0;
 static	int	flogin = MAXTRYS;	/* flag for SYSLOG_FAILED_LOGINS */
 
@@ -353,11 +357,14 @@ static	void	process_rlogin(void);
 static	void	login_authenticate();
 static	void	setup_credentials(void);
 static	void	adjust_nice(void);
-static	void	update_utmpx_entry(int, boolean_t);
+static	void	update_utmpx_entry(int);
 static	void	establish_user_environment(char **);
+static	void	print_banner(void);
+static	void	display_last_login_time(void);
 static	void	exec_the_shell(void);
 static	int	process_chroot_logins(void);
 static 	void	chdir_to_dir_user(void);
+static	void	check_log(void);
 static	void	validate_account(void);
 static	void	doremoteterm(char *);
 static	int	get_options(int, char **);
@@ -388,7 +395,6 @@ main(int argc, char *argv[], char **renvp)
 {
 	int sublogin;
 	int pam_rc;
-	boolean_t silent = B_FALSE;
 
 	login_pid = getpid();
 
@@ -577,15 +583,13 @@ main(int argc, char *argv[], char **renvp)
 
 	setup_credentials();	/* Set user credentials  - exits on failure */
 
-	if (chdir(pwd->pw_dir) == 0)
-		silent = (access(HUSHLOGIN, F_OK) == 0);
 	/*
 	 * NOTE: telnetd and rlogind rely upon this updating of utmpx
 	 * to indicate that the authentication completed  successfully,
 	 * pam_open_session was called and therefore they are required to
 	 * call pam_close_session.
 	 */
-	update_utmpx_entry(sublogin, silent);
+	update_utmpx_entry(sublogin);
 
 	/* set the real (and effective) UID */
 	if (setuid(pwd->pw_uid) == -1) {
@@ -616,6 +620,16 @@ main(int argc, char *argv[], char **renvp)
 
 	(void) signal(SIGQUIT, SIG_DFL);
 	(void) signal(SIGINT, SIG_DFL);
+
+	/*
+	 * Display some useful information to the new user like the banner
+	 * and last login time if not a quiet login.
+	 */
+
+	if (access(HUSHLOGIN, F_OK) != 0) {
+		print_banner();
+		display_last_login_time();
+	}
 
 	/*
 	 * Set SIGXCPU and SIGXFSZ to default disposition.
@@ -1632,6 +1646,8 @@ validate_account(void)
 
 	(void) alarm(0);	/* give user time to come up with password */
 
+	check_log();
+
 	if (Passreqflag)
 		flag = PAM_DISALLOW_NULL_AUTHTOK;
 	else
@@ -1678,6 +1694,29 @@ validate_account(void)
 			audit_error = ADT_FAIL_PAM + error;
 			login_exit(1);
 		}
+	}
+}
+
+/*
+ * Check_log	- This is really a hack because PAM checks the log, but login
+ *		  wants to know if the log is okay and PAM doesn't have
+ *		  a module independent way of handing this info back.
+ */
+
+static void
+check_log(void)
+{
+	int fdl;
+	long long offset;
+
+	offset = (long long) pwd->pw_uid * (long long) sizeof (struct lastlog);
+
+	if ((fdl = open(LASTLOG, O_RDWR|O_CREAT, 0444)) >= 0) {
+		if (llseek(fdl, offset, SEEK_SET) == offset &&
+		    read(fdl, (char *)&ll, sizeof (ll)) == sizeof (ll) &&
+		    ll.ll_time != 0)
+			lastlogok = 1;
+		(void) close(fdl);
 	}
 }
 
@@ -1922,6 +1961,8 @@ get_audit_id(void)
  *				adjust_nice
  *				update_utmpx_entry
  *				establish_user_environment
+ *				print_banner
+ *				display_last_login_time
  *				exec_the_shell
  *
  */
@@ -1963,7 +2004,7 @@ adjust_nice(void)
  */
 
 static void
-update_utmpx_entry(int sublogin, boolean_t silent)
+update_utmpx_entry(int sublogin)
 {
 	int	err;
 	char	*user;
@@ -1973,10 +2014,6 @@ update_utmpx_entry(int sublogin, boolean_t silent)
 	struct utmpx  *u = (struct utmpx *)0;
 	struct utmpx  utmpx;
 	char	*ttyntail;
-	int	pamflags = 0;
-
-	if (silent)
-		pamflags |= PAM_SILENT;
 
 	/*
 	 * If we're not a sublogin then
@@ -1987,7 +2024,7 @@ update_utmpx_entry(int sublogin, boolean_t silent)
 	 * exist.
 	 */
 
-	if ((err = pam_open_session(pamh, pamflags)) != PAM_SUCCESS) {
+	if ((err = pam_open_session(pamh, 0)) != PAM_SUCCESS) {
 		audit_error = ADT_FAIL_PAM + err;
 		login_exit(1);
 	}
@@ -2375,6 +2412,56 @@ switch_env:
 	 * Switch to the new environment.
 	 */
 	environ = envinit;
+}
+
+/*
+ * print_banner		- Print the banner at start up
+ *			   Do not turn on DOBANNER ifdef.  This is not
+ *			   relevant to SunOS.
+ */
+
+static void
+print_banner(void)
+{
+#ifdef DOBANNER
+	uname(&un);
+#if i386
+	(void) printf("UNIX System V/386 Release %s\n%s\n"
+	    "Copyright (C) 1984, 1986, 1987, 1988 AT&T\n"
+	    "Copyright (C) 1987, 1988 Microsoft Corp.\nAll Rights Reserved\n",
+	    un.release, un.nodename);
+#elif sun
+	(void) printf("SunOS Release %s Sun Microsystems %s\n%s\n"
+	    "Copyright (c) 1984, 1986, 1987, 1988 AT&T\n"
+	    "Copyright (c) 1988, 1989, 1990, 1991 Sun Microsystems\n"
+	    "All Rights Reserved\n",
+	    un.release, un.machine, un.nodename);
+#else
+	(void) printf("UNIX System V Release %s AT&T %s\n%s\n"
+	    "Copyright (c) 1984, 1986, 1987, 1988 AT&T\nAll Rights Reserved\n",
+	    un.release, un.machine, un.nodename);
+#endif /* i386 */
+#endif /* DOBANNER */
+}
+
+/*
+ * display_last_login_time	- Advise the user the time and date
+ *				  that this login-id was last used.
+ */
+
+static void
+display_last_login_time(void)
+{
+	if (lastlogok) {
+		(void) printf("Last login: %.*s ", 24-5, ctime(&ll.ll_time));
+
+		if (*ll.ll_host != '\0')
+			(void) printf("from %.*s\n", sizeof (ll.ll_host),
+			    ll.ll_host);
+		else
+			(void) printf("on %.*s\n", sizeof (ll.ll_line),
+			    ll.ll_line);
+	}
 }
 
 /*
