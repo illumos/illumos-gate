@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright 2015, Joyent, Inc. All rights reserved.
+ * Copyright 2016, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -322,14 +322,21 @@ lx_proc_exit(proc_t *p)
 	lx_proc_data_t *lxpd;
 	proc_t *cp;
 	lx_zone_data_t *lxzdata;
+	vfs_t *cgrp;
 
 	/* cgroup integration */
 	lxzdata = ztolxzd(p->p_zone);
-	if (lxzdata->lxzd_cgroup != NULL) {
+	mutex_enter(&lxzdata->lxzd_lock);
+	cgrp = lxzdata->lxzd_cgroup;
+	if (cgrp != NULL) {
+		VFS_HOLD(cgrp);
+		mutex_exit(&lxzdata->lxzd_lock);
 		lx_lwp_data_t *lwpd = lwptolxlwp(ttolwp(curthread));
 		ASSERT(lx_cgrp_proc_exit != NULL);
-		(*lx_cgrp_proc_exit)(lxzdata->lxzd_cgroup,
-		    lwpd->br_cgroupid, p->p_pid);
+		(*lx_cgrp_proc_exit)(cgrp, lwpd->br_cgroupid, p->p_pid);
+		VFS_RELE(cgrp);
+	} else {
+		mutex_exit(&lxzdata->lxzd_lock);
 	}
 
 	mutex_enter(&p->p_lock);
@@ -382,8 +389,10 @@ lx_setattr(zone_t *zone, int attr, void *ubuf, size_t ubufsz)
 		if (copyin(ubuf, buf, ubufsz) != 0) {
 			return (EFAULT);
 		}
+		mutex_enter(&lxzd->lxzd_lock);
 		(void) strlcpy(lxzd->lxzd_kernel_release, buf,
 		    LX_KERN_RELEASE_MAX);
+		mutex_exit(&lxzd->lxzd_lock);
 		return (0);
 	}
 	case LX_ATTR_KERN_VERSION: {
@@ -395,8 +404,10 @@ lx_setattr(zone_t *zone, int attr, void *ubuf, size_t ubufsz)
 		if (copyin(ubuf, buf, ubufsz) != 0) {
 			return (EFAULT);
 		}
+		mutex_enter(&lxzd->lxzd_lock);
 		(void) strlcpy(lxzd->lxzd_kernel_version, buf,
 		    LX_KERN_VERSION_MAX);
+		mutex_exit(&lxzd->lxzd_lock);
 		return (0);
 	}
 	default:
@@ -413,26 +424,34 @@ lx_getattr(zone_t *zone, int attr, void *ubuf, size_t *ubufsz)
 
 	switch (attr) {
 	case LX_ATTR_KERN_RELEASE: {
+		mutex_enter(&lxzd->lxzd_lock);
 		len = strnlen(lxzd->lxzd_kernel_release, LX_KERN_RELEASE_MAX);
 		len++;
 		if (*ubufsz < len) {
+			mutex_exit(&lxzd->lxzd_lock);
 			return (ERANGE);
 		}
 		if (copyout(lxzd->lxzd_kernel_release, ubuf, len) != 0) {
+			mutex_exit(&lxzd->lxzd_lock);
 			return (EFAULT);
 		}
+		mutex_exit(&lxzd->lxzd_lock);
 		*ubufsz = len;
 		return (0);
 	}
 	case LX_ATTR_KERN_VERSION: {
+		mutex_enter(&lxzd->lxzd_lock);
 		len = strnlen(lxzd->lxzd_kernel_version, LX_KERN_VERSION_MAX);
 		len++;
 		if (*ubufsz < len) {
+			mutex_exit(&lxzd->lxzd_lock);
 			return (ERANGE);
 		}
 		if (copyout(lxzd->lxzd_kernel_version, ubuf, len) != 0) {
+			mutex_exit(&lxzd->lxzd_lock);
 			return (EFAULT);
 		}
+		mutex_exit(&lxzd->lxzd_lock);
 		*ubufsz = len;
 		return (0);
 	}
@@ -766,6 +785,11 @@ lx_init_brand_data(zone_t *zone)
 	ASSERT(zone->zone_brand == &lx_brand);
 	ASSERT(zone->zone_brand_data == NULL);
 	data = (lx_zone_data_t *)kmem_zalloc(sizeof (lx_zone_data_t), KM_SLEEP);
+
+	mutex_init(&data->lxzd_lock, NULL, MUTEX_DEFAULT, NULL);
+
+	/* No need to hold mutex now since zone_brand_data is not set yet. */
+
 	/*
 	 * Set the default lxzd_kernel_version to 2.4.
 	 * This can be changed by a call to setattr() during zone boot.
@@ -774,14 +798,6 @@ lx_init_brand_data(zone_t *zone)
 	    LX_KERN_RELEASE_MAX);
 	(void) strlcpy(data->lxzd_kernel_version, "BrandZ virtual linux",
 	    LX_KERN_VERSION_MAX);
-
-	/*
-	 * Linux is not at all picky about address family when it comes to
-	 * supporting interface-related ioctls.  To mimic this behavior, we'll
-	 * attempt those ioctls against a ksocket configured for that purpose.
-	 */
-	(void) ksocket_socket(&data->lxzd_ioctl_sock, AF_INET, SOCK_DGRAM, 0,
-	    0, zone->zone_kcred);
 
 	zone->zone_brand_data = data;
 
@@ -797,6 +813,7 @@ lx_free_brand_data(zone_t *zone)
 {
 	lx_zone_data_t *data = ztolxzd(zone);
 	ASSERT(data != NULL);
+	mutex_enter(&data->lxzd_lock);
 	if (data->lxzd_ioctl_sock != NULL) {
 		/*
 		 * Since zone_kcred has been cleaned up already, close the
@@ -805,7 +822,10 @@ lx_free_brand_data(zone_t *zone)
 		ksocket_close(data->lxzd_ioctl_sock, kcred);
 		data->lxzd_ioctl_sock = NULL;
 	}
+	ASSERT(data->lxzd_cgroup == NULL);
+	mutex_exit(&data->lxzd_lock);
 	zone->zone_brand_data = NULL;
+	mutex_destroy(&data->lxzd_lock);
 	kmem_free(data, sizeof (*data));
 }
 
@@ -1488,11 +1508,14 @@ lx_kern_release_cmp(zone_t *zone, const char *vers)
 	int zvers[3] = {0, 0, 0};
 	int cvers[3] = {0, 0, 0};
 	int i;
+	lx_zone_data_t *lxzd = (lx_zone_data_t *)zone->zone_brand_data;
 
 	VERIFY(zone->zone_brand == &lx_brand);
 
-	(void) sscanf(ztolxzd(zone)->lxzd_kernel_release, "%d.%d.%d", &zvers[0],
+	mutex_enter(&lxzd->lxzd_lock);
+	(void) sscanf(lxzd->lxzd_kernel_release, "%d.%d.%d", &zvers[0],
 	    &zvers[1], &zvers[2]);
+	mutex_exit(&lxzd->lxzd_lock);
 	(void) sscanf(vers, "%d.%d.%d", &cvers[0], &cvers[1], &cvers[2]);
 
 	for (i = 0; i < 3; i++) {

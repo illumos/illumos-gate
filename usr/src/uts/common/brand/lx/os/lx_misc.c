@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright (c) 2015, Joyent, Inc. All rights reserved.
+ * Copyright 2016, Joyent, Inc.
  */
 
 #include <sys/errno.h>
@@ -272,6 +272,7 @@ lx_freelwp(klwp_t *lwp)
 	struct lx_lwp_data *lwpd = lwptolxlwp(lwp);
 	proc_t *p = lwptoproc(lwp);
 	lx_zone_data_t *lxzdata;
+	vfs_t *cgrp;
 
 	VERIFY(MUTEX_NOT_HELD(&p->p_lock));
 
@@ -292,10 +293,17 @@ lx_freelwp(klwp_t *lwp)
 
 	/* cgroup integration */
 	lxzdata = ztolxzd(p->p_zone);
-	if (lxzdata->lxzd_cgroup != NULL) {
+	mutex_enter(&lxzdata->lxzd_lock);
+	cgrp = lxzdata->lxzd_cgroup;
+	if (cgrp != NULL) {
+		VFS_HOLD(cgrp);
+		mutex_exit(&lxzdata->lxzd_lock);
 		ASSERT(lx_cgrp_freelwp != NULL);
-		(*lx_cgrp_freelwp)(lxzdata->lxzd_cgroup,
-		    lwpd->br_cgroupid, lwptot(lwp)->t_tid, lwpd->br_pid);
+		(*lx_cgrp_freelwp)(cgrp, lwpd->br_cgroupid, lwptot(lwp)->t_tid,
+		    lwpd->br_pid);
+		VFS_RELE(cgrp);
+	} else {
+		mutex_exit(&lxzdata->lxzd_lock);
 	}
 
 	/*
@@ -391,6 +399,7 @@ lx_initlwp(klwp_t *lwp, void *lwpbd)
 	kthread_t *tp = lwptot(lwp);
 	proc_t *p = lwptoproc(lwp);
 	lx_zone_data_t *lxzdata;
+	vfs_t *cgrp;
 
 	VERIFY(MUTEX_HELD(&p->p_lock));
 	VERIFY(lwp->lwp_brand == NULL);
@@ -472,10 +481,17 @@ lx_initlwp(klwp_t *lwp, void *lwpbd)
 		lwpd->br_cgroupid = plwpd->br_cgroupid;
 	}
 	lxzdata = ztolxzd(p->p_zone);
-	if (lxzdata->lxzd_cgroup != NULL) {
+	mutex_enter(&lxzdata->lxzd_lock);
+	cgrp = lxzdata->lxzd_cgroup;
+	if (cgrp != NULL) {
+		VFS_HOLD(cgrp);
+		mutex_exit(&lxzdata->lxzd_lock);
 		ASSERT(lx_cgrp_initlwp != NULL);
-		(*lx_cgrp_initlwp)(lxzdata->lxzd_cgroup,
-		    lwpd->br_cgroupid, lwptot(lwp)->t_tid, lwpd->br_pid);
+		(*lx_cgrp_initlwp)(cgrp, lwpd->br_cgroupid, lwptot(lwp)->t_tid,
+		    lwpd->br_pid);
+		VFS_RELE(cgrp);
+	} else {
+		mutex_exit(&lxzdata->lxzd_lock);
 	}
 }
 
@@ -504,6 +520,7 @@ lx_forklwp(klwp_t *srclwp, klwp_t *dstlwp)
 	struct lx_lwp_data *src = srclwp->lwp_brand;
 	struct lx_lwp_data *dst = dstlwp->lwp_brand;
 	lx_zone_data_t *lxzdata;
+	vfs_t *cgrp;
 
 	dst->br_ppid = src->br_pid;
 	dst->br_ptid = lwptot(srclwp)->t_tid;
@@ -538,12 +555,18 @@ lx_forklwp(klwp_t *srclwp, klwp_t *dstlwp)
 
 	/* cgroup integration */
 	lxzdata = ztolxzd(srclwp->lwp_procp->p_zone);
-	if (lxzdata->lxzd_cgroup != NULL) {
+	mutex_enter(&lxzdata->lxzd_lock);
+	cgrp = lxzdata->lxzd_cgroup;
+	if (cgrp != NULL) {
+		VFS_HOLD(cgrp);
+		mutex_exit(&lxzdata->lxzd_lock);
 		ASSERT(lx_cgrp_forklwp != NULL);
-		(*lx_cgrp_forklwp)(lxzdata->lxzd_cgroup,
-		    dst->br_cgroupid, lwptoproc(dstlwp)->p_pid);
+		(*lx_cgrp_forklwp)(cgrp, dst->br_cgroupid,
+		    lwptoproc(dstlwp)->p_pid);
+		VFS_RELE(cgrp);
+	} else {
+		mutex_exit(&lxzdata->lxzd_lock);
 	}
-
 }
 
 /*
