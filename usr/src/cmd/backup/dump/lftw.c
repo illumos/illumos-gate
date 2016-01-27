@@ -26,8 +26,6 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* LINTLIBRARY */
 /*
  *	ftw - file tree walk
@@ -100,8 +98,6 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <ftw.h>
-
-#define	NULL 0
 
 static int pwdfd;
 

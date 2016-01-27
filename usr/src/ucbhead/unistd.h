@@ -40,9 +40,8 @@
 #ifndef _UNISTD_H
 #define	_UNISTD_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/fcntl.h>
+#include <sys/null.h>
 
 #ifdef __cplusplus
 extern "C" {

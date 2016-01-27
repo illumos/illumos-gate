@@ -30,6 +30,7 @@
  */
 
 #include <sys/types.h>
+#include <sys/null.h>
 #include <sys/varargs.h>
 
 #if defined(_KERNEL)
@@ -37,10 +38,6 @@
 #include <sys/debug.h>
 #elif !defined(_BOOT)
 #include <string.h>
-#endif
-
-#ifndef	NULL
-#define	NULL	0l
 #endif
 
 #include "memcpy.h"

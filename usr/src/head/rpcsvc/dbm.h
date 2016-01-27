@@ -20,6 +20,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014, 2016 PALO, Richard.
+ *
  * Copyright 1989 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -35,7 +37,8 @@
 #ifndef	_RPCSVC_DBM_H
 #define	_RPCSVC_DBM_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#include <sys/isa_defs.h>
+#include <sys/null.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -44,9 +47,6 @@ extern "C" {
 #define	PBLKSIZ	1024
 #define	DBLKSIZ	4096
 #define	BYTESIZ	8
-#ifndef NULL
-#define	NULL	((char *)0)
-#endif
 
 long	bitno;
 long	maxbno;
@@ -66,7 +66,6 @@ typedef	struct
 	int	dsize;
 } datum;
 
-#ifdef __STDC_
 datum	fetch(datum);
 datum	makdatum(char *, int);
 datum	firstkey(void);
@@ -74,15 +73,6 @@ datum	nextkey(datum);
 datum	firsthash(long);
 long	calchash(datum);
 long	hashinc(long);
-#else
-datum	fetch();
-datum	makdatum();
-datum	firstkey();
-datum	nextkey();
-datum	firsthash();
-long	calchash();
-long	hashinc();
-#endif
 
 #ifdef	__cplusplus
 }

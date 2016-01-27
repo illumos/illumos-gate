@@ -27,17 +27,10 @@
 #define	_SYS_SYSEVENT_H
 
 #include <sys/nvpair.h>
+#include <sys/null.h>
 
 #ifdef	__cplusplus
 extern "C" {
-#endif
-
-#ifndef	NULL
-#if defined(_LP64) && !defined(__cplusplus)
-#define	NULL    0L
-#else
-#define	NULL	0
-#endif
 #endif
 
 /* Internal registration class and subclass */

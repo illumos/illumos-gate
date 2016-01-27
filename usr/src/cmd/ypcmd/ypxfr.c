@@ -32,8 +32,6 @@
  * California.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This is a user command which gets a NIS data base from some running
  * server, and gets it to the local site by using the normal NIS client
@@ -72,7 +70,6 @@
  */
 
 #include <ndbm.h>
-#undef NULL
 #define	DATUM
 
 #include <stdio.h>
