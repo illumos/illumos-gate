@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
  */
@@ -876,7 +876,7 @@ nullfree(caddr_t resop)
 /* ARGSUSED */
 static void
 rfs4_op_inval(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
-	struct compound_state *cs)
+    struct compound_state *cs)
 {
 	*cs->statusp = *((nfsstat4 *)&(resop)->nfs_resop4_u) = NFS4ERR_INVAL;
 }
@@ -3218,12 +3218,6 @@ rfs4_op_read(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 			*cs->statusp = resp->status = NFS4ERR_LOCKED;
 			goto out;
 		}
-	}
-
-	if ((stat = rfs4_check_stateid(FREAD, vp, &args->stateid, FALSE,
-	    deleg, TRUE, &ct)) != NFS4_OK) {
-		*cs->statusp = resp->status = stat;
-		goto out;
 	}
 
 	if (args->wlist) {
@@ -8811,6 +8805,7 @@ rfs4_do_lock(rfs4_lo_state_t *lsp, nfs_lock_type4 locktype,
 	int error;
 	sysid_t sysid;
 	LOCK4res *lres;
+	vnode_t *vp;
 
 	if (rfs4_lease_expired(lo->rl_client)) {
 		return (NFS4ERR_EXPIRED);
@@ -8827,7 +8822,7 @@ rfs4_do_lock(rfs4_lo_state_t *lsp, nfs_lock_type4 locktype,
 
 retry:
 	rfs4_dbe_lock(sp->rs_dbe);
-	if (sp->rs_closed) {
+	if (sp->rs_closed == TRUE) {
 		rfs4_dbe_unlock(sp->rs_dbe);
 		return (NFS4ERR_OLD_STATEID);
 	}
@@ -8877,14 +8872,40 @@ retry:
 	 */
 	flag = (int)sp->rs_share_access | F_REMOTELOCK;
 
-	error = setlock(sp->rs_finfo->rf_vp, &flock, flag, cred);
+	vp = sp->rs_finfo->rf_vp;
+	VN_HOLD(vp);
+
+	/*
+	 * We need to unlock sp before we call the underlying filesystem to
+	 * acquire the file lock.
+	 */
+	rfs4_dbe_unlock(sp->rs_dbe);
+
+	error = setlock(vp, &flock, flag, cred);
+
+	/*
+	 * Make sure the file is still open.  In a case the file was closed in
+	 * the meantime, clean the lock we acquired using the setlock() call
+	 * above, and return the appropriate error.
+	 */
+	rfs4_dbe_lock(sp->rs_dbe);
+	if (sp->rs_closed == TRUE) {
+		cleanlocks(vp, lsp->rls_locker->rl_pid, sysid);
+		rfs4_dbe_unlock(sp->rs_dbe);
+
+		VN_RELE(vp);
+
+		return (NFS4ERR_OLD_STATEID);
+	}
+	rfs4_dbe_unlock(sp->rs_dbe);
+
+	VN_RELE(vp);
+
 	if (error == 0) {
 		rfs4_dbe_lock(lsp->rls_dbe);
 		next_stateid(&lsp->rls_lockid);
 		rfs4_dbe_unlock(lsp->rls_dbe);
 	}
-
-	rfs4_dbe_unlock(sp->rs_dbe);
 
 	/*
 	 * N.B. We map error values to nfsv4 errors. This is differrent
