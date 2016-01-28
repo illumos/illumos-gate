@@ -10,6 +10,9 @@ To build
 As root first make sure you have the tools installed:
     apt-get install build-essential autoconf automake git quota
 
+Additional prerequisites are required activate some tests:
+    apt-get install attr-dev libaio-dev
+
 As a normal user:
     git clone https://github.com/linux-test-project/ltp.git
     cd ltp
@@ -53,7 +56,7 @@ should show "Total Failures: 0". If not, something is wrong.
 Running tests for development
 -----------------------------
 The source for the tests can be found under the testcases directory. The
-largest and most useful set for lx live under testcases/kernel/syscalls. 
+largest and most useful set for lx live under testcases/kernel/syscalls.
 
 For development purposes, an individual test (or tests) can be run by listing
 them in a command file, one per line. For example, with a command file named
@@ -186,7 +189,7 @@ x mremap02
 x mremap03
 x mremap04
 x mremap05
-# msgctl12	uses MSG_STAT   
+# msgctl12	uses MSG_STAT
 # msgrcv07	MSG_EXCEPT subtest - not avail.
 x open01	need PRIV_SYS_CONFIG to set sticky bit on reg file
 # open02	expects NOATIME to cause err for unpriv user
@@ -209,7 +212,7 @@ x ptrace04	not supp on our arch
 - renameat01	needs dev
 - rmdir02	needs dev
 x sched_getparam01	assumes Linux SCHED_OTHER return value
-x sched_getparam02	assumes Linux SCHED_OTHER return value 
+x sched_getparam02	assumes Linux SCHED_OTHER return value
 # sched_rr_get_interval01
 # sched_rr_get_interval02
 # sched_rr_get_interval03
@@ -222,7 +225,7 @@ x sched_setaffinity01
 x sched_getaffinity01
 # semctl01	all pass but SEM_STAT - linux specific
 # semop02	last test fails errno - expensive
-# sendfile02	OS-3296  
+# sendfile02	OS-3296
 # sendfile02_64	"
 # sendfile04	"
 # sendfile04_64	"
@@ -230,10 +233,10 @@ x sched_getaffinity01
 # sendfile06_64	"
 # sendfile07	"
 # sendfile07_64	"
-sendmsg01	OS-3295 - tests actually pass 
+sendmsg01	OS-3295 - tests actually pass
 x setfsuid04	no real equiv. and only for NFS server
 x setfsuid04_16
-# sgetmask01	obsolete   
+# sgetmask01	obsolete
 # setgroups04_16	expects sig11 for certain err
 # setns01
 # setns02
@@ -258,7 +261,7 @@ x switch01
 # sysconf01	most pass but see OS-3305
 # sysctl01	the build compiled this out,
 # sysctl03	this syscall is basically obsolete
-# sysctl04	obsolete 
+# sysctl04	obsolete
 # sysctl05
 # syslog01
 # syslog02
@@ -277,7 +280,7 @@ x switch01
 - umount01	needs dev
 - umount02	needs dev
 - umount03	needs dev
-x ustat01	obsolete call to stat FS   
+x ustat01	obsolete call to stat FS
 x ustat02	obsolete call to stat FS
 - utime06	needs dev
 - utimes01	needs dev
