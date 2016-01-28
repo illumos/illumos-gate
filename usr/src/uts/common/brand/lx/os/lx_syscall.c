@@ -842,18 +842,18 @@ lx_sysent_t lx_sysent32[] = {
 	{"security",	NULL,			NOSYS_NO_EQUIV,	0}, /* 223 */
 	{"gettid",	lx_gettid,		0,		0}, /* 224 */
 	{"readahead",	NULL,			NOSYS_NO_EQUIV,	0}, /* 225 */
-	{"setxattr",	lx_xattr,		0,		5}, /* 226 */
-	{"lsetxattr",	lx_xattr,		0,		5}, /* 227 */
-	{"fsetxattr",	lx_xattr,		0,		5}, /* 228 */
-	{"getxattr",	lx_xattr,		0,		4}, /* 229 */
-	{"lgetxattr",	lx_xattr,		0,		4}, /* 230 */
-	{"fgetxattr",	lx_xattr,		0,		4}, /* 231 */
-	{"listxattr",	lx_xattr,		0,		3}, /* 232 */
-	{"llistxattr",	lx_xattr,		0,		3}, /* 233 */
-	{"flistxattr",	lx_xattr,		0,		3}, /* 234 */
-	{"removexattr",	lx_xattr,		0,		2}, /* 235 */
-	{"lremovexattr", lx_xattr,		0,		2}, /* 236 */
-	{"fremovexattr", lx_xattr,		0,		2}, /* 237 */
+	{"setxattr",	lx_setxattr,		0,		5}, /* 226 */
+	{"lsetxattr",	lx_lsetxattr,		0,		5}, /* 227 */
+	{"fsetxattr",	lx_fsetxattr,		0,		5}, /* 228 */
+	{"getxattr",	lx_getxattr,		0,		4}, /* 229 */
+	{"lgetxattr",	lx_lgetxattr,		0,		4}, /* 230 */
+	{"fgetxattr",	lx_fgetxattr,		0,		4}, /* 231 */
+	{"listxattr",	lx_listxattr,		0,		3}, /* 232 */
+	{"llistxattr",	lx_llistxattr,		0,		3}, /* 233 */
+	{"flistxattr",	lx_flistxattr,		0,		3}, /* 234 */
+	{"removexattr",	lx_removexattr,		0,		2}, /* 235 */
+	{"lremovexattr", lx_lremovexattr,	0,		2}, /* 236 */
+	{"fremovexattr", lx_fremovexattr,	0,		2}, /* 237 */
 	{"tkill",	lx_tkill,		0,		2}, /* 238 */
 	{"sendfile64",	NULL,			0,		4}, /* 239 */
 	{"futex",	lx_futex,		LX_SYS_EBPARG6,	6}, /* 240 */
@@ -1175,18 +1175,18 @@ lx_sysent_t lx_sysent64[] = {
 	{"security",	NULL,			NOSYS_NO_EQUIV,	0}, /* 185 */
 	{"gettid",	lx_gettid,		0,		0}, /* 186 */
 	{"readahead",	NULL,			NOSYS_NO_EQUIV,	0}, /* 187 */
-	{"setxattr",	lx_xattr,		0,		5}, /* 188 */
-	{"lsetxattr",	lx_xattr,		0,		5}, /* 189 */
-	{"fsetxattr",	lx_xattr,		0,		5}, /* 190 */
-	{"getxattr",	lx_xattr,		0,		4}, /* 191 */
-	{"lgetxattr",	lx_xattr,		0,		4}, /* 192 */
-	{"fgetxattr",	lx_xattr,		0,		4}, /* 193 */
-	{"listxattr",	lx_xattr,		0,		3}, /* 194 */
-	{"llistxattr",	lx_xattr,		0,		3}, /* 195 */
-	{"flistxattr",	lx_xattr,		0,		3}, /* 196 */
-	{"removexattr",	lx_xattr,		0,		2}, /* 197 */
-	{"lremovexattr", lx_xattr,		0,		2}, /* 198 */
-	{"fremovexattr", lx_xattr,		0,		2}, /* 199 */
+	{"setxattr",	lx_setxattr,		0,		5}, /* 188 */
+	{"lsetxattr",	lx_lsetxattr,		0,		5}, /* 189 */
+	{"fsetxattr",	lx_fsetxattr,		0,		5}, /* 190 */
+	{"getxattr",	lx_getxattr,		0,		4}, /* 191 */
+	{"lgetxattr",	lx_lgetxattr,		0,		4}, /* 192 */
+	{"fgetxattr",	lx_fgetxattr,		0,		4}, /* 193 */
+	{"listxattr",	lx_listxattr,		0,		3}, /* 194 */
+	{"llistxattr",	lx_llistxattr,		0,		3}, /* 195 */
+	{"flistxattr",	lx_flistxattr,		0,		3}, /* 196 */
+	{"removexattr",	lx_removexattr,		0,		2}, /* 197 */
+	{"lremovexattr", lx_lremovexattr,	0,		2}, /* 198 */
+	{"fremovexattr", lx_fremovexattr,	0,		2}, /* 199 */
 	{"tkill",	lx_tkill,		0,		2}, /* 200 */
 	{"time",	lx_time,		0,		1}, /* 201 */
 	{"futex",	lx_futex,		0,		6}, /* 202 */
