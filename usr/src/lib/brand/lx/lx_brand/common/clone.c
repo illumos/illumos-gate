@@ -22,7 +22,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2015 Joyent, Inc.  All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include <assert.h>
@@ -118,7 +118,6 @@ lx_exit(uintptr_t p1)
 	 * cleanly as possible to avoid corrupting our parent.
 	 */
 	if (lx_is_vforked != 0) {
-		lx_is_vforked--;
 		_exit(status);
 	}
 
@@ -156,7 +155,6 @@ lx_group_exit(uintptr_t p1)
 	 * cleanly as possible to avoid corrupting our parent.
 	 */
 	if (lx_is_vforked != 0) {
-		lx_is_vforked--;
 		_exit(status);
 	}
 
@@ -306,8 +304,7 @@ ptrace_clone_event(int flags)
  * to the clone syscall (CONFIG_CLONE_BACKWARDS, et al).
  */
 long
-lx_clone(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
-	uintptr_t p5)
+lx_clone(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4, uintptr_t p5)
 {
 	struct clone_state *cs;
 	int flags = (int)p1;
