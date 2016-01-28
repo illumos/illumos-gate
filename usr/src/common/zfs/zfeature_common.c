@@ -188,8 +188,10 @@ zpool_feature_init(void)
 	    "Record txg at which a feature is enabled",
 	    ZFEATURE_FLAG_READONLY_COMPAT, NULL);
 
-	static spa_feature_t hole_birth_deps[] = { SPA_FEATURE_ENABLED_TXG,
-	    SPA_FEATURE_NONE };
+	static spa_feature_t hole_birth_deps[] = {
+		SPA_FEATURE_ENABLED_TXG,
+		SPA_FEATURE_NONE
+	};
 	zfeature_register(SPA_FEATURE_HOLE_BIRTH,
 	    "com.delphix:hole_birth", "hole_birth",
 	    "Retain hole birth txg for more precise zfs send",
@@ -211,8 +213,8 @@ zpool_feature_init(void)
 	    ZFEATURE_FLAG_READONLY_COMPAT, bookmarks_deps);
 
 	static const spa_feature_t filesystem_limits_deps[] = {
-	    SPA_FEATURE_EXTENSIBLE_DATASET,
-	    SPA_FEATURE_NONE
+		SPA_FEATURE_EXTENSIBLE_DATASET,
+		SPA_FEATURE_NONE
 	};
 	zfeature_register(SPA_FEATURE_FS_SS_LIMIT,
 	    "com.joyent:filesystem_limits", "filesystem_limits",
