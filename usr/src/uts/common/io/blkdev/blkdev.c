@@ -22,7 +22,7 @@
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
  * Copyright 2012 Alexey Zaytsev <alexey.zaytsev@gmail.com> All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -420,7 +420,7 @@ bd_errstats_setstr(kstat_named_t *k, char *str, size_t len, char *alt)
 	if (KSTAT_NAMED_STR_PTR(k) == NULL) {
 		if (len > 0) {
 			tmp = kmem_alloc(len + 1, KM_SLEEP);
-			(void) strlcpy(tmp, str, len);
+			(void) strlcpy(tmp, str, len + 1);
 		} else {
 			tmp = alt;
 		}
