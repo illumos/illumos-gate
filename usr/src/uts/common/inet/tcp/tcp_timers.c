@@ -23,7 +23,7 @@
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2011 Joyent, Inc.  All rights reserved.
- * Copyright (c) 2014 by Delphix. All rights reserved.
+ * Copyright (c) 2014, 2016 by Delphix. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -751,15 +751,14 @@ tcp_timer(void *arg)
 	case TCPS_LAST_ACK:
 		/* If we have data to rexmit */
 		if (tcp->tcp_suna != tcp->tcp_snxt) {
-			clock_t	time_to_wait;
+			clock_t time_to_wait;
 
 			TCPS_BUMP_MIB(tcps, tcpTimRetrans);
 			if (!tcp->tcp_xmit_head)
 				break;
-			time_to_wait = ddi_get_lbolt() -
-			    (clock_t)tcp->tcp_xmit_head->b_prev;
-			time_to_wait = tcp->tcp_rto -
-			    TICK_TO_MSEC(time_to_wait);
+			time_to_wait = NSEC2MSEC(gethrtime() -
+			    (hrtime_t)(intptr_t)tcp->tcp_xmit_head->b_prev);
+			time_to_wait = tcp->tcp_rto - time_to_wait;
 			/*
 			 * If the timer fires too early, 1 clock tick earlier,
 			 * restart the timer.
@@ -1012,8 +1011,8 @@ tcp_timer(void *arg)
 		 * window probe.
 		 */
 		if (tcp->tcp_rtt_sa != 0 && tcp->tcp_zero_win_probe == 0) {
-			tcp->tcp_rtt_sd += (tcp->tcp_rtt_sa >> 3) +
-			    (tcp->tcp_rtt_sa >> 5);
+			tcp->tcp_rtt_sd += tcp->tcp_rtt_sa >> 3 +
+			    tcp->tcp_rtt_sa >> 5;
 			tcp->tcp_rtt_sa = 0;
 			tcp_ip_notify(tcp);
 			tcp->tcp_rtt_update = 0;
@@ -1022,24 +1021,14 @@ tcp_timer(void *arg)
 
 timer_rexmit:
 	tcp->tcp_timer_backoff++;
-	if ((ms = (tcp->tcp_rtt_sa >> 3) + tcp->tcp_rtt_sd +
-	    tcps->tcps_rexmit_interval_extra + (tcp->tcp_rtt_sa >> 5)) <
-	    tcp->tcp_rto_min) {
-		/*
-		 * This means the original RTO is tcp_rexmit_interval_min.
-		 * So we will use tcp_rexmit_interval_min as the RTO value
-		 * and do the backoff.
-		 */
-		ms = tcp->tcp_rto_min << tcp->tcp_timer_backoff;
-	} else {
-		ms <<= tcp->tcp_timer_backoff;
-	}
+	/*
+	 * Calculate the backed off retransmission timeout. If the shift brings
+	 * us back over the max, then we repin the value, and decrement the
+	 * backoff to avoid overflow.
+	 */
+	ms = tcp_calculate_rto(tcp, tcps, 0) << tcp->tcp_timer_backoff;
 	if (ms > tcp->tcp_rto_max) {
 		ms = tcp->tcp_rto_max;
-		/*
-		 * ms is at max, decrement tcp_timer_backoff to avoid
-		 * overflow.
-		 */
 		tcp->tcp_timer_backoff--;
 	}
 	tcp->tcp_ms_we_have_waited += ms;
@@ -1059,8 +1048,9 @@ timer_rexmit:
 	if (mss > tcp->tcp_swnd && tcp->tcp_swnd != 0)
 		mss = tcp->tcp_swnd;
 
-	if ((mp = tcp->tcp_xmit_head) != NULL)
-		mp->b_prev = (mblk_t *)ddi_get_lbolt();
+	if ((mp = tcp->tcp_xmit_head) != NULL) {
+		mp->b_prev = (mblk_t *)(intptr_t)gethrtime();
+	}
 	mp = tcp_xmit_mp(tcp, mp, mss, NULL, NULL, tcp->tcp_suna, B_TRUE, &mss,
 	    B_TRUE);
 

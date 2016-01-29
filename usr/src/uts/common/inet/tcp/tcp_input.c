@@ -22,8 +22,8 @@
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
- * Copyright 2016 Joyent, Inc.
- * Copyright (c) 2014 by Delphix. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
+ * Copyright (c) 2014, 2016 by Delphix. All rights reserved.
  */
 
 /* This file contains all TCP input processing functions. */
@@ -166,7 +166,7 @@ static void	tcp_process_options(tcp_t *, tcpha_t *);
 static mblk_t	*tcp_reass(tcp_t *, mblk_t *, uint32_t);
 static void	tcp_reass_elim_overlap(tcp_t *, mblk_t *);
 static void	tcp_rsrv_input(void *, mblk_t *, void *, ip_recv_attr_t *);
-static void	tcp_set_rto(tcp_t *, time_t);
+static void	tcp_set_rto(tcp_t *, hrtime_t);
 static void	tcp_setcred_data(mblk_t *, ip_recv_attr_t *);
 
 /*
@@ -3362,7 +3362,7 @@ ok:;
 	 * and TCP_OLD_URP_INTERPRETATION is set. This implies that the urgent
 	 * byte was at seg_seq - 1, in which case we ignore the urgent flag.
 	 */
-	if (flags & TH_URG && urp >= 0) {
+	if ((flags & TH_URG) && urp >= 0) {
 		if (!tcp->tcp_urp_last_valid ||
 		    SEQ_GT(urp + seg_seq, tcp->tcp_urp_last)) {
 			/*
@@ -4304,36 +4304,29 @@ process_ack:
 	    SEQ_GT(seg_ack, tcp->tcp_urg))
 		tcp->tcp_valid_bits &= ~TCP_URG_VALID;
 
-	/* Can we update the RTT estimates? */
-	if (tcp->tcp_snd_ts_ok) {
-		/* Ignore zero timestamp echo-reply. */
-		if (tcpopt.tcp_opt_ts_ecr != 0) {
-			tcp_set_rto(tcp, (int32_t)LBOLT_FASTPATH -
-			    (int32_t)tcpopt.tcp_opt_ts_ecr);
-		}
-
-		/* If needed, restart the timer. */
-		if (tcp->tcp_set_timer == 1) {
-			TCP_TIMER_RESTART(tcp, tcp->tcp_rto);
-			tcp->tcp_set_timer = 0;
-		}
-		/*
-		 * Update tcp_csuna in case the other side stops sending
-		 * us timestamps.
-		 */
-		tcp->tcp_csuna = tcp->tcp_snxt;
-	} else if (SEQ_GT(seg_ack, tcp->tcp_csuna)) {
+	/*
+	 * Update the RTT estimates. Note that we don't use the TCP
+	 * timestamp option to calculate RTT even if one is present. This is
+	 * because the timestamp option's resolution (CPU tick) is
+	 * too coarse to measure modern datacenter networks' microsecond
+	 * latencies. The timestamp field's resolution is limited by its
+	 * 4-byte width (see RFC1323), and since we always store a
+	 * high-resolution nanosecond presision timestamp along with the data,
+	 * there is no point to ever using the timestamp option.
+	 */
+	if (SEQ_GT(seg_ack, tcp->tcp_csuna)) {
 		/*
 		 * An ACK sequence we haven't seen before, so get the RTT
 		 * and update the RTO. But first check if the timestamp is
 		 * valid to use.
 		 */
 		if ((mp1->b_next != NULL) &&
-		    SEQ_GT(seg_ack, (uint32_t)(uintptr_t)(mp1->b_next)))
-			tcp_set_rto(tcp, (int32_t)LBOLT_FASTPATH -
-			    (int32_t)(intptr_t)mp1->b_prev);
-		else
+		    SEQ_GT(seg_ack, (uint32_t)(uintptr_t)(mp1->b_next))) {
+			tcp_set_rto(tcp, gethrtime() -
+			    (hrtime_t)(intptr_t)mp1->b_prev);
+		} else {
 			TCPS_BUMP_MIB(tcps, tcpRttNoUpdate);
+		}
 
 		/* Remeber the last sequence to be ACKed */
 		tcp->tcp_csuna = seg_ack;
@@ -4362,7 +4355,7 @@ process_ack:
 			if (SEQ_GT(seg_ack,
 			    (uint32_t)(uintptr_t)(mp1->b_next))) {
 				mp1->b_prev =
-				    (mblk_t *)(uintptr_t)LBOLT_FASTPATH;
+				    (mblk_t *)(intptr_t)gethrtime();
 				mp1->b_next = NULL;
 			}
 			break;
@@ -4839,7 +4832,7 @@ xmit_check:
 
 			if (mp1 != NULL) {
 				tcp->tcp_xmit_head->b_prev =
-				    (mblk_t *)LBOLT_FASTPATH;
+				    (mblk_t *)(intptr_t)gethrtime();
 				tcp->tcp_csuna = tcp->tcp_snxt;
 				TCPS_BUMP_MIB(tcps, tcpRetransSegs);
 				TCPS_UPDATE_MIB(tcps, tcpRetransBytes,
@@ -4873,9 +4866,10 @@ xmit_check:
 			 * timer is used to avoid a timeout before the
 			 * limited transmitted segment's ACK gets back.
 			 */
-			if (tcp->tcp_xmit_head != NULL)
+			if (tcp->tcp_xmit_head != NULL) {
 				tcp->tcp_xmit_head->b_prev =
-				    (mblk_t *)LBOLT_FASTPATH;
+				    (mblk_t *)(intptr_t)gethrtime();
+			}
 		}
 
 		/* Anything more to do? */
@@ -5211,26 +5205,26 @@ tcp_input_add_ancillary(tcp_t *tcp, mblk_t *mp, ip_pkt_t *ipp,
 	return (mp);
 }
 
-/* The minimum of smoothed mean deviation in RTO calculation. */
-#define	TCP_SD_MIN	400
+/* The minimum of smoothed mean deviation in RTO calculation (nsec). */
+#define	TCP_SD_MIN	400000000
 
 /*
- * Set RTO for this connection.  The formula is from Jacobson and Karels'
- * "Congestion Avoidance and Control" in SIGCOMM '88.  The variable names
- * are the same as those in Appendix A.2 of that paper.
+ * Set RTO for this connection based on a new round-trip time measurement.
+ * The formula is from Jacobson and Karels' "Congestion Avoidance and Control"
+ * in SIGCOMM '88.  The variable names are the same as those in Appendix A.2
+ * of that paper.
  *
  * m = new measurement
  * sa = smoothed RTT average (8 * average estimates).
  * sv = smoothed mean deviation (mdev) of RTT (4 * deviation estimates).
  */
 static void
-tcp_set_rto(tcp_t *tcp, clock_t rtt)
+tcp_set_rto(tcp_t *tcp, hrtime_t rtt)
 {
-	long m = TICK_TO_MSEC(rtt);
-	clock_t sa = tcp->tcp_rtt_sa;
-	clock_t sv = tcp->tcp_rtt_sd;
-	clock_t rto;
-	tcp_stack_t	*tcps = tcp->tcp_tcps;
+	hrtime_t m = rtt;
+	hrtime_t sa = tcp->tcp_rtt_sa;
+	hrtime_t sv = tcp->tcp_rtt_sd;
+	tcp_stack_t *tcps = tcp->tcp_tcps;
 
 	TCPS_BUMP_MIB(tcps, tcpRttUpdate);
 	tcp->tcp_rtt_update++;
@@ -5238,11 +5232,24 @@ tcp_set_rto(tcp_t *tcp, clock_t rtt)
 	/* tcp_rtt_sa is not 0 means this is a new sample. */
 	if (sa != 0) {
 		/*
-		 * Update average estimator:
-		 *	new rtt = 7/8 old rtt + 1/8 Error
+		 * Update average estimator (see section 2.3 of RFC6298):
+		 *	SRTT = 7/8 SRTT + 1/8 rtt
+		 *
+		 * We maintain tcp_rtt_sa as 8 * SRTT, so this reduces to:
+		 *	tcp_rtt_sa = 7 * SRTT + rtt
+		 *	tcp_rtt_sa = 7 * (tcp_rtt_sa / 8) + rtt
+		 *	tcp_rtt_sa = tcp_rtt_sa - (tcp_rtt_sa / 8) + rtt
+		 *	tcp_rtt_sa = tcp_rtt_sa + (rtt - (tcp_rtt_sa / 8))
+		 *	tcp_rtt_sa = tcp_rtt_sa + (rtt - (tcp_rtt_sa / 2^3))
+		 *	tcp_rtt_sa = tcp_rtt_sa + (rtt - (tcp_rtt_sa >> 3))
+		 *
+		 * (rtt - tcp_rtt_sa / 8) is simply the difference
+		 * between the new rtt measurement and the existing smoothed
+		 * RTT average. This is referred to as "Error" in subsequent
+		 * calculations.
 		 */
 
-		/* m is now Error in estimate. */
+		/* m is now Error. */
 		m -= sa >> 3;
 		if ((sa += m) <= 0) {
 			/*
@@ -5255,7 +5262,13 @@ tcp_set_rto(tcp_t *tcp, clock_t rtt)
 
 		/*
 		 * Update deviation estimator:
-		 *	new mdev = 3/4 old mdev + 1/4 (abs(Error) - old mdev)
+		 *  mdev = 3/4 mdev + 1/4 abs(Error)
+		 *
+		 * We maintain tcp_rtt_sd as 4 * mdev, so this reduces to:
+		 *  tcp_rtt_sd = 3 * mdev + abs(Error)
+		 *  tcp_rtt_sd = tcp_rtt_sd - (tcp_rtt_sd / 4) + abs(Error)
+		 *  tcp_rtt_sd = tcp_rtt_sd - (tcp_rtt_sd / 2^2) + abs(Error)
+		 *  tcp_rtt_sd = tcp_rtt_sd - (tcp_rtt_sd >> 2) + abs(Error)
 		 */
 		if (m < 0)
 			m = -m;
@@ -5275,33 +5288,21 @@ tcp_set_rto(tcp_t *tcp, clock_t rtt)
 	}
 	if (sv < TCP_SD_MIN) {
 		/*
-		 * We do not know that if sa captures the delay ACK
-		 * effect as in a long train of segments, a receiver
-		 * does not delay its ACKs.  So set the minimum of sv
-		 * to be TCP_SD_MIN, which is default to 400 ms, twice
-		 * of BSD DATO.  That means the minimum of mean
+		 * Since a receiver doesn't delay its ACKs during a long run of
+		 * segments, sa may not have captured the effect of delayed ACK
+		 * timeouts on the RTT.  To make sure we always account for the
+		 * possible delay (and avoid the unnecessary retransmission),
+		 * TCP_SD_MIN is set to 400ms, twice the delayed ACK timeout of
+		 * 200ms on older SunOS/BSD systems and modern Windows systems
+		 * (as of 2019).  This means that the minimum possible mean
 		 * deviation is 100 ms.
-		 *
 		 */
 		sv = TCP_SD_MIN;
 	}
 	tcp->tcp_rtt_sa = sa;
 	tcp->tcp_rtt_sd = sv;
-	/*
-	 * RTO = average estimates (sa / 8) + 4 * deviation estimates (sv)
-	 *
-	 * Add tcp_rexmit_interval extra in case of extreme environment
-	 * where the algorithm fails to work.  The default value of
-	 * tcp_rexmit_interval_extra should be 0.
-	 *
-	 * As we use a finer grained clock than BSD and update
-	 * RTO for every ACKs, add in another .25 of RTT to the
-	 * deviation of RTO to accomodate burstiness of 1/4 of
-	 * window size.
-	 */
-	rto = (sa >> 3) + sv + tcps->tcps_rexmit_interval_extra + (sa >> 5);
 
-	TCP_SET_RTO(tcp, rto);
+	tcp->tcp_rto = tcp_calculate_rto(tcp, tcps, 0);
 
 	/* Now, we can reset tcp_timer_backoff to use the new RTO... */
 	tcp->tcp_timer_backoff = 0;

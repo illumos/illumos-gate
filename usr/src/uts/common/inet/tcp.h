@@ -22,7 +22,7 @@
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011, Joyent, Inc. All rights reserved.
  * Copyright (c) 2011 Nexenta Systems, Inc. All rights reserved.
- * Copyright (c) 2014 by Delphix. All rights reserved.
+ * Copyright (c) 2014, 2016 by Delphix. All rights reserved.
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -282,9 +282,9 @@ typedef struct tcp_s {
 	uint32_t tcp_cwnd_max;
 	uint32_t tcp_csuna;		/* Clear (no rexmits in window) suna */
 
-	clock_t	tcp_rtt_sa;		/* Round trip smoothed average */
-	clock_t	tcp_rtt_sd;		/* Round trip smoothed deviation */
-	clock_t	tcp_rtt_update;		/* Round trip update(s) */
+	hrtime_t tcp_rtt_sa;		/* Round trip smoothed average */
+	hrtime_t tcp_rtt_sd;		/* Round trip smoothed deviation */
+	uint32_t tcp_rtt_update;	/* Round trip update(s) */
 	clock_t tcp_ms_we_have_waited;	/* Total retrans time */
 
 	uint32_t tcp_swl1;		/* These help us avoid using stale */

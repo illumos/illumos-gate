@@ -23,7 +23,7 @@
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011, Joyent Inc. All rights reserved.
  * Copyright (c) 2011 Nexenta Systems, Inc. All rights reserved.
- * Copyright (c) 2013,2014 by Delphix. All rights reserved.
+ * Copyright (c) 2013, 2016 by Delphix. All rights reserved.
  * Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -266,8 +266,6 @@ typedef struct tcpt_s {
 /*
  * Functions called directly via squeue having a prototype of edesc_t.
  */
-void		tcp_input_listener(void *arg, mblk_t *mp, void *arg2,
-    ip_recv_attr_t *ira);
 void		tcp_input_data(void *arg, mblk_t *mp, void *arg2,
     ip_recv_attr_t *ira);
 static void	tcp_linger_interrupted(void *arg, mblk_t *mp, void *arg2,
@@ -640,15 +638,9 @@ tcp_set_destination(tcp_t *tcp)
 	tcp->tcp_localnet = uinfo.iulp_localnet;
 
 	if (uinfo.iulp_rtt != 0) {
-		clock_t	rto;
-
-		tcp->tcp_rtt_sa = uinfo.iulp_rtt;
-		tcp->tcp_rtt_sd = uinfo.iulp_rtt_sd;
-		rto = (tcp->tcp_rtt_sa >> 3) + tcp->tcp_rtt_sd +
-		    tcps->tcps_rexmit_interval_extra +
-		    (tcp->tcp_rtt_sa >> 5);
-
-		TCP_SET_RTO(tcp, rto);
+		tcp->tcp_rtt_sa = MSEC2NSEC(uinfo.iulp_rtt);
+		tcp->tcp_rtt_sd = MSEC2NSEC(uinfo.iulp_rtt_sd);
+		tcp->tcp_rto = tcp_calculate_rto(tcp, tcps, 0);
 	}
 	if (uinfo.iulp_ssthresh != 0)
 		tcp->tcp_cwnd_ssthresh = uinfo.iulp_ssthresh;
@@ -2334,7 +2326,6 @@ tcp_init_values(tcp_t *tcp, tcp_t *parent)
 {
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
 	conn_t		*connp = tcp->tcp_connp;
-	clock_t		rto;
 
 	ASSERT((connp->conn_family == AF_INET &&
 	    connp->conn_ipversion == IPV4_VERSION) ||
@@ -2403,12 +2394,10 @@ tcp_init_values(tcp_t *tcp, tcp_t *parent)
 	 * during first few transmissions of a connection as seen in slow
 	 * links.
 	 */
-	tcp->tcp_rtt_sa = tcp->tcp_rto_initial << 2;
-	tcp->tcp_rtt_sd = tcp->tcp_rto_initial >> 1;
-	rto = (tcp->tcp_rtt_sa >> 3) + tcp->tcp_rtt_sd +
-	    tcps->tcps_rexmit_interval_extra + (tcp->tcp_rtt_sa >> 5) +
-	    tcps->tcps_conn_grace_period;
-	TCP_SET_RTO(tcp, rto);
+	tcp->tcp_rtt_sa = MSEC2NSEC(tcp->tcp_rto_initial) << 2;
+	tcp->tcp_rtt_sd = MSEC2NSEC(tcp->tcp_rto_initial) >> 1;
+	tcp->tcp_rto = tcp_calculate_rto(tcp, tcps,
+	    tcps->tcps_conn_grace_period);
 
 	tcp->tcp_timer_backoff = 0;
 	tcp->tcp_ms_we_have_waited = 0;
