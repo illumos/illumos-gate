@@ -68,7 +68,7 @@ static struct pam_conv conv = {
 	(int (*)())do_pam_conversation,
 	NULL
 };
-static char *__pam_msg = NULL;
+char *__pam_msg = NULL;
 
 static
 char *

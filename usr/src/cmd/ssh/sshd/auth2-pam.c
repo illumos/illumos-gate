@@ -48,6 +48,7 @@ static struct pam_conv conv2 = {
 	do_pam_conv_kbd_int,
 	NULL,
 };
+extern char *__pam_msg;
 
 static void do_pam_kbdint_cleanup(pam_handle_t *pamh);
 static void do_pam_kbdint(Authctxt *authctxt);
@@ -254,12 +255,12 @@ do_pam_conv_kbd_int(int num_msg, struct pam_message **msg,
 		case PAM_TEXT_INFO:
 			debug2("PAM text info prompt: %s",
 				PAM_MSG_MEMBER(msg, i, msg));
-			message_cat(&text, PAM_MSG_MEMBER(msg, i, msg));
+			message_cat(&__pam_msg, PAM_MSG_MEMBER(msg, i, msg));
 			break;
 		case PAM_ERROR_MSG:
 			debug2("PAM error prompt: %s",
 				PAM_MSG_MEMBER(msg, i, msg));
-			message_cat(&text, PAM_MSG_MEMBER(msg, i, msg));
+			message_cat(&__pam_msg, PAM_MSG_MEMBER(msg, i, msg));
 			break;
 		default:
 			/* Capture all these messages to be sent at once */
