@@ -1,4 +1,5 @@
 .\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
+.\" Copyright 2016 Joyent, Inc.
 .\" Redistribution and use in source and binary forms, with or without
 .\" modification, are permitted provided that the following conditions
 .\" are met:
@@ -20,7 +21,7 @@
 .\" (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 .\" THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 .\"
-.Dd "Aug 7, 2014"
+.Dd "Jan 29, 2016"
 .Dt IEEE802.3 5
 .Os
 .Sh NAME
@@ -73,6 +74,8 @@ Advertises 1000 Mbps full-duplex support.
 Advertises 1000 Mbps half-duplex support.
 .It Sy adv_cap_100fdx
 Advertises 100 Mbps full-duplex support.
+.It Sy adv_cap_100gfdx
+Advertises 100 Gbps support.
 .It Sy adv_cap_100hdx
 Advertises 100 Mbps half-duplex support.
 .It Sy adv_cap_100T4
@@ -83,6 +86,12 @@ Advertises 10 Mbps full-duplex support.
 Advertises 10 Gbps support.
 .It Sy adv_cap_10hdx
 Advertises 10 Mbps half-duplex support.
+.It Sy adv_cap_2500fdx
+Advertises 2.5 Gbps support.
+.It Sy adv_cap_40gfdx
+Advertises 40 Gbps support.
+.It Sy adv_cap_5000fdx
+Advertises 5 Gbps support.
 .It Sy adv_cap_autoneg
 Advertises auto-negotiation support.
 .It Sy adv_cap_asmpause
@@ -103,6 +112,8 @@ Device supports 1000 Mbps full-duplex.
 Device supports 1000 Mbps half-duplex.
 .It Sy cap_100fdx
 Device supports 100 Mbps full-duplex.
+.It Sy cap_100gfdx
+Device supports 100 Gbps.
 .It Sy cap_100hdx
 Device supports 100 Mbps half-duplex.
 .It Sy cap_100T4
@@ -113,6 +124,12 @@ Device supports 10 Mbps full-duplex.
 Device supports 10 Gpbs.
 .It Sy cap_10hdx
 Device supports 10 Mbps half-duplex.
+.It Sy cap_2500fdx
+Device supports 2.5 Gbps.
+.It Sy cap_40gfdx
+Device supports 40 Gpbs.
+.It Sy cap_5000fdx
+Device supports 5 Gbps.
 .It Sy cap_asmpause
 Device supports asymmetric flow control.
 .It Sy cap_autoneg
@@ -175,6 +192,8 @@ Peer supports 1000 Mbps full-duplex.
 Peer supports 1000 Mbps half-duplex.
 .It Sy lp_cap_100fdx
 Peer supports 100 Mbps full-duplex.
+.It Sy lp_cap_100gfdx
+Peer supports 100 Gbps full-duplex.
 .It Sy lp_cap_100hdx
 Peer supports 100 Mbps half-duplex.
 .It Sy lp_cap_100T4
@@ -185,6 +204,12 @@ Peer supports 10 Mbps full-duplex.
 Peer supports 10 Gbps.
 .It Sy lp_cap_10hdx
 Peer supports 10 Mbps half-duplex.
+.It Sy lp_cap_2500fdx
+Peer supports 2.5 Gbps.
+.It Sy lp_cap_5000fdx
+Peer supports 5 Gbps.
+.It Sy lp_cap_40gfdx
+Peer supports 40 Gbps.
 .It Sy lp_cap_asmpause
 Peer supports asymmetric flow control.
 .It Sy lp_cap_autoneg
