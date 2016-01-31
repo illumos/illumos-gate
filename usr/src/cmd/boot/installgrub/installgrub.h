@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc. All rights reserved.
  */
 
 #ifndef	_INSTALLGRUB_H
@@ -43,7 +43,7 @@ typedef struct _device_data {
 	int		disk_fd;
 	int		slice;
 	int		partition;
-	uint32_t	start_sector;
+	uint64_t	start_sector;
 	char		boot_sector[SECTOR_SIZE];
 } ig_device_t;
 

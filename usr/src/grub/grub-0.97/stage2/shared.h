@@ -667,8 +667,8 @@ extern int compressed_file;
 #endif
 
 /* instrumentation variables */
-extern void (*disk_read_hook) (unsigned int, int, int);
-extern void (*disk_read_func) (unsigned int, int, int);
+extern void (*disk_read_hook) (unsigned long long, int, int);
+extern void (*disk_read_func) (unsigned long long, int, int);
 
 #ifndef STAGE1_5
 /* The flag for debug mode.  */
@@ -708,14 +708,14 @@ struct geometry
   unsigned long flags;
 };
 
-extern unsigned long part_start;
-extern unsigned long part_length;
+extern unsigned long long part_start;
+extern unsigned long long part_length;
 
 extern int current_slice;
 
 extern int buf_drive;
-#define BUF_CACHE_INVALID 0xffffffff
-extern unsigned int buf_track;
+#define BUF_CACHE_INVALID (-1ULL)
+extern unsigned long long buf_track;
 extern struct geometry buf_geom;
 
 /* these are the current file position and maximum file position */
@@ -889,7 +889,7 @@ int checkkey (void);
 /* Low-level disk I/O */
 int get_diskinfo (int drive, struct geometry *geometry);
 int biosdisk (int subfunc, int drive, struct geometry *geometry,
-    unsigned int sector, int nsec, int segment);
+    unsigned long long sector, int nsec, int segment);
 void stop_floppy (void);
 
 /* Command-line interface functions. */
@@ -990,7 +990,7 @@ extern grub_jmp_buf restart_cmdline_env;
 /* misc */
 void init_page (void);
 void print_error (void);
-char *convert_to_ascii (char *buf, int c, ...);
+char *convert_to_ascii (char *buf, int c, unsigned long long num);
 int get_cmdline (char *prompt, char *cmdline, int maxlen,
 		 int echo_char, int history);
 int substring (const char *s1, const char *s2);
@@ -1006,11 +1006,11 @@ int gunzip_test_header (void);
 int gunzip_read (char *buf, int len);
 #endif /* NO_DECOMPRESSION */
 
-int rawread (int drive, unsigned int sector, int byte_offset, int byte_len,
+int rawread (int drive, unsigned long long sector, int byte_offset, int byte_len,
 	char *buf);
-int devread (unsigned int sector, int byte_offset, int byte_len, char *buf);
-int rawwrite (int drive, unsigned int sector, char *buf);
-int devwrite (unsigned int sector, int sector_len, char *buf);
+int devread (unsigned long long sector, int byte_offset, int byte_len, char *buf);
+int rawwrite (int drive, unsigned long long sector, char *buf);
+int devwrite (unsigned long long sector, int sector_len, char *buf);
 
 /* Parse a device string and initialize the global parameters. */
 char *set_device (char *device);
@@ -1019,10 +1019,10 @@ int real_open_partition (int flags);
 int open_partition (void);
 int next_partition (unsigned long drive, unsigned long dest,
 		    unsigned long *partition, int *type,
-		    unsigned long *start, unsigned long *len,
-		    unsigned long *offset, int *entry,
-                   unsigned long *ext_offset,
-                   unsigned long *gpt_offset, int *gpt_count,
+		    unsigned long long *start, unsigned long long *len,
+		    unsigned long long *offset, int *entry,
+                   unsigned long long *ext_offset,
+                   unsigned long long *gpt_offset, int *gpt_count,
                    int *gpt_size, char *buf);
 
 /* Sets device to the one represented by the SAVED_* parameters. */

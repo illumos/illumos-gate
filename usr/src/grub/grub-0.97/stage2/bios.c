@@ -17,6 +17,9 @@
  *  along with this program; if not, write to the Free Software
  *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
+/*
+ * Copyright 2016 Nexenta Systems, Inc.
+ */
 
 #include "shared.h"
 
@@ -47,7 +50,7 @@ extern int get_diskinfo_floppy (int drive,
    return the error number. Otherwise, return 0.  */
 int
 biosdisk (int read, int drive, struct geometry *geometry,
-	  unsigned int sector, int nsec, int segment)
+	  unsigned long long sector, int nsec, int segment)
 {
 
   int err;
