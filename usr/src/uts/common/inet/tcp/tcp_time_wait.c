@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2012, Joyent Inc. All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*
@@ -41,13 +41,13 @@
 #include <inet/tcp_impl.h>
 #include <inet/tcp_cluster.h>
 
-static void	tcp_timewait_close(void *, mblk_t *, void *, ip_recv_attr_t *);
+static void tcp_time_wait_purge(tcp_t *, tcp_squeue_priv_t *);
 
-/*
- * TCP_TIME_WAIT_DELAY governs how often the time_wait_collector runs.
- * Running it every 5 seconds seems to give the best results.
- */
-#define	TCP_TIME_WAIT_DELAY ((hrtime_t)5 * NANOSEC)
+#define	TW_BUCKET(t)					\
+	(((t) / MSEC_TO_TICK(TCP_TIME_WAIT_DELAY)) % TCP_TIME_WAIT_BUCKETS)
+
+#define	TW_BUCKET_NEXT(b)	(((b) + 1) % TCP_TIME_WAIT_BUCKETS)
+
 
 /*
  * Remove a connection from the list of detached TIME_WAIT connections.
@@ -56,17 +56,17 @@ static void	tcp_timewait_close(void *, mblk_t *, void *, ip_recv_attr_t *);
  * earlier call to tcp_time_wait_remove(); otherwise it returns B_TRUE.
  */
 boolean_t
-tcp_time_wait_remove(tcp_t *tcp, tcp_squeue_priv_t *tcp_time_wait)
+tcp_time_wait_remove(tcp_t *tcp, tcp_squeue_priv_t *tsp)
 {
 	boolean_t	locked = B_FALSE;
 
-	if (tcp_time_wait == NULL) {
-		tcp_time_wait = *((tcp_squeue_priv_t **)
+	if (tsp == NULL) {
+		tsp = *((tcp_squeue_priv_t **)
 		    squeue_getprivate(tcp->tcp_connp->conn_sqp, SQPRIVATE_TCP));
-		mutex_enter(&tcp_time_wait->tcp_time_wait_lock);
+		mutex_enter(&tsp->tcp_time_wait_lock);
 		locked = B_TRUE;
 	} else {
-		ASSERT(MUTEX_HELD(&tcp_time_wait->tcp_time_wait_lock));
+		ASSERT(MUTEX_HELD(&tsp->tcp_time_wait_lock));
 	}
 
 	/* 0 means that the tcp_t has not been added to the time wait list. */
@@ -74,40 +74,34 @@ tcp_time_wait_remove(tcp_t *tcp, tcp_squeue_priv_t *tcp_time_wait)
 		ASSERT(tcp->tcp_time_wait_next == NULL);
 		ASSERT(tcp->tcp_time_wait_prev == NULL);
 		if (locked)
-			mutex_exit(&tcp_time_wait->tcp_time_wait_lock);
+			mutex_exit(&tsp->tcp_time_wait_lock);
 		return (B_FALSE);
 	}
 	ASSERT(TCP_IS_DETACHED(tcp));
 	ASSERT(tcp->tcp_state == TCPS_TIME_WAIT);
+	ASSERT(tsp->tcp_time_wait_cnt > 0);
 
-	if (tcp == tcp_time_wait->tcp_time_wait_head) {
-		ASSERT(tcp->tcp_time_wait_prev == NULL);
-		tcp_time_wait->tcp_time_wait_head = tcp->tcp_time_wait_next;
-		if (tcp_time_wait->tcp_time_wait_head != NULL) {
-			tcp_time_wait->tcp_time_wait_head->tcp_time_wait_prev =
-			    NULL;
-		} else {
-			tcp_time_wait->tcp_time_wait_tail = NULL;
-		}
-	} else if (tcp == tcp_time_wait->tcp_time_wait_tail) {
-		ASSERT(tcp->tcp_time_wait_next == NULL);
-		tcp_time_wait->tcp_time_wait_tail = tcp->tcp_time_wait_prev;
-		ASSERT(tcp_time_wait->tcp_time_wait_tail != NULL);
-		tcp_time_wait->tcp_time_wait_tail->tcp_time_wait_next = NULL;
-	} else {
-		ASSERT(tcp->tcp_time_wait_prev->tcp_time_wait_next == tcp);
-		ASSERT(tcp->tcp_time_wait_next->tcp_time_wait_prev == tcp);
-		tcp->tcp_time_wait_prev->tcp_time_wait_next =
-		    tcp->tcp_time_wait_next;
+	if (tcp->tcp_time_wait_next != NULL) {
 		tcp->tcp_time_wait_next->tcp_time_wait_prev =
 		    tcp->tcp_time_wait_prev;
+	}
+	if (tcp->tcp_time_wait_prev != NULL) {
+		tcp->tcp_time_wait_prev->tcp_time_wait_next =
+		    tcp->tcp_time_wait_next;
+	} else {
+		unsigned int bucket;
+
+		bucket = TW_BUCKET(tcp->tcp_time_wait_expire);
+		ASSERT(tsp->tcp_time_wait_bucket[bucket] == tcp);
+		tsp->tcp_time_wait_bucket[bucket] = tcp->tcp_time_wait_next;
 	}
 	tcp->tcp_time_wait_next = NULL;
 	tcp->tcp_time_wait_prev = NULL;
 	tcp->tcp_time_wait_expire = 0;
+	tsp->tcp_time_wait_cnt--;
 
 	if (locked)
-		mutex_exit(&tcp_time_wait->tcp_time_wait_lock);
+		mutex_exit(&tsp->tcp_time_wait_lock);
 	return (B_TRUE);
 }
 
@@ -126,6 +120,7 @@ tcp_time_wait_remove(tcp_t *tcp, tcp_squeue_priv_t *tcp_time_wait)
 	((x)->tcp_connp->conn_ipversion == IPV6_VERSION && \
 	IN6_IS_ADDR_LOOPBACK(&(x)->tcp_connp->conn_laddr_v6)))
 
+
 /*
  * Add a connection to the list of detached TIME_WAIT connections
  * and set its time to expire.
@@ -135,9 +130,10 @@ tcp_time_wait_append(tcp_t *tcp)
 {
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
 	squeue_t	*sqp = tcp->tcp_connp->conn_sqp;
-	tcp_squeue_priv_t *tcp_time_wait =
+	tcp_squeue_priv_t *tsp =
 	    *((tcp_squeue_priv_t **)squeue_getprivate(sqp, SQPRIVATE_TCP));
-	hrtime_t firetime = 0;
+	int64_t		now, schedule;
+	unsigned int	bucket;
 
 	tcp_timers_stop(tcp);
 
@@ -146,6 +142,8 @@ tcp_time_wait_append(tcp_t *tcp)
 	ASSERT(tcp->tcp_ack_tid == 0);
 
 	/* must have happened at the time of detaching the tcp */
+	ASSERT(TCP_IS_DETACHED(tcp));
+	ASSERT(tcp->tcp_state == TCPS_TIME_WAIT);
 	ASSERT(tcp->tcp_ptpahn == NULL);
 	ASSERT(tcp->tcp_flow_stopped == 0);
 	ASSERT(tcp->tcp_time_wait_next == NULL);
@@ -153,97 +151,112 @@ tcp_time_wait_append(tcp_t *tcp)
 	ASSERT(tcp->tcp_time_wait_expire == 0);
 	ASSERT(tcp->tcp_listener == NULL);
 
-	tcp->tcp_time_wait_expire = ddi_get_lbolt64();
-	if (IS_LOCAL_HOST(tcp)) {
-		/*
-		 * This is the fastpath for handling localhost connections.
-		 * Since we don't have to worry about packets on the localhost
-		 * showing up after a long network delay, we want to expire
-		 * these quickly so the port range on the localhost doesn't
-		 * get starved by short-running, local apps.
-		 *
-		 * Leave tcp_time_wait_expire at the current time. This
-		 * essentially means the connection is expired now and it will
-		 * clean up the next time tcp_time_wait_collector runs.  We set
-		 * firetime to use a short delay so that if we have to start a
-		 * tcp_time_wait_collector thread below, it runs soon instead
-		 * of after a delay of time_wait_interval. firetime being set
-		 * to a non-0 value is also our indicator that we should add
-		 * this connection to the head of the time wait list (since we
-		 * are already expired) so that its sure to get cleaned up on
-		 * the next run of tcp_time_wait_collector (which expects the
-		 * entries to appear in time-order and stops when it hits the
-		 * first non-expired entry).
-		 */
-		firetime = TCP_TIME_WAIT_DELAY;
-	} else {
-		/*
-		 * Since tcp_time_wait_expire is lbolt64, it should not wrap
-		 * around in practice.  Hence it cannot be 0.  Note that zero
-		 * means that the tcp_t is not in the TIME_WAIT list.
-		 */
-		tcp->tcp_time_wait_expire += MSEC_TO_TICK(
-		    tcps->tcps_time_wait_interval);
-	}
-
-	ASSERT(TCP_IS_DETACHED(tcp));
-	ASSERT(tcp->tcp_state == TCPS_TIME_WAIT);
-	ASSERT(tcp->tcp_time_wait_next == NULL);
-	ASSERT(tcp->tcp_time_wait_prev == NULL);
 	TCP_DBGSTAT(tcps, tcp_time_wait);
+	mutex_enter(&tsp->tcp_time_wait_lock);
 
-	mutex_enter(&tcp_time_wait->tcp_time_wait_lock);
-	if (tcp_time_wait->tcp_time_wait_head == NULL) {
-		ASSERT(tcp_time_wait->tcp_time_wait_tail == NULL);
-		tcp_time_wait->tcp_time_wait_head = tcp;
-
-		/*
-		 * Even if the list was empty before, there may be a timer
-		 * running since a tcp_t can be removed from the list
-		 * in other places, such as tcp_clean_death().  So check if
-		 * a timer is needed.
-		 */
-		if (tcp_time_wait->tcp_time_wait_tid == 0) {
-			if (firetime == 0)
-				firetime = (hrtime_t)
-				    (tcps->tcps_time_wait_interval + 1) *
-				    MICROSEC;
-
-			tcp_time_wait->tcp_time_wait_tid =
-			    timeout_generic(CALLOUT_NORMAL,
-			    tcp_time_wait_collector, sqp, firetime,
-			    CALLOUT_TCP_RESOLUTION, CALLOUT_FLAG_ROUNDUP);
-		}
-		tcp_time_wait->tcp_time_wait_tail = tcp;
-	} else {
-		/*
-		 * The list is not empty, so a timer must be running.  If not,
-		 * tcp_time_wait_collector() must be running on this
-		 * tcp_time_wait list at the same time.
-		 */
-		ASSERT(tcp_time_wait->tcp_time_wait_tid != 0 ||
-		    tcp_time_wait->tcp_time_wait_running);
-		ASSERT(tcp_time_wait->tcp_time_wait_tail != NULL);
-		ASSERT(tcp_time_wait->tcp_time_wait_tail->tcp_state ==
-		    TCPS_TIME_WAIT);
-
-		if (firetime == 0) {
-			/* add at end */
-			tcp_time_wait->tcp_time_wait_tail->tcp_time_wait_next =
-			    tcp;
-			tcp->tcp_time_wait_prev =
-			    tcp_time_wait->tcp_time_wait_tail;
-			tcp_time_wait->tcp_time_wait_tail = tcp;
-		} else {
-			/* add at head */
-			tcp->tcp_time_wait_next =
-			    tcp_time_wait->tcp_time_wait_head;
-			tcp_time_wait->tcp_time_wait_head->tcp_time_wait_prev =
-			    tcp;
-			tcp_time_wait->tcp_time_wait_head = tcp;
-		}
+	/*
+	 * Immediately expire loopback connections.  Since there is no worry
+	 * about packets on the local host showing up after a long network
+	 * delay, this is safe and allows much higher rates of connection churn
+	 * for applications operating locally.
+	 *
+	 * This typically bypasses the tcp_free_list fast path due to squeue
+	 * re-entry for the loopback close operation.
+	 */
+	if (tcp->tcp_loopback) {
+		tcp_time_wait_purge(tcp, tsp);
+		mutex_exit(&tsp->tcp_time_wait_lock);
+		return;
 	}
-	mutex_exit(&tcp_time_wait->tcp_time_wait_lock);
+
+	/*
+	 * In order to reap TIME_WAITs reliably, we should use a source of time
+	 * that is not adjustable by the user.  While it would be more accurate
+	 * to grab this timestamp before (potentially) sleeping on the
+	 * tcp_time_wait_lock, doing so complicates bucket addressing later.
+	 */
+	now = ddi_get_lbolt64();
+
+	/*
+	 * Each squeue uses an arbitrary time offset when scheduling
+	 * expiration timers.  This prevents the bucketing from forcing
+	 * tcp_time_wait_collector to run in locksetup across squeues.
+	 *
+	 * This offset is (re)initialized when a new TIME_WAIT connection is
+	 * added to an squeue which has no connections waiting to expire.
+	 */
+	if (tsp->tcp_time_wait_tid == 0) {
+		ASSERT(tsp->tcp_time_wait_cnt == 0);
+		tsp->tcp_time_wait_offset =
+		    now % MSEC_TO_TICK(TCP_TIME_WAIT_DELAY);
+	}
+	now -= tsp->tcp_time_wait_offset;
+
+	/*
+	 * Use the netstack-defined timeout, rounded up to the minimum
+	 * time_wait_collector interval.
+	 */
+	schedule = now + MSEC_TO_TICK(tcps->tcps_time_wait_interval);
+	tcp->tcp_time_wait_expire = schedule;
+
+	/*
+	 * Append the connection into the appropriate bucket.
+	 */
+	bucket = TW_BUCKET(tcp->tcp_time_wait_expire);
+	tcp->tcp_time_wait_next = tsp->tcp_time_wait_bucket[bucket];
+	tsp->tcp_time_wait_bucket[bucket] = tcp;
+	if (tcp->tcp_time_wait_next != NULL) {
+		ASSERT(tcp->tcp_time_wait_next->tcp_time_wait_prev == NULL);
+		tcp->tcp_time_wait_next->tcp_time_wait_prev = tcp;
+	}
+	tsp->tcp_time_wait_cnt++;
+
+	/*
+	 * Round delay up to the nearest bucket boundary.
+	 */
+	schedule += MSEC_TO_TICK(TCP_TIME_WAIT_DELAY);
+	schedule -= schedule % MSEC_TO_TICK(TCP_TIME_WAIT_DELAY);
+
+	/*
+	 * The newly inserted entry may require a tighter schedule for the
+	 * expiration timer.
+	 */
+	if (schedule < tsp->tcp_time_wait_schedule) {
+		callout_id_t old_tid = tsp->tcp_time_wait_tid;
+
+		tsp->tcp_time_wait_schedule = schedule;
+		tsp->tcp_time_wait_tid =
+		    timeout_generic(CALLOUT_NORMAL,
+		    tcp_time_wait_collector, sqp,
+		    TICK_TO_NSEC(schedule - now),
+		    CALLOUT_TCP_RESOLUTION, CALLOUT_FLAG_ROUNDUP);
+
+		/*
+		 * It is possible for the timer to fire before the untimeout
+		 * action is able to complete.  In that case, the exclusion
+		 * offered by the tcp_time_wait_collector_active flag will
+		 * prevent multiple collector threads from processing records
+		 * simultaneously from the same squeue.
+		 */
+		mutex_exit(&tsp->tcp_time_wait_lock);
+		(void) untimeout_default(old_tid, 0);
+		return;
+	}
+
+	/*
+	 * Start a fresh timer if none exists.
+	 */
+	if (tsp->tcp_time_wait_schedule == 0) {
+		ASSERT(tsp->tcp_time_wait_tid == 0);
+
+		tsp->tcp_time_wait_schedule = schedule;
+		tsp->tcp_time_wait_tid =
+		    timeout_generic(CALLOUT_NORMAL,
+		    tcp_time_wait_collector, sqp,
+		    TICK_TO_NSEC(schedule - now),
+		    CALLOUT_TCP_RESOLUTION, CALLOUT_FLAG_ROUNDUP);
+	}
+	mutex_exit(&tsp->tcp_time_wait_lock);
 }
 
 /*
@@ -278,216 +291,287 @@ tcp_timewait_close(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *dummy)
 	tcp_close_detached(tcp);
 }
 
+
+static void
+tcp_time_wait_purge(tcp_t *tcp, tcp_squeue_priv_t *tsp)
+{
+	mblk_t *mp;
+	conn_t *connp = tcp->tcp_connp;
+	kmutex_t *lock;
+
+	ASSERT(MUTEX_HELD(&tsp->tcp_time_wait_lock));
+	ASSERT(connp->conn_fanout != NULL);
+
+	lock = &connp->conn_fanout->connf_lock;
+
+	/*
+	 * This is essentially a TIME_WAIT reclaim fast path optimization for
+	 * performance where the connection is checked under the fanout lock
+	 * (so that no one else can get access to the conn_t) that the refcnt
+	 * is 2 (one each for TCP and the classifier hash list).  That is the
+	 * case and clustering callbacks are not enabled, the conn can be
+	 * removed under the fanout lock and avoid clean-up under the squeue.
+	 *
+	 * This optimization is forgone when clustering is enabled since the
+	 * clustering callback must be made before setting the CONDEMNED flag
+	 * and after dropping all locks
+	 *
+	 * See the comments in tcp_closei_local for additional information
+	 * regarding the refcnt logic.
+	 */
+	if (mutex_tryenter(lock)) {
+		mutex_enter(&connp->conn_lock);
+		if (connp->conn_ref == 2 && cl_inet_disconnect == NULL) {
+			ipcl_hash_remove_locked(connp, connp->conn_fanout);
+			/*
+			 * Set the CONDEMNED flag now itself so that the refcnt
+			 * cannot increase due to any walker.
+			 */
+			connp->conn_state_flags |= CONN_CONDEMNED;
+			mutex_exit(&connp->conn_lock);
+			mutex_exit(lock);
+			if (tsp->tcp_free_list_cnt < tcp_free_list_max_cnt) {
+				/*
+				 * Add to head of tcp_free_list
+				 */
+				tcp_cleanup(tcp);
+				ASSERT(connp->conn_latch == NULL);
+				ASSERT(connp->conn_policy == NULL);
+				ASSERT(tcp->tcp_tcps == NULL);
+				ASSERT(connp->conn_netstack == NULL);
+
+				tcp->tcp_time_wait_next = tsp->tcp_free_list;
+				tcp->tcp_in_free_list = B_TRUE;
+				tsp->tcp_free_list = tcp;
+				tsp->tcp_free_list_cnt++;
+			} else {
+				/*
+				 * Do not add to tcp_free_list
+				 */
+				tcp_bind_hash_remove(tcp);
+				ixa_cleanup(tcp->tcp_connp->conn_ixa);
+				tcp_ipsec_cleanup(tcp);
+				CONN_DEC_REF(tcp->tcp_connp);
+			}
+
+			/*
+			 * With the fast-path complete, we can bail.
+			 */
+			return;
+		} else {
+			/*
+			 * Fall back to slow path.
+			 */
+			CONN_INC_REF_LOCKED(connp);
+			mutex_exit(&connp->conn_lock);
+			mutex_exit(lock);
+		}
+	} else {
+		CONN_INC_REF(connp);
+	}
+
+	/*
+	 * We can reuse the closemp here since conn has detached (otherwise we
+	 * wouldn't even be in time_wait list). It is safe to change
+	 * tcp_closemp_used without taking a lock as no other thread can
+	 * concurrently access it at this point in the connection lifecycle.
+	 */
+	if (tcp->tcp_closemp.b_prev == NULL) {
+		tcp->tcp_closemp_used = B_TRUE;
+	} else {
+		cmn_err(CE_PANIC,
+		    "tcp_timewait_collector: concurrent use of tcp_closemp: "
+		    "connp %p tcp %p\n", (void *)connp, (void *)tcp);
+	}
+
+	TCP_DEBUG_GETPCSTACK(tcp->tcmp_stk, 15);
+	mp = &tcp->tcp_closemp;
+	mutex_exit(&tsp->tcp_time_wait_lock);
+	SQUEUE_ENTER_ONE(connp->conn_sqp, mp, tcp_timewait_close, connp, NULL,
+	    SQ_FILL, SQTAG_TCP_TIMEWAIT);
+	mutex_enter(&tsp->tcp_time_wait_lock);
+}
+
 /*
- * Blows away all tcps whose TIME_WAIT has expired. List traversal
- * is done forwards from the head.
- * This walks all stack instances since
- * tcp_time_wait remains global across all stacks.
+ * Purge any tcp_t instances associated with this squeue which have expired
+ * from the TIME_WAIT state.
  */
-/* ARGSUSED */
 void
 tcp_time_wait_collector(void *arg)
 {
 	tcp_t *tcp;
-	int64_t now;
-	mblk_t *mp;
-	conn_t *connp;
-	kmutex_t *lock;
-	boolean_t removed;
-	extern void (*cl_inet_disconnect)(netstackid_t, uint8_t, sa_family_t,
-	    uint8_t *, in_port_t, uint8_t *, in_port_t, void *);
+	int64_t now, active_schedule, new_schedule;
+	unsigned int idx;
 
 	squeue_t *sqp = (squeue_t *)arg;
-	tcp_squeue_priv_t *tcp_time_wait =
+	tcp_squeue_priv_t *tsp =
 	    *((tcp_squeue_priv_t **)squeue_getprivate(sqp, SQPRIVATE_TCP));
 
-	mutex_enter(&tcp_time_wait->tcp_time_wait_lock);
-	tcp_time_wait->tcp_time_wait_tid = 0;
-#ifdef DEBUG
-	tcp_time_wait->tcp_time_wait_running = B_TRUE;
-#endif
+	mutex_enter(&tsp->tcp_time_wait_lock);
 
-	if (tcp_time_wait->tcp_free_list != NULL &&
-	    tcp_time_wait->tcp_free_list->tcp_in_free_list == B_TRUE) {
+	/*
+	 * Because of timer scheduling complexity and the fact that the
+	 * tcp_time_wait_lock is dropped during tcp_time_wait_purge, it is
+	 * possible for multiple tcp_time_wait_collector threads to run against
+	 * the same squeue.  This flag is used to exclude other collectors from
+	 * the squeue during execution.
+	 */
+	if (tsp->tcp_time_wait_collector_active) {
+		mutex_exit(&tsp->tcp_time_wait_lock);
+		return;
+	}
+	tsp->tcp_time_wait_collector_active = B_TRUE;
+
+	/*
+	 * Purge the free list if necessary
+	 */
+	if (tsp->tcp_free_list != NULL) {
 		TCP_G_STAT(tcp_freelist_cleanup);
-		while ((tcp = tcp_time_wait->tcp_free_list) != NULL) {
-			tcp_time_wait->tcp_free_list = tcp->tcp_time_wait_next;
+		while ((tcp = tsp->tcp_free_list) != NULL) {
+			tsp->tcp_free_list = tcp->tcp_time_wait_next;
 			tcp->tcp_time_wait_next = NULL;
-			tcp_time_wait->tcp_free_list_cnt--;
+			tsp->tcp_free_list_cnt--;
 			ASSERT(tcp->tcp_tcps == NULL);
 			CONN_DEC_REF(tcp->tcp_connp);
 		}
-		ASSERT(tcp_time_wait->tcp_free_list_cnt == 0);
+		ASSERT(tsp->tcp_free_list_cnt == 0);
 	}
 
 	/*
-	 * In order to reap time waits reliably, we should use a
-	 * source of time that is not adjustable by the user -- hence
-	 * the call to ddi_get_lbolt64().
+	 * If there are no connections pending, clear timer-related state to be
+	 * reinitialized by the next caller.
 	 */
-	now = ddi_get_lbolt64();
-	while ((tcp = tcp_time_wait->tcp_time_wait_head) != NULL) {
-		/*
-		 * lbolt64 should not wrap around in practice...  So we can
-		 * do a direct comparison.
-		 */
-		if (now < tcp->tcp_time_wait_expire)
-			break;
+	if (tsp->tcp_time_wait_cnt == 0) {
+		tsp->tcp_time_wait_offset = 0;
+		tsp->tcp_time_wait_schedule = 0;
+		tsp->tcp_time_wait_tid = 0;
+		tsp->tcp_time_wait_collector_active = B_FALSE;
+		mutex_exit(&tsp->tcp_time_wait_lock);
+		return;
+	}
 
-		removed = tcp_time_wait_remove(tcp, tcp_time_wait);
-		ASSERT(removed);
+	/*
+	 * Grab the bucket which we were scheduled to cleanse.
+	 */
+	active_schedule = tsp->tcp_time_wait_schedule;
+	idx = TW_BUCKET(active_schedule - 1);
+	now = ddi_get_lbolt64() - tsp->tcp_time_wait_offset;
+retry:
+	tcp = tsp->tcp_time_wait_bucket[idx];
 
-		connp = tcp->tcp_connp;
-		ASSERT(connp->conn_fanout != NULL);
-		lock = &connp->conn_fanout->connf_lock;
+	while (tcp != NULL) {
 		/*
-		 * This is essentially a TW reclaim fast path optimization for
-		 * performance where the timewait collector checks under the
-		 * fanout lock (so that no one else can get access to the
-		 * conn_t) that the refcnt is 2 i.e. one for TCP and one for
-		 * the classifier hash list. If ref count is indeed 2, we can
-		 * just remove the conn under the fanout lock and avoid
-		 * cleaning up the conn under the squeue, provided that
-		 * clustering callbacks are not enabled. If clustering is
-		 * enabled, we need to make the clustering callback before
-		 * setting the CONDEMNED flag and after dropping all locks and
-		 * so we forego this optimization and fall back to the slow
-		 * path. Also please see the comments in tcp_closei_local
-		 * regarding the refcnt logic.
+		 * Since the bucket count is sized to prevent wrap-around
+		 * during typical operation and timers are schedule to process
+		 * buckets with only expired connections, there is only one
+		 * reason to encounter a connection expiring in the future:
+		 * The tcp_time_wait_collector thread has been so delayed in
+		 * its processing that connections have wrapped around the
+		 * timing wheel into this bucket.
 		 *
-		 * Since we are holding the tcp_time_wait_lock, its better
-		 * not to block on the fanout_lock because other connections
-		 * can't add themselves to time_wait list. So we do a
-		 * tryenter instead of mutex_enter.
+		 * In that case, the remaining entires in the bucket can be
+		 * ignored since, being appended sequentially, they should all
+		 * expire in the future.
 		 */
-		if (mutex_tryenter(lock)) {
-			mutex_enter(&connp->conn_lock);
-			if ((connp->conn_ref == 2) &&
-			    (cl_inet_disconnect == NULL)) {
-				ipcl_hash_remove_locked(connp,
-				    connp->conn_fanout);
-				/*
-				 * Set the CONDEMNED flag now itself so that
-				 * the refcnt cannot increase due to any
-				 * walker.
-				 */
-				connp->conn_state_flags |= CONN_CONDEMNED;
-				mutex_exit(lock);
-				mutex_exit(&connp->conn_lock);
-				if (tcp_time_wait->tcp_free_list_cnt <
-				    tcp_free_list_max_cnt) {
-					/* Add to head of tcp_free_list */
-					mutex_exit(
-					    &tcp_time_wait->tcp_time_wait_lock);
-					tcp_cleanup(tcp);
-					ASSERT(connp->conn_latch == NULL);
-					ASSERT(connp->conn_policy == NULL);
-					ASSERT(tcp->tcp_tcps == NULL);
-					ASSERT(connp->conn_netstack == NULL);
-
-					mutex_enter(
-					    &tcp_time_wait->tcp_time_wait_lock);
-					tcp->tcp_time_wait_next =
-					    tcp_time_wait->tcp_free_list;
-					tcp_time_wait->tcp_free_list = tcp;
-					tcp_time_wait->tcp_free_list_cnt++;
-					continue;
-				} else {
-					/* Do not add to tcp_free_list */
-					mutex_exit(
-					    &tcp_time_wait->tcp_time_wait_lock);
-					tcp_bind_hash_remove(tcp);
-					ixa_cleanup(tcp->tcp_connp->conn_ixa);
-					tcp_ipsec_cleanup(tcp);
-					CONN_DEC_REF(tcp->tcp_connp);
-				}
-			} else {
-				CONN_INC_REF_LOCKED(connp);
-				mutex_exit(lock);
-				mutex_exit(&tcp_time_wait->tcp_time_wait_lock);
-				mutex_exit(&connp->conn_lock);
-				/*
-				 * We can reuse the closemp here since conn has
-				 * detached (otherwise we wouldn't even be in
-				 * time_wait list). tcp_closemp_used can safely
-				 * be changed without taking a lock as no other
-				 * thread can concurrently access it at this
-				 * point in the connection lifecycle.
-				 */
-
-				if (tcp->tcp_closemp.b_prev == NULL)
-					tcp->tcp_closemp_used = B_TRUE;
-				else
-					cmn_err(CE_PANIC,
-					    "tcp_timewait_collector: "
-					    "concurrent use of tcp_closemp: "
-					    "connp %p tcp %p\n", (void *)connp,
-					    (void *)tcp);
-
-				TCP_DEBUG_GETPCSTACK(tcp->tcmp_stk, 15);
-				mp = &tcp->tcp_closemp;
-				SQUEUE_ENTER_ONE(connp->conn_sqp, mp,
-				    tcp_timewait_close, connp, NULL,
-				    SQ_FILL, SQTAG_TCP_TIMEWAIT);
-			}
-		} else {
-			mutex_enter(&connp->conn_lock);
-			CONN_INC_REF_LOCKED(connp);
-			mutex_exit(&tcp_time_wait->tcp_time_wait_lock);
-			mutex_exit(&connp->conn_lock);
-			/*
-			 * We can reuse the closemp here since conn has
-			 * detached (otherwise we wouldn't even be in
-			 * time_wait list). tcp_closemp_used can safely
-			 * be changed without taking a lock as no other
-			 * thread can concurrently access it at this
-			 * point in the connection lifecycle.
-			 */
-
-			if (tcp->tcp_closemp.b_prev == NULL)
-				tcp->tcp_closemp_used = B_TRUE;
-			else
-				cmn_err(CE_PANIC, "tcp_timewait_collector: "
-				    "concurrent use of tcp_closemp: "
-				    "connp %p tcp %p\n", (void *)connp,
-				    (void *)tcp);
-
-			TCP_DEBUG_GETPCSTACK(tcp->tcmp_stk, 15);
-			mp = &tcp->tcp_closemp;
-			SQUEUE_ENTER_ONE(connp->conn_sqp, mp,
-			    tcp_timewait_close, connp, NULL,
-			    SQ_FILL, SQTAG_TCP_TIMEWAIT);
+		if (now < tcp->tcp_time_wait_expire) {
+			break;
 		}
-		mutex_enter(&tcp_time_wait->tcp_time_wait_lock);
+
+		/*
+		 * Pull the connection out of the bucket.
+		 */
+		VERIFY(tcp_time_wait_remove(tcp, tsp));
+
+		/*
+		 * Purge the connection.
+		 *
+		 * While tcp_time_wait_lock will be temporarily dropped as part
+		 * of the process, there is no risk of the timer being
+		 * (re)scheduled while the collector is running since a value
+		 * corresponding to the past is left in tcp_time_wait_schedule.
+		 */
+		tcp_time_wait_purge(tcp, tsp);
+
+		/*
+		 * Because tcp_time_wait_remove clears the tcp_time_wait_next
+		 * field, the next item must be grabbed directly from the
+		 * bucket itself.
+		 */
+		tcp = tsp->tcp_time_wait_bucket[idx];
 	}
 
-	if (tcp_time_wait->tcp_free_list != NULL)
-		tcp_time_wait->tcp_free_list->tcp_in_free_list = B_TRUE;
+	if (tsp->tcp_time_wait_cnt == 0) {
+		/*
+		 * There is not a need for the collector to schedule a new
+		 * timer if no pending items remain.  The timer state can be
+		 * cleared only if it was untouched while the collector dropped
+		 * its locks during tcp_time_wait_purge.
+		 */
+		if (tsp->tcp_time_wait_schedule == active_schedule) {
+			tsp->tcp_time_wait_offset = 0;
+			tsp->tcp_time_wait_schedule = 0;
+			tsp->tcp_time_wait_tid = 0;
+		}
+		tsp->tcp_time_wait_collector_active = B_FALSE;
+		mutex_exit(&tsp->tcp_time_wait_lock);
+		return;
+	} else {
+		unsigned int nidx;
+
+		/*
+		 * Locate the next bucket containing entries.
+		 */
+		new_schedule = active_schedule
+		    + MSEC_TO_TICK(TCP_TIME_WAIT_DELAY);
+		nidx = TW_BUCKET_NEXT(idx);
+		while (tsp->tcp_time_wait_bucket[nidx] == NULL) {
+			if (nidx == idx) {
+				break;
+			}
+			nidx = TW_BUCKET_NEXT(nidx);
+			new_schedule += MSEC_TO_TICK(TCP_TIME_WAIT_DELAY);
+		}
+		ASSERT(tsp->tcp_time_wait_bucket[nidx] != NULL);
+	}
 
 	/*
-	 * If the time wait list is not empty and there is no timer running,
-	 * restart it.
+	 * It is possible that the system is under such dire load that between
+	 * the timer scheduling and TIME_WAIT processing delay, execution
+	 * overran the interval allocated to this bucket.
 	 */
-	if ((tcp = tcp_time_wait->tcp_time_wait_head) != NULL &&
-	    tcp_time_wait->tcp_time_wait_tid == 0) {
-		hrtime_t firetime;
-
-		/* shouldn't be necessary, but just in case */
-		if (tcp->tcp_time_wait_expire < now)
-			tcp->tcp_time_wait_expire = now;
-
-		firetime = TICK_TO_NSEC(tcp->tcp_time_wait_expire - now);
-		/* This ensures that we won't wake up too often. */
-		firetime = MAX(TCP_TIME_WAIT_DELAY, firetime);
-		tcp_time_wait->tcp_time_wait_tid =
-		    timeout_generic(CALLOUT_NORMAL, tcp_time_wait_collector,
-		    sqp, firetime, CALLOUT_TCP_RESOLUTION,
-		    CALLOUT_FLAG_ROUNDUP);
+	now = ddi_get_lbolt64() - tsp->tcp_time_wait_offset;
+	if (new_schedule <= now) {
+		/*
+		 * Attempt to right the situation by immediately performing a
+		 * purge on the next bucket.  This loop will continue as needed
+		 * until the schedule can be pushed out ahead of the clock.
+		 */
+		idx = TW_BUCKET(new_schedule - 1);
+		goto retry;
 	}
-#ifdef DEBUG
-	tcp_time_wait->tcp_time_wait_running = B_FALSE;
-#endif
-	mutex_exit(&tcp_time_wait->tcp_time_wait_lock);
+
+	/*
+	 * Another thread may have snuck in to reschedule the timer while locks
+	 * were dropped during tcp_time_wait_purge.  Defer to the running timer
+	 * if that is the case.
+	 */
+	if (tsp->tcp_time_wait_schedule != active_schedule) {
+		tsp->tcp_time_wait_collector_active = B_FALSE;
+		mutex_exit(&tsp->tcp_time_wait_lock);
+		return;
+	}
+
+	/*
+	 * Schedule the next timer.
+	 */
+	tsp->tcp_time_wait_schedule = new_schedule;
+	tsp->tcp_time_wait_tid =
+	    timeout_generic(CALLOUT_NORMAL,
+	    tcp_time_wait_collector, sqp,
+	    TICK_TO_NSEC(new_schedule - now),
+	    CALLOUT_TCP_RESOLUTION, CALLOUT_FLAG_ROUNDUP);
+	tsp->tcp_time_wait_collector_active = B_FALSE;
+	mutex_exit(&tsp->tcp_time_wait_lock);
 }
 
 /*

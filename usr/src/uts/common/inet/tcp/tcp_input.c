@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
- * Copyright (c) 2011 Joyent, Inc. All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  * Copyright (c) 2014 by Delphix. All rights reserved.
  */
 
@@ -99,7 +99,7 @@
  * tcps_time_wait_interval since the period before upper layer closes the
  * connection is not accounted for when tcp_time_wait_append() is called.
  *
- * If uppser layer has closed the connection, call tcp_time_wait_append()
+ * If upper layer has closed the connection, call tcp_time_wait_append()
  * directly.
  *
  */
