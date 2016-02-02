@@ -149,6 +149,9 @@ static void lxd_ptm_devt_translator(dev_t, dev_t *);
 #define	LX_PTM_MAJOR		5
 #define	LX_PTM_MINOR		2
 
+static kmutex_t			lxd_xlate_lock;
+static boolean_t		lxd_xlate_initialized = B_FALSE;
+
 static lxd_minor_translator_t lxd_mtranslator_mm[] = {
 	{ "/dev/null",		0, 1, 3 },
 	{ "/dev/zero",		0, 1, 5 },
@@ -199,6 +202,7 @@ _fini()
 	 */
 	(void) vfs_freevfsops_by_type(lxd_fstype);
 	vn_freevnodeops(lxd_vnodeops);
+	mutex_destroy(&lxd_xlate_lock);
 	return (0);
 }
 
@@ -225,7 +229,6 @@ lxd_init(int fstype, char *name)
 	extern const struct fs_operation_def lxd_vnodeops_template[];
 	int error;
 	major_t dev;
-	int i;
 
 	lxd_fstype = fstype;
 	ASSERT(lxd_fstype != 0);
@@ -263,9 +266,30 @@ lxd_init(int fstype, char *name)
 	 */
 	lxd_dev = makedevice(dev, 0);
 
-	/*
-	 * Initialize device translator mapping table.
-	 */
+	mutex_init(&lxd_xlate_lock, NULL, MUTEX_DEFAULT, NULL);
+
+	return (0);
+}
+
+/*
+ * Initialize device translator mapping table.
+ *
+ * Note that we cannot do this in lxd_init since that can lead to a recursive
+ * rw_enter while we're doing lookupnameat (via sdev_lookup/prof_make_maps/
+ * devi_attach_node/modload). Thus we do it in the mount path and keep track
+ * so that we only initialize the table once.
+ */
+static void
+lxd_xlate_init()
+{
+	int i;
+
+	mutex_enter(&lxd_xlate_lock);
+	if (lxd_xlate_initialized) {
+		mutex_exit(&lxd_xlate_lock);
+		return;
+	}
+
 	for (i = 0; lxd_devt_translators[i].lxd_xl_driver != NULL; i++) {
 		lxd_minor_translator_t	*mt;
 		int j;
@@ -319,7 +343,8 @@ lxd_init(int fstype, char *name)
 		}
 	}
 
-	return (0);
+	lxd_xlate_initialized = B_TRUE;
+	mutex_exit(&lxd_xlate_lock);
 }
 
 static int
@@ -342,6 +367,8 @@ lxd_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 
 	if (mvp->v_type != VDIR)
 		return (ENOTDIR);
+
+	lxd_xlate_init();
 
 	/*
 	 * This is the same behavior as with lofs.
