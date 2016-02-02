@@ -1277,8 +1277,8 @@ record_name(char *name, int op)
 }
 
 /*
- * This routine adds a symlink in the form of an ASCII dotted quad
- * IP address that is linked to the name already recorded in the
+ * This routine adds a symlink in the form of an IP address in
+ * text string format that is linked to the name already recorded in the
  * filesystem name space by record_name().  Enough information is
  * (hopefully) provided to support other address types in the future.
  * The purpose of this is to cache enough information to contact
@@ -1319,8 +1319,7 @@ record_addr(char *name, sa_family_t family, struct netobj *ah)
 	}
 
 	if (family == AF_INET) {
-		if (addr.s_addr == INADDR_ANY ||
-		    ((addr.s_addr && 0xff000000) == 0)) {
+		if ((ntohl(addr.s_addr) & 0xff000000) == 0) {
 			syslog(LOG_DEBUG,
 			    "record_addr: illegal IP address %x\n",
 			    addr.s_addr);
