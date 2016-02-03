@@ -26,6 +26,7 @@
 
 #
 # Copyright (c) 2013 by Delphix. All rights reserved.
+# Copyright 2016 Nexenta Systems, Inc.
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -918,58 +919,26 @@ function verify_fs_share
 	typeset user=$1
 	typeset perm=$2
 	typeset fs=$3
+	typeset -i ret=0
 
-	typeset stamp=${perm}.${user}.$($DATE +'%F-%H%M%S')
-	typeset mntpt=$(get_prop mountpoint $fs)
-
+	$SVCADM enable -rs nfs/server
 	typeset stat=$($SVCS -H -o STA nfs/server:default)
 	if [[ $stat != "ON" ]]; then
-		log_note "Current nfs/server status: $stat"
-		# legacy share
-		user_run $user $SHARE $mntpt
-		if is_shared $fs; then
-			return 1
-		fi
-
-		# sharenfs=on
-		log_must $ZFS set sharenfs=on $fs
-		user_run $user $ZFS share $fs
-		if is_shared $fs; then
-			log_must $ZFS set sharenfs=off $fs
-			return 1
-		fi
-		log_must $ZFS set sharenfs=off $fs
+		log_fail "Could not enable nfs/server"
 	fi
 
-	# turn on nfs/server service if it is not enabled
-	typeset tmpshare=/var/tmp/a.$$
-	$RM -rf $tmpshare
-
-	log_must $MKDIR -p $tmpshare
-	log_must $SHARE $tmpshare
-
-	# legacy share
-	user_run $user $SHARE $mntpt
-	if ! is_shared $fs ; then
-		log_must $UNSHARE $tmpshare
-		log_must $RM -rf $tmpshare
-		return 1
-	fi
-	log_must $UNSHARE $mntpt
-
-	# sharenfs=on
 	log_must $ZFS set sharenfs=on $fs
+	$ZFS unshare $fs
+
 	user_run $user $ZFS share $fs
 	if ! is_shared $fs; then
-		log_must $UNSHARE $tmpshare
-		log_must $RM -rf $tmpshare
-		return 1
+		ret=1
 	fi
 
-	log_must $UNSHARE $tmpshare
-	log_must $RM -rf $tmpshare
+	$ZFS unshare $fs
+	log_must $ZFS set sharenfs=off $fs
 
-	return 0
+	return $ret
 }
 
 function verify_fs_mountpoint
@@ -1318,58 +1287,26 @@ function verify_fs_sharenfs
 	typeset user=$1
 	typeset perm=$2
 	typeset fs=$3
+	typeset nmode omode
 
-	typeset oldval
-	set -A modes "on" "off"
-	oldval=$(get_prop $perm $fs)
-	if [[ $oldval == "on" ]]; then
-		n=1
-	elif [[ $oldval == "off" ]]; then
-		n=0
+	omode=$(get_prop $perm $fs)
+	if [[ $omode == "off" ]]; then
+		nmode="on"
+	else
+		nmode="off"
 	fi
-	log_note "$user $ZFS set $perm=${modes[$n]} $fs"
-	user_run $user $ZFS set $perm=${modes[$n]} $fs
-	if [[ ${modes[$n]} != $(get_prop $perm $fs) ]]; then
-		return 1
-	fi
-	log_must $ZFS set $perm=$oldval $fs
 
-	# turn on nfs/server service if it is not enabled
-	typeset tmpshare=/var/tmp/a.$$
-	$RM -rf $tmpshare
-	log_must $MKDIR -p $tmpshare
-	log_must $SHARE $tmpshare
-
-	log_note "$user $ZFS set $perm=${modes[$n]} $fs"
-	user_run $user $ZFS set $perm=${modes[$n]} $fs
-	if [[ ${modes[$n]} != $(get_prop $perm $fs) ]]; then
+	log_note "$user $ZFS set $perm=$nmode $fs"
+	user_run $user $ZFS set $perm=$nmode $fs
+	if [[ $(get_prop $perm $fs) != $nmode ]]; then
 		return 1
 	fi
 
-	user_run $user $ZFS share $fs
-	if is_shared $fs; then
+	log_note "$user $ZFS set $perm=$omode $fs"
+	user_run $user $ZFS set $perm=$omode $fs
+	if [[ $(get_prop $perm $fs) != $omode ]]; then
 		return 1
 	fi
-
-	# share permission is needed
-	log_must $ZFS allow $user share $fs
-	user_run $user $ZFS share $fs
-	log_must $ZFS unallow $user share $fs
-
-	if [[ $n -eq 0 ]] && ! is_shared $fs ; then
-		log_must $UNSHARE $tmpshare
-		log_must $RM -rf $tmpshare
-		return 1
-	fi
-
-	if [[ $n -eq 1 ]] && is_shared $fs ; then
-		log_must $UNSHARE $tmpshare
-		log_must $RM -rf $tmpshare
-		return 1
-	fi
-
-	log_must $UNSHARE $tmpshare
-	log_must $RM -rf $tmpshare
 
 	return 0
 }
