@@ -219,8 +219,6 @@
 #include <smbsrv/smb_door.h>
 #include <smbsrv/smb_kstat.h>
 
-extern void smb_reply_notify_change_request(smb_request_t *);
-
 typedef struct {
 	smb_listener_daemon_t	*ra_listener;
 	smb_session_t		*ra_session;

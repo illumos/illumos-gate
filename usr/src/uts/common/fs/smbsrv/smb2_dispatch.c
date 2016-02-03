@@ -308,7 +308,8 @@ smb2_tq_work(void *arg)
  * that begins at smb2_cmd_hdr.  The reply is appended to the
  * sr->reply chain starting at smb2_reply_hdr.
  *
- * This function must always free the smb request.
+ * This function must always free the smb request, or arrange
+ * for it to be completed and free'd later (if SDRC_SR_KEPT).
  */
 void
 smb2sr_work(struct smb_request *sr)
@@ -849,9 +850,9 @@ void
 smb2sr_do_async(smb_request_t *sr)
 {
 	const smb_disp_entry_t	*sdd;
-	smb_disp_stats_t	*sds;
 	smb2_async_req_t	*ar;
-	int rc = 0;
+	smb_sdrc_t		(*ar_func)(smb_request_t *);
+	int sdrc;
 
 	/*
 	 * Restore what smb2_decode_header found.
@@ -885,6 +886,13 @@ smb2sr_do_async(smb_request_t *sr)
 	    ar->ar_cmd_len - SMB2_HDR_SIZE);
 
 	/*
+	 * Done with sr_async_req
+	 */
+	ar_func = ar->ar_func;
+	kmem_free(ar, sizeof (*ar));
+	sr->sr_async_req = ar = NULL;
+
+	/*
 	 * Setup output mbuf_chain
 	 */
 	MBC_FLUSH(&sr->reply);
@@ -893,8 +901,6 @@ smb2sr_do_async(smb_request_t *sr)
 
 	VERIFY3U(sr->smb2_cmd_code, <, SMB2_INVALID_CMD);
 	sdd = &smb2_disp_table[sr->smb2_cmd_code];
-	sds = sr->session->s_server->sv_disp_stats2;
-	sds = &sds[sr->smb2_cmd_code];
 
 	/*
 	 * Keep the UID, TID, ofile we have.
@@ -916,11 +922,28 @@ smb2sr_do_async(smb_request_t *sr)
 	 *
 	 * Just call the async handler function.
 	 */
-	rc = ar->ar_func(sr);
-	if (rc != 0 && sr->smb2_status == 0)
-		sr->smb2_status = NT_STATUS_INTERNAL_ERROR;
+	sdrc = ar_func(sr);
+	switch (sdrc) {
+	case SDRC_SUCCESS:
+		break;
+	case SDRC_ERROR:
+		if (sr->smb2_status == 0)
+			sr->smb2_status = NT_STATUS_INTERNAL_ERROR;
+		break;
+	case SDRC_SR_KEPT:
+		/* This SR will be completed later. */
+		return;
+	}
 
 cmd_done:
+	smb2sr_finish_async(sr);
+}
+
+void
+smb2sr_finish_async(smb_request_t *sr)
+{
+	smb_disp_stats_t	*sds;
+
 	/*
 	 * Pad the reply to align(8) if necessary.
 	 */
@@ -933,12 +956,11 @@ cmd_done:
 	/*
 	 * Record some statistics: (just tx bytes here)
 	 */
-	atomic_add_64(&sds->sdt_txb,
-	    (int64_t)(sr->reply.chain_offset - sr->smb2_reply_hdr));
+	sds = &sr->session->s_server->sv_disp_stats2[sr->smb2_cmd_code];
+	atomic_add_64(&sds->sdt_txb, (int64_t)(sr->reply.chain_offset));
 
 	/*
-	 * Overwrite the SMB2 header for the response of
-	 * this command (possibly part of a compound).
+	 * Put (overwrite) the final SMB2 header.
 	 * The call adds: SMB2_FLAGS_SERVER_TO_REDIR
 	 */
 	(void) smb2_encode_header(sr, B_TRUE);
@@ -951,8 +973,6 @@ cmd_done:
 	/*
 	 * Done.  Unlink and free.
 	 */
-	sr->sr_async_req = NULL;
-	kmem_free(ar, sizeof (*ar));
 
 	mutex_enter(&sr->sr_mutex);
 	sr->sr_state = SMB_REQ_STATE_COMPLETED;

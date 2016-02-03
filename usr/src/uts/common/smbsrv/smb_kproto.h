@@ -550,10 +550,10 @@ DWORD smb_node_rename_check(smb_node_t *);
 DWORD smb_node_delete_check(smb_node_t *);
 boolean_t smb_node_share_check(smb_node_t *);
 
-void smb_node_fcn_subscribe(smb_node_t *, smb_request_t *);
-void smb_node_fcn_unsubscribe(smb_node_t *, smb_request_t *);
+void smb_node_fcn_subscribe(smb_node_t *);
+void smb_node_fcn_unsubscribe(smb_node_t *);
 void smb_node_notify_change(smb_node_t *, uint_t, const char *);
-void smb_node_notify_parents(smb_node_t *);
+
 int smb_node_getattr(smb_request_t *, smb_node_t *, cred_t *,
     smb_ofile_t *, smb_attr_t *);
 int smb_node_setattr(smb_request_t *, smb_node_t *, cred_t *,
@@ -583,11 +583,15 @@ int smb_vfs_hold(smb_export_t *, vfs_t *);
 void smb_vfs_rele(smb_export_t *, vfs_t *);
 void smb_vfs_rele_all(smb_export_t *);
 
-/* NOTIFY CHANGE */
-
-uint32_t smb_notify_common(smb_request_t *, mbuf_chain_t *, uint32_t);
-void smb_notify_event(smb_node_t *, uint_t, const char *);
-void smb_notify_file_closed(smb_ofile_t *);
+/*
+ * smb_notify.c
+ */
+uint32_t smb_notify_act1(smb_request_t *, uint32_t, uint32_t);
+uint32_t smb_notify_act2(smb_request_t *);
+uint32_t smb_notify_act3(smb_request_t *);
+void smb_notify_ofile(smb_ofile_t *, uint_t, const char *);
+void smb_nt_transact_notify_finish(void *);
+void smb2_change_notify_finish(void *);
 
 int smb_fem_fcn_install(smb_node_t *);
 void smb_fem_fcn_uninstall(smb_node_t *);

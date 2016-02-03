@@ -471,20 +471,49 @@ typedef struct smb_export {
 	smb_thread_t	e_unexport_thread;
 } smb_export_t;
 
-/* NOTIFY CHANGE */
-typedef struct smb_node_fcn {
-	kmutex_t	fcn_mutex;
-	uint32_t	fcn_count;
-	list_t		fcn_watchers;	/* smb_request_t, sr_ncr.nc_lnd */
-} smb_node_fcn_t;
+/*
+ * NOTIFY CHANGE, a.k.a. File Change Notification (FCN)
+ */
 
-typedef struct smb_notify_change_req {
-	list_node_t		nc_lnd;	/* n_fcn.fcn_watchers */
-	kcondvar_t		nc_cv;	/* prot: sr_mutex */
-	uint32_t		nc_flags;
-	uint32_t		nc_action;
-	char			*nc_fname;
-} smb_notify_change_req_t;
+/*
+ * These FCN filter mask values are not from MS-FSCC, but
+ * must not overlap with any FILE_NOTIFY_VALID_MASK values.
+ */
+#define	FILE_NOTIFY_CHANGE_EV_SUBDIR	0x00010000
+#define	FILE_NOTIFY_CHANGE_EV_DELETE	0x00020000
+#define	FILE_NOTIFY_CHANGE_EV_CLOSED	0x00040000
+#define	FILE_NOTIFY_CHANGE_EV_OVERFLOW	0x00080000
+
+/*
+ * Note: These FCN action values are not from MS-FSCC, but must
+ * follow in sequence from FILE_ACTION_MODIFIED_STREAM.
+ *
+ * FILE_ACTION_SUBDIR_CHANGED is used internally for
+ * "watch tree" support, posted to all parents of a
+ * directory that had one of the changes above.
+ *
+ * FILE_ACTION_DELETE_PENDING is used internally to tell
+ * notify change requests when the "delete-on-close" flag
+ * has been set on the directory being watched.
+ *
+ * FILE_ACTION_HANDLE_CLOSED is used to wakeup notify change
+ * requests when the watched directory handle is closed.
+ */
+#define	FILE_ACTION_SUBDIR_CHANGED	0x00000009
+#define	FILE_ACTION_DELETE_PENDING	0x0000000a
+#define	FILE_ACTION_HANDLE_CLOSED	0x0000000b
+
+/*
+ * Sub-struct within smb_ofile_t
+ */
+typedef struct smb_notify {
+	list_t			nc_waiters; /* Waiting SRs */
+	mbuf_chain_t		nc_buffer;
+	uint32_t		nc_filter;
+	uint32_t		nc_events;
+	int			nc_last_off;
+	boolean_t		nc_subscribed;
+} smb_notify_t;
 
 /*
  * SMB operates over a NetBIOS-over-TCP transport (NBT) or directly
@@ -643,7 +672,7 @@ typedef struct smb_node {
 	uint32_t		n_pending_dosattr;
 	volatile int		flags;
 	u_offset_t		n_allocsz;
-	smb_node_fcn_t		n_fcn;
+	uint32_t		n_fcn_count;
 	smb_oplock_t		n_oplock;
 	struct smb_node		*n_dnode;
 	struct smb_node		*n_unode;
@@ -660,7 +689,6 @@ typedef struct smb_node {
 #define	NODE_FLAGS_SYSTEM		0x00008000
 #define	NODE_FLAGS_WRITE_THROUGH	0x00100000
 #define	NODE_XATTR_DIR			0x01000000
-#define	NODE_FLAGS_WATCH_TREE		0x10000000	/* smb_notify.c */
 #define	NODE_FLAGS_DELETE_ON_CLOSE	0x40000000
 #define	NODE_FLAGS_EXECUTABLE		0x80000000
 
@@ -1285,6 +1313,7 @@ typedef struct smb_ofile {
 	boolean_t		f_written;
 	char			f_quota_resume[SMB_SID_STRSZ];
 	smb_oplock_grant_t	f_oplock_grant;
+	smb_notify_t		f_notify;
 } smb_ofile_t;
 
 typedef struct smb_fileinfo {
@@ -1615,10 +1644,10 @@ typedef enum smb_req_state {
 	SMB_REQ_STATE_INITIALIZING,
 	SMB_REQ_STATE_SUBMITTED,
 	SMB_REQ_STATE_ACTIVE,
-	SMB_REQ_STATE_WAITING_EVENT,
-	SMB_REQ_STATE_EVENT_OCCURRED,
-	SMB_REQ_STATE_WAITING_LOCK,
 	SMB_REQ_STATE_WAITING_AUTH,
+	SMB_REQ_STATE_WAITING_FCN1,
+	SMB_REQ_STATE_WAITING_FCN2,
+	SMB_REQ_STATE_WAITING_LOCK,
 	SMB_REQ_STATE_WAITING_PIPE,
 	SMB_REQ_STATE_COMPLETED,
 	SMB_REQ_STATE_CANCEL_PENDING,
@@ -1640,7 +1669,7 @@ typedef struct smb_request {
 	void			(*cancel_method)(struct smb_request *);
 	void			*cancel_arg2;
 
-	smb_notify_change_req_t	sr_ncr;
+	list_node_t		sr_waiters;	/* smb_notify.c */
 
 	/* Info from session service header */
 	uint32_t		sr_req_length; /* Excluding NBT header */

@@ -242,18 +242,7 @@ typedef uint32_t smb_utime_t;
 #define	FILE_ACTION_ADDED_STREAM	0x00000006
 #define	FILE_ACTION_REMOVED_STREAM	0x00000007
 #define	FILE_ACTION_MODIFIED_STREAM	0x00000008
-/*
- * Note: These action values are not from MS-FSCC.
- * FILE_ACTION_SUBDIR_CHANGED is used internally for
- * "watch tree" support, posted to all parents of a
- * directory that had one of the changes above.
- * FILE_ACTION_DELETE_PENDING is used internally to tell
- * notify change requests when the "delete-on-close" flag
- * has been set on the directory being watched.
- */
-#define	FILE_ACTION_SUBDIR_CHANGED	0x00000009
-#define	FILE_ACTION_DELETE_PENDING	0x0000000a
-
+/* See also: FILE_ACTION_SUBDIR_CHANGED etc. */
 
 /* Lock type flags */
 #define	LOCKING_ANDX_NORMAL_LOCK	0x00

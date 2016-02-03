@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <mdb/mdb_modapi.h>
@@ -2098,7 +2098,6 @@ typedef struct mdb_smb_node {
 	smb_llist_t		n_ofile_list;
 	smb_llist_t		n_lock_list;
 	volatile int		flags;
-	smb_node_fcn_t		n_fcn;
 	smb_oplock_t		n_oplock;
 	struct smb_node		*n_dnode;
 	struct smb_node		*n_unode;

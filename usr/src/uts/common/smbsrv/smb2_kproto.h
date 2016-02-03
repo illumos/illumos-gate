@@ -92,6 +92,8 @@ uint32_t smb2_setinfo_fs(smb_request_t *, smb_setinfo_t *, int);
 uint32_t smb2_setinfo_sec(smb_request_t *, smb_setinfo_t *, uint32_t);
 uint32_t smb2_setinfo_quota(smb_request_t *, smb_setinfo_t *);
 
+void smb2sr_finish_async(smb_request_t *);
+
 #ifdef	__cplusplus
 }
 #endif
