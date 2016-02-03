@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2016 OmniTI Computer Consulting, Inc. All rights reserved.
  */
 
 /*
@@ -5136,7 +5137,7 @@ nxge_set_priv_prop(p_nxge_t nxgep, const char *pr_name, uint_t pr_valsize,
 		return (err);
 	}
 
-	return (EINVAL);
+	return (ENOTSUP);
 }
 
 static int
@@ -5145,7 +5146,7 @@ nxge_get_priv_prop(p_nxge_t nxgep, const char *pr_name, uint_t pr_valsize,
 {
 	p_nxge_param_t	param_arr = nxgep->param_arr;
 	char		valstr[MAXNAMELEN];
-	int		err = EINVAL;
+	int		err = ENOTSUP;
 	uint_t		strsize;
 
 	NXGE_DEBUG_MSG((nxgep, NXGE_CTL,
