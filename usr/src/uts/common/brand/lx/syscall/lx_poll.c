@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -677,7 +677,7 @@ lx_select(int nfds, long *rfds, long *wfds, long *efds,
 
 long
 lx_pselect(int nfds, long *rfds, long *wfds, long *efds,
-    timespec_t *timeoutp, lx_sigset_t *setp)
+    timespec_t *timeoutp, uintptr_t setp)
 {
 	timespec_t ts, *tsp = NULL;
 	k_sigset_t kset, *ksetp = NULL;
@@ -702,12 +702,30 @@ lx_pselect(int nfds, long *rfds, long *wfds, long *efds,
 		tsp = &ts;
 	}
 	if (setp != NULL) {
+		struct {
+			lx_sigset_t *addr;
+			size_t size;
+		} ps_lx_sigset;
 		lx_sigset_t lset;
 
-		if (copyin(setp, &lset, sizeof (lset)))
+		if (copyin((void *)setp, &ps_lx_sigset, sizeof (ps_lx_sigset)))
 			return (set_errno(EFAULT));
-		lx_ltos_sigset(&lset, &kset);
-		ksetp = &kset;
+
+		/*
+		 * Yes, that's right:  Linux forces a size to be passed only
+		 * so it can check that it's the size of a sigset_t.
+		 */
+		if (ps_lx_sigset.size != sizeof (lx_sigset_t))
+			return (set_errno(EINVAL));
+
+		/* This is where we check if the sigset is *really* NULL. */
+		if (ps_lx_sigset.addr != NULL) {
+			if (copyin(ps_lx_sigset.addr, &lset, sizeof (lset)))
+				return (set_errno(EFAULT));
+
+			lx_ltos_sigset(&lset, &kset);
+			ksetp = &kset;
+		}
 	}
 
 	return (lx_select_common(nfds, rfds, wfds, efds, tsp, ksetp));
