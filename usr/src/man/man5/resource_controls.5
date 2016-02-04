@@ -7,7 +7,6 @@
 .SH NAME
 resource_controls \- resource controls available through project database
 .SH DESCRIPTION
-.sp
 .LP
 The resource controls facility is configured through the project database. See
 \fBproject\fR(4). You can set and modify resource controls through the
@@ -192,7 +191,7 @@ of bytes.
 .sp
 .ne 2
 .na
-\fB\fBproject.cpu-caps\fR\fR
+\fB\fBproject.cpu-cap\fR\fR
 .ad
 .sp .6
 .RS 4n
@@ -477,7 +476,6 @@ mappings and \fBtmpfs\fR mounts for this zone.
 .LP
 See \fBzones\fR(5).
 .SS "Units Used in Resource Controls"
-.sp
 .LP
 Resource controls can be expressed as in units of size (bytes), time (seconds),
 or as a count (integer). These units use the strings specified below.
@@ -563,7 +561,6 @@ Note that unit modifiers (for example, \fB5G\fR) are accepted by the
 \fBprctl\fR(1), \fBprojadd\fR(1M), and \fBprojmod\fR(1M) commands. You cannot
 use unit modifiers in the project database itself.
 .SS "Resource Control Values and Privilege Levels"
-.sp
 .LP
 A threshold value on a resource control constitutes a point at which local
 actions can be triggered or global actions, such as logging, can occur.
@@ -632,7 +629,6 @@ task.max-lwps=(priv,1K,deny)
 .in -2
 
 .SS "Global and Local Actions on Resource Control Values"
-.sp
 .LP
 There are two categories of actions on resource control values: global and
 local.
@@ -858,7 +854,6 @@ controls with the \fBRCTL_GLOBAL_CPUTIME\fR property
 .RE
 
 .SS "Resource Control Flags and Properties"
-.sp
 .LP
 Each resource control on the system has a certain set of associated properties.
 This set of properties is defined as a set of flags, which are associated with
@@ -963,7 +958,6 @@ resource control. An \fBinf\fR value has an infinite quantity. The value is
 never enforced. Hence, as configured, both threshold quantities represent
 infinite values that are never exceeded.
 .SS "Resource Control Enforcement"
-.sp
 .LP
 More than one resource control can exist on a resource. A resource control can
 exist at each containment level in the process model. If resource controls are
@@ -972,7 +966,6 @@ container's control is enforced first. Thus, action is taken on
 \fBprocess.max-cpu-time\fR before \fBtask.max-cpu-time\fR if both controls are
 encountered simultaneously.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for a description of the following attributes:
 .sp
@@ -988,7 +981,6 @@ Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBprctl\fR(1), \fBpooladm\fR(1M), \fBpoolcfg\fR(1M), \fBprojadd\fR(1M),
 \fBprojmod\fR(1M), \fBrctladm\fR(1M), \fBsetrctl\fR(2),

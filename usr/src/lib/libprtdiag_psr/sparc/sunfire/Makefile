@@ -19,6 +19,7 @@
 # CDDL HEADER END
 #
 #
+# Copyright 2016 Gary Mills
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -42,6 +43,9 @@ $(USR_PLAT_DIR)/$(PLATFORM)/lib/libprtdiag_psr.so.1 := FILEMODE= 0755
 PLATLIBS= $(USR_PLAT_DIR)/$(PLATFORM)/lib/
 
 install:	all $(USR_PSM_LIBS)
+
+$(USR_PSM_LIB_DIR):
+	cd $(UTSBASE)/sun4u/sunfire; $(MAKE) $(USR_PSM_LIB_DIR)
 
 #
 # install rule

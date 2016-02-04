@@ -459,9 +459,6 @@ typedef struct {
 #define	VM_CPU_DATA_PADSIZE						\
 	(P2ROUNDUP(sizeof (vm_cpu_data_t), L2CACHE_ALIGN_MAX))
 
-/* for boot cpu before kmem is initialized */
-extern char	vm_cpu_data0[];
-
 /*
  * When a bin is empty, and we can't satisfy a color request correctly,
  * we scan.  If we assume that the programs have reasonable spatial
