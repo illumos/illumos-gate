@@ -47,7 +47,9 @@ UTSBASE	= ../..
 MODULE		= lxautofs
 OBJECTS		= $(LX_AUTOFS_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(LX_AUTOFS_OBJS:%.o=$(LINTS_DIR)/%.ln)
-ROOTMODULE	= $(USR_FS_DIR)/$(MODULE)
+ROOTMODULE	= $(USR_DRV_DIR)/$(MODULE)
+ROOTLINK	= $(USR_FS_DIR)/$(MODULE)
+CONF_SRCDIR	= $(UTSBASE)/common/brand/lx/autofs
 
 INC_PATH	+= -I$(UTSBASE)/common/brand/lx
 
@@ -61,7 +63,7 @@ include $(UTSBASE)/intel/Makefile.intel
 #
 ALL_TARGET	= $(BINARY)
 LINT_TARGET	= $(MODULE).lint
-INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
+INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTLINK) $(ROOT_CONFFILE)
 
 #
 #	Overrides.
@@ -96,6 +98,9 @@ modlintlib:	$(MODLINTLIB_DEPS)
 clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
+
+$(ROOTLINK):    $(ROOT_FS_DIR) $(ROOTMODULE)
+	-$(RM) $@; ln $(ROOTMODULE) $@
 
 #
 #	Include common targets.

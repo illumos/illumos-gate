@@ -93,11 +93,21 @@ typedef struct lx_autofs_vfs {
 	 */
 	ulong_t		lav_timeout;
 
+	/* ioctl-set catatonic value (prevents future mounts).  */
+	boolean_t	lav_catatonic;
+
+	/* Mount initiator's uid/gid for recovery handling. */
+	uid_t		lav_uid;
+	gid_t		lav_gid;
+
 	/* Each automount requests needs a unique id. */
 	id_space_t	*lav_ids;
 
 	/* All remaining structure members are protected by lav_lock. */
 	kmutex_t	lav_lock;
+	/* openmount counter */
+	int		lav_openmnt_cnt;
+
 
 	/* Hashes to keep track of outstanding automounter requests. */
 	mod_hash_t	*lav_path_hash;

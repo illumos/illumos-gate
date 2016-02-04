@@ -31,46 +31,46 @@
 #define	_LX_AUTOFS_H
 
 /*
- * The lxautofs filesystem exists to emulate the Linux autofs filesystem
- * and provide support for the Linux "automount" automounter.
+ * The lxautofs filesystem and driver exist to emulate the Linux autofs
+ * filesystem and /dev/autofs device (this code emulates both). The
+ * purpose is to provide support for the Linux "automount" automounter.
  *
- * We emulate parts of the Linux autofs v4 file system (which confusingly uses
- * the v5 autofs protocol to user-land).
+ * The device ioctls map fairly closely to the filesystem ioctls. The device
+ * ioctls have superseded the filesystem ioctls and the automounter will
+ * use the device ioctls if the device exists.
+ *
+ * The device ioctls are used by the automounter to perform recovery
+ * in cases where the automounter is restarted while mounts are present. It
+ * also allows for better management operations when a filesystem is mounted
+ * on top of an autofs mountpoint, as in the case of an NFS direct mount on
+ * top of an autofs mount.
  *
  *
  * +++ Linux automounter background.
  *
- * Linux has two automounters: "amd" and "automount"
+ * Linux has two automounters: "amd" (not used in any popular, modern distro)
+ * and "automount".
  *
- * 1) "amd" is a userland NFS server.  It basically mounts an NFS filesystem
- * at an automount point, and it acts as the NFS server for the mount.  When
- * an access is done to that NFS filesystem, the access is redirected by the
- * kernel to the "amd" process via rpc.  "amd" then looks up any information
- * required to resolve the requests, mounts real NFS filesystems if
- * necessary, and returns.  "amd" has it's own strange configuration
- * mechanism that doesn't seem to be very compatabile with illumos's network
- * based automounter map support.
- *
- * 2) "automount" is the other Linux automounter.  It utilizes a kernel
- * filesystem (autofs) to provide it's functionality.  Basically, it mounts
- * the autofs filesystem at any automounter controlled mountpoint.  This
- * filesystem then intercepts and redirects lookup operations (or expire ops)
+ * "automount" is the normal Linux automounter.  It utilizes a kernel
+ * filesystem (autofs) and device (/dev/autofs) to provide its functionality.
+ * Basically, it mounts the autofs filesystem at any automounter controlled
+ * mountpoint. This filesystem then intercepts and redirects lookup operations
  * to the userland automounter process via a pipe. The pipe to the automounter
- * is established via mount options when the autofs filesystem is mounted. When
- * the automounter recieves a request via this pipe, it does lookups (or
- * unmounts) to whatever backing store it's configured to use, does mkdir
- * operations on the autofs filesystem, mounts remote NFS filesystems on any
- * leaf directories it just created, and signals the autofs filesystem via an
- * ioctl to let it know that the lookup (or expire) can continue.
+ * is established via a mount option when the autofs filesystem is mounted or
+ * via the setpipefd ioctl if the automounter restarts. When the automounter
+ * receives a request via this pipe, it does lookups (or unmounts) to whatever
+ * backing store it's configured to use, does mkdir operations on the autofs
+ * filesystem, mounts remote NFS filesystems on any directories it manages or
+ * just created, and signals the autofs device via an ioctl to let it know
+ * that the lookup (or expire) can continue. Other management operations (such
+ * as querying expiration for unmounting) are performed using the autofs device.
  *
  *
  * +++ Linux autofs documentation.
  *
  * Within the Linux src tree, see the file:
- * Documentation/filesystems/autofs4-mount-control.txt. This documents some
- * of the autofs behavior and the dev ioctls (which we currently do not
- * support). The dev ioctls are used for recovery if the automounter dies, or
- * is killed, and restarted.
+ * Documentation/filesystems/autofs4-mount-control.txt
+ * This documents some of the autofs behavior and the device driver ioctls.
  *
  * The following URL (https://lwn.net/Articles/606960/) documents autofs in
  * general. This patch was targeted for Documentation/filesystems/autofs4.txt,
@@ -79,14 +79,23 @@
  *
  * +++ Linux autofs (and automount daemon) notes
  *
- * Since we're mimicking the behavior of the Linux autofs filesystem it's
- * important to document some of it's observed behavior here. There are
- * multiple versions of the autofs kernel API protocol and modern
- * implementations of the user-land automount daemon depend on v5.
+ * Since we're mimicking the behavior of the Linux autofs filesystem and
+ * device, we document some of the observed behavior here.
  *
- * Our original autofs implementation was developed in the mid-2000s around
- * the v2 protocol, but that is currently obsolete. Our current implementation
- * is based around the v5 protocol API.
+ * There are multiple versions of the autofs filesystem kernel API protocol
+ * and modern implementations of the user-land automount daemon would depend
+ * on v5, although the filesystem API has been superseded by the driver ioctl
+ * API, which is roughly similar.
+ *
+ * We'll describe the filesystem ioctls first, since support for those was
+ * implemented first. The device ioctls roughly correspond to the filesystem
+ * ioctls and were implemented last, but the automounter will use those
+ * ioctls, instead of the filesystem ioctls, when the device is present.
+ *
+ * Our original autofs implementation was developed in the mid-2000s around the
+ * v2 protocol, but that is currently obsolete. Our current implementation is
+ * based around the v5 protocol API. There was no autofs device support at that
+ * time.
  *
  * The autoumounter supports 3 different, mutually exclusive, mount options for
  * each mountpoint:
@@ -203,6 +212,11 @@
  * obtain the name of a mountpoint which the automounter can unmount.
  * Unmounting is dicussed in more detail below.
  *
+ * H) The device ioctls roughly correspond to the filesystem ioctls, but
+ * instead of being tied to an auotfs mountpoint vnode, they can be called any
+ * time. The argument structure uses either a path or an autofs pipe file
+ * descriptor to indicate what is being operated on.
+ *
  * +++ lxautofs notes
  *
  * 1) In general, the lxautofs filesystem tries to mimic the behavior of the
@@ -264,14 +278,14 @@
  * 4) Unmounting
  *
  * The automounter has a timeout associated with each mount. It informs autofs
- * of this timeout using the LX_AUTOFS_IOC_SETTIMEOUT ioctl after autofs has
- * been mounted on the mountpoint.
+ * of this timeout using the LX_AUTOFS_DEV_IOC_TIMEOUT_CMD ioctl after autofs
+ * has been mounted on the mountpoint.
  *
  * After the automounter has mounted something associated with the mountpoint
  * then periodically (<timeout>/4 seconds) the automounter will issue the
- * LX_AUTOFS_IOC_EXPIRE_MULTI ioctl on the autofs mount. autofs is expected to
- * respond with one or more underlying mountpoint entries which are candidates
- * for unmounting. The automounter will attempt to unmount the filesystem
+ * LX_AUTOFS_DEV_IOC_EXPIRE_CMD ioctl on the autofs mount. autofs is expected
+ * to respond with an underlying mountpoint entry which is a candidate for
+ * unmounting. The automounter will attempt to unmount the filesystem
  * (which may fail if it is busy, since this is obviously racy) and then
  * acknowledge the expire ioctl. The successful acknowledgement is independent
  * of the success of unmounting the underlying filesystem.
@@ -282,13 +296,13 @@
  * To support 'indirect' mount expiration, the autofs vfs keeps track of the
  * filesystems mounted immediately under the autofs mountpoint (in
  * lav_mnt_list) after a lookup has completed successfully. Upon receipt of the
- * LX_AUTOFS_IOC_EXPIRE_MULTI ioctl, autofs removes the first element from the
- * list, attempts to check if it is busy and if not, returns that mountpoint
- * as the ioctl response (if busy the entry is added to the end of the list).
- * When the ioctl is acknowledged, if the mountpoint still exists, that
- * means the unmount failed and the entry is added at the back of the list. If
- * there are no elements or the first one is busy, EAGAIN is returned for the
- * 'expire' ioctl and the autoumounter will check again in <timeout>/4 seconds.
+ * LX_AUTOFS_IOC_DEV_EXPIRE_CMD ioctl, autofs removes the first element from
+ * the list, attempts to check if it is busy and if not, returns that mountpoint
+ * over the fifo (if busy the entry is added to the end of the list). When the
+ * ioctl is acknowledged, if the mountpoint still exists, that means the unmount
+ * failed and the entry is added at the back of the list. If there are no
+ * elements or the first one is busy, EAGAIN is returned for the 'expire' ioctl
+ * and the autoumounter will check again in <timeout>/4 seconds.
  *
  * For example, if /home is an autofs indirect mount, then there are typically
  * many different {username}-specific NFS mounts under that /home autofs mount.
@@ -333,6 +347,21 @@
  * mounts under /net/jurassic. We umount those using the lx_autofs_umount_offset
  * function and respond to the automounter expire ioctl with "jurassic", in the
  * same way as we would for any other indirect mount.
+ *
+ * 5) Recovery
+ *
+ * If the automounter is restarted for any reason, it needs to cope with
+ * pre-existing autofs mounts, as well as other automount-initiated mounts (e.g.
+ * a direct mount on top of an autofs mountpoint). The automounter uses the
+ * /proc/mounts file to correlate mounts to the managed mountpoints. It then
+ * uses the /dev/autofs device to openmount each of the autofs devices and
+ * reinitialize them using the various dev ioctls (timeout, requester, etc.).
+ *
+ * In general, the autoumounter will closemount the mountpoint once it's done,
+ * but it doesn't in the case of an offset mountpoint with nothing mounted
+ * on top. In this case the automounter expects autofs to expire that mountpoint
+ * before it will closemount (so things can subsequently cleanup). We handle
+ * this special case in the expire code path.
  */
 
 #ifdef	__cplusplus
@@ -345,6 +374,8 @@ extern "C" {
  * system names are limited to 8 characters.
  */
 #define	LX_AUTOFS_NAME			"lxautofs"
+
+#define	LX_AUTOFS_MINORNAME		"autofs"
 
 /*
  * Mount options supported.
@@ -454,6 +485,24 @@ union lx_autofs_pkt {
 #define	LX_AUTOFS_IOC_EXPIRE_MULTI	0x40049366 /* arg: int */
 #define	LX_AUTOFS_IOC_EXPIRE_INDIRECT	LX_AUTOFS_IOC_EXPIRE_MULTI
 #define	LX_AUTOFS_IOC_EXPIRE_DIRECT	LX_AUTOFS_IOC_EXPIRE_MULTI
+
+/*
+ * autofs device ioctls
+ */
+#define	LX_AUTOFS_DEV_IOC_VERSION_CMD		0xc0189371
+#define	LX_AUTOFS_DEV_IOC_PROTOVER_CMD		0xc0189372
+#define	LX_AUTOFS_DEV_IOC_PROTOSUBVER_CMD	0xc0189373
+#define	LX_AUTOFS_DEV_IOC_OPENMOUNT_CMD		0xc0189374
+#define	LX_AUTOFS_DEV_IOC_CLOSEMOUNT_CMD	0xc0189375
+#define	LX_AUTOFS_DEV_IOC_READY_CMD		0xc0189376
+#define	LX_AUTOFS_DEV_IOC_FAIL_CMD		0xc0189377
+#define	LX_AUTOFS_DEV_IOC_SETPIPEFD_CMD		0xc0189378
+#define	LX_AUTOFS_DEV_IOC_CATATONIC_CMD		0xc0189379
+#define	LX_AUTOFS_DEV_IOC_TIMEOUT_CMD		0xc018937a
+#define	LX_AUTOFS_DEV_IOC_REQUESTER_CMD		0xc018937b
+#define	LX_AUTOFS_DEV_IOC_EXPIRE_CMD		0xc018937c
+#define	LX_AUTOFS_DEV_IOC_ASKUMOUNT_CMD		0xc018937d
+#define	LX_AUTOFS_DEV_IOC_ISMOUNTPOINT_CMD	0xc018937e
 
 #ifdef	__cplusplus
 }
