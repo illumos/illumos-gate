@@ -472,7 +472,6 @@ file path=usr/include/kmftypes.h
 file path=usr/include/kstat.h
 file path=usr/include/kvm.h
 file path=usr/include/langinfo.h
-file path=usr/include/lastlog.h
 file path=usr/include/lber.h
 file path=usr/include/ldap.h
 file path=usr/include/libcontract.h

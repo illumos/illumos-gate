@@ -39,6 +39,7 @@ usr/include/bsm/audit_door_infc.h
 usr/include/bsm/audit_private.h
 usr/include/bsm/devalloc.h
 usr/include/getxby_door.h
+usr/include/lastlog.h
 usr/include/passwdutil.h
 usr/include/priv_utils.h
 usr/include/rpcsvc/daemon_utils.h
