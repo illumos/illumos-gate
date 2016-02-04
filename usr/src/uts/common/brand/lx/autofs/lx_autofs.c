@@ -30,6 +30,7 @@
  */
 
 #include <fs/fs_subr.h>
+#include <sys/stat.h>
 #include <sys/atomic.h>
 #include <sys/cmn_err.h>
 #include <sys/dirent.h>
@@ -38,6 +39,7 @@
 #include <sys/mount.h>
 #include <sys/policy.h>
 #include <sys/sunddi.h>
+#include <sys/conf.h>
 #include <sys/sdt.h>
 
 #include <sys/sysmacros.h>
@@ -65,6 +67,29 @@ static vnodeops_t		*lx_autofs_vn_ops = NULL;
 static int			lx_autofs_fstype;
 static major_t			lx_autofs_major;
 static minor_t			lx_autofs_minor = 0;
+static dev_info_t		*lx_autofs_dip = NULL;
+
+#define	LX_AUTOFS_DEV_VERSION_MAJOR	1
+#define	LX_AUTOFS_DEV_VERSION_MINOR	0
+
+/* The Linux autofs superblock magic number */
+#define	LX_AUTOFS_SB_MAGIC	0x0187
+
+/* Linux autofs mount types */
+#define	LX_AUTOFS_TYPE_INDIRECT		1
+#define	LX_AUTOFS_TYPE_DIRECT		2
+#define	LX_AUTOFS_TYPE_OFFSET		4
+
+/* Structure passed for autofs dev ioctls */
+typedef struct lx_autofs_dv_ioctl {
+	uint32_t lad_ver_major;
+	uint32_t lad_ver_minor;
+	uint32_t lad_size;
+	uint32_t lad_ioctlfd;
+	uint32_t lad_arg1;
+	uint32_t lad_arg2;
+	char	lad_path[0];
+} lx_autofs_dv_ioctl_t;
 
 /*
  * Support functions
@@ -155,7 +180,7 @@ lx_autofs_fifo_peer_vp(vnode_t *vp)
 static vnode_t *
 lx_autofs_vn_alloc(vfs_t *vfsp, vnode_t *uvp)
 {
-	lx_autofs_vfs_t	*data = vfsp->vfs_data;
+	lx_autofs_vfs_t	*data = (lx_autofs_vfs_t *)vfsp->vfs_data;
 	vnode_t		*vp, *vp_old;
 
 	/* Allocate a new vnode structure in case we need it. */
@@ -207,7 +232,7 @@ static void
 lx_autofs_vn_free(vnode_t *vp)
 {
 	vfs_t		*vfsp = vp->v_vfsp;
-	lx_autofs_vfs_t	*data = vfsp->vfs_data;
+	lx_autofs_vfs_t	*data = (lx_autofs_vfs_t *)vfsp->vfs_data;
 	vnode_t		*uvp = vp->v_data;
 	vnode_t	*vp_tmp;
 
@@ -969,7 +994,7 @@ lx_autofs_automounter_call(vnode_t *dvp, char *nm)
 	boolean_t		is_dup;
 
 	/* Get a pointer to the vfs mount data. */
-	data = dvp->v_vfsp->vfs_data;
+	data = (lx_autofs_vfs_t *)dvp->v_vfsp->vfs_data;
 
 	/* The automounter only supports queries in the root directory. */
 	if (dvp != data->lav_root)
@@ -1078,9 +1103,10 @@ lx_autofs_may_unmount(vfs_t *vfsp, struct cred *cr)
 	if (vfsp->vfs_count > 2)
 		return (B_FALSE);
 
-	/* Check for any remaining holds on the root vnode. */
-	data = vfsp->vfs_data;
+	data = (lx_autofs_vfs_t *)vfsp->vfs_data;
 	ASSERT(data->lav_root->v_vfsp == vfsp);
+
+	/* Check for any remaining holds on the root vnode. */
 	if (data->lav_root->v_count > 1)
 		return (B_FALSE);
 
@@ -1226,7 +1252,7 @@ errexit:
  * Note that lx_autofs_automounter_call() only supports queries in the root
  * directory, so all mntent names are relative to that.
  */
-static void
+static int
 lx_autofs_expire(vfs_t *vfsp, struct cred *cr)
 {
 	lx_autofs_vfs_t *data;
@@ -1238,7 +1264,7 @@ lx_autofs_expire(vfs_t *vfsp, struct cred *cr)
 	boolean_t busy = B_FALSE;
 	char exp_path[MAXPATHLEN];
 
-	data = vfsp->vfs_data;
+	data = (lx_autofs_vfs_t *)vfsp->vfs_data;
 
 	/*
 	 * We process only the first element (i.e. do not do multi). This
@@ -1247,8 +1273,41 @@ lx_autofs_expire(vfs_t *vfsp, struct cred *cr)
 	mutex_enter(&data->lav_lock);
 	mp = (lx_autofs_mntent_t *)list_remove_head(&data->lav_mnt_list);
 	mutex_exit(&data->lav_lock);
-	if (mp == NULL)
-		return;
+	if (mp == NULL) {
+		if (data->lav_mnttype == LXAMT_OFFSET) {
+			/*
+			 * During restart the automounter will openmount each
+			 * offset mount for management. It won't closemount the
+			 * offset mount until we expire it, even though nothing
+			 * is mounted over that offset. We handle this as a
+			 * special expiration case.
+			 */
+			int cnt;
+
+			mutex_enter(&data->lav_lock);
+			cnt = data->lav_openmnt_cnt;
+			mutex_exit(&data->lav_lock);
+
+			if (cnt == 1 && vn_ismntpt(data->lav_root) == 0) {
+				char *mntpt = (char *)
+				    refstr_value(vfsp->vfs_mntpt);
+				char *nm = ZONE_PATH_TRANSLATE(mntpt, curzone);
+
+				mp = kmem_zalloc(sizeof (lx_autofs_mntent_t),
+				    KM_SLEEP);
+				mp->lxafme_len = strlen(nm) + 1;
+				mp->lxafme_path = kmem_zalloc(mp->lxafme_len,
+				    KM_SLEEP);
+				mp->lxafme_ts = TICK_TO_SEC(ddi_get_lbolt64());
+				(void) strlcpy(mp->lxafme_path, nm,
+				    mp->lxafme_len);
+
+				goto exp_offset;
+			}
+		}
+
+		return (EAGAIN);
+	}
 
 	/*
 	 * We only return an expired mount if it is inactive for the full
@@ -1262,7 +1321,7 @@ lx_autofs_expire(vfs_t *vfsp, struct cred *cr)
 			mutex_enter(&data->lav_lock);
 			list_insert_tail(&data->lav_mnt_list, mp);
 			mutex_exit(&data->lav_lock);
-			return;
+			return (EAGAIN);
 		}
 	}
 
@@ -1278,16 +1337,6 @@ lx_autofs_expire(vfs_t *vfsp, struct cred *cr)
 	if (fnd_vfs != NULL) {
 		boolean_t skip = B_FALSE;
 		vfssw_t *vfssw;
-		char *vfsmp = (char *)refstr_value(fnd_vfs->vfs_mntpt);
-
-		/*
-		 * Check if we found a sub-mount. This happens with an offset
-		 * mount below an indirect mount subdirectory.
-		 */
-		if (strcmp(exp_path, vfsmp) != 0) {
-			busy = B_TRUE;
-			skip = B_TRUE;
-		}
 
 		/*
 		 * If it's an NFS file system (typical) then we check in
@@ -1353,7 +1402,7 @@ lx_autofs_expire(vfs_t *vfsp, struct cred *cr)
 		mutex_enter(&data->lav_lock);
 		list_insert_tail(&data->lav_mnt_list, mp);
 		mutex_exit(&data->lav_lock);
-		return;
+		return (EAGAIN);
 	}
 
 	/*
@@ -1361,6 +1410,7 @@ lx_autofs_expire(vfs_t *vfsp, struct cred *cr)
 	 * to the automounter in a similar way.
 	 */
 
+exp_offset:
 	/* Verify that the automount process pipe still exists. */
 	mutex_enter(&data->lav_lock);
 	if (data->lav_fifo_wr == NULL) {
@@ -1424,20 +1474,38 @@ lx_autofs_expire(vfs_t *vfsp, struct cred *cr)
 	}
 
 	lx_autofs_la_release(data, laar);
-	return;
+	return (0);
 
 err_free:
 	kmem_free(mp->lxafme_path, mp->lxafme_len);
 	kmem_free(mp, sizeof (lx_autofs_mntent_t));
+	return (EAGAIN);
+}
+
+static int
+lx_autofs_ack(int reqid, vfs_t *vfsp, enum lx_autofs_callres result)
+{
+	lx_autofs_vfs_t	*data;
+	lx_autofs_automnt_req_t	*laar;
+
+	data = (lx_autofs_vfs_t *)vfsp->vfs_data;
+	if ((laar = lx_autofs_la_find(data, reqid)) == NULL)
+		return (ENXIO);
+
+	/* Mark the request as complete and release it. */
+	laar->laar_result = result;
+	lx_autofs_la_complete(data, laar);
+	lx_autofs_la_release(data, laar);
+	return (0);
 }
 
 static int
 lx_autofs_automounter_ioctl(vnode_t *vp, int cmd, intptr_t arg, cred_t *cr)
 {
 	lx_autofs_vfs_t *data = (lx_autofs_vfs_t *)vp->v_vfsp->vfs_data;
-	lx_autofs_automnt_req_t	*laar;
 	int			id = arg;
 	int			v;
+	int			err;
 
 	/*
 	 * Be strict.
@@ -1452,20 +1520,13 @@ lx_autofs_automounter_ioctl(vnode_t *vp, int cmd, intptr_t arg, cred_t *cr)
 
 	switch (cmd) {
 	case LX_AUTOFS_IOC_READY:
+		if ((err = lx_autofs_ack(id, vp->v_vfsp, LXACR_READY)) != 0)
+			return (err);
+		return (0);
+
 	case LX_AUTOFS_IOC_FAIL:
-		/*
-		 * We don't actually care if the request failed or succeeded.
-		 * We do the same thing either way.
-		 */
-		if ((laar = lx_autofs_la_find(data, id)) == NULL)
-			return (ENXIO);
-
-		laar->laar_result = ((cmd == LX_AUTOFS_IOC_READY) ?
-		    LXACR_READY : LXACR_FAIL);
-
-		/* Mark the request as complete and release it. */
-		lx_autofs_la_complete(data, laar);
-		lx_autofs_la_release(data, laar);
+		if ((err = lx_autofs_ack(id, vp->v_vfsp, LXACR_FAIL)) != 0)
+			return (err);
 		return (0);
 
 	case LX_AUTOFS_IOC_CATATONIC:
@@ -1475,14 +1536,14 @@ lx_autofs_automounter_ioctl(vnode_t *vp, int cmd, intptr_t arg, cred_t *cr)
 
 	case LX_AUTOFS_IOC_PROTOVER:
 		v = LX_AUTOFS_PROTO_VERS5;
-		if (copyout(&v, (caddr_t)arg, sizeof (int)))
-			return (set_errno(EFAULT));
+		if (copyout(&v, (caddr_t)arg, sizeof (int)) != 0)
+			return (EFAULT);
 		return (0);
 
 	case LX_AUTOFS_IOC_PROTOSUBVER:
 		v = LX_AUTOFS_PROTO_SUBVERSION;
-		if (copyout(&v, (caddr_t)arg, sizeof (int)))
-			return (set_errno(EFAULT));
+		if (copyout(&v, (caddr_t)arg, sizeof (int)) != 0)
+			return (EFAULT);
 		return (0);
 
 	case LX_AUTOFS_IOC_ASKUMOUNT:
@@ -1495,18 +1556,14 @@ lx_autofs_automounter_ioctl(vnode_t *vp, int cmd, intptr_t arg, cred_t *cr)
 		if (lx_autofs_may_unmount(vp->v_vfsp, cr))
 			v = 0;
 
-		if (copyout(&v, (caddr_t)arg, sizeof (int)))
-			return (set_errno(EFAULT));
+		if (copyout(&v, (caddr_t)arg, sizeof (int)) != 0)
+			return (EFAULT);
 		return (0);
 
 	case LX_AUTOFS_IOC_SETTIMEOUT:
-		/*
-		 * We currently don't use the timeout, but we keep track of
-		 * it in case we want to use it as an expiration hint in the
-		 * future.
-		 */
-		if (copyin((caddr_t)arg, &data->lav_timeout, sizeof (ulong_t)))
-			return (set_errno(EFAULT));
+		if (copyin((caddr_t)arg, &data->lav_timeout, sizeof (ulong_t))
+		    != 0)
+			return (EFAULT);
 		return (0);
 
 	case LX_AUTOFS_IOC_EXPIRE:
@@ -1743,7 +1800,7 @@ lx_autofs_unmount(vfs_t *vfsp, int flag, struct cred *cr)
 		return (EBUSY);
 
 	/* Check for any remaining holds on the root vnode. */
-	data = vfsp->vfs_data;
+	data = (lx_autofs_vfs_t *)vfsp->vfs_data;
 	ASSERT(data->lav_root->v_vfsp == vfsp);
 	if (data->lav_root->v_count > 1)
 		return (EBUSY);
@@ -1792,7 +1849,7 @@ lx_autofs_unmount(vfs_t *vfsp, int flag, struct cred *cr)
 static int
 lx_autofs_root(vfs_t *vfsp, vnode_t **vpp)
 {
-	lx_autofs_vfs_t	*data = vfsp->vfs_data;
+	lx_autofs_vfs_t	*data = (lx_autofs_vfs_t *)vfsp->vfs_data;
 
 	*vpp = data->lav_root;
 	VN_HOLD(*vpp);
@@ -1803,7 +1860,7 @@ lx_autofs_root(vfs_t *vfsp, vnode_t **vpp)
 static int
 lx_autofs_statvfs(vfs_t *vfsp, statvfs64_t *sp)
 {
-	lx_autofs_vfs_t	*data = vfsp->vfs_data;
+	lx_autofs_vfs_t	*data = (lx_autofs_vfs_t *)vfsp->vfs_data;
 	vnode_t		*urvp = data->lav_root->v_data;
 	dev32_t		d32;
 	int		error;
@@ -1883,7 +1940,7 @@ static vnode_t *
 lx_autofs_do_direct(vnode_t *vp)
 {
 	vfs_t	*vfsp = vp->v_vfsp;
-	lx_autofs_vfs_t *data = vfsp->vfs_data;
+	lx_autofs_vfs_t *data = (lx_autofs_vfs_t *)vfsp->vfs_data;
 	vnode_t *nvp;
 	boolean_t skip_am_call = B_FALSE;
 
@@ -2015,6 +2072,7 @@ lx_autofs_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 	vnode_t		*uvp = vp->v_data;
 	vnode_t		*dvp;
 	int		error;
+	lx_autofs_vfs_t *data = (lx_autofs_vfs_t *)vp->v_vfsp->vfs_data;
 
 	if ((dvp = lx_autofs_do_direct(vp)) != NULL) {
 		uvp = dvp;
@@ -2025,9 +2083,20 @@ lx_autofs_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 	if (dvp != NULL) {
 		/* we operated on the direct mounted fs */
 		VN_RELE(dvp);
+		if (error == 0) {
+			/*
+			 * During automounter restart recovery the automounter
+			 * will fstat the fd provided in the setpipe ioctl. It
+			 * uses the resulting inode & dev to correlate future
+			 * autofs fifo requests to the correct entry. Thus, we
+			 * have to update the attributes with our own id's.
+			 */
+			vap->va_fsid = data->lav_dev;
+			vap->va_nodeid = data->lav_ino;
+		}
 	} else if (error == 0) {
 		/* Update the attributes with our filesystem id. */
-		vap->va_fsid = vp->v_vfsp->vfs_dev;
+		vap->va_fsid = data->lav_dev;
 	}
 
 	return (error);
@@ -2071,7 +2140,7 @@ lx_autofs_mkdir(vnode_t *dvp, char *nm, struct vattr *vap, vnode_t **vpp,
 static void
 lx_autofs_inactive(struct vnode *vp, struct cred *cr, caller_context_t *ctp)
 {
-	lx_autofs_vfs_t	*data = vp->v_vfsp->vfs_data;
+	lx_autofs_vfs_t	*data = (lx_autofs_vfs_t *)vp->v_vfsp->vfs_data;
 
 	/*
 	 * We need to hold the vfs lock because if we're going to free
@@ -2107,8 +2176,10 @@ lx_autofs_lookup(vnode_t *dvp, char *nm, vnode_t **vpp, struct pathname *pnp,
 {
 	vnode_t			*udvp = dvp->v_data;
 	vnode_t			*uvp = NULL;
-	lx_autofs_vfs_t		*data = dvp->v_vfsp->vfs_data;
+	lx_autofs_vfs_t		*data;
 	int			error = ENOENT;
+
+	data = (lx_autofs_vfs_t *)dvp->v_vfsp->vfs_data;
 
 	/*
 	 * For an indirect mount first try to lookup if this path component
@@ -2125,6 +2196,13 @@ lx_autofs_lookup(vnode_t *dvp, char *nm, vnode_t **vpp, struct pathname *pnp,
 	/* Only query the automounter if the path does not exist. */
 	if (error != ENOENT)
 		return (error);
+
+	if (data->lav_catatonic)
+		return (ENOENT);
+
+	/* Save the uid/gid for the requestor ioctl. */
+	data->lav_uid = crgetuid(cr);
+	data->lav_gid = crgetgid(cr);
 
 	/* Refer the lookup to the automounter. */
 	if ((error = lx_autofs_automounter_call(dvp, nm)) != 0)
@@ -2210,8 +2288,669 @@ static const fs_operation_def_t lx_autofs_tops_root[] = {
 };
 
 /*
+ * DEV-specific entry points
+ */
+
+/*ARGSUSED*/
+static int
+lx_autofs_dev_open(dev_t *devp, int flags, int otyp, cred_t *credp)
+{
+	return (0);
+}
+
+/*ARGSUSED*/
+static int
+lx_autofs_dev_close(dev_t dev, int flags, int otyp, cred_t *credp)
+{
+	return (0);
+}
+
+static int
+lx_autofs_dev_validate_cmd(intptr_t arg, lx_autofs_dv_ioctl_t *dcmd)
+{
+	if (copyin((caddr_t)arg, dcmd, sizeof (lx_autofs_dv_ioctl_t)) != 0)
+		return (EFAULT);
+
+	if (dcmd->lad_ver_major != LX_AUTOFS_DEV_VERSION_MAJOR ||
+	    dcmd->lad_ver_minor > LX_AUTOFS_DEV_VERSION_MINOR)
+		return (EINVAL);
+
+	DTRACE_PROBE1(lx__dev__cmd, void *, dcmd);
+
+	/* Fill in the version for return */
+	dcmd->lad_ver_major = LX_AUTOFS_DEV_VERSION_MAJOR;
+	dcmd->lad_ver_minor = LX_AUTOFS_DEV_VERSION_MINOR;
+	return (0);
+}
+
+static vfs_t *
+lx_autofs_dev_getvfs_bypath(char *fs_mntpt)
+{
+	struct vfs *vfsp;
+	struct vfs *vfslist;
+	vfs_t *fnd_vfs = NULL;
+	zone_t *zone = curzone;
+
+	vfs_list_read_lock();
+
+	vfsp = vfslist = curzone->zone_vfslist;
+	if (vfslist == NULL) {
+		vfs_list_unlock();
+		return (NULL);
+	}
+
+	do {
+		if (vfsp->vfs_op == lx_autofs_vfsops) {
+			char *mntpt = (char *)refstr_value(vfsp->vfs_mntpt);
+
+			if (strcmp(fs_mntpt, ZONE_PATH_TRANSLATE(mntpt, zone))
+			    == 0) {
+				fnd_vfs = vfsp;
+				VFS_HOLD(fnd_vfs)
+				break;
+			}
+		}
+		vfsp = vfsp->vfs_zone_next;
+	} while (vfsp != vfslist);
+
+	vfs_list_unlock();
+
+	return (fnd_vfs);
+}
+
+static int
+lx_autofs_dev_fd_preamble(intptr_t arg, lx_autofs_dv_ioctl_t *dc, vfs_t **vfspp)
+{
+	int err;
+	lx_autofs_vfs_t	*data;
+	file_t *fp;
+	vfs_t *vfsp;
+
+	if ((err = lx_autofs_dev_validate_cmd(arg, dc)) != 0)
+		return (err);
+
+	if ((fp = getf(dc->lad_ioctlfd)) == NULL)
+		return (EBADF);
+
+	vfsp = fp->f_vnode->v_vfsp;
+	if (vfsp->vfs_op != lx_autofs_vfsops) {
+		releasef(dc->lad_ioctlfd);
+		return (EBADF);
+	}
+
+	data = (lx_autofs_vfs_t *)vfsp->vfs_data;
+	if (data->lav_root->v_count <= 1) {
+		releasef(dc->lad_ioctlfd);
+		return (EBADF);
+	}
+
+	VFS_HOLD(vfsp);
+	*vfspp = vfsp;
+
+	releasef(dc->lad_ioctlfd);
+	return (0);
+}
+
+static int
+lx_autofs_dev_vers(intptr_t arg)
+{
+	int err;
+	lx_autofs_dv_ioctl_t dcmd;
+
+	if ((err = lx_autofs_dev_validate_cmd(arg, &dcmd)) != 0)
+		return (err);
+
+	if (copyout(&dcmd, (caddr_t)arg, sizeof (dcmd)) != 0)
+		return (EFAULT);
+
+	return (0);
+}
+
+static int
+lx_autofs_dev_protver(intptr_t arg)
+{
+	int err;
+	lx_autofs_dv_ioctl_t dcmd;
+
+	if ((err = lx_autofs_dev_validate_cmd(arg, &dcmd)) != 0)
+		return (err);
+
+	dcmd.lad_arg1 = LX_AUTOFS_PROTO_VERS5;
+
+	if (copyout(&dcmd, (caddr_t)arg, sizeof (dcmd)) != 0)
+		return (EFAULT);
+
+	return (0);
+}
+
+static int
+lx_autofs_dev_protosubver(intptr_t arg)
+{
+	int err;
+	lx_autofs_dv_ioctl_t dcmd;
+
+	if ((err = lx_autofs_dev_validate_cmd(arg, &dcmd)) != 0)
+		return (err);
+
+	dcmd.lad_arg1 = LX_AUTOFS_PROTO_SUBVERSION;
+
+	if (copyout(&dcmd, (caddr_t)arg, sizeof (dcmd)) != 0)
+		return (EFAULT);
+
+	return (0);
+}
+
+static int
+lx_autofs_dev_get_path_cmd(intptr_t arg, lx_autofs_dv_ioctl_t **dcp)
+{
+	int err;
+	lx_autofs_dv_ioctl_t dcmd, *dc;
+
+	if ((err = lx_autofs_dev_validate_cmd(arg, &dcmd)) != 0)
+		return (err);
+
+	if (dcmd.lad_size <= sizeof (dcmd) ||
+	    dcmd.lad_size > (sizeof (dcmd) + MAXPATHLEN))
+		return (EINVAL);
+
+	dc = kmem_alloc(dcmd.lad_size, KM_SLEEP);
+
+	/* re-copyin the full struct with the path */
+	if (copyin((caddr_t)arg, dc, dcmd.lad_size) != 0) {
+		kmem_free(dc, dcmd.lad_size);
+		return (EFAULT);
+	}
+	dc->lad_size = dcmd.lad_size;
+
+	if (dc->lad_path[0] != '/' ||
+	    dc->lad_path[dcmd.lad_size - sizeof (dcmd) - 1] != '\0') {
+		kmem_free(dc, dcmd.lad_size);
+		return (EINVAL);
+	}
+
+	*dcp = dc;
+	return (0);
+}
+
+static int
+lx_autofs_dev_openmount(intptr_t arg)
+{
+	int err;
+	int fd;
+	lx_autofs_dv_ioctl_t *dc;
+	vfs_t *vfsp;
+	lx_autofs_vfs_t	*data;
+
+	if ((err = lx_autofs_dev_get_path_cmd(arg, &dc)) != 0)
+		return (err);
+
+	if ((vfsp = lx_autofs_dev_getvfs_bypath(dc->lad_path)) == NULL) {
+		kmem_free(dc, dc->lad_size);
+		return (EINVAL);
+	}
+
+	/* lad_arg1 is the dev number of the mnt but we don't check that */
+
+	/*
+	 * Do an "open" on the root vnode. To fully simulate "open" we also add
+	 * a hold on the root vnode itself since lx_autofs_open will only open
+	 * (and hold) the underlying vnode.
+	 */
+	data = (lx_autofs_vfs_t *)vfsp->vfs_data;
+	VN_HOLD(data->lav_root);
+	if ((err = fassign(&data->lav_root, FWRITE|FREAD, &fd)) != 0) {
+		VN_RELE(data->lav_root);
+		VFS_RELE(vfsp);
+		kmem_free(dc, dc->lad_size);
+		return (err);
+	}
+
+	mutex_enter(&data->lav_lock);
+	data->lav_openmnt_cnt++;
+	mutex_exit(&data->lav_lock);
+
+	dc->lad_ioctlfd = fd;
+
+	if (copyout(dc, (caddr_t)arg, sizeof (lx_autofs_dv_ioctl_t)) != 0) {
+		mutex_enter(&data->lav_lock);
+		data->lav_openmnt_cnt--;
+		mutex_exit(&data->lav_lock);
+		(void) closeandsetf(fd, NULL);
+		VFS_RELE(vfsp);
+		kmem_free(dc, dc->lad_size);
+		return (EFAULT);
+	}
+	VFS_RELE(vfsp);
+
+	kmem_free(dc, dc->lad_size);
+	return (0);
+}
+
+static int
+lx_autofs_dev_closemount(intptr_t arg)
+{
+	int err;
+	lx_autofs_dv_ioctl_t dcmd;
+	vfs_t *vfsp;
+	lx_autofs_vfs_t	*data;
+
+	if ((err = lx_autofs_dev_fd_preamble(arg, &dcmd, &vfsp)) != 0)
+		return (err);
+
+	data = (lx_autofs_vfs_t *)vfsp->vfs_data;
+
+	/* "close" the vnode */
+	if ((err = closeandsetf(dcmd.lad_ioctlfd, NULL)) != 0) {
+		VFS_RELE(vfsp);
+		return (err);
+	}
+
+	mutex_enter(&data->lav_lock);
+	ASSERT(data->lav_openmnt_cnt > 0);
+	data->lav_openmnt_cnt--;
+	mutex_exit(&data->lav_lock);
+
+	VFS_RELE(vfsp);
+	return (0);
+}
+
+static int
+lx_autofs_dev_ready(intptr_t arg)
+{
+	int err;
+	lx_autofs_dv_ioctl_t dcmd;
+	vfs_t *vfsp;
+
+	if ((err = lx_autofs_dev_fd_preamble(arg, &dcmd, &vfsp)) != 0)
+		return (err);
+
+	if ((err = lx_autofs_ack(dcmd.lad_arg1, vfsp, LXACR_READY)) != 0) {
+		VFS_RELE(vfsp);
+		return (err);
+	}
+
+	VFS_RELE(vfsp);
+	return (0);
+}
+
+static int
+lx_autofs_dev_fail(intptr_t arg)
+{
+	int err;
+	lx_autofs_dv_ioctl_t dcmd;
+	vfs_t *vfsp;
+
+	if ((err = lx_autofs_dev_fd_preamble(arg, &dcmd, &vfsp)) != 0)
+		return (err);
+
+	if ((err = lx_autofs_ack(dcmd.lad_arg1, vfsp, LXACR_FAIL)) != 0) {
+		VFS_RELE(vfsp);
+		return (err);
+	}
+
+	VFS_RELE(vfsp);
+	return (0);
+}
+
+/*
+ * Update the fifo pipe information we use to talk to the automounter. The
+ * ioctl is used when the automounter restarts. This logic is similar to the
+ * handling done in lx_autofs_parse_mntopt() when the filesytem is first
+ * mounted.
+ */
+static int
+lx_autofs_dev_setpipefd(intptr_t arg)
+{
+	int err;
+	lx_autofs_dv_ioctl_t dcmd;
+	vfs_t *vfsp;
+	lx_autofs_vfs_t	*data;
+	int fd, pgrp;
+	file_t *fp_wr, *fp_rd;
+
+	if ((err = lx_autofs_dev_fd_preamble(arg, &dcmd, &vfsp)) != 0)
+		return (err);
+
+	mutex_enter(&pidlock);
+	pgrp = curproc->p_pgrp;
+	mutex_exit(&pidlock);
+	fd = dcmd.lad_arg1;
+
+	/* Lookup the new fifos. See comment in lx_autofs_parse_mntopt. */
+	if (lx_autofs_fifo_lookup(pgrp, fd, &fp_wr, &fp_rd) != 0) {
+		int pid = (int)curproc->p_pid;
+
+		if (lx_autofs_fifo_lookup(pid, fd, &fp_wr, &fp_rd) != 0) {
+			VFS_RELE(vfsp);
+			return (EINVAL);
+		}
+	}
+
+	data = (lx_autofs_vfs_t *)vfsp->vfs_data;
+
+	/* Close the old fifos. */
+	if (data->lav_fifo_wr != NULL)
+		(void) closef(data->lav_fifo_wr);
+	if (data->lav_fifo_rd != NULL)
+		(void) closef(data->lav_fifo_rd);
+
+	data->lav_fd = fd;
+	data->lav_pgrp = pgrp;
+	data->lav_fifo_rd = fp_rd;
+	data->lav_fifo_wr = fp_wr;
+	/*
+	 * Not explicitly in the ioctl spec. but necessary for correct recovery
+	 */
+	data->lav_catatonic = B_FALSE;
+
+	VFS_RELE(vfsp);
+
+	return (0);
+}
+
+static int
+lx_autofs_dev_catatonic(intptr_t arg)
+{
+	int err;
+	lx_autofs_dv_ioctl_t dcmd;
+	vfs_t *vfsp;
+	lx_autofs_vfs_t	*data;
+
+	if ((err = lx_autofs_dev_fd_preamble(arg, &dcmd, &vfsp)) != 0)
+		return (err);
+
+	data = (lx_autofs_vfs_t *)vfsp->vfs_data;
+	data->lav_catatonic = B_TRUE;
+	VFS_RELE(vfsp);
+
+	return (0);
+}
+
+static int
+lx_autofs_dev_expire(intptr_t arg)
+{
+	int err;
+	lx_autofs_dv_ioctl_t dcmd;
+	vfs_t *vfsp;
+
+	if ((err = lx_autofs_dev_fd_preamble(arg, &dcmd, &vfsp)) != 0)
+		return (err);
+
+	/* If it succeeds in expiring then we don't want to return EAGAIN */
+	if ((err = lx_autofs_expire(vfsp, kcred)) == 0) {
+		VFS_RELE(vfsp);
+		return (0);
+	}
+
+	VFS_RELE(vfsp);
+	return (EAGAIN);
+}
+
+static int
+lx_autofs_dev_timeout(intptr_t arg)
+{
+	int err;
+	lx_autofs_dv_ioctl_t dcmd;
+	vfs_t *vfsp;
+	lx_autofs_vfs_t	*data;
+
+	if ((err = lx_autofs_dev_fd_preamble(arg, &dcmd, &vfsp)) != 0)
+		return (err);
+
+	data = (lx_autofs_vfs_t *)vfsp->vfs_data;
+	data->lav_timeout = dcmd.lad_arg1;
+	VFS_RELE(vfsp);
+
+	return (0);
+}
+
+static int
+lx_autofs_dev_requestor(intptr_t arg)
+{
+	int err;
+	lx_autofs_dv_ioctl_t *dc;
+	vfs_t *vfsp;
+	vfs_t *fnd_vfs = NULL;
+	struct vfs *vfslist;
+	zone_t *zone = curzone;
+	lx_autofs_vfs_t	*data;
+	uid_t uid;
+	gid_t gid;
+
+	if ((err = lx_autofs_dev_get_path_cmd(arg, &dc)) != 0)
+		return (err);
+
+	vfs_list_read_lock();
+	vfsp = vfslist = curzone->zone_vfslist;
+	if (vfslist == NULL) {
+		vfs_list_unlock();
+		kmem_free(dc, dc->lad_size);
+		return (EINVAL);
+	}
+
+	do {
+		/* Skip mounts we shouldn't show. */
+		if (!(vfsp->vfs_flag & VFS_NOMNTTAB)) {
+			char *mntpt = (char *)refstr_value(vfsp->vfs_mntpt);
+
+			if (strcmp(dc->lad_path,
+			    ZONE_PATH_TRANSLATE(mntpt, zone)) == 0) {
+
+				if (vfsp->vfs_op != lx_autofs_vfsops) {
+					/*
+					 * Found an indirect mount (probably
+					 * NFS) so we need to get the vfs it's
+					 * mounted onto.
+					 */
+					vnode_t *vn = vfsp->vfs_vnodecovered;
+					vfsp = vn->v_vfsp;
+
+					if (vfsp->vfs_op != lx_autofs_vfsops) {
+						/*
+						 * autofs doesn't manage this
+						 * path.
+						 */
+						break;
+					}
+				}
+
+				fnd_vfs = vfsp;
+				VFS_HOLD(fnd_vfs)
+				break;
+			}
+		}
+		vfsp = vfsp->vfs_zone_next;
+	} while (vfsp != vfslist);
+	vfs_list_unlock();
+
+	if (fnd_vfs == NULL) {
+		kmem_free(dc, dc->lad_size);
+		return (EINVAL);
+	}
+
+	data = (lx_autofs_vfs_t *)fnd_vfs->vfs_data;
+	uid = data->lav_uid;
+	gid = data->lav_gid;
+	VFS_RELE(fnd_vfs);
+
+	dc->lad_arg1 = uid;
+	dc->lad_arg2 = gid;
+
+	if (copyout(dc, (caddr_t)arg, sizeof (lx_autofs_dv_ioctl_t)) != 0) {
+		kmem_free(dc, dc->lad_size);
+		return (EFAULT);
+	}
+
+	kmem_free(dc, dc->lad_size);
+	return (0);
+}
+
+static int
+lx_autofs_dev_ismntpt(intptr_t arg)
+{
+	int err = 0;
+	lx_autofs_dv_ioctl_t *dc;
+	struct vfs *vfslist;
+	vfs_t *vfsp;
+	vfs_t *fnd_vfs = NULL;
+	zone_t *zone = curzone;
+
+	if ((err = lx_autofs_dev_get_path_cmd(arg, &dc)) != 0)
+		return (err);
+
+	/*
+	 * The automounter will always pass a path. It can also either pass an
+	 * ioctlfd or, if it's -1, arg1 can be an LX_AUTOFS_TYPE_* value. We
+	 * currently don't need those for our algorithm.
+	 */
+
+	vfs_list_read_lock();
+	vfsp = vfslist = curzone->zone_vfslist;
+	if (vfslist == NULL) {
+		vfs_list_unlock();
+		kmem_free(dc, dc->lad_size);
+		return (0);	/* return 0 if not a mount point */
+	}
+
+	do {
+		if (!(vfsp->vfs_flag & VFS_NOMNTTAB)) {
+			char *mntpt = (char *)refstr_value(vfsp->vfs_mntpt);
+
+			if (strcmp(dc->lad_path,
+			    ZONE_PATH_TRANSLATE(mntpt, zone)) == 0) {
+
+				/*
+				 * To handle direct mounts (on top of an autofs
+				 * mount), we must prefer non-autofs vfs for
+				 * this request.
+				 */
+				if (fnd_vfs != NULL)
+					VFS_RELE(fnd_vfs);
+
+				fnd_vfs = vfsp;
+				VFS_HOLD(fnd_vfs)
+
+				if (fnd_vfs->vfs_op != lx_autofs_vfsops)
+					break;
+			}
+		}
+		vfsp = vfsp->vfs_zone_next;
+	} while (vfsp != vfslist);
+	vfs_list_unlock();
+
+	if (fnd_vfs == NULL) {
+		kmem_free(dc, dc->lad_size);
+		return (0);	/* return 0 if not a mount point */
+	}
+
+	/*
+	 * arg1 is device number, arg2 is superblock magic number
+	 * The superblock value only matters if autofs or not.
+	 */
+	dc->lad_arg1 = fnd_vfs->vfs_dev;
+	if (fnd_vfs->vfs_op == lx_autofs_vfsops) {
+		dc->lad_arg2 = LX_AUTOFS_SB_MAGIC;
+	} else {
+		dc->lad_arg2 = ~LX_AUTOFS_SB_MAGIC;
+	}
+
+	VFS_RELE(fnd_vfs);
+
+	if (copyout(dc, (caddr_t)arg, sizeof (lx_autofs_dv_ioctl_t)) != 0) {
+		kmem_free(dc, dc->lad_size);
+		return (EFAULT);
+	}
+
+	kmem_free(dc, dc->lad_size);
+
+	/*
+	 * We have to return 1 if it is a mount point. The lx ioctl autofs
+	 * translator will convert a negative value back to a positive,
+	 * non-error return value.
+	 */
+	return (-1);
+}
+
+static int
+lx_autofs_dev_askumount(intptr_t arg)
+{
+	int err;
+	int v;
+	lx_autofs_dv_ioctl_t dcmd;
+	vfs_t *vfsp;
+
+	if ((err = lx_autofs_dev_fd_preamble(arg, &dcmd, &vfsp)) != 0)
+		return (err);
+
+	if (lx_autofs_may_unmount(vfsp, kcred)) {
+		v = 0;
+	} else {
+		v = 1;
+	}
+	VFS_RELE(vfsp);
+
+	dcmd.lad_arg1 = v;
+	if (copyout(&dcmd, (caddr_t)arg, sizeof (dcmd)) != 0)
+		return (EFAULT);
+
+	return (0);
+}
+
+/*ARGSUSED*/
+static int
+lx_autofs_dev_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
+    int *rvalp)
+{
+	switch (cmd) {
+	case LX_AUTOFS_DEV_IOC_VERSION_CMD:
+		return (lx_autofs_dev_vers(arg));
+
+	case LX_AUTOFS_DEV_IOC_PROTOVER_CMD:
+		return (lx_autofs_dev_protver(arg));
+
+	case LX_AUTOFS_DEV_IOC_PROTOSUBVER_CMD:
+		return (lx_autofs_dev_protosubver(arg));
+
+	case LX_AUTOFS_DEV_IOC_OPENMOUNT_CMD:
+		return (lx_autofs_dev_openmount(arg));
+
+	case LX_AUTOFS_DEV_IOC_CLOSEMOUNT_CMD:
+		return (lx_autofs_dev_closemount(arg));
+
+	case LX_AUTOFS_DEV_IOC_READY_CMD:
+		return (lx_autofs_dev_ready(arg));
+
+	case LX_AUTOFS_DEV_IOC_FAIL_CMD:
+		return (lx_autofs_dev_fail(arg));
+
+	case LX_AUTOFS_DEV_IOC_SETPIPEFD_CMD:
+		return (lx_autofs_dev_setpipefd(arg));
+
+	case LX_AUTOFS_DEV_IOC_CATATONIC_CMD:
+		return (lx_autofs_dev_catatonic(arg));
+
+	case LX_AUTOFS_DEV_IOC_TIMEOUT_CMD:
+		return (lx_autofs_dev_timeout(arg));
+
+	case LX_AUTOFS_DEV_IOC_REQUESTER_CMD:
+		return (lx_autofs_dev_requestor(arg));
+
+	case LX_AUTOFS_DEV_IOC_EXPIRE_CMD:
+		return (lx_autofs_dev_expire(arg));
+
+	case LX_AUTOFS_DEV_IOC_ASKUMOUNT_CMD:
+		return (lx_autofs_dev_askumount(arg));
+
+	case LX_AUTOFS_DEV_IOC_ISMOUNTPOINT_CMD:
+		return (lx_autofs_dev_ismntpt(arg));
+	}
+
+	return (EINVAL);
+}
+
+/*
  * lx_autofs_init() gets invoked via the mod_install() call in
- * this modules _init() routine.  Therefor, the code that cleans
+ * this module's _init() routine.  Therefore, the code that cleans
  * up the structures we allocate below is actually found in
  * our _fini() routine.
  */
@@ -2221,22 +2960,7 @@ lx_autofs_init(int fstype, char *name)
 {
 	int		error;
 
-	if ((lx_autofs_major =
-	    (major_t)space_fetch(LX_AUTOFS_SPACE_KEY_UDEV)) == 0) {
-
-		if ((lx_autofs_major = getudev()) == (major_t)-1) {
-			cmn_err(CE_WARN, "lx_autofs_init: "
-			    "can't get unique device number");
-			return (EAGAIN);
-		}
-
-		if (space_store(LX_AUTOFS_SPACE_KEY_UDEV,
-		    (uintptr_t)lx_autofs_major) != 0) {
-			cmn_err(CE_WARN, "lx_autofs_init: "
-			    "can't save unique device number");
-			return (EAGAIN);
-		}
-	}
+	lx_autofs_major = ddi_name_to_major(LX_AUTOFS_NAME);
 
 	lx_autofs_fstype = fstype;
 	if ((error = vfs_setfsops(fstype, lx_autofs_vfstops,
@@ -2255,6 +2979,78 @@ lx_autofs_init(int fstype, char *name)
 	return (0);
 }
 
+/*ARGSUSED*/
+static int
+lx_autofs_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
+{
+	int	instance = ddi_get_instance(dip);
+
+	if (cmd != DDI_ATTACH)
+		return (DDI_FAILURE);
+
+	ASSERT(instance == 0);
+	if (instance != 0)
+		return (DDI_FAILURE);
+
+	/* create our minor node */
+	if (ddi_create_minor_node(dip, LX_AUTOFS_MINORNAME, S_IFCHR, 0,
+	    DDI_PSEUDO, 0) != DDI_SUCCESS)
+		return (DDI_FAILURE);
+
+	lx_autofs_dip = dip;
+
+	return (DDI_SUCCESS);
+}
+
+/*ARGSUSED*/
+static int
+lx_autofs_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
+{
+	if (cmd != DDI_DETACH)
+		return (DDI_FAILURE);
+
+	lx_autofs_dip = NULL;
+
+	return (DDI_SUCCESS);
+}
+
+/*ARGSUSED*/
+static int
+lx_autofs_info(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg,
+    void **resultp)
+{
+	switch (infocmd) {
+	case DDI_INFO_DEVT2DEVINFO:
+		*resultp = lx_autofs_dip;
+		return (DDI_SUCCESS);
+
+	case DDI_INFO_DEVT2INSTANCE:
+		*resultp = (void *)0;
+		return (DDI_SUCCESS);
+	}
+	return (DDI_FAILURE);
+}
+
+/*
+ * Driver flags
+ */
+static struct cb_ops lx_autofs_cb_ops = {
+	lx_autofs_dev_open,	/* open */
+	lx_autofs_dev_close,	/* close */
+	nodev,			/* strategy */
+	nodev,			/* print */
+	nodev,			/* dump */
+	nodev,			/* read */
+	nodev,			/* write */
+	lx_autofs_dev_ioctl,	/* ioctl */
+	nodev,			/* devmap */
+	nodev,			/* mmap */
+	nodev,			/* segmap */
+	nochpoll,		/* poll */
+	ddi_prop_op,		/* vb_prop_op */
+	NULL,			/* streamtab */
+	D_NEW | D_MP		/* Driver compatibility flag */
+};
 
 /*
  * Module linkage
@@ -2282,20 +3078,48 @@ static vfsdef_t vfw = {
 	&lx_autofs_mntopts
 };
 
+static struct dev_ops lx_autofs_dev_ops = {
+	DEVO_REV,		/* version */
+	0,			/* refcnt */
+	lx_autofs_info,		/* info */
+	nulldev,		/* identify */
+	nulldev,		/* probe */
+	lx_autofs_attach,	/* attach */
+	lx_autofs_detach,	/* detach */
+	nodev,			/* reset */
+	&lx_autofs_cb_ops,	/* driver operations */
+	NULL,			/* no bus operations */
+	NULL,			/* power */
+	ddi_quiesce_not_needed	/* quiesce */
+};
+
 extern struct mod_ops mod_fsops;
 
 static struct modlfs modlfs = {
 	&mod_fsops, "lx autofs filesystem", &vfw
 };
 
+static struct modldrv modldrv = {
+	&mod_driverops, "lx autofs driver", &lx_autofs_dev_ops
+};
+
 static struct modlinkage modlinkage = {
-	MODREV_1, (void *)&modlfs, NULL
+	MODREV_1,
+	(void *)&modlfs,
+	(void *)&modldrv,
+	NULL
 };
 
 int
 _init(void)
 {
-	return (mod_install(&modlinkage));
+	int error;
+
+	if ((error = mod_install(&modlinkage)) != 0) {
+		return (error);
+	}
+
+	return (0);
 }
 
 int

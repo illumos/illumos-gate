@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2015 Joyent, Inc.  All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include <sys/errno.h>
@@ -1194,6 +1194,27 @@ ict_siocgifconf(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 		return (ict_siocgifconf32(fp, cmd, arg, lxcmd));
 }
 
+/*
+ * Unfortunately some of the autofs ioctls want to return a positive integer
+ * result which does not indicate an error. To minimize disruption in the
+ * rest of the code, we'll treat a positive return as an errno and a negative
+ * return as the non-error return (which we then negate).
+ */
+static int
+ict_autofs(file_t *fp, int cmd, intptr_t arg, int lxcmd)
+{
+	int res = 0;
+	int rv;
+
+	res = VOP_IOCTL(fp->f_vnode, cmd, arg, FLUSER(fp), fp->f_cred, &rv,
+	    NULL);
+	if (res > 0)
+		return (set_errno(res));
+	if (res == 0)
+		return (0);
+	return (-res);
+}
+
 /* Structure used to define an ioctl translator. */
 typedef struct lx_ioc_cmd_translator {
 	int	lict_lxcmd;
@@ -1308,6 +1329,22 @@ static lx_ioc_cmd_translator_t lx_ioc_xlate_autofs[] = {
 	LX_IOC_CMD_TRANSLATOR_PTHRU(LX_AUTOFS_IOC_EXPIRE_MULTI)
 	LX_IOC_CMD_TRANSLATOR_PTHRU(LX_AUTOFS_IOC_PROTOSUBVER)
 	LX_IOC_CMD_TRANSLATOR_PTHRU(LX_AUTOFS_IOC_ASKUMOUNT)
+
+	LX_IOC_CMD_TRANSLATOR_PTHRU(LX_AUTOFS_DEV_IOC_VERSION_CMD)
+	LX_IOC_CMD_TRANSLATOR_PTHRU(LX_AUTOFS_DEV_IOC_PROTOVER_CMD)
+	LX_IOC_CMD_TRANSLATOR_PTHRU(LX_AUTOFS_DEV_IOC_PROTOSUBVER_CMD)
+	LX_IOC_CMD_TRANSLATOR_PTHRU(LX_AUTOFS_DEV_IOC_OPENMOUNT_CMD)
+	LX_IOC_CMD_TRANSLATOR_PTHRU(LX_AUTOFS_DEV_IOC_CLOSEMOUNT_CMD)
+	LX_IOC_CMD_TRANSLATOR_PTHRU(LX_AUTOFS_DEV_IOC_READY_CMD)
+	LX_IOC_CMD_TRANSLATOR_PTHRU(LX_AUTOFS_DEV_IOC_FAIL_CMD)
+	LX_IOC_CMD_TRANSLATOR_PTHRU(LX_AUTOFS_DEV_IOC_SETPIPEFD_CMD)
+	LX_IOC_CMD_TRANSLATOR_PTHRU(LX_AUTOFS_DEV_IOC_CATATONIC_CMD)
+	LX_IOC_CMD_TRANSLATOR_PTHRU(LX_AUTOFS_DEV_IOC_TIMEOUT_CMD)
+	LX_IOC_CMD_TRANSLATOR_PTHRU(LX_AUTOFS_DEV_IOC_REQUESTER_CMD)
+	LX_IOC_CMD_TRANSLATOR_PTHRU(LX_AUTOFS_DEV_IOC_EXPIRE_CMD)
+	LX_IOC_CMD_TRANSLATOR_PTHRU(LX_AUTOFS_DEV_IOC_ASKUMOUNT_CMD)
+	LX_IOC_CMD_TRANSLATOR_CUSTOM(LX_AUTOFS_DEV_IOC_ISMOUNTPOINT_CMD,
+	    ict_autofs)
 
 	LX_IOC_CMD_TRANSLATOR_END
 };

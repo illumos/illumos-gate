@@ -873,7 +873,7 @@ f kernel/fs/amd64/sockfs 0755 root sys
 f kernel/fs/amd64/specfs 0755 root sys
 f kernel/fs/amd64/tmpfs 0755 root sys
 f kernel/fs/amd64/ufs 0755 root sys
-f kernel/fs/amd64/zfs 0755 root sys
+h kernel/fs/amd64/zfs=kernel/drv/amd64/zfs
 d kernel/ipp 0755 root sys
 d kernel/ipp/amd64 0755 root sys
 f kernel/ipp/amd64/dlcosmk 0755 root sys
@@ -4530,6 +4530,7 @@ f usr/kernel/drv/amd64/logindmux 0755 root sys
 f usr/kernel/drv/amd64/lx_audio 0755 root sys
 f usr/kernel/drv/amd64/lx_ptm 0755 root sys
 f usr/kernel/drv/amd64/lx_systrace 0755 root sys
+f usr/kernel/drv/amd64/lxautofs 0755 root sys
 f usr/kernel/drv/amd64/nsmb 0755 root sys
 f usr/kernel/drv/amd64/pm 0755 root sys
 f usr/kernel/drv/amd64/pool 0755 root sys
@@ -4553,6 +4554,7 @@ f usr/kernel/drv/kstat.conf 0644 root sys
 f usr/kernel/drv/ksyms.conf 0644 root sys
 f usr/kernel/drv/logindmux.conf 0644 root sys
 f usr/kernel/drv/lx_audio.conf 0644 root sys
+f usr/kernel/drv/lxautofs.conf 0644 root sys
 f usr/kernel/drv/lx_ptm.conf 0644 root sys
 f usr/kernel/drv/lx_systrace.conf 0644 root sys
 f usr/kernel/drv/nsmb.conf 0644 root sys
@@ -4568,7 +4570,7 @@ f usr/kernel/drv/timerfd.conf 0644 root sys
 d usr/kernel/fs 0755 root sys
 d usr/kernel/fs/amd64 0755 root sys
 f usr/kernel/fs/amd64/fdfs 0755 root sys
-f usr/kernel/fs/amd64/lxautofs 0755 root sys
+h usr/kernel/fs/amd64/lxautofs=usr/kernel/drv/amd64/lxautofs
 f usr/kernel/fs/amd64/lx_cgroup 0755 root sys
 f usr/kernel/fs/amd64/lx_devfs 0755 root sys
 f usr/kernel/fs/amd64/lx_proc 0755 root sys
