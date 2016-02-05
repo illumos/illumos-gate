@@ -1531,6 +1531,37 @@ lxpr_read_pid_maps(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 }
 
 /*
+ * Make mount entry look more like Linux. Non-zero return to skip it.
+ */
+static int
+lxpr_clean_mntent(char **mntpt, char **fstype, char **resource)
+{
+	if (strcmp(*mntpt, "/var/ld") == 0 ||
+	    strcmp(*fstype, "objfs") == 0 ||
+	    strcmp(*fstype, "mntfs") == 0 ||
+	    strcmp(*fstype, "ctfs") == 0 ||
+	    strncmp(*mntpt, "/native/", 8) == 0) {
+		return (1);
+	}
+
+	if (strcmp(*fstype, "tmpfs") == 0) {
+		*resource = "tmpfs";
+	} else if (strcmp(*fstype, "lx_proc") == 0) {
+		*resource = *fstype = "proc";
+	} else if (strcmp(*fstype, "lx_sysfs") == 0) {
+		*resource = *fstype = "sysfs";
+	} else if (strcmp(*fstype, "lx_devfs") == 0) {
+		*resource = *fstype = "devtmpfs";
+	} else if (strcmp(*fstype, "lx_cgroup") == 0) {
+		*resource = *fstype = "cgroup";
+	} else if (strcmp(*fstype, "lxautofs") == 0) {
+		*fstype = "autofs";
+	}
+
+	return (0);
+}
+
+/*
  * lxpr_read_pid_mountinfo(): information about process mount points. e.g.:
  *    14 19 0:13 / /sys rw,nosuid,nodev,noexec,relatime - sysfs sysfs rw
  * mntid parid devnums root mntpnt mntopts - fstype mntsrc superopts
@@ -1637,13 +1668,14 @@ nextfs:
 	printp = print_head;
 	while (printp != NULL) {
 		struct print_data *printp_next;
-		const char *resource;
+		char *resource;
 		char *mntpt;
+		char *fstype;
 		struct vnode *vp;
 		int error;
 
 		mntpt = (char *)refstr_value(printp->vfs_mntpt);
-		resource = refstr_value(printp->vfs_resource);
+		resource = (char *)refstr_value(printp->vfs_resource);
 
 		if (mntpt != NULL && mntpt[0] != '\0')
 			mntpt = ZONE_PATH_TRANSLATE(mntpt, zone);
@@ -1670,6 +1702,12 @@ nextfs:
 			resource = "none";
 		}
 
+		/*  Make things look more like Linux. */
+		fstype = vfssw[printp->vfs_fstype].vsw_name;
+		if (lxpr_clean_mntent(&mntpt, &fstype, &resource) != 0) {
+			goto nextp;
+		}
+
 		/*
 		 * XXX parent ID is not tracked correctly here. Currently we
 		 * always assume the parent ID is the root ID.
@@ -1680,7 +1718,7 @@ nextfs:
 		    major(printp->vfs_dev), minor(printp->vfs_dev),
 		    mntpt,
 		    printp->vfs_flag & VFS_RDONLY ? "ro" : "rw",
-		    vfssw[printp->vfs_fstype].vsw_name,
+		    fstype,
 		    resource,
 		    printp->vfs_flag & VFS_RDONLY ? "ro" : "rw");
 
@@ -1693,6 +1731,10 @@ nextp:
 
 		mnt_id++;
 	}
+
+	/* Add a single dummy entry for /native */
+	lxpr_uiobuf_printf(uiobuf, "%d %d 0:1 / /native ro - zfs /native ro\n",
+	    mnt_id, root_id);
 }
 
 /*
@@ -3490,14 +3532,14 @@ nextfs:
 	printp = print_head;
 	while (printp != NULL) {
 		struct print_data *printp_next;
-		const char *resource;
+		char *resource;
 		char *fstype;
 		char *mntpt;
 		struct vnode *vp;
 		int error;
 
 		mntpt = (char *)refstr_value(printp->vfs_mntpt);
-		resource = refstr_value(printp->vfs_resource);
+		resource = (char *)refstr_value(printp->vfs_resource);
 
 		if (mntpt != NULL && mntpt[0] != '\0')
 			mntpt = ZONE_PATH_TRANSLATE(mntpt, zone);
@@ -3525,29 +3567,10 @@ nextfs:
 			resource = "-";
 		}
 
-		/* Make things look more like Linux */
+		/* Make things look more like Linux. */
 		fstype = vfssw[printp->vfs_fstype].vsw_name;
-
-		if (strcmp(mntpt, "/var/ld") == 0 ||
-		    strcmp(fstype, "objfs") == 0 ||
-		    strcmp(fstype, "mntfs") == 0 ||
-		    strcmp(fstype, "ctfs") == 0 ||
-		    strncmp(mntpt, "/native/", 8) == 0) {
+		if (lxpr_clean_mntent(&mntpt, &fstype, &resource) != 0) {
 			goto nextp;
-		}
-
-		if (strcmp(fstype, "tmpfs") == 0) {
-			resource = "tmpfs";
-		} else if (strcmp(fstype, "lx_proc") == 0) {
-			resource = fstype = "proc";
-		} else if (strcmp(fstype, "lx_sysfs") == 0) {
-			resource = fstype = "sysfs";
-		} else if (strcmp(fstype, "lx_devfs") == 0) {
-			resource = fstype = "devtmpfs";
-		} else if (strcmp(fstype, "lx_cgroup") == 0) {
-			resource = fstype = "cgroup";
-		} else if (strcmp(fstype, "lxautofs") == 0) {
-			fstype = "autofs";
 		}
 
 		lxpr_uiobuf_printf(uiobuf,
