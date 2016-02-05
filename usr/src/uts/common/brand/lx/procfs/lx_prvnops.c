@@ -218,6 +218,7 @@ static void lxpr_read_sys_kernel_osrel(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_kernel_pid_max(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_kernel_rand_bootid(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_kernel_sem(lxpr_node_t *, lxpr_uiobuf_t *);
+static void lxpr_read_sys_kernel_shmall(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_kernel_shmmax(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_kernel_shmmni(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_kernel_threads_max(lxpr_node_t *, lxpr_uiobuf_t *);
@@ -471,6 +472,7 @@ static lxpr_dirent_t sys_kerneldir[] = {
 	{ LXPR_SYS_KERNEL_PID_MAX,	"pid_max" },
 	{ LXPR_SYS_KERNEL_RANDDIR,	"random" },
 	{ LXPR_SYS_KERNEL_SEM,		"sem" },
+	{ LXPR_SYS_KERNEL_SHMALL,	"shmall" },
 	{ LXPR_SYS_KERNEL_SHMMAX,	"shmmax" },
 	{ LXPR_SYS_KERNEL_SHMMNI,	"shmmni" },
 	{ LXPR_SYS_KERNEL_THREADS_MAX,	"threads-max" },
@@ -536,6 +538,8 @@ lxpr_open(vnode_t **vpp, int flag, cred_t *cr, caller_context_t *ct)
 		case LXPR_PID_OOM_SCR_ADJ:
 		case LXPR_PID_TID_OOM_SCR_ADJ:
 		case LXPR_SYS_KERNEL_COREPATT:
+		case LXPR_SYS_KERNEL_SHMALL:
+		case LXPR_SYS_KERNEL_SHMMAX:
 		case LXPR_SYS_NET_CORE_SOMAXCON:
 		case LXPR_SYS_VM_OVERCOMMIT_MEM:
 		case LXPR_SYS_VM_SWAPPINESS:
@@ -711,6 +715,7 @@ static void (*lxpr_read_function[LXPR_NFILES])() = {
 	lxpr_read_invalid,		/* /proc/sys/kernel/random */
 	lxpr_read_sys_kernel_rand_bootid, /* /proc/sys/kernel/random/boot_id */
 	lxpr_read_sys_kernel_sem,	/* /proc/sys/kernel/sem */
+	lxpr_read_sys_kernel_shmall,	/* /proc/sys/kernel/shmall */
 	lxpr_read_sys_kernel_shmmax,	/* /proc/sys/kernel/shmmax */
 	lxpr_read_sys_kernel_shmmni,	/* /proc/sys/kernel/shmmni */
 	lxpr_read_sys_kernel_threads_max, /* /proc/sys/kernel/threads-max */
@@ -831,6 +836,7 @@ static vnode_t *(*lxpr_lookup_function[LXPR_NFILES])() = {
 	lxpr_lookup_sys_kdir_randdir,	/* /proc/sys/kernel/random */
 	lxpr_lookup_not_a_dir,		/* /proc/sys/kernel/random/boot_id */
 	lxpr_lookup_not_a_dir,		/* /proc/sys/kernel/sem */
+	lxpr_lookup_not_a_dir,		/* /proc/sys/kernel/shmall */
 	lxpr_lookup_not_a_dir,		/* /proc/sys/kernel/shmmax */
 	lxpr_lookup_not_a_dir,		/* /proc/sys/kernel/shmmni */
 	lxpr_lookup_not_a_dir,		/* /proc/sys/kernel/threads-max */
@@ -951,6 +957,7 @@ static int (*lxpr_readdir_function[LXPR_NFILES])() = {
 	lxpr_readdir_sys_kdir_randdir,	/* /proc/sys/kernel/random */
 	lxpr_readdir_not_a_dir,		/* /proc/sys/kernel/random/boot_id */
 	lxpr_readdir_not_a_dir,		/* /proc/sys/kernel/sem */
+	lxpr_readdir_not_a_dir,		/* /proc/sys/kernel/shmall */
 	lxpr_readdir_not_a_dir,		/* /proc/sys/kernel/shmmax */
 	lxpr_readdir_not_a_dir,		/* /proc/sys/kernel/shmmni */
 	lxpr_readdir_not_a_dir,		/* /proc/sys/kernel/threads-max */
@@ -4192,6 +4199,22 @@ lxpr_read_sys_kernel_sem(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 }
 
 static void
+lxpr_read_sys_kernel_shmall(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+{
+	rctl_qty_t val;
+
+	ASSERT(lxpnp->lxpr_type == LXPR_SYS_KERNEL_SHMALL);
+
+	mutex_enter(&curproc->p_lock);
+	val = rctl_enforced_value(rc_zone_shmmax,
+	    curproc->p_zone->zone_rctls, curproc);
+	mutex_exit(&curproc->p_lock);
+
+	/* value is in pages */
+	lxpr_uiobuf_printf(uiobuf, "%u\n", (uint_t)btop(val));
+}
+
+static void
 lxpr_read_sys_kernel_shmmax(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
 	rctl_qty_t val;
@@ -4712,6 +4735,8 @@ lxpr_access(vnode_t *vp, int mode, int flags, cred_t *cr, caller_context_t *ct)
 		case LXPR_PID_OOM_SCR_ADJ:
 		case LXPR_PID_TID_OOM_SCR_ADJ:
 		case LXPR_SYS_KERNEL_COREPATT:
+		case LXPR_SYS_KERNEL_SHMALL:
+		case LXPR_SYS_KERNEL_SHMMAX:
 		case LXPR_SYS_NET_CORE_SOMAXCON:
 		case LXPR_SYS_VM_OVERCOMMIT_MEM:
 		case LXPR_SYS_VM_SWAPPINESS:
@@ -6181,6 +6206,8 @@ lxpr_create(struct vnode *dvp, char *nm, struct vattr *vap,
 	 * - /proc/<pid>/task/<tid>/fd/<num>
 	 * - /proc/<pid>/task/<tid>/oom_score_adj
 	 * - /proc/sys/kernel/core_pattern
+	 * - /proc/sys/kernel/shmall
+	 * - /proc/sys/kernel/shmmax
 	 * - /proc/sys/net/core/somaxconn
 	 * - /proc/sys/vm/overcommit_memory
 	 * - /proc/sys/vm/swappiness
@@ -6207,7 +6234,9 @@ lxpr_create(struct vnode *dvp, char *nm, struct vattr *vap,
 		break;
 
 	case LXPR_SYS_KERNELDIR:
-		if (strcmp(nm, "core_pattern") == 0) {
+		if (strcmp(nm, "core_pattern") == 0 ||
+		    strcmp(nm, "shmall") == 0 ||
+		    strcmp(nm, "shmmax") == 0) {
 			vp = lxpr_lookup_common(dvp, nm, NULL, sys_kerneldir,
 			    SYS_KERNELDIRFILES);
 		}

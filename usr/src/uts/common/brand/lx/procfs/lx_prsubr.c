@@ -21,7 +21,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2015 Joyent, Inc.  All rights reserved.
+ * Copyright 2016 Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -541,6 +541,8 @@ lxpr_getnode(vnode_t *dp, lxpr_nodetype_t type, proc_t *p, int desc)
 	case LXPR_PID_OOM_SCR_ADJ:
 	case LXPR_PID_TID_OOM_SCR_ADJ:
 	case LXPR_SYS_KERNEL_COREPATT:
+	case LXPR_SYS_KERNEL_SHMALL:
+	case LXPR_SYS_KERNEL_SHMMAX:
 	case LXPR_SYS_NET_CORE_SOMAXCON:
 	case LXPR_SYS_VM_OVERCOMMIT_MEM:
 	case LXPR_SYS_VM_SWAPPINESS:
