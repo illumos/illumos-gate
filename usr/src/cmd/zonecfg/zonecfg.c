@@ -23,6 +23,7 @@
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2014 Gary Mills
+ * Copyright 2016, Joyent Inc.
  */
 
 /*
@@ -4100,7 +4101,7 @@ set_func(cmd_t *cmd)
 	zone_iptype_t iptype;
 	boolean_t force_set = B_FALSE;
 	uint64_t mem_cap, mem_limit;
-	float cap;
+	double cap;
 	char *unitp;
 	struct zone_psettab tmp_psettab;
 	boolean_t arg_err = B_FALSE;
@@ -4633,19 +4634,22 @@ set_func(cmd_t *cmd)
 		 * the add_resource() function.
 		 */
 
-		if ((cap = strtof(prop_id, &unitp)) <= 0 || *unitp != '\0' ||
-		    (int)(cap * 100) < 1) {
+		if ((cap = strtod(prop_id, &unitp)) <= 0 || *unitp != '\0' ||
+		    (cap * 100.0) < 1) {
 			zerr(gettext("%s property is out of range."),
 			    pt_to_str(PT_NCPUS));
 			saw_error = B_TRUE;
 			return;
 		}
+		cap *= 100.0;
 
+		/* To avoid rounding issues add .5 to force correct value. */
 		if ((err = zonecfg_set_aliased_rctl(handle, ALIAS_CPUCAP,
-		    (int)(cap * 100))) != Z_OK)
+		    (uint_t)(cap + 0.5))) != Z_OK) {
 			zone_perror(zone, err, B_TRUE);
-		else
+		} else {
 			need_to_commit = B_TRUE;
+		}
 		return;
 	case RT_MCAP:
 		switch (prop_type) {
