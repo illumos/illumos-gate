@@ -3491,6 +3491,7 @@ nextfs:
 	while (printp != NULL) {
 		struct print_data *printp_next;
 		const char *resource;
+		char *fstype;
 		char *mntpt;
 		struct vnode *vp;
 		int error;
@@ -3524,9 +3525,33 @@ nextfs:
 			resource = "-";
 		}
 
+		/* Make things look more like Linux */
+		fstype = vfssw[printp->vfs_fstype].vsw_name;
+
+		if (strcmp(mntpt, "/var/ld") == 0 ||
+		    strcmp(fstype, "objfs") == 0 ||
+		    strcmp(fstype, "mntfs") == 0 ||
+		    strcmp(fstype, "ctfs") == 0 ||
+		    strncmp(mntpt, "/native/", 8) == 0) {
+			goto nextp;
+		}
+
+		if (strcmp(fstype, "tmpfs") == 0) {
+			resource = "tmpfs";
+		} else if (strcmp(fstype, "lx_proc") == 0) {
+			resource = fstype = "proc";
+		} else if (strcmp(fstype, "lx_sysfs") == 0) {
+			resource = fstype = "sysfs";
+		} else if (strcmp(fstype, "lx_devfs") == 0) {
+			resource = fstype = "devtmpfs";
+		} else if (strcmp(fstype, "lx_cgroup") == 0) {
+			resource = fstype = "cgroup";
+		} else if (strcmp(fstype, "lxautofs") == 0) {
+			fstype = "autofs";
+		}
+
 		lxpr_uiobuf_printf(uiobuf,
-		    "%s %s %s %s 0 0\n",
-		    resource, mntpt, vfssw[printp->vfs_fstype].vsw_name,
+		    "%s %s %s %s 0 0\n", resource, mntpt, fstype,
 		    printp->vfs_flag & VFS_RDONLY ? "ro" : "rw");
 
 nextp:
@@ -3537,6 +3562,9 @@ nextp:
 		printp = printp_next;
 
 	}
+
+	/* Add a single dummy entry for /native */
+	lxpr_uiobuf_printf(uiobuf, "/native /native zfs ro 0 0\n");
 }
 
 /*
