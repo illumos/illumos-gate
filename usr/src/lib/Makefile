@@ -357,7 +357,6 @@ MSGSUBDIRS=		\
 	madv		\
 	mpss		\
 	pam_modules	\
-	pyzfs		\
 	rpcsec_gss	\
 	$($(MACH)_MSGSUBDIRS)
 
