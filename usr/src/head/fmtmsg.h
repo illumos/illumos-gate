@@ -25,6 +25,7 @@
 
 /*
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ * Copyright 2014-2015 PALO, Richard.
  *
  * Copyright 1996-2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -47,23 +48,6 @@ extern "C" {
  *	in a standard format to the standard error stream (stderr)
  *	and to the system console.
  */
-
-/*
- * Define the value "NULL" if it hasn't been defined already.
- * NULL breaks namespace so we define _NULL
- */
-#if defined(_LP64)
-#define	_NULL	0L
-#else
-#define	_NULL	0
-#endif
-
-#if !defined(_XPG4_2) || defined(__EXTENSIONS__)
-#ifndef NULL
-#define	NULL	_NULL
-#endif
-#endif /* !defined(_XPG4_2) || defined(__EXTENSIONS__) */
-
 
 /*
  * Constraint definitions:
@@ -174,12 +158,12 @@ extern "C" {
  *	MM_NULLTAG		Null value for the tag-component
  */
 
-#define	MM_NULLLBL	((char *)_NULL)
+#define	MM_NULLLBL	((char *)0)
 #define	MM_NULLSEV	MM_NOSEV
 #define	MM_NULLMC	MM_NULL
-#define	MM_NULLTXT	((char *)_NULL)
-#define	MM_NULLACT	((char *)_NULL)
-#define	MM_NULLTAG	((char *)_NULL)
+#define	MM_NULLTXT	((char *)0)
+#define	MM_NULLACT	((char *)0)
+#define	MM_NULLTAG	((char *)0)
 
 /*
  * Values returned by fmtmsg()

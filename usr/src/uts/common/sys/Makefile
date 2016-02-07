@@ -419,6 +419,7 @@ CHKHDRS=			\
 	netstack.h		\
 	nexusdefs.h		\
 	note.h			\
+	null.h			\
 	nvpair.h		\
 	nvpair_impl.h		\
 	objfs.h			\

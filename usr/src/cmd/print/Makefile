@@ -22,7 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # cmd/print/Makefile
 #
@@ -89,7 +88,7 @@ _msg_test: scripts
 	@/bin/cat messages.po scripts/scripts.po | sed '/domain/d' > $(POFILE)
 	echo 'domain "SUNW_OST_OSCMD"' > SUNW_OST_OSCMD.po
 	cat $(POFILE) >> SUNW_OST_OSCMD.po
-	msgfmt SUNW_OST_OSCMD.po
+	$(MSGFMT) SUNW_OST_OSCMD.po
 	@$(RM) messages.po $(POFILE) SUNW_OST_OSCMD.po
 
 clean strip cstyle lint:	$(SUBDIRS)

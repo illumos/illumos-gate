@@ -30,6 +30,7 @@
  */
 
 #include <sys/types.h>
+#include <sys/null.h>
 #include <sys/cmn_err.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -39,10 +40,6 @@
 #include <sys/psm.h>
 #include <sys/bootconf.h>
 #include <sys/reboot.h>
-
-#ifndef	NULL
-#define	NULL	0
-#endif
 
 typedef enum ibft_structure_type {
 	Reserved	=	0,

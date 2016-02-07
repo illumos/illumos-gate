@@ -20,6 +20,10 @@
  */
 
 /*
+ * Copyright 2015 PALO, Richard.
+ */
+
+/*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -28,8 +32,7 @@
 /*	  All Rights Reserved  	*/
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-/* 
+/*
  *	UNIX shell
  */
 
@@ -41,11 +44,11 @@
 #include	"defs.h"
 
 #define	DOT		'.'
-#define	NULL	0
-#define	SLASH	'/'
-#define PARTLY	2
+#define	NULLCHAR	'\0'
+#define	SLASH		'/'
+#define	PARTLY		2
 
-static void rmslash();
+static void rmslash(unsigned char *string);
 #ifdef __STDC__
 extern const char	longpwd[];
 #else
@@ -70,27 +73,25 @@ cwd(unsigned char *dir)
 	/* Now remove any .'s */
 
 	pdir = dir;
-	if(*dir == SLASH)
+	if (*dir == SLASH)
 		pdir++;
-	while(*pdir) 			/* remove /./ by itself */
-	{
-		if((*pdir==DOT) && (*(pdir+1)==SLASH))
-		{
+	while (*pdir) {			/* remove /./ by itself */
+		if ((*pdir == DOT) && (*(pdir+1) == SLASH)) {
 			movstr(pdir+2, pdir);
 			continue;
 		}
 		pdir++;
-		while ((*pdir) && (*pdir != SLASH)) 
+		while ((*pdir) && (*pdir != SLASH))
 			pdir++;
-		if (*pdir) 
+		if (*pdir)
 			pdir++;
 	}
 	/* take care of trailing /. */
-	if(*(--pdir)==DOT && pdir > dir && *(--pdir)==SLASH) {
-		if(pdir > dir) {
-			*pdir = NULL;
+	if (*(--pdir) == DOT && pdir > dir && *(--pdir) == SLASH) {
+		if (pdir > dir) {
+			*pdir = NULLCHAR;
 		} else {
-			*(pdir+1) = NULL;
+			*(pdir+1) = NULLCHAR;
 		}
 
 	}
@@ -101,14 +102,12 @@ cwd(unsigned char *dir)
 
 	/* Now that the dir is canonicalized, process it */
 
-	if(*dir==DOT && *(dir+1)==NULL)
-	{
+	if (*dir == DOT && *(dir+1) == NULLCHAR) {
 		return;
 	}
 
 
-	if(*dir==SLASH)
-	{
+	if (*dir == SLASH) {
 		/* Absolute path */
 
 		pcwd = cwdname;
@@ -119,73 +118,62 @@ cwd(unsigned char *dir)
 	{
 		/* Relative path */
 
-		if (didpwd == FALSE) 
+		if (didpwd == FALSE)
 			return;
-		didpwd = PARTLY;	
+		didpwd = PARTLY;
 		pcwd = cwdname + length(cwdname) - 1;
-		if(pcwd != cwdname+1)
+		if (pcwd != cwdname+1)
 			*pcwd++ = SLASH;
 	}
-	while(*dir)
-	{
-		if(*dir==DOT && 
-		   *(dir+1)==DOT &&
-		   (*(dir+2)==SLASH || *(dir+2)==NULL))
-		{
+	while (*dir) {
+		if (*dir == DOT &&
+		    *(dir+1) == DOT &&
+		    (*(dir+2) == SLASH || *(dir+2) == NULLCHAR)) {
 			/* Parent directory, so backup one */
 
-			if( pcwd > cwdname+2 )
+			if (pcwd > cwdname+2)
 				--pcwd;
-			while(*(--pcwd) != SLASH)
+			while (*(--pcwd) != SLASH)
 				;
 			pcwd++;
 			dir += 2;
-			if(*dir==SLASH)
-			{
+			if (*dir == SLASH) {
 				dir++;
 			}
 			continue;
 		}
-	 	if (pcwd >= &cwdname[PATH_MAX+1])
-		{
-			didpwd=FALSE;
+		if (pcwd >= &cwdname[PATH_MAX+1]) {
+			didpwd = FALSE;
 			return;
 		}
 		*pcwd++ = *dir++;
-		while((*dir) && (*dir != SLASH))
-		{  
-	 		if (pcwd >= &cwdname[PATH_MAX+1])
-			{
-				didpwd=FALSE;
+		while ((*dir) && (*dir != SLASH)) {
+			if (pcwd >= &cwdname[PATH_MAX+1]) {
+				didpwd = FALSE;
 				return;
 			}
 			*pcwd++ = *dir++;
-		} 
-		if (*dir) 
-		{
-	 		if (pcwd >= &cwdname[PATH_MAX+1])
-			{
-				didpwd=FALSE;
+		}
+		if (*dir) {
+			if (pcwd >= &cwdname[PATH_MAX+1]) {
+				didpwd = FALSE;
 				return;
 			}
 			*pcwd++ = *dir++;
 		}
 	}
-	if (pcwd >= &cwdname[PATH_MAX+1])
-	{
-		didpwd=FALSE;
+	if (pcwd >= &cwdname[PATH_MAX+1]) {
+		didpwd = FALSE;
 		return;
 	}
-	*pcwd = NULL;
+	*pcwd = NULLCHAR;
 
 	--pcwd;
-	if(pcwd>cwdname && *pcwd==SLASH)
-	{
+	if (pcwd > cwdname && *pcwd == SLASH) {
 		/* Remove trailing / */
 
-		*pcwd = NULL;
+		*pcwd = NULLCHAR;
 	}
-	return;
 }
 
 void
@@ -195,27 +183,28 @@ cwd2()
 	unsigned char *pcwd;
 	/* check if there are any symbolic links in pathname */
 
-	if(didpwd == FALSE)
+	if (didpwd == FALSE)
 		return;
 	pcwd = cwdname + 1;
-	if(didpwd == PARTLY) {
-		while (*pcwd)
-		{
+	if (didpwd == PARTLY) {
+		while (*pcwd) {
 			char c;
-			while((c = *pcwd++) != SLASH && c != '\0');
-			*--pcwd = '\0';
-			if (lstat((char *)cwdname, &stat1) == -1
-		    	|| (stat1.st_mode & S_IFMT) == S_IFLNK) {
+			do {
+				c = *pcwd++;
+			} while (c != SLASH && c != NULLCHAR);
+			*--pcwd = NULLCHAR;
+			if (lstat((char *)cwdname, &stat1) == -1 ||
+			    (stat1.st_mode & S_IFMT) == S_IFLNK) {
 				didpwd = FALSE;
 				*pcwd = c;
 				return;
 			}
 			*pcwd = c;
-			if(c)
+			if (c)
 				pcwd++;
 		}
 		didpwd = TRUE;
-	} else 
+	} else
 		if (stat((char *)cwdname, &stat1) == -1) {
 			didpwd = FALSE;
 			return;
@@ -225,11 +214,10 @@ cwd2()
 	 * consist of symbolic links with ".."
 	 */
 
-	if (stat(".", &stat2) == -1
-	    || stat1.st_dev != stat2.st_dev
-	    || stat1.st_ino != stat2.st_ino)
+	if (stat(".", &stat2) == -1 ||
+	    stat1.st_dev != stat2.st_dev ||
+	    stat1.st_ino != stat2.st_ino)
 		didpwd = FALSE;
-	return;
 }
 
 unsigned char *
@@ -238,9 +226,9 @@ cwdget()
 	cwd2();
 	if (didpwd == FALSE) {
 		if (getcwd((char *)cwdname, PATH_MAX+1) == NULL)
-			*cwdname = 0;
+			*cwdname = NULLCHAR;
 		didpwd = TRUE;
-	} 
+	}
 	return (cwdname);
 }
 
@@ -265,11 +253,10 @@ cwdprint(void)
 	}
 
 	for (cp = cwdname; *cp; cp++) {
-	  prc_buff(*cp);
+		prc_buff(*cp);
 	}
 
 	prc_buff(NL);
-	return;
 }
 
 /*
@@ -277,16 +264,13 @@ cwdprint(void)
  */
 
 static void
-rmslash(string)
-	unsigned char *string;
+rmslash(unsigned char *string)
 {
 	unsigned char *pstring;
 
 	pstring = string;
-	while(*pstring)
-	{
-		if(*pstring==SLASH && *(pstring+1)==SLASH)
-		{
+	while (*pstring) {
+		if (*pstring == SLASH && *(pstring+1) == SLASH) {
 			/* Remove repeated SLASH's */
 
 			movstr(pstring+1, pstring);
@@ -296,11 +280,9 @@ rmslash(string)
 	}
 
 	--pstring;
-	if(pstring>string && *pstring==SLASH)
-	{
+	if (pstring > string && *pstring == SLASH) {
 		/* Remove trailing / */
 
-		*pstring = NULL;
+		*pstring = NULLCHAR;
 	}
-	return;
 }

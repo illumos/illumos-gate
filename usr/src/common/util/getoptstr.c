@@ -28,8 +28,6 @@
 /*	  All Rights Reserved  	*/
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file contains getoptstr(), which is getopt() for strings of arguments
  * (not arrays of strings).  It is used by the bootloader ({*fs,inet}boot) and
@@ -38,6 +36,7 @@
 
 
 #include "getoptstr.h"
+#include <sys/null.h>
 
 
 /*
@@ -45,8 +44,6 @@
  */
 char *strchr(const char *s, int c);
 
-
-#define	NULL	((void *)0)
 
 #define	ISNTWORDCH(c)	((c) == '\0' || ISSPACE(c))
 

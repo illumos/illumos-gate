@@ -4011,6 +4011,7 @@ f usr/include/sys/nsctl/sv.h 0644 root bin
 f usr/include/sys/nsctl/sv_efi.h 0644 root bin
 f usr/include/sys/nsctl/sv_impl.h 0644 root bin
 f usr/include/sys/nskernd.h 0644 root bin
+f usr/include/sys/null.h 0644 root bin
 f usr/include/sys/nvpair.h 0644 root bin
 f usr/include/sys/nvpair_impl.h 0644 root bin
 f usr/include/sys/objfs.h 0644 root bin

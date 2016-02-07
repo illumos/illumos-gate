@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright 2016 Gary Mills
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -133,6 +134,10 @@ extern "C" {
 #ifndef	_POSIX_SOURCE
 #define	F_CNVT 		12	/* Convert a fhandle to an open fd */
 #endif	/* !_POSIX_SOURCE */
+
+/* Needed by flock.c */
+#define	F_FLOCKW	F_SETLKW
+#define	F_FLOCK		F_SETLK
 
 /* fcntl(2) flags (l_type field of flock structure) */
 #define	F_RDLCK		1	/* read lock */

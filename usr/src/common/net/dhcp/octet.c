@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* LINTLIBRARY */
 
 #if !defined(_BOOT) && !defined(_KERNEL)
@@ -34,10 +32,10 @@
 #include <stdlib.h>
 #endif	/* _BOOT && _KERNEL */
 #include <sys/types.h>
+#include <sys/null.h>
 #include <sys/errno.h>
 
 #if	defined(_BOOT) || defined(_KERNEL)
-#define	NULL		0
 #define	isdigit(c)	((c) >= '0' && c <= '9')
 #define	isxdigit(c)	(isdigit(c) || (((c) >= 'a') && ((c) <= 'f')) || \
 			(((c) >= 'A') && ((c) <= 'F')))

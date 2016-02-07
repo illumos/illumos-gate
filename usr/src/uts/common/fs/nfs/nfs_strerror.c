@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file contains code to support better NFS error messages.  Death to
  * integer codes in user error messages!
@@ -35,14 +33,11 @@
  */
 
 #include <nfs/nfs.h>
+#include <sys/null.h>
 #include <sys/systm.h>
 #include <sys/cmn_err.h>
 #include <sys/errno.h>
 #include <sys/varargs.h>
-
-#ifndef NULL
-#define	NULL	0
-#endif
 
 /* size of a temporary printf format buffer. */
 #define	FMT_BUF_SIZE	1024

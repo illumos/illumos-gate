@@ -27,9 +27,8 @@
 #ifndef	_SYS_SALIB_H
 #define	_SYS_SALIB_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
+#include <sys/null.h>
 #include <time.h>
 
 #ifdef	__cplusplus
@@ -77,10 +76,6 @@ extern char *strstr(const char *, const char *);
 extern size_t strspn(const char *, const char *);
 extern char *strpbrk(const char *, const char *);
 extern char *strtok(char *, const char *);
-
-#ifndef	NULL
-#define	NULL	(0)
-#endif
 
 #ifdef	__cplusplus
 }

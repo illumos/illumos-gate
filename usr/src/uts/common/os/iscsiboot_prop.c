@@ -29,6 +29,7 @@
  */
 
 #include <sys/types.h>
+#include <sys/null.h>
 #include <sys/bootprops.h>
 #include <sys/cmn_err.h>
 #include <sys/socket.h>
@@ -45,10 +46,6 @@ extern ib_boot_prop_t *iscsiboot_prop;
 int  iscsi_print_bootprop	=	0;
 
 #define	ISCSI_BOOTPROP_BUFLEN	256
-
-#ifndef	NULL
-#define	NULL	0
-#endif
 
 static int replace_sp_c(unsigned char *dst, unsigned char *source, size_t n);
 

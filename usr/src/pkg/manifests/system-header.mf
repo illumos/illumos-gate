@@ -1263,6 +1263,7 @@ file path=usr/include/sys/neti.h
 file path=usr/include/sys/netstack.h
 file path=usr/include/sys/nexusdefs.h
 file path=usr/include/sys/note.h
+file path=usr/include/sys/null.h
 file path=usr/include/sys/nvpair.h
 file path=usr/include/sys/nvpair_impl.h
 file path=usr/include/sys/objfs.h

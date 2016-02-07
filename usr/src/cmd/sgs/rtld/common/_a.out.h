@@ -26,6 +26,7 @@
 #define	_A_DOT_OUT_DOT_H
 
 #include <sys/types.h>
+#include <sys/null.h>
 #include <sys/mman.h>
 #include <a.out.h>
 #include <_rtld.h>
@@ -63,9 +64,6 @@ typedef struct _rt_aout_private {
 /*
  * Special defines for a.out format file class.
  */
-#ifndef NULL
-#define	NULL	0
-#endif
 #define	N_UNDF	0x0		/* undefined */
 #define	N_ABS	0x2		/* absolute */
 #define	N_COMM	0x12		/* common (internal to ld) */
