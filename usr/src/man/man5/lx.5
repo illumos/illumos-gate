@@ -1,0 +1,108 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2016, Joyent, Inc.
+.\"
+.Dd February 5, 2106
+.Dt LX 5
+.Os
+.Sh NAME
+.Nm lx
+.Nd zone brand for running a GNU/Linux user-level environment
+.Sh DESCRIPTION
+The
+.Em lx
+brand
+uses the
+.Xr brands 5
+framework to provide an environment for running binary applications built
+for GNU/Linux. User-level code, including an entire Linux distribution, can
+run inside the zone. Both 32-bit and 64-bit applications are supported. The
+majority of Linux system calls are provided, along with emulation for a
+variety of Linux file systems, such as
+.Em proc ,
+.Em cgroup
+and
+.Em sysfs .
+.Pp
+The
+.Em /proc
+file system within the zone is a subset of a full Linux
+.Em /proc .
+Most kernel-level tuning applied to
+.Em /proc
+is unavailable or ignored. Some tuning can be performed, but only to reduce
+the overall limits that have been specified on the zone's configuration.
+That is, within the zone there is no way to increase the resource limits set
+on the zone itself.
+.Pp
+The zone must be installed using a clone of a
+.Xr zfs 1m
+dataset which contains an image of the software to be run in the zone.
+.Pp
+Example:
+.Dl zoneadm -z myzone install -x nodataset -t debian7
+.Pp
+Applications provided by the base SunOS operating system are also available
+within the zone under the
+.Em /native
+mount point. This allows the use of various native tools such as
+.Xr dtrace 1m ,
+.Xr mdb 1 ,
+or the
+.Xr proc 1
+tools on GNU/Linux applications. However, not every native tool will work
+properly within an
+.Em lx
+zone.
+.Sh CONFIGURATION
+The
+.Em kernel-version
+attribute can be included in the zone's
+.Xr zonecfg 1m
+settings as a way to specify the Linux version that the zone is emulating. For
+example, the value could be
+.Em 3.13.0 .
+.Sh LIMITATIONS
+The brand only supports the exclusive IP stack zone configuration.
+.Pp
+Most modern GNU/Linux application software runs on
+.Em lx ,
+but because there are some system calls or file systems which are not currently
+implemented, it's possible that an application won't run. This does not
+preclude the application running in the future as the
+.Em lx
+brand adds new capabilities.
+.Pp
+Because there is only the single SunOS kernel running on the system, there
+is no support for any Linux kernel-level modules. That is, there is no support
+for add-on drivers or any other modules that are part of the Linux kernel
+itself. If that is required, a full virtual machine should be used instead of
+an
+.Em lx
+branded zone.
+.Pp
+Any core files produced within the zone are in the native SunOS format.
+.Pp
+As with any zone, the normal security mechanisms and privileges apply. Thus,
+certain operations (for example, changing the system time), will not be allowed
+unless the zone has been configured with the appropriate additional privileges.
+.Sh SEE ALSO
+.Xr mdb 1 ,
+.Xr proc 1 ,
+.Xr dtrace 1m ,
+.Xr zfs 1m ,
+.Xr zoneadm 1m ,
+.Xr zonecfg 1m ,
+.Xr brands 5 ,
+.Xr privileges 5 ,
+.Xr resource_controls 5 ,
+.Xr zones 5
