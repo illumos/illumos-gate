@@ -14,7 +14,7 @@
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2014 Nexenta Systems, Inc.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
-# Copyright (c) 2015, Joyent, Inc.  All rights reserved.
+# Copyright 2016, Joyent, Inc.
 #
 
 include		$(SRC)/Makefile.master
@@ -69,6 +69,7 @@ MANFILES=	Intro.5			\
 		lfcompile.5		\
 		lfcompile64.5		\
 		locale.5		\
+		lx.5			\
 		man.5			\
 		mandoc_char.5		\
 		mandoc_roff.5		\
