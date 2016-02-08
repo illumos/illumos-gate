@@ -1,5 +1,4 @@
 #
-#
 # This file and its contents are supplied under the terms of the
 # Common Development and Distribution License ("CDDL"), version 1.0.
 # You may only use this file in accordance with the terms of version
@@ -12,6 +11,7 @@
 
 #
 # Copyright (c) 2013, 2015 by Delphix. All rights reserved.
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 #
 
 .PARALLEL: $(SUBDIRS)
@@ -21,6 +21,7 @@ SUBDIRS = acl \
 	bootfs \
 	cache \
 	cachefile \
+	casenorm \
 	checksum \
 	clean_mirror \
 	cli_root \
@@ -74,6 +75,5 @@ SUBDIRS = acl \
 	write_dirs \
 	xattr \
 	zvol
-
 
 include $(SRC)/test/Makefile.com
