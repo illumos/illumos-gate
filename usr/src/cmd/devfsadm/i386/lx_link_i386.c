@@ -29,19 +29,15 @@
 #include <strings.h>
 #include <stdio.h>
 #include <sys/lx_ptm.h>
-#include <sys/lx_audio.h>
 #include <sys/lx_autofs.h>
 
 static int lx_ptm(di_minor_t minor, di_node_t node);
-static int lx_audio(di_minor_t minor, di_node_t node);
 static int lx_autofs(di_minor_t minor, di_node_t node);
 static int lx_systrace(di_minor_t minor, di_node_t node);
 
 static devfsadm_create_t lx_create_cbt[] = {
 	{ "pseudo", "ddi_pseudo", LX_PTM_DRV,
 	    TYPE_EXACT | DRV_EXACT, ILEVEL_0, lx_ptm },
-	{ "pseudo", "ddi_pseudo", LX_AUDIO_DRV,
-	    TYPE_EXACT | DRV_EXACT, ILEVEL_0, lx_audio },
 	{ "pseudo", "ddi_pseudo", LX_AUTOFS_NAME,
 	    TYPE_EXACT | DRV_EXACT, ILEVEL_0, lx_autofs },
 	{ "pseudo", "ddi_pseudo", "lx_systrace",
@@ -57,21 +53,6 @@ lx_ptm(di_minor_t minor, di_node_t node)
 
 	if (strcmp(LX_PTM_MINOR_NODE, mname) == 0)
 		(void) devfsadm_mklink("brand/lx/ptmx", node, minor, 0);
-
-	return (DEVFSADM_CONTINUE);
-}
-
-static int
-lx_audio(di_minor_t minor, di_node_t node)
-{
-	char *mname = di_minor_name(minor);
-
-	if (strcmp(LXA_MINORNAME_DEVCTL, mname) == 0)
-		(void) devfsadm_mklink("brand/lx/audio_devctl", node, minor, 0);
-	if (strcmp(LXA_MINORNAME_DSP, mname) == 0)
-		(void) devfsadm_mklink("brand/lx/dsp", node, minor, 0);
-	if (strcmp(LXA_MINORNAME_MIXER, mname) == 0)
-		(void) devfsadm_mklink("brand/lx/mixer", node, minor, 0);
 
 	return (DEVFSADM_CONTINUE);
 }
