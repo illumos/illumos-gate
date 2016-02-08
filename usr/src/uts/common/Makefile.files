@@ -496,8 +496,6 @@ PTM_OBJS +=	ptm.o
 
 LX_PTM_OBJS +=	lx_ptm.o
 
-LX_AUDIO_OBJS += lx_audio.o
-
 LX_NETLINK_OBJS +=	lx_netlink.o
 
 MII_OBJS +=	mii.o mii_cicada.o mii_natsemi.o mii_intel.o mii_qualsemi.o \
