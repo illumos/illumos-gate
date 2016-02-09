@@ -26,6 +26,7 @@
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2016 OmniTI Computer Consulting, Inc. All rights reserved.
  */
 
 #include "ixgbe_sw.h"
@@ -431,7 +432,7 @@ setup_link:
 		err = ixgbe_set_priv_prop(ixgbe, pr_name, pr_valsize, pr_val);
 		break;
 	default:
-		err = EINVAL;
+		err = ENOTSUP;
 		break;
 	}
 	mutex_exit(&ixgbe->gen_lock);
@@ -504,7 +505,7 @@ ixgbe_m_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 		    pr_valsize, pr_val);
 		break;
 	default:
-		err = EINVAL;
+		err = ENOTSUP;
 		break;
 	}
 	return (err);

@@ -46,7 +46,6 @@
  * memory fragmentation to 12.5%
  */
 #define	MEMSIZ	PATH_MAX*8
-#define	NULL	0
 
 struct dup {
 	char	mem[MEMSIZ];

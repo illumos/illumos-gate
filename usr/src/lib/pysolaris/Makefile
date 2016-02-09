@@ -26,8 +26,6 @@
 include	../Makefile.lib
 
 SUBDIRS=	$(MACH)
-XGETTEXT=	$(GNUXGETTEXT)
-XGETFLAGS=	$(GNUXGETFLAGS)
 
 all :=		TARGET= all
 install :=	TARGET= install
@@ -35,21 +33,14 @@ clean :=	TARGET= clean
 clobber :=	TARGET= clobber
 lint :=		TARGET= lint
 
-MSGFIND =	$(FIND) . -name '*.py' -o -name '*.c'
-MSGFILES =	$(MSGFIND:sh)
 PYCFIND =	$(FIND) . -name '*.pyc'
 PYCFILES = 	$(PYCFIND:sh)
-POFILE =	pysolaris.po
 
 .KEEP_STATE:
 
 all install clean lint: $(SUBDIRS)
 clobber: $(SUBDIRS)
-	$(RM) $(POFILE) $(PYCFILES)
-
-$(POFILE):	pofile_MSGFILES
-
-_msg: $(MSGDOMAINPOFILE)
+	$(RM) $(PYCFILES)
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

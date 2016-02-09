@@ -40,8 +40,6 @@
 #ifndef	_SYS_PARAM_H
 #define	_SYS_PARAM_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 
 /*
  * Fundamental variables; don't change too often.
@@ -127,12 +125,6 @@ extern "C" {
 
 #define	NBPS	0x20000		/* Number of bytes per segment */
 #define	NBPW	sizeof (int)	/* number of bytes in an integer */
-
-#if	defined(_LP64) && !defined(__cplusplus)
-#define	NULL	0L
-#else
-#define	NULL	0
-#endif
 
 #define	CMASK	0		/* default mask for file creation */
 #define	CDLIMIT	(1L<<11)	/* default max write address */

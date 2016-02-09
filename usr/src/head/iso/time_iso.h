@@ -24,6 +24,7 @@
 
 /*
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ * Copyright 2014 PALO, Richard.
  *
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -45,6 +46,7 @@
 #define	_ISO_TIME_ISO_H
 
 #include <sys/feature_tests.h>
+#include <sys/null.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -52,14 +54,6 @@ extern "C" {
 
 #if __cplusplus >= 199711L
 namespace std {
-#endif
-
-#ifndef NULL
-#if defined(_LP64)
-#define	NULL	0L
-#else
-#define	NULL	0
-#endif
 #endif
 
 #if !defined(_SIZE_T) || __cplusplus >= 199711L

@@ -63,7 +63,6 @@
 extern	void *xmalloc(size_t);
 
 #define	INFINITY	2147483647L	/* upper bound on time	*/
-#define	NULL		0		/* a null pointer 	*/
 #define	TRUE		1
 #define	FALSE		0
 
