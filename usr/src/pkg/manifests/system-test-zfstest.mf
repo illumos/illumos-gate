@@ -12,7 +12,7 @@
 #
 # Copyright (c) 2012, 2015 by Delphix. All rights reserved.
 # Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
-# Copyright 2015, Nexenta Systems Inc. All rights reserved.
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/system/test/zfstest@$(PKGVERS)
@@ -35,6 +35,7 @@ dir path=opt/zfs-tests/tests/functional/atime
 dir path=opt/zfs-tests/tests/functional/bootfs
 dir path=opt/zfs-tests/tests/functional/cache
 dir path=opt/zfs-tests/tests/functional/cachefile
+dir path=opt/zfs-tests/tests/functional/casenorm
 dir path=opt/zfs-tests/tests/functional/checksum
 dir path=opt/zfs-tests/tests/functional/clean_mirror
 dir path=opt/zfs-tests/tests/functional/cli_root
@@ -328,6 +329,36 @@ file path=opt/zfs-tests/tests/functional/cachefile/cachefile_001_pos mode=0555
 file path=opt/zfs-tests/tests/functional/cachefile/cachefile_002_pos mode=0555
 file path=opt/zfs-tests/tests/functional/cachefile/cachefile_003_pos mode=0555
 file path=opt/zfs-tests/tests/functional/cachefile/cachefile_004_pos mode=0555
+file path=opt/zfs-tests/tests/functional/casenorm/case_all_values mode=0555
+file path=opt/zfs-tests/tests/functional/casenorm/casenorm.cfg mode=0444
+file path=opt/zfs-tests/tests/functional/casenorm/casenorm.kshlib mode=0444
+file path=opt/zfs-tests/tests/functional/casenorm/cleanup mode=0555
+file path=opt/zfs-tests/tests/functional/casenorm/insensitive_formd_delete \
+    mode=0555
+file path=opt/zfs-tests/tests/functional/casenorm/insensitive_formd_lookup \
+    mode=0555
+file path=opt/zfs-tests/tests/functional/casenorm/insensitive_none_delete \
+    mode=0555
+file path=opt/zfs-tests/tests/functional/casenorm/insensitive_none_lookup \
+    mode=0555
+file path=opt/zfs-tests/tests/functional/casenorm/mixed_formd_delete mode=0555
+file path=opt/zfs-tests/tests/functional/casenorm/mixed_formd_lookup mode=0555
+file path=opt/zfs-tests/tests/functional/casenorm/mixed_formd_lookup_ci \
+    mode=0555
+file path=opt/zfs-tests/tests/functional/casenorm/mixed_none_delete mode=0555
+file path=opt/zfs-tests/tests/functional/casenorm/mixed_none_lookup mode=0555
+file path=opt/zfs-tests/tests/functional/casenorm/mixed_none_lookup_ci \
+    mode=0555
+file path=opt/zfs-tests/tests/functional/casenorm/norm_all_values mode=0555
+file path=opt/zfs-tests/tests/functional/casenorm/sensitive_formd_delete \
+    mode=0555
+file path=opt/zfs-tests/tests/functional/casenorm/sensitive_formd_lookup \
+    mode=0555
+file path=opt/zfs-tests/tests/functional/casenorm/sensitive_none_delete \
+    mode=0555
+file path=opt/zfs-tests/tests/functional/casenorm/sensitive_none_lookup \
+    mode=0555
+file path=opt/zfs-tests/tests/functional/casenorm/setup mode=0555
 $(i386_ONLY)file path=opt/zfs-tests/tests/functional/checksum/edonr_test.amd64 \
     mode=0555
 $(i386_ONLY)file path=opt/zfs-tests/tests/functional/checksum/edonr_test.i386 \
