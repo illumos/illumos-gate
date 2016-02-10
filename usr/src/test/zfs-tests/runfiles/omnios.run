@@ -11,6 +11,7 @@
 
 #
 # Copyright (c) 2013, 2015 by Delphix. All rights reserved.
+# Copyright 2016, OmniTI Computer Consulting, Inc. All rights reserved.
 #
 
 [DEFAULT]
@@ -149,7 +150,7 @@ tests = ['zfs_written_property_001_pos']
 tests = ['zfs_receive_001_pos', 'zfs_receive_002_pos', 'zfs_receive_003_pos',
     'zfs_receive_005_neg', 'zfs_receive_006_pos',
     'zfs_receive_007_neg', 'zfs_receive_008_pos', 'zfs_receive_009_neg',
-    'zfs_receive_010_pos', 'zfs_receive_011_pos']
+    'zfs_receive_010_pos', 'zfs_receive_011_pos', 'zfs_receive_012_pos']
 
 [/opt/zfs-tests/tests/functional/cli_root/zfs_rename]
 tests = ['zfs_rename_001_pos', 'zfs_rename_002_pos', 'zfs_rename_003_pos',
