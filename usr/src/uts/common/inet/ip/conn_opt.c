@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -1190,8 +1190,24 @@ conn_opt_set_ip(conn_opt_arg_t *coa, t_scalar_t name, uint_t inlen,
 	ip_stack_t	*ipst = connp->conn_netstack->netstack_ip;
 	int		error;
 
-	if (connp->conn_family != AF_INET)
+	if (connp->conn_family == AF_INET6 &&
+	    connp->conn_ipversion == IPV4_VERSION) {
+		/*
+		 * Allow certain IPv4 options to be set on an AF_INET6 socket
+		 * if the connection is still IPv4.
+		 */
+		switch (name) {
+		case IP_TOS:
+		case T_IP_TOS:
+		case IP_TTL:
+		case IP_DONTFRAG:
+			break;
+		default:
+			return (EINVAL);
+		}
+	} else if (connp->conn_family != AF_INET) {
 		return (EINVAL);
+	}
 
 	switch (name) {
 	case IP_TTL:
