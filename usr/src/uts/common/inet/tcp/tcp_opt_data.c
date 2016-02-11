@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011 Nexenta Systems, Inc. All rights reserved.
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -996,10 +996,6 @@ tcp_opt_set(conn_t *connp, uint_t optset_context, int level, int name,
 		}
 		break;
 	case IPPROTO_IP:
-		if (connp->conn_family != AF_INET) {
-			*outlenp = 0;
-			return (EINVAL);
-		}
 		switch (name) {
 		case IP_SEC_OPT:
 			/*
