@@ -744,7 +744,8 @@ typedef enum vnevent	{
 	VE_PRE_RENAME_SRC = 10,	/* Pre-rename, with vnode as source */
 	VE_PRE_RENAME_DEST = 11, /* Pre-rename, with vnode as target/dest. */
 	VE_PRE_RENAME_DEST_DIR = 12, /* Pre-rename with vnode as target dir */
-	VE_RENAME_SRC_DIR = 13	/* Rename with vnode as source dir */
+	VE_RENAME_SRC_DIR = 13,	/* Rename with vnode as source dir */
+	VE_RESIZE	= 14	/* Resize/truncate to non-zero offset */
 } vnevent_t;
 
 /*
@@ -1310,6 +1311,7 @@ void	vnevent_pre_rename_dest(vnode_t *, vnode_t *, char *,
 	    caller_context_t *);
 void	vnevent_pre_rename_dest_dir(vnode_t *, vnode_t *, char *,
 	    caller_context_t *);
+void	vnevent_resize(vnode_t *, caller_context_t *);
 
 /* Vnode specific data */
 void vsd_create(uint_t *, void (*)(void *));

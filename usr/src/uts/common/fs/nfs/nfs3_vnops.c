@@ -5522,8 +5522,13 @@ nfs3_space(vnode_t *vp, int cmd, struct flock64 *bfp, int flag,
 			va.va_size = bfp->l_start;
 			error = nfs3setattr(vp, &va, 0, cr);
 
-			if (error == 0 && bfp->l_start == 0)
-				vnevent_truncate(vp, ct);
+			if (error == 0) {
+				if (bfp->l_start == 0) {
+					vnevent_truncate(vp, ct);
+				} else {
+					vnevent_resize(vp, ct);
+				}
+			}
 		} else
 			error = EINVAL;
 	}

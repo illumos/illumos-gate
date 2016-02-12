@@ -786,8 +786,13 @@ tmp_setattr(
 		rw_exit(&tp->tn_contents);
 		rw_exit(&tp->tn_rwlock);
 
-		if (error == 0 && vap->va_size == 0)
-			vnevent_truncate(vp, ct);
+		if (error == 0) {
+			if (vap->va_size == 0) {
+				vnevent_truncate(vp, ct);
+			} else {
+				vnevent_resize(vp, ct);
+			}
+		}
 
 		goto out1;
 	}
@@ -2340,8 +2345,13 @@ tmp_space(
 			return (EFBIG);
 		error = tmp_freesp(vp, bfp, flag);
 
-		if (error == 0 && bfp->l_start == 0)
-			vnevent_truncate(vp, ct);
+		if (error == 0) {
+			if (bfp->l_start == 0) {
+				vnevent_truncate(vp, ct);
+			} else {
+				vnevent_resize(vp, ct);
+			}
+		}
 	}
 	return (error);
 }

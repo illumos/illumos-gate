@@ -2836,8 +2836,11 @@ top:
 			return (err);
 		}
 
-		if (vap->va_size == 0)
+		if (vap->va_size == 0) {
 			vnevent_truncate(ZTOV(zp), ct);
+		} else {
+			vnevent_resize(ZTOV(zp), ct);
+		}
 	}
 
 	if (mask & (AT_ATIME|AT_MTIME) ||
@@ -4861,8 +4864,13 @@ zfs_space(vnode_t *vp, int cmd, flock64_t *bfp, int flag,
 
 	error = zfs_freesp(zp, off, len, flag, TRUE);
 
-	if (error == 0 && off == 0 && len == 0)
-		vnevent_truncate(ZTOV(zp), ct);
+	if (error == 0 && len == 0) {
+		if (off == 0) {
+			vnevent_truncate(ZTOV(zp), ct);
+		} else {
+			vnevent_resize(ZTOV(zp), ct);
+		}
+	}
 
 	ZFS_EXIT(zfsvfs);
 	return (error);

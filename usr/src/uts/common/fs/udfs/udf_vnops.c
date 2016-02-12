@@ -569,8 +569,11 @@ udf_setattr(
 			goto update_inode;
 		}
 
-		if (vap->va_size == 0)
+		if (vap->va_size == 0) {
 			vnevent_truncate(vp, ct);
+		} else {
+			vnevent_resize(vp, ct);
+		}
 	}
 	/*
 	 * Change file access or modified times.
@@ -1649,8 +1652,13 @@ udf_space(
 	} else if ((error = convoff(vp, bfp, 0, offset)) == 0) {
 		error = ud_freesp(vp, bfp, flag, cr);
 
-		if (error == 0 && bfp->l_start == 0)
-			vnevent_truncate(vp, ct);
+		if (error == 0) {
+			if (bfp->l_start == 0) {
+				vnevent_truncate(vp, ct);
+			} else {
+				vnevent_resize(vp, ct);
+			}
+		}
 	}
 
 	return (error);

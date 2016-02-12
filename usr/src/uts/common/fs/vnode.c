@@ -2628,6 +2628,15 @@ vnevent_truncate(vnode_t *vp, caller_context_t *ct)
 	(void) VOP_VNEVENT(vp, VE_TRUNCATE, NULL, NULL, ct);
 }
 
+void
+vnevent_resize(vnode_t *vp, caller_context_t *ct)
+{
+	if (vp == NULL || vp->v_femhead == NULL) {
+		return;
+	}
+	(void) VOP_VNEVENT(vp, VE_RESIZE, NULL, NULL, ct);
+}
+
 /*
  * Vnode accessors.
  */

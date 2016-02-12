@@ -1174,8 +1174,13 @@ nfs_setattr(vnode_t *vp, struct vattr *vap, int flags, cred_t *cr,
 
 	error = nfssetattr(vp, vap, flags, cr);
 
-	if (error == 0 && (mask & AT_SIZE) && vap->va_size == 0)
-		vnevent_truncate(vp, ct);
+	if (error == 0 && (mask & AT_SIZE)) {
+		if (vap->va_size == 0) {
+			vnevent_truncate(vp, ct);
+		} else {
+			vnevent_resize(vp, ct);
+		}
+	}
 
 	return (error);
 }
@@ -4618,8 +4623,13 @@ nfs_space(vnode_t *vp, int cmd, struct flock64 *bfp, int flag,
 			va.va_size = bfp->l_start;
 			error = nfssetattr(vp, &va, 0, cr);
 
-			if (error == 0 && bfp->l_start == 0)
-				vnevent_truncate(vp, ct);
+			if (error == 0) {
+				if (bfp->l_start == 0) {
+					vnevent_truncate(vp, ct);
+				} else {
+					vnevent_resize(vp, ct);
+				}
+			}
 		} else
 			error = EINVAL;
 	}
