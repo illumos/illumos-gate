@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 
-/* Copyright 2010 QLogic Corporation */
+/* Copyright 2015 QLogic Corporation */
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
@@ -35,7 +35,7 @@
  * ***********************************************************************
  * *									**
  * *				NOTICE					**
- * *		COPYRIGHT (C) 1996-2010 QLOGIC CORPORATION		**
+ * *		COPYRIGHT (C) 1996-2015 QLOGIC CORPORATION		**
  * *			ALL RIGHTS RESERVED				**
  * *									**
  * ***********************************************************************
@@ -63,6 +63,8 @@ extern	uint32_t	ql_max_intr_loop;
 uint_t ql_isr(caddr_t);
 uint_t ql_isr_aif(caddr_t, caddr_t);
 uint_t ql_isr_default(caddr_t, caddr_t);
+void ql_disable_intr(ql_adapter_state_t *);
+void ql_enable_intr(ql_adapter_state_t *);
 
 #ifdef	__cplusplus
 }

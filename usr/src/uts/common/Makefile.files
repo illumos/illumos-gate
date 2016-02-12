@@ -916,7 +916,7 @@ OCE_OBJS +=	oce_buf.o oce_fm.o oce_gld.o oce_hw.o oce_intr.o oce_main.o \
 
 FCT_OBJS += discovery.o fct.o
 
-QLT_OBJS += 2400.o 2500.o 8100.o qlt.o qlt_dma.o
+QLT_OBJS += 2400.o 2500.o 2700.o 8100.o 8300fc.o qlt.o qlt_dma.o
 
 SRPT_OBJS += srpt_mod.o srpt_ch.o srpt_cm.o srpt_ioc.o srpt_stp.o
 
@@ -1014,8 +1014,8 @@ FCTL_OBJS += fctl.o
 
 FP_OBJS += fp.o
 
-QLC_OBJS += ql_api.o ql_debug.o ql_hba_fru.o ql_init.o ql_iocb.o ql_ioctl.o \
-	ql_isr.o ql_mbx.o ql_nx.o ql_xioctl.o ql_fw_table.o
+QLC_OBJS += ql_api.o ql_debug.o ql_fm.o ql_hba_fru.o ql_init.o ql_iocb.o \
+	ql_ioctl.o ql_isr.o ql_mbx.o ql_nx.o ql_xioctl.o ql_fw_table.o
 
 QLC_FW_2200_OBJS += ql_fw_2200.o
 
@@ -1025,9 +1025,13 @@ QLC_FW_2400_OBJS += ql_fw_2400.o
 
 QLC_FW_2500_OBJS += ql_fw_2500.o
 
+QLC_FW_2700_OBJS += ql_fw_2700.o
+
 QLC_FW_6322_OBJS += ql_fw_6322.o
 
 QLC_FW_8100_OBJS += ql_fw_8100.o
+
+QLC_FW_8301FC_OBJS += ql_fw_8301fc.o
 
 QLGE_OBJS += qlge.o qlge_dbg.o qlge_flash.o qlge_fm.o qlge_gld.o qlge_mpi.o
 

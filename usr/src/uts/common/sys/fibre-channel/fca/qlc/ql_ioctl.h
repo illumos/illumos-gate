@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 
-/* Copyright 2010 QLogic Corporation */
+/* Copyright 2015 QLogic Corporation */
 
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
@@ -35,7 +35,7 @@
  * ***********************************************************************
  * *									**
  * *				NOTICE					**
- * *		COPYRIGHT (C) 1996-2010 QLOGIC CORPORATION		**
+ * *		COPYRIGHT (C) 1996-2015 QLOGIC CORPORATION		**
  * *			ALL RIGHTS RESERVED				**
  * *									**
  * ***********************************************************************

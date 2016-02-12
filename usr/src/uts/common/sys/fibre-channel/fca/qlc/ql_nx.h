@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 QLogic Corporation.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2015 QLogic Corporation.  All rights reserved.
  */
 
 #ifndef	_QL_NX_H
@@ -33,7 +32,7 @@
  * ***********************************************************************
  * *									**
  * *				NOTICE					**
- * *		COPYRIGHT (C) 1996-2010 QLOGIC CORPORATION		**
+ * *		COPYRIGHT (C) 1996-2015 QLOGIC CORPORATION		**
  * *			ALL RIGHTS RESERVED				**
  * *									**
  * ***********************************************************************
@@ -52,8 +51,9 @@ extern "C" {
 #define	NX_P3P_A0	0x50
 #define	NX_P3P_B0	0x54
 
-#define	NX_IS_REVISION_P3(REVISION)	(REVISION >= NX_P3_A0)
-#define	NX_IS_REVISION_P3PLUS(REVISION)	(REVISION >= NX_P3P_A0)
+#define	NX_IS_REVISION_P3(REVISION)		(REVISION >= NX_P3_A0)
+#define	NX_IS_REVISION_P3PLUS(REVISION)		(REVISION >= NX_P3P_A0)
+#define	NX_IS_REVISION_P3PLUS_B0(REVISION)	(REVISION >= NX_P3P_B0)
 
 /*
  * Following are the states of the Phantom. Phantom will set them and
@@ -82,17 +82,19 @@ extern "C" {
 #define	CRB_DRV_ACTIVE		(UNM_CAM_RAM(0x138))
 #define	CRB_DRV_STATE		(UNM_CAM_RAM(0x144))
 #define	CRB_DRV_SCRATCH		(UNM_CAM_RAM(0x148))
-#define	CRB_FCOE_PORT_0_REQIN 	(UNM_CAM_RAM(0x1b8))
-#define	CRB_FCOE_PORT_1_REQIN	(UNM_CAM_RAM(0x1bc))
+#define	CRB_PORT_0_REQIN	(UNM_CAM_RAM(0x1b8))
+#define	CRB_PORT_1_REQIN	(UNM_CAM_RAM(0x1bc))
 
 /* Every driver should use these Device State */
+#define	NX_DEV_POLL		0
 #define	NX_DEV_COLD		1
-#define	NX_DEV_INITIALIZING 	2
+#define	NX_DEV_INITIALIZING	2
 #define	NX_DEV_READY		3
 #define	NX_DEV_NEED_RESET	4
-#define	NX_DEV_NEED_QUIESCENT 	5
+#define	NX_DEV_NEED_QUIESCENT	5
 #define	NX_DEV_FAILED		6
 #define	NX_DEV_QUIESCENT	7
+#define	NX_DEV_BADOBADO		0xbad0bad0
 
 #define	NX_IDC_VERSION		0x1
 
@@ -770,7 +772,7 @@ extern "C" {
 #define	P2_TICKS_PER_SEC	2048
 #define	P2_MIN_TICKS_PER_SEC	(P2_TICKS_PER_SEC - 10)
 #define	P2_MAX_TICKS_PER_SEC	(P2_TICKS_PER_SEC + 10)
-#define	CHECK_TICKS_PER_SEC(ticks)	((ticks >= P2_MIN_TICKS_PER_SEC) &&  \
+#define	CHECK_TICKS_PER_SEC(ticks)	((ticks >= P2_MIN_TICKS_PER_SEC) && \
 	(ticks <= P2_MAX_TICKS_PER_SEC))
 
 /* CAM RAM */
@@ -791,7 +793,7 @@ extern "C" {
 #define	UNM_BUS_DEV_NO			(UNM_CAM_RAM(0x114))
 
 #define	NX_PEG_TUNE_MN_SPD_ZEROED	0x80000000
-#define	NX_BOOT_LOADER_MN_OTHER		0x100  	/* other problem with DIMM */
+#define	NX_BOOT_LOADER_MN_OTHER		0x100	/* other problem with DIMM */
 #define	NX_BOOT_LOADER_MN_NOT_DDR2	0x80    /* not a DDR2 DIMM */
 #define	NX_BOOT_LOADER_MN_NO_ECC	0x40    /* ECC not supported */
 #define	NX_BOOT_LOADER_MN_WRONG_CAS	0x20    /* CL 5 not supported */
@@ -957,7 +959,7 @@ extern "C" {
 /* ISP 3031 related declarations  */
 
 #define	NX_MSIX_MEM_REGION_THRESHOLD	0x2000000
-#define	UNM_MSIX_TBL_SPACE  		8192
+#define	UNM_MSIX_TBL_SPACE		8192
 #define	UNM_PCI_REG_MSIX_TBL		0x44
 #define	NX_PCI_MSIX_CONTROL		0x40
 
@@ -1072,55 +1074,55 @@ struct crb_addr_pair {
 #define	PCIX_INT_VECTOR_BIT_F6	0x2000
 #define	PCIX_INT_VECTOR_BIT_F7	0x4000
 
-#define	NX_LEGACY_INTR_CONFIG   				\
-{       							\
-	{       						\
-		.int_vec_bit    = PCIX_INT_VECTOR_BIT_F0, 	\
-		.tgt_status_reg = ISR_INT_TARGET_STATUS,  	\
-		.tgt_mask_reg   = ISR_INT_TARGET_MASK,    	\
-		.pci_int_reg    = ISR_MSI_INT_TRIGGER(0) },     \
+#define	NX_LEGACY_INTR_CONFIG					\
+{								\
+	{							\
+		.int_vec_bit	= PCIX_INT_VECTOR_BIT_F0,	\
+		.tgt_status_reg = ISR_INT_TARGET_STATUS,	\
+		.tgt_mask_reg	= ISR_INT_TARGET_MASK,		\
+		.pci_int_reg	= ISR_MSI_INT_TRIGGER(0) },	\
 								\
-	{       						\
-		.int_vec_bit    = PCIX_INT_VECTOR_BIT_F1, 	\
-		.tgt_status_reg = ISR_INT_TARGET_STATUS_F1,     \
-		.tgt_mask_reg   = ISR_INT_TARGET_MASK_F1, 	\
-		.pci_int_reg    = ISR_MSI_INT_TRIGGER(1) },     \
+	{							\
+		.int_vec_bit	= PCIX_INT_VECTOR_BIT_F1,	\
+		.tgt_status_reg = ISR_INT_TARGET_STATUS_F1,	\
+		.tgt_mask_reg	= ISR_INT_TARGET_MASK_F1,	\
+		.pci_int_reg	= ISR_MSI_INT_TRIGGER(1) },	\
 								\
-	{       						\
-		.int_vec_bit    = PCIX_INT_VECTOR_BIT_F2, 	\
-		.tgt_status_reg = ISR_INT_TARGET_STATUS_F2,     \
-		.tgt_mask_reg   = ISR_INT_TARGET_MASK_F2, 	\
-		.pci_int_reg    = ISR_MSI_INT_TRIGGER(2) },     \
+	{							\
+		.int_vec_bit	= PCIX_INT_VECTOR_BIT_F2,	\
+		.tgt_status_reg = ISR_INT_TARGET_STATUS_F2,	\
+		.tgt_mask_reg	= ISR_INT_TARGET_MASK_F2,	\
+		.pci_int_reg	= ISR_MSI_INT_TRIGGER(2) },	\
 								\
-	{       						\
-		.int_vec_bit    = PCIX_INT_VECTOR_BIT_F3, 	\
-		.tgt_status_reg = ISR_INT_TARGET_STATUS_F3,     \
-		.tgt_mask_reg   = ISR_INT_TARGET_MASK_F3, 	\
-		.pci_int_reg    = ISR_MSI_INT_TRIGGER(3) },     \
-							        \
-	{       					        \
-		.int_vec_bit    = PCIX_INT_VECTOR_BIT_F4, 	\
-		.tgt_status_reg = ISR_INT_TARGET_STATUS_F4,     \
-		.tgt_mask_reg   = ISR_INT_TARGET_MASK_F4, 	\
-		.pci_int_reg    = ISR_MSI_INT_TRIGGER(4) },     \
+	{							\
+		.int_vec_bit	= PCIX_INT_VECTOR_BIT_F3,	\
+		.tgt_status_reg = ISR_INT_TARGET_STATUS_F3,	\
+		.tgt_mask_reg	= ISR_INT_TARGET_MASK_F3,	\
+		.pci_int_reg	= ISR_MSI_INT_TRIGGER(3) },	\
 								\
-	{       						\
-		.int_vec_bit    = PCIX_INT_VECTOR_BIT_F5, 	\
-		.tgt_status_reg = ISR_INT_TARGET_STATUS_F5,     \
-		.tgt_mask_reg   = ISR_INT_TARGET_MASK_F5, 	\
-		.pci_int_reg    = ISR_MSI_INT_TRIGGER(5) },     \
+	{							\
+		.int_vec_bit	= PCIX_INT_VECTOR_BIT_F4,	\
+		.tgt_status_reg = ISR_INT_TARGET_STATUS_F4,	\
+		.tgt_mask_reg	= ISR_INT_TARGET_MASK_F4,	\
+		.pci_int_reg	= ISR_MSI_INT_TRIGGER(4) },	\
 								\
-	{       						\
-		.int_vec_bit    = PCIX_INT_VECTOR_BIT_F6, 	\
-		.tgt_status_reg = ISR_INT_TARGET_STATUS_F6,     \
-		.tgt_mask_reg   = ISR_INT_TARGET_MASK_F6, 	\
-		.pci_int_reg    = ISR_MSI_INT_TRIGGER(6) },     \
+	{							\
+		.int_vec_bit	= PCIX_INT_VECTOR_BIT_F5,	\
+		.tgt_status_reg = ISR_INT_TARGET_STATUS_F5,	\
+		.tgt_mask_reg	= ISR_INT_TARGET_MASK_F5,	\
+		.pci_int_reg	= ISR_MSI_INT_TRIGGER(5) },	\
 								\
-	{       						\
-		.int_vec_bit    = PCIX_INT_VECTOR_BIT_F7, 	\
-		.tgt_status_reg = ISR_INT_TARGET_STATUS_F7,     \
-		.tgt_mask_reg   = ISR_INT_TARGET_MASK_F7, 	\
-		.pci_int_reg    = ISR_MSI_INT_TRIGGER(7) },     \
+	{							\
+		.int_vec_bit	= PCIX_INT_VECTOR_BIT_F6,	\
+		.tgt_status_reg = ISR_INT_TARGET_STATUS_F6,	\
+		.tgt_mask_reg	= ISR_INT_TARGET_MASK_F6,	\
+		.pci_int_reg	= ISR_MSI_INT_TRIGGER(6) },	\
+								\
+	{							\
+		.int_vec_bit	= PCIX_INT_VECTOR_BIT_F7,	\
+		.tgt_status_reg = ISR_INT_TARGET_STATUS_F7,	\
+		.tgt_mask_reg	= ISR_INT_TARGET_MASK_F7,	\
+		.pci_int_reg	= ISR_MSI_INT_TRIGGER(7) },	\
 }
 
 #define	BOOTLD_START		0x10000
@@ -1170,7 +1172,7 @@ struct crb_addr_pair {
 
 /* PCI Windowing for DDR regions.  */
 #define	QL_8021_ADDR_IN_RANGE(addr, low, high)	\
-	(((addr) <= (high)) && ((addr) >= (low)))
+	(((addr) <= (high)) && ((int64_t)(addr) >= (low)))
 
 #define	CRB_WIN_LOCK_TIMEOUT	100000000
 #define	ROM_LOCK_TIMEOUT	100
@@ -1178,10 +1180,391 @@ struct crb_addr_pair {
 #define	IDC_LOCK_TIMEOUT	100000000
 
 /*
- * IDC parameters are defined in “user area” in the flash
+ * IDC parameters are defined in "user area" in the flash
  */
 #define	ROM_DEV_INIT_TIMEOUT		0x3e885c
 #define	ROM_DRV_RESET_ACK_TIMEOUT	0x3e8860
+
+/* ****************************************************************** */
+/* ******************* NetXen MiniDump Defines ********************** */
+/* ****************************************************************** */
+
+/*
+ * Get MBC_GET_DUMP_TEMPLATE Command Options
+ */
+#define	GTO_TEMPLATE_SIZE	0
+#define	GTO_TEMPLATE		1
+
+/*
+ * Entry Type Defines
+ */
+#define	RDNOP		 0
+#define	RDCRB		 1
+#define	RDMUX		 2
+#define	QUEUE		 3
+#define	BOARD		 4
+#define	RDSRE		 5
+#define	RDOCM		 6
+#define	PREGS		 7
+#define	L1DTG		 8
+#define	L1ITG		 9
+#define	CACHE		10
+#define	L1DAT		11
+#define	L1INS		12
+#define	RDSTK		13
+#define	RDCON		14
+#define	L2DTG		21
+#define	L2ITG		22
+#define	L2DAT		23
+#define	L2INS		24
+#define	RDOC3		25
+#define	MEMBK		32
+#define	RDROM		71
+#define	RDMEM		72
+#define	INFOR		81
+#define	CNTRL		98
+#define	TLHDR		99
+#define	RDEND		255
+#define	PRIMQ		103
+#define	SQG2Q		104
+#define	SQG3Q		105
+#define	ISCSI_EVENT_LOG	201
+
+/*
+ * Minidump Template Header
+ * Parts of the template header can be modified by the driver.
+ * These include the saved_state_array, capture_debug_level, driver_timestamp
+ * The driver_info_wordX is used to add info about the drivers environment.
+ * It is important that drivers add identication and system info in these
+ * fields.
+ */
+
+#define	QL_DBG_STATE_ARRAY_LEN		16
+#define	QL_DBG_CAP_SIZE_ARRAY_LEN	8
+#define	QL_DBG_RSVD_ARRAY_LEN		8
+
+typedef struct md_template_hdr {
+	uint32_t	entry_type;
+	uint32_t	first_entry_offset;
+	uint32_t	size_of_template;
+	uint32_t	capture_debug_level;
+	uint32_t	num_of_entries;
+	uint32_t	version;
+	uint32_t	driver_timestamp;
+	uint32_t	checksum;
+	uint32_t	driver_capture_mask;
+	uint32_t	driver_info_word1;
+	uint32_t	driver_info_word2;
+	uint32_t	driver_info_word3;
+	uint32_t	saved_state_array[QL_DBG_STATE_ARRAY_LEN];
+	uint32_t	capture_size_array[QL_DBG_CAP_SIZE_ARRAY_LEN];
+
+	/* markers_array used to capture some special locations on board */
+	uint32_t	markers_array[QL_DBG_RSVD_ARRAY_LEN];
+	uint32_t	num_of_free_entries;	/* For internal use */
+	uint32_t	free_entry_offset;	/* For internal use */
+	uint32_t	total_table_size;	/* For internal use */
+	uint32_t	bkup_table_offset;	/* For internal use */
+} md_template_hdr_t;
+
+/*
+ * Driver Flags
+ */
+#define	QL_DBG_SKIPPED_FLAG	0x80	/* driver skipped this entry  */
+#define	QL_DBG_SIZE_ERR_FLAG	0x40	/* entry siz vs capture siz mismatch */
+
+/*
+ * Minidump Entry Header
+ */
+typedef struct md_entry_hdr {
+	uint32_t	entry_type;
+	uint32_t	entry_size;
+	uint32_t	entry_capture_size;
+	union {
+		struct {
+#ifdef _BIG_ENDIAN
+			uint8_t	driver_flags;
+			uint8_t	driver_code;
+			uint8_t	entry_code;
+			uint8_t	entry_capture_mask;
+#else
+			uint8_t	entry_capture_mask;
+			uint8_t	entry_code;
+			uint8_t	driver_code;
+			uint8_t	driver_flags;
+#endif
+		} ecw;
+		uint32_t	entry_ctrl_word;
+	} a;
+} md_entry_hdr_t;
+
+/*
+ * Minidump Entry Including Header
+ */
+typedef struct md_entry {
+	md_entry_hdr_t	h;
+	uint32_t	entry_data00;
+	uint32_t	entry_data01;
+	uint32_t	entry_data02;
+	uint32_t	entry_data03;
+	uint32_t	entry_data04;
+	uint32_t	entry_data05;
+	uint32_t	entry_data06;
+	uint32_t	entry_data07;
+} md_entry_t;
+
+/*
+ *  Minidump Read CRB Entry Header
+ */
+typedef struct md_entry_rdcrb {
+	md_entry_hdr_t	h;
+	uint32_t	addr;
+	union {
+		struct {
+#ifdef _BIG_ENDIAN
+			uint8_t	rsvd_1[2];
+			uint8_t	rsvd_0;
+			uint8_t	addr_stride;
+#else
+			uint8_t	addr_stride;
+			uint8_t	rsvd_0;
+			uint8_t	rsvd_1[2];
+#endif
+		} ac;
+		uint32_t	addr_cntrl;
+	} a;
+	uint32_t	data_size;
+	uint32_t	op_count;
+	uint32_t	rsvd_2;
+	uint32_t	rsvd_3;
+	uint32_t	rsvd_4;
+	uint32_t	rsvd_5;
+} md_entry_rdcrb_t;
+
+/*
+ * Minidump Cache Entry Header
+ */
+typedef struct ql_md_entry_cache {
+	md_entry_hdr_t	h;
+	uint32_t	tag_reg_addr;
+	union {
+		struct {
+#ifdef _BIG_ENDIAN
+			uint8_t	init_tag_value[2];
+			uint8_t	tag_value_stride[2];
+#else
+			uint8_t	tag_value_stride[2];
+			uint8_t	init_tag_value[2];
+#endif
+		} sac;
+		uint32_t	select_addr_cntrl;
+	} a;
+	uint32_t	data_size;
+	uint32_t	op_count;
+	uint32_t	control_addr;
+	union {
+		struct {
+#ifdef _BIG_ENDIAN
+			uint8_t	poll_wait;
+			uint8_t	poll_mask;
+			uint8_t	write_value[2];
+#else
+			uint8_t	write_value[2];
+			uint8_t	poll_mask;
+			uint8_t	poll_wait;
+#endif
+		} cv;
+		uint32_t	control_value;
+	} b;
+	uint32_t	read_addr;
+	union {
+		struct {
+#ifdef _BIG_ENDIAN
+			uint8_t	rsvd_1[2];
+			uint8_t	read_addr_cnt;
+			uint8_t	read_addr_stride;
+#else
+			uint8_t	read_addr_stride;
+			uint8_t	read_addr_cnt;
+			uint8_t	rsvd_1[2];
+#endif
+		} rac;
+		uint32_t	read_addr_cntrl;
+	} c;
+} md_entry_cache_t;
+
+/*
+ * Minidump Read OCM Entry Header
+ */
+typedef struct md_entry_rdocm {
+	md_entry_hdr_t	h;
+	uint32_t	rsvd_0;
+	uint32_t	rsvd_1;
+	uint32_t	data_size;
+	uint32_t	op_count;
+	uint32_t	rsvd_2;
+	uint32_t	rsvd_3;
+	uint32_t	read_addr;
+	uint32_t	read_addr_stride;
+} md_entry_rdocm_t;
+
+/*
+ * Minidump Read MEM Entry Header
+ */
+typedef struct md_entry_rdmem {
+	md_entry_hdr_t	h;
+	uint32_t	rsvd_0[6];
+	uint32_t	read_addr;
+	uint32_t	read_data_size;
+} md_entry_rdmem_t;
+/*
+ * Minidump MIU AGENT ADDRESSES.
+ */
+#define	MD_TA_CTL_ENABLE		0x2
+#define	MD_TA_CTL_START			0x1
+#define	MD_TA_CTL_BUSY			0x8
+#define	MD_TA_CTL_CHECK			1000
+#define	MD_MIU_TEST_AGT_CTRL		0x41000090
+#define	MD_MIU_TEST_AGT_ADDR_LO		0x41000094
+#define	MD_MIU_TEST_AGT_ADDR_HI		0x41000098
+#define	MD_MIU_TEST_AGT_RDDATA_0_31	0x410000A8
+#define	MD_MIU_TEST_AGT_RDDATA_32_63	0x410000AC
+#define	MD_MIU_TEST_AGT_RDDATA_64_95	0x410000B8
+#define	MD_MIU_TEST_AGT_RDDATA_96_127	0x410000BC
+#define	MD_MIU_TEST_AGT_WRDATA_0_31	0x410000A0
+#define	MD_MIU_TEST_AGT_WRDATA_32_63	0x410000A4
+#define	MD_MIU_TEST_AGT_WRDATA_64_95	0x410000B0
+#define	MD_MIU_TEST_AGT_WRDATA_96_127	0x410000B4
+
+/*
+ * Minidump Read ROM Entry Header
+ */
+typedef struct md_entry_rdrom {
+	md_entry_hdr_t	h;
+	uint32_t	rsvd_0[6];
+	uint32_t	read_addr;
+	uint32_t	read_data_size;
+} md_entry_rdrom_t;
+/*
+ *  Minidump ROM Read Address
+ */
+#define	MD_DIRECT_ROM_WINDOW	0x42110030
+#define	MD_DIRECT_ROM_READ_BASE	0x42150000
+
+/*
+ * Minidump Read MUX Entry Header
+ */
+typedef struct md_entry_mux {
+	md_entry_hdr_t	h;
+	uint32_t	select_addr;
+	union {
+		struct {
+			uint32_t	rsvd_0;
+		} sac;
+		uint32_t	select_addr_cntrl;
+	} a;
+	uint32_t	data_size;
+	uint32_t	op_count;
+	uint32_t	select_value;
+	uint32_t	select_value_stride;
+	uint32_t	read_addr;
+	uint32_t	rsvd_1;
+} md_entry_mux_t;
+
+/*
+ * Minidump Read QUEUE Entry Header
+ */
+typedef struct md_entry_queue {
+	md_entry_hdr_t	h;
+	uint32_t	select_addr;
+	union {
+		struct {
+#ifdef _BIG_ENDIAN
+			uint8_t	rsvd_0[2];
+			uint8_t	queue_id_stride[2];
+#else
+			uint8_t	queue_id_stride[2];
+			uint8_t	rsvd_0[2];
+#endif
+		} sac;
+		uint32_t	select_addr_cntrl;
+	} a;
+	uint32_t	data_size;
+	uint32_t	op_count;
+	uint32_t	rsvd_1;
+	uint32_t	rsvd_2;
+	uint32_t	read_addr;
+	union {
+		struct {
+#ifdef _BIG_ENDIAN
+			uint8_t	rsvd_3[2];
+			uint8_t	read_addr_cnt;
+			uint8_t	read_addr_stride;
+#else
+			uint8_t	read_addr_stride;
+			uint8_t	read_addr_cnt;
+			uint8_t	rsvd_3[2];
+#endif
+		} rac;
+		uint32_t	read_addr_cntrl;
+	} b;
+} md_entry_queue_t;
+
+/*
+ * Minidump Control Entry Header
+ */
+typedef struct md_entry_cntrl {
+	md_entry_hdr_t	h;
+	uint32_t	addr;
+	union {
+		struct {
+#ifdef _BIG_ENDIAN
+			uint8_t	poll_timeout[2];
+			uint8_t	state_index_a;
+			uint8_t	addr_stride;
+#else
+			uint8_t	addr_stride;
+			uint8_t	state_index_a;
+			uint8_t	poll_timeout[2];
+#endif
+		} ac;
+		uint32_t	addr_cntrl;
+	} a;
+	uint32_t	data_size;
+	uint32_t	op_count;
+	union {
+		struct {
+#ifdef _BIG_ENDIAN
+			uint8_t	shr;
+			uint8_t	shl;
+			uint8_t	state_index_v;
+			uint8_t	opcode;
+#else
+			uint8_t	opcode;
+			uint8_t	state_index_v;
+			uint8_t	shl;
+			uint8_t	shr;
+#endif
+		} cv;
+		uint32_t	control_value;
+	} b;
+	uint32_t	value_1;
+	uint32_t	value_2;
+	uint32_t	value_3;
+} md_entry_cntrl_t;
+
+/*
+ * Opcodes for Control Entries.
+ * These Flags are bit fields.
+ */
+#define	QL_DBG_OPCODE_WR	0x01
+#define	QL_DBG_OPCODE_RW	0x02
+#define	QL_DBG_OPCODE_AND	0x04
+#define	QL_DBG_OPCODE_OR	0x08
+#define	QL_DBG_OPCODE_POLL	0x10
+#define	QL_DBG_OPCODE_RDSTATE	0x20
+#define	QL_DBG_OPCODE_WRSTATE	0x40
+#define	QL_DBG_OPCODE_MDSTATE	0x80
 
 /*
  * Global Data in ql_nx.c source file.
@@ -1190,8 +1573,10 @@ struct crb_addr_pair {
 /*
  * Global Function Prototypes in ql_nx.c source file.
  */
+void ql_8021_wr_32(ql_adapter_state_t *, uint64_t, uint32_t);
+void ql_8021_rd_32(ql_adapter_state_t *, uint64_t, uint32_t *);
 void ql_8021_reset_chip(ql_adapter_state_t *);
-int ql_8021_load_risc(ql_adapter_state_t *);
+int ql_8021_fw_reload(ql_adapter_state_t *);
 void ql_8021_clr_hw_intr(ql_adapter_state_t *);
 void ql_8021_clr_fw_intr(ql_adapter_state_t *);
 void ql_8021_enable_intrs(ql_adapter_state_t *);
@@ -1203,7 +1588,12 @@ int ql_8021_rom_erase(ql_adapter_state_t *, uint32_t);
 int ql_8021_rom_wrsr(ql_adapter_state_t *, uint32_t);
 void ql_8021_set_drv_active(ql_adapter_state_t *);
 void ql_8021_clr_drv_active(ql_adapter_state_t *);
-uint32_t ql_8021_idc_handler(ql_adapter_state_t *);
+int ql_8021_idc_handler(ql_adapter_state_t *, uint32_t);
+void ql_8021_wr_req_in(ql_adapter_state_t *, uint32_t);
+void ql_8021_idc_poll(ql_adapter_state_t *);
+int ql_8021_reset_fw(ql_adapter_state_t *);
+int ql_8021_fw_chk(ql_adapter_state_t *);
+int ql_8021_get_md_template(ql_adapter_state_t *);
 
 #ifdef __cplusplus
 }

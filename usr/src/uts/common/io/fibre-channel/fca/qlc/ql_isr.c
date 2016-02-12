@@ -19,10 +19,10 @@
  * CDDL HEADER END
  */
 
-/* Copyright 2010 QLogic Corporation */
+/* Copyright 2015 QLogic Corporation */
 
 /*
- * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2008, 2011, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -31,7 +31,7 @@
  * ***********************************************************************
  * *									**
  * *				NOTICE					**
- * *		COPYRIGHT (C) 1996-2010 QLOGIC CORPORATION		**
+ * *		COPYRIGHT (C) 1996-2015 QLOGIC CORPORATION		**
  * *			ALL RIGHTS RESERVED				**
  * *									**
  * ***********************************************************************
@@ -47,53 +47,165 @@
 #include <ql_mbx.h>
 #include <ql_nx.h>
 #include <ql_xioctl.h>
+#include <ql_fm.h>
 
 /*
  * Local Function Prototypes.
  */
-static void ql_handle_uncommon_risc_intr(ql_adapter_state_t *, uint32_t,
-    uint32_t *);
-static void ql_spurious_intr(ql_adapter_state_t *, int);
-static void ql_mbx_completion(ql_adapter_state_t *, uint16_t, uint32_t *,
-    uint32_t *, int);
-static void ql_async_event(ql_adapter_state_t *, uint32_t, ql_head_t *,
-    uint32_t *, uint32_t *, int);
-static void ql_fast_fcp_post(ql_srb_t *);
-static void ql_response_pkt(ql_adapter_state_t *, ql_head_t *, uint32_t *,
-    uint32_t *, int);
-static void ql_error_entry(ql_adapter_state_t *, response_t *, ql_head_t *,
-    uint32_t *, uint32_t *);
-static int ql_status_entry(ql_adapter_state_t *, sts_entry_t *, ql_head_t *,
-    uint32_t *, uint32_t *);
-static int ql_24xx_status_entry(ql_adapter_state_t *, sts_24xx_entry_t *,
-    ql_head_t *, uint32_t *, uint32_t *);
-static int ql_status_error(ql_adapter_state_t *, ql_srb_t *, sts_entry_t *,
-    ql_head_t *, uint32_t *, uint32_t *);
-static void ql_status_cont_entry(ql_adapter_state_t *, sts_cont_entry_t *,
-    ql_head_t *, uint32_t *, uint32_t *);
-static void ql_ip_entry(ql_adapter_state_t *, ip_entry_t *, ql_head_t *,
-    uint32_t *, uint32_t *);
-static void ql_ip_rcv_entry(ql_adapter_state_t *, ip_rcv_entry_t *,
-    ql_head_t *, uint32_t *, uint32_t *);
-static void ql_ip_rcv_cont_entry(ql_adapter_state_t *,
-    ip_rcv_cont_entry_t *, ql_head_t *, uint32_t *, uint32_t *);
-static void ql_ip_24xx_rcv_entry(ql_adapter_state_t *, ip_rcv_24xx_entry_t *,
-    ql_head_t *, uint32_t *, uint32_t *);
-static void ql_ms_entry(ql_adapter_state_t *, ms_entry_t *, ql_head_t *,
-    uint32_t *, uint32_t *);
-static void ql_report_id_entry(ql_adapter_state_t *, report_id_1_t *,
-    ql_head_t *, uint32_t *, uint32_t *);
-static void ql_els_passthru_entry(ql_adapter_state_t *,
-    els_passthru_entry_rsp_t *, ql_head_t *, uint32_t *, uint32_t *);
-static ql_srb_t *ql_verify_preprocessed_cmd(ql_adapter_state_t *, uint32_t *,
-    uint32_t *, uint32_t *);
-static void ql_signal_abort(ql_adapter_state_t *ha, uint32_t *set_flags);
+static void ql_clr_risc_intr(ql_adapter_state_t *);
+static void ql_handle_uncommon_risc_intr(ql_adapter_state_t *, int, uint32_t,
+    uint64_t *);
+static void ql_mbx_completion(ql_adapter_state_t *, uint16_t, uint64_t *,
+    uint64_t *);
+static void ql_async_event(ql_adapter_state_t *, ql_response_q_t *, uint32_t,
+    ql_head_t *, uint64_t *, uint64_t *);
+static void ql_fast_fcp_post(ql_srb_t *, ql_response_q_t *);
+static void ql_response_pkt(ql_adapter_state_t *, ql_response_q_t *,
+    ql_head_t *, uint64_t *, uint64_t *);
+static void ql_error_entry(ql_adapter_state_t *, ql_response_q_t *,
+    response_t *, ql_head_t *, uint64_t *, uint64_t *);
+static int ql_status_entry(ql_adapter_state_t *, ql_response_q_t *,
+    sts_entry_t *, ql_head_t *, uint64_t *, uint64_t *);
+static int ql_24xx_status_entry(ql_adapter_state_t *, ql_response_q_t *,
+    sts_24xx_entry_t *, ql_head_t *, uint64_t *, uint64_t *);
+static int ql_status_error(ql_adapter_state_t *, ql_response_q_t *, ql_srb_t *,
+    sts_entry_t *, ql_head_t *, uint64_t *, uint64_t *);
+static void ql_status_cont_entry(ql_adapter_state_t *, ql_response_q_t *,
+    sts_cont_entry_t *, ql_head_t *, uint64_t *, uint64_t *);
+static void ql_ip_entry(ql_adapter_state_t *, ql_response_q_t *, ip_entry_t *,
+    ql_head_t *, uint64_t *, uint64_t *);
+static void ql_ip_rcv_entry(ql_adapter_state_t *, ql_response_q_t *,
+    ip_rcv_entry_t *, ql_head_t *, uint64_t *, uint64_t *);
+static void ql_ip_rcv_cont_entry(ql_adapter_state_t *, ql_response_q_t *,
+    ip_rcv_cont_entry_t *, ql_head_t *, uint64_t *, uint64_t *);
+static void ql_ip_24xx_rcv_entry(ql_adapter_state_t *, ql_response_q_t *,
+    ip_rcv_24xx_entry_t *, ql_head_t *, uint64_t *, uint64_t *);
+static void ql_ms_entry(ql_adapter_state_t *, ql_response_q_t *, ms_entry_t *,
+    ql_head_t *, uint64_t *, uint64_t *);
+static void ql_report_id_entry(ql_adapter_state_t *, ql_response_q_t *,
+    report_id_acq_t *, ql_head_t *, uint64_t *, uint64_t *);
+static void ql_els_passthru_entry(ql_adapter_state_t *, ql_response_q_t *,
+    els_passthru_entry_rsp_t *, ql_head_t *, uint64_t *, uint64_t *);
+static ql_srb_t *ql_verify_preprocessed_cmd(ql_adapter_state_t *,
+    ql_response_q_t *, uint32_t *, uint32_t *, uint64_t *, uint64_t *);
+static void ql_signal_abort(ql_adapter_state_t *, uint64_t *);
 
 /*
- * Spurious interrupt counter
+ * ql_disable_intr
+ *	Disable interrupts.
+ *
+ * Input:
+ *	ha:	adapter state pointer.
+ *
+ * Context:
+ *	Interrupt or Kernel context, no mailbox commands allowed.
  */
-uint32_t	ql_spurious_cnt = 4;
-uint32_t	ql_max_intr_loop = 16;
+void
+ql_disable_intr(ql_adapter_state_t *ha)
+{
+	int	i, rval;
+
+	QL_PRINT_10(ha, "started\n");
+
+	if (CFG_IST(ha, CFG_CTRL_82XX)) {
+		ql_8021_disable_intrs(ha);
+	} else {
+		if (CFG_IST(ha, CFG_ISP_FW_TYPE_2)) {
+			WRT32_IO_REG(ha, ictrl, 0);
+			(void) RD32_IO_REG(ha, ictrl);	/* PCI posting */
+		} else {
+			WRT16_IO_REG(ha, ictrl, 0);
+			(void) RD16_IO_REG(ha, ictrl);	/* PCI posting */
+		}
+	}
+	if (ha->intr_cap & DDI_INTR_FLAG_MASKABLE) {
+		for (i = 0; i < ha->intr_cnt; i++) {
+			QL_PRINT_10(ha, "intr_set_mask %d\n", i);
+			if ((rval = ddi_intr_set_mask(ha->htable[i])) !=
+			    DDI_SUCCESS) {
+				EL(ha, "intr_set_mask status=%xh\n", rval);
+			}
+		}
+	}
+	ADAPTER_STATE_LOCK(ha);
+	ha->flags &= ~INTERRUPTS_ENABLED;
+	ADAPTER_STATE_UNLOCK(ha);
+
+	QL_PRINT_10(ha, "done\n");
+}
+
+/*
+ * ql_enaable_intr
+ *	Enable interrupts.
+ *
+ * Input:
+ *	ha:	adapter state pointer.
+ *
+ * Context:
+ *	Interrupt or Kernel context, no mailbox commands allowed.
+ */
+void
+ql_enable_intr(ql_adapter_state_t *ha)
+{
+	int	i, rval;
+
+	QL_PRINT_10(ha, "started\n");
+
+	if (CFG_IST(ha, CFG_CTRL_82XX)) {
+		ql_8021_enable_intrs(ha);
+	} else {
+		if (CFG_IST(ha, CFG_ISP_FW_TYPE_2)) {
+			WRT32_IO_REG(ha, ictrl, ISP_EN_RISC);
+			(void) RD32_IO_REG(ha, ictrl);	/* PCI posting */
+		} else {
+			WRT16_IO_REG(ha, ictrl, ISP_EN_INT + ISP_EN_RISC);
+			(void) RD16_IO_REG(ha, ictrl);	/* PCI posting */
+		}
+	}
+	if (ha->intr_cap & DDI_INTR_FLAG_MASKABLE) {
+		for (i = 0; i < ha->intr_cnt; i++) {
+			QL_PRINT_10(ha, "intr_clr_mask %d\n", i);
+			if ((rval = ddi_intr_clr_mask(ha->htable[i])) !=
+			    DDI_SUCCESS) {
+				EL(ha, "intr_clr_mask status=%xh\n", rval);
+			}
+		}
+	}
+	ADAPTER_STATE_LOCK(ha);
+	ha->flags |= INTERRUPTS_ENABLED;
+	ADAPTER_STATE_UNLOCK(ha);
+
+	QL_PRINT_10(ha, "done\n");
+}
+
+/*
+ * ql_clr_risc_intr
+ *	Clear firmware interrupt.
+ *
+ * Input:
+ *	ha:	adapter state pointer.
+ *
+ * Context:
+ *	Interrupt or Kernel context, no mailbox commands allowed.
+ */
+static void
+ql_clr_risc_intr(ql_adapter_state_t *ha)
+{
+	QL_PRINT_3(ha, "started\n");
+
+	if (CFG_IST(ha, CFG_CTRL_82XX)) {
+		ql_8021_clr_fw_intr(ha);
+	} else if (CFG_IST(ha, CFG_ISP_FW_TYPE_2)) {
+		WRT32_IO_REG(ha, hccr, HC24_CLR_RISC_INT);
+		RD32_IO_REG(ha, hccr);	/* PCI posting. */
+	} else {
+		WRT16_IO_REG(ha, semaphore, 0);
+		WRT16_IO_REG(ha, hccr, HC_CLR_RISC_INT);
+		RD16_IO_REG(ha, hccr);  /* PCI posting. */
+	}
+
+	QL_PRINT_3(ha, "done\n");
+}
 
 /*
  * ql_isr
@@ -116,11 +228,11 @@ ql_isr(caddr_t arg1)
 }
 
 /*
- * ql_isr_default
- *	Process unknown/unvectored intr types
+ * ql_isr_aif
+ *	Process mailbox and I/O command completions.
  *
  * Input:
- *	arg1:	adapter state pointer.
+ *	arg:	adapter state pointer.
  *	arg2:	interrupt vector.
  *
  * Returns:
@@ -131,385 +243,289 @@ ql_isr(caddr_t arg1)
  */
 /* ARGSUSED */
 uint_t
-ql_isr_default(caddr_t arg1, caddr_t arg2)
+ql_isr_aif(caddr_t arg, caddr_t arg2)
 {
-	ql_adapter_state_t	*ha = (void *)arg1;
-
-	EL(ha, "isr_default called: idx=%x\n", arg2);
-	return (ql_isr_aif(arg1, arg2));
-}
-
-/*
- * ql_isr_aif
- *	Process mailbox and I/O command completions.
- *
- * Input:
- *	arg:	adapter state pointer.
- *	intvec:	interrupt vector.
- *
- * Returns:
- *	DDI_INTR_CLAIMED or DDI_INTR_UNCLAIMED
- *
- * Context:
- *	Interrupt or Kernel context, no mailbox commands allowed.
- */
-/* ARGSUSED */
-uint_t
-ql_isr_aif(caddr_t arg, caddr_t intvec)
-{
-	uint16_t		mbx;
-	uint32_t		stat;
+	uint32_t		mbx, stat;
 	ql_adapter_state_t	*ha = (void *)arg;
-	uint32_t		set_flags = 0;
-	uint32_t		reset_flags = 0;
+	uint64_t		set_flags = 0, reset_flags = 0;
 	ql_head_t		isr_done_q = {NULL, NULL};
 	uint_t			rval = DDI_INTR_UNCLAIMED;
-	int			spurious_intr = 0;
-	boolean_t		intr = B_FALSE, daemon = B_FALSE;
-	int			intr_loop = 4;
-	boolean_t		clear_spurious = B_TRUE;
+	ql_response_q_t		*rsp_q = NULL;
+	int			intr, index = (int)((uintptr_t)arg2);
 
-	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
+	QL_PRINT_3(ha, "started, index=%d\n", index);
 
-	QL_PM_LOCK(ha);
-	if (ha->power_level != PM_LEVEL_D0) {
-		/*
-		 * Looks like we are about to go down soon, exit early.
-		 */
-		QL_PM_UNLOCK(ha);
-		QL_PRINT_3(CE_CONT, "(%d): power down exit\n", ha->instance);
+	/* Exit if not attached. */
+	if (ha == NULL || ha->intr_pri == NULL) {
+		EL(ha, "ha=%p, intr_pri=%p not attached\n", (void *)ha,
+		    ha != NULL ? ha->intr_pri : NULL);
 		return (DDI_INTR_UNCLAIMED);
 	}
-	ha->busy++;
+
+	/* Exit if chip not powered up. */
+	if (ha->power_level != PM_LEVEL_D0) {
+		EL(ha, "power down exit\n");
+		return (DDI_INTR_UNCLAIMED);
+	}
+	QL_PM_LOCK(ha);
+	ha->pm_busy++;
 	QL_PM_UNLOCK(ha);
 
 	/* Acquire interrupt lock. */
-	INTR_LOCK(ha);
+	if (index > ha->rsp_queues_cnt) {
+		intr = index = 0;
+	} else if (index) {
+		intr = index - 1;
+	} else {
+		intr = 0;
+	}
+	INDX_INTR_LOCK(ha, intr);
 
-	if (CFG_IST(ha, CFG_CTRL_2200)) {
-		while (RD16_IO_REG(ha, istatus) & RISC_INT) {
-			/* Reset idle timer. */
-			ha->idle_timer = 0;
+	if (index && ha->flags & NO_INTR_HANDSHAKE) {
+		QL_PRINT_3(ha, "MULTI_Q_RSP_UPDATE, index=%xh\n", index);
+		index--;
+		if (index < ha->rsp_queues_cnt) {
+			rsp_q = ha->rsp_queues[index];
+		}
+		if (rsp_q == NULL) {
+			EL(ha, "unsupported MULTI_Q_RSP_UPDATE, index=%d\n",
+			    index);
+			rsp_q = ha->rsp_queues[0];
+		}
+
+		if (ha->flags & QUEUE_SHADOW_PTRS) {
+			(void) ddi_dma_sync(rsp_q->rsp_ring.dma_handle,
+			    (off_t)rsp_q->rsp_in_shadow_ofst,
+			    SHADOW_ENTRY_SIZE, DDI_DMA_SYNC_FORCPU);
+			mbx = ddi_get32(rsp_q->rsp_ring.acc_handle,
+			    rsp_q->rsp_in_shadow_ptr);
+		} else {
+			mbx = RD32_MBAR_REG(ha, rsp_q->mbar_rsp_in);
+		}
+
+		if (mbx != rsp_q->rsp_ring_index) {
+			rsp_q->isp_rsp_index = (uint16_t)mbx;
+			ql_response_pkt(ha, rsp_q, &isr_done_q,
+			    &set_flags, &reset_flags);
+			/* PCI posting */
+			(void) RD32_MBAR_REG(ha, rsp_q->mbar_rsp_in);
+		} else if (ha->flags & INTERRUPTS_ENABLED) {
+			/*EMPTY*/
+			QL_PRINT_3(ha, "MULTI_Q_RSP_UPDATE mbar_rsp_in "
+			    "same as before\n");
+		}
+
+		/* Set interrupt claimed status. */
+		rval = DDI_INTR_CLAIMED;
+
+	} else if (CFG_IST(ha, CFG_CTRL_22XX)) {
+		rsp_q = ha->rsp_queues[0];
+		if (RD16_IO_REG(ha, istatus) & RISC_INT) {
 			rval = DDI_INTR_CLAIMED;
-			if (intr_loop) {
-				intr_loop--;
-			}
 
-			/* Special Fast Post 2200. */
-			stat = 0;
-			if (ha->task_daemon_flags & FIRMWARE_LOADED &&
-			    ha->flags & ONLINE) {
-				ql_srb_t	*sp;
-
-				mbx = RD16_IO_REG(ha, mailbox_out[23]);
-
-				if ((mbx & 3) == MBX23_SCSI_COMPLETION) {
-					/* Release mailbox registers. */
-					WRT16_IO_REG(ha, semaphore, 0);
-
-					if (intr_loop) {
-						WRT16_IO_REG(ha, hccr,
-						    HC_CLR_RISC_INT);
-					}
-
-					/* Get handle. */
-					mbx >>= 4;
-					stat = mbx & OSC_INDEX_MASK;
-
-					/* Validate handle. */
-					sp = stat < MAX_OUTSTANDING_COMMANDS ?
-					    ha->outstanding_cmds[stat] : NULL;
-
-					if (sp != NULL && (sp->handle & 0xfff)
-					    == mbx) {
-						ha->outstanding_cmds[stat] =
-						    NULL;
-						sp->handle = 0;
-						sp->flags &=
-						    ~SRB_IN_TOKEN_ARRAY;
-
-						/* Set completed status. */
-						sp->flags |= SRB_ISP_COMPLETED;
-
-						/* Set completion status */
-						sp->pkt->pkt_reason =
-						    CS_COMPLETE;
-
-						ql_fast_fcp_post(sp);
-					} else if (mbx !=
-					    (QL_FCA_BRAND & 0xfff)) {
-						if (sp == NULL) {
-							EL(ha, "unknown IOCB"
-							    " handle=%xh\n",
-							    mbx);
-						} else {
-							EL(ha, "mismatch IOCB"
-							    " handle pkt=%xh, "
-							    "sp=%xh\n", mbx,
-							    sp->handle & 0xfff);
-						}
-
-						(void) ql_binary_fw_dump(ha,
-						    FALSE);
-
-						if (!(ha->task_daemon_flags &
-						    (ISP_ABORT_NEEDED |
-						    ABORT_ISP_ACTIVE))) {
-							EL(ha, "ISP Invalid "
-							    "handle, "
-							    "isp_abort_needed"
-							    "\n");
-							set_flags |=
-							    ISP_ABORT_NEEDED;
-						}
-					}
-				}
-			}
-
-			if (stat == 0) {
-				/* Check for mailbox interrupt. */
-				mbx = RD16_IO_REG(ha, semaphore);
-				if (mbx & BIT_0) {
-					/* Release mailbox registers. */
-					WRT16_IO_REG(ha, semaphore, 0);
-
-					/* Get mailbox data. */
-					mbx = RD16_IO_REG(ha, mailbox_out[0]);
-					if (mbx > 0x3fff && mbx < 0x8000) {
-						ql_mbx_completion(ha, mbx,
-						    &set_flags, &reset_flags,
-						    intr_loop);
-					} else if (mbx > 0x7fff &&
-					    mbx < 0xc000) {
-						ql_async_event(ha, mbx,
-						    &isr_done_q, &set_flags,
-						    &reset_flags, intr_loop);
-					} else {
-						EL(ha, "UNKNOWN interrupt "
-						    "type\n");
-						intr = B_TRUE;
-					}
+			/* Check for mailbox interrupt. */
+			stat = RD16_IO_REG(ha, semaphore);
+			if (stat & BIT_0) {
+				/* Get mailbox data. */
+				mbx = RD16_IO_REG(ha, mailbox_out[0]);
+				if (mbx > 0x3fff && mbx < 0x8000) {
+					ql_mbx_completion(ha, mbx,
+					    &set_flags, &reset_flags);
+				} else if (mbx > 0x7fff && mbx < 0xc000) {
+					ql_async_event(ha, rsp_q, mbx,
+					    &isr_done_q, &set_flags,
+					    &reset_flags);
 				} else {
-					ha->isp_rsp_index = RD16_IO_REG(ha,
-					    resp_in);
-
-					if (ha->isp_rsp_index !=
-					    ha->rsp_ring_index) {
-						ql_response_pkt(ha,
-						    &isr_done_q, &set_flags,
-						    &reset_flags, intr_loop);
-					} else if (++spurious_intr ==
-					    MAX_SPURIOUS_INTR) {
-						/*
-						 * Process excessive
-						 * spurious intrrupts
-						 */
-						ql_spurious_intr(ha,
-						    intr_loop);
-						EL(ha, "excessive spurious "
-						    "interrupts, "
-						    "isp_abort_needed\n");
-						set_flags |= ISP_ABORT_NEEDED;
-					} else {
-						intr = B_TRUE;
-					}
+					EL(ha, "22XX unknown interrupt type\n");
+				}
+			} else {
+				rsp_q->isp_rsp_index = RD16_IO_REG(ha, resp_in);
+				if (rsp_q->isp_rsp_index !=
+				    rsp_q->rsp_ring_index) {
+					ql_response_pkt(ha, rsp_q,
+					    &isr_done_q, &set_flags,
+					    &reset_flags);
+				} else {
+					/*EMPTY*/
+					QL_PRINT_10(ha, "22XX isp_rsp_index "
+					    "same as before\n");
 				}
 			}
-
 			/* Clear RISC interrupt */
-			if (intr || intr_loop == 0) {
-				intr = B_FALSE;
-				WRT16_IO_REG(ha, hccr, HC_CLR_RISC_INT);
-			}
-
-			if (set_flags != 0 || reset_flags != 0) {
-				TASK_DAEMON_LOCK(ha);
-				ha->task_daemon_flags |= set_flags;
-				ha->task_daemon_flags &= ~reset_flags;
-				TASK_DAEMON_UNLOCK(ha);
-				set_flags = 0;
-				reset_flags = 0;
-				daemon = B_TRUE;
-			}
+			ql_clr_risc_intr(ha);
 		}
 	} else {
-		uint32_t	ql_max_intr_loop_cnt = 0;
-
-		if (CFG_IST(ha, CFG_CTRL_8021)) {
+		if (CFG_IST(ha, CFG_CTRL_82XX)) {
 			ql_8021_clr_hw_intr(ha);
-			intr_loop = 1;
 		}
-		while (((stat = RD32_IO_REG(ha, risc2host)) & RH_RISC_INT) &&
-		    (++ql_max_intr_loop_cnt < ql_max_intr_loop)) {
 
-			clear_spurious = B_TRUE;	/* assume ok */
+		if (((stat = RD32_IO_REG(ha, risc2host)) & RH_RISC_INT) == 0) {
+			QL_PRINT_10(ha, "done, index=%d, no interrupt "
+			    "stat=%xh\n", index, stat);
+			rval = DDI_INTR_UNCLAIMED;
+		} else if (ha->ql_dump_state & QL_DUMPING) {
+			EL(ha, "fw_dump, index=%d, active stat=%xh\n",
+			    index, stat);
+			rval = DDI_INTR_CLAIMED;
+		} else if (CFG_IST(ha, CFG_CTRL_82XX) &&
+		    RD32_IO_REG(ha, nx_risc_int) == 0) {
+			QL_PRINT_10(ha, "done, index=%d, no nx_risc_int "
+			    "stat=%xh\n", index, stat);
+			rval = DDI_INTR_UNCLAIMED;
+		} else {
+			rval = DDI_INTR_CLAIMED;
+			QL_PRINT_3(ha, "index=%d, interrupt stat=%xh\n",
+			    index, stat);
 
 			/* Capture FW defined interrupt info */
 			mbx = MSW(stat);
 
-			/* Reset idle timer. */
-			ha->idle_timer = 0;
-			rval = DDI_INTR_CLAIMED;
-
-			if (CFG_IST(ha, CFG_CTRL_8021) &&
-			    (RD32_IO_REG(ha, nx_risc_int) == 0 ||
-			    intr_loop == 0)) {
-				break;
-			}
-
-			if (intr_loop) {
-				intr_loop--;
+			if (qlc_fm_check_acc_handle(ha, ha->dev_handle)
+			    != DDI_FM_OK) {
+				qlc_fm_report_err_impact(ha,
+				    QL_FM_EREPORT_ACC_HANDLE_CHECK);
 			}
 
 			switch (stat & 0x1ff) {
 			case ROM_MBX_SUCCESS:
 			case ROM_MBX_ERR:
 				ql_mbx_completion(ha, mbx, &set_flags,
-				    &reset_flags, intr_loop);
-
-				/* Release mailbox registers. */
-				if ((CFG_IST(ha, CFG_CTRL_24258081)) == 0) {
-					WRT16_IO_REG(ha, semaphore, 0);
-				}
+				    &reset_flags);
 				break;
 
 			case MBX_SUCCESS:
 			case MBX_ERR:
-				/* Sun FW, Release mailbox registers. */
-				if ((CFG_IST(ha, CFG_CTRL_24258081)) == 0) {
-					WRT16_IO_REG(ha, semaphore, 0);
-				}
 				ql_mbx_completion(ha, mbx, &set_flags,
-				    &reset_flags, intr_loop);
+				    &reset_flags);
 				break;
 
 			case ASYNC_EVENT:
-				/* Sun FW, Release mailbox registers. */
-				if ((CFG_IST(ha, CFG_CTRL_24258081)) == 0) {
-					WRT16_IO_REG(ha, semaphore, 0);
-				}
-				ql_async_event(ha, (uint32_t)mbx, &isr_done_q,
-				    &set_flags, &reset_flags, intr_loop);
+				ql_async_event(ha, ha->rsp_queues[0],
+				    (uint32_t)mbx, &isr_done_q,
+				    &set_flags, &reset_flags);
 				break;
 
-			case RESP_UPDATE:
-				if (mbx != ha->rsp_ring_index) {
-					ha->isp_rsp_index = mbx;
-					ql_response_pkt(ha, &isr_done_q,
-					    &set_flags, &reset_flags,
-					    intr_loop);
-				} else if (++spurious_intr ==
-				    ql_spurious_cnt) {
-					/* Process excessive spurious intr. */
-					ql_spurious_intr(ha, intr_loop);
-					EL(ha, "excessive spurious "
-					    "interrupts, isp_abort_needed\n");
-					set_flags |= ISP_ABORT_NEEDED;
-					clear_spurious = B_FALSE;
+			case MULTI_Q_RSP_UPDATE:
+				QL_PRINT_3(ha, "MULTI_Q_RSP_UPDATE mbx=%xh\n",
+				    mbx);
+				if (mbx < ha->rsp_queues_cnt) {
+					rsp_q = ha->rsp_queues[mbx];
+				}
+				if (rsp_q == NULL) {
+					EL(ha, "unsupported MULTI_Q_RSP_UPDATE"
+					    " mbx=%d\n", mbx);
+					rsp_q = ha->rsp_queues[0];
+				}
+				if (ha->flags & QUEUE_SHADOW_PTRS) {
+					(void) ddi_dma_sync(
+					    rsp_q->rsp_ring.dma_handle,
+					    (off_t)rsp_q->rsp_in_shadow_ofst,
+					    SHADOW_ENTRY_SIZE,
+					    DDI_DMA_SYNC_FORCPU);
+					mbx = ddi_get32(
+					    rsp_q->rsp_ring.acc_handle,
+					    rsp_q->rsp_in_shadow_ptr);
 				} else {
-					QL_PRINT_10(CE_CONT, "(%d): response "
-					    "ring index same as before\n",
-					    ha->instance);
-					intr = B_TRUE;
-					clear_spurious = B_FALSE;
+					mbx = RD32_MBAR_REG(ha,
+					    rsp_q->mbar_rsp_in);
+				}
+				/* FALLTHRU */
+
+			case RESP_UPDATE:
+				/* Clear RISC interrupt */
+				ql_clr_risc_intr(ha);
+
+				if (rsp_q == NULL) {
+					rsp_q = ha->rsp_queues[0];
+				}
+				if (mbx != rsp_q->rsp_ring_index) {
+					rsp_q->isp_rsp_index = (uint16_t)mbx;
+					ql_response_pkt(ha, rsp_q, &isr_done_q,
+					    &set_flags, &reset_flags);
+				} else {
+					/*EMPTY*/
+					QL_PRINT_3(ha, "response "
+					    "ring index same as before\n");
 				}
 				break;
 
 			case SCSI_FAST_POST_16:
 				stat = (stat & 0xffff0000) | MBA_CMPLT_1_16BIT;
-				ql_async_event(ha, stat, &isr_done_q,
-				    &set_flags, &reset_flags, intr_loop);
+				ql_async_event(ha, ha->rsp_queues[0],
+				    stat, &isr_done_q, &set_flags,
+				    &reset_flags);
 				break;
 
 			case SCSI_FAST_POST_32:
 				stat = (stat & 0xffff0000) | MBA_CMPLT_1_32BIT;
-				ql_async_event(ha, stat, &isr_done_q,
-				    &set_flags, &reset_flags, intr_loop);
+				ql_async_event(ha, ha->rsp_queues[0],
+				    stat, &isr_done_q, &set_flags,
+				    &reset_flags);
 				break;
 
 			case CTIO_FAST_POST:
 				stat = (stat & 0xffff0000) |
 				    MBA_CTIO_COMPLETION;
-				ql_async_event(ha, stat, &isr_done_q,
-				    &set_flags, &reset_flags, intr_loop);
+				ql_async_event(ha, ha->rsp_queues[0],
+				    stat, &isr_done_q, &set_flags,
+				    &reset_flags);
 				break;
 
 			case IP_FAST_POST_XMT:
 				stat = (stat & 0xffff0000) | MBA_IP_COMPLETION;
-				ql_async_event(ha, stat, &isr_done_q,
-				    &set_flags, &reset_flags, intr_loop);
+				ql_async_event(ha, ha->rsp_queues[0],
+				    stat, &isr_done_q, &set_flags,
+				    &reset_flags);
 				break;
 
 			case IP_FAST_POST_RCV:
 				stat = (stat & 0xffff0000) | MBA_IP_RECEIVE;
-				ql_async_event(ha, stat, &isr_done_q,
-				    &set_flags, &reset_flags, intr_loop);
+				ql_async_event(ha, ha->rsp_queues[0],
+				    stat, &isr_done_q, &set_flags,
+				    &reset_flags);
 				break;
 
 			case IP_FAST_POST_BRD:
 				stat = (stat & 0xffff0000) | MBA_IP_BROADCAST;
-				ql_async_event(ha, stat, &isr_done_q,
-				    &set_flags, &reset_flags, intr_loop);
+				ql_async_event(ha, ha->rsp_queues[0],
+				    stat, &isr_done_q, &set_flags,
+				    &reset_flags);
 				break;
 
 			case IP_FAST_POST_RCV_ALN:
 				stat = (stat & 0xffff0000) |
 				    MBA_IP_HDR_DATA_SPLIT;
-				ql_async_event(ha, stat, &isr_done_q,
-				    &set_flags, &reset_flags, intr_loop);
+				ql_async_event(ha, ha->rsp_queues[0],
+				    stat, &isr_done_q, &set_flags,
+				    &reset_flags);
 				break;
 
 			case ATIO_UPDATE:
 				EL(ha, "unsupported ATIO queue update"
 				    " interrupt, status=%xh\n", stat);
-				intr = B_TRUE;
 				break;
 
 			case ATIO_RESP_UPDATE:
 				EL(ha, "unsupported ATIO response queue "
 				    "update interrupt, status=%xh\n", stat);
-				intr = B_TRUE;
 				break;
 
 			default:
-				ql_handle_uncommon_risc_intr(ha, stat,
+				ql_handle_uncommon_risc_intr(ha, intr, stat,
 				    &set_flags);
-				intr = B_TRUE;
 				break;
 			}
+		}
 
-			/* Clear RISC interrupt */
-			if (intr || intr_loop == 0) {
-				intr = B_FALSE;
-				if (CFG_IST(ha, CFG_CTRL_8021)) {
-					ql_8021_clr_fw_intr(ha);
-				} else if (CFG_IST(ha, CFG_CTRL_242581)) {
-					WRT32_IO_REG(ha, hccr,
-					    HC24_CLR_RISC_INT);
-				} else {
-					WRT16_IO_REG(ha, hccr, HC_CLR_RISC_INT);
-				}
-			}
+		/* Clear RISC interrupt */
+		if (rval == DDI_INTR_CLAIMED && rsp_q == NULL) {
+			ql_clr_risc_intr(ha);
+		}
 
-			if (set_flags != 0 || reset_flags != 0) {
-				TASK_DAEMON_LOCK(ha);
-				ha->task_daemon_flags |= set_flags;
-				ha->task_daemon_flags &= ~reset_flags;
-				TASK_DAEMON_UNLOCK(ha);
-				set_flags = 0;
-				reset_flags = 0;
-				daemon = B_TRUE;
-			}
-
-			if (ha->flags & PARITY_ERROR) {
-				EL(ha, "parity/pause exit\n");
-				mbx = RD16_IO_REG(ha, hccr); /* PCI posting */
-				break;
-			}
-
-			if (clear_spurious) {
-				spurious_intr = 0;
-			}
+		/* A0 chip delay */
+		if (CFG_IST(ha, CFG_CTRL_83XX) && ha->rev_id == 1 &&
+		    ha->iflags & (IFLG_INTR_LEGACY | IFLG_INTR_FIXED)) {
+			drv_usecwait(4);
 		}
 	}
 
@@ -520,28 +536,30 @@ ql_isr_aif(caddr_t arg, caddr_t intvec)
 	}
 
 	/* Release interrupt lock. */
-	INTR_UNLOCK(ha);
+	INDX_INTR_UNLOCK(ha, intr);
 
-	if (daemon) {
-		ql_awaken_task_daemon(ha, NULL, 0, 0);
+	if (set_flags || reset_flags) {
+		ql_awaken_task_daemon(ha, NULL, set_flags, reset_flags);
 	}
 
 	if (isr_done_q.first != NULL) {
-		ql_done(isr_done_q.first);
-	}
-
-	if (rval == DDI_INTR_CLAIMED) {
-		QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
-		ha->xioctl->TotalInterrupts++;
-	} else {
-		/*EMPTY*/
-		QL_PRINT_3(CE_CONT, "(%d): interrupt not claimed\n",
-		    ha->instance);
+		ql_done(isr_done_q.first, B_FALSE);
 	}
 
 	QL_PM_LOCK(ha);
-	ha->busy--;
+	if (ha->pm_busy) {
+		ha->pm_busy--;
+	}
 	QL_PM_UNLOCK(ha);
+
+	if (rval == DDI_INTR_CLAIMED) {
+		QL_PRINT_3(ha, "done\n");
+		ha->idle_timer = 0;
+		ha->xioctl->TotalInterrupts++;
+	} else {
+		/*EMPTY*/
+		QL_PRINT_10(ha, "interrupt not claimed\n");
+	}
 
 	return (rval);
 }
@@ -552,14 +570,16 @@ ql_isr_aif(caddr_t arg, caddr_t intvec)
  *
  * Input:
  *	ha:		adapter state pointer.
+ *	intr:		interrupt index.
  *	stat:		interrupt status
+ *	set_flags:	task daemon flags to set.
  *
  * Context:
  *	Interrupt or Kernel context, no mailbox commands allowed.
  */
 static void
-ql_handle_uncommon_risc_intr(ql_adapter_state_t *ha, uint32_t stat,
-    uint32_t *set_flags)
+ql_handle_uncommon_risc_intr(ql_adapter_state_t *ha, int intr, uint32_t stat,
+    uint64_t *set_flags)
 {
 	uint16_t	hccr_reg;
 
@@ -585,9 +605,11 @@ ql_handle_uncommon_risc_intr(ql_adapter_state_t *ha, uint32_t stat,
 
 		EL(ha, "parity/pause error, isp_abort_needed\n");
 
+		INDX_INTR_UNLOCK(ha, intr);
 		if (ql_binary_fw_dump(ha, FALSE) != QL_SUCCESS) {
 			ql_reset_chip(ha);
 		}
+		INDX_INTR_LOCK(ha, intr);
 
 		if (ha->parity_pause_errors == 0) {
 			ha->log_parity_pause = B_TRUE;
@@ -600,57 +622,10 @@ ql_handle_uncommon_risc_intr(ql_adapter_state_t *ha, uint32_t stat,
 		*set_flags |= ISP_ABORT_NEEDED;
 
 		/* Disable ISP interrupts. */
-		CFG_IST(ha, CFG_CTRL_8021) ? ql_8021_disable_intrs(ha) :
-		    WRT16_IO_REG(ha, ictrl, 0);
-		ADAPTER_STATE_LOCK(ha);
-		ha->flags &= ~INTERRUPTS_ENABLED;
-		ADAPTER_STATE_UNLOCK(ha);
+		ql_disable_intr(ha);
 	} else {
 		EL(ha, "UNKNOWN interrupt status=%xh, hccr=%xh\n",
 		    stat, hccr_reg);
-	}
-}
-
-/*
- * ql_spurious_intr
- *	Inform Solaris of spurious interrupts.
- *
- * Input:
- *	ha:		adapter state pointer.
- *	intr_clr:	early interrupt clear
- *
- * Context:
- *	Interrupt or Kernel context, no mailbox commands allowed.
- */
-static void
-ql_spurious_intr(ql_adapter_state_t *ha, int intr_clr)
-{
-	ddi_devstate_t	state;
-
-	EL(ha, "Spurious interrupt\n");
-
-	/* Disable ISP interrupts. */
-	WRT16_IO_REG(ha, ictrl, 0);
-	ADAPTER_STATE_LOCK(ha);
-	ha->flags &= ~INTERRUPTS_ENABLED;
-	ADAPTER_STATE_UNLOCK(ha);
-
-	/* Clear RISC interrupt */
-	if (intr_clr) {
-		if (CFG_IST(ha, CFG_CTRL_8021)) {
-			ql_8021_clr_fw_intr(ha);
-		} else if (CFG_IST(ha, CFG_CTRL_242581)) {
-			WRT32_IO_REG(ha, hccr, HC24_CLR_RISC_INT);
-		} else {
-			WRT16_IO_REG(ha, hccr, HC_CLR_RISC_INT);
-		}
-	}
-
-	state = ddi_get_devstate(ha->dip);
-	if (state == DDI_DEVSTATE_UP) {
-		/*EMPTY*/
-		ddi_dev_report_fault(ha->dip, DDI_SERVICE_DEGRADED,
-		    DDI_DEVICE_FAULT, "spurious interrupts");
 	}
 }
 
@@ -663,20 +638,19 @@ ql_spurious_intr(ql_adapter_state_t *ha, int intr_clr)
  *	mb0:		Mailbox 0 contents.
  *	set_flags:	task daemon flags to set.
  *	reset_flags:	task daemon flags to reset.
- *	intr_clr:	early interrupt clear
  *
  * Context:
  *	Interrupt context.
  */
 /* ARGSUSED */
 static void
-ql_mbx_completion(ql_adapter_state_t *ha, uint16_t mb0, uint32_t *set_flags,
-    uint32_t *reset_flags, int intr_clr)
+ql_mbx_completion(ql_adapter_state_t *ha, uint16_t mb0, uint64_t *set_flags,
+    uint64_t *reset_flags)
 {
 	uint32_t	index;
 	uint16_t	cnt;
 
-	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
+	QL_PRINT_3(ha, "started\n");
 
 	/* Load return mailbox registers. */
 	MBX_REGISTER_LOCK(ha);
@@ -697,17 +671,6 @@ ql_mbx_completion(ql_adapter_state_t *ha, uint16_t mb0, uint32_t *set_flags,
 		EL(ha, "mcp == NULL\n");
 	}
 
-	if (intr_clr) {
-		/* Clear RISC interrupt. */
-		if (CFG_IST(ha, CFG_CTRL_8021)) {
-			ql_8021_clr_fw_intr(ha);
-		} else if (CFG_IST(ha, CFG_CTRL_242581)) {
-			WRT32_IO_REG(ha, hccr, HC24_CLR_RISC_INT);
-		} else {
-			WRT16_IO_REG(ha, hccr, HC_CLR_RISC_INT);
-		}
-	}
-
 	ha->mailbox_flags = (uint8_t)(ha->mailbox_flags | MBX_INTERRUPT);
 	if (ha->flags & INTERRUPTS_ENABLED) {
 		cv_broadcast(&ha->cv_mbx_intr);
@@ -715,7 +678,7 @@ ql_mbx_completion(ql_adapter_state_t *ha, uint16_t mb0, uint32_t *set_flags,
 
 	MBX_REGISTER_UNLOCK(ha);
 
-	QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
+	QL_PRINT_3(ha, "done\n");
 }
 
 /*
@@ -724,56 +687,102 @@ ql_mbx_completion(ql_adapter_state_t *ha, uint16_t mb0, uint32_t *set_flags,
  *
  * Input:
  *	ha:		adapter state pointer.
+ *	rsp_q:		response queue structure pointer.
  *	mbx:		Mailbox 0 register.
  *	done_q:		head pointer to done queue.
  *	set_flags:	task daemon flags to set.
  *	reset_flags:	task daemon flags to reset.
- *	intr_clr:	early interrupt clear
  *
  * Context:
  *	Interrupt or Kernel context, no mailbox commands allowed.
  */
 static void
-ql_async_event(ql_adapter_state_t *ha, uint32_t mbx, ql_head_t *done_q,
-    uint32_t *set_flags, uint32_t *reset_flags, int intr_clr)
+ql_async_event(ql_adapter_state_t *ha, ql_response_q_t *rsp_q, uint32_t mbx,
+    ql_head_t *done_q, uint64_t *set_flags, uint64_t *reset_flags)
 {
-	uint32_t		handle;
-	uint32_t		index;
-	uint16_t		cnt;
-	uint16_t		mb[MAX_MBOX_COUNT];
+	uint32_t		index, handles[5];
+	uint16_t		cnt, handle_cnt, mb[MAX_MBOX_COUNT];
 	ql_srb_t		*sp;
 	port_id_t		s_id;
 	ql_tgt_t		*tq;
-	boolean_t		intr = B_TRUE;
 	ql_adapter_state_t	*vha;
 
-	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
+	QL_PRINT_3(ha, "started\n");
 
 	/* Setup to process fast completion. */
 	mb[0] = LSW(mbx);
 	switch (mb[0]) {
 	case MBA_SCSI_COMPLETION:
-		handle = SHORT_TO_LONG(RD16_IO_REG(ha, mailbox_out[1]),
+		handles[0] = SHORT_TO_LONG(RD16_IO_REG(ha, mailbox_out[1]),
 		    RD16_IO_REG(ha, mailbox_out[2]));
+		handle_cnt = 1;
 		break;
 
 	case MBA_CMPLT_1_16BIT:
-		handle = MSW(mbx);
+		handles[0] = MSW(mbx);
+		handle_cnt = 1;
+		mb[0] = MBA_SCSI_COMPLETION;
+		break;
+
+	case MBA_CMPLT_2_16BIT:
+		handles[0] = (uint32_t)RD16_IO_REG(ha, mailbox_out[1]);
+		handles[1] = (uint32_t)RD16_IO_REG(ha, mailbox_out[2]);
+		handle_cnt = 2;
+		mb[0] = MBA_SCSI_COMPLETION;
+		break;
+
+	case MBA_CMPLT_3_16BIT:
+		handles[0] = (uint32_t)RD16_IO_REG(ha, mailbox_out[1]);
+		handles[1] = (uint32_t)RD16_IO_REG(ha, mailbox_out[2]);
+		handles[2] = (uint32_t)RD16_IO_REG(ha, mailbox_out[3]);
+		handle_cnt = 3;
+		mb[0] = MBA_SCSI_COMPLETION;
+		break;
+
+	case MBA_CMPLT_4_16BIT:
+		handles[0] = (uint32_t)RD16_IO_REG(ha, mailbox_out[1]);
+		handles[1] = (uint32_t)RD16_IO_REG(ha, mailbox_out[2]);
+		handles[2] = (uint32_t)RD16_IO_REG(ha, mailbox_out[3]);
+		handles[3] = (uint32_t)RD16_IO_REG(ha, mailbox_out[6]);
+		handle_cnt = 4;
+		mb[0] = MBA_SCSI_COMPLETION;
+		break;
+
+	case MBA_CMPLT_5_16BIT:
+		handles[0] = (uint32_t)RD16_IO_REG(ha, mailbox_out[1]);
+		handles[1] = (uint32_t)RD16_IO_REG(ha, mailbox_out[2]);
+		handles[2] = (uint32_t)RD16_IO_REG(ha, mailbox_out[3]);
+		handles[3] = (uint32_t)RD16_IO_REG(ha, mailbox_out[6]);
+		handles[4] = (uint32_t)RD16_IO_REG(ha, mailbox_out[7]);
+		handle_cnt = 5;
 		mb[0] = MBA_SCSI_COMPLETION;
 		break;
 
 	case MBA_CMPLT_1_32BIT:
-		handle = SHORT_TO_LONG(MSW(mbx),
+		handles[0] = SHORT_TO_LONG(MSW(mbx),
 		    RD16_IO_REG(ha, mailbox_out[2]));
+		handle_cnt = 1;
+		mb[0] = MBA_SCSI_COMPLETION;
+		break;
+
+	case MBA_CMPLT_2_32BIT:
+		handles[0] = SHORT_TO_LONG(
+		    RD16_IO_REG(ha, mailbox_out[1]),
+		    RD16_IO_REG(ha, mailbox_out[2]));
+		handles[1] = SHORT_TO_LONG(
+		    RD16_IO_REG(ha, mailbox_out[6]),
+		    RD16_IO_REG(ha, mailbox_out[7]));
+		handle_cnt = 2;
 		mb[0] = MBA_SCSI_COMPLETION;
 		break;
 
 	case MBA_CTIO_COMPLETION:
 	case MBA_IP_COMPLETION:
-		handle = CFG_IST(ha, CFG_CTRL_2200) ? SHORT_TO_LONG(
+		handles[0] = CFG_IST(ha, CFG_CTRL_22XX) ? SHORT_TO_LONG(
 		    RD16_IO_REG(ha, mailbox_out[1]),
 		    RD16_IO_REG(ha, mailbox_out[2])) :
 		    SHORT_TO_LONG(MSW(mbx), RD16_IO_REG(ha, mailbox_out[2]));
+		handle_cnt = 1;
 		mb[0] = MBA_SCSI_COMPLETION;
 		break;
 
@@ -784,80 +793,81 @@ ql_async_event(ql_adapter_state_t *ha, uint32_t mbx, ql_head_t *done_q,
 	/* Handle asynchronous event */
 	switch (mb[0]) {
 	case MBA_SCSI_COMPLETION:
-		QL_PRINT_5(CE_CONT, "(%d): Fast post completion\n",
-		    ha->instance);
-
-		if (intr_clr) {
-			/* Clear RISC interrupt */
-			if (CFG_IST(ha, CFG_CTRL_8021)) {
-				ql_8021_clr_fw_intr(ha);
-			} else if (CFG_IST(ha, CFG_CTRL_242581)) {
-				WRT32_IO_REG(ha, hccr, HC24_CLR_RISC_INT);
-			} else {
-				WRT16_IO_REG(ha, hccr, HC_CLR_RISC_INT);
-			}
-			intr = B_FALSE;
-		}
+		QL_PRINT_5(ha, "Fast post completion\n");
 
 		if ((ha->flags & ONLINE) == 0) {
 			break;
 		}
 
-		/* Get handle. */
-		index = handle & OSC_INDEX_MASK;
+		for (cnt = 0; cnt < handle_cnt; cnt++) {
+			QL_PRINT_5(ha, "Fast post completion, handle=%xh\n",
+			    handles[cnt]);
 
-		/* Validate handle. */
-		sp = index < MAX_OUTSTANDING_COMMANDS ?
-		    ha->outstanding_cmds[index] : NULL;
+			/* Get handle. */
+			index = handles[cnt] & OSC_INDEX_MASK;
 
-		if (sp != NULL && sp->handle == handle) {
-			ha->outstanding_cmds[index] = NULL;
-			sp->handle = 0;
-			sp->flags &= ~SRB_IN_TOKEN_ARRAY;
+			/* Validate handle. */
+			sp = index < ha->osc_max_cnt ?
+			    ha->outstanding_cmds[index] : NULL;
 
-			/* Set completed status. */
-			sp->flags |= SRB_ISP_COMPLETED;
-
-			/* Set completion status */
-			sp->pkt->pkt_reason = CS_COMPLETE;
-
-			if (!(sp->flags & SRB_FCP_CMD_PKT)) {
-				/* Place block on done queue */
-				ql_add_link_b(done_q, &sp->cmd);
-			} else {
-				ql_fast_fcp_post(sp);
+			if (sp == QL_ABORTED_SRB(ha)) {
+				EL(ha, "QL_ABORTED_SRB handle=%xh\n",
+				    handles[cnt]);
+				ha->outstanding_cmds[index] = NULL;
+				continue;
 			}
-		} else if (handle != QL_FCA_BRAND) {
-			if (sp == NULL) {
-				EL(ha, "%xh unknown IOCB handle=%xh\n",
-				    mb[0], handle);
-			} else {
-				EL(ha, "%xh mismatch IOCB handle pkt=%xh, "
-				    "sp=%xh\n", mb[0], handle, sp->handle);
-			}
+			if (sp != NULL && sp->handle == handles[cnt]) {
+				ha->outstanding_cmds[index] = NULL;
+				sp->handle = 0;
+				sp->flags &= ~SRB_IN_TOKEN_ARRAY;
 
-			EL(ha, "%xh Fast post, mbx1=%xh, mbx2=%xh, mbx3=%xh,"
-			    "mbx6=%xh, mbx7=%xh\n", mb[0],
-			    RD16_IO_REG(ha, mailbox_out[1]),
-			    RD16_IO_REG(ha, mailbox_out[2]),
-			    RD16_IO_REG(ha, mailbox_out[3]),
-			    RD16_IO_REG(ha, mailbox_out[6]),
-			    RD16_IO_REG(ha, mailbox_out[7]));
+				/* Set completed status. */
+				sp->flags |= SRB_ISP_COMPLETED;
 
-			(void) ql_binary_fw_dump(ha, FALSE);
+				/* Set completion status */
+				sp->pkt->pkt_reason = CS_COMPLETE;
 
-			if (!(ha->task_daemon_flags &
-			    (ISP_ABORT_NEEDED | ABORT_ISP_ACTIVE))) {
-				EL(ha, "%xh ISP Invalid handle, "
-				    "isp_abort_needed\n", mb[0]);
-				*set_flags |= ISP_ABORT_NEEDED;
+				if (!(sp->flags & SRB_FCP_CMD_PKT)) {
+					/* Place block on done queue */
+					ql_add_link_b(done_q, &sp->cmd);
+				} else {
+					ql_fast_fcp_post(sp, rsp_q);
+				}
+			} else if (handles[cnt] != QL_FCA_BRAND) {
+				if (sp == NULL) {
+					EL(ha, "%xh unknown IOCB handle=%xh\n",
+					    mb[0], handles[cnt]);
+				} else {
+					EL(ha, "%xh mismatch IOCB handle "
+					    "pkt=%xh, sp=%xh\n", mb[0],
+					    handles[cnt], sp->handle);
+				}
+
+				EL(ha, "%xh Fast post, mbx1=%xh, mbx2=%xh, "
+				    "mbx3=%xh, mbx6=%xh, mbx7=%xh\n", mb[0],
+				    RD16_IO_REG(ha, mailbox_out[1]),
+				    RD16_IO_REG(ha, mailbox_out[2]),
+				    RD16_IO_REG(ha, mailbox_out[3]),
+				    RD16_IO_REG(ha, mailbox_out[6]),
+				    RD16_IO_REG(ha, mailbox_out[7]));
+
+				ADAPTER_STATE_LOCK(ha);
+				ha->flags |= FW_DUMP_NEEDED;
+				ADAPTER_STATE_UNLOCK(ha);
+
+				if (!(ha->task_daemon_flags &
+				    ISP_ABORT_NEEDED)) {
+					EL(ha, "%xh ISP Invalid handle, "
+					    "isp_abort_needed\n", mb[0]);
+					*set_flags |= ISP_ABORT_NEEDED;
+				}
 			}
 		}
 		break;
 
 	case MBA_RESET:		/* Reset */
 		EL(ha, "%xh Reset received\n", mb[0]);
-		*set_flags |= RESET_MARKER_NEEDED;
+		*set_flags |= MARKER_NEEDED;
 		break;
 
 	case MBA_SYSTEM_ERR:		/* System Error */
@@ -908,10 +918,17 @@ ql_async_event(ql_adapter_state_t *ha, uint32_t mbx, ql_head_t *done_q,
 			    RD16_IO_REG(ha, mailbox_out[31]));
 		}
 
-		(void) ql_binary_fw_dump(ha, FALSE);
+		ADAPTER_STATE_LOCK(ha);
+		ha->flags |= FW_DUMP_NEEDED;
+		ADAPTER_STATE_UNLOCK(ha);
 
-		(void) ql_flash_errlog(ha, FLASH_ERRLOG_AEN_8002, mb[1],
-		    mb[2], mb[3]);
+		/* Signal task daemon to store error log. */
+		if (ha->errlog[0] == 0) {
+			ha->errlog[3] = mb[3];
+			ha->errlog[2] = mb[2];
+			ha->errlog[1] = mb[1];
+			ha->errlog[0] = FLASH_ERRLOG_AEN_8002;
+		}
 
 		if (CFG_IST(ha, CFG_CTRL_81XX) && mb[7] & SE_MPI_RISC) {
 			ADAPTER_STATE_LOCK(ha);
@@ -927,31 +944,46 @@ ql_async_event(ql_adapter_state_t *ha, uint32_t mbx, ql_head_t *done_q,
 		EL(ha, "%xh Request Transfer Error received, "
 		    "isp_abort_needed\n", mb[0]);
 
-		(void) ql_flash_errlog(ha, FLASH_ERRLOG_AEN_8003,
-		    RD16_IO_REG(ha, mailbox_out[1]),
-		    RD16_IO_REG(ha, mailbox_out[2]),
-		    RD16_IO_REG(ha, mailbox_out[3]));
+		/* Signal task daemon to store error log. */
+		if (ha->errlog[0] == 0) {
+			ha->errlog[3] = RD16_IO_REG(ha, mailbox_out[3]);
+			ha->errlog[2] = RD16_IO_REG(ha, mailbox_out[2]);
+			ha->errlog[1] = RD16_IO_REG(ha, mailbox_out[1]);
+			ha->errlog[0] = FLASH_ERRLOG_AEN_8003;
+		}
 
 		*set_flags |= ISP_ABORT_NEEDED;
 		ha->xioctl->ControllerErrorCount++;
+
+		(void) qlc_fm_report_err_impact(ha,
+		    QL_FM_EREPORT_MBA_REQ_TRANSFER_ERR);
+
 		break;
 
 	case MBA_RSP_TRANSFER_ERR:  /* Response Xfer Err */
 		EL(ha, "%xh Response Transfer Error received,"
 		    " isp_abort_needed\n", mb[0]);
 
-		(void) ql_flash_errlog(ha, FLASH_ERRLOG_AEN_8004,
-		    RD16_IO_REG(ha, mailbox_out[1]),
-		    RD16_IO_REG(ha, mailbox_out[2]),
-		    RD16_IO_REG(ha, mailbox_out[3]));
+		/* Signal task daemon to store error log. */
+		if (ha->errlog[0] == 0) {
+			ha->errlog[3] = RD16_IO_REG(ha, mailbox_out[3]);
+			ha->errlog[2] = RD16_IO_REG(ha, mailbox_out[2]);
+			ha->errlog[1] = RD16_IO_REG(ha, mailbox_out[1]);
+			ha->errlog[0] = FLASH_ERRLOG_AEN_8004;
+		}
 
 		*set_flags |= ISP_ABORT_NEEDED;
 		ha->xioctl->ControllerErrorCount++;
+
+		(void) qlc_fm_report_err_impact(ha,
+		    QL_FM_EREPORT_MBA_RSP_TRANSFER_ERR);
+
 		break;
 
 	case MBA_WAKEUP_THRES: /* Request Queue Wake-up */
-		EL(ha, "%xh Request Queue Wake-up received\n",
-		    mb[0]);
+		EL(ha, "%xh Request Queue Wake-up "
+		    "received, mbx1=%xh\n", mb[0],
+		    RD16_IO_REG(ha, mailbox_out[1]));
 		break;
 
 	case MBA_MENLO_ALERT:	/* Menlo Alert Notification */
@@ -980,7 +1012,7 @@ ql_async_event(ql_adapter_state_t *ha, uint32_t mbx, ql_head_t *done_q,
 	case MBA_LIP_F8:	/* Received a LIP F8. */
 	case MBA_LIP_RESET:	/* LIP reset occurred. */
 	case MBA_LIP_OCCURRED:	/* Loop Initialization Procedure */
-		if (CFG_IST(ha, CFG_CTRL_8081)) {
+		if (CFG_IST(ha, CFG_FCOE_SUPPORT)) {
 			EL(ha, "%xh DCBX_STARTED received, mbx1=%xh, mbx2=%xh"
 			    "\n", mb[0], RD16_IO_REG(ha, mailbox_out[1]),
 			    RD16_IO_REG(ha, mailbox_out[2]));
@@ -1012,8 +1044,7 @@ ql_async_event(ql_adapter_state_t *ha, uint32_t mbx, ql_head_t *done_q,
 		break;
 
 	case MBA_LOOP_UP:
-		if (CFG_IST(ha, (CFG_CTRL_2300 | CFG_CTRL_6322 |
-		    CFG_CTRL_24258081))) {
+		if (!CFG_IST(ha, CFG_CTRL_22XX)) {
 			ha->iidma_rate = RD16_IO_REG(ha, mailbox_out[1]);
 			if (ha->iidma_rate == IIDMA_RATE_1GB) {
 				ha->state = FC_PORT_STATE_MASK(
@@ -1035,6 +1066,14 @@ ql_async_event(ql_adapter_state_t *ha, uint32_t mbx, ql_head_t *done_q,
 				ha->state = FC_PORT_STATE_MASK(
 				    ha->state) | FC_STATE_10GBIT_SPEED;
 				index = 10;
+			} else if (ha->iidma_rate == IIDMA_RATE_16GB) {
+				ha->state = FC_PORT_STATE_MASK(
+				    ha->state) | FC_STATE_16GBIT_SPEED;
+				index = 16;
+			} else if (ha->iidma_rate == IIDMA_RATE_32GB) {
+				ha->state = FC_PORT_STATE_MASK(
+				    ha->state) | FC_STATE_32GBIT_SPEED;
+				index = 32;
 			} else {
 				ha->state = FC_PORT_STATE_MASK(
 				    ha->state);
@@ -1076,7 +1115,7 @@ ql_async_event(ql_adapter_state_t *ha, uint32_t mbx, ql_head_t *done_q,
 			ha->loop_down_timer = LOOP_DOWN_TIMER_START;
 		}
 
-		if (CFG_IST(ha, CFG_CTRL_258081)) {
+		if (CFG_IST(ha, CFG_CTRL_252780818283)) {
 			ha->sfp_stat = RD16_IO_REG(ha, mailbox_out[2]);
 		}
 
@@ -1102,16 +1141,19 @@ ql_async_event(ql_adapter_state_t *ha, uint32_t mbx, ql_head_t *done_q,
 			break;
 		}
 
-		if (CFG_IST(ha, CFG_CTRL_8081) && mb[1] == 0xffff &&
+		if (mb[1] == 0xffff &&
 		    mb[2] == 7 && (MSB(mb[3]) == 0xe || MSB(mb[3]) == 0x1a ||
 		    MSB(mb[3]) == 0x1c || MSB(mb[3]) == 0x1d ||
 		    MSB(mb[3]) == 0x1e)) {
+			EL(ha, "%xh Port Database Update, Loop down "
+			    "received, mbx1=%xh, mbx2=%xh, mbx3=%xh\n",
+			    mb[0], mb[1], mb[2], mb[3]);
 			/*
 			 * received FLOGI reject
 			 * received FLOGO
 			 * FCF configuration changed
 			 * FIP Clear Virtual Link received
-			 * FKA timeout
+			 * FCF timeout
 			 */
 			if (!(ha->task_daemon_flags & LOOP_DOWN)) {
 				*set_flags |= LOOP_DOWN;
@@ -1128,8 +1170,8 @@ ql_async_event(ql_adapter_state_t *ha, uint32_t mbx, ql_head_t *done_q,
 		 */
 		} else if ((mb[1] != 0x7fe) &&
 		    ((FC_PORT_STATE_MASK(vha->state) != FC_STATE_OFFLINE ||
-		    (CFG_IST(ha, CFG_CTRL_24258081) &&
-		    (mb[1] != 0xffff || mb[2] != 6 || mb[3] != 0))))) {
+		    (CFG_IST(ha, CFG_ISP_FW_TYPE_2) &&
+		    (mb[2] != 6 || mb[3] != 0))))) {
 			EL(ha, "%xh Port Database Update, Login/Logout "
 			    "received, mbx1=%xh, mbx2=%xh, mbx3=%xh\n",
 			    mb[0], mb[1], mb[2], mb[3]);
@@ -1221,7 +1263,7 @@ ql_async_event(ql_adapter_state_t *ha, uint32_t mbx, ql_head_t *done_q,
 			break;
 		}
 
-		cnt = (uint16_t)(CFG_IST(ha, CFG_CTRL_24258081) ?
+		cnt = (uint16_t)(CFG_IST(ha, CFG_ISP_FW_TYPE_2) ?
 		    CHAR_TO_SHORT(ha->ip_init_ctrl_blk.cb24.buf_size[0],
 		    ha->ip_init_ctrl_blk.cb24.buf_size[1]) :
 		    CHAR_TO_SHORT(ha->ip_init_ctrl_blk.cb.buf_size[0],
@@ -1243,7 +1285,7 @@ ql_async_event(ql_adapter_state_t *ha, uint32_t mbx, ql_head_t *done_q,
 		tq->ub_seq_cnt = 0;
 		tq->ub_frame_ro = 0;
 		tq->ub_loop_id = (uint16_t)(mb[0] == MBA_IP_BROADCAST ?
-		    (CFG_IST(ha, CFG_CTRL_24258081) ? BROADCAST_24XX_HDL :
+		    (CFG_IST(ha, CFG_CTRL_24XX) ? BROADCAST_24XX_HDL :
 		    IP_BROADCAST_LOOP_ID) : tq->loop_id);
 		ha->rcv_dev_q = tq;
 
@@ -1277,7 +1319,7 @@ ql_async_event(ql_adapter_state_t *ha, uint32_t mbx, ql_head_t *done_q,
 
 	case MBA_POINT_TO_POINT:
 	/* case MBA_DCBX_COMPLETED: */
-		if (CFG_IST(ha, CFG_CTRL_8081)) {
+		if (CFG_IST(ha, CFG_FCOE_SUPPORT)) {
 			EL(ha, "%xh DCBX completed received\n", mb[0]);
 		} else {
 			EL(ha, "%xh Point to Point Mode received\n", mb[0]);
@@ -1285,6 +1327,14 @@ ql_async_event(ql_adapter_state_t *ha, uint32_t mbx, ql_head_t *done_q,
 		ADAPTER_STATE_LOCK(ha);
 		ha->flags |= POINT_TO_POINT;
 		ADAPTER_STATE_UNLOCK(ha);
+		if (!(ha->task_daemon_flags & LOOP_DOWN)) {
+			*set_flags |= LOOP_DOWN;
+		}
+		if (ha->loop_down_timer == LOOP_DOWN_TIMER_OFF) {
+			ha->loop_down_timer = LOOP_DOWN_TIMER_START;
+		}
+		ql_port_state(ha, FC_STATE_OFFLINE,
+		    FC_STATE_CHANGE | COMMAND_WAIT_NEEDED | LOOP_DOWN);
 		break;
 
 	case MBA_FCF_CONFIG_ERROR:
@@ -1301,7 +1351,7 @@ ql_async_event(ql_adapter_state_t *ha, uint32_t mbx, ql_head_t *done_q,
 		mb[1] = RD16_IO_REG(ha, mailbox_out[1]);
 		if (mb[1] == 2) {
 			EL(ha, "%xh Change In Connection received, "
-			    "mbx1=%xh\n",  mb[0], mb[1]);
+			    "mbx1=%xh\n", mb[0], mb[1]);
 			ADAPTER_STATE_LOCK(ha);
 			ha->flags &= ~POINT_TO_POINT;
 			ADAPTER_STATE_UNLOCK(ha);
@@ -1321,9 +1371,8 @@ ql_async_event(ql_adapter_state_t *ha, uint32_t mbx, ql_head_t *done_q,
 	case MBA_ZIO_UPDATE:
 		EL(ha, "%xh ZIO response received\n", mb[0]);
 
-		ha->isp_rsp_index = RD16_IO_REG(ha, resp_in);
-		ql_response_pkt(ha, done_q, set_flags, reset_flags, intr_clr);
-		intr = B_FALSE;
+		rsp_q->isp_rsp_index = RD16_IO_REG(ha, resp_in);
+		ql_response_pkt(ha, rsp_q, done_q, set_flags, reset_flags);
 		break;
 
 	case MBA_PORT_BYPASS_CHANGED:
@@ -1362,44 +1411,66 @@ ql_async_event(ql_adapter_state_t *ha, uint32_t mbx, ql_head_t *done_q,
 	 * IDC async event until we ACK the current one.
 	 */
 	case MBA_IDC_COMPLETE:
-		ha->idc_mb[0] = mb[0];
-		ha->idc_mb[1] = RD16_IO_REG(ha, mailbox_out[1]);
-		ha->idc_mb[2] = RD16_IO_REG(ha, mailbox_out[2]);
-		ha->idc_mb[3] = RD16_IO_REG(ha, mailbox_out[3]);
-		ha->idc_mb[4] = RD16_IO_REG(ha, mailbox_out[4]);
-		ha->idc_mb[5] = RD16_IO_REG(ha, mailbox_out[5]);
-		ha->idc_mb[6] = RD16_IO_REG(ha, mailbox_out[6]);
-		ha->idc_mb[7] = RD16_IO_REG(ha, mailbox_out[7]);
-		EL(ha, "%xh Inter-driver communication complete received, "
-		    " mbx1=%xh, mbx2=%xh, mbx3=%xh, mbx4=%xh, mbx5=%xh,"
-		    " mbx6=%xh, mbx7=%xh\n", mb[0], ha->idc_mb[1],
-		    ha->idc_mb[2], ha->idc_mb[3], ha->idc_mb[4], ha->idc_mb[5],
-		    ha->idc_mb[6], ha->idc_mb[7]);
-		*set_flags |= IDC_EVENT;
+		mb[2] = RD16_IO_REG(ha, mailbox_out[2]);
+		EL(ha, "%xh MBA_IDC_COMPLETE received, mbx2=%xh\n", mb[0],
+		    mb[2]);
+		switch (mb[2]) {
+		case IDC_OPC_FLASH_ACC:
+		case IDC_OPC_RESTART_MPI:
+		case IDC_OPC_PORT_RESET_MBC:
+		case IDC_OPC_SET_PORT_CONFIG_MBC:
+			ADAPTER_STATE_LOCK(ha);
+			ha->flags |= IDC_RESTART_NEEDED;
+			ADAPTER_STATE_UNLOCK(ha);
+			break;
+		default:
+			EL(ha, "unknown IDC completion opcode=%xh\n", mb[2]);
+			break;
+		}
 		break;
 
 	case MBA_IDC_NOTIFICATION:
-		ha->idc_mb[0] = mb[0];
-		ha->idc_mb[1] = RD16_IO_REG(ha, mailbox_out[1]);
-		ha->idc_mb[2] = RD16_IO_REG(ha, mailbox_out[2]);
-		ha->idc_mb[3] = RD16_IO_REG(ha, mailbox_out[3]);
-		ha->idc_mb[4] = RD16_IO_REG(ha, mailbox_out[4]);
-		ha->idc_mb[5] = RD16_IO_REG(ha, mailbox_out[5]);
-		ha->idc_mb[6] = RD16_IO_REG(ha, mailbox_out[6]);
-		ha->idc_mb[7] = RD16_IO_REG(ha, mailbox_out[7]);
-		EL(ha, "%xh Inter-driver communication request notification "
-		    "received, mbx1=%xh, mbx2=%xh, mbx3=%xh, mbx4=%xh, "
-		    "mbx5=%xh, mbx6=%xh, mbx7=%xh\n", mb[0], ha->idc_mb[1],
-		    ha->idc_mb[2], ha->idc_mb[3], ha->idc_mb[4], ha->idc_mb[5],
-		    ha->idc_mb[6], ha->idc_mb[7]);
-		*set_flags |= IDC_EVENT;
+		for (cnt = 1; cnt < 8; cnt++) {
+			ha->idc_mb[cnt] = RD16_IO_REG(ha, mailbox_out[cnt]);
+		}
+		EL(ha, "%xh MBA_IDC_REQ_NOTIFICATION received, mbx1=%xh, "
+		    "mbx2=%xh, mbx3=%xh, mbx4=%xh, mbx5=%xh, mbx6=%xh, "
+		    "mbx7=%xh\n", mb[0], ha->idc_mb[1], ha->idc_mb[2],
+		    ha->idc_mb[3], ha->idc_mb[4], ha->idc_mb[5], ha->idc_mb[6],
+		    ha->idc_mb[7]);
+
+		ADAPTER_STATE_LOCK(ha);
+		switch (ha->idc_mb[2]) {
+		case IDC_OPC_DRV_START:
+			ha->flags |= IDC_RESTART_NEEDED;
+			break;
+		case IDC_OPC_FLASH_ACC:
+		case IDC_OPC_RESTART_MPI:
+		case IDC_OPC_PORT_RESET_MBC:
+		case IDC_OPC_SET_PORT_CONFIG_MBC:
+			ha->flags |= IDC_STALL_NEEDED;
+			break;
+		default:
+			EL(ha, "unknown IDC request opcode=%xh\n",
+			    ha->idc_mb[2]);
+			break;
+		}
+		/*
+		 * If there is a timeout value associated with this IDC
+		 * notification then there is an implied requirement
+		 * that we return an ACK.
+		 */
+		if (ha->idc_mb[1] & IDC_TIMEOUT_MASK) {
+			ha->flags |= IDC_ACK_NEEDED;
+		}
+		ADAPTER_STATE_UNLOCK(ha);
+
+		ql_awaken_task_daemon(ha, NULL, 0, 0);
 		break;
 
 	case MBA_IDC_TIME_EXTENDED:
-		EL(ha, "%xh Inter-driver communication time extended received,"
-		    " mbx1=%xh, mbx2=%xh\n", mb[0],
-		    RD16_IO_REG(ha, mailbox_out[1]),
-		    RD16_IO_REG(ha, mailbox_out[2]));
+		EL(ha, "%xh MBA_IDC_TIME_EXTENDED received, mbx2=%xh\n",
+		    mb[0], RD16_IO_REG(ha, mailbox_out[2]));
 		break;
 
 	default:
@@ -1410,18 +1481,7 @@ ql_async_event(ql_adapter_state_t *ha, uint32_t mbx, ql_head_t *done_q,
 		break;
 	}
 
-	/* Clear RISC interrupt */
-	if (intr && intr_clr) {
-		if (CFG_IST(ha, CFG_CTRL_8021)) {
-			ql_8021_clr_fw_intr(ha);
-		} else if (CFG_IST(ha, CFG_CTRL_242581)) {
-			WRT32_IO_REG(ha, hccr, HC24_CLR_RISC_INT);
-		} else {
-			WRT16_IO_REG(ha, hccr, HC_CLR_RISC_INT);
-		}
-	}
-
-	QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
+	QL_PRINT_3(ha, "done\n");
 }
 
 /*
@@ -1430,18 +1490,19 @@ ql_async_event(ql_adapter_state_t *ha, uint32_t mbx, ql_head_t *done_q,
  *
  * Input:
  *	sp:	SRB pointer.
+ *	rsp_q:	response queue structure pointer.
  *
  * Context:
  *	Interrupt or Kernel context, no mailbox commands allowed.
  */
 static void
-ql_fast_fcp_post(ql_srb_t *sp)
+ql_fast_fcp_post(ql_srb_t *sp, ql_response_q_t *rsp_q)
 {
 	ql_adapter_state_t	*ha = sp->ha;
 	ql_lun_t		*lq = sp->lun_queue;
 	ql_tgt_t		*tq = lq->target_queue;
 
-	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
+	QL_PRINT_3(ha, "started\n");
 
 	/* Acquire device queue lock. */
 	DEVICE_QUEUE_LOCK(tq);
@@ -1498,16 +1559,27 @@ ql_fast_fcp_post(ql_srb_t *sp)
 	sp->pkt->pkt_action = FC_ACTION_RETRYABLE;
 	sp->pkt->pkt_state = FC_PKT_SUCCESS;
 
+	(void) qlc_fm_check_pkt_dma_handle(ha, sp);
+
 	/* Now call the pkt completion callback */
 	if (sp->flags & SRB_POLL) {
 		sp->flags &= ~SRB_POLL;
-	} else if (sp->pkt->pkt_comp) {
-		INTR_UNLOCK(ha);
+	} else if (ha->completion_thds == 1 && sp->pkt->pkt_comp &&
+	    !(ha->flags & POLL_INTR)) {
+		INDX_INTR_UNLOCK(ha, rsp_q->rsp_q_number);
 		(*sp->pkt->pkt_comp)(sp->pkt);
-		INTR_LOCK(ha);
+		INDX_INTR_LOCK(ha, rsp_q->rsp_q_number);
+	} else {
+		ql_io_comp(sp);
 	}
 
-	QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
+	if (qlc_fm_check_acc_handle(ha, ha->dev_handle)
+	    != DDI_FM_OK) {
+		qlc_fm_report_err_impact(ha,
+		    QL_FM_EREPORT_ACC_HANDLE_CHECK);
+	}
+
+	QL_PRINT_3(ha, "done\n");
 }
 
 /*
@@ -1516,155 +1588,155 @@ ql_fast_fcp_post(ql_srb_t *sp)
  *
  * Input:
  *	ha:		adapter state pointer.
+ *	rsp_q:		response queue structure pointer.
  *	done_q:		head pointer to done queue.
  *	set_flags:	task daemon flags to set.
  *	reset_flags:	task daemon flags to reset.
- *	intr_clr:	early interrupt clear
  *
  * Context:
  *	Interrupt or Kernel context, no mailbox commands allowed.
  */
 static void
-ql_response_pkt(ql_adapter_state_t *ha, ql_head_t *done_q, uint32_t *set_flags,
-    uint32_t *reset_flags, int intr_clr)
+ql_response_pkt(ql_adapter_state_t *ha, ql_response_q_t *rsp_q,
+    ql_head_t *done_q, uint64_t *set_flags, uint64_t *reset_flags)
 {
 	response_t	*pkt;
 	uint32_t	dma_sync_size_1 = 0;
 	uint32_t	dma_sync_size_2 = 0;
 	int		status = 0;
 
-	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
+	QL_PRINT_3(ha, "started\n");
 
-	/* Clear RISC interrupt */
-	if (intr_clr) {
-		if (CFG_IST(ha, CFG_CTRL_8021)) {
-			ql_8021_clr_fw_intr(ha);
-		} else if (CFG_IST(ha, CFG_CTRL_242581)) {
-			WRT32_IO_REG(ha, hccr, HC24_CLR_RISC_INT);
-		} else {
-			WRT16_IO_REG(ha, hccr, HC_CLR_RISC_INT);
-		}
-	}
-
-	if (ha->isp_rsp_index >= RESPONSE_ENTRY_CNT) {
+	if (rsp_q->isp_rsp_index >= rsp_q->rsp_entry_cnt) {
 		EL(ha, "index error = %xh, isp_abort_needed",
-		    ha->isp_rsp_index);
+		    rsp_q->isp_rsp_index);
 		*set_flags |= ISP_ABORT_NEEDED;
 		return;
 	}
 
 	if ((ha->flags & ONLINE) == 0) {
-		QL_PRINT_3(CE_CONT, "(%d): not onlne, done\n", ha->instance);
+		QL_PRINT_10(ha, "not onlne, done\n");
 		return;
 	}
 
 	/* Calculate size of response queue entries to sync. */
-	if (ha->isp_rsp_index > ha->rsp_ring_index) {
+	if (rsp_q->isp_rsp_index > rsp_q->rsp_ring_index) {
 		dma_sync_size_1 = (uint32_t)
-		    ((uint32_t)(ha->isp_rsp_index - ha->rsp_ring_index) *
+		    ((uint32_t)(rsp_q->isp_rsp_index - rsp_q->rsp_ring_index) *
 		    RESPONSE_ENTRY_SIZE);
-	} else if (ha->isp_rsp_index == 0) {
+	} else if (rsp_q->isp_rsp_index == 0) {
 		dma_sync_size_1 = (uint32_t)
-		    ((uint32_t)(RESPONSE_ENTRY_CNT - ha->rsp_ring_index) *
+		    ((uint32_t)(rsp_q->rsp_entry_cnt - rsp_q->rsp_ring_index) *
 		    RESPONSE_ENTRY_SIZE);
 	} else {
 		/* Responses wrap around the Q */
 		dma_sync_size_1 = (uint32_t)
-		    ((uint32_t)(RESPONSE_ENTRY_CNT - ha->rsp_ring_index) *
+		    ((uint32_t)(rsp_q->rsp_entry_cnt - rsp_q->rsp_ring_index) *
 		    RESPONSE_ENTRY_SIZE);
 		dma_sync_size_2 = (uint32_t)
-		    (ha->isp_rsp_index * RESPONSE_ENTRY_SIZE);
+		    (rsp_q->isp_rsp_index * RESPONSE_ENTRY_SIZE);
 	}
 
 	/* Sync DMA buffer. */
-	(void) ddi_dma_sync(ha->hba_buf.dma_handle,
-	    (off_t)(ha->rsp_ring_index * RESPONSE_ENTRY_SIZE +
-	    RESPONSE_Q_BUFFER_OFFSET), dma_sync_size_1,
-	    DDI_DMA_SYNC_FORKERNEL);
+	(void) ddi_dma_sync(rsp_q->rsp_ring.dma_handle,
+	    (off_t)(rsp_q->rsp_ring_index * RESPONSE_ENTRY_SIZE),
+	    dma_sync_size_1, DDI_DMA_SYNC_FORCPU);
 	if (dma_sync_size_2) {
-		(void) ddi_dma_sync(ha->hba_buf.dma_handle,
-		    RESPONSE_Q_BUFFER_OFFSET, dma_sync_size_2,
-		    DDI_DMA_SYNC_FORKERNEL);
+		(void) ddi_dma_sync(rsp_q->rsp_ring.dma_handle, 0,
+		    dma_sync_size_2, DDI_DMA_SYNC_FORCPU);
 	}
 
-	while (ha->rsp_ring_index != ha->isp_rsp_index) {
-		pkt = ha->response_ring_ptr;
+	if (qlc_fm_check_acc_handle(ha, ha->dev_handle)
+	    != DDI_FM_OK) {
+		qlc_fm_report_err_impact(ha,
+		    QL_FM_EREPORT_ACC_HANDLE_CHECK);
+	}
 
-		QL_PRINT_5(CE_CONT, "(%d): ha->rsp_rg_idx=%xh, mbx[5]=%xh\n",
-		    ha->instance, ha->rsp_ring_index, ha->isp_rsp_index);
-		QL_DUMP_5((uint8_t *)ha->response_ring_ptr, 8,
+	while (rsp_q->rsp_ring_index != rsp_q->isp_rsp_index) {
+		pkt = rsp_q->rsp_ring_ptr;
+
+		QL_PRINT_5(ha, "ha->rsp_rg_idx=%xh, mbx[5]=%xh\n",
+		    rsp_q->rsp_ring_index, rsp_q->isp_rsp_index);
+		QL_DUMP_5((uint8_t *)rsp_q->rsp_ring_ptr, 8,
 		    RESPONSE_ENTRY_SIZE);
 
 		/* Adjust ring index. */
-		ha->rsp_ring_index++;
-		if (ha->rsp_ring_index == RESPONSE_ENTRY_CNT) {
-			ha->rsp_ring_index = 0;
-			ha->response_ring_ptr = ha->response_ring_bp;
+		rsp_q->rsp_ring_index++;
+		if (rsp_q->rsp_ring_index == rsp_q->rsp_entry_cnt) {
+			rsp_q->rsp_ring_index = 0;
+			rsp_q->rsp_ring_ptr = rsp_q->rsp_ring.bp;
 		} else {
-			ha->response_ring_ptr++;
+			rsp_q->rsp_ring_ptr++;
 		}
 
 		/* Process packet. */
-		if (ha->status_srb != NULL && pkt->entry_type !=
-		    STATUS_CONT_TYPE) {
-			ql_add_link_b(done_q, &ha->status_srb->cmd);
-			ha->status_srb = NULL;
+		if (rsp_q->status_srb != NULL &&
+		    pkt->entry_type != STATUS_CONT_TYPE) {
+			ql_add_link_b(done_q, &rsp_q->status_srb->cmd);
+			rsp_q->status_srb = NULL;
 		}
 
-		pkt->entry_status = (uint8_t)(CFG_IST(ha, CFG_CTRL_24258081) ?
+		pkt->entry_status = (uint8_t)
+		    (CFG_IST(ha, CFG_ISP_FW_TYPE_2) ?
 		    pkt->entry_status & 0x3c : pkt->entry_status & 0x7e);
 
-		if (pkt->entry_status != 0) {
-			ql_error_entry(ha, pkt, done_q, set_flags,
-			    reset_flags);
+		if (pkt->entry_status != 0 ||
+		    pkt->entry_type == ABORTED_ENTRY_TYPE) {
+			ql_error_entry(ha, rsp_q,
+			    pkt, done_q,
+			    set_flags, reset_flags);
 		} else {
 			switch (pkt->entry_type) {
 			case STATUS_TYPE:
-				status |= CFG_IST(ha, CFG_CTRL_24258081) ?
-				    ql_24xx_status_entry(ha,
-				    (sts_24xx_entry_t *)pkt, done_q, set_flags,
-				    reset_flags) :
-				    ql_status_entry(ha, (sts_entry_t *)pkt,
+				status |= CFG_IST(ha, CFG_ISP_FW_TYPE_2) ?
+				    ql_24xx_status_entry(ha, rsp_q,
+				    (sts_24xx_entry_t *)pkt, done_q,
+				    set_flags, reset_flags) :
+				    ql_status_entry(ha, rsp_q,
+				    (sts_entry_t *)pkt,
 				    done_q, set_flags, reset_flags);
 				break;
 			case STATUS_CONT_TYPE:
-				ql_status_cont_entry(ha,
-				    (sts_cont_entry_t *)pkt, done_q, set_flags,
-				    reset_flags);
+				ql_status_cont_entry(ha, rsp_q,
+				    (sts_cont_entry_t *)pkt, done_q,
+				    set_flags, reset_flags);
 				break;
 			case IP_TYPE:
 			case IP_A64_TYPE:
 			case IP_CMD_TYPE:
-				ql_ip_entry(ha, (ip_entry_t *)pkt, done_q,
+				ql_ip_entry(ha, rsp_q,
+				    (ip_entry_t *)pkt, done_q,
 				    set_flags, reset_flags);
 				break;
 			case IP_RECEIVE_TYPE:
-				ql_ip_rcv_entry(ha,
-				    (ip_rcv_entry_t *)pkt, done_q, set_flags,
-				    reset_flags);
+				ql_ip_rcv_entry(ha, rsp_q,
+				    (ip_rcv_entry_t *)pkt, done_q,
+				    set_flags, reset_flags);
 				break;
 			case IP_RECEIVE_CONT_TYPE:
-				ql_ip_rcv_cont_entry(ha,
+				ql_ip_rcv_cont_entry(ha, rsp_q,
 				    (ip_rcv_cont_entry_t *)pkt,	done_q,
 				    set_flags, reset_flags);
 				break;
 			case IP_24XX_RECEIVE_TYPE:
-				ql_ip_24xx_rcv_entry(ha,
+				ql_ip_24xx_rcv_entry(ha, rsp_q,
 				    (ip_rcv_24xx_entry_t *)pkt, done_q,
 				    set_flags, reset_flags);
 				break;
 			case MS_TYPE:
-				ql_ms_entry(ha, (ms_entry_t *)pkt, done_q,
+				ql_ms_entry(ha, rsp_q,
+				    (ms_entry_t *)pkt, done_q,
 				    set_flags, reset_flags);
 				break;
 			case REPORT_ID_TYPE:
-				ql_report_id_entry(ha, (report_id_1_t *)pkt,
-				    done_q, set_flags, reset_flags);
+				ql_report_id_entry(ha, rsp_q,
+				    (report_id_acq_t *)pkt, done_q,
+				    set_flags, reset_flags);
 				break;
 			case ELS_PASSTHRU_TYPE:
-				ql_els_passthru_entry(ha,
-				    (els_passthru_entry_rsp_t *)pkt,
-				    done_q, set_flags, reset_flags);
+				ql_els_passthru_entry(ha, rsp_q,
+				    (els_passthru_entry_rsp_t *)pkt, done_q,
+				    set_flags, reset_flags);
 				break;
 			case IP_BUF_POOL_TYPE:
 			case MARKER_TYPE:
@@ -1680,14 +1752,25 @@ ql_response_pkt(ql_adapter_state_t *ha, ql_head_t *done_q, uint32_t *set_flags,
 	}
 
 	/* Inform RISC of processed responses. */
-	WRT16_IO_REG(ha, resp_out, ha->rsp_ring_index);
+
+	if (ha->flags & MULTI_QUEUE) {
+		WR32_MBAR_REG(ha, rsp_q->mbar_rsp_out, rsp_q->rsp_ring_index);
+	} else {
+		WRT16_IO_REG(ha, resp_out, rsp_q->rsp_ring_index);
+	}
+
+	if (qlc_fm_check_acc_handle(ha, ha->dev_handle)
+	    != DDI_FM_OK) {
+		qlc_fm_report_err_impact(ha,
+		    QL_FM_EREPORT_ACC_HANDLE_CHECK);
+	}
 
 	/* RESET packet received delay for possible async event. */
 	if (status & BIT_0) {
 		drv_usecwait(500000);
 	}
 
-	QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
+	QL_PRINT_3(ha, "done\n");
 }
 
 /*
@@ -1695,29 +1778,47 @@ ql_response_pkt(ql_adapter_state_t *ha, ql_head_t *done_q, uint32_t *set_flags,
  *	Processes error entry.
  *
  * Input:
- *	ha = adapter state pointer.
- *	pkt = entry pointer.
- *	done_q = head pointer to done queue.
- *	set_flags = task daemon flags to set.
- *	reset_flags = task daemon flags to reset.
+ *	ha:		adapter state pointer.
+ *	rsp_q:		response queue structure pointer.
+ *	pkt:		entry pointer.
+ *	done_q:		head pointer to done queue.
+ *	set_flags:	task daemon flags to set.
+ *	reset_flags:	task daemon flags to reset.
  *
  * Context:
  *	Interrupt or Kernel context, no mailbox commands allowed.
  */
 /* ARGSUSED */
 static void
-ql_error_entry(ql_adapter_state_t *ha, response_t *pkt, ql_head_t *done_q,
-    uint32_t *set_flags, uint32_t *reset_flags)
+ql_error_entry(ql_adapter_state_t *ha, ql_response_q_t *rsp_q, response_t *pkt,
+    ql_head_t *done_q, uint64_t *set_flags, uint64_t *reset_flags)
 {
-	ql_srb_t	*sp;
+	ql_srb_t	*sp = NULL;
 	uint32_t	index, resp_identifier;
 
-	if (pkt->entry_type == INVALID_ENTRY_TYPE) {
-		EL(ha, "Aborted command\n");
+	if (pkt->entry_type == ABORTED_ENTRY_TYPE) {
+		resp_identifier = ddi_get32(rsp_q->rsp_ring.acc_handle,
+		    &pkt->handle);
+		index = resp_identifier & OSC_INDEX_MASK;
+		if (index < ha->osc_max_cnt) {
+			if (ha->outstanding_cmds[index] ==
+			    QL_ABORTED_SRB(ha)) {
+				EL(ha, "Aborted command sp=QL_ABORTED_SRB, "
+				    "handle=%xh\n", resp_identifier);
+				ha->outstanding_cmds[index] = NULL;
+			} else {
+				EL(ha, "Aborted command sp=%ph, handle=%xh\n",
+				    (void *) ha->outstanding_cmds[index],
+				    resp_identifier);
+			}
+		} else {
+			EL(ha, "Aborted command handle=%xh, out of range "
+			    "index=%xh\n", resp_identifier, index);
+		}
 		return;
 	}
 
-	QL_PRINT_2(CE_CONT, "(%d): started, packet:\n", ha->instance);
+	QL_PRINT_2(ha, "started, packet:\n");
 	QL_DUMP_2((uint8_t *)pkt, 8, RESPONSE_ENTRY_SIZE);
 
 	if (pkt->entry_status & BIT_6) {
@@ -1737,13 +1838,23 @@ ql_error_entry(ql_adapter_state_t *ha, response_t *pkt, ql_head_t *done_q,
 	}
 
 	/* Validate the response entry handle. */
-	resp_identifier = ddi_get32(ha->hba_buf.acc_handle, &pkt->handle);
+	resp_identifier = ddi_get32(rsp_q->rsp_ring.acc_handle, &pkt->handle);
 	index = resp_identifier & OSC_INDEX_MASK;
-	if (index < MAX_OUTSTANDING_COMMANDS) {
+	if (index < ha->osc_max_cnt) {
 		/* the index seems reasonable */
-		sp = ha->outstanding_cmds[index];
+		if ((sp = ha->outstanding_cmds[index]) == NULL) {
+			sp = ql_verify_preprocessed_cmd(ha, rsp_q,
+			    (uint32_t *)&pkt->handle,
+			    (uint32_t *)&resp_identifier, set_flags,
+			    reset_flags);
+		}
 		if (sp != NULL) {
-			if (sp->handle == resp_identifier) {
+			if (sp == QL_ABORTED_SRB(ha)) {
+				EL(ha, "QL_ABORTED_SRB handle=%xh\n",
+				    resp_identifier);
+				sp = NULL;
+				ha->outstanding_cmds[index] = NULL;
+			} else if (sp->handle == resp_identifier) {
 				/* Neo, you're the one... */
 				ha->outstanding_cmds[index] = NULL;
 				sp->handle = 0;
@@ -1754,9 +1865,6 @@ ql_error_entry(ql_adapter_state_t *ha, response_t *pkt, ql_head_t *done_q,
 				sp = NULL;
 				ql_signal_abort(ha, set_flags);
 			}
-		} else {
-			sp = ql_verify_preprocessed_cmd(ha,
-			    (uint32_t *)&pkt->handle, set_flags, reset_flags);
 		}
 	} else {
 		EL(ha, "osc index out of range, index=%xh, handle=%xh\n",
@@ -1783,7 +1891,7 @@ ql_error_entry(ql_adapter_state_t *ha, response_t *pkt, ql_head_t *done_q,
 		ql_add_link_b(done_q, &sp->cmd);
 
 	}
-	QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
+	QL_PRINT_3(ha, "done\n");
 }
 
 /*
@@ -1792,6 +1900,7 @@ ql_error_entry(ql_adapter_state_t *ha, response_t *pkt, ql_head_t *done_q,
  *
  * Input:
  *	ha:		adapter state pointer.
+ *	rsp_q:		response queue structure pointer.
  *	pkt:		entry pointer.
  *	done_q:		done queue pointer.
  *	set_flags:	task daemon flags to set.
@@ -1805,24 +1914,35 @@ ql_error_entry(ql_adapter_state_t *ha, response_t *pkt, ql_head_t *done_q,
  */
 /* ARGSUSED */
 static int
-ql_status_entry(ql_adapter_state_t *ha, sts_entry_t *pkt,
-    ql_head_t *done_q, uint32_t *set_flags, uint32_t *reset_flags)
+ql_status_entry(ql_adapter_state_t *ha, ql_response_q_t *rsp_q,
+    sts_entry_t *pkt, ql_head_t *done_q, uint64_t *set_flags,
+    uint64_t *reset_flags)
 {
-	ql_srb_t		*sp;
+	ql_srb_t		*sp = NULL;
 	uint32_t		index, resp_identifier;
 	uint16_t		comp_status;
 	int			rval = 0;
 
-	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
+	QL_PRINT_3(ha, "started\n");
 
 	/* Validate the response entry handle. */
-	resp_identifier = ddi_get32(ha->hba_buf.acc_handle, &pkt->handle);
+	resp_identifier = ddi_get32(rsp_q->rsp_ring.acc_handle, &pkt->handle);
 	index = resp_identifier & OSC_INDEX_MASK;
-	if (index < MAX_OUTSTANDING_COMMANDS) {
+	if (index < ha->osc_max_cnt) {
 		/* the index seems reasonable */
-		sp = ha->outstanding_cmds[index];
+		if ((sp = ha->outstanding_cmds[index]) == NULL) {
+			sp = ql_verify_preprocessed_cmd(ha, rsp_q,
+			    (uint32_t *)&pkt->handle,
+			    (uint32_t *)&resp_identifier, set_flags,
+			    reset_flags);
+		}
 		if (sp != NULL) {
-			if (sp->handle == resp_identifier) {
+			if (sp == QL_ABORTED_SRB(ha)) {
+				EL(ha, "QL_ABORTED_SRB handle=%xh\n",
+				    resp_identifier);
+				sp = NULL;
+				ha->outstanding_cmds[index] = NULL;
+			} else if (sp->handle == resp_identifier) {
 				/* Neo, you're the one... */
 				ha->outstanding_cmds[index] = NULL;
 				sp->handle = 0;
@@ -1833,9 +1953,6 @@ ql_status_entry(ql_adapter_state_t *ha, sts_entry_t *pkt,
 				sp = NULL;
 				ql_signal_abort(ha, set_flags);
 			}
-		} else {
-			sp = ql_verify_preprocessed_cmd(ha,
-			    (uint32_t *)&pkt->handle, set_flags, reset_flags);
 		}
 	} else {
 		EL(ha, "osc index out of range, index=%xh, handle=%xh\n",
@@ -1844,7 +1961,7 @@ ql_status_entry(ql_adapter_state_t *ha, sts_entry_t *pkt,
 	}
 
 	if (sp != NULL) {
-		comp_status = (uint16_t)ddi_get16(ha->hba_buf.acc_handle,
+		comp_status = (uint16_t)ddi_get16(rsp_q->rsp_ring.acc_handle,
 		    &pkt->comp_status);
 
 		/*
@@ -1861,9 +1978,9 @@ ql_status_entry(ql_adapter_state_t *ha, sts_entry_t *pkt,
 		 * 2300 firmware marks completion status as data underrun
 		 * for scsi qfulls. Make it transport complete.
 		 */
-		if ((CFG_IST(ha, (CFG_CTRL_2300 | CFG_CTRL_6322))) &&
-		    (comp_status == CS_DATA_UNDERRUN) &&
-		    (pkt->scsi_status_l != 0)) {
+		if (CFG_IST(ha, CFG_CTRL_2363) &&
+		    comp_status == CS_DATA_UNDERRUN &&
+		    pkt->scsi_status_l != STATUS_GOOD) {
 			comp_status = CS_COMPLETE;
 		}
 
@@ -1873,7 +1990,7 @@ ql_status_entry(ql_adapter_state_t *ha, sts_entry_t *pkt,
 		 */
 		if ((pkt->state_flags_h & SF_XFERRED_DATA) == 0 &&
 		    comp_status == CS_COMPLETE &&
-		    pkt->scsi_status_l == 0 &&
+		    pkt->scsi_status_l == STATUS_GOOD &&
 		    (pkt->scsi_status_h & FCP_RSP_MASK) == 0 &&
 		    pkt->residual_length == 0 &&
 		    sp->fcp &&
@@ -1890,31 +2007,29 @@ ql_status_entry(ql_adapter_state_t *ha, sts_entry_t *pkt,
 			 * parameters in MS IOCB returns it as
 			 * status entry and not as ms entry type.
 			 */
-			ql_ms_entry(ha, (ms_entry_t *)pkt, done_q,
+			ql_ms_entry(ha, rsp_q, (ms_entry_t *)pkt, done_q,
 			    set_flags, reset_flags);
-			QL_PRINT_3(CE_CONT, "(%d): ql_ms_entry done\n",
-			    ha->instance);
+			QL_PRINT_3(ha, "ql_ms_entry done\n");
 			return (0);
 		}
 
 		/*
 		 * Fast path to good SCSI I/O completion
 		 */
-		if ((comp_status == CS_COMPLETE) &
-		    (!pkt->scsi_status_l) &
-		    (!(pkt->scsi_status_h & FCP_RSP_MASK))) {
+		if (comp_status == CS_COMPLETE &&
+		    pkt->scsi_status_l == STATUS_GOOD &&
+		    (pkt->scsi_status_h & FCP_RSP_MASK) == 0) {
 			/* Set completed status. */
 			sp->flags |= SRB_ISP_COMPLETED;
 			sp->pkt->pkt_reason = comp_status;
-			ql_fast_fcp_post(sp);
-			QL_PRINT_3(CE_CONT, "(%d): ql_fast_fcp_post done\n",
-			    ha->instance);
+			ql_fast_fcp_post(sp, rsp_q);
+			QL_PRINT_3(ha, "ql_fast_fcp_post done\n");
 			return (0);
 		}
-		rval = ql_status_error(ha, sp, pkt, done_q, set_flags,
+		rval = ql_status_error(ha, rsp_q, sp, pkt, done_q, set_flags,
 		    reset_flags);
 	}
-	QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
+	QL_PRINT_3(ha, "done\n");
 
 	return (rval);
 }
@@ -1925,6 +2040,7 @@ ql_status_entry(ql_adapter_state_t *ha, sts_entry_t *pkt,
  *
  * Input:
  *	ha:		adapter state pointer.
+ *	rsp_q:		response queue structure pointer.
  *	pkt:		entry pointer.
  *	done_q:		done queue pointer.
  *	set_flags:	task daemon flags to set.
@@ -1938,24 +2054,35 @@ ql_status_entry(ql_adapter_state_t *ha, sts_entry_t *pkt,
  */
 /* ARGSUSED */
 static int
-ql_24xx_status_entry(ql_adapter_state_t *ha, sts_24xx_entry_t *pkt,
-    ql_head_t *done_q, uint32_t *set_flags, uint32_t *reset_flags)
+ql_24xx_status_entry(ql_adapter_state_t *ha, ql_response_q_t *rsp_q,
+    sts_24xx_entry_t *pkt, ql_head_t *done_q, uint64_t *set_flags,
+    uint64_t *reset_flags)
 {
 	ql_srb_t		*sp = NULL;
 	uint16_t		comp_status;
 	uint32_t		index, resp_identifier;
 	int			rval = 0;
 
-	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
+	QL_PRINT_3(ha, "started\n");
 
 	/* Validate the response entry handle. */
-	resp_identifier = ddi_get32(ha->hba_buf.acc_handle, &pkt->handle);
+	resp_identifier = ddi_get32(rsp_q->rsp_ring.acc_handle, &pkt->handle);
 	index = resp_identifier & OSC_INDEX_MASK;
-	if (index < MAX_OUTSTANDING_COMMANDS) {
+	if (index < ha->osc_max_cnt) {
 		/* the index seems reasonable */
-		sp = ha->outstanding_cmds[index];
+		if ((sp = ha->outstanding_cmds[index]) == NULL) {
+			sp = ql_verify_preprocessed_cmd(ha, rsp_q,
+			    (uint32_t *)&pkt->handle,
+			    (uint32_t *)&resp_identifier, set_flags,
+			    reset_flags);
+		}
 		if (sp != NULL) {
-			if (sp->handle == resp_identifier) {
+			if (sp == QL_ABORTED_SRB(ha)) {
+				EL(ha, "QL_ABORTED_SRB handle=%xh\n",
+				    resp_identifier);
+				sp = NULL;
+				ha->outstanding_cmds[index] = NULL;
+			} else if (sp->handle == resp_identifier) {
 				/* Neo, you're the one... */
 				ha->outstanding_cmds[index] = NULL;
 				sp->handle = 0;
@@ -1966,9 +2093,6 @@ ql_24xx_status_entry(ql_adapter_state_t *ha, sts_24xx_entry_t *pkt,
 				sp = NULL;
 				ql_signal_abort(ha, set_flags);
 			}
-		} else {
-			sp = ql_verify_preprocessed_cmd(ha,
-			    (uint32_t *)&pkt->handle, set_flags, reset_flags);
 		}
 	} else {
 		EL(ha, "osc index out of range, index=%xh, handle=%xh\n",
@@ -1977,7 +2101,7 @@ ql_24xx_status_entry(ql_adapter_state_t *ha, sts_24xx_entry_t *pkt,
 	}
 
 	if (sp != NULL) {
-		comp_status = (uint16_t)ddi_get16(ha->hba_buf.acc_handle,
+		comp_status = (uint16_t)ddi_get16(rsp_q->rsp_ring.acc_handle,
 		    &pkt->comp_status);
 
 		/* We dont care about SCSI QFULLs. */
@@ -1992,8 +2116,8 @@ ql_24xx_status_entry(ql_adapter_state_t *ha, sts_24xx_entry_t *pkt,
 		 * 2300 firmware marks completion status as data underrun
 		 * for scsi qfulls. Make it transport complete.
 		 */
-		if ((comp_status == CS_DATA_UNDERRUN) &&
-		    (pkt->scsi_status_l != 0)) {
+		if (comp_status == CS_DATA_UNDERRUN &&
+		    pkt->scsi_status_l != STATUS_GOOD) {
 			comp_status = CS_COMPLETE;
 		}
 
@@ -2002,7 +2126,7 @@ ql_24xx_status_entry(ql_adapter_state_t *ha, sts_24xx_entry_t *pkt,
 		 * but get back a good status.
 		 */
 		if (comp_status == CS_COMPLETE &&
-		    pkt->scsi_status_l == 0 &&
+		    pkt->scsi_status_l == STATUS_GOOD &&
 		    (pkt->scsi_status_h & FCP_RSP_MASK) == 0 &&
 		    pkt->residual_length != 0 &&
 		    sp->fcp &&
@@ -2014,21 +2138,20 @@ ql_24xx_status_entry(ql_adapter_state_t *ha, sts_24xx_entry_t *pkt,
 		/*
 		 * Fast path to good SCSI I/O completion
 		 */
-		if ((comp_status == CS_COMPLETE) &
-		    (!pkt->scsi_status_l) &
-		    (!(pkt->scsi_status_h & FCP_RSP_MASK))) {
+		if (comp_status == CS_COMPLETE &&
+		    pkt->scsi_status_l == STATUS_GOOD &&
+		    (pkt->scsi_status_h & FCP_RSP_MASK) == 0) {
 			/* Set completed status. */
 			sp->flags |= SRB_ISP_COMPLETED;
 			sp->pkt->pkt_reason = comp_status;
-			ql_fast_fcp_post(sp);
-			QL_PRINT_3(CE_CONT, "(%d): ql_fast_fcp_post done\n",
-			    ha->instance);
+			ql_fast_fcp_post(sp, rsp_q);
+			QL_PRINT_3(ha, "ql_fast_fcp_post done\n");
 			return (0);
 		}
-		rval = ql_status_error(ha, sp, (sts_entry_t *)pkt, done_q,
-		    set_flags, reset_flags);
+		rval = ql_status_error(ha, rsp_q, sp, (sts_entry_t *)pkt,
+		    done_q, set_flags, reset_flags);
 	}
-	QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
+	QL_PRINT_3(ha, "done\n");
 
 	return (rval);
 }
@@ -2038,10 +2161,12 @@ ql_24xx_status_entry(ql_adapter_state_t *ha, sts_24xx_entry_t *pkt,
  *	Handles preprocessed cmds..
  *
  * Input:
- *	ha:		adapter state pointer.
- *	pkt_handle:	handle pointer.
- *	set_flags:	task daemon flags to set.
- *	reset_flags:	task daemon flags to reset.
+ *	ha:			adapter state pointer.
+ *	rsp_q:			response queue structure pointer.
+ *	pkt_handle:		handle pointer.
+ *	resp_identifier:	resp_identifier pointer.
+ *	set_flags:		task daemon flags to set.
+ *	reset_flags:		task daemon flags to reset.
  *
  * Returns:
  *	srb pointer or NULL
@@ -2051,41 +2176,41 @@ ql_24xx_status_entry(ql_adapter_state_t *ha, sts_24xx_entry_t *pkt,
  */
 /* ARGSUSED */
 ql_srb_t *
-ql_verify_preprocessed_cmd(ql_adapter_state_t *ha, uint32_t *pkt_handle,
-    uint32_t *set_flags, uint32_t *reset_flags)
+ql_verify_preprocessed_cmd(ql_adapter_state_t *ha, ql_response_q_t *rsp_q,
+    uint32_t *pkt_handle, uint32_t *resp_identifier, uint64_t *set_flags,
+    uint64_t *reset_flags)
 {
 	ql_srb_t		*sp = NULL;
-	uint32_t		index, resp_identifier;
+	uint32_t		index;
 	uint32_t		get_handle = 10;
 
 	while (get_handle) {
 		/* Get handle. */
-		resp_identifier = ddi_get32(ha->hba_buf.acc_handle, pkt_handle);
-		index = resp_identifier & OSC_INDEX_MASK;
+		*resp_identifier = ddi_get32(rsp_q->rsp_ring.acc_handle,
+		    pkt_handle);
+		index = *resp_identifier & OSC_INDEX_MASK;
 		/* Validate handle. */
-		if (index < MAX_OUTSTANDING_COMMANDS) {
+		if (index < ha->osc_max_cnt) {
 			sp = ha->outstanding_cmds[index];
 		}
 
 		if (sp != NULL) {
 			EL(ha, "sp=%xh, resp_id=%xh, get=%d, index=%xh\n", sp,
-			    resp_identifier, get_handle, index);
+			    *resp_identifier, get_handle, index);
 			break;
 		} else {
 			get_handle -= 1;
 			drv_usecwait(10000);
-			if (get_handle == 1) {
+			if (get_handle == 1 && rsp_q->rsp_ring.dma_handle) {
 				/* Last chance, Sync whole DMA buffer. */
-				(void) ddi_dma_sync(ha->hba_buf.dma_handle,
-				    RESPONSE_Q_BUFFER_OFFSET,
-				    RESPONSE_QUEUE_SIZE,
-				    DDI_DMA_SYNC_FORKERNEL);
+				(void) ddi_dma_sync(rsp_q->rsp_ring.dma_handle,
+				    0, 0, DDI_DMA_SYNC_FORCPU);
 				EL(ha, "last chance DMA sync, index=%xh\n",
 				    index);
 			}
 		}
 	}
-	QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
+	QL_PRINT_3(ha, "done\n");
 
 	return (sp);
 }
@@ -2097,6 +2222,7 @@ ql_verify_preprocessed_cmd(ql_adapter_state_t *ha, uint32_t *pkt_handle,
  *
  * Input:
  *	ha:		adapter state pointer.
+ *	rsp_q:		response queue structure pointer.
  *	sp:		SRB pointer.
  *	pkt:		entry pointer.
  *	done_q:		done queue pointer.
@@ -2111,8 +2237,9 @@ ql_verify_preprocessed_cmd(ql_adapter_state_t *ha, uint32_t *pkt_handle,
  */
 /* ARGSUSED */
 static int
-ql_status_error(ql_adapter_state_t *ha, ql_srb_t *sp, sts_entry_t *pkt23,
-    ql_head_t *done_q, uint32_t *set_flags, uint32_t *reset_flags)
+ql_status_error(ql_adapter_state_t *ha, ql_response_q_t *rsp_q, ql_srb_t *sp,
+    sts_entry_t *pkt23, ql_head_t *done_q, uint64_t *set_flags,
+    uint64_t *reset_flags)
 {
 	uint32_t		sense_sz = 0;
 	uint32_t		cnt;
@@ -2135,26 +2262,26 @@ ql_status_error(ql_adapter_state_t *ha, ql_srb_t *sp, sts_entry_t *pkt23,
 		uint8_t		scsi_status_h;
 	} sts;
 
-	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
+	QL_PRINT_3(ha, "started\n");
 
-	if (CFG_IST(ha, CFG_CTRL_24258081)) {
+	if (CFG_IST(ha, CFG_ISP_FW_TYPE_2)) {
 		sts_24xx_entry_t *pkt24 = (sts_24xx_entry_t *)pkt23;
 
 		/* Setup status. */
-		sts.comp_status = (uint16_t)ddi_get16(ha->hba_buf.acc_handle,
-		    &pkt24->comp_status);
+		sts.comp_status = (uint16_t)ddi_get16(
+		    rsp_q->rsp_ring.acc_handle, &pkt24->comp_status);
 		sts.scsi_status_l = pkt24->scsi_status_l;
 		sts.scsi_status_h = pkt24->scsi_status_h;
 
 		/* Setup firmware residuals. */
 		sts.residual_length = sts.comp_status == CS_DATA_UNDERRUN ?
-		    ddi_get32(ha->hba_buf.acc_handle,
+		    ddi_get32(rsp_q->rsp_ring.acc_handle,
 		    (uint32_t *)&pkt24->residual_length) : 0;
 
 		/* Setup FCP residuals. */
 		sts.fcp_residual_length = sts.scsi_status_h &
 		    (FCP_RESID_UNDER | FCP_RESID_OVER) ?
-		    ddi_get32(ha->hba_buf.acc_handle,
+		    ddi_get32(rsp_q->rsp_ring.acc_handle,
 		    (uint32_t *)&pkt24->fcp_rsp_residual_count) : 0;
 
 		if ((sts.comp_status == CS_DATA_UNDERRUN) &&
@@ -2206,7 +2333,8 @@ ql_status_error(ql_adapter_state_t *ha, ql_srb_t *sp, sts_entry_t *pkt23,
 		/* Setup FCP response info. */
 		sts.rsp_info = &pkt24->rsp_sense_data[0];
 		if ((sts.scsi_status_h & FCP_RSP_LEN_VALID) != 0) {
-			sts.rsp_info_length = ddi_get32(ha->hba_buf.acc_handle,
+			sts.rsp_info_length = ddi_get32(
+			    rsp_q->rsp_ring.acc_handle,
 			    (uint32_t *)&pkt24->fcp_rsp_data_length);
 			if (sts.rsp_info_length >
 			    sizeof (struct fcp_rsp_info)) {
@@ -2225,7 +2353,7 @@ ql_status_error(ql_adapter_state_t *ha, ql_srb_t *sp, sts_entry_t *pkt23,
 		    &pkt24->rsp_sense_data[sts.rsp_info_length];
 		if (sts.scsi_status_h & FCP_SNS_LEN_VALID) {
 			sts.req_sense_length =
-			    ddi_get32(ha->hba_buf.acc_handle,
+			    ddi_get32(rsp_q->rsp_ring.acc_handle,
 			    (uint32_t *)&pkt24->fcp_sense_length);
 			sts.state_flags_h = (uint8_t)
 			    (sts.state_flags_h | SF_ARQ_DONE);
@@ -2241,13 +2369,13 @@ ql_status_error(ql_adapter_state_t *ha, ql_srb_t *sp, sts_entry_t *pkt23,
 	} else {
 		/* Setup status. */
 		sts.comp_status = (uint16_t)ddi_get16(
-		    ha->hba_buf.acc_handle, &pkt23->comp_status);
+		    rsp_q->rsp_ring.acc_handle, &pkt23->comp_status);
 		sts.scsi_status_l = pkt23->scsi_status_l;
 		sts.scsi_status_h = pkt23->scsi_status_h;
 
 		/* Setup firmware residuals. */
 		sts.residual_length = sts.comp_status == CS_DATA_UNDERRUN ?
-		    ddi_get32(ha->hba_buf.acc_handle,
+		    ddi_get32(rsp_q->rsp_ring.acc_handle,
 		    (uint32_t *)&pkt23->residual_length) : 0;
 
 		/* Setup FCP residuals. */
@@ -2263,7 +2391,7 @@ ql_status_error(ql_adapter_state_t *ha, ql_srb_t *sp, sts_entry_t *pkt23,
 		sts.rsp_info = &pkt23->rsp_info[0];
 		if ((sts.scsi_status_h & FCP_RSP_LEN_VALID) != 0) {
 			sts.rsp_info_length = ddi_get16(
-			    ha->hba_buf.acc_handle,
+			    rsp_q->rsp_ring.acc_handle,
 			    (uint16_t *)&pkt23->rsp_info_length);
 			if (sts.rsp_info_length >
 			    sizeof (struct fcp_rsp_info)) {
@@ -2277,7 +2405,7 @@ ql_status_error(ql_adapter_state_t *ha, ql_srb_t *sp, sts_entry_t *pkt23,
 		/* Setup sense data. */
 		sts.req_sense_data = &pkt23->req_sense_data[0];
 		sts.req_sense_length = sts.scsi_status_h & FCP_SNS_LEN_VALID ?
-		    ddi_get16(ha->hba_buf.acc_handle,
+		    ddi_get16(rsp_q->rsp_ring.acc_handle,
 		    (uint16_t *)&pkt23->req_sense_length) : 0;
 	}
 
@@ -2318,8 +2446,9 @@ ql_status_error(ql_adapter_state_t *ha, ql_srb_t *sp, sts_entry_t *pkt23,
 
 		/* copy response information data. */
 		if (sense_sz) {
-			ddi_rep_get8(ha->hba_buf.acc_handle, (uint8_t *)rsp,
-			    sts.rsp_info, sense_sz, DDI_DEV_AUTOINCR);
+			ddi_rep_get8(rsp_q->rsp_ring.acc_handle,
+			    (uint8_t *)rsp, sts.rsp_info, sense_sz,
+			    DDI_DEV_AUTOINCR);
 		}
 		fcpr->fcp_response_len = sense_sz;
 
@@ -2358,6 +2487,7 @@ ql_status_error(ql_adapter_state_t *ha, ql_srb_t *sp, sts_entry_t *pkt23,
 
 	/* Set reset status received. */
 	if (sts.comp_status == CS_RESET && LOOP_READY(ha)) {
+		*set_flags |= MARKER_NEEDED;
 		rval |= BIT_0;
 	}
 
@@ -2446,6 +2576,11 @@ ql_status_error(ql_adapter_state_t *ha, ql_srb_t *sp, sts_entry_t *pkt23,
 		} else {
 			EL(sp->ha, "Abort Retry, d_id=%xh, lun=%xh\n",
 			    tq->d_id.b24, sp->lun_queue->lun_no);
+
+			if (CFG_IST(ha, CFG_ISP_FW_TYPE_2) && LOOP_READY(ha)) {
+				*set_flags |= MARKER_NEEDED;
+				rval |= BIT_0;
+			}
 		}
 
 		/* Set retry status. */
@@ -2479,9 +2614,11 @@ ql_status_error(ql_adapter_state_t *ha, ql_srb_t *sp, sts_entry_t *pkt23,
 
 		if (sp->pkt->pkt_reason != CS_COMPLETE) {
 			ha->xioctl->DeviceErrorCount++;
-			EL(sp->ha, "Cmplt status err = %xh, d_id=%xh, lun=%xh"
-			    "\n", sts.comp_status, tq->d_id.b24,
-			    sp->lun_queue->lun_no);
+			EL(sp->ha, "Cmplt status err = %xh, d_id=%xh, lun=%xh,"
+			    " pkt_reason=%xh, spf=%xh, sp=%ph\n",
+			    sts.comp_status, tq->d_id.b24,
+			    sp->lun_queue->lun_no, sp->pkt->pkt_reason,
+			    sp->flags, sp);
 		}
 
 		/* Set target request sense data. */
@@ -2530,7 +2667,7 @@ ql_status_error(ql_adapter_state_t *ha, ql_srb_t *sp, sts_entry_t *pkt23,
 				fcpr->fcp_sense_len = sense_sz;
 
 				/* Move sense data. */
-				ddi_rep_get8(ha->hba_buf.acc_handle,
+				ddi_rep_get8(rsp_q->rsp_ring.acc_handle,
 				    (uint8_t *)sp->request_sense_ptr,
 				    sts.req_sense_data,
 				    (size_t)sense_sz,
@@ -2539,8 +2676,8 @@ ql_status_error(ql_adapter_state_t *ha, ql_srb_t *sp, sts_entry_t *pkt23,
 				sp->request_sense_ptr += sense_sz;
 				sp->request_sense_length -= sense_sz;
 				if (sp->request_sense_length != 0 &&
-				    !(CFG_IST(ha, CFG_CTRL_8021))) {
-					ha->status_srb = sp;
+				    !(CFG_IST(ha, CFG_CTRL_82XX))) {
+					rsp_q->status_srb = sp;
 				}
 			}
 
@@ -2579,11 +2716,11 @@ ql_status_error(ql_adapter_state_t *ha, ql_srb_t *sp, sts_entry_t *pkt23,
 	sp->flags |= SRB_ISP_COMPLETED;
 
 	/* Place command on done queue. */
-	if (ha->status_srb == NULL) {
+	if (rsp_q->status_srb == NULL) {
 		ql_add_link_b(done_q, &sp->cmd);
 	}
 
-	QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
+	QL_PRINT_3(ha, "done\n");
 
 	return (rval);
 }
@@ -2594,6 +2731,7 @@ ql_status_error(ql_adapter_state_t *ha, ql_srb_t *sp, sts_entry_t *pkt23,
  *
  * Input:
  *	ha:		adapter state pointer.
+ *	rsp_q:		response queue structure pointer.
  *	pkt:		entry pointer.
  *	done_q:		done queue pointer.
  *	set_flags:	task daemon flags to set.
@@ -2604,13 +2742,14 @@ ql_status_error(ql_adapter_state_t *ha, ql_srb_t *sp, sts_entry_t *pkt23,
  */
 /* ARGSUSED */
 static void
-ql_status_cont_entry(ql_adapter_state_t *ha, sts_cont_entry_t *pkt,
-    ql_head_t *done_q, uint32_t *set_flags, uint32_t *reset_flags)
+ql_status_cont_entry(ql_adapter_state_t *ha, ql_response_q_t *rsp_q,
+    sts_cont_entry_t *pkt, ql_head_t *done_q, uint64_t *set_flags,
+    uint64_t *reset_flags)
 {
 	uint32_t	sense_sz, index;
-	ql_srb_t	*sp = ha->status_srb;
+	ql_srb_t	*sp = rsp_q->status_srb;
 
-	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
+	QL_PRINT_3(ha, "started\n");
 
 	if (sp != NULL && sp->request_sense_length) {
 		if (sp->request_sense_length > sizeof (pkt->req_sense_data)) {
@@ -2619,7 +2758,7 @@ ql_status_cont_entry(ql_adapter_state_t *ha, sts_cont_entry_t *pkt,
 			sense_sz = sp->request_sense_length;
 		}
 
-		if (CFG_IST(ha, CFG_CTRL_24258081)) {
+		if (CFG_IST(ha, CFG_ISP_FW_TYPE_2)) {
 			for (index = 0; index < sense_sz; index += 4) {
 				ql_chg_endian((uint8_t *)
 				    &pkt->req_sense_data[0] + index, 4);
@@ -2627,7 +2766,7 @@ ql_status_cont_entry(ql_adapter_state_t *ha, sts_cont_entry_t *pkt,
 		}
 
 		/* Move sense data. */
-		ddi_rep_get8(ha->hba_buf.acc_handle,
+		ddi_rep_get8(rsp_q->rsp_ring.acc_handle,
 		    (uint8_t *)sp->request_sense_ptr,
 		    (uint8_t *)&pkt->req_sense_data[0], (size_t)sense_sz,
 		    DDI_DEV_AUTOINCR);
@@ -2638,11 +2777,11 @@ ql_status_cont_entry(ql_adapter_state_t *ha, sts_cont_entry_t *pkt,
 		/* Place command on done queue. */
 		if (sp->request_sense_length == 0) {
 			ql_add_link_b(done_q, &sp->cmd);
-			ha->status_srb = NULL;
+			rsp_q->status_srb = NULL;
 		}
 	}
 
-	QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
+	QL_PRINT_3(ha, "done\n");
 }
 
 /*
@@ -2651,6 +2790,7 @@ ql_status_cont_entry(ql_adapter_state_t *ha, sts_cont_entry_t *pkt,
  *
  * Input:
  *	ha:		adapter state pointer.
+ *	rsp_q:		response queue structure pointer.
  *	pkt:		entry pointer.
  *	done_q:		done queue pointer.
  *	set_flags:	task daemon flags to set.
@@ -2661,23 +2801,34 @@ ql_status_cont_entry(ql_adapter_state_t *ha, sts_cont_entry_t *pkt,
  */
 /* ARGSUSED */
 static void
-ql_ip_entry(ql_adapter_state_t *ha, ip_entry_t *pkt23, ql_head_t *done_q,
-    uint32_t *set_flags, uint32_t *reset_flags)
+ql_ip_entry(ql_adapter_state_t *ha, ql_response_q_t *rsp_q, ip_entry_t *pkt23,
+    ql_head_t *done_q, uint64_t *set_flags, uint64_t *reset_flags)
 {
-	ql_srb_t	*sp;
+	ql_srb_t	*sp = NULL;
 	uint32_t	index, resp_identifier;
 	ql_tgt_t	*tq;
 
-	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
+	QL_PRINT_3(ha, "started\n");
 
 	/* Validate the response entry handle. */
-	resp_identifier = ddi_get32(ha->hba_buf.acc_handle, &pkt23->handle);
+	resp_identifier = ddi_get32(rsp_q->rsp_ring.acc_handle,
+	    &pkt23->handle);
 	index = resp_identifier & OSC_INDEX_MASK;
-	if (index < MAX_OUTSTANDING_COMMANDS) {
+	if (index < ha->osc_max_cnt) {
 		/* the index seems reasonable */
-		sp = ha->outstanding_cmds[index];
+		if ((sp = ha->outstanding_cmds[index]) == NULL) {
+			sp = ql_verify_preprocessed_cmd(ha, rsp_q,
+			    (uint32_t *)&pkt23->handle,
+			    (uint32_t *)&resp_identifier, set_flags,
+			    reset_flags);
+		}
 		if (sp != NULL) {
-			if (sp->handle == resp_identifier) {
+			if (sp == QL_ABORTED_SRB(ha)) {
+				EL(ha, "QL_ABORTED_SRB handle=%xh\n",
+				    resp_identifier);
+				sp = NULL;
+				ha->outstanding_cmds[index] = NULL;
+			} else if (sp->handle == resp_identifier) {
 				/* Neo, you're the one... */
 				ha->outstanding_cmds[index] = NULL;
 				sp->handle = 0;
@@ -2688,9 +2839,6 @@ ql_ip_entry(ql_adapter_state_t *ha, ip_entry_t *pkt23, ql_head_t *done_q,
 				sp = NULL;
 				ql_signal_abort(ha, set_flags);
 			}
-		} else {
-			sp = ql_verify_preprocessed_cmd(ha,
-			    (uint32_t *)&pkt23->handle, set_flags, reset_flags);
 		}
 	} else {
 		EL(ha, "osc index out of range, index=%xh, handle=%xh\n",
@@ -2702,14 +2850,14 @@ ql_ip_entry(ql_adapter_state_t *ha, ip_entry_t *pkt23, ql_head_t *done_q,
 		tq = sp->lun_queue->target_queue;
 
 		/* Set ISP completion status */
-		if (CFG_IST(ha, CFG_CTRL_24258081)) {
+		if (CFG_IST(ha, CFG_CTRL_24XX)) {
 			ip_cmd_entry_t	*pkt24 = (ip_cmd_entry_t *)pkt23;
 
 			sp->pkt->pkt_reason = ddi_get16(
-			    ha->hba_buf.acc_handle, &pkt24->hdl_status);
+			    rsp_q->rsp_ring.acc_handle, &pkt24->hdl_status);
 		} else {
 			sp->pkt->pkt_reason = ddi_get16(
-			    ha->hba_buf.acc_handle, &pkt23->comp_status);
+			    rsp_q->rsp_ring.acc_handle, &pkt23->comp_status);
 		}
 
 		if (ha->task_daemon_flags & LOOP_DOWN) {
@@ -2779,7 +2927,7 @@ ql_ip_entry(ql_adapter_state_t *ha, ip_entry_t *pkt23, ql_head_t *done_q,
 		ql_add_link_b(done_q, &sp->cmd);
 
 	}
-	QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
+	QL_PRINT_3(ha, "done\n");
 }
 
 /*
@@ -2788,6 +2936,7 @@ ql_ip_entry(ql_adapter_state_t *ha, ip_entry_t *pkt23, ql_head_t *done_q,
  *
  * Input:
  *	ha:		adapter state pointer.
+ *	rsp_q:		response queue structure pointer.
  *	pkt:		entry pointer.
  *	done_q:		done queue pointer.
  *	set_flags:	task daemon flags to set.
@@ -2798,15 +2947,16 @@ ql_ip_entry(ql_adapter_state_t *ha, ip_entry_t *pkt23, ql_head_t *done_q,
  */
 /* ARGSUSED */
 static void
-ql_ip_rcv_entry(ql_adapter_state_t *ha, ip_rcv_entry_t *pkt,
-    ql_head_t *done_q, uint32_t *set_flags, uint32_t *reset_flags)
+ql_ip_rcv_entry(ql_adapter_state_t *ha, ql_response_q_t *rsp_q,
+    ip_rcv_entry_t *pkt, ql_head_t *done_q, uint64_t *set_flags,
+    uint64_t *reset_flags)
 {
 	port_id_t	s_id;
 	uint16_t	index;
 	uint8_t		cnt;
 	ql_tgt_t	*tq;
 
-	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
+	QL_PRINT_3(ha, "started\n");
 
 	/* Locate device queue. */
 	s_id.b.al_pa = pkt->s_id[0];
@@ -2817,8 +2967,8 @@ ql_ip_rcv_entry(ql_adapter_state_t *ha, ip_rcv_entry_t *pkt,
 		return;
 	}
 
-	tq->ub_sequence_length = (uint16_t)ddi_get16(ha->hba_buf.acc_handle,
-	    &pkt->seq_length);
+	tq->ub_sequence_length = (uint16_t)ddi_get16(
+	    rsp_q->rsp_ring.acc_handle, &pkt->seq_length);
 	tq->ub_total_seg_cnt = pkt->segment_count;
 	tq->ub_seq_id = ++ha->ub_seq_id;
 	tq->ub_seq_cnt = 0;
@@ -2829,7 +2979,7 @@ ql_ip_rcv_entry(ql_adapter_state_t *ha, ip_rcv_entry_t *pkt,
 	for (cnt = 0; cnt < IP_RCVBUF_HANDLES && tq->ub_seq_cnt <
 	    tq->ub_total_seg_cnt; cnt++) {
 
-		index = (uint16_t)ddi_get16(ha->hba_buf.acc_handle,
+		index = (uint16_t)ddi_get16(rsp_q->rsp_ring.acc_handle,
 		    &pkt->buffer_handle[cnt]);
 
 		if (ql_ub_frame_hdr(ha, tq, index, done_q) != QL_SUCCESS) {
@@ -2839,7 +2989,7 @@ ql_ip_rcv_entry(ql_adapter_state_t *ha, ip_rcv_entry_t *pkt,
 		}
 	}
 
-	QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
+	QL_PRINT_3(ha, "done\n");
 }
 
 /*
@@ -2848,6 +2998,7 @@ ql_ip_rcv_entry(ql_adapter_state_t *ha, ip_rcv_entry_t *pkt,
  *
  * Input:
  *	ha:		adapter state pointer.
+ *	rsp_q:		response queue structure pointer.
  *	pkt:		entry pointer.
  *	done_q:		done queue pointer.
  *	set_flags:	task daemon flags to set.
@@ -2858,14 +3009,15 @@ ql_ip_rcv_entry(ql_adapter_state_t *ha, ip_rcv_entry_t *pkt,
  */
 /* ARGSUSED */
 static void
-ql_ip_rcv_cont_entry(ql_adapter_state_t *ha, ip_rcv_cont_entry_t *pkt,
-    ql_head_t *done_q, uint32_t *set_flags, uint32_t *reset_flags)
+ql_ip_rcv_cont_entry(ql_adapter_state_t *ha, ql_response_q_t *rsp_q,
+    ip_rcv_cont_entry_t *pkt, ql_head_t *done_q, uint64_t *set_flags,
+    uint64_t *reset_flags)
 {
 	uint16_t	index;
 	uint8_t		cnt;
 	ql_tgt_t	*tq;
 
-	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
+	QL_PRINT_3(ha, "started\n");
 
 	if ((tq = ha->rcv_dev_q) == NULL) {
 		EL(ha, "No IP receive device\n");
@@ -2875,7 +3027,7 @@ ql_ip_rcv_cont_entry(ql_adapter_state_t *ha, ip_rcv_cont_entry_t *pkt,
 	for (cnt = 0; cnt < IP_RCVBUF_CONT_HANDLES &&
 	    tq->ub_seq_cnt < tq->ub_total_seg_cnt; cnt++) {
 
-		index = (uint16_t)ddi_get16(ha->hba_buf.acc_handle,
+		index = (uint16_t)ddi_get16(rsp_q->rsp_ring.acc_handle,
 		    &pkt->buffer_handle[cnt]);
 
 		if (ql_ub_frame_hdr(ha, tq, index, done_q) != QL_SUCCESS) {
@@ -2885,7 +3037,7 @@ ql_ip_rcv_cont_entry(ql_adapter_state_t *ha, ip_rcv_cont_entry_t *pkt,
 		}
 	}
 
-	QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
+	QL_PRINT_3(ha, "done\n");
 }
 
 /*
@@ -2894,6 +3046,7 @@ ql_ip_rcv_cont_entry(ql_adapter_state_t *ha, ip_rcv_cont_entry_t *pkt,
  *
  * Input:
  *	ha:		adapter state pointer.
+ *	rsp_q:		response queue structure pointer.
  *	pkt:		entry pointer.
  *	done_q:		done queue pointer.
  *	set_flags:	task daemon flags to set.
@@ -2904,15 +3057,16 @@ ql_ip_rcv_cont_entry(ql_adapter_state_t *ha, ip_rcv_cont_entry_t *pkt,
  */
 /* ARGSUSED */
 static void
-ql_ip_24xx_rcv_entry(ql_adapter_state_t *ha, ip_rcv_24xx_entry_t *pkt,
-    ql_head_t *done_q, uint32_t *set_flags, uint32_t *reset_flags)
+ql_ip_24xx_rcv_entry(ql_adapter_state_t *ha, ql_response_q_t *rsp_q,
+    ip_rcv_24xx_entry_t *pkt, ql_head_t *done_q, uint64_t *set_flags,
+    uint64_t *reset_flags)
 {
 	port_id_t	s_id;
 	uint16_t	index;
 	uint8_t		cnt;
 	ql_tgt_t	*tq;
 
-	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
+	QL_PRINT_3(ha, "started\n");
 
 	/* Locate device queue. */
 	s_id.b.al_pa = pkt->s_id[0];
@@ -2925,19 +3079,19 @@ ql_ip_24xx_rcv_entry(ql_adapter_state_t *ha, ip_rcv_24xx_entry_t *pkt,
 
 	if (tq->ub_total_seg_cnt == 0) {
 		tq->ub_sequence_length = (uint16_t)ddi_get16(
-		    ha->hba_buf.acc_handle, &pkt->seq_length);
+		    rsp_q->rsp_ring.acc_handle, &pkt->seq_length);
 		tq->ub_total_seg_cnt = pkt->segment_count;
 		tq->ub_seq_id = ++ha->ub_seq_id;
 		tq->ub_seq_cnt = 0;
 		tq->ub_frame_ro = 0;
 		tq->ub_loop_id = (uint16_t)ddi_get16(
-		    ha->hba_buf.acc_handle, &pkt->n_port_hdl);
+		    rsp_q->rsp_ring.acc_handle, &pkt->n_port_hdl);
 	}
 
 	for (cnt = 0; cnt < IP_24XX_RCVBUF_HANDLES && tq->ub_seq_cnt <
 	    tq->ub_total_seg_cnt; cnt++) {
 
-		index = (uint16_t)ddi_get16(ha->hba_buf.acc_handle,
+		index = (uint16_t)ddi_get16(rsp_q->rsp_ring.acc_handle,
 		    &pkt->buffer_handle[cnt]);
 
 		if (ql_ub_frame_hdr(ha, tq, index, done_q) != QL_SUCCESS) {
@@ -2947,7 +3101,7 @@ ql_ip_24xx_rcv_entry(ql_adapter_state_t *ha, ip_rcv_24xx_entry_t *pkt,
 		}
 	}
 
-	QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
+	QL_PRINT_3(ha, "done\n");
 }
 
 /*
@@ -2956,6 +3110,7 @@ ql_ip_24xx_rcv_entry(ql_adapter_state_t *ha, ip_rcv_24xx_entry_t *pkt,
  *
  * Input:
  *	ha:		adapter state pointer.
+ *	rsp_q:		response queue structure pointer.
  *	pkt23:		entry pointer.
  *	done_q:		done queue pointer.
  *	set_flags:	task daemon flags to set.
@@ -2966,24 +3121,35 @@ ql_ip_24xx_rcv_entry(ql_adapter_state_t *ha, ip_rcv_24xx_entry_t *pkt,
  */
 /* ARGSUSED */
 static void
-ql_ms_entry(ql_adapter_state_t *ha, ms_entry_t *pkt23, ql_head_t *done_q,
-    uint32_t *set_flags, uint32_t *reset_flags)
+ql_ms_entry(ql_adapter_state_t *ha, ql_response_q_t *rsp_q, ms_entry_t *pkt23,
+    ql_head_t *done_q, uint64_t *set_flags, uint64_t *reset_flags)
 {
-	ql_srb_t		*sp;
+	ql_srb_t		*sp = NULL;
 	uint32_t		index, cnt, resp_identifier;
 	ql_tgt_t		*tq;
 	ct_passthru_entry_t	*pkt24 = (ct_passthru_entry_t *)pkt23;
 
-	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
+	QL_PRINT_3(ha, "started\n");
 
 	/* Validate the response entry handle. */
-	resp_identifier = ddi_get32(ha->hba_buf.acc_handle, &pkt23->handle);
+	resp_identifier = ddi_get32(rsp_q->rsp_ring.acc_handle,
+	    &pkt23->handle);
 	index = resp_identifier & OSC_INDEX_MASK;
-	if (index < MAX_OUTSTANDING_COMMANDS) {
+	if (index < ha->osc_max_cnt) {
 		/* the index seems reasonable */
-		sp = ha->outstanding_cmds[index];
+		if ((sp = ha->outstanding_cmds[index]) == NULL) {
+			sp = ql_verify_preprocessed_cmd(ha, rsp_q,
+			    (uint32_t *)&pkt23->handle,
+			    (uint32_t *)&resp_identifier, set_flags,
+			    reset_flags);
+		}
 		if (sp != NULL) {
-			if (sp->handle == resp_identifier) {
+			if (sp == QL_ABORTED_SRB(ha)) {
+				EL(ha, "QL_ABORTED_SRB handle=%xh\n",
+				    resp_identifier);
+				sp = NULL;
+				ha->outstanding_cmds[index] = NULL;
+			} else if (sp->handle == resp_identifier) {
 				/* Neo, you're the one... */
 				ha->outstanding_cmds[index] = NULL;
 				sp->handle = 0;
@@ -2994,9 +3160,6 @@ ql_ms_entry(ql_adapter_state_t *ha, ms_entry_t *pkt23, ql_head_t *done_q,
 				sp = NULL;
 				ql_signal_abort(ha, set_flags);
 			}
-		} else {
-			sp = ql_verify_preprocessed_cmd(ha,
-			    (uint32_t *)&pkt23->handle, set_flags, reset_flags);
 		}
 	} else {
 		EL(ha, "osc index out of range, index=%xh, handle=%xh\n",
@@ -3015,12 +3178,12 @@ ql_ms_entry(ql_adapter_state_t *ha, ms_entry_t *pkt23, ql_head_t *done_q,
 		tq = sp->lun_queue->target_queue;
 
 		/* Set ISP completion status */
-		if (CFG_IST(ha, CFG_CTRL_24258081)) {
+		if (CFG_IST(ha, CFG_ISP_FW_TYPE_2)) {
 			sp->pkt->pkt_reason = ddi_get16(
-			    ha->hba_buf.acc_handle, &pkt24->status);
+			    rsp_q->rsp_ring.acc_handle, &pkt24->status);
 		} else {
 			sp->pkt->pkt_reason = ddi_get16(
-			    ha->hba_buf.acc_handle, &pkt23->comp_status);
+			    rsp_q->rsp_ring.acc_handle, &pkt23->comp_status);
 		}
 
 		if (sp->pkt->pkt_reason == CS_RESOUCE_UNAVAILABLE &&
@@ -3083,9 +3246,9 @@ ql_ms_entry(ql_adapter_state_t *ha, ms_entry_t *pkt23, ql_head_t *done_q,
 			/* Set retry status. */
 			sp->flags |= SRB_RETRY;
 
-		} else if (CFG_IST(ha, CFG_CTRL_24258081) &&
+		} else if (CFG_IST(ha, CFG_ISP_FW_TYPE_2) &&
 		    sp->pkt->pkt_reason == CS_DATA_UNDERRUN) {
-			cnt = ddi_get32(ha->hba_buf.acc_handle,
+			cnt = ddi_get32(rsp_q->rsp_ring.acc_handle,
 			    &pkt24->resp_byte_count);
 			if (cnt < sizeof (fc_ct_header_t)) {
 				EL(ha, "Data underrun\n");
@@ -3093,21 +3256,28 @@ ql_ms_entry(ql_adapter_state_t *ha, ms_entry_t *pkt23, ql_head_t *done_q,
 				sp->pkt->pkt_reason = CS_COMPLETE;
 			}
 
+		} else if (sp->pkt->pkt_reason == CS_PORT_UNAVAILABLE ||
+		    sp->pkt->pkt_reason == CS_PORT_LOGGED_OUT) {
+			EL(ha, "Port unavailable %xh\n", sp->pkt->pkt_reason);
+			DEVICE_QUEUE_LOCK(tq);
+			tq->flags |= TQF_LOGIN_NEEDED;
+			DEVICE_QUEUE_UNLOCK(tq);
+			sp->pkt->pkt_reason = CS_TIMEOUT;
+
 		} else if (sp->pkt->pkt_reason != CS_COMPLETE) {
 			EL(ha, "status err=%xh\n", sp->pkt->pkt_reason);
 		}
 
 		if (sp->pkt->pkt_reason == CS_COMPLETE) {
 			/*EMPTY*/
-			QL_PRINT_3(CE_CONT, "(%d): ct_cmdrsp=%x%02xh resp\n",
-			    ha->instance, sp->pkt->pkt_cmd[8],
-			    sp->pkt->pkt_cmd[9]);
+			QL_PRINT_3(ha, "ct_cmdrsp=%x%02xh resp\n",
+			    sp->pkt->pkt_cmd[8], sp->pkt->pkt_cmd[9]);
 			QL_DUMP_3(sp->pkt->pkt_resp, 8, sp->pkt->pkt_rsplen);
 		}
 
 		/* For nameserver restore command, management change header. */
 		if ((sp->flags & SRB_RETRY) == 0) {
-			tq->d_id.b24 == 0xfffffc ?
+			tq->d_id.b24 == FS_NAME_SERVER ?
 			    ql_cthdr_endian(sp->pkt->pkt_cmd_acc,
 			    sp->pkt->pkt_cmd, B_TRUE) :
 			    ql_cthdr_endian(sp->pkt->pkt_resp_acc,
@@ -3121,7 +3291,7 @@ ql_ms_entry(ql_adapter_state_t *ha, ms_entry_t *pkt23, ql_head_t *done_q,
 		ql_add_link_b(done_q, &sp->cmd);
 
 	}
-	QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
+	QL_PRINT_3(ha, "done\n");
 }
 
 /*
@@ -3130,6 +3300,7 @@ ql_ms_entry(ql_adapter_state_t *ha, ms_entry_t *pkt23, ql_head_t *done_q,
  *
  * Input:
  *	ha:		adapter state pointer.
+ *	rsp_q:		response queue structure pointer.
  *	pkt:		entry pointer.
  *	done_q:		done queue pointer.
  *	set_flags:	task daemon flags to set.
@@ -3140,15 +3311,16 @@ ql_ms_entry(ql_adapter_state_t *ha, ms_entry_t *pkt23, ql_head_t *done_q,
  */
 /* ARGSUSED */
 static void
-ql_report_id_entry(ql_adapter_state_t *ha, report_id_1_t *pkt,
-    ql_head_t *done_q, uint32_t *set_flags, uint32_t *reset_flags)
+ql_report_id_entry(ql_adapter_state_t *ha, ql_response_q_t *rsp_q,
+    report_id_acq_t *pkt, ql_head_t *done_q, uint64_t *set_flags,
+    uint64_t *reset_flags)
 {
 	ql_adapter_state_t	*vha;
 
-	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
+	QL_PRINT_3(ha, "started\n");
 
-	EL(ha, "format=%d, vp=%d, status=%d\n",
-	    pkt->format, pkt->vp_index, pkt->status);
+	EL(ha, "format=%d, index=%d, status=%d\n",
+	    pkt->format, pkt->vp_index, pkt->vp_status);
 
 	if (pkt->format == 1) {
 		/* Locate port state structure. */
@@ -3157,20 +3329,49 @@ ql_report_id_entry(ql_adapter_state_t *ha, report_id_1_t *pkt,
 				break;
 			}
 		}
-		if (vha != NULL && vha->vp_index != 0 &&
-		    (pkt->status == CS_COMPLETE ||
-		    pkt->status == CS_PORT_ID_CHANGE)) {
-			*set_flags |= LOOP_RESYNC_NEEDED;
-			*reset_flags &= ~LOOP_RESYNC_NEEDED;
-			vha->loop_down_timer = LOOP_DOWN_TIMER_OFF;
-			TASK_DAEMON_LOCK(ha);
-			vha->task_daemon_flags |= LOOP_RESYNC_NEEDED;
-			vha->task_daemon_flags &= ~LOOP_DOWN;
-			TASK_DAEMON_UNLOCK(ha);
+		if (vha != NULL) {
+			if (pkt->vp_status == CS_COMPLETE ||
+			    pkt->vp_status == CS_PORT_ID_CHANGE) {
+				if (CFG_IST(ha, CFG_FCOE_SUPPORT)) {
+					vha->fcoe_fcf_idx = pkt->fcf_index;
+				}
+				if (vha->vp_index != 0) {
+					*set_flags |= LOOP_RESYNC_NEEDED;
+					*reset_flags &= ~LOOP_RESYNC_NEEDED;
+					vha->loop_down_timer =
+					    LOOP_DOWN_TIMER_OFF;
+					TASK_DAEMON_LOCK(ha);
+					vha->task_daemon_flags |=
+					    LOOP_RESYNC_NEEDED;
+					vha->task_daemon_flags &= ~LOOP_DOWN;
+					TASK_DAEMON_UNLOCK(ha);
+				}
+				ADAPTER_STATE_LOCK(ha);
+				vha->flags &= ~VP_ID_NOT_ACQUIRED;
+				ADAPTER_STATE_UNLOCK(ha);
+			} else {
+				/* FA-WWPN failure. */
+				if (pkt->vp_status == CS_INCOMPLETE &&
+				    pkt->ls_rjt_reason_code == 0xff &&
+				    pkt->ls_rjt_explanation == 0x44) {
+					*set_flags |= ISP_ABORT_NEEDED;
+				}
+				if (CFG_IST(ha, CFG_FCOE_SUPPORT)) {
+					EL(ha, "sts sc=%d, rjt_rea=%xh, "
+					    "rjt_exp=%xh, rjt_sc=%xh\n",
+					    pkt->status_subcode,
+					    pkt->ls_rjt_reason_code,
+					    pkt->ls_rjt_explanation,
+					    pkt->ls_rjt_subcode);
+				}
+				ADAPTER_STATE_LOCK(ha);
+				vha->flags |= VP_ID_NOT_ACQUIRED;
+				ADAPTER_STATE_UNLOCK(ha);
+			}
 		}
 	}
 
-	QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
+	QL_PRINT_3(ha, "done\n");
 }
 
 /*
@@ -3179,6 +3380,7 @@ ql_report_id_entry(ql_adapter_state_t *ha, report_id_1_t *pkt,
  *
  * Input:
  *	ha:		adapter state pointer.
+ *	rsp_q:		response queue structure pointer.
  *	pkt23:		entry pointer.
  *	done_q:		done queue pointer.
  *	set_flags:	task daemon flags to set.
@@ -3189,24 +3391,35 @@ ql_report_id_entry(ql_adapter_state_t *ha, report_id_1_t *pkt,
  */
 /* ARGSUSED */
 static void
-ql_els_passthru_entry(ql_adapter_state_t *ha, els_passthru_entry_rsp_t *rsp,
-    ql_head_t *done_q, uint32_t *set_flags, uint32_t *reset_flags)
+ql_els_passthru_entry(ql_adapter_state_t *ha, ql_response_q_t *rsp_q,
+    els_passthru_entry_rsp_t *rsp, ql_head_t *done_q, uint64_t *set_flags,
+    uint64_t *reset_flags)
 {
 	ql_tgt_t	*tq;
-	port_id_t	d_id, s_id;
-	ql_srb_t	*srb;
+	port_id_t	s_id;
+	ql_srb_t	*srb = NULL;
 	uint32_t	index, resp_identifier;
 
-	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
+	QL_PRINT_3(ha, "started\n");
 
 	/* Validate the response entry handle. */
-	resp_identifier = ddi_get32(ha->hba_buf.acc_handle, &rsp->handle);
+	resp_identifier = ddi_get32(rsp_q->rsp_ring.acc_handle, &rsp->handle);
 	index = resp_identifier & OSC_INDEX_MASK;
-	if (index < MAX_OUTSTANDING_COMMANDS) {
+	if (index < ha->osc_max_cnt) {
 		/* the index seems reasonable */
-		srb = ha->outstanding_cmds[index];
+		if ((srb = ha->outstanding_cmds[index]) == NULL) {
+			srb = ql_verify_preprocessed_cmd(ha, rsp_q,
+			    (uint32_t *)&rsp->handle,
+			    (uint32_t *)&resp_identifier, set_flags,
+			    reset_flags);
+		}
 		if (srb != NULL) {
-			if (srb->handle == resp_identifier) {
+			if (srb == QL_ABORTED_SRB(ha)) {
+				EL(ha, "QL_ABORTED_SRB handle=%xh\n",
+				    resp_identifier);
+				srb = NULL;
+				ha->outstanding_cmds[index] = NULL;
+			} else if (srb->handle == resp_identifier) {
 				/* Neo, you're the one... */
 				ha->outstanding_cmds[index] = NULL;
 				srb->handle = 0;
@@ -3217,9 +3430,6 @@ ql_els_passthru_entry(ql_adapter_state_t *ha, els_passthru_entry_rsp_t *rsp,
 				srb = NULL;
 				ql_signal_abort(ha, set_flags);
 			}
-		} else {
-			srb = ql_verify_preprocessed_cmd(ha,
-			    (uint32_t *)&rsp->handle, set_flags, reset_flags);
 		}
 	} else {
 		EL(ha, "osc index out of range, index=%xh, handle=%xh\n",
@@ -3229,7 +3439,7 @@ ql_els_passthru_entry(ql_adapter_state_t *ha, els_passthru_entry_rsp_t *rsp,
 
 	if (srb != NULL) {
 		if (!(srb->flags & SRB_ELS_PKT)) {
-			EL(ha, "Not SRB_ELS_PKT flags=%xh, isp_abort_needed",
+			EL(ha, "Not SRB_ELS_PKT flags=%xh, isp_abort_needed\n",
 			    srb->flags);
 			*set_flags |= ISP_ABORT_NEEDED;
 			return;
@@ -3239,12 +3449,14 @@ ql_els_passthru_entry(ql_adapter_state_t *ha, els_passthru_entry_rsp_t *rsp,
 		    DDI_DMA_SYNC_FORKERNEL);
 
 		/* Set ISP completion status */
-		srb->pkt->pkt_reason = ddi_get16(
-		    ha->hba_buf.acc_handle, &rsp->comp_status);
+		srb->pkt->pkt_reason = ddi_get16(rsp_q->rsp_ring.acc_handle,
+		    &rsp->comp_status);
 
 		if (srb->pkt->pkt_reason != CS_COMPLETE) {
 			la_els_rjt_t	rjt;
-			EL(ha, "status err=%xh\n", srb->pkt->pkt_reason);
+
+			EL(ha, "srb=%ph,status err=%xh\n",
+			    srb, srb->pkt->pkt_reason);
 
 			if (srb->pkt->pkt_reason == CS_LOGIN_LOGOUT_ERROR) {
 				EL(ha, "e1=%xh e2=%xh\n",
@@ -3272,31 +3484,21 @@ ql_els_passthru_entry(ql_adapter_state_t *ha, els_passthru_entry_rsp_t *rsp,
 			/* Indicate ISP completion */
 			srb->flags |= SRB_ISP_COMPLETED;
 
-			loop_id = ddi_get16(ha->hba_buf.acc_handle,
+			loop_id = ddi_get16(rsp_q->rsp_ring.acc_handle,
 			    &rsp->n_port_hdl);
 
+			/* tq is obtained from lun_queue */
+			tq = srb->lun_queue->target_queue;
+
 			if (ha->topology & QL_N_PORT) {
-				/* create a target Q if there isn't one */
-				tq = ql_loop_id_to_queue(ha, loop_id);
-				if (tq == NULL) {
-					d_id.b.al_pa = rsp->d_id_7_0;
-					d_id.b.area = rsp->d_id_15_8;
-					d_id.b.domain = rsp->d_id_23_16;
-					/* Acquire adapter state lock. */
-					ADAPTER_STATE_LOCK(ha);
-
-					tq = ql_dev_init(ha, d_id, loop_id);
-					EL(ha, " tq = %x\n", tq);
-
-					ADAPTER_STATE_UNLOCK(ha);
-				}
-
 				/* on plogi success assume the chosen s_id */
-				opcode = ddi_get8(ha->hba_buf.acc_handle,
+				opcode = ddi_get8(rsp_q->rsp_ring.acc_handle,
 				    &rsp->els_cmd_opcode);
 
-				EL(ha, "els_cmd_opcode=%x srb->pkt=%x\n",
-				    opcode, srb->pkt);
+				EL(ha, "els opcode=%x srb=%ph,pkt=%ph, tq=%ph"
+				    ", portid=%xh, tqlpid=%xh, loop_id=%xh\n",
+				    opcode, srb, srb->pkt, tq, tq->d_id.b24,
+				    tq->loop_id, loop_id);
 
 				if (opcode == LA_ELS_PLOGI) {
 					s_id.b.al_pa = rsp->s_id_7_0;
@@ -3318,16 +3520,27 @@ ql_els_passthru_entry(ql_adapter_state_t *ha, els_passthru_entry_rsp_t *rsp,
 				tq->logout_sent = 0;
 				tq->flags &= ~TQF_NEED_AUTHENTICATION;
 
-				if (CFG_IST(ha, CFG_CTRL_24258081)) {
+				if (CFG_IST(ha, CFG_ISP_FW_TYPE_2)) {
 					tq->flags |= TQF_IIDMA_NEEDED;
 				}
-			srb->pkt->pkt_state = FC_PKT_SUCCESS;
+				srb->pkt->pkt_state = FC_PKT_SUCCESS;
 			}
 		}
+
+		/* Remove command from watchdog queue. */
+		if (srb->flags & SRB_WATCHDOG_ENABLED) {
+			tq = srb->lun_queue->target_queue;
+
+			DEVICE_QUEUE_LOCK(tq);
+			ql_remove_link(&tq->wdg, &srb->wdg);
+			srb->flags &= ~SRB_WATCHDOG_ENABLED;
+			DEVICE_QUEUE_UNLOCK(tq);
+		}
+
 		/* invoke the callback */
-		ql_awaken_task_daemon(ha, srb, 0, 0);
+		ql_io_comp(srb);
 	}
-	QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
+	QL_PRINT_3(ha, "done\n");
 }
 
 /*
@@ -3343,9 +3556,9 @@ ql_els_passthru_entry(ql_adapter_state_t *ha, els_passthru_entry_rsp_t *rsp,
  *	Interrupt or Kernel context, no mailbox commands allowed.
  */
 static void
-ql_signal_abort(ql_adapter_state_t *ha, uint32_t *set_flags)
+ql_signal_abort(ql_adapter_state_t *ha, uint64_t *set_flags)
 {
-	if (!CFG_IST(ha, CFG_CTRL_8021) &&
+	if (!CFG_IST(ha, CFG_CTRL_82XX) &&
 	    !(ha->task_daemon_flags & (ISP_ABORT_NEEDED | ABORT_ISP_ACTIVE))) {
 		*set_flags |= ISP_ABORT_NEEDED;
 	}

@@ -20,12 +20,15 @@
  */
 
 /*
- * Copyright 2009 QLogic Corporation.  All rights reserved.
+ * Copyright 2009-2015 QLogic Corporation.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2009, 2015 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef	_QLT_H
@@ -98,12 +101,28 @@ extern uint32_t fw2500_code02[];
 extern uint32_t fw2500_length02;
 extern uint32_t fw2500_addr02;
 
+extern uint32_t fw2700_code01[];
+extern uint32_t fw2700_length01;
+extern uint32_t fw2700_addr01;
+extern uint32_t fw2700_code02[];
+extern uint32_t fw2700_length02;
+extern uint32_t fw2700_addr02;
+extern uint32_t	tmplt2700_code01[];
+extern uint32_t	tmplt2700_length01;
+
 extern uint32_t fw8100_code01[];
 extern uint32_t fw8100_length01;
 extern uint32_t fw8100_addr01;
 extern uint32_t fw8100_code02[];
 extern uint32_t fw8100_length02;
 extern uint32_t fw8100_addr02;
+
+extern uint32_t fw8300fc_code01[];
+extern uint32_t fw8300fc_length01;
+extern uint32_t fw8300fc_addr01;
+extern uint32_t fw8300fc_code02[];
+extern uint32_t fw8300fc_length02;
+extern uint32_t fw8300fc_addr02;
 
 typedef enum {
 	MBOX_STATE_UNKNOWN = 0,
@@ -113,6 +132,17 @@ typedef enum {
 } mbox_state_t;
 
 /*
+ * ISP mailbox Self-Test status codes
+ */
+#define	MBS_ROM_IDLE		0	/* Firmware Alive. */
+#define	MBS_ROM_BUSY		4	/* Busy. */
+#define	MBS_ROM_CONFIG_ERR	0xF	/* Board Config Error. */
+#define	MBS_ROM_STATUS_MASK	0xF
+
+#define	MBS_FW_RUNNING		0x8400	/* firmware running. */
+#define	MBS_FW_CONFIG_ERR	0x8401	/* firmware config error */
+
+/*
  * ISP mailbox commands
  */
 #define	MBC_LOAD_RAM			0x01	/* Load RAM. */
@@ -120,6 +150,7 @@ typedef enum {
 #define	MBC_DUMP_RAM			0x03	/* Dump RAM. */
 #define	MBC_WRITE_RAM_WORD		0x04	/* Write RAM word. */
 #define	MBC_READ_RAM_WORD		0x05	/* Read RAM word. */
+#define	MBC_MPI_RAM			0x05	/* Load/dump MPI RAM. */
 #define	MBC_MAILBOX_REGISTER_TEST	0x06	/* Wrap incoming mailboxes */
 #define	MBC_VERIFY_CHECKSUM		0x07	/* Verify checksum. */
 #define	MBC_ABOUT_FIRMWARE		0x08	/* About Firmware. */
@@ -138,6 +169,7 @@ typedef enum {
 #define	MBC_RESET			0x18	/* Target reset. */
 #define	MBC_XMIT_PARM			0x19	/* Change default xmit parms */
 #define	MBC_PORT_PARAM			0x1a	/* Get/set port speed parms */
+#define	MBC_INIT_MQ			0x1f	/* Initialize multiple queue */
 #define	MBC_GET_ID			0x20	/* Get loop id of ISP2200. */
 #define	MBC_GET_TIMEOUT_PARAMETERS	0x22	/* Get Timeout Parameters. */
 #define	MBC_TRACE_CONTROL		0x27	/* Trace control. */
@@ -216,6 +248,11 @@ typedef enum {
 
 #define	IOCB_SIZE		64
 
+#define	MAX_SPEED_MASK	0x0000000F
+#define	MAX_PORTS_MASK	0x000000F0
+#define	MAX_SPEED_16G	0x0
+#define	MAX_SPEED_32G	0x1
+
 /*
  * These should not be constents but should be obtained from fw.
  */
@@ -223,8 +260,8 @@ typedef enum {
 #define	QLT_MAX_XCHGES	2048
 
 #define	MAX_MBOXES	32
-#define	MBOX_TIMEOUT	(2*1000*1000)
-#define	DEREG_RP_TIMEOUT	(2*1000*1000)
+#define	MBOX_TIMEOUT	(14*1000*1000) /* for Palladium */
+#define	DEREG_RP_TIMEOUT	(22*1000*1000)
 
 typedef struct {
 	uint16_t	to_fw[MAX_MBOXES];
@@ -236,21 +273,61 @@ typedef struct {
 
 typedef struct qlt_abts_cmd {
 	uint8_t		buf[IOCB_SIZE];
+	uint16_t	qid;
 } qlt_abts_cmd_t;
 
 struct qlt_dmem_bucket;
-struct qlt_ddi_dma_handle_pool;
 
 #define	QLT_INTR_FIXED	0x1
 #define	QLT_INTR_MSI	0x2
 #define	QLT_INTR_MSIX	0x4
 
-typedef struct qlt_el_trace_desc {
+#define	QL_LOG_ENTRIES	16384
+#define	QL_LOG_LENGTH	128
+
+typedef struct qlt_trace_entry {
+	timespec_t	hs_time;
+	char		buf[QL_LOG_LENGTH];
+} qlt_trace_entry_t;
+
+typedef struct qlt_trace_desc {
 	kmutex_t	mutex;
-	uint16_t	next;
-	uint32_t	trace_buffer_size;
-	char		*trace_buffer;
-} qlt_el_trace_desc_t;
+	uint32_t	nentries;
+	uint32_t	nindex;
+	uint32_t	start;
+	uint32_t	end;
+	uint32_t	csize;
+	uint32_t	count;
+	size_t		trace_buffer_size;
+	qlt_trace_entry_t	*trace_buffer;
+} qlt_trace_desc_t;
+
+typedef struct qlt_mq_req_ptr_blk {
+	kmutex_t	mq_lock;
+	caddr_t		mq_ptr;
+	uint32_t	mq_ndx_to_fw;
+	uint32_t	mq_ndx_from_fw;
+	uint32_t	mq_available;
+
+	ddi_dma_handle_t queue_mem_mq_dma_handle;
+	ddi_acc_handle_t queue_mem_mq_acc_handle;
+	caddr_t		 queue_mem_mq_base_addr;
+	ddi_dma_cookie_t queue_mem_mq_cookie;
+
+} qlt_mq_req_ptr_blk_t;
+
+typedef struct qlt_mq_rsp_ptr_blk {
+	kmutex_t	mq_lock;
+	caddr_t		mq_ptr;
+	uint32_t	mq_ndx_to_fw;
+	uint32_t	mq_ndx_from_fw;
+
+	ddi_dma_handle_t queue_mem_mq_dma_handle;
+	ddi_acc_handle_t queue_mem_mq_acc_handle;
+	caddr_t		 queue_mem_mq_base_addr;
+	ddi_dma_cookie_t queue_mem_mq_cookie;
+
+} qlt_mq_rsp_ptr_blk_t;
 
 typedef struct qlt_state {
 	dev_info_t		*dip;
@@ -262,6 +339,7 @@ typedef struct qlt_state {
 	struct qlt_dma_handle_pool
 				*qlt_dma_handle_pool;
 
+
 	int			instance;
 	uint8_t			qlt_state:7,
 				qlt_state_not_acked:1;
@@ -270,13 +348,21 @@ typedef struct qlt_state {
 				qlt_stay_offline:1,
 				qlt_link_up,
 				qlt_81xx_chip:1,
-				qlt_rsvd1:3;
+				qlt_mq_enabled:1,
+				qlt_83xx_chip:1,
+				qlt_fcoe_enabled:1;
+	uint8_t			qlt_27xx_chip:1,
+				rsvd0:7;
 	uint8_t			cur_topology;
 
 	/* Registers */
-	caddr_t		regs;
-	ddi_acc_handle_t regs_acc_handle;
-	ddi_acc_handle_t pcicfg_acc_handle;
+	caddr_t			regs;
+	ddi_acc_handle_t	regs_acc_handle;
+	ddi_acc_handle_t	pcicfg_acc_handle;
+	caddr_t			msix_base;
+	ddi_acc_handle_t	msix_acc_handle;
+	caddr_t			mq_reg_base;
+	ddi_acc_handle_t	mq_reg_acc_handle;
 
 	/* Interrupt stuff */
 	kmutex_t		intr_lock;	/* Only used by intr routine */
@@ -294,15 +380,20 @@ typedef struct qlt_state {
 	caddr_t		 queue_mem_ptr;
 	ddi_dma_cookie_t queue_mem_cookie;
 
-	kmutex_t	req_lock;
-	caddr_t		req_ptr;
-	uint32_t	req_ndx_to_fw;
-	uint32_t	req_ndx_from_fw;
-	uint32_t	req_available;
+/*
+ *	kmutex_t	req_lock;
+ *	caddr_t		req_ptr;
+ *	uint32_t	req_ndx_to_fw;
+ *	uint32_t	req_ndx_from_fw;
+ *	uint32_t	req_available;
+ */
 
-	caddr_t		resp_ptr;
-	uint32_t	resp_ndx_to_fw;
-	uint32_t	resp_ndx_from_fw;
+	qlt_mq_req_ptr_blk_t	*mq_req;
+	qlt_mq_rsp_ptr_blk_t	*mq_resp;
+/* MQMQ */
+	uint32_t	qlt_queue_cnt;
+	kmutex_t	qlock;
+	uint32_t	last_qi;
 
 	kmutex_t	preq_lock;
 	caddr_t		preq_ptr;
@@ -325,6 +416,8 @@ typedef struct qlt_state {
 	mbox_state_t	mbox_io_state;
 	mbox_cmd_t	*mcp;
 	qlt_nvram_t	*nvram;
+	uint32_t	*vpd;
+	qlt_rom_image_t	rimage[6];
 
 	uint8_t		link_speed;	/* Cached from intr routine */
 	uint16_t	fw_major;
@@ -341,12 +434,31 @@ typedef struct qlt_state {
 	uint32_t	fw_length02;
 	uint32_t	*fw_code02;
 
+	uint32_t	fw_ext_memory_end;
+	uint32_t	fw_shared_ram_start;
+	uint32_t	fw_shared_ram_end;
+	uint32_t	fw_ddr_ram_start;
+	uint32_t	fw_ddr_ram_end;
+
 	uint32_t	qlt_ioctl_flags;
 	kmutex_t	qlt_ioctl_lock;
+	uint32_t	fw_dump_size;
 	caddr_t		qlt_fwdump_buf;	/* FWDUMP will use ioctl flags/lock */
 	uint32_t	qlt_change_state_flags;	/* Cached for ACK handling */
 
-	qlt_el_trace_desc_t	*el_trace_desc;
+	/* Dump template */
+	ddi_dma_handle_t dmp_template_dma_handle;
+	ddi_acc_handle_t dmp_template_acc_handle;
+	caddr_t		 dmp_template_addr;
+	ddi_dma_cookie_t dmp_template_cookie;
+
+	uint32_t	fw_bin_dump_size;
+	caddr_t		fw_bin_dump_buf;
+	uint32_t	fw_ascii_dump_size;
+
+	qlt_trace_desc_t *qlt_trace_desc;
+	uint32_t	qlt_log_entries;
+	uint8_t		qlt_eel_level;		/* extended error logging */
 
 	/* temp ref & stat counters */
 	uint32_t	qlt_bucketcnt[5];	/* element 0 = 2k */
@@ -354,6 +466,10 @@ typedef struct qlt_state {
 	uint64_t	qlt_bumpbucket;		/* bigger buffer supplied */
 	uint64_t	qlt_pmintry;
 	uint64_t	qlt_pmin_ok;
+
+	uint32_t	qlt_27xx_speed;
+	uint32_t	qlt_atio_reproc_cnt;
+	uint32_t	qlt_resp_reproc_cnt;
 } qlt_state_t;
 
 /*
@@ -373,14 +489,18 @@ typedef struct qlt_state {
 #define	QLT_IOCTL_FLAG_EXCL		0x02
 
 typedef struct qlt_cmd {
+	fct_cmd_t	*cmd;
+	uint32_t	handle;
 	stmf_data_buf_t	*dbuf;		/* dbuf with handle 0 for SCSI cmds */
 	stmf_data_buf_t	*dbuf_rsp_iu;	/* dbuf for possible FCP_RSP IU */
 	uint32_t	fw_xchg_addr;
+	uint16_t	oxid;
 	uint16_t	flags;
 	union {
 		uint16_t	resp_offset;
 		uint8_t		atio_byte3;
 	} param;
+	uint16_t	qid;
 } qlt_cmd_t;
 
 /*
@@ -412,8 +532,15 @@ typedef struct {
 #define	TOTAL_DMA_MEM_SIZE	(MBOX_DMA_MEM_OFFSET + MBOX_DMA_MEM_SIZE)
 
 #define	QLT_MAX_ITERATIONS_PER_INTR	32
-#define	QLT_INFO_LEN			160
 
+#define	REQUEST_QUEUE_MQ_ENTRIES	512
+#define	REQUEST_QUEUE_MQ_SIZE	(REQUEST_QUEUE_MQ_ENTRIES * IOCB_SIZE)
+
+#define	RESPONSE_QUEUE_MQ_ENTRIES	512
+#define	RESPONSE_QUEUE_MQ_SIZE	(RESPONSE_QUEUE_MQ_ENTRIES * IOCB_SIZE)
+
+#define	REG_RD8(qlt, addr) \
+	ddi_get8(qlt->regs_acc_handle, (uint8_t *)(qlt->regs + addr))
 #define	REG_RD16(qlt, addr) \
 	ddi_get16(qlt->regs_acc_handle, (uint16_t *)(qlt->regs + addr))
 #define	REG_RD32(qlt, addr) \
@@ -424,19 +551,30 @@ typedef struct {
 #define	REG_WR32(qlt, addr, data) \
 	ddi_put32(qlt->regs_acc_handle, (uint32_t *)(qlt->regs + addr), \
 	(uint32_t)(data))
+
+#define	PCICFG_RD8(qlt, addr) \
+	pci_config_get8(qlt->pcicfg_acc_handle, (off_t)(addr))
 #define	PCICFG_RD16(qlt, addr) \
 	pci_config_get16(qlt->pcicfg_acc_handle, (off_t)(addr))
 #define	PCICFG_RD32(qlt, addr) \
 	pci_config_get32(qlt->pcicfg_acc_handle, (off_t)(addr))
 #define	PCICFG_WR16(qlt, addr, data) \
 	pci_config_put16(qlt->pcicfg_acc_handle, (off_t)(addr), \
-		(uint16_t)(data))
+	(uint16_t)(data))
+#define	PCICFG_WR32(qlt, addr, data) \
+	pci_config_put32(qlt->pcicfg_acc_handle, (off_t)(addr), \
+	(uint32_t)(data))
+
+/*
+ * Used for Req/Resp queue 0 and atio queue only
+ */
 #define	QMEM_RD16(qlt, addr) \
 	ddi_get16(qlt->queue_mem_acc_handle, (uint16_t *)(addr))
 #define	DMEM_RD16(qlt, addr) LE_16((uint16_t)(*((uint16_t *)(addr))))
 #define	QMEM_RD32(qlt, addr) \
 	ddi_get32(qlt->queue_mem_acc_handle, (uint32_t *)(addr))
 #define	DMEM_RD32(qlt, addr) LE_32((uint32_t)(*((uint32_t *)(addr))))
+
 /*
  * #define	QMEM_RD64(qlt, addr) \
  *	ddi_get64(qlt->queue_mem_acc_handle, (uint64_t *)(addr))
@@ -450,7 +588,7 @@ typedef struct {
 	ddi_put32(qlt->queue_mem_acc_handle, (uint32_t *)(addr), \
 	(uint32_t)(data))
 #define	DMEM_WR32(qlt, addr, data) (*((uint32_t *)(addr)) = \
-						LE_32((uint32_t)(data)))
+	LE_32((uint32_t)(data)))
 
 /*
  * [QD]MEM is always little endian so the [QD]MEM_WR64 macro works for
@@ -463,6 +601,82 @@ typedef struct {
 #define	DMEM_WR64(qlt, addr, data) \
 	DMEM_WR32(qlt, addr, (data & 0xffffffff)), \
 	DMEM_WR32(qlt, (addr)+4, ((uint64_t)data) >> 32)
+
+/*
+ * Multi Queue suppport since the queue access handles are
+ * allocated separetly.
+ */
+#define	QMEM_RD16_REQ(qlt, qi, addr) \
+	(qi == 0) ? QMEM_RD16(qlt, addr) : \
+	ddi_get16(qlt->mq_req[qi].queue_mem_mq_acc_handle, \
+	    (uint16_t *)(addr))
+
+#define	QMEM_RD16_RSPQ(qlt, qi, addr) \
+	(qi == 0) ? QMEM_RD16(qlt, addr) : \
+	ddi_get16(qlt->mq_resp[qi].queue_mem_mq_acc_handle, \
+	    (uint16_t *)(addr))
+
+#define	QMEM_RD32_REQ(qlt, qi, addr) \
+	(qi == 0) ? QMEM_RD32(qlt, addr) : \
+	ddi_get32(qlt->mq_req[qi].queue_mem_mq_acc_handle, \
+	    (uint32_t *)(addr))
+
+#define	QMEM_RD32_RSPQ(qlt, qi, addr) \
+	(qi == 0) ? QMEM_RD32(qlt, addr) : \
+	ddi_get32(qlt->mq_resp[qi].queue_mem_mq_acc_handle, \
+	    (uint32_t *)(addr))
+
+#define	QMEM_WR16_REQ(qlt, qi, addr, data) \
+	(qi == 0) ? QMEM_WR16(qlt, addr, data) : \
+	ddi_put16(qlt->mq_req[qi].queue_mem_mq_acc_handle, \
+	(uint16_t *)(addr), (uint16_t)(data))
+
+#define	QMEM_WR16_RSPQ(qlt, qi, addr, data) \
+	(qi == 0) ? QMEM_WR16(qlt, addr, data) : \
+	ddi_put16(qlt->mq_resp[qi].queue_mem_mq_acc_handle, \
+	(uint16_t *)(addr), (uint16_t)(data))
+
+#define	QMEM_WR32_REQ(qlt, qi, addr, data) \
+	(qi == 0) ? QMEM_WR32(qlt, addr, data) : \
+	ddi_put32(qlt->mq_req[qi].queue_mem_mq_acc_handle, \
+	(uint32_t *)(addr), (uint32_t)(data))
+
+#define	QMEM_WR32_RSPQ(qlt, qi, addr, data) \
+	(qi == 0) ? QMEM_WR32(qlt, addr, data) : \
+	ddi_put32(qlt->mq_resp[qi].queue_mem_mq_acc_handle, \
+	(uint32_t *)(addr), (uint32_t)(data))
+/*
+ * [QD]MEM is always little endian so the [QD]MEM_WR64 macro works for
+ * both sparc and x86.
+ */
+#define	QMEM_WR64_REQ(qlt, qi, addr, data) \
+	(qi == 0) ? QMEM_WR64(qlt, addr, data) : \
+	QMEM_WR32_REQ(qlt, qi, addr, (data & 0xffffffff)), \
+	QMEM_WR32_REQ(qlt, qi, (addr)+4, ((uint64_t)data) >> 32)
+
+#define	QMEM_WR64_RSPQ(qlt, qi, addr, data) \
+	(qi == 0) ? QMEM_WR64(qlt, addr, data) : \
+	QMEM_WR32_RSPQ(qlt, qi, addr, (data & 0xffffffff)), \
+	QMEM_WR32_RSPQ(qlt, qi, (addr)+4, ((uint64_t)data) >> 32)
+
+/*
+ *	MBAR access for Multi-Queue
+ */
+#define	MQBAR_RD16(qlt, addr) \
+	ddi_get16(qlt->mq_reg_acc_handle, (uint16_t *)(qlt->mq_reg_base + addr))
+
+#define	MQBAR_RD32(qlt, addr) \
+	ddi_get32(qlt->mq_reg_acc_handle, (uint32_t *)(qlt->mq_reg_base + addr))
+
+#define	MQBAR_WR16(qlt, addr, data) \
+	ddi_put16(qlt->mq_reg_acc_handle, \
+	(uint16_t *)(qlt->mq_reg_base + addr), \
+	(uint16_t)(data))
+
+#define	MQBAR_WR32(qlt, addr, data) \
+	ddi_put32(qlt->mq_reg_acc_handle, \
+	(uint32_t *)(qlt->mq_reg_base + addr), \
+	(uint32_t)(data))
 
 /*
  * Structure used to associate values with strings which describe them.
@@ -534,7 +748,17 @@ char *value2string(string_table_t *entry, int value, int delimiter);
 #define	LSD(x)		(uint32_t)(x)
 #define	MSD(x)		(uint32_t)((uint64_t)(x) >> 32)
 
+#define	SHORT_TO_LONG(lsw, msw)	(uint32_t)((uint16_t)msw << 16 | (uint16_t)lsw)
+#define	CHAR_TO_SHORT(lsb, msb)	(uint16_t)((uint8_t)msb << 8 | (uint8_t)lsb)
+#define	CHAR_TO_LONG(lsb, b1, b2, msb) \
+	(uint32_t)(SHORT_TO_LONG(CHAR_TO_SHORT(lsb, b1), \
+	CHAR_TO_SHORT(b2, msb)))
+
 void	qlt_chg_endian(uint8_t *, size_t);
+
+#define	TRACE_BUFFER_LOCK(qlt)	mutex_enter(&qlt->qlt_trace_desc->mutex)
+#define	TRACE_BUFFER_UNLOCK(qlt) mutex_exit(&qlt->qlt_trace_desc->mutex)
+#define	QL_BANG	"!"
 
 void qlt_el_msg(qlt_state_t *qlt, const char *fn, int ce, ...);
 void qlt_dump_el_trace_buffer(qlt_state_t *qlt);

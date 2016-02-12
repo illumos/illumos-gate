@@ -20,12 +20,12 @@
  */
 
 /*
- * Copyright 2009 QLogic Corporation.  All rights reserved.
+ * Copyright 2009-2015 QLogic Corporation.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*
- * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2008, 2015, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_QLT_DMA_H

@@ -21,7 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
 #
 
 #
@@ -51,8 +51,10 @@ file path=kernel/misc/qlc/$(ARCH64)/qlc_fw_2200 group=sys mode=0755
 file path=kernel/misc/qlc/$(ARCH64)/qlc_fw_2300 group=sys mode=0755
 file path=kernel/misc/qlc/$(ARCH64)/qlc_fw_2400 group=sys mode=0755
 file path=kernel/misc/qlc/$(ARCH64)/qlc_fw_2500 group=sys mode=0755
+file path=kernel/misc/qlc/$(ARCH64)/qlc_fw_2700 group=sys mode=0755
 file path=kernel/misc/qlc/$(ARCH64)/qlc_fw_6322 group=sys mode=0755
 file path=kernel/misc/qlc/$(ARCH64)/qlc_fw_8100 group=sys mode=0755
+file path=kernel/misc/qlc/$(ARCH64)/qlc_fw_8301fc group=sys mode=0755
 dir  path=usr/share/man
 dir  path=usr/share/man/man4d
 file path=usr/share/man/man4d/qlc.4d
@@ -62,6 +64,9 @@ driver name=qlc perms="* 0666 root sys" class=fibre-channel \
     alias=pci1077,2312 \
     alias=pci1077,2322 \
     alias=pci1077,2422 \
+    alias=pciex1077,2031 \
+    alias=pciex1077,2071 \
+    alias=pciex1077,2261 \
     alias=pciex1077,2432 \
     alias=pciex1077,2532 \
     alias=pciex1077,5432 \

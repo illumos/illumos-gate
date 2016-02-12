@@ -638,8 +638,10 @@ MISC_KMODS	+= qlc_fw_2200
 MISC_KMODS	+= qlc_fw_2300
 MISC_KMODS	+= qlc_fw_2400
 MISC_KMODS	+= qlc_fw_2500
+MISC_KMODS	+= qlc_fw_2700
 MISC_KMODS	+= qlc_fw_6322
 MISC_KMODS	+= qlc_fw_8100
+MISC_KMODS	+= qlc_fw_8301fc
 MISC_KMODS	+= uathfw
 
 MISC_KMODS	+= klmmod klmops

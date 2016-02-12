@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 QLogic Corporation.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright 2015 QLogic Corporation.  All rights reserved.
  */
 
 /*
@@ -30,7 +29,7 @@
  * ***********************************************************************
  * *									**
  * *				NOTICE					**
- * *		COPYRIGHT (C) 1996-2010 QLOGIC CORPORATION		**
+ * *		COPYRIGHT (C) 1996-2015 QLOGIC CORPORATION		**
  * *			ALL RIGHTS RESERVED				**
  * *									**
  * ***********************************************************************
@@ -45,7 +44,7 @@ extern "C" {
 #endif
 
 #ifndef QL_VERSION
-#define	QL_VERSION	"20100408-3.01"
+#define	QL_VERSION	"151216-3.07"
 #endif
 
 #ifndef	QL_NAME

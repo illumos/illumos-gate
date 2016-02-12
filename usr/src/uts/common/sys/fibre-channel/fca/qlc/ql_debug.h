@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 
-/* Copyright 2009 QLogic Corporation */
+/* Copyright 2015 QLogic Corporation */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2011, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_QL_DEBUG_H
@@ -35,7 +34,7 @@
  * ***********************************************************************
  * *									**
  * *				NOTICE					**
- * *		COPYRIGHT (C) 1996-2009 QLOGIC CORPORATION		**
+ * *		COPYRIGHT (C) 1996-2015 QLOGIC CORPORATION		**
  * *			ALL RIGHTS RESERVED				**
  * *									**
  * ***********************************************************************
@@ -68,7 +67,7 @@ extern "C" {
 
 void ql_dump_buffer(uint8_t *, uint8_t, uint32_t);
 void ql_el_msg(ql_adapter_state_t *, const char *, int, ...);
-void ql_dbg_msg(const char *, int, ...);
+void ql_dbg_msg(ql_adapter_state_t *, const char *, int, ...);
 int ql_flash_errlog(ql_adapter_state_t *, uint16_t, uint16_t, uint16_t,
     uint16_t);
 void ql_dump_el_trace_buffer(ql_adapter_state_t *);
@@ -90,10 +89,10 @@ void ql_dump_el_trace_buffer(ql_adapter_state_t *);
 #define	GLOBAL_EL_LOCK()	mutex_enter(&ql_global_el_mutex)
 #define	GLOBAL_EL_UNLOCK()	mutex_exit(&ql_global_el_mutex)
 
-#define	TRACE_BUFFER_LOCK(ha)	mutex_enter(&ha->el_trace_desc->mutex)
-#define	TRACE_BUFFER_UNLOCK(ha)	mutex_exit(&ha->el_trace_desc->mutex)
+#define	TRACE_BUFFER_LOCK(ha)	mutex_enter(&ha->ql_trace_desc->mutex)
+#define	TRACE_BUFFER_UNLOCK(ha)	mutex_exit(&ha->ql_trace_desc->mutex)
 
-#define	EL(ha, ...) 		ql_el_msg(ha, __func__, CE_CONT, __VA_ARGS__);
+#define	EL(ha, ...)		ql_el_msg(ha, __func__, CE_CONT, __VA_ARGS__);
 
 #define	ER(s)			cmn_err(CE_CONT, QL_BANG "%s", s);
 #define	ERV(s, ...)		cmn_err(CE_CONT, QL_BANG s, __VA_ARGS__);
@@ -103,7 +102,7 @@ void ql_dump_el_trace_buffer(ql_adapter_state_t *);
 
 #if QL_DEBUG & 1
 #define	QL_DEBUG_LEVEL_1
-#define	QL_PRINT_1(ce, ...)	ql_dbg_msg(__func__, ce, __VA_ARGS__)
+#define	QL_PRINT_1(ha, ...)	ql_dbg_msg(ha, __func__, CE_CONT, __VA_ARGS__)
 #define	QL_DUMP_1(bp, wdsize, count) \
 	ql_dump_buffer((uint8_t *)bp, (uint8_t)wdsize, (uint32_t)count)
 #else
@@ -113,7 +112,7 @@ void ql_dump_el_trace_buffer(ql_adapter_state_t *);
 
 #ifdef QL_DEBUG_ROUTINES
 #define	QL_DEBUG_LEVEL_2
-#define	QL_PRINT_2(ce, ...)	ql_dbg_msg(__func__, ce, __VA_ARGS__)
+#define	QL_PRINT_2(ha, ...)	ql_dbg_msg(ha, __func__, CE_CONT, __VA_ARGS__)
 #define	QL_DUMP_2(bp, wdsize, count) \
 	ql_dump_buffer((uint8_t *)bp, (uint8_t)wdsize, (uint32_t)count)
 #else
@@ -123,7 +122,7 @@ void ql_dump_el_trace_buffer(ql_adapter_state_t *);
 
 #if QL_DEBUG & 4
 #define	QL_DEBUG_LEVEL_3
-#define	QL_PRINT_3(ce, ...)	ql_dbg_msg(__func__, ce, __VA_ARGS__)
+#define	QL_PRINT_3(ha, ...)	ql_dbg_msg(ha, __func__, CE_CONT, __VA_ARGS__)
 #define	QL_DUMP_3(bp, wdsize, count) \
 	ql_dump_buffer((uint8_t *)bp, (uint8_t)wdsize, (uint32_t)count)
 #else
@@ -133,7 +132,7 @@ void ql_dump_el_trace_buffer(ql_adapter_state_t *);
 
 #if QL_DEBUG & 8
 #define	QL_DEBUG_LEVEL_4
-#define	QL_PRINT_4(ce, ...)	ql_dbg_msg(__func__, ce, __VA_ARGS__)
+#define	QL_PRINT_4(ha, ...)	ql_dbg_msg(ha, __func__, CE_CONT, __VA_ARGS__)
 #define	QL_DUMP_4(bp, wdsize, count) \
 	ql_dump_buffer((uint8_t *)bp, (uint8_t)wdsize, (uint32_t)count)
 #else
@@ -143,7 +142,7 @@ void ql_dump_el_trace_buffer(ql_adapter_state_t *);
 
 #if QL_DEBUG & 0x10
 #define	QL_DEBUG_LEVEL_5
-#define	QL_PRINT_5(ce, ...)	ql_dbg_msg(__func__, ce, __VA_ARGS__)
+#define	QL_PRINT_5(ha, ...)	ql_dbg_msg(ha, __func__, CE_CONT, __VA_ARGS__)
 #define	QL_DUMP_5(bp, wdsize, count) \
 	ql_dump_buffer((uint8_t *)bp, (uint8_t)wdsize, (uint32_t)count)
 #else
@@ -153,7 +152,7 @@ void ql_dump_el_trace_buffer(ql_adapter_state_t *);
 
 #if QL_DEBUG & 0x20
 #define	QL_DEBUG_LEVEL_6
-#define	QL_PRINT_6(ce, ...)	ql_dbg_msg(__func__, ce, __VA_ARGS__)
+#define	QL_PRINT_6(ha, ...)	ql_dbg_msg(ha, __func__, CE_CONT, __VA_ARGS__)
 #define	QL_DUMP_6(bp, wdsize, count) \
 	ql_dump_buffer((uint8_t *)bp, (uint8_t)wdsize, (uint32_t)count)
 #else
@@ -163,7 +162,7 @@ void ql_dump_el_trace_buffer(ql_adapter_state_t *);
 
 #if QL_DEBUG & 0x40
 #define	QL_DEBUG_LEVEL_7
-#define	QL_PRINT_7(ce, ...)	ql_dbg_msg(__func__, ce, __VA_ARGS__)
+#define	QL_PRINT_7(ha, ...)	ql_dbg_msg(ha, __func__, CE_CONT, __VA_ARGS__)
 #define	QL_DUMP_7(bp, wdsize, count) \
 	ql_dump_buffer((uint8_t *)bp, (uint8_t)wdsize, (uint32_t)count)
 #else
@@ -173,7 +172,7 @@ void ql_dump_el_trace_buffer(ql_adapter_state_t *);
 
 #if QL_DEBUG & 0x80
 #define	QL_DEBUG_LEVEL_8
-#define	QL_PRINT_8(ce, ...)	ql_dbg_msg(__func__, ce, __VA_ARGS__)
+#define	QL_PRINT_8(ha, ...)	ql_dbg_msg(ha, __func__, CE_CONT, __VA_ARGS__)
 #define	QL_DUMP_8(bp, wdsize, count) \
 	ql_dump_buffer((uint8_t *)bp, (uint8_t)wdsize, (uint32_t)count)
 #else
@@ -182,7 +181,7 @@ void ql_dump_el_trace_buffer(ql_adapter_state_t *);
 #endif
 
 #if QL_DEBUG & 0x104
-#define	QL_PRINT_9(ce, ...)	ql_dbg_msg(__func__, ce, __VA_ARGS__)
+#define	QL_PRINT_9(ha, ...)	ql_dbg_msg(ha, __func__, CE_CONT, __VA_ARGS__)
 #define	QL_DUMP_9(bp, wdsize, count) \
 	ql_dump_buffer((uint8_t *)bp, (uint8_t)wdsize, (uint32_t)count)
 #else
@@ -192,7 +191,7 @@ void ql_dump_el_trace_buffer(ql_adapter_state_t *);
 
 #if QL_DEBUG & 0x200
 #define	QL_DEBUG_LEVEL_10
-#define	QL_PRINT_10(ce, ...)	ql_dbg_msg(__func__, ce, __VA_ARGS__)
+#define	QL_PRINT_10(ha, ...)	ql_dbg_msg(ha, __func__, CE_CONT, __VA_ARGS__)
 #define	QL_DUMP_10(bp, wdsize, count) \
 	ql_dump_buffer((uint8_t *)bp, (uint8_t)wdsize, (uint32_t)count)
 #else
@@ -202,7 +201,7 @@ void ql_dump_el_trace_buffer(ql_adapter_state_t *);
 
 #if QL_DEBUG & 0x400
 #define	QL_DEBUG_LEVEL_11
-#define	QL_PRINT_11(ce, ...)	ql_dbg_msg(__func__, ce, __VA_ARGS__)
+#define	QL_PRINT_11(ha, ...)	ql_dbg_msg(ha, __func__, CE_CONT, __VA_ARGS__)
 #define	QL_DUMP_11(bp, wdsize, count) \
 	ql_dump_buffer((uint8_t *)bp, (uint8_t)wdsize, (uint32_t)count)
 #else
@@ -212,7 +211,7 @@ void ql_dump_el_trace_buffer(ql_adapter_state_t *);
 
 #if QL_DEBUG & 0x800
 #define	QL_DEBUG_LEVEL_12
-#define	QL_PRINT_12(ce, ...)	ql_dbg_msg(__func__, ce, __VA_ARGS__)
+#define	QL_PRINT_12(ha, ...)	ql_dbg_msg(ha, __func__, CE_CONT, __VA_ARGS__)
 #define	QL_DUMP_12(bp, wdsize, count) \
 	ql_dump_buffer((uint8_t *)bp, (uint8_t)wdsize, (uint32_t)count)
 #else
@@ -222,7 +221,7 @@ void ql_dump_el_trace_buffer(ql_adapter_state_t *);
 
 #if QL_DEBUG & 0x1000
 #define	QL_DEBUG_LEVEL_13
-#define	QL_PRINT_13(ce, ...)	ql_dbg_msg(__func__, ce, __VA_ARGS__)
+#define	QL_PRINT_13(ha, ...)	ql_dbg_msg(ha, __func__, CE_CONT, __VA_ARGS__)
 #define	QL_DUMP_13(bp, wdsize, count) \
 	ql_dump_buffer((uint8_t *)bp, (uint8_t)wdsize, (uint32_t)count)
 #else
@@ -232,7 +231,7 @@ void ql_dump_el_trace_buffer(ql_adapter_state_t *);
 
 #if QL_DEBUG & 0x2000
 #define	QL_DEBUG_LEVEL_14
-#define	QL_PRINT_14(ce, ...)	ql_dbg_msg(__func__, ce, __VA_ARGS__)
+#define	QL_PRINT_14(ha, ...)	ql_dbg_msg(ha, __func__, CE_CONT, __VA_ARGS__)
 #define	QL_DUMP_14(bp, wdsize, count) \
 	ql_dump_buffer((uint8_t *)bp, (uint8_t)wdsize, (uint32_t)count)
 #else
@@ -242,7 +241,7 @@ void ql_dump_el_trace_buffer(ql_adapter_state_t *);
 
 #if QL_DEBUG & 0x4000
 #define	QL_DEBUG_LEVEL_15
-#define	QL_PRINT_15(ce, ...)	ql_dbg_msg(__func__, ce, __VA_ARGS__)
+#define	QL_PRINT_15(ha, ...)	ql_dbg_msg(ha, __func__, CE_CONT, __VA_ARGS__)
 #define	QL_DUMP_15(bp, wdsize, count) \
 	ql_dump_buffer((uint8_t *)bp, (uint8_t)wdsize, (uint32_t)count)
 #else
@@ -252,7 +251,7 @@ void ql_dump_el_trace_buffer(ql_adapter_state_t *);
 
 #if QL_DEBUG & 0x8000
 #define	QL_DEBUG_LEVEL_16
-#define	QL_PRINT_16(ce, ...)	ql_dbg_msg(__func__, ce, __VA_ARGS__)
+#define	QL_PRINT_16(ha, ...)	ql_dbg_msg(ha, __func__, CE_CONT, __VA_ARGS__)
 #define	QL_DUMP_16(bp, wdsize, count) \
 	ql_dump_buffer((uint8_t *)bp, (uint8_t)wdsize, (uint32_t)count)
 #else

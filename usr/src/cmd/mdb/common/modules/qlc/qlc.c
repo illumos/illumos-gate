@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 
-/* Copyright 2010 QLogic Corporation */
+/* Copyright 2015 QLogic Corporation */
 
 /*
  * ISP2xxx Solaris Fibre Channel Adapter (FCA) qlc mdb source file.
@@ -27,7 +27,7 @@
  * ***********************************************************************
  * *									**
  * *				NOTICE					**
- * *		COPYRIGHT (C) 1996-2010 QLOGIC CORPORATION		**
+ * *		COPYRIGHT (C) 1996-2015 QLOGIC CORPORATION		**
  * *			ALL RIGHTS RESERVED				**
  * *									**
  * ***********************************************************************
@@ -42,7 +42,6 @@
 #include <ql_apps.h>
 #include <ql_api.h>
 #include <ql_init.h>
-#include <ql_debug.h>
 
 /*
  * local prototypes
@@ -76,6 +75,10 @@ static int ql_25xx_dump_dcmd(ql_adapter_state_t *, uint_t, int,
     const mdb_arg_t *);
 static int ql_81xx_dump_dcmd(ql_adapter_state_t *, uint_t, int,
     const mdb_arg_t *);
+static int ql_8021_dump_dcmd(ql_adapter_state_t *, uint_t, int,
+    const mdb_arg_t *);
+static int ql_8300_dump_dcmd(ql_adapter_state_t *, uint_t, int,
+    const mdb_arg_t *);
 static void ql_elog_common(ql_adapter_state_t *, boolean_t);
 
 /*
@@ -92,18 +95,29 @@ int8_t *adapter_state_flags[] = {
 	"IP_INITIALIZED",
 	"MENLO_LOGIN_OPERATIONAL",
 	"ADAPTER_SUSPENDED",
-	"ADAPTER_TIMER_BUSY",
+	"FW_DUMP_NEEDED",
 	"PARITY_ERROR",
 	"FLASH_ERRLOG_MARKER",
 	"VP_ENABLED",
 	"FDISC_ENABLED",
-	"FUNCTION_1",
+	"MULTI_QUEUE",
 	"MPI_RESET_NEEDED",
+	"VP_ID_NOT_ACQUIRED",
+	"IDC_STALL_NEEDED",
+	"POLL_INTR",
+	"IDC_RESTART_NEEDED",
+	"IDC_ACK_NEEDED",
+	"LOOPBACK_ACTIVE",
+	"QUEUE_SHADOW_PTRS",
+	"NO_INTR_HANDSHAKE",
+	"COMP_THD_TERMINATE",
+	"DISABLE_NIC_FW_DMP",
+	"MULTI_CHIP_ADAPTER",
 	NULL
 };
 
 int8_t *adapter_config_flags[] = {
-	"ENABLE_HARD_ADDRESS",
+	"CTRL_27XX",
 	"ENABLE_64BIT_ADDRESSING",
 	"ENABLE_LIP_RESET",
 	"ENABLE_FULL_LIP_LOGIN",
@@ -111,12 +125,12 @@ int8_t *adapter_config_flags[] = {
 	"ENABLE_LINK_DOWN_REPORTING",
 	"DISABLE_EXTENDED_LOGGING_TRACE",
 	"ENABLE_FCP_2_SUPPORT",
-	"MULTI_CHIP_ADAPTER",
+	"CTRL_83XX",
 	"SBUS_CARD",
-	"CTRL_2300",
-	"CTRL_6322",
-	"CTRL_2200",
-	"CTRL_2422",
+	"CTRL_23XX",
+	"CTRL_63XX",
+	"CTRL_22XX",
+	"CTRL_24XX",
 	"CTRL_25XX",
 	"ENABLE_EXTENDED_LOGGING",
 	"DISABLE_RISC_CODE_LOAD",
@@ -130,10 +144,10 @@ int8_t *adapter_config_flags[] = {
 	"DUMP_LOOP_OFFLINE_TIMEOUT",
 	"ENABLE_FWEXTTRACE",
 	"ENABLE_FWFCETRACE",
-	"FW_MISMATCH",
+	"CTRL_80XX",
 	"CTRL_81XX",
-	"CTRL_8021",
-	"ENABLE_FAST_TIMEOUT",
+	"CTRL_82XX",
+	"FAST_TIMEOUT",
 	"LR_SUPPORT",
 	NULL
 };
@@ -149,8 +163,8 @@ int8_t *task_daemon_flags[] = {
 	"SUSPENDED_WAKEUP_FLG",
 	"FC_STATE_CHANGE",
 	"NEED_UNSOLICITED_BUFFERS",
-	"RESET_MARKER_NEEDED",
-	"RESET_ACTIVE",
+	"MARKER_NEEDED",
+	"MARKER_ACTIVE",
 	"ISP_ABORT_NEEDED",
 	"ABORT_ISP_ACTIVE",
 	"LOOP_RESYNC_NEEDED",
@@ -162,17 +176,17 @@ int8_t *task_daemon_flags[] = {
 	"STATE_ONLINE",
 	"ABORT_QUEUES_NEEDED",
 	"TASK_DAEMON_STALLED_FLG",
-	"TASK_THREAD_CALLED",
+	"SEND_PLOGI",
 	"FIRMWARE_UP",
-	"LIP_RESET_PENDING",
+	"IDC_POLL_NEEDED",
 	"FIRMWARE_LOADED",
 	"RSCN_UPDATE_NEEDED",
 	"HANDLE_PORT_BYPASS_CHANGE",
 	"PORT_RETRY_NEEDED",
 	"TASK_DAEMON_POWERING_DOWN",
 	"TD_IIDMA_NEEDED",
-	"SEND_PLOGI",
-	"IDC_EVENT",
+	"WATCHDOG_NEEDED",
+	"LED_BLINK",
 	NULL
 };
 
@@ -211,6 +225,7 @@ int8_t *qlsrb_flags[] = {
 	"SRB_UB_FREE_REQUESTED",
 	"SRB_UB_ACQUIRED",
 	"SRB_MS_PKT",
+	"SRB_ELS_PKT",
 	NULL
 };
 
@@ -228,6 +243,7 @@ int8_t *qltgt_flags[] = {
 	"TQF_NEED_AUTHENTICATION",
 	"TQF_PLOGI_PROGRS",
 	"TQF_IIDMA_NEEDED",
+	"TQF_LOGIN_NEEDED",
 	NULL
 };
 
@@ -272,7 +288,7 @@ qlclinks_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_ERR);
 	}
 
-	if (&ql_hba == NULL) {
+	if (ql_hba.first == NULL) {
 		mdb_warn("failed to read ql_hba structure -- is qlc loaded?");
 		return (DCMD_ERR);
 	}
@@ -447,7 +463,7 @@ qlcver_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 			mdb_printf("%x\t%-11s", fwt->fw_class, fwverptr);
 
-			if (&ql_hba == NULL) {
+			if (ql_hba.first == NULL) {
 				mdb_warn("failed to read ql_hba structure");
 				hbaptr = 0;
 			} else {
@@ -571,7 +587,7 @@ qlc_el_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_ERR);
 	}
 
-	if (&ql_hba == NULL) {
+	if (ql_hba.first == NULL) {
 		mdb_warn("failed to read ql_hba structure - is qlc loaded?");
 		return (DCMD_ERR);
 	}
@@ -755,7 +771,7 @@ qlc_osc_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		mdb_warn("failed to allocate space for srb_t\n");
 		return (DCMD_OK);
 	}
-	for (indx = 0; indx < MAX_OUTSTANDING_COMMANDS; indx++, qlosc += 8) {
+	for (indx = 0; indx < qlstate->osc_max_cnt; indx++, qlosc += 8) {
 		if (mdb_vread(&ptr1, 8, qlosc) == -1) {
 			mdb_warn("failed to read ptr1, indx=%d", indx);
 			break;
@@ -1605,7 +1621,6 @@ qlc_triggerdump_dcmd(uintptr_t addr, uint_t flags, int argc,
 	}
 
 	if (addr == NULL) {
-		char		*tptr;
 		uint32_t	instance;
 
 		if (argc == 0) {
@@ -1619,13 +1634,7 @@ qlc_triggerdump_dcmd(uintptr_t addr, uint_t flags, int argc,
 		 * find the specified instance in the ha list
 		 */
 
-		instance = (uint32_t)strtol(argv[1].a_un.a_str, &tptr, 16);
-		if (tptr == argv[1].a_un.a_str) {
-			mdb_printf("instance # is illegal: '%s'\n",
-			    argv[1].a_un.a_str);
-			mdb_free(qlstate, qlsize);
-			return (DCMD_OK);
-		}
+		instance = (uint32_t)mdb_strtoull(argv[1].a_un.a_str);
 
 		if (mdb_readvar(&ql_hba, "ql_hba") == -1) {
 			mdb_warn("failed to read ql_hba structure");
@@ -1763,7 +1772,7 @@ qlc_getdump_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	 */
 	if (mdb_readvar(&ql_hba, "ql_hba") == -1) {
 		mdb_warn("failed to read ql_hba structure");
-	} else if (&ql_hba == NULL) {
+	} else if (ql_hba.first == NULL) {
 		mdb_warn("failed to read ql_hba structure -- is qlc loaded?");
 	} else if (verbose) {
 		hbaptr = (uintptr_t)ql_hba.first;
@@ -1819,17 +1828,569 @@ qlc_getdump_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_OK);
 	}
 
-	if (CFG_IST(ha, CFG_CTRL_2422)) {
+	if (CFG_IST(ha, CFG_CTRL_24XX)) {
 		(void) ql_24xx_dump_dcmd(ha, flags, argc, argv);
-	} else if (CFG_IST(ha, CFG_CTRL_25XX))  {
+	} else if (CFG_IST(ha, CFG_CTRL_25XX)) {
 		(void) ql_25xx_dump_dcmd(ha, flags, argc, argv);
-	} else if (CFG_IST(ha, CFG_CTRL_81XX))  {
+	} else if (CFG_IST(ha, CFG_CTRL_81XX)) {
 		(void) ql_81xx_dump_dcmd(ha, flags, argc, argv);
-	} else if (!(CFG_IST(ha, CFG_CTRL_8021)))  {
+	} else if (CFG_IST(ha, CFG_CTRL_82XX | CFG_CTRL_27XX)) {
+		(void) ql_8021_dump_dcmd(ha, flags, argc, argv);
+	} else if (CFG_IST(ha, CFG_CTRL_83XX)) {
+		(void) ql_8300_dump_dcmd(ha, flags, argc, argv);
+	} else {
 		(void) ql_23xx_dump_dcmd(ha, flags, argc, argv);
 	}
 
 	mdb_free(ha, sizeof (ql_adapter_state_t));
+
+	return (DCMD_OK);
+}
+
+/*
+ * ql_8021_dump_dcmd
+ *	prints out a firmware dump buffer
+ *
+ * Input:
+ *	addr  = User supplied address. (NB: nust be an ha)
+ *	flags = mdb flags.
+ *	argc  = Number of user supplied args.
+ *	argv  = Arg array.
+ *
+ * Returns:
+ *	DCMD_OK or DCMD_ERR
+ *
+ * Context:
+ *	User context.
+ *
+ */
+/*ARGSUSED*/
+static int
+ql_8021_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
+    const mdb_arg_t *argv)
+{
+	uint8_t		*fw, *bp;
+	uint32_t	cnt = 0;
+
+	bp = fw = (uint8_t *)mdb_alloc(ha->ql_dump_size, UM_SLEEP);
+
+	if (mdb_vread(fw, ha->ql_dump_size,
+	    (uintptr_t)ha->ql_dump_ptr) == -1) {
+		mdb_warn("failed to read ql_dump_ptr (no f/w dump active?)");
+		mdb_free(fw, ha->ql_dump_size);
+		return (DCMD_OK);
+	}
+
+	while (cnt < ha->ql_dump_size) {
+		mdb_printf("%02x ", *bp++);
+		if (++cnt % 16 == 0) {
+			mdb_printf("\n");
+		}
+	}
+	if (cnt % 16 != 0) {
+		mdb_printf("\n");
+	}
+
+	mdb_free(fw, ha->ql_dump_size);
+
+	return (DCMD_OK);
+}
+
+/*
+ * ql_83xx_dump_dcmd
+ *	prints out a firmware dump buffer
+ *
+ * Input:
+ *	addr  = User supplied address. (NB: must be an ha)
+ *	flags = mdb flags.
+ *	argc  = Number of user supplied args.
+ *	argv  = Arg array.
+ *
+ * Returns:
+ *	DCMD_OK or DCMD_ERR
+ *
+ * Context:
+ *	User context.
+ *
+ */
+/*ARGSUSED*/
+static int
+ql_8300_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
+    const mdb_arg_t *argv)
+{
+	ql_83xx_fw_dump_t	*fw;
+	ql_response_q_t		**rsp_queues, *rsp_q;
+	uint32_t		cnt, cnt1, *dp, *dp2;
+
+	fw = mdb_alloc(ha->ql_dump_size, UM_SLEEP);
+	rsp_queues = mdb_alloc(ha->rsp_queues_cnt *
+	    sizeof (ql_response_q_t *), UM_SLEEP);
+	rsp_q = mdb_alloc(sizeof (ql_response_q_t), UM_SLEEP);
+
+	if (mdb_vread(fw, ha->ql_dump_size,
+	    (uintptr_t)ha->ql_dump_ptr) == -1 ||
+	    mdb_vread(rsp_queues, ha->rsp_queues_cnt *
+	    sizeof (ql_response_q_t *), (uintptr_t)ha->rsp_queues) == -1) {
+		mdb_warn("failed to read fw_dump_buffer (no f/w dump active?)");
+		mdb_free(rsp_q, sizeof (ql_response_q_t));
+		mdb_free(rsp_queues, ha->rsp_queues_cnt *
+		    sizeof (ql_response_q_t *));
+		mdb_free(fw, ha->ql_dump_size);
+		return (DCMD_OK);
+	}
+
+	mdb_printf("\nISP FW Version %d.%02d.%02d Attributes %X\n",
+	    ha->fw_major_version, ha->fw_minor_version,
+	    ha->fw_subminor_version, ha->fw_attributes);
+
+	mdb_printf("\nHCCR Register\n%08x\n", fw->hccr);
+
+	mdb_printf("\nR2H Status Register\n%08x\n", fw->r2h_status);
+
+	mdb_printf("\nAER Uncorrectable Error Status Register\n%08x\n",
+	    fw->aer_ues);
+
+	mdb_printf("\nHostRisc Registers");
+	for (cnt = 0; cnt < sizeof (fw->hostrisc_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->hostrisc_reg[cnt]);
+	}
+
+	mdb_printf("\n\nPCIe Registers");
+	for (cnt = 0; cnt < sizeof (fw->pcie_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->pcie_reg[cnt]);
+	}
+
+	dp = fw->req_rsp_ext_mem;
+	for (cnt = 0; cnt < ha->rsp_queues_cnt; cnt++) {
+		mdb_printf("\n\nQueue Pointers #%d:\n", cnt);
+		for (cnt1 = 0; cnt1 < 4; cnt1++) {
+			mdb_printf("%08x ", *dp++);
+		}
+	}
+
+	mdb_printf("\n\nHost Interface Registers");
+	for (cnt = 0; cnt < sizeof (fw->host_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->host_reg[cnt]);
+	}
+
+	mdb_printf("\n\nShadow Registers");
+	for (cnt = 0; cnt < sizeof (fw->shadow_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->shadow_reg[cnt]);
+	}
+
+	mdb_printf("\n\nRISC IO Register\n%08x", fw->risc_io);
+
+	mdb_printf("\n\nMailbox Registers");
+	for (cnt = 0; cnt < sizeof (fw->mailbox_reg) / 2; cnt++) {
+		if (cnt % 16 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%04x ", fw->mailbox_reg[cnt]);
+	}
+
+	mdb_printf("\n\nXSEQ GP Registers");
+	for (cnt = 0; cnt < sizeof (fw->xseq_gp_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->xseq_gp_reg[cnt]);
+	}
+
+	mdb_printf("\n\nXSEQ-0 Registers");
+	for (cnt = 0; cnt < sizeof (fw->xseq_0_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->xseq_0_reg[cnt]);
+	}
+
+	mdb_printf("\n\nXSEQ-1 Registers");
+	for (cnt = 0; cnt < sizeof (fw->xseq_1_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->xseq_1_reg[cnt]);
+	}
+
+	mdb_printf("\n\nXSEQ-2 Registers");
+	for (cnt = 0; cnt < sizeof (fw->xseq_2_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->xseq_2_reg[cnt]);
+	}
+
+	mdb_printf("\n\nRSEQ GP Registers");
+	for (cnt = 0; cnt < sizeof (fw->rseq_gp_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->rseq_gp_reg[cnt]);
+	}
+
+	mdb_printf("\n\nRSEQ-0 Registers");
+	for (cnt = 0; cnt < sizeof (fw->rseq_0_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->rseq_0_reg[cnt]);
+	}
+
+	mdb_printf("\n\nRSEQ-1 Registers");
+	for (cnt = 0; cnt < sizeof (fw->rseq_1_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->rseq_1_reg[cnt]);
+	}
+
+	mdb_printf("\n\nRSEQ-2 Registers");
+	for (cnt = 0; cnt < sizeof (fw->rseq_2_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->rseq_2_reg[cnt]);
+	}
+
+	mdb_printf("\n\nRSEQ-3 Registers");
+	for (cnt = 0; cnt < sizeof (fw->rseq_3_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->rseq_3_reg[cnt]);
+	}
+
+	mdb_printf("\n\nASEQ GP Registers");
+	for (cnt = 0; cnt < sizeof (fw->aseq_gp_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->aseq_gp_reg[cnt]);
+	}
+
+	mdb_printf("\n\nASEQ-0 Registers");
+	for (cnt = 0; cnt < sizeof (fw->aseq_0_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->aseq_0_reg[cnt]);
+	}
+
+	mdb_printf("\n\nASEQ-1 Registers");
+	for (cnt = 0; cnt < sizeof (fw->aseq_1_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->aseq_1_reg[cnt]);
+	}
+
+	mdb_printf("\n\nASEQ-2 Registers");
+	for (cnt = 0; cnt < sizeof (fw->aseq_2_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->aseq_2_reg[cnt]);
+	}
+
+	mdb_printf("\n\nASEQ-3 Registers");
+	for (cnt = 0; cnt < sizeof (fw->aseq_3_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->aseq_3_reg[cnt]);
+	}
+
+	mdb_printf("\n\nCommand DMA Registers");
+	for (cnt = 0; cnt < sizeof (fw->cmd_dma_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->cmd_dma_reg[cnt]);
+	}
+
+	mdb_printf("\n\nRequest0 Queue DMA Channel Registers");
+	for (cnt = 0; cnt < sizeof (fw->req0_dma_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->req0_dma_reg[cnt]);
+	}
+
+	mdb_printf("\n\nResponse0 Queue DMA Channel Registers");
+	for (cnt = 0; cnt < sizeof (fw->resp0_dma_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->resp0_dma_reg[cnt]);
+	}
+
+	mdb_printf("\n\nRequest1 Queue DMA Channel Registers");
+	for (cnt = 0; cnt < sizeof (fw->req1_dma_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->req1_dma_reg[cnt]);
+	}
+
+	mdb_printf("\n\nXMT0 Data DMA Registers");
+	for (cnt = 0; cnt < sizeof (fw->xmt0_dma_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->xmt0_dma_reg[cnt]);
+	}
+
+	mdb_printf("\n\nXMT1 Data DMA Registers");
+	for (cnt = 0; cnt < sizeof (fw->xmt1_dma_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->xmt1_dma_reg[cnt]);
+	}
+
+	mdb_printf("\n\nXMT2 Data DMA Registers");
+	for (cnt = 0; cnt < sizeof (fw->xmt2_dma_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->xmt2_dma_reg[cnt]);
+	}
+
+	mdb_printf("\n\nXMT3 Data DMA Registers");
+	for (cnt = 0; cnt < sizeof (fw->xmt3_dma_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->xmt3_dma_reg[cnt]);
+	}
+
+	mdb_printf("\n\nXMT4 Data DMA Registers");
+	for (cnt = 0; cnt < sizeof (fw->xmt4_dma_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->xmt4_dma_reg[cnt]);
+	}
+
+	mdb_printf("\n\nXMT Data DMA Common Registers");
+	for (cnt = 0; cnt < sizeof (fw->xmt_data_dma_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->xmt_data_dma_reg[cnt]);
+	}
+
+	mdb_printf("\n\nRCV Thread 0 Data DMA Registers");
+	for (cnt = 0; cnt < sizeof (fw->rcvt0_data_dma_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->rcvt0_data_dma_reg[cnt]);
+	}
+
+	mdb_printf("\n\nRCV Thread 1 Data DMA Registers");
+	for (cnt = 0; cnt < sizeof (fw->rcvt1_data_dma_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->rcvt1_data_dma_reg[cnt]);
+	}
+
+	mdb_printf("\n\nRISC GP Registers");
+	for (cnt = 0; cnt < sizeof (fw->risc_gp_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->risc_gp_reg[cnt]);
+	}
+
+	mdb_printf("\n\nLMC Registers");
+	for (cnt = 0; cnt < sizeof (fw->lmc_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->lmc_reg[cnt]);
+	}
+
+	mdb_printf("\n\nFPM Hardware Registers");
+	for (cnt = 0; cnt < sizeof (fw->fpm_hdw_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->fpm_hdw_reg[cnt]);
+	}
+
+	mdb_printf("\n\nRQ0 Array Registers");
+	for (cnt = 0; cnt < sizeof (fw->rq0_array_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->rq0_array_reg[cnt]);
+	}
+
+	mdb_printf("\n\nRQ1 Array Registers");
+	for (cnt = 0; cnt < sizeof (fw->rq1_array_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->rq1_array_reg[cnt]);
+	}
+
+	mdb_printf("\n\nRP0 Array Registers");
+	for (cnt = 0; cnt < sizeof (fw->rp0_array_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->rp0_array_reg[cnt]);
+	}
+
+	mdb_printf("\n\nRP1 Array Registers");
+	for (cnt = 0; cnt < sizeof (fw->rp1_array_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->rp1_array_reg[cnt]);
+	}
+
+	mdb_printf("\n\nAT0 Array Registers");
+	for (cnt = 0; cnt < sizeof (fw->ato_array_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->ato_array_reg[cnt]);
+	}
+
+	mdb_printf("\n\nQueue Control Registers");
+	for (cnt = 0; cnt < sizeof (fw->queue_control_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->queue_control_reg[cnt]);
+	}
+
+	mdb_printf("\n\nFB Hardware Registers");
+	for (cnt = 0; cnt < sizeof (fw->fb_hdw_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->fb_hdw_reg[cnt]);
+	}
+
+	mdb_printf("\n\nCode RAM");
+	for (cnt = 0; cnt < sizeof (fw->code_ram) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n%08x: ", cnt + 0x20000);
+		}
+		mdb_printf("%08x ", fw->code_ram[cnt]);
+	}
+
+	mdb_printf("\n\nExternal Memory");
+	dp = (uint32_t *)(void *)((caddr_t)fw->req_rsp_ext_mem +
+	    fw->req_q_size[0] + fw->req_q_size[1] + fw->rsp_q_size +
+	    (ha->rsp_queues_cnt * 16));
+	for (cnt = 0; cnt < ha->fw_ext_memory_size / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n%08x: ", cnt + 0x100000);
+		}
+		mdb_printf("%08x ", *dp++);
+	}
+
+	mdb_printf("\n\n[<==END] ISP Debug Dump");
+
+	dp = fw->req_rsp_ext_mem + (ha->rsp_queues_cnt * 4);
+	for (cnt = 0; cnt < 2 && fw->req_q_size[cnt]; cnt++) {
+		dp2 = dp;
+		for (cnt1 = 0; cnt1 < fw->req_q_size[cnt] / 4; cnt1++) {
+			if (*dp2++) {
+				break;
+			}
+		}
+		if (cnt1 == fw->req_q_size[cnt] / 4) {
+			dp = dp2;
+			continue;
+		}
+		mdb_printf("\n\nRequest Queue\nQueue 0%d:", cnt);
+		for (cnt1 = 0; cnt1 < fw->req_q_size[cnt] / 4; cnt1++) {
+			if (cnt1 % 8 == 0) {
+				mdb_printf("\n%08x: ", cnt1);
+			}
+			mdb_printf("%08x ", *dp++);
+		}
+	}
+
+	for (cnt = 0; cnt < ha->rsp_queues_cnt; cnt++) {
+		if (mdb_vread(rsp_q, sizeof (ql_response_q_t),
+		    (uintptr_t)rsp_queues[cnt]) == -1) {
+			mdb_warn("failed to read ha->rsp_queues[%d]", cnt);
+			break;
+		}
+		dp2 = dp;
+		for (cnt1 = 0; cnt1 < rsp_q->rsp_ring.size / 4; cnt1++) {
+			if (*dp2++) {
+				break;
+			}
+		}
+		if (cnt1 == rsp_q->rsp_ring.size / 4) {
+			dp = dp2;
+			continue;
+		}
+		mdb_printf("\n\nResponse Queue\nQueue 0%d:", cnt);
+
+		for (cnt1 = 0; cnt1 < rsp_q->rsp_ring.size / 4; cnt1++) {
+			if (cnt1 % 8 == 0) {
+				mdb_printf("\n%08x: ", cnt1);
+			}
+			mdb_printf("%08x ", *dp++);
+		}
+	}
+
+	if (ha->fwexttracebuf.dma_handle != NULL) {
+		uint32_t	cnt_b;
+		uint32_t	*w32 = ha->fwexttracebuf.bp;
+
+		mdb_printf("\n\nExtended Trace Buffer Memory");
+		/* show data address as a byte address, data as long words */
+		for (cnt = 0; cnt < FWEXTSIZE / 4; cnt++) {
+			cnt_b = cnt * 4;
+			if (cnt_b % 32 == 0) {
+				mdb_printf("\n%08x: ", w32 + cnt_b);
+			}
+			mdb_printf("%08x ", fw->ext_trace_buf[cnt]);
+		}
+	}
+
+	if (ha->fwfcetracebuf.dma_handle != NULL) {
+		uint32_t	cnt_b;
+		uint32_t	*w32 = ha->fwfcetracebuf.bp;
+
+		mdb_printf("\n\nFC Event Trace Buffer Memory");
+		/* show data address as a byte address, data as long words */
+		for (cnt = 0; cnt < FWFCESIZE / 4; cnt++) {
+			cnt_b = cnt * 4;
+			if (cnt_b % 32 == 0) {
+				mdb_printf("\n%08x: ", w32 + cnt_b);
+			}
+			mdb_printf("%08x ", fw->fce_trace_buf[cnt]);
+		}
+	}
+
+	mdb_free(rsp_q, sizeof (ql_response_q_t));
+	mdb_free(rsp_queues, ha->rsp_queues_cnt * sizeof (ql_response_q_t *));
+	mdb_free(fw, ha->ql_dump_size);
+
+	mdb_printf("\n\nreturn exit\n");
 
 	return (DCMD_OK);
 }
@@ -1869,10 +2430,10 @@ ql_23xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 		return (DCMD_OK);
 	}
 
-	if (ha->cfg_flags & CFG_CTRL_2300) {
+	if (ha->cfg_flags & CFG_CTRL_23XX) {
 		mdb_printf("\nISP 2300IP ");
-	} else if (ha->cfg_flags & CFG_CTRL_6322) {
-		mdb_printf("\nISP 6322FLX ");
+	} else if (ha->cfg_flags & CFG_CTRL_63XX) {
+		mdb_printf("\nISP 2322/6322FLX ");
 	} else {
 		mdb_printf("\nISP 2200IP ");
 	}
@@ -1889,7 +2450,7 @@ ql_23xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 		mdb_printf("%04x  ", fw->pbiu_reg[cnt]);
 	}
 
-	if (ha->cfg_flags & (CFG_CTRL_2300 | CFG_CTRL_6322)) {
+	if (ha->cfg_flags & CFG_CTRL_2363) {
 		mdb_printf("\n\nReqQ-RspQ-Risc2Host Status registers:");
 		for (cnt = 0; cnt < sizeof (fw->risc_host_reg) / 2; cnt++) {
 			if (cnt % 8 == 0) {
@@ -1900,7 +2461,7 @@ ql_23xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 	}
 
 	mdb_printf("\n\nMailbox Registers:");
-	mbox_cnt = (ha->cfg_flags & (CFG_CTRL_2300 | CFG_CTRL_6322)) ? 16 : 8;
+	mbox_cnt = ha->cfg_flags & CFG_CTRL_2363 ? 16 : 8;
 	for (cnt = 0; cnt < mbox_cnt; cnt++) {
 		if (cnt % 8 == 0) {
 			mdb_printf("\n");
@@ -1908,7 +2469,7 @@ ql_23xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 		mdb_printf("%04x  ", fw->mailbox_reg[cnt]);
 	}
 
-	if (ha->cfg_flags & (CFG_CTRL_2300 | CFG_CTRL_6322)) {
+	if (ha->cfg_flags & CFG_CTRL_2363) {
 		mdb_printf("\n\nAuto Request Response DMA Registers:");
 		for (cnt = 0; cnt < sizeof (fw->resp_dma_reg) / 2; cnt++) {
 			if (cnt % 8 == 0) {
@@ -2001,7 +2562,7 @@ ql_23xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 	mdb_printf("\n\nFrame Buffer Hardware Registers:");
 	for (cnt = 0; cnt < sizeof (fw->frame_buf_hdw_reg) / 2; cnt++) {
 		if ((cnt == 16) &&
-		    ((ha->cfg_flags & (CFG_CTRL_2300 | CFG_CTRL_6322)) == 0)) {
+		    ((ha->cfg_flags & CFG_CTRL_2363) == 0)) {
 			break;
 		}
 		if (cnt % 8 == 0) {
@@ -2026,7 +2587,7 @@ ql_23xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 		mdb_printf("%04x  ", fw->fpm_b1_reg[cnt]);
 	}
 
-	if (ha->cfg_flags & (CFG_CTRL_2300 | CFG_CTRL_6322)) {
+	if (ha->cfg_flags & CFG_CTRL_2363) {
 		mdb_printf("\n\nCode RAM Dump:");
 		for (cnt = 0; cnt < sizeof (fw->risc_ram) / 2; cnt++) {
 			if (cnt % 8 == 0) {
@@ -2431,13 +2992,22 @@ ql_25xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
     const mdb_arg_t *argv)
 {
 	ql_25xx_fw_dump_t	*fw;
-	uint32_t		cnt = 0;
+	ql_response_q_t		**rsp_queues, *rsp_q;
+	uint32_t		cnt, cnt1, *dp, *dp2;
 
 	fw = (ql_25xx_fw_dump_t *)mdb_alloc(ha->ql_dump_size, UM_SLEEP);
+	rsp_queues = mdb_alloc(ha->rsp_queues_cnt *
+	    sizeof (ql_response_q_t *), UM_SLEEP);
+	rsp_q = mdb_alloc(sizeof (ql_response_q_t), UM_SLEEP);
 
 	if (mdb_vread(fw, ha->ql_dump_size,
-	    (uintptr_t)ha->ql_dump_ptr) == -1) {
+	    (uintptr_t)ha->ql_dump_ptr) == -1 ||
+	    mdb_vread(rsp_queues, ha->rsp_queues_cnt *
+	    sizeof (ql_response_q_t *), (uintptr_t)ha->rsp_queues) == -1) {
 		mdb_warn("failed to read ql_dump_ptr (no f/w dump active?)");
+		mdb_free(rsp_q, sizeof (ql_response_q_t));
+		mdb_free(rsp_queues, ha->rsp_queues_cnt *
+		    sizeof (ql_response_q_t *));
 		mdb_free(fw, ha->ql_dump_size);
 		return (DCMD_OK);
 	}
@@ -2446,7 +3016,10 @@ ql_25xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 	    ha->fw_major_version, ha->fw_minor_version,
 	    ha->fw_subminor_version, ha->fw_attributes);
 
+	mdb_printf("\nHCCR Register\n%08x\n", fw->hccr);
 	mdb_printf("\nR2H Register\n%08x\n", fw->r2h_status);
+	mdb_printf("\nAER Uncorrectable Error Status Register\n%08x\n",
+	    fw->aer_ues);
 
 	mdb_printf("\n\nHostRisc Registers");
 	for (cnt = 0; cnt < sizeof (fw->hostrisc_reg) / 4; cnt++) {
@@ -2718,31 +3291,65 @@ ql_25xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 	}
 
 	mdb_printf("\n\nExternal Memory");
+	dp = (uint32_t *)(void *)((caddr_t)fw->req_rsp_ext_mem +
+	    fw->req_q_size[0] + fw->req_q_size[1] + fw->rsp_q_size +
+	    (ha->rsp_queues_cnt * 16));
 	for (cnt = 0; cnt < ha->fw_ext_memory_size / 4; cnt++) {
 		if (cnt % 8 == 0) {
 			mdb_printf("\n%08x: ", cnt + 0x100000);
 		}
-		mdb_printf("%08x ", fw->ext_mem[cnt]);
+		mdb_printf("%08x ", *dp++);
 	}
 
 	mdb_printf("\n[<==END] ISP Debug Dump");
 
 	mdb_printf("\n\nRequest Queue");
 
-	for (cnt = 0; cnt < REQUEST_QUEUE_SIZE / 4; cnt++) {
-		if (cnt % 8 == 0) {
-			mdb_printf("\n%08x: ", cnt);
+	dp = fw->req_rsp_ext_mem + (ha->rsp_queues_cnt * 4);
+	for (cnt = 0; cnt < 2 && fw->req_q_size[cnt]; cnt++) {
+		dp2 = dp;
+		for (cnt1 = 0; cnt1 < fw->req_q_size[cnt] / 4; cnt1++) {
+			if (*dp2++) {
+				break;
+			}
 		}
-		mdb_printf("%08x ", fw->req_q[cnt]);
+		if (cnt1 == fw->req_q_size[cnt] / 4) {
+			dp = dp2;
+			continue;
+		}
+		mdb_printf("\n\nRequest Queue\nQueue 0%d:", cnt);
+		for (cnt1 = 0; cnt1 < fw->req_q_size[cnt] / 4; cnt1++) {
+			if (cnt1 % 8 == 0) {
+				mdb_printf("\n%08x: ", cnt1);
+			}
+			mdb_printf("%08x ", *dp++);
+		}
 	}
 
-	mdb_printf("\n\nResponse Queue");
-
-	for (cnt = 0; cnt < RESPONSE_QUEUE_SIZE / 4; cnt++) {
-		if (cnt % 8 == 0) {
-			mdb_printf("\n%08x: ", cnt);
+	for (cnt = 0; cnt < ha->rsp_queues_cnt; cnt++) {
+		if (mdb_vread(rsp_q, sizeof (ql_response_q_t),
+		    (uintptr_t)rsp_queues[cnt]) == -1) {
+			mdb_warn("failed to read ha->rsp_queues[%d]", cnt);
+			break;
 		}
-		mdb_printf("%08x ", fw->rsp_q[cnt]);
+		dp2 = dp;
+		for (cnt1 = 0; cnt1 < rsp_q->rsp_ring.size / 4; cnt1++) {
+			if (*dp2++) {
+				break;
+			}
+		}
+		if (cnt1 == rsp_q->rsp_ring.size / 4) {
+			dp = dp2;
+			continue;
+		}
+		mdb_printf("\n\nResponse Queue\nQueue 0%d:", cnt);
+
+		for (cnt1 = 0; cnt1 < rsp_q->rsp_ring.size / 4; cnt1++) {
+			if (cnt1 % 8 == 0) {
+				mdb_printf("\n%08x: ", cnt1);
+			}
+			mdb_printf("%08x ", *dp++);
+		}
 	}
 
 	if ((ha->cfg_flags & CFG_ENABLE_FWEXTTRACE) &&
@@ -2777,6 +3384,8 @@ ql_25xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 		}
 	}
 
+	mdb_free(rsp_q, sizeof (ql_response_q_t));
+	mdb_free(rsp_queues, ha->rsp_queues_cnt * sizeof (ql_response_q_t *));
 	mdb_free(fw, ha->ql_dump_size);
 
 	mdb_printf("\n\nreturn exit\n");
@@ -2807,13 +3416,22 @@ ql_81xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
     const mdb_arg_t *argv)
 {
 	ql_81xx_fw_dump_t	*fw;
-	uint32_t		cnt = 0;
+	ql_response_q_t		**rsp_queues, *rsp_q;
+	uint32_t		cnt, cnt1, *dp, *dp2;
 
 	fw = (ql_81xx_fw_dump_t *)mdb_alloc(ha->ql_dump_size, UM_SLEEP);
+	rsp_queues = mdb_alloc(ha->rsp_queues_cnt *
+	    sizeof (ql_response_q_t *), UM_SLEEP);
+	rsp_q = mdb_alloc(sizeof (ql_response_q_t), UM_SLEEP);
 
 	if (mdb_vread(fw, ha->ql_dump_size,
-	    (uintptr_t)ha->ql_dump_ptr) == -1) {
+	    (uintptr_t)ha->ql_dump_ptr) == -1 ||
+	    mdb_vread(rsp_queues, ha->rsp_queues_cnt *
+	    sizeof (ql_response_q_t *), (uintptr_t)ha->rsp_queues) == -1) {
 		mdb_warn("failed to read ql_dump_ptr (no f/w dump active?)");
+		mdb_free(rsp_q, sizeof (ql_response_q_t));
+		mdb_free(rsp_queues, ha->rsp_queues_cnt *
+		    sizeof (ql_response_q_t *));
 		mdb_free(fw, ha->ql_dump_size);
 		return (DCMD_OK);
 	}
@@ -2822,7 +3440,12 @@ ql_81xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 	    ha->fw_major_version, ha->fw_minor_version,
 	    ha->fw_subminor_version, ha->fw_attributes);
 
+	mdb_printf("\nHCCR Register\n%08x\n", fw->hccr);
+
 	mdb_printf("\nR2H Register\n%08x\n", fw->r2h_status);
+
+	mdb_printf("\nAER Uncorrectable Error Status Register\n%08x\n",
+	    fw->aer_ues);
 
 	mdb_printf("\n\nHostRisc Registers");
 	for (cnt = 0; cnt < sizeof (fw->hostrisc_reg) / 4; cnt++) {
@@ -3094,31 +3717,65 @@ ql_81xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 	}
 
 	mdb_printf("\n\nExternal Memory");
+	dp = (uint32_t *)(void *)((caddr_t)fw->req_rsp_ext_mem +
+	    fw->req_q_size[0] + fw->req_q_size[1] + fw->rsp_q_size +
+	    (ha->rsp_queues_cnt * 16));
 	for (cnt = 0; cnt < ha->fw_ext_memory_size / 4; cnt++) {
 		if (cnt % 8 == 0) {
 			mdb_printf("\n%08x: ", cnt + 0x100000);
 		}
-		mdb_printf("%08x ", fw->ext_mem[cnt]);
+		mdb_printf("%08x ", *dp++);
 	}
 
 	mdb_printf("\n[<==END] ISP Debug Dump");
 
 	mdb_printf("\n\nRequest Queue");
 
-	for (cnt = 0; cnt < REQUEST_QUEUE_SIZE / 4; cnt++) {
-		if (cnt % 8 == 0) {
-			mdb_printf("\n%08x: ", cnt);
+	dp = fw->req_rsp_ext_mem + (ha->rsp_queues_cnt * 4);
+	for (cnt = 0; cnt < 2 && fw->req_q_size[cnt]; cnt++) {
+		dp2 = dp;
+		for (cnt1 = 0; cnt1 < fw->req_q_size[cnt] / 4; cnt1++) {
+			if (*dp2++) {
+				break;
+			}
 		}
-		mdb_printf("%08x ", fw->req_q[cnt]);
+		if (cnt1 == fw->req_q_size[cnt] / 4) {
+			dp = dp2;
+			continue;
+		}
+		mdb_printf("\n\nRequest Queue\nQueue 0%d:", cnt);
+		for (cnt1 = 0; cnt1 < fw->req_q_size[cnt] / 4; cnt1++) {
+			if (cnt1 % 8 == 0) {
+				mdb_printf("\n%08x: ", cnt1);
+			}
+			mdb_printf("%08x ", *dp++);
+		}
 	}
 
-	mdb_printf("\n\nResponse Queue");
-
-	for (cnt = 0; cnt < RESPONSE_QUEUE_SIZE / 4; cnt++) {
-		if (cnt % 8 == 0) {
-			mdb_printf("\n%08x: ", cnt);
+	for (cnt = 0; cnt < ha->rsp_queues_cnt; cnt++) {
+		if (mdb_vread(rsp_q, sizeof (ql_response_q_t),
+		    (uintptr_t)rsp_queues[cnt]) == -1) {
+			mdb_warn("failed to read ha->rsp_queues[%d]", cnt);
+			break;
 		}
-		mdb_printf("%08x ", fw->rsp_q[cnt]);
+		dp2 = dp;
+		for (cnt1 = 0; cnt1 < rsp_q->rsp_ring.size / 4; cnt1++) {
+			if (*dp2++) {
+				break;
+			}
+		}
+		if (cnt1 == rsp_q->rsp_ring.size / 4) {
+			dp = dp2;
+			continue;
+		}
+		mdb_printf("\n\nResponse Queue\nQueue 0%d:", cnt);
+
+		for (cnt1 = 0; cnt1 < rsp_q->rsp_ring.size / 4; cnt1++) {
+			if (cnt1 % 8 == 0) {
+				mdb_printf("\n%08x: ", cnt1);
+			}
+			mdb_printf("%08x ", *dp++);
+		}
 	}
 
 	if ((ha->cfg_flags & CFG_ENABLE_FWEXTTRACE) &&
@@ -3153,6 +3810,8 @@ ql_81xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 		}
 	}
 
+	mdb_free(rsp_q, sizeof (ql_response_q_t));
+	mdb_free(rsp_queues, ha->rsp_queues_cnt * sizeof (ql_response_q_t *));
 	mdb_free(fw, ha->ql_dump_size);
 
 	mdb_printf("\n\nreturn exit\n");
@@ -3181,22 +3840,21 @@ static int
 qlc_gettrace_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	ql_adapter_state_t	*ha;
-	int			verbose = 0;
-	int			wrapped = 0;
-	char			*trace_start;
-	char			*trace_end;
-	char			*dump_start = 0;
-	char			*trace_next  = 0;
-	char			*dump_current  = 0;
-	el_trace_desc_t		*trace_desc;
+	ql_trace_desc_t		*trace_desc;
+	ql_trace_entry_t	entry;
+	uint32_t		i = 0;
+	char			merge[1024];
 
 	if ((!(flags & DCMD_ADDRSPEC)) || addr == 0) {
 		mdb_warn("ql_adapter_state structure addr is required");
 		return (DCMD_USAGE);
 	}
 
-	if (mdb_getopts(argc, argv, 'v', MDB_OPT_SETBITS, TRUE, &verbose,
-	    NULL) != argc) {
+	if (argc != 0) {
+		return (DCMD_USAGE);
+	}
+
+	if (mdb_getopts(argc, argv, NULL) != argc) {
 		return (DCMD_USAGE);
 	}
 
@@ -3215,105 +3873,101 @@ qlc_gettrace_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_OK);
 	}
 
-	/*
-	 * If its not a valid trace descriptor then bail out
-	 */
-	if (ha->el_trace_desc == NULL) {
+	if (ha->ql_trace_desc == NULL) {
 		mdb_warn("trace descriptor does not exist for instance %d\n",
 		    ha->instance);
 		mdb_free(ha, sizeof (ql_adapter_state_t));
 		return (DCMD_OK);
+
 	} else {
-		trace_desc = (el_trace_desc_t *)
-		    mdb_alloc(sizeof (el_trace_desc_t), UM_SLEEP);
-		if (mdb_vread(trace_desc, sizeof (el_trace_desc_t),
-		    (uintptr_t)ha->el_trace_desc) == -1) {
+		trace_desc = (ql_trace_desc_t *)
+		    mdb_alloc(sizeof (ql_trace_desc_t), UM_SLEEP);
+
+		if (mdb_vread(trace_desc, sizeof (ql_trace_desc_t),
+		    (uintptr_t)ha->ql_trace_desc) == -1) {
 			mdb_warn("failed to read ql_adapter_state at %p",
 			    addr);
-			mdb_free(trace_desc, sizeof (el_trace_desc_t));
+			mdb_free(trace_desc, sizeof (ql_trace_desc_t));
 			mdb_free(ha, sizeof (ql_adapter_state_t));
 			return (DCMD_OK);
 		}
+
 		if (trace_desc->trace_buffer == NULL) {
 			mdb_warn("trace buffer does not exist for "
 			    "instance %d\n", ha->instance);
-			mdb_free(trace_desc, sizeof (el_trace_desc_t));
+
+			mdb_free(trace_desc, sizeof (ql_trace_desc_t));
 			mdb_free(ha, sizeof (ql_adapter_state_t));
 			return (DCMD_OK);
 		}
 	}
 
-	/* Get the trace buffer */
-
-	trace_start = (char *)
-	    mdb_zalloc(trace_desc->trace_buffer_size, UM_SLEEP);
-
-	if (mdb_vread(trace_start, trace_desc->trace_buffer_size,
-	    (uintptr_t)trace_desc->trace_buffer) == -1) {
-		mdb_warn("failed to read trace buffer?)");
-		mdb_free(trace_start, trace_desc->trace_buffer_size);
+	/* Check if anything logged or not */
+	if (trace_desc->csize == 0) {
+		mdb_warn("Extended log buffer is empty.\n");
+		mdb_free(trace_desc, sizeof (ql_trace_desc_t));
 		mdb_free(ha, sizeof (ql_adapter_state_t));
 		return (DCMD_OK);
 	}
 
-	/* set the end of the trace buffer. */
-	trace_end = trace_start + trace_desc->trace_buffer_size;
-
-	/* Find the start point of trace. */
-	trace_next = trace_start + trace_desc->next;
-
 	/*
-	 * If the buffer has not wrapped next will point at a null so
-	 * start is the begining of the buffer.  If next points at a char
-	 * then we must traverse the buffer further until a null is detected.
-	 * The location after the null will be the beginning of the oldest
-	 * whole object in the buffer, which we use as the start.
+	 * Locate the start and end point. If ever wrapped, then
+	 * always print from start to end in the circular buffer
 	 */
 
-	if ((trace_next + EL_BUFFER_RESERVE) >= trace_end) {
-		dump_start = trace_start;
-	} else if (*trace_next != '\0') {
-		dump_start = trace_next + (strlen(trace_next) + 1);
-	} else {
-		dump_start = trace_start;
+	/* always print from start to end */
+	for (i = trace_desc->start; i < trace_desc->csize; i++) {
+		if (mdb_vread(&entry, sizeof (ql_trace_entry_t),
+		    (uintptr_t)&trace_desc->trace_buffer[i]) !=
+		    sizeof (ql_trace_entry_t)) {
+			mdb_warn("Cannot read trace entry. %xh", i);
+			mdb_free(trace_desc, sizeof (ql_trace_desc_t));
+			mdb_free(ha, sizeof (ql_adapter_state_t));
+			return (DCMD_ERR);
+		}
+		if (entry.buf[0] != '\0') {
+			(void) mdb_snprintf(merge, sizeof (merge),
+			    "[%Y:%03d:%03d:%03d] "
+			    "%s",
+			    entry.hs_time.tv_sec,
+			    (int)entry.hs_time.tv_nsec / 1000000,
+			    (int)(entry.hs_time.tv_nsec / 1000) % 1000,
+			    (int)entry.hs_time.tv_nsec % 1000,
+			    entry.buf + 1);
+		}
+		mdb_printf("%s", merge);
 	}
 
-	dump_current = dump_start;
-
-	mdb_printf("\nExtended Logging trace buffer @%x, start @%x, "
-	    "size=%d\n\n", trace_start, dump_current,
-	    trace_desc->trace_buffer_size);
-
-	/* Don't run off the end, no matter what. */
-	while (((uintptr_t)dump_current - (uintptr_t)trace_start) <=
-	    (uintptr_t)trace_desc->trace_buffer_size) {
-		/* Show it... */
-		mdb_printf("%s", dump_current);
-		/* Calculate the next and make it the current */
-		dump_current += (strlen(dump_current) + 1);
-		/* check for wrap */
-		if ((dump_current + EL_BUFFER_RESERVE) >= trace_end) {
-			mdb_printf("Wraping %x\n", dump_current);
-			dump_current = trace_start;
-			wrapped = 1;
-		} else if (wrapped) {
-			/*   Don't go past next. */
-			if ((trace_start + trace_desc->next) <= dump_current) {
-				mdb_printf("Done %x", dump_current);
-				break;
+	if (trace_desc->start != 0) {
+		for (i = 0; i < trace_desc->start; i++) {
+			if (mdb_vread(&entry, sizeof (ql_trace_entry_t),
+			    (uintptr_t)&trace_desc->trace_buffer[i]) !=
+			    sizeof (ql_trace_entry_t)) {
+				mdb_warn("Cannot read trace entry. %xh", i);
+				mdb_free(trace_desc, sizeof (ql_trace_desc_t));
+				mdb_free(ha, sizeof (ql_adapter_state_t));
+				return (DCMD_ERR);
 			}
-		} else if (*dump_current == '\0') {
-			mdb_printf("Done %x(null)", dump_current);
-			break;
+			if (entry.buf[0] != '\0') {
+				(void) mdb_snprintf(merge, sizeof (merge),
+				    "[%Y:%03d:%03d:%03d] "
+				    "%s",
+				    entry.hs_time.tv_sec,
+				    (int)entry.hs_time.tv_nsec / 1000000,
+				    (int)(entry.hs_time.tv_nsec / 1000) % 1000,
+				    (int)entry.hs_time.tv_nsec % 1000,
+				    entry.buf + 1);
+			}
+			mdb_printf("%s", merge);
 		}
 	}
 
+	mdb_printf("\n");
+	mdb_free(trace_desc, sizeof (ql_trace_desc_t));
 	mdb_free(ha, sizeof (ql_adapter_state_t));
-	mdb_free(trace_start, trace_desc->trace_buffer_size);
-	mdb_free(trace_desc, sizeof (el_trace_desc_t));
-
 	return (DCMD_OK);
 }
+
 /*
  * ql_doprint
  *	ql generic function to call the print dcmd
@@ -3411,7 +4065,7 @@ static const mdb_dcmd_t dcmds[] = {
 	{ "qlcwdog", NULL, "Prints out watchdog linked list", qlc_wdog_dcmd},
 	{ "qlcgetdump", ":[-v]", "Retrieves the ASCII f/w dump",
 	    qlc_getdump_dcmd },
-	{ "qlcgettrace", ":[-v]", "Retrieves the ASCII Extended Logging trace",
+	{ "qlcgettrace", ":", "Retrieves the ASCII Extended Logging trace",
 	    qlc_gettrace_dcmd },
 	{ NULL }
 };

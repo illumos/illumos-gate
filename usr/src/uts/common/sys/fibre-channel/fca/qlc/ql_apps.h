@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 
-/* Copyright 2009 QLogic Corporation */
+/* Copyright 2015 QLogic Corporation */
 
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
@@ -35,7 +35,7 @@
  * ***********************************************************************
  * *									**
  * *				NOTICE					**
- * *		COPYRIGHT (C) 1996-2009 QLOGIC CORPORATION		**
+ * *		COPYRIGHT (C) 1996-2015 QLOGIC CORPORATION		**
  * *			ALL RIGHTS RESERVED				**
  * *									**
  * ***********************************************************************
@@ -113,23 +113,23 @@ typedef struct app_mbx_cmd {
  */
 #ifndef apps_64bit
 typedef struct lbp {
-	uint16_t  options;
-	uint32_t  transfer_count;
-	uint16_t  transfer_segment_count;
-	uint16_t  receive_segment_count;
-	uint32_t  transfer_data_address;
-	uint32_t  receive_data_address;
-	uint32_t  iteration_count;
+	uint16_t	options;
+	uint32_t	transfer_count;
+	uint16_t	transfer_segment_count;
+	uint16_t	receive_segment_count;
+	uint32_t	transfer_data_address;
+	uint32_t	receive_data_address;
+	uint32_t	iteration_count;
 } lbp_t;
 #else
 typedef struct lbp {
-	uint16_t  options;
-	uint32_t  transfer_count;
-	uint16_t  transfer_segment_count;
-	uint16_t  receive_segment_count;
-	uint64_t  transfer_data_address;
-	uint64_t  receive_data_address;
-	uint32_t  iteration_count;
+	uint16_t	options;
+	uint32_t	transfer_count;
+	uint16_t	transfer_segment_count;
+	uint16_t	receive_segment_count;
+	uint64_t	transfer_data_address;
+	uint64_t	receive_data_address;
+	uint32_t	iteration_count;
 } lbp_t;
 #endif
 
@@ -178,12 +178,15 @@ typedef struct lbp {
  *		qladm utility
  *		qlctest utility
  */
-typedef enum ql_adm_cmd  {
+typedef enum ql_adm_cmd {
 	QL_EXTENDED_LOGGING,
 	QL_ADAPTER_INFO,
 	QL_DEVICE_LIST,
 	QL_LOOP_RESET,
 	QL_FW_DUMP,
+	QL_FW_DUMP_TRIGGER,
+	QL_BEACON_ENABLE,
+	QL_BEACON_DISABLE,
 	QL_NVRAM_LOAD,
 	QL_NVRAM_DUMP,
 	QL_FLASH_LOAD,
