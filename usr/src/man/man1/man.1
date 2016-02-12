@@ -1,9 +1,14 @@
-.\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
-.\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
-.\" Copyright (c) 1980 Regents of the University of California.
+.\"
 .\" The Berkeley software License Agreement specifies the terms and conditions
 .\" for redistribution.
-.Dd Jul 18, 2014
+.\"
+.\"
+.\" Copyright (c) 1980 Regents of the University of California.
+.\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
+.\" Copyright 2016 Nexenta Systems, Inc.
+.\"
+.Dd February 12, 2016
 .Dt MAN 1
 .Os
 .Sh NAME
@@ -289,7 +294,7 @@ The
 .Pa man.cf
 file has the following format:
 .Lp
-.Dl Pf MANSECTS= Ar section , Ns Op Ar section...
+.Dl Pf MANSECTS= Ar section Ns Oo , Ns Ar section Oc Ns ...
 .Lp
 Lines beginning with
 .Sq Li #
