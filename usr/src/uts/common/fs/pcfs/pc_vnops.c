@@ -781,8 +781,11 @@ pcfs_setattr(
 		if (error)
 			goto out;
 
-		if (vap->va_size == 0)
+		if (vap->va_size == 0) {
 			vnevent_truncate(vp, ct);
+		} else {
+			vnevent_resize(vp, ct);
+		}
 	}
 	/*
 	 * Change file modified times.
