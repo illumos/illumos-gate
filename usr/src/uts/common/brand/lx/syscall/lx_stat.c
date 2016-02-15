@@ -328,7 +328,11 @@ lx_fstatat64(int fd, char *name, void *outp, int flag)
 	model_t model = get_udatamodel();
 	enum symfollow follow = FOLLOW;
 	int error;
+	char c;
 
+	if (fd == LX_AT_FDCWD) {
+		fd = AT_FDCWD;
+	}
 	if ((flag & ~LX_FSTATAT_ALLOWED) != 0) {
 		return (set_errno(EINVAL));
 	}
@@ -343,28 +347,43 @@ lx_fstatat64(int fd, char *name, void *outp, int flag)
 	if ((flag & LX_AT_SYMLINK_NOFOLLOW) != 0) {
 		follow = NO_FOLLOW;
 	}
-	if ((flag & LX_AT_EMPTY_PATH) == 0) {
-		char c;
 
-		/*
-		 * If the AT_EMPTY_PATH flag is absent and the provided path
-		 * has a zero length, then automatically bail instead of
-		 * performing the lookup on the fd itself.
-		 */
-		if (copyin(name, &c, sizeof (c)) != 0) {
-			return (set_errno(EFAULT));
-		}
-		if (c == '\0') {
+	if (copyin(name, &c, sizeof (c)) != 0) {
+		return (set_errno(EFAULT));
+	}
+	if (c == '\0') {
+		if ((flag & LX_AT_EMPTY_PATH) == 0) {
 			return (set_errno(ENOENT));
 		}
-	}
-	if (fd == LX_AT_FDCWD) {
-		fd = AT_FDCWD;
+
+		/*
+		 * When AT_EMPTY_PATH is set and and empty string has been
+		 * passed for the name parameter, direct the lookup against the
+		 * vnode for that fd.
+		 */
+		if (fd == AT_FDCWD) {
+			vp = PTOU(curproc)->u_cdir;
+			VN_HOLD(vp);
+			cr = CRED();
+			crhold(cr);
+		} else {
+			file_t *fp;
+
+			if ((fp = getf(fd)) == NULL) {
+				return (set_errno(EBADF));
+			}
+			vp = fp->f_vnode;
+			VN_HOLD(vp);
+			cr = fp->f_cred;
+			crhold(cr);
+			releasef(fd);
+		}
+	} else {
+		if ((error = cstatat_getvp(fd, name, follow, &vp, &cr)) != 0) {
+			return (set_errno(error));
+		}
 	}
 
-	if ((error = cstatat_getvp(fd, name, follow, &vp, &cr)) != 0) {
-		return (set_errno(error));
-	}
 	error = lx_stat_common(vp, cr, outp,
 	    (model == DATAMODEL_LP64) ? LXF_STAT64_64 : LXF_STAT64_32);
 	VN_RELE(vp);
