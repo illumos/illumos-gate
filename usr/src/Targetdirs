@@ -275,7 +275,6 @@ DIRS= \
 	/usr/lib/inet/wanboot \
 	/usr/lib/krb5 \
 	/usr/lib/link_audit \
-	/usr/lib/libp \
 	/usr/lib/lwp \
 	/usr/lib/mdb \
 	/usr/lib/mdb/kvm \
@@ -456,7 +455,6 @@ DIRS64= \
 	/usr/lib/fs/smb/$(MACH64) \
 	/usr/lib/inet/$(MACH64) \
 	/usr/lib/krb5/$(MACH64) \
-	/usr/lib/libp/$(MACH64) \
 	/usr/lib/link_audit/$(MACH64) \
 	/usr/lib/lwp/$(MACH64) \
 	/usr/lib/mdb/kvm/$(MACH64) \
@@ -499,7 +497,6 @@ SYM.DIRS= \
 	/usr/lib/32 \
 	/usr/lib/cron \
 	/usr/lib/elfedit/32 \
-	/usr/lib/libp/32 \
 	/usr/lib/lwp/32 \
 	/usr/lib/link_audit/32 \
 	/usr/lib/secure/32 \
@@ -522,7 +519,6 @@ SYM.DIRS64= \
 	/usr/lib/brand/sn1/64 \
 	/usr/lib/brand/solaris10/64 \
 	/usr/lib/elfedit/64 \
-	/usr/lib/libp/64 \
 	/usr/lib/link_audit/64 \
 	/usr/lib/lwp/64 \
 	/usr/lib/secure/64 \
@@ -614,7 +610,6 @@ $(ROOT)/usr/tmp:=			LINKDEST=../var/tmp
 $(ROOT)/usr/lib/tmac:=			LINKDEST=../share/lib/tmac
 $(ROOT)/usr/lib/32:=			LINKDEST=.
 $(ROOT)/usr/lib/elfedit/32:=		LINKDEST=.
-$(ROOT)/usr/lib/libp/32:=		LINKDEST=.
 $(ROOT)/usr/lib/lwp/32:=		LINKDEST=.
 $(ROOT)/usr/lib/link_audit/32:=		LINKDEST=.
 $(ROOT)/usr/lib/secure/32:=		LINKDEST=.
@@ -630,7 +625,6 @@ $(BUILD64) $(ROOT)/usr/lib/64:=		LINKDEST=$(MACH64)
 $(BUILD64) $(ROOT)/usr/lib/elfedit/64:=	LINKDEST=$(MACH64)
 $(BUILD64) $(ROOT)/usr/lib/brand/sn1/64:=	LINKDEST=$(MACH64)
 $(BUILD64) $(ROOT)/usr/lib/brand/solaris10/64:=	LINKDEST=$(MACH64)
-$(BUILD64) $(ROOT)/usr/lib/libp/64:=	LINKDEST=$(MACH64)
 $(BUILD64) $(ROOT)/usr/lib/lwp/64:=	LINKDEST=$(MACH64)
 $(BUILD64) $(ROOT)/usr/lib/link_audit/64:=	LINKDEST=$(MACH64)
 $(BUILD64) $(ROOT)/usr/lib/secure/64:=	LINKDEST=$(MACH64)
@@ -681,7 +675,6 @@ $(ROOT)/usr/ccs/lib/libl.so:=		REALPATH=../../lib/libl.so.1
 $(ROOT)/usr/ccs/lib/llib-ll.ln:= 	REALPATH=../../lib/llib-ll.ln
 $(ROOT)/usr/ccs/lib/liby.so:=		REALPATH=../../lib/liby.so.1
 $(ROOT)/usr/ccs/lib/llib-ly.ln:= 	REALPATH=../../lib/llib-ly.ln
-$(ROOT)/usr/lib/libp/libc.so.1:=	REALPATH=../../../lib/libc.so.1
 $(ROOT)/usr/lib/lwp/libthread.so.1:=	REALPATH=../libthread.so.1
 $(ROOT)/usr/lib/lwp/libthread_db.so.1:=	REALPATH=../libthread_db.so.1
 
@@ -736,8 +729,6 @@ $(ROOT)/usr/ccs/lib/$(MACH64)/liby.so:= \
 	REALPATH=../../../lib/$(MACH64)/liby.so.1
 $(ROOT)/usr/ccs/lib/$(MACH64)/llib-ly.ln:= \
 	REALPATH=../../../lib/$(MACH64)/llib-ly.ln
-$(ROOT)/usr/lib/libp/$(MACH64)/libc.so.1:= \
-	REALPATH=../../../../lib/$(MACH64)/libc.so.1
 $(ROOT)/usr/lib/lwp/$(MACH64)/libthread.so.1:= \
 	REALPATH=../../$(MACH64)/libthread.so.1
 $(ROOT)/usr/lib/lwp/$(MACH64)/libthread_db.so.1:= \
@@ -776,7 +767,6 @@ SYM.USRCCSLIB= \
 	/usr/ccs/lib/llib-ll.ln \
 	/usr/ccs/lib/liby.so \
 	/usr/ccs/lib/llib-ly.ln \
-	/usr/lib/libp/libc.so.1 \
 	/usr/lib/lwp/libthread.so.1 \
 	/usr/lib/lwp/libthread_db.so.1
 
@@ -806,7 +796,6 @@ SYM.USRCCSLIB64= \
 	/usr/ccs/lib/$(MACH64)/llib-ll.ln \
 	/usr/ccs/lib/$(MACH64)/liby.so \
 	/usr/ccs/lib/$(MACH64)/llib-ly.ln \
-	/usr/lib/libp/$(MACH64)/libc.so.1 \
 	/usr/lib/lwp/$(MACH64)/libthread.so.1 \
 	/usr/lib/lwp/$(MACH64)/libthread_db.so.1
 
