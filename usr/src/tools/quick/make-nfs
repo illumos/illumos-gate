@@ -1,0 +1,332 @@
+#!/bin/ksh
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
+#
+
+# Use normal make (not dmake) by default.
+make=${MAKE:-make}
+
+# Set this if you want to use dbx or gdb:
+# export SOURCEDEBUG=yes
+
+[ -n "$SRC" ] || {
+  echo "SRC not set.  Run 'ws' or 'bldenv' first."
+  exit 1
+}
+
+cpu=`uname -p`
+case $cpu in
+i386)
+	x=intel
+	kmdb_arch="amd64"
+	mdb_arch="ia32 amd64"
+	arch64=amd64
+	;;
+sparc)
+	x=sparc
+	kmdb_arch=v9
+	mdb_arch="v7 v9"
+	arch64=sparcv9
+	;;
+*)  echo "Unknown architecture" ; exit 1;;
+esac
+
+################################################################
+
+build_tools() {
+  test -f $SRC/tools/proto/root_i386-nd/opt/onbld/bin/genoffsets ||
+    (cd $SRC/tools && $make install)
+  (cd $SRC/common/mapfiles; $make install)
+}
+
+clobber_tools() {
+  (cd $SRC/tools && $make clobber)
+  (cd $SRC/common/mapfiles; $make clobber)
+}
+
+# end build_tools()
+
+
+################################################################
+
+do_hdrs() {
+
+targ=$1
+if [ "$targ" = clobber ]
+then
+  (cd $SRC/uts && $make -k clobber_h)
+  (cd $SRC/head && $make clobber)
+fi
+
+if [ "$targ" = install ]
+then
+  targ=install_h
+
+  # Just the parts of "make sgs" we need, and
+  # skip them if they appear to be done.
+  # ... stuff under $SRC
+  test -f $SRC/uts/common/sys/priv_names.h ||
+    (cd $SRC/uts && $make -k all_h)
+
+  test -f $SRC/head/rpcsvc/nispasswd.h ||
+    (cd $SRC/head && $make -k $targ)
+
+  # ... stuff under $ROOT (proto area)
+  test -d $ROOT/usr/include/sys ||
+    (cd $SRC && $make rootdirs)
+  test -f $ROOT/usr/include/sys/types.h ||
+    (cd $SRC/uts && $make -k $targ)
+  test -f $ROOT/usr/include/rpcsvc/daemon_utils.h ||
+    (cd $SRC/head && $make $targ)
+
+  # always update the NFS (kernel) headers to be safe
+  (cd $SRC/uts/common/gssapi && $make -k $targ)
+  (cd $SRC/uts/common/sys && $make -k $targ)
+  (cd $SRC/uts/common/nfs && $make -k $targ)
+fi
+
+# Need some library headers too...
+for lib in \
+  libcmdutils \
+  libcryptoutil \
+  libidmap \
+  libpam \
+  libsec \
+  libzfs_core \
+  libzfs \
+  libshare \
+  libuutil \
+  librpcsvc \
+  libmapid
+do
+  (cd $SRC/lib/$lib && $make $targ)
+done
+}
+
+# end do_hdrs()
+
+
+################################################################
+
+do_kern() {
+  case $1 in
+  *) targ=$1 ;;
+  esac
+  ( unset SOURCEDEBUG ;
+  (cd $SRC/uts/$x/nfs && $make $targ) ;
+  (cd $SRC/uts/$x/nfs_dlboot && $make $targ) ;
+  (cd $SRC/uts/$x/nfssrv && $make $targ) ;
+  (cd $SRC/uts/$x/klmmod && $make $targ) ;
+  (cd $SRC/uts/$x/klmops && $make $targ) )
+}
+
+# end do_kern()
+
+
+################################################################
+
+# Note lib1 builds prerequisite libraries not delivered by the
+# tar file we create below.  To accelerate clean/install, we
+# skip these on clean (but still nuke them for clobber)
+
+do_lib1() {
+
+for lib in \
+  libavl \
+  libuutil \
+  libcmdutils \
+  libidmap \
+  libzfs_core \
+  libzfs
+do
+  (cd $SRC/lib/$lib && $make $1)
+done
+}
+
+# lib2 builds stuff we include in the tar file,
+# or that we don't mind rebuilding after clean.
+
+do_lib2() {
+
+for lib in \
+  librpcsvc \
+  libmapid
+do
+  (cd $SRC/lib/$lib && $make $1)
+done
+
+(cd $SRC/lib/libshare && $make $1 PLUGINS=nfs)
+
+}
+
+# end do_lib1() and do_lib2()
+
+
+################################################################
+
+do_cmds() {
+
+case $1 in
+install)
+  # mount programs need fslib.o
+  (cd $SRC/cmd/fs.d && $make fslib.o)
+  (cd $SRC/cmd/fs.d/nfs && $make $1 catalog)
+  ;;
+clean|clobber)
+  (cd $SRC/cmd/fs.d/nfs && $make $1)
+  (cd $SRC/cmd/fs.d && $make ${1}_local)
+  ;;
+esac
+
+
+}
+
+# Build the MDB modules, WITH the linktest
+# Not yet.  See https://www.illumos.org/issues/3409
+
+# end do_cmds()
+
+
+################################################################
+# This builds $SRC/TAGS (and cscope.files) in a helpful order.
+
+do_tags() {
+	(cd $SRC ;
+	find uts/common/sys -name '*.[ch]' -print |sort
+	find uts/common/net -name '*.[ch]' -print |sort
+	find uts/common/netinet -name '*.[ch]' -print |sort
+	find uts/common/nfs -name '*.[ch]' -print |sort
+	find uts/common/rpc -name '*.[ch]' -print |sort
+	find uts/common/klm -name '*.[ch]' -print |sort
+	find uts/common/fs/nfs -name '*.[ch]' -print |sort
+	find uts/common/gssapi -name '*.[ch]' -print |sort
+	find head -name '*.h' -print |sort
+	find cmd/fs.d/nfs -name '*.[ch]' -print |sort
+	) > $SRC/cscope.files
+
+	(cd $SRC ;
+	exctags -e --langmap=c:+.ndl -h ndl -L - < cscope.files
+	cscope -b )
+}
+
+#end do_tags()
+
+
+################################################################
+# This creates tarfiles one can use to update a test machine.
+
+do_tar() {
+	git_rev=`git rev-parse --short=8 HEAD`
+
+# NFS (everything)
+	files="
+kernel/misc/$arch64/klmmod
+kernel/misc/$arch64/klmops
+kernel/misc/$arch64/nfs_dlboot
+kernel/misc/$arch64/nfssrv
+kernel/fs/$arch64/nfs
+kernel/sys/$arch64/nfs
+lib/svc/manifest/network/nfs/cbd.xml
+lib/svc/manifest/network/nfs/client.xml
+lib/svc/manifest/network/nfs/mapid.xml
+lib/svc/manifest/network/nfs/nfslogd.xml
+lib/svc/manifest/network/nfs/nlockmgr.xml
+lib/svc/manifest/network/nfs/rquota.xml
+lib/svc/manifest/network/nfs/server.xml
+lib/svc/manifest/network/nfs/status.xml
+lib/svc/method/nfs-client
+lib/svc/method/nfs-server
+lib/svc/method/nlockmgr
+usr/bin/nfsstat
+usr/lib/fs/nfs/$arch64/libshare_nfs.so.1
+usr/lib/fs/nfs/libshare_nfs.so.1
+usr/lib/fs/nfs/dfmounts
+usr/lib/fs/nfs/dfshares
+usr/lib/fs/nfs/nfsfind
+usr/lib/fs/nfs/showmount
+usr/lib/fs/nfs/umount
+usr/lib/nfs/libmapid.so.1
+usr/lib/nfs/lockd
+usr/lib/nfs/mountd
+usr/lib/nfs/nfs4cbd
+usr/lib/nfs/nfsd
+usr/lib/nfs/nfslogd
+usr/lib/nfs/nfsmapid
+usr/lib/nfs/rquotad
+usr/lib/nfs/statd
+usr/lib/reparse/$arch64/libnfs_basic.so.1
+usr/lib/reparse/libnfs_basic.so.1
+usr/sbin/clear_locks
+usr/sbin/exportfs
+usr/sbin/nfsref
+"
+	(cd $ROOT && tar cfj ../../nfs-${git_rev}.tar.bz2 $files)
+
+# KLM kmod
+	files="
+kernel/misc/$arch64/klmmod
+kernel/misc/$arch64/klmops
+"
+	(cd $ROOT && tar cfj ../../klm-${git_rev}.tar.bz2 $files)
+}
+
+# end do_tar()
+
+
+################################################################
+
+if [ "$1" = "" ]; then
+  set '?' # force usage
+fi
+
+set -x
+
+for arg
+do
+  case "$arg" in
+  install)
+    build_tools
+    set -e
+    do_hdrs $arg
+    do_kern $arg
+    do_lib1 $arg
+    do_lib2 $arg
+    do_cmds $arg
+    ;;
+  clean)
+    # intentionally skip: lib1, hdrs, tools
+    do_cmds $arg
+    do_lib2 $arg
+    do_kern $arg
+    ;;
+  clobber)
+    do_cmds $arg
+    do_lib2 $arg
+    do_lib1 $arg
+    do_kern $arg
+    do_hdrs $arg
+    clobber_tools
+    ;;
+  tags)
+    do_tags
+    ;;
+  tar)
+    do_tar
+    ;;
+  *)
+    echo "Usage: $0 {install|clean|clobber|tags|tar}";
+    exit 1;
+    ;;
+  esac
+done
