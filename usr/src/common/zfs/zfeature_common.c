@@ -130,6 +130,16 @@ zfeature_depends_on(spa_feature_t fid, spa_feature_t check)
 	return (B_FALSE);
 }
 
+static boolean_t
+deps_contains_feature(const spa_feature_t *deps, const spa_feature_t feature)
+{
+	for (int i = 0; deps[i] != SPA_FEATURE_NONE; i++)
+		if (deps[i] == feature)
+			return (B_TRUE);
+
+	return (B_FALSE);
+}
+
 static void
 zfeature_register(spa_feature_t fid, const char *guid, const char *name,
     const char *desc, zfeature_flags_t flags, const spa_feature_t *deps)
@@ -146,6 +156,9 @@ zfeature_register(spa_feature_t fid, const char *guid, const char *name,
 
 	if (deps == NULL)
 		deps = nodeps;
+
+	VERIFY(((flags & ZFEATURE_FLAG_PER_DATASET) == 0) ||
+	    (deps_contains_feature(deps, SPA_FEATURE_EXTENSIBLE_DATASET)));
 
 	feature->fi_feature = fid;
 	feature->fi_guid = guid;
@@ -188,8 +201,10 @@ zpool_feature_init(void)
 	    "Record txg at which a feature is enabled",
 	    ZFEATURE_FLAG_READONLY_COMPAT, NULL);
 
-	static spa_feature_t hole_birth_deps[] = { SPA_FEATURE_ENABLED_TXG,
-	    SPA_FEATURE_NONE };
+	static spa_feature_t hole_birth_deps[] = {
+		SPA_FEATURE_ENABLED_TXG,
+		SPA_FEATURE_NONE
+	};
 	zfeature_register(SPA_FEATURE_HOLE_BIRTH,
 	    "com.delphix:hole_birth", "hole_birth",
 	    "Retain hole birth txg for more precise zfs send",
@@ -211,8 +226,8 @@ zpool_feature_init(void)
 	    ZFEATURE_FLAG_READONLY_COMPAT, bookmarks_deps);
 
 	static const spa_feature_t filesystem_limits_deps[] = {
-	    SPA_FEATURE_EXTENSIBLE_DATASET,
-	    SPA_FEATURE_NONE
+		SPA_FEATURE_EXTENSIBLE_DATASET,
+		SPA_FEATURE_NONE
 	};
 	zfeature_register(SPA_FEATURE_FS_SS_LIMIT,
 	    "com.joyent:filesystem_limits", "filesystem_limits",
@@ -234,16 +249,30 @@ zpool_feature_init(void)
 	    "Support for blocks larger than 128KB.",
 	    ZFEATURE_FLAG_PER_DATASET, large_blocks_deps);
 
+	static const spa_feature_t sha512_deps[] = {
+		SPA_FEATURE_EXTENSIBLE_DATASET,
+		SPA_FEATURE_NONE
+	};
 	zfeature_register(SPA_FEATURE_SHA512,
 	    "org.illumos:sha512", "sha512",
 	    "SHA-512/256 hash algorithm.",
-	    ZFEATURE_FLAG_PER_DATASET, NULL);
+	    ZFEATURE_FLAG_PER_DATASET, sha512_deps);
+
+	static const spa_feature_t skein_deps[] = {
+		SPA_FEATURE_EXTENSIBLE_DATASET,
+		SPA_FEATURE_NONE
+	};
 	zfeature_register(SPA_FEATURE_SKEIN,
 	    "org.illumos:skein", "skein",
 	    "Skein hash algorithm.",
-	    ZFEATURE_FLAG_PER_DATASET, NULL);
+	    ZFEATURE_FLAG_PER_DATASET, skein_deps);
+
+	static const spa_feature_t edonr_deps[] = {
+		SPA_FEATURE_EXTENSIBLE_DATASET,
+		SPA_FEATURE_NONE
+	};
 	zfeature_register(SPA_FEATURE_EDONR,
 	    "org.illumos:edonr", "edonr",
 	    "Edon-R hash algorithm.",
-	    ZFEATURE_FLAG_PER_DATASET, NULL);
+	    ZFEATURE_FLAG_PER_DATASET, edonr_deps);
 }
