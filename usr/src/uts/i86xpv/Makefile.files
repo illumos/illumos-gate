@@ -119,6 +119,7 @@ BOOT_DRIVER_OBJS =		\
 	boot_mmu.o		\
 	boot_vga.o		\
 	boot_xconsole.o		\
+	dboot_multiboot2.o	\
 	$(FONT_OBJS)
 
 CORE_OBJS += $(BOOT_DRIVER_OBJS)

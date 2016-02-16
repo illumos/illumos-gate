@@ -40,6 +40,8 @@
 #include <sys/bootsvcs.h>
 #include <sys/bootinfo.h>
 #include <sys/multiboot.h>
+#include <sys/multiboot2.h>
+#include <sys/multiboot2_impl.h>
 #include <sys/bootvfs.h>
 #include <sys/bootprops.h>
 #include <sys/varargs.h>
@@ -132,7 +134,7 @@ shared_info_t *HYPERVISOR_shared_info;
 static ulong_t total_bop_alloc_scratch = 0;
 static ulong_t total_bop_alloc_kernel = 0;
 
-static void build_firmware_properties(void);
+static void build_firmware_properties(struct xboot_info *);
 
 static int early_allocation = 1;
 
@@ -1130,7 +1132,8 @@ build_panic_cmdline(const char *cmd, int cmdlen)
 
 #ifndef	__xpv
 /*
- * Construct boot command line for Fast Reboot
+ * Construct boot command line for Fast Reboot. The saved_cmdline
+ * is also reported by "eeprom bootcmd".
  */
 static void
 build_fastboot_cmdline(struct xboot_info *xbp)
@@ -1228,9 +1231,6 @@ build_boot_properties(struct xboot_info *xbp)
 	static int stdout_val = 0;
 	uchar_t boot_device;
 	char str[3];
-	multiboot_info_t *mbi;
-	int netboot;
-	struct sol_netinfo *sip;
 #endif
 
 	/*
@@ -1276,6 +1276,19 @@ build_boot_properties(struct xboot_info *xbp)
 	if (xbp->bi_module_cnt > 1) {
 		fastreboot_disable(FBNS_BOOTMOD);
 	}
+
+#ifndef __xpv
+	/*
+	 * Disable fast reboot if we're using the Multiboot 2 boot protocol,
+	 * since we don't currently support MB2 info and module relocation.
+	 * Note that fast reboot will have already been disabled if multiple
+	 * modules are present, since the current implementation assumes that
+	 * we only have a single module, the boot_archive.
+	 */
+	if (xbp->bi_mb_version != 1) {
+		fastreboot_disable(FBNS_MULTIBOOT2);
+	}
+#endif
 
 	DBG_MSG("Parsing command line for boot properties\n");
 	value = xbp->bi_cmdline;
@@ -1472,46 +1485,79 @@ build_boot_properties(struct xboot_info *xbp)
 
 #ifndef __xpv
 	/*
-	 * set the BIOS boot device from GRUB
-	 */
-	netboot = 0;
-	mbi = xbp->bi_mb_info;
-
-	/*
 	 * Build boot command line for Fast Reboot
 	 */
 	build_fastboot_cmdline(xbp);
 
-	/*
-	 * Save various boot information for Fast Reboot
-	 */
-	save_boot_info(xbp);
+	if (xbp->bi_mb_version == 1) {
+		multiboot_info_t *mbi = xbp->bi_mb_info;
+		int netboot;
+		struct sol_netinfo *sip;
 
-	if (mbi != NULL && mbi->flags & MB_INFO_BOOTDEV) {
-		boot_device = mbi->boot_device >> 24;
-		if (boot_device == 0x20)
-			netboot++;
-		str[0] = (boot_device >> 4) + '0';
-		str[1] = (boot_device & 0xf) + '0';
-		str[2] = 0;
-		bsetprops("bios-boot-device", str);
+		/*
+		 * set the BIOS boot device from GRUB
+		 */
+		netboot = 0;
+
+		/*
+		 * Save various boot information for Fast Reboot
+		 */
+		save_boot_info(xbp);
+
+		if (mbi != NULL && mbi->flags & MB_INFO_BOOTDEV) {
+			boot_device = mbi->boot_device >> 24;
+			if (boot_device == 0x20)
+				netboot++;
+			str[0] = (boot_device >> 4) + '0';
+			str[1] = (boot_device & 0xf) + '0';
+			str[2] = 0;
+			bsetprops("bios-boot-device", str);
+		} else {
+			netboot = 1;
+		}
+
+		/*
+		 * In the netboot case, drives_info is overloaded with the
+		 * dhcp ack. This is not multiboot compliant and requires
+		 * special pxegrub!
+		 */
+		if (netboot && mbi->drives_length != 0) {
+			sip = (struct sol_netinfo *)(uintptr_t)mbi->drives_addr;
+			if (sip->sn_infotype == SN_TYPE_BOOTP)
+				bsetprop("bootp-response",
+				    sizeof ("bootp-response"),
+				    (void *)(uintptr_t)mbi->drives_addr,
+				    mbi->drives_length);
+			else if (sip->sn_infotype == SN_TYPE_RARP)
+				setup_rarp_props(sip);
+		}
 	} else {
-		netboot = 1;
+		multiboot2_info_header_t *mbi = xbp->bi_mb_info;
+		multiboot_tag_bootdev_t *bootdev = NULL;
+		multiboot_tag_network_t *netdev = NULL;
+
+		if (mbi != NULL) {
+			bootdev = dboot_multiboot2_find_tag(mbi,
+			    MULTIBOOT_TAG_TYPE_BOOTDEV);
+			netdev = dboot_multiboot2_find_tag(mbi,
+			    MULTIBOOT_TAG_TYPE_NETWORK);
+		}
+		if (bootdev != NULL) {
+			DBG(bootdev->mb_biosdev);
+			boot_device = bootdev->mb_biosdev;
+			str[0] = (boot_device >> 4) + '0';
+			str[1] = (boot_device & 0xf) + '0';
+			str[2] = 0;
+			bsetprops("bios-boot-device", str);
+		}
+		if (netdev != NULL) {
+			bsetprop("bootp-response", sizeof ("bootp-response"),
+			    (void *)(uintptr_t)netdev->mb_dhcpack,
+			    netdev->mb_size -
+			    sizeof (multiboot_tag_network_t));
+		}
 	}
 
-	/*
-	 * In the netboot case, drives_info is overloaded with the dhcp ack.
-	 * This is not multiboot compliant and requires special pxegrub!
-	 */
-	if (netboot && mbi->drives_length != 0) {
-		sip = (struct sol_netinfo *)(uintptr_t)mbi->drives_addr;
-		if (sip->sn_infotype == SN_TYPE_BOOTP)
-			bsetprop("bootp-response", sizeof ("bootp-response"),
-			    (void *)(uintptr_t)mbi->drives_addr,
-			    mbi->drives_length);
-		else if (sip->sn_infotype == SN_TYPE_RARP)
-			setup_rarp_props(sip);
-	}
 	bsetprop("stdout", strlen("stdout"),
 	    &stdout_val, sizeof (stdout_val));
 #endif /* __xpv */
@@ -1530,7 +1576,7 @@ build_boot_properties(struct xboot_info *xbp)
 	/*
 	 * Build firmware-provided system properties
 	 */
-	build_firmware_properties();
+	build_firmware_properties(xbp);
 
 	/*
 	 * XXPV
@@ -2019,8 +2065,25 @@ static ACPI_TABLE_RSDP *
 find_rsdp()
 {
 	ACPI_TABLE_RSDP *rsdp;
+	uint64_t rsdp_val = 0;
 	uint16_t *ebda_seg;
 	paddr_t  ebda_addr;
+
+	/* check for "acpi-root-tab" property */
+	if (do_bsys_getproplen(NULL, "acpi-root-tab") == sizeof (uint64_t)) {
+		(void) do_bsys_getprop(NULL, "acpi-root-tab", &rsdp_val);
+		if (rsdp_val != 0) {
+			rsdp = scan_rsdp(rsdp_val, rsdp_val + sizeof (*rsdp));
+			if (rsdp != NULL) {
+				if (kbm_debug) {
+					bop_printf(NULL,
+					    "Using RSDP from bootloader: "
+					    "0x%p\n", (void *)rsdp);
+				}
+				return (rsdp);
+			}
+		}
+	}
 
 	/*
 	 * Get the EBDA segment and scan the first 1K
@@ -2536,12 +2599,18 @@ enumerate_xen_cpus()
 }
 #endif /* __xpv */
 
+/*ARGSUSED*/
 static void
-build_firmware_properties(void)
+build_firmware_properties(struct xboot_info *xbp)
 {
 	ACPI_TABLE_HEADER *tp = NULL;
 
 #ifndef __xpv
+	if (xbp->bi_acpi_rsdp) {
+		bsetprop64("acpi-root-tab",
+		    (uint64_t)(uintptr_t)xbp->bi_acpi_rsdp);
+	}
+
 	if ((tp = find_fw_table(ACPI_SIG_MSCT)) != NULL)
 		msct_ptr = process_msct((ACPI_TABLE_MSCT *)tp);
 	else
