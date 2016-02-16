@@ -29,7 +29,7 @@
 
 /*
  * Copyright (c) 2012 by Delphix. All rights reserved.
- * Copyright 2015, Joyent, Inc.
+ * Copyright 2016, Joyent, Inc.
  */
 
 /*
@@ -390,6 +390,7 @@ poll_common(pollstate_t *ps, pollfd_t *fds, nfds_t nfds, timespec_t *tsp,
 	 * If yes then bypass all the other stuff and make him sleep.
 	 */
 	if (nfds == 0) {
+		*fdcnt = 0;
 		/*
 		 * Sleep until we have passed the requested future
 		 * time or until interrupted by a signal.
@@ -401,9 +402,9 @@ poll_common(pollstate_t *ps, pollfd_t *fds, nfds_t nfds, timespec_t *tsp,
 			    &t->t_delay_lock, deadline)) > 0)
 				continue;
 			mutex_exit(&t->t_delay_lock);
+			return ((error == 0) ? EINTR : 0);
 		}
-		*fdcnt = 0;
-		return ((error == 0) ? EINTR : 0);
+		return (0);
 	}
 
 	VERIFY(ps != NULL);
