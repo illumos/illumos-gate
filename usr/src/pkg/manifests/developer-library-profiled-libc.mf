@@ -24,23 +24,5 @@
 #
 
 set name=pkg.fmri value=pkg:/developer/library/profiled-libc@$(PKGVERS)
-set name=pkg.description \
-    value="system libraries compiled with profiling for software development performance measurement"
-set name=pkg.summary value="Developer Profiled Libraries"
-set name=info.classification \
-    value=org.opensolaris.category.2008:Development/System
+set name=pkg.obsolete value=true
 set name=variant.arch value=$(ARCH)
-dir path=usr group=sys
-dir path=usr/lib
-dir path=usr/lib/libp
-dir path=usr/lib/libp/$(ARCH64)
-legacy pkg=SUNWdpl \
-    desc="system libraries compiled with profiling for software development performance measurement" \
-    name="Developer Profiled Libraries"
-license cr_Sun license=cr_Sun
-license lic_CDDL license=lic_CDDL
-link path=usr/lib/libp/$(ARCH64)/libc.so.1 \
-    target=../../../../lib/$(ARCH64)/libc.so.1
-link path=usr/lib/libp/32 target=.
-link path=usr/lib/libp/64 target=$(ARCH64)
-link path=usr/lib/libp/libc.so.1 target=../../../lib/libc.so.1

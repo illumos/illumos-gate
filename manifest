@@ -6291,12 +6291,6 @@ s usr/lib/libnvpair.so.1=../../lib/libnvpair.so.1
 s usr/lib/libnvpair.so=../../lib/libnvpair.so.1
 s usr/lib/libnwam.so.1=../../lib/libnwam.so.1
 s usr/lib/libnwam.so=../../lib/libnwam.so.1
-d usr/lib/libp 0755 root bin
-s usr/lib/libp/32=.
-s usr/lib/libp/64=amd64
-d usr/lib/libp/amd64 0755 root bin
-s usr/lib/libp/amd64/libc.so.1=../../../../lib/amd64/libc.so.1
-s usr/lib/libp/libc.so.1=../../../lib/libc.so.1
 s usr/lib/libpam.so.1=../../lib/libpam.so.1
 s usr/lib/libpam.so=../../lib/libpam.so.1
 f usr/lib/libpanel.so.1 0755 root bin
