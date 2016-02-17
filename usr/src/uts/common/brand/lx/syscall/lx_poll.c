@@ -675,9 +675,22 @@ lx_select(int nfds, long *rfds, long *wfds, long *efds,
 	return (lx_select_common(nfds, rfds, wfds, efds, tsp, NULL));
 }
 
+
+typedef struct {
+	uintptr_t lpsa_addr;
+	unsigned long lpsa_len;
+} lx_pselect_sig_arg_t;
+
+#if defined(_LP64)
+typedef struct {
+	caddr32_t lpsa_addr;
+	uint32_t lpsa_len;
+} lx_pselect_sig_arg32_t;
+#endif /* defined(_LP64) */
+
 long
 lx_pselect(int nfds, long *rfds, long *wfds, long *efds,
-    timespec_t *timeoutp, uintptr_t setp)
+    timespec_t *timeoutp, void *setp)
 {
 	timespec_t ts, *tsp = NULL;
 	k_sigset_t kset, *ksetp = NULL;
@@ -702,25 +715,42 @@ lx_pselect(int nfds, long *rfds, long *wfds, long *efds,
 		tsp = &ts;
 	}
 	if (setp != NULL) {
-		struct {
-			lx_sigset_t *addr;
-			size_t size;
-		} ps_lx_sigset;
-		lx_sigset_t lset;
+		lx_sigset_t lset, *sigaddr = NULL;
 
-		if (copyin((void *)setp, &ps_lx_sigset, sizeof (ps_lx_sigset)))
-			return (set_errno(EFAULT));
+		if (get_udatamodel() == DATAMODEL_NATIVE) {
+			lx_pselect_sig_arg_t lpsa;
 
-		/*
-		 * Yes, that's right:  Linux forces a size to be passed only
-		 * so it can check that it's the size of a sigset_t.
-		 */
-		if (ps_lx_sigset.size != sizeof (lx_sigset_t))
-			return (set_errno(EINVAL));
+			if (copyin(setp, &lpsa, sizeof (lpsa)) != 0)
+				return (set_errno(EFAULT));
+			/*
+			 * Linux forces a size to be passed only so it can
+			 * check that it's the size of a sigset_t.
+			 */
+			if (lpsa.lpsa_len != sizeof (lx_sigset_t))
+				return (set_errno(EINVAL));
+
+			sigaddr = (lx_sigset_t *)lpsa.lpsa_addr;
+		}
+#if defined(_LP64)
+		else {
+			lx_pselect_sig_arg32_t lpsa32;
+
+			if (copyin(setp, &lpsa32, sizeof (lpsa32)) != 0)
+				return (set_errno(EFAULT));
+			/*
+			 * Linux forces a size to be passed only so it can
+			 * check that it's the size of a sigset_t.
+			 */
+			if (lpsa32.lpsa_len != sizeof (lx_sigset_t))
+				return (set_errno(EINVAL));
+
+			sigaddr = (lx_sigset_t *)(uint64_t)lpsa32.lpsa_addr;
+		}
+#endif /* defined(_LP64) */
 
 		/* This is where we check if the sigset is *really* NULL. */
-		if (ps_lx_sigset.addr != NULL) {
-			if (copyin(ps_lx_sigset.addr, &lset, sizeof (lset)))
+		if (sigaddr != NULL) {
+			if (copyin(sigaddr, &lset, sizeof (lset)) != 0)
 				return (set_errno(EFAULT));
 
 			lx_ltos_sigset(&lset, &kset);
