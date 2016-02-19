@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*
@@ -42,6 +42,7 @@
 #include <sys/netstack.h>
 #include <sys/ethernet.h>
 #include <inet/ip_arp.h>
+#include <sys/kstat.h>
 
 #include "lx_sysfs.h"
 
@@ -71,14 +72,19 @@ static void lxsys_inactive(vnode_t *, cred_t *, caller_context_t *);
 static vnode_t *lxsys_lookup_static(lxsys_node_t *, char *);
 static vnode_t *lxsys_lookup_class_netdir(lxsys_node_t *, char *);
 static vnode_t *lxsys_lookup_devices_virtual_netdir(lxsys_node_t *, char *);
+static vnode_t *lxsys_lookup_blockdir(lxsys_node_t *, char *);
+static vnode_t *lxsys_lookup_devices_virtual_bdidir(lxsys_node_t *, char *);
 
 static int lxsys_read_devices_virtual_net(lxsys_node_t *, lxsys_uiobuf_t *);
 
 static int lxsys_readdir_static(lxsys_node_t *, uio_t *, int *);
 static int lxsys_readdir_class_netdir(lxsys_node_t *, uio_t *, int *);
 static int lxsys_readdir_devices_virtual_netdir(lxsys_node_t *, uio_t *, int *);
+static int lxsys_readdir_blockdir(lxsys_node_t *, uio_t *, int *);
+static int lxsys_readdir_devices_virtual_bdidir(lxsys_node_t *, uio_t *, int *);
 
-static int lxsys_readlink_class_net(lxsys_node_t *lnp, char *buf, size_t len);
+static int lxsys_readlink_class_net(lxsys_node_t *, char *, size_t);
+static int lxsys_readlink_block(lxsys_node_t *, char *, size_t);
 
 /*
  * The lx /sys vnode operations vector
@@ -111,17 +117,21 @@ const fs_operation_def_t lxsys_vnodeops_template[] = {
  * 1 - SYS_STATIC
  * 2 - SYS_CLASS_NET
  * 3 - SYS_DEVICES_NET
+ * 4 - SYS_BLOCK
+ * 5 - SYS_DEVICES_BDI
  *
  * Static entries will have assigned INSTANCE identifiers:
- * - 0: /sys
- * - 1: /sys/class
- * - 2: /sys/devices
- * - 3: /sys/fs
- * - 4: /sys/class/net
- * - 5: /sys/devices/virtual
- * - 7: /sys/devices/system
- * - 8: /sys/fs/cgroup
- * - 9: /sys/devices/virtual/net
+ * - 0x00: /sys
+ * - 0x01: /sys/class
+ * - 0x02: /sys/devices
+ * - 0x03: /sys/fs
+ * - 0x04: /sys/class/net
+ * - 0x05: /sys/devices/virtual
+ * - 0x06: /sys/devices/system
+ * - 0x07: /sys/fs/cgroup
+ * - 0x08: /sys/devices/virtual/net
+ * - 0x09: /sys/block
+ * - 0x0a: /sys/devices/virtual/bdi
  *
  * Dynamic /sys/class/net/<interface> symlinks will use an INSTANCE derived
  * from the corresonding ifindex.
@@ -129,21 +139,28 @@ const fs_operation_def_t lxsys_vnodeops_template[] = {
  * Dynamic /sys/devices/virtual/net/<interface>/<entries> directories will use
  * an INSTANCE derived from the ifindex and statically assigned ENDPOINT IDs
  * for the contained entries.
+ *
+ * Dynamic /sys/block/<dev> symlinks and /sys/devices/virtual/bdi/<dev>
+ * directories will use an INSTANCE derived from the device major and instance
+ * from records listed in kstat.
  */
 
-#define	LXSYS_INST_CLASSDIR			1
-#define	LXSYS_INST_DEVICESDIR			2
-#define	LXSYS_INST_FSDIR			3
-#define	LXSYS_INST_CLASS_NETDIR			4
-#define	LXSYS_INST_DEVICES_VIRTUALDIR		5
-#define	LXSYS_INST_DEVICES_SYSTEMDIR		6
-#define	LXSYS_INST_FS_CGROUPDIR			7
-#define	LXSYS_INST_DEVICES_VIRTUAL_NETDIR	8
+#define	LXSYS_INST_CLASSDIR			0x1
+#define	LXSYS_INST_DEVICESDIR			0x2
+#define	LXSYS_INST_FSDIR			0x3
+#define	LXSYS_INST_CLASS_NETDIR			0x4
+#define	LXSYS_INST_DEVICES_VIRTUALDIR		0x5
+#define	LXSYS_INST_DEVICES_SYSTEMDIR		0x6
+#define	LXSYS_INST_FS_CGROUPDIR			0x7
+#define	LXSYS_INST_DEVICES_VIRTUAL_NETDIR	0x8
+#define	LXSYS_INST_BLOCKDIR			0x9
+#define	LXSYS_INST_DEVICES_VIRTUAL_BDIDIR	0xa
 
 /*
  * file contents of an lx /sys directory.
  */
 static lxsys_dirent_t dirlist_root[] = {
+	{ LXSYS_INST_BLOCKDIR,		"block" },
 	{ LXSYS_INST_CLASSDIR,		"class" },
 	{ LXSYS_INST_DEVICESDIR,	"devices" },
 	{ LXSYS_INST_FSDIR,		"fs" }
@@ -160,6 +177,7 @@ static lxsys_dirent_t dirlist_devices[] = {
 	{ LXSYS_INST_DEVICES_VIRTUALDIR,	"virtual" }
 };
 static lxsys_dirent_t dirlist_devices_virtual[] = {
+	{ LXSYS_INST_DEVICES_VIRTUAL_BDIDIR,	"bdi" },
 	{ LXSYS_INST_DEVICES_VIRTUAL_NETDIR,	"net" }
 };
 
@@ -204,6 +222,8 @@ static vnode_t *(*lxsys_lookup_function[LXSYS_MAXTYPE])() = {
 	lxsys_lookup_static,			/* LXSYS_STATIC		*/
 	lxsys_lookup_class_netdir,		/* LXSYS_CLASS_NET	*/
 	lxsys_lookup_devices_virtual_netdir,	/* LXSYS_DEVICES_NET	*/
+	lxsys_lookup_blockdir,			/* LXSYS_BLOCK		*/
+	lxsys_lookup_devices_virtual_bdidir,	/* LXSYS_DEVICES_BDI	*/
 };
 
 /*
@@ -214,6 +234,8 @@ static int (*lxsys_readdir_function[LXSYS_MAXTYPE])() = {
 	lxsys_readdir_static,			/* LXSYS_STATIC		*/
 	lxsys_readdir_class_netdir,		/* LXSYS_CLASS_NET	*/
 	lxsys_readdir_devices_virtual_netdir,	/* LXSYS_DEVICES_NET	*/
+	lxsys_readdir_blockdir,			/* LXSYS_BLOCK		*/
+	lxsys_readdir_devices_virtual_bdidir,	/* LXSYS_DEVICES_BDI	*/
 };
 
 /*
@@ -224,6 +246,8 @@ static int (*lxsys_read_function[LXSYS_MAXTYPE])() = {
 	NULL,					/* LXSYS_STATIC		*/
 	NULL,					/* LXSYS_CLASS_NET	*/
 	lxsys_read_devices_virtual_net,		/* LXSYS_DEVICES_NET	*/
+	NULL,					/* LXSYS_BLOCK		*/
+	NULL,					/* LXSYS_DEVICES_BDI	*/
 };
 
 /*
@@ -234,7 +258,104 @@ static int (*lxsys_readlink_function[LXSYS_MAXTYPE])() = {
 	NULL,					/* LXSYS_STATIC		*/
 	lxsys_readlink_class_net,		/* LXSYS_CLASS_NET	*/
 	NULL,					/* LXSYS_DEVICES_NET	*/
+	lxsys_readlink_block,			/* LXSYS_BLOCK		*/
+	NULL,					/* LXSYS_DEVICES_BDI	*/
 };
+
+
+/*
+ * Utility functions
+ */
+static void *
+lxsys_kstat_read(kstat_t *kn, boolean_t byname, size_t *size, int *num)
+{
+	kstat_t *kp;
+	int i, nrec = 0;
+	size_t bufsize;
+	void *buf = NULL;
+
+	if (byname == B_TRUE) {
+		kp = kstat_hold_byname(kn->ks_module, kn->ks_instance,
+		    kn->ks_name, getzoneid());
+	} else {
+		kp = kstat_hold_bykid(kn->ks_kid, getzoneid());
+	}
+	if (kp == NULL) {
+		return (NULL);
+	}
+	if (kp->ks_flags & KSTAT_FLAG_INVALID) {
+		kstat_rele(kp);
+		return (NULL);
+	}
+
+	bufsize = kp->ks_data_size + 1;
+	kstat_rele(kp);
+
+	/*
+	 * The kstat in question is released so that kmem_alloc(KM_SLEEP) is
+	 * performed without it held.  After the alloc, the kstat is reacquired
+	 * and its size is checked again. If the buffer is no longer large
+	 * enough, the alloc and check are repeated up to three times.
+	 */
+	for (i = 0; i < 2; i++) {
+		buf = kmem_alloc(bufsize, KM_SLEEP);
+
+		/* Check if bufsize still appropriate */
+		if (byname == B_TRUE) {
+			kp = kstat_hold_byname(kn->ks_module, kn->ks_instance,
+			    kn->ks_name, getzoneid());
+		} else {
+			kp = kstat_hold_bykid(kn->ks_kid, getzoneid());
+		}
+		if (kp == NULL || kp->ks_flags & KSTAT_FLAG_INVALID) {
+			if (kp != NULL) {
+				kstat_rele(kp);
+			}
+			kmem_free(buf, bufsize);
+			return (NULL);
+		}
+		KSTAT_ENTER(kp);
+		(void) KSTAT_UPDATE(kp, KSTAT_READ);
+		if (bufsize < kp->ks_data_size) {
+			kmem_free(buf, bufsize);
+			buf = NULL;
+			bufsize = kp->ks_data_size + 1;
+			KSTAT_EXIT(kp);
+			kstat_rele(kp);
+			continue;
+		} else {
+			if (KSTAT_SNAPSHOT(kp, buf, KSTAT_READ) != 0) {
+				kmem_free(buf, bufsize);
+				buf = NULL;
+			}
+			nrec = kp->ks_ndata;
+			KSTAT_EXIT(kp);
+			kstat_rele(kp);
+			break;
+		}
+	}
+
+	if (buf != NULL) {
+		*size = bufsize;
+		*num = nrec;
+	}
+	return (buf);
+}
+
+static int
+lxsys_disk_instance(kstat_t *ksp)
+{
+	int result;
+
+	/*
+	 * Use a naive method to generate the 16-bit disk instance number for
+	 * calculating the inode.  This is adequate when module and disk counts
+	 * remain low.
+	 */
+	result = (mod_name_to_major(ksp->ks_module) & 0xff) << 8;
+	result |= (ksp->ks_instance & 0xff);
+	return (result);
+}
 
 
 
@@ -409,6 +530,37 @@ lxsys_lookup(vnode_t *dp, char *comp, vnode_t **vpp, pathname_t *pathp,
 	return ((*vpp == NULL) ? ENOENT : 0);
 }
 
+static lxsys_node_t *
+lxsys_lookup_disk(lxsys_node_t *ldp, char *comp, lxsys_nodetype_t type)
+{
+	kstat_t ks0, *ksr;
+	int nidx, i;
+	size_t sidx;
+	lxsys_node_t *lnp = NULL;
+
+	ks0.ks_kid = 0;
+	ksr = (kstat_t *)lxsys_kstat_read(&ks0, B_FALSE, &sidx, &nidx);
+	if (ksr == NULL) {
+		return (NULL);
+	}
+	for (i = 1; i < nidx; i++) {
+		kstat_t *ksp = &ksr[i];
+		int inst;
+
+		if (ksp->ks_type != KSTAT_TYPE_IO ||
+		    strcmp(ksp->ks_class, "disk") != 0) {
+			continue;
+		}
+		if (strncmp(ksp->ks_name, comp, KSTAT_STRLEN) == 0 &&
+		    (inst = lxsys_disk_instance(ksp)) != 0) {
+			lnp = lxsys_getnode(ldp->lxsys_vnode, type, inst, 0);
+			break;
+		}
+	}
+	kmem_free(ksr, sidx);
+	return (lnp);
+}
+
 static vnode_t *
 lxsys_lookup_static(lxsys_node_t *ldp, char *comp)
 {
@@ -433,11 +585,17 @@ lxsys_lookup_static(lxsys_node_t *ldp, char *comp)
 			lxsys_node_t *lnp;
 
 			switch (dirent[i].d_idnum) {
+			case LXSYS_INST_BLOCKDIR:
+				node_type = LXSYS_BLOCK;
+				break;
 			case LXSYS_INST_CLASS_NETDIR:
 				node_type = LXSYS_CLASS_NET;
 				break;
 			case LXSYS_INST_DEVICES_VIRTUAL_NETDIR:
 				node_type = LXSYS_DEVICES_NET;
+				break;
+			case LXSYS_INST_DEVICES_VIRTUAL_BDIDIR:
+				node_type = LXSYS_DEVICES_BDI;
 				break;
 			default:
 				/* Another static node */
@@ -548,6 +706,41 @@ lxsys_lookup_devices_virtual_netdir(lxsys_node_t *ldp, char *comp)
 				lnp->lxsys_mode = 0444;
 				return (lnp->lxsys_vnode);
 			}
+		}
+	}
+
+	return (NULL);
+}
+
+static vnode_t *
+lxsys_lookup_blockdir(lxsys_node_t *ldp, char *comp)
+{
+	lxsys_node_t *lnp;
+
+	if (ldp->lxsys_instance == 0) {
+		/* top-level dev listing */
+		lnp = lxsys_lookup_disk(ldp, comp, LXSYS_BLOCK);
+
+		if (lnp != NULL) {
+			lnp->lxsys_vnode->v_type = VLNK;
+			return (lnp->lxsys_vnode);
+		}
+	}
+
+	return (NULL);
+}
+
+static vnode_t *
+lxsys_lookup_devices_virtual_bdidir(lxsys_node_t *ldp, char *comp)
+{
+	lxsys_node_t *lnp;
+
+	if (ldp->lxsys_instance == 0) {
+		/* top-level dev listing */
+		lnp = lxsys_lookup_disk(ldp, comp, LXSYS_DEVICES_BDI);
+
+		if (lnp != NULL) {
+			return (lnp->lxsys_vnode);
 		}
 	}
 
@@ -927,6 +1120,74 @@ lxsys_readdir_ifaces(lxsys_node_t *ldp, struct uio *uiop, int *eofp,
 	return (error);
 }
 
+static int
+lxsys_readdir_disks(lxsys_node_t *ldp, struct uio *uiop, int *eofp,
+    lxsys_nodetype_t type)
+{
+	longlong_t bp[DIRENT64_RECLEN(LXSNSIZ) / sizeof (longlong_t)];
+	dirent64_t *dirent = (dirent64_t *)bp;
+	ssize_t oresid, uresid;
+	kstat_t ks0, *ksr;
+	int nidx, i, skip, error;
+	size_t sidx;
+
+	/* Emit "." and ".." entries */
+	oresid = uiop->uio_resid;
+	error = lxsys_readdir_common(ldp, uiop, eofp, NULL, 0);
+	if (error != 0 || *eofp == 0) {
+		return (error);
+	}
+
+	ks0.ks_kid = 0;
+	ksr = (kstat_t *)lxsys_kstat_read(&ks0, B_FALSE, &sidx, &nidx);
+	if (ksr == NULL) {
+		*eofp = 1;
+		return (0);
+	}
+	skip = (uiop->uio_offset/LXSYS_SDSIZE) - 2;
+	for (i = 1; i < nidx; i++) {
+		kstat_t *ksp = &ksr[i];
+		uint_t instance;
+		int reclen;
+
+		if (ksp->ks_type != KSTAT_TYPE_IO ||
+		    strcmp(ksp->ks_class, "disk") != 0) {
+			continue;
+		}
+		if ((instance = lxsys_disk_instance(ksp)) == 0) {
+			continue;
+		}
+		if (skip > 0) {
+			skip--;
+			continue;
+		}
+
+		(void) strncpy(dirent->d_name, ksp->ks_name, KSTAT_STRLEN);
+		dirent->d_ino = lxsys_inode(type, instance, 0);
+		reclen = DIRENT64_RECLEN(strlen(dirent->d_name));
+
+		uresid = uiop->uio_resid;
+		if (reclen > uresid) {
+			if (uresid == oresid) {
+				/* Not enough space for one record */
+				error = EINVAL;
+			}
+			break;
+		}
+		if ((error = lxsys_dirent_out(dirent, reclen, uiop)) != 0) {
+			break;
+		}
+	}
+
+	/* Indicate EOF if we reached the end of the kstats. */
+	if (i >= nidx) {
+		*eofp = 1;
+	}
+	kmem_free(ksr, sidx);
+
+	return (error);
+}
+
 
 static int
 lxsys_readdir_static(lxsys_node_t *lnp, uio_t *uiop, int *eofp)
@@ -979,6 +1240,42 @@ lxsys_readdir_devices_virtual_netdir(lxsys_node_t *lnp, uio_t *uiop, int *eofp)
 		error = lxsys_readdir_subdir(lnp, uiop, eofp,
 		    dirlist_devices_virtual_net,
 		    SYSDIRLISTSZ(dirlist_devices_virtual_net));
+	} else {
+		/* there shouldn't be subdirs below this */
+		error = ENOTDIR;
+	}
+
+	return (error);
+}
+
+static int
+lxsys_readdir_blockdir(lxsys_node_t *lnp, uio_t *uiop, int *eofp)
+{
+	if (lnp->lxsys_type != LXSYS_BLOCK ||
+	    lnp->lxsys_instance != 0) {
+		/*
+		 * Since /sys/block contains only symlinks, readdir operations
+		 * should not be performed anywhere except the top level
+		 * (instance == 0).
+		 */
+		return (ENOTDIR);
+	}
+
+	return (lxsys_readdir_disks(lnp, uiop, eofp, LXSYS_BLOCK));
+}
+
+static int
+lxsys_readdir_devices_virtual_bdidir(lxsys_node_t *lnp, uio_t *uiop, int *eofp)
+{
+	int error;
+
+	if (lnp->lxsys_instance == 0) {
+		/* top-level dev listing */
+		error = lxsys_readdir_disks(lnp, uiop, eofp,
+		    LXSYS_DEVICES_NET);
+	} else if (lnp->lxsys_endpoint == 0) {
+		/* disk-level sub-item listing (empty for now) */
+		error = lxsys_readdir_subdir(lnp, uiop, eofp, NULL, 0);
 	} else {
 		/* there shouldn't be subdirs below this */
 		error = ENOTDIR;
@@ -1052,6 +1349,41 @@ lxsys_readlink_class_net(lxsys_node_t *lnp, char *buf, size_t len)
 
 	rw_exit(&ipst->ips_ill_g_lock);
 	netstack_rele(ns);
+	return (error);
+}
+
+static int
+lxsys_readlink_block(lxsys_node_t *lnp, char *buf, size_t len)
+{
+	kstat_t *ksr;
+	kstat_t ks0;
+	int nidx, i, inst, error = EINVAL;
+	size_t sidx;
+
+	if ((inst = lnp->lxsys_instance) == 0) {
+		return (error);
+	}
+
+	ks0.ks_kid = 0;
+	ksr = (kstat_t *)lxsys_kstat_read(&ks0, B_FALSE, &sidx, &nidx);
+	if (ksr == NULL) {
+		return (error);
+	}
+	for (i = 1; i < nidx; i++) {
+		kstat_t *ksp = &ksr[i];
+
+		if (ksp->ks_type != KSTAT_TYPE_IO ||
+		    strcmp(ksp->ks_class, "disk") != 0) {
+			continue;
+		}
+		if (lxsys_disk_instance(ksp) == inst) {
+			(void) snprintf(buf, len,
+			    "/sys/devices/virtual/bdi/%s", ksp->ks_name);
+			error = 0;
+			break;
+		}
+	}
+	kmem_free(ksr, sidx);
 	return (error);
 }
 
