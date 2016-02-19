@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright 2016 Gary Mills
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -27,24 +28,33 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#ifndef	_COMMON_UTIL_CTYPE_H
-#define	_COMMON_UTIL_CTYPE_H
+#ifndef	_COMMON_UTIL_STRTOLCTYPE_H
+#define	_COMMON_UTIL_STRTOLCTYPE_H
 
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
 /*
- * This header file contains a collection of macros that the strtou?ll?
- * functions in common/util use to test characters.  What we need is a kernel
- * version of ctype.h.
+ * This is a private header file containing a collection of macros that
+ * the strtou?ll? functions in common/util use to test characters.  Which
+ * macros are defined depends on which of _KERNEL or _BOOT are defined.
+ * New code should use the kernel version of ctype.h: <sys/ctype.h>.
  *
  * NOTE: These macros are used within several DTrace probe context functions.
  * They must not be altered to make function calls or perform actions not
  * safe in probe context.
  */
 
-#if	defined(_KERNEL) || defined(_BOOT)
+/*
+ * Cases that define these macros:
+ *   _KERNEL && !_BOOT: Used by kernel functions
+ *   !_KERNEL && _BOOT: Used by dboot_startkern.c for x86 boot
+ * Cases that omit these macros:
+ *   _KERNEL && _BOOT: Used by common/util/strtol.c for SPARC boot library
+ *   !_KERNEL && !_BOOT: Used by strtou?ll? functions in libc
+ */
+#if	defined(_KERNEL) ^ defined(_BOOT)
 
 #define	isalnum(ch)	(isalpha(ch) || isdigit(ch))
 #define	isalpha(ch)	(isupper(ch) || islower(ch))
@@ -56,7 +66,11 @@ extern "C" {
 #define	isxdigit(ch)	(isdigit(ch) || ((ch) >= 'a' && (ch) <= 'f') || \
 			((ch) >= 'A' && (ch) <= 'F'))
 
-#endif	/* _KERNEL || _BOOT */
+#endif	/* _KERNEL ^ _BOOT */
+
+/*
+ * The following macros are defined unconditionally.
+ */
 
 #define	DIGIT(x)	\
 	(isdigit(x) ? (x) - '0' : islower(x) ? (x) + 10 - 'a' : (x) + 10 - 'A')
@@ -76,4 +90,4 @@ extern "C" {
 }
 #endif
 
-#endif	/* _COMMON_UTIL_CTYPE_H */
+#endif	/* _COMMON_UTIL_STRTOLCTYPE_H */
