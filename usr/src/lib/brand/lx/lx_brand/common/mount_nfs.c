@@ -96,6 +96,7 @@
 #define	RET_OK		0
 #define	RET_RETRY	32
 #define	RET_ERR		33
+#define	RET_PROTOUNSUPP	34
 #define	RET_MNTERR	1000
 #define	ERR_PROTO_NONE		0
 #define	ERR_PROTO_INVALID	901
@@ -110,8 +111,10 @@ typedef struct err_ret {
 } err_ret_t;
 
 #define	SET_ERR_RET(errst, etype, eval) \
+	{ \
 	(errst)->error_type = etype; \
-	(errst)->error_value = eval;
+	(errst)->error_value = eval; \
+	}
 
 /*
  * Built-in netconfig table.
@@ -413,6 +416,8 @@ mount_nfs(struct mnttab *mntp, int mntflags, err_ret_t *retry_error,
 		/* All attempts failed */
 		if (r == RET_MNTERR) {
 			r = -EREMOTE;
+		} else if (r == RET_PROTOUNSUPP) {
+			r = -EPROTONOSUPPORT;
 		} else if (r != RET_RETRY) {
 			r = -EAGAIN;
 		}
@@ -1406,14 +1411,16 @@ get_addr(char *hostname, rpcprog_t prog, rpcvers_t vers,
 
 			/* nb is NULL - deal with errors */
 			if (error) {
-				if (error->error_type == ERR_NOHOST)
+				if (error->error_type == ERR_NOHOST) {
 					SET_ERR_RET(&errsave_nohost,
 					    error->error_type,
 					    error->error_value);
-				if (error->error_type == ERR_RPCERROR)
+				}
+				if (error->error_type == ERR_RPCERROR) {
 					SET_ERR_RET(&errsave_rpcerr,
 					    error->error_type,
 					    error->error_value);
+				}
 			}
 
 			/* continue with same protocol selection */
@@ -1447,15 +1454,17 @@ retry:
 
 				/* nb is NULL - deal with errors */
 				if (error) {
-					if (error->error_type == ERR_NOHOST)
+					if (error->error_type == ERR_NOHOST) {
 						SET_ERR_RET(&errsave_nohost,
 						    error->error_type,
 						    error->error_value);
+					}
 
-					if (error->error_type == ERR_RPCERROR)
+					if (error->error_type == ERR_RPCERROR) {
 						SET_ERR_RET(&errsave_rpcerr,
 						    error->error_type,
 						    error->error_value);
+					}
 				}
 
 				/*
@@ -1487,16 +1496,18 @@ retry:
 done:
 	if (nb == NULL) {
 		/*
-		 * Check the saved errors. The RPC error has *
+		 * Check the saved errors. The RPC error has
 		 * precedence over the no host error.
 		 */
-		if (errsave_nohost.error_type != ERR_PROTO_NONE)
+		if (errsave_nohost.error_type != ERR_PROTO_NONE) {
 			SET_ERR_RET(error, errsave_nohost.error_type,
 			    errsave_nohost.error_value);
+		}
 
-		if (errsave_rpcerr.error_type != ERR_PROTO_NONE)
+		if (errsave_rpcerr.error_type != ERR_PROTO_NONE) {
 			SET_ERR_RET(error, errsave_rpcerr.error_type,
 			    errsave_rpcerr.error_value);
+		}
 	}
 
 	return (nb);
@@ -1606,6 +1617,17 @@ get_fh(struct nfs_args *args, char *fshost, char *fspath, int *versp,
 			return (RET_OK);
 		}
 		nmdp->nmd_nfsvers_to_use = savevers;
+
+		if (retval == RET_ERR && error.error_type == ERR_RPCERROR &&
+		    error.error_value == RPC_PROGVERSMISMATCH &&
+		    nmdp->nmd_nfsvers != 0) {
+			/*
+			 * We had an explicit vers=N mount request which locked
+			 * us in to that version, however the server does not
+			 * support that version (and responded to tell us that).
+			 */
+			return (RET_PROTOUNSUPP);
+		}
 
 		vers_to_try--;
 		/* If no more versions to try, let the user know. */
