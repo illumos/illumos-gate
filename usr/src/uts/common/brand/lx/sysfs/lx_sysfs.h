@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #ifndef	_LXSYSFS_H
@@ -98,6 +98,8 @@ typedef enum lxsys_nodetype {
 	LXSYS_STATIC,		/* Statically defined entries		*/
 	LXSYS_CLASS_NET,	/* /sys/class/net/<iface>		*/
 	LXSYS_DEVICES_NET,	/* /sys/devices/virtual/net/<iface>	*/
+	LXSYS_BLOCK,		/* /sys/block/<dev>			*/
+	LXSYS_DEVICES_BDI,	/* /sys/devices/virtual/bdi/<dev>	*/
 	LXSYS_MAXTYPE,		/* type limit				*/
 } lxsys_nodetype_t;
 

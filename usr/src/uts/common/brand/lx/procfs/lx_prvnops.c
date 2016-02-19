@@ -3709,6 +3709,7 @@ lxpr_read_diskstats(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	for (i = 1; i < nidx; i++) {
 		kstat_t *ksp = &ksr[i];
 		kstat_io_t *kip;
+		int major, minor;
 
 		if (ksp->ks_type != KSTAT_TYPE_IO ||
 		    strcmp(ksp->ks_class, "disk") != 0)
@@ -3754,13 +3755,32 @@ lxpr_read_diskstats(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 		 * This is also a lie of sorts, but it should be more
 		 * immediately clear to the user that reads and writes are
 		 * each being double-counted as the other.
+		 *
+		 * Since certain consumers interpret the major/minor numbers to
+		 * infer device names, some translation is required to avoid
+		 * output which results in totally unexpected results.
 		 */
+		minor = ksp->ks_instance;
+		if (strncmp(ksp->ks_name, "sd", 2) == 0) {
+			/* map sd[0-9]+ to sd[a-z]+ */
+			major = 8;
+			minor = minor * 16;
+		} else if (strncmp(ksp->ks_name, "ram", 3) == 0) {
+			/* map ramdisk[0-9]+ to ram[0-9]+ */
+			major = 1;
+		} else if (strcmp(ksp->ks_module, "zfs") == 0) {
+			/* map zfs pools to md[0-9]+ (software RAID) */
+			major = 9;
+		} else {
+			/* pretend everything else is ide */
+			major = 2;
+			minor = minor * 64;
+		}
 		lxpr_uiobuf_printf(uiobuf, "%4d %7d %s "
 		    "%llu %llu %llu %llu "
 		    "%llu %llu %llu %llu "
 		    "%llu %llu %llu\n",
-		    mod_name_to_major(ksp->ks_module),
-		    ksp->ks_instance, ksp->ks_name,
+		    major, minor, ksp->ks_name,
 		    (uint64_t)kip->reads, 0LL,
 		    kip->nread / (uint64_t)LXPR_SECTOR_SIZE,
 		    (kip->rtime + kip->wtime) / (uint64_t)(NANOSEC / MILLISEC),
