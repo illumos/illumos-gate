@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH REBOOT 1M "Aug 24, 2009"
+.TH REBOOT 1M "Feb 21, 2016"
 .SH NAME
 reboot \- restart the operating system
 .SH SYNOPSIS
@@ -19,7 +19,6 @@ reboot \- restart the operating system
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBreboot\fR utility restarts the kernel. The kernel is loaded into memory
 by the PROM monitor, which transfers control to the loaded kernel.
@@ -49,7 +48,6 @@ options are present.
 .LP
 Normally, the system reboots itself at power-up or after crashes.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -149,7 +147,6 @@ first.
 .RE
 
 .SH OPERANDS
-.sp
 .LP
 The following operands are supported:
 .sp
@@ -212,8 +209,8 @@ be omitted.
 
 .sp
 .LP
-The following command reboots to the default entry in the GRUB (see
-\fBgrub\fR(5)) menu file \fBmenu.lst\fR.
+The following command reboots to the default entry in the boot
+menu file \fBmenu.lst\fR.
 
 .sp
 .in +2
@@ -327,30 +324,26 @@ example# \fBsvcadm refresh svc:/system/boot-config:default\fR
 .sp
 
 .LP
-\fBExample 4 \fRRebooting to a Particular GRUB Menu
+\fBExample 4 \fRRebooting to a Particular Boot Menu Entry
 .sp
 .LP
-The following commands will reboot to entry \fB2\fR in the GRUB menu.
+The following commands will reboot to entry \fB2\fR in the boot menu.
 
 .sp
 .in +2
 .nf
 example# \fBbootadm list-menu\fR
-  the location for the active GRUB menu is: /rpool/boot/grub/menu.lst
-  default 0
-  timeout 10
-  0 zfsbe1
-  1 zfsbe1 failsafe
-  2 zfsbe2
-  3 zfsbe2 Solaris xVM
-  4 zfsbe2 failsafe
+the location for the active menu is: /rpool/boot/menu.lst
+Index  Default  Dataset             Menu
+0      -        rpool/ROOT/test-182  test-182
+1      *        rpool/ROOT/test-183  test-183
+2      -        rpool/ROOT/test-183  test-183
 example# \fBreboot 2\fR
 .fi
 .in -2
 .sp
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/var/adm/wtmpx\fR\fR
@@ -361,15 +354,12 @@ login accounting file
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBmdb\fR(1), \fBboot\fR(1M), \fBdumpadm\fR(1M), \fBfsck\fR(1M),
 \fBhalt\fR(1M), \fBinit\fR(1M), \fBkernel\fR(1M), \fBshutdown\fR(1M),
 \fBsvcadm\fR(1M), \fBsvccfg\fR(1M), \fBsync\fR(1M), \fBsyslogd\fR(1M),
-\fBsync\fR(2), \fBuadmin\fR(2), \fBreboot\fR(3C), \fBattributes\fR(5),
-\fBgrub\fR(5)
+\fBsync\fR(2), \fBuadmin\fR(2), \fBreboot\fR(3C), \fBattributes\fR(5)
 .SH NOTES
-.sp
 .LP
 The \fBreboot\fR utility does not execute the scripts in
 \fB/etc/rc\fInum\fR.d\fR or execute shutdown actions in \fBinittab\fR(4). To
