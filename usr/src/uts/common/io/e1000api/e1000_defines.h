@@ -1,6 +1,6 @@
 /******************************************************************************
 
-  Copyright (c) 2001-2014, Intel Corporation 
+  Copyright (c) 2001-2015, Intel Corporation 
   All rights reserved.
   
   Redistribution and use in source and binary forms, with or without 
@@ -158,11 +158,12 @@
 	E1000_RXDEXT_STATERR_CXE |	\
 	E1000_RXDEXT_STATERR_RXE)
 
-#define E1000_MRQC_ENABLE_RSS_2Q		0x00000001
+#define E1000_MRQC_RSS_ENABLE_2Q		0x00000001
 #define E1000_MRQC_RSS_FIELD_MASK		0xFFFF0000
 #define E1000_MRQC_RSS_FIELD_IPV4_TCP		0x00010000
 #define E1000_MRQC_RSS_FIELD_IPV4		0x00020000
 #define E1000_MRQC_RSS_FIELD_IPV6_TCP_EX	0x00040000
+#define E1000_MRQC_RSS_FIELD_IPV6_EX		0x00080000
 #define E1000_MRQC_RSS_FIELD_IPV6		0x00100000
 #define E1000_MRQC_RSS_FIELD_IPV6_TCP		0x00200000
 
@@ -196,6 +197,8 @@
 #define E1000_RCTL_LBM_TCVR	0x000000C0 /* tcvr loopback mode */
 #define E1000_RCTL_DTYP_PS	0x00000400 /* Packet Split descriptor */
 #define E1000_RCTL_RDMTS_HALF	0x00000000 /* Rx desc min thresh size */
+#define E1000_RCTL_RDMTS_HEX	0x00010000
+#define E1000_RCTL_RDMTS1_HEX	E1000_RCTL_RDMTS_HEX
 #define E1000_RCTL_MO_SHIFT	12 /* multicast offset shift */
 #define E1000_RCTL_MO_3		0x00003000 /* multicast offset 15:4 */
 #define E1000_RCTL_BAM		0x00008000 /* broadcast enable */
@@ -752,6 +755,12 @@
 #define E1000_TSYNCTXCTL_VALID		0x00000001 /* Tx timestamp valid */
 #define E1000_TSYNCTXCTL_ENABLED	0x00000010 /* enable Tx timestamping */
 
+/* HH Time Sync */
+#define E1000_TSYNCTXCTL_MAX_ALLOWED_DLY_MASK	0x0000F000 /* max delay */
+#define E1000_TSYNCTXCTL_SYNC_COMP_ERR		0x20000000 /* sync err */
+#define E1000_TSYNCTXCTL_SYNC_COMP		0x40000000 /* sync complete */
+#define E1000_TSYNCTXCTL_START_SYNC		0x80000000 /* initiate sync */
+
 #define E1000_TSYNCRXCTL_VALID		0x00000001 /* Rx timestamp valid */
 #define E1000_TSYNCRXCTL_TYPE_MASK	0x0000000E /* Rx type mask */
 #define E1000_TSYNCRXCTL_TYPE_L2_V2	0x00
@@ -848,6 +857,7 @@
 #define E1000_M88E1543_PAGE_ADDR	0x16       /* Page Offset Register */
 #define E1000_M88E1543_EEE_CTRL_1	0x0
 #define E1000_M88E1543_EEE_CTRL_1_MS	0x0001     /* EEE Master/Slave */
+#define E1000_M88E1543_FIBER_CTRL	0x0        /* Fiber Control Register */
 #define E1000_EEE_ADV_DEV_I354		7
 #define E1000_EEE_ADV_ADDR_I354		60
 #define E1000_EEE_ADV_100_SUPPORTED	(1 << 1)   /* 100BaseTx EEE Supported */
@@ -1019,9 +1029,7 @@
 /* NVM Addressing bits based on type 0=small, 1=large */
 #define E1000_EECD_ADDR_BITS	0x00000400
 #define E1000_EECD_TYPE		0x00002000 /* NVM Type (1-SPI, 0-Microwire) */
-#ifndef E1000_NVM_GRANT_ATTEMPTS
 #define E1000_NVM_GRANT_ATTEMPTS	1000 /* NVM # attempts to gain grant */
-#endif
 #define E1000_EECD_AUTO_RD		0x00000200  /* NVM Auto Read done */
 #define E1000_EECD_SIZE_EX_MASK		0x00007800  /* NVM Size */
 #define E1000_EECD_SIZE_EX_SHIFT	11
@@ -1058,7 +1066,6 @@
 /* NVM Word Offsets */
 #define NVM_COMPAT			0x0003
 #define NVM_ID_LED_SETTINGS		0x0004
-#define	NVM_VERSION			0x0005
 #define NVM_SERDES_AMPLITUDE		0x0006 /* SERDES output amplitude */
 #define NVM_PHY_CLASS_WORD		0x0007
 #define E1000_I210_NVM_FW_MODULE_PTR	0x0010
@@ -1121,10 +1128,6 @@
 
 /* For checksumming, the sum of all words in the NVM should equal 0xBABA. */
 #define NVM_SUM				0xBABA
-
-/* OEM NVM Offsets */
-#define	NVM_OEM_OFFSET_0		6
-#define	NVM_OEM_OFFSET_1		7
 
 /* PBA (printed board assembly) number words */
 #define NVM_PBA_OFFSET_0		8
@@ -1473,4 +1476,12 @@
 #ifndef ERROR_REPORT
 #define ERROR_REPORT(fmt)	do { } while (0)
 #endif /* ERROR_REPORT */
+
+/*
+ * illumos additions
+ */
+#define		NVM_VERSION			0x0005
+#define		NVM_OEM_OFFSET_0		6
+#define		NVM_OEM_OFFSET_1		7
+
 #endif /* _E1000_DEFINES_H_ */

@@ -1375,13 +1375,15 @@ igb_set_priv_prop(igb_t *igb, const char *pr_name,
 			case e1000_i350:
 				/* Must set this prior to the set call. */
 				hw->dev_spec._82575.eee_disable = !result;
-				if (e1000_set_eee_i350(hw) != E1000_SUCCESS)
+				if (e1000_set_eee_i350(hw, result,
+				    result) != E1000_SUCCESS)
 					err = EIO;
 				break;
 			case e1000_i354:
 				/* Must set this prior to the set call. */
 				hw->dev_spec._82575.eee_disable = !result;
-				if (e1000_set_eee_i354(hw) != E1000_SUCCESS)
+				if (e1000_set_eee_i354(hw, result,
+				    result) != E1000_SUCCESS)
 					err = EIO;
 				break;
 			default:

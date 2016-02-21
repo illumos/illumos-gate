@@ -24,6 +24,7 @@
 
 /*
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*
@@ -902,4 +903,39 @@ rx_drop:
 	}
 
 	return (ret_mp);
+}
+
+/*
+ * This is part of a workaround for the I219, see e1000g_flush_desc_rings() for
+ * more information.
+ *
+ * Flush all descriptors in the rx ring and disable it.
+ */
+void
+e1000g_flush_rx_ring(struct e1000g *Adapter)
+{
+	struct e1000_hw	*hw = &Adapter->shared;
+	uint32_t rctl, rxdctl;
+
+	rctl = E1000_READ_REG(hw, E1000_RCTL);
+	E1000_WRITE_REG(hw, E1000_RCTL, rctl & ~E1000_RCTL_EN);
+	E1000_WRITE_FLUSH(hw);
+	usec_delay(150);
+
+	rxdctl = E1000_READ_REG(hw, E1000_RXDCTL(0));
+	/* Zero the lower 14 bits (prefetch and host thresholds). */
+	rxdctl &= 0xffffc000;
+	/*
+	 * Update thresholds: prefetch threshold to 31, host threshold to 1
+	 * and make sure the granularity is "descriptors" and not "cache lines"
+	 */
+	rxdctl |= (0x1F | (1 << 8) | E1000_RXDCTL_THRESH_UNIT_DESC);
+	E1000_WRITE_REG(hw, E1000_RXDCTL(0), rxdctl);
+
+	/* Momentarily enable the RX ring for the changes to take effect */
+	E1000_WRITE_REG(hw, E1000_RCTL, rctl | E1000_RCTL_EN);
+	E1000_WRITE_FLUSH(hw);
+	usec_delay(150);
+	E1000_WRITE_REG(hw, E1000_RCTL, rctl & ~E1000_RCTL_EN);
+
 }
