@@ -106,7 +106,10 @@
 			<propval name='policy' type='astring' value='none' />
 			<propval name='block_policy' type='astring'
 				value='none' />
-			<propval name='custom_policy_file' type='astring' value='' />
+			<propval name='custom_policy_file' type='astring'
+				value='/etc/ipf/ipf.conf' />
+			<propval name='custom_policy_file_6' type='astring'
+				value='/etc/ipf/ipf6.conf' />
 			<propval name='apply_to' type='astring' value='' />
 			<propval name='apply_to_6' type='astring' value='' />
 			<propval name='exceptions' type='astring' value='' />
