@@ -14,6 +14,7 @@
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
+# Copyright 2016 Nexenta Systems, Inc.
 #
 
 export STF_SUITE="/opt/zfs-tests"
@@ -115,13 +116,16 @@ else
 	verify_disks || fail "Couldn't verify all the disks in \$DISKS"
 fi
 
-# Add the rpool to $KEEP according to its contents. It's ok to list it twice.
+# Add the root pool to $KEEP according to its contents.
+# It's ok to list it twice.
 if [[ -z $KEEP ]]; then
-	export KEEP="^$(find_rpool)\$"
+	KEEP="$(find_rpool)"
 else
-	export KEEP="^$(echo $KEEP | sed 's/ /|$/')\$"
-	KEEP+="|^$(find_rpool)\$"
+	KEEP+=" $(find_rpool)"
 fi
+
+export __ZFS_POOL_EXCLUDE="$KEEP"
+export KEEP="^$(echo $KEEP | sed 's/ /$|^/g')\$"
 
 [[ -z $runfile ]] && runfile=$(find_runfile)
 [[ -z $runfile ]] && fail "Couldn't determine distro"
