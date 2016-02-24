@@ -524,8 +524,7 @@ cmd_fw_defect(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class,
 		}
 	}
 
-	if (rsc)
-		nvlist_free(rsc);
+	nvlist_free(rsc);
 
 	return (solve ? CMD_EVD_OK : CMD_EVD_UNUSED);
 }

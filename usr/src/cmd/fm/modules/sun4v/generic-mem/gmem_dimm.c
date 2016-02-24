@@ -482,8 +482,7 @@ gmem_dimm_present(fmd_hdl_t *hdl, nvlist_t *asru)
 		fmd_hdl_debug(hdl, "Dimm sn=%s is not present\n", sn);
 		return (0);
 	}
-	if (dimm != NULL)
-		nvlist_free(dimm);
+	nvlist_free(dimm);
 	return (1);
 }
 

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH NVLIST_ALLOC 9F "Jan 16, 2006"
+.TH NVLIST_ALLOC 9F "Feb 15, 2016"
 .SH NAME
 nvlist_alloc, nvlist_free, nvlist_size, nvlist_pack, nvlist_unpack, nvlist_dup,
 nv_alloc_init, nv_alloc_fini, nvlist_xalloc, nvlist_xpack, nvlist_xunpack,
@@ -104,11 +104,9 @@ Pluggable Allocation Initialization with Fixed Allocator:
 .fi
 
 .SH INTERFACE LEVEL
-.sp
 .LP
 Solaris DDI specific (Solaris DDI)
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fInvlp\fR\fR
@@ -236,7 +234,6 @@ Points to a nv_alloc_t structure to be used for the specified \fBnvlist_t\fR.
 .RE
 
 .SH DESCRIPTION
-.sp
 .LP
 List Manipulation:
 .sp
@@ -259,7 +256,8 @@ The \fBnvlist_xalloc()\fR function differs from \fBnvlist_alloc()\fR in that
 Pluggable Allocators section.
 .sp
 .LP
-The \fBnvlist_free()\fR function frees a name-value pair list.
+The \fBnvlist_free()\fR function frees a name-value pair list. If \fInvl\fR
+is a null pointer, no action occurs.
 .sp
 .LP
 The \fBnvlist_size()\fR function returns the minimum size of a contiguous
@@ -338,7 +336,6 @@ has the type \fBNV_UNIQUE_NAME_TYPE\fR).
 The \fBnvlist_lookup_nv_alloc()\fR function retrieves the pointer to the
 allocator used when manipulating a name-value pair list.
 .SS "PLUGGABLE ALLOCATORS"
-.sp
 .LP
 Using Pluggable Allocators:
 .sp
@@ -422,7 +419,6 @@ When invoked on a fixed-buffer, the \fBnv_alloc_reset()\fR function resets the
 fixed buffer and prepares it for re-use. The framework consumer is responsible
 for freeing the buffer passed to \fBnv_alloc_init()\fR.
 .SS "CREATING PLUGGABLE ALLOCATORS"
-.sp
 .LP
 Any producer of name-value pairs may possibily specify his own allocator
 routines. You must provide the following pluggable allocator operations in the
@@ -472,7 +468,6 @@ must exactly match the original allocation.
 The disposition of the allocated objects and the memory used to store them is
 left to the allocator implementation.
 .SH RETURN VALUES
-.sp
 .LP
 For \fBnvlist_alloc()\fR, \fBnvlist_dup()\fR, \fBnvlist_xalloc()\fR, and
 \fBnvlist_xdup()\fR:
@@ -580,13 +575,11 @@ For \fBnvlist_lookup_nv_alloc()\fR:
 .LP
 pointer to the allocator
 .SH USAGE
-.sp
 .LP
 The fixed-buffer allocator is very simple allocator. It uses a pre-allocated
 buffer for memory allocations and it can be used in interrupt context. You are
 responsible for allocation and de-allocation for the pre-allocated buffer.
 .SH EXAMPLES
-.sp
 .in +2
 .nf
   /*
@@ -634,7 +627,6 @@ responsible for allocation and de-allocation for the pre-allocated buffer.
 .in -2
 
 .SH CONTEXT
-.sp
 .LP
 The \fBnvlist_alloc()\fR, \fBnvlist_pack()\fR, \fBnvlist_unpack()\fR, and
 \fBnvlist_dup()\fR functions can be called from interrupt context only if the

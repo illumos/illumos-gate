@@ -716,10 +716,8 @@ dm_isoverlapping(char *slicename, char **overlaps_with, int *errp)
 	}
 
 out:
-	if (media_attrs)
-		nvlist_free(media_attrs);
-	if (slice_attrs)
-		nvlist_free(slice_attrs);
+	nvlist_free(media_attrs);
+	nvlist_free(slice_attrs);
 
 	if (slices)
 		dm_free_descriptors(slices);
@@ -1057,8 +1055,7 @@ dm_inuse(char *dev_name, char **msg, dm_who_type_t who, int *errp)
 out:
 	if (dname != NULL)
 		free(dname);
-	if (dev_stats != NULL)
-		nvlist_free(dev_stats);
+	nvlist_free(dev_stats);
 
 	return (found);
 }

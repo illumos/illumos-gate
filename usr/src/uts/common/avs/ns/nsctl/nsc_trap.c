@@ -71,8 +71,7 @@ nsc_do_sysevent(char *driver_name, char *trap_messages, int errorno,
 		rc = ddi_log_sysevent(info_dip, DDI_VENDOR_SUNW,
 		    SVE_II_CLASS, component, attr_list, NULL, DDI_SLEEP);
 out:
-	if (attr_list)
-		nvlist_free(attr_list);
+	nvlist_free(attr_list);
 
 	if (rc != 0) {
 		cmn_err(CE_WARN, "!%s: unable to log sysevent %d:%s and %d",

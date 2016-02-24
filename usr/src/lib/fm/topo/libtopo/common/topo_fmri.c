@@ -74,8 +74,7 @@
 static int
 set_error(topo_hdl_t *thp, int err, int *errp, char *method, nvlist_t *nvlp)
 {
-	if (nvlp != NULL)
-		nvlist_free(nvlp);
+	nvlist_free(nvlp);
 
 	topo_dprintf(thp, TOPO_DBG_ERR, "%s failed: %s\n", method,
 	    topo_strerror(err));
@@ -88,8 +87,7 @@ set_error(topo_hdl_t *thp, int err, int *errp, char *method, nvlist_t *nvlp)
 static nvlist_t *
 set_nverror(topo_hdl_t *thp, int err, int *errp, char *method, nvlist_t *nvlp)
 {
-	if (nvlp != NULL)
-		nvlist_free(nvlp);
+	nvlist_free(nvlp);
 
 	topo_dprintf(thp, TOPO_DBG_ERR, "%s failed: %s\n", method,
 	    topo_strerror(err));
@@ -593,8 +591,7 @@ int topo_fmri_setprop(topo_hdl_t *thp, nvlist_t *nvl, const char *pg,
 	nvlist_free(in);
 
 	/* no return values */
-	if (out != NULL)
-		nvlist_free(out);
+	nvlist_free(out);
 
 	if (rv)
 		return (-1);

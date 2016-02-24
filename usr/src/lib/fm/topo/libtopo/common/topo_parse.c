@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <libxml/parser.h>
 #include <fm/libtopo.h>
 #include <topo_alloc.h>
@@ -195,8 +193,7 @@ tf_pad_free(topo_mod_t *mp, tf_pad_t *p)
 		return;
 	if (p->tpad_pgs != NULL) {
 		for (n = 0; n < p->tpad_pgcnt; n++)
-			if (p->tpad_pgs[n] != NULL)
-				nvlist_free(p->tpad_pgs[n]);
+			nvlist_free(p->tpad_pgs[n]);
 		topo_mod_free(mp,
 		    p->tpad_pgs, p->tpad_pgcnt * sizeof (nvlist_t *));
 	}

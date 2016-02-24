@@ -109,8 +109,7 @@ propval_get(topo_pgroup_t *pg, const char *pname)
 static int
 method_geterror(nvlist_t *nvl, int err, int *errp)
 {
-	if (nvl != NULL)
-		nvlist_free(nvl);
+	nvlist_free(nvl);
 
 	*errp = err;
 
@@ -165,8 +164,7 @@ prop_method_get(tnode_t *node, topo_propval_t *pv, topo_propmethod_t *pm,
 		return (method_geterror(nvl, ETOPO_PROP_TYPE, err));
 
 	/* Release the last value and re-assign to the new value */
-	if (pv->tp_val != NULL)
-		nvlist_free(pv->tp_val);
+	nvlist_free(pv->tp_val);
 	pv->tp_val = nvl;
 
 	return (0);
@@ -855,8 +853,7 @@ register_methoderror(tnode_t *node, topo_propmethod_t *pm, int *errp, int l,
 	if (pm != NULL) {
 		if (pm->tpm_name != NULL)
 			topo_hdl_strfree(thp, pm->tpm_name);
-		if (pm->tpm_args != NULL)
-			nvlist_free(pm->tpm_args);
+		nvlist_free(pm->tpm_args);
 		topo_hdl_free(thp, pm, sizeof (topo_propmethod_t));
 	}
 
@@ -1307,8 +1304,7 @@ propmethod_destroy(topo_hdl_t *thp, topo_propval_t *pv)
 	if (pm != NULL) {
 		if (pm->tpm_name != NULL)
 			topo_hdl_strfree(thp, pm->tpm_name);
-		if (pm->tpm_args != NULL)
-			nvlist_free(pm->tpm_args);
+		nvlist_free(pm->tpm_args);
 		topo_hdl_free(thp, pm, sizeof (topo_propmethod_t));
 		pv->tp_method = NULL;
 	}
@@ -1327,8 +1323,7 @@ topo_propval_destroy(topo_propval_t *pv)
 	if (pv->tp_name != NULL)
 		topo_hdl_strfree(thp, pv->tp_name);
 
-	if (pv->tp_val != NULL)
-		nvlist_free(pv->tp_val);
+	nvlist_free(pv->tp_val);
 
 	propmethod_destroy(thp, pv);
 
@@ -1403,8 +1398,7 @@ get_pgrp_seterror(tnode_t *node, nvlist_t *nvl, int *errp, int err)
 {
 	topo_node_unlock(node);
 
-	if (nvl != NULL)
-		nvlist_free(nvl);
+	nvlist_free(nvl);
 
 	*errp = err;
 
@@ -1476,8 +1470,7 @@ get_all_seterror(tnode_t *node, nvlist_t *nvl, int *errp, int err)
 {
 	topo_node_unlock(node);
 
-	if (nvl != NULL)
-		nvlist_free(nvl);
+	nvlist_free(nvl);
 
 	*errp = err;
 

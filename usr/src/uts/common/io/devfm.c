@@ -298,12 +298,10 @@ fm_ioctl(dev_t dev, int cmd, intptr_t data, int flag, cred_t *cred, int *rvalp)
 
 	err = subr->func(cmd, invl, &onvl);
 
-	if (invl != NULL)
-		nvlist_free(invl);
+	nvlist_free(invl);
 
 	if (err != 0) {
-		if (onvl != NULL)
-			nvlist_free(onvl);
+		nvlist_free(onvl);
 		return (err);
 	}
 
@@ -425,8 +423,7 @@ _fini(void)
 	int ret;
 
 	if ((ret = mod_remove(&modlinkage)) == 0) {
-		if (fm_vers_nvl != NULL)
-			nvlist_free(fm_vers_nvl);
+		nvlist_free(fm_vers_nvl);
 	}
 
 	return (ret);

@@ -281,18 +281,12 @@ context:
 out:
 	if (moderr == 0)
 		*out = fmri;
-
-	if (moderr != 0 && fmri)
+	else
 		nvlist_free(fmri);
 
-	if (obj)
-		nvlist_free(obj);
-
-	if (site)
-		nvlist_free(site);
-
-	if (ctxt)
-		nvlist_free(ctxt);
+	nvlist_free(obj);
+	nvlist_free(site);
+	nvlist_free(ctxt);
 
 	return (moderr == 0 ? 0 : topo_mod_seterrno(mod, moderr));
 }

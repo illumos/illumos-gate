@@ -1164,8 +1164,7 @@ evch_chunbind(evch_bind_t *bp)
 		mutex_exit(&chp->ch_mutex);
 		evch_dl_del(&eg->evch_list, &chp->ch_link);
 		evch_evq_destroy(chp->ch_queue);
-		if (chp->ch_propnvl)
-			nvlist_free(chp->ch_propnvl);
+		nvlist_free(chp->ch_propnvl);
 		mutex_destroy(&chp->ch_mutex);
 		mutex_destroy(&chp->ch_pubmx);
 		cv_destroy(&chp->ch_pubcv);
@@ -1572,8 +1571,7 @@ evch_chsetpropnvl(evch_bind_t *bp, nvlist_t *nvl)
 
 	mutex_enter(&chp->ch_mutex);
 
-	if (chp->ch_propnvl)
-		nvlist_free(chp->ch_propnvl);
+	nvlist_free(chp->ch_propnvl);
 
 	chp->ch_propnvl = nvl;
 	chp->ch_propnvlgen++;

@@ -80,8 +80,7 @@ reparse_init(void)
 void
 reparse_free(nvlist_t *nvl)
 {
-	if (nvl)
-		nvlist_free(nvl);
+	nvlist_free(nvl);
 }
 
 /*

@@ -313,8 +313,7 @@ inb_create_nvl()
 		    (uint8_t)nb_number_memory_controllers);
 	inb_dimmlist(nvl);
 
-	if (inb_mc_nvl)
-		nvlist_free(inb_mc_nvl);
+	nvlist_free(inb_mc_nvl);
 	inb_mc_nvl = nvl;
 }
 

@@ -366,8 +366,7 @@ pci_cache_pack_nvlist(nvf_handle_t hdl, nvlist_t **ret_nvl)
 	return (DDI_SUCCESS);
 
 error:
-	if (sub_nvl)
-		nvlist_free(sub_nvl);
+	nvlist_free(sub_nvl);
 	ASSERT(nvl);
 	nvlist_free(nvl);
 	*ret_nvl = NULL;

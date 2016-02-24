@@ -287,12 +287,9 @@ fmevt_detector(nvlist_t *attr, char *ruleset, int user, int priv,
 	err += nvlist_add_nvlist(dtcr, FM_FMRI_SW_CTXT, ctxt);
 
 done:
-	if (obj != NULL)
-		nvlist_free(obj);
-	if (site != NULL)
-		nvlist_free(site);
-	if (ctxt != NULL)
-		nvlist_free(ctxt);
+	nvlist_free(obj);
+	nvlist_free(site);
+	nvlist_free(ctxt);
 
 	if (err == 0) {
 		return (dtcr);
@@ -556,8 +553,7 @@ done:
 	if (ruleset)
 		free(ruleset);
 
-	if (rawattr)
-		nvlist_free(rawattr);
+	nvlist_free(rawattr);
 
 	return (0);	/* in all cases consider the event delivered */
 }

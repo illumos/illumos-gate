@@ -612,8 +612,7 @@ FRU_set(tnode_t *tn, did_t *pd,
 		}
 		nvlist_free(in);
 		(void) topo_node_fru_set(tn, out, 0, &err);
-		if (out != NULL)
-			nvlist_free(out);
+		nvlist_free(out);
 	} else
 		(void) topo_node_fru_set(tn, NULL, 0, &err);
 

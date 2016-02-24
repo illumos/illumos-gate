@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Routines for traversing and packing/unpacking the handle
  * returned from ri_init.
@@ -82,8 +80,7 @@ ri_ap_free(ri_ap_t *ap)
 
 	assert(ap != NULL);
 
-	if (ap->conf_props != NULL)
-		nvlist_free(ap->conf_props);
+	nvlist_free(ap->conf_props);
 
 	while ((dev = ap->cpus) != NULL) {
 		ap->cpus = dev->next;
@@ -120,10 +117,8 @@ ri_client_free(ri_client_t *client)
 {
 	assert(client != NULL);
 
-	if (client->usg_props != NULL)
-		nvlist_free(client->usg_props);
-	if (client->v_props != NULL)
-		nvlist_free(client->v_props);
+	nvlist_free(client->usg_props);
+	nvlist_free(client->v_props);
 	free(client);
 }
 
@@ -196,8 +191,7 @@ ri_pack(ri_hdl_t *hdl, caddr_t *bufp, size_t *sizep, int encoding)
 
 fail:
 	s_free(buf);
-	if (nvl != NULL)
-		nvlist_free(nvl);
+	nvlist_free(nvl);
 
 	return (RI_FAILURE);
 }
@@ -250,8 +244,7 @@ ap_list_pack(ri_ap_t *aplist, char **bufp, size_t *sizep, int encoding)
 
 fail:
 	s_free(buf);
-	if (nvl != NULL)
-		nvlist_free(nvl);
+	nvlist_free(nvl);
 
 	return (-1);
 }
@@ -304,8 +297,7 @@ dev_list_pack(ri_dev_t *devlist, char **bufp, size_t *sizep, int encoding)
 
 fail:
 	s_free(buf);
-	if (nvl != NULL)
-		nvlist_free(nvl);
+	nvlist_free(nvl);
 
 	return (-1);
 }
@@ -359,8 +351,7 @@ client_list_pack(ri_client_t *client_list, char **bufp, size_t *sizep,
 
 fail:
 	s_free(buf);
-	if (nvl != NULL)
-		nvlist_free(nvl);
+	nvlist_free(nvl);
 
 	return (-1);
 }
@@ -424,8 +415,7 @@ ap_pack(ri_ap_t *ap, char **bufp, size_t *sizep, int encoding)
 
 fail:
 	s_free(buf);
-	if (nvl != NULL)
-		nvlist_free(nvl);
+	nvlist_free(nvl);
 
 	return (-1);
 }
@@ -470,8 +460,7 @@ dev_pack(ri_dev_t *dev, char **bufp, size_t *sizep, int encoding)
 
 fail:
 	s_free(buf);
-	if (nvl != NULL)
-		nvlist_free(nvl);
+	nvlist_free(nvl);
 
 	return (-1);
 }
@@ -515,8 +504,7 @@ client_pack(ri_client_t *client, char **bufp, size_t *sizep, int encoding)
 
 fail:
 	s_free(buf);
-	if (nvl != NULL)
-		nvlist_free(nvl);
+	nvlist_free(nvl);
 
 	return (-1);
 }
@@ -617,8 +605,7 @@ ri_unpack(caddr_t buf, size_t size, ri_hdl_t **hdlp)
 
 fail:
 	free(ri_hdl);
-	if (nvl != NULL)
-		nvlist_free(nvl);
+	nvlist_free(nvl);
 
 	return (-1);
 }
@@ -671,8 +658,7 @@ ap_list_unpack(char *buf, size_t size, ri_ap_t **aps)
 	return (0);
 
 fail:
-	if (nvl != NULL)
-		nvlist_free(nvl);
+	nvlist_free(nvl);
 	if (aplist != NULL) {
 		while ((tmp = aplist) != NULL) {
 			aplist = aplist->next;
@@ -729,8 +715,7 @@ dev_list_unpack(char *buf, size_t size, ri_dev_t **devs)
 	return (0);
 
 fail:
-	if (nvl != NULL)
-		nvlist_free(nvl);
+	nvlist_free(nvl);
 	if (devlist != NULL) {
 		while ((tmp = devlist) != NULL) {
 			devlist = devlist->next;
@@ -789,8 +774,7 @@ client_list_unpack(char *buf, size_t size, ri_client_t **clients)
 	return (0);
 
 fail:
-	if (nvl != NULL)
-		nvlist_free(nvl);
+	nvlist_free(nvl);
 	if (client_list != NULL) {
 		while ((tmp = client_list) != NULL) {
 			client_list = client_list->next;

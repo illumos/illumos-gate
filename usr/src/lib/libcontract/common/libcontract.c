@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/ctfs.h>
 #include <sys/contract.h>
 #include <string.h>
@@ -467,8 +465,7 @@ errout:
 	if (event_buffer)
 		free(event_buffer);
 	if (info) {
-		if (info->nvl)
-			nvlist_free(info->nvl);
+		nvlist_free(info->nvl);
 		free(info);
 	}
 	return (error);
@@ -507,8 +504,7 @@ ct_event_free(ct_evthdl_t evthdl)
 {
 	struct ctlib_event_info *info = evthdl;
 
-	if (info->nvl)
-		nvlist_free(info->nvl);
+	nvlist_free(info->nvl);
 	free(info);
 }
 

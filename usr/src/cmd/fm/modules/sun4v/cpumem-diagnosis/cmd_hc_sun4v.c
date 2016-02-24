@@ -200,8 +200,7 @@ cmd_mkboard_fru(fmd_hdl_t *hdl, char *frustr, char *serialstr, char *partstr) {
 
 	if (cmd_breakup_components(nac, "/", hc_list) < 0) {
 		for (i = 0; i < n; i++) {
-			if (hc_list[i] != NULL)
-			    nvlist_free(hc_list[i]);
+			nvlist_free(hc_list[i]);
 		}
 		fmd_hdl_free(hdl, hc_list, sizeof (nvlist_t *)*n);
 		fmd_hdl_free(hdl, nac, len);
@@ -210,8 +209,7 @@ cmd_mkboard_fru(fmd_hdl_t *hdl, char *frustr, char *serialstr, char *partstr) {
 
 	if (nvlist_alloc(&fru, NV_UNIQUE_NAME, 0) != 0) {
 		for (i = 0; i < n; i++) {
-			if (hc_list[i] != NULL)
-			    nvlist_free(hc_list[i]);
+			nvlist_free(hc_list[i]);
 		}
 		fmd_hdl_free(hdl, hc_list, sizeof (nvlist_t *)*n);
 		fmd_hdl_free(hdl, nac, len);
@@ -224,8 +222,7 @@ cmd_mkboard_fru(fmd_hdl_t *hdl, char *frustr, char *serialstr, char *partstr) {
 	    nvlist_add_uint32(fru, FM_FMRI_HC_LIST_SZ, n) != 0 ||
 	    nvlist_add_nvlist_array(fru, FM_FMRI_HC_LIST, hc_list, n) != 0) {
 		for (i = 0; i < n; i++) {
-			if (hc_list[i] != NULL)
-			    nvlist_free(hc_list[i]);
+			nvlist_free(hc_list[i]);
 		}
 		fmd_hdl_free(hdl, hc_list, sizeof (nvlist_t *)*n);
 		fmd_hdl_free(hdl, nac, len);
@@ -234,8 +231,7 @@ cmd_mkboard_fru(fmd_hdl_t *hdl, char *frustr, char *serialstr, char *partstr) {
 	}
 
 	for (i = 0; i < n; i++) {
-		if (hc_list[i] != NULL)
-		    nvlist_free(hc_list[i]);
+		nvlist_free(hc_list[i]);
 	}
 	fmd_hdl_free(hdl, hc_list, sizeof (nvlist_t *)*n);
 	fmd_hdl_free(hdl, nac, len);
@@ -272,8 +268,7 @@ cmd_boardfru_create_fault(fmd_hdl_t *hdl, nvlist_t *asru, const char *fltnm,
 
 	flt = cmd_nvl_create_fault(hdl, fltnm, cert, nvlfru, nvlfru, NULL);
 	flt = cmd_fault_add_location(hdl, flt, loc);
-	if (nvlfru != NULL)
-		nvlist_free(nvlfru);
+	nvlist_free(nvlfru);
 	return (flt);
 }
 
@@ -638,16 +633,14 @@ cmd_nvl_create_fault(fmd_hdl_t *hdl, const char *class, uint8_t cert,
 		}
 		fllist = fmd_nvl_create_fault(hdl, class, cert, asru,
 		    fru, rsrc);
-		if (hsp != NULL)
-			nvlist_free(hsp);
+		nvlist_free(hsp);
 	} else {
 		rsrc = get_cpu_fault_resource(hdl, asru);
 		fllist = fmd_nvl_create_fault(hdl, class, cert, asru,
 		    fru, rsrc);
 	}
 
-	if (rsrc != NULL)
-		nvlist_free(rsrc);
+	nvlist_free(rsrc);
 
 	return (fllist);
 }

@@ -1770,8 +1770,7 @@ _scf_get_fma_notify_params(const char *class, nvlist_t *nvl, int getsource)
 	r = SCF_SUCCESS;
 
 cleanup:
-	if (params)
-		nvlist_free(params);
+	nvlist_free(params);
 	scf_pg_destroy(pg);
 	scf_instance_destroy(i);
 	scf_handle_destroy(h);

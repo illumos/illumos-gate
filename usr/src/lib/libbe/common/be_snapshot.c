@@ -606,8 +606,7 @@ _be_create_snapshot(char *be_name, char **snap_name, char *policy)
 done:
 	ZFS_CLOSE(zhp);
 
-	if (ss_props != NULL)
-		nvlist_free(ss_props);
+	nvlist_free(ss_props);
 
 	return (ret);
 }

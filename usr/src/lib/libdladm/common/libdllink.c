@@ -580,8 +580,7 @@ i_dladm_rename_link_c2(dladm_handle_t handle, datalink_id_t linkid1,
 done:
 	if (rcm_hdl != NULL)
 		(void) rcm_free_handle(rcm_hdl);
-	if (nvl != NULL)
-		nvlist_free(nvl);
+	nvlist_free(nvl);
 	return (status);
 }
 

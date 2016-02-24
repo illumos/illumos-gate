@@ -2525,8 +2525,7 @@ stmf_load_ppd_ioctl(stmf_ppioctl_data_t *ppi, uint64_t *ppi_token,
 	}
 
 	/* Free any existing lists and add this one to the ppd */
-	if (ppd->ppd_nv)
-		nvlist_free(ppd->ppd_nv);
+	nvlist_free(ppd->ppd_nv);
 	ppd->ppd_nv = nv;
 
 	/* set the token for writes */
@@ -2598,8 +2597,7 @@ stmf_delete_ppd(stmf_pp_data_t *ppd)
 		return;
 
 	*pppd = ppd->ppd_next;
-	if (ppd->ppd_nv)
-		nvlist_free(ppd->ppd_nv);
+	nvlist_free(ppd->ppd_nv);
 
 	kmem_free(ppd, ppd->ppd_alloc_size);
 }
