@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 #include <smbsrv/smb_kproto.h>
@@ -572,11 +573,13 @@ smb_fem_oplock_vnevent(
 	if (ct != &smb_ct) {
 		switch (vnevent) {
 		case VE_REMOVE:
+		case VE_PRE_RENAME_DEST:
 		case VE_RENAME_DEST:
 			flags = SMB_OPLOCK_BREAK_TO_NONE |
 			    SMB_OPLOCK_BREAK_BATCH;
 			rc = smb_fem_oplock_break(arg, ct, flags);
 			break;
+		case VE_PRE_RENAME_SRC:
 		case VE_RENAME_SRC:
 			flags = SMB_OPLOCK_BREAK_TO_LEVEL_II |
 			    SMB_OPLOCK_BREAK_BATCH;
