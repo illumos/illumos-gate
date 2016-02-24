@@ -1656,13 +1656,19 @@ lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 	struct execenv	origenv;
 	stack_t		orig_sigaltstack;
 	struct user	*up = PTOU(ttoproc(curthread));
-	lx_elf_data_t	*edp;
+	lx_elf_data_t	edp;
 	char		*lib_path = NULL;
 
 	ASSERT(ttoproc(curthread)->p_brand == &lx_brand);
 	ASSERT(ttoproc(curthread)->p_brand_data != NULL);
 
-	edp = &ttolxproc(curthread)->l_elf_data;
+	/*
+	 * Start with a separate struct for ELF data instead of inheriting
+	 * values from the currently running binary.  This ensures that fields
+	 * such as ed_base are cleared if the new binary does not utilize an
+	 * interpreter.
+	 */
+	bzero(&edp, sizeof (edp));
 
 	if (args->to_model == DATAMODEL_NATIVE) {
 		lib_path = LX_LIB_PATH;
@@ -1786,11 +1792,11 @@ lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 	 * library will ask us for this data later, when it is ready to set
 	 * things up for the lx executable.
 	 */
-	edp->ed_phdr = (uphdr_vaddr == -1) ? voffset + ehdr.e_phoff :
+	edp.ed_phdr = (uphdr_vaddr == -1) ? voffset + ehdr.e_phoff :
 	    voffset + uphdr_vaddr;
-	edp->ed_entry = voffset + ehdr.e_entry;
-	edp->ed_phent = ehdr.e_phentsize;
-	edp->ed_phnum = ehdr.e_phnum;
+	edp.ed_entry = voffset + ehdr.e_entry;
+	edp.ed_phent = ehdr.e_phentsize;
+	edp.ed_phnum = ehdr.e_phnum;
 
 	if (interp != NULL) {
 		if (ehdr.e_type == ET_DYN) {
@@ -1855,8 +1861,8 @@ lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 		 * Now that we know the base address of the brand's linker,
 		 * we also save this for later use by the brand library.
 		 */
-		edp->ed_base = voffset;
-		edp->ed_ldentry = voffset + ehdr.e_entry;
+		edp.ed_base = voffset;
+		edp.ed_ldentry = voffset + ehdr.e_entry;
 	} else {
 		/*
 		 * This program has no interpreter. The lx brand library will
@@ -1872,14 +1878,14 @@ lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 			 * which case the e_entry field of the elf header is an
 			 * absolute address.
 			 */
-			edp->ed_ldentry = ehdr.e_entry;
-			edp->ed_entry = ehdr.e_entry;
+			edp.ed_ldentry = ehdr.e_entry;
+			edp.ed_entry = ehdr.e_entry;
 		} else {
 			/*
 			 * A shared object with no interpreter, we use the
 			 * calculated address from above.
 			 */
-			edp->ed_ldentry = edp->ed_entry;
+			edp.ed_ldentry = edp.ed_entry;
 
 			/*
 			 * In all situations except an ET_DYN elf object with no
@@ -1914,7 +1920,6 @@ lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 				env.ex_brksize = 0;
 			}
 		}
-
 	}
 
 	env.ex_vp = vp;
@@ -1931,7 +1936,7 @@ lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 		    { AT_SUN_BRAND_LX_CLKTCK, 0 },
 		    { AT_SUN_BRAND_LX_SYSINFO_EHDR, 0 }
 		};
-		phdr_auxv[0].a_un.a_val = edp->ed_phdr;
+		phdr_auxv[0].a_un.a_val = edp.ed_phdr;
 		phdr_auxv[1].a_un.a_val = ldaddr;
 		phdr_auxv[2].a_un.a_val = hz;
 		/*
@@ -1952,7 +1957,7 @@ lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 		    { AT_SUN_BRAND_LX_CLKTCK, 0 },
 		    { AT_SUN_BRAND_LX_SYSINFO_EHDR, 0 }
 		};
-		phdr_auxv32[0].a_un.a_val = edp->ed_phdr;
+		phdr_auxv32[0].a_un.a_val = edp.ed_phdr;
 		phdr_auxv32[1].a_un.a_val = ldaddr;
 		phdr_auxv32[2].a_un.a_val = hz;
 		/*
@@ -1985,11 +1990,11 @@ lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 	for (i = 0; i < __KERN_NAUXV_IMPL; i++) {
 		switch (up->u_auxv[i].a_type) {
 		case AT_ENTRY:
-			up->u_auxv[i].a_un.a_val = edp->ed_entry;
+			up->u_auxv[i].a_un.a_val = edp.ed_entry;
 			break;
 
 		case AT_SUN_BRAND_LX_PHDR:
-			up->u_auxv[i].a_un.a_val = edp->ed_phdr;
+			up->u_auxv[i].a_un.a_val = edp.ed_phdr;
 			break;
 
 		case AT_SUN_BRAND_LX_INTERP:
@@ -2004,6 +2009,11 @@ lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 			break;
 		}
 	}
+
+	/*
+	 * Record the brand ELF data now that the exec is a success.
+	 */
+	bcopy(&edp, &ttolxproc(curthread)->l_elf_data, sizeof (edp));
 
 	return (0);
 }
