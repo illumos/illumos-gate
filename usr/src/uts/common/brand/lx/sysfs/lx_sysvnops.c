@@ -43,6 +43,7 @@
 #include <sys/ethernet.h>
 #include <inet/ip_arp.h>
 #include <sys/kstat.h>
+#include <sys/zfs_ioctl.h>
 
 #include "lx_sysfs.h"
 
@@ -74,17 +75,25 @@ static vnode_t *lxsys_lookup_class_netdir(lxsys_node_t *, char *);
 static vnode_t *lxsys_lookup_devices_virtual_netdir(lxsys_node_t *, char *);
 static vnode_t *lxsys_lookup_blockdir(lxsys_node_t *, char *);
 static vnode_t *lxsys_lookup_devices_virtual_bdidir(lxsys_node_t *, char *);
+static vnode_t *lxsys_lookup_devices_zfsdir(lxsys_node_t *, char *);
 
 static int lxsys_read_devices_virtual_net(lxsys_node_t *, lxsys_uiobuf_t *);
+static int lxsys_read_devices_zfs_block(lxsys_node_t *, lxsys_uiobuf_t *);
 
 static int lxsys_readdir_static(lxsys_node_t *, uio_t *, int *);
 static int lxsys_readdir_class_netdir(lxsys_node_t *, uio_t *, int *);
 static int lxsys_readdir_devices_virtual_netdir(lxsys_node_t *, uio_t *, int *);
 static int lxsys_readdir_blockdir(lxsys_node_t *, uio_t *, int *);
 static int lxsys_readdir_devices_virtual_bdidir(lxsys_node_t *, uio_t *, int *);
+static int lxsys_readdir_devices_zfsdir(lxsys_node_t *, uio_t *, int *);
 
 static int lxsys_readlink_class_net(lxsys_node_t *, char *, size_t);
 static int lxsys_readlink_block(lxsys_node_t *, char *, size_t);
+
+static void lxsys_zfs_list_zvols(ldi_ident_t, list_t *);
+
+extern int zvol_name2minor(const char *, minor_t *);
+extern int zvol_create_minor(const char *);
 
 /*
  * The lx /sys vnode operations vector
@@ -119,6 +128,7 @@ const fs_operation_def_t lxsys_vnodeops_template[] = {
  * 3 - SYS_DEVICES_NET
  * 4 - SYS_BLOCK
  * 5 - SYS_DEVICES_BDI
+ * 6 - SYS_DEVICES_ZFS
  *
  * Static entries will have assigned INSTANCE identifiers:
  * - 0x00: /sys
@@ -132,6 +142,7 @@ const fs_operation_def_t lxsys_vnodeops_template[] = {
  * - 0x08: /sys/devices/virtual/net
  * - 0x09: /sys/block
  * - 0x0a: /sys/devices/virtual/bdi
+ * - 0x0b: /sys/devices/zfs
  *
  * Dynamic /sys/class/net/<interface> symlinks will use an INSTANCE derived
  * from the corresonding ifindex.
@@ -140,9 +151,14 @@ const fs_operation_def_t lxsys_vnodeops_template[] = {
  * an INSTANCE derived from the ifindex and statically assigned ENDPOINT IDs
  * for the contained entries.
  *
- * Dynamic /sys/block/<dev> symlinks and /sys/devices/virtual/bdi/<dev>
- * directories will use an INSTANCE derived from the device major and instance
- * from records listed in kstat.
+ * Dynamic /sys/block/<dev> symlinks will use an INSTANCE derived from the
+ * device major and instance from records listed in kstat or zvols.
+ *
+ * Dynamic /sys/devices/virtual/bdi/<dev> directories will use an INSTANCE
+ * derived from the device major and instance from records listed in kstat.
+ *
+ * Dynamic /sys/devices/zfs/<dev> directories will use an INSTANCE derived from
+ * the zvols.
  */
 
 #define	LXSYS_INST_CLASSDIR			0x1
@@ -155,6 +171,7 @@ const fs_operation_def_t lxsys_vnodeops_template[] = {
 #define	LXSYS_INST_DEVICES_VIRTUAL_NETDIR	0x8
 #define	LXSYS_INST_BLOCKDIR			0x9
 #define	LXSYS_INST_DEVICES_VIRTUAL_BDIDIR	0xa
+#define	LXSYS_INST_DEVICES_ZFSDIR		0xb
 
 /*
  * file contents of an lx /sys directory.
@@ -174,7 +191,8 @@ static lxsys_dirent_t dirlist_fs[] = {
 };
 static lxsys_dirent_t dirlist_devices[] = {
 	{ LXSYS_INST_DEVICES_SYSTEMDIR,		"system" },
-	{ LXSYS_INST_DEVICES_VIRTUALDIR,	"virtual" }
+	{ LXSYS_INST_DEVICES_VIRTUALDIR,	"virtual" },
+	{ LXSYS_INST_DEVICES_ZFSDIR,		"zfs" }
 };
 static lxsys_dirent_t dirlist_devices_virtual[] = {
 	{ LXSYS_INST_DEVICES_VIRTUAL_BDIDIR,	"bdi" },
@@ -190,6 +208,8 @@ static lxsys_dirent_t dirlist_devices_virtual[] = {
 #define	LXSYS_ENDP_NET_TXQLEN	6
 #define	LXSYS_ENDP_NET_TYPE	7
 
+#define	LXSYS_ENDP_BLOCK_DEVICE	1
+
 static lxsys_dirent_t dirlist_devices_virtual_net[] = {
 	{ LXSYS_ENDP_NET_ADDRESS,	"address" },
 	{ LXSYS_ENDP_NET_ADDRLEN,	"addr_len" },
@@ -198,6 +218,10 @@ static lxsys_dirent_t dirlist_devices_virtual_net[] = {
 	{ LXSYS_ENDP_NET_MTU,		"mtu" },
 	{ LXSYS_ENDP_NET_TXQLEN,	"tx_queue_len" },
 	{ LXSYS_ENDP_NET_TYPE,		"type" }
+};
+
+static lxsys_dirent_t dirlist_devices_zfs_block[] = {
+	{ LXSYS_ENDP_BLOCK_DEVICE,	"device" }
 };
 
 #define	SYSDIRLISTSZ(l)	(sizeof (l) / sizeof ((l)[0]))
@@ -224,6 +248,7 @@ static vnode_t *(*lxsys_lookup_function[LXSYS_MAXTYPE])() = {
 	lxsys_lookup_devices_virtual_netdir,	/* LXSYS_DEVICES_NET	*/
 	lxsys_lookup_blockdir,			/* LXSYS_BLOCK		*/
 	lxsys_lookup_devices_virtual_bdidir,	/* LXSYS_DEVICES_BDI	*/
+	lxsys_lookup_devices_zfsdir,		/* LXSYS_DEVICES_ZFS	*/
 };
 
 /*
@@ -236,6 +261,7 @@ static int (*lxsys_readdir_function[LXSYS_MAXTYPE])() = {
 	lxsys_readdir_devices_virtual_netdir,	/* LXSYS_DEVICES_NET	*/
 	lxsys_readdir_blockdir,			/* LXSYS_BLOCK		*/
 	lxsys_readdir_devices_virtual_bdidir,	/* LXSYS_DEVICES_BDI	*/
+	lxsys_readdir_devices_zfsdir,		/* LXSYS_DEVICES_ZFS	*/
 };
 
 /*
@@ -248,6 +274,7 @@ static int (*lxsys_read_function[LXSYS_MAXTYPE])() = {
 	lxsys_read_devices_virtual_net,		/* LXSYS_DEVICES_NET	*/
 	NULL,					/* LXSYS_BLOCK		*/
 	NULL,					/* LXSYS_DEVICES_BDI	*/
+	lxsys_read_devices_zfs_block,		/* LXSYS_DEVICES_ZFS	*/
 };
 
 /*
@@ -260,8 +287,14 @@ static int (*lxsys_readlink_function[LXSYS_MAXTYPE])() = {
 	NULL,					/* LXSYS_DEVICES_NET	*/
 	lxsys_readlink_block,			/* LXSYS_BLOCK		*/
 	NULL,					/* LXSYS_DEVICES_BDI	*/
+	NULL,					/* LXSYS_DEVICES_ZFS	*/
 };
 
+typedef struct lxsys_zfs_ds {
+	list_node_t	ds_link;
+	char		ds_name[MAXPATHLEN];
+	uint64_t	ds_cookie;
+} lxsys_zfs_ds_t;
 
 /*
  * Utility functions
@@ -351,13 +384,42 @@ lxsys_disk_instance(kstat_t *ksp)
 	 * Use a naive method to generate the 16-bit disk instance number for
 	 * calculating the inode.  This is adequate when module and disk counts
 	 * remain low.
+	 *
+	 * The high order bit in the 2nd byte indicates a zvol.
 	 */
-	result = (mod_name_to_major(ksp->ks_module) & 0xff) << 8;
+	result = (mod_name_to_major(ksp->ks_module) & 0x7f) << 8;
 	result |= (ksp->ks_instance & 0xff);
 	return (result);
 }
 
+static int
+lxsys_zvol_instance(char *znm)
+{
+	int result;
+	minor_t m;
 
+	/*
+	 * Use a naive method to generate the 16-bit disk instance number for
+	 * calculating the inode. This is adequate when zvol counts remain low
+	 * (< 32k).
+	 *
+	 * The high order bit in the 2nd byte indicates a zvol.
+	 */
+	result = 0x80 << 8;
+
+	/*
+	 * zvol_name2minor simplifies things here but the call won't succeed
+	 * unless the minor has first been created, so we can't count on this.
+	 */
+	if (zvol_name2minor(znm, &m) != 0) {
+		(void) zvol_create_minor(znm);
+		if (zvol_name2minor(znm, &m) != 0)
+			return (0);
+	}
+
+	result |= (m & 0xffff);
+	return (result);
+}
 
 /*
  * lxsys_open(): Vnode operation for VOP_OPEN()
@@ -530,6 +592,41 @@ lxsys_lookup(vnode_t *dp, char *comp, vnode_t **vpp, pathname_t *pathp,
 	return ((*vpp == NULL) ? ENOENT : 0);
 }
 
+/* zvol basename to flatten namespace */
+static char *
+lxsys_zv_basename(char *ds_name)
+{
+	char *nm;
+
+	if ((nm = strrchr(ds_name, '/')) != NULL) {
+		nm++;
+		ASSERT(*nm != '\0');
+	} else {
+		nm = ds_name;
+	}
+
+	return (nm);
+}
+
+/* Cleanup zvol list */
+static int
+lxsys_zvol_cleanup(list_t *zvol_lst)
+{
+	lxsys_zfs_ds_t *zv;
+	int fnd = 0;
+
+	zv = list_remove_head(zvol_lst);
+	while (zv != NULL) {
+		fnd = 1;
+		kmem_free(zv, sizeof (lxsys_zfs_ds_t));
+		zv = list_remove_head(zvol_lst);
+	}
+
+	list_destroy(zvol_lst);
+
+	return (fnd);
+}
+
 static lxsys_node_t *
 lxsys_lookup_disk(lxsys_node_t *ldp, char *comp, lxsys_nodetype_t type)
 {
@@ -537,6 +634,10 @@ lxsys_lookup_disk(lxsys_node_t *ldp, char *comp, lxsys_nodetype_t type)
 	int nidx, i;
 	size_t sidx;
 	lxsys_node_t *lnp = NULL;
+	int inst;
+	ldi_ident_t li = VTOLXSM(LXSTOV(ldp))->lxsysm_li;
+	list_t	zvol_lst;
+	lxsys_zfs_ds_t *zv;
 
 	ks0.ks_kid = 0;
 	ksr = (kstat_t *)lxsys_kstat_read(&ks0, B_FALSE, &sidx, &nidx);
@@ -545,7 +646,6 @@ lxsys_lookup_disk(lxsys_node_t *ldp, char *comp, lxsys_nodetype_t type)
 	}
 	for (i = 1; i < nidx; i++) {
 		kstat_t *ksp = &ksr[i];
-		int inst;
 
 		if (ksp->ks_type != KSTAT_TYPE_IO ||
 		    strcmp(ksp->ks_class, "disk") != 0) {
@@ -558,6 +658,33 @@ lxsys_lookup_disk(lxsys_node_t *ldp, char *comp, lxsys_nodetype_t type)
 		}
 	}
 	kmem_free(ksr, sidx);
+
+	if (lnp != NULL)
+		return (lnp);
+
+	/* try a zvol */
+	list_create(&zvol_lst, sizeof (lxsys_zfs_ds_t),
+	    offsetof(lxsys_zfs_ds_t, ds_link));
+
+	lxsys_zfs_list_zvols(li, &zvol_lst);
+
+	zv = list_remove_head(&zvol_lst);
+	while (zv != NULL) {
+		char *nm = lxsys_zv_basename(zv->ds_name);
+
+		if (strcmp(nm, comp) == 0 &&
+		    (inst = lxsys_zvol_instance(zv->ds_name)) != 0) {
+			lnp = lxsys_getnode(ldp->lxsys_vnode, type, inst, 0);
+			kmem_free(zv, sizeof (lxsys_zfs_ds_t));
+			break;
+		}
+
+		kmem_free(zv, sizeof (lxsys_zfs_ds_t));
+		zv = list_remove_head(&zvol_lst);
+	}
+
+	(void) lxsys_zvol_cleanup(&zvol_lst);
+
 	return (lnp);
 }
 
@@ -596,6 +723,9 @@ lxsys_lookup_static(lxsys_node_t *ldp, char *comp)
 				break;
 			case LXSYS_INST_DEVICES_VIRTUAL_BDIDIR:
 				node_type = LXSYS_DEVICES_BDI;
+				break;
+			case LXSYS_INST_DEVICES_ZFSDIR:
+				node_type = LXSYS_DEVICES_ZFS;
 				break;
 			default:
 				/* Another static node */
@@ -747,6 +877,44 @@ lxsys_lookup_devices_virtual_bdidir(lxsys_node_t *ldp, char *comp)
 	return (NULL);
 }
 
+static vnode_t *
+lxsys_lookup_devices_zfsdir(lxsys_node_t *ldp, char *comp)
+{
+	lxsys_node_t *lnp;
+
+	if (ldp->lxsys_instance == 0) {
+		/* top-level dev listing */
+		lnp = lxsys_lookup_disk(ldp, comp, LXSYS_DEVICES_ZFS);
+
+		if (lnp != NULL) {
+			return (lnp->lxsys_vnode);
+		}
+	} else if (ldp->lxsys_endpoint == 0) {
+		/* disk-level sub-item listing */
+		int i, size;
+		lxsys_dirent_t *dirent;
+
+		/*
+		 * All of these entries currently look like regular files
+		 * but on a real Linux system some will be subdirs. This should
+		 * be fixed when we populate the directory for real.
+		 */
+		size = SYSDIRLISTSZ(dirlist_devices_zfs_block);
+		for (i = 0; i < size; i++) {
+			dirent = &dirlist_devices_zfs_block[i];
+			if (strncmp(comp, dirent->d_name, LXSNSIZ) == 0) {
+				lnp = lxsys_getnode(ldp->lxsys_vnode,
+				    ldp->lxsys_type, ldp->lxsys_instance,
+				    dirent->d_idnum);
+				lnp->lxsys_vnode->v_type = VREG;
+				lnp->lxsys_mode = 0444;
+				return (lnp->lxsys_vnode);
+			}
+		}
+	}
+
+	return (NULL);
+}
 
 static int
 lxsys_read_devices_virtual_net(lxsys_node_t *lnp, lxsys_uiobuf_t *luio)
@@ -821,6 +989,17 @@ lxsys_read_devices_virtual_net(lxsys_node_t *lnp, lxsys_uiobuf_t *luio)
 	return (error);
 }
 
+static int
+lxsys_read_devices_zfs_block(lxsys_node_t *lnp, lxsys_uiobuf_t *luio)
+{
+	uint_t dskindex = lnp->lxsys_instance;
+
+	if (dskindex == 0 || lnp->lxsys_endpoint == 0) {
+		return (EISDIR);
+	}
+
+	return (EIO);
+}
 /*
  * lxsys_readdir(): Vnode operation for VOP_READDIR()
  */
@@ -1121,6 +1300,156 @@ lxsys_readdir_ifaces(lxsys_node_t *ldp, struct uio *uiop, int *eofp,
 }
 
 static int
+lxsys_zfs_ioctl(ldi_handle_t lh, int cmd, zfs_cmd_t *zc, size_t *dst_alloc_size)
+{
+	uint64_t	cookie;
+	size_t		dstsize = 8192;
+	int		rc, unused;
+
+	cookie = zc->zc_cookie;
+
+again:
+	zc->zc_nvlist_dst = (uint64_t)(intptr_t)kmem_alloc(dstsize, KM_SLEEP);
+	zc->zc_nvlist_dst_size = dstsize;
+
+	rc = ldi_ioctl(lh, cmd, (intptr_t)zc, FKIOCTL, kcred, &unused);
+	if (rc == ENOMEM) {
+		/*
+		 * Our nvlist_dst buffer was too small, retry with a bigger
+		 * buffer. ZFS will tell us the exact needed size.
+		 */
+		size_t newsize = zc->zc_nvlist_dst_size;
+		ASSERT(newsize > dstsize);
+
+		kmem_free((void *)(uintptr_t)zc->zc_nvlist_dst, dstsize);
+		dstsize = newsize;
+		zc->zc_cookie = cookie;
+
+		goto again;
+	}
+
+	if (dst_alloc_size != NULL) {
+		*dst_alloc_size = dstsize;
+	} else {
+		/* Caller didn't want the nvlist_dst anyway */
+		kmem_free((void *)(uintptr_t)zc->zc_nvlist_dst, dstsize);
+		zc->zc_nvlist_dst = NULL;
+	}
+
+	return (rc);
+}
+
+static void
+lxsys_zfs_list_zvols(ldi_ident_t li, list_t *zvol_lst)
+{
+	int	rc;
+	size_t	size;
+	ldi_handle_t lh;
+	dev_t zfs_dv;
+	zfs_cmd_t *zc;
+	nvpair_t *elem = NULL;
+	nvlist_t *pnv = NULL;
+	list_t	ds_lst;
+
+	if (ldi_open_by_name("/dev/zfs", FREAD | FWRITE, kcred, &lh, li) != 0)
+		return;
+
+	if (ldi_get_dev(lh, &zfs_dv) != 0) {
+		ldi_close(lh, FREAD|FWRITE, kcred);
+		return;
+	}
+
+	zc = kmem_zalloc(sizeof (zfs_cmd_t), KM_SLEEP);
+	bzero(zc, sizeof (zfs_cmd_t));
+
+	rc = lxsys_zfs_ioctl(lh, ZFS_IOC_POOL_CONFIGS, zc, &size);
+	if (rc != 0)
+		goto out;
+
+	ASSERT(zc->zc_cookie > 0);
+
+	rc = nvlist_unpack((char *)(uintptr_t)zc->zc_nvlist_dst,
+	    zc->zc_nvlist_dst_size, &pnv, 0);
+
+	kmem_free((void *)(uintptr_t)zc->zc_nvlist_dst, size);
+
+	if (rc != 0)
+		goto out;
+
+	/*
+	 * We use a dataset list to process all of the datasets in the pool
+	 * without doing recursion so that we don't risk blowing the kernel
+	 * stack.
+	 */
+	list_create(&ds_lst, sizeof (lxsys_zfs_ds_t),
+	    offsetof(lxsys_zfs_ds_t, ds_link));
+
+	while ((elem = nvlist_next_nvpair(pnv, elem)) != NULL) {
+		lxsys_zfs_ds_t *ds;
+
+		ds = kmem_zalloc(sizeof (lxsys_zfs_ds_t), KM_SLEEP);
+		(void) strcpy(ds->ds_name, nvpair_name(elem));
+
+		list_insert_head(&ds_lst, ds);
+
+		while (ds != NULL) {
+			bzero(zc, sizeof (zfs_cmd_t));
+			zc->zc_cookie = ds->ds_cookie;
+			(void) strcpy(zc->zc_name, ds->ds_name);
+
+			rc = lxsys_zfs_ioctl(lh, ZFS_IOC_DATASET_LIST_NEXT, zc,
+			    NULL);
+
+			/* Update the cookie before doing anything else. */
+			ds->ds_cookie = zc->zc_cookie;
+
+			if (rc != 0) {
+				list_remove(&ds_lst, ds);
+				kmem_free(ds, sizeof (lxsys_zfs_ds_t));
+				ds = list_tail(&ds_lst);
+				continue;
+			}
+
+			/* Reserved internal names, skip over these. */
+			if (strchr(zc->zc_name, '$') != NULL ||
+			    strchr(zc->zc_name, '%') != NULL)
+				continue;
+
+			if (zc->zc_objset_stats.dds_type == DMU_OST_ZVOL) {
+				/* add it to the zvol list */
+				lxsys_zfs_ds_t *zv;
+
+				zv = kmem_zalloc(sizeof (lxsys_zfs_ds_t),
+				    KM_SLEEP);
+				(void) strcpy(zv->ds_name, zc->zc_name);
+				list_insert_tail(zvol_lst, zv);
+			} else {
+				lxsys_zfs_ds_t *nds;
+
+				/* Create a new ds_t for the child. */
+				nds = kmem_zalloc(sizeof (lxsys_zfs_ds_t),
+				    KM_SLEEP);
+				(void) strcpy(nds->ds_name, zc->zc_name);
+				list_insert_after(&ds_lst, ds, nds);
+
+				/* Depth-first, so do the one just created. */
+				ds = nds;
+			}
+		}
+
+		ASSERT(list_is_empty(&ds_lst));
+	}
+
+	ASSERT(list_is_empty(&ds_lst));
+	list_destroy(&ds_lst);
+
+out:
+	nvlist_free(pnv);
+	ldi_close(lh, FREAD|FWRITE, kcred);
+	kmem_free(zc, sizeof (zfs_cmd_t));
+}
+
+static int
 lxsys_readdir_disks(lxsys_node_t *ldp, struct uio *uiop, int *eofp,
     lxsys_nodetype_t type)
 {
@@ -1130,6 +1459,12 @@ lxsys_readdir_disks(lxsys_node_t *ldp, struct uio *uiop, int *eofp,
 	kstat_t ks0, *ksr;
 	int nidx, i, skip, error;
 	size_t sidx;
+	int reclen;
+	uint_t instance;
+	ldi_ident_t li = VTOLXSM(LXSTOV(ldp))->lxsysm_li;
+	list_t	zvol_lst;
+	lxsys_zfs_ds_t *zv;
+	boolean_t zv_done;
 
 	/* Emit "." and ".." entries */
 	oresid = uiop->uio_resid;
@@ -1138,17 +1473,25 @@ lxsys_readdir_disks(lxsys_node_t *ldp, struct uio *uiop, int *eofp,
 		return (error);
 	}
 
+	skip = (uiop->uio_offset/LXSYS_SDSIZE) - 2;
+	i = nidx = 0;
+
+	/*
+	 * We show all disks (virtual and physical) for LXSYS_BLOCK, only
+	 * virtual disks for LXSYS_DEVICES_BDI and only physical disks for
+	 * LXSYS_DEVICES_ZFS.
+	 */
+	if (type == LXSYS_DEVICES_ZFS)
+		goto zvols;
+
 	ks0.ks_kid = 0;
 	ksr = (kstat_t *)lxsys_kstat_read(&ks0, B_FALSE, &sidx, &nidx);
 	if (ksr == NULL) {
 		*eofp = 1;
 		return (0);
 	}
-	skip = (uiop->uio_offset/LXSYS_SDSIZE) - 2;
 	for (i = 1; i < nidx; i++) {
 		kstat_t *ksp = &ksr[i];
-		uint_t instance;
-		int reclen;
 
 		if (ksp->ks_type != KSTAT_TYPE_IO ||
 		    strcmp(ksp->ks_class, "disk") != 0) {
@@ -1179,11 +1522,72 @@ lxsys_readdir_disks(lxsys_node_t *ldp, struct uio *uiop, int *eofp,
 		}
 	}
 
-	/* Indicate EOF if we reached the end of the kstats. */
-	if (i >= nidx) {
+	kmem_free(ksr, sidx);
+
+zvols:
+	zv_done = B_TRUE;
+	if (type == LXSYS_DEVICES_BDI)
+		goto done;
+
+	list_create(&zvol_lst, sizeof (lxsys_zfs_ds_t),
+	    offsetof(lxsys_zfs_ds_t, ds_link));
+
+	lxsys_zfs_list_zvols(li, &zvol_lst);
+
+	zv = list_remove_head(&zvol_lst);
+	while (zv != NULL) {
+		char *nm;
+
+		if (skip > 0) {
+			skip--;
+			kmem_free(zv, sizeof (lxsys_zfs_ds_t));
+			zv = list_remove_head(&zvol_lst);
+			continue;
+		}
+
+		nm = lxsys_zv_basename(zv->ds_name);
+		if (strlen(nm) > LXSNSIZ) {
+			kmem_free(zv, sizeof (lxsys_zfs_ds_t));
+			zv = list_remove_head(&zvol_lst);
+			continue;
+		}
+
+		(void) strncpy(dirent->d_name, nm, LXSNSIZ);
+		instance = lxsys_zvol_instance(zv->ds_name);
+		if (instance == 0) {
+			kmem_free(zv, sizeof (lxsys_zfs_ds_t));
+			zv = list_remove_head(&zvol_lst);
+			continue;
+		}
+
+		kmem_free(zv, sizeof (lxsys_zfs_ds_t));
+
+		dirent->d_ino = lxsys_inode(type, instance, 0);
+		reclen = DIRENT64_RECLEN(strlen(dirent->d_name));
+
+		uresid = uiop->uio_resid;
+		if (reclen > uresid) {
+			if (uresid == oresid) {
+				/* Not enough space for one record */
+				error = EINVAL;
+			}
+			break;
+		}
+		if ((error = lxsys_dirent_out(dirent, reclen, uiop)) != 0) {
+			break;
+		}
+
+		zv = list_remove_head(&zvol_lst);
+	}
+
+	if (lxsys_zvol_cleanup(&zvol_lst) != 0)
+		zv_done = B_FALSE;	/* we didn't process all of them */
+
+done:
+	/* Indicate EOF if we reached the end of the kstats and zvols. */
+	if (i >= nidx && zv_done) {
 		*eofp = 1;
 	}
-	kmem_free(ksr, sidx);
 
 	return (error);
 }
@@ -1272,12 +1676,38 @@ lxsys_readdir_devices_virtual_bdidir(lxsys_node_t *lnp, uio_t *uiop, int *eofp)
 	if (lnp->lxsys_instance == 0) {
 		/* top-level dev listing */
 		error = lxsys_readdir_disks(lnp, uiop, eofp,
-		    LXSYS_DEVICES_NET);
+		    LXSYS_DEVICES_BDI);
 	} else if (lnp->lxsys_endpoint == 0) {
 		/* disk-level sub-item listing (empty for now) */
 		error = lxsys_readdir_subdir(lnp, uiop, eofp, NULL, 0);
 	} else {
 		/* there shouldn't be subdirs below this */
+		error = ENOTDIR;
+	}
+
+	return (error);
+}
+
+static int
+lxsys_readdir_devices_zfsdir(lxsys_node_t *lnp, uio_t *uiop, int *eofp)
+{
+	int error;
+
+	if (lnp->lxsys_instance == 0) {
+		/* top-level dev listing */
+		error = lxsys_readdir_disks(lnp, uiop, eofp,
+		    LXSYS_DEVICES_ZFS);
+	} else if (lnp->lxsys_endpoint == 0) {
+		/* disk-level sub-item listing */
+		error = lxsys_readdir_subdir(lnp, uiop, eofp,
+		    dirlist_devices_zfs_block,
+		    SYSDIRLISTSZ(dirlist_devices_zfs_block));
+	} else {
+		/*
+		 * Currently there shouldn't be subdirs below this but
+		 * on a real Linux system some will be subdirs. This should
+		 * be fixed when we populate the directory for real.
+		 */
 		error = ENOTDIR;
 	}
 
@@ -1359,6 +1789,9 @@ lxsys_readlink_block(lxsys_node_t *lnp, char *buf, size_t len)
 	kstat_t ks0;
 	int nidx, i, inst, error = EINVAL;
 	size_t sidx;
+	ldi_ident_t li = VTOLXSM(LXSTOV(lnp))->lxsysm_li;
+	list_t	zvol_lst;
+	lxsys_zfs_ds_t *zv;
 
 	if ((inst = lnp->lxsys_instance) == 0) {
 		return (error);
@@ -1378,12 +1811,40 @@ lxsys_readlink_block(lxsys_node_t *lnp, char *buf, size_t len)
 		}
 		if (lxsys_disk_instance(ksp) == inst) {
 			(void) snprintf(buf, len,
-			    "/sys/devices/virtual/bdi/%s", ksp->ks_name);
+			    "../devices/virtual/bdi/%s", ksp->ks_name);
 			error = 0;
 			break;
 		}
 	}
 	kmem_free(ksr, sidx);
+
+	if (error == 0)
+		return (0);
+
+	/* try a zvol */
+	list_create(&zvol_lst, sizeof (lxsys_zfs_ds_t),
+	    offsetof(lxsys_zfs_ds_t, ds_link));
+
+	lxsys_zfs_list_zvols(li, &zvol_lst);
+
+	zv = list_remove_head(&zvol_lst);
+	while (zv != NULL) {
+		if (lxsys_zvol_instance(zv->ds_name) == inst) {
+			char *nm = lxsys_zv_basename(zv->ds_name);
+
+			(void) snprintf(buf, len,
+			    "../devices/zfs/%s", nm);
+			error = 0;
+			kmem_free(zv, sizeof (lxsys_zfs_ds_t));
+			break;
+		}
+
+		kmem_free(zv, sizeof (lxsys_zfs_ds_t));
+		zv = list_remove_head(&zvol_lst);
+	}
+
+	(void) lxsys_zvol_cleanup(&zvol_lst);
+
 	return (error);
 }
 
