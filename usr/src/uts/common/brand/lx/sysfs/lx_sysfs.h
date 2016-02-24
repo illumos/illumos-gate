@@ -100,6 +100,7 @@ typedef enum lxsys_nodetype {
 	LXSYS_DEVICES_NET,	/* /sys/devices/virtual/net/<iface>	*/
 	LXSYS_BLOCK,		/* /sys/block/<dev>			*/
 	LXSYS_DEVICES_BDI,	/* /sys/devices/virtual/bdi/<dev>	*/
+	LXSYS_DEVICES_ZFS,	/* /sys/devices/zfs/<dev>		*/
 	LXSYS_MAXTYPE,		/* type limit				*/
 } lxsys_nodetype_t;
 
@@ -142,6 +143,7 @@ struct lxsys_node {
  * which is attached to vfs_data in the vfs structure
  */
 typedef struct lxsys_mnt {
+	ldi_ident_t	lxsysm_li;	/* set once at mount time */
 	kmutex_t	lxsysm_lock;	/* protects fields		*/
 	lxsys_node_t	*lxsysm_node;	/* node at root of sys mount	*/
 	zone_t		*lxsysm_zone;	/* zone for this mount		*/
