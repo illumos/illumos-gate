@@ -407,7 +407,9 @@ smb_oplock_sched_async_break(smb_oplock_grant_t *og, uint8_t brk)
 	/*
 	 * Make sure we can get a hold on the ofile.  If we can't,
 	 * the file is closing, and there's no point scheduling an
-	 * oplock break on it.  (Also hold the tree and user.)
+	 * oplock break on it because the close will release the
+	 * oplock very soon. Same for the tree & user holds.
+	 *
 	 * These holds account for the pointers we copy into the
 	 * smb_request fields: fid_ofile, tid_tree, uid_user.
 	 * These holds are released via smb_request_free after
@@ -416,10 +418,15 @@ smb_oplock_sched_async_break(smb_oplock_grant_t *og, uint8_t brk)
 	ofile = og->og_ofile;
 	if (!smb_ofile_hold(ofile))
 		return;
+
+	if ((sr = smb_request_alloc(og->og_session, 0)) == NULL) {
+		smb_ofile_release(ofile);
+		return;
+	}
+
 	smb_tree_hold_internal(ofile->f_tree);
 	smb_user_hold_internal(ofile->f_user);
 
-	sr = smb_request_alloc(og->og_session, 0);
 	sr->sr_state = SMB_REQ_STATE_SUBMITTED;
 	sr->user_cr = zone_kcred();
 	sr->fid_ofile = ofile;
