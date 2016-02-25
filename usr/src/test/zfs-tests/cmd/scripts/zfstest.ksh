@@ -12,7 +12,7 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2012, 2015 by Delphix. All rights reserved.
 # Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
 # Copyright 2016 Nexenta Systems, Inc.
 #
@@ -30,7 +30,7 @@ function fail
 
 function find_disks
 {
-	typeset all_disks=$(echo '' | sudo /usr/sbin/format | awk \
+	typeset all_disks=$(echo '' | sudo -k /usr/sbin/format | awk \
 	    '/c[0-9]/ {print $2}')
 	typeset used_disks=$(/sbin/zpool status | awk \
 	    '/c[0-9]*t[0-9a-f]*d[0-9]/ {print $1}' | sed 's/s[0-9]//g')
@@ -71,19 +71,15 @@ function verify_id
 {
 	[[ $(id -u) = "0" ]] && fail "This script must not be run as root."
 
-	sudo -n id >/dev/null 2>&1
+	sudo -k -n id >/dev/null 2>&1
 	[[ $? -eq 0 ]] || fail "User must be able to sudo without a password."
-
-	typeset -i priv_cnt=$(ppriv $$ | egrep -v \
-	    ": basic$|	L:| <none>|$$:" | wc -l)
-	[[ $priv_cnt -ne 0 ]] && fail "User must only have basic privileges."
 }
 
 function verify_disks
 {
 	typeset disk
 	for disk in $DISKS; do
-		sudo /usr/sbin/prtvtoc /dev/rdsk/${disk}s0 >/dev/null 2>&1
+		sudo -k /usr/sbin/prtvtoc /dev/rdsk/${disk}s0 >/dev/null 2>&1
 		[[ $? -eq 0 ]] || return 1
 	done
 	return 0
@@ -135,6 +131,7 @@ export KEEP="^$(echo $KEEP | sed 's/ /$|^/g')\$"
 num_disks=$(echo $DISKS | awk '{print NF}')
 [[ $num_disks -lt 3 ]] && fail "Not enough disks to run ZFS Test Suite"
 
-$runner $quiet -c $runfile
+# Ensure user has only basic privileges.
+/usr/bin/ppriv -s EIP=basic -e $runner $quiet -c $runfile
 
 exit $?
