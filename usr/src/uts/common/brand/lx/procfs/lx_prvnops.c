@@ -3605,82 +3605,66 @@ nextp:
 static void
 lxpr_read_partitions(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
-
-	kstat_t *ksr;
-	kstat_t ks0;
-	int nidx, num, i;
-	size_t sidx, size;
-	zfs_cmd_t *zc;
-	nvlist_t *nv = NULL;
-	nvpair_t *elem = NULL;
 	lxpr_mnt_t *mnt;
-	lxpr_zfs_iter_t zfsi;
+	lx_zone_data_t *lxzdata;
+	lxd_zfs_dev_t *zv;
 
 	ASSERT(lxpnp->lxpr_type == LXPR_PARTITIONS);
 
-	ks0.ks_kid = 0;
-	ksr = (kstat_t *)lxpr_kstat_read(&ks0, B_FALSE, &sidx, &nidx);
-
-	if (ksr == NULL)
-		return;
-
 	lxpr_uiobuf_printf(uiobuf, "major minor  #blocks  name\n\n");
 
-	for (i = 1; i < nidx; i++) {
-		kstat_t *ksp = &ksr[i];
-		kstat_io_t *kip;
+	mnt = (lxpr_mnt_t *)lxpnp->lxpr_vnode->v_vfsp->vfs_data;
+	lxzdata = ztolxzd(curproc->p_zone);
+	if (lxzdata == NULL)
+		return;
+	ASSERT(lxzdata->lxzd_vdisks != NULL);
 
-		if (ksp->ks_type != KSTAT_TYPE_IO ||
-		    strcmp(ksp->ks_class, "disk") != 0)
-			continue;
+	zv = list_head(lxzdata->lxzd_vdisks);
+	while (zv != NULL) {
+		minor_t minor;
+		char *nm;
 
-		if ((kip = (kstat_io_t *)lxpr_kstat_read(ksp, B_TRUE,
-		    &size, &num)) == NULL)
-			continue;
+		if ((nm = strrchr(zv->lzd_name, '/')) != NULL) {
+			nm++;
+			ASSERT(*nm != '\0');
+		} else {
+			nm = zv->lzd_name;
+		}
 
-		if (size < sizeof (kstat_io_t)) {
-			kmem_free(kip, size);
-			continue;
+		if (zv->lzd_type == LXD_ZFS_DEV_POOL) {
+			minor = 0;
+		} else {
+			minor = zv->lzd_minor;
 		}
 
 		lxpr_uiobuf_printf(uiobuf, "%4d %7d %10d %s\n",
-		    mod_name_to_major(ksp->ks_module),
-		    ksp->ks_instance, 0, ksp->ks_name);
+		    mnt->lxprm_zfs_major, minor, 0, nm);
 
-		kmem_free(kip, size);
+		zv = list_next(lxzdata->lxzd_vdisks, zv);
+	}
+}
+
+static boolean_t
+lxpr_is_vdisk(char *nm)
+{
+	lx_zone_data_t *lxzdata;
+	lxd_zfs_dev_t *zv;
+
+	lxzdata = ztolxzd(curproc->p_zone);
+	if (lxzdata == NULL)
+		return (B_FALSE);
+	ASSERT(lxzdata->lxzd_vdisks != NULL);
+
+	zv = list_head(lxzdata->lxzd_vdisks);
+	while (zv != NULL) {
+		if (zv->lzd_type == LXD_ZFS_DEV_POOL &&
+		    strcmp(nm, zv->lzd_name) == 0)
+			return (B_TRUE);
+
+		zv = list_next(lxzdata->lxzd_vdisks, zv);
 	}
 
-	kmem_free(ksr, sidx);
-
-	/* If we never got to open the zfs LDI, then stop now. */
-	mnt = (lxpr_mnt_t *)lxpnp->lxpr_vnode->v_vfsp->vfs_data;
-	if (mnt->lxprm_zfs_isopen == B_FALSE)
-		return;
-
-	zc = kmem_zalloc(sizeof (zfs_cmd_t), KM_SLEEP);
-
-	if (lxpr_zfs_list_pools(mnt, zc, &nv) != 0)
-		goto out;
-
-	while ((elem = nvlist_next_nvpair(nv, elem)) != NULL) {
-		char *pool = nvpair_name(elem);
-
-		bzero(&zfsi, sizeof (lxpr_zfs_iter_t));
-		while (lxpr_zfs_next_zvol(mnt, pool, zc, &zfsi) == 0) {
-			major_t	major;
-			minor_t	minor;
-			if (lxpr_zvol_dev(mnt, zc->zc_name, &major, &minor)
-			    != 0)
-				continue;
-
-			lxpr_uiobuf_printf(uiobuf, "%4d %7d %10d zvol/dsk/%s\n",
-			    major, minor, 0, zc->zc_name);
-		}
-	}
-
-	nvlist_free(nv);
-out:
-	kmem_free(zc, sizeof (zfs_cmd_t));
+	return (B_FALSE);
 }
 
 /*
@@ -3713,6 +3697,9 @@ lxpr_read_diskstats(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 
 		if (ksp->ks_type != KSTAT_TYPE_IO ||
 		    strcmp(ksp->ks_class, "disk") != 0)
+			continue;
+
+		if (!lxpr_is_vdisk(ksp->ks_name))
 			continue;
 
 		if ((kip = (kstat_io_t *)lxpr_kstat_read(ksp, B_TRUE,

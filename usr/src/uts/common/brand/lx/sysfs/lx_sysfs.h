@@ -143,7 +143,6 @@ struct lxsys_node {
  * which is attached to vfs_data in the vfs structure
  */
 typedef struct lxsys_mnt {
-	ldi_ident_t	lxsysm_li;	/* set once at mount time */
 	kmutex_t	lxsysm_lock;	/* protects fields		*/
 	lxsys_node_t	*lxsysm_node;	/* node at root of sys mount	*/
 	zone_t		*lxsysm_zone;	/* zone for this mount		*/

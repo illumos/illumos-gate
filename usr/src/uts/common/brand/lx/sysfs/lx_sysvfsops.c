@@ -181,8 +181,6 @@ lxsys_mount(vfs_t *vfsp, vnode_t *mvp, mounta_t *uap, cred_t *cr)
 {
 	lxsys_mnt_t *lxsys_mnt;
 	zone_t *zone = curproc->p_zone;
-	ldi_ident_t li;
-	int err;
 
 	/*
 	 * must be root to mount
@@ -211,13 +209,6 @@ lxsys_mount(vfs_t *vfsp, vnode_t *mvp, mounta_t *uap, cred_t *cr)
 	vfs_setresource(vfsp, "lxsys", 0);
 
 	lxsys_mnt = kmem_alloc(sizeof (*lxsys_mnt), KM_SLEEP);
-
-	if ((err = ldi_ident_from_mod(&modlinkage, &li)) != 0) {
-		kmem_free(lxsys_mnt, sizeof (*lxsys_mnt));
-		return (err);
-	}
-
-	lxsys_mnt->lxsysm_li = li;
 
 	mutex_enter(&lxsys_mount_lock);
 

@@ -171,6 +171,8 @@
 #include <sys/socket.h>
 #include <lx_signum.h>
 #include <util/sscanf.h>
+#include <sys/lx_brand.h>
+#include <sys/zfs_ioctl.h>
 
 int	lx_debug = 0;
 
@@ -190,6 +192,9 @@ extern int waitsys(idtype_t, id_t, siginfo_t *, int);
 extern int getsetcontext32(int, void *);
 extern int waitsys32(idtype_t, id_t, siginfo_t *, int);
 #endif
+
+extern int zvol_name2minor(const char *, minor_t *);
+extern int zvol_create_minor(const char *);
 
 extern void lx_proc_exit(proc_t *);
 extern int lx_sched_affinity(int, uintptr_t, int, uintptr_t, int64_t *);
@@ -241,6 +246,11 @@ static int lx_pagefault(proc_t *, klwp_t *, caddr_t, enum fault_type,
     enum seg_rw);
 #endif
 
+typedef struct lx_zfs_ds {
+	list_node_t	ds_link;
+	char		ds_name[MAXPATHLEN];
+	uint64_t	ds_cookie;
+} lx_zfs_ds_t;
 
 /* lx brand */
 struct brand_ops lx_brops = {
@@ -778,6 +788,212 @@ lx_savecontext32(ucontext32_t *ucp)
 }
 #endif
 
+static int
+lx_zfs_ioctl(ldi_handle_t lh, int cmd, zfs_cmd_t *zc, size_t *dst_alloc_size)
+{
+	uint64_t	cookie;
+	size_t		dstsize = 8192;
+	int		rc, unused;
+
+	cookie = zc->zc_cookie;
+
+again:
+	zc->zc_nvlist_dst = (uint64_t)(intptr_t)kmem_alloc(dstsize, KM_SLEEP);
+	zc->zc_nvlist_dst_size = dstsize;
+
+	rc = ldi_ioctl(lh, cmd, (intptr_t)zc, FKIOCTL, kcred, &unused);
+	if (rc == ENOMEM) {
+		/*
+		 * Our nvlist_dst buffer was too small, retry with a bigger
+		 * buffer. ZFS will tell us the exact needed size.
+		 */
+		size_t newsize = zc->zc_nvlist_dst_size;
+		ASSERT(newsize > dstsize);
+
+		kmem_free((void *)(uintptr_t)zc->zc_nvlist_dst, dstsize);
+		dstsize = newsize;
+		zc->zc_cookie = cookie;
+
+		goto again;
+	}
+
+	if (dst_alloc_size != NULL) {
+		*dst_alloc_size = dstsize;
+	} else {
+		/* Caller didn't want the nvlist_dst anyway */
+		kmem_free((void *)(uintptr_t)zc->zc_nvlist_dst, dstsize);
+		zc->zc_nvlist_dst = NULL;
+	}
+
+	return (rc);
+}
+
+static minor_t
+lx_zvol_minor(char *znm)
+{
+	minor_t m;
+
+	/*
+	 * zvol_name2minor simplifies things here but the call won't succeed
+	 * unless the minor has first been created, so we can't count on this.
+	 */
+	if (zvol_name2minor(znm, &m) != 0) {
+		(void) zvol_create_minor(znm);
+		if (zvol_name2minor(znm, &m) != 0)
+			return (0);
+	}
+
+	return (m);
+}
+
+/*
+ * We treat the zpool as a virtual device and any zvols as actual devices.
+ */
+static void
+lx_zfs_get_devs(zone_t *zone, list_t *zvol_lst)
+{
+	ldi_ident_t li;
+	int	rc;
+	size_t	size;
+	ldi_handle_t lh;
+	dev_t zfs_dv;
+	zfs_cmd_t *zc;
+	nvpair_t *elem = NULL;
+	uint_t pool_minor = 1;
+	nvlist_t *pnv = NULL;
+	list_t	ds_lst;
+
+	li = ldi_ident_from_anon();
+	if (ldi_open_by_name("/dev/zfs", FREAD | FWRITE, kcred, &lh, li) != 0)
+		return;
+
+	if (ldi_get_dev(lh, &zfs_dv) != 0) {
+		ldi_close(lh, FREAD|FWRITE, kcred);
+		return;
+	}
+
+	zc = kmem_zalloc(sizeof (zfs_cmd_t), KM_SLEEP);
+
+	rc = lx_zfs_ioctl(lh, ZFS_IOC_POOL_CONFIGS, zc, &size);
+	if (rc != 0)
+		goto out;
+
+	ASSERT(zc->zc_cookie > 0);
+
+	rc = nvlist_unpack((char *)(uintptr_t)zc->zc_nvlist_dst,
+	    zc->zc_nvlist_dst_size, &pnv, 0);
+
+	kmem_free((void *)(uintptr_t)zc->zc_nvlist_dst, size);
+
+	if (rc != 0)
+		goto out;
+
+	/*
+	 * We use a dataset list to process all of the datasets in the pool
+	 * without doing recursion so that we don't risk blowing the kernel
+	 * stack.
+	 */
+	list_create(&ds_lst, sizeof (lx_zfs_ds_t),
+	    offsetof(lx_zfs_ds_t, ds_link));
+
+	while ((elem = nvlist_next_nvpair(pnv, elem)) != NULL) {
+		lx_zfs_ds_t *ds;
+		lxd_zfs_dev_t *zv;
+
+		/* we include the pool as a virtual disk */
+		zv = kmem_zalloc(sizeof (lxd_zfs_dev_t), KM_SLEEP);
+		(void) strcpy(zv->lzd_name, nvpair_name(elem));
+		zv->lzd_type = LXD_ZFS_DEV_POOL;
+		/* construct a fabricated minor number for the virtual disk */
+		zv->lzd_minor = pool_minor++;
+		list_insert_tail(zvol_lst, zv);
+
+		ds = kmem_zalloc(sizeof (lx_zfs_ds_t), KM_SLEEP);
+		(void) strcpy(ds->ds_name, nvpair_name(elem));
+
+		list_insert_head(&ds_lst, ds);
+
+		while (ds != NULL) {
+			int w;		/* dummy variable */
+			bzero(zc, sizeof (zfs_cmd_t));
+			zc->zc_cookie = ds->ds_cookie;
+			(void) strcpy(zc->zc_name, ds->ds_name);
+
+			rc = lx_zfs_ioctl(lh, ZFS_IOC_DATASET_LIST_NEXT, zc,
+			    NULL);
+
+			/* Update the cookie before doing anything else. */
+			ds->ds_cookie = zc->zc_cookie;
+
+			if (rc != 0) {
+				list_remove(&ds_lst, ds);
+				kmem_free(ds, sizeof (lx_zfs_ds_t));
+				ds = list_tail(&ds_lst);
+				continue;
+			}
+
+			/* Reserved internal names, skip over these. */
+			if (strchr(zc->zc_name, '$') != NULL ||
+			    strchr(zc->zc_name, '%') != NULL)
+				continue;
+
+			if (!zone_dataset_visible_inzone(zone, zc->zc_name, &w))
+				continue;
+
+			if (zc->zc_objset_stats.dds_type == DMU_OST_ZVOL) {
+				/* add it to the zvol list */
+				zv = kmem_zalloc(sizeof (lxd_zfs_dev_t),
+				    KM_SLEEP);
+				(void) strcpy(zv->lzd_name, zc->zc_name);
+				zv->lzd_type = LXD_ZFS_DEV_ZVOL;
+				zv->lzd_minor = lx_zvol_minor(zc->zc_name);
+				list_insert_tail(zvol_lst, zv);
+			} else {
+				lx_zfs_ds_t *nds;
+
+				/* Create a new ds_t for the child. */
+				nds = kmem_zalloc(sizeof (lx_zfs_ds_t),
+				    KM_SLEEP);
+				(void) strcpy(nds->ds_name, zc->zc_name);
+				list_insert_after(&ds_lst, ds, nds);
+
+				/* Depth-first, so do the one just created. */
+				ds = nds;
+			}
+		}
+
+		ASSERT(list_is_empty(&ds_lst));
+	}
+
+	list_destroy(&ds_lst);
+
+out:
+	nvlist_free(pnv);
+	ldi_close(lh, FREAD|FWRITE, kcred);
+	kmem_free(zc, sizeof (zfs_cmd_t));
+}
+
+/* Cleanup virtual disk list */
+static void
+lx_zfs_cleanup_devs(lx_zone_data_t *lxzdata)
+{
+	lxd_zfs_dev_t *zv;
+
+	if (lxzdata->lxzd_vdisks == NULL) {
+		return;
+	}
+
+	zv = list_remove_head(lxzdata->lxzd_vdisks);
+	while (zv != NULL) {
+		kmem_free(zv, sizeof (lxd_zfs_dev_t));
+		zv = list_remove_head(lxzdata->lxzd_vdisks);
+	}
+
+	list_destroy(lxzdata->lxzd_vdisks);
+	kmem_free(lxzdata->lxzd_vdisks, sizeof (list_t));
+	lxzdata->lxzd_vdisks = NULL;
+}
+
 void
 lx_init_brand_data(zone_t *zone)
 {
@@ -798,6 +1014,22 @@ lx_init_brand_data(zone_t *zone)
 	    LX_KERN_RELEASE_MAX);
 	(void) strlcpy(data->lxzd_kernel_version, "BrandZ virtual linux",
 	    LX_KERN_VERSION_MAX);
+
+	/*
+	 * Unlike ZFS proper, which does dynamic zvols, we currently only
+	 * generate the zone's "disk" list once at zone boot time and use that
+	 * consistently in all of the various subsystems (devfs, sysfs, procfs).
+	 * This allows us to avoid re-iterating the datasets every time one
+	 * of those subsystems accesses a "disk" and allows us to keep the
+	 * view consistent across all subsystems, but it does mean a reboot is
+	 * required to see new "disks". This is somewhat mitigated by its
+	 * similarity to actual disk drives on a real system.
+	 */
+	data->lxzd_vdisks = kmem_alloc(sizeof (list_t), KM_SLEEP);
+	list_create(data->lxzd_vdisks, sizeof (lxd_zfs_dev_t),
+	    offsetof(lxd_zfs_dev_t, lzd_link));
+
+	lx_zfs_get_devs(zone, data->lxzd_vdisks);
 
 	zone->zone_brand_data = data;
 
@@ -823,6 +1055,7 @@ lx_free_brand_data(zone_t *zone)
 		data->lxzd_ioctl_sock = NULL;
 	}
 	ASSERT(data->lxzd_cgroup == NULL);
+	lx_zfs_cleanup_devs(data);
 	mutex_exit(&data->lxzd_lock);
 	zone->zone_brand_data = NULL;
 	mutex_destroy(&data->lxzd_lock);

@@ -936,7 +936,8 @@ err:
 	return (error);
 }
 
-static int
+/* Not static so it can be used during mount. */
+int
 lxd_symlink(vnode_t *dvp, char *nm, struct vattr *tva, char *tnm,
     struct cred *cr, caller_context_t *ct, int flags)
 {

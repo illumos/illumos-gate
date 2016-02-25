@@ -42,8 +42,6 @@
 #include <sys/netstack.h>
 #include <sys/ethernet.h>
 #include <inet/ip_arp.h>
-#include <sys/kstat.h>
-#include <sys/zfs_ioctl.h>
 
 #include "lx_sysfs.h"
 
@@ -89,11 +87,6 @@ static int lxsys_readdir_devices_zfsdir(lxsys_node_t *, uio_t *, int *);
 
 static int lxsys_readlink_class_net(lxsys_node_t *, char *, size_t);
 static int lxsys_readlink_block(lxsys_node_t *, char *, size_t);
-
-static void lxsys_zfs_list_zvols(ldi_ident_t, list_t *);
-
-extern int zvol_name2minor(const char *, minor_t *);
-extern int zvol_create_minor(const char *);
 
 /*
  * The lx /sys vnode operations vector
@@ -290,134 +283,26 @@ static int (*lxsys_readlink_function[LXSYS_MAXTYPE])() = {
 	NULL,					/* LXSYS_DEVICES_ZFS	*/
 };
 
-typedef struct lxsys_zfs_ds {
-	list_node_t	ds_link;
-	char		ds_name[MAXPATHLEN];
-	uint64_t	ds_cookie;
-} lxsys_zfs_ds_t;
-
-/*
- * Utility functions
- */
-static void *
-lxsys_kstat_read(kstat_t *kn, boolean_t byname, size_t *size, int *num)
-{
-	kstat_t *kp;
-	int i, nrec = 0;
-	size_t bufsize;
-	void *buf = NULL;
-
-	if (byname == B_TRUE) {
-		kp = kstat_hold_byname(kn->ks_module, kn->ks_instance,
-		    kn->ks_name, getzoneid());
-	} else {
-		kp = kstat_hold_bykid(kn->ks_kid, getzoneid());
-	}
-	if (kp == NULL) {
-		return (NULL);
-	}
-	if (kp->ks_flags & KSTAT_FLAG_INVALID) {
-		kstat_rele(kp);
-		return (NULL);
-	}
-
-	bufsize = kp->ks_data_size + 1;
-	kstat_rele(kp);
-
-	/*
-	 * The kstat in question is released so that kmem_alloc(KM_SLEEP) is
-	 * performed without it held.  After the alloc, the kstat is reacquired
-	 * and its size is checked again. If the buffer is no longer large
-	 * enough, the alloc and check are repeated up to three times.
-	 */
-	for (i = 0; i < 2; i++) {
-		buf = kmem_alloc(bufsize, KM_SLEEP);
-
-		/* Check if bufsize still appropriate */
-		if (byname == B_TRUE) {
-			kp = kstat_hold_byname(kn->ks_module, kn->ks_instance,
-			    kn->ks_name, getzoneid());
-		} else {
-			kp = kstat_hold_bykid(kn->ks_kid, getzoneid());
-		}
-		if (kp == NULL || kp->ks_flags & KSTAT_FLAG_INVALID) {
-			if (kp != NULL) {
-				kstat_rele(kp);
-			}
-			kmem_free(buf, bufsize);
-			return (NULL);
-		}
-		KSTAT_ENTER(kp);
-		(void) KSTAT_UPDATE(kp, KSTAT_READ);
-		if (bufsize < kp->ks_data_size) {
-			kmem_free(buf, bufsize);
-			buf = NULL;
-			bufsize = kp->ks_data_size + 1;
-			KSTAT_EXIT(kp);
-			kstat_rele(kp);
-			continue;
-		} else {
-			if (KSTAT_SNAPSHOT(kp, buf, KSTAT_READ) != 0) {
-				kmem_free(buf, bufsize);
-				buf = NULL;
-			}
-			nrec = kp->ks_ndata;
-			KSTAT_EXIT(kp);
-			kstat_rele(kp);
-			break;
-		}
-	}
-
-	if (buf != NULL) {
-		*size = bufsize;
-		*num = nrec;
-	}
-	return (buf);
-}
-
 static int
-lxsys_disk_instance(kstat_t *ksp)
+lxsys_vdisk_instance(lxd_zfs_dev_t *zv)
 {
 	int result;
 
 	/*
 	 * Use a naive method to generate the 16-bit disk instance number for
-	 * calculating the inode.  This is adequate when module and disk counts
-	 * remain low.
-	 *
-	 * The high order bit in the 2nd byte indicates a zvol.
-	 */
-	result = (mod_name_to_major(ksp->ks_module) & 0x7f) << 8;
-	result |= (ksp->ks_instance & 0xff);
-	return (result);
-}
-
-static int
-lxsys_zvol_instance(char *znm)
-{
-	int result;
-	minor_t m;
-
-	/*
-	 * Use a naive method to generate the 16-bit disk instance number for
-	 * calculating the inode. This is adequate when zvol counts remain low
+	 * calculating the inode.  This is adequate when disk counts remain low
 	 * (< 32k).
 	 *
-	 * The high order bit in the 2nd byte indicates a zvol.
+	 * The high order bit in the 2nd byte indicates a zvol; clear means its
+	 * a virtual disk (zpool).
 	 */
-	result = 0x80 << 8;
 
-	/*
-	 * zvol_name2minor simplifies things here but the call won't succeed
-	 * unless the minor has first been created, so we can't count on this.
-	 */
-	if (zvol_name2minor(znm, &m) != 0) {
-		(void) zvol_create_minor(znm);
-		if (zvol_name2minor(znm, &m) != 0)
-			return (0);
+	if (zv->lzd_type == LXD_ZFS_DEV_POOL) {
+		result = 0;
+	} else {
+		result = 0x80 << 8;
 	}
-
-	result |= (m & 0xffff);
+	result |= (zv->lzd_minor & 0x7fff);
 	return (result);
 }
 
@@ -608,82 +493,31 @@ lxsys_zv_basename(char *ds_name)
 	return (nm);
 }
 
-/* Cleanup zvol list */
-static int
-lxsys_zvol_cleanup(list_t *zvol_lst)
-{
-	lxsys_zfs_ds_t *zv;
-	int fnd = 0;
-
-	zv = list_remove_head(zvol_lst);
-	while (zv != NULL) {
-		fnd = 1;
-		kmem_free(zv, sizeof (lxsys_zfs_ds_t));
-		zv = list_remove_head(zvol_lst);
-	}
-
-	list_destroy(zvol_lst);
-
-	return (fnd);
-}
-
 static lxsys_node_t *
 lxsys_lookup_disk(lxsys_node_t *ldp, char *comp, lxsys_nodetype_t type)
 {
-	kstat_t ks0, *ksr;
-	int nidx, i;
-	size_t sidx;
 	lxsys_node_t *lnp = NULL;
-	int inst;
-	ldi_ident_t li = VTOLXSM(LXSTOV(ldp))->lxsysm_li;
-	list_t	zvol_lst;
-	lxsys_zfs_ds_t *zv;
+	lx_zone_data_t *lxzdata;
+	lxd_zfs_dev_t *zv;
 
-	ks0.ks_kid = 0;
-	ksr = (kstat_t *)lxsys_kstat_read(&ks0, B_FALSE, &sidx, &nidx);
-	if (ksr == NULL) {
+	lxzdata = ztolxzd(curproc->p_zone);
+	if (lxzdata == NULL)
 		return (NULL);
-	}
-	for (i = 1; i < nidx; i++) {
-		kstat_t *ksp = &ksr[i];
+	ASSERT(lxzdata->lxzd_vdisks != NULL);
 
-		if (ksp->ks_type != KSTAT_TYPE_IO ||
-		    strcmp(ksp->ks_class, "disk") != 0) {
-			continue;
-		}
-		if (strncmp(ksp->ks_name, comp, KSTAT_STRLEN) == 0 &&
-		    (inst = lxsys_disk_instance(ksp)) != 0) {
-			lnp = lxsys_getnode(ldp->lxsys_vnode, type, inst, 0);
-			break;
-		}
-	}
-	kmem_free(ksr, sidx);
-
-	if (lnp != NULL)
-		return (lnp);
-
-	/* try a zvol */
-	list_create(&zvol_lst, sizeof (lxsys_zfs_ds_t),
-	    offsetof(lxsys_zfs_ds_t, ds_link));
-
-	lxsys_zfs_list_zvols(li, &zvol_lst);
-
-	zv = list_remove_head(&zvol_lst);
+	zv = list_head(lxzdata->lxzd_vdisks);
 	while (zv != NULL) {
-		char *nm = lxsys_zv_basename(zv->ds_name);
+		int inst;
+		char *nm = lxsys_zv_basename(zv->lzd_name);
 
-		if (strcmp(nm, comp) == 0 &&
-		    (inst = lxsys_zvol_instance(zv->ds_name)) != 0) {
+		inst = lxsys_vdisk_instance(zv);
+		if (strcmp(nm, comp) == 0 && inst != 0) {
 			lnp = lxsys_getnode(ldp->lxsys_vnode, type, inst, 0);
-			kmem_free(zv, sizeof (lxsys_zfs_ds_t));
 			break;
 		}
 
-		kmem_free(zv, sizeof (lxsys_zfs_ds_t));
-		zv = list_remove_head(&zvol_lst);
+		zv = list_next(lxzdata->lxzd_vdisks, zv);
 	}
-
-	(void) lxsys_zvol_cleanup(&zvol_lst);
 
 	return (lnp);
 }
@@ -1300,171 +1134,17 @@ lxsys_readdir_ifaces(lxsys_node_t *ldp, struct uio *uiop, int *eofp,
 }
 
 static int
-lxsys_zfs_ioctl(ldi_handle_t lh, int cmd, zfs_cmd_t *zc, size_t *dst_alloc_size)
-{
-	uint64_t	cookie;
-	size_t		dstsize = 8192;
-	int		rc, unused;
-
-	cookie = zc->zc_cookie;
-
-again:
-	zc->zc_nvlist_dst = (uint64_t)(intptr_t)kmem_alloc(dstsize, KM_SLEEP);
-	zc->zc_nvlist_dst_size = dstsize;
-
-	rc = ldi_ioctl(lh, cmd, (intptr_t)zc, FKIOCTL, kcred, &unused);
-	if (rc == ENOMEM) {
-		/*
-		 * Our nvlist_dst buffer was too small, retry with a bigger
-		 * buffer. ZFS will tell us the exact needed size.
-		 */
-		size_t newsize = zc->zc_nvlist_dst_size;
-		ASSERT(newsize > dstsize);
-
-		kmem_free((void *)(uintptr_t)zc->zc_nvlist_dst, dstsize);
-		dstsize = newsize;
-		zc->zc_cookie = cookie;
-
-		goto again;
-	}
-
-	if (dst_alloc_size != NULL) {
-		*dst_alloc_size = dstsize;
-	} else {
-		/* Caller didn't want the nvlist_dst anyway */
-		kmem_free((void *)(uintptr_t)zc->zc_nvlist_dst, dstsize);
-		zc->zc_nvlist_dst = NULL;
-	}
-
-	return (rc);
-}
-
-static void
-lxsys_zfs_list_zvols(ldi_ident_t li, list_t *zvol_lst)
-{
-	int	rc;
-	size_t	size;
-	ldi_handle_t lh;
-	dev_t zfs_dv;
-	zfs_cmd_t *zc;
-	nvpair_t *elem = NULL;
-	nvlist_t *pnv = NULL;
-	list_t	ds_lst;
-
-	if (ldi_open_by_name("/dev/zfs", FREAD | FWRITE, kcred, &lh, li) != 0)
-		return;
-
-	if (ldi_get_dev(lh, &zfs_dv) != 0) {
-		ldi_close(lh, FREAD|FWRITE, kcred);
-		return;
-	}
-
-	zc = kmem_zalloc(sizeof (zfs_cmd_t), KM_SLEEP);
-	bzero(zc, sizeof (zfs_cmd_t));
-
-	rc = lxsys_zfs_ioctl(lh, ZFS_IOC_POOL_CONFIGS, zc, &size);
-	if (rc != 0)
-		goto out;
-
-	ASSERT(zc->zc_cookie > 0);
-
-	rc = nvlist_unpack((char *)(uintptr_t)zc->zc_nvlist_dst,
-	    zc->zc_nvlist_dst_size, &pnv, 0);
-
-	kmem_free((void *)(uintptr_t)zc->zc_nvlist_dst, size);
-
-	if (rc != 0)
-		goto out;
-
-	/*
-	 * We use a dataset list to process all of the datasets in the pool
-	 * without doing recursion so that we don't risk blowing the kernel
-	 * stack.
-	 */
-	list_create(&ds_lst, sizeof (lxsys_zfs_ds_t),
-	    offsetof(lxsys_zfs_ds_t, ds_link));
-
-	while ((elem = nvlist_next_nvpair(pnv, elem)) != NULL) {
-		lxsys_zfs_ds_t *ds;
-
-		ds = kmem_zalloc(sizeof (lxsys_zfs_ds_t), KM_SLEEP);
-		(void) strcpy(ds->ds_name, nvpair_name(elem));
-
-		list_insert_head(&ds_lst, ds);
-
-		while (ds != NULL) {
-			bzero(zc, sizeof (zfs_cmd_t));
-			zc->zc_cookie = ds->ds_cookie;
-			(void) strcpy(zc->zc_name, ds->ds_name);
-
-			rc = lxsys_zfs_ioctl(lh, ZFS_IOC_DATASET_LIST_NEXT, zc,
-			    NULL);
-
-			/* Update the cookie before doing anything else. */
-			ds->ds_cookie = zc->zc_cookie;
-
-			if (rc != 0) {
-				list_remove(&ds_lst, ds);
-				kmem_free(ds, sizeof (lxsys_zfs_ds_t));
-				ds = list_tail(&ds_lst);
-				continue;
-			}
-
-			/* Reserved internal names, skip over these. */
-			if (strchr(zc->zc_name, '$') != NULL ||
-			    strchr(zc->zc_name, '%') != NULL)
-				continue;
-
-			if (zc->zc_objset_stats.dds_type == DMU_OST_ZVOL) {
-				/* add it to the zvol list */
-				lxsys_zfs_ds_t *zv;
-
-				zv = kmem_zalloc(sizeof (lxsys_zfs_ds_t),
-				    KM_SLEEP);
-				(void) strcpy(zv->ds_name, zc->zc_name);
-				list_insert_tail(zvol_lst, zv);
-			} else {
-				lxsys_zfs_ds_t *nds;
-
-				/* Create a new ds_t for the child. */
-				nds = kmem_zalloc(sizeof (lxsys_zfs_ds_t),
-				    KM_SLEEP);
-				(void) strcpy(nds->ds_name, zc->zc_name);
-				list_insert_after(&ds_lst, ds, nds);
-
-				/* Depth-first, so do the one just created. */
-				ds = nds;
-			}
-		}
-
-		ASSERT(list_is_empty(&ds_lst));
-	}
-
-	ASSERT(list_is_empty(&ds_lst));
-	list_destroy(&ds_lst);
-
-out:
-	nvlist_free(pnv);
-	ldi_close(lh, FREAD|FWRITE, kcred);
-	kmem_free(zc, sizeof (zfs_cmd_t));
-}
-
-static int
 lxsys_readdir_disks(lxsys_node_t *ldp, struct uio *uiop, int *eofp,
     lxsys_nodetype_t type)
 {
 	longlong_t bp[DIRENT64_RECLEN(LXSNSIZ) / sizeof (longlong_t)];
 	dirent64_t *dirent = (dirent64_t *)bp;
 	ssize_t oresid, uresid;
-	kstat_t ks0, *ksr;
-	int nidx, i, skip, error;
-	size_t sidx;
+	int skip, error;
 	int reclen;
 	uint_t instance;
-	ldi_ident_t li = VTOLXSM(LXSTOV(ldp))->lxsysm_li;
-	list_t	zvol_lst;
-	lxsys_zfs_ds_t *zv;
-	boolean_t zv_done;
+	lx_zone_data_t *lxzdata;
+	lxd_zfs_dev_t *zv;
 
 	/* Emit "." and ".." entries */
 	oresid = uiop->uio_resid;
@@ -1474,93 +1154,43 @@ lxsys_readdir_disks(lxsys_node_t *ldp, struct uio *uiop, int *eofp,
 	}
 
 	skip = (uiop->uio_offset/LXSYS_SDSIZE) - 2;
-	i = nidx = 0;
 
-	/*
-	 * We show all disks (virtual and physical) for LXSYS_BLOCK, only
-	 * virtual disks for LXSYS_DEVICES_BDI and only physical disks for
-	 * LXSYS_DEVICES_ZFS.
-	 */
-	if (type == LXSYS_DEVICES_ZFS)
-		goto zvols;
+	lxzdata = ztolxzd(curproc->p_zone);
+	if (lxzdata == NULL)
+		return (EINVAL);
+	ASSERT(lxzdata->lxzd_vdisks != NULL);
 
-	ks0.ks_kid = 0;
-	ksr = (kstat_t *)lxsys_kstat_read(&ks0, B_FALSE, &sidx, &nidx);
-	if (ksr == NULL) {
-		*eofp = 1;
-		return (0);
-	}
-	for (i = 1; i < nidx; i++) {
-		kstat_t *ksp = &ksr[i];
-
-		if (ksp->ks_type != KSTAT_TYPE_IO ||
-		    strcmp(ksp->ks_class, "disk") != 0) {
-			continue;
-		}
-		if ((instance = lxsys_disk_instance(ksp)) == 0) {
-			continue;
-		}
-		if (skip > 0) {
-			skip--;
-			continue;
-		}
-
-		(void) strncpy(dirent->d_name, ksp->ks_name, KSTAT_STRLEN);
-		dirent->d_ino = lxsys_inode(type, instance, 0);
-		reclen = DIRENT64_RECLEN(strlen(dirent->d_name));
-
-		uresid = uiop->uio_resid;
-		if (reclen > uresid) {
-			if (uresid == oresid) {
-				/* Not enough space for one record */
-				error = EINVAL;
-			}
-			break;
-		}
-		if ((error = lxsys_dirent_out(dirent, reclen, uiop)) != 0) {
-			break;
-		}
-	}
-
-	kmem_free(ksr, sidx);
-
-zvols:
-	zv_done = B_TRUE;
-	if (type == LXSYS_DEVICES_BDI)
-		goto done;
-
-	list_create(&zvol_lst, sizeof (lxsys_zfs_ds_t),
-	    offsetof(lxsys_zfs_ds_t, ds_link));
-
-	lxsys_zfs_list_zvols(li, &zvol_lst);
-
-	zv = list_remove_head(&zvol_lst);
+	zv = list_head(lxzdata->lxzd_vdisks);
 	while (zv != NULL) {
 		char *nm;
 
+		/*
+		 * We show all disks (virtual and zvol) for LXSYS_BLOCK,
+		 * only virtual disks for LXSYS_DEVICES_BDI and only zvol
+		 * disks for LXSYS_DEVICES_ZFS.
+		 */
+		if (type == LXSYS_DEVICES_ZFS &&
+		    zv->lzd_type == LXD_ZFS_DEV_POOL)
+			goto next;
+
+		if (type == LXSYS_DEVICES_BDI &&
+		    zv->lzd_type == LXD_ZFS_DEV_ZVOL)
+			goto next;
+
 		if (skip > 0) {
 			skip--;
-			kmem_free(zv, sizeof (lxsys_zfs_ds_t));
-			zv = list_remove_head(&zvol_lst);
-			continue;
+			goto next;
 		}
 
-		nm = lxsys_zv_basename(zv->ds_name);
-		if (strlen(nm) > LXSNSIZ) {
-			kmem_free(zv, sizeof (lxsys_zfs_ds_t));
-			zv = list_remove_head(&zvol_lst);
-			continue;
-		}
+		nm = lxsys_zv_basename(zv->lzd_name);
+		if (strlen(nm) > LXSNSIZ)
+			goto next;
 
 		(void) strncpy(dirent->d_name, nm, LXSNSIZ);
-		instance = lxsys_zvol_instance(zv->ds_name);
-		if (instance == 0) {
-			kmem_free(zv, sizeof (lxsys_zfs_ds_t));
-			zv = list_remove_head(&zvol_lst);
-			continue;
-		}
 
-		kmem_free(zv, sizeof (lxsys_zfs_ds_t));
+		instance = lxsys_vdisk_instance(zv);
+		if (instance == 0)
+			goto next;
 
 		dirent->d_ino = lxsys_inode(type, instance, 0);
 		reclen = DIRENT64_RECLEN(strlen(dirent->d_name));
@@ -1577,15 +1207,12 @@ zvols:
 			break;
 		}
 
-		zv = list_remove_head(&zvol_lst);
+next:
+		zv = list_next(lxzdata->lxzd_vdisks, zv);
 	}
 
-	if (lxsys_zvol_cleanup(&zvol_lst) != 0)
-		zv_done = B_FALSE;	/* we didn't process all of them */
-
-done:
-	/* Indicate EOF if we reached the end of the kstats and zvols. */
-	if (i >= nidx && zv_done) {
+	/* Indicate EOF if we reached the end of the virtual disks. */
+	if (zv == NULL) {
 		*eofp = 1;
 	}
 
@@ -1785,65 +1412,40 @@ lxsys_readlink_class_net(lxsys_node_t *lnp, char *buf, size_t len)
 static int
 lxsys_readlink_block(lxsys_node_t *lnp, char *buf, size_t len)
 {
-	kstat_t *ksr;
-	kstat_t ks0;
-	int nidx, i, inst, error = EINVAL;
-	size_t sidx;
-	ldi_ident_t li = VTOLXSM(LXSTOV(lnp))->lxsysm_li;
-	list_t	zvol_lst;
-	lxsys_zfs_ds_t *zv;
+	int inst, error = EINVAL;
+	lx_zone_data_t *lxzdata;
+	lxd_zfs_dev_t *zv;
 
 	if ((inst = lnp->lxsys_instance) == 0) {
 		return (error);
 	}
 
-	ks0.ks_kid = 0;
-	ksr = (kstat_t *)lxsys_kstat_read(&ks0, B_FALSE, &sidx, &nidx);
-	if (ksr == NULL) {
+	lxzdata = ztolxzd(curproc->p_zone);
+	if (lxzdata == NULL)
 		return (error);
-	}
-	for (i = 1; i < nidx; i++) {
-		kstat_t *ksp = &ksr[i];
+	ASSERT(lxzdata->lxzd_vdisks != NULL);
 
-		if (ksp->ks_type != KSTAT_TYPE_IO ||
-		    strcmp(ksp->ks_class, "disk") != 0) {
-			continue;
-		}
-		if (lxsys_disk_instance(ksp) == inst) {
-			(void) snprintf(buf, len,
-			    "../devices/virtual/bdi/%s", ksp->ks_name);
-			error = 0;
-			break;
-		}
-	}
-	kmem_free(ksr, sidx);
-
-	if (error == 0)
-		return (0);
-
-	/* try a zvol */
-	list_create(&zvol_lst, sizeof (lxsys_zfs_ds_t),
-	    offsetof(lxsys_zfs_ds_t, ds_link));
-
-	lxsys_zfs_list_zvols(li, &zvol_lst);
-
-	zv = list_remove_head(&zvol_lst);
+	zv = list_head(lxzdata->lxzd_vdisks);
 	while (zv != NULL) {
-		if (lxsys_zvol_instance(zv->ds_name) == inst) {
-			char *nm = lxsys_zv_basename(zv->ds_name);
+		int zvinst;
 
-			(void) snprintf(buf, len,
-			    "../devices/zfs/%s", nm);
+		zvinst = lxsys_vdisk_instance(zv);
+		if (zvinst == inst) {
+			char *nm = lxsys_zv_basename(zv->lzd_name);
+
+			if (zv->lzd_type == LXD_ZFS_DEV_POOL) {
+				(void) snprintf(buf, len,
+				    "../devices/virtual/bdi/%s", nm);
+			} else {
+				(void) snprintf(buf, len,
+				    "../devices/zfs/%s", nm);
+			}
 			error = 0;
-			kmem_free(zv, sizeof (lxsys_zfs_ds_t));
 			break;
 		}
 
-		kmem_free(zv, sizeof (lxsys_zfs_ds_t));
-		zv = list_remove_head(&zvol_lst);
+		zv = list_next(lxzdata->lxzd_vdisks, zv);
 	}
-
-	(void) lxsys_zvol_cleanup(&zvol_lst);
 
 	return (error);
 }

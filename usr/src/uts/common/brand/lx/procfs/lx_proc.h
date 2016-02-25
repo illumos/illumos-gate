@@ -317,21 +317,6 @@ extern void lxpr_uiobuf_write(lxpr_uiobuf_t *, const char *, size_t);
 extern void lxpr_uiobuf_printf(lxpr_uiobuf_t *, const char *, ...);
 extern void lxpr_uiobuf_seterr(lxpr_uiobuf_t *, int);
 
-extern void lxpr_zfs_init(void);
-extern void lxpr_zfs_fini(void);
-
-typedef struct lxpr_zfs_iter lxpr_zfs_iter_t;
-typedef struct lxpr_zfs_ds lxpr_zfs_ds_t;
-struct lxpr_zfs_iter {
-	list_t		it_list;
-	lxpr_zfs_ds_t	*it_ds;
-};
-extern int lxpr_zfs_list_pools(lxpr_mnt_t *, zfs_cmd_t *, nvlist_t **);
-extern int lxpr_zvol_dev(lxpr_mnt_t *, char *, major_t *, minor_t *);
-extern void lxpr_zfs_end_iter(lxpr_zfs_iter_t *);
-extern int lxpr_zfs_next_zvol(lxpr_mnt_t *, char *, zfs_cmd_t *,
-    lxpr_zfs_iter_t *);
-
 extern int lxpr_core_path_l2s(const char *, char *, size_t);
 extern int lxpr_core_path_s2l(const char *, char *, size_t);
 
