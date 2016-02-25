@@ -62,9 +62,9 @@ include $(UTSBASE)/sparc/Makefile.sparc
 #
 #	Define targets
 #
-ALL_TARGET	= $(LIBGEN)
+ALL_TARGET	= $(LIBGEN) $(GENUNIX)
 LINT_TARGET	= $(MODULE).lint
-INSTALL_TARGET	= $(GENUNIX) $(ROOTMODULE)
+INSTALL_TARGET	= $(LIBGEN) $(GENUNIX) $(ROOTMODULE)
 
 #
 #	Override defaults

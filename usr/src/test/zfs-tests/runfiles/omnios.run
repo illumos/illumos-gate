@@ -361,6 +361,8 @@ tests = ['grow_pool_001_pos']
 
 [/opt/zfs-tests/tests/functional/grow_replicas]
 tests = ['grow_replicas_001_pos']
+pre =
+post =
 
 [/opt/zfs-tests/tests/functional/history]
 tests = ['history_001_pos', 'history_002_pos', 'history_003_pos',

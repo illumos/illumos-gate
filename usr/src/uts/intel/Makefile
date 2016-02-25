@@ -48,7 +48,7 @@ def.prereq	:=	TARGET= def
 all		:=	TARGET= all
 all.prereq	:=	TARGET= all
 install		:=	TARGET= install
-install.prereq	:=	TARGET= all
+install.prereq	:=	TARGET= install
 clean		:=	TARGET= clean
 clobber		:=	TARGET= clobber
 lint		:=	TARGET= lint
