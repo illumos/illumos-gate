@@ -120,11 +120,6 @@ _fini(void)
 	lxpr_fininodecache();
 
 	/*
-	 * Clean up any reference to the ZFS module we have.
-	 */
-	lxpr_zfs_fini();
-
-	/*
 	 * clean out the vfsops and vnodeops
 	 */
 	(void) vfs_freevfsops_by_type(lxprocfstype);
@@ -191,11 +186,6 @@ lxpr_init(int fstype, char *name)
 	 * Initialise cache for lxpr_nodes
 	 */
 	lxpr_initnodecache();
-
-	/*
-	 * Set up a pointer to the ZFS module and some key functions.
-	 */
-	lxpr_zfs_init();
 
 	return (0);
 }

@@ -23,7 +23,6 @@ LINTS		= $(LX_SYS_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(USR_FS_DIR)/$(MODULE)
 
 INC_PATH	+= -I$(UTSBASE)/common/brand/lx -I$(LX_CMN)
-INC_PATH	+= -I$(UTSBASE)/common/fs/zfs
 
 include $(UTSBASE)/intel/Makefile.intel
 
@@ -33,7 +32,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 CFLAGS		+= $(CCVERBOSE)
 
-LDFLAGS		+= -dy -Nbrand/lx_brand -Ndrv/ip -Nfs/zfs
+LDFLAGS		+= -dy -Nbrand/lx_brand -Ndrv/ip
 
 #
 # For now, disable these lint checks; maintainers should endeavor

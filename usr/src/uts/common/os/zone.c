@@ -7270,16 +7270,15 @@ zone_shutdown_global(void)
 }
 
 /*
- * Returns true if the named dataset is visible in the current zone.
+ * Returns true if the named dataset is visible in the specified zone.
  * The 'write' parameter is set to 1 if the dataset is also writable.
  */
 int
-zone_dataset_visible(const char *dataset, int *write)
+zone_dataset_visible_inzone(zone_t *zone, const char *dataset, int *write)
 {
 	static int zfstype = -1;
 	zone_dataset_t *zd;
 	size_t len;
-	zone_t *zone = curproc->p_zone;
 	const char *name = NULL;
 	vfs_t *vfsp = NULL;
 
@@ -7347,7 +7346,8 @@ zone_dataset_visible(const char *dataset, int *write)
 	vfs_list_read_lock();
 	vfsp = zone->zone_vfslist;
 	do {
-		ASSERT(vfsp);
+		if (vfsp == NULL)
+			break;
 		if (vfsp->vfs_fstype == zfstype) {
 			name = refstr_value(vfsp->vfs_resource);
 
@@ -7381,6 +7381,18 @@ zone_dataset_visible(const char *dataset, int *write)
 
 	vfs_list_unlock();
 	return (0);
+}
+
+/*
+ * Returns true if the named dataset is visible in the current zone.
+ * The 'write' parameter is set to 1 if the dataset is also writable.
+ */
+int
+zone_dataset_visible(const char *dataset, int *write)
+{
+	zone_t *zone = curproc->p_zone;
+
+	return (zone_dataset_visible_inzone(zone, dataset, write));
 }
 
 /*

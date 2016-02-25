@@ -535,6 +535,7 @@ typedef struct lx_zone_data {
 	ksocket_t lxzd_ioctl_sock;
 	char lxzd_bootid[LX_BOOTID_LEN];	/* procfs boot_id */
 	vfs_t *lxzd_cgroup;			/* cgroup for this zone */
+	list_t *lxzd_vdisks;			/* virtual disks (zvols) */
 } lx_zone_data_t;
 
 #define	BR_CPU_BOUND	0x0001
@@ -554,6 +555,19 @@ typedef struct lx_zone_data {
 /* Macro for converting to system call arguments. */
 #define	LX_ARGS(scall) ((struct lx_##scall##_args *)\
 	(ttolxlwp(curthread)->br_scall_args))
+
+typedef enum lxd_zfs_dev_type {
+	LXD_ZFS_DEV_NONE,
+	LXD_ZFS_DEV_POOL,
+	LXD_ZFS_DEV_ZVOL
+} lxd_zfs_dev_type_t;
+
+typedef struct lxd_zfs_dev {
+	list_node_t		lzd_link;
+	char			lzd_name[MAXPATHLEN];
+	lxd_zfs_dev_type_t	lzd_type;
+	minor_t			lzd_minor;
+} lxd_zfs_dev_t;
 
 /*
  * Determine the upper bound on the system call number:
