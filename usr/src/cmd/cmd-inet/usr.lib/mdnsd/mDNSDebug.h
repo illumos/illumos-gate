@@ -5,84 +5,15 @@
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
-
-    Change History (most recent first):
-
-$Log: mDNSDebug.h,v $
-Revision 1.26.2.1  2006/08/29 06:24:22  cheshire
-Re-licensed mDNSResponder daemon source code under Apache License, Version 2.0
-
-Revision 1.26  2005/07/04 22:40:26  cheshire
-Additional debugging code to help catch memory corruption
-
-Revision 1.25  2004/12/14 21:34:16  cheshire
-Add "#define ANSWER_REMOTE_HOSTNAME_QUERIES 0" and comment
-
-Revision 1.24  2004/09/16 01:58:21  cheshire
-Fix compiler warnings
-
-Revision 1.23  2004/05/18 23:51:25  cheshire
-Tidy up all checkin comments to use consistent "<rdar://problem/xxxxxxx>" format for bug numbers
-
-Revision 1.22  2004/04/22 04:27:42  cheshire
-Spacing tidyup
-
-Revision 1.21  2004/04/14 23:21:41  ksekar
-Removed accidental checkin of MALLOC_DEBUGING flag in 1.20
-
-Revision 1.20  2004/04/14 23:09:28  ksekar
-Support for TSIG signed dynamic updates.
-
-Revision 1.19  2004/03/15 18:57:59  cheshire
-Undo last checkin that accidentally made verbose debugging the default for all targets
-
-Revision 1.18  2004/03/13 01:57:33  ksekar
-<rdar://problem/3192546>: DynDNS: Dynamic update of service records
-
-Revision 1.17  2004/01/28 21:14:23  cheshire
-Reconcile debug_mode and gDebugLogging into a single flag (mDNS_DebugMode)
-
-Revision 1.16  2003/12/09 01:30:06  rpantos
-Fix usage of ARGS... macros to build properly on Windows.
-
-Revision 1.15  2003/12/08 20:55:26  rpantos
-Move some definitions here from mDNSMacOSX.h.
-
-Revision 1.14  2003/08/12 19:56:24  cheshire
-Update to APSL 2.0
-
-Revision 1.13  2003/07/02 21:19:46  cheshire
-<rdar://problem/3313413> Update copyright notices, etc., in source code comments
-
-Revision 1.12  2003/05/26 03:01:27  cheshire
-<rdar://problem/3268904> sprintf/vsprintf-style functions are unsafe; use snprintf/vsnprintf instead
-
-Revision 1.11  2003/05/21 17:48:10  cheshire
-Add macro to enable GCC's printf format string checking
-
-Revision 1.10  2003/04/26 02:32:57  cheshire
-Add extern void LogMsg(const char *format, ...);
-
-Revision 1.9  2002/09/21 20:44:49  zarzycki
-Added APSL info
-
-Revision 1.8  2002/09/19 04:20:43  cheshire
-Remove high-ascii characters that confuse some systems
-
-Revision 1.7  2002/09/16 18:41:42  cheshire
-Merge in license terms from Quinn's copy, in preparation for Darwin release
-
-*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+ */
 
 #ifndef __mDNSDebug_h
 #define __mDNSDebug_h
@@ -104,89 +35,132 @@ Merge in license terms from Quinn's copy, in preparation for Darwin release
 //    warning: repeated `#' flag in format              (for %##s             -- DNS name string format)
 //    warning: double format, pointer arg (arg 2)       (for %.4a, %.16a, %#a -- IP address formats)
 #define MDNS_CHECK_PRINTF_STYLE_FUNCTIONS 0
-#if MDNS_CHECK_PRINTF_STYLE_FUNCTIONS
-#define IS_A_PRINTF_STYLE_FUNCTION(F,A) __attribute__ ((format(printf,F,A)))
-#else
-#define IS_A_PRINTF_STYLE_FUNCTION(F,A)
-#endif
 
-#ifdef	__cplusplus
-	extern "C" {
-#endif
-
-#if MDNS_DEBUGMSGS
-#define debugf debugf_
-extern void debugf_(const char *format, ...) IS_A_PRINTF_STYLE_FUNCTION(1,2);
-#else // If debug breaks are off, use a preprocessor trick to optimize those calls out of the code
-	#if (defined(__GNUC__))
-		#define	debugf( ARGS... ) ((void)0)
-	#elif (defined(__MWERKS__))
-		#define	debugf( ... )
-	#else
-		#define debugf 1 ? ((void)0) : (void)
-	#endif
-#endif
-
-#if MDNS_DEBUGMSGS > 1
-#define verbosedebugf verbosedebugf_
-extern void verbosedebugf_(const char *format, ...) IS_A_PRINTF_STYLE_FUNCTION(1,2);
-#else
-	#if (defined(__GNUC__))
-		#define	verbosedebugf( ARGS... ) ((void)0)
-	#elif (defined(__MWERKS__))
-		#define	verbosedebugf( ... )
-	#else
-		#define verbosedebugf 1 ? ((void)0) : (void)
-	#endif
-#endif
-
-// LogMsg is used even in shipping code, to write truly serious error messages to syslog (or equivalent)
-extern int	mDNS_DebugMode;	// If non-zero, LogMsg() writes to stderr instead of syslog
-extern void LogMsg(const char *format, ...) IS_A_PRINTF_STYLE_FUNCTION(1,2);
-extern void LogMsgIdent(const char *ident, const char *format, ...) IS_A_PRINTF_STYLE_FUNCTION(2,3);
-extern void LogMsgNoIdent(const char *format, ...) IS_A_PRINTF_STYLE_FUNCTION(1,2);
+typedef enum
+{
+    MDNS_LOG_MSG,
+    MDNS_LOG_OPERATION,
+    MDNS_LOG_SPS,
+    MDNS_LOG_INFO,
+    MDNS_LOG_DEBUG,
+} mDNSLogLevel_t;
 
 // Set this symbol to 1 to answer remote queries for our Address, reverse mapping PTR, and HINFO records
 #define ANSWER_REMOTE_HOSTNAME_QUERIES 0
 
 // Set this symbol to 1 to do extra debug checks on malloc() and free()
 // Set this symbol to 2 to write a log message for every malloc() and free()
-#define MACOSX_MDNS_MALLOC_DEBUGGING 0
+//#define MACOSX_MDNS_MALLOC_DEBUGGING 1
 
-#if MACOSX_MDNS_MALLOC_DEBUGGING >= 1
+//#define ForceAlerts 1
+//#define LogTimeStamps 1
+
+// Developer-settings section ends here
+
+#if MDNS_CHECK_PRINTF_STYLE_FUNCTIONS
+#define IS_A_PRINTF_STYLE_FUNCTION(F,A) __attribute__ ((format(printf,F,A)))
+#else
+#define IS_A_PRINTF_STYLE_FUNCTION(F,A)
+#endif
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+// Variable argument macro support. Use ANSI C99 __VA_ARGS__ where possible. Otherwise, use the next best thing.
+
+#if (defined(__GNUC__))
+    #if ((__GNUC__ > 3) || ((__GNUC__ == 3) && (__GNUC_MINOR__ >= 2)))
+        #define MDNS_C99_VA_ARGS        1
+        #define MDNS_GNU_VA_ARGS        0
+    #else
+        #define MDNS_C99_VA_ARGS        0
+        #define MDNS_GNU_VA_ARGS        1
+    #endif
+    #define MDNS_HAS_VA_ARG_MACROS      1
+#elif (_MSC_VER >= 1400) // Visual Studio 2005 and later
+    #define MDNS_C99_VA_ARGS            1
+    #define MDNS_GNU_VA_ARGS            0
+    #define MDNS_HAS_VA_ARG_MACROS      1
+#elif (defined(__MWERKS__))
+    #define MDNS_C99_VA_ARGS            1
+    #define MDNS_GNU_VA_ARGS            0
+    #define MDNS_HAS_VA_ARG_MACROS      1
+#else
+    #define MDNS_C99_VA_ARGS            1
+    #define MDNS_GNU_VA_ARGS            0
+    #define MDNS_HAS_VA_ARG_MACROS      1
+#endif
+
+#if (MDNS_HAS_VA_ARG_MACROS)
+    #if (MDNS_C99_VA_ARGS)
+        #define debug_noop(... ) ((void)0)
+        #define LogMsg(... )           LogMsgWithLevel(MDNS_LOG_MSG, __VA_ARGS__)
+        #define LogOperation(... )     do { if (mDNS_LoggingEnabled) LogMsgWithLevel(MDNS_LOG_OPERATION, __VA_ARGS__);} while (0)
+        #define LogSPS(... )           do { if (mDNS_LoggingEnabled) LogMsgWithLevel(MDNS_LOG_SPS,       __VA_ARGS__);} while (0)
+        #define LogInfo(... )          do { if (mDNS_LoggingEnabled) LogMsgWithLevel(MDNS_LOG_INFO,      __VA_ARGS__);} while (0)
+    #elif (MDNS_GNU_VA_ARGS)
+        #define debug_noop( ARGS... ) ((void)0)
+        #define LogMsg( ARGS... )       LogMsgWithLevel(MDNS_LOG_MSG, ARGS)
+        #define LogOperation( ARGS... ) do { if (mDNS_LoggingEnabled) LogMsgWithLevel(MDNS_LOG_OPERATION, ARGS);} while (0)
+        #define LogSPS( ARGS... )       do { if (mDNS_LoggingEnabled) LogMsgWithLevel(MDNS_LOG_SPS,       ARGS);} while (0)
+        #define LogInfo( ARGS... )      do { if (mDNS_LoggingEnabled) LogMsgWithLevel(MDNS_LOG_INFO,      ARGS);} while (0)
+    #else
+        #error Unknown variadic macros
+    #endif
+#else
+// If your platform does not support variadic macros, you need to define the following variadic functions.
+// See mDNSShared/mDNSDebug.c for sample implementation
+    #define debug_noop 1 ? (void)0 : (void)
+    #define LogMsg LogMsg_
+    #define LogOperation (mDNS_LoggingEnabled == 0) ? ((void)0) : LogOperation_
+    #define LogSPS       (mDNS_LoggingEnabled == 0) ? ((void)0) : LogSPS_
+    #define LogInfo      (mDNS_LoggingEnabled == 0) ? ((void)0) : LogInfo_
+extern void LogMsg_(const char *format, ...)       IS_A_PRINTF_STYLE_FUNCTION(1,2);
+extern void LogOperation_(const char *format, ...) IS_A_PRINTF_STYLE_FUNCTION(1,2);
+extern void LogSPS_(const char *format, ...)       IS_A_PRINTF_STYLE_FUNCTION(1,2);
+extern void LogInfo_(const char *format, ...)      IS_A_PRINTF_STYLE_FUNCTION(1,2);
+#endif
+
+#if MDNS_DEBUGMSGS
+#define debugf debugf_
+extern void debugf_(const char *format, ...) IS_A_PRINTF_STYLE_FUNCTION(1,2);
+#else
+#define debugf debug_noop
+#endif
+
+#if MDNS_DEBUGMSGS > 1
+#define verbosedebugf verbosedebugf_
+extern void verbosedebugf_(const char *format, ...) IS_A_PRINTF_STYLE_FUNCTION(1,2);
+#else
+#define verbosedebugf debug_noop
+#endif
+
+extern int mDNS_LoggingEnabled;
+extern int mDNS_PacketLoggingEnabled;
+extern int mDNS_McastLoggingEnabled;
+extern int mDNS_McastTracingEnabled;
+extern int mDNS_DebugMode;          // If non-zero, LogMsg() writes to stderr instead of syslog
+extern const char ProgramName[];
+
+extern void LogMsgWithLevel(mDNSLogLevel_t logLevel, const char *format, ...) IS_A_PRINTF_STYLE_FUNCTION(2,3);
+// LogMsgNoIdent needs to be fixed so that it logs without the ident prefix like it used to
+// (or completely overhauled to use the new "log to a separate file" facility)
+#define LogMsgNoIdent LogMsg
+
+#if APPLE_OSX_mDNSResponder && MACOSX_MDNS_MALLOC_DEBUGGING >= 1
 extern void *mallocL(char *msg, unsigned int size);
 extern void freeL(char *msg, void *x);
 extern void LogMemCorruption(const char *format, ...);
 extern void uds_validatelists(void);
+extern void udns_validatelists(void *const v);
 #else
 #define mallocL(X,Y) malloc(Y)
 #define freeL(X,Y) free(Y)
 #endif
 
-#if MACOSX_MDNS_MALLOC_DEBUGGING >= 2
-#define LogMalloc LogMsg
-#else
-	#if (defined( __GNUC__ ))
-		#define	LogMalloc(ARGS...) ((void)0)
-	#elif (defined( __MWERKS__ ))
-		#define	LogMalloc( ... )
-	#else
-		#define LogMalloc 1 ? ((void)0) : (void)
-	#endif
-#endif
-
-#define LogAllOperations 0
-
-#if LogAllOperations
-#define LogOperation LogMsg
-#else
-#define	LogOperation debugf
-#endif
-
-#define ForceAlerts 0
-
-#ifdef	__cplusplus
-	}
+#ifdef __cplusplus
+}
 #endif
 
 #endif

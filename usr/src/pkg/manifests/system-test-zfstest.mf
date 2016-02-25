@@ -1739,12 +1739,10 @@ file path=opt/zfs-tests/tests/functional/grow_pool/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/grow_pool/grow_pool.cfg mode=0555
 file path=opt/zfs-tests/tests/functional/grow_pool/grow_pool_001_pos mode=0555
 file path=opt/zfs-tests/tests/functional/grow_pool/setup mode=0555
-file path=opt/zfs-tests/tests/functional/grow_replicas/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/grow_replicas/grow_replicas.cfg \
     mode=0555
 file path=opt/zfs-tests/tests/functional/grow_replicas/grow_replicas_001_pos \
     mode=0555
-file path=opt/zfs-tests/tests/functional/grow_replicas/setup mode=0555
 file path=opt/zfs-tests/tests/functional/history/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/history/history.cfg mode=0555
 file path=opt/zfs-tests/tests/functional/history/history_001_pos mode=0555

@@ -94,7 +94,7 @@ install:	$(INSTALL_DEPS)
 $(BINARY):	$(OBJS_DIR)/asm10k $(DSP_HDRS)
 
 $(ASM10K):	$(DSP_SRCDIR)/asm10k.c
-	$(CC) -o $@ $(DSP_SRCDIR)/asm10k.c
+	$(NATIVECC) $(NATIVE_CFLAGS) -o $@ $(DSP_SRCDIR)/asm10k.c
 
 $(DSP_HDRS): $(ASM10K) $(DSP_SRCS)
 	$(CPP) -D$(MODEL10K) -I$(DSP_SRCDIR) $(DSP_SRCDIR)/emu10k.dsp | \

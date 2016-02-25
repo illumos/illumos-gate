@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <gelf.h>
 
 #include <sys/mdb_modapi.h>
@@ -485,7 +483,7 @@ uhci_td_walk_step(mdb_walk_state_t *wsp)
 
 
 	if (mdb_vread(wsp->walk_data, sizeof (uhci_td_t), wsp->walk_addr)
-		== -1) {
+	    == -1) {
 		mdb_warn("failed to read td at %p", wsp->walk_addr);
 		return (WALK_DONE);
 	}
@@ -584,8 +582,8 @@ uhci_qh_walk_step(mdb_walk_state_t *wsp)
 	}
 
 	/* Make sure next element is a QH.  If a TD, stop.  */
-	if (!  ((((queue_head_t *)wsp->walk_data)->link_ptr) & HC_QUEUE_HEAD)
-	    == HC_QUEUE_HEAD)  {
+	if (((((queue_head_t *)wsp->walk_data)->link_ptr) & HC_QUEUE_HEAD)
+	    != HC_QUEUE_HEAD)  {
 		return (WALK_DONE);
 	}
 

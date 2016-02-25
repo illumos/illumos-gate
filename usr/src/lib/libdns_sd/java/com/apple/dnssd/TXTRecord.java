@@ -14,29 +14,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
 
-    Change History (most recent first):
-
-$Log: TXTRecord.java,v $
-Revision 1.6  2006/08/14 23:25:08  cheshire
-Re-licensed mDNSResponder daemon source code under Apache License, Version 2.0
-
-Revision 1.5  2004/08/25 21:54:36  rpantos
-<rdar://problem/3773973> Fix getValue() for values containing '='.
-
-Revision 1.4  2004/08/04 01:04:50  rpantos
-<rdar://problems/3731579&3731582> Fix set(); add remove() & toString().
-
-Revision 1.3  2004/07/13 21:24:25  rpantos
-Fix for <rdar://problem/3701120>.
-
-Revision 1.2  2004/04/30 21:48:27  rpantos
-Change line endings for CVS.
-
-Revision 1.1  2004/04/30 16:29:35  rpantos
-First checked in.
-
-ident	"%Z%%M%	%I%	%E% SMI"
-
 	To do:
 	- implement remove()
 	- fix set() to replace existing values
@@ -126,20 +103,20 @@ public class	TXTRecord
 		byte[]	oldBytes = fBytes;
 		int		valLen = (value != null) ? value.length : 0;
 		int		insertion = 0;
-		byte	newLen, avLen;
+		int		newLen, avLen;
 	
 		// locate the insertion point
 		for ( int i=0; i < index && insertion < fBytes.length; i++)
-			insertion += fBytes[ insertion] + 1;
+			insertion += (0xFF & (fBytes[ insertion] + 1));
 	
-		avLen = (byte) ( keyBytes.length + valLen + (value != null ? 1 : 0));
-		newLen = (byte) ( avLen + oldBytes.length + 1);
+		avLen = keyBytes.length + valLen + (value != null ? 1 : 0);
+		newLen = avLen + oldBytes.length + 1;
 
 		fBytes = new byte[ newLen];
 		System.arraycopy( oldBytes, 0, fBytes, 0, insertion);
 		int secondHalfLen = oldBytes.length - insertion;
 		System.arraycopy( oldBytes, insertion, fBytes, newLen - secondHalfLen, secondHalfLen);
-		fBytes[ insertion] = avLen;
+		fBytes[ insertion] = ( byte) avLen;
 		System.arraycopy( keyBytes, 0, fBytes, insertion + 1, keyBytes.length);
 		if ( value != null)
 		{
@@ -169,7 +146,7 @@ public class	TXTRecord
 					return i;
 				}
 			}
-			avStart += avLen + 1;
+			avStart += (0xFF & (avLen + 1));
 		}
 		return -1;
 	}
@@ -180,7 +157,7 @@ public class	TXTRecord
 		int		i, avStart;
 
 		for ( i=0, avStart=0; avStart < fBytes.length; i++)
-			avStart += fBytes[ avStart] + 1;
+			avStart += (0xFF & (fBytes[ avStart] + 1));
 		return i;
 	}
 

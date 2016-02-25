@@ -808,6 +808,29 @@ kstat_q_panic_msg:
 QRETURN;								\
 	stx	%g1, [%o0 + QTYPE/**/LASTUPDATE]; /* lastupdate = now */
 
+#if !defined(DEBUG)
+/*
+ * same as KSTAT_Q_UPDATE but without:
+ * QBR     %o1, QZERO;
+ * to be used only with non-debug build. mimics ASSERT() behaviour.
+ */
+#define	KSTAT_Q_UPDATE_ND(QOP, QRETURN, QTYPE) \
+	ld	[%o0 + QTYPE/**/CNT], %o1;	/* %o1 = old qlen */	\
+	QOP	%o1, 1, %o2;			/* %o2 = new qlen */	\
+	st	%o2, [%o0 + QTYPE/**/CNT];	/* delay: save qlen */	\
+	ldx	[%o0 + QTYPE/**/LASTUPDATE], %o3;			\
+	ldx	[%o0 + QTYPE/**/TIME], %o4;	/* %o4 = old time */	\
+	ldx	[%o0 + QTYPE/**/LENTIME], %o5;	/* %o5 = old lentime */	\
+	sub	%g1, %o3, %o2;			/* %o2 = time delta */	\
+	mulx	%o1, %o2, %o3;			/* %o3 = cur lentime */	\
+	add	%o4, %o2, %o4;			/* %o4 = new time */	\
+	add	%o5, %o3, %o5;			/* %o5 = new lentime */	\
+	stx	%o4, [%o0 + QTYPE/**/TIME];	/* save time */		\
+	stx	%o5, [%o0 + QTYPE/**/LENTIME];	/* save lentime */	\
+QRETURN;								\
+	stx	%g1, [%o0 + QTYPE/**/LASTUPDATE]; /* lastupdate = now */
+#endif
+
 	.align 16
 	ENTRY(kstat_waitq_enter)
 	GET_NATIVE_TIME(%g1, %g2, %g3)
@@ -817,7 +840,11 @@ QRETURN;								\
 	.align 16
 	ENTRY(kstat_waitq_exit)
 	GET_NATIVE_TIME(%g1, %g2, %g3)
+#if defined(DEBUG)
 	KSTAT_Q_UPDATE(sub, BRZPN, kstat_q_panic, retl, KSTAT_IO_W)
+#else
+	KSTAT_Q_UPDATE_ND(sub, retl, KSTAT_IO_W)
+#endif
 	SET_SIZE(kstat_waitq_exit)
 
 	.align 16
@@ -829,20 +856,32 @@ QRETURN;								\
 	.align 16
 	ENTRY(kstat_runq_exit)
 	GET_NATIVE_TIME(%g1, %g2, %g3)
+#if defined(DEBUG)
 	KSTAT_Q_UPDATE(sub, BRZPN, kstat_q_panic, retl, KSTAT_IO_R)
+#else
+	KSTAT_Q_UPDATE_ND(sub, retl, KSTAT_IO_R)
+#endif
 	SET_SIZE(kstat_runq_exit)
 
 	.align 16
 	ENTRY(kstat_waitq_to_runq)
 	GET_NATIVE_TIME(%g1, %g2, %g3)
+#if defined(DEBUG)
 	KSTAT_Q_UPDATE(sub, BRZPN, kstat_q_panic, 1:, KSTAT_IO_W)
+#else
+	KSTAT_Q_UPDATE_ND(sub, 1:, KSTAT_IO_W)
+#endif
 	KSTAT_Q_UPDATE(add, BRZPT, 1f, 1:retl, KSTAT_IO_R)
 	SET_SIZE(kstat_waitq_to_runq)
 
 	.align 16
 	ENTRY(kstat_runq_back_to_waitq)
 	GET_NATIVE_TIME(%g1, %g2, %g3)
+#if defined(DEBUG)
 	KSTAT_Q_UPDATE(sub, BRZPN, kstat_q_panic, 1:, KSTAT_IO_R)
+#else
+	KSTAT_Q_UPDATE_ND(sub, 1:, KSTAT_IO_R)
+#endif
 	KSTAT_Q_UPDATE(add, BRZPT, 1f, 1:retl, KSTAT_IO_W)
 	SET_SIZE(kstat_runq_back_to_waitq)
 

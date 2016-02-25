@@ -66,7 +66,7 @@ install: all $(DIRS) $(ROOTTZSRCD) $(ROOTTZTABD) $(ROOTUSRSBINPROG) \
 	$(NPROG) -d $(ROOTTZD) $(TZFILES)
 
 $(NPROG): $(NATIVE) $(NOBJS)
-	$(NATIVECC) -o $@ $(NOBJS)
+	$(NATIVECC) $(NATIVE_CFLAGS) -o $@ $(NOBJS)
 
 #
 # XXX
@@ -95,15 +95,9 @@ clean:
 lint: lint_SRCS
 
 $(NOBJS): $$(@F:.o=.c)
-	$(NATIVECC) -O $(NCPPFLAGS) -c -o $@ $(@F:.o=.c)
+	$(NATIVECC) -O $(NATIVE_CFLAGS) $(NCPPFLAGS) -c -o $@ $(@F:.o=.c)
 
 $(NATIVE)/zic.o: $(NATIVE)/tzfile.h
-
-#$(NATIVE)/scheck.o: scheck.c
-#	$(NATIVECC) -c -o $@ scheck.c
-
-#$(NATIVE)/ialloc.o: ialloc.c
-#	$(NATIVECC) -c -o $@ ialloc.c
 
 $(NATIVE)/tzfile.h: $(ROOT)/usr/include/tzfile.h
 	$(RM) $@; cp $(ROOT)/usr/include/tzfile.h $@

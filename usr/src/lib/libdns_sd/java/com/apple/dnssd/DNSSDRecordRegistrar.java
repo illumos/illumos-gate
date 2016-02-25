@@ -13,21 +13,6 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
-
-	This file declares the public interface to DNSSDRecordRegistrar, a DNSSDService
-	subclass that allows efficient registration of multiple individual records.
-
-    Change History (most recent first):
-
-$Log: DNSSDRecordRegistrar.java,v $
-Revision 1.2  2006/08/14 23:25:08  cheshire
-Re-licensed mDNSResponder daemon source code under Apache License, Version 2.0
-
-Revision 1.1  2006/06/20 23:00:12  rpantos
-<rdar://problem/3839132> Java needs to implement DNSServiceRegisterRecord equivalent
-
-ident	"%Z%%M%	%I%	%E% SMI"
-
  */
 
 
@@ -58,14 +43,11 @@ public interface	DNSSDRecordRegistrar extends DNSSDService
 					The class of the resource record, as defined in nameser.h 
 					(usually 1 for the Internet class).
 		<P>
-		@param	rData
+		@param	rdata
 					The new rdata  as it is to appear in the DNS record.
 		<P>
 		@param	ttl
 					The time to live of the resource record, in seconds. Pass 0 to use a default value.
-		<P>
-		@param	listener
-					This object will get called when the service is registered.
 		<P>
 		@return		A {@link DNSSDService} that can be used to abort the record registration.
 

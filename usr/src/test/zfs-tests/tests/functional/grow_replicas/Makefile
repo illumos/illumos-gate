@@ -18,11 +18,9 @@ include $(SRC)/Makefile.master
 ROOTOPTPKG = $(ROOT)/opt/zfs-tests
 TESTDIR = $(ROOTOPTPKG)/tests/functional/grow_replicas
 
-PROGS = cleanup \
-	grow_replicas_001_pos \
-	setup
+PROGS = grow_replicas_001_pos
 
-FILES = grow_replicas.cfg \
+FILES = grow_replicas.cfg
 
 CMDS = $(PROGS:%=$(TESTDIR)/%) $(FILES:%=$(TESTDIR)/%)
 $(CMDS) := FILEMODE = 0555

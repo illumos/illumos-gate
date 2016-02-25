@@ -27,57 +27,82 @@
 
 #
 # Copyright (c) 2013 by Delphix. All rights reserved.
+# Copyright 2016 Nexenta Systems, Inc.
 #
 
 . $STF_SUITE/tests/functional/grow_replicas/grow_replicas.cfg
-. $STF_SUITE/include/libtest.shlib
 
-#
 # DESCRIPTION:
-# A ZFS file system is limited by the amount of disk space
+# A ZFS filesystem is limited by the amount of disk space
 # available to the pool. Growing the pool by adding a disk
 # increases the amount of space.
 #
 # STRATEGY:
-# 1) Fill a ZFS filesystem mirror/raidz until ENOSPC by creating lots
-# of files
-# 2) Grow the mirror/raidz by adding a disk
-# 3) Verify that more data can now be written to the file system
-#
+# 1. Fill the filesystem on mirror/raidz pool by writing a file until ENOSPC.
+# 2. Grow the mirror/raidz pool by adding another mirror/raidz vdev.
+# 3. Verify that more data can now be written to the filesystem.
 
 verify_runnable "global"
 
-log_assert "A zpool mirror/raidz may be increased in capacity by adding a disk."
+if ! is_physical_device $DISKS; then
+	log_unsupported "This test case cannot be run on raw files"
+fi
 
-log_must $ZFS set compression=off $TESTPOOL/$TESTFS
-$FILE_WRITE -o create -f $TESTDIR/$TESTFILE1 \
-        -b $BLOCK_SIZE -c $WRITE_COUNT -d 0
+function cleanup
+{
+	datasetexists $TESTPOOL && log_must destroy_pool $TESTPOOL
+	[[ -d $TESTDIR ]] && log_must $RM -rf $TESTDIR
+}
 
-typeset -i zret=$?
+log_assert "mirror/raidz pool may be increased in capacity by adding a disk"
+
+log_onexit cleanup
+
 readonly ENOSPC=28
-if [[ $zret -ne $ENOSPC ]]; then
-        log_fail "file_write completed w/o ENOSPC, aborting!!!"
-fi
 
-if [[ ! -s $TESTDIR/$TESTFILE1 ]]; then
-        log_fail "$TESTDIR/$TESTFILE1 was not created"
-fi
+for pooltype in "mirror" "raidz"; do
+	log_note "Creating pool type: $pooltype"
 
-#
-# $DISK will be set if we're using slices on one disk
-#
-if [[ -n $DISK ]]; then
-        log_must $ZPOOL add $TESTPOOL $POOLTYPE $DISK"s"$SLICE3 \
-            $DISK"s"$SLICE4
-else
-        [[ -z $DISK2 || -z $DISK3 ]] && \
-            log_unsupported "No spare disks available."
-        log_must $ZPOOL add -f $TESTPOOL $POOLTYPE $DISK2"s"$SLICE \
-	    $DISK3"s"$SLICE
-fi
+	if [[ -n $DISK ]]; then
+		log_note "No spare disks available. Using slices on $DISK"
+		for slice in 0 1 3 4 ; do
+			log_must set_partition $slice "$cyl" $SIZE $DISK
+			cyl=$(get_endslice $DISK $slice)
+		done
+		create_pool $TESTPOOL $pooltype ${DISK}s0 ${DISK}s1
+	else
+		log_must set_partition 0 "" $SIZE $DISK0
+		log_must set_partition 0 "" $SIZE $DISK1
+		create_pool $TESTPOOL $pooltype ${DISK0}s0 ${DISK1}s0
+	fi
 
-log_must $FILE_WRITE -o append -f $TESTDIR/$TESTFILE1 \
-        -b $BLOCK_SIZE -c $SMALL_WRITE_COUNT -d 0
+	[[ -d $TESTDIR ]] && log_must $RM -rf $TESTDIR
+	log_must $ZFS create $TESTPOOL/$TESTFS
+	log_must $ZFS set mountpoint=$TESTDIR $TESTPOOL/$TESTFS
 
-log_must $ZFS inherit compression $TESTPOOL/$TESTFS
-log_pass "TESTPOOL mirror/raidz successfully grown"
+	log_must $ZFS set compression=off $TESTPOOL/$TESTFS
+	$FILE_WRITE -o create -f $TESTDIR/$TESTFILE1 \
+            -b $BLOCK_SIZE -c $WRITE_COUNT -d 0
+
+	[[ $? -ne $ENOSPC ]] && \
+	    log_fail "file_write completed w/o ENOSPC"
+
+	[[ ! -s $TESTDIR/$TESTFILE1 ]] && \
+	    log_fail "$TESTDIR/$TESTFILE1 was not created"
+
+	# $DISK will be set if we're using slices on one disk
+	if [[ -n $DISK ]]; then
+		log_must $ZPOOL add $TESTPOOL $pooltype ${DISK}s3 ${DISK}s4
+	else
+		[[ -z $DISK2 || -z $DISK3 ]] && 
+		    log_unsupported "No spare disks available"
+		log_must $ZPOOL add $TESTPOOL $pooltype ${DISK2}s0 ${DISK3}s0
+	fi
+
+	log_must $FILE_WRITE -o append -f $TESTDIR/$TESTFILE1 \
+	    -b $BLOCK_SIZE -c $SMALL_WRITE_COUNT -d 0
+
+	log_must destroy_pool $TESTPOOL
+done
+
+log_pass "mirror/raidz pool successfully grown"

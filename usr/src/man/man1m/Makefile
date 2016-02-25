@@ -13,6 +13,7 @@
 # Copyright 2011, Richard Lowe
 # Copyright (c) 2012, Joyent, Inc.  All rights reserved.
 # Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2016 Toomas Soome <tsoome@me.com>
 #
 
 include		$(SRC)//Makefile.master
@@ -286,6 +287,7 @@ _MANFILES=	6to4relay.1m		\
 		makedbm.1m		\
 		makemap.1m		\
 		mdmonitord.1m		\
+		mdnsd.1m		\
 		medstat.1m		\
 		metaclear.1m		\
 		metadb.1m		\

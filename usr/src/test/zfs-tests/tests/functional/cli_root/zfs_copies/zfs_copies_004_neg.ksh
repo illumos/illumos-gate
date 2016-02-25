@@ -41,7 +41,7 @@ verify_runnable "both"
 
 log_assert "Verify that copies property cannot be set to any value other than 1,2 or 3"
 
-set -A badval 0 01 02 03 0 -1 -2 -3 10 20 30 4 5 6 ? * blah
+set -A badval 0 01 02 03 0 -1 -2 -3 10 20 30 4 5 6 blah
 
 for val in ${badval[@]}; do
 	log_mustnot $ZFS create -o copies=$val $TESTPOOL/$TESTFS1

@@ -1007,15 +1007,13 @@ be_do_installboot_helper(zpool_handle_t *zphp, nvlist_t *child, char *stage1,
 static int
 be_do_copy_grub_cap(be_transaction_data_t *bt)
 {
-	zpool_handle_t  *zphp = NULL;
-	zfs_handle_t	*zhp = NULL;
+	zfs_handle_t *zhp = NULL;
 	char cap_file[MAXPATHLEN];
 	char zpool_cap_file[MAXPATHLEN];
 	char line[BUFSIZ];
 	char *tmp_mntpnt = NULL;
 	char *orig_mntpnt = NULL;
 	char *pool_mntpnt = NULL;
-	char *ptmp_mntpnt = NULL;
 	FILE *cap_fp = NULL;
 	FILE *zpool_cap_fp = NULL;
 	int err = 0;
@@ -1024,35 +1022,60 @@ be_do_copy_grub_cap(be_transaction_data_t *bt)
 	boolean_t be_mounted = B_FALSE;
 
 	/*
-	 * Copy the grub capability file from the BE we're activating
-	 * into the root pool.
+	 * first get BE dataset mountpoint, we can free all the resources
+	 * once cap_file is built, leaving only be unmount to be done.
 	 */
+	if ((zhp = zfs_open(g_zfs, bt->obe_root_ds, ZFS_TYPE_FILESYSTEM)) ==
+	    NULL) {
+		be_print_err(gettext("be_do_copy_grub_cap: failed to "
+		    "open BE root dataset (%s): %s\n"), bt->obe_root_ds,
+		    libzfs_error_description(g_zfs));
+		return (zfs_err_to_be_err(g_zfs));
+	}
+
+	if (!zfs_is_mounted(zhp, &tmp_mntpnt)) {
+		if ((ret = _be_mount(bt->obe_name, &tmp_mntpnt,
+		    BE_MOUNT_FLAG_NO_ZONES)) != BE_SUCCESS) {
+			be_print_err(gettext("be_do_copy_grub_cap: failed to "
+			    "mount BE (%s)\n"), bt->obe_name);
+			ZFS_CLOSE(zhp);
+			goto done;
+		}
+		be_mounted = B_TRUE;
+	}
+	ZFS_CLOSE(zhp);	/* BE dataset handle is not needed any more */
+
+	(void) snprintf(cap_file, sizeof (cap_file), "%s%s", tmp_mntpnt,
+	    BE_CAP_FILE);
+	free(tmp_mntpnt);
+
+	/* get pool root dataset mountpoint */
 	zhp = zfs_open(g_zfs, bt->obe_zpool, ZFS_TYPE_FILESYSTEM);
 	if (zhp == NULL) {
-		be_print_err(gettext("be_do_installboot: zfs_open "
+		be_print_err(gettext("be_do_copy_grub_cap: zfs_open "
 		    "failed: %s\n"), libzfs_error_description(g_zfs));
-		zpool_close(zphp);
-		return (zfs_err_to_be_err(g_zfs));
+		ret = zfs_err_to_be_err(g_zfs);
+		goto done;
 	}
 
 	/*
 	 * Check to see if the pool's dataset is mounted. If it isn't we'll
 	 * attempt to mount it.
 	 */
-	if ((ret = be_mount_pool(zhp, &ptmp_mntpnt,
+	if ((ret = be_mount_pool(zhp, &tmp_mntpnt,
 	    &orig_mntpnt, &pool_mounted)) != BE_SUCCESS) {
-		be_print_err(gettext("be_do_installboot: pool dataset "
+		be_print_err(gettext("be_do_copy_grub_cap: pool dataset "
 		    "(%s) could not be mounted\n"), bt->obe_zpool);
 		ZFS_CLOSE(zhp);
-		zpool_close(zphp);
-		return (ret);
+		goto done;
 	}
 
 	/*
 	 * Get the mountpoint for the root pool dataset.
+	 * NOTE: zhp must be kept for _be_unmount_pool()
 	 */
 	if (!zfs_is_mounted(zhp, &pool_mntpnt)) {
-		be_print_err(gettext("be_do_installboot: pool "
+		be_print_err(gettext("be_do_copy_grub_cap: pool "
 		    "dataset (%s) is not mounted. Can't check the grub "
 		    "version from the grub capability file.\n"), bt->obe_zpool);
 		ret = BE_ERR_NO_MENU;
@@ -1061,44 +1084,18 @@ be_do_copy_grub_cap(be_transaction_data_t *bt)
 
 	(void) snprintf(zpool_cap_file, sizeof (zpool_cap_file), "%s%s",
 	    pool_mntpnt, BE_CAP_FILE);
-
 	free(pool_mntpnt);
-
-	if ((zhp = zfs_open(g_zfs, bt->obe_root_ds, ZFS_TYPE_FILESYSTEM)) ==
-	    NULL) {
-		be_print_err(gettext("be_do_installboot: failed to "
-		    "open BE root dataset (%s): %s\n"), bt->obe_root_ds,
-		    libzfs_error_description(g_zfs));
-		ret = zfs_err_to_be_err(g_zfs);
-		goto done;
-	}
-
-	if (!zfs_is_mounted(zhp, &tmp_mntpnt)) {
-		if ((ret = _be_mount(bt->obe_name, &tmp_mntpnt,
-		    BE_MOUNT_FLAG_NO_ZONES)) != BE_SUCCESS) {
-			be_print_err(gettext("be_do_installboot: failed to "
-			    "mount BE (%s)\n"), bt->obe_name);
-			ZFS_CLOSE(zhp);
-			goto done;
-		}
-		be_mounted = B_TRUE;
-	}
-	ZFS_CLOSE(zhp);
-
-	(void) snprintf(cap_file, sizeof (cap_file), "%s%s", tmp_mntpnt,
-	    BE_CAP_FILE);
-	free(tmp_mntpnt);
 
 	if ((cap_fp = fopen(cap_file, "r")) == NULL) {
 		err = errno;
-		be_print_err(gettext("be_do_installboot: failed to open grub "
+		be_print_err(gettext("be_do_copy_grub_cap: failed to open grub "
 		    "capability file\n"));
 		ret = errno_to_be_err(err);
 		goto done;
 	}
 	if ((zpool_cap_fp = fopen(zpool_cap_file, "w")) == NULL) {
 		err = errno;
-		be_print_err(gettext("be_do_installboot: failed to open new "
+		be_print_err(gettext("be_do_copy_grub_cap: failed to open new "
 		    "grub capability file\n"));
 		ret = errno_to_be_err(err);
 		(void) fclose(cap_fp);
@@ -1117,12 +1114,12 @@ done:
 		(void) _be_unmount(bt->obe_name, 0);
 
 	if (pool_mounted) {
-		int iret = 0;
-		iret = be_unmount_pool(zhp, ptmp_mntpnt, orig_mntpnt);
+		err = be_unmount_pool(zhp, tmp_mntpnt, orig_mntpnt);
 		if (ret == BE_SUCCESS)
-			ret = iret;
+			ret = err;
 		free(orig_mntpnt);
-		free(ptmp_mntpnt);
+		free(tmp_mntpnt);
+		zfs_close(zhp);
 	}
 	return (ret);
 }

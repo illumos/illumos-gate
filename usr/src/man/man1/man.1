@@ -1,9 +1,14 @@
-.\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
-.\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
-.\" Copyright (c) 1980 Regents of the University of California.
+.\"
 .\" The Berkeley software License Agreement specifies the terms and conditions
 .\" for redistribution.
-.Dd Jul 18, 2014
+.\"
+.\"
+.\" Copyright (c) 1980 Regents of the University of California.
+.\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
+.\" Copyright 2016 Nexenta Systems, Inc.
+.\"
+.Dd February 12, 2016
 .Dt MAN 1
 .Os
 .Sh NAME
@@ -289,7 +294,7 @@ The
 .Pa man.cf
 file has the following format:
 .Lp
-.Dl Pf MANSECTS= Ar section , Ns Op Ar section...
+.Dl Pf MANSECTS= Ar section Ns Oo , Ns Ar section Oc Ns ...
 .Lp
 Lines beginning with
 .Sq Li #
@@ -302,16 +307,21 @@ configuration file, specifying the default search order for that directory.
 If the first line of the manual page is a reference to another manual
 page entry fitting the pattern:
 .Lp
-.Dl \&.so man*/\fIsourcefile\fR
+.Dl \&.so man*/ Ns Em sourcefile
 .Lp
 .Nm
 processes the indicated file in place of the current one. The
 reference must be expressed as a path name relative to the root of the manual
 page directory subtree.
 .Lp
-When the second or any subsequent line starts with \fB\&.so\fR, \fBman\fR
-ignores it; \fBtroff\fR(1) or \fBnroff\fR(1) processes the request in the usual
-manner.
+When the second or any subsequent line starts with
+.Sy \&.so ,
+.Nm
+ignores it;
+.Xr troff 1
+or
+.Xr nroff 1
+processes the request in the usual manner.
 .Sh ENVIRONMENT VARIABLES
 See
 .Xr environ 5
@@ -324,13 +334,25 @@ that affect the execution of
 .Ev LC_MESSAGES ,
 and
 .Ev NLSPATH .
-.Bl -tag -width indent
+.Bl -tag -width MANWIDTH
 .It Ev MANPATH
 A colon-separated list of directories; each directory can be followed by a
 comma-separated list of sections. If set, its value overrides
-\fB/usr/share/man\fR as the default directory search path, and the \fBman.cf\fR
-file as the default section search path. The \fB-M\fR and \fB-s\fR flags, in
-turn, override these values.)
+.Pa /usr/share/man
+as the default directory search path, and the
+.Pa man.cf
+file as the default section search path. The
+.Fl M
+and
+.Fl s
+flags, in turn, override these values.
+.It Ev MANWIDTH
+Width of the output. If set to the special value
+.Qq Sy TTY
+.Po or
+.Qq Sy tty
+.Pc ,
+and output is to terminal, auto-detect terminal width.
 .It Ev PAGER
 A program to use for interactively delivering
 output to the screen. If not set,

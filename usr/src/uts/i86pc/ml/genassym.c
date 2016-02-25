@@ -81,7 +81,7 @@ main(int argc, char *argv[])
 	printf("#define\tPIC_NSEOI 0x%x\n", PIC_NSEOI);
 	printf("#define\tPIC_SEOI_LVL7 0x%x\n", PIC_SEOI_LVL7);
 
-	printf("#define\tNANOSEC 0x%x\n", NANOSEC);
+	printf("#define\tNANOSEC 0x%llx\n", NANOSEC);
 	printf("#define\tADJ_SHIFT 0x%x\n", ADJ_SHIFT);
 
 	printf("#define\tSSLEEP 0x%x\n", SSLEEP);
@@ -150,9 +150,9 @@ main(int argc, char *argv[])
 	printf("#define\tMAXSYSARGS 0x%x\n", MAXSYSARGS);
 
 	/* Hack value just to allow clock to be kicked */
-	printf("#define\tNSEC_PER_CLOCK_TICK 0x%x\n", NANOSEC / 100);
+	printf("#define\tNSEC_PER_CLOCK_TICK 0x%llx\n", NANOSEC / 100);
 
-	printf("#define\tNSEC_PER_COUNTER_TICK 0x%x\n", NANOSEC / PIT_HZ);
+	printf("#define\tNSEC_PER_COUNTER_TICK 0x%llx\n", NANOSEC / PIT_HZ);
 
 	printf("#define\tPITCTR0_PORT 0x%x\n", PITCTR0_PORT);
 	printf("#define\tPITCTL_PORT 0x%x\n", PITCTL_PORT);

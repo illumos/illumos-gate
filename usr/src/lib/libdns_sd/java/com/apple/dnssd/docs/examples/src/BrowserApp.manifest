@@ -1,3 +1,2 @@
 Manifest-Version: 1.0
 Main-Class: BrowserApp
-Class-Path: /usr/share/lib/java/dnssd.jar

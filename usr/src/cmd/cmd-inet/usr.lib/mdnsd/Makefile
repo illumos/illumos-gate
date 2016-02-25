@@ -20,6 +20,7 @@
 #
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2016 Toomas Soome <tsoome@me.com>
 #
 
 PROG=		mdnsd
@@ -32,15 +33,15 @@ CMN_SRCS=	$(CMN_OBJS:%.o=$(CMN_DIR)/%.c)
 LOCAL_OBJS=	DNSCommon.o DNSDigest.o GenLinkedList.o \
 		PlatformCommon.o PosixDaemon.o \
 		mDNS.o mDNSDebug.o mDNSPosix.o mDNSUNP.o \
-		uDNS.o uds_daemon.o 
+		uDNS.o uds_daemon.o CryptoAlg.o anonymous.o
 LOCAL_SRCS=     $(LOCAL_OBJS:%.o=%.c)
 
 SRCS=		$(LOCAL_SRCS) $(CMN_SRCS)
 OBJS=	 	$(LOCAL_OBJS) $(CMN_OBJS)	
 
 
-MDNSFLAGS=	-DNOT_HAVE_DAEMON -DNOT_HAVE_SA_LEN \
-		-DLOG_PERROR=0 -DHAVE_SOLARIS \
+MDNSFLAGS=	-DNOT_HAVE_SA_LEN \
+		-DLOG_PERROR=0 -DHAVE_SOLARIS -DTARGET_OS_SOLARIS \
 		-D_XPG4_2 -D__EXTENSIONS__ -DHAVE_BROKEN_RECVIF_NAME \
 		-DHAVE_IPV6=1 -Dasm=__asm -DMDNSD_NOROOT \
 		-DPID_FILE=\"\" -DMDNSD_USER=\"noaccess\" \

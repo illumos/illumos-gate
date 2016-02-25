@@ -602,7 +602,7 @@ ufs_sync_indir(struct inode *ip)
 	}
 
 	/* Write out all the first level indirect blocks */
-	for (i = 0; i <= NIADDR; i++) {
+	for (i = 0; i < NIADDR; i++) {
 		if ((blkno = ip->i_ib[i]) == 0)
 			continue;
 		blkflush(ip->i_dev, (daddr_t)fsbtodb(fs, blkno));

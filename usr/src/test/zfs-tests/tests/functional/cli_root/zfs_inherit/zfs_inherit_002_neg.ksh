@@ -50,16 +50,15 @@ function cleanup
 	fi
 }
 
-log_assert "'zfs inherit' should return an error with bad parameters in \
-one command."
+log_assert "'zfs inherit' should return an error with bad parameters in" \
+    "one command."
 log_onexit cleanup
 
 set -A badopts "r" "R" "-R" "-rR" "-a" "-" "-?" "-1" "-2" "-v" "-n"
 set -A props "recordsize" "mountpoint" "sharenfs" "checksum" "compression" \
     "atime" "devices" "exec" "setuid" "readonly" "zoned" "snapdir" "aclmode" \
     "aclinherit" "xattr" "copies"
-set -A illprops "shareiscsi" "recordsiz" "mountpont" "sharen" "compres" \
-    "atme" "???" "***" "blah"
+set -A illprops "recordsiz" "mountpont" "sharen" "compres" "atme" "blah"
 
 log_must $ZFS snapshot $TESTPOOL/$TESTFS@$TESTSNAP
 
