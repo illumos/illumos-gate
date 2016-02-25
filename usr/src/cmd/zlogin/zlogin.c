@@ -23,7 +23,7 @@
  * Copyright 2013 DEY Storage Systems, Inc.
  * Copyright (c) 2014 Gary Mills
  * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
- * Copyright 2015 Joyent, Inc. All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*
@@ -1234,13 +1234,7 @@ prep_args(brand_handle_t bh, char *zonename, const char *login, char **argv)
 			struct stat sb;
 			char zonepath[MAXPATHLEN];
 			char supath[MAXPATHLEN];
-
-			/*
-			 * We allocated an extra slot in case our login below
-			 * is not 'root' but normally we don't take that code
-			 * path.
-			 */
-			n--;
+			char *supath_choice = NULL;
 
 			if (zone_get_zonepath(zonename, zonepath,
 			    sizeof (zonepath)) != Z_OK) {
@@ -1252,30 +1246,49 @@ prep_args(brand_handle_t bh, char *zonename, const char *login, char **argv)
 			(void) snprintf(supath, sizeof (supath), "%s/root/%s",
 			    zonepath, SUPATH1);
 			if (stat(supath, &sb) == 0) {
-				new_argv[a++] = SUPATH1;
+				supath_choice = SUPATH1;
 			} else {
 				(void) snprintf(supath, sizeof (supath),
 				    "%s/root/%s", zonepath, SUPATH2);
 				if (stat(supath, &sb) == 0) {
-					new_argv[a++] = SUPATH2;
-				} else {
+					supath_choice = SUPATH2;
+				}
+			}
+
+			if (supath_choice != NULL) {
+				/*
+				 * Craft appropriate args for 'su'
+				 */
+				new_argv[a++] = supath_choice;
+
+				if (strcmp(login, "root") != 0) {
+					new_argv[a++] = "-";
+				}
+				new_argv[a++] = (char *)login;
+
+				new_argv[a++] = "-c";
+			} else {
+				/*
+				 * If the 'su' executable cannot be found, the
+				 * specified program can be run directly unless
+				 * a non-root login is requested.
+				 */
+				if (strcmp(login, "root") != 0) {
 					zerror(gettext("unable to find 'su' "
 					    "command"));
 					return (NULL);
 				}
 			}
-
-			if (strcmp(login, "root") != 0) {
-				new_argv[a++] = "-";
-				n++;
-			}
-			new_argv[a++] = (char *)login;
-			new_argv[a++] = "-c";
 		}
 
 		new_argv[a++] = subshell;
 		new_argv[a++] = NULL;
-		assert(a == n);
+
+		/*
+		 * The arg count may be less than planned for if a 'su' binary
+		 * was not present or the user specified was root.
+		 */
+		assert(a <= n);
 	} else {
 		if (failsafe) {
 			n = 2;
