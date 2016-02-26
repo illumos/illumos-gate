@@ -3590,6 +3590,22 @@ nextp:
 	lxpr_uiobuf_printf(uiobuf, "/native /native zfs ro 0 0\n");
 }
 
+/* zvol basename to flatten namespace */
+static char *
+lxpr_zv_basename(char *ds_name)
+{
+	char *nm;
+
+	if ((nm = strrchr(ds_name, '/')) != NULL) {
+		nm++;
+		ASSERT(*nm != '\0');
+	} else {
+		nm = ds_name;
+	}
+
+	return (nm);
+}
+
 /*
  * lxpr_read_partitions():
  *
@@ -3622,14 +3638,7 @@ lxpr_read_partitions(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	zv = list_head(lxzdata->lxzd_vdisks);
 	while (zv != NULL) {
 		minor_t minor;
-		char *nm;
-
-		if ((nm = strrchr(zv->lzd_name, '/')) != NULL) {
-			nm++;
-			ASSERT(*nm != '\0');
-		} else {
-			nm = zv->lzd_name;
-		}
+		char *nm = lxpr_zv_basename(zv->lzd_name);
 
 		if (zv->lzd_type == LXD_ZFS_DEV_POOL) {
 			minor = 0;
@@ -3644,29 +3653,6 @@ lxpr_read_partitions(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	}
 }
 
-static boolean_t
-lxpr_is_vdisk(char *nm)
-{
-	lx_zone_data_t *lxzdata;
-	lxd_zfs_dev_t *zv;
-
-	lxzdata = ztolxzd(curproc->p_zone);
-	if (lxzdata == NULL)
-		return (B_FALSE);
-	ASSERT(lxzdata->lxzd_vdisks != NULL);
-
-	zv = list_head(lxzdata->lxzd_vdisks);
-	while (zv != NULL) {
-		if (zv->lzd_type == LXD_ZFS_DEV_POOL &&
-		    strcmp(nm, zv->lzd_name) == 0)
-			return (B_TRUE);
-
-		zv = list_next(lxzdata->lxzd_vdisks, zv);
-	}
-
-	return (B_FALSE);
-}
-
 /*
  * lxpr_read_diskstats():
  *
@@ -3677,39 +3663,47 @@ lxpr_is_vdisk(char *nm)
 static void
 lxpr_read_diskstats(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
-	kstat_t *ksr;
-	kstat_t ks0;
-	int nidx, num, i;
-	size_t sidx, size;
+	kstat_t kn;
+	int num;
+	int zv_min = 0;
+	zone_vfs_kstat_t *kip;
+	int major, minor;
+	size_t size;
+	lx_zone_data_t *lxzdata;
+	lxd_zfs_dev_t *zv;
 
 	ASSERT(lxpnp->lxpr_type == LXPR_DISKSTATS);
 
-	ks0.ks_kid = 0;
-	ksr = (kstat_t *)lxpr_kstat_read(&ks0, B_FALSE, &sidx, &nidx);
+	lxzdata = ztolxzd(curproc->p_zone);
+	if (lxzdata == NULL)
+		return;
+	ASSERT(lxzdata->lxzd_vdisks != NULL);
 
-	if (ksr == NULL)
+	/*
+	 * Use the zone_vfs kstat, which is a superset of a kstat_io_t, since
+	 * it tracks IO at the zone level.
+	 */
+	strlcpy(kn.ks_module, "zone_vfs", sizeof (kn.ks_module));
+	strlcpy(kn.ks_name, curproc->p_zone->zone_name, sizeof (kn.ks_name));
+	kn.ks_instance = getzoneid();
+
+	kip = (zone_vfs_kstat_t *)lxpr_kstat_read(&kn, B_TRUE, &size, &num);
+	if (kip == NULL)
 		return;
 
-	for (i = 1; i < nidx; i++) {
-		kstat_t *ksp = &ksr[i];
-		kstat_io_t *kip;
-		int major, minor;
+	if (size < sizeof (kstat_io_t)) {
+		kmem_free(kip, size);
+		return;
+	}
 
-		if (ksp->ks_type != KSTAT_TYPE_IO ||
-		    strcmp(ksp->ks_class, "disk") != 0)
-			continue;
-
-		if (!lxpr_is_vdisk(ksp->ks_name))
-			continue;
-
-		if ((kip = (kstat_io_t *)lxpr_kstat_read(ksp, B_TRUE,
-		    &size, &num)) == NULL)
-			continue;
-
-		if (size < sizeof (kstat_io_t)) {
-			kmem_free(kip, size);
-			continue;
-		}
+	/*
+	 * Because the zone vfs stats are tracked at the zone level we use
+	 * the same kstat for the zone's virtual disk (the zpool) and any
+	 * zvols that might also visible within the zone.
+	 */
+	zv = list_head(lxzdata->lxzd_vdisks);
+	while (zv != NULL) {
+		char *nm = lxpr_zv_basename(zv->lzd_name);
 
 		/*
 		 * /proc/diskstats is defined to have one line of output for
@@ -3747,42 +3741,46 @@ lxpr_read_diskstats(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 		 * infer device names, some translation is required to avoid
 		 * output which results in totally unexpected results.
 		 */
-		minor = ksp->ks_instance;
-		if (strncmp(ksp->ks_name, "sd", 2) == 0) {
-			/* map sd[0-9]+ to sd[a-z]+ */
-			major = 8;
-			minor = minor * 16;
-		} else if (strncmp(ksp->ks_name, "ram", 3) == 0) {
-			/* map ramdisk[0-9]+ to ram[0-9]+ */
-			major = 1;
-		} else if (strcmp(ksp->ks_module, "zfs") == 0) {
+
+		if (zv->lzd_type == LXD_ZFS_DEV_POOL) {
 			/* map zfs pools to md[0-9]+ (software RAID) */
 			major = 9;
+			minor = 0;
 		} else {
-			/* pretend everything else is ide */
-			major = 2;
-			minor = minor * 64;
+			/*
+			 * The zvols are in the unused range (see
+			 * /etc/sysstat/sysstat.ioconf on a Linux distro).
+			 * Use a counter for the fabricated minor number since
+			 * Linux only supports 20 bits for minor numbers, which
+			 * allows for 65k zvols if we want scale by partition.
+			 */
+			major = 203;
+			minor = zv_min++;
 		}
+
+#define	KV(N)	kip->zv_ ## N.value.ui64
+
 		lxpr_uiobuf_printf(uiobuf, "%4d %7d %s "
 		    "%llu %llu %llu %llu "
 		    "%llu %llu %llu %llu "
 		    "%llu %llu %llu\n",
-		    major, minor, ksp->ks_name,
-		    (uint64_t)kip->reads, 0LL,
-		    kip->nread / (uint64_t)LXPR_SECTOR_SIZE,
-		    (kip->rtime + kip->wtime) / (uint64_t)(NANOSEC / MILLISEC),
-		    (uint64_t)kip->writes, 0LL,
-		    kip->nwritten / (uint64_t)LXPR_SECTOR_SIZE,
-		    (kip->rtime + kip->wtime) / (uint64_t)(NANOSEC / MILLISEC),
-		    (uint64_t)(kip->rcnt + kip->wcnt),
-		    (kip->rtime + kip->wtime) / (uint64_t)(NANOSEC / MILLISEC),
-		    (kip->rlentime + kip->wlentime) /
+		    major, minor, nm,
+		    (uint64_t)KV(reads), 0LL,
+		    KV(nread) / (uint64_t)LXPR_SECTOR_SIZE,
+		    (KV(rtime) + KV(wtime)) / (uint64_t)(NANOSEC / MILLISEC),
+		    (uint64_t)KV(writes), 0LL,
+		    KV(nwritten) / (uint64_t)LXPR_SECTOR_SIZE,
+		    (KV(rtime) + KV(wtime)) / (uint64_t)(NANOSEC / MILLISEC),
+		    (uint64_t)(KV(rcnt) + KV(wcnt)),
+		    (KV(rtime) + KV(wtime)) / (uint64_t)(NANOSEC / MILLISEC),
+		    (KV(rlentime) + KV(wlentime)) /
 		    (uint64_t)(NANOSEC / MILLISEC));
+#undef	KV
 
-		kmem_free(kip, size);
+		zv = list_next(lxzdata->lxzd_vdisks, zv);
 	}
 
-	kmem_free(ksr, sidx);
+	kmem_free(kip, size);
 }
 
 /*

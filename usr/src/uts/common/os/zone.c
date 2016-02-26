@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015, Joyent Inc. All rights reserved.
+ * Copyright 2016, Joyent Inc.
  */
 
 /*
@@ -2001,10 +2001,12 @@ zone_vfs_kstat_update(kstat_t *ksp, int rw)
 	zvp->zv_nread.value.ui64 = kiop->nread;
 	zvp->zv_reads.value.ui64 = kiop->reads;
 	zvp->zv_rtime.value.ui64 = kiop->rtime;
+	zvp->zv_rcnt.value.ui64 = kiop->rcnt;
 	zvp->zv_rlentime.value.ui64 = kiop->rlentime;
 	zvp->zv_nwritten.value.ui64 = kiop->nwritten;
 	zvp->zv_writes.value.ui64 = kiop->writes;
 	zvp->zv_wtime.value.ui64 = kiop->wtime;
+	zvp->zv_wcnt.value.ui64 = kiop->wcnt;
 	zvp->zv_wlentime.value.ui64 = kiop->wlentime;
 
 	scalehrtime((hrtime_t *)&zvp->zv_rtime.value.ui64);
@@ -2041,10 +2043,12 @@ zone_vfs_kstat_create(zone_t *zone)
 	kstat_named_init(&zvp->zv_nread, "nread", KSTAT_DATA_UINT64);
 	kstat_named_init(&zvp->zv_reads, "reads", KSTAT_DATA_UINT64);
 	kstat_named_init(&zvp->zv_rtime, "rtime", KSTAT_DATA_UINT64);
+	kstat_named_init(&zvp->zv_rcnt, "rcnt", KSTAT_DATA_UINT64);
 	kstat_named_init(&zvp->zv_rlentime, "rlentime", KSTAT_DATA_UINT64);
 	kstat_named_init(&zvp->zv_nwritten, "nwritten", KSTAT_DATA_UINT64);
 	kstat_named_init(&zvp->zv_writes, "writes", KSTAT_DATA_UINT64);
 	kstat_named_init(&zvp->zv_wtime, "wtime", KSTAT_DATA_UINT64);
+	kstat_named_init(&zvp->zv_wcnt, "wcnt", KSTAT_DATA_UINT64);
 	kstat_named_init(&zvp->zv_wlentime, "wlentime", KSTAT_DATA_UINT64);
 	kstat_named_init(&zvp->zv_10ms_ops, "10ms_ops", KSTAT_DATA_UINT64);
 	kstat_named_init(&zvp->zv_100ms_ops, "100ms_ops", KSTAT_DATA_UINT64);

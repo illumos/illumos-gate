@@ -23,7 +23,7 @@
  * Copyright 2013, Joyent, Inc. All rights reserved.
  * Copyright 2014 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2014 Igor Kozhukhov <ikozhukhov@gmail.com>.
- * Copyright 2015, Joyent, Inc. All rights reserved.
+ * Copyright 2016, Joyent, Inc.
  */
 
 #ifndef _SYS_ZONE_H
@@ -406,10 +406,12 @@ typedef struct {
 	kstat_named_t	zv_reads;
 	kstat_named_t	zv_rtime;
 	kstat_named_t	zv_rlentime;
+	kstat_named_t	zv_rcnt;
 	kstat_named_t	zv_nwritten;
 	kstat_named_t	zv_writes;
 	kstat_named_t	zv_wtime;
 	kstat_named_t	zv_wlentime;
+	kstat_named_t	zv_wcnt;
 	kstat_named_t	zv_10ms_ops;
 	kstat_named_t	zv_100ms_ops;
 	kstat_named_t	zv_1s_ops;
