@@ -189,6 +189,7 @@ smb_node_fini(void)
 
 #ifdef DEBUG
 	for (i = 0; i <= SMBND_HASH_MASK; i++) {
+		smb_llist_t	*bucket;
 		smb_node_t	*node;
 
 		/*
@@ -204,8 +205,13 @@ smb_node_fini(void)
 		 * smb_node_lookup() and smb_node_release(). You must track that
 		 * down.
 		 */
-		node = smb_llist_head(&smb_node_hash_table[i]);
-		ASSERT(node == NULL);
+		bucket = &smb_node_hash_table[i];
+		node = smb_llist_head(bucket);
+		while (node != NULL) {
+			cmn_err(CE_NOTE, "leaked node: 0x%p %s",
+			    (void *)node, node->od_name);
+			node = smb_llist_next(bucket, node);
+		}
 	}
 #endif
 
@@ -1227,7 +1233,7 @@ smb_node_constructor(void *buf, void *un, int kmflags)
 	bzero(node, sizeof (smb_node_t));
 
 	smb_llist_constructor(&node->n_ofile_list, sizeof (smb_ofile_t),
-	    offsetof(smb_ofile_t, f_nnd));
+	    offsetof(smb_ofile_t, f_node_lnd));
 	smb_llist_constructor(&node->n_lock_list, sizeof (smb_lock_t),
 	    offsetof(smb_lock_t, l_lnd));
 	smb_llist_constructor(&node->n_wlock_list, sizeof (smb_lock_t),

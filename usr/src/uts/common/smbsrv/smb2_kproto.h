@@ -28,6 +28,11 @@ extern uint32_t smb2_max_rwsize;
 extern uint32_t smb2_max_trans;
 
 extern int smb2_aapl_use_file_ids;
+extern uint32_t smb2_dh_def_timeout;
+extern uint32_t smb2_dh_max_timeout;
+extern uint32_t smb2_res_def_timeout;
+extern uint32_t smb2_res_max_timeout;
+extern int smb2_enable_dh;
 
 void	smb2_dispatch_stats_init(smb_server_t *);
 void	smb2_dispatch_stats_fini(smb_server_t *);
@@ -51,6 +56,7 @@ void smb2_sign_reply(smb_request_t *);
 void smb2_sign_init_mech(smb_session_t *);
 
 uint32_t smb2_fsctl_vneginfo(smb_request_t *, smb_fsctl_t *);
+uint32_t smb2_fsctl_resiliency(smb_request_t *, smb_fsctl_t *);
 
 smb_sdrc_t smb2_negotiate(smb_request_t *);
 smb_sdrc_t smb2_session_setup(smb_request_t *);
@@ -92,6 +98,12 @@ uint32_t smb2_setinfo_file(smb_request_t *, smb_setinfo_t *, int);
 uint32_t smb2_setinfo_fs(smb_request_t *, smb_setinfo_t *, int);
 uint32_t smb2_setinfo_sec(smb_request_t *, smb_setinfo_t *, uint32_t);
 uint32_t smb2_setinfo_quota(smb_request_t *, smb_setinfo_t *);
+
+void smb2_durable_timers(smb_server_t *);
+
+uint32_t smb2_dh_reconnect(smb_request_t *);
+boolean_t smb_dh_should_save(smb_ofile_t *);
+extern void smb2_dh_shutdown(smb_server_t *);
 
 void smb2sr_finish_async(smb_request_t *);
 

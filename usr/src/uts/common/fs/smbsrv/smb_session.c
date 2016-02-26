@@ -74,14 +74,29 @@ static int smb_session_xprt_puthdr(smb_session_t *,
     uint8_t *dst, size_t dstlen);
 static smb_tree_t *smb_session_get_tree(smb_session_t *, smb_tree_t *);
 static void smb_session_logoff(smb_session_t *);
+static void smb_session_disconnect_trees(smb_session_t	*);
 static void smb_request_init_command_mbuf(smb_request_t *sr);
 static void smb_session_genkey(smb_session_t *);
 
+/*
+ * This (legacy) code is in support of an "idle timeout" feature,
+ * which is apparently incomplete.  To complete it, we should:
+ * when the keep_alive timer expires, check whether the client
+ * has any open files, and if not then kill their session.
+ * Right now the timers are there, but nothing happens when
+ * a timer expires.
+ *
+ * Todo: complete logic to kill idle sessions.
+ *
+ * Only called when sv_cfg.skc_keepalive != 0
+ */
 void
-smb_session_timers(smb_llist_t *ll)
+smb_session_timers(smb_server_t *sv)
 {
 	smb_session_t	*session;
+	smb_llist_t	*ll;
 
+	ll = &sv->sv_session_list;
 	smb_llist_enter(ll, RW_READER);
 	session = smb_llist_head(ll);
 	while (session != NULL) {
@@ -93,40 +108,8 @@ smb_session_timers(smb_llist_t *ll)
 		if (session->keep_alive &&
 		    (session->keep_alive != (uint32_t)-1))
 			session->keep_alive--;
+
 		session = smb_llist_next(ll, session);
-	}
-	smb_llist_exit(ll);
-}
-
-void
-smb_session_correct_keep_alive_values(smb_llist_t *ll, uint32_t new_keep_alive)
-{
-	smb_session_t		*sn;
-
-	/*
-	 * Caller specifies seconds, but we track in minutes, so
-	 * convert to minutes (rounded up).
-	 */
-	new_keep_alive = (new_keep_alive + 59) / 60;
-
-	if (new_keep_alive == smb_keep_alive)
-		return;
-	/*
-	 * keep alive == 0 means do not drop connection if it's idle
-	 */
-	smb_keep_alive = (new_keep_alive) ? new_keep_alive : -1;
-
-	/*
-	 * Walk through the table and set each session to the new keep_alive
-	 * value if they have not already timed out.  Block clock interrupts.
-	 */
-	smb_llist_enter(ll, RW_READER);
-	sn = smb_llist_head(ll);
-	while (sn != NULL) {
-		SMB_SESSION_VALID(sn);
-		if (sn->keep_alive != 0)
-			sn->keep_alive = new_keep_alive;
-		sn = smb_llist_next(ll, sn);
 	}
 	smb_llist_exit(ll);
 }
@@ -242,9 +225,9 @@ smb_netbios_session_request(struct smb_session *session)
 	int			rc;
 	char			*calling_name;
 	char			*called_name;
-	char 			client_name[NETBIOS_NAME_SZ];
-	struct mbuf_chain 	mbc;
-	char 			*names = NULL;
+	char			client_name[NETBIOS_NAME_SZ];
+	struct mbuf_chain	mbc;
+	char			*names = NULL;
 	smb_wchar_t		*wbuf = NULL;
 	smb_xprt_t		hdr;
 	char *p;
@@ -491,6 +474,11 @@ smb_request_cancel(smb_request_t *sr)
  * smb_session_receiver
  *
  * Receives request from the network and dispatches them to a worker.
+ *
+ * When we receive a disconnect here, it _could_ be due to the server
+ * having initiated disconnect, in which case the session state will be
+ * SMB_SESSION_STATE_TERMINATED and we want to keep that state so later
+ * tear-down logic will know which side initiated.
  */
 void
 smb_session_receiver(smb_session_t *session)
@@ -505,7 +493,9 @@ smb_session_receiver(smb_session_t *session)
 		rc = smb_netbios_session_request(session);
 		if (rc != 0) {
 			smb_rwx_rwenter(&session->s_lock, RW_WRITER);
-			session->s_state = SMB_SESSION_STATE_DISCONNECTED;
+			if (session->s_state != SMB_SESSION_STATE_TERMINATED)
+				session->s_state =
+				    SMB_SESSION_STATE_DISCONNECTED;
 			smb_rwx_rwexit(&session->s_lock);
 			return;
 		}
@@ -518,7 +508,8 @@ smb_session_receiver(smb_session_t *session)
 	(void) smb_session_reader(session);
 
 	smb_rwx_rwenter(&session->s_lock, RW_WRITER);
-	session->s_state = SMB_SESSION_STATE_DISCONNECTED;
+	if (session->s_state != SMB_SESSION_STATE_TERMINATED)
+		session->s_state = SMB_SESSION_STATE_DISCONNECTED;
 	smb_rwx_rwexit(&session->s_lock);
 
 	smb_soshutdown(session->sock);
@@ -536,7 +527,7 @@ smb_session_receiver(smb_session_t *session)
 /*
  * smb_session_disconnect
  *
- * Disconnects the session passed in.
+ * Server-initiated disconnect (i.e. server shutdown)
  */
 void
 smb_session_disconnect(smb_session_t *session)
@@ -550,8 +541,8 @@ smb_session_disconnect(smb_session_t *session)
 	case SMB_SESSION_STATE_ESTABLISHED:
 	case SMB_SESSION_STATE_NEGOTIATED:
 		smb_soshutdown(session->sock);
-		session->s_state = SMB_SESSION_STATE_DISCONNECTED;
-		_NOTE(FALLTHRU)
+		session->s_state = SMB_SESSION_STATE_TERMINATED;
+		break;
 	case SMB_SESSION_STATE_DISCONNECTED:
 	case SMB_SESSION_STATE_TERMINATED:
 		break;
@@ -622,8 +613,8 @@ smb_session_reader(smb_session_t *session)
 
 		/*
 		 * Allocate a request context, read the whole message.
-		 * If the request alloc fails, we've disconnected and
-		 * won't be able to send the reply anyway, so bail now.
+		 * If the request alloc fails, we've disconnected
+		 * and won't be able to send the reply anyway, so bail now.
 		 */
 		if ((sr = smb_request_alloc(session, hdr.xh_length)) == NULL)
 			break;
@@ -733,6 +724,7 @@ smb_session_create(ksocket_t new_so, uint16_t port, smb_server_t *sv,
 
 	now = ddi_get_lbolt64();
 
+	session->s_server = sv;
 	session->s_kid = SMB_NEW_KID();
 	session->s_state = SMB_SESSION_STATE_INITIALIZED;
 	session->native_os = NATIVE_OS_UNKNOWN;
@@ -802,7 +794,6 @@ smb_session_create(ksocket_t new_so, uint16_t port, smb_server_t *sv,
 		else
 			smb_server_inc_tcp_sess(sv);
 	}
-	session->s_server = sv;
 	smb_server_get_cfg(sv, &session->s_cfg);
 	session->s_srqueue = &sv->sv_srqueue;
 
@@ -925,13 +916,23 @@ smb_session_cancel_requests(
 smb_user_t *
 smb_session_lookup_uid(smb_session_t *session, uint16_t uid)
 {
-	return (smb_session_lookup_uid_st(session, uid,
+	return (smb_session_lookup_uid_st(session, 0, uid,
+	    SMB_USER_STATE_LOGGED_ON));
+}
+
+/*
+ * Find a user on the specified session by SMB2 SSNID.
+ */
+smb_user_t *
+smb_session_lookup_ssnid(smb_session_t *session, uint64_t ssnid)
+{
+	return (smb_session_lookup_uid_st(session, ssnid, 0,
 	    SMB_USER_STATE_LOGGED_ON));
 }
 
 smb_user_t *
-smb_session_lookup_uid_st(smb_session_t *session, uint16_t uid,
-    smb_user_state_t st)
+smb_session_lookup_uid_st(smb_session_t *session, uint64_t ssnid,
+    uint16_t uid, smb_user_state_t st)
 {
 	smb_user_t	*user;
 	smb_llist_t	*user_list;
@@ -941,32 +942,28 @@ smb_session_lookup_uid_st(smb_session_t *session, uint16_t uid,
 	user_list = &session->s_user_list;
 	smb_llist_enter(user_list, RW_READER);
 
-	user = smb_llist_head(user_list);
-	while (user) {
+	for (user = smb_llist_head(user_list);
+	    user != NULL;
+	    user = smb_llist_next(user_list, user)) {
+
 		SMB_USER_VALID(user);
 		ASSERT(user->u_session == session);
 
-		if (user->u_uid == uid && user->u_state == st) {
-			smb_user_hold_internal(user);
+		if (user->u_ssnid != ssnid && user->u_uid != uid)
+			continue;
+
+		mutex_enter(&user->u_mutex);
+		if (user->u_state == st) {
+			// smb_user_hold_internal(user);
+			user->u_refcnt++;
+			mutex_exit(&user->u_mutex);
 			break;
 		}
-
-		user = smb_llist_next(user_list, user);
+		mutex_exit(&user->u_mutex);
 	}
 
 	smb_llist_exit(user_list);
 	return (user);
-}
-
-void
-smb_session_post_user(smb_session_t *session, smb_user_t *user)
-{
-	SMB_USER_VALID(user);
-	ASSERT(user->u_refcnt == 0);
-	ASSERT(user->u_state == SMB_USER_STATE_LOGGED_OFF);
-	ASSERT(user->u_session == session);
-
-	smb_llist_post(&session->s_user_list, user, smb_user_delete);
 }
 
 /*
@@ -976,7 +973,6 @@ smb_tree_t *
 smb_session_lookup_tree(
     smb_session_t	*session,
     uint16_t		tid)
-
 {
 	smb_tree_t	*tree;
 
@@ -1148,8 +1144,9 @@ smb_session_disconnect_owned_trees(
 			/*
 			 * smb_tree_hold() succeeded, hence we are in state
 			 * SMB_TREE_STATE_CONNECTED; schedule this tree
-			 * for asynchronous disconnect, which will fire
-			 * after we drop the llist traversal lock.
+			 * for disconnect after smb_llist_exit because
+			 * the "unmap exec" up-call can block, and we'd
+			 * rather not block with the tree list locked.
 			 */
 			smb_llist_post(tree_list, tree, smb_session_tree_dtor);
 		}
@@ -1163,11 +1160,11 @@ smb_session_disconnect_owned_trees(
 /*
  * Disconnect all trees that this user has connected.
  */
-void
+static void
 smb_session_disconnect_trees(
     smb_session_t	*session)
 {
-	smb_tree_t	*tree;
+	smb_tree_t	*tree, *next_tree;
 
 	SMB_SESSION_VALID(session);
 
@@ -1176,8 +1173,9 @@ smb_session_disconnect_trees(
 		ASSERT3U(tree->t_magic, ==, SMB_TREE_MAGIC);
 		ASSERT(tree->t_session == session);
 		smb_tree_disconnect(tree, B_TRUE);
+		next_tree = smb_session_get_tree(session, tree);
 		smb_tree_release(tree);
-		tree = smb_session_get_tree(session, NULL);
+		tree = next_tree;
 	}
 }
 
@@ -1204,18 +1202,6 @@ smb_session_disconnect_share(
 		smb_tree_release(tree);
 		tree = next;
 	}
-}
-
-void
-smb_session_post_tree(smb_session_t *session, smb_tree_t *tree)
-{
-	SMB_SESSION_VALID(session);
-	SMB_TREE_VALID(tree);
-	ASSERT0(tree->t_refcnt);
-	ASSERT(tree->t_state == SMB_TREE_STATE_DISCONNECTED);
-	ASSERT(tree->t_session == session);
-
-	smb_llist_post(&session->s_tree_list, tree, smb_tree_dealloc);
 }
 
 /*
@@ -1260,44 +1246,110 @@ smb_session_get_tree(
 
 /*
  * Logoff all users associated with the specified session.
+ *
+ * This is called for both server-initiated disconnect
+ * (SMB_SESSION_STATE_TERMINATED) and client-initiated
+ * disconnect (SMB_SESSION_STATE_DISCONNECTED).
+ * If client-initiated, save durable handles.
  */
 static void
 smb_session_logoff(smb_session_t *session)
 {
+	smb_llist_t	*ulist;
 	smb_user_t	*user;
 
 	SMB_SESSION_VALID(session);
 
-	smb_session_disconnect_trees(session);
+top:
+	ulist = &session->s_user_list;
+	smb_llist_enter(ulist, RW_READER);
 
-	smb_llist_enter(&session->s_user_list, RW_READER);
-
-	user = smb_llist_head(&session->s_user_list);
+	user = smb_llist_head(ulist);
 	while (user) {
 		SMB_USER_VALID(user);
 		ASSERT(user->u_session == session);
 
+		mutex_enter(&user->u_mutex);
 		switch (user->u_state) {
 		case SMB_USER_STATE_LOGGING_ON:
 		case SMB_USER_STATE_LOGGED_ON:
-			smb_user_hold_internal(user);
+			// smb_user_hold_internal(user);
+			user->u_refcnt++;
+			mutex_exit(&user->u_mutex);
+			if (user->u_session->s_state ==
+			    SMB_SESSION_STATE_DISCONNECTED)
+				user->preserve_opens = SMB2_DH_PRESERVE_ALL;
 			smb_user_logoff(user);
 			smb_user_release(user);
 			break;
 
 		case SMB_USER_STATE_LOGGED_OFF:
 		case SMB_USER_STATE_LOGGING_OFF:
+			mutex_exit(&user->u_mutex);
 			break;
 
 		default:
 			ASSERT(0);
+			mutex_exit(&user->u_mutex);
 			break;
 		}
 
-		user = smb_llist_next(&session->s_user_list, user);
+		user = smb_llist_next(ulist, user);
 	}
 
-	smb_llist_exit(&session->s_user_list);
+	/* Needed below (Was the list empty?) */
+	user = smb_llist_head(ulist);
+
+	smb_llist_exit(ulist);
+
+	/*
+	 * It's possible for user objects to remain due to references
+	 * obtained via smb_server_lookup_ssnid(), when an SMB2
+	 * session setup is destroying a previous session.
+	 *
+	 * Wait for user objects to clear out (last refs. go away,
+	 * then smb_user_delete takes them out of the list).  When
+	 * the last user object is removed, the session state is
+	 * set to SHUTDOWN and s_lock is signaled.
+	 *
+	 * Not all places that call smb_user_release necessarily
+	 * flush the delete queue, so after we wait for the list
+	 * to empty out, go back to the top and recheck the list
+	 * delete queue to make sure smb_user_delete happens.
+	 */
+	if (user == NULL) {
+		/* User list is empty. */
+		smb_rwx_rwenter(&session->s_lock, RW_WRITER);
+		session->s_state = SMB_SESSION_STATE_SHUTDOWN;
+		smb_rwx_rwexit(&session->s_lock);
+	} else {
+		smb_rwx_rwenter(&session->s_lock, RW_READER);
+		if (session->s_state != SMB_SESSION_STATE_SHUTDOWN) {
+			(void) smb_rwx_cvwait(&session->s_lock,
+			    MSEC_TO_TICK(200));
+			smb_rwx_rwexit(&session->s_lock);
+			goto top;
+		}
+		smb_rwx_rwexit(&session->s_lock);
+	}
+	ASSERT(session->s_state == SMB_SESSION_STATE_SHUTDOWN);
+
+	/*
+	 * User list should be empty now.
+	 */
+#ifdef	DEBUG
+	if (ulist->ll_count != 0) {
+		cmn_err(CE_WARN, "user list not empty?");
+		debug_enter("s_user_list");
+	}
+#endif
+
+	/*
+	 * User logoff happens first so we'll set preserve_opens
+	 * for client-initiated disconnect.  When that's done
+	 * there should be no trees left, but check anyway.
+	 */
+	smb_session_disconnect_trees(session);
 }
 
 /*
@@ -1400,6 +1452,7 @@ smb_request_alloc(smb_session_t *session, int req_length)
 		ASSERT(0);
 		/* FALLTHROUGH */
 	case SMB_SESSION_STATE_DISCONNECTED:
+	case SMB_SESSION_STATE_SHUTDOWN:
 	case SMB_SESSION_STATE_TERMINATED:
 		/* Disallow new requests in these states. */
 		if (sr->sr_request_buf)
@@ -1489,34 +1542,6 @@ smb_session_levelII_oplocks(smb_session_t *session)
 		return (B_TRUE);
 
 	return (B_FALSE);
-}
-
-/*
- * smb_session_oplock_break
- *
- * Send an oplock break request to the client,
- * recalling some cache delegation.
- */
-void
-smb_session_oplock_break(smb_request_t *sr, uint8_t brk)
-{
-	smb_session_t	*session = sr->session;
-	mbuf_chain_t	*mbc = &sr->reply;
-
-	SMB_SESSION_VALID(session);
-
-	/*
-	 * Build the break message in sr->reply and then send it.
-	 * The mbc is free'd later, in smb_request_free().
-	 */
-	mbc->max_bytes = MLEN;
-	if (session->dialect <= NT_LM_0_12) {
-		smb1_oplock_break_notification(sr, brk);
-	} else {
-		smb2_oplock_break_notification(sr, brk);
-	}
-
-	(void) smb_session_send(session, 0, mbc);
 }
 
 static void
