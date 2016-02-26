@@ -1372,6 +1372,77 @@ dtrace_lookup_by_addr(dtrace_hdl_t *dtp, GElf_Addr addr,
 	return (0);
 }
 
+/*
+ * We've been asked to look up something inside a pid related module and it has
+ * been qualified with a library name. In that case, we may have to split this
+ * up into the library and the type itself, which will be separated by an '`'
+ * character. This is complicated further by the fact that the keyword for a
+ * struct, union, or enum, will precede the library. Hence we may have something
+ * that looks like "struct libsocket.so.1`msghdr" in name and we need to
+ * transform that into "libsocket.so.1" and "struct msghdr".
+ */
+int
+dtrace_lookup_fixup_pidtype(const char *name, char **libp, char **typep)
+{
+	int len, i;
+	char *split = NULL, *lib, *buf;
+	char *base;
+	char *keywords[] = { "struct ", "union ", "enum ", NULL };
+
+	if (name == NULL)
+		return (-1);
+
+	*libp = NULL;
+	*typep = NULL;
+	buf = strdup(name);
+	if (buf == NULL)
+		return (-1);
+
+	i = 0;
+	lib = buf;
+	while (keywords[i] != NULL) {
+		base = keywords[i];
+		len = strlen(base);
+		if (strncmp(name, base, len) == 0) {
+			lib += len;
+			break;
+		}
+		i++;
+	}
+
+	split = strchr(buf, '`');
+	assert(split != NULL);
+	*split = '\0';
+	split++;
+	if (lib == buf) {
+		*libp = strdup(buf);
+		*typep = strdup(split);
+		if (*libp == NULL || *typep == NULL)
+			goto err;
+		free(buf);
+		return (0);
+	} else {
+		assert(len > 0);
+		assert(base != NULL);
+
+		*libp = strdup(lib);
+		if (*libp == NULL)
+			goto err;
+		if (asprintf(typep, "%s%s", base, split) == -1)
+			goto err;
+		free(buf);
+		return (0);
+	}
+
+err:
+	free(buf);
+	free(*libp);
+	*libp = NULL;
+	free(*typep);
+	*typep = NULL;
+	return (-1);
+}
+
 int
 dtrace_lookup_by_type(dtrace_hdl_t *dtp, const char *object, const char *name,
     dtrace_typeinfo_t *tip)
@@ -1383,7 +1454,6 @@ dtrace_lookup_by_type(dtrace_hdl_t *dtp, const char *object, const char *name,
 	uint_t n, i;
 	int justone;
 	ctf_file_t *fp;
-	char *buf, *p, *q;
 
 	uint_t mask = 0; /* mask of dt_module flags to match */
 	uint_t bits = 0; /* flag bits that must be present */
@@ -1437,19 +1507,19 @@ dtrace_lookup_by_type(dtrace_hdl_t *dtp, const char *object, const char *name,
 			id = ctf_lookup_by_name(dmp->dm_ctfp, name);
 			fp = dmp->dm_ctfp;
 		} else {
-			if ((p = strchr(name, '`')) != NULL) {
-				buf = strdup(name);
-				if (buf == NULL)
+			dt_dprintf("Trying to find userland type: %s\n", name);
+			if (strchr(name, '`') != NULL) {
+				char *lib, *type;
+				if (dtrace_lookup_fixup_pidtype(name, &lib,
+				    &type) != 0) {
 					return (dt_set_errno(dtp, EDT_NOMEM));
-				p = strchr(buf, '`');
-				if ((q = strchr(p + 1, '`')) != NULL)
-					p = q;
-				*p = '\0';
-				fp = dt_module_getctflib(dtp, dmp, buf);
+				}
+				fp = dt_module_getctflib(dtp, dmp, lib);
 				if (fp == NULL || (id = ctf_lookup_by_name(fp,
-				    p + 1)) == CTF_ERR)
+				    type)) == CTF_ERR)
 					id = CTF_ERR;
-				free(buf);
+				free(lib);
+				free(type);
 			} else {
 				for (i = 0; i < dmp->dm_nctflibs; i++) {
 					fp = dmp->dm_libctfp[i];
