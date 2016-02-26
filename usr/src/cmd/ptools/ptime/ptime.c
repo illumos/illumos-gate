@@ -93,7 +93,6 @@ main(int argc, char **argv)
 	int status;
 	int gret;
 	struct ps_prochandle *Pr;
-	char *pp, *np;
 
 	if ((command = strrchr(argv[0], '/')) != NULL)
 		command++;
