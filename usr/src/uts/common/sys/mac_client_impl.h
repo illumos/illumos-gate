@@ -96,7 +96,7 @@ typedef union mac_tx_percpu_s {
 #define	pcpu_tx_refcnt	pcpu_lr._pcpu_tx_refcnt
 
 /*
- * One of these is instanciated for each MAC client.
+ * One of these is instantiated for each MAC client.
  */
 struct mac_client_impl_s {			/* Protected by */
 	struct mac_client_impl_s *mci_client_next;	/* mi_rw_lock */
@@ -182,6 +182,7 @@ struct mac_client_impl_s {			/* Protected by */
 	 */
 	kmutex_t		mci_protect_lock;
 	uint32_t		mci_protect_flags;	/* SL */
+	in6_addr_t		mci_v6_mac_token;	/* SL */
 	in6_addr_t		mci_v6_local_addr;	/* SL */
 	avl_tree_t		mci_v4_pending_txn;	/* mci_protect_lock */
 	avl_tree_t		mci_v4_completed_txn;	/* mci_protect_lock */
@@ -189,6 +190,7 @@ struct mac_client_impl_s {			/* Protected by */
 	avl_tree_t		mci_v6_pending_txn;	/* mci_protect_lock */
 	avl_tree_t		mci_v6_cid;		/* mci_protect_lock */
 	avl_tree_t		mci_v6_dyn_ip;		/* mci_protect_lock */
+	avl_tree_t		mci_v6_slaac_ip;	/* mci_protect_lock */
 	timeout_id_t		mci_txn_cleanup_tid;	/* mci_protect_lock */
 
 	/*
