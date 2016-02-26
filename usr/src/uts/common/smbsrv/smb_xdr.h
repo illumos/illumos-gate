@@ -127,7 +127,6 @@ typedef struct smb_doorhdr {
  */
 typedef struct smb_netuserinfo {
 	uint64_t	ui_session_id;
-	uint16_t	ui_smb_uid;
 	uint16_t	ui_domain_len;
 	char		*ui_domain;
 	uint16_t	ui_account_len;

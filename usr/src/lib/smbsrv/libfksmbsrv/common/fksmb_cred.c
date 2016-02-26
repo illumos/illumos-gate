@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -38,11 +38,18 @@
  * we don't bother with real credential.  Everything here uses
  * the ordinary credentials of the process running this.
  */
+
+/*
+ * This library does not implement real credentials. All contexts
+ * use an opaque cred_t object, and all activity happens in the
+ * context of the user who runs the program.
+ */
 cred_t *
 smb_cred_create(smb_token_t *token)
 {
+	_NOTE(ARGUNUSED(token))
 	cred_t *cr;
-	cr = (cred_t *)token;	/* hack */
+	cr = CRED();
 	return (cr);
 }
 

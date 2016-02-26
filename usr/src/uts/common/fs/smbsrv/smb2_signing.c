@@ -366,7 +366,7 @@ smb2_sign_check_request(smb_request_t *sr)
 	 * Don't check commands with a zero session ID.
 	 * [MS-SMB2] 3.3.4.1.1
 	 */
-	if (sr->smb_uid == 0 || u == NULL)
+	if (sr->smb2_ssnid == 0 || u == NULL)
 		return (0);
 
 	/* In case _sign_begin failed. */

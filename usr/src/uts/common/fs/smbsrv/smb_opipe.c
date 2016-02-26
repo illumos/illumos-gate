@@ -111,9 +111,12 @@ smb_opipe_cancel(smb_request_t *sr)
 {
 	ksocket_t so;
 
-	if (sr->session->s_state == SMB_SESSION_STATE_DISCONNECTED &&
-	    (so = sr->cancel_arg2) != NULL) {
-		(void) ksocket_shutdown(so, SHUT_RDWR, sr->user_cr);
+	switch (sr->session->s_state) {
+	case SMB_SESSION_STATE_DISCONNECTED:
+	case SMB_SESSION_STATE_TERMINATED:
+		if ((so = sr->cancel_arg2) != NULL)
+			(void) ksocket_shutdown(so, SHUT_RDWR, sr->user_cr);
+		break;
 	}
 }
 

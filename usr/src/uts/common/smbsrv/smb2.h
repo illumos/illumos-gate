@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _SMB_SMB2_H
@@ -261,6 +261,22 @@ typedef enum {
  * opaque BLOB that uniquely identifies the file being opened
  * on disk. No data is passed to the server by the client.
  */
+
+#define	SMB2_CREATE_DURABLE_HANDLE_REQUEST_V2	0x44483251 /* ("DH2Q") */
+/*
+ * The client is requesting the open to be durable.
+ * This value is only supported for the SMB 3.x dialect family.
+ */
+
+#define	SMB2_CREATE_DURABLE_HANDLE_RECONNECT_V2	0x44483243 /* ("DH2C") */
+/*
+ * The client is requesting to reconnect to a
+ * durable open after being disconnected.
+ * This value is only supported for the SMB 3.x dialect family.
+ */
+
+#define	SMB2_DHANDLE_FLAG_PERSISTENT	0x00000002
+/* A persistent handle is requested. */
 
 #define	SMB2_CREATE_REQUEST_LEASE		0x52714c73 /* ("RqLs") */
 /*

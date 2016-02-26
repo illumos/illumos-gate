@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
@@ -122,10 +122,14 @@
  *
  * Transition T2
  *
+ *    This transition occurs in smb_tree_disconnect()
+ *
+ * Transition T3
+ *
  *    This transition occurs in smb_tree_release(). The resources associated
  *    with the tree are freed as well as the tree structure. For the transition
- *    to occur, the tree must be in the SMB_TREE_STATE_DISCONNECTED state and
- *    the reference count be zero.
+ *    to occur, the tree must be in the SMB_TREE_STATE_DISCONNECTED and the
+ *    reference count must be zero.
  *
  * Comments
  * --------
@@ -144,7 +148,11 @@
  *    Rules of access to a tree structure:
  *
  *    1) In order to avoid deadlocks, when both (mutex and lock of the user
- *       list) have to be entered, the lock must be entered first.
+ *       list) have to be entered, the lock must be entered first. Additionally,
+ *       when both the (mutex and lock of the ofile list) have to be entered,
+ *       the mutex must be entered first. However, the ofile list lock must NOT
+ *       be dropped while the mutex is held in such a way that the ofile deleteq
+ *       is flushed.
  *
  *    2) All actions applied to a tree require a reference count.
  *
@@ -178,8 +186,8 @@ uint32_t	smb_tree_connect_printq(smb_request_t *, smb_arg_tcon_t *);
 uint32_t	smb_tree_connect_ipc(smb_request_t *, smb_arg_tcon_t *);
 static smb_tree_t *smb_tree_alloc(smb_request_t *, const smb_kshare_t *,
     smb_node_t *, uint32_t, uint32_t);
+static void smb_tree_dealloc(void *);
 static boolean_t smb_tree_is_connected_locked(smb_tree_t *);
-static boolean_t smb_tree_is_disconnected(smb_tree_t *);
 static char *smb_tree_get_sharename(char *);
 static int smb_tree_getattr(const smb_kshare_t *, smb_node_t *, smb_tree_t *);
 static void smb_tree_get_volname(vfs_t *, smb_tree_t *);
@@ -297,7 +305,7 @@ smb_tree_disconnect(smb_tree_t *tree, boolean_t do_exec)
 			/*
 			 * The files opened under this tree are closed.
 			 */
-			smb_ofile_close_all(tree);
+			smb_ofile_close_all(tree, 0);
 			/*
 			 * The directories opened under this tree are closed.
 			 */
@@ -371,42 +379,32 @@ smb_tree_release(
 {
 	SMB_TREE_VALID(tree);
 
-	mutex_enter(&tree->t_mutex);
-	ASSERT(tree->t_refcnt);
-	tree->t_refcnt--;
-
 	/* flush the ofile and odir lists' delete queues */
 	smb_llist_flush(&tree->t_ofile_list);
 	smb_llist_flush(&tree->t_odir_list);
 
-	if (smb_tree_is_disconnected(tree) && (tree->t_refcnt == 0))
-		smb_session_post_tree(tree->t_session, tree);
+	mutex_enter(&tree->t_mutex);
+	ASSERT(tree->t_refcnt);
+	tree->t_refcnt--;
+
+	switch (tree->t_state) {
+	case SMB_TREE_STATE_DISCONNECTED:
+		if (tree->t_refcnt == 0) {
+			smb_session_t *ssn = tree->t_session;
+			tree->t_state = SMB_TREE_STATE_DISCONNECTED;
+			smb_llist_post(&ssn->s_tree_list, tree,
+			    smb_tree_dealloc);
+		}
+		break;
+	case SMB_TREE_STATE_CONNECTED:
+	case SMB_TREE_STATE_DISCONNECTING:
+		break;
+	default:
+		ASSERT(0);
+		break;
+	}
 
 	mutex_exit(&tree->t_mutex);
-}
-
-void
-smb_tree_post_ofile(smb_tree_t *tree, smb_ofile_t *of)
-{
-	SMB_TREE_VALID(tree);
-	SMB_OFILE_VALID(of);
-	ASSERT(of->f_refcnt == 0);
-	ASSERT(of->f_state == SMB_OFILE_STATE_CLOSED);
-	ASSERT(of->f_tree == tree);
-
-	smb_llist_post(&tree->t_ofile_list, of, smb_ofile_delete);
-}
-
-void
-smb_tree_post_odir(smb_tree_t *tree, smb_odir_t *od)
-{
-	SMB_TREE_VALID(tree);
-	SMB_ODIR_VALID(od);
-	ASSERT(od->d_refcnt == 0);
-	ASSERT(od->d_state == SMB_ODIR_STATE_CLOSED);
-	ASSERT(od->d_tree == tree);
-
-	smb_llist_post(&tree->t_odir_list, od, smb_odir_delete);
 }
 
 /*
@@ -420,7 +418,7 @@ smb_tree_close_pid(
 	ASSERT(tree);
 	ASSERT(tree->t_magic == SMB_TREE_MAGIC);
 
-	smb_ofile_close_all_by_pid(tree, pid);
+	smb_ofile_close_all(tree, pid);
 	smb_tree_close_odirs(tree, pid);
 }
 
@@ -484,6 +482,11 @@ smb_tree_fclose(smb_tree_t *tree, uint32_t uniqid)
 	ASSERT(tree);
 	ASSERT(tree->t_magic == SMB_TREE_MAGIC);
 
+	/*
+	 * Note that ORPHANED ofiles aren't fclosable, as they have
+	 * no session, user, or tree by which they might be found.
+	 * They will eventually expire.
+	 */
 	if ((of = smb_ofile_lookup_by_uniqid(tree, uniqid)) == NULL)
 		return (ENOENT);
 
@@ -650,7 +653,7 @@ smb_tree_connect_disk(smb_request_t *sr, smb_arg_tcon_t *tcon)
 	smb_user_t		*user = sr->uid_user;
 	smb_node_t		*dnode = NULL;
 	smb_node_t		*snode = NULL;
-	smb_kshare_t 		*si = tcon->si;
+	smb_kshare_t		*si = tcon->si;
 	char			*service = tcon->service;
 	char			last_component[MAXNAMELEN];
 	smb_tree_t		*tree;
@@ -772,7 +775,7 @@ smb_tree_connect_printq(smb_request_t *sr, smb_arg_tcon_t *tcon)
 	smb_user_t		*user = sr->uid_user;
 	smb_node_t		*dnode = NULL;
 	smb_node_t		*snode = NULL;
-	smb_kshare_t 		*si = tcon->si;
+	smb_kshare_t		*si = tcon->si;
 	char			*service = tcon->service;
 	char			last_component[MAXNAMELEN];
 	smb_tree_t		*tree;
@@ -922,7 +925,7 @@ smb_tree_alloc(smb_request_t *sr, const smb_kshare_t *si,
 	}
 
 	smb_llist_constructor(&tree->t_ofile_list, sizeof (smb_ofile_t),
-	    offsetof(smb_ofile_t, f_lnd));
+	    offsetof(smb_ofile_t, f_tree_lnd));
 
 	smb_llist_constructor(&tree->t_odir_list, sizeof (smb_odir_t),
 	    offsetof(smb_odir_t, d_lnd));
@@ -968,7 +971,7 @@ smb_tree_alloc(smb_request_t *sr, const smb_kshare_t *si,
  * Remove the tree from the user's tree list before freeing resources
  * associated with the tree.
  */
-void
+static void
 smb_tree_dealloc(void *arg)
 {
 	smb_session_t	*session;
@@ -985,6 +988,13 @@ smb_tree_dealloc(void *arg)
 	atomic_dec_32(&session->s_tree_cnt);
 	smb_llist_exit(&session->s_tree_list);
 
+	/*
+	 * This tree is no longer on s_tree_list, however...
+	 *
+	 * This is called via smb_llist_post, which means it may run
+	 * BEFORE smb_tree_release drops t_mutex (if another thread
+	 * flushes the delete queue before we do).  Synchronize.
+	 */
 	mutex_enter(&tree->t_mutex);
 	mutex_exit(&tree->t_mutex);
 
@@ -1019,29 +1029,8 @@ smb_tree_is_connected_locked(smb_tree_t *tree)
 	case SMB_TREE_STATE_DISCONNECTING:
 	case SMB_TREE_STATE_DISCONNECTED:
 		/*
-		 * The tree exists but being diconnected or destroyed.
+		 * The tree exists but is being disconnected or destroyed.
 		 */
-		return (B_FALSE);
-
-	default:
-		ASSERT(0);
-		return (B_FALSE);
-	}
-}
-
-/*
- * Determine whether or not a tree is disconnected.
- * This function must be called with the tree mutex held.
- */
-static boolean_t
-smb_tree_is_disconnected(smb_tree_t *tree)
-{
-	switch (tree->t_state) {
-	case SMB_TREE_STATE_DISCONNECTED:
-		return (B_TRUE);
-
-	case SMB_TREE_STATE_CONNECTED:
-	case SMB_TREE_STATE_DISCONNECTING:
 		return (B_FALSE);
 
 	default:

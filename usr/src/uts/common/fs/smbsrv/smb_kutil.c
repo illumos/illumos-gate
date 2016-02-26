@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <sys/param.h>
@@ -40,6 +40,7 @@
 
 #include <sys/sid.h>
 #include <sys/priv_names.h>
+#include <sys/bitmap.h>
 
 static kmem_cache_t	*smb_dtor_cache = NULL;
 
@@ -332,8 +333,22 @@ smb_idpool_alloc(
 			pool->id_pool[pool->id_idx] |= bit;
 			*id = (uint16_t)(pool->id_idx * 8 + (uint32_t)bit_idx);
 			pool->id_free_counter--;
-			pool->id_bit = bit;
-			pool->id_bit_idx = bit_idx;
+			/*
+			 * Leave position at next bit to allocate,
+			 * so we don't keep re-using the last in an
+			 * alloc/free/alloc/free sequence.  Doing
+			 * that can confuse some SMB clients.
+			 */
+			if (bit & 0x80) {
+				pool->id_bit = 1;
+				pool->id_bit_idx = 0;
+				pool->id_idx++;
+				pool->id_idx &= pool->id_idx_msk;
+			} else {
+				pool->id_bit = (bit << 1);
+				pool->id_bit_idx = bit_idx + 1;
+				/* keep id_idx */
+			}
 			mutex_exit(&pool->id_mutex);
 			return (0);
 		}
@@ -442,6 +457,16 @@ smb_llist_destructor(
 	list_destroy(&ll->ll_list);
 	list_destroy(&ll->ll_deleteq);
 	mutex_destroy(&ll->ll_mutex);
+}
+
+/*
+ * smb_llist_enter
+ * Not a macro so dtrace smbsrv:* can see it.
+ */
+void
+smb_llist_enter(smb_llist_t *ll, krw_t mode)
+{
+	rw_enter(&ll->ll_lock, mode);
 }
 
 /*
@@ -636,6 +661,16 @@ smb_slist_destructor(
 }
 
 /*
+ * smb_slist_enter
+ * Not a macro so dtrace smbsrv:* can see it.
+ */
+void
+smb_slist_enter(smb_slist_t *sl)
+{
+	mutex_enter(&(sl)->sl_mutex);
+}
+
+/*
  * smb_slist_insert_head
  *
  * This function inserts the object passed a the beginning of the list.
@@ -799,89 +834,45 @@ smb_rwx_destroy(
 }
 
 /*
+ * smb_rwx_rwenter
+ */
+void
+smb_rwx_rwenter(smb_rwx_t *rwx, krw_t mode)
+{
+	rw_enter(&rwx->rwx_lock, mode);
+}
+
+/*
  * smb_rwx_rwexit
  */
 void
 smb_rwx_rwexit(
     smb_rwx_t	*rwx)
 {
-	if (rw_write_held(&rwx->rwx_lock)) {
-		ASSERT(rw_owner(&rwx->rwx_lock) == curthread);
-		mutex_enter(&rwx->rwx_mutex);
-		if (rwx->rwx_waiting) {
-			rwx->rwx_waiting = B_FALSE;
-			cv_broadcast(&rwx->rwx_cv);
-		}
-		mutex_exit(&rwx->rwx_mutex);
-	}
 	rw_exit(&rwx->rwx_lock);
 }
 
-/*
- * smb_rwx_rwupgrade
- */
-krw_t
-smb_rwx_rwupgrade(
-    smb_rwx_t	*rwx)
-{
-	if (rw_write_held(&rwx->rwx_lock)) {
-		ASSERT(rw_owner(&rwx->rwx_lock) == curthread);
-		return (RW_WRITER);
-	}
-	if (!rw_tryupgrade(&rwx->rwx_lock)) {
-		rw_exit(&rwx->rwx_lock);
-		rw_enter(&rwx->rwx_lock, RW_WRITER);
-	}
-	return (RW_READER);
-}
 
 /*
- * smb_rwx_rwrestore
- */
-void
-smb_rwx_rwdowngrade(
-    smb_rwx_t	*rwx,
-    krw_t	mode)
-{
-	ASSERT(rw_write_held(&rwx->rwx_lock));
-	ASSERT(rw_owner(&rwx->rwx_lock) == curthread);
-
-	if (mode == RW_WRITER) {
-		return;
-	}
-	ASSERT(mode == RW_READER);
-	mutex_enter(&rwx->rwx_mutex);
-	if (rwx->rwx_waiting) {
-		rwx->rwx_waiting = B_FALSE;
-		cv_broadcast(&rwx->rwx_cv);
-	}
-	mutex_exit(&rwx->rwx_mutex);
-	rw_downgrade(&rwx->rwx_lock);
-}
-
-/*
- * smb_rwx_wait
+ * smb_rwx_cvwait
  *
- * This function assumes the smb_rwx lock was enter in RW_READER or RW_WRITER
+ * Wait on rwx->rw_cv, dropping the rw lock and retake after wakeup.
+ * Assumes the smb_rwx lock was entered in RW_READER or RW_WRITER
  * mode. It will:
  *
  *	1) release the lock and save its current mode.
- *	2) wait until the condition variable is signaled. This can happen for
- *	   2 reasons: When a writer releases the lock or when the time out (if
- *	   provided) expires.
+ *	2) wait until the condition variable is signaled.
  *	3) re-acquire the lock in the mode saved in (1).
+ *
+ * Lock order: rwlock, mutex
  */
 int
-smb_rwx_rwwait(
+smb_rwx_cvwait(
     smb_rwx_t	*rwx,
     clock_t	timeout)
 {
 	krw_t	mode;
 	int	rc = 1;
-
-	mutex_enter(&rwx->rwx_mutex);
-	rwx->rwx_waiting = B_TRUE;
-	mutex_exit(&rwx->rwx_mutex);
 
 	if (rw_write_held(&rwx->rwx_lock)) {
 		ASSERT(rw_owner(&rwx->rwx_lock) == curthread);
@@ -890,21 +881,39 @@ smb_rwx_rwwait(
 		ASSERT(rw_read_held(&rwx->rwx_lock));
 		mode = RW_READER;
 	}
-	rw_exit(&rwx->rwx_lock);
 
 	mutex_enter(&rwx->rwx_mutex);
-	if (rwx->rwx_waiting) {
-		if (timeout == -1) {
-			cv_wait(&rwx->rwx_cv, &rwx->rwx_mutex);
-		} else {
-			rc = cv_reltimedwait(&rwx->rwx_cv, &rwx->rwx_mutex,
-			    timeout, TR_CLOCK_TICK);
-		}
+	rw_exit(&rwx->rwx_lock);
+
+	rwx->rwx_waiting = B_TRUE;
+	if (timeout == -1) {
+		cv_wait(&rwx->rwx_cv, &rwx->rwx_mutex);
+	} else {
+		rc = cv_reltimedwait(&rwx->rwx_cv, &rwx->rwx_mutex,
+		    timeout, TR_CLOCK_TICK);
 	}
 	mutex_exit(&rwx->rwx_mutex);
 
 	rw_enter(&rwx->rwx_lock, mode);
 	return (rc);
+}
+
+/*
+ * smb_rwx_cvbcast
+ *
+ * Wake up threads waiting on rx_cv
+ * The rw lock may or may not be held.
+ * The mutex MUST NOT be held.
+ */
+void
+smb_rwx_cvbcast(smb_rwx_t *rwx)
+{
+	mutex_enter(&rwx->rwx_mutex);
+	if (rwx->rwx_waiting) {
+		rwx->rwx_waiting = B_FALSE;
+		cv_broadcast(&rwx->rwx_cv);
+	}
+	mutex_exit(&rwx->rwx_mutex);
 }
 
 /* smb_idmap_... moved to smb_idmap.c */
@@ -1269,8 +1278,8 @@ smb_avl_destroy(smb_avl_t *avl)
  *
  * Returns:
  *
- * 	ENOTACTIVE	AVL is not in READY state
- * 	EEXIST		The item is already in AVL
+ *	ENOTACTIVE	AVL is not in READY state
+ *	EEXIST		The item is already in AVL
  */
 int
 smb_avl_add(smb_avl_t *avl, void *item)
@@ -1736,4 +1745,52 @@ smb_threshold_wake_all(smb_cmd_threshold_t *ct)
 	ct->ct_threshold = 0;
 	cv_broadcast(&ct->ct_cond);
 	mutex_exit(&ct->ct_mutex);
+}
+
+/* taken from mod_hash_byptr */
+uint_t
+smb_hash_uint64(smb_hash_t *hash, uint64_t val)
+{
+	uint64_t k = val >> hash->rshift;
+	uint_t idx = ((uint_t)k) & (hash->num_buckets - 1);
+
+	return (idx);
+}
+
+boolean_t
+smb_is_pow2(size_t n)
+{
+	return ((n & (n - 1)) == 0);
+}
+
+smb_hash_t *
+smb_hash_create(size_t elemsz, size_t link_offset,
+    uint32_t num_buckets)
+{
+	smb_hash_t *hash = kmem_alloc(sizeof (*hash), KM_SLEEP);
+	int i;
+
+	if (!smb_is_pow2(num_buckets))
+		num_buckets = 1 << highbit(num_buckets);
+
+	hash->rshift = highbit(elemsz);
+	hash->num_buckets = num_buckets;
+	hash->buckets = kmem_zalloc(num_buckets * sizeof (smb_bucket_t),
+	    KM_SLEEP);
+	for (i = 0; i < num_buckets; i++)
+		smb_llist_constructor(&hash->buckets[i].b_list, elemsz,
+		    link_offset);
+	return (hash);
+}
+
+void
+smb_hash_destroy(smb_hash_t *hash)
+{
+	int i;
+
+	for (i = 0; i < hash->num_buckets; i++)
+		smb_llist_destructor(&hash->buckets[i].b_list);
+
+	kmem_free(hash->buckets, hash->num_buckets * sizeof (smb_bucket_t));
+	kmem_free(hash, sizeof (*hash));
 }

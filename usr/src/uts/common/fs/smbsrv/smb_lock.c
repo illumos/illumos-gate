@@ -415,6 +415,7 @@ smb_lock_range_access(
 void
 smb_node_destroy_lock_by_ofile(smb_node_t *node, smb_ofile_t *file)
 {
+	cred_t		*kcr = zone_kcred();
 	smb_lock_t	*lock;
 	smb_lock_t	*nxtl;
 	list_t		destroy_list;
@@ -457,7 +458,7 @@ smb_node_destroy_lock_by_ofile(smb_node_t *node, smb_ofile_t *file)
 		nxtl = smb_llist_next(&node->n_lock_list, lock);
 		if (lock->l_file == file) {
 			smb_llist_remove(&node->n_lock_list, lock);
-			smb_lock_posix_unlock(node, lock, file->f_user->u_cred);
+			smb_lock_posix_unlock(node, lock, kcr);
 			list_insert_tail(&destroy_list, lock);
 		}
 		lock = nxtl;

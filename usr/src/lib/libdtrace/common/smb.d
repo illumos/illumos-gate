@@ -145,7 +145,7 @@ translator smb2opinfo_t < struct smb_request *P > {
 	soi_sid		= P->session->s_kid;
 	soi_mid		= P->smb2_messageid;
 	soi_asyncid	= P->smb2_async_id;
-	soi_uid		= P->smb_uid;
+	soi_uid		= P->smb2_ssnid;
 	soi_tid		= P->smb_tid;
 	soi_status	= P->smb2_status;
 	soi_flags	= P->smb2_hdr_flags;

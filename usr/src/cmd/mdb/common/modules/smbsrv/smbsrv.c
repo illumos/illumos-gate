@@ -571,7 +571,19 @@ smblist_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 typedef struct mdb_smb_server {
 	smb_server_state_t	sv_state;
 	zoneid_t		sv_zid;
+	smb_hash_t		*sv_persistid_ht;
 } mdb_smb_server_t;
+
+static int
+smb_server_exp_off_sv_list(void)
+{
+	int svl_off, ll_off;
+
+	/* OFFSETOF(smb_server_t, sv_session_list.ll_list); */
+	GET_OFFSET(svl_off, smb_server_t, sv_session_list);
+	GET_OFFSET(ll_off, smb_llist_t, ll_list);
+	return (svl_off + ll_off);
+}
 
 static int
 smb_server_exp_off_nbt_list(void)
@@ -580,7 +592,17 @@ smb_server_exp_off_nbt_list(void)
 
 	/* OFFSETOF(smb_server_t, sv_nbt_daemon.ld_session_list.ll_list); */
 	GET_OFFSET(svd_off, smb_server_t, sv_nbt_daemon);
-	GET_OFFSET(lds_off, smb_listener_daemon_t, ld_session_list);
+	/*
+	 * We can't do OFFSETOF() because the member doesn't exist,
+	 * but we want backwards compatibility to old cores
+	 */
+	lds_off = mdb_ctf_offsetof_by_name("smb_listener_daemon_t",
+	    "ld_session_list");
+	if (lds_off < 0) {
+		mdb_warn("cannot lookup: "
+		    "smb_listener_daemon_t.ld_session_list");
+		return (-1);
+	}
 	GET_OFFSET(ll_off, smb_llist_t, ll_list);
 	return (svd_off + lds_off + ll_off);
 }
@@ -592,7 +614,17 @@ smb_server_exp_off_tcp_list(void)
 
 	/* OFFSETOF(smb_server_t, sv_tcp_daemon.ld_session_list.ll_list); */
 	GET_OFFSET(svd_off, smb_server_t, sv_tcp_daemon);
-	GET_OFFSET(lds_off, smb_listener_daemon_t, ld_session_list);
+	/*
+	 * We can't do OFFSETOF() because the member doesn't exist,
+	 * but we want backwards compatibility to old cores
+	 */
+	lds_off = mdb_ctf_offsetof_by_name("smb_listener_daemon_t",
+	    "ld_session_list");
+	if (lds_off < 0) {
+		mdb_warn("cannot lookup: "
+		    "smb_listener_daemon_t.ld_session_list");
+		return (-1);
+	}
 	GET_OFFSET(ll_off, smb_llist_t, ll_list);
 	return (svd_off + lds_off + ll_off);
 }
@@ -601,6 +633,15 @@ smb_server_exp_off_tcp_list(void)
  * List of objects that can be expanded under a server structure.
  */
 static const smb_exp_t smb_server_exp[] =
+{
+	{ SMB_OPT_ALL_OBJ,
+	    smb_server_exp_off_sv_list,
+	    "smbsess", "smb_session"},
+	{ 0, 0, NULL, NULL }
+};
+
+/* for backwards compatibility only */
+static const smb_exp_t smb_server_exp_old[] =
 {
 	{ SMB_OPT_ALL_OBJ,
 	    smb_server_exp_off_nbt_list,
@@ -622,6 +663,9 @@ smbsrv_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	uint_t		opts;
 	ulong_t		indent = 0;
+	const smb_exp_t	*sv_exp;
+	mdb_ctf_id_t id;
+	ulong_t off;
 
 	if (smb_dcmd_getopt(&opts, argc, argv))
 		return (DCMD_USAGE);
@@ -668,7 +712,18 @@ smbsrv_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			    addr, sv->sv_zid, state);
 		}
 	}
-	if (smb_obj_expand(addr, opts, smb_server_exp, indent))
+
+	/* if we can't look up the type name, just error out */
+	if (mdb_ctf_lookup_by_name("smb_server_t", &id) == -1)
+		return (DCMD_ERR);
+
+	if (mdb_ctf_offsetof(id, "sv_session_list", &off) == -1)
+		/* sv_session_list doesn't exist; old core */
+		sv_exp = smb_server_exp_old;
+	else
+		sv_exp = smb_server_exp;
+
+	if (smb_obj_expand(addr, opts, sv_exp, indent))
 		return (DCMD_ERR);
 	return (DCMD_OK);
 }
@@ -892,14 +947,16 @@ typedef struct mdb_smb_request {
 
 	unsigned char		first_smb_com;
 	unsigned char		smb_com;
-	uint16_t		smb2_cmd_code;
-	uint64_t		smb2_messageid;
 
 	uint16_t		smb_tid;
 	uint32_t		smb_pid;
 	uint16_t		smb_uid;
 	uint16_t		smb_mid;
 	uint16_t		smb_fid;
+
+	uint16_t		smb2_cmd_code;
+	uint64_t		smb2_messageid;
+	uint64_t		smb2_ssnid;
 
 	struct smb_tree		*tid_tree;
 	struct smb_ofile	*fid_ofile;
@@ -990,13 +1047,19 @@ smbreq_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			    "state: %u (%s)\n",
 			    sr->sr_state, state);
 
+			if (sr->smb2_ssnid != 0) {
+				mdb_printf(
+				    "SSNID(user): 0x%llx (%p)\n",
+				    sr->smb2_ssnid, sr->uid_user);
+			} else {
+				mdb_printf(
+				    "UID(user): %u (%p)\n",
+				    sr->smb_uid, sr->uid_user);
+			}
+
 			mdb_printf(
 			    "TID(tree): %u (%p)\n",
 			    sr->smb_tid, sr->tid_tree);
-
-			mdb_printf(
-			    "UID(user): %u (%p)\n",
-			    sr->smb_uid, sr->uid_user);
 
 			mdb_printf(
 			    "FID(file): %u (%p)\n",
@@ -1284,6 +1347,7 @@ typedef struct mdb_smb_user {
 	cred_t			*u_cred;
 	cred_t			*u_privcred;
 
+	uint64_t		u_ssnid;
 	uint32_t		u_refcnt;
 	uint32_t		u_flags;
 	uint32_t		u_privileges;
@@ -1387,6 +1451,7 @@ smbuser_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			mdb_printf("%<b>%<u>SMB user information (%p):"
 			    "%</u>%</b>\n", addr);
 			mdb_printf("UID: %u\n", user->u_uid);
+			mdb_printf("SSNID: %llx\n", user->u_ssnid);
 			mdb_printf("State: %d (%s)\n", user->u_state, state);
 			mdb_printf("Flags: 0x%08x <%b>\n", user->u_flags,
 			    user->u_flags, user_flag_bits);
@@ -1401,11 +1466,12 @@ smbuser_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 				mdb_printf(
 				    "%<b>%<u>%?-s "
 				    "%-5s "
+				    "%-16s "
 				    "%-32s%</u>%</b>\n",
-				    "USER", "UID", "ACCOUNT");
+				    "USER", "UID", "SSNID", "ACCOUNT");
 
-			mdb_printf("%-?p %-5u %-32s\n", addr, user->u_uid,
-			    account);
+			mdb_printf("%-?p %-5u %-16llx %-32s\n",
+			    addr, user->u_uid, user->u_ssnid, account);
 		}
 	}
 	return (DCMD_OK);
@@ -1717,6 +1783,7 @@ typedef struct mdb_smb_ofile {
 	int			f_mode;
 	cred_t			*f_cr;
 	pid_t			f_pid;
+	smb_dh_vers_t		dh_vers;
 } mdb_smb_ofile_t;
 
 static const mdb_bitmask_t
@@ -1775,16 +1842,23 @@ smbofile_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		}
 		if (opts & SMB_OPT_VERBOSE) {
 			char		state[40];
+			char		durable[40];
 
 			get_enum(state, sizeof (state),
 			    "smb_ofile_state_t", of->f_state,
 			    "SMB_OFILE_STATE_");
+
+			get_enum(durable, sizeof (durable),
+			    "smb_dh_vers_t", of->dh_vers,
+			    "SMB2_");
 
 			mdb_printf(
 			    "%<b>%<u>SMB ofile information (%p):%</u>%</b>\n\n",
 			    addr);
 			mdb_printf("FID: %u\n", of->f_fid);
 			mdb_printf("State: %d (%s)\n", of->f_state, state);
+			mdb_printf("DH Type: %d (%s)\n", of->dh_vers,
+			    durable);
 			mdb_printf("SMB Node: %p\n", of->f_node);
 			mdb_printf("LLF Offset: 0x%llx (%s)\n",
 			    of->f_llf_pos,
@@ -1815,6 +1889,174 @@ smbofile_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		}
 	}
 	return (DCMD_OK);
+}
+
+static int
+smbdurable_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	mdb_smb_server_t *sv;
+
+	if (!(flags & DCMD_ADDRSPEC)) {
+		mdb_printf("require address of an smb_server_t\n");
+		return (WALK_ERR);
+	}
+
+	sv = mdb_zalloc(sizeof (*sv), UM_SLEEP | UM_GC);
+	if (mdb_ctf_vread(sv, SMBSRV_SCOPE "smb_server_t",
+	    "mdb_smb_server_t", addr, 0) < 0) {
+		mdb_warn("failed to read smb_server at %p", addr);
+		return (DCMD_ERR);
+	}
+
+	if (mdb_pwalk_dcmd("smb_hash_walker", "smbofile",
+	    argc, argv, (uintptr_t)sv->sv_persistid_ht) == -1) {
+		mdb_warn("failed to walk 'smb_ofile'");
+		return (DCMD_ERR);
+	}
+	return (DCMD_OK);
+}
+
+static int
+smb_hash_walk_init(mdb_walk_state_t *wsp)
+{
+	smb_hash_t hash;
+	int ll_off, sll_off, i;
+	uintptr_t addr = wsp->walk_addr;
+
+	if (addr == NULL) {
+		mdb_printf("require address of an smb_hash_t\n");
+		return (WALK_ERR);
+	}
+
+	GET_OFFSET(sll_off, smb_bucket_t, b_list);
+	GET_OFFSET(ll_off, smb_llist_t, ll_list);
+
+	if (mdb_vread(&hash, sizeof (hash), addr) == -1) {
+		mdb_warn("failed to read smb_hash_t at %p", addr);
+		return (WALK_ERR);
+	}
+
+	for (i = 0; i < hash.num_buckets; i++) {
+		wsp->walk_addr = (uintptr_t)hash.buckets +
+		    (i * sizeof (smb_bucket_t)) + sll_off + ll_off;
+		if (mdb_layered_walk("list", wsp) == -1) {
+			mdb_warn("failed to walk 'list'");
+			return (WALK_ERR);
+		}
+	}
+
+	return (WALK_NEXT);
+}
+
+static int
+smb_hash_walk_step(mdb_walk_state_t *wsp)
+{
+	return (wsp->walk_callback(wsp->walk_addr, wsp->walk_layer,
+	    wsp->walk_cbdata));
+}
+
+static int
+smbhashstat_cb(uintptr_t addr, const void *data, void *varg)
+{
+	_NOTE(ARGUNUSED(varg))
+	const smb_bucket_t *bucket = data;
+
+	mdb_printf("%-?p ", addr);	/* smb_bucket_t */
+	mdb_printf("%-6u ", bucket->b_list.ll_count);
+	mdb_printf("%-16u", bucket->b_max_seen);
+	mdb_printf("%-u\n", (bucket->b_list.ll_wrop +
+	    bucket->b_list.ll_count) / 2);
+	return (WALK_NEXT);
+}
+
+static int
+smbhashstat_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	_NOTE(ARGUNUSED(argc, argv))
+	if (!(flags & DCMD_ADDRSPEC)) {
+		mdb_printf("require address of an smb_hash_t\n");
+		return (DCMD_USAGE);
+	}
+
+	if (DCMD_HDRSPEC(flags)) {
+		mdb_printf(
+		    "%<b>%<u>"
+		    "%-?s "
+		    "%-6s "
+		    "%-16s"
+		    "%-s"
+		    "%</u>%</b>\n",
+		    "smb_bucket_t", "count", "largest seen", "inserts");
+	}
+
+	if (mdb_pwalk("smb_hashstat_walker", smbhashstat_cb,
+	    NULL, addr) == -1) {
+		mdb_warn("failed to walk 'smb_ofile'");
+		return (DCMD_ERR);
+	}
+	return (DCMD_OK);
+}
+
+typedef struct smb_hash_wd {
+	smb_bucket_t	*bucket;
+	smb_bucket_t	*end;
+} smb_hash_wd_t;
+
+static int
+smb_hashstat_walk_init(mdb_walk_state_t *wsp)
+{
+	int sll_off, ll_off;
+	smb_hash_t hash;
+	smb_bucket_t *buckets;
+	uintptr_t addr = wsp->walk_addr;
+	uint32_t arr_sz;
+	smb_hash_wd_t *wd;
+
+	if (addr == NULL) {
+		mdb_printf("require address of an smb_hash_t\n");
+		return (WALK_ERR);
+	}
+
+	GET_OFFSET(sll_off, smb_bucket_t, b_list);
+	GET_OFFSET(ll_off, smb_llist_t, ll_list);
+
+	if (mdb_vread(&hash, sizeof (hash), addr) == -1) {
+		mdb_warn("failed to read smb_hash_t at %p", addr);
+		return (WALK_ERR);
+	}
+
+	arr_sz = hash.num_buckets * sizeof (smb_bucket_t);
+	buckets = mdb_alloc(arr_sz, UM_SLEEP | UM_GC);
+	if (mdb_vread(buckets, arr_sz, (uintptr_t)hash.buckets) == -1) {
+		mdb_warn("failed to read smb_bucket_t array at %p",
+		    hash.buckets);
+		return (WALK_ERR);
+	}
+
+	wd = mdb_alloc(sizeof (*wd), UM_SLEEP | UM_GC);
+	wd->bucket = buckets;
+	wd->end = buckets + hash.num_buckets;
+
+	wsp->walk_addr = (uintptr_t)hash.buckets;
+	wsp->walk_data = wd;
+
+	return (WALK_NEXT);
+}
+
+static int
+smb_hashstat_walk_step(mdb_walk_state_t *wsp)
+{
+	int rc;
+	smb_hash_wd_t *wd = wsp->walk_data;
+
+	if (wd->bucket >= wd->end)
+		return (WALK_DONE);
+
+	rc = wsp->walk_callback(wsp->walk_addr, wd->bucket++,
+	    wsp->walk_cbdata);
+
+	wsp->walk_addr += sizeof (smb_bucket_t);
+	return (rc);
 }
 
 /*
@@ -3168,6 +3410,13 @@ smb_obj_expand(uintptr_t addr, uint_t opts, const smb_exp_t *x, ulong_t indent)
 	while (x->ex_dcmd) {
 		if (x->ex_mask & opts) {
 			ex_off = (x->ex_offset)();
+			if (ex_off < 0) {
+				mdb_warn("failed to get the list offset for %s",
+				    x->ex_name);
+				rc = ex_off;
+				break;
+			}
+
 			rc = mdb_pwalk_dcmd("list", x->ex_dcmd, argc, argv,
 			    addr + ex_off);
 
@@ -3361,6 +3610,15 @@ static const mdb_dcmd_t dcmds[] = {
 	{   "smb_mbuf_dump", ":[max_len]",
 	    "print mbuf_t data",
 	    smb_mbuf_dump_dcmd },
+	{   "smbdurable",
+	    "[-v]",
+	    "list ofiles on sv->sv_persistid_ht",
+	    smbdurable_dcmd },
+	{   "smbhashstat",
+	    "[-v]",
+	    "list stats from an smb_hash_t structure",
+	    smbhashstat_dcmd },
+
 	{ NULL }
 };
 
@@ -3395,6 +3653,19 @@ static const mdb_walker_t walkers[] = {
 	    smb_mbuf_walk_step,
 	    NULL,
 	    NULL },
+	{   "smb_hash_walker",
+	    "walk an smb_hash_t structure",
+	    smb_hash_walk_init,
+	    smb_hash_walk_step,
+	    NULL,
+	    NULL },
+	{   "smb_hashstat_walker",
+	    "walk the buckets from an smb_hash_t structure",
+	    smb_hashstat_walk_init,
+	    smb_hashstat_walk_step,
+	    NULL,
+	    NULL },
+
 	{ NULL }
 };
 
