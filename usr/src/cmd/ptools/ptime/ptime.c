@@ -25,7 +25,7 @@
  * Portions Copyright 2008 Chad Mynhier
  */
 /*
- * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include <stdio.h>
@@ -61,6 +61,7 @@ static	int	Fflag;
 static	int	mflag;
 static	int	errflg;
 static	int	pflag;
+static	int	pfirst;
 
 static int
 ptime_pid(const char *pidstr)
@@ -130,22 +131,22 @@ main(int argc, char **argv)
 	}
 
 	if (pflag) {
+		char *pp;
+
 		exit = 0;
 		(void) signal(SIGINT, SIG_IGN);
 		(void) signal(SIGQUIT, SIG_IGN);
-		pp = pidarg;
-		if ((np = strchr(pp, ' ')) != NULL ||
-		    (np = strchr(pp, ',')) != NULL)
-			pflag++;
-		while (np != NULL) {
-			*np = '\0';
-			exit |= ptime_pid(pp);
-			pp = np + 1;
-			np = strchr(pp, ' ');
-			if (np == NULL)
-				np = strchr(pp, ',');
+
+		pp = strtok(pidarg, ", ");
+		if (pp == NULL) {
+			(void) fprintf(stderr, "%s: invalid argument for -p\n",
+			    command);
+			return (1);
 		}
-		exit |= ptime_pid(pp);
+		exit = ptime_pid(pp);
+		while ((pp = strtok(NULL, ", ")) != NULL) {
+			exit |= ptime_pid(pp);
+		}
 		return (exit);
 	}
 
@@ -200,6 +201,8 @@ look(pid_t pid)
 	hrtime_t hrtime;
 	prusage_t *pup = &prusage;
 
+	pfirst++;
+
 	if (proc_get_psinfo(pid, &psinfo) < 0)
 		return (perr("read psinfo"));
 
@@ -223,8 +226,9 @@ look(pid_t pid)
 		if (!mflag)
 			tsadd(&sys, &sys, &pup->pr_ttime);
 
-		(void) fprintf(stderr, "\n");
-		if (pflag > 1)
+		if (!pflag || pfirst > 1)
+			(void) fprintf(stderr, "\n");
+		if (pflag)
 			(void) fprintf(stderr, "%d:\t%.70s\n",
 			    (int)psinfo.pr_pid, psinfo.pr_psargs);
 		prtime("real", &real);

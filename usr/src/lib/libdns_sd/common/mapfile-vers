@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-#
+# Copyright 2016 Toomas Soome <tsoome@me.com>
 # Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
@@ -37,6 +37,14 @@
 #
 
 $mapfile_version 2
+
+SYMBOL_VERSION ILLUMOS_0.1 {	# mDNSResponder-576.30.4
+    global:
+	DNSServiceGetAddrInfo;
+	DNSServiceGetProperty;
+	DNSServiceNATPortMappingCreate;
+	DNSServiceSleepKeepalive;
+} SUNW_1.1;
 
 SYMBOL_VERSION SUNW_1.1 {
     global:

@@ -13,18 +13,6 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
-
-    Change History (most recent first):
-
-$Log: RegisterRecordListener.java,v $
-Revision 1.2  2006/08/14 23:25:08  cheshire
-Re-licensed mDNSResponder daemon source code under Apache License, Version 2.0
-
-Revision 1.1  2006/06/20 23:00:12  rpantos
-<rdar://problem/3839132> Java needs to implement DNSServiceRegisterRecord equivalent
-
-ident	"%Z%%M%	%I%	%E% SMI"
-
  */
 
 
