@@ -23,7 +23,7 @@
  * Copyright 2015 Joyent, Inc. All rights reserved.
  * Copyright 2014 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2014 Igor Kozhukhov <ikozhukhov@gmail.com>.
- * Copyright 2015, Joyent, Inc. All rights reserved.
+ * Copyright 2016, Joyent, Inc.
  */
 
 #ifndef _SYS_ZONE_H
@@ -397,6 +397,37 @@ typedef struct {
 	uint_t		cycle_cnt;
 	hrtime_t	zone_avg_cnt;
 } sys_zio_cntr_t;
+
+typedef struct {
+	kstat_named_t	zv_zonename;
+	kstat_named_t	zv_nread;
+	kstat_named_t	zv_reads;
+	kstat_named_t	zv_rtime;
+	kstat_named_t	zv_rlentime;
+	kstat_named_t	zv_rcnt;
+	kstat_named_t	zv_nwritten;
+	kstat_named_t	zv_writes;
+	kstat_named_t	zv_wtime;
+	kstat_named_t	zv_wlentime;
+	kstat_named_t	zv_wcnt;
+	kstat_named_t	zv_10ms_ops;
+	kstat_named_t	zv_100ms_ops;
+	kstat_named_t	zv_1s_ops;
+	kstat_named_t	zv_10s_ops;
+	kstat_named_t 	zv_delay_cnt;
+	kstat_named_t	zv_delay_time;
+} zone_vfs_kstat_t;
+
+typedef struct {
+	kstat_named_t	zz_zonename;
+	kstat_named_t	zz_nread;
+	kstat_named_t	zz_reads;
+	kstat_named_t	zz_rtime;
+	kstat_named_t	zz_rlentime;
+	kstat_named_t	zz_nwritten;
+	kstat_named_t	zz_writes;
+	kstat_named_t	zz_waittime;
+} zone_zfs_kstat_t;
 
 typedef struct {
 	kstat_named_t	zm_zonename;
