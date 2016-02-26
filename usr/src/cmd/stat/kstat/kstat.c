@@ -23,7 +23,7 @@
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013 David Hoeppner. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
- * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*
@@ -658,7 +658,6 @@ ks_instances_read(kstat_ctl_t *kc)
 		    offsetof(ks_nvpair_t, nv_next));
 
 		SAVE_HRTIME_X(ksi, "crtime", kp->ks_crtime);
-		SAVE_HRTIME_X(ksi, "snaptime", kp->ks_snaptime);
 		if (g_pflg) {
 			SAVE_STRING_X(ksi, "class", kp->ks_class);
 		}
@@ -678,6 +677,8 @@ ks_instances_read(kstat_ctl_t *kc)
 #endif
 			continue;
 		}
+
+		SAVE_HRTIME_X(ksi, "snaptime", kp->ks_snaptime);
 
 		switch (kp->ks_type) {
 		case KSTAT_TYPE_RAW:
