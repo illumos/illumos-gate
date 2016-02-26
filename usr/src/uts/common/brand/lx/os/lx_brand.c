@@ -176,7 +176,7 @@
 
 int	lx_debug = 0;
 
-void	lx_init_brand_data(zone_t *);
+void	lx_init_brand_data(zone_t *, kmutex_t *);
 void	lx_free_brand_data(zone_t *);
 void	lx_setbrand(proc_t *);
 int	lx_getattr(zone_t *, int, void *, size_t *);
@@ -995,9 +995,10 @@ lx_zfs_cleanup_devs(lx_zone_data_t *lxzdata)
 }
 
 void
-lx_init_brand_data(zone_t *zone)
+lx_init_brand_data(zone_t *zone, kmutex_t *zsl)
 {
 	lx_zone_data_t *data;
+	ASSERT(MUTEX_HELD(zsl));
 	ASSERT(zone->zone_brand == &lx_brand);
 	ASSERT(zone->zone_brand_data == NULL);
 	data = (lx_zone_data_t *)kmem_zalloc(sizeof (lx_zone_data_t), KM_SLEEP);
@@ -1015,6 +1016,14 @@ lx_init_brand_data(zone_t *zone)
 	(void) strlcpy(data->lxzd_kernel_version, "BrandZ virtual linux",
 	    LX_KERN_VERSION_MAX);
 
+	zone->zone_brand_data = data;
+
+	/*
+	 * In Linux, if the init(1) process terminates the system panics.
+	 * The zone must reboot to simulate this behaviour.
+	 */
+	zone->zone_reboot_on_init_exit = B_TRUE;
+
 	/*
 	 * Unlike ZFS proper, which does dynamic zvols, we currently only
 	 * generate the zone's "disk" list once at zone boot time and use that
@@ -1029,15 +1038,15 @@ lx_init_brand_data(zone_t *zone)
 	list_create(data->lxzd_vdisks, sizeof (lxd_zfs_dev_t),
 	    offsetof(lxd_zfs_dev_t, lzd_link));
 
-	lx_zfs_get_devs(zone, data->lxzd_vdisks);
-
-	zone->zone_brand_data = data;
-
 	/*
-	 * In Linux, if the init(1) process terminates the system panics.
-	 * The zone must reboot to simulate this behaviour.
+	 * We cannot hold the zone_status_lock while performing zfs operations
+	 * so we drop the lock, get the zfs devs as the last step in this
+	 * function, then reaquire the lock. Don't add any code after this
+	 * which requires that the zone_status_lock was continuously held.
 	 */
-	zone->zone_reboot_on_init_exit = B_TRUE;
+	mutex_exit(zsl);
+	lx_zfs_get_devs(zone, data->lxzd_vdisks);
+	mutex_enter(zsl);
 }
 
 void
