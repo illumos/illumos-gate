@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2015, Joyent, Inc. All rights reserved.
+ * Copyright 2016, Joyent, Inc.
  */
 
 #include <sys/errno.h>
@@ -46,7 +46,7 @@
 
 char *s10_emulation_table = NULL;
 
-void	s10_init_brand_data(zone_t *);
+void	s10_init_brand_data(zone_t *, kmutex_t *);
 void	s10_free_brand_data(zone_t *);
 void	s10_setbrand(proc_t *);
 int	s10_getattr(zone_t *, int, void *, size_t *);
@@ -410,7 +410,7 @@ s10_free_brand_data(zone_t *zone)
 }
 
 void
-s10_init_brand_data(zone_t *zone)
+s10_init_brand_data(zone_t *zone, kmutex_t *zsl)
 {
 	ASSERT(zone->zone_brand == &s10_brand);
 	ASSERT(zone->zone_brand_data == NULL);

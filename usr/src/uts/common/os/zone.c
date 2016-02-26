@@ -2788,9 +2788,14 @@ zone_set_brand(zone_t *zone, const char *brand)
 		return (EINVAL);
 	}
 
-	/* set up the brand specific data */
+	/*
+	 * Set up the brand specific data.
+	 * Note that it's possible that the hook has to drop the
+	 * zone_status_lock and reaquire it before returning so we can't
+	 * assume the lock has been held the entire time.
+	 */
 	zone->zone_brand = bp;
-	ZBROP(zone)->b_init_brand_data(zone);
+	ZBROP(zone)->b_init_brand_data(zone, &zone_status_lock);
 
 	mutex_exit(&zone_status_lock);
 	return (0);

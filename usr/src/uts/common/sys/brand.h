@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015, Joyent, Inc.
+ * Copyright 2016, Joyent, Inc.
  */
 
 #ifndef _SYS_BRAND_H
@@ -150,7 +150,7 @@ struct execa;
  * b_pagefault - Trap pagefault events
  */
 struct brand_ops {
-	void	(*b_init_brand_data)(zone_t *);
+	void	(*b_init_brand_data)(zone_t *, kmutex_t *);
 	void	(*b_free_brand_data)(zone_t *);
 	int	(*b_brandsys)(int, int64_t *, uintptr_t, uintptr_t, uintptr_t,
 		uintptr_t, uintptr_t);

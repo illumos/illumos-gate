@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015 Joyent, Inc. All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include <sys/errno.h>
@@ -43,7 +43,7 @@
 
 char *sn1_emulation_table = NULL;
 
-void	sn1_init_brand_data(zone_t *);
+void	sn1_init_brand_data(zone_t *, kmutex_t *);
 void	sn1_free_brand_data(zone_t *);
 void	sn1_setbrand(proc_t *);
 int	sn1_getattr(zone_t *, int, void *, size_t *);
@@ -244,7 +244,7 @@ sn1_free_brand_data(zone_t *zone)
 
 /*ARGSUSED*/
 void
-sn1_init_brand_data(zone_t *zone)
+sn1_init_brand_data(zone_t *zone, kmutex_t *zsl)
 {
 }
 
