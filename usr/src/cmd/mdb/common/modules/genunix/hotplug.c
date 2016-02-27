@@ -114,6 +114,7 @@ hotplug(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	int status;
 
 	data.di_flags = 0;
+	data.di_filter = NULL;
 	if (mdb_getopts(argc, argv,
 	    'p', MDB_OPT_SETBITS, DEVINFO_HP_PHYSICAL, &data.di_flags, NULL)
 	    != argc)

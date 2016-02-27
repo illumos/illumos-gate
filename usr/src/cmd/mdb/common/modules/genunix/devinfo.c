@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2000, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -74,9 +75,10 @@ prtconf_help(void)
 	    "with an address, prints the parents of, "
 	    "and all children of, that address.\n\n"
 	    "Switches:\n"
-	    "  -v   be verbose - print device property lists\n"
-	    "  -p   only print the ancestors of the given node\n"
-	    "  -c   only print the children of the given node\n");
+	    "  -v          be verbose - print device property lists\n"
+	    "  -p          only print the ancestors of the given node\n"
+	    "  -c          only print the children of the given node\n"
+	    "  -d driver   only print instances of driver\n");
 }
 
 void
@@ -580,7 +582,8 @@ is_printable_string(unsigned char *prop_value)
 }
 
 static void
-devinfo_print_props_type(int type) {
+devinfo_print_props_type(int type)
+{
 	char *type_str = NULL;
 
 	switch (type) {
@@ -612,7 +615,7 @@ devinfo_print_props_type(int type) {
 
 static void
 devinfo_print_props_value(int elem_size, int nelem,
-	unsigned char *prop_value, int prop_value_len)
+    unsigned char *prop_value, int prop_value_len)
 {
 	int i;
 
@@ -839,7 +842,8 @@ next:
 }
 
 static void
-devinfo_pathinfo_state(mdi_pathinfo_state_t state) {
+devinfo_pathinfo_state(mdi_pathinfo_state_t state)
+{
 	char *type_str = NULL;
 
 	switch (state) {
@@ -866,7 +870,8 @@ devinfo_pathinfo_state(mdi_pathinfo_state_t state) {
 }
 
 static void
-devinfo_print_pathing(int mdi_component, void *mdi_client) {
+devinfo_print_pathing(int mdi_component, void *mdi_client)
+{
 	mdi_client_t		mdi_c;
 	struct mdi_pathinfo	*pip;
 
@@ -898,7 +903,7 @@ devinfo_print_pathing(int mdi_component, void *mdi_client) {
 
 		/* read in the pathinfo structure */
 		if (mdb_vread((void*)&pi, sizeof (pi),
-			    (uintptr_t)pip) == -1) {
+		    (uintptr_t)pip) == -1) {
 			mdb_warn("failed to read mdi_pathinfo at %p",
 			    (uintptr_t)pip);
 			goto exit;
@@ -906,7 +911,7 @@ devinfo_print_pathing(int mdi_component, void *mdi_client) {
 
 		/* read in the pchi (path host adapter) info */
 		if (mdb_vread((void*)&ph, sizeof (ph),
-			    (uintptr_t)pi.pi_phci) == -1) {
+		    (uintptr_t)pi.pi_phci) == -1) {
 			mdb_warn("failed to read mdi_pchi at %p",
 			    (uintptr_t)pi.pi_phci);
 			goto exit;
@@ -914,13 +919,13 @@ devinfo_print_pathing(int mdi_component, void *mdi_client) {
 
 		/* read in the dip of the phci so we can get it's name */
 		if (mdb_vread((void*)&ph_di, sizeof (ph_di),
-			    (uintptr_t)ph.ph_dip) == -1) {
+		    (uintptr_t)ph.ph_dip) == -1) {
 			mdb_warn("failed to read mdi_pchi at %p",
 			    (uintptr_t)ph.ph_dip);
 			goto exit;
 		}
 		if (mdb_vread(binding_name, sizeof (binding_name),
-			    (uintptr_t)ph_di.devi_binding_name) == -1) {
+		    (uintptr_t)ph_di.devi_binding_name) == -1) {
 			mdb_warn("failed to read binding_name at %p",
 			    (uintptr_t)ph_di.devi_binding_name);
 			goto exit;
@@ -932,7 +937,7 @@ devinfo_print_pathing(int mdi_component, void *mdi_client) {
 		/* print out the pathing info */
 		mdb_inc_indent(DEVINFO_PROP_INDENT);
 		if (mdb_pwalk_dcmd(NVPAIR_WALKER_FQNAME, NVPAIR_DCMD_FQNAME,
-			    0, NULL, (uintptr_t)pi.pi_prop) != 0) {
+		    0, NULL, (uintptr_t)pi.pi_prop) != 0) {
 			mdb_dec_indent(DEVINFO_PROP_INDENT);
 			goto exit;
 		}
@@ -954,6 +959,7 @@ devinfo_print(uintptr_t addr, struct dev_info *dev, devinfo_cb_data_t *data)
 	char		dname[MODMAXNAMELEN + 1];
 	devinfo_node_t	*din = (devinfo_node_t *)dev;
 	ddi_prop_t	*global_props = NULL;
+	boolean_t	hdname = B_FALSE;
 
 	if (mdb_readstr(binding_name, sizeof (binding_name),
 	    (uintptr_t)dev->devi_binding_name) == -1) {
@@ -974,6 +980,30 @@ devinfo_print(uintptr_t addr, struct dev_info *dev, devinfo_cb_data_t *data)
 		global_props = plist.prop_list;
 	}
 
+	if (dev->devi_node_state > DS_ATTACHED) {
+		if (mdb_devinfo2driver(addr, dname, sizeof (dname)) == 0)
+			hdname = B_TRUE;
+	}
+
+	/*
+	 * If a filter is installed and we don't have the driver's name, we
+	 * always skip it. Also if the filter doesn't match, then we'll also
+	 * skip the driver.
+	 */
+	if (data->di_filter != NULL &&
+	    (!hdname || strcmp(data->di_filter, dname) != 0)) {
+		return (WALK_NEXT);
+	}
+
+	/*
+	 * If we are output to a pipe, we only print the address of the
+	 * devinfo_t.
+	 */
+	if (data->di_flags & DEVINFO_PIPE) {
+		mdb_printf("%-0?p\n", addr);
+		return (WALK_NEXT);
+	}
+
 	mdb_inc_indent(din->din_depth * DEVINFO_TREE_INDENT);
 	if ((addr == data->di_base) || (data->di_flags & DEVINFO_ALLBOLD))
 		mdb_printf("%<b>");
@@ -985,7 +1015,7 @@ devinfo_print(uintptr_t addr, struct dev_info *dev, devinfo_cb_data_t *data)
 
 	if (dev->devi_node_state < DS_ATTACHED)
 		mdb_printf(" (driver not attached)");
-	else if (mdb_devinfo2driver(addr, dname, sizeof (dname)) != 0)
+	else if (hdname == B_FALSE)
 		mdb_printf(" (could not determine driver name)");
 	else
 		mdb_printf(" (driver name: %s)", dname);
@@ -1017,8 +1047,13 @@ prtconf(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	int status;
 
 	data.di_flags = DEVINFO_PARENT | DEVINFO_CHILD;
+	data.di_filter = NULL;
+
+	if (flags & DCMD_PIPE_OUT)
+		data.di_flags |= DEVINFO_PIPE;
 
 	if (mdb_getopts(argc, argv,
+	    'd', MDB_OPT_STR, &data.di_filter,
 	    'v', MDB_OPT_SETBITS, DEVINFO_VERBOSE, &data.di_flags,
 	    'p', MDB_OPT_CLRBITS, DEVINFO_CHILD, &data.di_flags,
 	    'c', MDB_OPT_CLRBITS, DEVINFO_PARENT, &data.di_flags, NULL) != argc)
@@ -1036,7 +1071,8 @@ prtconf(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	}
 
 	data.di_base = addr;
-	mdb_printf("%<u>%-?s %-50s%</u>\n", "DEVINFO", "NAME");
+	if (!(flags & DCMD_PIPE_OUT))
+		mdb_printf("%<u>%-?s %-50s%</u>\n", "DEVINFO", "NAME");
 
 	if ((data.di_flags & (DEVINFO_PARENT | DEVINFO_CHILD)) ==
 	    (DEVINFO_PARENT | DEVINFO_CHILD)) {
@@ -1118,6 +1154,7 @@ devinfo(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	data.di_flags = DEVINFO_VERBOSE;
 	data.di_base = addr;
+	data.di_filter = NULL;
 
 	if (mdb_getopts(argc, argv,
 	    'q', MDB_OPT_CLRBITS, DEVINFO_VERBOSE, &data.di_flags,

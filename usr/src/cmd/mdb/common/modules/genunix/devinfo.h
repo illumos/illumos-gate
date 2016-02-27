@@ -42,10 +42,12 @@ extern "C" {
 #define	DEVINFO_ALLBOLD		0x8
 #define	DEVINFO_SUMMARY		0x10
 #define	DEVINFO_HP_PHYSICAL	0x20
+#define	DEVINFO_PIPE		0x40
 
 typedef struct devinfo_cb_data {
 	uintptr_t	di_base;
 	uint_t		di_flags;
+	char 		*di_filter;
 } devinfo_cb_data_t;
 
 extern int devinfo_walk_init(mdb_walk_state_t *);
