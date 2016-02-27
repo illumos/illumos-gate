@@ -1,626 +1,709 @@
-'\" te
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.\"
 .\" Copyright 1989 AT&T
 .\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
-.\" Copyright 2015 Nexenta Systems, Inc. All rights reserved.
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH AUTOMOUNT 1M "Sep 8, 2015"
-.SH NAME
-automount \- install automatic mount points
-.SH SYNOPSIS
-.LP
-.nf
-\fB/usr/sbin/automount\fR [\fB-t\fR \fIduration\fR] [\fB-v\fR]
-.fi
-
-.SH DESCRIPTION
-.LP
-The \fBautomount\fR utility installs \fBautofs\fR mount points and associates
-an automount map with each mount point. It starts the \fBautomountd\fR(1M)
+.\" Copyright 2016 Nexenta Systems, Inc.
+.\"
+.Dd March 1, 2016
+.Dt AUTOMOUNT 1M
+.Os
+.Sh NAME
+.Nm automount
+.Nd install automatic mount points
+.Sh SYNOPSIS
+.Nm
+.Op Fl v
+.Op Fl t Ar duration
+.Sh DESCRIPTION
+The
+.Nm
+utility installs
+.Nm autofs
+mount points and associates an automount map with each mount point. It starts
+the
+.Xr automountd 1M
 daemon if it finds any non-trivial entries in either local or distributed
-automount maps and if the daemon is not already running. The \fBautofs\fR file
-system monitors attempts to access directories within it and notifies the
-\fBautomountd\fR(1M) daemon. The daemon uses the map to locate a file system,
-which it then mounts at the point of reference within the \fBautofs\fR file
-system. A map can be assigned to an \fBautofs\fR mount using an entry in the
-\fB/etc/auto_master\fR map or a direct map.
-.sp
-.LP
-If the file system is not accessed within an appropriate interval (\fB10\fR
-minutes by default), the \fBautomountd\fR daemon unmounts the file system.
-.sp
-.LP
-The file \fB/etc/auto_master\fR determines the locations of all \fBautofs\fR
+automount maps and if the daemon is not already running. The
+.Nm autofs
+file system monitors attempts to access directories within it and notifies the
+.Xr automountd 1M
+daemon. The daemon uses the map to locate a file system, which it then mounts at
+the point of reference within the
+.Nm autofs
+file system. A map can be assigned to an
+.Nm autofs
+mount using an entry in the
+.Pa /etc/auto_master
+map or a direct map.
+.Pp
+If the file system is not accessed within an appropriate interval
+.Pq 10 minutes by default ,
+the
+.Nm automountd
+daemon unmounts the file system.
+.Pp
+The file
+.Pa /etc/auto_master
+determines the locations of all
+.Nm autofs
 mount points. By default, this file contains three entries:
-.sp
-.in +2
-.nf
+.Bd -literal -offset indent
 # Master map for automounter
 #
 +auto_master
-/net          -hosts    -nosuid
-/home         auto_home
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-The \fB+auto_master\fR entry is a reference to an external \fBNIS\fR or
-\fBNIS+\fR master map. If one exists, then its entries are read as if they
-occurred in place of the \fB+auto_master\fR entry. The remaining entries in the
-master file specify a directory on which an \fBautofs\fR mount will be made
-followed by the automounter map to be associated with it. Optional mount
-options may be supplied as an optional third field in the each entry. These
-options are used for any entries in the map that do not specify mount options
-explicitly. The \fBautomount\fR command is usually run without arguments. It
-compares the entries \fB/etc/auto_master\fR with the current list of
-\fBautofs\fR mounts in \fB/etc/mnttab\fR and adds, removes or updates
-\fBautofs\fR mounts to bring the \fB/etc/mnttab\fR up to date with the
-\fB/etc/auto_master\fR. At boot time it installs all \fBautofs\fR mounts from
-the master map. Subsequently, it may be run to install \fBautofs\fR mounts for
-new entries in the master map or the direct map, or to perform unmounts for
-entries that have been removed from these maps.
-.SS "Automount with Solaris Trusted Extensions"
-.LP
+/net	-hosts -nosuid
+/home	auto_home
+.Ed
+.Pp
+The
+.Sy +auto_master
+entry is a reference to an external NIS or NIS+ master map. If one exists, then
+its entries are read as if they occurred in place of the
+.Sy +auto_master
+entry. The remaining entries in the master file specify a directory on which an
+.Nm autofs
+mount will be made followed by the automounter map to be associated with it.
+Optional mount options may be supplied as an optional third field in the each
+entry. These options are used for any entries in the map that do not specify
+mount options explicitly. The
+.Nm
+command is usually run without arguments. It compares the entries
+.Pa /etc/auto_master
+with the current list of
+.Nm autofs
+mounts in
+.Pa /etc/mnttab
+and adds, removes or updates
+.Nm autofs
+mounts to bring the
+.Pa /etc/mnttab
+up to date with the
+.Pa /etc/auto_master .
+At boot time it installs all
+.Nm autofs
+mounts from the master map. Subsequently, it may be run to install
+.Nm autofs
+mounts for new entries in the master map or the direct map, or to perform
+unmounts for entries that have been removed from these maps.
+.Ss Automount with Solaris Trusted Extensions
 If a system is configured with Solaris Trusted Extensions, additional
 processing is performed to facilitate multilevel home directory access. A list
 of zones whose labels are dominated by the current zone is generated and
-default \fBauto_home\fR automount maps are generated if they do not currently
-exist. These automount maps are named \fBauto_home_\fR\fI<zonename>\fR, where
-\fI<zonename>\fR is the name of each zone's lower-level zone. An \fBautofs\fR
-mount of each such \fBauto_home\fR map is then performed, regardless of whether
-it is explicitly or implicitly listed in the master map. Instead of
-\fBautofs\fR mounting the standard \fBauto_home\fR map, the zone uses an
-\fBauto_home\fR file appended with its own zone name. Each zone's
-\fBauto_home\fR map is uniquely named so that it can be maintained and shared
-by all zones using a common name server.
-.LP
+default
+.Sy auto_home
+automount maps are generated if they do not currently exist. These automount
+maps are named
+.Sy auto_home_ Ns Ar zonename ,
+where
+.Ar zonename
+is the name of each zone's lower-level zone. An
+.Nm autofs
+mount of each such
+.Sy auto_home
+map is then performed, regardless of whether it is explicitly or implicitly
+listed in the master map. Instead of
+.Nm autofs
+mounting the standard
+.Sy auto_home
+map, the zone uses an
+.Pa auto_home
+file appended with its own zone name. Each zone's
+.Sy auto_home
+map is uniquely named so that it can be maintained and shared by all zones using
+a common name server.
+.Pp
 By default, the home directories of lower-level zones are mounted read-only
-under \fB/zone/\fI<zonename>\fR/export/home\fR when each zone is booted. The
-default \fBauto_home_\fR\fI<zonename>\fR automount map specifies that path as
-the source directory for an \fBlofs\fR remount onto
-\fB/zone/\fI<zonename>\fR/home/\fI<username>\fR\fR. For example, the file
-\fBauto_home_public\fR, as generated from a higher level zone would contain:
-.sp
-.LP
+under
+.Pa /zone/ Ns Ar zonename Ns Pa /export/home
+when each zone is booted. The default
+.Sy auto_home_ Ns Ar zonename
+automount map specifies that path as the source directory for an
+.Nm lofs
+remount onto
+.Pa /zone/ Ns Ar zonename Ns Pa /home/ Ns Ar username .
+For example, the file
+.Pa auto_home_public ,
+as generated from a higher level zone would contain:
+.Bd -literal -offset indent
 +auto_home_public
-.sp
-.LP
-*       -fstype=lofs    :/zone/public/export/home/&
-.sp
-.LP
+*	-fstype=lofs	:/zone/public/export/home/&
+.Ed
+.Pp
 When a home directory is referenced and the name does not match any other keys
-in the \fBauto_home_public\fR map, it will match this loopback mount
-specification. If this loopback match occurs and the name corresponds to a
-valid user whose home directory does not exist in the public zone, the
-directory is automatically created on behalf of the user.
-.SH OPTIONS
-.LP
+in the
+.Sy auto_home_public
+map, it will match this loopback mount specification. If this loopback match
+occurs and the name corresponds to a valid user whose home directory does not
+exist in the public zone, the directory is automatically created on behalf of
+the user.
+.Sh OPTIONS
 The following options are supported:
-.sp
-.ne 2
-.na
-\fB\fB-t\fR \fIduration\fR\fR
-.ad
-.RS 15n
-Specifies a \fIduration\fR, in seconds, that a file system is to remain mounted
-when not in use. The default is \fB10\fR minutes.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-v\fR\fR
-.ad
-.RS 15n
-Verbose mode. Notifies of \fBautofs\fR mounts, unmounts, or other non-essential
-information.
-.RE
-
-.SH USAGE
-.SS "Map Entry Format"
-.LP
-A simple map entry (mapping) takes the form:
-.sp
-.in +2
-.nf
-key [ -\fImount-options\fR ] \fIlocation\fR .\|.\|.
-.fi
-.in -2
-.sp
-
-.LP
-where \fBkey\fR is the full pathname of the directory to mount when used in a
-direct map, or the simple name of a subdirectory in an indirect map.
-\fImount-options\fR is a comma-separated list of \fBmount\fR options, and
-\fIlocation\fR specifies a file system from which the directory may be mounted.
-In the case of a simple \fBNFS\fR mount, the options that can be used are
-specified in \fBmount_nfs\fR(1M), and \fIlocation\fR takes the form:
-.sp
-.in +2
-.nf
-\fIhost\fR\fB:\|\fR\fIpathname\fR
-.fi
-.in -2
-.sp
-
-.LP
-\fIhost\fR is the name of the host from which to mount the file system, and
-\fIpathname\fR is the absolute pathname of the directory to mount.
-.LP
-Options to other file systems are documented in the other \fBmount_*\fR
+.Bl -tag -width Ds
+.It Fl v
+Verbose mode. Notifies of
+.Nm autofs
+mounts, unmounts, or other non-essential information.
+.It Fl t Ar duration
+Specifies a
+.Ar duration ,
+in seconds, that a file system is to remain mounted when not in use. The default
+is
+.Sy 10
+minutes.
+.El
+.Sh USAGE
+.Ss Map Entry Format
+A simple map entry
+.Pq mapping
+takes the form:
+.Bd -literal -offset indent
+.Ar key Oo Fl Ns Ar mount-options Oc Ar location Ns ...
+.Ed
+.Pp
+where
+.Ar key
+is the full pathname of the directory to mount when used in a direct map, or the
+simple name of a subdirectory in an indirect map.
+.Ar mount-options
+is a comma-separated list of
+.Nm mount
+options, and
+.Ar location
+specifies a file system from which the directory may be mounted. In the case of
+a simple NFS mount, the options that can be used are specified in
+.Xr mount_nfs 1M ,
+and
+.Ar location
+takes the form:
+.Pp
+.Dl Ar host Ns : Ns Ar pathname
+.Pp
+.Ar host
+is the name of the host from which to mount the file system, and
+.Ar pathname
+is the absolute pathname of the directory to mount.
+.Pp
+Options to other file systems are documented in the other
+.Nm mount_*
 reference manual pages.
-.SS "Replicated File Systems"
-.LP
-Multiple \fIlocation\fR fields can be specified for replicated \fBNFS\fR file
-systems, in which case \fBautomount\fR and the kernel will each try to use that
-information to increase availability. If the read-only flag is set in the map
-entry, \fBautomountd\fR mounts a list of locations that the kernel may use,
-sorted by several criteria. Only locations available at mount time will be
-mounted, and thus be available to the kernel. When a server does not respond,
-the kernel will switch to an alternate server. The sort ordering of
-\fBautomount\fR is used to determine how the next server is chosen. If the
-read-only flag is not set, \fBautomount\fR will mount the best single location,
-chosen by the same sort ordering, and new servers will only be chosen when an
-unmount has been possible, and a remount is done. Servers on the same local
-subnet are given the strongest preference, and servers on the local net are
-given the second strongest preference. Among servers equally far away, response
-times will determine the order if no weighting factors (see below) are used.
-.LP
-If the list includes server locations using both the \fBNFS\fR Version 2
-Protocol and the \fBNFS\fR Version 3 Protocol, \fBautomount\fR will choose only
-a subset of the server locations on the list, so that all entries will be the
-same protocol. It will choose servers with the \fBNFS\fR Version 3 Protocol so
-long as an \fBNFS\fR Version 2 Protocol server on a local subnet will not be
-ignored. See the \fI\fR for additional details.
-.LP
-If each \fIlocation\fR in the list shares the same \fIpathname\fR then a single
-\fIlocation\fR may be used with a comma-separated list of hostnames:
-.sp
-.in +2
-.nf
-\fBhostname\fR\fB,\fR\fBhostname\fR\|.\|.\|.\|\fB:\fR\|\fIpathname\fR
-.fi
-.in -2
-.sp
-
-.LP
+.Ss Replicated File Systems
+Multiple
+.Ar location
+fields can be specified for replicated NFS file systems, in which case
+.Nm
+and the kernel will each try to use that information to increase availability.
+If the read-only flag is set in the map entry,
+.Nm automountd
+mounts a list of locations that the kernel may use, sorted by several criteria.
+Only locations available at mount time will be mounted, and thus be available to
+the kernel. When a server does not respond, the kernel will switch to an
+alternate server. The sort ordering of
+.Nm
+is used to determine how the next server is chosen. If the read-only flag is not
+set,
+.Nm
+will mount the best single location, chosen by the same sort ordering, and new
+servers will only be chosen when an unmount has been possible, and a remount is
+done. Servers on the same local subnet are given the strongest preference, and
+servers on the local net are given the second strongest preference. Among
+servers equally far away, response times will determine the order if no
+weighting factors
+.Pq see below
+are used.
+.Pp
+If the list includes server locations using both the NFS Version 2 Protocol and
+the NFS Version 3 Protocol,
+.Nm
+will choose only a subset of the server locations on the list, so that all
+entries will be the same protocol. It will choose servers with the NFS Version 3
+Protocol so long as an NFS Version 2 Protocol server on a local subnet will not
+be ignored. See the FIXME for additional details.
+.Pp
+If each
+.Ar location
+in the list shares the same
+.Ar pathname
+then a single
+.Ar location
+may be used with a comma-separated list of hostnames:
+.Bd -literal -offset indent
+.Ar hostname Ns , Ns Ar hostname Ns ...: Ns Ar pathname
+.Ed
+.Pp
 Requests for a server may be weighted, with the weighting factor appended to
 the server name as an integer in parentheses. Servers without a weighting are
-assumed to have a value of zero (most likely to be selected). Progressively
-higher values decrease the chance of being selected. In the example,
-.sp
-.in +2
-.nf
-\fBman\fR -ro \fBalpha,bravo,charlie(1),delta(4)\|:\|/usr/man\fR
-.fi
-.in -2
-.sp
-
-.LP
-hosts \fBalpha\fR and \fBbravo\fR have the highest priority; host \fBdelta\fR
+assumed to have a value of zero
+.Pq most likely to be selected .
+Progressively higher values decrease the chance of being selected. In the
+example,
+.Bd -literal -offset indent
+man -ro	alpha,bravo,charlie(1),delta(4):/usr/man
+.Ed
+.Pp
+hosts
+.Sy alpha
+and
+.Sy bravo
+have the highest priority; host
+.Sy delta
 has the lowest.
-.LP
+.Pp
 Server proximity takes priority in the selection process. In the example above,
-if the server \fBdelta\fR is on the same network segment as the client, but the
-others are on different network segments, then \fBdelta\fR will be selected;
-the weighting value is ignored. The weighting has effect only when selecting
-between servers with the same network proximity. The automounter always selects
-the localhost over other servers on the same network segment, regardless of
-weighting.
-.LP
+if the server
+.Sy delta
+is on the same network segment as the client, but the others are on different
+network segments, then
+.Sy delta
+will be selected; the weighting value is ignored. The weighting has effect only
+when selecting between servers with the same network proximity. The automounter
+always selects the localhost over other servers on the same network segment,
+regardless of weighting.
+.Pp
 In cases where each server has a different export point, the weighting can
 still be applied. For example:
-.sp
-.in +2
-.nf
-man -ro alpha:/usr/man  bravo,charlie(1):/usr/share/man
-     delta(3):/export/man
-.fi
-.in -2
-.sp
-
-.LP
-A mapping can be continued across input lines by escaping the \fBNEWLINE\fR
-with a backslash (\e) Comments begin with a number sign (\fB#\fR) and end at
-the subsequent NEWLINE.
-.SS "Map Key Substitution"
-.LP
-The ampersand (\fB&\fR) character is expanded to the value of the \fBkey\fR
+.Bd -literal -offset indent
+man	-ro	alpha:/usr/man bravo,charlie(1):/usr/share/man \e
+		delta(3):/export/man
+.Ed
+.Pp
+A mapping can be continued across input lines by escaping the NEWLINE with a
+backslash
+.Pq Qq Sy \e .
+Comments begin with a number sign
+.Pq Qq Sy #
+and end at the subsequent NEWLINE.
+.Ss Map Key Substitution
+The ampersand
+.Pq Qq Sy \*(Am
+character is expanded to the value of the
+.Ar key
 field for the entry in which it occurs. In this case:
-.sp
-.in +2
-.nf
-\fBjane\fR \fBsparcserver\|:\|/home/&\fR
-.fi
-.in -2
-.sp
-
-.LP
-the \fB&\fR expands to \fBjane\fR.
-.SS "Wildcard Key"
-.LP
-The asterisk (\fB*\fR) character, when supplied as the \fBkey\fR field, is
-recognized as the catch-all entry. Such an entry will match any key not
-previously matched. For instance, if the following entry appeared in the
-indirect map for \fB/config\fR:
-.sp
-.in +2
-.nf
-*         &\|:\|/export/config/&
-.fi
-.in -2
-.sp
-
-.LP
-this would allow automatic mounts in \fB/config\fR of any remote file system
-whose location could be specified as:
-.sp
-.in +2
-.nf
-hostname\|:\|/export/config/hostname
-.fi
-.in -2
-.sp
-
-.LP
-Note that the wildcard key does not work in conjunction with the \fB-browse\fR
+.Bd -literal -offset indent
+jane	sparcserver:/home/&
+.Ed
+.Pp
+the
+.Sy \*(Am
+expands to
+.Sy jane .
+.Ss Wildcard Key
+The asterisk
+.Pq Qq Sy *
+character, when supplied as the
+.Ar key
+field, is recognized as the catch-all entry. Such an entry will match any key
+not previously matched. For instance, if the following entry appeared in the
+indirect map for
+.Pa /config :
+.Bd -literal -offset indent
+*	&:/export/config/&
+.Ed
+.Pp
+this would allow automatic mounts in
+.Pa /config
+of any remote file system whose location could be specified as:
+.Bd -literal -offset indent
+.Ar hostname Ns : Ns Pa /export/config/ Ns Ar hostname
+.Ed
+.Pp
+Note that the wildcard key does not work in conjunction with the
+.Fl browse
 option.
-.SS "Variable Substitution"
-.LP
-Client specific variables can be used within an \fBautomount\fR map. For
-instance, if \fB$HOST\fR appeared within a map, \fBautomount\fR would expand it
-to its current value for the client's host name. Supported variables are:
-.sp
-
-.sp
-.TS
-l l l
-l l l .
-\fBARCH\fR	The output of \fBarch\fR	T{
-The architecture name. For example, \fBsun4\fR on a sun4u machine.
-T}
-\fBCPU\fR	The output of \fBuname\fR \fB-p\fR	The processor type.
-		For example, "sparc"
-\fBHOST\fR	The output of \fBuname\fR \fB-n\fR	The host name.
-		For example, \fBmyhost\fR.
-\fBKARCH\fR	The output of \fBarch -k\fR or \fBuname -m\fR	T{
-The kernel architecture name or machine hardware name. For example, \fBsun4u\fR.
-T}
-		
-\fBOSNAME\fR	The output of \fBuname\fR \fB-s\fR	The OS name.
-		For example, "SunOS"
-\fBOSREL\fR	The output of \fBuname\fR \fB-r\fR	The OS release name.
-		For example "5.3"
-\fBOSVERS\fR	The output of \fBuname\fR \fB-v\fR	The OS version.
-		For example, "beta1.0"
-\fBNATISA\fR	The output of \fBisainfo\fR \fB-n\fR	T{
-The native instruction set architecture for the system.
-T}
-		For example, "sparcv9"
-\fBPLATFORM\fR	The output of \fBuname -i\fR	T{
-The platform name. For example,  \fBSUNW,Sun-Fire-V240\fR.
-T}
-		
-.TE
-
-.LP
+.Ss Variable Substitution
+Client specific variables can be used within an
+.Nm
+map. For instance, if
+.Sy $HOST
+appeared within a map,
+.Nm
+would expand it to its current value for the client's host name. Supported
+variables are:
+.Bl -column "PLATFORM" "arch -k or uname -m"
+.It Sy NAME Ta Sy OUTPUT OF Ta Sy DESCRIPTION (EXAMPLE)
+.It Ev ARCH
+.Ta Nm arch
+.Ta architecture name
+.Pq Qq Sy sun4
+.It Ev CPU
+.Ta Nm uname Fl p
+.Ta processor type
+.Pq Qq Sy sparc
+.It Ev HOST
+.Ta Nm uname Fl n
+.Ta host name
+.Pq Qq Sy myhost
+.It Ev KARCH
+.Ta Nm arch Fl k No or Nm uname Fl m
+.Ta kernel architecture name or machine hardware name
+.Pq Qq Sy sun4u
+.It Ev OSNAME
+.Ta Nm uname Fl s
+.Ta OS name
+.Pq Qq Sy SunOS
+.It Ev OSREL
+.Ta Nm name Fl r
+.Ta OS release name
+.Pq Qq Sy 5.3
+.It Ev OSVERS
+.Ta Nm uname Fl v
+.Ta OS version
+.Pq Qq Sy beta1.0
+.It Ev NATISA
+.Ta Nm isainfo Fl n
+.Ta native instruction set architecture for the system
+.Pq Qq Sy sparcv9
+.It Ev PLATFORM
+.Ta Nm uname Fl i
+.Ta platform name
+.Pq Qq Sy SUNW,Sun-Fire-V240
+.El
+.Pp
 If a reference needs to be protected from affixed characters, you can surround
-the variable name with curly braces (\fB\|{\|}\|\fR).
-.SS "Multiple Mounts"
-.LP
+the variable name with curly braces
+.Pq Qq Sy \(lC Ns Sy \(rC .
+.Ss Multiple Mounts
 A multiple mount entry takes the form:
-.sp
-.in +2
-.nf
-key [\fI-mount-options\fR] [\|[\fImountpoint\fR] [\fI-mount-options\fR] \fIlocation\fR.\|.\|.\|]\|.\|.\|.
-.fi
-.in -2
-.sp
-
-.LP
-The initial \fB/\fR[\fImountpoint\fR\|] is optional for the first mount and
-mandatory for all subsequent mounts. The optional \fImountpoint\fR is taken as
-a pathname relative to the directory named by \fBkey\fR. If \fImountpoint\fR is
-omitted in the first occurrence, a \fImountpoint\fR of \fB/\fR (root) is
-implied.
-.LP
-Given an entry in the indirect map for \fB/src\fR
-.sp
-.in +2
-.nf
-beta     -ro\e
-  /           svr1,svr2:/export/src/beta  \e
-  /1.0        svr1,svr2:/export/src/beta/1.0  \e
-  /1.0/man    svr1,svr2:/export/src/beta/1.0/man
-.fi
-.in -2
-.sp
-
-.LP
-All offsets must exist on the server under \fBbeta\fR. \fBautomount\fR will
-automatically mount \fB/src/beta\fR, \fB/src/beta/1.0\fR, and
-\fB/src/beta/1.0/man\fR, as needed, from either \fBsvr1\fR or \fBsvr2\fR,
+.Bd -literal -offset indent
+.Ar key Oo Fl Ns Ar mount-options Oc Oo Oo Ar mountpoint Oc
+.Oo Fl Ns Ar mount-options Oc  Ar location Ns ... Oc Ns ...
+.Ed
+.Pp
+The initial
+.Ar mountpoint
+is optional for the first mount and mandatory for all subsequent mounts. The
+optional
+.Ar mountpoint
+is taken as a pathname relative to the directory named by
+.Ar key .
+If
+.Ar mountpoint
+is omitted in the first occurrence, a
+.Ar mountpoint
+of
+.Pa /
+.Pq root
+is implied.
+.Pp
+Given an entry in the indirect map for
+.Pa /src :
+.Bd -literal -offset indent
+beta	-ro \e
+	/		svr1,svr2:/export/src/beta  \e
+	/1.0		svr1,svr2:/export/src/beta/1.0 \e
+	/1.0/man	svr1,svr2:/export/src/beta/1.0/man
+.Ed
+.Pp
+All offsets must exist on the server under
+.Sy beta .
+.Nm
+will automatically mount
+.Pa /src/beta ,
+.Pa /src/beta/1.0 ,
+and
+.Pa /src/beta/1.0/man ,
+as needed, from either
+.Sy svr1
+or
+.Sy svr2 ,
 whichever host is nearest and responds first.
-.SS "Other File System Types"
-.LP
-The automounter assumes \fBNFS\fR mounts as a default file system type. Other
-file system types can be described using the \fBfstype\fR mount option. Other
-mount options specific to this file system type can be combined with the
-\fBfstype\fR option. The location field must contain information specific to
-the file system type. If the location field begins with a slash, a colon
-character must be prepended, for instance, to mount a CD file system:
-.sp
-.in +2
-.nf
-\fBcdrom -fstype=hsfs,ro   :\|/dev/sr0\fR
-.fi
-.in -2
-.sp
-
-.LP
-or to perform an \fBautofs\fR mount:
-.sp
-.in +2
-.nf
-\fBsrc\fR \fB-fstype\fR\fB=autofs    auto_src\fR
-.fi
-.in -2
-.sp
-
-.LP
+.Ss Other File System Types
+The automounter assumes NFS mounts as a default file system type. Other file
+system types can be described using the
+.Sy fstype
+mount option. Other mount options specific to this file system type can be
+combined with the
+.Sy fstype
+option. The location field must contain information specific to the file system
+type. If the location field begins with a slash, a colon character must be
+prepended, for instance, to mount a CD file system:
+.Bd -literal -offset indent
+cdrom	-fstype=hsfs,ro	:/dev/sr0
+.Ed
+.Pp
+or to perform an
+.Nm autofs
+mount:
+.Bd -literal -offset indent
+src	-fstype=autofs	auto_src
+.Ed
+.Pp
 Use this procedure only if you are not using Volume Manager.
-.LP
-See the  \fBNOTES\fR section for information on option inheritance.
-.SS "Indirect Maps"
-.LP
+.Pp
+See the
+.Sx NOTES
+section for information on option inheritance.
+.Ss Indirect Maps
 An indirect map allows you to specify mappings for the subdirectories you wish
-to mount under the \fBdirectory\fR indicated on the command line. In an
-indirect map, each \fBkey\fR consists of a simple name that refers to one or
-more file systems that are to be mounted as needed.
-.SS "Direct Maps"
-.LP
-Entries in a direct map are associated directly with \fBautofs\fR mount points.
-Each \fIkey\fR is the full pathname of an \fBautofs\fR mount point. The direct
-map as a whole is not associated with any single directory.
-.LP
-Direct maps are distinguished from indirect maps by the \fB/-\fR key. For
-example:
-.sp
-.in +2
-.nf
+to mount under the
+.Ar directory
+indicated on the command line. In an indirect map, each
+.Ar key
+consists of a simple name that refers to one or more file systems that are to be
+mounted as needed.
+.Ss Direct Maps
+Entries in a direct map are associated directly with
+.Nm autofs
+mount points. Each
+.Ar key
+is the full pathname of an
+.Nm autofs
+mount point. The direct map as a whole is not associated with any single
+directory.
+.Pp
+Direct maps are distinguished from indirect maps by the
+.Sy \-
+key. For example:
+.Bd -literal -offset indent
 # Master map for automounter
 #
 +auto_master
-/net            -hosts          -nosuid,nobrowse
-/home           auto_home       -nobrowse
-/-              auto_direct
-.fi
-.in -2
-.sp
-
-.SS "Included Maps"
-.LP
+/net	-hosts		-nosuid,nobrowse
+/home	auto_home	-nobrowse
+/-	auto_direct
+.Ed
+.Ss Included Maps
 The contents of another map can be included within a map with an entry of the
 form
-.sp
-.in +2
-.nf
-+\fImapname\fR
-.fi
-.in -2
-.sp
-
-.LP
-If \fImapname\fR begins with a slash, it is assumed to be the pathname of a
-local file. Otherwise, the location of the map is determined by the policy of
-the name service switch according to the entry for the automounter in
-\fB/etc/nsswitch.conf\fR, such as
-.sp
-.in +2
-.nf
+.Bd -literal -offset indent
+.No + Ns Ar mapname
+.Ed
+.Pp
+If
+.Ar mapname
+begins with a slash, it is assumed to be the pathname of a local file.
+Otherwise, the location of the map is determined by the policy of the name
+service switch according to the entry for the automounter in
+.Pa /etc/nsswitch.conf ,
+such as
+.Bd -literal -offset indent
 automount: files nis
-.fi
-.in -2
-.sp
-
-.LP
-If the name service is \fBfiles\fR, then the name is assumed to be that of a
-local file in \fB/etc\fR. If the key being searched for is not found in the
-included map, the search continues with the next entry.
-.SS "Special Maps"
-.LP
-There are two special maps available: \fB-hosts\fR and \fB-null\fR. The
-\fB-hosts\fR map is used with the \fB/net\fR directory and assumes that the map
-key is the hostname of an \fBNFS\fR server. The \fBautomountd\fR daemon
-dynamically constructs a map entry from the server's list of exported file
-systems. References to a directory under \fB/net/hermes\fR will refer to the
-corresponding directory relative to \fBhermes\fR root.
-.LP
-The \fB-null\fR map cancels a previous map for the directory indicated. This is
-most useful in the \fB/etc/auto_master\fR for cancelling entries that would
-otherwise be inherited from the \fB+auto_master\fR include entry. To be
-effective, the \fB-null\fR entries must be inserted before the included map
-entry.
-.SS "Executable Maps"
-.LP
+.Ed
+.Pp
+If the name service is
+.Sy files ,
+then the name is assumed to be that of a local file in
+.Pa /etc .
+If the key being searched for is not found in the included map, the search
+continues with the next entry.
+.Ss Special Maps
+There are two special maps available:
+.Sy -hosts
+and
+.Sy -null .
+The
+.Sy -hosts
+map is used with the
+.Pa /net
+directory and assumes that the map key is the hostname of an NFS server. The
+.Nm automountd
+daemon dynamically constructs a map entry from the server's list of exported
+file systems. References to a directory under
+.Pa /net/hermes
+will refer to the corresponding directory relative to
+.Sy hermes
+root.
+.Pp
+The
+.Sy -null
+map cancels a previous map for the directory indicated. This is most useful in
+the
+.Pa /etc/auto_master
+for cancelling entries that would otherwise be inherited from the
+.Sy +auto_master
+include entry. To be effective, the
+.Sy -null
+entries must be inserted before the included map entry.
+.Ss Executable Maps
 Local maps that have the execute bit set in their file permissions will be
 executed by the automounter and provided with a key to be looked up as an
 argument. The executable map is expected to return the content of an
 automounter map entry on its stdout or no output if the entry cannot be
 determined. A direct map cannot be made executable.
-.SS "Configuration and the auto_master Map"
-.LP
-When initiated without arguments, \fBautomount\fR consults the master map for a
-list of \fBautofs\fR mount points and their maps. It mounts any \fBautofs\fR
-mounts that are not already mounted, and unmounts \fBautofs\fR mounts that have
-been removed from the master map or direct map.
-.LP
-The master map is assumed to be called \fBauto_master\fR and its location is
-determined by the name service switch policy. Normally the master map is
-located initially as a local file \fB/etc/auto_master\fR.
-.SS "Browsing"
-.LP
-The \fBautomount\fR daemon supports browsability of indirect maps. This allows
-all of the potential mount points to be visible, whether or not they are
-mounted. The \fB-nobrowse\fR option can be added to any indirect \fBautofs\fR
+.Ss Configuration and the auto_master Map
+When initiated without arguments,
+.Nm
+consults the master map for a list of
+.Nm autofs
+mount points and their maps. It mounts any
+.Nm autofs
+mounts that are not already mounted, and unmounts
+.Nm autofs
+mounts that have been removed from the master map or direct map.
+.Pp
+The master map is assumed to be called
+.Sy auto_master
+and its location is determined by the name service switch policy. Normally the
+master map is located initially as a local file
+.Pa /etc/auto_master .
+.Ss Browsing
+The
+.Nm automountd
+daemon supports browsability of indirect maps. This allows all of the potential
+mount points to be visible, whether or not they are mounted. The
+.Sy -nobrowse
+option can be added to any indirect
+.Nm autofs
 map to disable browsing. For example:
-.sp
-.in +2
-.nf
-/net     -hosts      -nosuid,nobrowse
-/home    auto_home
-.fi
-.in -2
-.sp
-
-.LP
-In this case, any \fIhostnames\fR would only be visible in \fB/net\fR after
-they are mounted, but all potential mount points would be visible under
-\fB/home\fR. The \fB-browse\fR option enables browsability of \fBautofs\fR file
-systems. This is the default for all indirect maps.
-.LP
-The \fB-browse\fR option does not work in conjunction with the wildcard key.
-.SS "Restricting Mount Maps"
-.LP
+.Bd -literal -offset indent
+/net	-hosts		-nosuid,nobrowse
+/home	auto_home
+.Ed
+.Pp
+In this case, any
+.Ar hostname Ns s
+would only be visible in
+.Pa /net
+after they are mounted, but all potential mount points would be visible under
+.Pa /home .
+The
+.Sy -browse
+option enables browsability of
+.Nm autofs
+file systems. This is the default for all indirect maps.
+.Pp
+The
+.Sy -browse
+option does not work in conjunction with the wildcard key.
+.Ss Restricting Mount Maps
 Options specified for a map are used as the default options for all the entries
 in that map. They are ignored when map entries specify their own mount options.
-.LP
-In some cases, however, it is desirable to force \fBnosuid\fR, \fBnodevices\fR,
-\fBnosetuid\fR, or \fBnoexec\fR for a complete mount map and its submounts.
-This can be done by specifying the additional mount option, \fB-restrict\fR.
-.sp
-.in +2
-.nf
- /home     auto_home       -restrict,nosuid,hard
-.fi
-.in -2
-.sp
-
-.LP
-The \fB-restrict\fR option forces the inheritance of all the restrictive
-options \fBnosuid\fR, \fBnodevices\fR, \fBnosetuid\fR, and \fBnoexec\fR as well
-as the restrict option itself. In this particular example, the \fBnosuid\fR and
-\fBrestrict\fR option are inherited but the \fBhard\fR option is not. The
-\fBrestrict\fR option also prevents the execution of "executable maps" and is
-enforced for auto mounts established by programs with fewer than all privileges
-available in their zone.
-.SH EXIT STATUS
-.LP
-The following exit values are returned:
-.sp
-.ne 2
-.na
-\fB\fB0\fR\fR
-.ad
-.RS 5n
-Successful completion.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB1\fR\fR
-.ad
-.RS 5n
-An error occurred.
-.RE
-
-.SH FILES
-.ne 2
-.na
-\fB\fB/etc/auto_master\fR\fR
-.ad
-.RS 23n
+.Pp
+In some cases, however, it is desirable to force
+.Sy nosuid , nodevices , nosetuid ,
+or
+.Sy noexec
+for a complete mount map and its submounts. This can be done by specifying the
+additional mount option,
+.Sy -restrict .
+.Bd -literal -offset indent
+/home	auto_home	-restrict,nosuid,hard
+.Ed
+.Pp
+The
+.Sy -restrict
+option forces the inheritance of all the restrictive options
+.Sy nosuid , nodevices , nosetuid ,
+and
+.Sy noexec
+as well as the restrict option itself. In this particular example, the
+.Sy nosuid
+and
+.Sy restrict
+option are inherited but the
+.Sy hard
+option is not. The
+.Sy restrict
+option also prevents the execution of
+.Qq executable maps
+and is enforced for auto mounts established by programs with fewer than all
+privileges available in their zone.
+.Sh FILES
+.Bl -tag -width Ds
+.It Pa /etc/auto_master
 Master automount map.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/etc/auto_home\fR\fR
-.ad
-.RS 23n
+.It Pa /etc/auto_home
 Map to support automounted home directories.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/etc/default/autofs\fR\fR
-.ad
-.RS 23n
-Supplies default values for parameters for \fBautomount\fR and
-\fBautomountd\fR. See \fBautofs\fR(4).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/etc/nsswitch.conf\fR\fR
-.ad
-.RS 23n
-Name service switch configuration file. See \fBnsswitch.conf\fR(4).
-.RE
-
-.SH SEE ALSO
-.LP
-\fBisainfo\fR(1), \fBls\fR(1), \fBsvcs\fR(1), \fBuname\fR(1),
-\fBautomountd\fR(1M), \fBmount\fR(1M), \fBmount_nfs\fR(1M),
-\fBsvcadm\fR(1M), \fBautofs\fR(4), \fBattributes\fR(5),
-\fBnfssec\fR(5), \fBsmf\fR(5)
-.LP
-\fI\fR
-.SH NOTES
-.LP
-\fBautofs\fR mount points must not be hierarchically related. \fBautomount\fR
-does not allow an \fBautofs\fR mount point to be created within another
-\fBautofs\fR mount.
-.LP
-Since each direct map entry results in a new \fBautofs\fR mount such maps
-should be kept short.
-.LP
-Entries in both direct and indirect maps can be modified at any time. The new
-information is used when \fBautomountd\fR next uses the map entry to do a
+.It Pa /etc/nsswitch.conf
+Name service switch configuration file. See
+.Xr nsswitch.conf 4 .
+.El
+.Sh EXIT STATUS
+.Ex -std
+.Sh SEE ALSO
+.Xr isainfo 1 ,
+.Xr ls 1 ,
+.Xr svcs 1 ,
+.Xr uname 1 ,
+.Xr automountd 1M ,
+.Xr mount 1M ,
+.Xr mount_nfs 1M ,
+.Xr svcadm 1M ,
+.Xr autofs 4 ,
+.Xr attributes 5 ,
+.Xr nfssec 5 ,
+.Xr smf 5
+.Sh NOTES
+.Nm autofs
+mount points must not be hierarchically related.
+.Nm
+does not allow an
+.Nm autofs
+mount point to be created within another
+.Nm autofs
 mount.
-.LP
+.Pp
+Since each direct map entry results in a new
+.Nm autofs
+mount such maps should be kept short.
+.Pp
+Entries in both direct and indirect maps can be modified at any time. The new
+information is used when
+.Nm automountd
+next uses the map entry to do a mount.
+.Pp
 New entries added to a master map or direct map will not be useful until the
-automount command is run to install them as new \fBautofs\fR mount points. New
-entries added to an indirect map may be used immediately.
-.LP
-As of the Solaris 2.6 release, a listing (see \fBls\fR(1)) of the \fBautofs\fR
+automount command is run to install them as new
+.Nm autofs
+mount points. New entries added to an indirect map may be used immediately.
+.Pp
+As of the Solaris 2.6 release, a listing
+.Po see
+.Xr ls 1
+.Pc
+of the
+.Nm autofs
 directory associated with an indirect map shows all potential mountable
 entries. The attributes associated with the potential mountable entries are
 temporary. The real file system attributes will only be shown once the file
 system has been mounted.
-.LP
+.Pp
 Default mount options can be assigned to an entire map when specified as an
 optional third field in the master map. These options apply only to map entries
 that have no mount options. Note that map entities with options override the
 default options, as at this time, the options do not concatenate. The
 concatenation feature is planned for a future release.
-.LP
+.Pp
 When operating on a map that invokes an NFS mount, the default number of
 retries for the automounter is 0, that is, a single mount attempt, with no
-retries. Note that this is significantly different from the default (10000) for
-the \fBmount_nfs\fR(1M) utility.
-.LP
-The Network Information Service (NIS) was formerly known as Sun Yellow Pages
-(YP). The functionality of the two remains the same.
-.LP
-The \fBautomount\fR service is managed by the service management facility,
-\fBsmf\fR(5), under the service identifier:
-.sp
-.in +2
-.nf
+retries. Note that this is significantly different from the default
+.Pq 10000
+for the
+.Xr mount_nfs 1M
+utility.
+.Pp
+The Network Information Service
+.Pq NIS
+was formerly known as Sun Yellow Pages
+.Pq YP .
+The functionality of the two remains the same.
+.Pp
+The
+.Nm
+service is managed by the service management facility,
+.Xr smf 5 ,
+under the service identifier:
+.Bd -literal -offset indent
 svc:/system/filesystem/autofs:default
-.fi
-.in -2
-.sp
-
-.LP
+.Ed
+.Pp
 Administrative actions on this service, such as enabling, disabling, or
-requesting restart, can be performed using \fBsvcadm\fR(1M). The service's
-status can be queried using the \fBsvcs\fR(1) command.
+requesting restart, can be performed using
+.Xr svcadm 1M .
+The service's status can be queried using the
+.Xr svcs 1
+command.
