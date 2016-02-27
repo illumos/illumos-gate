@@ -1132,6 +1132,7 @@ MANLINKS=	SIZEOF_PTR.9f				\
 	 	sema_tryp.9f				\
 	 	sema_v.9f				\
 	 	strcasecmp.9f				\
+	 	strcat.9f				\
 	 	strchr.9f				\
 	 	strcmp.9f				\
 	 	strcpy.9f				\
@@ -1952,6 +1953,7 @@ numtos.9f				:= LINKSRC = stoi.9f
 
 ddi_strdup.9f				:= LINKSRC = string.9f
 strcasecmp.9f				:= LINKSRC = string.9f
+strcat.9f				:= LINKSRC = string.9f
 strchr.9f				:= LINKSRC = string.9f
 strcmp.9f				:= LINKSRC = string.9f
 strcpy.9f				:= LINKSRC = string.9f

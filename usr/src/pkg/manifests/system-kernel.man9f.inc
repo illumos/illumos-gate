@@ -1227,6 +1227,7 @@ link path=usr/share/man/man9f/sema_p_sig.9f target=semaphore.9f
 link path=usr/share/man/man9f/sema_tryp.9f target=semaphore.9f
 link path=usr/share/man/man9f/sema_v.9f target=semaphore.9f
 link path=usr/share/man/man9f/strcasecmp.9f target=string.9f
+link path=usr/share/man/man9f/strcat.9f target=string.9f
 link path=usr/share/man/man9f/strchr.9f target=string.9f
 link path=usr/share/man/man9f/strcmp.9f target=string.9f
 link path=usr/share/man/man9f/strcpy.9f target=string.9f
