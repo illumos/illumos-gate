@@ -1210,6 +1210,7 @@ MANLINKS=	FD_CLR.3c				\
 	 	thr_setconcurrency.3c			\
 	 	thr_setprio.3c				\
 	 	thr_setspecific.3c			\
+		timegm.3c				\
 	 	timer_getoverrun.3c			\
 	 	timer_gettime.3c			\
 	 	timerclear.3c				\
@@ -2246,6 +2247,8 @@ thr_keycreate_once.3c			:= LINKSRC = thr_keycreate.3c
 thr_setspecific.3c			:= LINKSRC = thr_keycreate.3c
 
 thr_continue.3c				:= LINKSRC = thr_suspend.3c
+
+timegm.3c				:= LINKSRC = mktime.3c
 
 timer_getoverrun.3c			:= LINKSRC = timer_settime.3c
 timer_gettime.3c			:= LINKSRC = timer_settime.3c
