@@ -222,7 +222,7 @@ beCopy(PyObject *self, PyObject *args)
 		    NULL, NULL));
 	}
 
-	if (beProps != NULL) nvlist_free(beProps);
+	nvlist_free(beProps);
 
 	if (trgtBeName == NULL) {
 		/*

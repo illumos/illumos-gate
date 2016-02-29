@@ -1701,8 +1701,7 @@ fme_receive_report(fmd_hdl_t *hdl, fmd_event_t *ffep,
 			ipath_print(O_ALTFP|O_NONL, eventstring, ipp);
 			out(O_ALTFP, " explained by FME%d]", fmep->id);
 
-			if (pre_peek_nvp)
-				nvlist_free(pre_peek_nvp);
+			nvlist_free(pre_peek_nvp);
 
 			if (ep->count == 1)
 				serialize_observation(fmep, eventstring, ipp);
@@ -2028,16 +2027,14 @@ node2fmri(struct node *n)
 	err = nvlist_add_nvlist_array(f, FM_FMRI_HC_LIST, pa, depth);
 	if (err == 0) {
 		for (i = 0; i < depth; i++)
-			if (pa[i] != NULL)
-				nvlist_free(pa[i]);
+			nvlist_free(pa[i]);
 		return (f);
 	}
 	failure = "addition of hc-pair array to FMRI failed";
 
 boom:
 	for (i = 0; i < depth; i++)
-		if (pa[i] != NULL)
-			nvlist_free(pa[i]);
+		nvlist_free(pa[i]);
 	nvlist_free(f);
 	out(O_DIE, "%s", failure);
 	/*NOTREACHED*/
@@ -2101,16 +2098,14 @@ ipath2fmri(struct ipath *ipath)
 	err = nvlist_add_nvlist_array(f, FM_FMRI_HC_LIST, pa, depth);
 	if (err == 0) {
 		for (i = 0; i < depth; i++)
-			if (pa[i] != NULL)
-				nvlist_free(pa[i]);
+			nvlist_free(pa[i]);
 		return (f);
 	}
 	failure = "addition of hc-pair array to FMRI failed";
 
 boom:
 	for (i = 0; i < depth; i++)
-		if (pa[i] != NULL)
-			nvlist_free(pa[i]);
+		nvlist_free(pa[i]);
 	nvlist_free(f);
 	out(O_DIE, "%s", failure);
 	/*NOTREACHED*/
@@ -2141,11 +2136,9 @@ static void publish_suspects(struct fme *fmep, struct rsl *srl);
 static void
 rslfree(struct rsl *freeme)
 {
-	if (freeme->asru != NULL)
-		nvlist_free(freeme->asru);
-	if (freeme->fru != NULL)
-		nvlist_free(freeme->fru);
-	if (freeme->rsrc != NULL && freeme->rsrc != freeme->asru)
+	nvlist_free(freeme->asru);
+	nvlist_free(freeme->fru);
+	if (freeme->rsrc != freeme->asru)
 		nvlist_free(freeme->rsrc);
 }
 

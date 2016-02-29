@@ -1322,8 +1322,7 @@ fmd_case_destroy_suspects(fmd_case_impl_t *cip)
 	if (cip->ci_proxy_asru)
 		fmd_free(cip->ci_proxy_asru, sizeof (uint8_t) *
 		    cip->ci_nsuspects);
-	if (cip->ci_diag_de)
-		nvlist_free(cip->ci_diag_de);
+	nvlist_free(cip->ci_diag_de);
 	if (cip->ci_diag_asru)
 		fmd_free(cip->ci_diag_asru, sizeof (uint8_t) *
 		    cip->ci_nsuspects);
@@ -2431,8 +2430,7 @@ fmd_case_set_de_fmri(fmd_case_t *cp, nvlist_t *nvl)
 {
 	fmd_case_impl_t *cip = (fmd_case_impl_t *)cp;
 
-	if (cip->ci_diag_de)
-		nvlist_free(cip->ci_diag_de);
+	nvlist_free(cip->ci_diag_de);
 	cip->ci_diag_de = nvl;
 }
 

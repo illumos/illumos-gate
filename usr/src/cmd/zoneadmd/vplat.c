@@ -3445,8 +3445,7 @@ out:
 	zonecfg_free_rctl_value_list(rctltab.zone_rctl_valptr);
 	if (error && nvl_packed != NULL)
 		free(nvl_packed);
-	if (nvl != NULL)
-		nvlist_free(nvl);
+	nvlist_free(nvl);
 	if (nvlv != NULL)
 		free(nvlv);
 	return (error);

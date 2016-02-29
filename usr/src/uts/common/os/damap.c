@@ -1110,12 +1110,10 @@ dam_deact_cleanup(dam_t *mapp, id_t addrid, char *addrstr,
 	mutex_enter(&mapp->dam_lock);
 	bitset_del(&mapp->dam_active_set, addrid);
 	passp->da_ppriv = NULL;
-	if (passp->da_nvl)
-		nvlist_free(passp->da_nvl);
+	nvlist_free(passp->da_nvl);
 	passp->da_nvl = NULL;
 	passp->da_ppriv_rpt = NULL;
-	if (passp->da_nvl_rpt)
-		nvlist_free(passp->da_nvl_rpt);
+	nvlist_free(passp->da_nvl_rpt);
 	passp->da_nvl_rpt = NULL;
 
 	DTRACE_PROBE3(damap__addr__deactivate__end,
@@ -1658,8 +1656,7 @@ dam_addr_report_release(dam_t *mapp, id_t addrid)
 		mutex_enter(&mapp->dam_lock);
 	}
 	passp->da_ppriv_rpt = NULL;
-	if (passp->da_nvl_rpt)
-		nvlist_free(passp->da_nvl_rpt);
+	nvlist_free(passp->da_nvl_rpt);
 }
 
 /*

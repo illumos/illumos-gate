@@ -4472,8 +4472,7 @@ failed:
 	    "sysevent posting failed: %s", vrrp_state2str(prev_st),
 	    vrrp_state2str(st), strerror(errno));
 
-	if (nvl != NULL)
-		nvlist_free(nvl);
+	nvlist_free(nvl);
 	return (-1);
 }
 

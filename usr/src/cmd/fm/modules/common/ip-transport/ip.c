@@ -1056,8 +1056,7 @@ _fmd_fini(fmd_hdl_t *hdl)
 	while (ip_xps != NULL)
 		ip_xprt_destroy(ip_xps);
 
-	if (ip_auth != NULL)
-		nvlist_free(ip_auth);
+	nvlist_free(ip_auth);
 
 	ip_addr_cleanup();
 

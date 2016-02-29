@@ -199,8 +199,7 @@ gmem_gen_datapath_fault(fmd_hdl_t *hdl, nvlist_t *det)
 
 	if (nvlist_alloc(&rsrc,  NV_UNIQUE_NAME|NV_UNIQUE_NAME_TYPE, 0) != 0) {
 		for (i = 0; i < n; i++) {
-			if (hcl[i] != NULL)
-				nvlist_free(hcl[i]);
+			nvlist_free(hcl[i]);
 		}
 		fmd_hdl_free(hdl, hcl, sizeof (nvlist_t *) * n);
 	}
@@ -211,8 +210,7 @@ gmem_gen_datapath_fault(fmd_hdl_t *hdl, nvlist_t *det)
 	    nvlist_add_uint32(rsrc, FM_FMRI_HC_LIST_SZ, n) != 0 ||
 	    nvlist_add_nvlist_array(rsrc, FM_FMRI_HC_LIST, hcl, n) != 0) {
 		for (i = 0; i < n; i++) {
-			if (hcl[i] != NULL)
-				nvlist_free(hcl[i]);
+			nvlist_free(hcl[i]);
 		}
 		fmd_hdl_free(hdl, hcl, sizeof (nvlist_t *) * n);
 		nvlist_free(rsrc);
@@ -229,8 +227,7 @@ gmem_gen_datapath_fault(fmd_hdl_t *hdl, nvlist_t *det)
 	}
 
 	for (i = 0; i < n; i++) {
-		if (hcl[i] != NULL)
-			nvlist_free(hcl[i]);
+		nvlist_free(hcl[i]);
 	}
 
 	fmd_hdl_free(hdl, hcl, sizeof (nvlist_t *) * n);
@@ -399,8 +396,7 @@ ce_thresh_check(fmd_hdl_t *hdl, gmem_dimm_t *dimm)
 		    GMEM_FLTMAXCONF, NULL, gmem_dimm_fru(dimm), rsrc);
 		fmd_case_add_suspect(hdl, cp, flt);
 		fmd_case_solve(hdl, cp);
-		if (rsrc != NULL)
-			nvlist_free(rsrc);
+		nvlist_free(rsrc);
 	}
 }
 
@@ -435,8 +431,7 @@ mq_5b_check(fmd_hdl_t *hdl, gmem_dimm_t *dimm)
 				gmem_dimm_dirty(hdl, dimm);
 				fmd_case_add_suspect(hdl, cp, flt);
 				fmd_case_solve(hdl, cp);
-				if (rsrc != NULL)
-					nvlist_free(rsrc);
+				nvlist_free(rsrc);
 				return;
 			}
 		}
@@ -705,8 +700,7 @@ mq_check(fmd_hdl_t *hdl, gmem_dimm_t *dimm)
 			gmem_dimm_dirty(hdl, dimm);
 			fmd_case_add_suspect(hdl, dimm->dimm_case.cc_cp, flt);
 			fmd_case_solve(hdl, dimm->dimm_case.cc_cp);
-			if (rsc != NULL)
-				nvlist_free(rsc);
+			nvlist_free(rsc);
 			return;
 		}
 		upos_pairs = i;

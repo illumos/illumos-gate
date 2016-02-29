@@ -271,8 +271,7 @@ gmem_page_unusable(fmd_hdl_t *hdl, gmem_page_t *page)
 		return (1);
 	}
 
-	if (asru != NULL)
-		nvlist_free(asru);
+	nvlist_free(asru);
 
 	return (0);
 }
@@ -326,8 +325,7 @@ gmem_page_fault(fmd_hdl_t *hdl, nvlist_t *fru, nvlist_t *rsc,
 	if (page != NULL) {
 		if (page->page_flags & GMEM_F_FAULTING ||
 		    gmem_page_unusable(hdl, page)) {
-			if (rsc != NULL)
-				nvlist_free(rsc);
+			nvlist_free(rsc);
 			page->page_flags |= GMEM_F_FAULTING;
 			return (0);
 		}
@@ -345,8 +343,7 @@ gmem_page_fault(fmd_hdl_t *hdl, nvlist_t *fru, nvlist_t *rsc,
 		(void) nvlist_add_nvlist(rsc, FM_FMRI_HC_SPECIFIC, hsp);
 
 	flt = fmd_nvl_create_fault(hdl, GMEM_FAULT_PAGE, 100, NULL, fru, rsc);
-	if (rsc != NULL)
-		nvlist_free(rsc);
+	nvlist_free(rsc);
 
 	if (nvlist_add_boolean_value(flt, FM_SUSPECT_MESSAGE, B_FALSE) != 0)
 		fmd_hdl_abort(hdl, "failed to add no-message member to fault");

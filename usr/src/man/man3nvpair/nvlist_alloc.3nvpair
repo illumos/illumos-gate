@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH NVLIST_ALLOC 3NVPAIR "Feb 2, 2004"
+.TH NVLIST_ALLOC 3NVPAIR "Feb 15, 2016"
 .SH NAME
 nvlist_alloc, nvlist_free, nvlist_size, nvlist_pack, nvlist_unpack, nvlist_dup,
 nvlist_merge, nvlist_xalloc, nvlist_xpack, nvlist_xunpack, nvlist_xdup,
@@ -96,7 +96,6 @@ a name-value pair list
 .fi
 
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fInvlp\fR\fR
@@ -226,7 +225,6 @@ A pointer to an \fBnv_alloc_t\fR structure to be used for the specified
 
 .SH DESCRIPTION
 .SS "List Manipulation"
-.sp
 .LP
 The \fBnvlist_alloc()\fR function allocates a new name-value pair list and
 updates \fInvlp\fR to point to the handle. The \fInvflag\fR argument specifies
@@ -243,7 +241,8 @@ that \fBnvlist_xalloc()\fR can use a different allocator, as described in the
 Pluggable Allocators section.
 .sp
 .LP
-The \fBnvlist_free()\fR function frees a name-value pair list.
+The \fBnvlist_free()\fR function frees a name-value pair list. If \fInvl\fR
+is a null pointer, no action occurs.
 .sp
 .LP
 The \fBnvlist_size()\fR function returns the minimum size of a contiguous
@@ -322,7 +321,6 @@ The \fBnvlist_lookup_nv_alloc()\fR function retrieves the pointer to the
 allocator that was used when manipulating a name-value pair list.
 .SS "Pluggable Allocators"
 .SS "Using Pluggable Allocators"
-.sp
 .LP
 The \fBnv_alloc_init()\fR, \fBnv_alloc_reset()\fR and \fBnv_alloc_fini()\fR
 functions provide an interface to specify the allocator to be used when
@@ -367,7 +365,6 @@ kernel use and is described on \fBnvlist_alloc\fR(9F).
 An example program that uses the pluggable allocator functionality is provided
 on \fBnvlist_alloc\fR(9F).
 .SS "Creating Pluggable Allocators"
-.sp
 .LP
 Any producer of name-value pairs can specify its own allocator functions. The
 application must provide the following pluggable allocator operations:
@@ -416,14 +413,12 @@ argument \fIsz\fR must exactly match the original allocation.
 The disposition of the allocated objects and the memory used to store them is
 left to the allocator implementation.
 .SH RETURN VALUES
-.sp
 .LP
 These functions return 0 on success and an error value on failure.
 .sp
 .LP
 The \fBnvlist_lookup_nv_alloc()\fR function returns a pointer to an allocator.
 .SH ERRORS
-.sp
 .LP
 These functions will fail if:
 .sp
@@ -473,7 +468,6 @@ An encode/decode method is not supported.
 .RE
 
 .SH EXAMPLES
-.sp
 .in +2
 .nf
 /*
@@ -574,7 +568,6 @@ main(int argc, char *argv[])
 .in -2
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -592,6 +585,5 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBlibnvpair\fR(3LIB), \fBattributes\fR(5), \fBnvlist_alloc\fR(9F)

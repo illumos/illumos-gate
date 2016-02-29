@@ -365,8 +365,7 @@ print_prop_nameval(topo_hdl_t *thp, tnode_t *node, nvlist_t *nvl)
 			}
 uint32_def:
 			(void) printf(" 0x%x", val);
-			if (rsrc != NULL)
-				nvlist_free(rsrc);
+			nvlist_free(rsrc);
 			break;
 		}
 		case DATA_TYPE_INT64: {

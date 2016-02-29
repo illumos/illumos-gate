@@ -3631,8 +3631,7 @@ picldevtree_evhandler(const char *ename, const void *earg, size_t size,
 	    nvlist_lookup_string(nvlp, PICLEVENTARG_DEVFS_PATH, &devfs_path) ||
 	    strlen(devfs_path) > (PATH_MAX - sizeof (PLATFORM_PATH))) {
 		syslog(LOG_INFO, PICL_EVENT_DROPPED, ename);
-		if (nvlp)
-			nvlist_free(nvlp);
+		nvlist_free(nvlp);
 		return;
 	}
 

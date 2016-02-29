@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * After having been declared, events, FMRIs and authorities must be defined
  * (instantiated) before they can be used as the subjects of commands.
@@ -104,8 +102,7 @@ inj_defn_destroy(inj_defn_t *defn)
 	if (defn->defn_name != NULL)
 		inj_strfree(defn->defn_name);
 
-	if (defn->defn_nvl != NULL)
-		nvlist_free(defn->defn_nvl);
+	nvlist_free(defn->defn_nvl);
 
 	inj_defn_destroy_memlist(inj_list_next(&defn->defn_members));
 }

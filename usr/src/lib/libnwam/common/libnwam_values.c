@@ -380,8 +380,7 @@ nwam_alloc_object_list(void *list)
 void
 nwam_free_object_list(void *list)
 {
-	if (list != NULL)
-		nvlist_free(list);
+	nvlist_free(list);
 }
 
 nwam_error_t

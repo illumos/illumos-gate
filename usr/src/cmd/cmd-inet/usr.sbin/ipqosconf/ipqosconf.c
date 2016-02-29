@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* enable debug output and some debug asserts */
 #undef	_IPQOS_CONF_DEBUG
 
@@ -622,8 +620,7 @@ char *first_action)
 
 	return (IPQOS_CONF_SUCCESS);
 fail:
-	if (nvl != NULL)
-		nvlist_free(nvl);
+	nvlist_free(nvl);
 	return (IPQOS_CONF_ERR);
 }
 
@@ -711,8 +708,7 @@ enum ipp_flags flags)
 
 	return (IPQOS_CONF_SUCCESS);
 fail:
-	if (nvl != NULL)
-		nvlist_free(nvl);
+	nvlist_free(nvl);
 	return (IPQOS_CONF_ERR);
 }
 
@@ -776,8 +772,7 @@ enum ipp_flags flags)
 
 	return (IPQOS_CONF_SUCCESS);
 fail:
-	if (nvl != NULL)
-		nvlist_free(nvl);
+	nvlist_free(nvl);
 	return (IPQOS_CONF_ERR);
 }
 
@@ -6345,8 +6340,7 @@ free_class(ipqos_conf_class_t *cls)
 
 	/* free its nvlist if present */
 
-	if (cls->nvlist)
-		nvlist_free(cls->nvlist);
+	nvlist_free(cls->nvlist);
 
 	/* free its action refs if present */
 
@@ -6790,8 +6784,7 @@ ipqos_conf_act_ref_t *arefs)
 	ipqos_conf_act_ref_t *next;
 
 	while (aref) {
-		if (aref->nvlist)
-			nvlist_free(aref->nvlist);
+		nvlist_free(aref->nvlist);
 		next = aref->next;
 		free(aref);
 		aref = next;
