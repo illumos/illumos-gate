@@ -504,7 +504,7 @@ sc_delsect(sa_handle_t handle, int flags, int argc, char *argv[])
 
 	if ((sa_proto_get_featureset(proto) & SA_FEATURE_HAS_SECTIONS) == 0) {
 		(void) printf(gettext("Protocol %s does not have sections\n"),
-		    section, proto);
+		    proto);
 		return (SA_NOT_SUPPORTED);
 	}
 
