@@ -19,6 +19,7 @@
 # CDDL HEADER END
 #
 #
+# Copyright 2016 Gary Mills
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -77,7 +78,7 @@ $(LINKED_DIRS):	$(USR_PLAT_DIR)
 $(LINKED_LIB_DIRS):	$(LINKED_DIRS)
 	-$(INS.dir)
 
-$(LINKED_PRTDIAG_DIRS):	$(USR_PLAT_DIR)
+$(LINKED_PRTDIAG_DIRS):	$(LINKED_LIB_DIRS)
 	-$(INS.slink6)
 
 #
