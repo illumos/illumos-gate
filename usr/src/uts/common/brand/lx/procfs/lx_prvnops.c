@@ -115,6 +115,8 @@ static int lxpr_realvp(vnode_t *, vnode_t **, caller_context_t *);
 static int lxpr_sync(void);
 static void lxpr_inactive(vnode_t *, cred_t *, caller_context_t *);
 
+static char *lxpr_zv_basename(char *);
+
 static vnode_t *lxpr_lookup_procdir(vnode_t *, char *);
 static vnode_t *lxpr_lookup_piddir(vnode_t *, char *);
 static vnode_t *lxpr_lookup_not_a_dir(vnode_t *, char *);
@@ -1604,18 +1606,44 @@ lxpr_read_pid_mountinfo(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 		if (vfslist == NULL || strcmp(refstr_value(vfsp->vfs_mntpt),
 		    zone->zone_rootpath) != 0) {
 			struct vfs *tvfsp;
+			char *rootdev = NULL;
+			lx_zone_data_t *lxzdata;
+			lxd_zfs_dev_t *zv;
+			char zdev[MAXPATHLEN];
+
 			/*
 			 * The root of the zone is not a mount point.  The vfs
 			 * we want to report is that of the zone's root vnode.
 			 */
 			tvfsp = zone->zone_rootvp->v_vfsp;
 
+			lxzdata = ztolxzd(curproc->p_zone);
+			ASSERT(lxzdata != NULL);
+			ASSERT(lxzdata->lxzd_vdisks != NULL);
+
+			zv = list_head(lxzdata->lxzd_vdisks);
+			while (zv != NULL) {
+				if (zv->lzd_type == LXD_ZFS_DEV_POOL) {
+					(void) snprintf(zdev, sizeof (zdev),
+					    "/dev/%s",
+					    lxpr_zv_basename(zv->lzd_name));
+					rootdev = zdev;
+					break;
+				}
+
+				zv = list_next(lxzdata->lxzd_vdisks, zv);
+			}
+
+			if (rootdev == NULL)
+				rootdev = "/";
+
 			lxpr_uiobuf_printf(uiobuf,
-			    "%d 1 %d:%d / / %s - %s / %s\n",
+			    "%d 1 %d:%d / / %s - %s %s %s\n",
 			    root_id,
 			    major(tvfsp->vfs_dev), minor(vfsp->vfs_dev),
 			    tvfsp->vfs_flag & VFS_RDONLY ? "ro" : "rw",
 			    vfssw[tvfsp->vfs_fstype].vsw_name,
+			    rootdev,
 			    tvfsp->vfs_flag & VFS_RDONLY ? "ro" : "rw");
 
 		}
@@ -1732,8 +1760,9 @@ nextp:
 		mnt_id++;
 	}
 
-	/* Add a single dummy entry for /native */
-	lxpr_uiobuf_printf(uiobuf, "%d %d 0:1 / /native ro - zfs /native ro\n",
+	/* Add a single dummy entry for /native/usr */
+	lxpr_uiobuf_printf(uiobuf,
+	    "%d %d 0:1 / /native/usr ro - zfs /native/usr ro\n",
 	    mnt_id, root_id);
 }
 
@@ -3474,14 +3503,40 @@ lxpr_read_mounts(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 		if (vfslist == NULL || strcmp(refstr_value(vfsp->vfs_mntpt),
 		    zone->zone_rootpath) != 0) {
 			struct vfs *tvfsp;
+			char *rootdev = NULL;
+			lx_zone_data_t *lxzdata;
+			lxd_zfs_dev_t *zv;
+			char zdev[MAXPATHLEN];
+
 			/*
 			 * The root of the zone is not a mount point.  The vfs
 			 * we want to report is that of the zone's root vnode.
 			 */
 			tvfsp = zone->zone_rootvp->v_vfsp;
 
+			lxzdata = ztolxzd(curproc->p_zone);
+			ASSERT(lxzdata != NULL);
+			ASSERT(lxzdata->lxzd_vdisks != NULL);
+
+			zv = list_head(lxzdata->lxzd_vdisks);
+			while (zv != NULL) {
+				if (zv->lzd_type == LXD_ZFS_DEV_POOL) {
+					(void) snprintf(zdev, sizeof (zdev),
+					    "/dev/%s",
+					    lxpr_zv_basename(zv->lzd_name));
+					rootdev = zdev;
+					break;
+				}
+
+				zv = list_next(lxzdata->lxzd_vdisks, zv);
+			}
+
+			if (rootdev == NULL)
+				rootdev = "/";
+
 			lxpr_uiobuf_printf(uiobuf,
-			    "/ / %s %s 0 0\n",
+			    "%s / %s %s 0 0\n",
+			    rootdev,
 			    vfssw[tvfsp->vfs_fstype].vsw_name,
 			    tvfsp->vfs_flag & VFS_RDONLY ? "ro" : "rw");
 
@@ -3586,8 +3641,8 @@ nextp:
 
 	}
 
-	/* Add a single dummy entry for /native */
-	lxpr_uiobuf_printf(uiobuf, "/native /native zfs ro 0 0\n");
+	/* Add a single dummy entry for /native/usr */
+	lxpr_uiobuf_printf(uiobuf, "/native/usr /native/usr zfs ro 0 0\n");
 }
 
 /* zvol basename to flatten namespace */
@@ -3665,7 +3720,7 @@ lxpr_read_diskstats(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
 	kstat_t kn;
 	int num;
-	int zv_min = 0;
+	int zv_min = 1;
 	zone_vfs_kstat_t *kip;
 	int major, minor;
 	size_t size;
@@ -3695,6 +3750,15 @@ lxpr_read_diskstats(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 		kmem_free(kip, size);
 		return;
 	}
+
+	/*
+	 * We make all of the zfs devices look like they are in the unused
+	 * range (see /etc/sysstat/sysstat.ioconf on a Linux distro) so that
+	 * utilities like iostat will simply report our "device" name instead
+	 * of one of the well-known disk types listed in the sysstat.ioconf
+	 * file.
+	 */
+	major = 203;
 
 	/*
 	 * Because the zone vfs stats are tracked at the zone level we use
@@ -3743,18 +3807,12 @@ lxpr_read_diskstats(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 		 */
 
 		if (zv->lzd_type == LXD_ZFS_DEV_POOL) {
-			/* map zfs pools to md[0-9]+ (software RAID) */
-			major = 9;
 			minor = 0;
 		} else {
 			/*
-			 * The zvols are in the unused range (see
-			 * /etc/sysstat/sysstat.ioconf on a Linux distro).
 			 * Use a counter for the fabricated minor number since
-			 * Linux only supports 20 bits for minor numbers, which
-			 * allows for 65k zvols if we want scale by partition.
+			 * Linux only supports 20 bits for minor numbers.
 			 */
-			major = 203;
 			minor = zv_min++;
 		}
 
