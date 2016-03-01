@@ -1154,8 +1154,8 @@ zone_login_cmd(brand_handle_t bh, const char *login)
 }
 
 /*
- * Prepare argv array for exec'd process; if we're passing commands to the
- * new process, then use su(1M) to do the invocation.  Otherwise, use
+ * Prepare argv array for exec'd process.  If commands are passed to the new
+ * process and su(1M) is avalable, use it for the invocation.  Otherwise, use
  * 'login -z <from_zonename> -f' (-z is an undocumented option which tells
  * login that we're coming from another zone, and to disregard its CONSOLE
  * checks).
@@ -1163,143 +1163,146 @@ zone_login_cmd(brand_handle_t bh, const char *login)
 static char **
 prep_args(brand_handle_t bh, char *zonename, const char *login, char **argv)
 {
-	int argc = 0, a = 0, i, n = -1;
-	char **new_argv;
+	int argc = 0, i;
+	size_t subshell_len = 1;
+	char *subshell = NULL, *supath = NULL;
+	char **new_argv = NULL;
 
-	if (argv != NULL) {
-		size_t subshell_len = 1;
-		char *subshell;
-
-		while (argv[argc] != NULL)
-			argc++;
-
-		for (i = 0; i < argc; i++) {
-			/*
-			 * Allocate enough space for the delimiter and 2
-			 * quotes which might be needed.
-			 */
-			subshell_len += strlen(argv[i]) + 3;
+	if (argv == NULL) {
+		if (failsafe) {
+			if ((new_argv = malloc(sizeof (char *) * 2)) == NULL)
+				return (NULL);
+			new_argv[0] = FAILSAFESHELL;
+			new_argv[1] = NULL;
+		} else {
+			new_argv = zone_login_cmd(bh, login);
 		}
-		if ((subshell = calloc(1, subshell_len)) == NULL)
+		return (new_argv);
+	}
+
+	/*
+	 * Attempt to locate a 'su' binary if not using the failsafe shell.
+	 */
+	if (!failsafe) {
+		struct stat sb;
+		char zonepath[MAXPATHLEN];
+		char supath_check[MAXPATHLEN];
+
+		if (zone_get_zonepath(zonename, zonepath,
+		    sizeof (zonepath)) != Z_OK) {
+			zerror(gettext("unable to determine zone "
+			    "path"));
 			return (NULL);
+		}
 
-		/*
-		 * The handling of quotes in the following block may seem
-		 * unusual, but it is done this way for backward compatibility.
-		 * When running a command, zlogin is documented as:
-		 *    zlogin zonename command args
-		 * However, some code has come to depend on the following usage:
-		 *    zlogin zonename 'command args'
-		 * This relied on the fact that the single argument would be
-		 * re-parsed within the zone and excuted as a command with an
-		 * argument. To remain compatible with this (incorrect) usage,
-		 * if there is only a single argument, it is not quoted, even
-		 * if it has embedded spaces.
-		 *
-		 * Here are two examples which both need to work:
-		 * 1) zlogin foo 'echo hello'
-		 *    This has a single argv member with a space in it but will
-		 *    not be quoted on the command passed into the zone.
-		 * 2) zlogin foo bash -c 'echo hello'
-		 *    This has 3 argv members. The 3rd arg has a space and must
-		 *    be quoted on the command passed into the zone.
-		 */
-		for (i = 0; i < argc; i++) {
-			if (i > 0)
-				(void) strcat(subshell, " ");
-
-			if (argc > 1 && (strchr(argv[i], ' ') != NULL ||
-			    strchr(argv[i], '\t') != NULL)) {
-				(void) strcat(subshell, "'");
-				(void) strcat(subshell, argv[i]);
-				(void) strcat(subshell, "'");
-			} else {
-				(void) strcat(subshell, argv[i]);
+		(void) snprintf(supath_check, sizeof (supath), "%s/root/%s",
+		    zonepath, SUPATH1);
+		if (stat(supath_check, &sb) == 0) {
+			supath = SUPATH1;
+		} else {
+			(void) snprintf(supath_check, sizeof (supath_check),
+			    "%s/root/%s", zonepath, SUPATH2);
+			if (stat(supath_check, &sb) == 0) {
+				supath = SUPATH2;
 			}
 		}
+	}
 
-		if (failsafe) {
-			n = 4;
-		} else {
-			n = 6;
+	/*
+	 * With no failsafe shell or supath to wrap the incoming command, the
+	 * arguments are passed straight through.
+	 */
+	if (!failsafe && supath == NULL) {
+		/*
+		 * Such an outcome is not acceptable, however, if the caller
+		 * expressed a desire to switch users.
+		 */
+		if (strcmp(login, "root") != 0) {
+			zerror(gettext("unable to find 'su' command"));
+			return (NULL);
 		}
+		return (argv);
+	}
+
+	/*
+	 * Inventory arguments and allocate a buffer to escape them for the
+	 * subshell.
+	 */
+	while (argv[argc] != NULL) {
+		/*
+		 * Allocate enough space for the delimiter and 2
+		 * quotes which might be needed.
+		 */
+		subshell_len += strlen(argv[argc]) + 3;
+		argc++;
+	}
+	if ((subshell = calloc(1, subshell_len)) == NULL) {
+		return (NULL);
+	}
+
+	/*
+	 * The handling of quotes in the following block may seem unusual, but
+	 * it is done this way for backward compatibility.
+	 * When running a command, zlogin is documented as:
+	 *    zlogin zonename command args
+	 * However, some code has come to depend on the following usage:
+	 *    zlogin zonename 'command args'
+	 * This relied on the fact that the single argument would be re-parsed
+	 * within the zone and excuted as a command with an argument. To remain
+	 * compatible with this (incorrect) usage, if there is only a single
+	 * argument, it is not quoted, even if it has embedded spaces.
+	 *
+	 * Here are two examples which both need to work:
+	 * 1) zlogin foo 'echo hello'
+	 *    This has a single argv member with a space in it but will not be
+	 *    quoted on the command passed into the zone.
+	 * 2) zlogin foo bash -c 'echo hello'
+	 *    This has 3 argv members. The 3rd arg has a space and must be
+	 *    quoted on the command passed into the zone.
+	 */
+	for (i = 0; i < argc; i++) {
+		if (i > 0)
+			(void) strcat(subshell, " ");
+
+		if (argc > 1 && (strchr(argv[i], ' ') != NULL ||
+		    strchr(argv[i], '\t') != NULL)) {
+			(void) strcat(subshell, "'");
+			(void) strcat(subshell, argv[i]);
+			(void) strcat(subshell, "'");
+		} else {
+			(void) strcat(subshell, argv[i]);
+		}
+	}
+
+	if (failsafe) {
+		int a = 0, n = 4;
 
 		if ((new_argv = malloc(sizeof (char *) * n)) == NULL)
 			return (NULL);
 
-		if (failsafe) {
-			new_argv[a++] = FAILSAFESHELL;
-			new_argv[a++] = "-c";
-		} else {
-			struct stat sb;
-			char zonepath[MAXPATHLEN];
-			char supath[MAXPATHLEN];
-			char *supath_choice = NULL;
-
-			if (zone_get_zonepath(zonename, zonepath,
-			    sizeof (zonepath)) != Z_OK) {
-				zerror(gettext("unable to determine zone "
-				    "path"));
-				return (NULL);
-			}
-
-			(void) snprintf(supath, sizeof (supath), "%s/root/%s",
-			    zonepath, SUPATH1);
-			if (stat(supath, &sb) == 0) {
-				supath_choice = SUPATH1;
-			} else {
-				(void) snprintf(supath, sizeof (supath),
-				    "%s/root/%s", zonepath, SUPATH2);
-				if (stat(supath, &sb) == 0) {
-					supath_choice = SUPATH2;
-				}
-			}
-
-			if (supath_choice != NULL) {
-				/*
-				 * Craft appropriate args for 'su'
-				 */
-				new_argv[a++] = supath_choice;
-
-				if (strcmp(login, "root") != 0) {
-					new_argv[a++] = "-";
-				}
-				new_argv[a++] = (char *)login;
-
-				new_argv[a++] = "-c";
-			} else {
-				/*
-				 * If the 'su' executable cannot be found, the
-				 * specified program can be run directly unless
-				 * a non-root login is requested.
-				 */
-				if (strcmp(login, "root") != 0) {
-					zerror(gettext("unable to find 'su' "
-					    "command"));
-					return (NULL);
-				}
-			}
-		}
-
+		new_argv[a++] = FAILSAFESHELL;
+		new_argv[a++] = "-c";
 		new_argv[a++] = subshell;
 		new_argv[a++] = NULL;
-
-		/*
-		 * The arg count may be less than planned for if a 'su' binary
-		 * was not present or the user specified was root.
-		 */
-		assert(a <= n);
+		assert(a == n);
 	} else {
-		if (failsafe) {
-			n = 2;
-			if ((new_argv = malloc(sizeof (char *) * n)) == NULL)
-				return (NULL);
-			new_argv[a++] = FAILSAFESHELL;
-			new_argv[a++] = NULL;
-			assert(n == a);
+		int a = 0, n = 6;
+
+		assert(supath != NULL);
+		if ((new_argv = malloc(sizeof (char *) * n)) == NULL)
+			return (NULL);
+
+		new_argv[a++] = supath;
+		if (strcmp(login, "root") != 0) {
+			new_argv[a++] = "-";
 		} else {
-			new_argv = zone_login_cmd(bh, login);
+			n--;
 		}
+		new_argv[a++] = (char *)login;
+		new_argv[a++] = "-c";
+		new_argv[a++] = subshell;
+		new_argv[a++] = NULL;
+		assert(a == n);
 	}
 
 	return (new_argv);
