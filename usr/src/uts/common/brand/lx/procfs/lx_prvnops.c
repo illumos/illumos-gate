@@ -1081,10 +1081,9 @@ lxpr_read_pid_auxv(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	ASSERT(lxpnp->lxpr_type == LXPR_PID_AUXV ||
 	    lxpnp->lxpr_type == LXPR_PID_TID_AUXV);
 
-	p = lxpr_lock(lxpnp->lxpr_pid);
+	p = lxpr_lock(lxpnp->lxpr_pid, NO_ZOMB);
 
 	if (p == NULL) {
-		lxpr_uiobuf_seterr(uiobuf, EINVAL);
 		return;
 	}
 	if ((pd = ptolxproc(p)) == NULL) {
@@ -1153,7 +1152,7 @@ lxpr_read_pid_cgroup(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	ASSERT(lxpnp->lxpr_type == LXPR_PID_CGROUP ||
 	    lxpnp->lxpr_type == LXPR_PID_TID_CGROUP);
 
-	p = lxpr_lock(lxpnp->lxpr_pid);
+	p = lxpr_lock(lxpnp->lxpr_pid, ZOMB_OK);
 	if (p == NULL) {
 		lxpr_uiobuf_seterr(uiobuf, EINVAL);
 		return;
@@ -1251,9 +1250,8 @@ lxpr_read_pid_cmdline(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 
 	buf = kmem_alloc(asz, KM_SLEEP);
 
-	p = lxpr_lock(lxpnp->lxpr_pid);
+	p = lxpr_lock(lxpnp->lxpr_pid, NO_ZOMB);
 	if (p == NULL) {
-		lxpr_uiobuf_seterr(uiobuf, EINVAL);
 		kmem_free(buf, asz);
 		return;
 	}
@@ -1294,7 +1292,7 @@ lxpr_read_pid_comm(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	 * Because prctl(PR_SET_NAME) does not set custom names for threads
 	 * (vs processes), there is no need for special handling here.
 	 */
-	if ((p = lxpr_lock(lxpnp->lxpr_pid)) == NULL) {
+	if ((p = lxpr_lock(lxpnp->lxpr_pid, ZOMB_OK)) == NULL) {
 		lxpr_uiobuf_seterr(uiobuf, EINVAL);
 		return;
 	}
@@ -1318,9 +1316,8 @@ lxpr_read_pid_env(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 
 	buf = kmem_alloc(asz, KM_SLEEP);
 
-	p = lxpr_lock(lxpnp->lxpr_pid);
+	p = lxpr_lock(lxpnp->lxpr_pid, NO_ZOMB);
 	if (p == NULL) {
-		lxpr_uiobuf_seterr(uiobuf, EINVAL);
 		kmem_free(buf, asz);
 		return;
 	}
@@ -1349,9 +1346,8 @@ lxpr_read_pid_limits(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	ASSERT(lxpnp->lxpr_type == LXPR_PID_LIMITS ||
 	    lxpnp->lxpr_type == LXPR_PID_TID_LIMITS);
 
-	p = lxpr_lock(lxpnp->lxpr_pid);
+	p = lxpr_lock(lxpnp->lxpr_pid, NO_ZOMB);
 	if (p == NULL) {
-		lxpr_uiobuf_seterr(uiobuf, EINVAL);
 		return;
 	}
 
@@ -1427,9 +1423,8 @@ lxpr_read_pid_maps(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	ASSERT(lxpnp->lxpr_type == LXPR_PID_MAPS ||
 	    lxpnp->lxpr_type == LXPR_PID_TID_MAPS);
 
-	p = lxpr_lock(lxpnp->lxpr_pid);
+	p = lxpr_lock(lxpnp->lxpr_pid, NO_ZOMB);
 	if (p == NULL) {
-		lxpr_uiobuf_seterr(uiobuf, EINVAL);
 		return;
 	}
 
@@ -1594,63 +1589,58 @@ lxpr_read_pid_mountinfo(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 
 	vfs_list_read_lock();
 
-	/* root is the top-level, it does not appear in this output */
-	if (zone == global_zone) {
-		vfsp = vfslist = rootvfs;
-	} else {
-		vfsp = vfslist = zone->zone_vfslist;
+	vfsp = vfslist = zone->zone_vfslist;
+	/*
+	 * If the zone has a root entry, it will be the first in
+	 * the list.  If it doesn't, we conjure one up.
+	 */
+	if (vfslist == NULL || strcmp(refstr_value(vfsp->vfs_mntpt),
+	    zone->zone_rootpath) != 0) {
+		struct vfs *tvfsp;
+		char *rootdev = NULL;
+		lx_zone_data_t *lxzdata;
+		lxd_zfs_dev_t *zv;
+		char zdev[MAXPATHLEN];
+
 		/*
-		 * If the zone has a root entry, it will be the first in
-		 * the list.  If it doesn't, we conjure one up.
+		 * The root of the zone is not a mount point.  The vfs
+		 * we want to report is that of the zone's root vnode.
 		 */
-		if (vfslist == NULL || strcmp(refstr_value(vfsp->vfs_mntpt),
-		    zone->zone_rootpath) != 0) {
-			struct vfs *tvfsp;
-			char *rootdev = NULL;
-			lx_zone_data_t *lxzdata;
-			lxd_zfs_dev_t *zv;
-			char zdev[MAXPATHLEN];
+		tvfsp = zone->zone_rootvp->v_vfsp;
 
-			/*
-			 * The root of the zone is not a mount point.  The vfs
-			 * we want to report is that of the zone's root vnode.
-			 */
-			tvfsp = zone->zone_rootvp->v_vfsp;
+		lxzdata = ztolxzd(zone);
+		ASSERT(lxzdata != NULL);
+		ASSERT(lxzdata->lxzd_vdisks != NULL);
 
-			lxzdata = ztolxzd(curproc->p_zone);
-			ASSERT(lxzdata != NULL);
-			ASSERT(lxzdata->lxzd_vdisks != NULL);
-
-			zv = list_head(lxzdata->lxzd_vdisks);
-			while (zv != NULL) {
-				if (zv->lzd_type == LXD_ZFS_DEV_POOL) {
-					(void) snprintf(zdev, sizeof (zdev),
-					    "/dev/%s",
-					    lxpr_zv_basename(zv->lzd_name));
-					rootdev = zdev;
-					break;
-				}
-
-				zv = list_next(lxzdata->lxzd_vdisks, zv);
+		zv = list_head(lxzdata->lxzd_vdisks);
+		while (zv != NULL) {
+			if (zv->lzd_type == LXD_ZFS_DEV_POOL) {
+				(void) snprintf(zdev, sizeof (zdev),
+				    "/dev/%s",
+				    lxpr_zv_basename(zv->lzd_name));
+				rootdev = zdev;
+				break;
 			}
 
-			if (rootdev == NULL)
-				rootdev = "/";
-
-			lxpr_uiobuf_printf(uiobuf,
-			    "%d 1 %d:%d / / %s - %s %s %s\n",
-			    root_id,
-			    major(tvfsp->vfs_dev), minor(vfsp->vfs_dev),
-			    tvfsp->vfs_flag & VFS_RDONLY ? "ro" : "rw",
-			    vfssw[tvfsp->vfs_fstype].vsw_name,
-			    rootdev,
-			    tvfsp->vfs_flag & VFS_RDONLY ? "ro" : "rw");
-
+			zv = list_next(lxzdata->lxzd_vdisks, zv);
 		}
-		if (vfslist == NULL) {
-			vfs_list_unlock();
-			return;
-		}
+
+		if (rootdev == NULL)
+			rootdev = "/";
+
+		lxpr_uiobuf_printf(uiobuf,
+		    "%d 1 %d:%d / / %s - %s %s %s\n",
+		    root_id,
+		    major(tvfsp->vfs_dev), minor(vfsp->vfs_dev),
+		    tvfsp->vfs_flag & VFS_RDONLY ? "ro" : "rw",
+		    vfssw[tvfsp->vfs_fstype].vsw_name,
+		    rootdev,
+		    tvfsp->vfs_flag & VFS_RDONLY ? "ro" : "rw");
+
+	}
+	if (vfslist == NULL) {
+		vfs_list_unlock();
+		return;
 	}
 
 	/*
@@ -1777,7 +1767,7 @@ lxpr_read_pid_oom_scr_adj(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	ASSERT(lxpnp->lxpr_type == LXPR_PID_OOM_SCR_ADJ ||
 	    lxpnp->lxpr_type == LXPR_PID_TID_OOM_SCR_ADJ);
 
-	p = lxpr_lock(lxpnp->lxpr_pid);
+	p = lxpr_lock(lxpnp->lxpr_pid, ZOMB_OK);
 	if (p == NULL) {
 		lxpr_uiobuf_seterr(uiobuf, EINVAL);
 		return;
@@ -1797,27 +1787,28 @@ lxpr_read_pid_statm(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
 	proc_t *p;
 	struct as *as;
-	size_t vsize;
-	size_t rss;
+	size_t vsize, rss;
 
 	ASSERT(lxpnp->lxpr_type == LXPR_PID_STATM ||
 	    lxpnp->lxpr_type == LXPR_PID_TID_STATM);
 
-	p = lxpr_lock(lxpnp->lxpr_pid);
+	p = lxpr_lock(lxpnp->lxpr_pid, ZOMB_OK);
 	if (p == NULL) {
 		lxpr_uiobuf_seterr(uiobuf, EINVAL);
 		return;
 	}
 
 	as = p->p_as;
-
 	mutex_exit(&p->p_lock);
-
-	AS_LOCK_ENTER(as, RW_READER);
-	vsize = btopr(as->a_resvsize);
-	rss = rm_asrss(as);
-	AS_LOCK_EXIT(as);
-
+	if (as != &kas) {
+		AS_LOCK_ENTER(as, RW_READER);
+		vsize = btopr(as->a_resvsize);
+		rss = rm_asrss(as);
+		AS_LOCK_EXIT(as);
+	} else {
+		vsize = 0;
+		rss = 0;
+	}
 	mutex_enter(&p->p_lock);
 	lxpr_unlock(p);
 
@@ -1919,7 +1910,7 @@ lxpr_read_status_common(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf,
 	boolean_t	printsz = B_FALSE;
 
 	real_pid = get_real_pid(lxpnp->lxpr_pid);
-	p = lxpr_lock(real_pid);
+	p = lxpr_lock(real_pid, ZOMB_OK);
 	if (p == NULL) {
 		lxpr_uiobuf_seterr(uiobuf, EINVAL);
 		return;
@@ -2003,7 +1994,8 @@ lxpr_read_status_common(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf,
 	 * Gather memory information
 	 */
 	as = p->p_as;
-	if ((p->p_stat != SZOMB) && !(p->p_flag & SSYS) && (as != &kas)) {
+	if ((p->p_stat != SZOMB) && !(p->p_flag & (SSYS | SEXITING)) &&
+	    (as != &kas)) {
 		mutex_exit(&p->p_lock);
 		AS_LOCK_ENTER(as, RW_READER);
 		vsize = as->a_resvsize;
@@ -2147,17 +2139,16 @@ lxpr_read_stat_common(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf,
 	rlim64_t vmem_ctl;
 
 	real_pid = get_real_pid(lxpnp->lxpr_pid);
-	p = lxpr_lock(real_pid);
+	p = lxpr_lock(real_pid, ZOMB_OK);
 	if (p == NULL) {
 		lxpr_uiobuf_seterr(uiobuf, EINVAL);
 		return;
 	}
 
-	pid = p->p_pid;
-
 	/*
 	 * Set Linux defaults if we're the zone's init process
 	 */
+	pid = p->p_pid;
 	if (pid == curproc->p_zone->zone_proc_initpid) {
 		pid = 1;		/* PID for init */
 		ppid = 0;		/* parent PID for init is 0 */
@@ -2247,10 +2238,15 @@ lxpr_read_stat_common(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf,
 	}
 	as = p->p_as;
 	mutex_exit(&p->p_lock);
-	AS_LOCK_ENTER(as, RW_READER);
-	vsize = as->a_resvsize;
-	rss = rm_asrss(as);
-	AS_LOCK_EXIT(as);
+	if (as != &kas) {
+		AS_LOCK_ENTER(as, RW_READER);
+		vsize = as->a_resvsize;
+		rss = rm_asrss(as);
+		AS_LOCK_EXIT(as);
+	} else {
+		vsize = 0;
+		rss = 0;
+	}
 	mutex_enter(&p->p_lock);
 
 	utime = p->p_utime;
@@ -4879,7 +4875,7 @@ lxpr_access(vnode_t *vp, int mode, int flags, cred_t *cr, caller_context_t *ct)
 	case LXPR_PID_FD_FD:
 	case LXPR_PID_TID_FDDIR:
 	case LXPR_PID_TID_FD_FD:
-		if ((tp = lxpr_lock(lxpnp->lxpr_pid)) == NULL)
+		if ((tp = lxpr_lock(lxpnp->lxpr_pid, ZOMB_OK)) == NULL)
 			return (ENOENT);
 		if (tp != curproc && secpolicy_proc_access(cr) != 0 &&
 		    priv_proc_cred_perm(cr, tp, NULL, mode) != 0) {
@@ -5010,7 +5006,7 @@ lxpr_lookup_piddir(vnode_t *dp, char *comp)
 
 	ASSERT(VTOLXP(dp)->lxpr_type == LXPR_PIDDIR);
 
-	p = lxpr_lock(VTOLXP(dp)->lxpr_pid);
+	p = lxpr_lock(VTOLXP(dp)->lxpr_pid, ZOMB_OK);
 	if (p == NULL)
 		return (NULL);
 
@@ -5057,15 +5053,14 @@ lxpr_lookup_taskdir(vnode_t *dp, char *comp)
 	 * get the proc to work with and lock it
 	 */
 	real_pid = get_real_pid(dlxpnp->lxpr_pid);
-	p = lxpr_lock(real_pid);
+	p = lxpr_lock(real_pid, NO_ZOMB);
 	if ((p == NULL))
 		return (NULL);
 
 	/*
-	 * If the process is a zombie or system process
-	 * it can't have any threads.
+	 * Bail if this is a system process.
 	 */
-	if ((p->p_stat == SZOMB) || (p->p_flag & SSYS) || (p->p_as == &kas)) {
+	if ((p->p_flag & SSYS) || (p->p_as == &kas)) {
 		lxpr_unlock(p);
 		return (NULL);
 	}
@@ -5119,15 +5114,14 @@ lxpr_lookup_task_tid_dir(vnode_t *dp, char *comp)
 	 * get the proc to work with and lock it
 	 */
 	real_pid = get_real_pid(dlxpnp->lxpr_pid);
-	p = lxpr_lock(real_pid);
+	p = lxpr_lock(real_pid, NO_ZOMB);
 	if ((p == NULL))
 		return (NULL);
 
 	/*
-	 * If the process is a zombie or system process
-	 * it can't have any threads.
+	 * Bail if this is a system process.
 	 */
-	if ((p->p_stat == SZOMB) || (p->p_flag & SSYS) || (p->p_as == &kas)) {
+	if ((p->p_flag & SSYS) || (p->p_as == &kas)) {
 		lxpr_unlock(p);
 		return (NULL);
 	}
@@ -5208,7 +5202,7 @@ lxpr_lookup_procdir(vnode_t *dp, char *comp)
 		 * Can't continue if the process is still loading or it doesn't
 		 * really exist yet (or maybe it just died!)
 		 */
-		p = lxpr_lock(pid);
+		p = lxpr_lock(pid, ZOMB_OK);
 		if (p == NULL)
 			return (NULL);
 
@@ -5639,23 +5633,18 @@ lxpr_readdir_taskdir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
 	ssize_t oresid;	/* save a copy for testing later */
 	ssize_t uresid;
 	off_t uoffset;
-	int error;
-	int ceof;
+	int error, ceof, tiddirsize, tasknum;
 	proc_t *p;
-	int tiddirsize = -1;
-	int tasknum;
 	pid_t real_pid;
 	kthread_t *t;
-	boolean_t branded = B_FALSE;
+	boolean_t branded;
 
 	ASSERT(lxpnp->lxpr_type == LXPR_PID_TASKDIR);
 
 	oresid = uiop->uio_resid;
 
 	real_pid = get_real_pid(lxpnp->lxpr_pid);
-	p = lxpr_lock(real_pid);
-
-	/* can't read its contents if it died */
+	p = lxpr_lock(real_pid, ZOMB_OK);
 	if (p == NULL) {
 		return (ENOENT);
 	}
@@ -5664,18 +5653,22 @@ lxpr_readdir_taskdir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
 		return (ENOENT);
 	}
 
-	if ((p->p_stat == SZOMB) || (p->p_flag & SSYS) || (p->p_as == &kas))
-		tiddirsize = 0;
+	/*
+	 * Just emit static entries for system processes and zombies.
+	 */
+	if ((p->p_stat == SZOMB) || (p->p_flag & (SSYS | SEXITING)) ||
+	    (p->p_as == &kas)) {
+		lxpr_unlock(p);
+		return (lxpr_readdir_common(lxpnp, uiop, eofp, 0, 0));
+	}
 
-	branded = (p->p_brand == &lx_brand);
 	/*
 	 * Drop p_lock, but keep the process P_PR_LOCK'd to prevent it from
 	 * going away while we iterate over its threads.
 	 */
+	tiddirsize = p->p_lwpcnt;
+	branded = (p->p_brand == &lx_brand);
 	mutex_exit(&p->p_lock);
-
-	if (tiddirsize == -1)
-		tiddirsize = p->p_lwpcnt;
 
 	/* Do the fixed entries (in this case just "." & "..") */
 	error = lxpr_readdir_common(lxpnp, uiop, &ceof, 0, 0);
@@ -5698,9 +5691,7 @@ lxpr_readdir_taskdir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
 	 * been returned.
 	 */
 	for (tasknum = 0; (uresid = uiop->uio_resid) > 0; tasknum++) {
-		int i;
-		int reclen;
-		int len;
+		int i, reclen, len;
 		uint_t emul_tid;
 		lx_lwp_data_t *lwpd;
 
@@ -5831,10 +5822,8 @@ lxpr_readdir_fddir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
 	ssize_t oresid;	/* save a copy for testing later */
 	ssize_t uresid;
 	off_t uoffset;
-	int error;
-	int ceof;
+	int error, ceof, fddirsize;
 	proc_t *p;
-	int fddirsize = -1;
 	uf_info_t *fip;
 
 	ASSERT(lxpnp->lxpr_type == LXPR_PID_FDDIR ||
@@ -5843,12 +5832,19 @@ lxpr_readdir_fddir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
 	oresid = uiop->uio_resid;
 
 	/* can't read its contents if it died */
-	p = lxpr_lock(lxpnp->lxpr_pid);
+	p = lxpr_lock(lxpnp->lxpr_pid, ZOMB_OK);
 	if (p == NULL)
 		return (ENOENT);
 
-	if ((p->p_stat == SZOMB) || (p->p_flag & SSYS) || (p->p_as == &kas))
-		fddirsize = 0;
+	/*
+	 * For exiting/exited processes or those belonging to the system, only
+	 * emit the fixed entries.
+	 */
+	if ((p->p_stat == SZOMB) || (p->p_flag & (SSYS | SEXITING)) ||
+	    (p->p_as == &kas)) {
+		lxpr_unlock(p);
+		return (lxpr_readdir_common(lxpnp, uiop, eofp, 0, 0));
+	}
 
 	/*
 	 * Drop p_lock, but keep the process P_PR_LOCK'd to prevent it from
@@ -5859,9 +5855,7 @@ lxpr_readdir_fddir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
 	/* Get open file info */
 	fip = (&(p)->p_user.u_finfo);
 	mutex_enter(&fip->fi_lock);
-
-	if (fddirsize == -1)
-		fddirsize = fip->fi_nfiles;
+	fddirsize = fip->fi_nfiles;
 
 	/* Do the fixed entries (in this case just "." & "..") */
 	error = lxpr_readdir_common(lxpnp, uiop, &ceof, 0, 0);
@@ -6331,7 +6325,7 @@ lxpr_create(struct vnode *dvp, char *nm, struct vattr *vap,
 	case LXPR_PID_TASK_IDDIR:
 		if (strcmp(nm, "oom_score_adj") == 0) {
 			proc_t *p;
-			p = lxpr_lock(lxpnp->lxpr_pid);
+			p = lxpr_lock(lxpnp->lxpr_pid, ZOMB_OK);
 			if (p != NULL) {
 				vp = lxpr_lookup_common(dvp, nm, p, piddir,
 				    PIDDIRFILES);

@@ -320,7 +320,12 @@ extern void lxpr_uiobuf_seterr(lxpr_uiobuf_t *, int);
 extern int lxpr_core_path_l2s(const char *, char *, size_t);
 extern int lxpr_core_path_s2l(const char *, char *, size_t);
 
-proc_t *lxpr_lock(pid_t);
+typedef enum lxpr_zombok {
+	NO_ZOMB = 0,
+	ZOMB_OK
+} zombok_t;
+
+proc_t *lxpr_lock(pid_t, zombok_t);
 void lxpr_unlock(proc_t *);
 
 #ifdef	__cplusplus

@@ -193,7 +193,7 @@ lxpr_uiobuf_printf(struct lxpr_uiobuf *uiobuf, const char *fmt, ...)
  * Lookup process from pid and return with p_plock and P_PR_LOCK held.
  */
 proc_t *
-lxpr_lock(pid_t pid)
+lxpr_lock(pid_t pid, zombok_t zombie_ok)
 {
 	proc_t *p;
 	kmutex_t *mp;
@@ -232,10 +232,11 @@ lxpr_lock(pid_t pid)
 
 		mutex_exit(&pidlock);
 
-		if (p->p_flag & SEXITING) {
-			/*
-			 * This process is exiting -- let it go.
-			 */
+		/*
+		 * Filter out exiting or zombie processes, if requested.
+		 */
+		if (zombie_ok == NO_ZOMB &&
+		    ((p->p_flag & SEXITING) || p->p_stat == SZOMB)) {
 			mutex_exit(mp);
 			return (NULL);
 		}
@@ -616,11 +617,12 @@ lxpr_lookup_fdnode(vnode_t *dvp, const char *name)
 	}
 
 	/* Lock the owner process */
-	p = lxpr_lock(lxdp->lxpr_pid);
+	p = lxpr_lock(lxdp->lxpr_pid, NO_ZOMB);
 	if ((p == NULL))
 		return (NULL);
-	if ((p->p_stat == SZOMB) || (p->p_flag & SSYS) || (p->p_as == &kas)) {
-		/* Not applicable to kernel or system processes */
+
+	/* Not applicable to processes which are system-owned. */
+	if ((p->p_flag & SSYS) || (p->p_as == &kas)) {
 		lxpr_unlock(p);
 		return (NULL);
 	}
