@@ -11,7 +11,7 @@
 #
 
 #
-# Copyright 2015 Joyent, Inc.
+# Copyright 2016 Joyent, Inc.
 #
 
 #
@@ -28,6 +28,13 @@ safe_dir /etc/resolvconf/resolv.conf.d
 safe_dir /etc/network
 safe_dir /etc/network/interfaces.d
 safe_dir /etc/network/interfaces.d/smartos
+
+ZPOOL=`df $ZONEROOT | awk -F '[()]' '{split($2, field, "/"); print field[1]; }'`
+if [ -z "$ZPOOL" ]; then
+	ROOTDEV="/"
+else
+	ROOTDEV="/dev/$ZPOOL"
+fi
 
 # Populate resolve.conf setup files
 zonecfg -z $ZONENAME info attr name=resolvers | awk '
@@ -99,8 +106,8 @@ fi
 # XXX need to add real mounting into this svc definition
 
 fnm=$ZONEROOT/etc/init/mountall.override
-if [[ ! -f $fnm && ! -h $fnm ]] then
-	cat <<'DONE' > $fnm
+if [[ ! -h $fnm ]] then
+	cat <<DONE > $fnm
 description	"Mount filesystems on boot"
 
 start on startup
@@ -115,7 +122,7 @@ emits filesystem
 emits mounted
 
 script
-    echo "/ / zfs rw 0 0" > /etc/mtab
+    echo "$ROOTDEV / zfs rw 0 0" > /etc/mtab
     echo "proc /proc proc rw,noexec,nosuid,nodev 0 0" >> /etc/mtab
 
     /sbin/initctl emit --no-wait virtual-filesystems

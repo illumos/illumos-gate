@@ -9,7 +9,7 @@
 # source.  A copy of the CDDL is also available via the Internet at
 # http://www.illumos.org/license/CDDL.
 #
-# Copyright 2015 Joyent, Inc.  All rights reserved.
+# Copyright 2016 Joyent, Inc.  All rights reserved.
 #
 
 #
@@ -80,6 +80,12 @@ zonename="$1"
 zoneroot="$2"
 install_src="3"
 install_root="$zoneroot/root"
+ZPOOL=`df $ZONEROOT | awk -F '[()]' '{split($2, field, "/"); print field[1]; }'`
+if [ -z "$ZPOOL" ]; then
+	ROOTDEV="none"
+else
+	ROOTDEV="/dev/$ZPOOL"
+fi
 
 if [[ ! -f "$install_src" ]]; then
 	echo "$install_src: file not found\n"
@@ -151,7 +157,7 @@ fi
 mv -f etc/fstab etc/fstab.$tag 2>/dev/null
 
 cat > etc/fstab <<- EOF
-	none		/			zfs	defaults	1 1
+	$ROOTDEV	/			zfs	defaults	1 1
 	proc		/proc			proc	defaults	0 0
 EOF
 
