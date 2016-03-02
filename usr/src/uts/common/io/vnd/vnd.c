@@ -3031,7 +3031,6 @@ vnd_striocdata(queue_t *q, vnd_str_t *vsp, mblk_t *mp, struct copyresp *csp)
 	    MBLKL(mp->b_cont) != sizeof (vnd_strioc_associate_t)) {
 		kmem_free(visp, sizeof (vnd_strioc_t));
 		miocnak(q, mp, 0, EINVAL);
-		qreply(q, mp);
 		return;
 	}
 
