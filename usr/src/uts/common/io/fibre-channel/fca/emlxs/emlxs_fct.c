@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2004-2012 Emulex. All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2016 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2020 RackTop Systems, Inc.
  */
 
@@ -1473,6 +1474,7 @@ emlxs_fct_ctl(fct_local_port_t *fct_port, int cmd, void *arg)
 	emlxs_port_t *port = (emlxs_port_t *)fct_port->port_fca_private;
 	emlxs_hba_t *hba = HBA;
 	stmf_change_status_t st;
+	int32_t rval;
 
 	st.st_completion_status = FCT_SUCCESS;
 	st.st_additional_info = NULL;
@@ -1563,6 +1565,7 @@ emlxs_fct_ctl(fct_local_port_t *fct_port, int cmd, void *arg)
 		if (port->mode == MODE_INITIATOR) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fct_detail_msg,
 			    "fct_ctl: FCT_CMD_FORCE_LIP.");
+			*((fct_status_t *)arg) = FCT_FAILURE;
 			break;
 		}
 
@@ -1574,14 +1577,16 @@ emlxs_fct_ctl(fct_local_port_t *fct_port, int cmd, void *arg)
 			hba->fw_flag |= FW_UPDATE_KERNEL;
 
 			/* Reset the adapter */
-			(void) emlxs_reset(port, FC_FCA_RESET);
+			rval = emlxs_reset(port, FC_FCA_RESET);
 		} else {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fct_detail_msg,
 			    "fct_ctl: FCT_CMD_FORCE_LIP");
 
 			/* Reset the link */
-			(void) emlxs_reset(port, FC_FCA_LINK_RESET);
+			rval = emlxs_reset(port, FC_FCA_LINK_RESET);
 		}
+		*((fct_status_t *)arg) = (rval == FC_SUCCESS) ? FCT_SUCCESS:
+		    FCT_FAILURE;
 		break;
 	}
 
