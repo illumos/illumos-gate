@@ -1744,8 +1744,7 @@ xvdi_post_event(dev_info_t *dip, xendev_hotplug_cmd_t hpc)
 	}
 
 failure:
-	if (attr_list != NULL)
-		nvlist_free(attr_list);
+	nvlist_free(attr_list);
 
 	return (err);
 }

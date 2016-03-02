@@ -209,8 +209,7 @@ opl_rc_node_create(topo_mod_t *mp, tnode_t *parent, di_node_t dnode, int inst)
 	    TOPO_IO_MODULE, TOPO_PROP_IMMUTABLE, mod,  &err) != 0) {
 		topo_mod_dprintf(mp, "Failed to set MODULE property\n");
 	}
-	if (mod != NULL)
-		nvlist_free(mod);
+	nvlist_free(mod);
 
 	/* This is a PCIEX Root Complex */
 	if (topo_prop_set_string(rcn, TOPO_PGROUP_PCI, TOPO_PCI_EXCAP,

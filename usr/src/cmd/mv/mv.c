@@ -1959,8 +1959,7 @@ next:
 			if (targattrfd != -1)
 				(void) close(targattrfd);
 			srcattrfd = targattrfd = -1;
-			if (res != NULL)
-				nvlist_free(res);
+			nvlist_free(res);
 		}
 	}
 	/* Copy source file non default extended system attributes to target */
@@ -1972,8 +1971,7 @@ next:
 		    "%s to %s\n"), cmd, source, target);
 	}
 out:
-	if (response != NULL)
-		nvlist_free(response);
+	nvlist_free(response);
 	close_all();
 	return (error == 0 ? 0 : 1);
 }

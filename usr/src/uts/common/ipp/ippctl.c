@@ -1243,8 +1243,7 @@ ippctl_action_modify(
 	 */
 
 	if ((rc = ippctl_set_rc(ipp_rc)) != 0) {
-		if (nvlp != NULL)
-			nvlist_free(nvlp);
+		nvlist_free(nvlp);
 		return (rc);
 	}
 

@@ -1923,8 +1923,7 @@ contract_device_publish(dev_info_t *dip, dev_t dev, int spec_type,
 	mutex_exit(&(DEVI(dip)->devi_ct_lock));
 
 out:
-	if (tnvl)
-		nvlist_free(tnvl);
+	nvlist_free(tnvl);
 	if (path)
 		kmem_free(path, MAXPATHLEN);
 

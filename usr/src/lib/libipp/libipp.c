@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -225,8 +223,7 @@ ipp_action_destroy(
 
 	return (dispatch(&nvlp, NULL, NULL));
 failed:
-	if (nvlp != NULL)
-		nvlist_free(nvlp);
+	nvlist_free(nvlp);
 	errno = rc;
 	return (-1);
 }
@@ -336,8 +333,7 @@ ipp_action_info(
 
 	return (dispatch(&nvlp, fn, arg));
 failed:
-	if (nvlp != NULL)
-		nvlist_free(nvlp);
+	nvlist_free(nvlp);
 	errno = rc;
 	return (-1);
 }
@@ -389,8 +385,7 @@ ipp_action_mod(
 
 	return (dispatch(&nvlp, string_callback, (void *)modnamep));
 failed:
-	if (nvlp != NULL)
-		nvlist_free(nvlp);
+	nvlist_free(nvlp);
 	errno = rc;
 	return (-1);
 }
@@ -446,8 +441,7 @@ ipp_list_mods(
 
 	return (rc);
 failed:
-	if (nvlp != NULL)
-		nvlist_free(nvlp);
+	nvlist_free(nvlp);
 	errno = rc;
 	return (-1);
 }
@@ -510,8 +504,7 @@ ipp_mod_list_actions(
 
 	return (rc);
 failed:
-	if (nvlp != NULL)
-		nvlist_free(nvlp);
+	nvlist_free(nvlp);
 	errno = rc;
 	return (-1);
 }

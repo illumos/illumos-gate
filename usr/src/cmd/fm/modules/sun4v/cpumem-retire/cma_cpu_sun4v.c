@@ -262,8 +262,7 @@ cpu_retry(fmd_hdl_t *hdl, cma_cpu_t *cpu)
 static void
 cma_cpu_free(fmd_hdl_t *hdl, cma_cpu_t *cpu)
 {
-	if (cpu->cpu_fmri != NULL)
-		nvlist_free(cpu->cpu_fmri);
+	nvlist_free(cpu->cpu_fmri);
 	if (cpu->cpu_uuid != NULL)
 		fmd_hdl_strfree(hdl, cpu->cpu_uuid);
 	fmd_hdl_free(hdl, cpu, sizeof (cma_cpu_t));

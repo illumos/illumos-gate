@@ -525,8 +525,7 @@ fmd_fmri_unusable(nvlist_t *nvl)
 		retval = 1;
 	}
 
-	if (nvlcp)
-		nvlist_free(nvlcp);
+	nvlist_free(nvlcp);
 
 	return (retval);
 }

@@ -218,8 +218,7 @@ sysevent_free(sysevent_t *ev)
 {
 	nvlist_t *attr_list = (nvlist_t *)(uintptr_t)SE_ATTR_PTR(ev);
 
-	if (attr_list)
-		nvlist_free(attr_list);
+	nvlist_free(attr_list);
 	free(ev);
 }
 
@@ -1462,8 +1461,7 @@ create_cached_registration(sysevent_handle_t *shp,
 create_failed:
 	dealloc_subscribers(shp);
 	free_cached_registration(shp);
-	if (nvl)
-		nvlist_free(nvl);
+	nvlist_free(nvl);
 	return (-1);
 
 }

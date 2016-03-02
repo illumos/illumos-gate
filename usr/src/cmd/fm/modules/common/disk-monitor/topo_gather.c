@@ -707,14 +707,12 @@ topo_add_bay(topo_hdl_t *thp, tnode_t *node, walk_diskmon_t *wdp)
 		} else if (diskp != NULL) {
 			diskmon_free(diskp);
 		} else {
-			if (dmap_nvl)
-				nvlist_free(dmap_nvl);
+			nvlist_free(dmap_nvl);
 			if (indp)
 				ind_free(indp);
 			if (indrp)
 				indrule_free(indrp);
-			if (diskprops)
-				nvlist_free(diskprops);
+			nvlist_free(diskprops);
 		}
 
 		wdp->pfmri = cstr;

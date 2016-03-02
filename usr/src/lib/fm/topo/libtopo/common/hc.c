@@ -1036,8 +1036,7 @@ hc_fmri_str2nvl(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 	return (0);
 
 hcfmbail:
-	if (nf != NULL)
-		nvlist_free(nf);
+	nvlist_free(nf);
 	for (i = 0; i < npairs; i++)
 		nvlist_free(pa[i]);
 	topo_mod_free(mod, pa, npairs * sizeof (nvlist_t *));
@@ -1177,8 +1176,7 @@ hc_fmri_create(topo_mod_t *mod, nvlist_t *pfmri, int version, const char *name,
 
 	if (hcl != NULL) {
 		for (i = 0; i < pelems + 1; ++i) {
-			if (hcl[i] != NULL)
-				nvlist_free(hcl[i]);
+			nvlist_free(hcl[i]);
 		}
 		topo_mod_free(mod, hcl, sizeof (nvlist_t *) * (pelems + 1));
 	}

@@ -227,10 +227,8 @@ fru_compare(nvlist_t *r1, nvlist_t *r2)
 	}
 
 	fmd_fmri_topo_rele(thp);
-	if (f1 != NULL)
-		nvlist_free(f1);
-	if (f2 != NULL)
-		nvlist_free(f2);
+	nvlist_free(f1);
+	nvlist_free(f2);
 	return (rc);
 }
 

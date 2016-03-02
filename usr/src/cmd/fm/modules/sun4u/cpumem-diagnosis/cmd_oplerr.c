@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * OPL platform specific functions for
  * CPU/Memory error diagnosis engine.
@@ -180,8 +178,7 @@ cmd_opl_ue_cpu(fmd_hdl_t *hdl, fmd_event_t *ep,
 			sib_cpu = cmd_cpu_lookup(hdl, fmri, class,
 			    CMD_CPU_LEVEL_THREAD);
 			if (sib_cpu == NULL || sib_cpu->cpu_faulting) {
-				if (fmri != NULL)
-					nvlist_free(fmri);
+				nvlist_free(fmri);
 				opl_cpu->oc_cmd_cpu = NULL;
 				fmd_hdl_debug(hdl,
 				"cpu not present, cpuid %u excluded\n",
@@ -189,8 +186,7 @@ cmd_opl_ue_cpu(fmd_hdl_t *hdl, fmd_event_t *ep,
 				continue;
 			}
 			opl_cpu->oc_cmd_cpu = sib_cpu;
-			if (fmri != NULL)
-				nvlist_free(fmri);
+			nvlist_free(fmri);
 			nsusp++;
 		}
 		if (cpu->cpu_cpuid == main_cpuid) {

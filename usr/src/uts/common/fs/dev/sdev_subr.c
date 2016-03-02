@@ -160,16 +160,11 @@ static void
 sdev_prof_free(struct sdev_node *dv)
 {
 	ASSERT(!SDEV_IS_GLOBAL(dv));
-	if (dv->sdev_prof.dev_name)
-		nvlist_free(dv->sdev_prof.dev_name);
-	if (dv->sdev_prof.dev_map)
-		nvlist_free(dv->sdev_prof.dev_map);
-	if (dv->sdev_prof.dev_symlink)
-		nvlist_free(dv->sdev_prof.dev_symlink);
-	if (dv->sdev_prof.dev_glob_incdir)
-		nvlist_free(dv->sdev_prof.dev_glob_incdir);
-	if (dv->sdev_prof.dev_glob_excdir)
-		nvlist_free(dv->sdev_prof.dev_glob_excdir);
+	nvlist_free(dv->sdev_prof.dev_name);
+	nvlist_free(dv->sdev_prof.dev_map);
+	nvlist_free(dv->sdev_prof.dev_symlink);
+	nvlist_free(dv->sdev_prof.dev_glob_incdir);
+	nvlist_free(dv->sdev_prof.dev_glob_excdir);
 	bzero(&dv->sdev_prof, sizeof (dv->sdev_prof));
 }
 

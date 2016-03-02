@@ -218,8 +218,7 @@ mv_xattrs(char *cmd, char *infile, char *outfile, int sattr, int silent)
 			    "failed to move system attribute");
 	}
 error:
-	if (res != NULL)
-		nvlist_free(res);
+	nvlist_free(res);
 	if (silent == 0 && etext != NULL) {
 		if (!sattr)
 			(void) fprintf(stderr, dgettext(TEXT_DOMAIN,
@@ -246,8 +245,7 @@ done:
 		(void) close(indfd);
 	if (outdfd != -1)
 		(void) close(outdfd);
-	if (response != NULL)
-		nvlist_free(response);
+	nvlist_free(response);
 	if (etext != NULL)
 		return (1);
 	else
@@ -319,7 +317,6 @@ sysattr_list(char *cmd, int fd, char *fname)
 				return (response);
 		}
 	}
-	if (response != NULL)
-		nvlist_free(response);
+	nvlist_free(response);
 	return (NULL);
 }

@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Disk & Indicator Monitor configuration file support routines
  */
@@ -375,16 +373,14 @@ diskmon_free(diskmon_t *dmp)
 	while (dmp != NULL) {
 		nextp = dmp->next;
 
-		if (dmp->props)
-			nvlist_free(dmp->props);
+		nvlist_free(dmp->props);
 		if (dmp->location)
 			dstrfree(dmp->location);
 		if (dmp->ind_list)
 			ind_free(dmp->ind_list);
 		if (dmp->indrule_list)
 			indrule_free(dmp->indrule_list);
-		if (dmp->app_props)
-			nvlist_free(dmp->app_props);
+		nvlist_free(dmp->app_props);
 		if (dmp->frup)
 			dmfru_free(dmp->frup);
 		dfree(dmp, sizeof (diskmon_t));

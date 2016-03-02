@@ -181,8 +181,7 @@ free_notify_prefs(fmd_hdl_t *hdl, nvlist_t **prefs, uint_t nprefs)
 	int i;
 
 	for (i = 0; i < nprefs; i++) {
-		if (prefs[i])
-			nvlist_free(prefs[i]);
+		nvlist_free(prefs[i]);
 	}
 
 	fmd_hdl_free(hdl, prefs, sizeof (nvlist_t *) * nprefs);

@@ -1727,8 +1727,7 @@ itree_destructor(void *left, void *right, void *arg)
 		bub = nextbub;
 	}
 
-	if (ep->nvp != NULL)
-		nvlist_free(ep->nvp);
+	nvlist_free(ep->nvp);
 	alloc_xfree(ep, sizeof (*ep));
 }
 
@@ -1759,8 +1758,7 @@ itree_pruner(void *left, void *right, void *arg)
 		bub = nextbub;
 	}
 
-	if (ep->nvp != NULL)
-		nvlist_free(ep->nvp);
+	nvlist_free(ep->nvp);
 	ep->props = NULL;
 	ep->payloadprops = NULL;
 	ep->serdprops = NULL;

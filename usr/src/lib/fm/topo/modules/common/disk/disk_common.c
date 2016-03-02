@@ -266,12 +266,11 @@ disk_set_props(topo_mod_t *mod, tnode_t *parent,
 	}
 	err = 0;
 
-out:	if (fmri)
-		nvlist_free(fmri);
+out:
+	nvlist_free(fmri);
 	if (label)
 		topo_mod_strfree(mod, label);
-	if (asru)
-		nvlist_free(asru);
+	nvlist_free(asru);
 	return (err);
 
 error:	err = topo_mod_seterrno(mod, err);

@@ -381,8 +381,7 @@ clone_snap(char *snapshot_name, char *zonepath)
 	    "off") != 0) ||
 	    (nvlist_add_string(props, zfs_prop_to_name(ZFS_PROP_SHARESMB),
 	    "off") != 0)) {
-		if (props != NULL)
-			nvlist_free(props);
+		nvlist_free(props);
 		(void) fprintf(stderr, gettext("could not create ZFS clone "
 		    "%s: out of memory\n"), zonepath);
 		return (Z_ERR);
@@ -988,8 +987,7 @@ create_zfs_zonepath(char *zonepath)
 	    "off") != 0) ||
 	    (nvlist_add_string(props, zfs_prop_to_name(ZFS_PROP_SHARESMB),
 	    "off") != 0)) {
-		if (props != NULL)
-			nvlist_free(props);
+		nvlist_free(props);
 		(void) fprintf(stderr, gettext("cannot create ZFS dataset %s: "
 		    "out of memory\n"), zfs_name);
 	}

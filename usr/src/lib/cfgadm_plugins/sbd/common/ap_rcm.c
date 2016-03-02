@@ -797,8 +797,7 @@ ap_rcm_cap_cpu(apd_t *a, rcmd_t *rcm, rcm_handle_t *hd, uint_t flags,
 	}
 
 done:
-	if (nvl)
-		nvlist_free(nvl);
+	nvlist_free(nvl);
 	s_free(oldcpuids);
 	s_free(newcpuids);
 	return (rv);

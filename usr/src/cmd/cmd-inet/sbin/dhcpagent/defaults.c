@@ -186,8 +186,7 @@ df_get_string(const char *if_name, boolean_t isv6, uint_t param)
 	if (statbuf.st_mtime != df_statbuf.st_mtime ||
 	    statbuf.st_size != df_statbuf.st_size) {
 		df_statbuf = statbuf;
-		if (df_nvlist != NULL)
-			nvlist_free(df_nvlist);
+		nvlist_free(df_nvlist);
 		df_nvlist = df_build_cache();
 	}
 

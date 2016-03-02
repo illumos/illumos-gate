@@ -262,7 +262,6 @@ inhm_create_nvl(int chip)
 	(void) nvlist_add_uint8(nvl, MCINTEL_NVLIST_NRANKS, 4);
 	inhm_dimmlist(chip, nvl);
 
-	if (inhm_mc_nvl[chip])
-		nvlist_free(inhm_mc_nvl[chip]);
+	nvlist_free(inhm_mc_nvl[chip]);
 	inhm_mc_nvl[chip] = nvl;
 }

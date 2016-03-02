@@ -8290,8 +8290,7 @@ build_event_attributes(char *class, char *subclass, char *node_path,
 	return (nvl);
 
 out:
-	if (nvl)
-		nvlist_free(nvl);
+	nvlist_free(nvl);
 
 	if (dev_name)
 		free(dev_name);
@@ -8364,8 +8363,7 @@ process_syseventq()
 			free(tmp->class);
 		if (tmp->subclass != NULL)
 			free(tmp->subclass);
-		if (tmp->nvl != NULL)
-			nvlist_free(tmp->nvl);
+		nvlist_free(tmp->nvl);
 		syseventq_back = syseventq_back->next;
 		if (syseventq_back == NULL)
 			syseventq_front = NULL;

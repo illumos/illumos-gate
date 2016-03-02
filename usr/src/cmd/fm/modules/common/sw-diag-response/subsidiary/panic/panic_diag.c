@@ -182,8 +182,7 @@ panic_sw_fmri(fmd_hdl_t *hdl, char *object)
 	sw_obj = fmd_nvl_alloc(hdl, FMD_SLEEP);
 	err |= nvlist_add_string(sw_obj, FM_FMRI_SW_OBJ_PATH, object);
 	err |= nvlist_add_nvlist(fmri, FM_FMRI_SW_OBJ, sw_obj);
-	if (sw_obj)
-		nvlist_free(sw_obj);
+	nvlist_free(sw_obj);
 	if (!err)
 		return (fmri);
 	else
