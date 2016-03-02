@@ -17,6 +17,10 @@
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
+/*
+ * Copyright (c) 2013, 2015 by Delphix. All rights reserved.
+ */
+
 #ifndef _SYS_TIME_H
 #define	_SYS_TIME_H
 
@@ -242,6 +246,9 @@ struct itimerval32 {
 
 #define	MSEC2NSEC(m)	((hrtime_t)(m) * (NANOSEC / MILLISEC))
 #define	NSEC2MSEC(n)	((n) / (NANOSEC / MILLISEC))
+
+#define	NSEC2SEC(n)	((n) / (NANOSEC / SEC))
+#define	SEC2NSEC(m)	((hrtime_t)(m) * (NANOSEC / SEC))
 
 #endif /* !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__) */
 
