@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include <sys/auxv.h>
@@ -47,6 +47,30 @@ lx_auxv_stol(const auxv_t *ap, auxv_t *oap, const lx_elf_data_t *edp)
 		}
 	case AT_SUN_BRAND_LX_CLKTCK:
 		oap->a_type = AT_CLKTCK;
+		oap->a_un.a_val = ap->a_un.a_val;
+		return (0);
+	case AT_SUN_AUXFLAGS:
+		if ((ap->a_un.a_val & AF_SUN_SETUGID) != 0) {
+			oap->a_type = AT_SECURE;
+			oap->a_un.a_val = 1;
+			return (0);
+		} else {
+			return (1);
+		}
+	case AT_SUN_GID:
+		oap->a_type = AT_LX_EGID;
+		oap->a_un.a_val = ap->a_un.a_val;
+		return (0);
+	case AT_SUN_RGID:
+		oap->a_type = AT_LX_GID;
+		oap->a_un.a_val = ap->a_un.a_val;
+		return (0);
+	case AT_SUN_UID:
+		oap->a_type = AT_LX_EUID;
+		oap->a_un.a_val = ap->a_un.a_val;
+		return (0);
+	case AT_SUN_RUID:
+		oap->a_type = AT_LX_UID;
 		oap->a_un.a_val = ap->a_un.a_val;
 		return (0);
 	case AT_EXECFD:
