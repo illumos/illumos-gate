@@ -1611,6 +1611,17 @@ lx_ptrace_issig_stop(proc_t *p, klwp_t *lwp)
 	VERIFY(MUTEX_HELD(&p->p_lock));
 
 	/*
+	 * In very rare circumstances, a process which is almost completely
+	 * through proc_exit() may incur issig checks in the current thread via
+	 * clean-up actions.  The process will still be branded, but the thread
+	 * will have already been stripped of any LX-specific data on its way
+	 * to the grave.  Bail early if the brand data is missing.
+	 */
+	if (lwpd == NULL) {
+		return (0);
+	}
+
+	/*
 	 * If we do not have an accord, bail out now.  Additionally, if there
 	 * is no valid signal then we have no reason to stop.
 	 */
