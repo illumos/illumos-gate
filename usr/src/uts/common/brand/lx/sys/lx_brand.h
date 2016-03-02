@@ -162,8 +162,15 @@ typedef enum lx_ptrace_options {
 #define	AT_SUN_BRAND_LX_CLKTCK		AT_SUN_BRAND_AUX3
 #define	AT_SUN_BRAND_LX_SYSINFO_EHDR	AT_SUN_BRAND_AUX4
 
+/* Aux vectors containing real/effective user/group IDs */
+#define	AT_LX_UID		11
+#define	AT_LX_EUID		12
+#define	AT_LX_GID		13
+#define	AT_LX_EGID		14
 /* Aux vector containing hz value */
 #define	AT_CLKTCK	17
+/* Aux vector containing secure boolean */
+#define	AT_SECURE	23
 /* Aux vector containing vDSO addr */
 #define	AT_SYSINFO_EHDR	33
 

@@ -26,7 +26,7 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 /*
- * Copyright (c) 2015, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2016, Joyent, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -554,6 +554,17 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 		args->auxsize += sizeof (aux_entry_t);
 	}
 
+	/*
+	 * If we have user credentials, we'll supply the following entries:
+	 *	AT_SUN_UID
+	 *	AT_SUN_RUID
+	 *	AT_SUN_GID
+	 *	AT_SUN_RGID
+	 */
+	if (cred != NULL) {
+		args->auxsize += 4 * sizeof (aux_entry_t);
+	}
+
 	if ((*brand_action != EBA_NATIVE) && (PROC_IS_BRANDED(p))) {
 		branded = 1;
 		/*
@@ -864,6 +875,18 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 		    ((char *)&aux->a_type -
 		    (char *)bigwad->elfargs));
 		ADDAUX(aux, AT_SUN_AUXFLAGS, auxf);
+
+		/*
+		 * Record information about the real and effective user and
+		 * group IDs.
+		 */
+		if (cred != NULL) {
+			ADDAUX(aux, AT_SUN_UID, crgetuid(cred));
+			ADDAUX(aux, AT_SUN_RUID, crgetruid(cred));
+			ADDAUX(aux, AT_SUN_GID, crgetgid(cred));
+			ADDAUX(aux, AT_SUN_RGID, crgetrgid(cred));
+		}
+
 		/*
 		 * Hardware capability flag word (performance hints)
 		 * Used for choosing faster library routines.

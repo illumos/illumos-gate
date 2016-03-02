@@ -93,19 +93,18 @@ typedef struct {
  * These are the values from LSB 1.3, the first five are also described
  * in the draft amd64 ABI.
  *
- * At the time of writing, Solaris doesn't place any of these values into
- * the aux vector, except AT_CLKTCK which is placed on the aux vector for
- * lx branded processes; also, we do similar things via AT_SUN_ values.
+ * At the time of writing, illumos doesn't place any of these values into the
+ * aux vector, except where noted. We do similar things via AT_SUN_ values.
  *
  * AT_NOTELF		10	program is not ELF?
- * AT_UID		11	real user id
- * AT_EUID		12	effective user id
- * AT_GID		13	real group id
- * AT_EGID		14	effective group id
+ * AT_UID		11	real user id (provided in LX)
+ * AT_EUID		12	effective user id (provided in LX)
+ * AT_GID		13	real group id (provided in LX)
+ * AT_EGID		14	effective group id (provided in LX)
  *
  * AT_PLATFORM		15
  * AT_HWCAP		16
- * AT_CLKTCK		17	c.f. _SC_CLK_TCK
+ * AT_CLKTCK		17	c.f. _SC_CLK_TCK (provided in LX)
  * AT_FPUCW		18
  *
  * AT_DCACHEBSIZE	19	(moved from 10)
@@ -116,7 +115,7 @@ typedef struct {
  *
  * On Linux:
  * AT_* values 18 through 22 are reserved
- * AT_SECURE		23	secure mode boolean
+ * AT_SECURE		23	secure mode boolean (provided in LX)
  * AT_BASE_PLATFORM	24	string identifying real platform, may
  *				differ from AT_PLATFORM.
  * AT_HWCAP2		26	extension of AT_HWCAP
