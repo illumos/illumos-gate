@@ -195,6 +195,9 @@ export BUILD_TOOLS='/opt'
 export SPRO_ROOT='/opt/SUNWspro'
 export SPRO_VROOT="$SPRO_ROOT"
 
+# Disable shadow compilation by default.
+export CW_NO_SHADOW='1'
+
 # This goes along with lint - it is a series of the form "A [y|n]" which
 # means "go to directory A and run 'make lint'" Then mail me (y) the
 # difference in the lint output. 'y' should only be used if the area you're
