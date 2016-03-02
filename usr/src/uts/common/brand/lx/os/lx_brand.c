@@ -434,6 +434,8 @@ lx_getattr(zone_t *zone, int attr, void *ubuf, size_t *ubufsz)
 
 	switch (attr) {
 	case LX_ATTR_KERN_RELEASE: {
+		char buf[LX_KERN_RELEASE_MAX];
+
 		mutex_enter(&lxzd->lxzd_lock);
 		len = strnlen(lxzd->lxzd_kernel_release, LX_KERN_RELEASE_MAX);
 		len++;
@@ -441,15 +443,18 @@ lx_getattr(zone_t *zone, int attr, void *ubuf, size_t *ubufsz)
 			mutex_exit(&lxzd->lxzd_lock);
 			return (ERANGE);
 		}
-		if (copyout(lxzd->lxzd_kernel_release, ubuf, len) != 0) {
-			mutex_exit(&lxzd->lxzd_lock);
+		bzero(buf, sizeof (buf));
+		(void) strncpy(buf, lxzd->lxzd_kernel_release, sizeof (buf));
+		mutex_exit(&lxzd->lxzd_lock);
+		if (copyout(buf, ubuf, len) != 0) {
 			return (EFAULT);
 		}
-		mutex_exit(&lxzd->lxzd_lock);
 		*ubufsz = len;
 		return (0);
 	}
 	case LX_ATTR_KERN_VERSION: {
+		char buf[LX_KERN_VERSION_MAX];
+
 		mutex_enter(&lxzd->lxzd_lock);
 		len = strnlen(lxzd->lxzd_kernel_version, LX_KERN_VERSION_MAX);
 		len++;
@@ -457,11 +462,12 @@ lx_getattr(zone_t *zone, int attr, void *ubuf, size_t *ubufsz)
 			mutex_exit(&lxzd->lxzd_lock);
 			return (ERANGE);
 		}
-		if (copyout(lxzd->lxzd_kernel_version, ubuf, len) != 0) {
-			mutex_exit(&lxzd->lxzd_lock);
+		bzero(buf, sizeof (buf));
+		(void) strncpy(buf, lxzd->lxzd_kernel_version, sizeof (buf));
+		mutex_exit(&lxzd->lxzd_lock);
+		if (copyout(buf, ubuf, len) != 0) {
 			return (EFAULT);
 		}
-		mutex_exit(&lxzd->lxzd_lock);
 		*ubufsz = len;
 		return (0);
 	}
