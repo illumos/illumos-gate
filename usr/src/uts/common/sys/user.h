@@ -185,9 +185,9 @@ typedef struct {		/* kernel syscall set type */
  * This value should not be changed in a patch.
  */
 #if defined(__sparc)
-#define	__KERN_NAUXV_IMPL 20
+#define	__KERN_NAUXV_IMPL 24
 #elif defined(__i386) || defined(__amd64)
-#define	__KERN_NAUXV_IMPL 22
+#define	__KERN_NAUXV_IMPL 26
 #endif
 
 struct execsw;
