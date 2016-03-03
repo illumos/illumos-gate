@@ -22,7 +22,7 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include <errno.h>
@@ -64,6 +64,8 @@
  * needs the proc_clock_highres privilege to use the CLOCK_HIGHRES clock so it
  * will generally be unusable by lx for timer_create.
  */
+
+#define	CLOCK_RT_SLOT	0
 
 static int ltos_clock[] = {
 	CLOCK_REALTIME,			/* LX_CLOCK_REALTIME */
@@ -191,6 +193,14 @@ lx_sigev_thread_id(union sigval sival)
  * However, in reality the Illumos timer_create only accepts CLOCK_REALTIME
  * and CLOCK_HIGHRES, and since we can't use CLOCK_HIGHRES in a zone, we're
  * down to one clock.
+ *
+ * Linux has complicated support for clock IDs. For example, the
+ * clock_getcpuclockid() function can return a negative clock_id. See the Linux
+ * source and the comment in include/linux/posix-timers.h (above CLOCKFD) which
+ * describes clock file descriptors and shows how they map to a virt. or sched.
+ * clock ID. A process can pass one of these negative IDs to timer_create so we
+ * need to convert it and we currently only allow CLOCK_PROCESS_CPUTIME_ID
+ * against the current process as the input.
  */
 long
 lx_timer_create(int clock, struct sigevent *lx_sevp, timer_t *tid)
@@ -198,7 +208,13 @@ lx_timer_create(int clock, struct sigevent *lx_sevp, timer_t *tid)
 	lx_sigevent_t lev;
 	struct sigevent sev;
 
-	if (clock < 0 || clock >= LX_TIMER_MAX)
+	if (clock < 0) {
+		if (clock != 0xfffffffe)
+			return (-EINVAL);
+		clock = CLOCK_RT_SLOT;	/* force our use of CLOCK_REALTIME */
+	}
+
+	if (clock >= LX_TIMER_MAX)
 		return (-EINVAL);
 
 	/* We have to convert the Linux sigevent layout to the Illumos layout */
