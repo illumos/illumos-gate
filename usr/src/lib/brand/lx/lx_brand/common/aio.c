@@ -37,17 +37,30 @@
  * asynchronous I/O facilities together with event port notification.  This
  * approach allows us to broadly approximate Linux semantics, but see
  * lx_io_cancel() for some limitations.
+ *
+ * NOTE:
+ * The Linux implementation of the io_* syscalls is not exposed via glibc.
+ * These syscalls are documented to use an aio_context_t for the context
+ * parameter. On Linux this is a ulong_t. On Linux the contexts live in the
+ * kernel address space and are looked up using the aio_context_t parameter.
+ * The Linux libaio interface uses a different type for the context_t parameter.
+ *
+ * Our implementation assumes the lx_aio_context_t can be treated as a
+ * pointer. This works fortuitously because a ulong_t is the same size as a
+ * pointer. Our implementation maps the contexts into the program's address
+ * space so the aio_context_t we pass back and forth will be valid as a
+ * pointer for the program. This is similar to the native aio implementation.
  */
 
-struct lx_aiocb {
+typedef struct lx_aiocb {
 	struct aiocb	lxaiocb_cb;		/* POSIX AIO control block */
 	struct lx_aiocb *lxaiocb_next;		/* next outstanding/free I/O */
 	struct lx_aiocb	*lxaiocb_prev;		/* prev outstanding I/O */
 	uintptr_t	lxaiocb_iocbp;		/* pointer to lx_iocb_t */
 	uintptr_t	lxaiocb_data;		/* data payload */
-};
+} lx_aiocb_t;
 
-struct lx_aio_context {
+typedef struct lx_aio_ctxt {
 	mutex_t		lxaio_lock;		/* lock protecting context */
 	boolean_t	lxaio_destroying;	/* boolean: being destroyed */
 	cond_t		lxaio_destroyer;	/* destroyer's condvar */
@@ -57,39 +70,39 @@ struct lx_aio_context {
 	lx_aiocb_t	*lxaio_outstanding;	/* outstanding I/O */
 	lx_aiocb_t	*lxaio_free;		/* free I/O control blocks */
 	int		lxaio_nevents;		/* max number of events */
-};
+} lx_aio_ctxt_t;
 
 int lx_aio_max_nr = 65536;
 
 long
-lx_io_setup(unsigned int nr_events, lx_aio_context_t **ctxp)
+lx_io_setup(unsigned int nr_events, lx_aio_context_t *cidp)
 {
-	lx_aio_context_t *ctx;
+	lx_aio_ctxt_t *ctx;
+	intptr_t tp;
 	lx_aiocb_t *lxcbs;
 	uintptr_t check;
 	size_t size;
 	int i;
 
-	if (uucopy(ctxp, &check, sizeof (ctxp)) != 0)
+	if (uucopy(cidp, &check, sizeof (cidp)) != 0)
 		return (-EFAULT);
 
 	if (check != NULL || nr_events == 0 || nr_events > lx_aio_max_nr)
 		return (-EINVAL);
 
 	/*
-	 * We can't actually malloc from the brand library, which makes this
-	 * a tad rocky -- but we're saved from complexity in no small measure
-	 * by the fact that the cap on the number of concurrent events must
-	 * be specified a priori; we use that to determine the amount of
-	 * memory we need and mmap() it upfront.
+	 * We're saved from complexity in no small measure by the fact that the
+	 * cap on the number of concurrent events must be specified a priori;
+	 * we use that to determine the amount of memory we need and mmap() it
+	 * upfront.
 	 */
-	size = sizeof (lx_aio_context_t) + nr_events * sizeof (lx_aiocb_t);
+	size = sizeof (lx_aio_ctxt_t) + nr_events * sizeof (lx_aiocb_t);
 
-	/* LINTED - alignment */
-	if ((ctx = (lx_aio_context_t *)mmap(0, size, PROT_READ | PROT_WRITE,
-	    MAP_PRIVATE | MAP_ANON, -1, 0)) == (lx_aio_context_t *)-1) {
+	if ((tp = (intptr_t)mmap(0, size, PROT_READ | PROT_WRITE,
+	    MAP_PRIVATE | MAP_ANON, -1, 0)) == -1) {
 		return (-ENOMEM);
 	}
+	ctx = (lx_aio_ctxt_t *)tp;
 
 	ctx->lxaio_size = size;
 	ctx->lxaio_nevents = nr_events;
@@ -104,14 +117,14 @@ lx_io_setup(unsigned int nr_events, lx_aio_context_t **ctxp)
 	/*
 	 * Link up the free list.
 	 */
-	lxcbs = (lx_aiocb_t *)((uintptr_t)ctx + sizeof (lx_aio_context_t));
+	lxcbs = (lx_aiocb_t *)((uintptr_t)ctx + sizeof (lx_aio_ctxt_t));
 
 	for (i = 0; i < nr_events - 1; i++)
 		lxcbs[i].lxaiocb_next = &lxcbs[i + 1];
 
 	ctx->lxaio_free = &lxcbs[0];
 
-	if (uucopy(&ctx, ctxp, sizeof (ctxp)) != 0) {
+	if (uucopy(&ctx, cidp, sizeof (cidp)) != 0) {
 		(void) close(ctx->lxaio_port);
 		munmap((caddr_t)ctx, ctx->lxaio_size);
 		return (-EFAULT);
@@ -121,13 +134,14 @@ lx_io_setup(unsigned int nr_events, lx_aio_context_t **ctxp)
 }
 
 long
-lx_io_submit(lx_aio_context_t *ctx, long nr, uintptr_t **bpp)
+lx_io_submit(lx_aio_context_t cid, long nr, uintptr_t **bpp)
 {
 	int processed = 0, err = 0, i;
 	port_notify_t notify;
 	lx_aiocb_t *lxcb;
 	lx_iocb_t **iocbpp, iocb, *iocbp = &iocb;
 	struct aiocb *aiocb;
+	lx_aio_ctxt_t *ctx = (lx_aio_ctxt_t *)cid;
 
 	if (nr <= 0 || ctx == NULL)
 		return (-EINVAL);
@@ -264,7 +278,7 @@ lx_io_submit(lx_aio_context_t *ctx, long nr, uintptr_t **bpp)
 }
 
 long
-lx_io_getevents(lx_aio_context_t *ctx, long min_nr, long nr,
+lx_io_getevents(lx_aio_context_t cid, long min_nr, long nr,
     lx_io_event_t *events, struct timespec *timeout)
 {
 	port_event_t *list;
@@ -272,11 +286,17 @@ lx_io_getevents(lx_aio_context_t *ctx, long min_nr, long nr,
 	unsigned int nget = min_nr;
 	int rval, i, err;
 	uint32_t max = nr;
+	lx_aio_ctxt_t *ctx = (lx_aio_ctxt_t *)cid;
 
 	if (nr > ctx->lxaio_nevents)
 		return (-EINVAL);
 
-	list = SAFE_ALLOCA(nr * sizeof (port_event_t));
+	/*
+	 * We can't return ENOMEM from this syscall so EINTR is the closest
+	 * we can come.
+	 */
+	if ((list = malloc(nr * sizeof (port_event_t))) == NULL)
+		return (-EINTR);
 
 	/*
 	 * Grab the lock associated with the context to bump the number of
@@ -287,6 +307,7 @@ lx_io_getevents(lx_aio_context_t *ctx, long min_nr, long nr,
 
 	if (ctx->lxaio_destroying) {
 		mutex_unlock(&ctx->lxaio_lock);
+		free(list);
 		return (-EINVAL);
 	}
 
@@ -314,10 +335,15 @@ lx_io_getevents(lx_aio_context_t *ctx, long min_nr, long nr,
 
 		mutex_unlock(&ctx->lxaio_lock);
 
+		free(list);
 		return (nget == 0 ? 0 : -err);
 	}
 
-	out = SAFE_ALLOCA(nget * sizeof (lx_io_event_t));
+	if ((out = malloc(nget * sizeof (lx_io_event_t))) == NULL) {
+		mutex_unlock(&ctx->lxaio_lock);
+		free(list);
+		return (-EINTR);
+	}
 
 	/*
 	 * For each returned event, translate it into the Linux event in our
@@ -356,6 +382,8 @@ lx_io_getevents(lx_aio_context_t *ctx, long min_nr, long nr,
 		ctx->lxaio_free = lxcb;
 	}
 
+	free(list);
+
 	/*
 	 * Perform one final check for a shutdown -- it's possible that we
 	 * raced with the port transitioning into alert mode, in which case we
@@ -365,14 +393,18 @@ lx_io_getevents(lx_aio_context_t *ctx, long min_nr, long nr,
 	if (ctx->lxaio_destroying) {
 		cond_signal(&ctx->lxaio_destroyer);
 		mutex_unlock(&ctx->lxaio_lock);
+		free(out);
 		return (-EINVAL);
 	}
 
 	mutex_unlock(&ctx->lxaio_lock);
 
-	if (uucopy(out, events, nget * sizeof (lx_io_event_t)) != 0)
+	if (uucopy(out, events, nget * sizeof (lx_io_event_t)) != 0) {
+		free(out);
 		return (-EFAULT);
+	}
 
+	free(out);
 	return (nget);
 }
 
@@ -408,10 +440,11 @@ lx_io_getevents(lx_aio_context_t *ctx, long min_nr, long nr,
  */
 /*ARGSUSED*/
 long
-lx_io_cancel(lx_aio_context_t *ctx, lx_iocb_t *iocbp, lx_io_event_t *result)
+lx_io_cancel(lx_aio_context_t cid, lx_iocb_t *iocbp, lx_io_event_t *result)
 {
 	lx_iocb_t iocb;
 	lx_aiocb_t *lxcb;
+	lx_aio_ctxt_t *ctx = (lx_aio_ctxt_t *)cid;
 
 	if (uucopy(iocbp, &iocb, sizeof (lx_iocb_t)) != 0)
 		return (-EFAULT);
@@ -446,12 +479,14 @@ lx_io_cancel(lx_aio_context_t *ctx, lx_iocb_t *iocbp, lx_io_event_t *result)
  * this purpose -- thereby kicking any waiters out of their port_get().
  */
 long
-lx_io_destroy(lx_aio_context_t *ctx)
+lx_io_destroy(lx_aio_context_t cid)
 {
 	lx_aiocb_t *lxcb;
-	unsigned int nget = 0, nr;
-	int port = ctx->lxaio_port;
+	unsigned int nget = 0, i;
+	int port;
+	lx_aio_ctxt_t *ctx = (lx_aio_ctxt_t *)cid;
 
+	port = ctx->lxaio_port;
 	mutex_lock(&ctx->lxaio_lock);
 
 	if (ctx->lxaio_destroying) {
@@ -495,16 +530,19 @@ lx_io_destroy(lx_aio_context_t *ctx)
 		nget++;
 	}
 
-	if (nget != 0) {
-		port_event_t *list = SAFE_ALLOCA(nget * sizeof (port_event_t));
+	/*
+	 * Drain one at a time using port_get (vs. port_getn) so that we don't
+	 * have to malloc a port_event list, which might fail.
+	 */
+	for (i = 0; i < nget; i++) {
+		port_event_t pe;
 		int rval;
 
 		do {
-			rval = port_getn(port, list, nr = nget, &nget, NULL);
+			rval = port_get(port, &pe, NULL);
 		} while (rval == -1 && errno == EINTR);
 
 		assert(rval == 0);
-		assert(nget == nr);
 	}
 
 	/*

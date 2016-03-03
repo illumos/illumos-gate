@@ -121,7 +121,7 @@ typedef long (*lx_syscall_handler_t)();
 
 static lx_syscall_handler_t lx_handlers[LX_NSYSCALLS + 1];
 
-static uintptr_t stack_bottom;
+static uintptr_t stack_size;
 
 #if defined(_LP64)
 long lx_fsb;
@@ -280,6 +280,10 @@ lx_err_fatal(char *msg, ...)
 
 /*
  * See if it is safe to alloca() sz bytes.  Return 1 for yes, 0 for no.
+ * We can't be certain we won't blow the stack since we don't know where it
+ * starts, but since the stack is only two pages we know any allocation bigger
+ * than that will blow the stack. Fortunately most allocations are small (e.g.
+ * 128 bytes).
  */
 int
 lx_check_alloca(size_t sz)
@@ -287,7 +291,7 @@ lx_check_alloca(size_t sz)
 	uintptr_t sp = (uintptr_t)&sz;
 	uintptr_t end = sp - sz;
 
-	return ((end < sp) && (end >= stack_bottom));
+	return ((end < sp) && (sz < stack_size));
 }
 
 /*PRINTFLIKE1*/
@@ -594,7 +598,7 @@ lx_init(int argc, char *argv[], char *envp[])
 
 	bzero(&reg, sizeof (reg));
 
-	stack_bottom = 2 * sysconf(_SC_PAGESIZE);
+	stack_size = 2 * sysconf(_SC_PAGESIZE);
 
 	/*
 	 * We need to shutdown all libc stdio.  libc stdio normally goes to

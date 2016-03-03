@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright (c) 2015 Joyent, Inc.  All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #ifndef _SYS_LX_AIO_H
@@ -36,8 +36,7 @@ extern "C" {
 
 typedef struct lx_io_event lx_io_event_t;
 typedef struct lx_iocb lx_iocb_t;
-typedef struct lx_aiocb lx_aiocb_t;
-typedef struct lx_aio_context lx_aio_context_t;
+typedef ulong_t lx_aio_context_t;
 
 /*
  * Linux binary definition of an I/O event.
@@ -67,12 +66,12 @@ struct lx_iocb {
 	uint32_t	lxiocb_resfd;		/* eventfd fd, if any */
 };
 
-extern long lx_io_setup(unsigned int, lx_aio_context_t **);
-extern long lx_io_submit(lx_aio_context_t *, long nr, uintptr_t **);
-extern long lx_io_getevents(lx_aio_context_t *, long, long,
+extern long lx_io_setup(unsigned int, lx_aio_context_t *);
+extern long lx_io_submit(lx_aio_context_t, long nr, uintptr_t **);
+extern long lx_io_getevents(lx_aio_context_t, long, long,
     lx_io_event_t *, struct timespec *);
-extern long lx_io_cancel(lx_aio_context_t *, lx_iocb_t *, lx_io_event_t *);
-extern long lx_io_destroy(lx_aio_context_t *);
+extern long lx_io_cancel(lx_aio_context_t, lx_iocb_t *, lx_io_event_t *);
+extern long lx_io_destroy(lx_aio_context_t);
 
 #ifdef	__cplusplus
 }
