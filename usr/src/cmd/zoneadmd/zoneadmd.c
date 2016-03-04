@@ -765,7 +765,8 @@ static void
 set_zonecfg_env(char *rsrc, char *attr, char *name, char *val)
 {
 	char *p;
-	char nm[MAXNAMELEN];
+	/* Enough for maximal name, rsrc + attr, & slop for ZONECFG & _'s */
+	char nm[2 * MAXNAMELEN + 32];
 
 	if (attr == NULL)
 		(void) snprintf(nm, sizeof (nm), "_ZONECFG_%s_%s", rsrc,

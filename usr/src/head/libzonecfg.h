@@ -120,6 +120,8 @@ extern "C" {
 
 #define	ZONE_STATE_MAXSTRLEN	14
 
+#define	ZONE_PROP_MAXSTRLEN	1024
+
 #define	LIBZONECFG_PATH		"libzonecfg.so.1"
 
 #define	ZONE_CONFIG_ROOT	"/etc/zones"
@@ -211,7 +213,7 @@ struct zone_fstab {
  */
 struct zone_res_attrtab {
 	char	zone_res_attr_name[MAXNAMELEN];
-	char	zone_res_attr_value[MAXNAMELEN];
+	char	zone_res_attr_value[ZONE_PROP_MAXSTRLEN];
 	struct zone_res_attrtab *zone_res_attr_next;
 };
 
