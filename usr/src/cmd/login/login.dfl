@@ -47,12 +47,15 @@ PASSREQ=YES
 ALTSHELL=YES
 
 # PATH sets the initial shell PATH variable
-#
-#PATH=/usr/bin:
+# sample with GNU tools in front of the path
+# PATH=/usr/gnu/bin:/usr/bin:/usr/sbin:/sbin
+# sample with XPG4 tools in front of the path
+# PATH=/usr/xpg4/bin:/usr/bin:/usr/sbin:/sbin
+PATH=/usr/bin:/usr/sbin:/sbin:/usr/gnu/bin
 
 # SUPATH sets the initial shell PATH variable for root
 #
-#SUPATH=/usr/sbin:/usr/bin
+SUPATH=/usr/sbin:/sbin:/usr/bin
 
 # TIMEOUT sets the number of seconds (between 0 and 900) to wait before
 # abandoning a login session.
