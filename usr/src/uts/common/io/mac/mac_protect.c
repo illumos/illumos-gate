@@ -1518,8 +1518,8 @@ intercept_ra_inbound(mac_client_impl_t *mcip, ip6_t *ip6h, uchar_t *end,
 	struct nd_opt_hdr *opt;
 	int len, optlen;
 
-	if (ip6h->ip6_hlim != 255 || ra->nd_ra_curhoplimit != 255) {
-		DTRACE_PROBE(invalid__hoplimit);
+	if (ip6h->ip6_hlim != 255) {
+		DTRACE_PROBE1(invalid__hoplimit, uint8_t, ip6h->ip6_hlim);
 		return;
 	}
 

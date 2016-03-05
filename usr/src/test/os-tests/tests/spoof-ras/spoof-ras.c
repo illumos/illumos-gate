@@ -137,7 +137,7 @@ spoof_prepare_header(struct nd_router_advert *ichdrp, struct iovec *iov)
 	bzero(ichdrp, sizeof (*ichdrp));
 
 	ichdrp->nd_ra_type = ND_ROUTER_ADVERT;
-	ichdrp->nd_ra_curhoplimit = 255;
+	ichdrp->nd_ra_curhoplimit = 0;
 
 	iov->iov_base = (caddr_t)ichdrp;
 	iov->iov_len = sizeof (*ichdrp);
