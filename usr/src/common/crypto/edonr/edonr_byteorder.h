@@ -25,10 +25,10 @@
  * C header file to determine compile machine byte order. Take care when cross
  * compiling.
  *
- * $Id: byteorder.h 517 2013-02-17 20:34:39Z joern $
  */
 /*
  * Portions copyright (c) 2013, Saso Kiselkov, All rights reserved
+ * Copyright 2016 Gary Mills
  */
 
 #ifndef _CRYPTO_EDONR_BYTEORDER_H
@@ -134,8 +134,9 @@
 #if !defined(__arch64__) && !defined(__sparcv8) && defined(__sparcv9)
 #define	__arch64__
 #endif
-#if defined(__GNUC__) || (defined(__SUNPRO_C) && __SUNPRO_C > 0x590)
-/* need Sun Studio C 5.10 and above for GNU inline assembly */
+#if defined(__GNUC__) || (defined(__SUNPRO_C) && __SUNPRO_C > 0x590 && \
+	!defined(__lint))
+/* need Sun Studio C 5.10 and above for GNU inline assembly, but not lint */
 #if defined(__arch64__)
 #define	sparc_ld_swap64(s64, d64)					\
 	__asm__("ldxa [%1]0x88,%0" : "=r"(d64) : "r"(s64))
