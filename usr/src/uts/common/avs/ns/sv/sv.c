@@ -74,6 +74,7 @@
 #include <sys/cmn_err.h>
 #include <sys/modctl.h>
 #include <sys/ddi.h>
+#include <sys/sysmacros.h>
 #include <sys/sunddi.h>
 #include <sys/sunldi.h>
 #include <sys/nsctl/nsvers.h>
@@ -2414,11 +2415,6 @@ sv_lyr_strategy(struct buf *bp)
 
 	return (0);
 }
-
-
-#ifndef offsetof
-#define	offsetof(s, m)	((size_t)(&((s *)0)->m))
-#endif
 
 /*
  * re-write the size of the current partition

@@ -672,9 +672,6 @@ typedef	struct	frentry {
 
 #define	FR_NOLOGTAG	0
 
-#ifndef	offsetof
-#define	offsetof(t,m)	(size_t)((&((t *)0)->m))
-#endif
 #define	FR_CMPSIZ	(sizeof(struct frentry) - \
 			 offsetof(struct frentry, fr_func))
 

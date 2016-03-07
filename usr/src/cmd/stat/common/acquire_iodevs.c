@@ -29,6 +29,7 @@
 #include <sys/dktp/fdisk.h>
 #include <stdlib.h>
 #include <stdarg.h>
+#include <stddef.h>
 #include <unistd.h>
 #include <strings.h>
 #include <errno.h>
@@ -147,9 +148,6 @@ find_parent(struct snapshot *ss, struct iodev_snapshot *iodev)
  * right position in the list. This index is an AVL tree of all the
  * iodev_snapshot in the list.
  */
-
-#define	offsetof(s, m)	(size_t)(&(((s *)0)->m))	/* for avl_create */
-
 static int
 avl_iodev_cmp(const void* is1, const void* is2)
 {

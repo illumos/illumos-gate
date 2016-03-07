@@ -31,8 +31,8 @@
 extern "C" {
 #endif
 
-#define	NET_TX_RING_SIZE  __RING_SIZE((netif_tx_sring_t *)0, PAGESIZE)
-#define	NET_RX_RING_SIZE  __RING_SIZE((netif_rx_sring_t *)0, PAGESIZE)
+#define	NET_TX_RING_SIZE  __CONST_RING_SIZE(netif_tx, PAGESIZE)
+#define	NET_RX_RING_SIZE  __CONST_RING_SIZE(netif_rx, PAGESIZE)
 
 #define	XNF_MAXPKT	1500		/* MTU size */
 #define	XNF_FRAMESIZE	1514		/* frame size including MAC header */

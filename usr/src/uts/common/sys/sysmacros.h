@@ -370,7 +370,11 @@ extern unsigned char bcd_to_byte[256];
 #if (defined(_KERNEL) || defined(_FAKE_KERNEL)) && !defined(_KMEMUSER)
 
 #if !defined(offsetof)
+#if __GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 5)
+#define	offsetof(s, m) __builtin_offsetof(s, m)
+#else
 #define	offsetof(s, m)	((size_t)(&(((s *)0)->m)))
+#endif
 #endif /* !offsetof */
 
 #define	container_of(m, s, name)			\

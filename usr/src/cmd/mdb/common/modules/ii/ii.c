@@ -23,6 +23,8 @@
  * Use is subject to license terms.
  */
 
+#include <stddef.h>
+
 #include <sys/types.h>
 #include <sys/mdb_modapi.h>
 
@@ -35,8 +37,6 @@
 #include <sys/nsctl/dsw_dev.h>
 
 #include <sys/nsctl/nsvers.h>
-
-#define	offsetof(s, m)  ((size_t)(&((s *)0)->m))
 
 
 const mdb_bitmask_t bi_flags_bits[] = {
