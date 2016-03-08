@@ -798,17 +798,22 @@ static int
 lx_zfs_ioctl(ldi_handle_t lh, int cmd, zfs_cmd_t *zc, size_t *dst_alloc_size)
 {
 	uint64_t	cookie;
-	size_t		dstsize = 8192;
+	size_t		dstsize;
 	int		rc, unused;
 
 	cookie = zc->zc_cookie;
 
+	dstsize = (dst_alloc_size == NULL ? 0 : 8192);
+
 again:
-	zc->zc_nvlist_dst = (uint64_t)(intptr_t)kmem_alloc(dstsize, KM_SLEEP);
-	zc->zc_nvlist_dst_size = dstsize;
+	if (dst_alloc_size != NULL) {
+		zc->zc_nvlist_dst = (uint64_t)(intptr_t)kmem_alloc(dstsize,
+		    KM_SLEEP);
+		zc->zc_nvlist_dst_size = dstsize;
+	}
 
 	rc = ldi_ioctl(lh, cmd, (intptr_t)zc, FKIOCTL, kcred, &unused);
-	if (rc == ENOMEM) {
+	if (rc == ENOMEM && dst_alloc_size != NULL) {
 		/*
 		 * Our nvlist_dst buffer was too small, retry with a bigger
 		 * buffer. ZFS will tell us the exact needed size.
@@ -825,10 +830,6 @@ again:
 
 	if (dst_alloc_size != NULL) {
 		*dst_alloc_size = dstsize;
-	} else {
-		/* Caller didn't want the nvlist_dst anyway */
-		kmem_free((void *)(uintptr_t)zc->zc_nvlist_dst, dstsize);
-		zc->zc_nvlist_dst = NULL;
 	}
 
 	return (rc);
@@ -850,6 +851,58 @@ lx_zvol_minor(char *znm)
 	}
 
 	return (m);
+}
+
+/*
+ * We only get the relevant properties for zvols. This is because we're
+ * essentially iterating all of the ZFS datasets/zvols on the entire system
+ * when we boot the zone and there is a significant performance penalty if we
+ * have to retrieve all of the properties for everything. Especially since we
+ * don't care about any of them except the zvols actually in our delegated
+ * datasets.
+ *
+ * Note that the two properties we care about, volsize & volblocksize, are
+ * mandatory for zvols and should always be present. Also, note that the
+ * blocksize property value cannot change after the zvol has been created.
+ */
+static void
+lx_zvol_props(ldi_handle_t lh, zfs_cmd_t *zc, uint64_t *vsz, uint64_t *bsz)
+{
+	int		rc;
+	size_t		size;
+	nvlist_t	*nv = NULL, *nv2;
+
+	rc = lx_zfs_ioctl(lh, ZFS_IOC_OBJSET_STATS, zc, &size);
+	if (rc != 0)
+		return;
+
+	rc = nvlist_unpack((char *)(uintptr_t)zc->zc_nvlist_dst,
+	    zc->zc_nvlist_dst_size, &nv, 0);
+	ASSERT(rc == 0);
+
+	kmem_free((void *)(uintptr_t)zc->zc_nvlist_dst, size);
+	zc->zc_nvlist_dst = NULL;
+	zc->zc_nvlist_dst_size = 0;
+
+	if ((rc = nvlist_lookup_nvlist(nv, "volsize", &nv2)) == 0) {
+		uint64_t val;
+
+		rc = nvlist_lookup_uint64(nv2, ZPROP_VALUE, &val);
+		if (rc == 0) {
+			*vsz = val;
+		}
+	}
+
+	if ((rc = nvlist_lookup_nvlist(nv, "volblocksize", &nv2)) == 0) {
+		uint64_t val;
+
+		rc = nvlist_lookup_uint64(nv2, ZPROP_VALUE, &val);
+		if (rc == 0) {
+			*bsz = val;
+		}
+	}
+
+	nvlist_free(nv);
 }
 
 /*
@@ -953,6 +1006,10 @@ lx_zfs_get_devs(zone_t *zone, list_t *zvol_lst)
 				(void) strcpy(zv->lzd_name, zc->zc_name);
 				zv->lzd_type = LXD_ZFS_DEV_ZVOL;
 				zv->lzd_minor = lx_zvol_minor(zc->zc_name);
+
+				lx_zvol_props(lh, zc, &zv->lzd_volsize,
+				    &zv->lzd_blksize);
+
 				list_insert_tail(zvol_lst, zv);
 			} else {
 				lx_zfs_ds_t *nds;

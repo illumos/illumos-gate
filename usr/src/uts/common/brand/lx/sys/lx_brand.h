@@ -574,6 +574,8 @@ typedef struct lxd_zfs_dev {
 	char			lzd_name[MAXPATHLEN];
 	lxd_zfs_dev_type_t	lzd_type;
 	minor_t			lzd_minor;
+	uint64_t		lzd_volsize;
+	uint64_t		lzd_blksize;
 } lxd_zfs_dev_t;
 
 /*
