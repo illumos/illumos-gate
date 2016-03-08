@@ -48,10 +48,14 @@
 #include <sys/netstack.h>
 #include <inet/ip.h>
 #include <inet/ip_if.h>
+#include <sys/dkio.h>
+#include <sys/sdt.h>
 
 /*
  * Linux ioctl types
  */
+#define	LX_IOC_TYPE_HD		0x03
+#define	LX_IOC_TYPE_BLK		0x12
 #define	LX_IOC_TYPE_FD		0x54
 #define	LX_IOC_TYPE_DTRACE	0x68
 #define	LX_IOC_TYPE_SOCK	0x89
@@ -60,6 +64,10 @@
 /*
  * Supported ioctls
  */
+#define	LX_HDIO_GETGEO		0x0301
+#define	LX_BLKGETSIZE		0x1260
+#define	LX_BLKSSZGET		0x1268
+#define	LX_BLKGETSIZE64		0x80081272
 #define	LX_TCGETS		0x5401
 #define	LX_TCSETS		0x5402
 #define	LX_TCSETSW		0x5403
@@ -497,6 +505,224 @@ ict_fionread(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 		if (error)
 			return (set_errno(error));
 	}
+	return (0);
+}
+
+/*
+ * hard disk-related translators
+ *
+ * Note that the normal disk ioctls only work for VCHR devices. See spec_ioctl
+ * which will return ENOTTY for a VBLK device. However, fdisk, etc. expect to
+ * work with block devices.
+ *
+ * We expect a zvol to be the primary block device we're interacting with and
+ * we use the zone's lxzd_vdisks list to handle zvols specifically.
+ */
+
+typedef struct lx_hd_geom {
+	unsigned char heads;
+	unsigned char sectors;
+	unsigned short cylinders;
+	unsigned long start;
+} lx_hd_geom_t;
+
+static lxd_zfs_dev_t *
+lx_lookup_zvol(minor_t min)
+{
+	lx_zone_data_t *lxzdata;
+	lxd_zfs_dev_t *zv;
+
+	lxzdata = ztolxzd(curproc->p_zone);
+	if (lxzdata == NULL)
+		return (NULL);
+	ASSERT(lxzdata->lxzd_vdisks != NULL);
+
+	zv = list_head(lxzdata->lxzd_vdisks);
+	while (zv != NULL) {
+		if (zv->lzd_minor == min)
+			return (zv);
+
+		zv = list_next(lxzdata->lxzd_vdisks, zv);
+	}
+
+	return (NULL);
+}
+
+/*
+ * See zvol_ioctl() which always fails for DKIOCGGEOM. The geometry for a
+ * zvol (or really any modern disk) is made up, so we do that here as well.
+ */
+static int
+ict_hdgetgeo(file_t *fp, int cmd, intptr_t arg, int lxcmd)
+{
+	lx_hd_geom_t lx_geom;
+
+	if (fp->f_vnode->v_type != VCHR && fp->f_vnode->v_type != VBLK)
+		return (set_errno(EINVAL));
+
+	if (getmajor(fp->f_vnode->v_rdev) == mod_name_to_major("zfs")) {
+		minor_t m;
+		lxd_zfs_dev_t *zv;
+
+		m = getminor(fp->f_vnode->v_rdev);
+		if ((zv = lx_lookup_zvol(m)) == NULL) {
+			/* should only happen if new zvol */
+			bzero(&lx_geom, sizeof (lx_geom));
+		} else {
+			diskaddr_t tot;
+
+			tot = zv->lzd_volsize / zv->lzd_blksize;
+
+			/*
+			 * Since the 'sectors' value is only one byte we make
+			 * up heads/cylinder values to get things to fit.
+			 * We roundup the number of heads to ensure we don't
+			 * overflow the sectors due to truncation.
+			 */
+			lx_geom.heads = lx_geom.cylinders = (tot / 0xff) + 1;
+			lx_geom.sectors = tot / lx_geom.heads;
+			lx_geom.start = 0;
+		}
+	} else {
+		int res, rv;
+		struct dk_geom geom;
+
+		res = VOP_IOCTL(fp->f_vnode, DKIOCGGEOM, (intptr_t)&geom,
+		    fp->f_flag | FKIOCTL, fp->f_cred, &rv, NULL);
+		if (res > 0)
+			return (set_errno(res));
+
+		lx_geom.heads = geom.dkg_nhead;
+		lx_geom.sectors = geom.dkg_nsect;
+		lx_geom.cylinders = geom.dkg_ncyl;
+		lx_geom.start = 0;
+	}
+
+	if (copyout(&lx_geom, (caddr_t)arg, sizeof (lx_geom)))
+		return (set_errno(EFAULT));
+	return (0);
+}
+
+/*
+ * Per the Linux sd(4) man page, get the number of sectors. The linux/fs.h
+ * header says its 512 byte blocks.
+ */
+static int
+ict_blkgetsize(file_t *fp, int cmd, intptr_t arg, int lxcmd)
+{
+	diskaddr_t tot;
+
+	if (fp->f_vnode->v_type != VCHR && fp->f_vnode->v_type != VBLK)
+		return (set_errno(EINVAL));
+
+	if (getmajor(fp->f_vnode->v_rdev) == mod_name_to_major("zfs")) {
+		minor_t m;
+		lxd_zfs_dev_t *zv;
+
+		m = getminor(fp->f_vnode->v_rdev);
+		if ((zv = lx_lookup_zvol(m)) == NULL) {
+			/* should only happen if new zvol */
+			tot = 0;
+		} else {
+			tot = zv->lzd_volsize / 512;
+		}
+	} else {
+		int res, rv;
+		struct dk_minfo minfo;
+
+		res = VOP_IOCTL(fp->f_vnode, DKIOCGMEDIAINFO, (intptr_t)&minfo,
+		    fp->f_flag | FKIOCTL, fp->f_cred, &rv, NULL);
+		if (res > 0)
+			return (set_errno(res));
+
+		tot = minfo.dki_capacity;
+		if (minfo.dki_lbsize > 512) {
+			uint_t bsize = minfo.dki_lbsize / 512;
+
+			tot *= bsize;
+		}
+	}
+
+	if (copyout(&tot, (caddr_t)arg, sizeof (long)))
+		return (set_errno(EFAULT));
+	return (0);
+}
+
+/*
+ * Get the sector size (i.e. the logical block size).
+ */
+static int
+ict_blkgetssize(file_t *fp, int cmd, intptr_t arg, int lxcmd)
+{
+	uint_t bsize;
+
+	if (fp->f_vnode->v_type != VCHR && fp->f_vnode->v_type != VBLK)
+		return (set_errno(EINVAL));
+
+	if (getmajor(fp->f_vnode->v_rdev) == mod_name_to_major("zfs")) {
+		minor_t m;
+		lxd_zfs_dev_t *zv;
+
+		m = getminor(fp->f_vnode->v_rdev);
+		if ((zv = lx_lookup_zvol(m)) == NULL) {
+			/* should only happen if new zvol */
+			bsize = 0;
+		} else {
+			bsize = (uint_t)zv->lzd_blksize;
+		}
+	} else {
+		int res, rv;
+		struct dk_minfo minfo;
+
+		res = VOP_IOCTL(fp->f_vnode, DKIOCGMEDIAINFO, (intptr_t)&minfo,
+		    fp->f_flag | FKIOCTL, fp->f_cred, &rv, NULL);
+		if (res > 0)
+			return (set_errno(res));
+
+		bsize = (uint_t)minfo.dki_lbsize;
+	}
+
+	if (copyout(&bsize, (caddr_t)arg, sizeof (bsize)))
+		return (set_errno(EFAULT));
+	return (0);
+}
+
+/*
+ * Get the size. The linux/fs.h header says its in bytes.
+ */
+static int
+ict_blkgetsize64(file_t *fp, int cmd, intptr_t arg, int lxcmd)
+{
+	uint64_t tot;
+
+	if (fp->f_vnode->v_type != VCHR && fp->f_vnode->v_type != VBLK)
+		return (set_errno(EINVAL));
+
+	if (getmajor(fp->f_vnode->v_rdev) == mod_name_to_major("zfs")) {
+		minor_t m;
+		lxd_zfs_dev_t *zv;
+
+		m = getminor(fp->f_vnode->v_rdev);
+		if ((zv = lx_lookup_zvol(m)) == NULL) {
+			/* should only happen if new zvol */
+			tot = 0;
+		} else {
+			tot = zv->lzd_volsize;
+		}
+	} else {
+		int res, rv;
+		struct dk_minfo minfo;
+
+		res = VOP_IOCTL(fp->f_vnode, DKIOCGMEDIAINFO, (intptr_t)&minfo,
+		    fp->f_flag | FKIOCTL, fp->f_cred, &rv, NULL);
+		if (res > 0)
+			return (set_errno(res));
+
+		tot = minfo.dki_capacity * minfo.dki_lbsize;
+	}
+
+	if (copyout(&tot, (caddr_t)arg, sizeof (uint64_t)))
+		return (set_errno(EFAULT));
 	return (0);
 }
 
@@ -1349,6 +1575,20 @@ static lx_ioc_cmd_translator_t lx_ioc_xlate_autofs[] = {
 	LX_IOC_CMD_TRANSLATOR_END
 };
 
+static lx_ioc_cmd_translator_t lx_ioc_xlate_hd[] = {
+	LX_IOC_CMD_TRANSLATOR_CUSTOM(LX_HDIO_GETGEO, ict_hdgetgeo)
+
+	LX_IOC_CMD_TRANSLATOR_END
+};
+
+static lx_ioc_cmd_translator_t lx_ioc_xlate_blk[] = {
+	LX_IOC_CMD_TRANSLATOR_CUSTOM(LX_BLKGETSIZE, ict_blkgetsize)
+	LX_IOC_CMD_TRANSLATOR_CUSTOM(LX_BLKSSZGET, ict_blkgetssize)
+	LX_IOC_CMD_TRANSLATOR_CUSTOM(LX_BLKGETSIZE64, ict_blkgetsize64)
+
+	LX_IOC_CMD_TRANSLATOR_END
+};
+
 static void
 lx_ioctl_vsd_free(void *data)
 {
@@ -1397,6 +1637,14 @@ lx_ioctl(int fdes, int cmd, intptr_t arg)
 
 	case LX_IOC_TYPE_AUTOFS:
 		ict = lx_ioc_xlate_autofs;
+		break;
+
+	case LX_IOC_TYPE_BLK:
+		ict = lx_ioc_xlate_blk;
+		break;
+
+	case LX_IOC_TYPE_HD:
+		ict = lx_ioc_xlate_hd;
 		break;
 
 	default:
