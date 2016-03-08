@@ -99,7 +99,6 @@ typedef enum lxsys_nodetype {
 	LXSYS_CLASS_NET,	/* /sys/class/net/<iface>		*/
 	LXSYS_DEVICES_NET,	/* /sys/devices/virtual/net/<iface>	*/
 	LXSYS_BLOCK,		/* /sys/block/<dev>			*/
-	LXSYS_DEVICES_BDI,	/* /sys/devices/virtual/bdi/<dev>	*/
 	LXSYS_DEVICES_ZFS,	/* /sys/devices/zfs/<dev>		*/
 	LXSYS_MAXTYPE,		/* type limit				*/
 } lxsys_nodetype_t;

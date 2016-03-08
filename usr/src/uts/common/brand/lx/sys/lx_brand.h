@@ -36,6 +36,8 @@
 #include <sys/zone.h>
 #include <sys/ksocket.h>
 #include <sys/vfs.h>
+#include <sys/sunddi.h>
+#include <sys/sunldi.h>
 #endif
 
 #ifdef	__cplusplus
@@ -543,6 +545,7 @@ typedef struct lx_zone_data {
 	char lxzd_bootid[LX_BOOTID_LEN];	/* procfs boot_id */
 	vfs_t *lxzd_cgroup;			/* cgroup for this zone */
 	list_t *lxzd_vdisks;			/* virtual disks (zvols) */
+	dev_t lxzd_zfs_dev;			/* major num for zfs */
 } lx_zone_data_t;
 
 #define	BR_CPU_BOUND	0x0001
@@ -563,20 +566,22 @@ typedef struct lx_zone_data {
 #define	LX_ARGS(scall) ((struct lx_##scall##_args *)\
 	(ttolxlwp(curthread)->br_scall_args))
 
-typedef enum lxd_zfs_dev_type {
-	LXD_ZFS_DEV_NONE,
-	LXD_ZFS_DEV_POOL,
-	LXD_ZFS_DEV_ZVOL
-} lxd_zfs_dev_type_t;
+typedef enum lx_virt_disk_type {
+	LXVD_NONE,
+	LXVD_ZFS_DS,
+	LXVD_ZVOL
+} lx_virt_disk_type_t;
 
-typedef struct lxd_zfs_dev {
-	list_node_t		lzd_link;
-	char			lzd_name[MAXPATHLEN];
-	lxd_zfs_dev_type_t	lzd_type;
-	minor_t			lzd_minor;
-	uint64_t		lzd_volsize;
-	uint64_t		lzd_blksize;
-} lxd_zfs_dev_t;
+typedef struct lx_virt_disk {
+	list_node_t		lxvd_link;
+	char			lxvd_name[MAXNAMELEN];
+	lx_virt_disk_type_t	lxvd_type;
+	dev_t			lxvd_emul_dev;
+	dev_t			lxvd_real_dev;
+	uint64_t		lxvd_volsize;
+	uint64_t		lxvd_blksize;
+	char			lxvd_real_name[MAXPATHLEN];
+} lx_virt_disk_t;
 
 /*
  * Determine the upper bound on the system call number:

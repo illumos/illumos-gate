@@ -21,7 +21,7 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*
@@ -54,6 +54,7 @@
 #include <sys/sunddi.h>
 #include <sys/sunldi.h>
 #include <sys/lx_impl.h>
+#include <sys/lx_brand.h>
 
 #include "lx_proc.h"
 
@@ -197,7 +198,6 @@ lxpr_mount(vfs_t *vfsp, vnode_t *mvp, mounta_t *uap, cred_t *cr)
 	zone_t *zone = curproc->p_zone;
 	ldi_ident_t li;
 	int err;
-	dev_t zfs_dv;
 
 	/*
 	 * must be root to mount
@@ -211,13 +211,11 @@ lxpr_mount(vfs_t *vfsp, vnode_t *mvp, mounta_t *uap, cred_t *cr)
 	if (mvp->v_type != VDIR)
 		return (ENOTDIR);
 
-	if (zone == global_zone) {
-		zone_t *mntzone;
-
-		mntzone = zone_find_by_path(refstr_value(vfsp->vfs_mntpt));
-		zone_rele(mntzone);
-		if (zone != mntzone)
-			return (EBUSY);
+	/*
+	 * Mounting lx_proc is not allowed outside an LX zone.
+	 */
+	if (zone->zone_brand != &lx_brand) {
+		return (ENOTSUP);
 	}
 
 	/*
@@ -231,32 +229,7 @@ lxpr_mount(vfs_t *vfsp, vnode_t *mvp, mounta_t *uap, cred_t *cr)
 		kmem_free(lxpr_mnt, sizeof (*lxpr_mnt));
 		return (err);
 	}
-
 	lxpr_mnt->lxprm_li = li;
-
-	/* Construct a root cred for our zone, to use with LDI. */
-	lxpr_mnt->lxprm_rcred = crdup(kcred);
-	crsetzone(lxpr_mnt->lxprm_rcred, zone);
-
-	/*
-	 * Try to open the ZFS LDI handle.
-	 */
-	lxpr_mnt->lxprm_zfs_isopen = B_FALSE;
-
-	if (ldi_open_by_name("/dev/zfs", FREAD | FWRITE,
-	    lxpr_mnt->lxprm_rcred, &lxpr_mnt->lxprm_zfs_lh, li) != 0)
-		goto nozfs;
-
-	if (ldi_get_dev(lxpr_mnt->lxprm_zfs_lh, &zfs_dv) != 0) {
-		ldi_close(lxpr_mnt->lxprm_zfs_lh, FREAD|FWRITE,
-		    lxpr_mnt->lxprm_rcred);
-		goto nozfs;
-	}
-
-	lxpr_mnt->lxprm_zfs_major = getmajor(zfs_dv);
-
-	lxpr_mnt->lxprm_zfs_isopen = B_TRUE;
-nozfs:
 
 	mutex_enter(&lxpr_mount_lock);
 
@@ -274,11 +247,14 @@ nozfs:
 	mutex_exit(&mvp->v_lock);
 
 	/*
-	 * allocate the first vnode
+	 * Hold a zone reference for access to the lxzd structure.
 	 */
 	zone_hold(lxpr_mnt->lxprm_zone = zone);
 
-	/* Arbitrarily set the parent vnode to the mounted over directory */
+	/*
+	 * Allocate the first vnode and arbitrarily set the parent vnode to the
+	 * mounted over directory
+	 */
 	lxpr_mnt->lxprm_node = lxpr_getnode(mvp, LXPR_PROCDIR, NULL, 0);
 
 	/* Correctly set the fs for the root node */
@@ -347,12 +323,7 @@ lxpr_unmount(vfs_t *vfsp, int flag, cred_t *cr)
 	lxpr_freenode(lxpr_mnt->lxprm_node);
 	zone_rele(lxpr_mnt->lxprm_zone);
 
-	if (lxpr_mnt->lxprm_zfs_isopen == B_TRUE) {
-		ldi_close(lxpr_mnt->lxprm_zfs_lh, FREAD|FWRITE,
-		    lxpr_mnt->lxprm_rcred);
-		lxpr_mnt->lxprm_zfs_isopen = B_FALSE;
-	}
-	crfree(lxpr_mnt->lxprm_rcred);
+	ldi_ident_release(lxpr_mnt->lxprm_li);
 
 	kmem_free(lxpr_mnt, sizeof (*lxpr_mnt));
 

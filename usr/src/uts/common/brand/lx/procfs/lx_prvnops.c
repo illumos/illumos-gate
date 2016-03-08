@@ -115,8 +115,6 @@ static int lxpr_realvp(vnode_t *, vnode_t **, caller_context_t *);
 static int lxpr_sync(void);
 static void lxpr_inactive(vnode_t *, cred_t *, caller_context_t *);
 
-static char *lxpr_zv_basename(char *);
-
 static vnode_t *lxpr_lookup_procdir(vnode_t *, char *);
 static vnode_t *lxpr_lookup_piddir(vnode_t *, char *);
 static vnode_t *lxpr_lookup_not_a_dir(vnode_t *, char *);
@@ -1558,154 +1556,194 @@ lxpr_clean_mntent(char **mntpt, char **fstype, char **resource)
 	return (0);
 }
 
-/*
- * lxpr_read_pid_mountinfo(): information about process mount points. e.g.:
- *    14 19 0:13 / /sys rw,nosuid,nodev,noexec,relatime - sysfs sysfs rw
- * mntid parid devnums root mntpnt mntopts - fstype mntsrc superopts
- *
- * We have to make up several of these fields.
- */
-static void
-lxpr_read_pid_mountinfo(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
-{
-	struct vfs *vfsp;
-	struct vfs *vfslist;
-	zone_t *zone = LXPTOZ(lxpnp);
-	struct print_data {
-		refstr_t *vfs_mntpt;
-		refstr_t *vfs_resource;
-		uint_t vfs_flag;
-		int vfs_fstype;
-		dev_t vfs_dev;
-		struct print_data *next;
-	} *print_head = NULL;
-	struct print_data **print_tail = &print_head;
-	struct print_data *printp;
-	int root_id = 15;	/* use a made-up value */
-	int mnt_id;
 
-	ASSERT(lxpnp->lxpr_type == LXPR_PID_MOUNTINFO ||
-	    lxpnp->lxpr_type == LXPR_PID_TID_MOUNTINFO);
+typedef struct lxpr_mount_entry {
+	list_node_t	lme_link;
+	uint_t		lme_id;
+	uint_t		lme_parent_id;
+	refstr_t	*lme_mntpt;
+	refstr_t	*lme_resource;
+	uint_t		lme_flag;
+	int		lme_fstype;
+	dev_t		lme_dev;
+	boolean_t	lme_force;
+} lxpr_mount_entry_t;
+
+static int lxpr_zfs_fstype = -1;
+
+#define	LXPR_ROOT_MOUNT_ID	15
+
+static list_t *
+lxpr_enumerate_mounts(zone_t *zone)
+{
+	vfs_t *vfsp, *rvfsp, *vfslist;
+	lx_zone_data_t *lxzd = ztolxzd(zone);
+	list_t *result;
+	lxpr_mount_entry_t *lme;
+	lx_virt_disk_t *vd;
+	uint_t root_id, mount_id;
+	char tmppath[MAXPATHLEN];
+
+	result = kmem_alloc(sizeof (list_t), KM_SLEEP);
+	list_create(result, sizeof (lxpr_mount_entry_t),
+	    offsetof(lxpr_mount_entry_t, lme_link));
+	/* use an arbitrary start value for the root mount_id */
+	root_id = 15;
+	mount_id = root_id + 1;
+
+	ASSERT(zone != global_zone);
+	ASSERT(lxzd != NULL);
+	ASSERT(lxzd->lxzd_vdisks != NULL);
 
 	vfs_list_read_lock();
-
 	vfsp = vfslist = zone->zone_vfslist;
+
 	/*
-	 * If the zone has a root entry, it will be the first in
-	 * the list.  If it doesn't, we conjure one up.
+	 * If the zone has a root entry, it will be the first in the list.
+	 * Conjure one up if needed.
 	 */
 	if (vfslist == NULL || strcmp(refstr_value(vfsp->vfs_mntpt),
 	    zone->zone_rootpath) != 0) {
-		struct vfs *tvfsp;
-		char *rootdev = NULL;
-		lx_zone_data_t *lxzdata;
-		lxd_zfs_dev_t *zv;
-		char zdev[MAXPATHLEN];
+		rvfsp = zone->zone_rootvp->v_vfsp;
+	} else {
+		rvfsp = vfslist;
+		vfsp = vfslist->vfs_zone_next;
+	}
 
-		/*
-		 * The root of the zone is not a mount point.  The vfs
-		 * we want to report is that of the zone's root vnode.
-		 */
-		tvfsp = zone->zone_rootvp->v_vfsp;
+	lme = kmem_alloc(sizeof (lxpr_mount_entry_t), KM_SLEEP);
+	lme->lme_id = root_id;
+	lme->lme_parent_id = 0;
+	lme->lme_mntpt = refstr_alloc(zone->zone_rootpath);
+	lme->lme_flag = rvfsp->vfs_flag;
+	lme->lme_fstype = rvfsp->vfs_fstype;
+	lme->lme_force = B_TRUE;
 
-		lxzdata = ztolxzd(zone);
-		ASSERT(lxzdata != NULL);
-		ASSERT(lxzdata->lxzd_vdisks != NULL);
+	lme->lme_resource = NULL;
+	vd = list_head(lxzd->lxzd_vdisks);
+	while (vd != NULL) {
+		if (vd->lxvd_type == LXVD_ZFS_DS &&
+		    vd->lxvd_real_dev == rvfsp->vfs_dev) {
+			(void) snprintf(tmppath, sizeof (tmppath),
+			    "%sdev/%s", zone->zone_rootpath, vd->lxvd_name);
+			lme->lme_resource = refstr_alloc(tmppath);
+			lme->lme_dev = vd->lxvd_emul_dev;
+			break;
+		}
+		vd = list_next(lxzd->lxzd_vdisks, vd);
+	}
+	if (lme->lme_resource == NULL) {
+		lme->lme_resource = refstr_alloc(zone->zone_rootpath);
+		lme->lme_dev = rvfsp->vfs_dev;
+	}
+	list_insert_head(result, lme);
 
-		zv = list_head(lxzdata->lxzd_vdisks);
-		while (zv != NULL) {
-			if (zv->lzd_type == LXD_ZFS_DEV_POOL) {
-				(void) snprintf(zdev, sizeof (zdev),
-				    "/dev/%s",
-				    lxpr_zv_basename(zv->lzd_name));
-				rootdev = zdev;
+	do {
+		if (vfsp == NULL) {
+			break;
+		}
+		/* Skip mounts we shouldn't show */
+		if ((vfsp->vfs_flag & VFS_NOMNTTAB) != 0) {
+			vfsp = vfsp->vfs_zone_next;
+			continue;
+		}
+
+		lme = kmem_alloc(sizeof (lxpr_mount_entry_t), KM_SLEEP);
+		lme->lme_id = mount_id++;
+		lme->lme_parent_id = root_id;
+		lme->lme_mntpt = vfsp->vfs_mntpt;
+		refstr_hold(vfsp->vfs_mntpt);
+		lme->lme_flag = vfsp->vfs_flag;
+		lme->lme_fstype = vfsp->vfs_fstype;
+		lme->lme_force = B_FALSE;
+
+		lme->lme_resource = NULL;
+		vd = list_head(lxzd->lxzd_vdisks);
+		while (vd != NULL) {
+			if (vd->lxvd_type == LXVD_ZFS_DS &&
+			    vd->lxvd_real_dev == vfsp->vfs_dev) {
+				char vdev[MAXPATHLEN];
+
+				(void) snprintf(vdev, sizeof (vdev),
+				    "%sdev/%s",
+				    zone->zone_rootpath, vd->lxvd_name);
+				lme->lme_resource = refstr_alloc(vdev);
+				lme->lme_dev = vd->lxvd_emul_dev;
 				break;
 			}
-
-			zv = list_next(lxzdata->lxzd_vdisks, zv);
+			vd = list_next(lxzd->lxzd_vdisks, vd);
 		}
-
-		if (rootdev == NULL)
-			rootdev = "/";
-
-		lxpr_uiobuf_printf(uiobuf,
-		    "%d 1 %d:%d / / %s - %s %s %s\n",
-		    root_id,
-		    major(tvfsp->vfs_dev), minor(vfsp->vfs_dev),
-		    tvfsp->vfs_flag & VFS_RDONLY ? "ro" : "rw",
-		    vfssw[tvfsp->vfs_fstype].vsw_name,
-		    rootdev,
-		    tvfsp->vfs_flag & VFS_RDONLY ? "ro" : "rw");
-
-	}
-	if (vfslist == NULL) {
-		vfs_list_unlock();
-		return;
-	}
-
-	/*
-	 * Later on we have to do a lookupname, which can end up causing
-	 * another vfs_list_read_lock() to be called. Which can lead to a
-	 * deadlock. To avoid this, we extract the data we need into a local
-	 * list, then we can run this list without holding vfs_list_read_lock()
-	 * We keep the list in the same order as the vfs_list
-	 */
-	do {
-		/* Skip mounts we shouldn't show */
-		if (vfsp->vfs_flag & VFS_NOMNTTAB) {
-			goto nextfs;
+		if (lme->lme_resource == NULL) {
+			lme->lme_resource = vfsp->vfs_resource;
+			refstr_hold(vfsp->vfs_resource);
+			lme->lme_dev = vfsp->vfs_dev;
 		}
-
-		printp = kmem_alloc(sizeof (*printp), KM_SLEEP);
-		refstr_hold(vfsp->vfs_mntpt);
-		printp->vfs_mntpt = vfsp->vfs_mntpt;
-		refstr_hold(vfsp->vfs_resource);
-		printp->vfs_resource = vfsp->vfs_resource;
-		printp->vfs_flag = vfsp->vfs_flag;
-		printp->vfs_fstype = vfsp->vfs_fstype;
-		printp->vfs_dev = vfsp->vfs_dev;
-		printp->next = NULL;
-
-		*print_tail = printp;
-		print_tail = &printp->next;
-
-nextfs:
-		vfsp = (zone == global_zone) ?
-		    vfsp->vfs_next : vfsp->vfs_zone_next;
-
+		list_insert_tail(result, lme);
+		vfsp = vfsp->vfs_zone_next;
 	} while (vfsp != vfslist);
 
 	vfs_list_unlock();
 
-	mnt_id = root_id + 1;
+	/* Add a single dummy entry for /native/usr */
+	lme = kmem_alloc(sizeof (lxpr_mount_entry_t), KM_SLEEP);
+	lme->lme_id = mount_id++;
+	lme->lme_parent_id = root_id;
+	lme->lme_flag = VFS_RDONLY;
+	lme->lme_dev = makedevice(0, 1);
+	(void) snprintf(tmppath, sizeof (tmppath),
+	    "%snative/usr", zone->zone_rootpath);
+	lme->lme_mntpt = refstr_alloc(tmppath);
+	lme->lme_resource = lme->lme_mntpt;
+	refstr_hold(lme->lme_mntpt);
+	if (lxpr_zfs_fstype == -1) {
+		vfssw_t *zfssw = vfs_getvfssw("zfs");
+		VERIFY(zfssw != NULL);
+		lxpr_zfs_fstype = ((uintptr_t)zfssw - (uintptr_t)vfssw) /
+		    sizeof (vfssw[0]);
+		VERIFY(&vfssw[lxpr_zfs_fstype] == zfssw);
+	}
+	lme->lme_fstype = lxpr_zfs_fstype;
+	lme->lme_force = B_TRUE;
+	list_insert_tail(result, lme);
+
+	return (result);
+}
+
+/*
+ * lxpr_read_pid_mountinfo(): information about process mount points.
+ */
+static void
+lxpr_read_pid_mountinfo(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+{
+	zone_t *zone = LXPTOZ(lxpnp);
+	list_t *mounts;
+	lxpr_mount_entry_t *lme;
+
+	ASSERT(lxpnp->lxpr_type == LXPR_PID_MOUNTINFO ||
+	    lxpnp->lxpr_type == LXPR_PID_TID_MOUNTINFO);
+
+	mounts = lxpr_enumerate_mounts(zone);
 
 	/*
 	 * now we can run through what we've extracted without holding
 	 * vfs_list_read_lock()
 	 */
-	printp = print_head;
-	while (printp != NULL) {
-		struct print_data *printp_next;
-		char *resource;
-		char *mntpt;
-		char *fstype;
-		struct vnode *vp;
+	lme = (lxpr_mount_entry_t *)list_remove_head(mounts);
+	while (lme != NULL) {
+		char *resource, *mntpt, *fstype, *rwflag;
+		vnode_t *vp;
 		int error;
 
-		mntpt = (char *)refstr_value(printp->vfs_mntpt);
-		resource = (char *)refstr_value(printp->vfs_resource);
+		mntpt = (char *)refstr_value(lme->lme_mntpt);
+		resource = (char *)refstr_value(lme->lme_resource);
 
-		if (mntpt != NULL && mntpt[0] != '\0')
-			mntpt = ZONE_PATH_TRANSLATE(mntpt, zone);
-		else
-			mntpt = "-";
-
-		error = lookupname(mntpt, UIO_SYSSPACE, FOLLOW, NULLVPP, &vp);
-
-		if (error != 0)
+		if (mntpt == NULL || mntpt[0] == '\0') {
 			goto nextp;
-
-		if (!(vp->v_flag & VROOT)) {
+		}
+		mntpt = ZONE_PATH_TRANSLATE(mntpt, zone);
+		error = lookupname(mntpt, UIO_SYSSPACE, FOLLOW, NULLVPP, &vp);
+		if (error != 0) {
+			goto nextp;
+		} else if ((vp->v_flag & VROOT) == 0 && !lme->lme_force) {
 			VN_RELE(vp);
 			goto nextp;
 		}
@@ -1721,10 +1759,12 @@ nextfs:
 		}
 
 		/*  Make things look more like Linux. */
-		fstype = vfssw[printp->vfs_fstype].vsw_name;
-		if (lxpr_clean_mntent(&mntpt, &fstype, &resource) != 0) {
+		fstype = vfssw[lme->lme_fstype].vsw_name;
+		if (lxpr_clean_mntent(&mntpt, &fstype, &resource) != 0 &&
+		    !lme->lme_force) {
 			goto nextp;
 		}
+		rwflag = ((lme->lme_flag & VFS_RDONLY) == 0) ? "rw" : "ro";
 
 		/*
 		 * XXX parent ID is not tracked correctly here. Currently we
@@ -1732,28 +1772,19 @@ nextfs:
 		 */
 		lxpr_uiobuf_printf(uiobuf,
 		    "%d %d %d:%d / %s %s - %s %s %s\n",
-		    mnt_id, root_id,
-		    major(printp->vfs_dev), minor(printp->vfs_dev),
-		    mntpt,
-		    printp->vfs_flag & VFS_RDONLY ? "ro" : "rw",
-		    fstype,
-		    resource,
-		    printp->vfs_flag & VFS_RDONLY ? "ro" : "rw");
+		    lme->lme_id, lme->lme_parent_id,
+		    getmajor(lme->lme_dev), getminor(lme->lme_dev),
+		    mntpt, rwflag, fstype, resource, rwflag);
 
 nextp:
-		printp_next = printp->next;
-		refstr_rele(printp->vfs_mntpt);
-		refstr_rele(printp->vfs_resource);
-		kmem_free(printp, sizeof (*printp));
-		printp = printp_next;
-
-		mnt_id++;
+		refstr_rele(lme->lme_mntpt);
+		refstr_rele(lme->lme_resource);
+		kmem_free(lme, sizeof (lxpr_mount_entry_t));
+		lme = (lxpr_mount_entry_t *)list_remove_head(mounts);
 	}
 
-	/* Add a single dummy entry for /native/usr */
-	lxpr_uiobuf_printf(uiobuf,
-	    "%d %d 0:1 / /native/usr ro - zfs /native/usr ro\n",
-	    mnt_id, root_id);
+	list_destroy(mounts);
+	kmem_free(mounts, sizeof (list_t));
 }
 
 /*
@@ -3473,136 +3504,33 @@ lxpr_read_meminfo(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 static void
 lxpr_read_mounts(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
-	struct vfs *vfsp;
-	struct vfs *vfslist;
 	zone_t *zone = LXPTOZ(lxpnp);
-	struct print_data {
-		refstr_t *vfs_mntpt;
-		refstr_t *vfs_resource;
-		uint_t vfs_flag;
-		int vfs_fstype;
-		struct print_data *next;
-	} *print_head = NULL;
-	struct print_data **print_tail = &print_head;
-	struct print_data *printp;
+	list_t *mounts;
+	lxpr_mount_entry_t *lme;
 
-	vfs_list_read_lock();
-
-	if (zone == global_zone) {
-		vfsp = vfslist = rootvfs;
-	} else {
-		vfsp = vfslist = zone->zone_vfslist;
-		/*
-		 * If the zone has a root entry, it will be the first in
-		 * the list.  If it doesn't, we conjure one up.
-		 */
-		if (vfslist == NULL || strcmp(refstr_value(vfsp->vfs_mntpt),
-		    zone->zone_rootpath) != 0) {
-			struct vfs *tvfsp;
-			char *rootdev = NULL;
-			lx_zone_data_t *lxzdata;
-			lxd_zfs_dev_t *zv;
-			char zdev[MAXPATHLEN];
-
-			/*
-			 * The root of the zone is not a mount point.  The vfs
-			 * we want to report is that of the zone's root vnode.
-			 */
-			tvfsp = zone->zone_rootvp->v_vfsp;
-
-			lxzdata = ztolxzd(curproc->p_zone);
-			ASSERT(lxzdata != NULL);
-			ASSERT(lxzdata->lxzd_vdisks != NULL);
-
-			zv = list_head(lxzdata->lxzd_vdisks);
-			while (zv != NULL) {
-				if (zv->lzd_type == LXD_ZFS_DEV_POOL) {
-					(void) snprintf(zdev, sizeof (zdev),
-					    "/dev/%s",
-					    lxpr_zv_basename(zv->lzd_name));
-					rootdev = zdev;
-					break;
-				}
-
-				zv = list_next(lxzdata->lxzd_vdisks, zv);
-			}
-
-			if (rootdev == NULL)
-				rootdev = "/";
-
-			lxpr_uiobuf_printf(uiobuf,
-			    "%s / %s %s 0 0\n",
-			    rootdev,
-			    vfssw[tvfsp->vfs_fstype].vsw_name,
-			    tvfsp->vfs_flag & VFS_RDONLY ? "ro" : "rw");
-
-		}
-		if (vfslist == NULL) {
-			vfs_list_unlock();
-			return;
-		}
-	}
-
-	/*
-	 * Later on we have to do a lookupname, which can end up causing
-	 * another vfs_list_read_lock() to be called. Which can lead to a
-	 * deadlock. To avoid this, we extract the data we need into a local
-	 * list, then we can run this list without holding vfs_list_read_lock()
-	 * We keep the list in the same order as the vfs_list
-	 */
-	do {
-		/* Skip mounts we shouldn't show */
-		if (vfsp->vfs_flag & VFS_NOMNTTAB) {
-			goto nextfs;
-		}
-
-		printp = kmem_alloc(sizeof (*printp), KM_SLEEP);
-		refstr_hold(vfsp->vfs_mntpt);
-		printp->vfs_mntpt = vfsp->vfs_mntpt;
-		refstr_hold(vfsp->vfs_resource);
-		printp->vfs_resource = vfsp->vfs_resource;
-		printp->vfs_flag = vfsp->vfs_flag;
-		printp->vfs_fstype = vfsp->vfs_fstype;
-		printp->next = NULL;
-
-		*print_tail = printp;
-		print_tail = &printp->next;
-
-nextfs:
-		vfsp = (zone == global_zone) ?
-		    vfsp->vfs_next : vfsp->vfs_zone_next;
-
-	} while (vfsp != vfslist);
-
-	vfs_list_unlock();
+	mounts = lxpr_enumerate_mounts(zone);
 
 	/*
 	 * now we can run through what we've extracted without holding
 	 * vfs_list_read_lock()
 	 */
-	printp = print_head;
-	while (printp != NULL) {
-		struct print_data *printp_next;
-		char *resource;
-		char *fstype;
-		char *mntpt;
-		struct vnode *vp;
+	lme = list_remove_head(mounts);
+	while (lme != NULL) {
+		char *resource, *mntpt, *fstype, *rwflag;
+		vnode_t *vp;
 		int error;
 
-		mntpt = (char *)refstr_value(printp->vfs_mntpt);
-		resource = (char *)refstr_value(printp->vfs_resource);
+		mntpt = (char *)refstr_value(lme->lme_mntpt);
+		resource = (char *)refstr_value(lme->lme_resource);
 
-		if (mntpt != NULL && mntpt[0] != '\0')
-			mntpt = ZONE_PATH_TRANSLATE(mntpt, zone);
-		else
-			mntpt = "-";
-
-		error = lookupname(mntpt, UIO_SYSSPACE, FOLLOW, NULLVPP, &vp);
-
-		if (error != 0)
+		if (mntpt == NULL || mntpt[0] == '\0') {
 			goto nextp;
-
-		if (!(vp->v_flag & VROOT)) {
+		}
+		mntpt = ZONE_PATH_TRANSLATE(mntpt, zone);
+		error = lookupname(mntpt, UIO_SYSSPACE, FOLLOW, NULLVPP, &vp);
+		if (error != 0) {
+			goto nextp;
+		} else if ((vp->v_flag & VROOT) == 0 && !lme->lme_force) {
 			VN_RELE(vp);
 			goto nextp;
 		}
@@ -3611,50 +3539,32 @@ nextfs:
 		if (resource != NULL && resource[0] != '\0') {
 			if (resource[0] == '/') {
 				resource = ZONE_PATH_VISIBLE(resource, zone) ?
-				    ZONE_PATH_TRANSLATE(resource, zone) :
-				    mntpt;
+				    ZONE_PATH_TRANSLATE(resource, zone) : mntpt;
 			}
 		} else {
-			resource = "-";
+			resource = "none";
 		}
 
-		/* Make things look more like Linux. */
-		fstype = vfssw[printp->vfs_fstype].vsw_name;
-		if (lxpr_clean_mntent(&mntpt, &fstype, &resource) != 0) {
+		/*  Make things look more like Linux. */
+		fstype = vfssw[lme->lme_fstype].vsw_name;
+		if (lxpr_clean_mntent(&mntpt, &fstype, &resource) != 0 &&
+		    !lme->lme_force) {
 			goto nextp;
 		}
+		rwflag = ((lme->lme_flag & VFS_RDONLY) == 0) ? "rw" : "ro";
 
-		lxpr_uiobuf_printf(uiobuf,
-		    "%s %s %s %s 0 0\n", resource, mntpt, fstype,
-		    printp->vfs_flag & VFS_RDONLY ? "ro" : "rw");
+		lxpr_uiobuf_printf(uiobuf, "%s %s %s %s 0 0\n",
+		    resource, mntpt, fstype, rwflag);
 
 nextp:
-		printp_next = printp->next;
-		refstr_rele(printp->vfs_mntpt);
-		refstr_rele(printp->vfs_resource);
-		kmem_free(printp, sizeof (*printp));
-		printp = printp_next;
-
+		refstr_rele(lme->lme_mntpt);
+		refstr_rele(lme->lme_resource);
+		kmem_free(lme, sizeof (lxpr_mount_entry_t));
+		lme = list_remove_head(mounts);
 	}
 
-	/* Add a single dummy entry for /native/usr */
-	lxpr_uiobuf_printf(uiobuf, "/native/usr /native/usr zfs ro 0 0\n");
-}
-
-/* zvol basename to flatten namespace */
-static char *
-lxpr_zv_basename(char *ds_name)
-{
-	char *nm;
-
-	if ((nm = strrchr(ds_name, '/')) != NULL) {
-		nm++;
-		ASSERT(*nm != '\0');
-	} else {
-		nm = ds_name;
-	}
-
-	return (nm);
+	list_destroy(mounts);
+	kmem_free(mounts, sizeof (list_t));
 }
 
 /*
@@ -3673,34 +3583,25 @@ static void
 lxpr_read_partitions(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
 	lxpr_mnt_t *mnt;
-	lx_zone_data_t *lxzdata;
-	lxd_zfs_dev_t *zv;
+	lx_zone_data_t *lxzd;
+	lx_virt_disk_t *vd;
 
 	ASSERT(lxpnp->lxpr_type == LXPR_PARTITIONS);
 
 	lxpr_uiobuf_printf(uiobuf, "major minor  #blocks  name\n\n");
 
 	mnt = (lxpr_mnt_t *)lxpnp->lxpr_vnode->v_vfsp->vfs_data;
-	lxzdata = ztolxzd(curproc->p_zone);
-	if (lxzdata == NULL)
+	lxzd = ztolxzd(curproc->p_zone);
+	if (lxzd == NULL)
 		return;
-	ASSERT(lxzdata->lxzd_vdisks != NULL);
+	ASSERT(lxzd->lxzd_vdisks != NULL);
 
-	zv = list_head(lxzdata->lxzd_vdisks);
-	while (zv != NULL) {
-		minor_t minor;
-		char *nm = lxpr_zv_basename(zv->lzd_name);
-
-		if (zv->lzd_type == LXD_ZFS_DEV_POOL) {
-			minor = 0;
-		} else {
-			minor = zv->lzd_minor;
-		}
-
+	vd = list_head(lxzd->lxzd_vdisks);
+	while (vd != NULL) {
 		lxpr_uiobuf_printf(uiobuf, "%4d %7d %10d %s\n",
-		    mnt->lxprm_zfs_major, minor, 0, nm);
-
-		zv = list_next(lxzdata->lxzd_vdisks, zv);
+		    getmajor(vd->lxvd_emul_dev), getminor(vd->lxvd_emul_dev),
+		    0, vd->lxvd_name);
+		vd = list_next(lxzd->lxzd_vdisks, vd);
 	}
 }
 
@@ -3714,28 +3615,27 @@ lxpr_read_partitions(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 static void
 lxpr_read_diskstats(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
+	zone_t *zone = LXPTOZ(lxpnp);
+	lx_zone_data_t *lxzd;
 	kstat_t kn;
 	int num;
-	int zv_min = 1;
 	zone_vfs_kstat_t *kip;
-	int major, minor;
 	size_t size;
-	lx_zone_data_t *lxzdata;
-	lxd_zfs_dev_t *zv;
+	lx_virt_disk_t *vd;
 
 	ASSERT(lxpnp->lxpr_type == LXPR_DISKSTATS);
 
-	lxzdata = ztolxzd(curproc->p_zone);
-	if (lxzdata == NULL)
+	lxzd = ztolxzd(zone);
+	if (lxzd == NULL)
 		return;
-	ASSERT(lxzdata->lxzd_vdisks != NULL);
+	ASSERT(lxzd->lxzd_vdisks != NULL);
 
 	/*
 	 * Use the zone_vfs kstat, which is a superset of a kstat_io_t, since
 	 * it tracks IO at the zone level.
 	 */
 	strlcpy(kn.ks_module, "zone_vfs", sizeof (kn.ks_module));
-	strlcpy(kn.ks_name, curproc->p_zone->zone_name, sizeof (kn.ks_name));
+	strlcpy(kn.ks_name, zone->zone_name, sizeof (kn.ks_name));
 	kn.ks_instance = getzoneid();
 
 	kip = (zone_vfs_kstat_t *)lxpr_kstat_read(&kn, B_TRUE, &size, &num);
@@ -3748,23 +3648,12 @@ lxpr_read_diskstats(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	}
 
 	/*
-	 * We make all of the zfs devices look like they are in the unused
-	 * range (see /etc/sysstat/sysstat.ioconf on a Linux distro) so that
-	 * utilities like iostat will simply report our "device" name instead
-	 * of one of the well-known disk types listed in the sysstat.ioconf
-	 * file.
-	 */
-	major = 203;
-
-	/*
 	 * Because the zone vfs stats are tracked at the zone level we use
 	 * the same kstat for the zone's virtual disk (the zpool) and any
 	 * zvols that might also visible within the zone.
 	 */
-	zv = list_head(lxzdata->lxzd_vdisks);
-	while (zv != NULL) {
-		char *nm = lxpr_zv_basename(zv->lzd_name);
-
+	vd = list_head(lxzd->lxzd_vdisks);
+	while (vd != NULL) {
 		/*
 		 * /proc/diskstats is defined to have one line of output for
 		 * each block device, with each line containing the following
@@ -3802,36 +3691,46 @@ lxpr_read_diskstats(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 		 * output which results in totally unexpected results.
 		 */
 
-		if (zv->lzd_type == LXD_ZFS_DEV_POOL) {
-			minor = 0;
+		lxpr_uiobuf_printf(uiobuf, "%4d %7d %s ",
+		    getmajor(vd->lxvd_emul_dev),
+		    getminor(vd->lxvd_emul_dev),
+		    vd->lxvd_name);
+
+		if (vd->lxvd_type == LXVD_ZFS_DS) {
+			/*
+			 * Use the zone-wide vfs stats for any zfs datasets
+			 * represented via virtual devices.
+			 */
+#define	KV(N)	kip->zv_ ## N.value.ui64
+#define	NS_PER_MS	(uint64_t)(NANOSEC / MILLISEC)
+			lxpr_uiobuf_printf(uiobuf,
+			    "%llu %llu %llu %llu "
+			    "%llu %llu %llu %llu "
+			    "%llu %llu %llu\n",
+			    (uint64_t)KV(reads), 0LL,
+			    KV(nread) / (uint64_t)LXPR_SECTOR_SIZE,
+			    (KV(rtime) + KV(wtime)) / NS_PER_MS,
+			    (uint64_t)KV(writes), 0LL,
+			    KV(nwritten) / (uint64_t)LXPR_SECTOR_SIZE,
+			    (KV(rtime) + KV(wtime)) / NS_PER_MS,
+			    (uint64_t)(KV(rcnt) + KV(wcnt)),
+			    (KV(rtime) + KV(wtime)) / NS_PER_MS,
+			    (KV(rlentime) + KV(wlentime)) / NS_PER_MS);
+#undef	KV
+#undef	NS_PER_MS
 		} else {
 			/*
-			 * Use a counter for the fabricated minor number since
-			 * Linux only supports 20 bits for minor numbers.
+			 * Report nearly-zeroed statistics for other devices.
+			 *
+			 * Since iostat will ignore devices which report no
+			 * succesful reads or writes, a single read of one
+			 * sector, taking 1ms, is reported.
 			 */
-			minor = zv_min++;
+			lxpr_uiobuf_printf(uiobuf,
+			    "1 0 1 1 0 0 0 0 0 0 0\n");
 		}
 
-#define	KV(N)	kip->zv_ ## N.value.ui64
-
-		lxpr_uiobuf_printf(uiobuf, "%4d %7d %s "
-		    "%llu %llu %llu %llu "
-		    "%llu %llu %llu %llu "
-		    "%llu %llu %llu\n",
-		    major, minor, nm,
-		    (uint64_t)KV(reads), 0LL,
-		    KV(nread) / (uint64_t)LXPR_SECTOR_SIZE,
-		    (KV(rtime) + KV(wtime)) / (uint64_t)(NANOSEC / MILLISEC),
-		    (uint64_t)KV(writes), 0LL,
-		    KV(nwritten) / (uint64_t)LXPR_SECTOR_SIZE,
-		    (KV(rtime) + KV(wtime)) / (uint64_t)(NANOSEC / MILLISEC),
-		    (uint64_t)(KV(rcnt) + KV(wcnt)),
-		    (KV(rtime) + KV(wtime)) / (uint64_t)(NANOSEC / MILLISEC),
-		    (KV(rlentime) + KV(wlentime)) /
-		    (uint64_t)(NANOSEC / MILLISEC));
-#undef	KV
-
-		zv = list_next(lxzdata->lxzd_vdisks, zv);
+		vd = list_next(lxzd->lxzd_vdisks, vd);
 	}
 
 	kmem_free(kip, size);

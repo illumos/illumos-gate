@@ -526,23 +526,16 @@ typedef struct lx_hd_geom {
 	unsigned long start;
 } lx_hd_geom_t;
 
-static lxd_zfs_dev_t *
-lx_lookup_zvol(minor_t min)
+static lx_virt_disk_t *
+lx_lookup_zvol(lx_zone_data_t *lxzd, dev_t dev)
 {
-	lx_zone_data_t *lxzdata;
-	lxd_zfs_dev_t *zv;
+	lx_virt_disk_t *vd;
 
-	lxzdata = ztolxzd(curproc->p_zone);
-	if (lxzdata == NULL)
-		return (NULL);
-	ASSERT(lxzdata->lxzd_vdisks != NULL);
-
-	zv = list_head(lxzdata->lxzd_vdisks);
-	while (zv != NULL) {
-		if (zv->lzd_minor == min)
-			return (zv);
-
-		zv = list_next(lxzdata->lxzd_vdisks, zv);
+	vd = list_head(lxzd->lxzd_vdisks);
+	while (vd != NULL) {
+		if (vd->lxvd_type == LXVD_ZVOL && vd->lxvd_real_dev == dev)
+			return (vd);
+		vd = list_next(lxzd->lxzd_vdisks, vd);
 	}
 
 	return (NULL);
@@ -556,22 +549,26 @@ static int
 ict_hdgetgeo(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 {
 	lx_hd_geom_t lx_geom;
+	lx_zone_data_t *lxzd;
 
 	if (fp->f_vnode->v_type != VCHR && fp->f_vnode->v_type != VBLK)
 		return (set_errno(EINVAL));
 
-	if (getmajor(fp->f_vnode->v_rdev) == mod_name_to_major("zfs")) {
-		minor_t m;
-		lxd_zfs_dev_t *zv;
+	lxzd = ztolxzd(curproc->p_zone);
+	ASSERT(lxzd != NULL);
+	ASSERT(lxzd->lxzd_vdisks != NULL);
 
-		m = getminor(fp->f_vnode->v_rdev);
-		if ((zv = lx_lookup_zvol(m)) == NULL) {
+	if (getmajor(fp->f_vnode->v_rdev) == getmajor(lxzd->lxzd_zfs_dev)) {
+		lx_virt_disk_t *vd;
+
+		vd = lx_lookup_zvol(lxzd, fp->f_vnode->v_rdev);
+		if (vd == NULL) {
 			/* should only happen if new zvol */
 			bzero(&lx_geom, sizeof (lx_geom));
 		} else {
 			diskaddr_t tot;
 
-			tot = zv->lzd_volsize / zv->lzd_blksize;
+			tot = vd->lxvd_volsize / vd->lxvd_blksize;
 
 			/*
 			 * Since the 'sectors' value is only one byte we make
@@ -611,20 +608,24 @@ static int
 ict_blkgetsize(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 {
 	diskaddr_t tot;
+	lx_zone_data_t *lxzd;
 
 	if (fp->f_vnode->v_type != VCHR && fp->f_vnode->v_type != VBLK)
 		return (set_errno(EINVAL));
 
-	if (getmajor(fp->f_vnode->v_rdev) == mod_name_to_major("zfs")) {
-		minor_t m;
-		lxd_zfs_dev_t *zv;
+	lxzd = ztolxzd(curproc->p_zone);
+	ASSERT(lxzd != NULL);
+	ASSERT(lxzd->lxzd_vdisks != NULL);
 
-		m = getminor(fp->f_vnode->v_rdev);
-		if ((zv = lx_lookup_zvol(m)) == NULL) {
+	if (getmajor(fp->f_vnode->v_rdev) == getmajor(lxzd->lxzd_zfs_dev)) {
+		lx_virt_disk_t *vd;
+
+		vd = lx_lookup_zvol(lxzd, fp->f_vnode->v_rdev);
+		if (vd == NULL) {
 			/* should only happen if new zvol */
 			tot = 0;
 		} else {
-			tot = zv->lzd_volsize / 512;
+			tot = vd->lxvd_volsize / 512;
 		}
 	} else {
 		int res, rv;
@@ -655,20 +656,24 @@ static int
 ict_blkgetssize(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 {
 	uint_t bsize;
+	lx_zone_data_t *lxzd;
 
 	if (fp->f_vnode->v_type != VCHR && fp->f_vnode->v_type != VBLK)
 		return (set_errno(EINVAL));
 
-	if (getmajor(fp->f_vnode->v_rdev) == mod_name_to_major("zfs")) {
-		minor_t m;
-		lxd_zfs_dev_t *zv;
+	lxzd = ztolxzd(curproc->p_zone);
+	ASSERT(lxzd != NULL);
+	ASSERT(lxzd->lxzd_vdisks != NULL);
 
-		m = getminor(fp->f_vnode->v_rdev);
-		if ((zv = lx_lookup_zvol(m)) == NULL) {
+	if (getmajor(fp->f_vnode->v_rdev) == getmajor(lxzd->lxzd_zfs_dev)) {
+		lx_virt_disk_t *vd;
+
+		vd = lx_lookup_zvol(lxzd, fp->f_vnode->v_rdev);
+		if (vd == NULL) {
 			/* should only happen if new zvol */
 			bsize = 0;
 		} else {
-			bsize = (uint_t)zv->lzd_blksize;
+			bsize = (uint_t)vd->lxvd_blksize;
 		}
 	} else {
 		int res, rv;
@@ -694,20 +699,24 @@ static int
 ict_blkgetsize64(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 {
 	uint64_t tot;
+	lx_zone_data_t *lxzd;
 
 	if (fp->f_vnode->v_type != VCHR && fp->f_vnode->v_type != VBLK)
 		return (set_errno(EINVAL));
 
-	if (getmajor(fp->f_vnode->v_rdev) == mod_name_to_major("zfs")) {
-		minor_t m;
-		lxd_zfs_dev_t *zv;
+	lxzd = ztolxzd(curproc->p_zone);
+	ASSERT(lxzd != NULL);
+	ASSERT(lxzd->lxzd_vdisks != NULL);
 
-		m = getminor(fp->f_vnode->v_rdev);
-		if ((zv = lx_lookup_zvol(m)) == NULL) {
+	if (getmajor(fp->f_vnode->v_rdev) == getmajor(lxzd->lxzd_zfs_dev)) {
+		lx_virt_disk_t *vd;
+
+		vd = lx_lookup_zvol(lxzd, fp->f_vnode->v_rdev);
+		if (vd == NULL) {
 			/* should only happen if new zvol */
 			tot = 0;
 		} else {
-			tot = zv->lzd_volsize;
+			tot = vd->lxvd_volsize;
 		}
 	} else {
 		int res, rv;

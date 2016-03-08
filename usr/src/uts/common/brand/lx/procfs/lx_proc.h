@@ -275,13 +275,6 @@ typedef struct lxpr_mnt {
 	lxpr_node_t	*lxprm_node;	/* node at root of proc mount */
 	struct zone	*lxprm_zone;	/* zone for this mount */
 	ldi_ident_t	lxprm_li;	/* ident for ldi */
-
-	cred_t		*lxprm_rcred;	/* Cred for root in our zone. */
-
-	/* Used for ZFS LDI functions in lx_prsubr.c. */
-	boolean_t	lxprm_zfs_isopen;
-	major_t		lxprm_zfs_major;
-	ldi_handle_t	lxprm_zfs_lh;
 } lxpr_mnt_t;
 
 extern vnodeops_t	*lxpr_vnodeops;
