@@ -226,6 +226,12 @@ void (*lx_cgrp_freelwp)(vfs_t *, uint_t, id_t, pid_t);
 
 uint64_t lx_maxstack64 = LX_MAXSTACK64;
 
+/*
+ * Certain Linux tools care deeply about major/minor number mapping.
+ * Map virtual disks (zfs datasets, zvols, etc) into a safe reserved range.
+ */
+#define	LX_MAJOR_DISK	203
+
 static int lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
     struct intpdata *idata, int level, long *execsz, int setid,
     caddr_t exec_file, struct cred *cred, int *brand_action);
@@ -835,22 +841,24 @@ again:
 	return (rc);
 }
 
-static minor_t
-lx_zvol_minor(char *znm)
+static int
+lx_zone_zfs_open(ldi_handle_t *lh, dev_t *zfs_dev)
 {
-	minor_t m;
+	ldi_ident_t li;
 
-	/*
-	 * zvol_name2minor simplifies things here but the call won't succeed
-	 * unless the minor has first been created, so we can't count on this.
-	 */
-	if (zvol_name2minor(znm, &m) != 0) {
-		(void) zvol_create_minor(znm);
-		if (zvol_name2minor(znm, &m) != 0)
-			return (0);
+	if (ldi_ident_from_mod(&modlinkage, &li) != 0) {
+		return (-1);
 	}
-
-	return (m);
+	if (ldi_open_by_name("/dev/zfs", FREAD|FWRITE, kcred, lh, li) != 0) {
+		ldi_ident_release(li);
+		return (-1);
+	}
+	ldi_ident_release(li);
+	if (ldi_get_dev(*lh, zfs_dev) != 0) {
+		ldi_close(*lh, FREAD|FWRITE, kcred);
+		return (-1);
+	}
+	return (0);
 }
 
 /*
@@ -906,44 +914,39 @@ lx_zvol_props(ldi_handle_t lh, zfs_cmd_t *zc, uint64_t *vsz, uint64_t *bsz)
 }
 
 /*
- * We treat the zpool as a virtual device and any zvols as actual devices.
+ * Unlike ZFS proper, which does dynamic zvols, we currently only generate the
+ * zone's "disk" list once at zone boot time and use that consistently in all
+ * of the various subsystems (devfs, sysfs, procfs).  This allows us to avoid
+ * re-iterating the datasets every time one of those subsystems accesses a
+ * "disk" and allows us to keep the view consistent across all subsystems, but
+ * it does mean a reboot is required to see new "disks". This is somewhat
+ * mitigated by its similarity to actual disk drives on a real system.
  */
 static void
-lx_zfs_get_devs(zone_t *zone, list_t *zvol_lst)
+lx_zone_get_zvols(zone_t *zone, ldi_handle_t lh, minor_t *emul_minor)
 {
-	ldi_ident_t li;
-	int	rc;
-	size_t	size;
-	ldi_handle_t lh;
-	dev_t zfs_dv;
+	lx_zone_data_t *lxzd;
+	list_t *zvol_lst, ds_lst;
+	int rc;
+	unsigned int devnum = 0;
+	size_t size;
 	zfs_cmd_t *zc;
 	nvpair_t *elem = NULL;
-	uint_t pool_minor = 1;
 	nvlist_t *pnv = NULL;
-	list_t	ds_lst;
 
-	li = ldi_ident_from_anon();
-	if (ldi_open_by_name("/dev/zfs", FREAD | FWRITE, kcred, &lh, li) != 0)
-		return;
-
-	if (ldi_get_dev(lh, &zfs_dv) != 0) {
-		ldi_close(lh, FREAD|FWRITE, kcred);
-		return;
-	}
+	lxzd = ztolxzd(zone);
+	ASSERT(lxzd != NULL);
+	zvol_lst = lxzd->lxzd_vdisks;
 
 	zc = kmem_zalloc(sizeof (zfs_cmd_t), KM_SLEEP);
-
-	rc = lx_zfs_ioctl(lh, ZFS_IOC_POOL_CONFIGS, zc, &size);
-	if (rc != 0)
+	if (lx_zfs_ioctl(lh, ZFS_IOC_POOL_CONFIGS, zc, &size) != 0) {
 		goto out;
-
+	}
 	ASSERT(zc->zc_cookie > 0);
 
 	rc = nvlist_unpack((char *)(uintptr_t)zc->zc_nvlist_dst,
 	    zc->zc_nvlist_dst_size, &pnv, 0);
-
 	kmem_free((void *)(uintptr_t)zc->zc_nvlist_dst, size);
-
 	if (rc != 0)
 		goto out;
 
@@ -957,30 +960,20 @@ lx_zfs_get_devs(zone_t *zone, list_t *zvol_lst)
 
 	while ((elem = nvlist_next_nvpair(pnv, elem)) != NULL) {
 		lx_zfs_ds_t *ds;
-		lxd_zfs_dev_t *zv;
-
-		/* we include the pool as a virtual disk */
-		zv = kmem_zalloc(sizeof (lxd_zfs_dev_t), KM_SLEEP);
-		(void) strcpy(zv->lzd_name, nvpair_name(elem));
-		zv->lzd_type = LXD_ZFS_DEV_POOL;
-		/* construct a fabricated minor number for the virtual disk */
-		zv->lzd_minor = pool_minor++;
-		list_insert_tail(zvol_lst, zv);
 
 		ds = kmem_zalloc(sizeof (lx_zfs_ds_t), KM_SLEEP);
 		(void) strcpy(ds->ds_name, nvpair_name(elem));
-
 		list_insert_head(&ds_lst, ds);
 
 		while (ds != NULL) {
 			int w;		/* dummy variable */
+
 			bzero(zc, sizeof (zfs_cmd_t));
 			zc->zc_cookie = ds->ds_cookie;
 			(void) strcpy(zc->zc_name, ds->ds_name);
 
-			rc = lx_zfs_ioctl(lh, ZFS_IOC_DATASET_LIST_NEXT, zc,
-			    NULL);
-
+			rc = lx_zfs_ioctl(lh, ZFS_IOC_DATASET_LIST_NEXT,
+			    zc, NULL);
 			/* Update the cookie before doing anything else. */
 			ds->ds_cookie = zc->zc_cookie;
 
@@ -1000,17 +993,38 @@ lx_zfs_get_devs(zone_t *zone, list_t *zvol_lst)
 				continue;
 
 			if (zc->zc_objset_stats.dds_type == DMU_OST_ZVOL) {
-				/* add it to the zvol list */
-				zv = kmem_zalloc(sizeof (lxd_zfs_dev_t),
+				lx_virt_disk_t *vd;
+				minor_t m = 0;
+				char *znm = zc->zc_name;
+
+				/* Create a virtual disk entry for the zvol */
+				vd = kmem_zalloc(sizeof (lx_virt_disk_t),
 				    KM_SLEEP);
-				(void) strcpy(zv->lzd_name, zc->zc_name);
-				zv->lzd_type = LXD_ZFS_DEV_ZVOL;
-				zv->lzd_minor = lx_zvol_minor(zc->zc_name);
+				vd->lxvd_type = LXVD_ZVOL;
+				(void) snprintf(vd->lxvd_name,
+				    sizeof (vd->lxvd_name),
+				    "zvol%u", devnum++);
+				(void) strlcpy(vd->lxvd_real_name,
+				    zc->zc_name,
+				    sizeof (vd->lxvd_real_name));
 
-				lx_zvol_props(lh, zc, &zv->lzd_volsize,
-				    &zv->lzd_blksize);
+				/* Record emulated and real dev_t values */
+				vd->lxvd_emul_dev = makedevice(LX_MAJOR_DISK,
+				    (*emul_minor)++);
+				if (zvol_name2minor(znm, &m) != 0) {
+					(void) zvol_create_minor(znm);
+					zvol_name2minor(znm, &m);
+				}
+				if (m != 0) {
+					vd->lxvd_real_dev = makedevice(
+					    lxzd->lxzd_zfs_dev, m);
+				}
 
-				list_insert_tail(zvol_lst, zv);
+				/* Query volume size properties */
+				lx_zvol_props(lh, zc, &vd->lxvd_volsize,
+				    &vd->lxvd_blksize);
+
+				list_insert_tail(zvol_lst, vd);
 			} else {
 				lx_zfs_ds_t *nds;
 
@@ -1032,40 +1046,66 @@ lx_zfs_get_devs(zone_t *zone, list_t *zvol_lst)
 
 out:
 	nvlist_free(pnv);
-	ldi_close(lh, FREAD|FWRITE, kcred);
 	kmem_free(zc, sizeof (zfs_cmd_t));
+}
+
+static void
+lx_zone_get_zfsds(zone_t *zone, minor_t *emul_minor)
+{
+	lx_zone_data_t *lxzd = ztolxzd(zone);
+	vfs_t *vfsp = zone->zone_rootvp->v_vfsp;
+
+	/*
+	 * Only the root will be mounted at zone init time.
+	 * Finding means of discovering other datasets mounted in the zone
+	 * would be a good enhancement later.
+	 */
+	if (getmajor(vfsp->vfs_dev) == getmajor(lxzd->lxzd_zfs_dev)) {
+		lx_virt_disk_t *vd;
+
+		vd = kmem_zalloc(sizeof (lx_virt_disk_t), KM_SLEEP);
+		vd->lxvd_type = LXVD_ZFS_DS;
+		vd->lxvd_real_dev = vfsp->vfs_dev;
+		vd->lxvd_emul_dev = makedevice(LX_MAJOR_DISK, (*emul_minor)++);
+		snprintf(vd->lxvd_name, sizeof (vd->lxvd_name),
+		    "zfsds%u", 0);
+		(void) strlcpy(vd->lxvd_real_name,
+		    refstr_value(vfsp->vfs_resource),
+		    sizeof (vd->lxvd_real_name));
+
+		list_insert_tail(lxzd->lxzd_vdisks, vd);
+	}
 }
 
 /* Cleanup virtual disk list */
 static void
-lx_zfs_cleanup_devs(lx_zone_data_t *lxzdata)
+lx_zone_cleanup_vdisks(lx_zone_data_t *lxzd)
 {
-	lxd_zfs_dev_t *zv;
+	lx_virt_disk_t *vd;
 
-	if (lxzdata->lxzd_vdisks == NULL) {
-		return;
+	ASSERT(lxzd->lxzd_vdisks != NULL);
+	vd = (list_remove_head(lxzd->lxzd_vdisks));
+	while (vd != NULL) {
+		kmem_free(vd, sizeof (lx_virt_disk_t));
+		vd = list_remove_head(lxzd->lxzd_vdisks);
 	}
 
-	zv = list_remove_head(lxzdata->lxzd_vdisks);
-	while (zv != NULL) {
-		kmem_free(zv, sizeof (lxd_zfs_dev_t));
-		zv = list_remove_head(lxzdata->lxzd_vdisks);
-	}
-
-	list_destroy(lxzdata->lxzd_vdisks);
-	kmem_free(lxzdata->lxzd_vdisks, sizeof (list_t));
-	lxzdata->lxzd_vdisks = NULL;
+	list_destroy(lxzd->lxzd_vdisks);
+	kmem_free(lxzd->lxzd_vdisks, sizeof (list_t));
+	lxzd->lxzd_vdisks = NULL;
 }
 
 void
 lx_init_brand_data(zone_t *zone, kmutex_t *zsl)
 {
 	lx_zone_data_t *data;
+	ldi_handle_t lh;
+
 	ASSERT(MUTEX_HELD(zsl));
 	ASSERT(zone->zone_brand == &lx_brand);
 	ASSERT(zone->zone_brand_data == NULL);
-	data = (lx_zone_data_t *)kmem_zalloc(sizeof (lx_zone_data_t), KM_SLEEP);
 
+	data = (lx_zone_data_t *)kmem_zalloc(sizeof (lx_zone_data_t), KM_SLEEP);
 	mutex_init(&data->lxzd_lock, NULL, MUTEX_DEFAULT, NULL);
 
 	/* No need to hold mutex now since zone_brand_data is not set yet. */
@@ -1088,27 +1128,27 @@ lx_init_brand_data(zone_t *zone, kmutex_t *zsl)
 	zone->zone_reboot_on_init_exit = B_TRUE;
 
 	/*
-	 * Unlike ZFS proper, which does dynamic zvols, we currently only
-	 * generate the zone's "disk" list once at zone boot time and use that
-	 * consistently in all of the various subsystems (devfs, sysfs, procfs).
-	 * This allows us to avoid re-iterating the datasets every time one
-	 * of those subsystems accesses a "disk" and allows us to keep the
-	 * view consistent across all subsystems, but it does mean a reboot is
-	 * required to see new "disks". This is somewhat mitigated by its
-	 * similarity to actual disk drives on a real system.
-	 */
-	data->lxzd_vdisks = kmem_alloc(sizeof (list_t), KM_SLEEP);
-	list_create(data->lxzd_vdisks, sizeof (lxd_zfs_dev_t),
-	    offsetof(lxd_zfs_dev_t, lzd_link));
-
-	/*
 	 * We cannot hold the zone_status_lock while performing zfs operations
 	 * so we drop the lock, get the zfs devs as the last step in this
 	 * function, then reaquire the lock. Don't add any code after this
 	 * which requires that the zone_status_lock was continuously held.
 	 */
 	mutex_exit(zsl);
-	lx_zfs_get_devs(zone, data->lxzd_vdisks);
+
+	data->lxzd_vdisks = kmem_alloc(sizeof (list_t), KM_SLEEP);
+	list_create(data->lxzd_vdisks, sizeof (lx_virt_disk_t),
+	    offsetof(lx_virt_disk_t, lxvd_link));
+
+	if (lx_zone_zfs_open(&lh, &data->lxzd_zfs_dev) == 0) {
+		minor_t emul_minor = 1;
+
+		lx_zone_get_zfsds(zone, &emul_minor);
+		lx_zone_get_zvols(zone, lh, &emul_minor);
+		ldi_close(lh, FREAD|FWRITE, kcred);
+	} else {
+		/* Avoid matching any devices */
+		data->lxzd_zfs_dev = makedevice(-1, 0);
+	}
 	mutex_enter(zsl);
 }
 
@@ -1127,7 +1167,9 @@ lx_free_brand_data(zone_t *zone)
 		data->lxzd_ioctl_sock = NULL;
 	}
 	ASSERT(data->lxzd_cgroup == NULL);
-	lx_zfs_cleanup_devs(data);
+
+	lx_zone_cleanup_vdisks(data);
+
 	mutex_exit(&data->lxzd_lock);
 	zone->zone_brand_data = NULL;
 	mutex_destroy(&data->lxzd_lock);

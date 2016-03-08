@@ -362,7 +362,7 @@ lxd_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 	vnode_t *realrootvp;
 	vnode_t *tvp;
 	lx_zone_data_t *lxzdata;
-	lxd_zfs_dev_t *zd;
+	lx_virt_disk_t *vd;
 	vattr_t vattr;
 
 	nodev = vfs_optionisset(vfsp, MNTOPT_NODEVICES, NULL);
@@ -497,27 +497,19 @@ lxd_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 	vattr.va_type = VLNK;
 	vattr.va_mode = 0777;
 
-	zd = list_head(lxzdata->lxzd_vdisks);
-	while (zd != NULL) {
-		char *nm;
-		char lnknm[MAXPATHLEN];
-
-		nm = strrchr(zd->lzd_name, '/');
-
+	vd = list_head(lxzdata->lxzd_vdisks);
+	while (vd != NULL) {
 		/* only create links for actual zvols */
-		if (zd->lzd_type != LXD_ZFS_DEV_ZVOL || nm == NULL) {
-			zd = list_next(lxzdata->lxzd_vdisks, zd);
-			continue;
+		if (vd->lxvd_type == LXVD_ZVOL) {
+			char lnknm[MAXPATHLEN];
+
+			(void) snprintf(lnknm, sizeof (lnknm),
+			    "./zvol/dsk/%s", vd->lxvd_real_name);
+			(void) lxd_symlink(LDNTOV(ldn), vd->lxvd_name, &vattr,
+			    lnknm, cr, NULL, 0);
 		}
 
-		nm++;
-		ASSERT(*nm != '\0');
-
-		(void) snprintf(lnknm, sizeof (lnknm), "./zvol/dsk/%s",
-		    zd->lzd_name);
-		(void) lxd_symlink(LDNTOV(ldn), nm, &vattr, lnknm, cr, NULL, 0);
-
-		zd = list_next(lxzdata->lxzd_vdisks, zd);
+		vd = list_next(lxzdata->lxzd_vdisks, vd);
 	}
 
 out:

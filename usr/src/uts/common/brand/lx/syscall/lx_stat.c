@@ -109,6 +109,22 @@ typedef enum lx_stat_fmt {
 	LXF_STAT64_64
 } lx_stat_fmt_t;
 
+static void
+lx_stat_xlate_dev(vattr_t *vattr)
+{
+	lx_zone_data_t *lxzd = ztolxzd(curproc->p_zone);
+	dev_t dev = vattr->va_fsid;
+	lx_virt_disk_t *vd;
+
+	vd = list_head(lxzd->lxzd_vdisks);
+	while (vd != NULL) {
+		if (vd->lxvd_real_dev == dev) {
+			vattr->va_fsid = vd->lxvd_emul_dev;
+			return;
+		}
+		vd = list_next(lxzd->lxzd_vdisks, vd);
+	}
+}
 
 static long
 lx_stat_common(vnode_t *vp, cred_t *cr, void *outp, lx_stat_fmt_t fmt)
@@ -131,6 +147,8 @@ lx_stat_common(vnode_t *vp, cred_t *cr, void *outp, lx_stat_fmt_t fmt)
 		/* Linux leaves st_rdev zeroed when it is absent */
 		vattr.va_rdev = 0;
 	}
+
+	lx_stat_xlate_dev(&vattr);
 
 	if (fmt == LXF_STAT32) {
 		struct lx_stat32 sb;
