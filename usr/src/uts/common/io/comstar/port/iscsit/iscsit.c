@@ -563,8 +563,7 @@ cleanup:
 			it_config_free_cmn(cfg);
 		if (cfg_pnvlist)
 			kmem_free(cfg_pnvlist, setcfg.set_cfg_pnvlist_len);
-		if (cfg_nvlist)
-			nvlist_free(cfg_nvlist);
+		nvlist_free(cfg_nvlist);
 
 		/*
 		 * Now that the reconfig is complete set our state back to

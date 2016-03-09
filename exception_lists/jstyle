@@ -1,0 +1,35 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2016 Toomas Soome <tsoome@me.com>
+#
+
+usr/src/lib/libdns_sd/java/com/apple/dnssd/BaseListener.java
+usr/src/lib/libdns_sd/java/com/apple/dnssd/BrowseListener.java
+usr/src/lib/libdns_sd/java/com/apple/dnssd/DNSRecord.java
+usr/src/lib/libdns_sd/java/com/apple/dnssd/DNSSD.java
+usr/src/lib/libdns_sd/java/com/apple/dnssd/DNSSDException.java
+usr/src/lib/libdns_sd/java/com/apple/dnssd/DNSSDRecordRegistrar.java
+usr/src/lib/libdns_sd/java/com/apple/dnssd/DNSSDRegistration.java
+usr/src/lib/libdns_sd/java/com/apple/dnssd/DNSSDService.java
+usr/src/lib/libdns_sd/java/com/apple/dnssd/DomainListener.java
+usr/src/lib/libdns_sd/java/com/apple/dnssd/QueryListener.java
+usr/src/lib/libdns_sd/java/com/apple/dnssd/RegisterListener.java
+usr/src/lib/libdns_sd/java/com/apple/dnssd/RegisterRecordListener.java
+usr/src/lib/libdns_sd/java/com/apple/dnssd/ResolveListener.java
+usr/src/lib/libdns_sd/java/com/apple/dnssd/TXTRecord.java
+usr/src/lib/libdns_sd/java/com/apple/dnssd/docs/examples/src/BrowserApp.java
+usr/src/lib/libdns_sd/java/com/apple/dnssd/docs/examples/src/SimpleChat.java
+usr/src/lib/libdns_sd/java/com/apple/dnssd/docs/examples/src/SwingBrowseListener.java
+usr/src/lib/libdns_sd/java/com/apple/dnssd/docs/examples/src/SwingDomainListener.java
+usr/src/lib/libdns_sd/java/com/apple/dnssd/docs/examples/src/SwingQueryListener.java
+usr/src/lib/libdns_sd/java/com/apple/dnssd/docs/examples/src/SwingResolveListener.java

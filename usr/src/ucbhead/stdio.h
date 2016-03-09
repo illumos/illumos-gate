@@ -48,6 +48,7 @@
 #include <sys/va_list.h>
 #include <stdio_tag.h>
 #include <stdio_impl.h>
+#include <sys/null.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -76,10 +77,6 @@ typedef long	ssize_t;
 #endif
 
 typedef long	fpos_t;
-
-#ifndef NULL
-#define	NULL		0
-#endif
 
 #define	BUFSIZ		1024
 

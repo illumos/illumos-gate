@@ -19,12 +19,15 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
+ */
+
 /*
  * Copyright (c) 1998 by Sun Microsystems, Inc.
  * All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -68,8 +71,8 @@ main(int argc, char **argv)
 
 		case 'n':	/* print our node number */
 			if (_cladm(CL_CONFIG, CL_NODEID, &nid) != 0) {
-				errmsg("node is not configured as part of a"
-				"cluster");
+				errmsg("node is not configured as part of a "
+				    "cluster");
 				return (1);
 			}
 			(void) printf("%s%u\n", cp, nid);
@@ -78,7 +81,7 @@ main(int argc, char **argv)
 		case 'h':	/* print the highest node number */
 			if (_cladm(CL_CONFIG, CL_HIGHEST_NODEID, &hid) != 0) {
 				errmsg("node is not booted as part of a "
-				"cluster");
+				    "cluster");
 				return (1);
 			}
 			(void) printf("%s%u\n", cp, hid);

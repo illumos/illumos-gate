@@ -1066,8 +1066,7 @@ rfs4_dss_setpaths(char *buf, size_t buflen)
 		 * Before we lose the ptr, destroy the nvlist and pathnames
 		 * array from the warm start before this one.
 		 */
-		if (rfs4_dss_oldpaths)
-			nvlist_free(rfs4_dss_oldpaths);
+		nvlist_free(rfs4_dss_oldpaths);
 		rfs4_dss_oldpaths = rfs4_dss_paths;
 	}
 
@@ -1465,10 +1464,8 @@ rfs4_state_fini()
 	rfs4_seen_first_compound = 0;
 
 	/* DSS: distributed stable storage */
-	if (rfs4_dss_oldpaths)
-		nvlist_free(rfs4_dss_oldpaths);
-	if (rfs4_dss_paths)
-		nvlist_free(rfs4_dss_paths);
+	nvlist_free(rfs4_dss_oldpaths);
+	nvlist_free(rfs4_dss_paths);
 	rfs4_dss_paths = rfs4_dss_oldpaths = NULL;
 }
 

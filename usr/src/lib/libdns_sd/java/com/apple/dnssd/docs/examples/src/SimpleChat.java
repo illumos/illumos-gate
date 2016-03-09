@@ -42,9 +42,6 @@
 
 	To do:
 	- implement better coloring algorithm
-
-ident	"%Z%%M%	%I%	%E% SMI"
-
  */
 
 

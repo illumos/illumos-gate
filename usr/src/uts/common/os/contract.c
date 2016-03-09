@@ -1837,10 +1837,8 @@ cte_rele(ct_kevent_t *e)
 	contract_rele(e->cte_contract);
 
 	mutex_destroy(&e->cte_lock);
-	if (e->cte_data)
-		nvlist_free(e->cte_data);
-	if (e->cte_gdata)
-		nvlist_free(e->cte_gdata);
+	nvlist_free(e->cte_data);
+	nvlist_free(e->cte_gdata);
 	kmem_free(e, sizeof (ct_kevent_t));
 }
 

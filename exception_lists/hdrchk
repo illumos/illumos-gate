@@ -1,3 +1,17 @@
+usr/src/cmd/cmd-inet/usr.bin/dns-sd/ClientCommon.h
+usr/src/cmd/cmd-inet/usr.lib/mdnsd/CryptoAlg.h
+usr/src/cmd/cmd-inet/usr.lib/mdnsd/DNSCommon.h
+usr/src/cmd/cmd-inet/usr.lib/mdnsd/GenLinkedList.h
+usr/src/cmd/cmd-inet/usr.lib/mdnsd/PlatformCommon.h
+usr/src/cmd/cmd-inet/usr.lib/mdnsd/anonymous.h
+usr/src/cmd/cmd-inet/usr.lib/mdnsd/dnssec.h
+usr/src/cmd/cmd-inet/usr.lib/mdnsd/mDNSDebug.h
+usr/src/cmd/cmd-inet/usr.lib/mdnsd/mDNSEmbeddedAPI.h
+usr/src/cmd/cmd-inet/usr.lib/mdnsd/mDNSPosix.h
+usr/src/cmd/cmd-inet/usr.lib/mdnsd/mDNSUNP.h
+usr/src/cmd/cmd-inet/usr.lib/mdnsd/uDNS.h
+usr/src/cmd/cmd-inet/usr.lib/mdnsd/nsec.h
+usr/src/cmd/cmd-inet/usr.lib/mdnsd/uds_daemon.h
 usr/src/cmd/krb5/kadmin/cli/kadmin.h
 usr/src/cmd/krb5/kadmin/dbutil/import_err.h
 usr/src/cmd/krb5/kadmin/dbutil/kdb5_util.h
@@ -135,6 +149,8 @@ usr/src/lib/krb5/ss/mit-sipb-copyright.h
 usr/src/lib/krb5/ss/ss_internal.h
 usr/src/lib/krb5/ss/ss.h
 usr/src/lib/libc/port/locale/utils.h
+usr/src/lib/libdns_sd/common/dns_sd.h
+usr/src/lib/libdns_sd/common/dnssd_ipc.h
 usr/src/lib/librstp/common/base.h
 usr/src/lib/librstp/common/choose.h
 usr/src/lib/librstp/common/edge.h

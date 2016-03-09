@@ -79,8 +79,7 @@ cmd_page_fault(fmd_hdl_t *hdl, nvlist_t *modasru, nvlist_t *modfru,
 	flt = cmd_nvl_create_fault(hdl, "fault.memory.page", 100,
 	    page->page_asru_nvl, nvlfru, NULL);
 	flt = cmd_fault_add_location(hdl, flt, cmd_fmri_get_unum(modfru));
-	if (nvlfru != NULL)
-		nvlist_free(nvlfru);
+	nvlist_free(nvlfru);
 #else /* sun4v */
 	flt = cmd_nvl_create_fault(hdl, "fault.memory.page", 100,
 	    page->page_asru_nvl, modfru, NULL);

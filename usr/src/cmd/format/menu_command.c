@@ -23,6 +23,7 @@
  * Copyright 2012 Milan Jurik. All rights reserved.
  * Copyright 2014 Toomas Soome <tsoome@me.com>
  * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2016 Igor Kozhukhov <ikozhukhov@gmail.com>
  */
 
 /*
@@ -1621,7 +1622,8 @@ c_label()
 		(void) memset((char *)&label, 0, sizeof (struct dk_label));
 
 		(void) strcpy(x86_devname, cur_disk->disk_name);
-		if (cur_ctype->ctype_ctype == DKC_DIRECT)
+		if (cur_ctype->ctype_ctype == DKC_DIRECT ||
+		    cur_ctype->ctype_ctype == DKC_BLKDEV)
 			dptr = auto_direct_get_geom_label(cur_file,  &label);
 		else
 			dptr = auto_sense(cur_file, 1, &label);

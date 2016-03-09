@@ -3639,8 +3639,7 @@ again:
 		}
 	}
 out:
-	if (nv != NULL)
-		nvlist_free(nv);
+	nvlist_free(nv);
 	kmem_free((void *)(uintptr_t)zc->zc_nvlist_dst, size);
 	kmem_free(zc, sizeof (zfs_cmd_t));
 	(void) ldi_close(zfs_lh, FREAD|FWRITE, kcred);

@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/fm/protocol.h>
 #include <limits.h>
 
@@ -222,8 +220,7 @@ fmd_event_destroy(fmd_event_t *e)
 		break;
 	}
 
-	if (ep->ev_nvl != NULL)
-		nvlist_free(ep->ev_nvl);
+	nvlist_free(ep->ev_nvl);
 
 	fmd_free(ep, sizeof (fmd_event_impl_t));
 }

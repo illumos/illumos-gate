@@ -25,6 +25,7 @@
 
 /*
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ * Copyright 2014 PALO, Richard.
  *
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -46,6 +47,7 @@
 #define	_ISO_STRING_ISO_H
 
 #include <sys/feature_tests.h>
+#include <sys/null.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -63,14 +65,6 @@ typedef unsigned long	size_t;		/* size of something in bytes */
 typedef unsigned int	size_t;		/* (historical version) */
 #endif
 #endif	/* !_SIZE_T */
-
-#ifndef	NULL
-#if defined(_LP64)
-#define	NULL	0L
-#else
-#define	NULL	0
-#endif
-#endif
 
 extern int memcmp(const void *, const void *, size_t);
 extern void *memcpy(void *_RESTRICT_KYWD, const void *_RESTRICT_KYWD, size_t);

@@ -731,8 +731,7 @@ cpu_cap_request(ri_hdl_t *ri_hdl, rcmd_t *rcm)
 out:
 	s_free(syscpuids);
 	s_free(newcpuids);
-	if (nvl != NULL)
-		nvlist_free(nvl);
+	nvlist_free(nvl);
 	if (rcm_info != NULL)
 		rcm_free_info(rcm_info);
 
@@ -1771,8 +1770,7 @@ ri_ap_alloc(char *ap_id, ri_hdl_t *hdl)
 
 	if (nvlist_alloc(&ap->conf_props, NV_UNIQUE_NAME, 0) != 0 ||
 	    nvlist_add_string(ap->conf_props, RI_AP_REQ_ID, ap_id) != 0) {
-		if (ap->conf_props != NULL)
-			nvlist_free(ap->conf_props);
+		nvlist_free(ap->conf_props);
 		free(ap);
 		return (NULL);
 	}

@@ -352,8 +352,7 @@ be_init(nvlist_t *be_attrs)
 	}
 
 done:
-	if (bt.nbe_zfs_props != NULL)
-		nvlist_free(bt.nbe_zfs_props);
+	nvlist_free(bt.nbe_zfs_props);
 
 	be_zfs_fini();
 
@@ -1167,8 +1166,7 @@ done:
 	ZFS_CLOSE(zhp);
 	be_free_fs_list(&fld);
 
-	if (bt.nbe_zfs_props != NULL)
-		nvlist_free(bt.nbe_zfs_props);
+	nvlist_free(bt.nbe_zfs_props);
 
 	free(bt.obe_altroot);
 	free(new_mp);
@@ -2090,8 +2088,7 @@ be_copy_zones(char *obe_name, char *obe_root_ds, char *nbe_root_ds)
 				    "failed to create zone BE clone for new "
 				    "zone BE %s\n"), new_zone_be_name);
 				ret = iret;
-				if (bt.nbe_zfs_props != NULL)
-					nvlist_free(bt.nbe_zfs_props);
+				nvlist_free(bt.nbe_zfs_props);
 				goto done;
 			}
 			/*
@@ -2116,8 +2113,7 @@ be_copy_zones(char *obe_name, char *obe_root_ds, char *nbe_root_ds)
 					    "failed to generate auto name "
 					    "for zone BE.\n"));
 					ret = BE_ERR_AUTONAME;
-					if (bt.nbe_zfs_props != NULL)
-						nvlist_free(bt.nbe_zfs_props);
+					nvlist_free(bt.nbe_zfs_props);
 					goto done;
 				}
 
@@ -2140,8 +2136,7 @@ be_copy_zones(char *obe_name, char *obe_root_ds, char *nbe_root_ds)
 					    zoneroot_ds,
 					    libzfs_error_description(g_zfs));
 					ret = zfs_err_to_be_err(g_zfs);
-					if (bt.nbe_zfs_props != NULL)
-						nvlist_free(bt.nbe_zfs_props);
+					nvlist_free(bt.nbe_zfs_props);
 					goto done;
 				}
 
@@ -2161,8 +2156,7 @@ be_copy_zones(char *obe_name, char *obe_root_ds, char *nbe_root_ds)
 					    "for new zone BE %s\n"),
 					    new_zone_be_name);
 					ret = iret;
-					if (bt.nbe_zfs_props != NULL)
-						nvlist_free(bt.nbe_zfs_props);
+					nvlist_free(bt.nbe_zfs_props);
 					goto done;
 				}
 			}
@@ -2177,14 +2171,12 @@ be_copy_zones(char *obe_name, char *obe_root_ds, char *nbe_root_ds)
 				free(bt.nbe_name);
 				bt.nbe_name = NULL;
 				ret = BE_ERR_AUTONAME;
-				if (bt.nbe_zfs_props != NULL)
-					nvlist_free(bt.nbe_zfs_props);
+				nvlist_free(bt.nbe_zfs_props);
 				goto done;
 			}
 		}
 
-		if (bt.nbe_zfs_props != NULL)
-			nvlist_free(bt.nbe_zfs_props);
+		nvlist_free(bt.nbe_zfs_props);
 
 		z_zhp = NULL;
 

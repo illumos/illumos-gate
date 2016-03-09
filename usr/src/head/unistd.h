@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright 2014 PALO, Richard.
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  * Copyright (c) 2013 Gary Mills
  *
@@ -36,6 +37,7 @@
 
 #include <sys/feature_tests.h>
 
+#include <sys/null.h>
 #include <sys/types.h>
 #include <sys/unistd.h>
 
@@ -176,14 +178,6 @@ extern "C" {
 
 #ifndef _POSIX_VDISABLE
 #define	_POSIX_VDISABLE		0
-#endif
-
-#ifndef NULL
-#if defined(_LP64)
-#define	NULL	0L
-#else
-#define	NULL	0
-#endif
 #endif
 
 #define	STDIN_FILENO	0

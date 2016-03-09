@@ -434,11 +434,10 @@ do_publish(const char *file, const char *func, int64_t line,
 
 done:
 	/* Free a passed in nvlist iff success */
-	if (nvl && rc == FMEV_SUCCESS)
+	if (rc == FMEV_SUCCESS)
 		nvlist_free(nvl);
 
-	if (tmpnvl)
-		nvlist_free(tmpnvl);
+	nvlist_free(tmpnvl);
 
 	return (rc);
 }

@@ -95,7 +95,6 @@ UNDEF_REF	^usr/snadm/lib/libsvm\.so\.1$
 
 # Objects allowed to have unused dependencies
 UNUSED_DEPS	^usr/lib/picl/plugins/		# require devtree dependencies
-UNUSED_DEPS	^usr/lib/libp	# profile libc makes libm an unused dep of libc
 
 # libm.so.2 dependency
 UNUSED_OBJ	unused object=.*MACH(libm)/libm_hwcap1\.so\.2

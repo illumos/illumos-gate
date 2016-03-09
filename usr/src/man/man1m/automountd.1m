@@ -1,126 +1,117 @@
-'\" te
-.\"  Copyright 1989 AT&T Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH AUTOMOUNTD 1M "Mar 3, 2005"
-.SH NAME
-automountd \- autofs mount/unmount daemon
-.SH SYNOPSIS
-.LP
-.nf
-\fBautomountd\fR [\fB-Tvn\fR] [\fB-D\fR \fIname=value\fR]
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
-\fBautomountd\fR is an \fBRPC\fR server that answers file system mount and
-unmount requests from the \fBautofs\fR file system. It uses local files or name
-service maps to locate file systems to be mounted. These maps are described
-with the \fBautomount\fR(1M) command.
-.sp
-.LP
-If \fBautomount\fR finds any non-trivial entries in either the local or
-distributed automount maps and if the daemon is not running already, the
-\fBautomountd\fR daemon is automatically invoked by \fBautomount\fR(1M).
-\fBautomountd\fR enables the \fBsvc:/network/nfs/nlockmgr\fR service
-(\fBlockd\fR(1M)), and the \fBsvc:/network/nfs/status\fR service
-(\fBstatd\fR(1M)), if NFS mounts need to be done.
-.sp
-.LP
-At startup, the \fBautomountd\fR daemon is invoked as is invoked as the
-\fBsystem/filesystem/autofs:default\fR service. See NOTES.
-.SH OPTIONS
-.sp
-.LP
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.\"
+.\" Copyright 1989 AT&T
+.\" Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright 2016 Nexenta Systems, Inc.
+.\"
+.Dd March 1, 2016
+.Dt AUTOMOUNTD 1M
+.Os
+.Sh NAME
+.Nm automountd
+.Nd autofs mount/unmount daemon
+.Sh SYNOPSIS
+.Nm
+.Op Fl nTv
+.Op Fl D Ar name Ns = Ns Ar value
+.Sh DESCRIPTION
+.Nm
+is an RPC server that answers file system mount and unmount requests from the
+.Nm autofs
+file system. It uses local files or name service maps to locate file systems to
+be mounted. These maps are described with the
+.Xr automount 1M
+command.
+.Pp
+If
+.Nm automount
+finds any non-trivial entries in either the local or distributed automount maps
+and if the daemon is not running already, the
+.Nm
+daemon is automatically invoked by
+.Xr automount 1M .
+.Nm
+enables the svc:/network/nfs/nlockmgr service
+.Pq Xr lockd 1M ,
+and the svc:/network/nfs/status service
+.Pq Xr statd 1M ,
+if NFS mounts need to be done.
+.Sh OPTIONS
 The following options are supported:
-.sp
-.ne 2
-.na
-\fB\fB-D\fR \fIname=value\fR\fR
-.ad
-.RS 17n
-Assign \fIvalue\fR to the indicated \fBautomount\fR map substitution variable.
-These assignments cannot be used to substitute variables in the master map
-\fBauto_master\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-n\fR\fR
-.ad
-.RS 17n
-Turn off browsing for all \fBautofs\fR mount points. This option overrides the
-\fB-browse\fR \fBautofs\fR map option on the local host.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-T\fR\fR
-.ad
-.RS 17n
-Trace. Expand each \fBRPC\fR call and display it on the standard output.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-v\fR\fR
-.ad
-.RS 17n
+.Bl -tag -width Ds
+.It Fl D Ar name Ns = Ns Ar value
+Assign
+.Ar value
+to the indicated
+.Nm automount
+map substitution variable. These assignments cannot be used to substitute
+variables in the master map
+.Sy auto_master .
+.It Fl n
+Turn off browsing for all
+.Nm autofs
+mount points. This option overrides the
+.Sy -browse
+.Nm autofs
+map option on the local host.
+.It Fl T
+Trace. Expand each RPC call and display it on the standard output.
+.It Fl v
 Verbose. Log status messages to the console.
-.RE
-
-.SH USAGE
-.sp
-.LP
-See \fBlargefile\fR(5) for the description of the behavior of \fBautomountd\fR
-when encountering files greater than or equal to 2 Gbyte ( 2^31 bytes).
-.SH FILES
-.sp
-.ne 2
-.na
-\fB\fB/etc/auto_master\fR\fR
-.ad
-.RS 23n
+.El
+.Sh USAGE
+See
+.Xr largefile 5
+for the description of the behavior of
+.Nm
+when encountering files greater than or equal to 2 Gbyte
+.Pq 2^31 bytes .
+.Sh FILES
+.Bl -tag -width Ds
+.It Pa /etc/auto_master
 Master map for automounter.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/etc/default/autofs\fR\fR
-.ad
-.RS 23n
-Supplies default values for parameters for \fBautomount\fR and
-\fBautomountd\fR. See \fBautofs\fR(4).
-.RE
-
-.SH SEE ALSO
-.sp
-.LP
-\fBsvcs\fR(1), \fBautomount\fR(1M), \fBsvcadm\fR(1M), \fBautofs\fR(4),
-\fBattributes\fR(5), \fBlargefile\fR(5), \fBsmf\fR(5)
-.SH NOTES
-.sp
-.LP
-The \fBautomountd\fR service is managed by the service management facility,
-\fBsmf\fR(5), under the service identifier:
-.sp
-.in +2
-.nf
+.El
+.Sh SEE ALSO
+.Xr svcs 1 ,
+.Xr automount 1M ,
+.Xr svcadm 1M ,
+.Xr autofs 4 ,
+.Xr attributes 5 ,
+.Xr largefile 5 ,
+.Xr smf 5
+.Sh NOTES
+The
+.Nm
+service is managed by the service management facility,
+.Xr smf 5 ,
+under the service identifier:
+.Bd -literal -offset indent
 svc:/system/filesystem/autofs
-.fi
-.in -2
-.sp
-
-.sp
-.LP
+.Ed
+.Pp
 Administrative actions on this service, such as enabling, disabling, or
-requesting restart, can be performed using \fBsvcadm\fR(1M). The service's
-status can be queried using \fBsvcs\fR(1). If it is disabled, it is enabled by
-\fBautomount\fR(1M) unless the \fBapplication/auto_enable\fR property is set to
-\fBfalse\fR.
+requesting restart, can be performed using
+.Xr svcadm 1M .
+The service's status can be queried using
+.Xr svcs 1 .
+If it is disabled, it is enabled by
+.Xr automount 1M
+unless the
+.Sy application Ns / Ns Sy auto_enable
+property is set to
+.Sy false .

@@ -2415,8 +2415,7 @@ pool_knl_put_property(pool_elem_t *pe, const char *name,
 		return (PO_FAIL);
 
 	if (prov->pkc_log->l_state != LS_DO) {
-		if (bl)
-			nvlist_free(bl);
+		nvlist_free(bl);
 		return (PO_SUCCESS);
 	}
 	/*
@@ -3460,8 +3459,7 @@ log_item_release(log_item_t *li)
 	case POOL_PROPPUT:
 		propput = (pool_propput_undo_t *)li->li_details;
 
-		if (propput->ppu_blist)
-			nvlist_free(propput->ppu_blist);
+		nvlist_free(propput->ppu_blist);
 		free(propput->ppu_ioctl.pp_o_buf);
 		free(propput);
 		break;

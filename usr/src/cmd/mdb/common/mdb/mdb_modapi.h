@@ -37,6 +37,7 @@
  */
 
 #include <sys/types.h>
+#include <sys/null.h>
 #include <gelf.h>
 
 #ifdef	__cplusplus
@@ -44,16 +45,10 @@ extern "C" {
 #endif
 
 /*
- * Make sure that NULL, TRUE, FALSE, MIN, and MAX have the usual definitions
+ * Make sure that TRUE, FALSE, MIN, and MAX have the usual definitions
  * so module writers can depend on these macros and defines.
+ * Make sure NULL is available to module writers by including <sys/null.h>.
  */
-#ifndef NULL
-#if defined(_LP64) && !defined(__cplusplus)
-#define	NULL	0L
-#else
-#define	NULL	0
-#endif
-#endif
 
 #ifndef TRUE
 #define	TRUE	1

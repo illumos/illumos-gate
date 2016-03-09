@@ -1696,12 +1696,10 @@ queue_event(sysevent_t *ev, syseventtab_t *sep, sysevent_hdr_info_t *hdr)
 		}
 		if (expand_macros(ev, nvlist, sep, line, hdr)) {
 			freestr(line);
-			if (nvlist)
-				nvlist_free(nvlist);
+			nvlist_free(nvlist);
 			return (1);
 		}
-		if (nvlist)
-			nvlist_free(nvlist);
+		nvlist_free(nvlist);
 	}
 
 	if (debug_level >= DBG_EXEC) {

@@ -35,12 +35,11 @@
 #ifndef _RPC_TYPES_H
 #define	_RPC_TYPES_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Rpc additions to <sys/types.h>
  */
 #include <sys/types.h>
+#include <sys/null.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -81,10 +80,6 @@ typedef long rpc_inline_t;
 
 #ifndef	TRUE
 #define	TRUE	(1)
-#endif
-
-#ifndef	NULL
-#define	NULL	0
 #endif
 
 #ifndef	_KERNEL

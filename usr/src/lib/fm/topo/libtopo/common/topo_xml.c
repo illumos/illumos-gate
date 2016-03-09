@@ -1012,8 +1012,7 @@ pmr_done:
 		xmlFree(meth_name);
 	if (prop_name)
 		xmlFree(prop_name);
-	if (arg_nvl)
-		nvlist_free(arg_nvl);
+	nvlist_free(arg_nvl);
 	return (ret);
 }
 
@@ -1102,8 +1101,7 @@ pgroup_record(topo_mod_t *mp, xmlNodePtr pxn, tnode_t *tn, const char *rname,
 		e |= nvlist_add_nvlist_array(pgnvl, INV_PGRP_ALLPROPS, apl,
 		    pcnt);
 		for (ai = 0; ai < pcnt; ai++)
-			if (apl[ai] != NULL)
-				nvlist_free(apl[ai]);
+			nvlist_free(apl[ai]);
 		topo_mod_free(mp, apl, pcnt * sizeof (nvlist_t *));
 		if (e != 0) {
 			nvlist_free(pgnvl);

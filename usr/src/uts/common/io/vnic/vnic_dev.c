@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 OmniTI Computer Consulting, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -1098,7 +1099,7 @@ vnic_m_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 		ret = vnic_get_secondary_macs(vn, pr_valsize, pr_val);
 		break;
 	default:
-		ret = EINVAL;
+		ret = ENOTSUP;
 		break;
 	}
 

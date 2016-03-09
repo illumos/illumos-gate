@@ -253,10 +253,8 @@ door_server(void *cookie, char *argp, size_t sz, door_desc_t *dp, uint_t ndesc)
 
 fail:
 	log_err("Door call failed (%s)\n", strerror(rv));
-	if (args != NULL)
-		nvlist_free(args);
-	if (results != NULL)
-		nvlist_free(results);
+	nvlist_free(args);
+	nvlist_free(results);
 	(void) door_return((char *)&rv, sizeof (int), NULL, 0);
 }
 

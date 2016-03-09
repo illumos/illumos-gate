@@ -1248,8 +1248,7 @@ ibpart_notify_new_ibpart(rcm_handle_t *hd, char *rsrc)
 
 	ret = 0;
 done:
-	if (nvl != NULL)
-		nvlist_free(nvl);
+	nvlist_free(nvl);
 	return (ret);
 }
 

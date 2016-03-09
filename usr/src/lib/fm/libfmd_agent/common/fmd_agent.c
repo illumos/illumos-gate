@@ -74,10 +74,8 @@ static int
 cleanup_set_errno(fmd_agent_hdl_t *hdl, nvlist_t *innvl, nvlist_t *outnvl,
     int err)
 {
-	if (innvl != NULL)
-		nvlist_free(innvl);
-	if (outnvl != NULL)
-		nvlist_free(outnvl);
+	nvlist_free(innvl);
+	nvlist_free(outnvl);
 	return (fmd_agent_seterrno(hdl, err));
 }
 

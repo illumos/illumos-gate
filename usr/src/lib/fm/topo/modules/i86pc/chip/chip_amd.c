@@ -688,8 +688,7 @@ amd_dramchan_create(topo_mod_t *mod, tnode_t *pnode, const char *name,
 		(void) topo_prop_set_string(chnode, PGNAME(CHAN), "channel",
 		    TOPO_PROP_IMMUTABLE, i == 0 ? "A" : "B", &err);
 	}
-	if (pfmri)
-		nvlist_free(pfmri);
+	nvlist_free(pfmri);
 
 	return (nerr == 0 ? 0 : -1);
 }

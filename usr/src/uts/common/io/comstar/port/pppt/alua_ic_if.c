@@ -355,8 +355,7 @@ stmf_ic_tx_msg(stmf_ic_msg_t *msg)
 	status = stmf_ic_transmit(buf, size);
 
 done:
-	if (nvl)
-		nvlist_free(nvl);
+	nvlist_free(nvl);
 
 	if (buf)
 		kmem_free(buf, size);
@@ -971,8 +970,7 @@ stmf_ic_msg_free(stmf_ic_msg_t *msg)
 		ASSERT(0);
 	}
 
-	if (msg->icm_nvlist)
-		nvlist_free(msg->icm_nvlist);
+	nvlist_free(msg->icm_nvlist);
 
 	kmem_free(msg, sizeof (*msg));
 }
@@ -1176,8 +1174,7 @@ done:
 	if (!rc)
 		return (nvl);
 
-	if (nvl)
-		nvlist_free(nvl);
+	nvlist_free(nvl);
 
 	return (NULL);
 }

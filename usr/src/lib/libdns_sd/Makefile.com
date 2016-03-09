@@ -20,6 +20,7 @@
 #
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2016 Toomas Soome <tsoome@me.com>
 #
 
 LIBRARY =	libdns_sd.a
@@ -33,14 +34,10 @@ $(LINTLIB):=    SRCS = $(SRCDIR)/$(LINTSRC)
 
 SRCDIR =	../common
 
-LDLIBS +=	-lsocket -lc
+LDLIBS +=	-lsocket -lnsl -lc
 
 C99MODE =	$(C99_ENABLE)
-CPPFLAGS +=	-I$(SRCDIR) -DNOT_HAVE_SA_LEN 
-
-CERRWARN +=	-erroff=E_ASSIGNMENT_TYPE_MISMATCH
-
-CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
+CPPFLAGS +=	-I$(SRCDIR) -DNOT_HAVE_SA_LEN -D_XPG4_2 -D__EXTENSIONS__
 
 .PARALLEL =     $(OBJECTS)
 .KEEP_STATE:

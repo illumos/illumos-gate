@@ -946,8 +946,7 @@ be_do_create(int argc, char **argv)
 out:
 	nvlist_free(be_attrs);
 out2:
-	if (zfs_props != NULL)
-		nvlist_free(zfs_props);
+	nvlist_free(zfs_props);
 
 	return (err);
 }

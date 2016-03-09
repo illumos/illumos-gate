@@ -25,6 +25,7 @@
  *
  * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2014 Gary Mills
+ * Copyright (c) 2016 Andrey Sokolov
  */
 
 /*
@@ -1832,7 +1833,7 @@ main(int argc, char *argv[])
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
 
-	while ((c = getopt(argc, argv, "a:c:Cd:efk:o:rs:T:U")) != EOF) {
+	while ((c = getopt(argc, argv, "a:c:Cd:efk:rs:T:U")) != EOF) {
 		switch (c) {
 		case 'a':
 			addflag = B_TRUE;

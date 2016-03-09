@@ -1802,8 +1802,6 @@ OpenSSL_SignData(KMF_HANDLE_T handle, KMF_KEY_HANDLE *key,
 		int len;
 		if (AlgId == KMF_ALGID_MD5WithRSA)
 			md = EVP_md5();
-		else if (AlgId == KMF_ALGID_MD2WithRSA)
-			md = EVP_md2();
 		else if (AlgId == KMF_ALGID_SHA1WithRSA)
 			md = EVP_sha1();
 		else if (AlgId == KMF_ALGID_SHA256WithRSA)

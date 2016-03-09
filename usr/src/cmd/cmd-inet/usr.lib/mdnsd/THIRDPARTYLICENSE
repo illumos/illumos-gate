@@ -1,13 +1,13 @@
- * Copyright (c) 2002-2006 Apple Computer, Inc. All rights reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * 
- *     http://www.apache.org/licenses/LICENSE-2.0
- * 
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+The majority of the source code in the mDNSResponder project is licensed
+under the terms of the Apache License, Version 2.0, available from:
+   <http://www.apache.org/licenses/LICENSE-2.0>
+
+To accommodate license compatibility with the widest possible range
+of client code licenses, the shared library code, which is linked
+at runtime into the same address space as the client using it, is
+licensed under the terms of the "Three-Clause BSD License".
+
+The Linux Name Service Switch code, contributed by National ICT
+Australia Ltd (NICTA) is licensed under the terms of the NICTA Public
+Software Licence (which is substantially similar to the "Three-Clause
+BSD License", with some additional language pertaining to Australian law).

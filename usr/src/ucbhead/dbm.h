@@ -40,7 +40,8 @@
 #ifndef _DBM_H
 #define	_DBM_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#include <sys/isa_defs.h>
+#include <sys/null.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -49,10 +50,6 @@ extern "C" {
 #define	PBLKSIZ	1024
 #define	DBLKSIZ	4096
 #define	BYTESIZ	8
-
-#ifndef	NULL
-#define	NULL	((char *) 0)
-#endif
 
 long	bitno;
 long	maxbno;

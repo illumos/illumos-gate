@@ -332,13 +332,13 @@ typedef enum {
 extern volatile uint_t  devfsadm_state; /* atomic mask for devfsadm status */
 
 #define	DEVNAME_DEVFSADM_SET_RUNNING(devfsadm_state)	\
-	devfsadm_state = DEVNAME_DEVFSADM_RUNNING
+	(devfsadm_state = DEVNAME_DEVFSADM_RUNNING)
 #define	DEVNAME_DEVFSADM_SET_STOP(devfsadm_state)	\
-	devfsadm_state = DEVNAME_DEVFSADM_STOPPED
+	(devfsadm_state = DEVNAME_DEVFSADM_STOPPED)
 #define	DEVNAME_DEVFSADM_SET_RUN(devfsadm_state)	\
-	devfsadm_state = DEVNAME_DEVFSADM_RUN
+	(devfsadm_state = DEVNAME_DEVFSADM_RUN)
 #define	DEVNAME_DEVFSADM_IS_RUNNING(devfsadm_state)	\
-	devfsadm_state == DEVNAME_DEVFSADM_RUNNING
+	(devfsadm_state == DEVNAME_DEVFSADM_RUNNING)
 #define	DEVNAME_DEVFSADM_HAS_RUN(devfsadm_state)	\
 	(devfsadm_state == DEVNAME_DEVFSADM_RUN)
 

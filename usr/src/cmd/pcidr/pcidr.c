@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -255,8 +253,7 @@ ERR_ARG:
 		*eqp = '=';
 	dprint(DDEBUG, "%s: bad attribute argv[%d]: \"%s\"\n", fn, i, argv[i]);
 ERR:
-	if (attrlistp != NULL)
-		nvlist_free(attrlistp);
+	nvlist_free(attrlistp);
 	return (NULL);
 }
 

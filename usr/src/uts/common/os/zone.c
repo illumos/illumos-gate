@@ -4401,8 +4401,7 @@ zone_create(const char *zone_name, const char *zone_root,
 	 */
 	if (curthread != pp->p_agenttp && !holdlwps(SHOLDFORK)) {
 		zone_free(zone);
-		if (rctls)
-			nvlist_free(rctls);
+		nvlist_free(rctls);
 		return (zone_create_error(error, 0, extended_error));
 	}
 
@@ -4412,8 +4411,7 @@ zone_create(const char *zone_name, const char *zone_root,
 			continuelwps(pp);
 		mutex_exit(&pp->p_lock);
 		zone_free(zone);
-		if (rctls)
-			nvlist_free(rctls);
+		nvlist_free(rctls);
 		return (zone_create_error(error, 0, extended_error));
 	}
 
@@ -4558,8 +4556,7 @@ zone_create(const char *zone_name, const char *zone_root,
 	 * The zone is fully visible, so we can let mounts progress.
 	 */
 	resume_mounts(zone);
-	if (rctls)
-		nvlist_free(rctls);
+	nvlist_free(rctls);
 
 	return (zoneid);
 
@@ -4574,8 +4571,7 @@ errout:
 	mutex_exit(&pp->p_lock);
 
 	resume_mounts(zone);
-	if (rctls)
-		nvlist_free(rctls);
+	nvlist_free(rctls);
 	/*
 	 * There is currently one reference to the zone, a cred_ref from
 	 * zone_kcred.  To free the zone, we call crfree, which will call
@@ -6875,8 +6871,7 @@ zone_remove_datalink(zoneid_t zoneid, datalink_id_t linkid)
 		err = ENXIO;
 	} else {
 		list_remove(&zone->zone_dl_list, zdl);
-		if (zdl->zdl_net != NULL)
-			nvlist_free(zdl->zdl_net);
+		nvlist_free(zdl->zdl_net);
 		kmem_free(zdl, sizeof (zone_dl_t));
 	}
 	mutex_exit(&zone->zone_lock);

@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "librcm_impl.h"
 #include "librcm_event.h"
 
@@ -545,8 +543,7 @@ rcm_free_info(rcm_info_t *info)
 	while (info) {
 		rcm_info_t *tmp = info->next;
 
-		if (info->info)
-			nvlist_free(info->info);
+		nvlist_free(info->info);
 		free(info);
 
 		info = tmp;
@@ -1260,8 +1257,7 @@ retry:
 out:
 	if (nvl_packed)
 		free(nvl_packed);
-	if (ret)
-		nvlist_free(ret);
+	nvlist_free(ret);
 	dprintf((stderr, "daemon call is done. error = %d, errno = %s\n", error,
 	    strerror(errno)));
 	return (error);
@@ -1450,8 +1446,7 @@ rcm_generate_nvlist(int cmd, rcm_handle_t *hd, char **rsrcnames, uint_t flag,
 fail:
 	if (buf)
 		free(buf);
-	if (nvl)
-		nvlist_free(nvl);
+	nvlist_free(nvl);
 	if (*nvl_packed)
 		free(*nvl_packed);
 	*nvl_packed = NULL;

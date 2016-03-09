@@ -3032,10 +3032,8 @@ savenew(char *root)
 static void
 clear_walk_args(void)
 {
-	if (walk_arg.old_nvlp)
-		nvlist_free(walk_arg.old_nvlp);
-	if (walk_arg.new_nvlp)
-		nvlist_free(walk_arg.new_nvlp);
+	nvlist_free(walk_arg.old_nvlp);
+	nvlist_free(walk_arg.new_nvlp);
 	if (walk_arg.sparcfile)
 		(void) fclose(walk_arg.sparcfile);
 	walk_arg.old_nvlp = NULL;

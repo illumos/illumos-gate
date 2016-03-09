@@ -21,6 +21,7 @@
  */
 /*
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ * Copyright 2014 PALO, Richard.
  *
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -46,6 +47,7 @@
 #define	_ISO_LOCALE_ISO_H
 
 #include <sys/feature_tests.h>
+#include <sys/null.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -98,14 +100,6 @@ struct lconv {
 #define	LC_MONETARY	4
 #define	LC_MESSAGES	5
 #define	LC_ALL		6
-
-#ifndef	NULL
-#if defined(_LP64)
-#define	NULL    0L
-#else
-#define	NULL    0
-#endif
-#endif
 
 extern char	*setlocale(int, const char *);
 extern struct lconv *localeconv(void);

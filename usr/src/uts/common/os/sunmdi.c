@@ -8029,8 +8029,7 @@ vhcache_to_mainnvl(mdi_vhci_cache_t *vhcache)
 
 	rw_exit(&vhcache->vhcache_lock);
 out:
-	if (nvl)
-		nvlist_free(nvl);
+	nvlist_free(nvl);
 	return (NULL);
 }
 

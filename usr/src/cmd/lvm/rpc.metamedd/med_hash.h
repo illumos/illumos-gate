@@ -27,15 +27,9 @@
 #ifndef	_MED_HASH_H
 #define	_MED_HASH_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
-
-#ifndef NULL
-#define	NULL	0
-#endif	/* NULL */
 
 typedef struct item_t {
     void *key;

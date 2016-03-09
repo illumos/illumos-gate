@@ -528,7 +528,7 @@ pfiles_dig_pathname(uintptr_t vp, char *path)
 }
 
 const struct fs_type {
-	int type;
+	vtype_t type;
 	const char *name;
 } fs_types[] = {
 	{ VNON,   "NON" },
@@ -947,9 +947,11 @@ pfile_callback(uintptr_t addr, const struct file *f, struct pfiles_cbdata *cb)
 	}
 
 	type = "?";
-	for (i = 0; i <= NUM_FS_TYPES; i++) {
-		if (fs_types[i].type == v.v_type)
+	for (i = 0; i < NUM_FS_TYPES; i++) {
+		if (fs_types[i].type == v.v_type) {
 			type = fs_types[i].name;
+			break;
+		}
 	}
 
 	do {

@@ -45,8 +45,7 @@
 #include <sys/smbios.h>
 #include <libdevinfo.h>
 #include <stdlib.h>
-
-#define	offsetof(s, m)	((size_t)(&(((s*)0)->m)))
+#include <stddef.h>
 
 /*
  * Fault records are added to catalog by calling add_fault_record_to_catalog()

@@ -22,6 +22,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2012 Milan Jurik. All rights reserved.
+ * Copyright 2016 OmniTI Computer Consulting, Inc. All rights reserved.
  */
 
 /*
@@ -3321,7 +3322,7 @@ hxge_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 			break;
 
 		default:
-			err = EINVAL;
+			err = ENOTSUP;
 			break;
 	}
 
@@ -3433,7 +3434,7 @@ hxge_set_priv_prop(p_hxge_t hxgep, const char *pr_name, uint_t pr_valsize,
 		err = hxge_param_set_ip_opt(hxgep, NULL, NULL, (char *)pr_val,
 		    (caddr_t)&param_arr[param_class_opt_ipv6_sctp]);
 	} else {
-		err = EINVAL;
+		err = ENOTSUP;
 	}
 
 	HXGE_DEBUG_MSG((hxgep, DLADM_CTL,
@@ -3503,7 +3504,7 @@ hxge_get_priv_prop(p_hxge_t hxgep, const char *pr_name, uint_t pr_valsize,
 
 		value = (int)param_arr[param_class_opt_ipv6_sctp].value;
 	} else {
-		err = EINVAL;
+		err = ENOTSUP;
 	}
 
 	if (err == 0) {

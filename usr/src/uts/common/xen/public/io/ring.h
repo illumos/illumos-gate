@@ -47,8 +47,14 @@ typedef unsigned int RING_IDX;
 /*
  * Calculate size of a shared ring, given the total available space for the
  * ring and indexes (_sz), and the name tag of the request/response structure.
- * A ring contains as many entries as will fit, rounded down to the nearest 
+ * A ring contains as many entries as will fit, rounded down to the nearest
  * power of two (so we can mask with (size-1) to loop around).
+ */
+#define __CONST_RING_SIZE(_s, _sz) \
+    (__RD32(((_sz) - offsetof(struct _s##_sring, ring)) / \
+       sizeof(((struct _s##_sring *)0)->ring[0])))
+/*
+ * The same for passing in an actual pointer instead of a name tag.
  */
 #define __RING_SIZE(_s, _sz) \
     (__RD32(((_sz) - (long)(_s)->ring + (long)(_s)) / sizeof((_s)->ring[0])))

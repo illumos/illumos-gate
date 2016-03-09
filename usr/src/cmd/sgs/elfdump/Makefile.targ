@@ -65,7 +65,7 @@ gen_layout_obj.o := CFLAGS64 += $(CTF_FLAGS)
 gen_layout_obj.o := POST_PROCESS_O = $(CTFCONVERT_O)
 
 gen_struct_layout:	../common/gen_struct_layout.c
-		$(NATIVECC) $(NATIVECC_CFLAGS) -o $@ \
+		$(NATIVECC) $(NATIVE_CFLAGS) -o $@ \
 			../common/gen_struct_layout.c -lctf
 
 clean:

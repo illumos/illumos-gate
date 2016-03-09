@@ -1529,10 +1529,8 @@ same_file_system(const char *path1, const char *path2)
 		return (B_FALSE);
 	}
 
-	if (nvl1 != NULL)
-		nvlist_free(nvl1);
-	if (nvl2 != NULL)
-		nvlist_free(nvl2);
+	nvlist_free(nvl1);
+	nvlist_free(nvl2);
 
 	/*
 	 * We were unable to find fsid's for at least one of the paths.

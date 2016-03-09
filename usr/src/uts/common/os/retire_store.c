@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 #include <sys/sunndi.h>
@@ -310,8 +308,7 @@ rio_store_encode(nvf_handle_t nvfh, nvlist_t **ret_nvl)
 	return (DDI_SUCCESS);
 
 error:
-	if (line_nvl)
-		nvlist_free(line_nvl);
+	nvlist_free(line_nvl);
 	ASSERT(nvl);
 	nvlist_free(nvl);
 	return (DDI_FAILURE);

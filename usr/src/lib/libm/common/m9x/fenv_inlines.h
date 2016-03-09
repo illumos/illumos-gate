@@ -39,7 +39,7 @@ union fp_cwsw {
 	} words;
 };
 
-extern __inline__ void
+extern __GNU_INLINE void
 __fenv_getcwsw(unsigned int *value)
 {
 	union fp_cwsw *u = (union fp_cwsw *)value;
@@ -50,7 +50,7 @@ __fenv_getcwsw(unsigned int *value)
 	    : "=m" (u->words.cw), "=m" (u->words.sw));
 }
 
-extern __inline__ void
+extern __GNU_INLINE void
 __fenv_setcwsw(const unsigned int *value)
 {
 	union fp_cwsw cwsw;
@@ -71,19 +71,19 @@ __fenv_setcwsw(const unsigned int *value)
 	      "st(6)", "st(7)");
 }
 
-extern __inline__ void
+extern __GNU_INLINE void
 __fenv_getmxcsr(unsigned int *value)
 {
 	__asm__ __volatile__("stmxcsr %0" : "=m" (*value));
 }
 
-extern __inline__ void
+extern __GNU_INLINE void
 __fenv_setmxcsr(const unsigned int *value)
 {
 	__asm__ __volatile__("ldmxcsr %0" : : "m" (*value));
 }
 
-extern __inline__ long double
+extern __GNU_INLINE long double
 f2xm1(long double x)
 {
 	long double ret;
@@ -92,7 +92,7 @@ f2xm1(long double x)
 	return (ret);
 }
 
-extern __inline__ long double
+extern __GNU_INLINE long double
 fyl2x(long double y, long double x)
 {
 	long double ret;
@@ -104,7 +104,7 @@ fyl2x(long double y, long double x)
 	return (ret);
 }
 
-extern __inline__ long double
+extern __GNU_INLINE long double
 fptan(long double x)
 {
 	/*
@@ -121,7 +121,7 @@ fptan(long double x)
 	return (ret);
 }
 
-extern __inline__ long double
+extern __GNU_INLINE long double
 fpatan(long double x, long double y)
 {
 	long double ret;
@@ -133,28 +133,28 @@ fpatan(long double x, long double y)
 	return (ret);
 }
 
-extern __inline__ long double
+extern __GNU_INLINE long double
 fxtract(long double x)
 {
 	__asm__ __volatile__("fxtract" : "+t" (x) : : "cc");
 	return (x);
 }
 
-extern __inline__ long double
+extern __GNU_INLINE long double
 fprem1(long double idend, long double div)
 {
 	__asm__ __volatile__("fprem1" : "+t" (div) : "u" (idend) : "cc");
 	return (div);
 }
 
-extern __inline__ long double
+extern __GNU_INLINE long double
 fprem(long double idend, long double div)
 {
 	__asm__ __volatile__("fprem" : "+t" (div) : "u" (idend) : "cc");
 	return (div);
 }
 
-extern __inline__ long double
+extern __GNU_INLINE long double
 fyl2xp1(long double y, long double x)
 {
 	long double ret;
@@ -166,14 +166,14 @@ fyl2xp1(long double y, long double x)
 	return (ret);
 }
 
-extern __inline__ long double
+extern __GNU_INLINE long double
 fsqrt(long double x)
 {
 	__asm__ __volatile__("fsqrt" : "+t" (x) : : "cc");
 	return (x);
 }
 
-extern __inline__ long double
+extern __GNU_INLINE long double
 fsincos(long double x)
 {
 	long double dummy;
@@ -182,14 +182,14 @@ fsincos(long double x)
 	return (x);
 }
 
-extern __inline__ long double
+extern __GNU_INLINE long double
 frndint(long double x)
 {
 	__asm__ __volatile__("frndint" : "+t" (x) : : "cc");
 	return (x);
 }
 
-extern __inline__ long double
+extern __GNU_INLINE long double
 fscale(long double x, long double y)
 {
 	long double ret;
@@ -198,21 +198,21 @@ fscale(long double x, long double y)
 	return (ret);
 }
 
-extern __inline__ long double
+extern __GNU_INLINE long double
 fsin(long double x)
 {
 	__asm__ __volatile__("fsin" : "+t" (x) : : "cc");
 	return (x);
 }
 
-extern __inline__ long double
+extern __GNU_INLINE long double
 fcos(long double x)
 {
 	__asm__ __volatile__("fcos" : "+t" (x) : : "cc");
 	return (x);
 }
 
-extern __inline__ void
+extern __GNU_INLINE void
 sse_cmpeqss(float *f1, float *f2, int *i1)
 {
 	__asm__ __volatile__(
@@ -223,7 +223,7 @@ sse_cmpeqss(float *f1, float *f2, int *i1)
 	    : "cc");
 }
 
-extern __inline__ void
+extern __GNU_INLINE void
 sse_cmpltss(float *f1, float *f2, int *i1)
 {
 	__asm__ __volatile__(
@@ -234,7 +234,7 @@ sse_cmpltss(float *f1, float *f2, int *i1)
 	    : "cc");
 }
 
-extern __inline__ void
+extern __GNU_INLINE void
 sse_cmpless(float *f1, float *f2, int *i1)
 {
 	__asm__ __volatile__(
@@ -245,7 +245,7 @@ sse_cmpless(float *f1, float *f2, int *i1)
 	    : "cc");
 }
 
-extern __inline__ void
+extern __GNU_INLINE void
 sse_cmpunordss(float *f1, float *f2, int *i1)
 {
 	__asm__ __volatile__(
@@ -256,7 +256,7 @@ sse_cmpunordss(float *f1, float *f2, int *i1)
 	    : "cc");
 }
 
-extern __inline__ void
+extern __GNU_INLINE void
 sse_minss(float *f1, float *f2, float *f3)
 {
 	__asm__ __volatile__(
@@ -266,7 +266,7 @@ sse_minss(float *f1, float *f2, float *f3)
 	    : "x" (*f2));
 }
 
-extern __inline__ void
+extern __GNU_INLINE void
 sse_maxss(float *f1, float *f2, float *f3)
 {
 	__asm__ __volatile__(
@@ -276,7 +276,7 @@ sse_maxss(float *f1, float *f2, float *f3)
 	    : "x" (*f2));
 }
 
-extern __inline__ void
+extern __GNU_INLINE void
 sse_addss(float *f1, float *f2, float *f3)
 {
 	__asm__ __volatile__(
@@ -286,7 +286,7 @@ sse_addss(float *f1, float *f2, float *f3)
 	    : "x" (*f2));
 }
 
-extern __inline__ void
+extern __GNU_INLINE void
 sse_subss(float *f1, float *f2, float *f3)
 {
 	__asm__ __volatile__(
@@ -296,7 +296,7 @@ sse_subss(float *f1, float *f2, float *f3)
 	    : "x" (*f2));
 }
 
-extern __inline__ void
+extern __GNU_INLINE void
 sse_mulss(float *f1, float *f2, float *f3)
 {
 	__asm__ __volatile__(
@@ -306,7 +306,7 @@ sse_mulss(float *f1, float *f2, float *f3)
 	    : "x" (*f2));
 }
 
-extern __inline__ void
+extern __GNU_INLINE void
 sse_divss(float *f1, float *f2, float *f3)
 {
 	__asm__ __volatile__(
@@ -316,7 +316,7 @@ sse_divss(float *f1, float *f2, float *f3)
 	    : "x" (*f2));
 }
 
-extern __inline__ void
+extern __GNU_INLINE void
 sse_sqrtss(float *f1, float *f2)
 {
 	double tmp;
@@ -328,20 +328,20 @@ sse_sqrtss(float *f1, float *f2)
 	    : "m" (*f1));
 }
 
-extern __inline__ void
+extern __GNU_INLINE void
 sse_ucomiss(float *f1, float *f2)
 {
 	__asm__ __volatile__("ucomiss %1, %0" : : "x" (*f1), "x" (*f2));
 
 }
 
-extern __inline__ void
+extern __GNU_INLINE void
 sse_comiss(float *f1, float *f2)
 {
 	__asm__ __volatile__("comiss %1, %0" : : "x" (*f1), "x" (*f2));
 }
 
-extern __inline__ void
+extern __GNU_INLINE void
 sse_cvtss2sd(float *f1, double *d1)
 {
 	double tmp;
@@ -353,7 +353,7 @@ sse_cvtss2sd(float *f1, double *d1)
 	    : "m" (*f1));
 }
 
-extern __inline__ void
+extern __GNU_INLINE void
 sse_cvtsi2ss(int *i1, float *f1)
 {
 	double tmp;
@@ -365,7 +365,7 @@ sse_cvtsi2ss(int *i1, float *f1)
 	    : "m" (*i1));
 }
 
-extern __inline__ void
+extern __GNU_INLINE void
 sse_cvttss2si(float *f1, int *i1)
 {
 	int tmp;
@@ -377,7 +377,7 @@ sse_cvttss2si(float *f1, int *i1)
 	    : "m" (*f1));
 }
 
-extern __inline__ void
+extern __GNU_INLINE void
 sse_cvtss2si(float *f1, int *i1)
 {
 	int tmp;
@@ -390,7 +390,7 @@ sse_cvtss2si(float *f1, int *i1)
 }
 
 #if defined(__amd64)
-extern __inline__ void
+extern __GNU_INLINE void
 sse_cvtsi2ssq(long long *ll1, float *f1)
 {
 	double tmp;
@@ -402,7 +402,7 @@ sse_cvtsi2ssq(long long *ll1, float *f1)
 	    : "m" (*ll1));
 }
 
-extern __inline__ void
+extern __GNU_INLINE void
 sse_cvttss2siq(float *f1, long long *ll1)
 {
 	uint64_t tmp;
@@ -414,7 +414,7 @@ sse_cvttss2siq(float *f1, long long *ll1)
 	    : "m" (*f1));
 }
 
-extern __inline__ void
+extern __GNU_INLINE void
 sse_cvtss2siq(float *f1, long long *ll1)
 {
 	uint64_t tmp;
@@ -428,7 +428,7 @@ sse_cvtss2siq(float *f1, long long *ll1)
 
 #endif
 
-extern __inline__ void
+extern __GNU_INLINE void
 sse_cmpeqsd(double *d1, double *d2, long long *ll1)
 {
 	__asm__ __volatile__(
@@ -438,7 +438,7 @@ sse_cmpeqsd(double *d1, double *d2, long long *ll1)
 	    : "x" (*d2));
 }
 
-extern __inline__ void
+extern __GNU_INLINE void
 sse_cmpltsd(double *d1, double *d2, long long *ll1)
 {
 	__asm__ __volatile__(
@@ -448,7 +448,7 @@ sse_cmpltsd(double *d1, double *d2, long long *ll1)
 	    : "x" (*d2));
 }
 
-extern __inline__ void
+extern __GNU_INLINE void
 sse_cmplesd(double *d1, double *d2, long long *ll1)
 {
 	__asm__ __volatile__(
@@ -458,7 +458,7 @@ sse_cmplesd(double *d1, double *d2, long long *ll1)
 	    : "x" (*d2));
 }
 
-extern __inline__ void
+extern __GNU_INLINE void
 sse_cmpunordsd(double *d1, double *d2, long long *ll1)
 {
 	__asm__ __volatile__(
@@ -469,7 +469,7 @@ sse_cmpunordsd(double *d1, double *d2, long long *ll1)
 }
 
 
-extern __inline__ void
+extern __GNU_INLINE void
 sse_minsd(double *d1, double *d2, double *d3)
 {
 	__asm__ __volatile__(
@@ -479,7 +479,7 @@ sse_minsd(double *d1, double *d2, double *d3)
 	    : "x" (*d2));
 }
 
-extern __inline__ void
+extern __GNU_INLINE void
 sse_maxsd(double *d1, double *d2, double *d3)
 {
 	__asm__ __volatile__(
@@ -489,7 +489,7 @@ sse_maxsd(double *d1, double *d2, double *d3)
 	    : "x" (*d2));
 }
 
-extern __inline__ void
+extern __GNU_INLINE void
 sse_addsd(double *d1, double *d2, double *d3)
 {
 	__asm__ __volatile__(
@@ -499,7 +499,7 @@ sse_addsd(double *d1, double *d2, double *d3)
 	    : "x" (*d2));
 }
 
-extern __inline__ void
+extern __GNU_INLINE void
 sse_subsd(double *d1, double *d2, double *d3)
 {
 	__asm__ __volatile__(
@@ -509,7 +509,7 @@ sse_subsd(double *d1, double *d2, double *d3)
 	    : "x" (*d2));
 }
 
-extern __inline__ void
+extern __GNU_INLINE void
 sse_mulsd(double *d1, double *d2, double *d3)
 {
 	__asm__ __volatile__(
@@ -519,7 +519,7 @@ sse_mulsd(double *d1, double *d2, double *d3)
 	    : "x" (*d2));
 }
 
-extern __inline__ void
+extern __GNU_INLINE void
 sse_divsd(double *d1, double *d2, double *d3)
 {
 	__asm__ __volatile__(
@@ -529,7 +529,7 @@ sse_divsd(double *d1, double *d2, double *d3)
 	    : "x" (*d2));
 }
 
-extern __inline__ void
+extern __GNU_INLINE void
 sse_sqrtsd(double *d1, double *d2)
 {
 	double tmp;
@@ -541,19 +541,19 @@ sse_sqrtsd(double *d1, double *d2)
 	    : "m" (*d1));
 }
 
-extern __inline__ void
+extern __GNU_INLINE void
 sse_ucomisd(double *d1, double *d2)
 {
 	__asm__ __volatile__("ucomisd %1, %0" : : "x" (*d1), "x" (*d2));
 }
 
-extern __inline__ void
+extern __GNU_INLINE void
 sse_comisd(double *d1, double *d2)
 {
 	__asm__ __volatile__("comisd %1, %0" : : "x" (*d1), "x" (*d2));
 }
 
-extern __inline__ void
+extern __GNU_INLINE void
 sse_cvtsd2ss(double *d1, float *f1)
 {
 	double tmp;
@@ -565,7 +565,7 @@ sse_cvtsd2ss(double *d1, float *f1)
 	    : "m" (*d1));
 }
 
-extern __inline__ void
+extern __GNU_INLINE void
 sse_cvtsi2sd(int *i1, double *d1)
 {
 	double tmp;
@@ -576,7 +576,7 @@ sse_cvtsi2sd(int *i1, double *d1)
 	    : "m" (*i1));
 }
 
-extern __inline__ void
+extern __GNU_INLINE void
 sse_cvttsd2si(double *d1, int *i1)
 {
 	int tmp;
@@ -588,7 +588,7 @@ sse_cvttsd2si(double *d1, int *i1)
 	    : "m" (*d1));
 }
 
-extern __inline__ void
+extern __GNU_INLINE void
 sse_cvtsd2si(double *d1, int *i1)
 {
 	int tmp;
@@ -601,7 +601,7 @@ sse_cvtsd2si(double *d1, int *i1)
 }
 
 #if defined(__amd64)
-extern __inline__ void
+extern __GNU_INLINE void
 sse_cvtsi2sdq(long long *ll1, double *d1)
 {
 	double tmp;
@@ -613,7 +613,7 @@ sse_cvtsi2sdq(long long *ll1, double *d1)
 	    : "m" (*ll1));
 }
 
-extern __inline__ void
+extern __GNU_INLINE void
 sse_cvttsd2siq(double *d1, long long *ll1)
 {
 	uint64_t tmp;
@@ -625,7 +625,7 @@ sse_cvttsd2siq(double *d1, long long *ll1)
 	    : "m" (*d1));
 }
 
-extern __inline__ void
+extern __GNU_INLINE void
 sse_cvtsd2siq(double *d1, long long *ll1)
 {
 	uint64_t tmp;
@@ -639,37 +639,37 @@ sse_cvtsd2siq(double *d1, long long *ll1)
 #endif
 
 #elif defined(__sparc)
-extern __inline__ void
+extern __GNU_INLINE void
 __fenv_getfsr(unsigned long *l)
 {
 	__asm__ __volatile__(
 #if defined(__sparcv9)
-		"stx %%fsr,%0\n\t"
+	    "stx %%fsr,%0\n\t"
 #else
-		"st  %%fsr,%0\n\t"
+	    "st  %%fsr,%0\n\t"
 #endif
-		: "=m" (*l));
+	    : "=m" (*l));
 }
 
-extern __inline__ void
+extern __GNU_INLINE void
 __fenv_setfsr(const unsigned long *l)
 {
 	__asm__ __volatile__(
 #if defined(__sparcv9)
-		"ldx %0,%%fsr\n\t"
+	    "ldx %0,%%fsr\n\t"
 #else
-		"ld %0,%%fsr\n\t"
+	    "ld %0,%%fsr\n\t"
 #endif
-		: : "m" (*l) : "cc");
+	    : : "m" (*l) : "cc");
 }
 
-extern __inline__ void
+extern __GNU_INLINE void
 __fenv_getfsr32(unsigned int *l)
 {
 	__asm__ __volatile__("st %%fsr,%0\n\t" : "=m" (*l));
 }
 
-extern __inline__ void
+extern __GNU_INLINE void
 __fenv_setfsr32(const unsigned int *l)
 {
 	__asm__ __volatile__("ld %0,%%fsr\n\t" : : "m" (*l));

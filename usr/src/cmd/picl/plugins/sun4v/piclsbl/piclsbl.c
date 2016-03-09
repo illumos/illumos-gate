@@ -372,8 +372,7 @@ sbl_return:
 		umem_free(req_ptr, sizeof (pcp_sbl_req_t));
 	if (resp_ptr != NULL)
 		free(resp_ptr);
-	if (nvlp != NULL)
-		nvlist_free(nvlp);
+	nvlist_free(nvlp);
 }
 
 static void

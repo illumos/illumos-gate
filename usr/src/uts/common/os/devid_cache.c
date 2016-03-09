@@ -343,8 +343,7 @@ devid_cache_pack_list(nvf_handle_t fd, nvlist_t **ret_nvl)
 	return (DDI_SUCCESS);
 
 err:
-	if (sub_nvl)
-		nvlist_free(sub_nvl);
+	nvlist_free(sub_nvl);
 	nvlist_free(nvl);
 	*ret_nvl = NULL;
 	return (DDI_FAILURE);

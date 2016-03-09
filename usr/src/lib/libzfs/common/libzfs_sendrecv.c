@@ -25,6 +25,7 @@
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  * Copyright (c) 2013 Steven Hartland. All rights reserved.
  * Copyright 2015, OmniTI Computer Consulting, Inc. All rights reserved.
+ * Copyright (c) 2014 Integros [integros.com]
  */
 
 #include <assert.h>
@@ -2752,8 +2753,7 @@ zfs_receive_package(libzfs_handle_t *hdl, int fd, const char *destname,
 
 out:
 	fsavl_destroy(stream_avl);
-	if (stream_nv)
-		nvlist_free(stream_nv);
+	nvlist_free(stream_nv);
 	if (softerr)
 		error = -2;
 	if (anyerr)

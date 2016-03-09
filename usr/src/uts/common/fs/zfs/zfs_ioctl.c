@@ -28,6 +28,7 @@
  * Copyright (c) 2011, 2015 by Delphix. All rights reserved.
  * Copyright (c) 2013 by Saso Kiselkov. All rights reserved.
  * Copyright (c) 2013 Steven Hartland. All rights reserved.
+ * Copyright (c) 2014 Integros [integros.com]
  */
 
 /*
@@ -1557,8 +1558,7 @@ zfs_ioc_pool_import(zfs_cmd_t *zc)
 
 	nvlist_free(config);
 
-	if (props)
-		nvlist_free(props);
+	nvlist_free(props);
 
 	return (error);
 }

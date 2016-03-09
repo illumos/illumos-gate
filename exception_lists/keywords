@@ -21,9 +21,11 @@
 # Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2011 Nexenta Systems, Inc. All rights reserved.
 # Copyright (c) 2013 by Delphix. All rights reserved.
+# Copyright 2016 Toomas Soome <tsoome@me.com>
 #
 
 syntax: glob
+usr/src/cmd/cmd-inet/usr.bin/dns-sd/dns-sd.c
 usr/src/cmd/localedef/data/zh_CN.UTF-8.src
 usr/src/cmd/localedef/data/zh_HK.UTF-8.src
 usr/src/cmd/localedef/data/zh_MO.UTF-8.src

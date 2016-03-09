@@ -33,6 +33,7 @@
 #include <sys/modctl.h>
 #include <sys/cred.h>
 #include <sys/ddi.h>
+#include <sys/sysmacros.h>
 #include <sys/unistat/spcs_s.h>
 #include <sys/unistat/spcs_s_k.h>
 #include <sys/unistat/spcs_errors.h>
@@ -520,14 +521,6 @@ convert_ioctl_args(int cmd, intptr_t arg, int mode, _rdc_ioctl_t *args)
 
 	return (0);
 }
-
-
-/*
- * Yet another standard thing that is not standard ...
- */
-#ifndef	offsetof
-#define	offsetof(s, m)	((size_t)(&((s *)0)->m))
-#endif
 
 /*
  * Build a 32bit rdc_set structure and copyout to the user level.

@@ -33,8 +33,6 @@ TEXT_DOMAIN=	SUNW_OST_SGS
 
 POFILE=		sgs.po
 
-MSGFMT=		msgfmt
-
 # The following message files are generated as part of each utilites build via
 # sgsmsg(1l).  By default each file is formatted as a portable object file
 # (.po) - see msgfmt(1).  If the sgsmsg -C option has been employed, each file

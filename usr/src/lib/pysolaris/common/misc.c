@@ -29,12 +29,6 @@
 #include <idmap.h>
 #include <directory.h>
 
-#ifdef __lint
-#define	dgettext(x, y) y
-#endif
-
-#define	_(s) dgettext(TEXT_DOMAIN, s)
-
 extern int sid_to_id(char *sid, boolean_t user, uid_t *id);
 
 static PyObject *
@@ -130,8 +124,5 @@ static PyMethodDef solarismethods[] = {
 void
 initmisc(void)
 {
-	char *noop;
-
-	noop = _("noop");
 	PyObject *solaris_misc = Py_InitModule("solaris.misc", solarismethods);
 }

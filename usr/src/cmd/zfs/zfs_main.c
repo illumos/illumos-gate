@@ -25,6 +25,7 @@
  * Copyright 2012 Milan Jurik. All rights reserved.
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  * Copyright (c) 2013 Steven Hartland.  All rights reserved.
+ * Copyright (c) 2014 Integros [integros.com]
  * Copyright 2016 Igor Kozhukhov <ikozhukhov@gmail.com>.
  * Copyright 2016 Nexenta Systems, Inc.
  */
@@ -5346,8 +5347,7 @@ zfs_do_allow_unallow_impl(int argc, char **argv, boolean_t un)
 
 cleanup0:
 	nvlist_free(perm_nvl);
-	if (update_perm_nvl != NULL)
-		nvlist_free(update_perm_nvl);
+	nvlist_free(update_perm_nvl);
 cleanup1:
 	fs_perm_set_fini(&fs_perm_set);
 cleanup2:
