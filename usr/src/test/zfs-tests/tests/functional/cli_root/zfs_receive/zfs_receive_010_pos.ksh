@@ -137,6 +137,11 @@ $TOUCH $mntpnt2/f18
 $RM $mntpnt/h17
 $RM $mntpnt2/h*
 
+# Add empty objects to $fs to exercise dmu_traverse code
+for i in `seq 1 100`; do
+	log_must touch $mntpnt/uf$i
+done
+
 log_must $ZFS snapshot $fs@s1
 log_must $ZFS snapshot $fs2@s1
 

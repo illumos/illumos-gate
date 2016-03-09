@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2012, 2015 by Delphix. All rights reserved.
 #
 
 include $(SRC)/Makefile.master
@@ -25,7 +25,8 @@ PROGS = cleanup \
 	zfs_send_003_pos \
 	zfs_send_004_neg \
 	zfs_send_005_pos \
-	zfs_send_006_pos
+	zfs_send_006_pos \
+	zfs_send_007_pos
 
 FILES = zfs_send.cfg
 
