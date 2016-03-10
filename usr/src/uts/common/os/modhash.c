@@ -454,6 +454,8 @@ mod_hash_create_extended(
 	mod_hash->mh_hashalg_data = hash_alg_data;
 	mod_hash->mh_keycmp = keycmp;
 
+	rw_init(&mod_hash->mh_contents, NULL, RW_DEFAULT, NULL);
+
 	/*
 	 * Link the hash up on the list of hashes
 	 */
@@ -501,6 +503,8 @@ mod_hash_destroy_hash(mod_hash_t *hash)
 	 * Clean out keys and values.
 	 */
 	mod_hash_clear(hash);
+
+	rw_destroy(&hash->mh_contents);
 
 	kmem_free(hash->mh_name, strlen(hash->mh_name) + 1);
 	kmem_free(hash, MH_SIZE(hash->mh_nchains));

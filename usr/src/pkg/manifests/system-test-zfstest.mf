@@ -152,6 +152,7 @@ file path=opt/zfs-tests/bin/file_write mode=0555
 file path=opt/zfs-tests/bin/getholes mode=0555
 file path=opt/zfs-tests/bin/largest_file mode=0555
 file path=opt/zfs-tests/bin/mkbusy mode=0555
+file path=opt/zfs-tests/bin/mkfiles mode=0555
 file path=opt/zfs-tests/bin/mkholes mode=0555
 file path=opt/zfs-tests/bin/mktree mode=0555
 file path=opt/zfs-tests/bin/mmapwrite mode=0555
@@ -793,6 +794,8 @@ file path=opt/zfs-tests/tests/functional/cli_root/zfs_send/zfs_send_004_neg \
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_send/zfs_send_005_pos \
     mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_send/zfs_send_006_pos \
+    mode=0555
+file path=opt/zfs-tests/tests/functional/cli_root/zfs_send/zfs_send_007_pos \
     mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_set/cache_001_pos \
     mode=0555
