@@ -154,6 +154,8 @@ lofi_compress_info_t lofi_compress_table[LOFI_COMPRESS_FUNCTIONS] = {
 #define	GIGABYTE		(KILOBYTE * MEGABYTE)
 #define	LIBZ			"libz.so.1"
 
+const char lofi_crypto_magic[6] = LOFI_CRYPTO_MAGIC;
+
 static void
 usage(const char *pname)
 {
@@ -836,7 +838,8 @@ parsetoken(char *spec)
  * PBE the passphrase into a raw key
  */
 static void
-getkeyfromuser(mech_alias_t *cipher, char **raw_key, size_t *raw_key_sz)
+getkeyfromuser(mech_alias_t *cipher, char **raw_key, size_t *raw_key_sz,
+    boolean_t with_confirmation)
 {
 	CK_SESSION_HANDLE sess;
 	CK_RV	rv;
@@ -867,7 +870,8 @@ getkeyfromuser(mech_alias_t *cipher, char **raw_key, size_t *raw_key_sz)
 		goto cleanup;
 
 	/* get user passphrase with 8 byte minimum */
-	if (pkcs11_get_pass(NULL, &pass, &passlen, MIN_PASSLEN, B_TRUE) < 0) {
+	if (pkcs11_get_pass(NULL, &pass, &passlen, MIN_PASSLEN,
+	    with_confirmation) < 0) {
 		die(gettext("passphrases do not match\n"));
 	}
 
@@ -1760,6 +1764,41 @@ check_file_validity(const char *filename)
 	}
 }
 
+static boolean_t
+check_file_is_encrypted(const char *filename)
+{
+	int	fd;
+	char    buf[sizeof (lofi_crypto_magic)];
+	int	got;
+	int	rest = sizeof (lofi_crypto_magic);
+
+	fd = open64(filename, O_RDONLY);
+	if (fd == -1)
+		die(gettext("failed to open: %s"), filename);
+
+	if (lseek(fd, CRYOFF, SEEK_SET) != CRYOFF)
+		die(gettext("failed to seek to offset 0x%lx in file %s"),
+		    CRYOFF, filename);
+
+	do {
+		got = read(fd, buf + sizeof (lofi_crypto_magic) - rest, rest);
+		if ((got == 0) || ((got == -1) && (errno != EINTR)))
+			die(gettext("failed to read crypto header"
+			    " at offset 0x%lx in file %s"), CRYOFF, filename);
+
+		if (got > 0)
+			rest -= got;
+	} while (rest > 0);
+
+	while (close(fd) == -1) {
+		if (errno != EINTR)
+			die(gettext("failed to close file %s"), filename);
+	}
+
+	return (strncmp(buf, lofi_crypto_magic,
+	    sizeof (lofi_crypto_magic)) == 0);
+}
+
 static uint32_t
 convert_to_num(const char *str)
 {
@@ -2022,7 +2061,8 @@ main(int argc, char *argv[])
 		init_crypto(token, cipher, &sess);
 
 		if (cipher_only) {
-			getkeyfromuser(cipher, &rkey, &rksz);
+			getkeyfromuser(cipher, &rkey, &rksz,
+			    !check_file_is_encrypted(filename));
 		} else if (token != NULL) {
 			getkeyfromtoken(sess, token, keyfile, cipher,
 			    &rkey, &rksz);

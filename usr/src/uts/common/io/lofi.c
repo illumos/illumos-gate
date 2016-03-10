@@ -22,6 +22,7 @@
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  *
  * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
+ * Copyright (c) 2016 Andrey Sokolov
  */
 
 /*
@@ -131,15 +132,6 @@
 #include <sys/crypto/api.h>
 #include <sys/rctl.h>
 #include <LzmaDec.h>
-
-/*
- * The basis for CRYOFF is derived from usr/src/uts/common/sys/fs/ufs_fs.h.
- * Crypto metadata, if it exists, is located at the end of the boot block
- * (BBOFF + BBSIZE, which is SBOFF).  The super block and everything after
- * is offset by the size of the crypto metadata which is handled by
- * lsp->ls_crypto_offset.
- */
-#define	CRYOFF	((off_t)8192)
 
 #define	NBLOCKS_PROP_NAME	"Nblocks"
 #define	SIZE_PROP_NAME		"Size"
