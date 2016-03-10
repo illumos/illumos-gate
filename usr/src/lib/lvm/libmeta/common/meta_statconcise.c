@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <meta.h>
 #include <assert.h>
 #include <ctype.h>
@@ -32,6 +30,7 @@
 #include <meta.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stddef.h>
 #include <strings.h>
 #include <sys/lvm/md_mddb.h>
 #include <sys/lvm/md_names.h>
@@ -161,7 +160,6 @@ typedef struct md_im_list {
  */
 #define	MAXSIZEMDRECNAME	20
 #define	NAMEWIDTH		16
-#define	offsetof(s, m)	((size_t)(&(((s *)0)->m)))
 #define	NOT_PHYSICAL_DEV	0
 #define	PHYSICAL_DEV		1
 

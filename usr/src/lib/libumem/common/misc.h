@@ -27,13 +27,12 @@
 #ifndef	_MISC_H
 #define	_MISC_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/time.h>
 #include <thread.h>
 #include <pthread.h>
 #include <stdarg.h>
+#include <stddef.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -43,14 +42,6 @@ extern uint_t umem_abort;		/* abort when errors occur */
 extern uint_t umem_output;		/* output error messages to stderr */
 extern caddr_t umem_min_stack;		/* max stack address for audit log */
 extern caddr_t umem_max_stack;		/* min stack address for audit log */
-
-/*
- * various utility functions
- * These are globally implemented.
- */
-
-#undef	offsetof
-#define	offsetof(s, m)	((size_t)(&(((s *)0)->m)))
 
 /*
  * a safe printf  -- do not use for error messages.

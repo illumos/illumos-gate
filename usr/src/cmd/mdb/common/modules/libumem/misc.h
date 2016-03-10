@@ -26,15 +26,12 @@
 #ifndef	_MDBMOD_MISC_H
 #define	_MDBMOD_MISC_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <mdb/mdb_modapi.h>
+#include <stddef.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-#define	offsetof(s, m)	((size_t)(&(((s *)0)->m)))
 
 extern int umem_debug(uintptr_t, uint_t, int, const mdb_arg_t *);
 

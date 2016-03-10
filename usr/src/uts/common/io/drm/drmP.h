@@ -56,6 +56,7 @@
 #include <sys/pmem.h>
 #include <sys/agpgart.h>
 #include <sys/time.h>
+#include <sys/sysmacros.h>
 #include "drm_atomic.h"
 #include "drm.h"
 #include "queue.h"

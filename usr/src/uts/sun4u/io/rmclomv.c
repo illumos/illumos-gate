@@ -52,8 +52,8 @@
 #include <sys/ddi.h>
 #include <sys/time.h>
 #include <sys/promif.h>
+#include <sys/sysmacros.h>
 
-#define	offsetof(s, m)	(size_t)(&(((s *)0)->m))
 #define	RMCRESBUFLEN	1024
 #define	DATE_TIME_MSG_SIZE	78
 #define	RMCLOMV_WATCHDOG_MODE	"rmclomv-watchdog-mode"

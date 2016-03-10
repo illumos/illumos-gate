@@ -32,6 +32,7 @@ extern "C" {
 #endif
 
 #include <sys/list.h>
+#include <sys/sysmacros.h>
 #include <sys/usb/usba/usbai_private.h>
 #include <sys/videodev2.h>
 #include <sys/usb/clients/video/usbvc/usbvc.h>
@@ -172,8 +173,6 @@ typedef struct usbvc_vic {
 #define	PRINT_MASK_DEVCTRL	0x00000100
 #define	PRINT_MASK_DEVMAP	0x00000200
 #define	PRINT_MASK_ALL		0xFFFFFFFF
-
-#define	offsetof(s, m)	((size_t)(&(((s *)0)->m)))
 
 #define	USBVC_MAX_PKTS 40
 

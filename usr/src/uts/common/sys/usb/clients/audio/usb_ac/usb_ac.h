@@ -33,6 +33,7 @@ extern "C" {
 #endif
 
 #include <sys/sunldi.h>
+#include <sys/sysmacros.h>
 #include <sys/usb/usba/usbai_private.h>
 
 
@@ -328,14 +329,6 @@ _NOTE(DATA_READABLE_WITHOUT_LOCK(usb_audio_format_t::ch))
 #define	USB_AS_PLUMBED	1
 #define	USB_AH_PLUMBED	2
 #define	UNKNOWN_PLUMBED	3
-
-/* other useful macros */
-#define	offsetof(s, m)	((size_t)(&(((s *)0)->m)))
-
-
-
-
-
 
 #define	AF_REGISTERED	0x1
 #define	AD_SETUP	0x10

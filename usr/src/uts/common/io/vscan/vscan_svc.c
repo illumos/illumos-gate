@@ -41,6 +41,7 @@
 #include <sys/cred.h>
 #include <sys/list.h>
 #include <sys/vscan.h>
+#include <sys/sysmacros.h>
 
 #define	VS_REQ_MAGIC		0x52515354 /* 'RQST' */
 
@@ -57,7 +58,6 @@
 #define	VS_ACCESS_DENY		2	/* return EACCES */
 
 #define	tolower(C)	(((C) >= 'A' && (C) <= 'Z') ? (C) - 'A' + 'a' : (C))
-#define	offsetof(s, m)	(size_t)(&(((s *)0)->m))
 
 /* global variables - tunable via /etc/system */
 uint32_t vs_reqs_max = VS_REQS_DEFAULT;	/* max scan requests */

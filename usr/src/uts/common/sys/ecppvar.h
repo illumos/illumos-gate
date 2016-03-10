@@ -28,6 +28,7 @@
 #define	_SYS_ECPPVAR_H
 
 #include <sys/note.h>
+#include <sys/sysmacros.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -513,7 +514,6 @@ struct ecppkstat {
  * Other useful macros
  */
 #define	NELEM(a)	(sizeof (a) / sizeof (*(a)))
-#define	offsetof(s, m)	((size_t)(&(((s *)0)->m)))
 
 #ifdef	__cplusplus
 }

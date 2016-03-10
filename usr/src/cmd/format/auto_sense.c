@@ -24,6 +24,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2016 Igor Kozhukhov <ikozhukhov@gmail.com>
  */
 
 /*
@@ -210,15 +211,11 @@ static struct disk_info	*find_scsi_disk_info(
 static struct disk_type *new_direct_disk_type(int fd, char *disk_name,
     struct dk_label *label);
 
-static struct disk_info *find_direct_disk_info(struct dk_cinfo *dkinfo);
 static int efi_ioctl(int fd, int cmd, dk_efi_t *dk_ioc);
 static int auto_label_init(struct dk_label *label);
-static struct ctlr_type *find_direct_ctlr_type(void);
-static struct ctlr_info *find_direct_ctlr_info(struct dk_cinfo	*dkinfo);
-static  struct disk_info *find_direct_disk_info(struct dk_cinfo *dkinfo);
-static struct ctlr_type *find_vbd_ctlr_type(void);
-static struct ctlr_info *find_vbd_ctlr_info(struct dk_cinfo *dkinfo);
-static struct disk_info *find_vbd_disk_info(struct dk_cinfo *dkinfo);
+static struct ctlr_type *find_ctlr_type(ushort_t);
+static struct ctlr_info *find_ctlr_info(struct dk_cinfo	*, ushort_t);
+static struct disk_info *find_disk_info(struct dk_cinfo *, ushort_t);
 
 static char		*get_sun_disk_name(
 				char		*disk_name,
@@ -264,12 +261,11 @@ auto_efi_sense(int fd, struct efi_info *label)
 		}
 		return (NULL);
 	}
-	if ((cur_ctype != NULL) && (cur_ctype->ctype_ctype == DKC_DIRECT)) {
-		ctlr = find_direct_ctlr_info(&dkinfo);
-		disk_info = find_direct_disk_info(&dkinfo);
-	} else if ((cur_ctype != NULL) && (cur_ctype->ctype_ctype == DKC_VBD)) {
-		ctlr = find_vbd_ctlr_info(&dkinfo);
-		disk_info = find_vbd_disk_info(&dkinfo);
+	if ((cur_ctype != NULL) && (cur_ctype->ctype_ctype == DKC_DIRECT ||
+	    cur_ctype->ctype_ctype == DKC_VBD ||
+	    cur_ctype->ctype_ctype == DKC_BLKDEV)) {
+		ctlr = find_ctlr_info(&dkinfo, cur_ctype->ctype_ctype);
+		disk_info = find_disk_info(&dkinfo, cur_ctype->ctype_ctype);
 	} else {
 		ctlr = find_scsi_ctlr_info(&dkinfo);
 		disk_info = find_scsi_disk_info(&dkinfo);
@@ -378,94 +374,61 @@ efi_ioctl(int fd, int cmd, dk_efi_t *dk_ioc)
 }
 
 static struct ctlr_type *
-find_direct_ctlr_type()
+find_ctlr_type(ushort_t type)
 {
 	struct	mctlr_list	*mlp;
+
+	assert(type == DKC_DIRECT ||
+	    type == DKC_VBD ||
+	    type == DKC_BLKDEV);
 
 	mlp = controlp;
 
 	while (mlp != NULL) {
-		if (mlp->ctlr_type->ctype_ctype == DKC_DIRECT) {
+		if (mlp->ctlr_type->ctype_ctype == type) {
 			return (mlp->ctlr_type);
 		}
 		mlp = mlp->next;
 	}
 
-	impossible("no DIRECT controller type");
-
-	return ((struct ctlr_type *)NULL);
-}
-
-static struct ctlr_type *
-find_vbd_ctlr_type()
-{
-	struct	mctlr_list	*mlp;
-
-	mlp = controlp;
-
-	while (mlp != NULL) {
-		if (mlp->ctlr_type->ctype_ctype == DKC_VBD) {
-			return (mlp->ctlr_type);
-		}
-		mlp = mlp->next;
-	}
-
-	impossible("no VBD controller type");
+	impossible("no DIRECT/VBD/BLKDEV controller type");
 
 	return ((struct ctlr_type *)NULL);
 }
 
 static struct ctlr_info *
-find_direct_ctlr_info(
-	struct dk_cinfo		*dkinfo)
+find_ctlr_info(struct dk_cinfo *dkinfo, ushort_t type)
 {
 	struct ctlr_info	*ctlr;
 
-	if (dkinfo->dki_ctype != DKC_DIRECT)
-		return (NULL);
+	assert(type == DKC_DIRECT ||
+	    type == DKC_VBD ||
+	    type == DKC_BLKDEV);
 
 	for (ctlr = ctlr_list; ctlr != NULL; ctlr = ctlr->ctlr_next) {
 		if (ctlr->ctlr_addr == dkinfo->dki_addr &&
 		    ctlr->ctlr_space == dkinfo->dki_space &&
-		    ctlr->ctlr_ctype->ctype_ctype == DKC_DIRECT) {
+		    ctlr->ctlr_ctype->ctype_ctype == dkinfo->dki_ctype) {
 			return (ctlr);
 		}
 	}
 
-	impossible("no DIRECT controller info");
+	impossible("no DIRECT/VBD/BLKDEV controller info");
 	/*NOTREACHED*/
-}
-
-static struct ctlr_info *
-find_vbd_ctlr_info(
-	struct dk_cinfo		*dkinfo)
-{
-	struct ctlr_info	*ctlr;
-
-	if (dkinfo->dki_ctype != DKC_VBD)
-		return (NULL);
-
-	for (ctlr = ctlr_list; ctlr != NULL; ctlr = ctlr->ctlr_next) {
-		if (ctlr->ctlr_addr == dkinfo->dki_addr &&
-		    ctlr->ctlr_space == dkinfo->dki_space &&
-		    ctlr->ctlr_ctype->ctype_ctype == DKC_VBD) {
-			return (ctlr);
-		}
-	}
-
-	impossible("no VBD controller info");
-	/*NOTREACHED*/
+	return ((struct ctlr_info *)NULL);
 }
 
 static  struct disk_info *
-find_direct_disk_info(
-	struct dk_cinfo		*dkinfo)
+find_disk_info(struct dk_cinfo *dkinfo, ushort_t type)
 {
 	struct disk_info	*disk;
 	struct dk_cinfo		*dp;
 
+	assert(type == DKC_DIRECT ||
+	    type == DKC_VBD ||
+	    type == DKC_BLKDEV);
+
 	for (disk = disk_list; disk != NULL; disk = disk->disk_next) {
-		assert(dkinfo->dki_ctype == DKC_DIRECT);
 		dp = &disk->disk_dkinfo;
 		if (dp->dki_ctype == dkinfo->dki_ctype &&
 		    dp->dki_cnum == dkinfo->dki_cnum &&
@@ -475,30 +438,9 @@ find_direct_disk_info(
 		}
 	}
 
-	impossible("No DIRECT disk info instance\n");
+	impossible("No DIRECT/VBD/BLKDEV disk info instance\n");
 	/*NOTREACHED*/
-}
-
-static  struct disk_info *
-find_vbd_disk_info(
-	struct dk_cinfo		*dkinfo)
-{
-	struct disk_info	*disk;
-	struct dk_cinfo		*dp;
-
-	for (disk = disk_list; disk != NULL; disk = disk->disk_next) {
-		assert(dkinfo->dki_ctype == DKC_VBD);
-		dp = &disk->disk_dkinfo;
-		if (dp->dki_ctype == dkinfo->dki_ctype &&
-		    dp->dki_cnum == dkinfo->dki_cnum &&
-		    dp->dki_unit == dkinfo->dki_unit &&
-		    strcmp(dp->dki_dname, dkinfo->dki_dname) == 0) {
-			return (disk);
-		}
-	}
-
-	impossible("No VBD disk info instance\n");
-	/*NOTREACHED*/
+	return ((struct disk_info *)NULL);
 }
 
 /*
@@ -691,7 +633,7 @@ new_direct_disk_type(
 	/*
 	 * Find the ctlr_info for this disk.
 	 */
-	ctlr = find_direct_ctlr_info(&dkinfo);
+	ctlr = find_ctlr_info(&dkinfo, dkinfo.dki_ctype);
 
 	/*
 	 * Allocate a new disk type for the direct controller.
@@ -701,7 +643,7 @@ new_direct_disk_type(
 	/*
 	 * Find the disk_info instance for this disk.
 	 */
-	disk_info = find_direct_disk_info(&dkinfo);
+	disk_info = find_disk_info(&dkinfo, dkinfo.dki_ctype);
 
 	/*
 	 * The controller and the disk should match.
@@ -2010,16 +1952,15 @@ new_scsi_disk_type(
  * Delete a disk type from disk type list.
  */
 int
-delete_disk_type(
-		struct disk_type *disk_type)
+delete_disk_type(struct disk_type *disk_type)
 {
 	struct ctlr_type	*ctlr;
 	struct disk_type	*dp, *disk;
 
-	if (cur_ctype->ctype_ctype == DKC_DIRECT)
-		ctlr = find_direct_ctlr_type();
-	else if (cur_ctype->ctype_ctype == DKC_VBD)
-		ctlr = find_vbd_ctlr_type();
+	if (cur_ctype->ctype_ctype == DKC_DIRECT ||
+	    cur_ctype->ctype_ctype == DKC_VBD ||
+	    cur_ctype->ctype_ctype == DKC_BLKDEV)
+		ctlr = find_ctlr_type(cur_ctype->ctype_ctype);
 	else
 		ctlr = find_scsi_ctlr_type();
 	if (ctlr == NULL || ctlr->ctype_dlist == NULL) {
@@ -2157,7 +2098,7 @@ strcopy(
  */
 int
 adjust_disk_geometry(diskaddr_t capacity, uint_t *cyl, uint_t *nhead,
-	uint_t *nsect)
+    uint_t *nsect)
 {
 	uint_t	lcyl = *cyl;
 	uint_t	lnhead = *nhead;
@@ -2296,7 +2237,7 @@ square_box(
  */
 static void
 compute_chs_values(diskaddr_t total_capacity, diskaddr_t usable_capacity,
-	uint_t *pcylp, uint_t *nheadp, uint_t *nsectp)
+    uint_t *pcylp, uint_t *nheadp, uint_t *nsectp)
 {
 
 	/* Unlabeled SCSI floppy device */

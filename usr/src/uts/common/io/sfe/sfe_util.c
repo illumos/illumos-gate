@@ -52,6 +52,7 @@
 #include <sys/stream.h>		/* required for MBLK* */
 #include <sys/strsun.h>		/* required for mionack() */
 #include <sys/byteorder.h>
+#include <sys/sysmacros.h>
 #include <sys/pci.h>
 #include <inet/common.h>
 #include <inet/led.h>
@@ -107,9 +108,6 @@ static int gem_debug = GEM_DEBUG_LEVEL;
 #define	GET_TXBUF(dp, sn)	\
 	&(dp)->tx_buf[SLOT((dp)->tx_slots_base + (sn), (dp)->gc.gc_tx_buf_size)]
 
-#ifndef offsetof
-#define	offsetof(t, m)	((long)&(((t *) 0)->m))
-#endif
 #define	TXFLAG_VTAG(flag)	\
 	(((flag) & GEM_TXFLAG_VTAG) >> GEM_TXFLAG_VTAG_SHIFT)
 

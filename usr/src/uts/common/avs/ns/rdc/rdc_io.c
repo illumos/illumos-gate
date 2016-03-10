@@ -29,6 +29,7 @@
 #include <sys/kmem.h>
 #include <sys/conf.h>
 #include <sys/errno.h>
+#include <sys/sysmacros.h>
 
 #ifdef _SunOS_5_6
 /*
@@ -5638,13 +5639,6 @@ done:
 
 	return (rc);
 }
-
-/*
- * Yet another standard thing that is not standard ...
- */
-#ifndef offsetof
-#define	offsetof(s, m)	((size_t)(&((s *)0)->m))
-#endif
 
 static int
 rdc_status(void *arg, int mode, rdc_config_t *uparms, spcs_s_info_t kstatus)
