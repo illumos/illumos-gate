@@ -25,6 +25,10 @@
  */
 
 /*
+ * Copyright 2016 Joyent, Inc.
+ */
+
+/*
  * Polled I/O safe ANSI terminal emulator module;
  * Supporting TERM types 'sun' and 'sun-color, parsing
  * ANSI x3.64 escape sequences, and the like.  (See wscons(7d)
@@ -507,6 +511,13 @@ tem_safe_selgraph(struct tem_vt_state *tem)
 			tem->tvs_fg_color = param - 30;
 			break;
 
+		case 39:
+			/*
+			 * Reset the foreground colour.
+			 */
+			tem->tvs_fg_color = tems.ts_init_color.fg_color;
+			break;
+
 		case 40: /* black	(grey) 		background */
 		case 41: /* red		(light red) 	background */
 		case 42: /* green	(light green) 	background */
@@ -516,6 +527,13 @@ tem_safe_selgraph(struct tem_vt_state *tem)
 		case 46: /* cyan	(light cyan) 	background */
 		case 47: /* white	(bright white) 	background */
 			tem->tvs_bg_color = param - 40;
+			break;
+
+		case 49:
+			/*
+			 * Reset the background colour.
+			 */
+			tem->tvs_bg_color = tems.ts_init_color.bg_color;
 			break;
 
 		default:
