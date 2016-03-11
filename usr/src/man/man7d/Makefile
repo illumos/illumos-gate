@@ -13,7 +13,7 @@
 # Copyright 2011, Richard Lowe
 # Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
-# Copyright 2014 Joyent, Inc. All rights reserved.
+# Copyright 2016 Joyent, Inc.
 #
 
 include		$(SRC)/Makefile.master
@@ -60,6 +60,7 @@ _MANFILES=	aac.7d		\
 		hme.7d		\
 		hubd.7d		\
 		hxge.7d		\
+		i40e.7d		\
 		ib.7d		\
 		ibcm.7d		\
 		ibd.7d		\

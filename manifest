@@ -594,6 +594,7 @@ f kernel/drv/amd64/heci 0755 root sys
 f kernel/drv/amd64/hid 0755 root sys
 f kernel/drv/amd64/hubd 0755 root sys
 f kernel/drv/amd64/hxge 0755 root sys
+f kernel/drv/amd64/i40e 0755 root sys
 f kernel/drv/amd64/i8042 0755 root sys
 f kernel/drv/amd64/icmp 0755 root sys
 f kernel/drv/amd64/icmp6 0755 root sys
@@ -749,6 +750,7 @@ f kernel/drv/fasttrap.conf 0644 root sys
 f kernel/drv/fbt.conf 0644 root sys
 f kernel/drv/fm.conf 0644 root sys
 f kernel/drv/hxge.conf 0644 root sys
+f kernel/drv/i40e.conf 0644 root sys
 f kernel/drv/icmp.conf 0644 root sys
 f kernel/drv/icmp6.conf 0644 root sys
 f kernel/drv/igb.conf 0644 root sys
@@ -900,6 +902,7 @@ f kernel/kmdb/amd64/emlxs 0555 root sys
 f kernel/kmdb/amd64/fctl 0555 root sys
 f kernel/kmdb/amd64/genunix 0555 root sys
 f kernel/kmdb/amd64/hook 0555 root sys
+f kernel/kmdb/amd64/i40e 0555 root sys
 f kernel/kmdb/amd64/idm 0555 root sys
 f kernel/kmdb/amd64/ii 0555 root sys
 f kernel/kmdb/amd64/ip 0555 root sys
@@ -9486,6 +9489,7 @@ f usr/lib/mdb/kvm/amd64/fcp.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/fctl.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/genunix.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/hook.so 0555 root sys
+f usr/lib/mdb/kvm/amd64/i40e.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/idm.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/ii.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/ip.so 0555 root sys
@@ -9543,6 +9547,7 @@ f usr/lib/mdb/kvm/fcp.so 0555 root sys
 f usr/lib/mdb/kvm/fctl.so 0555 root sys
 f usr/lib/mdb/kvm/genunix.so 0555 root sys
 f usr/lib/mdb/kvm/hook.so 0555 root sys
+f usr/lib/mdb/kvm/i40e.so 0555 root sys
 f usr/lib/mdb/kvm/idm.so 0555 root sys
 f usr/lib/mdb/kvm/ii.so 0555 root sys
 f usr/lib/mdb/kvm/ip.so 0555 root sys
@@ -18404,6 +18409,7 @@ f usr/share/man/man7d/heci.7d 0444 root bin
 f usr/share/man/man7d/hid.7d 0444 root bin
 f usr/share/man/man7d/hubd.7d 0444 root bin
 f usr/share/man/man7d/hxge.7d 0444 root bin
+f usr/share/man/man7d/i40e.7d 0444 root bin
 f usr/share/man/man7d/ieee1394.7d 0444 root bin
 f usr/share/man/man7d/igb.7d 0444 root bin
 f usr/share/man/man7d/ipmi.7d 0444 root bin
