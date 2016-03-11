@@ -164,6 +164,7 @@ static void lxpr_read_stat(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_swaps(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_uptime(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_version(lxpr_node_t *, lxpr_uiobuf_t *);
+static void lxpr_read_vmstat(lxpr_node_t *, lxpr_uiobuf_t *);
 
 static void lxpr_read_pid_auxv(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_pid_cgroup(lxpr_node_t *, lxpr_uiobuf_t *);
@@ -306,7 +307,8 @@ static lxpr_dirent_t lx_procdir[] = {
 	{ LXPR_SWAPS,		"swaps" },
 	{ LXPR_SYSDIR,		"sys" },
 	{ LXPR_UPTIME,		"uptime" },
-	{ LXPR_VERSION,		"version" }
+	{ LXPR_VERSION,		"version" },
+	{ LXPR_VMSTAT,		"vmstat" }
 };
 
 #define	PROCDIRFILES	(sizeof (lx_procdir) / sizeof (lx_procdir[0]))
@@ -729,6 +731,7 @@ static void (*lxpr_read_function[LXPR_NFILES])() = {
 	lxpr_read_sys_vm_swappiness,	/* /proc/sys/vm/swappiness */
 	lxpr_read_uptime,		/* /proc/uptime		*/
 	lxpr_read_version,		/* /proc/version	*/
+	lxpr_read_vmstat,		/* /proc/vmstat		*/
 };
 
 /*
@@ -850,6 +853,7 @@ static vnode_t *(*lxpr_lookup_function[LXPR_NFILES])() = {
 	lxpr_lookup_not_a_dir,		/* /proc/sys/vm/swappiness */
 	lxpr_lookup_not_a_dir,		/* /proc/uptime		*/
 	lxpr_lookup_not_a_dir,		/* /proc/version	*/
+	lxpr_lookup_not_a_dir,		/* /proc/vmstat		*/
 };
 
 /*
@@ -971,6 +975,7 @@ static int (*lxpr_readdir_function[LXPR_NFILES])() = {
 	lxpr_readdir_not_a_dir,		/* /proc/sys/vm/swappiness */
 	lxpr_readdir_not_a_dir,		/* /proc/uptime		*/
 	lxpr_readdir_not_a_dir,		/* /proc/version	*/
+	lxpr_readdir_not_a_dir,		/* /proc/vmstat		*/
 };
 
 
@@ -3772,6 +3777,57 @@ lxpr_read_version(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	    "cc", 1, 0, 0,
 #endif
 	    version);
+}
+
+/* ARGSUSED */
+static void
+lxpr_read_vmstat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+{
+	cpu_t *cp, *cpstart;
+	int pools_enabled;
+
+	ulong_t pgpgin_cum    = 0;
+	ulong_t pgpgout_cum   = 0;
+	ulong_t pgswapout_cum = 0;
+	ulong_t pgswapin_cum  = 0;
+
+	mutex_enter(&cpu_lock);
+	pools_enabled = pool_pset_enabled();
+	/* Calculate cumulative stats */
+	cp = cpstart = CPU->cpu_part->cp_cpulist;
+	do {
+		/* Only count CPUs which are present and active. */
+		if ((cp->cpu_flags & CPU_EXISTS) == 0) {
+			continue;
+		}
+
+		pgpgin_cum += CPU_STATS(cp, vm.pgpgin);
+		pgpgout_cum += CPU_STATS(cp, vm.pgpgout);
+		pgswapin_cum += CPU_STATS(cp, vm.pgswapin);
+		pgswapout_cum += CPU_STATS(cp, vm.pgswapout);
+
+		if (pools_enabled)
+			cp = cp->cpu_next_part;
+		else
+			cp = cp->cpu_next;
+	} while (cp != cpstart);
+	mutex_exit(&cpu_lock);
+
+	/*
+	 * Needless to say, the metrics presented by vmstat are very specific
+	 * to the internals of the Linux kernel.  There is little per-zone
+	 * information which can be translated in a meaningful way to fit the
+	 * expected fields.  For the time being, the output is kept sparse.
+	 */
+	lxpr_uiobuf_printf(uiobuf,
+	    "pgpgin %lu\n"
+	    "pgpgout %lu\n"
+	    "pswpin %lu\n"
+	    "pswpout %lu\n",
+	    pgpgin_cum,
+	    pgpgout_cum,
+	    pgswapin_cum,
+	    pgswapout_cum);
 }
 
 /*

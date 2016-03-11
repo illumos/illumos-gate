@@ -223,6 +223,7 @@ typedef enum lxpr_nodetype {
 	LXPR_SYS_VM_SWAPPINESS,		/* /proc/sys/vm/swappiness	*/
 	LXPR_UPTIME,		/* /proc/uptime		*/
 	LXPR_VERSION,		/* /proc/version	*/
+	LXPR_VMSTAT,		/* /proc/vmstat		*/
 	LXPR_NFILES		/* number of lx /proc file types */
 } lxpr_nodetype_t;
 
