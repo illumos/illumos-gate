@@ -113,7 +113,11 @@
 #define	LX_SIOCGPGRP		0x8904
 #define	LX_SIOCATMARK		0x8905
 #define	LX_SIOCGSTAMP		0x8906
+#define	LX_SIOCADDRT		0x890b
+#define	LX_SIOCDELRT		0x890c
+#define	LX_SIOCRTMSG		0x890d
 #define	LX_SIOCGIFNAME		0x8910
+#define	LX_SIOCSIFLINK		0x8911
 #define	LX_SIOCGIFCONF		0x8912
 #define	LX_SIOCGIFFLAGS		0x8913
 #define	LX_SIOCSIFFLAGS		0x8914
@@ -131,10 +135,57 @@
 #define	LX_SIOCSIFMEM		0x8920
 #define	LX_SIOCGIFMTU		0x8921
 #define	LX_SIOCSIFMTU		0x8922
+#define	LX_SIOCSIFNAME		0x8923
 #define	LX_SIOCSIFHWADDR	0x8924
+#define	LX_SIOCGIFENCAP		0x8925
+#define	LX_SIOCSIFENCAP		0x8926
 #define	LX_SIOCGIFHWADDR	0x8927
+#define	LX_SIOCGIFSLAVE		0x8929
+#define	LX_SIOCSIFSLAVE		0x8930
+#define	LX_SIOCADDMULTI		0x8931
+#define	LX_SIOCDELMULTI		0x8932
 #define	LX_SIOCGIFINDEX		0x8933
+#define	LX_SIOCSIFPFLAGS	0x8934
+#define	LX_SIOCGIFPFLAGS	0x8935
+#define	LX_SIOCDIFADDR		0x8936
+#define	LX_SIOCSIFHWBROADCAST	0x8937
+#define	LX_SIOCGIFCOUNT		0x8938
+#define	LX_SIOCGIFBR		0x8940
+#define	LX_SIOCSIFBR		0x8941
 #define	LX_SIOCGIFTXQLEN	0x8942
+#define	LX_SIOCSIFTXQLEN	0x8943
+#define	LX_SIOCETHTOOL		0x8946
+#define	LX_SIOCGMIIPHY		0x8947
+#define	LX_SIOCGMIIREG		0x8948
+#define	LX_SIOCSMIIREG		0x8949
+#define	LX_SIOCWANDEV		0x894a
+#define	LX_SIOCOUTQNSD		0x894b
+#define	LX_SIOCDARP		0x8953
+#define	LX_SIOCGARP		0x8954
+#define	LX_SIOCSARP		0x8955
+#define	LX_SIOCDRARP		0x8960
+#define	LX_SIOCGRARP		0x8961
+#define	LX_SIOCSRARP		0x8962
+#define	LX_SIOCGIFMAP		0x8970
+#define	LX_SIOCSIFMAP		0x8971
+#define	LX_SIOCADDDLCI		0x8980
+#define	LX_SIOCDELDLCI		0x8981
+#define	LX_SIOCGIFVLAN		0x8982
+#define	LX_SIOCSIFVLAN		0x8983
+#define	LX_SIOCBONDENSLAVE	0x8990
+#define	LX_SIOCBONDRELEASE	0x8991
+#define	LX_SIOCBONDSETHWADDR	0x8992
+#define	LX_SIOCBONDSLAVEINFOQUERY 0x8993
+#define	LX_SIOCBONDINFOQUERY	0x8994
+#define	LX_SIOCBONDCHANGEACTIVE	0x8995
+#define	LX_SIOCBRADDBR		0x89a0
+#define	LX_SIOCBRDELBR		0x89a1
+#define	LX_SIOCBRADDIF		0x89a2
+#define	LX_SIOCBRDELIF		0x89a3
+#define	LX_SIOCSHWTSTAMP	0x89b0
+#define	LX_SIOCGHWTSTAMP	0x89b1
+#define	LX_SIOCDEVPRIVATE	0x89f0
+#define	LX_SIOCPROTOPRIVATE	0x89e0
 
 #define	FLUSER(fp)	fp->f_flag | get_udatamodel()
 #define	FLFAKE(fp)	fp->f_flag | FKIOCTL
@@ -1087,6 +1138,15 @@ ict_if_ioctl(vnode_t *vn, int cmd, intptr_t arg, int flags, cred_t *cred)
 
 	ASSERT(lxzd != NULL);
 
+	/*
+	 * For ioctls of this type, we are strict about address family
+	 * whereas Linux is lenient.  This strictness can be avoided by using
+	 * an internal AF_INET ksocket, which we use if the family is anything
+	 * but AF_PACKET.
+	 */
+	if (vn->v_type == VSOCK && VTOSO(vn)->so_family == AF_PACKET)
+		return (VOP_IOCTL(vn, cmd, arg, flags, cred, &rv, NULL));
+
 	mutex_enter(&lxzd->lxzd_lock);
 	ks = lxzd->lxzd_ioctl_sock;
 	if (ks == NULL) {
@@ -1102,11 +1162,6 @@ ict_if_ioctl(vnode_t *vn, int cmd, intptr_t arg, int flags, cred_t *cred)
 	}
 	mutex_exit(&lxzd->lxzd_lock);
 
-	/*
-	 * For ioctls of this type, Illumos is strict about address family
-	 * whereas Linux is lenient.  This strictness can be avoided by using
-	 * an internal AF_INET ksocket.
-	 */
 	if (ks != NULL) {
 		error = ksocket_ioctl(ks, cmd, arg, &rv, cred);
 	} else {
@@ -1620,7 +1675,7 @@ long
 lx_ioctl(int fdes, int cmd, intptr_t arg)
 {
 	file_t *fp;
-	int res = 0;
+	int res = 0, error = ENOTTY;
 	lx_ioc_cmd_translator_t *ict = NULL;
 
 	if (cmd == LX_FIOCLEX || cmd == LX_FIONCLEX) {
@@ -1642,6 +1697,7 @@ lx_ioctl(int fdes, int cmd, intptr_t arg)
 
 	case LX_IOC_TYPE_SOCK:
 		ict = lx_ioc_xlate_socket;
+		error = EOPNOTSUPP;
 		break;
 
 	case LX_IOC_TYPE_AUTOFS:
@@ -1676,7 +1732,7 @@ lx_ioctl(int fdes, int cmd, intptr_t arg)
 	}
 	if (ict->lict_func == NULL) {
 		releasef(fdes);
-		return (set_errno(ENOTTY));
+		return (set_errno(error));
 	}
 
 	res = ict->lict_func(fp, ict->lict_cmd, arg, ict->lict_lxcmd);
