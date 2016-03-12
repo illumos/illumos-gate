@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -441,12 +441,23 @@ xdrmblk_putbytes(XDR *xdrs, caddr_t addr, int len)
 bool_t
 xdrmblk_putmblk(XDR *xdrs, mblk_t *m, uint_t len)
 {
-	struct xdrmblk_params *p;
 	int32_t llen = (int32_t)len;
 
-	if ((DLEN(m) % BYTES_PER_XDR_UNIT) != 0)
-		return (FALSE);
 	if (!xdrmblk_putint32(xdrs, &llen))
+		return (FALSE);
+
+	return (xdrmblk_putmblk_raw(xdrs, m));
+}
+
+/*
+ * The raw version of putmblk does not prepend the added data with the length.
+ */
+bool_t
+xdrmblk_putmblk_raw(XDR *xdrs, mblk_t *m)
+{
+	struct xdrmblk_params *p;
+
+	if ((DLEN(m) % BYTES_PER_XDR_UNIT) != 0)
 		return (FALSE);
 
 	p = (struct xdrmblk_params *)xdrs->x_private;
