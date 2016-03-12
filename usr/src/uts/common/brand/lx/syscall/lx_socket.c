@@ -2873,7 +2873,7 @@ lx_setsockopt_packet(sonode_t *so, int optname, void *optval, socklen_t optlen)
 		return (ENOPROTOOPT);
 	}
 
-	error = socket_setsockopt(so, IPPROTO_TCP, optname, optval, optlen,
+	error = socket_setsockopt(so, SOL_PACKET, optname, optval, optlen,
 	    CRED());
 	return (error);
 }
