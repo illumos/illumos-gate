@@ -341,10 +341,10 @@ main(int argc, char *argv[])
 	ret = sysinfo(SI_HW_PROVIDER, hw_provider, sizeof (hw_provider));
 	/*
 	 * If 0 bytes are returned (the system returns '1', for the \0),
-	 * we're probably on x86, default to Oracle.
+	 * we're probably on x86, default to "Unknown Hardware Vendor".
 	 */
 	if (ret <= 1) {
-		(void) strncpy(hw_provider, "Oracle Corporation",
+		(void) strncpy(hw_provider, "Unknown Hardware Vendor",
 		    sizeof (hw_provider));
 	}
 	(void) printf("System Configuration:  %s  %s\n", hw_provider,
