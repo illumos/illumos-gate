@@ -578,7 +578,6 @@ pfp_packet(void *arg, mac_resource_handle_t mrh, mblk_t *mp, boolean_t flag)
  * network interface) into promiscuous mode. It is then up to the application
  * to turn that down by issuing the relevant ioctls, if desired.
  */
-/* ARGSUSED */
 static int
 sdpfp_bind(sock_lower_handle_t handle, struct sockaddr *addr,
     socklen_t addrlen, struct cred *cred)

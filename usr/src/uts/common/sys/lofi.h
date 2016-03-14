@@ -22,6 +22,7 @@
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  *
  * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
+ * Copyright (c) 2016 Andrey Sokolov
  */
 
 #ifndef	_SYS_LOFI_H
@@ -163,6 +164,17 @@ struct lofi_ioctl {
 #define	S_ISLOFIABLE(mode) \
 	(S_ISREG(mode) || S_ISBLK(mode) || S_ISCHR(mode))
 
+/*
+ * The basis for CRYOFF is derived from usr/src/uts/common/sys/fs/ufs_fs.h.
+ * Crypto metadata, if it exists, is located at the end of the boot block
+ * (BBOFF + BBSIZE, which is SBOFF).  The super block and everything after
+ * is offset by the size of the crypto metadata which is handled by
+ * lsp->ls_crypto_offset.
+ */
+#define	CRYOFF	((off_t)8192)
+
+#define	LOFI_CRYPTO_MAGIC	{ 'C', 'F', 'L', 'O', 'F', 'I' }
+
 #if defined(_KERNEL)
 
 
@@ -195,7 +207,6 @@ struct compbuf {
  * Need exactly 6 bytes to identify encrypted lofi image
  */
 extern const char lofi_crypto_magic[6];
-#define	LOFI_CRYPTO_MAGIC	{ 'C', 'F', 'L', 'O', 'F', 'I' }
 #define	LOFI_CRYPTO_VERSION	((uint16_t)0)
 #define	LOFI_CRYPTO_DATA_SECTOR	((uint32_t)16)		/* for version 0 */
 
