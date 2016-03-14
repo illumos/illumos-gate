@@ -500,7 +500,7 @@ pfp_packet(void *arg, mac_resource_handle_t mrh, mblk_t *mp, boolean_t flag)
 	tunit->SRC_length = sizeof (struct sockaddr);
 	tunit->SRC_offset = sizeof (*tunit);
 
-	sol = (struct sockaddr_ll *)&ps->ps_sock;
+	sol = &ps->ps_sock;
 	sll = (struct sockaddr_ll *)(mp0->b_rptr + sizeof (*tunit));
 	sll->sll_ifindex = sol->sll_ifindex;
 	sll->sll_hatype = (uint16_t)hdr.mhi_origsap;
@@ -578,7 +578,6 @@ pfp_packet(void *arg, mac_resource_handle_t mrh, mblk_t *mp, boolean_t flag)
  * network interface) into promiscuous mode. It is then up to the application
  * to turn that down by issuing the relevant ioctls, if desired.
  */
-/* ARGSUSED */
 static int
 sdpfp_bind(sock_lower_handle_t handle, struct sockaddr *addr,
     socklen_t addrlen, struct cred *cred)
@@ -591,6 +590,9 @@ sdpfp_bind(sock_lower_handle_t handle, struct sockaddr *addr,
 
 	ps = (struct pfpsock *)handle;
 	if (ps->ps_bound)
+		return (EINVAL);
+
+	if (addrlen < sizeof (struct sockaddr_ll) || addr == NULL)
 		return (EINVAL);
 
 	addr_ll = (struct sockaddr_ll *)addr;
@@ -615,7 +617,7 @@ sdpfp_bind(sock_lower_handle_t handle, struct sockaddr *addr,
 	 * Cache all of the information from bind so that it's in an easy
 	 * place to get at when packets are received.
 	 */
-	sol = (struct sockaddr_ll *)&ps->ps_sock;
+	sol = &ps->ps_sock;
 	sol->sll_family = AF_PACKET;
 	sol->sll_ifindex = addr_ll->sll_ifindex;
 	sol->sll_protocol = addr_ll->sll_protocol;
@@ -763,7 +765,7 @@ sdpfp_senduio(sock_lower_handle_t handle, struct uio *uiop,
 			ks_stats.kp_send_unbound.value.ui64++;
 			return (EPROTO);
 		}
-		sol = (struct sockaddr_ll *)&ps->ps_sock;
+		sol = &ps->ps_sock;
 	} else {
 		/*
 		 * Verify the sockaddr_ll message passed down before using
@@ -782,7 +784,7 @@ sdpfp_senduio(sock_lower_handle_t handle, struct uio *uiop,
 			return (EAFNOSUPPORT);
 		}
 
-		sll = (struct sockaddr_ll *)&ps->ps_sock;
+		sll = &ps->ps_sock;
 		if (sol->sll_ifindex != sll->sll_ifindex) {
 			error = pfp_open_index(sol->sll_ifindex, &mh, &mch,
 			    cred);
@@ -1264,8 +1266,7 @@ pfp_setpacket_sockopt(sock_lower_handle_t handle, int option_name,
 	case PACKET_ADD_MEMBERSHIP :
 		switch (mreq.mr_type) {
 		case PACKET_MR_MULTICAST :
-			if (mreq.mr_alen !=
-			    ((struct sockaddr_ll *)&ps->ps_sock)->sll_halen)
+			if (mreq.mr_alen != ps->ps_sock.sll_halen)
 				return (EINVAL);
 
 			error = mac_multicast_add(ps->ps_mch, mreq.mr_address);
@@ -1284,8 +1285,7 @@ pfp_setpacket_sockopt(sock_lower_handle_t handle, int option_name,
 	case PACKET_DROP_MEMBERSHIP :
 		switch (mreq.mr_type) {
 		case PACKET_MR_MULTICAST :
-			if (mreq.mr_alen !=
-			    ((struct sockaddr_ll *)&ps->ps_sock)->sll_halen)
+			if (mreq.mr_alen != ps->ps_sock.sll_halen)
 				return (EINVAL);
 
 			mac_multicast_remove(ps->ps_mch, mreq.mr_address);

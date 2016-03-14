@@ -1575,6 +1575,8 @@ file path=opt/SUNWdtrt/tst/common/scalars/err.D_OP_INCOMPAT.dupttype.d \
 file path=opt/SUNWdtrt/tst/common/scalars/err.D_SYNTAX.declare.d mode=0444
 file path=opt/SUNWdtrt/tst/common/scalars/err.bigglobal.d mode=0444
 file path=opt/SUNWdtrt/tst/common/scalars/err.biglocal.d mode=0444
+file path=opt/SUNWdtrt/tst/common/scalars/tst.16kglobal.d mode=0444
+file path=opt/SUNWdtrt/tst/common/scalars/tst.16klocal.d mode=0444
 file path=opt/SUNWdtrt/tst/common/scalars/tst.basicvar.d mode=0444
 file path=opt/SUNWdtrt/tst/common/scalars/tst.basicvar.d.out mode=0444
 file path=opt/SUNWdtrt/tst/common/scalars/tst.localvar.d mode=0444

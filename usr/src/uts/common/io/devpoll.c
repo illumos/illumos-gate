@@ -25,7 +25,7 @@
 
 /*
  * Copyright (c) 2012 by Delphix. All rights reserved.
- * Copyright (c) 2015, Joyent, Inc. All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -951,12 +951,15 @@ dpwrite(dev_t dev, struct uio *uiop, cred_t *credp)
 		}
 	}
 	/*
+	 * Wake any pollcache waiters so they can check the new descriptors.
+	 *
 	 * Any fds added to an recursive-capable pollcache could themselves be
 	 * /dev/poll handles. To ensure that proper event propagation occurs,
-	 * parent pollcaches are woken so that they can create any needed
+	 * parent pollcaches are woken too, so that they can create any needed
 	 * pollcache links.
 	 */
 	if (fds_added) {
+		cv_broadcast(&pcp->pc_cv);
 		pcache_wake_parents(pcp);
 	}
 	pollstate_exit(pcp);
