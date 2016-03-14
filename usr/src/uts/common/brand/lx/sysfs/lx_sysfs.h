@@ -97,9 +97,12 @@ typedef enum lxsys_nodetype {
 	LXSYS_NONE,		/* None-type to keep inodes non-zero	*/
 	LXSYS_STATIC,		/* Statically defined entries		*/
 	LXSYS_CLASS_NET,	/* /sys/class/net/<iface>		*/
-	LXSYS_DEVICES_NET,	/* /sys/devices/virtual/net/<iface>	*/
+	LXSYS_DEV_NET,		/* /sys/devices/virtual/net/<iface>	*/
 	LXSYS_BLOCK,		/* /sys/block/<dev>			*/
-	LXSYS_DEVICES_ZFS,	/* /sys/devices/zfs/<dev>		*/
+	LXSYS_DEV_ZFS,		/* /sys/devices/zfs/<dev>		*/
+	LXSYS_DEV_SYS_CPU,	/* /sys/devices/system/cpu/<cpu>	*/
+	LXSYS_DEV_SYS_CPUINFO,	/* /sys/devices/system/cpu/cpuN/<info>	*/
+	LXSYS_DEV_SYS_NODE,	/* /sys/devices/system/node/node0/<info> */
 	LXSYS_MAXTYPE,		/* type limit				*/
 } lxsys_nodetype_t;
 
