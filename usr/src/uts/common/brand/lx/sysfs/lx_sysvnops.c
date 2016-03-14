@@ -73,9 +73,16 @@ static vnode_t *lxsys_lookup_class_netdir(lxsys_node_t *, char *);
 static vnode_t *lxsys_lookup_devices_virtual_netdir(lxsys_node_t *, char *);
 static vnode_t *lxsys_lookup_blockdir(lxsys_node_t *, char *);
 static vnode_t *lxsys_lookup_devices_zfsdir(lxsys_node_t *, char *);
+static vnode_t *lxsys_lookup_devices_syscpu(lxsys_node_t *, char *);
+static vnode_t *lxsys_lookup_devices_syscpuinfo(lxsys_node_t *, char *);
+static vnode_t *lxsys_lookup_devices_sysnode(lxsys_node_t *, char *);
 
+static int lxsys_read_static(lxsys_node_t *, lxsys_uiobuf_t *);
 static int lxsys_read_devices_virtual_net(lxsys_node_t *, lxsys_uiobuf_t *);
 static int lxsys_read_devices_zfs_block(lxsys_node_t *, lxsys_uiobuf_t *);
+static int lxsys_readdir_devices_syscpu(lxsys_node_t *, uio_t *, int *);
+static int lxsys_readdir_devices_syscpuinfo(lxsys_node_t *, uio_t *, int *);
+static int lxsys_readdir_devices_sysnode(lxsys_node_t *, uio_t *, int *);
 
 static int lxsys_readdir_static(lxsys_node_t *, uio_t *, int *);
 static int lxsys_readdir_class_netdir(lxsys_node_t *, uio_t *, int *);
@@ -116,9 +123,12 @@ const fs_operation_def_t lxsys_vnodeops_template[] = {
  * Where TYPE is one of:
  * 1 - SYS_STATIC
  * 2 - SYS_CLASS_NET
- * 3 - SYS_DEVICES_NET
+ * 3 - SYS_DEV_NET
  * 4 - SYS_BLOCK
- * 5 - SYS_DEVICES_ZFS
+ * 5 - SYS_DEV_ZFS
+ * 6 - SYS_DEV_SYS_CPU
+ * 7 - SYS_DEV_SYS_CPUINFO
+ * 8 - SYS_DEV_SYS_NODE
  *
  * Static entries will have assigned INSTANCE identifiers:
  * - 0x00: /sys
@@ -132,6 +142,11 @@ const fs_operation_def_t lxsys_vnodeops_template[] = {
  * - 0x08: /sys/devices/virtual/net
  * - 0x09: /sys/block
  * - 0x0a: /sys/devices/zfs
+ * - 0x0b: /sys/devices/system/cpu
+ * - 0x0c: /sys/devices/system/cpu/kernel_max
+ * - 0x0d: /sys/devices/system/node
+ * - 0x0e: /sys/devices/system/node/node0
+ * - 0x0f: /sys/devices/system/node/node0/cpulist
  *
  * Dynamic /sys/class/net/<interface> symlinks will use an INSTANCE derived
  * from the corresonding ifindex.
@@ -145,6 +160,15 @@ const fs_operation_def_t lxsys_vnodeops_template[] = {
  *
  * Dynamic /sys/devices/zfs/<dev> directories will use an INSTANCE derived from
  * the emulated minor number.
+ *
+ * Static/Dynamic /sys/devices/system/cpu contains a static kernel_max file
+ * and a dynamic set of cpuN subdirectories.
+ *
+ * Static/Dynamic /sys/devices/system/node/node0 currently only contains a
+ * static cpulist file, but will likely need future dynamic entries for cpuN
+ * symlinks, and perhaps other static files. By only providing 'node0' we
+ * pretend that there is only a single NUMA node available to a zone (trying to
+ * be NUMA-aware inside a zone is generally not going to work anyway).
  */
 
 #define	LXSYS_INST_CLASSDIR			0x1
@@ -157,6 +181,11 @@ const fs_operation_def_t lxsys_vnodeops_template[] = {
 #define	LXSYS_INST_DEVICES_VIRTUAL_NETDIR	0x8
 #define	LXSYS_INST_BLOCKDIR			0x9
 #define	LXSYS_INST_DEVICES_ZFSDIR		0xa
+#define	LXSYS_INST_DEVICES_SYSCPU		0xb
+#define	LXSYS_INST_DEV_SYSCPU_KMAX		0xc
+#define	LXSYS_INST_DEVICES_SYSNODE		0xd
+#define	LXSYS_INST_DEVICES_SYSNODE0		0xe
+#define	LXSYS_INST_DEV_SYSNODE0_CPULIST		0xf
 
 /*
  * file contents of an lx /sys directory.
@@ -183,6 +212,14 @@ static lxsys_dirent_t dirlist_devices_virtual[] = {
 	{ LXSYS_INST_DEVICES_VIRTUAL_NETDIR,	"net" }
 };
 
+static lxsys_dirent_t dirlist_devices_system[] = {
+	{ LXSYS_INST_DEVICES_SYSCPU,	"cpu" },
+	{ LXSYS_INST_DEVICES_SYSNODE,	"node" }
+};
+
+static lxsys_dirent_t dirlist_devices_sysnode[] = {
+	{ LXSYS_INST_DEVICES_SYSNODE0,	"node0" }
+};
 
 #define	LXSYS_ENDP_NET_ADDRESS	1
 #define	LXSYS_ENDP_NET_ADDRLEN	2
@@ -217,8 +254,9 @@ static lxsys_dirlookup_t lxsys_dirlookup[] = {
 	SYSDLENT(LXSYS_INST_FSDIR, dirlist_fs),
 	SYSDLENT(LXSYS_INST_FS_CGROUPDIR, dirlist_empty),
 	SYSDLENT(LXSYS_INST_DEVICESDIR, dirlist_devices),
-	SYSDLENT(LXSYS_INST_DEVICES_SYSTEMDIR, dirlist_empty),
-	SYSDLENT(LXSYS_INST_DEVICES_VIRTUALDIR, dirlist_devices_virtual)
+	SYSDLENT(LXSYS_INST_DEVICES_SYSTEMDIR, dirlist_devices_system),
+	SYSDLENT(LXSYS_INST_DEVICES_VIRTUALDIR, dirlist_devices_virtual),
+	SYSDLENT(LXSYS_INST_DEVICES_SYSNODE, dirlist_devices_sysnode)
 };
 
 
@@ -229,9 +267,12 @@ static vnode_t *(*lxsys_lookup_function[LXSYS_MAXTYPE])() = {
 	NULL,					/* LXSYS_NONE		*/
 	lxsys_lookup_static,			/* LXSYS_STATIC		*/
 	lxsys_lookup_class_netdir,		/* LXSYS_CLASS_NET	*/
-	lxsys_lookup_devices_virtual_netdir,	/* LXSYS_DEVICES_NET	*/
+	lxsys_lookup_devices_virtual_netdir,	/* LXSYS_DEV_NET	*/
 	lxsys_lookup_blockdir,			/* LXSYS_BLOCK		*/
-	lxsys_lookup_devices_zfsdir,		/* LXSYS_DEVICES_ZFS	*/
+	lxsys_lookup_devices_zfsdir,		/* LXSYS_DEV_ZFS	*/
+	lxsys_lookup_devices_syscpu,		/* LXSYS_DEV_SYS_CPU	*/
+	lxsys_lookup_devices_syscpuinfo,	/* LXSYS_DEV_SYS_CPUINFO */
+	lxsys_lookup_devices_sysnode,		/* LXSYS_DEV_SYS_NODE	*/
 };
 
 /*
@@ -241,9 +282,12 @@ static int (*lxsys_readdir_function[LXSYS_MAXTYPE])() = {
 	NULL,					/* LXSYS_NONE		*/
 	lxsys_readdir_static,			/* LXSYS_STATIC		*/
 	lxsys_readdir_class_netdir,		/* LXSYS_CLASS_NET	*/
-	lxsys_readdir_devices_virtual_netdir,	/* LXSYS_DEVICES_NET	*/
+	lxsys_readdir_devices_virtual_netdir,	/* LXSYS_DEV_NET	*/
 	lxsys_readdir_blockdir,			/* LXSYS_BLOCK		*/
-	lxsys_readdir_devices_zfsdir,		/* LXSYS_DEVICES_ZFS	*/
+	lxsys_readdir_devices_zfsdir,		/* LXSYS_DEV_ZFS	*/
+	lxsys_readdir_devices_syscpu,		/* LXSYS_DEV_SYS_CPU	*/
+	lxsys_readdir_devices_syscpuinfo,	/* LXSYS_DEV_SYS_CPUINFO */
+	lxsys_readdir_devices_sysnode,		/* LXSYS_DEV_SYS_NODE	*/
 };
 
 /*
@@ -251,11 +295,14 @@ static int (*lxsys_readdir_function[LXSYS_MAXTYPE])() = {
  */
 static int (*lxsys_read_function[LXSYS_MAXTYPE])() = {
 	NULL,					/* LXSYS_NONE		*/
-	NULL,					/* LXSYS_STATIC		*/
+	lxsys_read_static,			/* LXSYS_STATIC		*/
 	NULL,					/* LXSYS_CLASS_NET	*/
-	lxsys_read_devices_virtual_net,		/* LXSYS_DEVICES_NET	*/
+	lxsys_read_devices_virtual_net,		/* LXSYS_DEV_NET	*/
 	NULL,					/* LXSYS_BLOCK		*/
-	lxsys_read_devices_zfs_block,		/* LXSYS_DEVICES_ZFS	*/
+	lxsys_read_devices_zfs_block,		/* LXSYS_DEV_ZFS	*/
+	NULL,					/* LXSYS_DEV_SYS_CPU	*/
+	NULL,					/* LXSYS_DEV_SYS_CPUINFO */
+	NULL,					/* LXSYS_DEV_SYS_NODE	*/
 };
 
 /*
@@ -265,10 +312,18 @@ static int (*lxsys_readlink_function[LXSYS_MAXTYPE])() = {
 	NULL,					/* LXSYS_NONE		*/
 	NULL,					/* LXSYS_STATIC		*/
 	lxsys_readlink_class_net,		/* LXSYS_CLASS_NET	*/
-	NULL,					/* LXSYS_DEVICES_NET	*/
+	NULL,					/* LXSYS_DEV_NET	*/
 	lxsys_readlink_block,			/* LXSYS_BLOCK		*/
-	NULL,					/* LXSYS_DEVICES_ZFS	*/
+	NULL,					/* LXSYS_DEV_ZFS	*/
+	NULL,					/* LXSYS_DEV_SYS_CPU	*/
+	NULL,					/* LXSYS_DEV_SYS_CPUINFO */
+	NULL,					/* LXSYS_DEV_SYS_NODE	*/
 };
+
+typedef struct lxsys_cpu_info {
+	processorid_t	cpu_id;
+	processorid_t	cpu_seqid;
+} lxsys_cpu_info_t;
 
 /*
  * lxsys_open(): Vnode operation for VOP_OPEN()
@@ -499,10 +554,16 @@ lxsys_lookup_static(lxsys_node_t *ldp, char *comp)
 				node_type = LXSYS_CLASS_NET;
 				break;
 			case LXSYS_INST_DEVICES_VIRTUAL_NETDIR:
-				node_type = LXSYS_DEVICES_NET;
+				node_type = LXSYS_DEV_NET;
 				break;
 			case LXSYS_INST_DEVICES_ZFSDIR:
-				node_type = LXSYS_DEVICES_ZFS;
+				node_type = LXSYS_DEV_ZFS;
+				break;
+			case LXSYS_INST_DEVICES_SYSCPU:
+				node_type = LXSYS_DEV_SYS_CPU;
+				break;
+			case LXSYS_INST_DEVICES_SYSNODE0:
+				node_type = LXSYS_DEV_SYS_NODE;
 				break;
 			default:
 				/* Another static node */
@@ -644,7 +705,7 @@ lxsys_lookup_devices_zfsdir(lxsys_node_t *ldp, char *comp)
 
 	if (ldp->lxsys_instance == 0) {
 		/* top-level dev listing */
-		lnp = lxsys_lookup_disk(ldp, comp, LXSYS_DEVICES_ZFS);
+		lnp = lxsys_lookup_disk(ldp, comp, LXSYS_DEV_ZFS);
 
 		if (lnp != NULL) {
 			return (lnp->lxsys_vnode);
@@ -670,6 +731,93 @@ lxsys_lookup_devices_zfsdir(lxsys_node_t *ldp, char *comp)
 				lnp->lxsys_mode = 0444;
 				return (lnp->lxsys_vnode);
 			}
+		}
+	}
+
+	return (NULL);
+}
+
+static vnode_t *
+lxsys_lookup_devices_syscpu(lxsys_node_t *ldp, char *comp)
+{
+	lxsys_node_t *lnp = NULL;
+
+	if (ldp->lxsys_instance == 0) {
+		/* top-level cpu listing */
+
+		/* If fixed entry */
+		if (strcmp(comp, "kernel_max") == 0) {
+			lnp = lxsys_getnode_static(ldp->lxsys_vnode,
+			    LXSYS_INST_DEV_SYSCPU_KMAX);
+			lnp->lxsys_vnode->v_type = VREG;
+			lnp->lxsys_mode = 0444;
+		} else {
+			/* Else dynamic cpuN entry */
+			cpu_t *cp, *cpstart;
+			int pools_enabled;
+
+			mutex_enter(&cpu_lock);
+			pools_enabled = pool_pset_enabled();
+
+			cp = cpstart = CPU->cpu_part->cp_cpulist;
+			do {
+				char cpunm[16];
+
+				(void) snprintf(cpunm, sizeof (cpunm), "cpu%d",
+				    cp->cpu_seqid);
+
+				if (strcmp(comp, cpunm) == 0) {
+					lnp = lxsys_getnode(ldp->lxsys_vnode,
+					    LXSYS_DEV_SYS_CPUINFO,
+					    cp->cpu_id + 1, 0);
+					break;
+				}
+				if (pools_enabled) {
+					cp = cp->cpu_next_part;
+				} else {
+					cp = cp->cpu_next;
+				}
+			} while (cp != cpstart);
+
+			mutex_exit(&cpu_lock);
+		}
+
+		if (lnp != NULL) {
+			return (lnp->lxsys_vnode);
+		}
+	} else if (ldp->lxsys_endpoint == 0) {
+		/* cpu-level sub-item listing, currently empty */
+	}
+
+	return (NULL);
+}
+
+static vnode_t *
+lxsys_lookup_devices_syscpuinfo(lxsys_node_t *ldp, char *comp)
+{
+	return (NULL);
+}
+
+static vnode_t *
+lxsys_lookup_devices_sysnode(lxsys_node_t *ldp, char *comp)
+{
+	lxsys_node_t *lnp = NULL;
+
+	if (ldp->lxsys_instance == 0) {
+		/* top-level node listing */
+
+		/* If fixed entry */
+		if (strcmp(comp, "cpulist") == 0) {
+			lnp = lxsys_getnode_static(ldp->lxsys_vnode,
+			    LXSYS_INST_DEV_SYSNODE0_CPULIST);
+			lnp->lxsys_vnode->v_type = VREG;
+			lnp->lxsys_mode = 0444;
+		} else {
+			/* Future dynamic entry added here - none for now */
+		}
+
+		if (lnp != NULL) {
+			return (lnp->lxsys_vnode);
 		}
 	}
 
@@ -760,6 +908,47 @@ lxsys_read_devices_zfs_block(lxsys_node_t *lnp, lxsys_uiobuf_t *luio)
 
 	return (EIO);
 }
+
+static int
+lxsys_read_static(lxsys_node_t *lnp, lxsys_uiobuf_t *luio)
+{
+	uint_t inst = lnp->lxsys_instance;
+
+	if (inst == LXSYS_INST_DEV_SYSCPU_KMAX) {
+		lxsys_uiobuf_printf(luio, "%d\n", NCPU);
+		return (0);
+
+	} else if (inst == LXSYS_INST_DEV_SYSNODE0_CPULIST) {
+		/* Show the range of CPUs */
+		cpu_t *cp, *cpstart;
+		int pools_enabled;
+		int maxid = -1;
+
+		mutex_enter(&cpu_lock);
+		pools_enabled = pool_pset_enabled();
+
+		cp = cpstart = CPU->cpu_part->cp_cpulist;
+		do {
+			if (cp->cpu_seqid > maxid)
+				maxid = cp->cpu_seqid;
+
+			if (pools_enabled) {
+				cp = cp->cpu_next_part;
+			} else {
+				cp = cp->cpu_next;
+			}
+		} while (cp != cpstart);
+
+		mutex_exit(&cpu_lock);
+
+		lxsys_uiobuf_printf(luio, "0-%d\n", maxid);
+		return (0);
+	}
+
+	/* All other static nodes are directories */
+	return (EISDIR);
+}
+
 /*
  * lxsys_readdir(): Vnode operation for VOP_READDIR()
  */
@@ -1175,7 +1364,7 @@ lxsys_readdir_devices_virtual_netdir(lxsys_node_t *lnp, uio_t *uiop, int *eofp)
 	if (lnp->lxsys_instance == 0) {
 		/* top-level interface listing */
 		error = lxsys_readdir_ifaces(lnp, uiop, eofp,
-		    LXSYS_DEVICES_NET);
+		    LXSYS_DEV_NET);
 	} else if (lnp->lxsys_endpoint == 0) {
 		/* interface-level sub-item listing */
 		error = lxsys_readdir_subdir(lnp, uiop, eofp,
@@ -1213,7 +1402,7 @@ lxsys_readdir_devices_zfsdir(lxsys_node_t *lnp, uio_t *uiop, int *eofp)
 	if (lnp->lxsys_instance == 0) {
 		/* top-level dev listing */
 		error = lxsys_readdir_disks(lnp, uiop, eofp,
-		    LXSYS_DEVICES_ZFS);
+		    LXSYS_DEV_ZFS);
 	} else if (lnp->lxsys_endpoint == 0) {
 		/* disk-level sub-item listing */
 		error = lxsys_readdir_subdir(lnp, uiop, eofp,
@@ -1228,6 +1417,212 @@ lxsys_readdir_devices_zfsdir(lxsys_node_t *lnp, uio_t *uiop, int *eofp)
 		error = ENOTDIR;
 	}
 
+	return (error);
+}
+
+static int
+lxsys_readdir_cpu(lxsys_node_t *ldp, struct uio *uiop, int *eofp)
+{
+	longlong_t bp[DIRENT64_RECLEN(LXSNSIZ) / sizeof (longlong_t)];
+	dirent64_t *dirent = (dirent64_t *)bp;
+	ssize_t oresid, uresid;
+	int skip, error;
+	int reclen;
+	cpu_t *cp, *cpstart;
+	int pools_enabled;
+	int i, cpucnt;
+	lxsys_cpu_info_t cpu_info[NCPU];
+
+	/* Emit "." and ".." entries */
+	oresid = uiop->uio_resid;
+	error = lxsys_readdir_common(ldp, uiop, eofp, NULL, 0);
+	if (error != 0 || *eofp == 0) {
+		return (error);
+	}
+
+	skip = (uiop->uio_offset/LXSYS_SDSIZE) - 2;
+
+	/* Fixed entries */
+	if (skip > 0) {
+		skip--;
+	} else {
+		(void) strncpy(dirent->d_name, "kernel_max", LXSNSIZ);
+
+		dirent->d_ino = lxsys_inode(LXSYS_STATIC,
+		    LXSYS_INST_DEV_SYSCPU_KMAX, 0);
+		reclen = DIRENT64_RECLEN(strlen(dirent->d_name));
+
+		uresid = uiop->uio_resid;
+		if (reclen > uresid) {
+			if (uresid == oresid) {
+				/* Not enough space for one record */
+				error = EINVAL;
+			}
+			goto done;
+		}
+		if ((error = lxsys_dirent_out(dirent, reclen, uiop)) != 0) {
+			goto done;
+		}
+	}
+
+	/* Collect a list of CPU info */
+	mutex_enter(&cpu_lock);
+	pools_enabled = pool_pset_enabled();
+
+	cpucnt = 0;
+	cp = cpstart = CPU->cpu_part->cp_cpulist;
+	do {
+		cpu_info[cpucnt].cpu_id = cp->cpu_id;
+		cpu_info[cpucnt++].cpu_seqid = cp->cpu_seqid;
+		ASSERT(cpucnt < NCPU);
+		if (pools_enabled) {
+			cp = cp->cpu_next_part;
+		} else {
+			cp = cp->cpu_next;
+		}
+	} while (cp != cpstart);
+
+	mutex_exit(&cpu_lock);
+
+	/* Output dynamic CPU info */
+	for (i = 0; i < cpucnt; i++) {
+		char cpunm[16];
+
+		if (skip > 0) {
+			skip--;
+			continue;
+		}
+
+		(void) snprintf(cpunm, sizeof (cpunm), "cpu%d",
+		    cpu_info[i].cpu_seqid);
+		(void) strncpy(dirent->d_name, cpunm, LXSNSIZ);
+
+		dirent->d_ino = lxsys_inode(LXSYS_DEV_SYS_CPU,
+		    cpu_info[i].cpu_id + 1, 0);
+		reclen = DIRENT64_RECLEN(strlen(dirent->d_name));
+
+		uresid = uiop->uio_resid;
+		if (reclen > uresid) {
+			if (uresid == oresid) {
+				/* Not enough space for one record */
+				error = EINVAL;
+			}
+			break;
+		}
+		if ((error = lxsys_dirent_out(dirent, reclen, uiop)) != 0) {
+			break;
+		}
+	}
+
+	/* Indicate EOF if we reached the end of the CPU list. */
+	if (i == cpucnt) {
+		*eofp = 1;
+	}
+
+done:
+	return (error);
+}
+
+static int
+lxsys_readdir_devices_syscpu(lxsys_node_t *lnp, uio_t *uiop, int *eofp)
+{
+	int error;
+
+	if (lnp->lxsys_instance == 0) {
+		/* top-level cpu listing */
+		error = lxsys_readdir_cpu(lnp, uiop, eofp);
+	} else if (lnp->lxsys_endpoint == 0) {
+		/* cpu-level sub-item listing */
+		error = lxsys_readdir_subdir(lnp, uiop, eofp,
+		    dirlist_empty, SYSDIRLISTSZ(dirlist_empty));
+	} else {
+		/*
+		 * Currently there shouldn't be subdirs below this but
+		 * on a real Linux system some will be subdirs. This should
+		 * be fixed when we populate the directory for real.
+		 */
+		error = ENOTDIR;
+	}
+
+	return (error);
+}
+
+static int
+lxsys_readdir_devices_syscpuinfo(lxsys_node_t *lnp, uio_t *uiop, int *eofp)
+{
+	int error;
+
+	if (lnp->lxsys_type != LXSYS_DEV_SYS_CPUINFO) {
+		/*
+		 * Since /sys/devices/system/cpu/cpuN is empty, readdir
+		 * operations should not be performed anywhere except the top
+		 * level.
+		 */
+		return (ENOTDIR);
+	}
+
+	/*
+	 * Emit "." and ".." entries
+	 * All cpuN directories are currently empty.
+	 */
+	error = lxsys_readdir_common(lnp, uiop, eofp, NULL, 0);
+	if (error != 0 || *eofp == 0) {
+		return (error);
+	}
+
+	/* Indicate EOF */
+	*eofp = 1;
+
+	return (error);
+}
+
+static int
+lxsys_readdir_devices_sysnode(lxsys_node_t *lnp, uio_t *uiop, int *eofp)
+{
+	longlong_t bp[DIRENT64_RECLEN(LXSNSIZ) / sizeof (longlong_t)];
+	dirent64_t *dirent = (dirent64_t *)bp;
+	ssize_t oresid, uresid;
+	int skip, error;
+	int reclen;
+
+	/* Emit "." and ".." entries */
+	oresid = uiop->uio_resid;
+	error = lxsys_readdir_common(lnp, uiop, eofp, NULL, 0);
+	if (error != 0 || *eofp == 0) {
+		return (error);
+	}
+
+	skip = (uiop->uio_offset/LXSYS_SDSIZE) - 2;
+
+	/* Fixed entries */
+	if (skip > 0) {
+		skip--;
+	} else {
+		(void) strncpy(dirent->d_name, "cpulist", LXSNSIZ);
+
+		dirent->d_ino = lxsys_inode(LXSYS_STATIC,
+		    LXSYS_INST_DEV_SYSNODE0_CPULIST, 0);
+		reclen = DIRENT64_RECLEN(strlen(dirent->d_name));
+
+		uresid = uiop->uio_resid;
+		if (reclen > uresid) {
+			if (uresid == oresid) {
+				/* Not enough space for one record */
+				error = EINVAL;
+			}
+			goto done;
+		}
+		if ((error = lxsys_dirent_out(dirent, reclen, uiop)) != 0) {
+			goto done;
+		}
+	}
+
+	/* Future dynamic entries should be added here */
+
+	/* Indicate EOF */
+	*eofp = 1;
+
+done:
 	return (error);
 }
 
