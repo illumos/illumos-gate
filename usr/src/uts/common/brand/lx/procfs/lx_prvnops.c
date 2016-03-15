@@ -3587,7 +3587,6 @@ nextp:
 static void
 lxpr_read_partitions(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
-	lxpr_mnt_t *mnt;
 	lx_zone_data_t *lxzd;
 	lx_virt_disk_t *vd;
 
@@ -3595,7 +3594,6 @@ lxpr_read_partitions(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 
 	lxpr_uiobuf_printf(uiobuf, "major minor  #blocks  name\n\n");
 
-	mnt = (lxpr_mnt_t *)lxpnp->lxpr_vnode->v_vfsp->vfs_data;
 	lxzd = ztolxzd(curproc->p_zone);
 	if (lxzd == NULL)
 		return;
@@ -3603,7 +3601,7 @@ lxpr_read_partitions(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 
 	vd = list_head(lxzd->lxzd_vdisks);
 	while (vd != NULL) {
-		lxpr_uiobuf_printf(uiobuf, "%4d %7d %10d %s\n",
+		lxpr_uiobuf_printf(uiobuf, "%4d  %7d %10d %s\n",
 		    getmajor(vd->lxvd_emul_dev), getminor(vd->lxvd_emul_dev),
 		    0, vd->lxvd_name);
 		vd = list_next(lxzd->lxzd_vdisks, vd);
