@@ -212,8 +212,15 @@ static lxsys_dirent_t dirlist_devices_virtual[] = {
 	{ LXSYS_INST_DEVICES_VIRTUAL_NETDIR,	"net" }
 };
 
+/*
+ * XXX: The presence of the cpu tree in sysfs triggers new behavior in various
+ * applications. The glibc code which accesses this part of the tree expects
+ * dirents to have the d_type field populated. We cannot implement the 'cpu'
+ * hierarchy until that is addressed. One such application is java, which
+ * becomes unstable due to the incorrect data from glibc.
+ */
 static lxsys_dirent_t dirlist_devices_system[] = {
-	{ LXSYS_INST_DEVICES_SYSCPU,	"cpu" },
+	/* { LXSYS_INST_DEVICES_SYSCPU,	"cpu" }, */
 	{ LXSYS_INST_DEVICES_SYSNODE,	"node" }
 };
 
