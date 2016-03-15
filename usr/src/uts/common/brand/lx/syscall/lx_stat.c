@@ -28,6 +28,7 @@
 #include <sys/lx_types.h>
 #include <sys/lx_impl.h>
 #include <sys/brand.h>
+#include <sys/ddi.h>
 
 /* From "uts/common/syscall/stat.c" */
 extern int cstatat_getvp(int, char *, int, vnode_t **, cred_t **);
@@ -109,6 +110,22 @@ typedef enum lx_stat_fmt {
 	LXF_STAT64_64
 } lx_stat_fmt_t;
 
+static dev_t
+lx_makedevice(major_t maj, minor_t minor)
+{
+	/*
+	 * Linux mangles major/minor numbers into dev_t differently than SunOS.
+	 */
+#ifdef _LP64
+	return ((minor & 0xff) | ((maj & 0xfff) << 8) |
+	    ((uint64_t)(minor & ~0xff) << 12) |
+	    ((uint64_t)(maj & ~0xfff) << 32));
+#else
+	return ((minor & 0xff) | ((maj & 0xfff) << 8) |
+	    ((minor & ~0xff) << 12));
+#endif
+}
+
 static void
 lx_stat_xlate_dev(vattr_t *vattr)
 {
@@ -116,14 +133,18 @@ lx_stat_xlate_dev(vattr_t *vattr)
 	dev_t dev = vattr->va_fsid;
 	lx_virt_disk_t *vd;
 
+	/* Substitute emulated major/minor on mounted datasets */
 	vd = list_head(lxzd->lxzd_vdisks);
 	while (vd != NULL) {
 		if (vd->lxvd_real_dev == dev) {
-			vattr->va_fsid = vd->lxvd_emul_dev;
-			return;
+			dev = vd->lxvd_emul_dev;
+			break;
 		}
 		vd = list_next(lxzd->lxzd_vdisks, vd);
 	}
+
+	/* Mangle st_dev into expected format */
+	vattr->va_fsid = lx_makedevice(getmajor(dev), getminor(dev));
 }
 
 static long
