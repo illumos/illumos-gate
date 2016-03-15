@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -559,7 +559,7 @@ clnt_zone_destroy(zoneid_t zoneid, void *unused)
 
 int
 clnt_cots_kcreate(dev_t dev, struct netbuf *addr, int family, rpcprog_t prog,
-	rpcvers_t vers, uint_t max_msgsize, cred_t *cred, CLIENT **ncl)
+    rpcvers_t vers, uint_t max_msgsize, cred_t *cred, CLIENT **ncl)
 {
 	CLIENT *h;
 	cku_private_t *p;
@@ -1546,7 +1546,7 @@ cots_done:
  */
 void
 clnt_cots_kinit(CLIENT *h, dev_t dev, int family, struct netbuf *addr,
-	int max_msgsize, cred_t *cred)
+    int max_msgsize, cred_t *cred)
 {
 	/* LINTED pointer alignment */
 	cku_private_t *p = htop(h);
@@ -1606,8 +1606,7 @@ clnt_cots_kinit(CLIENT *h, dev_t dev, int family, struct netbuf *addr,
 /* ARGSUSED */
 static int
 clnt_cots_ksettimers(CLIENT *h, struct rpc_timers *t, struct rpc_timers *all,
-	int minimum, void (*feedback)(int, int, caddr_t), caddr_t arg,
-	uint32_t xid)
+    int minimum, void (*feedback)(int, int, caddr_t), caddr_t arg, uint32_t xid)
 {
 	/* LINTED pointer alignment */
 	cku_private_t *p = htop(h);
@@ -1653,10 +1652,9 @@ conn_kstat_update(kstat_t *ksp, int rw)
 				cm_entry->x_server.buf;
 			b = (uchar_t *)&sa->sin_addr;
 			(void) sprintf(fbuf,
-			    "%03d.%03d.%03d.%03d", b[0] & 0xFF, b[1] & 0xFF,
+			    "%d.%d.%d.%d", b[0] & 0xFF, b[1] & 0xFF,
 			    b[2] & 0xFF, b[3] & 0xFF);
-			cm_ksp_data->x_port.value.ui32 =
-				(uint32_t)sa->sin_port;
+			cm_ksp_data->x_port.value.ui32 = ntohs(sa->sin_port);
 		} else if (cm_entry->x_family == AF_INET6 &&
 				cm_entry->x_server.len >=
 				sizeof (struct sockaddr_in6)) {
@@ -1665,14 +1663,14 @@ conn_kstat_update(kstat_t *ksp, int rw)
 			sin6 = (struct sockaddr_in6 *)cm_entry->x_server.buf;
 			(void) kinet_ntop6((uchar_t *)&sin6->sin6_addr, fbuf,
 				INET6_ADDRSTRLEN);
-			cm_ksp_data->x_port.value.ui32 = sin6->sin6_port;
+			cm_ksp_data->x_port.value.ui32 = ntohs(sin6->sin6_port);
 		} else {
 			struct sockaddr_in  *sa;
 
 			sa = (struct sockaddr_in *)cm_entry->x_server.buf;
 			b = (uchar_t *)&sa->sin_addr;
 			(void) sprintf(fbuf,
-			    "%03d.%03d.%03d.%03d", b[0] & 0xFF, b[1] & 0xFF,
+			    "%d.%d.%d.%d", b[0] & 0xFF, b[1] & 0xFF,
 			    b[2] & 0xFF, b[3] & 0xFF);
 		}
 		KSTAT_NAMED_STR_BUFLEN(&cm_ksp_data->x_server) =
@@ -1703,7 +1701,7 @@ clnt_delay(clock_t ticks, bool_t nosignal)
  */
 static enum clnt_stat
 connmgr_cwait(struct cm_xprt *cm_entry, const struct timeval *waitp,
-	bool_t nosignal)
+    bool_t nosignal)
 {
 	bool_t interrupted;
 	clock_t timout, cv_stat;
@@ -3105,7 +3103,7 @@ connmgr_snddis(struct cm_xprt *cm_entry)
  */
 static int
 clnt_dispatch_send(queue_t *q, mblk_t *mp, calllist_t *e, uint_t xid,
-			uint_t queue_flag)
+    uint_t queue_flag)
 {
 	ASSERT(e != NULL);
 
