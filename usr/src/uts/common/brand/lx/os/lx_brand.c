@@ -1017,7 +1017,7 @@ lx_zone_get_zvols(zone_t *zone, ldi_handle_t lh, minor_t *emul_minor)
 				}
 				if (m != 0) {
 					vd->lxvd_real_dev = makedevice(
-					    lxzd->lxzd_zfs_dev, m);
+					    getmajor(lxzd->lxzd_zfs_dev), m);
 				}
 
 				/* Query volume size properties */
