@@ -9,7 +9,7 @@
 # http://www.illumos.org/license/CDDL.
 #
 
-# Copyright 2015, Joyent, Inc.
+# Copyright 2016 Joyent, Inc.
 
 # Broken tests
 poll02		# OS-3997
@@ -148,8 +148,6 @@ fcntl25
 fcntl25_64
 fcntl26
 fcntl26_64
-fcntl30
-fcntl30_64
 fcntl31
 fcntl31_64
 fcntl32

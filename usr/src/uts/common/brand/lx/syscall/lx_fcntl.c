@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include <sys/systm.h>
@@ -26,6 +26,9 @@
 #include <sys/lx_fcntl.h>
 #include <sys/lx_misc.h>
 #include <sys/lx_socket.h>
+#include <sys/fs/fifonode.h>
+#include <sys/strsubr.h>
+#include <sys/stream.h>
 
 extern int fcntl(int, int, intptr_t);
 extern int flock_check(vnode_t *, flock64_t *, offset_t, offset_t);
@@ -191,6 +194,78 @@ lx_fcntl_setfl(int fd, ulong_t arg)
 	return (fcntl(fd, F_SETFL, new_arg));
 }
 
+/* The default unprivileged limit in Linux is 1MB */
+static int lx_pipe_max_size = 1048576;
+
+static int
+lx_fcntl_pipesz(int fd, int cmd, ulong_t arg)
+{
+	file_t *fp;
+	vnode_t *vp;
+	stdata_t *str;
+	int err = 0, res = 0;
+
+	if ((fp = getf(fd)) == NULL) {
+		return (set_errno(EBADF));
+	}
+	vp = fp->f_vnode;
+	if (vp->v_type != VFIFO || vp->v_op != fifo_vnodeops) {
+		err = EBADF;
+		goto out;
+	}
+	VERIFY((str = vp->v_stream) != NULL);
+
+	if (cmd == LX_F_SETPIPE_SZ) {
+		stdata_t *mate;
+		intptr_t val = arg;
+
+		if (val < PAGESIZE || val > lx_pipe_max_size) {
+			err = EINVAL;
+			goto out;
+		}
+		if (!STRMATED(str)) {
+			err = strqset(RD(str->sd_wrq), QHIWAT, 0, val);
+			goto out;
+		}
+
+		/*
+		 * Ensure consistent order so the set operation is always
+		 * attempted on the "higher" stream first.
+		 */
+		if (str > str->sd_mate) {
+			VERIFY((mate = str->sd_mate) != NULL);
+		} else {
+			mate = str;
+			VERIFY((str = mate->sd_mate) != NULL);
+		}
+
+		/*
+		 * While it is unfortunate that an error could occur for the
+		 * latter half of the stream pair, there is little to be done
+		 * about it aside from reporting the failure.
+		 */
+		if ((err = strqset(RD(str->sd_wrq), QHIWAT, 0, val)) != 0) {
+			goto out;
+		}
+		err = strqset(RD(mate->sd_wrq), QHIWAT, 0, val);
+	} else if (cmd == LX_F_GETPIPE_SZ) {
+		size_t val;
+
+		err = strqget(RD(str->sd_wrq), QHIWAT, 0, &val);
+		res = val;
+	} else {
+		/* NOTREACHED */
+		ASSERT(0);
+	}
+
+out:
+	releasef(fd);
+	if (err != 0) {
+		return (set_errno(err));
+	}
+	return (res);
+}
+
 static int
 lx_fcntl_common(int fd, int cmd, ulong_t arg)
 {
@@ -213,8 +288,6 @@ lx_fcntl_common(int fd, int cmd, ulong_t arg)
 	case LX_F_GETLEASE:
 	case LX_F_NOTIFY:
 	case LX_F_CANCELLK:
-	case LX_F_SETPIPE_SZ:
-	case LX_F_GETPIPE_SZ:
 		{
 			char buf[80];
 
@@ -300,6 +373,11 @@ lx_fcntl_common(int fd, int cmd, ulong_t arg)
 		}
 
 		rc = pid;
+		break;
+
+	case LX_F_SETPIPE_SZ:
+	case LX_F_GETPIPE_SZ:
+		rc = lx_fcntl_pipesz(fd, cmd, arg);
 		break;
 
 	default:
