@@ -146,11 +146,16 @@ usr/src/common/bzip2/huffman.c
 usr/src/common/crypto/chacha/chacha.c
 usr/src/common/openssl/crypto/krb5/krb5_asn.c
 usr/src/common/openssl/crypto/krb5/krb5_asn.h
+usr/src/grub/grub-0.97/grub/asmstub.c
+usr/src/grub/grub-0.97/stage2/bios.c
 usr/src/grub/grub-0.97/stage2/builtins.c
+usr/src/grub/grub-0.97/stage2/char_io.c
 usr/src/grub/grub-0.97/stage2/disk_io.c
-usr/src/grub/grub-0.97/stage2/pc_slice.h
 usr/src/grub/grub-0.97/stage2/gpt.h
+usr/src/grub/grub-0.97/stage2/moddiv.c
+usr/src/grub/grub-0.97/stage2/pc_slice.h
 usr/src/grub/grub-0.97/stage2/shared.h
+usr/src/grub/grub-0.97/stage2/stage1_5.c
 usr/src/lib/libc/port/gen/arc4random_uniform.c
 usr/src/lib/gss_mechs/mech_krb5/crypto/aes/aes_s2k.c
 usr/src/lib/gss_mechs/mech_krb5/crypto/cksumtype_to_string.c

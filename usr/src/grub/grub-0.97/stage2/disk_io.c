@@ -32,8 +32,8 @@
 #endif
 
 /* instrumentation variables */
-void (*disk_read_hook) (unsigned int, int, int) = NULL;
-void (*disk_read_func) (unsigned int, int, int) = NULL;
+void (*disk_read_hook) (unsigned long long, int, int) = NULL;
+void (*disk_read_func) (unsigned long long, int, int) = NULL;
 
 #ifndef STAGE1_5
 int print_possibilities;
@@ -119,8 +119,8 @@ static int block_file = 0;
 #endif /* NO_BLOCK_FILES */
 
 /* these are the translated numbers for the open partition */
-unsigned long part_start;
-unsigned long part_length;
+unsigned long long part_start;
+unsigned long long part_length;
 
 int current_slice;
 
@@ -137,7 +137,7 @@ int find_best_root;
 
 /* disk buffer parameters */
 int buf_drive = -1;
-unsigned int buf_track;
+unsigned long long buf_track;
 struct geometry buf_geom;
 
 /* filesystem common variables */
@@ -155,7 +155,7 @@ grub_log2 (unsigned long word)
 #define log2 grub_log2
 
 int
-rawread(int drive, unsigned int sector, int byte_offset, int byte_len,
+rawread(int drive, unsigned long long sector, int byte_offset, int byte_len,
 	char *buf)
 {
   int slen, sectors_per_vtrack;
@@ -167,7 +167,7 @@ rawread(int drive, unsigned int sector, int byte_offset, int byte_len,
   while (byte_len > 0 && !errnum)
     {
       int soff, num_sect, size = byte_len;
-      unsigned int track;  
+      unsigned long long track;
       char *bufaddr;
 
       /*
@@ -205,7 +205,7 @@ rawread(int drive, unsigned int sector, int byte_offset, int byte_len,
       if (track != buf_track)
 	{
 	  int bios_err, read_len = sectors_per_vtrack;
-	  unsigned int read_start = track;
+	  unsigned long long read_start = track;
 
 	  /*
 	   *  If there's more than one read in this entire loop, then
@@ -275,7 +275,7 @@ rawread(int drive, unsigned int sector, int byte_offset, int byte_len,
        */
       if (disk_read_func)
 	{
-	  unsigned int sector_num = sector;
+	  unsigned long long sector_num = sector;
 	  int length = buf_geom.sector_size - byte_offset;
 	  if (length > size)
 	    length = size;
@@ -305,7 +305,7 @@ rawread(int drive, unsigned int sector, int byte_offset, int byte_len,
 
 
 int
-devread(unsigned int sector, int byte_offset, int byte_len, char *buf)
+devread(unsigned long long sector, int byte_offset, int byte_len, char *buf)
 {
   /*
    *  Check partition boundaries
@@ -325,7 +325,7 @@ devread(unsigned int sector, int byte_offset, int byte_len, char *buf)
 
 #if !defined(STAGE1_5)
   if (disk_read_hook && debug)
-    printf ("<%u, %d, %d>", sector, byte_offset, byte_len);
+    printf ("<%llu, %d, %d>", sector, byte_offset, byte_len);
 #endif /* !STAGE1_5 */
 
   /*
@@ -343,7 +343,7 @@ devread(unsigned int sector, int byte_offset, int byte_len, char *buf)
 
 #ifndef STAGE1_5
 int
-rawwrite(int drive, unsigned int sector, char *buf)
+rawwrite(int drive, unsigned long long sector, char *buf)
 {
   if (sector == 0)
     {
@@ -376,7 +376,7 @@ rawwrite(int drive, unsigned int sector, char *buf)
 }
 
 int
-devwrite(unsigned int sector, int sector_count, char *buf)
+devwrite(unsigned long long sector, int sector_count, char *buf)
 {
 #if defined(GRUB_UTIL) && defined(__linux__)
   if (current_partition != 0xFFFFFF
@@ -515,7 +515,7 @@ int
 set_partition_hidden_flag (int hidden)
 {
   unsigned long part = 0xFFFFFF;
-  unsigned long start, len, offset, ext_offset, gpt_offset;
+  unsigned long long start, len, offset, ext_offset, gpt_offset;
   int entry, type, gpt_count, gpt_size;
   char mbr[512];
   
@@ -595,10 +595,10 @@ check_and_print_mount (void)
 int
 next_partition (unsigned long drive, unsigned long dest,
 		unsigned long *partition, int *type,
-		unsigned long *start, unsigned long *len,
-		unsigned long *offset, int *entry,
-                unsigned long *ext_offset,
-                unsigned long *gpt_offset, int *gpt_count,
+		unsigned long long *start, unsigned long long *len,
+		unsigned long long *offset, int *entry,
+                unsigned long long *ext_offset,
+                unsigned long long *gpt_offset, int *gpt_count,
                 int *gpt_size, char *buf)
 {
   /* Forward declarations.  */
@@ -909,9 +909,9 @@ int
 real_open_partition (int flags)
 {
   unsigned long dest_partition = current_partition;
-  unsigned long part_offset;
-  unsigned long ext_offset;
-  unsigned long gpt_offset;
+  unsigned long long part_offset;
+  unsigned long long ext_offset;
+  unsigned long long gpt_offset;
   int gpt_count;
   int gpt_size;
   int entry;
