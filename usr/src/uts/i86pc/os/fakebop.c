@@ -68,7 +68,8 @@
 #include <sys/kobj_lex.h>
 #include <sys/pci_cfgspace_impl.h>
 #include <sys/fastboot_impl.h>
-#include "acpi_fw.h"
+#include <sys/acpi/acconfig.h>
+#include <sys/acpi/acpi.h>
 
 static int have_console = 0;	/* set once primitive console is initialized */
 static char *boot_args = "";
@@ -162,9 +163,19 @@ static const char fastreboot_onpanic_args[] = " -B fastreboot_onpanic=0";
  * Information Table (SLIT) and Maximum System Capability Table (MSCT)
  * are mapped into virtual memory
  */
-struct srat	*srat_ptr = NULL;
-struct slit	*slit_ptr = NULL;
-struct msct	*msct_ptr = NULL;
+ACPI_TABLE_SRAT	*srat_ptr = NULL;
+ACPI_TABLE_SLIT	*slit_ptr = NULL;
+ACPI_TABLE_MSCT	*msct_ptr = NULL;
+
+/*
+ * Arbitrary limit on number of localities we handle; if
+ * this limit is raised to more than UINT16_MAX, make sure
+ * process_slit() knows how to handle it.
+ */
+#define	SLIT_LOCALITIES_MAX	(4096)
+
+#define	SLIT_NUM_PROPNAME	"acpi-slit-localities"
+#define	SLIT_PROPNAME		"acpi-slit"
 
 /*
  * Allocate aligned physical memory at boot time. This allocator allocates
@@ -1937,19 +1948,19 @@ checksum_table(uint8_t *tp, size_t len)
 }
 
 static int
-valid_rsdp(struct rsdp *rp)
+valid_rsdp(ACPI_TABLE_RSDP *rp)
 {
 
 	/* validate the V1.x checksum */
-	if (checksum_table((uint8_t *)&rp->v1, sizeof (struct rsdp_v1)) != 0)
+	if (checksum_table((uint8_t *)rp, ACPI_RSDP_CHECKSUM_LENGTH) != 0)
 		return (0);
 
 	/* If pre-ACPI 2.0, this is a valid RSDP */
-	if (rp->v1.revision < 2)
+	if (rp->Revision < 2)
 		return (1);
 
 	/* validate the V2.x checksum */
-	if (checksum_table((uint8_t *)rp, sizeof (struct rsdp)) != 0)
+	if (checksum_table((uint8_t *)rp, ACPI_RSDP_XCHECKSUM_LENGTH) != 0)
 		return (0);
 
 	return (1);
@@ -1959,19 +1970,20 @@ valid_rsdp(struct rsdp *rp)
  * Scan memory range for an RSDP;
  * see ACPI 3.0 Spec, 5.2.5.1
  */
-static struct rsdp *
+static ACPI_TABLE_RSDP *
 scan_rsdp(paddr_t start, paddr_t end)
 {
-	size_t len  = end - start + 1;
+	size_t len  = end - start;
 	caddr_t ptr;
 
 	ptr = vmap_phys(len, start);
 	while (len > 0) {
-		if (strncmp(ptr, ACPI_RSDP_SIG, ACPI_RSDP_SIG_LEN) == 0)
-			if (valid_rsdp((struct rsdp *)ptr))
-				return ((struct rsdp *)ptr);
-		ptr += 16;
-		len -= 16;
+		if (strncmp(ptr, ACPI_SIG_RSDP, strlen(ACPI_SIG_RSDP)) == 0 &&
+		    valid_rsdp((ACPI_TABLE_RSDP *)ptr))
+			return ((ACPI_TABLE_RSDP *)ptr);
+
+		ptr += ACPI_RSDP_SCAN_STEP;
+		len -= ACPI_RSDP_SCAN_STEP;
 	}
 
 	return (NULL);
@@ -1980,53 +1992,55 @@ scan_rsdp(paddr_t start, paddr_t end)
 /*
  * Refer to ACPI 3.0 Spec, section 5.2.5.1 to understand this function
  */
-static struct rsdp *
+static ACPI_TABLE_RSDP *
 find_rsdp()
 {
-	struct rsdp *rsdp;
+	ACPI_TABLE_RSDP *rsdp;
 	uint16_t *ebda_seg;
 	paddr_t  ebda_addr;
 
 	/*
 	 * Get the EBDA segment and scan the first 1K
 	 */
-	ebda_seg = (uint16_t *)vmap_phys(sizeof (uint16_t), ACPI_EBDA_SEG_ADDR);
+	ebda_seg = (uint16_t *)vmap_phys(sizeof (uint16_t),
+	    ACPI_EBDA_PTR_LOCATION);
 	ebda_addr = *ebda_seg << 4;
-	rsdp = scan_rsdp(ebda_addr, ebda_addr + ACPI_EBDA_LEN - 1);
+	rsdp = scan_rsdp(ebda_addr, ebda_addr + ACPI_EBDA_WINDOW_SIZE);
 	if (rsdp == NULL)
 		/* if EBDA doesn't contain RSDP, look in BIOS memory */
-		rsdp = scan_rsdp(0xe0000, 0xfffff);
+		rsdp = scan_rsdp(ACPI_HI_RSDP_WINDOW_BASE,
+		    ACPI_HI_RSDP_WINDOW_BASE + ACPI_HI_RSDP_WINDOW_SIZE);
 	return (rsdp);
 }
 
-static struct table_header *
+static ACPI_TABLE_HEADER *
 map_fw_table(paddr_t table_addr)
 {
-	struct table_header *tp;
-	size_t len = MAX(sizeof (struct table_header), MMU_PAGESIZE);
+	ACPI_TABLE_HEADER *tp;
+	size_t len = MAX(sizeof (*tp), MMU_PAGESIZE);
 
 	/*
 	 * Map at least a page; if the table is larger than this, remap it
 	 */
-	tp = (struct table_header *)vmap_phys(len, table_addr);
-	if (tp->len > len)
-		tp = (struct table_header *)vmap_phys(tp->len, table_addr);
+	tp = (ACPI_TABLE_HEADER *)vmap_phys(len, table_addr);
+	if (tp->Length > len)
+		tp = (ACPI_TABLE_HEADER *)vmap_phys(tp->Length, table_addr);
 	return (tp);
 }
 
-static struct table_header *
+static ACPI_TABLE_HEADER *
 find_fw_table(char *signature)
 {
 	static int revision = 0;
-	static struct xsdt *xsdt;
+	static ACPI_TABLE_XSDT *xsdt;
 	static int len;
 	paddr_t xsdt_addr;
-	struct rsdp *rsdp;
-	struct table_header *tp;
+	ACPI_TABLE_RSDP *rsdp;
+	ACPI_TABLE_HEADER *tp;
 	paddr_t table_addr;
 	int	n;
 
-	if (strlen(signature) != ACPI_TABLE_SIG_LEN)
+	if (strlen(signature) != ACPI_NAME_SIZE)
 		return (NULL);
 
 	/*
@@ -2039,8 +2053,15 @@ find_fw_table(char *signature)
 	 * revision 1 and use the RSDT.
 	 */
 	if (revision == 0) {
-		if ((rsdp = (struct rsdp *)find_rsdp()) != NULL) {
-			revision = rsdp->v1.revision;
+		if ((rsdp = find_rsdp()) != NULL) {
+			revision = rsdp->Revision;
+			/*
+			 * ACPI 6.0 states that current revision is 2
+			 * from acpi_table_rsdp definition:
+			 * Must be (0) for ACPI 1.0 or (2) for ACPI 2.0+
+			 */
+			if (revision > 2)
+				revision = 2;
 			switch (revision) {
 			case 2:
 				/*
@@ -2048,7 +2069,7 @@ find_fw_table(char *signature)
 				 * claims to be rev 2 but has a null XSDT
 				 * address
 				 */
-				xsdt_addr = rsdp->xsdt;
+				xsdt_addr = rsdp->XsdtPhysicalAddress;
 				if (xsdt_addr != 0)
 					break;
 				/* FALLTHROUGH */
@@ -2058,7 +2079,7 @@ find_fw_table(char *signature)
 				/* FALLTHROUGH */
 			case 1:
 				/* use the RSDT for rev 0/1 */
-				xsdt_addr = rsdp->v1.rsdt;
+				xsdt_addr = rsdp->RsdtPhysicalAddress;
 				break;
 			default:
 				/* unknown revision */
@@ -2070,8 +2091,8 @@ find_fw_table(char *signature)
 			return (NULL);
 
 		/* cache the XSDT info */
-		xsdt = (struct xsdt *)map_fw_table(xsdt_addr);
-		len = (xsdt->hdr.len - sizeof (xsdt->hdr)) /
+		xsdt = (ACPI_TABLE_XSDT *)map_fw_table(xsdt_addr);
+		len = (xsdt->Header.Length - sizeof (xsdt->Header)) /
 		    ((revision == 1) ? sizeof (uint32_t) : sizeof (uint64_t));
 	}
 
@@ -2079,11 +2100,14 @@ find_fw_table(char *signature)
 	 * Scan the table headers looking for a signature match
 	 */
 	for (n = 0; n < len; n++) {
-		table_addr = (revision == 1) ? xsdt->p.r[n] : xsdt->p.x[n];
+		ACPI_TABLE_RSDT *rsdt = (ACPI_TABLE_RSDT *)xsdt;
+		table_addr = (revision == 1) ? rsdt->TableOffsetEntry[n] :
+		    xsdt->TableOffsetEntry[n];
+
 		if (table_addr == 0)
 			continue;
 		tp = map_fw_table(table_addr);
-		if (strncmp(tp->sig, signature, ACPI_TABLE_SIG_LEN) == 0) {
+		if (strncmp(tp->Signature, signature, ACPI_NAME_SIZE) == 0) {
 			return (tp);
 		}
 	}
@@ -2091,20 +2115,20 @@ find_fw_table(char *signature)
 }
 
 static void
-process_mcfg(struct mcfg *tp)
+process_mcfg(ACPI_TABLE_MCFG *tp)
 {
-	struct cfg_base_addr_alloc *cfg_baap;
+	ACPI_MCFG_ALLOCATION *cfg_baap;
 	char *cfg_baa_endp;
 	int64_t ecfginfo[4];
 
-	cfg_baap = tp->CfgBaseAddrAllocList;
-	cfg_baa_endp = ((char *)tp) + tp->Length;
+	cfg_baap = (ACPI_MCFG_ALLOCATION *)((uintptr_t)tp + sizeof (*tp));
+	cfg_baa_endp = ((char *)tp) + tp->Header.Length;
 	while ((char *)cfg_baap < cfg_baa_endp) {
-		if (cfg_baap->base_addr != 0 && cfg_baap->segment == 0) {
-			ecfginfo[0] = cfg_baap->base_addr;
-			ecfginfo[1] = cfg_baap->segment;
-			ecfginfo[2] = cfg_baap->start_bno;
-			ecfginfo[3] = cfg_baap->end_bno;
+		if (cfg_baap->Address != 0 && cfg_baap->PciSegment == 0) {
+			ecfginfo[0] = cfg_baap->Address;
+			ecfginfo[1] = cfg_baap->PciSegment;
+			ecfginfo[2] = cfg_baap->StartBusNumber;
+			ecfginfo[3] = cfg_baap->EndBusNumber;
 			bsetprop(MCFG_PROPNAME, strlen(MCFG_PROPNAME),
 			    ecfginfo, sizeof (ecfginfo));
 			break;
@@ -2115,45 +2139,90 @@ process_mcfg(struct mcfg *tp)
 
 #ifndef __xpv
 static void
-process_madt(struct madt *tp)
+process_madt_entries(ACPI_TABLE_MADT *tp, uint32_t *cpu_countp,
+    uint32_t *cpu_possible_countp, uint32_t *cpu_apicid_array)
 {
-	struct madt_processor *cpu, *end;
+	ACPI_SUBTABLE_HEADER *item, *end;
 	uint32_t cpu_count = 0;
 	uint32_t cpu_possible_count = 0;
-	uint8_t cpu_apicid_array[UINT8_MAX + 1];
+
+	/*
+	 * Determine number of CPUs and keep track of "final" APIC ID
+	 * for each CPU by walking through ACPI MADT processor list
+	 */
+	end = (ACPI_SUBTABLE_HEADER *)(tp->Header.Length + (uintptr_t)tp);
+	item = (ACPI_SUBTABLE_HEADER *)((uintptr_t)tp + sizeof (*tp));
+
+	while (item < end) {
+		switch (item->Type) {
+		case ACPI_MADT_TYPE_LOCAL_APIC: {
+			ACPI_MADT_LOCAL_APIC *cpu =
+			    (ACPI_MADT_LOCAL_APIC *) item;
+
+			if (cpu->LapicFlags & ACPI_MADT_ENABLED) {
+				if (cpu_apicid_array != NULL)
+					cpu_apicid_array[cpu_count] = cpu->Id;
+				cpu_count++;
+			}
+			cpu_possible_count++;
+			break;
+		}
+		case ACPI_MADT_TYPE_LOCAL_X2APIC: {
+			ACPI_MADT_LOCAL_X2APIC *cpu =
+			    (ACPI_MADT_LOCAL_X2APIC *) item;
+
+			if (cpu->LapicFlags & ACPI_MADT_ENABLED) {
+				if (cpu_apicid_array != NULL)
+					cpu_apicid_array[cpu_count] =
+					    cpu->LocalApicId;
+				cpu_count++;
+			}
+			cpu_possible_count++;
+			break;
+		}
+		default:
+			if (kbm_debug)
+				bop_printf(NULL, "MADT type %d\n", item->Type);
+			break;
+		}
+
+		item = (ACPI_SUBTABLE_HEADER *)((uintptr_t)item + item->Length);
+	}
+	if (cpu_countp)
+		*cpu_countp = cpu_count;
+	if (cpu_possible_countp)
+		*cpu_possible_countp = cpu_possible_count;
+}
+
+static void
+process_madt(ACPI_TABLE_MADT *tp)
+{
+	uint32_t cpu_count = 0;
+	uint32_t cpu_possible_count = 0;
+	uint32_t *cpu_apicid_array; /* x2APIC ID is 32bit! */
 
 	if (tp != NULL) {
-		/*
-		 * Determine number of CPUs and keep track of "final" APIC ID
-		 * for each CPU by walking through ACPI MADT processor list
-		 */
-		end = (struct madt_processor *)(tp->hdr.len + (uintptr_t)tp);
-		cpu = tp->list;
-		while (cpu < end) {
-			if (cpu->type == MADT_PROCESSOR) {
-				if (cpu->flags & 1) {
-					if (cpu_count < UINT8_MAX)
-						cpu_apicid_array[cpu_count] =
-						    cpu->apic_id;
-					cpu_count++;
-				}
-				cpu_possible_count++;
-			}
+		/* count cpu's */
+		process_madt_entries(tp, &cpu_count, &cpu_possible_count, NULL);
 
-			cpu = (struct madt_processor *)
-			    (cpu->len + (uintptr_t)cpu);
-		}
+		cpu_apicid_array = (uint32_t *)do_bsys_alloc(NULL, NULL,
+		    cpu_count * sizeof (*cpu_apicid_array), MMU_PAGESIZE);
+		if (cpu_apicid_array == NULL)
+			bop_panic("Not enough memory for APIC ID array");
+
+		/* copy IDs */
+		process_madt_entries(tp, NULL, NULL, cpu_apicid_array);
 
 		/*
 		 * Make boot property for array of "final" APIC IDs for each
 		 * CPU
 		 */
 		bsetprop(BP_CPU_APICID_ARRAY, strlen(BP_CPU_APICID_ARRAY),
-		    cpu_apicid_array, cpu_count * sizeof (uint8_t));
+		    cpu_apicid_array, cpu_count * sizeof (*cpu_apicid_array));
 	}
 
 	/*
-	 * Check whehter property plat-max-ncpus is already set.
+	 * Check whether property plat-max-ncpus is already set.
 	 */
 	if (do_bsys_getproplen(NULL, PLAT_MAX_NCPUS_NAME) < 0) {
 		/*
@@ -2194,9 +2263,9 @@ process_madt(struct madt *tp)
 }
 
 static void
-process_srat(struct srat *tp)
+process_srat(ACPI_TABLE_SRAT *tp)
 {
-	struct srat_item *item, *end;
+	ACPI_SUBTABLE_HEADER *item, *end;
 	int i;
 	int proc_num, mem_num;
 #pragma pack(1)
@@ -2223,47 +2292,58 @@ process_srat(struct srat *tp)
 		return;
 
 	proc_num = mem_num = 0;
-	end = (struct srat_item *)(tp->hdr.len + (uintptr_t)tp);
-	item = tp->list;
+	end = (ACPI_SUBTABLE_HEADER *)(tp->Header.Length + (uintptr_t)tp);
+	item = (ACPI_SUBTABLE_HEADER *)((uintptr_t)tp + sizeof (*tp));
 	while (item < end) {
-		switch (item->type) {
-		case SRAT_PROCESSOR:
-			if (!(item->i.p.flags & SRAT_ENABLED))
+		switch (item->Type) {
+		case ACPI_SRAT_TYPE_CPU_AFFINITY: {
+			ACPI_SRAT_CPU_AFFINITY *cpu =
+			    (ACPI_SRAT_CPU_AFFINITY *) item;
+
+			if (!(cpu->Flags & ACPI_SRAT_CPU_ENABLED))
 				break;
-			processor.domain = item->i.p.domain1;
+			processor.domain = cpu->ProximityDomainLo;
 			for (i = 0; i < 3; i++)
 				processor.domain +=
-				    item->i.p.domain2[i] << ((i + 1) * 8);
-			processor.apic_id = item->i.p.apic_id;
-			processor.sapic_id = item->i.p.local_sapic_eid;
+				    cpu->ProximityDomainHi[i] << ((i + 1) * 8);
+			processor.apic_id = cpu->ApicId;
+			processor.sapic_id = cpu->LocalSapicEid;
 			(void) snprintf(prop_name, 30, "acpi-srat-processor-%d",
 			    proc_num);
 			bsetprop(prop_name, strlen(prop_name), &processor,
 			    sizeof (processor));
 			proc_num++;
 			break;
-		case SRAT_MEMORY:
-			if (!(item->i.m.flags & SRAT_ENABLED))
+		}
+		case ACPI_SRAT_TYPE_MEMORY_AFFINITY: {
+			ACPI_SRAT_MEM_AFFINITY *mem =
+			    (ACPI_SRAT_MEM_AFFINITY *)item;
+
+			if (!(mem->Flags & ACPI_SRAT_MEM_ENABLED))
 				break;
-			memory.domain = item->i.m.domain;
-			memory.addr = item->i.m.base_addr;
-			memory.length = item->i.m.len;
-			memory.flags = item->i.m.flags;
+			memory.domain = mem->ProximityDomain;
+			memory.addr = mem->BaseAddress;
+			memory.length = mem->Length;
+			memory.flags = mem->Flags;
 			(void) snprintf(prop_name, 30, "acpi-srat-memory-%d",
 			    mem_num);
 			bsetprop(prop_name, strlen(prop_name), &memory,
 			    sizeof (memory));
-			if ((item->i.m.flags & SRAT_HOT_PLUG) &&
+			if ((mem->Flags & ACPI_SRAT_MEM_HOT_PLUGGABLE) &&
 			    (memory.addr + memory.length > maxmem)) {
 				maxmem = memory.addr + memory.length;
 			}
 			mem_num++;
 			break;
-		case SRAT_X2APIC:
-			if (!(item->i.xp.flags & SRAT_ENABLED))
+		}
+		case ACPI_SRAT_TYPE_X2APIC_CPU_AFFINITY: {
+			ACPI_SRAT_X2APIC_CPU_AFFINITY *x2cpu =
+			    (ACPI_SRAT_X2APIC_CPU_AFFINITY *) item;
+
+			if (!(x2cpu->Flags & ACPI_SRAT_CPU_ENABLED))
 				break;
-			x2apic.domain = item->i.xp.domain;
-			x2apic.x2apic_id = item->i.xp.x2apic_id;
+			x2apic.domain = x2cpu->ProximityDomain;
+			x2apic.x2apic_id = x2cpu->ApicId;
 			(void) snprintf(prop_name, 30, "acpi-srat-processor-%d",
 			    proc_num);
 			bsetprop(prop_name, strlen(prop_name), &x2apic,
@@ -2271,9 +2351,14 @@ process_srat(struct srat *tp)
 			proc_num++;
 			break;
 		}
+		default:
+			if (kbm_debug)
+				bop_printf(NULL, "SRAT type %d\n", item->Type);
+			break;
+		}
 
-		item = (struct srat_item *)
-		    (item->len + (caddr_t)item);
+		item = (ACPI_SUBTABLE_HEADER *)
+		    (item->Length + (uintptr_t)item);
 	}
 
 	/*
@@ -2286,7 +2371,7 @@ process_srat(struct srat *tp)
 }
 
 static void
-process_slit(struct slit *tp)
+process_slit(ACPI_TABLE_SLIT *tp)
 {
 
 	/*
@@ -2299,47 +2384,47 @@ process_slit(struct slit *tp)
 	 * UINT16_MAX, the table size may overflow an int when being
 	 * passed to bsetprop() below.
 	 */
-	if (tp->number >= SLIT_LOCALITIES_MAX)
+	if (tp->LocalityCount >= SLIT_LOCALITIES_MAX)
 		return;
 
-	bsetprop(SLIT_NUM_PROPNAME, strlen(SLIT_NUM_PROPNAME), &tp->number,
-	    sizeof (tp->number));
-	bsetprop(SLIT_PROPNAME, strlen(SLIT_PROPNAME), &tp->entry,
-	    tp->number * tp->number);
+	bsetprop(SLIT_NUM_PROPNAME, strlen(SLIT_NUM_PROPNAME),
+	    &tp->LocalityCount, sizeof (tp->LocalityCount));
+	bsetprop(SLIT_PROPNAME, strlen(SLIT_PROPNAME), &tp->Entry,
+	    tp->LocalityCount * tp->LocalityCount);
 }
 
-static struct msct *
-process_msct(struct msct *tp)
+static ACPI_TABLE_MSCT *
+process_msct(ACPI_TABLE_MSCT *tp)
 {
 	int last_seen = 0;
 	int proc_num = 0;
-	struct msct_proximity_domain *item, *end;
+	ACPI_MSCT_PROXIMITY *item, *end;
 	extern uint64_t plat_dr_options;
 
 	ASSERT(tp != NULL);
 
-	end = (void *)(tp->hdr.len + (uintptr_t)tp);
-	for (item = (void *)((uintptr_t)tp + tp->proximity_domain_offset);
+	end = (ACPI_MSCT_PROXIMITY *)(tp->Header.Length + (uintptr_t)tp);
+	for (item = (void *)((uintptr_t)tp + tp->ProximityOffset);
 	    item < end;
-	    item = (void *)(item->length + (uintptr_t)item)) {
+	    item = (void *)(item->Length + (uintptr_t)item)) {
 		/*
 		 * Sanity check according to section 5.2.19.1 of ACPI 4.0.
 		 * Revision 	1
 		 * Length	22
 		 */
-		if (item->revision != 1 || item->length != 22) {
+		if (item->Revision != 1 || item->Length != 22) {
 			cmn_err(CE_CONT,
 			    "?boot: unknown proximity domain structure in MSCT "
-			    "with rev(%d), len(%d).\n",
-			    (int)item->revision, (int)item->length);
+			    "with Revision(%d), Length(%d).\n",
+			    (int)item->Revision, (int)item->Length);
 			return (NULL);
-		} else if (item->domain_min > item->domain_max) {
+		} else if (item->RangeStart > item->RangeEnd) {
 			cmn_err(CE_CONT,
 			    "?boot: invalid proximity domain structure in MSCT "
-			    "with domain_min(%u), domain_max(%u).\n",
-			    item->domain_min, item->domain_max);
+			    "with RangeStart(%u), RangeEnd(%u).\n",
+			    item->RangeStart, item->RangeEnd);
 			return (NULL);
-		} else if (item->domain_min != last_seen) {
+		} else if (item->RangeStart != last_seen) {
 			/*
 			 * Items must be organized in ascending order of the
 			 * proximity domain enumerations.
@@ -2351,24 +2436,24 @@ process_msct(struct msct *tp)
 		}
 
 		/*
-		 * If processor_max is 0 then there would be no CPUs in this
+		 * If ProcessorCapacity is 0 then there would be no CPUs in this
 		 * domain.
 		 */
-		if (item->processor_max != 0) {
-			proc_num += (item->domain_max - item->domain_min + 1) *
-			    item->processor_max;
+		if (item->ProcessorCapacity != 0) {
+			proc_num += (item->RangeEnd - item->RangeStart + 1) *
+			    item->ProcessorCapacity;
 		}
 
-		last_seen = item->domain_max - item->domain_min + 1;
+		last_seen = item->RangeEnd - item->RangeStart + 1;
 		/*
 		 * Break out if all proximity domains have been processed.
 		 * Some BIOSes may have unused items at the end of MSCT table.
 		 */
-		if (last_seen > tp->maximum_proximity_domains) {
+		if (last_seen > tp->MaxProximityDomains) {
 			break;
 		}
 	}
-	if (last_seen != tp->maximum_proximity_domains + 1) {
+	if (last_seen != tp->MaxProximityDomains + 1) {
 		cmn_err(CE_CONT,
 		    "?boot: invalid proximity domain structure in MSCT, "
 		    "proximity domain count doesn't match.\n");
@@ -2389,7 +2474,7 @@ process_msct(struct msct *tp)
 	 * memory hot-adding by default. It may be overridden by value from
 	 * the SRAT table or the "plat-dr-physmax" boot option.
 	 */
-	plat_dr_physmax = btop(tp->maximum_physical_address + 1);
+	plat_dr_physmax = btop(tp->MaxAddress + 1);
 
 	/*
 	 * Existence of MSCT implies CPU/memory hotplug-capability for the
@@ -2431,29 +2516,32 @@ enumerate_xen_cpus()
 static void
 build_firmware_properties(void)
 {
-	struct table_header *tp = NULL;
+	ACPI_TABLE_HEADER *tp = NULL;
 
 #ifndef __xpv
-	if ((msct_ptr = (struct msct *)find_fw_table("MSCT")) != NULL)
-		msct_ptr = process_msct(msct_ptr);
+	if ((tp = find_fw_table(ACPI_SIG_MSCT)) != NULL)
+		msct_ptr = process_msct((ACPI_TABLE_MSCT *)tp);
+	else
+		msct_ptr = NULL;
 
-	if ((tp = find_fw_table("APIC")) != NULL)
-		process_madt((struct madt *)tp);
+	if ((tp = find_fw_table(ACPI_SIG_MADT)) != NULL)
+		process_madt((ACPI_TABLE_MADT *)tp);
 
-	if ((srat_ptr = (struct srat *)find_fw_table("SRAT")) != NULL)
+	if ((srat_ptr = (ACPI_TABLE_SRAT *)
+	    find_fw_table(ACPI_SIG_SRAT)) != NULL)
 		process_srat(srat_ptr);
 
-	if (slit_ptr = (struct slit *)find_fw_table("SLIT"))
+	if (slit_ptr = (ACPI_TABLE_SLIT *)find_fw_table(ACPI_SIG_SLIT))
 		process_slit(slit_ptr);
 
-	tp = find_fw_table("MCFG");
+	tp = find_fw_table(ACPI_SIG_MCFG);
 #else /* __xpv */
 	enumerate_xen_cpus();
 	if (DOMAIN_IS_INITDOMAIN(xen_info))
-		tp = find_fw_table("MCFG");
+		tp = find_fw_table(ACPI_SIG_MCFG);
 #endif /* __xpv */
 	if (tp != NULL)
-		process_mcfg((struct mcfg *)tp);
+		process_mcfg((ACPI_TABLE_MCFG *)tp);
 }
 
 /*

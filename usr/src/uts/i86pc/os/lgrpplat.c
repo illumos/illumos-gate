@@ -182,8 +182,12 @@
 #include <vm/vm_dep.h>
 
 #include <sys/acpidev.h>
-#include "acpi_fw.h"		/* for SRAT, SLIT and MSCT */
+#include <sys/acpi/acpi.h>		/* for SRAT, SLIT and MSCT */
 
+/* from fakebop.c */
+extern ACPI_TABLE_SRAT *srat_ptr;
+extern ACPI_TABLE_SLIT *slit_ptr;
+extern ACPI_TABLE_MSCT *msct_ptr;
 
 #define	MAX_NODES		8
 #define	NLGRP			(MAX_NODES * (MAX_NODES - 1) + 1)
@@ -483,7 +487,7 @@ static hrtime_t	lgrp_plat_probe_time(int to, cpu_node_map_t *cpu_node,
 
 static int	lgrp_plat_process_cpu_apicids(cpu_node_map_t *cpu_node);
 
-static int	lgrp_plat_process_slit(struct slit *tp,
+static int	lgrp_plat_process_slit(ACPI_TABLE_SLIT *tp,
     node_domain_map_t *node_domain, uint_t node_cnt,
     memnode_phys_addr_map_t *memnode_info,
     lgrp_plat_latency_stats_t *lat_stats);
@@ -492,17 +496,17 @@ static int	lgrp_plat_process_sli(uint32_t domain, uchar_t *sli_info,
     uint32_t sli_cnt, node_domain_map_t *node_domain, uint_t node_cnt,
     lgrp_plat_latency_stats_t *lat_stats);
 
-static int	lgrp_plat_process_srat(struct srat *tp, struct msct *mp,
+static int	lgrp_plat_process_srat(ACPI_TABLE_SRAT *tp, ACPI_TABLE_MSCT *mp,
     uint32_t *prox_domain_min, node_domain_map_t *node_domain,
     cpu_node_map_t *cpu_node, int cpu_count,
     memnode_phys_addr_map_t *memnode_info);
 
 static void	lgrp_plat_release_bootstrap(void);
 
-static int	lgrp_plat_srat_domains(struct srat *tp,
+static int	lgrp_plat_srat_domains(ACPI_TABLE_SRAT *tp,
     uint32_t *prox_domain_min);
 
-static int	lgrp_plat_msct_domains(struct msct *tp,
+static int	lgrp_plat_msct_domains(ACPI_TABLE_MSCT *tp,
     uint32_t *prox_domain_min);
 
 static void	lgrp_plat_2level_setup(lgrp_plat_latency_stats_t *lat_stats);
@@ -2560,7 +2564,7 @@ lgrp_plat_process_cpu_apicids(cpu_node_map_t *cpu_node)
 {
 	int	boot_prop_len;
 	char	*boot_prop_name = BP_CPU_APICID_ARRAY;
-	uint8_t	cpu_apicid_array[UINT8_MAX + 1];
+	uint32_t *cpu_apicid_array;
 	int	i;
 	int	n;
 
@@ -2568,7 +2572,7 @@ lgrp_plat_process_cpu_apicids(cpu_node_map_t *cpu_node)
 	 * Check length of property value
 	 */
 	boot_prop_len = BOP_GETPROPLEN(bootops, boot_prop_name);
-	if (boot_prop_len <= 0 || boot_prop_len > sizeof (cpu_apicid_array))
+	if (boot_prop_len <= 0)
 		return (-1);
 
 	/*
@@ -2576,14 +2580,17 @@ lgrp_plat_process_cpu_apicids(cpu_node_map_t *cpu_node)
 	 * not very interesting for NUMA. It's not interesting for NUMA if
 	 * system has only one CPU and doesn't support CPU hotplug.
 	 */
-	n = boot_prop_len / sizeof (uint8_t);
+	n = boot_prop_len / sizeof (*cpu_apicid_array);
 	if (n == 1 && !plat_dr_support_cpu())
 		return (-2);
 
+	cpu_apicid_array = (uint32_t *)BOP_ALLOC(bootops, NULL, boot_prop_len,
+	    sizeof (*cpu_apicid_array));
 	/*
 	 * Get CPU to APIC ID property value
 	 */
-	if (BOP_GETPROP(bootops, boot_prop_name, cpu_apicid_array) < 0)
+	if (cpu_apicid_array == NULL ||
+	    BOP_GETPROP(bootops, boot_prop_name, cpu_apicid_array) < 0)
 		return (-3);
 
 	/*
@@ -2623,7 +2630,7 @@ lgrp_plat_process_cpu_apicids(cpu_node_map_t *cpu_node)
  * NUMA node is from each other
  */
 static int
-lgrp_plat_process_slit(struct slit *tp,
+lgrp_plat_process_slit(ACPI_TABLE_SLIT *tp,
     node_domain_map_t *node_domain, uint_t node_cnt,
     memnode_phys_addr_map_t *memnode_info, lgrp_plat_latency_stats_t *lat_stats)
 {
@@ -2643,7 +2650,7 @@ lgrp_plat_process_slit(struct slit *tp,
 	if (lat_stats == NULL)
 		return (2);
 
-	localities = tp->number;
+	localities = tp->LocalityCount;
 
 	min = lat_stats->latency_min;
 	max = lat_stats->latency_max;
@@ -2651,7 +2658,7 @@ lgrp_plat_process_slit(struct slit *tp,
 	/*
 	 * Fill in latency matrix based on SLIT entries
 	 */
-	slit_entries = tp->entry;
+	slit_entries = tp->Entry;
 	for (i = 0; i < localities; i++) {
 		src = lgrp_plat_domain_to_node(node_domain,
 		    node_cnt, i);
@@ -2795,14 +2802,13 @@ lgrp_plat_process_sli(uint32_t domain_id, uchar_t *sli_info,
  * of nodes
  */
 static int
-lgrp_plat_process_srat(struct srat *tp, struct msct *mp,
+lgrp_plat_process_srat(ACPI_TABLE_SRAT *tp, ACPI_TABLE_MSCT *mp,
     uint32_t *prox_domain_min, node_domain_map_t *node_domain,
     cpu_node_map_t *cpu_node, int cpu_count,
     memnode_phys_addr_map_t *memnode_info)
 {
-	struct srat_item	*srat_end;
+	ACPI_SUBTABLE_HEADER	*item, *srat_end;
 	int			i;
-	struct srat_item	*item;
 	int			node_cnt;
 	int			proc_entry_count;
 	int			rc;
@@ -2838,8 +2844,8 @@ lgrp_plat_process_srat(struct srat *tp, struct msct *mp,
 	 * Walk through SRAT, examining each CPU and memory entry to determine
 	 * which CPUs and memory belong to which node.
 	 */
-	item = tp->list;
-	srat_end = (struct srat_item *)(tp->hdr.len + (uintptr_t)tp);
+	item = (ACPI_SUBTABLE_HEADER *)((uintptr_t)tp + sizeof (*tp));
+	srat_end = (ACPI_SUBTABLE_HEADER *)(tp->Header.Length + (uintptr_t)tp);
 	proc_entry_count = 0;
 	while (item < srat_end) {
 		uint32_t	apic_id;
@@ -2848,9 +2854,12 @@ lgrp_plat_process_srat(struct srat *tp, struct msct *mp,
 		uint64_t	length;
 		uint64_t	start;
 
-		switch (item->type) {
-		case SRAT_PROCESSOR:	/* CPU entry */
-			if (!(item->i.p.flags & SRAT_ENABLED) ||
+		switch (item->Type) {
+		case ACPI_SRAT_TYPE_CPU_AFFINITY: {	/* CPU entry */
+			ACPI_SRAT_CPU_AFFINITY *cpu =
+			    (ACPI_SRAT_CPU_AFFINITY *) item;
+
+			if (!(cpu->Flags & ACPI_SRAT_CPU_ENABLED) ||
 			    cpu_node == NULL)
 				break;
 
@@ -2858,12 +2867,12 @@ lgrp_plat_process_srat(struct srat *tp, struct msct *mp,
 			 * Calculate domain (node) ID and fill in APIC ID to
 			 * domain/node mapping table
 			 */
-			domain = item->i.p.domain1;
+			domain = cpu->ProximityDomainLo;
 			for (i = 0; i < 3; i++) {
-				domain += item->i.p.domain2[i] <<
+				domain += cpu->ProximityDomainHi[i] <<
 				    ((i + 1) * 8);
 			}
-			apic_id = item->i.p.apic_id;
+			apic_id = cpu->ApicId;
 
 			rc = lgrp_plat_cpu_node_update(node_domain, node_cnt,
 			    cpu_node, cpu_count, apic_id, domain);
@@ -2872,9 +2881,12 @@ lgrp_plat_process_srat(struct srat *tp, struct msct *mp,
 			else if (rc == 0)
 				proc_entry_count++;
 			break;
+		}
+		case ACPI_SRAT_TYPE_MEMORY_AFFINITY: {	/* memory entry */
+			ACPI_SRAT_MEM_AFFINITY *mem =
+			    (ACPI_SRAT_MEM_AFFINITY *)item;
 
-		case SRAT_MEMORY:	/* memory entry */
-			if (!(item->i.m.flags & SRAT_ENABLED) ||
+			if (!(mem->Flags & ACPI_SRAT_MEM_ENABLED) ||
 			    memnode_info == NULL)
 				break;
 
@@ -2882,9 +2894,9 @@ lgrp_plat_process_srat(struct srat *tp, struct msct *mp,
 			 * Get domain (node) ID and fill in domain/node
 			 * to memory mapping table
 			 */
-			domain = item->i.m.domain;
-			start = item->i.m.base_addr;
-			length = item->i.m.len;
+			domain = mem->ProximityDomain;
+			start = mem->BaseAddress;
+			length = mem->Length;
 			end = start + length - 1;
 
 			/*
@@ -2895,7 +2907,7 @@ lgrp_plat_process_srat(struct srat *tp, struct msct *mp,
 			 * with memory ranges in physinstalled to filter out
 			 * memory address ranges reserved for hot plug.
 			 */
-			if (item->i.m.flags & SRAT_HOT_PLUG) {
+			if (mem->Flags & ACPI_SRAT_MEM_HOT_PLUGGABLE) {
 				uint64_t	rstart = UINT64_MAX;
 				uint64_t	rend = 0;
 				struct memlist	*ml;
@@ -2932,9 +2944,12 @@ lgrp_plat_process_srat(struct srat *tp, struct msct *mp,
 			    start, end, domain, ACPI_MEMNODE_DEVID_BOOT) < 0)
 				return (-4);
 			break;
+		}
+		case ACPI_SRAT_TYPE_X2APIC_CPU_AFFINITY: {	/* x2apic CPU */
+			ACPI_SRAT_X2APIC_CPU_AFFINITY *x2cpu =
+			    (ACPI_SRAT_X2APIC_CPU_AFFINITY *) item;
 
-		case SRAT_X2APIC:	/* x2apic CPU entry */
-			if (!(item->i.xp.flags & SRAT_ENABLED) ||
+			if (!(x2cpu->Flags & ACPI_SRAT_CPU_ENABLED) ||
 			    cpu_node == NULL)
 				break;
 
@@ -2942,8 +2957,8 @@ lgrp_plat_process_srat(struct srat *tp, struct msct *mp,
 			 * Calculate domain (node) ID and fill in APIC ID to
 			 * domain/node mapping table
 			 */
-			domain = item->i.xp.domain;
-			apic_id = item->i.xp.x2apic_id;
+			domain = x2cpu->ProximityDomain;
+			apic_id = x2cpu->ApicId;
 
 			rc = lgrp_plat_cpu_node_update(node_domain, node_cnt,
 			    cpu_node, cpu_count, apic_id, domain);
@@ -2952,12 +2967,12 @@ lgrp_plat_process_srat(struct srat *tp, struct msct *mp,
 			else if (rc == 0)
 				proc_entry_count++;
 			break;
-
+		}
 		default:
 			break;
 		}
 
-		item = (struct srat_item *)((uintptr_t)item + item->len);
+		item = (ACPI_SUBTABLE_HEADER *)((uintptr_t)item + item->Length);
 	}
 
 	/*
@@ -3003,13 +3018,12 @@ lgrp_plat_release_bootstrap(void)
  * Return number of proximity domains given in ACPI SRAT
  */
 static int
-lgrp_plat_srat_domains(struct srat *tp, uint32_t *prox_domain_min)
+lgrp_plat_srat_domains(ACPI_TABLE_SRAT *tp, uint32_t *prox_domain_min)
 {
 	int			domain_cnt;
 	uint32_t		domain_min;
-	struct srat_item	*end;
+	ACPI_SUBTABLE_HEADER	*item, *end;
 	int			i;
-	struct srat_item	*item;
 	node_domain_map_t	node_domain[MAX_NODES];
 
 
@@ -3020,46 +3034,55 @@ lgrp_plat_srat_domains(struct srat *tp, uint32_t *prox_domain_min)
 	 * Walk through SRAT to find minimum proximity domain ID
 	 */
 	domain_min = UINT32_MAX;
-	item = tp->list;
-	end = (struct srat_item *)(tp->hdr.len + (uintptr_t)tp);
+	item = (ACPI_SUBTABLE_HEADER *)((uintptr_t)tp + sizeof (*tp));
+	end = (ACPI_SUBTABLE_HEADER *)(tp->Header.Length + (uintptr_t)tp);
 	while (item < end) {
 		uint32_t	domain;
 
-		switch (item->type) {
-		case SRAT_PROCESSOR:	/* CPU entry */
-			if (!(item->i.p.flags & SRAT_ENABLED)) {
-				item = (struct srat_item *)((uintptr_t)item +
-				    item->len);
+		switch (item->Type) {
+		case ACPI_SRAT_TYPE_CPU_AFFINITY: {	/* CPU entry */
+			ACPI_SRAT_CPU_AFFINITY *cpu =
+			    (ACPI_SRAT_CPU_AFFINITY *) item;
+
+			if (!(cpu->Flags & ACPI_SRAT_CPU_ENABLED)) {
+				item = (ACPI_SUBTABLE_HEADER *)
+				    ((uintptr_t)item + item->Length);
 				continue;
 			}
-			domain = item->i.p.domain1;
+			domain = cpu->ProximityDomainLo;
 			for (i = 0; i < 3; i++) {
-				domain += item->i.p.domain2[i] <<
+				domain += cpu->ProximityDomainHi[i] <<
 				    ((i + 1) * 8);
 			}
 			break;
+		}
+		case ACPI_SRAT_TYPE_MEMORY_AFFINITY: {	/* memory entry */
+			ACPI_SRAT_MEM_AFFINITY *mem =
+			    (ACPI_SRAT_MEM_AFFINITY *)item;
 
-		case SRAT_MEMORY:	/* memory entry */
-			if (!(item->i.m.flags & SRAT_ENABLED)) {
-				item = (struct srat_item *)((uintptr_t)item +
-				    item->len);
+			if (!(mem->Flags & ACPI_SRAT_MEM_ENABLED)) {
+				item = (ACPI_SUBTABLE_HEADER *)
+				    ((uintptr_t)item + item->Length);
 				continue;
 			}
-			domain = item->i.m.domain;
+			domain = mem->ProximityDomain;
 			break;
+		}
+		case ACPI_SRAT_TYPE_X2APIC_CPU_AFFINITY: {	/* x2apic CPU */
+			ACPI_SRAT_X2APIC_CPU_AFFINITY *x2cpu =
+			    (ACPI_SRAT_X2APIC_CPU_AFFINITY *) item;
 
-		case SRAT_X2APIC:	/* x2apic CPU entry */
-			if (!(item->i.xp.flags & SRAT_ENABLED)) {
-				item = (struct srat_item *)((uintptr_t)item +
-				    item->len);
+			if (!(x2cpu->Flags & ACPI_SRAT_CPU_ENABLED)) {
+				item = (ACPI_SUBTABLE_HEADER *)
+				    ((uintptr_t)item + item->Length);
 				continue;
 			}
-			domain = item->i.xp.domain;
+			domain = x2cpu->ProximityDomain;
 			break;
-
+		}
 		default:
-			item = (struct srat_item *)((uintptr_t)item +
-			    item->len);
+			item = (ACPI_SUBTABLE_HEADER *)((uintptr_t)item +
+			    item->Length);
 			continue;
 		}
 
@@ -3069,7 +3092,7 @@ lgrp_plat_srat_domains(struct srat *tp, uint32_t *prox_domain_min)
 		if (domain < domain_min)
 			domain_min = domain;
 
-		item = (struct srat_item *)((uintptr_t)item + item->len);
+		item = (ACPI_SUBTABLE_HEADER *)((uintptr_t)item + item->Length);
 	}
 	if (lgrp_plat_domain_min_enable && prox_domain_min != NULL)
 		*prox_domain_min = domain_min;
@@ -3079,49 +3102,58 @@ lgrp_plat_srat_domains(struct srat *tp, uint32_t *prox_domain_min)
 	 * proximity domain ID for each.
 	 */
 	domain_cnt = 0;
-	item = tp->list;
-	end = (struct srat_item *)(tp->hdr.len + (uintptr_t)tp);
+	item = (ACPI_SUBTABLE_HEADER *)((uintptr_t)tp + sizeof (*tp));
+	end = (ACPI_SUBTABLE_HEADER *)(tp->Header.Length + (uintptr_t)tp);
 	bzero(node_domain, MAX_NODES * sizeof (node_domain_map_t));
 	while (item < end) {
 		uint32_t	domain;
 		boolean_t	overflow;
 		uint_t		start;
 
-		switch (item->type) {
-		case SRAT_PROCESSOR:	/* CPU entry */
-			if (!(item->i.p.flags & SRAT_ENABLED)) {
-				item = (struct srat_item *)((uintptr_t)item +
-				    item->len);
+		switch (item->Type) {
+		case ACPI_SRAT_TYPE_CPU_AFFINITY: {	/* CPU entry */
+			ACPI_SRAT_CPU_AFFINITY *cpu =
+			    (ACPI_SRAT_CPU_AFFINITY *) item;
+
+			if (!(cpu->Flags & ACPI_SRAT_CPU_ENABLED)) {
+				item = (ACPI_SUBTABLE_HEADER *)
+				    ((uintptr_t)item + item->Length);
 				continue;
 			}
-			domain = item->i.p.domain1;
+			domain = cpu->ProximityDomainLo;
 			for (i = 0; i < 3; i++) {
-				domain += item->i.p.domain2[i] <<
+				domain += cpu->ProximityDomainHi[i] <<
 				    ((i + 1) * 8);
 			}
 			break;
+		}
+		case ACPI_SRAT_TYPE_MEMORY_AFFINITY: {	/* memory entry */
+			ACPI_SRAT_MEM_AFFINITY *mem =
+			    (ACPI_SRAT_MEM_AFFINITY *)item;
 
-		case SRAT_MEMORY:	/* memory entry */
-			if (!(item->i.m.flags & SRAT_ENABLED)) {
-				item = (struct srat_item *)((uintptr_t)item +
-				    item->len);
+			if (!(mem->Flags & ACPI_SRAT_MEM_ENABLED)) {
+				item = (ACPI_SUBTABLE_HEADER *)
+				    ((uintptr_t)item + item->Length);
 				continue;
 			}
-			domain = item->i.m.domain;
+			domain = mem->ProximityDomain;
 			break;
+		}
+		case ACPI_SRAT_TYPE_X2APIC_CPU_AFFINITY: {	/* x2apic CPU */
+			ACPI_SRAT_X2APIC_CPU_AFFINITY *x2cpu =
+			    (ACPI_SRAT_X2APIC_CPU_AFFINITY *) item;
 
-		case SRAT_X2APIC:	/* x2apic CPU entry */
-			if (!(item->i.xp.flags & SRAT_ENABLED)) {
-				item = (struct srat_item *)((uintptr_t)item +
-				    item->len);
+			if (!(x2cpu->Flags & ACPI_SRAT_CPU_ENABLED)) {
+				item = (ACPI_SUBTABLE_HEADER *)
+				    ((uintptr_t)item + item->Length);
 				continue;
 			}
-			domain = item->i.xp.domain;
+			domain = x2cpu->ProximityDomain;
 			break;
-
+		}
 		default:
-			item = (struct srat_item *)((uintptr_t)item +
-			    item->len);
+			item = (ACPI_SUBTABLE_HEADER *)((uintptr_t)item +
+			    item->Length);
 			continue;
 		}
 
@@ -3170,7 +3202,7 @@ lgrp_plat_srat_domains(struct srat *tp, uint32_t *prox_domain_min)
 		if (overflow == B_TRUE)
 			return (-1);
 
-		item = (struct srat_item *)((uintptr_t)item + item->len);
+		item = (ACPI_SUBTABLE_HEADER *)((uintptr_t)item + item->Length);
 	}
 	return (domain_cnt);
 }
@@ -3181,48 +3213,48 @@ lgrp_plat_srat_domains(struct srat *tp, uint32_t *prox_domain_min)
  * MSCT table has been verified in function process_msct() in fakebop.c.
  */
 static int
-lgrp_plat_msct_domains(struct msct *tp, uint32_t *prox_domain_min)
+lgrp_plat_msct_domains(ACPI_TABLE_MSCT *tp, uint32_t *prox_domain_min)
 {
 	int last_seen = 0;
 	uint32_t proxmin = UINT32_MAX;
-	struct msct_proximity_domain *item, *end;
+	ACPI_MSCT_PROXIMITY *item, *end;
 
 	if (tp == NULL || lgrp_plat_msct_enable == 0)
 		return (-1);
 
-	if (tp->maximum_proximity_domains >= MAX_NODES) {
+	if (tp->MaxProximityDomains >= MAX_NODES) {
 		cmn_err(CE_CONT,
 		    "?lgrp: too many proximity domains (%d), max %d supported, "
 		    "disable support of CPU/memory DR operations.",
-		    tp->maximum_proximity_domains + 1, MAX_NODES);
+		    tp->MaxProximityDomains + 1, MAX_NODES);
 		plat_dr_disable_cpu();
 		plat_dr_disable_memory();
 		return (-1);
 	}
 
 	if (prox_domain_min != NULL) {
-		end = (void *)(tp->hdr.len + (uintptr_t)tp);
+		end = (void *)(tp->Header.Length + (uintptr_t)tp);
 		for (item = (void *)((uintptr_t)tp +
-		    tp->proximity_domain_offset); item < end;
-		    item = (void *)(item->length + (uintptr_t)item)) {
-			if (item->domain_min < proxmin) {
-				proxmin = item->domain_min;
+		    tp->ProximityOffset); item < end;
+		    item = (void *)(item->Length + (uintptr_t)item)) {
+			if (item->RangeStart < proxmin) {
+				proxmin = item->RangeStart;
 			}
 
-			last_seen = item->domain_max - item->domain_min + 1;
+			last_seen = item->RangeEnd - item->RangeStart + 1;
 			/*
 			 * Break out if all proximity domains have been
 			 * processed. Some BIOSes may have unused items
 			 * at the end of MSCT table.
 			 */
-			if (last_seen > tp->maximum_proximity_domains) {
+			if (last_seen > tp->MaxProximityDomains) {
 				break;
 			}
 		}
 		*prox_domain_min = proxmin;
 	}
 
-	return (tp->maximum_proximity_domains + 1);
+	return (tp->MaxProximityDomains + 1);
 }
 
 
