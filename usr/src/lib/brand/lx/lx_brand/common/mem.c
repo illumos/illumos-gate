@@ -21,7 +21,7 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include <errno.h>
@@ -544,7 +544,7 @@ lx_remap_anon(prmap_t *map, prmap_t *maps, int nmap,
 		 * and our hint.
 		 */
 		for (i = 0; i < nmap; i++) {
-			if (maps[i].pr_vaddr < (uintptr_t)(1 << 3UL))
+			if (maps[i].pr_vaddr < (uintptr_t)(1 << 31UL))
 				continue;
 
 			hint = (void *)(maps[i].pr_vaddr - (new_size << 4UL));
