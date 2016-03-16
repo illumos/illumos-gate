@@ -181,6 +181,12 @@ dboot_elfload64(uintptr_t file_image)
 
 		/* zero out bss */
 		if (shdr->sh_type == SHT_NOBITS) {
+			if (prom_debug)
+				dboot_printf("zeroing BSS %ld bytes from "
+				    "physaddr 0x%llx (end=0x%llx)\n",
+				    (ulong_t)shdr->sh_size,
+				    (long long unsigned)next_addr,
+				    next_addr + shdr->sh_size);
 			(void) memset((void *)(uintptr_t)next_addr, 0,
 			    shdr->sh_size);
 			break;
