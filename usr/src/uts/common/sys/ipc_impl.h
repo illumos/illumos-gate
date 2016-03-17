@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2002, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2016, Joyent, Inc.
  */
 
 #ifndef	_IPC_IMPL_H
@@ -226,6 +227,7 @@ int ipc_commit_begin(ipc_service_t *, key_t, int, kipc_perm_t *);
 kmutex_t *ipc_commit_end(ipc_service_t *, kipc_perm_t *);
 void ipc_cleanup(ipc_service_t *, kipc_perm_t *);
 
+void ipc_rmsvc(ipc_service_t *, kipc_perm_t *);
 int ipc_rmid(ipc_service_t *, int, cred_t *);
 int ipc_ids(ipc_service_t *, int *, uint_t, uint_t *);
 

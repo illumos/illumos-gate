@@ -21,7 +21,7 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2015 Joyent, Inc.  All rights reserved.
+ * Copyright 2016 Joyent, Inc.  All rights reserved.
  */
 
 #include <errno.h>
@@ -46,6 +46,9 @@
 #define	SLOT_SEM	0
 #define	SLOT_SHM	1
 #define	SLOT_MSG	2
+
+/* Use private SHM_RMID interface for IPC_RMID */
+#define	SHM_RMID	5
 
 static int
 get_rctlval(rctlblk_t *rblk, char *name, ulong_t limit, uint64_t *val)
@@ -845,7 +848,7 @@ lx_shmctl(int shmid, int cmd, void *buf)
 	switch (cmd & ~LX_IPC_64) {
 	case LX_IPC_RMID:
 		use_errno = 1;
-		r = shmctl(shmid, IPC_RMID, NULL);
+		r = shmctl(shmid, SHM_RMID, NULL);	/* lx-private cmd */
 		break;
 
 	case LX_IPC_SET:

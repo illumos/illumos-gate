@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1986, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T */
@@ -319,6 +320,7 @@ shmat(int shmid, caddr_t uaddr, int uflags, uintptr_t *rvp)
 		size_t	share_size;
 		struct	shm_data ssd;
 		uintptr_t align_hint;
+		long	curprot;
 
 		/*
 		 * Pick a share pagesize to use, if (!isspt(sp)).
@@ -453,6 +455,7 @@ shmat(int shmid, caddr_t uaddr, int uflags, uintptr_t *rvp)
 			}
 		}
 
+		curprot = sp->shm_opts & SHM_PROT_MASK;
 		if (!isspt(sp)) {
 			error = sptcreate(size, &segspt, sp->shm_amp, prot,
 			    flags, share_szc);
@@ -462,8 +465,8 @@ shmat(int shmid, caddr_t uaddr, int uflags, uintptr_t *rvp)
 			}
 			sp->shm_sptinfo->sptas = segspt->s_as;
 			sp->shm_sptseg = segspt;
-			sp->shm_sptprot = prot;
-		} else if ((prot & sp->shm_sptprot) != sp->shm_sptprot) {
+			sp->shm_opts = (sp->shm_opts & ~SHM_PROT_MASK) | prot;
+		} else if ((prot & curprot) != curprot) {
 			/*
 			 * Ensure we're attaching to an ISM segment with
 			 * fewer or equal permissions than what we're
@@ -748,6 +751,23 @@ shmctl(int shmid, int cmd, void *arg)
 		}
 		break;
 
+	/* Stage segment for removal, but don't remove until last detach */
+	case SHM_RMID:
+		if ((error = secpolicy_ipc_owner(cr, (kipc_perm_t *)sp)) != 0)
+			break;
+
+		/*
+		 * If attached, just mark it as a pending remove, otherwise
+		 * we must perform the normal ipc_rmid now.
+		 */
+		if ((sp->shm_perm.ipc_ref - 1) > 0) {
+			sp->shm_opts |= SHM_RM_PENDING;
+		} else {
+			mutex_exit(lock);
+			return (ipc_rmid(shm_svc, shmid, cr));
+		}
+		break;
+
 	default:
 		error = EINVAL;
 		break;
@@ -778,6 +798,23 @@ shm_detach(proc_t *pp, segacct_t *sap)
 		sp->shm_ismattch--;
 	sp->shm_dtime = gethrestime_sec();
 	sp->shm_lpid = pp->p_pid;
+	if ((sp->shm_opts & SHM_RM_PENDING) != 0 &&
+	    sp->shm_perm.ipc_ref == 2) {
+		/*
+		 * If this is the last detach of the segment across the whole
+		 * system then now we can perform the delayed IPC_RMID.
+		 * The ipc_ref count has 1 for the original 'get' and one for
+		 * each 'attach' (see 'stat' handling in shmctl).
+		 */
+		sp->shm_opts &= ~SHM_RM_PENDING;
+		mutex_enter(&shm_svc->ipcs_lock);
+		ipc_rmsvc(shm_svc, (kipc_perm_t *)sp);	/* Drops lock */
+		ASSERT(!MUTEX_HELD(&shm_svc->ipcs_lock));
+		ASSERT(((kipc_perm_t *)sp)->ipc_ref > 0);
+
+		/* Lock was dropped, need to retake it for following rele. */
+		(void) ipc_lock(shm_svc, sp->shm_perm.ipc_id);
+	}
 	ipc_rele(shm_svc, (kipc_perm_t *)sp);	/* Drops lock */
 
 	kmem_free(sap, sizeof (segacct_t));
