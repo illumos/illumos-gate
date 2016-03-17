@@ -21,8 +21,8 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Milan Jurik. All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2016 Toomas Soome <tsoome@me.com>
+ * Copyright 2016 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <stdio.h>
@@ -1426,7 +1426,14 @@ prepare_stage2(ig_data_t *install, char *updt_str)
 			i += 2;
 		}
 	} else {
-		/* Solaris VTOC */
+		/* Solaris VTOC & EFI */
+		if (device->start_sector >
+		    UINT32_MAX - STAGE2_BLKOFF(device->type)) {
+			fprintf(stderr, gettext("Error: partition start sector "
+			    "must be less than %lld\n"),
+			    (uint64_t)UINT32_MAX - STAGE2_BLKOFF(device->type));
+			return (BC_ERROR);
+		}
 		stage2->first_sector = device->start_sector +
 		    STAGE2_BLKOFF(device->type);
 		BOOT_DEBUG("stage2 first sector: %d\n", stage2->first_sector);
