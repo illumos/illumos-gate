@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 1983, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015, Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 /*
  * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
@@ -83,6 +83,7 @@ static int	interactive;		/* user invoked; no syslog */
 static int	csave;			/* save dump compressed */
 static int	filemode;		/* processing file, not dump device */
 static int	percent_done;		/* progress indicator */
+static int	sec_done;		/* progress last report time */
 static hrtime_t	startts;		/* timestamp at start */
 static volatile uint64_t saved;		/* count of pages written */
 static volatile uint64_t zpages;	/* count of zero pages not written */
@@ -1084,11 +1085,12 @@ report_progress()
 		return;
 
 	percent = saved * 100LL / corehdr.dump_npages;
-	if (percent > percent_done) {
-		sec = (gethrtime() - startts) / 1000 / 1000 / 1000;
+	sec = (gethrtime() - startts) / NANOSEC;
+	if (percent > percent_done || sec > sec_done) {
 		(void) printf("\r%2d:%02d %3d%% done", sec / 60, sec % 60,
 		    percent);
 		(void) fflush(stdout);
+		sec_done = sec;
 		percent_done = percent;
 	}
 }
