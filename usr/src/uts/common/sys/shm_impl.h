@@ -21,12 +21,11 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #ifndef	_SYS_SHM_IMPL_H
 #define	_SYS_SHM_IMPL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/ipc_impl.h>
 #if defined(_KERNEL) || defined(_KMEMUSER)
@@ -70,13 +69,25 @@ typedef struct kshmid {
 	time_t		shm_ctime;	/* last change time */
 	struct sptinfo	*shm_sptinfo;	/* info about ISM segment */
 	struct seg	*shm_sptseg;	/* pointer to ISM segment */
-	long		shm_sptprot;	/* was reserved (still a "long") */
+	ulong_t		shm_opts;
+					/*
+					 * Composed of: sptprot (uchar_t) and
+					 * RM_PENDING flag (1 bit).
+					 */
 } kshmid_t;
 
 /*
  *	Segacct Flags.
  */
 #define	SHMSA_ISM	1	/* uses shared page table */
+
+/*
+ * shm_opts definitions
+ * Low byte in shm_opts is used for sptprot (see PROT_ALL). The upper bits are
+ * used for additional options.
+ */
+#define	SHM_PROT_MASK	0xff
+#define	SHM_RM_PENDING	0x100
 
 typedef struct sptinfo {
 	struct as	*sptas;		/* dummy as ptr. for spt segment */

@@ -21,6 +21,7 @@
  */
 /*
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ * Copyright 2016 Joyent, Inc.
  *
  * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -119,6 +120,10 @@ struct shmid_ds {
  */
 #define	SHM_LOCK	3	/* Lock segment in core */
 #define	SHM_UNLOCK	4	/* Unlock segment */
+
+#if defined(_KERNEL)
+#define	SHM_RMID	5	/* Private RMID for lx support */
+#endif
 
 #if !defined(_KERNEL)
 int shmget(key_t, size_t, int);

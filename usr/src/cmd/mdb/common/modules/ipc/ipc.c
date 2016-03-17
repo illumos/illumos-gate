@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include <mdb/mdb_modapi.h>
@@ -229,7 +230,9 @@ shm_print(kshmid_t *shmid, uintptr_t addr)
 	printtime_nice("ctime: ", shmid->shm_ctime);
 	mdb_printf("sptinfo: %-?p    sptseg: %-?p\n",
 	    shmid->shm_sptinfo, shmid->shm_sptseg);
-	mdb_printf("sptprot: <%lb>\n", shmid->shm_sptprot, prot_flag_bits);
+	mdb_printf("opts: rmpend: %d prot: <%b>\n",
+	    ((shmid->shm_opts & SHM_RM_PENDING) != 0),
+	    (shmid->shm_opts & SHM_PROT_MASK), prot_flag_bits);
 }
 
 

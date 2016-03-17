@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T		*/
@@ -1217,6 +1218,23 @@ ipc_remove(ipc_service_t *service, kipc_perm_t *perm)
 	    (IPC_ZONE_USAGE(perm, service) == 0)));
 }
 
+/*
+ * Perform actual IPC_RMID, either via ipc_rmid or due to a delayed *_RMID.
+ */
+void
+ipc_rmsvc(ipc_service_t *service, kipc_perm_t *perm)
+{
+	ASSERT(service->ipcs_count > 0);
+	ASSERT(MUTEX_HELD(&service->ipcs_lock));
+
+	ipc_remove(service, perm);
+	mutex_exit(&service->ipcs_lock);
+
+	/* perform any per-service removal actions */
+	service->ipcs_rmid(perm);
+
+	ipc_rele(service, perm);
+}
 
 /*
  * Common code to perform an IPC_RMID.  Returns an errno value on
@@ -1247,13 +1265,7 @@ ipc_rmid(ipc_service_t *service, int id, cred_t *cr)
 	/*
 	 * Nothing can fail from this point on.
 	 */
-	ipc_remove(service, perm);
-	mutex_exit(&service->ipcs_lock);
-
-	/* perform any per-service removal actions */
-	service->ipcs_rmid(perm);
-
-	ipc_rele(service, perm);
+	ipc_rmsvc(service, perm);
 
 	return (0);
 }
