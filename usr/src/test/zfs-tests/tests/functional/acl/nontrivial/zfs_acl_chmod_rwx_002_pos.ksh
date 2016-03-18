@@ -107,7 +107,7 @@ function cal_bits #bits acl_access acl_type
 	set -A bit r w x
 
 	typeset tmpbits=""
-	typeset -i i=0 j
+	typeset -i i=0
 	while (( i < 3 )); do
 		if [[ $acl_access == *"${a_access[i]}"* ]]; then
 			if [[ $acl_type == "allow" ]]; then
@@ -116,8 +116,7 @@ function cal_bits #bits acl_access acl_type
 				tmpbits="${tmpbits}-"
 			fi
 		else
-			(( j = i + 1 ))
-			tmpbits="$tmpbits$(get_substr $bits $j 1)"
+			tmpbits="$tmpbits${bits:$i:1}"
 		fi
 
 		(( i += 1 ))
@@ -139,7 +138,7 @@ function check_test_result #init_mode node acl_flag acl_access a_type
 	typeset acl_type=$5
 
 	typeset -L3 u_bits=$init_mode
-	typeset g_bits=$(get_substr $init_mode 4 3)
+	typeset g_bits=${init_mode:3:3}
 	typeset -R3 o_bits=$init_mode
 
 	if [[ $acl_flag == "owner" || $acl_flag == "everyone" ]]; then
@@ -153,7 +152,7 @@ function check_test_result #init_mode node acl_flag acl_access a_type
 	fi
 
 	typeset cur_mode=$(get_mode $node)
-	cur_mode=$(get_substr $cur_mode 2 9)
+	cur_mode=${cur_mode:1:9}
 
 	if [[ $cur_mode == $u_bits$g_bits$o_bits ]]; then
 		log_note "SUCCESS: Current map($cur_mode) == " \
@@ -192,7 +191,7 @@ function test_chmod_map #<node>
 	for operator in "A0+" "A0="; do
 		log_must usr_exec $CHMOD $init_mask $node
 		init_mode=$(get_mode $node)
-		init_mode=$(get_substr $init_mode 2 9)
+		init_mode=${init_mode:1:9}
 		log_must usr_exec eval "$LS -vd $node > $orig_ace"
 
 		# To "A=", firstly add one ACE which can't modify map

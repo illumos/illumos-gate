@@ -124,18 +124,18 @@ function verify_inherit #<aclinherit> <object> [strategy]
 	log_must usr_exec $TOUCH $nfile1 $nfile2 $nfile3
 
 	# Get the files which inherited ACE.
-	if [[ $(get_substr $obj 1 1) == f ]]; then
+	if [[ ${obj:0:1} == "f" ]]; then
 		inherit_nodes="$inherit_nodes $nfile1"
 
-		if [[ $(get_substr $str 2 1) != n ]]; then
+		if [[ ${str:1:1} != "n" ]]; then
 			inherit_nodes="$inherit_nodes $nfile2 $nfile3"
 		fi
 	fi
 	# Get the directores which inherited ACE.
-	if [[ $(get_substr $obj 2 1) == d ]]; then
+	if [[ ${obj:1:1} == "d" ]]; then
 		inherit_nodes="$inherit_nodes $ndir1"
 
-		if [[ $(get_substr $str 2 1) != n ]]; then
+		if [[ ${str:1:1} != "n" ]]; then
 			inherit_nodes="$inherit_nodes $ndir2 $ndir3"
 		fi
 	fi
@@ -212,7 +212,7 @@ function verify_inherit #<aclinherit> <object> [strategy]
 				inh=${acltemp##*:}
 
 				if [[ -d $node ]]; then
-					if [[ $(get_substr $inh 4 1) == n ]]; then
+					if [[ ${inh:3:1} == "n" ]]; then
 
 						#
 						# if no_propagate is set,
@@ -223,7 +223,7 @@ function verify_inherit #<aclinherit> <object> [strategy]
 						step=0
 						expect1=""
 
-					elif [[ $(get_substr $inh 3 1) != i ]]; then
+					elif [[ ${inh:2:1} != "i" ]]; then
 
 						#
 						# directory should append
