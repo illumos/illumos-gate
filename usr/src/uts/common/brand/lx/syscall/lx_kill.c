@@ -18,14 +18,12 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
-
-
-
 
 #include <sys/types.h>
 #include <sys/systm.h>
@@ -196,9 +194,9 @@ lx_kill(pid_t lx_pid, int lx_sig)
 	 * signal to init(1M).
 	 */
 	initpid = zone->zone_proc_initpid;
-	if (lx_pid == 1 || lx_pid == -1) {
+	if (lx_pid == 1) {
 		s_pid = initpid;
-	} else if (lx_pid == 0) {
+	} else if (lx_pid == 0 || lx_pid == -1) {
 		s_pid = 0;
 	} else if (lx_pid > 0) {
 		if (lx_lpid_to_spair(lx_pid, &s_pid, NULL) != 0) {
@@ -260,10 +258,15 @@ lx_kill(pid_t lx_pid, int lx_sig)
 		p = (lx_pid == -1) ? p->p_next : p->p_pglink;
 	}
 	mutex_exit(&pidlock);
+
+	/*
+	 * If we found no processes, we'll return ESRCH -- but unlike our
+	 * native kill(2), we do not return EPERM if processes are found but
+	 * we did not have permission to send any of them a signal.
+	 */
 	if (nfound == 0)
 		err = ESRCH;
-	else if (err == 0 && v.perm == 0)
-		err = EPERM;
+
 	return (err ? set_errno(err) : 0);
 }
 
