@@ -99,7 +99,7 @@ static paddr_t high_phys = -(paddr_t)1;	/* last used physical address */
 /*
  * buffer for vsnprintf for console I/O
  */
-#define	BUFFERSIZE	256
+#define	BUFFERSIZE	512
 static char buffer[BUFFERSIZE];
 /*
  * stuff to store/report/manipulate boot property settings.
@@ -1981,7 +1981,8 @@ scan_rsdp(paddr_t start, paddr_t end)
  * Refer to ACPI 3.0 Spec, section 5.2.5.1 to understand this function
  */
 static struct rsdp *
-find_rsdp() {
+find_rsdp()
+{
 	struct rsdp *rsdp;
 	uint16_t *ebda_seg;
 	paddr_t  ebda_addr;
