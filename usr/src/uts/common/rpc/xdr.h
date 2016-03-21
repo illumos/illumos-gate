@@ -17,11 +17,15 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
+ */
+
+/*
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
+ */
+
+/*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- *
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
 /* All Rights Reserved */
@@ -592,6 +596,7 @@ extern void	xdrmem_create(XDR *, caddr_t, uint_t, enum xdr_op);
 extern void	xdrmblk_init(XDR *, mblk_t *, enum xdr_op, int);
 extern bool_t	xdrmblk_getmblk(XDR *, mblk_t **, uint_t *);
 extern bool_t	xdrmblk_putmblk(XDR *, mblk_t *, uint_t);
+extern bool_t	xdrmblk_putmblk_raw(XDR *, mblk_t *);
 extern struct xdr_ops xdrmblk_ops;
 extern struct xdr_ops xdrrdmablk_ops;
 extern struct xdr_ops xdrrdma_ops;

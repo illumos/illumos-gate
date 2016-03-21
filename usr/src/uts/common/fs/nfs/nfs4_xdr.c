@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -479,7 +479,7 @@ xdr_decode_nfs_fh4(XDR *xdrs, nfs_fh4 *objp)
  */
 bool_t
 xdr_inline_encode_nfs_fh4(uint32_t **ptrp, uint32_t *ptr_redzone,
-	nfs_fh4_fmt_t *fhp)
+    nfs_fh4_fmt_t *fhp)
 {
 	uint32_t *ptr = *ptrp;
 	uchar_t *cp;
@@ -870,7 +870,7 @@ xdr_ga_prefill_statvfs(struct nfs4_ga_ext_res *gesp, struct mntinfo4 *mi)
 
 static bool_t
 xdr_ga_fattr_res(XDR *xdrs, struct nfs4_ga_res *garp, bitmap4 resbmap,
-		bitmap4 argbmap, struct mntinfo4 *mi, ug_cache_t *pug)
+    bitmap4 argbmap, struct mntinfo4 *mi, ug_cache_t *pug)
 {
 	int truefalse;
 	struct nfs4_ga_ext_res ges, *gesp;
@@ -1544,8 +1544,7 @@ xdr_get_bitmap4_inline(uint32_t **iptr)
 
 static bool_t
 xdr_ga_fattr_res_inline(uint32_t *ptr, struct nfs4_ga_res *garp,
-			bitmap4 resbmap, bitmap4 argbmap, struct mntinfo4 *mi,
-			ug_cache_t *pug)
+    bitmap4 resbmap, bitmap4 argbmap, struct mntinfo4 *mi, ug_cache_t *pug)
 {
 	int truefalse;
 	struct nfs4_ga_ext_res ges, *gesp;
@@ -3649,20 +3648,6 @@ xdr_READDIR4args(XDR *xdrs, READDIR4args *objp)
 	return (xdr_bitmap4(xdrs, &objp->attr_request));
 }
 
-/* ARGSUSED */
-static bool_t
-xdrmblk_putmblk_rd(XDR *xdrs, mblk_t *m)
-{
-	if (((m->b_wptr - m->b_rptr) % BYTES_PER_XDR_UNIT) != 0)
-		return (FALSE);
-
-	/* LINTED pointer alignment */
-	((mblk_t *)xdrs->x_base)->b_cont = m;
-	xdrs->x_base = (caddr_t)m;
-	xdrs->x_handy = 0;
-	return (TRUE);
-}
-
 bool_t
 xdr_READDIR4res(XDR *xdrs, READDIR4res *objp)
 {
@@ -3680,7 +3665,7 @@ xdr_READDIR4res(XDR *xdrs, READDIR4res *objp)
 		return (FALSE);
 
 	if (xdrs->x_ops == &xdrmblk_ops) {
-		if (xdrmblk_putmblk_rd(xdrs, mp)
+		if (xdrmblk_putmblk_raw(xdrs, mp)
 		    == TRUE) {
 			/* mblk successfully inserted into outgoing chain */
 			objp->mblk = NULL;

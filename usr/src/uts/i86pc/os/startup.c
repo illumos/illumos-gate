@@ -1611,11 +1611,34 @@ startup_modules(void)
 	if (DOMAIN_IS_INITDOMAIN(xen_info))
 #endif
 	{
+		id_t smid;
+		smbios_system_t smsys;
+		smbios_info_t sminfo;
+		char *mfg;
 		/*
 		 * Load the System Management BIOS into the global ksmbios
 		 * handle, if an SMBIOS is present on this system.
+		 * Also set "si-hw-provider" property, if not already set.
 		 */
 		ksmbios = smbios_open(NULL, SMB_VERSION, ksmbios_flags, NULL);
+		if (ksmbios != NULL &&
+		    ((smid = smbios_info_system(ksmbios, &smsys)) != SMB_ERR) &&
+		    (smbios_info_common(ksmbios, smid, &sminfo)) != SMB_ERR) {
+			mfg = (char *)sminfo.smbi_manufacturer;
+			if (BOP_GETPROPLEN(bootops, "si-hw-provider") < 0) {
+				extern char hw_provider[];
+				int i;
+				for (i = 0; i < SYS_NMLN; i++) {
+					if (isprint(mfg[i]))
+						hw_provider[i] = mfg[i];
+					else {
+						hw_provider[i] = '\0';
+						break;
+					}
+				}
+				hw_provider[SYS_NMLN - 1] = '\0';
+			}
+		}
 	}
 
 
