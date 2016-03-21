@@ -27,7 +27,7 @@
 /*	  All Rights Reserved  	*/
 
 /*
- * Copyright 2015, Joyent, Inc.
+ * Copyright 2016, Joyent, Inc.
  */
 
 #ifndef _SYS_EXEC_H
@@ -112,6 +112,7 @@ typedef struct uarg {
 	cred_t	*pfcred;
 	boolean_t scrubenv;
 	uintptr_t maxstack;
+	boolean_t stk_prot_override;
 } uarg_t;
 
 /*
@@ -248,6 +249,8 @@ extern int elfexec(vnode_t *, execa_t *, uarg_t *, intpdata_t *, int,
 extern int mapexec_brand(vnode_t *, uarg_t *, Ehdr *, Addr *,
     intptr_t *, caddr_t, char **, caddr_t *, caddr_t *, size_t *,
     uintptr_t *, uintptr_t *);
+extern int elfreadhdr(vnode_t *, cred_t *, Ehdr *, int *, caddr_t *,
+    ssize_t *);
 #endif /* !_ELF32_COMPAT */
 
 #if defined(_LP64)
@@ -256,6 +259,8 @@ extern int elf32exec(vnode_t *, execa_t *, uarg_t *, intpdata_t *, int,
 extern int mapexec32_brand(vnode_t *, uarg_t *, Elf32_Ehdr *, Elf32_Addr *,
     intptr_t *, caddr_t, char **, caddr_t *, caddr_t *, size_t *,
     uintptr_t *, uintptr_t *);
+extern int elf32readhdr(vnode_t *, cred_t *, Elf32_Ehdr *, int *, caddr_t *,
+    ssize_t *);
 #endif  /* _LP64 */
 
 /*

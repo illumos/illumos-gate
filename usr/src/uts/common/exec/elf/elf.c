@@ -376,7 +376,9 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 		*execsz = btopr(SINCR) + btopr(SSIZE) + btopr(NCARGS32-1);
 	} else {
 		args->to_model = DATAMODEL_LP64;
-		args->stk_prot &= ~PROT_EXEC;
+		if (!args->stk_prot_override) {
+			args->stk_prot &= ~PROT_EXEC;
+		}
 #if defined(__i386) || defined(__amd64)
 		args->dat_prot &= ~PROT_EXEC;
 #endif
@@ -1291,6 +1293,29 @@ getelfshdr(vnode_t *vp, cred_t *credp, const Ehdr *ehdr,
 
 	return (0);
 }
+
+
+#ifdef _ELF32_COMPAT
+int
+elf32readhdr(vnode_t *vp, cred_t *credp, Ehdr *ehdrp, int *nphdrs,
+    caddr_t *phbasep, ssize_t *phsizep)
+#else
+int
+elfreadhdr(vnode_t *vp, cred_t *credp, Ehdr *ehdrp, int *nphdrs,
+    caddr_t *phbasep, ssize_t *phsizep)
+#endif
+{
+	int error, nshdrs, shstrndx;
+
+	if ((error = getelfhead(vp, credp, ehdrp, &nshdrs, &shstrndx,
+	    nphdrs)) != 0 ||
+	    (error = getelfphdr(vp, credp, ehdrp, *nphdrs, phbasep,
+	    phsizep)) != 0) {
+		return (error);
+	}
+	return (0);
+}
+
 
 static int
 mapelfexec(

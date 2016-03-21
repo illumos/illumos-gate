@@ -2004,7 +2004,8 @@ lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 	stack_t		orig_sigaltstack;
 	struct user	*up = PTOU(ttoproc(curthread));
 	lx_elf_data_t	edp;
-	char		*lib_path = NULL;
+	char		*lib_path = LX_LIB_PATH;
+	boolean_t	execstk = B_TRUE;
 
 	ASSERT(ttoproc(curthread)->p_brand == &lx_brand);
 	ASSERT(ttoproc(curthread)->p_brand_data != NULL);
@@ -2017,11 +2018,8 @@ lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 	 */
 	bzero(&edp, sizeof (edp));
 
-	if (args->to_model == DATAMODEL_NATIVE) {
-		lib_path = LX_LIB_PATH;
-	}
 #if defined(_LP64)
-	else {
+	if (args->to_model != DATAMODEL_NATIVE) {
 		lib_path = LX_LIB_PATH32;
 	}
 #endif
@@ -2048,6 +2046,75 @@ lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 	 */
 	args->maxstack = lx_maxstack64;
 #endif
+
+	/*
+	 * Search the binary for a PT_GNU_STACK header.  The PF_X bit contained
+	 * within is used to dictate protection defaults for the stack, among
+	 * other things.
+	 */
+	if (args->to_model == DATAMODEL_NATIVE) {
+		Ehdr ehdr;
+		Phdr *phdrp;
+		caddr_t phdrbase = NULL;
+		ssize_t phdrsize = 0;
+		int nphdrs, hsize;
+
+		if ((error = elfreadhdr(vp, cred, &ehdr, &nphdrs, &phdrbase,
+		    &phdrsize)) != 0) {
+			return (error);
+		}
+
+		hsize = ehdr.e_phentsize;
+		phdrp = (Phdr *)phdrbase;
+		for (i = nphdrs; i > 0; i--) {
+			switch (phdrp->p_type) {
+			case PT_GNU_STACK:
+				if ((phdrp->p_flags & PF_X) == 0) {
+					execstk = B_FALSE;
+				}
+				break;
+			}
+			phdrp = (Phdr *)((caddr_t)phdrp + hsize);
+		}
+		kmem_free(phdrbase, phdrsize);
+	}
+#if defined(_LP64)
+	else {
+		Elf32_Ehdr ehdr;
+		Elf32_Phdr *phdrp;
+		caddr_t phdrbase = NULL;
+		ssize_t phdrsize = 0;
+		int nphdrs, hsize;
+
+		if ((error = elf32readhdr(vp, cred, &ehdr, &nphdrs, &phdrbase,
+		    &phdrsize)) != 0) {
+			return (error);
+		}
+
+		hsize = ehdr.e_phentsize;
+		phdrp = (Elf32_Phdr *)phdrbase;
+		for (i = nphdrs; i > 0; i--) {
+			switch (phdrp->p_type) {
+			case PT_GNU_STACK:
+				if ((phdrp->p_flags & PF_X) == 0) {
+					execstk = B_FALSE;
+				}
+				break;
+			}
+			phdrp = (Elf32_Phdr *)((caddr_t)phdrp + hsize);
+		}
+		kmem_free(phdrbase, phdrsize);
+	}
+#endif
+
+	/*
+	 * Linux defaults to an executable stack unless the aformentioned
+	 * PT_GNU_STACK entry in the elf header dictates otherwise.
+	 */
+	if (execstk) {
+		args->stk_prot |= PROT_EXEC;
+		args->stk_prot_override = B_TRUE;
+	}
 
 	/*
 	 * We will first exec the brand library, then map in the linux
