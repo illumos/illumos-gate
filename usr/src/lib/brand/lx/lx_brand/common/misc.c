@@ -304,61 +304,6 @@ lx_setgroups16(uintptr_t p1, uintptr_t p2)
 }
 
 /*
- * personality().  We don't really support Linux personalities, but we have to
- * emulate enough (or ahem, lie) to show that we support the basic personality.
- * We also allow certain (relatively) harmless bits of the personality to be
- * "set" -- keeping track of whatever lie we're telling so we don't get caught
- * out too easily.
- */
-#define	LX_PER_LINUX			0x0
-#define	LX_PER_MASK			0xff
-
-/*
- * These are for what Linux calls "bug emulation".
- */
-#define	LX_PER_UNAME26			0x0020000
-#define	LX_PER_ADDR_NO_RANDOMIZE	0x0040000
-#define	LX_PER_FDPIC_FUNCPTRS		0x0080000
-#define	LX_PER_MMAP_PAGE_ZERO		0x0100000
-#define	LX_PER_ADDR_COMPAT_LAYOUT	0x0200000
-#define	LX_PER_READ_IMPLIES_EXEC	0x0400000
-#define	LX_PER_ADDR_LIMIT_32BIT		0x0800000
-#define	LX_PER_SHORT_INODE		0x1000000
-#define	LX_PER_WHOLE_SECONDS		0x2000000
-#define	LX_PER_STICKY_TIMEOUTS		0x4000000
-#define	LX_PER_ADDR_LIMIT_3GB		0x8000000
-
-long
-lx_personality(uintptr_t p1)
-{
-	static int current = LX_PER_LINUX;
-	int per = (int)p1;
-
-	switch (per) {
-	case -1:
-		/* Request current personality */
-		return (current);
-	case LX_PER_LINUX:
-		current = per;
-		return (0);
-	default:
-		if (per & LX_PER_MASK)
-			return (-EINVAL);
-
-		/*
-		 * We allow a subset of the legacy emulation personality
-		 * attributes to be "turned on" -- which we put in quotes
-		 * because we don't actually change our behavior based on
-		 * them.  (Note that we silently ignore the others.)
-		 */
-		current = per & (LX_PER_ADDR_LIMIT_3GB |
-		    LX_PER_ADDR_NO_RANDOMIZE | LX_PER_ADDR_COMPAT_LAYOUT);
-
-		return (0);
-	}
-}
-
-/*
  * mknod() - Since we don't have the SYS_CONFIG privilege within a zone, the
  * only mode we have to support is S_IFIFO.  We also have to distinguish between
  * an invalid type and insufficient privileges.

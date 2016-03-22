@@ -104,6 +104,7 @@ extern long lx_nanosleep();
 extern long lx_oldgetrlimit();
 extern long lx_open();
 extern long lx_openat();
+extern long lx_personality();
 extern long lx_pipe();
 extern long lx_pipe2();
 extern long lx_poll();

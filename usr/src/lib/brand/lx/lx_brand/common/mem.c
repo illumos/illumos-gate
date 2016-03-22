@@ -139,9 +139,20 @@ mmap_common(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 	 * show that segments mmap'd from userland (such as libraries mapped in
 	 * by the dynamic linker) all have exec the permission set, even for
 	 * data segments.
+	 *
+	 * This insanity is tempered by the fact that the behavior is disabled
+	 * for ELF binaries bearing a PT_GNU_STACK header which lacks PF_X
+	 * (which most do).  Such a header will clear the READ_IMPLIES_EXEC
+	 * flag from the process personality.
 	 */
-	if (prot & PROT_READ)
-		prot |= PROT_EXEC;
+	if (prot & PROT_READ) {
+		unsigned int personality;
+
+		personality = syscall(SYS_brand, B_GET_PERSONALITY);
+		if ((personality & LX_PER_READ_IMPLIES_EXEC) != 0) {
+			prot |= PROT_EXEC;
+		}
+	}
 
 	ret = mmap64(addr, len, prot, ltos_mmap_flags(flags), fd, off);
 

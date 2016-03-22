@@ -1834,6 +1834,16 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 		return (EINVAL);
 	}
 
+	case B_GET_PERSONALITY: {
+		unsigned int result;
+
+		mutex_enter(&p->p_lock);
+		pd = ptolxproc(p);
+		result = pd->l_personality;
+		mutex_exit(&p->p_lock);
+		return (result);
+	}
+
 	}
 
 	return (EINVAL);
@@ -1984,26 +1994,26 @@ lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
     struct intpdata *idata, int level, long *execsz, int setid,
     caddr_t exec_file, struct cred *cred, int *brand_action)
 {
-	int		error;
+	int		error, i;
 	vnode_t		*nvp;
 	Ehdr		ehdr;
 	Addr		uphdr_vaddr;
 	intptr_t	voffset;
 	char		*interp = NULL;
 	uintptr_t	ldaddr = NULL;
-	int		i;
 	proc_t		*p = ttoproc(curthread);
 	klwp_t		*lwp = ttolwp(curthread);
-	struct execenv	env;
-	struct execenv	origenv;
+	lx_proc_data_t	*lxpd = ptolxproc(p);
+	struct execenv	env, origenv;
 	stack_t		orig_sigaltstack;
 	struct user	*up = PTOU(ttoproc(curthread));
 	lx_elf_data_t	edp;
 	char		*lib_path = LX_LIB_PATH;
 	boolean_t	execstk = B_TRUE;
+	unsigned int	personality;
 
-	ASSERT(ttoproc(curthread)->p_brand == &lx_brand);
-	ASSERT(ttoproc(curthread)->p_brand_data != NULL);
+	ASSERT(p->p_brand == &lx_brand);
+	ASSERT(lxpd != NULL);
 
 	/*
 	 * Start with a separate struct for ELF data instead of inheriting
@@ -2103,12 +2113,19 @@ lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 #endif
 
 	/*
+	 * Revert the base personality while maintaining any existing flags.
+	 */
+	personality = LX_PER_LINUX | (lxpd->l_personality & ~LX_PER_MASK);
+
+	/*
 	 * Linux defaults to an executable stack unless the aformentioned
-	 * PT_GNU_STACK entry in the elf header dictates otherwise.
+	 * PT_GNU_STACK entry in the elf header dictates otherwise.  Enabling
+	 * the READ_IMPLIES_EXEC personality flag is also implied in this case.
 	 */
 	if (execstk) {
 		args->stk_prot |= PROT_EXEC;
 		args->stk_prot_override = B_TRUE;
+		personality |= LX_PER_READ_IMPLIES_EXEC;
 	}
 
 	/*
@@ -2420,9 +2437,11 @@ lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 	}
 
 	/*
-	 * Record the brand ELF data now that the exec is a success.
+	 * Record the brand ELF data and new personality now that the exec has
+	 * proceeded successfully.
 	 */
-	bcopy(&edp, &ttolxproc(curthread)->l_elf_data, sizeof (edp));
+	bcopy(&edp, &lxpd->l_elf_data, sizeof (edp));
+	lxpd->l_personality = personality;
 
 	return (0);
 }
