@@ -145,12 +145,6 @@ static struct modlinkage modlinkage = {
 static void lxd_pts_devt_translator(dev_t, dev_t *);
 static void lxd_ptm_devt_translator(dev_t, dev_t *);
 
-#define	LX_PTS_MAJOR_MIN	136
-#define	LX_PTS_MAJOR_MAX	143
-
-#define	LX_PTM_MAJOR		5
-#define	LX_PTM_MINOR		2
-
 static kmutex_t			lxd_xlate_lock;
 static boolean_t		lxd_xlate_initialized = B_FALSE;
 
@@ -165,11 +159,11 @@ static lxd_minor_translator_t lxd_mtranslator_random[] = {
 	{ NULL,			0, 0, 0 }
 };
 static lxd_minor_translator_t lxd_mtranslator_sy[] = {
-	{ "/dev/tty",		0, 5, 0 },
+	{ "/dev/tty",		0, LX_TTY_MAJOR, 0 },
 	{ NULL,			0, 0, 0 }
 };
 static lxd_minor_translator_t lxd_mtranslator_zcons[] = {
-	{ "/dev/console",	0, 5, 1 },
+	{ "/dev/console",	0, LX_TTY_MAJOR, 1 },
 	{ NULL,			0, 0, 0 }
 };
 lxd_devt_translator_t lxd_devt_translators[] = {
@@ -336,7 +330,7 @@ lxd_xlate_init()
 			} else {
 				ASSERT(getmajor(va.va_rdev) ==
 				    lxd_devt_translators[i].lxd_xl_major);
-				ASSERT(mt[j].lxd_mt_lx_minor < LX_MINORMASK);
+				ASSERT(mt[j].lxd_mt_lx_minor < LX_MAXMIN);
 			}
 
 			mt[j].lxd_mt_minor = getminor(va.va_rdev);
@@ -812,11 +806,11 @@ lxd_pts_devt_translator(dev_t dev, dev_t *jdev)
 
 	/*
 	 * Linux uses a range of major numbers for pts devices to address the
-	 * relatively small minor number space (8 bits).
+	 * relatively small minor number space (20 bits).
 	 */
 
-	lx_maj = LX_PTS_MAJOR_MIN + (min / LX_MINORMASK);
-	lx_min = min % LX_MINORMASK;
+	lx_maj = LX_PTS_MAJOR_MIN + (min / LX_MAXMIN);
+	lx_min = min % LX_MAXMIN;
 	if (lx_maj > LX_PTS_MAJOR_MAX) {
 		/*
 		 * The major is outside the acceptable range but there's little

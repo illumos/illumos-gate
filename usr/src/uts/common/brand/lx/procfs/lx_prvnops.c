@@ -62,6 +62,7 @@
 #include <sys/rctl.h>
 #include <sys/kstat.h>
 #include <sys/lx_misc.h>
+#include <sys/lx_types.h>
 #include <sys/brand.h>
 #include <sys/cred_impl.h>
 #include <sys/tihdr.h>
@@ -151,6 +152,7 @@ static void lxpr_read_invalid(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_empty(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_cgroups(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_cpuinfo(lxpr_node_t *, lxpr_uiobuf_t *);
+static void lxpr_read_devices(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_diskstats(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_isdir(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_fd(lxpr_node_t *, lxpr_uiobuf_t *);
@@ -661,7 +663,7 @@ static void (*lxpr_read_function[LXPR_NFILES])() = {
 	lxpr_read_cgroups,		/* /proc/cgroups	*/
 	lxpr_read_empty,		/* /proc/cmdline	*/
 	lxpr_read_cpuinfo,		/* /proc/cpuinfo	*/
-	lxpr_read_empty,		/* /proc/devices	*/
+	lxpr_read_devices,		/* /proc/devices	*/
 	lxpr_read_diskstats,		/* /proc/diskstats	*/
 	lxpr_read_empty,		/* /proc/dma		*/
 	lxpr_read_filesystems,		/* /proc/filesystems	*/
@@ -2152,6 +2154,21 @@ lxpr_read_pid_tid_status(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 }
 
 /*
+ * Same logic as the lx devfs lxd_pts_devt_translator.
+ */
+static dev_t
+lxpr_xlate_pts_dev(dev_t dev)
+{
+	minor_t min = getminor(dev);
+	int lx_maj, lx_min;
+
+	lx_maj = LX_PTS_MAJOR_MIN + (min / LX_MAXMIN);
+	lx_min = min % LX_MAXMIN;
+
+	return (LX_MAKEDEVICE(lx_maj, lx_min));
+}
+
+/*
  * pid/tid common code to read stat file
  */
 static void
@@ -2219,7 +2236,7 @@ lxpr_read_stat_common(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf,
 		mutex_enter(&p->p_splock);
 		mutex_enter(&p->p_sessp->s_lock);
 		spid = p->p_sessp->s_sid;
-		psdev = p->p_sessp->s_dev;
+		psdev = lxpr_xlate_pts_dev(p->p_sessp->s_dev);
 		if (p->p_sessp->s_cred)
 			psgid = crgetgid(p->p_sessp->s_cred);
 		else
@@ -3606,6 +3623,31 @@ lxpr_read_partitions(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 		    0, vd->lxvd_name);
 		vd = list_next(lxzd->lxzd_vdisks, vd);
 	}
+}
+
+/*
+ * There aren't many actual devices inside a zone but we want to provide the
+ * major numbers for the pseudo devices that do exist, including  our pts/ptm
+ * device, as well as the zvol virtual disk device. We simply hardcode the
+ * emulated major numbers that are used elsewhere in the code and that match
+ * the expected Linux major numbers. See lx devfs where some of the major
+ * numbers have no defined constants.
+ */
+/* ARGSUSED */
+static void
+lxpr_read_devices(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+{
+	ASSERT(lxpnp->lxpr_type == LXPR_DEVICES);
+
+	lxpr_uiobuf_printf(uiobuf, "Character devices:\n");
+	lxpr_uiobuf_printf(uiobuf, "%3d /dev/tty\n", LX_TTY_MAJOR);
+	lxpr_uiobuf_printf(uiobuf, "%3d /dev/console\n", LX_TTY_MAJOR);
+	lxpr_uiobuf_printf(uiobuf, "%3d /dev/ptmx\n", LX_TTY_MAJOR);
+	lxpr_uiobuf_printf(uiobuf, "%3d ptm\n", LX_PTM_MAJOR);
+	lxpr_uiobuf_printf(uiobuf, "%3d pts\n", LX_PTS_MAJOR_MIN);
+
+	lxpr_uiobuf_printf(uiobuf, "\nBlock devices:\n");
+	lxpr_uiobuf_printf(uiobuf, "%3d zvol\n", LX_MAJOR_DISK);
 }
 
 /*

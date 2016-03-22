@@ -178,8 +178,7 @@ lxd_s2l_devt(dev_t dev, dev_t *rdev)
 			mt = lxd_devt_translators[i].xl_list;
 			for (j = 0; mt[j].lxd_mt_path != NULL; j++) {
 				if (mt[j].lxd_mt_minor == min) {
-					ASSERT(mt[j].lxd_mt_minor <
-					    LX_MINORMASK);
+					ASSERT(mt[j].lxd_mt_minor < LX_MAXMIN);
 
 					/* found a translation */
 					*rdev = LX_MAKEDEVICE(

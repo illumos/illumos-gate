@@ -71,10 +71,45 @@ typedef	uint64_t	lx_blkcnt64_t;
 typedef	uint32_t	lx_mode_t;
 typedef	uint16_t	lx_mode16_t;
 
-#define	LX_MAJORSHIFT	8
-#define	LX_MINORMASK	((1 << LX_MAJORSHIFT) - 1)
-#define	LX_MAKEDEVICE(lx_maj, lx_min) \
-	((dev_t)((lx_maj) << LX_MAJORSHIFT | ((lx_min) & LX_MINORMASK)))
+/*
+ * Linux mangles major/minor numbers into dev_t differently than SunOS.
+ */
+#ifdef _LP64
+#define	LX_MAKEDEVICE(maj, min) \
+	(((min) & 0xff) | (((maj) & 0xfff) << 8) | \
+	((uint64_t)((min) & ~0xff) << 12) | ((uint64_t)((maj) & ~0xfff) << 32))
+
+#define	LX_GETMAJOR(lx_dev)	((((lx_dev) >> 8) & 0xfff) | \
+	((((uint64_t)(lx_dev)) >> 32) & ~0xfff))
+
+#else
+#define	LX_MAKEDEVICE(maj, min) \
+	(((min) & 0xff) | (((maj) & 0xfff) << 8) | (((min) & ~0xff) << 12))
+
+#define	LX_GETMAJOR(lx_dev)	(((lx_dev) >> 8) & 0xfff)
+#endif
+
+#define	LX_GETMINOR(lx_dev)	(((lx_dev) & 0xff) | (((lx_dev) >> 12) & ~0xff))
+/* Linux supports 20 bits for the minor, and 12 bits for the major number */
+#define	LX_MAXMIN	0xfffff
+#define	LX_MAXMAJ	0xfff
+
+/*
+ * Certain Linux tools care deeply about major/minor number mapping.
+ * Map virtual disks (zfs datasets, zvols, etc) into a safe reserved range.
+ */
+#define	LX_MAJOR_DISK	203
+
+/* LX ptm driver major/minor number */
+#define	LX_PTM_MAJOR		5
+#define	LX_PTM_MINOR		2
+
+/* LX pts driver major number range */
+#define	LX_PTS_MAJOR_MIN	136
+#define	LX_PTS_MAJOR_MAX	143
+
+/* LX tty/cons driver major number */
+#define	LX_TTY_MAJOR		5
 
 #define	LX_UID16_TO_UID32(uid16)	\
 	(((uid16) == (lx_uid16_t)-1) ? ((lx_uid_t)-1) : (lx_uid_t)(uid16))
