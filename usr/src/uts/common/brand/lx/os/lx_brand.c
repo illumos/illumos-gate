@@ -149,6 +149,7 @@
 #include <sys/lx_misc.h>
 #include <sys/lx_futex.h>
 #include <sys/lx_brand.h>
+#include <sys/lx_types.h>
 #include <sys/param.h>
 #include <sys/termios.h>
 #include <sys/sunddi.h>
@@ -225,12 +226,6 @@ void (*lx_cgrp_freelwp)(vfs_t *, uint_t, id_t, pid_t);
 #define	LX_MAXSTACK64	0x7ffffff00000
 
 uint64_t lx_maxstack64 = LX_MAXSTACK64;
-
-/*
- * Certain Linux tools care deeply about major/minor number mapping.
- * Map virtual disks (zfs datasets, zvols, etc) into a safe reserved range.
- */
-#define	LX_MAJOR_DISK	203
 
 static int lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
     struct intpdata *idata, int level, long *execsz, int setid,

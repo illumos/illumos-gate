@@ -373,9 +373,6 @@ lx_personality(uintptr_t p1)
 #define	LX_S_IFLNK	0120000
 #define	LX_S_IFSOCK	0140000
 
-#define	LX_GETMAJOR(lx_dev)	((lx_dev) >> LX_MAJORSHIFT)
-#define	LX_GETMINOR(lx_dev)	((lx_dev) & LX_MINORMASK)
-
 /*ARGSUSED*/
 long
 lx_mknod(uintptr_t p1, uintptr_t p2, uintptr_t p3)

@@ -110,22 +110,6 @@ typedef enum lx_stat_fmt {
 	LXF_STAT64_64
 } lx_stat_fmt_t;
 
-static dev_t
-lx_makedevice(major_t maj, minor_t minor)
-{
-	/*
-	 * Linux mangles major/minor numbers into dev_t differently than SunOS.
-	 */
-#ifdef _LP64
-	return ((minor & 0xff) | ((maj & 0xfff) << 8) |
-	    ((uint64_t)(minor & ~0xff) << 12) |
-	    ((uint64_t)(maj & ~0xfff) << 32));
-#else
-	return ((minor & 0xff) | ((maj & 0xfff) << 8) |
-	    ((minor & ~0xff) << 12));
-#endif
-}
-
 static void
 lx_stat_xlate_dev(vattr_t *vattr)
 {
@@ -144,7 +128,7 @@ lx_stat_xlate_dev(vattr_t *vattr)
 	}
 
 	/* Mangle st_dev into expected format */
-	vattr->va_fsid = lx_makedevice(getmajor(dev), getminor(dev));
+	vattr->va_fsid = LX_MAKEDEVICE(getmajor(dev), getminor(dev));
 }
 
 static long
