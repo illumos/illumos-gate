@@ -638,6 +638,8 @@ static lx_cmsg_xlate_t lx_cmsg_xlate_tbl[] = {
 	    LX_SOL_SOCKET, LX_SCM_TIMESTAMP, cmsg_conv_generic },
 	{ IPPROTO_IP, IP_PKTINFO, cmsg_conv_generic,
 	    LX_IPPROTO_IP, LX_IP_PKTINFO, cmsg_conv_generic },
+	{ IPPROTO_IPV6, IPV6_HOPLIMIT, cmsg_conv_generic,
+	    LX_IPPROTO_IPV6, LX_IPV6_HOPLIMIT, cmsg_conv_generic },
 	{ IPPROTO_IPV6, IPV6_PKTINFO, cmsg_conv_generic,
 	    LX_IPPROTO_IPV6, LX_IPV6_PKTINFO, cmsg_conv_generic }
 };
@@ -2659,7 +2661,7 @@ static int
 lx_setsockopt_icmpv6(sonode_t *so, int optname, void *optval, socklen_t optlen)
 {
 	int error;
-	lx_proto_opts_t sockopts_tbl = PROTO_SOCKOPTS(ltos_ipv6_sockopts);
+	lx_proto_opts_t sockopts_tbl = PROTO_SOCKOPTS(ltos_icmpv6_sockopts);
 
 	if (optname == LX_ICMP6_FILTER && optval != NULL) {
 		/*
@@ -2928,7 +2930,7 @@ lx_getsockopt_icmpv6(sonode_t *so, int optname, void *optval,
     socklen_t *optlen)
 {
 	int error = 0;
-	lx_proto_opts_t sockopts_tbl = PROTO_SOCKOPTS(ltos_tcp_sockopts);
+	lx_proto_opts_t sockopts_tbl = PROTO_SOCKOPTS(ltos_icmpv6_sockopts);
 
 	if (optname == LX_ICMP6_FILTER) {
 		error = socket_getsockopt(so, IPPROTO_ICMPV6, ICMP6_FILTER,
