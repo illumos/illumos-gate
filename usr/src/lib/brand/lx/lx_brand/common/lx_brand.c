@@ -1098,7 +1098,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_utime,			/* 132: utime */
 	lx_mknod,			/* 133: mknod */
 	NULL,				/* 134: uselib */
-	lx_personality,			/* 135: personality */
+	NULL,				/* 135: personality */
 	NULL,				/* 136: ustat */
 	lx_statfs,			/* 137: statfs */
 	lx_fstatfs,			/* 138: fstatfs */
@@ -1430,7 +1430,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_fchdir,			/* 133: fchdir */
 	NULL,				/* 134: bdflush */
 	lx_sysfs,			/* 135: sysfs */
-	lx_personality,			/* 136: personality */
+	NULL,				/* 136: personality */
 	NULL,				/* 137: afs_syscall */
 	lx_setfsuid16,			/* 138: setfsuid16 */
 	lx_setfsgid16,			/* 139: setfsgid16 */

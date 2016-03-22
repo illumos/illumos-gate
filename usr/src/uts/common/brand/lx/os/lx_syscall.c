@@ -752,7 +752,7 @@ lx_sysent_t lx_sysent32[] = {
 	{"fchdir",	NULL,			0,		1}, /* 133 */
 	{"bdflush",	NULL,			NOSYS_KERNEL,	0}, /* 134 */
 	{"sysfs",	NULL,			0,		3}, /* 135 */
-	{"personality",	NULL,			0,		1}, /* 136 */
+	{"personality",	lx_personality,		0,		1}, /* 136 */
 	{"afs_syscall",	NULL,			NOSYS_KERNEL,	0}, /* 137 */
 	{"setfsuid16",	NULL,			0,		1}, /* 138 */
 	{"setfsgid16",	NULL,			0,		1}, /* 139 */
@@ -1122,7 +1122,7 @@ lx_sysent_t lx_sysent64[] = {
 	{"utime",	NULL,			0,		2}, /* 132 */
 	{"mknod",	NULL,			0,		3}, /* 133 */
 	{"uselib",	NULL,			NOSYS_KERNEL,	0}, /* 134 */
-	{"personality",	NULL,			0,		1}, /* 135 */
+	{"personality",	lx_personality,		0,		1}, /* 135 */
 	{"ustat",	NULL,			NOSYS_OBSOLETE,	2}, /* 136 */
 	{"statfs",	NULL,			0,		2}, /* 137 */
 	{"fstatfs",	NULL,			0,		2}, /* 138 */

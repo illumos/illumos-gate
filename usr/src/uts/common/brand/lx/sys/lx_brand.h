@@ -104,6 +104,7 @@ extern "C" {
 #define	B_SIGEV_THREAD_ID	148
 #define	B_OVERRIDE_KERN_VER	149
 #define	B_NOTIFY_VDSO_LOC	150
+#define	B_GET_PERSONALITY	151
 
 #ifndef _ASM
 /*
@@ -310,9 +311,31 @@ typedef struct lx_proc_data {
 	/* Override zone-wide settings for uname release and version */
 	char l_uname_release[LX_KERN_RELEASE_MAX];
 	char l_uname_version[LX_KERN_VERSION_MAX];
+
+	/* Linux process personality */
+	unsigned int l_personality;
 } lx_proc_data_t;
 
 #endif	/* _KERNEL */
+
+/*
+ * Linux process personality(2) flags stored in l_personality
+ */
+#define	LX_PER_UNAME26			0x0020000
+#define	LX_PER_ADDR_NO_RANDOMIZE	0x0040000
+#define	LX_PER_FDPIC_FUNCPTRS		0x0080000
+#define	LX_PER_MMAP_PAGE_ZERO		0x0100000
+#define	LX_PER_ADDR_COMPAT_LAYOUT	0x0200000
+#define	LX_PER_READ_IMPLIES_EXEC	0x0400000
+#define	LX_PER_ADDR_LIMIT_32BIT		0x0800000
+#define	LX_PER_SHORT_INODE		0x1000000
+#define	LX_PER_WHOLE_SECONDS		0x2000000
+#define	LX_PER_STICKY_TIMEOUTS		0x4000000
+#define	LX_PER_ADDR_LIMIT_3GB		0x8000000
+
+#define	LX_PER_LINUX	0x00
+#define	LX_PER_SUNOS	(0x06 | LX_PER_STICKY_TIMEOUTS)
+#define	LX_PER_MASK	0xff
 
 /*
  * A data type big enough to bitmap all Linux possible cpus.

@@ -314,6 +314,7 @@ LX_BRAND_OBJS  =		\
 	lx_mkdir.o		\
 	lx_modify_ldt.o		\
 	lx_open.o		\
+	lx_personality.o	\
 	lx_pid.o		\
 	lx_pipe.o		\
 	lx_poll.o		\

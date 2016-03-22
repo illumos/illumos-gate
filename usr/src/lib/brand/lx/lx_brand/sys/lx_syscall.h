@@ -148,7 +148,6 @@ extern long lx_reboot(uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 extern long lx_getgroups16(uintptr_t, uintptr_t);
 extern long lx_setgroups(uintptr_t, uintptr_t);
 extern long lx_setgroups16(uintptr_t, uintptr_t);
-extern long lx_personality(uintptr_t);
 
 extern long lx_query_module(uintptr_t, uintptr_t, uintptr_t, uintptr_t,
     uintptr_t);

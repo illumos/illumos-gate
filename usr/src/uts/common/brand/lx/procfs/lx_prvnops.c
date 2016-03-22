@@ -177,6 +177,7 @@ static void lxpr_read_pid_limits(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_pid_maps(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_pid_mountinfo(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_pid_oom_scr_adj(lxpr_node_t *, lxpr_uiobuf_t *);
+static void lxpr_read_pid_personality(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_pid_stat(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_pid_statm(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_pid_status(lxpr_node_t *, lxpr_uiobuf_t *);
@@ -332,6 +333,7 @@ static lxpr_dirent_t piddir[] = {
 	{ LXPR_PID_MEM,		"mem" },
 	{ LXPR_PID_MOUNTINFO,	"mountinfo" },
 	{ LXPR_PID_OOM_SCR_ADJ,	"oom_score_adj" },
+	{ LXPR_PID_PERSONALITY,	"personality" },
 	{ LXPR_PID_ROOTDIR,	"root" },
 	{ LXPR_PID_STAT,	"stat" },
 	{ LXPR_PID_STATM,	"statm" },
@@ -359,6 +361,7 @@ static lxpr_dirent_t tiddir[] = {
 	{ LXPR_PID_MEM,		"mem" },
 	{ LXPR_PID_MOUNTINFO,	"mountinfo" },
 	{ LXPR_PID_TID_OOM_SCR_ADJ,	"oom_score_adj" },
+	{ LXPR_PID_PERSONALITY,	"personality" },
 	{ LXPR_PID_ROOTDIR,	"root" },
 	{ LXPR_PID_TID_STAT,	"stat" },
 	{ LXPR_PID_STATM,	"statm" },
@@ -633,6 +636,7 @@ static void (*lxpr_read_function[LXPR_NFILES])() = {
 	lxpr_read_empty,		/* /proc/<pid>/mem	*/
 	lxpr_read_pid_mountinfo,	/* /proc/<pid>/mountinfo */
 	lxpr_read_pid_oom_scr_adj,	/* /proc/<pid>/oom_score_adj */
+	lxpr_read_pid_personality,	/* /proc/<pid>/personality */
 	lxpr_read_invalid,		/* /proc/<pid>/root	*/
 	lxpr_read_pid_stat,		/* /proc/<pid>/stat	*/
 	lxpr_read_pid_statm,		/* /proc/<pid>/statm	*/
@@ -654,6 +658,7 @@ static void (*lxpr_read_function[LXPR_NFILES])() = {
 	lxpr_read_empty,		/* /proc/<pid>/task/<tid>/mem	*/
 	lxpr_read_pid_mountinfo,	/* /proc/<pid>/task/<tid>/mountinfo */
 	lxpr_read_pid_oom_scr_adj,	/* /proc/<pid>/task/<tid>/oom_scr_adj */
+	lxpr_read_pid_personality,	/* /proc/<pid>/task/<tid>/personality */
 	lxpr_read_invalid,		/* /proc/<pid>/task/<tid>/root	*/
 	lxpr_read_pid_tid_stat,		/* /proc/<pid>/task/<tid>/stat	*/
 	lxpr_read_pid_statm,		/* /proc/<pid>/task/<tid>/statm	*/
@@ -755,6 +760,7 @@ static vnode_t *(*lxpr_lookup_function[LXPR_NFILES])() = {
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/mem	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/mountinfo */
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/oom_score_adj */
+	lxpr_lookup_not_a_dir,		/* /proc/<pid>/personality */
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/root	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/stat	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/statm	*/
@@ -776,6 +782,7 @@ static vnode_t *(*lxpr_lookup_function[LXPR_NFILES])() = {
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/mem	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/mountinfo */
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/oom_scr_adj */
+	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/personality */
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/root	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/stat	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/statm	*/
@@ -877,6 +884,7 @@ static int (*lxpr_readdir_function[LXPR_NFILES])() = {
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/mem	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/mountinfo */
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/oom_score_adj */
+	lxpr_readdir_not_a_dir,		/* /proc/<pid>/personality */
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/root	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/stat	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/statm	*/
@@ -898,6 +906,7 @@ static int (*lxpr_readdir_function[LXPR_NFILES])() = {
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid>/mem	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid>/mountinfo */
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid/oom_scr_adj */
+	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid/personality */
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid>/root	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid>/stat	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid>/statm	*/
@@ -1816,6 +1825,33 @@ lxpr_read_pid_oom_scr_adj(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	lxpr_uiobuf_printf(uiobuf, "0\n");
 }
 
+/*
+ * lxpr_read_pid_personality(): read personality for process
+ */
+static void
+lxpr_read_pid_personality(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+{
+	proc_t *p;
+	lx_proc_data_t *lxpd;
+	unsigned int personality;
+
+	ASSERT(lxpnp->lxpr_type == LXPR_PID_PERSONALITY);
+
+	p = lxpr_lock(lxpnp->lxpr_pid, ZOMB_OK);
+	if (p == NULL) {
+		lxpr_uiobuf_seterr(uiobuf, EINVAL);
+		return;
+	}
+	if ((lxpd = ptolxproc(p)) != NULL) {
+		personality = lxpd->l_personality;
+	} else {
+		/* Report native processes as having the SunOS personality */
+		personality = LX_PER_SUNOS;
+	}
+	lxpr_unlock(p);
+
+	lxpr_uiobuf_printf(uiobuf, "%08x\n", personality);
+}
 
 /*
  * lxpr_read_pid_statm(): memory status file
