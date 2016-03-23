@@ -49,7 +49,6 @@
 #include <sys/lx_thread.h>
 #include <sys/inotify.h>
 #include <sys/eventfd.h>
-#include <sys/timerfd.h>
 #include <thread.h>
 #include <unistd.h>
 #include <libintl.h>
@@ -900,38 +899,6 @@ lx_eventfd2(unsigned int initval, int flags)
 	 */
 	if (r == -1 && errno == ENOENT)
 		return (-ENOTSUP);
-
-	return (r == -1 ? -errno : r);
-}
-
-long
-lx_timerfd_create(int clockid, int flags)
-{
-	int r = timerfd_create(clockid, flags);
-
-	/*
-	 * As with the eventfd case, above, we return a slightly less jarring
-	 * error condition if we cannot open /dev/timerfd.
-	 */
-	if (r == -1 && errno == ENOENT)
-		return (-ENOTSUP);
-
-	return (r == -1 ? -errno : r);
-}
-
-long
-lx_timerfd_settime(int fd, int flags, const struct itimerspec *value,
-    struct itimerspec *ovalue)
-{
-	int r = timerfd_settime(fd, flags, value, ovalue);
-
-	return (r == -1 ? -errno : r);
-}
-
-long
-lx_timerfd_gettime(int fd, struct itimerspec *value)
-{
-	int r = timerfd_gettime(fd, value);
 
 	return (r == -1 ? -errno : r);
 }
