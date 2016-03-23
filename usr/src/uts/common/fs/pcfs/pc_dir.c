@@ -22,6 +22,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2015 Joyent, Inc.
  */
 
 #include <sys/param.h>
@@ -560,7 +561,7 @@ pc_rename(
 	caller_context_t *ctp)
 {
 	struct pcnode *pcp;	/* pcnode we are trying to rename */
-	struct pcnode *tpcp;	/* pcnode that's in our way */
+	struct pcnode *tpcp = NULL; /* pcnode that's in our way */
 	struct pcslot slot;
 	int error;
 	struct vnode *vp = PCTOV(dp);
@@ -641,8 +642,6 @@ top:
 		newisdir = tpcp->pc_entry.pcd_attr & PCA_DIR;
 
 		brelse(slot.sl_bp);
-		vnevent_rename_dest(PCTOV(tpcp), PCTOV(tdp), tnm, ctp);
-		VN_RELE(PCTOV(tpcp));
 
 		/*
 		 * Error cases (from rename(2)):
@@ -658,6 +657,10 @@ top:
 				error = pc_dirremove(tdp, tnm,
 				    (struct vnode *)NULL, VREG, ctp);
 				if (error == 0) {
+					vnevent_rename_dest(PCTOV(tpcp),
+					    PCTOV(tdp), tnm, ctp);
+					VN_RELE(PCTOV(tpcp));
+					tpcp = NULL;
 					VN_RELE(PCTOV(pcp));
 					goto top;
 				}
@@ -667,6 +670,10 @@ top:
 			error = pc_dirremove(tdp, tnm,
 			    (struct vnode *)NULL, VDIR, ctp);
 			if (error == 0) {
+				vnevent_rename_dest(PCTOV(tpcp), PCTOV(tdp),
+				    tnm, ctp);
+				VN_RELE(PCTOV(tpcp));
+				tpcp = NULL;
 				VN_RELE(PCTOV(pcp));
 				goto top;
 			}
@@ -710,8 +717,8 @@ top:
 			brelse(slot.sl_bp);
 		ndirentries = direntries_needed(tdp, tnm);
 		if (ndirentries == -1) {
-			VN_RELE(PCTOV(pcp));
-			return (EINVAL);
+			error = EINVAL;
+			goto done;
 		}
 		/*
 		 * first see if we have enough space to create the new
@@ -719,14 +726,13 @@ top:
 		 */
 		offset = pc_find_free_space(tdp, ndirentries);
 		if (offset == -1) {
-			VN_RELE(PCTOV(pcp));
-			return (ENOSPC);
+			error = ENOSPC;
+			goto done;
 		}
 
 		error = pc_findentry(dp, snm, &slot, &lfn_offset);
 		if (error) {
-			VN_RELE(PCTOV(pcp));
-			return (error);
+			goto done;
 		}
 		pct_lo = slot.sl_ep->pcd_scluster_lo;
 		if (IS_FAT32(fsp))
@@ -745,9 +751,8 @@ top:
 			brelse(slot.sl_bp);
 			error = pc_remove_long_fn(dp, lfn_offset);
 			if (error) {
-				VN_RELE(PCTOV(pcp));
 				pc_mark_irrecov(VFSTOPCFS(vp->v_vfsp));
-				return (error);
+				goto done;
 			}
 		} else {
 			slot.sl_ep->pcd_filename[0] =
@@ -757,9 +762,9 @@ top:
 			brelse(slot.sl_bp);
 		}
 		if (error) {
-			VN_RELE(PCTOV(pcp));
 			pc_mark_irrecov(VFSTOPCFS(vp->v_vfsp));
-			return (EIO);
+			error = EIO;
+			goto done;
 		}
 
 		/*
@@ -767,23 +772,21 @@ top:
 		 */
 		direntries = pc_name_to_pcdir(tdp, tnm, ndirentries, &error);
 		if (direntries == NULL) {
-			VN_RELE(PCTOV(pcp));
-			return (error);
+			goto done;
 		}
+
 		error = pc_makedirentry(tdp, direntries, ndirentries, NULL,
 		    offset);
 		kmem_free(direntries, ndirentries * sizeof (struct pcdir));
 		if (error) {
-			VN_RELE(PCTOV(pcp));
-			return (error);
+			goto done;
 		}
 		/* advance to short name */
 		offset += (ndirentries - 1)  * sizeof (struct pcdir);
 		boff = pc_blkoff(fsp, offset);
 		error = pc_blkatoff(tdp, offset, &bp, &ep);
 		if (error) {
-			VN_RELE(PCTOV(pcp));
-			return (error);
+			goto done;
 		}
 		blkno = pc_daddrdb(fsp, bp->b_blkno);
 		ep->pcd_scluster_lo = pct_lo;
@@ -806,28 +809,30 @@ top:
 		pcp->pc_flags |= PC_CHG;
 		brelse(bp);
 		if (error) {
-			VN_RELE(PCTOV(pcp));
 			pc_mark_irrecov(VFSTOPCFS(vp->v_vfsp));
-			return (EIO);
+			error = EIO;
+			goto done;
 		}
 		/* No need to fix ".." if we're renaming within a dir */
 		if (oldisdir && dp != tdp) {
 			if ((error = pc_dirfixdotdot(pcp, dp, tdp)) != 0) {
-				VN_RELE(PCTOV(pcp));
-				return (error);
+				goto done;
 			}
 		}
 		if ((error = pc_nodeupdate(pcp)) != 0) {
-			VN_RELE(PCTOV(pcp));
-			return (error);
+			goto done;
 		}
 	}
-out:
-	vnevent_rename_src(PCTOV(pcp), PCTOV(dp), snm, ctp);
-	if (dp != tdp) {
-		vnevent_rename_dest_dir(PCTOV(tdp), ctp);
+
+	if (error == 0) {
+		vnevent_rename_src(PCTOV(pcp), PCTOV(dp), snm, ctp);
+		if (dp != tdp)
+			vnevent_rename_dest_dir(PCTOV(tdp), ctp);
 	}
 
+done:
+	if (tpcp != NULL)
+		VN_RELE(PCTOV(tpcp));
 	VN_RELE(PCTOV(pcp));
 
 	return (error);

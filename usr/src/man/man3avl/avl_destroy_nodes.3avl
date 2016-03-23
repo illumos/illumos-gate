@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2015 Joyent, Inc.
 .\"
-.Dd May 07, 2015
+.Dd Dec 03, 2015
 .Dt AVL_DESTROY_NODES 3AVL
 .Os
 .Sh NAME
@@ -53,7 +53,7 @@ initializing it. After each call to
 .Fn avl_destroy_nodes ,
 .Fa cookie
 will be updated and must be passed to subsequent calls to
-.Fn avl_destroy_nodes.
+.Fn avl_destroy_nodes .
 .Pp
 Each time
 .Fn avl_destroy_nodes

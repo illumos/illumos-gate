@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SNDRSYNCD 1M "Oct 2, 2007"
+.TH SNDRSYNCD 1M "Dec 11, 2015"
 .SH NAME
 sndrsyncd \- Availability Suite Remote Mirror update resynchronization daemon
 .SH SYNOPSIS
@@ -13,7 +13,6 @@ sndrsyncd \- Availability Suite Remote Mirror update resynchronization daemon
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBsndrsyncd\fR daemon automates update resynchronization after a network
 or machine failure and invokes Point-in-Time Copy copies when needed to protect
@@ -34,7 +33,6 @@ if a file system is currently mounted on the secondary volume and informs the
 kernel not to allow the synchronization to start if the file system is
 currently mounted.
 .SH EXIT STATUS
-.sp
 .ne 2
 .na
 \fB\fB0\fR\fR
@@ -53,7 +51,6 @@ Daemon failed to start.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/lib/svc/method/svc-rdcsyncd\fR\fR
@@ -74,7 +71,6 @@ Shell script for stopping \fBsndrsyncd\fR.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -90,14 +86,12 @@ Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBiiadm\fR(1M), \fBsndradm\fR(1M), \fBsndrd\fR(1M), \fBsvcadm\fR(1M),
 \fBds.log\fR(4), \fBrdc.cf\fR(4), \fBattributes\fR(5)
 .SH NOTES
-.sp
 .LP
-Do not manually stop the sndrsyncd deamon. If you need to manually stop
+Do not manually stop the sndrsyncd daemon. If you need to manually stop
 sndrsyncd perform these steps. This stops both the \fBsndrd\fR and
 \fBsndrsyncd\fR daemons.
 .sp
@@ -116,7 +110,7 @@ sndrsyncd perform these steps. This stops both the \fBsndrd\fR and
 
 .sp
 .LP
-Do not manually start or restart the \fBsndrsyncd\fR deamon. If you need to
+Do not manually start or restart the \fBsndrsyncd\fR daemon. If you need to
 manually start \fBsndrsyncd\fR perform these steps. This starts both the
 \fBsndrd\fR and \fBsndrsyncd\fR daemons.
 .sp

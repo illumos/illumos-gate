@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH TRACEROUTE 1M "Sep 18, 2008"
+.TH TRACEROUTE 1M "Dec 11, 2015"
 .SH NAME
 traceroute \- print the route packets take to network host
 .SH SYNOPSIS
@@ -18,7 +18,6 @@ traceroute \- print the route packets take to network host
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The Internet is a large and complex aggregation of network hardware, connected
 by gateways. Tracking the route a packet follows can be difficult. The utility
@@ -217,7 +216,6 @@ All integer arguments to \fBtraceroute\fR can be specified in either decimal or
 hexadecimal notation. For example, \fIpacketlen\fR can be specified either as
 \fB256\fR or \fB0x100\fR.
 .SH OPTIONS
-.sp
 .ne 2
 .na
 \fB\fB-A\fR\ \fIaddr_family\fR\fR
@@ -455,7 +453,7 @@ Set the desired number of probe queries. The default is 3.
 Bypass the normal routing tables and send directly to a host on an attached
 network. If the host is not on a directly-attached network, an error is
 returned. This option can be used to send probes to a local host through an
-interface that has been dropped by the router deamon. See \fBin.routed\fR(1M).
+interface that has been dropped by the router daemon. See \fBin.routed\fR(1M).
 You cannot use this option if the \fB-g\fR option is used.
 .RE
 
@@ -540,7 +538,6 @@ checksum is always calculated by the operating system in this case.
 .RE
 
 .SH OPERANDS
-.sp
 .LP
 The following operands are supported:
 .sp
@@ -645,7 +642,6 @@ traceroute to sanfrancisco (172.29.64.39), 30 hops max, 56 byte packets
 .sp
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -669,12 +665,10 @@ An error occurred.
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBnetstat\fR(1M), \fBsignal\fR(3C), \fBping\fR(1M), \fBattributes\fR(5),
 \fBprivileges\fR(5), \fBzones\fR(5)
 .SH WARNINGS
-.sp
 .LP
 This utility is intended for use in network testing, measurement and
 management. It should be used primarily for manual fault isolation. Because of

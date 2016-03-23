@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1984, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright 2015, Joyent, Inc.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -3371,7 +3371,7 @@ ufs_rename(
 	struct vnode *tvp = NULL;	/* target vnode, if it exists */
 	struct vnode *realvp;
 	struct ufsvfs *ufsvfsp;
-	struct ulockfs *ulp;
+	struct ulockfs *ulp = NULL;
 	struct ufs_slot slot;
 	timestruc_t now;
 	int error;
@@ -3389,26 +3389,24 @@ ufs_rename(
 	if (VOP_REALVP(tdvp, &realvp, ct) == 0)
 		tdvp = realvp;
 
+	/* Must do this before taking locks in case of DNLC miss */
 	terr = ufs_eventlookup(tdvp, tnm, cr, &tvp);
 	serr = ufs_eventlookup(sdvp, snm, cr, &svp);
 
 	if ((serr == 0) && ((terr == 0) || (terr == ENOENT))) {
 		if (tvp != NULL)
-			vnevent_rename_dest(tvp, tdvp, tnm, ct);
+			vnevent_pre_rename_dest(tvp, tdvp, tnm, ct);
 
 		/*
 		 * Notify the target directory of the rename event
 		 * if source and target directories are not the same.
 		 */
 		if (sdvp != tdvp)
-			vnevent_rename_dest_dir(tdvp, ct);
+			vnevent_pre_rename_dest_dir(tdvp, svp, tnm, ct);
 
 		if (svp != NULL)
-			vnevent_rename_src(svp, sdvp, snm, ct);
+			vnevent_pre_rename_src(svp, sdvp, snm, ct);
 	}
-
-	if (tvp != NULL)
-		VN_RELE(tvp);
 
 	if (svp != NULL)
 		VN_RELE(svp);
@@ -3416,7 +3414,7 @@ ufs_rename(
 retry_rename:
 	error = ufs_lockfs_begin(ufsvfsp, &ulp, ULOCKFS_RENAME_MASK);
 	if (error)
-		goto out;
+		goto unlock;
 
 	if (ulp)
 		TRANS_BEGIN_CSYNC(ufsvfsp, issync, TOP_RENAME,
@@ -3712,6 +3710,9 @@ retry_firstlock:
 		goto errout;
 	}
 
+	if (error == 0 && tvp != NULL)
+		vnevent_rename_dest(tvp, tdvp, tnm, ct);
+
 	/*
 	 * Unlink the source.
 	 * Remove the source entry.  ufs_dirremove() checks that the entry
@@ -3723,6 +3724,16 @@ retry_firstlock:
 	    DR_RENAME, cr)) == ENOENT)
 		error = 0;
 
+	if (error == 0) {
+		vnevent_rename_src(ITOV(sip), sdvp, snm, ct);
+		/*
+		 * Notify the target directory of the rename event
+		 * if source and target directories are not the same.
+		 */
+		if (sdvp != tdvp)
+			vnevent_rename_dest_dir(tdvp, ct);
+	}
+
 errout:
 	if (slot.fbp)
 		fbrelse(slot.fbp, S_OTHER);
@@ -3732,15 +3743,17 @@ errout:
 		rw_exit(&sdp->i_rwlock);
 	}
 
-	VN_RELE(ITOV(sip));
-
 unlock:
+	if (tvp != NULL)
+		VN_RELE(tvp);
+	if (sip != NULL)
+		VN_RELE(ITOV(sip));
+
 	if (ulp) {
 		TRANS_END_CSYNC(ufsvfsp, error, issync, TOP_RENAME, trans_size);
 		ufs_lockfs_end(ulp);
 	}
 
-out:
 	return (error);
 }
 
