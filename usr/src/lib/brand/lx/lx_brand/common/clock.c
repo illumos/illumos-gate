@@ -32,20 +32,21 @@
 #include <unistd.h>
 #include <sys/resource.h>
 #include <sys/syscall.h>
+#include <sys/timerfd.h>
 #include <sys/lx_misc.h>
 #include <sys/lx_syscall.h>
 #include <lx_signum.h>
 
 /*
- * Translating from the Linux clock types to the Illumos types is a bit of a
+ * Translating from the Linux clock types to the illumos types is a bit of a
  * mess.
  *
  * Linux uses different values for it clock identifiers, so we have to do basic
- * translations between the two.  Thankfully, both Linux and Illumos implement
+ * translations between the two.  Thankfully, both Linux and illumos implement
  * the same POSIX SUSv3 clock types, so the semantics should be identical.
  *
  * However, CLOCK_REALTIME and CLOCK_HIGHRES (CLOCK_MONOTONIC) are the only two
- * clock backends currently implemented on Illumos. Functions in the kernel
+ * clock backends currently implemented on illumos. Functions in the kernel
  * that use the CLOCK_BACKEND macro will return an error for any clock type
  * that does not exist in the clock_backend array. These functions are
  * clock_settime, clock_gettime, clock_getres and timer_create.
@@ -60,9 +61,13 @@
  *    4	CLOCK_MONOTONIC (CLOCK_HIGHRES)	valid ptr.
  *    5	CLOCK_PROCESS_CPUTIME_ID	NULL
  *
- * See the comment on clock_highres_timer_create for full details but a zone
- * needs the proc_clock_highres privilege to use the CLOCK_HIGHRES clock so it
- * will generally be unusable by lx for timer_create.
+ * Although an lx zone has the proc_clock_highres privilege (required to use
+ * the CLOCK_HIGHRES clock), it will be unusable by an unprivileged user for
+ * timer_create or timerfd_create. See the comment on clock_highres_timer_create
+ * for full details. We currently map the Linux CLOCK_MONOTONIC (which
+ * corresponds to the illumos CLOCK_HIGHRES) to the illumos CLOCK_REALTIME
+ * in the ltos_timer array. This is generally fine since, unlike a standalone
+ * system, zone's are not allowed to adjust the sytem's clock.
  */
 
 #define	CLOCK_RT_SLOT	0
@@ -78,9 +83,11 @@ static int ltos_clock[] = {
 };
 
 /*
- * Since the Illumos CLOCK_HIGHRES clock requires elevated privs, which can
+ * Since the illumos CLOCK_HIGHRES clock requires elevated privs, which can
  * lead to a DOS, we use the only other option (CLOCK_REALTIME) when given
- * LX_CLOCK_MONOTONIC.
+ * LX_CLOCK_MONOTONIC. Note that this thinking is somewhat misguided and should
+ * be revisited, since it implies that root in an lx zone can never be
+ * compromised or would never DOS the system.
  */
 static int ltos_timer[] = {
 	CLOCK_REALTIME,
@@ -185,14 +192,14 @@ lx_sigev_thread_id(union sigval sival)
 
 
 /*
- * The Illumos timer_create man page says it accepts the following clocks:
+ * The illumos timer_create man page says it accepts the following clocks:
  *   CLOCK_REALTIME (3)	wall clock
  *   CLOCK_VIRTUAL (1)	user CPU usage clock - No Backend
  *   CLOCK_PROF (2)	user and system CPU usage clock - No Backend
  *   CLOCK_HIGHRES (4)	non-adjustable, high-resolution clock
- * However, in reality the Illumos timer_create only accepts CLOCK_REALTIME
- * and CLOCK_HIGHRES, and since we can't use CLOCK_HIGHRES in a zone, we're
- * down to one clock.
+ * However, in reality the illumos timer_create only accepts CLOCK_REALTIME
+ * and CLOCK_HIGHRES, and since only root could use CLOCK_HIGHRES in an lx zone,
+ * we're down to one clock.
  *
  * Linux has complicated support for clock IDs. For example, the
  * clock_getcpuclockid() function can return a negative clock_id. See the Linux
@@ -217,7 +224,7 @@ lx_timer_create(int clock, struct sigevent *lx_sevp, timer_t *tid)
 	if (clock >= LX_TIMER_MAX)
 		return (-EINVAL);
 
-	/* We have to convert the Linux sigevent layout to the Illumos layout */
+	/* We have to convert the Linux sigevent layout to the illumos layout */
 	if (uucopy(lx_sevp, &lev, sizeof (lev)) < 0)
 		return (-EFAULT);
 
@@ -316,4 +323,36 @@ long
 lx_timer_delete(timer_t tid)
 {
 	return ((timer_delete(tid) < 0) ? -errno : 0);
+}
+
+long
+lx_timerfd_create(int clockid, int flags)
+{
+	int r = timerfd_create(ltos_timer[clockid], flags);
+
+	/*
+	 * As with the eventfd case, we return a slightly less jarring
+	 * error condition if we cannot open /dev/timerfd.
+	 */
+	if (r == -1 && errno == ENOENT)
+		return (-ENOTSUP);
+
+	return (r == -1 ? -errno : r);
+}
+
+long
+lx_timerfd_settime(int fd, int flags, const struct itimerspec *value,
+    struct itimerspec *ovalue)
+{
+	int r = timerfd_settime(fd, flags, value, ovalue);
+
+	return (r == -1 ? -errno : r);
+}
+
+long
+lx_timerfd_gettime(int fd, struct itimerspec *value)
+{
+	int r = timerfd_gettime(fd, value);
+
+	return (r == -1 ? -errno : r);
 }
