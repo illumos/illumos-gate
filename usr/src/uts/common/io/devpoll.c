@@ -1123,13 +1123,17 @@ dpioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 			void *setp = STRUCT_FGETP(dvpoll, dp_setp);
 
 			if (setp != NULL) {
-				if (copyin(setp, &set, sizeof (set))) {
-					DP_REFRELE(dpep);
-					return (EFAULT);
+				if ((mode & FKIOCTL) != 0) {
+					/* Use the signal set directly */
+					ksetp = (k_sigset_t *)setp;
+				} else {
+					if (copyin(setp, &set, sizeof (set))) {
+						DP_REFRELE(dpep);
+						return (EFAULT);
+					}
+					sigutok(&set, &kset);
+					ksetp = &kset;
 				}
-
-				sigutok(&set, &kset);
-				ksetp = &kset;
 
 				mutex_enter(&p->p_lock);
 				schedctl_finish_sigblock(t);
@@ -1279,6 +1283,10 @@ dpioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 		DP_SIGMASK_RESTORE(ksetp);
 
 		if (error == 0 && fdcnt > 0) {
+			/*
+			 * It should be noted that FKIOCTL does not influence
+			 * the copyout (vs bcopy) of dp_fds at this time.
+			 */
 			if (copyout(ps->ps_dpbuf,
 			    STRUCT_FGETP(dvpoll, dp_fds), fdcnt * fdsize)) {
 				DP_REFRELE(dpep);

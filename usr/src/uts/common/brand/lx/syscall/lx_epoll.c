@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -29,6 +29,7 @@
 #include <sys/vnode.h>
 #include <sys/lx_brand.h>
 #include <sys/lx_types.h>
+#include <sys/lx_signal.h>
 
 static major_t devpoll_major = 0;
 
@@ -232,6 +233,7 @@ lx_epoll_pwait(int fd, void *events, int maxevents, int timeout, void *sigmask)
 	struct dvpoll arg;
 	file_t *fp;
 	int rv = 0, error, flag;
+	k_sigset_t ksig;
 
 	if (maxevents <= 0) {
 		return (set_errno(EINVAL));
@@ -242,11 +244,22 @@ lx_epoll_pwait(int fd, void *events, int maxevents, int timeout, void *sigmask)
 		releasef(fd);
 		return (set_errno(EINVAL));
 	}
+	if (sigmask != NULL) {
+		lx_sigset_t lsig;
+
+		if (copyin(sigmask, &lsig, sizeof (lsig)) != 0) {
+			releasef(fd);
+			return (set_errno(EFAULT));
+		}
+		lx_ltos_sigset(&lsig, &ksig);
+		arg.dp_setp = (sigset_t *)&ksig;
+	} else {
+		arg.dp_setp = NULL;
+	}
 
 	arg.dp_nfds = maxevents;
 	arg.dp_timeout = timeout;
 	arg.dp_fds = (pollfd_t *)events;
-	arg.dp_setp = (sigset_t *)sigmask;
 	flag = fp->f_flag | DATAMODEL_NATIVE | FKIOCTL;
 	error = VOP_IOCTL(fp->f_vnode, DP_PPOLL, (uintptr_t)&arg, flag,
 	    fp->f_cred, &rv, NULL);
