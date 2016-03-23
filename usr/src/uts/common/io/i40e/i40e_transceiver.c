@@ -1633,10 +1633,10 @@ mac_ether_offload_info(mblk_t *mp, mac_ether_offload_info_t *meoi)
 
 	switch (ipproto) {
 	case IPPROTO_TCP:
-		off = offsetof(tcph_t, th_offset_and_rsrvd);
+		off = offsetof(tcph_t, th_offset_and_rsrvd) + maclen + iplen;
 		if (i40e_meoi_get_uint8(mp, off, &l4len) == -1)
 			return (-1);
-		l4len &= 0xf0 >> 4;
+		l4len = (l4len & 0xf0) >> 4;
 		if (l4len < 5 || l4len > 0xf)
 			return (-1);
 		l4len *= 4;
