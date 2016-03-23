@@ -13,6 +13,7 @@
 # Copyright 2011, Richard Lowe
 # Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore>
+# Copyright 2016 Joyent, Inc.
 #
 
 include		$(SRC)/Makefile.master
@@ -641,6 +642,7 @@ MANLINKS=	SIZEOF_PTR.9f				\
 		avl_last.9f				\
 		avl_nearest.9f				\
 		avl_numnodes.9f				\
+		avl_remove.9f				\
 		avl_swap.9f				\
 		AVL_NEXT.9f				\
 		AVL_PREV.9f				\
@@ -1331,6 +1333,7 @@ avl_is_empty.9f				:= LINKSRC = avl.9f
 avl_last.9f				:= LINKSRC = avl.9f
 avl_nearest.9f				:= LINKSRC = avl.9f
 avl_numnodes.9f				:= LINKSRC = avl.9f
+avl_remove.9f				:= LINKSRC = avl.9f
 avl_swap.9f				:= LINKSRC = avl.9f
 AVL_NEXT.9f				:= LINKSRC = avl.9f
 AVL_PREV.9f				:= LINKSRC = avl.9f
