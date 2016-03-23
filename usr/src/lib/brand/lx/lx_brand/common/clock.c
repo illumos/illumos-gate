@@ -72,6 +72,9 @@
 
 #define	CLOCK_RT_SLOT	0
 
+#define	LX_CLOCK_REALTIME	0
+#define	LX_CLOCK_MONOTONIC	1
+
 static int ltos_clock[] = {
 	CLOCK_REALTIME,			/* LX_CLOCK_REALTIME */
 	CLOCK_HIGHRES,			/* LX_CLOCK_MONOTONIC */
@@ -328,8 +331,13 @@ lx_timer_delete(timer_t tid)
 long
 lx_timerfd_create(int clockid, int flags)
 {
-	int r = timerfd_create(ltos_timer[clockid], flags);
+	int r;
 
+	/* These are the only two valid values. LTP tests for this. */
+	if (clockid != LX_CLOCK_REALTIME && clockid != LX_CLOCK_MONOTONIC)
+		return (-EINVAL);
+
+	r = timerfd_create(ltos_timer[clockid], flags);
 	/*
 	 * As with the eventfd case, we return a slightly less jarring
 	 * error condition if we cannot open /dev/timerfd.
