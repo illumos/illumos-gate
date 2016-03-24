@@ -444,29 +444,6 @@ lx_execve(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 	char **argv = (char **)p2;
 	char **envp = (char **)p3;
 	char *nullist[] = { NULL };
-	char path[64];
-
-	/* Get a copy of the executable we're trying to run */
-	path[0] = '\0';
-	(void) uucopystr(filename, path, sizeof (path));
-
-	/* Check if we're trying to run a native binary */
-	if (strncmp(path, "/native/usr/lib/brand/lx/lx_native",
-	    sizeof (path)) == 0) {
-		/* Skip the first element in the argv array */
-		argv++;
-
-		/*
-		 * The name of the new program to execute was the first
-		 * parameter passed to lx_native.
-		 */
-		if (uucopy(argv, &filename, sizeof (char *)) != 0)
-			return (-errno);
-
-		(void) syscall(SYS_brand, B_EXEC_NATIVE, filename, argv, envp,
-		    NULL, NULL, NULL);
-		return (-errno);
-	}
 
 	if (argv == NULL)
 		argv = nullist;
