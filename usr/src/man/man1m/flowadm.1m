@@ -36,7 +36,6 @@ services, containers, and virtual machines
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBflowadm\fR command is used to create, modify, remove, and show
 networking bandwidth and associated resources for a type of traffic on a
@@ -161,11 +160,11 @@ header.
 .sp
 .ne 2
 .na
-\fB\fB-p\fR, \fB--parseable\fR\fR
+\fB\fB-p\fR, \fB--parsable\fR\fR
 .ad
 .sp .6
 .RS 4n
-Display using a stable machine-parseable format.
+Display using a stable machine-parsable format.
 .RE
 
 .sp
@@ -506,11 +505,11 @@ Flow properties are documented in the "Flow Properties" section, below.
 .sp
 .ne 2
 .na
-\fB\fB-c\fR, \fB--parseable\fR\fR
+\fB\fB-c\fR
 .ad
 .sp .6
 .RS 4n
-Display using a stable machine-parseable format.
+Display using a stable machine-parsable format.
 .RE
 
 .sp
@@ -628,7 +627,6 @@ Otherwise, display network usage from all flows.
 .RE
 
 .SS "Flow Attributes"
-.sp
 .LP
 The flow operand that identify a flow in a \fBflowadm\fR command is a
 comma-separated list of one or more keyword, value pairs from the list below.
@@ -719,11 +717,9 @@ dsfield=\fIval\fR[:\fIdsfield_mask\fR]
 On a given link, the combinations above are mutually exclusive. An attempt to
 create flows of different combinations will fail.
 .SS "Restrictions"
-.sp
 .LP
 There are individual flow restrictions and flow restrictions per zone.
 .SS "Individual Flow Restrictions"
-.sp
 .LP
 Restrictions on individual flows do not require knowledge of other flows that
 have been added to the link.
@@ -770,13 +766,11 @@ flow16\fR
 .sp
 
 .SS "Flow Restrictions Per Zone"
-.sp
 .LP
 Within a zone, no two flows can have the same name. After adding a flow with
 the link specified, the link will not be required for display, modification, or
 deletion of the flow.
 .SS "Flow Properties"
-.sp
 .LP
 The following flow properties are supported. Note that the ability to set a
 given property to a given value depends on the driver and hardware.
@@ -976,7 +970,6 @@ Output the same information as above as a plotfile:
 .sp
 
 .SH EXIT STATUS
-.sp
 .ne 2
 .na
 \fB\fB0\fR\fR
@@ -997,7 +990,6 @@ An error occurred.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -1013,7 +1005,6 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBacctadm\fR(1M), \fBdladm\fR(1M), \fBifconfig\fR(1M), \fBprstat\fR(1M),
 \fBroute\fR(1M), \fBattributes\fR(5), \fBdlpi\fR(7P)

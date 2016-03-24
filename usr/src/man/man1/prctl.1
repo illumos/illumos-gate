@@ -16,7 +16,6 @@ projects
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBprctl\fR utility allows the examination and modification of the resource
 controls associated with an active process, task, or project on the system. It
@@ -27,7 +26,6 @@ the     specified entity.
 See \fBresource_controls\fR(5) for a description of the resource controls
 supported in the current release of the Solaris operating system.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -238,7 +236,6 @@ If none of the \fB-s\fR, \fB-r\fR, \fB-x\fR, \fB-v\fR, \fB-d\fR, or \fB-e\fR
 options are specified, the invocation is considered a get operation. Otherwise,
 it is considered a modify operation.
 .SH OPERANDS
-.sp
 .LP
 The following operand is supported:
 .sp
@@ -497,7 +494,6 @@ The cap can be lowered to 50% using:
 .sp
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -528,7 +524,6 @@ Invalid command line options were specified.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/proc/pid/*\fR\fR
@@ -538,7 +533,6 @@ Process information and control files
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -556,15 +550,13 @@ Interface Stability	See below.
 .sp
 .LP
 The command-line syntax is Committed. The human-readable output is Uncommitted.
-The parseable output is Committed.
+The parsable output is Committed.
 .SH SEE ALSO
-.sp
 .LP
 \fBrctladm\fR(1M), \fBzonecfg\fR(1M), \fBsetrctl\fR(2),
 \fBrctlblk_get_local_action\fR(3C), \fBproject\fR(4), \fBattributes\fR(5),
 \fBresource_controls\fR(5)
 .SH NOTES
-.sp
 .LP
 The valid signals that can be set on a resource control block allowing local
 actions are \fBSIGABRT\fR, \fBSIGXRES\fR, \fBSIGHUP\fR, \fBSIGSTOP\fR,

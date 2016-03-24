@@ -242,6 +242,7 @@ misspellings = {
 }
 
 alternates = {
+	'parseable': 'parsable',
 	'sub-command': 'subcommand',
 	'sub-commands': 'subcommands',
 	'writeable': 'writable'
