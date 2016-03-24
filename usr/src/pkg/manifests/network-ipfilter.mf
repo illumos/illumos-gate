@@ -115,6 +115,10 @@ file path=usr/share/man/man1m/ipfstat.1m
 file path=usr/share/man/man1m/ipmon.1m
 file path=usr/share/man/man1m/ipnat.1m
 file path=usr/share/man/man1m/ippool.1m
+file path=usr/share/man/man4/ipf.4
+file path=usr/share/man/man4/ipmon.4
+file path=usr/share/man/man4/ipnat.4
+file path=usr/share/man/man4/ippool.4
 file path=usr/share/man/man5/ipfilter.5
 file path=usr/share/man/man7i/ipnat.7i
 hardlink path=usr/lib/ipf/ipftest target=../../../usr/lib/isaexec
@@ -131,3 +135,8 @@ legacy pkg=SUNWipfu desc="IP Filter Utilities" \
 license cr_Sun license=cr_Sun
 license usr/src/cmd/ipf/tools/IPFILTER.LICENCE \
     license=usr/src/cmd/ipf/tools/IPFILTER.LICENCE
+link path=usr/share/man/man4/ipf.conf.4 target=./ipf.4
+link path=usr/share/man/man4/ipf6.conf.4 target=./ipf.4
+link path=usr/share/man/man4/ipmon.conf.4 target=./ipmon.4
+link path=usr/share/man/man4/ipnat.conf.4 target=./ipnat.4
+link path=usr/share/man/man4/ippool.conf.4 target=./ippool.4
