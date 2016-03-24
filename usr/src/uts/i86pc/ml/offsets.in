@@ -124,6 +124,9 @@ _kthread	THREAD_SIZE
 	_tu._ts._t_post_sys	T_POST_SYS
 	_tu._t_post_sys_ast	T_POST_SYS_AST
 	t_copyops
+#ifdef	__amd64
+	t_useracc
+#endif
 
 ctxop
 	save_op			CTXOP_SAVE

@@ -110,9 +110,11 @@ extern "C" {
 #define	CR4_SMXE	0x4000
 #define	CR4_OSXSAVE	0x40000		/* OS xsave/xrestore support	*/
 #define	CR4_SMEP	0x100000	/* NX for user pages in kernel */
+#define	CR4_SMAP	0x200000	/* kernel can't access user pages */
 
-#define	FMT_CR4							\
-	"\20\25smep\23osxsav\17smxe\16vmxe\13xmme\12fxsr\11pce\10pge"	\
+#define	FMT_CR4						\
+	"\20\26smap\25smep\23osxsav"			\
+	"\17smxe\16vmxe\13xmme\12fxsr\11pce\10pge"	\
 	"\7mce\6pae\5pse\4de\3tsd\2pvi\1vme"
 
 /*

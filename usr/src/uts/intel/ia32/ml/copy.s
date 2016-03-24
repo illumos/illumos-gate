@@ -35,6 +35,10 @@
 /*       Copyright (c) 1987, 1988 Microsoft Corporation			*/
 /*         All Rights Reserved						*/
 
+/*
+ * Copyright 2015 Joyent, Inc.
+ */
+
 #include <sys/errno.h>
 #include <sys/asm_linkage.h>
 
@@ -56,6 +60,69 @@
 #define	COUNT_ALIGN_MASK	_CONST(COUNT_ALIGN_SIZE-1)
 
 /*
+ * With the introduction of Broadwell, Intel has introduced supervisor mode
+ * access protection -- SMAP. SMAP forces the kernel to set certain bits to
+ * enable access of user pages (AC in rflags, defines as PS_ACHK in
+ * <sys/psw.h>). One of the challenges is that the implementation of many of the
+ * userland copy routines directly use the kernel ones. For example, copyin and
+ * copyout simply go and jump to the do_copy_fault label and traditionally let
+ * those deal with the return for them. In fact, changing that is a can of frame
+ * pointers.
+ *
+ * Rules and Constraints:
+ *
+ * 1. For anything that's not in copy.s, we have it do explicit calls to the
+ * smap related code. It usually is in a position where it is able to. This is
+ * restricted to the following three places: DTrace, resume() in swtch.s and
+ * on_fault/no_fault. If you want to add it somewhere else, we should be
+ * thinking twice.
+ *
+ * 2. We try to toggle this at the smallest window possible. This means that if
+ * we take a fault, need to try to use a copyop in copyin() or copyout(), or any
+ * other function, we will always leave with SMAP enabled (the kernel cannot
+ * access user pages).
+ *
+ * 3. None of the *_noerr() or ucopy/uzero routines should toggle SMAP. They are
+ * explicitly only allowed to be called while in an on_fault()/no_fault() handler,
+ * which already takes care of ensuring that SMAP is enabled and disabled. Note
+ * this means that when under an on_fault()/no_fault() handler, one must not
+ * call the non-*_noeer() routines.
+ *
+ * 4. The first thing we should do after coming out of an lofault handler is to
+ * make sure that we call smap_enable again to ensure that we are safely
+ * protected, as more often than not, we will have disabled smap to get there.
+ *
+ * 5. The SMAP functions, smap_enable and smap_disable may not touch any
+ * registers beyond those done by the call and ret. These routines may be called
+ * from arbitrary contexts in copy.s where we have slightly more special ABIs in
+ * place.
+ *
+ * 6. For any inline user of SMAP, the appropriate SMAP_ENABLE_INSTR and
+ * SMAP_DISABLE_INSTR macro should be used (except for smap_enable() and
+ * smap_disable()). If the number of these is changed, you must update the
+ * constants SMAP_ENABLE_COUNT and SMAP_DISABLE_COUNT below.
+ *
+ * 7. Note, at this time SMAP is not implemented for the 32-bit kernel. There is
+ * no known technical reason preventing it from being enabled.
+ *
+ * 8. Generally this .s file is processed by a K&R style cpp. This means that it
+ * really has a lot of feelings about whitespace. In particular, if you have a
+ * macro FOO with the arguments FOO(1, 3), the second argument is in fact ' 3'.
+ *
+ * 9. The smap_enable and smap_disable functions should not generally be called.
+ * They exist such that DTrace and on_trap() may use them, that's it.
+ *
+ * 10. In general, the kernel has its own value for rflags that gets used. This
+ * is maintained in a few different places which vary based on how the thread
+ * comes into existence and whether it's a user thread. In general, when the
+ * kernel takes a trap, it always will set ourselves to a known set of flags,
+ * mainly as part of ENABLE_INTR_FLAGS and F_OFF and F_ON. These ensure that
+ * PS_ACHK is cleared for us. In addition, when using the sysenter instruction,
+ * we mask off PS_ACHK off via the AMD_SFMASK MSR. See init_cpu_syscall() for
+ * where that gets masked off.
+ */
+
+/*
  * The optimal 64-bit bcopy and kcopy for modern x86 processors uses
  * "rep smovq" for large sizes. Performance data shows that many calls to
  * bcopy/kcopy/bzero/kzero operate on small buffers. For best performance for
@@ -71,6 +138,28 @@
  * `to' takes a kernel pagefault which cannot be resolved.
  * Returns errno value on pagefault error, 0 if all ok
  */
+
+/*
+ * I'm sorry about these macros, but copy.s is unsurprisingly sensitive to
+ * additional call instructions.
+ */
+#if defined(__amd64)
+#define	SMAP_DISABLE_COUNT	16
+#define	SMAP_ENABLE_COUNT	26
+#elif defined(__i386)
+#define	SMAP_DISABLE_COUNT	0
+#define	SMAP_ENABLE_COUNT	0
+#endif
+
+#define	SMAP_DISABLE_INSTR(ITER)		\
+	.globl	_smap_disable_patch_/**/ITER;	\
+	_smap_disable_patch_/**/ITER/**/:;	\
+	nop; nop; nop;
+
+#define	SMAP_ENABLE_INSTR(ITER)			\
+	.globl	_smap_enable_patch_/**/ITER;	\
+	_smap_enable_patch_/**/ITER/**/:;	\
+	nop; nop; nop;
 
 #if defined(__lint)
 
@@ -110,6 +199,7 @@ do_copy_fault:
 	movq	%rcx, T_LOFAULT(%r9)	/* new lofault */
 	call	bcopy_altentry
 	xorl	%eax, %eax		/* return 0 (success) */
+	SMAP_ENABLE_INSTR(0)
 
 	/*
 	 * A fault during do_copy_fault is indicated through an errno value
@@ -268,6 +358,7 @@ kcopy_nta(const void *from, void *to, size_t count, int copy_cached)
 
 	mfence
 	xorl	%eax, %eax		/* return 0 (success) */
+	SMAP_ENABLE_INSTR(1)
 
 _kcopy_nta_copyerr:
 	movq	%r11, T_LOFAULT(%r9)    /* restore original lofault */
@@ -1466,10 +1557,12 @@ copyin(const void *uaddr, void *kaddr, size_t count)
 
 	movq	%gs:CPU_THREAD, %r9
 	cmpq	%rax, %rdi		/* test uaddr < kernelbase */
-	jb	do_copy_fault
-	jmp	3f
+	jae	3f			/* take copyop if uaddr > kernelbase */
+	SMAP_DISABLE_INSTR(0)
+	jmp	do_copy_fault		/* Takes care of leave for us */
 
 _copyin_err:
+	SMAP_ENABLE_INSTR(2)
 	movq	%r11, T_LOFAULT(%r9)	/* restore original lofault */	
 	addq	$8, %rsp		/* pop bcopy_altentry call ret addr */
 3:
@@ -1577,24 +1670,29 @@ xcopyin_nta(const void *uaddr, void *kaddr, size_t count, int copy_cached)
 	 * pass lofault value as 4th argument to do_copy_fault
 	 */
 	leaq	_xcopyin_err(%rip), %rcx	/* doesn't set rflags */
-	jnz	do_copy_fault		/* use regular access */
+	jnz	6f			/* use regular access */
 	/*
 	 * Make sure cnt is >= XCOPY_MIN_SIZE bytes
 	 */
 	cmpq	$XCOPY_MIN_SIZE, %rdx
-	jb	do_copy_fault
+	jae	5f
+6:
+	SMAP_DISABLE_INSTR(1)
+	jmp	do_copy_fault
 	
 	/*
 	 * Make sure src and dst are NTA_ALIGN_SIZE aligned,
 	 * count is COUNT_ALIGN_SIZE aligned.
 	 */
+5:
 	movq	%rdi, %r10
 	orq	%rsi, %r10
 	andq	$NTA_ALIGN_MASK, %r10
 	orq	%rdx, %r10
 	andq	$COUNT_ALIGN_MASK, %r10
-	jnz	do_copy_fault
+	jnz	6b	
 	leaq	_xcopyin_nta_err(%rip), %rcx	/* doesn't set rflags */
+	SMAP_DISABLE_INSTR(2)
 	jmp	do_copy_fault_nta	/* use non-temporal access */
 	
 4:
@@ -1609,6 +1707,7 @@ xcopyin_nta(const void *uaddr, void *kaddr, size_t count, int copy_cached)
 _xcopyin_err:
 	addq	$8, %rsp		/* pop bcopy_altentry call ret addr */
 _xcopyin_nta_err:
+	SMAP_ENABLE_INSTR(3)
 	movq	%r11, T_LOFAULT(%r9)	/* restore original lofault */
 3:
 	movq	T_COPYOPS(%r9), %r8
@@ -1745,10 +1844,12 @@ copyout(const void *kaddr, void *uaddr, size_t count)
 
 	movq	%gs:CPU_THREAD, %r9
 	cmpq	%rax, %rsi		/* test uaddr < kernelbase */
-	jb	do_copy_fault
-	jmp	3f
+	jae	3f			/* take copyop if uaddr > kernelbase */
+	SMAP_DISABLE_INSTR(3)
+	jmp	do_copy_fault		/* Calls leave for us */
 
 _copyout_err:
+	SMAP_ENABLE_INSTR(4)
 	movq	%r11, T_LOFAULT(%r9)	/* restore original lofault */
 	addq	$8, %rsp		/* pop bcopy_altentry call ret addr */
 3:
@@ -1855,25 +1956,32 @@ xcopyout_nta(const void *kaddr, void *uaddr, size_t count, int copy_cached)
 	 * pass lofault value as 4th argument to do_copy_fault
 	 */
 	leaq	_xcopyout_err(%rip), %rcx
-	jnz	do_copy_fault
+	jnz	6f
 	/*
 	 * Make sure cnt is >= XCOPY_MIN_SIZE bytes
 	 */
 	cmpq	$XCOPY_MIN_SIZE, %rdx
-	jb	do_copy_fault
+	jae	5f
+6:
+	SMAP_DISABLE_INSTR(4)
+	jmp	do_copy_fault
 	
 	/*
 	 * Make sure src and dst are NTA_ALIGN_SIZE aligned,
 	 * count is COUNT_ALIGN_SIZE aligned.
 	 */
+5:
 	movq	%rdi, %r10
 	orq	%rsi, %r10
 	andq	$NTA_ALIGN_MASK, %r10
 	orq	%rdx, %r10
 	andq	$COUNT_ALIGN_MASK, %r10
-	jnz	do_copy_fault
+	jnz	6b	
 	leaq	_xcopyout_nta_err(%rip), %rcx
-	jmp	do_copy_fault_nta
+	SMAP_DISABLE_INSTR(5)
+	call	do_copy_fault_nta
+	SMAP_ENABLE_INSTR(5)
+	ret
 
 4:
 	movl	$EFAULT, %eax
@@ -1887,6 +1995,7 @@ xcopyout_nta(const void *kaddr, void *uaddr, size_t count, int copy_cached)
 _xcopyout_err:
 	addq	$8, %rsp		/* pop bcopy_altentry call ret addr */
 _xcopyout_nta_err:
+	SMAP_ENABLE_INSTR(6)
 	movq	%r11, T_LOFAULT(%r9)	/* restore original lofault */
 3:
 	movq	T_COPYOPS(%r9), %r8
@@ -2011,6 +2120,8 @@ copystr(const char *from, char *to, size_t maxlength, size_t *lencopied)
 	movq	%gs:CPU_THREAD, %r9
 	movq	T_LOFAULT(%r9), %r8	/* pass current lofault value as */
 					/* 5th argument to do_copystr */
+	xorl	%r10d,%r10d		/* pass smap restore need in %r10d */
+					/* as a non-ABI 6th arg */
 do_copystr:
 	movq	%gs:CPU_THREAD, %r9	/* %r9 = thread addr */
 	movq    T_LOFAULT(%r9), %r11	/* save the current lofault */
@@ -2041,9 +2152,14 @@ copystr_null:
 
 copystr_out:
 	cmpq	$0, %rcx		/* want length? */
-	je	copystr_done		/* no */
+	je	copystr_smap		/* no */
 	subq	%r8, %rdx		/* compute length and store it */
 	movq	%rdx, (%rcx)
+
+copystr_smap:
+	cmpl	$0, %r10d
+	jz	copystr_done
+	SMAP_ENABLE_INSTR(7)
 
 copystr_done:
 	movq	%r11, T_LOFAULT(%r9)	/* restore the original lofault */
@@ -2178,15 +2294,21 @@ copyinstr(const char *uaddr, char *kaddr, size_t maxlength,
 #endif
 	/*
 	 * pass lofault value as 5th argument to do_copystr
+	 * do_copystr expects whether or not we need smap in %r10d
 	 */
 	leaq	_copyinstr_error(%rip), %r8
+	movl	$1, %r10d
 
 	cmpq	%rax, %rdi		/* test uaddr < kernelbase */
-	jb	do_copystr
+	jae	4f
+	SMAP_DISABLE_INSTR(6)
+	jmp	do_copystr
+4:
 	movq	%gs:CPU_THREAD, %r9
 	jmp	3f
 
 _copyinstr_error:
+	SMAP_ENABLE_INSTR(8)
 	movq	%r11, T_LOFAULT(%r9)	/* restore original lofault */
 3:
 	movq	T_COPYOPS(%r9), %rax
@@ -2294,15 +2416,21 @@ copyoutstr(const char *kaddr, char *uaddr, size_t maxlength,
 #endif
 	/*
 	 * pass lofault value as 5th argument to do_copystr
+	 * pass one as 6th argument to do_copystr in %r10d
 	 */
 	leaq	_copyoutstr_error(%rip), %r8
+	movl	$1, %r10d
 
 	cmpq	%rax, %rsi		/* test uaddr < kernelbase */
-	jb	do_copystr
+	jae	4f
+	SMAP_DISABLE_INSTR(7)
+	jmp	do_copystr
+4:
 	movq	%gs:CPU_THREAD, %r9
 	jmp	3f
 
 _copyoutstr_error:
+	SMAP_ENABLE_INSTR(9)
 	movq	%r11, T_LOFAULT(%r9)	/* restore the original lofault */
 3:
 	movq	T_COPYOPS(%r9), %rax
@@ -2406,23 +2534,28 @@ fuword8(const void *addr, uint8_t *dst)
 #if defined(__amd64)
 
 /*
- * (Note that we don't save and reload the arguments here
- * because their values are not altered in the copy path)
+ * Note that we don't save and reload the arguments here
+ * because their values are not altered in the copy path.
+ * Additionally, when successful, the smap_enable jmp will
+ * actually return us to our original caller.
  */
 
-#define	FUWORD(NAME, INSTR, REG, COPYOP)	\
+#define	FUWORD(NAME, INSTR, REG, COPYOP, DISNUM, EN1, EN2)	\
 	ENTRY(NAME)				\
 	movq	%gs:CPU_THREAD, %r9;		\
 	cmpq	kernelbase(%rip), %rdi;		\
 	jae	1f;				\
 	leaq	_flt_/**/NAME, %rdx;		\
 	movq	%rdx, T_LOFAULT(%r9);		\
+	SMAP_DISABLE_INSTR(DISNUM)		\
 	INSTR	(%rdi), REG;			\
 	movq	$0, T_LOFAULT(%r9);		\
 	INSTR	REG, (%rsi);			\
 	xorl	%eax, %eax;			\
+	SMAP_ENABLE_INSTR(EN1)			\
 	ret;					\
 _flt_/**/NAME:					\
+	SMAP_ENABLE_INSTR(EN2)			\
 	movq	$0, T_LOFAULT(%r9);		\
 1:						\
 	movq	T_COPYOPS(%r9), %rax;		\
@@ -2434,10 +2567,10 @@ _flt_/**/NAME:					\
 	ret;					\
 	SET_SIZE(NAME)
 	
-	FUWORD(fuword64, movq, %rax, CP_FUWORD64)
-	FUWORD(fuword32, movl, %eax, CP_FUWORD32)
-	FUWORD(fuword16, movw, %ax, CP_FUWORD16)
-	FUWORD(fuword8, movb, %al, CP_FUWORD8)
+	FUWORD(fuword64, movq, %rax, CP_FUWORD64,8,10,11)
+	FUWORD(fuword32, movl, %eax, CP_FUWORD32,9,12,13)
+	FUWORD(fuword16, movw, %ax, CP_FUWORD16,10,14,15)
+	FUWORD(fuword8, movb, %al, CP_FUWORD8,11,16,17)
 
 #elif defined(__i386)
 
@@ -2513,22 +2646,25 @@ suword8(void *addr, uint8_t value)
 #if defined(__amd64)
 
 /*
- * (Note that we don't save and reload the arguments here
- * because their values are not altered in the copy path)
+ * Note that we don't save and reload the arguments here
+ * because their values are not altered in the copy path.
  */
 
-#define	SUWORD(NAME, INSTR, REG, COPYOP)	\
+#define	SUWORD(NAME, INSTR, REG, COPYOP, DISNUM, EN1, EN2)	\
 	ENTRY(NAME)				\
 	movq	%gs:CPU_THREAD, %r9;		\
 	cmpq	kernelbase(%rip), %rdi;		\
 	jae	1f;				\
 	leaq	_flt_/**/NAME, %rdx;		\
+	SMAP_DISABLE_INSTR(DISNUM)		\
 	movq	%rdx, T_LOFAULT(%r9);		\
 	INSTR	REG, (%rdi);			\
 	movq	$0, T_LOFAULT(%r9);		\
 	xorl	%eax, %eax;			\
+	SMAP_ENABLE_INSTR(EN1)			\
 	ret;					\
 _flt_/**/NAME:					\
+	SMAP_ENABLE_INSTR(EN2)			\
 	movq	$0, T_LOFAULT(%r9);		\
 1:						\
 	movq	T_COPYOPS(%r9), %rax;		\
@@ -2540,10 +2676,10 @@ _flt_/**/NAME:					\
 	ret;					\
 	SET_SIZE(NAME)
 
-	SUWORD(suword64, movq, %rsi, CP_SUWORD64)
-	SUWORD(suword32, movl, %esi, CP_SUWORD32)
-	SUWORD(suword16, movw, %si, CP_SUWORD16)
-	SUWORD(suword8, movb, %sil, CP_SUWORD8)
+	SUWORD(suword64, movq, %rsi, CP_SUWORD64,12,18,19)
+	SUWORD(suword32, movl, %esi, CP_SUWORD32,13,20,21)
+	SUWORD(suword16, movw, %si, CP_SUWORD16,14,22,23)
+	SUWORD(suword8, movb, %sil, CP_SUWORD8,15,24,25)
 
 #elif defined(__i386)
 
@@ -2880,6 +3016,10 @@ ucopystr(const char *ufrom, char *uto, size_t umaxlength, size_t *lencopied)
 	jmp	do_copy
 	SET_SIZE(ucopy)
 
+	/*
+	 * Note, the frame pointer is required here becuase do_copystr expects
+	 * to be able to pop it off!
+	 */
 	ENTRY(ucopystr)
 	pushq	%rbp
 	movq	%rsp, %rbp
@@ -2889,6 +3029,8 @@ ucopystr(const char *ufrom, char *uto, size_t umaxlength, size_t *lencopied)
 	cmpq	%rax, %rsi
 	cmovaeq	%rax, %rsi	/* force fault at kernelbase */
 	/* do_copystr expects lofault address in %r8 */
+	/* do_copystr expects whether or not we need smap in %r10 */
+	xorl	%r10d, %r10d
 	movq	%gs:CPU_THREAD, %r8
 	movq	T_LOFAULT(%r8), %r8
 	jmp	do_copystr
@@ -2995,3 +3137,62 @@ ucopystr(const char *ufrom, char *uto, size_t umaxlength, size_t *lencopied)
 #endif
 
 #endif	/* __lint */
+
+/*
+ * These functions are used for SMAP, supervisor mode access protection. They
+ * are hotpatched to become real instructions when the system starts up which is
+ * done in mlsetup() as a part of enabling the other CR4 related features.
+ *
+ * Generally speaking, smap_disable() is a stac instruction and smap_enable is a
+ * clac instruction. It's safe to call these any number of times, and in fact,
+ * out of paranoia, the kernel will likely call it at several points.
+ */
+
+#if defined(__lint)
+
+void
+smap_enable(void)
+{}
+
+void
+smap_disable(void)
+{}
+
+#else
+
+#if defined (__amd64) || defined(__i386)
+	ENTRY(smap_disable)
+	nop
+	nop
+	nop
+	ret
+	SET_SIZE(smap_disable)
+
+	ENTRY(smap_enable)
+	nop
+	nop
+	nop
+	ret
+	SET_SIZE(smap_enable)
+
+#endif /* __amd64 || __i386 */
+
+#endif /* __lint */
+
+#ifndef __lint
+
+.data
+.align 	4
+.globl	_smap_enable_patch_count
+.type	_smap_enable_patch_count,@object
+.size	_smap_enable_patch_count, 4
+_smap_enable_patch_count:
+	.long	SMAP_ENABLE_COUNT
+
+.globl	_smap_disable_patch_count
+.type	_smap_disable_patch_count,@object
+.size	_smap_disable_patch_count, 4
+_smap_disable_patch_count:
+	.long SMAP_DISABLE_COUNT
+
+#endif /* __lint */
