@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2015, Joyent, Inc. All rights reserved.
+# Copyright 2016 Joyent, Inc.
 #
 # This lists all the files that illumos-joyent delivers as part of a build.
 # Keep this sorted as by LC_ALL=C sort -u -k2.
@@ -5070,7 +5070,6 @@ f usr/lib/brand/lx/lx_boot_zone_busybox 0755 root root
 f usr/lib/brand/lx/lx_boot_zone_ubuntu 0755 root root
 f usr/lib/brand/lx/lxinit 0755 root root
 f usr/lib/brand/lx/lx_librtld_db.so.1 0755 root root
-f usr/lib/brand/lx/lx_native 0755 root root
 f usr/lib/brand/lx/lx_support 0755 root root
 f usr/lib/brand/lx/platform.xml 0444 root root
 d usr/lib/brand/shared 0755 root sys
