@@ -1038,8 +1038,6 @@ errout:
 	ITIMES(sdp);
 	ITIMES(tdp);
 	VN_RELE(ITOV(sip));
-	if (tip != NULL)
-		VN_RELE(ITOV(tip));
 	mutex_exit(&udf_vfsp->udf_rename_lck);
 
 	return (error);

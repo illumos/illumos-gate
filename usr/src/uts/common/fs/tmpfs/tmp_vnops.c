@@ -1325,8 +1325,6 @@ tmp_rename(
 
 done:
 	tmpnode_rele(fromtp);
-	if (totp != NULL)
-		tmpnode_rele(totp);
 	mutex_exit(&tm->tm_renamelck);
 
 	TRACE_5(TR_FAC_TMPFS, TR_TMPFS_RENAME,
