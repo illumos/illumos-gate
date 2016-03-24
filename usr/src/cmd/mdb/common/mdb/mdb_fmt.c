@@ -21,9 +21,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2016 Joyent, Inc.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Format String Decoder
@@ -90,6 +89,7 @@ typedef struct mdb_fmt_desc {
 	void *f_ptr;		/* Data pointer (see above) */
 	const char *f_help;	/* Additional help string */
 	size_t f_size;		/* Size of type in bytes, or SZ_NONE */
+	boolean_t f_float;	/* Is this a floating point type */
 } mdb_fmt_desc_t;
 
 static const char help_plus[] = "increment dot by the count";
@@ -556,7 +556,7 @@ static const mdb_fmt_desc_t fmttab[] = {
 #ifdef _KMDB
 	{ FMT_NONE, NULL, NULL, 0 },				/* 70 = F */
 #else
-	{ FMT_PRINTF, "%g", NULL, sizeof (double) },		/* 70 = F */
+	{ FMT_PRINTF, "%g", NULL, sizeof (double), B_TRUE },	/* 70 = F */
 #endif
 	{ FMT_PRINTF, "%-16llo", NULL, 8 },			/* 71 = G */
 	{ FMT_FUNC, FUNCP(fmt_swapint), help_swapint, 4 },	/* 72 = H */
@@ -596,7 +596,8 @@ static const mdb_fmt_desc_t fmttab[] = {
 #ifdef _KMDB
 	{ FMT_NONE, NULL, NULL, 0 },				/* 102 = f */
 #else
-	{ FMT_FUNC, FUNCP(fmt_float), help_f, sizeof (float) },	/* 102 = f */
+	{ FMT_FUNC, FUNCP(fmt_float), help_f, sizeof (float),
+	    B_TRUE },						/* 102 = f */
 #endif
 	{ FMT_PRINTF, "%-16llq", NULL, 8 },			/* 103 = g */
 	{ FMT_FUNC, FUNCP(fmt_swapshort), help_swapshort, 2 },	/* 104 = h */
@@ -634,6 +635,7 @@ mdb_fmt_print(mdb_tgt_t *t, mdb_tgt_as_t as,
 		uint32_t i4;
 		uint16_t i2;
 		uint8_t i1;
+		double d;
 	} u;
 
 	if (fmt < 0 || fmt > (sizeof (fmttab) / sizeof (fmttab[0]))) {
@@ -665,6 +667,15 @@ mdb_fmt_print(mdb_tgt_t *t, mdb_tgt_as_t as,
 			fail("format %c is defined using illegal size\n", fmt);
 		}
 
+		if (fp->f_float == B_TRUE) {
+			if (fp->f_size != 8) {
+				fail("format %c is using illegal fp size\n",
+				    fmt);
+			}
+
+			buf = &u.d;
+		}
+
 		while (cnt-- != 0) {
 			if (mdb_tgt_aread(t, as, buf, fp->f_size, addr) !=
 			    fp->f_size) {
@@ -686,7 +697,13 @@ mdb_fmt_print(mdb_tgt_t *t, mdb_tgt_as_t as,
 				rvalue = u.i4;
 				break;
 			case 8:
-				mdb_iob_printf(mdb.m_out, fp->f_ptr, u.i8);
+				if (fp->f_float) {
+					mdb_iob_printf(mdb.m_out, fp->f_ptr,
+					    u.d);
+				} else {
+					mdb_iob_printf(mdb.m_out, fp->f_ptr,
+					    u.i8);
+				}
 				rvalue = u.i8;
 				break;
 			}
