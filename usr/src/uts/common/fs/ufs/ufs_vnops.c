@@ -3715,6 +3715,9 @@ retry_firstlock:
 		goto errout;
 	}
 
+	if (error == 0 && tvp != NULL)
+		vnevent_rename_dest(tvp, tdvp, tnm, ct);
+
 	/*
 	 * Unlink the source.
 	 * Remove the source entry.  ufs_dirremove() checks that the entry
@@ -3728,9 +3731,12 @@ retry_firstlock:
 
 	if (error == 0) {
 		vnevent_rename_src(ITOV(sip), sdvp, snm, ct);
-		if (tvp != NULL)
-			vnevent_rename_dest(tvp, tdvp, tnm, ct);
-		vnevent_rename_dest_dir(tdvp, ITOV(sip), tnm, ct);
+		/*
+		 * Notify the target directory of the rename event
+		 * if source and target directories are not the same.
+		 */
+		if (sdvp != tdvp)
+			vnevent_rename_dest_dir(tdvp, ITOV(sip), tnm, ct);
 	}
 
 errout:

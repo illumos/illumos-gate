@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright 2015, Joyent, Inc.
+ * Copyright (c) 2015, Joyent, Inc. All rights reserved.
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
@@ -1200,7 +1200,7 @@ tmp_rename(
 	struct tmpnode *fromparent;
 	struct tmpnode *toparent;
 	struct tmpnode *fromtp = NULL;	/* source tmpnode */
-	struct tmpnode *totp = NULL;	/* target tmpnode */
+	struct tmpnode *totp;		/* target tmpnode */
 	struct tmount *tm = (struct tmount *)VTOTM(odvp);
 	int error;
 	int samedir = 0;	/* set if odvp == ndvp */
@@ -1259,13 +1259,17 @@ tmp_rename(
 			goto done;
 	}
 
-	if (tdirlookup(toparent, nnm, &totp, cred) == 0)
+	if (tdirlookup(toparent, nnm, &totp, cred) == 0) {
 		vnevent_pre_rename_dest(TNTOV(totp), ndvp, nnm, ct);
+		tmpnode_rele(totp);
+	}
 
 	/* Notify the target dir. if not the same as the source dir. */
 	if (ndvp != odvp) {
 		vnevent_pre_rename_dest_dir(ndvp, TNTOV(fromtp), nnm, ct);
 	}
+
+	vnevent_pre_rename_src(TNTOV(fromtp), odvp, onm, ct);
 
 	/*
 	 * Link source to new target
@@ -1286,8 +1290,6 @@ tmp_rename(
 			error = 0;
 		goto done;
 	}
-
-	vnevent_pre_rename_src(TNTOV(fromtp), odvp, onm, ct);
 
 	/*
 	 * Unlink from source.
@@ -1313,8 +1315,12 @@ tmp_rename(
 
 	if (error == 0) {
 		vnevent_rename_src(TNTOV(fromtp), odvp, onm, ct);
-		/* vnevent_rename_dest event emitted in tdirenter(). */
-		vnevent_rename_dest_dir(ndvp, TNTOV(fromtp), nnm, ct);
+		/*
+		 * vnevent_rename_dest is called in tdirenter().
+		 * Notify the target dir if not same as source dir.
+		 */
+		if (ndvp != odvp)
+			vnevent_rename_dest_dir(ndvp, TNTOV(fromtp), nnm, ct);
 	}
 
 done:

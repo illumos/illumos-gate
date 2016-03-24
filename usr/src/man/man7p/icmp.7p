@@ -31,7 +31,7 @@ parameter to the socket call, can be obtained from
 connectionless, and are normally used with the \fBt_sndudata\fR /
 \fBt_rcvudata\fR and the \fBsendto()\fR / \fBrecvfrom()\fR calls. In order to
 send \fBICMP\fR packets, a process needs the \fBPRIV_NET_ICMPACCESS\fR
-privilege. (See \fBprivileges\fR(5) for more on privileges.)
+privilege. (See \fBprivileges\fR(5) for more information on privileges.)
 .sp
 .LP
 Outgoing packets automatically have an Internet Protocol (\fBIP\fR) header

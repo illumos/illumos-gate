@@ -42,7 +42,7 @@ descriptors and sockets are connectionless and are normally used with the
 calls. They may also be used with the \fBsendmsg()\fR/\fBrecvgmsg()\fR calls
 when sending or receiving ancillary data. In order to send \fBICMP6\fR packets,
 a process needs the \fBPRIV_NET_ICMPACCESS\fR privilege. (See
-\fBprivileges\fR(5) for more on privileges.)
+\fBprivileges\fR(5) for more information on privileges.)
 .sp
 .LP
 Outgoing packets automatically have an Internet Protocol Version 6 (\fBIPv6\fR)

@@ -22,6 +22,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2015 Joyent, Inc.
  */
 
 /*
@@ -645,7 +646,6 @@ top:
 		newisdir = tpcp->pc_entry.pcd_attr & PCA_DIR;
 
 		brelse(slot.sl_bp);
-		vnevent_pre_rename_dest(PCTOV(tpcp), PCTOV(tdp), tnm, ctp);
 
 		/*
 		 * Error cases (from rename(2)):
@@ -661,6 +661,8 @@ top:
 				error = pc_dirremove(tdp, tnm,
 				    (struct vnode *)NULL, VREG, ctp);
 				if (error == 0) {
+					vnevent_rename_dest(PCTOV(tpcp),
+					    PCTOV(tdp), tnm, ctp);
 					VN_RELE(PCTOV(tpcp));
 					tpcp = NULL;
 					VN_RELE(PCTOV(pcp));
@@ -672,6 +674,8 @@ top:
 			error = pc_dirremove(tdp, tnm,
 			    (struct vnode *)NULL, VDIR, ctp);
 			if (error == 0) {
+				vnevent_rename_dest(PCTOV(tpcp), PCTOV(tdp),
+				    tnm, ctp);
 				VN_RELE(PCTOV(tpcp));
 				tpcp = NULL;
 				VN_RELE(PCTOV(pcp));
@@ -775,11 +779,6 @@ top:
 			goto done;
 		}
 
-		if (dp != tdp)
-			vnevent_pre_rename_dest_dir(PCTOV(tdp), PCTOV(pcp),
-			    tnm, ctp);
-		vnevent_pre_rename_src(PCTOV(pcp), PCTOV(dp), snm, ctp);
-
 		error = pc_makedirentry(tdp, direntries, ndirentries, NULL,
 		    offset);
 		kmem_free(direntries, ndirentries * sizeof (struct pcdir));
@@ -830,10 +829,10 @@ top:
 	}
 
 	if (error == 0) {
-		if (tpcp != NULL)
-			vnevent_rename_dest(PCTOV(tpcp), PCTOV(tdp), tnm, ctp);
 		vnevent_rename_src(PCTOV(pcp), PCTOV(dp), snm, ctp);
-		vnevent_rename_dest_dir(PCTOV(tdp), PCTOV(pcp), tnm, ctp);
+		if (dp != tdp)
+			vnevent_rename_dest_dir(PCTOV(tdp), PCTOV(pcp), tnm,
+			    ctp);
 	}
 
 done:
