@@ -529,11 +529,12 @@ void
 i40e_link_check(i40e_t *i40e)
 {
 	i40e_hw_t *hw = &i40e->i40e_hw_space;
-	boolean_t ls;
+	boolean_t ls, changed;
 	int ret;
 
 	ASSERT(MUTEX_HELD(&i40e->i40e_general_lock));
 
+	changed = B_FALSE;
 	hw->phy.get_link_info = B_TRUE;
 	if ((ret = i40e_get_link_status(hw, &ls)) != I40E_SUCCESS) {
 		i40e->i40e_s_link_status_errs++;
@@ -579,15 +580,20 @@ i40e_link_check(i40e_t *i40e)
 		 * operation, hence why we don't ask the hardware about our
 		 * current speed.
 		 */
+		if (i40e->i40e_link_state == LINK_STATE_DOWN)
+			changed = B_TRUE;
 		i40e->i40e_link_duplex = LINK_DUPLEX_FULL;
 		i40e->i40e_link_state = LINK_STATE_UP;
 	} else {
+		if (i40e->i40e_link_state == LINK_STATE_UP)
+			changed = B_TRUE;
 		i40e->i40e_link_speed = 0;
 		i40e->i40e_link_duplex = 0;
 		i40e->i40e_link_state = LINK_STATE_DOWN;
 	}
 
-	mac_link_update(i40e->i40e_mac_hdl, i40e->i40e_link_state);
+	if (changed == B_TRUE)
+		mac_link_update(i40e->i40e_mac_hdl, i40e->i40e_link_state);
 }
 
 static void
