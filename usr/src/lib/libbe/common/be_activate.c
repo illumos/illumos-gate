@@ -900,7 +900,6 @@ be_do_installboot_helper(zpool_handle_t *zphp, nvlist_t *child, char *stage1,
 		be_print_err(gettext("be_do_installboot: "
 		    "vdev %s is %s, can't install boot loader\n"),
 		    path, zpool_state_to_name(vs->vs_state, vs->vs_aux));
-		free(path);
 		return (BE_SUCCESS);
 	}
 
