@@ -52,6 +52,8 @@ outputdir = /var/tmp/test_results
 [/opt/libc-tests/tests/random/arc4key.ksh]
 
 [/opt/libc-tests/tests/catopen]
+[/opt/libc-tests/tests/env-OS-4089.32]
+[/opt/libc-tests/tests/env-OS-4089.64]
 [/opt/libc-tests/tests/priv_gettext]
 [/opt/libc-tests/tests/strerror]
 

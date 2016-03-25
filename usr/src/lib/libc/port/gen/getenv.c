@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
@@ -336,6 +337,16 @@ addtoenv(char *string, int overwrite)
 int
 putenv(char *string)
 {
+	/*
+	 * Historically a call to putenv() with no '=' in the string would work
+	 * great until someone called getenv() on that particular environment
+	 * variable again. As we've always treated this as valid, rather than
+	 * teaching the rest of the environment code how to handle something
+	 * without an '=' sign, it instead just calls unsetenv().
+	 */
+	if (strchr(string, '=') == NULL)
+		return (unsetenv(string));
+
 	return (addtoenv(string, 1));
 }
 

@@ -26,5 +26,51 @@ SUBDIRS = \
 	wcsrtombs \
 	wctype
 
-include $(SRC)/Makefile.master
-include $(SRC)/test/Makefile.com
+PROGS = \
+	env-OS-4089
+
+PROGS32 = $(PROGS:%=%.32)
+PROGS64 = $(PROGS:%=%.64)
+
+ROOTOPTDIR = $(ROOT)/opt/libc-tests/tests
+ROOTOPTPROGS = $(PROGS32:%=$(ROOTOPTDIR)/%) $(PROGS64:%=$(ROOTOPTDIR)/%)
+
+include $(SRC)/cmd/Makefile.cmd
+
+all     :=      TARGET = all
+install :=      TARGET = install
+clean   :=      TARGET = clean
+clobber :=      TARGET = clobber
+lint    :=      TARGET = lint
+
+.KEEP_STATE:
+
+install: $(SUBDIRS) $(ROOTOPTPROGS)
+
+all: $(SUBDIRS) $(PROGS32) $(PROGS64)
+
+clean lint: $(SUBDIRS)
+
+$(ROOTOPTPROGS): $(PROGS32) $(PROGS64) $(ROOTOPTDIR)
+
+$(ROOTOPTDIR):
+	$(INS.dir)
+
+$(ROOTOPTDIR)/%: %
+	$(INS.file)
+
+%.64: %.c
+	$(LINK.c) -m64 -o $@ $< $(LDLIBS64)
+	$(POST_PROCESS)
+
+%.32: %.c
+	$(LINK.c) -m32 -o $@ $< $(LDLIBS)
+	$(POST_PROCESS)
+
+clobber: $(SUBDIRS)
+	$(RM) $(PROGS32) $(PROGS64)
+
+$(SUBDIRS): FRC
+	@cd $@; pwd; $(MAKE) $(TARGET)
+
+FRC:
