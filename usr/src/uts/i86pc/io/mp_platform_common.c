@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.
  */
 /*
  * Copyright (c) 2010, Intel Corporation.
@@ -752,12 +753,15 @@ acpi_probe(char *modname)
 			 * 255 will have their APIC reported through
 			 * Processor Local APIC.
 			 */
-			if ((mpx2a->LapicFlags & ACPI_MADT_ENABLED) &&
-			    (mpx2a->LocalApicId >> 8)) {
+			if (mpx2a->LocalApicId < 255) {
+				cmn_err(CE_WARN, "!%s: ignoring invalid entry "
+				    "in MADT: CPU %d has X2APIC Id %d (< 255)",
+				    psm_name, mpx2a->Uid, mpx2a->LocalApicId);
+			} else if (mpx2a->LapicFlags & ACPI_MADT_ENABLED) {
 				if (apic_nproc < NCPU && use_mp &&
 				    apic_nproc < boot_ncpus) {
 					local_ids[index] = mpx2a->LocalApicId;
-					proc_ids[index] = mpa->ProcessorId;
+					proc_ids[index] = mpx2a->Uid;
 					index++;
 					apic_nproc++;
 				} else if (apic_nproc == NCPU && !warned) {
@@ -1332,7 +1336,7 @@ apic_checksum(caddr_t bptr, int len)
 /* this is the non-acpi version */
 int
 apic_handle_pci_pci_bridge(dev_info_t *idip, int child_devno, int child_ipin,
-			struct apic_io_intr **intrp)
+    struct apic_io_intr **intrp)
 {
 	dev_info_t *dipp, *dip;
 	int pci_irq;
