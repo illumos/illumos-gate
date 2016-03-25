@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2011, Joyent, Inc. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -166,9 +167,9 @@ cleanup_path(const char *input_path, char *path)
  */
 
 #ifdef	DEBUG
-static const char *optstring = "abcdDvVxpPFf:M:dLuC";
+static const char *optstring = "abcdDvVxmpPFf:M:dLuC";
 #else
-static const char *optstring = "abcdDvVxpPFf:uC";
+static const char *optstring = "abcdDvVxmpPFf:uC";
 #endif	/* DEBUG */
 
 int
@@ -200,6 +201,9 @@ main(int argc, char *argv[])
 			break;
 		case 'v':
 			++opts.o_verbose;
+			break;
+		case 'm':
+			++opts.o_memory;
 			break;
 		case 'p':
 			++opts.o_prominfo;
@@ -338,34 +342,41 @@ main(int argc, char *argv[])
 		return (0);
 	}
 
-	ret = sysinfo(SI_HW_PROVIDER, hw_provider, sizeof (hw_provider));
-	/*
-	 * If 0 bytes are returned (the system returns '1', for the \0),
-	 * we're probably on x86, default to "Unknown Hardware Vendor".
-	 */
-	if (ret <= 1) {
-		(void) strncpy(hw_provider, "Unknown Hardware Vendor",
+	if (!opts.o_memory) {
+		ret = sysinfo(SI_HW_PROVIDER, hw_provider,
 		    sizeof (hw_provider));
+		/*
+		 * If 0 bytes are returned (the system returns '1', for the \0),
+		 * we're probably on x86, default to "Unknown Hardware Vendor".
+		 */
+		if (ret <= 1) {
+			(void) strncpy(hw_provider, "Unknown Hardware Vendor",
+			    sizeof (hw_provider));
+		}
+		(void) printf("System Configuration:  %s  %s\n", hw_provider,
+		    opts.o_uts.machine);
 	}
-	(void) printf("System Configuration:  %s  %s\n", hw_provider,
-	    opts.o_uts.machine);
 
 	pagesize = sysconf(_SC_PAGESIZE);
 	npages = sysconf(_SC_PHYS_PAGES);
-	(void) printf("Memory size: ");
-	if (pagesize == -1 || npages == -1)
-		(void) printf("unable to determine\n");
-	else {
-		const int64_t kbyte = 1024;
+	if (pagesize == -1 || npages == -1) {
+		if (opts.o_memory) {
+			(void) printf("0\n");
+			return (1);
+		} else {
+			(void) printf("Memory size: unable to determine\n");
+		}
+	} else {
 		const int64_t mbyte = 1024 * 1024;
 		int64_t ii = (int64_t)pagesize * npages;
 
-		if (ii >= mbyte)
-			(void) printf("%ld Megabytes\n",
+		if (opts.o_memory) {
+			(void) printf("%ld\n", (long)((ii+mbyte-1) / mbyte));
+			return (0);
+		} else {
+			(void) printf("Memory size: %ld Megabytes\n",
 			    (long)((ii+mbyte-1) / mbyte));
-		else
-			(void) printf("%ld Kilobytes\n",
-			    (long)((ii+kbyte-1) / kbyte));
+		}
 	}
 
 	if (opts.o_prominfo) {

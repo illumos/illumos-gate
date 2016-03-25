@@ -54,6 +54,7 @@ struct prt_opts {
 	int o_drv_name;
 	int o_pseudodevs;
 	int o_fbname;
+	int o_memory;
 	int o_noheader;
 	int o_prominfo;
 	int o_productinfo;
