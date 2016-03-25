@@ -383,6 +383,14 @@ typedef struct zone_kstat {
 struct cpucap;
 
 typedef struct {
+	kstat_named_t	zm_zonename;
+	kstat_named_t	zm_pgpgin;
+	kstat_named_t	zm_anonpgin;
+	kstat_named_t	zm_execpgin;
+	kstat_named_t	zm_fspgin;
+} zone_mcap_kstat_t;
+
+typedef struct {
 	kstat_named_t	zm_zonename;	/* full name, kstat truncates name */
 	kstat_named_t	zm_utime;
 	kstat_named_t	zm_stime;
@@ -561,6 +569,14 @@ typedef struct zone {
 	rctl_qty_t	zone_nprocs_ctl;	/* current limit protected by */
 						/* zone_rctls->rcs_lock */
 	kstat_t		*zone_nprocs_kstat;
+
+	kmutex_t	zone_mcap_lock;	/* protects mcap statistics */
+	kstat_t		*zone_mcap_ksp;
+	zone_mcap_kstat_t *zone_mcap_stats;
+	uint64_t	zone_pgpgin;		/* pages paged in */
+	uint64_t	zone_anonpgin;		/* anon pages paged in */
+	uint64_t	zone_execpgin;		/* exec pages paged in */
+	uint64_t	zone_fspgin;		/* fs pages paged in */
 
 	/*
 	 * Misc. kstats and counters for zone cpu-usage aggregation.

@@ -1817,6 +1817,59 @@ zone_kstat_create_common(zone_t *zone, char *name,
 	return (ksp);
 }
 
+
+static int
+zone_mcap_kstat_update(kstat_t *ksp, int rw)
+{
+	zone_t *zone = ksp->ks_private;
+	zone_mcap_kstat_t *zmp = ksp->ks_data;
+
+	if (rw == KSTAT_WRITE)
+		return (EACCES);
+
+	zmp->zm_pgpgin.value.ui64 = zone->zone_pgpgin;
+	zmp->zm_anonpgin.value.ui64 = zone->zone_anonpgin;
+	zmp->zm_execpgin.value.ui64 = zone->zone_execpgin;
+	zmp->zm_fspgin.value.ui64 = zone->zone_fspgin;
+
+	return (0);
+}
+
+static kstat_t *
+zone_mcap_kstat_create(zone_t *zone)
+{
+	kstat_t *ksp;
+	zone_mcap_kstat_t *zmp;
+
+	if ((ksp = kstat_create_zone("memory_cap", zone->zone_id,
+	    zone->zone_name, "zone_memory_cap", KSTAT_TYPE_NAMED,
+	    sizeof (zone_mcap_kstat_t) / sizeof (kstat_named_t),
+	    KSTAT_FLAG_VIRTUAL, zone->zone_id)) == NULL)
+		return (NULL);
+
+	if (zone->zone_id != GLOBAL_ZONEID)
+		kstat_zone_add(ksp, GLOBAL_ZONEID);
+
+	zmp = ksp->ks_data = kmem_zalloc(sizeof (zone_mcap_kstat_t), KM_SLEEP);
+	ksp->ks_data_size += strlen(zone->zone_name) + 1;
+	ksp->ks_lock = &zone->zone_mcap_lock;
+	zone->zone_mcap_stats = zmp;
+
+	/* The kstat "name" field is not large enough for a full zonename */
+	kstat_named_init(&zmp->zm_zonename, "zonename", KSTAT_DATA_STRING);
+	kstat_named_setstr(&zmp->zm_zonename, zone->zone_name);
+	kstat_named_init(&zmp->zm_pgpgin, "pgpgin", KSTAT_DATA_UINT64);
+	kstat_named_init(&zmp->zm_anonpgin, "anonpgin", KSTAT_DATA_UINT64);
+	kstat_named_init(&zmp->zm_execpgin, "execpgin", KSTAT_DATA_UINT64);
+	kstat_named_init(&zmp->zm_fspgin, "fspgin", KSTAT_DATA_UINT64);
+
+	ksp->ks_update = zone_mcap_kstat_update;
+	ksp->ks_private = zone;
+
+	kstat_install(ksp);
+	return (ksp);
+}
+
 static int
 zone_misc_kstat_update(kstat_t *ksp, int rw)
 {
@@ -1903,6 +1956,11 @@ zone_kstat_create(zone_t *zone)
 	zone->zone_nprocs_kstat = zone_kstat_create_common(zone,
 	    "nprocs", zone_nprocs_kstat_update);
 
+	if ((zone->zone_mcap_ksp = zone_mcap_kstat_create(zone)) == NULL) {
+		zone->zone_mcap_stats = kmem_zalloc(
+		    sizeof (zone_mcap_kstat_t), KM_SLEEP);
+	}
+
 	if ((zone->zone_misc_ksp = zone_misc_kstat_create(zone)) == NULL) {
 		zone->zone_misc_stats = kmem_zalloc(
 		    sizeof (zone_misc_kstat_t), KM_SLEEP);
@@ -1931,6 +1989,8 @@ zone_kstat_delete(zone_t *zone)
 	    sizeof (zone_kstat_t));
 	zone_kstat_delete_common(&zone->zone_nprocs_kstat,
 	    sizeof (zone_kstat_t));
+	zone_kstat_delete_common(&zone->zone_mcap_ksp,
+	    sizeof (zone_mcap_kstat_t));
 	zone_kstat_delete_common(&zone->zone_misc_ksp,
 	    sizeof (zone_misc_kstat_t));
 }
