@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH MADVISE 3C "Feb 23, 2005"
+.TH MADVISE 3C "Mar 28, 2016"
 .SH NAME
 madvise \- provide advice to VM system
 .SH SYNOPSIS
@@ -16,13 +16,15 @@ madvise \- provide advice to VM system
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBmadvise()\fR function advises the kernel that a region of user mapped
 memory in the range [\fIaddr\fR, \fIaddr\fR + \fIlen\fR) will be accessed
 following a type of pattern. The kernel uses this information to optimize the
 procedure for manipulating and maintaining the resources associated with the
-specified mapping range.
+specified mapping range. In general (and true to the name of the function),
+the advice is merely advisory, and the only user-visible ramifications
+are in terms of performance, not semantics. Note that
+\fBMADV_PURGE\fR is an exception to this; see below for details.
 .sp
 .LP
 Values for \fIadvice\fR are defined in <\fBsys/mman.h\fR> as:
@@ -38,6 +40,7 @@ Values for \fIadvice\fR are defined in <\fBsys/mman.h\fR> as:
 #define MADV_ACCESS_DEFAULT   0x6  /* default access */
 #define MADV_ACCESS_LWP       0x7  /* next LWP to access heavily */
 #define MADV_ACCESS_MANY      0x8  /* many processes to access heavily */
+#define MADV_PURGE            0x9  /* contents will be purged */
 .fi
 .in -2
 
@@ -99,6 +102,12 @@ kernel would need to read in from the file.
 .RS 23n
 Tell the kernel that the specified address range is no longer needed, so the
 system starts to free the resources associated with the address range.
+While the semantics of \fBMADV_DONTNEED\fR are similar to other systems,
+they differ significantly from the semantics on Linux, where
+\fBMADV_DONTNEED\fR will actually synchronously purge the address range,
+and subsequent faults will load from either backing store or be
+zero-filled on demand. If the peculiar Linux semantics are
+desired, \fBMADV_PURGE\fR should be used in lieu of \fBMADV_DONTNEED\fR.
 .RE
 
 .sp
@@ -117,6 +126,26 @@ the system read from backing store (swap space) until the page is modified
 again.
 .sp
 This value cannot be used on mappings that have underlying file objects.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBMADV_PURGE\fR\fR
+.ad
+.RS 23n
+Tell the kernel to purge the specified address range.  The mapping will
+be retained, but the pages themselves will be destroyed; subsequent
+faults on the range will result in the page being read from backing
+store (if file-backed) or being zero-filled on demand (if anonymous).  Note
+that these semantics are generally inferior to \fBMADV_FREE\fR, which gives the
+system more flexibility and results in better performance
+when pages are, in fact, reused by the caller. Indeed, \fBMADV_PURGE\fR only
+exists to provide an equivalent to the unfortunate
+\fBMADV_DONTNEED\fR semantics found in Linux, upon which some programs
+have (regrettably) come to depend. In de novo applications,
+\fBMADV_PURGE\fR should be avoided; \fBMADV_FREE\fR should always be
+preferred.
 .RE
 
 .sp
@@ -157,12 +186,10 @@ The \fBmadvise()\fR function should be used by applications with specific
 knowledge of their access patterns over a memory object, such as a mapped file,
 to increase system performance.
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, \fBmadvise()\fR returns \fB0\fR; otherwise, it
 returns \fB\(mi1\fR and sets \fBerrno\fR to indicate the error.
 .SH ERRORS
-.sp
 .ne 2
 .na
 \fB\fBEAGAIN\fR\fR
@@ -235,7 +262,6 @@ Stale \fBNFS\fR file handle.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -253,6 +279,5 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBmeminfo\fR(2), \fBmmap\fR(2), \fBsysconf\fR(3C), \fBattributes\fR(5)

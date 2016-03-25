@@ -845,6 +845,7 @@ prt_mad(private_t *pri, int raw, long val)	/* print madvise() argument */
 		case MADV_ACCESS_DEFAULT: s = "MADV_ACCESS_DEFAULT";	break;
 		case MADV_ACCESS_LWP:	s = "MADV_ACCESS_LWP";	break;
 		case MADV_ACCESS_MANY:	s = "MADV_ACCESS_MANY";	break;
+		case MADV_PURGE:	s = "MADV_PURGE";	break;
 		}
 	}
 

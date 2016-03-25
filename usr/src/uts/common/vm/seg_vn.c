@@ -8043,7 +8043,7 @@ out:
 
 /*
  * Set advice from user for specified pages
- * There are 9 types of advice:
+ * There are 10 types of advice:
  *	MADV_NORMAL	- Normal (default) behavior (whatever that is)
  *	MADV_RANDOM	- Random page references
  *				do not allow readahead or 'klustering'
@@ -8057,6 +8057,7 @@ out:
  *	MADV_ACCESS_DEFAULT- Default access
  *	MADV_ACCESS_LWP	- Next LWP will access heavily
  *	MADV_ACCESS_MANY- Many LWPs or processes will access heavily
+ *	MADV_PURGE	- Contents will be immediately discarded
  */
 static int
 segvn_advise(struct seg *seg, caddr_t addr, size_t len, uint_t behav)
@@ -8075,10 +8076,10 @@ segvn_advise(struct seg *seg, caddr_t addr, size_t len, uint_t behav)
 	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as));
 
 	/*
-	 * In case of MADV_FREE, we won't be modifying any segment private
-	 * data structures; so, we only need to grab READER's lock
+	 * In case of MADV_FREE/MADV_PURGE, we won't be modifying any segment
+	 * private data structures; so, we only need to grab READER's lock
 	 */
-	if (behav != MADV_FREE) {
+	if (behav != MADV_FREE && behav != MADV_PURGE) {
 		SEGVN_LOCK_ENTER(seg->s_as, &svd->lock, RW_WRITER);
 		if (svd->tr_state != SEGVN_TR_OFF) {
 			SEGVN_LOCK_EXIT(seg->s_as, &svd->lock);
@@ -8154,27 +8155,65 @@ segvn_advise(struct seg *seg, caddr_t addr, size_t len, uint_t behav)
 
 	amp = svd->amp;
 	vp = svd->vp;
-	if (behav == MADV_FREE) {
-		/*
-		 * MADV_FREE is not supported for segments with
-		 * underlying object; if anonmap is NULL, anon slots
-		 * are not yet populated and there is nothing for
-		 * us to do. As MADV_FREE is advisory, we don't
-		 * return error in either case.
-		 */
-		if (vp != NULL || amp == NULL) {
+	if (behav == MADV_FREE || behav == MADV_PURGE) {
+		pgcnt_t purged;
+
+		if (behav == MADV_FREE && (vp != NULL || amp == NULL)) {
+			/*
+			 * MADV_FREE is not supported for segments with an
+			 * underlying object; if anonmap is NULL, anon slots
+			 * are not yet populated and there is nothing for us
+			 * to do. As MADV_FREE is advisory, we don't return an
+			 * error in either case.
+			 */
 			SEGVN_LOCK_EXIT(seg->s_as, &svd->lock);
 			return (0);
+		}
+
+		if (amp == NULL) {
+			/*
+			 * If we're here with a NULL anonmap, it's because we
+			 * are doing a MADV_PURGE.  We have nothing to do, but
+			 * because MADV_PURGE isn't merely advisory, we return
+			 * an error in this case.
+			 */
+			SEGVN_LOCK_EXIT(seg->s_as, &svd->lock);
+			return (EBUSY);
 		}
 
 		segvn_purge(seg);
 
 		page = seg_page(seg, addr);
 		ANON_LOCK_ENTER(&amp->a_rwlock, RW_READER);
-		anon_disclaim(amp, svd->anon_index + page, len);
+		err = anon_disclaim(amp,
+		    svd->anon_index + page, len, behav, &purged);
+
+		if (purged != 0 && (svd->flags & MAP_NORESERVE)) {
+			/*
+			 * If we purged pages on a MAP_NORESERVE mapping, we
+			 * need to be sure to now unreserve our reserved swap.
+			 * (We use the atomic operations to manipulate our
+			 * segment and address space counters because we only
+			 * have the corresponding locks held as reader, not
+			 * writer.)
+			 */
+			ssize_t bytes = ptob(purged);
+
+			anon_unresv_zone(bytes, seg->s_as->a_proc->p_zone);
+			atomic_add_long(&svd->swresv, -bytes);
+			atomic_add_long(&seg->s_as->a_resvsize, -bytes);
+		}
+
 		ANON_LOCK_EXIT(&amp->a_rwlock);
 		SEGVN_LOCK_EXIT(seg->s_as, &svd->lock);
-		return (0);
+
+		/*
+		 * MADV_PURGE and MADV_FREE differ in their return semantics:
+		 * because MADV_PURGE is designed to be bug-for-bug compatible
+		 * with its clumsy Linux forebear, it will fail where MADV_FREE
+		 * does not.
+		 */
+		return (behav == MADV_PURGE ? err : 0);
 	}
 
 	/*
@@ -8279,6 +8318,7 @@ segvn_advise(struct seg *seg, caddr_t addr, size_t len, uint_t behav)
 		case MADV_WILLNEED:	/* handled in memcntl */
 		case MADV_DONTNEED:	/* handled in memcntl */
 		case MADV_FREE:		/* handled above */
+		case MADV_PURGE:	/* handled above */
 			break;
 		default:
 			err = EINVAL;
@@ -8514,6 +8554,7 @@ segvn_advise(struct seg *seg, caddr_t addr, size_t len, uint_t behav)
 		case MADV_WILLNEED:	/* handled in memcntl */
 		case MADV_DONTNEED:	/* handled in memcntl */
 		case MADV_FREE:		/* handled above */
+		case MADV_PURGE:	/* handled above */
 			break;
 		default:
 			err = EINVAL;

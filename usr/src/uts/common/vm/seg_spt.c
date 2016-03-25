@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015, Joyent, Inc. All rights reserved.
  */
 
 #include <sys/param.h>
@@ -2859,7 +2860,7 @@ segspt_shmadvise(struct seg *seg, caddr_t addr, size_t len, uint_t behav)
 
 	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as));
 
-	if (behav == MADV_FREE) {
+	if (behav == MADV_FREE || behav == MADV_PURGE) {
 		if ((sptd->spt_flags & SHM_PAGEABLE) == 0)
 			return (0);
 
@@ -2870,7 +2871,7 @@ segspt_shmadvise(struct seg *seg, caddr_t addr, size_t len, uint_t behav)
 		if ((ppa = sptd->spt_ppa) == NULL) {
 			mutex_exit(&sptd->spt_lock);
 			ANON_LOCK_ENTER(&amp->a_rwlock, RW_READER);
-			anon_disclaim(amp, pg_idx, len);
+			(void) anon_disclaim(amp, pg_idx, len, behav, NULL);
 			ANON_LOCK_EXIT(&amp->a_rwlock);
 			return (0);
 		}
@@ -2928,7 +2929,7 @@ segspt_shmadvise(struct seg *seg, caddr_t addr, size_t len, uint_t behav)
 		}
 
 		ANON_LOCK_ENTER(&amp->a_rwlock, RW_READER);
-		anon_disclaim(amp, pg_idx, len);
+		(void) anon_disclaim(amp, pg_idx, len, behav, NULL);
 		ANON_LOCK_EXIT(&amp->a_rwlock);
 	} else if (lgrp_optimizations() && (behav == MADV_ACCESS_LWP ||
 	    behav == MADV_ACCESS_MANY || behav == MADV_ACCESS_DEFAULT)) {
