@@ -680,6 +680,7 @@ lx_remap(uintptr_t old_address, uintptr_t old_size,
 		rval = -EINVAL;
 		goto out;
 	}
+	(void) close(fd);
 
 	nmap = n / sizeof (prmap_t);
 	lx_debug("\tfound %d mappings", nmap);
@@ -705,8 +706,6 @@ lx_remap(uintptr_t old_address, uintptr_t old_size,
 			goto out;
 		}
 	}
-
-	(void) close(fd);
 
 	if (i == nmap) {
 		lx_debug("\tno matching mapping found");
