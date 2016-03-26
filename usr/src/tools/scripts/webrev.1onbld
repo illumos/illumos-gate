@@ -22,7 +22,7 @@
 .\" Use is subject to license terms.
 .\"
 .\"
-.TH WEBREV 1ONBLD "Feb 7, 2014"
+.TH WEBREV 1ONBLD "Mar 27, 2016"
 .SH NAME
 webrev \- Generate HTML codereview materials
 .SH SYNOPSIS
@@ -180,6 +180,9 @@ in /opt/onbld/etc/its.conf.  These file formats are self documenting.  Also
 see the -I and -C options below.
 .SH OPTIONS
 .TP 10
+.BI "-c " revision
+Generate webrev for single commit specified by \fIrevision\fR (git only).
+.TP 10
 .BI "-C " priority-file
 In addition to the system default and an optional user-supplied ~/.its.conf,
 use the specified file to specify a local domain list and prioritize the list
@@ -197,6 +200,9 @@ moving the webrev to special directory in user's home directory. It is
 expected that the remote host periodically runs a script which deletes
 the contents of this directory. See the ENVIRONMENT VARIABLES section for
 more details about this directory.
+.TP 10
+.BI "-h " head-revision
+Specify the explicit head to generate webrev from (git only).
 .TP 10
 .BI "-I " information-file
 Use the specified file to seed the list of information tracking systems.
