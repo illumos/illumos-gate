@@ -156,6 +156,15 @@ extern "C" {
 #define	I40E_TX_MAX_COOKIE	8
 
 /*
+ * Sizing to determine the amount of available descriptors at which we'll
+ * consider ourselves blocked. Also, when we have these available, we'll then
+ * consider ourselves available to transmit to MAC again. Strictly speaking, the
+ * MAX is based on the ring size. The default sizing is based on ixgbe.
+ */
+#define	I40E_MIN_TX_BLOCK_THRESH	I40E_TX_MAX_COOKIE
+#define	I40E_DEF_TX_BLOCK_THRESH	I40E_MIN_TX_BLOCK_THRESH
+
+/*
  * Resource sizing counts. There are various aspects of hardware where we may
  * have some variable number of elements that we need to handle. Such as the
  * hardware capabilities and switch capacities. We cannot know a priori how many
@@ -749,6 +758,7 @@ typedef struct i40e {
 	uint32_t	i40e_rx_limit_per_intr;
 	uint32_t	i40e_tx_ring_size;
 	uint32_t	i40e_tx_buf_size;
+	uint32_t	i40e_tx_block_thresh;
 	boolean_t	i40e_tx_hcksum_enable;
 
 	/*

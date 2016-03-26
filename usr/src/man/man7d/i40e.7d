@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2016 Joyent, Inc.
 .\"
-.Dd February 02, 2016
+.Dd March 25, 2016
 .Dt I40E 7D
 .Os
 .Sh NAME
@@ -167,6 +167,23 @@ transmit ring on the card. Administrators should not normally need to
 tune this value. Hardware requires that the ring size be a multiple of
 32. The system will round up the set value to the nearest multiple of
 32.
+.Ed
+.It Sy tx_resched_threshold
+.Bd -filled -compact
+Minimum:
+.Sy 8 |
+Maximum:
+.Sy Variable
+.Ed
+.Bd -filled
+The
+.Sy tx_resched_threshold
+property determines the number of descriptors that must be available for
+a frame to be transmitted. The maximum is variable. It is dependent on
+the value of the
+.Sy tx_ring_size
+property. At least eight descriptors must be available for the device to
+function correctly.
 .Ed
 .It Sy rx_limit_per_intr
 .Bd -filled -compact

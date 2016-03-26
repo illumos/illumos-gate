@@ -1502,6 +1502,11 @@ i40e_init_properties(i40e_t *i40e)
 		    I40E_DESC_ALIGN);
 	}
 
+	i40e->i40e_tx_block_thresh = i40e_get_prop(i40e, "tx_resched_threshold",
+	    I40E_MIN_TX_BLOCK_THRESH,
+	    i40e->i40e_tx_ring_size - I40E_TX_MAX_COOKIE,
+	    I40E_DEF_TX_BLOCK_THRESH);
+
 	i40e->i40e_rx_ring_size = i40e_get_prop(i40e, "rx_ring_size",
 	    I40E_MIN_RX_RING_SIZE, I40E_MAX_RX_RING_SIZE,
 	    I40E_DEF_RX_RING_SIZE);

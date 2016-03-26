@@ -1847,9 +1847,6 @@ i40e_tx_cleanup_ring(i40e_trqpair_t *itrq)
 	/*
 	 * Because we should have shut down the chip at this point, it should be
 	 * safe to just clean up all the entries between our head and tail.
-	 *
-	 * XXX This should probably just check I40E_QTX_ENA_QENA_REQ_MASK due to
-	 * stalls.
 	 */
 #ifdef	DEBUG
 	index = I40E_READ_REG(&itrq->itrq_i40e->i40e_hw_space,
@@ -1944,6 +1941,14 @@ i40e_tx_recycle_ring(i40e_trqpair_t *itrq)
 	itrq->itrq_desc_head = wbhead;
 	itrq->itrq_desc_free += count;
 	ASSERT(itrq->itrq_desc_free <= itrq->itrq_tx_ring_size);
+
+	if (itrq->itrq_tx_blocked == B_TRUE &&
+	    itrq->itrq_desc_free > i40e->i40e_tx_block_thresh) {
+		itrq->itrq_tx_blocked = B_FALSE;
+
+		mac_tx_ring_update(i40e->i40e_mac_hdl, itrq->itrq_mactxring);
+		itrq->itrq_txstat.itxs_num_unblocked.value.ui64++;
+	}
 
 	mutex_exit(&itrq->itrq_tx_lock);
 }
@@ -2053,7 +2058,7 @@ i40e_ring_tx(void *arg, mblk_t *mp)
 	I40E_DMA_SYNC(&tcb->tcb_dma, DDI_DMA_SYNC_FORDEV);
 
 	mutex_enter(&itrq->itrq_tx_lock);
-	if (itrq->itrq_desc_free < 1) {
+	if (itrq->itrq_desc_free < i40e->i40e_tx_block_thresh) {
 		txs->itxs_err_nodescs.value.ui64++;
 		mutex_exit(&itrq->itrq_tx_lock);
 		goto txfail;
