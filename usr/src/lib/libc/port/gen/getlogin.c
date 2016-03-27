@@ -35,7 +35,6 @@
 #include "lint.h"
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <sys/sysmacros.h>
 #include <fcntl.h>
 #include <string.h>
 #include <stdlib.h>
