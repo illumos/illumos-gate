@@ -672,13 +672,13 @@ brand_solaris_elfexec(vnode_t *vp, execa_t *uap, uarg_t *args,
 	orig_sigaltstack.ss_flags = lwp->lwp_sigaltstack.ss_flags;
 
 	if (args->to_model == DATAMODEL_NATIVE) {
-		err = elfexec(nvp, uap, args, idatap, level + 1, execsz,
+		err = elfexec(nvp, uap, args, idatap, INTP_MAXDEPTH + 1, execsz,
 		    setid, exec_file, cred, brand_action);
 	}
 #if defined(_LP64)
 	else {
-		err = elf32exec(nvp, uap, args, idatap, level + 1, execsz,
-		    setid, exec_file, cred, brand_action);
+		err = elf32exec(nvp, uap, args, idatap, INTP_MAXDEPTH + 1,
+		    execsz, setid, exec_file, cred, brand_action);
 	}
 #endif  /* _LP64 */
 	VN_RELE(nvp);
