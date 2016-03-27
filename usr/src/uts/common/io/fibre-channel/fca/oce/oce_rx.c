@@ -532,7 +532,8 @@ oce_drain_rq_cq(void *arg)
 			if (dev->function_mode & FLEX10_MODE) {
 				if (cqe->u0.s.vlan_tag_present &&
 				    cqe->u0.s.qnq) {
-					oce_rx_insert_tag(mp, cqe->u0.s.vlan_tag);
+					oce_rx_insert_tag(mp,
+					    cqe->u0.s.vlan_tag);
 				}
 			} else if (cqe->u0.s.vlan_tag_present) {
 				oce_rx_insert_tag(mp, cqe->u0.s.vlan_tag);
