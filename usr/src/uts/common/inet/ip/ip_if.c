@@ -25,9 +25,6 @@
  * Copyright 2013 Joyent, Inc.
  * Copyright (c) 2014, OmniTI Computer Consulting, Inc. All rights reserved.
  */
-/*
- * Copyright (c) 2013, Joyent, Inc. All rights reserved.
- */
 
 /*
  * This file contains the interface control functions for IP.
