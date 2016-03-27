@@ -64,7 +64,6 @@
 #include <sys/contract/process_impl.h>
 #include <sys/ddi.h>
 
-extern int yield(void);
 /*
  * Processes running within a zone potentially dump core in 3 locations,
  * based on the per-process, per-zone, and the global zone's core settings.
