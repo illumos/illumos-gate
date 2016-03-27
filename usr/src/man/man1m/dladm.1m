@@ -1,6 +1,6 @@
 '\" te
 .\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
-.\" Copyright (c) 2014, Joyent, Inc. All Rights Reserved
+.\" Copyright 2016 Joyent, Inc.
 .\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text
 .\" are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical
@@ -130,9 +130,10 @@ dladm \- administer data links
 
 .LP
 .nf
-\fBdladm create-iptun\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] \fB-T\fR \fItype\fR [\fB-s\fR \fItsrc\fR] [\fB-d\fR \fItdst\fR]
+\fBdladm create-iptun\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] \fB-T\fR \fItype\fR
+    [-a {local|remote}=<addr>[,...]] \fIiptun-link\fR
+\fBdladm modify-iptun\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] [-a {local|remote}=<addr>[,...]]
      \fIiptun-link\fR
-\fBdladm modify-iptun\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] [\fB-s\fR \fItsrc\fR] [\fB-d\fR \fItdst\fR] \fIiptun-link\fR
 \fBdladm delete-iptun\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] \fIiptun-link\fR
 \fBdladm show-iptun\fR [\fB-P\fR] [[\fB-p\fR] \fB-o\fR \fIfield\fR[,...]] [\fIiptun-link\fR]
 .fi
@@ -3995,7 +3996,7 @@ Show all configured etherstubs by default, or the specified etherstub if
 .ne 2
 .na
 \fB\fBdladm create-iptun\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] \fB-T\fR
-\fItype\fR [\fB-s\fR \fItsrc\fR] [\fB-d\fR \fItdst\fR] \fIiptun-link\fR\fR
+\fItype\fR [-a {local|remote}=<addr>[,...]] \fIiptun-link\fR\fR
 .ad
 .sp .6
 .RS 4n
@@ -4080,7 +4081,7 @@ plumbed on such a tunnel link to configure a 6to4 router.
 .sp
 .ne 2
 .na
-\fB\fB-s\fR \fItsrc\fR, \fB--tunnel-src\fR=\fItsrc\fR\fR
+\fB\fB-a\fR \fBlocal=\fR\fIaddr\fR
 .ad
 .sp .6
 .RS 4n
@@ -4094,7 +4095,7 @@ important that any hostname used be included in \fB/etc/hosts\fR.
 .sp
 .ne 2
 .na
-\fB\fB-d\fR \fItdst\fR, \fB--tunnel-dst\fR=\fItdst\fR\fR
+\fB\fB-a\fR \fBremote=\fR\fIaddr\fR
 .ad
 .sp .6
 .RS 4n
@@ -4106,8 +4107,8 @@ Literal IP address or hostname corresponding to the tunnel destination.
 .sp
 .ne 2
 .na
-\fB\fBdladm modify-iptun\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] [\fB-s\fR
-\fItsrc\fR] [\fB-d\fR \fItdst\fR] \fIiptun-link\fR\fR
+\fB\fBdladm modify-iptun\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR]
+[-a {local|remote}=<addr>[,...]] \fIiptun-link\fR\fR
 .ad
 .sp .6
 .RS 4n
@@ -4136,7 +4137,7 @@ See "Options," above.
 .sp
 .ne 2
 .na
-\fB\fB-s\fR \fItsrc\fR, \fB--tunnel-src\fR=\fItsrc\fR\fR
+\fB\fB-a\fR \fBlocal=\fR\fIaddr\fR
 .ad
 .sp .6
 .RS 4n
@@ -4147,7 +4148,7 @@ description.
 .sp
 .ne 2
 .na
-\fB\fB-d\fR \fItdst\fR, \fB--tunnel-dst\fR=\fItdst\fR\fR
+\fB\fB-a\fR \fBremote=\fR\fIaddr\fR
 .ad
 .sp .6
 .RS 4n
