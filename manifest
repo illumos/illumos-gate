@@ -554,6 +554,7 @@ f kernel/drv/amd64/arp 0755 root sys
 f kernel/drv/amd64/asy 0755 root sys
 f kernel/drv/amd64/ata 0755 root sys
 f kernel/drv/amd64/atge 0755 root sys
+f kernel/drv/amd64/audio 0755 root sys
 f kernel/drv/amd64/axf 0755 root sys
 f kernel/drv/amd64/bcm_sata 0755 root sys
 f kernel/drv/amd64/bfe 0755 root sys
@@ -696,6 +697,9 @@ f kernel/drv/amd64/udp 0755 root sys
 f kernel/drv/amd64/udp6 0755 root sys
 f kernel/drv/amd64/ugen 0755 root sys
 f kernel/drv/amd64/uhci 0755 root sys
+f kernel/drv/amd64/usb_ac 0755 root sys
+f kernel/drv/amd64/usb_as 0755 root sys
+f kernel/drv/amd64/usb_ia 0755 root sys
 f kernel/drv/amd64/usb_mid 0755 root sys
 f kernel/drv/amd64/usbecm 0755 root sys
 f kernel/drv/amd64/usbftdi 0755 root sys
@@ -718,6 +722,7 @@ f kernel/drv/amd64/vr 0755 root sys
 f kernel/drv/amd64/vscan 0755 root sys
 f kernel/drv/amd64/wc 0755 root sys
 f kernel/drv/amd64/xge 0755 root sys
+f kernel/drv/amd64/xhci 0755 root sys
 f kernel/drv/amd64/yge 0755 root sys
 f kernel/drv/amd64/zfs 0755 root sys
 f kernel/drv/amr.conf 0644 root sys
@@ -725,6 +730,7 @@ f kernel/drv/arcmsr.conf 0644 root sys
 f kernel/drv/arp.conf 0644 root sys
 f kernel/drv/asy.conf 0644 root sys
 f kernel/drv/ata.conf 0644 root sys
+f kernel/drv/audio.conf 0644 root sys
 f kernel/drv/bge.conf 0644 root sys
 f kernel/drv/bl.conf 0644 root sys
 f kernel/drv/bnx.conf 0644 root sys
@@ -843,6 +849,7 @@ f kernel/drv/vnd.conf 0644 root sys
 f kernel/drv/vnic.conf 0644 root sys
 f kernel/drv/vscan.conf 0644 root sys
 f kernel/drv/wc.conf 0644 root sys
+f kernel/drv/xhci.conf 0644 root sys
 f kernel/drv/zfs.conf 0644 root sys
 d kernel/dtrace 0755 root sys
 d kernel/dtrace/amd64 0755 root sys
@@ -961,6 +968,7 @@ f kernel/kmdb/amd64/sv 0555 root sys
 f kernel/kmdb/amd64/ufs 0555 root sys
 f kernel/kmdb/amd64/uhci 0555 root sys
 f kernel/kmdb/amd64/usba 0555 root sys
+f kernel/kmdb/amd64/xhci 0555 root sys
 f kernel/kmdb/amd64/zfs 0555 root sys
 d kernel/mac 0755 root sys
 d kernel/mac/amd64 0755 root sys
@@ -9588,6 +9596,7 @@ f usr/lib/mdb/kvm/amd64/sv.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/ufs.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/uhci.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/usba.so 0555 root sys
+f usr/lib/mdb/kvm/amd64/xhci.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/zfs.so 0555 root sys
 f usr/lib/mdb/kvm/arp.so 0555 root sys
 f usr/lib/mdb/kvm/cpc.so 0555 root sys
@@ -9646,6 +9655,7 @@ f usr/lib/mdb/kvm/sv.so 0555 root sys
 f usr/lib/mdb/kvm/ufs.so 0555 root sys
 f usr/lib/mdb/kvm/uhci.so 0555 root sys
 f usr/lib/mdb/kvm/usba.so 0555 root sys
+f usr/lib/mdb/kvm/xhci.so 0555 root sys
 f usr/lib/mdb/kvm/zfs.so 0555 root sys
 d usr/lib/mdb/proc 0755 root sys
 d usr/lib/mdb/proc/amd64 0755 root sys
@@ -10140,6 +10150,8 @@ f usr/lib/vtdaemon 0555 root bin
 f usr/lib/vtinfo 0555 root bin
 f usr/lib/vtxlock 0555 root bin
 f usr/lib/watchmalloc.so.1 0755 root bin
+d usr/lib/xhci 0755 root bin
+f usr/lib/xhci/xhci_portsc 0555 root bin
 d usr/lib/zfs 0755 root bin
 f usr/lib/zfs/availdevs 0555 root bin
 d usr/lib/zones 0755 root bin
@@ -20205,6 +20217,7 @@ f usr/share/man/man9f/usb_client_attach.9f 0444 root bin
 s usr/share/man/man9f/usb_client_detach.9f=usb_client_attach.9f
 f usr/share/man/man9f/usb_clr_feature.9f 0444 root bin
 f usr/share/man/man9f/usb_create_pm_components.9f 0444 root bin
+f usr/share/man/man9f/usb_ep_xdescr_fill.9f 0444 root bin
 s usr/share/man/man9f/usb_free_bulk_req.9f=usb_alloc_request.9f
 s usr/share/man/man9f/usb_free_ctrl_req.9f=usb_alloc_request.9f
 s usr/share/man/man9f/usb_free_descr_tree.9f=usb_get_dev_data.9f
@@ -20234,7 +20247,8 @@ s usr/share/man/man9f/usb_pipe_get_private.9f=usb_pipe_set_private.9f
 f usr/share/man/man9f/usb_pipe_get_state.9f 0444 root bin
 f usr/share/man/man9f/usb_pipe_intr_xfer.9f 0444 root bin
 f usr/share/man/man9f/usb_pipe_isoc_xfer.9f 0444 root bin
-f usr/share/man/man9f/usb_pipe_open.9f 0444 root bin
+s usr/share/man/man9f/usb_pipe_open.9f=usb_pipe_xopen.9f
+f usr/share/man/man9f/usb_pipe_xopen.9f 0444 root bin
 f usr/share/man/man9f/usb_pipe_reset.9f 0444 root bin
 f usr/share/man/man9f/usb_pipe_set_private.9f 0444 root bin
 s usr/share/man/man9f/usb_pipe_stop_intr_polling.9f=usb_pipe_intr_xfer.9f
@@ -20334,18 +20348,29 @@ f usr/share/man/man9s/streamtab.9s 0444 root bin
 f usr/share/man/man9s/stroptions.9s 0444 root bin
 f usr/share/man/man9s/tuple.9s 0444 root bin
 f usr/share/man/man9s/uio.9s 0444 root bin
-f usr/share/man/man9s/usb_bulk_request.9s 0444 root bin
+s usr/share/man/man9s/usb_bulk_req_t.9s=usb_bulk_req.9s
+f usr/share/man/man9s/usb_bulk_req.9s 0444 root bin
+s usr/share/man/man9s/usb_bulk_request.9s=usb_bulk_req.9s
 f usr/share/man/man9s/usb_callback_flags.9s 0444 root bin
 f usr/share/man/man9s/usb_cfg_descr.9s 0444 root bin
 f usr/share/man/man9s/usb_client_dev_data.9s 0444 root bin
 f usr/share/man/man9s/usb_completion_reason.9s 0444 root bin
-f usr/share/man/man9s/usb_ctrl_request.9s 0444 root bin
+s usr/share/man/man9s/usb_ctrl_req_t.9s=usb_ctrl_req.9s
+f usr/share/man/man9s/usb_ctrl_req.9s 0444 root bin
+s usr/share/man/man9s/usb_ctrl_request.9s=usb_ctrl_req.9s
 f usr/share/man/man9s/usb_dev_descr.9s 0444 root bin
 f usr/share/man/man9s/usb_dev_qlf_descr.9s 0444 root bin
 f usr/share/man/man9s/usb_ep_descr.9s 0444 root bin
+f usr/share/man/man9s/usb_ep_xdescr.9s 0444 root bin
+f usr/share/man/man9s/usb_ep_ss_comp_descr.9s 0444 root bin
+s usr/share/man/man9s/usb_ep_ss_comp_descr_t.9s=usb_ep_ss_comp_descr
 f usr/share/man/man9s/usb_if_descr.9s 0444 root bin
-f usr/share/man/man9s/usb_intr_request.9s 0444 root bin
-f usr/share/man/man9s/usb_isoc_request.9s 0444 root bin
+s usr/share/man/man9s/usb_intr_req_t.9s=usb_intr_req.9s
+f usr/share/man/man9s/usb_intr_req.9s 0444 root bin
+s usr/share/man/man9s/usb_intr_request.9s=usb_intr_req.9s
+s usr/share/man/man9s/usb_isoc_req_t.9s=usb_isoc_req.9s
+f usr/share/man/man9s/usb_isoc_req.9s 0444 root bin
+s usr/share/man/man9s/usb_isoc_request.9s=usb_isoc_req.9s
 f usr/share/man/man9s/usb_other_speed_cfg_descr.9s 0444 root bin
 f usr/share/man/man9s/usb_request_attributes.9s 0444 root bin
 f usr/share/man/man9s/usb_string_descr.9s 0444 root bin

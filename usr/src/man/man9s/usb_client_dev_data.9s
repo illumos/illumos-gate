@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH USB_CLIENT_DEV_DATA 9S "Jan 5, 2004"
+.TH USB_CLIENT_DEV_DATA 9S "Oct 30, 2016"
 .SH NAME
 usb_client_dev_data \- Device configuration information
 .SH SYNOPSIS
@@ -13,11 +13,9 @@ usb_client_dev_data \- Device configuration information
 .fi
 
 .SH INTERFACE LEVEL
-.sp
 .LP
 Solaris DDI specific (Solaris DDI)
 .SH DESCRIPTION
-.sp
 .LP
 The usb_client_dev_data_t structure carries all device configuration
 information. It is provided to a USB client driver through a call to
@@ -142,7 +140,7 @@ devices.
 .LP
 The descriptor tree, returned by dev_cfg, makes a device's parsed standard USB
 descriptors available to the driver. The tree is designed to be easily
-traversed to get any or all standard \fIUSB 2.0\fR descriptors.  (See the "Tree
+traversed to get any or all standard \fIUSB 3.0\fR descriptors.  (See the "Tree
 Structure" section of this manpage below.)  dev_n_cfg returns the number of
 configurations in the tree. Note that this value may differ from the number of
 configurations returned in the device descriptor.
@@ -161,10 +159,9 @@ USB_PARSE_LVL_NONE is returned when no tree is returned. Note that the value of
 this field can differ from the parse_level requested as an argument to
 \fBusb_get_dev_data()\fR.
 .SS "TREE STRUCTURE"
-.sp
 .LP
 The root of the tree is dev_cfg, an array of usb_cfg_data_t configuration
-nodes, each representing one device configuration. The         array index does
+nodes, each representing one device configuration. The array index does
 not correspond to a configuration's value; use the bConfigurationValue field of
 the configuration descriptor within to find out the proper number for a given
 configuration.
@@ -227,7 +224,6 @@ Configuration and interface alternate nodes return string descriptions. Note
 that all string descriptions returned have a maximum length of USB_MAXSTRINGLEN
 bytes and are in English ASCII.
 .SH EXAMPLES
-.sp
 .LP
 In the following example, a device's configuration data, including the
 following descriptor tree, is retrieved by \fBusb_get_dev_data\fR(9F) into
@@ -278,7 +274,6 @@ usb_client_dev_data_t *reg_data:
 .in -2
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -296,7 +291,6 @@ Interface stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBusb_get_alt_if\fR(9F), \fBusb_get_cfg\fR(9F), \fBusb_get_dev_data\fR(9F),
 \fBusb_get_string_descr\fR(9F), \fBusb_lookup_ep_data\fR(9F),

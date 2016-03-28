@@ -1272,7 +1272,7 @@ ehci_handle_get_port_status(
 	port_status = ehci_get_root_hub_port_status(ehcip, port);
 
 	new_port_status = port_status & PORT_STATUS_MASK;
-	change_status = (port_status >> 16) & PORT_CHANGE_MASK;
+	change_status = (port_status >> 16) & PORT_CHANGE_MASK_2X;
 
 	ehcip->ehci_root_hub.rh_port_status[port] = new_port_status;
 
@@ -1924,7 +1924,7 @@ ehci_handle_root_hub_status_change(void *arg)
 		port_status = ehci_get_root_hub_port_status(ehcip, i);
 
 		new_port_status = port_status & PORT_STATUS_MASK;
-		change_status = (port_status >> 16) & PORT_CHANGE_MASK;
+		change_status = (port_status >> 16) & PORT_CHANGE_MASK_2X;
 
 		/*
 		 * If there is change in the port status then set the bit in the

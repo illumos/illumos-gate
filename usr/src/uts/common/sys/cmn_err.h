@@ -28,6 +28,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #ifndef _SYS_CMN_ERR_H
@@ -62,6 +63,9 @@ extern void vzcmn_err(zoneid_t, int, const char *, __va_list)
 
 extern void dev_err(dev_info_t *, int, char *, ...)
     __KPRINTFLIKE(3);
+
+extern void vdev_err(dev_info_t *, int, const char *, __va_list)
+    __KVPRINTFLIKE(3);
 
 extern void vcmn_err(int, const char *, __va_list)
     __KVPRINTFLIKE(2);

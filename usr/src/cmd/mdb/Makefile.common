@@ -103,6 +103,7 @@ COMMON_MODULES_KVM = \
 	sv \
 	ufs \
 	usba \
+	xhci \
 	zfs
 
 CLOSED_COMMON_MODULES_KVM = \

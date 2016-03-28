@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH USB_CLIENT_ATTACH 9F "Jan 5, 2004"
+.TH USB_CLIENT_ATTACH 9F "Oct 30, 2016"
 .SH NAME
 usb_client_attach, usb_client_detach \- USBA framework registration of client
 USB drivers
@@ -28,11 +28,9 @@ USB drivers
 .fi
 
 .SH INTERFACE LEVEL
-.sp
 .LP
 Solaris DDI specific (Solaris DDI)
 .SH PARAMETERS
-.sp
 .LP
 For \fBusb_client_attach()\fR:
 .sp
@@ -84,7 +82,6 @@ Pointer to a usb_client_dev_data_t to free. Can be NULL.
 .RE
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBusb_client_attach()\fR function registers a driver with the USBA
 framework and must be called before any other USBA function. Usually,
@@ -98,7 +95,6 @@ dev_data argument is non-NULL.  The \fBusb_client_detach()\fR function is the
 last USBA function a client calls before completing \fBdetach\fR(9E). It is not
 necessary to call \fBusb_client_detach()\fR during a suspend operation.
 .SS "VERSIONING"
-.sp
 .LP
 USBDRV_VERSION is a macro which creates a version number based on the
 USBDRV_MAJOR_VER and USBDRV_MINOR_VER definitions. It must be passed as the
@@ -112,15 +108,13 @@ USBA_MINOR_VER value also in <sys/usb/usbai.h>.
 .sp
 .LP
 Version 0.8 drivers from previous releases are binary compatible and run on
-Solaris 10, but are not compilable. Version 0.8 binary compatibility will not
-be supported in subsequent Solaris OS releases.
+illumos, but are not compilable.
 .sp
 .LP
 Definitions of USBDRV_MAJOR_VERSION and USBDRV_MINOR_VERSION must appear in the
 client driver above the reference to <\fBsys/usb/usba.h\fR>. Note that
 different releases have different USBA_[MAJOR|MINOR]_VER numbers.
 .SH RETURN VALUES
-.sp
 .LP
 For \fBusb_client_attach()\fR:
 .sp
@@ -190,7 +184,6 @@ Not called from an attach routine context.
 .RE
 
 .SH CONTEXT
-.sp
 .LP
 The \fBusb_client_attach()\fR function may only be called from
 \fBattach\fR(9E).
@@ -199,7 +192,6 @@ The \fBusb_client_attach()\fR function may only be called from
 The \fBusb_client_detach()\fR function may be called only from \fBattach\fR(9E)
 or \fBdetach\fR(9E).
 .SH EXAMPLES
-.sp
 .in +2
 .nf
   if (usb_client_attach(dip, USBDRV_VERSION, 0) != USB_SUCCESS) {
@@ -221,7 +213,6 @@ or \fBdetach\fR(9E).
 .in -2
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -239,7 +230,6 @@ Interface stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBattributes\fR(5), \fBattach\fR(9E), \fBdetach\fR(9E),
 \fBusb_get_dev_data\fR(9F)

@@ -24,6 +24,7 @@
  */
 /*
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #ifndef	_SYS_USB_HUBDVAR_H
@@ -167,14 +168,18 @@ typedef struct hubd {
 	 * pipe handle for ep1
 	 */
 	usb_pipe_handle_t	h_ep1_ph;
-	usb_ep_descr_t		h_ep1_descr;
+	usb_ep_xdescr_t		h_ep1_xdescr;
 	usb_pipe_policy_t	h_pipe_policy;
 	uint_t			h_intr_pipe_state;
 
 	/*
-	 * root hub descriptor
+	 * hub characteristics (normalized across various USB versions) from the
+	 * Hub class description.
 	 */
-	struct usb_hub_descr	h_hub_descr;
+	uint8_t			h_nports;	/* from bNbrPorts */
+	uint16_t		h_hub_chars;	/* from wHubCharacteristics */
+	uint_t			h_power_good;	/* from bPwrOn2PwrGood */
+	uint_t			h_current;	/* from bHubContrCurrent */
 
 	/*
 	 * hotplug handling
@@ -204,6 +209,9 @@ typedef struct hubd {
 
 	/* track event registration of children */
 	uint8_t			h_child_events[MAX_PORTS + 1];
+
+	/* track the raw port state for debugging purposes */
+	uint16_t		h_port_raw[MAX_PORTS + 1];
 
 	kcondvar_t		h_cv_reset_port;
 	kcondvar_t		h_cv_hotplug_dev;
@@ -412,6 +420,16 @@ _NOTE(SCHEME_PROTECTS_DATA("unshared", hubd_offline_req))
  * is expressed in 2mA units
  */
 #define	USB_CFG_DESCR_PWR_UNIT	2
+
+/*
+ * USB 3.x devices have the notion of a 'route' which describes the series of
+ * hubs which must be passed through to reach a given device. The route string
+ * has support for a fixed number of nested hubs. Each USB 3.x hub has to be
+ * told what its depth in the route string is, effectively it's 4-bit index into
+ * the route string. The maximum number of nested hubs, in other words a hub's
+ * depth, is defined in USB 3.1 / 10.16.2.9.
+ */
+#define	HUBD_SS_MAX_DEPTH	5
 
 /* variables shared with wire adapter class drivers */
 extern uint_t hubd_errlevel;
