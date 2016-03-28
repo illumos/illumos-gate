@@ -89,8 +89,9 @@
 	<privilege set="default" name="sys_iptun_config" ip-type="exclusive" />
 	<privilege set="default" name="sys_mount" />
 	<privilege set="default" name="sys_nfs" />
-	<privilege set="default" name="sys_resource" />
 	<privilege set="default" name="sys_ppp_config" ip-type="exclusive" />
+	<privilege set="default" name="sys_resource" />
+	<privilege set="default" name="sys_smb" />
 
 	<privilege set="prohibited" name="dtrace_kernel" />
 	<privilege set="prohibited" name="proc_zone" />

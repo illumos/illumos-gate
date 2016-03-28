@@ -1,5 +1,6 @@
 '\" te
 .\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
+.\" Copyright 2016 Joyent, Inc.
 .\" Copyright 1989 AT&T.  Copyright (c) 1992, X/Open Company Limited  All Rights Reserved.  Portions Copyright (c) 2005, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
@@ -8,12 +9,12 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH CTYPE 3C "Jun 27, 2014"
+.TH CTYPE 3C "Mar 14, 2016"
 .SH NAME
 ctype, isalpha, isalnum, isascii, isblank, iscntrl, isdigit, islower,
 isprint, isspace, isupper, ispunct, isgraph, isxdigit, isalpha_l,
 isalnum_l, isblank_l, iscntrl_l, isdigit_l, islower_l, isprint_l,
-isspace_l, isupper_l, ispunct_l, isgraph_l \- character handling
+isspace_l, isupper_l, ispunct_l, isgraph_l isxdigit_l \- character handling
 .SH SYNOPSIS
 .LP
 .nf
@@ -113,6 +114,10 @@ isspace_l, isupper_l, ispunct_l, isgraph_l \- character handling
 .nf
 \fBint\fR \fBisupper_l\fR(\fBint\fR \fIc\fR, \fBlocale_t\fR \fIloc\fR);
 .fi
+.LP
+.nf
+\fBint\fR \fBisxdigit_l\fR(\fBint\fR \fIc\fR, \fBlocale_t\fR \fIloc\fR);
+.fi
 .SH DESCRIPTION
 .LP
 These functions classify character-coded integer values. Each is a
@@ -126,12 +131,12 @@ characters are classified according to the rules of the \fBUS-ASCII\fR
 7-bit coded character set.
 .LP
 The functions \fBisalnum_l()\fR, \fBisalpha_l()\fR, \fBisblank_l()\fR,
-\fBiscntrl_l\fR, \fBisdigit_l()\fR, \fBislower_l()\fR,
-\fBisprint_l()\fR, \fBispunct_l()\fR, \fBisspace_l()\fR,
-\fBisupper_l()\fR, all behave identically to their counterparts without
-the '\fB_l\fR' prefix, except that instead of acting on the current
-locale, that perform the test on the locale specified in the argument
-\fIloc\fR.
+\fBiscntrl_l\fR, \fBisdigit_l()\fR, \fBisgraph_l()\fr,
+\fBislower_l()\fR, \fBisprint_l()\fR, \fBispunct_l()\fR,
+\fBisspace_l()\fR, \fBisupper_l()\fR, and \fBisxdigit_l()\fR all behave
+identically to their counterparts without the '\fB_l\fR' prefix, except
+that instead of acting on the current locale, they perform the test on
+the locale specified in the argument \fIloc\fR.
 .LP
 The \fBisascii()\fR macro is defined on all integer values. The rest are
 defined only where the argument is an \fBint\fR, the value of which is
@@ -294,7 +299,6 @@ the function, the result is undefined. Otherwise, the macro or function returns
 non-zero if the classification is \fBTRUE\fR and \fB0\fR if the classification
 is \fBFALSE\fR.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .TS

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LIBNVPAIR 3LIB "Aug 1, 2008"
+.TH LIBNVPAIR 3LIB "Mar 13, 2016"
 .SH NAME
 libnvpair \- name-value pair library
 .SH SYNOPSIS
@@ -14,7 +14,6 @@ cc [ \fIflag\fR... ] \fIfile\fR... \fB-lnvpair\fR [ \fIlibrary\fR... ]
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBlibnvpair\fR library exports a set of functions for managing name-value
 pairs.
@@ -97,7 +96,6 @@ Pack an \fBnvlist_t\fR into a contiguous buffer.
 Expand a packed nvlist into a searchable \fBnvlist_t\fR.
 .RE
 .SH INTERFACES
-.sp
 .LP
 The shared object \fBlibnvpair.so.1\fR provides the public interfaces defined
 below. See \fBIntro\fR(3) for additional information on shared object
@@ -122,7 +120,8 @@ l l .
 \fBnvlist_add_uint16_array\fR	\fBnvlist_add_uint32\fR
 \fBnvlist_add_uint32_array\fR	\fBnvlist_add_uint64\fR
 \fBnvlist_add_uint64_array\fR	\fBnvlist_alloc\fR
-\fBnvlist_dup\fR	\fBnvlist_exists\fR
+\fBnvlist_dup\fR	\fBnvpair_empty\fR
+\fBnvlist_exists\fR
 \fBnvlist_free\fR	\fBnvlist_lookup_boolean\fR
 \fBnvlist_lookup_boolean_value\fR	\fBnvlist_lookup_boolean_array\fR
 \fBnvlist_lookup_byte\fR	\fBnvlist_lookup_byte_array\fR
@@ -162,7 +161,6 @@ l l .
 .TE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/lib/libnvpair.so.1\fR\fR
@@ -181,7 +179,6 @@ shared object
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for description of the following attributes:
 .sp
@@ -199,6 +196,5 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBIntro\fR(3), \fBattributes\fR(5)

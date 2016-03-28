@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * These routines simply provide wrappers around malloc(3C) and free(3C)
  * for now.  In the future we hope to provide a userland equivalent to
@@ -169,11 +167,14 @@ void *
 mdb_alloc_align(size_t nbytes, size_t align, uint_t flags)
 {
 	void *ptr;
+	size_t obytes = nbytes;
 
-	if (nbytes == 0)
+	if (nbytes == 0 || nbytes > MDB_ALLOC_MAX)
 		return (NULL);
 
 	nbytes = (nbytes + sizeof (uint32_t) - 1) & ~(sizeof (uint32_t) - 1);
+	if (nbytes < obytes || nbytes == 0)
+		return (NULL);
 
 	if (align != 0)
 		ptr = memalign(align, nbytes);

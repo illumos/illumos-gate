@@ -3018,8 +3018,8 @@ mac_datapath_setup(mac_client_impl_t *mcip, flow_entry_t *flent,
 			goto setup_failed;
 		mcip->mci_unicast = mac_find_macaddr(mip, mac_addr);
 		ASSERT(mcip->mci_unicast != NULL);
-		/* Initialize the v6 local addr used by link protection */
-		mac_protect_update_v6_local_addr(mcip);
+		/* (Re)init the v6 token & local addr used by link protection */
+		mac_protect_update_mac_token(mcip);
 		break;
 
 	default:

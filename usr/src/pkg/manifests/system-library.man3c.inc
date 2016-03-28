@@ -1280,6 +1280,7 @@ link path=usr/share/man/man3c/thr_setconcurrency.3c \
     target=thr_getconcurrency.3c
 link path=usr/share/man/man3c/thr_setprio.3c target=thr_getprio.3c
 link path=usr/share/man/man3c/thr_setspecific.3c target=thr_keycreate.3c
+link path=usr/share/man/man3c/timegm.3c target=mktime.3c
 link path=usr/share/man/man3c/timer_getoverrun.3c target=timer_settime.3c
 link path=usr/share/man/man3c/timer_gettime.3c target=timer_settime.3c
 link path=usr/share/man/man3c/timerclear.3c target=timeradd.3c

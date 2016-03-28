@@ -3,11 +3,11 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH STRING 9F "Sep 14, 2015"
+.TH STRING 9F "Mar 14, 2016"
 .SH NAME
-string, strcasecmp, strncasecmp, strncat, strlcat, strchr, strrchr, strcmp,
-strncmp, strcpy, strncpy, strlcpy, strfree, strspn, strdup, ddi_strdup, strlen,
-strnlen \- string operations
+string, strcasecmp, strncasecmp, strcat, strncat, strlcat, strchr,
+strrchr, strcmp, strncmp, strcpy, strncpy, strlcpy, strfree, strspn,
+strdup, ddi_strdup, strlen, strnlen \- string operations
 .SH SYNOPSIS
 .LP
 .nf
@@ -20,6 +20,11 @@ strnlen \- string operations
 .LP
 .nf
 \fBint\fR \fBstrncasecmp\fR(\fBconst char *\fR\fIs1\fR, \fBconst char *\fR\fIs2\fR, \fBsize_t\fR \fIn\fR);
+.fi
+
+.LP
+.nf
+\fBchar *\fR\fBstrcat\fR(\fBchar *\fR \fIs1\fR, \fBconst char *\fR \fIs2\fR);
 .fi
 
 .LP
@@ -114,14 +119,16 @@ The \fBstrcasecmp()\fR and \fBstrncasecmp()\fR functions are case-insensitive
 versions of  \fBstrcmp()\fR and \fBstrncmp()\fR respectively, described below.
 They assume the \fBASCII\fR character set and ignore differences in case when
 comparing lower and upper case characters.
-.SS "\fBstrncat()\fR, \fBstrlcat()\fR"
+.SS "\fBstrcat()\fR, \fBstrncat()\fR, and \fBstrlcat()\fR"
 .LP
-The \fBstrncat()\fR function appends at most \fIn\fR characters of string
-\fIs2\fR, including the terminating null character, to the end of string
-\fIs1\fR. It returns a pointer to the null-terminated result. The initial
-character of  \fIs2\fR overrides the null character at the end of \fIs1\fR. If
-copying takes place between objects that overlap, the behavior of
-\fBstrncat()\fRand \fBstrlcat()\fR is undefined.
+The \fBstrcat()\fR function appends a copy of string \fIs2\fR, including the
+terminating null character, to the end of string \fIs1\fR. The \fBstrncat()\fR
+function appends at most \fIn\fR characters of \fIs2\fR to \fIs1\fR, not
+including any terminating null character, and then appends a null character.
+Each returns a pointer to the null-terminated result. The initial character of
+\fIs2\fR overrides the null character at the end of \fIs1\fR. If copying takes
+place between objects that overlap, the behavior of \fBstrcat()\fR,
+\fBstrncat()\fR, and \fBstrlcat()\fR is undefined.
 .sp
 .LP
 The \fBstrlcat()\fR function appends  at most

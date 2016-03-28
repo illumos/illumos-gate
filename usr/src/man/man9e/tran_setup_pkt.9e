@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH TRAN_SETUP_PKT 9E "Jan 29, 2009"
+.TH TRAN_SETUP_PKT 9E "Mar 13, 2016"
 .SH NAME
 tran_setup_pkt, tran_teardown_pkt, tran_pkt_constructor, tran_pkt_destructor \-
 SCSI HBA packet allocation and deallocation
@@ -12,7 +12,7 @@ SCSI HBA packet allocation and deallocation
 .nf
 #include <sys/scsi/scsi.h>
 
-\fBstruct scsi_pkt *\fR\fBprefix_tran_setup_pkt\fR(\fBstruct scsi_pkt *\fR\fIpkt\fR,
+\fBint \fR\fBprefix_tran_setup_pkt\fR(\fBstruct scsi_pkt *\fR\fIpkt\fR,
      \fBint (*\fR\fIcallback\fR) (\fIcaddr_t\fR), \fBcaddr_t\fR \fIarg\fR);
 .fi
 
@@ -34,11 +34,9 @@ SCSI HBA packet allocation and deallocation
 .fi
 
 .SH INTERFACE LEVEL
-.sp
 .LP
 Solaris architecture specific (Solaris DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIpkt\fR\fR
@@ -84,7 +82,6 @@ Either \fBKM_SLEEP\fR or \fBKM_NOSLEEP\fR.
 .RE
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBtran_setup_pkt()\fR and \fBtran_destroy_pkt()\fR vectors in the
 \fBscsi_hba_tran\fR(9S) structure are alternatives to the \fBtran_init_pkt()\fR
@@ -92,7 +89,6 @@ and \fBtran_destroy_pkt()\fR entry points. They are initialized during the
 \fBHBA\fR driver's \fBattach\fR(9E) and they are used when a target driver
 calls \fBscsi_init_pkt\fR(9F) and \fBscsi_destroy_pkt\fR(9F).
 .SS "tran_setup_pkt(\|)"
-.sp
 .LP
 The \fBtran_setup_pkt()\fR vector is the entry point into the \fBHBA\fR which
 is used to initialize \fBHBA\fR specific information in a \fBscsi_pkt\fR
@@ -119,8 +115,8 @@ pointed to by \fBpkt_private\fR, allocated on behalf of the SCSI target driver.
 The \fBpkt_scblen\fR field contains the length of the SCSI status completion
 block pointed to by \fBpkt_scbp\fR. If the status length is greater than or
 equal to sizeof (\fBstruct\fR \fBscsi_arq_status\fR) and the
-\fBauto_rqsensecapability\fR has been set, automatic request sense (\fBARS\fR)
-is enabled for this packet. If the status \fBlengthislessthansizeof\fR
+\fBauto-rqsense\fR capability has been set, automatic request sense (\fBARS\fR)
+is enabled for this packet. If the status length is less than \fBsizeof\fR
 (\fBstruct\fR \fBscsi_arq_status\fR), automatic request sense should be
 disabled for this pkt if the \fBHBA\fR driver is capable of disabling \fBARQ\fR
 on a per-packet basis.
@@ -138,7 +134,7 @@ when resources are not available:
 \fB\fBNULL_FUNC\fR\fR
 .ad
 .RS 14n
-Do not wait for resources. Return a \fINULL\fR pointer.
+Do not wait for resources. Return \fB-1\fR when resources are not available.
 .RE
 
 .sp
@@ -151,13 +147,11 @@ Wait indefinitely for resources.
 .RE
 
 .SS "tran_teardown_pkt(\|)"
-.sp
 .LP
 The \fBtran_teardown_pkt()\fR is the entry point into the \fBHBA\fR that must
 free all of the resources that were allocated to the \fBscsi_pkt\fR(9S)
 structure during \fBtran_setup_pkt()\fR.
 .SS "tran_pkt_constructor(\|) tran_pkt_destructor(\|)"
-.sp
 .LP
 When using \fBtran_pkt_setup()\fR and \fBtran_pkt_teardown()\fR,
 \fBtran_pkt_constructor()\fR and \fBtran_pkt_destructor()\fR are additional
@@ -225,11 +219,9 @@ HBA drivers that implement \fBtran_setup_pkt()\fR must signal
 use of  the \fBscsi_pkt\fR \fIpkt_comp\fR field is not permitted and results in
 undefined behavior.
 .SH RETURN VALUES
-.sp
 .LP
 \fBtran_setup_pkt()\fR must return zero on success, and \fB-1\fR on failure.
 .SH SEE ALSO
-.sp
 .LP
 \fBattach\fR(9E), \fBtran_sync_pkt\fR(9E), \fBbioerror\fR(9F),
 \fBddi_dma_buf_bind_handle\fR(9F), \fBkmem_cache_create\fR(9F),

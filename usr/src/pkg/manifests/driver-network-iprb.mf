@@ -53,6 +53,7 @@ driver name=iprb clone_perms="iprb 0666 root sys" perms="* 0666 root sys" \
     alias=pci8086,103d \
     alias=pci8086,1050 \
     alias=pci8086,1059 \
+    alias=pci8086,1064 \
     alias=pci8086,1068 \
     alias=pci8086,1069 \
     alias=pci8086,1092 \
