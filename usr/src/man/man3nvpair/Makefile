@@ -56,6 +56,7 @@ MANLINKS=	nv_alloc_fini.3nvpair			\
 		nvlist_add_uint8.3nvpair		\
 		nvlist_add_uint8_array.3nvpair		\
 		nvlist_dup.3nvpair			\
+		nvlist_empty.3nvpair			\
 		nvlist_exists.3nvpair			\
 		nvlist_free.3nvpair			\
 		nvlist_lookup_boolean_array.3nvpair	\
@@ -190,6 +191,7 @@ nvlist_lookup_uint64_array.3nvpair	:= LINKSRC = nvlist_lookup_boolean.3nvpair
 nvlist_lookup_uint8.3nvpair		:= LINKSRC = nvlist_lookup_boolean.3nvpair
 nvlist_lookup_uint8_array.3nvpair	:= LINKSRC = nvlist_lookup_boolean.3nvpair
 
+nvlist_empty.3nvpair			:= LINKSRC = nvlist_lookup_nvpair.3nvpair
 nvlist_exists.3nvpair			:= LINKSRC = nvlist_lookup_nvpair.3nvpair
 
 nvpair_name.3nvpair			:= LINKSRC = nvlist_next_nvpair.3nvpair

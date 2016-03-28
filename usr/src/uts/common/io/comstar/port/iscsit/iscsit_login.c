@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.
  */
 
 #include <sys/cpuvar.h>
@@ -32,12 +32,14 @@
 #include <sys/sunddi.h>
 #include <sys/modctl.h>
 #include <sys/scsi/generic/persist.h>
+#include <sys/scsi/scsi_names.h>
 
 #include <sys/socket.h>
 #include <sys/strsubr.h>
 #include <sys/sysmacros.h>
 #include <sys/note.h>
 #include <sys/sdt.h>
+#include <sys/errno.h>
 
 #include <sys/stmf.h>
 #include <sys/stmf_ioctl.h>
@@ -193,6 +195,9 @@ login_resp_complete_cb(idm_pdu_t *pdu, idm_status_t status);
 
 static idm_status_t
 iscsit_add_declarative_keys(iscsit_conn_t *ict);
+
+static char *
+iscsit_fold_name(char *name, size_t *buflen);
 
 uint64_t max_dataseglen_target = ISCSIT_MAX_RECV_DATA_SEGMENT_LENGTH;
 
@@ -1086,6 +1091,8 @@ login_sm_validate_initial_parameters(iscsit_conn_t *ict)
 {
 	int		nvrc;
 	char		*string_val;
+	char		*u8_iscsi_name;
+	size_t		u8_iscsi_name_len;
 	uint8_t		error_class = ISCSI_STATUS_CLASS_INITIATOR_ERR;
 	uint8_t		error_detail = ISCSI_LOGIN_STATUS_MISSING_FIELDS;
 	idm_status_t	status = IDM_STATUS_FAIL;
@@ -1105,10 +1112,16 @@ login_sm_validate_initial_parameters(iscsit_conn_t *ict)
 	    "InitiatorName", &string_val)) != 0) {
 		goto initial_params_done;
 	}
-	if ((nvrc = nvlist_add_string(lsm->icl_negotiated_values,
-	    "InitiatorName", string_val)) != 0) {
+
+	u8_iscsi_name = iscsit_fold_name(string_val, &u8_iscsi_name_len);
+	if (u8_iscsi_name == NULL)
 		goto initial_params_done;
-	}
+	nvrc = nvlist_add_string(lsm->icl_negotiated_values, "InitiatorName",
+	    u8_iscsi_name);
+	kmem_free(u8_iscsi_name, u8_iscsi_name_len);
+	if (nvrc != 0)
+		goto initial_params_done;
+
 	if ((nvrc = nvlist_lookup_string(lsm->icl_negotiated_values,
 	    "InitiatorName", &string_val)) != 0) {
 		goto initial_params_done;
@@ -1155,10 +1168,15 @@ login_sm_validate_initial_parameters(iscsit_conn_t *ict)
 		goto initial_params_done;
 	}
 	if (nvrc == 0) {
-		if ((nvrc = nvlist_add_string(lsm->icl_negotiated_values,
-		    "TargetName", string_val)) != 0) {
+		u8_iscsi_name = iscsit_fold_name(string_val,
+		    &u8_iscsi_name_len);
+		if (u8_iscsi_name == NULL)
 			goto initial_params_done;
-		}
+		nvrc = nvlist_add_string(lsm->icl_negotiated_values,
+		    "TargetName", u8_iscsi_name);
+		kmem_free(u8_iscsi_name, u8_iscsi_name_len);
+		if (nvrc != 0)
+			goto initial_params_done;
 		if ((nvrc = nvlist_lookup_string(lsm->icl_negotiated_values,
 		    "TargetName", &string_val)) != 0) {
 			goto initial_params_done;
@@ -2691,4 +2709,51 @@ alloc_fail:
 		idm_status = IDM_STATUS_FAIL;
 	}
 	return (idm_status);
+}
+
+static char *
+iscsit_fold_name(char *name, size_t *buflen)
+{
+	char		*ret;
+	const char	*sns;
+	int		errnum;
+	int		flag = U8_TEXTPREP_NFKC;
+	size_t		inlen, outlen, coff;
+
+	if (name == NULL)
+		return (NULL);
+
+	/* Check for one of the supported name types */
+	if (strncasecmp(name, SNS_EUI ".", strlen(SNS_EUI) + 1) == 0) {
+		sns = SNS_EUI;
+		*buflen = SNS_EUI_U8_LEN_MAX + 1;
+		flag |= U8_TEXTPREP_TOUPPER;
+	} else if (strncasecmp(name, SNS_IQN ".", strlen(SNS_IQN) + 1) == 0) {
+		sns = SNS_IQN;
+		*buflen = SNS_IQN_U8_LEN_MAX + 1;
+		flag |= U8_TEXTPREP_TOLOWER;
+	} else if (strncasecmp(name, SNS_NAA ".", strlen(SNS_NAA) + 1) == 0) {
+		sns = SNS_NAA;
+		*buflen = SNS_NAA_U8_LEN_MAX + 1;
+		flag |= U8_TEXTPREP_TOUPPER;
+	} else {
+		return (NULL);
+	}
+
+	ret = kmem_zalloc(*buflen, KM_SLEEP);
+	coff = strlen(sns);
+	inlen = strlen(name) - coff;
+	outlen = *buflen - coff;
+
+	/* Fold the case and normalize string */
+	if (u8_textprep_str(name + coff, &inlen, ret + coff, &outlen, flag,
+	    U8_UNICODE_320, &errnum) == (size_t)-1) {
+		kmem_free(ret, *buflen);
+		return (NULL);
+	}
+
+	/* Copy the name type prefix */
+	bcopy(sns, ret, coff);
+
+	return (ret);
 }

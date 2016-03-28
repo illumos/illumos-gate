@@ -199,7 +199,8 @@ typedef struct dhcpv6_txn {
 } dhcpv6_txn_t;
 
 /*
- * SLAAC address. May be added to mci_v6_slaac_ip.
+ * Stateless address autoconfiguration (SLAAC) address. May be added to
+ * mci_v6_slaac_ip.
  */
 typedef struct slaac_addr {
 	in6_addr_t		sla_prefix;
@@ -665,7 +666,7 @@ done:
  * Core logic for intercepting inbound DHCPv4 packets.
  */
 static void
-intercept_dhcpv4_inbound(mac_client_impl_t *mcip, ipha_t *ipha, uchar_t *end,
+intercept_dhcpv4_inbound(mac_client_impl_t *mcip, uchar_t *end,
     struct dhcp *dh4)
 {
 	uchar_t		*opt;
@@ -855,8 +856,7 @@ get_dhcpv6_info(ip6_t *ip6h, uchar_t *end, dhcpv6_message_t **dh6)
 static int
 get_ra_info(ip6_t *ip6h, uchar_t *end, nd_router_advert_t **ra)
 {
-	uint16_t		hdrlen, client, server;
-	boolean_t		first_frag = B_FALSE;
+	uint16_t		hdrlen;
 	ip6_frag_t		*frag = NULL;
 	uint8_t			proto;
 	uchar_t			*hdrp;
@@ -1368,7 +1368,7 @@ done:
  * Core logic for intercepting inbound DHCPv6 packets.
  */
 static void
-intercept_dhcpv6_inbound(mac_client_impl_t *mcip, ip6_t *ip6h, uchar_t *end,
+intercept_dhcpv6_inbound(mac_client_impl_t *mcip, uchar_t *end,
     dhcpv6_message_t *dh6)
 {
 	dhcpv6_txn_t		*txn;
@@ -1683,7 +1683,7 @@ mac_protect_intercept_dynamic_one(mac_client_impl_t *mcip, mblk_t *mp)
 			return;
 
 		if (get_dhcpv4_info(ipha, end, &dh4) == 0) {
-			intercept_dhcpv4_inbound(mcip, ipha, end, dh4);
+			intercept_dhcpv4_inbound(mcip, end, dh4);
 		}
 		break;
 	}
@@ -1696,7 +1696,7 @@ mac_protect_intercept_dynamic_one(mac_client_impl_t *mcip, mblk_t *mp)
 			return;
 
 		if (get_dhcpv6_info(ip6h, end, &dh6) == 0) {
-			intercept_dhcpv6_inbound(mcip, ip6h, end, dh6);
+			intercept_dhcpv6_inbound(mcip, end, dh6);
 		} else if (get_ra_info(ip6h, end, &ra) == 0) {
 			intercept_ra_inbound(mcip, ip6h, end, ra);
 		}
@@ -2576,9 +2576,6 @@ mac_protect_init(mac_client_impl_t *mcip)
 	    sizeof (dhcpv6_addr_t), offsetof(dhcpv6_addr_t, da_node));
 	avl_create(&mcip->mci_v6_slaac_ip, compare_slaac_ip,
 	    sizeof (slaac_addr_t), offsetof(slaac_addr_t, sla_node));
-
-	if (mcip->mci_state_flags & MCIS_IS_VNIC)
-		mcip->mci_protect_flags |= MPT_FLAG_PROMISC_FILTERED;
 }
 
 void

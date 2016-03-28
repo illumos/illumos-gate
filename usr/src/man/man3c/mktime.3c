@@ -1,5 +1,6 @@
 '\" te
 .\" Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 2016 Joyent, Inc.
 .\" Copyright 1989 AT&T
 .\" Portions Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
 .\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
@@ -9,9 +10,9 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH MKTIME 3C "Nov 1, 2003"
+.TH MKTIME 3C "Mar 14, 2016"
 .SH NAME
-mktime \- converts a tm structure to a calendar time
+mktime, timegm \- convert a tm structure to a calendar time
 .SH SYNOPSIS
 .LP
 .nf
@@ -19,9 +20,12 @@ mktime \- converts a tm structure to a calendar time
 
 \fBtime_t\fR \fBmktime\fR(\fBstruct tm *\fR\fItimeptr\fR);
 .fi
+.LP
+.nf
+\fBtime_t\fR \fBtimegm\fR(\fBstruct tm *\fR\fItimeptr\fR);
+.fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBmktime()\fR function converts the time represented by the \fBtm\fR
 structure pointed to by \fItimeptr\fR into a calendar time  (the number of
@@ -81,17 +85,22 @@ specified time.
 .LP
 Local timezone information is used as if \fBmktime()\fR had called
 \fBtzset()\fR. See \fBctime\fR(3C).
+.sp
+.LP
+The \fBtimegm()\fR function is identical to the \fBmktime()\fR function,
+except that the \fBtimegm()\fR function ignores both the current time
+zone and the \fBtm_isdst\fR member and operates as though the time zone
+were set to UTC.
 .SH RETURN VALUES
-.sp
 .LP
-If the calendar time can be represented in an object of type \fBtime_t\fR,
-\fBmktime()\fR returns the specified calendar time without changing
-\fBerrno\fR. If the calendar time cannot be represented, the function returns
-the value (\fBtime_t\fR)\(mi1 and sets \fBerrno\fR to indicate the error.
+If the calendar time can be represented in an object of type
+\fBtime_t\fR, the \fBmktime()\fR and \fBtimegm()\fR functions return the
+specified calendar time without changing \fBerrno\fR. If the calendar
+time cannot be represented, the function returns the value
+(\fBtime_t\fR)\(mi1 and sets \fBerrno\fR to indicate the error.
 .SH ERRORS
-.sp
 .LP
-The \fBmktime()\fR function will fail if:
+The \fBmktime()\fR and \fBtimegm()\fR functions will fail if:
 .sp
 .ne 2
 .na
@@ -104,22 +113,23 @@ to the standards specify a different value.
 .RE
 
 .SH USAGE
+.LP
+The \fBmktime()\fR and \fBtimegm()\fR functions are MT-Safe in
+multithreaded applications, as long as no user-defined function directly
+modifies one of the following variables: \fBtimezone\fR, \fBaltzone\fR,
+\fBdaylight\fR, and \fBtzname\fR. See \fBctime\fR(3C).
 .sp
 .LP
-The  \fBmktime()\fR function is MT-Safe in multithreaded applications, as long
-as no user-defined function directly modifies one of the following variables:
-\fBtimezone\fR, \fBaltzone\fR, \fBdaylight\fR, and \fBtzname\fR. See
-\fBctime\fR(3C).
+Note that \(mi1 can be a valid return value for the time that is one
+second before the Epoch.  The user should clear \fBerrno\fR before
+calling \fBmktime()\fR and \fBtimegm()\fR. If \fBmktime()\fR or
+\fBtimegm()\fR then returns \(mi1, the user should check \fBerrno\fR to
+determine whether or not an error actually occurred.
 .sp
 .LP
-Note that \(mi1 can be a valid return value for the time that is one second
-before the Epoch.  The user should clear \fBerrno\fR before calling
-\fBmktime()\fR. If \fBmktime()\fR then returns \(mi1, the user should check
-\fBerrno\fR to determine whether or not an error actually occurred.
-.sp
-.LP
-The  \fBmktime()\fR function assumes Gregorian dates. Times before the adoption
-of the Gregorian calendar will not match historial records.
+The \fBmktime()\fR and \fBtimegm()\fR functions assume Gregorian dates.
+Times before the adoption of the Gregorian calendar will not match
+historial records.
 .SH EXAMPLES
 .LP
 \fBExample 1 \fRSample code using \fBmktime()\fR.
@@ -152,15 +162,13 @@ printf("%s\en", wday[time_str.tm_wday]);
 .in -2
 
 .SH BUGS
-.sp
 .LP
 The \fBzoneinfo\fR timezone data files do not transition past Tue Jan 19
 03:14:07 2038 UTC.  Therefore for 64-bit applications using \fBzoneinfo\fR
 timezones, calculations beyond this date may not use the correct offset from
 standard time, and could return incorrect values. This affects the 64-bit
-version of \fBmktime()\fR.
+versions of \fBmktime()\fR and \fBtimegm()\fR.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -178,7 +186,6 @@ MT-Level	MT-Safe with exceptions
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBctime\fR(3C), \fBgetenv\fR(3C), \fBTIMEZONE\fR(4), \fBattributes\fR(5),
 \fBstandards\fR(5)

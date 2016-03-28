@@ -9,9 +9,9 @@
 .\" http://www.illumos.org/license/CDDL.
 .\"
 .\"
-.\" Copyright 2015 Joyent, Inc.
+.\" Copyright 2016 Joyent, Inc.
 .\"
-.Dd May 08, 2015
+.Dd Mar 13, 2016
 .Dt AVL 9F
 .Os
 .Sh NAME
@@ -28,6 +28,7 @@
 .Nm avl_last ,
 .Nm avl_nearest ,
 .Nm avl_numnodes ,
+.Nm avl_remove ,
 .Nm avl_swap ,
 .Nm AVL_NEXT ,
 .Nm AVL_PREV ,
@@ -81,6 +82,7 @@ for more information on synchronization primitives.
 .Xr AVL_NEXT 3AVL ,
 .Xr avl_numnodes 3AVL ,
 .Xr AVL_PREV 3AVL ,
+.Xr avl_remove 3AVL ,
 .Xr avl_swap 3AVL ,
 .Xr libavl 3LIB
 .Rs

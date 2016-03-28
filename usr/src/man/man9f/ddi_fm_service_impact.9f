@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DDI_FM_SERVICE_IMPACT 9F "May 14, 2007"
+.TH DDI_FM_SERVICE_IMPACT 9F "Mar 13, 2016"
 .SH NAME
 ddi_fm_service_impact \- report the impact of an error
 .SH SYNOPSIS
@@ -11,15 +11,13 @@ ddi_fm_service_impact \- report the impact of an error
 .nf
 #include <sys/ddifm.h>
 
-\fBvoid\fR \fBddi_fm_service_impact\fR(\fBdev_info_t\fR *\fIdip\fR, \fBint\fR *\fIimpact\fR);
+\fBvoid\fR \fBddi_fm_service_impact\fR(\fBdev_info_t\fR *\fIdip\fR, \fBint\fR \fIimpact\fR);
 .fi
 
 .SH INTERFACE LEVEL
-.sp
 .LP
 Solaris DDI specific (Solaris DDI)
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIdip\fR\fR
@@ -38,7 +36,6 @@ Impact of error
 .RE
 
 .SH DESCRIPTION
-.sp
 .LP
 The following service impact values are accepted by
 \fBddi_fm_service_impact()\fR:
@@ -88,12 +85,10 @@ The service provided by the device was unaffected by the error.
 .RE
 
 .SH CONTEXT
-.sp
 .LP
 The \fBddi_fm_service_impact()\fR function can be called from user, kernel, or
 high-level interrupt context.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -109,7 +104,6 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBfmd\fR(1M), \fBattributes\fR(5), \fBddi_fm_ereport_post\fR(9F),
 \fBpci_ereport_post\fR(9F)

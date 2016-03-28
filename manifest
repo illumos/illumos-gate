@@ -4166,6 +4166,7 @@ f usr/include/sys/scsi/scsi.h 0644 root bin
 f usr/include/sys/scsi/scsi_address.h 0644 root bin
 f usr/include/sys/scsi/scsi_ctl.h 0644 root bin
 f usr/include/sys/scsi/scsi_fm.h 0644 root bin
+f usr/include/sys/scsi/scsi_names.h 0644 root bin
 f usr/include/sys/scsi/scsi_params.h 0644 root bin
 f usr/include/sys/scsi/scsi_pkt.h 0644 root bin
 f usr/include/sys/scsi/scsi_resource.h 0644 root bin
@@ -13671,6 +13672,7 @@ f usr/share/man/man3c/thr_suspend.3c 0444 root bin
 f usr/share/man/man3c/thr_yield.3c 0444 root bin
 f usr/share/man/man3c/timer_create.3c 0444 root bin
 f usr/share/man/man3c/timer_delete.3c 0444 root bin
+s usr/share/man/man3c/timegm.3c=mktime.3c
 s usr/share/man/man3c/timer_getoverrun.3c=timer_settime.3c
 s usr/share/man/man3c/timer_gettime.3c=timer_settime.3c
 f usr/share/man/man3c/timer_settime.3c 0444 root bin
@@ -16299,6 +16301,7 @@ s usr/share/man/man3nvpair/nvlist_add_uint8.3nvpair=nvlist_add_boolean.3nvpair
 s usr/share/man/man3nvpair/nvlist_add_uint8_array.3nvpair=nvlist_add_boolean.3nvpair
 f usr/share/man/man3nvpair/nvlist_alloc.3nvpair 0444 root bin
 s usr/share/man/man3nvpair/nvlist_dup.3nvpair=nvlist_alloc.3nvpair
+s usr/share/man/man3nvpair/nvlist_empty.3nvpair=nvlist_lookup_nvpair.3nvpair
 s usr/share/man/man3nvpair/nvlist_exists.3nvpair=nvlist_lookup_nvpair.3nvpair
 s usr/share/man/man3nvpair/nvlist_free.3nvpair=nvlist_alloc.3nvpair
 f usr/share/man/man3nvpair/nvlist_lookup_boolean.3nvpair 0444 root bin
@@ -18833,6 +18836,7 @@ s usr/share/man/man9f/avl_is_empty.9f=avl.9f
 s usr/share/man/man9f/avl_last.9f=avl.9f
 s usr/share/man/man9f/avl_nearest.9f=avl.9f
 s usr/share/man/man9f/avl_numnodes.9f=avl.9f
+s usr/share/man/man9f/avl_remove.9f=avl.9f
 s usr/share/man/man9f/avl_swap.9f=avl.9f
 f usr/share/man/man9f/backq.9f 0444 root bin
 f usr/share/man/man9f/bcanput.9f 0444 root bin
@@ -19746,6 +19750,7 @@ s usr/share/man/man9f/sema_v.9f=semaphore.9f
 f usr/share/man/man9f/semaphore.9f 0444 root bin
 f usr/share/man/man9f/stoi.9f 0444 root bin
 s usr/share/man/man9f/strcasecmp.9f=string.9f
+s usr/share/man/man9f/strcat.9f=string.9f
 s usr/share/man/man9f/strchr.9f=string.9f
 s usr/share/man/man9f/strcmp.9f=string.9f
 s usr/share/man/man9f/strcpy.9f=string.9f

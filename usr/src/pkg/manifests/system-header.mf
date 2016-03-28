@@ -24,7 +24,7 @@
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2013 Saso Kiselkov. All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
-# Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2016 Nexenta Systems, Inc.
 #
 
 set name=pkg.fmri value=pkg:/system/header@$(PKGVERS)
@@ -1397,6 +1397,7 @@ file path=usr/include/sys/scsi/scsi.h
 file path=usr/include/sys/scsi/scsi_address.h
 file path=usr/include/sys/scsi/scsi_ctl.h
 file path=usr/include/sys/scsi/scsi_fm.h
+file path=usr/include/sys/scsi/scsi_names.h
 file path=usr/include/sys/scsi/scsi_params.h
 file path=usr/include/sys/scsi/scsi_pkt.h
 file path=usr/include/sys/scsi/scsi_resource.h

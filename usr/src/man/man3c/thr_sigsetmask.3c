@@ -10,7 +10,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH THR_SIGSETMASK 3C "Mar 23, 2005"
+.TH THR_SIGSETMASK 3C "Mar 13, 2016"
 .SH NAME
 thr_sigsetmask \- change or examine calling thread's signal mask
 .SH SYNOPSIS
@@ -24,7 +24,6 @@ cc -mt [ \fIflag\fR... ] \fIfile\fR... [ \fIlibrary\fR... ]
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBthr_sigsetmask()\fR function changes or examines a calling thread's
 signal mask. Each thread has its own signal mask. A new thread inherits the
@@ -32,7 +31,7 @@ calling thread's signal mask and priority; however, pending signals are not
 inherited. Signals pending for a new thread will be empty.
 .sp
 .LP
-If the value of the argument \fIset\fR is not  \fINULL,\fR \fBset\fR points to
+If the value of the argument \fIset\fR is not  \fINULL,\fR \fIset\fR points to
 a set of signals that can modify the currently blocked set. If the value of
 \fIset\fR is \fINULL\fR, the value of \fIhow\fR is insignificant and the
 thread's signal mask is unmodified; thus, \fBthr_sigsetmask()\fR can be used to
@@ -68,7 +67,7 @@ from the current signal mask.
 .ad
 .RS 15n
 \fIset\fR corresponds to the new signal mask. The current signal mask is
-replaced by \fBset\fR.
+replaced by \fIset\fR.
 .RE
 
 .sp
@@ -76,12 +75,10 @@ replaced by \fBset\fR.
 If the value of \fIoset\fR is not \fINULL\fR, it points to the location where
 the previous signal mask is stored.
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, the \fBthr_sigsetmask()\fR function returns
 \fB0\fR. Otherwise, it returns a non-zero value.
 .SH ERRORS
-.sp
 .LP
 The \fBthr_sigsetmask()\fR function will fail if:
 .sp
@@ -290,7 +287,6 @@ thread can be used by passing the argument \fBTHR_DAEMON\fR to
 \fBthr_create()\fR.
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -306,7 +302,6 @@ MT-Level	MT-Safe and Async-Signal-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBsigaction\fR(2), \fBsigprocmask\fR(2), \fBsigwait\fR(2),
 \fBcond_wait\fR(3C), \fBpthread_cancel\fR(3C), \fBpthread_create\fR(3C),
@@ -314,7 +309,6 @@ MT-Level	MT-Safe and Async-Signal-Safe
 \fBsigemptyset\fR(3C), \fBsigsetops\fR(3C), \fBsleep\fR(3C),
 \fBattributes\fR(5), \fBcancellation\fR(5), \fBstandards\fR(5)
 .SH NOTES
-.sp
 .LP
 It is not possible to block signals that cannot be caught or ignored (see
 \fBsigaction\fR(2)). It is also not possible to block or unblock
@@ -334,7 +328,7 @@ blocks waiting for signals, the blocking thread cannot receive a synchronously
 generated signal.
 .sp
 .LP
-Calling the\fBsigprocmask\fR(2) function will be the same as if
+Calling the \fBsigprocmask\fR(2) function will be the same as if
 \fBthr_sigsetmask()\fR or \fBpthread_sigmask()\fR has been called. POSIX leaves
 the semantics of the call to \fBsigprocmask\fR(2) unspecified in a
 multi-threaded process, so programs that care about POSIX portability should
