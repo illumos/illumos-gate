@@ -511,8 +511,8 @@ typedef struct {	/* return values from system call */
 
 #if !defined(_KERNEL)
 
-extern int	syscall(int, ...);
-extern int	__systemcall(sysret_t *, int, ...);
+extern long	syscall(int, ...);
+extern long	__systemcall(sysret_t *, int, ...);
 extern int	__set_errno(int);
 
 #endif	/* _KERNEL */
