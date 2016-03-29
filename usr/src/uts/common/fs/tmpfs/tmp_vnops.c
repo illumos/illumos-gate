@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright (c) 2015, Joyent, Inc. All rights reserved.
+ * Copyright 2016, Joyent, Inc.
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
@@ -1317,10 +1317,8 @@ tmp_rename(
 		vnevent_rename_src(TNTOV(fromtp), odvp, onm, ct);
 		/*
 		 * vnevent_rename_dest is called in tdirenter().
-		 * Notify the target dir if not same as source dir.
 		 */
-		if (ndvp != odvp)
-			vnevent_rename_dest_dir(ndvp, TNTOV(fromtp), nnm, ct);
+		vnevent_rename_dest_dir(ndvp, TNTOV(fromtp), nnm, ct);
 	}
 
 done:

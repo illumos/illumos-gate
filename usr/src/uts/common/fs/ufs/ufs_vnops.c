@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1984, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015, Joyent, Inc.
+ * Copyright 2016, Joyent, Inc.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -3731,12 +3731,7 @@ retry_firstlock:
 
 	if (error == 0) {
 		vnevent_rename_src(ITOV(sip), sdvp, snm, ct);
-		/*
-		 * Notify the target directory of the rename event
-		 * if source and target directories are not the same.
-		 */
-		if (sdvp != tdvp)
-			vnevent_rename_dest_dir(tdvp, ITOV(sip), tnm, ct);
+		vnevent_rename_dest_dir(tdvp, ITOV(sip), tnm, ct);
 	}
 
 errout:

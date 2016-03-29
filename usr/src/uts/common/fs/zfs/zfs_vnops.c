@@ -22,17 +22,12 @@
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012, 2015 by Delphix. All rights reserved.
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
- * Copyright 2015 Joyent, Inc.  All rights reserved.
  * Copyright (c) 2014 Integros [integros.com]
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 /* Portions Copyright 2007 Jeremy Teo */
 /* Portions Copyright 2010 Robert Milkowski */
-
-/*
- * Copyright (c) 2013, Joyent, Inc. All rights reserved.
- */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -3770,9 +3765,7 @@ top:
 
 	if (error == 0) {
 		vnevent_rename_src(ZTOV(szp), sdvp, snm, ct);
-		/* notify the target dir if it is not the same as source dir */
-		if (tdvp != sdvp)
-			vnevent_rename_dest_dir(tdvp, ZTOV(szp), tnm, ct);
+		vnevent_rename_dest_dir(tdvp, ZTOV(szp), tnm, ct);
 	}
 out:
 	if (zl != NULL)
