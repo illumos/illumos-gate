@@ -27,9 +27,8 @@
 #ifndef	_MDB_UMEM_H
 #define	_MDB_UMEM_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
+#include <limits.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -47,6 +46,20 @@ extern void *mdb_alloc_align(size_t, size_t, uint_t);
 extern void mdb_free_align(void *, size_t);
 
 extern void mdb_recycle(mdb_mblk_t **);
+
+/*
+ * These values represent an attempt to help constrain dmods that have bugs and
+ * have accidentally underflowed their size arguments. They represent
+ * allocations that are impossible.
+ */
+#if	defined(_ILP32)
+#define	MDB_ALLOC_MAX	INT32_MAX
+#elif	defined(_LP64)
+#define	MDB_ALLOC_MAX	INT64_MAX
+#else
+#error	"Unknown data model"
+#endif
+
 
 #endif /* _MDB */
 
