@@ -1865,7 +1865,6 @@ usbser_thr_dispatch(usbser_thread_t *thr)
 {
 	usbser_port_t	*pp = thr->thr_port;
 	usbser_state_t	*usp = pp->port_usp;
-	/*LINTED E_FUNC_SET_NOT_USED*/
 	int		rval;
 
 	ASSERT(mutex_owned(&pp->port_mutex));

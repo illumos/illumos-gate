@@ -34,7 +34,6 @@
 #include <sys/debug.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
-/*LINTED E_STATIC_UNUSED*/
 static long rseq_random();
 #define	random	rseq_random
 #else
