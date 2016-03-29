@@ -1,5 +1,6 @@
 '\" te
 .\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 2016, Joyent, Inc.
 .\" Copyright 1989 AT&T
 .\" Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
 .\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
@@ -9,7 +10,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH TIMER_SETTIME 3C "Feb 5, 2008"
+.TH TIMER_SETTIME 3C "Mar 24, 2016"
 .SH NAME
 timer_settime, timer_gettime, timer_getoverrun \- per-process timers
 .SH SYNOPSIS
@@ -103,6 +104,12 @@ set to \fBDELAYTIMER_MAX\fR. The value returned by \fBtimer_getoverrun()\fR
 applies to the most recent expiration signal delivery or acceptance for the
 timer. If no expiration signal has been delivered for the timer, the meaning of
 the overrun count returned is undefined.
+.sp
+.LP
+If the specified timer is of type \fBCLOCK_HIGHRES\fR and the time value is
+smaller than a system defined threshold, then {\fBPRIV_PROC_CLOCK_HIGHRES\fR}
+must be asserted in the effective set of the calling process or the time values
+will be adjusted up to the threshold value.
 .SH RETURN VALUES
 .sp
 .LP
@@ -171,4 +178,5 @@ Standard	See \fBstandards\fR(5).
 .sp
 .LP
 \fBtime.h\fR(3HEAD), \fBclock_settime\fR(3C), \fBtimer_create\fR(3C),
-\fBtimer_delete\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)
+\fBtimer_delete\fR(3C), \fBattributes\fR(5), \fBprivileges\fR(5),
+\fBstandards\fR(5)
