@@ -1,0 +1,90 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2016 Joyent, Inc.
+.\"
+.Dd "Jan 13, 2015"
+.Dt THRD_CREATE 3C
+.Os
+.Sh NAME
+.Nm thrd_create
+.Nd create a thread
+.Sh SYNOPSIS
+.In threads.h
+.Vt "typedef int (*thrd_start_t)(void *);"
+.Ft int
+.Fo thrd_create
+.Fa "thrd_t *thrdp"
+.Fa "thrd_start_t func"
+.Fa "void *arg"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn thrd_create
+function creates a new thread of execution inside of the current
+process and stores its identifier in
+.Fa thrdp .
+Each thread operates concurrently within the process.
+.Pp
+When a thread is created, it begins its execution at the function
+.Fa func
+with the argument
+.Fa arg .
+A created thread has access to all global data within a process;
+however, it has its own private stack. Currently 32-bit processes have a
+default stack of 1 megabyte, while 64-bit systems have a default stack
+size of 2 megabytes. In addition, newly created threads inherit the
+signal mask of the thread which created them; however, they do not
+inherit any pending signals.
+.Pp
+Once created, a thread will continue to execute until either, it returns
+from its initial function, the thread explicitly calls
+.Xr thrd_exit 3C ,
+or the process itself terminates, such as with a call to
+.Xr exit 2 .
+When the initial function returns, it behaves as though a call to
+.Xr thrd_exit
+was made, and, if the thread has not been detached with a call to
+.Xr thrd_detach,
+the exit status remains available and the corresponding thread ID will
+not be reused until a process calls
+.Xr thrd_join 3C .
+This is similar to how a parent must call
+.Xr wait 2 ,
+to clean up a child process that has terminated.
+.Pp
+For a richer interface interface with more control over aspects of the
+newly created thread, such as stack size, stack placement, and the like,
+see
+.Xr thr_create 3C
+and
+.Xr pthread_create 3C .
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn thrd_create
+function returns
+.Sy thrd_success .
+If insufficient memory was available, then
+.Sy thrd_nomem
+is returned. Otherwise,
+.Sy thrd_error
+is returned, indicating that a non-memory related error.
+.Sh INTERFACE STABILITY
+.Sy Standard
+.Sh MT-LEVEL
+.Sy MT-Safe
+.Sh SEE ALSO
+.Xr pthread_create 3C ,
+.Xr thr_create 3C ,
+.Xr thrd_detach 3C ,
+.Xr thrd_join 3C ,
+.Xr attributes 5 ,
+.Xr threads 5

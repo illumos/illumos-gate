@@ -11,6 +11,7 @@
 
 #
 # Copyright 2015 Garrett D'Amore <garrett@damore.org>
+# Copyright 2016 Joyent, Inc.
 #
 
 The configuration files in this directory are structured using the
@@ -56,6 +57,14 @@ value | <name> | <type> | <header> | <envs>
     assign the given value to a scratch variable declared with the given
     type.  The value can be a macro or other C symbol.
 
+define | <name> | <value> | <header> | <envs>
+
+    Tests for a definition named <name>.  The test verifies that the
+    pre-processor sees the definition.  If the <value> entry is not
+    empty then the check also verifies that there is strict equality
+    between the pre-processor value and it.  Only strict equality checks
+    are supported at this time.
+
 func | <name> | <type> | <type> [; <type> ]... | <header> | <envs>
 
     Tests whether a function <name>, returning the first <type>, and
@@ -69,4 +78,6 @@ Examples:
 
     type | size_t | sys/types.h | ALL
     value | NULL | void * | stdlib.h | ALL
-    func strnlen | int | const char *; int | string.h | ALL
+    define | thread_local | | threads.h | -ALL +C11
+    define | __alignas_is_defined | 1 | threads.h | -ALL +C11
+    func | strnlen | int | const char *; int | string.h | ALL

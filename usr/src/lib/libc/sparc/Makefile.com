@@ -20,7 +20,7 @@
 #
 #
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright (c) 2015, Joyent, Inc.  All rights reserved.
+# Copyright 2016 Joyent, Inc.
 # Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved.
 # Copyright 2013 Garrett D'Amore <garrett@damore.org>
 #
@@ -629,6 +629,7 @@ PORTGEN=			\
 	tfind.o			\
 	time_data.o		\
 	time_gdata.o		\
+	timespec_get.o		\
 	tls_data.o		\
 	truncate.o		\
 	tsdalloc.o		\
@@ -889,6 +890,7 @@ THREADSOBJS=			\
 	alloc.o			\
 	assfail.o		\
 	cancel.o		\
+	c11_thr.o		\
 	door_calls.o		\
 	tmem.o			\
 	pthr_attr.o		\

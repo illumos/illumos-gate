@@ -25,7 +25,7 @@
 # Use is subject to license terms.
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright (c) 2015, Joyent, Inc.  All rights reserved.
+# Copyright 2016 Joyent, Inc.
 # Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved.
 # Copyright (c) 2013 Gary Mills
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
@@ -92,6 +92,39 @@ $endif
 $if _x86 && _ELF64
 $add amd64
 $endif
+
+SYMBOL_VERSION ILLUMOS_0.20 {	# C11
+    protected:
+	aligned_alloc;
+	at_quick_exit;
+	call_once;
+	cnd_broadcast;
+	cnd_destroy;
+	cnd_init;
+	cnd_signal;
+	cnd_timedwait;
+	cnd_wait;
+	mtx_destroy;
+	mtx_init;
+	mtx_lock;
+	mtx_timedlock;
+	mtx_trylock;
+	mtx_unlock;
+	quick_exit;
+	thrd_create;
+	thrd_current;
+	thrd_detach;
+	thrd_equal;
+	thrd_exit;
+	thrd_join;
+	thrd_sleep;
+	thrd_yield;
+	timespec_get;
+	tss_create;
+	tss_delete;
+	tss_get;
+	tss_set;
+} ILLUMOS_0.19;
 
 SYMBOL_VERSION ILLUMOS_0.19 {	# flock
     protected:

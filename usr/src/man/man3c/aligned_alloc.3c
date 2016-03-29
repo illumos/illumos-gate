@@ -1,0 +1,74 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2016 Joyent, Inc.
+.\"
+.Dd "Mar 26, 2016"
+.Dt ALIGNED_ALLOC 3C
+.Os
+.Sh NAME
+.Nm aligned_alloc
+.Nd aligned memory allocation
+.Sh SYNOPSIS
+.In stdlib.h
+.Ft "void *"
+.Fo aligned_alloc
+.Fa "size_t alignment"
+.Fa "size_t size"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn aligned_alloc
+function allocates
+.Fa size
+bytes aligned on the specified alignment boundary
+.Fa alignment .
+The value of
+.Fa alignment
+is constrained, it must be a power of two and it must be greater than or
+equal to the size of a word on the platform.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn aligned_alloc
+function returns a pointer to suitably aligned memory at least
+.Fa size
+bytes large. Otherwise, a
+.Sy NULL
+pointer is returned and
+.Sy errno
+is set to indicate the error.
+.Sh ERRORS
+The
+.Fn aligned_alloc
+function will fail if:
+.Bl -tag -width Er
+.It Er ENOMEM
+The physical limits of the system are exceeded by
+.Fa size
+bytes of memory which cannot be allocated.
+.It Er EAGAIN
+There is not enough memory available to allocate
+.Fa size
+bytes of memory; but the application could try again later.
+.It Er EINVAL
+An invalid value for
+.Fa alignment
+was passed in. It is not a power of two multiple of the word size.
+.El
+.Sh INTERFACE STABILITY
+.Sy STANDARD
+.Sh MT-LEVEL
+.Sy MT-Safe
+.Sh SEE ALSO
+.Xr malloc 3C ,
+.Xr memalgin 3C ,
+.Xr posix_memalign 3C ,
+.Xr attributes 5

@@ -1,0 +1,56 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright (c) 2015, Joyent, Inc.
+.\" Copyright 2016 Joyent, Inc.
+.\"
+.Dd "Jan 13, 2015"
+.Dt THRD_DETACH 3C
+.Os
+.Sh NAME
+.Nm thrd_detach
+.Nd detach a thread
+.Sh SYNOPSIS
+.In threads.h
+.Ft int
+.Fo thrd_detach
+.Fa "thrd_t thrd"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn thrd_detach
+function causes a thread to be considered detached from the rest of the
+execution environment. While detached threads are still fully
+observable, they cannot be joined with, calls to
+.Fn thrd_join
+will fail. In addition, if all non-detached
+threads have terminated, the program will terminate; detached threads
+cannot keep a program running. The act of calling
+.Fn thrd_detach
+on a thread does not cause it to terminate.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Xr thrd_detach
+function returns
+.Sy thrd_success .
+Otherwise, it returns
+.Sy thrd_error ,
+indicating that an error has occurred.
+.Sh INTERFACE STABILITY
+.Sy Standard
+.Sh MT-LEVEL
+.Sy MT-safe
+.Sh SEE ALSO
+.Xr pthread_detach 3C ,
+.Xr thrd_create 3C ,
+.Xr thrd_join 3C ,
+.Xr attributes 5 ,
+.Xr threads 5

@@ -23,7 +23,7 @@
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
- * Copyright (c) 2015, Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #ifndef _THR_UBERDATA_H
@@ -893,6 +893,28 @@ typedef struct {
 } atexit_root32_t;
 #endif	/* _SYSCALL32 */
 
+/*
+ * at_quick_exit() and quick_exit() data structures. The ISO/IEC C11 odd
+ * siblings of atexit()
+ */
+typedef void (*_quick_exithdlr_func_t)(void);
+
+typedef struct _qexthdlr {
+	struct _qexthdlr 	*next;	/* next in handler list */
+	_quick_exithdlr_func_t	hdlr;	/* handler itself */
+} _qexthdlr_t;
+
+typedef struct {
+	mutex_t		exitfns_lock;
+	_qexthdlr_t	*head;
+} quickexit_root_t;
+
+#ifdef _SYSCALL32
+typedef struct {
+	mutex_t		exitfns_lock;
+	caddr32_t	head;
+} quickexit_root32_t;
+#endif /* _SYSCALL32 */
 
 /*
  * This is data that is global to all link maps (uberdata, aka super-global).
@@ -910,6 +932,7 @@ typedef struct uberdata {
 	siguaction_t	siguaction[NSIG];
 	bucket_t	bucket[NBUCKETS];
 	atexit_root_t	atexit_root;
+	quickexit_root_t quickexit_root;
 	tsd_metadata_t	tsd_metadata;
 	tls_metadata_t	tls_metadata;
 	/*
@@ -1126,6 +1149,7 @@ typedef struct uberdata32 {
 	siguaction32_t	siguaction[NSIG];
 	bucket32_t	bucket[NBUCKETS];
 	atexit_root32_t	atexit_root;
+	quickexit_root32_t quickexit_root;
 	tsd_metadata32_t tsd_metadata;
 	tls_metadata32_t tls_metadata;
 	char		primary_map;

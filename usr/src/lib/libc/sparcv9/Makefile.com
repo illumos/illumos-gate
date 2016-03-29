@@ -589,6 +589,7 @@ PORTGEN=			\
 	tfind.o			\
 	time_data.o		\
 	time_gdata.o		\
+	timespec_get.o		\
 	tls_data.o		\
 	truncate.o		\
 	tsdalloc.o		\
@@ -834,6 +835,7 @@ TPOOLOBJS=			\
 THREADSOBJS=			\
 	alloc.o			\
 	assfail.o		\
+	c11_thr.o		\
 	cancel.o		\
 	door_calls.o		\
 	tmem.o			\

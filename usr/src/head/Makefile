@@ -169,6 +169,7 @@ HDRS=   $($(MACH)_HDRS)  $(ATTRDB_HDRS) \
 	siginfo.h	\
 	signal.h	\
 	spawn.h		\
+	stdalign.h	\
 	stdarg.h	\
 	stdbool.h	\
 	stddef.h	\
@@ -178,6 +179,7 @@ HDRS=   $($(MACH)_HDRS)  $(ATTRDB_HDRS) \
 	stdio_tag.h	\
 	stdio_impl.h	\
 	stdlib.h	\
+	stdnoreturn.h	\
 	storclass.h	\
 	string.h	\
 	strings.h	\
@@ -192,6 +194,7 @@ HDRS=   $($(MACH)_HDRS)  $(ATTRDB_HDRS) \
 	tgmath.h	\
 	thread.h	\
 	thread_db.h	\
+	threads.h	\
 	time.h		\
 	tiuser.h	\
 	tzfile.h	\
@@ -232,6 +235,7 @@ ISOHDRS = \
 	stdio_c99.h	\
 	stdio_iso.h	\
 	stdlib_c99.h	\
+	stdlib_c11.h	\
 	stdlib_iso.h	\
 	string_iso.h	\
 	time_iso.h	\

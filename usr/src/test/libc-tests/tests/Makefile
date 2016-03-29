@@ -12,6 +12,7 @@
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2015 Garrett D'Amore <garrett@damore.org>
+# Copyright 2016 Joyent, Inc.
 #
 
 SUBDIRS = \
@@ -26,5 +27,70 @@ SUBDIRS = \
 	wcsrtombs \
 	wctype
 
-include $(SRC)/Makefile.master
-include $(SRC)/test/Makefile.com
+PROGS = \
+	aligned_alloc \
+	c11_threads \
+	c11_tss \
+	call_once \
+	quick_exit_order \
+	quick_exit_status \
+	timespec_get
+
+SCRIPTS = \
+	quick_exit
+
+CPPFLAGS += -D_REENTRANT
+
+PROGS32 = $(PROGS:%=%.32)
+PROGS64 = $(PROGS:%=%.64)
+
+aligned_alloc.32 :=	LDLIBS += -lproc
+aligned_alloc.64 :=	LDLIBS64 += -lproc
+
+ROOTOPTDIR = $(ROOT)/opt/libc-tests/tests
+ROOTOPTPROGS = $(PROGS32:%=$(ROOTOPTDIR)/%) \
+	$(PROGS64:%=$(ROOTOPTDIR)/%) \
+	$(SCRIPTS:%=$(ROOTOPTDIR)/%)
+
+include $(SRC)/cmd/Makefile.cmd
+
+all     :=      TARGET = all
+install :=      TARGET = install
+clean   :=      TARGET = clean
+clobber :=      TARGET = clobber
+lint    :=      TARGET = lint
+
+.KEEP_STATE:
+
+install: $(SUBDIRS) $(ROOTOPTPROGS)
+
+all: $(SUBDIRS) $(PROGS32) $(PROGS64)
+
+clean lint: $(SUBDIRS)
+
+$(ROOTOPTPROGS): $(PROGS32) $(PROGS64) $(ROOTOPTDIR)
+
+$(ROOTOPTDIR):
+	$(INS.dir)
+
+$(ROOTOPTDIR)/%: %
+	$(INS.file)
+
+$(ROOTOPTDIR)/%: %.ksh
+	$(INS.rename)
+
+%.64: %.c
+	$(LINK.c) -m64 -o $@ $< $(LDLIBS64)
+	$(POST_PROCESS)
+
+%.32: %.c
+	$(LINK.c) -m32 -o $@ $< $(LDLIBS)
+	$(POST_PROCESS)
+
+clobber: $(SUBDIRS)
+	$(RM) $(PROGS32) $(PROGS64)
+
+$(SUBDIRS): FRC
+	@cd $@; pwd; $(MAKE) $(TARGET)
+
+FRC:

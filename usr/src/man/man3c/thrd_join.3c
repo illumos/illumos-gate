@@ -1,0 +1,81 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2016 Joyent, Inc.
+.\"
+.Dd "Jan 13, 2015"
+.Dt THRD_JOIN 3C
+.Os
+.Sh NAME
+.Nm thrd_join
+.Nd wait for thread termination
+.Sh SYNOPSIS
+.In threads.h
+.Ft int
+.Fo thrd_join
+.Fa "thrd_t thrd"
+.Fa "int *res"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn thrd_join
+function suspends the exection of the current thread and waits for the
+thread indicated by
+.Fa thrd
+to terminate and stores the exit status, as set by a call to
+.Xr thrd_exit 3C ,
+for that thread in
+.Fa res ,
+if
+.Fa res
+is non-null. The
+.Fa thrd
+argument must be a member of the current process and it cannot be
+detached. If
+.Fa thrd
+has already terminated and another caller has not called
+.Fn thrd_join
+then the exit status will be returned to the caller without blocking
+execution of the thread.
+.Pp
+If multiple threads call
+.Fn thrd_join
+on the same thread, then both will be suspended until that thread
+terminates; however, only one thread will return successfully and obtain
+the actual status and the other will instead return with an error.
+.Pp
+For additional information on the thread joining interfaces supported by
+the system, see
+.Xr pthread_join 3C
+and
+.Xr thr_join 3C .
+.Sh RETURN_VALUES
+Upon successful completion, the
+.Fn thrd_join
+function returns
+.Sy thrd_success
+and if
+.Fa res
+is a non-null pointer, it will be filled in with the exit status of
+.Xr thrd .
+If an error occurs,
+.Sy thrd_error
+will be returned.
+.Sh INTERFACE STABILITY
+.Sy Standard
+.Sh MT-LEVEL
+.Sy MT-Safe
+.Sh SEE ALSO
+.Xr pthread_join 3C ,
+.Xr thrd_create 3C ,
+.Xr thrd_detach 3C ,
+.Xr attributes 5 ,
+.Xr threads 5
