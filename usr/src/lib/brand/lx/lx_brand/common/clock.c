@@ -60,14 +60,6 @@
  *    3	CLOCK_REALTIME			valid ptr.
  *    4	CLOCK_MONOTONIC (CLOCK_HIGHRES)	valid ptr.
  *    5	CLOCK_PROCESS_CPUTIME_ID	NULL
- *
- * Although an lx zone has the proc_clock_highres privilege (required to use
- * the CLOCK_HIGHRES clock), it will be unusable by an unprivileged user for
- * timer_create or timerfd_create. See the comment on clock_highres_timer_create
- * for full details. We currently map the Linux CLOCK_MONOTONIC (which
- * corresponds to the illumos CLOCK_HIGHRES) to the illumos CLOCK_REALTIME
- * in the ltos_timer array. This is generally fine since, unlike a standalone
- * system, zone's are not allowed to adjust the sytem's clock.
  */
 
 #define	CLOCK_RT_SLOT	0
@@ -75,6 +67,11 @@
 #define	LX_CLOCK_REALTIME	0
 #define	LX_CLOCK_MONOTONIC	1
 
+/*
+ * Limits for a minimum interval are enforced when creating timers from the
+ * CLOCK_HIGHRES source. Values below this minimum will be clamped if the
+ * process lacks the proc_clock_highres privilege.
+ */
 static int ltos_clock[] = {
 	CLOCK_REALTIME,			/* LX_CLOCK_REALTIME */
 	CLOCK_HIGHRES,			/* LX_CLOCK_MONOTONIC */
@@ -85,25 +82,7 @@ static int ltos_clock[] = {
 	CLOCK_HIGHRES			/* LX_CLOCK_MONOTONIC_COARSE */
 };
 
-/*
- * Since the illumos CLOCK_HIGHRES clock requires elevated privs, which can
- * lead to a DOS, we use the only other option (CLOCK_REALTIME) when given
- * LX_CLOCK_MONOTONIC. Note that this thinking is somewhat misguided and should
- * be revisited, since it implies that root in an lx zone can never be
- * compromised or would never DOS the system.
- */
-static int ltos_timer[] = {
-	CLOCK_REALTIME,
-	CLOCK_REALTIME,
-	CLOCK_THREAD_CPUTIME_ID,	/* XXX thread, not process but fails */
-	CLOCK_THREAD_CPUTIME_ID,
-	CLOCK_REALTIME,
-	CLOCK_REALTIME,
-	CLOCK_REALTIME
-};
-
 #define	LX_CLOCK_MAX	(sizeof (ltos_clock) / sizeof (ltos_clock[0]))
-#define	LX_TIMER_MAX	(sizeof (ltos_timer) / sizeof (ltos_timer[0]))
 
 #define	LX_SIGEV_PAD_SIZE	((64 - \
 	(sizeof (int) * 2 + sizeof (union sigval))) / sizeof (int))
@@ -201,8 +180,7 @@ lx_sigev_thread_id(union sigval sival)
  *   CLOCK_PROF (2)	user and system CPU usage clock - No Backend
  *   CLOCK_HIGHRES (4)	non-adjustable, high-resolution clock
  * However, in reality the illumos timer_create only accepts CLOCK_REALTIME
- * and CLOCK_HIGHRES, and since only root could use CLOCK_HIGHRES in an lx zone,
- * we're down to one clock.
+ * and CLOCK_HIGHRES.
  *
  * Linux has complicated support for clock IDs. For example, the
  * clock_getcpuclockid() function can return a negative clock_id. See the Linux
@@ -224,7 +202,7 @@ lx_timer_create(int clock, struct sigevent *lx_sevp, timer_t *tid)
 		clock = CLOCK_RT_SLOT;	/* force our use of CLOCK_REALTIME */
 	}
 
-	if (clock >= LX_TIMER_MAX)
+	if (clock >= LX_CLOCK_MAX)
 		return (-EINVAL);
 
 	/* We have to convert the Linux sigevent layout to the illumos layout */
@@ -297,7 +275,7 @@ lx_timer_create(int clock, struct sigevent *lx_sevp, timer_t *tid)
 		sev.sigev_value.sival_ptr = lev_copy;
 	}
 
-	return ((timer_create(ltos_timer[clock], &sev, tid) < 0) ? -errno : 0);
+	return ((timer_create(ltos_clock[clock], &sev, tid) < 0) ? -errno : 0);
 }
 
 long
@@ -337,7 +315,7 @@ lx_timerfd_create(int clockid, int flags)
 	if (clockid != LX_CLOCK_REALTIME && clockid != LX_CLOCK_MONOTONIC)
 		return (-EINVAL);
 
-	r = timerfd_create(ltos_timer[clockid], flags);
+	r = timerfd_create(ltos_clock[clockid], flags);
 	/*
 	 * As with the eventfd case, we return a slightly less jarring
 	 * error condition if we cannot open /dev/timerfd.
