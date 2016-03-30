@@ -227,6 +227,7 @@ static void lxpr_read_sys_kernel_shmmax(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_kernel_shmmni(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_kernel_threads_max(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_net_core_somaxc(lxpr_node_t *, lxpr_uiobuf_t *);
+static void lxpr_read_sys_vm_max_map_cnt(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_vm_minfr_kb(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_vm_nhpages(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_vm_overcommit_mem(lxpr_node_t *, lxpr_uiobuf_t *);
@@ -519,6 +520,7 @@ static lxpr_dirent_t sys_net_coredir[] = {
  * contents of /proc/sys/vm directory
  */
 static lxpr_dirent_t sys_vmdir[] = {
+	{ LXPR_SYS_VM_MAX_MAP_CNT,	"max_map_count" },
 	{ LXPR_SYS_VM_MINFR_KB,		"min_free_kbytes" },
 	{ LXPR_SYS_VM_NHUGEP,		"nr_hugepages" },
 	{ LXPR_SYS_VM_OVERCOMMIT_MEM,	"overcommit_memory" },
@@ -732,6 +734,7 @@ static void (*lxpr_read_function[LXPR_NFILES])() = {
 	lxpr_read_invalid,		/* /proc/sys/net/core	*/
 	lxpr_read_sys_net_core_somaxc,	/* /proc/sys/net/core/somaxconn	*/
 	lxpr_read_invalid,		/* /proc/sys/vm	*/
+	lxpr_read_sys_vm_max_map_cnt,	/* /proc/sys/vm/max_map_count */
 	lxpr_read_sys_vm_minfr_kb,	/* /proc/sys/vm/min_free_kbytes */
 	lxpr_read_sys_vm_nhpages,	/* /proc/sys/vm/nr_hugepages */
 	lxpr_read_sys_vm_overcommit_mem, /* /proc/sys/vm/overcommit_memory */
@@ -856,6 +859,7 @@ static vnode_t *(*lxpr_lookup_function[LXPR_NFILES])() = {
 	lxpr_lookup_sys_net_coredir,	/* /proc/sys/net/core */
 	lxpr_lookup_not_a_dir,		/* /proc/sys/net/core/somaxconn */
 	lxpr_lookup_sys_vmdir,		/* /proc/sys/vm */
+	lxpr_lookup_not_a_dir,		/* /proc/sys/vm/max_map_count */
 	lxpr_lookup_not_a_dir,		/* /proc/sys/vm/min_free_kbytes */
 	lxpr_lookup_not_a_dir,		/* /proc/sys/vm/nr_hugepages */
 	lxpr_lookup_not_a_dir,		/* /proc/sys/vm/overcommit_memory */
@@ -980,6 +984,7 @@ static int (*lxpr_readdir_function[LXPR_NFILES])() = {
 	lxpr_readdir_sys_net_coredir,	/* /proc/sys/net/core */
 	lxpr_readdir_not_a_dir,		/* /proc/sys/net/core/somaxconn */
 	lxpr_readdir_sys_vmdir,		/* /proc/sys/vm */
+	lxpr_readdir_not_a_dir,		/* /proc/sys/vm/max_map_count */
 	lxpr_readdir_not_a_dir,		/* /proc/sys/vm/min_free_kbytes */
 	lxpr_readdir_not_a_dir,		/* /proc/sys/vm/nr_hugepages */
 	lxpr_readdir_not_a_dir,		/* /proc/sys/vm/overcommit_memory */
@@ -4415,6 +4420,14 @@ lxpr_read_sys_net_core_somaxc(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	tcps = ns->netstack_tcp;
 	lxpr_uiobuf_printf(uiobuf, "%d\n", tcps->tcps_conn_req_max_q);
 	netstack_rele(ns);
+}
+
+static void
+lxpr_read_sys_vm_max_map_cnt(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+{
+	ASSERT(lxpnp->lxpr_type == LXPR_SYS_VM_MAX_MAP_CNT);
+	/* We don't limit mappings, just say we have a large limit. */
+	lxpr_uiobuf_printf(uiobuf, "%d\n", 16777215);
 }
 
 static void
