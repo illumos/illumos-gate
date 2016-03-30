@@ -279,6 +279,30 @@ mapexec_brand(vnode_t *vp, uarg_t *args, Ehdr *ehdr, Addr *uphdr_vaddr,
 
 		if (uphdr->p_flags == 0)
 			kmem_free(uphdr, sizeof (Phdr));
+	} else if (ehdr->e_type == ET_DYN) {
+		/*
+		 * If we don't have a uphdr, we'll apply the logic found
+		 * in mapelfexec() and use the p_vaddr of the first PT_LOAD
+		 * section as the base address of the object.
+		 */
+		Phdr *phdr = (Phdr *)phdrbase;
+		int i, hsize = ehdr->e_phentsize;
+
+		for (i = nphdrs; i > 0; i--) {
+			if (phdr->p_type == PT_LOAD) {
+				*uphdr_vaddr = (uintptr_t)phdr->p_vaddr +
+				    ehdr->e_phoff;
+				break;
+			}
+
+			phdr = (Phdr *)((caddr_t)phdr + hsize);
+		}
+
+		/*
+		 * If we don't have a PT_LOAD segment, we should have returned
+		 * ENOEXEC when elfsize() returned 0, above.
+		 */
+		VERIFY(i > 0);
 	} else {
 		*uphdr_vaddr = (Addr)-1;
 	}
@@ -1349,30 +1373,66 @@ mapelfexec(
 	extern int use_brk_lpg;
 
 	if (ehdr->e_type == ET_DYN) {
-		/*
-		 * Obtain the virtual address of a hole in the
-		 * address space to map the "interpreter".
-		 */
-		map_addr(&addr, len, (offset_t)0, 1, 0);
-		if (addr == NULL)
-			return (ENOMEM);
-		*voffset = (intptr_t)addr;
+		caddr_t vaddr;
 
 		/*
-		 * Calculate the minimum vaddr so it can be subtracted out.
-		 * According to the ELF specification, since PT_LOAD sections
-		 * must be sorted by increasing p_vaddr values, this is
-		 * guaranteed to be the first PT_LOAD section.
+		 * Despite the fact that mmapobj(2) refuses to load them, we
+		 * need to support executing ET_DYN objects that have a
+		 * non-NULL p_vaddr.  When found in the wild, these objects
+		 * are likely to be due to an old (and largely obviated) Linux
+		 * facility, prelink(8), that rewrites shared objects to
+		 * prefer specific (disjoint) virtual address ranges.  (Yes,
+		 * this is putatively for performance -- and yes, it has
+		 * limited applicability, many edge conditions and grisly
+		 * failure modes; even for Linux, it's insane.)  As ELF
+		 * mandates that the PT_LOAD segments be in p_vaddr order, we
+		 * find the lowest p_vaddr by finding the first PT_LOAD
+		 * segment.
 		 */
 		phdr = (Phdr *)phdrbase;
 		for (i = nphdrs; i > 0; i--) {
 			if (phdr->p_type == PT_LOAD) {
-				*voffset -= (uintptr_t)phdr->p_vaddr;
+				addr = (caddr_t)(uintptr_t)phdr->p_vaddr;
 				break;
 			}
 			phdr = (Phdr *)((caddr_t)phdr + hsize);
 		}
 
+		/*
+		 * We have a non-zero p_vaddr in the first PT_LOAD segment --
+		 * presumably because we're directly executing a prelink(8)'d
+		 * ld-linux.so.  While we could correctly execute such an
+		 * object without locating it at its desired p_vaddr (it is,
+		 * after all, still relocatable), our inner antiquarian
+		 * derives a perverse pleasure in accommodating the steampunk
+		 * prelink(8) contraption -- goggles on!
+		 */
+		if ((vaddr = addr) != NULL) {
+			if (as_gap(curproc->p_as, len,
+			    &addr, &len, AH_LO, NULL) == -1 || addr != vaddr) {
+				addr = NULL;
+			}
+		}
+
+		if (addr == NULL) {
+			/*
+			 * We either have a NULL p_vaddr (the common case, by
+			 * many orders of magnitude) or we have a non-NULL
+			 * p_vaddr and we were unable to obtain the specified
+			 * VA range (presumably because it's an illegal
+			 * address).  Either way, obtain an address in which
+			 * to map the interpreter.
+			 */
+			map_addr(&addr, len, (offset_t)0, 1, 0);
+			if (addr == NULL)
+				return (ENOMEM);
+		}
+
+		/*
+		 * Our voffset is the difference between where we landed and
+		 * where we wanted to be.
+		 */
+		*voffset = (uintptr_t)addr - (uintptr_t)vaddr;
 	} else {
 		*voffset = 0;
 	}
