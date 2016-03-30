@@ -219,6 +219,7 @@ typedef enum lxpr_nodetype {
 	LXPR_SYS_NET_COREDIR,		/* /proc/sys/net/core		*/
 	LXPR_SYS_NET_CORE_SOMAXCON,	/* /proc/sys/net/core/somaxconn	*/
 	LXPR_SYS_VMDIR,			/* /proc/sys/vm			*/
+	LXPR_SYS_VM_MAX_MAP_CNT,	/* /proc/sys/vm/max_map_count	*/
 	LXPR_SYS_VM_MINFR_KB,		/* /proc/sys/vm/min_free_kbytes	*/
 	LXPR_SYS_VM_NHUGEP,		/* /proc/sys/vm/nr_hugepages	*/
 	LXPR_SYS_VM_OVERCOMMIT_MEM,	/* /proc/sys/vm/overcommit_memory */
