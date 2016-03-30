@@ -71,6 +71,8 @@ CERRWARN	+= -_gcc=-Wno-unused-label
 CERRWARN	+= -_gcc=-Wno-unused-variable
 CERRWARN	+= -_cc=-erroff=E_STATEMENT_NOT_REACHED
 
+LINTTAGS	+= -erroff=E_CONSTANT_CONDITION
+
 #
 #	Define targets
 #

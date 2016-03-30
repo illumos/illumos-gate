@@ -167,7 +167,7 @@ cleanup_path(const char *input_path, char *path)
  */
 
 #ifdef	DEBUG
-static const char *optstring = "abcdDvVxpPFf:M:dLuC";
+static const char *optstring = "abcdDvVxmpPFf:M:dLuC";
 #else
 static const char *optstring = "abcdDvVxmpPFf:uC";
 #endif	/* DEBUG */
