@@ -1360,10 +1360,15 @@ calc_loadable(Ehdr *ehdrp, caddr_t phdrbase, int nphdrs, size_t *len,
 			}
 			if (num_segs++ == 0) {
 				/*
-				 * The p_vaddr of the first PT_LOAD segment
-				 * must either be NULL or within the first
-				 * page in order to be interpreted.
-				 * Otherwise, its an invalid file.
+				 * While ELF doesn't specify the meaning of
+				 * p_vaddr for PT_LOAD segments in ET_DYN
+				 * objects, we mandate that is either NULL or
+				 * (to accommodate some historical binaries)
+				 * within the first page.  (Note that there
+				 * exist non-native ET_DYN objects that violate
+				 * this constraint that we nonetheless must be
+				 * able to execute; see the ET_DYN handling in
+				 * mapelfexec() for details.)
 				 */
 				if (e_type == ET_DYN &&
 				    ((caddr_t)((uintptr_t)vaddr &
