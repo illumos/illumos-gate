@@ -226,11 +226,13 @@ i_lx_opt_verify(char *opts, mount_opt_t *mop)
 			} else if (mop[i].mo_type == MOUNT_OPT_BYTESIZE) {
 				int j;
 				int stage = 0;
+				int suffix;
 
 				/*
 				 * Verify that the value is an unsigned integer
-				 * that ends in a magnitude suffix (i.e. 'k'
-				 * or 'm') or a '%' character.
+				 * that ends in a magnitude suffix (i.e. case
+				 * insensitive 'k' 'm' or 'g') or a '%'
+				 * character.
 				 */
 				for (j = 0; j < ovalue_len; j++) {
 					switch (stage) {
@@ -256,9 +258,11 @@ i_lx_opt_verify(char *opts, mount_opt_t *mop)
 						 * Allow one (valid) byte
 						 * magnitude character.
 						 */
-						if (ovalue[j] == 'm' ||
-						    ovalue[j] == 'k' ||
-						    ovalue[j] == '\%') {
+						suffix = tolower(ovalue[j]);
+						if (suffix == 'k' ||
+						    suffix == 'm' ||
+						    suffix == 'g' ||
+						    suffix == '\%') {
 							stage = 2;
 							break;
 						}
