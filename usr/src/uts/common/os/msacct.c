@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Joyent, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -566,27 +567,18 @@ cpu_update_pct(kthread_t *t, hrtime_t newtime)
 	 */
 
 	do {
-		if (T_ONPROC(t) && t->t_waitrq == 0) {
-			hrlb = t->t_hrtime;
+		pctcpu = t->t_pctcpu;
+		hrlb = t->t_hrtime;
+		delta = newtime - hrlb;
+		if (delta < 0) {
+			newtime = gethrtime_unscaled();
 			delta = newtime - hrlb;
-			if (delta < 0) {
-				newtime = gethrtime_unscaled();
-				delta = newtime - hrlb;
-			}
-			t->t_hrtime = newtime;
-			scalehrtime(&delta);
-			pctcpu = t->t_pctcpu;
+		}
+		t->t_hrtime = newtime;
+		scalehrtime(&delta);
+		if (T_ONPROC(t) && t->t_waitrq == 0) {
 			npctcpu = cpu_grow(pctcpu, delta);
 		} else {
-			hrlb = t->t_hrtime;
-			delta = newtime - hrlb;
-			if (delta < 0) {
-				newtime = gethrtime_unscaled();
-				delta = newtime - hrlb;
-			}
-			t->t_hrtime = newtime;
-			scalehrtime(&delta);
-			pctcpu = t->t_pctcpu;
 			npctcpu = cpu_decay(pctcpu, delta);
 		}
 	} while (atomic_cas_32(&t->t_pctcpu, pctcpu, npctcpu) != pctcpu);
