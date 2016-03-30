@@ -22,7 +22,7 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #ifndef	_LX_MOUNT_H
@@ -67,12 +67,20 @@ extern int lx_nfs_mount(char *, char *, char *, int, char *);
 #define	LX_MS_I_VERSION		0x00800000
 #define	LX_MS_STRICTATIME	0x01000000
 #define	LX_MS_LAZYTIME		0x02000000
+
+/* internal flags - ignored if passed in */
+#define	LX_MS_NOSEC		0x10000000
+#define	LX_MS_BORN		0x20000000
+#define	LX_MS_ACTIVE		0x40000000
+#define	LX_MS_NOUSER		0x80000000
+
 #define	LX_MS_SUPPORTED		(LX_MS_MGC_VAL | \
 				LX_MS_RDONLY | LX_MS_NOSUID | \
 				LX_MS_NODEV | LX_MS_NOEXEC | \
 				LX_MS_REMOUNT | LX_MS_NOATIME | \
 				LX_MS_BIND | LX_MS_SILENT | \
-				LX_MS_STRICTATIME)
+				LX_MS_STRICTATIME | LX_MS_NOSEC | \
+				LX_MS_BORN | LX_MS_ACTIVE | LX_MS_NOUSER)
 
 /*
  * support for nfs mounts
