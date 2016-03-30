@@ -373,8 +373,9 @@ DRV_KMODS	+= qlt
 DRV_KMODS	+= iscsit
 DRV_KMODS	+= pppt
 DRV_KMODS	+= ncall nsctl sdbc nskern sv
-DRV_KMODS	+= ii rdc rdcsrv rdcstub 
+DRV_KMODS	+= ii rdc rdcsrv rdcstub
 DRV_KMODS	+= iptun
+DRV_KMODS	+= vmxnet3s
 
 #
 # Common code drivers
