@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -306,10 +306,7 @@ struct auth_cache {
 	avl_node_t		auth_link;
 	struct auth_cache_clnt	*auth_clnt;
 	int			auth_flavor;
-	uid_t			auth_clnt_uid;
-	gid_t			auth_clnt_gid;
-	uint_t			auth_clnt_ngids;
-	gid_t			*auth_clnt_gids;
+	cred_t			*auth_clnt_cred;
 	uid_t			auth_srv_uid;
 	gid_t			auth_srv_gid;
 	uint_t			auth_srv_ngids;

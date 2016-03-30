@@ -25,7 +25,7 @@
 /*
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
- * Copyright (c) 2015, Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*
@@ -710,6 +710,17 @@ e1000g_regs_map(struct e1000g *Adapter)
 			goto regs_map_fail;
 		}
 		break;
+	case e1000_pch_spt:
+		/*
+		 * On the SPT, the device flash is actually in BAR0, not a
+		 * separate BAR. Therefore we end up setting the
+		 * ich_flash_handle to be the same as the register handle.
+		 * We mark the same to reduce the confusion in the other
+		 * functions and macros. Though this does make the set up and
+		 * tear-down path slightly more complicated.
+		 */
+		osdep->ich_flash_handle = osdep->reg_handle;
+		hw->flash_address = hw->hw_addr;
 	default:
 		break;
 	}
@@ -769,7 +780,7 @@ e1000g_regs_map(struct e1000g *Adapter)
 regs_map_fail:
 	if (osdep->reg_handle != NULL)
 		ddi_regs_map_free(&osdep->reg_handle);
-	if (osdep->ich_flash_handle != NULL)
+	if (osdep->ich_flash_handle != NULL && hw->mac.type != e1000_pch_spt)
 		ddi_regs_map_free(&osdep->ich_flash_handle);
 	return (DDI_FAILURE);
 }
@@ -897,6 +908,7 @@ e1000g_setup_max_mtu(struct e1000g *Adapter)
 	/* pch2 can do jumbo frames up to 9K */
 	case e1000_pch2lan:
 	case e1000_pch_lpt:
+	case e1000_pch_spt:
 		Adapter->max_mtu = MAXIMUM_MTU_9K;
 		break;
 	/* types with a special limit */
@@ -1129,7 +1141,8 @@ e1000g_unattach(dev_info_t *devinfo, struct e1000g *Adapter)
 	if (Adapter->attach_progress & ATTACH_PROGRESS_REGS_MAP) {
 		if (Adapter->osdep.reg_handle != NULL)
 			ddi_regs_map_free(&Adapter->osdep.reg_handle);
-		if (Adapter->osdep.ich_flash_handle != NULL)
+		if (Adapter->osdep.ich_flash_handle != NULL &&
+		    Adapter->shared.mac.type != e1000_pch_spt)
 			ddi_regs_map_free(&Adapter->osdep.ich_flash_handle);
 		if (Adapter->osdep.io_reg_handle != NULL)
 			ddi_regs_map_free(&Adapter->osdep.io_reg_handle);
@@ -1461,6 +1474,8 @@ e1000g_init(struct e1000g *Adapter)
 		pba = E1000_PBA_26K;
 	} else if (hw->mac.type == e1000_pch_lpt) {
 		pba = E1000_PBA_26K;
+	} else if (hw->mac.type == e1000_pch_spt) {
+		pba = E1000_PBA_26K;
 	} else {
 		/*
 		 * Total FIFO is 40K
@@ -1686,6 +1701,12 @@ e1000g_link_up(struct e1000g *Adapter)
 	switch (hw->phy.media_type) {
 	case e1000_media_type_copper:
 		if (hw->mac.get_link_status) {
+			/*
+			 * SPT devices need a bit of extra time before we ask
+			 * them.
+			 */
+			if (hw->mac.type == e1000_pch_spt)
+				msec_delay(50);
 			(void) e1000_check_for_link(hw);
 			if ((E1000_READ_REG(hw, E1000_STATUS) &
 			    E1000_STATUS_LU)) {
@@ -1942,6 +1963,41 @@ start_fail:
 	return (DDI_FAILURE);
 }
 
+/*
+ * The I219 has the curious property that if the descriptor rings are not
+ * emptied before resetting the hardware or before changing the device state
+ * based on runtime power management, it'll cause the card to hang. This can
+ * then only be fixed by a PCI reset. As such, for the I219 and it alone, we
+ * have to flush the rings if we're in this state.
+ */
+static void
+e1000g_flush_desc_rings(struct e1000g *Adapter)
+{
+	struct e1000_hw	*hw = &Adapter->shared;
+	u16		hang_state;
+	u32		fext_nvm11, tdlen;
+
+	/* First, disable MULR fix in FEXTNVM11 */
+	fext_nvm11 = E1000_READ_REG(hw, E1000_FEXTNVM11);
+	fext_nvm11 |= E1000_FEXTNVM11_DISABLE_MULR_FIX;
+	E1000_WRITE_REG(hw, E1000_FEXTNVM11, fext_nvm11);
+
+	/* do nothing if we're not in faulty state, or if the queue is empty */
+	tdlen = E1000_READ_REG(hw, E1000_TDLEN(0));
+	hang_state = pci_config_get16(Adapter->osdep.cfg_handle,
+	    PCICFG_DESC_RING_STATUS);
+	if (!(hang_state & FLUSH_DESC_REQUIRED) || !tdlen)
+		return;
+	e1000g_flush_tx_ring(Adapter);
+
+	/* recheck, maybe the fault is caused by the rx ring */
+	hang_state = pci_config_get16(Adapter->osdep.cfg_handle,
+	    PCICFG_DESC_RING_STATUS);
+	if (hang_state & FLUSH_DESC_REQUIRED)
+		e1000g_flush_rx_ring(Adapter);
+
+}
+
 static void
 e1000g_m_stop(void *arg)
 {
@@ -2004,6 +2060,14 @@ e1000g_stop(struct e1000g *Adapter, boolean_t global)
 
 	/* Clean the pending rx jumbo packet fragment */
 	e1000g_rx_clean(Adapter);
+
+	/*
+	 * The I219, eg. the pch_spt, has bugs such that we must ensure that
+	 * rings are flushed before we do anything else. This must be done
+	 * before we release DMA resources.
+	 */
+	if (Adapter->shared.mac.type == e1000_pch_spt)
+		e1000g_flush_desc_rings(Adapter);
 
 	if (global) {
 		e1000g_release_dma_resources(Adapter);
@@ -2453,16 +2517,17 @@ e1000g_init_unicst(struct e1000g *Adapter)
 
 		/*
 		 * The common code does not correctly calculate the number of
-		 * rar's that could be reserved by firmware for the pch_lpt
-		 * macs. The interface has one primary rar, and 11 additional
-		 * ones. Those 11 additional ones are not always available.
-		 * According to the datasheet, we need to check a few of the
-		 * bits set in the FWSM register. If the value is zero,
-		 * everything is available. If the value is 1, none of the
+		 * rar's that could be reserved by firmware for the pch_lpt and
+		 * pch_spt macs. The interface has one primary rar, and 11
+		 * additional ones. Those 11 additional ones are not always
+		 * available.  According to the datasheet, we need to check a
+		 * few of the bits set in the FWSM register. If the value is
+		 * zero, everything is available. If the value is 1, none of the
 		 * additional registers are available. If the value is 2-7, only
 		 * that number are available.
 		 */
-		if (hw->mac.type == e1000_pch_lpt) {
+		if (hw->mac.type == e1000_pch_lpt ||
+		    hw->mac.type == e1000_pch_spt) {
 			uint32_t locked, rar;
 
 			locked = E1000_READ_REG(hw, E1000_FWSM) &

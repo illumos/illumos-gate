@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 David Höppner. All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #ifndef _E1000G_SW_H
@@ -1070,6 +1071,24 @@ int e1000g_check_dma_handle(ddi_dma_handle_t handle);
 void e1000g_fm_ereport(struct e1000g *Adapter, char *detail);
 void e1000g_set_fma_flags(int dma_flag);
 int e1000g_reset_link(struct e1000g *Adapter);
+
+/*
+ * Functions for working around various problems, these used to be from the
+ * common code.
+ */
+s32 e1000_fifo_workaround_82547(struct e1000_hw *hw, u16 length);
+void e1000_update_tx_fifo_head_82547(struct e1000_hw *hw, u32 length);
+void e1000_set_ttl_workaround_state_82541(struct e1000_hw *hw, bool state);
+bool e1000_ttl_workaround_enabled_82541(struct e1000_hw *hw);
+s32 e1000_igp_ttl_workaround_82547(struct e1000_hw *hw);
+
+/*
+ * I219 specific workarounds
+ */
+#define	PCICFG_DESC_RING_STATUS	0xe4
+#define	FLUSH_DESC_REQUIRED	0x100
+extern void e1000g_flush_rx_ring(struct e1000g *);
+extern void e1000g_flush_tx_ring(struct e1000g *);
 
 /*
  * Global variables

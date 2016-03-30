@@ -4,18 +4,17 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\" See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PRTCONF 1M "Jan 11, 2013"
+.TH PRTCONF 1M "Mar 24, 2016"
 .SH NAME
 prtconf \- print system configuration
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/sbin/prtconf\fR [\fB-V\fR] | [\fB-F\fR] | [\fB-x\fR] | [\fB-bpv\fR] | [\fB-acdDPv\fR]
+\fB/usr/sbin/prtconf\fR [\fB-V\fR] | [\fB-F\fR] | [\fB-m\fr] | [\fB-x\fR] | [\fB-bpv\fR] | [\fB-acdDPv\fR]
      [\fIdev_path\fR]
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBprtconf\fR command prints the system configuration information. The
 output includes the total amount of memory, and the configuration of system
@@ -26,7 +25,6 @@ If a device path is specified on the command line for those command options
 that can take a device path, \fBprtconf\fR will only display information for
 that device node.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -100,6 +98,16 @@ console frame buffer on a SUNW,Ultra-30 is \fBffb\fR, the command returns:
 .sp
 .ne 2
 .na
+\fB\fB-m\fR\fR
+.ad
+.RS 6n
+Displays the amount of system memory in megabytes.
+This flag must be used by itself.
+.RE
+
+
+.ne 2
+.na
 \fB\fB-p\fR\fR
 .ad
 .RS 6n
@@ -160,7 +168,6 @@ This flag overrides all other flags and must be used by itself.
 .RE
 
 .SH OPERANDS
-.sp
 .LP
 The following operands are supported:
 .sp
@@ -174,7 +181,6 @@ which device node configuration information is displayed
 .RE
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -199,7 +205,6 @@ non-zero return value means that an error occurred.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -214,18 +219,15 @@ Interface Stability	Unstable
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBfuser\fR(1M), \fBmodinfo\fR(1M), \fBsysdef\fR(1M), \fBattributes\fR(5)
 .sp
 .LP
 \fISun Hardware Platform Guide\fR
 .SS "SPARC Only"
-.sp
 .LP
 \fBopenprom\fR(7D)
 .SH NOTES
-.sp
 .LP
 The output of the \fBprtconf\fR command is highly dependent on the version of
 the \fBPROM\fR installed in the system. The output will be affected in

@@ -71,32 +71,10 @@ struct e1000_dev_spec_82541 {
 	u32 tx_fifo_head;
 	u32 tx_fifo_start;
 	u32 tx_fifo_size;
-	u16 dsp_reset_counter;
 	u16 spd_default;
 	bool phy_init_script;
 	bool ttl_workaround;
 };
-
-Similarly in e1000_82541.h you must make sure the following macros and external
-function declarations are present:
-
-#define	E1000_FIFO_MULTIPLIER			0x80
-#define	E1000_FIFO_HDR_SIZE			0x10
-#define	E1000_FIFO_GRANULARITY			0x10
-#define	E1000_FIFO_PAD_82547			0x3E0
-#define	E1000_ERR_FIFO_WRAP			8
-
-#define	DSP_RESET_ENABLE			0x0
-#define	DSP_RESET_DISABLE			0x2
-#define	E1000_MAX_DSP_RESETS			10
-
-#define	E1000_ROUNDUP(size, unit)	(((size) + (unit) - 1) & ~((unit) - 1))
-
-s32 e1000_fifo_workaround_82547(struct e1000_hw *hw, u16 length);
-void e1000_update_tx_fifo_head_82547(struct e1000_hw *hw, u32 length);
-void e1000_set_ttl_workaround_state_82541(struct e1000_hw *hw, bool state);
-bool e1000_ttl_workaround_enabled_82541(struct e1000_hw *hw);
-s32 e1000_igp_ttl_workaround_82547(struct e1000_hw *hw);
 
 # EEE
 

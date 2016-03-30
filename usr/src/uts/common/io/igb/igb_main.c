@@ -26,6 +26,7 @@
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2013, Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include "igb_sw.h"
@@ -596,9 +597,9 @@ igb_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	 * default.
 	 */
 	if (igb->hw.mac.type == e1000_i350)
-		(void) e1000_set_eee_i350(&igb->hw);
+		(void) e1000_set_eee_i350(&igb->hw, B_FALSE, B_FALSE);
 	else if (igb->hw.mac.type == e1000_i354)
-		(void) e1000_set_eee_i354(&igb->hw);
+		(void) e1000_set_eee_i354(&igb->hw, B_FALSE, B_FALSE);
 
 	return (DDI_SUCCESS);
 
@@ -1864,9 +1865,9 @@ igb_start(igb_t *igb, boolean_t alloc_buffer)
 		goto start_failure;
 
 	if (igb->hw.mac.type == e1000_i350)
-		(void) e1000_set_eee_i350(&igb->hw);
+		(void) e1000_set_eee_i350(&igb->hw, B_FALSE, B_FALSE);
 	else if (igb->hw.mac.type == e1000_i354)
-		(void) e1000_set_eee_i354(&igb->hw);
+		(void) e1000_set_eee_i354(&igb->hw, B_FALSE, B_FALSE);
 
 	for (i = igb->num_tx_rings - 1; i >= 0; i--)
 		mutex_exit(&igb->tx_rings[i].tx_lock);
