@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*
@@ -518,12 +518,6 @@ overlay_target_associate(overlay_target_hdl_t *thdl, void *arg)
 
 	odd->odd_flags |= OVERLAY_F_VARPD;
 	odd->odd_target = ott;
-
-	/*
-	 * Now that we've successfully integrated ourselves here, we should note
-	 * that the link state is now up, and transition it away from UKNOWN.
-	 */
-	overlay_link_state_update(odd);
 	mutex_exit(&odd->odd_lock);
 
 	overlay_hold_rele(odd);
@@ -578,11 +572,6 @@ overlay_target_disassociate(overlay_target_hdl_t *thdl, void *arg)
 
 	mutex_enter(&odd->odd_lock);
 	odd->odd_flags &= ~OVERLAY_F_VARPD;
-
-	/*
-	 * Without a varpd instance, we should consider ourselves link down.
-	 */
-	overlay_link_state_update(odd);
 	mutex_exit(&odd->odd_lock);
 
 	overlay_hold_rele(odd);

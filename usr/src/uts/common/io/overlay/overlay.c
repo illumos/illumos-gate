@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*
@@ -510,9 +510,13 @@
  * devices is wrong, we store the odd_fmamsg[] character array. This character
  * array can be fetched with doing a dladm show-overlay -f.
  *
- * When an overlay device is degraded, we update the link status of a device to
- * ensure that dladm and other tooling that is trying to check the link status
- * note that it is down due to this error.
+ * Note, that it's important that we do not update the link status of the
+ * devices. We want to remain up as much as possible. By changing the link in a
+ * degraded state, this may end up making things worse. We may still actually
+ * have information in the target cache and if we mark the link down, that'll
+ * result in not being able to use it. The reason being that this'll mark all
+ * the downstream VNICs down which will go to IP and from there we end up
+ * dealing with sadness.
  *
  * -----------------------
  * Target Cache Life Cycle
@@ -922,27 +926,6 @@ overlay_io_wait(overlay_dev_t *odd, overlay_dev_flag_t flag)
 	while (odd->odd_flags & flag) {
 		cv_wait(&odd->odd_iowait, &odd->odd_lock);
 	}
-}
-
-/*
- * Update our link state with MAC. Note that it may not actually be changing
- * from what MAC thinks it is. We compute our state by looking at a combination
- * of two different flags: OVERLAY_F_DEGRADED and OVERLAY_F_VARPD. For the link
- * to be up, OVERLAY_F_DEGRADED must be false and OVERLAY_F_VARPD must be true,
- * eg. the link must not be degraded and varpd must be around.
- */
-void
-overlay_link_state_update(overlay_dev_t *odd)
-{
-	link_state_t state = LINK_STATE_DOWN;
-
-	ASSERT(MUTEX_HELD(&odd->odd_lock));
-
-	if ((odd->odd_flags & OVERLAY_F_DEGRADED) == 0 &&
-	    (odd->odd_flags & OVERLAY_F_VARPD) != 0)
-		state = LINK_STATE_UP;
-
-	mac_link_update(odd->odd_mh, state);
 }
 
 void
@@ -1461,6 +1444,14 @@ overlay_i_activate(void *karg, intptr_t arg, int mode, cred_t *cred, int *rvalp)
 
 	ASSERT((odd->odd_flags & OVERLAY_F_ACTIVATED) == 0);
 	odd->odd_flags |= OVERLAY_F_ACTIVATED;
+
+	/*
+	 * Now that we've activated ourselves, we should indicate to the world
+	 * that we're up. Note that we may not be able to perform lookups at
+	 * this time, but our notion of being 'up' isn't dependent on that
+	 * ability.
+	 */
+	mac_link_update(odd->odd_mh, LINK_STATE_UP);
 	mutex_exit(&odd->odd_lock);
 
 	mac_perim_exit(mph);

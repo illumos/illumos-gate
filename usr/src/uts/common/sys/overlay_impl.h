@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2015, Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #ifndef _SYS_OVERLAY_IMPL_H
@@ -162,8 +162,6 @@ extern void overlay_plugin_walk(overlay_plugin_walk_f, void *);
 
 extern void overlay_io_start(overlay_dev_t *, overlay_dev_flag_t);
 extern void overlay_io_done(overlay_dev_t *, overlay_dev_flag_t);
-
-extern void overlay_link_state_update(overlay_dev_t *);
 
 extern void overlay_mux_init(void);
 extern void overlay_mux_fini(void);
