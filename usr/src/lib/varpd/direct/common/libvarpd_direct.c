@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2015, Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*
@@ -326,7 +326,8 @@ varpd_direct_restore(nvlist_t *nvp, varpd_provider_handle_t *hdl,
 	if (vdp == NULL)
 		return (ENOMEM);
 
-	if ((ret = mutex_init(&vdp->vad_lock, USYNC_THREAD, NULL)) != 0) {
+	if ((ret = mutex_init(&vdp->vad_lock, USYNC_THREAD | LOCK_ERRORCHECK,
+	    NULL)) != 0) {
 		umem_free(vdp, sizeof (varpd_direct_t));
 		return (ret);
 	}
