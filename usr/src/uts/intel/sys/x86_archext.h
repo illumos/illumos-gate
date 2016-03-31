@@ -203,7 +203,7 @@ extern "C" {
 #define	CPUID_INTC_EBX_7_0_BMI1		0x00000008	/* BMI1 instrs */
 #define	CPUID_INTC_EBX_7_0_AVX2		0x00000020	/* AVX2 supported */
 #define	CPUID_INTC_EBX_7_0_SMEP		0x00000080	/* SMEP in CR4 */
-#define	CPUID_INTC_EBX_7_0_BMI2		0x00000100	/* BMI2 instrs */
+#define	CPUID_INTC_EBX_7_0_BMI2		0x00000100	/* BMI2 Instrs */
 #define	CPUID_INTC_EBX_7_0_RDSEED	0x00040000	/* RDSEED instr */
 #define	CPUID_INTC_EBX_7_0_ADX		0x00080000	/* ADX instrs */
 #define	CPUID_INTC_EBX_7_0_SMAP		0x00100000	/* SMAP in CR 4 */

@@ -3179,6 +3179,8 @@ smap_disable(void)
 
 #endif /* __lint */
 
+#ifndef __lint
+
 .data
 .align 	4
 .globl	_smap_enable_patch_count
@@ -3192,3 +3194,5 @@ _smap_enable_patch_count:
 .size	_smap_disable_patch_count, 4
 _smap_disable_patch_count:
 	.long SMAP_DISABLE_COUNT
+
+#endif /* __lint */

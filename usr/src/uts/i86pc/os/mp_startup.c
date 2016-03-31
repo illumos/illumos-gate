@@ -173,6 +173,7 @@ init_cpu_syscall(struct cpu *cp)
 #if defined(__amd64)
 	if (is_x86_feature(x86_featureset, X86FSET_MSR) &&
 	    is_x86_feature(x86_featureset, X86FSET_ASYSC)) {
+		uint64_t flags;
 
 #if !defined(__lint)
 		/*
