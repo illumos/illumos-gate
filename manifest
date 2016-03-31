@@ -2300,7 +2300,6 @@ h usr/bin/sparc=usr/bin/sun
 f usr/bin/spell 0555 root bin
 f usr/bin/split 0555 root bin
 f usr/bin/srchtxt 0555 root bin
-s usr/bin/strace=../sbin/strace
 f usr/bin/strchg 0555 root root
 s usr/bin/strclean=../sbin/strclean
 f usr/bin/strconf 0555 root root
@@ -10488,7 +10487,6 @@ f usr/sbin/sppptun 0555 root bin
 f usr/sbin/spray 0555 root bin
 f usr/sbin/stmfadm 0555 root bin
 f usr/sbin/stmsboot 0555 root bin
-f usr/sbin/strace 0555 root sys
 f usr/sbin/strclean 0555 root sys
 f usr/sbin/strerr 0555 root sys
 f usr/sbin/sttydefs 0755 root sys
@@ -12145,7 +12143,6 @@ f usr/share/man/man1m/spray.1m 0444 root bin
 f usr/share/man/man1m/statd.1m 0444 root bin
 f usr/share/man/man1m/stmfadm.1m 0444 root bin
 f usr/share/man/man1m/stmsboot.1m 0444 root bin
-f usr/share/man/man1m/strace.1m 0444 root bin
 f usr/share/man/man1m/strclean.1m 0444 root bin
 f usr/share/man/man1m/strerr.1m 0444 root bin
 f usr/share/man/man1m/sttydefs.1m 0444 root bin
