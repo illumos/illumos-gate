@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright 2011 Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 #include <sys/asm_linkage.h>
@@ -195,12 +195,14 @@ dtrace_copy(uintptr_t src, uintptr_t dest, size_t size)
 
 	ENTRY(dtrace_copy)
 	pushq	%rbp
+	call	smap_disable
 	movq	%rsp, %rbp
 
 	xchgq	%rdi, %rsi		/* make %rsi source, %rdi dest */
 	movq	%rdx, %rcx		/* load count */
 	repz				/* repeat for count ... */
 	smovb				/*   move from %ds:rsi to %ed:rdi */
+	call	smap_enable
 	leave
 	ret
 	SET_SIZE(dtrace_copy)
@@ -244,7 +246,7 @@ dtrace_copystr(uintptr_t uaddr, uintptr_t kaddr, size_t size,
 	ENTRY(dtrace_copystr)
 	pushq	%rbp
 	movq	%rsp, %rbp
-
+	call	smap_disable
 0:
 	movb	(%rdi), %al		/* load from source */
 	movb	%al, (%rsi)		/* store to destination */
@@ -261,6 +263,7 @@ dtrace_copystr(uintptr_t uaddr, uintptr_t kaddr, size_t size,
 	cmpq	$0, %rdx
 	jne	0b
 2:
+	call	smap_enable
 	leave
 	ret
 
@@ -273,7 +276,7 @@ dtrace_copystr(uintptr_t uaddr, uintptr_t kaddr, size_t size,
 	pushl	%ebp			/ Setup stack frame
 	movl	%esp, %ebp
 	pushl	%ebx			/ Save registers
-
+	
 	movl	8(%ebp), %ebx		/ Load source address
 	movl	12(%ebp), %edx		/ Load destination address
 	movl	16(%ebp), %ecx		/ Load count
@@ -317,7 +320,9 @@ dtrace_fulword(void *addr)
 #if defined(__amd64)
 
 	ENTRY(dtrace_fulword)
+	call	smap_disable
 	movq	(%rdi), %rax
+	call	smap_enable
 	ret
 	SET_SIZE(dtrace_fulword)
 
@@ -344,8 +349,10 @@ dtrace_fuword8_nocheck(void *addr)
 #if defined(__amd64)
 
 	ENTRY(dtrace_fuword8_nocheck)
+	call	smap_disable
 	xorq	%rax, %rax
 	movb	(%rdi), %al
+	call	smap_enable
 	ret
 	SET_SIZE(dtrace_fuword8_nocheck)
 
@@ -372,8 +379,10 @@ dtrace_fuword16_nocheck(void *addr)
 #if defined(__amd64)
 
 	ENTRY(dtrace_fuword16_nocheck)
+	call	smap_disable
 	xorq	%rax, %rax
 	movw	(%rdi), %ax
+	call	smap_enable
 	ret
 	SET_SIZE(dtrace_fuword16_nocheck)
 
@@ -400,8 +409,10 @@ dtrace_fuword32_nocheck(void *addr)
 #if defined(__amd64)
 
 	ENTRY(dtrace_fuword32_nocheck)
+	call	smap_disable
 	xorq	%rax, %rax
 	movl	(%rdi), %eax
+	call	smap_enable
 	ret
 	SET_SIZE(dtrace_fuword32_nocheck)
 
@@ -428,7 +439,9 @@ dtrace_fuword64_nocheck(void *addr)
 #if defined(__amd64)
 
 	ENTRY(dtrace_fuword64_nocheck)
+	call	smap_disable
 	movq	(%rdi), %rax
+	call	smap_enable
 	ret
 	SET_SIZE(dtrace_fuword64_nocheck)
 

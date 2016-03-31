@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2016 Nexenta Systems, Inc.
  */
 /*
  * Copyright (c) 2009-2010, Intel Corporation.
@@ -36,6 +37,10 @@
  * OSPM using the Processor Local X2APIC structure. Logical Processors with APIC
  * ID values less than 255 must use the Processor Local XAPIC structure to
  * convey their APIC information to OSPM.
+ *
+ * Some systems ignore that requirement of ACPI Spec and use Processor Local
+ * X2APIC structures even for Logical Processors with APIC ID values less than
+ * 255.
  */
 
 #include <sys/types.h>
@@ -166,9 +171,7 @@ acpidev_cpu_count_MADT(ACPI_SUBTABLE_HEADER *ap, void *context)
 
 	case ACPI_MADT_TYPE_LOCAL_X2APIC:
 		mpx2a = (ACPI_MADT_LOCAL_X2APIC *)ap;
-		/* See comment at beginning about 255 limitation. */
-		if ((mpx2a->LapicFlags & ACPI_MADT_ENABLED) &&
-		    (mpx2a->LocalApicId >= 255)) {
+		if ((mpx2a->LapicFlags & ACPI_MADT_ENABLED)) {
 			(*cntp)++;
 		}
 		break;
@@ -207,7 +210,8 @@ acpidev_cpu_parse_MADT(ACPI_SUBTABLE_HEADER *ap, void *context)
 		if (mpx2a->LocalApicId < 255) {
 			ACPIDEV_DEBUG(CE_WARN,
 			    "!acpidev: encountered CPU with X2APIC Id < 255.");
-		} else if (mpx2a->LapicFlags & ACPI_MADT_ENABLED) {
+		}
+		if (mpx2a->LapicFlags & ACPI_MADT_ENABLED) {
 			ASSERT(*cntp < acpidev_cpu_map_count);
 			acpidev_cpu_map[*cntp].proc_id = mpx2a->Uid;
 			acpidev_cpu_map[*cntp].apic_id = mpx2a->LocalApicId;
@@ -265,21 +269,19 @@ acpidev_cpu_query_MAT(ACPI_SUBTABLE_HEADER *ap, void *context)
 
 	case ACPI_MADT_TYPE_LOCAL_X2APIC:
 		mpx2a = (ACPI_MADT_LOCAL_X2APIC *)ap;
-		if (mpx2a->LocalApicId >= 255) {
-			rp->found = B_TRUE;
-			rp->proc_id = mpx2a->Uid;
-			rp->apic_id = mpx2a->LocalApicId;
-			if (mpx2a->LapicFlags & ACPI_MADT_ENABLED) {
-				rp->enabled = B_TRUE;
-			} else {
-				rp->enabled = B_FALSE;
-			}
-			return (AE_CTRL_TERMINATE);
-		} else {
+		if (mpx2a->LocalApicId < 255) {
 			ACPIDEV_DEBUG(CE_WARN, "!acpidev: encountered CPU "
 			    "with X2APIC Id < 255 in _MAT.");
 		}
-		break;
+		rp->found = B_TRUE;
+		rp->proc_id = mpx2a->Uid;
+		rp->apic_id = mpx2a->LocalApicId;
+		if (mpx2a->LapicFlags & ACPI_MADT_ENABLED) {
+			rp->enabled = B_TRUE;
+		} else {
+			rp->enabled = B_FALSE;
+		}
+		return (AE_CTRL_TERMINATE);
 
 	case ACPI_MADT_TYPE_LOCAL_APIC_NMI:
 		/* UNIMPLEMENTED */

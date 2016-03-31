@@ -269,7 +269,10 @@ mlsetup(struct regs *rp)
 		(void) wrmsr(MSR_AMD_TSCAUX, 0);
 
 	/*
-	 * Let's get the other %cr4 stuff while we're here.
+	 * Let's get the other %cr4 stuff while we're here. Note, we defer
+	 * enabling CR4_SMAP until startup_end(); however, that's importantly
+	 * before we start other CPUs. That ensures that it will be synced out
+	 * to other CPUs.
 	 */
 	if (is_x86_feature(x86_featureset, X86FSET_DE))
 		setcr4(getcr4() | CR4_DE);

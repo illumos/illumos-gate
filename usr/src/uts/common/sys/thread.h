@@ -339,6 +339,7 @@ typedef struct _kthread {
 	uintptr_t	t_dtrace_astpc;	/* DTrace return sequence location */
 #ifdef __amd64
 	uint64_t	t_dtrace_regv;	/* DTrace saved reg from fasttrap */
+	uint64_t	t_useracc;	/* SMAP state saved across swtch() */
 #endif
 	hrtime_t	t_hrtime;	/* high-res last time on cpu */
 	kmutex_t	t_ctx_lock;	/* protects t_ctx in removectx() */
