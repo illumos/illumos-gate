@@ -1628,8 +1628,24 @@ smb_server_listener(smb_thread_t *thread, void *arg)
 
 	DTRACE_PROBE1(so__wait__accept, struct sonode *, ld->ld_so);
 
-	while (ksocket_accept(ld->ld_so, NULL, NULL, &s_so, CRED())
-	    == 0) {
+	for (;;) {
+		int ret = ksocket_accept(ld->ld_so, NULL, NULL, &s_so, CRED());
+
+		switch (ret) {
+		case 0:
+			break;
+		case ECONNABORTED:
+			continue;
+		case EINTR:
+		case EBADF:	/* libfakekernel */
+			goto out;
+		default:
+			cmn_err(CE_WARN,
+			    "smb_server_listener: ksocket_accept(%d)",
+			    ret);
+			goto out;
+		}
+
 		DTRACE_PROBE1(so__accept, struct sonode *, s_so);
 
 		on = 1;
@@ -1649,6 +1665,7 @@ smb_server_listener(smb_thread_t *thread, void *arg)
 		 */
 		smb_server_create_session(ld, s_so);
 	}
+out:
 	/* Disconnect all the sessions this listener created. */
 	smb_llist_enter(&ld->ld_session_list, RW_READER);
 	session = smb_llist_head(&ld->ld_session_list);
