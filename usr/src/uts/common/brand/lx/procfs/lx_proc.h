@@ -218,6 +218,12 @@ typedef enum lxpr_nodetype {
 	LXPR_SYS_NETDIR,		/* /proc/sys/net		*/
 	LXPR_SYS_NET_COREDIR,		/* /proc/sys/net/core		*/
 	LXPR_SYS_NET_CORE_SOMAXCON,	/* /proc/sys/net/core/somaxconn	*/
+	LXPR_SYS_NET_IPV4DIR,		/* /proc/sys/net/ipv4		*/
+	LXPR_SYS_NET_IPV4_TCP_FIN_TO,	/* /proc/sys/net/ipv4/tcp_fin_timeout */
+	LXPR_SYS_NET_IPV4_TCP_KA_INT,	/* .../net/ipv4/tcp_keepalive_intvl */
+	LXPR_SYS_NET_IPV4_TCP_KA_TIM,	/* .../net/ipv4/tcp_keepalive_time */
+	LXPR_SYS_NET_IPV4_TCP_SACK,	/* /proc/sys/net/ipv4/tcp_sack */
+	LXPR_SYS_NET_IPV4_TCP_WINSCALE,	/* .../net/ipv4/tcp_window_scaling */
 	LXPR_SYS_VMDIR,			/* /proc/sys/vm			*/
 	LXPR_SYS_VM_MAX_MAP_CNT,	/* /proc/sys/vm/max_map_count	*/
 	LXPR_SYS_VM_MINFR_KB,		/* /proc/sys/vm/min_free_kbytes	*/
