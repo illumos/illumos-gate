@@ -128,6 +128,7 @@ static vnode_t *lxpr_lookup_sys_kerneldir(vnode_t *, char *);
 static vnode_t *lxpr_lookup_sys_kdir_randdir(vnode_t *, char *);
 static vnode_t *lxpr_lookup_sys_netdir(vnode_t *, char *);
 static vnode_t *lxpr_lookup_sys_net_coredir(vnode_t *, char *);
+static vnode_t *lxpr_lookup_sys_net_ipv4dir(vnode_t *, char *);
 static vnode_t *lxpr_lookup_sys_vmdir(vnode_t *, char *);
 static vnode_t *lxpr_lookup_taskdir(vnode_t *, char *);
 static vnode_t *lxpr_lookup_task_tid_dir(vnode_t *, char *);
@@ -144,6 +145,7 @@ static int lxpr_readdir_sys_kerneldir(lxpr_node_t *, uio_t *, int *);
 static int lxpr_readdir_sys_kdir_randdir(lxpr_node_t *, uio_t *, int *);
 static int lxpr_readdir_sys_netdir(lxpr_node_t *, uio_t *, int *);
 static int lxpr_readdir_sys_net_coredir(lxpr_node_t *, uio_t *, int *);
+static int lxpr_readdir_sys_net_ipv4dir(lxpr_node_t *, uio_t *, int *);
 static int lxpr_readdir_sys_vmdir(lxpr_node_t *, uio_t *, int *);
 static int lxpr_readdir_taskdir(lxpr_node_t *, uio_t *, int *);
 static int lxpr_readdir_task_tid_dir(lxpr_node_t *, uio_t *, int *);
@@ -227,6 +229,11 @@ static void lxpr_read_sys_kernel_shmmax(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_kernel_shmmni(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_kernel_threads_max(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_net_core_somaxc(lxpr_node_t *, lxpr_uiobuf_t *);
+static void lxpr_read_sys_net_ipv4_tcp_fin_to(lxpr_node_t *, lxpr_uiobuf_t *);
+static void lxpr_read_sys_net_ipv4_tcp_ka_int(lxpr_node_t *, lxpr_uiobuf_t *);
+static void lxpr_read_sys_net_ipv4_tcp_ka_tim(lxpr_node_t *, lxpr_uiobuf_t *);
+static void lxpr_read_sys_net_ipv4_tcp_sack(lxpr_node_t *, lxpr_uiobuf_t *);
+static void lxpr_read_sys_net_ipv4_tcp_winscale(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_vm_max_map_cnt(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_vm_minfr_kb(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_vm_nhpages(lxpr_node_t *, lxpr_uiobuf_t *);
@@ -235,6 +242,16 @@ static void lxpr_read_sys_vm_swappiness(lxpr_node_t *, lxpr_uiobuf_t *);
 
 static int lxpr_write_sys_net_core_somaxc(lxpr_node_t *, uio_t *, cred_t *,
     caller_context_t *);
+static int lxpr_write_sys_net_ipv4_tcp_fin_to(lxpr_node_t *, uio_t *, cred_t *,
+    caller_context_t *);
+static int lxpr_write_sys_net_ipv4_tcp_ka_int(lxpr_node_t *, uio_t *,
+    cred_t *, caller_context_t *);
+static int lxpr_write_sys_net_ipv4_tcp_ka_tim(lxpr_node_t *, uio_t *,
+    cred_t *, caller_context_t *);
+static int lxpr_write_sys_net_ipv4_tcp_sack(lxpr_node_t *, uio_t *,
+    cred_t *, caller_context_t *);
+static int lxpr_write_sys_net_ipv4_tcp_winscale(lxpr_node_t *, uio_t *,
+    cred_t *, caller_context_t *);
 static int lxpr_write_sys_kernel_corepatt(lxpr_node_t *, uio_t *, cred_t *,
     caller_context_t *);
 
@@ -502,6 +519,7 @@ static lxpr_dirent_t sys_randdir[] = {
  */
 static lxpr_dirent_t sys_netdir[] = {
 	{ LXPR_SYS_NET_COREDIR,		"core" },
+	{ LXPR_SYS_NET_IPV4DIR,		"ipv4" },
 };
 
 #define	SYS_NETDIRFILES (sizeof (sys_netdir) / sizeof (sys_netdir[0]))
@@ -515,6 +533,22 @@ static lxpr_dirent_t sys_net_coredir[] = {
 
 #define	SYS_NET_COREDIRFILES \
 	(sizeof (sys_net_coredir) / sizeof (sys_net_coredir[0]))
+
+/*
+ * contents of /proc/sys/net/ipv4 directory
+ * See the Linux tcp(7) man page for descriptions and the illumos tcp(7p)
+ * man page for the native descriptions.
+ */
+static lxpr_dirent_t sys_net_ipv4dir[] = {
+	{ LXPR_SYS_NET_IPV4_TCP_FIN_TO,	"tcp_fin_timeout" },
+	{ LXPR_SYS_NET_IPV4_TCP_KA_INT,	"tcp_keepalive_intvl" },
+	{ LXPR_SYS_NET_IPV4_TCP_KA_TIM,	"tcp_keepalive_time" },
+	{ LXPR_SYS_NET_IPV4_TCP_SACK,	"tcp_sack" },
+	{ LXPR_SYS_NET_IPV4_TCP_WINSCALE, "tcp_window_scaling" },
+};
+
+#define	SYS_NET_IPV4DIRFILES \
+	(sizeof (sys_net_ipv4dir) / sizeof (sys_net_ipv4dir[0]))
 
 /*
  * contents of /proc/sys/vm directory
@@ -550,6 +584,11 @@ lxpr_open(vnode_t **vpp, int flag, cred_t *cr, caller_context_t *ct)
 		case LXPR_SYS_KERNEL_SHMALL:
 		case LXPR_SYS_KERNEL_SHMMAX:
 		case LXPR_SYS_NET_CORE_SOMAXCON:
+		case LXPR_SYS_NET_IPV4_TCP_FIN_TO:
+		case LXPR_SYS_NET_IPV4_TCP_KA_INT:
+		case LXPR_SYS_NET_IPV4_TCP_KA_TIM:
+		case LXPR_SYS_NET_IPV4_TCP_SACK:
+		case LXPR_SYS_NET_IPV4_TCP_WINSCALE:
 		case LXPR_SYS_VM_OVERCOMMIT_MEM:
 		case LXPR_SYS_VM_SWAPPINESS:
 		case LXPR_PID_FD_FD:
@@ -733,6 +772,12 @@ static void (*lxpr_read_function[LXPR_NFILES])() = {
 	lxpr_read_invalid,		/* /proc/sys/net	*/
 	lxpr_read_invalid,		/* /proc/sys/net/core	*/
 	lxpr_read_sys_net_core_somaxc,	/* /proc/sys/net/core/somaxconn	*/
+	lxpr_read_invalid,		/* /proc/sys/net/ipv4	*/
+	lxpr_read_sys_net_ipv4_tcp_fin_to, /* .../ipv4/tcp_fin_timeout */
+	lxpr_read_sys_net_ipv4_tcp_ka_int, /* .../ipv4/tcp_keepalive_intvl */
+	lxpr_read_sys_net_ipv4_tcp_ka_tim, /* .../ipv4/tcp_keepalive_time */
+	lxpr_read_sys_net_ipv4_tcp_sack, /* .../ipv4/tcp_sack */
+	lxpr_read_sys_net_ipv4_tcp_winscale, /* .../ipv4/tcp_window_scaling */
 	lxpr_read_invalid,		/* /proc/sys/vm	*/
 	lxpr_read_sys_vm_max_map_cnt,	/* /proc/sys/vm/max_map_count */
 	lxpr_read_sys_vm_minfr_kb,	/* /proc/sys/vm/min_free_kbytes */
@@ -858,6 +903,12 @@ static vnode_t *(*lxpr_lookup_function[LXPR_NFILES])() = {
 	lxpr_lookup_sys_netdir,		/* /proc/sys/net */
 	lxpr_lookup_sys_net_coredir,	/* /proc/sys/net/core */
 	lxpr_lookup_not_a_dir,		/* /proc/sys/net/core/somaxconn */
+	lxpr_lookup_sys_net_ipv4dir,	/* /proc/sys/net/ipv4 */
+	lxpr_lookup_not_a_dir,		/* .../net/ipv4/tcp_fin_timeout */
+	lxpr_lookup_not_a_dir,		/* .../net/ipv4/tcp_keepalive_intvl */
+	lxpr_lookup_not_a_dir,		/* .../net/ipv4/tcp_keepalive_time */
+	lxpr_lookup_not_a_dir,		/* .../net/ipv4/tcp_sack */
+	lxpr_lookup_not_a_dir,		/* .../net/ipv4/tcp_window_scaling */
 	lxpr_lookup_sys_vmdir,		/* /proc/sys/vm */
 	lxpr_lookup_not_a_dir,		/* /proc/sys/vm/max_map_count */
 	lxpr_lookup_not_a_dir,		/* /proc/sys/vm/min_free_kbytes */
@@ -983,6 +1034,12 @@ static int (*lxpr_readdir_function[LXPR_NFILES])() = {
 	lxpr_readdir_sys_netdir,	/* /proc/sys/net */
 	lxpr_readdir_sys_net_coredir,	/* /proc/sys/net/core */
 	lxpr_readdir_not_a_dir,		/* /proc/sys/net/core/somaxconn */
+	lxpr_readdir_sys_net_ipv4dir,	/* /proc/sys/net/ipv4 */
+	lxpr_readdir_not_a_dir,		/* .../net/ipv4/tcp_fin_timeout */
+	lxpr_readdir_not_a_dir,		/* .../net/ipv4/tcp_keepalive_intvl */
+	lxpr_readdir_not_a_dir,		/* .../net/ipv4/tcp_keepalive_time */
+	lxpr_readdir_not_a_dir,		/* .../net/ipv4/tcp_sack */
+	lxpr_readdir_not_a_dir,		/* .../net/ipv4/tcp_window_scaling */
 	lxpr_readdir_sys_vmdir,		/* /proc/sys/vm */
 	lxpr_readdir_not_a_dir,		/* /proc/sys/vm/max_map_count */
 	lxpr_readdir_not_a_dir,		/* /proc/sys/vm/min_free_kbytes */
@@ -4422,6 +4479,162 @@ lxpr_read_sys_net_core_somaxc(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	netstack_rele(ns);
 }
 
+/*
+ * tcp_fin_timeout
+ *
+ * This specifies how many seconds to wait for a final FIN packet before the
+ * socket is forcibly closed. This is strictly a violation of the TCP
+ * specification, but required to prevent denial-of-service attacks.
+ * integer; default: 60;
+ *
+ * illumos: tcp_fin_wait_2_flush_interval
+ * Not in tcp(7p) man page but see comment in uts/common/inet/tcp/tcp_input.c
+ * in the tcp_input_data() function on the use of tcp_fin_wait_2_flush_interval.
+ * The value is in milliseconds.
+ */
+static void
+lxpr_read_sys_net_ipv4_tcp_fin_to(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+{
+	netstack_t *ns;
+	tcp_stack_t	*tcps;
+
+	ASSERT(lxpnp->lxpr_type == LXPR_SYS_NET_IPV4_TCP_FIN_TO);
+
+	ns = netstack_get_current();
+	if (ns == NULL) {
+		lxpr_uiobuf_seterr(uiobuf, ENXIO);
+		return;
+	}
+
+	tcps = ns->netstack_tcp;
+	lxpr_uiobuf_printf(uiobuf, "%d\n",
+	    tcps->tcps_fin_wait_2_flush_interval / 1000);
+	netstack_rele(ns);
+}
+
+/*
+ * tcp_keepalive_intvl
+ *
+ * The number of seconds between TCP keep-alive probes. default: 75
+ * Linux retries tcp_keepalive_probes (9) times before timing out.
+ *
+ * illumos:
+ * We have tcp_ka_rinterval but there is no corresponding tcps_* tunable for
+ * this. The closest is tcps_keepalive_abort_interval which specifies the
+ * time threshold for aborting a TCP connection in milliseconds. Linux retries
+ * 9 times (giving a total of 11.25 minutes) so we emulate this by dividing out
+ * tcps_keepalive_abort_interval by 9.
+ */
+static void
+lxpr_read_sys_net_ipv4_tcp_ka_int(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+{
+	netstack_t *ns;
+	tcp_stack_t	*tcps;
+
+	ASSERT(lxpnp->lxpr_type == LXPR_SYS_NET_IPV4_TCP_KA_INT);
+
+	ns = netstack_get_current();
+	if (ns == NULL) {
+		lxpr_uiobuf_seterr(uiobuf, ENXIO);
+		return;
+	}
+
+	tcps = ns->netstack_tcp;
+	lxpr_uiobuf_printf(uiobuf, "%d\n",
+	    (tcps->tcps_keepalive_abort_interval / 1000) / 9);
+	netstack_rele(ns);
+}
+
+/*
+ * tcp_keepalive_time
+ *
+ * The number of seconds a connection needs to be idle before TCP begins
+ * sending out keep-alive probes. The default value is 7200 seconds (2 hours).
+ *
+ * illumos: tcp_keepalive_interval
+ * The interval for sending out the first probe in milliseconds. The default is
+ * two hours.
+ */
+static void
+lxpr_read_sys_net_ipv4_tcp_ka_tim(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+{
+	netstack_t *ns;
+	tcp_stack_t	*tcps;
+
+	ASSERT(lxpnp->lxpr_type == LXPR_SYS_NET_IPV4_TCP_KA_TIM);
+
+	ns = netstack_get_current();
+	if (ns == NULL) {
+		lxpr_uiobuf_seterr(uiobuf, ENXIO);
+		return;
+	}
+
+	tcps = ns->netstack_tcp;
+	lxpr_uiobuf_printf(uiobuf, "%d\n",
+	    (tcps->tcps_keepalive_interval / 1000));
+	netstack_rele(ns);
+}
+
+/*
+ * tcp_sack
+ *
+ * Enable RFC 2018 TCP Selective Acknowledgements. Boolean, default: enabled
+ *
+ * illumos: tcp_sack_permitted
+ * tcp_sack_permitted 0 == disabled, 1 == no initiate but accept,
+ * 2 == initiate and accept. default is 2.
+ */
+static void
+lxpr_read_sys_net_ipv4_tcp_sack(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+{
+	netstack_t *ns;
+	tcp_stack_t	*tcps;
+
+	ASSERT(lxpnp->lxpr_type == LXPR_SYS_NET_IPV4_TCP_SACK);
+
+	ns = netstack_get_current();
+	if (ns == NULL) {
+		lxpr_uiobuf_seterr(uiobuf, ENXIO);
+		return;
+	}
+
+	tcps = ns->netstack_tcp;
+	lxpr_uiobuf_printf(uiobuf, "%d\n",
+	    (tcps->tcps_sack_permitted  == 0 ? 0 : 1));
+	netstack_rele(ns);
+}
+
+/*
+ * tcp_window_scaling
+ *
+ * RFC 1323 TCP window scaling. This feature allows the use of a large window
+ * (> 64K) on a TCP connection. Boolean; default: enabled
+ *
+ * illumos: tcp_wscale_always
+ * tcp_wscale_always is set to 1, the window scale option will always be
+ * set when connecting to a remote system. If tcp_wscale_always is 0, the
+ * window scale option will be set only if the user has requested a send or
+ * receive window larger than 64K. The default value of is 1.
+ */
+static void
+lxpr_read_sys_net_ipv4_tcp_winscale(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+{
+	netstack_t *ns;
+	tcp_stack_t	*tcps;
+
+	ASSERT(lxpnp->lxpr_type == LXPR_SYS_NET_IPV4_TCP_WINSCALE);
+
+	ns = netstack_get_current();
+	if (ns == NULL) {
+		lxpr_uiobuf_seterr(uiobuf, ENXIO);
+		return;
+	}
+
+	tcps = ns->netstack_tcp;
+	lxpr_uiobuf_printf(uiobuf, "%d\n", tcps->tcps_wscale_always);
+	netstack_rele(ns);
+}
+
 static void
 lxpr_read_sys_vm_max_map_cnt(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -4892,6 +5105,11 @@ lxpr_access(vnode_t *vp, int mode, int flags, cred_t *cr, caller_context_t *ct)
 		case LXPR_SYS_KERNEL_SHMALL:
 		case LXPR_SYS_KERNEL_SHMMAX:
 		case LXPR_SYS_NET_CORE_SOMAXCON:
+		case LXPR_SYS_NET_IPV4_TCP_FIN_TO:
+		case LXPR_SYS_NET_IPV4_TCP_KA_INT:
+		case LXPR_SYS_NET_IPV4_TCP_KA_TIM:
+		case LXPR_SYS_NET_IPV4_TCP_SACK:
+		case LXPR_SYS_NET_IPV4_TCP_WINSCALE:
 		case LXPR_SYS_VM_OVERCOMMIT_MEM:
 		case LXPR_SYS_VM_SWAPPINESS:
 		case LXPR_PID_FD_FD:
@@ -5309,6 +5527,14 @@ lxpr_lookup_sys_net_coredir(vnode_t *dp, char *comp)
 	ASSERT(VTOLXP(dp)->lxpr_type == LXPR_SYS_NET_COREDIR);
 	return (lxpr_lookup_common(dp, comp, NULL, sys_net_coredir,
 	    SYS_NET_COREDIRFILES));
+}
+
+static vnode_t *
+lxpr_lookup_sys_net_ipv4dir(vnode_t *dp, char *comp)
+{
+	ASSERT(VTOLXP(dp)->lxpr_type == LXPR_SYS_NET_IPV4DIR);
+	return (lxpr_lookup_common(dp, comp, NULL, sys_net_ipv4dir,
+	    SYS_NET_IPV4DIRFILES));
 }
 
 static vnode_t *
@@ -6027,6 +6253,14 @@ lxpr_readdir_sys_net_coredir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
 }
 
 static int
+lxpr_readdir_sys_net_ipv4dir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
+{
+	ASSERT(lxpnp->lxpr_type == LXPR_SYS_NET_IPV4DIR);
+	return (lxpr_readdir_common(lxpnp, uiop, eofp, sys_net_ipv4dir,
+	    SYS_NET_IPV4DIRFILES));
+}
+
+static int
 lxpr_readdir_sys_vmdir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
 {
 	ASSERT(lxpnp->lxpr_type == LXPR_SYS_VMDIR);
@@ -6034,9 +6268,11 @@ lxpr_readdir_sys_vmdir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
 	    SYS_VMDIRFILES));
 }
 
+/* ARGSUSED */
 static int
-lxpr_write_sys_net_core_somaxc(lxpr_node_t *lxpnp, struct uio *uio,
-    struct cred *cr, caller_context_t *ct)
+lxpr_write_tcp_property(lxpr_node_t *lxpnp, struct uio *uio,
+    struct cred *cr, caller_context_t *ct, char *prop,
+    int (*xlate)(char *, int))
 {
 	int error;
 	int res = 0;
@@ -6045,8 +6281,6 @@ lxpr_write_sys_net_core_somaxc(lxpr_node_t *lxpnp, struct uio *uio,
 	netstack_t *ns;
 	mod_prop_info_t *ptbl = NULL;
 	mod_prop_info_t *pinfo = NULL;
-
-	ASSERT(lxpnp->lxpr_type == LXPR_SYS_NET_CORE_SOMAXCON);
 
 	if (uio->uio_loffset != 0)
 		return (EINVAL);
@@ -6073,13 +6307,120 @@ lxpr_write_sys_net_core_somaxc(lxpr_node_t *lxpnp, struct uio *uio,
 	if (ns == NULL)
 		return (EINVAL);
 
+	if (xlate != NULL && xlate(val, sizeof (val)) != 0) {
+		netstack_rele(ns);
+		return (EINVAL);
+	}
+
 	ptbl = ns->netstack_tcp->tcps_propinfo_tbl;
-	pinfo = mod_prop_lookup(ptbl, "_conn_req_max_q", MOD_PROTO_TCP);
+	pinfo = mod_prop_lookup(ptbl, prop, MOD_PROTO_TCP);
 	if (pinfo == NULL || pinfo->mpi_setf(ns, cr, pinfo, NULL, val, 0) != 0)
 		res = EINVAL;
 
 	netstack_rele(ns);
 	return (res);
+}
+
+static int
+lxpr_write_sys_net_core_somaxc(lxpr_node_t *lxpnp, struct uio *uio,
+    struct cred *cr, caller_context_t *ct)
+{
+	ASSERT(lxpnp->lxpr_type == LXPR_SYS_NET_CORE_SOMAXCON);
+	return (lxpr_write_tcp_property(lxpnp, uio, cr, ct,
+	    "_conn_req_max_q", NULL));
+}
+
+static int
+lxpr_xlate_sec2ms(char *val, int size)
+{
+	long sec;
+	char *endptr = NULL;
+
+	if (ddi_strtol(val, &endptr, 10, &sec) != 0)
+		return (EINVAL);
+	if (val[0] < '0' || val[0] > '9' || *endptr != '\0')
+		return (EINVAL);
+	if (snprintf(val, size, "%ld", sec * 1000) >= size)
+		return (EINVAL);
+	return (0);
+}
+
+static int
+lxpr_xlate_ka_intvl(char *val, int size)
+{
+	long sec;
+	char *endptr = NULL;
+
+	if (ddi_strtol(val, &endptr, 10, &sec) != 0)
+		return (EINVAL);
+	if (val[0] < '0' || val[0] > '9' || *endptr != '\0')
+		return (EINVAL);
+	if (snprintf(val, size, "%ld", sec * 1000 * 9) >= size)
+		return (EINVAL);
+	return (0);
+}
+
+static int
+lxpr_xlate_sack(char *val, int size)
+{
+	long flag;
+	char *endptr = NULL;
+
+	if (ddi_strtol(val, &endptr, 10, &flag) != 0)
+		return (EINVAL);
+	if (val[0] < '0' || val[0] > '9' || *endptr != '\0')
+		return (EINVAL);
+	if (flag != 0 && flag != 1)
+		return (EINVAL);
+	/* see comment on lxpr_read_sys_net_ipv4_tcp_sack */
+	if (snprintf(val, size, "%d", (flag == 0 ? 0 : 2)) >= size)
+		return (EINVAL);
+	return (0);
+}
+
+static int
+lxpr_write_sys_net_ipv4_tcp_fin_to(lxpr_node_t *lxpnp, struct uio *uio,
+    struct cred *cr, caller_context_t *ct)
+{
+	ASSERT(lxpnp->lxpr_type == LXPR_SYS_NET_IPV4_TCP_FIN_TO);
+	return (lxpr_write_tcp_property(lxpnp, uio, cr, ct,
+	    "_fin_wait_2_flush_interval", lxpr_xlate_sec2ms));
+}
+
+static int
+lxpr_write_sys_net_ipv4_tcp_ka_int(lxpr_node_t *lxpnp, struct uio *uio,
+    struct cred *cr, caller_context_t *ct)
+{
+	ASSERT(lxpnp->lxpr_type == LXPR_SYS_NET_IPV4_TCP_KA_INT);
+	return (lxpr_write_tcp_property(lxpnp, uio, cr, ct,
+	    "_keepalive_abort_interval", lxpr_xlate_ka_intvl));
+}
+
+static int
+lxpr_write_sys_net_ipv4_tcp_ka_tim(lxpr_node_t *lxpnp, struct uio *uio,
+    struct cred *cr, caller_context_t *ct)
+{
+	ASSERT(lxpnp->lxpr_type == LXPR_SYS_NET_IPV4_TCP_KA_TIM);
+	return (lxpr_write_tcp_property(lxpnp, uio, cr, ct,
+	    "_keepalive_interval", lxpr_xlate_sec2ms));
+}
+
+static int
+lxpr_write_sys_net_ipv4_tcp_sack(lxpr_node_t *lxpnp, struct uio *uio,
+    struct cred *cr, caller_context_t *ct)
+{
+	ASSERT(lxpnp->lxpr_type == LXPR_SYS_NET_IPV4_TCP_SACK);
+	return (lxpr_write_tcp_property(lxpnp, uio, cr, ct, "sack",
+	    lxpr_xlate_sack));
+}
+
+static int
+lxpr_write_sys_net_ipv4_tcp_winscale(lxpr_node_t *lxpnp, struct uio *uio,
+    struct cred *cr, caller_context_t *ct)
+{
+	ASSERT(lxpnp->lxpr_type == LXPR_SYS_NET_IPV4_TCP_WINSCALE);
+	return (lxpr_write_tcp_property(lxpnp, uio, cr, ct, "_wscale_always",
+	    NULL));
 }
 
 /* ARGSUSED */
@@ -6310,6 +6651,20 @@ lxpr_write(vnode_t *vp, uio_t *uiop, int ioflag, cred_t *cr,
 		return (lxpr_write_sys_kernel_corepatt(lxpnp, uiop, cr, ct));
 	case LXPR_SYS_NET_CORE_SOMAXCON:
 		return (lxpr_write_sys_net_core_somaxc(lxpnp, uiop, cr, ct));
+	case LXPR_SYS_NET_IPV4_TCP_FIN_TO:
+		return (lxpr_write_sys_net_ipv4_tcp_fin_to(lxpnp, uiop, cr,
+		    ct));
+	case LXPR_SYS_NET_IPV4_TCP_KA_INT:
+		return (lxpr_write_sys_net_ipv4_tcp_ka_int(lxpnp, uiop, cr,
+		    ct));
+	case LXPR_SYS_NET_IPV4_TCP_KA_TIM:
+		return (lxpr_write_sys_net_ipv4_tcp_ka_tim(lxpnp, uiop, cr,
+		    ct));
+	case LXPR_SYS_NET_IPV4_TCP_SACK:
+		return (lxpr_write_sys_net_ipv4_tcp_sack(lxpnp, uiop, cr, ct));
+	case LXPR_SYS_NET_IPV4_TCP_WINSCALE:
+		return (lxpr_write_sys_net_ipv4_tcp_winscale(lxpnp, uiop, cr,
+		    ct));
 
 	default:
 		/* pretend we wrote the whole thing */

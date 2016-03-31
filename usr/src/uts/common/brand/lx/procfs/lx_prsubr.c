@@ -521,6 +521,7 @@ lxpr_getnode(vnode_t *dp, lxpr_nodetype_t type, proc_t *p, int desc)
 	case LXPR_SYS_KERNEL_RANDDIR:
 	case LXPR_SYS_NETDIR:
 	case LXPR_SYS_NET_COREDIR:
+	case LXPR_SYS_NET_IPV4DIR:
 	case LXPR_SYS_VMDIR:
 		vp->v_type = VDIR;
 		lxpnp->lxpr_mode = 0555;	/* read-search by all */
@@ -541,6 +542,11 @@ lxpr_getnode(vnode_t *dp, lxpr_nodetype_t type, proc_t *p, int desc)
 	case LXPR_SYS_KERNEL_SHMALL:
 	case LXPR_SYS_KERNEL_SHMMAX:
 	case LXPR_SYS_NET_CORE_SOMAXCON:
+	case LXPR_SYS_NET_IPV4_TCP_FIN_TO:
+	case LXPR_SYS_NET_IPV4_TCP_KA_INT:
+	case LXPR_SYS_NET_IPV4_TCP_KA_TIM:
+	case LXPR_SYS_NET_IPV4_TCP_SACK:
+	case LXPR_SYS_NET_IPV4_TCP_WINSCALE:
 	case LXPR_SYS_VM_OVERCOMMIT_MEM:
 	case LXPR_SYS_VM_SWAPPINESS:
 		vp->v_type = VREG;
