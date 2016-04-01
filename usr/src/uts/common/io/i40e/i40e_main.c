@@ -1097,11 +1097,14 @@ i40e_free_trqpairs(i40e_t *i40e)
 		i40e->i40e_trqpairs = NULL;
 	}
 
+	cv_destroy(&i40e->i40e_rx_pending_cv);
+	mutex_destroy(&i40e->i40e_rx_pending_lock);
 	mutex_destroy(&i40e->i40e_general_lock);
 }
 
 /*
- * Allocate receive & transmit rings.
+ * Allocate transmit and receive rings, as well as other data structures that we
+ * need.
  */
 static boolean_t
 i40e_alloc_trqpairs(i40e_t *i40e)
@@ -1114,6 +1117,8 @@ i40e_alloc_trqpairs(i40e_t *i40e)
 	 * all relevant locks.
 	 */
 	mutex_init(&i40e->i40e_general_lock, NULL, MUTEX_DRIVER, mutexpri);
+	mutex_init(&i40e->i40e_rx_pending_lock, NULL, MUTEX_DRIVER, mutexpri);
+	cv_init(&i40e->i40e_rx_pending_cv, NULL, CV_DRIVER, NULL);
 
 	i40e->i40e_trqpairs = kmem_zalloc(sizeof (i40e_trqpair_t) *
 	    i40e->i40e_num_trqpairs, KM_SLEEP);
@@ -1526,6 +1531,23 @@ i40e_init_properties(i40e_t *i40e)
 
 	i40e->i40e_rx_hcksum_enable = i40e_get_prop(i40e, "rx_hcksum_enable",
 	    B_FALSE, B_TRUE, B_TRUE);
+
+	i40e->i40e_rx_dma_min = i40e_get_prop(i40e, "rx_dma_threshold",
+	    I40E_MIN_RX_DMA_THRESH, I40E_MAX_RX_DMA_THRESH,
+	    I40E_DEF_RX_DMA_THRESH);
+
+	i40e->i40e_tx_dma_min = i40e_get_prop(i40e, "tx_dma_threshold",
+	    I40E_MIN_TX_DMA_THRESH, I40E_MAX_TX_DMA_THRESH,
+	    I40E_DEF_TX_DMA_THRESH);
+
+	i40e->i40e_tx_itr = i40e_get_prop(i40e, "tx_intr_throttle",
+	    I40E_MIN_ITR, I40E_MAX_ITR, I40E_DEF_TX_ITR);
+
+	i40e->i40e_rx_itr = i40e_get_prop(i40e, "rx_intr_throttle",
+	    I40E_MIN_ITR, I40E_MAX_ITR, I40E_DEF_RX_ITR);
+
+	i40e->i40e_other_itr = i40e_get_prop(i40e, "other_intr_throttle",
+	    I40E_MIN_ITR, I40E_MAX_ITR, I40E_DEF_OTHER_ITR);
 
 	if (!i40e->i40e_mr_enable) {
 		i40e->i40e_num_trqpairs = I40E_TRQPAIR_NOMSIX;
@@ -2567,6 +2589,27 @@ done:
 	return (rc);
 }
 
+/*
+ * We may have loaned up descriptors to the stack. As such, if we still have
+ * them outstanding, then we will not continue with detach.
+ */
+static boolean_t
+i40e_drain_rx(i40e_t *i40e)
+{
+	mutex_enter(&i40e->i40e_rx_pending_lock);
+	while (i40e->i40e_rx_pending > 0) {
+		if (cv_reltimedwait(&i40e->i40e_rx_pending_cv,
+		    &i40e->i40e_rx_pending_lock,
+		    drv_usectohz(I40E_DRAIN_RX_WAIT), TR_CLOCK_TICK) == -1) {
+			mutex_exit(&i40e->i40e_rx_pending_lock);
+			return (B_FALSE);
+		}
+	}
+	mutex_exit(&i40e->i40e_rx_pending_lock);
+
+	return (B_TRUE);
+}
+
 static int
 i40e_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 {
@@ -2712,11 +2755,12 @@ i40e_detach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 		return (DDI_FAILURE);
 	}
 
-	/*
-	 * When we add support for DMA binding, we'll need to make sure that we
-	 * take care of draining any outstanding packets that are still up in
-	 * the kernel.
-	 */
+	if (i40e_drain_rx(i40e) == B_FALSE) {
+		i40e_log(i40e, "timed out draining DMA resources, %d buffers "
+		    "remain", i40e->i40e_rx_pending);
+		return (DDI_FAILURE);
+	}
+
 	mutex_enter(&i40e_glock);
 	list_remove(&i40e_glist, i40e);
 	mutex_exit(&i40e_glock);
@@ -2725,7 +2769,6 @@ i40e_detach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 
 	return (DDI_SUCCESS);
 }
-
 
 static struct cb_ops i40e_cb_ops = {
 	nulldev,		/* cb_open */

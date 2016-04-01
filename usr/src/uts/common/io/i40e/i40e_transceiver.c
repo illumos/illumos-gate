@@ -661,8 +661,6 @@ i40e_alloc_rx_data(i40e_t *i40e, i40e_trqpair_t *itrq)
 	rxd->rxd_ring_size = i40e->i40e_rx_ring_size;
 	rxd->rxd_free_list_size = i40e->i40e_rx_ring_size;
 
-	rxd->rxd_rcb_head = 0;
-	rxd->rxd_rcb_tail = 0;
 	rxd->rxd_rcb_free = rxd->rxd_free_list_size;
 
 	rxd->rxd_work_list = kmem_zalloc(sizeof (i40e_rx_control_block_t *) *
@@ -1069,6 +1067,36 @@ i40e_init_dma_attrs(i40e_t *i40e, boolean_t fma)
 	}
 }
 
+static void
+i40e_rcb_free(i40e_rx_data_t *rxd, i40e_rx_control_block_t *rcb)
+{
+	mutex_enter(&rxd->rxd_free_lock);
+	ASSERT(rxd->rxd_rcb_free < rxd->rxd_free_list_size);
+	ASSERT(rxd->rxd_free_list[rxd->rxd_rcb_free] == NULL);
+	rxd->rxd_free_list[rxd->rxd_rcb_free] = rcb;
+	rxd->rxd_rcb_free++;
+	mutex_exit(&rxd->rxd_free_lock);
+}
+
+static i40e_rx_control_block_t *
+i40e_rcb_alloc(i40e_rx_data_t *rxd)
+{
+	i40e_rx_control_block_t *rcb;
+
+	mutex_enter(&rxd->rxd_free_lock);
+	if (rxd->rxd_rcb_free == 0) {
+		mutex_exit(&rxd->rxd_free_lock);
+		return (NULL);
+	}
+	rxd->rxd_rcb_free--;
+	rcb = rxd->rxd_free_list[rxd->rxd_rcb_free];
+	VERIFY(rcb != NULL);
+	rxd->rxd_free_list[rxd->rxd_rcb_free] = NULL;
+	mutex_exit(&rxd->rxd_free_lock);
+
+	return (rcb);
+}
+
 /*
  * This is the callback that we get from the OS when freemsg(9F) has been called
  * on a loaned descriptor. In addition, if we take the last reference count
@@ -1087,11 +1115,27 @@ i40e_rx_recycle(caddr_t arg)
 	i40e = rxd->rxd_i40e;
 
 	/*
-	 * At the moment this only exists for tearing down, because we don't
-	 * support rx DMA binding. When we do, this will need to also put things
-	 * back onto the free list.
+	 * It's possible for this to be called with a reference count of zero.
+	 * That will happen when we're doing the freemsg after taking the last
+	 * reference because we're tearing down everything and this rcb is not
+	 * outstanding.
 	 */
+	if (rcb->rcb_ref == 0)
+		return;
 
+	/*
+	 * Don't worry about failure of desballoc here. It'll only become fatal
+	 * if we're trying to use it and we can't in i40e_rx_bind().
+	 */
+	rcb->rcb_mp = desballoc((unsigned char *)rcb->rcb_dma.dmab_address,
+	    rcb->rcb_dma.dmab_size, 0, &rcb->rcb_free_rtn);
+	i40e_rcb_free(rxd, rcb);
+
+	/*
+	 * It's possible that the rcb was being used while we are shutting down
+	 * the device. In that case, we'll take the final reference from the
+	 * device here.
+	 */
 	ref = atomic_dec_32_nv(&rcb->rcb_ref);
 	if (ref == 0) {
 		freemsg(rcb->rcb_mp);
@@ -1106,11 +1150,66 @@ i40e_rx_recycle(caddr_t arg)
 		 * If this was the last block and it's been indicated that we've
 		 * passed the shutdown point, we should clean up.
 		 */
-		if (rxd->rxd_shutdown == B_TRUE && rxd->rxd_rcb_pending == 0)
+		if (rxd->rxd_shutdown == B_TRUE && rxd->rxd_rcb_pending == 0) {
 			i40e_free_rx_data(rxd);
+			cv_broadcast(&i40e->i40e_rx_pending_cv);
+		}
 
 		mutex_exit(&i40e->i40e_rx_pending_lock);
 	}
+}
+
+static mblk_t *
+i40e_rx_bind(i40e_trqpair_t *itrq, i40e_rx_data_t *rxd, uint32_t index,
+    uint32_t plen)
+{
+	mblk_t *mp;
+	i40e_t *i40e = rxd->rxd_i40e;
+	i40e_rx_control_block_t *rcb, *rep_rcb;
+
+	ASSERT(MUTEX_HELD(&itrq->itrq_rx_lock));
+
+	if ((rep_rcb = i40e_rcb_alloc(rxd)) == NULL) {
+		itrq->itrq_rxstat.irxs_rx_bind_norcb.value.ui64++;
+		return (NULL);
+	}
+
+	rcb = rxd->rxd_work_list[index];
+
+	/*
+	 * Check to make sure we have a mblk_t. If we don't, this is our last
+	 * chance to try and get one.
+	 */
+	if (rcb->rcb_mp == NULL) {
+		rcb->rcb_mp =
+		    desballoc((unsigned char *)rcb->rcb_dma.dmab_address,
+		    rcb->rcb_dma.dmab_size, 0, &rcb->rcb_free_rtn);
+		if (rcb->rcb_mp == NULL) {
+			itrq->itrq_rxstat.irxs_rx_bind_nomp.value.ui64++;
+			i40e_rcb_free(rxd, rcb);
+			return (NULL);
+		}
+	}
+
+	I40E_DMA_SYNC(&rcb->rcb_dma, DDI_DMA_SYNC_FORKERNEL);
+
+	if (i40e_check_dma_handle(rcb->rcb_dma.dmab_dma_handle) != DDI_FM_OK) {
+		ddi_fm_service_impact(i40e->i40e_dip, DDI_SERVICE_DEGRADED);
+		atomic_or_32(&i40e->i40e_state, I40E_ERROR);
+		i40e_rcb_free(rxd, rcb);
+		return (NULL);
+	}
+
+	/*
+	 * Note, we've already accounted for the I40E_BUF_IPHDR_ALIGNMENT.
+	 */
+	mp = rcb->rcb_mp;
+	atomic_inc_32(&rcb->rcb_ref);
+	mp->b_wptr = mp->b_rptr + plen;
+	mp->b_next = mp->b_cont = NULL;
+
+	rxd->rxd_work_list[index] = rep_rcb;
+	return (mp);
 }
 
 /*
@@ -1372,7 +1471,12 @@ i40e_ring_rx(i40e_trqpair_t *itrq, int poll_bytes)
 			break;
 		rx_bytes += plen;
 
-		mp = i40e_rx_copy(itrq, rxd, cur_head, plen);
+		mp = NULL;
+		if (plen >= i40e->i40e_rx_dma_min)
+			mp = i40e_rx_bind(itrq, rxd, cur_head, plen);
+		if (mp == NULL)
+			mp = i40e_rx_copy(itrq, rxd, cur_head, plen);
+
 		if (mp != NULL) {
 			if (i40e->i40e_rx_hcksum_enable)
 				i40e_rx_hcksum(itrq, mp, stword, error, ptype);
@@ -1829,6 +1933,7 @@ i40e_tcb_reset(i40e_tx_control_block_t *tcb)
 	tcb->tcb_type = I40E_TX_NONE;
 	freemsg(tcb->tcb_mp);
 	tcb->tcb_mp = NULL;
+	tcb->tcb_next = NULL;
 }
 
 /*
@@ -1884,6 +1989,7 @@ void
 i40e_tx_recycle_ring(i40e_trqpair_t *itrq)
 {
 	uint32_t wbhead, toclean, count;
+	i40e_tx_control_block_t *tcbhead;
 	i40e_t *i40e = itrq->itrq_i40e;
 
 	mutex_enter(&itrq->itrq_tx_lock);
@@ -1920,6 +2026,7 @@ i40e_tx_recycle_ring(i40e_trqpair_t *itrq)
 	wbhead = *itrq->itrq_desc_wbhead;
 	toclean = itrq->itrq_desc_head;
 	count = 0;
+	tcbhead = NULL;
 
 	while (toclean != wbhead) {
 		i40e_tx_control_block_t *tcb;
@@ -1927,8 +2034,8 @@ i40e_tx_recycle_ring(i40e_trqpair_t *itrq)
 		tcb = itrq->itrq_tcb_work_list[toclean];
 		itrq->itrq_tcb_work_list[toclean] = NULL;
 		ASSERT(tcb != NULL);
-		i40e_tcb_reset(tcb);
-		i40e_tcb_free(itrq, tcb);
+		tcb->tcb_next = tcbhead;
+		tcbhead = tcb;
 
 		/*
 		 * We zero this out for sanity purposes.
@@ -1940,6 +2047,7 @@ i40e_tx_recycle_ring(i40e_trqpair_t *itrq)
 
 	itrq->itrq_desc_head = wbhead;
 	itrq->itrq_desc_free += count;
+	itrq->itrq_txstat.itxs_recycled.value.ui64 += count;
 	ASSERT(itrq->itrq_desc_free <= itrq->itrq_tx_ring_size);
 
 	if (itrq->itrq_tx_blocked == B_TRUE &&
@@ -1951,6 +2059,19 @@ i40e_tx_recycle_ring(i40e_trqpair_t *itrq)
 	}
 
 	mutex_exit(&itrq->itrq_tx_lock);
+
+	/*
+	 * Now clean up the tcb.
+	 */
+	while (tcbhead != NULL) {
+		i40e_tx_control_block_t *tcb = tcbhead;
+
+		tcbhead = tcb->tcb_next;
+		i40e_tcb_reset(tcb);
+		i40e_tcb_free(itrq, tcb);
+	}
+
+	DTRACE_PROBE2(i40e__recycle, i40e_trqpair_t *, itrq, uint32_t, count);
 }
 
 /*
@@ -2116,6 +2237,7 @@ i40e_ring_tx(void *arg, mblk_t *mp)
 
 	txs->itxs_bytes.value.ui64 += mpsize;
 	txs->itxs_packets.value.ui64++;
+	txs->itxs_descriptors.value.ui64++;
 
 	mutex_exit(&itrq->itrq_tx_lock);
 

@@ -68,6 +68,7 @@ extern "C" {
 #include <sys/fm/io/ddi.h>
 #include <sys/list.h>
 #include <sys/debug.h>
+#include <sys/sdt.h>
 #include "i40e_type.h"
 #include "i40e_osdep.h"
 #include "i40e_prototype.h"
@@ -124,16 +125,39 @@ extern "C" {
 #define	I40E_DEF_MTU	ETHERMTU
 
 /*
+ * Interrupt throttling related values. Interrupt throttling values are defined
+ * in two microsecond increments. Note that a value of zero basically says do no
+ * ITR activity. A helpful way to think about these is that setting the ITR to a
+ * value will allow a certain number of interrupts per second.
+ *
+ * Our default values for RX allow 20k interrupts per second while our default
+ * values for TX allow for 5k interrupts per second. For other class interrupts,
+ * we limit ourselves to a rate of 2k/s.
+ */
+#define	I40E_MIN_ITR		0x0000
+#define	I40E_MAX_ITR		0x0FF0
+#define	I40E_DEF_RX_ITR		0x0019
+#define	I40E_DEF_TX_ITR		0x0064
+#define	I40E_DEF_OTHER_ITR	0x00FA
+
+/*
+ * Indexes into the three ITR registers that we have.
+ */
+typedef enum i40e_itr_index {
+	I40E_ITR_INDEX_RX	= 0x0,
+	I40E_ITR_INDEX_TX	= 0x1,
+	I40E_ITR_INDEX_OTHER	= 0x2,
+	I40E_ITR_INDEX_NONE 	= 0x3
+} i40e_itr_index_t;
+
+
+/*
  * Table 1-5 of the PRM notes that LSO supports up to 256 KB.
  */
 #define	I40E_LSO_MAXLEN	(256 * 1024)
 
 #define	I40E_CYCLIC_PERIOD NANOSEC	/* 1 second */
-
-/*
- * Interrupt rates and ITR logic.
- */
-#define	I40E_ITR_NONE 		0x3
+#define	I40E_DRAIN_RX_WAIT	(500 * MILLISEC)	/* In us */
 
 /*
  * All the other queue types for are defined by the common code. However, this
@@ -163,6 +187,20 @@ extern "C" {
  */
 #define	I40E_MIN_TX_BLOCK_THRESH	I40E_TX_MAX_COOKIE
 #define	I40E_DEF_TX_BLOCK_THRESH	I40E_MIN_TX_BLOCK_THRESH
+
+/*
+ * Sizing for DMA thresholds. These are used to indicate whether or not we
+ * should perform a bcopy or a DMA binding of a given message block. The range
+ * allows for setting things such that we'll always do a bcopy (a high value) or
+ * always perform a DMA binding (a low value).
+ */
+#define	I40E_MIN_RX_DMA_THRESH		0
+#define	I40E_DEF_RX_DMA_THRESH		256
+#define	I40E_MAX_RX_DMA_THRESH		INT32_MAX
+
+#define	I40E_MIN_TX_DMA_THRESH		0
+#define	I40E_DEF_TX_DMA_THRESH		256
+#define	I40E_MAX_TX_DMA_THRESH		INT32_MAX
 
 /*
  * Resource sizing counts. There are various aspects of hardware where we may
@@ -350,6 +388,7 @@ typedef struct i40e_tx_desc i40e_tx_desc_t;
 typedef union i40e_32byte_rx_desc i40e_rx_desc_t;
 
 typedef struct i40e_tx_control_block {
+	struct i40e_tx_control_block	*tcb_next;
 	mblk_t				*tcb_mp;
 	i40e_tx_type_t			tcb_type;
 	ddi_dma_handle_t		tcb_dma_handle;
@@ -372,11 +411,10 @@ typedef struct i40e_rx_data {
 	/*
 	 * RX control block list definitions
 	 */
+	kmutex_t		rxd_free_lock;	/* Lock to protect free data */
 	i40e_rx_control_block_t	*rxd_rcb_area;	/* Array of control blocks */
 	i40e_rx_control_block_t	**rxd_work_list; /* Work list of rcbs */
 	i40e_rx_control_block_t	**rxd_free_list; /* Free list of rcbs */
-	uint32_t		rxd_rcb_head;	/* Index of next free rcb */
-	uint32_t		rxd_rcb_tail;	/* Index to put recycled rcb */
 	uint32_t		rxd_rcb_free;	/* Number of free rcbs */
 
 	/*
@@ -427,6 +465,8 @@ typedef struct i40e_rxq_stat {
 	kstat_named_t	irxs_rx_desc_error;	/* Error bit set on desc */
 	kstat_named_t	irxs_rx_copy_nomem;	/* allocb failure for copy */
 	kstat_named_t	irxs_rx_intr_limit;	/* Hit i40e_rx_limit_per_intr */
+	kstat_named_t	irxs_rx_bind_norcb;	/* No replacement rcb free */
+	kstat_named_t	irxs_rx_bind_nomp;	/* No mblk_t in bind rcb */
 
 	/*
 	 * The following set of statistics covers rx checksum related activity.
@@ -449,9 +489,10 @@ typedef struct i40e_rxq_stat {
  * Collection of TX Statistics on a given queue
  */
 typedef struct i40e_txq_stat {
-	kstat_named_t	itxs_bytes;	/* Bytes out on queue */
-	kstat_named_t	itxs_packets;	/* Packets out on queue */
-
+	kstat_named_t	itxs_bytes;		/* Bytes out on queue */
+	kstat_named_t	itxs_packets;		/* Packets out on queue */
+	kstat_named_t	itxs_descriptors;	/* Descriptors issued */
+	kstat_named_t	itxs_recycled;		/* Descriptors reclaimed */
 	/*
 	 * Various failure conditions.
 	 */
@@ -748,21 +789,33 @@ typedef struct i40e {
 	i40e_trqpair_t	*i40e_trqpairs;
 	boolean_t 	i40e_mr_enable;
 	int		i40e_num_trqpairs;
+	uint_t		i40e_other_itr;
+
 	int		i40e_num_rx_groups;
 	int		i40e_num_rx_descs;
-	int		i40e_num_tx_descs;
 	mac_group_handle_t i40e_rx_group_handle;
 	uint32_t	i40e_rx_ring_size;
 	uint32_t	i40e_rx_buf_size;
 	boolean_t	i40e_rx_hcksum_enable;
+	uint32_t	i40e_rx_dma_min;
 	uint32_t	i40e_rx_limit_per_intr;
+	uint_t		i40e_rx_itr;
+
+	int		i40e_num_tx_descs;
 	uint32_t	i40e_tx_ring_size;
 	uint32_t	i40e_tx_buf_size;
 	uint32_t	i40e_tx_block_thresh;
 	boolean_t	i40e_tx_hcksum_enable;
+	uint32_t	i40e_tx_dma_min;
+	uint_t		i40e_tx_itr;
 
 	/*
 	 * Interrupt state
+	 *
+	 * Note that the use of a single boolean_t for i40e_intr_poll isn't
+	 * really the best design. When we have more than a single ring on the
+	 * device working, we'll transition to using something more
+	 * sophisticated.
 	 */
 	uint_t		i40e_intr_pri;
 	uint_t		i40e_intr_force;
@@ -774,6 +827,7 @@ typedef struct i40e {
 	size_t		i40e_intr_size;
 	ddi_intr_handle_t *i40e_intr_handles;
 	ddi_cb_handle_t	i40e_callback_handle;
+	boolean_t	i40e_intr_poll;
 
 	/*
 	 * DMA attributes. See i40e_buf.c for why we have copies of them in the
@@ -790,6 +844,7 @@ typedef struct i40e {
 	 * detach as we have active DMA memory outstanding.
 	 */
 	kmutex_t	i40e_rx_pending_lock;
+	kcondvar_t	i40e_rx_pending_cv;
 	uint32_t	i40e_rx_pending;
 
 	/*
@@ -867,6 +922,9 @@ extern uint_t i40e_intr_legacy(void *, void *);
 extern void i40e_intr_io_enable_all(i40e_t *);
 extern void i40e_intr_io_disable_all(i40e_t *);
 extern void i40e_intr_io_clear_cause(i40e_t *);
+extern void i40e_intr_rx_queue_disable(i40e_t *, uint_t);
+extern void i40e_intr_rx_queue_enable(i40e_t *, uint_t);
+extern void i40e_intr_set_itr(i40e_t *, i40e_itr_index_t, uint_t);
 
 /*
  * Receive-side functions

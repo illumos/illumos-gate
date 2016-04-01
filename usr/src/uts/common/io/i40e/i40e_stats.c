@@ -1212,6 +1212,13 @@ i40e_stats_trqpair_init(i40e_trqpair_t *itrq)
 	kstat_named_init(&tsp->itxs_packets, "tx_packets",
 	    KSTAT_DATA_UINT64);
 	tsp->itxs_packets.value.ui64 = 0;
+	kstat_named_init(&tsp->itxs_descriptors, "tx_descriptors",
+	    KSTAT_DATA_UINT64);
+	tsp->itxs_descriptors.value.ui64 = 0;
+	kstat_named_init(&tsp->itxs_recycled, "tx_recycled",
+	    KSTAT_DATA_UINT64);
+	tsp->itxs_recycled.value.ui64 = 0;
+
 	kstat_named_init(&tsp->itxs_hck_meoifail, "tx_hck_meoifail",
 	    KSTAT_DATA_UINT64);
 	tsp->itxs_hck_meoifail.value.ui64 = 0;
@@ -1256,6 +1263,12 @@ i40e_stats_trqpair_init(i40e_trqpair_t *itrq)
 	kstat_named_init(&rsp->irxs_rx_intr_limit, "rx_intr_limit",
 	    KSTAT_DATA_UINT64);
 	rsp->irxs_rx_intr_limit.value.ui64 = 0;
+	kstat_named_init(&rsp->irxs_rx_bind_norcb, "rx_bind_norcb",
+	    KSTAT_DATA_UINT64);
+	rsp->irxs_rx_bind_norcb.value.ui64 = 0;
+	kstat_named_init(&rsp->irxs_rx_bind_nomp, "rx_bind_nomp",
+	    KSTAT_DATA_UINT64);
+	rsp->irxs_rx_bind_nomp.value.ui64 = 0;
 	kstat_named_init(&rsp->irxs_rx_copy_nomem, "rx_copy_nomem",
 	    KSTAT_DATA_UINT64);
 	rsp->irxs_rx_copy_nomem.value.ui64 = 0;

@@ -119,6 +119,56 @@
  * Finally, we still have to set up the interrupt linked list, but the list is
  * instead rooted at the register I40E_PFINT_LNKLST0, rather than being tied to
  * one of the other MSI-X registers.
+ *
+ * --------------------
+ * Interrupt Moderation
+ * --------------------
+ *
+ * The XL710 hardware has three different interrupt moderation registers per
+ * interrupt. Unsurprisingly, we use these for:
+ *
+ *   o RX interrupts
+ *   o TX interrupts
+ *   o 'Other interrupts' (link status change, admin queue, etc.)
+ *
+ * By default, we throttle 'other interrupts' the most, then TX interrupts, and
+ * then RX interrupts. The default values for these were based on trying to
+ * reason about both the importance and frequency of events. Generally speaking
+ * 'other interrupts' are not very frequent and they're not important for the
+ * I/O data path in and of itself (though they may indicate issues with the I/O
+ * data path).
+ *
+ * On the flip side, when we're not polling, RX interrupts are very important.
+ * The longer we wait for them, the more latency that we inject into the system.
+ * However, if we allow interrupts to occur too frequently, we risk a few
+ * problems:
+ *
+ *  1) Abusing system resources. Without proper interrupt blanking and polling,
+ *     we can see upwards of 200k-300k interrupts per second on the system.
+ *
+ *  2) Not enough data coalescing to enable polling. In other words, the more
+ *     data that we allow to build up, the more likely we'll be able to enable
+ *     polling mode and allowing us to better handle bulk data.
+ *
+ * In-between the 'other interrupts' and the TX interrupts we have the
+ * reclamation of TX buffers. This operation is not quite as important as we
+ * generally size the ring large enough that we should be able to reclaim a
+ * substantial amount of the descriptors that we have used per interrupt. So
+ * while it's important that this interrupt occur, we don't necessarily need it
+ * firing as frequently as RX; it doesn't, on its own, induce additional latency
+ * into the system.
+ *
+ * Based on all this we currently assign static ITR values for the system. While
+ * we could move to a dynamic system (the hardware supports that), we'd want to
+ * make sure that we're seeing problems from this that we believe would be
+ * generally helped by the added complexity.
+ *
+ * Based on this, the default values that we have allow for the following
+ * interrupt thresholds:
+ *
+ *    o 20k interrupts/s for RX
+ *    o 5k interrupts/s for TX
+ *    o 2k interupts/s for 'Other Interrupts'
  */
 
 #include "i40e_sw.h"
@@ -129,6 +179,30 @@
 #define	I40E_INTR_NOTX_RX_MASK	(1 << I40E_PFINT_ICR0_QUEUE_0_SHIFT)
 #define	I40E_INTR_NOTX_TX_QUEUE	1
 #define	I40E_INTR_NOTX_TX_MASK	(1 << I40E_PFINT_ICR0_QUEUE_1_SHIFT)
+
+void
+i40e_intr_set_itr(i40e_t *i40e, i40e_itr_index_t itr, uint_t val)
+{
+	int i;
+	i40e_hw_t *hw = &i40e->i40e_hw_space;
+
+	VERIFY3U(val, <=, I40E_MAX_ITR);
+	VERIFY3U(itr, <, I40E_ITR_INDEX_NONE);
+
+	/*
+	 * No matter the interrupt mode, the ITR for other interrupts is always
+	 * on interrupt zero and the same is true if we're not using MSI-X.
+	 */
+	if (itr == I40E_ITR_INDEX_OTHER ||
+	    i40e->i40e_intr_type != DDI_INTR_TYPE_MSIX) {
+		I40E_WRITE_REG(hw, I40E_PFINT_ITR0(itr), val);
+		return;
+	}
+
+	for (i = 1; i < i40e->i40e_intr_count; i++) {
+		I40E_WRITE_REG(hw, I40E_PFINT_ITRN(itr, i - 1), val);
+	}
+}
 
 /*
  * Re-enable the adminq. Note that the adminq doesn't have a traditional queue
@@ -144,7 +218,7 @@ i40e_intr_adminq_enable(i40e_t *i40e)
 
 	reg = I40E_PFINT_DYN_CTL0_INTENA_MASK |
 	    I40E_PFINT_DYN_CTL0_CLEARPBA_MASK |
-	    (I40E_ITR_NONE << I40E_PFINT_DYN_CTL0_ITR_INDX_SHIFT);
+	    (I40E_ITR_INDEX_NONE << I40E_PFINT_DYN_CTL0_ITR_INDX_SHIFT);
 	I40E_WRITE_REG(hw, I40E_PFINT_DYN_CTL0, reg);
 	i40e_flush(hw);
 }
@@ -155,7 +229,7 @@ i40e_intr_adminq_disable(i40e_t *i40e)
 	i40e_hw_t *hw = &i40e->i40e_hw_space;
 	uint32_t reg;
 
-	reg = I40E_ITR_NONE << I40E_PFINT_DYN_CTL0_ITR_INDX_SHIFT;
+	reg = I40E_ITR_INDEX_NONE << I40E_PFINT_DYN_CTL0_ITR_INDX_SHIFT;
 	I40E_WRITE_REG(hw, I40E_PFINT_DYN_CTL0, reg);
 }
 
@@ -167,7 +241,7 @@ i40e_intr_io_enable(i40e_t *i40e, int vector)
 
 	reg = I40E_PFINT_DYN_CTLN_INTENA_MASK |
 	    I40E_PFINT_DYN_CTLN_CLEARPBA_MASK |
-	    (I40E_ITR_NONE << I40E_PFINT_DYN_CTLN_ITR_INDX_SHIFT);
+	    (I40E_ITR_INDEX_NONE << I40E_PFINT_DYN_CTLN_ITR_INDX_SHIFT);
 	I40E_WRITE_REG(hw, I40E_PFINT_DYN_CTLN(vector - 1), reg);
 }
 
@@ -177,7 +251,7 @@ i40e_intr_io_disable(i40e_t *i40e, int vector)
 	uint32_t reg;
 	i40e_hw_t *hw = &i40e->i40e_hw_space;
 
-	reg = I40E_ITR_NONE << I40E_PFINT_DYN_CTLN_ITR_INDX_SHIFT;
+	reg = I40E_ITR_INDEX_NONE << I40E_PFINT_DYN_CTLN_ITR_INDX_SHIFT;
 	I40E_WRITE_REG(hw, I40E_PFINT_DYN_CTLN(vector - 1), reg);
 }
 
@@ -326,7 +400,7 @@ i40e_intr_init_queue_msix(i40e_t *i40e)
 	I40E_WRITE_REG(hw, I40E_PFINT_LNKLSTN(0), reg);
 
 	reg = (1 << I40E_QINT_RQCTL_MSIX_INDX_SHIFT) |
-	    (I40E_ITR_NONE << I40E_QINT_RQCTL_ITR_INDX_SHIFT) |
+	    (I40E_ITR_INDEX_RX << I40E_QINT_RQCTL_ITR_INDX_SHIFT) |
 	    (0 << I40E_QINT_RQCTL_NEXTQ_INDX_SHIFT) |
 	    (I40E_QUEUE_TYPE_TX << I40E_QINT_RQCTL_NEXTQ_TYPE_SHIFT) |
 	    I40E_QINT_RQCTL_CAUSE_ENA_MASK;
@@ -334,7 +408,7 @@ i40e_intr_init_queue_msix(i40e_t *i40e)
 	I40E_WRITE_REG(hw, I40E_QINT_RQCTL(0), reg);
 
 	reg = (1 << I40E_QINT_RQCTL_MSIX_INDX_SHIFT) |
-	    (I40E_ITR_NONE << I40E_QINT_RQCTL_ITR_INDX_SHIFT) |
+	    (I40E_ITR_INDEX_TX << I40E_QINT_RQCTL_ITR_INDX_SHIFT) |
 	    (I40E_QUEUE_TYPE_EOL << I40E_QINT_TQCTL_NEXTQ_INDX_SHIFT) |
 	    (I40E_QUEUE_TYPE_RX << I40E_QINT_RQCTL_NEXTQ_TYPE_SHIFT) |
 	    I40E_QINT_TQCTL_CAUSE_ENA_MASK;
@@ -363,7 +437,7 @@ i40e_intr_init_queue_shared(i40e_t *i40e)
 	I40E_WRITE_REG(hw, I40E_PFINT_LNKLST0, reg);
 
 	reg = (I40E_INTR_NOTX_INTR << I40E_QINT_RQCTL_MSIX_INDX_SHIFT) |
-	    (I40E_ITR_NONE << I40E_QINT_RQCTL_ITR_INDX_SHIFT) |
+	    (I40E_ITR_INDEX_RX << I40E_QINT_RQCTL_ITR_INDX_SHIFT) |
 	    (I40E_INTR_NOTX_RX_QUEUE << I40E_QINT_RQCTL_MSIX0_INDX_SHIFT) |
 	    (I40E_INTR_NOTX_QUEUE << I40E_QINT_RQCTL_NEXTQ_INDX_SHIFT) |
 	    (I40E_QUEUE_TYPE_TX << I40E_QINT_RQCTL_NEXTQ_TYPE_SHIFT);
@@ -371,12 +445,53 @@ i40e_intr_init_queue_shared(i40e_t *i40e)
 	I40E_WRITE_REG(hw, I40E_QINT_RQCTL(I40E_INTR_NOTX_QUEUE), reg);
 
 	reg = (I40E_INTR_NOTX_INTR << I40E_QINT_TQCTL_MSIX_INDX_SHIFT) |
-	    (I40E_ITR_NONE << I40E_QINT_TQCTL_ITR_INDX_SHIFT) |
+	    (I40E_ITR_INDEX_TX << I40E_QINT_TQCTL_ITR_INDX_SHIFT) |
 	    (I40E_INTR_NOTX_TX_QUEUE << I40E_QINT_TQCTL_MSIX0_INDX_SHIFT) |
 	    (I40E_QUEUE_TYPE_EOL << I40E_QINT_TQCTL_NEXTQ_INDX_SHIFT) |
 	    (I40E_QUEUE_TYPE_RX << I40E_QINT_TQCTL_NEXTQ_TYPE_SHIFT);
 
 	I40E_WRITE_REG(hw, I40E_QINT_TQCTL(I40E_INTR_NOTX_QUEUE), reg);
+}
+
+/*
+ * Enable the specified queue as a valid source of interrupts. Note, this should
+ * only be used as part of the GLDv3's interrupt blanking routines. The debug
+ * build assertions are specific to that.
+ */
+void
+i40e_intr_rx_queue_enable(i40e_t *i40e, uint_t queue)
+{
+	uint32_t reg;
+	i40e_hw_t *hw = &i40e->i40e_hw_space;
+
+	ASSERT(MUTEX_HELD(&i40e->i40e_general_lock));
+	ASSERT(queue < i40e->i40e_num_trqpairs);
+
+	reg = I40E_READ_REG(hw, I40E_QINT_RQCTL(queue));
+	ASSERT0(reg & I40E_QINT_RQCTL_CAUSE_ENA_MASK);
+	reg |= I40E_QINT_RQCTL_CAUSE_ENA_MASK;
+	I40E_WRITE_REG(hw, I40E_QINT_RQCTL(queue), reg);
+}
+
+/*
+ * Disable the specified queue as a valid source of interrupts. Note, this
+ * should only be used as part of the GLDv3's interrupt blanking routines. The
+ * debug build assertions are specific to that.
+ */
+void
+i40e_intr_rx_queue_disable(i40e_t *i40e, uint_t queue)
+{
+	uint32_t reg;
+	i40e_hw_t *hw = &i40e->i40e_hw_space;
+
+	ASSERT(MUTEX_HELD(&i40e->i40e_general_lock));
+	ASSERT(queue < i40e->i40e_num_trqpairs);
+
+	reg = I40E_READ_REG(hw, I40E_QINT_RQCTL(queue));
+	ASSERT3U(reg & I40E_QINT_RQCTL_CAUSE_ENA_MASK, ==,
+	    I40E_QINT_RQCTL_CAUSE_ENA_MASK);
+	reg &= ~I40E_QINT_RQCTL_CAUSE_ENA_MASK;
+	I40E_WRITE_REG(hw, I40E_QINT_RQCTL(queue), reg);
 }
 
 /*
@@ -395,9 +510,16 @@ i40e_intr_chip_init(i40e_t *i40e)
 	 */
 	i40e_intr_io_disable_all(i40e);
 
-	/* First, the adminq. */
 	I40E_WRITE_REG(hw, I40E_PFINT_ICR0_ENA, 0);
 	I40E_READ_REG(hw, I40E_PFINT_ICR0);
+
+	/*
+	 * Always enable all of the other-class interrupts to be on their own
+	 * ITR. This only needs to be set on interrupt zero, which has its own
+	 * special setting.
+	 */
+	reg = I40E_ITR_INDEX_OTHER << I40E_PFINT_STAT_CTL0_OTHER_ITR_INDX_SHIFT;
+	I40E_WRITE_REG(hw, I40E_PFINT_STAT_CTL0, reg);
 
 	/*
 	 * Enable interrupt types we expect to receive. At the moment, this
@@ -425,8 +547,15 @@ i40e_intr_chip_init(i40e_t *i40e)
 	} else {
 		i40e_intr_init_queue_shared(i40e);
 	}
-}
 
+	/*
+	 * Finally set all of the default ITRs for the interrupts. Note that the
+	 * queues will have been set up above.
+	 */
+	i40e_intr_set_itr(i40e, I40E_ITR_INDEX_RX, i40e->i40e_rx_itr);
+	i40e_intr_set_itr(i40e, I40E_ITR_INDEX_TX, i40e->i40e_tx_itr);
+	i40e_intr_set_itr(i40e, I40E_ITR_INDEX_OTHER, i40e->i40e_other_itr);
+}
 
 static void
 i40e_intr_adminq_work(i40e_t *i40e)
@@ -548,7 +677,16 @@ i40e_intr_msix(void *arg1, void *arg2)
 
 	VERIFY(vector_idx == 1);
 
-	i40e_intr_rx_work(i40e, 0);
+	/*
+	 * Note that we explicitly do not check this value under the lock even
+	 * though assignments to it are done so. In this case, the cost of
+	 * getting this wrong is at worst a bit of additional contention and
+	 * even more rarely, a duplicated packet. However, the cost on the other
+	 * hand is a lot more. This is something that as we more generally
+	 * implement ring support we should revisit.
+	 */
+	if (i40e->i40e_intr_poll != B_TRUE)
+		i40e_intr_rx_work(i40e, 0);
 	i40e_intr_tx_work(i40e, 0);
 	i40e_intr_io_enable(i40e, 1);
 

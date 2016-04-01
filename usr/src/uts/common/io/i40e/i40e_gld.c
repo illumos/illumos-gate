@@ -20,6 +20,21 @@
 
 #include "i40e_sw.h"
 
+#define	I40E_PROP_RX_DMA_THRESH	"_rx_dma_threshold"
+#define	I40E_PROP_TX_DMA_THRESH	"_tx_dma_threshold"
+#define	I40E_PROP_RX_ITR	"_rx_intr_throttle"
+#define	I40E_PROP_TX_ITR	"_tx_intr_throttle"
+#define	I40E_PROP_OTHER_ITR	"_other_intr_throttle"
+
+char *i40e_priv_props[] = {
+	I40E_PROP_RX_DMA_THRESH,
+	I40E_PROP_TX_DMA_THRESH,
+	I40E_PROP_RX_ITR,
+	I40E_PROP_TX_ITR,
+	I40E_PROP_OTHER_ITR,
+	NULL
+};
+
 static int
 i40e_group_remove_mac(void *arg, const uint8_t *mac_addr)
 {
@@ -431,24 +446,35 @@ i40e_ring_start(mac_ring_driver_t rh, uint64_t gen_num)
 	return (0);
 }
 
-/*
- * Because we only support a single ring at this time, we don't support toggling
- * interrupts and polling. When we do, we should simply toggle the interrupt
- * cause enable bit for this and potentially ignore it when looking at the
- * interrupt vector mapping.
- */
 /* ARGSUSED */
 static int
 i40e_rx_ring_intr_enable(mac_intr_handle_t intrh)
 {
-	return (EINVAL);
+	i40e_trqpair_t *itrq = (i40e_trqpair_t *)intrh;
+	i40e_t *i40e = itrq->itrq_i40e;
+
+	mutex_enter(&i40e->i40e_general_lock);
+	ASSERT(i40e->i40e_intr_poll == B_TRUE);
+	i40e_intr_rx_queue_enable(i40e, itrq->itrq_index);
+	i40e->i40e_intr_poll = B_FALSE;
+	mutex_exit(&i40e->i40e_general_lock);
+
+	return (0);
 }
 
 /* ARGSUSED */
 static int
 i40e_rx_ring_intr_disable(mac_intr_handle_t intrh)
 {
-	return (EINVAL);
+	i40e_trqpair_t *itrq = (i40e_trqpair_t *)intrh;
+	i40e_t *i40e = itrq->itrq_i40e;
+
+	mutex_enter(&i40e->i40e_general_lock);
+	i40e_intr_rx_queue_disable(i40e, itrq->itrq_index);
+	i40e->i40e_intr_poll = B_TRUE;
+	mutex_exit(&i40e->i40e_general_lock);
+
+	return (0);
 }
 
 static void
@@ -599,6 +625,145 @@ i40e_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 }
 
 static int
+i40e_m_setprop_private(i40e_t *i40e, const char *pr_name, uint_t pr_valsize,
+    const void *pr_val)
+{
+	int ret;
+	long val;
+	char *eptr;
+
+	ASSERT(MUTEX_HELD(&i40e->i40e_general_lock));
+
+	if ((ret = ddi_strtol(pr_val, &eptr, 10, &val)) != 0 ||
+	    *eptr != '\0') {
+		return (ret);
+	}
+
+	if (strcmp(pr_name, I40E_PROP_RX_DMA_THRESH) == 0) {
+		if (val < I40E_MIN_RX_DMA_THRESH ||
+		    val > I40E_MAX_RX_DMA_THRESH) {
+			return (EINVAL);
+		}
+		i40e->i40e_rx_dma_min = (uint32_t)val;
+		return (0);
+	}
+
+	if (strcmp(pr_name, I40E_PROP_TX_DMA_THRESH) == 0) {
+		if (val < I40E_MIN_TX_DMA_THRESH ||
+		    val > I40E_MAX_TX_DMA_THRESH) {
+			return (EINVAL);
+		}
+		i40e->i40e_tx_dma_min = (uint32_t)val;
+		return (0);
+	}
+
+	if (strcmp(pr_name, I40E_PROP_RX_ITR) == 0) {
+		if (val < I40E_MIN_ITR ||
+		    val > I40E_MAX_ITR) {
+			return (EINVAL);
+		}
+		i40e->i40e_rx_itr = (uint32_t)val;
+		i40e_intr_set_itr(i40e, I40E_ITR_INDEX_RX, i40e->i40e_rx_itr);
+		return (0);
+	}
+
+	if (strcmp(pr_name, I40E_PROP_TX_ITR) == 0) {
+		if (val < I40E_MIN_ITR ||
+		    val > I40E_MAX_ITR) {
+			return (EINVAL);
+		}
+		i40e->i40e_tx_itr = (uint32_t)val;
+		i40e_intr_set_itr(i40e, I40E_ITR_INDEX_TX, i40e->i40e_tx_itr);
+		return (0);
+	}
+
+	if (strcmp(pr_name, I40E_PROP_OTHER_ITR) == 0) {
+		if (val < I40E_MIN_ITR ||
+		    val > I40E_MAX_ITR) {
+			return (EINVAL);
+		}
+		i40e->i40e_tx_itr = (uint32_t)val;
+		i40e_intr_set_itr(i40e, I40E_ITR_INDEX_OTHER,
+		    i40e->i40e_other_itr);
+		return (0);
+	}
+
+	return (ENOTSUP);
+}
+
+static int
+i40e_m_getprop_private(i40e_t *i40e, const char *pr_name, uint_t pr_valsize,
+    void *pr_val)
+{
+	uint32_t val;
+
+	ASSERT(MUTEX_HELD(&i40e->i40e_general_lock));
+
+	if (strcmp(pr_name, I40E_PROP_RX_DMA_THRESH) == 0) {
+		val = i40e->i40e_rx_dma_min;
+	} else if (strcmp(pr_name, I40E_PROP_TX_DMA_THRESH) == 0) {
+		val = i40e->i40e_tx_dma_min;
+	} else if (strcmp(pr_name, I40E_PROP_RX_ITR) == 0) {
+		val = i40e->i40e_rx_itr;
+	} else if (strcmp(pr_name, I40E_PROP_TX_ITR) == 0) {
+		val = i40e->i40e_tx_itr;
+	} else if (strcmp(pr_name, I40E_PROP_OTHER_ITR) == 0) {
+		val = i40e->i40e_other_itr;
+	} else {
+		return (ENOTSUP);
+	}
+
+	if (snprintf(pr_val, pr_valsize, "%d", val) >= pr_valsize)
+		return (ERANGE);
+	return (0);
+}
+
+/*
+ * Annoyingly for private properties MAC seems to ignore default values that
+ * aren't strings. That means that we have to translate all of these into
+ * uint32_t's and instead we size the buffer to be large enough to hold a
+ * uint32_t.
+ */
+static void
+i40e_m_propinfo_private(i40e_t *i40e, const char *pr_name,
+    mac_prop_info_handle_t prh)
+{
+	char buf[64];
+	uint32_t def;
+
+	if (strcmp(pr_name, I40E_PROP_RX_DMA_THRESH) == 0) {
+		mac_prop_info_set_perm(prh, MAC_PROP_PERM_RW);
+		def = I40E_DEF_RX_DMA_THRESH;
+		mac_prop_info_set_range_uint32(prh,
+		    I40E_MIN_RX_DMA_THRESH,
+		    I40E_MAX_RX_DMA_THRESH);
+	} else if (strcmp(pr_name, I40E_PROP_TX_DMA_THRESH) == 0) {
+		mac_prop_info_set_perm(prh, MAC_PROP_PERM_RW);
+		def = I40E_DEF_TX_DMA_THRESH;
+		mac_prop_info_set_range_uint32(prh,
+		    I40E_MIN_TX_DMA_THRESH,
+		    I40E_MAX_TX_DMA_THRESH);
+	} else if (strcmp(pr_name, I40E_PROP_RX_ITR) == 0) {
+		mac_prop_info_set_perm(prh, MAC_PROP_PERM_RW);
+		def = I40E_DEF_RX_ITR;
+		mac_prop_info_set_range_uint32(prh, I40E_MIN_ITR, I40E_MAX_ITR);
+	} else if (strcmp(pr_name, I40E_PROP_TX_ITR) == 0) {
+		mac_prop_info_set_perm(prh, MAC_PROP_PERM_RW);
+		def = I40E_DEF_TX_ITR;
+		mac_prop_info_set_range_uint32(prh, I40E_MIN_ITR, I40E_MAX_ITR);
+	} else if (strcmp(pr_name, I40E_PROP_OTHER_ITR) == 0) {
+		mac_prop_info_set_perm(prh, MAC_PROP_PERM_RW);
+		def = I40E_DEF_OTHER_ITR;
+		mac_prop_info_set_range_uint32(prh, I40E_MIN_ITR, I40E_MAX_ITR);
+	} else {
+		return;
+	}
+
+	(void) snprintf(buf, sizeof (buf), "%d", def);
+	mac_prop_info_set_default_str(prh, buf);
+}
+
+static int
 i40e_m_setprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
     uint_t pr_valsize, const void *pr_val)
 {
@@ -662,6 +827,8 @@ i40e_m_setprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 		break;
 
 	case MAC_PROP_PRIVATE:
+		ret = i40e_m_setprop_private(i40e, pr_name, pr_valsize, pr_val);
+		break;
 	default:
 		ret = ENOTSUP;
 		break;
@@ -775,6 +942,8 @@ i40e_m_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 		*u8 = (i40e->i40e_phy.link_speed & I40E_LINK_SPEED_40GB) != 0;
 		break;
 	case MAC_PROP_PRIVATE:
+		ret = i40e_m_getprop_private(i40e, pr_name, pr_valsize, pr_val);
+		break;
 	default:
 		ret = ENOTSUP;
 		break;
@@ -862,6 +1031,8 @@ i40e_m_propinfo(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 		    (i40e->i40e_phy.link_speed & I40E_LINK_SPEED_40GB) != 0);
 		break;
 	case MAC_PROP_PRIVATE:
+		i40e_m_propinfo_private(i40e, pr_name, prh);
+		break;
 	default:
 		break;
 	}
@@ -909,7 +1080,7 @@ i40e_register_mac(i40e_t *i40e)
 	mac->m_min_sdu = 0;
 	mac->m_max_sdu = i40e->i40e_sdu;
 	mac->m_margin = VLAN_TAGSZ;
-	mac->m_priv_props = NULL;
+	mac->m_priv_props = i40e_priv_props;
 	mac->m_v12n = MAC_VIRT_LEVEL1;
 
 	status = mac_register(mac, &i40e->i40e_mac_hdl);

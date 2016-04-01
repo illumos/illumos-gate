@@ -101,6 +101,11 @@ consumer such as
 .Xr snoop 1M
 or an LLDP daemon is started.
 .Pp
+Some properties may be tuned at runtime with the
+.Xr dladm 1M
+utility. Properties that can be will have the name of the dladm property
+called out explicitly.
+.Pp
 These properties are not considered stable at this time. They may change
 and should not be relied on. They are considered
 .Sy Volatile .
@@ -112,7 +117,9 @@ these values.
 Minimum:
 .Sy 1500 |
 Maximum:
-.Sy 9710
+.Sy 9710 |
+Runtime Property:
+.Sy mtu
 .Ed
 .Bd -filled
 The
@@ -231,6 +238,24 @@ checksuming of incoming packets. The default is to always enable support
 for this. Turning it off will increase latency and decrease throughput
 when receiving packets, but should be done if a hardware bug is
 suspected.
+.Ed
+.It Sy rx_dma_threshold
+.Bd -filled -compact
+Minimum:
+.Sy 0 |
+Maximum:
+.Sy INT32_MAX |
+Runtime Property:
+.Sy _rx_dma_treshold
+.Ed
+.Bd -filled
+The
+.Sy rx_dma_treshold
+indicates the size in bytes of a received frame, including all of its
+headers, at which the driver should not copy the frame but instead bind
+DMA memory. By setting this property to its minimum, all frames will be
+processed with DMA binding. By setting this property to its maximum, all
+frames will be processed by copying the frame.
 .Ed
 .El
 .Sh ARCHITECTURE
