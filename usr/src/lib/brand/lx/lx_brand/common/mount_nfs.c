@@ -83,6 +83,7 @@
 #include <limits.h>
 #include <nfs/nfssys.h>
 #include <strings.h>
+#include <assert.h>
 #include <sys/lx_mount.h>
 #include <sys/lx_misc.h>
 
@@ -401,6 +402,7 @@ mount_nfs(struct mnttab *mntp, int mntflags, err_ret_t *retry_error,
 	nmdp->nmd_sec_opt = 0;
 	port = 0;
 
+	/* returns a negative errno */
 	if ((r = set_args(&mntflags, argp, host, mntp, nmdp)) != 0)
 		goto out;
 
@@ -411,16 +413,10 @@ mount_nfs(struct mnttab *mntp, int mntflags, err_ret_t *retry_error,
 		goto out;
 	}
 
+	/* returns a negative errno or positive EAGAIN for retry */
 	r = get_fh(argp, host, path, &vers, &nconf, port, nmdp);
 	if (r != 0) {
 		/* All attempts failed */
-		if (r == RET_MNTERR) {
-			r = -EREMOTE;
-		} else if (r == RET_PROTOUNSUPP) {
-			r = -EPROTONOSUPPORT;
-		} else if (r != RET_RETRY) {
-			r = -EAGAIN;
-		}
 		goto out;
 	}
 
@@ -430,11 +426,10 @@ mount_nfs(struct mnttab *mntp, int mntflags, err_ret_t *retry_error,
 	 */
 	if (!(argp->flags & NFSMNT_KNCONF)) {
 		nconf = NULL;
+		/* returns a negative errno or positive EAGAIN for retry */
 		r = getaddr_nfs(argp, host, &nconf, path, port,
 		    retry_error, TRUE, nmdp);
 		if (r != 0) {
-			if (r != RET_RETRY)
-				r = -EAGAIN;
 			goto out;
 		}
 	}
@@ -450,7 +445,7 @@ mount_nfs(struct mnttab *mntp, int mntflags, err_ret_t *retry_error,
 	    nmdp->nmd_fstype, argp, sizeof (*argp), mntp->mnt_mntopts,
 	    MAX_MNTOPT_STR);
 	if (r != 0)
-		r = -r;
+		r = -errno;
 out:
 	if (argp->fh)
 		free(argp->fh);
@@ -1532,7 +1527,66 @@ lx_get_ent_func(int pos)
 }
 
 /*
+ * Roughly based on the NFSv4 try_failover_table but used here for generic
+ * errno translation.
+ */
+static int
+rpcerr2errno(int rpcerr)
+{
+	switch (rpcerr) {
+	case RPC_INTR:
+		return (EINTR);
+	case RPC_TIMEDOUT:
+		return (ETIMEDOUT);
+	case RPC_VERSMISMATCH:
+	case RPC_PROGVERSMISMATCH:
+	case RPC_PROGUNAVAIL:
+	case RPC_PROCUNAVAIL:
+	case RPC_PMAPFAILURE:
+	case RPC_PROGNOTREGISTERED:
+		return (EPROTONOSUPPORT);
+	case RPC_AUTHERROR:
+		return (EACCES);
+	case RPC_UNKNOWNPROTO:
+	case RPC_UNKNOWNHOST:
+		return (EHOSTUNREACH);
+	case RPC_CANTENCODEARGS:
+	case RPC_CANTDECODERES:
+	case RPC_CANTDECODEARGS:
+	case RPC_CANTSEND:
+	case RPC_CANTRECV:
+		return (ECOMM);
+	case RPC_SYSTEMERROR:
+		return (ENOSR);
+	default:
+		return (EIO);
+	}
+}
+
+static int
+err2errno(int err)
+{
+	assert(err != ERR_RPCERROR);
+	switch (err) {
+	case ERR_PROTO_NONE:
+	case ERR_PROTO_INVALID:
+	case ERR_PROTO_UNSUPP:
+		return (EPROTONOSUPPORT);
+	case ERR_NETPATH:
+		return (ENOSR);
+	case ERR_NOHOST:
+		return (EHOSTUNREACH);
+	default:
+		return (EIO);
+	}
+}
+
+/*
  * get fhandle of remote path from server's mountd
+ *
+ * Return a positive EAGAIN if the caller should retry and a -EAGAIN to
+ * indicate a fatal (Linux-oriented) error condition. Return other negative
+ * errno values to indicate different fatal errors.
  */
 static int
 get_fh(struct nfs_args *args, char *fshost, char *fspath, int *versp,
@@ -1612,9 +1666,9 @@ get_fh(struct nfs_args *args, char *fshost, char *fspath, int *versp,
 			args->fh = strdup(fspath);
 			if (args->fh == NULL) {
 				*versp = nmdp->nmd_nfsvers_to_use = savevers;
-				return (RET_ERR);
+				return (-EAGAIN);
 			}
-			return (RET_OK);
+			return (0);
 		}
 		nmdp->nmd_nfsvers_to_use = savevers;
 
@@ -1626,13 +1680,16 @@ get_fh(struct nfs_args *args, char *fshost, char *fspath, int *versp,
 			 * us in to that version, however the server does not
 			 * support that version (and responded to tell us that).
 			 */
-			return (RET_PROTOUNSUPP);
+			return (-EPROTONOSUPPORT);
 		}
 
 		vers_to_try--;
 		/* If no more versions to try, let the user know. */
-		if (vers_to_try < vers_min)
-			return (retval);
+		if (vers_to_try < vers_min) {
+			if (error.error_value == 0)
+				return (-EPROTONOSUPPORT);
+			return (-rpcerr2errno(error.error_value));
+		}
 
 		/*
 		 * If we are here, there are more versions to try but
@@ -1642,20 +1699,20 @@ get_fh(struct nfs_args *args, char *fshost, char *fspath, int *versp,
 		 * the same error as well.
 		 */
 		if (retval == RET_ERR && error.error_type != ERR_RPCERROR)
-			return (retval);
+			return (-err2errno(error.error_type));
 	}
 
 	while ((cl = clnt_create_vers(fshost, MOUNTPROG, &outvers,
 	    vers_min, vers_to_try, NULL)) == NULL) {
 		if (rpc_createerr.cf_stat == RPC_UNKNOWNHOST)
-			return (RET_ERR);
+			return (-EAGAIN);
 
 		/*
 		 * We don't want to downgrade version on lost packets
 		 */
 		if ((rpc_createerr.cf_stat == RPC_TIMEDOUT) ||
 		    (rpc_createerr.cf_stat == RPC_PMAPFAILURE))
-			return (RET_RETRY);
+			return (EAGAIN);
 
 		/*
 		 * back off and try the previous version - patch to the
@@ -1668,24 +1725,24 @@ get_fh(struct nfs_args *args, char *fshost, char *fspath, int *versp,
 		vers_to_try--;
 		if (vers_to_try < vers_min) {
 			if (rpc_createerr.cf_stat == RPC_PROGVERSMISMATCH)
-				return (RET_ERR);
+				return (-EAGAIN);
 
-			return (RET_RETRY);
+			return (EAGAIN);
 		}
 	}
 	if (nmdp->nmd_posix && outvers < MOUNTVERS_POSIX) {
 		clnt_destroy(cl);
-		return (RET_ERR);
+		return (-EAGAIN);
 	}
 
 	if (__clnt_bindresvport(cl) < 0) {
 		clnt_destroy(cl);
-		return (RET_RETRY);
+		return (EAGAIN);
 	}
 
 	if ((cl->cl_auth = authsys_create_default()) == NULL) {
 		clnt_destroy(cl);
-		return (RET_RETRY);
+		return (EAGAIN);
 	}
 
 	switch (outvers) {
@@ -1698,16 +1755,16 @@ get_fh(struct nfs_args *args, char *fshost, char *fspath, int *versp,
 			log_err("%s:%s: server not responding %s\n",
 			    fshost, fspath, clnt_sperror(cl, ""));
 			clnt_destroy(cl);
-			return (RET_RETRY);
+			return (EAGAIN);
 		}
 
 		if ((errno = fhs.fhs_status) != MNT_OK) {
 			clnt_destroy(cl);
-			return (RET_MNTERR);
+			return (-fhs.fhs_status);
 		}
 		args->fh = malloc(sizeof (fhs.fhstatus_u.fhs_fhandle));
 		if (args->fh == NULL)
-			return (RET_ERR);
+			return (-EAGAIN);
 
 		memcpy((caddr_t)args->fh, (caddr_t)&fhs.fhstatus_u.fhs_fhandle,
 		    sizeof (fhs.fhstatus_u.fhs_fhandle));
@@ -1720,19 +1777,19 @@ get_fh(struct nfs_args *args, char *fshost, char *fspath, int *versp,
 				    fshost, fspath, clnt_sperror(cl, ""));
 				free(args->fh);
 				clnt_destroy(cl);
-				return (RET_RETRY);
+				return (EAGAIN);
 			}
 			if (_PC_ISSET(_PC_ERROR, p.pc_mask)) {
 				free(args->fh);
 				clnt_destroy(cl);
-				return (RET_ERR);
+				return (-EAGAIN);
 			}
 			args->flags |= NFSMNT_POSIX;
 			args->pathconf = malloc(sizeof (p));
 			if (args->pathconf == NULL) {
 				free(args->fh);
 				clnt_destroy(cl);
-				return (RET_ERR);
+				return (-EAGAIN);
 			}
 			memcpy((caddr_t)args->pathconf, (caddr_t)&p,
 			    sizeof (p));
@@ -1748,21 +1805,21 @@ get_fh(struct nfs_args *args, char *fshost, char *fspath, int *versp,
 			log_err("%s:%s: server not responding %s\n",
 			    fshost, fspath, clnt_sperror(cl, ""));
 			clnt_destroy(cl);
-			return (RET_RETRY);
+			return (EAGAIN);
 		}
 
 		/*
 		 * Assume here that most of the MNT3ERR_*
-		 * codes map into E* errors.
+		 * codes map into E* errors. See the nfsstat enum for values.
 		 */
 		if ((errno = mountres3.fhs_status) != MNT_OK) {
 			clnt_destroy(cl);
-			return (RET_MNTERR);
+			return (-mountres3.fhs_status);
 		}
 
 		fh3p = (nfs_fh3 *)malloc(sizeof (*fh3p));
 		if (fh3p == NULL)
-			return (RET_ERR);
+			return (-EAGAIN);
 
 		fh3p->fh3_length =
 		    mountres3.mountres3_u.mountinfo.fhandle.fhandle3_len;
@@ -1796,7 +1853,7 @@ get_fh(struct nfs_args *args, char *fshost, char *fspath, int *versp,
 
 		if (count <= 0) {
 			clnt_destroy(cl);
-			return (RET_ERR);
+			return (-EAGAIN);
 		}
 
 		if (nmdp->nmd_sec_opt) {
@@ -1814,21 +1871,24 @@ get_fh(struct nfs_args *args, char *fshost, char *fspath, int *versp,
 		break;
 	default:
 		clnt_destroy(cl);
-		return (RET_ERR);
+		return (-EAGAIN);
 	}
 
 	clnt_destroy(cl);
-	return (RET_OK);
+	return (0);
 
 autherr:
 	clnt_destroy(cl);
-	return (RET_ERR);
+	return (-EAGAIN);
 }
 
 /*
- * Fill in the address for the server's NFS service and
- * fill in a knetconfig structure for the transport that
- * the service is available on.
+ * Fill in the address for the server's NFS service and fill in a knetconfig
+ * structure for the transport that the service is available on.
+ *
+ * Return a positive EAGAIN if the caller should retry and a -EAGAIN to
+ * indicate a fatal (Linux-oriented) error condition. Return other negative
+ * errno values to indicate different fatal errors.
  */
 static int
 getaddr_nfs(struct nfs_args *args, char *fshost, struct netconfig **nconfp,
@@ -1885,11 +1945,11 @@ getaddr_nfs(struct nfs_args *args, char *fshost, struct netconfig **nconfp,
 
 		SET_ERR_RET(error,
 		    addr_error.error_type, addr_error.error_value);
-		if (addr_error.error_type == ERR_PROTO_NONE)
-			return (RET_RETRY);
-		else if (addr_error.error_type == ERR_RPCERROR &&
+		if (addr_error.error_type == ERR_PROTO_NONE) {
+			return (EAGAIN);
+		} else if (addr_error.error_type == ERR_RPCERROR &&
 		    !IS_UNRECOVERABLE_RPC(addr_error.error_value)) {
-			return (RET_RETRY);
+			return (EAGAIN);
 		} else if (nmdp->nmd_nfsvers == 0 &&
 		    addr_error.error_type == ERR_PROTO_UNSUPP &&
 		    nmdp->nmd_nfsvers_to_use != NFS_VERSMIN) {
@@ -1898,18 +1958,21 @@ getaddr_nfs(struct nfs_args *args, char *fshost, struct netconfig **nconfp,
 			 * to an unsupported transport, then decrement the
 			 * version and retry.
 			 */
-			return (RET_RETRY);
-		} else
-			return (RET_ERR);
+			return (EAGAIN);
+		} else if (addr_error.error_type != ERR_RPCERROR) {
+			return (-err2errno(addr_error.error_type));
+		} else {
+			return (-rpcerr2errno(addr_error.error_value));
+		}
 	}
 	nconf = *nconfp;
 
 	if (stat(nconf->nc_device, &sb) < 0)
-		return (RET_ERR);
+		return (-ENOSR);
 
 	knconfp = (struct knetconfig *)malloc(sizeof (*knconfp));
 	if (!knconfp)
-		return (RET_ERR);
+		return (-ENOMEM);
 
 	knconfp->knc_semantics = nconf->nc_semantics;
 	knconfp->knc_protofmly = nconf->nc_protofmly;
@@ -1927,7 +1990,7 @@ getaddr_nfs(struct nfs_args *args, char *fshost, struct netconfig **nconfp,
 
 	args->flags |= NFSMNT_KNCONF;
 	args->knconf = knconfp;
-	return (RET_OK);
+	return (0);
 }
 
 static int
@@ -1956,7 +2019,7 @@ retry(struct mnttab *mntp, int mntflags, nfs_mnt_data_t *nmdp)
 		if ((r = mount_nfs(mntp, mntflags, &retry_error, nmdp)) == 0)
 			return (0);
 
-		if (r != RET_RETRY)
+		if (r != EAGAIN)
 			break;
 
 		if (count > 0) {
@@ -2226,14 +2289,14 @@ lx_nfs_mount(char *srcp, char *mntp, char *fst, int lx_flags, char *opts)
 	if (r < 0)
 		return (r);
 
-	if (r == RET_RETRY && nmd.nmd_retries) {
+	if (r == EAGAIN && nmd.nmd_retries) {
 		/*
 		 * Check the error code from the last mount attempt. If it was
 		 * an RPC error, then retry as is. Otherwise we retry with the
 		 * nmd_nfsretry_vers set. It is set by decrementing
 		 * nmd_nfsvers_to_use.
 		 */
-		if (retry_error.error_type) {
+		if (retry_error.error_type != 0) {
 			if (retry_error.error_type != ERR_RPCERROR) {
 				nmd.nmd_nfsretry_vers =
 				    nmd.nmd_nfsvers_to_use =
@@ -2246,7 +2309,7 @@ lx_nfs_mount(char *srcp, char *mntp, char *fst, int lx_flags, char *opts)
 		r = retry(&mnt, il_flags, &nmd);
 	}
 
-	/* Convert any positve error into a valid errno. */
+	/* Convert positve EAGAIN into a valid errno. */
 	if (r > 0)
 		return (-EAGAIN);
 
