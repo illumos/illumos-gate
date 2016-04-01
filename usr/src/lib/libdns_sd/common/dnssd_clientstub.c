@@ -594,7 +594,7 @@ static DNSServiceErrorType ConnectToServer(DNSServiceRef *ref, DNSServiceFlags f
 }
 
 #define deliver_request_bailout(MSG) \
-    do { syslog(LOG_WARNING, "dnssd_clientstub deliver_request: %s failed %d (%s)", (MSG), dnssd_errno, dnssd_strerror(dnssd_errno)); goto cleanup; } while(0)
+    syslog(LOG_WARNING, "dnssd_clientstub deliver_request: %s failed %d (%s)", (MSG), dnssd_errno, dnssd_strerror(dnssd_errno)); goto cleanup
 
 static DNSServiceErrorType deliver_request(ipc_msg_hdr *hdr, DNSServiceOp *sdr)
 {
@@ -636,14 +636,22 @@ static DNSServiceErrorType deliver_request(ipc_msg_hdr *hdr, DNSServiceOp *sdr)
             dnssd_sockaddr_t caddr;
             dnssd_socklen_t len = (dnssd_socklen_t) sizeof(caddr);
             listenfd = socket(AF_DNSSD, SOCK_STREAM, 0);
-            if (!dnssd_SocketValid(listenfd)) deliver_request_bailout("TCP socket");
+            if (!dnssd_SocketValid(listenfd)) {
+				deliver_request_bailout("TCP socket");
+			}
 
             caddr.sin_family      = AF_INET;
             caddr.sin_port        = 0;
             caddr.sin_addr.s_addr = inet_addr(MDNS_TCP_SERVERADDR);
-            if (bind(listenfd, (struct sockaddr*) &caddr, sizeof(caddr)) < 0) deliver_request_bailout("TCP bind");
-            if (getsockname(listenfd, (struct sockaddr*) &caddr, &len)   < 0) deliver_request_bailout("TCP getsockname");
-            if (listen(listenfd, 1)                                      < 0) deliver_request_bailout("TCP listen");
+            if (bind(listenfd, (struct sockaddr*) &caddr, sizeof(caddr)) < 0) {
+				deliver_request_bailout("TCP bind");
+			}
+            if (getsockname(listenfd, (struct sockaddr*) &caddr, &len)   < 0) {
+				deliver_request_bailout("TCP getsockname");
+			}
+			if (listen(listenfd, 1)                                      < 0) {
+				deliver_request_bailout("TCP listen");
+			}
             port.s = caddr.sin_port;
             data[0] = port.b[0];  // don't switch the byte order, as the
             data[1] = port.b[1];  // daemon expects it in network byte order
@@ -654,7 +662,9 @@ static DNSServiceErrorType deliver_request(ipc_msg_hdr *hdr, DNSServiceOp *sdr)
             int bindresult;
             dnssd_sockaddr_t caddr;
             listenfd = socket(AF_DNSSD, SOCK_STREAM, 0);
-            if (!dnssd_SocketValid(listenfd)) deliver_request_bailout("USE_NAMED_ERROR_RETURN_SOCKET socket");
+            if (!dnssd_SocketValid(listenfd)) {
+				deliver_request_bailout("USE_NAMED_ERROR_RETURN_SOCKET socket");
+			}
 
             caddr.sun_family = AF_LOCAL;
             // According to Stevens (section 3.2), there is no portable way to
@@ -666,13 +676,19 @@ static DNSServiceErrorType deliver_request(ipc_msg_hdr *hdr, DNSServiceOp *sdr)
             mask = umask(0);
             bindresult = bind(listenfd, (struct sockaddr *)&caddr, sizeof(caddr));
             umask(mask);
-            if (bindresult          < 0) deliver_request_bailout("USE_NAMED_ERROR_RETURN_SOCKET bind");
-            if (listen(listenfd, 1) < 0) deliver_request_bailout("USE_NAMED_ERROR_RETURN_SOCKET listen");
+            if (bindresult          < 0) {
+				deliver_request_bailout("USE_NAMED_ERROR_RETURN_SOCKET bind");
+			}
+            if (listen(listenfd, 1) < 0) {
+				deliver_request_bailout("USE_NAMED_ERROR_RETURN_SOCKET listen");
+			}
         }
         #else
         {
             dnssd_sock_t sp[2];
-            if (socketpair(AF_DNSSD, SOCK_STREAM, 0, sp) < 0) deliver_request_bailout("socketpair");
+            if (socketpair(AF_DNSSD, SOCK_STREAM, 0, sp) < 0) {
+				deliver_request_bailout("socketpair");
+			}
             else
             {
                 errsd    = sp[0];   // We'll read our four-byte error code from sp[0]
@@ -738,8 +754,9 @@ static DNSServiceErrorType deliver_request(ipc_msg_hdr *hdr, DNSServiceOp *sdr)
         if ((err = set_waitlimit(listenfd, DNSSD_CLIENT_TIMEOUT)) != kDNSServiceErr_NoError) 
             goto cleanup;
         errsd = accept(listenfd, (struct sockaddr *)&daddr, &len);
-        if (!dnssd_SocketValid(errsd)) 
+        if (!dnssd_SocketValid(errsd)) {
             deliver_request_bailout("accept");
+		}
 #else
 
         struct iovec vec = { ((char *)hdr) + sizeof(ipc_msg_hdr) + datalen, 1 }; // Send the last byte along with the SCM_RIGHTS
