@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PCI_EREPORT_SETUP 9F "May 10, 2007"
+.TH PCI_EREPORT_SETUP 9F "Mar 27, 2016"
 .SH NAME
 pci_ereport_setup, pci_ereport_teardown, pci_ereport_post \- post error reports
 for the generic PCI errors logged in the PCI Configuration Status register.
@@ -12,7 +12,7 @@ for the generic PCI errors logged in the PCI Configuration Status register.
 .nf
 #include <sys/sunddi.h>
 
-\fBvoid\fR \fBpci_ereport_setup\fR(\fBdev_info_t\fR *\fIdip\fR, \fBint\fR);
+\fBvoid\fR \fBpci_ereport_setup\fR(\fBdev_info_t\fR *\fIdip\fR);
 .fi
 
 .LP
@@ -27,11 +27,9 @@ for the generic PCI errors logged in the PCI Configuration Status register.
 .fi
 
 .SH INTERFACE LEVEL
-.sp
 .LP
 Solaris DDI specific (Solaris DDI)
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIdip\fR\fR
@@ -59,7 +57,6 @@ Pointer to status bit storage location
 .RE
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBpci_ereport_setup()\fR function initializes support for error report
 generation and sets up the resources for subsequent access to \fBPCI\fR,
@@ -222,7 +219,6 @@ error on the operational state of the system. This is treated the same way as
 .RE
 
 .SH CONTEXT
-.sp
 .LP
 The \fBpci_ereport_setup()\fR and \fBpci_ereport_teardown()\fR functions must
 be called from user or kernel context.
@@ -230,7 +226,6 @@ be called from user or kernel context.
 .LP
 The \fBpci_ereport_post()\fR function can be called in any context.
 .SH EXAMPLES
-.sp
 .in +2
 .nf
 int xxx_fmcap = DDI_FM_EREPORT_CAPABLE | DDI_FM_ERRCB_CAPABLE;
@@ -238,18 +233,18 @@ int xxx_fmcap = DDI_FM_EREPORT_CAPABLE | DDI_FM_ERRCB_CAPABLE;
 xxx_attach(dev_info_t *dip, ddi_attach_cmd_t cmd) {
 
       ddi_fm_init(dip, &xxx_fmcap, &xxx_ibc);
-          if (xxx_fmcap & DDI_FM_ERRCB_CAPABLE)
-      ddi_fm_handler_register(dip, xxx_err_cb);
-          if (xxx_fmcap & DDI_FM_EREPORT_CAPABLE)
-              pci_ereport_setup(dip);
+      if (xxx_fmcap & DDI_FM_ERRCB_CAPABLE)
+         ddi_fm_handler_register(dip, xxx_err_cb);
+      if (xxx_fmcap & DDI_FM_EREPORT_CAPABLE)
+         pci_ereport_setup(dip);
 
 }
 
 xxx_err_cb(dev_info_t *dip, ddi_fm_error_t *errp) {
-uint16_t status;
+     uint16_t status;
 
      pci_ereport_post(dip, errp, &status);
-return (errp->fme_status);
+     return (errp->fme_status);
 }
 
 xxx_detach(dev_info_t *dip, ddi_attach_cmd_t cmd) {
@@ -258,14 +253,13 @@ xxx_detach(dev_info_t *dip, ddi_attach_cmd_t cmd) {
          pci_ereport_teardown(dip);
      if (xxx_fmcap & DDI_FM_ERRCB_CAPABLE)
          ddi_fm_handler_unregister(dip);
-ddi_fm_fini(dip);
+     ddi_fm_fini(dip);
 
 }
 .fi
 .in -2
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -281,7 +275,6 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBfmd\fR(1M), \fBattributes\fR(5), \fBddi_fm_handler_register\fR(9F),
 \fBddi_fm_init\fR(9F), \fBddi_peek\fR(9F), \fBddi_poke\fR(9F),

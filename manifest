@@ -913,6 +913,7 @@ f kernel/kmdb/amd64/lofs 0555 root sys
 f kernel/kmdb/amd64/logindmux 0555 root sys
 f kernel/kmdb/amd64/mac 0555 root sys
 f kernel/kmdb/amd64/mdb_ds 0555 root sys
+f kernel/kmdb/amd64/mm 0555 root sys
 f kernel/kmdb/amd64/mpt 0555 root sys
 f kernel/kmdb/amd64/mpt_sas 0555 root sys
 f kernel/kmdb/amd64/mr_sas 0555 root sys

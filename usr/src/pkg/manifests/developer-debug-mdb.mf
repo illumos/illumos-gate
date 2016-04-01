@@ -108,6 +108,7 @@ file path=kernel/kmdb/$(ARCH64)/logindmux group=sys mode=0555
 file path=kernel/kmdb/$(ARCH64)/mac group=sys mode=0555
 file path=kernel/kmdb/$(ARCH64)/md group=sys mode=0555
 file path=kernel/kmdb/$(ARCH64)/mdb_ds group=sys mode=0555
+file path=kernel/kmdb/$(ARCH64)/mm group=sys mode=0555
 file path=kernel/kmdb/$(ARCH64)/mpt group=sys mode=0555
 file path=kernel/kmdb/$(ARCH64)/mpt_sas group=sys mode=0555
 file path=kernel/kmdb/$(ARCH64)/mr_sas group=sys mode=0555
@@ -144,6 +145,7 @@ $(i386_ONLY)file path=kernel/kmdb/logindmux group=sys mode=0555
 $(i386_ONLY)file path=kernel/kmdb/mac group=sys mode=0555
 $(i386_ONLY)file path=kernel/kmdb/md group=sys mode=0555
 $(i386_ONLY)file path=kernel/kmdb/mdb_ds group=sys mode=0555
+$(i386_ONLY)file path=kernel/kmdb/mm group=sys mode=0555
 $(i386_ONLY)file path=kernel/kmdb/mpt group=sys mode=0555
 $(i386_ONLY)file path=kernel/kmdb/mpt_sas group=sys mode=0555
 $(i386_ONLY)file path=kernel/kmdb/mr_sas group=sys mode=0555
