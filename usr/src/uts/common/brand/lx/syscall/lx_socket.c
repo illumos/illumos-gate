@@ -2595,15 +2595,39 @@ lx_setsockopt_ip(sonode_t *so, int optname, void *optval, socklen_t optlen)
 		 */
 		return (0);
 
-	case LX_IP_MTU_DISCOVER:
+	case LX_IP_MTU_DISCOVER: {
+		int val;
+
 		/*
-		 * Native programs such as traceroute use IP_DONTFRAG to
-		 * achieve this functionality.  Set that option instead.
+		 * We translate Linux's IP_MTU_DISCOVER into our IP_DONTFRAG,
+		 * allowing this be a byte or an integer and observing the
+		 * inverted sense of the two relative to one another (and
+		 * translating accordingly).
 		 */
-		optlen = MIN(optlen, sizeof (int));
-		error = socket_setsockopt(so, IPPROTO_IP, IP_DONTFRAG, optval,
-		    optlen, CRED());
+		if (optlen < sizeof (int)) {
+			val = *((uint8_t *)optval);
+		} else {
+			val = *((int *)optval);
+		}
+
+		switch (val) {
+		case LX_IP_PMTUDISC_DONT:
+			val = 1;
+			break;
+
+		case LX_IP_PMTUDISC_DO:
+		case LX_IP_PMTUDISC_WANT:
+			val = 0;
+			break;
+
+		default:
+			return (EOPNOTSUPP);
+		}
+
+		error = socket_setsockopt(so, IPPROTO_IP, IP_DONTFRAG,
+		    &val, sizeof (val), CRED());
 		return (error);
+	}
 
 	case LX_IP_MULTICAST_TTL:
 	case LX_IP_MULTICAST_LOOP:
