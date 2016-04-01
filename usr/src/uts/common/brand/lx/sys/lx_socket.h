@@ -21,7 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #ifndef _SYS_LX_SOCKET_H
@@ -262,6 +262,16 @@ extern "C" {
 #define	LX_MCAST_MSFILTER	48
 #define	LX_IP_MULTICAST_ALL	49
 #define	LX_IP_UNICAST_IF	50
+
+/*
+ * LX_IP_MTU_DISCOVER values
+ */
+#define	LX_IP_PMTUDISC_DONT		0
+#define	LX_IP_PMTUDISC_WANT		1
+#define	LX_IP_PMTUDISC_DO		2
+#define	LX_IP_PMTUDISC_PROBE		3
+#define	LX_IP_PMTUDISC_INTERFACE	4
+#define	LX_IP_PMTUDISC_OMIT		5
 
 /*
  * Options for use with [gs]etsockopt at the IP level.
