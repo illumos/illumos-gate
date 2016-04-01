@@ -2285,7 +2285,7 @@ lxpr_read_stat_common(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf,
 	caddr_t wchan;
 	processorid_t cpu;
 	pid_t real_pid;
-	clock_t utime, stime, cutime, cstime, ticks;
+	clock_t utime, stime, cutime, cstime, ticks, boottime;
 	char buf_comm[MAXCOMLEN + 1];
 	rlim64_t vmem_ctl;
 
@@ -2344,8 +2344,13 @@ lxpr_read_stat_common(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf,
 		mutex_exit(&p->p_splock);
 	}
 
+	utime = stime = 0;
 	t = lxpr_get_thread(p, lookup_id);
 	if (t != NULL) {
+		klwp_t *lwp = ttolwp(t);
+		struct mstate *ms = &lwp->lwp_mstate;
+		hrtime_t utm, stm;
+
 		switch (t->t_state) {
 		case TS_SLEEP:
 			stat = 'S';
@@ -2371,7 +2376,19 @@ lxpr_read_stat_common(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf,
 		pri = t->t_pri;
 		wchan = t->t_wchan;
 		cpu = t->t_cpu->cpu_id;
+
+		utm = ms->ms_acct[LMS_USER];
+		stm = ms->ms_acct[LMS_SYSTEM];
+
 		thread_unlock(t);
+
+		/* convert unscaled high-res time to nanoseconds */
+		scalehrtime(&utm);
+		scalehrtime(&stm);
+
+		/* Linux /proc expects these values in ticks */
+		utime = (clock_t)NSEC_TO_TICK(utm);
+		stime = (clock_t)NSEC_TO_TICK(stm);
 	} else {
 		if (lookup_id != 0) {
 			/* we can't find this specific thread */
@@ -2400,18 +2417,27 @@ lxpr_read_stat_common(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf,
 	}
 	mutex_enter(&p->p_lock);
 
-	utime = p->p_utime;
-	stime = p->p_stime;
+	if (lookup_id == 0) {
+		/* process */
+		utime = p->p_utime;
+		stime = p->p_stime;
+	} else {
+		/* tid: utime & stime for the thread set in block above */
+	}
 	cutime = p->p_cutime;
 	cstime = p->p_cstime;
 	lwpcnt = p->p_lwpcnt;
 	vmem_ctl = p->p_vmem_ctl;
 	strlcpy(buf_comm, p->p_user.u_comm, sizeof (buf_comm));
-	ticks = p->p_user.u_ticks;
+	ticks = p->p_user.u_ticks;	/* lbolt at process start */
+	/* adjust ticks to account for zone boot time */
+	boottime = LXPTOZ(lxpnp)->zone_zsched->p_user.u_ticks;
+	ticks -= boottime;
 	lxpr_unlock(p);
 
 	lxpr_uiobuf_printf(uiobuf,
-	    "%d (%s) %c %d %d %d %d %d "
+	    "%d "
+	    "(%s) %c %d %d %d %d %d "
 	    "%lu %lu %lu %lu %lu "
 	    "%lu %lu %ld %ld "
 	    "%d %d %d "
