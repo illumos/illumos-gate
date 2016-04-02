@@ -243,7 +243,7 @@ is_pci_bridge(dev_info_t *dip)
 
 static void
 gfxp_check_for_console(dev_info_t *devi, struct vgatext_softc *softc,
-	int pci_pcie_bus)
+    int pci_pcie_bus)
 {
 	ddi_acc_handle_t pci_conf;
 	dev_info_t *pdevi;
@@ -321,7 +321,7 @@ gfxp_check_for_console(dev_info_t *devi, struct vgatext_softc *softc,
 
 int
 gfxp_vgatext_attach(dev_info_t *devi, ddi_attach_cmd_t cmd,
-	gfxp_vgatext_softc_ptr_t ptr)
+    gfxp_vgatext_softc_ptr_t ptr)
 {
 	struct vgatext_softc *softc = (struct vgatext_softc *)ptr;
 	int	unit = ddi_get_instance(devi);
@@ -487,7 +487,7 @@ fail:
 /*ARGSUSED*/
 int
 gfxp_vgatext_detach(dev_info_t *devi, ddi_detach_cmd_t cmd,
-	gfxp_vgatext_softc_ptr_t ptr)
+    gfxp_vgatext_softc_ptr_t ptr)
 {
 	struct vgatext_softc *softc = (struct vgatext_softc *)ptr;
 
@@ -516,7 +516,7 @@ gfxp_vgatext_detach(dev_info_t *devi, ddi_detach_cmd_t cmd,
 /*ARGSUSED*/
 int
 gfxp_vgatext_open(dev_t *devp, int flag, int otyp, cred_t *cred,
-	gfxp_vgatext_softc_ptr_t ptr)
+    gfxp_vgatext_softc_ptr_t ptr)
 {
 	struct vgatext_softc *softc = (struct vgatext_softc *)ptr;
 
@@ -529,7 +529,7 @@ gfxp_vgatext_open(dev_t *devp, int flag, int otyp, cred_t *cred,
 /*ARGSUSED*/
 int
 gfxp_vgatext_close(dev_t devp, int flag, int otyp, cred_t *cred,
-	gfxp_vgatext_softc_ptr_t ptr)
+    gfxp_vgatext_softc_ptr_t ptr)
 {
 	return (0);
 }
@@ -822,7 +822,7 @@ vgatext_kdsetmode(struct vgatext_softc *softc, int mode)
 /*ARGSUSED*/
 int
 gfxp_vgatext_devmap(dev_t dev, devmap_cookie_t dhp, offset_t off, size_t len,
-		size_t *maplen, uint_t model, void *ptr)
+    size_t *maplen, uint_t model, void *ptr)
 {
 	struct vgatext_softc *softc = (struct vgatext_softc *)ptr;
 	int err;
@@ -1183,7 +1183,7 @@ vgatext_init_graphics(struct vgatext_softc *softc)
 static void
 vgatext_setfont(struct vgatext_softc *softc)
 {
-	extern unsigned char *ENCODINGS[];
+	extern bitmap_data_t font_data_8x16;
 	unsigned char *from;
 	unsigned char *to;
 	int	i;
@@ -1213,7 +1213,7 @@ vgatext_setfont(struct vgatext_softc *softc)
 	 */
 	bpc = 16;
 	for (i = 0; i < 256; i++) {
-		from = ENCODINGS[i];
+		from = font_data_8x16.encoding[i];
 		to = (unsigned char *)softc->fb.addr + i * 0x20;
 		for (j = 0; j < bpc; j++)
 			*to++ = *from++;
@@ -1376,9 +1376,8 @@ vgatext_get_isa_reg_index(
  */
 
 void
-vgatext_return_pointers(struct vgatext_softc *softc,
-			struct vgaregmap *fbs,
-			struct vgaregmap *regss)
+vgatext_return_pointers(struct vgatext_softc *softc, struct vgaregmap *fbs,
+    struct vgaregmap *regss)
 {
 
 	fbs->addr	= softc->fb.addr;

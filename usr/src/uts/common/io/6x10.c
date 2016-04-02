@@ -3,8 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/param.h>  /* for NULL */
 #include <sys/font.h>
@@ -19,9 +17,9 @@
 /* COPYRIGHT "Public domain terminal emulator font.  Share and enjoy." */
 
 
-static unsigned char FONTDATA[] = {
+static unsigned char FONTDATA_6x10[] = {
 
-/* FONTDATA + 0x0000 */
+/* FONTDATA_6x10 + 0x0000 */
 0x00, /*        */
 0x10, /*    X   */
 0x38, /*   XXX  */
@@ -33,7 +31,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x000a */
+/* FONTDATA_6x10 + 0x000a */
 0x00, /*        */
 0x54, /*  X X X */
 0x28, /*   X X  */
@@ -46,7 +44,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 
 
-/* FONTDATA + 0x0014 */
+/* FONTDATA_6x10 + 0x0014 */
 0x10, /*    X   */
 0x10, /*    X   */
 0x10, /*    X   */
@@ -58,7 +56,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x001e */
+/* FONTDATA_6x10 + 0x001e */
 0x00, /*        */
 0x00, /*        */
 0x00, /*        */
@@ -70,7 +68,7 @@ static unsigned char FONTDATA[] = {
 0x10, /*    X   */
 0x10, /*    X   */
 
-/* FONTDATA + 0x0028 */
+/* FONTDATA_6x10 + 0x0028 */
 0x00, /*        */
 0x00, /*        */
 0x00, /*        */
@@ -82,7 +80,7 @@ static unsigned char FONTDATA[] = {
 0x10, /*    X   */
 0x10, /*    X   */
 
-/* FONTDATA + 0x0032 */
+/* FONTDATA_6x10 + 0x0032 */
 0x10, /*    X   */
 0x10, /*    X   */
 0x10, /*    X   */
@@ -94,7 +92,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x003c */
+/* FONTDATA_6x10 + 0x003c */
 0x10, /*    X   */
 0x10, /*    X   */
 0x10, /*    X   */
@@ -106,7 +104,7 @@ static unsigned char FONTDATA[] = {
 0x10, /*    X   */
 0x10, /*    X   */
 
-/* FONTDATA + 0x0046 */
+/* FONTDATA_6x10 + 0x0046 */
 0xfc, /* XXXXXX */
 0x00, /*        */
 0x00, /*        */
@@ -118,7 +116,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0050 */
+/* FONTDATA_6x10 + 0x0050 */
 0x00, /*        */
 0x00, /*        */
 0xfc, /* XXXXXX */
@@ -130,7 +128,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x005a */
+/* FONTDATA_6x10 + 0x005a */
 0x00, /*        */
 0x00, /*        */
 0x00, /*        */
@@ -142,7 +140,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0064 */
+/* FONTDATA_6x10 + 0x0064 */
 0x00, /*        */
 0x00, /*        */
 0x00, /*        */
@@ -154,7 +152,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x006e */
+/* FONTDATA_6x10 + 0x006e */
 0x00, /*        */
 0x00, /*        */
 0x00, /*        */
@@ -166,7 +164,7 @@ static unsigned char FONTDATA[] = {
 0xfc, /* XXXXXX */
 0x00, /*        */
 
-/* FONTDATA + 0x0078 */
+/* FONTDATA_6x10 + 0x0078 */
 0x10, /*    X   */
 0x10, /*    X   */
 0x10, /*    X   */
@@ -178,7 +176,7 @@ static unsigned char FONTDATA[] = {
 0x10, /*    X   */
 0x10, /*    X   */
 
-/* FONTDATA + 0x0082 */
+/* FONTDATA_6x10 + 0x0082 */
 0x10, /*    X   */
 0x10, /*    X   */
 0x10, /*    X   */
@@ -190,7 +188,7 @@ static unsigned char FONTDATA[] = {
 0x10, /*    X   */
 0x10, /*    X   */
 
-/* FONTDATA + 0x008c */
+/* FONTDATA_6x10 + 0x008c */
 0x10, /*    X   */
 0x10, /*    X   */
 0x10, /*    X   */
@@ -202,7 +200,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0096 */
+/* FONTDATA_6x10 + 0x0096 */
 0x00, /*        */
 0x00, /*        */
 0x00, /*        */
@@ -214,7 +212,7 @@ static unsigned char FONTDATA[] = {
 0x10, /*    X   */
 0x10, /*    X   */
 
-/* FONTDATA + 0x00a0 */
+/* FONTDATA_6x10 + 0x00a0 */
 0x10, /*    X   */
 0x10, /*    X   */
 0x10, /*    X   */
@@ -226,7 +224,7 @@ static unsigned char FONTDATA[] = {
 0x10, /*    X   */
 0x10, /*    X   */
 
-/* FONTDATA + 0x00aa */
+/* FONTDATA_6x10 + 0x00aa */
 0x00, /*        */
 0x00, /*        */
 0x00, /*        */
@@ -238,7 +236,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x00b4 */
+/* FONTDATA_6x10 + 0x00b4 */
 0x00, /*        */
 0x10, /*    X   */
 0x10, /*    X   */
@@ -250,7 +248,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x00be */
+/* FONTDATA_6x10 + 0x00be */
 0x00, /*        */
 0x28, /*   X X  */
 0x28, /*   X X  */
@@ -262,7 +260,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x00c8 */
+/* FONTDATA_6x10 + 0x00c8 */
 0x00, /*        */
 0x28, /*   X X  */
 0x28, /*   X X  */
@@ -274,7 +272,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x00d2 */
+/* FONTDATA_6x10 + 0x00d2 */
 0x00, /*        */
 0x10, /*    X   */
 0x38, /*   XXX  */
@@ -286,7 +284,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x00dc */
+/* FONTDATA_6x10 + 0x00dc */
 0x00, /*        */
 0x24, /*   X  X */
 0x54, /*  X X X */
@@ -298,7 +296,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x00e6 */
+/* FONTDATA_6x10 + 0x00e6 */
 0x00, /*        */
 0x20, /*   X    */
 0x50, /*  X X   */
@@ -310,7 +308,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x00f0 */
+/* FONTDATA_6x10 + 0x00f0 */
 0x00, /*        */
 0x18, /*    XX  */
 0x10, /*    X   */
@@ -322,7 +320,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x00fa */
+/* FONTDATA_6x10 + 0x00fa */
 0x00, /*        */
 0x08, /*     X  */
 0x10, /*    X   */
@@ -334,7 +332,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0104 */
+/* FONTDATA_6x10 + 0x0104 */
 0x00, /*        */
 0x20, /*   X    */
 0x10, /*    X   */
@@ -346,7 +344,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x010e */
+/* FONTDATA_6x10 + 0x010e */
 0x00, /*        */
 0x00, /*        */
 0x44, /*  X   X */
@@ -358,7 +356,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0118 */
+/* FONTDATA_6x10 + 0x0118 */
 0x00, /*        */
 0x00, /*        */
 0x10, /*    X   */
@@ -370,7 +368,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0122 */
+/* FONTDATA_6x10 + 0x0122 */
 0x00, /*        */
 0x00, /*        */
 0x00, /*        */
@@ -382,7 +380,7 @@ static unsigned char FONTDATA[] = {
 0x20, /*   X    */
 0x00, /*        */
 
-/* FONTDATA + 0x012c */
+/* FONTDATA_6x10 + 0x012c */
 0x00, /*        */
 0x00, /*        */
 0x00, /*        */
@@ -394,7 +392,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0136 */
+/* FONTDATA_6x10 + 0x0136 */
 0x00, /*        */
 0x00, /*        */
 0x00, /*        */
@@ -406,7 +404,7 @@ static unsigned char FONTDATA[] = {
 0x10, /*    X   */
 0x00, /*        */
 
-/* FONTDATA + 0x0140 */
+/* FONTDATA_6x10 + 0x0140 */
 0x00, /*        */
 0x04, /*      X */
 0x04, /*      X */
@@ -418,7 +416,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x014a */
+/* FONTDATA_6x10 + 0x014a */
 0x00, /*        */
 0x10, /*    X   */
 0x28, /*   X X  */
@@ -430,7 +428,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0154 */
+/* FONTDATA_6x10 + 0x0154 */
 0x00, /*        */
 0x10, /*    X   */
 0x30, /*   XX   */
@@ -442,7 +440,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x015e */
+/* FONTDATA_6x10 + 0x015e */
 0x00, /*        */
 0x38, /*   XXX  */
 0x44, /*  X   X */
@@ -454,7 +452,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0168 */
+/* FONTDATA_6x10 + 0x0168 */
 0x00, /*        */
 0x7c, /*  XXXXX */
 0x04, /*      X */
@@ -466,7 +464,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0172 */
+/* FONTDATA_6x10 + 0x0172 */
 0x00, /*        */
 0x08, /*     X  */
 0x18, /*    XX  */
@@ -478,7 +476,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x017c */
+/* FONTDATA_6x10 + 0x017c */
 0x00, /*        */
 0x7c, /*  XXXXX */
 0x40, /*  X     */
@@ -490,7 +488,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0186 */
+/* FONTDATA_6x10 + 0x0186 */
 0x00, /*        */
 0x18, /*    XX  */
 0x20, /*   X    */
@@ -502,7 +500,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0190 */
+/* FONTDATA_6x10 + 0x0190 */
 0x00, /*        */
 0x7c, /*  XXXXX */
 0x04, /*      X */
@@ -514,7 +512,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x019a */
+/* FONTDATA_6x10 + 0x019a */
 0x00, /*        */
 0x38, /*   XXX  */
 0x44, /*  X   X */
@@ -526,7 +524,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x01a4 */
+/* FONTDATA_6x10 + 0x01a4 */
 0x00, /*        */
 0x38, /*   XXX  */
 0x44, /*  X   X */
@@ -538,7 +536,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x01ae */
+/* FONTDATA_6x10 + 0x01ae */
 0x00, /*        */
 0x00, /*        */
 0x10, /*    X   */
@@ -550,7 +548,7 @@ static unsigned char FONTDATA[] = {
 0x10, /*    X   */
 0x00, /*        */
 
-/* FONTDATA + 0x01b8 */
+/* FONTDATA_6x10 + 0x01b8 */
 0x00, /*        */
 0x00, /*        */
 0x10, /*    X   */
@@ -562,7 +560,7 @@ static unsigned char FONTDATA[] = {
 0x20, /*   X    */
 0x00, /*        */
 
-/* FONTDATA + 0x01c2 */
+/* FONTDATA_6x10 + 0x01c2 */
 0x00, /*        */
 0x04, /*      X */
 0x08, /*     X  */
@@ -574,7 +572,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x01cc */
+/* FONTDATA_6x10 + 0x01cc */
 0x00, /*        */
 0x00, /*        */
 0x00, /*        */
@@ -586,7 +584,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x01d6 */
+/* FONTDATA_6x10 + 0x01d6 */
 0x00, /*        */
 0x40, /*  X     */
 0x20, /*   X    */
@@ -598,7 +596,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x01e0 */
+/* FONTDATA_6x10 + 0x01e0 */
 0x00, /*        */
 0x38, /*   XXX  */
 0x44, /*  X   X */
@@ -610,7 +608,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x01ea */
+/* FONTDATA_6x10 + 0x01ea */
 0x00, /*        */
 0x38, /*   XXX  */
 0x44, /*  X   X */
@@ -622,7 +620,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x01f4 */
+/* FONTDATA_6x10 + 0x01f4 */
 0x00, /*        */
 0x10, /*    X   */
 0x28, /*   X X  */
@@ -634,7 +632,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x01fe */
+/* FONTDATA_6x10 + 0x01fe */
 0x00, /*        */
 0x78, /*  XXXX  */
 0x24, /*   X  X */
@@ -646,7 +644,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0208 */
+/* FONTDATA_6x10 + 0x0208 */
 0x00, /*        */
 0x38, /*   XXX  */
 0x44, /*  X   X */
@@ -658,7 +656,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0212 */
+/* FONTDATA_6x10 + 0x0212 */
 0x00, /*        */
 0x78, /*  XXXX  */
 0x24, /*   X  X */
@@ -670,7 +668,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x021c */
+/* FONTDATA_6x10 + 0x021c */
 0x00, /*        */
 0x7c, /*  XXXXX */
 0x40, /*  X     */
@@ -682,7 +680,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0226 */
+/* FONTDATA_6x10 + 0x0226 */
 0x00, /*        */
 0x7c, /*  XXXXX */
 0x40, /*  X     */
@@ -694,7 +692,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0230 */
+/* FONTDATA_6x10 + 0x0230 */
 0x00, /*        */
 0x38, /*   XXX  */
 0x44, /*  X   X */
@@ -706,7 +704,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x023a */
+/* FONTDATA_6x10 + 0x023a */
 0x00, /*        */
 0x44, /*  X   X */
 0x44, /*  X   X */
@@ -718,7 +716,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0244 */
+/* FONTDATA_6x10 + 0x0244 */
 0x00, /*        */
 0x38, /*   XXX  */
 0x10, /*    X   */
@@ -730,7 +728,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x024e */
+/* FONTDATA_6x10 + 0x024e */
 0x00, /*        */
 0x1c, /*    XXX */
 0x04, /*      X */
@@ -742,7 +740,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0258 */
+/* FONTDATA_6x10 + 0x0258 */
 0x00, /*        */
 0x44, /*  X   X */
 0x48, /*  X  X  */
@@ -754,7 +752,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0262 */
+/* FONTDATA_6x10 + 0x0262 */
 0x00, /*        */
 0x40, /*  X     */
 0x40, /*  X     */
@@ -766,7 +764,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x026c */
+/* FONTDATA_6x10 + 0x026c */
 0x00, /*        */
 0x44, /*  X   X */
 0x44, /*  X   X */
@@ -778,7 +776,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0276 */
+/* FONTDATA_6x10 + 0x0276 */
 0x00, /*        */
 0x44, /*  X   X */
 0x44, /*  X   X */
@@ -790,7 +788,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0280 */
+/* FONTDATA_6x10 + 0x0280 */
 0x00, /*        */
 0x38, /*   XXX  */
 0x44, /*  X   X */
@@ -802,7 +800,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x028a */
+/* FONTDATA_6x10 + 0x028a */
 0x00, /*        */
 0x78, /*  XXXX  */
 0x44, /*  X   X */
@@ -814,7 +812,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0294 */
+/* FONTDATA_6x10 + 0x0294 */
 0x00, /*        */
 0x38, /*   XXX  */
 0x44, /*  X   X */
@@ -826,7 +824,7 @@ static unsigned char FONTDATA[] = {
 0x04, /*      X */
 0x00, /*        */
 
-/* FONTDATA + 0x029e */
+/* FONTDATA_6x10 + 0x029e */
 0x00, /*        */
 0x78, /*  XXXX  */
 0x44, /*  X   X */
@@ -838,7 +836,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x02a8 */
+/* FONTDATA_6x10 + 0x02a8 */
 0x00, /*        */
 0x38, /*   XXX  */
 0x44, /*  X   X */
@@ -850,7 +848,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x02b2 */
+/* FONTDATA_6x10 + 0x02b2 */
 0x00, /*        */
 0x7c, /*  XXXXX */
 0x10, /*    X   */
@@ -862,7 +860,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x02bc */
+/* FONTDATA_6x10 + 0x02bc */
 0x00, /*        */
 0x44, /*  X   X */
 0x44, /*  X   X */
@@ -874,7 +872,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x02c6 */
+/* FONTDATA_6x10 + 0x02c6 */
 0x00, /*        */
 0x44, /*  X   X */
 0x44, /*  X   X */
@@ -886,7 +884,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x02d0 */
+/* FONTDATA_6x10 + 0x02d0 */
 0x00, /*        */
 0x44, /*  X   X */
 0x44, /*  X   X */
@@ -898,7 +896,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x02da */
+/* FONTDATA_6x10 + 0x02da */
 0x00, /*        */
 0x44, /*  X   X */
 0x44, /*  X   X */
@@ -910,7 +908,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x02e4 */
+/* FONTDATA_6x10 + 0x02e4 */
 0x00, /*        */
 0x44, /*  X   X */
 0x44, /*  X   X */
@@ -922,7 +920,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x02ee */
+/* FONTDATA_6x10 + 0x02ee */
 0x00, /*        */
 0x7c, /*  XXXXX */
 0x04, /*      X */
@@ -934,7 +932,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x02f8 */
+/* FONTDATA_6x10 + 0x02f8 */
 0x00, /*        */
 0x38, /*   XXX  */
 0x20, /*   X    */
@@ -946,7 +944,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0302 */
+/* FONTDATA_6x10 + 0x0302 */
 0x00, /*        */
 0x40, /*  X     */
 0x40, /*  X     */
@@ -958,7 +956,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x030c */
+/* FONTDATA_6x10 + 0x030c */
 0x00, /*        */
 0x38, /*   XXX  */
 0x08, /*     X  */
@@ -970,7 +968,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0316 */
+/* FONTDATA_6x10 + 0x0316 */
 0x00, /*        */
 0x10, /*    X   */
 0x28, /*   X X  */
@@ -982,7 +980,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0320 */
+/* FONTDATA_6x10 + 0x0320 */
 0x00, /*        */
 0x00, /*        */
 0x00, /*        */
@@ -994,7 +992,7 @@ static unsigned char FONTDATA[] = {
 0x7c, /*  XXXXX */
 0x00, /*        */
 
-/* FONTDATA + 0x032a */
+/* FONTDATA_6x10 + 0x032a */
 0x00, /*        */
 0x30, /*   XX   */
 0x10, /*    X   */
@@ -1006,7 +1004,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0334 */
+/* FONTDATA_6x10 + 0x0334 */
 0x00, /*        */
 0x00, /*        */
 0x00, /*        */
@@ -1018,7 +1016,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x033e */
+/* FONTDATA_6x10 + 0x033e */
 0x00, /*        */
 0x40, /*  X     */
 0x40, /*  X     */
@@ -1030,7 +1028,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0348 */
+/* FONTDATA_6x10 + 0x0348 */
 0x00, /*        */
 0x00, /*        */
 0x00, /*        */
@@ -1042,7 +1040,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0352 */
+/* FONTDATA_6x10 + 0x0352 */
 0x00, /*        */
 0x04, /*      X */
 0x04, /*      X */
@@ -1054,7 +1052,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x035c */
+/* FONTDATA_6x10 + 0x035c */
 0x00, /*        */
 0x00, /*        */
 0x00, /*        */
@@ -1066,7 +1064,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0366 */
+/* FONTDATA_6x10 + 0x0366 */
 0x00, /*        */
 0x18, /*    XX  */
 0x24, /*   X  X */
@@ -1078,7 +1076,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0370 */
+/* FONTDATA_6x10 + 0x0370 */
 0x00, /*        */
 0x00, /*        */
 0x00, /*        */
@@ -1090,7 +1088,7 @@ static unsigned char FONTDATA[] = {
 0x44, /*  X   X */
 0x38, /*   XXX  */
 
-/* FONTDATA + 0x037a */
+/* FONTDATA_6x10 + 0x037a */
 0x00, /*        */
 0x40, /*  X     */
 0x40, /*  X     */
@@ -1102,7 +1100,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0384 */
+/* FONTDATA_6x10 + 0x0384 */
 0x00, /*        */
 0x10, /*    X   */
 0x00, /*        */
@@ -1114,7 +1112,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x038e */
+/* FONTDATA_6x10 + 0x038e */
 0x00, /*        */
 0x08, /*     X  */
 0x00, /*        */
@@ -1126,7 +1124,7 @@ static unsigned char FONTDATA[] = {
 0x48, /*  X  X  */
 0x30, /*   XX   */
 
-/* FONTDATA + 0x0398 */
+/* FONTDATA_6x10 + 0x0398 */
 0x00, /*        */
 0x40, /*  X     */
 0x40, /*  X     */
@@ -1138,7 +1136,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x03a2 */
+/* FONTDATA_6x10 + 0x03a2 */
 0x00, /*        */
 0x30, /*   XX   */
 0x10, /*    X   */
@@ -1150,7 +1148,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x03ac */
+/* FONTDATA_6x10 + 0x03ac */
 0x00, /*        */
 0x00, /*        */
 0x00, /*        */
@@ -1162,7 +1160,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x03b6 */
+/* FONTDATA_6x10 + 0x03b6 */
 0x00, /*        */
 0x00, /*        */
 0x00, /*        */
@@ -1174,7 +1172,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x03c0 */
+/* FONTDATA_6x10 + 0x03c0 */
 0x00, /*        */
 0x00, /*        */
 0x00, /*        */
@@ -1186,7 +1184,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x03ca */
+/* FONTDATA_6x10 + 0x03ca */
 0x00, /*        */
 0x00, /*        */
 0x00, /*        */
@@ -1198,7 +1196,7 @@ static unsigned char FONTDATA[] = {
 0x40, /*  X     */
 0x40, /*  X     */
 
-/* FONTDATA + 0x03d4 */
+/* FONTDATA_6x10 + 0x03d4 */
 0x00, /*        */
 0x00, /*        */
 0x00, /*        */
@@ -1210,7 +1208,7 @@ static unsigned char FONTDATA[] = {
 0x04, /*      X */
 0x04, /*      X */
 
-/* FONTDATA + 0x03de */
+/* FONTDATA_6x10 + 0x03de */
 0x00, /*        */
 0x00, /*        */
 0x00, /*        */
@@ -1222,7 +1220,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x03e8 */
+/* FONTDATA_6x10 + 0x03e8 */
 0x00, /*        */
 0x00, /*        */
 0x00, /*        */
@@ -1234,7 +1232,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x03f2 */
+/* FONTDATA_6x10 + 0x03f2 */
 0x00, /*        */
 0x20, /*   X    */
 0x20, /*   X    */
@@ -1246,7 +1244,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x03fc */
+/* FONTDATA_6x10 + 0x03fc */
 0x00, /*        */
 0x00, /*        */
 0x00, /*        */
@@ -1258,7 +1256,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0406 */
+/* FONTDATA_6x10 + 0x0406 */
 0x00, /*        */
 0x00, /*        */
 0x00, /*        */
@@ -1270,7 +1268,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0410 */
+/* FONTDATA_6x10 + 0x0410 */
 0x00, /*        */
 0x00, /*        */
 0x00, /*        */
@@ -1282,7 +1280,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x041a */
+/* FONTDATA_6x10 + 0x041a */
 0x00, /*        */
 0x00, /*        */
 0x00, /*        */
@@ -1294,7 +1292,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0424 */
+/* FONTDATA_6x10 + 0x0424 */
 0x00, /*        */
 0x00, /*        */
 0x00, /*        */
@@ -1306,7 +1304,7 @@ static unsigned char FONTDATA[] = {
 0x44, /*  X   X */
 0x38, /*   XXX  */
 
-/* FONTDATA + 0x042e */
+/* FONTDATA_6x10 + 0x042e */
 0x00, /*        */
 0x00, /*        */
 0x00, /*        */
@@ -1318,7 +1316,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0438 */
+/* FONTDATA_6x10 + 0x0438 */
 0x00, /*        */
 0x0c, /*     XX */
 0x10, /*    X   */
@@ -1330,7 +1328,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0442 */
+/* FONTDATA_6x10 + 0x0442 */
 0x00, /*        */
 0x10, /*    X   */
 0x10, /*    X   */
@@ -1342,7 +1340,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x044c */
+/* FONTDATA_6x10 + 0x044c */
 0x00, /*        */
 0x60, /*  XX    */
 0x10, /*    X   */
@@ -1354,7 +1352,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0456 */
+/* FONTDATA_6x10 + 0x0456 */
 0x00, /*        */
 0x24, /*   X  X */
 0x54, /*  X X X */
@@ -1366,7 +1364,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0460 */
+/* FONTDATA_6x10 + 0x0460 */
 0x00, /*        */
 0x00, /*        */
 0x00, /*        */
@@ -1378,7 +1376,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x046a */
+/* FONTDATA_6x10 + 0x046a */
 0x00, /*        */
 0x00, /*        */
 0x00, /*        */
@@ -1390,7 +1388,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0474 */
+/* FONTDATA_6x10 + 0x0474 */
 0x00, /*        */
 0x10, /*    X   */
 0x00, /*        */
@@ -1402,7 +1400,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x047e */
+/* FONTDATA_6x10 + 0x047e */
 0x00, /*        */
 0x00, /*        */
 0x10, /*    X   */
@@ -1414,7 +1412,7 @@ static unsigned char FONTDATA[] = {
 0x10, /*    X   */
 0x00, /*        */
 
-/* FONTDATA + 0x0488 */
+/* FONTDATA_6x10 + 0x0488 */
 0x00, /*        */
 0x18, /*    XX  */
 0x24, /*   X  X */
@@ -1426,7 +1424,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0492 */
+/* FONTDATA_6x10 + 0x0492 */
 0x00, /*        */
 0x00, /*        */
 0x00, /*        */
@@ -1438,7 +1436,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x049c */
+/* FONTDATA_6x10 + 0x049c */
 0x00, /*        */
 0x44, /*  X   X */
 0x44, /*  X   X */
@@ -1450,7 +1448,7 @@ static unsigned char FONTDATA[] = {
 0x10, /*    X   */
 0x00, /*        */
 
-/* FONTDATA + 0x04a6 */
+/* FONTDATA_6x10 + 0x04a6 */
 0x00, /*        */
 0x10, /*    X   */
 0x10, /*    X   */
@@ -1462,7 +1460,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x04b0 */
+/* FONTDATA_6x10 + 0x04b0 */
 0x00, /*        */
 0x38, /*   XXX  */
 0x40, /*  X     */
@@ -1474,7 +1472,7 @@ static unsigned char FONTDATA[] = {
 0x38, /*   XXX  */
 0x00, /*        */
 
-/* FONTDATA + 0x04ba */
+/* FONTDATA_6x10 + 0x04ba */
 0x28, /*   X X  */
 0x00, /*        */
 0x00, /*        */
@@ -1486,7 +1484,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x04c4 */
+/* FONTDATA_6x10 + 0x04c4 */
 0x00, /*        */
 0x38, /*   XXX  */
 0x44, /*  X   X */
@@ -1498,7 +1496,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x04ce */
+/* FONTDATA_6x10 + 0x04ce */
 0x00, /*        */
 0x38, /*   XXX  */
 0x48, /*  X  X  */
@@ -1510,7 +1508,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x04d8 */
+/* FONTDATA_6x10 + 0x04d8 */
 0x00, /*        */
 0x00, /*        */
 0x00, /*        */
@@ -1522,7 +1520,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x04e2 */
+/* FONTDATA_6x10 + 0x04e2 */
 0x00, /*        */
 0x00, /*        */
 0x00, /*        */
@@ -1534,7 +1532,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x04ec */
+/* FONTDATA_6x10 + 0x04ec */
 0x00, /*        */
 0x00, /*        */
 0x00, /*        */
@@ -1546,7 +1544,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x04f6 */
+/* FONTDATA_6x10 + 0x04f6 */
 0x00, /*        */
 0x38, /*   XXX  */
 0x44, /*  X   X */
@@ -1558,7 +1556,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0500 */
+/* FONTDATA_6x10 + 0x0500 */
 0x7c, /*  XXXXX */
 0x00, /*        */
 0x00, /*        */
@@ -1570,7 +1568,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x050a */
+/* FONTDATA_6x10 + 0x050a */
 0x00, /*        */
 0x10, /*    X   */
 0x28, /*   X X  */
@@ -1582,7 +1580,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0514 */
+/* FONTDATA_6x10 + 0x0514 */
 0x00, /*        */
 0x00, /*        */
 0x10, /*    X   */
@@ -1594,7 +1592,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x051e */
+/* FONTDATA_6x10 + 0x051e */
 0x30, /*   XX   */
 0x48, /*  X  X  */
 0x10, /*    X   */
@@ -1606,7 +1604,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0528 */
+/* FONTDATA_6x10 + 0x0528 */
 0x70, /*  XXX   */
 0x08, /*     X  */
 0x30, /*   XX   */
@@ -1618,7 +1616,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0532 */
+/* FONTDATA_6x10 + 0x0532 */
 0x18, /*    XX  */
 0x30, /*   XX   */
 0x00, /*        */
@@ -1630,7 +1628,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x053c */
+/* FONTDATA_6x10 + 0x053c */
 0x00, /*        */
 0x00, /*        */
 0x00, /*        */
@@ -1642,7 +1640,7 @@ static unsigned char FONTDATA[] = {
 0x40, /*  X     */
 0x00, /*        */
 
-/* FONTDATA + 0x0546 */
+/* FONTDATA_6x10 + 0x0546 */
 0x00, /*        */
 0x3c, /*   XXXX */
 0x74, /*  XXX X */
@@ -1654,7 +1652,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0550 */
+/* FONTDATA_6x10 + 0x0550 */
 0x00, /*        */
 0x00, /*        */
 0x00, /*        */
@@ -1666,7 +1664,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x055a */
+/* FONTDATA_6x10 + 0x055a */
 0x00, /*        */
 0x00, /*        */
 0x00, /*        */
@@ -1678,7 +1676,7 @@ static unsigned char FONTDATA[] = {
 0x10, /*    X   */
 0x20, /*   X    */
 
-/* FONTDATA + 0x0564 */
+/* FONTDATA_6x10 + 0x0564 */
 0x10, /*    X   */
 0x30, /*   XX   */
 0x10, /*    X   */
@@ -1690,7 +1688,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x056e */
+/* FONTDATA_6x10 + 0x056e */
 0x00, /*        */
 0x30, /*   XX   */
 0x48, /*  X  X  */
@@ -1702,7 +1700,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0578 */
+/* FONTDATA_6x10 + 0x0578 */
 0x00, /*        */
 0x00, /*        */
 0x00, /*        */
@@ -1714,7 +1712,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0582 */
+/* FONTDATA_6x10 + 0x0582 */
 0x40, /*  X     */
 0xc0, /* XX     */
 0x40, /*  X     */
@@ -1726,7 +1724,7 @@ static unsigned char FONTDATA[] = {
 0x04, /*      X */
 0x00, /*        */
 
-/* FONTDATA + 0x058c */
+/* FONTDATA_6x10 + 0x058c */
 0x40, /*  X     */
 0xc0, /* XX     */
 0x40, /*  X     */
@@ -1738,7 +1736,7 @@ static unsigned char FONTDATA[] = {
 0x1c, /*    XXX */
 0x00, /*        */
 
-/* FONTDATA + 0x0596 */
+/* FONTDATA_6x10 + 0x0596 */
 0x60, /*  XX    */
 0x10, /*    X   */
 0x20, /*   X    */
@@ -1750,7 +1748,7 @@ static unsigned char FONTDATA[] = {
 0x04, /*      X */
 0x00, /*        */
 
-/* FONTDATA + 0x05a0 */
+/* FONTDATA_6x10 + 0x05a0 */
 0x00, /*        */
 0x10, /*    X   */
 0x00, /*        */
@@ -1762,7 +1760,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x05aa */
+/* FONTDATA_6x10 + 0x05aa */
 0x20, /*   X    */
 0x10, /*    X   */
 0x38, /*   XXX  */
@@ -1774,7 +1772,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x05b4 */
+/* FONTDATA_6x10 + 0x05b4 */
 0x08, /*     X  */
 0x10, /*    X   */
 0x38, /*   XXX  */
@@ -1786,7 +1784,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x05be */
+/* FONTDATA_6x10 + 0x05be */
 0x10, /*    X   */
 0x28, /*   X X  */
 0x38, /*   XXX  */
@@ -1798,7 +1796,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x05c8 */
+/* FONTDATA_6x10 + 0x05c8 */
 0x24, /*   X  X */
 0x58, /*  X XX  */
 0x38, /*   XXX  */
@@ -1810,7 +1808,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x05d2 */
+/* FONTDATA_6x10 + 0x05d2 */
 0x28, /*   X X  */
 0x00, /*        */
 0x38, /*   XXX  */
@@ -1822,7 +1820,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x05dc */
+/* FONTDATA_6x10 + 0x05dc */
 0x10, /*    X   */
 0x28, /*   X X  */
 0x38, /*   XXX  */
@@ -1834,7 +1832,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x05e6 */
+/* FONTDATA_6x10 + 0x05e6 */
 0x00, /*        */
 0x3c, /*   XXXX */
 0x50, /*  X X   */
@@ -1846,7 +1844,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x05f0 */
+/* FONTDATA_6x10 + 0x05f0 */
 0x00, /*        */
 0x38, /*   XXX  */
 0x44, /*  X   X */
@@ -1858,7 +1856,7 @@ static unsigned char FONTDATA[] = {
 0x10, /*    X   */
 0x20, /*   X    */
 
-/* FONTDATA + 0x05fa */
+/* FONTDATA_6x10 + 0x05fa */
 0x20, /*   X    */
 0x7c, /*  XXXXX */
 0x40, /*  X     */
@@ -1870,7 +1868,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0604 */
+/* FONTDATA_6x10 + 0x0604 */
 0x08, /*     X  */
 0x7c, /*  XXXXX */
 0x40, /*  X     */
@@ -1882,7 +1880,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x060e */
+/* FONTDATA_6x10 + 0x060e */
 0x10, /*    X   */
 0x7c, /*  XXXXX */
 0x40, /*  X     */
@@ -1894,7 +1892,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0618 */
+/* FONTDATA_6x10 + 0x0618 */
 0x28, /*   X X  */
 0x7c, /*  XXXXX */
 0x40, /*  X     */
@@ -1906,7 +1904,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0622 */
+/* FONTDATA_6x10 + 0x0622 */
 0x20, /*   X    */
 0x38, /*   XXX  */
 0x10, /*    X   */
@@ -1918,7 +1916,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x062c */
+/* FONTDATA_6x10 + 0x062c */
 0x08, /*     X  */
 0x38, /*   XXX  */
 0x10, /*    X   */
@@ -1930,7 +1928,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0636 */
+/* FONTDATA_6x10 + 0x0636 */
 0x10, /*    X   */
 0x38, /*   XXX  */
 0x10, /*    X   */
@@ -1942,7 +1940,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0640 */
+/* FONTDATA_6x10 + 0x0640 */
 0x28, /*   X X  */
 0x38, /*   XXX  */
 0x10, /*    X   */
@@ -1954,7 +1952,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x064a */
+/* FONTDATA_6x10 + 0x064a */
 0x00, /*        */
 0x78, /*  XXXX  */
 0x24, /*   X  X */
@@ -1966,7 +1964,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0654 */
+/* FONTDATA_6x10 + 0x0654 */
 0x18, /*    XX  */
 0x44, /*  X   X */
 0x44, /*  X   X */
@@ -1978,7 +1976,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x065e */
+/* FONTDATA_6x10 + 0x065e */
 0x20, /*   X    */
 0x38, /*   XXX  */
 0x44, /*  X   X */
@@ -1990,7 +1988,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0668 */
+/* FONTDATA_6x10 + 0x0668 */
 0x08, /*     X  */
 0x38, /*   XXX  */
 0x44, /*  X   X */
@@ -2002,7 +2000,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0672 */
+/* FONTDATA_6x10 + 0x0672 */
 0x10, /*    X   */
 0x38, /*   XXX  */
 0x44, /*  X   X */
@@ -2014,7 +2012,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x067c */
+/* FONTDATA_6x10 + 0x067c */
 0x38, /*   XXX  */
 0x38, /*   XXX  */
 0x44, /*  X   X */
@@ -2026,7 +2024,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0686 */
+/* FONTDATA_6x10 + 0x0686 */
 0x28, /*   X X  */
 0x38, /*   XXX  */
 0x44, /*  X   X */
@@ -2038,7 +2036,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0690 */
+/* FONTDATA_6x10 + 0x0690 */
 0x00, /*        */
 0x00, /*        */
 0x00, /*        */
@@ -2050,7 +2048,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x069a */
+/* FONTDATA_6x10 + 0x069a */
 0x00, /*        */
 0x38, /*   XXX  */
 0x4c, /*  X  XX */
@@ -2062,7 +2060,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x06a4 */
+/* FONTDATA_6x10 + 0x06a4 */
 0x20, /*   X    */
 0x54, /*  X X X */
 0x44, /*  X   X */
@@ -2074,7 +2072,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x06ae */
+/* FONTDATA_6x10 + 0x06ae */
 0x08, /*     X  */
 0x54, /*  X X X */
 0x44, /*  X   X */
@@ -2086,7 +2084,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x06b8 */
+/* FONTDATA_6x10 + 0x06b8 */
 0x10, /*    X   */
 0x6c, /*  XX XX */
 0x44, /*  X   X */
@@ -2098,7 +2096,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x06c2 */
+/* FONTDATA_6x10 + 0x06c2 */
 0x28, /*   X X  */
 0x44, /*  X   X */
 0x44, /*  X   X */
@@ -2110,7 +2108,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x06cc */
+/* FONTDATA_6x10 + 0x06cc */
 0x08, /*     X  */
 0x54, /*  X X X */
 0x44, /*  X   X */
@@ -2122,7 +2120,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x06d6 */
+/* FONTDATA_6x10 + 0x06d6 */
 0x00, /*        */
 0x40, /*  X     */
 0x78, /*  XXXX  */
@@ -2134,7 +2132,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x06e0 */
+/* FONTDATA_6x10 + 0x06e0 */
 0x00, /*        */
 0x38, /*   XXX  */
 0x44, /*  X   X */
@@ -2146,7 +2144,7 @@ static unsigned char FONTDATA[] = {
 0x40, /*  X     */
 0x00, /*        */
 
-/* FONTDATA + 0x06ea */
+/* FONTDATA_6x10 + 0x06ea */
 0x00, /*        */
 0x20, /*   X    */
 0x10, /*    X   */
@@ -2158,7 +2156,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x06f4 */
+/* FONTDATA_6x10 + 0x06f4 */
 0x00, /*        */
 0x08, /*     X  */
 0x10, /*    X   */
@@ -2170,7 +2168,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x06fe */
+/* FONTDATA_6x10 + 0x06fe */
 0x00, /*        */
 0x10, /*    X   */
 0x28, /*   X X  */
@@ -2182,7 +2180,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0708 */
+/* FONTDATA_6x10 + 0x0708 */
 0x00, /*        */
 0x14, /*    X X */
 0x28, /*   X X  */
@@ -2194,7 +2192,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0712 */
+/* FONTDATA_6x10 + 0x0712 */
 0x00, /*        */
 0x28, /*   X X  */
 0x00, /*        */
@@ -2206,7 +2204,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x071c */
+/* FONTDATA_6x10 + 0x071c */
 0x10, /*    X   */
 0x28, /*   X X  */
 0x10, /*    X   */
@@ -2218,7 +2216,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0726 */
+/* FONTDATA_6x10 + 0x0726 */
 0x00, /*        */
 0x00, /*        */
 0x00, /*        */
@@ -2230,7 +2228,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0730 */
+/* FONTDATA_6x10 + 0x0730 */
 0x00, /*        */
 0x00, /*        */
 0x00, /*        */
@@ -2242,7 +2240,7 @@ static unsigned char FONTDATA[] = {
 0x10, /*    X   */
 0x20, /*   X    */
 
-/* FONTDATA + 0x073a */
+/* FONTDATA_6x10 + 0x073a */
 0x00, /*        */
 0x20, /*   X    */
 0x10, /*    X   */
@@ -2254,7 +2252,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0744 */
+/* FONTDATA_6x10 + 0x0744 */
 0x00, /*        */
 0x08, /*     X  */
 0x10, /*    X   */
@@ -2266,7 +2264,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x074e */
+/* FONTDATA_6x10 + 0x074e */
 0x00, /*        */
 0x10, /*    X   */
 0x28, /*   X X  */
@@ -2278,7 +2276,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0758 */
+/* FONTDATA_6x10 + 0x0758 */
 0x00, /*        */
 0x28, /*   X X  */
 0x00, /*        */
@@ -2290,7 +2288,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0762 */
+/* FONTDATA_6x10 + 0x0762 */
 0x20, /*   X    */
 0x10, /*    X   */
 0x00, /*        */
@@ -2302,7 +2300,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x076c */
+/* FONTDATA_6x10 + 0x076c */
 0x10, /*    X   */
 0x20, /*   X    */
 0x00, /*        */
@@ -2314,7 +2312,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0776 */
+/* FONTDATA_6x10 + 0x0776 */
 0x10, /*    X   */
 0x28, /*   X X  */
 0x00, /*        */
@@ -2326,7 +2324,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0780 */
+/* FONTDATA_6x10 + 0x0780 */
 0x00, /*        */
 0x28, /*   X X  */
 0x00, /*        */
@@ -2338,7 +2336,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x078a */
+/* FONTDATA_6x10 + 0x078a */
 0x00, /*        */
 0x60, /*  XX    */
 0x18, /*    XX  */
@@ -2350,7 +2348,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0794 */
+/* FONTDATA_6x10 + 0x0794 */
 0x00, /*        */
 0x14, /*    X X */
 0x28, /*   X X  */
@@ -2362,7 +2360,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x079e */
+/* FONTDATA_6x10 + 0x079e */
 0x00, /*        */
 0x20, /*   X    */
 0x10, /*    X   */
@@ -2374,7 +2372,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x07a8 */
+/* FONTDATA_6x10 + 0x07a8 */
 0x00, /*        */
 0x08, /*     X  */
 0x10, /*    X   */
@@ -2386,7 +2384,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x07b2 */
+/* FONTDATA_6x10 + 0x07b2 */
 0x00, /*        */
 0x10, /*    X   */
 0x28, /*   X X  */
@@ -2398,7 +2396,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x07bc */
+/* FONTDATA_6x10 + 0x07bc */
 0x00, /*        */
 0x14, /*    X X */
 0x28, /*   X X  */
@@ -2410,7 +2408,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x07c6 */
+/* FONTDATA_6x10 + 0x07c6 */
 0x00, /*        */
 0x28, /*   X X  */
 0x00, /*        */
@@ -2422,7 +2420,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x07d0 */
+/* FONTDATA_6x10 + 0x07d0 */
 0x00, /*        */
 0x00, /*        */
 0x10, /*    X   */
@@ -2434,7 +2432,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x07da */
+/* FONTDATA_6x10 + 0x07da */
 0x00, /*        */
 0x00, /*        */
 0x00, /*        */
@@ -2446,7 +2444,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x07e4 */
+/* FONTDATA_6x10 + 0x07e4 */
 0x00, /*        */
 0x20, /*   X    */
 0x10, /*    X   */
@@ -2458,7 +2456,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x07ee */
+/* FONTDATA_6x10 + 0x07ee */
 0x00, /*        */
 0x08, /*     X  */
 0x10, /*    X   */
@@ -2470,7 +2468,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x07f8 */
+/* FONTDATA_6x10 + 0x07f8 */
 0x00, /*        */
 0x10, /*    X   */
 0x28, /*   X X  */
@@ -2482,7 +2480,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x0802 */
+/* FONTDATA_6x10 + 0x0802 */
 0x00, /*        */
 0x28, /*   X X  */
 0x00, /*        */
@@ -2494,7 +2492,7 @@ static unsigned char FONTDATA[] = {
 0x00, /*        */
 0x00, /*        */
 
-/* FONTDATA + 0x080c */
+/* FONTDATA_6x10 + 0x080c */
 0x00, /*        */
 0x08, /*     X  */
 0x10, /*    X   */
@@ -2506,7 +2504,7 @@ static unsigned char FONTDATA[] = {
 0x44, /*  X   X */
 0x38, /*   XXX  */
 
-/* FONTDATA + 0x0816 */
+/* FONTDATA_6x10 + 0x0816 */
 0x00, /*        */
 0x00, /*        */
 0x40, /*  X     */
@@ -2518,7 +2516,7 @@ static unsigned char FONTDATA[] = {
 0x40, /*  X     */
 0x40, /*  X     */
 
-/* FONTDATA + 0x0820 */
+/* FONTDATA_6x10 + 0x0820 */
 0x00, /*        */
 0x28, /*   X X  */
 0x00, /*        */
@@ -2531,269 +2529,269 @@ static unsigned char FONTDATA[] = {
 0x38, /*   XXX  */
 };
 
-static unsigned char *ENCODINGS[256] = {
-/* 000 */ FONTDATA + 0x0000,
-/* 001 */ FONTDATA + 0x0000,
-/* 002 */ FONTDATA + 0x0000,
-/* 003 */ FONTDATA + 0x0000,
-/* 004 */ FONTDATA + 0x0000,
-/* 005 */ FONTDATA + 0x0000,
-/* 006 */ FONTDATA + 0x0000,
-/* 007 */ FONTDATA + 0x0000,
-/* 008 */ FONTDATA + 0x0000,
-/* 009 */ FONTDATA + 0x0000,
-/* 010 */ FONTDATA + 0x0000,
-/* 011 */ FONTDATA + 0x0000,
-/* 012 */ FONTDATA + 0x0000,
-/* 013 */ FONTDATA + 0x0000,
-/* 014 */ FONTDATA + 0x0000,
-/* 015 */ FONTDATA + 0x0000,
-/* 016 */ FONTDATA + 0x0000,
-/* 017 */ FONTDATA + 0x0000,
-/* 018 */ FONTDATA + 0x0000,
-/* 019 */ FONTDATA + 0x0000,
-/* 020 */ FONTDATA + 0x0000,
-/* 021 */ FONTDATA + 0x0000,
-/* 022 */ FONTDATA + 0x0000,
-/* 023 */ FONTDATA + 0x0000,
-/* 024 */ FONTDATA + 0x0000,
-/* 025 */ FONTDATA + 0x0000,
-/* 026 */ FONTDATA + 0x0000,
-/* 027 */ FONTDATA + 0x0000,
-/* 028 */ FONTDATA + 0x0000,
-/* 029 */ FONTDATA + 0x0000,
-/* 030 */ FONTDATA + 0x0000,
-/* 031 */ FONTDATA + 0x0000,
-/* 032 */ FONTDATA + 0x00aa,
-/* 033 */ FONTDATA + 0x00b4,
-/* 034 */ FONTDATA + 0x00be,
-/* 035 */ FONTDATA + 0x00c8,
-/* 036 */ FONTDATA + 0x00d2,
-/* 037 */ FONTDATA + 0x00dc,
-/* 038 */ FONTDATA + 0x00e6,
-/* 039 */ FONTDATA + 0x00f0,
-/* 040 */ FONTDATA + 0x00fa,
-/* 041 */ FONTDATA + 0x0104,
-/* 042 */ FONTDATA + 0x010e,
-/* 043 */ FONTDATA + 0x0118,
-/* 044 */ FONTDATA + 0x0122,
-/* 045 */ FONTDATA + 0x012c,
-/* 046 */ FONTDATA + 0x0136,
-/* 047 */ FONTDATA + 0x0140,
-/* 048 */ FONTDATA + 0x014a,
-/* 049 */ FONTDATA + 0x0154,
-/* 050 */ FONTDATA + 0x015e,
-/* 051 */ FONTDATA + 0x0168,
-/* 052 */ FONTDATA + 0x0172,
-/* 053 */ FONTDATA + 0x017c,
-/* 054 */ FONTDATA + 0x0186,
-/* 055 */ FONTDATA + 0x0190,
-/* 056 */ FONTDATA + 0x019a,
-/* 057 */ FONTDATA + 0x01a4,
-/* 058 */ FONTDATA + 0x01ae,
-/* 059 */ FONTDATA + 0x01b8,
-/* 060 */ FONTDATA + 0x01c2,
-/* 061 */ FONTDATA + 0x01cc,
-/* 062 */ FONTDATA + 0x01d6,
-/* 063 */ FONTDATA + 0x01e0,
-/* 064 */ FONTDATA + 0x01ea,
-/* 065 */ FONTDATA + 0x01f4,
-/* 066 */ FONTDATA + 0x01fe,
-/* 067 */ FONTDATA + 0x0208,
-/* 068 */ FONTDATA + 0x0212,
-/* 069 */ FONTDATA + 0x021c,
-/* 070 */ FONTDATA + 0x0226,
-/* 071 */ FONTDATA + 0x0230,
-/* 072 */ FONTDATA + 0x023a,
-/* 073 */ FONTDATA + 0x0244,
-/* 074 */ FONTDATA + 0x024e,
-/* 075 */ FONTDATA + 0x0258,
-/* 076 */ FONTDATA + 0x0262,
-/* 077 */ FONTDATA + 0x026c,
-/* 078 */ FONTDATA + 0x0276,
-/* 079 */ FONTDATA + 0x0280,
-/* 080 */ FONTDATA + 0x028a,
-/* 081 */ FONTDATA + 0x0294,
-/* 082 */ FONTDATA + 0x029e,
-/* 083 */ FONTDATA + 0x02a8,
-/* 084 */ FONTDATA + 0x02b2,
-/* 085 */ FONTDATA + 0x02bc,
-/* 086 */ FONTDATA + 0x02c6,
-/* 087 */ FONTDATA + 0x02d0,
-/* 088 */ FONTDATA + 0x02da,
-/* 089 */ FONTDATA + 0x02e4,
-/* 090 */ FONTDATA + 0x02ee,
-/* 091 */ FONTDATA + 0x02f8,
-/* 092 */ FONTDATA + 0x0302,
-/* 093 */ FONTDATA + 0x030c,
-/* 094 */ FONTDATA + 0x0316,
-/* 095 */ FONTDATA + 0x0320,
-/* 096 */ FONTDATA + 0x032a,
-/* 097 */ FONTDATA + 0x0334,
-/* 098 */ FONTDATA + 0x033e,
-/* 099 */ FONTDATA + 0x0348,
-/* 100 */ FONTDATA + 0x0352,
-/* 101 */ FONTDATA + 0x035c,
-/* 102 */ FONTDATA + 0x0366,
-/* 103 */ FONTDATA + 0x0370,
-/* 104 */ FONTDATA + 0x037a,
-/* 105 */ FONTDATA + 0x0384,
-/* 106 */ FONTDATA + 0x038e,
-/* 107 */ FONTDATA + 0x0398,
-/* 108 */ FONTDATA + 0x03a2,
-/* 109 */ FONTDATA + 0x03ac,
-/* 110 */ FONTDATA + 0x03b6,
-/* 111 */ FONTDATA + 0x03c0,
-/* 112 */ FONTDATA + 0x03ca,
-/* 113 */ FONTDATA + 0x03d4,
-/* 114 */ FONTDATA + 0x03de,
-/* 115 */ FONTDATA + 0x03e8,
-/* 116 */ FONTDATA + 0x03f2,
-/* 117 */ FONTDATA + 0x03fc,
-/* 118 */ FONTDATA + 0x0406,
-/* 119 */ FONTDATA + 0x0410,
-/* 120 */ FONTDATA + 0x041a,
-/* 121 */ FONTDATA + 0x0424,
-/* 122 */ FONTDATA + 0x042e,
-/* 123 */ FONTDATA + 0x0438,
-/* 124 */ FONTDATA + 0x0442,
-/* 125 */ FONTDATA + 0x044c,
-/* 126 */ FONTDATA + 0x0456,
-/* 127 */ FONTDATA + 0x0000,
-/* 128 */ FONTDATA + 0x0000,
-/* 129 */ FONTDATA + 0x0000,
-/* 130 */ FONTDATA + 0x0000,
-/* 131 */ FONTDATA + 0x0000,
-/* 132 */ FONTDATA + 0x0000,
-/* 133 */ FONTDATA + 0x0000,
-/* 134 */ FONTDATA + 0x0000,
-/* 135 */ FONTDATA + 0x0000,
-/* 136 */ FONTDATA + 0x0000,
-/* 137 */ FONTDATA + 0x0000,
-/* 138 */ FONTDATA + 0x0000,
-/* 139 */ FONTDATA + 0x0000,
-/* 140 */ FONTDATA + 0x0000,
-/* 141 */ FONTDATA + 0x0000,
-/* 142 */ FONTDATA + 0x0000,
-/* 143 */ FONTDATA + 0x0000,
-/* 144 */ FONTDATA + 0x0000,
-/* 145 */ FONTDATA + 0x0000,
-/* 146 */ FONTDATA + 0x0000,
-/* 147 */ FONTDATA + 0x0000,
-/* 148 */ FONTDATA + 0x0000,
-/* 149 */ FONTDATA + 0x0000,
-/* 150 */ FONTDATA + 0x0000,
-/* 151 */ FONTDATA + 0x0000,
-/* 152 */ FONTDATA + 0x0000,
-/* 153 */ FONTDATA + 0x0000,
-/* 154 */ FONTDATA + 0x0000,
-/* 155 */ FONTDATA + 0x0000,
-/* 156 */ FONTDATA + 0x0000,
-/* 157 */ FONTDATA + 0x0000,
-/* 158 */ FONTDATA + 0x0000,
-/* 159 */ FONTDATA + 0x0000,
-/* 160 */ FONTDATA + 0x0000,
-/* 161 */ FONTDATA + 0x0474,
-/* 162 */ FONTDATA + 0x047e,
-/* 163 */ FONTDATA + 0x0488,
-/* 164 */ FONTDATA + 0x0492,
-/* 165 */ FONTDATA + 0x049c,
-/* 166 */ FONTDATA + 0x04a6,
-/* 167 */ FONTDATA + 0x04b0,
-/* 168 */ FONTDATA + 0x04ba,
-/* 169 */ FONTDATA + 0x04c4,
-/* 170 */ FONTDATA + 0x04ce,
-/* 171 */ FONTDATA + 0x04d8,
-/* 172 */ FONTDATA + 0x04e2,
-/* 173 */ FONTDATA + 0x04ec,
-/* 174 */ FONTDATA + 0x04f6,
-/* 175 */ FONTDATA + 0x0500,
-/* 176 */ FONTDATA + 0x050a,
-/* 177 */ FONTDATA + 0x0514,
-/* 178 */ FONTDATA + 0x051e,
-/* 179 */ FONTDATA + 0x0528,
-/* 180 */ FONTDATA + 0x0532,
-/* 181 */ FONTDATA + 0x053c,
-/* 182 */ FONTDATA + 0x0546,
-/* 183 */ FONTDATA + 0x0550,
-/* 184 */ FONTDATA + 0x055a,
-/* 185 */ FONTDATA + 0x0564,
-/* 186 */ FONTDATA + 0x056e,
-/* 187 */ FONTDATA + 0x0578,
-/* 188 */ FONTDATA + 0x0582,
-/* 189 */ FONTDATA + 0x058c,
-/* 190 */ FONTDATA + 0x0596,
-/* 191 */ FONTDATA + 0x05a0,
-/* 192 */ FONTDATA + 0x05aa,
-/* 193 */ FONTDATA + 0x05b4,
-/* 194 */ FONTDATA + 0x05be,
-/* 195 */ FONTDATA + 0x05c8,
-/* 196 */ FONTDATA + 0x05d2,
-/* 197 */ FONTDATA + 0x05dc,
-/* 198 */ FONTDATA + 0x05e6,
-/* 199 */ FONTDATA + 0x05f0,
-/* 200 */ FONTDATA + 0x05fa,
-/* 201 */ FONTDATA + 0x0604,
-/* 202 */ FONTDATA + 0x060e,
-/* 203 */ FONTDATA + 0x0618,
-/* 204 */ FONTDATA + 0x0622,
-/* 205 */ FONTDATA + 0x062c,
-/* 206 */ FONTDATA + 0x0636,
-/* 207 */ FONTDATA + 0x0640,
-/* 208 */ FONTDATA + 0x064a,
-/* 209 */ FONTDATA + 0x0654,
-/* 210 */ FONTDATA + 0x065e,
-/* 211 */ FONTDATA + 0x0668,
-/* 212 */ FONTDATA + 0x0672,
-/* 213 */ FONTDATA + 0x067c,
-/* 214 */ FONTDATA + 0x0686,
-/* 215 */ FONTDATA + 0x0690,
-/* 216 */ FONTDATA + 0x069a,
-/* 217 */ FONTDATA + 0x06a4,
-/* 218 */ FONTDATA + 0x06ae,
-/* 219 */ FONTDATA + 0x06b8,
-/* 220 */ FONTDATA + 0x06c2,
-/* 221 */ FONTDATA + 0x06cc,
-/* 222 */ FONTDATA + 0x06d6,
-/* 223 */ FONTDATA + 0x06e0,
-/* 224 */ FONTDATA + 0x06ea,
-/* 225 */ FONTDATA + 0x06f4,
-/* 226 */ FONTDATA + 0x06fe,
-/* 227 */ FONTDATA + 0x0708,
-/* 228 */ FONTDATA + 0x0712,
-/* 229 */ FONTDATA + 0x071c,
-/* 230 */ FONTDATA + 0x0726,
-/* 231 */ FONTDATA + 0x0730,
-/* 232 */ FONTDATA + 0x073a,
-/* 233 */ FONTDATA + 0x0744,
-/* 234 */ FONTDATA + 0x074e,
-/* 235 */ FONTDATA + 0x0758,
-/* 236 */ FONTDATA + 0x0762,
-/* 237 */ FONTDATA + 0x076c,
-/* 238 */ FONTDATA + 0x0776,
-/* 239 */ FONTDATA + 0x0780,
-/* 240 */ FONTDATA + 0x078a,
-/* 241 */ FONTDATA + 0x0794,
-/* 242 */ FONTDATA + 0x079e,
-/* 243 */ FONTDATA + 0x07a8,
-/* 244 */ FONTDATA + 0x07b2,
-/* 245 */ FONTDATA + 0x07bc,
-/* 246 */ FONTDATA + 0x07c6,
-/* 247 */ FONTDATA + 0x07d0,
-/* 248 */ FONTDATA + 0x07da,
-/* 249 */ FONTDATA + 0x07e4,
-/* 250 */ FONTDATA + 0x07ee,
-/* 251 */ FONTDATA + 0x07f8,
-/* 252 */ FONTDATA + 0x0802,
-/* 253 */ FONTDATA + 0x080c,
-/* 254 */ FONTDATA + 0x0816,
-/* 255 */ FONTDATA + 0x0820,
+static unsigned char *ENCODINGS_6x10[256] = {
+/* 000 */ FONTDATA_6x10 + 0x0000,
+/* 001 */ FONTDATA_6x10 + 0x0000,
+/* 002 */ FONTDATA_6x10 + 0x0000,
+/* 003 */ FONTDATA_6x10 + 0x0000,
+/* 004 */ FONTDATA_6x10 + 0x0000,
+/* 005 */ FONTDATA_6x10 + 0x0000,
+/* 006 */ FONTDATA_6x10 + 0x0000,
+/* 007 */ FONTDATA_6x10 + 0x0000,
+/* 008 */ FONTDATA_6x10 + 0x0000,
+/* 009 */ FONTDATA_6x10 + 0x0000,
+/* 010 */ FONTDATA_6x10 + 0x0000,
+/* 011 */ FONTDATA_6x10 + 0x0000,
+/* 012 */ FONTDATA_6x10 + 0x0000,
+/* 013 */ FONTDATA_6x10 + 0x0000,
+/* 014 */ FONTDATA_6x10 + 0x0000,
+/* 015 */ FONTDATA_6x10 + 0x0000,
+/* 016 */ FONTDATA_6x10 + 0x0000,
+/* 017 */ FONTDATA_6x10 + 0x0000,
+/* 018 */ FONTDATA_6x10 + 0x0000,
+/* 019 */ FONTDATA_6x10 + 0x0000,
+/* 020 */ FONTDATA_6x10 + 0x0000,
+/* 021 */ FONTDATA_6x10 + 0x0000,
+/* 022 */ FONTDATA_6x10 + 0x0000,
+/* 023 */ FONTDATA_6x10 + 0x0000,
+/* 024 */ FONTDATA_6x10 + 0x0000,
+/* 025 */ FONTDATA_6x10 + 0x0000,
+/* 026 */ FONTDATA_6x10 + 0x0000,
+/* 027 */ FONTDATA_6x10 + 0x0000,
+/* 028 */ FONTDATA_6x10 + 0x0000,
+/* 029 */ FONTDATA_6x10 + 0x0000,
+/* 030 */ FONTDATA_6x10 + 0x0000,
+/* 031 */ FONTDATA_6x10 + 0x0000,
+/* 032 */ FONTDATA_6x10 + 0x00aa,
+/* 033 */ FONTDATA_6x10 + 0x00b4,
+/* 034 */ FONTDATA_6x10 + 0x00be,
+/* 035 */ FONTDATA_6x10 + 0x00c8,
+/* 036 */ FONTDATA_6x10 + 0x00d2,
+/* 037 */ FONTDATA_6x10 + 0x00dc,
+/* 038 */ FONTDATA_6x10 + 0x00e6,
+/* 039 */ FONTDATA_6x10 + 0x00f0,
+/* 040 */ FONTDATA_6x10 + 0x00fa,
+/* 041 */ FONTDATA_6x10 + 0x0104,
+/* 042 */ FONTDATA_6x10 + 0x010e,
+/* 043 */ FONTDATA_6x10 + 0x0118,
+/* 044 */ FONTDATA_6x10 + 0x0122,
+/* 045 */ FONTDATA_6x10 + 0x012c,
+/* 046 */ FONTDATA_6x10 + 0x0136,
+/* 047 */ FONTDATA_6x10 + 0x0140,
+/* 048 */ FONTDATA_6x10 + 0x014a,
+/* 049 */ FONTDATA_6x10 + 0x0154,
+/* 050 */ FONTDATA_6x10 + 0x015e,
+/* 051 */ FONTDATA_6x10 + 0x0168,
+/* 052 */ FONTDATA_6x10 + 0x0172,
+/* 053 */ FONTDATA_6x10 + 0x017c,
+/* 054 */ FONTDATA_6x10 + 0x0186,
+/* 055 */ FONTDATA_6x10 + 0x0190,
+/* 056 */ FONTDATA_6x10 + 0x019a,
+/* 057 */ FONTDATA_6x10 + 0x01a4,
+/* 058 */ FONTDATA_6x10 + 0x01ae,
+/* 059 */ FONTDATA_6x10 + 0x01b8,
+/* 060 */ FONTDATA_6x10 + 0x01c2,
+/* 061 */ FONTDATA_6x10 + 0x01cc,
+/* 062 */ FONTDATA_6x10 + 0x01d6,
+/* 063 */ FONTDATA_6x10 + 0x01e0,
+/* 064 */ FONTDATA_6x10 + 0x01ea,
+/* 065 */ FONTDATA_6x10 + 0x01f4,
+/* 066 */ FONTDATA_6x10 + 0x01fe,
+/* 067 */ FONTDATA_6x10 + 0x0208,
+/* 068 */ FONTDATA_6x10 + 0x0212,
+/* 069 */ FONTDATA_6x10 + 0x021c,
+/* 070 */ FONTDATA_6x10 + 0x0226,
+/* 071 */ FONTDATA_6x10 + 0x0230,
+/* 072 */ FONTDATA_6x10 + 0x023a,
+/* 073 */ FONTDATA_6x10 + 0x0244,
+/* 074 */ FONTDATA_6x10 + 0x024e,
+/* 075 */ FONTDATA_6x10 + 0x0258,
+/* 076 */ FONTDATA_6x10 + 0x0262,
+/* 077 */ FONTDATA_6x10 + 0x026c,
+/* 078 */ FONTDATA_6x10 + 0x0276,
+/* 079 */ FONTDATA_6x10 + 0x0280,
+/* 080 */ FONTDATA_6x10 + 0x028a,
+/* 081 */ FONTDATA_6x10 + 0x0294,
+/* 082 */ FONTDATA_6x10 + 0x029e,
+/* 083 */ FONTDATA_6x10 + 0x02a8,
+/* 084 */ FONTDATA_6x10 + 0x02b2,
+/* 085 */ FONTDATA_6x10 + 0x02bc,
+/* 086 */ FONTDATA_6x10 + 0x02c6,
+/* 087 */ FONTDATA_6x10 + 0x02d0,
+/* 088 */ FONTDATA_6x10 + 0x02da,
+/* 089 */ FONTDATA_6x10 + 0x02e4,
+/* 090 */ FONTDATA_6x10 + 0x02ee,
+/* 091 */ FONTDATA_6x10 + 0x02f8,
+/* 092 */ FONTDATA_6x10 + 0x0302,
+/* 093 */ FONTDATA_6x10 + 0x030c,
+/* 094 */ FONTDATA_6x10 + 0x0316,
+/* 095 */ FONTDATA_6x10 + 0x0320,
+/* 096 */ FONTDATA_6x10 + 0x032a,
+/* 097 */ FONTDATA_6x10 + 0x0334,
+/* 098 */ FONTDATA_6x10 + 0x033e,
+/* 099 */ FONTDATA_6x10 + 0x0348,
+/* 100 */ FONTDATA_6x10 + 0x0352,
+/* 101 */ FONTDATA_6x10 + 0x035c,
+/* 102 */ FONTDATA_6x10 + 0x0366,
+/* 103 */ FONTDATA_6x10 + 0x0370,
+/* 104 */ FONTDATA_6x10 + 0x037a,
+/* 105 */ FONTDATA_6x10 + 0x0384,
+/* 106 */ FONTDATA_6x10 + 0x038e,
+/* 107 */ FONTDATA_6x10 + 0x0398,
+/* 108 */ FONTDATA_6x10 + 0x03a2,
+/* 109 */ FONTDATA_6x10 + 0x03ac,
+/* 110 */ FONTDATA_6x10 + 0x03b6,
+/* 111 */ FONTDATA_6x10 + 0x03c0,
+/* 112 */ FONTDATA_6x10 + 0x03ca,
+/* 113 */ FONTDATA_6x10 + 0x03d4,
+/* 114 */ FONTDATA_6x10 + 0x03de,
+/* 115 */ FONTDATA_6x10 + 0x03e8,
+/* 116 */ FONTDATA_6x10 + 0x03f2,
+/* 117 */ FONTDATA_6x10 + 0x03fc,
+/* 118 */ FONTDATA_6x10 + 0x0406,
+/* 119 */ FONTDATA_6x10 + 0x0410,
+/* 120 */ FONTDATA_6x10 + 0x041a,
+/* 121 */ FONTDATA_6x10 + 0x0424,
+/* 122 */ FONTDATA_6x10 + 0x042e,
+/* 123 */ FONTDATA_6x10 + 0x0438,
+/* 124 */ FONTDATA_6x10 + 0x0442,
+/* 125 */ FONTDATA_6x10 + 0x044c,
+/* 126 */ FONTDATA_6x10 + 0x0456,
+/* 127 */ FONTDATA_6x10 + 0x0000,
+/* 128 */ FONTDATA_6x10 + 0x0000,
+/* 129 */ FONTDATA_6x10 + 0x0000,
+/* 130 */ FONTDATA_6x10 + 0x0000,
+/* 131 */ FONTDATA_6x10 + 0x0000,
+/* 132 */ FONTDATA_6x10 + 0x0000,
+/* 133 */ FONTDATA_6x10 + 0x0000,
+/* 134 */ FONTDATA_6x10 + 0x0000,
+/* 135 */ FONTDATA_6x10 + 0x0000,
+/* 136 */ FONTDATA_6x10 + 0x0000,
+/* 137 */ FONTDATA_6x10 + 0x0000,
+/* 138 */ FONTDATA_6x10 + 0x0000,
+/* 139 */ FONTDATA_6x10 + 0x0000,
+/* 140 */ FONTDATA_6x10 + 0x0000,
+/* 141 */ FONTDATA_6x10 + 0x0000,
+/* 142 */ FONTDATA_6x10 + 0x0000,
+/* 143 */ FONTDATA_6x10 + 0x0000,
+/* 144 */ FONTDATA_6x10 + 0x0000,
+/* 145 */ FONTDATA_6x10 + 0x0000,
+/* 146 */ FONTDATA_6x10 + 0x0000,
+/* 147 */ FONTDATA_6x10 + 0x0000,
+/* 148 */ FONTDATA_6x10 + 0x0000,
+/* 149 */ FONTDATA_6x10 + 0x0000,
+/* 150 */ FONTDATA_6x10 + 0x0000,
+/* 151 */ FONTDATA_6x10 + 0x0000,
+/* 152 */ FONTDATA_6x10 + 0x0000,
+/* 153 */ FONTDATA_6x10 + 0x0000,
+/* 154 */ FONTDATA_6x10 + 0x0000,
+/* 155 */ FONTDATA_6x10 + 0x0000,
+/* 156 */ FONTDATA_6x10 + 0x0000,
+/* 157 */ FONTDATA_6x10 + 0x0000,
+/* 158 */ FONTDATA_6x10 + 0x0000,
+/* 159 */ FONTDATA_6x10 + 0x0000,
+/* 160 */ FONTDATA_6x10 + 0x0000,
+/* 161 */ FONTDATA_6x10 + 0x0474,
+/* 162 */ FONTDATA_6x10 + 0x047e,
+/* 163 */ FONTDATA_6x10 + 0x0488,
+/* 164 */ FONTDATA_6x10 + 0x0492,
+/* 165 */ FONTDATA_6x10 + 0x049c,
+/* 166 */ FONTDATA_6x10 + 0x04a6,
+/* 167 */ FONTDATA_6x10 + 0x04b0,
+/* 168 */ FONTDATA_6x10 + 0x04ba,
+/* 169 */ FONTDATA_6x10 + 0x04c4,
+/* 170 */ FONTDATA_6x10 + 0x04ce,
+/* 171 */ FONTDATA_6x10 + 0x04d8,
+/* 172 */ FONTDATA_6x10 + 0x04e2,
+/* 173 */ FONTDATA_6x10 + 0x04ec,
+/* 174 */ FONTDATA_6x10 + 0x04f6,
+/* 175 */ FONTDATA_6x10 + 0x0500,
+/* 176 */ FONTDATA_6x10 + 0x050a,
+/* 177 */ FONTDATA_6x10 + 0x0514,
+/* 178 */ FONTDATA_6x10 + 0x051e,
+/* 179 */ FONTDATA_6x10 + 0x0528,
+/* 180 */ FONTDATA_6x10 + 0x0532,
+/* 181 */ FONTDATA_6x10 + 0x053c,
+/* 182 */ FONTDATA_6x10 + 0x0546,
+/* 183 */ FONTDATA_6x10 + 0x0550,
+/* 184 */ FONTDATA_6x10 + 0x055a,
+/* 185 */ FONTDATA_6x10 + 0x0564,
+/* 186 */ FONTDATA_6x10 + 0x056e,
+/* 187 */ FONTDATA_6x10 + 0x0578,
+/* 188 */ FONTDATA_6x10 + 0x0582,
+/* 189 */ FONTDATA_6x10 + 0x058c,
+/* 190 */ FONTDATA_6x10 + 0x0596,
+/* 191 */ FONTDATA_6x10 + 0x05a0,
+/* 192 */ FONTDATA_6x10 + 0x05aa,
+/* 193 */ FONTDATA_6x10 + 0x05b4,
+/* 194 */ FONTDATA_6x10 + 0x05be,
+/* 195 */ FONTDATA_6x10 + 0x05c8,
+/* 196 */ FONTDATA_6x10 + 0x05d2,
+/* 197 */ FONTDATA_6x10 + 0x05dc,
+/* 198 */ FONTDATA_6x10 + 0x05e6,
+/* 199 */ FONTDATA_6x10 + 0x05f0,
+/* 200 */ FONTDATA_6x10 + 0x05fa,
+/* 201 */ FONTDATA_6x10 + 0x0604,
+/* 202 */ FONTDATA_6x10 + 0x060e,
+/* 203 */ FONTDATA_6x10 + 0x0618,
+/* 204 */ FONTDATA_6x10 + 0x0622,
+/* 205 */ FONTDATA_6x10 + 0x062c,
+/* 206 */ FONTDATA_6x10 + 0x0636,
+/* 207 */ FONTDATA_6x10 + 0x0640,
+/* 208 */ FONTDATA_6x10 + 0x064a,
+/* 209 */ FONTDATA_6x10 + 0x0654,
+/* 210 */ FONTDATA_6x10 + 0x065e,
+/* 211 */ FONTDATA_6x10 + 0x0668,
+/* 212 */ FONTDATA_6x10 + 0x0672,
+/* 213 */ FONTDATA_6x10 + 0x067c,
+/* 214 */ FONTDATA_6x10 + 0x0686,
+/* 215 */ FONTDATA_6x10 + 0x0690,
+/* 216 */ FONTDATA_6x10 + 0x069a,
+/* 217 */ FONTDATA_6x10 + 0x06a4,
+/* 218 */ FONTDATA_6x10 + 0x06ae,
+/* 219 */ FONTDATA_6x10 + 0x06b8,
+/* 220 */ FONTDATA_6x10 + 0x06c2,
+/* 221 */ FONTDATA_6x10 + 0x06cc,
+/* 222 */ FONTDATA_6x10 + 0x06d6,
+/* 223 */ FONTDATA_6x10 + 0x06e0,
+/* 224 */ FONTDATA_6x10 + 0x06ea,
+/* 225 */ FONTDATA_6x10 + 0x06f4,
+/* 226 */ FONTDATA_6x10 + 0x06fe,
+/* 227 */ FONTDATA_6x10 + 0x0708,
+/* 228 */ FONTDATA_6x10 + 0x0712,
+/* 229 */ FONTDATA_6x10 + 0x071c,
+/* 230 */ FONTDATA_6x10 + 0x0726,
+/* 231 */ FONTDATA_6x10 + 0x0730,
+/* 232 */ FONTDATA_6x10 + 0x073a,
+/* 233 */ FONTDATA_6x10 + 0x0744,
+/* 234 */ FONTDATA_6x10 + 0x074e,
+/* 235 */ FONTDATA_6x10 + 0x0758,
+/* 236 */ FONTDATA_6x10 + 0x0762,
+/* 237 */ FONTDATA_6x10 + 0x076c,
+/* 238 */ FONTDATA_6x10 + 0x0776,
+/* 239 */ FONTDATA_6x10 + 0x0780,
+/* 240 */ FONTDATA_6x10 + 0x078a,
+/* 241 */ FONTDATA_6x10 + 0x0794,
+/* 242 */ FONTDATA_6x10 + 0x079e,
+/* 243 */ FONTDATA_6x10 + 0x07a8,
+/* 244 */ FONTDATA_6x10 + 0x07b2,
+/* 245 */ FONTDATA_6x10 + 0x07bc,
+/* 246 */ FONTDATA_6x10 + 0x07c6,
+/* 247 */ FONTDATA_6x10 + 0x07d0,
+/* 248 */ FONTDATA_6x10 + 0x07da,
+/* 249 */ FONTDATA_6x10 + 0x07e4,
+/* 250 */ FONTDATA_6x10 + 0x07ee,
+/* 251 */ FONTDATA_6x10 + 0x07f8,
+/* 252 */ FONTDATA_6x10 + 0x0802,
+/* 253 */ FONTDATA_6x10 + 0x080c,
+/* 254 */ FONTDATA_6x10 + 0x0816,
+/* 255 */ FONTDATA_6x10 + 0x0820,
 };
 
 bitmap_data_t   font_data_6x10 = {
     6, 10,     /* width, height */
-    FONTDATA,  /* image */
-    ENCODINGS  /* encoding */
+    FONTDATA_6x10,  /* image */
+    ENCODINGS_6x10  /* encoding */
 };
 
 
