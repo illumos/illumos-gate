@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2011, 2015 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <sys/cpuvar.h>
@@ -1981,7 +1981,7 @@ iscsit_portal_online(iscsit_portal_t *portal)
 			sr.sr_port = port;
 			sr.sr_li = iscsit_global.global_li;
 			sr.sr_conn_ops.icb_rx_scsi_cmd = &iscsit_op_scsi_cmd;
-			sr.sr_conn_ops.icb_rx_scsi_rsp = NULL;
+			sr.sr_conn_ops.icb_rx_scsi_rsp = &iscsit_rx_scsi_rsp;
 			sr.sr_conn_ops.icb_rx_misc = &iscsit_rx_pdu;
 			sr.sr_conn_ops.icb_rx_error = &iscsit_rx_pdu_error;
 			sr.sr_conn_ops.icb_task_aborted = &iscsit_task_aborted;

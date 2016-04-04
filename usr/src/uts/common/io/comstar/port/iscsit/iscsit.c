@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  *
- * Copyright 2014 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2014, 2015 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <sys/cpuvar.h>
@@ -942,6 +942,22 @@ void
 iscsit_rx_pdu_error(idm_conn_t *ic, idm_pdu_t *rx_pdu, idm_status_t status)
 {
 	idm_pdu_complete(rx_pdu, IDM_STATUS_SUCCESS);
+}
+
+/*
+ * iscsit_rx_scsi_rsp -- cause the connection to be closed if response rx'd
+ *
+ * A target sends an SCSI Response PDU, it should never receive one.
+ * This has been seen when running the Codemonicon suite of tests which
+ * does negative testing of the protocol. If such a condition occurs using
+ * a normal initiator it most likely means there's data corruption in the
+ * header and that's grounds for dropping the connection as well.
+ */
+void
+iscsit_rx_scsi_rsp(idm_conn_t *ic, idm_pdu_t *rx_pdu)
+{
+	idm_pdu_complete(rx_pdu, IDM_STATUS_SUCCESS);
+	idm_conn_event(ic, CE_TRANSPORT_FAIL, NULL);
 }
 
 void
@@ -2391,9 +2407,10 @@ iscsit_op_scsi_task_mgmt(iscsit_conn_t *ict, idm_pdu_t *rx_pdu)
 			if (iscsit_cmdsn_in_window(ict, refcmdsn) &&
 			    iscsit_sna_lt(refcmdsn, cmdsn)) {
 				mutex_enter(&ict->ict_sess->ist_sn_mutex);
-				(void) iscsit_remove_pdu_from_queue(
-				    ict->ict_sess, refcmdsn);
-				iscsit_conn_dispatch_rele(ict);
+				if (iscsit_remove_pdu_from_queue(
+				    ict->ict_sess, refcmdsn)) {
+					iscsit_conn_dispatch_rele(ict);
+				}
 				mutex_exit(&ict->ict_sess->ist_sn_mutex);
 				iscsit_send_task_mgmt_resp(tm_resp_pdu,
 				    SCSI_TCP_TM_RESP_COMPLETE);
