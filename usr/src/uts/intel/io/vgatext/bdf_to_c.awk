@@ -24,8 +24,6 @@
 # Copyright (c) 1998-1999 by Sun Microsystems, Inc.
 # All rights reserved.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 BEGIN {
 	pats["0"]="    ";
@@ -94,6 +92,9 @@ $1=="COMMENT" {
 }
 
 $1=="FONT" {
+	font = $2;
+	printf "#include <sys/types.h>\n"
+	printf "#include <sys/font.h>\n\n"
 	printf "/* %s */\n", $0;
 	next;
 }
@@ -207,7 +208,7 @@ $1=="CHARS" {
 
 $1=="STARTCHAR" {
 	if (first) {
-	    printf "unsigned char FONTDATA[] = {\n";
+	    printf "static unsigned char FONTDATA_%s[] = {\n", font;
 	    first = 0;
 	}
 	ignoring = 1;
@@ -245,12 +246,17 @@ $1=="BITMAP" {
 $1=="ENDFONT" {
 	printf "};\n";
 	printf "\n";
-	printf "unsigned char *ENCODINGS[256] = {\n";
+	printf "static unsigned char *ENCODINGS_%s[256] = {\n", font;
 
 	for (i = 0; i < 256; i++) {
 	    if (encoding[i] == -1) encoding[i] = encoding[default_char];
-	    printf "\tFONTDATA+%d,\n", encoding[i];
+	    printf "\tFONTDATA_%s+%d,\n", font, encoding[i];
 	}
+	printf "};\n\n";
+	printf "bitmap_data_t font_data_%s = {\n", font;
+	printf "\t%s, %s,\n", bitswide, rows;
+	printf "\tFONTDATA_%s,\n", font;
+	printf "\tENCODINGS_%s\n", font;
 	printf "};\n";
 	next;
 }

@@ -458,11 +458,11 @@ smb_chk_hostaccess(smb_inaddr_t *ipaddr, char *access_list)
 					if (inet_ntop(AF_INET, &np->n_net, addr,
 					    INET_ADDRSTRLEN) == NULL)
 						break;
-					if (inet_matchaddr(buf.buf, addr))
+					if (inet_matchaddr(buf.buf, addr) == 1)
 						return (response);
 				}
 			} else {
-				if (inet_matchaddr(buf.buf, gr))
+				if (inet_matchaddr(buf.buf, gr) == 1)
 					return (response);
 			}
 
