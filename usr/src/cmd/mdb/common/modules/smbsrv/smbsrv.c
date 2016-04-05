@@ -855,8 +855,6 @@ smbsess_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		    "smb_session_state_t", se->s_state,
 		    "SMB_SESSION_STATE_");
 
-		if (se->ipaddr.a_family == AF_INET)
-			ipaddrstrlen = INET_ADDRSTRLEN;
 		smb_inaddr_ntop(&se->ipaddr, cipaddr, ipaddrstrlen);
 		smb_inaddr_ntop(&se->local_ipaddr, lipaddr, ipaddrstrlen);
 
@@ -881,14 +879,20 @@ smbsess_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			mdb_printf("Number of active Transact.: %u\n\n",
 			    se->s_xa_list.ll_count);
 		} else {
+			/*
+			 * Use a reasonable mininum field width for the
+			 * IP addr so the summary (usually) won't wrap.
+			 */
+			int ipwidth = 22;
+
 			if (DCMD_HDRSPEC(flags)) {
 				mdb_printf(
 			"%<b>%<u>%-?s %-*s %-8s %-8s %-12s%</u>%</b>\n",
-				    "SESSION", ipaddrstrlen, "IP_ADDR",
+				    "SESSION", ipwidth, "IP_ADDR",
 				    "PORT", "DIALECT", "STATE");
 			}
 			mdb_printf("%-?p %-*s %-8d %-8#x %s\n",
-			    addr, ipaddrstrlen, cipaddr,
+			    addr, ipwidth, cipaddr,
 			    se->s_remote_port, se->dialect, state);
 		}
 	}
@@ -3232,7 +3236,7 @@ smb_inaddr_ntop(smb_inaddr_t *ina, char *buf, size_t sz)
 		(void) mdb_snprintf(buf, sz, "%I", ina->a_ipv4);
 		break;
 	case AF_INET6:
-		(void) mdb_snprintf(buf, sz, "%N", ina->a_ipv6);
+		(void) mdb_snprintf(buf, sz, "%N", &ina->a_ipv6);
 		break;
 	default:
 		(void) mdb_snprintf(buf, sz, "(?)");
