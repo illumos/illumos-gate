@@ -19,6 +19,7 @@
 # Copyright 2008, 2012 Richard Lowe
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright (c) 2014, Joyent, Inc.
+# Copyright (c) 2015 by Delphix. All rights reserved.
 #
 
 import getopt
@@ -163,7 +164,9 @@ def git_file_list(parent, paths=None):
 
     ret = set()
     for fname in p:
-        if fname and not fname.isspace() and fname not in ret:
+        res = git("diff %s HEAD %s" % (parent, fname))
+        empty = not res.readline()
+        if fname and not fname.isspace() and fname not in ret and not empty:
             ret.add(fname.strip())
 
     return ret

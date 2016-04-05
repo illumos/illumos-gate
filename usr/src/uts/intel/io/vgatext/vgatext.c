@@ -354,7 +354,7 @@ is_pci_bridge(dev_info_t *dip)
 
 static void
 vgatext_check_for_console(dev_info_t *devi, struct vgatext_softc *softc,
-	int pci_pcie_bus)
+    int pci_pcie_bus)
 {
 	ddi_acc_handle_t pci_conf;
 	dev_info_t *pdevi;
@@ -947,7 +947,7 @@ vgatext_kdsetmode(struct vgatext_softc *softc, int mode)
 /*ARGSUSED*/
 static int
 vgatext_devmap(dev_t dev, devmap_cookie_t dhp, offset_t off, size_t len,
-		size_t *maplen, uint_t model)
+    size_t *maplen, uint_t model)
 {
 	struct vgatext_softc *softc;
 	int err;
@@ -1313,7 +1313,7 @@ vgatext_setfont(struct vgatext_softc *softc)
 {
 	static uchar_t fsreg[8] = {0x0, 0x30, 0x5, 0x35, 0xa, 0x3a, 0xf, 0x3f};
 
-	extern unsigned char *ENCODINGS[];
+	extern bitmap_data_t font_data_8x16;
 	uchar_t *from;
 	uchar_t volatile *to;
 	int	i, j, s;
@@ -1357,7 +1357,7 @@ vgatext_setfont(struct vgatext_softc *softc)
 	s = vga_fontslot;
 	f_offset = s * 8 * 1024;
 	for (i = 0; i < 256; i++) {
-		from = ENCODINGS[i];
+		from = font_data_8x16.encoding[i];
 		to = (unsigned char *)softc->fb.addr + f_offset + i * 0x20;
 		for (j = 0; j < bpc; j++)
 			*to++ = *from++;

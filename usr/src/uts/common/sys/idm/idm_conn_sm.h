@@ -22,6 +22,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 #ifndef	_IDM_CONN_SM_H_
 #define	_IDM_CONN_SM_H_
@@ -218,6 +219,32 @@ static const char *idm_cs_name[CS_MAX_STATE+1] = {
 	"CS_MAX_STATE"
 };
 #endif
+
+/*
+ * Currently the state machine has a condition where idm_login_timeout() is
+ * left active after the connection has been closed. This causes the system
+ * to panic when idm_login_timeout() modifies the freed memory. In an attempt
+ * to isolate and find this issue special attention is being placed on
+ * the ic_state_timeout value. After each untimeout call the value will now
+ * be cleared. Just before the value is set the code will check for 0 and
+ * display an error. One final change is being done in idm_conn_sm_fini() which
+ * if ic_state_machine is not 0, an error message will be displayed and
+ * untimeout() called. That should prevent customer sites from seeing the
+ * panic. The code also calls ASSERT(0) which should cause a panic during
+ * system test.
+ */
+#define	IDM_SM_TIMER_CHECK(ic) \
+	if (ic->ic_state_timeout) { \
+		cmn_err(CE_WARN, "%s: existing timeout still set. " \
+		    "state: %s, last: %s\n", __func__, \
+		    idm_cs_name[ic->ic_state], \
+		    idm_cs_name[ic->ic_last_state]); \
+		ASSERT(0); \
+	}
+
+#define	IDM_SM_TIMER_CLEAR(ic) \
+	(void) untimeout(ic->ic_state_timeout); \
+	ic->ic_state_timeout = 0;
 
 typedef enum {
 	CT_NONE = 0,

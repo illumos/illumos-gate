@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013, Joyent, Inc. All rights reserved.
+ * Copyright 2015 Joyent, Inc. All rights reserved.
  * Copyright 2014 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2014 Igor Kozhukhov <ikozhukhov@gmail.com>.
  */
@@ -389,6 +389,14 @@ typedef struct {
 } sys_zio_cntr_t;
 
 typedef struct {
+	kstat_named_t	zm_zonename;
+	kstat_named_t	zm_pgpgin;
+	kstat_named_t	zm_anonpgin;
+	kstat_named_t	zm_execpgin;
+	kstat_named_t	zm_fspgin;
+} zone_mcap_kstat_t;
+
+typedef struct {
 	kstat_named_t	zm_zonename;	/* full name, kstat truncates name */
 	kstat_named_t	zm_utime;
 	kstat_named_t	zm_stime;
@@ -405,6 +413,8 @@ typedef struct {
 	kstat_named_t	zm_ffnoproc;
 	kstat_named_t	zm_ffnomem;
 	kstat_named_t	zm_ffmisc;
+	kstat_named_t	zm_init_pid;
+	kstat_named_t	zm_boot_time;
 } zone_misc_kstat_t;
 
 typedef struct zone {
@@ -582,6 +592,14 @@ typedef struct zone {
 	rctl_qty_t	zone_nprocs_ctl;	/* current limit protected by */
 						/* zone_rctls->rcs_lock */
 	kstat_t		*zone_nprocs_kstat;
+
+	kmutex_t	zone_mcap_lock;	/* protects mcap statistics */
+	kstat_t		*zone_mcap_ksp;
+	zone_mcap_kstat_t *zone_mcap_stats;
+	uint64_t	zone_pgpgin;		/* pages paged in */
+	uint64_t	zone_anonpgin;		/* anon pages paged in */
+	uint64_t	zone_execpgin;		/* exec pages paged in */
+	uint64_t	zone_fspgin;		/* fs pages paged in */
 
 	/*
 	 * Misc. kstats and counters for zone cpu-usage aggregation.

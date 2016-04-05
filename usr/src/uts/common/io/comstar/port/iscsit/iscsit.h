@@ -650,6 +650,7 @@ iscsit_text_cmd_fini(iscsit_conn_t *ict);
 idm_rx_pdu_cb_t		iscsit_op_scsi_cmd;
 idm_rx_pdu_cb_t		iscsit_rx_pdu;
 idm_rx_pdu_error_cb_t	iscsit_rx_pdu_error;
+idm_rx_pdu_cb_t		iscsit_rx_scsi_rsp;
 idm_task_cb_t		iscsit_task_aborted;
 idm_client_notify_cb_t	iscsit_client_notify;
 idm_build_hdr_cb_t	iscsit_build_hdr;
