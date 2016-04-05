@@ -27,8 +27,6 @@
 #ifndef _SYS_FBIO_H
 #define	_SYS_FBIO_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SunOS4.1.2 5.49 */
-
 #include <sys/types.h>
 
 #ifdef	__cplusplus
@@ -91,9 +89,9 @@ struct	fbcmap {
 struct	fbcmap32 {
 	int32_t		index;		/* first element (0 origin) */
 	int32_t		count;		/* number of elements */
-	caddr32_t 	red;		/* red color map elements */
-	caddr32_t 	green;		/* green color map elements */
-	caddr32_t 	blue;		/* blue color map elements */
+	caddr32_t	red;		/* red color map elements */
+	caddr32_t	green;		/* green color map elements */
+	caddr32_t	blue;		/* blue color map elements */
 };
 
 #endif	/* _SYSCALL32 */
@@ -299,6 +297,20 @@ struct fb_wid_dbl_info {
 #define	FBIO_FULLSCREEN_ELIMINATION_GROUPS	(FIOC|36)
 #define	FBIO_WID_DBL_SET	(FIOC|37)
 #define	FBIOVRTOFFSET	(FIOC|38)
+
+struct gfxfb_info {
+	uint16_t terminal_origin_x;
+	uint16_t terminal_origin_y;
+	uint32_t pitch;
+	uint16_t font_width;
+	uint16_t font_height;
+	uint8_t red_mask_size;
+	uint8_t red_field_position;
+	uint8_t green_mask_size;
+	uint8_t green_field_position;
+	uint8_t blue_mask_size;
+	uint8_t blue_field_position;
+};
 
 struct cg6_info {
 	ushort_t  accessible_width;	/* accessible bytes in scanline */
