@@ -609,6 +609,15 @@ typedef struct {
 	uint8_t lr_rsvd3[16];
 } nvme_lba_range_type_t;
 
+/* Volatile Write Cache Feature */
+typedef union {
+	struct {
+		uint32_t wc_wce:1;	/* Volatile Write Cache Enable */
+		uint32_t wc_rsvd:31;
+	} b;
+	uint32_t r;
+} nvme_write_cache_t;
+
 /* Number of Queues */
 typedef union {
 	struct {

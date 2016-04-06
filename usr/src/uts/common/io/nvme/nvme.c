@@ -147,13 +147,14 @@
  * - io-queue-len: the maximum length of the I/O queues (16-65536)
  * - async-event-limit: the maximum number of asynchronous event requests to be
  *   posted by the driver
+ * - volatile-write-cache-enable: can be set to 0 to disable the volatile write
+ *   cache
  *
  *
  * TODO:
  * - figure out sane default for I/O queue depth reported to blkdev
  * - polled I/O support to support kernel core dumping
  * - FMA handling of media errors
- * - support for the Volatile Write Cache
  * - support for devices supporting very large I/O requests using chained PRPs
  * - support for querying log pages from user space
  * - support for configuring hardware parameters like interrupt coalescing
@@ -227,6 +228,9 @@ static void nvme_abort_cmd(nvme_cmd_t *);
 static int nvme_async_event(nvme_t *);
 static void *nvme_get_logpage(nvme_t *, uint8_t, ...);
 static void *nvme_identify(nvme_t *, uint32_t);
+static boolean_t nvme_set_features(nvme_t *, uint32_t, uint8_t, uint32_t,
+    uint32_t *);
+static boolean_t nvme_write_cache_set(nvme_t *, boolean_t);
 static int nvme_set_nqueues(nvme_t *, uint16_t);
 
 static void nvme_free_dma(nvme_dma_t *);
@@ -1611,36 +1615,81 @@ fail:
 	return (buf);
 }
 
-static int
-nvme_set_nqueues(nvme_t *nvme, uint16_t nqueues)
+static boolean_t
+nvme_set_features(nvme_t *nvme, uint32_t nsid, uint8_t feature, uint32_t val,
+    uint32_t *res)
 {
+	_NOTE(ARGUNUSED(nsid));
 	nvme_cmd_t *cmd = nvme_alloc_cmd(nvme, KM_SLEEP);
-	nvme_nqueue_t nq = { 0 };
+	boolean_t ret = B_FALSE;
 
-	nq.b.nq_nsq = nq.b.nq_ncq = nqueues - 1;
+	ASSERT(res != NULL);
 
 	cmd->nc_sqid = 0;
 	cmd->nc_callback = nvme_wakeup_cmd;
 	cmd->nc_sqe.sqe_opc = NVME_OPC_SET_FEATURES;
-	cmd->nc_sqe.sqe_cdw10 = NVME_FEAT_NQUEUES;
-	cmd->nc_sqe.sqe_cdw11 = nq.r;
+	cmd->nc_sqe.sqe_cdw10 = feature;
+	cmd->nc_sqe.sqe_cdw11 = val;
+
+	switch (feature) {
+	case NVME_FEAT_WRITE_CACHE:
+		if (!nvme->n_write_cache_present)
+			goto fail;
+		break;
+
+	case NVME_FEAT_NQUEUES:
+		break;
+
+	default:
+		goto fail;
+	}
 
 	if (nvme_admin_cmd(cmd, nvme_admin_cmd_timeout) != DDI_SUCCESS) {
 		dev_err(nvme->n_dip, CE_WARN,
-		    "!nvme_admin_cmd failed for SET FEATURES (NQUEUES)");
-		return (0);
+		    "!nvme_admin_cmd failed for SET FEATURES");
+		return (ret);
 	}
 
 	if (nvme_check_cmd_status(cmd)) {
 		dev_err(nvme->n_dip, CE_WARN,
-		    "!SET FEATURES (NQUEUES) failed with sct = %x, sc = %x",
-		    cmd->nc_cqe.cqe_sf.sf_sct, cmd->nc_cqe.cqe_sf.sf_sc);
-		nvme_free_cmd(cmd);
-		return (0);
+		    "!SET FEATURES %d failed with sct = %x, sc = %x",
+		    feature, cmd->nc_cqe.cqe_sf.sf_sct,
+		    cmd->nc_cqe.cqe_sf.sf_sc);
+		goto fail;
 	}
 
-	nq.r = cmd->nc_cqe.cqe_dw0;
+	*res = cmd->nc_cqe.cqe_dw0;
+	ret = B_TRUE;
+
+fail:
 	nvme_free_cmd(cmd);
+	return (ret);
+}
+
+static boolean_t
+nvme_write_cache_set(nvme_t *nvme, boolean_t enable)
+{
+	nvme_write_cache_t nwc = { 0 };
+
+	if (enable)
+		nwc.b.wc_wce = 1;
+
+	if (!nvme_set_features(nvme, 0, NVME_FEAT_WRITE_CACHE, nwc.r, &nwc.r))
+		return (B_FALSE);
+
+	return (B_TRUE);
+}
+
+static int
+nvme_set_nqueues(nvme_t *nvme, uint16_t nqueues)
+{
+	nvme_nqueue_t nq = { 0 };
+
+	nq.b.nq_nsq = nq.b.nq_ncq = nqueues - 1;
+
+	if (!nvme_set_features(nvme, 0, NVME_FEAT_NQUEUES, nq.r, &nq.r)) {
+		return (0);
+	}
 
 	/*
 	 * Always use the same number of submission and completion queues, and
@@ -2049,19 +2098,31 @@ nvme_init(nvme_t *nvme)
 
 	/*
 	 * Check for the presence of a Volatile Write Cache. If present,
-	 * enable it by default.
+	 * enable or disable based on the value of the property
+	 * volatile-write-cache-enable (default is enabled).
 	 */
-	if (nvme->n_idctl->id_vwc.vwc_present == 0) {
-		nvme->n_volatile_write_cache_enabled = B_FALSE;
-		nvme_bd_ops.o_sync_cache = NULL;
-	} else {
+	nvme->n_write_cache_present =
+	    nvme->n_idctl->id_vwc.vwc_present == 0 ? B_FALSE : B_TRUE;
+
+	(void) ddi_prop_update_int(DDI_DEV_T_NONE, nvme->n_dip,
+	    "volatile-write-cache-present",
+	    nvme->n_write_cache_present ? 1 : 0);
+
+	if (!nvme->n_write_cache_present) {
+		nvme->n_write_cache_enabled = B_FALSE;
+	} else if (!nvme_write_cache_set(nvme, nvme->n_write_cache_enabled)) {
+		dev_err(nvme->n_dip, CE_WARN,
+		    "!failed to %sable volatile write cache",
+		    nvme->n_write_cache_enabled ? "en" : "dis");
 		/*
-		 * TODO: send SET FEATURES to enable VWC
-		 * (have no hardware to test this)
+		 * Assume the cache is (still) enabled.
 		 */
-		nvme->n_volatile_write_cache_enabled = B_FALSE;
-		nvme_bd_ops.o_sync_cache = NULL;
+		nvme->n_write_cache_enabled = B_TRUE;
 	}
+
+	(void) ddi_prop_update_int(DDI_DEV_T_NONE, nvme->n_dip,
+	    "volatile-write-cache-enable",
+	    nvme->n_write_cache_enabled ? 1 : 0);
 
 	/*
 	 * Grab a copy of all mandatory log pages.
@@ -2427,6 +2488,9 @@ nvme_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	nvme->n_async_event_limit = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
 	    DDI_PROP_DONTPASS, "async-event-limit",
 	    NVME_DEFAULT_ASYNC_EVENT_LIMIT);
+	nvme->n_write_cache_enabled = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
+	    DDI_PROP_DONTPASS, "volatile-write-cache-enable", 1) != 0 ?
+	    B_TRUE : B_FALSE;
 
 	if (nvme->n_admin_queue_len < NVME_MIN_ADMIN_QUEUE_LEN)
 		nvme->n_admin_queue_len = NVME_MIN_ADMIN_QUEUE_LEN;
@@ -2889,11 +2953,16 @@ nvme_bd_sync(void *arg, bd_xfer_t *xfer)
 		return (EIO);
 
 	/*
-	 * If the volatile write cache isn't enabled the FLUSH command is a
-	 * no-op, so we can take a shortcut here.
+	 * If the volatile write cache is not present or not enabled the FLUSH
+	 * command is a no-op, so we can take a shortcut here.
 	 */
-	if (ns->ns_nvme->n_volatile_write_cache_enabled == B_FALSE) {
+	if (!ns->ns_nvme->n_write_cache_present) {
 		bd_xfer_done(xfer, ENOTSUP);
+		return (0);
+	}
+
+	if (!ns->ns_nvme->n_write_cache_enabled) {
+		bd_xfer_done(xfer, 0);
 		return (0);
 	}
 

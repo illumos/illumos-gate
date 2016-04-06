@@ -9,9 +9,9 @@
 .\" http://www.illumos.org/license/CDDL.
 .\"
 .\"
-.\" Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+.\" Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
 .\"
-.Dd July 20, 2015
+.Dd May 13, 2016
 .Dt NVME 7D
 .Os
 .Sh NAME
@@ -63,6 +63,10 @@ the driver. Asynchronous events are used to report error conditions.
 The driver will never use more asynchronous events than this value, or
 what the hardware supports if it is less, or what 1/10th of the admin
 queue length if it is less.
+.It Va volatile-write-cache-enable
+This property can be set to 0 to disable the volatile write cache, if
+the hardware supports it.
+The default setting is 1, which enables the volatile write cache.
 .El
 .
 .Sh FILES
