@@ -29,6 +29,7 @@
 /*
  * Copyright (c) 2012 by Delphix. All rights reserved.
  * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2016 James S. Blachly, MD. All rights reserved.
  */
 
 #include <stdio.h>
@@ -1270,7 +1271,7 @@ do_args(int argc, char **argv)
 void
 do_format(void)
 {
-	char	header[SMALL_SCRATCH_BUFLEN];
+	char	header[SMALL_SCRATCH_BUFLEN] = {0};
 	char 	ch;
 	char 	iosz;
 	const char    *fstr;
@@ -1283,8 +1284,7 @@ do_format(void)
 			(void) sprintf(header, "s/w h/w trn tot ");
 		} else
 			(void) sprintf(header, "s/w,h/w,trn,tot");
-	} else
-		*header = NULL;
+	}
 	switch (do_disk & DISK_IO_MASK) {
 		case DISK_OLD:
 			if (do_raw == 0)
@@ -1321,8 +1321,15 @@ do_format(void)
 					    sizeof (disk_header),
 					    "device,r/%c,w/%c,%cr/%c,%cw/%c,"
 					    "wait,actv,svc_t,%%%%w,"
-					    "%%%%b,%s",
-					    ch, ch, iosz, ch, iosz, ch, header);
+					    "%%%%b%s%s",
+					    ch, ch, iosz, ch, iosz, ch,
+					    *header == '\0' ? "" : ",",
+					    header);
+					/*
+					 * if no -e flag, header == '\0...'
+					 * Ternary operator above is to prevent
+					 * trailing comma in full disk_header
+					 */
 				}
 			} else {
 				/* with -n option */
@@ -1334,6 +1341,18 @@ do_format(void)
 					fstr = "r/%c,w/%c,%cr/%c,%cw/%c,"
 					    "wait,actv,wsvc_t,asvc_t,"
 					    "%%%%w,%%%%b,%sdevice";
+					/*
+					 * if -rnxe, "tot" (from -e) and
+					 * "device" are run together
+					 * due to lack of trailing comma
+					 * in 'header'. However, adding
+					 * trailing comma to header at
+					 * its definition leads to prob-
+					 * lems elsewhere so it's added
+					 * here in this edge case -rnxe
+					 */
+					if (*header != '\0')
+						(void) strcat(header, ",");
 				}
 				(void) snprintf(disk_header,
 				    sizeof (disk_header),
