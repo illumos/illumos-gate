@@ -71,6 +71,12 @@ length if it is less.
 This property can be set to 0 to disable the volatile write cache, if
 the hardware supports it.
 The default setting is 1, which enables the volatile write cache.
+.It Va min-phys-block-size
+This is the minimum physical block size that is reported to
+.Xr blkdev 7d .
+This value must be a power of 2 greater than or equal to 512.
+If the device reports a best block size larger than what is
+specified here the driver will ignore the value specified here.
 .El
 .
 .Sh FILES

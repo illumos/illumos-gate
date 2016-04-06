@@ -149,6 +149,8 @@
  *   posted by the driver
  * - volatile-write-cache-enable: can be set to 0 to disable the volatile write
  *   cache
+ * - min-phys-block-size: the minimum physical block size to report to blkdev,
+ *   which is among other things the basis for ZFS vdev ashift
  *
  *
  * TODO:
@@ -2181,6 +2183,10 @@ nvme_init(nvme_t *nvme)
 			    1 << idns->id_lbaf[j].lbaf_lbads;
 		}
 
+		if (nvme->n_ns[i].ns_best_block_size < nvme->n_min_block_size)
+			nvme->n_ns[i].ns_best_block_size =
+			    nvme->n_min_block_size;
+
 		/*
 		 * We currently don't support namespaces that use either:
 		 * - thin provisioning
@@ -2491,6 +2497,18 @@ nvme_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	nvme->n_write_cache_enabled = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
 	    DDI_PROP_DONTPASS, "volatile-write-cache-enable", 1) != 0 ?
 	    B_TRUE : B_FALSE;
+	nvme->n_min_block_size = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
+	    DDI_PROP_DONTPASS, "min-phys-block-size",
+	    NVME_DEFAULT_MIN_BLOCK_SIZE);
+
+	if (!ISP2(nvme->n_min_block_size) ||
+	    (nvme->n_min_block_size < NVME_DEFAULT_MIN_BLOCK_SIZE)) {
+		dev_err(dip, CE_WARN, "!min-phys-block-size %s, "
+		    "using default %d", ISP2(nvme->n_min_block_size) ?
+		    "too low" : "not a power of 2",
+		    NVME_DEFAULT_MIN_BLOCK_SIZE);
+		nvme->n_min_block_size = NVME_DEFAULT_MIN_BLOCK_SIZE;
+	}
 
 	if (nvme->n_admin_queue_len < NVME_MIN_ADMIN_QUEUE_LEN)
 		nvme->n_admin_queue_len = NVME_MIN_ADMIN_QUEUE_LEN;
