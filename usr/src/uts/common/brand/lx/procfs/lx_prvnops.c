@@ -3590,7 +3590,7 @@ lxpr_read_meminfo(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
 	zone_t *zone = LXPTOZ(lxpnp);
 	int global = zone == global_zone;
-	long total_mem, free_mem, total_swap, used_swap;
+	long total_mem, free_mem, total_swap;
 
 	ASSERT(lxpnp->lxpr_type == LXPR_MEMINFO);
 
@@ -3604,14 +3604,19 @@ lxpr_read_meminfo(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 
 	if (global || zone->zone_max_swap_ctl == UINT64_MAX) {
 		total_swap = k_anoninfo.ani_max * PAGESIZE;
-		used_swap = k_anoninfo.ani_phys_resv * PAGESIZE;
 	} else {
 		mutex_enter(&zone->zone_mem_lock);
 		total_swap = zone->zone_max_swap_ctl;
-		used_swap = zone->zone_max_swap;
 		mutex_exit(&zone->zone_mem_lock);
 	}
 
+	/*
+	 * SwapFree
+	 * On illumos we reserve swap up front, whereas on Linux they just
+	 * wing it and kill a random process if they run out of backing store
+	 * for virtual memory. Our swap reservation doesn't translate to that
+	 * model, so just inform the caller that no swap is being used.
+	 */
 	lxpr_uiobuf_printf(uiobuf,
 	    "MemTotal:  %8lu kB\n"
 	    "MemFree:   %8lu kB\n"
@@ -3640,7 +3645,7 @@ lxpr_read_meminfo(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	    btok(total_mem),				/* LowTotal */
 	    btok(free_mem),				/* LowFree */
 	    btok(total_swap),				/* SwapTotal */
-	    btok(total_swap - used_swap));		/* SwapFree */
+	    btok(total_swap));				/* SwapFree */
 }
 
 /*
@@ -4176,7 +4181,8 @@ lxpr_read_stat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
  *
  * We don't support swap files or partitions, but some programs like to look
  * here just to check we have some swap on the system, so we lie and show
- * our entire swap cap as one swap partition.
+ * our entire swap cap as one swap partition. See lxpr_read_meminfo for an
+ * explanation on why we report 0 used swap.
  *
  * It is important to use formatting identical to the Linux implementation
  * so that consumers do not break. See swap_show() in mm/swapfile.c.
@@ -4188,11 +4194,15 @@ lxpr_read_swaps(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	zone_t *zone = curzone;
 	uint64_t totswap, usedswap;
 
-	mutex_enter(&zone->zone_mem_lock);
-	/* Uses units of 1 kb (2^10). */
-	totswap = zone->zone_max_swap_ctl >> 10;
-	usedswap = zone->zone_max_swap >> 10;
-	mutex_exit(&zone->zone_mem_lock);
+	if (zone == global_zone || zone->zone_max_swap_ctl == UINT64_MAX) {
+		totswap = (k_anoninfo.ani_max * PAGESIZE) >> 10;
+	} else {
+		mutex_enter(&zone->zone_mem_lock);
+		/* Uses units of 1 kb (2^10). */
+		totswap = zone->zone_max_swap_ctl >> 10;
+		mutex_exit(&zone->zone_mem_lock);
+	}
+	usedswap = 0;
 
 	lxpr_uiobuf_printf(uiobuf,
 	    "Filename\t\t\t\tType\t\tSize\tUsed\tPriority\n");
