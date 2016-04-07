@@ -1831,6 +1831,7 @@ zone_mcap_kstat_update(kstat_t *ksp, int rw)
 	zmp->zm_anonpgin.value.ui64 = zone->zone_anonpgin;
 	zmp->zm_execpgin.value.ui64 = zone->zone_execpgin;
 	zmp->zm_fspgin.value.ui64 = zone->zone_fspgin;
+	zmp->zm_anon_alloc_fail.value.ui64 = zone->zone_anon_alloc_fail;
 
 	return (0);
 }
@@ -1862,6 +1863,8 @@ zone_mcap_kstat_create(zone_t *zone)
 	kstat_named_init(&zmp->zm_anonpgin, "anonpgin", KSTAT_DATA_UINT64);
 	kstat_named_init(&zmp->zm_execpgin, "execpgin", KSTAT_DATA_UINT64);
 	kstat_named_init(&zmp->zm_fspgin, "fspgin", KSTAT_DATA_UINT64);
+	kstat_named_init(&zmp->zm_anon_alloc_fail, "anon_alloc_fail",
+	    KSTAT_DATA_UINT64);
 
 	ksp->ks_update = zone_mcap_kstat_update;
 	ksp->ks_private = zone;

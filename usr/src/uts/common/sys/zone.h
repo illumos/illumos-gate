@@ -388,6 +388,7 @@ typedef struct {
 	kstat_named_t	zm_anonpgin;
 	kstat_named_t	zm_execpgin;
 	kstat_named_t	zm_fspgin;
+	kstat_named_t	zm_anon_alloc_fail;
 } zone_mcap_kstat_t;
 
 typedef struct {
@@ -574,6 +575,7 @@ typedef struct zone {
 	uint64_t	zone_anonpgin;		/* anon pages paged in */
 	uint64_t	zone_execpgin;		/* exec pages paged in */
 	uint64_t	zone_fspgin;		/* fs pages paged in */
+	uint64_t	zone_anon_alloc_fail;	/* cnt of anon alloc fails */
 
 	/*
 	 * Misc. kstats and counters for zone cpu-usage aggregation.
