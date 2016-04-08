@@ -12,11 +12,11 @@
 #
 # Copyright 2011 Nexenta Systems, Inc. All rights reserved.
 # Copyright (c) 2014 Joyent, Inc. All rights reserved.
-# Copyright 2015 OmniTI Computer Consulting, Inc. All rights reserved.
+# Copyright 2016 OmniTI Computer Consulting, Inc. All rights reserved.
 #
 
 set name=pkg.fmri \
-    value=pkg:/system/data/zoneinfo@2015.7,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
+    value=pkg:/system/data/zoneinfo@2016.3,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
 set name=pkg.description value="timezone information"
 set name=pkg.summary value="Timezone Information"
 set name=info.classification value=org.opensolaris.category.2008:System/Core
@@ -186,7 +186,6 @@ file path=usr/share/lib/zoneinfo/America/Recife
 file path=usr/share/lib/zoneinfo/America/Regina
 file path=usr/share/lib/zoneinfo/America/Resolute
 file path=usr/share/lib/zoneinfo/America/Rio_Branco
-file path=usr/share/lib/zoneinfo/America/Santa_Isabel
 file path=usr/share/lib/zoneinfo/America/Santarem
 file path=usr/share/lib/zoneinfo/America/Santiago
 file path=usr/share/lib/zoneinfo/America/Santo_Domingo
@@ -230,6 +229,7 @@ file path=usr/share/lib/zoneinfo/Asia/Ashgabat
 file path=usr/share/lib/zoneinfo/Asia/Baghdad
 file path=usr/share/lib/zoneinfo/Asia/Baku
 file path=usr/share/lib/zoneinfo/Asia/Bangkok
+file path=usr/share/lib/zoneinfo/Asia/Barnaul
 file path=usr/share/lib/zoneinfo/Asia/Beirut
 file path=usr/share/lib/zoneinfo/Asia/Bishkek
 file path=usr/share/lib/zoneinfo/Asia/Brunei
@@ -353,6 +353,7 @@ file path=usr/share/lib/zoneinfo/Etc/UCT
 file path=usr/share/lib/zoneinfo/Etc/UTC
 file path=usr/share/lib/zoneinfo/Europe/Amsterdam
 file path=usr/share/lib/zoneinfo/Europe/Andorra
+file path=usr/share/lib/zoneinfo/Europe/Astrakhan
 file path=usr/share/lib/zoneinfo/Europe/Athens
 file path=usr/share/lib/zoneinfo/Europe/Belgrade
 file path=usr/share/lib/zoneinfo/Europe/Berlin
@@ -387,6 +388,7 @@ file path=usr/share/lib/zoneinfo/Europe/Stockholm
 file path=usr/share/lib/zoneinfo/Europe/Tallinn
 file path=usr/share/lib/zoneinfo/Europe/Tirane
 file path=usr/share/lib/zoneinfo/Europe/Tiraspol
+file path=usr/share/lib/zoneinfo/Europe/Ulyanovsk
 file path=usr/share/lib/zoneinfo/Europe/Uzhgorod
 file path=usr/share/lib/zoneinfo/Europe/Vaduz
 file path=usr/share/lib/zoneinfo/Europe/Vienna
@@ -546,6 +548,8 @@ hardlink path=usr/share/lib/zoneinfo/America/Porto_Acre \
     target=../America/Rio_Branco
 hardlink path=usr/share/lib/zoneinfo/America/Rosario \
     target=../America/Argentina/Cordoba
+hardlink path=usr/share/lib/zoneinfo/America/Santa_Isabel \
+    target=../America/Tijuana
 hardlink path=usr/share/lib/zoneinfo/America/Shiprock target=../America/Denver
 hardlink path=usr/share/lib/zoneinfo/America/St_Barthelemy \
     target=../America/Guadeloupe
