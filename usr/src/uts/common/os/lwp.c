@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright 2015, Joyent, Inc.
+ * Copyright 2016, Joyent, Inc.
  */
 
 #include <sys/param.h>
@@ -860,15 +860,17 @@ lwp_ctmpl_copy(klwp_t *dst, klwp_t *src)
 
 		/*
 		 * If the process contract template is setup to be preserved
-		 * across exec, then perform an implicit template_clear now
-		 * since we're forking. This ensures that future children of
+		 * across exec, then if we're forking, perform an implicit
+		 * template_clear now. This ensures that future children of
 		 * this child will remain in the same contract unless they're
-		 * explicitly setup differently.
+		 * explicitly setup differently. We know we're forking if the
+		 * two LWPs belong to different processes.
 		 */
 		if (i == CTT_PROCESS && tmpl != NULL) {
 			ctmpl_process_t *ctp = tmpl->ctmpl_data;
 
-			if ((ctp->ctp_params & CT_PR_KEEP_EXEC) != 0)
+			if (dst->lwp_procp != src->lwp_procp &&
+			    (ctp->ctp_params & CT_PR_KEEP_EXEC) != 0)
 				tmpl = NULL;
 		}
 
