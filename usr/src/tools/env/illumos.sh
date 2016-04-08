@@ -180,8 +180,9 @@ export PKGFMT_OUTPUT='v1'
 # one problem.
 export MAKEFLAGS='k'
 
-# Magic variable to prevent the devpro compilers/teamware from sending
-# mail back to devpro on every use.
+# Magic variables to prevent the devpro compilers/teamware from checking
+# for updates or sending mail back to devpro on every use.
+export SUNW_NO_UPDATE_NOTIFY='1'
 export UT_NO_USAGE_TRACKING='1'
 
 # Build tools - don't change these unless you know what you're doing.  These
