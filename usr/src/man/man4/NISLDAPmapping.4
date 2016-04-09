@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH NISLDAPMAPPING 4 "Mar 29, 2006"
+.TH NISLDAPMAPPING 4 "April 9, 2016"
 .SH NAME
 NISLDAPmapping \- mapping file used by the NIS server components
 .SH SYNOPSIS
@@ -13,7 +13,6 @@ NISLDAPmapping \- mapping file used by the NIS server components
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBNISLDAPmapping\fR file specifies the mapping between NIS map entries and
 equivalent Directory Information Tree (DIT) entries. The syntax of this file is
@@ -44,7 +43,7 @@ values) takes precedence.
 .LP
 A continuation is indicated by a '\e' (backslash) in the last position,
 immediately before the newline of a line. Characters are escaped, that is,
-exempted from special interpretation, when preceeded by a backslash character.
+exempted from special interpretation, when preceded by a backslash character.
 .sp
 .LP
 The '#' (hash) character starts a comment. White space is either ASCII space or
@@ -52,7 +51,6 @@ a horizontal tab. In general, lines consist of optional white space, an
 attribute name, at least one white space character, and an attribute value.
 .SH EXTENDED DESCRIPTION
 .SS "File Syntax"
-.sp
 .LP
 Repeated fields, with separator characters, are described by the following
 syntax:
@@ -88,7 +86,6 @@ entry[":"...]
 .RE
 
 .SS "Attributes"
-.sp
 .LP
 Attributes generally apply to one more more NIS maps. Map names can be
 specified either on their own,that is in \fBpasswd.byname\fR, in which case
@@ -479,7 +476,7 @@ fields.
 \fB\fBrf_comment\fR\fR
 .ad
 .RS 18n
-Everything following the first occurance of a symbol. \fBrf_comment\fR is
+Everything following the first occurrence of a symbol. \fBrf_comment\fR is
 defined by \fBnisLDAPcommentChar\fR.
 .RE
 
@@ -745,7 +742,6 @@ field name are ignored when information is mapped into the DIT.
 .RE
 
 .SS "Field and Attribute Conversion Syntax"
-.sp
 .LP
 The general format of a \fBfieldattrspec\fR is:
 .sp
@@ -967,7 +963,7 @@ performed without checking if read and write are enabled for the LDAP container
 or NIS map.
 .sp
 .LP
-The ommision of the \fBnamespec\fR in an \fBrhs\fR is only allowed if the
+The omission of the \fBnamespec\fR in an \fBrhs\fR is only allowed if the
 \fBlhs\fR is one or more attributes. The effect is to delete the specified
 attribute(s). In all other situations, an omitted \fBnamespec\fR means that the
 rule is ignored.
@@ -1015,7 +1011,6 @@ If there is an error when evaluating a certain \fBfieldattrspec\fR, including
 retrieval or assignment of entry or field values, the extent to which the other
 \fBfieldattrspec\fR rules are evaluated is unspecified.
 .SS "Wildcards"
-.sp
 .LP
 Where wildcard support is available, it is of the following limited form:
 .sp
@@ -1050,7 +1045,6 @@ Matches any character in the range x to y, inclusive
 Combinations such as \fB[a-cA-C0123]\fR are also allowed, which would match any
 one of a, b, c, A, B, C, 0, 1, 2, or 3.
 .SS "Substring Extraction"
-.sp
 .in +2
 .nf
 substringextract = "(" namespec "," matchspec ")"
@@ -1109,7 +1103,6 @@ way to specify that special case is:
 .in -2
 
 .SS "Values"
-.sp
 .in +2
 .nf
 lval            = "(" formatspec "," namespec *("," namespec) ")"
@@ -1281,7 +1274,6 @@ Remove value of \fBmyName\fR from value \fBmyAliases\fR
 This results in the field values \fBmyName\fR is set to \fBfoo\fR, and
 \fBmyAliases\fR is set to \fBfoo1 foo2\fR.
 .SS "Assignments"
-.sp
 .LP
 The assignment syntax, also found at Field and Attribute Conversion Syntax, is
 as follows:
@@ -1477,7 +1469,6 @@ instance of \fBmgrprfc822mailmember\fR:
 .in -2
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/var/yp/NISLDAPmapping\fR\fR
@@ -1487,7 +1478,6 @@ Mapping file used by the NIS server components
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -1503,7 +1493,6 @@ Interface Stability 	Obsolete
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBinityp2l\fR(1M), \fBmakedbm\fR(1M), \fBypserv\fR(1M),
 \fBber_printf\fR(3LDAP), \fBsprintf\fR(3C), \fBsscanf\fR(3C),
