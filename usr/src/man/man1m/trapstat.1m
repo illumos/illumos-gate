@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH TRAPSTAT 1M "May 11, 2004"
+.TH TRAPSTAT 1M "April 9, 2016"
 .SH NAME
 trapstat \- report trap statistics
 .SH SYNOPSIS
@@ -20,7 +20,6 @@ trapstat \- report trap statistics
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBtrapstat\fR utility gathers and displays run-time trap statistics on
 UltraSPARC-based systems. The default output is a table of trap types and
@@ -28,7 +27,7 @@ UltraSPARC-based systems. The default output is a table of trap types and
 column of the table denoting a \fBCPU\fR. If standard output is a terminal, the
 table contains as many columns of data as can fit within the terminal width; if
 standard output is not a terminal, the table contains at most six columns of
-data. By default, data is gathered and and displayed for all \fBCPU\fRs; if the
+data. By default, data is gathered and displayed for all \fBCPU\fRs; if the
 data cannot fit in a single table, it is printed across multiple tables. The
 set of \fBCPU\fRs for which data is gathered and displayed can be optionally
 specified with the \fB-c\fR or \fB-C\fR option.
@@ -76,7 +75,6 @@ provides in-depth TLB miss information broken down by page size using the
 of that provided by the \fB-t\fR option; only one of \fB-t\fR and \fB-T\fR can
 be specified.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -576,7 +574,6 @@ example# \fBtrapstat -e level-10 -P -r 1000\fR
 .sp
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -593,7 +590,6 @@ Interface Stability
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBlockstat\fR(1M), \fBpmap\fR(1), \fBpsrset\fR(1M), \fBpsrinfo\fR(1M),
 \fBpbind\fR(1M), \fBppgsz\fR(1), \fBgetpagesizes\fR(3C)
@@ -604,7 +600,6 @@ Interface Stability
 .LP
 \fIThe SPARC Architecture Manual, Version 9,\fR 1994, Prentice-Hall.
 .SH NOTES
-.sp
 .LP
 When enabled, \fBtrapstat\fR induces a varying probe effect, depending on the
 type of information collected. While the precise probe effect depends upon the

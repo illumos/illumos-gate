@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SVCPROP 1 "Sep 13, 2007"
+.TH SVCPROP 1 "April 9, 2016"
 .SH NAME
 svcprop \- retrieve values of service configuration properties
 .SH SYNOPSIS
@@ -20,7 +20,6 @@ svcprop \- retrieve values of service configuration properties
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBsvcprop\fR utility prints values of properties in the service
 configuration repository. Properties are selected by \fB-p\fR options and the
@@ -36,7 +35,6 @@ instance's directly attached properties. See \fBsmf\fR(5) for an explanation of
 property composition. If the \fBrunning\fR snapshot does not exist then the
 instance's directly attached properties are used instead.
 .SS "Output Format"
-.sp
 .LP
 By default, when a single property is selected, the values for each are printed
 on separate lines. Empty \fBASCII\fR string values are represented by a pair of
@@ -64,7 +62,6 @@ due to access controls, an error results.
 .LP
 Error messages are printed to the standard error stream.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -177,7 +174,6 @@ Uses properties from the service or instance in the specified \fIzone\fR.
 This option is only applicable from the global zone, see \fBzones\fR(5).
 
 .SH OPERANDS
-.sp
 .LP
 The following operands are supported:
 .sp
@@ -294,7 +290,7 @@ general/single_instance boolean true
 .sp
 
 .LP
-\fBExample 4 \fRTesting the Existance of a Property
+\fBExample 4 \fRTesting the Existence of a Property
 .sp
 .LP
 The following example tests the existence of the \fBgeneral/enabled\fR property
@@ -371,7 +367,6 @@ svcprop -p $1 $2 | (
 .sp
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -402,7 +397,6 @@ Invalid command line options were specified.
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBsvcs\fR(1), \fBinetd\fR(1M), \fBsvcadm\fR(1M), \fBsvccfg\fR(1M),
 \fBsvc.startd\fR(1M), \fBservice_bundle\fR(4), \fBattributes\fR(5),

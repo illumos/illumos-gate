@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH CSH 1 "Jul 27, 2007"
+.TH CSH 1 "April 9, 2016"
 .SH NAME
 csh \- shell command interpreter with a C-like syntax
 .SH SYNOPSIS
@@ -14,7 +14,6 @@ csh \- shell command interpreter with a C-like syntax
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBcsh\fR, the C shell, is a command interpreter with a syntax reminiscent of
 the C language. It provides a number of convenient features for interactive use
@@ -23,7 +22,6 @@ command aliasing, history substitution, job control, and a number of built-in
 commands. As with the Bourne shell, the C shell provides variable, command and
 filename substitution.
 .SS "Initialization and Termination"
-.sp
 .LP
 When first started, the C shell normally performs commands from the
 \fB\&.cshrc\fR file in your home directory, provided that it is readable and
@@ -46,7 +44,6 @@ As a login shell terminates, it performs commands from the \fB\&.logout\fR file
 in your home directory; the same permission checks as those for \fB\&.cshrc\fR
 are applied to this file.
 .SS "Interactive Operation"
-.sp
 .LP
 After startup processing is complete, an interactive C shell begins reading
 commands from the terminal, prompting with \fBhostname\fR\fB%\fR (or
@@ -56,14 +53,12 @@ performs the following actions: a line of command input is read and broken into
 parsed, as described under USAGE. Finally, the shell executes each command in
 the current line.
 .SS "Noninteractive Operation"
-.sp
 .LP
 When running noninteractively, the shell does not prompt for input from the
 terminal. A noninteractive C shell can execute a command supplied as an
 \fIargument\fR on its command line, or interpret commands from a file, also
 known as a script.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -195,7 +190,6 @@ passed as argument zero, and subsequent arguments are added to the argument
 list for that command or script.
 .SH USAGE
 .SS "Filename Completion"
-.sp
 .LP
 When enabled by setting the variable \fBfilec\fR, an interactive C shell can
 complete a partially typed filename or user name. When an unambiguous partial
@@ -220,7 +214,6 @@ however, the only possible completion includes a suffix in the list, it is not
 ignored. \fBfignore\fR does not affect the listing of filenames by the
 \fBEOF\fR character.
 .SS "Lexical Structure"
-.sp
 .LP
 The shell splits input lines into words at space and tab characters, except as
 noted below. The characters \fB&\fR, \fB|\fR, \fB;\fR, \fB<\fR, \fB>\fR,
@@ -245,7 +238,6 @@ When the shell's input is not a terminal, the character \fB#\fR introduces a
 comment that continues to the end of the input line. Its special meaning is
 suppressed when preceded by a \fB\e\fR or enclosed in matching quotes.
 .SS "Command Line Parsing"
-.sp
 .LP
 A \fIsimple command\fR is composed of a sequence of words. The first word (that
 is not part of an I/O redirection) specifies the command to be executed. A
@@ -271,7 +263,6 @@ by appending an `\fB&\fR\&'; rather than waiting for the sequence to finish
 before issuing a prompt, the shell displays the job number (see \fBJob
 Control\fR, below) and associated process IDs and prompts immediately.
 .SS "History Substitution"
-.sp
 .LP
 History substitution allows you to use words from previous command lines in the
 command line you are typing. This simplifies spelling corrections and the
@@ -287,7 +278,6 @@ Input lines containing history substitutions are echoed on the terminal after
 being expanded, but before any other substitutions take place or the command
 gets executed.
 .SS "Event Designators"
-.sp
 .LP
 An event designator is a reference to a command line entry in the history list.
 .sp
@@ -404,7 +394,6 @@ re-executing command #6,
 .RE
 
 .SS "Word Designators"
-.sp
 .LP
 A `\fB:\fR' (colon) separates the event specification from the word designator.
 It can be omitted if the word designator begins with a \fB^\fR, \fB$\fR,
@@ -504,7 +493,6 @@ Like \fIx*\fR but omitting word \fB$\fR.
 .RE
 
 .SS "Modifiers"
-.sp
 .LP
 After the optional word designator, you can add one of the following modifiers,
 preceded by a \fB:\fR.
@@ -620,7 +608,6 @@ Without an event specification, a history reference refers either to the
 previous command, or to a previous history reference on the command line (if
 any).
 .SS "Quick Substitution"
-.sp
 .ne 2
 .na
 \fB\fB^\fR\fIl\fR\fB^\fR\fIr\fR\fB^\fR\fR
@@ -638,7 +625,6 @@ This is equivalent to the history substitution:
 .RE
 
 .SS "Aliases"
-.sp
 .LP
 The C shell maintains a list of aliases that you can create, display, and
 modify using the \fBalias\fR and \fBunalias\fR commands. The shell checks the
@@ -671,7 +657,6 @@ Except for the first word, the name of the alias can not appear in its
 definition, nor in any alias referred to by its definition. Such loops are
 detected, and cause an error message.
 .SS "I/O Redirection"
-.sp
 .LP
 The following metacharacters indicate that the subsequent word is the name of a
 file to which the command's standard input, standard output, or standard error
@@ -729,13 +714,12 @@ forms append both the standard error and standard output to the file.
 .RE
 
 .SS "Variable Substitution"
-.sp
 .LP
 The C shell maintains a set of variables, each of which is composed of a
 \fIname\fR and a \fIvalue\fR. A variable name consists of up to 128 letters and
 digits, and starts with a letter. An underscore (\fB_\fR) is considered a
 letter). A variable's value is a space-separated list of zero or more words. If
-the shell supports a variable name upto 128 characters the variable
+the shell supports a variable name up to 128 characters the variable
 \fBSUNW_VARLEN\fR is defined. If a variable name of up to 128 characters is not
 supported, then an older version of the shell is being used, and the shell
 variable name length has a maximum length of 20.
@@ -918,7 +902,6 @@ thereafter. It can be used to read from the keyboard in a C shell script.
 .RE
 
 .SS "Command and Filename Substitutions"
-.sp
 .LP
 Command and filename substitutions are applied selectively to the arguments of
 built-in commands. Portions of expressions that are not evaluated are not
@@ -926,7 +909,6 @@ expanded. For non-built-in commands, filename expansion of the command name is
 done separately from that of the argument list; expansion occurs in a subshell,
 after I/O redirection is performed.
 .SS "Command Substitution"
-.sp
 .LP
 A command enclosed by backquotes (\|\fB`\fR\|.\|.\|.\|\fB`\fR\|) is performed
 by a subshell. Its standard output is broken into separate words at each space
@@ -936,7 +918,6 @@ newline characters force new words; space and tab characters are preserved.
 However, a final newline is ignored. It is therefore possible for a command
 substitution to yield a partial word.
 .SS "Filename Substitution"
-.sp
 .LP
 Unquoted words containing any of the characters \fB*\fR, \fB?\fR, \fB[\fR or
 \fB{\fR, or that begin with ~, are expanded (also known as \fIglobbing\fR) to
@@ -1002,7 +983,6 @@ The `\fB\&.\fR' (dot character), when it is the first character in a filename
 or pathname component, must be matched explicitly. The \fB/\fR (slash) must
 also be matched explicitly.
 .SS "Expressions and Operators"
-.sp
 .LP
 A number of C shell built-in commands accept expressions, in which the
 operators are similar to those of C and have the same precedence. These
@@ -1241,7 +1221,6 @@ of the \fBstatus\fR variable rather than this expression.
 .RE
 
 .SS "Control Flow"
-.sp
 .LP
 The shell contains a number of commands to regulate the flow of control in
 scripts and within limits, from the terminal. These commands operate by forcing
@@ -1259,7 +1238,6 @@ buffered. The shell performs seeks within the internal buffer to accomplish the
 rereading implied by the loop. (To the extent that this allows, backward
 \fBgoto\fR commands succeeds on nonseekable inputs.)
 .SS "Command Execution"
-.sp
 .LP
 If the command is a C shell built-in command, the shell executes it directly.
 Otherwise, the shell searches for a file by that name with execute access. If
@@ -1308,7 +1286,6 @@ If the first character of the file is a \fB#\fR, a C shell is invoked.
 Otherwise, a Bourne shell is invoked.
 .RE
 .SS "Signal Handling"
-.sp
 .LP
 The shell normally ignores \fBQUIT\fR signals. Background jobs are immune to
 signals generated from the keyboard, including hangups (\fBHUP\fR). Other
@@ -1319,7 +1296,6 @@ controlled by the \fBonintr\fR built-in command. Login shells catch the
 no case are interrupts allowed when a login shell is reading the
 \fB\&.logout\fR file.
 .SS "Job Control"
-.sp
 .LP
 The shell associates a numbered \fIjob\fR with each command sequence to keep
 track of those commands that are running in the background or have been stopped
@@ -1396,7 +1372,6 @@ A job running in the background stops when it attempts to read from the
 terminal. Background jobs can normally produce output, but this can be
 suppressed using the `\fBstty tostop\fR' command.
 .SS "Status Reporting"
-.sp
 .LP
 While running interactively, the shell tracks the status of each job and
 reports whenever the job finishes or becomes blocked. It normally displays a
@@ -1406,7 +1381,6 @@ the shell is to report status changes immediately. By default, the \fBnotify\fR
 command marks the current process; after starting a background job, type
 \fBnotify\fR to mark it.
 .SS "Commands"
-.sp
 .LP
 Built-in commands are executed within the C shell. If a built-in command occurs
 as any component of a pipeline except the last, it is executed in a subshell.
@@ -2498,7 +2472,6 @@ decrement \fIname\fR, respectively.
 .RE
 
 .SS "Environment Variables and Predefined Shell Variables"
-.sp
 .LP
 Unlike the Bourne shell, the C shell maintains a distinction between
 environment variables, which are automatically exported to processes it
@@ -2937,12 +2910,10 @@ Display each command after history substitution takes place.
 .RE
 
 .SS "Large File Behavior"
-.sp
 .LP
 See \fBlargefile\fR(5) for the description of the behavior of \fBcsh\fR when
 encountering files greater than or equal to 2 Gbyte (2^31 bytes).
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB~/.cshrc\fR\fR
@@ -3006,7 +2977,6 @@ Source of home directories for `~\fIname\fR'.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -3022,7 +2992,6 @@ CSI	Enabled
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBbc\fR(1), \fBecho\fR(1), \fBlimit\fR(1), \fBlogin\fR(1), \fBls\fR(1),
 \fBmore\fR(1), \fBpfcsh\fR(1), \fBpfexec\fR(1), \fBps\fR(1), \fBsh\fR(1),
@@ -3031,7 +3000,6 @@ CSI	Enabled
 \fBfork\fR(2), \fBpipe\fR(2), \fBa.out\fR(4), \fBascii\fR(5),
 \fBattributes\fR(5), \fBenviron\fR(5), \fBlargefile\fR(5), \fBtermio\fR(7I)
 .SH DIAGNOSTICS
-.sp
 .ne 2
 .na
 \fB\fBYou have stopped jobs.\fR\fR
@@ -3042,11 +3010,9 @@ immediate second attempt to exit succeeds, terminating the stopped jobs.
 .RE
 
 .SH WARNINGS
-.sp
 .LP
 The use of \fBsetuid\fR shell scripts is \fIstrongly\fR discouraged.
 .SH NOTES
-.sp
 .LP
 Words can be no longer than 1024 bytes. The system limits argument lists to
 1,048,576 bytes. However, the maximum number of arguments to a command for
@@ -3161,7 +3127,6 @@ When the shell executes a shell script that attempts to execute a non-existent
 command interpreter, the shell returns an erroneous diagnostic message that the
 shell script file does not exist.
 .SH BUGS
-.sp
 .LP
 As of this writing, the \fBtime\fR built-in command does \fBnot\fR compute the
 last 6 fields of output, rendering the output to erroneously report the value
