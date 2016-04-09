@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SGEN 7D "Mar 29, 2008"
+.TH SGEN 7D "April 9, 2016"
 .SH NAME
 sgen \- Generic SCSI device driver
 .SH SYNOPSIS
@@ -18,14 +18,12 @@ sgen \- Generic SCSI device driver
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBsgen\fR driver exports the \fBuscsi\fR(7I) interfaces to user processes.
 The \fBsgen\fR driver can be configured to bind to \fBSCSI\fR devices for which
 no system driver is available. Examples of such devices include \fBSCSI\fR
 scanners and \fBSCSI\fR processor devices.
 .SH SECURITY
-.sp
 .LP
 Typically, drivers which export the \fBuscsi\fR(7I) interface unconditionally
 require that the user present superuser credentials. The \fBsgen\fR driver does
@@ -49,11 +47,10 @@ device may create other   problems. It may be possible for a user to instruct a
 target device to gather data from another target device on the same bus. It may
 also be possible for malicious users to install new firmware onto a device to
 which they are granted access. In environments where security is a concern but
-user access to devices controlled by the \fBsgen\fR driver is nontheless
+user access to devices controlled by the \fBsgen\fR driver is nonetheless
 desired, it is recommended that the devices be separated onto a dedicated
 \fBSCSI\fR bus to mitigate the risk of data corruption and security violations.
 .SH CONFIGURATION
-.sp
 .LP
 The \fBsgen\fR driver is configurable via the \fBsgen.conf\fR file. In addition
 to standard \fBSCSI\fR device configuration directives (see \fBscsi\fR(4)),
@@ -103,7 +100,6 @@ larger systems with many \fBSCSI\fR controllers, carefully edit the
 \fBsgen.conf\fR file so that \fBsgen\fR binds only where needed. Refer to
 \fBdriver.conf\fR(4) for further details.
 .SH PROPERTIES
-.sp
 .ne 2
 .na
 \fB\fBinquiry-config-list\fR\fR
@@ -294,10 +290,9 @@ contents of each CDB passed to the driver.
 .sp
 .LP
 In ascending order, each level includes the diagnostics that the previous level
-reports. See the IOCTLS section for more infomation on the \fBSGEN_IOC_DIAG\fR
+reports. See the IOCTLS section for more information on the \fBSGEN_IOC_DIAG\fR
 ioctl.
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fBsgen.conf\fR\fR
@@ -326,7 +321,6 @@ for naming disks. For example, \fB/dev/dsk/c0t0d0s0\fR and
 .RE
 
 .SH IOCTLS
-.sp
 .LP
 The \fBsgen\fR driver exports the \fBuscsi\fR(7I) interface for each device it
 manages. This allows a user process to talk directly to a \fBSCSI\fR device for
@@ -354,7 +348,6 @@ meaning as in the \fBsgen-diag\fR property discussed in PROPERTIES above.
 .RE
 
 .SH ERRORS
-.sp
 .ne 2
 .na
 \fB\fBEBUSY\fR\fR
@@ -384,7 +377,6 @@ Indicates that the device does  not  support the  requested ioctl function.
 .RE
 
 .SH EXAMPLES
-.sp
 .LP
 Here is an example of how \fBsgen\fR can be configured to bind to scanner
 devices on the system:
@@ -411,7 +403,6 @@ For large systems where boot times are a concern, it is recommended that the
 \fBparent=""\fR property be used to specify which \fBSCSI\fR bus \fBsgen\fR
 should examine.
 .SH SEE ALSO
-.sp
 .LP
 \fBdriver.conf\fR(4), \fBscsi\fR(4), \fBsd\fR(7D), \fBst\fR(7D),
 \fBuscsi\fR(7I)

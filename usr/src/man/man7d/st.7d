@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ST 7D "Oct 22, 2008"
+.TH ST 7D "April 9, 2016"
 .SH NAME
 st \- driver for SCSI tape devices
 .SH SYNOPSIS
@@ -13,7 +13,6 @@ st \- driver for SCSI tape devices
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBst\fR device driver provides a standard interface to various \fBSCSI\fR
 tape devices. See \fBmtio\fR(7I) for details.
@@ -88,13 +87,11 @@ open, as per the POSIX standard (see \fBstandards\fR(5)). However, if a command
 not found in the above list is used, a  reservation will occur to provide
 reserve/release functionality before the command is issued.
 .SS "Persistent Errors and Asynchronous Tape Operation"
-.sp
 .LP
 The \fBst\fR driver now supports persistent errors (see \fBmtio\fR(7I) and
 asynchronous tape operations (see \fBmtio\fR(7I), \fBaioread\fR(3C), and
 \fBaiowrite\fR(3C)).
 .SS "Read Operation"
-.sp
 .LP
 If the driver is opened for reading in a different format than the tape is
 written in, the driver overrides the user-selected format. For example, if a
@@ -109,12 +106,10 @@ message to inform you of an overridden format selection. Some devices
 automatically perform this function and do not require driver support (1/2"
 reel tape drive, for example).
 .SS "Write Operation"
-.sp
 .LP
 Writing from the beginning of tape is performed in the user-specified format.
 The original tape format is used for appending onto previously written tapes.
 .SS "Tape Configuration"
-.sp
 .LP
 The \fBst\fR driver has a built-in configuration table for most Sun-supported
 tape drives. For those tape drives that are not in the table, the \fBst\fR
@@ -479,7 +474,7 @@ release on close. If an attempt to use a ioctl of \fBMTRESERVE\fR or
 .RS 4n
 The \fBST_READ_IGNORE_ILI\fR flag is applicable only to variable block devices
 which support the SILI bit option. The \fBST_READ_IGNORE_ILI\fR flag indicates
-that SILI (supress incorrect length indicator) bit will be set during reads.
+that SILI (suppress incorrect length indicator) bit will be set during reads.
 When this flag is set, short reads (requested read size is less than the record
 size on the tape) will be successful and the number of bytes transferred will
 be equal to the record size on the tape. The tape will be positioned at the
@@ -626,7 +621,6 @@ before issuing the unload.
 \fB<erase time-out>\fR Time in seconds to preform a full (BOT to EOT) erase of
 longest medium with worst case error recovery.
 .SS "Device Statistics Support"
-.sp
 .LP
 Each device maintains I/O statistics both for the device and for each partition
 allocated on that device. For each device/partition, the driver accumulates
@@ -640,7 +634,6 @@ Each device also has error statistics associated with it. These must include
 counters for hard errors, soft errors and transport errors. Other data may be
 implemented as required.
 .SH IOCTLS
-.sp
 .LP
 The behavior of \fBSCSI\fR tape positioning ioctls is the same across all
 devices which support them. (Refer to \fBmtio\fR(7I).) However, not all devices
@@ -671,7 +664,6 @@ Note that the error status is reset by the \fBMTIOCGET\fR get status ioctl call
 or by the next read, write, or other ioctl operation. If no error has occurred
 (sense key is \fB0\fR), the current file and record position is returned.
 .SH ERRORS
-.sp
 .ne 2
 .na
 \fB\fBEACCES\fR\fR
@@ -805,7 +797,6 @@ name="st" class="scsi"
 .in -2
 
 .SS "Large Record Sizes"
-.sp
 .LP
 To support applications such as seismic programs that require large record
 sizes, the flag \fBST_NO_RECSIZE_LIMIT\fR must be set in drive option in the
@@ -831,7 +822,6 @@ platforms.
 .LP
 (Refer to the \fBWARNINGS\fR section for more information.)
 .SS "EOT Handling"
-.sp
 .LP
 The Emulex drives have only a physical end of tape (PEOT); thus it is not
 possible to write past EOT. All other drives have a logical end of tape
@@ -854,7 +844,6 @@ Reading past \fBEOT\fR is transparent to the user. Reading is stopped only by
 reading EOF's. For 1/2" reel devices, it is possible to read off the end of the
 reel if one reads past the two file marks which mark the end of recorded media.
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/kernel/drv/st.conf\fR\fR
@@ -959,14 +948,12 @@ l l .
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBmt\fR(1), \fBmodload\fR(1M), \fBmodunload\fR(1M), \fBopen\fR(2),
 \fBread\fR(2), \fBwrite\fR(2), \fBaioread\fR(3C), \fBaiowrite\fR(3C),
 \fBkstat\fR(3KSTAT), \fBdriver.conf\fR(4), \fBscsi\fR(4), \fBstandards\fR(5),
 \fBesp\fR(7D), \fBisp\fR(7D), \fBmtio\fR(7I), \fBioctl\fR(9E)
 .SH DIAGNOSTICS
-.sp
 .LP
 The \fBst\fR driver diagnostics may be printed to the console or messages file.
 .sp
@@ -1381,7 +1368,6 @@ These diagnostics are only seen with tape drives with the
 ST_RETRY_ON_RECOVERED_DEFERRED_ERROR bit set. See \fBstdef.h\fR for explanation
 of the specific usage of this setting.
 .SH WARNINGS
-.sp
 .LP
 Effective with Solaris 2.4, the \fBST_NO_RECSIZE_LIMIT\fR flag is set for the
 built-in config entries of the Archive \fBDAT\fR and Exabyte drivers by
@@ -1399,7 +1385,6 @@ reading of tapes written prior to Solaris 2.4 with large block sizes.
 .LP
 (Refer to \fBmtio\fR(7I) for a description of maximum record sizes.)
 .SH BUGS
-.sp
 .LP
 Tape devices that do not return a \fBBUSY\fR status during tape loading prevent
 user commands from being held until the device is ready. The user must delay

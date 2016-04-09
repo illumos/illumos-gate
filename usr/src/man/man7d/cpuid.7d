@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH CPUID 7D "Sep 16, 2004"
+.TH CPUID 7D "April 9, 2016"
 .SH NAME
 cpuid \- CPU identification driver
 .SH SYNOPSIS
@@ -14,43 +14,36 @@ cpuid \- CPU identification driver
 
 .SH DESCRIPTION
 .SS "SPARC and x86 system"
-.sp
 .LP
 This device provides implementation-private information via ioctls about
 various aspects of the implementation to Solaris libraries and utilities.
 .SS "x86 systems only"
-.sp
 .LP
 This device also provides a file-like view of the namespace and return values
 of the x86 cpuid instruction. The cpuid instruction takes a single 32-bit
 integer function code, and returns four 32-bit integer values corresponding to
 the input value that describe various aspects of the capabilities and
 configuration of the processor.
-.sp
 .LP
 The API for the character device consists of using the seek offset to set the
 function code value, and using a \fBread\fR(2) or \fBpread\fR(2) of 16 bytes to
 fetch the four 32-bit return values of the instruction in the order %\fBeax\fR,
 %\fBebx\fR, %\fBecx\fR and %\fBedx\fR.
-.sp
 .LP
 No data can be written to the device. Like the \fBcpuid\fR instruction, no
 special privileges are required to use the device.
-.sp
 .LP
 The device is useful to enable low-level configuration information to be
 extracted from the CPU without having to write any assembler code to invoke the
 \fBcpuid\fR instruction directly. It also allows the kernel to attempt to
-correct any erroneous data returned by the instruction (prompted by occassional
+correct any erroneous data returned by the instruction (prompted by occasional
 errors in the information exported by various processor implementations over
 the years).
-.sp
 .LP
 See the processor manufacturers documentation for further information about the
 syntax and semantics of the wide variety of information available from this
 instruction.
 .SH EXAMPLE
-.sp
 .LP
 This example allows you to determine if the current x86 processor supports
 "long mode," which is a necessary (but not sufficient) condition for running
@@ -113,7 +106,6 @@ fail:
 .in -2
 
 .SH ERRORS
-.sp
 .ne 2
 .na
 \fBENXIO\fR
@@ -134,7 +126,6 @@ with a size that is not multiple of 16 bytes.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/dev/cpu/self/cpuid\fR\fR
@@ -144,7 +135,6 @@ Provides access to CPU identification data.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -160,7 +150,6 @@ Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBpsrinfo\fR(1M), \fBprtconf\fR(1M), \fBpread\fR(2), \fBread\fR(2),
 \fBattributes\fR(5)

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SU 7D "Jun 18, 2004"
+.TH SU 7D "April 9, 2016"
 .SH NAME
 su \- asynchronous serial port driver
 .SH SYNOPSIS
@@ -22,11 +22,10 @@ open("/dev/cua\fI[a-z]\fR", _\fImode\fR);
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBsu\fR module is a loadable STREAMS driver that provides basic support
 for standard \fBUARTS\fR that use Intel-8250, National
-Semiconductor-16450/16550 hardware and Southbridge 1535D (16550 compatable)
+Semiconductor-16450/16550 hardware and Southbridge 1535D (16550 compatible)
 Super I/O hardware. The module also provides keyboard and mouse I/O support for
 Sun machines using those same Intel, National Semiconductor and Southbridge
 chipsets. The \fBsu\fR driver provides basic asynchronous communication support
@@ -62,7 +61,6 @@ device number. By accessing character-special devices with names of the form
 Detect\fR signal being asserted, either through hardware or an equivalent
 software mechanism. These devices are commonly known as \fI_dial-out_\fR lines.
 .SH APPLICATION PROGRAMMING INTERFACE
-.sp
 .LP
 Once a \fB/dev/cua\fR\fI_n_\fR line is opened, the corresponding tty, or ttyd
 line cannot be opened until the \fB/dev/cua\fR\fI_n_\fR line is closed. A
@@ -77,7 +75,6 @@ renamed from \fB/dev/tty00\fR) and used for dial-in (by enabling the line for
 login in \fB/etc/inittab\fR) or dial-out (by \fBtip\fR(1) or \fBuucp\fR(1C)) as
 \fB/dev/cua0\fR when no one is logged in on the line.
 .SH IOCTLS
-.sp
 .LP
 The standard set of \fBtermio\fR \fBioctl()\fR calls are supported by \fBsu\fR.
 .sp
@@ -122,7 +119,6 @@ carriage return, tilde and control-B (CR ~ CTRL-B), but may be changed by the
 driver. For more information on breaking (entering the debugger or monitor),
 see \fBkbd\fR(1) and \fBkb\fR(7M).
 .SH ERRORS
-.sp
 .LP
 An \fBopen()\fR will fail under the following conditions:
 .sp
@@ -156,7 +152,6 @@ The unit has been marked as exclusive-use by another process with a
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/dev/cua/[a-z]\fR\fR
@@ -184,7 +179,6 @@ binary compatibility package device names
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -200,14 +194,12 @@ Architecture	 SPARC
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBstrconf\fR(1), \fBkbd\fR(1), \fBtip\fR(1),\fBuucp\fR(1C),
 \fBautopush\fR(1M), \fBkstat\fR(1M), \fBpppd\fR(1M), \fBioctl\fR(2),
 \fBopen\fR(2), \fBtermios\fR(3C), \fBdacf.conf\fR(4), \fBattributes\fR(5),
 \fBkb\fR(7M), \fBldterm\fR(7M), \fBttcompat\fR(7M), \fBtermio\fR(7I)
 .SH DIAGNOSTICS
-.sp
 .LP
 The \fBsu\fR driver keeps track of various warning and error conditions using
 \fBkstat\fR counters. The output of the \fBkstat su\fR command provides
