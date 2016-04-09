@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LIBKRB5 3LIB "Sep 2, 2009"
+.TH LIBKRB5 3LIB "April 9, 2016"
 .SH NAME
 libkrb5 \- MIT Kerberos 5 library
 .SH SYNOPSIS
@@ -15,20 +15,18 @@ libkrb5 \- MIT Kerberos 5 library
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The functions in this library are the routines that comprise the MIT Kerberos 5
 library.
 .SH INTERFACES
-.sp
 .LP
 The shared object \fBlibkrb5.so\fR provides the public interface defined below.
 .sp
 .LP
 The \fBkrb5\fR library is provided as a convenience to allow native \fBkrb5\fR
-applications to be built and to run. Compatability between Solaris releases of
+applications to be built and to run. Compatibility between Solaris releases of
 the \fBkrb5\fR interface is not guaranteed. For new applications that require
-these features, \fBlibgss\fR(3LIB) is recomended.
+these features, \fBlibgss\fR(3LIB) is recommended.
 .sp
 .LP
 For detailed documentation on the \fBkrb5\fR interface, see the MIT Kerberos 5
@@ -71,7 +69,6 @@ The \fBkrb5_string_to_key\fR and \fBkrb5_string_to_key\fR routines, listed in
 \fBkrb5.h\fR section, are part of the old cryptosystem and should not be used
 in new apps.
 .SS "com_err.h"
-.br
 .in +2
 \fBcom_err\fR
 .in -2
@@ -84,7 +81,6 @@ in new apps.
 \fBerror_message\fR
 .in -2
 .SS "krb5.h"
-.br
 .in +2
 \fBkrb5_address_compare\fR
 .in -2
@@ -945,7 +941,6 @@ in new apps.
 \fBkrb5_xfree_wrap\fR
 .in -2
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/usr/lib/libkrb5.so.1\fR\fR
@@ -964,7 +959,6 @@ shared object
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -982,6 +976,5 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBkrb5-config\fR(1), \fBlibgss\fR(3LIB), \fBattributes\fR(5)

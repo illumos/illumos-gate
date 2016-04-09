@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH MENU_ITEM_CURRENT 3CURSES "Dec 31, 1996"
+.TH MENU_ITEM_CURRENT 3CURSES "April 9, 2016"
 .SH NAME
 menu_item_current, set_current_item, current_item, set_top_row, top_row,
 item_index \- set and get current menus items
@@ -38,11 +38,10 @@ item_index \- set and get current menus items
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The current item of a menu is the item where the cursor is currently
 positioned. \fBset_current_item()\fR sets the current item of \fImenu\fR to
-\fIitem\fR. \fBcurrent_item()\fR returns a pointer to the the current item in
+\fIitem\fR. \fBcurrent_item()\fR returns a pointer to the current item in
 \fImenu\fR.
 .sp
 .LP
@@ -55,7 +54,6 @@ number  of the menu row currently displayed at the top of \fImenu\fR.
 array. The value of this index ranges from \fB0\fR through \fIN\fR\fB-1\fR,
 where \fIN\fR is the total number of items connected to the menu.
 .SH RETURN VALUES
-.sp
 .LP
 \fBcurrent_item()\fR returns \fBNULL\fR on error.
 .sp
@@ -110,7 +108,6 @@ No items are connected to the menu.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -126,11 +123,9 @@ MT-Level	Unsafe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBcurses\fR(3CURSES), \fBmenus\fR(3CURSES), \fBattributes\fR(5)
 .SH NOTES
-.sp
 .LP
 The header \fB<menu.h>\fR automatically includes the headers  \fB<eti.h>\fR and
 \fB<curses.h>\fR\&.

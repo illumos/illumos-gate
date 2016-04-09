@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ECONVERT 3C "May 3, 1999"
+.TH ECONVERT 3C "April 9, 2016"
 .SH NAME
 econvert, fconvert, gconvert, seconvert, sfconvert, sgconvert, qeconvert,
 qfconvert, qgconvert \- output conversion
@@ -62,7 +62,6 @@ qfconvert, qgconvert \- output conversion
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBeconvert()\fR function converts the \fIvalue\fR to a null-terminated
 string of \fIndigit\fR \fBASCII\fR digits in \fIbuf\fR and returns a pointer to
@@ -80,7 +79,7 @@ correct digit has been rounded as if for  \fBsprintf(%w.nf)\fR output with
 \fIn\fR=\fIndigit\fR digits to the right of the decimal point. \fIndigit\fR can
 be negative to indicate rounding to the left of the decimal point. The return
 value is a pointer to \fIbuf\fR. \fIbuf\fR should contain at least
-\fI310+max(0,ndigit)\fR characters to accomodate any double-precision
+\fI310+max(0,ndigit)\fR characters to accommodate any double-precision
 \fIvalue\fR.
 .sp
 .LP
@@ -123,13 +122,11 @@ are documented on the \fBecvt\fR(3C) manual page.  They constitute the default
 implementation of these functions and conform to the X/Open CAE Specification,
 System Interfaces and Headers, Issue 4, Version 2.
 .SH USAGE
-.sp
 .LP
 \fBIEEE\fR Infinities and NaNs are treated similarly by these functions.
 ``NaN'' is returned for NaN, and ``Inf'' or ``Infinity'' for Infinity.  The
 longer form is produced when \fIndigit\fR >= 8.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -145,6 +142,5 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBecvt\fR(3C),\fBsprintf\fR(3C), \fBattributes\fR(5)

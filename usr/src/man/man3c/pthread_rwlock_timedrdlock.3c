@@ -8,7 +8,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PTHREAD_RWLOCK_TIMEDRDLOCK 3C "Jan 30, 2004"
+.TH PTHREAD_RWLOCK_TIMEDRDLOCK 3C "April 9, 2016"
 .SH NAME
 pthread_rwlock_timedrdlock, pthread_rwlock_reltimedrdlock_np \- lock a
 read-write lock for reading
@@ -30,7 +30,6 @@ cc \fB-mt\fR [ \fIflag\fR... ] \fIfile\fR... [ \fIlibrary\fR... ]
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBpthread_rwlock_timedrdlock()\fR function applies a read lock to the
 read-write lock referenced by \fIrwlock\fR as in the
@@ -72,16 +71,14 @@ write lock on rwlock.
 The results are undefined if this function is called with an uninitialized
 read-write lock.
 .SH RETURN VALUES
-.sp
 .LP
 The \fBpthread_rwlock_timedrdlock()\fR and
 \fBpthread_rwlock_reltimedrdlock_np()\fR functions return 0 if the lock for
 reading on the read-write lock object referenced by \fIrwlock\fR is acquired.
 Otherwise, an error number is returned to indicate the error.
 .SH ERRORS
-.sp
 .LP
-The \fBpthread_rwlock_timedrdlock()\fR and and
+The \fBpthread_rwlock_timedrdlock()\fR and
 \fBpthread_rwlock_reltimedrdlock_np()\fR functions will fail if:
 .sp
 .ne 2
@@ -127,7 +124,6 @@ or equal to 1 000 million.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -149,7 +145,6 @@ MT-Level	MT-Safe
 The \fBpthread_rwlock_timedrdlock()\fR function is Standard. The
 \fBpthread_rwlock_reltimedrdlock_np()\fR is Stable.
 .SH SEE ALSO
-.sp
 .LP
 \fBpthread_rwlock_destroy\fR(3C), \fBpthread_rwlock_rdlock\fR(3C),
 \fBpthread_rwlock_timedwrlock\fR(3C), \fBpthread_rwlock_trywrlock\fR(3C),

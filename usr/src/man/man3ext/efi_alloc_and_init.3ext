@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH EFI_ALLOC_AND_INIT 3EXT "May 8, 2008"
+.TH EFI_ALLOC_AND_INIT 3EXT "April 9, 2016"
 .SH NAME
 efi_alloc_and_init, efi_alloc_and_read, efi_free, efi_write, efi_use_whole_disk
 \- manipulate a disk's EFI Partition Table
@@ -38,13 +38,12 @@ cc [ \fIflag \&.\|.\|.\fR ] \fIfile\fR\&.\|.\|. \fB-lefi\fR [ \fIlibrary \&.\|.\
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBefi_alloc_and_init()\fR function initializes the \fBdk_gpt_t\fR
 structure specified by \fIvtoc\fR in preparation for a call to
 \fBefi_write()\fR. It calculates and initializes the \fBefi_version\fR,
 \fBefi_lbasize\fR, \fBefi_nparts\fR, \fBefi_first_u_lba\fR, \fBefi_last_lba\fR,
-and \fBefi_last_u_lba\fR members of this sturcture. The caller can then set the
+and \fBefi_last_u_lba\fR members of this structure. The caller can then set the
 \fBefi_nparts\fR member.
 .sp
 .LP
@@ -87,7 +86,6 @@ struct dk_part  efi_parts[];     /* array of partitions */
 .in -2
 
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, \fBefi_alloc_and_init()\fR returns 0. Otherwise it
 returns \fBVT_EIO\fR if an I/O operation to the disk fails.
@@ -195,7 +193,6 @@ Space out of label was not found.
 .RE
 
 .SH USAGE
-.sp
 .LP
 The EFI label is used on disks with more than 1^32-1 blocks. For compatibility
 reasons, the \fBread_vtoc\fR(3EXT) and \fBwrite_vtoc()\fR functions should be
@@ -203,7 +200,6 @@ used on smaller disks. The application should attempt the \fBread_vtoc()\fR or
 \fBwrite_vtoc()\fR call, check for an error of \fBVT_ENOTSUP\fR, then call the
 analogous EFI function.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -221,7 +217,6 @@ MT-Level	Unsafe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBfmthard\fR(1M), \fBformat\fR(1M), \fBprtvtoc\fR(1M), \fBioctl\fR(2),
 \fBopen\fR(2), \fBlibefi\fR(3LIB), \fBread_vtoc\fR(3EXT), \fBattributes\fR(5),

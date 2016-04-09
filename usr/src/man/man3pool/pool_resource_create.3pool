@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH POOL_RESOURCE_CREATE 3POOL "Sep 23, 2003"
+.TH POOL_RESOURCE_CREATE 3POOL "April 9, 2016"
 .SH NAME
 pool_resource_create, pool_resource_destroy, pool_resource_info,
 pool_query_resource_components, pool_resource_transfer, pool_resource_xtransfer
@@ -52,7 +52,6 @@ cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lpool\fR [ \fIlibrary\fR\&.\|
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBpool_resource_create()\fR function creates and returns a new resource of
 the given \fIname\fR and \fItype\fR in the provided configuration. If there is
@@ -65,7 +64,7 @@ from its configuration file.
 .LP
 The \fBpool_resource_info()\fR function returns a string describing the given
 \fIresource\fR. The string is allocated with \fBmalloc\fR(3C). The caller is
-reponsible for freeing the returned string. If the \fIflags\fR argument is
+responsible for freeing the returned string. If the \fIflags\fR argument is
 non-zero, the string returned also describes the components (if any) contained
 in the resource.
 .sp
@@ -92,7 +91,6 @@ list of \fBpool_component_t\fR.
 The \fIconf\fR argument for each function refers to the target configuration to
 which the operation applies.
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, \fBpool_resource_create()\fR returns a new
 \fBpool_resource_t\fR with default properties initialized. Otherwise,
@@ -121,7 +119,6 @@ pool-specific error value.
 \fBpool_resource_xtransfer()\fR return 0. Otherwise -1 is returned and
 \fBpool_error()\fR returns the pool-specific error value.
 .SH ERRORS
-.sp
 .LP
 The \fBpool_resource_create()\fR function will fail if:
 .sp
@@ -314,7 +311,6 @@ if ((resource = pool_resource_create(conf, "pset",
 .in -2
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -334,6 +330,5 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBlibpool\fR(3LIB), \fBpool_error\fR(3POOL), \fBattributes\fR(5)

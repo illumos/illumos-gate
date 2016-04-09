@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SIP_ENABLE_TRANS_LOGGING 3SIP "Jan 11, 2008"
+.TH SIP_ENABLE_TRANS_LOGGING 3SIP "April 9, 2016"
 .SH NAME
 sip_enable_trans_logging, sip_enable_dialog_logging,
 sip_disable_dialog_logging, sip_disable_trans_logging \- transaction and dialog
@@ -33,7 +33,6 @@ logging operations
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBsip_enable_trans_logging()\fR and \fBsip_enable_dialog_logging()\fR
 functions enable transaction and dialog logging respectively. The \fIlogfile\fR
@@ -60,7 +59,6 @@ close the files. It is the responsibility of the application to close them.
 The log contains the state of the transaction or dialog at the time the message
 was processed.
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, \fBsip_enable_trans_logging()\fR and
 \fBsip_enable_dialog_logging()\fR return 0. They return \fBEINVAL\fR if
@@ -80,10 +78,10 @@ FILE    *logfile;
 logfile = fopen("/tmp/ApplicationA", "a+");
 sip_enable_dialog_logging(logfile, SIP_DETAIL_LOGGING);
 
-/* Application sends INVITE, recieves 180 and 200 response and dialog is
+/* Application sends INVITE, receives 180 and 200 response and dialog is
         created. */
 /* Application sends ACK request */
-/* Application sends BYE and recieves 200 response */
+/* Application sends BYE and receives 200 response */
 
 /* Application disables logging */
 sip_disable_dialog_logging();
@@ -141,7 +139,6 @@ Dialog State            : SIP_DLG_CONFIRMED
 .in -2
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -159,6 +156,5 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBsip_stack_init\fR(3SIP), \fBattributes\fR(5)

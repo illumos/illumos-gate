@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SECURE_RPC 3NSL "Feb 19, 2004"
+.TH SECURE_RPC 3NSL "April 9, 2016"
 .SH NAME
 secure_rpc, authdes_getucred, authdes_seccreate, getnetname, host2netname,
 key_decryptsession, key_encryptsession, key_gendes, key_setsecret,
@@ -80,7 +80,6 @@ routines for secure remote procedure calls
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBRPC\fR library functions allow C programs to make procedure calls on
 other machines across the network.
@@ -231,7 +230,7 @@ functions \fBkey_encryptsession()\fR, \fBkey_gendes()\fR, and
 \fBkey_setsecret()\fR.
 .sp
 The \fBkey_decryptsession()\fR function takes a server netname \fIremotename\fR
-and a \fBDES\fR key \fIdeskey\fR, and decrypts the key by using the the public
+and a \fBDES\fR key \fIdeskey\fR, and decrypts the key by using the public
 key of the server and the secret key associated with the effective \fBUID\fR of
 the calling process. The \fBkey_decryptsession()\fR function is the inverse of
 \fBkey_encryptsession()\fR function.
@@ -245,7 +244,7 @@ the calling process. The \fBkey_decryptsession()\fR function is the inverse of
 .RS 26n
 This function is a keyserver interface that takes a server netname
 \fIremotename\fR and a \fBDES\fR key \fIdeskey\fR, and encrypts the key using
-the public key of the the server and the secret key associated with the
+the public key of the server and the secret key associated with the
 effective \fBUID\fR of the calling process. If the keyserver does not have a
 key registered for the UID, it falls back to using the secret key for the
 netname \fBnobody\fR unless this feature has been disabled. See
@@ -336,7 +335,6 @@ succeeds and \fB0\fR if it fails. The function is the inverse of
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -352,7 +350,6 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBchkey\fR(1), \fBkeylogin\fR(1), \fBkeyserv\fR(1M), \fBnewkey\fR(1M),
 \fBrpc\fR(3NSL), \fBrpc_clnt_auth\fR(3NSL), \fBattributes\fR(5)

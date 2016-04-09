@@ -10,7 +10,7 @@
 .\"
 .\"  Copyright 2015, Joyent, Inc.
 .\"
-.Dd "Jun 15, 2015"
+.Dd "April 9, 2016"
 .Dt SIGNALFD 3C
 .Os
 .Sh NAME
@@ -151,7 +151,7 @@ typedef struct signalfd_siginfo {
 } signalfd_siginfo_t;
 .Ed
 .Sh RETURN VALUES
-Upon succesful completion, a file descriptor associated with the instance
+Upon successful completion, a file descriptor associated with the instance
 is returned. Otherwise, -1 is returned and errno is set to indicate the error.
 When
 .Va fd

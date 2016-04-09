@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH POOL_COMPONENT_INFO 3POOL "Sep 23, 2003"
+.TH POOL_COMPONENT_INFO 3POOL "April 9, 2016"
 .SH NAME
 pool_component_info, pool_get_owning_resource \- resource pool component
 functions
@@ -24,7 +24,6 @@ cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lpool\fR [ \fIlibrary\fR\&.\|
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 Certain resources, such as processor sets, are composed of resource components.
 Informational and ownership attributes of resource components are made
@@ -35,14 +34,13 @@ function refers to the target configuration to which the operation applies.
 .LP
 The \fBpool_component_info()\fR function returns a string describing
 \fIcomponent\fR. The string is allocated with \fBmalloc\fR(3C). The caller is
-reponsible for freeing the returned string. The \fIflags\fR argument is
+responsible for freeing the returned string. The \fIflags\fR argument is
 ignored.
 .sp
 .LP
 The \fBpool_get_owning_resource()\fR function returns the resource currently
 containing \fIcomponent\fR.  Every component is contained by a resource.
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, \fBpool_component_info()\fR returns a string.
 Otherwise it returns \fINULL\fR and \fBpool_error\fR(3POOL) returns the
@@ -53,7 +51,6 @@ Upon successful completion, \fBpool_get_owning_resource()\fR returns the owning
 resource. Otherwise it returns \fINULL\fR and \fBpool_error()\fR returns the
 pool-specific error value.
 .SH ERRORS
-.sp
 .LP
 The \fBpool_component_info()\fR function will fail if:
 .sp
@@ -97,7 +94,6 @@ The supplied configuration's status is not \fBPOF_VALID\fR.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -117,6 +113,5 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBlibpool\fR(3LIB), \fBpool_error\fR(3POOL), \fBattributes\fR(5)

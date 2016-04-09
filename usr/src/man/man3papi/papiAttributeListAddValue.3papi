@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PAPIATTRIBUTELISTADDVALUE 3PAPI "Jan 17, 2007"
+.TH PAPIATTRIBUTELISTADDVALUE 3PAPI "April 9, 2016"
 .SH NAME
 papiAttributeListAddValue, papiAttributeListAddBoolean,
 papiAttributeListAddCollection, papiAttributeListAddDatetime,
@@ -168,7 +168,6 @@ cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lpapi\fR [ \fIlibrary\fR\&.\|
 .fi
 
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIattrs\fR\fR
@@ -457,7 +456,6 @@ vertical (y) component of a resolution
 .RE
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBpapiAttributeListAdd*()\fR functions add new attributes and/or values to
 the attribute list passed in. If necessary, the attribute list passed in is
@@ -529,7 +527,6 @@ The \fBpapiAttributeListToString()\fR function converts an attribute list to a
 string representation that can be displayed to a user.  The delimiter value is
 placed between attributes in the string.
 .SH RETURN VALUES
-.sp
 .LP
 These functions return \fBPAPI_OK\fR upon successful completion and one of the
 following on failure:
@@ -621,7 +618,7 @@ main(int ac, char *av[])
         printf("Attribute list to big to dump\en");
 
 
-    /* retreive various elements */
+    /* retrieve various elements */
     integer = 12;
     (void) papiAttributeListGetInteger(list, NULL, "copies", &integer);
     printf("copies: %d\en", integer);
@@ -639,7 +636,6 @@ main(int ac, char *av[])
 .in -2
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -657,6 +653,5 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBlibpapi\fR(3LIB), \fBattributes\fR(5)
