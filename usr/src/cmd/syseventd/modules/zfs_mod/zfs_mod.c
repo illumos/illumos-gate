@@ -209,7 +209,8 @@ zfs_process_add(zpool_handle_t *zhp, nvlist_t *vdev, boolean_t isdisk)
 		 * trigger a ZFS fault for the device (and any hot spare
 		 * replacement).
 		 */
-		if (strncmp(path, "/dev/dsk/", 9) != 0) {
+		if (strncmp(path, ZFS_DISK_ROOTD,
+		    strlen(ZFS_DISK_ROOTD)) != 0) {
 			(void) zpool_vdev_online(zhp, fullpath,
 			    ZFS_ONLINE_FORCEFAULT, &newstate);
 			return;
