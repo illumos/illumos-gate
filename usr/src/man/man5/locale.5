@@ -8,12 +8,11 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LOCALE 5 "Dec 1, 2003"
+.TH LOCALE 5 "April 9, 2016"
 .SH NAME
 locale \- subset of a user's environment that depends on language and cultural
 conventions
 .SH DESCRIPTION
-.sp
 .LP
 A \fBlocale\fR is the definition of the subset of a user's environment that
 depends on language and cultural conventions. It is made up from one or more
@@ -105,7 +104,6 @@ the value of the corresponding environment variable is used. If the environment
 variable is unset or is set to the empty string, the  \fBsetlocale()\fR
 function sets the appropriate environment.
 .SS "Locale Definition"
-.sp
 .LP
 Locales can be described with the file format accepted by the \fBlocaledef\fR
 utility.
@@ -308,7 +306,6 @@ decimal or hexadecimal constants. Symbolic names not present in the charmap
 file can be specified and will be ignored, as specified under item 1 above.
 .RE
 .SS "LC_CTYPE"
-.sp
 .LP
 The  \fBLC_CTYPE\fR category defines character classification, case conversion
 and other character attributes. In addition, a series of characters can be
@@ -687,7 +684,6 @@ the mapping will be the reverse mapping of the one specified for \fBtoupper\fR.
 .RE
 
 .SS "LC_COLLATE"
-.sp
 .LP
 The  \fBLC_COLLATE\fR category provides a collation sequence definition for
 numerous utilities (such as \fBsort\fR(1), \fBuniq\fR(1), and so forth),
@@ -802,7 +798,6 @@ Specify the end of the collation-order statements.
 .RE
 
 .SS "collating-element \fIkeyword\fR"
-.sp
 .LP
 In addition to the collating elements in the character set, the
 \fBcollating-element\fR keyword is used to define multi-character collating
@@ -838,7 +833,6 @@ Example:
 \fBcollating-element\fR <\fBll\fR> from "\fBll\fR"
 .in -2
 .SS "collating-symbol \fIkeyword\fR"
-.sp
 .LP
 This keyword will be used to define symbols for use in collation sequence
 statements; that is, between the \fBorder_start\fR and the \fBorder_end\fR
@@ -878,7 +872,6 @@ associated with a relative position in the character order sequence. While such
 a symbolic name does not represent any collating element, it can be used as a
 weight.
 .SS "order_start \fIkeyword\fR"
-.sp
 .LP
 The \fBorder_start\fR keyword must precede collation order entries and also
 defines the number of weights for this collation sequence definition and other
@@ -959,7 +952,6 @@ order_start	forward;backward
 .LP
 If no operands are specified, a single \fBforward\fR operand is assumed.
 .SS "Collation Order"
-.sp
 .LP
 The \fBorder_start\fR keyword is followed by collating identifier entries. The
 syntax for the collating element entries is:
@@ -1004,7 +996,7 @@ specified the highest coded character set value in the current coded character
 set. An ellipsis is treated as invalid if the preceding or following lines do
 not specify characters in the current coded character set. The use of the
 ellipsis symbol ties the definition to a specific coded character set and may
-preclude the definition from being portable beween implementations.
+preclude the definition from being portable between implementations.
 .sp
 .LP
 The symbol \fBUNDEFINED\fR is interpreted as including all coded character set
@@ -1159,11 +1151,9 @@ collating symbol <\fBch\fR> and belongs to the same primary equivalence class
 as the multi-character collating element <\fBCh\fR>.
 .RE
 .SS "order_end \fIkeyword\fR"
-.sp
 .LP
 The collating order entries must be terminated with an \fBorder_end\fR keyword.
 .SS "LC_MONETARY"
-.sp
 .LP
 The  \fBLC_MONETARY\fR category defines the rules and symbols that are used to
 format monetary numeric information. This information is available through the
@@ -1671,7 +1661,6 @@ END LC_MONETARY
 The entry \fBn/a\fR indicates that the value is not available in the POSIX
 locale.
 .SS "LC_NUMERIC"
-.sp
 .LP
 The  \fBLC_NUMERIC\fR category defines the rules and symbols that will be used
 to format non-monetary numeric information. This information is available
@@ -1771,7 +1760,6 @@ _
 The entry \fBn/a\fR indicates that the value is not available in the POSIX
 locale.
 .SS "LC_TIME"
-.sp
 .LP
 The  \fBLC_TIME\fR category defines the interpretation of the field descriptors
 supported by  \fBdate\fR(1) and affects the behavior of the \fBstrftime\fR(3C),
@@ -2039,7 +2027,6 @@ field descriptor will be used instead of the value.
 .RE
 
 .SS "LC_TIME \fIC-language\fR Access"
-.sp
 .LP
 The following information can be accessed. These correspond to constants
 defined in <\fBlanginfo.h\fR> and used as arguments to the
@@ -2302,7 +2289,6 @@ _
 .TE
 
 .SS "LC_TIME \fIGeneral\fR Information"
-.sp
 .LP
 Although certain of the field descriptors in the POSIX locale (such as the name
 of the month) are shown with initial capital letters, this need not be the case
@@ -2341,7 +2327,6 @@ in 1776" while 7/14/1789 would come out as "The 14 day of July in 1789" The
 above example is for illustrative purposes only. The \fB%O\fR modifier is
 primarily intended to provide for Kanji or Hindi digits in \fBdate\fR formats.
 .SS "LC_MESSAGES"
-.sp
 .LP
 The  \fBLC_MESSAGES\fR category defines the format and values for affirmative
 and negative responses.
@@ -2435,7 +2420,6 @@ l | l | l .
 In an application conforming to the SUSv3 standard, the information on
 \fByesstr\fR and \fBnostr\fR is not available.
 .SH SEE ALSO
-.sp
 .LP
 \fBdate\fR(1), \fBlocale\fR(1), \fBlocaledef\fR(1), \fBsort\fR(1), \fBtr\fR(1),
 \fBuniq\fR(1), \fBlocaleconv\fR(3C), \fBnl_langinfo\fR(3C),
