@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH USB_ISOC_REQUEST 9S "Dec 28, 2006"
+.TH USB_ISOC_REQUEST 9S "April 9, 2016"
 .SH NAME
 usb_isoc_request \- USB isochronous request structure
 .SH SYNOPSIS
@@ -13,11 +13,9 @@ usb_isoc_request \- USB isochronous request structure
 .fi
 
 .SH INTERFACE LEVEL
-.sp
 .LP
 Solaris DDI specific (Solaris DDI)
 .SH DESCRIPTION
-.sp
 .LP
 A request sent through an isochronous pipe is used to transfer large amounts of
 packetized data with relative unreliability, but with bounded service periods.
@@ -179,7 +177,7 @@ X      X      ISOC_XFER_ASAP       !=NULL  See table note (C)
 Table notes:
 
     A) continuous polling, new data is returned in
-       cloned request structures via continous callbacks,
+       cloned request structures via continuous callbacks,
        original request is returned on stop polling
 
     B) invalid if the current_frame number is past
@@ -233,7 +231,6 @@ usb_callback_flags(9s) for a description of use and operation.
 .in -2
 
 .SH ATTRIBUTES
-.sp
 .LP
 See attributes(5) for descriptions of the following attributes:
 .sp
@@ -251,7 +248,6 @@ Interface stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBattributes\fR(5), \fBusb_alloc_request\fR(9F),
 \fBusb_get_current_frame_number\fR(9F),
