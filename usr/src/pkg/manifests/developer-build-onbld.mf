@@ -168,6 +168,8 @@ file path=opt/onbld/lib/python2.6/onbld/Checks/Mapfile.py mode=0444
 file path=opt/onbld/lib/python2.6/onbld/Checks/Mapfile.pyc mode=0444
 file path=opt/onbld/lib/python2.6/onbld/Checks/ProcessCheck.py mode=0444
 file path=opt/onbld/lib/python2.6/onbld/Checks/ProcessCheck.pyc mode=0444
+file path=opt/onbld/lib/python2.6/onbld/Checks/SpellCheck.py mode=0444
+file path=opt/onbld/lib/python2.6/onbld/Checks/SpellCheck.pyc mode=0444
 file path=opt/onbld/lib/python2.6/onbld/Checks/__init__.py mode=0444
 file path=opt/onbld/lib/python2.6/onbld/Checks/__init__.pyc mode=0444
 file path=opt/onbld/lib/python2.6/onbld/Scm/Backup.py mode=0444
