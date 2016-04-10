@@ -1665,19 +1665,21 @@ static void
 tem_safe_pix_clear_prom_output(struct tem_vt_state *tem, cred_t *credp,
     enum called_from called_from)
 {
-	int	nrows, ncols, width, height;
+	int	nrows, ncols, width, height, offset;
 
 	ASSERT((MUTEX_HELD(&tems.ts_lock) && MUTEX_HELD(&tem->tvs_lock)) ||
 	    called_from == CALLED_FROM_STANDALONE);
 
 	width = tems.ts_font.width;
 	height = tems.ts_font.height;
+	offset = tems.ts_p_offset.y % height;
 
-	nrows = (tems.ts_p_offset.y + (height - 1))/ height;
+	nrows = tems.ts_p_offset.y / height;
 	ncols = (tems.ts_p_dimension.width + (width - 1))/ width;
 
-	tem_safe_pix_cls_range(tem, 0, nrows, 0, 0, ncols, 0,
-	    B_FALSE, credp, called_from);
+	if (nrows > 0)
+		tem_safe_pix_cls_range(tem, 0, nrows, offset, 0, ncols, 0,
+		    B_FALSE, credp, called_from);
 }
 
 /*
