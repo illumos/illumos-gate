@@ -38,7 +38,6 @@ tpmadm \- administer Trusted Platform Module
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 A Trusted Platform Module (TPM) is a hardware component that provides for
 protected key storage and reliable measurements of software used to boot the
@@ -69,8 +68,7 @@ regardless of the privilege level of the calling process. Second, the TPM owner
 is not able to override access controls for data protected by TPM keys. The
 owner can effectively destroy data by re-initializing the TPM, but he cannot
 access data that has been encrypted using TPM keys owned by other users.
-.SH SUB-COMMANDS
-.sp
+.SH SUBCOMMANDS
 .LP
 The following subcommands are used in the form:
 .sp
@@ -170,7 +168,6 @@ storage.
 .RE
 
 .SH EXIT STATUS
-.sp
 .LP
 After completing the requested operation, \fBtpmadm\fR exits with one of the
 following status values.
@@ -205,7 +202,6 @@ Usage error. The \fBtpmadm\fR command was invoked with invalid arguments.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -221,7 +217,6 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBattributes\fR(5)
 .sp

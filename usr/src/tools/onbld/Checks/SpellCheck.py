@@ -242,6 +242,8 @@ misspellings = {
 }
 
 alternates = {
+	'sub-command': 'subcommand',
+	'sub-commands': 'subcommands',
 	'writeable': 'writable'
 }
 

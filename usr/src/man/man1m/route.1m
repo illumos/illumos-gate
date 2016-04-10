@@ -40,7 +40,6 @@ route \- manually manipulate the routing tables
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBroute\fR manually manipulates the network routing tables. These tables are
 normally maintained by the system routing daemon, such as \fBin.routed\fR(1M)
@@ -57,15 +56,14 @@ of the programmatic interface discussed in \fBroute\fR(7P).
 can modify routing tables, the \fBRTM_GET\fR operation is allowed for
 non-privileged users.
 .SH OPTIONS
-.sp
 .ne 2
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 15n
 Flush the routing tables of all gateway entries. If you use the \fB-f\fR option
-in conjunction with any of the \fBroute\fR sub-commands, \fBroute\fR flushes
-the gateways before performing the sub-command. Specify the table to flush by
+in conjunction with any of the \fBroute\fR subcommands, \fBroute\fR flushes
+the gateways before performing the subcommand. Specify the table to flush by
 placing the \fBinet\fR or \fBinet6\fR modifier immediately after the \fB-f\fR
 option. If unspecified, flushing IPv4 (\fBinet\fR) routes is the default.
 .RE
@@ -131,7 +129,6 @@ Print additional details in verbose mode.
 .RE
 
 .SS "Subcommands"
-.sp
 .LP
 The following subcommands are supported:
 .sp
@@ -201,7 +198,7 @@ conjunction with the \fB-p\fR option.
 
 .sp
 .LP
-The \fBadd\fR and \fBdelete\fR sub-commands have the following syntax:
+The \fBadd\fR and \fBdelete\fR subcommands have the following syntax:
 .sp
 .in +2
 .nf
@@ -218,7 +215,7 @@ through which packets should be routed. Modifiers described in \fBOPERANDS\fR
 can be placed anywhere on the command line.
 .sp
 .LP
-The \fBget\fR and \fBchange\fR sub-commands have the following syntax:
+The \fBget\fR and \fBchange\fR subcommands have the following syntax:
 .sp
 .in +2
 .nf
@@ -235,7 +232,7 @@ through which packets should be routed. Modifiers described in \fBOPERANDS\fR
 can be placed anywhere on the command line.
 .sp
 .LP
-The \fBmonitor\fR sub-command has the following syntax:
+The \fBmonitor\fR subcommand has the following syntax:
 .sp
 .in +2
 .nf
@@ -245,12 +242,10 @@ route monitor [ -inet | -inet6 ]
 .sp
 
 .SH OPERANDS
-.sp
 .LP
-\fBroute\fR executes its sub-commands on routes to destinations by way of
+\fBroute\fR executes its subcommands on routes to destinations by way of
 gateways.
 .SS "Destinations and Gateways"
-.sp
 .LP
 By default, destination and gateway addresses are interpreted as IPv4
 addresses. All symbolic names are tried first as a host name, using
@@ -259,7 +254,7 @@ addresses. All symbolic names are tried first as a host name, using
 .sp
 .LP
 Including an optional modifier on the command line before the address changes
-how the \fBroute\fR sub-command interprets it.
+how the \fBroute\fR subcommand interprets it.
 .sp
 .LP
 The following modifiers are supported:
@@ -448,7 +443,6 @@ multipathing) group, then requests to add a route will automatically be
 translated to the corresponding IPMP IP interface, and requests to delete or
 change a route on an underlying interface will fail.
 .SS "Routing Flags"
-.sp
 .LP
 Routes have associated flags that influence operation of the protocols when
 sending to destinations matched by the routes. These flags can be set (and in
@@ -603,7 +597,6 @@ sensitivity label.
 .RE
 
 .SS "Compatibility"
-.sp
 .LP
 The modifiers \fBhost\fR and \fBnet\fR are taken to be equivalent to
 \fB-\fR\fBhost\fR and \fB-net\fR\fB\fR. To specify a symbolic address that
@@ -630,7 +623,6 @@ _
 The \fB\fR\fB-ifa\fR \fBhostname\fR modifier is also accepted, but has no
 effect.
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/defaultrouter\fR\fR
@@ -658,7 +650,6 @@ List of network names and addresses
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBuname\fR(1), \fBin.ripngd\fR(1M), \fBin.routed\fR(1M), \fBnetstat\fR(1M),
 \fBrouted\fR(1M), \fBioctl\fR(2), \fBgetipnodebyname\fR(3SOCKET),
@@ -666,7 +657,6 @@ List of network names and addresses
 \fBhosts\fR(4), \fBnetworks\fR(4), \fBattributes\fR(5), \fBARP\fR(7P),
 \fBip\fR(7P), \fBroute\fR(7P), \fBrouting\fR(7P)
 .SH DIAGNOSTICS
-.sp
 .ne 2
 .na
 \fB\fBadd\fR [ \fBhost\fR\||\ \fBnetwork\|]\fR \fIdestination\fR:\fIgateway\fR
@@ -704,7 +694,7 @@ As \fBadd\fR, but when deleting or changing an entry.
 .ad
 .sp .6
 .RS 4n
-When the \fB-f\fR flag is specified, or the \fBflush\fR sub-command is used,
+When the \fB-f\fR flag is specified, or the \fBflush\fR subcommand is used,
 each routing table entry deleted is indicated with a message of this form.
 .RE
 
@@ -763,7 +753,6 @@ process does not have appropriate privileges.
 .RE
 
 .SH NOTES
-.sp
 .LP
 Specifying that destinations are local (with the \fB-interface\fRmodifier)
 assumes that the routers implement \fBproxy ARP\fR, meaning that they respond
