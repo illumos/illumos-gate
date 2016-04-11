@@ -43,9 +43,10 @@ sysevent handle, \fIev\fR.  The publisher name identifies the name of the
 publishing application or kernel subsystem of the sysevent.
 .sp
 .LP
-The \fBsysevent_get_pid()\fR function sets the process ID for the publishing
-application or \fBSE_KERN_PID\fR for sysevents originating in the kernel.  The
-publisher name and PID are useful for implementing event acknowledgement.
+The \fBsysevent_get_pid()\fR function sets the process ID \fIpid\fR to that of
+the publishing application or \fBSE_KERN_PID\fR for sysevents originating in the
+kernel. The publisher name and PID are useful for implementing event
+acknowledgement.
 .sp
 .LP
 The \fBsysevent_get_vendor_name()\fR function returns the vendor string for the

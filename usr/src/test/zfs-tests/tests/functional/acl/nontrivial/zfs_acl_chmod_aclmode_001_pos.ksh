@@ -237,8 +237,8 @@ function check_new_acl # bit newmode isdir
 	typeset gbit
 	typeset ebit
 	typeset str=":"
-	gbit=$(get_substr $mode 2 1)
-	ebit=$(get_substr $mode 3 1)
+	gbit=${mode:1:1}
+	ebit=${mode:2:1}
 	if (( ((bits & 4)) == 0 )); then
 		if (( ((gbit & 4)) != 0 || \
 		    ((ebit & 4)) != 0 )); then
@@ -278,12 +278,12 @@ function build_new_acl # newmode isdir
 	typeset expect
 	if ((flag == 0)); then
 		prefix="owner@"
-		bit=$(get_substr $newmode 1 1)
+		bit=${newmode:0:1}
 		status=$(check_new_acl $bit $newmode $isdir)
 
 	else
 		prefix="group@"
-		bit=$(get_substr $newmode 2 1)
+		bit=${newmode:1:1}
 		status=$(check_new_acl $bit $newmode $isdir)
 	fi
 	expect=$prefix$status:deny
@@ -375,13 +375,13 @@ function verify_aclmode # <aclmode> <node> <newmode>
 					#
 					case $who in
 						owner@)
-							pos=1
+							pos=0
 							;;
 						group@)
-							pos=2
+							pos=1
 							;;
 						everyone@)
-							pos=3
+							pos=2
 							;;
 						user)
 							acltemp=${expect1#*:}
@@ -390,35 +390,33 @@ function verify_aclmode # <aclmode> <node> <newmode>
 							group=$(get_group $node)
 							if [[ $acltemp == \
 							    $owner ]]; then
-								pos=1
+								pos=0
 							else
-								pos=2
+								pos=1
 							fi
 							prefix=$prefix:$acltemp
 							;;
 						group)
 							acltemp=${expect1#*:}
 							acltemp=${acltemp%%:*}
-							pos=2
+							pos=1
 							prefix=$prefix:$acltemp
 							reduce=1
 							;;
 					esac
-					obits=$(get_substr $newmode $pos 1)
+					obits=${newmode:$pos:1}
 					((bits = $obits))
 					#
-					# permission should no greater than the
+					# permission should be no greater than the
 					# group permission bits
 					#
 					if ((reduce != 0)); then
-						((bits &= \
-						    $(get_substr $newmode 2 1)))
+						((bits &= ${newmode:1:1}))
 					# The ACL permissions are reduced so
 					# that they are no greater than owner
 					# permission bits.
 
-						((bits_owner = \
-						    $(get_substr $newmode 1 1)))
+						((bits_owner = ${newmode:0:1}))
 						((bits &= $bits_owner))
 					fi
 
