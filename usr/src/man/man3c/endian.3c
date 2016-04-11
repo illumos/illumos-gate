@@ -1,0 +1,191 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2016 Joyent, Inc.
+.\"
+.Dd January 30, 2016
+.Dt ENDIAN 3C
+.Os
+.Sh NAME
+.Nm endian ,
+.Nm be16toh ,
+.Nm be32toh ,
+.Nm be64toh ,
+.Nm betoh16 ,
+.Nm betoh32 ,
+.Nm betoh64 ,
+.Nm htobe16 ,
+.Nm htobe32 ,
+.Nm htobe64 ,
+.Nm htole16 ,
+.Nm htole32 ,
+.Nm htole64 ,
+.Nm le16toh ,
+.Nm le32toh ,
+.Nm le64toh ,
+.Nm letoh16 ,
+.Nm letoh32 ,
+.Nm letoh64
+.Nd convert between big and little endian byte order
+.Sh SYNOPSIS
+.In endian.h
+.Ft uint16_t
+.Fo be16toh
+.Fa "uint16_t be16"
+.Fc
+.Ft uint32_t
+.Fo be32toh
+.Fa "uint32_t be32"
+.Fc
+.Ft uint64_t
+.Fo betoh64
+.Fa "uint64_t be64"
+.Fc
+.Ft uint16_t
+.Fo betoh16
+.Fa "uint16_t be16"
+.Fc
+.Ft uint32_t
+.Fo betoh32
+.Fa "uint32_t be32"
+.Fc
+.Ft uint64_t
+.Fo be64toh
+.Fa "uint64_t be64"
+.Fc
+.Ft uint16_t
+.Fo htobe16
+.Fa "uint16_t host16"
+.Fc
+.Ft uint32_t
+.Fo htobe32
+.Fa "uint32_t host32"
+.Fc
+.Ft uint64_t
+.Fo htobe64
+.Fa "uint64_t host64"
+.Fc
+.Ft uint16_t
+.Fo htole16
+.Fa "uint16_t host16"
+.Fc
+.Ft uint32_t
+.Fo htole32
+.Fa "uint32_t host32"
+.Fc
+.Ft uint64_t
+.Fo htole64
+.Fa "uint64_t host64"
+.Fc
+.Ft uint16_t
+.Fo le16toh
+.Fa "uint16_t le16"
+.Fc
+.Ft uint32_t
+.Fo le32toh
+.Fa "uint32_t le32"
+.Fc
+.Ft uint64_t
+.Fo le64toh
+.Fa "uint64_t le64"
+.Fc
+.Ft uint16_t
+.Fo letoh16
+.Fa "uint16_t le16"
+.Fc
+.Ft uint32_t
+.Fo letoh32
+.Fa "uint32_t le32"
+.Fc
+.Ft uint64_t
+.Fo letoh64
+.Fa "uint64_t le64"
+.Fc
+.Sh DESCRIPTION
+The
+.Nm
+family of functions convert 16, 32, and 64-bit values between the host's
+native byte order and big- or little-endian. All of the functions in
+this family simply return their input when the host's native byte order
+is the same as the desired order. For more information on
+endianness, see
+.Xr byteorder 5 .
+.Pp
+The
+.Fn betoh16 ,
+.Fn betoh32 ,
+and
+.Fn betoh64
+functions take a 16-bit, 32-bit, or 64-bit value and convert it from
+big-endian to the host's native endianness, swapping bytes as required.
+.Pp
+The
+.Fn letoh16 ,
+.Fn letoh32 ,
+and
+.Fn letoh64
+functions take a 16-bit, 32-bit, or 64-bit value and convert it from
+little-endian to the host's native endianness, swapping bytes as
+required.
+.Pp
+The
+.Fn htobe16 ,
+.Fn htobe32 ,
+and
+.Fn htobe64
+functions take a 16-bit, 32-bit, or 64-bit value and convert it from
+the host's native endianness to big-endian, swapping bytes as required.
+.Pp
+The
+.Fn htole16 ,
+.Fn htole32 ,
+and
+.Fn htole64
+functions take a 16-bit, 32-bit, or 64-bit value and convert it from
+the host's native endianness to little-endian, swapping bytes as
+required.
+.Pp
+The functions
+.Fn be16toh ,
+.Fn be32toh ,
+.Fn be64toh ,
+.Fn le16toh ,
+.Fn le32toh ,
+and
+.Fn le64toh ,
+are the same as
+.Fn betoh16 ,
+.Fn betoh32 ,
+.Fn betoh64 ,
+.Fn letoh16 ,
+.Fn letoh32 ,
+and
+.Fn letoh64
+respectively. Historically, different platforms have diverged on the
+naming of these functions. To better support extant software, both are
+provided.
+.Pp
+While these functions are common across multiple platforms, they have
+not been standardized. Portable applications should instead use the
+functions defined in
+.Xr byteorder 3C .
+.Sh RETURN VALUES
+The functions always succeed and return a value that has been properly
+converted.
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh MT-LEVEL
+.Sy MT-Safe
+.Sh SEE ALSO
+.Xr byteorder 3C ,
+.Xr endian.h 3HEAD ,
+.Xr attributes 5 ,
+.Xr byteorder 5

@@ -79,6 +79,8 @@ file path=opt/libc-tests/tests/c11_tss.64 mode=0555
 file path=opt/libc-tests/tests/call_once.32 mode=0555
 file path=opt/libc-tests/tests/call_once.64 mode=0555
 file path=opt/libc-tests/tests/catopen mode=0555
+file path=opt/libc-tests/tests/endian.32 mode=0555
+file path=opt/libc-tests/tests/endian.64 mode=0555
 file path=opt/libc-tests/tests/fpround_test mode=0555
 file path=opt/libc-tests/tests/fpround_test.$(ARCH) mode=0555
 file path=opt/libc-tests/tests/fpround_test.$(ARCH64) mode=0555

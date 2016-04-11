@@ -113,6 +113,7 @@ MANFILES= 	__fbufsize.3c					\
 	 	enable_extended_FILE_stdio.3c			\
 	 	encrypt.3c					\
 	 	end.3c						\
+		endian.3c					\
 	 	epoll_create.3c					\
 	 	epoll_ctl.3c					\
 	 	epoll_wait.3c					\
@@ -698,6 +699,12 @@ MANLINKS=	FD_CLR.3c				\
 	 	backtrace_symbols_fd.3c			\
 	 	bcmp.3c					\
 	 	bcopy.3c				\
+		be16toh.3c				\
+		be32toh.3c				\
+		be64toh.3c				\
+		betoh16.3c				\
+		betoh32.3c				\
+		betoh64.3c				\
 	 	bind_textdomain_codeset.3c		\
 	 	bindtextdomain.3c			\
 	 	btowc_l.3c				\
@@ -861,6 +868,12 @@ MANLINKS=	FD_CLR.3c				\
 	 	hasmntopt.3c				\
 	 	hcreate.3c				\
 	 	hdestroy.3c				\
+		htobe16.3c				\
+		htobe32.3c				\
+		htobe64.3c				\
+		htole16.3c				\
+		htole32.3c				\
+		htole64.3c				\
 	 	initstate.3c				\
 	 	innetgr.3c				\
 	 	isalnum.3c				\
@@ -934,6 +947,12 @@ MANLINKS=	FD_CLR.3c				\
 	 	labs.3c					\
 	 	lcong48.3c				\
 	 	ldiv.3c					\
+		le16toh.3c				\
+		le32toh.3c				\
+		le64toh.3c				\
+		letoh16.3c				\
+		letoh32.3c				\
+		letoh64.3c				\
 	 	lfind.3c				\
 	 	llabs.3c				\
 	 	lldiv.3c				\
@@ -1634,6 +1653,25 @@ _end.3c					:= LINKSRC = end.3c
 _etext.3c				:= LINKSRC = end.3c
 edata.3c				:= LINKSRC = end.3c
 etext.3c				:= LINKSRC = end.3c
+
+be16toh.3c				:= LINKSRC = endian.3c
+be32toh.3c				:= LINKSRC = endian.3c
+be64toh.3c				:= LINKSRC = endian.3c
+betoh16.3c				:= LINKSRC = endian.3c
+betoh32.3c				:= LINKSRC = endian.3c
+betoh64.3c				:= LINKSRC = endian.3c
+htobe16.3c				:= LINKSRC = endian.3c
+htobe32.3c				:= LINKSRC = endian.3c
+htobe64.3c				:= LINKSRC = endian.3c
+htole16.3c				:= LINKSRC = endian.3c
+htole32.3c				:= LINKSRC = endian.3c
+htole64.3c				:= LINKSRC = endian.3c
+le16toh.3c				:= LINKSRC = endian.3c
+le32toh.3c				:= LINKSRC = endian.3c
+le64toh.3c				:= LINKSRC = endian.3c
+letoh16.3c				:= LINKSRC = endian.3c
+letoh32.3c				:= LINKSRC = endian.3c
+letoh64.3c				:= LINKSRC = endian.3c
 
 epoll_create1.3c			:= LINKSRC = epoll_create.3c
 epoll_pwait.3c				:= LINKSRC = epoll_wait.3c

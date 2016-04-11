@@ -115,6 +115,7 @@ GENOBJS=			\
 	byteorder.o		\
 	cuexit.o		\
 	ecvt.o			\
+	endian.o		\
 	errlst.o		\
 	amd64_data.o		\
 	ldivide.o		\

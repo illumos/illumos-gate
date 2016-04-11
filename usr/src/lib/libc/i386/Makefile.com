@@ -122,6 +122,7 @@ GENOBJS=			\
 	byteorder64.o		\
 	cuexit.o		\
 	ecvt.o			\
+	endian.o		\
 	errlst.o		\
 	i386_data.o		\
 	ladd.o			\

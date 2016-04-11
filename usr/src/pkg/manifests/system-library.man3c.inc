@@ -108,6 +108,7 @@ file path=usr/share/man/man3c/ecvt.3c
 file path=usr/share/man/man3c/enable_extended_FILE_stdio.3c
 file path=usr/share/man/man3c/encrypt.3c
 file path=usr/share/man/man3c/end.3c
+file path=usr/share/man/man3c/endian.3c
 file path=usr/share/man/man3c/epoll_create.3c
 file path=usr/share/man/man3c/epoll_ctl.3c
 file path=usr/share/man/man3c/epoll_wait.3c
@@ -692,6 +693,12 @@ link path=usr/share/man/man3c/backtrace_symbols.3c target=walkcontext.3c
 link path=usr/share/man/man3c/backtrace_symbols_fd.3c target=walkcontext.3c
 link path=usr/share/man/man3c/bcmp.3c target=bstring.3c
 link path=usr/share/man/man3c/bcopy.3c target=bstring.3c
+link path=usr/share/man/man3c/be16toh.3c target=endian.3c
+link path=usr/share/man/man3c/be32toh.3c target=endian.3c
+link path=usr/share/man/man3c/be64toh.3c target=endian.3c
+link path=usr/share/man/man3c/betoh16.3c target=endian.3c
+link path=usr/share/man/man3c/betoh32.3c target=endian.3c
+link path=usr/share/man/man3c/betoh64.3c target=endian.3c
 link path=usr/share/man/man3c/bind_textdomain_codeset.3c target=gettext.3c
 link path=usr/share/man/man3c/bindtextdomain.3c target=gettext.3c
 link path=usr/share/man/man3c/btowc_l.3c target=btowc.3c
@@ -861,6 +868,12 @@ link path=usr/share/man/man3c/gsignal.3c target=ssignal.3c
 link path=usr/share/man/man3c/hasmntopt.3c target=getmntent.3c
 link path=usr/share/man/man3c/hcreate.3c target=hsearch.3c
 link path=usr/share/man/man3c/hdestroy.3c target=hsearch.3c
+link path=usr/share/man/man3c/htobe16.3c target=endian.3c
+link path=usr/share/man/man3c/htobe32.3c target=endian.3c
+link path=usr/share/man/man3c/htobe64.3c target=endian.3c
+link path=usr/share/man/man3c/htole16.3c target=endian.3c
+link path=usr/share/man/man3c/htole32.3c target=endian.3c
+link path=usr/share/man/man3c/htole64.3c target=endian.3c
 link path=usr/share/man/man3c/initstate.3c target=random.3c
 link path=usr/share/man/man3c/innetgr.3c target=getnetgrent.3c
 link path=usr/share/man/man3c/isalnum.3c target=ctype.3c
@@ -934,6 +947,12 @@ link path=usr/share/man/man3c/l64a.3c target=a64l.3c
 link path=usr/share/man/man3c/labs.3c target=abs.3c
 link path=usr/share/man/man3c/lcong48.3c target=drand48.3c
 link path=usr/share/man/man3c/ldiv.3c target=div.3c
+link path=usr/share/man/man3c/le16toh.3c target=endian.3c
+link path=usr/share/man/man3c/le32toh.3c target=endian.3c
+link path=usr/share/man/man3c/le64toh.3c target=endian.3c
+link path=usr/share/man/man3c/letoh16.3c target=endian.3c
+link path=usr/share/man/man3c/letoh32.3c target=endian.3c
+link path=usr/share/man/man3c/letoh64.3c target=endian.3c
 link path=usr/share/man/man3c/lfind.3c target=lsearch.3c
 link path=usr/share/man/man3c/llabs.3c target=abs.3c
 link path=usr/share/man/man3c/lldiv.3c target=div.3c

@@ -33,6 +33,7 @@ PROGS = \
 	c11_threads \
 	c11_tss \
 	call_once \
+	endian \
 	quick_exit_order \
 	quick_exit_status \
 	timespec_get

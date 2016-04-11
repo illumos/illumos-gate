@@ -147,6 +147,7 @@ GENOBJS=			\
 	byteorder.o		\
 	cuexit.o		\
 	ecvt.o			\
+	endian.o		\
 	errlst.o		\
 	getctxt.o		\
 	ladd.o			\
@@ -1189,6 +1190,7 @@ SRCS=							\
 	$(LIBCBASE)/gen/_xregs_clrptr.c			\
 	$(LIBCBASE)/gen/byteorder.c			\
 	$(LIBCBASE)/gen/ecvt.c				\
+	$(LIBCBASE)/gen/endian.c			\
 	$(LIBCBASE)/gen/getctxt.c			\
 	$(LIBCBASE)/gen/lmul.c				\
 	$(LIBCBASE)/gen/makectxt.c			\

@@ -66,6 +66,7 @@ HDRS=   $($(MACH)_HDRS)  $(ATTRDB_HDRS) \
 	dlfcn.h		\
 	door.h		\
 	elf.h		\
+	endian.h	\
 	err.h		\
 	errno.h		\
 	euc.h		\
