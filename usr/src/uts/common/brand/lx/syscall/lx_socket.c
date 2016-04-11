@@ -1808,15 +1808,19 @@ lx_recvmsg(int sock, void *msg, int flags)
 	}
 
 	iovcnt = smsg.msg_iovlen;
-	if (iovcnt <= 0 || iovcnt > IOV_MAX) {
+	if (iovcnt < 0 || iovcnt > IOV_MAX) {
 		return (set_errno(EMSGSIZE));
 	}
 	if (iovcnt > IOV_MAX_STACK) {
 		iovsize = iovcnt * sizeof (struct iovec);
 		uiov = kmem_alloc(iovsize, KM_SLEEP);
-	} else {
+	} else if (iovcnt > 0) {
 		iovsize = 0;
 		uiov = luiov;
+	} else {
+		iovsize = 0;
+		uiov = NULL;
+		goto noiov;
 	}
 
 #if defined(_LP64)
@@ -1889,6 +1893,8 @@ lx_recvmsg(int sock, void *msg, int flags)
 			}
 		}
 	}
+
+noiov:
 	/* Since the iovec is passed via the uio, NULL it out in the msg */
 	smsg.msg_iov = NULL;
 
