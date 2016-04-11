@@ -1,0 +1,29 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2016 Joyent Inc.
+#
+
+<include global_zone_only_component>
+set name=pkg.fmri value=pkg:/driver/usb/usbgem@$(PKGVERS)
+set name=pkg.description value="USB General Ethernet Module"
+set name=pkg.summary value="USB General Ethernet Module"
+set name=info.classification value=org.opensolaris.category.2008:Drivers/Ports
+set name=variant.arch value=i386
+dir path=kernel group=sys
+dir path=kernel/misc group=sys
+dir path=kernel/misc/$(ARCH64) group=sys
+file path=kernel/misc/$(ARCH64)/usbgem group=sys mode=0755
+$(i386_ONLY)file path=kernel/misc/usbgem group=sys mode=0755
+license usr/src/uts/common/io/usbgem/THIRDPARTYLICENSE \
+    license=usr/src/uts/common/io/usbgem/THIRDPARTYLICENSE
+depend fmri=driver/usb type=require

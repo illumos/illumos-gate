@@ -210,6 +210,7 @@ usr/src/uts/common/gssapi/mechs/krb5/include/krb5.h
 usr/src/uts/common/gssapi/mechs/krb5/include/old.h
 usr/src/uts/common/gssapi/mechs/krb5/include/raw.h
 usr/src/uts/common/gssapi/mechs/krb5/include/rsa-md4.h
+usr/src/uts/common/io/axf/ax88172reg.h
 usr/src/uts/common/io/bnxe/577xx/drivers/common/ecore/ecore_common.h
 usr/src/uts/common/io/bnxe/577xx/drivers/common/ecore/ecore_init_ops.h
 usr/src/uts/common/io/bnxe/577xx/drivers/common/ecore/ecore_init.h
@@ -331,6 +332,9 @@ usr/src/uts/common/io/ixgbe/core/ixgbe_common.h
 usr/src/uts/common/io/ixgbe/core/ixgbe_dcb_82598.h
 usr/src/uts/common/io/ixgbe/core/ixgbe_dcb_82599.h
 usr/src/uts/common/io/i40e/core/i40e_adminq_cmd.h
+usr/src/uts/common/io/udmf/dm9601reg.h
+usr/src/uts/common/io/upf/adm8511reg.h
+usr/src/uts/common/io/urf/rtl8150reg.h
 usr/src/uts/common/sys/scsi/adapters/mpt_sas/mpi/mpi2.h
 usr/src/uts/common/sys/scsi/adapters/mpt_sas/mpi/mpi2_cnfg.h
 usr/src/uts/common/sys/scsi/adapters/mpt_sas/mpi/mpi2_hbd.h
