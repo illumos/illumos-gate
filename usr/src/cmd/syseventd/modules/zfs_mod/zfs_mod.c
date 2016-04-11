@@ -155,6 +155,8 @@ zfs_process_add(zpool_handle_t *zhp, nvlist_t *vdev, boolean_t isdisk)
 	uint64_t offline = 0ULL;
 	char *physpath = NULL;
 	char rawpath[PATH_MAX], fullpath[PATH_MAX];
+	zpool_boot_label_t boot_type;
+	uint64_t boot_size;
 	size_t len;
 
 	if (nvlist_lookup_string(vdev, ZPOOL_CONFIG_PATH, &path) != 0)
@@ -220,7 +222,14 @@ zfs_process_add(zpool_handle_t *zhp, nvlist_t *vdev, boolean_t isdisk)
 		len = strlen(rawpath);
 		rawpath[len - 2] = '\0';
 
-		if (zpool_label_disk(g_zfshdl, zhp, rawpath) != 0) {
+		if (zpool_is_bootable(zhp))
+			boot_type = ZPOOL_COPY_BOOT_LABEL;
+		else
+			boot_type = ZPOOL_NO_BOOT_LABEL;
+
+		boot_size = zpool_get_prop_int(zhp, ZPOOL_PROP_BOOTSIZE, NULL);
+		if (zpool_label_disk(g_zfshdl, zhp, rawpath,
+		    boot_type, boot_size, NULL) != 0) {
 			(void) zpool_vdev_online(zhp, fullpath,
 			    ZFS_ONLINE_FORCEFAULT, &newstate);
 			return;
