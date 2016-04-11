@@ -680,6 +680,7 @@ typedef struct ulwp {
 	void		*ul_unwind_ret;	/* used only by _ex_clnup_handler() */
 #endif
 	tumem_t		ul_tmem;	/* used only by umem */
+	uint_t		ul_ptinherit;	/* pthreads sched inherit value */
 } ulwp_t;
 
 #define	ul_cursig	ul_cp.s.cursig		/* deferred signal number */

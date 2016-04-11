@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2015, Joyent, Inc.
+ */
+
 #include "lint.h"
 #include "thr_uberdata.h"
 #include <sched.h>
@@ -242,7 +246,8 @@ pthread_attr_setdaemonstate_np(pthread_attr_t *attr, int daemonstate)
 
 /*
  * pthread_attr_getdaemonstate_np: gets the daemon state.
- * For now, this is a private interface in libc.
+ * For now, this is a private interface in libc, but it is exposed in the
+ * mapfile for the purposes of testing only.
  */
 int
 pthread_attr_getdaemonstate_np(const pthread_attr_t *attr, int *daemonstate)
@@ -366,7 +371,7 @@ pthread_attr_getschedpolicy(const pthread_attr_t *attr, int *policy)
  */
 int
 pthread_attr_setschedparam(pthread_attr_t *attr,
-	const struct sched_param *param)
+    const struct sched_param *param)
 {
 	thrattr_t *ap;
 
@@ -385,7 +390,7 @@ pthread_attr_setschedparam(pthread_attr_t *attr,
 #pragma weak _pthread_attr_getschedparam = pthread_attr_getschedparam
 int
 pthread_attr_getschedparam(const pthread_attr_t *attr,
-					struct sched_param *param)
+    struct sched_param *param)
 {
 	thrattr_t *ap;
 
@@ -437,7 +442,7 @@ pthread_attr_getguardsize(const pthread_attr_t *attr, size_t *guardsize)
  */
 int
 pthread_attr_setstack(pthread_attr_t *attr,
-	void *stackaddr, size_t stacksize)
+    void *stackaddr, size_t stacksize)
 {
 	thrattr_t *ap;
 
@@ -458,7 +463,7 @@ pthread_attr_setstack(pthread_attr_t *attr,
  */
 int
 pthread_attr_getstack(const pthread_attr_t *attr,
-	void **stackaddr, size_t *stacksize)
+    void **stackaddr, size_t *stacksize)
 {
 	thrattr_t *ap;
 
@@ -469,4 +474,86 @@ pthread_attr_getstack(const pthread_attr_t *attr,
 		return (0);
 	}
 	return (EINVAL);
+}
+
+/*
+ * This function is a common BSD extension to pthread which is used to obtain
+ * the attributes of a thread that might have changed after its creation, for
+ * example, it's stack address.
+ *
+ * Note, there is no setattr analogue, nor do we desire to add one at this time.
+ * Similarly there is no native threads API analogue (nor should we add one for
+ * C11).
+ *
+ * The astute reader may note that there is a GNU version of this called
+ * pthread_getattr_np(). The two functions are similar, but subtley different in
+ * a rather important way. While the pthread_attr_get_np() expects to be given
+ * a pthread_attr_t that has had pthread_attr_init() called on in,
+ * pthread_getattr_np() does not. However, on GNU systems, where the function
+ * originates, the pthread_attr_t is not opaque and thus it is entirely safe to
+ * both call pthread_attr_init() and then call pthread_getattr_np() on the same
+ * attributes object. On illumos, since the pthread_attr_t is opaque, that would
+ * be a memory leak. As such, we don't provide it.
+ */
+int
+pthread_attr_get_np(pthread_t tid, pthread_attr_t *attr)
+{
+	int ret;
+	ulwp_t *self = curthread;
+	uberdata_t *udp = self->ul_uberdata;
+	ulwp_t *target = NULL;
+	thrattr_t *ap;
+
+	/*
+	 * To ensure that information about the target thread does not change or
+	 * disappear while we're trying to interrogate it, we grab the uwlp
+	 * lock.
+	 */
+	if (self->ul_lwpid == tid) {
+		ulwp_lock(self, udp);
+		target = self;
+	} else {
+		target = find_lwp(tid);
+		if (target == NULL)
+			return (ESRCH);
+	}
+
+	if (attr == NULL) {
+		ret = EINVAL;
+		goto out;
+	}
+
+	if ((ap = attr->__pthread_attrp) == NULL) {
+		ret = EINVAL;
+		goto out;
+	}
+
+	ap->stksize = target->ul_stksiz;
+	ap->stkaddr = target->ul_stk;
+	if (target->ul_usropts & THR_DETACHED) {
+		ap->detachstate = PTHREAD_CREATE_DETACHED;
+	} else {
+		ap->detachstate = PTHREAD_CREATE_JOINABLE;
+	}
+
+	if (target->ul_usropts & THR_DAEMON) {
+		ap->daemonstate = PTHREAD_CREATE_DAEMON_NP;
+	} else {
+		ap->daemonstate = PTHREAD_CREATE_NONDAEMON_NP;
+	}
+
+	if (target->ul_usropts & THR_BOUND) {
+		ap->scope = PTHREAD_SCOPE_SYSTEM;
+	} else {
+		ap->scope = PTHREAD_SCOPE_PROCESS;
+	}
+	ap->prio = target->ul_pri;
+	ap->policy = target->ul_policy;
+	ap->inherit = target->ul_ptinherit;
+	ap->guardsize = target->ul_guardsize;
+
+	ret = 0;
+out:
+	ulwp_unlock(target, udp);
+	return (ret);
 }

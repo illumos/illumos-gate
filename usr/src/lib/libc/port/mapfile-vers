@@ -93,6 +93,11 @@ $if _x86 && _ELF64
 $add amd64
 $endif
 
+SYMBOL_VERSION ILLUMOS_0.21 {
+    protected:
+	pthread_attr_get_np;
+} ILLUMOS_0.20;
+
 SYMBOL_VERSION ILLUMOS_0.20 {	# C11
     protected:
 	aligned_alloc;
@@ -3024,6 +3029,8 @@ $endif
 	pset_assign_forced;
 	pset_bind_lwp;
 	_psignal;
+	pthread_attr_getdaemonstate_np;
+	pthread_attr_setdaemonstate_np;
 	_pthread_setcleanupinit;
 	__putwchar_xpg5;
 	__putwc_xpg5;

@@ -89,6 +89,7 @@ file path=opt/libc-tests/tests/nl_langinfo_test mode=0555
 file path=opt/libc-tests/tests/nl_langinfo_test.$(ARCH) mode=0555
 file path=opt/libc-tests/tests/nl_langinfo_test.$(ARCH64) mode=0555
 file path=opt/libc-tests/tests/priv_gettext mode=0555
+file path=opt/libc-tests/tests/pthread_attr_get_np mode=0555
 file path=opt/libc-tests/tests/quick_exit mode=0555
 file path=opt/libc-tests/tests/quick_exit_order.32 mode=0555
 file path=opt/libc-tests/tests/quick_exit_order.64 mode=0555

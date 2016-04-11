@@ -290,6 +290,7 @@ file path=usr/share/man/man3c/priv_str_to_set.3c
 file path=usr/share/man/man3c/pset_getloadavg.3c
 file path=usr/share/man/man3c/psignal.3c
 file path=usr/share/man/man3c/pthread_atfork.3c
+file path=usr/share/man/man3c/pthread_attr_get_np.3c
 file path=usr/share/man/man3c/pthread_attr_getdetachstate.3c
 file path=usr/share/man/man3c/pthread_attr_getguardsize.3c
 file path=usr/share/man/man3c/pthread_attr_getinheritsched.3c

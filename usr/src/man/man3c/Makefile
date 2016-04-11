@@ -304,6 +304,7 @@ MANFILES= 	__fbufsize.3c					\
 	 	pthread_attr_getstack.3c			\
 	 	pthread_attr_getstackaddr.3c			\
 	 	pthread_attr_getstacksize.3c			\
+		pthread_attr_get_np.3c				\
 	 	pthread_attr_init.3c				\
 	 	pthread_barrier_destroy.3c			\
 	 	pthread_barrier_wait.3c				\

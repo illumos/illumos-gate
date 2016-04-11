@@ -66,6 +66,8 @@ outputdir = /var/tmp/test_results
 [/opt/libc-tests/tests/timespec_get.32]
 [/opt/libc-tests/tests/timespec_get.64]
 
+[/opt/libc-tests/tests/pthread_attr_get_np]
+
 [/opt/libc-tests/tests/symbols]
 pre = setup
 tests = [

@@ -24,6 +24,7 @@ SUBDIRS = \
 	random \
 	strerror \
 	symbols \
+	threads \
 	wcsrtombs \
 	wctype
 
