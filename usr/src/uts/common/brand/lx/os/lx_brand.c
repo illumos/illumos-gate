@@ -213,8 +213,6 @@ static int lx_systrace_enabled;
 /*
  * cgroup file system maintenance functions which are set when cgroups loads.
  */
-void (*lx_cgrp_forklwp)(vfs_t *, uint_t, pid_t);
-void (*lx_cgrp_proc_exit)(vfs_t *, uint_t, pid_t);
 void (*lx_cgrp_initlwp)(vfs_t *, uint_t, id_t, pid_t);
 void (*lx_cgrp_freelwp)(vfs_t *, uint_t, id_t, pid_t);
 
@@ -332,23 +330,6 @@ lx_proc_exit(proc_t *p)
 {
 	lx_proc_data_t *lxpd;
 	proc_t *cp;
-	lx_zone_data_t *lxzdata;
-	vfs_t *cgrp;
-
-	/* cgroup integration */
-	lxzdata = ztolxzd(p->p_zone);
-	mutex_enter(&lxzdata->lxzd_lock);
-	cgrp = lxzdata->lxzd_cgroup;
-	if (cgrp != NULL) {
-		VFS_HOLD(cgrp);
-		mutex_exit(&lxzdata->lxzd_lock);
-		lx_lwp_data_t *lwpd = lwptolxlwp(ttolwp(curthread));
-		ASSERT(lx_cgrp_proc_exit != NULL);
-		(*lx_cgrp_proc_exit)(cgrp, lwpd->br_cgroupid, p->p_pid);
-		VFS_RELE(cgrp);
-	} else {
-		mutex_exit(&lxzdata->lxzd_lock);
-	}
 
 	mutex_enter(&p->p_lock);
 	VERIFY(lxpd = ptolxproc(p));

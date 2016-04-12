@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #ifndef	_LXCGRPS_H
@@ -68,11 +68,6 @@ typedef struct cgrpmgr_info32 {
 	caddr32_t	cgmi_cgroup_path;
 } cgrpmgr_info32_t;
 
-typedef struct cgrp_evnt {
-	list_node_t	cg_evnt_lst;
-	char		*cg_evnt_path;
-} cgrp_evnt_t;
-
 #define	CG_PSNSIZE	256	/* max size of pseudo file name entries */
 #define	CG_PSDSIZE	16	/* pretend that a dir entry takes 16 bytes */
 
@@ -104,6 +99,7 @@ typedef struct cgrp_subsys_dirent {
  * we size the hash for 2x that number.
  */
 #define	CGRP_HASH_SZ	128
+#define	CGRP_AGENT_LEN	(MAXPATHLEN + 1)
 
 /*
  * cgroups per-mount data structure.
@@ -120,12 +116,7 @@ typedef struct cgrp_mnt {
 	uint_t		cg_gen;		/* node ID source for files */
 	uint_t		cg_grp_gen;	/* ID source for cgroups */
 	kmutex_t	cg_contents;	/* global lock for most fs activity */
-	char		cg_agent[MAXPATHLEN + 1]; /* release_agent path */
-	pid_t		cg_mgrpid;	/* pid of user-level manager */
-	kmutex_t	cg_events;	/* lock for event list */
-	kcondvar_t	cg_evnt_cv;	/* condvar for event list wakeup */
-	int		cg_evnt_cnt;	/* counter for num events in list */
-	list_t		cg_evnt_list;	/* list of agent events */
+	char		cg_agent[CGRP_AGENT_LEN]; /* release_agent path */
 	/* ptr to zone data for containing zone */
 	lx_zone_data_t	*cg_lxzdata;
 	struct cgrp_node **cg_grp_hash;	/* hash list of cgroups in the fs */

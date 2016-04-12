@@ -61,12 +61,10 @@
  *
  * Cgroup membership is implemented via hooks into the lx brand code. When
  * the cgroup file system loads it installs callbacks for:
- *    lx_cgrp_forklwp
- *    lx_cgrp_procexit
  *    lx_cgrp_initlwp
  *    lx_cgrp_freelwp
  * and when it unloads it clears those hooks. The lx brand code calls those
- * hooks when a process/lwp starts and when it exits. Internally we use a
+ * hooks when a lwp starts and when it exits. Internally we use a
  * simple reference counter (cgn_task_cnt) on the cgroup node to track how many
  * threads are in the group, so we can tell when a group becomes empty.
  * To make this quick, a hash table (cg_grp_hash) is maintained on the
@@ -76,15 +74,10 @@
  * (lxzd_cgroup) so that the lx brand code can pass in the correct vfs_t
  * when it runs the hook.
  *
- * Once a cgroup becomes empty, running the release agent is actually done
- * by a user-level cgrpmgr process. That process makes a CGRPFS_GETEVNT
- * ioctl which blocks until there is an event (i.e. the agent needs to run).
- * Internally we maintain a list (cg_evnt_list) of release events on
- * cgrp_mnt_t. The ioctl pulls an event off of the list, or blocks until an
- * event is available, and then returns the event. The cgrpmgr process is
- * started by the lx mount emulation when it mounts the file system. The
- * cgrpmgr will exit when the ioctl returns EIO, indicating that the file
- * system is being unmounted.
+ * Once a cgroup is about to become empty, the final process exiting the cgroup
+ * will launch a new user-level process which execs the release agent. The new
+ * process is created as a child of zsched (indicated by the -1 pid argument
+ * to newproc) and is not associated with the exiting process in any way.
  *
  * This file system is similar to tmpfs in that directories only exist in
  * memory. Each subdirectory represents a different cgroup. Within the cgroup
@@ -129,9 +122,6 @@
  * and p_lock, but the cgrp_lwp_fork_helper can also be called while one of
  * those is held. To prevent deadlock we always take cg_contents after pidlock
  * and p_lock.
- *
- * In addition to the cg_contents lock there is also a second mutex (cg_events)
- * used with the event queue condvar (cg_evnt_cv).
  *
  * EXTENDING THE FILE SYSTEM
  *
@@ -185,6 +175,14 @@
 #include <sys/policy.h>
 #include <sys/sdt.h>
 #include <sys/ddi.h>
+#include <sys/vmparam.h>
+#include <sys/corectl.h>
+#include <sys/contract_impl.h>
+#include <sys/pool.h>
+#include <sys/stack.h>
+#include <sys/rt.h>
+#include <sys/fx.h>
+#include <sys/brand.h>
 #include <sys/lx_brand.h>
 
 #include "cgrps.h"
@@ -239,8 +237,6 @@ static int cgrp_statvfs(struct vfs *, struct statvfs64 *);
 static void cgrp_freevfs(vfs_t *vfsp);
 
 /* Forward declarations for hooks */
-static void cgrp_proc_fork_helper(vfs_t *, uint_t, pid_t);
-static void cgrp_proc_exit_helper(vfs_t *, uint_t, pid_t);
 static void cgrp_lwp_fork_helper(vfs_t *, uint_t, id_t, pid_t);
 static void cgrp_lwp_exit_helper(vfs_t *, uint_t, id_t, pid_t);
 
@@ -286,8 +282,6 @@ _fini()
 		return (error);
 
 	/* Disable hooks used by the lx brand module. */
-	lx_cgrp_forklwp = NULL;
-	lx_cgrp_proc_exit = NULL;
 	lx_cgrp_initlwp = NULL;
 	lx_cgrp_freelwp = NULL;
 
@@ -362,8 +356,6 @@ cgrp_init(int fstype, char *name)
 	cgrp_dev = makedevice(dev, 0);
 
 	/* Install the hooks used by the lx brand module. */
-	lx_cgrp_forklwp = cgrp_proc_fork_helper;
-	lx_cgrp_proc_exit = cgrp_proc_exit_helper;
 	lx_cgrp_initlwp = cgrp_lwp_fork_helper;
 	lx_cgrp_freelwp = cgrp_lwp_exit_helper;
 
@@ -450,17 +442,12 @@ cgrp_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 
 	/* Set but don't bother entering the mutex (not on mount list yet) */
 	mutex_init(&cgm->cg_contents, NULL, MUTEX_DEFAULT, NULL);
-	mutex_init(&cgm->cg_events, NULL, MUTEX_DEFAULT, NULL);
-	cv_init(&cgm->cg_evnt_cv, NULL, CV_DRIVER, NULL);
 
 	cgm->cg_vfsp = lxzdata->lxzd_cgroup = vfsp;
 	mutex_exit(&lxzdata->lxzd_lock);
 
 	cgm->cg_lxzdata = lxzdata;
 	cgm->cg_ssid = ssid;
-
-	list_create(&cgm->cg_evnt_list, sizeof (cgrp_evnt_t),
-	    offsetof(cgrp_evnt_t, cg_evnt_lst));
 
 	vfsp->vfs_data = (caddr_t)cgm;
 	vfsp->vfs_fstype = cgrp_fstype;
@@ -546,27 +533,6 @@ retry:
 
 	ASSERT(cgm->cg_lxzdata->lxzd_cgroup != NULL);
 
-	mutex_enter(&cgm->cg_events);
-	cv_signal(&cgm->cg_evnt_cv);
-
-	/*
-	 * Delete any queued events (normally there shouldn't be any).
-	 */
-	for (;;) {
-		cgrp_evnt_t *evntp;
-
-		evntp = list_remove_head(&cgm->cg_evnt_list);
-		if (evntp == NULL)
-			break;
-		kmem_free(evntp->cg_evnt_path, MAXPATHLEN);
-		kmem_free(evntp, sizeof (cgrp_evnt_t));
-		cgm->cg_evnt_cnt--;
-	}
-
-	/* Set the counter to -1 so an incoming ioctl knows we're unmounting */
-	cgm->cg_evnt_cnt = -1;
-	mutex_exit(&cgm->cg_events);
-
 	vp = CGNTOV(cgnp);
 	mutex_enter(&vp->v_lock);
 
@@ -621,8 +587,6 @@ retry:
 	cgm->cg_lxzdata->lxzd_cgroup = NULL;
 	mutex_exit(&cgm->cg_lxzdata->lxzd_lock);
 	kmem_free(cgm->cg_grp_hash, sizeof (cgrp_node_t *) * CGRP_HASH_SZ);
-	list_destroy(&cgm->cg_evnt_list);
-	cv_destroy(&cgm->cg_evnt_cv);
 
 	/*
 	 * We can drop the mutex now because
@@ -719,7 +683,6 @@ cgrp_freevfs(vfs_t *vfsp)
 	kmem_free(cgm->cg_mntpath, strlen(cgm->cg_mntpath) + 1);
 
 	mutex_destroy(&cgm->cg_contents);
-	mutex_destroy(&cgm->cg_events);
 	kmem_free(cgm, sizeof (cgrp_mnt_t));
 
 	/* Allow _fini() to succeed now */
@@ -852,8 +815,94 @@ cgrp_get_dirname(cgrp_node_t *cn, char *buf, int blen)
 	return (-1);
 }
 
+typedef struct cgrp_rra_arg {
+	char *crraa_agent_path;
+	char *crraa_event_path;
+} cgrp_rra_arg_t;
+
+static void
+cgrp_run_rel_agent(void *a)
+{
+	cgrp_rra_arg_t *rarg = a;
+	proc_t *p = ttoproc(curthread);
+	zone_t *z = p->p_zone;
+	struct core_globals *cg;
+	int res;
+
+	ASSERT(!INGLOBALZONE(curproc));
+
+	/* The following block is derived from start_init_common */
+	ASSERT_STACK_ALIGNED();
+
+	p->p_cstime = p->p_stime = p->p_cutime = p->p_utime = 0;
+	p->p_usrstack = (caddr_t)USRSTACK32;
+	p->p_model = DATAMODEL_ILP32;
+	p->p_stkprot = PROT_ZFOD & ~PROT_EXEC;
+	p->p_datprot = PROT_ZFOD & ~PROT_EXEC;
+	p->p_stk_ctl = INT32_MAX;
+
+	p->p_as = as_alloc();
+	p->p_as->a_proc = p;
+	p->p_as->a_userlimit = (caddr_t)USERLIMIT32;
+	(void) hat_setup(p->p_as->a_hat, HAT_INIT);
+
+	VERIFY((cg = zone_getspecific(core_zone_key, z)) != NULL);
+
+	corectl_path_hold(cg->core_default_path);
+	corectl_content_hold(cg->core_default_content);
+
+	curproc->p_corefile = cg->core_default_path;
+	curproc->p_content = cg->core_default_content;
+
+	init_mstate(curthread, LMS_SYSTEM);
+	res = exec_init(rarg->crraa_agent_path, rarg->crraa_event_path);
+
+	/* End of code derived from start_init_common */
+
+	kmem_free(rarg->crraa_event_path, MAXPATHLEN);
+	kmem_free(rarg->crraa_agent_path, CGRP_AGENT_LEN);
+	kmem_free(rarg, sizeof (cgrp_rra_arg_t));
+
+	/* The following is derived from zone_start_init - see comments there */
+	if (res != 0 || zone_status_get(global_zone) >= ZONE_IS_SHUTTING_DOWN) {
+		if (proc_exit(CLD_EXITED, res) != 0) {
+			mutex_enter(&p->p_lock);
+			ASSERT(p->p_flag & SEXITLWPS);
+			lwp_exit();
+		}
+	} else {
+		id_t cid = curthread->t_cid;
+
+		mutex_enter(&class_lock);
+		ASSERT(cid < loaded_classes);
+		if (strcmp(sclass[cid].cl_name, "FX") == 0 &&
+		    z->zone_fixed_hipri) {
+			pcparms_t pcparms;
+
+			pcparms.pc_cid = cid;
+			((fxkparms_t *)pcparms.pc_clparms)->fx_upri = FXMAXUPRI;
+			((fxkparms_t *)pcparms.pc_clparms)->fx_uprilim =
+			    FXMAXUPRI;
+			((fxkparms_t *)pcparms.pc_clparms)->fx_cflags =
+			    FX_DOUPRILIM | FX_DOUPRI;
+
+			mutex_enter(&pidlock);
+			mutex_enter(&curproc->p_lock);
+			(void) parmsset(&pcparms, curthread);
+			mutex_exit(&curproc->p_lock);
+			mutex_exit(&pidlock);
+		} else if (strcmp(sclass[cid].cl_name, "RT") == 0) {
+			curthread->t_pri = RTGPPRIO0;
+		}
+		mutex_exit(&class_lock);
+
+		/* cause the process to return to userland. */
+		lwp_rtt();
+	}
+}
+
 /*
- * Engueue an event for user-level release_agent manager. The event data is the
+ * Launch the user-level release_agent manager. The event data is the
  * pathname (relative to the mount point of the file system) of the newly empty
  * cgroup.
  */
@@ -863,7 +912,12 @@ cgrp_rel_agent_event(cgrp_mnt_t *cgm, cgrp_node_t *cn)
 	cgrp_node_t *parent;
 	char nm[MAXNAMELEN];
 	char *argstr, *oldstr, *tmp;
-	cgrp_evnt_t *evntp;
+	id_t cid;
+	int agent_err;
+	proc_t *p = ttoproc(curthread);
+	zone_t *z = p->p_zone;
+	lx_lwp_data_t *plwpd = ttolxlwp(curthread);
+	cgrp_rra_arg_t *rarg;
 
 	ASSERT(MUTEX_HELD(&cgm->cg_contents));
 
@@ -911,63 +965,39 @@ cgrp_rel_agent_event(cgrp_mnt_t *cgm, cgrp_node_t *cn)
 
 	kmem_free(oldstr, MAXPATHLEN);
 
-	DTRACE_PROBE1(cgrp__agent__event, char *, argstr);
+	rarg = kmem_alloc(sizeof (cgrp_rra_arg_t), KM_SLEEP);
+	rarg->crraa_agent_path = kmem_alloc(sizeof (cgm->cg_agent), KM_SLEEP);
+	(void) strlcpy(rarg->crraa_agent_path, cgm->cg_agent,
+	    sizeof (cgm->cg_agent));
+	rarg->crraa_event_path = argstr;
 
-	/*
-	 * Add the event to the list for the user-level agent. We add it to
-	 * the end of the list (which should normally be an empty list since
-	 * the user-level agent is designed to service events as quickly as
-	 * it can).
-	 */
-	evntp = kmem_zalloc(sizeof (cgrp_evnt_t), KM_SLEEP);
-	evntp->cg_evnt_path = argstr;
+	DTRACE_PROBE2(cgrp__agent__event, cgrp_rra_arg_t *, rarg,
+	    int, plwpd->br_cgroupid);
 
-	mutex_enter(&cgm->cg_events);
-	if (cgm->cg_evnt_cnt >= MAX_AGENT_EVENTS) {
-		/*
-		 * We don't queue up an arbitrary number of events. Because
-		 * the user-level manager should be servicing events quickly,
-		 * if the list gets long then something is wrong.
-		 */
-		cmn_err(CE_WARN, "cgrp: event queue full for zone %s",
-		    ttoproc(curthread)->p_zone->zone_name);
-		kmem_free(evntp->cg_evnt_path, MAXPATHLEN);
-		kmem_free(evntp, sizeof (cgrp_evnt_t));
+	/* The release agent process cannot belong to our cgroup */
+	plwpd->br_cgroupid = 0;
 
+	if (z->zone_defaultcid > 0) {
+		cid = z->zone_defaultcid;
 	} else {
-		list_insert_tail(&cgm->cg_evnt_list, evntp);
-		cgm->cg_evnt_cnt++;
-		cv_signal(&cgm->cg_evnt_cv);
+		pool_lock();
+		cid = pool_get_class(z->zone_pool);
+		pool_unlock();
 	}
-	mutex_exit(&cgm->cg_events);
-}
+	if (cid == -1)
+		cid = defaultcid;
 
-/*ARGSUSED*/
-static void
-cgrp_proc_fork_helper(vfs_t *vfsp, uint_t cg_id, pid_t pid)
-{
-}
+	mutex_exit(&cgm->cg_contents);
 
-/*ARGSUSED*/
-static void
-cgrp_proc_exit_helper(vfs_t *vfsp, uint_t cg_id, pid_t pid)
-{
-	if (curproc->p_zone->zone_proc_initpid == pid ||
-	    curproc->p_zone->zone_proc_initpid == -1) {
-		/*
-		 * The zone's init just exited. If this is because of a zone
-		 * reboot initiated from outside the zone, then we've never
-		 * tried to unmount this fs, so we need to wakeup the
-		 * user-level manager so that it can exit. Its also possible
-		 * init died abnormally, but that leads to a zone reboot so the
-		 * action is the same here.
-		 */
-		cgrp_mnt_t *cgm = (cgrp_mnt_t *)VFSTOCGM(vfsp);
-
-		mutex_enter(&cgm->cg_events);
-		cv_signal(&cgm->cg_evnt_cv);
-		mutex_exit(&cgm->cg_events);
+	if ((agent_err = newproc(cgrp_run_rel_agent, (void *)rarg, cid,
+	    minclsyspri - 1, NULL, -1)) != 0) {
+		/* There's nothing we can do if creating the proc fails. */
+		kmem_free(rarg->crraa_event_path, MAXPATHLEN);
+		kmem_free(rarg->crraa_agent_path, sizeof (cgm->cg_agent));
+		kmem_free(rarg, sizeof (cgrp_rra_arg_t));
 	}
+
+	mutex_enter(&cgm->cg_contents);
 }
 
 /*ARGSUSED*/
@@ -996,7 +1026,11 @@ cgrp_lwp_exit_helper(vfs_t *vfsp, uint_t cg_id, id_t tid, pid_t tpid)
 	mutex_enter(&cgm->cg_contents);
 	cn = cgrp_cg_hash_lookup(cgm, cg_id);
 	ASSERT(cn != NULL);
-	VERIFY(cn->cgn_task_cnt > 0);
+	if (cn->cgn_task_cnt == 0) {
+		/* top-level cgroup cnt can be 0 during reboot */
+		mutex_exit(&cgm->cg_contents);
+		return;
+	}
 	cn->cgn_task_cnt--;
 	DTRACE_PROBE1(cgrp__lwp__exit, void *, cn);
 
