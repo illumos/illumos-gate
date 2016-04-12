@@ -522,6 +522,11 @@ tests = ['utils_test_001_pos', 'utils_test_002_pos', 'utils_test_003_pos',
     'utils_test_004_pos', 'utils_test_005_pos', 'utils_test_006_pos',
     'utils_test_007_pos', 'utils_test_008_pos', 'utils_test_009_pos']
 
+[/opt/zfs-tests/tests/functional/vdev_zaps]
+tests = ['vdev_zaps_001_pos', 'vdev_zaps_002_pos', 'vdev_zaps_003_pos',
+    'vdev_zaps_004_pos', 'vdev_zaps_005_pos', 'vdev_zaps_006_pos',
+    'vdev_zaps_007_pos']
+
 [/opt/zfs-tests/tests/functional/write_dirs]
 tests = ['write_dirs_001_pos', 'write_dirs_002_pos']
 
