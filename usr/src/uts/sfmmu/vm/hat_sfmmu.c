@@ -23,6 +23,7 @@
  */
 /*
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 Gary Mills
  */
 
 /*
@@ -8190,7 +8191,6 @@ hat_page_demote(page_t *pp)
 	page_t *rootpp;
 	struct sf_hment *sfhme;
 	struct sf_hment *tmphme = NULL;
-	struct hme_blk *hmeblkp;
 	uint_t pszc;
 	page_t *lastpp;
 	cpuset_t tset;
@@ -8228,7 +8228,6 @@ hat_page_demote(page_t *pp)
 		for (sfhme = rootpp->p_mapping; sfhme; sfhme = tmphme) {
 			tmphme = sfhme->hme_next;
 			ASSERT(!IS_PAHME(sfhme));
-			hmeblkp = sfmmu_hmetohblk(sfhme);
 			if (hme_size(sfhme) != sz) {
 				continue;
 			}
@@ -13236,7 +13235,6 @@ static void
 sfmmu_rm_large_mappings(page_t *pp, int ttesz)
 {
 	struct sf_hment *sfhmep;
-	struct hme_blk *hmeblkp;
 	int	index;
 	pgcnt_t	npgs;
 
@@ -13255,7 +13253,6 @@ sfmmu_rm_large_mappings(page_t *pp, int ttesz)
 	for (sfhmep = pp->p_mapping; sfhmep; sfhmep = sfhmep->hme_next) {
 		if (IS_PAHME(sfhmep))
 			continue;
-		hmeblkp = sfmmu_hmetohblk(sfhmep);
 		if (hme_size(sfhmep) == ttesz) {
 			/*
 			 * another mapping of the same size. don't clear index.

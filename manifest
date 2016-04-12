@@ -10967,7 +10967,7 @@ h usr/share/lib/zoneinfo/America/Regina=usr/share/lib/zoneinfo/Canada/Saskatchew
 f usr/share/lib/zoneinfo/America/Resolute 0644 root bin
 h usr/share/lib/zoneinfo/America/Rio_Branco=usr/share/lib/zoneinfo/Brazil/Acre
 h usr/share/lib/zoneinfo/America/Rosario=usr/share/lib/zoneinfo/America/Cordoba
-f usr/share/lib/zoneinfo/America/Santa_Isabel 0644 root bin
+h usr/share/lib/zoneinfo/America/Santa_Isabel=usr/share/lib/zoneinfo/America/Tijuana
 f usr/share/lib/zoneinfo/America/Santarem 0644 root bin
 f usr/share/lib/zoneinfo/America/Santiago 0644 root bin
 f usr/share/lib/zoneinfo/America/Santo_Domingo 0644 root bin
@@ -11022,6 +11022,7 @@ f usr/share/lib/zoneinfo/Asia/Baghdad 0644 root bin
 h usr/share/lib/zoneinfo/Asia/Bahrain=usr/share/lib/zoneinfo/Asia/Qatar
 f usr/share/lib/zoneinfo/Asia/Baku 0644 root bin
 f usr/share/lib/zoneinfo/Asia/Bangkok 0644 root bin
+f usr/share/lib/zoneinfo/Asia/Barnaul 0644 root bin
 f usr/share/lib/zoneinfo/Asia/Beirut 0644 root bin
 f usr/share/lib/zoneinfo/Asia/Bishkek 0644 root bin
 f usr/share/lib/zoneinfo/Asia/Brunei 0644 root bin
@@ -11206,6 +11207,7 @@ h usr/share/lib/zoneinfo/Etc/Zulu=usr/share/lib/zoneinfo/UTC
 d usr/share/lib/zoneinfo/Europe 0755 root bin
 f usr/share/lib/zoneinfo/Europe/Amsterdam 0644 root bin
 f usr/share/lib/zoneinfo/Europe/Andorra 0644 root bin
+f usr/share/lib/zoneinfo/Europe/Astrakhan 0644 root bin
 f usr/share/lib/zoneinfo/Europe/Athens 0644 root bin
 h usr/share/lib/zoneinfo/Europe/Belfast=usr/share/lib/zoneinfo/GB
 f usr/share/lib/zoneinfo/Europe/Belgrade 0644 root bin
@@ -11252,6 +11254,7 @@ f usr/share/lib/zoneinfo/Europe/Stockholm 0644 root bin
 f usr/share/lib/zoneinfo/Europe/Tallinn 0644 root bin
 f usr/share/lib/zoneinfo/Europe/Tirane 0644 root bin
 f usr/share/lib/zoneinfo/Europe/Tiraspol 0644 root bin
+f usr/share/lib/zoneinfo/Europe/Ulyanovsk 0644 root bin
 f usr/share/lib/zoneinfo/Europe/Uzhgorod 0644 root bin
 f usr/share/lib/zoneinfo/Europe/Vaduz 0644 root bin
 h usr/share/lib/zoneinfo/Europe/Vatican=usr/share/lib/zoneinfo/Europe/Rome

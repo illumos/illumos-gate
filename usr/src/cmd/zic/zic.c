@@ -2,9 +2,8 @@
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-static char	elsieid[] = "@(#)zic.c	7.128.1";
+static char    elsieid[] = "@(#)zic.c  7.128.1";
 
 /*
  * #define	LEAPSECOND_SUPPORT
@@ -2230,8 +2229,7 @@ register const int			wantedy;
 }
 
 static void
-newabbr(string)
-const char * const	string;
+newabbr(const char * const string)
 {
 	register int	i;
 
@@ -2239,30 +2237,25 @@ const char * const	string;
 		register const char *cp;
 		register char *wp;
 
-		/*
-		 * Want one to ZIC_MAX_ABBR_LEN_WO_WARN alphabetics
-		 * optionally followed by a + or - and a number from 1 to 14.
-		 */
 		cp = string;
 		wp = NULL;
-		while (isascii(*cp) && isalpha(*cp))
+		while (isalpha(*cp) || ('0' <= *cp && *cp <= '9') ||
+		    *cp == '-' || *cp == '+') {
 			++cp;
-		if (cp - string == 0)
-			wp = gettext(("time zone abbreviation lacks "
-			    "alphabetic at start"));
-		if (noise && cp - string > 3)
-			wp = gettext(("time zone abbreviation has more than 3 "
+		}
+		if (noise && cp - string < 3)
+			wp = gettext(("time zone abbreviation has less than 3 "
 			    "alphabetics"));
-		if (cp - string > ZIC_MAX_ABBR_LEN_WO_WARN)
+		if (wp == NULL && cp - string > ZIC_MAX_ABBR_LEN_WO_WARN)
 			wp = gettext(("time zone abbreviation has too many "
-			    "alphabetics"));
+			    "characters"));
 		if (wp == NULL && (*cp == '+' || *cp == '-')) {
 			++cp;
 			if (isascii(*cp) && isdigit(*cp))
 				if (*cp++ == '1' && *cp >= '0' && *cp <= '4')
 					++cp;
 		}
-		if (*cp != '\0')
+		if (wp == NULL && *cp != '\0')
 			wp = gettext("time zone abbreviation differs from "
 			    "POSIX standard");
 		if (wp != NULL) {
