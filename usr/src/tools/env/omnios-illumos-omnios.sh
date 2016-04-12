@@ -21,7 +21,7 @@
 # Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2012 Joshua M. Clulow <josh@sysmgr.org>
-# Copyright 2015, OmniTI Computer Consulting, Inc. All rights reserved.
+# Copyright 2016, OmniTI Computer Consulting, Inc. All rights reserved.
 #
 
 # Configuration variables for the runtime environment of the nightly
@@ -161,7 +161,7 @@ export MULTI_PROTO="no"
 
 # VERSION for OmniOS uses the git ID of the repo. Don't use this if you aren't
 # using git for $GATE, or if $GATE isn't created yet.
-export VERSION=omnios-`cd $CODEMGR_WS; git log --pretty=format:'%h' -n 1`
+export VERSION=omnios-`cd $CODEMGR_WS; git branch | awk '{print $2}'`-`cd $CODEMGR_WS; git log --pretty=format:'%h' -n 1`
 
 #
 # the RELEASE and RELEASE_DATE variables are set in Makefile.master;
