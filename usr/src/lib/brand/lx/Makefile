@@ -33,7 +33,7 @@ include Makefile.lx
 .PARALLEL:
 
 SUBDIRS=	librtld_db lx_support lx_init lx_brand netfiles \
-		zone lx_vdso cgrpmgr testing .WAIT
+		zone lx_vdso testing .WAIT
 MSGSUBDIRS=	lx_brand lx_support zone
 
 all :=		TARGET= all

@@ -21,6 +21,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*
@@ -287,7 +288,10 @@ contract_ctor(contract_t *ct, ct_type_t *type, ct_template_t *tmpl, void *data,
 	avl_index_t where;
 	klwp_t *curlwp = ttolwp(curthread);
 
-	ASSERT(author == curproc);
+	/*
+	 * It's possible that author is not curproc if the zone is creating
+	 * a new process as a child of zsched.
+	 */
 
 	mutex_init(&ct->ct_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&ct->ct_reflock, NULL, MUTEX_DEFAULT, NULL);

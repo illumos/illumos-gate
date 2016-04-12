@@ -519,8 +519,6 @@ lx_forklwp(klwp_t *srclwp, klwp_t *dstlwp)
 {
 	struct lx_lwp_data *src = srclwp->lwp_brand;
 	struct lx_lwp_data *dst = dstlwp->lwp_brand;
-	lx_zone_data_t *lxzdata;
-	vfs_t *cgrp;
 
 	dst->br_ppid = src->br_pid;
 	dst->br_ptid = lwptot(srclwp)->t_tid;
@@ -552,21 +550,6 @@ lx_forklwp(klwp_t *srclwp, klwp_t *dstlwp)
 	 */
 	dst->br_lwp_flags = src->br_lwp_flags & BR_CPU_BOUND;
 	dst->br_scall_args = NULL;
-
-	/* cgroup integration */
-	lxzdata = ztolxzd(srclwp->lwp_procp->p_zone);
-	mutex_enter(&lxzdata->lxzd_lock);
-	cgrp = lxzdata->lxzd_cgroup;
-	if (cgrp != NULL) {
-		VFS_HOLD(cgrp);
-		mutex_exit(&lxzdata->lxzd_lock);
-		ASSERT(lx_cgrp_forklwp != NULL);
-		(*lx_cgrp_forklwp)(cgrp, dst->br_cgroupid,
-		    lwptoproc(dstlwp)->p_pid);
-		VFS_RELE(cgrp);
-	} else {
-		mutex_exit(&lxzdata->lxzd_lock);
-	}
 }
 
 /*

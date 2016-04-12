@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -920,131 +920,6 @@ cgrp_write(struct vnode *vp, struct uio *uiop, int ioflag, struct cred *cred,
 	return (error);
 }
 
-static int
-cgrp_ioctl(vnode_t *vp, int cmd, intptr_t data, int flag, cred_t *cr,
-    int *rvalp, caller_context_t *ct)
-{
-	cgrp_mnt_t *cgm = VTOCGM(vp);
-	model_t model;
-	cgrpmgr_info_t cgmi;
-	cgrp_evnt_t *evntp;
-	int res = 0;
-
-	/* We only support the cgrpmgr ioctls on the root vnode */
-	if (!(vp->v_flag & VROOT))
-		return (ENOTTY);
-
-	/* The caller must be root */
-	if (secpolicy_vnode_any_access(cr, vp, crgetuid(cr)) != 0 ||
-	    crgetuid(cr) != 0)
-		return (ENOTTY);
-
-	if (cmd != CGRPFS_GETEVNT)
-		return (ENOTTY);
-
-	model = get_udatamodel();
-	if (model == DATAMODEL_NATIVE) {
-		if (copyin((void *)data, &cgmi, sizeof (cgmi)))
-			return (EFAULT);
-
-	} else {
-		cgrpmgr_info32_t cgmi32;
-
-		if (copyin((void *)data, &cgmi32, sizeof (cgmi32)))
-			return (EFAULT);
-
-		cgmi.cgmi_pid = cgmi32.cgmi_pid;
-		cgmi.cgmi_rel_agent_path =
-		    (char *)(intptr_t)cgmi32.cgmi_rel_agent_path;
-		cgmi.cgmi_cgroup_path =
-		    (char *)(intptr_t)cgmi32.cgmi_cgroup_path;
-	}
-
-	if (cgm->cg_mgrpid == 0) {
-		/*
-		 * This is the initial call from the user-level manager,
-		 * keep track of its pid.
-		 */
-		cgm->cg_mgrpid  = cgmi.cgmi_pid;
-	} else if (cgm->cg_mgrpid != cgmi.cgmi_pid) {
-		/*
-		 * We only allow the manager which first contacted us to
-		 * make this ioctl.
-		 */
-		return (EINVAL);
-	}
-
-	/*
-	 * If there is a pending event, service it immediately, otherwise
-	 * block until an event occurs.
-	 */
-retry:
-	mutex_enter(&cgm->cg_events);
-
-	if (cgm->cg_evnt_cnt < 0) {
-		/*
-		 * Trying to unmount, tell the manager to quit.
-		 */
-		mutex_exit(&cgm->cg_events);
-		return (EIO);
-	}
-
-	if (cgm->cg_evnt_cnt == 0) {
-		cv_wait_sig(&cgm->cg_evnt_cv, &cgm->cg_events);
-
-		if (cgm->cg_evnt_cnt <= 0) {
-			/*
-			 * We were woken up but there are no events, it must
-			 * be due to an unmount and it's time for the user
-			 * manager to go away.
-			 */
-			mutex_exit(&cgm->cg_events);
-			return (EIO);
-		}
-	}
-
-	evntp = list_remove_head(&cgm->cg_evnt_list);
-	VERIFY(evntp != NULL);
-	ASSERT(cgm->cg_evnt_cnt > 0);
-	cgm->cg_evnt_cnt--;
-
-	mutex_exit(&cgm->cg_events);
-
-	/*
-	 * An event for the user-level manager should only occur if a
-	 * release_agent has been set, but on the unlikely chance that the
-	 * agent path was cleared after the event was enqueued, we check under
-	 * the lock and go back to waiting if the path is empty.
-	 */
-	mutex_enter(&cgm->cg_contents);
-	if (cgm->cg_agent[0] == '\0') {
-		mutex_exit(&cgm->cg_contents);
-		kmem_free(evntp->cg_evnt_path, MAXPATHLEN);
-		kmem_free(evntp, sizeof (cgrp_evnt_t));
-		goto retry;
-	}
-
-	if (copyout(cgm->cg_agent, (void *)cgmi.cgmi_rel_agent_path,
-	    strlen(cgm->cg_agent) + 1)) {
-		mutex_exit(&cgm->cg_contents);
-		res = EFAULT;
-		goto done;
-	}
-
-	mutex_exit(&cgm->cg_contents);
-
-	if (copyout(evntp->cg_evnt_path, (void *)cgmi.cgmi_cgroup_path,
-	    strlen(evntp->cg_evnt_path) + 1)) {
-		res = EFAULT;
-	}
-
-done:
-	kmem_free(evntp->cg_evnt_path, MAXPATHLEN);
-	kmem_free(evntp, sizeof (cgrp_evnt_t));
-
-	return (res);
-}
-
 /* ARGSUSED2 */
 static int
 cgrp_getattr(struct vnode *vp, struct vattr *vap, int flags, struct cred *cred,
@@ -1709,7 +1584,6 @@ const fs_operation_def_t cgrp_vnodeops_template[] = {
 	VOPNAME_CLOSE,		{ .vop_close = cgrp_close },
 	VOPNAME_READ,		{ .vop_read = cgrp_read },
 	VOPNAME_WRITE,		{ .vop_write = cgrp_write },
-	VOPNAME_IOCTL,		{ .vop_ioctl = cgrp_ioctl },
 	VOPNAME_GETATTR,	{ .vop_getattr = cgrp_getattr },
 	VOPNAME_SETATTR,	{ .vop_setattr = cgrp_setattr },
 	VOPNAME_ACCESS,		{ .vop_access = cgrp_access },

@@ -675,32 +675,6 @@ i_make_nfs_args(lx_nfs_mount_data_t *lx_nmd, struct nfs_args *nfs_args,
 	return (0);
 }
 
-static int
-run_cgrp_mgr(char *mntpnt)
-{
-	const char *cmd = "/native/usr/lib/brand/lx/cgrpmgr";
-	char *argv[] = { "cgrpmgr", NULL, NULL };
-
-	argv[1] = mntpnt;
-
-	switch (fork1()) {
-	case 0:
-		/* child */
-		execv(cmd, argv);
-		exit(1);
-		break;
-
-	case -1:
-		return (-1);
-
-	default:
-		/* the cgroup manager process runs until we unmount */
-		break;
-	}
-
-	return (0);
-}
-
 long
 lx_mount(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
     uintptr_t p5)
@@ -1054,15 +1028,7 @@ lx_mount(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 	    options, sizeof (options));
 
 	if (res == 0) {
-		if (is_cgrp && run_cgrp_mgr(target) != 0) {
-			/*
-			 * Forking the cgrp manager failed, unmount and return
-			 * an ENOMEM error as the best approximation that we're
-			 * out of resources.
-			 */
-			(void) umount(target);
-			return (-ENOMEM);
-		} else if (is_tmpfs) {
+		if (is_tmpfs) {
 			/* Handle uid/gid mount options. */
 			if (uid != -1 || gid != -1)
 				(void) chown(target, uid, gid);

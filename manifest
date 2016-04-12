@@ -5058,7 +5058,6 @@ s usr/lib/brand/lx/64=amd64
 d usr/lib/brand/lx/amd64 0755 root bin
 f usr/lib/brand/lx/amd64/lx_librtld_db.so.1 0755 root root
 f usr/lib/brand/lx/amd64/lx_vdso.so.1 0755 root root
-f usr/lib/brand/lx/cgrpmgr 0755 root root
 f usr/lib/brand/lx/etc_default_nfs 0444 root root
 d usr/lib/brand/lx/ld 0755 root root
 f usr/lib/brand/lx/ld/ld.config 0755 root root
