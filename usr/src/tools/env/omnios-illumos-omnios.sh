@@ -195,8 +195,9 @@ export PKGFMT_OUTPUT='v1'
 # one problem.
 export MAKEFLAGS='k'
 
-# Magic variable to prevent the devpro compilers/teamware from sending
-# mail back to devpro on every use.
+# Magic variables to prevent the devpro compilers/teamware from checking
+# for updates or sending mail back to devpro on every use.
+export SUNW_NO_UPDATE_NOTIFY='1'
 export UT_NO_USAGE_TRACKING='1'
 
 # Build tools - don't change these unless you know what you're doing.  These
@@ -250,5 +251,5 @@ ONLY_LINT_DEFS=-I${SPRO_ROOT}/sunstudio12.1/prod/include/lint; export ONLY_LINT_
 # To build IPS packages for the version you wish to update, ONNV_BUILDNUM must
 # match the version you're on.  Find this in /etc/release, and lose the 'r'.
 
-# Current bloody is r151017, so use '151017'.
-export ONNV_BUILDNUM=151017
+# Current bloody is r151019, so use '151019'.
+export ONNV_BUILDNUM=151019
