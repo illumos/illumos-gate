@@ -552,6 +552,9 @@ typedef struct zpool_rewind_policy {
 #define	ZPOOL_CONFIG_CAN_RDONLY		"can_rdonly"	/* not stored on disk */
 #define	ZPOOL_CONFIG_FEATURES_FOR_READ	"features_for_read"
 #define	ZPOOL_CONFIG_FEATURE_STATS	"feature_stats"	/* not stored on disk */
+#define	ZPOOL_CONFIG_VDEV_TOP_ZAP	"com.delphix:vdev_zap_top"
+#define	ZPOOL_CONFIG_VDEV_LEAF_ZAP	"com.delphix:vdev_zap_leaf"
+#define	ZPOOL_CONFIG_HAS_PER_VDEV_ZAPS	"com.delphix:has_per_vdev_zaps"
 /*
  * The persistent vdev state is stored as separate values rather than a single
  * 'vdev_state' entry.  This is because a device can be in multiple states, such
@@ -768,6 +771,10 @@ typedef struct ddt_histogram {
 #define	ZVOL_DRIVER	"zvol"
 #define	ZFS_DRIVER	"zfs"
 #define	ZFS_DEV		"/dev/zfs"
+#define	ZFS_DISK_ROOT	"/dev/dsk"
+#define	ZFS_DISK_ROOTD	ZFS_DISK_ROOT "/"
+#define	ZFS_RDISK_ROOT	"/dev/rdsk"
+#define	ZFS_RDISK_ROOTD	ZFS_RDISK_ROOT "/"
 
 /* general zvol path */
 #define	ZVOL_DIR		"/dev/zvol"

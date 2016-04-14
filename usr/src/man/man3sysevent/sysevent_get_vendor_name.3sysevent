@@ -1,9 +1,10 @@
 '\" te
 .\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright (c) 2015, Joyent, Inc. All Rights Reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SYSEVENT_GET_VENDOR_NAME 3SYSEVENT "Jul 24, 2009"
+.TH SYSEVENT_GET_VENDOR_NAME 3SYSEVENT "Jun 29, 2015"
 .SH NAME
 sysevent_get_vendor_name, sysevent_get_pub_name, sysevent_get_pid \- get vendor
 name, publisher name or processor ID of event
@@ -23,11 +24,10 @@ name, publisher name or processor ID of event
 
 .LP
 .nf
-\fBpid_t\fR \fBsysevent_get_pid\fR(\fBsysevent_t *\fR\fIev\fR);
+\fBvoid\fR \fBsysevent_get_pid\fR(\fBsysevent_t *\fR\fIev\fR, \fBpid_t *\fR\fIpid\fR);
 .fi
 
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIev\fR\fR
@@ -37,16 +37,16 @@ handle to a system event object
 .RE
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBsysevent_get_pub_name()\fR function returns the publisher name for the
 sysevent handle, \fIev\fR.  The publisher name identifies the name of the
 publishing application or kernel subsystem of the sysevent.
 .sp
 .LP
-The \fBsysevent_get_pid()\fR function returns the process ID for the publishing
-application or \fBSE_KERN_PID\fR for sysevents originating in the kernel.  The
-publisher name and PID are useful for implementing event acknowledgement.
+The \fBsysevent_get_pid()\fR function sets the process ID \fIpid\fR to that of
+the publishing application or \fBSE_KERN_PID\fR for sysevents originating in the
+kernel. The publisher name and PID are useful for implementing event
+acknowledgement.
 .sp
 .LP
 The \fBsysevent_get_vendor_name()\fR function returns the vendor string for the
@@ -75,6 +75,7 @@ event handler.
 .nf
 char *vendor;
 char *pub;
+pid_t pid;
 
 void
 event_handler(sysevent_t *ev)
@@ -94,7 +95,9 @@ event_handler(sysevent_t *ev)
                 free(pub);
                 return;
         }
-        (void) kill(sysevent_get_pid(ev), SIGUSR1);
+        sysevent_get_pid(ev, &pid);
+        (void) kill(pid, SIGUSR1);
+
         free(vendor);
         free(pub);
 }
@@ -102,7 +105,6 @@ event_handler(sysevent_t *ev)
 .in -2
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -120,10 +122,8 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBmalloc\fR(3MALLOC), \fBattributes\fR(5)
 .SH NOTES
-.sp
 .LP
 The \fBlibsysevent\fR interfaces do not work at all in non-global zones.

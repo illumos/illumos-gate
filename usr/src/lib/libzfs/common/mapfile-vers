@@ -219,6 +219,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zpool_obj_to_path;
 	zpool_open;
 	zpool_open_canfail;
+	zpool_pool_state_to_name;
 	zpool_print_unsup_feat;
 	zpool_prop_align_right;
 	zpool_prop_column_name;

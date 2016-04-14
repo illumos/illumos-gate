@@ -23,6 +23,9 @@
 
 /* Macros.  */
 
+/* The maximum number of ports we ever try to use. */
+#define	SERIAL_MAX_PORTS	4
+
 /* The offsets of UART registers.  */
 #define UART_TX		0
 #define UART_RX		0
@@ -64,6 +67,9 @@
 
 /* Turn on DTR, RTS, and OUT2.  */
 #define UART_ENABLE_MODEM	0x0B
+
+/* Arbitrary pattern to write during existence testing. */
+#define	UART_SR_TEST	0x4F
 
 
 /* Function prototypes.  */

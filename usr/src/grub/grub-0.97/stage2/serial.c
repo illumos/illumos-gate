@@ -141,6 +141,16 @@ serial_hw_init (unsigned short port, unsigned int speed,
   int i;
   unsigned short div = 0;
   unsigned char status = 0;
+
+  if (port == 0)
+    return 0;
+
+  /* Make sure the port actually exists. */
+  outb (port + UART_SR, UART_SR_TEST);
+  outb (port + UART_FCR, 0);
+  status = inb (port + UART_SR);
+  if (status != UART_SR_TEST)
+    return 0;
   
   /* Turn off the interrupt.  */
   outb (port + UART_IER, 0);
@@ -163,7 +173,7 @@ serial_hw_init (unsigned short port, unsigned int speed,
   outb (port + UART_DLH, div >> 8);
   
   /* Set the line status.  */
-  status |= parity | word_len | stop_bit_len;
+  status = parity | word_len | stop_bit_len;
   outb (port + UART_LCR, status);
 
   /* Enable the FIFO.  */
@@ -186,8 +196,6 @@ serial_hw_init (unsigned short port, unsigned int speed,
       {
 	term_table[i].flags &= ~TERM_NEED_INIT;
       }
-
-  /* FIXME: should check if the serial terminal was found.  */
   
   return 1;
 }
