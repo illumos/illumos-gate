@@ -55,6 +55,7 @@
 #include <sys/pool_pset.h>
 #include <sys/pset.h>
 #include <sys/zone.h>
+#include <sys/fcntl.h>
 #include <sys/pghw.h>
 #include <sys/vfs_opreg.h>
 #include <sys/param.h>
@@ -102,6 +103,8 @@ static int lxpr_create(struct vnode *, char *, struct vattr *, enum vcexcl,
     int, struct vnode **, struct cred *, int, caller_context_t *, vsecattr_t *);
 static int lxpr_read(vnode_t *, uio_t *, int, cred_t *, caller_context_t *);
 static int lxpr_write(vnode_t *, uio_t *, int, cred_t *, caller_context_t *);
+static int lxpr_space(vnode_t *, int, flock64_t *, int, offset_t, cred_t *,
+    caller_context_t *);
 static int lxpr_getattr(vnode_t *, vattr_t *, int, cred_t *,
     caller_context_t *);
 static int lxpr_access(vnode_t *, int, int, cred_t *, caller_context_t *);
@@ -176,6 +179,7 @@ static void lxpr_read_pid_cmdline(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_pid_comm(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_pid_env(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_pid_limits(lxpr_node_t *, lxpr_uiobuf_t *);
+static void lxpr_read_pid_loginuid(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_pid_maps(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_pid_mountinfo(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_pid_oom_scr_adj(lxpr_node_t *, lxpr_uiobuf_t *);
@@ -240,6 +244,8 @@ static void lxpr_read_sys_vm_nhpages(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_vm_overcommit_mem(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_vm_swappiness(lxpr_node_t *, lxpr_uiobuf_t *);
 
+static int lxpr_write_pid_loginuid(lxpr_node_t *, uio_t *, cred_t *,
+    caller_context_t *);
 static int lxpr_write_sys_net_core_somaxc(lxpr_node_t *, uio_t *, cred_t *,
     caller_context_t *);
 static int lxpr_write_sys_net_ipv4_tcp_fin_to(lxpr_node_t *, uio_t *, cred_t *,
@@ -293,6 +299,7 @@ const fs_operation_def_t lxpr_vnodeops_template[] = {
 	VOPNAME_CREATE,		{ .vop_create = lxpr_create },
 	VOPNAME_READDIR,	{ .vop_readdir = lxpr_readdir },
 	VOPNAME_READLINK,	{ .vop_readlink = lxpr_readlink },
+	VOPNAME_SPACE,		{ .vop_space = lxpr_space },
 	VOPNAME_FSYNC,		{ .error = lxpr_sync },
 	VOPNAME_SEEK,		{ .error = lxpr_sync },
 	VOPNAME_INACTIVE,	{ .vop_inactive = lxpr_inactive },
@@ -347,6 +354,7 @@ static lxpr_dirent_t piddir[] = {
 	{ LXPR_PID_ENV,		"environ" },
 	{ LXPR_PID_EXE,		"exe" },
 	{ LXPR_PID_LIMITS,	"limits" },
+	{ LXPR_PID_LOGINUID,	"loginuid" },
 	{ LXPR_PID_MAPS,	"maps" },
 	{ LXPR_PID_MEM,		"mem" },
 	{ LXPR_PID_MOUNTINFO,	"mountinfo" },
@@ -375,6 +383,7 @@ static lxpr_dirent_t tiddir[] = {
 	{ LXPR_PID_ENV,		"environ" },
 	{ LXPR_PID_EXE,		"exe" },
 	{ LXPR_PID_LIMITS,	"limits" },
+	{ LXPR_PID_LOGINUID,	"loginuid" },
 	{ LXPR_PID_MAPS,	"maps" },
 	{ LXPR_PID_MEM,		"mem" },
 	{ LXPR_PID_MOUNTINFO,	"mountinfo" },
@@ -578,6 +587,8 @@ lxpr_open(vnode_t **vpp, int flag, cred_t *cr, caller_context_t *ct)
 	if (flag & FWRITE) {
 		/* Restrict writes to certain files */
 		switch (type) {
+		case LXPR_PID_LOGINUID:
+		case LXPR_PID_TID_LOGINUID:
 		case LXPR_PID_OOM_SCR_ADJ:
 		case LXPR_PID_TID_OOM_SCR_ADJ:
 		case LXPR_SYS_KERNEL_COREPATT:
@@ -673,6 +684,7 @@ static void (*lxpr_read_function[LXPR_NFILES])() = {
 	lxpr_read_pid_env,		/* /proc/<pid>/environ	*/
 	lxpr_read_invalid,		/* /proc/<pid>/exe	*/
 	lxpr_read_pid_limits,		/* /proc/<pid>/limits	*/
+	lxpr_read_pid_loginuid,		/* /proc/<pid>/loginuid	*/
 	lxpr_read_pid_maps,		/* /proc/<pid>/maps	*/
 	lxpr_read_empty,		/* /proc/<pid>/mem	*/
 	lxpr_read_pid_mountinfo,	/* /proc/<pid>/mountinfo */
@@ -695,6 +707,7 @@ static void (*lxpr_read_function[LXPR_NFILES])() = {
 	lxpr_read_pid_env,		/* /proc/<pid>/task/<tid>/environ */
 	lxpr_read_invalid,		/* /proc/<pid>/task/<tid>/exe	*/
 	lxpr_read_pid_limits,		/* /proc/<pid>/task/<tid>/limits */
+	lxpr_read_pid_loginuid,		/* /proc/<pid>/task/<tid>/loginuid */
 	lxpr_read_pid_maps,		/* /proc/<pid>/task/<tid>/maps	*/
 	lxpr_read_empty,		/* /proc/<pid>/task/<tid>/mem	*/
 	lxpr_read_pid_mountinfo,	/* /proc/<pid>/task/<tid>/mountinfo */
@@ -804,6 +817,7 @@ static vnode_t *(*lxpr_lookup_function[LXPR_NFILES])() = {
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/environ	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/exe	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/limits	*/
+	lxpr_lookup_not_a_dir,		/* /proc/<pid>/loginuid	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/maps	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/mem	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/mountinfo */
@@ -826,6 +840,7 @@ static vnode_t *(*lxpr_lookup_function[LXPR_NFILES])() = {
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/environ */
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/exe	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/limits */
+	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/loginuid */
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/maps	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/mem	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/mountinfo */
@@ -935,6 +950,7 @@ static int (*lxpr_readdir_function[LXPR_NFILES])() = {
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/environ	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/exe	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/limits	*/
+	lxpr_readdir_not_a_dir,		/* /proc/<pid>/loginuid	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/maps	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/mem	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/mountinfo */
@@ -957,6 +973,7 @@ static int (*lxpr_readdir_function[LXPR_NFILES])() = {
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid>/environ */
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid>/exe	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid>/limits */
+	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid>/loginuid */
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid>/maps	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid>/mem	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid>/mountinfo */
@@ -1471,6 +1488,33 @@ lxpr_read_pid_limits(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 		lxpr_uiobuf_printf(uiobuf, " %-10s\n",
 		    lxpr_rlimtab[i].rlim_unit);
 	}
+}
+
+/*
+ * lxpr_read_pid_loginuid(): loginuid file
+ */
+static void
+lxpr_read_pid_loginuid(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+{
+	proc_t *p;
+	lx_proc_data_t *pd;
+	uid_t lu = 0;
+
+	ASSERT(lxpnp->lxpr_type == LXPR_PID_LOGINUID ||
+	    lxpnp->lxpr_type == LXPR_PID_TID_LOGINUID);
+
+	p = lxpr_lock(lxpnp->lxpr_pid, NO_ZOMB);
+	if (p == NULL) {
+		lxpr_uiobuf_seterr(uiobuf, ENXIO);
+		return;
+	}
+
+	if ((pd = ptolxproc(p)) != NULL) {
+		lu = pd->l_loginuid;
+	}
+	lxpr_unlock(p);
+
+	lxpr_uiobuf_printf(uiobuf, "%d", lu);
 }
 
 /*
@@ -5132,9 +5176,10 @@ lxpr_access(vnode_t *vp, int mode, int flags, cred_t *cr, caller_context_t *ct)
 	int shift = 0;
 	proc_t *tp;
 
-	/* lx /proc is a read only file system */
+	/* lx /proc is primarily a read only file system */
 	if (mode & VWRITE) {
 		switch (type) {
+		case LXPR_PID_LOGINUID:
 		case LXPR_PID_OOM_SCR_ADJ:
 		case LXPR_PID_TID_OOM_SCR_ADJ:
 		case LXPR_SYS_KERNEL_COREPATT:
@@ -6520,6 +6565,58 @@ lxpr_write_sys_kernel_corepatt(lxpr_node_t *lxpnp, struct uio *uio,
 	return (0);
 }
 
+/* ARGSUSED */
+static int
+lxpr_write_pid_loginuid(lxpr_node_t *lxpnp, struct uio *uio, struct cred *cr,
+    caller_context_t *ct)
+{
+	int error;
+	size_t olen;
+	char val[16];	/* big enough for a uint numeric string */
+	char *endptr = NULL;
+	long u;
+	proc_t *p;
+	lx_proc_data_t *pd;
+
+	ASSERT(lxpnp->lxpr_type == LXPR_PID_LOGINUID);
+
+	if (uio->uio_loffset != 0)
+		return (EINVAL);
+
+	if (uio->uio_resid == 0)
+		return (0);
+
+	olen = uio->uio_resid;
+	if (olen > sizeof (val) - 1)
+		return (EINVAL);
+
+	bzero(val, sizeof (val));
+	error = uiomove(val, olen, UIO_WRITE, uio);
+	if (error != 0)
+		return (error);
+
+	if (val[olen - 1] == '\n')
+		val[olen - 1] = '\0';
+
+	if (val[0] == '\0') /* no input */
+		return (EINVAL);
+
+	if (ddi_strtol(val, &endptr, 10, &u) != 0)
+		return (EINVAL);
+	if (val[0] < '0' || val[0] > '9' || *endptr != '\0')
+		return (EINVAL);
+
+	if ((p = lxpr_lock(lxpnp->lxpr_pid, NO_ZOMB)) == NULL)
+		return (ENXIO);
+
+	if ((pd = ptolxproc(p)) != NULL) {
+		pd->l_loginuid = (uid_t)u;
+	}
+	lxpr_unlock(p);
+
+	return (0);
+}
+
 /*
  * lxpr_readlink(): Vnode operation for VOP_READLINK()
  */
@@ -6683,6 +6780,8 @@ lxpr_write(vnode_t *vp, uio_t *uiop, int ioflag, cred_t *cr,
 	lxpr_nodetype_t	type = lxpnp->lxpr_type;
 
 	switch (type) {
+	case LXPR_PID_LOGINUID:
+		return (lxpr_write_pid_loginuid(lxpnp, uiop, cr, ct));
 	case LXPR_SYS_KERNEL_COREPATT:
 		return (lxpr_write_sys_kernel_corepatt(lxpnp, uiop, cr, ct));
 	case LXPR_SYS_NET_CORE_SOMAXCON:
@@ -6708,6 +6807,16 @@ lxpr_write(vnode_t *vp, uio_t *uiop, int ioflag, cred_t *cr,
 		uiop->uio_resid = 0;
 		return (0);
 	}
+}
+
+/* Needed for writable files which are first "truncated" */
+static int
+lxpr_space(vnode_t *vp, int cmd, flock64_t *bfp, int flag, offset_t offset,
+    cred_t *cred, caller_context_t *ct)
+{
+	if (cmd != F_FREESP)
+		return (EINVAL);
+	return (0);
 }
 
 /*

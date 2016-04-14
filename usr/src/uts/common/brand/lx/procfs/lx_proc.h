@@ -119,6 +119,7 @@ typedef enum lxpr_nodetype {
 	LXPR_PID_ENV,		/* /proc/<pid>/environ	*/
 	LXPR_PID_EXE,		/* /proc/<pid>/exe	*/
 	LXPR_PID_LIMITS,	/* /proc/<pid>/limits	*/
+	LXPR_PID_LOGINUID,	/* /proc/<pid>/loginuid	*/
 	LXPR_PID_MAPS,		/* /proc/<pid>/maps	*/
 	LXPR_PID_MEM,		/* /proc/<pid>/mem	*/
 	LXPR_PID_MOUNTINFO,	/* /proc/<pid>/mountinfo */
@@ -141,6 +142,7 @@ typedef enum lxpr_nodetype {
 	LXPR_PID_TID_ENV,	/* /proc/<pid>/task/<tid>/environ	*/
 	LXPR_PID_TID_EXE,	/* /proc/<pid>/task/<tid>/exe		*/
 	LXPR_PID_TID_LIMITS,	/* /proc/<pid>/task/<tid>/limits	*/
+	LXPR_PID_TID_LOGINUID,	/* /proc/<pid>/task/<tid>/loginuid	*/
 	LXPR_PID_TID_MAPS,	/* /proc/<pid>/task/<tid>/maps		*/
 	LXPR_PID_TID_MEM,	/* /proc/<pid>/task/<tid>/mem		*/
 	LXPR_PID_TID_MOUNTINFO,	/* /proc/<pid>/task/<tid>/mountinfo	*/
