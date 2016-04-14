@@ -19,7 +19,7 @@
 # Copyright 2008, 2012 Richard Lowe
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright (c) 2014, Joyent, Inc.
-# Copyright (c) 2015 by Delphix. All rights reserved.
+# Copyright (c) 2015, 2016 by Delphix. All rights reserved.
 #
 
 import getopt
@@ -164,9 +164,7 @@ def git_file_list(parent, paths=None):
 
     ret = set()
     for fname in p:
-        res = git("diff %s HEAD %s" % (parent, fname))
-        empty = not res.readline()
-        if fname and not fname.isspace() and fname not in ret and not empty:
+        if fname and not fname.isspace() and fname not in ret:
             ret.add(fname.strip())
 
     return ret
@@ -201,7 +199,17 @@ def gen_files(root, parent, paths, exclude):
 
         for f in git_file_list(parent, paths):
             f = relpath(f, '.')
-            if (os.path.exists(f) and select(f) and not exclude(f)):
+            try:
+                res = git("diff %s HEAD %s" % (parent, f))
+            except GitError, e:
+                # This ignores all the errors that can be thrown. Usually, this means
+                # that git returned non-zero because the file doesn't exist, but it
+                # could also fail if git can't create a new file or it can't be
+                # executed.  Such errors are 1) unlikely, and 2) will be caught by other
+                # invocations of git().
+                continue
+            empty = not res.readline()
+            if (os.path.exists(f) and not empty and select(f) and not exclude(f)):
                 yield f
     return ret
 
