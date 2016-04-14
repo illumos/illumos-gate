@@ -22,7 +22,7 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2015 Joyent, Inc.  All rights reserved.
+ * Copyright 2016 Joyent, Inc.  All rights reserved.
  */
 
 #include <errno.h>
@@ -107,6 +107,7 @@ lx_vfork(void)
 	lx_sighandlers_t saved;
 	ucontext_t vforkuc;
 	ucontext_t *ucp;
+	lx_tsd_t *lx_tsd = lx_get_tsd();
 
 	ucp = lx_syscall_regs();
 
@@ -126,11 +127,11 @@ lx_vfork(void)
 	_sigoff();
 	lx_stack_prefork();
 	lx_sighandlers_save(&saved);
-	lx_is_vforked++;
+	lx_tsd->lxtsd_is_vforked++;
 	ret = vfork();
 	if (ret != 0) {
 		/* parent/error */
-		lx_is_vforked--;
+		lx_tsd->lxtsd_is_vforked--;
 		lx_sighandlers_restore(&saved);
 	}
 

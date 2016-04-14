@@ -101,27 +101,19 @@ struct clone_state {
 	lx_tsd_t	*c_lx_tsd;	/* tsd area for thread */
 };
 
-/*
- * Counter incremented when we vfork(2) ourselves, and decremented when the
- * vfork(2)ed child exit(2)s or exec(2)s.
- */
-int lx_is_vforked = 0;
-
 long
 lx_exit(uintptr_t p1)
 {
 	int		status = (int)p1;
-	lx_tsd_t	*lx_tsd;
+	lx_tsd_t	*lx_tsd = lx_get_tsd();
 
 	/*
 	 * If we are a vfork(2)ed child, we need to exit as quickly and
 	 * cleanly as possible to avoid corrupting our parent.
 	 */
-	if (lx_is_vforked != 0) {
+	if (lx_tsd->lxtsd_is_vforked != 0) {
 		_exit(status);
 	}
-
-	lx_tsd = lx_get_tsd();
 
 	lx_tsd->lxtsd_exit = LX_ET_EXIT;
 	lx_tsd->lxtsd_exit_status = status;
@@ -148,17 +140,15 @@ long
 lx_group_exit(uintptr_t p1)
 {
 	int		status = (int)p1;
-	lx_tsd_t	*lx_tsd;
+	lx_tsd_t	*lx_tsd = lx_get_tsd();
 
 	/*
 	 * If we are a vfork(2)ed child, we need to exit as quickly and
 	 * cleanly as possible to avoid corrupting our parent.
 	 */
-	if (lx_is_vforked != 0) {
+	if (lx_tsd->lxtsd_is_vforked != 0) {
 		_exit(status);
 	}
-
-	lx_tsd = lx_get_tsd();
 
 	lx_tsd->lxtsd_exit = LX_ET_EXIT_GROUP;
 	lx_tsd->lxtsd_exit_status = status;
@@ -327,6 +317,7 @@ lx_clone(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4, uintptr_t p5)
 	int fork_flags = 0;
 	int ptrace_event;
 	int error = 0;
+	lx_tsd_t *lx_tsd = lx_get_tsd();
 
 	if (flags & LX_CLONE_SETTLS) {
 		lx_debug("lx_clone(flags=0x%x stk=0x%p ptidp=0x%p ldt=0x%p "
@@ -419,10 +410,10 @@ lx_clone(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4, uintptr_t p5)
 			 * concurrently with our child.
 			 */
 			lx_sighandlers_save(&saved);
-			lx_is_vforked++;
+			lx_tsd->lxtsd_is_vforked++;
 			rval = vforkx(fork_flags);
 			if (rval != 0) {
-				lx_is_vforked--;
+				lx_tsd->lxtsd_is_vforked--;
 				lx_sighandlers_restore(&saved);
 			}
 		} else {

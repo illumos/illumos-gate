@@ -22,7 +22,7 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.	All rights reserved.
  * Use is subject to license terms.
- * Copyright 2015 Joyent, Inc
+ * Copyright 2016 Joyent, Inc
  */
 
 #ifndef _SYS_LX_THREAD_H
@@ -42,6 +42,8 @@ typedef enum lx_exit_type {
 } lx_exit_type_t;
 
 typedef struct lx_tsd {
+	/* per-thread flag set on parent vfork, cleared on thread resume */
+	int		lxtsd_is_vforked;
 	lx_exit_type_t	lxtsd_exit;
 	int		lxtsd_exit_status;
 	ucontext_t	lxtsd_exit_context;
