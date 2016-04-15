@@ -173,6 +173,7 @@ struct vdev {
 	uint64_t	vdev_islog;	/* is an intent log device	*/
 	uint64_t	vdev_removing;	/* device is being removed?	*/
 	boolean_t	vdev_ishole;	/* is a hole in the namespace 	*/
+	uint64_t	vdev_top_zap;
 
 	/*
 	 * Leaf vdev state.
@@ -211,6 +212,7 @@ struct vdev {
 	spa_aux_vdev_t	*vdev_aux;	/* for l2cache and spares vdevs	*/
 	zio_t		*vdev_probe_zio; /* root of current probe	*/
 	vdev_aux_t	vdev_label_aux;	/* on-disk aux state		*/
+	uint64_t	vdev_leaf_zap;
 
 	/*
 	 * For DTrace to work in userland (libzpool) context, these fields must

@@ -135,6 +135,7 @@ dir path=opt/zfs-tests/tests/functional/threadsappend
 dir path=opt/zfs-tests/tests/functional/truncate
 dir path=opt/zfs-tests/tests/functional/userquota
 dir path=opt/zfs-tests/tests/functional/utils_test
+dir path=opt/zfs-tests/tests/functional/vdev_zaps
 dir path=opt/zfs-tests/tests/functional/write_dirs
 dir path=opt/zfs-tests/tests/functional/xattr
 dir path=opt/zfs-tests/tests/functional/zvol
@@ -2169,6 +2170,16 @@ file path=opt/zfs-tests/tests/functional/utils_test/utils_test_008_pos \
     mode=0555
 file path=opt/zfs-tests/tests/functional/utils_test/utils_test_009_pos \
     mode=0555
+file path=opt/zfs-tests/tests/functional/vdev_zaps/cleanup mode=0555
+file path=opt/zfs-tests/tests/functional/vdev_zaps/setup mode=0555
+file path=opt/zfs-tests/tests/functional/vdev_zaps/vdev_zaps.kshlib mode=0555
+file path=opt/zfs-tests/tests/functional/vdev_zaps/vdev_zaps_001_pos mode=0555
+file path=opt/zfs-tests/tests/functional/vdev_zaps/vdev_zaps_002_pos mode=0555
+file path=opt/zfs-tests/tests/functional/vdev_zaps/vdev_zaps_003_pos mode=0555
+file path=opt/zfs-tests/tests/functional/vdev_zaps/vdev_zaps_004_pos mode=0555
+file path=opt/zfs-tests/tests/functional/vdev_zaps/vdev_zaps_005_pos mode=0555
+file path=opt/zfs-tests/tests/functional/vdev_zaps/vdev_zaps_006_pos mode=0555
+file path=opt/zfs-tests/tests/functional/vdev_zaps/vdev_zaps_007_pos mode=0555
 file path=opt/zfs-tests/tests/functional/write_dirs/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/write_dirs/setup mode=0555
 file path=opt/zfs-tests/tests/functional/write_dirs/write_dirs_001_pos \
