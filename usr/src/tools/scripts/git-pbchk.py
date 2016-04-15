@@ -71,13 +71,13 @@ def git(command):
     try:
         p = subprocess.Popen(command,
                              stdout=tmpfile,
-                             stderr=subprocess.STDOUT)
+                             stderr=subprocess.PIPE)
     except OSError, e:
         raise GitError("could not execute %s: %s\n" (command, e))
 
     err = p.wait()
     if err != 0:
-        raise GitError(p.stdout.read())
+        raise GitError(p.stderr.read())
 
     tmpfile.seek(0)
     return tmpfile
