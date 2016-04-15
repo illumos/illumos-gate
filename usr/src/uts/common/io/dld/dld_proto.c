@@ -725,10 +725,6 @@ proto_promiscoff_req(dld_str_t *dsp, mblk_t *mp)
 		goto failed;
 	}
 
-	/* DLS_PROMISC_RX_ONLY can't be a solo flag */
-	if (new_flags == DLS_PROMISC_RX_ONLY)
-		new_flags = 0;
-
 	/*
 	 * Adjust channel promiscuity.
 	 */

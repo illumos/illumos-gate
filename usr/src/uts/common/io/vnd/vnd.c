@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*
@@ -216,7 +216,7 @@
  *   |             |                         we become a zombie.
  *   |             v
  *   |    +--------------+
- *   +--<-| VNS_S_ONLINE |                   This is a vnd STREAMS device's
+ *   |    | VNS_S_ONLINE |                   This is a vnd STREAMS device's
  *   |    +--------------+                   steady state. It will normally
  *   |             |                         reside in this state while it is in
  *   |             |                         active use. It will only transition
@@ -226,15 +226,53 @@
  *   |             |                         flows over the dld fast path.
  *   |             v
  *   |    +---------------------+
- *   +--<-| VNS_S_SHUTTING_DOWN |            This vnd state takes care of
- *   |    +---------------------+            disabling capabilities and then
- *   |             |                         transitions to zombie state to
- *   v             |                         indicate that it is finished.
+ *   +--->| VNS_S_SHUTTING_DOWN |            This vnd state takes care of
+ *   |    +---------------------+            disabling capabilities and
+ *   |             |                         flushing all data. At this point
+ *   |             |                         any additional data that we receive
+ *   |             |                         will be dropped. We leave this
+ *   v             |                         state by trying to remove multicast
+ *   |             |                         promiscuity.
+ *   |             |
+ *   |             v
+ *   |   +---------------------------------+
+ *   +-->| VNS_S_MULTICAST_PROMISCOFF_SENT | In this state, we check if we have
+ *   |   +---------------------------------+ successfully removed multicast
+ *   |             |                         promiscuous mode. If we have
+ *   |             |                         failed, we still carry on but only
+ *   |             |                         warn. We leave this state by trying
+ *   |             |                         to disable SAP level promiscuous
+ *   |             |                         mode.
+ *   |             v
+ *   |   +---------------------------+
+ *   +-->| VNS_S_SAP_PROMISCOFF_SENT |       In this state, we check if we have
+ *   |   +---------------------------+       successfully removed SAP level
+ *   |             |                         promiscuous mode. If we have
+ *   |             |                         failed, we still carry on but only
+ *   |             |                         warn. Note that we don't worry
+ *   |             |                         about either of
+ *   |             |                         DL_PROMISC_FIXUPS or
+ *   |             |                         DL_PROMISC_RX_ONLY. If these are
+ *   |             |                         the only two entries left, then we
+ *   |             |                         should have anything that MAC is
+ *   |             |                         doing for us at this point,
+ *   |             |                         therefore it's safe for us to
+ *   |             |                         proceed to unbind, which is how we
+ *   |             |                         leave this state via a
+ *   |             v                         DL_UNBIND_REQ.
+ *   |    +-------------------+
+ *   +--->| VNS_S_UNBIND_SENT |              Here, we check how the unbind
+ *   |    +-------------------+              request went. Regardless of its
+ *   |             |                         success, we always transition to
+ *   |             |                         a zombie state.
  *   |             v
  *   |    +--------------+
  *   +--->| VNS_S_ZOMBIE |                   In this state, the vnd STREAMS
- *        +--------------+                   device is waiting to finished being
- *                                           reaped.
+ *        +--------------+                   device is waiting to finish being
+ *                                           reaped. Because we have no more
+ *                                           ways to receive data it should be
+ *                                           safe to destroy all remaining data
+ *                                           structures.
  *
  * If the stream association fails for any reason the state machine reaches
  * VNS_S_ZOMBIE. A more detailed vnd_errno_t will propagate back through the
@@ -246,6 +284,19 @@
  * finished, which will occur after the original user attach ioctl to the
  * character device returns.
  *
+ * It's quite important that we end up sending the full series of STREAMS
+ * messages when tearing down. While it's tempting to say that we should just
+ * rely on the STREAMS device being closed to properly ensure that we have no
+ * more additional data, that's not sufficient due to our use of direct
+ * callbacks.  DLS does not ensure that by the time we change the direct
+ * callback (vnd_mac_input) that all callers to it will have been quiesced.
+ * However, it does guarantee that if we disable promiscuous mode ourselves and
+ * we turn off the main data path via DL_UNBIND_REQ that it will work.
+ * Therefore, we make sure to do this ourselves rather than letting DLS/DLD do
+ * it as part of tearing down the STREAMS device. This ensures that we'll
+ * quiesce all data before we destroy our data structures and thus we should
+ * eliminate the race in changing the data function.
+ *
  * --------------------
  * General Architecture
  * --------------------
@@ -255,7 +306,7 @@
  * consumers see, the internal STREAMS device state, and the data queues
  * themselves. The following ASCII art picture describes their relationships and
  * some of the major pieces of data that contain them. These are not exhaustive,
- * eg. synchronization primitives are left out.
+ * e.g. synchronization primitives are left out.
  *
  *  +----------------+     +-----------------+
  *  | global         |     | global          |
@@ -946,6 +997,9 @@ typedef enum vnd_str_state {
 	VNS_S_CAPAB_E_SENT,
 	VNS_S_ONLINE,
 	VNS_S_SHUTTING_DOWN,
+	VNS_S_MULTICAST_PROMISCOFF_SENT,
+	VNS_S_SAP_PROMISCOFF_SENT,
+	VNS_S_UNBIND_SENT,
 	VNS_S_ZOMBIE
 } vnd_str_state_t;
 
@@ -2094,7 +2148,7 @@ vnd_mac_input(vnd_str_t *vsp, mac_resource_t *unused, mblk_t *mp_chain,
 
 		/*
 		 * If we were operating in a traditional dlpi context then we
-		 * would have enabled DLIOCRAW and rather than the fast path we
+		 * would have enabled DLIOCRAW and rather than the fast path, we
 		 * would come through dld_str_rx_raw. That function does two
 		 * things that we have to consider doing ourselves. The first is
 		 * that it adjusts the b_rptr back to account for dld bumping us
@@ -2405,11 +2459,129 @@ vnd_st_shutdown(vnd_str_t *vsp)
 		    NULL, DLD_DISABLE);
 		vnd_mac_exit(vsp, mph);
 	}
+}
+
+static boolean_t
+vnd_st_spromiscoff(vnd_str_t *vsp, int type, vnd_str_state_t next)
+{
+	boolean_t ret = B_TRUE;
+	mblk_t *mp;
+	dl_promiscoff_req_t *dprp;
+
+	VERIFY(MUTEX_HELD(&vsp->vns_lock));
+	mp = vnd_dlpi_alloc(sizeof (dl_promiscon_req_t), DL_PROMISCOFF_REQ);
+	if (mp == NULL) {
+		cmn_err(CE_NOTE, "!vnd failed to allocate mblk_t for "
+		    "promiscoff request");
+		ret = B_FALSE;
+		goto next;
+	}
+
+	dprp = (dl_promiscoff_req_t *)mp->b_rptr;
+	dprp->dl_level = type;
+
+	putnext(vsp->vns_wq, mp);
+next:
+	vsp->vns_state = next;
+	cv_broadcast(&vsp->vns_stcv);
+	return (ret);
+}
+
+static void
+vnd_st_promiscoff(vnd_str_t *vsp)
+{
+	mblk_t *mp;
+	t_uscalar_t prim, cprim;
+
+	VERIFY(MUTEX_HELD(&vsp->vns_lock));
 
 	/*
-	 * We could send an unbind, but dld also does that for us. As we add
-	 * more capabilities and the like, we should revisit this.
+	 * Unlike other cases where we guard against the incoming packet being
+	 * NULL, during tear down we try to keep driving and therefore we may
+	 * have gotten here due to an earlier failure, so there's nothing to do.
 	 */
+	mp = vnd_dlpi_inc_pop(vsp);
+	if (mp == NULL)
+		return;
+
+	prim = ((dl_ok_ack_t *)mp->b_rptr)->dl_primitive;
+	cprim = ((dl_ok_ack_t *)mp->b_rptr)->dl_correct_primitive;
+
+	if (prim != DL_OK_ACK && prim != DL_ERROR_ACK) {
+		vnd_drop_ctl(vsp, mp,
+		    "wrong dlpi primitive for vnd_st_promiscoff");
+		return;
+	}
+
+	if (cprim != DL_PROMISCOFF_REQ) {
+		vnd_drop_ctl(vsp, mp,
+		    "vnd_st_promiscoff: Got ack/nack for wrong primitive");
+		return;
+	}
+
+	if (prim == DL_ERROR_ACK) {
+		cmn_err(CE_WARN, "!failed to disable promiscuos mode during "
+		    "vnd teardown");
+	}
+}
+
+static boolean_t
+vnd_st_sunbind(vnd_str_t *vsp)
+{
+	mblk_t *mp;
+	boolean_t ret = B_TRUE;
+
+	mp = vnd_dlpi_alloc(sizeof (dl_unbind_req_t), DL_UNBIND_REQ);
+	if (mp == NULL) {
+		cmn_err(CE_NOTE, "!vnd failed to allocate mblk_t for "
+		    "unbind request");
+		ret = B_FALSE;
+		goto next;
+	}
+
+	putnext(vsp->vns_wq, mp);
+next:
+	vsp->vns_state = VNS_S_UNBIND_SENT;
+	cv_broadcast(&vsp->vns_stcv);
+	return (ret);
+}
+
+static void
+vnd_st_unbind(vnd_str_t *vsp)
+{
+	mblk_t *mp;
+	t_uscalar_t prim, cprim;
+
+	/*
+	 * Unlike other cases where we guard against the incoming packet being
+	 * NULL, during tear down we try to keep driving and therefore we may
+	 * have gotten here due to an earlier failure, so there's nothing to do.
+	 */
+	mp = vnd_dlpi_inc_pop(vsp);
+	if (mp == NULL)
+		goto next;
+
+	prim = ((dl_ok_ack_t *)mp->b_rptr)->dl_primitive;
+	cprim = ((dl_ok_ack_t *)mp->b_rptr)->dl_correct_primitive;
+
+	if (prim != DL_OK_ACK && prim != DL_ERROR_ACK) {
+		vnd_drop_ctl(vsp, mp,
+		    "wrong dlpi primitive for vnd_st_unbind");
+		goto next;
+	}
+
+	if (cprim != DL_UNBIND_REQ) {
+		vnd_drop_ctl(vsp, mp,
+		    "vnd_st_unbind: Got ack/nack for wrong primitive");
+		goto next;
+	}
+
+	if (prim == DL_ERROR_ACK) {
+		cmn_err(CE_WARN, "!failed to unbind stream during vnd "
+		    "teardown");
+	}
+
+next:
 	vsp->vns_state = VNS_S_ZOMBIE;
 	cv_broadcast(&vsp->vns_stcv);
 }
@@ -2431,6 +2603,14 @@ vnd_str_state_transition(void *arg)
 		mutex_exit(&vsp->vns_lock);
 		return;
 	}
+
+	/*
+	 * When trying to shut down, or unwinding from a failed enabling, rather
+	 * than immediately entering the ZOMBIE state, we may instead opt to try
+	 * and enter the next state in the progression. This is especially
+	 * important when trying to tear everything down.
+	 */
+loop:
 	DTRACE_PROBE2(vnd__state__transition, uintptr_t, vsp,
 	    vnd_str_state_t, vsp->vns_state);
 	switch (vsp->vns_state) {
@@ -2528,10 +2708,27 @@ vnd_str_state_transition(void *arg)
 		break;
 	case VNS_S_SHUTTING_DOWN:
 		vnd_st_shutdown(vsp);
+		if (vnd_st_spromiscoff(vsp, DL_PROMISC_MULTI,
+		    VNS_S_MULTICAST_PROMISCOFF_SENT) == B_FALSE)
+			goto loop;
+		break;
+	case VNS_S_MULTICAST_PROMISCOFF_SENT:
+		vnd_st_promiscoff(vsp);
+		if (vnd_st_spromiscoff(vsp, DL_PROMISC_SAP,
+		    VNS_S_SAP_PROMISCOFF_SENT) == B_FALSE)
+			goto loop;
+		break;
+	case VNS_S_SAP_PROMISCOFF_SENT:
+		vnd_st_promiscoff(vsp);
+		if (vnd_st_sunbind(vsp) == B_FALSE)
+			goto loop;
+		break;
+	case VNS_S_UNBIND_SENT:
+		vnd_st_unbind(vsp);
 		break;
 	case VNS_S_ZOMBIE:
 		while ((mp = vnd_dlpi_inc_pop(vsp)) != NULL)
-			vnd_drop_ctl(vsp, mp, "vsp committed suicide");
+			vnd_drop_ctl(vsp, mp, "vsp received data as a zombie");
 		break;
 	default:
 		panic("vnd_str_t entered an unknown state");
