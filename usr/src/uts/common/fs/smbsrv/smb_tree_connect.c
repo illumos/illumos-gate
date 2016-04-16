@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <smbsrv/smb_kproto.h>
@@ -315,8 +315,8 @@ smb_com_tree_connect_andx(smb_request_t *sr)
 	if (tcon->flags & SMB_TCONX_DISCONECT_TID) {
 		tree = smb_session_lookup_tree(sr->session, sr->smb_tid);
 		if (tree != NULL) {
-			smb_session_cancel_requests(sr->session, tree, sr);
 			smb_tree_disconnect(tree, B_TRUE);
+			smb_session_cancel_requests(sr->session, tree, sr);
 		}
 	}
 
@@ -447,8 +447,8 @@ smb_com_tree_disconnect(smb_request_t *sr)
 
 	sr->user_cr = smb_user_getcred(sr->uid_user);
 
-	smb_session_cancel_requests(sr->session, sr->tid_tree, sr);
 	smb_tree_disconnect(sr->tid_tree, B_TRUE);
+	smb_session_cancel_requests(sr->session, sr->tid_tree, sr);
 
 	if (smbsr_encode_empty_result(sr))
 		return (SDRC_ERROR);

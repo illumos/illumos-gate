@@ -1208,6 +1208,7 @@ smb_node_free(smb_node_t *node)
 	node->n_magic = 0;
 	VERIFY(!list_link_active(&node->n_lnd));
 	VERIFY(node->n_lock_list.ll_count == 0);
+	VERIFY(node->n_wlock_list.ll_count == 0);
 	VERIFY(node->n_ofile_list.ll_count == 0);
 	VERIFY(node->n_oplock.ol_count == 0);
 	VERIFY(node->n_oplock.ol_xthread == NULL);
@@ -1233,6 +1234,8 @@ smb_node_constructor(void *buf, void *un, int kmflags)
 	smb_llist_constructor(&node->n_ofile_list, sizeof (smb_ofile_t),
 	    offsetof(smb_ofile_t, f_nnd));
 	smb_llist_constructor(&node->n_lock_list, sizeof (smb_lock_t),
+	    offsetof(smb_lock_t, l_lnd));
+	smb_llist_constructor(&node->n_wlock_list, sizeof (smb_lock_t),
 	    offsetof(smb_lock_t, l_lnd));
 	cv_init(&node->n_oplock.ol_cv, NULL, CV_DEFAULT, NULL);
 	mutex_init(&node->n_oplock.ol_mutex, NULL, MUTEX_DEFAULT, NULL);
@@ -1260,6 +1263,7 @@ smb_node_destructor(void *buf, void *un)
 	cv_destroy(&node->n_oplock.ol_cv);
 	mutex_destroy(&node->n_oplock.ol_mutex);
 	smb_llist_destructor(&node->n_lock_list);
+	smb_llist_destructor(&node->n_wlock_list);
 	smb_llist_destructor(&node->n_ofile_list);
 	list_destroy(&node->n_oplock.ol_grants);
 }

@@ -136,6 +136,7 @@ extern	kmem_cache_t		*smb_cache_ofile;
 extern	kmem_cache_t		*smb_cache_odir;
 extern	kmem_cache_t		*smb_cache_opipe;
 extern	kmem_cache_t		*smb_cache_event;
+extern	kmem_cache_t		*smb_cache_lock;
 
 extern	kmem_cache_t		*smb_kshare_cache_vfs;
 
@@ -322,11 +323,15 @@ void smb2_oplock_break_notification(smb_request_t *, uint8_t);
  * range lock functions - node operations
  */
 uint32_t smb_lock_get_lock_count(smb_node_t *, smb_ofile_t *);
-uint32_t smb_unlock_range(smb_request_t *, smb_node_t *,
-    uint64_t, uint64_t);
+uint32_t smb_unlock_range(smb_request_t *, uint64_t, uint64_t, uint32_t);
 uint32_t smb_lock_range(smb_request_t *, uint64_t, uint64_t, uint32_t,
-    uint32_t locktype);
+    uint32_t, uint32_t);
+uint32_t smb_lock_range_cancel(smb_request_t *, uint64_t, uint64_t, uint32_t);
 void smb_lock_range_error(smb_request_t *, uint32_t);
+
+int smb_lock_range_access(smb_request_t *, smb_node_t *,
+    uint64_t, uint64_t, boolean_t);
+
 DWORD smb_nbl_conflict(smb_node_t *, uint64_t, uint64_t, nbl_op_t);
 
 void smb_mangle(const char *, ino64_t, char *, size_t);
@@ -415,9 +420,6 @@ int	smb_mbc_copy(mbuf_chain_t *, const mbuf_chain_t *, int, int);
 
 void	smbsr_encode_header(smb_request_t *sr, int wct,
 		    int bcc, const char *fmt, ...);
-
-int smb_lock_range_access(smb_request_t *, smb_node_t *,
-    uint64_t, uint64_t, boolean_t);
 
 void smb_encode_sd(mbuf_chain_t *, smb_sd_t *, uint32_t);
 void smb_encode_sid(mbuf_chain_t *, smb_sid_t *);

@@ -46,6 +46,25 @@ static volatile uint64_t smb_kids;
  */
 uint32_t smb_keep_alive = SMB_PI_KEEP_ALIVE_MIN / 60;
 
+/*
+ * There are many smbtorture test cases that send
+ * racing requests, and where the tests fail if we
+ * don't execute them in exactly the order sent.
+ * These are test bugs.  The protocol makes no
+ * guarantees about execution order of requests
+ * that are concurrently active.
+ *
+ * Nonetheless, smbtorture has many useful tests,
+ * so we have this work-around we can enable to
+ * basically force sequential execution.  When
+ * enabled, insert a delay after each request is
+ * issued a taskq job.  Enable this with mdb by
+ * setting smb_reader_delay to 10.  Don't make it
+ * more than 500 or so or the server will appear
+ * to be so slow that tests may time out.
+ */
+int smb_reader_delay = 0;  /* mSec. */
+
 static int  smbsr_newrq_initial(smb_request_t *);
 
 static void smb_session_cancel(smb_session_t *);
@@ -633,6 +652,11 @@ smb_session_reader(smb_session_t *session)
 		sr = NULL;	/* enqueued or freed */
 		if (rc != 0)
 			break;
+
+		/* See notes where this is defined (above). */
+		if (smb_reader_delay) {
+			delay(MSEC_TO_TICK(smb_reader_delay));
+		}
 	}
 	return (rc);
 }
@@ -1171,8 +1195,8 @@ smb_session_disconnect_share(
 	while (tree) {
 		ASSERT3U(tree->t_magic, ==, SMB_TREE_MAGIC);
 		ASSERT(tree->t_session == session);
-		smb_session_cancel_requests(session, tree, NULL);
 		smb_tree_disconnect(tree, B_TRUE);
+		smb_session_cancel_requests(session, tree, NULL);
 		next = smb_session_lookup_share(session, sharename, tree);
 		smb_tree_release(tree);
 		tree = next;

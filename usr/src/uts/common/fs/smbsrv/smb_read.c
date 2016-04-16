@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <smbsrv/smb_kproto.h>
@@ -179,6 +179,7 @@ smb_com_lock_and_read(smb_request_t *sr)
 {
 	smb_rw_param_t *param = sr->arg.rw;
 	DWORD status;
+	uint32_t lk_pid;
 	uint16_t count;
 	int rc;
 
@@ -195,8 +196,11 @@ smb_com_lock_and_read(smb_request_t *sr)
 
 	sr->user_cr = smb_ofile_getcred(sr->fid_ofile);
 
+	/* Note: SMB1 locking uses 16-bit PIDs. */
+	lk_pid = sr->smb_pid & 0xFFFF;
+
 	status = smb_lock_range(sr, param->rw_offset, (uint64_t)param->rw_count,
-	    0, SMB_LOCK_TYPE_READWRITE);
+	    lk_pid, SMB_LOCK_TYPE_READWRITE, 0);
 
 	if (status != NT_STATUS_SUCCESS) {
 		smb_lock_range_error(sr, status);

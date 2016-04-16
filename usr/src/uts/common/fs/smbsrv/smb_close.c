@@ -22,7 +22,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <smbsrv/smb_kproto.h>
@@ -109,8 +109,9 @@ smb_com_close_and_tree_disconnect(smb_request_t *sr)
 
 	mtime = smb_time_local_to_gmt(sr, sr->arg.timestamp);
 	smb_ofile_close(sr->fid_ofile, mtime);
-	smb_session_cancel_requests(sr->session, sr->tid_tree, sr);
+
 	smb_tree_disconnect(sr->tid_tree, B_TRUE);
+	smb_session_cancel_requests(sr->session, sr->tid_tree, sr);
 
 	if (smbsr_encode_empty_result(sr) != 0)
 		return (SDRC_ERROR);

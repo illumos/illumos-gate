@@ -858,6 +858,18 @@ fop_frlock(
 	cred_t *cr,
 	caller_context_t *ct)
 {
+#if defined(_LP64)
+	offset_t maxoffset = INT64_MAX;
+#elif defined(_ILP32)
+	/*
+	 * Sadly, the fcntl API enforces 32-bit offsets,
+	 * even though we have _FILE_OFFSET_BITS=64
+	 */
+	offset_t maxoffset = INT32_MAX;
+#else
+#error "unsupported env."
+#endif
+
 	/* See fs_frlock */
 
 	switch (cmd) {
@@ -869,6 +881,30 @@ fop_frlock(
 	default:
 		return (EINVAL);
 	}
+
+	/* We only get SEEK_SET ranges here. */
+	if (bfp->l_whence != 0)
+		return (EINVAL);
+
+	/*
+	 * One limitation of using fcntl(2) F_SETLK etc is that
+	 * the real kernel limits the offsets we can use.
+	 * (Maybe the fcntl API should loosen that up?)
+	 * See syscall/fcntl.c:flock_check()
+	 *
+	 * Here in libfksmbsrv we can just ignore such locks,
+	 * or ignore the part that extends beyond maxoffset.
+	 * The SMB layer still keeps track of such locks for
+	 * conflict detection, so not reflecting such locks
+	 * into the real FS layer is OK.  Note: this may
+	 * modify the pased bfp->l_len.
+	 */
+	if (bfp->l_start < 0 || bfp->l_start > maxoffset)
+		return (0);
+	if (bfp->l_len < 0 || bfp->l_len > maxoffset)
+		return (0);
+	if (bfp->l_len > (maxoffset - bfp->l_start + 1))
+		bfp->l_len = (maxoffset - bfp->l_start + 1);
 
 	if (fcntl(vp->v_fd, cmd, bfp) == -1)
 		return (errno);
