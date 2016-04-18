@@ -64,6 +64,8 @@ int pagesize;	/* needed for mmap2() */
 #define	LX_MADV_DONTDUMP	16
 #define	LX_MADV_DODUMP		17
 
+#define	TWO_GB			0x80000000
+
 static void lx_remap_anoncache_invalidate(uintptr_t, size_t);
 
 static int
@@ -555,7 +557,7 @@ lx_remap_anon(prmap_t *map, prmap_t *maps, int nmap,
 		 * and our hint.
 		 */
 		for (i = 0; i < nmap; i++) {
-			if (maps[i].pr_vaddr < (uintptr_t)(1 << 31UL))
+			if (maps[i].pr_vaddr < TWO_GB)
 				continue;
 
 			hint = (void *)(maps[i].pr_vaddr - (new_size << 4UL));
