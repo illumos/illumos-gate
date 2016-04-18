@@ -693,7 +693,6 @@ lx_mount(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 	int			sflags, rv;
 	long			res;
 	boolean_t		is_tmpfs = B_FALSE;
-	boolean_t		is_cgrp = B_FALSE;
 
 	/* Variable for tmpfs mounts. */
 	int			uid = -1;
@@ -878,8 +877,6 @@ lx_mount(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 				return (-EFAULT);
 		}
 		lx_debug("\tlinux mount options: \"%s\"", options);
-
-		is_cgrp = B_TRUE;
 
 		/*
 		 * Currently don't verify Linux mount options since we can
