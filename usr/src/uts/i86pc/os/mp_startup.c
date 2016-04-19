@@ -27,7 +27,7 @@
  * All rights reserved.
  */
 /*
- * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
@@ -171,6 +171,7 @@ init_cpu_syscall(struct cpu *cp)
 #if defined(__amd64)
 	if (is_x86_feature(x86_featureset, X86FSET_MSR) &&
 	    is_x86_feature(x86_featureset, X86FSET_ASYSC)) {
+		uint64_t flags;
 
 #if !defined(__lint)
 		/*
@@ -199,7 +200,10 @@ init_cpu_syscall(struct cpu *cp)
 		 * This list of flags is masked off the incoming
 		 * %rfl when we enter the kernel.
 		 */
-		wrmsr(MSR_AMD_SFMASK, (uint64_t)(uintptr_t)(PS_IE | PS_T));
+		flags = PS_IE | PS_T;
+		if (is_x86_feature(x86_featureset, X86FSET_SMAP) == B_TRUE)
+			flags |= PS_ACHK;
+		wrmsr(MSR_AMD_SFMASK, flags);
 	}
 #endif
 

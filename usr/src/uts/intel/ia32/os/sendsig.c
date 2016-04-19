@@ -288,7 +288,10 @@ sendsig(int sig, k_siginfo_t *sip, void (*hdlr)())
 	 */
 	uc = (ucontext_t *)(sp + sizeof (struct sigframe));
 	tuc = kmem_alloc(sizeof (*tuc), KM_SLEEP);
+	no_fault();
 	savecontext(tuc, &lwp->lwp_sigoldmask);
+	if (on_fault(&ljb))
+		goto badstack;
 	copyout_noerr(tuc, uc, sizeof (*tuc));
 	kmem_free(tuc, sizeof (*tuc));
 	tuc = NULL;
@@ -506,7 +509,10 @@ sendsig32(int sig, k_siginfo_t *sip, void (*hdlr)())
 	fp -= SA32(sizeof (*tuc));
 	uc = (ucontext32_t *)fp;
 	tuc = kmem_alloc(sizeof (*tuc), KM_SLEEP);
+	no_fault();
 	savecontext32(tuc, &lwp->lwp_sigoldmask);
+	if (on_fault(&ljb))
+		goto badstack;
 	copyout_noerr(tuc, uc, sizeof (*tuc));
 	kmem_free(tuc, sizeof (*tuc));
 	tuc = NULL;

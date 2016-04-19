@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ICMP6 7P "Nov 10, 1999"
+.TH ICMP6 7P "Dec 03, 2015"
 .SH NAME
 icmp6 \- Internet Control Message Protocol for Internet Protocol Version 6
 .SH SYNOPSIS
@@ -27,7 +27,6 @@ t = t_open("/dev/icmp6", O_RDWR);
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBICMP6\fR protocol is the error and control message protocol used with
 Version 6 of the Internet Protocol. It is used by the kernel to handle and
@@ -41,7 +40,9 @@ can be obtained from \fBgetprotobyname\fR(3SOCKET). \fBICMP6\fR file
 descriptors and sockets are connectionless and are normally used with the
 \fBt_sndudata\fR / \fBt_rcvudata\fR and the \fBsendto()\fR / \fBrecvfrom()\fR
 calls. They may also be used with the \fBsendmsg()\fR/\fBrecvgmsg()\fR calls
-when sending or receiving ancillary data.
+when sending or receiving ancillary data. In order to send \fBICMP6\fR packets,
+a process needs the \fBPRIV_NET_ICMPACCESS\fR privilege. (See
+\fBprivileges\fR(5) for more information on privileges.)
 .sp
 .LP
 Outgoing packets automatically have an Internet Protocol Version 6 (\fBIPv6\fR)
@@ -63,22 +64,20 @@ configured.
 \fBICMP6\fR is a datagram protocol layered above \fBIPv6\fR. Received
 \fBICMP6\fR messages may be reflected back to users of higher-level protocols
 such as \fBTCP\fR or \fBUDP\fR as error returns from system calls. A copy of
-each \fBICMP6\fRerror message received by the system is provided to every
+each \fBICMP6\fR error message received by the system is provided to every
 holder of an open \fBICMP6\fR socket or \fBTLI\fR descriptor.
 .SH SEE ALSO
-.sp
 .LP
 \fBgetprotobyname\fR(3SOCKET), \fBrecv\fR(3SOCKET), \fBrecvmsg\fR(3SOCKET),
 \fBsend\fR(3SOCKET), \fBsendmsg\fR(3SOCKET), \fBsetsockopt\fR(3SOCKET),
-\fBt_rcvudata\fR(3NSL), \fBt_sndudata\fR(3NSL), \fBinet6\fR(7P), \fBip6\fR(7P),
-\fBrouting\fR(7P)
+\fBt_rcvudata\fR(3NSL), \fBt_sndudata\fR(3NSL), \fBprivileges\fR(5),
+\fBinet6\fR(7P), \fBip6\fR(7P), \fBrouting\fR(7P)
 .sp
 .LP
 Conta, A. and Deering, S., \fIRFC 2463, Internet Control Message Protocol
 (ICMPv6) for the Internet Protocol Version 6 (IPv6) Specification\fR, The
 Internet Society, December 1998.
 .SH DIAGNOSTICS
-.sp
 .LP
 A socket operation may fail with one of the following errors returned:
 .sp

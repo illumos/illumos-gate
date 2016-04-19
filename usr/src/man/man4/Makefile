@@ -12,6 +12,7 @@
 #
 # Copyright 2011, Richard Lowe
 # Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2015, Joyent, Inc.
 #
 
 include		$(SRC)/Makefile.master
@@ -82,6 +83,10 @@ _MANFILES=	Intro.4				\
 		ib.4				\
 		ike.config.4			\
 		ike.preshared.4			\
+		ipf.4				\
+		ipmon.4				\
+		ipnat.4				\
+		ippool.4			\
 		inet_type.4			\
 		inetd.conf.4			\
 		init.4				\
@@ -224,6 +229,11 @@ _MANLINKS=	addresses.4			\
 		hosts.allow.4			\
 		hosts.deny.4			\
 		intro.4				\
+		ipf.conf.4			\
+		ipf6.conf.4			\
+		ipmon.conf.4			\
+		ipnat.conf.4			\
+		ippool.conf.4			\
 		md.cf.4				\
 		mdi_ib_cache.4			\
 		mdi_scsi_vhci_cache.4		\
@@ -265,6 +275,15 @@ rhosts.4			:= LINKSRC = hosts.equiv.4
 
 hosts.allow.4			:= LINKSRC = hosts_access.4
 hosts.deny.4			:= LINKSRC = hosts_access.4
+
+ipf.conf.4			:= LINKSRC = ipf.4
+ipf6.conf.4			:= LINKSRC = ipf.4
+
+ipmon.conf.4			:= LINKSRC = ipmon.4
+
+ipnat.conf.4			:= LINKSRC = ipnat.4
+
+ippool.conf.4			:= LINKSRC = ippool.4
 
 fbtab.4				:= LINKSRC = logindevperm.4
 

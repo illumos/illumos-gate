@@ -1799,6 +1799,7 @@ in_access_list(struct cln *cln,
 	char *gr = access_list;
 	int i;
 	int response;
+	int ret;
 	struct netbuf *pnb;
 	struct nd_hostservlist *clnames = NULL;
 
@@ -1854,12 +1855,31 @@ in_access_list(struct cln *cln,
 					if (inet_ntop(AF_INET, &np->n_net, addr,
 					    INET_ADDRSTRLEN) == NULL)
 						break;
-					if (inet_matchaddr(pnb->buf, addr))
+					ret = inet_matchaddr(pnb->buf, addr);
+					if (ret == -1) {
+						if (errno == EINVAL) {
+							syslog(LOG_WARNING,
+							    "invalid access "
+							    "list entry: %s",
+							    addr);
+						}
+						return (-1);
+					} else if (ret == 1) {
 						return (response);
+					}
 				}
 			} else {
-				if (inet_matchaddr(pnb->buf, gr))
+				ret = inet_matchaddr(pnb->buf, gr);
+				if (ret == -1) {
+					if (errno == EINVAL) {
+						syslog(LOG_WARNING,
+						    "invalid access list "
+						    "entry: %s", gr);
+					}
+					return (-1);
+				} else if (ret == 1) {
 					return (response);
+				}
 			}
 
 			goto next;

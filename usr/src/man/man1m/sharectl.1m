@@ -1,144 +1,144 @@
-'\" te
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.\"
 .\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
-.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
-.\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SHARECTL 1M "Mar 16, 2009"
-.SH NAME
-sharectl \- configure and manage file sharing service
-.SH SYNOPSIS
-.LP
-.nf
-\fBsharectl\fR  [\fB-h\fR]
-.fi
-
-.LP
-.nf
-\fBsharectl\fR  status [\fB-h\fR] [\fIprotocol\fR]
-.fi
-
-.LP
-.nf
-\fBsharectl\fR  get [\fB-h\fR] [\fB-p\fR \fIproperty\fR]... \fIprotocol\fR
-.fi
-
-.LP
-.nf
-\fBsharectl\fR  set [\fB-h\fR] [\fB-p\fR \fIproperty\fR=\fIvalue\fR]... \fIprotocol\fR
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
-The \fBsharectl\fR command operates on file-sharing protocols, such as NFS. The
-command sets the client and server operational properties, takes and restores
-configuration snapshots, and gets status of the protocol service.
-.sp
-.LP
-The \fBget\fR and \fBset\fR subcommands (see below) require root privileges or
-that you assume the Primary Administrator role. A non-privileged user can
-change the Solaris CIFS client's persistent settings when granted the SMBFS
-Management rights profile in the \fB/etc/user_attr\fR file. See
-\fBuser_attr\fR(4) and \fBrbac\fR(5). An authorized user can use \fBsharectl\fR
-to set global values for Solaris CIFS server properties in the Solaris server
-management facility. See \fBsmb\fR(4).
-.SH OPTIONS
-.sp
-.LP
-The following options are supported:
-.sp
-.ne 2
-.na
-\fB\fB-h\fR\fR
-.ad
-.sp .6
-.RS 4n
-Displays usage message.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-p\fR \fIproperty\fR[=\fIvalue\fR]\fR
-.ad
-.sp .6
-.RS 4n
-Specifies a property. See "Subcommands," below.
-.RE
-
-.SS "Subcommands"
-.sp
-.LP
-\fBsharectl\fR supports the subcommands described below. The form of a
-\fBsharectl\fR command is:
-.sp
-.in +2
-.nf
-# \fBsharectl \fIsubcommand\fR [\fIoption\fR]\fR
-.fi
-.in -2
-.sp
-
-.sp
-.ne 2
-.na
-\fB\fBget\fR [\fB-p\fR\ \fIproperty\fR] \fIprotocol\fR\fR
-.ad
-.sp .6
-.RS 4n
-Get the property values for the specified protocol. If no \fB-p\fR option is
-provided, get all the properties for the specified protocol. For NFS,
-properties correspond to entries in the \fB/etc/default/nfs\fR file. See
-\fBnfs\fR(4).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBset\fR [\fB-p\fR\ \fIproperty\fR=\fIvalue\fR]... \fIprotocol\fR\fR
-.ad
-.sp .6
-.RS 4n
+.\" Copyright 2016 Nexenta Systems, Inc.
+.\"
+.Dd March 1, 2016
+.Dt SHARECTL 1M
+.Os
+.Sh NAME
+.Nm sharectl
+.Nd configure and manage file sharing services
+.Sh SYNOPSIS
+.Nm
+.Ar subcommand
+.Op Fl h
+.Nm
+.Cm delsect
+.Ar section protocol
+.Nm
+.Cm get
+.Oo Fl p Ar property Oc Ns ...
+.Ar protocol
+.Nm
+.Cm set
+.Bro Fl p Ar property Ns = Ns Ar value Brc Ns ...
+.Ar protocol
+.Nm
+.Cm status
+.Op Ar protocol
+.Sh DESCRIPTION
+The
+.Nm
+command operates on file sharing services. The command sets the client and
+server operational properties, takes and restores configuration snapshots, and
+gets status of the protocol service. Currently supported services are
+.Xr autofs 4 ,
+.Xr nfs 4 ,
+.Xr smb 4
+and smbfs.
+.Pp
+The
+.Cm set
+subcommand requires root privileges or that you assume the Primary Administrator
+role.
+.Pp
+A non-privileged user can change the persistent settings when granted required
+authorizations, see appropriate sharing protocol man page.
+.Ss Options
+The following options are supported where applicable:
+.Bl -tag -width Ds
+.It Fl h
+Displays usage message. Supported for all subcommands.
+.It Fl p Ar property Ns Op = Ns Ar value
+Specifies a property. See
+.Sx Subcommands ,
+below.
+.El
+.Ss Subcommands
+.Nm
+supports the subcommands described below:
+.Bl -tag -width Ds
+.It Xo
+.Nm
+.Cm delsect
+.Ar section protocol
+.Xc
+Delete configuration section for the specified protocol. Currently only protocol
+that has configuration sections is
+.Nm smbfs
+.Po see
+.Xr nsmbrc 4
+and
+.Sx EXAMPLES
+.Pc .
+.It Xo
+.Nm
+.Cm get
+.Oo Fl p Ar property Oc Ns ...
+.Ar protocol
+.Xc
+Get the property values for the specified protocol. If no
+.Fl p
+option is provided, get all the properties for the specified protocol. For NFS,
+properties correspond to entries in the
+.Pa /etc/default/nfs
+file. See
+.Xr nfs 4 .
+.It Xo
+.Nm
+.Cm set
+.Bro Fl p Ar property Ns = Ns Ar value Brc Ns ...
+.Ar protocol
+.Xc
 Set properties for the specified file sharing protocol.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBstatus\fR [\fIprotocol\fR]\fR
-.ad
-.sp .6
-.RS 4n
+.It Xo
+.Nm
+.Cm status
+.Op Ar protocol
+.Xc
 Display status of the specified protocol, or, if no protocol is specified, of
-all file-sharing protocols.
-.RE
-
-.SH EXAMPLES
-.LP
-\fBExample 1 \fRSetting a Property
-.sp
-.LP
+all file sharing protocols.
+.El
+.Sh FILES
+.Bl -tag -width Ds
+.It Pa /usr/include/libshare.h
+Error codes used for exit status.
+.El
+.Sh EXIT STATUS
+.Bl -tag -width Ds
+.It Sy 0
+Successful completion.
+.It Sy non-zero
+Command failed.
+.El
+.Sh EXAMPLES
+.Bl -tag -width Ds
+.It Sy Example 1 No Setting a Property
 The following command sets the minimum version of the server NFS protocol to
 version 3.
-
-.sp
-.in +2
-.nf
-% \fBsharectl -p server_versmin=3 nfs\fR
-.fi
-.in -2
-.sp
-
-.LP
-\fBExample 2 \fRGetting Properties
-.sp
-.LP
+.Bd -literal
+# sharectl -p server_versmin=3 nfs
+.Ed
+.It Sy Example 2 No Getting Properties
 The following command gets the properties for the NFS protocol.
-
-.sp
-.in +2
-.nf
-% \fBsharectl get nfs\fR
+.Bd -literal
+# sharectl get nfs
 lockd_listen_backlog=32
 lockd_servers=20
 lockd_retransmit_timeout=5
@@ -148,77 +148,53 @@ servers=16
 server_versmin=2
 server_versmax=4
 max_connections=-1
-.fi
-.in -2
-.sp
-
-.sp
-.LP
+.Ed
+.Pp
 The following command gets the value of the grace_period property for the NFS
 protocol.
-
-.sp
-.in +2
-.nf
-% \fBsharectl get -p grace_period nfs\fR
+.Bd -literal
+# sharectl get -p grace_period nfs
 grace_period=90
-.fi
-.in -2
-.sp
-
-.LP
-\fBExample 3 \fRObtaining Status
-.sp
-.LP
+.Ed
+.It Sy Example 3 No Obtaining Status
 The following command obtains the status of all file-sharing protocols on a
 system.
-
-.sp
-.in +2
-.nf
-% \fBsharectl status\fR
+.Bd -literal
+# sharectl status
 nfs      enabled
-.fi
-.in -2
-.sp
-
-.LP
-\fBExample 4 \fRConfiguring Global Settings
-.sp
-.LP
-The following command shows how an authorized user can use \fBsharectl\fR
-commands to configure global settings for the \fBex.com\fR environment in the
-service management facility (SMF). See \fBnsmbrc\fR(4) for a description of the
-example environment, \fBex.com\fR. See \fBsmf\fR(5) for a description of the
-SMF.
-
-.sp
-.in +2
-.nf
-# \fBsharectl set -p section=default -p workgroup=SALES \e
--p timeout=5 smbfs\fR
-# \fBsharectl set -p section=FSERVER -p addr=fserv.ex.com smbfs\fR
-# \fBsharectl set -p section=RSERVER -p workgroup=REMGROUP \e
--p addr=rserv.ex.com smbfs\fR
-# \fBsharectl set -p section=RSERVER:george -p timeout=30 smbfs\fR
-# \fBsharectl set -p section="SSERV:*:POKY" -p addr=sserv.ex.com \e
--p timeout=25 smbfs\fR
-.fi
-.in -2
-.sp
-
-.LP
-\fBExample 5 \fRDisplaying Current Settings
-.sp
-.LP
-The following command shows how an authorized user can use the \fBsharectl
-get\fR command to view the global settings for \fBsmbfs\fR in the SMF. The
-values shown are those set by the previous example.
-
-.sp
-.in +2
-.nf
-% # \fBsharectl get smbfs\fR
+.Ed
+.It Sy Example 4 No Configuring Global Settings
+The following command shows how an authorized user can use
+.Nm
+commands to configure global settings for the
+.Pa ex.com
+environment in the service management facility
+.Pq SMF .
+See
+.Xr nsmbrc 4
+for a description of the example environment,
+.Pa ex.com .
+See
+.Xr smf 5
+for a description of the SMF.
+.Bd -literal
+# sharectl set -p section=default -p workgroup=SALES \e
+  -p timeout=5 smbfs
+# sharectl set -p section=FSERVER -p addr=fserv.ex.com smbfs
+# sharectl set -p section=RSERVER -p workgroup=REMGROUP \e
+  -p addr=rserv.ex.com smbfs
+# sharectl set -p section=RSERVER:george -p timeout=30 smbfs
+# sharectl set -p section="SSERV:*:POKY" -p addr=sserv.ex.com \e
+  -p timeout=25 smbfs
+.Ed
+.It Sy Example 5 No Displaying Current Settings
+The following command shows how an authorized user can use the
+.Nm sharectl Cm get
+command to view the global settings for
+.Nm smbfs
+in the SMF. The values shown are those set by the previous example.
+.Bd -literal
+# sharectl get smbfs
 [default]
 workgroup=SALES
 timeout=5
@@ -232,58 +208,18 @@ timeout=30
 [SSERV:*:POKY]
 addr=sserv.ex.com
 timeout=25
-.fi
-.in -2
-.sp
-
-.SH EXIT STATUS
-.sp
-.ne 2
-.na
-\fB\fB0\fR\fR
-.ad
-.RS 12n
-Successful completion.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fInon-zero\fR\fR
-.ad
-.RS 12n
-Command failed.
-.RE
-
-.SH FILES
-.sp
-.ne 2
-.na
-\fB\fB/usr/include/libshare.h\fR\fR
-.ad
-.RS 27n
-Error codes used for exit status.
-.RE
-
-.SH ATTRIBUTES
-.sp
-.LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Interface Stability	Committed
-.TE
-
-.SH SEE ALSO
-.sp
-.LP
-\fBsharemgr\fR(1M), \fBnfs\fR(4), \fBnsmbrc\fR(4), \fBuser_attr\fR(4),
-\fBattributes\fR(5), \fBrbac\fR(5), \fBsmb\fR(4), \fBsmf\fR(5),
-\fBstandards\fR(5)
+.Ed
+.El
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh SEE ALSO
+.Xr sharemgr 1M ,
+.Xr autofs 4 ,
+.Xr nfs 4 ,
+.Xr nsmbrc 4 ,
+.Xr smb 4 ,
+.Xr user_attr 4 ,
+.Xr attributes 5 ,
+.Xr rbac 5 ,
+.Xr smf 5 ,
+.Xr standards 5

@@ -5,7 +5,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ICMP 7P "Jul 3, 1990"
+.TH ICMP 7P "Dec 03, 2015"
 .SH NAME
 icmp, ICMP \- Internet Control Message Protocol
 .SH SYNOPSIS
@@ -19,7 +19,6 @@ t = t_open("/dev/icmp", O_RDWR);
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBICMP\fR is the error and control message protocol used by the Internet
 protocol family. It is used by the kernel to handle and report errors in
@@ -30,7 +29,9 @@ type is used. The protocol number for \fBICMP,\fR used in the \fIproto\fR
 parameter to the socket call, can be obtained from
 \fBgetprotobyname\fR(3SOCKET). \fBICMP\fR file descriptors and sockets are
 connectionless, and are normally used with the \fBt_sndudata\fR /
-\fBt_rcvudata\fR and the \fBsendto()\fR / \fBrecvfrom()\fR calls.
+\fBt_rcvudata\fR and the \fBsendto()\fR / \fBrecvfrom()\fR calls. In order to
+send \fBICMP\fR packets, a process needs the \fBPRIV_NET_ICMPACCESS\fR
+privilege. (See \fBprivileges\fR(5) for more information on privileges.)
 .sp
 .LP
 Outgoing packets automatically have an Internet Protocol (\fBIP\fR) header
@@ -39,7 +40,7 @@ header and options intact.
 .sp
 .LP
 \fBICMP\fR is an datagram protocol layered above \fBIP.\fR It is used
-internally by the protcol code for various purposes including routing, fault
+internally by the protocol code for various purposes including routing, fault
 isolation, and congestion control. Receipt of an \fBICMP\fR "redirect" message
 will add a new entry in the routing table, or modify an existing one.
 \fBICMP\fR messages are routinely sent by the protocol code. Received
@@ -48,18 +49,16 @@ such as \fBTCP\fR or \fBUDP\fR as error returns from system calls. A copy of
 all \fBICMP\fR message received by the system is provided to every holder of an
 open \fBICMP\fR socket or \fBTLI\fR descriptor.
 .SH SEE ALSO
-.sp
 .LP
 \fBgetprotobyname\fR(3SOCKET), \fBrecv\fR(3SOCKET), \fBsend\fR(3SOCKET),
-\fBt_rcvudata\fR(3NSL), \fBt_sndudata\fR(3NSL), \fBinet\fR(7P), \fBip\fR(7P),
-\fBrouting\fR(7P)
+\fBt_rcvudata\fR(3NSL), \fBt_sndudata\fR(3NSL), \fBprivileges\fR(5),
+\fBinet\fR(7P), \fBip\fR(7P), \fBrouting\fR(7P)
 .sp
 .LP
 Postel, Jon, \fIInternet Control Message Protocol \(em DARPA Internet Program
 Protocol Specification\fR, \fBRFC\fR 792, Network Information Center, \fBSRI\fR
 International, Menlo Park, Calif., September 1981.
 .SH DIAGNOSTICS
-.sp
 .LP
 A socket operation may fail with one of the following errors returned:
 .sp
@@ -103,7 +102,6 @@ network interface exists.
 .RE
 
 .SH NOTES
-.sp
 .LP
 Replies to \fBICMP\fR "echo" messages which are source routed are not sent back
 using inverted source routes, but rather go back through the normal routing

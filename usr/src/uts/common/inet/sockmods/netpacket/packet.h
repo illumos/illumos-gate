@@ -185,7 +185,7 @@ typedef struct pfpsock {
 	mac_client_promisc_type_t	ps_promisc;
 	boolean_t			ps_auxdata;
 	struct tpacket_stats		ps_stats;
-	struct sockaddr			ps_sock;
+	struct sockaddr_ll		ps_sock;
 	datalink_id_t			ps_linkid;
 	kmutex_t			ps_lock;
 	boolean_t			ps_flow_ctrld;

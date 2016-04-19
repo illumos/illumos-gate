@@ -21,6 +21,8 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms of the CDDLv1.
+ *
+ * Copyright 2016 Joyent, Inc.
  */
 
 #ifndef _E1000_OSDEP_H
@@ -103,8 +105,23 @@ extern "C" {
  */
 #define	E1000_WRITE_FLUSH(a)	(void)E1000_READ_REG(a, E1000_STATUS)
 
+/*
+ * Note, for all of the following register defines, it's important that these be
+ * in do {} while loops that only run a single time. Previously they were formed
+ * as normal blocks. Unfortunately this would fail in the following form which
+ * is used in the common code:
+ *
+ * if (cond)
+ * 	E1000_WRITE_REG
+ * else
+ * 	...
+ *
+ * When the E1000_WRITE_REG macros was missing the do keyword, the compiler
+ * would end up associating the outer brace of the block with the if statement
+ * and thus the else clause would get left behind.
+ */
 #define	E1000_WRITE_REG(hw, reg, value)	\
-{\
+do { \
 	if ((hw)->mac.type != e1000_82542) \
 		ddi_put32((OS_DEP(hw))->reg_handle, \
 		    (uint32_t *)((uintptr_t)(hw)->hw_addr + reg), \
@@ -114,7 +131,7 @@ extern "C" {
 		    (uint32_t *)((uintptr_t)(hw)->hw_addr + \
 		    e1000_translate_register_82542(reg)), \
 		    value); \
-}
+} while (0)
 
 #define	E1000_READ_REG(hw, reg) (\
 	((hw)->mac.type != e1000_82542) ? \
@@ -125,7 +142,7 @@ extern "C" {
 		e1000_translate_register_82542(reg))))
 
 #define	E1000_WRITE_REG_ARRAY(hw, reg, offset, value) \
-{\
+do {\
 	if ((hw)->mac.type != e1000_82542) \
 		ddi_put32((OS_DEP(hw))->reg_handle, \
 		    (uint32_t *)((uintptr_t)(hw)->hw_addr + \
@@ -136,7 +153,7 @@ extern "C" {
 		    (uint32_t *)((uintptr_t)(hw)->hw_addr + \
 		    e1000_translate_register_82542(reg) + \
 		    ((offset) << 2)), value); \
-}
+} while (0)
 
 #define	E1000_READ_REG_ARRAY(hw, reg, offset) (\
 	((hw)->mac.type != e1000_82542) ? \

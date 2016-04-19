@@ -27,6 +27,7 @@
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
+#include <sys/cmn_err.h>
 #include <sys/strsun.h>
 #include <sys/sdt.h>
 #include <sys/mac.h>
@@ -145,6 +146,7 @@
  */
 static ulong_t	dhcp_max_pending_txn = 512;
 static ulong_t	dhcp_max_completed_txn = 512;
+static ulong_t	slaac_max_allowed = 512;
 static hrtime_t	txn_cleanup_interval = 60 * NANOSEC;
 
 /*
@@ -195,6 +197,16 @@ typedef struct dhcpv6_txn {
 	avl_node_t		dt_node;
 	struct dhcpv6_txn	*dt_next;
 } dhcpv6_txn_t;
+
+/*
+ * Stateless address autoconfiguration (SLAAC) address. May be added to
+ * mci_v6_slaac_ip.
+ */
+typedef struct slaac_addr {
+	in6_addr_t		sla_prefix;
+	in6_addr_t		sla_addr;
+	avl_node_t		sla_node;
+} slaac_addr_t;
 
 static void	start_txn_cleanup_timer(mac_client_impl_t *);
 static boolean_t allowed_ips_set(mac_resource_props_t *, uint32_t);
@@ -654,15 +666,12 @@ done:
  * Core logic for intercepting inbound DHCPv4 packets.
  */
 static void
-intercept_dhcpv4_inbound(mac_client_impl_t *mcip, ipha_t *ipha, uchar_t *end)
+intercept_dhcpv4_inbound(mac_client_impl_t *mcip, uchar_t *end,
+    struct dhcp *dh4)
 {
 	uchar_t		*opt;
-	struct dhcp	*dh4;
 	dhcpv4_txn_t	*txn, *ctxn;
 	uint8_t		opt_len, mtype;
-
-	if (get_dhcpv4_info(ipha, end, &dh4) != 0)
-		return;
 
 	if (get_dhcpv4_option(dh4, end, CD_DHCP_TYPE, &opt, &opt_len) != 0 ||
 	    opt_len != 1) {
@@ -771,6 +780,21 @@ compare_dhcpv6_cid(const void *arg1, const void *arg2)
 		return (0);
 }
 
+static int
+compare_slaac_ip(const void *arg1, const void *arg2)
+{
+	const slaac_addr_t	*ip1 = arg1, *ip2 = arg2;
+	int			ret;
+
+	ret = memcmp(&ip1->sla_addr, &ip2->sla_addr, sizeof (in6_addr_t));
+	if (ret < 0)
+		return (-1);
+	else if (ret > 0)
+		return (1);
+	else
+		return (0);
+}
+
 /*
  * Locate the start of a DHCPv6 header.
  * The possible return values and associated meanings are:
@@ -826,6 +850,51 @@ get_dhcpv6_info(ip6_t *ip6h, uchar_t *end, dhcpv6_message_t **dh6)
 		return (EINVAL);
 
 	*dh6 = (dhcpv6_message_t *)dh;
+	return (0);
+}
+
+static int
+get_ra_info(ip6_t *ip6h, uchar_t *end, nd_router_advert_t **ra)
+{
+	uint16_t		hdrlen;
+	ip6_frag_t		*frag = NULL;
+	uint8_t			proto;
+	uchar_t			*hdrp;
+	struct icmp6_hdr	*icmp;
+
+	if (!mac_ip_hdr_length_v6(ip6h, end, &hdrlen, &proto, &frag))
+		return (ENOSPC);
+
+	if (proto != IPPROTO_ICMPV6)
+		return (EINVAL);
+
+	if (frag != NULL) {
+		/*
+		 * All non-initial fragments may pass because we cannot
+		 * identify their type. It's safe to let them through
+		 * because reassembly will fail if we decide to drop the
+		 * initial fragment.
+		 */
+		if ((ntohs(frag->ip6f_offlg) & ~7) != 0)
+			return (EINVAL);
+		return (ENOSPC);
+	}
+
+	/*
+	 * Ensure that the ICMP header falls w/in packet boundaries, in case
+	 * we've received a malicious packet that reports incorrect lengths.
+	 */
+	hdrp = (uchar_t *)ip6h + hdrlen;
+	if ((hdrp + sizeof (struct icmp6_hdr)) > end) {
+		return (EINVAL);
+	}
+	icmp = (struct icmp6_hdr *)hdrp;
+
+	if (icmp->icmp6_type != ND_ROUTER_ADVERT ||
+	    icmp->icmp6_code != 0)
+		return (EINVAL);
+
+	*ra = (nd_router_advert_t *)icmp;
 	return (0);
 }
 
@@ -1172,6 +1241,18 @@ flush_dhcpv6(mac_client_impl_t *mcip)
 	}
 }
 
+void
+flush_slaac(mac_client_impl_t *mcip)
+{
+	void		*cookie = NULL;
+	slaac_addr_t	*addr = NULL;
+
+	while ((addr = avl_destroy_nodes(&mcip->mci_v6_slaac_ip, &cookie)) !=
+	    NULL) {
+		kmem_free(addr, sizeof (slaac_addr_t));
+	}
+}
+
 /*
  * Cleanup stale DHCPv6 transactions.
  */
@@ -1287,16 +1368,13 @@ done:
  * Core logic for intercepting inbound DHCPv6 packets.
  */
 static void
-intercept_dhcpv6_inbound(mac_client_impl_t *mcip, ip6_t *ip6h, uchar_t *end)
+intercept_dhcpv6_inbound(mac_client_impl_t *mcip, uchar_t *end,
+    dhcpv6_message_t *dh6)
 {
-	dhcpv6_message_t	*dh6;
 	dhcpv6_txn_t		*txn;
 	uint32_t		xid;
 	uint8_t			mtype;
 	uint16_t		status;
-
-	if (get_dhcpv6_info(ip6h, end, &dh6) != 0)
-		return;
 
 	mtype = dh6->d6m_msg_type;
 	if (mtype != DHCPV6_MSG_REPLY)
@@ -1337,6 +1415,134 @@ done:
 	if (txn != NULL)
 		free_dhcpv6_txn(txn);
 	mutex_exit(&mcip->mci_protect_lock);
+}
+
+/*
+ * Check whether an IP address is in the SLAAC table.
+ */
+static boolean_t
+check_slaac_ip(mac_client_impl_t *mcip, in6_addr_t *addr)
+{
+	slaac_addr_t	tmp_addr, *a;
+
+	mutex_enter(&mcip->mci_protect_lock);
+	bcopy(addr, &tmp_addr.sla_addr, sizeof (in6_addr_t));
+	a = avl_find(&mcip->mci_v6_slaac_ip, &tmp_addr, NULL);
+	mutex_exit(&mcip->mci_protect_lock);
+	return (a != NULL);
+}
+
+static boolean_t
+insert_slaac_ip(avl_tree_t *tree, in6_addr_t *token, slaac_addr_t *addr)
+{
+	uint_t		i;
+	avl_index_t	where;
+	in6_addr_t	*prefix = &addr->sla_prefix;
+	in6_addr_t	*in6p = &addr->sla_addr;
+
+	bcopy(prefix, in6p, sizeof (struct in6_addr));
+
+	for (i = 0; i < 4; i++) {
+		in6p->s6_addr32[i] = token->s6_addr32[i] |
+		    in6p->s6_addr32[i];
+	}
+
+	DTRACE_PROBE1(generated__addr, in6_addr_t *, in6p);
+
+	if (avl_find(tree, addr, &where) != NULL)
+		return (B_FALSE);
+
+	avl_insert(tree, addr, where);
+	return (B_TRUE);
+}
+
+static void
+insert_slaac_prefix(mac_client_impl_t *mcip, nd_opt_prefix_info_t *po)
+{
+	slaac_addr_t	*addr = NULL;
+	in6_addr_t	*token = &mcip->mci_v6_mac_token;
+
+	ASSERT(MUTEX_HELD(&mcip->mci_protect_lock));
+
+	if (avl_numnodes(&mcip->mci_v6_slaac_ip) >= slaac_max_allowed) {
+		DTRACE_PROBE(limit__reached);
+		return;
+	}
+
+	if ((addr = kmem_zalloc(sizeof (slaac_addr_t),
+	    KM_NOSLEEP | KM_NORMALPRI)) == NULL)
+		return;
+
+	bcopy(&po->nd_opt_pi_prefix, &addr->sla_prefix,
+	    sizeof (struct in6_addr));
+
+	if (!insert_slaac_ip(&mcip->mci_v6_slaac_ip, token, addr)) {
+		kmem_free(addr, sizeof (slaac_addr_t));
+	}
+}
+
+static void
+intercept_prefix_info(mac_client_impl_t *mcip, nd_opt_prefix_info_t *po)
+{
+	if (8 * po->nd_opt_pi_len != sizeof (nd_opt_prefix_info_t)) {
+		DTRACE_PROBE(invalid__length);
+		return;
+	}
+
+	if (po->nd_opt_pi_prefix_len > 128) {
+		DTRACE_PROBE(invalid__plen);
+		return;
+	}
+
+	if (IN6_IS_ADDR_LINKLOCAL(&po->nd_opt_pi_prefix)) {
+		DTRACE_PROBE(link__local);
+		return;
+	}
+
+	if ((po->nd_opt_pi_flags_reserved & ND_OPT_PI_FLAG_AUTO) == 0)
+		return;
+
+	mutex_enter(&mcip->mci_protect_lock);
+	insert_slaac_prefix(mcip, po);
+	mutex_exit(&mcip->mci_protect_lock);
+}
+
+/*
+ * If we receive a Router Advertisement carrying prefix information and
+ * indicating that SLAAC should be performed, then track the prefix.
+ */
+static void
+intercept_ra_inbound(mac_client_impl_t *mcip, ip6_t *ip6h, uchar_t *end,
+    nd_router_advert_t *ra)
+{
+	struct nd_opt_hdr *opt;
+	int len, optlen;
+
+	if (ip6h->ip6_hlim != 255) {
+		DTRACE_PROBE1(invalid__hoplimit, uint8_t, ip6h->ip6_hlim);
+		return;
+	}
+
+	len = ip6h->ip6_plen - sizeof (nd_router_advert_t);
+	opt = (struct nd_opt_hdr *)&ra[1];
+	while (len >= sizeof (struct nd_opt_hdr) &&
+	    ((uchar_t *)opt + sizeof (struct nd_opt_hdr)) <= end) {
+		optlen = opt->nd_opt_len * 8;
+
+		if (optlen < sizeof (struct nd_opt_hdr) ||
+		    ((uchar_t *)opt + optlen) > end) {
+			DTRACE_PROBE(invalid__length);
+			return;
+		}
+
+		if (opt->nd_opt_type == ND_OPT_PREFIX_INFORMATION) {
+			intercept_prefix_info(mcip,
+			    (nd_opt_prefix_info_t *)opt);
+		}
+
+		opt = (struct nd_opt_hdr *)((char *)opt + optlen);
+		len -= optlen;
+	}
 }
 
 /*
@@ -1446,7 +1652,7 @@ get_l3_info(mblk_t *mp, size_t hdrsize, uchar_t **start, uchar_t **end,
 }
 
 void
-mac_protect_intercept_dhcp_one(mac_client_impl_t *mcip, mblk_t *mp)
+mac_protect_intercept_dynamic_one(mac_client_impl_t *mcip, mblk_t *mp)
 {
 	mac_impl_t		*mip = mcip->mci_mip;
 	uchar_t			*start, *end;
@@ -1470,21 +1676,31 @@ mac_protect_intercept_dhcp_one(mac_client_impl_t *mcip, mblk_t *mp)
 
 	switch (mhi.mhi_bindsap) {
 	case ETHERTYPE_IP: {
-		ipha_t	*ipha = (ipha_t *)start;
+		struct dhcp	*dh4;
+		ipha_t		*ipha = (ipha_t *)start;
 
 		if (start + sizeof (ipha_t) > end)
 			return;
 
-		intercept_dhcpv4_inbound(mcip, ipha, end);
+		if (get_dhcpv4_info(ipha, end, &dh4) == 0) {
+			intercept_dhcpv4_inbound(mcip, end, dh4);
+		}
 		break;
 	}
 	case ETHERTYPE_IPV6: {
-		ip6_t		*ip6h = (ip6_t *)start;
+		dhcpv6_message_t	*dh6;
+		nd_router_advert_t	*ra;
+		ip6_t			*ip6h = (ip6_t *)start;
 
 		if (start + sizeof (ip6_t) > end)
 			return;
 
-		intercept_dhcpv6_inbound(mcip, ip6h, end);
+		if (get_dhcpv6_info(ip6h, end, &dh6) == 0) {
+			intercept_dhcpv6_inbound(mcip, end, dh6);
+		} else if (get_ra_info(ip6h, end, &ra) == 0) {
+			intercept_ra_inbound(mcip, ip6h, end, ra);
+		}
+
 		break;
 	}
 	}
@@ -1492,7 +1708,7 @@ mac_protect_intercept_dhcp_one(mac_client_impl_t *mcip, mblk_t *mp)
 }
 
 void
-mac_protect_intercept_dhcp(mac_client_impl_t *mcip, mblk_t *mp)
+mac_protect_intercept_dynamic(mac_client_impl_t *mcip, mblk_t *mp)
 {
 	/*
 	 * Skip checks if we are part of an aggr.
@@ -1501,15 +1717,16 @@ mac_protect_intercept_dhcp(mac_client_impl_t *mcip, mblk_t *mp)
 		return;
 
 	for (; mp != NULL; mp = mp->b_next)
-		mac_protect_intercept_dhcp_one(mcip, mp);
+		mac_protect_intercept_dynamic_one(mcip, mp);
 }
 
 void
-mac_protect_flush_dhcp(mac_client_impl_t *mcip)
+mac_protect_flush_dynamic(mac_client_impl_t *mcip)
 {
 	mutex_enter(&mcip->mci_protect_lock);
 	flush_dhcpv4(mcip);
 	flush_dhcpv6(mcip);
+	flush_slaac(mcip);
 	mutex_exit(&mcip->mci_protect_lock);
 }
 
@@ -1586,8 +1803,13 @@ ipnospoof_check_v6(mac_client_impl_t *mcip, mac_protect_t *protect,
 		    v6addr->ip_netmask))
 			return (B_TRUE);
 	}
-	return (protect->mp_ipaddrcnt == 0 ?
-	    check_dhcpv6_dyn_ip(mcip, addr) : B_FALSE);
+
+	if (protect->mp_ipaddrcnt == 0) {
+		return (check_slaac_ip(mcip, addr) ||
+		    check_dhcpv6_dyn_ip(mcip, addr));
+	} else {
+		return (B_FALSE);
+	}
 }
 
 /*
@@ -1943,19 +2165,68 @@ fail:
 }
 
 /*
- * This needs to be called whenever the mac client's mac address changes.
+ * This is called whenever the mac client's mac address changes, to make sure
+ * we allow use of the new link-local address.
  */
-void
+static void
 mac_protect_update_v6_local_addr(mac_client_impl_t *mcip)
 {
-	uint8_t		*p, *macaddr = mcip->mci_unicast->ma_addr;
-	uint_t		i, media = mcip->mci_mip->mi_info.mi_media;
-	in6_addr_t	token, *v6addr = &mcip->mci_v6_local_addr;
+	uint_t		i;
+	in6_addr_t	*token = &mcip->mci_v6_mac_token;
+	in6_addr_t	*v6addr = &mcip->mci_v6_local_addr;
 	in6_addr_t	ll_template = {(uint32_t)V6_LINKLOCAL, 0x0, 0x0, 0x0};
 
+	for (i = 0; i < 4; i++) {
+		v6addr->s6_addr32[i] = token->s6_addr32[i] |
+		    ll_template.s6_addr32[i];
+	}
+	mcip->mci_protect_flags |= MPT_FLAG_V6_LOCAL_ADDR_SET;
+}
 
-	bzero(&token, sizeof (token));
-	p = (uint8_t *)&token.s6_addr32[2];
+/*
+ * This is called whenever the mac client's mac address changes, to make sure
+ * that any existing addresses gained via SLAAC are appropriately updated.
+ */
+static void
+mac_protect_update_v6_slaac_addr(mac_client_impl_t *mcip)
+{
+	void		*cookie = NULL;
+	avl_tree_t	temp_tree;
+	avl_tree_t	*ttp = &temp_tree, *sip = &mcip->mci_v6_slaac_ip;
+	in6_addr_t	*token = &mcip->mci_v6_mac_token;
+	slaac_addr_t	*addr = NULL;
+
+	avl_create(ttp, compare_slaac_ip, sizeof (slaac_addr_t),
+	    offsetof(slaac_addr_t, sla_node));
+
+	/* Copy everything over to the temporary tree, and fix the IP address */
+	while ((addr = avl_destroy_nodes(sip, &cookie)) != NULL) {
+		VERIFY(insert_slaac_ip(ttp, token, addr) == B_TRUE);
+	}
+
+	/*
+	 * Now that the tempory tree has all of the modified addresses, we can
+	 * swap them over to the original tree once it's reset.
+	 */
+	avl_destroy(sip);
+	avl_create(sip, compare_slaac_ip, sizeof (slaac_addr_t),
+	    offsetof(slaac_addr_t, sla_node));
+	avl_swap(ttp, sip);
+}
+
+/*
+ * After the unicast MAC address changes, we need to update the derived token,
+ * and update the IPv6 addresses that use the token.
+ */
+void
+mac_protect_update_mac_token(mac_client_impl_t *mcip)
+{
+	uint_t		media = mcip->mci_mip->mi_info.mi_media;
+	uint8_t		*p, *macaddr = mcip->mci_unicast->ma_addr;
+	in6_addr_t	*token = &mcip->mci_v6_mac_token;
+
+	bzero(token, sizeof (in6_addr_t));
+	p = (uint8_t *)&token->s6_addr32[2];
 
 	switch (media) {
 	case DL_ETHER:
@@ -1974,18 +2245,17 @@ mac_protect_update_v6_local_addr(mac_client_impl_t *mcip)
 		/*
 		 * We do not need to generate the local address for link types
 		 * that do not support link protection. Wifi pretends to be
-		 * ethernet so it is covered by the DL_ETHER case (note the
+		 * Ethernet so it is covered by the DL_ETHER case (note the
 		 * use of mi_media instead of mi_nativemedia).
 		 */
 		return;
 	}
 
-	for (i = 0; i < 4; i++) {
-		v6addr->s6_addr32[i] = token.s6_addr32[i] |
-		    ll_template.s6_addr32[i];
-	}
-	mcip->mci_protect_flags |= MPT_FLAG_V6_LOCAL_ADDR_SET;
+	mac_protect_update_v6_local_addr(mcip);
+	mac_protect_update_v6_slaac_addr(mcip);
 }
+
+
 
 /*
  * Enforce link protection on one packet.
@@ -2304,6 +2574,8 @@ mac_protect_init(mac_client_impl_t *mcip)
 	    sizeof (dhcpv6_cid_t), offsetof(dhcpv6_cid_t, dc_node));
 	avl_create(&mcip->mci_v6_dyn_ip, compare_dhcpv6_ip,
 	    sizeof (dhcpv6_addr_t), offsetof(dhcpv6_addr_t, da_node));
+	avl_create(&mcip->mci_v6_slaac_ip, compare_slaac_ip,
+	    sizeof (slaac_addr_t), offsetof(slaac_addr_t, sla_node));
 }
 
 void
@@ -2315,6 +2587,7 @@ mac_protect_fini(mac_client_impl_t *mcip)
 	avl_destroy(&mcip->mci_v4_dyn_ip);
 	avl_destroy(&mcip->mci_v4_completed_txn);
 	avl_destroy(&mcip->mci_v4_pending_txn);
+	avl_destroy(&mcip->mci_v6_slaac_ip);
 	mcip->mci_txn_cleanup_tid = 0;
 	mcip->mci_protect_flags = 0;
 	mutex_destroy(&mcip->mci_protect_lock);

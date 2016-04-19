@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -339,8 +339,7 @@ sys_log(const char *msg)
  */
 static bool_t
 nfsauth_retrieve(struct exportinfo *exi, char *req_netid, int flavor,
-    struct netbuf *addr, int *access, uid_t clnt_uid, gid_t clnt_gid,
-    uint_t clnt_gids_cnt, const gid_t *clnt_gids, uid_t *srv_uid,
+    struct netbuf *addr, int *access, cred_t *clnt_cred, uid_t *srv_uid,
     gid_t *srv_gid, uint_t *srv_gids_cnt, gid_t **srv_gids)
 {
 	varg_t			  varg = {0};
@@ -367,10 +366,10 @@ nfsauth_retrieve(struct exportinfo *exi, char *req_netid, int flavor,
 	varg.arg_u.arg.areq.req_netid = req_netid;
 	varg.arg_u.arg.areq.req_path = exi->exi_export.ex_path;
 	varg.arg_u.arg.areq.req_flavor = flavor;
-	varg.arg_u.arg.areq.req_clnt_uid = clnt_uid;
-	varg.arg_u.arg.areq.req_clnt_gid = clnt_gid;
-	varg.arg_u.arg.areq.req_clnt_gids.len = clnt_gids_cnt;
-	varg.arg_u.arg.areq.req_clnt_gids.val = (gid_t *)clnt_gids;
+	varg.arg_u.arg.areq.req_clnt_uid = crgetuid(clnt_cred);
+	varg.arg_u.arg.areq.req_clnt_gid = crgetgid(clnt_cred);
+	varg.arg_u.arg.areq.req_clnt_gids.len = crgetngroups(clnt_cred);
+	varg.arg_u.arg.areq.req_clnt_gids.val = (gid_t *)crgetgroups(clnt_cred);
 
 	DTRACE_PROBE1(nfsserv__func__nfsauth__varg, varg_t *, &varg);
 
@@ -699,9 +698,7 @@ nfsauth_refresh_thread(void)
 			 */
 			retrieval = nfsauth_retrieve(exi, netid,
 			    p->auth_flavor, &p->auth_clnt->authc_addr, &access,
-			    p->auth_clnt_uid, p->auth_clnt_gid,
-			    p->auth_clnt_ngids, p->auth_clnt_gids, &uid, &gid,
-			    &ngids, &gids);
+			    p->auth_clnt_cred, &uid, &gid, &ngids, &gids);
 
 			/*
 			 * This can only be set in one other place
@@ -777,6 +774,8 @@ nfsauth_cache_clnt_compar(const void *v1, const void *v2)
 static int
 nfsauth_cache_compar(const void *v1, const void *v2)
 {
+	int c;
+
 	const struct auth_cache *a1 = (const struct auth_cache *)v1;
 	const struct auth_cache *a2 = (const struct auth_cache *)v2;
 
@@ -785,14 +784,26 @@ nfsauth_cache_compar(const void *v1, const void *v2)
 	if (a1->auth_flavor > a2->auth_flavor)
 		return (1);
 
-	if (a1->auth_clnt_uid < a2->auth_clnt_uid)
+	if (crgetuid(a1->auth_clnt_cred) < crgetuid(a2->auth_clnt_cred))
 		return (-1);
-	if (a1->auth_clnt_uid > a2->auth_clnt_uid)
+	if (crgetuid(a1->auth_clnt_cred) > crgetuid(a2->auth_clnt_cred))
 		return (1);
 
-	if (a1->auth_clnt_gid < a2->auth_clnt_gid)
+	if (crgetgid(a1->auth_clnt_cred) < crgetgid(a2->auth_clnt_cred))
 		return (-1);
-	if (a1->auth_clnt_gid > a2->auth_clnt_gid)
+	if (crgetgid(a1->auth_clnt_cred) > crgetgid(a2->auth_clnt_cred))
+		return (1);
+
+	if (crgetngroups(a1->auth_clnt_cred) < crgetngroups(a2->auth_clnt_cred))
+		return (-1);
+	if (crgetngroups(a1->auth_clnt_cred) > crgetngroups(a2->auth_clnt_cred))
+		return (1);
+
+	c = memcmp(crgetgroups(a1->auth_clnt_cred),
+	    crgetgroups(a2->auth_clnt_cred), crgetngroups(a1->auth_clnt_cred));
+	if (c < 0)
+		return (-1);
+	if (c > 0)
 		return (1);
 
 	return (0);
@@ -845,8 +856,7 @@ nfsauth_cache_get(struct exportinfo *exi, struct svc_req *req, int flavor,
 	addrmask(&addr, taddrmask);
 
 	ac.auth_flavor = flavor;
-	ac.auth_clnt_uid = crgetuid(cr);
-	ac.auth_clnt_gid = crgetgid(cr);
+	ac.auth_clnt_cred = crdup(cr);
 
 	acc.authc_addr = addr;
 
@@ -918,10 +928,7 @@ nfsauth_cache_get(struct exportinfo *exi, struct svc_req *req, int flavor,
 		 */
 		np->auth_clnt = c;
 		np->auth_flavor = flavor;
-		np->auth_clnt_uid = crgetuid(cr);
-		np->auth_clnt_gid = crgetgid(cr);
-		np->auth_clnt_ngids = 0;
-		np->auth_clnt_gids = NULL;
+		np->auth_clnt_cred = ac.auth_clnt_cred;
 		np->auth_srv_ngids = 0;
 		np->auth_srv_gids = NULL;
 		np->auth_time = np->auth_freshness = gethrestime_sec();
@@ -942,16 +949,17 @@ nfsauth_cache_get(struct exportinfo *exi, struct svc_req *req, int flavor,
 
 			cv_destroy(&np->auth_cv);
 			mutex_destroy(&np->auth_lock);
+			crfree(ac.auth_clnt_cred);
 			kmem_cache_free(exi_cache_handle, np);
 		}
 	} else {
 		rw_exit(&exi->exi_cache_lock);
+		crfree(ac.auth_clnt_cred);
 	}
 
 	mutex_enter(&p->auth_lock);
 	rw_exit(&c->authc_lock);
 
-wait:
 	/*
 	 * If the entry is in the WAITING state then some other thread is just
 	 * retrieving the required info.  The entry was either NEW, or the list
@@ -967,76 +975,6 @@ wait:
 	 */
 	ASSERT(p->auth_state != NFS_AUTH_WAITING);
 	ASSERT(p->auth_state != NFS_AUTH_INVALID);
-
-	/*
-	 * In a case the client's list of supplemental groups changed (or, the
-	 * list is not initialized yet) we need to (re)allocate it and make
-	 * sure the auth_cache entry is (re)retrieved.
-	 */
-	if (p->auth_clnt_ngids != crgetngroups(cr) ||
-	    bcmp(p->auth_clnt_gids, crgetgroups(cr),
-	    p->auth_clnt_ngids * sizeof (gid_t)) != 0) {
-
-		/*
-		 * If the refresh thread is just working on this entry then
-		 * wait for it so we do not modify the list of supplemental
-		 * groups in the middle of its processing.
-		 */
-		if (p->auth_state == NFS_AUTH_REFRESHING) {
-			p->auth_state = NFS_AUTH_WAITING;
-			goto wait;
-		}
-
-		/*
-		 * We won't modify (and use) the STALE entries here since they
-		 * are already in the refreshq_queue list.  Such entries will
-		 * be updated later.
-		 */
-		if (p->auth_state == NFS_AUTH_STALE) {
-			mutex_exit(&p->auth_lock);
-
-			p = NULL;
-
-			goto retrieve;
-		}
-
-		p->auth_state = NFS_AUTH_NEW;
-
-		/*
-		 * If the number of supplemental groups differ, we need to
-		 * reallocate first.
-		 */
-		if (p->auth_clnt_ngids != crgetngroups(cr)) {
-			kmem_free(p->auth_clnt_gids,
-			    p->auth_clnt_ngids * sizeof (gid_t));
-
-			p->auth_clnt_ngids = crgetngroups(cr);
-			p->auth_clnt_gids = kmem_alloc(
-			    p->auth_clnt_ngids * sizeof (gid_t),
-			    KM_NOSLEEP | KM_NORMALPRI);
-
-			/*
-			 * If we failed to preallocate the memory for
-			 * supplemental groups, we won't cache the retrieved
-			 * data.
-			 */
-			if (p->auth_clnt_ngids != 0 &&
-			    p->auth_clnt_gids == NULL) {
-				p->auth_clnt_ngids = 0;
-				mutex_exit(&p->auth_lock);
-
-				p = NULL;
-
-				goto retrieve;
-			}
-		}
-
-		/*
-		 * Fill the client's supplemental groups.
-		 */
-		bcopy(crgetgroups(cr), p->auth_clnt_gids,
-		    p->auth_clnt_ngids * sizeof (gid_t));
-	}
 
 	/*
 	 * If the cache entry is not valid yet, we need to retrieve the
@@ -1058,9 +996,7 @@ wait:
 		atomic_inc_uint(&nfsauth_cache_miss);
 
 		res = nfsauth_retrieve(exi, svc_getnetid(req->rq_xprt), flavor,
-		    &addr, &access, crgetuid(cr), crgetgid(cr),
-		    crgetngroups(cr), crgetgroups(cr), &tmpuid, &tmpgid,
-		    &tmpngids, &tmpgids);
+		    &addr, &access, cr, &tmpuid, &tmpgid, &tmpngids, &tmpgids);
 
 		p->auth_access = access;
 		p->auth_time = p->auth_freshness = gethrestime_sec();
@@ -1203,6 +1139,8 @@ wait:
 	return (access);
 
 retrieve:
+	crfree(ac.auth_clnt_cred);
+
 	/*
 	 * Retrieve the required data without caching.
 	 */
@@ -1212,8 +1150,7 @@ retrieve:
 	atomic_inc_uint(&nfsauth_cache_miss);
 
 	if (nfsauth_retrieve(exi, svc_getnetid(req->rq_xprt), flavor, &addr,
-	    &access, crgetuid(cr), crgetgid(cr), crgetngroups(cr),
-	    crgetgroups(cr), &tmpuid, &tmpgid, &tmpngids, &tmpgids)) {
+	    &access, cr, &tmpuid, &tmpgid, &tmpngids, &tmpgids)) {
 		if (uid != NULL)
 			*uid = tmpuid;
 		if (gid != NULL)
@@ -1237,7 +1174,7 @@ retrieve:
  */
 int
 nfsauth4_secinfo_access(struct exportinfo *exi, struct svc_req *req,
-			int flavor, int perm, cred_t *cr)
+    int flavor, int perm, cred_t *cr)
 {
 	int access;
 
@@ -1429,7 +1366,7 @@ nfsauth_free_clnt_node(struct auth_cache_clnt *p)
 static void
 nfsauth_free_node(struct auth_cache *p)
 {
-	kmem_free(p->auth_clnt_gids, p->auth_clnt_ngids * sizeof (gid_t));
+	crfree(p->auth_clnt_cred);
 	kmem_free(p->auth_srv_gids, p->auth_srv_ngids * sizeof (gid_t));
 	mutex_destroy(&p->auth_lock);
 	cv_destroy(&p->auth_cv);

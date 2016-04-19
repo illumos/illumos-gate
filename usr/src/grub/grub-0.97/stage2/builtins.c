@@ -146,9 +146,9 @@ check_password (char *entered, char* expected, password_t type)
 
 /* Print which sector is read when loading a file.  */
 static void
-disk_read_print_func(unsigned int sector, int offset, int length)
+disk_read_print_func(unsigned long long sector, int offset, int length)
 {
-  grub_printf ("[%u,%d,%d]", sector, offset, length);
+  grub_printf ("[%llu,%d,%d]", sector, offset, length);
 }
 
 
@@ -157,17 +157,17 @@ static int
 blocklist_func (char *arg, int flags)
 {
   char *dummy = (char *) RAW_ADDR (0x100000);
-  unsigned int start_sector = 0;
+  unsigned long long start_sector = 0;
   int num_sectors = 0;
   int num_entries = 0;
   int last_length = 0;
 
-  auto void disk_read_blocklist_func (unsigned int sector, int offset,
+  auto void disk_read_blocklist_func (unsigned long long sector, int offset,
       int length);
 
   /* Collect contiguous blocks into one entry as many as possible,
      and print the blocklist notation on the screen.  */
-  auto void disk_read_blocklist_func (unsigned int sector, int offset,
+  auto void disk_read_blocklist_func (unsigned long long sector, int offset,
       int length)
     {
       if (num_sectors > 0)
@@ -182,15 +182,15 @@ blocklist_func (char *arg, int flags)
 	  else
 	    {
 	      if (last_length == SECTOR_SIZE)
-		grub_printf ("%s%d+%d", num_entries ? "," : "",
+		grub_printf ("%s%lld+%d", num_entries ? "," : "",
 			     start_sector - part_start, num_sectors);
 	      else if (num_sectors > 1)
-		grub_printf ("%s%d+%d,%d[0-%d]", num_entries ? "," : "",
+		grub_printf ("%s%lld+%d,%lld[0-%d]", num_entries ? "," : "",
 			     start_sector - part_start, num_sectors-1,
 			     start_sector + num_sectors-1 - part_start, 
 			     last_length);
 	      else
-		grub_printf ("%s%d[0-%d]", num_entries ? "," : "",
+		grub_printf ("%s%;lld[0-%d]", num_entries ? "," : "",
 			     start_sector - part_start, last_length);
 	      num_entries++;
 	      num_sectors = 0;
@@ -199,7 +199,7 @@ blocklist_func (char *arg, int flags)
 
       if (offset > 0)
 	{
-	  grub_printf("%s%u[%d-%d]", num_entries ? "," : "",
+	  grub_printf("%s%llu[%d-%d]", num_entries ? "," : "",
 		      sector-part_start, offset, offset+length);
 	  num_entries++;
 	}
@@ -236,7 +236,7 @@ blocklist_func (char *arg, int flags)
   /* The last entry may not be printed yet.  Don't check if it is a
    * full sector, since it doesn't matter if we read too much. */
   if (num_sectors > 0)
-    grub_printf ("%s%d+%d", num_entries ? "," : "",
+    grub_printf ("%s%lld+%d", num_entries ? "," : "",
 		 start_sector - part_start, num_sectors);
 
   grub_printf ("\n");
@@ -1654,7 +1654,7 @@ harddisk:
   for (drive = 0x80; drive < 0x88; drive++)
     {
       unsigned long part = 0xFFFFFF;
-      unsigned long start, len, offset, ext_offset, gpt_offset;
+      unsigned long long start, len, offset, ext_offset, gpt_offset;
       int type, entry, gpt_count, gpt_size;
       char buf[SECTOR_SIZE];
 
@@ -1870,7 +1870,7 @@ geometry_func (char *arg, int flags)
 #endif
 
   grub_printf ("drive 0x%x: C/H/S = %d/%d/%d, "
-	       "The number of sectors = %u, %s\n",
+	       "The number of sectors = %llu, %s\n",
 	       current_drive,
 	       geom.cylinders, geom.heads, geom.sectors,
 	       geom.total_sectors, msg);
@@ -2222,8 +2222,8 @@ install_func (char *arg, int flags)
   int src_drive, src_partition, src_part_start;
   int i;
   struct geometry dest_geom, src_geom;
-  unsigned int saved_sector;
-  unsigned int stage2_first_sector, stage2_second_sector;
+  unsigned long long saved_sector;
+  unsigned long long stage2_first_sector, stage2_second_sector;
   char *ptr;
   int installaddr, installlist;
   /* Point to the location of the name of a configuration file in Stage 2.  */
@@ -2243,17 +2243,17 @@ install_func (char *arg, int flags)
   char *stage2_os_file = 0;
 #endif /* GRUB_UTIL */
   
-  auto void disk_read_savesect_func (unsigned int sector, int offset,
+  auto void disk_read_savesect_func (unsigned long long sector, int offset,
       int length);
-  auto void disk_read_blocklist_func (unsigned int sector, int offset,
+  auto void disk_read_blocklist_func (unsigned long long sector, int offset,
       int length);
 
   /* Save the first sector of Stage2 in STAGE2_SECT.  */
-  auto void disk_read_savesect_func (unsigned int sector, int offset,
+  auto void disk_read_savesect_func (unsigned long long sector, int offset,
       int length)
     {
       if (debug)
-	printf ("[%u]", sector);
+	printf ("[%llu]", sector);
 
       /* ReiserFS has files which sometimes contain data not aligned
          on sector boundaries.  Returning an error is better than
@@ -2266,11 +2266,11 @@ install_func (char *arg, int flags)
 
   /* Write SECTOR to INSTALLLIST, and update INSTALLADDR and
      INSTALLSECT.  */
-  auto void disk_read_blocklist_func (unsigned int sector, int offset,
+  auto void disk_read_blocklist_func (unsigned long long sector, int offset,
       int length)
     {
       if (debug)
-	printf("[%u]", sector);
+	printf("[%llu]", sector);
 
       if (offset != 0 || last_length != SECTOR_SIZE)
 	{
@@ -2435,6 +2435,10 @@ install_func (char *arg, int flags)
     goto fail;
 
   stage2_first_sector = saved_sector;
+  if (stage2_first_sector >= 0xffffffffUL) {
+    grub_printf ("Error: stage2 first sector must be below 2TB\n");
+    goto fail;
+  }
   
   /* Read the second sector of Stage 2.  */
   if (grub_read (stage2_second_buffer, SECTOR_SIZE) != SECTOR_SIZE)
@@ -3379,7 +3383,7 @@ parttype_func (char *arg, int flags)
 {
   int new_type;
   unsigned long part = 0xFFFFFF;
-  unsigned long start, len, offset, ext_offset, gpt_offset;
+  unsigned long long start, len, offset, ext_offset, gpt_offset;
   int entry, type, gpt_count, gpt_size;
   char mbr[512];
 
@@ -3896,7 +3900,7 @@ savedefault_func (char *arg, int flags)
   char sect[SECTOR_SIZE];
   int entryno;
   int sector_count = 0;
-  unsigned int saved_sectors[2];
+  unsigned long long saved_sectors[2];
   int saved_offsets[2];
   int saved_lengths[2];
 
@@ -3906,9 +3910,9 @@ savedefault_func (char *arg, int flags)
   }
 
   /* Save sector information about at most two sectors.  */
-  auto void disk_read_savesect_func (unsigned int sector, int offset,
+  auto void disk_read_savesect_func (unsigned long long sector, int offset,
       int length);
-  void disk_read_savesect_func (unsigned int sector, int offset, int length)
+  void disk_read_savesect_func (unsigned long long sector, int offset, int length)
     {
       if (sector_count < 2)
 	{
@@ -4053,11 +4057,19 @@ static struct builtin builtin_savedefault =
 static int
 serial_func (char *arg, int flags)
 {
-  unsigned short port = serial_hw_get_port (0);
+  int i;
+  int units[SERIAL_MAX_PORTS];
+  unsigned short ports[SERIAL_MAX_PORTS];
   unsigned int speed = 9600;
   int word_len = UART_8BITS_WORD;
   int parity = UART_NO_PARITY;
   int stop_bit_len = UART_1_STOP_BIT;
+
+  for (i = 0; i < SERIAL_MAX_PORTS; ++i)
+    {
+      units[i] = -1;
+      ports[i] = 0;
+    }
 
   /* Process GNU-style long options.
      FIXME: We should implement a getopt-like function, to avoid
@@ -4068,17 +4080,28 @@ serial_func (char *arg, int flags)
 	{
 	  char *p = arg + sizeof ("--unit=") - 1;
 	  int unit;
-	  
-	  if (! safe_parse_maxint (&p, &unit))
-	    return 1;
-	  
-	  if (unit < 0 || unit > 3)
-	    {
-	      errnum = ERR_DEV_VALUES;
-	      return 1;
-	    }
 
-	  port = serial_hw_get_port (unit);
+	  i = 0;
+	  do
+	    {
+	      if (i >= SERIAL_MAX_PORTS)
+		{
+		  errnum = ERR_DEV_FORMAT;
+		  return 1;
+		}
+
+	      if (! safe_parse_maxint (&p, &unit))
+	        return 1;
+	  
+	      if (unit < 0 || unit > 3)
+	        {
+	          errnum = ERR_DEV_VALUES;
+	          return 1;
+	        }
+
+	      units[i++] = unit;
+	    }
+	  while (*p++ == ',');
 	}
       else if (grub_memcmp (arg, "--speed=", sizeof ("--speed=") - 1) == 0)
 	{
@@ -4094,11 +4117,28 @@ serial_func (char *arg, int flags)
 	{
 	  char *p = arg + sizeof ("--port=") - 1;
 	  int num;
-	  
-	  if (! safe_parse_maxint (&p, &num))
-	    return 1;
 
-	  port = (unsigned short) num;
+	  i = 0;
+	  do
+	    {
+	      if (i >= SERIAL_MAX_PORTS)
+		{
+		  errnum = ERR_DEV_FORMAT;
+		  return 1;
+		}
+
+	      if (! safe_parse_maxint (&p, &num))
+	        return 1;
+
+	      if (num > 0xffff || num <= 0)
+		{
+		  errnum = ERR_DEV_VALUES;
+		  return 1;
+		}
+
+	      ports[i++] = (unsigned short) num;
+	    }
+	  while (*p++ == ',');
 	}
       else if (grub_memcmp (arg, "--word=", sizeof ("--word=") - 1) == 0)
 	{
@@ -4174,8 +4214,21 @@ serial_func (char *arg, int flags)
       arg = skip_to (0, arg);
     }
 
-  /* Initialize the serial unit.  */
-  if (! serial_hw_init (port, speed, word_len, parity, stop_bit_len))
+  if (units[0] == -1 && ports[0] == 0)
+    units[0] = 0;
+
+  for (i = 0; i < SERIAL_MAX_PORTS; ++i)
+    {
+      if (units[i] != -1)
+	ports[i] = serial_hw_get_port (units[i]);
+      if (ports[i] == 0)
+	continue;
+
+      if (serial_hw_init (ports[i], speed, word_len, parity, stop_bit_len))
+	break;
+    }
+
+  if (i >= SERIAL_MAX_PORTS)
     {
       errnum = ERR_BAD_ARGUMENT;
       return 1;
@@ -4189,14 +4242,17 @@ static struct builtin builtin_serial =
   "serial",
   serial_func,
   BUILTIN_MENU | BUILTIN_CMDLINE | BUILTIN_HELP_LIST,
-  "serial [--unit=UNIT] [--port=PORT] [--speed=SPEED] [--word=WORD] [--parity=PARITY] [--stop=STOP] [--device=DEV]",
+  "serial [[--unit=UNIT[,UNIT...]] | [--port=PORT[,PORT...]]] [--speed=SPEED] [--word=WORD] [--parity=PARITY] [--stop=STOP] [--device=DEV]",
   "Initialize a serial device. UNIT is a digit that specifies which serial"
-  " device is used (e.g. 0 == COM1). If you need to specify the port number,"
-  " set it by --port. SPEED is the DTE-DTE speed. WORD is the word length,"
+  " device is used (e.g. 0 == ttya (aka COM1)). If you need to specify the port"
+  " number, set it by --port. Either but not both of --unit and --port is"
+  " permitted; --unit takes precedence. Multiple devices may be specified,"
+  " separated by commas; the first working device in the list will be used"
+  " and the rest ignored. SPEED is the DTE-DTE speed. WORD is the word length,"
   " PARITY is the type of parity, which is one of `no', `odd' and `even'."
   " STOP is the length of stop bit(s). The option --device can be used only"
   " in the grub shell, which specifies the file name of a tty device. The"
-  " default values are COM1, 9600, 8N1."
+  " default values are ttya, 9600, 8N1."
 };
 #endif /* SUPPORT_SERIAL */
 

@@ -660,7 +660,7 @@ so_ux_addr_xlate(struct sonode *so, struct sockaddr *name,
 	/*
 	 * Use the address of the peer vnode as the address to send
 	 * to. We release the peer vnode here. In case it has been
-	 * closed by the time the T_CONN_REQ or T_UNIDATA_REQ reaches the
+	 * closed by the time the T_CONN_REQ or T_UNITDATA_REQ reaches the
 	 * transport the message will get an error or be dropped.
 	 */
 	sti->sti_ux_faddr.soua_vp = vp;

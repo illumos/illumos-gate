@@ -71,9 +71,12 @@
 
 /*
  * on_fault()
+ *
  * Catch lofault faults. Like setjmp except it returns one
  * if code following causes uncorrectable fault. Turned off
- * by calling no_fault().
+ * by calling no_fault(). Note that while under on_fault(),
+ * SMAP is disabled. For more information see
+ * uts/intel/ia32/ml/copy.s.
  */
 
 #if defined(__lint)
@@ -96,6 +99,7 @@ no_fault(void)
 	leaq	catch_fault(%rip), %rdx
 	movq	%rdi, T_ONFAULT(%rsi)		/* jumpbuf in t_onfault */
 	movq	%rdx, T_LOFAULT(%rsi)		/* catch_fault in t_lofault */
+	call	smap_disable			/* allow user accesses */
 	jmp	setjmp				/* let setjmp do the rest */
 
 catch_fault:
@@ -104,6 +108,7 @@ catch_fault:
 	xorl	%eax, %eax
 	movq	%rax, T_ONFAULT(%rsi)		/* turn off onfault */
 	movq	%rax, T_LOFAULT(%rsi)		/* turn off lofault */
+	call	smap_enable			/* disallow user accesses */
 	jmp	longjmp				/* let longjmp do the rest */
 	SET_SIZE(on_fault)
 
@@ -112,6 +117,7 @@ catch_fault:
 	xorl	%eax, %eax
 	movq	%rax, T_ONFAULT(%rsi)		/* turn off onfault */
 	movq	%rax, T_LOFAULT(%rsi)		/* turn off lofault */
+	call	smap_enable			/* disallow user accesses */
 	ret
 	SET_SIZE(no_fault)
 

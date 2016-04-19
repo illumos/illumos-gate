@@ -23,6 +23,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2012 Milan Jurik. All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.
  */
 
 #include <stdlib.h>
@@ -45,7 +46,7 @@ static void sub_command_help(char *proto);
 static void
 global_help()
 {
-	(void) printf(gettext("usage: sharectl <command> [options]\n"));
+	(void) printf(gettext("usage: sharectl <subcommand> [<options>]\n"));
 	sub_command_help(NULL);
 }
 
@@ -99,17 +100,17 @@ sc_get_usage(sc_usage_t index)
 	char *ret = NULL;
 
 	switch (index) {
+	case USAGE_CTL_DELSECT:
+		ret = gettext("delsect\t<section> <proto>");
+		break;
 	case USAGE_CTL_GET:
-		ret = gettext("get [-h | -p property ...] proto");
+		ret = gettext("get\t[-p <property>]... <proto>");
 		break;
 	case USAGE_CTL_SET:
-		ret = gettext("set [-h] -p property=value ... proto");
+		ret = gettext("set\t{-p <property>=<value>}... <proto>");
 		break;
 	case USAGE_CTL_STATUS:
-		ret = gettext("status [-h | proto ...]");
-		break;
-	case USAGE_CTL_DELSECT:
-		ret = gettext("delsect [-h] section proto");
+		ret = gettext("status\t[<proto>]...");
 		break;
 	}
 	return (ret);
@@ -503,7 +504,7 @@ sc_delsect(sa_handle_t handle, int flags, int argc, char *argv[])
 
 	if ((sa_proto_get_featureset(proto) & SA_FEATURE_HAS_SECTIONS) == 0) {
 		(void) printf(gettext("Protocol %s does not have sections\n"),
-		    section, proto);
+		    proto);
 		return (SA_NOT_SUPPORTED);
 	}
 
@@ -527,10 +528,10 @@ sc_delsect(sa_handle_t handle, int flags, int argc, char *argv[])
 }
 
 static sa_command_t commands[] = {
+	{"delsect", 0, sc_delsect, USAGE_CTL_DELSECT},
 	{"get", 0, sc_get, USAGE_CTL_GET},
 	{"set", 0, sc_set, USAGE_CTL_SET},
 	{"status", 0, sc_status, USAGE_CTL_STATUS},
-	{"delsect", 0, sc_delsect, USAGE_CTL_DELSECT},
 	{NULL, 0, NULL, 0},
 };
 
@@ -540,7 +541,6 @@ sub_command_help(char *proto)
 {
 	int i;
 
-	(void) printf("\tsub-commands:\n");
 	for (i = 0; commands[i].cmdname != NULL; i++) {
 		if (!(commands[i].flags & (CMD_ALIAS|CMD_NODISPLAY)))
 			(void) printf("\t%s\n",

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PCI_CONFIG_SETUP 9F "Jan 1, 1997"
+.TH PCI_CONFIG_SETUP 9F "Mar 27, 2016"
 .SH NAME
 pci_config_setup, pci_config_teardown \- setup or tear down the resources for
 enabling accesses to the PCI Local Bus Configuration space
@@ -11,7 +11,7 @@ enabling accesses to the PCI Local Bus Configuration space
 .LP
 .nf
 #include <sys/ddi.h>
- #include <sys/sunddi.h>
+#include <sys/sunddi.h>
 
 
 
@@ -24,11 +24,9 @@ enabling accesses to the PCI Local Bus Configuration space
 .fi
 
 .SH INTERFACE LEVEL
-.sp
 .LP
 Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIdip\fR \fR
@@ -47,14 +45,12 @@ Pointer to a data access handle.
 .RE
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBpci_config_setup()\fR sets up the necessary resources for enabling
 subsequent data accesses to the  \fBPCI \fRLocal Bus Configuration space.
 \fBpci_config_teardown()\fR reclaims and removes those resources  represented
 by the data access handle returned from  \fBpci_config_setup()\fR.
 .SH RETURN VALUES
-.sp
 .LP
 \fBpci_config_setup()\fR returns:
 .sp
@@ -76,18 +72,15 @@ Unable to allocate resources for setup.
 .RE
 
 .SH CONTEXT
-.sp
 .LP
 \fBpci_config_setup()\fR must be called from user or kernel context.
 \fBpci_config_teardown()\fR can be called from any context.
 .SH NOTES
-.sp
 .LP
 These functions are specific to \fBPCI \fRbus device drivers. For drivers using
 these functions,  a single source to support devices with multiple bus versions
 may not be easy to maintain.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -103,7 +96,6 @@ Architecture	PCI Local Bus
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBattributes\fR(5)
 .sp

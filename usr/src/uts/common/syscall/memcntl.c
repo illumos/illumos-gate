@@ -347,7 +347,8 @@ memcntl(caddr_t addr, size_t len, int cmd, caddr_t arg, int attr, int mask)
 		}
 		return (error);
 	case MC_ADVISE:
-		if ((uintptr_t)arg == MADV_FREE) {
+		if ((uintptr_t)arg == MADV_FREE ||
+		    (uintptr_t)arg == MADV_PURGE) {
 			len &= PAGEMASK;
 		}
 		switch ((uintptr_t)arg) {

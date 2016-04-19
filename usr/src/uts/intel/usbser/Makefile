@@ -67,7 +67,6 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 # Please do not carry these forward to new Makefiles.
 #
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
-LINTTAGS	+= -erroff=E_SUPPRESSION_DIRECTIVE_UNUSED
 
 .KEEP_STATE:
 

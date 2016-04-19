@@ -9945,6 +9945,10 @@ ip_sioctl_get_addr(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 		*sin6 = sin6_null;
 		sin6->sin6_family = AF_INET6;
 		sin6->sin6_addr = ipif->ipif_v6lcl_addr;
+		if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr)) {
+			sin6->sin6_scope_id =
+			    ipif->ipif_ill->ill_phyint->phyint_ifindex;
+		}
 		ASSERT(ipip->ipi_cmd_type == LIF_CMD);
 		lifr->lifr_addrlen =
 		    ip_mask_to_plen_v6(&ipif->ipif_v6net_mask);

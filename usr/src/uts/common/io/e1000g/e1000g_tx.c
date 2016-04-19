@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*
@@ -1722,4 +1722,43 @@ e1000g_82547_tx_move_tail(e1000g_tx_ring_t *tx_ring)
 	}
 	tx_ring->timer_enable_82547 = B_TRUE;
 	e1000g_82547_tx_move_tail_work(tx_ring);
+}
+
+/*
+ * This is part of a workaround for the I219, see e1000g_flush_desc_rings() for
+ * more information.
+ *
+ * We need to clear any potential pending descriptors from the tx_ring.  As
+ * we're about to reset the device, we don't care about the data that we give it
+ * itself.
+ */
+void
+e1000g_flush_tx_ring(struct e1000g *Adapter)
+{
+	struct e1000_hw *hw = &Adapter->shared;
+	e1000g_tx_ring_t *tx_ring = &Adapter->tx_ring[0];
+	uint32_t tctl, txd_lower = E1000_TXD_CMD_IFCS;
+	uint16_t size = 512;
+	struct e1000_tx_desc *desc;
+
+	tctl = E1000_READ_REG(hw, E1000_TCTL);
+	E1000_WRITE_REG(hw, E1000_TCTL, tctl | E1000_TCTL_EN);
+
+	desc = tx_ring->tbd_next;
+	if (tx_ring->tbd_next == tx_ring->tbd_last)
+		tx_ring->tbd_next = tx_ring->tbd_first;
+	else
+		tx_ring->tbd_next++;
+
+	/* We just need to set any valid address, so we use the ring itself */
+	desc->buffer_addr = tx_ring->tbd_dma_addr;
+	desc->lower.data = LE_32(txd_lower | size);
+	desc->upper.data = 0;
+
+	(void) ddi_dma_sync(tx_ring->tbd_dma_handle,
+	    0, 0, DDI_DMA_SYNC_FORDEV);
+	E1000_WRITE_REG(hw, E1000_TDT(0),
+	    (uint32_t)(tx_ring->tbd_next - tx_ring->tbd_first));
+	(void) E1000_READ_REG(hw, E1000_STATUS);
+	usec_delay(250);
 }

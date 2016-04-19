@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright 2015, Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -914,6 +914,7 @@ udf_rename(
 	int32_t error = 0;
 	struct udf_vfs *udf_vfsp;
 	struct ud_inode *sip;		/* source inode */
+	struct ud_inode *tip;		/* target inode */
 	struct ud_inode *sdp, *tdp;	/* source and target parent inode */
 	struct vnode *realvp;
 
@@ -974,9 +975,20 @@ udf_rename(
 		rw_exit(&sdp->i_contents);
 		goto errout;
 	}
+
 	rw_exit(&sip->i_contents);
 	rw_exit(&sdp->i_contents);
 
+	if (ud_dirlook(tdp, tnm, &tip, cr, 0) == 0) {
+		vnevent_pre_rename_dest(ITOV(tip), tdvp, tnm, ct);
+		VN_RELE(ITOV(tip));
+	}
+
+	/* Notify the target dir. if not the same as the source dir. */
+	if (sdvp != tdvp)
+		vnevent_pre_rename_dest_dir(tdvp, ITOV(sip), tnm, ct);
+
+	vnevent_pre_rename_src(ITOV(sip), sdvp, snm, ct);
 
 	/*
 	 * Link source to the target.
@@ -995,7 +1007,6 @@ udf_rename(
 		rw_exit(&tdp->i_rwlock);
 		goto errout;
 	}
-	vnevent_rename_src(ITOV(sip), sdvp, snm, ct);
 	rw_exit(&tdp->i_rwlock);
 
 	rw_enter(&sdp->i_rwlock, RW_WRITER);
@@ -1011,6 +1022,15 @@ udf_rename(
 		error = 0;
 	}
 	rw_exit(&sdp->i_rwlock);
+
+	if (error == 0) {
+		vnevent_rename_src(ITOV(sip), sdvp, snm, ct);
+		/*
+		 * vnevent_rename_dest and vnevent_rename_dest_dir are called
+		 * in ud_direnter().
+		 */
+	}
+
 errout:
 	ITIMES(sdp);
 	ITIMES(tdp);

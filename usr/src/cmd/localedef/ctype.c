@@ -300,6 +300,8 @@ dump_ctype(void)
 				ctn->ctype |= _ISLOWER;
 			if ((wc >= '0') && (wc <= '9'))
 				ctn->ctype |= _ISDIGIT;
+			if (wc == ' ')
+				ctn->ctype |= _ISPRINT;
 			if (strchr(" \f\n\r\t\v", (char)wc) != NULL)
 				ctn->ctype |= _ISSPACE;
 			if (strchr("0123456789ABCDEFabcdef", (char)wc) != NULL)

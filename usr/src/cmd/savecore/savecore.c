@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 1983, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright 2015, Joyent, Inc.
  */
 /*
  * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
@@ -1929,24 +1929,32 @@ main(int argc, char *argv[])
 			if (sec < 1)
 				sec = 1;
 
-			(void) fprintf(mfile, "[[[[,,,");
-			for (i = 0; i < argc; i++)
-				(void) fprintf(mfile, "%s ", argv[i]);
-			(void) fprintf(mfile, "\n");
-			(void) fprintf(mfile, ",,,%s/%s\n", savedir, corefile);
-			(void) fprintf(mfile, ",,,%s %s %s %s %s\n",
-			    dumphdr.dump_utsname.sysname,
-			    dumphdr.dump_utsname.nodename,
-			    dumphdr.dump_utsname.release,
-			    dumphdr.dump_utsname.version,
-			    dumphdr.dump_utsname.machine);
-			(void) fprintf(mfile, "Uncompress pages,%"PRIu64"\n",
-			    saved);
-			(void) fprintf(mfile, "Uncompress time,%d\n", sec);
-			(void) fprintf(mfile, "Uncompress pages/sec,%"
-			    PRIu64"\n", saved / sec);
-			(void) fprintf(mfile, "]]]]\n");
-			(void) fclose(mfile);
+			if (mfile == NULL) {
+				logprint(SC_SL_WARN,
+				    "Can't create %s: %s",
+				    METRICSFILE, strerror(errno));
+			} else {
+				(void) fprintf(mfile, "[[[[,,,");
+				for (i = 0; i < argc; i++)
+					(void) fprintf(mfile, "%s ", argv[i]);
+				(void) fprintf(mfile, "\n");
+				(void) fprintf(mfile, ",,,%s/%s\n", savedir,
+				    corefile);
+				(void) fprintf(mfile, ",,,%s %s %s %s %s\n",
+				    dumphdr.dump_utsname.sysname,
+				    dumphdr.dump_utsname.nodename,
+				    dumphdr.dump_utsname.release,
+				    dumphdr.dump_utsname.version,
+				    dumphdr.dump_utsname.machine);
+				(void) fprintf(mfile,
+				    "Uncompress pages,%"PRIu64"\n", saved);
+				(void) fprintf(mfile, "Uncompress time,%d\n",
+				    sec);
+				(void) fprintf(mfile, "Uncompress pages/sec,%"
+				    PRIu64"\n", saved / sec);
+				(void) fprintf(mfile, "]]]]\n");
+				(void) fclose(mfile);
+			}
 		}
 	}
 

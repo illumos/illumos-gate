@@ -918,6 +918,7 @@ crregs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		{ "SMXE",	CR4_SMXE,	CR4_SMXE },
 		{ "OSXSAVE",	CR4_OSXSAVE,	CR4_OSXSAVE },
 		{ "SMEP",	CR4_SMEP,	CR4_SMEP },
+		{ "SMAP",	CR4_SMAP,	CR4_SMAP },
 		{ NULL,		0,		0 }
 	};
 

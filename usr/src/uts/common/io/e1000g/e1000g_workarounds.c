@@ -24,6 +24,19 @@
  */
 #include "e1000_api.h"
 
+#define	E1000_FIFO_MULTIPLIER			0x80
+#define	E1000_FIFO_HDR_SIZE			0x10
+#define	E1000_FIFO_GRANULARITY			0x10
+#define	E1000_FIFO_PAD_82547			0x3E0
+#define	E1000_ERR_FIFO_WRAP			8
+
+#define	DSP_RESET_ENABLE			0x0
+#define	DSP_RESET_DISABLE			0x2
+#define	E1000_MAX_DSP_RESETS			10
+
+#define	E1000_ROUNDUP(size, unit)	(((size) + (unit) - 1) & ~((unit) - 1))
+
+
 /*
  * e1000_ttl_workaround_enabled_82541 - Returns current TTL workaround status
  * @hw: pointer to the HW structure

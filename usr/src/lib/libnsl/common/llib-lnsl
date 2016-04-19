@@ -23,7 +23,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.
  */
 
 
@@ -440,7 +440,7 @@ void endrpcent(void);
 struct rpcent *getrpcent_r(struct rpcent *result, char *buffer, int buflen);
 
 /* inet_matchaddr.c */
-boolean_t inet_matchaddr(const void *, const char *);
+int inet_matchaddr(const void *, const char *);
 
 /* inet_ntop.c */
 const char *inet_ntop(int af, const void *src, char *dst, socklen_t size);

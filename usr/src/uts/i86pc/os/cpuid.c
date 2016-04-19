@@ -170,7 +170,8 @@ static char *x86_feature_names[NUM_X86_FEATURES] = {
 	"bmi1",
 	"bmi2",
 	"fma",
-	"smep"
+	"smep",
+	"smap"
 };
 
 boolean_t
@@ -223,6 +224,7 @@ print_x86_featureset(void *featureset)
 static size_t xsave_state_size = 0;
 uint64_t xsave_bv_all = (XFEATURE_LEGACY_FP | XFEATURE_SSE);
 boolean_t xsave_force_disable = B_FALSE;
+extern int disable_smap;
 
 /*
  * This is set to platform type we are running on.
@@ -1249,6 +1251,19 @@ cpuid_pass1(cpu_t *cpu, uchar_t *featureset)
 
 		if (ecp->cp_ebx & CPUID_INTC_EBX_7_0_SMEP)
 			add_x86_feature(featureset, X86FSET_SMEP);
+
+		/*
+		 * We check disable_smap here in addition to in startup_smap()
+		 * to ensure CPUs that aren't the boot CPU don't accidentally
+		 * include it in the feature set and thus generate a mismatched
+		 * x86 feature set across CPUs. Note that at this time we only
+		 * enable SMAP for the 64-bit kernel.
+		 */
+#if defined(__amd64)
+		if (ecp->cp_ebx & CPUID_INTC_EBX_7_0_SMAP &&
+		    disable_smap == 0)
+			add_x86_feature(featureset, X86FSET_SMAP);
+#endif
 	}
 
 	/*

@@ -24,6 +24,10 @@
  */
 
 /*
+ * Copyright (c) 2015, Joyent, Inc.  All rights reserved.
+ */
+
+/*
  * Memory special file
  */
 
@@ -94,6 +98,49 @@ static int mm_kstat_update(kstat_t *ksp, int rw);
 static int mm_kstat_snapshot(kstat_t *ksp, void *buf, int rw);
 
 static int mm_read_mem_name(intptr_t data, mem_name_t *mem_name);
+
+#define	MM_KMEMLOG_NENTRIES	64
+
+static int mm_kmemlogent;
+static mm_logentry_t mm_kmemlog[MM_KMEMLOG_NENTRIES];
+
+/*
+ * On kmem/allmem writes, we log information that might be useful in the event
+ * that a write is errant (that is, due to operator error) and induces a later
+ * problem.  Note that (in particular) in the event of such operator-induced
+ * corruption, a search over the kernel address space for the corrupted
+ * address will yield the ring buffer entry that recorded the write.  And
+ * should it seem baroque or otherwise unnecessary, yes, we need this kind of
+ * auditing facility and yes, we learned that the hard way: disturbingly,
+ * there exist recommendations for "tuning" the system that involve writing to
+ * kernel memory addresses via the kernel debugger, and -- as we discovered --
+ * these can easily be applied incorrectly or unsafely, yielding an entirely
+ * undebuggable "can't happen" kind of panic.
+ */
+static void
+mm_logkmem(struct uio *uio)
+{
+	mm_logentry_t *ent;
+	proc_t *p = curthread->t_procp;
+
+	mutex_enter(&mm_lock);
+
+	ent = &mm_kmemlog[mm_kmemlogent++];
+
+	if (mm_kmemlogent == MM_KMEMLOG_NENTRIES)
+		mm_kmemlogent = 0;
+
+	ent->mle_vaddr = (uintptr_t)uio->uio_loffset;
+	ent->mle_len = uio->uio_resid;
+	gethrestime(&ent->mle_hrestime);
+	ent->mle_hrtime = gethrtime();
+	ent->mle_pid = p->p_pidp->pid_id;
+
+	(void) strncpy(ent->mle_psargs,
+	    p->p_user.u_psargs, sizeof (ent->mle_psargs));
+
+	mutex_exit(&mm_lock);
+}
 
 /*ARGSUSED1*/
 static int
@@ -353,6 +400,9 @@ mmrw(dev_t dev, struct uio *uio, enum uio_rw rw, cred_t *cred)
 
 			if ((error = plat_mem_do_mmio(uio, rw)) != ENOTSUP)
 				break;
+
+			if (rw == UIO_WRITE)
+				mm_logkmem(uio);
 
 			/*
 			 * If vaddr does not map a valid page, as_pagelock()

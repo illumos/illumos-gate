@@ -30,8 +30,6 @@
 #ifndef _IA32_SYS_PSW_H
 #define	_IA32_SYS_PSW_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -98,6 +96,10 @@ typedef struct flags {
 
 /*
  * kernel flags settings
+ *
+ * Note that the kernel's SMAP protection relies on PS_ACHK not being present in
+ * the following two definitions. See uts/intel/ia32/ml/copy.s for more
+ * information on SMAP.
  */
 #define	F_OFF		0x2		/* interrupts off */
 #define	F_ON		0x202		/* interrupts on */

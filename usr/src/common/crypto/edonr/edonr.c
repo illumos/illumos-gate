@@ -23,10 +23,10 @@
  * Copyright (C) 2009, 2010, Jorn Amundsen <jorn.amundsen@ntnu.no>
  * Tweaked Edon-R implementation for SUPERCOP, based on NIST API.
  *
- * $Id: edonr.c 517 2013-02-17 20:34:39Z joern $
  */
 /*
  * Portions copyright (c) 2013, Saso Kiselkov, All rights reserved
+ * Copyright 2016 Gary Mills
  */
 
 /* determine where we can get bcopy/bzero declarations */
@@ -659,6 +659,7 @@ EdonRFinal(EdonRState *state, uint8_t *hashval)
 	switch (state->hashbitlen) {
 	case 224: {
 #if defined(MACHINE_IS_BIG_ENDIAN)
+		/* LINTED: pointer cast may result in improper alignment */
 		uint32_t *d32 = (uint32_t *)hashval;
 		uint32_t *s32 = hashState224(state)->DoublePipe + 9;
 		int j;
@@ -673,6 +674,7 @@ EdonRFinal(EdonRState *state, uint8_t *hashval)
 	}
 	case 256: {
 #if defined(MACHINE_IS_BIG_ENDIAN)
+		/* LINTED: pointer cast may result in improper alignment */
 		uint32_t *d32 = (uint32_t *)hashval;
 		uint32_t *s32 = hashState224(state)->DoublePipe + 8;
 		int j;
@@ -687,6 +689,7 @@ EdonRFinal(EdonRState *state, uint8_t *hashval)
 	}
 	case 384: {
 #if defined(MACHINE_IS_BIG_ENDIAN)
+		/* LINTED: pointer cast may result in improper alignment */
 		uint64_t *d64 = (uint64_t *)hashval;
 		uint64_t *s64 = hashState384(state)->DoublePipe + 10;
 		int j;
@@ -701,6 +704,7 @@ EdonRFinal(EdonRState *state, uint8_t *hashval)
 	}
 	case 512: {
 #if defined(MACHINE_IS_BIG_ENDIAN)
+		/* LINTED: pointer cast may result in improper alignment */
 		uint64_t *d64 = (uint64_t *)hashval;
 		uint64_t *s64 = hashState512(state)->DoublePipe + 8;
 		int j;

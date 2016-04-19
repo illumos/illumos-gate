@@ -3,14 +3,14 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DDI_FM_ACC_ERR_GET 9F "May 13, 2007"
+.TH DDI_FM_ACC_ERR_GET 9F "Mar 27, 2016"
 .SH NAME
 ddi_fm_acc_err_get, ddi_fm_dma_err_get \- get the error status for an access or
 DMA handle
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/ndifma.h>
+#include <sys/ddifm.h>
 
 \fBvoid\fR \fBddi_fm_acc_err_get\fR(\fBddi_acc_handle_t\fR \fIacc_handle\fR,
      \fBddi_fm_error_t\fR *\fIerror_status\fR, \fBint\fR \fIversion\fR);
@@ -23,11 +23,9 @@ DMA handle
 .fi
 
 .SH INTERFACE LEVEL
-.sp
 .LP
 Solaris DDI specific (Solaris DDI)
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIacc_handle\fR\fR
@@ -69,7 +67,6 @@ Version number of \fBddi_fm_error_t\fR. The driver should always set this to
 .RE
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBddi_fm_dma_err_get()\fR and \fBddi_fm_acc_err_get()\fR functions return
 the error status for a \fBDMA\fR or access handle respectively. If a fault has
@@ -110,12 +107,10 @@ the impacted device instance. If the recovery and retry succeed, a call should
 still be made to \fBddi_fm_service_impact()\fR but \fBDDI_SERVICE_UNAFFECTED\fR
 should be specified.
 .SH CONTEXT
-.sp
 .LP
 The \fBddi_fm_acc_err_get()\fR and \fBddi_fm_dma_err_get()\fR functions can be
 called from user, kernel, or high-level interrupt context.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -131,7 +126,6 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBattributes\fR(5), \fBddi_dma_mem_alloc\fR(9F),
 \fBddi_fm_acc_err_clear\fR(9F), \fBddi_fm_service_impact\fR(9F),

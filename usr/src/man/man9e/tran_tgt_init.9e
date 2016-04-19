@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH TRAN_TGT_INIT 9E "Nov 1, 1993"
+.TH TRAN_TGT_INIT 9E "Mar 13, 2016"
 .SH NAME
 tran_tgt_init \- request to initialize HBA resources on behalf of a particular
 target
@@ -14,16 +14,14 @@ target
 
 
 
-\fBvoid prefix\fR\fBtran_tgt_init\fR(\fBdev_info_t *\fR\fIhba_dip\fR, \fBdev_info_t *\fR\fItgt_dip\fR,
+\fBint prefix\fR\fBtran_tgt_init\fR(\fBdev_info_t *\fR\fIhba_dip\fR, \fBdev_info_t *\fR\fItgt_dip\fR,
      \fBscsi_hba_tran_t *\fR\fIhba_tran\fR, \fBstruct scsi_device *\fR\fIsd\fR);
 .fi
 
 .SH INTERFACE LEVEL
-.sp
 .LP
 Solaris architecture specific (Solaris DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIhba_dip\fR \fR
@@ -63,7 +61,6 @@ Pointer to a  \fBscsi_device\fR(9S) structure, describing the target.
 .RE
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBtran_tgt_init()\fR vector in the \fBscsi_hba_tran\fR(9S) structure may
 be initialized during the \fBHBA\fR driver's \fBattach\fR(9E) to point to an
@@ -84,7 +81,6 @@ initialize the \fItran_tgt_private\fR field in the structure pointed to by
 \fIhba_tran\fR, to point to the data specific to the particular target device
 instance.
 .SH RETURN VALUES
-.sp
 .LP
 \fBtran_tgt_init()\fR must return:
 .sp
@@ -110,7 +106,6 @@ instance of the target device will not be continued, the target driver's
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBattach\fR(9E), \fBprobe\fR(9E), \fBtran_tgt_free\fR(9E),
 \fBtran_tgt_probe\fR(9E), \fBscsi_hba_attach_setup\fR(9F),

@@ -309,3 +309,11 @@ INTEL_NB5000_OBJS += \
 	dimm_addr.o \
 	nb_pci_cfg.o \
 	nb5000_init.o
+
+#
+# VMware VMXNET3 virtual network device
+#
+VMXNET3S_OBJS =	vmxnet3_main.o \
+		vmxnet3_rx.o \
+		vmxnet3_tx.o \
+		vmxnet3_utils.o

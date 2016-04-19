@@ -17,6 +17,9 @@
  *  along with this program; if not, write to the Free Software
  *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
+/*
+ * Copyright 2016 Nexenta Systems, Inc.
+ */
 
 /* Try to use glibc's transparant LFS support. */
 #define _LARGEFILE_SOURCE	1
@@ -928,7 +931,7 @@ hex_dump (void *buf, size_t size)
 
 int
 biosdisk (int subfunc, int drive, struct geometry *geometry,
-	  unsigned int sector, int nsec, int segment)
+	  unsigned long long sector, int nsec, int segment)
 {
   char *buf;
   int fd = geometry->flags;

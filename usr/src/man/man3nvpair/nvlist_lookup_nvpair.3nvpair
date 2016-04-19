@@ -1,11 +1,12 @@
 '\" te
 .\" Copyright (c) 2007, Sun Microsystems Inc. All Rights Reserved.
+.\" Copyright 2016 Joyent, Inc.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH NVLIST_LOOKUP_NVPAIR 3NVPAIR "Oct 24, 2007"
+.TH NVLIST_LOOKUP_NVPAIR 3NVPAIR "Mar 13, 2016"
 .SH NAME
-nvlist_lookup_nvpair, nvlist_exists \- lookup named pairs
+nvlist_lookup_nvpair, nvlist_exists, nvlist_empty \- lookup named pairs
 .SH SYNOPSIS
 .LP
 .nf
@@ -21,8 +22,12 @@ nvlist_lookup_nvpair, nvlist_exists \- lookup named pairs
 \fBboolean_t\fR \fBnvlist_exists\fR(\fBnvlist_t *\fR\fInvl\fR, \fBconst char *\fR\fIname\fR);
 .fi
 
+.LP
+.nf
+\fBboolean_t\fR \fBnvlist_empty\fR(\fBnvlist_t *\fR\fInvl\fR);
+.fi
+
 .SH DESCRIPTION
-.sp
 .LP
 The \fBnvlist_lookup_nvpair()\fR function returns the nvpair with the matching
 name, regardless of type. It is valid only for lists allocated with
@@ -31,8 +36,11 @@ name, regardless of type. It is valid only for lists allocated with
 .LP
 The \fBnvlist_exists()\fR function returns success if any nvpair exists with
 the given name. It is valid for all types of lists.
-.SH RETURN VALUES
 .sp
+.LP
+The \fBnvlist_empty()\fR function returns success if the list \fInvl\fR
+contains no nvpairs. It is valid for all types of lists.
+.SH RETURN VALUES
 .LP
 The \fBnvlist_lookup_nvpair()\fR function returns 0 on success and an error
 value on failure.
@@ -40,8 +48,11 @@ value on failure.
 .LP
 The \fBnvlist_exists()\fR function returns \fBB_TRUE\fR if an nvpair with the
 given name exists and \fBB_FALSE\fR otherwise.
-.SH ERRORS
 .sp
+.LP
+The \fBnvlist_empty()\fR function returns \fBB_TRUE\fR if the given
+list, \fInvl\fR, contains no nvpairs and \fBB_FALSE\fR otherwise.
+.SH ERRORS
 .LP
 The \fBnvlist_lookup_nvpair()\fR function will fail if:
 .sp
@@ -72,7 +83,6 @@ The list was not allocated with \fBNV_UNIQUE_NAME\fR.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -90,7 +100,6 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBlibnvpair\fR(3LIB), \fBnvlist_alloc\fR(3NVPAIR), \fBattributes\fR(5),
 \fBnvlist_lookup_nvpair\fR(9F)
