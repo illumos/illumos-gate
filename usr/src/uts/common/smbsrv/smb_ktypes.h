@@ -1325,6 +1325,12 @@ typedef struct smb_opipe {
 #define	SMB_OFILE_VALID(p)	\
     ASSERT((p != NULL) && ((p)->f_magic == SMB_OFILE_MAGIC))
 
+/*
+ * This is the size of the per-handle "Lock Sequence" array.
+ * See LockSequenceIndex in [MS-SMB2] 2.2.26, and smb2_lock.c
+ */
+#define	SMB_OFILE_LSEQ_MAX		64
+
 /* {arg_open,ofile}->dh_vers values */
 typedef enum {
 	SMB2_NOT_DURABLE = 0,
@@ -1387,7 +1393,6 @@ typedef struct smb_ofile {
 	pid_t			f_pid;
 	smb_attr_t		f_pending_attr;
 	boolean_t		f_written;
-	char			f_quota_resume[SMB_SID_STRSZ];
 	smb_oplock_grant_t	f_oplock_grant;
 	smb_notify_t		f_notify;
 
@@ -1396,6 +1401,8 @@ typedef struct smb_ofile {
 	hrtime_t		dh_expire_time; /* time the handle expires */
 	boolean_t		dh_persist;
 	uint8_t			dh_create_guid[16];
+	char			f_quota_resume[SMB_SID_STRSZ];
+	uint8_t			f_lock_seq[SMB_OFILE_LSEQ_MAX];
 } smb_ofile_t;
 
 typedef struct smb_fileinfo {

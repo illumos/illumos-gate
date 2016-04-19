@@ -342,6 +342,7 @@ smb_ofile_open(
 	crhold(of->f_cr);
 	of->f_server = tree->t_server;
 	of->f_session = tree->t_session;
+	(void) memset(of->f_lock_seq, -1, SMB_OFILE_LSEQ_MAX);
 
 	/*
 	 * grab a ref for of->f_user and of->f_tree
