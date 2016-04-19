@@ -20,7 +20,7 @@
 #
 #
 # Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright (c) 2011, 2014 by Delphix. All rights reserved.
+# Copyright (c) 2011, 2015 by Delphix. All rights reserved.
 #
 
 LIBRARY= libzfs.a
@@ -77,7 +77,6 @@ $(DYNLIB) := LDLIBS +=	-lz
 
 CERRWARN +=	-_gcc=-Wno-switch
 CERRWARN +=	-_gcc=-Wno-parentheses
-CERRWARN +=	-_gcc=-Wno-uninitialized
 CERRWARN +=	-_gcc=-Wno-unused-function
 
 SRCS=	$(OBJS_COMMON:%.o=$(SRCDIR)/%.c)	\
