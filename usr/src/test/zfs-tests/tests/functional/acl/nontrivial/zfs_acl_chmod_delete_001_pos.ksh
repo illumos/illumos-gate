@@ -25,12 +25,15 @@
 # Use is subject to license terms.
 #
 
+#
+# Copyright 2016 Nexenta Systems, Inc.
+#
+
 . $STF_SUITE/tests/functional/acl/acl_common.kshlib
 
-#
 # DESCRIPTION:
-#	Verify that the combined delete_child/delete permission for
-#	owner/group/everyone are correct.
+# Verify that the combined delete_child/delete permission for
+# owner/group/everyone are correct.
 #
 #        -------------------------------------------------------
 #        |   Parent Dir  |           Target Object Permissions |
@@ -39,20 +42,13 @@
 #        |               | ACL Allows | ACL Denies| Delete     |
 #        |               |  Delete    |  Delete   | unspecified|
 #        -------------------------------------------------------
-#        |  ACL Allows   | Permit     | Permit    | Permit     |
-#        |  DELETE_CHILD |                                     |
+#        | ACL Denies    | Permit     | Deny      | Deny       |
+#        | DELETE_CHILD  |            |           |            |
+#        | or WRITE_DATA |            |           |            |
 #        -------------------------------------------------------
-#        |  ACL Denies   | Permit     | Deny      | Deny       |
-#        |  DELETE_CHILD |            |           |            |
-#        -------------------------------------------------------
-#        | ACL specifies |            |           |            |
-#        | only allows   | Permit     | Permit    | Permit     |
-#        | write and     |            |           |            |
-#        | execute       |            |           |            |
-#        -------------------------------------------------------
-#        | ACL denies    |            |           |            |
-#        | write and     | Permit     | Deny      | Deny       |
-#        | execute       |            |           |            |
+#        | ACL Allows    | Permit     | Deny      | Permit     |
+#        | DELETE_CHILD  |            |           |            |
+#        | or WRITE_DATA |            |           |            |
 #        -------------------------------------------------------
 #
 # STRATEGY:
@@ -60,7 +56,6 @@
 # 2. Set special ACE combination to the file and directory
 # 3. Try to remove the file
 # 4. Verify that combined permissions for owner/group/everyone are correct.
-#
 
 verify_runnable "both"
 
@@ -99,7 +94,7 @@ set -A access_target \
 set -A a_flag "owner@" "group@" "everyone@" "user:$ZFS_ACL_STAFF1"
 
 log_assert "Verify that the combined delete_child/delete permission for" \
-	"owner/group/everyone are correct."
+    "owner/group/everyone are correct."
 log_onexit cleanup
 
 function operate_node #user node
@@ -139,20 +134,25 @@ function logname #acl_parent acl_target user
 	typeset user=$3
 
 	# To super user, read and write deny permission was override.
-	if [[ $user == root || $acl_target == *:allow ]]; then
+	if [[ $user == "root" || $acl_target == *":allow"* ]]; then
 		print "log_must"
-	elif [[ $acl_parent == *"delete_child"* ]]; then
-		if [[ $acl_parent == *"delete_child:allow"* ]]; then
-			print "log_must"
-		else
-			print "log_mustnot"
-		fi
-	elif [[ $acl_parent == *"write_data"* ]]; then
-		if [[ $acl_parent == *"write_data:allow"* ]]; then
-			print "log_must"
-		else
-			print "log_mustnot"
-		fi
+	# If target ACL has an ACE deny'ing delete, DENY
+	elif [[ $acl_target == *"delete:deny"* ]]; then
+		print "log_mustnot"
+	# If target ACL has an ACE allow'ing delete, ALLOW
+	elif [[ $acl_target == *"delete:allow"* ]]; then
+		print "log_must"
+	# If container ACL has an ACE deny'ing delete_child or
+	# write_data, DENY
+	elif [[ $acl_parent == *"delete_child:deny"* ||
+	    $acl_parent == *"write_data:deny"* ]]; then
+		print "log_mustnot"
+	# If container ACL has an ACE allow'ing delete_child or
+	# write_data, ALLOW
+	elif [[ $acl_parent == *"delete_child:allow"* ||
+	    $acl_parent == *"write_data:allow"* ]]; then
+		print "log_must"
+	# Otherwise, DENY
 	else
 		print "log_mustnot"
 	fi
@@ -298,4 +298,4 @@ while (( i < ${#users[@]} )); do
 done
 
 log_pass "Verify that the combined delete_child/delete permission for" \
-	"owner/group/everyone are correct."
+    "owner/group/everyone are correct."

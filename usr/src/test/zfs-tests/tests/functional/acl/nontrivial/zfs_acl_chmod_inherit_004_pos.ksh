@@ -25,125 +25,91 @@
 # Use is subject to license terms.
 #
 
-#
 # Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright 2016 Nexenta Systems, Inc.
 #
 
 . $STF_SUITE/tests/functional/acl/acl_common.kshlib
 
-#
 # DESCRIPTION:
-#	Verify aclinherit=passthrough-x will inherit the 'x' bits while mode request.
+# Verify aclinherit=passthrough-x will inherit the execute permission only if
+# file creation mode requests it.
 #
 # STRATEGY:
-#	1. Loop super user and non-super user to run the test case.
-#	2. Create basedir and a set of subdirectores and files within it.
-#	3. Set aclinherit=passthrough-x
-#	4. Verify only passthrough-x will inherit the 'x' bits while mode request.
-#
+# 1. Use both super user and non-super user to run the test case.
+# 2. Set aclinherit=passthrough-x
+# 3. Create basedir and a set of files, one with 644 and one with 755 mode.
+# 4. Verify that execute permission is inherited only if file creation mode
+#    requests them.
 
 verify_runnable "both"
 
 function cleanup
 {
-	if [[ -d $basedir ]]; then
-		log_must $RM -rf $basedir
-	fi
+	[[ -d $basedir ]] && log_must $RM -rf $basedir
 }
-$ZPOOL upgrade -v
-$ZPOOL upgrade -v | $GREP "passthrough-x aclinherit" > /dev/null 2>&1
-if (($? != 0)); then
-	log_unsupported "passthrough-x aclinherit not supported."
-fi
 
-log_assert "Verify aclinherit=passthrough-x will inherit the 'x' bits while" \
-    " mode request."
+log_assert "aclinherit=passthrough-x should inherit the execute permission" \
+    "only if file creation mode requests it"
 log_onexit cleanup
 
 set -A aces \
-    "owner@:read_data/write_data/add_subdirectory/append_data/execute:dir_inherit/inherit_only:allow" \
-    "owner@:read_data/write_data/add_subdirectory/append_data/execute::allow" \
-    "group@:add_subdirectory/append_data/execute:dir_inherit/inherit_only:allow" \
-    "group@:add_subdirectory/append_data/execute::allow" \
-    "everyone@:add_subdirectory/append_data/execute:dir_inherit/inherit_only:allow" \
-    "everyone@:add_subdirectory/append_data/execute::allow" \
-    "owner@:read_data/write_data/add_subdirectory/append_data/execute:file_inherit/inherit_only:allow" \
-    "group@:read_data/add_subdirectory/append_data/execute:file_inherit/inherit_only:allow" \
-    "everyone@:read_data/add_subdirectory/append_data/execute:file_inherit/inherit_only:allow"
+    "owner@:rwxp:f:allow" \
+    "group@:rxp:f:allow" \
+    "everyone@:rxp:f:allow"
 
-# Defile the based directory and file
-basedir=$TESTDIR/basedir
+typeset basedir="$TESTDIR/basedir"
+typeset nfile1="$basedir/nfile1" nfile2="$basedir/nfile2"
 
-
-#
-# According to inherited flag, verify subdirectories and files within it has
-# correct inherited access control.
-#
-function verify_inherit # <object>
+function check_execute_bit
 {
-	typeset obj=$1
-
-	# Define the files and directories will be created after chmod
-	ndir1=$obj/ndir1; ndir2=$ndir1/ndir2
-	nfile1=$ndir1/nfile1.c; nfile2=$ndir1/nfile2
-
-	log_must usr_exec $MKDIR -p $ndir1
-
+	typeset ace
+	typeset file=$1
 	typeset -i i=0
-	while ((i < ${#aces[*]})); do
-		if ((i < 3)); then
-			log_must usr_exec $CHMOD A$i=${aces[i]} $ndir1
-		else
-			log_must usr_exec $CHMOD A$i+${aces[i]} $ndir1
+
+	while ((i < 6)); do
+		ace=$(get_ACE $file $i)
+		if [[ "$ace" == *"execute"* ]]; then
+			return 0
 		fi
 		((i = i + 1))
 	done
-	log_must usr_exec $MKDIR -p $ndir2
-	log_must usr_exec $TOUCH $nfile1
 
-	$CAT > $nfile1 <<EOF
-#include <stdlib.h>
-#include <stdio.h>
-int main()
-{ return 0; }
-EOF
-
-	mode=$(get_mode $ndir2)
-	if [[ $mode != "drwx--x--x"* ]]; then
-		log_fail "Unexpect mode of $ndir2, expect: drwx--x--x, current: $mode"
-	fi
-
-	mode=$(get_mode $nfile1)
-	if [[ $mode != "-rw-r--r--"* ]]; then
-		log_fail "Unexpect mode of $nfile1, expect: -rw-r--r--, current: $mode"
-	fi
-
-	if [[ -x /usr/sfw/bin/gcc ]]; then
-		log_must /usr/sfw/bin/gcc -o $nfile2 $nfile1
-		mode=$(get_mode $nfile2)
-		if [[ $mode != "-rwxr-xr-x"* ]]; then
-			log_fail "Unexpect mode of $nfile2, expect: -rwxr-xr-x, current: $mode"
-		fi
-	fi
+	return 1
 }
 
-#
-# Set aclmode=passthrough to make sure
-# the acl will not change during chmod.
-# A general testing should verify the combination of
-# aclmode/aclinherit works well,
-# here we just simple test them separately.
-#
+function verify_inherit
+{
+	typeset -i i=0
+
+	log_must usr_exec $MKDIR $basedir
+
+	# Modify owner@, group@ and everyone@ ACEs to include execute
+	# permission (see above), and make them file-inheritable
+	while ((i < ${#aces[*]})); do
+		log_must usr_exec $CHMOD A$i=${aces[i]} $basedir
+		((i = i + 1))
+	done
+
+	# Create file with 644 mode
+	log_must usr_exec $TOUCH $nfile1
+	# Check that execute permission wasn't inherited
+	log_mustnot check_execute_bit $nfile1
+
+	# Use cp(1) to copy over /usr/bin/true
+	log_must usr_exec $CP $TRUE $nfile2
+	# Check that execute permission was inherited
+	log_must check_execute_bit $nfile2
+}
 
 log_must $ZFS set aclmode=passthrough $TESTPOOL/$TESTFS
 log_must $ZFS set aclinherit=passthrough-x $TESTPOOL/$TESTFS
 
 for user in root $ZFS_ACL_STAFF1; do
 	log_must set_cur_usr $user
-
-	verify_inherit $basedir
-
+	verify_inherit
 	cleanup
 done
 
-log_pass "Verify aclinherit=passthrough-x will inherit the 'x' bits while mode request."
+log_pass "aclinherit=passthrough-x should inherit the execute permission" \
+    "only if file creation mode requests it"
