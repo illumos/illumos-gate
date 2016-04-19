@@ -19,6 +19,12 @@
 
 #include <smbsrv/smb2_kproto.h>
 
+/*
+ * [MS-SMB2] 2.2.26 LockSequenceIndex, LockSequenceNumber.
+ */
+#define	SMB2_LSN_SHIFT	4
+#define	SMB2_LSN_MASK	0xf
+
 typedef struct SMB2_LOCK_ELEMENT {
 	uint64_t Offset;
 	uint64_t Length;
@@ -29,6 +35,9 @@ typedef struct SMB2_LOCK_ELEMENT {
 static uint32_t smb2_unlock(smb_request_t *);
 static uint32_t smb2_locks(smb_request_t *);
 static smb_sdrc_t smb2_lock_async(smb_request_t *);
+
+static boolean_t smb2_lock_chk_lockseq(smb_ofile_t *, uint32_t);
+static void smb2_lock_set_lockseq(smb_ofile_t *, uint32_t);
 
 /*
  * This is a somewhat arbitrary sanity limit on the length of the
@@ -76,6 +85,26 @@ smb2_lock(smb_request_t *sr)
 	if (LockCount > smb2_lock_max_elem) {
 		status = NT_STATUS_INSUFFICIENT_RESOURCES;
 		goto errout;
+	}
+
+	/*
+	 * Check the LockSequence to determine whether a previous
+	 * lock request succeeded, but the client disconnected
+	 * (retaining a durable or resilient handle).  If so, this
+	 * is a lock "replay".  We'll find the lock sequence here
+	 * and return success without processing the lock again.
+	 */
+	if (sr->session->dialect < SMB_VERS_2_1)
+		LockSequence = 0;
+	if ((sr->session->dialect == SMB_VERS_2_1) &&
+	    sr->fid_ofile->dh_vers != SMB2_RESILIENT)
+		LockSequence = 0;
+	/* dialect 3.0 or later can always use LockSequence */
+
+	if (LockSequence != 0 &&
+	    smb2_lock_chk_lockseq(sr->fid_ofile, LockSequence)) {
+		status = NT_STATUS_SUCCESS;
+		goto done;
 	}
 
 	/*
@@ -127,6 +156,7 @@ errout:
 	/*
 	 * Encode SMB2 Lock reply (sync)
 	 */
+done:
 	(void) smb_mbc_encodef(
 	    &sr->reply, "w..",
 	    4); /* StructSize	w */
@@ -160,7 +190,9 @@ smb2_unlock(smb_request_t *sr)
 		if (status != 0)
 			break;
 	}
-	(void) LockSequence; /* todo */
+	if (status == 0 && LockSequence != 0) {
+		smb2_lock_set_lockseq(sr->fid_ofile, LockSequence);
+	}
 
 	return (status);
 }
@@ -174,6 +206,7 @@ smb2_locks(smb_request_t *sr)
 	lock_elem_t *lk;
 	lock_elem_t *lvec = sr->arg.lock.lvec;
 	uint32_t LockCount = sr->arg.lock.lcnt;
+	uint32_t LockSequence = sr->arg.lock.lseq;
 	uint32_t i;
 	uint32_t ltype;
 	uint32_t pid = 0;	/* SMB2 ignores lock PIDs */
@@ -236,6 +269,8 @@ end_loop:
 			    lk->Offset, lk->Length, pid);
 		}
 	}
+	if (status == 0 && LockSequence != 0)
+		smb2_lock_set_lockseq(sr->fid_ofile, LockSequence);
 
 	return (status);
 }
@@ -249,6 +284,7 @@ smb2_lock_async(smb_request_t *sr)
 {
 	lock_elem_t *lk = sr->arg.lock.lvec;
 	uint32_t LockCount = sr->arg.lock.lcnt;
+	uint32_t LockSequence = sr->arg.lock.lseq;
 	uint32_t status;
 	uint32_t ltype;
 	uint32_t pid = 0;	/* SMB2 ignores lock PIDs */
@@ -284,6 +320,9 @@ errout:
 		return (SDRC_SUCCESS);
 	}
 
+	if (LockSequence != 0)
+		smb2_lock_set_lockseq(sr->fid_ofile, LockSequence);
+
 	/*
 	 * SMB2 Lock reply (async)
 	 */
@@ -292,4 +331,83 @@ errout:
 	    4); /* StructSize	w */
 	    /* reserved		.. */
 	return (SDRC_SUCCESS);
+}
+
+/*
+ * Check whether we've stored a given LockSequence
+ *
+ * [MS-SMB2] 3.3.5.14
+ *
+ * The server verifies the LockSequence by performing the following steps:
+ *
+ * 1. The server MUST use LockSequenceIndex as an index into the
+ * Open.LockSequenceArray in order to locate the sequence number entry.
+ * If the index exceeds the maximum extent of the Open.LockSequenceArray,
+ * or LockSequenceIndex is 0, or if the sequence number entry is empty,
+ * the server MUST skip step 2 and continue lock/unlock processing.
+ *
+ * 2. The server MUST compare LockSequenceNumber to the SequenceNumber of
+ * the entry located in step 1. If the sequence numbers are equal, the
+ * server MUST complete the lock/unlock request with success. Otherwise,
+ * the server MUST reset the entry value to empty and continue lock/unlock
+ * processing.
+ */
+boolean_t
+smb2_lock_chk_lockseq(smb_ofile_t *ofile, uint32_t lockseq)
+{
+	uint32_t lsi;
+	uint8_t lsn;
+	boolean_t rv;
+
+	/*
+	 * LockSequenceNumber is the low four bits.
+	 * LockSequenceIndex is the remaining 28 bits.
+	 * valid range is 1..64, which we convert to an
+	 * array index in the range 0..63
+	 */
+	lsn = lockseq & SMB2_LSN_MASK;
+	lsi = (lockseq >> SMB2_LSN_SHIFT);
+	if (lsi == 0 || lsi > SMB_OFILE_LSEQ_MAX)
+		return (B_FALSE);
+	--lsi;
+
+	mutex_enter(&ofile->f_mutex);
+
+	if (ofile->f_lock_seq[lsi] == lsn) {
+		rv = B_TRUE;
+	} else {
+		ofile->f_lock_seq[lsi] = (uint8_t)-1;	/* "Empty" */
+		rv = B_FALSE;
+	}
+
+	mutex_exit(&ofile->f_mutex);
+
+	return (rv);
+}
+
+static void
+smb2_lock_set_lockseq(smb_ofile_t *ofile, uint32_t lockseq)
+{
+	uint32_t lsi;
+	uint8_t lsn;
+
+	/*
+	 * LockSequenceNumber is the low four bits.
+	 * LockSequenceIndex is the remaining 28 bits.
+	 * valid range is 1..64, which we convert to an
+	 * array index in the range 0..63
+	 */
+	lsn = lockseq & SMB2_LSN_MASK;
+	lsi = (lockseq >> SMB2_LSN_SHIFT);
+	if (lsi == 0 || lsi > SMB_OFILE_LSEQ_MAX) {
+		cmn_err(CE_NOTE, "smb2_lock_set_lockseq, index=%u", lsi);
+		return;
+	}
+	--lsi;
+
+	mutex_enter(&ofile->f_mutex);
+
+	ofile->f_lock_seq[lsi] = lsn;
+
+	mutex_exit(&ofile->f_mutex);
 }
