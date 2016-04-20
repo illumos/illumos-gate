@@ -417,6 +417,15 @@ lxpr_getnode(vnode_t *dp, lxpr_nodetype_t type, proc_t *p, int desc)
 	/*
 	 * Do node specific stuff
 	 */
+	if (lxpr_is_writable(type)) {
+		/* These two have different modes; handled later. */
+		if (type != LXPR_PID_FD_FD && type != LXPR_PID_TID_FD_FD) {
+			vp->v_type = VREG;
+			lxpnp->lxpr_mode = 0644;
+			return (lxpnp);
+		}
+	}
+
 	switch (type) {
 	case LXPR_PROCDIR:
 		vp->v_flag |= VROOT;
@@ -494,6 +503,7 @@ lxpr_getnode(vnode_t *dp, lxpr_nodetype_t type, proc_t *p, int desc)
 		break;
 
 	case LXPR_PID_FD_FD:
+	case LXPR_PID_TID_FD_FD:
 		ASSERT(p != NULL);
 		/* lxpr_realvp is set after we return */
 		lxpnp->lxpr_mode = 0700;	/* read-write-exe owner only */
@@ -534,24 +544,6 @@ lxpr_getnode(vnode_t *dp, lxpr_nodetype_t type, proc_t *p, int desc)
 	case LXPR_KCORE:
 		vp->v_type = VREG;
 		lxpnp->lxpr_mode = 0400;	/* read-only by owner only */
-		break;
-
-	case LXPR_PID_LOGINUID:
-	case LXPR_PID_OOM_SCR_ADJ:
-	case LXPR_PID_TID_OOM_SCR_ADJ:
-	case LXPR_SYS_KERNEL_COREPATT:
-	case LXPR_SYS_KERNEL_SHMALL:
-	case LXPR_SYS_KERNEL_SHMMAX:
-	case LXPR_SYS_NET_CORE_SOMAXCON:
-	case LXPR_SYS_NET_IPV4_TCP_FIN_TO:
-	case LXPR_SYS_NET_IPV4_TCP_KA_INT:
-	case LXPR_SYS_NET_IPV4_TCP_KA_TIM:
-	case LXPR_SYS_NET_IPV4_TCP_SACK:
-	case LXPR_SYS_NET_IPV4_TCP_WINSCALE:
-	case LXPR_SYS_VM_OVERCOMMIT_MEM:
-	case LXPR_SYS_VM_SWAPPINESS:
-		vp->v_type = VREG;
-		lxpnp->lxpr_mode = 0644;
 		break;
 
 	default:

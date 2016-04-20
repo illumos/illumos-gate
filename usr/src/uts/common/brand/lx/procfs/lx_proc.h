@@ -108,6 +108,7 @@ extern "C" {
  * (directories and files contained therein).
  */
 typedef enum lxpr_nodetype {
+	LXPR_INVALID,		/* nodes start at 1	*/
 	LXPR_PROCDIR,		/* /proc		*/
 	LXPR_PIDDIR,		/* /proc/<pid>		*/
 	LXPR_PID_AUXV,		/* /proc/<pid>/auxv	*/
@@ -221,6 +222,7 @@ typedef enum lxpr_nodetype {
 	LXPR_SYS_NET_COREDIR,		/* /proc/sys/net/core		*/
 	LXPR_SYS_NET_CORE_SOMAXCON,	/* /proc/sys/net/core/somaxconn	*/
 	LXPR_SYS_NET_IPV4DIR,		/* /proc/sys/net/ipv4		*/
+	LXPR_SYS_NET_IPV4_IP_LPORT_RANGE, /* .../net/ipv4/ip_local_port_range */
 	LXPR_SYS_NET_IPV4_TCP_FIN_TO,	/* /proc/sys/net/ipv4/tcp_fin_timeout */
 	LXPR_SYS_NET_IPV4_TCP_KA_INT,	/* .../net/ipv4/tcp_keepalive_intvl */
 	LXPR_SYS_NET_IPV4_TCP_KA_TIM,	/* .../net/ipv4/tcp_keepalive_time */
@@ -299,6 +301,7 @@ extern void lxpr_fininodecache();
 extern void lxpr_initrootnode(lxpr_node_t **, vfs_t *);
 extern ino_t lxpr_inode(lxpr_nodetype_t, pid_t, int);
 extern ino_t lxpr_parentinode(lxpr_node_t *);
+extern boolean_t lxpr_is_writable(lxpr_nodetype_t);
 extern lxpr_node_t *lxpr_getnode(vnode_t *, lxpr_nodetype_t, proc_t *, int);
 extern void lxpr_freenode(lxpr_node_t *);
 extern vnode_t *lxpr_lookup_fdnode(vnode_t *, const char *);
