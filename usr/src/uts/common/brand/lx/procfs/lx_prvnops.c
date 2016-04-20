@@ -105,6 +105,8 @@ static int lxpr_read(vnode_t *, uio_t *, int, cred_t *, caller_context_t *);
 static int lxpr_write(vnode_t *, uio_t *, int, cred_t *, caller_context_t *);
 static int lxpr_space(vnode_t *, int, flock64_t *, int, offset_t, cred_t *,
     caller_context_t *);
+static int lxpr_setattr(vnode_t *, vattr_t *, int, cred_t *,
+    caller_context_t *);
 static int lxpr_getattr(vnode_t *, vattr_t *, int, cred_t *,
     caller_context_t *);
 static int lxpr_access(vnode_t *, int, int, cred_t *, caller_context_t *);
@@ -304,6 +306,7 @@ const fs_operation_def_t lxpr_vnodeops_template[] = {
 	VOPNAME_READDIR,	{ .vop_readdir = lxpr_readdir },
 	VOPNAME_READLINK,	{ .vop_readlink = lxpr_readlink },
 	VOPNAME_SPACE,		{ .vop_space = lxpr_space },
+	VOPNAME_SETATTR,	{ .vop_setattr = lxpr_setattr },
 	VOPNAME_FSYNC,		{ .error = lxpr_sync },
 	VOPNAME_SEEK,		{ .error = lxpr_sync },
 	VOPNAME_INACTIVE,	{ .vop_inactive = lxpr_inactive },
@@ -6965,8 +6968,31 @@ static int
 lxpr_space(vnode_t *vp, int cmd, flock64_t *bfp, int flag, offset_t offset,
     cred_t *cred, caller_context_t *ct)
 {
+	int error;
+
 	if (cmd != F_FREESP)
 		return (EINVAL);
+	if ((error = lxpr_access(vp, VWRITE, 0, cred, ct)) != 0)
+		return (error);
+
+	return (0);
+}
+
+/*
+ * Needed for writable files which are first "truncated". We only support
+ * truncation.
+ */
+static int
+lxpr_setattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
+    caller_context_t *ct)
+{
+	int error;
+
+	if (vap->va_mask != AT_SIZE)
+		return (EINVAL);
+	if ((error = lxpr_access(vp, VWRITE, 0, cr, ct)) != 0)
+		return (error);
+
 	return (0);
 }
 
