@@ -21,6 +21,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2016 Joyent, Inc.
  */
 
 
@@ -219,6 +220,14 @@ ksyms_open(dev_t *devp, int flag, int otyp, struct cred *cred)
 	char *addr;
 	void *hptr = NULL;
 	ksyms_buflist_hdr_t hdr;
+
+	/*
+	 * This device should never be visible in a zone, but if it somehow
+	 * does get created we refuse to allow the zone to use it.
+	 */
+	if (crgetzoneid(cred) != GLOBAL_ZONEID)
+		return (EACCES);
+
 	bzero(&hdr, sizeof (struct ksyms_buflist_hdr));
 	list_create(&hdr.blist, PAGESIZE,
 	    offsetof(ksyms_buflist_t, buflist_node));

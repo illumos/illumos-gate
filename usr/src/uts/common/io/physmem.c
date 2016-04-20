@@ -21,6 +21,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2016 Joyent, Inc.
  */
 
 
@@ -806,6 +807,13 @@ physmem_open(dev_t *devp, int flag, int otyp, cred_t *credp)
 {
 	int ret;
 	static int msg_printed = 0;
+
+	/*
+	 * This device should never be visible in a zone, but if it somehow
+	 * does get created we refuse to allow the zone to use it.
+	 */
+	if (crgetzoneid(credp) != GLOBAL_ZONEID)
+		return (EACCES);
 
 	if ((flag & (FWRITE | FREAD)) != (FWRITE | FREAD)) {
 		return (EINVAL);
