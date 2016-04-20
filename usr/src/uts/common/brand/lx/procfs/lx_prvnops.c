@@ -233,6 +233,8 @@ static void lxpr_read_sys_kernel_shmmax(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_kernel_shmmni(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_kernel_threads_max(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_net_core_somaxc(lxpr_node_t *, lxpr_uiobuf_t *);
+static void lxpr_read_sys_net_ipv4_ip_lport_range(lxpr_node_t *,
+    lxpr_uiobuf_t *);
 static void lxpr_read_sys_net_ipv4_tcp_fin_to(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_net_ipv4_tcp_ka_int(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_net_ipv4_tcp_ka_tim(lxpr_node_t *, lxpr_uiobuf_t *);
@@ -248,6 +250,8 @@ static int lxpr_write_pid_loginuid(lxpr_node_t *, uio_t *, cred_t *,
     caller_context_t *);
 static int lxpr_write_sys_net_core_somaxc(lxpr_node_t *, uio_t *, cred_t *,
     caller_context_t *);
+static int lxpr_write_sys_net_ipv4_ip_lport_range(lxpr_node_t *, uio_t *,
+    cred_t *, caller_context_t *);
 static int lxpr_write_sys_net_ipv4_tcp_fin_to(lxpr_node_t *, uio_t *, cred_t *,
     caller_context_t *);
 static int lxpr_write_sys_net_ipv4_tcp_ka_int(lxpr_node_t *, uio_t *,
@@ -545,10 +549,11 @@ static lxpr_dirent_t sys_net_coredir[] = {
 
 /*
  * contents of /proc/sys/net/ipv4 directory
- * See the Linux tcp(7) man page for descriptions and the illumos tcp(7p)
- * man page for the native descriptions.
+ * See the Linux ip(7) & tcp(7) man pages for descriptions and the illumos
+ * ip(7p) & tcp(7p) man pages for the native descriptions.
  */
 static lxpr_dirent_t sys_net_ipv4dir[] = {
+	{ LXPR_SYS_NET_IPV4_IP_LPORT_RANGE, "ip_local_port_range" },
 	{ LXPR_SYS_NET_IPV4_TCP_FIN_TO,	"tcp_fin_timeout" },
 	{ LXPR_SYS_NET_IPV4_TCP_KA_INT,	"tcp_keepalive_intvl" },
 	{ LXPR_SYS_NET_IPV4_TCP_KA_TIM,	"tcp_keepalive_time" },
@@ -573,6 +578,57 @@ static lxpr_dirent_t sys_vmdir[] = {
 #define	SYS_VMDIRFILES (sizeof (sys_vmdir) / sizeof (sys_vmdir[0]))
 
 /*
+ * Table for standard writable files. Non-standard writable files not in this
+ * table can be handled explicitly as special cases.
+ * This table drives lxpr_is_writable, lxpr_write, and lxpr_create.
+ * Note that the entries LXPR_PID_FD_FD and LXPR_PID_TID_FD_FD exist in the
+ * table both to verify writability and to satisfy opening with O_CREATE.
+ */
+typedef struct wftab {
+	lxpr_nodetype_t	wft_type;	/* file entry type */
+	int		(*wft_wrf)(lxpr_node_t *, struct uio *, cred_t *,
+			    caller_context_t *); /* write function */
+} wftab_t;
+
+static wftab_t wr_tab[] = {
+	{LXPR_PID_FD_FD, NULL},
+	{LXPR_PID_LOGINUID, lxpr_write_pid_loginuid},
+	{LXPR_PID_OOM_SCR_ADJ, NULL},
+	{LXPR_PID_TID_FD_FD, NULL},
+	{LXPR_PID_TID_OOM_SCR_ADJ, NULL},
+	{LXPR_SYS_KERNEL_COREPATT, lxpr_write_sys_kernel_corepatt},
+	{LXPR_SYS_KERNEL_SHMALL, NULL},
+	{LXPR_SYS_KERNEL_SHMMAX, NULL},
+	{LXPR_SYS_NET_CORE_SOMAXCON, lxpr_write_sys_net_core_somaxc},
+	{LXPR_SYS_NET_IPV4_IP_LPORT_RANGE,
+	    lxpr_write_sys_net_ipv4_ip_lport_range},
+	{LXPR_SYS_NET_IPV4_TCP_FIN_TO, lxpr_write_sys_net_ipv4_tcp_fin_to},
+	{LXPR_SYS_NET_IPV4_TCP_KA_INT, lxpr_write_sys_net_ipv4_tcp_ka_int},
+	{LXPR_SYS_NET_IPV4_TCP_KA_TIM, lxpr_write_sys_net_ipv4_tcp_ka_tim},
+	{LXPR_SYS_NET_IPV4_TCP_SACK, lxpr_write_sys_net_ipv4_tcp_sack},
+	{LXPR_SYS_NET_IPV4_TCP_WINSCALE, lxpr_write_sys_net_ipv4_tcp_winscale},
+	{LXPR_SYS_VM_OVERCOMMIT_MEM, NULL},
+	{LXPR_SYS_VM_SWAPPINESS, NULL},
+	{LXPR_INVALID, NULL}
+};
+
+/*
+ * Centralized test for the standard writable proc files. Other non-standard
+ * writable files might be handled separately.
+ */
+boolean_t
+lxpr_is_writable(lxpr_nodetype_t type)
+{
+	int i;
+
+	for (i = 0; wr_tab[i].wft_type != LXPR_INVALID; i++) {
+		if (wr_tab[i].wft_type == type)
+			return (B_TRUE);
+	}
+	return (B_FALSE);
+}
+
+/*
  * lxpr_open(): Vnode operation for VOP_OPEN()
  */
 static int
@@ -584,30 +640,9 @@ lxpr_open(vnode_t **vpp, int flag, cred_t *cr, caller_context_t *ct)
 	vnode_t		*rvp;
 	int		error = 0;
 
-	if (flag & FWRITE) {
-		/* Restrict writes to certain files */
-		switch (type) {
-		case LXPR_PID_LOGINUID:
-		case LXPR_PID_TID_LOGINUID:
-		case LXPR_PID_OOM_SCR_ADJ:
-		case LXPR_PID_TID_OOM_SCR_ADJ:
-		case LXPR_SYS_KERNEL_COREPATT:
-		case LXPR_SYS_KERNEL_SHMALL:
-		case LXPR_SYS_KERNEL_SHMMAX:
-		case LXPR_SYS_NET_CORE_SOMAXCON:
-		case LXPR_SYS_NET_IPV4_TCP_FIN_TO:
-		case LXPR_SYS_NET_IPV4_TCP_KA_INT:
-		case LXPR_SYS_NET_IPV4_TCP_KA_TIM:
-		case LXPR_SYS_NET_IPV4_TCP_SACK:
-		case LXPR_SYS_NET_IPV4_TCP_WINSCALE:
-		case LXPR_SYS_VM_OVERCOMMIT_MEM:
-		case LXPR_SYS_VM_SWAPPINESS:
-		case LXPR_PID_FD_FD:
-		case LXPR_PID_TID_FD_FD:
-			break;
-		default:
-			return (EPERM);
-		}
+	/* Restrict writes to certain files */
+	if ((flag & FWRITE) && !lxpr_is_writable(type)) {
+		return (EPERM);
 	}
 
 	/*
@@ -673,6 +708,7 @@ lxpr_close(vnode_t *vp, int flag, int count, offset_t offset, cred_t *cr,
 }
 
 static void (*lxpr_read_function[LXPR_NFILES])() = {
+	NULL,				/* invalid		*/
 	lxpr_read_isdir,		/* /proc		*/
 	lxpr_read_isdir,		/* /proc/<pid>		*/
 	lxpr_read_pid_auxv,		/* /proc/<pid>/auxv	*/
@@ -786,6 +822,7 @@ static void (*lxpr_read_function[LXPR_NFILES])() = {
 	lxpr_read_invalid,		/* /proc/sys/net/core	*/
 	lxpr_read_sys_net_core_somaxc,	/* /proc/sys/net/core/somaxconn	*/
 	lxpr_read_invalid,		/* /proc/sys/net/ipv4	*/
+	lxpr_read_sys_net_ipv4_ip_lport_range, /* ../ipv4/ip_local_port_range */
 	lxpr_read_sys_net_ipv4_tcp_fin_to, /* .../ipv4/tcp_fin_timeout */
 	lxpr_read_sys_net_ipv4_tcp_ka_int, /* .../ipv4/tcp_keepalive_intvl */
 	lxpr_read_sys_net_ipv4_tcp_ka_tim, /* .../ipv4/tcp_keepalive_time */
@@ -806,6 +843,7 @@ static void (*lxpr_read_function[LXPR_NFILES])() = {
  * Array of lookup functions, indexed by lx /proc file type.
  */
 static vnode_t *(*lxpr_lookup_function[LXPR_NFILES])() = {
+	NULL,				/* invalid		*/
 	lxpr_lookup_procdir,		/* /proc		*/
 	lxpr_lookup_piddir,		/* /proc/<pid>		*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/auxv	*/
@@ -919,6 +957,7 @@ static vnode_t *(*lxpr_lookup_function[LXPR_NFILES])() = {
 	lxpr_lookup_sys_net_coredir,	/* /proc/sys/net/core */
 	lxpr_lookup_not_a_dir,		/* /proc/sys/net/core/somaxconn */
 	lxpr_lookup_sys_net_ipv4dir,	/* /proc/sys/net/ipv4 */
+	lxpr_lookup_not_a_dir,		/* .../net/ipv4/ip_local_port_range */
 	lxpr_lookup_not_a_dir,		/* .../net/ipv4/tcp_fin_timeout */
 	lxpr_lookup_not_a_dir,		/* .../net/ipv4/tcp_keepalive_intvl */
 	lxpr_lookup_not_a_dir,		/* .../net/ipv4/tcp_keepalive_time */
@@ -939,6 +978,7 @@ static vnode_t *(*lxpr_lookup_function[LXPR_NFILES])() = {
  * Array of readdir functions, indexed by /proc file type.
  */
 static int (*lxpr_readdir_function[LXPR_NFILES])() = {
+	NULL,				/* invalid		*/
 	lxpr_readdir_procdir,		/* /proc		*/
 	lxpr_readdir_piddir,		/* /proc/<pid>		*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/auxv	*/
@@ -1052,6 +1092,7 @@ static int (*lxpr_readdir_function[LXPR_NFILES])() = {
 	lxpr_readdir_sys_net_coredir,	/* /proc/sys/net/core */
 	lxpr_readdir_not_a_dir,		/* /proc/sys/net/core/somaxconn */
 	lxpr_readdir_sys_net_ipv4dir,	/* /proc/sys/net/ipv4 */
+	lxpr_readdir_not_a_dir,		/* .../net/ipv4/ip_local_port_range */
 	lxpr_readdir_not_a_dir,		/* .../net/ipv4/tcp_fin_timeout */
 	lxpr_readdir_not_a_dir,		/* .../net/ipv4/tcp_keepalive_intvl */
 	lxpr_readdir_not_a_dir,		/* .../net/ipv4/tcp_keepalive_time */
@@ -4560,6 +4601,35 @@ lxpr_read_sys_net_core_somaxc(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 }
 
 /*
+ * ip_local_port_range
+ *
+ * The low & high port number range.
+ * integers; default: 32768 61000
+ *
+ * illumos: tcp_smallest_anon_port & tcp_largest_anon_port
+ * Not in tcp(7p) man page.
+ */
+static void
+lxpr_read_sys_net_ipv4_ip_lport_range(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+{
+	netstack_t *ns;
+	tcp_stack_t	*tcps;
+
+	ASSERT(lxpnp->lxpr_type == LXPR_SYS_NET_IPV4_IP_LPORT_RANGE);
+
+	ns = netstack_get_current();
+	if (ns == NULL) {
+		lxpr_uiobuf_seterr(uiobuf, ENXIO);
+		return;
+	}
+
+	tcps = ns->netstack_tcp;
+	lxpr_uiobuf_printf(uiobuf, "%d\t%d\n",
+	    tcps->tcps_smallest_anon_port, tcps->tcps_largest_anon_port);
+	netstack_rele(ns);
+}
+
+/*
  * tcp_fin_timeout
  *
  * This specifies how many seconds to wait for a final FIN packet before the
@@ -5177,28 +5247,8 @@ lxpr_access(vnode_t *vp, int mode, int flags, cred_t *cr, caller_context_t *ct)
 	proc_t *tp;
 
 	/* lx /proc is primarily a read only file system */
-	if (mode & VWRITE) {
-		switch (type) {
-		case LXPR_PID_LOGINUID:
-		case LXPR_PID_OOM_SCR_ADJ:
-		case LXPR_PID_TID_OOM_SCR_ADJ:
-		case LXPR_SYS_KERNEL_COREPATT:
-		case LXPR_SYS_KERNEL_SHMALL:
-		case LXPR_SYS_KERNEL_SHMMAX:
-		case LXPR_SYS_NET_CORE_SOMAXCON:
-		case LXPR_SYS_NET_IPV4_TCP_FIN_TO:
-		case LXPR_SYS_NET_IPV4_TCP_KA_INT:
-		case LXPR_SYS_NET_IPV4_TCP_KA_TIM:
-		case LXPR_SYS_NET_IPV4_TCP_SACK:
-		case LXPR_SYS_NET_IPV4_TCP_WINSCALE:
-		case LXPR_SYS_VM_OVERCOMMIT_MEM:
-		case LXPR_SYS_VM_SWAPPINESS:
-		case LXPR_PID_FD_FD:
-		case LXPR_PID_TID_FD_FD:
-			break;
-		default:
-			return (EROFS);
-		}
+	if ((mode & VWRITE) && !lxpr_is_writable(type)) {
+		return (EROFS);
 	}
 
 	/*
@@ -6349,6 +6399,47 @@ lxpr_readdir_sys_vmdir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
 	    SYS_VMDIRFILES));
 }
 
+#define	isdigit(c)	((c) >= '0' && (c) <= '9')
+#define	isspace(c)	((c) == ' ' || (c) == '\t' || (c) == '\n')
+
+/*
+ * Obtain a numeric value from the null-terminated input string.
+ * We don't have strtok in the kernel, so tokenize this ourselves and
+ * validate the input.
+ */
+static int
+lxpr_tokenize_num(char *str, long *pv, char **ep)
+{
+	char *pstart, *pc, c, *endptr;
+	long v;
+
+	for (pc = str; isspace(*pc); pc++)
+		;
+
+	for (pstart = pc; isdigit(*pc); pc++)
+		;
+	if (pc == pstart || (!isspace(*pc) && *pc != '\0'))
+		return (EINVAL);
+	c = *pc;
+	*pc = '\0';
+
+	if (ddi_strtol(pstart, &endptr, 10, &v) != 0) {
+		*pc = c;
+		return (EINVAL);
+	}
+	if (*endptr != '\0') {
+		*pc = c;
+		return (EINVAL);
+	}
+
+	if (pv != NULL)
+		*pv = v;
+	if (ep != NULL)
+		*ep = ++pc;
+
+	return (0);
+}
+
 /* ARGSUSED */
 static int
 lxpr_write_tcp_property(lxpr_node_t *lxpnp, struct uio *uio,
@@ -6415,11 +6506,11 @@ static int
 lxpr_xlate_sec2ms(char *val, int size)
 {
 	long sec;
-	char *endptr = NULL;
+	char *ep;
 
-	if (ddi_strtol(val, &endptr, 10, &sec) != 0)
+	if (lxpr_tokenize_num(val, &sec, &ep) != 0)
 		return (EINVAL);
-	if (val[0] < '0' || val[0] > '9' || *endptr != '\0')
+	if (*ep != '\0')
 		return (EINVAL);
 	if (snprintf(val, size, "%ld", sec * 1000) >= size)
 		return (EINVAL);
@@ -6430,11 +6521,11 @@ static int
 lxpr_xlate_ka_intvl(char *val, int size)
 {
 	long sec;
-	char *endptr = NULL;
+	char *ep;
 
-	if (ddi_strtol(val, &endptr, 10, &sec) != 0)
+	if (lxpr_tokenize_num(val, &sec, &ep) != 0)
 		return (EINVAL);
-	if (val[0] < '0' || val[0] > '9' || *endptr != '\0')
+	if (*ep != '\0')
 		return (EINVAL);
 	if (snprintf(val, size, "%ld", sec * 1000 * 9) >= size)
 		return (EINVAL);
@@ -6445,11 +6536,11 @@ static int
 lxpr_xlate_sack(char *val, int size)
 {
 	long flag;
-	char *endptr = NULL;
+	char *ep;
 
-	if (ddi_strtol(val, &endptr, 10, &flag) != 0)
+	if (lxpr_tokenize_num(val, &flag, &ep) != 0)
 		return (EINVAL);
-	if (val[0] < '0' || val[0] > '9' || *endptr != '\0')
+	if (*ep != '\0')
 		return (EINVAL);
 	if (flag != 0 && flag != 1)
 		return (EINVAL);
@@ -6457,6 +6548,86 @@ lxpr_xlate_sack(char *val, int size)
 	if (snprintf(val, size, "%d", (flag == 0 ? 0 : 2)) >= size)
 		return (EINVAL);
 	return (0);
+}
+
+/*
+ * We expect two port numbers on a line as input for the range, and we have to
+ * set two properties on the netstack_tcp, so we can't reuse
+ * lxpr_write_tcp_property.
+ */
+static int
+lxpr_write_sys_net_ipv4_ip_lport_range(lxpr_node_t *lxpnp, struct uio *uio,
+    struct cred *cr, caller_context_t *ct)
+{
+	int res;
+	size_t olen;
+	char vals[32];	/* big enough for a line w/ 2 16-bit numeric strings */
+	char *ep;
+	long low, high;
+	netstack_t *ns;
+	tcp_stack_t *tcps;
+	mod_prop_info_t *ptbl = NULL;
+	mod_prop_info_t *pinfo = NULL;
+
+	ASSERT(lxpnp->lxpr_type == LXPR_SYS_NET_IPV4_IP_LPORT_RANGE);
+
+	if (uio->uio_loffset != 0)
+		return (EINVAL);
+
+	if (uio->uio_resid == 0)
+		return (0);
+
+	olen = uio->uio_resid;
+	if (olen > sizeof (vals) - 1)
+		return (EINVAL);
+
+	bzero(vals, sizeof (vals));
+	res = uiomove(vals, olen, UIO_WRITE, uio);
+	if (res != 0)
+		return (res);
+
+	if (lxpr_tokenize_num(vals, &low, &ep) != 0)
+		return (EINVAL);
+
+	if (lxpr_tokenize_num(ep, &high, &ep) != 0)
+		return (EINVAL);
+
+	if (*ep != '\0') {
+		/* make sure no other tokens on the line */
+		*ep++ = '\0';
+		for (; isspace(*ep); ep++)
+			;
+		if (*ep != '\0')
+			return (EINVAL);
+	}
+
+	if (low > high || high > 65535)
+		return (EINVAL);
+
+	ns = netstack_get_current();
+	if (ns == NULL)
+		return (EINVAL);
+
+	tcps = ns->netstack_tcp;
+	if (low < tcps->tcps_smallest_nonpriv_port) {
+		netstack_rele(ns);
+		return (EINVAL);
+	}
+
+	ptbl = ns->netstack_tcp->tcps_propinfo_tbl;
+
+	(void) snprintf(vals, sizeof (vals), "%ld", low);
+	pinfo = mod_prop_lookup(ptbl, "smallest_anon_port", MOD_PROTO_TCP);
+	if (pinfo == NULL || pinfo->mpi_setf(ns, cr, pinfo, NULL, vals, 0) != 0)
+		res = EINVAL;
+
+	(void) snprintf(vals, sizeof (vals), "%ld", high);
+	pinfo = mod_prop_lookup(ptbl, "largest_anon_port", MOD_PROTO_TCP);
+	if (pinfo == NULL || pinfo->mpi_setf(ns, cr, pinfo, NULL, vals, 0) != 0)
+		res = EINVAL;
+
+	netstack_rele(ns);
+	return (res);
 }
 
 static int
@@ -6573,7 +6744,7 @@ lxpr_write_pid_loginuid(lxpr_node_t *lxpnp, struct uio *uio, struct cred *cr,
 	int error;
 	size_t olen;
 	char val[16];	/* big enough for a uint numeric string */
-	char *endptr = NULL;
+	char *ep;
 	long u;
 	proc_t *p;
 	lx_proc_data_t *pd;
@@ -6595,15 +6766,9 @@ lxpr_write_pid_loginuid(lxpr_node_t *lxpnp, struct uio *uio, struct cred *cr,
 	if (error != 0)
 		return (error);
 
-	if (val[olen - 1] == '\n')
-		val[olen - 1] = '\0';
-
-	if (val[0] == '\0') /* no input */
+	if (lxpr_tokenize_num(val, &u, &ep) != 0)
 		return (EINVAL);
-
-	if (ddi_strtol(val, &endptr, 10, &u) != 0)
-		return (EINVAL);
-	if (val[0] < '0' || val[0] > '9' || *endptr != '\0')
+	if (*ep != '\0')
 		return (EINVAL);
 
 	if ((p = lxpr_lock(lxpnp->lxpr_pid, NO_ZOMB)) == NULL)
@@ -6778,35 +6943,21 @@ lxpr_write(vnode_t *vp, uio_t *uiop, int ioflag, cred_t *cr,
 {
 	lxpr_node_t	*lxpnp = VTOLXP(vp);
 	lxpr_nodetype_t	type = lxpnp->lxpr_type;
+	int i;
 
-	switch (type) {
-	case LXPR_PID_LOGINUID:
-		return (lxpr_write_pid_loginuid(lxpnp, uiop, cr, ct));
-	case LXPR_SYS_KERNEL_COREPATT:
-		return (lxpr_write_sys_kernel_corepatt(lxpnp, uiop, cr, ct));
-	case LXPR_SYS_NET_CORE_SOMAXCON:
-		return (lxpr_write_sys_net_core_somaxc(lxpnp, uiop, cr, ct));
-	case LXPR_SYS_NET_IPV4_TCP_FIN_TO:
-		return (lxpr_write_sys_net_ipv4_tcp_fin_to(lxpnp, uiop, cr,
-		    ct));
-	case LXPR_SYS_NET_IPV4_TCP_KA_INT:
-		return (lxpr_write_sys_net_ipv4_tcp_ka_int(lxpnp, uiop, cr,
-		    ct));
-	case LXPR_SYS_NET_IPV4_TCP_KA_TIM:
-		return (lxpr_write_sys_net_ipv4_tcp_ka_tim(lxpnp, uiop, cr,
-		    ct));
-	case LXPR_SYS_NET_IPV4_TCP_SACK:
-		return (lxpr_write_sys_net_ipv4_tcp_sack(lxpnp, uiop, cr, ct));
-	case LXPR_SYS_NET_IPV4_TCP_WINSCALE:
-		return (lxpr_write_sys_net_ipv4_tcp_winscale(lxpnp, uiop, cr,
-		    ct));
-
-	default:
-		/* pretend we wrote the whole thing */
-		uiop->uio_offset += uiop->uio_resid;
-		uiop->uio_resid = 0;
-		return (0);
+	for (i = 0; wr_tab[i].wft_type != LXPR_INVALID; i++) {
+		if (wr_tab[i].wft_type == type) {
+			if (wr_tab[i].wft_wrf != NULL) {
+				return (wr_tab[i].wft_wrf(lxpnp, uiop, cr, ct));
+			}
+			break;
+		}
 	}
+
+	/* pretend we wrote the whole thing */
+	uiop->uio_offset += uiop->uio_resid;
+	uiop->uio_resid = 0;
+	return (0);
 }
 
 /* Needed for writable files which are first "truncated" */
@@ -6820,13 +6971,13 @@ lxpr_space(vnode_t *vp, int cmd, flock64_t *bfp, int flag, offset_t offset,
 }
 
 /*
- * We need to allow open with O_CREAT for the oom_score_adj file.
+ * We need to allow open with O_CREAT for the writable files.
  */
 /*ARGSUSED7*/
 static int
-lxpr_create(struct vnode *dvp, char *nm, struct vattr *vap,
-    enum vcexcl exclusive, int mode, struct vnode **vpp, struct cred *cred,
-    int flag, caller_context_t *ct, vsecattr_t *vsecp)
+lxpr_create(vnode_t *dvp, char *nm, vattr_t *vap, enum vcexcl exclusive,
+    int mode, vnode_t **vpp, cred_t *cr, int flag, caller_context_t *ct,
+    vsecattr_t *vsecp)
 {
 	lxpr_node_t *lxpnp = VTOLXP(dvp);
 	lxpr_nodetype_t type = lxpnp->lxpr_type;
@@ -6838,7 +6989,7 @@ lxpr_create(struct vnode *dvp, char *nm, struct vattr *vap,
 	/*
 	 * restrict create permission to owner or root
 	 */
-	if ((error = lxpr_access(dvp, VEXEC, 0, cred, ct)) != 0) {
+	if ((error = lxpr_access(dvp, VEXEC, 0, cr, ct)) != 0) {
 		return (error);
 	}
 
@@ -6852,73 +7003,23 @@ lxpr_create(struct vnode *dvp, char *nm, struct vattr *vap,
 		return (EEXIST);
 
 	/*
-	 * We're currently restricting O_CREAT to:
-	 * - /proc/<pid>/fd/<num>
-	 * - /proc/<pid>/oom_score_adj
-	 * - /proc/<pid>/task/<tid>/fd/<num>
-	 * - /proc/<pid>/task/<tid>/oom_score_adj
-	 * - /proc/sys/kernel/core_pattern
-	 * - /proc/sys/kernel/shmall
-	 * - /proc/sys/kernel/shmmax
-	 * - /proc/sys/net/core/somaxconn
-	 * - /proc/sys/vm/overcommit_memory
-	 * - /proc/sys/vm/swappiness
+	 * No writable files in top-level proc dir. We check this to avoid
+	 * getting a non-proc node via "..".
 	 */
-	switch (type) {
-	case LXPR_PIDDIR:
-	case LXPR_PID_TASK_IDDIR:
-		if (strcmp(nm, "oom_score_adj") == 0) {
-			proc_t *p;
-			p = lxpr_lock(lxpnp->lxpr_pid, ZOMB_OK);
-			if (p != NULL) {
-				vp = lxpr_lookup_common(dvp, nm, p, piddir,
-				    PIDDIRFILES);
-			}
-			lxpr_unlock(p);
+	if (type != LXPR_PROCDIR &&
+	    lxpr_lookup(dvp, nm, &vp, NULL, 0, NULL, cr, ct, NULL, NULL) == 0) {
+		lxpr_nodetype_t ftype = VTOLXP(vp)->lxpr_type;
+		if (!lxpr_is_writable(ftype)) {
+			VN_RELE(vp);
+			vp = NULL;
 		}
-		break;
-
-	case LXPR_SYS_NET_COREDIR:
-		if (strcmp(nm, "somaxconn") == 0) {
-			vp = lxpr_lookup_common(dvp, nm, NULL, sys_net_coredir,
-			    SYS_NET_COREDIRFILES);
-		}
-		break;
-
-	case LXPR_SYS_KERNELDIR:
-		if (strcmp(nm, "core_pattern") == 0 ||
-		    strcmp(nm, "shmall") == 0 ||
-		    strcmp(nm, "shmmax") == 0) {
-			vp = lxpr_lookup_common(dvp, nm, NULL, sys_kerneldir,
-			    SYS_KERNELDIRFILES);
-		}
-		break;
-
-	case LXPR_SYS_VMDIR:
-		if (strcmp(nm, "overcommit_memory") == 0 ||
-		    strcmp(nm, "swappiness") == 0) {
-			vp = lxpr_lookup_common(dvp, nm, NULL, sys_vmdir,
-			    SYS_VMDIRFILES);
-		}
-		break;
-
-	case LXPR_PID_FDDIR:
-	case LXPR_PID_TID_FDDIR:
-		vp = lxpr_lookup_fdnode(dvp, nm);
-		break;
-
-	default:
-		vp = NULL;
-		break;
 	}
 
 	if (vp != NULL) {
-		/* Creating an existing file, allow it for regular files. */
-		if (vp->v_type == VDIR)
-			return (EISDIR);
+		ASSERT(vp->v_type != VDIR);
 
 		/* confirm permissions against existing file */
-		if ((error = lxpr_access(vp, mode, 0, cred, ct)) != 0) {
+		if ((error = lxpr_access(vp, mode, 0, cr, ct)) != 0) {
 			VN_RELE(vp);
 			return (error);
 		}
