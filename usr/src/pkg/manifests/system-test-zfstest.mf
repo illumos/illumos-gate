@@ -404,6 +404,7 @@ file path=opt/zfs-tests/tests/functional/clean_mirror/default.cfg mode=0555
 file path=opt/zfs-tests/tests/functional/clean_mirror/setup mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/cli_common.kshlib mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zdb/zdb_001_neg mode=0555
+file path=opt/zfs-tests/tests/functional/cli_root/zdb/zdb_002_pos mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zfs/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zfs/setup mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zfs/zfs_001_neg mode=0555

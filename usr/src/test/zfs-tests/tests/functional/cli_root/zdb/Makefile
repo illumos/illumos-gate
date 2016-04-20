@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2015 by Delphix. All rights reserved.
 #
 
 include $(SRC)/Makefile.master
@@ -18,7 +18,8 @@ include $(SRC)/Makefile.master
 ROOTOPTPKG = $(ROOT)/opt/zfs-tests
 TESTDIR = $(ROOTOPTPKG)/tests/functional/cli_root/zdb
 
-PROGS = zdb_001_neg
+PROGS = zdb_001_neg \
+	zdb_002_pos
 
 CMDS = $(PROGS:%=$(TESTDIR)/%)
 $(CMDS) := FILEMODE = 0555
