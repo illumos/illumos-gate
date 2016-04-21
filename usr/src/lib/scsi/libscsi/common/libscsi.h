@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #ifndef	_LIBSCSI_H
@@ -97,6 +98,7 @@ typedef struct libscsi_engine_ops {
 	void (*lseo_close)(libscsi_hdl_t *, void *);
 	int (*lseo_exec)(libscsi_hdl_t *, void *, libscsi_action_t *);
 	void (*lseo_target_name)(libscsi_hdl_t *, void *, char *, size_t);
+	int (*lseo_max_transfer)(libscsi_hdl_t *, void *, size_t *);
 } libscsi_engine_ops_t;
 
 typedef struct libscsi_engine {
@@ -116,6 +118,7 @@ extern libscsi_hdl_t *libscsi_get_handle(libscsi_target_t *);
 extern const char *libscsi_vendor(libscsi_target_t *);
 extern const char *libscsi_product(libscsi_target_t *);
 extern const char *libscsi_revision(libscsi_target_t *);
+extern int libscsi_max_transfer(libscsi_target_t *, size_t *);
 
 extern libscsi_errno_t libscsi_errno(libscsi_hdl_t *);
 extern const char *libscsi_errmsg(libscsi_hdl_t *);

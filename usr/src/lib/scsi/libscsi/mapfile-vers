@@ -71,6 +71,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 		libscsi_vendor;
 		libscsi_product;
 		libscsi_revision;
+		libscsi_max_transfer;
 		libscsi_get_handle;
 
 		libscsi_alloc;

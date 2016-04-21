@@ -18,14 +18,18 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*
  * sd / ssd (SCSI Direct-attached Device) specific functions.
  */
+
 #include <libnvpair.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -33,16 +37,20 @@
 #include <sys/types.h>
 #include <sys/sysmacros.h>
 #include <sys/queue.h>
+#include <sys/stat.h>
 #include <fcntl.h>
 #include <string.h>
 #include <errno.h>
 #include <scsi/libscsi.h>
+#include <sys/scsi/scsi_types.h>
 #include <libintl.h> /* for gettext(3c) */
 #include <fwflash/fwflash.h>
+#include <sys/debug.h>
+#include <umem.h>
 
 typedef struct sam4_statdesc {
-	int status;
-	char *message;
+	int sam_status;
+	char *sam_message;
 } sam4_statdesc_t;
 
 static sam4_statdesc_t sam4_status[] = {
@@ -53,12 +61,10 @@ static sam4_statdesc_t sam4_status[] = {
 	{ SAM4_STATUS_RESERVATION_CONFLICT, "Status: Device is RESERVED" },
 	{ SAM4_STATUS_TASK_SET_FULL,
 	    "Status: TASK SET FULL (insufficient resources in command queue" },
-	{ SAM4_STATUS_TASK_ABORTED, "Status: TASK ABORTED" },
-	{ NULL, NULL }
+	{ SAM4_STATUS_TASK_ABORTED, "Status: TASK ABORTED" }
 };
 
-#define	NSAM4_STATUS	\
-	(sizeof (sam4_status) / sizeof (sam4_status[0]))
+#define	NSAM4_STATUS	(sizeof (sam4_status) / sizeof (sam4_status[0]))
 
 #define	FW_SD_FREE_DEVPATH(devpath)	{	\
 		di_devfs_path_free((devpath));	\
@@ -100,27 +106,35 @@ static sam4_statdesc_t sam4_status[] = {
 		FW_SD_FREE_IDENT_PID((thisdev), (devpath))	\
 	}
 
-int errno;
+/*
+ * This is our default partial write size when we encounter a situation where we
+ * need to upgrade disks whose firmware image cannot be done in a single write.
+ * While in theory we should just use the maximum transfer size and make sure
+ * it's aligned, that's proven to be problematic for some Seagate disks. Hence
+ * we just make sure that if partial writes are required that this value fits in
+ * the required alignment and in the actual maximum transfer size.
+ */
+#define	FW_SD_PARTIAL_WRITE_SIZE	(64 * 1024)
+
+/*
+ * Declarations required for fwflash
+ */
 char drivername[] = "sd\0";
 int plugin_version = FWPLUGIN_VERSION_2;
 
-static char *devprefix = "/devices";
+/*
+ * Data provided by fwflash
+ */
 extern di_node_t rootnode;
 extern struct fw_plugin *self;
 extern struct vrfyplugin *verifier;
 extern int fwflash_debug;
 
-/* required functions for this plugin */
-int fw_readfw(struct devicelist *device, char *filename);
-int fw_writefw(struct devicelist *device);
-int fw_identify(int start);
-int fw_devinfo(struct devicelist *thisdev);
-void fw_cleanup(struct devicelist *thisdev);
+static char *sdfw_devprefix = "/devices";
 
-/* helper functions */
-static char *find_link(di_node_t bnode, char *acc_devname);
-static int link_cb(di_devlink_t devlink, void *arg);
-static int sd_idtfy_custmz(struct devicelist *device, char *sp);
+static char *sdfw_find_link(di_node_t bnode, char *acc_devname);
+static int sdfw_link_cb(di_devlink_t devlink, void *arg);
+static int sdfw_idtfy_custmz(struct devicelist *device, char *sp);
 
 /*
  * We don't currently support reading firmware from a disk. If we do eventually
@@ -141,17 +155,215 @@ fw_readfw(struct devicelist *flashdev, char *filename)
 	return (FWFLASH_SUCCESS);
 }
 
+
+static int
+sdfw_read_descriptor(struct devicelist *flashdev, libscsi_hdl_t *hdl,
+    libscsi_target_t *targ, uint8_t *align)
+{
+	spc3_read_buffer_cdb_t *rb_cdb;
+	size_t nwritten;
+	libscsi_action_t *action = NULL;
+	uint8_t descbuf[4];
+	sam4_status_t samstatus;
+
+	VERIFY3P(hdl, !=, NULL);
+	VERIFY3P(targ, !=, NULL);
+	VERIFY3P(align, !=, NULL);
+
+	if ((action = libscsi_action_alloc(hdl, SPC3_CMD_READ_BUFFER,
+	    LIBSCSI_AF_READ, descbuf, sizeof (descbuf))) == NULL) {
+		logmsg(MSG_ERROR, gettext("%s: failed to alloc scsi action: "
+		    "%s\n"),
+		    flashdev->drvname, libscsi_errmsg(hdl));
+		return (FWFLASH_FAILURE);
+	}
+
+	rb_cdb = (spc3_read_buffer_cdb_t *)libscsi_action_get_cdb(action);
+
+	rb_cdb->rbc_mode = SPC3_RB_MODE_DESCRIPTOR;
+
+	/*
+	 * Microcode upgrade usually only uses the first buffer ID which is
+	 * sequentially indexed from zero. Strictly speaking these are all
+	 * vendor defined, but so far most vendors we've seen use index zero
+	 * for this.
+	 */
+	rb_cdb->rbc_bufferid = 0;
+
+	rb_cdb->rbc_allocation_len[0] = 0;
+	rb_cdb->rbc_allocation_len[1] = 0;
+	rb_cdb->rbc_allocation_len[2] = sizeof (descbuf);
+
+	if (libscsi_exec(action, targ) != 0) {
+		logmsg(MSG_ERROR, gettext("%s: failed to execute SCSI buffer "
+		    "data read: %s\n"),
+		    flashdev->drvname, libscsi_errmsg(hdl));
+		libscsi_action_free(action);
+		return (FWFLASH_FAILURE);
+	}
+
+	if ((samstatus = libscsi_action_get_status(action)) !=
+	    SAM4_STATUS_GOOD) {
+		int i;
+		for (i = 0; i < NSAM4_STATUS; i++) {
+			if (samstatus == sam4_status[i].sam_status) {
+				logmsg(MSG_ERROR, gettext("%s: SCSI buffer "
+				    "data read failed: %s\n"),
+				    flashdev->drvname,
+				    sam4_status[i].sam_message);
+				libscsi_action_free(action);
+				return (FWFLASH_FAILURE);
+			}
+		}
+		logmsg(MSG_ERROR, gettext("%s: SCSI buffer data read failed: "
+		    "unknown error: %d\n"), flashdev->drvname, samstatus);
+		libscsi_action_free(action);
+		return (FWFLASH_FAILURE);
+	}
+
+	if (libscsi_action_get_buffer(action, NULL, NULL, &nwritten) != 0) {
+		logmsg(MSG_ERROR, gettext("%s: failed to get actual data "
+		    "size: %s\n"),
+		    flashdev->drvname, libscsi_errmsg(hdl));
+		libscsi_action_free(action);
+		return (FWFLASH_FAILURE);
+	}
+	libscsi_action_free(action);
+
+	if (nwritten != sizeof (descbuf)) {
+		logmsg(MSG_ERROR, gettext("%s: received a short read from the "
+		    "SCSI READ BUFFER command, expected %u bytes, read %u\n"),
+		    flashdev->drvname, sizeof (descbuf), nwritten);
+		return (FWFLASH_FAILURE);
+	}
+
+	if (descbuf[0] == 0 && descbuf[1] == 0 && descbuf[2] == 0 &&
+	    descbuf[3] == 0) {
+		logmsg(MSG_ERROR, gettext("%s: devices %s does not support "
+		    "firmware upgrade\n"), verifier->vendor,
+		    flashdev->access_devname);
+		return (FWFLASH_FAILURE);
+	}
+
+	*align = descbuf[0];
+
+	return (FWFLASH_SUCCESS);
+}
+
+static int
+sdfw_write(struct devicelist *flashdev, libscsi_hdl_t *handle,
+    libscsi_target_t *target, size_t len, size_t off, void *buf)
+{
+	sam4_status_t samstatus;
+	libscsi_action_t *action = NULL;
+	spc3_write_buffer_cdb_t *wb_cdb;
+
+	logmsg(MSG_INFO, "%s: writing %u bytes of image %s at offset %u from "
+	    "address %p\n", flashdev->drvname, len, verifier->imgfile, off,
+	    buf);
+	logmsg(MSG_INFO, "%s: writing to buffer id %u\n",
+	    flashdev->drvname, verifier->flashbuf);
+
+	VERIFY3P(flashdev, !=, NULL);
+	VERIFY3P(handle, !=, NULL);
+	VERIFY3P(target, !=, NULL);
+	VERIFY3P(buf, !=, NULL);
+	VERIFY3U(len, >, 0);
+	VERIFY3U(off + len, <=, verifier->imgsize);
+
+	action = libscsi_action_alloc(handle, SPC3_CMD_WRITE_BUFFER,
+	    LIBSCSI_AF_WRITE | LIBSCSI_AF_RQSENSE | LIBSCSI_AF_ISOLATE, buf,
+	    len);
+	if (action == NULL) {
+		logmsg(MSG_ERROR, gettext("%s: failed to alloc scsi action: "
+		    "%s\n"), flashdev->drvname, libscsi_errmsg(handle));
+		goto err;
+	}
+
+	wb_cdb = (spc3_write_buffer_cdb_t *)libscsi_action_get_cdb(action);
+
+	wb_cdb->wbc_mode = SPC3_WB_MODE_DL_UCODE_OFFS_SAVE;
+
+	wb_cdb->wbc_buffer_offset[0] = (off >> 16) & 0xff;
+	wb_cdb->wbc_buffer_offset[1] = (off >> 8) & 0xff;
+	wb_cdb->wbc_buffer_offset[2] = off & 0xff;
+
+	wb_cdb->wbc_bufferid = verifier->flashbuf;
+
+	wb_cdb->wbc_parameter_list_len[0] = (len >> 16) & 0xff;
+	wb_cdb->wbc_parameter_list_len[1] = (len >> 8) & 0xff;
+	wb_cdb->wbc_parameter_list_len[2] = len & 0xff;
+
+	logmsg(MSG_INFO, "%s: spc3_write_buffer_cdb_t opcode: %u\n",
+	    flashdev->drvname, wb_cdb->wbc_opcode);
+
+	if (libscsi_exec(action, target) != 0) {
+		logmsg(MSG_ERROR, gettext("%s: failed to execute SCSI WRITE "
+		    "BUFFER: %s\n"),
+		    flashdev->drvname, libscsi_errmsg(handle));
+		goto err;
+	}
+
+	if ((samstatus = libscsi_action_get_status(action)) ==
+	    SAM4_STATUS_CHECK_CONDITION) {
+		uint64_t asc = 0, ascq = 0, key = 0;
+		const char *code, *keystr;
+
+		if (libscsi_action_parse_sense(action, &key, &asc, &ascq,
+		    NULL) != 0) {
+			logmsg(MSG_ERROR, gettext("%s: failed to write "
+			    "firmware. Received CHECK_CONDITION that cannot be "
+			    "parsed.\n"),
+			    flashdev->drvname);
+			goto err;
+		}
+
+		code = libscsi_sense_code_name(asc, ascq);
+		keystr = libscsi_sense_key_name(key);
+
+		logmsg(MSG_ERROR, gettext("%s: failed to write firmware: "
+		    "received sense key %llu (%s) additional sense code "
+		    "0x%llx/0x%llx (%s)\n"), flashdev->drvname, key,
+		    keystr != NULL ? keystr : "<unknown>",
+		    asc, ascq, code != NULL ? code : "<unknown>");
+		goto err;
+	} else if (samstatus != SAM4_STATUS_GOOD) {
+		int i;
+
+		logmsg(MSG_ERROR, gettext("%s: SCSI buffer data write failed:"),
+		    flashdev->drvname);
+		for (i = 0; i < NSAM4_STATUS; i++) {
+			if (samstatus == sam4_status[i].sam_status) {
+				logmsg(MSG_ERROR, gettext("%s\n"),
+				    sam4_status[i].sam_message);
+				goto err;
+			}
+		}
+		logmsg(MSG_ERROR, gettext("unknown error: %d\n"), samstatus);
+		goto err;
+	} else {
+		logmsg(MSG_INFO, "%s: received STATUS GOOD\n",
+		    flashdev->drvname);
+	}
+
+	libscsi_action_free(action);
+	return (FWFLASH_SUCCESS);
+
+err:
+	if (action != NULL)
+		libscsi_action_free(action);
+	return (FWFLASH_FAILURE);
+}
+
 int
 fw_writefw(struct devicelist *flashdev)
 {
-	int rv;
-	int i = 0;
 	libscsi_hdl_t	*handle;
 	libscsi_target_t *target;
-	libscsi_action_t *action;
 	libscsi_errno_t serr;
-	spc3_write_buffer_cdb_t *wb_cdb;
-	sam4_status_t samstatus;
+	size_t maxxfer, nwrite;
+	uint8_t align;
+	int ret = FWFLASH_FAILURE;
 
 	if ((verifier == NULL) || (verifier->imgsize == 0) ||
 	    (verifier->fwimage == NULL)) {
@@ -168,8 +380,8 @@ fw_writefw(struct devicelist *flashdev)
 		return (FWFLASH_FAILURE);
 	}
 
-	if ((target = libscsi_open(handle, NULL, flashdev->access_devname))
-	    == NULL) {
+	if ((target = libscsi_open(handle, NULL, flashdev->access_devname)) ==
+	    NULL) {
 		logmsg(MSG_ERROR,
 		    gettext("%s: unable to open device %s\n"),
 		    flashdev->drvname, flashdev->access_devname);
@@ -177,55 +389,90 @@ fw_writefw(struct devicelist *flashdev)
 		return (FWFLASH_FAILURE);
 	}
 
-	action = libscsi_action_alloc(handle, SPC3_CMD_WRITE_BUFFER,
-	    LIBSCSI_AF_WRITE|LIBSCSI_AF_RQSENSE,
-	    (void *)verifier->fwimage, (size_t)verifier->imgsize);
+	if (libscsi_max_transfer(target, &maxxfer) != 0) {
+		logmsg(MSG_ERROR, gettext("%s: failed to determine device "
+		    "maximum transfer size: %s\n"), flashdev->drvname,
+		    libscsi_errmsg(handle));
+		goto err;
+	}
 
-	wb_cdb = (spc3_write_buffer_cdb_t *)libscsi_action_get_cdb(action);
+	if (sdfw_read_descriptor(flashdev, handle, target, &align) !=
+	    FWFLASH_SUCCESS) {
+		goto err;
+	}
 
-	wb_cdb->wbc_mode = SPC3_WB_MODE_DL_UCODE_SAVE;
-	wb_cdb->wbc_bufferid = verifier->flashbuf;
-
-	wb_cdb->wbc_buffer_offset[0] = 0;
-	wb_cdb->wbc_buffer_offset[1] = 0;
-	wb_cdb->wbc_buffer_offset[2] = 0;
-
-	wb_cdb->wbc_parameter_list_len[0] =
-	    (verifier->imgsize & 0xff0000) >> 16;
-	wb_cdb->wbc_parameter_list_len[1] = (verifier->imgsize & 0xff00) >> 8;
-	wb_cdb->wbc_parameter_list_len[2] = (verifier->imgsize & 0xff);
-
-	rv = libscsi_exec(action, target);
-	samstatus = libscsi_action_get_status(action);
-
-	logmsg(MSG_INFO, "\nscsi_writebuffer: ret 0x%0x, samstatus 0x%0x\n",
-	    rv, samstatus);
-
-	libscsi_action_free(action);
-	libscsi_close(handle, target);
-	libscsi_fini(handle);
-
-	if (rv != FWFLASH_SUCCESS)
-		return (FWFLASH_FAILURE);
-
-	for (i = 0; i < NSAM4_STATUS; i++) {
-		if (sam4_status[i].status == samstatus) {
-			logmsg(MSG_ERROR, gettext("RETURN STATUS: %s\n"),
-			    (sam4_status[i].message));
-			break;
+	/*
+	 * If the maximum transfer size is less than the maximum image size then
+	 * we have to do some additional work. We need to read the descriptor
+	 * via a READ BUFFER command and make sure that we support the required
+	 * offset alignment. Note that an alignment of 0xff indicates that the
+	 * device does not support partial writes and must receive the firmware
+	 * in a single WRITE BUFFER.  Otherwise a value in align represents a
+	 * required offset alignment of 2^off. From there, we make sure that
+	 * this works for our partial write size and that our partial write size
+	 * fits in the maximum transfer size.
+	 */
+	if (maxxfer < verifier->imgsize) {
+		logmsg(MSG_INFO, "%s: Maximum transfer is %u, required "
+		    "alignment is 2^%d\n", flashdev->drvname, maxxfer, align);
+		if (FW_SD_PARTIAL_WRITE_SIZE > maxxfer) {
+			logmsg(MSG_ERROR, gettext("%s: cannot write firmware "
+			    "image: HBA enforces a maximum transfer size of "
+			    "%u bytes, but the default partial transfer size "
+			    "is %u bytes\n"), flashdev->drvname, maxxfer,
+			    FW_SD_PARTIAL_WRITE_SIZE);
+			goto err;
 		}
-	}
-	if (i == NSAM4_STATUS)
-		logmsg(MSG_ERROR, gettext("Status UNKNOWN\n"));
+		maxxfer = FW_SD_PARTIAL_WRITE_SIZE;
 
-	if (samstatus == SAM4_STATUS_GOOD) {
-		logmsg(MSG_ERROR, gettext("Note: For flash based disks "
-		    "(SSD, etc). You may need power off the system to wait a "
-		    "few minutes for supercap to fully discharge, then power "
-		    "on the system again to activate the new firmware\n"));
-		return (FWFLASH_SUCCESS);
+		if (ffsll(maxxfer) < align || align == 0xff) {
+			logmsg(MSG_ERROR, gettext("%s: cannot write firmware "
+			    "image: device requires partial writes aligned "
+			    "to an unsupported value\n"), flashdev->drvname);
+			goto err;
+		}
+
+		logmsg(MSG_INFO, "%s: final transfer block size is %u\n",
+		    flashdev->drvname, maxxfer);
 	}
-	return (FWFLASH_FAILURE);
+
+	logmsg(MSG_INFO, "%s: Writing out %u bytes to %s\n", flashdev->drvname,
+	    verifier->imgsize, flashdev->access_devname);
+	nwrite = 0;
+	for (;;) {
+		uintptr_t buf;
+		size_t towrite = MIN(maxxfer, verifier->imgsize - nwrite);
+
+		if (towrite == 0)
+			break;
+
+		buf = (uintptr_t)verifier->fwimage;
+		buf += nwrite;
+
+		if (sdfw_write(flashdev, handle, target, towrite, nwrite,
+		    (void *)buf) != FWFLASH_SUCCESS) {
+			logmsg(MSG_ERROR, gettext("%s: failed to write to %s "
+			    "successfully: %s\n"), flashdev->drvname,
+			    flashdev->access_devname, libscsi_errmsg(handle));
+			goto err;
+		}
+
+		nwrite += towrite;
+	}
+
+	logmsg(MSG_ERROR, gettext("Note: For flash based disks "
+	    "(SSD, etc). You may need power off the system to wait a "
+	    "few minutes for supercap to fully discharge, then power "
+	    "on the system again to activate the new firmware\n"));
+	ret = FWFLASH_SUCCESS;
+
+err:
+	if (target != NULL)
+		libscsi_close(handle, target);
+	if (handle != NULL)
+		libscsi_fini(handle);
+
+	return (ret);
 }
 
 /*
@@ -300,8 +547,8 @@ fw_identify(int start)
 			continue;
 		}
 
-		if ((newdev = calloc(1, sizeof (struct devicelist)))
-		    == NULL) {
+		if ((newdev = calloc(1, sizeof (struct devicelist))) ==
+		    NULL) {
 			logmsg(MSG_ERROR,
 			    gettext("%s: identification function unable "
 			    "to allocate space for device entry\n"),
@@ -311,8 +558,8 @@ fw_identify(int start)
 			return (FWFLASH_FAILURE);
 		}
 
-		if ((newdev->drvname = calloc(1, strlen(driver) + 1))
-		    == NULL) {
+		if ((newdev->drvname = calloc(1, strlen(driver) + 1)) ==
+		    NULL) {
 			logmsg(MSG_ERROR,
 			    gettext("%s: Unable to allocate space to store a "
 			    "driver name\n"), driver);
@@ -322,8 +569,8 @@ fw_identify(int start)
 		}
 		(void) strlcpy(newdev->drvname, driver, strlen(driver) + 1);
 
-		if ((newdev->classname = calloc(1, strlen(driver) + 1))
-		    == NULL) {
+		if ((newdev->classname = calloc(1, strlen(driver) + 1)) ==
+		    NULL) {
 			logmsg(MSG_ERROR,
 			    gettext("%s: Unable to allocate space for a class "
 			    "name\n"), drivername);
@@ -345,12 +592,12 @@ fw_identify(int start)
 
 		/* The slice number may be 2 or 0, we will try 2 first */
 		(void) snprintf(newdev->access_devname, MAXPATHLEN,
-		    "%s%s:c,raw", devprefix, devpath);
+		    "%s%s:c,raw", sdfw_devprefix, devpath);
 		if ((target = libscsi_open(handle, NULL,
 		    newdev->access_devname)) == NULL) {
 			/* try 0 for EFI label */
 			(void) snprintf(newdev->access_devname, MAXPATHLEN,
-			    "%s%s:a,raw", devprefix, devpath);
+			    "%s%s:a,raw", sdfw_devprefix, devpath);
 			if ((target = libscsi_open(handle, NULL,
 			    newdev->access_devname)) == NULL) {
 				logmsg(MSG_INFO,
@@ -362,7 +609,7 @@ fw_identify(int start)
 		}
 
 		/* and the /dev/rdsk/ name */
-		if ((newdev->addresses[0] = find_link(thisnode,
+		if ((newdev->addresses[0] = sdfw_find_link(thisnode,
 		    newdev->access_devname)) == NULL) {
 			libscsi_fini(handle);
 			FW_SD_FREE_ACC_NAME(newdev, devpath)
@@ -423,7 +670,7 @@ fw_identify(int start)
 				 * There is no SPACE character in the PID field
 				 * Customize strings for special SATA disks
 				 */
-				if (sd_idtfy_custmz(newdev, sp_temp)
+				if (sdfw_idtfy_custmz(newdev, sp_temp)
 				    != FWFLASH_SUCCESS) {
 					libscsi_close(handle, target);
 					libscsi_fini(handle);
@@ -483,8 +730,8 @@ fw_identify(int start)
 
 		/* Revision ID */
 		sp_temp = (char *)libscsi_revision(target);
-		if ((newdev->ident->revid = calloc(1, strlen(sp_temp) + 1))
-		    == NULL || sp_temp == NULL) {
+		if ((newdev->ident->revid = calloc(1, strlen(sp_temp) + 1)) ==
+		    NULL || sp_temp == NULL) {
 			logmsg(MSG_ERROR, gettext("%s: unable to get revision "
 			    "id of %s\n"), newdev->drvname,
 			    newdev->access_devname);
@@ -634,7 +881,7 @@ fw_cleanup(struct devicelist *thisdev)
  * Helper functions
  */
 static int
-link_cb(di_devlink_t devlink, void *arg)
+sdfw_link_cb(di_devlink_t devlink, void *arg)
 {
 	const char *result;
 
@@ -645,14 +892,14 @@ link_cb(di_devlink_t devlink, void *arg)
 		(void) strlcpy(arg, result, strlen(result) + 1);
 	}
 
-	logmsg(MSG_INFO, "\nlink_cb::linkdata->resultstr = %s\n",
+	logmsg(MSG_INFO, "\nsdfw_link_cb::linkdata->resultstr = %s\n",
 	    ((result != NULL) ? result : "(null)"));
 
 	return (DI_WALK_CONTINUE);
 }
 
 static char *
-find_link(di_node_t bnode, char *acc_devname)
+sdfw_find_link(di_node_t bnode, char *acc_devname)
 {
 	di_minor_t devminor = DI_MINOR_NIL;
 	di_devlink_handle_t hdl;
@@ -661,7 +908,7 @@ find_link(di_node_t bnode, char *acc_devname)
 
 	if (bnode == DI_NODE_NIL) {
 		logmsg(MSG_ERROR,
-		    gettext("find_link must be called with non-null "
+		    gettext("sdfw_find_link must be called with non-null "
 		    "di_node_t\n"));
 		return (NULL);
 	}
@@ -690,8 +937,8 @@ find_link(di_node_t bnode, char *acc_devname)
 	}
 
 	errno = 0;
-	if (di_devlink_walk(hdl, linkname, acc_devname + strlen(devprefix),
-	    DI_PRIMARY_LINK, (void *)cbresult, link_cb) < 0) {
+	if (di_devlink_walk(hdl, linkname, acc_devname + strlen(sdfw_devprefix),
+	    DI_PRIMARY_LINK, (void *)cbresult, sdfw_link_cb) < 0) {
 		logmsg(MSG_ERROR,
 		    gettext("Unable to walk devlink snapshot for %s: %s\n"),
 		    acc_devname, strerror(errno));
@@ -710,7 +957,7 @@ find_link(di_node_t bnode, char *acc_devname)
 }
 
 static int
-sd_idtfy_custmz(struct devicelist *device, char *sp)
+sdfw_idtfy_custmz(struct devicelist *device, char *sp)
 {
 	/* vid customization */
 	if (strncmp(sp, "ST", 2) == 0) {
@@ -724,7 +971,7 @@ sd_idtfy_custmz(struct devicelist *device, char *sp)
 			return (FWFLASH_FAILURE);
 		}
 	} else {
-		/* disks to do in the furture, fill 'ATA' first */
+		/* disks to do in the future, fill 'ATA' first */
 		if ((device->ident->vid = strdup("ATA")) == NULL) {
 			return (FWFLASH_FAILURE);
 		}

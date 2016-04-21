@@ -21,10 +21,12 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*
- * Defines for user SCSI commands					*
+ * Defines for user SCSI commands
  */
 
 #ifndef _SYS_SCSI_IMPL_USCSI_H
@@ -186,10 +188,16 @@ struct uscsi_rqs32	{
 #define	RQS_VALID	0x02	/* RQS data is valid */
 
 /*
+ * Structure for USCSIMAXXFER ioctls
+ */
+typedef uint64_t	uscsi_xfer_t;
+
+/*
  * User SCSI io control command
  */
 #define	USCSIIOC	(0x04 << 8)
 #define	USCSICMD	(USCSIIOC|201) 	/* user scsi command */
+#define	USCSIMAXXFER	(USCSIIOC|202)	/* get max transfer size */
 
 #ifdef	_KERNEL
 

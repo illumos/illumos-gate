@@ -1,9 +1,10 @@
 '\" te
 .\" Copyright (c) 2007 by Sun Microsystems, Inc.  All rights reserved.
+.\" Copyright 2016 Joyent, Inc.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH USCSI 7I "May 29, 2007"
+.TH USCSI 7I "Sep 23, 2016"
 .SH NAME
 uscsi \- user SCSI command interface
 .SH SYNOPSIS
@@ -15,7 +16,6 @@ uscsi \- user SCSI command interface
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBuscsi\fR command is very powerful and somewhat dangerous; therefore it
 has some permission restrictions. See \fBWARNINGS\fR for more details.
@@ -349,8 +349,13 @@ See the \fBscsi_pkt\fR(9S) flag \fBFLAG_RENEGOTIATE_WIDE_SYNC\fR for more
 information.
 .RE
 
+The \fBuscsi_xfer_t\fR is a type definition that corresponds to a 64-bit
+unsigned integer. It should be used for the \fBUSCSIMAXXFER\fR ioctls. This is
+used for determining the maximum transfer size that can be performed in a single
+\fBUSCSICMD\fR ioctl. If the SCSI request is larger than the specified size,
+then it may not work, depending on the hardware platform.
+
 .SH IOCTLS
-.sp
 .LP
 The \fBioctl\fR supported by drivers providing the \fBuscsi\fR interface is:
 .sp
@@ -371,8 +376,22 @@ status, and Request Sense is enabled, the sense data itself is returned in
 Sense data transfer.
 .RE
 
-.SH ERRORS
 .sp
+.ne 2
+.na
+.B USCSIMAXXFER
+.ad
+.RS 12n
+The argument is a pointer to a \fBuscsi_xfer_t\fR value. The maximum transfer
+size that can be used with the \fBUSCSICMD\fR ioctl for the current device will
+be returned in the \fBuscsi_xfer_t\fR.
+.sp
+.LP
+Not all devices which support the \fBUSCSICMD\fR ioctl also support the
+\fBUSCSIMAXXFER\fR ioctl.
+.RE
+
+.SH ERRORS
 .ne 2
 .na
 \fB\fBEINVAL\fR\fR
@@ -396,7 +415,8 @@ An error occurred during the execution of the command.
 \fB\fBEPERM\fR\fR
 .ad
 .RS 10n
-A process without root credentials tried to execute the \fBUSCSICMD\fR ioctl.
+A process without root credentials tried to execute the \fBUSCSICMD\fR or
+\fRUSCSIMAXXFER\fR ioctl.
 .RE
 
 .sp
@@ -405,12 +425,11 @@ A process without root credentials tried to execute the \fBUSCSICMD\fR ioctl.
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 10n
-The \fBuscsi_cmd\fR itself, the \fBuscsi_cdb\fR, the \fBuscsi_buf\fR, or the
-\fBuscsi_rqbuf\fR point to an invalid address.
+The \fBuscsi_cmd\fR itself, the \fBuscsi_cdb\fR, the \fBuscsi_buf\fR, the
+\fBuscsi_rqbuf\fR, or the \fBuscsi_xfer_t\fR point to an invalid address.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -426,14 +445,12 @@ Interface Stability 	Committed
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBioctl\fR(2), \fBattributes\fR(5), \fBsd\fR(7D), \fBst\fR(7D)
 .sp
 .LP
 \fIANSI Small Computer System Interface-2 (SCSI-2)\fR
 .SH WARNINGS
-.sp
 .LP
 The \fBuscsi\fR command is very powerful, but somewhat dangerous, and so its
 use is restricted to processes running as root, regardless of the file
@@ -450,7 +467,8 @@ number is used to send the command.
 The \fBuscsi\fR interface is not recommended for very large data transfers
 (typically more than 16MB). If the requested transfer size exceeds the maximum
 transfer size of the DMA engine, it will not be broken up into multiple
-transfers and DMA errors may result.
+transfers and DMA errors may result. The \fBUSCSIMAXXFER\fR ioctl can be used
+to determine the maximum transfer size.
 .sp
 .LP
 The \fBUSCSICMD\fR ioctl associates a \fBstruct uscsi_cmd\fR with a device by

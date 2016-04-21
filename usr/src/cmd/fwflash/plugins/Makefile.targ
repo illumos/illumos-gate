@@ -61,6 +61,9 @@ $(SD-GENERIC_LIB):= SONAME = $(SD-GENERIC_LIB)
 $(HERMON-MELLANOX_LIB):= DYNFLAGS += -R/usr/lib/fwflash/identify 
 $(HERMON-MELLANOX_LIB):= LDLIBS += -L. $(ROOT)/usr/lib/fwflash/identify/hermon.so
 
+$(SD-GENERIC_LIB):= LDLIBS += -L$(ROOT)/usr/lib/scsi -lscsi
+$(SD-GENERIC_LIB):= DYNFLAGS += -R/usr/lib/scsi
+
 
 .KEEP STATE:
 

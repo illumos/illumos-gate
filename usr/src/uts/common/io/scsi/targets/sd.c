@@ -27,6 +27,7 @@
  * Copyright (c) 2012 by Delphix. All rights reserved.
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 /*
  * Copyright 2011 cyril.galibern@opensvc.com
@@ -14175,15 +14176,21 @@ sd_initpkt_for_uscsi(struct buf *bp, struct scsi_pkt **pktpp)
 
 	/*
 	 * Allocate the scsi_pkt for the command.
+	 *
 	 * Note: If PKT_DMA_PARTIAL flag is set, scsi_vhci binds a path
 	 *	 during scsi_init_pkt time and will continue to use the
 	 *	 same path as long as the same scsi_pkt is used without
-	 *	 intervening scsi_dma_free(). Since uscsi command does
+	 *	 intervening scsi_dmafree(). Since uscsi command does
 	 *	 not call scsi_dmafree() before retry failed command, it
 	 *	 is necessary to make sure PKT_DMA_PARTIAL flag is NOT
 	 *	 set such that scsi_vhci can use other available path for
 	 *	 retry. Besides, ucsci command does not allow DMA breakup,
 	 *	 so there is no need to set PKT_DMA_PARTIAL flag.
+	 *
+	 *	 More fundamentally, we can't support breaking up this DMA into
+	 *	 multiple windows on x86. There is, in general, no guarantee
+	 *	 that arbitrary SCSI commands are idempotent, which is required
+	 *	 if we want to use multiple windows for a given command.
 	 */
 	if (uscmd->uscsi_rqlen > SENSE_LENGTH) {
 		pktp = scsi_init_pkt(SD_ADDRESS(un), NULL,
@@ -22408,6 +22415,7 @@ sdioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cred_p, int *rval_p)
 		case MHIOCGRP_REGISTERANDIGNOREKEY:
 		case CDROMCLOSETRAY:
 		case USCSICMD:
+		case USCSIMAXXFER:
 			goto skip_ready_valid;
 		default:
 			break;
@@ -22841,6 +22849,23 @@ skip_ready_valid:
 				goto done_with_assess;
 			else
 				sd_ssc_assessment(ssc, SD_FMT_STANDARD);
+		}
+		break;
+
+	case USCSIMAXXFER:
+		SD_TRACE(SD_LOG_IOCTL, un, "USCSIMAXXFER\n");
+		cr = ddi_get_cred();
+		if ((drv_priv(cred_p) != 0) && (drv_priv(cr) != 0)) {
+			err = EPERM;
+		} else {
+			const uscsi_xfer_t xfer = un->un_max_xfer_size;
+
+			if (ddi_copyout(&xfer, (void *)arg, sizeof (xfer),
+			    flag) != 0) {
+				err = EFAULT;
+			} else {
+				err = 0;
+			}
 		}
 		break;
 

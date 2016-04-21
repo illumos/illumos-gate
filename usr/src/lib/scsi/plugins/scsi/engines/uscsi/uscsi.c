@@ -22,9 +22,9 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2016 Joyent, Inc.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/scsi/impl/uscsi.h>
@@ -111,10 +111,10 @@ xlate_flags(libscsi_hdl_t *hp, uint_t flags, int *uf)
 			f |= USCSI_DIAGNOSE;
 			break;
 		case LIBSCSI_AF_ISOLATE:
-			f = USCSI_ISOLATE;
+			f |= USCSI_ISOLATE;
 			break;
 		case LIBSCSI_AF_RQSENSE:
-			f = USCSI_RQENABLE;
+			f |= USCSI_RQENABLE;
 			break;
 		default:
 			return (libscsi_error(hp, ESCSI_BOGUSFLAGS,
@@ -214,11 +214,43 @@ uscsi_target_name(libscsi_hdl_t *hp, void *private, char *buf, size_t len)
 	(void) snprintf(buf, len, "%s", dp->dev);
 }
 
+static int
+uscsi_max_transfer(libscsi_hdl_t *hp, void *private, size_t *sizep)
+{
+	uscsi_xfer_t xfer;
+	struct uscsi_dev *dp = (struct uscsi_dev *)private;
+
+	if (ioctl(dp->fd, USCSIMAXXFER, &xfer) < 0) {
+		ASSERT(errno != EFAULT);
+		switch (errno) {
+		case EINVAL:
+			return (libscsi_error(hp, ESCSI_BADCMD, "internal "
+			    "uscsi error"));
+		case EPERM:
+			return (libscsi_error(hp, ESCSI_PERM, "insufficient "
+			    "privileges "));
+		case ENOTTY:
+			return (libscsi_error(hp, ESCSI_NOTSUP, "max transfer "
+			    "request not supported on device"));
+		default:
+			return (libscsi_error(hp, ESCSI_SYS, "uscsi ioctl "
+			    "failed: %s", strerror(errno)));
+		}
+	}
+
+	if (xfer > SIZE_MAX)
+		xfer = SIZE_MAX;
+
+	*sizep = (size_t)xfer;
+	return (0);
+}
+
 static const libscsi_engine_ops_t uscsi_ops = {
 	.lseo_open = uscsi_open,
 	.lseo_close = uscsi_close,
 	.lseo_exec = uscsi_exec,
-	.lseo_target_name = uscsi_target_name
+	.lseo_target_name = uscsi_target_name,
+	.lseo_max_transfer = uscsi_max_transfer
 };
 
 static const libscsi_engine_t uscsi_engine = {
