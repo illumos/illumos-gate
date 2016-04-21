@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2015 by Delphix. All rights reserved.
- * Copyright 2015, Joyent Inc. All rights reserved.
+ * Copyright 2016, Joyent Inc.
  */
 
 /*
@@ -3351,6 +3351,7 @@ get_rctls(zlog_t *zlogp, char **bufp, size_t *bufsizep)
 	rctlblk_t *rctlblk = NULL;
 	uint64_t maxlwps;
 	uint64_t maxprocs;
+	int rproc, rlwp;
 
 	*bufp = NULL;
 	*bufsizep = 0;
@@ -3373,17 +3374,26 @@ get_rctls(zlog_t *zlogp, char **bufp, size_t *bufsizep)
 
 	/*
 	 * Allow the administrator to control both the maximum number of
-	 * process table slots and the maximum number of lwps with just the
-	 * max-processes property.  If only the max-processes property is set,
-	 * we add a max-lwps property with a limit derived from max-processes.
+	 * process table slots, and the maximum number of lwps, with a single
+	 * max-processes or max-lwps property. If only the max-processes
+	 * property is set, we add a max-lwps property with a limit derived
+	 * from max-processes. If only the max-lwps property is set, we add a
+	 * max-processes property with the same limit as max-lwps.
 	 */
-	if (zonecfg_get_aliased_rctl(handle, ALIAS_MAXPROCS, &maxprocs)
-	    == Z_OK &&
-	    zonecfg_get_aliased_rctl(handle, ALIAS_MAXLWPS, &maxlwps)
-	    == Z_NO_ENTRY) {
-		if (zonecfg_set_aliased_rctl(handle, ALIAS_MAXLWPS,
+	rproc = zonecfg_get_aliased_rctl(snap_hndl, ALIAS_MAXPROCS, &maxprocs);
+	rlwp = zonecfg_get_aliased_rctl(snap_hndl, ALIAS_MAXLWPS, &maxlwps);
+	if (rproc == Z_OK && rlwp == Z_NO_ENTRY) {
+		if (zonecfg_set_aliased_rctl(snap_hndl, ALIAS_MAXLWPS,
 		    maxprocs * LWPS_PER_PROCESS) != Z_OK) {
 			zerror(zlogp, B_FALSE, "unable to set max-lwps alias");
+			goto out;
+		}
+	} else if (rlwp == Z_OK && rproc == Z_NO_ENTRY) {
+		/* no scaling for max-proc value */
+		if (zonecfg_set_aliased_rctl(snap_hndl, ALIAS_MAXPROCS,
+		    maxlwps) != Z_OK) {
+			zerror(zlogp, B_FALSE,
+			    "unable to set max-processes alias");
 			goto out;
 		}
 	}
