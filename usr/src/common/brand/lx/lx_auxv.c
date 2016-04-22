@@ -37,14 +37,9 @@ lx_auxv_stol(const auxv_t *ap, auxv_t *oap, const lx_elf_data_t *edp)
 		oap->a_un.a_val = edp->ed_phnum;
 		break;
 	case AT_SUN_BRAND_LX_SYSINFO_EHDR:
-		if (edp->ed_vdso != 0) {
-			oap->a_type = AT_SYSINFO_EHDR;
-			oap->a_un.a_val = edp->ed_vdso;
-			return (0);
-		} else {
-			/* No vDSO for i386 */
-			return (1);
-		}
+		oap->a_type = AT_SYSINFO_EHDR;
+		oap->a_un.a_val = ap->a_un.a_val;
+		return (0);
 	case AT_SUN_BRAND_LX_CLKTCK:
 		oap->a_type = AT_CLKTCK;
 		oap->a_un.a_val = ap->a_un.a_val;

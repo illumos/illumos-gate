@@ -14,26 +14,30 @@
 #
 
 ISASRCDIR=.
-TARGET_ARCH=$(MACH64)
+TARGET_ARCH=$(MACH)
 
 include ../Makefile.com
-include $(SRC)/lib/Makefile.lib.64
 
-ASFLAGS += -D__$(MACH64)
+ASFLAGS += -D__$(MACH)
 
-SONAME = linux-vdso.so.1
+SONAME = linux-gate.so.1
 
 #
 # You might ask, why aren't we overriding BUILD.SO in Makefile.com.
-# That's a sad story. The answer is that Makefile.lib.64 includes
-# Makefile.master.64 which redefines BUILD.SO, leaving us in an
-# unfortunate jumble. Therefore we have to redefine it in the
-# lower-level Makefile.
+# See the amd64 Makefile for more answers
 #
 BUILD.SO =	$(LD) -o $@ $(GSHARED) $(DYNFLAGS) $(PICS) $(LDLIBS)
 
 ASSYMDEP_OBJS = lx_vdso.o
 
-CLOBBERFILES	= $(ROOTLIBDIR64)/$(DYNLIB) $(ROOTLIBDIR64)/$(LINTLIB)
+CLOBBERFILES	= $(ROOTLIBDIR)/$(DYNLIB) $(ROOTLIBDIR)/$(LINTLIB)
 
-install: all $(ROOTLIBS64)
+# Set the object entry point for __vsyscall-ers
+entryfix: $(DYNLIB)
+	$(ELFEDIT) -e "ehdr:e_entry \
+	    $$($(ELFEDIT) -re 'sym:st_value -osimple __vsyscall' $(DYNLIB))" \
+	    $(DYNLIB)
+
+all: entryfix
+
+install: all $(ROOTLIBS)

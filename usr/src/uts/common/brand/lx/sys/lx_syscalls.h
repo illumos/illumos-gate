@@ -184,12 +184,13 @@ extern long lx_writev();
 #define	LX_VSYSCALL_SIZE		(uintptr_t)0x1000
 #endif
 
+#endif	/* _KERNEL */
 
 /*
  * System call numbers for revectoring:
  */
 
-#if defined(_LP64)
+#if defined(__amd64)
 #define	LX_SYS_close		3
 #define	LX_SYS_gettimeofday	96
 #define	LX_SYS_time		201
@@ -203,17 +204,26 @@ extern long lx_writev();
 #define	LX_SYS32_clock_gettime	265
 #define	LX_SYS32_io_setup	245
 #define	LX_SYS32_getcpu		318
-#else
+#elif defined(__i386)
 #define	LX_SYS_close		6
 #define	LX_SYS_gettimeofday	78
 #define	LX_SYS_time		13
 #define	LX_SYS_clock_gettime	265
 #define	LX_SYS_io_setup		245
 #define	LX_SYS_getcpu		318
-#endif
+#else
+#error "Architecture not supported"
+#endif /* defined(__amd64) */
 
-
-#endif	/* _KERNEL */
+/*
+ * The current code in the VDSO operates under the expectation that it will be
+ * mapped at a fixed offset from the comm page.  This simplifies the act of
+ * locating said page without any other reference.  The VDSO must fit within
+ * this offset, matching the same value as COMM_PAGE_ALIGN.
+ * See: uts/i86pc/sys/comm_page.h
+ */
+#define	LX_VDSO_SIZE		0x4000
+#define	LX_VDSO_ADDR_MASK	~(LX_VDSO_SIZE - 1)
 
 #ifdef	__cplusplus
 }

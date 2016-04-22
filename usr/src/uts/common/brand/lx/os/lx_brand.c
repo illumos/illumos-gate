@@ -1358,7 +1358,6 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 			led32.ed_entry = (int)pd->l_elf_data.ed_entry;
 			led32.ed_base = (int)pd->l_elf_data.ed_base;
 			led32.ed_ldentry = (int)pd->l_elf_data.ed_ldentry;
-			led32.ed_vdso = 0;
 			mutex_exit(&p->p_lock);
 
 			if (copyout(&led32, (void *)arg1,
@@ -1792,30 +1791,6 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 		return (0);
 	}
 
-	case B_NOTIFY_VDSO_LOC: {
-#if defined(_LP64)
-		if (get_udatamodel() == DATAMODEL_NATIVE) {
-			int i;
-
-			mutex_enter(&p->p_lock);
-			pd = ptolxproc(p);
-			pd->l_elf_data.ed_vdso = arg1;
-			/* overwrite the auxv data too */
-			for (i = 0; i < __KERN_NAUXV_IMPL; i++) {
-				if (p->p_user.u_auxv[i].a_type ==
-				    AT_SUN_BRAND_LX_SYSINFO_EHDR) {
-					p->p_user.u_auxv[i].a_un.a_val = arg1;
-					break;
-				}
-			}
-			mutex_exit(&p->p_lock);
-			return (0);
-		}
-#endif /* defined(_LP64) */
-		/* This is not valid for 32bit processes */
-		return (EINVAL);
-	}
-
 	case B_GET_PERSONALITY: {
 		unsigned int result;
 
@@ -1966,6 +1941,63 @@ extern int elfexec(vnode_t *, execa_t *, uarg_t *, intpdata_t *, int,
 
 extern int elf32exec(struct vnode *, execa_t *, uarg_t *, intpdata_t *, int,
     long *, int, caddr_t, cred_t *, int *);
+
+static uintptr_t
+lx_map_vdso(struct uarg *args, struct cred *cred)
+{
+	int err;
+	char *fpath = LX_VDSO_PATH;
+	vnode_t *vp;
+	vattr_t attr;
+	caddr_t addr;
+
+#if defined(_LP64)
+	if (args->to_model != DATAMODEL_NATIVE) {
+		fpath = LX_VDSO_PATH32;
+	}
+#endif
+
+	/*
+	 * The comm page should have been mapped in already.
+	 */
+	if (args->commpage == NULL) {
+		return (NULL);
+	}
+
+	/*
+	 * Ensure the VDSO library is present and appropriately sized.
+	 * This lookup is started at the zone root to avoid complications for
+	 * processes which have chrooted.  For the specified lookup root to be
+	 * used, the leading slash must be dropped from the path.
+	 */
+	ASSERT(fpath[0] == '/');
+	fpath++;
+	if (lookupnameat(fpath, UIO_SYSSPACE, FOLLOW, NULLVPP, &vp,
+	    curzone->zone_rootvp) != 0) {
+		return (NULL);
+	}
+
+	/*
+	 * The VDSO requires data exposed via the comm page in order to
+	 * function properly.  The VDSO is always mapped in at a fixed known
+	 * offset from the comm page, providing an easy means to locate it.
+	 */
+	addr = (caddr_t)(args->commpage - LX_VDSO_SIZE);
+	attr.va_mask = AT_SIZE;
+	if (VOP_GETATTR(vp, &attr, 0, cred, NULL) != 0 ||
+	    attr.va_size > LX_VDSO_SIZE) {
+		VN_RELE(vp);
+		return (NULL);
+	}
+
+	err = execmap(vp, addr, attr.va_size, 0, 0,
+	    PROT_USER|PROT_READ|PROT_EXEC, 1, 0);
+	VN_RELE(vp);
+	if (err != 0) {
+		return (NULL);
+	}
+	return ((uintptr_t)addr);
+}
 
 /*
  * Exec routine called by elfexec() to load either 32-bit or 64-bit Linux
@@ -2159,6 +2191,12 @@ lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 	 * brand emulation library and its linker.
 	 */
 
+	/*
+	 * After execing the brand library (which should have implicitly mapped
+	 * in the comm page), map the VDSO into the approprate place in the AS.
+	 */
+	lxpd->l_vdso = lx_map_vdso(args, cred);
+
 	bzero(&env, sizeof (env));
 
 	/*
@@ -2347,11 +2385,7 @@ lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 		phdr_auxv[0].a_un.a_val = edp.ed_phdr;
 		phdr_auxv[1].a_un.a_val = ldaddr;
 		phdr_auxv[2].a_un.a_val = hz;
-		/*
-		 * The userspace brand library will map in the vDSO and notify
-		 * the kernel of its location during lx_init.
-		 */
-		phdr_auxv[3].a_un.a_val = 1;
+		phdr_auxv[3].a_un.a_val = lxpd->l_vdso;
 
 		if (copyout(&phdr_auxv, args->auxp_brand,
 		    sizeof (phdr_auxv)) == -1)
@@ -2368,11 +2402,7 @@ lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 		phdr_auxv32[0].a_un.a_val = edp.ed_phdr;
 		phdr_auxv32[1].a_un.a_val = ldaddr;
 		phdr_auxv32[2].a_un.a_val = hz;
-		/*
-		 * Unused on i386 due to lack of vDSO.
-		 * It will be cleaned up during lx_init.
-		 */
-		phdr_auxv32[3].a_un.a_val = 0;
+		phdr_auxv32[3].a_un.a_val = lxpd->l_vdso;
 
 		if (copyout(&phdr_auxv32, args->auxp_brand,
 		    sizeof (phdr_auxv32)) == -1)
