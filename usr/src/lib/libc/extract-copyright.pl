@@ -12,6 +12,7 @@
 
 #
 # Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2016 Josef 'Jeff' Sipek <jeffpc@josefsipek.net>
 #
 
 #
@@ -105,6 +106,9 @@ foreach $a (@ARGV) {
 		push(@FILES, $a);
 	}
 }
+
+# sort files to get a stable ordering to aid wsdiff(1onbld)
+@FILES = sort @FILES;
 
 foreach $a (@FILES) {
 	dofile($a);

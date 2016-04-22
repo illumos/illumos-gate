@@ -23,6 +23,10 @@
 # Use is subject to license terms.
 #
 
+#
+# Copyright (c) 2015 by Delphix. All rights reserved.
+#
+
 LIBRARY= libzfs_jni.a
 VERS= .1
 
@@ -45,7 +49,6 @@ LDLIBS +=	-lc -lnvpair -ldiskmgt -lzfs
 CPPFLAGS +=	$(INCS)
 $(NOT_RELEASE_BUILD) CPPFLAGS += -DDEBUG
 CERRWARN +=	-_gcc=-Wno-switch
-CERRWARN +=	-_gcc=-Wno-uninitialized
 
 SRCDIR =	../common
 $(LINTLIB) := SRCS=	$(SRCDIR)/$(LINTSRC)

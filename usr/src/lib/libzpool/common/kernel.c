@@ -69,10 +69,11 @@ struct proc p0;
  */
 /*ARGSUSED*/
 kthread_t *
-zk_thread_create(void (*func)(), void *arg)
+zk_thread_create(void (*func)(), void *arg, uint64_t len)
 {
 	thread_t tid;
 
+	ASSERT0(len);
 	VERIFY(thr_create(0, 0, (void *(*)(void *))func, arg, THR_DETACHED,
 	    &tid) == 0);
 
