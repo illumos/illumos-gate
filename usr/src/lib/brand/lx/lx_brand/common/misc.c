@@ -172,62 +172,6 @@ lx_reboot(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4)
 }
 
 /*
- * getcwd() - Linux syscall semantics are slightly different; we need to return
- * the length of the pathname copied (+ 1 for the terminating NULL byte.)
- */
-long
-lx_getcwd(uintptr_t p1, uintptr_t p2)
-{
-	char *buf;
-	size_t buflen = (size_t)p2;
-	size_t copylen, local_len;
-	size_t len = 0;
-
-	if ((getcwd((char *)p1, (size_t)p2)) == NULL)
-		return (-errno);
-
-	/*
-	 * We need the length of the pathname getcwd() copied but we never want
-	 * to dereference a Linux pointer for any reason.
-	 *
-	 * Thus, to get the string length we will uucopy() up to copylen
-	 * bytes at a time into a local buffer and will walk each chunk looking
-	 * for the string-terminating NULL byte.
-	 *
-	 * We can use strlen() to find the length of the string in the
-	 * local buffer by delimiting the buffer with a NULL byte in the
-	 * last element that will never be overwritten.
-	 */
-	copylen = min(buflen, MAXPATHLEN + 1);
-	buf = SAFE_ALLOCA(copylen + 1);
-	if (buf == NULL)
-		return (-ENOMEM);
-	buf[copylen] = '\0';
-
-	for (;;) {
-		if (uucopy((char *)p1 + len, buf, copylen) != 0)
-			return (-errno);
-
-		local_len = strlen(buf);
-		len += local_len;
-
-		/*
-		 * If the strlen() is less than copylen, we found the
-		 * real end of the string -- not the NULL byte used to
-		 * delimit the end of our buffer.
-		 */
-		if (local_len != copylen)
-			break;
-
-		/* prepare to check the next chunk of the string */
-		buflen -= copylen;
-		copylen = min(buflen, copylen);
-	}
-
-	return (len + 1);
-}
-
-/*
  * {get,set}groups16() - Handle the conversion between 16-bit Linux gids and
  * 32-bit illumos gids.
  */

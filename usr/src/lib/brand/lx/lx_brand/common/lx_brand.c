@@ -1042,7 +1042,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_truncate,			/*  76: truncate */
 	lx_ftruncate,			/*  77: ftruncate */
 	NULL,				/*  78: getdents */
-	lx_getcwd,			/*  79: getcwd */
+	NULL,				/*  79: getcwd */
 	lx_chdir,			/*  80: chdir */
 	lx_fchdir,			/*  81: fchdir */
 	lx_rename,			/*  82: rename */
@@ -1477,7 +1477,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/* 180: pread64 */
 	NULL,				/* 181: pwrite64 */
 	NULL,				/* 182: chown16 */
-	lx_getcwd,			/* 183: getcwd */
+	NULL,				/* 183: getcwd */
 	lx_capget,			/* 184: capget */
 	lx_capset,			/* 185: capset */
 	lx_sigaltstack,			/* 186: sigaltstack */
