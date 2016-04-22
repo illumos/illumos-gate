@@ -76,7 +76,7 @@ getxva_parse_nvl(xvattr_t *xvap,
 	nvpair_t *pair = NULL;
 	int error;
 
-	while (pair = nvlist_next_nvpair(nvl, pair)) {
+	while ((pair = nvlist_next_nvpair(nvl, pair)) != NULL) {
 		data_type_t type;
 		f_attr_t attr;
 		boolean_t value = B_FALSE;

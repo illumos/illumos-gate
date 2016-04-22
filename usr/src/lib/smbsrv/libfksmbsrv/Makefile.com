@@ -213,7 +213,6 @@ CPPFLAGS += -D_FILE_OFFSET_BITS=64
 # Always want DEBUG here
 CPPFLAGS += -DDEBUG
 
-CERRWARN += -_gcc=-Wno-parentheses
 CERRWARN += -_gcc=-Wno-switch
 
 # not linted

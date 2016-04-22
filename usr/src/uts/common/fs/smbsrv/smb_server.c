@@ -625,7 +625,7 @@ smb_server_start(smb_ioc_start_t *ioc)
 		sv->sv_lmshrd = smb_kshare_door_init(ioc->lmshrd);
 		if (sv->sv_lmshrd == NULL)
 			break;
-		if (rc = smb_kdoor_open(sv, ioc->udoor)) {
+		if ((rc = smb_kdoor_open(sv, ioc->udoor)) != 0) {
 			cmn_err(CE_WARN, "Cannot open smbd door");
 			break;
 		}
@@ -634,7 +634,7 @@ smb_server_start(smb_ioc_start_t *ioc)
 		fksmb_kdoor_open(sv, ioc->udoor_func);
 #endif	/* _KERNEL */
 
-		if (rc = smb_thread_start(&sv->si_thread_timers))
+		if ((rc = smb_thread_start(&sv->si_thread_timers)) != 0)
 			break;
 
 		family = AF_INET;

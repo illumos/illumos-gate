@@ -1218,7 +1218,7 @@ smb_vop_acl_read(vnode_t *vp, acl_t **aclp, int flags, acl_type_t acl_type,
 		return (EINVAL);
 	}
 
-	if (error = VOP_GETSECATTR(vp, &vsecattr, flags, cr, &smb_ct))
+	if ((error = VOP_GETSECATTR(vp, &vsecattr, flags, cr, &smb_ct)) != 0)
 		return (error);
 
 	*aclp = smb_fsacl_from_vsa(&vsecattr, acl_type);
