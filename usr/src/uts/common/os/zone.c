@@ -1486,6 +1486,14 @@ static rctl_ops_t zone_procs_ops = {
 };
 
 /*ARGSUSED*/
+static rctl_qty_t
+zone_shmmax_usage(rctl_t *rctl, struct proc *p)
+{
+	ASSERT(MUTEX_HELD(&p->p_lock));
+	return (p->p_zone->zone_shmmax);
+}
+
+/*ARGSUSED*/
 static int
 zone_shmmax_test(rctl_t *r, proc_t *p, rctl_entity_p_t *e, rctl_val_t *rval,
     rctl_qty_t incr, uint_t flags)
@@ -1501,10 +1509,18 @@ zone_shmmax_test(rctl_t *r, proc_t *p, rctl_entity_p_t *e, rctl_val_t *rval,
 
 static rctl_ops_t zone_shmmax_ops = {
 	rcop_no_action,
-	rcop_no_usage,
+	zone_shmmax_usage,
 	rcop_no_set,
 	zone_shmmax_test
 };
+
+/*ARGSUSED*/
+static rctl_qty_t
+zone_shmmni_usage(rctl_t *rctl, struct proc *p)
+{
+	ASSERT(MUTEX_HELD(&p->p_lock));
+	return (p->p_zone->zone_ipc.ipcq_shmmni);
+}
 
 /*ARGSUSED*/
 static int
@@ -1522,10 +1538,18 @@ zone_shmmni_test(rctl_t *r, proc_t *p, rctl_entity_p_t *e, rctl_val_t *rval,
 
 static rctl_ops_t zone_shmmni_ops = {
 	rcop_no_action,
-	rcop_no_usage,
+	zone_shmmni_usage,
 	rcop_no_set,
 	zone_shmmni_test
 };
+
+/*ARGSUSED*/
+static rctl_qty_t
+zone_semmni_usage(rctl_t *rctl, struct proc *p)
+{
+	ASSERT(MUTEX_HELD(&p->p_lock));
+	return (p->p_zone->zone_ipc.ipcq_semmni);
+}
 
 /*ARGSUSED*/
 static int
@@ -1543,10 +1567,18 @@ zone_semmni_test(rctl_t *r, proc_t *p, rctl_entity_p_t *e, rctl_val_t *rval,
 
 static rctl_ops_t zone_semmni_ops = {
 	rcop_no_action,
-	rcop_no_usage,
+	zone_semmni_usage,
 	rcop_no_set,
 	zone_semmni_test
 };
+
+/*ARGSUSED*/
+static rctl_qty_t
+zone_msgmni_usage(rctl_t *rctl, struct proc *p)
+{
+	ASSERT(MUTEX_HELD(&p->p_lock));
+	return (p->p_zone->zone_ipc.ipcq_msgmni);
+}
 
 /*ARGSUSED*/
 static int
@@ -1564,7 +1596,7 @@ zone_msgmni_test(rctl_t *r, proc_t *p, rctl_entity_p_t *e, rctl_val_t *rval,
 
 static rctl_ops_t zone_msgmni_ops = {
 	rcop_no_action,
-	rcop_no_usage,
+	zone_msgmni_usage,
 	rcop_no_set,
 	zone_msgmni_test
 };
