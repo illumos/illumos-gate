@@ -70,6 +70,7 @@ extern long lx_futex();
 extern long lx_get_robust_list();
 extern long lx_get_thread_area();
 extern long lx_getcpu();
+extern long lx_getcwd();
 extern long lx_getdents_32();
 extern long lx_getdents_64();
 extern long lx_getdents64();

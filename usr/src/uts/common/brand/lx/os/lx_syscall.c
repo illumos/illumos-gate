@@ -799,7 +799,7 @@ lx_sysent_t lx_sysent32[] = {
 	{"pread64",	lx_pread32,		0,		5}, /* 180 */
 	{"pwrite64",	lx_pwrite32,		0,		5}, /* 181 */
 	{"chown16",	lx_chown16,		0,		3}, /* 182 */
-	{"getcwd",	NULL,			0,		2}, /* 183 */
+	{"getcwd",	lx_getcwd,		0,		2}, /* 183 */
 	{"capget",	NULL,			0,		2}, /* 184 */
 	{"capset",	NULL,			0,		2}, /* 185 */
 	{"sigaltstack",	NULL,			0,		2}, /* 186 */
@@ -1066,7 +1066,7 @@ lx_sysent_t lx_sysent64[] = {
 	{"truncate",	NULL,			0,		2}, /* 76 */
 	{"ftruncate",	NULL,			0,		2}, /* 77 */
 	{"getdents",	lx_getdents_64,		0,		3}, /* 78 */
-	{"getcwd",	NULL,			0,		2}, /* 79 */
+	{"getcwd",	lx_getcwd,		0,		2}, /* 79 */
 	{"chdir",	NULL,			0,		1}, /* 80 */
 	{"fchdir",	NULL,			0,		1}, /* 81 */
 	{"rename",	NULL,			0,		2}, /* 82 */

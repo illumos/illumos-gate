@@ -302,6 +302,7 @@ LX_BRAND_OBJS  =		\
 	lx_fallocate.o		\
 	lx_fcntl.o		\
 	lx_futex.o		\
+	lx_getcwd.o		\
 	lx_getdents.o		\
 	lx_getpid.o		\
 	lx_getrandom.o		\
