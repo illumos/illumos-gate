@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2000, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2016, Joyent, Inc.
  */
 
 #include <sys/project.h>
@@ -659,6 +660,14 @@ static rctl_ops_t project_tasks_ops = {
  */
 
 /*ARGSUSED*/
+static rctl_qty_t
+project_shmmax_usage(rctl_t *rctl, struct proc *p)
+{
+	ASSERT(MUTEX_HELD(&p->p_lock));
+	return (p->p_task->tk_proj->kpj_data.kpd_shmmax);
+}
+
+/*ARGSUSED*/
 static int
 project_shmmax_test(struct rctl *rctl, struct proc *p, rctl_entity_p_t *e,
     rctl_val_t *rval, rctl_qty_t inc, uint_t flags)
@@ -675,7 +684,7 @@ project_shmmax_test(struct rctl *rctl, struct proc *p, rctl_entity_p_t *e,
 
 static rctl_ops_t project_shmmax_ops = {
 	rcop_no_action,
-	rcop_no_usage,
+	project_shmmax_usage,
 	rcop_no_set,
 	project_shmmax_test
 };
@@ -683,6 +692,14 @@ static rctl_ops_t project_shmmax_ops = {
 /*
  * project.max-shm-ids resource control support.
  */
+
+/*ARGSUSED*/
+static rctl_qty_t
+project_shmmni_usage(rctl_t *rctl, struct proc *p)
+{
+	ASSERT(MUTEX_HELD(&p->p_lock));
+	return (p->p_task->tk_proj->kpj_data.kpd_ipc.ipcq_shmmni);
+}
 
 /*ARGSUSED*/
 static int
@@ -701,7 +718,7 @@ project_shmmni_test(struct rctl *rctl, struct proc *p, rctl_entity_p_t *e,
 
 static rctl_ops_t project_shmmni_ops = {
 	rcop_no_action,
-	rcop_no_usage,
+	project_shmmni_usage,
 	rcop_no_set,
 	project_shmmni_test
 };
@@ -709,6 +726,14 @@ static rctl_ops_t project_shmmni_ops = {
 /*
  * project.max-sem-ids resource control support.
  */
+
+/*ARGSUSED*/
+static rctl_qty_t
+project_semmni_usage(rctl_t *rctl, struct proc *p)
+{
+	ASSERT(MUTEX_HELD(&p->p_lock));
+	return (p->p_task->tk_proj->kpj_data.kpd_ipc.ipcq_semmni);
+}
 
 /*ARGSUSED*/
 static int
@@ -727,7 +752,7 @@ project_semmni_test(struct rctl *rctl, struct proc *p, rctl_entity_p_t *e,
 
 static rctl_ops_t project_semmni_ops = {
 	rcop_no_action,
-	rcop_no_usage,
+	project_semmni_usage,
 	rcop_no_set,
 	project_semmni_test
 };
@@ -735,6 +760,14 @@ static rctl_ops_t project_semmni_ops = {
 /*
  * project.max-msg-ids resource control support.
  */
+
+/*ARGSUSED*/
+static rctl_qty_t
+project_msgmni_usage(rctl_t *rctl, struct proc *p)
+{
+	ASSERT(MUTEX_HELD(&p->p_lock));
+	return (p->p_task->tk_proj->kpj_data.kpd_ipc.ipcq_msgmni);
+}
 
 /*ARGSUSED*/
 static int
@@ -753,7 +786,7 @@ project_msgmni_test(struct rctl *rctl, struct proc *p, rctl_entity_p_t *e,
 
 static rctl_ops_t project_msgmni_ops = {
 	rcop_no_action,
-	rcop_no_usage,
+	project_msgmni_usage,
 	rcop_no_set,
 	project_msgmni_test
 };
