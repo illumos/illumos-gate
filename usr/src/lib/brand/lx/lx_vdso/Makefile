@@ -10,16 +10,13 @@
 #
 
 #
-# Copyright 2015 Joyent, Inc.
+# Copyright 2016 Joyent, Inc.
 #
 
 include ../../../Makefile.lib
 
-SUBDIRS = tools
+SUBDIRS = tools $(MACH)
 $(BUILD64)SUBDIRS += $(MACH64)
-
-LINT_SUBDIRS = 
-$(BUILD64)LINT_SUBDIRS += $(MACH64)
 
 all :=          TARGET= all
 clean :=        TARGET= clean
@@ -33,6 +30,7 @@ all install clean clobber: $(SUBDIRS)
 
 lint: $(LINT_SUBDIRS)
 
+$(MACH): tools
 $(MACH64): tools
 
 $(SUBDIRS): FRC

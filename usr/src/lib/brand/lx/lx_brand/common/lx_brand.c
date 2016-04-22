@@ -422,29 +422,6 @@ lx_close_fh(FILE *file)
 
 extern int set_l10n_alternate_root(char *path);
 
-#if defined(_LP64)
-static void *
-map_vdso()
-{
-	int fd;
-	mmapobj_result_t	mpp[10]; /* we know the size of our lib */
-	mmapobj_result_t	*smpp = mpp;
-	uint_t			mapnum = 10;
-
-	if ((fd = open("/native/usr/lib/brand/lx/amd64/lx_vdso.so.1",
-	    O_RDONLY)) == -1)
-		lx_err_fatal("couldn't open lx_vdso.so.1");
-
-	if (mmapobj(fd, MMOBJ_INTERPRET, smpp, &mapnum, NULL) == -1)
-		lx_err_fatal("couldn't mmapobj lx_vdso.so.1");
-
-	(void) close(fd);
-
-	/* assume first segment is the base of the mapping */
-	return (smpp->mr_addr);
-}
-#endif
-
 /*
  * Initialize the thread specific data for this thread.
  */
@@ -592,12 +569,8 @@ lx_init(int argc, char *argv[], char *envp[])
 	lx_elf_data_t	edp;
 	lx_brand_registration_t reg;
 	lx_tsd_t	*lxtsd;
-#if defined(_LP64)
-	void		*vdso_hdr;
-#endif
 
 	bzero(&reg, sizeof (reg));
-
 	stack_size = 2 * sysconf(_SC_PAGESIZE);
 
 	/*
@@ -685,18 +658,6 @@ lx_init(int argc, char *argv[], char *envp[])
 
 	if (lx_statfs_init() != 0)
 		lx_err_fatal("failed to setup the statfs translator");
-
-#if defined(_LP64)
-	vdso_hdr = map_vdso();
-	edp.ed_vdso = (uintptr_t)vdso_hdr;
-	/*
-	 * Notify the kernel of this mapping location to keep its
-	 * representation of the auxv consistent with reality.
-	 */
-	(void) syscall(SYS_brand, B_NOTIFY_VDSO_LOC, (void *)vdso_hdr);
-#else
-	edp.ed_vdso = 0;
-#endif
 
 	/*
 	 * Find the aux vector on the stack.

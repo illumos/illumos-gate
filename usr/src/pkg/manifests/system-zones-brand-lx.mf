@@ -130,6 +130,7 @@ file path=usr/lib/brand/lx/lx_boot_zone_redhat mode=0755
 file path=usr/lib/brand/lx/lx_boot_zone_ubuntu mode=0755
 file path=usr/lib/brand/lx/lx_librtld_db.so.1
 file path=usr/lib/brand/lx/lx_support mode=0755
+file path=usr/lib/brand/lx/lx_vdso.so.1 mode=0755
 file path=usr/lib/brand/lx/lxinit mode=0555
 file path=usr/lib/brand/lx/platform.xml mode=0444
 file path=usr/lib/devfsadm/linkmod/SUNW_lx_link_$(ARCH).so group=sys

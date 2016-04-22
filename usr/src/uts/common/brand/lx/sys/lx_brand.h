@@ -59,12 +59,17 @@ extern "C" {
 #define	LX_LIB_PATH32	"/native/usr/lib/lx_brand.so.1"
 #define	LX_LIB_PATH64	"/native/usr/lib/amd64/lx_brand.so.1"
 
+#define	LX_VDSO_PATH32	"/native/usr/lib/brand/lx/lx_vdso.so.1"
+#define	LX_VDSO_PATH64	"/native/usr/lib/brand/lx/amd64/lx_vdso.so.1"
+
 #if defined(_LP64)
 #define	LX_LIB_PATH		LX_LIB_PATH64
 #define	LX_UNAME_MACHINE	LX_UNAME_MACHINE64
+#define	LX_VDSO_PATH		LX_VDSO_PATH64
 #else
 #define	LX_LIB_PATH		LX_LIB_PATH32
 #define	LX_UNAME_MACHINE	LX_UNAME_MACHINE32
+#define	LX_VDSO_PATH		LX_VDSO_PATH32
 #endif
 
 /*
@@ -103,7 +108,7 @@ extern "C" {
 #define	B_SET_NATIVE_STACK	147
 #define	B_SIGEV_THREAD_ID	148
 #define	B_OVERRIDE_KERN_VER	149
-#define	B_NOTIFY_VDSO_LOC	150
+/* formerly B_NOTIFY_VDSO_LOC	150 */
 #define	B_GET_PERSONALITY	151
 
 #ifndef _ASM
@@ -229,7 +234,6 @@ typedef struct lx_elf_data64 {
 	uintptr_t	ed_entry;
 	uintptr_t	ed_base;
 	uintptr_t	ed_ldentry;
-	uintptr_t	ed_vdso;
 } lx_elf_data64_t;
 
 typedef struct lx_elf_data32 {
@@ -239,7 +243,6 @@ typedef struct lx_elf_data32 {
 	uint32_t	ed_entry;
 	uint32_t	ed_base;
 	uint32_t	ed_ldentry;
-	uint32_t	ed_vdso;
 } lx_elf_data32_t;
 
 #if defined(_LP64)
@@ -313,6 +316,9 @@ typedef struct lx_proc_data {
 
 	/* Linux process personality */
 	unsigned int l_personality;
+
+	/* VDSO location */
+	uintptr_t l_vdso;
 } lx_proc_data_t;
 
 #endif	/* _KERNEL */

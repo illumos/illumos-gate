@@ -1568,6 +1568,7 @@ static void
 lxpr_read_pid_maps(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
 	proc_t *p;
+	lx_proc_data_t *lxpd;
 	struct as *as;
 	struct seg *seg;
 	char *buf;
@@ -1579,6 +1580,7 @@ lxpr_read_pid_maps(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 		char prot[5];
 		uintptr_t offset;
 		vnode_t *vp;
+		char *name_override;
 		struct print_data *next;
 	} *print_head = NULL;
 	struct print_data **print_tail = &print_head;
@@ -1593,6 +1595,7 @@ lxpr_read_pid_maps(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	}
 
 	as = p->p_as;
+	lxpd = ptolxproc(p);
 
 	if (as == &kas) {
 		lxpr_unlock(p);
@@ -1637,6 +1640,15 @@ lxpr_read_pid_maps(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 
 		pbuf->offset = SEGOP_GETOFFSET(seg, (caddr_t)pbuf->saddr);
 
+		pbuf->name_override = NULL;
+		if (lxpd != NULL) {
+			if (pbuf->saddr == lxpd->l_vdso) {
+				pbuf->name_override = "[vdso]";
+			} else if (pbuf->saddr == p->p_user.u_commpagep) {
+				pbuf->name_override = "[vvar]";
+			}
+		}
+
 		pbuf->next = NULL;
 		*print_tail = pbuf;
 		print_tail = &pbuf->next;
@@ -1658,7 +1670,9 @@ lxpr_read_pid_maps(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 		ino_t inode = 0;
 
 		*buf = '\0';
-		if (pbuf->vp != NULL) {
+		if (pbuf->name_override != NULL) {
+			(void) strncpy(buf, pbuf->name_override, buflen);
+		} else if (pbuf->vp != NULL) {
 			vattr.va_mask = AT_FSID | AT_NODEID;
 			if (VOP_GETATTR(pbuf->vp, &vattr, 0, CRED(),
 			    NULL) == 0) {

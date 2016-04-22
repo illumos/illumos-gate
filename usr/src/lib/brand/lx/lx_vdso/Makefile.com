@@ -10,14 +10,16 @@
 #
 
 #
-# Copyright 2015 Joyent, Inc.
+# Copyright 2016 Joyent, Inc.
 #
 
 LIBRARY	=	lx_vdso.a
 VERS =		.1
 
-COBJS =		lx_vdso.o
-OBJECTS =	$(COBJS)
+include $(SRC)/lib/commpage/Makefile.shared.com
+
+COBJS =		vdso_main.o vdso_subr.o
+OBJECTS =	$(COBJS) $(COMMPAGE_OBJS)
 
 include ../../../../Makefile.lib
 include ../../Makefile.lx
@@ -31,14 +33,15 @@ LIBNAME =	lx_vdso
 MAPFILES =	../common/mapfile-vers
 MAPOPTS =	$(MAPFILES:%=-M%)
 
-ASOBJS  =	lx_vdso.o
-OBJECTS =	$(ASOBJS)
-
-ASSRCS =	$(ASOBJS:%o=$(ISASRCDIR)/%s)
-SRCS =		$(ASSRCS)
+ASOBJS  =	vdso_subr.o
+COBJS  =	vdso_main.o
+OBJECTS =	$(ASOBJS) $(COBJS) $(COMMPAGE_OBJS)
 
 SRCDIR =	../common
-UTSBASE	=	../../../../../uts
+
+ASSRCS =	$(ASOBJS:%.o=$(ISASRCDIR)/%.s)
+CSRCS =		$(COBJS:%.o=$(SRCDIR)/%.c)
+SRCS =		$(ASSRCS) $(CSRCS)
 
 LIBS =		$(DYNLIB)
 DYNFLAGS +=	$(DYNFLAGS_$(CLASS))
@@ -72,7 +75,11 @@ all: $(LIBS)
 lint: $(LINTLIB) lintcheck
 
 include ../../../../Makefile.targ
+include $(SRC)/lib/commpage/Makefile.shared.targ
 
 pics/%.o: $(ISASRCDIR)/%.s
 	$(COMPILE.s) -o $@ $<
 	$(POST_PROCESS_O)
+
+pics/vdso_main.o := CPPFLAGS += $(COMMPAGE_CPPFLAGS)
+pics/vdso_subr.o := ASFLAGS += -I$(SRC)/uts/common/brand/lx

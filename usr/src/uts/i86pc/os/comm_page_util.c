@@ -39,12 +39,12 @@ comm_page_mapin()
 {
 #if defined(__amd64) && !defined(__xpv)
 	proc_t *p = curproc;
-	caddr_t addr = NULL;
+	caddr_t addr = (caddr_t)COMM_PAGE_ALIGN;
 	size_t len = COMM_PAGE_SIZE;
 	uint_t prot = PROT_USER | PROT_READ;
 	segumap_crargs_t suarg;
 
-	map_addr(&addr, len, (offset_t)0, 1, 0);
+	map_addr(&addr, len, (offset_t)0, 1, MAP_ALIGN);
 	if (addr == NULL || valid_usr_range(addr, len, prot, p->p_as,
 	    p->p_as->a_userlimit) != RANGE_OKAY) {
 		return (NULL);
