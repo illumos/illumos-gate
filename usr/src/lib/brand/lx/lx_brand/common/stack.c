@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*
@@ -71,7 +71,10 @@ lx_stack_prefork(void)
 	 * currently executing thread is duplicated in the child process.  We
 	 * require that the stack list lock be taken before the native fork1()
 	 * or forkx(), and released in both the parent and the child once the
-	 * operation is complete.
+	 * operation is complete. For vfork() the lock must only be released in
+	 * the parent (once it resumes execution) since the child is borrowing
+	 * the parent's thread. The _sigoff/_sigon dance will also only take
+	 * place in the parent.
 	 *
 	 * Holding this mutex prevents the forked child from containing a
 	 * copy-on-write copy of a locked mutex without the thread that would
