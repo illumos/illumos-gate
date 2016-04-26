@@ -80,10 +80,11 @@ static vnode_t *lxsys_lookup_devices_sysnode(lxsys_node_t *, char *);
 static int lxsys_read_static(lxsys_node_t *, lxsys_uiobuf_t *);
 static int lxsys_read_devices_virtual_net(lxsys_node_t *, lxsys_uiobuf_t *);
 static int lxsys_read_devices_zfs_block(lxsys_node_t *, lxsys_uiobuf_t *);
+static int lxsys_read_devices_sysnode(lxsys_node_t *, lxsys_uiobuf_t *);
+
 static int lxsys_readdir_devices_syscpu(lxsys_node_t *, uio_t *, int *);
 static int lxsys_readdir_devices_syscpuinfo(lxsys_node_t *, uio_t *, int *);
 static int lxsys_readdir_devices_sysnode(lxsys_node_t *, uio_t *, int *);
-
 static int lxsys_readdir_static(lxsys_node_t *, uio_t *, int *);
 static int lxsys_readdir_class_netdir(lxsys_node_t *, uio_t *, int *);
 static int lxsys_readdir_devices_virtual_netdir(lxsys_node_t *, uio_t *, int *);
@@ -145,8 +146,6 @@ const fs_operation_def_t lxsys_vnodeops_template[] = {
  * - 0x0b: /sys/devices/system/cpu
  * - 0x0c: /sys/devices/system/cpu/kernel_max
  * - 0x0d: /sys/devices/system/node
- * - 0x0e: /sys/devices/system/node/node0
- * - 0x0f: /sys/devices/system/node/node0/cpulist
  *
  * Dynamic /sys/class/net/<interface> symlinks will use an INSTANCE derived
  * from the corresonding ifindex.
@@ -184,8 +183,6 @@ const fs_operation_def_t lxsys_vnodeops_template[] = {
 #define	LXSYS_INST_DEVICES_SYSCPU		0xb
 #define	LXSYS_INST_DEV_SYSCPU_KMAX		0xc
 #define	LXSYS_INST_DEVICES_SYSNODE		0xd
-#define	LXSYS_INST_DEVICES_SYSNODE0		0xe
-#define	LXSYS_INST_DEV_SYSNODE0_CPULIST		0xf
 
 /*
  * file contents of an lx /sys directory.
@@ -224,10 +221,6 @@ static lxsys_dirent_t dirlist_devices_system[] = {
 	{ LXSYS_INST_DEVICES_SYSNODE,	"node" }
 };
 
-static lxsys_dirent_t dirlist_devices_sysnode[] = {
-	{ LXSYS_INST_DEVICES_SYSNODE0,	"node0" }
-};
-
 #define	LXSYS_ENDP_NET_ADDRESS	1
 #define	LXSYS_ENDP_NET_ADDRLEN	2
 #define	LXSYS_ENDP_NET_FLAGS	3
@@ -237,6 +230,8 @@ static lxsys_dirent_t dirlist_devices_sysnode[] = {
 #define	LXSYS_ENDP_NET_TYPE	7
 
 #define	LXSYS_ENDP_BLOCK_DEVICE	1
+
+#define	LXSYS_ENDP_NODE_CPULIST	1
 
 static lxsys_dirent_t dirlist_devices_virtual_net[] = {
 	{ LXSYS_ENDP_NET_ADDRESS,	"address" },
@@ -250,6 +245,10 @@ static lxsys_dirent_t dirlist_devices_virtual_net[] = {
 
 static lxsys_dirent_t dirlist_devices_zfs_block[] = {
 	{ LXSYS_ENDP_BLOCK_DEVICE,	"device" }
+};
+
+static lxsys_dirent_t dirlist_devices_sysnode[] = {
+	{ LXSYS_ENDP_NODE_CPULIST,	"cpulist" }
 };
 
 #define	SYSDIRLISTSZ(l)	(sizeof (l) / sizeof ((l)[0]))
@@ -309,7 +308,7 @@ static int (*lxsys_read_function[LXSYS_MAXTYPE])() = {
 	lxsys_read_devices_zfs_block,		/* LXSYS_DEV_ZFS	*/
 	NULL,					/* LXSYS_DEV_SYS_CPU	*/
 	NULL,					/* LXSYS_DEV_SYS_CPUINFO */
-	NULL,					/* LXSYS_DEV_SYS_NODE	*/
+	lxsys_read_devices_sysnode,		/* LXSYS_DEV_SYS_NODE	*/
 };
 
 /*
@@ -569,7 +568,7 @@ lxsys_lookup_static(lxsys_node_t *ldp, char *comp)
 			case LXSYS_INST_DEVICES_SYSCPU:
 				node_type = LXSYS_DEV_SYS_CPU;
 				break;
-			case LXSYS_INST_DEVICES_SYSNODE0:
+			case LXSYS_INST_DEVICES_SYSNODE:
 				node_type = LXSYS_DEV_SYS_NODE;
 				break;
 			default:
@@ -811,20 +810,33 @@ lxsys_lookup_devices_sysnode(lxsys_node_t *ldp, char *comp)
 	lxsys_node_t *lnp = NULL;
 
 	if (ldp->lxsys_instance == 0) {
-		/* top-level node listing */
-
-		/* If fixed entry */
-		if (strcmp(comp, "cpulist") == 0) {
-			lnp = lxsys_getnode_static(ldp->lxsys_vnode,
-			    LXSYS_INST_DEV_SYSNODE0_CPULIST);
-			lnp->lxsys_vnode->v_type = VREG;
-			lnp->lxsys_mode = 0444;
-		} else {
-			/* Future dynamic entry added here - none for now */
-		}
-
-		if (lnp != NULL) {
+		/*
+		 * The system is presently represented as a single node,
+		 * regardless of any NUMA topology which exists.
+		 * The instances are offset by 1 to account for the top level
+		 * directory occupying instance 0.
+		 */
+		if (strcmp(comp, "node0") == 0) {
+			lnp = lxsys_getnode(ldp->lxsys_vnode, ldp->lxsys_type,
+			    1, 0);
 			return (lnp->lxsys_vnode);
+		}
+	} else {
+		/* interface-level sub-item listing */
+		int i, size;
+		lxsys_dirent_t *dirent;
+
+		size = SYSDIRLISTSZ(dirlist_devices_sysnode);
+		for (i = 0; i < size; i++) {
+			dirent = &dirlist_devices_sysnode[i];
+			if (strncmp(comp, dirent->d_name, LXSNSIZ) == 0) {
+				lnp = lxsys_getnode(ldp->lxsys_vnode,
+				    ldp->lxsys_type, ldp->lxsys_instance,
+				    dirent->d_idnum);
+				lnp->lxsys_vnode->v_type = VREG;
+				lnp->lxsys_mode = 0444;
+				return (lnp->lxsys_vnode);
+			}
 		}
 	}
 
@@ -917,19 +929,13 @@ lxsys_read_devices_zfs_block(lxsys_node_t *lnp, lxsys_uiobuf_t *luio)
 }
 
 static int
-lxsys_read_static(lxsys_node_t *lnp, lxsys_uiobuf_t *luio)
+lxsys_read_devices_sysnode(lxsys_node_t *lnp, lxsys_uiobuf_t *luio)
 {
-	uint_t inst = lnp->lxsys_instance;
-
-	if (inst == LXSYS_INST_DEV_SYSCPU_KMAX) {
-		lxsys_uiobuf_printf(luio, "%d\n", NCPU);
-		return (0);
-
-	} else if (inst == LXSYS_INST_DEV_SYSNODE0_CPULIST) {
+	if (lnp->lxsys_instance == 1 &&
+	    lnp->lxsys_endpoint == LXSYS_ENDP_NODE_CPULIST) {
 		/* Show the range of CPUs */
 		cpu_t *cp, *cpstart;
-		int pools_enabled;
-		int maxid = -1;
+		int pools_enabled, maxid = -1;
 
 		mutex_enter(&cpu_lock);
 		pools_enabled = pool_pset_enabled();
@@ -949,6 +955,19 @@ lxsys_read_static(lxsys_node_t *lnp, lxsys_uiobuf_t *luio)
 		mutex_exit(&cpu_lock);
 
 		lxsys_uiobuf_printf(luio, "0-%d\n", maxid);
+		return (0);
+	}
+	return (EISDIR);
+
+}
+
+static int
+lxsys_read_static(lxsys_node_t *lnp, lxsys_uiobuf_t *luio)
+{
+	uint_t inst = lnp->lxsys_instance;
+
+	if (inst == LXSYS_INST_DEV_SYSCPU_KMAX) {
+		lxsys_uiobuf_printf(luio, "%d\n", NCPU);
 		return (0);
 	}
 
@@ -1586,50 +1605,57 @@ lxsys_readdir_devices_syscpuinfo(lxsys_node_t *lnp, uio_t *uiop, int *eofp)
 static int
 lxsys_readdir_devices_sysnode(lxsys_node_t *lnp, uio_t *uiop, int *eofp)
 {
-	longlong_t bp[DIRENT64_RECLEN(LXSNSIZ) / sizeof (longlong_t)];
-	dirent64_t *dirent = (dirent64_t *)bp;
-	ssize_t oresid, uresid;
-	int skip, error;
-	int reclen;
+	int error;
 
-	/* Emit "." and ".." entries */
-	oresid = uiop->uio_resid;
-	error = lxsys_readdir_common(lnp, uiop, eofp, NULL, 0);
-	if (error != 0 || *eofp == 0) {
-		return (error);
-	}
+	if (lnp->lxsys_instance == 0) {
+		/* top-level node listing */
+		longlong_t bp[DIRENT64_RECLEN(LXSNSIZ) / sizeof (longlong_t)];
+		dirent64_t *dirent = (dirent64_t *)bp;
+		ssize_t oresid, uresid;
+		int reclen, skip;
 
-	skip = (uiop->uio_offset/LXSYS_SDSIZE) - 2;
+		/* Emit "." and ".." entries */
+		oresid = uiop->uio_resid;
+		error = lxsys_readdir_common(lnp, uiop, eofp, NULL, 0);
+		if (error != 0 || *eofp == 0) {
+			return (error);
+		}
+		skip = (uiop->uio_offset/LXSYS_SDSIZE) - 2;
 
-	/* Fixed entries */
-	if (skip > 0) {
-		skip--;
-	} else {
-		(void) strncpy(dirent->d_name, "cpulist", LXSNSIZ);
+		/* Fixed entries */
+		if (skip > 0) {
+			skip--;
+		} else {
+			(void) strncpy(dirent->d_name, "node0", LXSNSIZ);
 
-		dirent->d_ino = lxsys_inode(LXSYS_STATIC,
-		    LXSYS_INST_DEV_SYSNODE0_CPULIST, 0);
-		reclen = DIRENT64_RECLEN(strlen(dirent->d_name));
+			dirent->d_ino = lxsys_inode(LXSYS_DEV_SYS_NODE,
+			    1, 0);
+			reclen = DIRENT64_RECLEN(strlen(dirent->d_name));
 
-		uresid = uiop->uio_resid;
-		if (reclen > uresid) {
-			if (uresid == oresid) {
-				/* Not enough space for one record */
-				error = EINVAL;
+			uresid = uiop->uio_resid;
+			if (reclen > uresid) {
+				if (uresid == oresid) {
+					/* Not enough space for one record */
+					return (EINVAL);
+				}
+				return (0);
 			}
-			goto done;
+			error = lxsys_dirent_out(dirent, reclen, uiop);
 		}
-		if ((error = lxsys_dirent_out(dirent, reclen, uiop)) != 0) {
-			goto done;
+		/* Indicate EOF */
+		if (error == 0) {
+			*eofp = 1;
 		}
+	} else if (lnp->lxsys_endpoint == 0) {
+		/* node-level sub-item listing */
+		error = lxsys_readdir_subdir(lnp, uiop, eofp,
+		    dirlist_devices_sysnode,
+		    SYSDIRLISTSZ(dirlist_devices_sysnode));
+	} else {
+		/* there shouldn't be subdirs below this */
+		error = ENOTDIR;
 	}
 
-	/* Future dynamic entries should be added here */
-
-	/* Indicate EOF */
-	*eofp = 1;
-
-done:
 	return (error);
 }
 
