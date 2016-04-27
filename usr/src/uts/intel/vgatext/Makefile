@@ -93,7 +93,8 @@ install:	$(INSTALL_DEPS)
 
 # Custom targets and rules
 
-$(OBJS_DIR)/$(VGATEXT_FONT).c:	$(VGATEXT_SRC)/$(VGATEXT_FONT).bdf
+$(OBJS_DIR)/$(VGATEXT_FONT).c:	$(VGATEXT_SRC)/$(VGATEXT_FONT).bdf \
+	$(VGATEXT_SRC)/bdf_to_c.awk
 	$(AWK) -f $(VGATEXT_SRC)/bdf_to_c.awk	\
 		$(VGATEXT_SRC)/$(VGATEXT_FONT).bdf > $@
 
