@@ -258,7 +258,7 @@ typedef enum i40e_itr_index {
  * This defines the error mask that we care about from rx descriptors. Currently
  * we're only concerned with the general errors and oversize errors.
  */
-#define	I40E_RX_ERR_BITS	((1 << I40E_RX_DESC_ERROR_RXE_SHIFT) || \
+#define	I40E_RX_ERR_BITS	((1 << I40E_RX_DESC_ERROR_RXE_SHIFT) | \
 	(1 << I40E_RX_DESC_ERROR_OVERSIZE_SHIFT))
 
 /*
@@ -750,7 +750,7 @@ typedef struct i40e {
 	dev_info_t	*i40e_dip;
 	int		i40e_instance;
 	int		i40e_fm_capabilities;
-	i40e_state_t	i40e_state;
+	uint_t		i40e_state;
 	i40e_attach_state_t i40e_attach_progress;
 	mac_handle_t	i40e_mac_hdl;
 	ddi_periodic_t	i40e_periodic_id;

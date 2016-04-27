@@ -511,7 +511,7 @@ i40e_intr_chip_init(i40e_t *i40e)
 	i40e_intr_io_disable_all(i40e);
 
 	I40E_WRITE_REG(hw, I40E_PFINT_ICR0_ENA, 0);
-	I40E_READ_REG(hw, I40E_PFINT_ICR0);
+	(void) I40E_READ_REG(hw, I40E_PFINT_ICR0);
 
 	/*
 	 * Always enable all of the other-class interrupts to be on their own
@@ -738,6 +738,7 @@ done:
 
 }
 
+/* ARGSUSED */
 uint_t
 i40e_intr_msi(void *arg1, void *arg2)
 {
@@ -746,6 +747,7 @@ i40e_intr_msi(void *arg1, void *arg2)
 	return (i40e_intr_notx(i40e, B_FALSE));
 }
 
+/* ARGSUSED */
 uint_t
 i40e_intr_legacy(void *arg1, void *arg2)
 {

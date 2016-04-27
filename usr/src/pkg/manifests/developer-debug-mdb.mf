@@ -98,6 +98,7 @@ $(i386_ONLY)file path=kernel/kmdb/$(ARCH64)/cpu_ms.AuthenticAMD.15 group=sys \
 file path=kernel/kmdb/$(ARCH64)/crypto group=sys mode=0555
 file path=kernel/kmdb/$(ARCH64)/genunix group=sys mode=0555
 file path=kernel/kmdb/$(ARCH64)/hook group=sys mode=0555
+$(i386_ONLY)file path=kernel/kmdb/$(ARCH64)/i40e group=sys mode=0555
 $(sparc_ONLY)file path=kernel/kmdb/$(ARCH64)/intr group=sys mode=0555
 file path=kernel/kmdb/$(ARCH64)/ip group=sys mode=0555
 file path=kernel/kmdb/$(ARCH64)/ipc group=sys mode=0555
@@ -136,6 +137,7 @@ $(i386_ONLY)file path=kernel/kmdb/cpu_ms.AuthenticAMD.15 group=sys mode=0555
 $(i386_ONLY)file path=kernel/kmdb/crypto group=sys mode=0555
 $(i386_ONLY)file path=kernel/kmdb/genunix group=sys mode=0555
 $(i386_ONLY)file path=kernel/kmdb/hook group=sys mode=0555
+$(i386_ONLY)file path=kernel/kmdb/i40e group=sys mode=0555
 $(i386_ONLY)file path=kernel/kmdb/ip group=sys mode=0555
 $(i386_ONLY)file path=kernel/kmdb/ipc group=sys mode=0555
 $(i386_ONLY)file path=kernel/kmdb/ipp group=sys mode=0555
@@ -216,6 +218,7 @@ $(i386_ONLY)file path=usr/lib/mdb/kvm/$(ARCH64)/cpu_ms.AuthenticAMD.15.so \
 file path=usr/lib/mdb/kvm/$(ARCH64)/crypto.so group=sys mode=0555
 file path=usr/lib/mdb/kvm/$(ARCH64)/genunix.so group=sys mode=0555
 file path=usr/lib/mdb/kvm/$(ARCH64)/hook.so group=sys mode=0555
+$(i386_ONLY)file path=usr/lib/mdb/kvm/$(ARCH64)/i40e.so group=sys mode=0555
 $(sparc_ONLY)file path=usr/lib/mdb/kvm/$(ARCH64)/intr.so group=sys mode=0555
 file path=usr/lib/mdb/kvm/$(ARCH64)/ip.so group=sys mode=0555
 file path=usr/lib/mdb/kvm/$(ARCH64)/ipc.so group=sys mode=0555
@@ -256,6 +259,7 @@ $(i386_ONLY)file path=usr/lib/mdb/kvm/cpu_ms.AuthenticAMD.15.so group=sys \
 $(i386_ONLY)file path=usr/lib/mdb/kvm/crypto.so group=sys mode=0555
 $(i386_ONLY)file path=usr/lib/mdb/kvm/genunix.so group=sys mode=0555
 $(i386_ONLY)file path=usr/lib/mdb/kvm/hook.so group=sys mode=0555
+$(i386_ONLY)file path=usr/lib/mdb/kvm/i40e.so group=sys mode=0555
 $(i386_ONLY)file path=usr/lib/mdb/kvm/ip.so group=sys mode=0555
 $(i386_ONLY)file path=usr/lib/mdb/kvm/ipc.so group=sys mode=0555
 $(i386_ONLY)file path=usr/lib/mdb/kvm/ipp.so group=sys mode=0555

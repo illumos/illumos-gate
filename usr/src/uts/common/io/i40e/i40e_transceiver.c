@@ -1110,6 +1110,7 @@ i40e_rx_recycle(caddr_t arg)
 	i40e_rx_data_t *rxd;
 	i40e_t *i40e;
 
+	/* LINTED: E_BAD_PTR_CAST_ALIGN */
 	rcb = (i40e_rx_control_block_t *)arg;
 	rxd = rcb->rcb_rxd;
 	i40e = rxd->rxd_i40e;
@@ -1682,9 +1683,9 @@ i40e_meoi_get_uint16(mblk_t *mp, off_t off, uint16_t *out)
 static int
 mac_ether_offload_info(mblk_t *mp, mac_ether_offload_info_t *meoi)
 {
-	size_t off, maclen;
+	size_t off;
 	uint16_t ether;
-	uint8_t ipproto, iplen, l4len;
+	uint8_t ipproto, iplen, l4len, maclen;
 
 	bzero(meoi, sizeof (mac_ether_offload_info_t));
 
@@ -1925,7 +1926,8 @@ i40e_tcb_reset(i40e_tx_control_block_t *tcb)
 		(void) ddi_dma_unbind_handle(tcb->tcb_dma_handle);
 		break;
 	case I40E_TX_NONE:
-		panic("trying to free tcb %p with bad type none\n", tcb);
+		/* Cast to pacify lint */
+		panic("trying to free tcb %p with bad type none\n", (void *)tcb);
 	default:
 		panic("unknown i40e tcb type: %d", tcb->tcb_type);
 	}

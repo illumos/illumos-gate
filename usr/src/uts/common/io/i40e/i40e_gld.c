@@ -477,6 +477,7 @@ i40e_rx_ring_intr_disable(mac_intr_handle_t intrh)
 	return (0);
 }
 
+/* ARGSUSED */
 static void
 i40e_fill_tx_ring(void *arg, mac_ring_type_t rtype, const int group_index,
     const int ring_index, mac_ring_info_t *infop, mac_ring_handle_t rh)
@@ -509,6 +510,7 @@ i40e_fill_tx_ring(void *arg, mac_ring_type_t rtype, const int group_index,
 	}
 }
 
+/* ARGSUSED */
 static void
 i40e_fill_rx_ring(void *arg, mac_ring_type_t rtype, const int group_index,
     const int ring_index, mac_ring_info_t *infop, mac_ring_handle_t rh)
@@ -545,6 +547,7 @@ i40e_fill_rx_ring(void *arg, mac_ring_type_t rtype, const int group_index,
 	}
 }
 
+/* ARGSUSED */
 static void
 i40e_fill_rx_group(void *arg, mac_ring_type_t rtype, const int index,
     mac_group_info_t *infop, mac_group_handle_t gh)
@@ -624,6 +627,7 @@ i40e_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 	return (B_TRUE);
 }
 
+/* ARGSUSED */
 static int
 i40e_m_setprop_private(i40e_t *i40e, const char *pr_name, uint_t pr_valsize,
     const void *pr_val)
@@ -724,6 +728,7 @@ i40e_m_getprop_private(i40e_t *i40e, const char *pr_name, uint_t pr_valsize,
  * uint32_t's and instead we size the buffer to be large enough to hold a
  * uint32_t.
  */
+/* ARGSUSED */
 static void
 i40e_m_propinfo_private(i40e_t *i40e, const char *pr_name,
     mac_prop_info_handle_t prh)

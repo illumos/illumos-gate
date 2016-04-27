@@ -655,6 +655,7 @@ i40e_check_dma_handle(ddi_dma_handle_t handle)
 /*
  * Fault service error handling callback function.
  */
+/* ARGSUSED */
 static int
 i40e_fm_error_cb(dev_info_t *dip, ddi_fm_error_t *err, const void *impl_data)
 {
@@ -757,6 +758,7 @@ i40e_get_vsi_id(i40e_t *i40e)
 	uint16_t next = 0;
 	int rc;
 
+	/* LINTED: E_BAD_PTR_CAST_ALIGN */
 	sw_config = (struct i40e_aqc_get_switch_config_resp *)aq_buf;
 	rc = i40e_aq_get_switch_config(hw, sw_config, sizeof (aq_buf), &next,
 	    NULL);
@@ -895,7 +897,8 @@ static boolean_t
 i40e_get_available_resources(i40e_t *i40e)
 {
 	dev_info_t *parent;
-	uint_t bus, device, func, nregs;
+	uint16_t bus, device, func;
+	uint_t nregs;
 	int *regs, i;
 	i40e_device_t *idp;
 	i40e_hw_t *hw = &i40e->i40e_hw_space;
@@ -1144,6 +1147,7 @@ i40e_alloc_trqpairs(i40e_t *i40e)
  * However, at the moment, we cap all of these resources as we only support a
  * single receive ring and a single group.
  */
+/* ARGSUSED */
 static void
 i40e_hw_to_instance(i40e_t *i40e, i40e_hw_t *hw)
 {
@@ -1260,9 +1264,15 @@ i40e_common_code_init(i40e_t *i40e, i40e_hw_t *hw)
 		return (B_FALSE);
 	}
 
-	i40e_aq_stop_lldp(hw, TRUE, NULL);
+	(void) i40e_aq_stop_lldp(hw, TRUE, NULL);
 
-	i40e_get_mac_addr(hw, hw->mac.addr);
+	rc = i40e_get_mac_addr(hw, hw->mac.addr);
+	if (rc != I40E_SUCCESS) {
+		i40e_error(i40e, "failed to retrieve hardware mac address: %d",
+		    rc);
+		return (B_FALSE);
+	}
+
 	rc = i40e_validate_mac_addr(hw->mac.addr);
 	if (rc != 0) {
 		i40e_error(i40e, "failed to validate internal mac address: "
@@ -1270,7 +1280,12 @@ i40e_common_code_init(i40e_t *i40e, i40e_hw_t *hw)
 		return (B_FALSE);
 	}
 	bcopy(hw->mac.addr, hw->mac.perm_addr, ETHERADDRL);
-	i40e_get_port_mac_addr(hw, hw->mac.port_addr);
+	if ((rc = i40e_get_port_mac_addr(hw, hw->mac.port_addr)) !=
+	    I40E_SUCCESS) {
+		i40e_error(i40e, "failed to retrieve port mac address: %d",
+		    rc);
+		return (B_FALSE);
+	}
 
 	/*
 	 * We need to obtain the Virtual Station ID (VSI) before we can
@@ -1778,8 +1793,9 @@ i40e_add_intr_handlers(i40e_t *i40e)
 		}
 		break;
 	default:
-		panic("i40e_intr_type %p contains an unknown type: %d", i40e,
-		    i40e->i40e_intr_type);
+		/* Cast to pacify lint */
+		panic("i40e_intr_type %p contains an unknown type: %d",
+		    (void *)i40e, i40e->i40e_intr_type);
 	}
 
 	return (B_TRUE);
@@ -1814,7 +1830,7 @@ i40e_get_hw_state(i40e_t *i40e, i40e_hw_t *hw)
 
 	ASSERT(MUTEX_HELD(&i40e->i40e_general_lock));
 
-	i40e_aq_get_link_info(hw, TRUE, NULL, NULL);
+	(void) i40e_aq_get_link_info(hw, TRUE, NULL, NULL);
 	i40e_link_check(i40e);
 
 	/*
@@ -1861,6 +1877,7 @@ i40e_get_hw_state(i40e_t *i40e, i40e_hw_t *hw)
  * implementing this yet, we're keeping this around for when we add reset
  * capabilities, so this isn't forgotten.
  */
+/* ARGSUSED */
 static void
 i40e_init_macaddrs(i40e_t *i40e, i40e_hw_t *hw)
 {
@@ -1890,7 +1907,7 @@ i40e_config_vsi(i40e_t *i40e, i40e_hw_t *hw)
 	 * Set the queue and traffic class bits.  Keep it simple for now.
 	 */
 	context.info.valid_sections = I40E_AQ_VSI_PROP_QUEUE_MAP_VALID;
-	context.info.mapping_flags |= I40E_AQ_VSI_QUE_MAP_CONTIG;
+	context.info.mapping_flags = I40E_AQ_VSI_QUE_MAP_CONTIG;
 	context.info.queue_mapping[0] = I40E_ASSIGN_ALL_QUEUES;
 	context.info.tc_mapping[0] = I40E_TRAFFIC_CLASS_NO_QUEUES;
 

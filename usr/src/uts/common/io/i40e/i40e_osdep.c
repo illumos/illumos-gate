@@ -21,6 +21,7 @@
 
 #include <sys/dtrace.h>
 
+/* ARGSUSED */
 i40e_status
 i40e_allocate_virt_mem(struct i40e_hw *hw, struct i40e_virt_mem *mem, u32 size)
 {
@@ -29,6 +30,7 @@ i40e_allocate_virt_mem(struct i40e_hw *hw, struct i40e_virt_mem *mem, u32 size)
 	return (I40E_SUCCESS);
 }
 
+/* ARGSUSED */
 i40e_status
 i40e_free_virt_mem(struct i40e_hw *hw, struct i40e_virt_mem *mem)
 {
@@ -37,6 +39,7 @@ i40e_free_virt_mem(struct i40e_hw *hw, struct i40e_virt_mem *mem)
 	return (I40E_SUCCESS);
 }
 
+/* ARGSUSED */
 i40e_status
 i40e_allocate_dma_mem(struct i40e_hw *hw, struct i40e_dma_mem *mem,
     enum i40e_memory_type type, u64 size, u32 alignment)
@@ -119,11 +122,17 @@ i40e_allocate_dma_mem(struct i40e_hw *hw, struct i40e_dma_mem *mem,
 
 	ASSERT(cookie_num == 1);
 	mem->pa = cookie.dmac_laddress;
-	mem->size = size;
+	/*
+	 * Lint doesn't like this because the common code gives us a uint64_t as
+	 * input, but the common code then asks us to assign it to a size_t. So
+	 * lint's right, but in this case there isn't much we can do.
+	 */
+	mem->size = (size_t)size;
 
 	return (I40E_SUCCESS);
 }
 
+/* ARGSUSED */
 i40e_status
 i40e_free_dma_mem(struct i40e_hw *hw, struct i40e_dma_mem *mem)
 {
@@ -212,6 +221,7 @@ i40e_set_hw_bus_info(struct i40e_hw *hw)
 	return (B_TRUE);
 }
 
+/* ARGSUSED */
 void
 i40e_debug(void *hw, u32 mask, char *fmt, ...)
 {
@@ -219,7 +229,7 @@ i40e_debug(void *hw, u32 mask, char *fmt, ...)
 	va_list args;
 
 	va_start(args, fmt);
-	vsnprintf(buf, sizeof (buf), fmt, args);
+	(void) vsnprintf(buf, sizeof (buf), fmt, args);
 	va_end(args);
 
 	DTRACE_PROBE2(i40e__debug, uint32_t, mask, char *, buf);

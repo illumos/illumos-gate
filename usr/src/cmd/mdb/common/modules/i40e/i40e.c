@@ -43,6 +43,7 @@ static const char *i40e_switch_rsrc_names[] = {
 /*
  * i40e mdb dcmds
  */
+/* ARGSUSED */
 static int
 i40e_switch_rsrcs_dcmd(uintptr_t addr, uint_t flags, int argc,
     const mdb_arg_t *argv)
