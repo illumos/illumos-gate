@@ -1080,6 +1080,7 @@ lx_cmsg_try_ucred(sonode_t *so, struct nmsghdr *msg, socklen_t origlen)
 	lx_socket_aux_data_t *sad;
 	struct cmsghdr *cmsg = NULL;
 	int msgsize;
+	cred_t *cred;
 
 	if (origlen == 0) {
 		return (0);
@@ -1091,7 +1092,15 @@ lx_cmsg_try_ucred(sonode_t *so, struct nmsghdr *msg, socklen_t origlen)
 	}
 	mutex_exit(&sad->lxsad_lock);
 
-	msgsize = ucredminsize(so->so_peercred) + sizeof (struct cmsghdr);
+	mutex_enter(&so->so_lock);
+	if (so->so_peercred == NULL) {
+		mutex_exit(&so->so_lock);
+		return (0);
+	}
+	crhold(cred = so->so_peercred);
+	mutex_exit(&so->so_lock);
+
+	msgsize = ucredminsize(cred) + sizeof (struct cmsghdr);
 	if (msg->msg_control == NULL) {
 		msg->msg_controllen = msgsize;
 		msg->msg_control = cmsg = kmem_zalloc(msgsize, KM_SLEEP);
@@ -1115,6 +1124,7 @@ lx_cmsg_try_ucred(sonode_t *so, struct nmsghdr *msg, socklen_t origlen)
 				 * being attached anyways, there is no need for
 				 * us to do it manually
 				 */
+				crfree(cred);
 				return (0);
 			}
 			cmsg = CMSG_NEXT(cmsg);
@@ -1126,6 +1136,7 @@ lx_cmsg_try_ucred(sonode_t *so, struct nmsghdr *msg, socklen_t origlen)
 
 			if (newsize < msg->msg_controllen) {
 				/* size overflow, bail */
+				crfree(cred);
 				return (-1);
 			}
 			newbuf = kmem_alloc(newsize, KM_SLEEP);
@@ -1141,8 +1152,8 @@ lx_cmsg_try_ucred(sonode_t *so, struct nmsghdr *msg, socklen_t origlen)
 	cmsg->cmsg_level = SOL_SOCKET;
 	cmsg->cmsg_type = SCM_UCRED;
 	cmsg->cmsg_len = msgsize;
-	(void) cred2ucred(so->so_peercred, so->so_cpid, CMSG_CONTENT(cmsg),
-	    CRED());
+	(void) cred2ucred(cred, so->so_cpid, CMSG_CONTENT(cmsg), CRED());
+	crfree(cred);
 	return (0);
 }
 
