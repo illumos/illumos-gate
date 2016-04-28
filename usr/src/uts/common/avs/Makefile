@@ -36,13 +36,14 @@ AVS_SUBDIRS = ncall \
 # install rules
 install_h:= TARGET= install_h
 check:=	    TARGET= check
+clean:=     TARGET= clean
 clobber:=   TARGET= clobber
 
 # standards checking rules
 
 install_h check: $(AVS_SUBDIRS)
 
-clobber: ns/rdc
+clean clobber: ns/rdc
 
 $(AVS_SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
