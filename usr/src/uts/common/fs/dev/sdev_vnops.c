@@ -22,7 +22,7 @@
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
- * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ * Copyright 2016, Joyent, Inc.
  */
 
 /*
@@ -864,6 +864,9 @@ sdev_remove(struct vnode *dvp, char *nm, struct cred *cred,
 		}
 	}
 
+	if (error == 0)
+		i_ddi_di_cache_invalidate();
+
 	return (error);
 }
 
@@ -1188,6 +1191,7 @@ sdev_symlink(struct vnode *dvp, char *lnm, struct vattr *tva,
 	sdev_update_timestamps(dvp, kcred, AT_MTIME|AT_ATIME);
 	if (SDEV_IS_GLOBAL(parent))
 		atomic_inc_ulong(&parent->sdev_gdir_gen);
+	i_ddi_di_cache_invalidate();
 
 	/* wake up other threads blocked on looking up this node */
 	mutex_enter(&self->sdev_lookup_lock);
@@ -1260,6 +1264,7 @@ sdev_mkdir(struct vnode *dvp, char *nm, struct vattr *va, struct vnode **vpp,
 	sdev_update_timestamps(dvp, kcred, AT_MTIME|AT_ATIME);
 	if (SDEV_IS_GLOBAL(parent))
 		atomic_inc_ulong(&parent->sdev_gdir_gen);
+	i_ddi_di_cache_invalidate();
 
 	/* wake up other threads blocked on looking up this node */
 	mutex_enter(&self->sdev_lookup_lock);
@@ -1374,6 +1379,9 @@ sdev_rmdir(struct vnode *dvp, char *nm, struct vnode *cdir, struct cred *cred,
 			error = 0;
 
 	}
+
+	if (error == 0)
+		i_ddi_di_cache_invalidate();
 
 	return (error);
 }
