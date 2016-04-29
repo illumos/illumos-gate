@@ -38,6 +38,8 @@ LINTTAGS	+= -erroff=E_STATIC_UNUSED
 
 LDFLAGS		+= -dy -N misc/mac
 
+MAPFILES	+= ddi mac
+
 .KEEP_STATE:
 
 def:		$(DEF_DEPS)
@@ -56,4 +58,5 @@ clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 
+include $(UTSBASE)/Makefile.mapfile
 include $(UTSBASE)/intel/Makefile.targ

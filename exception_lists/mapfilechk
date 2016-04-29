@@ -46,3 +46,5 @@ usr/src/cmd/perl/*
 usr/src/cmd/mklocale/*
 usr/src/tools/onbld/Checks/Mapfile*
 usr/src/tools/scripts/*
+usr/src/uts/common/mapfiles/dtrace.mapfile.awk
+usr/src/uts/Makefile.mapfile

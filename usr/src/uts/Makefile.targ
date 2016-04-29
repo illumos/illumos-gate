@@ -51,7 +51,7 @@ $(OBJECTS): $(INLINES)
 #	ELFSIGN_MOD is defined in the individual KCF plug-in modules Makefiles,
 #	and will sign the ELF objects using elfsign(1).
 #
-$(BINARY):		$(OBJECTS)
+$(BINARY):		$(OBJECTS) $(DTRACE_MAPFILE)
 	$(LD) -r $(LDFLAGS) -o $@ $(OBJECTS)
 	$(CTFMERGE_UNIQUIFY_AGAINST_GENUNIX)
 	$(POST_PROCESS)
