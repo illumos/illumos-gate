@@ -23,6 +23,7 @@
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2015 Joyent, Inc.
+ * Copyright (c) 2015 by Delphix. All rights reserved.
  */
 /*
  * Copyright (c) 2010, Intel Corporation.
@@ -404,9 +405,9 @@ static pgcnt_t kphysm_init(page_t *, pgcnt_t);
  *		|---       GDT       ---|- GDT page (GDT_VA)
  *		|---    debug info   ---|- debug info (DEBUG_INFO_VA)
  *		|			|
- * 		|   page_t structures	|
- * 		|   memsegs, memlists, 	|
- * 		|   page hash, etc.	|
+ *		|   page_t structures	|
+ *		|   memsegs, memlists,	|
+ *		|   page hash, etc.	|
  * ---	       -|-----------------------|- ekernelheap, valloc_base (floating)
  *		|			|  (segkp is just an arena in the heap)
  *		|			|
@@ -414,7 +415,7 @@ static pgcnt_t kphysm_init(page_t *, pgcnt_t);
  *		|			|
  *		|			|
  * ---         -|-----------------------|- kernelheap (floating)
- * 		|        Segkmap	|
+ *		|        Segkmap	|
  * 0xC3002000  -|-----------------------|- segmap_start (floating)
  *		|	Red Zone	|
  * 0xC3000000  -|-----------------------|- kernelbase / userlimit (floating)
@@ -438,7 +439,7 @@ static pgcnt_t kphysm_init(page_t *, pgcnt_t);
  * 0xFFFFFFFF.FFC00000  |-----------------------|- ARGSBASE
  *			|	debugger (?)	|
  * 0xFFFFFFFF.FF800000  |-----------------------|- SEGDEBUGBASE
- *			|      unused    	|
+ *			|      unused		|
  *			+-----------------------+
  *			|      Kernel Data	|
  * 0xFFFFFFFF.FBC00000  |-----------------------|
@@ -447,7 +448,7 @@ static pgcnt_t kphysm_init(page_t *, pgcnt_t);
  *			|---       GDT       ---|- GDT page (GDT_VA)
  *			|---    debug info   ---|- debug info (DEBUG_INFO_VA)
  *			|			|
- * 			|      Core heap	| (used for loadable modules)
+ *			|      Core heap	| (used for loadable modules)
  * 0xFFFFFFFF.C0000000  |-----------------------|- core_base / ekernelheap
  *			|	 Kernel		|
  *			|	  heap		|
@@ -460,23 +461,23 @@ static pgcnt_t kphysm_init(page_t *, pgcnt_t);
  * 0xFFFFFXXX.XXX00000  |-----------------------|- segzio_base (floating)
  *			|	  segkp		|
  * ---                  |-----------------------|- segkp_base (floating)
- * 			|   page_t structures	|  valloc_base + valloc_sz
- * 			|   memsegs, memlists, 	|
- * 			|   page hash, etc.	|
- * 0xFFFFFF00.00000000  |-----------------------|- valloc_base (lower if > 1TB)
+ *			|   page_t structures	|  valloc_base + valloc_sz
+ *			|   memsegs, memlists,	|
+ *			|   page hash, etc.	|
+ * 0xFFFFFF00.00000000  |-----------------------|- valloc_base (lower if >256GB)
  *			|	 segkpm		|
  * 0xFFFFFE00.00000000  |-----------------------|
  *			|	Red Zone	|
- * 0xFFFFFD80.00000000  |-----------------------|- KERNELBASE (lower if > 1TB)
+ * 0xFFFFFD80.00000000  |-----------------------|- KERNELBASE (lower if >256GB)
  *			|     User stack	|- User space memory
- * 			|			|
- * 			| shared objects, etc	|	(grows downwards)
+ *			|			|
+ *			| shared objects, etc	|	(grows downwards)
  *			:			:
- * 			|			|
+ *			|			|
  * 0xFFFF8000.00000000  |-----------------------|
- * 			|			|
- * 			| VA Hole / unused	|
- * 			|			|
+ *			|			|
+ *			| VA Hole / unused	|
+ *			|			|
  * 0x00008000.00000000  |-----------------------|
  *			|			|
  *			|			|
@@ -1243,20 +1244,45 @@ startup_memlist(void)
 
 	/*
 	 * The default values of VALLOC_BASE and SEGKPM_BASE should work
-	 * for values of physmax up to 1 Terabyte. They need adjusting when
-	 * memory is at addresses above 1 TB. When adjusted, segkpm_base must
+	 * for values of physmax up to 256GB (1/4 TB). They need adjusting when
+	 * memory is at addresses above 256GB. When adjusted, segkpm_base must
 	 * be aligned on KERNEL_REDZONE_SIZE boundary (span of top level pte).
+	 *
+	 * In the general case (>256GB), we use (4 * physmem) for the
+	 * kernel's virtual addresses, which is divided approximately
+	 * as follows:
+	 *  - 1 * physmem for segkpm
+	 *  - 1.5 * physmem for segzio
+	 *  - 1.5 * physmem for heap
+	 * Total: 4.0 * physmem
+	 *
+	 * Note that the segzio and heap sizes are more than physmem so that
+	 * VA fragmentation does not prevent either of them from being
+	 * able to use nearly all of physmem.  The value of 1.5x is determined
+	 * experimentally and may need to change if the workload changes.
 	 */
-	if (physmax + 1 > mmu_btop(TERABYTE) ||
-	    plat_dr_physmax > mmu_btop(TERABYTE)) {
+	if (physmax + 1 > mmu_btop(TERABYTE / 4) ||
+	    plat_dr_physmax > mmu_btop(TERABYTE / 4)) {
 		uint64_t kpm_resv_amount = mmu_ptob(physmax + 1);
 
 		if (kpm_resv_amount < mmu_ptob(plat_dr_physmax)) {
 			kpm_resv_amount = mmu_ptob(plat_dr_physmax);
 		}
 
-		segkpm_base = -(P2ROUNDUP((2 * kpm_resv_amount),
-		    KERNEL_REDZONE_SIZE));	/* down from top VA */
+		/*
+		 * This is what actually controls the KVA : UVA split.
+		 * The kernel uses high VA, and this is lowering the
+		 * boundary, thus increasing the amount of VA for the kernel.
+		 * This gives the kernel 4 * (amount of physical memory) VA.
+		 *
+		 * The maximum VA is UINT64_MAX and we are using
+		 * 64-bit 2's complement math, so e.g. if you have 512GB
+		 * of memory, segkpm_base = -(4 * 512GB) == -2TB ==
+		 * UINT64_MAX - 2TB (approximately).  So the kernel's
+		 * VA is [UINT64_MAX-2TB to UINT64_MAX].
+		 */
+		segkpm_base = -(P2ROUNDUP((4 * kpm_resv_amount),
+		    KERNEL_REDZONE_SIZE));
 
 		/* make sure we leave some space for user apps above hole */
 		segkpm_base = MAX(segkpm_base, AMD64_VA_HOLE_END + TERABYTE);
@@ -1906,8 +1932,9 @@ layout_kernel_va(void)
 	 * segment (from kernel heap) so that we can easily tell not to
 	 * include it in kernel crash dumps on 64 bit kernels. The trick is
 	 * to give it lots of VA, but not constrain the kernel heap.
-	 * We scale the size of segzio linearly with physmem up to
-	 * SEGZIOMAXSIZE. Above that amount it scales at 50% of physmem.
+	 * We can use 1.5x physmem for segzio, leaving approximately
+	 * another 1.5x physmem for heap.  See also the comment in
+	 * startup_memlist().
 	 */
 	segzio_base = segkp_base + mmu_ptob(segkpsize);
 	if (segzio_fromheap) {
@@ -1915,15 +1942,10 @@ layout_kernel_va(void)
 	} else {
 		size_t physmem_size = mmu_ptob(physmem);
 		size_t size = (segziosize == 0) ?
-		    physmem_size : mmu_ptob(segziosize);
+		    physmem_size * 3 / 2 : mmu_ptob(segziosize);
 
 		if (size < SEGZIOMINSIZE)
 			size = SEGZIOMINSIZE;
-		if (size > SEGZIOMAXSIZE) {
-			size = SEGZIOMAXSIZE;
-			if (physmem_size > size)
-				size += (physmem_size - size) / 2;
-		}
 		segziosize = mmu_btop(ROUND_UP_LPAGE(size));
 	}
 	PRM_DEBUG(segziosize);
