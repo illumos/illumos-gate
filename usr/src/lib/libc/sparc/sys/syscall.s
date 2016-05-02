@@ -28,8 +28,8 @@
 /*	  All Rights Reserved	*/
 
 /*
- * C library -- int syscall(int sysnum, ...);
- * C library -- int __systemcall(sysret_t *, int sysnum, ...);
+ * C library -- long syscall(int sysnum, ...);
+ * C library -- long __systemcall(sysret_t *, int sysnum, ...);
  *
  * Interpret a given system call
  *

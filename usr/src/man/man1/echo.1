@@ -10,7 +10,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ECHO 1 "Apr 8, 2008"
+.TH ECHO 1 "Apr 14, 2016"
 .SH NAME
 echo \- echo arguments
 .SH SYNOPSIS
@@ -20,7 +20,6 @@ echo \- echo arguments
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBecho\fR utility writes its arguments, separated by BLANKs and terminated
 by a NEWLINE, to the standard output. If there are no arguments, only the
@@ -38,16 +37,13 @@ full pathname. See \fBshell_builtins\fR(1). \fBsh\fR's \fBecho\fR, \fBksh\fR's
 \fBecho\fR, \fBksh93\fR's \fBecho\fR, and \fB/usr/bin/echo\fR understand the
 back-slashed escape characters, except that \fBsh\fR's \fBecho\fR does not
 understand \fB\ea\fR as the alert character. In addition, \fBksh\fR's and
-\fBksh93\fR's \fBecho\fR does not have an \fB-n\fR option. \fBsh\fR's
-\fBecho\fR and \fB/usr/bin/echo\fR have an \fB-n\fR option if the \fBSYSV3\fR
-environment variable is set (see \fBENVIRONMENT VARIABLES\fR below).
+\fBksh93\fR's \fBecho\fR does not have an \fB-n\fR option.
 \fBcsh\fR's \fBecho\fR and \fB/usr/ucb/echo\fR, on the other hand, have an
 \fB-n\fR option, but do not understand the back-slashed escape characters.
 \fBsh\fR and \fBksh\fR determine whether \fB/usr/ucb/echo\fR is found first in
 the \fBPATH\fR and, if so, they adapt the behavior of the \fBecho\fR builtin to
 match \fB/usr/ucb/echo\fR.
 .SH OPERANDS
-.sp
 .LP
 The following operand is supported:
 .sp
@@ -154,7 +150,6 @@ Where \fIn\fR is the 8-bit character whose \fBASCII\fR code is the 1-, 2- or
 .RE
 
 .SH USAGE
-.sp
 .LP
 Portable applications should not use \fB-n\fR (as the first argument) or escape
 sequences.
@@ -289,25 +284,12 @@ example% \fB/usr/ucb/echo -n "$USER's current directory is $PWD"\fR
 .sp
 
 .SH ENVIRONMENT VARIABLES
-.sp
 .LP
 See \fBenviron\fR(5) for descriptions of the following environment variables
 that affect the execution of \fBecho\fR: \fBLANG\fR, \fBLC_ALL\fR,
 \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
-.sp
-.ne 2
-.na
-\fB\fBSYSV3\fR\fR
-.ad
-.RS 9n
-This environment variable is used to provide compatibility with INTERACTIVE
-UNIX System and SCO UNIX installation scripts. It is intended for compatibility
-only and should not be used in new scripts. This variable is applicable only
-for Solaris x86 platforms, not Solaris SPARC systems.
-.RE
 
 .SH EXIT STATUS
-.sp
 .LP
 The following error values are returned:
 .sp
@@ -329,7 +311,6 @@ An error occurred.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -349,13 +330,11 @@ Standard	See \fBstandards\fR(5).
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBksh93\fR(1), \fBprintf\fR(1), \fBshell_builtins\fR(1), \fBtr\fR(1),
 \fBwc\fR(1), \fBecho\fR(1B), \fBascii\fR(5), \fBattributes\fR(5),
 \fBenviron\fR(5), \fBstandards\fR(5)
 .SH NOTES
-.sp
 .LP
 When representing an 8-bit character by using the escape convention
 \fB\e0\fR\fIn\fR, the \fIn\fR must \fBalways\fR be preceded by the digit zero

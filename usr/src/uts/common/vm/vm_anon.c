@@ -793,6 +793,7 @@ anon_resvmem(size_t size, boolean_t takemem, zone_t *zone, int tryhard)
 		mutex_enter(&p->p_lock);
 		if (rctl_incr_swap(p, zone, ptob(npages)) != 0) {
 			mutex_exit(&p->p_lock);
+			atomic_add_64(&zone->zone_anon_alloc_fail, 1);
 			return (0);
 		}
 		mutex_exit(&p->p_lock);

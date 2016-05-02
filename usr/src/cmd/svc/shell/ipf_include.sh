@@ -458,7 +458,7 @@ append_new_nat_rules()
 #
 tuple_get_port()
 {
-	port_str=`echo "$1" | sed -e 's/ //g; s/.*://' 2>/dev/null`
+	port_str=`echo "$1" | sed -e 's/ //g; s/\\\//g; s/.*://' 2>/dev/null`
 	[ -z "$port_str" ] && return 1
 
 	echo $port_str | grep "-" >/dev/null
@@ -543,6 +543,22 @@ custom_set_symlink()
 
 	rm $IPFILCONF >/dev/null 2>&1
 	ln -s $1 $IPFILCONF >/dev/null 2>&1
+}
+
+#
+# Make IP6FILCONF, /var/tmp/ipf/ipf6.conf, a symlink to the input file argument.
+#
+custom_set_symlink_6()
+{
+	#
+	# Nothing to do if the input file doesn't exist.
+	#
+	[ ! -f "$1" ] && return 0
+
+	check_ipf_dir || return 1
+
+	rm $IP6FILCONF >/dev/null 2>&1
+	ln -s $1 $IP6FILCONF >/dev/null 2>&1
 }
 
 #
@@ -883,7 +899,7 @@ create_global_rules()
 		file6=`global_get_prop_value $FW_CONFIG_DEF_PG $CUSTOM_FILE_6_PROP`
 
 		[ -n "$file" ] && custom_set_symlink $file
-		[ -n "$file6" ] && custom_set_symlink $file6
+		[ -n "$file6" ] && custom_set_symlink_6 $file6
 
 		return 0
 	fi

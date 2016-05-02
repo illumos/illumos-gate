@@ -214,7 +214,7 @@ case "$1" in
 		fi
 
 		ipf -D
-		[ -n "$ipfid" ] && modunload -i $ipfid
+		[ "$zone" = "global" -a -n "$ipfid" ] && modunload -i $ipfid
 		;;
 
 	pause)
