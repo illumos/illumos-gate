@@ -198,6 +198,7 @@ lxpr_lock(pid_t pid, zombok_t zombie_ok)
 	proc_t *p;
 	kmutex_t *mp;
 	pid_t find_pid;
+	uint_t flags;
 
 	ASSERT(!MUTEX_HELD(&pidlock));
 
@@ -241,8 +242,21 @@ lxpr_lock(pid_t pid, zombok_t zombie_ok)
 			return (NULL);
 		}
 
-		if (!(p->p_proc_flag & P_PR_LOCK))
+		flags = p->p_proc_flag & (P_PR_LOCK | P_PR_EXEC);
+		if (flags == 0) {
 			break;
+		} else if (flags == P_PR_EXEC && p == curproc) {
+			/*
+			 * Forward progress with (only) the PR_EXEC flag is
+			 * safe if a process is accessing resources in its own
+			 * piddir.  Executing its own /proc/<pid>/exe symlink
+			 * is one potential example.
+			 *
+			 * For all other processes, it is necessary to wait
+			 * until the exec is completed.
+			 */
+			break;
+		}
 
 		cv_wait(&pr_pid_cv[p->p_slot], mp);
 		mutex_exit(mp);

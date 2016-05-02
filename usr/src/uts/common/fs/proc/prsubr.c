@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015, Joyent, Inc.
+ * Copyright 2016, Joyent, Inc.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -535,6 +535,12 @@ prexecend(void)
 			pcp->prc_tslot = tslot;
 		}
 	}
+
+	/*
+	 * There may be threads waiting for the flag change blocked behind the
+	 * pr_pid_cv as well.
+	 */
+	cv_signal(&pr_pid_cv[p->p_slot]);
 }
 
 /*
