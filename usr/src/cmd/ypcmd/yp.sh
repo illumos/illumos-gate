@@ -36,6 +36,12 @@ create_client_ipf_rules()
 	file6=`fmri_to_file $FMRI $IPF6_SUFFIX`
 	iana_name=`svcprop -p $FW_CONTEXT_PG/name $FMRI`
 	domain=`domainname`
+	block_policy=$GLOBAL_BLOCK_POLICY
+
+	if [ "$block_policy" = "return" ]; then
+		block_policy_tcp="return-rst"
+		block_policy_udp="return-icmp-as-dest"
+	fi
 
 	if [ -z "$domain" ]; then
 		return 0
@@ -60,31 +66,43 @@ create_client_ipf_rules()
 			#
 			# Get corresponding IPv4/IPv6 addresses
 			#
-			servers=`getent ipnodes $ypsvr | awk '/^:/{ print $1 }'`
-			servers_6=`getent ipnodes $ypsvr | awk '/:/{ print $1 }'`
+			servers=`getent ipnodes $ypsvr | \
+			    /usr/xpg4/bin/awk '$1 ~ !/:/{ print $1 }'`
+			servers_6=`getent ipnodes $ypsvr | \
+			    /usr/xpg4/bin/awk '$1 ~ /:/{ print $1 }'`
 
 			if [ -n "$servers" ]; then
 				server_addrs="$server_addrs $servers"
 			fi
 
 			if [ -n "$servers_6" ]; then
-				server_addrs_6="$server_addrs_6 $servers"
+				server_addrs_6="$server_addrs_6 $servers_6"
 			fi
 		done
 
-		if [ -n "$server_addrs"  ]; then
-			for s in $server_addrs; do
-				if [ -n "$tports" ]; then
-					for tport in $tports; do
+		if [ -n "$tports" -o -n "$tports_6" ]; then
+			for tport in $tports $tports_6; do
+				echo "block $block_policy_tcp in log" \
+				    "proto tcp from any to any" \
+				    "port = $tport" >>$file
+				if [ -n "$server_addrs"  ]; then
+					for s in $server_addrs; do
 						echo "pass in log quick" \
 						    "proto tcp from $s" \
 						    "to any port = $tport" \
 						    >>$file
 					done
 				fi
+			done
+		fi
 
-				if [ -n "$uports" ]; then
-					for uport in $uports; do
+		if [ -n "$uports" -o -n "$uports_6" ]; then
+			for uport in $uports $uports_6; do
+				echo "block $block_policy_udp in log" \
+				    "proto udp from any to any" \
+				    "port = $uport" >>$file
+				if [ -n "$server_addrs"  ]; then
+					for s in $server_addrs; do
 						echo "pass in log quick" \
 						    "proto udp from $s" \
 						    "to any port = $uport" \
@@ -94,19 +112,29 @@ create_client_ipf_rules()
 			done
 		fi
 
-		if [ -n "$server_addrs_6"  ]; then
-			for s in $server_addrs_6; do
-				if [ -n "$tports_6" ]; then
-					for tport in $tports_6; do
+		if [ -n "$tports_6" ]; then
+			for tport in $tports_6; do
+				echo "block $block_policy_tcp in log" \
+				    "proto tcp from any to any" \
+				    "port = $tport" >>$file6
+				if [ -n "$server_addrs_6"  ]; then
+					for s in $server_addrs_6; do
 						echo "pass in log quick" \
 						    "proto tcp from $s" \
 						    "to any port = $tport" \
 						    >>$file6
 					done
 				fi
+			done
+		fi
 
-				if [ -n "$uports_6" ]; then
-					for uport in $uports_6; do
+		if [ -n "$uports_6" ]; then
+			for uport in $uports_6; do
+				echo "block $block_policy_udp in log" \
+				    "proto udp from any to any" \
+				    "port = $uport" >>$file6
+				if [ -n "$server_addrs_6"  ]; then
+					for s in $server_addrs_6; do
 						echo "pass in log quick" \
 						    "proto udp from $s" \
 						    "to any port = $uport" \
