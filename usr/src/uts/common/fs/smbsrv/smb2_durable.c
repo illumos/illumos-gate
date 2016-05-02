@@ -438,7 +438,7 @@ smb2_dh_shutdown(smb_server_t *sv)
 }
 
 uint32_t
-smb2_fsctl_resiliency(smb_request_t *sr, smb_fsctl_t *fsctl)
+smb2_fsctl_set_resilient(smb_request_t *sr, smb_fsctl_t *fsctl)
 {
 	uint32_t timeout;
 	smb_ofile_t *of = sr->fid_ofile;

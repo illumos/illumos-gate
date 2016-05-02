@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -263,7 +263,11 @@ smb2_setf_valid_len(smb_request_t *sr, smb_setinfo_t *si)
 	if (smb_mbc_decodef(&si->si_data, "q", &eod) != 0)
 		return (NT_STATUS_INFO_LENGTH_MISMATCH);
 
-	rc = smb_fsop_set_data_length(sr, of->f_cr, of->f_node, eod);
+	/*
+	 * Zero out data from EoD to end of file.
+	 * (Passing len=0 covers to end of file)
+	 */
+	rc = smb_fsop_freesp(sr, of->f_cr, of, eod, 0);
 	if (rc != 0)
 		return (smb_errno2status(rc));
 

@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -50,7 +50,11 @@ static uint64_t vfs_features = VFSFT_XVATTR;
 vnode_t *rootdir = NULL;	/* pointer to root inode vnode. */
 
 static struct vfs fake_rootvfs;
+static struct vfsops fake_vfsops;
 struct vfs *rootvfs = NULL;
+static struct vfssw fake_vfssw = {
+	.vsw_name = "fake"	/* see smb_tree.c:smb_mtype[] */
+};
 
 int
 fksmbsrv_vfs_init(void)
@@ -64,6 +68,7 @@ fksmbsrv_vfs_init(void)
 		rootvfs = &fake_rootvfs;
 		rootvfs->vfs_mntpt = refstr_alloc(name);
 		rootvfs->vfs_fsid.val[0] = 1;
+		rootvfs->vfs_op = &fake_vfsops;
 	}
 
 	if (rootdir == NULL) {
@@ -126,6 +131,8 @@ vfs_getops(vfs_t *vfsp)
 struct vfssw *
 vfs_getvfsswbyvfsops(vfsops_t *vfsops)
 {
+	if (vfsops == &fake_vfsops)
+		return (&fake_vfssw);
 	return (NULL);
 }
 

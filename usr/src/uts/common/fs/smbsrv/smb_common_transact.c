@@ -1432,7 +1432,7 @@ smb_trans_nmpipe(smb_request_t *sr, smb_xa_t *xa)
 	fsctl.in_mbc = &xa->req_data_mb; /* write from here */
 	fsctl.out_mbc = &xa->rep_data_mb; /* read into here */
 
-	status = smb_opipe_fsctl(sr, &fsctl);
+	status = smb_opipe_transceive(sr, &fsctl);
 	if (status) {
 		smbsr_status(sr, status, 0, 0);
 		if (NT_SC_SEVERITY(status) == NT_STATUS_SEVERITY_ERROR)

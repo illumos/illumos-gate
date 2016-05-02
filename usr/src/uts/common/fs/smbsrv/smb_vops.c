@@ -279,6 +279,23 @@ smb_vop_write(vnode_t *vp, uio_t *uiop, int ioflag, uint32_t *lcount,
 	return (error);
 }
 
+int
+smb_vop_ioctl(vnode_t *vp, int cmd, void *arg, cred_t *cr)
+{
+	int error, rval = 0;
+	uint_t flags = 0;
+
+#ifdef	FKIOCTL
+	flags |= FKIOCTL;
+#endif
+	error = VOP_IOCTL(vp, cmd, (intptr_t)arg, (int)flags, cr,
+	    &rval, &smb_ct);
+	if (error != 0)
+		rval = error;
+
+	return (rval);
+}
+
 /*
  * smb_vop_getattr()
  *

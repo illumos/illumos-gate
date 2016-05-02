@@ -411,7 +411,7 @@ smb2_negotiate(smb_request_t *sr)
  * VALIDATE_NEGOTIATE_INFO [MS-SMB2] 2.2.32.6
  */
 uint32_t
-smb2_fsctl_vneginfo(smb_request_t *sr, smb_fsctl_t *fsctl)
+smb2_nego_validate(smb_request_t *sr, smb_fsctl_t *fsctl)
 {
 	smb_session_t *s = sr->session;
 	int rc;

@@ -511,7 +511,7 @@ smb_common_write(smb_request_t *sr, smb_rw_param_t *param)
 			stability = FSYNC;
 		}
 
-		rc = smb_fsop_write(sr, sr->user_cr, node,
+		rc = smb_fsop_write(sr, sr->user_cr, node, ofile,
 		    &param->rw_vdb.vdb_uio, &lcount, stability);
 
 		if (rc)

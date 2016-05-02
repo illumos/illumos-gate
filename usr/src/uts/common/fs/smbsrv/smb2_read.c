@@ -115,7 +115,8 @@ smb2_read(smb_request_t *sr)
 				break;
 			}
 		}
-		rc = smb_fsop_read(sr, of->f_cr, of->f_node, &vdb->vdb_uio);
+		rc = smb_fsop_read(sr, of->f_cr, of->f_node, of,
+		    &vdb->vdb_uio);
 		break;
 	case STYPE_IPC:
 		rc = smb_opipe_read(sr, &vdb->vdb_uio);

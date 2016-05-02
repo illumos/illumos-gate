@@ -1174,6 +1174,10 @@ smb_tree_get_flags(const smb_kshare_t *si, vfs_t *vfsp, smb_tree_t *tree)
 	} smb_mtype_t;
 
 	static smb_mtype_t smb_mtype[] = {
+#ifdef	_FAKE_KERNEL
+		/* See libfksmbsrv:fake_vfs.c */
+		{ "fake",    3,	SMB_TREE_SPARSE},
+#endif	/* _FAKE_KERNEL */
 		{ "zfs",    3,	SMB_TREE_QUOTA | SMB_TREE_SPARSE},
 		{ "ufs",    3,	0 },
 		{ "nfs",    3,	SMB_TREE_NFS_MOUNTED },

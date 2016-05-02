@@ -231,6 +231,7 @@ void smb_quota_free_quotas(list_t *);
 
 void smb_query_shortname(smb_node_t *, smb_queryinfo_t *);
 
+uint32_t smb_dfs_fsctl(smb_request_t *, smb_fsctl_t *);
 uint32_t smb_dfs_get_referrals(smb_request_t *, smb_fsctl_t *);
 
 int smb1_newrq_negotiate(smb_request_t *);
@@ -420,6 +421,7 @@ int smb_opipe_write(smb_request_t *, struct uio *);
 int smb_opipe_getattr(smb_ofile_t *, smb_attr_t *);
 int smb_opipe_getname(smb_ofile_t *, char *, size_t);
 uint32_t smb_opipe_fsctl(smb_request_t *, smb_fsctl_t *);
+uint32_t smb_opipe_transceive(smb_request_t *, smb_fsctl_t *);
 
 void smb_kdoor_init(smb_server_t *);
 void smb_kdoor_fini(smb_server_t *);
