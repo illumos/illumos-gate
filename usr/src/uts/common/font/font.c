@@ -78,6 +78,10 @@ set_font(struct font *f, short *rows, short *cols, short height, short width)
 		if ((((*rows * fl->data->height) + BORDER_PIXELS) <= height) &&
 		    (((*cols * fl->data->width) + BORDER_PIXELS) <= width)) {
 			font_selected = fl->data;
+			*rows = (height - BORDER_PIXELS) /
+			    font_selected->height;
+			*cols = (width - BORDER_PIXELS) /
+			    font_selected->width;
 			break;
 		}
 	}

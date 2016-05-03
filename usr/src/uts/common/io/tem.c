@@ -563,10 +563,10 @@ tems_setup_terminal(struct vis_devinit *tp, size_t height, size_t width)
 
 		/*
 		 * set_font() will select a appropriate sized font for
-		 * the number of rows and columns selected.  If we don't
+		 * the number of rows and columns selected. If we don't
 		 * have a font that will fit, then it will use the
-		 * default builtin font and adjust the rows and columns
-		 * to fit on the screen.
+		 * default builtin font. set_font() will adjust the rows
+		 * and columns to fit on the screen.
 		 */
 		set_font(&tems.ts_font,
 		    &tems.ts_c_dimension.height,
