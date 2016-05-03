@@ -23,6 +23,7 @@
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef	_SYS_SUNDDI_H
@@ -174,6 +175,7 @@ extern "C" {
 #define	DDI_NT_SCSI_ENCLOSURE	"ddi_enclosure:scsi"
 
 #define	DDI_NT_BLOCK_SAS	"ddi_block:sas"
+#define	DDI_NT_BLOCK_BLKDEV	"ddi_block:blkdev"
 
 /*
  * xVM virtual block devices

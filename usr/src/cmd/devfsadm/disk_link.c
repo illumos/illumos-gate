@@ -20,7 +20,7 @@
  */
 /*
  * Copyright 2016 Toomas Soome <tsoome@me.com>
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -64,6 +64,7 @@ extern int system_labeled;
 
 static int disk_callback_chan(di_minor_t minor, di_node_t node);
 static int disk_callback_nchan(di_minor_t minor, di_node_t node);
+static int disk_callback_blkdev(di_minor_t minor, di_node_t node);
 static int disk_callback_wwn(di_minor_t minor, di_node_t node);
 static int disk_callback_xvmd(di_minor_t minor, di_node_t node);
 static int disk_callback_fabric(di_minor_t minor, di_node_t node);
@@ -81,6 +82,9 @@ static devfsadm_create_t disk_cbt[] = {
 	},
 	{ "disk", DDI_NT_BLOCK_CHAN, NULL,
 	    TYPE_EXACT, ILEVEL_0, disk_callback_chan
+	},
+	{ "disk", DDI_NT_BLOCK_BLKDEV, NULL,
+	    TYPE_EXACT, ILEVEL_0, disk_callback_blkdev
 	},
 	{ "disk", DDI_NT_BLOCK_FABRIC, NULL,
 		TYPE_EXACT, ILEVEL_0, disk_callback_fabric
@@ -214,6 +218,21 @@ disk_callback_nchan(di_minor_t minor, di_node_t node)
 	disk_common(minor, node, disk, 0);
 	return (DEVFSADM_CONTINUE);
 
+}
+
+static int
+disk_callback_blkdev(di_minor_t minor, di_node_t node)
+{
+	char *addr;
+	char disk[DISK_SUBPATH_MAX];
+	uint64_t eui64;
+	uint_t lun = 0;
+
+	addr = di_bus_addr(node);
+	(void) sscanf(addr, "w%016"PRIx64",%X", &eui64, &lun);
+	(void) snprintf(disk, DISK_SUBPATH_MAX, "t%016"PRIX64"d%d", eui64, lun);
+	disk_common(minor, node, disk, RM_STALE);
+	return (DEVFSADM_CONTINUE);
 }
 
 static int
