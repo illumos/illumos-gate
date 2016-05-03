@@ -884,6 +884,7 @@ main(int argc, char *argv[])
 			break;
 		case 'e':
 			errflag++;
+			break;
 		case 'o':
 			oflag++;
 			break;
@@ -4516,9 +4517,9 @@ checkdir(char *name)
  */
 
 static void
-resugname(int dirfd, 	/* dir fd file resides in */
-	char *name,	/* name of the file to be modified */
-	int symflag)	/* true if file is a symbolic link */
+resugname(int dirfd,	/* dir fd file resides in */
+    char *name,		/* name of the file to be modified */
+    int symflag)	/* true if file is a symbolic link */
 {
 	uid_t duid;
 	gid_t dgid;
@@ -4654,9 +4655,9 @@ static	int
  * non-portability among heterogeneous systems.  It is retained here
  * for backward compatibility.
  */
-checksum_signed(union hblock *dblockp)
+    checksum_signed(union hblock *dblockp)
 #else
-checksum(union hblock *dblockp)
+    checksum(union hblock *dblockp)
 #endif	/* EUC */
 {
 	int i;
@@ -5988,7 +5989,8 @@ is_directory(char *name)
  */
 
 static int
-tar_chdir(const char *path) {
+tar_chdir(const char *path)
+{
 	const char *sep = "/";
 	char *path_copy = NULL;
 	char *ptr = NULL;
@@ -6008,8 +6010,8 @@ tar_chdir(const char *path) {
 
 		/* chdir(2) for every path element. */
 		for (ptr = strtok(path_copy, sep);
-			ptr != NULL;
-			ptr = strtok(NULL, sep)) {
+		    ptr != NULL;
+		    ptr = strtok(NULL, sep)) {
 			if (chdir(ptr) != 0) {
 				free(path_copy);
 				return (-1);
@@ -6614,7 +6616,6 @@ doDirTimes(char *name, timestruc_t modTime)
 
 static void
 setPathTimes(int dirfd, char *path, timestruc_t modTime)
-
 {
 	struct timeval timebuf[2];
 
@@ -8162,7 +8163,7 @@ put_extra_attributes(char *longname, char *shortname, char *longattrname,
 #if defined(O_XATTR)
 static int
 put_xattr_hdr(char *longname, char *shortname, char *longattrname, char *prefix,
-	int typeflag, int filetype, struct linkbuf *lp)
+    int typeflag, int filetype, struct linkbuf *lp)
 {
 	char *lname = NULL;
 	char *sname = NULL;
