@@ -183,8 +183,7 @@ cgrp_thr_move(cgrp_mnt_t *cgm, lx_lwp_data_t *plwpd, cgrp_node_t *ncn,
 		 */
 		mutex_exit(&p->p_lock);
 		cgrp_rel_agent_event(cgm, ocn);
-		mutex_exit(&cgm->cg_contents);
-
+		ASSERT(MUTEX_NOT_HELD(&cgm->cg_contents));
 		return (B_TRUE);
 	}
 
@@ -1364,10 +1363,13 @@ cgrp_rmdir(struct vnode *dvp, char *nm, struct vnode *cdir, struct cred *cred,
 	if (parent->cgn_task_cnt == 0 &&
 	    parent->cgn_dirents == N_DIRENTS(cgm) && parent->cgn_notify == 1) {
 		cgrp_rel_agent_event(cgm, parent);
+		ASSERT(MUTEX_NOT_HELD(&cgm->cg_contents));
+		goto dropped;
 	}
 
 done:
 	mutex_exit(&cgm->cg_contents);
+dropped:
 	vnevent_rmdir(CGNTOV(self), dvp, nm, ct);
 	cgnode_rele(self);
 
