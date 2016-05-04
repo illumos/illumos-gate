@@ -905,6 +905,8 @@ cgrp_run_rel_agent(void *a)
  * Launch the user-level release_agent manager. The event data is the
  * pathname (relative to the mount point of the file system) of the newly empty
  * cgroup.
+ *
+ * The cg_contents mutex is held on entry and dropped before returning.
  */
 void
 cgrp_rel_agent_event(cgrp_mnt_t *cgm, cgrp_node_t *cn)
@@ -922,13 +924,17 @@ cgrp_rel_agent_event(cgrp_mnt_t *cgm, cgrp_node_t *cn)
 	ASSERT(MUTEX_HELD(&cgm->cg_contents));
 
 	/* Nothing to do if the agent is not set */
-	if (cgm->cg_agent[0] == '\0')
+	if (cgm->cg_agent[0] == '\0') {
+		mutex_exit(&cgm->cg_contents);
 		return;
+	}
 
 	parent = cn->cgn_parent;
 	/* Cannot remove the top-level cgroup (only via unmount) */
-	if (parent == cn)
+	if (parent == cn) {
+		mutex_exit(&cgm->cg_contents);
 		return;
+	}
 
 	argstr = kmem_alloc(MAXPATHLEN, KM_SLEEP);
 	oldstr = kmem_alloc(MAXPATHLEN, KM_SLEEP);
@@ -977,6 +983,12 @@ cgrp_rel_agent_event(cgrp_mnt_t *cgm, cgrp_node_t *cn)
 	/* The release agent process cannot belong to our cgroup */
 	plwpd->br_cgroupid = 0;
 
+	/*
+	 * The cg_contents mutex cannot be held while taking the pool lock
+	 * or calling newproc.
+	 */
+	mutex_exit(&cgm->cg_contents);
+
 	if (z->zone_defaultcid > 0) {
 		cid = z->zone_defaultcid;
 	} else {
@@ -987,8 +999,6 @@ cgrp_rel_agent_event(cgrp_mnt_t *cgm, cgrp_node_t *cn)
 	if (cid == -1)
 		cid = defaultcid;
 
-	mutex_exit(&cgm->cg_contents);
-
 	if ((agent_err = newproc(cgrp_run_rel_agent, (void *)rarg, cid,
 	    minclsyspri - 1, NULL, -1)) != 0) {
 		/* There's nothing we can do if creating the proc fails. */
@@ -996,8 +1006,6 @@ cgrp_rel_agent_event(cgrp_mnt_t *cgm, cgrp_node_t *cn)
 		kmem_free(rarg->crraa_agent_path, sizeof (cgm->cg_agent));
 		kmem_free(rarg, sizeof (cgrp_rra_arg_t));
 	}
-
-	mutex_enter(&cgm->cg_contents);
 }
 
 /*ARGSUSED*/
@@ -1037,7 +1045,8 @@ cgrp_lwp_exit_helper(vfs_t *vfsp, uint_t cg_id, id_t tid, pid_t tpid)
 	if (cn->cgn_task_cnt == 0 && cn->cgn_dirents == N_DIRENTS(cgm) &&
 	    cn->cgn_notify == 1) {
 		cgrp_rel_agent_event(cgm, cn);
+		ASSERT(MUTEX_NOT_HELD(&cgm->cg_contents));
+	} else {
+		mutex_exit(&cgm->cg_contents);
 	}
-
-	mutex_exit(&cgm->cg_contents);
 }
