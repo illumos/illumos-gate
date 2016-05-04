@@ -1006,7 +1006,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_sendfile64,			/*  40: sendfile */
 	NULL,				/*  41: socket */
 	NULL,				/*  42: connect */
-	lx_accept,			/*  43: accept */
+	NULL,				/*  43: accept */
 	NULL,				/*  44: sendto */
 	NULL,				/*  45: recvfrom */
 	NULL,				/*  46: sendmsg */
@@ -1014,8 +1014,8 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_shutdown,			/*  48: shutdown */
 	NULL,				/*  49: bind */
 	lx_listen,			/*  50: listen */
-	lx_getsockname,			/*  51: getsockname */
-	lx_getpeername,			/*  52: getpeername */
+	NULL,				/*  51: getsockname */
+	NULL,				/*  52: getpeername */
 	lx_socketpair,			/*  53: socketpair */
 	NULL,				/*  54: setsockopt */
 	NULL,				/*  55: getsockopt */
@@ -1251,7 +1251,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/* 285: fallocate */
 	lx_timerfd_settime,		/* 286: timerfd_settime */
 	lx_timerfd_gettime,		/* 287: timerfd_gettime */
-	lx_accept4,			/* 288: accept4 */
+	NULL,				/* 288: accept4 */
 	lx_signalfd4,			/* 289: signalfd4 */
 	lx_eventfd2,			/* 290: eventfd2 */
 	NULL,				/* 291: epoll_create1 */

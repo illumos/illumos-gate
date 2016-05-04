@@ -1030,7 +1030,7 @@ lx_sysent_t lx_sysent64[] = {
 	{"sendfile",	NULL,			0,		4}, /* 40 */
 	{"socket",	lx_socket,		0,		3}, /* 41 */
 	{"connect",	lx_connect,		0,		3}, /* 42 */
-	{"accept",	NULL,			0,		3}, /* 43 */
+	{"accept",	lx_accept,		0,		3}, /* 43 */
 	{"sendto",	lx_sendto,		0,		6}, /* 44 */
 	{"recvfrom",	lx_recvfrom,		0,		6}, /* 45 */
 	{"sendmsg",	lx_sendmsg,		0,		3}, /* 46 */
@@ -1038,8 +1038,8 @@ lx_sysent_t lx_sysent64[] = {
 	{"shutdown",	NULL,			0,		2}, /* 48 */
 	{"bind",	lx_bind,		0,		3}, /* 49 */
 	{"listen",	NULL,			0,		2}, /* 50 */
-	{"getsockname",	NULL,			0,		3}, /* 51 */
-	{"getpeername",	NULL,			0,		3}, /* 52 */
+	{"getsockname",	lx_getsockname,		0,		3}, /* 51 */
+	{"getpeername",	lx_getpeername,		0,		3}, /* 52 */
 	{"socketpair",	NULL,			0,		4}, /* 53 */
 	{"setsockopt",	lx_setsockopt,		0,		5}, /* 54 */
 	{"getsockopt",	lx_getsockopt,		0,		5}, /* 55 */
@@ -1275,7 +1275,7 @@ lx_sysent_t lx_sysent64[] = {
 	{"fallocate",	lx_fallocate,		0,		4}, /* 285 */
 	{"timerfd_settime", NULL,		0,		4}, /* 286 */
 	{"timerfd_gettime", NULL,		0,		2}, /* 287 */
-	{"accept4",	NULL,			0,		4}, /* 288 */
+	{"accept4",	lx_accept4,		0,		4}, /* 288 */
 	{"signalfd4",	NULL,			0,		4}, /* 289 */
 	{"eventfd2",	NULL,			0,		2}, /* 290 */
 	{"epoll_create1", lx_epoll_create1,	0,		1}, /* 291 */
