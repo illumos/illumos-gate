@@ -344,8 +344,14 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 	 * We do this because now the brand library can just check
 	 * args->to_model to see if the target is 32-bit or 64-bit without
 	 * having do duplicate all the code above.
+	 *
+	 * The level checks associated with brand handling below are used to
+	 * prevent a loop since the brand elfexec function typically comes back
+	 * through this function. We must check <= here since the nested
+	 * handling in the #! interpreter code will increment the level before
+	 * calling gexec to run the final elfexec interpreter.
 	 */
-	if ((level < 2) &&
+	if ((level <= INTP_MAXDEPTH) &&
 	    (brand_action != EBA_NATIVE) && (PROC_IS_BRANDED(p))) {
 		error = BROP(p)->b_elfexec(vp, uap, args,
 		    idatap, level + 1, execsz, setid, exec_file, cred,

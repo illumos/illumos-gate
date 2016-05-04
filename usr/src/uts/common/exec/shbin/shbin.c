@@ -221,8 +221,8 @@ shbinexec(
 	 * a script's name starts with a '-' character.
 	 */
 	idata.intp = NULL;
-	idata.intp_name = shell_list[i];
-	idata.intp_arg = "--";
+	idata.intp_name[0] = shell_list[i];
+	idata.intp_arg[0] = "--";
 
 	opath = args->pathname;
 	args->pathname = resolvepn.pn_path;

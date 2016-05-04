@@ -1,5 +1,6 @@
 '\" te
 .\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 2015, Joyent, Inc.
 .\" Copyright 1989 AT&T.
 .\" Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
 .\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
@@ -9,7 +10,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH EXEC 2 "Jun 16, 2008"
+.TH EXEC 2 "Oct 27, 2015"
 .SH NAME
 exec, execl, execle, execlp, execv, execve, execvp \- execute a file
 .SH SYNOPSIS
@@ -50,7 +51,6 @@ exec, execl, execle, execlp, execv, execve, execvp \- execute a file
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 Each of the functions in the \fBexec\fR family replaces the current process
 image with a new process image. The new image is constructed from a regular,
@@ -76,7 +76,9 @@ specified interpreter. The pathname specified in the interpreter file is passed
 as \fIarg0\fR to the interpreter. If \fIarg\fR was specified in the interpreter
 file, it is passed as \fIarg1\fR to the interpreter. The remaining arguments to
 the interpreter are \fIarg0\fR through \fIargn\fR of the originally exec'd
-file. The interpreter named by \fIpathname\fR must not be an interpreter file.
+file. The interpreter named by \fIpathname\fR may also be an interpreter file.
+There can be up to four nested interpreter files before the final interpreter.
+The setid bits on nested interpreters are silently ignored.
 .sp
 .LP
 When a C-language program is executed as a result of this call, it is entered
@@ -499,13 +501,11 @@ consequence of replacing the process image.
 The saved resource limits in the new process image are set to be a copy of the
 process's corresponding hard and soft limits.
 .SH RETURN VALUES
-.sp
 .LP
 If a function in the \fBexec\fR family returns to the calling process image, an
 error has occurred; the return value is \fB\(mi1\fR and \fBerrno\fR is set to
 indicate the error.
 .SH ERRORS
-.sp
 .LP
 The \fBexec\fR functions will fail if:
 .sp
@@ -587,7 +587,7 @@ A signal was caught during the execution of one of the functions in the
 .ad
 .RS 16n
 Too many symbolic links were encountered in translating \fIpath\fR or
-\fIfile\fR.
+\fIfile\fR, or too many nested interpreter files.
 .RE
 
 .sp
@@ -678,7 +678,6 @@ currently open for writing by some process.
 .RE
 
 .SH USAGE
-.sp
 .LP
 As the state of conversion descriptors and message catalogue descriptors in the
 new process image is undefined, portable applications should not rely on their
@@ -692,7 +691,6 @@ thenew process.
 .LP
 The \fIenviron\fR array should not be accessed directly by the application.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -715,7 +713,6 @@ Standard	See \fBstandards\fR(5).
 .LP
 The \fBexecle()\fR and \fBexecve()\fR fucntions are Async-Signal-Safe.
 .SH SEE ALSO
-.sp
 .LP
 \fBksh\fR(1), \fBps\fR(1), \fBsh\fR(1), \fBalarm\fR(2), \fBbrk\fR(2),
 \fBchmod\fR(2), \fBexit\fR(2), \fBfcntl\fR(2), \fBfork\fR(2),
@@ -727,7 +724,6 @@ The \fBexecle()\fR and \fBexecve()\fR fucntions are Async-Signal-Safe.
 \fBcontract\fR(4), \fBprocess\fR(4), \fBattributes\fR(5), \fBenviron\fR(5),
 \fBprivileges\fR(5), \fBstandards\fR(5)
 .SH WARNINGS
-.sp
 .LP
 If a program is \fBsetuid\fR to a user \fBID\fR other than the superuser, and
 the program is executed when the real user \fBID\fR is super-user, then the

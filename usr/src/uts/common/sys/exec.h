@@ -157,10 +157,11 @@ typedef struct uarg {
 #endif
 
 #define	INTPSZ	MAXPATHLEN
+#define	INTP_MAXDEPTH	5	/* Nested interpreter depth matches Linux */
 typedef struct intpdata {
 	char	*intp;
-	char	*intp_name;
-	char	*intp_arg;
+	char	*intp_name[INTP_MAXDEPTH];
+	char	*intp_arg[INTP_MAXDEPTH];
 } intpdata_t;
 
 #define	EXECSETID_SETID		0x1 /* setid exec */
