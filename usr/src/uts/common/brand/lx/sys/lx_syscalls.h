@@ -34,6 +34,8 @@ extern "C" {
 
 #ifdef	_KERNEL
 
+extern long lx_accept();
+extern long lx_accept4();
 extern long lx_arch_prctl();
 extern long lx_bind();
 extern long lx_brk();
@@ -74,6 +76,8 @@ extern long lx_getcwd();
 extern long lx_getdents_32();
 extern long lx_getdents_64();
 extern long lx_getdents64();
+extern long lx_getpeername();
+extern long lx_getsockname();
 extern long lx_getpid();
 extern long lx_getppid();
 extern long lx_getrandom();
