@@ -130,7 +130,6 @@ clock_highres_timer_settime(itimer_t *it, int flags,
 	    secpolicy_clock_highres(cr) != 0) {
 		clamped.it_value.tv_sec = when->it_value.tv_sec;
 		clamped.it_interval.tv_sec = when->it_interval.tv_sec;
-		when = &clamped;
 
 		if (value_need_clamp) {
 			clamped.it_value.tv_nsec = clock_highres_interval_min;
@@ -144,6 +143,8 @@ clock_highres_timer_settime(itimer_t *it, int flags,
 		} else {
 			clamped.it_interval.tv_nsec = when->it_interval.tv_nsec;
 		}
+
+		when = &clamped;
 	}
 
 	cyctime.cyt_when = ts2hrt(&when->it_value);
