@@ -71,7 +71,6 @@ npe_query_acpi_mcfg(dev_info_t *dip)
 	CFG_BASE_ADDR_ALLOC *cfg_baap;
 	char *cfg_baa_endp;
 	int64_t ecfginfo[4];
-	int ecfg_found = 0;
 
 	/* Query the MCFG table using ACPI */
 	if (AcpiGetTable(ACPI_SIG_MCFG, 1,
@@ -100,7 +99,6 @@ npe_query_acpi_mcfg(dev_info_t *dip)
 				(void) ndi_prop_update_int64_array(
 				    DDI_DEV_T_NONE, dip, "ecfg",
 				    ecfginfo, 4);
-				ecfg_found = 1;
 				break;
 			}
 			cfg_baap++;
