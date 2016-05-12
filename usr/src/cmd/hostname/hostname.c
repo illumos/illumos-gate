@@ -36,7 +36,6 @@
 
 /* Portions Copyright 2007 Jeremy Teo */
 /* Portions Copyright 2006 Stephen P. Potter */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <unistd.h>
 #include <stdio.h>
@@ -56,8 +55,8 @@ static char *progname;
 static void
 usage(void)
 {
-	(void) fprintf(stderr, gettext("usage: %s [system_name]\n"),
-		basename(progname));
+	(void) fprintf(stderr, gettext("usage: %s [-s] [system_name]\n"),
+	    basename(progname));
 	exit(1);
 }
 
@@ -67,7 +66,8 @@ main(int argc, char *argv[])
 	char	*nodename = NULL;
 	char    c_hostname[MAXHOSTNAMELEN];
 	int	optlet;
-	char	*optstring = "?";
+	int	sflag = 0;
+	char	*optstring = "s";
 
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
@@ -77,13 +77,17 @@ main(int argc, char *argv[])
 	opterr = 0;
 	while ((optlet = getopt(argc, argv, optstring)) != -1) {
 		switch (optlet) {
+		case 's':
+			sflag = 1;
+			break;
 		case '?':
 			usage();
+			break;
 		}
 	}
 
 	/*
-	 * if called with no options, just print out the hostname/nodename
+	 * if called with no arguments, just print out the hostname/nodename
 	 */
 	if (argc <= optind) {
 		if (gethostname(c_hostname, sizeof (c_hostname)) < 0) {
@@ -92,6 +96,8 @@ main(int argc, char *argv[])
 			    basename(progname));
 			exit(1);
 		} else {
+			if (sflag)
+				c_hostname[strcspn(c_hostname, ".")] = '\0';
 			(void) fprintf(stdout, "%s\n", c_hostname);
 		}
 	} else {
