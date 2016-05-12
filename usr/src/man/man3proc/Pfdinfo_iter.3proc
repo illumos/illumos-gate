@@ -1,0 +1,88 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PFDINFO_ITER 3PROC
+.Os
+.Sh NAME
+.Nm Pfdinfo_iter
+.Nd iterate open files in a process
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft int
+.Fo Pfdinfo_iter
+.Fa "struct ps_prochandle *P"
+.Fa "proc_fdinfo_f *func"
+.Fa "void *data"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Pfdinfo_iter
+function iterates over the open files in the process represented by
+.Fa P .
+.Pp
+For each open file, the callback function
+.Fa func
+will be invoked and it will be passed the
+.Fa data
+argument as well as a pointer to a
+.Sy prfdinfo_t
+structure defined in
+.Xr libproc 3LIB .
+For the full signature of the
+.Vt proc_fdinfo_f
+see
+.Xr libproc 3LIB .
+.Pp
+The return value of
+.Fa func
+controls whether or not iteration continues. If
+.Fa func
+returns
+.Sy 0 ,
+then iteration will continue. However, if
+.Fa func
+instead returns a non-zero value, then iteration will halt and that
+value will be used as the return value of the
+.Fn Pfdinfo_iter
+function. Because the
+.Fn Pfdinfo_iter
+function returns
+.Sy -1
+to an indicate its own errors, it is recommended that the callback
+function does not return
+.Sy -1
+to indicate an error so that the caller may distinguish between the
+failure of the callback function and the failure of the
+.Fn Pfdinfo_iter
+function.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn Pfdinfo_iter
+returns
+.Sy 0 .
+Otherwise, if there was an internal error then
+.Sy -1
+is returned. Otherwise, if the callback function
+.Fa func
+returns non-zero, then its return value will be returned instead.
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr libproc 3LIB

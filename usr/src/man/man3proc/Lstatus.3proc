@@ -1,0 +1,59 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt LSTATUS 3PROC
+.Os
+.Sh NAME
+.Nm Lstatus
+.Nd obtain thread status structure
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft "const lwpstatus_t *"
+.Fo Pstatus
+.Fa "struct ps_lwphandle *L"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Lstatus
+function returns the status information about the thread handle
+.Fa L .
+The
+.Sy lwpstatus_t
+structure is defined in
+.Xr proc 4
+and contains information about the thread including its flags, the size
+of its stack, its user and system time, and more.
+.Pp
+The returned pointer is only valid as long as the thread handle
+.Fa L
+is valid. After a call to
+.Xr Ltree 3PROC ,
+the returned data pointer is invalid.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn Lstatus
+function returns a pointer to the status information of the process.
+It always succeeds.
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr libproc 3LIB ,
+.Xr Lfree 3PROC ,
+.Xr proc 4

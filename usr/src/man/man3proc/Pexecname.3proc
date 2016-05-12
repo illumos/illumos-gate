@@ -1,0 +1,68 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PEXECNAME 3PROC
+.Os
+.Sh NAME
+.Nm Pexecname
+.Nd obtain full path to process executable
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft "char *"
+.Fo Pexecname
+.Fa "struct ps_prochandle *P"
+.Fa "char *buf"
+.Fa "size_t buflen"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Pexecname
+function attempts to determine the full path to the process executable
+referred to by the handle
+.Fa P .
+.Pp
+If found,
+.Fa buf
+will be filled in with the full path for up to
+.Fa buflen
+bytes, including the null terminator.
+.Pp
+For a handle grabbed with
+.Xr Pgrab_file 3PROC ,
+the executable refers to the path of the file itself. For a core file,
+the system attempts to determine the original path of the executable
+and return that.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn Pexecname
+function returns the value of
+.Fa buf ,
+and up to
+.Fa buflen
+bytes of
+.Fa buf
+are filled in with a null-terminated path.
+Otherwise,
+.Dv NULL
+is returned.
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr libproc 3LIB

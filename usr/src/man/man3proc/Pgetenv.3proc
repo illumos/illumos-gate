@@ -1,0 +1,62 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PGETENV 3PROC
+.Os
+.Sh NAME
+.Nm Pgetenv
+.Nd get process environment variable
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft "char *"
+.Fo Pgetenv
+.Fa "struct ps_prochandle *P"
+.Fa "const char *name"
+.Fa "char *buf"
+.Fa "size_t buflen"
+.Fc
+.Sh DESCRIPTION
+The
+.Fa Pgetenv
+function searches the environment of the process handle
+.Fa P
+for the environment variable named
+.Fa name .
+If found it copies up to
+.Fa buflen
+characters of the value, including the null terminator, into the buffer
+.Fa buf .
+Everything after the
+.Sy =
+sign is copied.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn Pgetenv
+function returns the pointer
+.Fa buf .
+Otherwise, if the environment variable was not found,
+.Dv NULL
+is returned.
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr libproc 3LIB ,
+.Xr Penv_iter 3PROC ,
+.Xr environ 5

@@ -1,0 +1,57 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PGETAUXVEC 3PROC
+.Os
+.Sh NAME
+.Nm Pgetauxvec
+.Nd obtain process auxiliary vector
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft "const auxv_t *"
+.Fo Pgetauxvec
+.Fa "struct ps_prochandle *P"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Pgetauxvec
+function returns a pointer to a copy of the auxiliary vector for the
+process handle
+.Fa P .
+If the process handle does not represent an actively running process or
+the auxiliary vector could not be found, then it instead returns an
+empty auxiliary vector. The definitions of the
+.Sy auxv_t
+may be found in
+.In sys/auxv.h .
+.Pp
+The returned auxiliary vector should not be used across any subsequent
+calls to
+.Xr libproc 3LIB .
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn Pgetauxvec
+function always returns a pointer to an auxiliary vector.
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr libproc 3LIB ,
+.Xr Pgetauxval 3PROC ,
+.Xr proc 4

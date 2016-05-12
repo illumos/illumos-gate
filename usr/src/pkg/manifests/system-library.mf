@@ -54,6 +54,7 @@
 <include system-library.man3nsl.inc>
 <include system-library.man3nvpair.inc>
 <include system-library.man3pam.inc>
+<include system-library.man3proc.inc>
 <include system-library.man3scf.inc>
 <include system-library.man3sec.inc>
 <include system-library.man3secdb.inc>

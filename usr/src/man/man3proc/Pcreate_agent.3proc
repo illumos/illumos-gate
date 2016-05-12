@@ -1,0 +1,82 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PCREATE_AGENT 3PROC
+.Os
+.Sh NAME
+.Nm Pcreate_agent
+.Nd create the agent LWP
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft int
+.Fo Pcreate_agent
+.Fa "struct ps_prochandle *P"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Pcreate_agent
+function creates the agent LWP in the process represented by the handle
+.Fa P .
+The agent LWP is used as a means to force system calls to be invoked on
+the controlled process. For more information on the agent LWP, see
+.Xr proc 4 .
+.Pp
+The agent LWP cannot be created for process handles corresponding to
+core files, zombie processes, processes that have yet to run, and ELF
+objects.
+.Pp
+The
+.Fn Pcreate_agent
+function is reentrant. It may be entered recursively. The act of
+creating the agent LWP will cause the process to be stopped.
+For every call to the
+.Fn Pcreate_agent
+function, a corresponding call to
+.Xr Pdestroy_agent 3PROC
+is required.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn Pcreate_agent
+function returns
+.Sy 0
+and creates the agent LWP. Otherwise,
+.Sy -1
+is returned,
+.Sy errno
+is set to indicate the error, and the agent LWP is not created.
+.Sh ERRORS
+The
+.Fn Pcreate_agent
+function will fail if:
+.Bl -tag -width Er
+.It Er ENOENT
+The process referred to by
+.Fa P
+is a core file, zombie, ELF object, or has not begun execution.
+.El
+.Pp
+Note, it is possible for other error numbers to be returned. If they
+are, they represent unanticipated failure.
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr libproc 3LIB ,
+.Xr Pdestroy_agent 3PROC ,
+.Xr proc 4

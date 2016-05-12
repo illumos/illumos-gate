@@ -25,7 +25,6 @@ the load object in the target process
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBps_pglobal_lookup()\fR looks up the symbol \fIsym_name\fR in the symbol
 table of the load object \fIobject_name\fR in the target process identified by
@@ -39,7 +38,6 @@ of the load object \fIobject_name\fR in the target process identified by
 the symbol table entry is the symbol's value as an address in the target
 process.
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fBPS_OK\fR \fR
@@ -67,7 +65,6 @@ The function did not return successfully.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for description of the following attributes:
 .sp
@@ -83,7 +80,6 @@ MT Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBkill\fR(2), \fBlibc_db\fR(3LIB), \fBproc_service\fR(3PROC),
 \fBattributes\fR(5), \fBthreads\fR(5)

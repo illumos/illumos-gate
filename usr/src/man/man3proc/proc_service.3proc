@@ -158,7 +158,6 @@ proc_service \- process service interfaces
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 Every program that links \fBlibthread_db\fR or \fBlibrtld_db\fR must provide a
 set of process control primitives that allow \fBlibthread_db\fR and
@@ -173,7 +172,6 @@ a functional specification that clients of \fBlibthread_db\fR and
 \fBlibrtld_db\fR can use to implement this required interface. The
 <\fBproc_service.h\fR> header lists the C declarations of these routines.
 .SH FUNCTIONS
-.sp
 .ne 2
 .na
 \fB\fBps_pdmodel()\fR\fR
@@ -334,7 +332,8 @@ Sets the \fBLWP`s\fR floating point register set.
 \fB\fBps_pauxv()\fR\fR
 .ad
 .RS 23n
-Returns a pointer to a read-only copy of the target process's auxiliary vector.
+Returns a pointer to a read-only copy of the auxiliary vector of the target
+process.
 .RE
 
 .sp
@@ -365,7 +364,6 @@ Logs a message.
 .RE
 
 .SS "SPARC"
-.sp
 .ne 2
 .na
 \fB\fBps_lgetxregsize()\fR\fR
@@ -393,7 +391,6 @@ Sets the extra state registers of the \fBLWP\fR.
 .RE
 
 .SS "x86"
-.sp
 .ne 2
 .na
 \fB\fBps_lgetLDT()\fR\fR
@@ -403,7 +400,6 @@ Reads the local descriptor table of the \fBLWP\fR.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for description of the following attributes:
 .sp
@@ -419,7 +415,6 @@ MT Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBlibc_db\fR(3LIB), \fBlibrtld_db\fR(3LIB), \fBps_pread\fR(3PROC),
 \fBrtld_db\fR(3EXT), \fBattributes\fR(5)

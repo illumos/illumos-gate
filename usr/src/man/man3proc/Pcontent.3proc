@@ -1,0 +1,68 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PCONTENT 3PROC
+.Os
+.Sh NAME
+.Nm Pconent
+.Nd obtain process content types available
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft "core_content_t"
+.Fo Pcontent
+.Fa "struct ps_prochandle *P"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Pcontent
+function describes information available from the process handle
+.Fa P .
+.Pp
+Different types of process handles have different kinds of content
+available to them. For example, handles to active and running processes
+have more information available than various core files, as the core
+file retains a subset of information available in the running process.
+Handles that refer to ELF objects, obtained through
+.Xr Pgrab_file 3PROC ,
+will not have information such as a stack available. The content of
+core files is controlled by
+.Xr coreadm 1M .
+.Pp
+The symbols that may be returned are listed in the
+.Sy core_content_t
+heading in the
+.Sy TYPES
+section in
+.Xr libproc 3LIB .
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn Pcontent
+function returns the bitwise-inclusive-OR of content types. Otherwise,
+.Dv CC_CONTENT_INVALID
+is returned to indicate an error.
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr libproc 3LIB ,
+.Xr Pcreate 3PROC ,
+.Xr Pgrab 3PROC ,
+.Xr Pgrab_core 3PROC ,
+.Xr Pgrab_file 3PROC ,
+.Xr proc 4

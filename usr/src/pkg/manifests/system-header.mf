@@ -497,6 +497,7 @@ file path=usr/include/libipp.h
 file path=usr/include/libnvpair.h
 file path=usr/include/libnwam.h
 file path=usr/include/libpolkit/libpolkit.h
+file path=usr/include/libproc.h
 file path=usr/include/librcm.h
 file path=usr/include/libscf.h
 file path=usr/include/libscf_priv.h

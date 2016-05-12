@@ -1,0 +1,90 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PROC_CONTENT2STR 3PROC
+.Os
+.Sh NAME
+.Nm proc_content2str ,
+.Nm proc_str2content
+.Nd convert a string to and from a core_content_t
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft int
+.Fo proc_content2str
+.Fa "core_content_t content"
+.Fa "char *buf"
+.Fa "size_t size"
+.Fc
+.Ft int
+.Fo proc_str2content
+.Fa "const char *str"
+.Fa "core_content_t *cp"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn proc_content2str
+function converts the contents of a process (whether active or a core
+file) from
+.Fa content
+into a string and writes up to
+.Fa size
+characters, including the null-terminator, into
+.Fa buf .
+.Pp
+A content string will be a series of one or more tokens concatenated
+together with the
+.Sy +
+or
+.Sy -
+characters, indicating that the subsequent token should be added or
+subtracted from the previous ones. The full list of tokens and constants
+is available in the
+.Sy core_content_t
+portion of the
+.Sy TYPES
+section in
+.Xr libproc 3LIB .
+.Pp
+The
+.Fn proc_str2content
+function takes the character string
+.Fa str
+and based on the format described in the previous paragraph, converts it
+back into a
+.Vt core_content_t
+which is placed into
+.Fa cp .
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn proc_content2str
+function will return the number of characters written into
+.Fa buf ,
+excluding the terminating null character.
+.Pp
+Upon successful completion, the
+.Fn proc_str2content
+function will return
+.Sy 0 .
+Otherwise,
+.Sy -1
+will be returned to indicate an unknown string.
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+.Sy MT-Safe
+.Sh SEE ALSO
+.Xr coreadm 1M ,
+.Xr libproc 3LIB ,
+.Xr proc 4

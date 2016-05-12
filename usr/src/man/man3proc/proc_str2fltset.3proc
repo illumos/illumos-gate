@@ -1,0 +1,125 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PROC_STR2FLTSET 3PROC
+.Os
+.Sh NAME
+.Nm proc_str2fltset ,
+.Nm proc_str2sigset ,
+.Nm proc_str2sysset
+.Nd convert a string to a fault, signal, or system call set
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft char *
+.Fo proc_str2fltset
+.Fa "const char *str"
+.Fa "const char *delim"
+.Fa "int members"
+.Fa "fltset_t *set"
+.Fc
+.Ft char *
+.Fo proc_str2sigset
+.Fa "const char *str"
+.Fa "const char *delim"
+.Fa "int members"
+.Fa "sigset_t *set"
+.Fc
+.Ft char *
+.Fo proc_str2sysset
+.Fa "const char *str"
+.Fa "const char *delim"
+.Fa "int members"
+.Fa "sysset_t *set"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn proc_str2fltset ,
+.Fn proc_str2sigset ,
+and
+.Fn proc_str2sysset
+functions translate a character string,
+.Fa str ,
+into the corresponding fault set, signal set, and system call set
+respectively.
+.Pp
+The character string
+.Fa delim
+will be used as a delimiter between subsequent entries in the string
+.Fa set .
+The value of
+.Fa members
+determines whether the entries in
+.Fa str
+enable or disable entries in
+.Fa set .
+If
+.Fa members
+is zero, then
+.Fa set
+is filled in entirely and then each entry in
+.Fa str
+causes the corresponding entry to be disabled in
+.Fa set.
+If
+.Fa members
+is non-zero, then
+.Fa set
+is empty initially and for each entry in
+.Fa str
+the corresponding entry in
+.Fa set
+will be enabled.
+.Pp
+If an unknown entry is encountered in
+.Fa str
+then the conversion will fail and a pointer to the first unknown
+character will be returned.
+.Sh RETURN VALUES
+Upon successful completion,
+.Dv NULL
+is returned and
+.Fa set
+is filled in. Otherwise, a pointer to the first unknown character is
+returned and
+.Sy errno
+is set to indicate the error.
+.Sh ERRORS
+The
+.Fn proc_str2fltset ,
+.Fn proc_str2sigset ,
+and
+.Fn proc_str2sigset
+functions will fail if:
+.Bl -tag -width Er
+.It Er EINVAL
+.Fa str
+contains an unrecognized set name.
+.El
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+.Sy MT-Safe
+.Sh SEE ALSO
+.Xr libproc 3LIB ,
+.Xr proc_fltname 3PROC ,
+.Xr proc_fltset2str 3PROC ,
+.Xr proc_signame 3PROC ,
+.Xr proc_sigset2str 3PROC ,
+.Xr proc_str2flt 3PROC ,
+.Xr proc_str2sig 3PROC ,
+.Xr proc_str2sys 3PROC ,
+.Xr proc_sysname 3PROC ,
+.Xr proc_sysset2str 3PROC ,
+.Xr proc 4

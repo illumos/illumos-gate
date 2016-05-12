@@ -26,6 +26,7 @@
  * Portions Copyright 2007 Chad Mynhier
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
+ * Copyright 2015, Joyent, Inc.
  */
 
 #include <assert.h>
@@ -1319,6 +1320,13 @@ Pldt(struct ps_prochandle *P, struct ssd *pldt, int nldt)
 
 }
 #endif	/* __i386 */
+
+/* ARGSUSED */
+void
+Ppriv_free(struct ps_prochandle *P, prpriv_t *prv)
+{
+	free(prv);
+}
 
 /*
  * Return a malloced process privilege structure in *pprv.

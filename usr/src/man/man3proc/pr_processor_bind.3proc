@@ -1,0 +1,106 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PR_PROCESSOR_BIND 3PROC
+.Os
+.Sh NAME
+.Nm pr_processor_bind
+.Nd inject processor_bind system call into victim process
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft int
+.Fo pr_processor_bind
+.Fa "struct ps_prochandle *P"
+.Fa "idtype_t idtype"
+.Fa "id_t id"
+.Fa "int processorid"
+.Fa "int *obind"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn pr_processor_bind
+function injects the
+.Xr processor_bind 2
+system call into the target process
+.Fa P
+by means of the agent LWP.
+If the process handle
+.Fa P
+is the value
+.Dv NULL
+then this will be equivalent to calling
+.Xr processor_bind 2
+on the currently running process.
+.Pp
+The arguments
+.Fa idtype ,
+.Fa id ,
+.Fa processorid ,
+and
+.Fa obind
+have the same meaning as in
+.Xr processor_bind 2 .
+See
+.Xr processor_bind 2
+for the full description and purpose of the
+.Sy processor_bind
+system call and its arguments.
+.Pp
+The
+.Fn pr_processor_bind
+function only works on active processes. Process handles that correspond
+to core files, zombie processes, or ELF objects do not support system
+call injection.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn pr_processor_bind
+function's return value is that described in
+.Xr processor_bind 2 .
+Otherwise,
+.Sy -1
+is returned and
+.Sy errno
+is set to
+.Er ENOSYS
+to indicate that the system call could not be injected.
+.Sh ERRORS
+For the full list of errors see the
+.Sy ERRORS
+section in
+.Xr processor_bind 2 .
+.Pp
+The
+.Fn pr_processor_bind
+function will fail if:
+.Bl -tag -width Er
+.It Er ENOSYS
+An error occurred while trying to invoke the agent LWP and inject a
+system call in the process handle
+.Fa P
+or the process handle
+.Fa P
+does not support system call injection.
+.El
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr processor_bind 2 ,
+.Xr libproc 3LIB ,
+.Xr proc 4

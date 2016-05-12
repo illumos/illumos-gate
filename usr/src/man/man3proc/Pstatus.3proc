@@ -1,0 +1,58 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PSTATUS 3PROC
+.Os
+.Sh NAME
+.Nm Pstatus
+.Nd obtain process status structure
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft "const pstatus_t *"
+.Fo Pstatus
+.Fa "struct ps_prochandle *P"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Pstatus
+function returns the status information about the process handle
+.Fa P .
+The
+.Sy pstatus_t
+structure is defined in
+.Xr proc 4
+and contains information about the process including its flags, the
+number of threads, the size of the stack, and more.
+.Pp
+The returned pointer is only valid as long as the process handle
+.Fa P
+is valid. After a call to
+.Xr Prelease 3PROC ,
+the returned data pointer is invalid.
+.Sh RETURN VALUES
+The
+.Fn Pstatus
+function always returns a pointer to the process's status.
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr libproc 3LIB ,
+.Xr Prelease 3PROC ,
+.Xr proc 4

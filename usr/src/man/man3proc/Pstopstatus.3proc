@@ -1,0 +1,235 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PSTOPSTATUS 3PROC
+.Os
+.Sh NAME
+.Nm Pdstop ,
+.Nm Pstopstatus ,
+.Nm Pstop ,
+.Nm Pwait ,
+.Nm Ldstop
+.Nm Lstop ,
+.Nm Lwait
+.Nd process and thread stop operations
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft int
+.Fo Pdstop
+.Fa "struct ps_prochandle *P"
+.Fc
+.Ft int
+.Fo Pstopstatus
+.Fa "struct ps_prochandle *P"
+.Fa "long request"
+.Fa "uint_t msec"
+.Fc
+.Ft int
+.Fo Pstop
+.Fa "struct ps_prochandle *P"
+.Fc
+.Ft int
+.Fo Pwait
+.Fa "struct ps_prochandle *P"
+.Fc
+.Ft int
+.Fo Ldstop
+.Fa "struct ps_lwphandle *L"
+.Fc
+.Ft int
+.Fo Lstop
+.Fa "struct ps_lwphandle *L"
+.Fc
+.Ft int
+.Fo Lwait
+.Fa "struct ps_lwphandle *L"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Pstopstatus
+function allows the caller to stop and optionally wait for the process
+handle referred to by
+.Fa P
+to be stopped. Stopping a process causes all of its threads to stop
+execution. Where in their execution the threads will halt is not
+defined. Threads may be resumed with
+.Xr Psetrun 3PROC
+and
+.Xr prun 1 .
+.Pp
+The
+.Fa request
+argument should be one of the following symbols:
+.Bl -tag -width Dv -offset indent
+.It Dv PCSTOP
+Stop the process; wait for completion before returning.
+.It Dv PCDSTOP
+Stop the process; do not wait for completion before returning. That
+is, the stopping of the process is performed asynchronously in
+relation to the caller.
+.It Dv PCWSTOP
+Do not direct the process to stop; simply wait for it to stop.
+.It Dv PCNULL
+Do not direct the process to stop; simply refreshes the state of the
+process.
+.El
+.Pp
+Both the
+.Dv PCSTOP
+and
+.Dv PCWSTOP
+requests allow an upper bound on the amount of time to wait for the
+process to stop. The
+.Fa msec
+argument indicates the number of milliseconds to wait for the stop to
+complete. If the value of
+.Fa msec
+is
+.Sy 0 ,
+then it will wait forever. Callers should pass
+.Sy 0
+for
+.Fa msec
+when the request is
+.Dv PCDSTOP
+or
+.Dv PCNULL .
+.Pp
+When a non-zero timeout is specified, the process may or may not be
+stopped upon return. The return value does not reflect the current
+state of the process. For example, if the timeout expires during a
+.Fa PCWSTOP
+request, the return value will be
+.Sy 0
+regardless of the actual state of the process.
+.Pp
+Only active processes may be stopped. Handles that refer to core
+files, zombie processes, or files cannot be used; unless the value of
+.Fa request
+is set to
+.Dv PCNULL .
+.Pp
+The
+.Fn Pstop
+function is is equivalent to calling the
+.Fn Pstopstatus
+function with the request set to
+.Dv PCSTOP
+and an infinite timeout.
+.Pp
+The
+.Fn Pwait
+function is is equivalent to calling the
+.Fn Pstopstatus
+function with the request set to
+.Dv PCWSTOP
+and an infinite timeout.
+.Pp
+The
+.Fn Pdstop
+function is is equivalent to calling the
+.Fn Pstopstatus
+function with the request set to
+.Dv PCDSTOP .
+.Pp
+The
+.Fn Ldstop ,
+.Fn Lstop ,
+and
+.Fn Lwait
+functions are equivalent to the
+.Fn Pdstop ,
+.Fn Pstop ,
+and
+.Fn Pwait
+functions, respectively. Except, rather than operating on a process,
+they operate on the thread handle
+.Fa L .
+A call to
+.Fn Lstop
+stops only a single thread; whereas
+.Fn Pstop
+stops every thread in the process.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn Pdstop ,
+.Fn Pstopstatus ,
+.Fn Pstop ,
+.Fn Pwait ,
+.Fn Ldstop ,
+.Fn Lstop ,
+and
+.Fn Lwait
+functions return
+.Sy 0 .
+Otherwise,
+.Sy -1
+is returned and
+.Dv errno
+is set to indicate the error that occurred.
+.Sh ERRORS
+For a full list of possible errors see the
+.Sy DIAGNOSTICS
+section in
+.Xr proc 4 .
+.Pp
+The
+.Fn Pdstop ,
+.Fn Pstopstatus ,
+.Fn Pstop ,
+.Fn Pwait ,
+.Fn Ldstop ,
+.Fn Lstop ,
+and
+.Fn Lwait
+functions will fail if:
+.Bl -tag -width Er
+.It Er EAGAIN
+Control over the handle
+.Fa P
+was lost. Callers should call
+.Xr Preopen 3PROC .
+For more information on losing control, see
+.Sy PROGRAMMING NOTES
+in
+.Xr proc 4 .
+.It Er ENOENT
+The request was not
+.Dv PCNULL
+and the process handle
+.Fa P
+does not refer to an active process, but refers to a core file, a zombie
+process, or a file.
+.It Er EINVAL
+.Fa request
+is not valid or the process is in an unknown state.
+.It Er EPROTO
+A fatal protocol error occurred and the process could not be stopped.
+.El
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr libproc 3LIB ,
+.Xr Lgrab 3PROC ,
+.Xr Pcreate 3PROC ,
+.Xr Pgrab 3PROC ,
+.Xr Pgrab_core 3PROC ,
+.Xr Pgrab_file 3PROC ,
+.Xr proc 4

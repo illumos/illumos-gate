@@ -1,0 +1,86 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PCLEARSIG 3PROC
+.Os
+.Sh NAME
+.Nm Pclearsig ,
+.Nm Lclearsig
+.Nd clear process signals
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft int
+.Fo Pclearsig
+.Fa "struct ps_prochandle *P"
+.Fc
+.Ft int
+.Fo Lclearsig
+.Fa "struct ps_lwphandle *L"
+.Fc
+.Sh DESCRIPTION
+During normal operation a process may receive a signal. Signals may
+indicate an error, for example referencing unmapped memory, an alarm
+firing, requests for information, and users requesting an interruption.
+For more information on the generation and usage of signals, see
+.Xr signal.h 3HEAD .
+.Pp
+The
+.Fn Pclearsig
+function instructs the system to clear any signal pending delivery to
+a thread in the process represented by the process handle
+.Fa P .
+The pending signal will never be delivered to process represented by
+.Fa P .
+.Pp
+The
+.Fn Lclearsig
+function is identical to the
+.Fn Pclearsig
+function, except rather than operating on the process and its
+representive thread, it instead operates on the thread handle
+.Fa L .
+.Pp
+The
+.Fn Pclearsig
+function only has meaning for active processes. It will fail on process
+handles corresponding to core files, zombie processes and ELF objects.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn Pclearsig
+function clears pending faults and
+returns
+.Sy 0 .
+Otherwise,
+.Sy -1
+is returned,
+.Sy errno
+is set to indicate the error,
+and no faults are cleared.
+.Sh ERRORS
+For a full list of possible errors see the
+.Sy DIAGNOSTICS
+section in
+.Xr proc 4 .
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr signal.h 3HEAD ,
+.Xr libproc 3LIB ,
+.Xr proc 4

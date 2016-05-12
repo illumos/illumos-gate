@@ -1,0 +1,72 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PCTFLD 3PROC
+.Os
+.Sh NAME
+.Nm Pctlfd
+.Nd obtain the process control file descriptor
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft int
+.Fo Pctlfd
+.Fa "struct ps_prochandle *P"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Pctlfd
+function returns a file descriptor to the underlying /proc file system
+.Sy ctl
+file for the process identified by the handle
+.Fa P .
+This may be used for injecting control operations manually;
+however, many interfaces for using it are provided by
+.Xr libproc 3LIB
+itself.
+.Pp
+Only live processes have a control file descriptor. Process handles that
+correspond to files and cores, created through
+.Xr Prab_file 3PROC
+and
+.Xr Pgrab_core 3PROC ,
+do not have a corresponding file descriptor.
+.Pp
+The file descriptor is invalidated when the process handle is released
+through
+.Xr Prelease 3PROC
+or if control is lost and the handle is reopened.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn Pctlfd
+function returns a valid file descriptor. Otherwise, if none exists,
+then
+.Sy -1
+is returned.
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr libproc 3LIB ,
+.Xr Pcreate 3PROC ,
+.Xr Pgrab 3PROC ,
+.Xr Pgrab_core 3PROC ,
+.Xr Pgrab_file 3PROC ,
+.Xr Prelease 3PROC ,
+.Xr Preopen 3PROC ,
+.Xr proc 4

@@ -1,0 +1,196 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PR_STAT 3PROC
+.Os
+.Sh NAME
+.Nm pr_fstat ,
+.Nm pr_fstat64
+.Nm pr_lstat ,
+.Nm pr_lstat64 ,
+.Nm pr_stat ,
+.Nm pr_stat64
+.Nd inject stat system call into victim process
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft int
+.Fo pr_fstat
+.Fa "struct ps_prochandle *P"
+.Fa "int fd"
+.Fa "struct stat *buf"
+.Fc
+.Ft int
+.Fo pr_fstat64
+.Fa "struct ps_prochandle *P"
+.Fa "int fd"
+.Fa "struct stat64 *buf"
+.Fc
+.Ft int
+.Fo pr_lstat
+.Fa "struct ps_prochandle *P"
+.Fa "const char *path"
+.Fa "struct stat *buf"
+.Fc
+.Ft int
+.Fo pr_lstat64
+.Fa "struct ps_prochandle *P"
+.Fa "const char *path"
+.Fa "struct stat64 *buf"
+.Fc
+.Ft int
+.Fo pr_stat
+.Fa "struct ps_prochandle *P"
+.Fa "const char *path"
+.Fa "struct stat *buf"
+.Fc
+.Ft int
+.Fo pr_stat64
+.Fa "struct ps_prochandle *P"
+.Fa "const char *path"
+.Fa "struct stat64 *buf"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn pr_stat ,
+.Fn pr_lstat ,
+and
+.Fn pr_fast
+functions inject the
+.Xr stat 2 ,
+.Xr lstat 2 ,
+and
+.Xr fstat 2
+system calls respectively into the target process
+.Fa P
+by means of the agent LWP.
+If the process handle
+.Fa P
+is the value
+.Dv NULL
+then this will be equivalent to calling
+.Xr stat 2 ,
+.Xr lstat 2 ,
+or
+.Xr fstat 2
+on the currently running process.
+.Pp
+The arguments
+.Fa path ,
+and
+.Fa buf
+to the
+.Fn pr_stat
+function have the same meaning as in
+.Xr stat 2 .
+See
+.Xr stat 2
+for the full description and purpose of the
+.Sy stat
+system call and its arguments.
+.Pp
+The arguments
+.Fa fd ,
+and
+.Fa buf
+to the
+.Fn pr_fstat
+function have the same meaning as in
+.Xr fstat 2 ,
+see
+.Xr fstat 2
+for the full description and purpose of the
+.Sy fstat
+system call and its arguments.
+.Pp
+The arguments
+.Fa path ,
+and
+.Fa buf
+to the
+.Fn pr_lstat
+function have the same meaning as in
+.Xr lstat 2 ,
+see
+.Xr lstat 2
+for the full description and purpose of the
+.Sy lstat
+system call and its arguments.
+.Pp
+The
+.Fn pr_stat ,
+.Fn pr_lstat ,
+and
+.Fn pr_fstat
+functions only work on active processes. Process handles that correspond
+to core files, zombie processes, or ELF objects do not support system
+call injection.
+.Pp
+The
+.Fn pr_stat64 ,
+.Fn pr_fstat64 ,
+and
+.Fn pr_lstat64
+functions are equivalent to
+.Fn pr_stat ,
+.Fn pr_fstat ,
+and
+.Fn pr_lstat
+respectively; however, rather than having the stat information be
+subject to the data model of the target process, they always provide
+64-bit stat information. See
+.Xr lf64 5
+for more information.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn pr_stat
+function's return value is that described in
+.Xr stat 2 .
+Otherwise,
+.Sy -1
+is returned and
+.Sy errno
+is set to
+.Er ENOSYS
+to indicate that the system call could not be injected.
+.Sh ERRORS
+For the full list of errors see the
+.Sy ERRORS
+section in
+.Xr stat 2 .
+.Pp
+The
+.Fn pr_stat
+function will fail if:
+.Bl -tag -width Er
+.It Er ENOSYS
+An error occurred while trying to invoke the agent LWP and inject a
+system call in the process handle
+.Fa P
+or the process handle
+.Fa P
+does not support system call injection.
+.El
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr stat 2 ,
+.Xr libproc 3LIB ,
+.Xr proc 4 ,
+.Xr lf64 5

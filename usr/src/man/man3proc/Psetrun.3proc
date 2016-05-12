@@ -1,0 +1,152 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PSETRUN 3PROC
+.Os
+.Sh NAME
+.Nm Psetrun ,
+.Nm Lsetrun
+.Nd run a stopped process or thread
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft int
+.Fo Psetrun
+.Fa "struct ps_prochandle *P"
+.Fa "int sig"
+.Fa "int flags"
+.Fc
+.Ft int
+.Fo Lsetrun
+.Fa "struct ps_lwphandle *L"
+.Fa "int sig"
+.Fa "int flags"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Psetrun
+function resumes the stopped process handle
+.Fa P
+and transitions the process to running.
+If
+.Fa sig
+is non-zero, then the
+.Fn Psetrun
+function causes the signal to be delivered. See
+.Xr signal.h 3HEAD
+for a list of valid signal identifiers.
+.Pp
+The
+.Fa flags
+member modifies the behavior of the resumed handle. The following values
+may be combined by a bitwise-inclusive-OR:
+.Bl -tag -width Dv -offset indent
+.It Dv PRCSIG
+Clears the current signal, if any.
+.It Dv PRCFAULT
+Clears the current fault, if any.
+.It Dv PRSTEP
+Indicates that the thread should single-step over the next machine
+instruction and upon completion, inject a trap. For the specific
+mechanics of single-stepping and what traps or signals will be injected,
+see the
+.Sy PRSTEP
+section of
+.Xr proc 4 .
+.It Dv PRSABORT
+Indicates that the thread should abort the system call that it is
+currently executing. This is only valid if the thread is stopped because
+it is asleep or right before a system call. This will cause the system
+call to return
+.Er EINTR .
+.El
+.Pp
+If
+both
+.Dv PRCSIG
+is specified and
+.Fa sig
+is non-zero, then the
+.Dv PRCSIG
+request takes priority, and it will be treated as though
+.Fa sig
+was passed the argument
+.Sy 0 .
+.Pp
+When the process is resumed all extent tracing flags and register
+changes will be synchronized with the process. For more information on
+resuming a thread see the
+.Sy PCRUN
+section in
+.Xr proc 4 .
+.Pp
+Note, the
+.Fn Psetrun
+function is only valid for active processes. It will fail on process
+handles that refer to core files, zombie processes, and ELF objects.
+.Pp
+The
+.Fn Lsetrun
+function is equivalent to the
+.Fn Psetrun
+function, except rather than operating on a process it operates on a
+thread.
+.Fn Lsetrun
+causes the specified thread,
+.Fa L ,
+to resume execution. Whereas
+.Fn Psetrun
+causes all threads in the process to resume.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn Psetrun
+and
+.Fn Lsetrun
+functions return
+.Sy 0 .
+Otherwise,
+.Sy -1
+is returned and
+.Sy errno
+is set to indicate the error.
+.Sh ERRORS
+For a full list of possible errors see the
+.Sy DIAGNOSTICS
+section in
+.Xr proc 4 .
+.Pp
+The
+.Fn Psetrun
+and
+.Fn Lsetrun
+functions will fail if:
+.Bl -tag -width Er
+.It Er EBUSY
+The process handle
+.Fa P
+is not currently stopped or it is not stopped due to an event of
+interest, a directed stop, or it is asleep in a system call.
+.El
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr signal.h 3HEAD ,
+.Xr libproc 3LIB ,
+.Xr Pstatus 3PROC ,
+.Xr proc 4

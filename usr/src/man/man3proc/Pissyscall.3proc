@@ -1,0 +1,91 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PISSYSCALL 3PROC
+.Os
+.Sh NAME
+.Nm Pissyscall ,
+.Nm Pissyscall_prev ,
+.Nd determine if instructions are system call instructions
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft int
+.Fo Pissyscall
+.Fa "struct ps_prochandle *P"
+.Fa "uintptr_t addr"
+.Fc
+.Ft int
+.Fo Pissyscall_prev
+.Fa "struct ps_prochandle *P"
+.Fa "uintptr_t addr"
+.Fa "uintptr_t *dst"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Pissyscall
+function determines whether or not the instructions at
+.Fa addr
+in the process handle
+.Fa P
+corresponds to one of the architecture's system call instructions.
+.Pp
+the
+.Fn Pissyscall_prev
+function determines whether or not the instruction before
+.Fa addr
+in the process handle
+.Fa P
+corresponds to one of the architecture's system call instructions. If it
+does, and
+.Fa dst
+is a
+.Pf non- Dv NULL
+pointer, then the address of the system call instruction will be copied
+into the location pointed to by
+.Fa dst .
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn Pissyscall
+function returns
+.Sy non-zero
+if
+.Fa addr
+corresponds to a system call instruction. Otherwise,
+.Sy 0
+is returned.
+.Pp
+Upon successful completion, the
+.Fn Pissyscall_prev
+function returns
+.Sy non-zero
+if
+.Fa addr
+corresponds to a system call instruction and if
+.Fa dst
+is
+.Pf non- Dv NULL ,
+.Fa dst
+is updated. Otherwise,
+.Sy 0
+is returned.
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr libproc 3LIB

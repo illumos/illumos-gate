@@ -1,0 +1,73 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PENV_ITER 3PROC
+.Os
+.Sh NAME
+.Nm Penv_iter
+.Nd iterate process environment
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft int
+.Fo Penv_iter
+.Fa "struct ps_prochandle *P"
+.Fa "proc_env_f *func"
+.Fa "void *data"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Penv_iter
+function iterates over the environment of the process represented by
+.Fa P .
+For each environment variable,
+.Fa func
+is passed the caller argument
+.Fa data
+along with the address of the environment variable and the key-value
+pair. For the full signature of the
+.Ft proc_env_f
+callback, see
+.Xr libproc 3LIB .
+.Pp
+The callback's return value controls whether or not iteration
+proceeds. If
+.Fa func
+returns zero, then iteration continues. Otherwise, iteration is
+terminated and the value if returned. It is recommend that callback
+functions do not return
+.Sy -1
+so as to distinguish between the failure of the
+.Fn Penv_iter
+function and the callback function.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn Penv_iter
+function returns
+.Sy 0 .
+Otherwise, if there was an internal error, for example due to a
+corrupted environment, then
+.Sy -1
+is returned. Otherwise, if the callback function
+.Fa func
+returns non-zero, then its return value will be returned instead.
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr libproc 3LIB
