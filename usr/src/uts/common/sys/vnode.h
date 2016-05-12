@@ -743,7 +743,7 @@ typedef enum vnevent	{
 	VE_TRUNCATE = 9,	/* Truncate */
 	VE_PRE_RENAME_SRC = 10,	/* Pre-rename, with vnode as source */
 	VE_PRE_RENAME_DEST = 11, /* Pre-rename, with vnode as target/dest. */
-	VE_PRE_RENAME_DEST_DIR = 12 /* Pre-rename with vnode as target dir */
+	VE_PRE_RENAME_DEST_DIR = 12, /* Pre-rename with vnode as target dir */
 	VE_RENAME_SRC_DIR = 13	/* Rename with vnode as source dir */
 } vnevent_t;
 
