@@ -143,6 +143,8 @@ static boolean_t forced_login = B_FALSE;
 #define	DEF_PATH	"/usr/sbin:/usr/bin"
 #define	LX_DEF_PATH	"/bin:/usr/sbin:/usr/bin"
 
+#define	MAX_RETRY	30
+
 #define	CLUSTER_BRAND_NAME	"cluster"
 
 /*
@@ -264,13 +266,14 @@ postfork_dropprivs()
 }
 
 static int
-connect_zone_sock(const char *zname, const char *suffix)
+connect_zone_sock(const char *zname, const char *suffix, boolean_t verbose)
 {
 	int sockfd = -1;
 	struct sockaddr_un servaddr;
 
 	if ((sockfd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
-		zperror(gettext("could not create socket"));
+		if (verbose)
+			zperror(gettext("could not create socket"));
 		return (-1);
 	}
 
@@ -280,7 +283,8 @@ connect_zone_sock(const char *zname, const char *suffix)
 	    "%s/%s.%s", ZONES_TMPDIR, zname, suffix);
 	if (connect(sockfd, (struct sockaddr *)&servaddr,
 	    sizeof (servaddr)) == -1) {
-		zperror(gettext("Could not connect to zone"));
+		if (verbose)
+			zperror(gettext("Could not connect to zone"));
 		close(sockfd);
 		return (-1);
 	}
@@ -1878,12 +1882,13 @@ get_username()
 }
 
 static boolean_t
-zlog_mode_logging(char *zonename)
+zlog_mode_logging(char *zonename, boolean_t *found)
 {
 	boolean_t lm = B_FALSE;
 	zone_dochandle_t handle;
 	struct zone_attrtab attr;
 
+	*found = B_FALSE;
 	if ((handle = zonecfg_init_handle()) == NULL)
 		return (lm);
 
@@ -1896,6 +1901,7 @@ zlog_mode_logging(char *zonename)
 		if (strcmp("zlog-mode", attr.zone_attr_name) == 0) {
 			int len = strlen(attr.zone_attr_value);
 
+			*found = B_TRUE;
 			if (strncmp("log", attr.zone_attr_value, 3) == 0 ||
 			    strncmp("nolog", attr.zone_attr_value, 5) == 0 ||
 			    (len >= 3 && attr.zone_attr_value[len - 2] == '-'))
@@ -2173,10 +2179,25 @@ main(int argc, char **argv)
 	 */
 	if (console) {
 		int gz_stderr_fd = -1;
+		int retry;
 		boolean_t set_raw = B_TRUE;
 
-		if (imode && zlog_mode_logging(zonename))
-			set_raw = B_FALSE;
+		if (imode) {
+			boolean_t has_zfd_config;
+
+			if (zlog_mode_logging(zonename, &has_zfd_config))
+				set_raw = B_FALSE;
+
+			/*
+			 * Asked for standalone interactive mode but the
+			 * zlog-mode attribute is not configured on the zone.
+			 */
+			if (!has_zfd_config) {
+				zerror(gettext("'%s' is not configured on "
+				    "the zone"), "zlog-mode");
+				return (1);
+			}
+		}
 
 		/*
 		 * Ensure that zoneadmd for this zone is running.
@@ -2186,32 +2207,38 @@ main(int argc, char **argv)
 
 		/*
 		 * Make contact with zoneadmd.
+		 *
+		 * Handshake with the control socket first. We handle retries
+		 * here since the relevant thread in zoneadmd might not have
+		 * finished setting up yet.
 		 */
-		if (!imode) {
-			masterfd = connect_zone_sock(zonename, "console_sock");
-			if (masterfd == -1) {
-				return (1);
-			}
-			if (handshake_zone_sock(masterfd,
-			    connect_flags) != 0) {
-				(void) close(masterfd);
-				return (1);
-			}
-		} else {
-			/* handshake with the control socket first */
-			ctlfd = connect_zone_sock(zonename, "server_ctl");
-			if (ctlfd == -1) {
-				return (1);
-			}
-			if (handshake_zone_sock(ctlfd,
-			    connect_flags) != 0) {
-				(void) close(ctlfd);
-				return (1);
-			}
-			/* then open the io-related sockets */
-			masterfd = connect_zone_sock(zonename, "server_out");
+		for (retry = 0; retry < MAX_RETRY; retry++) {
+			masterfd = connect_zone_sock(zonename,
+			    (imode ? "server_ctl" : "console_sock"), B_FALSE);
+			if (masterfd != -1)
+				break;
+			sleep(1);
+		}
+
+		if (retry == MAX_RETRY) {
+			zerror(gettext("unable to connect for %d seconds"),
+			    MAX_RETRY);
+			return (1);
+		}
+
+		if (handshake_zone_sock(masterfd, connect_flags) != 0) {
+			(void) close(masterfd);
+			return (1);
+		}
+
+		if (imode) {
+			ctlfd = masterfd;
+
+			/* Now open the io-related sockets */
+			masterfd = connect_zone_sock(zonename, "server_out",
+			    B_TRUE);
 			gz_stderr_fd = connect_zone_sock(zonename,
-			    "server_err");
+			    "server_err", B_TRUE);
 			if (masterfd == -1 || gz_stderr_fd == -1) {
 				(void) close(ctlfd);
 				(void) close(masterfd);
