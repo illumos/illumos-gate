@@ -398,6 +398,12 @@ typedef struct {
 
 typedef struct {
 	kstat_named_t	zm_zonename;
+	kstat_named_t	zm_rss;
+	kstat_named_t	zm_phys_cap;
+	kstat_named_t	zm_swap;
+	kstat_named_t	zm_swap_cap;
+	kstat_named_t	zm_nover;
+	kstat_named_t	zm_pagedout;
 	kstat_named_t	zm_pgpgin;
 	kstat_named_t	zm_anonpgin;
 	kstat_named_t	zm_execpgin;
@@ -423,16 +429,6 @@ typedef struct {
 	kstat_named_t	zm_init_pid;
 	kstat_named_t	zm_boot_time;
 } zone_misc_kstat_t;
-
-typedef struct {
-	kstat_named_t	zm_zonename;
-	kstat_named_t	zm_rss;
-	kstat_named_t	zm_phys_cap;
-	kstat_named_t	zm_swap;
-	kstat_named_t	zm_swap_cap;
-	kstat_named_t	zm_nover;
-	kstat_named_t	zm_pagedout;
-} zone_mcap_kstat_t;
 
 typedef struct zone {
 	/*
