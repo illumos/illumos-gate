@@ -2148,7 +2148,7 @@ sdev_cleandir(struct sdev_node *ddv, char *expr, uint_t flags)
 	int error = 0;
 	int busy = 0;
 	struct vnode *vp;
-	struct sdev_node *dv;
+	struct sdev_node *dv, *next;
 	int bkstore = 0;
 	int len = 0;
 	char *bks_name = NULL;
@@ -2159,7 +2159,8 @@ sdev_cleandir(struct sdev_node *ddv, char *expr, uint_t flags)
 	 * We try our best to destroy all unused sdev_node's
 	 */
 	rw_enter(&ddv->sdev_contents, RW_WRITER);
-	while ((dv = SDEV_FIRST_ENTRY(ddv)) != NULL) {
+	for (dv = SDEV_FIRST_ENTRY(ddv); dv != NULL; dv = next) {
+		next = SDEV_NEXT_ENTRY(ddv, dv);
 		vp = SDEVTOV(dv);
 
 		if (expr && gmatch(dv->sdev_name, expr) == 0)

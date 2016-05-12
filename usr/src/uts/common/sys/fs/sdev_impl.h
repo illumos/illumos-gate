@@ -488,6 +488,7 @@ extern int sdev_copyin_mountargs(struct mounta *, struct sdev_mountargs *);
 extern int sdev_reserve_subdirs(struct sdev_node *);
 extern int prof_lookup();
 extern void prof_filldir(struct sdev_node *);
+extern int prof_name_matched(char *, struct sdev_node *);
 extern int devpts_validate(struct sdev_node *dv);
 extern int devnet_validate(struct sdev_node *dv);
 extern int devipnet_validate(struct sdev_node *dv);
