@@ -10,7 +10,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\" See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DF 1M "Nov 15, 2012"
+.TH DF 1M "Apr 14, 2016"
 .SH NAME
 df \- displays number of free disk blocks and free files
 .SH SYNOPSIS
@@ -22,7 +22,6 @@ df \- displays number of free disk blocks and free files
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBdf\fR utility displays the amount of disk space occupied by mounted or
 unmounted file systems, the amount of used and available space, and how much of
@@ -40,7 +39,6 @@ If \fBdf\fR is run on a networked mount point that the automounter has not yet
 mounted, the file system size will be reported as zero. As soon as the
 automounter mounts the file system, the sizes will be reported correctly.
 .SH OPTIONS
-.sp
 .ne 2
 .na
 \fB\fB-a\fR\fR
@@ -280,7 +278,6 @@ Same as \fB-h\fR except in 512-byte units.
 .RE
 
 .SH OPERANDS
-.sp
 .LP
 The \fBdf\fR utility interprets operands according to the following precedence:
 \fIblock_device\fR, \fIdirectory\fR, \fIfile\fR. The following operands are
@@ -328,7 +325,6 @@ Represents an \fBNFS\fR resource name.
 .RE
 
 .SH USAGE
-.sp
 .LP
 See \fBlargefile\fR(5) for the description of the behavior of \fBdf\fR when
 encountering files greater than or equal to 2 Gbyte ( 2^31 bytes).
@@ -414,27 +410,11 @@ example%\fB/usr/bin/df -F ufs -o i\fR
 .sp
 
 .SH ENVIRONMENT VARIABLES
-.sp
-.ne 2
-.na
-\fB\fBSYSV3\fR\fR
-.ad
-.sp .6
-.RS 4n
-This variable is used to override the default behavior of \fBdf\fR and provide
-compatibility with INTERACTIVE UNIX System and \fBSCO\fR UNIX installation
-scripts. As the \fBSYSV3\fR variable is provided for compatibility purposes
-only, it should not be used in new scripts.
-.RE
-
-.sp
 .LP
-When set, any header which normally displays "files" will now display "nodes".
 See \fBenviron\fR(5) for descriptions of the following environment variables
 that affect the execution of \fBdf\fR: \fBLANG\fR, \fBLC_ALL\fR,
 \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -458,7 +438,6 @@ An error occurred.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/dev/dsk/*\fR\fR
@@ -501,7 +480,6 @@ List of default parameters for each file system
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 
@@ -515,13 +493,11 @@ Interface Stability	Standard
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBfind\fR(1), \fBdf_ufs\fR(1M), \fBmount\fR(1M), \fBstatvfs\fR(2),
 \fBdefault_fs\fR(4), \fBmnttab\fR(4), \fBvfstab\fR(4), \fBattributes\fR(5),
 \fBenviron\fR(5), \fBlargefile\fR(5), \fBstandards\fR(5), \fBobjfs\fR(7FS)
 .SH NOTES
-.sp
 .LP
 If \fBUFS\fR logging is enabled on a file system, the disk space used for the
 log is reflected in the \fBdf\fR report. The log is allocated from free blocks

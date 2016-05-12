@@ -46,6 +46,7 @@
 #include <sys/exec.h>
 #include <sys/kmem.h>
 #include <sys/note.h>
+#include <sys/sdt.h>
 
 /*
  * This is the loadable module wrapper.
@@ -137,19 +138,19 @@ getintphead(struct vnode *vp, struct intpdata *idatap)
 		;
 	if (*cp == '\0')
 		return (ENOEXEC);
-	idatap->intp_name = cp;
+	idatap->intp_name[0] = cp;
 	while (*cp && *cp != ' ')
 		cp++;
-	if (*cp == '\0')
-		idatap->intp_arg = NULL;
-	else {
+	if (*cp == '\0') {
+		idatap->intp_arg[0] = NULL;
+	} else {
 		*cp++ = '\0';
 		while (*cp == ' ')
 			cp++;
 		if (*cp == '\0')
-			idatap->intp_arg = NULL;
+			idatap->intp_arg[0] = NULL;
 		else {
-			idatap->intp_arg = cp;
+			idatap->intp_arg[0] = cp;
 			while (*cp && *cp != ' ')
 				cp++;
 			*cp = '\0';
@@ -158,6 +159,24 @@ getintphead(struct vnode *vp, struct intpdata *idatap)
 	return (0);
 }
 
+/*
+ * We support nested interpreters up to a depth of INTP_MAXDEPTH (this value
+ * matches the depth on Linux). When a nested interpreter is in use, the
+ * previous name and argument must be passed along. We use the intpdata_t
+ * name and argument arrays for this. In the normal, non-nested case, only the
+ * first element in those arrays will be populated.
+ *
+ * For setid scripts the "script hole" is a security race condition between
+ * when we exec the interpreter and when the interpreter reads the script. We
+ * handle this below for the initial script, but we don't allow setid scripts
+ * when using nested interpreters. Because gexec only modifies the credentials
+ * for a setid script at level 0, then if we come back through for a nested
+ * interpreter we know that args->fname will be set (the first script is setid)
+ * and we can return an error. If an intermediate nested interpreter is setid
+ * then it will not be run with different credentials because of the gexec
+ * handling, so it is effectively no longer setid and we don't have to worry
+ * about the "script hole".
+ */
 int
 intpexec(
 	struct vnode *vp,
@@ -181,12 +200,15 @@ intpexec(
 	char devfd[19]; /* 32-bit int fits in 10 digits + 8 for "/dev/fd/" */
 	int fd = -1;
 
-	if (level) {		/* Can't recurse */
-		error = ENOEXEC;
+	if (level >= INTP_MAXDEPTH) {	/* Can't recurse past maxdepth */
+		error = ELOOP;
 		goto bad;
 	}
 
-	ASSERT(idatap == (struct intpdata *)NULL);
+	if (level == 0)
+		ASSERT(idatap == (struct intpdata *)NULL);
+
+	bzero(&idata, sizeof (intpdata_t));
 
 	/*
 	 * Allocate a buffer to read in the interpreter pathname.
@@ -198,7 +220,7 @@ intpexec(
 	/*
 	 * Look the new vnode up.
 	 */
-	if (error = pn_get(idata.intp_name, UIO_SYSSPACE, &intppn))
+	if (error = pn_get(idata.intp_name[0], UIO_SYSSPACE, &intppn))
 		goto fail;
 	pn_alloc(&resolvepn);
 	if (error = lookuppn(&intppn, &resolvepn, FOLLOW, NULLVPP, &nvp)) {
@@ -206,10 +228,41 @@ intpexec(
 		pn_free(&intppn);
 		goto fail;
 	}
+
+	if (level > 0) {
+		/*
+		 * We have a nested interpreter. The previous name(s) and
+		 * argument(s) need to be passed along. We also keep track
+		 * of how often this zone uses nested interpreters.
+		 */
+		int i;
+
+		atomic_inc_32(&curproc->p_zone->zone_nested_intp);
+
+		ASSERT(idatap != NULL);
+		/* since we're shifting up, loop stops one short */
+		for (i = 0; i < (INTP_MAXDEPTH - 1); i++) {
+			idata.intp_name[i + 1] = idatap->intp_name[i];
+			idata.intp_arg[i + 1] = idatap->intp_arg[i];
+		}
+
+		DTRACE_PROBE3(nested__intp, int, level, void *, &idata,
+		    void *, nvp);
+	}
+
 	opath = args->pathname;
 	args->pathname = resolvepn.pn_path;
 	/* don't free resolvepn until we are done with args */
 	pn_free(&intppn);
+
+	/*
+	 * Disallow setuid or additional privilege execution for nested
+	 * interpreters.
+	 */
+	if (level > 0 && args->fname != NULL) {
+		error = ENOEXEC;
+		goto done;
+	}
 
 	/*
 	 * When we're executing a set-uid script resulting in uids

@@ -1,0 +1,71 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PLMID 3PROC
+.Os
+.Sh NAME
+.Nm Plmid
+.Nd get the link-map identifier of an address
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft int
+.Fo Plmid
+.Fa "struct ps_prochandle *P"
+.Fa "uintptr_t addr"
+.Fa "Lmid_t *lmidp"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Plmid
+function attempts to determine the link-map identifier that corresponds
+to the address
+.Fa addr
+in the process
+.Fa P .
+If
+.Fa addr
+does not correspond to an address from an object mapped in by the
+run-time link editor, such as anonymous mapping created with
+.Xr mmap 2 ,
+then there will be no corresponding link-map identifier.
+.Pp
+.Fa lmidp
+must be a
+.Pf non- Dv NULL
+pointer that will be filled in with the link-map identifier when it is
+successfully determined by the run-time link-editor.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn Plmid
+function returns
+.Sy 0
+and updates
+.Fa lmidp
+with the link-map identifier of
+.Fa addr .
+Otherwise,
+.Sy -1
+is returned to indicate that the link-map identifier could not be
+determined.
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr libproc 3LIB ,
+.Xr proc 4

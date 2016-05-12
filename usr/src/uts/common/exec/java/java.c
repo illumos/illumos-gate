@@ -145,9 +145,9 @@ javaexec(vnode_t *vp, struct execa *uap, struct uarg *args,
 	 * Find and invoke the Java runtime environment on the file
 	 */
 	idata.intp = NULL;
-	idata.intp_name = jexec;
-	idata.intp_arg = jexec_arg;
-	if (error = pn_get(idata.intp_name, UIO_SYSSPACE, &lookpn))
+	idata.intp_name[0] = jexec;
+	idata.intp_arg[0] = jexec_arg;
+	if (error = pn_get(idata.intp_name[0], UIO_SYSSPACE, &lookpn))
 		return (error);
 	pn_alloc(&resolvepn);
 	if (error = lookuppn(&lookpn, &resolvepn, FOLLOW, NULLVPP, &nvp)) {

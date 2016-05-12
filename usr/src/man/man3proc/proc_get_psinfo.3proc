@@ -1,0 +1,56 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PROC_GET_PSINFO 3PROC
+.Os
+.Sh NAME
+.Nm proc_get_psinfo
+.Nd get process ps information
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft int
+.Fo proc_get_psinfo
+.Fa "pid_t pid"
+.Fa "psinfo_t *psp"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn proc_get_psinfo
+function is a convenient way to read the /proc psinfo file for the
+process
+.Fa pid .
+The
+.Xr ps 1
+related information of the process will be filled into
+.Fa psp .
+The definition of the
+.Sy psinfo_t
+structure may be found in
+.Xr proc 4 .
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn proc_get_psinfo
+function returns
+.Sy 0 .
+Otherwise,
+.Sy -1
+is returned to indicate an error occurred.
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+.Sy MT-Safe
+.Sh SEE ALSO
+.Xr libproc 3LIB ,
+.Xr proc 4

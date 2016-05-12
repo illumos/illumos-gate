@@ -126,8 +126,10 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	Pgrab_file;
 	Pgrab_ops;
 	Pisprocdir;
+	Pissyscall;
 	Pissyscall_prev;
 	Plmid;
+	Plmid_to_ctf;
 	Plmid_to_loadobj;
 	Plmid_to_map;
 	Plookup_by_addr;
@@ -156,6 +158,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	Ppltdest;
 	Ppriv;
 	Pprivinfo;
+	Ppriv_free;
 	Ppsinfo;
 	Pputareg;
 	pr_access;
@@ -204,6 +207,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	proc_fltname;
 	proc_fltset2str;
 	proc_flushstdio;
+	proc_free_priv;
 	proc_get_auxv;
 	proc_get_cred;
 	proc_get_priv;

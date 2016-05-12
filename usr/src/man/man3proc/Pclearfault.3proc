@@ -1,0 +1,90 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PCLEARFAULT 3PROC
+.Os
+.Sh NAME
+.Nm Pclearfault ,
+.Nm Lclearfault
+.Nd clear process and thread faults
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft int
+.Fo Pclearfault
+.Fa "struct ps_prochandle *P"
+.Fc
+.Ft int
+.Fo Lclearfault
+.Fa "struct ps_lwphandle *L"
+.Fc
+.Sh DESCRIPTION
+During normal operation a process may encounter a
+.Sy fault ,
+due to a hardware exception, identifying a problem with the running
+process. Hardware faults include things like executing illegal
+instructions, encountering a breakpoint, and arithmetic exceptions.
+Faults are discussed further in
+.Xr proc 4 .
+.Pp
+The
+.Fn Pclearfault
+function instructs the system to clear any fault pending delivery to a
+thread in the process represented by the process handle
+.Fa P .
+The pending fault will never be delivered to process represented by
+.Fa P .
+.Pp
+The
+.Fn Lclearfault
+function is identical to the
+.Fn Pclearfault
+function, except rather than operating on the representative thread of
+the process it operates on the thread handle
+.Fa L .
+.Pp
+The
+.Fn Pclearfault
+and
+.Fn Lclearfault
+functions only have meaning for active processes. They will fail on process
+handles corresponding to zombie processes, ELF objects, and cores.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn Pclearfault
+and
+.Fn Lclearfault
+functions clear pending faults and return
+.Sy 0 .
+Otherwise,
+.Sy -1
+is returned,
+.Sy errno
+is set to indicate the error,
+and no faults are cleared.
+.Sh ERRORS
+For a full list of possible errors see the
+.Sy DIAGNOSTICS
+section in
+.Xr proc 4 .
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr libproc 3LIB ,
+.Xr proc 4

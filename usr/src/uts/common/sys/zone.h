@@ -388,6 +388,7 @@ typedef struct {
 	kstat_named_t	zm_anonpgin;
 	kstat_named_t	zm_execpgin;
 	kstat_named_t	zm_fspgin;
+	kstat_named_t	zm_anon_alloc_fail;
 } zone_mcap_kstat_t;
 
 typedef struct {
@@ -402,6 +403,7 @@ typedef struct {
 	kstat_named_t	zm_ffnoproc;
 	kstat_named_t	zm_ffnomem;
 	kstat_named_t	zm_ffmisc;
+	kstat_named_t	zm_nested_intp;
 	kstat_named_t	zm_init_pid;
 	kstat_named_t	zm_boot_time;
 } zone_misc_kstat_t;
@@ -574,6 +576,7 @@ typedef struct zone {
 	uint64_t	zone_anonpgin;		/* anon pages paged in */
 	uint64_t	zone_execpgin;		/* exec pages paged in */
 	uint64_t	zone_fspgin;		/* fs pages paged in */
+	uint64_t	zone_anon_alloc_fail;	/* cnt of anon alloc fails */
 
 	/*
 	 * Misc. kstats and counters for zone cpu-usage aggregation.
@@ -598,6 +601,8 @@ typedef struct zone {
 	uint32_t	zone_ffnoproc;		/* get proc/lwp error */
 	uint32_t	zone_ffnomem;		/* as_dup/memory error */
 	uint32_t	zone_ffmisc;		/* misc. other error */
+
+	uint32_t	zone_nested_intp;	/* nested interp. kstat */
 
 	struct loadavg_s zone_loadavg;		/* loadavg for this zone */
 	uint64_t	zone_hp_avenrun[3];	/* high-precision avenrun */

@@ -1,0 +1,126 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PXECBKPT 3PROC
+.Os
+.Sh NAME
+.Nm Pxecbkpt ,
+.Nm Pxecwapt ,
+.Nm Lxecbkpt ,
+.Nm Lxecwapt
+.Nd step over a breakpoint or watchpoint
+.Sh SYNOPSIS
+.Ft int
+.Fo Pxecbkpt
+.Fa "struct ps_prochandle *P"
+.Fa "ulong_t saved"
+.Fc
+.Ft int
+.Fo Pxecwapt
+.Fa "struct ps_prochandle *P"
+.Fa "ulong_t saved"
+.Fc
+.Ft int
+.Fo Lxecbkpt
+.Fa "struct ps_lwphandle *L"
+.Fa "ulong_t saved"
+.Fc
+.Ft int
+.Fo Lxecwapt
+.Fa "struct ps_lwphandle *L"
+.Fa "ulong_t saved"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Pxecbkpt
+and
+.Fn Pxecwapt
+functions step over a breakpoint or watchpoint respectively in the
+corresponding process handle
+.Fa P .
+The functions execute the original instruction that was at the current
+program counter, provided by
+.Fa saved ,
+and then leave the process stopped at the next instruction.
+.Pp
+The process must be stopped at the time that the
+.Fn Pxecbkpt
+or
+.Fn Pxecwapt
+functions are called.
+.Pp
+The
+.Fn Lxecbkpt
+and
+.Fn Lxecwapt
+functions are identical to
+.Fn Pxecbkpt
+and
+.Fn Pxecwapt ,
+respectively; except rather than operating on the process as a
+whole, they operate on the thread handle
+.Fa L .
+These functions only require that the thread represented by
+.Fa L
+be stopped and not the entire process.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn Pxecbkpt ,
+.Fn Pxecwapt ,
+.Fn Lxecbkpt ,
+and
+.Fn Lxecwapt
+functions return
+.Sy 0
+having executed the original instruction at
+.Fa saved .
+Otherwise,
+.Sy -1
+is returned and
+.Sy errno
+is set to indicate the error.
+.Sh ERRORS
+For a full list of errors see the
+.Sy DIAGNOSTICS
+section in
+.Xr proc 4 .
+The
+.Fn Pxecbkpt ,
+.Fn Pxecwapt ,
+.Fn Lxecbkpt ,
+and
+.Fn Lxecwapt
+functions will fail if:
+.Bl -tag -width Er
+.It Er EBUSY
+Either
+.Fa P
+or
+.Fa L
+is not stopped.
+.El
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr libproc 3LIB ,
+.Xr Pdelbkpt 3PROC ,
+.Xr Pdelwapt 3PROC ,
+.Xr Psetbkpt 3PROC ,
+.Xr Psetwapt 3PROC ,
+.Xr proc 4

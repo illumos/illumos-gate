@@ -1,0 +1,55 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PRESET_MAPS 3PROC
+.Os
+.Sh NAME
+.Nm Preset_maps
+.Nd reset memory mapping data after exec
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft void
+.Fo Preset_maps
+.Fa "struct ps_prochandle *P"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Preset_maps
+function resets all of the mapping data, cached symbol tables, debug
+information, CTF, and more in the process handle
+.Fa P .
+The map information will rebuild itself on the execution of another
+.Xr libproc 3LIB
+function that requires the information.
+This function should be called any time after a process handle performs
+an
+.Xr exec 2 .
+As such, this interface is only relevant to the manipulation of live
+processes and not core files or ELF files.
+For more information, see the
+.Sy PROGRAMMING NOTES
+section in
+.Xr libproc 3LIB .
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr exec 2 ,
+.Xr libproc 3LIB ,
+.Xr proc 4

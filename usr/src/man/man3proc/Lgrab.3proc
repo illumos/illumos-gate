@@ -1,0 +1,113 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt LGRAB 3PROC
+.Os
+.Sh NAME
+.Nm Lgrab
+.Nd obtain a handle to control a thread
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft "struct ps_lwphandle *"
+.Fo Lgrab
+.Fa "struct ps_prochandle *P"
+.Fa "lwpid_t lwpid"
+.Fa "int *perr"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Lgrab
+function obtains a control handle to the thread identified by
+.Fa lwpid
+residing under the process
+.Fa P .
+This handle is then passed as argument to other
+.Sy libproc
+routines. The
+.Fa lwpid
+can be obtained from the
+.Sy pr_lwpid
+member of the
+.Sy lwpstatus_t
+structure.
+.Pp
+The
+.Fa perr
+argument must point to a valid pointer that will be used to store an
+error code in the event that
+.Fn Lgrab
+is unable to successfully obtain a handle to the process. The possible
+errors are defined below in the
+.Sx ERRORS
+section. The code may be transformed into a human readable string
+through the use of
+.Xr Lgrab_error 3PROC .
+.Pp
+The handle to the thread is valid until the
+.Xr Lfree 3PROC
+function is called, which also releases associated resources from the
+handle. Only a single handle to a specific thread may exist at any
+time. If the handle already exists and another caller attempts to grab
+that thread, it will result in an error. The caller must call
+.Fn Lfree
+before releasing the handle associated with
+.Fa P .
+.Pp
+Unlike grabbing a process, grabbing a thread does not change the current
+state of the thread. If it is running, it will remain running. If it is
+stopped, it will remain stopped.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn Lgrab
+function returns a pointer to the control handle for the specified
+thread. Otherwise, the
+.Dv NULL
+pointer is returned and
+.Fa perr
+is set to indicate the error.
+.Sh ERRORS
+The
+.Fn Lgrab
+function will fail if:
+.Bl -tag -width Er
+.It Er G_BUSY
+Another handle already exists for the thread identified by
+.Fa lwpid .
+The handle need not exist in the current process and may exist in
+another process.
+.It Er G_NOPROC
+The thread identified by
+.Fa lwpid
+does not exist or has already become a zombie.
+.It Er G_STRANGE
+An unanticipated system error occurred while trying to create the
+handle. When this occurs, then the value of
+.Sy errno
+is meaningful. See
+.Xr errno 3C
+for more information and
+.Xr Intro 2
+for the list of possible errors.
+.El
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+.Sy MT-Safe
+.Sh SEE ALSO
+.Xr errno 3C ,
+.Xr libproc 3LIB ,
+.Xr Lfree 3PROC ,
+.Xr Lgrab_error 3PROC ,
+.Xr proc 4

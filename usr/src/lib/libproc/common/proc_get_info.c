@@ -22,8 +22,9 @@
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2015, Joyent, Inc.
+ */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -65,6 +66,12 @@ proc_get_cred(pid_t pid, prcred_t *credp, int ngroups)
 		(void) close(fd);
 	}
 	return (rv);
+}
+
+void
+proc_free_priv(prpriv_t *prv)
+{
+	free(prv);
 }
 
 /*

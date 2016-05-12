@@ -21,13 +21,14 @@
 
 /*
  * Copyright (c) 2000, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015, Joyent, Inc.  All rights reserved.
  */
 
 #include "lint.h"
 #include "thr_uberdata.h"
 #include <sys/syscall.h>
 
-extern int __systemcall6(sysret_t *, int, ...);
+extern long __systemcall6(sysret_t *, int, ...);
 
 /*
  * This is a small and simple power of two memory allocator that is

@@ -49,6 +49,9 @@ CONF_SRCDIR	= $(UTSBASE)/common/io/ixgbe
 #
 include $(UTSBASE)/sparc/Makefile.sparc
 
+INC_PATH	+= -I$(UTSBASE)/common/io/ixgbe
+INC_PATH	+= -I$(UTSBASE)/common/io/ixgbe/core
+
 CERRWARN	+= -_gcc=-Wno-parentheses
 CERRWARN	+= -_gcc=-Wno-switch
 CERRWARN	+= -_gcc=-Wno-uninitialized

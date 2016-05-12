@@ -1,0 +1,104 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PR_GETPEERNAME 3PROC
+.Os
+.Sh NAME
+.Nm pr_getpeername
+.Nd inject getpeername library call into victim process
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft int
+.Fo pr_getpeername
+.Fa "struct ps_prochandle *P"
+.Fa "int sock"
+.Fa "struct sockaddr *name"
+.Fa "socklen_t *namelen"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn pr_getpeername
+function injects the
+.Xr getpeername 3SOCKET
+library call into the target process
+.Fa P
+by means of the agent LWP.
+If the process handle
+.Fa P
+is
+.Dv NULL
+then this is equivalent to calling
+.Xr getpeername 3SOCKET
+on the currently running process.
+.Pp
+The arguments
+.Fa sock ,
+.Fa name ,
+and
+.Fa namelen
+have the same meaning as in
+.Xr getpeername 3SOCKET .
+See
+.Xr getpeername 3SOCKET
+for the full description and purpose of the
+.Sy getpeername
+library call and its arguments.
+.Pp
+The
+.Fn pr_getpeername
+function only works on active processes. Process handles that correspond
+to core files, zombie processes, or ELF objects do not support library
+call injection.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn pr_getpeername
+function's return value is that described in
+.Xr getpeername 3SOCKET .
+Otherwise,
+.Sy -1
+is returned and
+.Sy errno
+is set to
+.Er ENOSYS
+to indicate that the library call could not be injected.
+.Sh ERRORS
+For the full list of errors see the
+.Sy ERRORS
+section in
+.Xr getpeername 3SOCKET .
+.Pp
+The
+.Fn pr_getpeername
+function will fail if:
+.Bl -tag -width Er
+.It Er ENOSYS
+An error occurred while trying to invoke the agent LWP and inject a
+library call in the process handle
+.Fa P
+or the process handle
+.Fa P
+does not support library call injection.
+.El
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr libproc 3LIB ,
+.Xr getpeername 3SOCKET ,
+.Xr proc 4

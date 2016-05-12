@@ -9,7 +9,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH UNAME 1 "Sep 17, 2003"
+.TH UNAME 1 "Apr 14, 2016"
 .SH NAME
 uname \- print name of current system
 .SH SYNOPSIS
@@ -24,7 +24,6 @@ uname \- print name of current system
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBuname\fR utility prints information about the current system on the
 standard output. When options are specified, symbols representing one or more
@@ -33,7 +32,6 @@ are specified, \fBuname\fR prints the current operating system's name. The
 options print selected information returned by \fBuname\fR(2),
 \fBsysinfo\fR(2), or both.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -173,101 +171,12 @@ prints the operating system name and release level, separated by one SPACE
 character.
 
 .SH ENVIRONMENT VARIABLES
-.sp
 .LP
 See \fBenviron\fR(5) for descriptions of the following environment variables
 that affect the execution of \fBuname\fR: \fBLANG\fR, \fBLC_ALL\fR,
 \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
-.sp
-.ne 2
-.na
-\fB\fBSYSV3\fR \fR
-.ad
-.RS 10n
-This variable is used to override the default behavior of \fBuname\fR. This is
-necessary to make it possible for some INTERACTIVE UNIX Systems and SCO UNIX
-programs and scripts to work properly. Many scripts use \fBuname\fR to
-determine the \fBSYSV3\fR type or the version of the \fBOS\fR to ensure
-software is compatible with that \fBOS\fR. Setting \fBSYSV3\fR to an empty
-string will make \fBuname\fR print the following default values:
-.sp
-.in +2
-.nf
-nodename nodename 3.2 2 i386
-.fi
-.in -2
-.sp
-
-The individual elements that \fBuname\fR displays can also be modified by
-setting \fBSYSV3\fR in the following format:
-.sp
-.in +2
-.nf
-\fIos,sysname,node,rel,ver,mach\fR
-.fi
-.in -2
-.sp
-
-.sp
-.ne 2
-.na
-\fB\fIos\fR \fR
-.ad
-.RS 12n
-Operating system (IUS or SCO).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fIsysname\fR \fR
-.ad
-.RS 12n
-System name.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fInode\fR \fR
-.ad
-.RS 12n
-Nodename as displayed by the \fB-n\fR option.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fIrel\fR \fR
-.ad
-.RS 12n
-Release level as displayed by the \fB-r\fR option.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fIver\fR \fR
-.ad
-.RS 12n
-Version number as displayed by the \fB-v\fR option.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fImach\fR \fR
-.ad
-.RS 12n
-Machine name as displayed by \fB-m\fR option.
-.RE
-
-Do not put spaces between the elements.  If an element is omitted, the current
-system value will be used.
-.RE
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -289,7 +198,6 @@ An error occurred.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -305,13 +213,11 @@ Interface Stability	Standard
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBarch\fR(1), \fBisalist\fR(1), \fBsys-unconfig\fR(1M), \fBsysinfo\fR(2),
 \fBuname\fR(2), \fBnodename\fR(4), \fBattributes\fR(5), \fBenviron\fR(5),
 \fBstandards\fR(5)
 .SH NOTES
-.sp
 .LP
 Independent software vendors (\fBISV\fRs) and others who need to determine
 detailed characteristics of the platform on which their software is either

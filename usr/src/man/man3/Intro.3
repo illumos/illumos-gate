@@ -1,13 +1,13 @@
 '\" te
+.\" Copyright 2015 Joyent, Inc.
 .\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH INTRO 3 "Apr 1, 2009"
+.TH INTRO 3 "Jul 19, 2015"
 .SH NAME
 Intro, intro \- introduction to functions and libraries
 .SH DESCRIPTION
-.sp
 .LP
 This section describes functions found in various Solaris libraries, other than
 those functions described in Section 2 of this manual that directly invoke UNIX
@@ -19,7 +19,6 @@ volumes as described below. The first volume contains pages describing the
 contents of each shared library and each header used by the functions, macros,
 and external variables described in the remaining volumes.
 .SS "Library Interfaces and Headers"
-.sp
 .LP
 This volume describes the contents of each shared library and each header used
 by functions, macros, and external variables described in the remaining
@@ -69,7 +68,6 @@ development system; they do have to be present on the target execution system.
 .RE
 
 .SS "Basic Library Functions"
-.sp
 .LP
 The functions described in this volume are the core C library functions that
 are basic to application development.
@@ -144,7 +142,6 @@ automatically linked by the C compilation system. Specify \fB-lucb\fR on the
 .RE
 
 .SS "Networking Library Functions"
-.sp
 .LP
 The functions described in this volume comprise the various networking
 libraries.
@@ -341,7 +338,6 @@ portability is not required, the sockets interfaces in \fBlibsocket\fR and
 TLI APIs, the \fBXTI\fR interfaces (available with \fBlibxnet\fR) are
 recommended over the \fBTLI\fR interfaces (available with \fBlibnsl\fR).
 .SS "Curses Library Functions"
-.sp
 .LP
 The functions described in this volume comprise the libraries that provide
 graphics and character screen updating capabilities.
@@ -437,8 +433,7 @@ update activities. The X/Open Curses library conforms fully with Issue 4 of the
 X/Open Extended Curses specification. See \fBlibcurses\fR(3XCURSES).
 .RE
 
-.SS "Extended Library Functions, Vol. 1"
-.sp
+.SS "Extended Library Functions"
 .LP
 The functions described in this volume comprise the following specialized
 libraries:
@@ -596,11 +591,6 @@ automatically linked by the C compilation system. Specify \fB-lfstyp\fR on the
 \fBcc\fR command line to link with this library. See \fBlibfstyp\fR(3LIB).
 .RE
 
-.SS "Extended Library Functions, Vol. 2"
-.sp
-.LP
-The functions described in this volume comprise the following specialized
-libraries:
 .sp
 .ne 2
 .na
@@ -760,11 +750,6 @@ automatically linked by the C compilation system. Specify \fB-lmvec\fR on the
 \fBcc\fR command line to link with this library. See \fBlibmvec\fR(3LIB).
 .RE
 
-.SS "Extended Library Functions, Vol. 3"
-.sp
-.LP
-The functions described in this volume comprise the following specialized
-libraries:
 .sp
 .ne 2
 .na
@@ -851,6 +836,20 @@ See \fBlibpool\fR(3LIB).
 .sp
 .ne 2
 .na
+\fB(3PROC)\fR
+.ad
+.sp .6
+.RS 4n
+These functions consittue the process mainpulation library,
+\fBlibproc\fR. This library is implemented as a shared object,
+\fBlibproc.so\fR, but it is not automatically linked by the C compilation
+system. Specify \fB-lproc\fR on the \fBcc\fR command line to link with this
+library. See \fBlibproc\fR(3LIB).
+.RE
+
+.sp
+.ne 2
+.na
 \fB(3PROJECT)\fR
 .ad
 .sp .6
@@ -875,11 +874,6 @@ automatically linked by the C compilation system. Specify \fB-lrsm\fR on the
 \fBcc\fR command line to link with this library. See \fBlibrsm\fR(3LIB).
 .RE
 
-.SS "Extended Library Functions, Vol. 4"
-.sp
-.LP
-The functions described in this volume comprise the following specialized
-libraries:
 .sp
 .ne 2
 .na
@@ -1079,7 +1073,6 @@ with this library. See \fBlibXtsol\fR(3LIB).
 .RE
 
 .SS "Multimedia Library Functions"
-.sp
 .ne 2
 .na
 \fB(3MLIB)\fR
@@ -1106,7 +1099,6 @@ automatically linked by the C compilation system. Specify \fB-lmms\fR on the
 .RE
 
 .SH DEFINITIONS
-.sp
 .LP
 A character is any bit pattern able to fit into a byte on the machine. In some
 international languages, however, a "character" might require more than one
@@ -1124,7 +1116,6 @@ return pointers return \fINULL\fR to indicate an error. The macro \fINULL\fR is
 defined in <\fBstdio.h\fR>. Types of the form \fBsize_t\fR are defined in the
 appropriate headers.
 .SH MULTITHREADED APPLICATIONS
-.sp
 .LP
 Both POSIX threads and Solaris threads can be used within the same application.
 Their implementations are completely compatible with each other; however, only
@@ -1189,13 +1180,11 @@ and libraries manual pages (see \fBattributes\fR(5)). If a manual page does not
 state explicitly that an interface is MT-Safe, the user should assume that the
 interface is unsafe.
 .SH REALTIME APPLICATIONS
-.sp
 .LP
 The environment variable \fBLD_BIND_NOW\fR must be set to a non-null value to
 enable early binding. Refer to the "When Relocations are Processed" chapter in
 \fILinker and Libraries Guide\fR for additional information.
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fIINCDIR\fR\fR
@@ -1224,7 +1213,6 @@ shared libraries
 .RE
 
 .SH ACKNOWLEDGMENTS
-.sp
 .LP
 Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to
 reproduce portions of its copyrighted documentation. Original documentation
@@ -1253,7 +1241,6 @@ http://www.opengroup.org/unix/online.html\&.
 .LP
 This notice shall appear on any product containing this material.
 .SH SEE ALSO
-.sp
 .LP
 \fBar\fR(1), \fBld\fR(1), \fBfork\fR(2), \fBstdio\fR(3C), \fBattributes\fR(5),
 \fBstandards\fR(5)
@@ -1267,7 +1254,6 @@ This notice shall appear on any product containing this material.
 .LP
 \fIANSI C Programmer's Guide\fR
 .SH DIAGNOSTICS
-.sp
 .LP
 For functions that return floating-point values, error handling varies
 according to compilation mode. Under the \fB-Xt\fR (default) option to
@@ -1278,7 +1264,6 @@ arguments or when the value is not representable. In the \fB-Xa\fR and
 \fB\(+-HUGE\fR\&. (\fBHUGE_VAL\fR and \fBHUGE\fR are defined in \fBmath.h\fR to
 be infinity and the largest-magnitude single-precision number, respectively.)
 .SH NOTES
-.sp
 .LP
 None of the functions, external variables, or macros should be redefined in the
 user's programs. Any other name can be redefined without affecting the behavior

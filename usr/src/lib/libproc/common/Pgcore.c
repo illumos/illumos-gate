@@ -25,7 +25,7 @@
  */
 /*
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
- * Copyright (c) 2014, Joyent, Inc. All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  * Copyright (c) 2013 by Delphix. All rights reserved.
  */
 
@@ -1392,10 +1392,10 @@ Pfgcore(struct ps_prochandle *P, int fd, core_content_t content)
 		pprivsz = PRIV_PRPRIV_SIZE(ppriv);
 
 		if (write_note(fd, NT_PRPRIV, ppriv, pprivsz, &doff) != 0) {
-			free(ppriv);
+			Ppriv_free(P, ppriv);
 			goto err;
 		}
-		free(ppriv);
+		Ppriv_free(P, ppriv);
 
 		if ((pinfo = getprivimplinfo()) == NULL)
 			goto err;

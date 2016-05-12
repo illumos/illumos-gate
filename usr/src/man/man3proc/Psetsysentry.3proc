@@ -1,0 +1,72 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PSETSYSENTRY 3PROC
+.Os
+.Sh NAME
+.Nm Psetsysentry ,
+.Nm Psetsysexit
+.Nd set system call tracing flags
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft void
+.Fo Psetsysentry
+.Fa "struct ps_prochandle *P"
+.Fa "const sysset_t *set"
+.Fc
+.Ft void
+.Fo Psetsysexit
+.Fa "struct ps_prochandle *P"
+.Fa "const sysset_t *set"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Psetsysentry
+and
+.Fn Psetsysexit
+set the system call entry and exit tracing flags respectively in the
+process handle
+.Fa P
+to
+.Fa set .
+The call to
+.Fn Psetsysentry
+or
+.Fn Psetsysexit
+replaces the corresponding set of system call tracing flags entirely
+with the new set. The system call entry tracing flags cause a thread to
+stop on entry to the system call and the exit tracing flags cause a
+thread to stop on return from the system call, before control returns
+back to the user land process. For more information on the state of the
+thread and for information on manipulating the
+.Sy sysset_t ,
+see
+.Xr proc 4 .
+.Pp
+Note that only active processes may have their system call tracing flags
+updated.  Process handles that refer to core files, zombie processes,
+and files do not have fault tracing flags and this function is a no-op
+on them.
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr Intro 2 ,
+.Xr libproc 3LIB ,
+.Xr proc 4

@@ -1,0 +1,44 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt LSTATE 3PROC
+.Os
+.Sh NAME
+.Nm Lstate
+.Nd obtain thread handle state
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft int
+.Fo Lstate
+.Fa "struct ps_lwphandle *L"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Lstate
+function returns the state of the thread handle
+.Fa L .
+The list of states is available in the
+.Xr libproc 3PROC .
+.Sh RETURN VALUES
+Upon successful completion, the current state is returned.
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr libproc 3LIB

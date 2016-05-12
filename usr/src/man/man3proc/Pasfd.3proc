@@ -1,0 +1,74 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PASFD 3PROC
+.Os
+.Sh NAME
+.Nm Pasfd
+.Nd obtain the process address space file descriptor
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft int
+.Fo Pasfd
+.Fa "struct ps_prochandle *P"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Pasfd
+funtion returns a file descriptor that allows direct access to the
+address space of the process handle
+.Fa P .
+A defined file descriptor is provided when using the
+.Xr Pcreate ,
+.Xr Pgrab 3PROC ,
+.Xr Pgrab_file 3PROC ,
+and
+.Xr Pgrab_core 3PROC
+functions. Note that the address space may be different in each of these
+cases and doesn't necessarily correspond to the /proc
+.Sy as
+file, except for live processes. Other means of obtaining a
+.Sy libproc
+process handle may not define a file descriptor that contains the
+address space.
+.Pp
+The returned file descriptor must not be closed and is only valid for
+as long as the corresponding process handle
+.Fa P
+is valid. After a call to
+.Xr Prelease 3PROC
+the file descriptor is invalidated.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn Pasfd
+function returns a valid file descriptor. Otherwise, if none exists,
+then
+.Sy -1
+is returned.
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr libproc 3LIB ,
+.Xr Pcreate 3PROC ,
+.Xr Pgrab 3PROC ,
+.Xr Pgrab_core 3PROC ,
+.Xr Pgrab_file 3PROC ,
+.Xr Prelease 3PROC ,
+.Xr proc 4

@@ -1,0 +1,56 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PUPDATE_SYMS 3PROC
+.Os
+.Sh NAME
+.Nm Pupdate_syms
+.Nd update cached symbol tables
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft void
+.Fo Pupdate_syms
+.Fa "struct ps_prochandle *P"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Pupdate_syms
+function is used to update all of the cached symbol tables in the
+process handle
+.Fa P :
+updating, invalidating, and caching new symbol tables as appropriate for
+functions such as
+.Xr Psymbol_iter 3PROC .
+This is generally called in response to activity by the run-time
+link-editor. In general, the
+.Sy libproc
+library takes care of managing the need to call this function;
+however, debuggers, introspection tools, and others that are
+interposing on rtld activity may need to call this function. Note that
+the
+.Fn Pupdate_syms
+function is only meaningful for active processes. It will do nothing on
+process handles that refer to core files, zombie processes, and ELF
+objects.
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr libproc 3LIB ,
+.Xr Pupdate_maps 3PROC

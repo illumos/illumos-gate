@@ -1,0 +1,84 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PSETWAPT 3PROC
+.Os
+.Sh NAME
+.Nm Psetwapt
+.Nd set a watchpoint in a process
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft int
+.Fo Psetwapt
+.Fa "struct ps_prochandle *P"
+.Fa "const prwatch_t *wp"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Psetwapt
+function adds a watchpoint to the process handle
+.Fa P .
+Allowing the hardware to generate a trap when the specified area is
+accessed. The watchpoint's parameters are described in
+.Fa wp .
+For more information on watchpoints and the
+.Sy prwatch_t
+structure, see the
+.Sy PCWATCH
+section in
+.Xr proc 4 .
+The watched area will persist until a subsequent call to
+.Xr Pdelwapt 3PROC .
+.Pp
+Note, only active processes support watchpoints. It is an error to call
+this function on process handles that correspond to core files, zombie
+processes, or files.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn Psetwapt
+function returns
+.Sy 0
+and installs the watchpoint in
+.Fa P .
+Otherwise,
+.Sy -1
+is returned and
+.Sy errno
+is set.
+.Sh ERRORS
+For a full list of possible errors see the
+.Sy DIAGNOSTICS
+section in
+.Xr proc 4 .
+.Pp
+The
+.Fn Psetwapt
+function will fail if:
+.Bl -tag -width Er
+.It Er ENOENT
+.Fa P
+does not refer to an active process.
+.El
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr libproc 3LIB ,
+.Xr Pdelwapt 3PROC ,
+.Xr proc 4

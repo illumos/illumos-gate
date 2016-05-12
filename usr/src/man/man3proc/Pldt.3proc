@@ -1,0 +1,132 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PLDT 3PROC
+.Os
+.Sh NAME
+.Nm Pldt ,
+.Nm proc_get_ldt
+.Nd obtain local descriptor table of a process
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft int
+.Fo Pldt
+.Fa "struct ps_prochandle *P"
+.Fa "struct ssd *pldt"
+.Fa "int nldt"
+.Fc
+.Ft int
+.Fo proc_get_ldt
+.Fa "pid_t pid"
+.Fa "struct ssd *pldt"
+.Fa "int nldt"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Pldt
+function reads the local descriptor table (LDT) of the process handle
+.Fa P
+into the buffer
+.Fa pldt .
+Up to
+.Fa nldt
+entries will be read.
+.Pp
+If either
+.Fa pldt
+is
+.Dv NULL
+or
+.Fa nldt
+is
+.Fa 0 ,
+then rather than filling in
+.Fa pldt ,
+only the number of entries currently in the LDT is returned.
+.Pp
+The buffer
+.Fa pldt
+should contain sufficient space for
+.Fa nldt
+entries. For example, callers could allocate space as:
+.Pp
+.Dl pldt = malloc(sizeof (struct ssd) * nldt);
+.Pp
+For more information on the LDT and the
+.Sy struct ssd ,
+see
+.Xr proc 4 .
+.Pp
+The
+.Fn proc_get_ldt
+function is similar to the
+.Fn Pldt
+function; however, rather than reading from a process handle, it reads
+the
+.Sy ldt
+file from the /proc file system for the process
+.Fa pid .
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn Pldt
+and
+.Fn proc_get_ldt
+functions return the number of LDT entries written to
+.Fa pldt .
+If
+.Fa pldt
+is
+.Dv NULL
+or
+.Fa nldt
+is zero, then no data will be written. Otherwise,
+.Sy -1
+is returned. The
+.Fn Pldt
+function sets
+.Sy errno
+to indicate the error that occurred.
+.Sh ERRORS
+For a full list of possible errors see the
+.Sy DIAGNOSTICS
+section in
+.Xr proc 4 .
+.Pp
+The
+.Fn Pldt
+function will fail if:
+.Bl -tag -width Er
+.It Er ENODATA
+No LDT information is available in the process handle
+.Fa P .
+.El
+.Sh ARCHITECTURE
+The
+.Fn Pldt
+and
+.Fn proc_get_ldt
+functions are only available on
+.Sy x86
+platforms.
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr libproc 3LIB ,
+.Xr proc 4

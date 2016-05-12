@@ -1354,6 +1354,10 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/ixgbe/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/ixgbe/core/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/ntxn/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
@@ -2575,6 +2579,9 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/iprb/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/ixgbe/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/ixgbe/core/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/ntxn/%.c

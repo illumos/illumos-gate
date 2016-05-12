@@ -1,0 +1,53 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt LFREE 3PROC
+.Os
+.Sh NAME
+.Nm Lfree
+.Nd free a control handle to a thread
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft "void"
+.Fo Lfree
+.Fa "struct ps_lwphandle *L"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Lfree
+function releases all control resources associated with the the handle
+.Fa L .
+After
+.Fn Lfree
+, calls to other
+.Sy libproc
+routines which leverage information from the handle
+.Fa L
+will no longer work as the handle has been invalidated.
+.Pp
+The state of the thread controlled by
+.Fa L
+is not affected by the call to
+.Fn Lfree .
+The thread's state will not transition from running to stopped or
+vice-versa. It will retain its state prior to the call to
+.Fn Lfree .
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+.Sy MT-Safe
+.Sh SEE ALSO
+.Xr libproc 3LIB ,
+.Xr Lgrab 3PROC
