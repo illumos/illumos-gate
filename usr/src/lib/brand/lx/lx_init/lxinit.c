@@ -187,6 +187,7 @@ lxi_config_open()
 
 }
 
+#if 0 /* XXX KEBE SAYS NOT YET */
 static int
 zone_find_attr(struct zone_res_attrtab *attrs, const char *name,
     const char **result)
@@ -201,6 +202,7 @@ zone_find_attr(struct zone_res_attrtab *attrs, const char *name,
 	}
 	return (-1);
 }
+#endif /* XXX KEBE SAYS NOT YET */
 
 void
 lxi_svc_start(char *name, char *path, char *fmri)
@@ -404,6 +406,7 @@ done:
 	return (err);
 }
 
+#if 0 /* XXX KEBE SAYS NOT YET */
 static int
 lxi_iface_dhcp(const char *origiface, boolean_t *first_ipv4_configured)
 {
@@ -455,6 +458,7 @@ done:
 	free(dhcpreply);
 	return (err);
 }
+#endif /* XXX KEBE SAYS NOT YET */
 
 /*
  * Initialize an IPv6 link-local address on a given interface
@@ -573,6 +577,8 @@ lxi_net_loopback()
 }
 
 
+
+#if 0 /* XXX KEBE SAYS NOT YET */
 /*
  * This function is used when the "ips" property doesn't exist in a zone's
  * configuration. It may be an older configuration, so we should search for
@@ -621,10 +627,12 @@ lxi_get_old_ip(struct zone_res_attrtab *attrs, const char **ipaddrs,
 	*ipaddrs = cidraddr;
 	return (0);
 }
+#endif /* XXX KEBE SAYS NOT YET */
 
 static void
 lxi_net_setup(zone_dochandle_t handle)
 {
+#if 0	/* XXX KEBE SAYS NOT YET */
 	struct zone_nwiftab lookup;
 	boolean_t do_addrconf = B_FALSE;
 
@@ -696,6 +704,7 @@ lxi_net_setup(zone_dochandle_t handle)
 	}
 
 	(void) zonecfg_endnwifent(handle);
+#endif /* XXX KEBE */
 }
 
 static void
