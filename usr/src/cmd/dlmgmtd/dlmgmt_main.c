@@ -221,7 +221,7 @@ dlmgmt_zone_init(zoneid_t zoneid)
 		return (EPERM);
 	}
 
-	if ((err = dlmgmt_db_init(zoneid)) != 0)
+	if ((err = dlmgmt_db_init(zoneid, rootdir)) != 0)
 		return (err);
 	return (dlmgmt_door_attach(zoneid, rootdir));
 }

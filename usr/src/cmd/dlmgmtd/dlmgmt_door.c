@@ -1335,6 +1335,10 @@ dlmgmt_zonehalt(void *argp, void *retp, size_t *sz, zoneid_t zoneid,
 	int			err = 0;
 	dlmgmt_door_zonehalt_t	*zonehalt = argp;
 	dlmgmt_zonehalt_retval_t *retvalp = retp;
+	static char my_pid[10];
+
+	if (my_pid[0] == NULL)
+		(void) snprintf(my_pid, sizeof (my_pid), "%d\n", getpid());
 
 	if ((err = dlmgmt_checkprivs(0, cred)) == 0) {
 		if (zoneid != GLOBAL_ZONEID) {

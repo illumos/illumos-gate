@@ -1461,7 +1461,7 @@ zone_file_exists(char *zoneroot, char *filename)
  * /etc/svc/volatile/dladm/datalink-management:default.cache.
  */
 int
-dlmgmt_db_init(zoneid_t zoneid)
+dlmgmt_db_init(zoneid_t zoneid, char *zoneroot)
 {
 	dlmgmt_db_req_t	*req;
 	int		err;
