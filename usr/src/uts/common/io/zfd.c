@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Copyright 2015 Joyent, Inc.  All rights reserved.
+ * Copyright 2016 Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -737,11 +737,17 @@ handle_mflush(queue_t *qp, mblk_t *mp)
 
 /*
  * Evaluate the various conditionals to determine if we're teeing into a log
- * stream, if that should be flow controlled, and if we can perform the tee.
- * This function can set the zfd_is_flowcon flag as a side effect.
+ * stream and if the primary stream should be flow controlled. This function
+ * can set the zfd_is_flowcon flag as a side effect.
+ *
+ * When teeing with flow control, we always queue the teed msg here and if
+ * the queue is getting full, we set zfd_is_flowcon. The primary stream will
+ * always queue when zfd_is_flowcon and will also not be served when
+ * zfd_is_flowcon is set. This causes backpressure on the primary stream
+ * until the teed queue can drain.
  */
 static void
-zfd_tee_handler(queue_t *qp, zfd_state_t *zfds, unsigned char type, mblk_t *mp)
+zfd_tee_handler(zfd_state_t *zfds, unsigned char type, mblk_t *mp)
 {
 	queue_t *log_qp;
 	zfd_state_t *log_zfds;
@@ -769,35 +775,24 @@ zfd_tee_handler(queue_t *qp, zfd_state_t *zfds, unsigned char type, mblk_t *mp)
 	log_qp = RD(log_zfds->zfd_slave_rdq);
 	DTRACE_PROBE2(zfd__tee__check, void *, log_qp, void *, zfds);
 
-	if (zfds->zfd_allow_flowcon) {
-		/*
-		 * If we're supposed to tee with flow control and the tee is
-		 * over the high water mark then we want the primary stream to
-		 * stop flowing. We'll resume teeing out of the read side of
-		 * the primary stream when the log stream has drained.
-		 */
-		if (log_qp->q_count > log_qp->q_hiwat) {
-			zfds->zfd_is_flowcon = B_TRUE;
-			log_qp = NULL;
-		}
-	} else {
+	if (!zfds->zfd_allow_flowcon) {
 		/*
 		 * We're not supposed to tee with flow control and the tee is
 		 * full so we skip teeing into the log stream.
 		 */
 		if ((log_qp->q_flag & QFULL) != 0)
-			log_qp = NULL;
+			return;
 	}
-
-	if (log_qp == NULL)
-		return;
 
 	/*
 	 * Tee the message into the log stream.
 	 */
 	lmp = dupmsg(mp);
-	if (lmp == NULL)
+	if (lmp == NULL) {
+		if (zfds->zfd_allow_flowcon)
+			zfds->zfd_is_flowcon = B_TRUE;
 		return;
+	}
 
 	if (log_qp->q_first == NULL && bcanputnext(log_qp, lmp->b_band)) {
 		putnext(log_qp, lmp);
@@ -805,6 +800,16 @@ zfd_tee_handler(queue_t *qp, zfd_state_t *zfds, unsigned char type, mblk_t *mp)
 		if (putq(log_qp, lmp) == 0) {
 			/* The logger queue is full, free the msg. */
 			freemsg(lmp);
+		}
+		/*
+		 * If we're supposed to tee with flow control and the tee is
+		 * over the high water mark then we want the primary stream to
+		 * stop flowing. We'll stop queueing the primary stream after
+		 * the log stream has drained.
+		 */
+		if (zfds->zfd_allow_flowcon &&
+		    log_qp->q_count > log_qp->q_hiwat) {
+			zfds->zfd_is_flowcon = B_TRUE;
 		}
 	}
 }
@@ -959,12 +964,12 @@ zfd_wput(queue_t *qp, mblk_t *mp)
 	/* if on the write side, may need to tee */
 	if (zfds->zfd_slave_rdq != NULL && qp == WR(zfds->zfd_slave_rdq)) {
 		/* tee output to any attached log stream */
-		zfd_tee_handler(qp, zfds, type, mp);
-	}
+		zfd_tee_handler(zfds, type, mp);
 
-	/* high-priority msgs are not subject to flow control */
-	if (zfds->zfd_is_flowcon && type == M_DATA)
-		must_queue = B_TRUE;
+		/* high-priority msgs are not subject to flow control */
+		if (zfds->zfd_is_flowcon && type == M_DATA)
+			must_queue = B_TRUE;
+	}
 
 	if (zfd_switch(RD(qp)) == NULL) {
 		DBG1("wput to %s side (no one listening)", zfd_side(qp));
@@ -1008,14 +1013,18 @@ zfd_wput(queue_t *qp, mblk_t *mp)
 	 * If the primary stream has been stopped for flow control then
 	 * enqueue the msg, otherwise only putnext if there isn't already
 	 * something in the queue. If we don't do this then things would wind
-	 * up out of order. We may tee into the mux here based on the
-	 * conditionals evaluated above.
+	 * up out of order.
 	 */
 	if (!must_queue && qp->q_first == NULL &&
 	    bcanputnext(RD(zfd_switch(qp)), mp->b_band)) {
 		putnext(RD(zfd_switch(qp)), mp);
 	} else {
-		(void) putq(RD(zfd_switch(qp)), mp);
+		/*
+		 * zfd_wsrv expects msgs queued on the primary queue. Those
+		 * will be handled by zfd_wsrv after zfd_rsrv performs the
+		 * qenable on the proper queue.
+		 */
+		(void) putq(qp, mp);
 	}
 
 	DBG1("done wput, %s side", zfd_side(qp));
@@ -1029,10 +1038,6 @@ zfd_wput(queue_t *qp, mblk_t *mp)
  * zfd_rsrv() can handle both without splitting up the codepath. We do this by
  * enabling the write side of the partner.  This triggers the partner to send
  * messages queued on its write side to this queue's read side.
- *
- * However, once we've flow controlled the write side, messages will be enqueued
- * in the read queue (see zfd_wput). Once flow control is turned off on the
- * write side, we need to drain these queued messages out to the reader.
  *
  * For log stream:
  * Internally we've queued up the msgs that we've teed off to the log stream
@@ -1082,44 +1087,6 @@ zfd_rsrv(queue_t *qp)
 	}
 
 	/*
-	 * If the master read side has data queued up due to flow control we
-	 * try to drain that out now. This is subtly different from the code in
-	 * zfd_wsrv since we're not switching sides for the zfd queues, instead
-	 * we're just passing data out of this driver
-	 */
-	if (zfds->zfd_muxt == ZFD_PRIMARY_STREAM &&
-	    qp == zfds->zfd_master_rdq &&
-	    qp->q_count > 0) {
-		/* serve the reader */
-		mblk_t *mp;
-
-		while ((mp = getq(qp)) != NULL) {
-			unsigned char type = mp->b_datap->db_type;
-			boolean_t must_queue;
-
-			/* high-priority msgs are not subject to flow control */
-			if (zfds->zfd_is_flowcon && type == M_DATA) {
-				must_queue = B_TRUE;
-			} else {
-				must_queue = B_FALSE;
-			}
-
-			/*
-			 * Note that we're not switching sides here!
-			 */
-			if (!must_queue && bcanputnext(qp, mp->b_band)) {
-				putnext(qp, mp);
-
-				/* tee output to any attached log stream */
-				zfd_tee_handler(qp, zfds, type, mp);
-			} else {
-				(void) putbq(qp, mp);
-				break;
-			}
-		}
-	}
-
-	/*
 	 * Care must be taken here, as either of the master or slave side
 	 * qptr could be NULL.
 	 */
@@ -1144,9 +1111,11 @@ zfd_rsrv(queue_t *qp)
 static void
 zfd_wsrv(queue_t *qp)
 {
+	queue_t *swq;
 	mblk_t *mp;
+	zfd_state_t *zfds = (zfd_state_t *)qp->q_ptr;
 
-	DBG1("zfd_wsrv master (%s) side", zfd_side(qp));
+	ASSERT(zfds != NULL);
 
 	/*
 	 * Partner has no read queue, so take the data, and throw it away.
@@ -1163,21 +1132,21 @@ zfd_wsrv(queue_t *qp)
 		return;
 	}
 
+	swq = RD(zfd_switch(qp));
+
 	/*
 	 * while there are messages on this write queue...
 	 */
-	while ((mp = getq(qp)) != NULL) {
+	while (!zfds->zfd_is_flowcon && (mp = getq(qp)) != NULL) {
 		/*
 		 * Due to the way zfd_wput is implemented, we should never
-		 * see a control message here.
+		 * see a high priority control message here.
 		 */
 		ASSERT(mp->b_datap->db_type < QPCTL);
 
-		if (bcanputnext(RD(zfd_switch(qp)), mp->b_band)) {
-			DBG("wsrv: send message to other side\n");
-			putnext(RD(zfd_switch(qp)), mp);
+		if (bcanputnext(swq, mp->b_band)) {
+			putnext(swq, mp);
 		} else {
-			DBG("wsrv: putting msg back on queue\n");
 			(void) putbq(qp, mp);
 			break;
 		}
