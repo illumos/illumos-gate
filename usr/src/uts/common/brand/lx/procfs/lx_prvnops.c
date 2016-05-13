@@ -2370,7 +2370,7 @@ lxpr_read_stat_common(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf,
 	dev_t psdev;
 	size_t rss, vsize;
 	int nice, pri, lwpcnt;
-	caddr_t wchan;
+	caddr_t wchan, stackbase;
 	processorid_t cpu;
 	pid_t real_pid;
 	clock_t utime, stime, cutime, cstime, ticks, boottime;
@@ -2430,6 +2430,14 @@ lxpr_read_stat_common(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf,
 
 		mutex_exit(&p->p_sessp->s_lock);
 		mutex_exit(&p->p_splock);
+	}
+
+	if ((p->p_stat == SZOMB) || (p->p_flag & (SSYS | SEXITING)) ||
+	    (p->p_as == &kas)) {
+		stackbase = 0;
+	} else {
+		/* from prgetstackbase() */
+		stackbase = p->p_usrstack - p->p_stksize;
 	}
 
 	utime = stime = 0;
@@ -2524,37 +2532,37 @@ lxpr_read_stat_common(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf,
 	lxpr_unlock(p);
 
 	lxpr_uiobuf_printf(uiobuf,
-	    "%d "
-	    "(%s) %c %d %d %d %d %d "
-	    "%lu %lu %lu %lu %lu "
-	    "%lu %lu %ld %ld "
-	    "%d %d %d "
-	    "%lu "
-	    "%lu "
-	    "%lu %ld %llu "
-	    "%lu %lu %u "
-	    "%lu %lu "
-	    "%lu %lu %lu %lu "
-	    "%lu "
-	    "%lu %lu "
-	    "%d "
-	    "%d"
+	    "%d "					/* 1 */
+	    "(%s) %c %d %d %d %d %d "			/* 2-8 */
+	    "%lu %lu %lu %lu %lu "			/* 9-13 */
+	    "%lu %lu %ld %ld "				/* 14-17 */
+	    "%d %d %d "					/* 18-20 */
+	    "%lu "					/* 21 */
+	    "%lu "					/* 22 */
+	    "%lu %ld %llu "				/* 23-25 */
+	    "%lu %lu %llu "				/* 26-28 */
+	    "%lu %lu "					/* 29-30 */
+	    "%lu %lu %lu %lu "				/* 31-34 */
+	    "%lu "					/* 35 */
+	    "%lu %lu "					/* 36-37 */
+	    "%d "					/* 38 */
+	    "%d"					/* 39 */
 	    "\n",
-	    (lookup_id == 0) ? pid : lxpnp->lxpr_desc,
-	    buf_comm, stat, ppid, pgpid, spid, psdev, psgid,
+	    (lookup_id == 0) ? pid : lxpnp->lxpr_desc,	/* 1 */
+	    buf_comm, stat, ppid, pgpid, spid, psdev, psgid, /* 2-8 */
 	    0l, 0l, 0l, 0l, 0l, /* flags, minflt, cminflt, majflt, cmajflt */
-	    utime, stime, cutime, cstime,
-	    pri, nice, lwpcnt,
-	    0l, /* itrealvalue (time before next SIGALRM) */
-	    ticks,
-	    vsize, rss, vmem_ctl,
-	    0l, 0l, USRSTACK, /* startcode, endcode, startstack */
-	    0l, 0l, /* kstkesp, kstkeip */
-	    0l, 0l, 0l, 0l, /* signal, blocked, sigignore, sigcatch */
-	    wchan,
-	    0l, 0l, /* nswap, cnswap */
-	    0, /* exit_signal */
-	    cpu);
+	    utime, stime, cutime, cstime,		/* 14-17 */
+	    pri, nice, lwpcnt,				/* 18-20 */
+	    0l, /* itrealvalue (time before next SIGALRM) 21 */
+	    ticks,					/* 22 */
+	    vsize, rss, vmem_ctl,			/* 23-25 */
+	    0l, 0l, stackbase, /* startcode, endcode, startstack 26-28 */
+	    0l, 0l,				/* kstkesp, kstkeip 29-30 */
+	    0l, 0l, 0l, 0l, /* signal, blocked, sigignore, sigcatch 31-34 */
+	    wchan,					/* 35 */
+	    0l, 0l,					/* nswap,cnswap 36-37 */
+	    0,						/* exit_signal	38 */
+	    cpu						/* 39 */);
 }
 
 /*
