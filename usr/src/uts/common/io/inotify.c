@@ -318,6 +318,8 @@ inotify_fop_vnevent(femarg_t *vf, vnevent_t vnevent, vnode_t *dvp, char *name,
 		inotify_watch_delete(watch, IN_DELETE_SELF);
 		break;
 	case VE_CREATE:
+	case VE_TRUNCATE:
+	case VE_RESIZE:
 		inotify_watch_event(watch, IN_MODIFY | IN_ATTRIB, NULL);
 		break;
 	case VE_LINK:
@@ -335,7 +337,9 @@ inotify_fop_vnevent(femarg_t *vf, vnevent_t vnevent, vnode_t *dvp, char *name,
 		break;
 	case VE_SUPPORT:
 	case VE_MOUNTEDOVER:
-	case VE_TRUNCATE:
+	case VE_PRE_RENAME_SRC:
+	case VE_PRE_RENAME_DEST:
+	case VE_PRE_RENAME_DEST_DIR:
 		break;
 	}
 
