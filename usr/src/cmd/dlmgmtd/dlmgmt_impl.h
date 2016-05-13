@@ -141,7 +141,7 @@ void		dlmgmt_handler(void *, char *, size_t, door_desc_t *, uint_t);
 void		dlmgmt_log(int, const char *, ...);
 int		dlmgmt_write_db_entry(const char *, dlmgmt_link_t *, uint32_t);
 int		dlmgmt_delete_db_entry(dlmgmt_link_t *, uint32_t);
-int 		dlmgmt_db_init(zoneid_t);
+int 		dlmgmt_db_init(zoneid_t, char *);
 void		dlmgmt_db_fini(zoneid_t);
 
 #ifdef  __cplusplus
