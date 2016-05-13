@@ -2850,7 +2850,9 @@ verify_details(int cmd_num, char *argv[])
 	if (cmd_num == CMD_READY || cmd_num == CMD_BOOT) {
 		int vcommit = 0, obscommit = 0;
 
+#if 0 /* XXX KEBE not yet */
 		vcommit = verify_fix_did(handle);
+#endif /* XXX KEBE not yet */
 		obscommit = zonecfg_fix_obsolete(handle);
 
 		if (vcommit || obscommit)
