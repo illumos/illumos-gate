@@ -58,7 +58,12 @@
 #include <libsysevent.h>
 #include <libdlmgmt.h>
 #include <librcm.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
 #include "dlmgmt_impl.h"
+
 
 typedef void dlmgmt_door_handler_t(void *, void *, size_t *, zoneid_t,
     ucred_t *);
