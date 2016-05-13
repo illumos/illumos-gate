@@ -1916,6 +1916,12 @@ zone_mcap_kstat_update(kstat_t *ksp, int rw)
 	if (rw == KSTAT_WRITE)
 		return (EACCES);
 
+	zmp->zm_rss.value.ui64 = zone->zone_phys_mem;
+	zmp->zm_phys_cap.value.ui64 = zone->zone_phys_mem_ctl;
+	zmp->zm_swap.value.ui64 = zone->zone_max_swap;
+	zmp->zm_swap_cap.value.ui64 = zone->zone_max_swap_ctl;
+	zmp->zm_nover.value.ui64 = zone->zone_mcap_nover;
+	zmp->zm_pagedout.value.ui64 = zone->zone_mcap_pagedout;
 	zmp->zm_pgpgin.value.ui64 = zone->zone_pgpgin;
 	zmp->zm_anonpgin.value.ui64 = zone->zone_anonpgin;
 	zmp->zm_execpgin.value.ui64 = zone->zone_execpgin;
@@ -1950,6 +1956,13 @@ zone_mcap_kstat_create(zone_t *zone)
 	/* The kstat "name" field is not large enough for a full zonename */
 	kstat_named_init(&zmp->zm_zonename, "zonename", KSTAT_DATA_STRING);
 	kstat_named_setstr(&zmp->zm_zonename, zone->zone_name);
+	kstat_named_setstr(&zmp->zm_zonename, zone->zone_name);
+	kstat_named_init(&zmp->zm_rss, "rss", KSTAT_DATA_UINT64);
+	kstat_named_init(&zmp->zm_phys_cap, "physcap", KSTAT_DATA_UINT64);
+	kstat_named_init(&zmp->zm_swap, "swap", KSTAT_DATA_UINT64);
+	kstat_named_init(&zmp->zm_swap_cap, "swapcap", KSTAT_DATA_UINT64);
+	kstat_named_init(&zmp->zm_nover, "nover", KSTAT_DATA_UINT64);
+	kstat_named_init(&zmp->zm_pagedout, "pagedout", KSTAT_DATA_UINT64);
 	kstat_named_init(&zmp->zm_pgpgin, "pgpgin", KSTAT_DATA_UINT64);
 	kstat_named_init(&zmp->zm_anonpgin, "anonpgin", KSTAT_DATA_UINT64);
 	kstat_named_init(&zmp->zm_execpgin, "execpgin", KSTAT_DATA_UINT64);
@@ -2046,61 +2059,6 @@ zone_misc_kstat_create(zone_t *zone)
 	kstat_named_init(&zmp->zm_boot_time, "boot_time", KSTAT_DATA_UINT64);
 
 	ksp->ks_update = zone_misc_kstat_update;
-	ksp->ks_private = zone;
-
-	kstat_install(ksp);
-	return (ksp);
-}
-
-static int
-zone_mcap_kstat_update(kstat_t *ksp, int rw)
-{
-	zone_t *zone = ksp->ks_private;
-	zone_mcap_kstat_t *zmp = ksp->ks_data;
-
-	if (rw == KSTAT_WRITE)
-		return (EACCES);
-
-	zmp->zm_rss.value.ui64 = zone->zone_phys_mem;
-	zmp->zm_phys_cap.value.ui64 = zone->zone_phys_mem_ctl;
-	zmp->zm_swap.value.ui64 = zone->zone_max_swap;
-	zmp->zm_swap_cap.value.ui64 = zone->zone_max_swap_ctl;
-	zmp->zm_nover.value.ui64 = zone->zone_mcap_nover;
-	zmp->zm_pagedout.value.ui64 = zone->zone_mcap_pagedout;
-
-	return (0);
-}
-
-static kstat_t *
-zone_mcap_kstat_create(zone_t *zone)
-{
-	kstat_t *ksp;
-	zone_mcap_kstat_t *zmp;
-
-	if ((ksp = kstat_create_zone("memory_cap", zone->zone_id,
-	    zone->zone_name, "zone_memory_cap", KSTAT_TYPE_NAMED,
-	    sizeof (zone_mcap_kstat_t) / sizeof (kstat_named_t),
-	    KSTAT_FLAG_VIRTUAL, zone->zone_id)) == NULL)
-		return (NULL);
-
-	if (zone->zone_id != GLOBAL_ZONEID)
-		kstat_zone_add(ksp, GLOBAL_ZONEID);
-
-	zmp = ksp->ks_data = kmem_zalloc(sizeof (zone_mcap_kstat_t), KM_SLEEP);
-	ksp->ks_data_size += strlen(zone->zone_name) + 1;
-	ksp->ks_lock = &zone->zone_mcap_lock;
-	zone->zone_mcap_stats = zmp;
-
-	kstat_named_init(&zmp->zm_zonename, "zonename", KSTAT_DATA_STRING);
-	kstat_named_setstr(&zmp->zm_zonename, zone->zone_name);
-	kstat_named_init(&zmp->zm_rss, "rss", KSTAT_DATA_UINT64);
-	kstat_named_init(&zmp->zm_phys_cap, "physcap", KSTAT_DATA_UINT64);
-	kstat_named_init(&zmp->zm_swap, "swap", KSTAT_DATA_UINT64);
-	kstat_named_init(&zmp->zm_swap_cap, "swapcap", KSTAT_DATA_UINT64);
-	kstat_named_init(&zmp->zm_nover, "nover", KSTAT_DATA_UINT64);
-	kstat_named_init(&zmp->zm_pagedout, "pagedout", KSTAT_DATA_UINT64);
-
-	ksp->ks_update = zone_mcap_kstat_update;
 	ksp->ks_private = zone;
 
 	kstat_install(ksp);
