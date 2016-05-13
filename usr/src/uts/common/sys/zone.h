@@ -427,16 +427,6 @@ typedef struct {
 	kstat_named_t	zz_nwritten;
 	kstat_named_t	zz_writes;
 	kstat_named_t	zz_waittime;
-=======
-	kstat_named_t	zv_10ms_ops;
-	kstat_named_t	zv_100ms_ops;
-	kstat_named_t	zv_1s_ops;
-} zone_vfs_kstat_t;
-
-typedef struct {
-	kstat_named_t 	zz_throttle_cnt;
-	kstat_named_t	zz_throttle_time;
->>>>>>> 278c9a7... OS-338 Kstat counters to show "slow" VFS operations
 } zone_zfs_kstat_t;
 
 typedef struct {
@@ -651,12 +641,12 @@ typedef struct zone {
 	zone_vfs_kstat_t *zone_vfs_stats;
 
 	/*
-	 * kstats for ZFS observability.
+	 * kstats for ZFS I/O ops and bytes.
 	 */
 	kmutex_t	zone_zfs_lock;		/* protects ZFS statistics */
 	kstat_t		*zone_zfs_ksp;
+	kstat_io_t	zone_zfs_rwstats;
 	zone_zfs_kstat_t *zone_zfs_stats;
->>>>>>> 278c9a7... OS-338 Kstat counters to show "slow" VFS operations
 
 	/*
 	 * Solaris Auditing per-zone audit context
