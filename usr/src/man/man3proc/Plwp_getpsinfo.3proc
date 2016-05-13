@@ -1,0 +1,101 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PLWP_GETPSINFO 3PROC
+.Os
+.Sh NAME
+.Nm Plwp_getpsinfo
+.Nd get thread specific ps information
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft int
+.Fo Plwp_getpsinfo
+.Fa "struct ps_prochandle *P"
+.Fa "lwpid_t lwpid"
+.Fa "lwpsinfo_t *lps"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Plwp_getpsinfo
+function
+looks up the thread-specific
+.Xr ps 1
+information for the thread specified by
+.Fa lwpid
+in the process handle
+.Fa P .
+The caller should provide a pointer to an
+.Sy lwpsinfo_t ,
+.Fa lps ,
+whose definition can be found in
+.Xr proc 4 .
+.Fa lps
+will be filled in with information such as the thread's id, its current
+state, priority, and run-time.
+.Pp
+The
+.Fn Plwp_getpsinfo
+function only works on process handles that refer to active processes
+and core files, it does not work on process handles that refer to
+individual files.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn Plwp_getpsinfo
+function returns
+.Sy 0
+and
+.Fa lps
+is filled in with the
+thread-specific
+.Xr ps 1
+information. Otherwise,
+.Sy -1
+is returned and
+.Sy errno
+is set to indicate the error.
+.Sh ERRORS
+For a full list of possible errors also see the
+.Sy DIAGNOSTICS
+section in
+.Xr proc 4 .
+.Pp
+The
+.Fn Plwp_getpsinfo
+function will fail if:
+.Bl -tag -width Er
+.It Er ENODATA
+.Fa P
+refers to a file handle obtained through
+.Xr Pgrab_file 3PROC .
+.It Er EINVAL
+The process handle
+.Fa P
+refers to a core file and the specified thread does not exist.
+.It Er ENOENT
+The process handle
+.Fa P
+refers to an active process and the specified thread does not exist.
+.El
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr ps 1 ,
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr libproc 3LIB ,
+.Xr proc 4

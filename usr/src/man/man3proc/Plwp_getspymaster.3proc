@@ -1,0 +1,116 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PLWP_GETSPYMASTER 3PROC
+.Os
+.Sh NAME
+.Nm Plwp_getspymaster
+.Nd get agent LWP spy master information
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft int
+.Fo Plwp_getspymaster
+.Fa "struct ps_prochandle *P"
+.Fa "lwpid_t lwpid"
+.Fa "psinfo_t *ps"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Plwp_getspymaster
+function returns information about the spy master that corresponds to
+the agent LWP for the thread
+.Fa lwpid
+in the process handle
+.Fa P .
+.Pp
+The agent LWP allows another process to inject actions into the target
+process. When an agent LWP is created, it leverages an existing thread
+in the process and it also creates a record of whom created the agent,
+which is called the spy master. For more information on the agent LWP
+and the spy master, see
+.Xr proc 4 .
+.Pp
+If the thread identified
+.Fa lwpid
+has an agent LWP, the corresponding ps information (see
+.Xr proc 4
+for the definition of the
+.Sy psinfo_t Ns )
+will be filled into
+.Fa ps .
+.Pp
+Note, process handles that correspond to a file, created by
+.Xr Pgrab_file 3PROC ,
+cannot have an agent LWP created for them and thus cannot have any spy
+master information. In addition, core files from older releases may not
+have any data on the spy master.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn Plwp_getspymaster
+returns
+.Sy 0
+and updates
+.Fa ps .
+Otherwise, it returns
+.Sy -1 ,
+sets
+.Sy errno ,
+and
+.Fa ps
+is not modified.
+.Sh ERRORS
+For a full list of possible errors also see the
+.Sy DIAGNOSTICS
+section in
+.Xr proc 4 .
+.Pp
+The
+.Fn Plwp_getpsinfo
+function will fail if:
+.Bl -tag -width Er
+.It Er ENODATA
+.Fa P
+refers to a file handle obtained through
+.Xr Pgrab_file 3PROC
+or
+.Fa P
+does not have any information about the spy master.
+.It Er EINVAL
+The process handle
+.Fa P
+refers to a core file and the specified thread does not exist.
+.Pp
+The thread,
+.Fa lwpid
+does not have an active agent,
+.Dv PR_AGENT
+is not set in the
+.Sy pr_flags
+member of the thread's status information.
+.It Er ENOENT
+The process handle
+.Fa P
+refers to an active process and the specified thread does not exist.
+.El
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr libproc 3LIB ,
+.Xr proc 4

@@ -1,0 +1,226 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PCREATE 3PROC
+.Os
+.Sh NAME
+.Nm Pcreate ,
+.Nm Pxcreate ,
+.Nm Pcreate_callback
+.Nd create and control a process
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft "struct ps_prochandle *"
+.Fo Pcreate
+.Fa "const char *file"
+.Fa "char *const *argv"
+.Fa "int *perr"
+.Fa "char *path"
+.Fa "size_t len"
+.Fc
+.Ft "struct ps_prochandle *"
+.Fo Pxcreate
+.Fa "const char *file"
+.Fa "char *const *argv"
+.Fa "char *const *envp"
+.Fa "int *perr"
+.Fa "char *path"
+.Fa "size_t len"
+.Fc
+.Ft void
+.Fo Pcreate_callback
+.Fa "struct ps_prochandle *P"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Pcreate
+function creates a process controlled by the
+.Sy libproc
+library. The
+.Fn Pxcreate
+function does the same while also allowing the replacement of the
+environment via
+.Fa envp .
+.Pp
+Both functions cause the caller to
+.Xr fork 2 .
+Followed by the child calling
+.Xr exec 2
+to load the new process image specified by
+.Fa file .
+The
+.Ev PATH
+is searched for
+.Fa file
+if it is not an absolute path, similar to
+.Xr execvp 2 .
+.Pp
+The process image will be invoked with the arguments specified by
+.Fa argv ,
+which should be a
+.Dv NULL Ns -terminated
+array of character strings. Each entry in the array is an individual
+argument. The environment of the process image will be inherited from
+the running process if the
+.Fn Pcreate
+function is called or if the
+.Fn Pxcreate
+function is called and the value of
+.Fa envp
+is
+.Dv NULL .
+Otherwise,
+.Fa envp
+should be a
+.Dv NULL Ns -terminated
+array of character strings whose entries are in the form of
+.Em key=value .
+For more on the process environment, see
+.Xr environ 5 .
+.Pp
+The
+.Fn Pcreate_callback
+function allows a way for callers to inject a callback into the child
+process before the call to
+.Xr exec 2 .
+The symbol
+.Sy Pcreate_callback
+is a symbol that may be interposed on by consumers. It allows the chance
+for the modification of signal dispositions or any other changes that a
+caller may wish to make.
+.Pp
+If the caller's real user or group ID is not their effective user or
+group ID, then the child process's user and group IDs will all be reset
+to the real user and group id.
+.Pp
+The
+.Fa perr
+argument must be a
+.Pf non- Dv NULL
+pointer. If the
+.Fn Pcreate
+or
+.Fn Pxcreate
+functions fail, the value pointed to will be filled in with a more
+detailed error code listed in
+.Sx ERRORS .
+A human-readable error message is obtained with
+.Xr Pcreate_error 3PROC .
+.Pp
+Multiple executables named
+.Fa file
+may exist on the
+.Fa PATH .
+To determine the full path of the executable pass a non-NULL
+.Fa path
+pointer. Upon succesful completion of
+.Fn Pcreate
+or
+.Fn Pxcreate
+the
+.Fa path
+pointer will contain the full path up to
+.Fa len
+bytes, including the NUL character.
+.Pp
+Upon successful completion of the
+.Fn Pcreate
+or
+.Fn Pxcreate
+function, a handle to the process is returned. This handle is usable
+with other
+.Sy libproc
+routines and will persist until either
+.Xr Pfree 3PROC
+or
+.Xr Prelease 3PROC
+is called on the resulting handle. The process created is stopped just
+after return from the
+.Xr exec 2
+family of system calls. The process will not run, unless the caller sets
+it running or releases its handle to the process.
+.Pp
+A 32-bit process cannot use this interface to launch or control a
+64-bit process. However, a 64-bit process can create and control both
+32-bit and 64-bit processes.
+.Sh RETURN VALUES
+Upon successful completion, both the
+.Fn Pcreate
+and
+.Fn Pxcreate
+functions create a new process and return a
+.Sy libproc
+handle to it. Otherwise,
+.Sy NULL
+is returned and
+.Fa perr
+is filled in with the corresponding error.
+.Sh ERRORS
+The
+.Fn Pcreate
+and
+.Fn Pxcreate
+functions will fail if:
+.Bl -tag -width Er
+.It Er C_FORK
+The call to
+.Xr fork 2
+failed.
+.It Er C_INTR
+The operation was interrupted by a signal.
+.It Er C_LP64
+The calling process is 32-bit, but it attempted to control a 64-bit
+process.
+.It Er C_NOEXEC
+The specified
+.Fa file
+or the one found by searching
+.Dv PATH
+cannot be executed.
+.It Er C_NOENT
+The specified
+.Fa file
+does not exist or it could not be found by searching
+.Dv PATH .
+.It Er C_PERM
+The specified
+.Fa file
+or the one found by searching
+.Dv PATH
+is set-id or unreadable.
+.It Er C_STRANGE
+An unanticipated system error occurred while trying to create the
+process and its handle. When this occurs, then the value of
+.Sy errno
+is meaningful. See
+.Xr errno 3C
+for more information and
+.Xr Intro 2
+for the list of possible errors.
+.El
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+.Sy MT-Safe
+.Sh SEE ALSO
+.Xr exec 2 ,
+.Xr execvp 2 ,
+.Xr fork 2 ,
+.Xr Intro 2 ,
+.Xr errno 3C ,
+.Xr libproc 3LIB ,
+.Xr Pcreate_error 3PROC ,
+.Xr Pfree 3PROC ,
+.Xr Prelease 3PROC

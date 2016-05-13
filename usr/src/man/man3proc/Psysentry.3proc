@@ -1,0 +1,124 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PSYSENTRY 3PROC
+.Os
+.Sh NAME
+.Nm Psysentry ,
+.Nm Psysexit
+.Nd set system call entry and exit actions
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft int
+.Fo Psysentry
+.Fa "struct ps_prochandle *P"
+.Fa "int which"
+.Fa "int stop"
+.Fc
+.Ft int
+.Fo Psysexit
+.Fa "struct ps_prochandle *P"
+.Fa "int which"
+.Fa "int stop"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Psetentry
+and
+.Fn Psetexit
+functions controls what actions the process handle
+.Fa P
+should take upon executing a system call.
+.Pp
+The system allows a process to be stopped on both entry and exit of a
+system call. For information on the state of the process when it is
+stopped due to system call tracing, see the
+.Sy PCSENTRY
+and
+.Sy PCSEXIT
+sections of
+.Xr proc 4 .
+.Pp
+The value of the
+.Fa stop
+parameter controls whether or not the system call listed in
+.Fa which
+causes the process to stop. A value of non-zero indicates the process
+should stop; a value of 0 indicates it should not.
+.Pp
+The value of
+.Fa which
+indicates which system call the change applies to. A value of 0
+applies to all system calls. Note, the system does not supply a stable
+mapping from system call names to identifiers.
+.Pp
+These functions only apply to actively running processes. They do not
+function on handles that refer to core files, zombie processes, or ELF
+objects.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn Psetentry
+and
+.Fn Psetexit
+functions return the previous disposition of the system call --
+.Sy 0
+if it was not set to stop and
+.Sy 1
+if it was --
+and the system call state is updated. Otherwise,
+.Sy -1
+is returned,
+.Dv errno
+is updated with the error that occurred, and the system call state is
+not updated.
+.Sh ERRORS
+The
+.Fn Psysentry
+and
+.Fn Psysexit
+functions will fail if:
+.Bl -tag -width Er
+.It Er EINVAL
+The value of
+.Fa which
+is invalid, e.g. it is less than zero or greater than the largest defined
+system call.
+.It Er ENOENT
+The handle
+.Fa P
+refers to a process that is a zombie, a core file, or an ELF object.
+.El
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Pp
+Note, while the
+.Fn Psysentry
+and
+.Fn Psysexit
+functions are uncommitted, the mapping of system calls to system call
+numbers is
+.Sy Not-an-Interface
+and may change at any time.
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr libproc 3LIB ,
+.Xr Psysentry 3PROC ,
+.Xr Psysexit 3PROC ,
+.Xr proc 4 ,
+.Xr attributes 5

@@ -1,0 +1,88 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PDELWAPT 3PROC
+.Os
+.Sh NAME
+.Nm Pdelwapt
+.Nd remove a watchpoint in a process
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft int
+.Fo Pdelwapt
+.Fa "struct ps_prochandle *P"
+.Fa "const prwatch_t *wp"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Pdelwapt
+function removes the watchpoint specified by
+.Fa wp
+from the process represented by the handle
+.Fa P .
+The watchpoint should have been installed with either
+.Xr Psetwapt 3PROC
+or the underlying /proc file system
+.Sy PCWATCH
+operation.
+.Pp
+The
+.Fn Pdelwapt
+function only works on running processes, such as those created through
+.Xr Pgrab 3PROC
+and
+.Xr Pcreate 3PROC .
+Attempting to remove a watchpoint from process handles to core files,
+zombie processes, or ELF objects will fail.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn Pdelwapt
+function removes the watchpoint and returns
+.Sy 0 .
+Otherwise,
+.Sy -1
+is returned,
+.Sy errno
+is set to indicate the error.
+.Sh ERRORS
+For a full list of possible errors see the
+.Sy DIAGNOSTICS
+section in
+.Xr proc 4 .
+.Pp
+The
+.Fn Pdelwapt
+function will fail with:
+.Bl -tag -width Er
+.It Er ENOENT
+The handle
+.Fa P
+refers to a grabbed core file, a zombie process, or an ELF object.
+.El
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr libproc 3LIB ,
+.Xr Pcreate 3PROC ,
+.Xr Pgrab 3PROC ,
+.Xr Pgrab_core 3PROC ,
+.Xr Pgrab_file 3PROC ,
+.Xr Psetwapt 3PROC ,
+.Xr proc 4

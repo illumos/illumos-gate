@@ -1,0 +1,193 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PGRAB_CORE 3PROC
+.Os
+.Sh NAME
+.Nm Pgrab_core ,
+.Nm Pfgrab_core
+.Nd grab a core file
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft "struct ps_prochandle *"
+.Fo Pgrab_core
+.Fa "const char *core"
+.Fa "const char *aout"
+.Fa "int gflag"
+.Fa "int *perr"
+.Fc
+.Ft "struct ps_prochandle *"
+.Fo Pfgrab_core
+.Fa "int core_fd"
+.Fa "const char *aout"
+.Fa "int *perr"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Pgrab_core
+and
+.Fn Pfgrab_core
+functions open a core file for introspection. Unlike live processes,
+core files cannot have their state modified; however, all of the
+functions that iterate or query state will work. These functions work
+on all illumos core files and the core files of some other operating
+systems. See both
+.Xr core 4
+and the
+.Em Core Files
+section of
+.Xr libproc 3LIB
+for more information.
+.Pp
+The
+.Fn Pgrab_core
+function attempts to open the core file specified by
+.Fa core .
+The system attempts to determine the path of the original executable.
+The argument
+.Fa aout
+may either be the path to that file, a path to a directory to
+search, or the
+.Dv NULL
+pointer, if neither is known. The system will search for it and will
+supplement information in the core file with that.
+.Pp
+The
+.Fa gflag
+argument to the
+.Fn Pgrab_core
+function controls how the file is opened. If the
+.Dv PGRAB_RDONLY
+flag is specified, then the core file will be opened with the
+.Xr open 2
+flag
+.Dv O_RDONLY .
+Otherwise, it will be opened
+.Dv O_RDWR .
+.Pp
+The
+.Fa perr
+argument must be a
+.Pf non- Dv NULL
+pointer which will store a more detailed error in the event that the
+.Fn Pgrab_core
+function fails. A human-readable form of the error can be obtained
+through the routine
+.Xr Pgrab_error 3PROC .
+.Pp
+The
+.Fn Pfgrab_core
+is similar to the
+.Fn Pgrab_core
+function. Except, instead of operating on a path, it opens a handle to
+the core file referenced by
+.Fa core_fd .
+The
+.Fa aout
+and
+.Fa perr
+arguments are identical to those in the
+.Fn Pgrab_core
+function.
+.Pp
+The handle returned, from either function, is valid until it is closed
+with
+.Xr Prelease 3PROC
+or
+.Xr Pfree 3PROC .
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn Pgrab_core
+and
+.Fn Pfgrab_core
+functions return a
+.Sy libproc
+handle to the core file. Otherwise,
+.Dv NULL
+is returned and
+.Fa perr
+is filled in with a more detailed error message.
+.Sh ERRORS
+The
+.Fn Pgrab_core
+function will fail if:
+.Bl -tag -width Er
+.It Er G_NOCORE
+The file
+.Fa core
+does not exist.
+.It Er G_STRANGE
+An unexpected system error occurred while trying to open
+.Fa core .
+The value of
+.Sy errno
+indicates the system failure.
+.El
+.Pp
+The
+.Fn Pgrab_core
+and
+.Fn Pfgrab_core
+functions will fail if:
+.Bl -tag -width Er
+.It Dv G_ELF
+An unexpected
+.Xr libelf 3LIB
+failure occurred.
+.It Dv G_FORMAT
+The core file referred to by either
+.Fa core
+or
+.Fa core_fd
+is not a valid ELF core file.
+.It Dv G_ISAINVAL
+The architecture of the core file referred to by either
+.Fa core
+or
+.Fa core_fd
+does not match the current running system.
+.It Dv G_LP64
+The calling process is a 32-bit process and the core file referenced by
+either
+.Fa core
+or
+.Fa core_fd
+refers to a 64-bit process.
+.It Dv G_NOTE
+The ELF notes present in the core file referred to by either
+.Fa core
+or
+.Fa core_fd
+are corrupt or missing required data.
+.It Dv G_STRANGE
+An unanticipated system error occurred while trying to open the core
+file and create the handle.
+The value of
+.Sy errno
+indicates the system failure.
+.El
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+.Sy MT-Safe
+.Sh SEE ALSO
+.Xr gcore 1 ,
+.Xr open 2 ,
+.Xr errno 3C ,
+.Xr libproc 3LIB ,
+.Xr Pfree 3PROC ,
+.Xr Pgrab_error 3PROC ,
+.Xr Prelease 3PROC ,
+.Xr core 4

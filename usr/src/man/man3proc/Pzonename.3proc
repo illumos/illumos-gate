@@ -1,0 +1,136 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PZONENAME 3PROC
+.Os
+.Sh NAME
+.Nm Pzonename ,
+.Nm Pzoneroot ,
+.Nm Pzonepath
+.Nd get zone name, root, and full object path
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft char *
+.Fo Pzonename
+.Fa "struct ps_prochandle *P"
+.Fa "char *buf"
+.Fa "size_t nbyte"
+.Fc
+.Ft char *
+.Fo Pzoneroot
+.Fa "struct ps_prochandle *P"
+.Fa "char *buf"
+.Fa "size_t nbyte"
+.Fc
+.Ft char *
+.Fo Pzonepath
+.Fa "struct ps_prochandle *P"
+.Fa "const char *path"
+.Fa "char *buf"
+.Fa "size_t nbyte"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Pzonename
+function attempts to determine the name of the zone for the process
+handle
+.Fa P .
+If found, up to
+.Fa nbytes ,
+including a null terminator, will be written into
+.Fa buf .
+.Pp
+The
+.Fn Pzoneroot
+function attempts to determine the root of the zone corresponding to the
+process handle
+.Fa P .
+If found, up to
+.Fa nbytes ,
+including a null terminator, will be written into
+.Fa buf .
+If the root cannot be found, for example a core file that did not
+originate on the current system, then the empty string will be written
+into
+.Fa buf .
+.Pp
+The
+.Fn Pzonepath
+function attempts to derive the full path of the object
+.Fa path
+in a zone relative to the root associated with the current process
+handle
+.Fa P .
+If found, up to
+.Fa nbytes ,
+including a null terminator, will be written into
+.Fa buf .
+It is legal to use the same buffer for both
+.Fa path
+and
+.Fa buf ;
+it will not be updated unless the function completes successfully.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn Pzonename ,
+.Fn Pzoneroot ,
+and
+.Fn Pzonepath
+functions return
+.Sy buf .
+Otherwise, if an error occurred,
+.Dv NULL
+is returned and
+.Sy errno
+is set.
+.Sh ERRORS
+The
+.Fn Pzonename
+and
+.Fn Pzoneroot
+functions will fail if:
+.Bl -tag -width Er
+.It Er ENODATA
+.Fa P
+refers to a core file and zone information was not available in the core
+dump or
+.Fa P
+refers to an ELF object grabbed through
+.Xr Pgrab_file .
+.It Er EFAULT
+.Fa P
+refers to an active process and
+.Fa buf
+is invalid.
+.El
+.Pp
+The
+.Fn Pzoneroot
+function will fail if:
+.Bl -tag -width Er
+.It Er ENOMEM
+Insufficient memory was available on the system.
+.El
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr getzoneidbyname 3C ,
+.Xr libproc 3LIB ,
+.Xr proc 4

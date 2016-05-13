@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2015, Joyent, Inc.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -2373,7 +2374,7 @@ show_cred(private_t *pri, int new, int loadonly)
 	}
 
 	if (privdata != NULL)
-		free(privdata);
+		proc_free_priv(privdata);
 	credentials = cred;
 	privdata = privs;
 }

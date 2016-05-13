@@ -179,17 +179,6 @@ usr/4lib				i386
 usr/include/sys/libc_kernel.h
 usr/include/sys/synch32.h
 #
-# These files are installed in the proto area by the build of libproc for
-# the benefit of the builds of cmd/truss, cmd/gcore and cmd/ptools, which
-# use libproc as their common process-control library.  These are not
-# interfaces for customer use, so the files are excluded from packaging.
-#
-lib/llib-lproc
-lib/llib-lproc.ln
-lib/amd64/llib-lproc.ln		i386
-lib/sparcv9/llib-lproc.ln	sparc
-usr/include/libproc.h
-#
 # Private interfaces for libdisasm
 #
 usr/include/libdisasm.h

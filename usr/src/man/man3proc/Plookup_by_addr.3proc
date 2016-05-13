@@ -1,0 +1,192 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PLOOKUP_BY_ADDR 3PROC
+.Os
+.Sh NAME
+.Nm Plookup_by_addr ,
+.Nm Pxlookup_by_addr ,
+.Nm Pxlookup_by_addr_resolved ,
+.Nm Plookup_by_name ,
+.Nm Pxlookup_by_name
+.Nd lookup symbols in a process
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft int
+.Fo Plookup_by_addr
+.Fa "struct ps_prochandle *P"
+.Fa "uintptr_t addr"
+.Fa "char *buf"
+.Fa "size_t size"
+.Fa "Gelf_Sym *symp"
+.Fc
+.Ft int
+.Fo Pxlookup_by_addr
+.Fa "struct ps_prochandle *P"
+.Fa "uintptr_t addr"
+.Fa "char *buf"
+.Fa "size_t size"
+.Fa "Gelf_Sym *symp"
+.Fa "prsyminfo_t *sip"
+.Fc
+.Ft int
+.Fo Pxlookup_by_addr_resolved
+.Fa "struct ps_prochandle *P"
+.Fa "uintptr_t addr"
+.Fa "char *buf"
+.Fa "size_t size"
+.Fa "Gelf_Sym *symp"
+.Fa "prsyminfo_t *sip"
+.Fc
+.Ft int
+.Fo Plookup_by_name
+.Fa "struct ps_prochandle *P"
+.Fa "const char *object"
+.Fa "const char *symbol"
+.Fa "GElf_Sym *symp"
+.Fc
+.Ft int
+.Fo Pxlookup_by_name
+.Fa "struct ps_prochandle *P"
+.Fa "Lmid_t lmid"
+.Fa "const char *object"
+.Fa "const char *symbol"
+.Fa "GElf_Sym *symp"
+.Fa "prsyminfo_t *sip"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Plookup_by_addr ,
+.Fn Pxlookup_by_addr ,
+.Fn Pxlookup_by_addr_resolved ,
+.Fn Plookup_by_name ,
+and
+.Fn Pxlookup_by_name
+functions look up symbol information in the process handle
+.Fa P
+and fill in the ELF symbol information in
+.Fa symp
+with the found symbol. Symbols may be looked up both by address and
+name.
+.Pp
+The
+.Fn Plookup_by_addr
+function looks up symbol information corresponding to the address
+.Fa addr .
+If found, up to
+.Fa size
+bytes of the symbol's name, including the null terminator will be filled
+in to the buffer
+.Fa buf .
+.Pp
+The
+.Fn Pxlookup_by_addr
+function is identical to the
+.Fn Plookup_by_addr
+function, except that it also fills in the structure
+.Fa sip
+with additional information. The definition of the
+.Sy prsyminfo_t
+is found in
+.Xr libproc 3PROC .
+.Pp
+The
+.Fn Pxlookup_by_addr_resolved
+function is similar to the
+.Fn Pxlookup_by_addr
+function; however, it attempts to resolve the paths present in the
+.Sy prsyminfo_t
+to an absolute path on the file system.
+.Pp
+The
+.Fn Plookup_by_name
+function attempts to look up a symbol based on its name. The
+.Fa object
+argument allows the caller to specify a specific object that was mapped
+in by the run-time link-editor to search for
+.Fa symbol
+in. The system provides three special values which may be passed in for
+.Fa object .
+The value
+.Dv PR_OBJ_EXEC
+refers to the executable's object (a.out). The value
+.Dv PR_OBJ_LDSO
+refers to the object
+.Sy ld.so.1 .
+The value
+.Dv PR_OBJ_EVERY
+indicates that every object should be searched.
+.Pp
+The
+.Fn Pxlookup_by_name
+function is similar to the
+.Fn Plookup_by_name
+function; however, it allows a link-map identifier,
+.Fa lmid ,
+to be specified and also provides additional information about the
+symbol in the form of the
+.Sy prsyminfo_t
+.Fa sip .
+The specification of
+.Fa lmid
+restricts the search for the object named
+.Fa object
+and symbol named
+.Fa symbol
+to the specified link-map.
+.Pp
+There are three special link-map identifiers
+that may be passed in. The symbol
+.Dv PR_LMID_EVERY
+indicates that every link-map should be searched. The symbol
+.Dv LM_ID_BASE
+indicates that the base link-map, the one that is used for the
+executable should be searched. Finally, the symbol
+.Dv LM_ID_LDSO
+refers to the link-map that is used by the run-time link editor,
+ld.so.1. The
+.Fn Plookup_by_name
+function behaves like
+.Fn Pxlookup_by_name
+when the
+.Dv PR_LMID_EVERY
+argument is passed to
+.Fa lmid ,
+indicating that every link-map should be searched.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn Plookup_by_addr ,
+.Fn Pxlookup_by_addr ,
+.Fn Pxlookup_by_addr_resolved ,
+.Fn Plookup_by_name ,
+and
+.Fn Pxlookup_by_name
+functions return
+.Sy 0
+and fill in the symbol information. Otherwise,
+.Sy -1
+is returned to indicate that the symbol could not be found.
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr elf 3ELF ,
+.Xr gelf 3ELF ,
+.Xr libproc 3LIB ,
+.Xr proc 4

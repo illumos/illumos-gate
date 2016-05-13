@@ -1,0 +1,55 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PERROR_PRINTF 3PROC
+.Os
+.Sh NAME
+.Nm Perror_printf
+.Nd interposable function for additional diagnostics
+.Sh SYNOPSIS
+.Ft void
+.Fo Perror_printf
+.Fa "struct ps_prochandle *P"
+.Fa "const char *format"
+.Fa "..."
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Perror_printf
+function allows for consumers of the
+.Sy libproc
+library to obtain additional diagnostic information during various
+operations. Consumers must explicitly
+.Em interpose
+on this symbol and provide their own definition, if desired. There is no
+requirement for such an interposition to be done. When called,
+.Fa P
+will be the process handle that the additional diagnostics are being
+generated for and the diagnostics will be provided in a
+.Xr printf 3C
+style.
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Pp
+While the interposing interface is
+.Sy uncommitted ,
+the provided diagnostics are
+.Sy Not-an-Interface
+and may change at any time.
+.Sh LOCKING
+Callers should presume that this function may be called from multiple
+threads and always in a context in which taking locks is fine. Callers
+should not expect to be called from a signal handler.
+.Sh SEE ALSO
+.Xr libproc 3LIB

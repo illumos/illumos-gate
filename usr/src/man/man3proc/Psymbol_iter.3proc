@@ -1,0 +1,270 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PSYMBOL_ITER 3PROC
+.Os
+.Sh NAME
+.Nm Psymbol_iter ,
+.Nm Psymbol_iter_by_addr ,
+.Nm Psymbol_iter_by_lmid ,
+.Nm Psymbol_iter_by_name ,
+.Nm Pxsymbol_iter
+.Nd iterate symbols in a process
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft int
+.Fo Psymbol_iter
+.Fa "struct ps_prochandle *P"
+.Fa "const char *object_name"
+.Fa "int which"
+.Fa "int mask"
+.Fa "proc_sym_f *func"
+.Fa "void *data"
+.Fc
+.Ft int
+.Fo Psymbol_iter_by_addr
+.Fa "struct ps_prochandle *P"
+.Fa "const char *object_name"
+.Fa "int which"
+.Fa "int mask"
+.Fa "proc_sym_f *func"
+.Fa "void *data"
+.Fc
+.Ft int
+.Fo Psymbol_iter_by_lmid
+.Fa "struct ps_prochandle *P"
+.Fa "Lmid_t lmid"
+.Fa "const char *object_name"
+.Fa "int which"
+.Fa "int mask"
+.Fa "proc_sym_f *func"
+.Fa "void *data"
+.Fc
+.Ft int
+.Fo Psymbol_iter_by_name
+.Fa "struct ps_prochandle *P"
+.Fa "const char *object_name"
+.Fa "int which"
+.Fa "int mask"
+.Fa "proc_sym_f *func"
+.Fa "void *data"
+.Fc
+.Ft int
+.Fo Pxsymbol_iter
+.Fa "struct ps_prochandle *P"
+.Fa "Lmid_t lmid"
+.Fa "const char *object_name"
+.Fa "int which"
+.Fa "int mask"
+.Fa "proc_xsym_f *func"
+.Fa "void *data"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Psymbol_iter ,
+.Fn Psymbol_iter_by_addr ,
+.Fn Psymbol_iter_by_lmid ,
+.Fn Psymbol_iter_by_name ,
+and
+.Fn Pxsymbol_iter
+functions are used to iterate over the symbols present in the process
+referred to by the handle
+.Fa P .
+For each symbol found, the callback function
+.Fa func
+will be called once and the argument
+.Fa data
+will be passed to it along with an ELF symbol entry in the form of the
+.Sy GElf_Sym
+along with the name of the symbol, if known.
+In the case of the
+.Fn Pxsymbol_iter
+function an additional
+.Sy prsyminfo_t
+argument will be provided to the callback. The definitions of
+.Sy proc_sym_f ,
+.Sy proc_xsym_f ,
+and
+.Sy prsyminfo_t
+are found in
+.Xr libproc 3LIB .
+.Pp
+The
+.Fa object_name
+argument names the object that is a part of the controlled process which
+will be searched for symbols. Only one object may be searched at any
+given time. Valid object names may be obtained through the
+.Xr Pobjname 3PROC
+and
+.Xr Pobject_iter 3PROC
+functions, among others. The system also has two special object names
+that may be passed in to refer to the objects of the executable file and
+for ld.so.1. The symbol
+.Dv PR_OBJ_EXEC
+refers to the executables object and the symbol
+.Dv PR_OBJ_LDSO
+refers to the object ld.so.1.
+.Pp
+The
+.Fa which
+argument controls which of two possible symbol tables will be searched.
+If the argument is
+.Dv PR_SYMTAB
+then the ELF symbol table will be searched. Otherwise, if it is
+.Dv PR_DYNSYM
+then the symbol table associated with the dynamic section will be
+searched instead. If any other value is specified for
+.Fa which ,
+then an error will be returned.
+.Pp
+The
+.Fa mask
+argument controls which symbols will be included. The
+.Fa mask
+argument allows for control over both the symbol's binding and the
+symbol's type. These flags logically correspond to the various ELF
+symbol bindings and types. The following values may be passed as a
+bitwise-inclusive-OR into the
+.Fa flags
+argument:
+.Bl -tag -width Dv -offset indent
+.It Dv BIND_LOCAL
+The symbol is a local symbol. Local symbols are not visible outside of
+their object file.
+.It Dv BIND_GLOBAL
+The symbol is a global symbol. Global symbols are visible outside of
+their object file and may be referred to by other ELF objects.
+.It Dv BIND_WEAK
+The symbol is a weak symbol. Weak symbols are visible outside of their
+object file, but another definition of the symbol may be used instead.
+.It Dv BIND_ANY
+This is a combination of
+.Dv BIND_LOCAL ,
+.Dv BIND_GLOBAL ,
+and
+.Dv BIND_WEAK .
+Every symbol's binding will match this value.
+.It Dv TYPE_NOTYPE
+The symbol's type is not specified.
+.It Dv TYPE_OBJECT
+The symbol refers to a data object. For example, variables.
+.It Dv TYPE_FUNC
+The symbol refers to a function.
+.It Dv TYPE_SECTION
+The symbol refers to an ELF section.
+.It Dv TYPE_FILE
+The symbol refers to the name of a source file associated with an object
+file.
+.It Dv TYPE_ANY
+This is a combination of
+.Dv TYPE_NOTYPE ,
+.Dv TYPE_OBJECT ,
+.Dv TYPE_FUNC ,
+.Dv TYPE_SECTION ,
+and
+.Dv TYPE_FILE .
+Every symbol's type will match this value.
+.El
+.Pp
+To obtain all of the symbols in an object, the caller would pass the
+expression
+.Dv BIND_ANY |
+.Dv TYPE_ANY
+in as the value of
+.Fa mask.
+.Pp
+The
+.Fn Psymbol_iter_by_lmid
+and
+.Fn Pxsymbol_iter
+functions allow for a link-map identifier to be specified in the
+.Fa lmid
+argument. This will restrict the search for the object specified in
+.Fa object_name
+to the specified link-map. There are three special link-map identifiers
+that may be passed in. The symbol
+.Dv PR_LMID_EVERY
+indicates that every link-map should be searched. The symbol
+.Dv LM_ID_BASE
+indicates that the base link-map, the one that is used for the
+executable should be searched. Finally, the symbol
+.Dv LM_ID_LDSO
+refers to the link-map that is used by the run-time link editor,
+ld.so.1. The functions which do not allow a link-map identifier to be
+specified always search every link-map.
+.Pp
+By default, symbols are iterated based on the order of the symbol
+table being searched. However, it is also possible to iterate based on
+the name of the symbol and based on the address of the symbol. To
+iterate by name use the
+.Fn Psymbol_iter_by_name
+function. To iterate by address use the
+.Fn Psymbol_iter_by_addr
+function. The
+.Fn Psymbol_iter ,
+.Fn Psymbol_iter_by_lmid ,
+and
+.Fn Pxsymbol_iter
+functions all sort based on the order of the symbol table.
+.Pp
+The return value of the callback function
+.Fa func
+determines whether or not iteration continues. If
+.Fa func
+returns
+.Sy 0,
+then iteration will continue. However, if
+.Fa func
+returns non-zero, then iteration will halt and that value will be used
+as the return value of the
+.Fn Psymbol_iter ,
+.Fn Psymbol_iter_by_addr ,
+.Fn Psymbol_iter_by_lmid ,
+.Fn Psymbol_iter_by_name ,
+and
+.Fn Pxsymbol_iter
+functions. Because these functions return
+.Sy -1
+on internal failure, it is recommended that the callback function not return
+.Sy -1
+to indicate an error so that the caller may distinguish between the
+failure of the callback function and the failure of these functions.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn Psymbol_iter ,
+.Fn Psymbol_iter_by_addr ,
+.Fn Psymbol_iter_by_lmid ,
+.Fn Psymbol_iter_by_name ,
+and
+.Fn Pxsymbol_iter
+functions return
+.Sy 0 .
+If there was an internal error then
+.Sy -1
+is returned. Otherwise, if the callback function
+.Fa func
+returns non-zero, then its return value will be returned instead.
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr elf 3ELF ,
+.Xr gelf 3ELF ,
+.Xr libproc 3LIB ,
+.Xr proc 4

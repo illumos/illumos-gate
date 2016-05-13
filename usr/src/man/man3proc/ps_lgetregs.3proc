@@ -54,7 +54,6 @@ in libthread_db
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBps_lgetregs()\fR, \fBps_lsetregs()\fR, \fBps_lgetfpregs()\fR,
 \fBps_lsetfpregs()\fR, \fBps_lgetxregsize()\fR, \fBps_lgetxregs()\fR,
@@ -64,7 +63,6 @@ in libthread_db
 \fIlid\fR, and \fBps_lsetregs()\fR sets them. \fBps_lgetfpregs()\fR gets the
 \fBLWP\fR's floating point register set, while \fBps_lsetfpregs()\fR sets it.
 .SS "SPARC Only"
-.sp
 .LP
 \fBps_lgetxregsize()\fR,\fBps_lgetxregs()\fR, and\fBps_lsetxregs()\fR are
 SPARC-specific. They do not need to be defined by a controlling process on
@@ -73,7 +71,6 @@ non-SPARC architecture. \fBps_lgetxregsize()\fR returns in
 registers. \fBps_lgetxregs()\fR gets the extra state registers, and
 \fBps_lsetxregs()\fR sets them.
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fBPS_OK\fR \fR
@@ -111,7 +108,6 @@ The function did not return successfully.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for description of the following attributes:
 .sp
@@ -127,7 +123,6 @@ MT Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBlibc_db\fR(3LIB), \fBproc_service\fR(3PROC), \fBattributes\fR(5),
 \fBthreads\fR(5)

@@ -1,0 +1,114 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PADDR_TO_CTF 3PROC
+.Os
+.Sh NAME
+.Nm Paddr_to_ctf ,
+.Nm Plmid_to_ctf ,
+.Nm Pname_to_ctf
+.Nd lookup CTF data
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft "ctf_file_t *"
+.Fo Paddr_to_ctf
+.Fa "struct ps_prochandle *P"
+.Fa "uintptr_t addr"
+.Fc
+.Ft "ctf_file_t *"
+.Fo Plmid_to_ctf
+.Fa "struct ps_prochandle *P"
+.Fa "Lmid_t lmid"
+.Fa "const char *name"
+.Fc
+.Ft "ctf_file_t *"
+.Fo Pname_to_ctf
+.Fa "struct ps_prochandle *P"
+.Fa "const char *name"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Paddr_to_ctf ,
+.Fn Plmid_to_ctf ,
+and
+.Fn Pname_to_ctf
+functions lookup CTF (Compact C Type Format) data, for use with
+.Sy libctf ,
+from the process represented by the handle
+.Fa P .
+In all cases, the CTF sections of both the running executable and its
+shared libraries are searched.
+.Pp
+The CTF container returned is valid as long as the process handle
+.Fa P
+is valid. That is, until a call to
+.Xr Prelease 3PROC
+is made. Further, consumers must not close the CTF container.
+.Pp
+The
+.Fn Paddr_to_ctf
+function attempts to find the CTF section, if any, that exists for the
+address
+.Fa addr .
+Note, not all addresses correspond to memory regions that have CTF
+data. For example, if a user creates a region of anonymous memory
+through the
+.Xr mmap 2
+function, then it will not have any corresponding CTF information.
+.Pp
+The
+.Fn Pname_to_ctf
+function looks up the object named
+.Fa name
+and returns the corresponding CTF section, if any exists. Two special
+values may be used for name. The macro
+.Dv PR_OBJ_EXEC
+refers to the executable object itself and the macro
+.Dv PR_OBJ_LDSO refers to the object ld.so.1 .
+.Pp
+The
+.Fn Plmid_to_ctf
+function is similar to
+.Fn Pname_to_ctf .
+It allows the passing of a link-map identifier,
+.Fa lmid ,
+which constricts the search of the object named with
+.Fa name
+to that link-map. The special value of
+.Dv PR_LMID_EVERY
+indicates that every link-map should be searched, which is equivalent
+in behavior to the
+.Fn Pname_to_ctf
+function.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn Paddr_to_ctf ,
+.Fn Plmid_to_ctf ,
+and
+.Fn Pname_to_ctf
+functions return a pointer to the corresponding CTF container.
+Otherwise, if none exists then
+.Dv NULL
+is returned.
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr libproc 3LIB ,
+.Xr ctf 4

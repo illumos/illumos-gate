@@ -76,6 +76,7 @@ MANFILES= 	libMPAPI.3lib		\
 	 	libpicltree.3lib	\
 	 	libpkcs11.3lib		\
 	 	libpool.3lib		\
+		libproc.3lib		\
 	 	libproject.3lib		\
 	 	libpthread.3lib		\
 	 	libresolv.3lib		\

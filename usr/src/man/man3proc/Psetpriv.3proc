@@ -1,0 +1,87 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PSETPRIV 3PROC
+.Os
+.Sh NAME
+.Nm Psetpriv
+.Nd set process privileges
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft int
+.Fo Psetpriv
+.Fa "struct ps_prochandle *P"
+.Fa "prpriv_t *pprv"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Psetpriv
+function updates the privileges of the process handle
+.Fa P
+to the set described by
+.Fa pprv .
+The updated privilege set has restrictions on what it may change for a
+process which are documented in the
+.Sy PCSPRIV
+section of
+.Xr proc 4 .
+In addition, the definition of the
+.Sy prpriv_t
+structure is described in
+.Xr proc 4 .
+.Pp
+The current privilege set for the process may be obtained through a call
+to
+.Xr Ppriv 3PROC .
+.Pp
+Note, the privilege set may only be updated for active processes.
+Process handles which correspond to core files, zombie processes, and
+files, may not have their privilege sets updated.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn Psetpriv
+function returns
+.Sy 0
+and updates the privilege sets of the process. Otherwise,
+.Sy -1
+is returned and
+.Sy errno
+is set to indicate the error.
+.Sh ERRORS
+For a full list of possible errors see the
+.Sy DIAGNOSTICS
+section in
+.Xr proc 4 .
+.Pp
+The
+.Fn Psetpriv
+function will fail if:
+.Bl -tag -width Er
+.It Er EBADF
+.Fa P
+doesn't refer to an active process, but a core file, zombie, or a file.
+.El
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr libproc 3LIB ,
+.Xr Ppriv 3PROC ,
+.Xr proc 4 ,
+.Xr privileges 5

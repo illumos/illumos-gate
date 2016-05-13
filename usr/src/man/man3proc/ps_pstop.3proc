@@ -43,7 +43,6 @@ process and LWP control in libthread_db
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBThe ps_pstop()\fR function stops the target process identified by \fIph\fR,
 while the \fBps_pcontinue()\fR function allows it to resume.
@@ -83,7 +82,6 @@ The \fBps_kill()\fR function directs the signal \fIsignum\fR to the target
 process for which the handle is \fIph\fR. It has the same semantics as
 \fBkill\fR(2).
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fBPS_OK\fR \fR
@@ -100,7 +98,7 @@ process is stopped.
 .ad
 .RS 14n
 For \fBps_lstop()\fR, \fBps_lcontinue()\fR and \fBps_lrolltoaddr()\fR; there is
-no \fBLWP\fR with id \fIlwipd\fR in the target process.
+no \fBLWP\fR with id \fIlwpid\fR in the target process.
 .RE
 
 .sp
@@ -113,7 +111,6 @@ The function did not return successfully.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for description of the following attributes:
 .sp
@@ -129,7 +126,6 @@ MT Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBkill\fR(2), \fBlibc_db\fR(3LIB), \fBproc_service\fR(3PROC),
 \fBattributes\fR(5), \fBthreads\fR(5)

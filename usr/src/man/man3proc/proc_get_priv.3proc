@@ -1,0 +1,72 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PROC_GET_PRIV 3PROC
+.Os
+.Sh NAME
+.Nm proc_get_priv ,
+.Nm proc_free_priv
+.Nd get process privileges
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft "prpriv_t *"
+.Fo proc_get_priv
+.Fa "pid_t pid"
+.Fc
+.Ft void
+.Fo proc_free_priv
+.Fa "prpriv_t *prp"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn proc_get_priv
+function is a convenient way to read the /proc privilege file for the
+process
+.Fa pid .
+The
+.Fn proc_get_priv
+function takes care of allocating memory for the privilege set and
+ensures that it is large enough to hold all of the privilege sets. The
+definition of the
+.Sy prpriv_t
+structure may be found in
+.Xr proc 4 .
+.Pp
+The
+.Fn proc_free_priv
+function releases the memory that was allocated by a call to
+.Fn proc_get_priv .
+It is safe to pass the
+.Dv NULL
+pointer in as
+.Fa prp ,
+the function will simply return without taking any action in that case.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn proc_get_priv
+function returns a pointer to an allocated
+.Sy prpriv_t
+with the privileges of
+.Fa pid .
+Otherwise,
+.Dv NULL
+is returned to indicate an error occurred.
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+.Sy MT-Safe
+.Sh SEE ALSO
+.Xr libproc 3LIB ,
+.Xr proc 4

@@ -1,0 +1,58 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt LCTLFD 3PROC
+.Os
+.Sh NAME
+.Nm Lctlfd
+.Nd obtain the thread control file descriptor
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft int
+.Fo Lctlfd
+.Fa "struct ps_lwphandle *L"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Lctlfd
+function returns a file descriptor to the underlying /proc file system
+.Sy ctl
+file for the thread identified by the handle
+.Fa L .
+This may be used for injecting control operations manually; however,
+many interfaces for using it are provided by
+.Xr libproc 3LIB
+itself.
+.Pp
+The file descriptor is invalidated when the thread handle is released
+through
+.Xr Lfree 3PROC .
+The caller
+.Em must not
+call
+.Xr close 2
+on the returned file descriptor.
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr libproc 3LIB ,
+.Xr Lfree 3PROC ,
+.Xr Lgrab 3PROC ,
+.Xr proc 4

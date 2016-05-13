@@ -1,0 +1,65 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PSETCRED 3PROC
+.Os
+.Sh NAME
+.Nm Psetcred
+.Nd set process credentials
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft int
+.Fo Psetcred
+.Fa "struct ps_prochandle *P"
+.Fa "const prcred_t *credp"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Psetcred
+function updates the credentials of the process handle
+.Fa P
+to the values set in
+.Fa credp .
+.Fa credp
+must be fully initialized. The definition of the
+.Sy prcred_t
+structure may be found in
+.Xr proc 4 .
+.Pp
+Note, the credentials may only be updated for an active process. If the
+process handle refers to a zombie process, core file, or a file, then
+.Fn Psetcred
+will fail.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn Psetcred
+function returns
+.Sy 0
+and updates the credentials of the process
+.Fa P .
+Otherwise,
+.Sy -1
+is returned.
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr libproc 3LIB ,
+.Xr Pcred 3PROC ,
+.Xr proc 4
