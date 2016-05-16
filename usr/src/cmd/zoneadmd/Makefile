@@ -33,7 +33,7 @@ include ../Makefile.cmd
 
 ROOTCMDDIR=	$(ROOTLIB)/zones
 
-OBJS= zoneadmd.o zcons.o vplat.o mcap.o
+OBJS= zoneadmd.o zcons.o vplat.o mcap.o zfd.o
 SRCS = $(OBJS:.o=.c)
 POFILE=zoneadmd_all.po
 POFILES= $(OBJS:%.o=%.po)

@@ -797,6 +797,7 @@ do_subproc(zlog_t *zlogp, char *cmdbuf, char **retstr)
 	return (WEXITSTATUS(status));
 }
 
+#if 0 /* XXX KEBE SAYS not yet */
 /*
  * Get the path for this zone's init(1M) (or equivalent) process. First look
  * for a zone-specific init-name attr, then get it from the brand.
@@ -839,6 +840,7 @@ restartinit(brand_handle_t bh)
 
 	return (brand_restartinit(bh));
 }
+#endif /* XXX KEBE */
 
 /*
  * Get the app-svc-dependent flag for this zone's init process. This is a
