@@ -1673,8 +1673,8 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 			} else {
 				log_init_exit(-1);
 			}
-			if ((rval = zone_halt(zlogp, B_FALSE, B_FALSE, zstate,
-			    debug)) != 0)
+			if ((rval = zone_halt(zlogp, B_FALSE, B_FALSE, zstate))
+			    != 0)
 				break;
 			eventstream_write(Z_EVT_ZONE_HALTED);
 			break;
