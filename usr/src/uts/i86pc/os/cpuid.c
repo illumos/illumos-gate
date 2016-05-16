@@ -32,7 +32,7 @@
  * Portions Copyright 2009 Advanced Micro Devices, Inc.
  */
 /*
- * Copyright (c) 2015, Joyent, Inc. All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 /*
  * Various routines to handle identification
@@ -57,6 +57,8 @@
 #include <sys/auxv_386.h>
 #include <sys/memnode.h>
 #include <sys/pci_cfgspace.h>
+#include <sys/comm_page.h>
+#include <sys/tsc.h>
 
 #ifdef __xpv
 #include <sys/hypervisor.h>
@@ -4614,27 +4616,30 @@ patch_tsc_read(int flag)
 	size_t cnt;
 
 	switch (flag) {
-	case X86_NO_TSC:
+	case TSC_NONE:
 		cnt = &_no_rdtsc_end - &_no_rdtsc_start;
 		(void) memcpy((void *)tsc_read, (void *)&_no_rdtsc_start, cnt);
 		break;
-	case X86_HAVE_TSCP:
-		cnt = &_tscp_end - &_tscp_start;
-		(void) memcpy((void *)tsc_read, (void *)&_tscp_start, cnt);
-		break;
-	case X86_TSC_MFENCE:
+	case TSC_RDTSC_MFENCE:
 		cnt = &_tsc_mfence_end - &_tsc_mfence_start;
 		(void) memcpy((void *)tsc_read,
 		    (void *)&_tsc_mfence_start, cnt);
 		break;
-	case X86_TSC_LFENCE:
+	case TSC_RDTSC_LFENCE:
 		cnt = &_tsc_lfence_end - &_tsc_lfence_start;
 		(void) memcpy((void *)tsc_read,
 		    (void *)&_tsc_lfence_start, cnt);
 		break;
+	case TSC_TSCP:
+		cnt = &_tscp_end - &_tscp_start;
+		(void) memcpy((void *)tsc_read, (void *)&_tscp_start, cnt);
+		break;
 	default:
+		/* Bail for unexpected TSC types. (TSC_NONE covers 0) */
+		cmn_err(CE_PANIC, "Unrecogized TSC type: %d", flag);
 		break;
 	}
+	tsc_type = flag;
 }
 
 int

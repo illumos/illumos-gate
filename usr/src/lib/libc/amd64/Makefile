@@ -20,7 +20,7 @@
 #
 #
 # Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright (c) 2015, Joyent, Inc. All rights reserved.
+# Copyright 2016 Joyent, Inc.
 #
 # Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved.
 # Copyright 2013 Garrett D'Amore <garrett@damore.org>
@@ -35,6 +35,10 @@ LIB_PIC=	libc_pic.a
 VERS=		.1
 CPP=		/usr/lib/cpp
 TARGET_ARCH=	amd64
+
+# include comm page definitions
+include $(SRC)/lib/commpage/Makefile.shared.targ
+include $(SRC)/lib/commpage/Makefile.shared.com
 
 # objects are grouped by source directory
 
@@ -106,6 +110,7 @@ COMOBJS=			\
 	strtoull.o
 
 GENOBJS=			\
+	$(COMMPAGE_OBJS)	\
 	_getsp.o		\
 	abs.o			\
 	alloca.o		\
@@ -280,6 +285,7 @@ COMSYSOBJS=			\
 
 SYSOBJS=			\
 	__clock_gettime.o	\
+	__clock_gettime_sys.o	\
 	__getcontext.o		\
 	__uadmin.o		\
 	_lwp_mutex_unlock.o	\
@@ -1180,6 +1186,8 @@ $(PORTI18N_COND:%=pics/%) := \
 	CPPFLAGS += -D_WCS_LONGLONG
 
 pics/arc4random.o :=	CPPFLAGS += -I$(SRC)/common/crypto/chacha
+
+pics/__clock_gettime.o := CPPFLAGS += $(COMMPAGE_CPPFLAGS)
 
 .KEEP_STATE:
 

@@ -2,7 +2,7 @@
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
- * Copyright 2011 Joyent, Inc. All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #ifndef	_SYS_SEGMENTS_H
@@ -522,6 +522,7 @@ void init_boot_gdt(user_desc_t *);
 #define	GDT_B16DATA	4	/* bios call 16 bit data descriptor */
 #define	GDT_B64CODE	5	/* dboot 64 bit code descriptor */
 #define	GDT_BGSTMP	7	/* kmdb descriptor only used early in boot */
+#define	GDT_CPUID	16	/* store numeric id of current CPU */
 
 #if defined(__amd64)
 
@@ -530,8 +531,8 @@ void init_boot_gdt(user_desc_t *);
 #define	GDT_U32CODE	8	/* 32-bit process on 64-bit kernel %cs */
 #define	GDT_UDATA	9	/* user data seg %ds (32 and 64 bit) */
 #define	GDT_UCODE	10	/* native user code  seg %cs */
-#define	GDT_LDT		12	/* LDT for current process */
-#define	GDT_KTSS	14	/* kernel tss */
+#define	GDT_LDT		12	/* (12-13) LDT for current process */
+#define	GDT_KTSS	14	/* (14-15) kernel tss */
 #define	GDT_FS		GDT_NULL /* kernel %fs segment selector */
 #define	GDT_GS		GDT_NULL /* kernel %gs segment selector */
 #define	GDT_LWPFS	55	/* lwp private %fs segment selector (32-bit) */

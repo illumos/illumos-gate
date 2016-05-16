@@ -113,6 +113,7 @@ typedef struct uarg {
 	boolean_t scrubenv;
 	uintptr_t maxstack;
 	boolean_t stk_prot_override;
+	uintptr_t commpage;
 } uarg_t;
 
 /*
