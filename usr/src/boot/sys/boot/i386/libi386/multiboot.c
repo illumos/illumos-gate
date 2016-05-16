@@ -49,7 +49,7 @@
 #include <stand.h>
 
 #include "bootstrap.h"
-#include "multiboot.h"
+#include <sys/multiboot.h>
 #include "../zfs/libzfs.h"
 #include "../i386/libi386/libi386.h"
 #include "../i386/btx/lib/btxv86.h"
