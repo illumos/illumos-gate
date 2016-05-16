@@ -23,6 +23,7 @@
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2014 by Delphix. All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*
@@ -3590,28 +3591,12 @@ hres_tick(void)
 {}
 
 int64_t timedelta;
-hrtime_t hres_last_tick;
-volatile timestruc_t hrestime;
-int64_t hrestime_adj;
-volatile int hres_lock;
 hrtime_t hrtime_base;
 
 #else	/* __lint */
 
-	DGDEF3(hrestime, _MUL(2, CLONGSIZE), 8)
-	.NWORD	0, 0
-
-	DGDEF3(hrestime_adj, 8, 8)
-	.long	0, 0
-
-	DGDEF3(hres_last_tick, 8, 8)
-	.long	0, 0
-
 	DGDEF3(timedelta, 8, 8)
 	.long	0, 0
-
-	DGDEF3(hres_lock, 4, 8)
-	.long	0
 
 	/*
 	 * initialized to a non zero value to make pc_gethrtime()

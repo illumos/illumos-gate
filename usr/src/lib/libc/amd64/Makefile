@@ -36,6 +36,10 @@ VERS=		.1
 CPP=		/usr/lib/cpp
 TARGET_ARCH=	amd64
 
+# include comm page definitions
+include $(SRC)/lib/commpage/Makefile.shared.com
+include $(SRC)/lib/commpage/Makefile.shared.targ
+
 # objects are grouped by source directory
 
 # local objects
@@ -106,6 +110,7 @@ COMOBJS=			\
 	strtoull.o
 
 GENOBJS=			\
+	$(COMMPAGE_OBJS)	\
 	_getsp.o		\
 	abs.o			\
 	alloca.o		\
@@ -282,6 +287,7 @@ COMSYSOBJS=			\
 
 SYSOBJS=			\
 	__clock_gettime.o	\
+	__clock_gettime_sys.o	\
 	__getcontext.o		\
 	__uadmin.o		\
 	_lwp_mutex_unlock.o	\
@@ -1065,7 +1071,7 @@ BUILD.AR= $(RM) $@ ; \
 	$(AR) q $@ `$(LORDER) $(MOSTOBJS:%=$(DIR)/%) | $(GREP) -v ' L ' | $(TSORT)`
 
 # extra files for the clean target
-CLEANFILES=			\
+CLEANFILES+=			\
 	$(LIBCDIR)/port/gen/errlst.c	\
 	$(LIBCDIR)/port/gen/new_list.c	\
 	assym.h			\
@@ -1189,6 +1195,8 @@ $(PORTI18N_COND:%=pics/%) := \
 	CPPFLAGS += -D_WCS_LONGLONG
 
 pics/arc4random.o :=	CPPFLAGS += -I$(SRC)/common/crypto/chacha
+
+pics/__clock_gettime.o := CPPFLAGS += $(COMMPAGE_CPPFLAGS)
 
 .KEEP_STATE:
 

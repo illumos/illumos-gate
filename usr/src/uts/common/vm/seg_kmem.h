@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #ifndef _VM_SEG_KMEM_H
@@ -135,6 +136,8 @@ extern size_t	segkmem_kmemlp_max;
 
 #define	IS_KMEM_VA_LARGEPAGE(vaddr)				        \
 	(((vaddr) >= heap_lp_base) && ((vaddr) < heap_lp_end))
+
+extern struct seg_ops segkmem_ops;
 
 #endif	/* _KERNEL */
 

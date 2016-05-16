@@ -23,6 +23,7 @@
 # Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # Copyright (c) 2010, Intel Corporation.
+# Copyright 2016 Joyent, Inc.
 #
 #	This Makefile defines file modules in the directory uts/i86pc
 #	and its children. These are the source files which are i86pc
@@ -40,6 +41,7 @@ CORE_OBJS +=			\
 	cmi.o			\
 	cmi_hw.o		\
 	cms.o			\
+	comm_page.o		\
 	confunix.o		\
 	cpu_idle.o		\
 	cpuid.o			\

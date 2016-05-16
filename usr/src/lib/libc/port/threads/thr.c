@@ -138,6 +138,7 @@ uberdata_t __uberdata = {
 	NULL,			/* robustlocks */
 	NULL,			/* robustlist */
 	NULL,			/* progname */
+	NULL,			/* ub_comm_page */
 	NULL,			/* __tdb_bootstrap */
 	{			/* tdb */
 		NULL,		/* tdb_sync_addr_hash */
@@ -1221,6 +1222,23 @@ extern void atfork_init(void);
 extern void __proc64id(void);
 #endif
 
+static void
+init_auxv_data(uberdata_t *udp)
+{
+	Dl_argsinfo_t args;
+
+	udp->ub_comm_page = NULL;
+	if (dlinfo(RTLD_SELF, RTLD_DI_ARGSINFO, &args) < 0)
+		return;
+
+	while (args.dla_auxv->a_type != AT_NULL) {
+		if (args.dla_auxv->a_type == AT_SUN_COMMPAGE) {
+			udp->ub_comm_page = args.dla_auxv->a_un.a_ptr;
+		}
+		args.dla_auxv++;
+	}
+}
+
 /*
  * libc_init() is called by ld.so.1 for library initialization.
  * We perform minimal initialization; enough to work with the main thread.
@@ -1255,6 +1273,13 @@ libc_init(void)
 	 * Every libc, regardless of which link map, must register __cleanup().
 	 */
 	(void) _atexit(__cleanup);
+
+	/*
+	 * Every libc, regardless of link map, needs to go through and check
+	 * its aux vectors.  Doing so will indicate whether or not this has
+	 * been given a comm page (to optimize certain system actions).
+	 */
+	init_auxv_data(udp);
 
 	/*
 	 * We keep our uberdata on one of (a) the first alternate link map

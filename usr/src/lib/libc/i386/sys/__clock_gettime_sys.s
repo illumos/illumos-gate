@@ -21,32 +21,34 @@
 /*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2016 Joyent, Inc.
  */
 
-	.file	"__clock_gettime.s"
+	.file	"__clock_gettime_sys.s"
 
+#include <sys/asm_linkage.h>
 #include <sys/time_impl.h>
 #include "SYS.h"
 
 /*
  * int
- * __clock_gettime(clockid_t clock_id, timespec_t *tp)
+ * __sys_clock_gettime(clockid_t clock_id, timespec_t *tp)
  */
 
-	ENTRY(__clock_gettime)
-	cmpl	$__CLOCK_REALTIME0, %edi	/* if (clock_id) */
+	ENTRY(__clock_gettime_sys)
+	movl	4(%esp), %eax
+	cmpl	$__CLOCK_REALTIME0, %eax	/* if (clock_id) */
 	je	2f				/* equal to __CLOCK_REALTIME0 */
-	cmpl	$CLOCK_REALTIME, %edi		/* or if (clock_id) */
+	cmpl	$CLOCK_REALTIME, %eax		/* or if (clock_id) */
 	jne	1f				/* equal to CLOCK_REALTIME */
 2:
-	pushq	%rsi		/* preserve the timespec_t pointer */
 	SYSFASTTRAP(GETHRESTIME)
-	popq	%rsi
-	movq	%rax, (%rsi)
-	movq	%rdx, 8(%rsi)
+	movl	8(%esp), %ecx
+	movl	%eax, (%ecx)
+	movl	%edx, 4(%ecx)
 	RETC
 1:
 	SYSTRAP_RVAL1(clock_gettime)
 	SYSCERROR
 	RETC
-	SET_SIZE(__clock_gettime)
+	SET_SIZE(__clock_gettime_sys)

@@ -977,6 +977,7 @@ typedef struct uberdata {
 	robust_t	**robustlocks;	/* table of registered robust locks */
 	robust_t	*robustlist;	/* list of registered robust locks */
 	char	*progname;	/* the basename of the program, from argv[0] */
+	void	*ub_comm_page;	/* arch-specific comm page of kernel data */
 	struct uberdata **tdb_bootstrap;
 	tdb_t	tdb;		/* thread debug interfaces (for libc_db) */
 } uberdata_t;
@@ -1190,6 +1191,7 @@ typedef struct uberdata32 {
 	caddr32_t	robustlocks;
 	caddr32_t	robustlist;
 	caddr32_t	progname;
+	caddr32_t	ub_comm_page;
 	caddr32_t	tdb_bootstrap;
 	tdb32_t		tdb;
 } uberdata32_t;

@@ -308,6 +308,7 @@ GENUNIX_OBJS +=	\
 		seg_map.o	\
 		seg_vn.o	\
 		seg_spt.o	\
+		seg_umap.o	\
 		semaphore.o	\
 		sendfile.o	\
 		session.o	\

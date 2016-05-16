@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*
@@ -720,6 +720,21 @@ isalnum(int c)
 {
 	return ((isalpha(c) || isdigit(c)) ? 1 : 0);
 }
+
+#if defined(__i386) || defined(__amd64)
+/*
+ * Instead of utilizing the comm page for clock_gettime, rtld uses the raw
+ * syscall instead.  Doing so decreases the surface of symbols needed from libc
+ * for a modest performance cost.
+ */
+extern int __clock_gettime_sys(clockid_t, struct timespec *);
+
+int
+__clock_gettime(clockid_t clock_id, struct timespec *tp)
+{
+	return (__clock_gettime_sys(clock_id, tp));
+}
+#endif /* defined(__i386) || defined(__amd64) */
 
 /*
  * In a similar vein to the is* functions above, we also have to define our own
