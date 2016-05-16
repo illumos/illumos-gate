@@ -211,6 +211,8 @@ static const int stol_socktype[SOCK_SEQPACKET + 1] = {
 #define	ABST_PRFX "/tmp/.ABSK_"
 #define	ABST_PRFX_LEN (sizeof (ABST_PRFX) - 1)
 
+#define	DATAFILT	"datafilt"
+
 typedef enum {
 	lxa_none,
 	lxa_abstract,
@@ -2750,6 +2752,7 @@ lx_setsockopt_tcp(sonode_t *so, int optname, void *optval, socklen_t optlen)
 
 	if (optname == LX_TCP_DEFER_ACCEPT) {
 		int *intval;
+		char *dfp;
 
 		/*
 		 * Emulate TCP_DEFER_ACCEPT using the datafilt(7M) socket
@@ -2761,20 +2764,27 @@ lx_setsockopt_tcp(sonode_t *so, int optname, void *optval, socklen_t optlen)
 		}
 		intval = (int *)optval;
 
+		/*
+		 * socket_setsockopt asserts that the optval is aligned, so
+		 * we use kmem_alloc to ensure this.
+		 */
+		dfp = (char *)kmem_alloc(sizeof (DATAFILT), KM_SLEEP);
+		(void) strcpy(dfp, DATAFILT);
 
 		if (*intval > 0) {
 			error = socket_setsockopt(so, SOL_FILTER, FIL_ATTACH,
-			    "datafilt", 9, CRED());
+			    dfp, 9, CRED());
 			if (error == EEXIST) {
 				error = 0;
 			}
 		} else {
 			error = socket_setsockopt(so, SOL_FILTER, FIL_DETACH,
-			    "datafilt", 9, CRED());
+			    dfp, 9, CRED());
 			if (error == ENXIO) {
 				error = 0;
 			}
 		}
+		kmem_free(dfp, sizeof (DATAFILT));
 		return (error);
 	}
 
