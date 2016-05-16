@@ -1,0 +1,110 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PR_MEMCNTL 3PROC
+.Os
+.Sh NAME
+.Nm pr_memcntl
+.Nd inject memcntl system call into victim process
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft int
+.Fo pr_memcntl
+.Fa "struct ps_prochandle *P"
+.Fa "caddr_t addr"
+.Fa "size_t len"
+.Fa "int cmd"
+.Fa "caddr_t arg"
+.Fa "int attr"
+.Fa "int mask"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn pr_memcntl
+function injects the
+.Xr memcntl 2
+system call into the target process
+.Fa P
+by means of the agent LWP.
+If the process handle
+.Fa P
+is the value
+.Dv NULL
+then this will be equivalent to calling
+.Xr memcntl 2
+on the currently running process.
+.Pp
+The arguments
+.Fa addr ,
+.Fa len ,
+.Fa cmd ,
+.Fa arg ,
+.Fa attr ,
+and
+.Fa mask
+have the same meaning as in
+.Xr memcntl 2 .
+See
+.Xr memcntl 2
+for the full description and purpose of the
+.Sy memcntl
+system call and its arguments.
+.Pp
+The
+.Fn pr_memcntl
+function only works on active processes. Process handles that correspond
+to core files, zombie processes, or ELF objects do not support system
+call injection.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn pr_memcntl
+function's return value is that described in
+.Xr memcntl 2 .
+Otherwise,
+.Sy -1
+is returned and
+.Sy errno
+is set to
+.Er ENOSYS
+to indicate that the system call could not be injected.
+.Sh ERRORS
+For the full list of errors see the
+.Sy ERRORS
+section in
+.Xr memcntl 2 .
+.Pp
+The
+.Fn pr_memcntl
+function will fail if:
+.Bl -tag -width Er
+.It Er ENOSYS
+An error occurred while trying to invoke the agent LWP and inject a
+system call in the process handle
+.Fa P
+or the process handle
+.Fa P
+does not support system call injection.
+.El
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr memcntl 2 ,
+.Xr libproc 3LIB ,
+.Xr proc 4

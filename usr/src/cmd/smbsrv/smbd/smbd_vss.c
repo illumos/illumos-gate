@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 Martin Matuska. All rights reserved.
  */
 
 #include <synch.h>
@@ -120,7 +121,7 @@ smbd_vss_get_count(const char *path, uint32_t *count)
 		return (-1);
 	}
 
-	(void) zfs_iter_snapshots(zfshd, smbd_vss_iterate_count,
+	(void) zfs_iter_snapshots(zfshd, B_FALSE, smbd_vss_iterate_count,
 	    (void *)&vss_count);
 
 	if (vss_count.vc_count > SMBD_VSS_SNAPSHOT_MAX)
@@ -183,8 +184,8 @@ smbd_vss_get_snapshots(const char *path, uint32_t count,
 		return;
 	}
 
-	(void) zfs_iter_snapshots(zfshd, smbd_vss_iterate_get_uint64_date,
-	    (void *)&vss_uint64_date);
+	(void) zfs_iter_snapshots(zfshd, B_FALSE,
+	    smbd_vss_iterate_get_uint64_date, (void *)&vss_uint64_date);
 
 	*num_gmttokens = vss_uint64_date.gd_return_count;
 	*return_count = vss_uint64_date.gd_return_count;
@@ -261,7 +262,7 @@ smbd_vss_map_gmttoken(const char *path, char *gmttoken, time_t toktime,
 		return (-1);
 	}
 
-	(void) zfs_iter_snapshots(zfshd, smbd_vss_iterate_map_gmttoken,
+	(void) zfs_iter_snapshots(zfshd, B_FALSE, smbd_vss_iterate_map_gmttoken,
 	    (void *)&vss_map_gmttoken);
 
 	/* compare the zfs snapshot name and the local snap name */

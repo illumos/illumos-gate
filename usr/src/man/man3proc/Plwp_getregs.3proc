@@ -1,0 +1,154 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PLWP_GETREGS 3PROC
+.Os
+.Sh NAME
+.Nm Plwp_getfpregs ,
+.Nm Plwp_setfpregs ,
+.Nm Plwp_getregs ,
+.Nm Plwp_setregs
+.Nd get and set thread registers
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft int
+.Fo Plwp_getfpregs
+.Fa "struct ps_prochandle *P"
+.Fa "lwpid_t lwpid"
+.Fa "prfpregset_t *fpregs"
+.Fc
+.Ft int
+.Fo Plwp_setfpregs
+.Fa "struct ps_prochandle *P"
+.Fa "lwpid_t lwpid"
+.Fa "const prfpregset_t fpregs"
+.Fc
+.Ft int
+.Fo Plwp_getregs
+.Fa "struct ps_prochandle *P"
+.Fa "lwpid_t lwpid"
+.Fa "prpregset_t *gregs"
+.Fc
+.Ft int
+.Fo Plwp_setregs
+.Fa "struct ps_prochandle *P"
+.Fa "lwpid_t lwpid"
+.Fa "const prpregset_t gregs"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Plwp_getregs ,
+.Fn Plwp_setregs ,
+.Fn Plwp_getfpregs ,
+and
+.Fn Plwp_setfpregs
+functions allow one to get and set the general purpose and floating
+point registers from the thread
+.Fa lwpid
+in the process handle
+.Fa P .
+.Pp
+The
+.Fn Plwp_getfpregs
+function updates the structure pointed to by
+.Fa fpregs
+with the state and values of the floating point registers of the thread
+specified by
+.Fa lwpid .
+.Pp
+The
+.Fn Plwp_setfpregs
+function updates the floating point registers of the thread specified by
+.Fa lwpid
+to the register state contained in
+.Fa fpregs .
+.Pp
+The
+.Fn Plwp_getregs
+function updates the structure pointed to by
+.Fa gregs
+with the state and values of the general purpose registers of the thread
+specified by
+.Fa lwpid.
+.Pp
+The
+.Fn Plwp_setregs
+function updates the general purpose registers of the thread specified
+by
+.Fa lwpid
+to the register state contained in
+.Fa gregs .
+.Pp
+Processes must be stopped before obtaining the register state of
+individual threads. Processes may be stopped with
+.Xr Pstop 3PROC .
+The structures used for registers are described in
+.Xr proc 4
+and their defintions may be found in
+.In sys/regset.h .
+The definitions of these structures varies based on the architecture of
+the system and the running process.
+.Pp
+One may not set the register values of a process that is not an active
+process, e.g. a process handle that refers to a file or a core file.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn Plwp_getregs ,
+.Fn Plwp_setregs ,
+.Fn Plwp_getfpregs ,
+and
+.Fn Plwp_setfpregs
+functions return
+.Sy 0
+and obtain or set the register state. Otherwise,
+.Sy -1
+is returned,
+.Sy errno
+is set to indicate the error, and the register state is not updated nor
+are the data pointers changed.
+.Sh ERRORS
+For a full list of possible errors also see the
+.Sy DIAGNOSTICS
+section in
+.Xr proc 4 .
+.Pp
+The
+.Fn Plwp_getregs ,
+.Fn Plwp_setregs ,
+.Fn Plwp_getfpregs ,
+and
+.Fn Plwp_setfpregs
+will fail if:
+.Bl -tag -width Er
+.It Er EBUSY
+The process handle
+.Fa P
+is not currently stopped.
+.It Er ENOENT
+There is no thread in
+.Fa P
+with id
+.Fa lwpid .
+.El
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr libproc 3LIB ,
+.Xr proc 4

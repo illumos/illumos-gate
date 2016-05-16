@@ -1,0 +1,49 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt LGRAB_ERROR 3PROC
+.Os
+.Sh NAME
+.Nm Lgrab_error
+.Nd get Lgrab error message string
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft "const char *"
+.Fo Lgrab_error
+.Fa "int error"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Lgrab_error
+function returns a pointer to a human-readable character string
+describing the error that occurred. The
+.Fn Lgrab_error
+function only knows how to translate error codes that were stored in
+the third argument
+.Pf ( Fa perr Ns )
+of a call to
+.Xr Lgrab 3PROC .
+.Sh RETURN VALUES
+The
+.Fn Lgrab_error
+function always returns a pointer to a character string describing the
+error that occurred, even if it is an unknown error.
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+.Sy MT-Safe
+.Sh SEE ALSO
+.Xr libproc 3LIB ,
+.Xr Lgrab 3PROC

@@ -1,0 +1,178 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PGETAREG 3PROC
+.Os
+.Sh NAME
+.Nm Pgetareg ,
+.Nm Pputareg ,
+.Nm Lgetareg ,
+.Nm Lputareg
+.Nd set and get a register from a stopped process or thread
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft int
+.Fo Pgetareg
+.Fa "struct ps_prochandle *P"
+.Fa "int regno"
+.Fa "prgreg_t *preg"
+.Fc
+.Ft int
+.Fo Pputareg
+.Fa "struct ps_prochandle *P"
+.Fa "int regno"
+.Fa "prgreg_t preg"
+.Fc
+.Ft int
+.Fo Lgetareg
+.Fa "struct ps_lwphandle *L"
+.Fa "int regno"
+.Fa "prgreg_t *preg"
+.Fc
+.Ft int
+.Fo Lputareg
+.Fa "struct ps_lwphandle *L"
+.Fa "int regno"
+.Fa "prgreg_t preg"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Pgetareg
+and
+.Fn Pputareg
+functions read and update the registers of the process handle referred
+to by
+.Fa P .
+.Pp
+The getting and setting of registers of the process operates on the
+representative thread (LWP). For more information on how the
+representative is chosen, see
+.Xr proc 4 .
+To change the registers of a specific thread, use the
+.Xr Lgetareg 3PROC
+and
+.Xr Lsetareg 3PROC
+functions.
+.Pp
+The getting and setting of registers only applies to stopped
+processes. In addition, one may obtain registers from core files, but
+not set them. To stop a process, see the
+.Xr Pstop 3PROC
+function.
+.Pp
+The register to get or set is indicated by the
+.Fa regno
+argument. For a list of registers, see
+.In sys/regset.h .
+The set of registers is specific to each architecture of the system. The
+.Fn Pgetareg
+function will fill in the value of
+.Fa preg
+with the value of the register
+.Fa regno ,
+while the
+.Fn Pputareg
+function will update the value of the register
+.Fa regno
+with the value in
+.Fa preg .
+Updated registers will be set when the process resumes execution.
+.Pp
+The
+.Fn Lgetareg
+and
+.Fn Lputareg
+functions are equivalent to the
+.Fn Pgetareg
+and
+.Fn Psetareg
+functions, except rather than operating on the process and its
+representative thread, they instead operate on the thread handle
+.Fa L .
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn Pgetareg
+and
+.Fn Pputareg
+function return
+.Sy 0 .
+Otherwise,
+.Sy -1
+is returned,
+.Sy errno
+is set, and no registers will have been gotten or updated.
+.Sh ERRORS
+The
+.Fn Pgetareg
+and
+.Fn Lgetareg
+functions will fail if:
+.Bl -tag -width Er
+.It Er EINVAL
+The value of
+.Fa regno
+is invalid. This means it is less than
+.Sy 0
+and greater than
+.Sy NPRGREG .
+Note,
+.Sy NPRGREG Ns 's
+value varies based on process architecture.
+.It Er EBUSY
+The handle
+.Fa P
+is neither stopped nor a core file.
+.It Er ENODATA
+The handle
+.Fa P
+refers to a file obtained through
+.Xr Pgrab_file 3PROC .
+.El
+.Pp
+The
+.Fn Pputareg
+and
+.Fn Lputareg
+functions will fail if:
+.Bl -tag -width Er
+.It Er EINVAL
+The value of
+.Fa regno
+is invalid. This means it is less than
+.Sy 0
+and greater than
+.Sy NPRGREG .
+Note,
+.Sy NPRGREG Ns 's
+value varies based on process architecture.
+.It Er EBUSY
+The handle
+.Fa P
+is not stopped or refers to a non-active process.
+.El
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr errno 3C ,
+.Xr libproc 3LIB ,
+.Xr Lgrab 3PROC ,
+.Xr Pgrab_file 3PROC ,
+.Xr Pstop 3PROC ,
+.Xr proc 4

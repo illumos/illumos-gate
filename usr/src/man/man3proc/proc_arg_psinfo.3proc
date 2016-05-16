@@ -1,0 +1,142 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PROC_ARG_PSINFO 3PROC
+.Os
+.Sh NAME
+.Nm proc_arg_psinfo ,
+.Nm proc_arg_xpsinfo
+.Nd process ps information utility function
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft pid_t
+.Fo proc_arg_psinfo
+.Fa "const char *arg"
+.Fa "int oflag"
+.Fa "psinfo_t *psp"
+.Fa "int *perr"
+.Fc
+.Ft pid_t
+.Fo proc_arg_xpsinfo
+.Fa "const char *arg"
+.Fa "int oflag"
+.Fa "psinfo_t *psp"
+.Fa "int *perr"
+.Fa "const char **lwps"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn proc_arg_psinfo
+and
+.Fn proc_arg_xpsinfo
+functions are utility functions which process an argument that may
+refer to a currently active process or core file and attempts to obtain the
+.Xr ps 1
+information from the process or core and fills it into
+.Fa psp .
+.Pp
+The string
+.Fa arg
+contains the name of something to try and open. How it is interpreted
+depends on the value of
+.Fa oflag .
+The following values may be passed in as a bitwise-exclusive-OR for
+.Fa oflag :
+.Bl -tag -width Dv -offset indent
+.It Dv PR_ARG_PIDS
+Allows
+.Fa arg
+to specify process IDs and /proc arguments.
+.It Dv PR_ARG_CORES
+Allows
+.Fa arg
+to specify core files.
+.It PR_ARG_ANY
+Encompasses all of the previous opens.
+.El
+.Pp
+The argument
+.Fa perr
+must be a
+.Pf non- Dv NULL
+pointer and in the event that the
+.Fn proc_arg_psinfo
+or
+.Fn proc_arg_xpsinfo
+functions fail, then
+.Fa perr
+will be updated with a more detailed error number.
+.Pp
+If the
+.Fa lwps
+argument is
+.Pf non- Dv NULL ,
+then if there is a thread specification present in
+.Fa arg ,
+it will be validated to see if it is a valid range and then a pointer to
+the start of the thread specification will be stored in
+.Fa lwps .
+For more information on determining process range validity, see
+.Xr proc_lwp_range_valid 3PROC
+for more information on valid and invalid tread specifications.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn proc_arg_psinfo
+and
+.Fn proc_arg_xpsinfo
+functions return the process identifier and fill in
+.Fa psp
+with the ps information of the process. Otherwise,
+.Sy -1
+is returned and
+.Fa perr
+is filled in with the error's details.
+.Sh ERRORS
+For a full list of additional errors, see the
+.Sy ERRORS
+section in
+.Xr Pgrab_core 3PROC .
+.Bl -tag -width Er
+.It Er G_BADLWPS
+.Fa arg
+contains an invalid thread specification.
+.It Er G_NOCORE
+.Dv PR_ARG_CORES
+was set and no core file could be found corresponding to
+.Fa arg .
+.It Er G_NOPROC
+.Dv PR_ARG_PIDS
+was set and no process could be found corresponding to
+.Fa arg .
+.It Er G_NOPROCORCORE
+Both
+.Dv PR_ARG_CORES
+and
+.Dv PR_ARG_NOPROC
+were set and no process or core file could be found corresponding to
+.Fa arg .
+.El
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+.Sy MT-Safe
+.Sh SEE ALSO
+.Xr ps 1 ,
+.Xr libproc 3LIB ,
+.Xr Pgrab 3PROC ,
+.Xr Pgrab_core 3PROC ,
+.Xr Prelease 3PROC ,
+.Xr proc_lwp_range_valid 3PROC ,
+.Xr proc 4

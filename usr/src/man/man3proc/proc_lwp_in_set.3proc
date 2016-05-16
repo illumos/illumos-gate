@@ -1,0 +1,120 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PROC_LWP_IN_SET 3PROC
+.Os
+.Sh NAME
+.Nm proc_lwp_in_set ,
+.Nm proc_lwp_range_valid
+.Nd test and validate thread ranges
+.Sh SYNOPSIS
+.Lb libproc
+.Ft int
+.Fo proc_lwp_in_set
+.Fa "const char *set"
+.Fa "lwpid_t lwpid"
+.Fc
+.Ft int
+.Fo proc_lwp_range_valid
+.Fa "const char *set"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn proc_lwp_in_set
+and
+.Fn proc_lwp_range_valid
+functions provide means for testing the validity of thread ranges and
+whether a thread is in a range.
+.Pp
+A thread range is a series of one or more series of range identifiers
+which describe a collection of threads. These are often used by programs
+such as
+.Xr pbind 1M ,
+.Xr pstack 1 ,
+.Xr prun 1 ,
+.Xr pstop 1 ,
+and others as a means for a user to specify a selection of threads from
+inside of a process.
+.Pp
+More formally, the thread range may be described as:
+.Bd -literal -offset indent
+lwp_range[,lwp_range]*
+.Ed
+.Pp
+An LWP range may be specified as one of the following four strings. The
+following table shows the string formats and the corresponding set of
+valid threads that match it:
+.Bl -column -offset indent ".Sy n-m" "n <= lwpid <= m"
+.It Sy -n Ta lwpid <= n
+.It Sy n-m Ta n <= lwpid <= m
+.It Sy n- Ta lwpid >= n
+.It Sy n Ta lwpid == n
+.El
+.Pp
+For example, the thread range
+.Sy -2,4-5,7,8-
+matches thread with IDs 0-2, 4-5, 7, and any thread id 8 or greater.
+.Pp
+The
+.Fn proc_lwp_range_valid
+function determines whether or not the character string
+.Fa set
+is a valid thread range based on the rules above. Note, the empty
+string, the
+.Dv NULL
+pointer, or otherwise are not valid.
+.Pp
+The
+.Fn proc_lwp_in_set
+function determines whether the thread identifier
+.Fa lwpid
+is contained in the set described by
+.Fa set .
+If
+.Fa set
+is the
+.Dv NULL
+pointer, then every thread matches the set.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fa proc_lwp_in_set
+function returns
+.Sy 1
+to indicate
+.Fa lwpid
+is in
+.Fa set .
+Otherwise,
+.Sy 0
+is returned to indicate that
+.Fa lwpid
+is not in
+.Fa set .
+.Pp
+Upon successful completion, the
+.Fa proc_lwp_range_valid
+function returns
+.Sy 0
+to indicate
+.Fa set
+is valid. Otherwise,
+.Sy -1
+is returned to indicate that the set is invalid.
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+.Sy MT-Safe
+.Sh SEE ALSO
+.Xr libproc 3LIB ,
+.Xr proc 4

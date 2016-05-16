@@ -1,0 +1,84 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PUNAME 3PROC
+.Os
+.Sh NAME
+.Nm Puname
+.Nd get uname information from a process
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft int
+.Fo Puname
+.Fa "struct ps_prochandle *P"
+.Fa "struct utsname *u"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Puname
+function copies the operating system information from the process
+handle
+.Fa P
+into
+.Fa u .
+.Pp
+For an active process or zombie process, this is the same information
+obtained from
+.Xr uname 2 .
+For core files, if available, it is the system information at the time
+the core was dumped.
+.Pp
+Handles that correspond to ELF objects do not contain uname
+information.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn Puname
+function returns
+.Sy 0
+and updates the information at
+.Fa u .
+Otherwise,
+.Sy -1
+is returned and
+.Sy errno
+is set to indicate the error.
+.Sh ERRORS
+The
+.Fn Puname
+function will fail if:
+.Bl -tag -width Er
+.It Er ENODATA
+.Fa P
+is a handle that corresponds to an ELF object or
+.Fa P
+is a handle that corresponds to a core file and that information is not
+available in the core file.
+.It Er EFAULT
+.Fa P
+is a handle that corresponds to an active process and
+.Fa u
+is a bad address.
+.El
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr uname 1 ,
+.Xr uname 2 ,
+.Xr libproc 3LIB

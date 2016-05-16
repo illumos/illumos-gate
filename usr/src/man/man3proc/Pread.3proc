@@ -1,0 +1,113 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PREAD 3PROC
+.Os
+.Sh NAME
+.Nm Pread ,
+.Nm Pread_string
+.Nd read data from a process
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft ssize_t
+.Fo Pread
+.Fa "struct ps_prochandle *P"
+.Fa "void *buf"
+.Fa "size_t nbytes"
+.Fa "uintptr_t address"
+.Fc
+.Ft ssize_t
+.Fo Pread_string
+.Fa "struct ps_prochandle *P"
+.Fa "char *buf"
+.Fa "size_t nbytes"
+.Fa "uintptr_t address"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Pread
+function reads data from the process handle
+.Fa P
+starting at
+.Fa address
+in the address space of the process and reads at most
+.Fa nbytes
+of data into
+.Fa buf
+and is logically analogous to the
+.Xr pread 2
+function.
+.Pp
+For live processes, this function is equivalent to reading from the
+/proc file system
+.Sy as
+file for the process. For core files and file handles, it reads and
+writes from the logical address space and not the corresponding offset
+of the file itself. For example, a core file contains a sparse
+representation of the address space of a crashed process and unmapped
+regions are not present in the file. However,
+.Fa address
+still refers to the virtual addresses that were present at run-time and
+not those in the core file.
+.Pp
+The
+.Fn Pread_string
+function is similar to the
+.Fn Pread
+function, except that it attempts to interpret
+.Fa address
+as a null terminated character string and will stop reading characters
+into
+.Fa buf
+if either
+.Fa nbytes
+has been read or a null terminator is encountered. The resulting data in
+.Fa buf
+will always be null terminated, even if no null terminator was found in
+the first
+.Fa nbytes
+of data.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn Pread
+and
+.Fn Pread_string
+functions return a non-negative integer indicating the number of bytes
+actually read. Otherwise, the functions return
+.Sy -1
+and set
+.Sy errno
+to indicate the error.
+.Sh ERRORS
+For a full list of possible errors also see the
+.Sy DIAGNOSTICS
+section in
+.Xr proc 4
+and
+the
+.Sy ERRORS
+section in
+.Xr pread 2 .
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr pread 2 ,
+.Xr libproc 3LIB ,
+.Xr proc 4

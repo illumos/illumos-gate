@@ -1,0 +1,193 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PLWP_STACK 3PROC
+.Os
+.Sh NAME
+.Nm Plwp_stack ,
+.Nm Plwp_alt_stack ,
+.Nm Plwp_main_stack ,
+.Nm Lstack ,
+.Nm Lalt_stack ,
+.Nm Lmain_stack
+.Nd get thread stack information
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft int
+.Fo Plwp_stack
+.Fa "struct ps_prochandle *P"
+.Fa "lwpid_t lwpid"
+.Fa "stack_t *stkp"
+.Fc
+.Ft int
+.Fo Plwp_alt_stack
+.Fa "struct ps_prochandle *P"
+.Fa "lwpid_t lwpid"
+.Fa "stack_t *stkp"
+.Fc
+.Ft int
+.Fo Plwp_main_stack
+.Fa "struct ps_prochandle *P"
+.Fa "lwpid_t lwpid"
+.Fa "stack_t *stkp"
+.Fc
+.Ft int
+.Fo Lalt_stack
+.Fa "struct ps_lwphandle *L"
+.Fa "stack_t *stkp"
+.Fc
+.Ft int
+.Fo Lmain_stack
+.Fa "struct ps_lwphandle *L"
+.Fa "stack_t *stkp"
+.Fc
+.Ft int
+.Fo Lstack
+.Fa "struct ps_lwphandle *L"
+.Fa "stack_t *stkp"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Plwp_stack ,
+.Fn Plwp_alt_stack ,
+and
+.Fn Plwp_main_stack
+functions obtain information about the size and address of the stacks
+for the thread identified by
+.Fa lwpid
+in the process handle
+.Fa P .
+.Pp
+Each thread in a process has its own stack which is used both for
+maintaining function call sequences and the storing of local variables.
+A thread may also configure a different stack to handle specific
+signals. This stack is often called the
+.Em alternate stack .
+Whether or not the alternate stack is used may be controlled through the
+.Xr sigaction 2
+and
+.Xr sigaltstack 2
+functions .
+.Pp
+The
+.Fn Plwp_stack
+function fills in
+.Fa stkp
+with the information about the thread's currently executing stack,
+whether the alternate or main one.
+.Pp
+The
+.Fn Plwp_alt_stack
+function fills in
+.Fa stkp
+with the information about the thread's alternate stack, if it's
+configured.
+.Pp
+The
+.Fn Plwp_main_stack
+function fills in
+.Fa stkp
+with the information about the thread's main stack, regardless of if there
+is an alternate stack or it is executing one.
+.Pp
+Process handles that refer to files, obtained through
+.Xr Pgrab_file 3PROC ,
+do not have any stack information and these functions will always fail
+on them.
+.Pp
+The
+.Fn Lalt_stack ,
+.Fn Lmain_stack ,
+and
+.Fn Lstack
+functions are identical to the
+.Fn Plwp_alt_stack ,
+.Fn Plwp_main_stack ,
+and
+.Fn Plwp_main_stack
+functions, except rather than specifying a thread to operate on, they
+operate on the thread handle
+.Fa L ,
+which specifies the thread to operate on.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn Plwp_stack ,
+.Fn Plwp_alt_stack ,
+.Fn Plwp_main_stack ,
+.Fn Lalt_stack ,
+.Fn Lmain_stack ,
+and
+.Fn Lstack
+functions return
+.Sy 0
+and fills in
+.Fa stkp
+with information about the appropriate stack. Otherwise,
+.Sy -1
+is returned,
+.Sy errno
+is updated with the error, and
+.Fa stkp
+is not modified.
+.Sh ERRORS
+For a full list of possible errors also see the
+.Sy DIAGNOSTICS
+section in
+.Xr proc 4 .
+.Pp
+The
+.Fn Plwp_stack ,
+.Fn Plwp_alt_stack ,
+and
+.Fn Plwp_main_stack
+function will fail if:
+.Bl -tag -width Er
+.It Er ENODATA
+The process handle
+.Fa P
+refers to a grabbed file, not an active process or core.
+.It Er EINVAL
+The process handle
+.Fa P
+refers to a core file and the specified thread does not exist.
+.It Er ENOENT
+The process handle
+.Fa P
+refers to an active process and the specified thread does not exist.
+.El
+.Pp
+The
+.Fn Plwp_alt_stack
+and
+.Fn Lalt_stack
+functions will fail if:
+.Bl -tag -width Er
+.It Er ENODATA
+The thread identified by
+.Fa lwpid
+did not have an alternate stack enabled.
+.El
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr sigaction 2 ,
+.Xr sigaltstack 2 ,
+.Xr libproc 3LIB ,
+.Xr proc 4

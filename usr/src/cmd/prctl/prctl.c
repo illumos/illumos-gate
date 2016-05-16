@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2015, Joyent, Inc.
  */
 
 #include <unistd.h>
@@ -1777,7 +1778,7 @@ prctl_setrctl(struct ps_prochandle *Pr, const char *name,
 				preserve_error(gettext("cannot get process "
 				    "privileges for pid %d: %s"),
 				    Pstatus(Pr)->pr_pid, strerror(errno));
-				free(new_prpriv);
+				proc_free_priv(new_prpriv);
 				return (1);
 			}
 			(void) priv_addset(eset, PRIV_SYS_RESOURCE);
@@ -1788,8 +1789,8 @@ prctl_setrctl(struct ps_prochandle *Pr, const char *name,
 				    "privileges for pid %d: %s"),
 				    Pstatus(Pr)->pr_pid, strerror(errno));
 				(void) Punsetflags(Pr, PR_KLC);
-				free(new_prpriv);
-				free(old_prpriv);
+				proc_free_priv(new_prpriv);
+				proc_free_priv(old_prpriv);
 				return (1);
 			}
 		}
@@ -1880,7 +1881,7 @@ bail:
 	if (old_prpriv != NULL) {
 		if (Psetpriv(Pr, old_prpriv) != 0)
 			relinquish_failed = B_TRUE;
-		free(old_prpriv);
+		proc_free_priv(old_prpriv);
 	}
 	if (relinquish_failed) {
 		/*
@@ -1900,7 +1901,7 @@ bail:
 			    Pstatus(Pr)->pr_pid);
 	}
 	if (new_prpriv != NULL)
-		free(new_prpriv);
+		proc_free_priv(new_prpriv);
 
 	return (ret);
 }
@@ -2171,9 +2172,11 @@ grab_process_by_id(char *idname, rctl_entity_t type, pr_info_handle_t *p,
 				    &prpriv->pr_sets[prpriv->pr_setsize *
 				    priv_getsetbyname(PRIV_LIMIT)];
 				if (!priv_ismember(prset, PRIV_SYS_RESOURCE)) {
+					proc_free_priv(prpriv);
 					release_process(p->pr);
 					continue;
 				}
+				proc_free_priv(prpriv);
 			}
 			found = 1;
 

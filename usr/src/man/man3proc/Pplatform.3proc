@@ -1,0 +1,90 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PPLATFORM 3PROC
+.Os
+.Sh NAME
+.Nm Pplatform
+.Nd get platform string
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft "char *"
+.Fo Pplatform
+.Fa "struct ps_prochandle *P"
+.Fa "char *buffer"
+.Fa "size_t bufsize"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Pplatform
+function determines the name of the platform for the process handle
+.Fa P .
+Up to
+.Fa bufsize
+characters, including the null terminator, will be copied into
+.Fa buffer .
+.Pp
+The platform is the value reported by the
+.Sy -s
+option to
+.Xr uname 1 .
+For example, on x86 systems, the value will be
+.Sy i86pc .
+.Pp
+Note, process handles that correspond to a file, created by
+.Xr Pgrab_file 3PROC ,
+will not report a platform and the
+.Fn Pplatform
+function will fail.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn Pplatform
+function returns
+.Fa buffer .
+Otherwise,
+.Dv NULL
+is returned,
+.Sy errno
+is set, and
+.Fa buffer
+is not updated.
+.Sh ERRORS
+The
+.Fn Pplatform
+function will fail if:
+.Bl -tag -width Er
+.It Er ENODATA
+.Fa P
+refers to a core file and there is no
+.Sy NT_PLATFORM
+ELF note available.
+.It Er EFAULT
+.Fa P
+refers to a live process and
+.Fa buffer
+is an invalid address.
+.El
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr uname 1 ,
+.Xr sysinfo 2 ,
+.Xr libproc 3LIB ,
+.Xr proc 4

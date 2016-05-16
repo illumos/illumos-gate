@@ -1,0 +1,124 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PSTACK_ITER 3PROC
+.Os
+.Sh NAME
+.Nm Pstack_iter
+.Nd iterate process stack frames
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft int
+.Fo Pstack_iter
+.Fa "struct ps_prochandle *P"
+.Fa "const prgregset_t regs"
+.Fa "proc_stack_f *func"
+.Fa "void *data"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Pstack_iter
+function iterates over the stack frames in the process
+.Fa P
+starting at the point defined by
+.Fa regs .
+.Pp
+For each valid stack frame encountered, the callback function
+.Fa func
+is invoked with
+.Fa data
+passed as argument. The full signature of
+.Ft proc_stack_f
+is defined in
+.Xr libproc 3LIB .
+With each callback, a register set, argument set, and argument count
+will be provided. In that register set, only a subset of the registers
+will be valid, which include the frame pointer, program counter, and on
+SPARC systems, the next program counter. These registers can be accessed
+with the constants
+.Sy R_FP ,
+.Sy R_PC ,
+and
+.Sy R_nPC
+respectively. These correspond to the registers
+.Em %ebp
+and
+.Em %eip
+on i386,
+.Em %rbp
+and
+.Em %rip
+on amd64,
+.Em %fp ,
+.Em %pc ,
+and
+.Em %npc
+on both SPARC and SPARCv9.
+.Pp
+Callers will receive a callback for the first stack frame indicated by
+.Fa regs
+and then will receive a subsequent callback for each caller of that
+frame until no such frame can be found. Stack frames that logically come
+after the frame indicated by
+.Fa regs
+will not receive callbacks.
+.Pp
+The compiler can either facilitate or stymie the iteration of the
+stack. Programs that have been compiled in such a way as to omit the
+frame pointer will result in truncated stacks. Similarly, if the initial
+set of registers passed in via
+.Fa regs
+is invalid, then the ability to iterate the stack will be limited.
+The return value of
+.Fa func
+controls whether or not iteration continues. If
+.Fa func
+returns
+.Sy 0
+then iteration continues. However, if
+.Fa func
+returns non-zero, then iteration will halt and that value will be used
+as the return value of the
+.Fn Pstack_iter
+function. Because
+.Fn Pstack_iter
+returns
+.Sy -1
+on internal failure it is recommended the callback function not return
+.Sy -1
+to indicate an error. Thus the caller may distinguish between the
+failure of the callback function and the failure of the
+.Fn Pstack_iter
+function.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn Pstack_iter
+function returns
+.Sy 0.
+If there was an internal error then
+.Sy -1
+is returned. Otherwise, if the callback function
+.Fa func
+returns non-zero, then its return value will be returned instead.
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr libproc 3LIB ,
+.Xr proc 4

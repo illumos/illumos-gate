@@ -1,0 +1,117 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PADDR_TO_LOADOBJ 3PROC
+.Os
+.Sh NAME
+.Nm Paddr_to_loadobj ,
+.Nm Plmid_to_loadobj ,
+.Nm Pname_to_loadobj
+.Nd lookup loaded object information
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft "const rd_loadobj_t *"
+.Fo Paddr_to_loadobj
+.Fa "struct ps_prochandle *P"
+.Fa "uintptr_t addr"
+.Fc
+.Ft "const rd_loadobj_t *"
+.Fo Plmid_to_loadobj
+.Fa "struct ps_prochandle *P"
+.Fa "Lmid_t lmid"
+.Fa "const char *name"
+.Fc
+.Ft "const rd_loadobj_t *"
+.Fo Pname_to_loadobj
+.Fa "struct ps_prochandle *P"
+.Fa "const char *name"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Paddr_to_loadobj ,
+.Fn Plmid_to_loadobj ,
+and
+.Fn Pname_to_loadobj
+functions lookup loaded object information from the process handle
+.Fa P .
+This information is provided by the run-time link-editor,
+.Xr ld.so.1 1 ,
+and provides information about the loaded object such as the link-map
+identifier, the TLS module ID, and the address of various sections.
+.Pp
+The pointer to the data returned by the library will only be valid for
+as long as the handle
+.Fa P
+is valid. Any calls to
+.Xr Prelease 3PROC
+will invalidate the data.
+.Pp
+The
+.Fn Paddr_to_loadobj
+function attempts to find the loaded object information, if any, that exists for the
+address
+.Fa addr .
+Not all address correspond to memory regions that were loaded by the
+run-time link-editor. For example, if a user creates a region of
+anonymous memory through the
+.Xr mmap 2
+function, then it will not have any corresponding loaded module.
+.Pp
+The
+.Fn Pname_to_loadobj
+function looks up the object named
+.Fa name
+and returns the corresponding loaded object information. Two special
+values may be used for name. The macro
+.Dv PR_OBJ_EXEC
+refers to the executable object itself and the macro
+.Dv PR_OBJ_LDSO refers to the object ld.so.1 .
+.Pp
+The
+.Fn Plmid_to_loadobj
+function is similar to
+.Fn Pname_to_loadobj .
+It allows the use of a link-map identifier,
+.Fa lmid ,
+which constricts the search of the object named with
+.Fa name
+to that link-map. The special value of
+.Dv PR_LMID_EVERY
+may be passed to indicate that every link-map should be searched, which
+is equivalent in behavior to the
+.Fn Pname_to_loadobj
+function.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn Paddr_to_loadobj ,
+.Fn Plmid_to_loadobj ,
+and
+.Fn Pname_to_loadobj
+functions return a pointer to the corresponding loadable object
+information.
+Otherwise, if none exists then
+.Dv NULL
+is returned.
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr libproc 3LIB ,
+.Xr librtld_db 3LIB ,
+.Xr Prelease 3PROC

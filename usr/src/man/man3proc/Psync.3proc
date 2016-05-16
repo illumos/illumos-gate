@@ -1,0 +1,79 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PSYNC 3PROC
+.Os
+.Sh NAME
+.Nm Psync ,
+.Nm Lsync
+.Nd synchronize cached tracing flags and modifications
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft void
+.Fo Psync
+.Fa "struct ps_prochandle *P"
+.Fc
+.Ft void
+.Fo Lsync
+.Fa "struct ps_lwphandle *L"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Psync
+function synchronizes modifications to the process handle
+.Fa P
+back to the underlying active process. The
+.Fn Psync
+function ensures that any outstanding process holds, register
+modifications, signal injections, and modifications to the various fault
+and system call tracing flags are taken care of.
+.Pp
+Normally this function is not required as other library routines take
+care of synchronizing this state out to the process when it is required.
+If the underlying /proc file system routines are used outside of the
+library, calling this function may be required.
+.Pp
+The
+.Fn Psync
+function is only meaningful for active processes. It will do nothing on
+process handles that refer to core files, zombie processes, and ELF
+objects.
+.Pp
+The
+.Fn Lsync
+function is equivalent to the
+.Fn Psync
+function, except rather than operating on the entire process and its
+representative thread, it instead operates on the thread handle
+.Fa L .
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr libproc 3LIB ,
+.Xr Pfault 3PROC ,
+.Xr Pputareg 3PROC ,
+.Xr Psetfault 3PROC ,
+.Xr Psetsignal 3PROC ,
+.Xr Psetsysentry 3PROC ,
+.Xr Psetsysexit 3PROC ,
+.Xr Psignal 3PROC ,
+.Xr Psysentry 3PROC ,
+.Xr Psysexit 3PROC ,
+.Xr proc 4

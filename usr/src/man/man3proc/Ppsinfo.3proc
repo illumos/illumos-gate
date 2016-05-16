@@ -1,0 +1,56 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PPSINFO 3PROC
+.Os
+.Sh NAME
+.Nm Ppsinfo
+.Nd get process ps information
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft "const psinfo_t *"
+.Fo Ppsinfo
+.Fa "struct ps_prochandle *P"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Ppsinfo
+function returns the process handle
+.Fa P Ns 's
+.Xr ps 1
+information. The
+.Sy psinfo_t
+structure that is returned is defined in
+.Xr proc 4
+and is valid until a subsequent call to
+.Xr Prelease 3PROC .
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn Ppsinfo
+function returns a pointer to the process ps information. Otherwise,
+.Dv NULL
+is returned to indicate that it could not be found.
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr ps 1 ,
+.Xr libproc 3LIB ,
+.Xr Prelease 3PROC ,
+.Xr proc 4

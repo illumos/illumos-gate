@@ -1,0 +1,53 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PDESTROY_AGENT 3PROC
+.Os
+.Sh NAME
+.Nm Pdestroy_agent
+.Nd destroy the agent LWP
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft void
+.Fo Pdestroy_agent
+.Fa "struct ps_prochandle *P"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Pdestroy_agent
+function
+removes the agent LWP in
+.Fa P .
+The existence of the agent LWP is reference counted by the library and
+therefore if
+.Xr Pcreate_agent 3PROC
+has been called multiple times, the
+.Fn Pdestroy_agent
+function must be called an equal number of times. Upon the last time, it
+will destroy the agent LWP.
+.Pp
+Destroying the agent LWP does not change the state of the process
+represented by
+.Fa P .
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr libproc 3LIB ,
+.Xr Pcreate_agent 3PROC

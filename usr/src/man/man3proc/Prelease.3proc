@@ -1,0 +1,114 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PRELEASE 3PROC
+.Os
+.Sh NAME
+.Nm Prelease ,
+.Nm Pfree
+.Nd release a process control handle
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft void
+.Fo Prelease
+.Fa "struct ps_prochandle *P"
+.Fa "int flags"
+.Fc
+.Ft void
+.Fo Pfree
+.Fa "struct ps_prochandle *P"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Prelease
+function is used to release all of the resources associated with a
+.Nm libproc
+handle. It is suitable for handles to core files, created processes, and
+grabbed processes from the
+.Xr Pgrab_core 3PROC ,
+.Xr Pcreate 3PROC ,
+.Xr Pgrab 3PROC ,
+and
+.Xr Pgrab_file 3PROC
+functions.
+.Pp
+After calling the
+.Fn Prelease
+function, all data that was returned via the handle will no longer be
+valid. For example, the data from calls to
+.Xr Pctlfd 3PROC ,
+.Xr Pgetauxvec 3PROC ,
+.Xr Pstatus 3PROC ,
+and others.
+.Pp
+The behavior of the released process is controlled by the
+.Fa flags
+argument. By default, if no flags are passed, then the process
+represented by
+.Fa P
+will be set running if it was created by
+.Xr Pcreate
+or if it was not originally stopped or set to stop in /proc. The
+following values may be passed in to the
+.Fa flags
+argument. Multiple flags should be be combined with a
+bitwise-inclusive-OR.
+.Bl -tag -width Er -offset indent
+.It Dv PRELEASE_CLEAR
+When releasing the process, clear all tracing flags that are set on the
+process.
+.It Dv PRELEASE_RETAIN
+When releasing the process, retain all tracing flags that are currently
+active on the process.
+.It Dv PRELEASE_HANG
+Leave the process stopped. It will not resume execution unless it is
+explicitly enabled with
+.Xr prun 1
+or another process explicitly enables it.
+.It Dv PRELEASE_KILL
+Release the process and terminate it with
+.Dv SIGKILL . This option takes precedence over all other values that may
+be passed in to
+.Fa flags .
+.El
+.Pp
+The
+.Fn Pfree
+function is similar to the
+.Fn Prelease
+function in that it frees the resources associated with the process
+handle
+.Fa P ;
+however, unlike the
+.Fn Prelease
+function, it does not handle any logic to change or set the grabbed processes
+state. In general, prefer
+.Fn Prelease
+to
+.Fn Pfree .
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr prun 1 ,
+.Xr libproc 3LIB ,
+.Xr Pcreate 3PROC ,
+.Xr Pgrab 3PROC ,
+.Xr Pgrab_core 3PROC ,
+.Xr proc 4

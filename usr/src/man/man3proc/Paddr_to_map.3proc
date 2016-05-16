@@ -1,0 +1,129 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PADDR_TO_MAP 3PROC
+.Os
+.Sh NAME
+.Nm Paddr_to_map ,
+.Nm Paddr_to_text_map ,
+.Nm Plmid_to_map ,
+.Nm Pname_to_map
+.Nd lookup memory map information
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft "const prmap_t *"
+.Fo Paddr_to_map
+.Fa "struct ps_prochandle *P"
+.Fa "uintptr_t addr"
+.Fc
+.Ft "const prmap_t *"
+.Fo Paddr_to_text_map
+.Fa "struct ps_prochandle *P"
+.Fa "uintptr_t addr"
+.Fc
+.Ft "const prmap_t *"
+.Fo Plmid_to_map
+.Fa "struct ps_prochandle *P"
+.Fa "Lmid_t lmid"
+.Fa "const char *name"
+.Fc
+.Ft "const prmap_t *"
+.Fo Pname_to_map
+.Fa "struct ps_prochandle *P"
+.Fa "const char *name"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Paddr_to_map ,
+.Fn Paddr_to_text_map ,
+.Fn Plmid_to_map ,
+and
+.Fn Pname_to_map
+functions lookup memory map information in the process handle
+.Fa P .
+The
+.Sy prmap_t
+structure provides information such as the size, offset, and object of
+the mapping and is defined in
+.Xr proc 4 .
+.Pp
+The pointer to the data returned by the library will only be valid for
+as long as the handle
+.Fa P
+is valid. Any calls to
+.Xr Prelease 3PROC
+will invalidate the data.
+.Pp
+The
+.Fn Paddr_to_map
+function attempts to find the mapping information corresponding to the
+address
+.Fa addr .
+.Pp
+The
+.Fn Paddr_to_text_map
+function is similar to the
+.Fn Paddr_to_map
+function; however, it only returns successfully if the specified address
+corresponds to a text mapping as identified by the run-time link-editor.
+One use of this is to ensure that a mapping is actually a text-mapping
+before inserting a breakpoint in it.
+.Pp
+The
+.Fn Pname_to_map
+function looks up the object named
+.Fa name
+and returns the corresponding mapping information. Two special
+values may be used for name. The macro
+.Dv PR_OBJ_EXEC
+refers to the executable object itself and the macro
+.Dv PR_OBJ_LDSO refers to the object ld.so.1 .
+.Pp
+The
+.Fn Plmid_to_map
+function is similar to
+.Fn Pname_to_map .
+It allows passing a link-map identifier,
+.Fa lmid ,
+which constricts the search of the object named with
+.Fa name
+to that link-map. The special value of
+.Dv PR_LMID_EVERY
+may be passed to indicate that every link-map should be searched, which
+is equivalent in behavior to the
+.Fn Pname_to_map
+function.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn Paddr_to_map ,
+.Fn Paddr_to_text_map ,
+.Fn Plmid_to_map ,
+and
+.Fn Pname_to_map
+functions return a pointer to the corresponding mapping information.
+If none exists then
+.Dv NULL
+is returned.
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr libproc 3LIB ,
+.Xr Prelease 3PROC ,
+.Xr proc 4

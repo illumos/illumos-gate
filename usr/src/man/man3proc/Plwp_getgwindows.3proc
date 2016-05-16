@@ -1,0 +1,96 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PLWP_GETGWINDOWS 3PROC
+.Os
+.Sh NAME
+.Nm Plwp_getgwindows
+.Nd get thread unspilled register windows
+.Sh SYNOPSIS
+.Ft int
+.Fo Plwp_getgwindows
+.Fa "struct ps_prochandle *P"
+.Fa "lwpid_t lwpid"
+.Fa "gwindows_t *gwins"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Plwp_getgwindows
+function returns information about register windows that were not
+spilled to the stack for the thread identified by
+.Fa lwpid
+in the process handle
+.Fa P .
+The argument
+.Fa gwins
+will be filled in with information about the register windows.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn Plwp_getgwindows
+function returns
+.Sy 0
+and
+.Fa gwins
+is filled in with information about the windows. Otherwise,
+.Sy -1
+is returned and
+.Sy errno
+is set to indicate the error.
+.Sh ERRORS
+For a full list of possible errors see the
+.Sy DIAGNOSTICS
+section in
+.Xr proc 4 .
+.Pp
+The
+.Fn Plwp_getgwindows
+function will fail if:
+.Bl -tag -width Er
+.It Er ENODATA
+The process handle
+.Fa P
+does not have any
+.Sy gwindows
+information.
+.It Er EBUSY
+The process handle
+.Fa P
+refers to a live process and it is not stopped.
+.It Er ENOENT
+The process handle
+.Fa P
+refers to a live process and there is no thread with id
+.Fa lwpid .
+.It Er EINVAL
+The process handle
+.Fa P
+refers to a core file and there is no thread with id
+.Fa lwpid .
+.El
+.Sh ARCHITECTURE
+The
+.Fn Plwp_getgwindows
+function is only available on
+.Sy SPARC
+platforms.
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr libproc 3LIB ,
+.Xr proc 4

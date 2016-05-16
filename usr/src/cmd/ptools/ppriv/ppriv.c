@@ -23,6 +23,7 @@
  */
 /*
  * Copyright (c) 2013 by Delphix. All rights reserved.
+ * Copyright 2015, Joyent, Inc.
  */
 /*
  * Program to examine or set process privileges.
@@ -200,7 +201,7 @@ look(char *arg)
 		    "%s: %s: bad PRNOTES section, size = %lx\n",
 		    command, arg, (long)sz);
 		Prelease(Pr, 0);
-		free(ppriv);
+		Ppriv_free(Pr, ppriv);
 		return (1);
 	}
 
@@ -209,11 +210,11 @@ look(char *arg)
 		if (Psetpriv(Pr, ppriv) != 0) {
 			perr(command);
 			Prelease(Pr, 0);
-			free(ppriv);
+			Ppriv_free(Pr, ppriv);
 			return (1);
 		}
 		Prelease(Pr, 0);
-		free(ppriv);
+		Ppriv_free(Pr, ppriv);
 		return (0);
 	}
 
@@ -288,7 +289,7 @@ look(char *arg)
 		}
 	}
 	Prelease(Pr, 0);
-	free(ppriv);
+	Ppriv_free(Pr, ppriv);
 	return (0);
 }
 

@@ -1,0 +1,77 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PPRIV 3PROC
+.Os
+.Sh NAME
+.Nm Ppriv ,
+.Nm Ppriv_free
+.Nd get and free process privilege sets
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft int
+.Fo Ppriv
+.Fa "struct ps_prochandle *P"
+.Fa "prpriv_t **pprv"
+.Fc
+.Ft void
+.Fo Ppriv_free
+.Fa "struct ps_prochandle *P"
+.Fa "prpriv_t *prv"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Ppriv
+function obtains the privilege set of the process handle
+.Fa P .
+The privilege set, if it exists, will be dynamically allocated and a
+pointer to it will be placed in
+.Fa pprv .
+It must be released with a call to
+.Fn Ppriv_free .
+The definition of the
+.Sy prpriv_t
+structure is documented in
+.Xr proc 4 .
+.Pp
+The
+.Fn Ppriv_free
+function releases the storage in
+.Fa prv
+that was allocated as a result of calling
+.Fn Ppriv .
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn Ppriv
+function returns
+.Sy 0
+and
+.Fa pprv
+is updated with a pointer to the allocated privilege set. Otherwise,
+.Sy -1
+is returned and
+.Fa pprv
+is not updated.
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr libproc 3LIB ,
+.Xr proc 4 ,
+.Xr privileges 5

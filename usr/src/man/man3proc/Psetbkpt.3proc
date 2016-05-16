@@ -1,0 +1,93 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PSETBKPT 3PROC
+.Os
+.Sh NAME
+.Nm Psetbkpt
+.Nd set a breakpoint trap in a process
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft int
+.Fo Psetbkpt
+.Fa "struct ps_prochandle *P"
+.Fa "uintptr_t address"
+.Fa "ulong_t *saved"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Psetbkpt
+function sets a breakpoint instruction at the address
+.Fa address
+in the process handle
+.Fa P .
+The instruction that used to be set will be set in
+.Fa saved
+and should be retained.
+.Pp
+A breakpoint will remain in place until a subsequent call to
+.Xr Pdelbkpt 3PROC .
+The value stored in
+.Fa saved
+should be passed as the third argument to
+.Xr Pdelbkpt 3PROC .
+.Pp
+When a process executes an instruction that has been replaced with a
+breakpoint it generates a
+.Sy FLTBPT
+trap
+causing the thread to stop.
+.Pp
+Note, breakpoints may only be set in active processes. They may not be
+set in process handles that refer to core files, zombie processes, or
+files.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn Psetbkpt
+function sets the breakpoint and
+returns
+.Sy 0 .
+Otherwise,
+.Sy -1
+is returned and
+.Sy errno
+is set to indicate the error.
+.Sh ERRORS
+For a full list of possible errors see the
+.Sy DIAGNOSTICS
+section in
+.Xr proc 4 .
+.Pp
+The
+.Fn Psetbkpt
+function will fail if:
+.Bl -tag -width Er
+.It Er ENOENT
+.Fa P
+does not refer to an active process.
+.It Er EBUSY
+A breakpoint instruction was already written by another debugger.
+.El
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr libproc 3LIB ,
+.Xr Pdelbkpt 3PROC ,
+.Xr proc 4

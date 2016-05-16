@@ -1,0 +1,89 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PROC_FLTNAME 3PROC
+.Os
+.Sh NAME
+.Nm proc_fltname ,
+.Nm proc_signame ,
+.Nm proc_sysname
+.Nd convert a fault, signal, and system call to a name
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft "char *"
+.Fo proc_fltname
+.Fa "int flt"
+.Fa "char *buf"
+.Fa "size_t bufsz"
+.Fc
+.Ft "char *"
+.Fo proc_signame
+.Fa "int sig"
+.Fa "char *buf"
+.Fa "size_t bufsz"
+.Fc
+.Ft "char *"
+.Fo proc_sysname
+.Fa "int sys"
+.Fa "char *buf"
+.Fa "size_t bufsz"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn proc_fltname ,
+.Fn proc_signame ,
+and
+.Fn proc_sysname
+functions respectively convert the fault, signal, and system call in
+.Fa flt ,
+.Fa sig ,
+and
+.Fa sys
+to a human-readable name and place the corresponding string in
+.Fa buf .
+Up to
+.Fa bufsz
+characters, including the null terminator, will be written into
+.Fa buf .
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn proc_fltname ,
+.Fn proc_signame ,
+and
+.Fn proc_sysname
+functions return a pointer to
+.Fa buf .
+The contents of
+.Fa buf
+are always null terminated.
+Otherwise,
+.Dv NULL
+is returned.
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+.Sy MT-Safe
+.Sh SEE ALSO
+.Xr libproc 3LIB ,
+.Xr proc_fltset2str 3PROC ,
+.Xr proc_sigset2str 3PROC ,
+.Xr proc_str2flt 3PROC ,
+.Xr proc_str2fltset 3PROC ,
+.Xr proc_str2sig 3PROC ,
+.Xr proc_str2sigset 3PROC ,
+.Xr proc_str2sys 3PROC ,
+.Xr proc_str2sysset 3PROC ,
+.Xr proc_sysset2str 3PROC ,
+.Xr proc 4

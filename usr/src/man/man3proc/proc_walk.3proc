@@ -1,0 +1,121 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PROC_WALK 3PROC
+.Os
+.Sh NAME
+.Nm proc_walk
+.Nd walk all processes or threads in /proc
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft int
+.Fo proc_walk
+.Fa "proc_walk_f *func"
+.Fa "void *arg"
+.Fa "int flag"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn proc_walk
+function walks all threads and processes in /proc and calls the callback
+function
+.Fa func
+once for each one with the user specified
+.Fa arg .
+The definition of the
+.Sy proc_walk_f
+is available in
+.Xr libproc 3LIB .
+.Pp
+.Fa func
+will be called once for each process and will always have its first
+argument filled in with the value of the
+.Sy psinfo
+file of the process.
+The value of
+.Fa flag
+controls whether or not information about the threads in the process are
+included and how many times the callback function
+.Fa func
+is called. The following values may be passed in for
+.Fa flag :
+.Bl -tag -width Dv -offset indent
+.It Dv PR_WALK_PROC
+Indicates that the walker is only concerned with the process.
+.Fa func
+will be called once for each process in the system. Only the
+.Sy psinfo
+will be read for the process and passed to
+.Fa func .
+The second argument, the one for the
+.Sy lwpsinfo_t ,
+will be passed as
+.Dv NULL .
+.It Dv PR_WALK_LWP
+The caller wants both process and thread information.
+.Fa func
+will be called once for each thread in the system. In addition to the
+process
+.Sy psinfo
+information, the ps specific information for a given thread will be
+included in the
+.Fa lwpsinfo_t
+argument.
+.El
+.Pp
+The return value of the caller's
+.Fa func
+function determines whether or not iteration will continue. If
+.Fa func
+returns a non-zero value, then iteration will terminate and that
+return value will be returned to the caller. To distinguish between
+system errors and caller errors, it is recommended that the function
+only return positive integers in the event of an error.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn proc_walk
+function returns
+.Sy 0 .
+Otherwise,
+.Sy -1
+is returned and
+.Sy errno
+is updated to reflect the error that occurred.
+.Sh ERRORS
+In addition to the errors listed below, the
+.Fn proc_walk
+function may fail for the same reasons as the
+.Xr opendir 3C ,
+.Xr readdir 3C ,
+and
+.Xr malloc 3C
+functions.
+.Bl -tag -width Er
+.It Er EINVAL
+.Fa flag is not one of
+.Dv PR_WALK_PROC
+or
+.Dv PR_WALK_LWP .
+.El
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+.Sy MT-Safe
+.Sh SEE ALSO
+.Xr malloc 3C ,
+.Xr opendir 3C ,
+.Xr readdir 3C ,
+.Xr libproc 3LIB ,
+.Xr proc 4

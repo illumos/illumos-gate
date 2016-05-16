@@ -25,23 +25,12 @@
  *
  * Portions Copyright 2007 Chad Mynhier
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
- * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright 2015, Joyent, Inc.
  * Copyright (c) 2013 by Delphix. All rights reserved.
  */
 
 /*
  * Interfaces available from the process control library, libproc.
- *
- * libproc provides process control functions for the /proc tools
- * (commands in /usr/proc/bin), /usr/bin/truss, and /usr/bin/gcore.
- * libproc is a private support library for these commands only.
- * It is _not_ a public interface, although it might become one
- * in the fullness of time, when the interfaces settle down.
- *
- * In the meantime, be aware that any program linked with libproc in this
- * release of Solaris is almost guaranteed to break in the next release.
- *
- * In short, do not use this header file or libproc for any purpose.
  */
 
 #ifndef	_LIBPROC_H
@@ -274,6 +263,7 @@ extern	const pstatus_t *Pstatus(struct ps_prochandle *);
 extern	int	Pcred(struct ps_prochandle *, prcred_t *, int);
 extern	int	Psetcred(struct ps_prochandle *, const prcred_t *);
 extern	int	Ppriv(struct ps_prochandle *, prpriv_t **);
+extern	void	Ppriv_free(struct ps_prochandle *, prpriv_t *);
 extern	int	Psetpriv(struct ps_prochandle *, prpriv_t *);
 extern	void   *Pprivinfo(struct ps_prochandle *);
 extern	int	Psetzoneid(struct ps_prochandle *, zoneid_t);
@@ -703,6 +693,7 @@ extern pid_t proc_arg_xpsinfo(const char *, int, psinfo_t *, int *,
 extern int proc_get_auxv(pid_t, auxv_t *, int);
 extern int proc_get_cred(pid_t, prcred_t *, int);
 extern prpriv_t *proc_get_priv(pid_t);
+extern void proc_free_priv(prpriv_t *);
 extern int proc_get_psinfo(pid_t, psinfo_t *);
 extern int proc_get_status(pid_t, pstatus_t *);
 
