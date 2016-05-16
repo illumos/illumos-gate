@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2015, Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
 
@@ -238,9 +238,11 @@ fsop_root(vfs_t *vfsp, vnode_t **vpp)
 	 */
 	if (ret == 0 && vfsp->vfs_mntpt != NULL &&
 	    (*vpp)->v_path == vn_vpath_empty) {
+		const char *path;
+
 		mntpt = vfs_getmntpoint(vfsp);
-		vn_setpath_str(*vpp, refstr_value(mntpt),
-		    strlen(refstr_value(mntpt)));
+		path = refstr_value(mntpt);
+		vn_setpath_str(*vpp, path, strlen(path));
 		refstr_rele(mntpt);
 	}
 
@@ -356,8 +358,8 @@ fs_copyfsops(const fs_operation_def_t *template, vfsops_t *actual,
 }
 
 void
-zfs_boot_init() {
-
+zfs_boot_init()
+{
 	if (strcmp(rootfs.bo_fstype, MNTTYPE_ZFS) == 0)
 		spa_boot_init();
 }
@@ -1106,7 +1108,7 @@ out:
  */
 int
 domount(char *fsname, struct mounta *uap, vnode_t *vp, struct cred *credp,
-	struct vfs **vfspp)
+    struct vfs **vfspp)
 {
 	struct vfssw	*vswp;
 	vfsops_t	*vfsops;
@@ -2789,7 +2791,7 @@ vfs_freeopttbl(mntopts_t *mp)
 /* ARGSUSED */
 static int
 vfs_mntdummyread(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cred,
-	caller_context_t *ct)
+    caller_context_t *ct)
 {
 	return (0);
 }
@@ -2797,7 +2799,7 @@ vfs_mntdummyread(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cred,
 /* ARGSUSED */
 static int
 vfs_mntdummywrite(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cred,
-	caller_context_t *ct)
+    caller_context_t *ct)
 {
 	return (0);
 }

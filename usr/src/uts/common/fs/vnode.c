@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2015, Joyent, Inc.
+ * Copyright 2016, Joyent, Inc.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -67,6 +67,7 @@
 #include <sys/taskq.h>
 #include <fs/fs_reparse.h>
 #include <sys/time.h>
+#include <sys/sdt.h>
 
 /* Determine if this vnode is a file that is read-only */
 #define	ISROFILE(vp)	\
@@ -1652,7 +1653,7 @@ vn_rename(char *from, char *to, enum uio_seg seg)
 
 int
 vn_renameat(vnode_t *fdvp, char *fname, vnode_t *tdvp,
-		char *tname, enum uio_seg seg)
+    char *tname, enum uio_seg seg)
 {
 	int error;
 	struct vattr vattr;
@@ -2294,6 +2295,7 @@ vn_cache_constructor(void *buf, void *cdrarg, int kmflags)
 	rw_init(&vp->v_nbllock, NULL, RW_DEFAULT, NULL);
 	vp->v_femhead = NULL;	/* Must be done before vn_reinit() */
 	vp->v_path = vn_vpath_empty;
+	vp->v_path_stamp = 0;
 	vp->v_mpssdata = NULL;
 	vp->v_vsd = NULL;
 	vp->v_fopdata = NULL;
@@ -2367,6 +2369,7 @@ vn_recycle(vnode_t *vp)
 		kmem_free(vp->v_path, strlen(vp->v_path) + 1);
 		vp->v_path = vn_vpath_empty;
 	}
+	vp->v_path_stamp = 0;
 
 	if (vp->v_fopdata != NULL) {
 		free_fopdata(vp);
@@ -2974,84 +2977,218 @@ fs_new_caller_id()
 }
 
 /*
+ * The value stored in v_path is relative to rootdir, located in the global
+ * zone.  Zones or chroot environments which reside deeper inside the VFS
+ * hierarchy will have a relative view of MAXPATHLEN since they are unaware of
+ * what lies below their perceived root.  In order to keep v_path usable for
+ * these child environments, its allocations are allowed to exceed MAXPATHLEN.
+ *
+ * An upper bound of max_vnode_path is placed upon v_path allocations to
+ * prevent the system from going too wild at the behest of pathological
+ * behavior from the operator.
+ */
+size_t max_vnode_path = 4 * MAXPATHLEN;
+
+
+void
+vn_clearpath(vnode_t *vp, hrtime_t compare_stamp)
+{
+	char *buf;
+
+	mutex_enter(&vp->v_lock);
+	/*
+	 * If the snapshot of v_path_stamp passed in via compare_stamp does not
+	 * match the present value on the vnode, it indicates that subsequent
+	 * changes have occurred.  The v_path value is not cleared in this case
+	 * since the new value may be valid.
+	 */
+	if (compare_stamp != 0 && vp->v_path_stamp != compare_stamp) {
+		mutex_exit(&vp->v_lock);
+		return;
+	}
+	buf = vp->v_path;
+	vp->v_path = vn_vpath_empty;
+	vp->v_path_stamp = 0;
+	mutex_exit(&vp->v_lock);
+	if (buf != vn_vpath_empty) {
+		kmem_free(buf, strlen(buf) + 1);
+	}
+}
+
+static void
+vn_setpath_common(vnode_t *pvp, vnode_t *vp, const char *name, size_t len,
+    boolean_t is_rename)
+{
+	char *buf, *oldbuf;
+	hrtime_t pstamp;
+	size_t baselen, buflen = 0;
+
+	/* Handle the vn_setpath_str case. */
+	if (pvp == NULL) {
+		if (len + 1 > max_vnode_path) {
+			DTRACE_PROBE4(vn__setpath__too__long, vnode_t *, pvp,
+			    vnode_t *, vp, char *, name, size_t, len + 1);
+			return;
+		}
+		buf = kmem_alloc(len + 1, KM_SLEEP);
+		bcopy(name, buf, len);
+		buf[len] = '\0';
+
+		mutex_enter(&vp->v_lock);
+		oldbuf = vp->v_path;
+		vp->v_path = buf;
+		vp->v_path_stamp = gethrtime();
+		mutex_exit(&vp->v_lock);
+		if (oldbuf != vn_vpath_empty) {
+			kmem_free(oldbuf, strlen(oldbuf) + 1);
+		}
+		return;
+	}
+
+	/* Take snapshot of parent dir */
+	mutex_enter(&pvp->v_lock);
+retrybuf:
+	if (pvp->v_path == vn_vpath_empty) {
+		/*
+		 * Without v_path from the parent directory, generating a child
+		 * path from the name is impossible.
+		 */
+		if (len > 0) {
+			pstamp = pvp->v_path_stamp;
+			mutex_exit(&pvp->v_lock);
+			vn_clearpath(vp, pstamp);
+			return;
+		}
+
+		/*
+		 * The only feasible case here is where a NUL lookup is being
+		 * performed on rootdir prior to its v_path being populated.
+		 */
+		ASSERT(pvp->v_path_stamp = 0);
+		baselen = 0;
+		pstamp = 0;
+	} else {
+		pstamp = pvp->v_path_stamp;
+		baselen = strlen(pvp->v_path);
+		/* ignore a trailing slash if present */
+		if (pvp->v_path[baselen - 1] == '/') {
+			/* This should only the be case for rootdir */
+			ASSERT(baselen == 1 && pvp == rootdir);
+			baselen--;
+		}
+	}
+	mutex_exit(&pvp->v_lock);
+
+	if (buflen != 0) {
+		/* Free the existing (mis-sized) buffer in case of retry */
+		kmem_free(buf, buflen);
+	}
+	/* base, '/', name and trailing NUL */
+	buflen = baselen + len + 2;
+	if (buflen > max_vnode_path) {
+		DTRACE_PROBE4(vn__setpath_too__long, vnode_t *, pvp,
+		    vnode_t *, vp, char *, name, size_t, buflen);
+		return;
+	}
+	buf = kmem_alloc(buflen, KM_SLEEP);
+
+	mutex_enter(&pvp->v_lock);
+	if (pvp->v_path_stamp != pstamp) {
+		size_t vlen;
+
+		/*
+		 * Since v_path_stamp changed on the parent, it is likely that
+		 * v_path has been altered as well.  If the length does not
+		 * exactly match what was previously measured, the buffer
+		 * allocation must be repeated for proper sizing.
+		 */
+		if (pvp->v_path == vn_vpath_empty) {
+			/* Give up if parent lack v_path */
+			mutex_exit(&pvp->v_lock);
+			kmem_free(buf, buflen);
+			return;
+		}
+		vlen = strlen(pvp->v_path);
+		if (pvp->v_path[vlen - 1] == '/') {
+			vlen--;
+		}
+		if (vlen != baselen) {
+			goto retrybuf;
+		}
+	}
+	bcopy(pvp->v_path, buf, baselen);
+	mutex_exit(&pvp->v_lock);
+
+	buf[baselen] = '/';
+	baselen++;
+	bcopy(name, &buf[baselen], len + 1);
+
+	mutex_enter(&vp->v_lock);
+	if (vp->v_path_stamp == 0) {
+		/* never-visited vnode can inherit stamp from parent */
+		ASSERT(vp->v_path == vn_vpath_empty);
+		vp->v_path_stamp = pstamp;
+		vp->v_path = buf;
+		mutex_exit(&vp->v_lock);
+	} else if (vp->v_path_stamp < pstamp || is_rename) {
+		/*
+		 * Install the updated path and stamp, ensuring that the v_path
+		 * pointer is valid at all times for dtrace.
+		 */
+		oldbuf = vp->v_path;
+		vp->v_path = buf;
+		vp->v_path_stamp = gethrtime();
+		mutex_exit(&vp->v_lock);
+		kmem_free(oldbuf, strlen(oldbuf) + 1);
+	} else {
+		/*
+		 * If the timestamp matches or is greater, it means another
+		 * thread performed the update first while locks were dropped
+		 * here to make the allocation.  We defer to the newer value.
+		 */
+		mutex_exit(&vp->v_lock);
+		kmem_free(buf, buflen);
+	}
+	ASSERT(MUTEX_NOT_HELD(&vp->v_lock));
+}
+
+void
+vn_updatepath(vnode_t *pvp, vnode_t *vp, const char *name)
+{
+	size_t len;
+
+	/*
+	 * If the parent is older or empty, there's nothing further to do.
+	 */
+	if (pvp->v_path == vn_vpath_empty ||
+	    pvp->v_path_stamp <= vp->v_path_stamp) {
+		return;
+	}
+
+	/*
+	 * Given the lack of appropriate context, meaningful updates to v_path
+	 * cannot be made for during lookups for the '.' or '..' entries.
+	 */
+	len = strlen(name);
+	if (len == 0 || (len == 1 && name[0] == '.') ||
+	    (len == 2 && name[0] == '.' && name[1] == '.')) {
+		return;
+	}
+
+	vn_setpath_common(pvp, vp, name, len, B_FALSE);
+}
+
+/*
  * Given a starting vnode and a path, updates the path in the target vnode in
  * a safe manner.  If the vnode already has path information embedded, then the
  * cached path is left untouched.
  */
-
-size_t max_vnode_path = 4 * MAXPATHLEN;
-
+/* ARGSUSED */
 void
-vn_setpath(vnode_t *rootvp, struct vnode *startvp, struct vnode *vp,
-    const char *path, size_t plen)
+vn_setpath(vnode_t *rootvp, vnode_t *pvp, vnode_t *vp, const char *name,
+    size_t len)
 {
-	char	*rpath;
-	vnode_t	*base;
-	size_t	rpathlen, rpathalloc;
-	int	doslash = 1;
-
-	if (*path == '/') {
-		base = rootvp;
-		path++;
-		plen--;
-	} else {
-		base = startvp;
-	}
-
-	/*
-	 * We cannot grab base->v_lock while we hold vp->v_lock because of
-	 * the potential for deadlock.
-	 */
-	mutex_enter(&base->v_lock);
-	if (base->v_path == vn_vpath_empty) {
-		mutex_exit(&base->v_lock);
-		return;
-	}
-
-	rpathlen = strlen(base->v_path);
-	rpathalloc = rpathlen + plen + 1;
-	/* Avoid adding a slash if there's already one there */
-	if (base->v_path[rpathlen-1] == '/')
-		doslash = 0;
-	else
-		rpathalloc++;
-
-	/*
-	 * We don't want to call kmem_alloc(KM_SLEEP) with kernel locks held,
-	 * so we must do this dance.  If, by chance, something changes the path,
-	 * just give up since there is no real harm.
-	 */
-	mutex_exit(&base->v_lock);
-
-	/* Paths should stay within reason */
-	if (rpathalloc > max_vnode_path)
-		return;
-
-	rpath = kmem_alloc(rpathalloc, KM_SLEEP);
-
-	mutex_enter(&base->v_lock);
-	if (base->v_path == vn_vpath_empty ||
-	    strlen(base->v_path) != rpathlen) {
-		mutex_exit(&base->v_lock);
-		kmem_free(rpath, rpathalloc);
-		return;
-	}
-	bcopy(base->v_path, rpath, rpathlen);
-	mutex_exit(&base->v_lock);
-
-	if (doslash)
-		rpath[rpathlen++] = '/';
-	bcopy(path, rpath + rpathlen, plen);
-	rpath[rpathlen + plen] = '\0';
-
-	mutex_enter(&vp->v_lock);
-	if (vp->v_path != vn_vpath_empty) {
-		mutex_exit(&vp->v_lock);
-		kmem_free(rpath, rpathalloc);
-	} else {
-		vp->v_path = rpath;
-		mutex_exit(&vp->v_lock);
-	}
+	vn_setpath_common(pvp, vp, name, len, B_FALSE);
 }
 
 /*
@@ -3060,22 +3197,9 @@ vn_setpath(vnode_t *rootvp, struct vnode *startvp, struct vnode *vp,
  * by fsop_root() for setting the path based on the mountpoint.
  */
 void
-vn_setpath_str(struct vnode *vp, const char *str, size_t len)
+vn_setpath_str(vnode_t *vp, const char *str, size_t len)
 {
-	char *buf = kmem_alloc(len + 1, KM_SLEEP);
-
-	mutex_enter(&vp->v_lock);
-	if (vp->v_path != vn_vpath_empty) {
-		mutex_exit(&vp->v_lock);
-		kmem_free(buf, len + 1);
-		return;
-	}
-
-	vp->v_path = buf;
-	bcopy(str, vp->v_path, len);
-	vp->v_path[len] = '\0';
-
-	mutex_exit(&vp->v_lock);
+	vn_setpath_common(NULL, vp, str, len, B_FALSE);
 }
 
 /*
@@ -3083,17 +3207,9 @@ vn_setpath_str(struct vnode *vp, const char *str, size_t len)
  * target vnode is available.
  */
 void
-vn_renamepath(vnode_t *dvp, vnode_t *vp, const char *nm, size_t len)
+vn_renamepath(vnode_t *pvp, vnode_t *vp, const char *name, size_t len)
 {
-	char *tmp;
-
-	mutex_enter(&vp->v_lock);
-	tmp = vp->v_path;
-	vp->v_path = vn_vpath_empty;
-	mutex_exit(&vp->v_lock);
-	vn_setpath(rootdir, dvp, vp, nm, len);
-	if (tmp != vn_vpath_empty)
-		kmem_free(tmp, strlen(tmp) + 1);
+	vn_setpath_common(pvp, vp, name, len, B_TRUE);
 }
 
 /*
@@ -3104,36 +3220,41 @@ void
 vn_copypath(struct vnode *src, struct vnode *dst)
 {
 	char *buf;
-	int alloc;
+	hrtime_t stamp;
+	size_t buflen;
 
 	mutex_enter(&src->v_lock);
 	if (src->v_path == vn_vpath_empty) {
 		mutex_exit(&src->v_lock);
 		return;
 	}
-	alloc = strlen(src->v_path) + 1;
-
-	/* avoid kmem_alloc() with lock held */
+	buflen = strlen(src->v_path) + 1;
 	mutex_exit(&src->v_lock);
-	buf = kmem_alloc(alloc, KM_SLEEP);
+
+	buf = kmem_alloc(buflen, KM_SLEEP);
+
 	mutex_enter(&src->v_lock);
-	if (src->v_path == vn_vpath_empty || strlen(src->v_path) + 1 != alloc) {
+	if (src->v_path == vn_vpath_empty ||
+	    strlen(src->v_path) + 1 != buflen) {
 		mutex_exit(&src->v_lock);
-		kmem_free(buf, alloc);
+		kmem_free(buf, buflen);
 		return;
 	}
-	bcopy(src->v_path, buf, alloc);
+	bcopy(src->v_path, buf, buflen);
+	stamp = src->v_path_stamp;
 	mutex_exit(&src->v_lock);
 
 	mutex_enter(&dst->v_lock);
 	if (dst->v_path != vn_vpath_empty) {
 		mutex_exit(&dst->v_lock);
-		kmem_free(buf, alloc);
+		kmem_free(buf, buflen);
 		return;
 	}
 	dst->v_path = buf;
+	dst->v_path_stamp = stamp;
 	mutex_exit(&dst->v_lock);
 }
+
 
 /*
  * XXX Private interface for segvn routines that handle vnode
@@ -3565,9 +3686,7 @@ fop_lookup(
 	}
 	if (ret == 0 && *vpp) {
 		VOPSTATS_UPDATE(*vpp, lookup);
-		if ((*vpp)->v_path == vn_vpath_empty) {
-			vn_setpath(rootdir, dvp, *vpp, nm, strlen(nm));
-		}
+		vn_updatepath(dvp, *vpp, nm);
 	}
 
 	return (ret);
@@ -3607,9 +3726,7 @@ fop_create(
 	    (dvp, name, vap, excl, mode, vpp, cr, flags, ct, vsecp);
 	if (ret == 0 && *vpp) {
 		VOPSTATS_UPDATE(*vpp, create);
-		if ((*vpp)->v_path == vn_vpath_empty) {
-			vn_setpath(rootdir, dvp, *vpp, name, strlen(name));
-		}
+		vn_updatepath(dvp, *vpp, name);
 	}
 
 	return (ret);
@@ -3729,10 +3846,7 @@ fop_mkdir(
 	    (dvp, dirname, vap, vpp, cr, ct, flags, vsecp);
 	if (ret == 0 && *vpp) {
 		VOPSTATS_UPDATE(*vpp, mkdir);
-		if ((*vpp)->v_path == vn_vpath_empty) {
-			vn_setpath(rootdir, dvp, *vpp, dirname,
-			    strlen(dirname));
-		}
+		vn_updatepath(dvp, *vpp, dirname);
 	}
 
 	return (ret);
