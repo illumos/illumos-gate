@@ -201,8 +201,8 @@ Unable to allocate state for the file descriptor.
 .Sh SEE ALSO
 .Xr poll 2 ,
 .Xr sigwait 2 ,
+.Xr port_create 3C ,
 .Xr sigsetops 3C ,
 .Xr sigwaitinfo 3C ,
 .Xr signal.h 3HEAD ,
-.Xr epoll 5 ,
-.Xr port_create 3C
+.Xr epoll 5
