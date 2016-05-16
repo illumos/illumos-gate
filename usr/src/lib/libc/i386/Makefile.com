@@ -34,6 +34,10 @@ VERS=		.1
 CPP=		/usr/lib/cpp
 TARGET_ARCH=	i386
 
+# include comm page definitions
+include $(SRC)/lib/commpage/Makefile.shared.targ
+include $(SRC)/lib/commpage/Makefile.shared.com
+
 VALUES=		values-Xa.o
 
 # objects are grouped by source directory
@@ -110,6 +114,7 @@ DTRACEOBJS=			\
 	dtrace_data.o
 
 GENOBJS=			\
+	$(COMMPAGE_OBJS)	\
 	_div64.o		\
 	_divdi3.o		\
 	_getsp.o		\
@@ -305,6 +310,7 @@ COMSYSOBJS=			\
 
 SYSOBJS=			\
 	__clock_gettime.o	\
+	__clock_gettime_sys.o	\
 	__getcontext.o		\
 	__uadmin.o		\
 	_lwp_mutex_unlock.o	\
@@ -1251,6 +1257,8 @@ $(PORTI18N_COND:%=pics/%) := \
 	CPPFLAGS += -D_WCS_LONGLONG
 
 pics/arc4random.o :=	CPPFLAGS += -I$(SRC)/common/crypto/chacha
+
+pics/__clock_gettime.o := CPPFLAGS += $(COMMPAGE_CPPFLAGS)
 
 .KEEP_STATE:
 

@@ -139,6 +139,7 @@ uberdata_t __uberdata = {
 	NULL,			/* robustlist */
 	NULL,			/* progname */
 	NULL,			/* ub_broot */
+	NULL,			/* ub_comm_page */
 	NULL,			/* __tdb_bootstrap */
 	{			/* tdb */
 		NULL,		/* tdb_sync_addr_hash */
@@ -1223,18 +1224,23 @@ extern void __proc64id(void);
 #endif
 
 static void
-init_brandroot(uberdata_t *udp)
+init_auxv_data(uberdata_t *udp)
 {
 	Dl_argsinfo_t args;
 
 	udp->ub_broot = NULL;
+	udp->ub_comm_page = NULL;
 	if (dlinfo(RTLD_SELF, RTLD_DI_ARGSINFO, &args) < 0)
 		return;
 
 	while (args.dla_auxv->a_type != AT_NULL) {
-		if (args.dla_auxv->a_type == AT_SUN_BRAND_NROOT) {
+		switch (args.dla_auxv->a_type) {
+		case AT_SUN_BRAND_NROOT:
 			udp->ub_broot = args.dla_auxv->a_un.a_ptr;
-			return;
+			break;
+		case AT_SUN_COMMPAGE:
+			udp->ub_comm_page = args.dla_auxv->a_un.a_ptr;
+			break;
 		}
 		args.dla_auxv++;
 	}
@@ -1276,11 +1282,12 @@ libc_init(void)
 	(void) _atexit(__cleanup);
 
 	/*
-	 * Every libc, regardless of link map, needs to go through and check its
-	 * aux vectors so as to indicate whether or not this has been given a
-	 * brand root with which we use to qualify various other data.
+	 * Every libc, regardless of link map, needs to go through and check
+	 * its aux vectors.  Doing so will indicate whether or not this has
+	 * been given a brand root (used to qualify various other data) or a
+	 * comm page (to optimize certain system actions).
 	 */
-	init_brandroot(udp);
+	init_auxv_data(udp);
 
 	/*
 	 * We keep our uberdata on one of (a) the first alternate link map

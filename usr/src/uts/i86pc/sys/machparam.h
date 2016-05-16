@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2015 by Delphix. All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
@@ -54,6 +55,10 @@ extern "C" {
  */
 
 #if defined(__amd64)
+/*
+ * If NCPU grows beyond 256, sizing for the x86 comm page will require
+ * adjustment.
+ */
 #define	NCPU	256
 #define	NCPU_LOG2	8
 #elif defined(__i386)

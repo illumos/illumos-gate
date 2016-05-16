@@ -26,7 +26,7 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 /*
- * Copyright (c) 2016, Joyent, Inc. All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -65,6 +65,11 @@
 #include "elf_impl.h"
 #include <sys/sdt.h>
 #include <sys/siginfo.h>
+
+#if defined(__x86) && !defined(__xpv)
+#include <sys/comm_page.h>
+#endif /* defined(__x86) && !defined(__xpv) */
+
 
 extern int at_flags;
 
@@ -580,6 +585,15 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 		args->auxsize += sizeof (aux_entry_t);
 	}
 
+
+	/*
+	 * On supported kernels (64-bit, non-xpv) make room in the auxv for the
+	 * AT_SUN_COMMPAGE entry.
+	 */
+#if defined(__amd64) && !defined(__xpv)
+	args->auxsize += sizeof (aux_entry_t);
+#endif /* defined(__amd64) && !defined(__xpv) */
+
 	/*
 	 * If we have user credentials, we'll supply the following entries:
 	 *	AT_SUN_UID
@@ -867,6 +881,7 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 
 	if (hasauxv) {
 		int auxf = AF_SUN_HWCAPVERIFY;
+
 		/*
 		 * Note: AT_SUN_PLATFORM and AT_RANDOM were filled in via
 		 * exec_args()
@@ -954,6 +969,16 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 			ADDAUX(aux, AT_SUN_BRAND_AUX4, 0)
 		}
 
+		/*
+		 * Add the comm page auxv entry, mapping it in if needed.
+		 */
+#if defined(__amd64) && !defined(__xpv)
+		if (args->commpage != NULL ||
+		    (args->commpage = (uintptr_t)comm_page_mapin()) != NULL) {
+			ADDAUX(aux, AT_SUN_COMMPAGE, args->commpage)
+		}
+#endif /* defined(__amd64) && !defined(__xpv) */
+
 		ADDAUX(aux, AT_NULL, 0)
 		postfixsize = (char *)aux - (char *)bigwad->elfargs;
 
@@ -993,6 +1018,7 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 	}
 
 	bzero(up->u_auxv, sizeof (up->u_auxv));
+	up->u_commpagep = args->commpage;
 	if (postfixsize) {
 		int num_auxv;
 

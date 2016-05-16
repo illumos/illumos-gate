@@ -27,7 +27,7 @@
  * All rights reserved.
  */
 /*
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
@@ -247,6 +247,24 @@ init_cpu_syscall(struct cpu *cp)
 	kpreempt_enable();
 }
 
+#if !defined(__xpv)
+/*
+ * Configure per-cpu ID GDT
+ */
+static void
+init_cpu_id_gdt(struct cpu *cp)
+{
+	/* Write cpu_id into limit field of GDT for usermode retrieval */
+#if defined(__amd64)
+	set_usegd(&cp->cpu_gdt[GDT_CPUID], SDP_SHORT, NULL, cp->cpu_id,
+	    SDT_MEMRODA, SEL_UPL, SDP_BYTES, SDP_OP32);
+#elif defined(__i386)
+	set_usegd(&cp->cpu_gdt[GDT_CPUID], NULL, cp->cpu_id, SDT_MEMRODA,
+	    SEL_UPL, SDP_BYTES, SDP_OP32);
+#endif
+}
+#endif /* !defined(__xpv) */
+
 /*
  * Multiprocessor initialization.
  *
@@ -429,6 +447,10 @@ mp_cpu_configure_common(int cpun, boolean_t boot)
 		cp->cpu_m.mcpu_idle_cpu = cpu_idle;
 
 	init_cpu_info(cp);
+
+#if !defined(__xpv)
+	init_cpu_id_gdt(cp);
+#endif
 
 	/*
 	 * alloc space for ucode_info
@@ -1485,6 +1507,10 @@ start_other_cpus(int cprboot)
 	 * Initialize our own cpu_info.
 	 */
 	init_cpu_info(CPU);
+
+#if !defined(__xpv)
+	init_cpu_id_gdt(CPU);
+#endif
 
 	cmn_err(CE_CONT, "?cpu%d: %s\n", CPU->cpu_id, CPU->cpu_idstr);
 	cmn_err(CE_CONT, "?cpu%d: %s\n", CPU->cpu_id, CPU->cpu_brandstr);
