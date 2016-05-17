@@ -39,7 +39,14 @@ set name=info.classification \
 set name=variant.arch value=i386
 dir path=etc group=sys
 dir path=etc/zones group=sys
+dir path=kernel group=sys
+dir path=kernel/fs group=sys
+dir path=kernel/fs/$(ARCH64) group=sys
+dir path=kernel/socketmod group=sys
+dir path=kernel/socketmod/$(ARCH64) group=sys
 dir path=usr group=sys
+dir path=usr/include group=bin
+dir path=usr/include/sys group=bin
 dir path=usr/kernel group=sys
 dir path=usr/kernel/brand group=sys
 dir path=usr/kernel/brand/$(ARCH64) group=sys
@@ -56,58 +63,98 @@ dir path=usr/lib/brand
 dir path=usr/lib/brand/lx
 dir path=usr/lib/brand/lx/$(ARCH64)
 dir path=usr/lib/brand/lx/distros
+dir path=usr/lib/brand/lx/ld
+dir path=usr/lib/brand/lx/ld/64
 dir path=usr/lib/devfsadm group=sys
 dir path=usr/lib/devfsadm/linkmod group=sys
-driver name=lx_audio
+dir path=usr/lib/fs/lxproc
+dir path=usr/share
+dir path=usr/share/man
+dir path=usr/share/man/man3c
+dir path=usr/share/man/man5
+dir path=usr/share/man/man7fs
 driver name=lx_ptm perms="lx_ptmajor 0666 root sys"
 driver name=lx_systrace perms="* 0644 root sys"
 file path=etc/zones/SUNWlx.xml mode=0444
 file path=etc/zones/SUNWlx26.xml mode=0444
+file path=kernel/fs/$(ARCH64)/lxprocfs group=sys mode=0755
+file path=kernel/fs/lxprocfs group=sys mode=0755
+file path=kernel/socketmod/$(ARCH64)/lx_netlink mode=0755
+file path=kernel/socketmod/lx_netlink mode=0755
+file path=usr/include/sys/inotify.h
+file path=usr/include/sys/limits.h
+file path=usr/include/sys/zfd.h
 file path=usr/kernel/brand/$(ARCH64)/lx_brand group=sys mode=0755
 file path=usr/kernel/brand/lx_brand group=sys mode=0755
-file path=usr/kernel/drv/$(ARCH64)/lx_audio group=sys
-file path=usr/kernel/drv/$(ARCH64)/lx_ptm group=sys
-file path=usr/kernel/drv/$(ARCH64)/lx_systrace group=sys
-file path=usr/kernel/drv/lx_audio group=sys
-file path=usr/kernel/drv/lx_audio.conf group=sys
+file path=usr/kernel/drv/$(ARCH64)/inotify group=sys mode=0755
+file path=usr/kernel/drv/$(ARCH64)/lx_ptm group=sys mode=0755
+file path=usr/kernel/drv/$(ARCH64)/lx_systrace group=sys mode=0755
+file path=usr/kernel/drv/$(ARCH64)/lxautofs group=sys mode=0755
+file path=usr/kernel/drv/$(ARCH64)/zfd group=sys mode=0755
+file path=usr/kernel/drv/inotify group=sys mode=0755
+file path=usr/kernel/drv/inotify.conf group=sys
 file path=usr/kernel/drv/lx_ptm group=sys
 file path=usr/kernel/drv/lx_ptm.conf group=sys
 file path=usr/kernel/drv/lx_systrace group=sys
 file path=usr/kernel/drv/lx_systrace.conf group=sys
-file path=usr/kernel/fs/$(ARCH64)/lx_afs group=sys mode=0755
+file path=usr/kernel/drv/lxautofs group=sys mode=0755
+file path=usr/kernel/drv/lxautofs.conf group=sys
+file path=usr/kernel/drv/zfd group=sys mode=0755
+file path=usr/kernel/fs/$(ARCH64)/lx_cgroup group=sys mode=0755
+file path=usr/kernel/fs/$(ARCH64)/lx_devfs group=sys mode=0755
 file path=usr/kernel/fs/$(ARCH64)/lx_proc group=sys mode=0755
-file path=usr/kernel/fs/lx_afs group=sys mode=0755
+file path=usr/kernel/fs/$(ARCH64)/lx_sysfs group=sys mode=0755
+file path=usr/kernel/fs/lx_cgroup group=sys mode=0755
+file path=usr/kernel/fs/lx_devfs group=sys mode=0755
 file path=usr/kernel/fs/lx_proc group=sys mode=0755
-file path=usr/kernel/strmod/$(ARCH64)/ldlinux group=sys mode=0755
-file path=usr/kernel/strmod/ldlinux group=sys mode=0755
+file path=usr/kernel/fs/lx_sysfs group=sys mode=0755
+#file path=usr/kernel/strmod/$(ARCH64)/ldlinux group=sys mode=0755
+#file path=usr/kernel/strmod/ldlinux group=sys mode=0755
+file path=usr/lib/$(ARCH64)/lx_brand.so.1
 file path=usr/lib/brand/lx/$(ARCH64)/lx_librtld_db.so.1
+file path=usr/lib/brand/lx/$(ARCH64)/lx_vdso.so.1 mode=0755
+#file path=usr/lib/brand/lx/distros/centos35.distro mode=0444
+#file path=usr/lib/brand/lx/distros/centos36.distro mode=0444
+#file path=usr/lib/brand/lx/distros/centos37.distro mode=0444
+#file path=usr/lib/brand/lx/distros/centos38.distro mode=0444
+#file path=usr/lib/brand/lx/distros/rhel35.distro mode=0444
+#file path=usr/lib/brand/lx/distros/rhel36.distro mode=0444
+#file path=usr/lib/brand/lx/distros/rhel37.distro mode=0444
+#file path=usr/lib/brand/lx/distros/rhel38.distro mode=0444
+#file path=usr/lib/brand/lx/distros/rhel_centos_common mode=0444
 file path=usr/lib/brand/lx/config.xml mode=0444
-file path=usr/lib/brand/lx/distros/centos35.distro mode=0444
-file path=usr/lib/brand/lx/distros/centos36.distro mode=0444
-file path=usr/lib/brand/lx/distros/centos37.distro mode=0444
-file path=usr/lib/brand/lx/distros/centos38.distro mode=0444
-file path=usr/lib/brand/lx/distros/rhel35.distro mode=0444
-file path=usr/lib/brand/lx/distros/rhel36.distro mode=0444
-file path=usr/lib/brand/lx/distros/rhel37.distro mode=0444
-file path=usr/lib/brand/lx/distros/rhel38.distro mode=0444
-file path=usr/lib/brand/lx/distros/rhel_centos_common mode=0444
 file path=usr/lib/brand/lx/etc_default_nfs group=sys mode=0444
-file path=usr/lib/brand/lx/lx_distro_install mode=0755
-file path=usr/lib/brand/lx/lxinit mode=0755
-file path=usr/lib/brand/lx/lx_init_zone mode=0755
-file path=usr/lib/brand/lx/lx_init_zone_debian mode=0755
-file path=usr/lib/brand/lx/lx_init_zone_redhat mode=0755
-file path=usr/lib/brand/lx/lx_install mode=0755
+file path=usr/lib/brand/lx/ld/64/ld.config group=sys
+file path=usr/lib/brand/lx/ld/ld.config group=sys
+file path=usr/lib/brand/lx/ltp_skiplist group=sys mode=0444
+file path=usr/lib/brand/lx/ltp_tests group=sys mode=0444
+file path=usr/lib/brand/lx/lx_boot mode=0755
+file path=usr/lib/brand/lx/lx_boot_zone_busybox mode=0755
+file path=usr/lib/brand/lx/lx_boot_zone_debian mode=0755
+file path=usr/lib/brand/lx/lx_boot_zone_redhat mode=0755
+file path=usr/lib/brand/lx/lx_boot_zone_ubuntu mode=0755
 file path=usr/lib/brand/lx/lx_librtld_db.so.1
-file path=usr/lib/brand/lx/lx_native mode=0755
 file path=usr/lib/brand/lx/lx_support mode=0755
+file path=usr/lib/brand/lx/lxinit mode=0555
 file path=usr/lib/brand/lx/platform.xml mode=0444
 file path=usr/lib/devfsadm/linkmod/SUNW_lx_link_$(ARCH).so group=sys
+file path=usr/lib/fs/lxproc/mount mode=0555
 file path=usr/lib/lx_brand.so.1
+file path=usr/share/man/man3c/inotify_add_watch.3c
+file path=usr/share/man/man3c/inotify_init.3c
+file path=usr/share/man/man3c/inotify_rm_watch.3c
+file path=usr/share/man/man5/inotify.5
+file path=usr/share/man/man5/lx.5
+file path=usr/share/man/man7d/zfd.7d
+file path=usr/share/man/man7fs/lxproc.7fs
+file path=usr/share/man/man9f/pollhead_clean.9f
 hardlink path=usr/kernel/dtrace/$(ARCH64)/lx_systrace \
     target=../../../kernel/drv/$(ARCH64)/lx_systrace
 hardlink path=usr/kernel/dtrace/lx_systrace \
     target=../../kernel/drv/lx_systrace
+hardlink path=usr/kernel/fs/$(ARCH64)/lxautofs \
+    target=../../../kernel/drv/$(ARCH64)/lxautofs
+hardlink path=usr/kernel/fs/lxautofs target=../../kernel/drv/lxautofs
 legacy pkg=SUNWlxr arch=$(ARCH) category=system \
     desc="Support for the 'lx' Brand" \
     hotline="Please contact your local service provider" \
