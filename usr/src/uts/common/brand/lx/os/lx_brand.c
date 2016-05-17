@@ -293,10 +293,11 @@ struct brand_ops lx_brops = {
 	lx_sendsig,			/* b_sendsig */
 	lx_setid_clear,			/* b_setid_clear */
 #if defined(_LP64)
-	lx_pagefault			/* b_pagefault */
+	lx_pagefault,			/* b_pagefault */
 #else
-	NULL
+	NULL,
 #endif
+	B_FALSE				/* b_intp_parse_arg */
 };
 
 struct brand_mach_ops lx_mops = {
