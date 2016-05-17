@@ -17,7 +17,6 @@ poll02		# OS-3997
 # tests functionality not allowed in a zone
 accept4_01
 acct01
-access01	# reeanble once test cases pass as root
 adjtimex01
 adjtimex02
 bdflush01
