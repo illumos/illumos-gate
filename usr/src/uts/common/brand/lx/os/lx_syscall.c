@@ -649,7 +649,7 @@ lx_sysent_t lx_sysent32[] = {
 	{"utime",	NULL,			0,		2}, /* 30 */
 	{"stty",	NULL,			NOSYS_OBSOLETE,	0}, /* 31 */
 	{"gtty",	NULL,			NOSYS_OBSOLETE,	0}, /* 32 */
-	{"access",	NULL,			0,		2}, /* 33 */
+	{"access",	lx_access,		0,		2}, /* 33 */
 	{"nice",	NULL,			0,		1}, /* 34 */
 	{"ftime",	NULL,			NOSYS_OBSOLETE,	0}, /* 35 */
 	{"sync",	NULL,			0, 		0}, /* 36 */
@@ -927,7 +927,7 @@ lx_sysent_t lx_sysent32[] = {
 	{"symlinkat",	NULL,			0,		3}, /* 304 */
 	{"readlinkat",	NULL,			0,		4}, /* 305 */
 	{"fchmodat",	lx_fchmodat,		0,		3}, /* 306 */
-	{"faccessat",	NULL,			0,		4}, /* 307 */
+	{"faccessat",	lx_faccessat,		0,		4}, /* 307 */
 	{"pselect6",	lx_pselect,		LX_SYS_EBPARG6,	6}, /* 308 */
 	{"ppoll",	lx_ppoll,		0,		5}, /* 309 */
 	{"unshare",	NULL,			NOSYS_NULL,	0}, /* 310 */
@@ -1008,7 +1008,7 @@ lx_sysent_t lx_sysent64[] = {
 	{"pwrite64",	lx_pwrite,		0,		4}, /* 18 */
 	{"readv",	lx_readv,		0,		3}, /* 19 */
 	{"writev",	lx_writev,		0,		3}, /* 20 */
-	{"access",	NULL,			0,		2}, /* 21 */
+	{"access",	lx_access,		0,		2}, /* 21 */
 	{"pipe",	lx_pipe,		0,		1}, /* 22 */
 	{"select",	lx_select,		0,		5}, /* 23 */
 	{"sched_yield",	lx_sched_yield,		0,		0}, /* 24 */
@@ -1256,7 +1256,7 @@ lx_sysent_t lx_sysent64[] = {
 	{"symlinkat",	NULL,			0,		3}, /* 266 */
 	{"readlinkat",	NULL,			0,		4}, /* 267 */
 	{"fchmodat",	lx_fchmodat,		0,		3}, /* 268 */
-	{"faccessat",	NULL,			0,		4}, /* 269 */
+	{"faccessat",	lx_faccessat,		0,		4}, /* 269 */
 	{"pselect6",	lx_pselect,		0,		6}, /* 270 */
 	{"ppoll",	lx_ppoll,		0,		5}, /* 271 */
 	{"unshare",	NULL,			NOSYS_NULL,	0}, /* 272 */

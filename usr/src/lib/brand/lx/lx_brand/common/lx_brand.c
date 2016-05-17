@@ -984,7 +984,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/*  18: pwrite64 */
 	NULL,				/*  19: readv */
 	NULL,				/*  20: writev */
-	lx_access,			/*  21: access */
+	NULL,				/*  21: access */
 	NULL,				/*  22: pipe */
 	NULL,				/*  23: select */
 	NULL,				/*  24: sched_yield */
@@ -1232,7 +1232,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_symlinkat,			/* 266: symlinkat */
 	lx_readlinkat,			/* 267: readlinkat */
 	NULL,				/* 268: fchmodat */
-	lx_faccessat,			/* 269: faccessat */
+	NULL,				/* 269: faccessat */
 	NULL,				/* 270: pselect6 */
 	NULL,				/* 271: ppoll */
 	NULL,				/* 272: unshare */
@@ -1327,7 +1327,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_utime,			/*  30: utime */
 	NULL,				/*  31: stty */
 	NULL,				/*  32: gtty */
-	lx_access,			/*  33: access */
+	NULL,				/*  33: access */
 	lx_nice,			/*  34: nice */
 	NULL,				/*  35: ftime */
 	lx_sync,			/*  36: sync */
@@ -1601,7 +1601,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_symlinkat,			/* 304: symlinkat */
 	lx_readlinkat,			/* 305: readlinkat */
 	NULL,				/* 306: fchmodat */
-	lx_faccessat,			/* 307: faccessat */
+	NULL,				/* 307: faccessat */
 	NULL,				/* 308: pselect6 */
 	NULL,				/* 309: ppoll */
 	NULL,				/* 310: unshare */
