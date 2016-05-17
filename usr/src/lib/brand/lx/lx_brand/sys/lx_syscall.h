@@ -52,8 +52,6 @@ extern long lx_unlinkat(uintptr_t, uintptr_t, uintptr_t);
 extern long lx_renameat(uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 extern long lx_symlinkat(uintptr_t, uintptr_t, uintptr_t);
 extern long lx_readlinkat(uintptr_t, uintptr_t, uintptr_t, uintptr_t);
-extern long lx_access(uintptr_t, uintptr_t);
-extern long lx_faccessat(uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 
 extern long lx_stat(uintptr_t, uintptr_t);
 extern long lx_fstat(uintptr_t, uintptr_t);

@@ -81,7 +81,7 @@ install_checkpath(uintptr_t p1)
  * ignore these, as indicated by the enforce parameter. See lx_fchmodat for
  * another example of this type of behavior.
  */
-int
+static int
 ltos_at_flag(int lflag, int allow, boolean_t enforce)
 {
 	int sflag = 0;
@@ -379,76 +379,6 @@ lx_sysfs(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 	}
 
 	return (-EINVAL);
-}
-
-/*
- * For Illumos, access() does this:
- *    If the process has appropriate privileges, an implementation may indicate
- *    success for X_OK even if none of the execute file permission bits are set.
- *
- * But for Linux, access() does this:
- *    If the calling process is privileged (i.e., its real UID is zero), then
- *    an X_OK check is successful for a regular file if execute permission is
- *    enabled for any of the file owner, group, or other.
- *
- * Linux used to behave more like Illumos on older kernels:
- *    In  kernel  2.4 (and earlier) there is some strangeness in the handling
- *    of X_OK tests for superuser.  If all categories of  execute  permission
- *    are  disabled for a nondirectory file, then the only access() test that
- *    returns -1 is when mode is specified as just X_OK; if R_OK or  W_OK  is
- *    also  specified in mode, then access() returns 0 for such files.  Early
- *    2.6 kernels (up to and including 2.6.3) also behaved in the same way as
- *    kernel 2.4.
- *
- * So we need to handle the case where a privileged process is checking for
- * X_OK but none of the execute bits are set on the file. We'll keep the old
- * 2.4 behavior for 2.4 emulation but use the new behavior for any other
- * kernel rev. (since 2.6.3 is uninteresting, no relevant distros use that).
- */
-long
-lx_access(uintptr_t p1, uintptr_t p2)
-{
-	char *path = (char *)p1;
-	int mode = (mode_t)p2;
-	int ret;
-
-	ret = access(path, mode);
-
-	if (ret == 0 && (mode & X_OK) && strncmp(lx_release, "2.4", 3) != 0 &&
-	    getuid() == 0) {
-		/* check for incorrect execute success */
-		struct stat64 sb;
-
-		if (stat64(path, &sb) < 0)
-			return (-errno);
-
-		if ((sb.st_mode & S_IFMT) == S_IFREG &&
-		    !(sb.st_mode & (S_IXUSR | S_IXGRP | S_IXOTH))) {
-			/* no execute bits are set in the mode */
-			return (-EACCES);
-		}
-	}
-
-	return (ret ? -errno : 0);
-
-}
-
-long
-lx_faccessat(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4)
-{
-	int atfd = (int)p1;
-	char *path = (char *)p2;
-	int mode = (mode_t)p3;
-	int flag = (int)p4;
-
-	if (atfd == LX_AT_FDCWD)
-		atfd = AT_FDCWD;
-
-	flag = ltos_at_flag(flag, AT_EACCESS, B_FALSE);
-	if (flag < 0)
-		return (-EINVAL);
-
-	return (faccessat(atfd, path, mode, flag) ? -errno : 0);
 }
 
 long

@@ -36,6 +36,7 @@ extern "C" {
 
 extern long lx_accept();
 extern long lx_accept4();
+extern long lx_access();
 extern long lx_arch_prctl();
 extern long lx_bind();
 extern long lx_brk();
@@ -52,6 +53,7 @@ extern long lx_epoll_create1();
 extern long lx_epoll_ctl();
 extern long lx_epoll_pwait();
 extern long lx_epoll_wait();
+extern long lx_faccessat();
 extern long lx_fallocate();
 extern long lx_fallocate32();
 extern long lx_fchmod();
