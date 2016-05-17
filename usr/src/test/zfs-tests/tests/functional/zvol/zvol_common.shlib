@@ -25,7 +25,7 @@
 #
 
 #
-# Copyright (c) 2013 by Delphix. All rights reserved.
+# Copyright (c) 2013, 2015 by Delphix. All rights reserved.
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -47,8 +47,6 @@ function default_zvol_setup # disk_device volume_size
         create_pool $TESTPOOL "$disk"
 
         log_must $ZFS create -V $size $TESTPOOL/$TESTVOL
-
-	set_dumpsize $TESTPOOL/$TESTVOL
 }
 
 #
