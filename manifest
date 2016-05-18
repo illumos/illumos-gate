@@ -10818,7 +10818,7 @@ f usr/share/lib/zoneinfo/Africa/Ndjamena 0644 root bin
 h usr/share/lib/zoneinfo/Africa/Niamey=usr/share/lib/zoneinfo/Africa/Lagos
 h usr/share/lib/zoneinfo/Africa/Nouakchott=usr/share/lib/zoneinfo/Africa/Abidjan
 h usr/share/lib/zoneinfo/Africa/Ouagadougou=usr/share/lib/zoneinfo/Africa/Abidjan
-h usr/share/lib/zoneinfo/Africa/Porto-Novo=usr/share/lib/zoneinfo/Africa/Abidjan
+h usr/share/lib/zoneinfo/Africa/Porto-Novo=usr/share/lib/zoneinfo/Africa/Lagos
 h usr/share/lib/zoneinfo/Africa/Sao_Tome=usr/share/lib/zoneinfo/Africa/Abidjan
 h usr/share/lib/zoneinfo/Africa/Timbuktu=usr/share/lib/zoneinfo/Africa/Abidjan
 f usr/share/lib/zoneinfo/Africa/Tripoli 0644 root bin
@@ -10870,6 +10870,7 @@ f usr/share/lib/zoneinfo/America/Chihuahua 0644 root bin
 f usr/share/lib/zoneinfo/America/Coral_Harbour 0644 root bin
 f usr/share/lib/zoneinfo/America/Cordoba 0644 root bin
 f usr/share/lib/zoneinfo/America/Costa_Rica 0644 root bin
+f usr/share/lib/zoneinfo/America/Creston 0644 root bin
 f usr/share/lib/zoneinfo/America/Cuiaba 0644 root bin
 f usr/share/lib/zoneinfo/America/Curacao 0644 root bin
 f usr/share/lib/zoneinfo/America/Danmarkshavn 0644 root bin
@@ -11054,6 +11055,7 @@ f usr/share/lib/zoneinfo/Asia/Karachi 0644 root bin
 h usr/share/lib/zoneinfo/Asia/Kashgar=usr/share/lib/zoneinfo/Asia/Urumqi
 f usr/share/lib/zoneinfo/Asia/Kathmandu 0644 root bin
 f usr/share/lib/zoneinfo/Asia/Katmandu 0644 root bin
+f usr/share/lib/zoneinfo/Asia/Khandyga 0644 root bin
 f usr/share/lib/zoneinfo/Asia/Kolkata 0644 root bin
 f usr/share/lib/zoneinfo/Asia/Krasnoyarsk 0644 root bin
 f usr/share/lib/zoneinfo/Asia/Kuala_Lumpur 0644 root bin
@@ -11099,6 +11101,7 @@ f usr/share/lib/zoneinfo/Asia/Ujung_Pandang 0644 root bin
 f usr/share/lib/zoneinfo/Asia/Ulaanbaatar 0644 root bin
 f usr/share/lib/zoneinfo/Asia/Ulan_Bator 0644 root bin
 f usr/share/lib/zoneinfo/Asia/Urumqi 0644 root bin
+f usr/share/lib/zoneinfo/Asia/Ust-Nera 0644 root bin
 h usr/share/lib/zoneinfo/Asia/Vientiane=usr/share/lib/zoneinfo/Asia/Bangkok
 f usr/share/lib/zoneinfo/Asia/Vladivostok 0644 root bin
 f usr/share/lib/zoneinfo/Asia/Yakutsk 0644 root bin
@@ -11215,6 +11218,7 @@ f usr/share/lib/zoneinfo/Europe/Bratislava 0644 root bin
 f usr/share/lib/zoneinfo/Europe/Brussels 0644 root bin
 f usr/share/lib/zoneinfo/Europe/Bucharest 0644 root bin
 f usr/share/lib/zoneinfo/Europe/Budapest 0644 root bin
+f usr/share/lib/zoneinfo/Europe/Busingen 0644 root bin
 f usr/share/lib/zoneinfo/Europe/Chisinau 0644 root bin
 f usr/share/lib/zoneinfo/Europe/Copenhagen 0644 root bin
 f usr/share/lib/zoneinfo/Europe/Dublin 0644 root bin
