@@ -372,7 +372,9 @@ typedef struct zfs_cmd {
 	uint64_t	zc_action_handle;
 	int		zc_cleanup_fd;
 	uint8_t		zc_simple;
+	uint8_t		zc_pad3[3];
 	boolean_t	zc_resumable;
+	uint32_t	zc_pad4;
 	uint64_t	zc_sendobj;
 	uint64_t	zc_fromobj;
 	uint64_t	zc_createtxg;
