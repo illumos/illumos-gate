@@ -26,7 +26,7 @@
 #
 
 #
-# Copyright (c) 2013 by Delphix. All rights reserved.
+# Copyright (c) 2013, 2015 by Delphix. All rights reserved.
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -51,7 +51,7 @@ typeset -i min max mem
 ((min = 2 * 1024 * 1024 * 1024))
 ((max = 16 * 1024 * 1024 * 1024))
 
-for vbs in 512 1024 2048 4096 8192 16384 32768 65536 131072; do
+for vbs in 8192 16384 32768 65536 131072; do
 	for multiplier in 1 32 16384 131072; do
 		((volsize = vbs * multiplier))
 		vol="$TESTPOOL/vol_$volsize"
