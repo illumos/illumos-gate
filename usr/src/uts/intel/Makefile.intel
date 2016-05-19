@@ -396,6 +396,7 @@ DRV_KMODS	+= pcn
 DRV_KMODS	+= rge
 DRV_KMODS	+= rtls
 DRV_KMODS	+= sfe
+DRV_KMODS	+= sfxge
 DRV_KMODS	+= amd8111s
 DRV_KMODS	+= igb
 DRV_KMODS	+= ipmi
