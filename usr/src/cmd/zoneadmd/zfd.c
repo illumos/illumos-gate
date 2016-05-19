@@ -36,7 +36,7 @@
  * The mode, which is controlled by the zone attribute "zlog-mode" is somewhat
  * of a misnomer since its purpose has evolved. The attribute currently
  * can have six values which are used to control:
- *    - how many zfd devices are created inside the zone
+ *    - how the zfd devices are used inside the zone
  *    - if the output on the device(s) is also teed into another stream within
  *      the zone
  *    - if we do logging in the GZ
@@ -46,6 +46,9 @@
  * Internally the zfd_mode_t struct holds the number of stdio devs (1 or 3),
  * the number of additional devs corresponding to the zone attr value and the
  * GZ logging flag.
+ *
+ * Note that although the mode indicates the number of devices needed, we always
+ * create all possible zfd devices for simplicity.
  */
 
 #include <sys/types.h>
@@ -103,6 +106,8 @@ static int eventstream[2] = {-1, -1};
 #define	SERVER_SOCKPATH		ZONES_TMPDIR "/%s.server_%s"
 #define	ZTTY_RETRY		5
 
+#define	NUM_ZFD_DEVS		5
+
 typedef struct zfd_mode {
 	uint_t		zmode_n_stddevs;
 	uint_t		zmode_n_addl_devs;
@@ -111,59 +116,12 @@ typedef struct zfd_mode {
 static zfd_mode_t mode;
 
 /*
- * count_zfd_devs() and its helper count_cb() do a walk of the subtree of the
- * device tree where zfd nodes are represented. The goal is to count zfd
- * instances already setup for a zone with the given name.
- *
- * Note: this algorithm is a linear search of nodes in the zfdnex subtree
- * of the device tree, and could be a scalability problem, but I don't see
- * how to avoid it.
- */
-
-/*
- * cb_data is shared by count_cb and destroy_cb for simplicity.
+ * cb_data is only used by destroy_cb.
  */
 struct cb_data {
 	zlog_t *zlogp;
-	int found;
 	int killed;
 };
-
-static int
-count_cb(di_node_t node, void *arg)
-{
-	struct cb_data *cb = (struct cb_data *)arg;
-	char *prop_data;
-
-	if (di_prop_lookup_strings(DDI_DEV_T_ANY, node, "zfd_zname",
-	    &prop_data) != -1) {
-		assert(prop_data != NULL);
-		if (strcmp(prop_data, zone_name) == 0) {
-			cb->found++;
-			return (DI_WALK_CONTINUE);
-		}
-	}
-	return (DI_WALK_CONTINUE);
-}
-
-static int
-count_zfd_devs(zlog_t *zlogp)
-{
-	di_node_t root;
-	struct cb_data cb;
-
-	bzero(&cb, sizeof (cb));
-	cb.zlogp = zlogp;
-
-	if ((root = di_init(ZFDNEX_DEVTREEPATH, DINFOCPYALL)) == DI_NODE_NIL) {
-		zerror(zlogp, B_TRUE, "di_init failed");
-		return (-1);
-	}
-
-	(void) di_walk_node(root, DI_WALK_CLDFIRST, (void *)&cb, count_cb);
-	di_fini(root);
-	return (cb.found);
-}
 
 /*
  * destroy_zfd_devs() and its helper destroy_cb() tears down any zfd instances
@@ -191,7 +149,6 @@ destroy_cb(di_node_t node, void *arg)
 		return (DI_WALK_CONTINUE);
 	}
 
-	cb->found++;
 	tmp = di_devfs_path(node);
 	(void) snprintf(devpath, sizeof (devpath), "/devices/%s", tmp);
 	di_devfs_path_free(tmp);
@@ -284,8 +241,8 @@ make_tty(zlog_t *zlogp, int id)
 /*
  * init_zfd_devs() drives the device-tree configuration of the zone fd devices.
  * The general strategy is to use the libdevice (devctl) interfaces to
- * instantiate the correct number of new zone fd nodes.  We do a lot of sanity
- * checking, and are careful to reuse a dev if one exists.
+ * instantiate all of new zone fd nodes.  We do a lot of sanity checking, and
+ * are careful to reuse a dev if one exists.
  *
  * Once the devices are in the device tree, we kick devfsadm via
  * di_devlink_init() to ensure that the appropriate symlinks (to the master and
@@ -349,21 +306,7 @@ init_zfd_devs(zlog_t *zlogp, zfd_mode_t *mode)
 	devctl_hdl_t bus_hdl = NULL;
 	di_devlink_handle_t dl = NULL;
 	int rv = -1;
-	int ndevs;
-	uint_t tot_devs;
 	int i;
-
-	tot_devs = mode->zmode_n_stddevs + mode->zmode_n_addl_devs;
-
-	/*
-	 * We have to re-setup zone fd devs if they already exist since we
-	 * might be changing zlog modes.
-	 */
-	ndevs = count_zfd_devs(zlogp);
-	if (ndevs > 0 || ndevs == -1) {
-		if (destroy_zfd_devs(zlogp) == -1)
-			goto error;
-	}
 
 	/*
 	 * Time to make the devices.
@@ -373,7 +316,7 @@ init_zfd_devs(zlog_t *zlogp, zfd_mode_t *mode)
 		goto error;
 	}
 
-	for (i = 0; i < tot_devs; i++) {
+	for (i = 0; i < NUM_ZFD_DEVS; i++) {
 		if (init_zfd_dev(zlogp, bus_hdl, i) != 0)
 			goto error;
 	}
