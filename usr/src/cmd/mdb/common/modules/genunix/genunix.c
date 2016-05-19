@@ -74,6 +74,7 @@
 #include "damap.h"
 #include "ddi_periodic.h"
 #include "devinfo.h"
+#include "dnlc.h"
 #include "findstack.h"
 #include "fm.h"
 #include "gcore.h"
@@ -4301,6 +4302,8 @@ static const mdb_walker_t walkers[] = {
 	{ "callout_table", "walk callout table array", callout_table_walk_init,
 		callout_table_walk_step, callout_table_walk_fini },
 	{ "cpu", "walk cpu structures", cpu_walk_init, cpu_walk_step },
+	{ "dnlc", "walk dnlc entries",
+		dnlc_walk_init, dnlc_walk_step, dnlc_walk_fini },
 	{ "ereportq_dump", "walk list of ereports in dump error queue",
 		ereportq_dump_walk_init, ereportq_dump_walk_step, NULL },
 	{ "ereportq_pend", "walk list of ereports in pending error queue",
