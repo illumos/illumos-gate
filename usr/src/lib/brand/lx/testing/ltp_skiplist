@@ -201,6 +201,9 @@ sched_rr_get_interval02
 sched_rr_get_interval03
 sched_getscheduler01
 sched_getscheduler02
+sched_getattr01
+sched_getattr02
+sched_setattr01
 semctl01
 semop02
 sendfile02		# OS-3296
