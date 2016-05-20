@@ -43,7 +43,6 @@ SCRIPTS = \
 	quick_exit
 
 CPPFLAGS += -D_REENTRANT
->>>>>>> FETCH_HEAD
 
 PROGS32 = $(PROGS:%=%.32)
 PROGS64 = $(PROGS:%=%.64)
