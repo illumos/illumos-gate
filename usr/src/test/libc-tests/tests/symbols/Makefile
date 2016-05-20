@@ -19,6 +19,7 @@ TESTSUBDIR = symbols
 PROG = symbols_test
 KSHPROG = setup
 SYMTESTS = \
+	assert_h \
 	ctype_h \
 	dirent_h \
 	fcntl_h \
@@ -26,14 +27,19 @@ SYMTESTS = \
 	math_h \
 	netdb_h \
 	pthread_h \
+	stdalign_h \
+	stddef_h \
 	signal_h \
 	stdio_h \
 	stdlib_h \
+	stdnoreturn_h \
 	string_h \
 	strings_h \
 	sys_stat_h \
 	sys_time_h \
 	sys_timeb_h \
+	time_h \
+	threads_h \
 	ucontext_h \
 	unistd_h \
 	wchar_h \
@@ -42,6 +48,15 @@ SYMTESTS = \
 EXTRAPROG += $(SYMTESTS)
 
 include ../Makefile.com
+
+#
+# Since we use libcmdutils which is LF64, we need to be LF64 even though we're
+# not using the LF64 related features at the moment, lint catches us otherwise.
+#
+CPPFLAGS += -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE
+
+LDLIBS += -lcmdutils
+LDLIBS64 += -lcmdutils
 
 $(SYMTESTS:%=$(TESTDIR)/%): $(TESTDIR)/setup
 	-$(RM) $@

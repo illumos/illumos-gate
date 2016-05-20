@@ -253,7 +253,7 @@ test_trim(char **ptr)
 	*ptr = p;
 	p += strlen(p);
 	while ((--p >= *ptr) && (isspace(*p))) {
-		*p = 0;
+		*p = '\0';
 	}
 }
 

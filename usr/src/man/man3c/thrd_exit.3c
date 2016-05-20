@@ -1,0 +1,64 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2016 Joyent, Inc.
+.\"
+.Dd "Jan 13, 2015"
+.Dt THRD_EXIT 3C
+.Os
+.Sh NAME
+.Nm thrd_exit
+.Nd terminate a thread
+.Sh SYNOPSIS
+.In threads.h
+.Ft "_Noreturn void"
+.Fo thrd_exit
+.Fa "int res"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn thrd_exit
+function terminates the calling thread, in a similar way that
+.Xr exit 3C
+terminates the calling process. If the calling thread has not been
+detached, then the exit status information provided in
+.Fa res
+is saved and can be retrieved by the use of the
+.Xr thrd_join 3C
+function.
+.Pp
+When the thread exits, all signals will be blocked and various
+destructors and clean up handlers will be called, such as those
+registered with
+.Xr tss_create 3C .
+The act of thread termination does not cause any process-wide resources,
+such as mutexes and file descriptors to be released.
+.Pp
+If a thread, other than the thread in which
+.Fn main
+was first invoked returns from its starting routine, it will implicitly
+call
+.Fn thrd_exit
+and set the return value to be its exit status.
+.Sh RETURN VALUES
+The
+.Fn thrd_exit
+function does not return, the calling thread is terminated.
+.Sh INTERFACE STABILITY
+.Sy Standard
+.Sh MT-LEVEL
+.Sy MT-Safe
+.Sh SEE ALSO
+.Xr pthread_exit 3C ,
+.Xr thr_exit 3C ,
+.Xr attributes 5 ,
+.Xr attributes 5 ,
+.Xr threads 5

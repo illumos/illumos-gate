@@ -1,0 +1,46 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2016 Joyent, Inc.
+.\"
+.Dd "Jan 11, 2015"
+.Dt THRD_CURRENT 3C
+.Os
+.Sh NAME
+.Nm thrd_current
+.Nd obtain current thread's ID
+.Sh SYNOPSIS
+.In threads.h
+.Ft thrd_t
+.Fo thrd_current
+.Fa void
+.Fc
+.Sh DESCRIPTION
+The
+.Fn thrd_current
+function returns the thread ID of the current calling thread. Note, this
+ID may be different from the thread ID returned when using
+.Xr thr_self 3C
+or
+.Xr pthread_self 3C ;
+however, it still uniquely identifies the thread.
+.Sh ERRORS
+No errors are defined.
+.Sh INTERFACE STABILITY
+.Sy Standard
+.Sh MT-Level
+.Sy MT-Safe
+.Sh SEE ALSO
+.Xr pthread_self 3C ,
+.Xr thr_self 3C ,
+.Xr thrd_create 3C ,
+.Xr attributes 5 ,
+.Xr threads 5

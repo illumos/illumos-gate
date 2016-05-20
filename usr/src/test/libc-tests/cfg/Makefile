@@ -19,6 +19,7 @@ include $(SRC)/Makefile.master
 CFGS = README \
 	compilation.cfg \
 	symbols/README \
+	symbols/assert_h.cfg \
 	symbols/ctype_h.cfg \
 	symbols/dirent_h.cfg \
 	symbols/fcntl_h.cfg \
@@ -27,13 +28,18 @@ CFGS = README \
 	symbols/netdb_h.cfg \
 	symbols/pthread_h.cfg \
 	symbols/signal_h.cfg \
+	symbols/stdalign_h.cfg \
+	symbols/stddef_h.cfg \
 	symbols/stdio_h.cfg \
 	symbols/stdlib_h.cfg \
+	symbols/stdnoreturn_h.cfg \
 	symbols/string_h.cfg \
 	symbols/strings_h.cfg \
 	symbols/sys_stat_h.cfg \
 	symbols/sys_time_h.cfg \
 	symbols/sys_timeb_h.cfg \
+	symbols/time_h.cfg \
+	symbols/threads_h.cfg \
 	symbols/ucontext_h.cfg \
 	symbols/unistd_h.cfg \
 	symbols/wchar_h.cfg \

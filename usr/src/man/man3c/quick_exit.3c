@@ -1,0 +1,92 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2016 Joyent, Inc.
+.\"
+.Dd "Mar 26, 2016"
+.Dt QUICK_EXIT 3C
+.Os
+.Sh NAME
+.Nm at_quick_exit ,
+.Nm quick_exit
+.Nd terminate a running process with minimal teardown
+.Sh SYNOPSIS
+.In stdlib.h
+.Ft int
+.Fo at_quick_exit
+.Fa "void (*func)(void)"
+.Fc
+.Ft _Noreturn void
+.Fo quick_exit
+.Fa "int status"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn quick_exit
+and
+.Fn at_quick_exit
+functions provide a veneer around
+.Xr _Exit 3C
+that allows for registered functions to be called before terminating.
+Like
+.Xr _Exit 3C ,
+standard library termination is not done.
+.Xr atexit 3C
+functions are not called and various standard termination that occurs
+when calling
+.Xr exit 3C
+may not occur.
+.Pp
+Functions that are registered with
+.Fn at_quick_exit
+will be called in reverse order upon calling
+.Fn quick_exit .
+Functions registered with
+.Fn at_quick_exit
+will not be called at any other time. Functions that are registered with
+.Fn at_quick_exit
+should not make use of
+.Xr longjump 3C
+and related functions.
+.Pp
+After calling all registered functions, the
+.Fn quick_exit
+function will terminate the calling program and its exit status will be
+.Fa status .
+.Sh RETURN VALUES
+The
+.Fn quick_exit
+function does not return.
+.Pp
+The
+.Fn at_quick_exit
+function returns
+.Sy 0
+on success. Otherwise, a non-zero error value is returned to indicate
+failure.
+.Sh ERRORS
+The
+.Fn at_quick_exit
+function may fail if:
+.Bl -tag -width Er
+.It Er ENOMEM
+Insufficient storage space is available.
+.El
+.Sh INTERFACE STABILITY
+.Sy Standard
+.Sh MT-LEVEL
+.Sy Safe
+.Sh SEE ALSO
+.Xr _Exit 3C ,
+.Xr atexit 3C ,
+.Xr exit 3C ,
+.Xr attributes 5 ,
+.Xr standards 5

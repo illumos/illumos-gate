@@ -1,0 +1,88 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2016 Joyent, Inc.
+.\"
+.Dd January 30, 2016
+.Dt ENDIAN.H 3HEAD
+.Os
+.Sh NAME
+.Nm endian.h
+.Nd definitions for endian routines
+.Sh SYNOPSIS
+.In endian.h
+.Sh DESCRIPTION
+The
+.In endian.h
+header defines functions and macros focused on converting data between
+the host machines native byte order and big or little-endian values.
+While the manual page details the macros defined by
+.In endian.h ,
+the functions are documented separately in
+.Xr endian 3C.
+More information on endianness and a general background on the topic can
+be found in
+.Xr byteorder 5 .
+.Pp
+The
+.In endian.h
+header defines the following macros:
+.Bl -tag -width Ds
+.It Sy LITTLE_ENDIAN
+A constant used to indicate a little-endian integer. It is always
+defined, regardless of the actual endianess of the underlying platform.
+This macro should be used to compare against the
+.Sy BYTE_ORDER
+macro.
+.It Sy BIG_ENDIAN
+A constant used to indicate a big-endian integer. It is always defined,
+regardless of the actual endianess of the underlying platform. This
+macro should be used to compare against the
+.Sy BYTE_ORDER
+macro.
+.It Sy PDP_ENDIAN
+A constant used to indicate the endianness used for four byte values on
+the PDP-11. It is always defined, regardless of the actual endianess of
+the underlying platform. This macro should be used to compare against
+the
+.Sy BYTE_ORDER
+macro.
+.It Sy BYTE_ORDER
+The value of the
+.Sy BYTE_ORDER
+macro will be one of
+.Sy LITTLE_ENDIAN
+or
+.Sy BIG_ENDIAN .
+At this time, no supported architectures use the byte order indicated by
+the
+.Sy PDP_ENDIAN
+macro.
+.Pp
+To determine the byte order of a system, one may compare the
+.Sy BYTE_ORDER
+to one of the aforementioned macros.
+.El
+.Pp
+In addition to the routines provided by this header, standardized
+functions may be found in
+.Xr byteorder 3C .
+The header
+.Xr types.h 3HEAD
+also defines additional pre-processor symbols to determine the current
+endianness of the system.
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh SEE ALSO
+.Xr endian 3C ,
+.Xr types.h 3HEAD ,
+.Xr attributes 5 ,
+.Xr byteorder 5

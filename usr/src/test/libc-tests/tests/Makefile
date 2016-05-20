@@ -12,6 +12,7 @@
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2015 Garrett D'Amore <garrett@damore.org>
+# Copyright 2016 Joyent, Inc.
 #
 
 SUBDIRS = \
@@ -23,17 +24,37 @@ SUBDIRS = \
 	random \
 	strerror \
 	symbols \
+	threads \
 	wcsrtombs \
 	wctype
 
 PROGS = \
-	env-OS-4089
+	env-OS-4089 \
+	aligned_alloc \
+	c11_threads \
+	c11_tss \
+	call_once \
+	endian \
+	quick_exit_order \
+	quick_exit_status \
+	timespec_get
+
+SCRIPTS = \
+	quick_exit
+
+CPPFLAGS += -D_REENTRANT
+>>>>>>> FETCH_HEAD
 
 PROGS32 = $(PROGS:%=%.32)
 PROGS64 = $(PROGS:%=%.64)
 
+aligned_alloc.32 :=	LDLIBS += -lproc
+aligned_alloc.64 :=	LDLIBS64 += -lproc
+
 ROOTOPTDIR = $(ROOT)/opt/libc-tests/tests
-ROOTOPTPROGS = $(PROGS32:%=$(ROOTOPTDIR)/%) $(PROGS64:%=$(ROOTOPTDIR)/%)
+ROOTOPTPROGS = $(PROGS32:%=$(ROOTOPTDIR)/%) \
+	$(PROGS64:%=$(ROOTOPTDIR)/%) \
+	$(SCRIPTS:%=$(ROOTOPTDIR)/%)
 
 include $(SRC)/cmd/Makefile.cmd
 
@@ -58,6 +79,9 @@ $(ROOTOPTDIR):
 
 $(ROOTOPTDIR)/%: %
 	$(INS.file)
+
+$(ROOTOPTDIR)/%: %.ksh
+	$(INS.rename)
 
 %.64: %.c
 	$(LINK.c) -m64 -o $@ $< $(LDLIBS64)

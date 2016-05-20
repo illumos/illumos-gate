@@ -22,12 +22,11 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "lint.h"
 #include "mallint.h"
@@ -182,4 +181,16 @@ memalign(size_t align, size_t nbytes)
 	}
 	(void) mutex_unlock(&libc_malloc_lock);
 	return (DATA(aligned_blk));
+}
+
+/*
+ * This is the ISO/IEC C11 version of memalign. We have kept it as a separate
+ * function, but it is basically the same thing. Note that this is implemented
+ * this way to make life easier to libraries which already interpose on
+ * memalign.
+ */
+void *
+aligned_alloc(size_t align, size_t size)
+{
+	return (memalign(align, size));
 }

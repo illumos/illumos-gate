@@ -2635,6 +2635,7 @@ f usr/include/dns_sd.h 0644 root bin
 f usr/include/door.h 0644 root bin
 f usr/include/dtrace.h 0644 root bin
 f usr/include/elf.h 0644 root bin
+f usr/include/endian.h 0644 root bin
 f usr/include/err.h 0644 root bin
 f usr/include/errfp.h 0644 root bin
 f usr/include/errno.h 0644 root bin
@@ -2802,6 +2803,7 @@ f usr/include/iso/stdarg_iso.h 0644 root bin
 f usr/include/iso/stddef_iso.h 0644 root bin
 f usr/include/iso/stdio_c99.h 0644 root bin
 f usr/include/iso/stdio_iso.h 0644 root bin
+f usr/include/iso/stdlib_c11.h 0644 root bin
 f usr/include/iso/stdlib_c99.h 0644 root bin
 f usr/include/iso/stdlib_iso.h 0644 root bin
 f usr/include/iso/string_iso.h 0644 root bin
@@ -3309,6 +3311,7 @@ f usr/include/smbsrv/wintypes.h 0644 root bin
 f usr/include/smhbaapi.h 0644 root bin
 f usr/include/spawn.h 0644 root bin
 f usr/include/stack_unwind.h 0644 root bin
+f usr/include/stdalign.h 0644 root bin
 f usr/include/stdarg.h 0644 root bin
 f usr/include/stdbool.h 0644 root bin
 f usr/include/stddef.h 0644 root bin
@@ -3318,6 +3321,7 @@ f usr/include/stdio_ext.h 0644 root bin
 f usr/include/stdio_impl.h 0644 root bin
 f usr/include/stdio_tag.h 0644 root bin
 f usr/include/stdlib.h 0644 root bin
+f usr/include/stdnoreturn.h 0644 root bin
 f usr/include/storclass.h 0644 root bin
 f usr/include/stp_bpdu.h 0644 root bin
 f usr/include/stp_in.h 0644 root bin
@@ -4448,6 +4452,7 @@ f usr/include/termio.h 0644 root bin
 f usr/include/termios.h 0644 root bin
 f usr/include/tgmath.h 0644 root bin
 f usr/include/thread.h 0644 root bin
+f usr/include/threads.h 0644 root bin
 f usr/include/thread_db.h 0644 root bin
 f usr/include/time.h 0644 root bin
 f usr/include/tiuser.h 0644 root bin
@@ -12587,6 +12592,7 @@ f usr/share/man/man3c/aiocancel.3c 0444 root bin
 f usr/share/man/man3c/aioread.3c 0444 root bin
 f usr/share/man/man3c/aiowait.3c 0444 root bin
 s usr/share/man/man3c/aiowrite.3c=aioread.3c
+f usr/share/man/man3c/aligned_alloc.3c 0444 root bin
 s usr/share/man/man3c/alloca.3c=malloc.3c
 s usr/share/man/man3c/alphasort.3c=scandir.3c
 f usr/share/man/man3c/arc4random.3c 0444 root bin
@@ -12597,6 +12603,7 @@ s usr/share/man/man3c/asctime.3c=ctime.3c
 s usr/share/man/man3c/asctime_r.3c=ctime.3c
 s usr/share/man/man3c/asprintf.3c=printf.3c
 f usr/share/man/man3c/assert.3c 0444 root bin
+s usr/share/man/man3c/at_quick_exit.3c=quick_exit.3c
 f usr/share/man/man3c/atexit.3c 0444 root bin
 s usr/share/man/man3c/atof.3c=strtod.3c
 s usr/share/man/man3c/atoi.3c=strtol.3c
@@ -12724,6 +12731,12 @@ s usr/share/man/man3c/backtrace_symbols_fd.3c=walkcontext.3c
 f usr/share/man/man3c/basename.3c 0444 root bin
 s usr/share/man/man3c/bcmp.3c=bstring.3c
 s usr/share/man/man3c/bcopy.3c=bstring.3c
+s usr/share/man/man3c/be16toh.3c=endian.3c
+s usr/share/man/man3c/be32toh.3c=endian.3c
+s usr/share/man/man3c/be64toh.3c=endian.3c
+s usr/share/man/man3c/betoh16.3c=endian.3c
+s usr/share/man/man3c/betoh32.3c=endian.3c
+s usr/share/man/man3c/betoh64.3c=endian.3c
 s usr/share/man/man3c/bind_textdomain_codeset.3c=gettext.3c
 s usr/share/man/man3c/bindtextdomain.3c=gettext.3c
 f usr/share/man/man3c/bsd_signal.3c 0444 root bin
@@ -12733,6 +12746,7 @@ f usr/share/man/man3c/btowc.3c 0444 root bin
 s usr/share/man/man3c/btowc_l.3c=btowc.3c
 s usr/share/man/man3c/bzero.3c=bstring.3c
 s usr/share/man/man3c/calloc.3c=malloc.3c
+f usr/share/man/man3c/call_once.3c 0444 root bin
 s usr/share/man/man3c/canonicalize_file_name.3c=realpath.3c
 s usr/share/man/man3c/catclose.3c=catopen.3c
 f usr/share/man/man3c/catgets.3c 0444 root bin
@@ -12752,6 +12766,13 @@ f usr/share/man/man3c/clock_settime.3c 0444 root bin
 f usr/share/man/man3c/closedir.3c 0444 root bin
 f usr/share/man/man3c/closefrom.3c 0444 root bin
 s usr/share/man/man3c/closelog.3c=syslog.3c
+f usr/share/man/man3c/cnd.3c 0444 root bin
+s usr/share/man/man3c/cnd_broadcast.3c=cnd.3c
+s usr/share/man/man3c/cnd_destroy.3c=cnd.3c
+s usr/share/man/man3c/cnd_init.3c=cnd.3c
+s usr/share/man/man3c/cnd_signal.3c=cnd.3c
+s usr/share/man/man3c/cnd_timedwait.3c=cnd.3c
+s usr/share/man/man3c/cnd_wait.3c=cnd.3c
 s usr/share/man/man3c/cond_broadcast.3c=cond_init.3c
 s usr/share/man/man3c/cond_destroy.3c=cond_init.3c
 f usr/share/man/man3c/cond_init.3c 0444 root bin
@@ -12831,6 +12852,7 @@ f usr/share/man/man3c/enable_extended_FILE_stdio.3c 0444 root bin
 f usr/share/man/man3c/encrypt.3c 0444 root bin
 f usr/share/man/man3c/end.3c 0444 root bin
 s usr/share/man/man3c/endgrent.3c=getgrnam.3c
+f usr/share/man/man3c/endian.3c 0444 root bin
 s usr/share/man/man3c/endnetgrent.3c=getnetgrent.3c
 s usr/share/man/man3c/endpwent.3c=getpwnam.3c
 s usr/share/man/man3c/endspent.3c=getspnam.3c
@@ -13028,6 +13050,12 @@ s usr/share/man/man3c/hasmntopt.3c=getmntent.3c
 s usr/share/man/man3c/hcreate.3c=hsearch.3c
 s usr/share/man/man3c/hdestroy.3c=hsearch.3c
 f usr/share/man/man3c/hsearch.3c 0444 root bin
+s usr/share/man/man3c/htobe16.3c=endian.3c
+s usr/share/man/man3c/htobe32.3c=endian.3c
+s usr/share/man/man3c/htobe64.3c=endian.3c
+s usr/share/man/man3c/htole16.3c=endian.3c
+s usr/share/man/man3c/htole32.3c=endian.3c
+s usr/share/man/man3c/htole64.3c=endian.3c
 f usr/share/man/man3c/iconv.3c 0444 root bin
 f usr/share/man/man3c/iconv_close.3c 0444 root bin
 f usr/share/man/man3c/iconv_open.3c 0444 root bin
@@ -13123,6 +13151,12 @@ s usr/share/man/man3c/labs.3c=abs.3c
 f usr/share/man/man3c/lckpwdf.3c 0444 root bin
 s usr/share/man/man3c/lcong48.3c=drand48.3c
 s usr/share/man/man3c/ldiv.3c=div.3c
+s usr/share/man/man3c/le16toh.3c=endian.3c
+s usr/share/man/man3c/le32toh.3c=endian.3c
+s usr/share/man/man3c/le64toh.3c=endian.3c
+s usr/share/man/man3c/letoh16.3c=endian.3c
+s usr/share/man/man3c/letoh32.3c=endian.3c
+s usr/share/man/man3c/letoh64.3c=endian.3c
 s usr/share/man/man3c/lfind.3c=lsearch.3c
 f usr/share/man/man3c/lfmt.3c 0444 root bin
 f usr/share/man/man3c/lio_listio.3c 0444 root bin
@@ -13198,6 +13232,13 @@ s usr/share/man/man3c/mq_timedsend.3c=mq_send.3c
 f usr/share/man/man3c/mq_unlink.3c 0444 root bin
 s usr/share/man/man3c/mrand48.3c=drand48.3c
 f usr/share/man/man3c/msync.3c 0444 root bin
+f usr/share/man/man3c/mtx.3c 0444 root bin
+s usr/share/man/man3c/mtx_destroy.3c=mtx.3c
+s usr/share/man/man3c/mtx_init.3c=mtx.3c
+s usr/share/man/man3c/mtx_lock.3c=mtx.3c
+s usr/share/man/man3c/mtx_timedlock.3c=mtx.3c
+s usr/share/man/man3c/mtx_trylock.3c=mtx.3c
+s usr/share/man/man3c/mtx_unlock.3c=mtx.3c
 s usr/share/man/man3c/munlock.3c=mlock.3c
 s usr/share/man/man3c/munlockall.3c=mlockall.3c
 s usr/share/man/man3c/mutex_consistent.3c=mutex_init.3c
@@ -13293,6 +13334,7 @@ s usr/share/man/man3c/psiginfo.3c=psignal.3c
 f usr/share/man/man3c/psignal.3c 0444 root bin
 f usr/share/man/man3c/pthread_atfork.3c 0444 root bin
 s usr/share/man/man3c/pthread_attr_destroy.3c=pthread_attr_init.3c
+f usr/share/man/man3c/pthread_attr_get_np.3c 0444 root bin
 f usr/share/man/man3c/pthread_attr_getdetachstate.3c 0444 root bin
 f usr/share/man/man3c/pthread_attr_getguardsize.3c 0444 root bin
 f usr/share/man/man3c/pthread_attr_getinheritsched.3c 0444 root bin
@@ -13421,6 +13463,7 @@ s usr/share/man/man3c/qfconvert.3c=econvert.3c
 s usr/share/man/man3c/qgconvert.3c=econvert.3c
 f usr/share/man/man3c/qsort.3c 0444 root bin
 s usr/share/man/man3c/quadruple_to_decimal.3c=floating_to_decimal.3c
+f usr/share/man/man3c/quick_exit.3c 0444 root bin
 f usr/share/man/man3c/raise.3c 0444 root bin
 f usr/share/man/man3c/rand.3c 0444 root bin
 s usr/share/man/man3c/rand_r.3c=rand.3c
@@ -13676,6 +13719,14 @@ f usr/share/man/man3c/thr_sigsetmask.3c 0444 root bin
 f usr/share/man/man3c/thr_stksegment.3c 0444 root bin
 f usr/share/man/man3c/thr_suspend.3c 0444 root bin
 f usr/share/man/man3c/thr_yield.3c 0444 root bin
+f usr/share/man/man3c/thrd_create.3c 0444 root bin
+f usr/share/man/man3c/thrd_current.3c 0444 root bin
+f usr/share/man/man3c/thrd_detach.3c 0444 root bin
+f usr/share/man/man3c/thrd_equal.3c 0444 root bin
+f usr/share/man/man3c/thrd_exit.3c 0444 root bin
+f usr/share/man/man3c/thrd_join.3c 0444 root bin
+s usr/share/man/man3c/thrd_sleep.3c=nanosleep.3c
+f usr/share/man/man3c/thrd_yield.3c 0444 root bin
 f usr/share/man/man3c/timer_create.3c 0444 root bin
 f usr/share/man/man3c/timer_delete.3c 0444 root bin
 s usr/share/man/man3c/timegm.3c=mktime.3c
@@ -13690,6 +13741,7 @@ s usr/share/man/man3c/timerfd_gettime.3c=timerfd_create.3c
 s usr/share/man/man3c/timerfd_settime.3c=timerfd_create.3c
 s usr/share/man/man3c/timerisset.3c=timeradd.3c
 s usr/share/man/man3c/timersub.3c=timeradd.3c
+f usr/share/man/man3c/timespec_get.3c 0444 root bin
 f usr/share/man/man3c/tmpfile.3c 0444 root bin
 f usr/share/man/man3c/tmpnam.3c 0444 root bin
 s usr/share/man/man3c/tmpnam_r.3c=tmpnam.3c
@@ -13706,6 +13758,11 @@ f usr/share/man/man3c/towupper.3c 0444 root bin
 s usr/share/man/man3c/towupper_l.3c=towupper.3c
 f usr/share/man/man3c/truncate.3c 0444 root bin
 f usr/share/man/man3c/tsearch.3c 0444 root bin
+f usr/share/man/man3c/tss.3c 0444 root bin
+s usr/share/man/man3c/tss_create.3c=tss.3c
+s usr/share/man/man3c/ttss_delete.3c=tss.3c
+s usr/share/man/man3c/tss_get.3c=tss.3c
+s usr/share/man/man3c/tss_set.3c=tss.3c
 f usr/share/man/man3c/ttyname.3c 0444 root bin
 s usr/share/man/man3c/ttyname_r.3c=ttyname.3c
 f usr/share/man/man3c/ttyslot.3c 0444 root bin
@@ -15230,6 +15287,7 @@ s usr/share/man/man3head/cpio.3head=cpio.h.3head
 f usr/share/man/man3head/cpio.h.3head 0444 root bin
 s usr/share/man/man3head/dirent.3head=dirent.h.3head
 f usr/share/man/man3head/dirent.h.3head 0444 root bin
+f usr/share/man/man3head/endian.h.3head 0444 root bin
 s usr/share/man/man3head/errno.3head=errno.h.3head
 f usr/share/man/man3head/errno.h.3head 0444 root bin
 s usr/share/man/man3head/fcntl.3head=fcntl.h.3head
@@ -18492,6 +18550,7 @@ f usr/share/man/man5/audit_remote.5 0444 root bin
 f usr/share/man/man5/audit_syslog.5 0444 root bin
 s usr/share/man/man5/availability.5=attributes.5
 f usr/share/man/man5/brands.5 0444 root bin
+f usr/share/man/man5/byteorder.5 0444 root bin
 f usr/share/man/man5/cancellation.5 0444 root bin
 f usr/share/man/man5/charmap.5 0444 root bin
 s usr/share/man/man5/compile.5=regexp.5
@@ -18504,6 +18563,7 @@ f usr/share/man/man5/crypt_sunmd5.5 0444 root bin
 f usr/share/man/man5/crypt_unix.5 0444 root bin
 f usr/share/man/man5/device_clean.5 0444 root bin
 f usr/share/man/man5/dhcp.5 0444 root bin
+s usr/share/man/man5/endian.5=byteorder.5
 f usr/share/man/man5/environ.5 0444 root bin
 f usr/share/man/man5/epoll.5 0444 root bin
 f usr/share/man/man5/eqn.5 0444 root bin

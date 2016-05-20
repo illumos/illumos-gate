@@ -22,6 +22,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
@@ -80,11 +82,13 @@ void
 atexit_locks()
 {
 	(void) mutex_lock(&__uberdata.atexit_root.exitfns_lock);
+	(void) mutex_lock(&__uberdata.quickexit_root.exitfns_lock);
 }
 
 void
 atexit_unlocks()
 {
+	(void) mutex_unlock(&__uberdata.quickexit_root.exitfns_lock);
 	(void) mutex_unlock(&__uberdata.atexit_root.exitfns_lock);
 }
 
@@ -381,4 +385,53 @@ in_range(void *addr, Lc_addr_range_t ranges[], uint_t count)
 	}
 
 	return (0);
+}
+
+int
+at_quick_exit(void (*func)(void))
+{
+	ulwp_t *self;
+	quickexit_root_t *arp;
+	_qexthdlr_t *p;
+
+	if ((p = lmalloc(sizeof (_qexthdlr_t))) == NULL)
+		return (-1);
+
+	if ((self = __curthread()) == NULL) {
+		arp = &__uberdata.quickexit_root;
+	} else {
+		arp = &self->ul_uberdata->quickexit_root;
+		(void) mutex_lock(&arp->exitfns_lock);
+	}
+	p->hdlr = func;
+	p->next = arp->head;
+	arp->head = p;
+
+	if (self != NULL)
+		(void) mutex_unlock(&arp->exitfns_lock);
+	return (0);
+
+}
+
+void
+quick_exit(int status)
+{
+	quickexit_root_t *qrp = &curthread->ul_uberdata->quickexit_root;
+	_qexthdlr_t *p;
+	int cancel_state;
+
+	(void) pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &cancel_state);
+	(void) mutex_lock(&qrp->exitfns_lock);
+
+	p = qrp->head;
+	while (p != NULL) {
+		qrp->head = p->next;
+		p->hdlr();
+		lfree(p, sizeof (_qexthdlr_t));
+		p = qrp->head;
+	}
+
+	(void) mutex_unlock(&qrp->exitfns_lock);
+	(void) pthread_setcancelstate(cancel_state, NULL);
+	_Exit(status);
 }

@@ -36,6 +36,7 @@
 
 #include <iso/stdlib_iso.h>
 #include <iso/stdlib_c99.h>
+#include <iso/stdlib_c11.h>
 
 #if defined(__EXTENSIONS__) || defined(_XPG4)
 #include <sys/wait.h>
