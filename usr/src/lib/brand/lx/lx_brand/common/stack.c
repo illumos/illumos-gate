@@ -60,6 +60,8 @@ extern void _sigoff(void);
 void
 lx_stack_prefork(void)
 {
+	lx_tsd_t *lx_tsd = lx_get_tsd();
+
 	/*
 	 * The "lx_stack_list_lock" mutex is used to protect access to the list
 	 * of per-thread native stacks.  Management of native stacks is
@@ -80,15 +82,25 @@ lx_stack_prefork(void)
 	 * copy-on-write copy of a locked mutex without the thread that would
 	 * later unlock it.  We also suspend signal delivery while entering
 	 * this critical section to ensure async signal safety.
+	 *
+	 * Unfortunately some Linux applications (e.g. busybox) will call vfork
+	 * and then call fork (without the expected intervening exec). We
+	 * avoid the mutex deadlock by skipping the call since we know this
+	 * thread has borrowed the parent's address space and the parent cannot
+	 * execute until we exit/exec.
 	 */
 	_sigoff();
-	VERIFY0(mutex_lock(&lx_stack_list_lock));
+	if (lx_tsd->lxtsd_is_vforked == 0)
+		VERIFY0(mutex_lock(&lx_stack_list_lock));
 }
 
 void
 lx_stack_postfork(void)
 {
-	VERIFY0(mutex_unlock(&lx_stack_list_lock));
+	lx_tsd_t *lx_tsd = lx_get_tsd();
+
+	if (lx_tsd->lxtsd_is_vforked == 0)
+		VERIFY0(mutex_unlock(&lx_stack_list_lock));
 	_sigon();
 }
 
@@ -148,9 +160,20 @@ lx_free_other_stacks(void)
 {
 	int i, this_stack = -1;
 	thread_t me = thr_self();
+	lx_tsd_t *lx_tsd = lx_get_tsd();
 
 	_sigoff();
-	VERIFY0(mutex_lock(&lx_stack_list_lock));
+
+	/*
+	 * We don't need to check or take the lx_stack_list_lock here because
+	 * we are the only thread in this process, but if we got here via an
+	 * evil vfork->fork path then we must drop the lock for the new child
+	 * and reset our "is_vforked" counter.
+	 */
+	if (lx_tsd->lxtsd_is_vforked != 0) {
+		VERIFY0(mutex_unlock(&lx_stack_list_lock));
+		lx_tsd->lxtsd_is_vforked = 0;
+	}
 
 	for (i = 0; i < lx_stack_list_elems; i++) {
 		if (lx_stack_list[i].sle_tid == me) {
@@ -200,7 +223,6 @@ lx_free_other_stacks(void)
 		    strerror(errno));
 	}
 
-	VERIFY0(mutex_unlock(&lx_stack_list_lock));
 	_sigon();
 }
 
