@@ -13760,7 +13760,7 @@ f usr/share/man/man3c/truncate.3c 0444 root bin
 f usr/share/man/man3c/tsearch.3c 0444 root bin
 f usr/share/man/man3c/tss.3c 0444 root bin
 s usr/share/man/man3c/tss_create.3c=tss.3c
-s usr/share/man/man3c/ttss_delete.3c=tss.3c
+s usr/share/man/man3c/tss_delete.3c=tss.3c
 s usr/share/man/man3c/tss_get.3c=tss.3c
 s usr/share/man/man3c/tss_set.3c=tss.3c
 f usr/share/man/man3c/ttyname.3c 0444 root bin
