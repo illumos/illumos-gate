@@ -3246,6 +3246,13 @@ lx_setsockopt(int sock, int level, int optname, void *optval, socklen_t optlen)
 		if (optlen > sizeof (stkbuf)) {
 			buflen = optlen;
 			optbuf = kmem_alloc(optlen, KM_SLEEP);
+		} else {
+			/*
+			 * Zero the on-stack buffer to avoid poisoning smaller
+			 * optvals with stack garbage.
+			 */
+			stkbuf[0] = 0;
+			stkbuf[1] = 0;
 		}
 		if (copyin(optval, optbuf, optlen) != 0) {
 			if (buflen != 0) {
