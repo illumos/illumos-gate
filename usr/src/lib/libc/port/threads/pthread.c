@@ -23,8 +23,9 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2016 Joyent, Inc.
+ */
 
 #include "lint.h"
 #include "thr_uberdata.h"
@@ -44,6 +45,22 @@ typedef struct  __once {
 } __once_t;
 
 #define	once_flag	oflag.pad32_flag[1]
+
+static int
+_thr_setinherit(pthread_t tid, int inherit)
+{
+	ulwp_t *ulwp;
+	int error = 0;
+
+	if ((ulwp = find_lwp(tid)) == NULL) {
+		error = ESRCH;
+	} else {
+		ulwp->ul_ptinherit = inherit;
+		ulwp_unlock(ulwp, curthread->ul_uberdata);
+	}
+
+	return (error);
+}
 
 static int
 _thr_setparam(pthread_t tid, int policy, int prio)
@@ -88,7 +105,7 @@ _thr_setparam(pthread_t tid, int policy, int prio)
 #pragma weak _pthread_create = pthread_create
 int
 pthread_create(pthread_t *thread, const pthread_attr_t *attr,
-	void * (*start_routine)(void *), void *arg)
+    void * (*start_routine)(void *), void *arg)
 {
 	ulwp_t		*self = curthread;
 	const thrattr_t	*ap = attr? attr->__pthread_attrp : def_thrattr();
@@ -113,15 +130,25 @@ pthread_create(pthread_t *thread, const pthread_attr_t *attr,
 	error = _thrp_create(ap->stkaddr, ap->stksize, start_routine, arg,
 	    flag, &tid, ap->guardsize);
 	if (error == 0) {
+		/*
+		 * Record the original inheritence value for
+		 * pthread_getattr_np(). We should always be able to find the
+		 * thread.
+		 */
+		(void) _thr_setinherit(tid, ap->inherit);
+
 		if (ap->inherit == PTHREAD_EXPLICIT_SCHED &&
 		    (ap->policy != self->ul_policy ||
-		    ap->prio != (self->ul_epri? self->ul_epri : self->ul_pri)))
+		    ap->prio != (self->ul_epri ? self->ul_epri :
+		    self->ul_pri))) {
 			/*
 			 * The SUSv3 specification requires pthread_create()
 			 * to fail with EPERM if it cannot set the scheduling
 			 * policy and parameters on the new thread.
 			 */
 			error = _thr_setparam(tid, ap->policy, ap->prio);
+		}
+
 		if (error) {
 			/*
 			 * We couldn't determine this error before
@@ -243,7 +270,7 @@ thr_getprio(thread_t tid, int *priority)
  */
 int
 pthread_setschedparam(pthread_t tid,
-	int policy, const struct sched_param *param)
+    int policy, const struct sched_param *param)
 {
 	return (_thr_setparam(tid, policy, param->sched_priority));
 }

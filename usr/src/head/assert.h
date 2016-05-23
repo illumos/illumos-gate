@@ -24,6 +24,7 @@
 
 /*
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ * Copyright 2016 Joyent, Inc.
  *
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -41,6 +42,13 @@ extern void __assert_c99(const char *, const char *, int, const char *);
 #else
 extern void __assert(const char *, const char *, int);
 #endif /* __STDC_VERSION__ - 0 >= 199901L */
+
+/*
+ * In C11 the static_assert macro is always defined, unlike the assert macro.
+ */
+#if __STDC_VERSION__ - 0 >= 201112L
+#define	static_assert	_Static_assert
+#endif /* __STDC_VERSION - 0 >= 201112L */
 
 #ifdef	__cplusplus
 }

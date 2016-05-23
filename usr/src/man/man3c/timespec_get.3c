@@ -1,0 +1,81 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2016 Joyent, Inc.
+.\"
+.Dd "Mar 25, 2016"
+.Dt TIMESPEC_GET 3C
+.Os
+.Sh NAME
+.Nm timespec_get
+.Nd get time information
+.Sh SYNOPSIS
+.In time.h
+.Ft int
+.Fo timespec_get
+.Fa "struct timespec *ts"
+.Fa "int base"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn timespec_get
+function provides access nanosecond resolution time. The
+meaning and source of time is defined by the
+.Fa base
+argument. The following values are defined for
+.Fa base :
+.Bl -tag -width Ds
+.It Sy TIME_UTC
+Obtain the current time of day from the realtime clock on the system. It
+represents the amount of time in second and nanoseconds since the Epoch.
+This is logically equivalent to calling
+.Xr clock_gettime 3C
+with
+.Sy CLOCK_REALTIME .
+.El
+.Pp
+For the definition of the
+.Sy timespec
+structure, see
+.Xr time.h 3HEAD .
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn timespec_get
+function returns the passed in value of
+.Fa base .
+Otherwise,
+.Sy 0
+is returned to represent an error.
+.Sh ERRORS
+Unlike other functions, the
+.Fn timespec_get
+function is not defined to set
+.Sy errno .
+However, the
+.Fn timespec_get
+function will fail if:
+.Bl -bullet -offset indent
+.It
+The value of
+.Fa base
+does not refer to a known time specification.
+.It
+There was an error obtaining the time for
+.Fa base .
+.El
+.Sh INTERFACE STABILITY
+.Sy Standard
+.Sh MT-LEVEL
+.Sy MT-Safe
+.Sh SEE ALSO
+.Xr clock_gettime 3C ,
+.Xr time.h 3HEAD ,
+.Xr attributes 5

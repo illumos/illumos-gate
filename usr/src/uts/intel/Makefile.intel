@@ -22,6 +22,7 @@
 # Copyright (c) 2015 Nexenta Systems, Inc. All rights reserved.
 # Copyright (c) 2013 Andrew Stormont.  All rights reserved.
 # Copyright (c) 2015, Joyent, Inc.  All rights reserved.
+# Copyright 2016 Garrett D'Amore <garrett@damore.org>
 
 #
 #	This makefile contains the common definitions for all intel
@@ -396,6 +397,7 @@ DRV_KMODS	+= pcn
 DRV_KMODS	+= rge
 DRV_KMODS	+= rtls
 DRV_KMODS	+= sfe
+DRV_KMODS	+= sfxge
 DRV_KMODS	+= amd8111s
 DRV_KMODS	+= igb
 DRV_KMODS	+= ipmi

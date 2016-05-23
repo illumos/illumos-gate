@@ -23,7 +23,7 @@
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
- * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include "lint.h"
@@ -105,6 +105,7 @@ uberdata_t __uberdata = {
 	{ DEFAULTMUTEX, NULL, 0 },
 	{ DEFAULTMUTEX, NULL, 0 }},
 	{ RECURSIVEMUTEX, NULL, NULL },		/* atexit_root */
+	{ RECURSIVEMUTEX, NULL },		/* quickexit_root */
 	{ DEFAULTMUTEX, 0, 0, NULL },		/* tsd_metadata */
 	{ DEFAULTMUTEX, {0, 0}, {0, 0} },	/* tls_metadata */
 	0,			/* primary_map */
@@ -556,7 +557,7 @@ find_lwp(thread_t tid)
 
 int
 _thrp_create(void *stk, size_t stksize, void *(*func)(void *), void *arg,
-	long flags, thread_t *new_thread, size_t guardsize)
+    long flags, thread_t *new_thread, size_t guardsize)
 {
 	ulwp_t *self = curthread;
 	uberdata_t *udp = self->ul_uberdata;
@@ -719,7 +720,7 @@ _thrp_create(void *stk, size_t stksize, void *(*func)(void *), void *arg,
 
 int
 thr_create(void *stk, size_t stksize, void *(*func)(void *), void *arg,
-	long flags, thread_t *new_thread)
+    long flags, thread_t *new_thread)
 {
 	return (_thrp_create(stk, stksize, func, arg, flags, new_thread, 0));
 }

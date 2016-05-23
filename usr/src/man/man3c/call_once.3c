@@ -1,0 +1,89 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2016 Joyent, Inc.
+.\"
+.Dd "Jan 11, 2015"
+.Dt CALL_ONCE 3C
+.Os
+.Sh NAME
+.Nm call_once
+.Nd ensure function is only called once
+.Sh SYNOPSIS
+.In treads.h
+.Vt "once_flag once = ONCE_FLAG_INIT;"
+.Ft void
+.Fo call_once
+.Fa "once_flag *once"
+.Fa "void (*func)(void)"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn call_once
+function is used to ensure that an operation occurs only once, even
+across multiple threads. Each instance of a properly initialized
+.Ft once_flag
+can be pased to the
+.Ft call_once
+function; however, only a single caller will successfully execute the
+specified function,
+.Fa func .
+This ensures that the argument
+.Fa func
+is called only once. Note, the argument
+.Fa once
+is the only thing used as a point of synchronization. If multiple
+callers use the same pointer for
+.Fa once ,
+but use different values for
+.Fa func ,
+then only one of the functions will be successfully called.
+.Pp
+The argument
+.Fn once
+should always be initialized to the symbol
+.Sy ONCE_FLAG_INIT
+before calling
+.Fn call_once .
+Failure to do so will result in undefined behavior.
+.Pp
+Like
+.Xr pthread_once 3C ,
+the
+.Fn call_once
+function is not itself a cancellation point; however, if the thread
+calling
+.Fn func
+encounters a cancellation point and is cancelled, then the value pointed
+to by
+.Fa once
+will be as though
+.Fn call_once
+had not been called, as
+.Fn func
+had not completed successfully.
+.Sh RETURN VALUES
+The
+.Fn call_once
+function does not return any values. Upon its completion, it is guaranteed that
+.Fa func
+will have been called at most once across the liftime of the
+.Fa once
+argument .
+.Sh INTERFACE STABILITY
+.Sy Standard
+.Sh MT-LEVEL
+.Sy MT-Safe
+.Sh SEE ALSO
+.Xr pthread_once 3C ,
+.Xr threads.h 3HEAD ,
+.Xr attributes 5 ,
+.Xr threads 5

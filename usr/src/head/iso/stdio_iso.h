@@ -232,7 +232,14 @@ extern int	putc(int, FILE *);
 extern int	getchar(void);
 extern int	putchar(int);
 #endif
+
+/*
+ * ISO/IEC C11 removed gets from the standard library. Therefore if a strict C11
+ * environment has been requested, we remove it.
+ */
+#if !defined(_STDC_C11) || defined(__EXTENSIONS__)
 extern char	*gets(char *);
+#endif
 extern int	puts(const char *);
 extern int	ungetc(int, FILE *);
 extern size_t	fread(void *_RESTRICT_KYWD, size_t, size_t,

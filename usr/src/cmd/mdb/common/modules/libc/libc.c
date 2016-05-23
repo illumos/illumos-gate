@@ -22,9 +22,7 @@
 /*
  * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
- */
-/*
- * Copyright (c) 2015, Joyent, Inc.
+ * Copyright 2016, Joyent, Inc.
  */
 
 #include <sys/mdb_modapi.h>
@@ -793,6 +791,13 @@ d_uberdata(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    prt_addr((void *)(addr + OFFSET(atexit_root.exitfns_lock)), 1),
 	    prt_addr(uberdata.atexit_root.head, 1),
 	    prt_addr(uberdata.atexit_root.exit_frame_monitor, 0));
+
+	HD("&quickexit_root       head");
+	mdb_printf(OFFSTR "%s %s\n",
+	    OFFSET(quickexit_root),
+	    prt_addr((void *)(addr + OFFSET(quickexit_root.exitfns_lock)), 1),
+	    prt_addr(uberdata.quickexit_root.head, 0));
+
 
 	HD("&tsd_metadata         tsdm_nkeys tsdm_nused tsdm_destro");
 	mdb_printf(OFFSTR "%s %-10d %-10d %s\n",

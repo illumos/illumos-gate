@@ -11,11 +11,11 @@
 
 /*
  * Copyright 2015 Garrett D'Amore <garrett@damore.org>
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*
- * This program tests symbol visibility using the /usr/bin/c89 and
- * /usr/bin/c99 programs.
+ * This program tests symbol visibility in different compilation environments.
  */
 
 #include <stdio.h>
@@ -27,6 +27,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <note.h>
+#include <libcmdutils.h>
 #include <sys/wait.h>
 #include "test_common.h"
 
@@ -64,6 +65,7 @@ const char *compilers[] = {
 char *compiler = NULL;
 const char *c89flags = NULL;
 const char *c99flags = NULL;
+const char *c11flags = NULL;
 
 #define	MAXENV	64	/* maximum number of environments (bitmask width) */
 #define	MAXHDR	10	/* maximum # headers to require to access symbol */
@@ -88,7 +90,12 @@ struct env_group {
 	struct env_group	*eg_next;
 };
 
-typedef enum { SYM_TYPE, SYM_VALUE, SYM_FUNC } sym_type_t;
+typedef enum {
+	SYM_TYPE,
+	SYM_VALUE,
+	SYM_DEFINE,
+	SYM_FUNC
+} sym_type_t;
 
 struct sym_test {
 	char			*st_name;
@@ -96,9 +103,10 @@ struct sym_test {
 	char			*st_hdrs[MAXHDR];
 	char			*st_rtype;
 	char			*st_atypes[MAXARG];
+	char			*st_defval;
 	uint64_t		st_test_mask;
 	uint64_t		st_need_mask;
-	char			*st_prog;
+	const char		*st_prog;
 	struct sym_test		*st_next;
 };
 
@@ -284,31 +292,23 @@ do_env_group(char **fields, int nfields, char **err)
 	return (0);
 }
 
-static char *progbuf = NULL;
-size_t proglen = 0;
-size_t progsiz = 0;
+static custr_t *st_custr;
 
 static void
 addprogch(char c)
 {
-	while (progsiz <= (proglen + 1)) {
-		progbuf = realloc(progbuf, progsiz + 4096);
-		if (progbuf == NULL) {
-			perror("realloc");
-			exit(1);
-		}
-		progsiz += 1024;
+	if (custr_appendc(st_custr, c) == -1) {
+		perror("custr_appendc");
+		exit(1);
 	}
-	progbuf[proglen++] = c;
-	progbuf[proglen] = 0;
 }
 
 static void
 addprogstr(char *s)
 {
-	while (*s != NULL) {
-		addprogch(*s);
-		s++;
+	if (custr_append(st_custr, s) == -1) {
+		perror("custr_append");
+		exit(1);
 	}
 }
 
@@ -316,38 +316,37 @@ static void
 addprogfmt(const char *fmt, ...)
 {
 	va_list va;
-	char *buf = NULL;
 	va_start(va, fmt);
-	if (vasprintf(&buf, fmt, va) < 0) {
-		perror("vasprintf");
+	if (custr_append_vprintf(st_custr, fmt, va) == -1) {
+		perror("custr_append_vprintf");
 		exit(1);
 	}
 	va_end(va);
-	addprogstr(buf);
-	free(buf);
 }
 
 static void
 mkprog(struct sym_test *st)
 {
-	char *s;
+	char *s = NULL;
 
-	proglen = 0;
+	custr_reset(st_custr);
 
 	for (int i = 0; i < MAXHDR && st->st_hdrs[i] != NULL; i++) {
 		addprogfmt("#include <%s>\n", st->st_hdrs[i]);
 	}
 
-	for (s = st->st_rtype; *s; s++) {
-		addprogch(*s);
-		if (*s == '(') {
-			s++;
+	if (st->st_rtype != NULL) {
+		for (s = st->st_rtype; *s; s++) {
 			addprogch(*s);
-			s++;
-			break;
+			if (*s == '(') {
+				s++;
+				addprogch(*s);
+				s++;
+				break;
+			}
 		}
+		addprogch(' ');
 	}
-	addprogch(' ');
 
 	/* for function pointers, s is closing suffix, otherwise empty */
 
@@ -360,6 +359,15 @@ mkprog(struct sym_test *st)
 		addprogfmt("test_value%s;\n", s);	/* s usually empty */
 		addprogstr("void\ntest_func(void)\n{\n");
 		addprogfmt("\ttest_value = %s;\n}", st->st_name);
+		break;
+
+	case SYM_DEFINE:
+		addprogfmt("#if !defined(%s)", st->st_name);
+		if (st->st_defval != NULL)
+			addprogfmt("|| %s != %s", st->st_name, st->st_defval);
+		addprogfmt("\n#error %s is not defined or has the wrong value",
+		    st->st_name);
+		addprogfmt("\n#endif\n");
 		break;
 
 	case SYM_FUNC:
@@ -427,7 +435,7 @@ mkprog(struct sym_test *st)
 
 	addprogch('\n');
 
-	st->st_prog = progbuf;
+	st->st_prog = custr_cstr(st_custr);
 }
 
 static int
@@ -533,6 +541,44 @@ do_value(char **fields, int nfields, char **err)
 	    (add_headers(st, hdrs, err) < 0)) {
 		return (-1);
 	}
+	append_sym_test(st);
+
+	return (0);
+}
+
+static int
+do_define(char **fields, int nfields, char **err)
+{
+	char *name, *value, *hdrs, *envs;
+	struct sym_test *st;
+
+	if (nfields != 4) {
+		myasprintf(err, "number of fields (%d) != 4", nfields);
+		return (-1);
+	}
+
+	name = fields[0];
+	value = fields[1];
+	hdrs = fields[2];
+	envs = fields[3];
+
+	st = myzalloc(sizeof (*st));
+	st->st_type = SYM_DEFINE;
+	st->st_name = mystrdup(name);
+
+	/*
+	 * A value to compare against is optional. trim will leave it as a null
+	 * pointer if there's nothing there.
+	 */
+	test_trim(&value);
+	if (*value != '\0')
+		st->st_defval = mystrdup(value);
+
+	if ((add_envs(st, envs, err) < 0) ||
+	    (add_headers(st, hdrs, err) < 0)) {
+		return (-1);
+	}
+
 	append_sym_test(st);
 
 	return (0);
@@ -762,6 +808,7 @@ find_compiler(void)
 			test_debugf(t, "Found Studio C");
 			c89flags = "-Xc -errwarn=%all -v -xc99=%none " MFLAG;
 			c99flags = "-Xc -errwarn=%all -v -xc99=%all " MFLAG;
+			c11flags = NULL;
 			if (extra_debug) {
 				test_debugf(t, "c89flags: %s", c89flags);
 				test_debugf(t, "c99flags: %s", c99flags);
@@ -773,6 +820,8 @@ find_compiler(void)
 			c89flags = "-Wall -Werror -std=c89 -nostdinc "
 			    "-isystem /usr/include " MFLAG;
 			c99flags = "-Wall -Werror -std=c99 -nostdinc "
+			    "-isystem /usr/include " MFLAG;
+			c11flags = "-Wall -Werror -std=c11 -nostdinc "
 			    "-isystem /usr/include " MFLAG;
 			if (extra_debug) {
 				test_debugf(t, "c89flags: %s", c89flags);
@@ -799,7 +848,7 @@ do_compile(test_t t, struct sym_test *st, struct compile_env *cenv, int need)
 	char *cmd;
 	FILE *logf;
 	FILE *dotc;
-	const char *prog;
+	const char *prog, *cflags, *lang;
 
 	full_count++;
 
@@ -820,9 +869,25 @@ do_compile(test_t t, struct sym_test *st, struct compile_env *cenv, int need)
 
 	(void) unlink(ofile);
 
+	if (strcmp(env_lang(cenv), "c99") == 0) {
+		lang = "c99";
+		cflags = c99flags;
+	} else if (strcmp(env_lang(cenv), "c11") == 0) {
+		lang = "c11";
+		cflags = c11flags;
+	} else {
+		lang = "c89";
+		cflags = c89flags;
+	}
+
+	if (cflags == NULL) {
+		test_failed(t, "compiler %s does not support %s", compiler,
+		    lang);
+		return (-1);
+	}
+
 	myasprintf(&cmd, "%s %s %s -c %s -o %s >>%s 2>&1",
-	    compiler, strcmp(env_lang(cenv), "c99") == 0 ? c99flags : c89flags,
-	    env_defs(cenv), cfile, ofile, lfile);
+	    compiler, cflags, env_defs(cenv), cfile, ofile, lfile);
 
 	if (extra_debug) {
 		test_debugf(t, "command: %s", cmd);
@@ -935,6 +1000,7 @@ main(int argc, char **argv)
 		if (test_load_config(NULL, argv[optind++],
 		    "type", do_type,
 		    "value", do_value,
+		    "define", do_define,
 		    "func", do_func,
 		    NULL) < 0) {
 			exit(1);
@@ -943,6 +1009,11 @@ main(int argc, char **argv)
 
 	if (atexit(cleanup) != 0) {
 		perror("atexit");
+		exit(1);
+	}
+
+	if (custr_alloc(&st_custr) == -1) {
+		perror("custr");
 		exit(1);
 	}
 

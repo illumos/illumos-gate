@@ -109,7 +109,15 @@ typedef long	wchar_t;
 #endif	/* !_WCHAR_T */
 #endif	/* !defined(__cplusplus) ... */
 
-extern void abort(void) __NORETURN;
+#if !defined(_NORETURN_KYWD)
+#if __STDC_VERSION__ - 0 >= 201112L
+#define	_NORETURN_KYWD	_Noreturn
+#else
+#define	_NORETURN_KYWD
+#endif	/* __STDC_VERSION__ - 0 >= 201112L */
+#endif	/* !defined(_NORETURN_KYWD) */
+
+extern _NORETURN_KYWD void abort(void) __NORETURN;
 extern int abs(int);
 extern int atexit(void (*)(void));
 extern double atof(const char *);
@@ -125,7 +133,7 @@ extern "C++" {
 #endif /* __cplusplus >= 199711L && defined(__SUNPRO_CC) */
 extern void *calloc(size_t, size_t);
 extern div_t div(int, int);
-extern void exit(int)
+extern _NORETURN_KYWD void exit(int)
 	__NORETURN;
 extern void free(void *);
 extern char *getenv(const char *);

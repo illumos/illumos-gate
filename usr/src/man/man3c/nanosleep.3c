@@ -1,5 +1,6 @@
 '\" te
 .\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 2016 Joyent, Inc.
 .\" Copyright 1989 AT&T
 .\" Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
 .\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
@@ -9,9 +10,9 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH NANOSLEEP 3C "Feb 5, 2008"
+.TH NANOSLEEP 3C "Mar 27, 2016"
 .SH NAME
-nanosleep \- high resolution sleep
+nanosleep, thrd_sleep \- high resolution sleep
 .SH SYNOPSIS
 .LP
 .nf
@@ -21,27 +22,32 @@ nanosleep \- high resolution sleep
      \fBstruct timespec *\fR\fIrmtp\fR);
 .fi
 
+.nf
+#include <threads.h>
+
+\fBint\fR \fBthrd_sleep\fR(\fBconst struct timespec *\fR\fIrqtp\fR,
+     \fBstruct timespec *\fR\fIrmtp\fR);
+
 .SH DESCRIPTION
+.LP
+The \fBnanosleep()\fR and \fBthrd_sleep()\fR functions cause the current thread
+to be suspended from execution until either the time interval specified by the
+\fIrqtp\fR argument has elapsed or a signal is delivered to the calling thread
+and its action is to invoke a signal-catching function or to terminate the
+process. The suspension time may be longer than requested because the argument
+value is rounded up to an integer multiple of the sleep resolution or because of
+the scheduling of other activity by the system. But, except for the case of
+being interrupted by a signal, the suspension time will not be less than the
+time specified by \fIrqtp\fR, as measured by the system clock,
+\fBCLOCK_REALTIME\fR.
 .sp
 .LP
-The \fBnanosleep()\fR function causes the current thread  to be suspended from
-execution until either the time interval specified by the \fIrqtp\fR argument
-has elapsed or a signal is delivered to the calling thread and its action is to
-invoke a signal-catching function or to terminate the process. The suspension
-time may be longer than requested because the argument value is rounded up to
-an integer multiple of the sleep resolution or because of the scheduling of
-other activity by the system. But, except for the case of being interrupted by
-a signal, the suspension time will not be less than the time specified by
-\fIrqtp\fR, as measured by the system clock, \fBCLOCK_REALTIME\fR.
-.sp
-.LP
-The use of the \fBnanosleep()\fR function has no effect on the action or
-blockage of any signal.
+The use of the \fBnanosleep()\fR and \fBthrd_sleep()\fR functions has no effect
+on the action or blockage of any signal.
 .SH RETURN VALUES
-.sp
 .LP
-If the \fBnanosleep()\fR function returns because the requested time has
-elapsed, its return value is \fB0\fR.
+If the \fBnanosleep()\fR or \fBthrd_sleep()\fR function returns because the
+requested time has elapsed, its return value is \fB0\fR.
 .sp
 .LP
 If the \fBnanosleep()\fR function returns because it has been interrupted by a
@@ -55,8 +61,21 @@ returned.
 .LP
 If \fBnanosleep()\fR fails, it returns \fB\(mi1\fR and sets \fBerrno\fR to
 indicate the error.
-.SH ERRORS
 .sp
+.LP
+
+The
+.B thrd_sleep()
+function may fail for identical reasons as the
+.B nanosleep()
+function and returns \(mi1; however, the C11 standard does not define that
+.B errno
+should be set, therefore callers of \fBthrd_sleep()\fR cannot rely on
+.B errno
+being set or staying the same across a call to
+.B thrd_sleep() .
+
+.SH ERRORS
 .LP
 The \fBnanosleep()\fR function will fail if:
 .sp
@@ -88,7 +107,6 @@ The \fBnanosleep()\fR function is not supported by this implementation.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -108,6 +126,5 @@ Standard	See \fBstandards\fR(5).
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBsleep\fR(3C), \fBtime.h\fR(3HEAD), \fBattributes\fR(5), \fBstandards\fR(5)

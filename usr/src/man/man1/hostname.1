@@ -1,24 +1,29 @@
-'\" te
 .\" Copyright (c) 1992, Sun Microsystems, Inc.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH HOSTNAME 1 "Sep 14, 1992"
-.SH NAME
-hostname \- set or print name of current host system
-.SH SYNOPSIS
-.LP
-.nf
-\fB/usr/bin/hostname\fR [\fIname-of-host\fR]
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
-The \fBhostname\fR command prints the name of the current host, as given before
-the \fBlogin\fR prompt. The super-user can set the hostname by giving an
-argument.
-.SH SEE ALSO
-.sp
-.LP
-\fBuname\fR(1), \fBattributes\fR(5)
+.Dd May 12, 2016
+.Dt HOSTNAME 1
+.Os
+.Sh NAME
+.Nm hostname
+.Nd set or print name of current host system
+.Sh SYNOPSIS
+.Nm
+.Op Fl s
+.Op Ar name-of-host
+.Sh DESCRIPTION
+The
+.Nm
+command prints the name of the current host, as given before the
+.Xr login 1
+prompt. The super-user can set the hostname by giving
+.Ar name-of-host .
+.Sh OPTIONS
+.Bl -tag -width Ds
+.It Fl s
+Prints only the part of the hostname preceding the first dot.
+.El
+.Sh SEE ALSO
+.Xr uname 1 ,
+.Xr attributes 5

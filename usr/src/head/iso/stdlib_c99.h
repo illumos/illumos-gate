@@ -40,6 +40,8 @@
 #ifndef _ISO_STDLIB_C99_H
 #define	_ISO_STDLIB_C99_H
 
+#include <sys/feature_tests.h>
+
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -62,7 +64,15 @@ typedef struct {
 #if (!defined(_STRICT_STDC) && !defined(__XOPEN_OR_POSIX)) || \
 	defined(_STDC_C99) || defined(__EXTENSIONS__)
 
-extern void _Exit(int);
+#if !defined(_NORETURN_KYWD)
+#if __STDC_VERSION__ - 0 >= 201112L
+#define	_NORETURN_KYWD	_Noreturn
+#else
+#define	_NORETURN_KYWD
+#endif	/* __STDC_VERSION__ - 0 >= 201112L */
+#endif	/* !defined(_NORETURN_KYWD) */
+
+extern _NORETURN_KYWD void _Exit(int);
 extern float strtof(const char *_RESTRICT_KYWD, char **_RESTRICT_KYWD);
 extern long double strtold(const char *_RESTRICT_KYWD, char **_RESTRICT_KYWD);
 

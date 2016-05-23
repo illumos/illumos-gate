@@ -27,6 +27,7 @@ MANFILES=	acct.h.3head		\
 	 	complex.h.3head		\
 	 	cpio.h.3head		\
 	 	dirent.h.3head		\
+		endian.h.3head		\
 	 	errno.h.3head		\
 	 	fcntl.h.3head		\
 	 	fenv.h.3head		\
