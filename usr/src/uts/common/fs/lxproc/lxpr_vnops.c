@@ -618,7 +618,7 @@ lxpr_read(vnode_t *vp, uio_t *uiop, int ioflag, cred_t *cr,
 	lxpr_uiobuf_t *uiobuf = lxpr_uiobuf_new(uiop);
 	int error;
 
-	ASSERT(type >= 0 && type < LXPR_NFILES);
+	ASSERT((int)type >= 0 && (int)type < LXPR_NFILES);
 
 	if (type == LXPR_KMSG) {
 		ldi_ident_t	li = VTOLXPM(vp)->lxprm_li;
@@ -2289,7 +2289,7 @@ lxpr_lookup(vnode_t *dp, char *comp, vnode_t **vpp, pathname_t *pathp,
 	int error;
 
 	ASSERT(dp->v_type == VDIR);
-	ASSERT(type >= 0 && type < LXPR_NFILES);
+	ASSERT((int)type >= 0 && (int)type < LXPR_NFILES);
 
 	/*
 	 * we should never get here because the lookup
@@ -2557,7 +2557,7 @@ lxpr_readdir(vnode_t *dp, uio_t *uiop, cred_t *cr, int *eofp,
 	int error;
 
 	ASSERT(dp->v_type == VDIR);
-	ASSERT(type >= 0 && type < LXPR_NFILES);
+	ASSERT((int)type >= 0 && (int)type < LXPR_NFILES);
 
 	/*
 	 * we should never get here because the readdir
