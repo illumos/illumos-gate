@@ -50,6 +50,7 @@ const psinfo_t *Ppsinfo(struct ps_prochandle *Pr);
 const pstatus_t *Pstatus(struct ps_prochandle *Pr);
 int	Pcred(struct ps_prochandle *Pr, prcred_t *pcrp, int ngroups);
 int	Ppriv(struct ps_prochandle *Pr, prpriv_t **pprivp);
+void	Ppriv_free(struct ps_prochandle *Pr, prpriv_t *privp);
 void	Psync(struct ps_prochandle *Pr);
 int	Pcreate_agent(struct ps_prochandle *Pr);
 void	Pdestroy_agent(struct ps_prochandle *Pr);
@@ -343,6 +344,7 @@ int	pr_waitid(struct ps_prochandle *Pr,
 /* proc_get_info.c */
 int	proc_get_cred(pid_t pid, prcred_t *credp, int ngroups);
 prpriv_t *proc_get_priv(pid_t pid);
+void	proc_free_priv(prpriv_t *);
 int	proc_get_psinfo(pid_t pid, psinfo_t *psp);
 int	proc_get_status(pid_t pid, pstatus_t *psp);
 int	proc_get_auxv(pid_t pid, auxv_t *pauxv, int naux);

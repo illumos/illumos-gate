@@ -30,6 +30,7 @@
  */
 /*
  * Copyright 2010 Nexenta Systems, Inc.  Al rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #ifndef _TIME_H
@@ -37,8 +38,11 @@
 
 #include <sys/feature_tests.h>
 #include <iso/time_iso.h>
+/*
+ * C11 requires sys/time_impl.h for the definition of the struct timespec.
+ */
 #if (!defined(_STRICT_STDC) && !defined(__XOPEN_OR_POSIX)) || \
-	(_POSIX_C_SOURCE > 2) || defined(__EXTENSIONS__)
+	(_POSIX_C_SOURCE > 2) || defined(__EXTENSIONS__) || defined(_STDC_C11)
 #include <sys/types.h>
 #include <sys/time_impl.h>
 #endif /* (!defined(_STRICT_STDC) && !defined(__XOPEN_OR_POSIX)) ... */
@@ -292,6 +296,17 @@ extern size_t strftime_l(char *_RESTRICT_KYWD, size_t,
 	const char *_RESTRICT_KYWD, const struct tm *_RESTRICT_KYWD, locale_t);
 
 #endif /* defined(_XPG7) || !defined(_STRICT_SYMBOLS) */
+
+#if !defined(_STRICT_SYMBOLS) || defined(_STDC_C11)
+
+/*
+ * Note, the C11 standard requires that all the various base values that are
+ * passed into timespec_get() be non-zero. Hence why TIME_UTC starts at one.
+ */
+#define	TIME_UTC	0x1		/* timespec_get base */
+
+extern int timespec_get(struct timespec *, int);
+#endif
 
 #ifdef	__cplusplus
 }

@@ -262,6 +262,14 @@ conf_scan(const char *fname, char *buf, int buflen, int timescan)
 		ArgsI = 0;
 		while (ap = nexttok(&line))
 			fillargs(ap);
+
+		/*
+		 * If there is no next token on the line, make sure that
+		 * we get a non-NULL Args array.
+		 */
+		if (Args == NULL)
+			fillargs(NULL);
+
 		Args[ArgsI] = NULL;
 
 		LOCAL_ERR_BEGIN {

@@ -14,7 +14,7 @@
  */
 
 /*
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include <stdlib.h>
@@ -71,7 +71,7 @@ custr_cstr(custr_t *cus)
 	return (cus->cus_data);
 }
 
-static int
+int
 custr_append_vprintf(custr_t *cus, const char *fmt, va_list ap)
 {
 	int len = vsnprintf(NULL, 0, fmt, ap);

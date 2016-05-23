@@ -1,0 +1,95 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PDELBKPT 3PROC
+.Os
+.Sh NAME
+.Nm Pdelbkpt
+.Nd clear a breakpoint in a process
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft int
+.Fo Pdelbkpt
+.Fa "struct ps_prochandle *P"
+.Fa "uintptr_t address"
+.Fa "ulong_t saved"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Pdelbkpt
+function removes the breakpoint installed at
+.Fa address
+from process
+.Fa P .
+Restoring the instruction present in
+.Fa saved .
+.Pp
+If the instruction at
+.Fa address
+is no longer the architecture-specific breakpoint instruction, then
+.Fa saved
+is not restored, but the function still returns successfully. This
+behavior is done due to the presence of setting breakpoints in
+self-modifying code, e.g. procedure linkage tables.
+.Pp
+The
+.Fn Pdelbkpt
+function only works on running processes, such as those created through
+.Xr Pgrab 3PROC
+and
+.Xr Pcreate 3PROC .
+Attempting to remove a breakpoint from process handles to core files,
+zombie processes, or ELF objects will fail.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn Pdelbkpt
+function removes the breakpoint and
+returns
+.Sy 0 .
+Otherwise,
+.Sy -1
+is returned, and
+.Sy errno
+is set to indicate the error.
+.Sh ERRORS
+For a full list of possible errors see the
+.Sy DIAGNOSTICS
+section in
+.Xr proc 4 .
+.Pp
+The
+.Fn Pdelbkpt
+function will fail with:
+.Bl -tag -width Er
+.It Er ENOENT
+The handle
+.Fa P
+refers to a grabbed core file, a zombie process, or an ELF object.
+.El
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr libproc 3LIB ,
+.Xr Pcreate 3PROC ,
+.Xr Pgrab 3PROC ,
+.Xr Pgrab_core 3PROC ,
+.Xr Pgrab_file 3PROC ,
+.Xr Psetbkpt 3PROC ,
+.Xr proc 4

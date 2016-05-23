@@ -23,8 +23,9 @@
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.5	*/
+/*
+ * Copyright 2015, Joyent, Inc.
+ */
 
 #define	__EXTENSIONS__	/* For strtok_r */
 
@@ -65,22 +66,22 @@ static void
 usage()
 {
 	(void) fprintf(stderr,
-		"usage:\n"
-		"    For each process, report all resource limits:\n"
-		"\t%s [-km] pid ...\n"
-		"\t-k\treport file sizes in kilobytes\n"
-		"\t-m\treport file/memory sizes in megabytes\n"
-		"    For each process, set specified resource limits:\n"
-		"\t%s -{cdfnstv} soft,hard ... pid ...\n"
-		"\t-c soft,hard\tset core file size limits\n"
-		"\t-d soft,hard\tset data segment (heap) size limits\n"
-		"\t-f soft,hard\tset file size limits\n"
-		"\t-n soft,hard\tset file descriptor limits\n"
-		"\t-s soft,hard\tset stack segment size limits\n"
-		"\t-t soft,hard\tset CPU time limits\n"
-		"\t-v soft,hard\tset virtual memory size limits\n"
-		"\t(default units are as shown by the output of '%s pid')\n",
-		command, command, command);
+	    "usage:\n"
+	    "    For each process, report all resource limits:\n"
+	    "\t%s [-km] pid ...\n"
+	    "\t-k\treport file sizes in kilobytes\n"
+	    "\t-m\treport file/memory sizes in megabytes\n"
+	    "    For each process, set specified resource limits:\n"
+	    "\t%s -{cdfnstv} soft,hard ... pid ...\n"
+	    "\t-c soft,hard\tset core file size limits\n"
+	    "\t-d soft,hard\tset data segment (heap) size limits\n"
+	    "\t-f soft,hard\tset file size limits\n"
+	    "\t-n soft,hard\tset file descriptor limits\n"
+	    "\t-s soft,hard\tset stack segment size limits\n"
+	    "\t-t soft,hard\tset CPU time limits\n"
+	    "\t-v soft,hard\tset virtual memory size limits\n"
+	    "\t(default units are as shown by the output of '%s pid')\n",
+	    command, command, command);
 	exit(2);
 }
 
@@ -173,7 +174,7 @@ main(int argc, char **argv)
 		if ((pid = proc_arg_psinfo(arg = *argv++, PR_ARG_PIDS,
 		    &psinfo, &gret)) == -1) {
 			(void) fprintf(stderr, "%s: cannot examine %s: %s\n",
-				command, arg, Pgrab_error(gret));
+			    command, arg, Pgrab_error(gret));
 			retc = 1;
 		} else if ((Pr = Pgrab(pid, Fflag, &gret)) != NULL) {
 			if (Pcreate_agent(Pr) == 0) {
@@ -183,14 +184,14 @@ main(int argc, char **argv)
 				} else {
 					proc_unctrl_psinfo(&psinfo);
 					(void) printf("%d:\t%.70s\n",
-						(int)pid, psinfo.pr_psargs);
+					    (int)pid, psinfo.pr_psargs);
 					show_limits(Pr);
 				}
 				Pdestroy_agent(Pr);
 			} else {
 				(void) fprintf(stderr,
-					"%s: cannot control process %d\n",
-					command, (int)pid);
+				    "%s: cannot control process %d\n",
+				    command, (int)pid);
 				retc = 1;
 			}
 			Prelease(Pr, 0);
@@ -198,15 +199,15 @@ main(int argc, char **argv)
 			if ((gret == G_SYS || gret == G_SELF) && !set) {
 				proc_unctrl_psinfo(&psinfo);
 				(void) printf("%d:\t%.70s\n", (int)pid,
-					psinfo.pr_psargs);
+				    psinfo.pr_psargs);
 				if (gret == G_SYS)
 					(void) printf("  [system process]\n");
 				else
 					show_limits(NULL);
 			} else {
 				(void) fprintf(stderr,
-					"%s: %s: %d\n",
-					command, Pgrab_error(gret), (int)pid);
+				    "%s: %s: %d\n",
+				    command, Pgrab_error(gret), (int)pid);
 				retc = 1;
 			}
 		}
@@ -521,7 +522,7 @@ set_one_limit(struct ps_prochandle *Pr, int which, rlim64_t cur, rlim64_t max)
 			/* Keep track of original privileges */
 			old_prpriv = proc_get_priv(Pstatus(Pr)->pr_pid);
 			if (old_prpriv == NULL) {
-				free(new_prpriv);
+				proc_free_priv(new_prpriv);
 				(void) fprintf(stderr,
 				    "%s: unable to get process privileges "
 				    "for pid %d: %s\n", command,
@@ -539,8 +540,8 @@ set_one_limit(struct ps_prochandle *Pr, int which, rlim64_t cur, rlim64_t max)
 				    " pid %d: %s\n", command,
 				    Pstatus(Pr)->pr_pid, strerror(errno));
 				(void) Punsetflags(Pr, PR_KLC);
-				free(new_prpriv);
-				free(old_prpriv);
+				proc_free_priv(new_prpriv);
+				proc_free_priv(old_prpriv);
 				return (1);
 			}
 		}
@@ -576,11 +577,11 @@ set_one_limit(struct ps_prochandle *Pr, int which, rlim64_t cur, rlim64_t max)
 			ret = 1;
 		}
 
-		free(old_prpriv);
+		proc_free_priv(old_prpriv);
 	}
 
 	if (new_prpriv != NULL)
-		free(new_prpriv);
+		proc_free_priv(new_prpriv);
 
 	return (ret);
 }

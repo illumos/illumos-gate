@@ -1,0 +1,220 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PGRAB 3PROC
+.Os
+.Sh NAME
+.Nm Pgrab
+.Nd grab and control a process
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft "struct ps_prochandle *"
+.Fo Pgrab
+.Fa "pid_t pid"
+.Fa "int flags"
+.Fa "int *perr"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Pgrab
+function attempts to grab the process identified by
+.Fa pid
+and returns a handle to it that allows the process to be controlled,
+interrogated, and manipulated. This interface only works with processes
+that already exist. Use
+.Xr Pgrab_core 3PROC
+for core files and
+.Xr Pcreate 3PROC
+to create processes.
+.Pp
+A grabbed process undergoes the following changes unless
+.Fa flags
+is set to the contrary:
+.Bl -bullet -offset indent
+.It
+The process is stopped
+.It
+All other tracing flags are cleared
+.It
+The grab is exclusive. If any existing handles to this process exist
+or anyone else is using the underlying facilities of the /proc file
+system to control this process, it will fail.
+.It
+Unless the process is already stopped, the
+.Dv PR_RLC
+flag is set indicating the process should run-on-last-close. Allowing
+the process to resume running if its controlling process dies.
+.El
+.Pp
+Grabbing a process is a
+.Em destructive
+action. Stopping a process stops execution of all its threads. The
+impact of stopping a process depends on the purpose of that process.
+For example, if one stops a process that's primarily doing
+computation, then its computation is delayed the entire time that it
+is stopped. However, if instead this is an active TCP server, then the
+accept backlog may fill causing connection errors and potentially
+connection time out errors.
+.Pp
+Special care must be taken to ensure that a stopped process continues,
+even if the controlling process terminates. If the controlling process
+disables the
+.Dv PR_RLC
+flag or the process was already stopped, then the process remains
+stopped after the controlling process terminates. Exercise caution
+when changing this behavior.
+.Pp
+Many of these default behaviors can be controlled by passing values to
+the
+.Fa flags
+argument. Values for
+.Fa flags
+are constructed by a bitwise-inclusive-OR of flags from the following
+list:
+.Bl -tag -width Dv -offset indent
+.It Dv PGRAB_RETAIN
+Indicates that any existing tracing flags on
+.Fa pid
+should be retained. If this flag is not specified, they will be cleared
+as part of creating the
+.Sy libproc
+handle for this process.
+.Pp
+Normally extant tracing flags are cleared when a process is grabbed.
+.It Dv PGRAB_FORCE
+Indicates that the process should not be grabbed exclusively. Care
+should be taken with this option. If other consumers are manipulating
+the process, then this may result in surprising behavior as the process
+is being manipulated from multiple points of control at the same time.
+.Pp
+Normally an attempt will be made to grab the process exclusively and
+fail if it is already in use.
+.It Dv PGRAB_RDONLY
+Indicates that the process should be grabbed in a read-only fashion.
+This implies that both the
+.Dv PGRAB_RETAIN
+and
+.Dv PGRAB_NOSTOP
+flags should be set. If a process is opened read-only, then a caller can
+only read information about a process and cannot manipulate it, change
+its current state, or inject systems calls into it.
+.Pp
+Normally when a process is grabbed, it does so for both reading and
+writing.
+.It Dv PGRAB_NOSTOP
+Do not stop a process as it is grabbed. Note, any extant tracing flags
+on the process will still be cleared unless the
+.Dv PGRAB_RETAIN
+flag has been set.
+.Pp
+Normally a process is stopped as a result of grabbing the process.
+.El
+.Pp
+The
+.Fa perr
+argument must be a
+.Pf non- Dv NULL
+pointer which will store a more detailed error in the event that the
+.Fn Pgrab
+function fails. A human-readable form of the error can be obtained
+with
+.Xr Pgrab_error 3PROC .
+.Pp
+Once a caller is done with the library handle it should call
+.Xr Prelease 3PROC
+to release the grabbed process. Failure to properly release the handle
+may leave a process stopped and interfere with the ability of other
+software to obtain a handle.
+.Ss Permissions
+Unprivileged users may grab and control their own processes only if both
+the user and group IDs of the target process match those of the calling
+process. In addition, the caller must have a super set of the target's
+privileges. Processes with the
+.Sy PRIV_PROC_OWNER
+privilege may manipulate any process on the system, as long as it has an
+equal privilege set. For more details on the security and programming
+considerations, please see the section
+.Sy PROGRAMMING NOTES
+in
+.Xr proc 4 .
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn Pgrab
+function returns a control handle to the process. Otherwise,
+.Dv NULL
+is returned with
+.Fa perr
+containing the error code.
+.Sh ERRORS
+The
+.Fn Pgrab
+function will fail if:
+.Bl -tag -width Er
+.It Er G_BUSY
+The process
+.Fa pid
+is already being traced and the
+.Dv PGRAB_FORCE
+flag was not passed in
+.Fa flags .
+.It Er G_LP64
+The calling process is a 32-bit process and process
+.Fa pid
+is 64-bit.
+.It Er G_NOFD
+Too many files are open. This is logically equivalent to receiving
+.Er EMFILE .
+.It Er G_NOPROC
+The process referred to by
+.Fa pid
+does not exist.
+.It Er G_PERM
+The calling process has insufficient permissions or privileges to open
+the specified process. See
+.Sx Permissions
+for more information.
+.It Er G_SYS
+The process referred to by
+.Fa pid
+is a system process and cannot be grabbed.
+.It Er G_SELF
+The process referred to by
+.Fa pid
+is the process ID of the caller and the
+.Dv PGRAB_RDONLY
+was not passed. A process may only grab itself if it's read-only.
+.It Er G_STRANGE
+An unanticipated system error occurred while trying to grab the process
+file and create the handle.
+The value of
+.Sy errno
+indicates the system failure.
+.It Er G_ZOMB
+The process referred to by
+.Fa pid
+is a zombie and cannot be grabbed.
+.El
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+.Sy MT-Safe
+.Sh SEE ALSO
+.Xr errno 3C ,
+.Xr libproc 3LIB ,
+.Xr Pfree 3PROC ,
+.Xr Pgrab_core 3PROC ,
+.Xr Pgrab_error 3PROC ,
+.Xr Pgrab_file 3PROC ,
+.Xr Prelease 3PROC

@@ -23,6 +23,7 @@
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2014 by Delphix. All rights reserved.
+ * Copyright (c) 2016 Martin Matuska. All rights reserved.
  */
 
 /*
@@ -483,7 +484,8 @@ be_destroy(nvlist_t *be_attrs)
 	 * Check if BE has snapshots and BE_DESTROY_FLAG_SNAPSHOTS
 	 * is not set.
 	 */
-	(void) zfs_iter_snapshots(zhp, be_has_snapshot_callback, &bs_found);
+	(void) zfs_iter_snapshots(zhp, B_FALSE, be_has_snapshot_callback,
+	    &bs_found);
 	if (!dd.destroy_snaps && bs_found) {
 		ZFS_CLOSE(zhp);
 		return (BE_ERR_SS_EXISTS);
@@ -2552,7 +2554,8 @@ be_destroy_callback(zfs_handle_t *zhp, void *data)
 		 * Iterate through this file system's snapshots and
 		 * destroy them before destroying the file system itself.
 		 */
-		if ((ret = zfs_iter_snapshots(zhp, be_destroy_callback, dd))
+		if ((ret = zfs_iter_snapshots(zhp, B_FALSE, be_destroy_callback,
+		    dd))
 		    != 0) {
 			ZFS_CLOSE(zhp);
 			return (ret);
@@ -2627,8 +2630,8 @@ be_demote_callback(zfs_handle_t *zhp, void *data)
 
 	for (i = 0; i < 2; i++) {
 
-		if (zfs_iter_snapshots(zhp, be_demote_find_clone_callback, &dd)
-		    != 0) {
+		if (zfs_iter_snapshots(zhp, B_FALSE,
+		    be_demote_find_clone_callback, &dd) != 0) {
 			be_print_err(gettext("be_demote_callback: "
 			    "failed to iterate snapshots for %s: %s\n"),
 			    zfs_get_name(zhp), libzfs_error_description(g_zfs));

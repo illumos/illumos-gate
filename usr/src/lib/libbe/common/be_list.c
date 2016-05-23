@@ -27,6 +27,7 @@
  * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2015 Toomas Soome <tsoome@me.com>
  * Copyright 2015 Gary Mills
+ * Copyright (c) 2016 Martin Matuska. All rights reserved.
  */
 
 #include <assert.h>
@@ -505,7 +506,8 @@ be_get_list_callback(zpool_handle_t *zlp, void *data)
 			zpool_close(zlp);
 			return (ret);
 		}
-		ret = zfs_iter_snapshots(zhp, be_add_children_callback, cb);
+		ret = zfs_iter_snapshots(zhp, B_FALSE, be_add_children_callback,
+		    cb);
 	}
 
 	if (ret == 0)

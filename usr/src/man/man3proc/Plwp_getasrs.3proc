@@ -1,0 +1,142 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PLWP_GETASRS 3PROC
+.Os
+.Sh NAME
+.Nm Plwp_getasrs ,
+.Nm Plwp_setasrs
+.Nd get and set SPARCv9 ancillary state registers
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft int
+.Fo Plwp_getasrs
+.Fa "struct ps_prochandle *P"
+.Fa "lwpid_t lwpid"
+.Fa "asrset_t asrs"
+.Fc
+.Ft int
+.Fo Plwp_setasrs
+.Fa "struct ps_prochandle *P"
+.Fa "lwpid_t lwpid"
+.Fa "const asrset_t asrs"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Plwp_getasrs
+and
+.Fn Plwp_setasrs
+functions get and set the ancillary thread-specific register set of the
+thread
+.Fa lwpid
+in the process handle
+.Fa P .
+.Pp
+The ancillary state registers are only present on 64-bit
+.Sy SPARCv9
+processes. They contain information that is specific to the platform and
+are not included in the information obtained through functions such as
+.Xr Plwp_getregs 3PROC ,
+.Xr Plwp_getfpregs 3PROC ,
+and
+.Xr Plwp_getxregs 3PROC .
+.Pp
+The Plwp_getasrs
+function reads the ancillary registers into
+.Fa asrs ,
+while the
+.Fn Plwp_setasrs
+sets the thread's ancillary registers to the values provided by
+.Fa asrs .
+.Pp
+Processes should be stopped prior to obtaining the register state of
+individual threads. Processes may be stopped with
+.Xr Pstop 3PROC .
+.Pp
+The
+.Sy asrset_t
+structure is described in
+.Xr proc 4 .
+.Pp
+One may not set the register values of a process that is not an active
+process, e.g. a process handle that refers to a file or a core file.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn Plwp_getasrs
+and
+.Fn Plwp_setasrs
+functions return
+.Sy 0
+and get or set the register state. Otherwise,
+.Sy -1
+is returned and
+.Sy errno
+is set to indicate the error.
+.Sh ERRORS
+For a full list of possible errors see the
+.Sy DIAGNOSTICS
+section in
+.Xr proc 4 .
+.Pp
+The
+.Fn Plwp_getasrs
+and
+.Fn Plwp_setasrs
+function will fail if:
+.Bl -tag -width Er
+.It Er ENODATA
+The process handle
+.Fa P
+does not have any ancillary register state information.
+.It Er EBUSY
+The process handle
+.Fa P
+refers to a live process and it is not stopped.
+.It Er ENOENT
+The process handle
+.Fa P
+refers to a live process and there is no thread with id
+.Fa lwpid
+or it is not a 64-bit SPARCv9 process.
+.It Er EINVAL
+The process handle
+.Fa P
+refers to a core file and there is no thread with id
+.Fa lwpid .
+.El
+.Sh ARCHITECTURE
+The
+.Fn Plwp_getasrs
+and
+.Fn Plwp_setasrs
+functions are only available on
+64-bit
+.Sy SPARCv9
+platforms.
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr libproc 3LIB ,
+.Xr Plwp_getfpregs 3PROC ,
+.Xr Plwp_getregs 3PROC ,
+.Xr Plwp_setregs 3PROC ,
+.Xr Plwp_setregs 3PROC ,
+.Xr Pstop 3PROC ,
+.Xr proc 4

@@ -1,0 +1,62 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PPLTDEST 3PROC
+.Os
+.Sh NAME
+.Nm Ppltdest
+.Nd determine PLT destination symbol
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft "const char *"
+.Fo Ppltdest
+.Fa "struct ps_prochandle *P"
+.Fa "uintptr_t addr"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Ppltdest
+function determines if the address at
+.Fa addr
+in the process handle
+.Fa P
+corresponds to an entry in the procedure linkage table (PLT) and if so,
+returns a pointer to a null-terminated character string that contains
+the symbol's name. The returned pointer is not valid after any other
+calls to function in
+.Xr libproc 3LIB .
+The
+.Fn Ppltdest
+is also a useful way to determine if
+.Fa addr
+corresponds to an address in the PLT.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn Ppltdest
+returns a pointer to a character string with the name. Otherwise,
+.Dv NULL
+is returned.
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr libproc 3LIB
+.Rs
+.%T Linkers and Libraries Guide
+.Re

@@ -3,13 +3,12 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH STANDARDS 5 "Nov 08, 2014"
+.TH STANDARDS 5 "Jan 11, 2015"
 .SH NAME
 standards, ANSI, C, C++, ISO, POSIX, POSIX.1, POSIX.2, SUS, SUSv2, SUSv3, SVID,
 SVID3, XNS, XNS4, XNS5, XPG, XPG3, XPG4, XPG4v2 \- standards and specifications
 supported by Solaris
 .SH DESCRIPTION
-.sp
 .LP
 Solaris 10 supports IEEE Std 1003.1 and IEEE Std 1003.2, commonly known as
 POSIX.1 and POSIX.2, respectively. The following table lists each version of
@@ -126,7 +125,6 @@ When \fBSun Studio C++ Compiler 5.6\fR is installed, Solaris releases 2.5.1
 through 10 support ISO/IEC 14882:1998 Programming Languages - C++.  Unsupported
 features of that standard are described in the compiler README file.
 .SS "Utilities"
-.sp
 .LP
 If the behavior required by POSIX.2, POSIX.2a, XPG4, SUS, or SUSv2 conflicts
 with historical Solaris utility behavior, the original Solaris version of the
@@ -246,7 +244,6 @@ other directories containing binaries needed by the application
 .RE
 
 .SS "Feature Test Macros"
-.sp
 .LP
 Feature test macros are used by applications to indicate additional sets of
 features that are desired beyond those specified by the C standard. If an
@@ -260,12 +257,10 @@ with access to all interfaces and headers not in conflict with the specified
 standard. The application must define \fB__EXTENSIONS__\fR either on the
 compile command line or within the application source files.
 .SS "1989 ANSI C, 1990 ISO C, 1999 ISO C"
-.sp
 .LP
 No feature test macros need to be defined to indicate that an application is a
 conforming C application.
 .SS "ANSI/ISO C++"
-.sp
 .LP
 ANSI/ISO C++ does not define any feature test macros. If the standard C++
 announcement macro \fB__cplusplus\fR is predefined to value 199711 or greater,
@@ -281,7 +276,6 @@ test macros such as \fB_POSIX_SOURCE\fR, \fB_POSIX_C_SOURCE\fR, and
 \fB_XOPEN_SOURCE\fR can result in compilation errors due to conflicting
 requirements of standard C++ and those specifications.
 .SS "POSIX"
-.sp
 .LP
 Applications that are intended to be conforming POSIX.1 applications must
 define the feature test macros specified by the standard before including any
@@ -310,13 +304,11 @@ POSIX.1-2001	\fB_POSIX_C_SOURCE=200112L\fR
 .TE
 
 .SS "SVID3"
-.sp
 .LP
 The SVID3 specification does not specify any feature test macros to indicate
 that an application is written to meet SVID3 requirements.  The SVID3
 specification was written before the C standard was completed.
 .SS "X/Open CAE"
-.sp
 .LP
 To build or compile an application that conforms to one of the X/Open CAE
 specifications, use the following guidelines. Applications need not set the
@@ -372,7 +364,6 @@ The application must define \fB_XOPEN_SOURCE=600\fR.
 .RE
 
 .SS "Compilation"
-.sp
 .LP
 A POSIX.1 (1988-1996)-, XPG4-, SUS-, or SUSv2-conforming implementation must
 include an ANSI X3.159-1989 (ANSI C Language) standard-conforming compilation
@@ -422,6 +413,9 @@ _________________________________________________________________________
 1989 ANSI C and 1990 ISO C    c89                none
 _________________________________________________________________________
 1999 ISO C                    c99                none
+_________________________________________________________________________
+2011 ISO C                    c11                none
+                              gcc -stdc=c11
 _________________________________________________________________________
 SVID3                         cc -Xt -xc99=none  none
 _________________________________________________________________________
@@ -479,7 +473,6 @@ c99 $(getconf POSIX_V6_LP64_OFF64_CFLAGS) -D_XOPEN_SOURCE=600 \e
 .in -2
 
 .SS "SUSv3"
-.sp
 .ne 2
 .na
 \fB\fBc99\fR\fR
@@ -489,7 +482,6 @@ c99 $(getconf POSIX_V6_LP64_OFF64_CFLAGS) -D_XOPEN_SOURCE=600 \e
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBcsh\fR(1), \fBksh\fR(1), \fBsh\fR(1), \fBexec\fR(2), \fBsysconf\fR(3C),
 \fBsystem\fR(3C), \fBenviron\fR(5), \fBlf64\fR(5)

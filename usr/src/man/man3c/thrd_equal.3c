@@ -1,0 +1,56 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2016 Joyent, Inc.
+.\"
+.Dd "Jan 11, 2015"
+.Dt THRD_EQUAL 3C
+.Os
+.Sh NAME
+.Nm thrd_equal
+.Nd determine if threads are equal
+.Sh SYNOPSIS
+.In threads.h
+.Ft int
+.Fo thrd_equal
+.Fa "thrd_t thrd0"
+.Fa "thrd_t thrd1"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn thrd_equal
+function compares
+.Fa thrd0
+and
+.Fa thrd1
+and determines whether or not they refer to the same thread.
+.Sh RETURN VALUES
+The
+.Fn thrd_equal
+function returns
+.Sy 0
+if
+.Fa thrd0
+and
+.Fa thrd1
+refer to the same thread. Otherwise, a non-zero value is returned,
+indicating that
+.Fa thrd0
+and
+.Fa thrd1
+are different threads.
+.Sh INTERFACE STABILITY
+.Sy Standard
+.Sh MT-LEVEL
+.Sy MT-Safe
+.Sh SEE ALSO
+.Xr attributes 5 ,
+.Xr threads 5

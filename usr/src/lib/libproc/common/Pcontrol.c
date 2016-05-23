@@ -1327,6 +1327,13 @@ Pldt(struct ps_prochandle *P, struct ssd *pldt, int nldt)
 }
 #endif	/* __i386 */
 
+/* ARGSUSED */
+void
+Ppriv_free(struct ps_prochandle *P, prpriv_t *prv)
+{
+	free(prv);
+}
+
 /*
  * Return a malloced process privilege structure in *pprv.
  */

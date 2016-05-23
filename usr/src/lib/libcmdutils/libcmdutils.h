@@ -26,7 +26,7 @@
  * Copyright (c) 2013 RackTop Systems.
  */
 /*
- * Copyright 2014 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*
@@ -44,6 +44,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
@@ -175,6 +176,7 @@ extern int custr_append(custr_t *, const char *);
  * will be unmodified if the function returns -1.
  */
 extern int custr_append_printf(custr_t *, const char *, ...);
+extern int custr_append_vprintf(custr_t *, const char *, va_list);
 
 /*
  * Determine the length in bytes, not including the NUL terminator, of the

@@ -1973,7 +1973,7 @@ valid_rsdp(ACPI_TABLE_RSDP *rp)
 static ACPI_TABLE_RSDP *
 scan_rsdp(paddr_t start, paddr_t end)
 {
-	size_t len  = end - start;
+	ssize_t len  = end - start;
 	caddr_t ptr;
 
 	ptr = vmap_phys(len, start);

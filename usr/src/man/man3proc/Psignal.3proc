@@ -1,0 +1,102 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PSIGNAL 3PROC
+.Os
+.Sh NAME
+.Nm Psignal
+.Nd set signal tracing action
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft int
+.Fo Psignal
+.Fa "struct ps_prochandle *P"
+.Fa "int which"
+.Fa "int stop"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Psignal
+function sets the signal tracing flag for the process handle
+.Fa P .
+If
+.Fa stop
+is
+.Sy non-zero
+it causes the process handle to stop threads that encounter the signal
+.Fa which .
+If
+.Fa stop
+is
+.Sy zero ,
+then it disables tracing for the signal
+.Fa which .
+.Pp
+The signal constants, representing valid values for
+.Fa which ,
+can be found in
+.Xr signal.h 3HEAD.
+The signal
+.Dv SIGKILL
+may not be stopped.
+.Pp
+Note, only active processes may have their signal tracing flags updated.
+Process handles that refer to core files, zombie processes, and files do
+not have signal tracing flags. Calling this function on them is an error.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn Psignal
+function returns the previous disposition of the signal
+.Fa which .
+It returns
+.Sy 1
+if it was set and
+.Sy 0
+if not. Otherwise,
+.Sy -1
+is returned and
+.Sy errno
+is set to indicate the error.
+.Sh ERRORS
+The
+.Fn Psignal
+function will fail if:
+.Bl -tag -width Er
+.It Er EINVAL
+.Fa which
+is
+.Dv SIGKILL
+and
+.Fa stop
+is non-zero .
+.Pp
+.Fa which
+is not a valid signal.
+.It Er ENOENT
+.Fa P
+does not correspond to an active process.
+.El
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr signal.h 3HEAD ,
+.Xr libproc 3LIB ,
+.Xr Psetsignal 3PROC ,
+.Xr proc 4

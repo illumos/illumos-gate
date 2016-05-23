@@ -1,0 +1,61 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PRD_AGENT 3PROC
+.Os
+.Sh NAME
+.Nm Prd_agent
+.Nd get librtld_db agent
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft "rd_agent_t *"
+.Fo Prd_agent
+.Fa "struct ps_prochandle *P"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Prd_agent
+function returns a pointer to an agent suitable for use with the
+run-time link editing database library,
+.Xr librtld_db 3PROC ,
+corresponding to the process handle
+.Fa P .
+.Pp
+The returned agent is valid until either the process handle executes a
+new process image through the
+.Xr exec 2
+family of calls or the process handle
+.Fa P
+is released through a call to
+.Xr Prelease 3PROC .
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn Prd_agent
+function returns a pointer to the librtld_db agent. Otherwise, it
+returns
+.Dv NULL
+to indicate failure.
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr exec 2 ,
+.Xr libproc 3LIB ,
+.Xr librtld_db 3LIB ,
+.Xr proc 4

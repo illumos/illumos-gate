@@ -1,0 +1,105 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PSETFLAGS 3PROC
+.Os
+.Sh NAME
+.Nm Psetflags
+.Nm Punsetflags
+.Nd set and unset process flags
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft int
+.Fo Psetflags
+.Fa "struct ps_prochandle *P"
+.Fa "long flags"
+.Fc
+.Ft int
+.Fo Punsetflags
+.Fa "struct ps_prochandle *P"
+.Fa "long flags"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Psetflags
+and
+.Fn Punsetflags
+functions manipulate the process flags for the process handle
+.Fa P .
+The process flags determine how the process behaves in the face of
+various actions. For example, setting the
+.Sy PR_FORK
+flag indicates that the tracing flags of the process and the
+inherit-on-fork mode should be set on children. A full list of the
+process flags is available in the
+.Sy PCSET
+section in
+.Xr proc 4 .
+.Pp
+The
+.Fn Psetflags
+function sets the flags specified in
+.Fa flags
+by doing a bitwise-inclusive-OR with the previously set flags.
+.Pp
+The
+.Fn Punsetflags
+function removes the flags specified in
+.Fa flags
+from the tracing flags of the process. Items not listed in
+.Fa flags
+will remain.
+.Pp
+To see the current set of flags active on the process, check the
+.Sy pr_flags
+member of the
+.Sy pstatus_t
+for the process. It can be obtained through the
+.Xr Pstatus 3PROC
+function.
+.Pp
+Note, attempting to modify the process flags only works on active
+processes. Attempting to call these functions of process handles
+corresponding to core files, zombie processes, or files, will result in
+an error.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn Psetflags
+and
+.Fn Punsetflags
+functions return
+.Sy 0 .
+Otherwise,
+.Sy -1
+is returned
+and
+.Sy errno
+is set to indicate the error.
+.Sh ERRORS
+For a full list of possible errors see the
+.Sy DIAGNOSTICS
+section in
+.Xr proc 4 .
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr libproc 3LIB ,
+.Xr Pstatus 3PROC ,
+.Xr proc 4

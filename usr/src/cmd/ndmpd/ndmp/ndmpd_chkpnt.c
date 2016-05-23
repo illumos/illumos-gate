@@ -2,6 +2,7 @@
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright (c) 2013 Steven Hartland. All rights reserved.
+ * Copyright (c) 2016 Martin Matuska. All rights reserved.
  */
 
 /*
@@ -115,7 +116,7 @@ ndmp_has_backup_snapshot(char *volname, char *jobname)
 	(void) snprintf(chname, ZFS_MAXNAMELEN, "@%s", jobname);
 	snp.snp_name = chname;
 
-	(void) zfs_iter_snapshots(zhp, ndmp_has_backup, &snp);
+	(void) zfs_iter_snapshots(zhp, B_FALSE, ndmp_has_backup, &snp);
 	zfs_close(zhp);
 	(void) mutex_unlock(&zlib_mtx);
 

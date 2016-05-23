@@ -1,0 +1,198 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2016 Joyent, Inc.
+.\"
+.Dd Feb 07, 2015
+.Dt PTHREAD_ATTR_GET_NP 3C
+.Os
+.Sh NAME
+.Nm pthread_attr_get_np
+.Nd get pthread attributes of a running thread
+.Sh SYNOPSIS
+.In pthread.h
+.Ft int
+.Fo pthread_attr_get_np
+.Fa "pthread_t thread"
+.Fa "pthread_attr_t *attr"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn pthread_attr_get_np
+function provides a way to get the attributes of the thread
+.Fa thread
+after it has been created. This function is most commonly used to obtain
+the actual location and size of a thread's stack.
+.Pp
+The attributes pointer,
+.Fa attr ,
+will be filled in with the current attributes for the thread. The
+attributes should be allocated by a call to
+.Xr pthread_attr_init 3C
+prior to calling the
+.Fn pthrad_attr_get_np
+function. When
+.Fa attr
+is done being used, it should be destroyed through a call to
+.Xr pthread_attr_destroy 3C .
+.Pp
+The attributes of the thread
+.Fa thread
+will be the same as those passed in at the time
+.Xr pthread_create 3C
+was called (or the default set if none were specified), except that the
+following values will be updated:
+.Bl -tag -width Sy
+.It Sy Thread Stack Size
+If no explicit stack size was specified, then
+.Fa attr
+will contain the actual size of the stack.
+.Pp
+If the size of the stack was specified, then it may have been changed to
+ensure that the required alignment of the platform is satisfied.
+.It Sy The Stack Address
+If no stack address was specified, then
+.Fa attr
+will contain the actual address of the stack that the system allocated
+for the thread.
+.It Sy Thread Detach State
+The detach state, whether or not the thread may be joined by a call to
+.Xr pthread_join 3C ,
+may have changed since the process was created due to a call to
+.Xr pthread_detach 3C .
+.Fa attr
+will reflect the current setting of
+.Fa thread .
+.It Sy Thread Scheduling Parameter
+The scheduling parameter attribute will be updated with the current
+scheduling parameter of
+.Fa thread .
+This is the same information as available through
+.Xr pthread_getschedparam 3C
+and it is the preferred interface for obtaining that information.
+.It Sy Thread Scheduling Policy
+The scheduling policy attribute of
+.Fa attr
+will be updated with the current scheduling policy being applied to the
+thread. This may have changed, for example, due to a call to
+.Xr pthread_setschedparam 3C .
+As with the thread's scheduling parameter, the preferred interface for
+obtaining this information is by using
+.Xr pthread_getschedparam 3C .
+.It Sy Thread Guard Size
+The value of the guard size attribute for the thread will be updated to
+reflect the actual size of the guard installed for
+.Fa thread .
+For more information on the guard size of a thread and its purpose, see
+.Xr pthread_attr_getguardsize 3C .
+.El
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn pthread_attr_get_np
+and
+.Fn pthread_getattr_np
+functions return
+.Sy 0 .
+Otherwise, an error number is returned to indicate the error.
+.Sh EXAMPLES
+The following program demonstrates how to use these functions to get
+the location and stack size of a newly created thread.
+.Bd -literal
+#include <assert.h>
+#include <errno.h>
+#include <pthread.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+static pthread_t g_thr;
+
+void *
+print_stackinfo(void *arg)
+{
+	int ret;
+	pthread_attr_t attr;
+	pthread_t *thrp = arg;
+	void *stk;
+	size_t stksize;
+
+	if (pthread_attr_init(&attr) != 0) {
+		fprintf(stderr, "failed to init attr: %s\\n",
+		    strerror(errno));
+		exit(1);
+	}
+
+	if (pthread_attr_get_np(*thrp, &attr) != 0) {
+		fprintf(stderr, "failed to get thread attributes: %s\\n",
+		    strerror(errno));
+		exit(1);
+	}
+
+	ret = pthread_attr_getstackaddr(&attr, &stk);
+	assert(ret == 0);
+	ret = pthread_attr_getstacksize(&attr, &stksize);
+	assert(ret == 0);
+	(void) printf("stack base is at %p, it is %d bytes large\\n",
+	    stk, stksize);
+	return (NULL);
+}
+
+int
+main(void)
+{
+	int ret;
+
+	if ((ret = pthread_create(&g_thr, NULL, print_stackinfo,
+	    &g_thr) != 0)) {
+		fprintf(stderr, "failed to create a thread: %s\\n",
+		    strerror(errno));
+		exit(1);
+	}
+
+	pthread_join(g_thr, NULL);
+	return (0);
+}
+.Ed
+.Sh ERRORS
+The
+.Fn pthread_attr_get_np
+function will fail if:
+.Bl -tag -width Er
+.It Er EINVAL
+The pthread_attr_t object
+.Fa attr
+was not properly initialized with a call to
+.Xr pthread_attr_init 3C .
+.It Er ESRCH
+No thread could be found corresponding to the specified thread ID,
+.Fa thread .
+.El
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh MT-LEVEL
+.Sy MT-Safe
+.Sh SEE ALSO
+.Xr pthread_attr_destroy 3C ,
+.Xr pthread_attr_getdetachstate 3C ,
+.Xr pthread_attr_getguardsize 3C ,
+.Xr pthread_attr_getinheritsched 3C ,
+.Xr pthread_attr_getschedparam 3C ,
+.Xr pthread_attr_getschedpolicy 3C ,
+.Xr pthread_attr_getscope 3C ,
+.Xr pthread_attr_getstackaddr 3C ,
+.Xr pthread_attr_getstacksize 3C ,
+.Xr pthread_attr_init 3C ,
+.Xr pthread_create 3C ,
+.Xr pthread_detach 3C ,
+.Xr pthread_getschedparam 3C ,
+.Xr pthread_setschedparam 3C ,
+.Xr attributes 5 ,
+.Xr threads 5

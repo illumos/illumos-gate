@@ -1,0 +1,60 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PGETAUXVAL 3PROC
+.Os
+.Sh NAME
+.Nm Pgetauxval
+.Nd obtain auxiliary vector value
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft int
+.Fo Pgetauxval
+.Fa "struct ps_prochandle *P"
+.Fa "int type"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Pgetauxval
+function looks up the entry
+.Fa type
+in the auxiliary vector of the process handle
+.Fa P
+and returns its value. The
+.Fa type
+argument should be the entry of the auxiliary vector. The list of such
+types may be found in
+.In sys/auxv.h .
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn Pgetauxval
+function returns the value of the auxiliary vector entry
+.Fa type .
+Otherwise,
+.Sy -1
+is returned to indicate that either the auxiliary vector or the
+.Fa type
+entry could not be found.
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr libproc 3LIB ,
+.Xr Pgetauxvec 3PROC ,
+.Xr proc 4

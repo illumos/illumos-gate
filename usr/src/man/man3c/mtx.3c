@@ -1,0 +1,216 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2016 Joyent, Inc.
+.\"
+.Dd "Jan 11, 2015"
+.Dt MTX 3C
+.Os
+.Sh NAME
+.Nm mtx ,
+.Nm mtx_destroy ,
+.Nm mtx_init ,
+.Nm mtx_lock ,
+.Nm mtx_timedlock ,
+.Nm mtx_trylock ,
+.Nm mtx_unlock
+.Nd C11 mutex operations
+.Sh SYNOPSIS
+.In threads.h
+.Ft int
+.Fo mtx_init
+.Fa "mtx_t *mtx"
+.Fa "int type"
+.Fc
+.Ft void
+.Fo mtx_destroy
+.Fa "mtx_t *mtx"
+.Fc
+.Ft int
+.Fo mtx_lock
+.Fa "mtx_t *mtx"
+.Fc
+.Ft int
+.Fo mtx_timedlock
+.Fa "mtx_t *mtx"
+.Fa "const struct timespec *restrict ts"
+.Fc
+.Ft int
+.Fo mtx_trylock
+.Fa "mtx_t *mtx"
+.Fc
+.Ft int
+.Fo mtx_unlock
+.Fa "mtx_t *mtx"
+.Fc
+.Sh DESCRIPTION
+The
+.Sy mtx
+family of functions implement mutual exclusion locks (mutexes) and behave
+similarly to both POSIX threads and illumos threads; however, they have
+slightly different call signatures and return values. For more
+information, see
+.Xr threads 5 .
+Importantly, they do not allow for inter-process synchronization.
+.Ss Creating and Destroying Mutexes
+The
+.Fn mtx_init
+function initializes the mutex specified by
+.Fa mtx .
+The following types of mutexes are valid and may be specified by the
+.Fa type
+argument:
+.Bl -tag -width Dv
+.It Sy mtx_plain
+A simple, intra-process mutex.
+.It Sy mtx_timed
+A simple, intra-process mutex, which allows timed locking operations.
+.It Sy mtx_plain | mtx_recursive
+An intra-process mutex that may be acquired recursively by the same
+thread. It must be unlocked an equal number of times that it is locked.
+.It Sy mtx_timed | mtx_recursive
+An intra-process mutex that supports timed locking operations and may be
+acquired recursively by the same thread. It must be unlocked an equal
+number of times that it is locked.
+.El
+For more information on the different kind of mutexes, see
+.Xr mutex_init 3C .
+.Pp
+The
+.Fn mtx_destroy
+function destroys the mutex pointed to by
+.Fa mtx .
+It is illegal for threads to be blocked waiting for
+.Fa mtx
+when
+.Fn mtx_destroy
+is called .
+.Ss Locking and Unlocking Mutexes
+The
+.Fn mtx_lock
+function attempts to lock the mutex
+.Fa mtx .
+When the function returns, it will be the sole owner of the mutex and
+must call
+.Fn mtx_unlock
+when it is done, or risk inducing a deadlock in the process. Other
+threads that make calls to
+.Fn mtx_lock
+after another thread has successfully completed its call to
+.Fn mtx_lock
+will block.
+When they finally return, then they will have obtained the mutex
+.Fa mtx .
+.Pp
+Unless a lock of type
+.Sy mtx_recursive
+was created, a thread calling
+.Fn mtx_lock
+when it already holds
+.Fa mtx
+will cause the thread to deadlock. Othewrise, the lock will be
+successfully taken again. However, a thread must call
+.Fn mtx_unlock
+for each time that it has acquried
+.Fa mtx .
+.Pp
+The
+.Fn mtx_trylock
+function will attempt to obtain the mutex pointed to by
+.Fa mtx .
+However, unlike
+.Fn mtx_lock ,
+if
+.Fa mtx
+is locked, then it will not block and wait for
+.Fa mtx
+and instead return
+.Sy thrd_busy
+to indicate that the lock is currently held.
+.Pp
+The
+.Fn mtx_timedlock
+function attempts to obtain the mutex pointed to by
+.Fa mtx .
+If it is unable to obtain it, then it will block for a set amount of
+time dictated by
+.Fa ts .
+The timeout in
+.Fa ts
+is treated as an absolute time in UTC to block until, measured based on
+the
+.Sy CLOCK_REALTIME
+clock.
+.Pp
+The
+.Fn mtx_unlock
+function unlocks the mutex pointed to by
+.Fa mtx ,
+which allows another thread the opportunity to obtain it. If any threads
+are actively blocking on the mutex, one of them will obtain it and be
+woken up. It is an error to call
+.Fn mtx_unlock
+on a mutex which the calling thread does not currently own.
+.Sh RETURN VALUES
+Upon successful completion, the function
+.Fn mtx_init returns
+.Sy thrd_success.
+If there was insufficient memory to create the thread,
+it instead returns
+.Sy thrd_nomem .
+If any other error occurred, it returns
+.Sy thrd_error .
+.Pp
+The functions
+.Fn mtx_lock ,
+and
+.Fn mtx_unlock
+return
+.Sy thrd_success .
+If they were unable to successfully complete the operation, they instead
+return
+.Sy thrd_error .
+.Pp
+Upon sucessful completion, the
+.Fn mtx_timedlock
+function returns
+.Sy thrd_success .
+If the timeout is reached and the calling thread is unable to obtain the
+mutex, then
+.Sy thrd_timedout
+is returned .
+If any other error occurs, then
+.Sy thrd_error is returned.
+.Pp
+Upon successful completion, the
+.Fn mtx_trylock
+function returns
+.Sy thrd_success .
+If the thread was unable to obtain the mutex because another thread owns
+it, then it returns
+.Sy thrd_busy .
+Otherwise, an error will have occurred and
+.Sy thrd_error
+is returned.
+.Sh INTERFACE STABILITY
+.Sy Standard
+.Sh MT-LEVEL
+.Sy MT-Safe
+.Sh SEE ALSO
+.Xr mutex_init 3C ,
+.Xr pthread_mutex_destroy 3C ,
+.Xr pthread_mutex_init 3C ,
+.Xr pthread_mutex_lock 3C ,
+.Xr pthread_mutex_timedlock 3C ,
+.Xr pthread_mutex_trylock 3C ,
+.Xr pthread_mutex_unlock 3C ,
+.Xr threads.h 3HEAD ,
+.Xr attributes 5

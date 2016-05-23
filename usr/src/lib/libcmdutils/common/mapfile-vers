@@ -47,6 +47,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	custr_append;
 	custr_appendc;
 	custr_append_printf;
+	custr_append_vprintf;
 	custr_cstr;
 	custr_free;
 	custr_len;

@@ -1,0 +1,110 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PGCORE 3PROC
+.Os
+.Sh NAME
+.Nm Pfgcore ,
+.Nm Pgcore
+.Nd produce a core file of a process
+.Sh SYNOPSIS
+.Ft int
+.Fo Pfgcore
+.Fa "struct ps_prochandle *P"
+.Fa "int fd"
+.Fa "core_content_t content"
+.Fc
+.Ft int
+.Fo Pgcore
+.Fa "struct ps_prochandle *P"
+.Fa "const char *fname"
+.Fa "core_content_t content"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Pgcore
+and
+.Fn Pfgcore
+functions produce core files of the handle referred to by
+.Fa P .
+Core files represent a snapshot of a process and may be manipulated by a
+wide variety of tools and libraries including
+.Xr libproc 3LIB ,
+.Xr mdb 1 ,
+.Xr pargs 1 ,
+.Xr pstack 1 ,
+and more. For details on the core file format, see
+.Xr core 4 .
+.Pp
+.Fn Pfgcore
+writes the core to the file represented by the open descriptor
+.Fa fd .
+The file descriptor should be open for both read and write.
+.Fn Pgcore
+writes the core to the file path
+.Fa fname .
+.Pp
+The content of the core is controlled by the
+.Fa content
+argument. It's the inclusive-bitwise-OR of the various content types
+listed under the
+.Sy core_content_t
+heading in the
+.Sy TYPES
+section in
+.Xr libproc 3LIB .
+Using
+.Dv CC_CONTENT_INVALID
+is illegal and will result in an error.
+.Pp
+Neither the
+.Fn Pgcore
+or
+.Fn Pfgcore
+functions stop the handle
+.Fa P .
+It is up to the caller to stop the process; which is recommended for
+obtaining a consistent view of the process. See the
+.Xr Pstop 3PROC
+function for a means to stop a handle.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn Pfcore
+and
+.Fn Pgcore
+functions return
+.Sy 0
+and write out a core file to specified location. Otherwise,
+.Sy -1
+is returned. The
+.Fn Pfgcore
+function will truncate
+.Fa fd
+and the
+.Fn Pgcore
+function will remove
+.Fa fname .
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr coreadm 1M ,
+.Xr libproc 3LIB ,
+.Xr Pstop 3PROC ,
+.Xr core 4 ,
+.Xr proc 4

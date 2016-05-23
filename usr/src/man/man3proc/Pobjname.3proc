@@ -1,0 +1,91 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt POBJNAME 3PROC
+.Os
+.Sh NAME
+.Nm Pobjname ,
+.Nm Pobjname_resolved ,
+.Nd turn a virtual address into its mapped object
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft "char *"
+.Fo Pobjname
+.Fa "struct ps_prochandle *P"
+.Fa "uintptr_t addr"
+.Fa "char *buffer"
+.Fa "size_t bufsize"
+.Fc
+.Ft char *
+.Fo Pobjname_resolved
+.Fa "struct ps_prochandle *P"
+.Fa "uintptr_t addr"
+.Fa "char *buffer"
+.Fa "size_t bufsize"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Pobjname
+and
+.Fn Pobjname_resolved
+functions attempt to determine the underlying mapped object that
+contains the virtual address
+.Fa addr
+in the process handle
+.Fa P .
+.Pp
+A program consists of multiple memory mappings. Some are provided by the
+system, such as the stack and the heap. While others are created through
+explicit calls to
+.Xr mmap 2
+or brought in by the run-time link-editor due to dependencies
+specified in binaries and libraries.
+.Pp
+If
+.Fa addr
+is contained in a mapping, then up to
+.Fa bufsize
+characters, including the null terminator,
+of the name of the corresponding object will be written into
+.Fa buffer .
+The
+.Fn Pobjname_resolved
+function attempts to resolve the object to a full file system path. If
+the full file-system path cannot be determined, then it will fall back
+to the name that the run-time link-editor has for that mapping, which is
+the behavior of
+.Fn Pobjname .
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn Pobjname
+and
+.Fn Pobjname_resolved
+functions return
+.Fa buffer .
+Otherwise,
+.Dv NULL
+is returned to indicate the object name could not be found.
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr mmap 2 ,
+.Xr libproc 3LIB ,
+.Xr Pobject_iter 3PROC ,
+.Xr proc 4

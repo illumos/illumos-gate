@@ -21,6 +21,7 @@
 
 /*
  * Copyright 2013 Garrett D'Amore <garrett@damore.org>
+ * Copyright 2016 Joyent, Inc.
  *
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -81,6 +82,10 @@ extern "C" {
  *                      compiler that complies with ISO/IEC 9899:1999, other-
  *                      wise known as the C99 standard.
  *
+ * _STDC_C11		Like _STDC_C99 except that the value of __STDC_VERSION__
+ *                      is 201112L indicating a compiler that compiles with
+ *                      ISO/IEXC 9899:2011, otherwise known as the C11 standard.
+ *
  * _STRICT_SYMBOLS	Used in cases where symbol visibility is restricted
  *                      by the standards, and the user has not explicitly
  *                      relaxed the strictness via __EXTENSIONS__.
@@ -91,8 +96,8 @@ extern "C" {
 #endif
 
 /*
- * ISO/IEC 9899:1990 and it's revision, ISO/IEC 9899:1999 specify the
- * following predefined macro name:
+ * ISO/IEC 9899:1990 and it's revisions, ISO/IEC 9899:1999 and ISO/IEC
+ * 99899:2011 specify the following predefined macro name:
  *
  * __STDC__	The integer constant 1, intended to indicate a conforming
  *		implementation.
@@ -143,8 +148,12 @@ extern "C" {
 #endif
 
 /*
- * Compiler complies with ISO/IEC 9899:1999
+ * Compiler complies with ISO/IEC 9899:1999 or ISO/IEC 9989:2011
  */
+
+#if __STDC_VERSION__ - 0 >= 201112L
+#define	_STDC_C11
+#endif
 
 #if __STDC_VERSION__ - 0 >= 199901L
 #define	_STDC_C99
@@ -415,6 +424,20 @@ extern "C" {
 #endif
 
 /*
+ * The following macro defines a value for the ISO C11 _Noreturn
+ * keyword so that _NORETURN_KYWD resolves to "_Noreturn" if
+ * an ISO C11 compiler is used and "" (null string) if any other
+ * compiler is used. This allows for the use of single prototype
+ * declarations regardless of compiler version.
+ */
+#if (defined(__STDC__) && defined(_STDC_C11)) && !defined(__cplusplus)
+#define	_NORETURN_KYWD	_Noreturn
+#else
+#define	_NORETURN_KYWD
+#endif
+
+
+/*
  * The following macro indicates header support for the ANSI C++
  * standard.  The ISO/IEC designation for this is ISO/IEC FDIS 14882.
  */
@@ -425,6 +448,12 @@ extern "C" {
  * ISO/IEC 9899:1999, Programming Languages - C.
  */
 #define	_ISO_C_9899_1999
+
+/*
+ * The following macro indicates header support for the C99 standard,
+ * ISO/IEC 9899:2011, Programming Languages - C.
+ */
+#define	_ISO_C_9899_2011
 
 /*
  * The following macro indicates header support for DTrace. The value is an

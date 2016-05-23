@@ -1,0 +1,104 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PGRAB_FILE 3PROC
+.Os
+.Sh NAME
+.Nm Pgrab_file
+.Nd grab and inspect an ELF object
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft struct ps_prochandle
+.Fo Pgrab_file
+.Fa "const char *fname"
+.Fa "int *perr"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Pgrab_file
+function creates a handle to the ELF object contained in file
+.Fa fname .
+This handle is considered an
+.Em idle
+handle, it allows one to inspect aspects of the ELF contents present in
+the handle, for example obtaining CTF information and looking up
+symbols.
+.Pp
+There is no running state associated with this handle nor can
+there be. If one intends to control a running process or create a
+process, see
+.Xr Pgrab 3PROC
+and
+.Xr Pcreate 3PROC
+respectively. To inspect a core file use
+.Xr Pgrab_core 3PROC .
+.Pp
+The
+.Fa perr
+argument must be a
+.Pf non- Dv NULL
+pointer which will store a more detailed error in the event that
+.Fn Pgrab_file
+fails. A human-readable form of the error can be obtained with
+.Xr Pgrab_error 3PROC .
+.Pp
+When finished with the returned handle,
+.Xr Prelease 3PROC
+must be called to clean up resources associated with it.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn Pgrab_file
+function returns a control handle to the process. Otherwise,
+.Dv NULL
+is returned and
+.Fa perr
+is filled in with an error code.
+.Sh ERRORS
+.Bl -tag -width Er -offset indent
+.It Er G_ELF
+An unexpected
+.Xr libelf 3LIB
+failure occurred while processing the file named by
+.Fa fname .
+.It Er G_FORMAT
+The file named by
+.Fa fname
+is not a valid ELF file.
+.It Er G_NOEXEC
+The file named by
+.Fa fname
+does not exist.
+.It Er G_STRANGE
+An unanticipated system error occurred while trying to grab the
+file
+.Fa fname
+and create the handle.
+The value of
+.Sy errno
+indicates the system failure.
+.El
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+.Sy MT-Safe
+.Sh SEE ALSO
+.Xr errno 3C ,
+.Xr libelf 3LIB ,
+.Xr libproc 3LIB ,
+.Xr Pfree 3PROC ,
+.Xr Pgrab_core 3PROC ,
+.Xr Pgrab_error 3PROC ,
+.Xr Pgrab_file 3PROC ,
+.Xr Prelease 3PROC

@@ -1,0 +1,72 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PREOPEN 3PROC
+.Os
+.Sh NAME
+.Nm Preopen
+.Nd reopen a process
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft int
+.Fo Preopen
+.Fa "struct ps_prochandle *P"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Preopen
+function is used to regain control of the process represented by the
+handle
+.Fa P .
+A loss of control is indicated by the
+.Xr Pstatus 3PROC
+function returning the value
+.Dv PS_LOST .
+This may occur when the controlled process performs an
+.Xr exec 2
+of a setuid or setgid binary or one where the controlling process cannot
+read the object file. For more information on this, see the
+.Sy PROGRAMMING NOTES
+section of
+.Xr proc 4 .
+.Pp
+If successful, the controlling process will obtain control of the
+process specified by
+.Fa P .
+If it fails, the controlling process should release the handle with
+.Xr Prelease 3PROC .
+Note there are occasions where due to permissions it may not be possible
+to obtain control again.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn Preopen
+function returns
+.Sy 0.
+Otherwise,
+.Sy -1
+is returned.
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr exec 2 ,
+.Xr libproc 3LIB ,
+.Xr Prelease 3PROC ,
+.Xr Pstatus 3PROC ,
+.Xr proc 4

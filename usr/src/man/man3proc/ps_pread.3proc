@@ -47,14 +47,13 @@ in libthread_db that target process memory access
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
-These routines copy data between the target process's address space and the
-controlling process. \fBps_pread()\fR copies \fIsize\fR bytes from address
-\fIaddr\fR in the target process into \fIbuf\fR in the controlling process.
-\fBpr_pwrite()\fR is like \fBps_pread()\fR except that the direction of the
-copy is reversed; data is copied from the controlling process to the target
-process.
+These routines copy data between the address space of the target process
+and the controlling process. \fBps_pread()\fR copies \fIsize\fR bytes from
+address \fIaddr\fR in the target process into \fIbuf\fR in the controlling
+process. \fBpr_pwrite()\fR is like \fBps_pread()\fR except that the
+direction of the copy is reversed; data is copied from the controlling
+process to the target process.
 .sp
 .LP
 \fBps_pdread()\fR and \fBps_ptread()\fR behave identically to \fBps_pread()\fR.
@@ -63,7 +62,6 @@ process.
 corresponding primary functions. They are artifacts of history that must be
 maintained.
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fBPS_OK\fR\fR
@@ -79,8 +77,8 @@ The call returned successfully. \fIsize\fR bytes were copied.
 .ad
 .RS 14n
 Some part of the address range from \fIaddr\fR through
-\fIaddr\fR+\fIsize\fR\(mi\fB1\fR is not part of the target process's address
-space.
+\fIaddr\fR+\fIsize\fR\(mi\fB1\fR is not part of the address space of the
+target process.
 .RE
 
 .sp
@@ -93,7 +91,6 @@ The function did not return successfully.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for description of the following attributes:
 .sp
@@ -109,7 +106,6 @@ MT Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBlibc_db\fR(3LIB), \fBlibrtld_db\fR(3LIB), \fBproc_service\fR(3PROC),
 \fBrtld_db\fR(3EXT), \fBattributes\fR(5), \fBthreads\fR(5)

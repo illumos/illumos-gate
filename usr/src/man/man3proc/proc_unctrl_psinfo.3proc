@@ -1,0 +1,53 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PROC_UNCTRL_PSINFO 3PROC
+.Os
+.Sh NAME
+.Nm proc_unctrl_psinfo
+.Nd fix unprintable characters in a psinfo structures
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft void
+.Fo proc_unctrl_psinfo
+.Fa "psinfo_t *psp"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn proc_uncctrl_psinfo
+function walks the process arguments of the
+.Fa psp
+structure (the
+.Sy pr_psargs
+member) converting unprintable characters into spaces. The conversion
+continues until a null character is encountered. Note, this routine only
+will correctly handle 7-bit ASCII characters. Characters in other
+encodings, e.g. UTF-8, may be misinterpreted as unprintable.
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+.Sy MT-Safe
+with exceptions.
+.Pp
+Note, the
+.Fn proc_unctrl_psinfo
+function is
+.Sy UNSAFE
+if the same value for
+.Fa psp
+is passed in from multiple threads.
+.Sh SEE ALSO
+.Xr libproc 3LIB ,
+.Xr proc 4

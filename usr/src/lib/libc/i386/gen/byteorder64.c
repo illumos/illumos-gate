@@ -22,6 +22,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2015, Joyent, Inc.
  */
 
 #include <sys/isa_defs.h>
@@ -45,6 +46,42 @@ uint64_t
 ntohll(uint64_t in)
 {
 	return (ntohl(in >> 32) | (uint64_t)ntohl(in) << 32);
+}
+
+uint64_t
+htobe64(uint64_t in)
+{
+	return (htonl(in >> 32) | ((uint64_t)htonl(in) << 32));
+}
+
+uint64_t
+htole64(uint64_t in)
+{
+	return (in);
+}
+
+uint64_t
+betoh64(uint64_t in)
+{
+	return (ntohl(in >> 32) | (uint64_t)ntohl(in) << 32);
+}
+
+uint64_t
+letoh64(uint64_t in)
+{
+	return (in);
+}
+
+uint64_t
+be64toh(uint64_t in)
+{
+	return (ntohl(in >> 32) | (uint64_t)ntohl(in) << 32);
+}
+
+uint64_t
+le64toh(uint64_t in)
+{
+	return (in);
 }
 
 #endif	/* (_BIG_ENDIAN) || _LP64) && !__lint */

@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -138,7 +139,6 @@ static void pciex_slot_names_prop(dev_info_t *, ushort_t);
 static void populate_bus_res(uchar_t bus);
 static void memlist_remove_list(struct memlist **list,
     struct memlist *remove_list);
-static boolean_t is_pcie_platform(void);
 static void ck804_fix_aer_ptr(dev_info_t *, pcie_req_id_t);
 
 static void pci_scan_bbn(void);
@@ -458,13 +458,6 @@ pci_setup_tree(void)
 {
 	uint_t i, root_bus_addr = 0;
 
-	/*
-	 * enable mem-mapped pci config space accessing,
-	 * if failed to do so during early boot
-	 */
-	if ((mcfg_mem_base == NULL) && is_pcie_platform())
-		mcfg_mem_base = 0xE0000000;
-
 	alloc_res_array();
 	for (i = 0; i <= pci_bios_maxbus; i++) {
 		pci_bus_res[i].par_bus = (uchar_t)-1;
@@ -499,7 +492,6 @@ pci_setup_tree(void)
 		/* add slot-names property for named pci hot-plug slots */
 		add_bus_slot_names_prop(i);
 	}
-
 }
 
 /*
@@ -1957,13 +1949,12 @@ process_devfunc(uchar_t bus, uchar_t dev, uchar_t func, uchar_t header,
 	}
 
 	/*
-	 * Only populate bus_t if this is a PCIE platform, and
-	 * the device is sitting under a PCIE root complex(RC) .
-	 * Some particular machines have both PCIE RC and PCI
-	 * hostbridge, in which case only devices under PCIE RC
-	 * get their bus_t populated.
+	 * Only populate bus_t if this device is sitting under a PCIE root
+	 * complex.  Some particular machines have both a PCIE root complex and
+	 * a PCI hostbridge, in which case only devices under the PCIE root
+	 * complex will have their bus_t populated.
 	 */
-	if ((mcfg_mem_base != NULL) && (pcie_get_rc_dip(dip) != NULL)) {
+	if (pcie_get_rc_dip(dip) != NULL) {
 		ck804_fix_aer_ptr(dip, bdf);
 		(void) pcie_init_bus(dip, bdf, PCIE_BUS_INITIAL);
 	}
@@ -3350,22 +3341,6 @@ pciex_slot_names_prop(dev_info_t *dip, ushort_t slot_num)
 	len += len % 4;
 	(void) ndi_prop_update_int_array(DDI_DEV_T_NONE, dip, "slot-names",
 	    (int *)slotprop, len / sizeof (int));
-}
-
-/*
- * This is currently a hack, a better way is needed to determine if it
- * is a PCIE platform.
- */
-static boolean_t
-is_pcie_platform()
-{
-	uint8_t bus;
-
-	for (bus = 0; bus < pci_bios_maxbus; bus++) {
-		if (look_for_any_pciex_device(bus))
-			return (B_TRUE);
-	}
-	return (B_FALSE);
 }
 
 /*

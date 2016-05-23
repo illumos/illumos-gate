@@ -37,8 +37,6 @@
 #ifndef _SYS_TIME_IMPL_H
 #define	_SYS_TIME_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/feature_tests.h>
 
 #ifdef	__cplusplus

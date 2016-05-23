@@ -1,0 +1,158 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 11, 2016
+.Dt PMAPPING_ITER 3PROC
+.Os
+.Sh NAME
+.Nm Pmapping_iter ,
+.Nm Pmapping_iter_resolved ,
+.Nm Pobject_iter ,
+.Nm Pobject_iter_resolved
+.Nd iterate over process mappings and objects
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft int
+.Fo Pmapping_iter
+.Fa "struct ps_prochandle *P"
+.Fa "proc_map_f *func"
+.Fa "void *data"
+.Fc
+.Ft int
+.Fo Pmapping_iter_resolved
+.Fa "struct ps_prochandle *P"
+.Fa "proc_map_f *func"
+.Fa "void *data"
+.Fc
+.Ft int
+.Fo Pobject_iter
+.Fa "struct ps_prochandle *P"
+.Fa "proc_map_f *func"
+.Fa "void *data"
+.Fc
+.Ft int
+.Fo Pobject_iter_resolved
+.Fa "struct ps_prochandle *P"
+.Fa "proc_map_f *func"
+.Fa "void *data"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Pmapping_iter
+and
+.Fn Pmapping_iter_resolved
+functions iterate over the memory mappings in the process represented by
+.Fa P.
+.Pp
+For each memory mapping, the callback function
+.Fa func
+will be invoked and it will be passed the
+.Fa data
+argument,
+the
+.Sy prmap_t
+structure defined from
+.Xr proc 4 ,
+and a name of the mapping. The way that the name is obtained varies
+based on whether one calls
+.Fn Pmapping_iter
+or
+.Fn Pmapping_iter_resolved .
+In both cases, the dynamic linker is consulted to determine the file
+name for the mapping, if it's known. If the name is unknown, for example
+an anonymous mapping, then the
+.Dv NULL
+pointer is passed in for the name. In the case of the
+.Fn Pmapping_iter_resolved
+function the system tries to resolve it to a complete file system path.
+If that fails, it falls back to the information from the dynamic linker,
+before returning
+.Dv NULL
+in the case of not being able to find any name.
+For more information on the
+signature of the
+.Ft proc_map_f ,
+see
+.Xr libproc 3LIB .
+.Pp
+The return value of
+.Fa func
+controls whether or not iteration continues. If
+.Fa func
+returns
+.Sy 0
+then iteration continues. If
+.Fa func
+returns non-zero then iteration will halt and the value will be
+returned to the caller. Because
+.Sy -1
+indicates internal failure, it is recommended that the callback
+function not return
+.Sy -1
+to indicate an error itself. This allows the caller to distinguish
+between failure of the callback function versus failure of the
+.Fn Pmapping_iter
+and
+.Fn Pmapping_iter_resolved
+functions.
+.Pp
+The
+.Fn Pobject_iter
+and
+.Fn Pobject_iter_resolved
+functions are similar to the
+.Fn Pmapping_iter
+and
+.Fn Pmapping_iter_resolved
+functions. Except, rather than iterating over every mapping, they
+iterate over the objects that the process has loaded by the dynamic
+linker. For example, an anonymous mapping will show up when iterating
+mappings, but will not show up when iterating objects. Further, while
+most dynamic shared objects have multiple mappings for the text and
+data sections, there will only be a single object that is iterated
+over.
+.Pp
+The distinction between the
+.Fn Pobject_iter
+and
+.Fn Pobject_iter_resolved
+functions is identical to the difference in name resolution between the
+.Fn Pmapping_iter
+and
+.Fn Pmapping_iter_resolved
+functions.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn Pmapping_iter ,
+.Fn Pmapping_iter_resolved
+.Fn Pobject_iter ,
+and
+.Fn Pobject_iter_resolved
+functions return
+.Sy 0.
+Otherwise, if there was an internal error then
+.Sy -1
+is returned. Otherwise, if the callback function
+.Fa func
+returns non-zero, then its return value will be returned instead.
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr libproc 3LIB ,
+.Xr proc 4
