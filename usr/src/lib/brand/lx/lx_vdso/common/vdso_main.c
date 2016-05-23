@@ -23,7 +23,7 @@ struct lx_timezone {
 
 extern comm_page_t *__vdso_find_commpage();
 extern int __vdso_sys_gettimeofday(timespec_t *, struct lx_timezone *);
-extern time_t __vdso_sys_time(timespec_t *);
+extern time_t __vdso_sys_time(time_t *);
 extern long __vdso_sys_clock_gettime(uint_t, timespec_t *);
 
 #define	LX_CLOCK_REALTIME		0	/* CLOCK_REALTIME	*/
@@ -99,7 +99,7 @@ __vdso_gettimeofday(timespec_t *tp, struct lx_timezone *tz)
 }
 
 time_t
-__vdso_time(timespec_t *tp)
+__vdso_time(time_t *tp)
 {
 	comm_page_t *cp = __vdso_find_commpage();
 	timespec_t ts;
@@ -110,8 +110,7 @@ __vdso_time(timespec_t *tp)
 
 	__cp_clock_gettime_realtime(cp, &ts);
 	if (tp != NULL) {
-		tp->tv_sec = ts.tv_sec;
-		tp->tv_nsec = 0;
+		*tp = ts.tv_sec;
 	}
 	return (ts.tv_sec);
 }
