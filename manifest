@@ -669,6 +669,7 @@ f kernel/drv/amd64/sdhost 0755 root sys
 f kernel/drv/amd64/sdt 0755 root sys
 f kernel/drv/amd64/ses 0755 root sys
 f kernel/drv/amd64/sfe 0755 root sys
+f kernel/drv/amd64/sfxge 0755 root sys
 f kernel/drv/amd64/sgen 0755 root sys
 f kernel/drv/amd64/si3124 0755 root sys
 f kernel/drv/amd64/simnet 0755 root sys
@@ -18756,6 +18757,7 @@ f usr/share/man/man7d/sdhost.7d 0444 root bin
 f usr/share/man/man7d/sdt.7d 0444 root bin
 f usr/share/man/man7d/ses.7d 0444 root bin
 f usr/share/man/man7d/sfe.7d 0444 root bin
+f usr/share/man/man7d/sfxge.7d 0444 root bin
 f usr/share/man/man7d/sgen.7d 0444 root bin
 f usr/share/man/man7d/si3124.7d 0444 root bin
 f usr/share/man/man7d/skd.7d 0444 root bin

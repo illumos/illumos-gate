@@ -38,8 +38,6 @@ set name=variant.arch value=$(ARCH)
 dir path=kernel group=sys
 dir path=kernel/drv group=sys
 dir path=kernel/drv/$(ARCH64) group=sys
-dir path=usr/share/man
-dir path=usr/share/man/man7d
 driver name=ixgb perms="* 0666 root root" \
     alias=pci8086,1048 \
     alias=pci8086,109e \
@@ -47,12 +45,9 @@ driver name=ixgb perms="* 0666 root root" \
     alias=pci8086,a11f
 file path=kernel/drv/$(ARCH64)/ixgb group=sys
 $(i386_ONLY)file path=kernel/drv/ixgb group=sys
-file path=usr/share/man/man7d/ixgbe.7d
 legacy pkg=SUNWixgb desc="Intel(R) PRO/10G Server Adapter Driver" \
     name="Intel(R) PRO/10G Server Adapter Driver"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 license lic_OSBL license=lic_OSBL
 license lic_OSBL_preamble license=lic_OSBL_preamble
-license usr/src/uts/common/io/ixgbe/THIRDPARTYLICENSE \
-    license=usr/src/uts/common/io/ixgbe/THIRDPARTYLICENSE
