@@ -578,6 +578,15 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 			if (strncmp(++p, ORIGIN_STR, ORIGIN_STR_SIZE))
 				continue;
 
+			/*
+			 * We don't support $ORIGIN on setid programs to close
+			 * a potential attack vector.
+			 */
+			if ((setid & EXECSETID_SETID) != 0) {
+				error = ENOEXEC;
+				goto bad;
+			}
+
 			curlen = 0;
 			len = p - dlnp - 1;
 			if (len) {
