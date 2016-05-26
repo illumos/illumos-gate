@@ -649,7 +649,13 @@ typedef struct lx_cmsg_xlate {
 static int cmsg_conv_generic(struct cmsghdr *, struct cmsghdr *);
 static int stol_conv_ucred(struct cmsghdr *, struct cmsghdr *);
 static int ltos_conv_ucred(struct cmsghdr *, struct cmsghdr *);
+static int stol_conv_recvttl(struct cmsghdr *, struct cmsghdr *);
 
+/*
+ * Table describing SunOS <-> Linux cmsg translation mappings.
+ * Certain types (IP_RECVTTL) are only converted in one direction and are
+ * indicated by one of the translation functions being set to NULL.
+ */
 static lx_cmsg_xlate_t lx_cmsg_xlate_tbl[] = {
 	{ SOL_SOCKET, SCM_RIGHTS, cmsg_conv_generic,
 	    LX_SOL_SOCKET, LX_SCM_RIGHTS, cmsg_conv_generic },
@@ -659,6 +665,10 @@ static lx_cmsg_xlate_t lx_cmsg_xlate_tbl[] = {
 	    LX_SOL_SOCKET, LX_SCM_TIMESTAMP, cmsg_conv_generic },
 	{ IPPROTO_IP, IP_PKTINFO, cmsg_conv_generic,
 	    LX_IPPROTO_IP, LX_IP_PKTINFO, cmsg_conv_generic },
+	{ IPPROTO_IP, IP_RECVTTL, stol_conv_recvttl,
+	    LX_IPPROTO_IP, LX_IP_TTL, NULL },
+	{ IPPROTO_IP, IP_TTL, cmsg_conv_generic,
+	    LX_IPPROTO_IP, LX_IP_TTL, cmsg_conv_generic },
 	{ IPPROTO_IPV6, IPV6_HOPLIMIT, cmsg_conv_generic,
 	    LX_IPPROTO_IPV6, LX_IPV6_HOPLIMIT, cmsg_conv_generic },
 	{ IPPROTO_IPV6, IPV6_PKTINFO, cmsg_conv_generic,
@@ -761,6 +771,25 @@ ltos_conv_ucred(struct cmsghdr *inmsg, struct cmsghdr *omsg)
 }
 
 static int
+stol_conv_recvttl(struct cmsghdr *inmsg, struct cmsghdr *omsg)
+{
+	/*
+	 * SunOS communicates the TTL of incoming packets via IP_RECVTTL using
+	 * a uint8_t value instead of IP_TTL using an int. This conversion is
+	 * only needed in the one direction since Linux does not handle
+	 * IP_RECVTTL in the sendmsg path.
+	 */
+	if (omsg != NULL) {
+		uint8_t *inttl = (uint8_t *)CMSG_CONTENT(inmsg);
+		int *ottl = (int *)CMSG_CONTENT(omsg);
+
+		*ottl = (int)*inttl;
+	}
+
+	return (sizeof (struct cmsghdr) + sizeof (int));
+}
+
+static int
 cmsg_conv_generic(struct cmsghdr *inmsg, struct cmsghdr *omsg)
 {
 	if (omsg != NULL) {
@@ -785,8 +814,8 @@ lx_xlate_cmsg(struct cmsghdr *inmsg, struct cmsghdr *omsg, lx_xlate_dir_t dir)
 		lx_cmsg_xlate_t *xlate = &lx_cmsg_xlate_tbl[i];
 		if (dir == LX_TO_SUNOS &&
 		    inmsg->cmsg_level == xlate->lcx_linux_level &&
-		    inmsg->cmsg_type == xlate->lcx_linux_type) {
-			ASSERT(xlate->lcx_ltos_conv != NULL);
+		    inmsg->cmsg_type == xlate->lcx_linux_type &&
+		    xlate->lcx_ltos_conv != NULL) {
 			len = xlate->lcx_ltos_conv(inmsg, omsg);
 			if (omsg != NULL) {
 				omsg->cmsg_len = len;
@@ -796,8 +825,8 @@ lx_xlate_cmsg(struct cmsghdr *inmsg, struct cmsghdr *omsg, lx_xlate_dir_t dir)
 			return (len);
 		} else if (dir == SUNOS_TO_LX &&
 		    inmsg->cmsg_level == xlate->lcx_sunos_level &&
-		    inmsg->cmsg_type == xlate->lcx_sunos_type) {
-			ASSERT(xlate->lcx_stol_conv != NULL);
+		    inmsg->cmsg_type == xlate->lcx_sunos_type &&
+		    xlate->lcx_stol_conv != NULL) {
 			len = xlate->lcx_stol_conv(inmsg, omsg);
 			if (omsg != NULL) {
 				omsg->cmsg_len = len;
