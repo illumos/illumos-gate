@@ -1,16 +1,17 @@
 '\" te
 .\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 2016 Joyent, Inc.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH THREADS 5 "Nov 11, 2008"
+.TH THREADS 5 "Mar 27, 2016"
 .SH NAME
-threads, pthreads \- POSIX pthreads and Solaris threads concepts
+threads, pthreads \- POSIX pthreads, c11, and illumos threads concepts
 .SH SYNOPSIS
 .SS "POSIX"
 .LP
 .nf
-cc -mt [ \fIflag\fR... ] \fIfile\fR... [ -lrt \fIlibrary\fR... ]
+gcc -D_REENTRANT [ \fIflag\fR... ] \fIfile\fR... [ \fIlibrary\fR... ]
 .fi
 
 .LP
@@ -18,10 +19,21 @@ cc -mt [ \fIflag\fR... ] \fIfile\fR... [ -lrt \fIlibrary\fR... ]
 #include <pthread.h>
 .fi
 
-.SS "Solaris"
+.SS "C11"
 .LP
 .nf
-cc -mt [ \fIflag\fR... ] \fIfile\fR... [ \fIlibrary\fR... ]
+gcc -std=c11 -D_REENTRANT [ \fIflag\fR... ] \fIfile\fR... [ \fIlibrary\fR... ]
+.fi
+
+.LP
+.nf
+#include <threads.h>
+.fi
+
+.SS "illumos"
+.LP
+.nf
+gcc -D_REENTRANT [ \fIflag\fR... ] \fIfile\fR... [ \fIlibrary\fR... ]
 .fi
 
 .LP
@@ -35,26 +47,52 @@ cc -mt [ \fIflag\fR... ] \fIfile\fR... [ \fIlibrary\fR... ]
 .fi
 
 .SH DESCRIPTION
+.LP
+A thread is an independent source of execution within a process. Every process
+is created with a single thread, which calls the
+.B main
+function. A process may have multiple threads, all of which are scheduled
+independently by the system and may run concurrently. Threads within a process
+all use the same address space and as a result can access all data in the
+process; however, each thread is created with its own attributes and its own
+stack. When a thread is created, it inherits the signal mask of the thread which
+created it, but it has no pending signals.
 .sp
 .LP
-POSIX and Solaris threads each have their own implementation within
-\fBlibc\fR(3LIB). Both implementations are interoperable, their functionality
+All threads of execution have their own, independent life time, though it is
+ultimately bounded by the life time of the process. If the process terminates
+for any reason, whether due to a call to \fBexit\fR(3C), the receipt of a fatal
+signal, or some other reason, then all threads within the process are
+terminated. Threads may themselves exit and status information of them may be
+obtained, for more information, see the \fBpthread_detach\fR(3C),
+\fBpthread_join\fR(3C), and \fBpthread_exit\fR(3C) functions, and their
+equivalents as described in the tables later on in the manual.
+.sp
+.LP
+Most hardware platforms do not have any special synchronization for data objects
+which may be accessed concurrently from multiple threads of execution. To avoid
+such problems, programs may use atomic operations (see \fBatomic_ops\fR(3C)) and
+locking primitives, such as mutexes, readers/writer locks, condition variables,
+and semaphores. Note, that depending on the hardware platform, memory
+synchronization may be necesary, for more information, see \fBmembar_ops\fR(3C).
+.LP
+POSIX, C11, and illumos threads each have their own implementation within
+\fBlibc\fR(3LIB). All implementations are interoperable, their functionality
 similar, and can be used within the same application. Only POSIX threads are
-guaranteed to be fully portable to other POSIX-compliant environments. POSIX
-and Solaris threads require different source, include files and linking
-libraries. See \fBSYNOPSIS\fR.
+guaranteed to be fully portable to other POSIX-compliant environments. C11
+threads are an optional part of ISO C11 and may not exist on every ISO C11
+platform. POSIX, C11, and illumos threads require different source and include
+files. See \fBSYNOPSIS\fR.
 .SS "Similarities"
-.sp
 .LP
-Most of the POSIX and Solaris threading functions have counterparts with each
+Most of the POSIX and illumos threading functions have counterparts with each
 other. POSIX function names, with the exception of the semaphore names, have a
-"\fBpthread\fR" prefix. Function names for similar POSIX and Solaris functions
-have similar endings. Typically, similar POSIX and Solaris functions have the
+"\fBpthread\fR" prefix. Function names for similar POSIX and illumos functions
+have similar endings. Typically, similar POSIX and illumos functions have the
 same number and use of arguments.
 .SS "Differences"
-.sp
 .LP
-POSIX pthreads and Solaris threads differ in the following ways:
+POSIX pthreads and illumos threads differ in the following ways:
 .RS +4
 .TP
 .ie t \(bu
@@ -90,278 +128,267 @@ POSIX pthreads allow for clean-up handlers for \fBfork\fR(2) calls.
 .TP
 .ie t \(bu
 .el o
-Solaris threads can be suspended and continued.
+illumos threads can be suspended and continued.
 .RE
 .RS +4
 .TP
 .ie t \(bu
 .el o
-Solaris threads implement daemon threads, for whose demise the process does not
+illumos threads implement daemon threads, for whose demise the process does not
 wait.
 .RE
-.SH FUNCTION COMPARISON
+.SS "Comparison to C11 Threads"
+.LP
+C11 threads are not as functional as either POSIX or illumos threads. C11
+threads only support intra-process locking and do not have any form of
+readers/writer locking or semaphores. In general, POSIX threads will be more
+portable than C11 threads, all POSIX-compliant systems support pthreads;
+however, not all C environments support C11 Threads.
 .sp
 .LP
-The following table compares the POSIX pthreads and Solaris threads functions.
-When a comparable interface is not available either in POSIX pthreads  or
-Solaris threads, a hyphen (\fB-\fR) appears in the column.
-.SS "Functions Related to Creation"
-.sp
+In addition to lacking other common synchronization primitives, the ISO/IEC
+standard for C11 threads does not have rich error semantics. In an effort to not
+extend the set of error numbers standardized in ISO/IEC C11, none of the
+routines set errno and instead multiple distinguishable errors, aside from the
+equivalent to ENOMEM and EBUSY, are all squashed into one. As such, users of the
+platform are encouraged to use POSIX threads, unless a portability concern
+dictates otherwise.
 
-.sp
+.SH FUNCTION COMPARISON
+.LP
+The following table compares the POSIX pthreads, C11 threads, and illumos
+threads functions.  When a comparable interface is not available either in POSIX
+pthreads, C11 threads  or illumos threads, a hyphen (\fB-\fR) appears in the
+column.
+.SS "Functions Related to Creation"
+
 .TS
-l l
-l l .
-\fBPOSIX\fR	\fBSolaris\fR
-\fBpthread_create()\fR	\fBthr_create()\fR
-\fBpthread_attr_init()\fR	\fB-\fR
-\fBpthread_attr_setdetachstate()\fR	\fB-\fR
-\fBpthread_attr_getdetachstate()\fR	\fB-\fR
-\fBpthread_attr_setinheritsched()\fR	\fB-\fR
-\fBpthread_attr_getinheritsched()\fR	\fB-\fR
-\fBpthread_attr_setschedparam()\fR	\fB-\fR
-\fBpthread_attr_getschedparam()\fR	\fB-\fR
-\fBpthread_attr_setschedpolicy()\fR	\fB-\fR
-\fBpthread_attr_getschedpolicy()\fR	\fB-\fR
-\fBpthread_attr_setscope()\fR	\fB-\fR
-\fBpthread_attr_getscope()\fR	\fB-\fR
-\fBpthread_attr_setstackaddr()\fR	\fB-\fR
-\fBpthread_attr_getstackaddr()\fR	\fB-\fR
-\fBpthread_attr_setstacksize()\fR	\fB-\fR
-\fBpthread_attr_getstacksize()\fR	\fB-\fR
-\fBpthread_attr_getguardsize()\fR	\fB-\fR
-\fBpthread_attr_setguardsize()\fR	\fB-\fR
-\fBpthread_attr_destroy()\fR	\fB-\fR
-\fB-\fR	\fBthr_min_stack()\fR
+l l l
+l l l .
+\fBPOSIX\fR	\fBillumos\fR	\fBC11\fR
+\fBpthread_create()\fR	\fBthr_create()\fR	\fBthrd_create()\fR
+\fBpthread_attr_init()\fR	\fB-\fR	\fB-\fR
+\fBpthread_attr_setdetachstate()\fR	\fB-\fR	\fB-\fR
+\fBpthread_attr_getdetachstate()\fR	\fB-\fR	\fB-\fR
+\fBpthread_attr_setinheritsched()\fR	\fB-\fR	\fB-\fR
+\fBpthread_attr_getinheritsched()\fR	\fB-\fR	\fB-\fR
+\fBpthread_attr_setschedparam()\fR	\fB-\fR	\fB-\fR
+\fBpthread_attr_getschedparam()\fR	\fB-\fR	\fB-\fR
+\fBpthread_attr_setschedpolicy()\fR	\fB-\fR	\fB-\fR
+\fBpthread_attr_getschedpolicy()\fR	\fB-\fR	\fB-\fR
+\fBpthread_attr_setscope()\fR	\fB-\fR	\fB-\fR
+\fBpthread_attr_getscope()\fR	\fB-\fR	\fB-\fR
+\fBpthread_attr_setstackaddr()\fR	\fB-\fR	\fB-\fR
+\fBpthread_attr_getstackaddr()\fR	\fB-\fR	\fB-\fR
+\fBpthread_attr_setstacksize()\fR	\fB-\fR	\fB-\fR
+\fBpthread_attr_getstacksize()\fR	\fB-\fR	\fB-\fR
+\fBpthread_attr_getguardsize()\fR	\fB-\fR	\fB-\fR
+\fBpthread_attr_setguardsize()\fR	\fB-\fR	\fB-\fR
+\fBpthread_attr_destroy()\fR	\fB-\fR	\fB-\fR
+\fB-\fR	\fBthr_min_stack()\fR	\fB-\fR
 .TE
 
 .SS "Functions Related to Exit"
-.sp
 
-.sp
 .TS
-l l
-l l .
-\fBPOSIX\fR	\fBSolaris\fR
-\fBpthread_exit()\fR	\fBthr_exit()\fR
-\fBpthread_join()\fR	\fBthr_join()\fR
-\fBpthread_detach()\fR	\fB-\fR
+l l l
+l l l .
+\fBPOSIX\fR	\fBillumos\fR	\fBC11\fR
+\fBpthread_exit()\fR	\fBthr_exit()\fR	\fBthrd_exit()\fR
+\fBpthread_join()\fR	\fBthr_join()\fR	\fBthrd_join()\fR
+\fBpthread_detach()\fR	\fB-\fR	\fBthrd_detach()\fR
 .TE
 
 .SS "Functions Related to Thread Specific Data"
-.sp
 
-.sp
 .TS
-l l
-l l .
-\fBPOSIX\fR	\fBSolaris\fR
-\fBpthread_key_create()\fR	\fBthr_keycreate()\fR
-\fBpthread_setspecific()\fR	\fBthr_setspecific()\fR
-\fBpthread_getspecific()\fR	\fBthr_getspecific()\fR
-\fBpthread_key_delete()\fR	\fB-\fR
+l l l
+l l l .
+\fBPOSIX\fR	\fBillumos\fR	\fBC11\fR
+\fBpthread_key_create()\fR	\fBthr_keycreate()\fR	\fBtss_create()\fR
+\fBpthread_setspecific()\fR	\fBthr_setspecific()\fR	\fBtss_set()\fR
+\fBpthread_getspecific()\fR	\fBthr_getspecific()\fR	\fBtss_get()\fR
+\fBpthread_key_delete()\fR	\fB-\fR	\fBtss_delete()\fR
 .TE
 
 .SS "Functions Related to Signals"
-.sp
 
-.sp
 .TS
-l l
-l l .
-\fBPOSIX\fR	\fBSolaris\fR
-\fBpthread_sigmask()\fR	\fBthr_sigsetmask()\fR
-\fBpthread_kill()\fR	\fBthr_kill()\fR
+l l l
+l l l .
+\fBPOSIX\fR	\fBillumos\fR	\fBC11\fR
+\fBpthread_sigmask()\fR	\fBthr_sigsetmask()\fR	\fB-\fR
+\fBpthread_kill()\fR	\fBthr_kill()\fR	\fB-\fR
 .TE
 
 .SS "Functions Related to IDs"
-.sp
 
-.sp
 .TS
-l l
-l l .
-\fBPOSIX\fR	\fBSolaris\fR
-\fBpthread_self()\fR	\fBthr_self()\fR
-\fBpthread_equal()\fR	\fB-\fR
-\fB-\fR	\fBthr_main()\fR
+l l l
+l l l .
+\fBPOSIX\fR	\fBillumos\fR	\fBc11\fR
+\fBpthread_self()\fR	\fBthr_self()\fR	\fBthrd_current()\fR
+\fBpthread_equal()\fR	\fB-\fR	\fBthrd_equal()\fR
+\fB-\fR	\fBthr_main()\fR	\fB-\fR
 .TE
 
 .SS "Functions Related to Scheduling"
-.sp
 
-.sp
 .TS
-l l
-l l .
-\fBPOSIX\fR	\fBSolaris\fR
-\fB-\fR	\fBthr_yield()\fR
-\fB-\fR	\fBthr_suspend()\fR
-\fB-\fR	\fBthr_continue()\fR
-\fBpthread_setconcurrency()\fR	\fBthr_setconcurrency()\fR
-\fBpthread_getconcurrency()\fR	\fBthr_getconcurrency()\fR
-\fBpthread_setschedparam()\fR	\fBthr_setprio()\fR
-\fBpthread_setschedprio()\fR	\fBthr_setprio()\fR
-\fBpthread_getschedparam()\fR	\fBthr_getprio()\fR
+l l l
+l l l .
+\fBPOSIX\fR	\fBillumos\fR	\fBC11\fR
+\fB-\fR	\fBthr_yield()\fR	\fBthrd_yield()\fR
+\fB-\fR	\fBthr_suspend()\fR	\fB-\fR
+\fB-\fR	\fBthr_continue()\fR	\fB-\fR
+\fBpthread_setconcurrency()\fR	\fBthr_setconcurrency()\fR	\fB-\fR
+\fBpthread_getconcurrency()\fR	\fBthr_getconcurrency()\fR	\fB-\fR
+\fBpthread_setschedparam()\fR	\fBthr_setprio()\fR	\fB-\fR
+\fBpthread_setschedprio()\fR	\fBthr_setprio()\fR	\fB-\fR
+\fBpthread_getschedparam()\fR	\fBthr_getprio()\fR	\fB-\fR
 .TE
 
 .SS "Functions Related to Cancellation"
-.sp
 
-.sp
 .TS
-l l
-l l .
-\fBPOSIX\fR	\fBSolaris\fR
-\fBpthread_cancel()\fR	\fB-\fR
-\fBpthread_setcancelstate()\fR	\fB-\fR
-\fBpthread_setcanceltype()\fR	\fB-\fR
-\fBpthread_testcancel()\fR	\fB-\fR
-\fBpthread_cleanup_pop()\fR	\fB-\fR
-\fBpthread_cleanup_push()\fR	\fB-\fR
+l l l
+l l l .
+\fBPOSIX\fR	\fBillumos\fR	\fBC11\fR
+\fBpthread_cancel()\fR	\fB-\fR	\fB-\fR
+\fBpthread_setcancelstate()\fR	\fB-\fR	\fB-\fR
+\fBpthread_setcanceltype()\fR	\fB-\fR	\fB-\fR
+\fBpthread_testcancel()\fR	\fB-\fR	\fB-\fR
+\fBpthread_cleanup_pop()\fR	\fB-\fR	\fB-\fR
+\fBpthread_cleanup_push()\fR	\fB-\fR	\fB-\fR
 .TE
 
 .SS "Functions Related to Mutexes"
-.sp
 
-.sp
 .TS
-l l
-l l .
-\fBPOSIX\fR	\fBSolaris\fR
-\fBpthread_mutex_init()\fR	\fBmutex_init()\fR
-\fBpthread_mutexattr_init()\fR	\fB-\fR
-\fBpthread_mutexattr_setpshared()\fR	\fB-\fR
-\fBpthread_mutexattr_getpshared()\fR	\fB-\fR
-\fBpthread_mutexattr_setprotocol()\fR	\fB-\fR
-\fBpthread_mutexattr_getprotocol()\fR	\fB-\fR
-\fBpthread_mutexattr_setprioceiling()\fR	\fB-\fR
-\fBpthread_mutexattr_getprioceiling()\fR	\fB-\fR
-\fBpthread_mutexattr_settype()\fR	\fB-\fR
-\fBpthread_mutexattr_gettype()\fR	\fB-\fR
-\fBpthread_mutexattr_setrobust()\fR	\fB-\fR
-\fBpthread_mutexattr_getrobust()\fR	\fB-\fR
-\fBpthread_mutexattr_destroy()\fR	\fB-\fR
-\fBpthread_mutex_setprioceiling()\fR	\fB-\fR
-\fBpthread_mutex_getprioceiling()\fR	\fB-\fR
-\fBpthread_mutex_lock()\fR	\fBmutex_lock()\fR
-\fBpthread_mutex_trylock()\fR	\fBmutex_trylock()\fR
-\fBpthread_mutex_unlock()\fR	\fBmutex_unlock()\fR
-\fBpthread_mutex_destroy()\fR	\fBmutex_destroy()\fR
+l l l
+l l l .
+\fBPOSIX\fR	\fBillumos\fR	\fBc11\fR
+\fBpthread_mutex_init()\fR	\fBmutex_init()\fR	\fBmtx_init()\fR
+\fBpthread_mutexattr_init()\fR	\fB-\fR	\fB-\fR
+\fBpthread_mutexattr_setpshared()\fR	\fB-\fR	\fB-\fR
+\fBpthread_mutexattr_getpshared()\fR	\fB-\fR	\fB-\fR
+\fBpthread_mutexattr_setprotocol()\fR	\fB-\fR	\fB-\fR
+\fBpthread_mutexattr_getprotocol()\fR	\fB-\fR	\fB-\fR
+\fBpthread_mutexattr_setprioceiling()\fR	\fB-\fR	\fB-\fR
+\fBpthread_mutexattr_getprioceiling()\fR	\fB-\fR	\fB-\fR
+\fBpthread_mutexattr_settype()\fR	\fB-\fR	\fB-\fR
+\fBpthread_mutexattr_gettype()\fR	\fB-\fR	\fB-\fR
+\fBpthread_mutexattr_setrobust()\fR	\fB-\fR	\fB-\fR
+\fBpthread_mutexattr_getrobust()\fR	\fB-\fR	\fB-\fR
+\fBpthread_mutexattr_destroy()\fR	\fB-\fR	\fBmtx_destroy()\fR
+\fBpthread_mutex_setprioceiling()\fR	\fB-\fR	\fB-\fR
+\fBpthread_mutex_getprioceiling()\fR	\fB-\fR	\fB-\fR
+\fBpthread_mutex_lock()\fR	\fBmutex_lock()\fR	\fBmtx_lock()\fR
+\fBpthread_mutex_timedlock()\fR	\fB-\fR	\fBmtx_timedlock()\fR
+\fBpthread_mutex_trylock()\fR	\fBmutex_trylock()\fR	\fBmtx_trylock()\fR
+\fBpthread_mutex_unlock()\fR	\fBmutex_unlock()\fR	\fBmtx_unlcok()\fR
+\fBpthread_mutex_destroy()\fR	\fBmutex_destroy()\fR	\fBmtx_destroy()\fR
 .TE
 
 .SS "Functions Related to Condition Variables"
-.sp
 
-.sp
 .TS
-l l
-l l .
-\fBPOSIX\fR	\fBSolaris\fR
-\fBpthread_cond_init()\fR	\fBcond_init()\fR
-\fBpthread_condattr_init()\fR	\fB-\fR
-\fBpthread_condattr_setpshared()\fR	\fB-\fR
-\fBpthread_condattr_getpshared()\fR	\fB-\fR
-\fBpthread_condattr_destroy()\fR	\fB-\fR
-\fBpthread_cond_wait()\fR	\fBcond_wait()\fR
-\fBpthread_cond_timedwait()\fR	\fBcond_timedwait()\fR
-\fBpthread_cond_signal()\fR	\fBcond_signal()\fR
-\fBpthread_cond_broadcast()\fR	\fBcond_broadcast()\fR
-\fBpthread_cond_destroy()\fR	\fBcond_destroy()\fR
+l l l
+l l l .
+\fBPOSIX\fR	\fBillumos\fR	\fBC11\fR
+\fBpthread_cond_init()\fR	\fBcond_init()\fR	\fBcnd_init()\fR
+\fBpthread_condattr_init()\fR	\fB-\fR	\fB-\fR
+\fBpthread_condattr_setpshared()\fR	\fB-\fR	\fB-\fR
+\fBpthread_condattr_getpshared()\fR	\fB-\fR	\fB-\fR
+\fBpthread_condattr_destroy()\fR	\fB-\fR	\fB-\fR
+\fBpthread_cond_wait()\fR	\fBcond_wait()\fR	\fBcnd_wait()\fR
+\fBpthread_cond_timedwait()\fR	\fBcond_timedwait()\fR	\fBcond_timedwait()\fR
+\fBpthread_cond_signal()\fR	\fBcond_signal()\fR	\fBcnd_signal()\fR
+\fBpthread_cond_broadcast()\fR	\fBcond_broadcast()\fR	\fBcnd_broadcast()\fR
+\fBpthread_cond_destroy()\fR	\fBcond_destroy()\fR	\fBcnd_destroy()\fR
 .TE
 
 .SS "Functions Related to Reader/Writer Locking"
-.sp
 
-.sp
 .TS
-l l
-l l .
-\fBPOSIX\fR	\fBSolaris\fR
-\fBpthread_rwlock_init()\fR	\fBrwlock_init()\fR
-\fBpthread_rwlock_rdlock()\fR	\fBrw_rdlock()\fR
-\fBpthread_rwlock_tryrdlock()\fR	\fBrw_tryrdlock()\fR
-\fBpthread_rwlock_wrlock()\fR	\fBrw_wrlock()\fR
-\fBpthread_rwlock_trywrlock()\fR	\fBrw_trywrlock()\fR
-\fBpthread_rwlock_unlock()\fR	\fBrw_unlock()\fR
-\fBpthread_rwlock_destroy()\fR	\fBrwlock_destroy()\fR
-\fBpthread_rwlockattr_init()\fR	\fB-\fR
-\fBpthread_rwlockattr_destroy()\fR	\fB-\fR
-\fBpthread_rwlockattr_getpshared()\fR	\fB-\fR
-\fBpthread_rwlockattr_setpshared()\fR	\fB-\fR
+l l l
+l l l .
+\fBPOSIX\fR	\fBillumos\fR	\fBC11\fR
+\fBpthread_rwlock_init()\fR	\fBrwlock_init()\fR	\fB-\fR
+\fBpthread_rwlock_rdlock()\fR	\fBrw_rdlock()\fR	\fB-\fR
+\fBpthread_rwlock_tryrdlock()\fR	\fBrw_tryrdlock()\fR	\fB-\fR
+\fBpthread_rwlock_wrlock()\fR	\fBrw_wrlock()\fR	\fB-\fR
+\fBpthread_rwlock_trywrlock()\fR	\fBrw_trywrlock()\fR	\fB-\fR
+\fBpthread_rwlock_unlock()\fR	\fBrw_unlock()\fR	\fB-\fR
+\fBpthread_rwlock_destroy()\fR	\fBrwlock_destroy()\fR	\fB-\fR
+\fBpthread_rwlockattr_init()\fR	\fB-\fR	\fB-\fR
+\fBpthread_rwlockattr_destroy()\fR	\fB-\fR	\fB-\fR
+\fBpthread_rwlockattr_getpshared()\fR	\fB-\fR	\fB-\fR
+\fBpthread_rwlockattr_setpshared()\fR	\fB-\fR	\fB-\fR
 .TE
 
 .SS "Functions Related to Semaphores"
-.sp
 
-.sp
 .TS
-l l
-l l .
-\fBPOSIX\fR	\fBSolaris\fR
-\fBsem_init()\fR	\fBsema_init()\fR
-\fBsem_open()\fR	\fB-\fR
-\fBsem_close()\fR	\fB-\fR
-\fBsem_wait()\fR	\fBsema_wait()\fR
-\fBsem_trywait()\fR	\fBsema_trywait()\fR
-\fBsem_post()\fR	\fBsema_post()\fR
-\fBsem_getvalue()\fR	\fB-\fR
-\fBsem_unlink()\fR	\fB-\fR
-\fBsem_destroy()\fR	\fBsema_destroy()\fR
+l l l
+l l l .
+\fBPOSIX\fR	\fBillumos\fR	\fBC11\fR
+\fBsem_init()\fR	\fBsema_init()\fR	\fB-\fR
+\fBsem_open()\fR	\fB-\fR	\fB-\fR
+\fBsem_close()\fR	\fB-\fR	\fB-\fR
+\fBsem_wait()\fR	\fBsema_wait()\	\fB-\fR
+\fBsem_trywait()\fR	\fBsema_trywait()\fR	\fB-\fR
+\fBsem_post()\fR	\fBsema_post()\fR	\fB-\fR
+\fBsem_getvalue()\fR	\fB-\fR	\fB-\fR
+\fBsem_unlink()\fR	\fB-\fR	\fB-\fR
+\fBsem_destroy()\fR	\fBsema_destroy()\fR	\fB-\fR
 .TE
 
 .SS "Functions Related to fork(\|) Clean Up"
-.sp
 
-.sp
 .TS
-l l
-l l .
-\fBPOSIX\fR	\fBSolaris\fR
-\fBpthread_atfork()\fR	\fB-\fR
+l l l
+l l l .
+\fBPOSIX\fR	\fBillumos\fR	\fBC11\fR
+\fBpthread_atfork()\fR	\fB-\fR	\fB-\fR
 .TE
 
 .SS "Functions Related to Limits"
-.sp
 
-.sp
 .TS
-l l
-l l .
-\fBPOSIX\fR	\fBSolaris\fR
-\fBpthread_once()\fR	\fB-\fR
+l l l
+l l l .
+\fBPOSIX\fR	\fBillumos\fR	\fBC11\fR
+\fBpthread_once()\fR	\fB-\fR	\fBcall_once()\fR
 .TE
 
 .SS "Functions Related to Debugging"
-.sp
 
-.sp
 .TS
-l l
-l l .
-\fBPOSIX\fR	\fBSolaris\fR
-\fB-\fR	\fBthr_stksegment()\fR
+l l l
+l l l .
+\fBPOSIX\fR	\fBillumos\fR	\fBC11\fR
+\fB-\fR	\fBthr_stksegment()\fR	\fB-\fR
 .TE
 
 .SH LOCKING
 .SS "Synchronization"
-.sp
 .LP
 Multithreaded behavior is asynchronous, and therefore,  optimized for
 concurrent and parallel processing. As threads, always from within the same
 process and  sometimes from multiple processes, share global data with each
 other, they are not guaranteed exclusive access to the shared data at any point
 in time. Securing mutually exclusive access to shared data requires
-synchronization among the threads. Both POSIX and Solaris implement four
+synchronization among the threads. Both POSIX and illumos implement four
 synchronization mechanisms: mutexes, condition variables, reader/writer locking
-(\fIoptimized frequent-read occasional-write mutex\fR), and semaphores.
+(\fIoptimized frequent-read occasional-write mutex\fR), and semaphores, where as
+C11 threads only implement two mechanisms: mutexes and condition variables.
 .sp
 .LP
 Synchronizing multiple threads diminishes their concurrency. The coarser the
 grain of synchronization, that is, the larger the block of code that is locked,
 the lesser the concurrency.
 .SS "MT \fBfork()\fR"
-.sp
 .LP
 If a threads program calls \fBfork\fR(2), it implicitly calls \fBfork1\fR(2),
 which replicates only the calling thread. Should there be any outstanding
@@ -370,9 +397,8 @@ mutexes throughout the process, the application should call
 \fBfork()\fR.
 .SH SCHEDULING
 .SS "POSIX Threads"
-.sp
 .LP
-Solaris supports the following three POSIX scheduling policies:
+illumos supports the following three POSIX scheduling policies:
 .sp
 .ne 2
 .na
@@ -409,7 +435,7 @@ process must have a effective user \fBID\fR of \fB0\fR.
 
 .sp
 .LP
-In addition to the POSIX-specified scheduling policies above, Solaris also
+In addition to the POSIX-specified scheduling policies above, illumos also
 supports these scheduling policies:
 .sp
 .ne 2
@@ -441,25 +467,26 @@ Threads are scheduled according to the Fixed-Priority Class (FX) policy as
 described in \fBpriocntl\fR(2).
 .RE
 
-.SS "Solaris Threads"
-.sp
+.SS "illumos Threads"
 .LP
 Only scheduling policy supported is \fBSCHED_OTHER\fR, which is timesharing,
 based on the \fBTS\fR scheduling class.
 .SH ERRORS
-.sp
 .LP
 In a multithreaded application, \fBEINTR\fR can be returned from blocking
-system calls when another thread calls  \fBforkall\fR(2).
+system calls when another thread calls \fBforkall\fR(2).
 .SH USAGE
 .SS "\fB-mt\fR compiler option"
-.sp
 .LP
 The \fB-mt\fR compiler option compiles and links for multithreaded code. It
 compiles source files with \(mi\fBD_REENTRANT\fR and augments the set of
 support libraries properly.
-.SH ATTRIBUTES
 .sp
+.LP
+Users of other compilers such as gcc and clang should manually set
+\(mi\fBD_REENTRANT\fR on the compilation line. There are no other libraries or
+flags necessary.
+.SH ATTRIBUTES
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -475,7 +502,6 @@ MT-Level	MT-Safe, Fork 1-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBcrle\fR(1), \fBfork\fR(2), \fBpriocntl\fR(2), \fBlibpthread\fR(3LIB),
 \fBlibrt\fR(3LIB), \fBlibthread\fR(3LIB), \fBpthread_atfork\fR(3C),

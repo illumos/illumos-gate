@@ -1,6 +1,7 @@
 '\" te
 .\" Copyright (c) 2001, The IEEE and The Open Group. All Rights Reserved.
 .\" Portions Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 2016 Joyent, Inc.
 .\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
@@ -18,7 +19,6 @@ time.h, time \- time types
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The <\fBtime.h\fR> header declares the structure \fBtm\fR, which includes the
 following members:
@@ -143,6 +143,16 @@ implementation-defined. See \fBclock_settime\fR(3C).
 .RE
 
 .sp
+.ne 2
+.na
+\fB\fBTIME_UTC\fR\fR
+.ad
+.RS 19n
+The identifier for the system-wide realtime clock with no time zone
+translation. Used in \fBtimespec_get\fR().
+.RE
+
+.sp
 .LP
 The \fBclock_t\fR, \fBsize_t\fR, \fBtime_t\fR, \fBclockid_t\fR, and
 \fBtimer_t\fR types are defined as described in <\fBsys/types.h\fR>. See
@@ -172,7 +182,6 @@ extern char *tzname[];
 Inclusion of the <\fBtime.h\fR> header can make visible all symbols from the
 <\fBsignal.h\fR> header.
 .SH USAGE
-.sp
 .LP
 The range [0,60] for \fBtm_sec\fR allows for the occasional leap second.
 .sp
@@ -185,7 +194,6 @@ To obtain the number of clock ticks per second returned by the \fBtimes()\fR
 function, applications should call \fBsysconf(_SC_CLK_TCK)\fR. See
 \fBtimes\fR(2) and \fBsysconf\fR(3C).
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -203,10 +211,10 @@ Standard	See \fBstandards\fR(5).
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBtime\fR(2), \fButime\fR(2), \fBclock\fR(3C), \fBctime\fR(3C),
-\fBdifftime\fR(3C), \fBgetdate\fR(3C), \fBmktime\fR(3C), \fBstrftime\fR(3C),
-\fBstrptime\fR(3C), \fBtypes.h\fR(3HEAD), \fBclock_settime\fR(3C),
-\fBnanosleep\fR(3C), \fBtimer_create\fR(3C), \fBtimer_delete\fR(3C),
-\fBtimer_settime\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)
+\fBdifftime\fR(3C), \fBgetdate\fR(3C), \fBmktime\fR(3C),
+\fBstrftime\fR(3C), \fBstrptime\fR(3C), \fBtypes.h\fR(3HEAD),
+\fBclock_settime\fR(3C), \fBnanosleep\fR(3C), \fBtimer_create\fR(3C),
+\fBtimer_delete\fR(3C), \fBtimer_settime\fR(3C), \fBtimespec_get\fR(3C),
+\fBattributes\fR(5), \fBstandards\fR(5)

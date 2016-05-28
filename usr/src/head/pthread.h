@@ -21,6 +21,7 @@
 
 /*
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ * Copyright 2016 Joyent, Inc.
  *
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -336,6 +337,14 @@ extern int pthread_mutex_consistent_np(pthread_mutex_t *);
 extern int pthread_mutexattr_setrobust_np(pthread_mutexattr_t *, int);
 extern int pthread_mutexattr_getrobust_np(
 	const pthread_mutexattr_t *_RESTRICT_KYWD, int *_RESTRICT_KYWD);
+
+/*
+ * These are non-standardized extensions that we provide. Their origins are
+ * documented in their manual pages.
+ */
+#if !defined(_STRICT_SYMBOLS) || defined(__EXTENSIONS__)
+extern int pthread_attr_get_np(pthread_t, pthread_attr_t *);
+#endif	/* !_STRICT_SYMBOLS || __EXTENSIONS__ */
 
 #endif	/* _ASM */
 

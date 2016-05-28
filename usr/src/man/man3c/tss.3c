@@ -1,0 +1,151 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2016 Joyent, Inc.
+.\"
+.Dd "Jan 11, 2015"
+.Dt TSS 3C
+.Os
+.Sh NAME
+.Nm tss ,
+.Nm tss_create ,
+.Nm tss_destroy ,
+.Nm tss_get ,
+.Nm tss_set
+.Nd thread-specific storage
+.Sh SYNOPSIS
+.In threads.h
+.Vt "typedef void (*tss_dtor_t)(void *);"
+.Ft int
+.Fo tss_create
+.Fa "tss_t *key"
+.Fa "tss_dtor_t dtor"
+.Fc
+.Ft void
+.Fo tss_delete
+.Fa "tss_t key"
+.Fc
+.Ft void *
+.Fo tss_get
+.Fa "tss_t key"
+.Fc
+.Ft int
+.Fo tss_set
+.Fa "tss_t key"
+.Fa "void *val"
+.Fc
+.Sh DESCRIPTION
+The
+.Sy tss
+family of functions create, get, set, and destroy thread-specific
+storage.
+.Ss Creating and Destorying Thread-Specific Storage
+The
+.Fn tss_create
+function creates a new thread-specific data key. The key space is opaque
+and global to all threads in the process. Each thread has its own
+value-space which can be mainpulated with the
+.Fn tss_get
+and
+.Fn tss_set
+functions. A given key persists until
+.Fn tss_destroy
+is called.
+.Pp
+When a key is created, the value
+.Dv NULL
+is associated with all current threads. When a thread is created, the
+value
+.Dv NULL
+is assigned as the value for the entire key-space.
+.Pp
+A key may optionally be created with a destructor function
+.Fa dtor .
+The function
+.Fa dtor
+will run when the thread exits (see
+.Xr thrd_exit 3C )
+if the value for the key is not
+.Dv NULL .
+The key space's destructors may be run in any order. When the destructor
+is run due to a thread exiting, all signals will be blocked.
+.Pp
+The
+.Fn tss_delete
+function deletes the key identify by
+.Fa key
+from the global name-space. When a key is deleted, no registered
+destructor is called, it is up to the calling program to free any
+storage that was associated with
+.Fa key
+across all threads. Because of this propety, it is legal to call
+.Fn tss_delete
+from inside a destructor. Any destructors that had been assocaited with
+.Fa key
+will no longer be called when a thread terminates.
+.Ss Obtaining Values
+The
+.Fn tss_get
+function may be used to obtain the value associated with
+.Fa key
+for the calling thread. Note that if the calling thread has never set a
+value, then it will receive the default value,
+.Dv NULL .
+.Fn tss_get
+may be called from a tss destructor.
+.Ss Setting Values
+The
+.Fn tss_set
+function sets the value of the key
+.Fa key
+for the callling thread to
+.Fa value ,
+which may be obtained by subsequent calls to
+.Fa tss_get .
+To remove a value for a specific thread, one may pass
+.Dv NULL
+in as
+.Fa value .
+Changing the value of a key with
+.Fn tss_set
+does not cause any destructors to be invoked. This means that
+.Fn tss_set
+may be used in the context of a destructor, but special care must be
+taken to avoid leaking storage or causing an infinite loop.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn tss_create
+and
+.Fn tss_set
+functions return
+.Sy thrd_success .
+Otherwise, they return
+.Sy thrd_error
+to indicate that an error occurred.
+.Pp
+Upon successful completion, the
+.Fn tss_get
+function returns the thread-specific value associated with the given
+.Fa key .
+If no thread-specific value is associated with the key or an invalid key
+was passed in, then
+.Dv NULL
+is returned.
+.Sh INTERFACE STABILITY
+.Sy Standard
+.Sh MT-LEVEL
+.Sy MT-Safe
+.Sh SEE ALSO
+.Xr pthread_getspecific 3C ,
+.Xr pthread_key_create 3C ,
+.Xr pthread_key_delete 3C ,
+.Xr pthread_setspecific 3C ,
+.Xr attributes 5

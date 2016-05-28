@@ -30,6 +30,7 @@
 
 /*
  * Copyright 2014 PALO, Richard.
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*
@@ -48,6 +49,7 @@
 #define	_ISO_STDDEF_ISO_H
 
 #include <sys/isa_defs.h>
+#include <sys/feature_tests.h>
 #include <sys/null.h>
 
 #ifdef	__cplusplus
@@ -89,6 +91,13 @@ typedef unsigned int	size_t;		/* (historical version) */
 #define	offsetof(s, m)  (size_t)(&(((s *)0)->m))
 #endif
 #endif	/* GNUC, etc. */
+
+#if !defined(_MAX_ALIGN_T)
+#if !defined(_STRICT_SYMBOLS) || defined(_STDC_C11)
+#define	_MAX_ALIGN_T
+typedef	_MAX_ALIGNMENT_TYPE max_align_t;
+#endif /* !_STRICT_SYMBOLS || _STDC_C11 */
+#endif	/* _MAX_ALIGN_T */
 
 #ifdef	__cplusplus
 }

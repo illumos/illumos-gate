@@ -25,6 +25,7 @@
 # Copyright (c) 2011, 2014 by Delphix. All rights reserved.
 # Copyright (c) 2013 by Saso Kiselkov. All rights reserved.
 # Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2016 Garrett D'Amore <garrett@damore.org>
 #
 
 #
@@ -2002,6 +2003,27 @@ IXGBE_OBJS =    ixgbe_82598.o ixgbe_82599.o ixgbe_api.o		\
                 ixgbe_log.o ixgbe_main.o 	                \
                 ixgbe_osdep.o ixgbe_rx.o ixgbe_stat.o           \
                 ixgbe_tx.o  ixgbe_x540.o ixgbe_mbx.o
+
+#
+#	Solarflare 1/10/40GbE NIC driver module
+#
+#	NB: The illumos specific sources are listed first, with the
+#	common (OS-independent) sources afterwards.
+#
+SFXGE_OBJS =	sfxge_err.o sfxge_ev.o sfxge_hash.o sfxge_intr.o sfxge_mac.o \
+		sfxge_gld_v3.o sfxge_mon.o sfxge_phy.o \
+		sfxge_sram.o sfxge_bar.o sfxge_pci.o sfxge_nvram.o \
+		sfxge_rx.o sfxge_tcp.o sfxge_tx.o sfxge_mcdi.o sfxge_vpd.o \
+		sfxge.o sfxge_dma.o
+SFXGE_SF_OBJS =	efx_bootcfg.o efx_crc32.o efx_ev.o efx_filter.o \
+		efx_hash.o efx_intr.o efx_mac.o efx_mcdi.o efx_mon.o \
+		efx_nic.o efx_nvram.o efx_phy.o efx_port.o efx_rx.o \
+		efx_sram.o efx_tx.o efx_vpd.o efx_wol.o mcdi_mon.o \
+		siena_mac.o siena_mcdi.o siena_nic.o siena_nvram.o \
+		siena_phy.o siena_sram.o siena_vpd.o \
+		ef10_ev.o ef10_filter.o ef10_intr.o ef10_mac.o ef10_mcdi.o \
+		ef10_nic.o ef10_nvram.o ef10_phy.o ef10_rx.o ef10_tx.o \
+		ef10_vpd.o hunt_nic.o hunt_phy.o
 
 #
 #	NIU 10G/1G driver module

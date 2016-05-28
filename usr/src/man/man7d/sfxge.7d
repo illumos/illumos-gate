@@ -1,0 +1,52 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2016 Garrett D'Amore <garrett@damore.org>
+.\"
+.Dd Apr 11, 2016
+.Dt SFXGE 7D
+.Os
+.Sh NAME
+.Nm sfxge
+.Nd Solarflare Ethernet device driver
+.Sh SYNOPSIS
+.Pa /dev/sfxge
+.Sh DESCRIPTION
+The
+.Nm
+driver provides support for 10 and 40 Gbps Ethernet adapters
+based on the Solarflare SFC9000 family of controllers.
+.Lp
+These devices generally support the standard Ethernet features, including
+autonegotiation, VLANs, and hardware based flow control.
+The maximum frame size supported by these devices is 9202 bytes, including
+the tag, if present.
+.Lp
+The device driver supports the
+.Xr ieee802.3 5
+properties, which can be configured with
+.Xr dladm 1M .
+.Sh FILES
+.Bl -tag -width /dev/sfxge
+.It Pa /dev/sfxge
+Special character device.
+.El
+.
+.Sh SEE ALSO
+.Xr dladm 1M ,
+.Xr ifconfig 1M ,
+.Xr pci 4 ,
+.Xr ieee802.3 5 ,
+.Xr dlpi 7P
+.Rs
+.%T IEEE 802.3: Ethernet
+.%Q IEEE Standards Association
+.Re

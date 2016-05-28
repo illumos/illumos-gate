@@ -1,0 +1,183 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2016 Joyent, Inc.
+.\"
+.Dd "Jan 11, 2015"
+.Dt CND 3C
+.Os
+.Sh NAME
+.Nm cnd
+.Nm cnd_broadcast ,
+.Nm cnd_destroy ,
+.Nm cnd_init ,
+.Nm cnd_signal ,
+.Nm cnd_timedwait ,
+.Nm cnd_wait
+.Nd C11 condition variable functions
+.Sh SYNOPSIS
+.In threads.h
+.Ft int
+.Fo cnd_init
+.Fa "cnd_t *cnd"
+.Fc
+.Ft void
+.Fo cnd_destroy
+.Fa "cnd_t *cnd"
+.Fc
+.Ft int
+.Fo cnd_broadcast
+.Fa "cnd_t *cnd"
+.Fc
+.Ft int
+.Fo cnd_signal
+.Fa "cnd_t *cnd"
+.Fc
+.Ft int
+.Fo cnd_timedwait
+.Fa "cnd_t *restrict cnd"
+.Fa "mtx_t *restrict mtx"
+.Fa "const struct timespec *abstime"
+.Fc
+.Ft int
+.Fo cnd_wait
+.Fa "cnd_t *restrict cnd"
+.Fa "mtx_t *restrict mtx"
+.Fc
+.Sh DESCRIPTION
+The
+.Sy cnd
+family of functions implement condition variables which allow threads
+within a process to wait until a condition occurs and be signaled when
+it does. These functions behave similar to both the POSIX threads and
+illumos threads; however, they have slightly different call signatures
+and return values. For more information, see
+.Xr threads 5 .
+Importantly, they do not allow for inter-process synchronization.
+.Ss Creating and Destroy Condition Variables
+The function
+.Fn cnd_init
+initializes the condition variable referred to by
+.Fa cnd .
+The condition variable is suitable for intra-process use. Initializing
+an already initialized condition variable results in undefined behavior.
+.Pp
+The function
+.Fn cnd_destroy
+destroys an initialized condition variable at which point it is illegal
+to use it, though it may be initialized again.
+.Ss Condition Waiting
+The function
+.Fn cond_wait
+can be used to wait on a condition variable. A thread that waits on a
+condition variable blocks until another thread signals that the
+condition has changed, generally after making the condition that was
+false, true.
+.Pp
+The function
+.Fn cond_wait
+atomically release the mutex pointed to by
+.Fa mtx
+and blocks on the condition variable
+.Fa cond .
+When the thread returns, it will once again be holding
+.Fa mtx
+and must check the current state of the condition. There is no
+guarantee that another thread has not gotten in and changed the value
+before being woken. In addition, a thread blocking on a condition
+variable, may be woken spuriously, such as when a signal is received or
+.Fn fork
+is called .
+.Pp
+The function
+.Fn cond_timedwait
+allows a thread to block in a similar fashion to
+.Fn cond_wait ,
+except that when the absolute time specified in seconds since the epoch
+(based on
+.Sy CLOCK_REALTIME )
+in UTC, expires, then the thread will be woken up. The timeout is
+specified in
+.Fa abstime .
+.Ss Conditional Signaling
+The
+.Fn cnd_signal
+and
+.Fn cnd_broadcast
+functions can be used to signal threads waiting on the condition variable
+.Fa cnd
+that they should be woken up and check the variable again. The
+.Fn cnd_signal
+function will only wake a single thread that is blocked on the
+condition variable
+.Fa cnd ;
+while
+.Fn cnd_broadcast
+will wake up every thread waiting on the condition variable
+.Fa cnd .
+.Pp
+A thread calling either
+.Fn cnd_signal
+or
+.Fn cnd_broadcast
+is not required to hold any of the mutexes that are associated with the
+condition variable.
+.Pp
+If there are no threads currently blocked in the condition variable
+.Fa cnd
+then neither function has an effect.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn cond_init
+function returns
+.Sy thrd_success.
+If insufficient memory was available, then
+.Sy thrd_nomem
+is returned; otherwise, if any other error occurred,
+.Sy thrd_error
+is returned.
+.Pp
+Upon successful completion, the
+.Fn cond_broadcast ,
+.Fn cond_signal ,
+and
+.Fn cond_wait
+functions return
+.Sy thrd_success .
+Otherwise, they return
+.Sy thrd_error
+to indicate that an error occurred and they were unable to complete.
+.Pp
+Upon successful completion, the
+.Fn cond_timedwait
+function returns
+.Sy thrd_success .
+If
+.Fa abstime
+expires without being signaled, it instead returns
+.Sy thrd_timedout .
+Otherwise,
+.Sy thrd_error
+is returned to indicate an error.
+.Sh INTERFACE STABILITY
+.Sy Standard
+.Sh MT-LEVEL
+.Sy MT-Safe
+.Sh SEE ALSO
+.Xr cond_braodcast 3C ,
+.Xr cond_destroy 3C ,
+.Xr cond_init 3C ,
+.Xr cond_signal 3C ,
+.Xr cond_timedwait 3C ,
+.Xr cond_wait 3C ,
+.Xr threads 3HEAD ,
+.Xr attributes 5 ,
+.Xr threads 5

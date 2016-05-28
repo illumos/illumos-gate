@@ -26,7 +26,7 @@
  * Copyright (c) 2013 RackTop Systems.
  */
 /*
- * Copyright 2014 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*
@@ -44,6 +44,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
@@ -156,12 +157,26 @@ extern int custr_alloc(custr_t **);
 extern void custr_free(custr_t *);
 
 /*
+ * Allocate a "custr_t" dynamic string object that operates on a fixed external
+ * buffer.
+ */
+extern int custr_alloc_buf(custr_t **, void *, size_t);
+
+/*
  * Append a single character, or a NUL-terminated string of characters, to a
  * dynamic string.  Returns 0 on success and -1 otherwise.  The dynamic string
  * will be unmodified if the function returns -1.
  */
 extern int custr_appendc(custr_t *, char);
 extern int custr_append(custr_t *, const char *);
+
+/*
+ * Append a format string and arguments as though the contents were being parsed
+ * through snprintf. Returns 0 on success and -1 otherwise.  The dynamic string
+ * will be unmodified if the function returns -1.
+ */
+extern int custr_append_printf(custr_t *, const char *, ...);
+extern int custr_append_vprintf(custr_t *, const char *, va_list);
 
 /*
  * Determine the length in bytes, not including the NUL terminator, of the

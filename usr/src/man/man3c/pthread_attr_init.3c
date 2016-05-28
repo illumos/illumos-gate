@@ -9,7 +9,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PTHREAD_ATTR_INIT 3C "Apr 1, 2008"
+.TH PTHREAD_ATTR_INIT 3C "Dec 10, 2015"
 .SH NAME
 pthread_attr_init, pthread_attr_destroy \- initialize or destroy threads
 attribute object
@@ -28,7 +28,6 @@ cc -mt [ \fIflag\fR... ] \fIfile\fR... -lpthread [ \fIlibrary\fR... ]
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The function \fBpthread_attr_init()\fR initializes a thread attributes object
 \fIattr\fR with the default value for all of the individual attributes used by
@@ -73,13 +72,11 @@ implementation may cause \fBpthread_attr_destroy()\fR to set \fIattr\fR to an
 implementation-dependent invalid value. The behavior of using the attribute
 after it has been destroyed is undefined.
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, \fBpthread_attr_init()\fR and
 \fBpthread_attr_destroy()\fR return a value of  \fB0\fR. Otherwise, an error
 number is returned to indicate the error.
 .SH ERRORS
-.sp
 .LP
 The  \fBpthread_attr_init()\fR function will fail if:
 .sp
@@ -104,7 +101,6 @@ The  \fBpthread_attr_destroy()\fR function may fail if:
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -124,9 +120,9 @@ Standard	See \fBstandards\fR(5).
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBsysconf\fR(3C), \fBpthread_attr_getdetachstate\fR(3C),
+\fBpthread_attr_get_np\fR(3C),
 \fBpthread_attr_getguardsize\fR(3C), \fBpthread_attr_getinheritsched\fR(3C),
 \fBpthread_attr_getschedparam\fR(3C), \fBpthread_attr_getschedpolicy\fR(3C),
 \fBpthread_attr_getscope\fR(3C), \fBpthread_attr_getstackaddr\fR(3C),

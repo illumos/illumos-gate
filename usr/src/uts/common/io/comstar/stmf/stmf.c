@@ -3180,8 +3180,7 @@ stmf_deregister_lu(stmf_lu_t *lu)
 		return (STMF_BUSY);
 	}
 	if (ilu->ilu_kstat_info) {
-		kmem_free(ilu->ilu_kstat_info->ks_data,
-		    ilu->ilu_kstat_info->ks_data_size);
+		kmem_free(ilu->ilu_kstat_info->ks_data, STMF_KSTAT_LU_SZ);
 		kstat_delete(ilu->ilu_kstat_info);
 	}
 	if (ilu->ilu_kstat_io) {
@@ -3359,7 +3358,7 @@ stmf_deregister_local_port(stmf_local_port_t *lport)
 	}
 	if (ilport->ilport_kstat_info) {
 		kmem_free(ilport->ilport_kstat_info->ks_data,
-		    ilport->ilport_kstat_info->ks_data_size);
+		    STMF_KSTAT_TGT_SZ);
 		kstat_delete(ilport->ilport_kstat_info);
 	}
 	if (ilport->ilport_kstat_io) {
