@@ -82,7 +82,7 @@ $(ROOTOPTDIR)/%: %.ksh
 	$(INS.rename)
 
 %.64: %.c
-	$(LINK.c) -m64 -o $@ $< $(LDLIBS64)
+	$(LINK64.c) -o $@ $< $(LDLIBS64)
 	$(POST_PROCESS)
 
 %.32: %.c
