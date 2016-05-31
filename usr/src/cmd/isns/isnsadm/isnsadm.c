@@ -105,6 +105,12 @@ static int build_enumerate_xml_doc(object_type, xmlChar **);
 #define	INITIATOR_ONLY	0x00000010
 #define	TARGET_ONLY	0x00000100
 
+#if LIBXML_VERSION >= 20904
+#define	XMLSTRING_CAST (const char *)
+#else
+#define	XMLSTRING_CAST (const xmlChar *)
+#endif
+
 /* object table based on definitions in isns_mgmt.h. */
 static obj_table_entry_t obj_table[] = {
 	{NODEOBJECT, Node},
@@ -455,7 +461,7 @@ print_partial_failure_info(xmlChar *doc)
 
 	for (i = 0; obj_table[i].obj_str != NULL; i++) {
 	    (void) xmlStrPrintf(expr, ISNS_MAX_LABEL_LEN + 13,
-		(const unsigned char *)"%s\"%s\"]", "//*[name()=",
+		XMLSTRING_CAST "%s\"%s\"]", "//*[name()=",
 		obj_table[i].obj_str);
 	    xpath_obj = xmlXPathEvalExpression(expr, ctext);
 	    if ((xpath_obj) && (xpath_obj->nodesetval) &&
