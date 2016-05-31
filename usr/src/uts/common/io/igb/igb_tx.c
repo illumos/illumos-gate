@@ -146,14 +146,14 @@ igb_tx(igb_tx_ring_t *tx_ring, mblk_t *mp)
 		    (!ctx->lso_flag &&
 		    (mbsize > (igb->max_frame_size - ETHERFCSL)))) {
 			freemsg(mp);
-			IGB_DEBUGLOG_0(igb, "igb_tx: packet oversize");
+			igb_log(igb, IGB_LOG_INFO, "igb_tx: packet oversize");
 			return (B_TRUE);
 		}
 	} else {
 		ctx = NULL;
 		if (mbsize > (igb->max_frame_size - ETHERFCSL)) {
 			freemsg(mp);
-			IGB_DEBUGLOG_0(igb, "igb_tx: packet oversize");
+			igb_log(igb, IGB_LOG_INFO, "igb_tx: packet oversize");
 			return (B_TRUE);
 		}
 	}
@@ -629,7 +629,7 @@ igb_get_tx_context(mblk_t *mp, tx_context_t *ctx)
 	if (ctx->lso_flag) {
 		if (!((ctx->hcksum_flags & HCK_PARTIALCKSUM) &&
 		    (ctx->hcksum_flags & HCK_IPV4_HDRCKSUM))) {
-			IGB_DEBUGLOG_0(NULL, "igb_tx: h/w "
+			igb_log(NULL, IGB_LOG_INFO, "igb_tx: h/w "
 			    "checksum flags are not set for LSO");
 			return (TX_CXT_E_LSO_CSUM);
 		}
@@ -721,7 +721,7 @@ igb_get_tx_context(mblk_t *mp, tx_context_t *ctx)
 		break;
 	default:
 		/* Unrecoverable error */
-		IGB_DEBUGLOG_0(NULL, "Ethernet type field error with "
+		igb_log(NULL, IGB_LOG_INFO, "Ethernet type field error with "
 		    "tx hcksum flag set");
 		return (TX_CXT_E_ETHER_TYPE);
 	}
@@ -832,7 +832,8 @@ igb_fill_tx_context(struct e1000_adv_tx_context_desc *ctx_tbd,
 			break;
 		default:
 			/* Unrecoverable error */
-			IGB_DEBUGLOG_0(NULL, "L4 type error with tx hcksum");
+			igb_log(NULL, IGB_LOG_INFO,
+			    "L4 type error with tx hcksum");
 			break;
 		}
 	}
