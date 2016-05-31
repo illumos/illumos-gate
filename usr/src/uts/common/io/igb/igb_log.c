@@ -26,68 +26,45 @@
  * Use is subject to license terms of the CDDL.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "igb_sw.h"
 
-#define	LOG_BUF_LEN	128
+#define	LOG_BUF_LEN	1024
 
-/*
- * igb_notice - Report a run-time event (CE_NOTE, to console & log)
- */
+extern int igb_debug;
+
 void
-igb_notice(void *arg, const char *fmt, ...)
+igb_log(void *arg, igb_debug_t level, const char *fmt, ...)
 {
 	igb_t *igbp = (igb_t *)arg;
 	char buf[LOG_BUF_LEN];
+	int celevel;
 	va_list ap;
 
 	va_start(ap, fmt);
 	(void) vsnprintf(buf, sizeof (buf), fmt, ap);
 	va_end(ap);
 
-	if (igbp != NULL)
-		cmn_err(CE_NOTE, "%s%d: %s", MODULE_NAME, igbp->instance, buf);
-	else
-		cmn_err(CE_NOTE, "%s: %s", MODULE_NAME, buf);
-}
+	DTRACE_PROBE2(igb__log, igb_t *, igbp, const char *, buf);
 
-/*
- * igb_log - Log a run-time event (CE_NOTE, to log only)
- */
-void
-igb_log(void *arg, const char *fmt, ...)
-{
-	igb_t *igbp = (igb_t *)arg;
-	char buf[LOG_BUF_LEN];
-	va_list ap;
+	if (level > igb_debug)
+		return;
 
-	va_start(ap, fmt);
-	(void) vsnprintf(buf, sizeof (buf), fmt, ap);
-	va_end(ap);
-
-	if (igbp != NULL)
-		cmn_err(CE_NOTE, "!%s%d: %s", MODULE_NAME, igbp->instance, buf);
-	else
-		cmn_err(CE_NOTE, "!%s: %s", MODULE_NAME, buf);
-}
-
-/*
- * igb_error - Log a run-time problem (CE_WARN, to log only)
- */
-void
-igb_error(void *arg, const char *fmt, ...)
-{
-	igb_t *igbp = (igb_t *)arg;
-	char buf[LOG_BUF_LEN];
-	va_list ap;
-
-	va_start(ap, fmt);
-	(void) vsnprintf(buf, sizeof (buf), fmt, ap);
-	va_end(ap);
+	switch (level) {
+	case IGB_LOG_ERROR:
+		celevel = CE_WARN;
+		break;
+	case IGB_LOG_INFO:
+		celevel = CE_NOTE;
+		break;
+	case IGB_LOG_TRACE:
+		celevel = CE_CONT;
+		break;
+	default:
+		celevel = CE_IGNORE;
+	}
 
 	if (igbp != NULL)
-		cmn_err(CE_WARN, "!%s%d: %s", MODULE_NAME, igbp->instance, buf);
+		dev_err(igbp->dip, celevel, "!%s", buf);
 	else
-		cmn_err(CE_WARN, "!%s: %s", MODULE_NAME, buf);
+		cmn_err(celevel, "!%s", buf);
 }

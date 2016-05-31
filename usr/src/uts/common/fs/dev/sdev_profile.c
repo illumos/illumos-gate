@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2016, Joyent Inc.
  */
 
 /*
@@ -415,7 +416,7 @@ is_nonempty_dir(char *name, char *pathleft, struct sdev_node *dir)
 
 
 /* Check if name passes matching rules */
-static int
+int
 prof_name_matched(char *name, struct sdev_node *dir)
 {
 	int type, match = 0;
