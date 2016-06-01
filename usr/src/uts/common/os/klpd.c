@@ -861,7 +861,7 @@ pfexec_call(const cred_t *cr, struct pathname *rpnp, cred_t **pfcr,
 	mutex_exit(&myzone->zone_lock);
 
 	if (pfd == NULL)
-		return (0);
+		return (ENOTACTIVE);
 
 	if (pfd->klpd_door_pid == curproc->p_pid) {
 		klpd_rele(pfd);
