@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015 Joyent, Inc.  All rights reserved.
+ * Copyright 2015, 2016 Joyent, Inc.  All rights reserved.
  */
 
 #ifndef _SYS_SDEV_IMPL_H

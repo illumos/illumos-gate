@@ -21,7 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2015 Joyent, Inc.  All rights reserved.
+ * Copyright 2013, 2016 Joyent, Inc.  All rights reserved.
  */
 
 /* vnode ops for the /dev/zvol directory */
@@ -304,7 +304,7 @@ devzvol_validate(struct sdev_node *dv)
 		 * be created as prof_* shadow nodes, because in the GZ they
 		 * are symlinks, but in the NGZ they are actual device files.
 		 *
-		 * The objset_check will fail on these are they are outside
+		 * The objset_check will fail on these as they are outside
 		 * any delegated dataset (zfs will not allow ioctl access to
 		 * them from this zone). We still want them to work, though.
 		 */
