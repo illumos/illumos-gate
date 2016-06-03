@@ -457,9 +457,6 @@ lx_readv(int fdes, struct iovec *iovp, int iovcnt)
 	if (fp->f_vnode->v_type == VDIR) {
 		error = EISDIR;
 		goto out;
-	} else if (fp->f_vnode->v_type == VFIFO) {
-		error = ESPIPE;
-		goto out;
 	}
 
 	auio.uio_iov = aiov;
