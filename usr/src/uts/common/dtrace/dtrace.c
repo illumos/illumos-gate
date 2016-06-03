@@ -389,7 +389,7 @@ do {									\
 	if ((remp) != NULL) {						\
 		*(remp) = (uintptr_t)(baseaddr) + (basesz) - (addr);	\
 	}								\
-} while (0)
+_NOTE(CONSTCOND) } while (0)
 
 
 /*
