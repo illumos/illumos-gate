@@ -1,0 +1,201 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2016 Joyent, Inc.
+.\"
+.Dd June 01, 2016
+.Dt MAC_HCKSUM_GET 9F
+.Os
+.Sh NAME
+.Nm mac_hcksum_get ,
+.Nm mac_hcksum_set
+.Nd get and set checksum information on message blocks
+.Sh SYNOPSIS
+.In sys/mac_provider.h
+.Ft void
+.Fo mac_hcksum_get
+.Fa "mblk_t *mp"
+.Fa "uint32_t *start"
+.Fa "uint32_t *stuff"
+.Fa "uint32_t *end"
+.Fa "uint32_t *value"
+.Fa "uint32_t *flags"
+.Fc
+.Ft void
+.Fo mac_hcksum_set
+.Fa "mblk_t *mp"
+.Fa "uint32_t start"
+.Fa "uint32_t stuff"
+.Fa "uint32_t end"
+.Fa "uint32_t value"
+.Fa "uint32_t flags"
+.Fc
+.Sh INTERFACE LEVEL
+illumos DDI specific
+.Sh PARAMETERS
+.Bl -tag -width Fa
+.It Fa mp
+A pointer to a
+.Xr mblk 9S
+structure that contains a frame.
+.It Fa start
+The value or a pointer to it that contains the offset from the L3
+header, generally IP, of the first byte that's covered by the checksum.
+.It Fa stuff
+The value or a pointer to it that contains the offset from the L3 header
+of where the L4 checksum is. For example, if using IPv4 and TCP, this
+would contain the offset from the start of the IPv4 header to the first
+byte of the TCP checksum.
+.It Fa end
+The value or a pointer to it that contains the offset from the L3
+header, generally IP, of the last byte that's covered by the checksum.
+.It Fa value
+The value or a pointer to it that contains the actual value of the
+checksum.
+.It Fa flags
+A series of one or more flags that have bitwise inclusive ORed together.
+The set of flags have different meanings depending on whether
+.Fa mp
+is being transmitted or received.
+.El
+.Sh DESCRIPTION
+The
+.Fn mac_hcksum_get
+and
+.Fn mac_hcksum_set
+functions are provided to device drivers to get and set checksum related
+information. When a device driver indicates that it supports the
+.Sy MAC_CAPAB_HCKSUM
+capability as part of its
+.Xr mc_getcapab 9E
+entry point, then it is responsible for calling these functions
+appropriately during the transmit and receive paths.
+.Pp
+While both functions operate on an
+.Sy mblk_t ,
+this function should only be called on the first
+.Sy mblk_t
+that begins a given individual frame in a chain. In other words, it only
+works on entries where it is the first of many possible entries linked
+together by the
+.Sy b_cont
+member. The first
+.Sy mblk_t
+received from any
+.Xr mac 9E
+API or pointed to by a
+.Sy b_next
+pointer should be used.
+.Ss Receiving Data
+When a device driver is receiving data, it is its responsibility to
+.Em set
+checksum information when it has indicated that it supports the
+.Sy MAC_CAPAB_HCKSUM
+capability. Device drivers will call the
+.Fn mac_hcksum_set
+function to indicate what checksum information has occurred.
+.Pp
+The proper values to set depend on the flags passed in. The following
+flags are supported when receiving data, note that they may have
+different meanings from when transmitting data. The driver should set
+the
+.Fa flags
+argument to the bitwise inclusive OR of the following values:
+.Bl -tag -width Sy
+.It Sy HCK_IPV4_HDRCKSUM_OK
+This flag indicates that the hardware has verified the IPv4 header is
+correct and that the networking stack does not need to verify it.
+.It Sy HCK_PARTIALCKSUM
+This flag indicates that the hardware has computed a partial checksum.
+When this flag is set, the driver is responsible for passing in the
+partial checksum in the
+.Fa value
+argument as well as the start and ending bytes of the checksum in the
+.Fa start
+and
+.Fa end
+arguments.
+.It Sy HCK_FULLCKSUM
+This flag indicates that the hardware has calculated the full L4 header
+checksum; however, it wants the system to verify it. The checksum should
+be passed in the
+.Fa value
+argument.
+.It Sy HCK_FULLCKSUM_OK
+This flag indicates that the hardware has calculated the full L4 header
+checksum and verified that it is correct. The networking stack does not
+need to verify it.
+.El
+.Pp
+The
+.Sy HCK_PARTIALCKSUM ,
+.Sy HCK_FULLCKSUM ,
+and
+.Sy HCK_FULLCKSUM_OK
+flags are all mutually exclusive. A device driver should only set one of
+the three flags.
+.Pp
+If one of the arguments is not required based on the specified value of
+.Fa flags ,
+then the device driver should set any remaining arguments to
+.Sy 0 .
+.Ss Transmitting Data
+When a device driver is transmitting data and it has advertised that it
+supports the
+.Sy MAC_CAPAB_HCKSUM
+capability, then it must call the
+.Fn mac_hcksum_get
+function to determine what hardware checksumming options are required to
+be performed by the hardware. While the device driver may need the other
+fields, it must check the
+.Fa flags
+argument to determine what it is being requested to do. The following
+values may be set in
+.Fa flags :
+.Bl -tag -width Sy
+.It Sy HCK_IPV4_HDRCKSUM
+The device driver must compute the IPv4 header checksum. No other fields
+have been filled in.
+.It Sy HCK_PARTIALCKSUM
+The device driver needs to compute the partial ones' complement of the
+checksum. The system has filled in the
+.Fa start ,
+.Fa stuff ,
+and
+.Fa end
+arguments to assist the device driver.
+.It Sy HCK_FULLCKSUM
+The device driver should compute the full L4 checksum. No other fields
+have been filled in for the device driver.
+.El
+.Pp
+The flags that the device driver will get will depend on what the device
+driver has advertised that it supports in response to the
+.Xr mc_getcapab 9E
+query for the
+.Sy MAC_CAPAB_HCKSUM
+capability.
+.Pp
+The
+.Sy HCK_PARTIALCKSUM
+and
+.Sy HCK_FULLCKSUM
+flags are mutually exclusive.
+.Sh CONTEXT
+The
+.Fn mac_hcksum_get
+and
+.Fn mac_hcksum_set
+functions may be called from any context.
+.Sh SEE ALSO
+.Xr mac 9E ,
+.Xr mac_getcapab 9E ,
+.Xr mblk 9S

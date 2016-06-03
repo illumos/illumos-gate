@@ -1,0 +1,74 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2016 Joyent, Inc.
+.\"
+.Dd May 31, 2016
+.Dt MAC_LINK_UPDATE 9F
+.Os
+.Sh NAME
+.Nm mac_link_update
+.Nd inform the MAC layer about a link state change
+.Sh SYNOPSIS
+.In sys/mac_provider.h
+.Ft void
+.Fo mac_link_update
+.Fa "mac_handle_t mh"
+.Fa "link_state_t link"
+.Fc
+.Sh INTERFACE LEVEL
+illumos DDI specific
+.Sh PARAMETERS
+.Bl -tag -width Fa
+.It Fa mh
+The MAC handle obtained from a call to
+.Xr mac_register 9F .
+.It Fa link
+The current state of the link. For valid link states see the discussion
+of
+.Sy MAC_PROP_STATUS
+in the
+.Sx PROPERTIES
+section of
+.Xr mac 9E .
+.El
+.Sh DESCRIPTION
+The
+.Fn mac_link_update
+function is used by device drivers to inform the MAC layer that the
+state of a link has changed. As discussed in the
+.Sx Link Updates
+section of
+.Xr mac 9E ,
+the driver should call this whenever it detects that the state of the
+link has changed. If the state has not changed, then the driver should
+not call this function. In addition, if the device driver is powering
+off the link or is transitioning to a state where it can no longer
+determine the link status, then it should make sure to call this
+function with the value of
+.Fa link
+set to
+.Sy LINK_STATE_UNKNOWN .
+.Pp
+Device drivers should ensure that they're not holding any of their
+specific locks when calling this function.
+.Sh CONTEXT
+The
+.Fn mac_link_update
+function may be called from
+.Sy user ,
+.Sy kernel ,
+or
+.Sy interrupt
+context.
+.Sh SEE ALSO
+.Xr mac 9E ,
+.Xr mac_register 9F

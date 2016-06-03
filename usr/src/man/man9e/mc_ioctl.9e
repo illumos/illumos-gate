@@ -1,0 +1,126 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2016 Joyent, Inc.
+.\"
+.Dd May 31, 2016
+.Dt MC_IOCTL 9E
+.Os
+.Sh NAME
+.Nm mc_ioctl
+.Nd device specific I/O control operation
+.Sh SYNOPSIS
+.In sys/types.h
+.In sys/stream.h
+.In sys/stropts.h
+.In sys/ddi.h
+.In sys/sunddi.h
+.Ft void
+.Fo prefix_m_ioctl
+.Fa "void *driver"
+.Fa "queue_t *wq"
+.Fa "mblk_t *mp"
+.Fc
+.Sh INTERFACE LEVEL
+illumos DDI Specific
+.Sh PARAMETERS
+.Bl -tag -width Ds
+.It Fa driver
+A pointer to the driver's private data that was passed in via the
+.Sy m_pdata
+member of the
+.Xr mac_register 9S
+structure to the
+.Xr mac_register 9F
+function.
+.It Fa wq
+A pointer to a STREAMS write-side queue that the ioctl request was
+received upon.
+.It Fa mp
+A pointer to a message block structure that contains the I/O control
+request.
+.El
+.Sh DESCRIPTION
+The
+.Fn mc_ioctl
+entry point is an optional GLDv3 entry point. It provides a means
+for device-specific I/O control operations to be initiated. In general,
+this entry point is not recommended for most devices and is
+unimplemented.
+.Pp
+The I/O control interface is not like a traditional character or block
+device's
+.Xr ioctl 9E
+entry point, rather it is a STREAMS-based I/O control operation. The
+data pointer of the
+.Fa mp
+argument is a
+.Xr iocblk 9S
+structure. After handling the message, the driver will need to reply to
+the message, which is usually done by using the
+.Xr miocack 9F
+and
+.Xr miocnak 9F
+functions to prepare
+.Fa mp .
+.Pp
+The device driver can access its soft state by casting the value pointed
+to in
+.Fa driver .
+The driver should be careful and ensure that it performs any necessary
+locking to access members of that structure while processing the I/O
+control operation.
+.Sh RETURN VALUES
+Return information is not conveyed by the return value of this function, rather
+it is encoded in the
+.Xr iocblk 9S
+structure in the
+.Fa mp
+argument.
+.Sh EXAMPLES
+The following example shows how a device driver might structure its
+.Fn mc_ioctl
+entry point.
+.Bd -literal
+#include <sys/types.h>
+#include <sys/stream.h>
+#include <sys/stropts.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+/*
+ * Note, this example merely shows the structure of this function. It does not
+ * actively handle any device-specific ioctls and instead returns failure for
+ * every one. This is the most common case. Note, miocnak(9F) takes care of
+ * calling putnext(9F) for us.
+ */
+static void
+example_m_ioctl(void *arg, queue_t *wq, mblk_t *mp)
+{
+	miocnak(wq, mp, 0, EINVAL);
+}
+.Ed
+.Sh SEE ALSO
+.Xr ioctl 9E ,
+.Xr mac 9E ,
+.Xr put 9E ,
+.Xr mac_register 9F ,
+.Xr miocack 9F ,
+.Xr miocnak 9F ,
+.Xr putnext 9F ,
+.Xr iocblk 9S ,
+.Xr mac_register 9S
+.Rs
+.%T Writing Device Drivers
+.Re
+.Rs
+.%T STREAMS Programming Guide
+.Re

@@ -316,6 +316,16 @@ file path=usr/share/man/man9f/ldi_remove_event_handler.9f
 file path=usr/share/man/man9f/ldi_strategy.9f
 file path=usr/share/man/man9f/linkb.9f
 file path=usr/share/man/man9f/list_create.9f
+file path=usr/share/man/man9f/mac_alloc.9f
+file path=usr/share/man/man9f/mac_hcksum_get.9f
+file path=usr/share/man/man9f/mac_init_ops.9f
+file path=usr/share/man/man9f/mac_link_update.9f
+file path=usr/share/man/man9f/mac_lso_get.9f
+file path=usr/share/man/man9f/mac_maxsdu_update.9f
+file path=usr/share/man/man9f/mac_prop_info.9f
+file path=usr/share/man/man9f/mac_register.9f
+file path=usr/share/man/man9f/mac_rx.9f
+file path=usr/share/man/man9f/mac_tx_update.9f
 file path=usr/share/man/man9f/makecom.9f
 file path=usr/share/man/man9f/makedevice.9f
 file path=usr/share/man/man9f/max.9f
@@ -975,6 +985,24 @@ link path=usr/share/man/man9f/list_remove.9f target=list_create.9f
 link path=usr/share/man/man9f/list_remove_head.9f target=list_create.9f
 link path=usr/share/man/man9f/list_remove_tail.9f target=list_create.9f
 link path=usr/share/man/man9f/list_tail.9f target=list_create.9f
+link path=usr/share/man/man9f/mac_fini_ops.9f target=mac_init_ops.9f
+link path=usr/share/man/man9f/mac_free.9f target=mac_alloc.9f
+link path=usr/share/man/man9f/mac_hcksum_set.9f target=mac_hcksum_get.9f
+link path=usr/share/man/man9f/mac_prop_info_set_default_link_flowctrl.9f \
+    target=mac_prop_info.9f
+link path=usr/share/man/man9f/mac_prop_info_set_default_str.9f \
+    target=mac_prop_info.9f
+link path=usr/share/man/man9f/mac_prop_info_set_default_uint32.9f \
+    target=mac_prop_info.9f
+link path=usr/share/man/man9f/mac_prop_info_set_default_uint64.9f \
+    target=mac_prop_info.9f
+link path=usr/share/man/man9f/mac_prop_info_set_default_uint8.9f \
+    target=mac_prop_info.9f
+link path=usr/share/man/man9f/mac_prop_info_set_perm.9f \
+    target=mac_prop_info.9f
+link path=usr/share/man/man9f/mac_prop_info_set_range_uint32.9f \
+    target=mac_prop_info.9f
+link path=usr/share/man/man9f/mac_unregister.9f target=mac_register.9f
 link path=usr/share/man/man9f/makecom_g0.9f target=makecom.9f
 link path=usr/share/man/man9f/makecom_g0_s.9f target=makecom.9f
 link path=usr/share/man/man9f/makecom_g1.9f target=makecom.9f

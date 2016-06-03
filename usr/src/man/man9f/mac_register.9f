@@ -1,0 +1,267 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2016 Joyent, Inc.
+.\"
+.Dd May 31, 2016
+.Dt MAC_REGISTER 9F
+.Os
+.Sh NAME
+.Nm mac_register ,
+.Nm mac_unregister
+.Nd register and unregister a device driver from the MAC framework
+.Sh SYNOPSIS
+.In sys/mac_provider.h
+.Ft int
+.Fo mac_register
+.Fa "mac_register_t *mregp"
+.Fa "mac_handle_t *mhp"
+.Fc
+.Ft int
+.Fo mac_unregister
+.Fa "mac_handle_t mh"
+.Fc
+.Sh INTERFACE LEVEL
+illumos DDI specific
+.Sh PARAMETERS
+.Bl -tag -width Fa
+.It Fa mregp
+A pointer to a
+.Xr mac_register 9S
+structure allocated by calling
+.Xr mac_alloc 9F
+and filled in by the device driver.
+.It Fa mhp
+A pointer to a driver-backed handle to the MAC framework.
+.It Fa mh
+The driver-backed handle to the MAC framework.
+.El
+.Sh DESCRIPTION
+The
+.Fn mac_register
+function is used to register an instance of a device driver with the
+.Xr mac 9E
+framework. Upon successfully calling the
+.Fn mac_register
+function, the device will start having its
+.Xr mac_callbacks 9S
+entry points called. The device driver should call this function
+during it's
+.Xr attach 9E
+entry point after the device has been configured and is set up. For a
+more detailed explanation of the exact steps that the device driver
+should take and where in the sequence of a driver's
+.Xr attach 9E
+entry point this function should be called, see the
+.Sx Registering with MAC
+section of
+.Xr mac 9E .
+.Pp
+The driver should provide a pointer to a
+.Ft mac_handle_t
+structure as the second argument to the
+.Fn mac_register
+function. This handle will be used when the device driver needs to
+interact with the framework in various ways throughout its life. It is
+also where the driver gets the
+.Fa mh
+argument for calling the
+.Fn mac_unregister
+function. It is recommended that the device driver keep the handle
+around in its soft state structure for a given instance.
+.Pp
+If the call to the
+.Fn mac_register
+function fails, the device driver should unwind its
+.Xr attach 9E
+entry point, tear down everything that it initialized, and ultimately
+return an error from its
+.Xr attach 9E
+entry point.
+.Pp
+If the
+.Xr attach 9E
+routine fails for some reason after the call to the
+.Fn mac_register
+function has succeeded, then the driver should call the
+.Fn mac_unregister
+function as part of unwinding all of its state.
+.Pp
+When a driver is in its
+.Xr detach 9E
+entry point, it should call the
+.Fn mac_unregister
+function immediately after draining any of its transmit and receive
+resources that might have been given to the rest of the operating system
+through DMA binding. See the
+.Sx MBLKS AND DMA
+section of
+.Xr mac 9E
+for more information. This should be done before the driver does any
+tearing down. The call to the
+.Fn mac_unregister
+function may fail. This may happen because the networking stack is still
+using the device. In such a case, the driver should fail the call to
+.Xr detach 9E
+and return
+.Sy DDI_FAILURE .
+.Sh CONTEXT
+The
+.Fn mac_register
+function is generally only called from a driver's
+.Xr attach 9E
+entry point. The
+.Fn mac_unregister
+function is generally only called from a driver's
+.Xr attach 9E
+and
+.Xr detach 9E
+entry point. However, both functions may be called from either
+.Sy user
+or
+.Sy kernel
+context.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn mac_register
+and
+.Fn mac_unregister
+functions both return
+.Sy 0 .
+Otherwise, they return an error number.
+.Sh EXAMPLES
+The following example shows how a device driver might call the
+.Fn mac_register
+function.
+.Bd -literal
+#include <sys/mac_provider.h>
+#include <sys/mac_ether.h>
+
+/*
+ * The call to mac_register(9F) generally comes from the context of
+ * attach(9E). This function encapsulates setting up and initializing
+ * the mac_register_t structure and should be assumed to be called from
+ * attach.
+ *
+ * The exact set of callbacks and private properties will vary based
+ * upon the driver.
+ */
+
+static char *example_priv_props[] = {
+	"_rx_intr_throttle",
+	"_tx_intr_throttle",
+	NULL
+};
+
+static mac_callbacks_t example_m_callbacks = {
+	.mc_callbacsk = MC_GETCAPAB | MC_SETPROP | MC_GETPROP | MC_PROPINFO |
+	    MC_IOCTL,
+	.mc_start = example_m_start,
+	.mc_stop = example_m_stop,
+	.mc_setpromisc = example_m_setpromisc,
+	.mc_multicst = example_m_multicst,
+	.mc_unicst = example_m_unicst,
+	.mc_tx = example_m_tx,
+	.mc_ioctl = example_m_ioctl,
+	.mc_getcapab = example_m_getcapab,
+	.mc_getprop = example_m_getprop,
+	.mc_setprop = example_m_setprop,
+	.mc_propinfo = example_m_propinfo
+};
+
+static boolean_t
+example_register_mac(example_t *ep)
+{
+	int status;
+	mac_register_t *mac;
+
+	mac = mac_alloc(MAC_VERSION);
+	if (mac == NULL)
+		return (B_FALSE);
+
+	mac->m_type_indent = MAC_PLUGIN_IDENT_ETHER;
+	mac->m_driver = ep;
+	mac->m_dip = ep->ep_dev_info;
+	mac->m_src_addr = ep->ep_mac_addr;
+	mac->m_callbacks = &example_m_callbacks;
+	mac->m_min_sdu = 0;
+	mac->m_max_sdu = ep->ep_sdu;
+	mac->m_margin = VLAN_TAGSZ;
+	mac->m_priv_props = exmple_priv_props;
+
+	status = mac_register(mac, &ep->ep_mac_hdl);
+	mac_free(mac);
+
+	return (status == 0);
+}
+.Ed
+.Sh ERRORS
+The
+.Fn mac_register
+function may fail if:
+.Bl -tag -width Er
+.It EEXIST
+A driver with the same name and instance already exists.
+.It EINVAL
+There was something invalid with the device's registration information.
+Some of the following reasons may apply, this list is not exhaustive:
+.Bl -bullet
+.It
+The
+.Xr mac_init_ops 9F
+function was not called.
+.It
+The specified mac plugin does not exist.
+.It
+An invalid minor number was used.
+.It
+The default unicast source address was incorrect.
+.It
+The plugin specific private data was incorrect or missing.
+.It
+Plugin specific data was provided when none is required.
+.It
+Required callback functions are not specified.
+.It
+The system was unable to properly create minor nodes.
+.El
+.It ENOSPC
+The
+.Xr mac 9E
+framework was unable to allocate a minor number for the device as they
+have all been exhausted.
+.El
+.Pp
+The
+.Fn mac_unregister
+function will fail if:
+.Bl -tag -width Er
+.It Er EBUSY
+The device is still in use.
+.It Er ENOTEMPTY
+The flow table is not empty.
+.El
+.Pp
+Note the set of errors for both the
+.Fn mac_regster
+and
+.Fn mac_unregister
+functions are not set in stone and may be expanded in future revisions.
+In general, all errors should be handled by the device driver in similar
+ways for these functions.
+.Sh SEE ALSO
+.Xr attach 9E ,
+.Xr detach 9E ,
+.Xr mac 9E ,
+.Xr mac_alloc 9F ,
+.Xr mac_init_ops 9F ,
+.Xr mac_callbacks 9S ,
+.Xr mac_register 9S

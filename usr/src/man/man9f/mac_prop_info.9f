@@ -1,0 +1,210 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2016 Joyent, Inc.
+.\"
+.Dd May 31, 2016
+.Dt MAC_PROP_INFO 9F
+.Os
+.Sh NAME
+.Nm mac_prop_info ,
+.Nm mac_prop_info_set_default_link_flowctrl ,
+.Nm mac_prop_info_set_default_str ,
+.Nm mac_prop_info_set_default_uint8 ,
+.Nm mac_prop_info_set_default_uint32 ,
+.Nm mac_prop_info_set_default_uint64 ,
+.Nm mac_prop_info_set_perm ,
+.Nm mac_prop_info_set_range_uint32
+.Nd mac property information functions
+.Sh SYNOPSIS
+.In sys/mac_provider.h
+.Ft void
+.Fo mac_prop_info_set_default_link_flowctrl
+.Fa "mac_prop_info_handle_t hdl"
+.Fa "link_flowctrl_t fctl"
+.Fc
+.Ft void
+.Fo mac_prop_info_set_default_str
+.Fa "mac_prop_info_handle_t hdl"
+.Fa "const char *str"
+.Fc
+.Ft void
+.Fo mac_prop_info_set_default_uint8
+.Fa "mac_prop_info_handle_t hdl"
+.Fa "uint8_t u8"
+.Fc
+.Ft void
+.Fo mac_prop_info_set_default_uint16
+.Fa "mac_prop_info_handle_t hdl"
+.Fa "uint16_t u16"
+.Fc
+.Ft void
+.Fo mac_prop_info_set_default_uint32
+.Fa "mac_prop_info_handle_t hdl"
+.Fa "uint32_t u32"
+.Fc
+.Ft void
+.Fo mac_prop_info_set_perm
+.Fa "mac_prop_info_handle_t hdl"
+.Fa "uint8_t perm"
+.Fc
+.Ft void
+.Fo mac_prop_info_set_range_uint32
+.Fa "mac_prop_info_handle_t hdl"
+.Fa "uint32_t low"
+.Fa "uint32_t high"
+.Fc
+.Sh INTERFACE LEVEL
+illumos DDI specific
+.Sh PARAMETERS
+.Bl -tag -width Ds
+.It Ft hdl
+A pointer to the MAC property information handle.
+.It Ft fctl
+A valid link flow control entry. Valid values are documented in the
+.Sy MAC_PROP_FLOWCTRL
+property description in the
+.Sx PROPERTIES
+section of
+.Xr mac 9E .
+.It Ft str
+A null-terminated ASCII character string that describes that contains a
+value of a property.
+.It Ft u8
+An 8-bit unsigned value.
+.It Ft u16
+An 16-bit unsigned value.
+.It Ft u32
+An 32-bit unsigned value.
+.It Ft perm
+An 8-bit unsigned value which is the bitwise inclusive OR of the
+following values:
+.Bl -tag -width Ds
+.It Sy MAC_PROP_PERM_READ
+This flag indicates that a property is
+.Sy readable .
+.It Sy MAC_PROP_PERM_WRITE
+This flag indicates that a property is
+.Sy writable .
+.It Sy MAC_PROP_PERM_RW
+This flag indicates that a property is both
+.Sy readable
+and
+.Sy writeable .
+This is equivalent to specifying both
+.Sy MAC_PROP_PERM_READ
+and
+.Sy MAC_PROP_PERM_WRITE .
+.El
+.It Ft low
+A 32-bit unsigned value that represents the lowest possible value of an
+integer property, generally inclusive.
+.It Ft high
+A 32-bit unsigned value that represents the highest possible value an
+integer property, generally inclusive.
+.El
+.Sh DESCRIPTION
+The
+.Sy mac_prop_info
+family of functions are used to fill in metadata about a given property
+as part of a driver's
+.Xr mc_propinfo 9E
+entry point. These functions can be used to fill in information about
+the default value that the device assigns to a property and the
+permissions that a privileged user has to update the property.
+.Pp
+The
+.Fn mac_prop_info_set_perm
+function is used to set the permissions of a property. These permissions
+indicate whether or not the property can be read or modified from the
+device driver's perspective. The permissions for a given property should
+generally not change for a given device and they do not need to take
+into account user privileges. For the most case, properties will only
+take one of two values:
+.Sy MAC_PROP_PERM_READ
+or
+.Sy MAC_PROP_PERM_RW .
+Usually it does not make sense for a property to just have
+.Sy MAC_PROP_PERM_WRITE .
+.Pp
+Subsequent calls to the
+.Fn mac_prop_info_set_perm
+function will override the values stored in previous calls.
+.Pp
+The
+.Fn mac_prop_info_set_range_uint32
+function is used to indicate a range of possible integer values that a
+device may take. This range is generally inclusive, meaning the property
+may be set to any value in the range of
+.Fa low
+to
+.Fa high .
+Each time the
+.Fn mac_prop_info_set_range_uint32
+function is called, a new property range is added, allowing for multiple
+disjoint ranges to be specified for a given property.
+.Pp
+The remaining functions,
+.Fn mac_prop_info_set_default_link_flowctrl ,
+.Fn mac_prop_info_set_default_str ,
+.Fn mac_prop_info_set_uint8 ,
+.Fn mac_prop_info_set_uint16 ,
+.Fn mac_prop_info_set_uint32 ,
+and
+.Fn mac_prop_info_set_range_uint32
+update the default value of a given property. The default value is the
+initial value that the property takes after the device driver has called
+.Xr mac_register 9F .
+If these functions are called multiple times, then the default value
+will be replaced with each call.
+.Pp
+The different functions each support a different type of default value
+and some are used for specific properties. The
+.Fn mac_prop_info_set_default_link_flowctrl
+function works with properties that describe flow control properties.
+The various values of a
+.Ft link_flowctrl_t
+are documented in
+.Xr mac 9E .
+.Pp
+The
+.Fn mac_prop_info_set_default_str
+function sets the default value for properties that use strings. The
+device driver should ensure that it uses alphanumeric ASCII characters
+only in the string to guarantee portability.
+.Pp
+The
+.Fn mac_prop_info_set_default_uint8 ,
+.Fn mac_prop_info_set_default_uint16 ,
+and
+.Fn mac_prop_info_set_default_uint32
+functions set the default value for values whose properties are 8-, 16-,
+and 32-bit unsigned values respectively.
+.Sh CONTEXT
+These functions are generally called on a handle passed into the
+.Xr mc_propinfo 9E
+entry point, though they function in both
+.Sy user
+and
+.Sy kernel
+context.
+.Sh RETURN VALUES
+All of the functions documented here do not return a value. It is not
+the driver's responsibility to ensure that there is sufficient space for
+permissions, ranges, or default values in the
+.Ft mac_prop_info_handle_t
+structures: the surrounding driver framework will transparently take
+care of that and ensure that errors are correctly propagated.
+.Sh SEE ALSO
+.Xr mac 9E ,
+.Xr mc_getprop 9E ,
+.Xr mc_propinfo 9E ,
+.Xr mc_setprop 9E

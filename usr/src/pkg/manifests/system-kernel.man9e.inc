@@ -36,6 +36,19 @@ file path=usr/share/man/man9e/identify.9e
 file path=usr/share/man/man9e/ioctl.9e
 file path=usr/share/man/man9e/ks_snapshot.9e
 file path=usr/share/man/man9e/ks_update.9e
+file path=usr/share/man/man9e/mac.9e
+file path=usr/share/man/man9e/mc_getcapab.9e
+file path=usr/share/man/man9e/mc_getprop.9e
+file path=usr/share/man/man9e/mc_getstat.9e
+file path=usr/share/man/man9e/mc_ioctl.9e
+file path=usr/share/man/man9e/mc_multicst.9e
+file path=usr/share/man/man9e/mc_open.9e
+file path=usr/share/man/man9e/mc_propinfo.9e
+file path=usr/share/man/man9e/mc_setpromisc.9e
+file path=usr/share/man/man9e/mc_setprop.9e
+file path=usr/share/man/man9e/mc_start.9e
+file path=usr/share/man/man9e/mc_tx.9e
+file path=usr/share/man/man9e/mc_unicst.9e
 file path=usr/share/man/man9e/mmap.9e
 file path=usr/share/man/man9e/open.9e
 file path=usr/share/man/man9e/power.9e
@@ -63,6 +76,8 @@ file path=usr/share/man/man9e/tran_tgt_free.9e
 file path=usr/share/man/man9e/tran_tgt_init.9e
 file path=usr/share/man/man9e/tran_tgt_probe.9e
 file path=usr/share/man/man9e/write.9e
+link path=usr/share/man/man9e/GLDv3.9e target=mac.9e
+link path=usr/share/man/man9e/MAC.9e target=mac.9e
 link path=usr/share/man/man9e/_info.9e target=_fini.9e
 link path=usr/share/man/man9e/_init.9e target=_fini.9e
 link path=usr/share/man/man9e/gldm_get_stats.9e target=gld.9e
@@ -75,7 +90,10 @@ link path=usr/share/man/man9e/gldm_set_multicast.9e target=gld.9e
 link path=usr/share/man/man9e/gldm_set_promiscuous.9e target=gld.9e
 link path=usr/share/man/man9e/gldm_start.9e target=gld.9e
 link path=usr/share/man/man9e/gldm_stop.9e target=gld.9e
+link path=usr/share/man/man9e/gldv3.9e target=mac.9e
 link path=usr/share/man/man9e/intro.9e target=Intro.9e
+link path=usr/share/man/man9e/mc_close.9e target=mc_open.9e
+link path=usr/share/man/man9e/mc_stop.9e target=mc_start.9e
 link path=usr/share/man/man9e/tran_destroy_pkt.9e target=tran_init_pkt.9e
 link path=usr/share/man/man9e/tran_pkt_constructor.9e target=tran_setup_pkt.9e
 link path=usr/share/man/man9e/tran_pkt_destructor.9e target=tran_setup_pkt.9e
