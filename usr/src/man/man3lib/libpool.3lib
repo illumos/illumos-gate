@@ -382,7 +382,7 @@ T}
 .sp
 .LP
 The \fBcpu.comment\fR, \fBcpu.pinned\fR, and \fBcpu.status\fR properties are
-writeable.
+writable.
 .sp
 .LP
 The \fBcpu.status\fR property can be set only to the following values:

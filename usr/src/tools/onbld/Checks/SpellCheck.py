@@ -242,6 +242,7 @@ misspellings = {
 }
 
 alternates = {
+	'writeable': 'writable'
 }
 
 misspellingREs = []
