@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2011, Joyent Inc. All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  * Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright (c) 2013, 2014 by Delphix. All rights reserved.
  */
@@ -105,7 +105,7 @@ extern sock_downcalls_t sock_tcp_downcalls;
  */
 #define	TCP_IS_DETACHED(tcp)	((tcp)->tcp_detached)
 
-/* TCP timers related data strucutres.  Refer to tcp_timers.c. */
+/* TCP timers related data structures.  Refer to tcp_timers.c. */
 typedef struct tcp_timer_s {
 	conn_t	*connp;
 	void 	(*tcpt_proc)(void *);
@@ -132,48 +132,79 @@ extern kmem_cache_t *tcp_timercache;
 	(tcp)->tcp_timer_tid = TCP_TIMER((tcp), tcp_timer, (intvl));	\
 }
 
+
+/*
+ * Maximum TIME_WAIT timeout.  It is defined here (instead of tcp_tunables.c)
+ * so that other parameters can be derived from it.
+ */
+#define	TCP_TIME_WAIT_MAX	(10 * MINUTES)
+
+/*
+ * TCP_TIME_WAIT_DELAY governs how often the time_wait_collector runs.
+ * Running it every 5 seconds seems to yield a reasonable balance between
+ * cleanup liveliness and system load.
+ */
+#define	TCP_TIME_WAIT_DELAY	(5 * SECONDS)
+
+#define	TCP_TIME_WAIT_BUCKETS	((TCP_TIME_WAIT_MAX / TCP_TIME_WAIT_DELAY) + 1)
+
 /*
  * For scalability, we must not run a timer for every TCP connection
  * in TIME_WAIT state.  To see why, consider (for time wait interval of
  * 1 minutes):
  *	10,000 connections/sec * 60 seconds/time wait = 600,000 active conn's
  *
- * This list is ordered by time, so you need only delete from the head
- * until you get to entries which aren't old enough to delete yet.
- * The list consists of only the detached TIME_WAIT connections.
+ * Since TIME_WAIT expiration occurs on a per-squeue basis, handling
+ * connections from all netstacks on the system, a simple queue is inadequate
+ * for pending entries.  This is because tcp_time_wait_interval may differ
+ * between connections, causing tail insertion to violate expiration order.
+ *
+ * Instead of performing expensive sorting or unnecessary list traversal to
+ * counteract interval variance between netstacks, a timing wheel structure is
+ * used.  The duration covered by each bucket in the wheel is determined by the
+ * TCP_TIME_WAIT_DELAY (5 seconds).  The number of buckets in the wheel is
+ * determined by dividing the maximum TIME_WAIT interval (10 minutes) by
+ * TCP_TIME_WAIT_DELAY, with one added bucket for rollover protection.
+ * (Yielding 121 buckets with the current parameters)  When items are inserted
+ * into the set of buckets, they are indexed by using their expiration time
+ * divided by the bucket size, modulo the number of buckets.  This means that
+ * when each bucket is processed, all items within should have expired within
+ * the last TCP_TIME_WAIT_DELAY interval.
+ *
+ * Since bucket timer schedules are rounded to the nearest TCP_TIME_WAIT_DELAY
+ * interval to ensure all connections in the pending bucket will be expired, a
+ * per-squeue offset is used when doing TIME_WAIT scheduling.  This offset is
+ * between 0 and the TCP_TIME_WAIT_DELAY and is designed to avoid scheduling
+ * all of the tcp_time_wait_collector threads to run in lock-step.  The offset
+ * is fixed while there are any connections present in the buckets.
  *
  * When a tcp_t enters TIME_WAIT state, a timer is started (timeout is
  * tcps_time_wait_interval).  When the tcp_t is detached (upper layer closes
- * the end point), it is moved to the time wait list and another timer is
- * started (expiry time is set at tcp_time_wait_expire, which is
- * also calculated using tcps_time_wait_interval).  This means that the
- * TIME_WAIT state can be extended (up to doubled) if the tcp_t doesn't
- * become detached for a long time.
+ * the end point), it is scheduled to be cleaned up by the squeue-driving
+ * tcp_time_wait_collector (also using tcps_time_wait_interval).  This means
+ * that the TIME_WAIT state can be extended (up to doubled) if the tcp_t
+ * doesn't become detached for a long time.
  *
  * The list manipulations (including tcp_time_wait_next/prev)
  * are protected by the tcp_time_wait_lock. The content of the
  * detached TIME_WAIT connections is protected by the normal perimeters.
  *
- * This list is per squeue and squeues are shared across the tcp_stack_t's.
- * Things on tcp_time_wait_head remain associated with the tcp_stack_t
- * and conn_netstack.
- * The tcp_t's that are added to tcp_free_list are disassociated and
- * have NULL tcp_tcps and conn_netstack pointers.
+ * These connection lists are per squeue and squeues are shared across the
+ * tcp_stack_t instances.  Things in a tcp_time_wait_bucket remain associated
+ * with the tcp_stack_t and conn_netstack.  Any tcp_t connections stored in the
+ * tcp_free_list are disassociated and have NULL tcp_tcps and conn_netstack
+ * pointers.
  */
 typedef struct tcp_squeue_priv_s {
 	kmutex_t	tcp_time_wait_lock;
+	boolean_t	tcp_time_wait_collector_active;
 	callout_id_t	tcp_time_wait_tid;
-	tcp_t		*tcp_time_wait_head;
-	tcp_t		*tcp_time_wait_tail;
+	uint64_t	tcp_time_wait_cnt;
+	int64_t		tcp_time_wait_schedule;
+	int64_t		tcp_time_wait_offset;
+	tcp_t		*tcp_time_wait_bucket[TCP_TIME_WAIT_BUCKETS];
 	tcp_t		*tcp_free_list;
 	uint_t		tcp_free_list_cnt;
-#ifdef DEBUG
-	/*
-	 * For debugging purpose, true when tcp_time_wait_collector() is
-	 * running.
-	 */
-	boolean_t	tcp_time_wait_running;
-#endif
 } tcp_squeue_priv_t;
 
 /*

@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2011, Joyent Inc. All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
  */
@@ -249,7 +249,7 @@ mod_prop_info_t tcp_propinfo_tbl[] = {
 	/* tunable - 0 */
 	{ "_time_wait_interval", MOD_PROTO_TCP,
 	    mod_set_uint32, mod_get_uint32,
-	    {1*SECONDS, 10*MINUTES, 1*MINUTES}, {1*MINUTES} },
+	    {1*SECONDS, TCP_TIME_WAIT_MAX, 1*MINUTES}, {1*MINUTES} },
 
 	{ "_conn_req_max_q", MOD_PROTO_TCP,
 	    mod_set_uint32, mod_get_uint32,
