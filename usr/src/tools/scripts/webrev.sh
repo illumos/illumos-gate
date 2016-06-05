@@ -26,6 +26,7 @@
 # Copyright 2012 Marcel Telka <marcel@telka.sk>
 # Copyright 2014 Bart Coddens <bart.coddens@gmail.com>
 # Copyright 2016 Nexenta Systems, Inc.
+# Copyright 2016 Joyent, Inc.
 #
 
 #
@@ -3119,8 +3120,22 @@ do
 	#
 	OWD=$PWD
 	cd $WDIR/raw_files
-	ofile=old/$PDIR/$PF
-	nfile=new/$DIR/$F
+
+	#
+	# The "git apply" command does not tolerate the spurious
+	# "./" that we otherwise insert; be careful not to include
+	# it in the paths that we pass to diff(1).
+	#
+	if [[ $PDIR == "." ]]; then
+		ofile=old/$PF
+	else
+		ofile=old/$PDIR/$PF
+	fi
+	if [[ $DIR == "." ]]; then
+		nfile=new/$F
+	else
+		nfile=new/$DIR/$F
+	fi
 
 	mv_but_nodiff=
 	cmp $ofile $nfile > /dev/null 2>&1
