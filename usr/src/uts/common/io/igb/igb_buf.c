@@ -231,7 +231,7 @@ igb_alloc_tbd_ring(igb_tx_ring_t *tx_ring)
 	    &tx_ring->tbd_area.dma_handle);
 
 	if (ret != DDI_SUCCESS) {
-		igb_error(igb,
+		igb_log(igb, IGB_LOG_ERROR,
 		    "Could not allocate tbd dma handle: %x", ret);
 		tx_ring->tbd_area.dma_handle = NULL;
 
@@ -249,7 +249,7 @@ igb_alloc_tbd_ring(igb_tx_ring_t *tx_ring)
 	    &len, &tx_ring->tbd_area.acc_handle);
 
 	if (ret != DDI_SUCCESS) {
-		igb_error(igb,
+		igb_log(igb, IGB_LOG_ERROR,
 		    "Could not allocate tbd dma memory: %x", ret);
 		tx_ring->tbd_area.acc_handle = NULL;
 		tx_ring->tbd_area.address = NULL;
@@ -276,7 +276,7 @@ igb_alloc_tbd_ring(igb_tx_ring_t *tx_ring)
 	    DDI_DMA_DONTWAIT, NULL, &cookie, &cookie_num);
 
 	if (ret != DDI_DMA_MAPPED) {
-		igb_error(igb,
+		igb_log(igb, IGB_LOG_ERROR,
 		    "Could not bind tbd dma resource: %x", ret);
 		tx_ring->tbd_area.dma_address = NULL;
 		if (tx_ring->tbd_area.acc_handle != NULL) {
@@ -339,7 +339,8 @@ igb_alloc_rx_ring_data(igb_rx_ring_t *rx_ring)
 	rx_data = kmem_zalloc(sizeof (igb_rx_data_t), KM_NOSLEEP);
 
 	if (rx_data == NULL) {
-		igb_error(igb, "Allocate software receive rings failed");
+		igb_log(igb, IGB_LOG_ERROR,
+		    "Allocate software receive rings failed");
 		return (IGB_FAILURE);
 	}
 
@@ -361,7 +362,7 @@ igb_alloc_rx_ring_data(igb_rx_ring_t *rx_ring)
 	    rx_data->ring_size, KM_NOSLEEP);
 
 	if (rx_data->work_list == NULL) {
-		igb_error(igb,
+		igb_log(igb, IGB_LOG_ERROR,
 		    "Could not allocate memory for rx work list");
 		goto alloc_rx_data_failure;
 	}
@@ -373,7 +374,7 @@ igb_alloc_rx_ring_data(igb_rx_ring_t *rx_ring)
 	    rx_data->free_list_size, KM_NOSLEEP);
 
 	if (rx_data->free_list == NULL) {
-		igb_error(igb,
+		igb_log(igb, IGB_LOG_ERROR,
 		    "Cound not allocate memory for rx free list");
 		goto alloc_rx_data_failure;
 	}
@@ -388,7 +389,7 @@ igb_alloc_rx_ring_data(igb_rx_ring_t *rx_ring)
 	    KM_NOSLEEP);
 
 	if (rx_data->rcb_area == NULL) {
-		igb_error(igb,
+		igb_log(igb, IGB_LOG_ERROR,
 		    "Cound not allocate memory for rx control blocks");
 		goto alloc_rx_data_failure;
 	}
@@ -460,7 +461,7 @@ igb_alloc_rbd_ring(igb_rx_data_t *rx_data)
 	    &rx_data->rbd_area.dma_handle);
 
 	if (ret != DDI_SUCCESS) {
-		igb_error(igb,
+		igb_log(igb, IGB_LOG_ERROR,
 		    "Could not allocate rbd dma handle: %x", ret);
 		rx_data->rbd_area.dma_handle = NULL;
 		return (IGB_FAILURE);
@@ -477,7 +478,7 @@ igb_alloc_rbd_ring(igb_rx_data_t *rx_data)
 	    &len, &rx_data->rbd_area.acc_handle);
 
 	if (ret != DDI_SUCCESS) {
-		igb_error(igb,
+		igb_log(igb, IGB_LOG_ERROR,
 		    "Could not allocate rbd dma memory: %x", ret);
 		rx_data->rbd_area.acc_handle = NULL;
 		rx_data->rbd_area.address = NULL;
@@ -503,7 +504,7 @@ igb_alloc_rbd_ring(igb_rx_data_t *rx_data)
 	    DDI_DMA_DONTWAIT, NULL, &cookie, &cookie_num);
 
 	if (ret != DDI_DMA_MAPPED) {
-		igb_error(igb,
+		igb_log(igb, IGB_LOG_ERROR,
 		    "Could not bind rbd dma resource: %x", ret);
 		rx_data->rbd_area.dma_address = NULL;
 		if (rx_data->rbd_area.acc_handle != NULL) {
@@ -573,7 +574,7 @@ igb_alloc_dma_buffer(igb_t *igb,
 
 	if (ret != DDI_SUCCESS) {
 		buf->dma_handle = NULL;
-		igb_error(igb,
+		igb_log(igb, IGB_LOG_ERROR,
 		    "Could not allocate dma buffer handle: %x", ret);
 		return (IGB_FAILURE);
 	}
@@ -590,7 +591,7 @@ igb_alloc_dma_buffer(igb_t *igb,
 			ddi_dma_free_handle(&buf->dma_handle);
 			buf->dma_handle = NULL;
 		}
-		igb_error(igb,
+		igb_log(igb, IGB_LOG_ERROR,
 		    "Could not allocate dma buffer memory: %x", ret);
 		return (IGB_FAILURE);
 	}
@@ -611,7 +612,7 @@ igb_alloc_dma_buffer(igb_t *igb,
 			ddi_dma_free_handle(&buf->dma_handle);
 			buf->dma_handle = NULL;
 		}
-		igb_error(igb,
+		igb_log(igb, IGB_LOG_ERROR,
 		    "Could not bind dma buffer handle: %x", ret);
 		return (IGB_FAILURE);
 	}
@@ -674,7 +675,7 @@ igb_alloc_tcb_lists(igb_tx_ring_t *tx_ring)
 	    tx_ring->ring_size, KM_NOSLEEP);
 
 	if (tx_ring->work_list == NULL) {
-		igb_error(igb,
+		igb_log(igb, IGB_LOG_ERROR,
 		    "Cound not allocate memory for tx work list");
 		return (IGB_FAILURE);
 	}
@@ -690,7 +691,7 @@ igb_alloc_tcb_lists(igb_tx_ring_t *tx_ring)
 		    sizeof (tx_control_block_t *) * tx_ring->ring_size);
 		tx_ring->work_list = NULL;
 
-		igb_error(igb,
+		igb_log(igb, IGB_LOG_ERROR,
 		    "Cound not allocate memory for tx free list");
 		return (IGB_FAILURE);
 	}
@@ -711,7 +712,7 @@ igb_alloc_tcb_lists(igb_tx_ring_t *tx_ring)
 		    sizeof (tx_control_block_t *) * tx_ring->free_list_size);
 		tx_ring->free_list = NULL;
 
-		igb_error(igb,
+		igb_log(igb, IGB_LOG_ERROR,
 		    "Cound not allocate memory for tx control blocks");
 		return (IGB_FAILURE);
 	}
@@ -736,7 +737,7 @@ igb_alloc_tcb_lists(igb_tx_ring_t *tx_ring)
 		    &tcb->tx_dma_handle);
 		if (ret != DDI_SUCCESS) {
 			tcb->tx_dma_handle = NULL;
-			igb_error(igb,
+			igb_log(igb, IGB_LOG_ERROR,
 			    "Could not allocate tx dma handle: %x", ret);
 			goto alloc_tcb_lists_fail;
 		}
@@ -754,7 +755,8 @@ igb_alloc_tcb_lists(igb_tx_ring_t *tx_ring)
 			ASSERT(tcb->tx_dma_handle != NULL);
 			ddi_dma_free_handle(&tcb->tx_dma_handle);
 			tcb->tx_dma_handle = NULL;
-			igb_error(igb, "Allocate tx dma buffer failed");
+			igb_log(igb, IGB_LOG_ERROR,
+			    "Allocate tx dma buffer failed");
 			goto alloc_tcb_lists_fail;
 		}
 		tcb->last_index = MAX_TX_RING_SIZE;
@@ -856,7 +858,8 @@ igb_alloc_rcb_lists(igb_rx_data_t *rx_data)
 		    rx_buf, igb->rx_buf_size);
 
 		if (ret != IGB_SUCCESS) {
-			igb_error(igb, "Allocate rx dma buffer failed");
+			igb_log(igb, IGB_LOG_ERROR,
+			    "Allocate rx dma buffer failed");
 			goto alloc_rcb_lists_fail;
 		}
 
