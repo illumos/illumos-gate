@@ -654,6 +654,7 @@ f kernel/drv/amd64/profile 0755 root sys
 f kernel/drv/amd64/pseudo 0755 root sys
 f kernel/drv/amd64/ptc 0755 root sys
 f kernel/drv/amd64/ptsl 0755 root sys
+f kernel/drv/amd64/pvscsi 0755 root sys
 f kernel/drv/amd64/qlc 0755 root sys
 f kernel/drv/amd64/qlge 0755 root sys
 f kernel/drv/amd64/ramdisk 0755 root sys
