@@ -38,41 +38,39 @@ extern "C" {
 #define	IGB_DEBUG
 #endif
 
-#ifdef IGB_DEBUG
+typedef enum {
+	IGB_LOG_NONE =	0,
+	IGB_LOG_ERROR =	1,
+	IGB_LOG_INFO =	2,
+	IGB_LOG_TRACE =	4
+} igb_debug_t;
 
 #define	IGB_DEBUGLOG_0(adapter, fmt)	\
-	igb_log((adapter), (fmt))
+	igb_log((adapter), (IGB_LOG_INFO), (fmt))
 #define	IGB_DEBUGLOG_1(adapter, fmt, d1)	\
-	igb_log((adapter), (fmt), (d1))
+	igb_log((adapter), (IGB_LOG_INFO), (fmt), (d1))
 #define	IGB_DEBUGLOG_2(adapter, fmt, d1, d2)	\
-	igb_log((adapter), (fmt), (d1), (d2))
+	igb_log((adapter), (IGB_LOG_INFO), (fmt), (d1), (d2))
 #define	IGB_DEBUGLOG_3(adapter, fmt, d1, d2, d3)	\
-	igb_log((adapter), (fmt), (d1), (d2), (d3))
+	igb_log((adapter), (IGB_LOG_INFO), (fmt), (d1), (d2), (d3))
 
+#ifdef IGB_DEBUG
+#define	IGB_DEBUGFUNC(fmt)		igb_log((NULL), (IGB_LOG_TRACE), (fmt))
 #define	IGB_DEBUG_STAT_COND(val, cond)	if (cond) (val)++
 #define	IGB_DEBUG_STAT(val)		(val)++
-
 #else
-
-#define	IGB_DEBUGLOG_0(adapter, fmt)
-#define	IGB_DEBUGLOG_1(adapter, fmt, d1)
-#define	IGB_DEBUGLOG_2(adapter, fmt, d1, d2)
-#define	IGB_DEBUGLOG_3(adapter, fmt, d1, d2, d3)
-
+#define	IGB_DEBUGFUNC(fmt)
 #define	IGB_DEBUG_STAT_COND(val, cond)
 #define	IGB_DEBUG_STAT(val)
-
 #endif	/* IGB_DEBUG */
 
 #define	IGB_STAT(val)		(val)++
 
 #ifdef IGB_DEBUG
-
 void pci_dump(void *);
-
 #endif	/* IGB_DEBUG */
 
-extern void igb_log(void *, const char *, ...);
+void igb_log(void *, igb_debug_t, const char *, ...);
 
 #ifdef __cplusplus
 }

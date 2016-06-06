@@ -68,6 +68,12 @@ extern boolean_t door_created;
 	(object_attrlist_t **)realloc((object_attrlist_t *)old, \
 	(unsigned)(n+2) * sizeof (object_attrlist_t *))
 
+#if LIBXML_VERSION >= 20904
+#define	XMLSTRING_CAST (const char *)
+#else
+#define	XMLSTRING_CAST (const xmlChar *)
+#endif
+
 /* operation table */
 static op_table_entry_t op_table[] = {
 	{GET, get_op},
@@ -115,7 +121,7 @@ get_op_id_from_doc(xmlXPathContextPtr ctext)
 
 	for (i = 0; op_table[i].op_str != NULL; i++) {
 	    (void) xmlStrPrintf(expr, ISNS_MAX_LABEL_LEN + 13,
-		(const unsigned char *)"%s\"%s\"]", "//*[name()=",
+		XMLSTRING_CAST "%s\"%s\"]", "//*[name()=",
 		op_table[i].op_str);
 	    xpath_obj = xmlXPathEvalExpression(expr, ctext);
 	    if ((xpath_obj) && (xpath_obj->nodesetval) &&
@@ -159,7 +165,7 @@ process_get_request_from_doc(xmlXPathContextPtr ctext, request_t *req)
 
 	isnslog(LOG_DEBUG, "process_get_request_from_doc", "entered");
 	(void) xmlStrPrintf(expr, ISNS_MAX_LABEL_LEN + 13,
-	    (const unsigned char *)"%s\"%s\"]", "//*[name()=", ISNSOBJECT);
+	    XMLSTRING_CAST "%s\"%s\"]", "//*[name()=", ISNSOBJECT);
 	xpath_obj = xmlXPathEvalExpression(expr, ctext);
 	if ((xpath_obj) && (xpath_obj->nodesetval) &&
 	    (xpath_obj->nodesetval->nodeTab) &&
@@ -186,7 +192,7 @@ process_get_request_from_doc(xmlXPathContextPtr ctext, request_t *req)
 	if (obj == 0) {
 	    /* check the server config request. */
 	    (void) xmlStrPrintf(expr, ISNS_MAX_LABEL_LEN + 13,
-	    (const unsigned char *)"%s\"%s\"]", "//*[name()=", ISNSSERVER);
+	    XMLSTRING_CAST "%s\"%s\"]", "//*[name()=", ISNSSERVER);
 	    xpath_obj = xmlXPathEvalExpression(expr, ctext);
 	    if ((xpath_obj) && (xpath_obj->nodesetval) &&
 		(xpath_obj->nodesetval->nodeNr > 0) &&
@@ -213,7 +219,7 @@ process_get_request_from_doc(xmlXPathContextPtr ctext, request_t *req)
 	}
 
 	(void) xmlStrPrintf(expr, ISNS_MAX_LABEL_LEN + 12,
-	    (const unsigned char *)"%s\"%s\"]", "//*[name()=",
+	    XMLSTRING_CAST "%s\"%s\"]", "//*[name()=",
 	    obj_table[i].obj_str);
 	xpath_obj = xmlXPathEvalExpression(expr, ctext);
 	if (((xpath_obj == NULL) || (xpath_obj->nodesetval == NULL) ||
@@ -284,7 +290,7 @@ process_enumerate_request_from_doc(xmlXPathContextPtr ctext, request_t *req)
 
 	isnslog(LOG_DEBUG, "process_enumerate_request_from_doc", "entered");
 	(void) xmlStrPrintf(expr, ISNS_MAX_LABEL_LEN + 13,
-	    (const unsigned char *)"%s\"%s\"]", "//*[name()=", ISNSOBJECTTYPE);
+	    XMLSTRING_CAST "%s\"%s\"]", "//*[name()=", ISNSOBJECTTYPE);
 	xpath_obj = xmlXPathEvalExpression(expr, ctext);
 	isnslog(LOG_DEBUG, "process_enumerate_request_from_doc",
 	"xpath obj->nodesetval->nodeNR: %d", xpath_obj->nodesetval->nodeNr);
@@ -345,7 +351,7 @@ process_getAssociated_request_from_doc(xmlXPathContextPtr ctext, request_t *req)
 
 	isnslog(LOG_DEBUG, "process_getAssociated_request_from_doc", "entered");
 	(void) xmlStrPrintf(expr, ISNS_MAX_LABEL_LEN + 13,
-	    (const unsigned char *)"%s\"%s\"]", "//*[name()=", ASSOCIATIONTYPE);
+	    XMLSTRING_CAST "%s\"%s\"]", "//*[name()=", ASSOCIATIONTYPE);
 	xpath_obj = xmlXPathEvalExpression(expr, ctext);
 	if ((xpath_obj) && (xpath_obj->nodesetval) &&
 		(xpath_obj->nodesetval->nodeNr > 0) &&
@@ -378,7 +384,7 @@ process_getAssociated_request_from_doc(xmlXPathContextPtr ctext, request_t *req)
 	    /* using the same algorithm for isns object */
 	    case DiscoveryDomainMember:
 		(void) xmlStrPrintf(expr, ISNS_MAX_LABEL_LEN + 13,
-		(const unsigned char *)"%s\"%s\"]", "//*[name()=", NODEOBJECT);
+		XMLSTRING_CAST "%s\"%s\"]", "//*[name()=", NODEOBJECT);
 		xpath_obj = xmlXPathEvalExpression(expr, ctext);
 		r_nodes = xpath_obj->nodesetval;
 		if ((xpath_obj) && (xpath_obj->nodesetval) &&
@@ -388,7 +394,7 @@ process_getAssociated_request_from_doc(xmlXPathContextPtr ctext, request_t *req)
 		} else {
 		    if (xpath_obj) xmlXPathFreeObject(xpath_obj);
 		    (void) xmlStrPrintf(expr, ISNS_MAX_LABEL_LEN + 13,
-		    (const unsigned char *)"%s\"%s\"]", "//*[name()=",
+		    XMLSTRING_CAST "%s\"%s\"]", "//*[name()=",
 		    DDOBJECT);
 		    xpath_obj = xmlXPathEvalExpression(expr, ctext);
 		    r_nodes = xpath_obj->nodesetval;
@@ -404,7 +410,7 @@ process_getAssociated_request_from_doc(xmlXPathContextPtr ctext, request_t *req)
 		break;
 	    case DiscoveryDomainSetMember:
 		(void) xmlStrPrintf(expr, ISNS_MAX_LABEL_LEN + 13,
-		(const unsigned char *)"%s\"%s\"]", "//*[name()=", DDSETOBJECT);
+		XMLSTRING_CAST "%s\"%s\"]", "//*[name()=", DDSETOBJECT);
 		xpath_obj = xmlXPathEvalExpression(expr, ctext);
 		r_nodes = xpath_obj->nodesetval;
 		if ((xpath_obj) && (xpath_obj->nodesetval) &&
@@ -414,7 +420,7 @@ process_getAssociated_request_from_doc(xmlXPathContextPtr ctext, request_t *req)
 		} else {
 		    if (xpath_obj) xmlXPathFreeObject(xpath_obj);
 		    (void) xmlStrPrintf(expr, ISNS_MAX_LABEL_LEN + 13,
-		    (const unsigned char *)"%s\"%s\"]", "//*[name()=",
+		    XMLSTRING_CAST "%s\"%s\"]", "//*[name()=",
 			DDOBJECT);
 		    xpath_obj = xmlXPathEvalExpression(expr, ctext);
 		    r_nodes = xpath_obj->nodesetval;
@@ -487,7 +493,7 @@ process_delete_request_from_doc(xmlXPathContextPtr ctext, request_t *req)
 	isnslog(LOG_DEBUG, "process_delete_request_from_doc", "entered");
 	for (i = 0; obj_table[i].obj_str != NULL; i++) {
 	    (void) xmlStrPrintf(expr, ISNS_MAX_LABEL_LEN + 13,
-		(const unsigned char *)"%s\"%s\"]", "//*[name()=",
+		XMLSTRING_CAST "%s\"%s\"]", "//*[name()=",
 		obj_table[i].obj_str);
 	    xpath_obj = xmlXPathEvalExpression(expr, ctext);
 	    if ((xpath_obj) && (xpath_obj->nodesetval) &&
@@ -677,7 +683,7 @@ process_createModify_request_from_doc(xmlXPathContextPtr ctext, request_t *req)
 	isnslog(LOG_DEBUG, "process_createModify_request_from_doc", "entered");
 	for (i = 0; obj_table[i].obj_str != NULL; i++) {
 	    (void) xmlStrPrintf(expr, ISNS_MAX_LABEL_LEN + 13,
-		(const unsigned char *)"%s\"%s\"]", "//*[name()=",
+		XMLSTRING_CAST "%s\"%s\"]", "//*[name()=",
 		obj_table[i].obj_str);
 	    xpath_obj = xmlXPathEvalExpression(expr, ctext);
 	    if ((xpath_obj) && (xpath_obj->nodesetval) &&
@@ -1099,7 +1105,7 @@ build_mgmt_response(xmlChar **response, request_t req, int *size)
 	    ctext = xmlXPathNewContext(doc);
 	    if (ctext != NULL) {
 		(void) xmlStrPrintf(expr, ISNS_MAX_LABEL_LEN + 13,
-		    (const unsigned char *)"%s\"%s\"]", "//*[name()=", RESULT);
+		    XMLSTRING_CAST "%s\"%s\"]", "//*[name()=", RESULT);
 		xpath_obj = xmlXPathEvalExpression(expr, ctext);
 		if ((xpath_obj == NULL) || (xpath_obj->nodesetval == NULL) ||
 		    (xpath_obj->nodesetval->nodeNr <= 0) ||

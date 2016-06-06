@@ -27,6 +27,7 @@
 
 #
 # Copyright (c) 2013, 2015 by Delphix. All rights reserved.
+# Copyright 2016 Nexenta Systems, Inc.
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -43,7 +44,7 @@
 
 verify_runnable "global"
 
-volsize=$(zfs get -H -o value volsize $TESTPOOL/$TESTVOL)
+volsize=$($ZFS get -H -o value volsize $TESTPOOL/$TESTVOL)
 
 function cleanup
 {
@@ -54,7 +55,7 @@ function cleanup
 	(( $? == 0 )) && log_must $UMOUNT $TESTDIR
 
 	[[ -e $TESTDIR ]] && $RM -rf $TESTDIR
-	zfs set volsize=$volsize $TESTPOOL/$TESTVOL
+	$ZFS set volsize=$volsize $TESTPOOL/$TESTVOL
 }
 
 log_assert "Verify that ZFS volume snapshot could be fscked"
@@ -64,7 +65,7 @@ TESTVOL='testvol'
 BLOCKSZ=$(( 1024 * 1024 ))
 NUM_WRITES=40
 
-log_must zfs set volsize=128m $TESTPOOL/$TESTVOL
+log_must $ZFS set volsize=128m $TESTPOOL/$TESTVOL
 
 $ECHO "y" | $NEWFS -v /dev/zvol/rdsk/$TESTPOOL/$TESTVOL >/dev/null 2>&1
 (( $? != 0 )) && log_fail "Unable to newfs(1M) $TESTPOOL/$TESTVOL"

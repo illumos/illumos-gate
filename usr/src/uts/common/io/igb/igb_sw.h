@@ -856,13 +856,6 @@ uint32_t igb_tx_recycle_legacy(igb_tx_ring_t *);
 uint32_t igb_tx_recycle_head_wb(igb_tx_ring_t *);
 
 /*
- * Function prototypes in igb_log.c
- */
-void igb_notice(void *, const char *, ...);
-void igb_log(void *, const char *, ...);
-void igb_error(void *, const char *, ...);
-
-/*
  * Function prototypes in igb_stat.c
  */
 int igb_init_stats(igb_t *);

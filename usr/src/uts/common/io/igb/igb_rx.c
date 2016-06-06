@@ -157,7 +157,8 @@ igb_rx_copy(igb_rx_data_t *rx_data, uint32_t index, uint32_t pkt_len)
 	 */
 	mp = allocb(pkt_len + IPHDR_ALIGN_ROOM, 0);
 	if (mp == NULL) {
-		igb_log(igb, "igb_rx_copy: allocate buffer failed");
+		igb_log(igb, IGB_LOG_INFO,
+		    "igb_rx_copy: allocate buffer failed");
 		return (NULL);
 	}
 

@@ -27,6 +27,7 @@
 
 #
 # Copyright (c) 2013, 2015 by Delphix. All rights reserved.
+# Copyright 2016 Nexenta Systems, Inc.
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -44,7 +45,7 @@
 
 verify_runnable "global"
 
-volsize=$(zfs get -H -o value volsize $TESTPOOL/$TESTVOL)
+volsize=$($ZFS get -H -o value volsize $TESTPOOL/$TESTVOL)
 
 function cleanup
 {
@@ -64,7 +65,7 @@ function cleanup
 			log_must $ZFS destroy $TESTPOOL/$TESTVOL@$snap
 		fi
 	done
-	zfs set volsize=$volsize $TESTPOOL/$TESTVOL
+	$ZFS set volsize=$volsize $TESTPOOL/$TESTVOL
 }
 
 function verify_snapshot
