@@ -1,3 +1,18 @@
+This is an attempt to port over LX zones into OmniOS.  It's going to be a long,
+painful slog, and I don't mean the ZFS kind, either.  :)
+
+These bits will ONU, and work on a global-only boot.  ipkg & lipkg zones
+do not boot yet, and LX hasn't even been tried yet (not until I sort out
+ipkg & lipkg).  Feel free to discuss this on the OmniOS discussion list.
+
+I may occasionally burn this repo to the ground and start fresh.
+
+This repo also has the "joyent" branch, which is a downstream of illumos-joyent.
+
+Thanks -- Dan
+
+===========
+
 illumos gate README - Sep 16, 2012.
 
 This is the illumos gate.  This is the illumos source tree.  It contains
