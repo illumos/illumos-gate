@@ -61,7 +61,7 @@ ALL_TARGET	= $(BINARY)
 LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
-INC_PATH	+= -I$(UTSBASE)/i86pc
+INC_PATH	+= -I$(UTSBASE)/intel/ia32
 
 #
 # For now, disable these lint checks; maintainers should endeavor

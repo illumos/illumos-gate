@@ -75,8 +75,6 @@ typedef struct comm_page_s {
 #if defined(_KERNEL)
 extern comm_page_t comm_page;
 
-extern caddr_t comm_page_mapin();
-
 #if defined(_MACHDEP)
 extern hrtime_t tsc_last;
 extern hrtime_t tsc_hrtime_base;
