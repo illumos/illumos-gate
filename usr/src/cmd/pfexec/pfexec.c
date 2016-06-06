@@ -96,7 +96,6 @@ main(int argc, char **argv)
 {
 	char *cmd;
 	char *pset = NULL;
-	const char *msg;
 	char pathbuf[MAXPATHLEN];
 	int c;
 	priv_set_t *wanted;
@@ -130,12 +129,9 @@ main(int argc, char **argv)
 	switch (shellname(cmd, pathbuf)) {
 	case RES_OK:
 		(void) execv(pathbuf, argv);
-		msg = strerror(errno);
-		if (errno == ENOTACTIVE)
-			msg = gettext("failed to contact pfexecd");
 		(void) fprintf(stderr,
 		    gettext("pfexec: unable to execute %s: %s\n"),
-		    pathbuf, msg);
+		    pathbuf, strerror(errno));
 		return (1);
 	case RES_PFEXEC:
 	case RES_FAILURE:
@@ -174,13 +170,9 @@ main(int argc, char **argv)
 		}
 
 		(void) execvp(argv[0], argv);
-
-		msg = strerror(errno);
-		if (errno == ENOTACTIVE)
-			msg = gettext("failed to contact pfexecd");
 		(void) fprintf(stderr,
 		    gettext("pfexec: unable to execute %s: %s\n"),
-		    argv[0], msg);
+		    argv[0], strerror(errno));
 		return (1);
 	}
 	return (1);

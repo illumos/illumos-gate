@@ -53,11 +53,6 @@ The privileges specification on the commands line is parsed using
 union of the privileges specified using the "\fBprivs\fR" keyword in
 \fBprof_attr\fR(4) for all the user's profiles and added to the inheritable set
 before executing the command.
-.sp
-.LP
-For \fBpfexec\fR to function correctly, the \fBpfexecd\fR daemon must be running
-in the current zone. This is normally managed by the
-"\fBsvc:/system/pfexec:default\fR" SMF service (see \fBsmf\fR(5)).
 .SH USAGE
 .sp
 .LP
@@ -109,4 +104,4 @@ An error occurred.
 .sp
 .LP
 \fBcsh\fR(1), \fBksh\fR(1), \fBprofiles\fR(1), \fBsh\fR(1), \fBexec_attr\fR(4),
-\fBprof_attr\fR(4), \fBuser_attr\fR(4), \fBattributes\fR(5), \fBsmf\fR(5)
+\fBprof_attr\fR(4), \fBuser_attr\fR(4), \fBattributes\fR(5)
