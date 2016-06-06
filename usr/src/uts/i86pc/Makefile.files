@@ -42,7 +42,6 @@ CORE_OBJS +=			\
 	cmi_hw.o		\
 	cms.o			\
 	comm_page.o		\
-	comm_page_util.o	\
 	confunix.o		\
 	cpu_idle.o		\
 	cpuid.o			\

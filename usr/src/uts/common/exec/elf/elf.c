@@ -66,9 +66,9 @@
 #include <sys/sdt.h>
 #include <sys/siginfo.h>
 
-#if defined(__x86) && !defined(__xpv)
-#include <sys/comm_page.h>
-#endif /* defined(__x86) && !defined(__xpv) */
+#if defined(__x86)
+#include <sys/comm_page_util.h>
+#endif /* defined(__x86) */
 
 
 extern int at_flags;
@@ -587,12 +587,13 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 
 
 	/*
-	 * On supported kernels (64-bit, non-xpv) make room in the auxv for the
-	 * AT_SUN_COMMPAGE entry.
+	 * On supported kernels (x86_64) make room in the auxv for the
+	 * AT_SUN_COMMPAGE entry.  This will go unpopulated on i86xpv systems
+	 * which do not provide such functionality.
 	 */
-#if defined(__amd64) && !defined(__xpv)
+#if defined(__amd64)
 	args->auxsize += sizeof (aux_entry_t);
-#endif /* defined(__amd64) && !defined(__xpv) */
+#endif /* defined(__amd64) */
 
 	/*
 	 * If we have user credentials, we'll supply the following entries:
@@ -973,12 +974,18 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 		/*
 		 * Add the comm page auxv entry, mapping it in if needed.
 		 */
-#if defined(__amd64) && !defined(__xpv)
+#if defined(__amd64)
 		if (args->commpage != NULL ||
 		    (args->commpage = (uintptr_t)comm_page_mapin()) != NULL) {
 			ADDAUX(aux, AT_SUN_COMMPAGE, args->commpage)
+		} else {
+			/*
+			 * If the comm page cannot be mapped, pad out the auxv
+			 * to satisfy later size checks.
+			 */
+			ADDAUX(aux, AT_NULL, 0)
 		}
-#endif /* defined(__amd64) && !defined(__xpv) */
+#endif /* defined(__amd64) */
 
 		ADDAUX(aux, AT_NULL, 0)
 		postfixsize = (char *)aux - (char *)bigwad->elfargs;
