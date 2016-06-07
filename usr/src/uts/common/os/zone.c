@@ -2231,6 +2231,11 @@ zone_kstat_create(zone_t *zone)
 	zone->zone_nprocs_kstat = zone_kstat_create_common(zone,
 	    "nprocs", zone_nprocs_kstat_update);
 
+	if ((zone->zone_vfs_ksp = zone_vfs_kstat_create(zone)) == NULL) {
+		zone->zone_vfs_stats = kmem_zalloc(
+		    sizeof (zone_vfs_kstat_t), KM_SLEEP);
+	}
+
 	if ((zone->zone_mcap_ksp = zone_mcap_kstat_create(zone)) == NULL) {
 		zone->zone_mcap_stats = kmem_zalloc(
 		    sizeof (zone_mcap_kstat_t), KM_SLEEP);
@@ -2241,15 +2246,6 @@ zone_kstat_create(zone_t *zone)
 		    sizeof (zone_misc_kstat_t), KM_SLEEP);
 	}
 
-	if ((zone->zone_vfs_ksp = zone_vfs_kstat_create(zone)) == NULL) {
-		zone->zone_vfs_stats = kmem_zalloc(
-		    sizeof (zone_vfs_kstat_t), KM_SLEEP);
-	}
-
-	if ((zone->zone_mcap_ksp = zone_mcap_kstat_create(zone)) == NULL) {
-		zone->zone_mcap_stats = kmem_zalloc(
-		    sizeof (zone_mcap_kstat_t), KM_SLEEP);
-	}
 }
 
 static void
