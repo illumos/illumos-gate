@@ -5759,8 +5759,10 @@ dtrace_dif_emulate(dtrace_difo_t *difo, dtrace_mstate_t *mstate,
 				regs[rd] = 0;
 				*flags |= CPU_DTRACE_DIVZERO;
 			} else {
+				DTRACE_CPUFLAG_SET(CPU_DTRACE_NOFAULT);
 				regs[rd] = (int64_t)regs[r1] /
 				    (int64_t)regs[r2];
+				DTRACE_CPUFLAG_CLEAR(CPU_DTRACE_NOFAULT);
 			}
 			break;
 
@@ -5769,7 +5771,9 @@ dtrace_dif_emulate(dtrace_difo_t *difo, dtrace_mstate_t *mstate,
 				regs[rd] = 0;
 				*flags |= CPU_DTRACE_DIVZERO;
 			} else {
+				DTRACE_CPUFLAG_SET(CPU_DTRACE_NOFAULT);
 				regs[rd] = regs[r1] / regs[r2];
+				DTRACE_CPUFLAG_CLEAR(CPU_DTRACE_NOFAULT);
 			}
 			break;
 
@@ -5778,8 +5782,10 @@ dtrace_dif_emulate(dtrace_difo_t *difo, dtrace_mstate_t *mstate,
 				regs[rd] = 0;
 				*flags |= CPU_DTRACE_DIVZERO;
 			} else {
+				DTRACE_CPUFLAG_SET(CPU_DTRACE_NOFAULT);
 				regs[rd] = (int64_t)regs[r1] %
 				    (int64_t)regs[r2];
+				DTRACE_CPUFLAG_CLEAR(CPU_DTRACE_NOFAULT);
 			}
 			break;
 
@@ -5788,7 +5794,9 @@ dtrace_dif_emulate(dtrace_difo_t *difo, dtrace_mstate_t *mstate,
 				regs[rd] = 0;
 				*flags |= CPU_DTRACE_DIVZERO;
 			} else {
+				DTRACE_CPUFLAG_SET(CPU_DTRACE_NOFAULT);
 				regs[rd] = regs[r1] % regs[r2];
+				DTRACE_CPUFLAG_CLEAR(CPU_DTRACE_NOFAULT);
 			}
 			break;
 

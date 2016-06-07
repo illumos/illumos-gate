@@ -140,6 +140,7 @@ file path=opt/SUNWdtrt/bin/exception.lst mode=0444
 file path=opt/SUNWdtrt/bin/jdtrace mode=0555
 file path=opt/SUNWdtrt/lib/java/jdtrace.jar
 file path=opt/SUNWdtrt/tst/$(ARCH)/arrays/tst.uregsarray.d mode=0444
+$(i386_ONLY)file path=opt/SUNWdtrt/tst/$(ARCH)/error/tst.DTRACEFLT_DIVZERO.d mode=0444
 $(i386_ONLY)file path=opt/SUNWdtrt/tst/$(ARCH)/funcs/tst.badcopyin.d mode=0444
 $(i386_ONLY)file path=opt/SUNWdtrt/tst/$(ARCH)/funcs/tst.badcopyinstr.d \
     mode=0444
