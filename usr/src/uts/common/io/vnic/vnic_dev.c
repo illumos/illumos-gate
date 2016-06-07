@@ -53,6 +53,7 @@
 #include <sys/vlan.h>
 #include <sys/vnic.h>
 #include <sys/vnic_impl.h>
+#include <sys/mac_impl.h>
 #include <sys/mac_flow_impl.h>
 #include <inet/ip_impl.h>
 
@@ -1072,6 +1073,18 @@ vnic_m_setprop(void *m_driver, const char *pr_name, mac_prop_id_t pr_num,
 		err = mac_maxsdu_update(vn->vn_mh, mtu);
 		break;
 	}
+	case MAC_PROP_VN_PROMISC_FILTERED: {
+		boolean_t filtered;
+
+		if (pr_valsize < sizeof (filtered)) {
+			err = EINVAL;
+			break;
+		}
+
+		bcopy(pr_val, &filtered, sizeof (filtered));
+		mac_set_promisc_filtered(vn->vn_mch, filtered);
+		break;
+	}
 	case MAC_PROP_SECONDARY_ADDRS: {
 		mac_secondary_addr_t msa;
 
@@ -1093,8 +1106,14 @@ vnic_m_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 {
 	vnic_t		*vn = arg;
 	int 		ret = 0;
+	boolean_t	out;
 
 	switch (pr_num) {
+	case MAC_PROP_VN_PROMISC_FILTERED:
+		out = mac_get_promisc_filtered(vn->vn_mch);
+		ASSERT(pr_valsize >= sizeof (boolean_t));
+		bcopy(&out, pr_val, sizeof (boolean_t));
+		break;
 	case MAC_PROP_SECONDARY_ADDRS:
 		ret = vnic_get_secondary_macs(vn, pr_valsize, pr_val);
 		break;
