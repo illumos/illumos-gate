@@ -40,7 +40,7 @@ pthread_mutexattr_init(pthread_mutexattr_t *attr)
 
 	if ((ap = lmalloc(sizeof (mattr_t))) == NULL)
 		return (ENOMEM);
-	ap->pshared = DEFAULT_TYPE;
+	ap->pshared = PTHREAD_PROCESS_PRIVATE;
 	ap->type = PTHREAD_MUTEX_DEFAULT;
 	ap->protocol = PTHREAD_PRIO_NONE;
 	ap->robustness = PTHREAD_MUTEX_STALLED;
@@ -222,7 +222,7 @@ pthread_mutex_init(pthread_mutex_t *_RESTRICT_KYWD mutex,
 		if (ap->protocol == PTHREAD_PRIO_PROTECT)
 			prioceiling = ap->prioceiling;
 	} else {
-		type = DEFAULT_TYPE | PTHREAD_MUTEX_DEFAULT |
+		type = PTHREAD_PROCESS_PRIVATE | PTHREAD_MUTEX_DEFAULT |
 		    PTHREAD_PRIO_NONE | PTHREAD_MUTEX_STALLED;
 	}
 
