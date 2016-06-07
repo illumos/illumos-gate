@@ -985,3 +985,11 @@ usr/lib/llib-lpcidb.ln
 # debugging program for libadutils
 #
 usr/bin/test-getdc
+
+#
+# LX Brand internals
+#
+
+usr/include/sys/inotify.h
+usr/include/sys/limits.h
+usr/include/sys/zfd.h

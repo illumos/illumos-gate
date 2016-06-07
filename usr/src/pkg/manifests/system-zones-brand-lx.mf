@@ -81,16 +81,12 @@ file path=kernel/fs/$(ARCH64)/lxprocfs group=sys mode=0755
 file path=kernel/fs/lxprocfs group=sys mode=0755
 file path=kernel/socketmod/$(ARCH64)/lx_netlink mode=0755
 file path=kernel/socketmod/lx_netlink mode=0755
-file path=usr/include/sys/inotify.h
-file path=usr/include/sys/limits.h
-file path=usr/include/sys/zfd.h
 file path=usr/kernel/brand/$(ARCH64)/lx_brand group=sys mode=0755
 file path=usr/kernel/brand/lx_brand group=sys mode=0755
 file path=usr/kernel/drv/$(ARCH64)/inotify group=sys mode=0755
 file path=usr/kernel/drv/$(ARCH64)/lx_ptm group=sys mode=0755
 file path=usr/kernel/drv/$(ARCH64)/lx_systrace group=sys mode=0755
 file path=usr/kernel/drv/$(ARCH64)/lxautofs group=sys mode=0755
-file path=usr/kernel/drv/$(ARCH64)/zfd group=sys mode=0755
 file path=usr/kernel/drv/inotify group=sys mode=0755
 file path=usr/kernel/drv/inotify.conf group=sys
 file path=usr/kernel/drv/lx_ptm group=sys
@@ -99,7 +95,6 @@ file path=usr/kernel/drv/lx_systrace group=sys
 file path=usr/kernel/drv/lx_systrace.conf group=sys
 file path=usr/kernel/drv/lxautofs group=sys mode=0755
 file path=usr/kernel/drv/lxautofs.conf group=sys
-file path=usr/kernel/drv/zfd group=sys mode=0755
 file path=usr/kernel/fs/$(ARCH64)/lx_cgroup group=sys mode=0755
 file path=usr/kernel/fs/$(ARCH64)/lx_devfs group=sys mode=0755
 file path=usr/kernel/fs/$(ARCH64)/lx_proc group=sys mode=0755
@@ -145,7 +140,6 @@ file path=usr/share/man/man3c/inotify_init.3c
 file path=usr/share/man/man3c/inotify_rm_watch.3c
 file path=usr/share/man/man5/inotify.5
 file path=usr/share/man/man5/lx.5
-file path=usr/share/man/man7d/zfd.7d
 file path=usr/share/man/man7fs/lxproc.7fs
 file path=usr/share/man/man9f/pollhead_clean.9f
 hardlink path=usr/kernel/dtrace/$(ARCH64)/lx_systrace \

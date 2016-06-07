@@ -60,6 +60,7 @@ dir path=usr/share/man/man1m
 dir path=usr/share/man/man5
 dir path=usr/share/man/man7d
 driver name=zcons
+driver name=zfd
 file path=etc/zones/SUNWblank.xml mode=0444 variant.opensolaris.zone=global
 file path=etc/zones/SUNWdefault.xml mode=0444 variant.opensolaris.zone=global
 file path=etc/zones/index group=sys original_name=SUNWzone:etc/zones/index \
@@ -77,7 +78,9 @@ file path=lib/svc/method/svc-zonestat mode=0555 \
     variant.opensolaris.zone=global
 file path=usr/bin/zonestat mode=0555
 file path=usr/kernel/drv/$(ARCH64)/zcons group=sys
+file path=usr/kernel/drv/$(ARCH64)/zfd group=sys
 $(i386_ONLY)file path=usr/kernel/drv/zcons group=sys
+$(i386_ONLY)file path=usr/kernel/drv/zfd group=sys mode=0755
 file path=usr/lib/$(ARCH64)/libbrand.so.1
 file path=usr/lib/$(ARCH64)/libzonecfg.so.1
 file path=usr/lib/$(ARCH64)/libzonestat.so.1
@@ -106,6 +109,7 @@ file path=usr/share/man/man1m/zonecfg.1m
 file path=usr/share/man/man5/brands.5
 file path=usr/share/man/man5/zones.5
 file path=usr/share/man/man7d/zcons.7d
+file path=usr/share/man/man7d/zfd.7d
 legacy pkg=SUNWzoner desc="Solaris Zones Configuration Files" \
     name="Solaris Zones (Root)"
 legacy pkg=SUNWzoneu desc="Solaris Zones Configuration and Administration" \
