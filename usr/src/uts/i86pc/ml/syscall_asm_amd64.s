@@ -28,7 +28,6 @@
 #include <sys/regset.h>
 #include <sys/privregs.h>
 #include <sys/psw.h>
-#include <sys/machbrand.h>
 
 #if defined(__lint)
 
@@ -38,6 +37,7 @@
 
 #else	/* __lint */
 
+#include <sys/machbrand.h>
 #include <sys/segments.h>
 #include <sys/pcb.h>
 #include <sys/trap.h>
