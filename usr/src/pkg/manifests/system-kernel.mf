@@ -236,7 +236,9 @@ driver name=physmem perms="* 0600 root sys"
 driver name=poll perms="* 0666 root sys"
 $(sparc_ONLY)driver name=power alias=ali1535d+-power
 $(i386_ONLY)driver name=power
-driver name=pseudo alias=zconsnex
+driver name=pseudo \
+    alias=zconsnex \
+    alias=zfdnex
 driver name=ptc perms="* 0666 root sys"
 driver name=ptsl perms="* 0666 root sys"
 $(sparc_ONLY)driver name=ramdisk alias=SUNW,ramdisk perms="* 0600 root sys" \
