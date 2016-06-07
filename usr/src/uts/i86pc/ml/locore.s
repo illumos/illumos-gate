@@ -23,7 +23,7 @@
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
- * Copyright 2011 Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2016, Joyent, Inc. All rights reserved.
  */
 
 /*	Copyright (c) 1990, 1991 UNIX System Laboratories, Inc.	*/
@@ -1158,7 +1158,12 @@ cmntrap()
 	cmpl	$T_ILLINST, REGOFF_TRAPNO(%rbp)
 	je	0f
 
-	jne	4f				/* if not PF, GP or UD, panic */
+	cmpl	$T_ZERODIV, REGOFF_TRAPNO(%rbp)
+	jne	4f				/* if not PF/GP/UD/DE, panic */
+
+	orw	$CPU_DTRACE_DIVZERO, %cx
+	movw	%cx, CPUC_DTRACE_FLAGS(%rax)
+	jmp	2f
 
 	/*
 	 * If we've taken a GPF, we don't (unfortunately) have the address that
@@ -1249,14 +1254,22 @@ cmntrap()
 
 .dtrace_induced:
 	cmpw	$KCS_SEL, REGOFF_CS(%ebp)	/* test CS for user-mode trap */
-	jne	2f				/* if from user, panic */
+	jne	3f				/* if from user, panic */
 
 	cmpl	$T_PGFLT, REGOFF_TRAPNO(%ebp)
-	je	0f
+	je	1f
 
 	cmpl	$T_GPFLT, REGOFF_TRAPNO(%ebp)
-	jne	3f				/* if not PF or GP, panic */
+	je	0f
 
+	cmpl	$T_ZERODIV, REGOFF_TRAPNO(%ebp)
+	jne	4f				/* if not PF/GP/UD/DE, panic */
+
+	orw	$CPU_DTRACE_DIVZERO, %cx
+	movw	%cx, CPUC_DTRACE_FLAGS(%eax)
+	jmp	2f
+
+0:
 	/*
 	 * If we've taken a GPF, we don't (unfortunately) have the address that
 	 * induced the fault.  So instead of setting the fault to BADADDR,
@@ -1264,13 +1277,13 @@ cmntrap()
 	 */
 	orw	$CPU_DTRACE_ILLOP, %cx
 	movw	%cx, CPUC_DTRACE_FLAGS(%eax)
-	jmp	1f
-0:
+	jmp	2f
+1:
 	orw	$CPU_DTRACE_BADADDR, %cx
 	movw	%cx, CPUC_DTRACE_FLAGS(%eax)	/* set fault to bad addr */
 	movl	%esi, CPUC_DTRACE_ILLVAL(%eax)
 					    /* fault addr is illegal value */
-1:
+2:
 	pushl	REGOFF_EIP(%ebp)
 	call	dtrace_instr_size
 	addl	$4, %esp
@@ -1280,10 +1293,10 @@ cmntrap()
 	INTR_POP_KERNEL
 	IRET
 	/*NOTREACHED*/
-2:
+3:
 	pushl	$dtrace_badflags
 	call	panic
-3:
+4:
 	pushl	$dtrace_badtrap
 	call	panic
 	SET_SIZE(cmntrap)
