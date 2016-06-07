@@ -21,7 +21,7 @@
 /*
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  * Copyright (c) 2013 by Delphix. All rights reserved.
  */
 
@@ -4030,7 +4030,8 @@ static const mdb_dcmd_t dcmds[] = {
 	    modctl2devinfo },
 	{ "name2major", "<dev-name>", "convert dev name to major number",
 	    name2major },
-	{ "prtconf", "?[-vpc]", "print devinfo tree", prtconf, prtconf_help },
+	{ "prtconf", "?[-vpc] [-d driver]", "print devinfo tree", prtconf,
+	    prtconf_help },
 	{ "softstate", ":<instance>", "retrieve soft-state pointer",
 	    softstate },
 	{ "devinfo_fm", ":", "devinfo fault managment configuration",
