@@ -28,6 +28,7 @@
  * Copyright (c) 2012 by Delphix. All rights reserved.
  * Copyright (c) 2015 Joyent, Inc. All rights reserved.
  * Copyright (c) 2013 Josef 'Jeff' Sipek <jeffpc@josefsipek.net>
+ * Copyright (c) 2015 by Delphix. All rights reserved.
  */
 
 #include <sys/elf.h>
@@ -2175,6 +2176,7 @@ cmd_dump(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	uint_t phys = FALSE;
 	uint_t file = FALSE;
 	uintptr_t group = 4;
+	uintptr_t length = 0;
 	uintptr_t width = 1;
 	mdb_tgt_status_t st;
 	int error;
@@ -2183,6 +2185,7 @@ cmd_dump(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    'e', MDB_OPT_SETBITS, MDB_DUMP_ENDIAN, &dflags,
 	    'f', MDB_OPT_SETBITS, TRUE, &file,
 	    'g', MDB_OPT_UINTPTR, &group,
+	    'l', MDB_OPT_UINTPTR, &length,
 	    'p', MDB_OPT_SETBITS, TRUE, &phys,
 	    'q', MDB_OPT_CLRBITS, MDB_DUMP_ASCII, &dflags,
 	    'r', MDB_OPT_SETBITS, MDB_DUMP_RELATIVE, &dflags,
@@ -2195,8 +2198,11 @@ cmd_dump(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	if ((phys && file) ||
 	    (width == 0) || (width > 0x10) ||
-	    (group == 0) || (group > 0x100))
+	    (group == 0) || (group > 0x100) ||
+	    (mdb.m_dcount > 1 && length > 0))
 		return (DCMD_USAGE);
+	if (length == 0)
+		length = mdb.m_dcount;
 
 	/*
 	 * If neither -f nor -p were specified and the state is IDLE (i.e. no
@@ -2208,13 +2214,13 @@ cmd_dump(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	dflags |= MDB_DUMP_GROUP(group) | MDB_DUMP_WIDTH(width);
 	if (phys)
-		error = mdb_dump64(mdb_get_dot(), mdb.m_dcount, dflags,
+		error = mdb_dump64(mdb_get_dot(), length, dflags,
 		    mdb_partial_pread, NULL);
 	else if (file)
-		error = mdb_dumpptr(addr, mdb.m_dcount, dflags,
+		error = mdb_dumpptr(addr, length, dflags,
 		    mdb_partial_xread, (void *)mdb_tgt_fread);
 	else
-		error = mdb_dumpptr(addr, mdb.m_dcount, dflags,
+		error = mdb_dumpptr(addr, length, dflags,
 		    mdb_partial_xread, (void *)mdb_tgt_vread);
 
 	return (((flags & DCMD_LOOP) || (error == -1)) ? DCMD_ABORT : DCMD_OK);
@@ -2854,6 +2860,8 @@ dump_help(void)
 #endif
 	    "-g n  display bytes in groups of n\n"
 	    "      (default is 4; n must be a power of 2, divide line width)\n"
+	    "-l n  display n bytes\n"
+	    "      (default is 1; rounded up to multiple of line width)\n"
 	    "-p    dump from physical memory\n"
 	    "-q    don't print ASCII\n"
 	    "-r    use relative numbering (automatically sets -u)\n"
@@ -2924,7 +2932,7 @@ const mdb_dcmd_t mdb_dcmd_builtins[] = {
 	{ "disasms", NULL, "list available disassemblers", cmd_disasms },
 	{ "dismode", "[mode]", "get/set disassembly mode", cmd_dismode },
 	{ "dmods", "[-l] [mod]", "list loaded debugger modules", cmd_dmods },
-	{ "dump", "?[-eqrstu] [-f|-p] [-g bytes] [-w paragraphs]",
+	{ "dump", "?[-eqrstu] [-f|-p] [-g bytes] [-l bytes] [-w paragraphs]",
 	    "dump memory from specified address", cmd_dump, dump_help },
 	{ "echo", "args ...", "echo arguments", cmd_echo },
 	{ "enum", "?[-ex] enum [name]", "print an enumeration", cmd_enum,
