@@ -22,6 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 # Copyright 2012 Joyent, Inc.  All rights reserved.
+# Copyright 2016 Nexenta Systems, Inc.
 #
 
 #
@@ -238,6 +239,10 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/heci/%.c
 	$(CTFCONVERT_O)
 
 $(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/vmxnet3s/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/scsi/adapters/pvscsi/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
@@ -465,6 +470,9 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/io/heci/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/io/vmxnet3s/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/io/scsi/adapters/pvscsi/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/os/%.c

@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "lint.h"
 #include "thr_uberdata.h"
 #include <pthread.h>
@@ -94,7 +92,7 @@ pthread_barrier_init(pthread_barrier_t *barrier,
 	int type;
 
 	if (attr == NULL)
-		type = DEFAULT_TYPE;
+		type = PTHREAD_PROCESS_PRIVATE;
 	else if ((ap = attr->__pthread_barrierattrp) != NULL)
 		type = ap->pshared;
 	else
