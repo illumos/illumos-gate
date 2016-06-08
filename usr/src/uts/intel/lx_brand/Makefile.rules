@@ -93,5 +93,8 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/brand/lx/syscall/%.c
 $(LINTS_DIR)/%.ln:		$(LX_CMN)/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/brand/lx/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/brand/lx/%.s
 	@($(LHEAD) $(LINT.s) $< $(LTAIL))
