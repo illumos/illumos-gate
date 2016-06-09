@@ -51,6 +51,8 @@
 	    directory="/native/etc/default/dhcpagent" type="lofs" opt="ro" />
 	<global_mount special="/etc/netconfig"
 	    directory="/native/etc/netconfig" type="lofs" opt="ro" />
+	<global_mount special="/etc/nfssec.conf"
+	    directory="/native/etc/nfssec.conf" type="lofs" opt="ro" />
 	<global_mount special="/sbin"
 	    directory="/native/sbin" opt="ro,nodevices" type="lofs" />
 	<global_mount special="/usr/lib/brand/lx/ld" directory="/var/ld"
