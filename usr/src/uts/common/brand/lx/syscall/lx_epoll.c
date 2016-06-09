@@ -191,8 +191,15 @@ lx_epoll_ctl(int fd, int op, int pfd, void *event)
 	error = VOP_WRITE(fp->f_vnode, &auio, 1, fp->f_cred, NULL);
 
 	releasef(fd);
-	if (error)
+	if (error == ELOOP) {
+		/*
+		 * In the case of descriptor loops, /dev/poll emits a more
+		 * descriptive error than Linux epoll consumers would expect.
+		 */
+		return (set_errno(EINVAL));
+	} else if (error != 0) {
 		return (set_errno(error));
+	}
 	return (0);
 }
 
