@@ -45,6 +45,7 @@
 #include <stdlib.h>
 #include <syslog.h>
 #include <synch.h>
+#include <zone.h>
 #include <rpc/rpc.h>
 #include <nfs/nfs_sec.h>
 #include <rpc/rpcsec_gss.h>
@@ -707,12 +708,17 @@ get_seconfig(int whichway, char *name, int num,
 {
 	char	line[BUFSIZ];	/* holds each line of NFSSEC_CONF */
 	FILE	*fp;		/* file stream for NFSSEC_CONF */
+	char	nfssec_conf[MAXPATHLEN];
+	const char *zroot = zone_get_nroot();
 
 	if ((whichway == GETBYNAME) && (name == NULL))
 		return (SC_NOTFOUND);
 
+	(void) snprintf(nfssec_conf, sizeof (nfssec_conf), "%s%s", zroot != NULL ?
+	    zroot : "", NFSSEC_CONF);
+
 	(void) mutex_lock(&matching_lock);
-	if ((fp = fopen(NFSSEC_CONF, "r")) == NULL) {
+	if ((fp = fopen(nfssec_conf, "r")) == NULL) {
 		(void) mutex_unlock(&matching_lock);
 		return (SC_OPENFAIL);
 	}
