@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2011, 2014 by Delphix. All rights reserved.
+ * Copyright (c) 2011, 2015 by Delphix. All rights reserved.
  */
 
 /*
@@ -57,7 +57,7 @@
 
 typedef struct {
 	char nzs_findprop[ZFS_MAXPROPLEN]; /* prop substring to find */
-	char nzs_snapname[ZFS_MAXNAMELEN]; /* snap's name */
+	char nzs_snapname[ZFS_MAX_DATASET_NAME_LEN]; /* snap's name */
 	char nzs_snapprop[ZFS_MAXPROPLEN]; /* snap's prop value */
 	char nzs_snapskip[ZFS_MAXPROPLEN]; /* snap to skip */
 	uint32_t nzs_prop_major;	   /* property major version */
@@ -1071,13 +1071,14 @@ ndmpd_zfs_pre_restore(ndmpd_zfs_args_t *ndmpd_zfs_args)
 	ndmpd_session_t *session = (ndmpd_session_t *)
 	    (ndmpd_zfs_params->mp_daemon_cookie);
 	ndmp_context_t *nctxp = &ndmpd_zfs_args->nz_nctx;
-	char bkpath[ZFS_MAXNAMELEN];
+	char bkpath[ZFS_MAX_DATASET_NAME_LEN];
 	int err;
 
 	if (ndmp_pl == NULL || ndmp_pl->np_pre_restore == NULL)
 		return (0);
 
-	err = ndmpd_zfs_backup_getpath(ndmpd_zfs_args, bkpath, ZFS_MAXNAMELEN);
+	err = ndmpd_zfs_backup_getpath(ndmpd_zfs_args, bkpath,
+	    ZFS_MAX_DATASET_NAME_LEN);
 
 	if (err != 0) {
 		NDMP_LOG(LOG_DEBUG, "error getting bkup path: %d", err);
@@ -1152,7 +1153,7 @@ ndmpd_zfs_backup_parms_valid(ndmpd_zfs_args_t *ndmpd_zfs_args)
 		}
 
 		(void) strlcpy(ndmpd_zfs_args->nz_fromsnap,
-		    snapdata.nzs_snapname, ZFS_MAXNAMELEN);
+		    snapdata.nzs_snapname, ZFS_MAX_DATASET_NAME_LEN);
 	}
 
 	return (B_TRUE);
@@ -1167,14 +1168,14 @@ ndmpd_zfs_backup_parms_valid(ndmpd_zfs_args_t *ndmpd_zfs_args)
 static boolean_t
 ndmpd_zfs_backup_pathvalid(ndmpd_zfs_args_t *ndmpd_zfs_args)
 {
-	char zpath[ZFS_MAXNAMELEN];
+	char zpath[ZFS_MAX_DATASET_NAME_LEN];
 	char propstr[ZFS_MAXPROPLEN];
 	zfs_handle_t *zhp;
 	zfs_type_t ztype = 0;
 	int err;
 
-	if (ndmpd_zfs_backup_getpath(ndmpd_zfs_args, zpath, ZFS_MAXNAMELEN)
-	    != 0)
+	if (ndmpd_zfs_backup_getpath(ndmpd_zfs_args, zpath,
+	    ZFS_MAX_DATASET_NAME_LEN) != 0)
 		return (B_FALSE);
 
 	if (ndmpd_zfs_args->nz_snapname[0] != '\0') {
@@ -1259,13 +1260,13 @@ ndmpd_zfs_backup_getpath(ndmpd_zfs_args_t *ndmpd_zfs_args, char *zpath,
 
 	(void) strlcpy(zpath, &env_path[1], zlen);
 	(void) strlcpy(ndmpd_zfs_args->nz_dataset, &env_path[1],
-	    ZFS_MAXNAMELEN);
+	    ZFS_MAX_DATASET_NAME_LEN);
 
 	at = strchr(ndmpd_zfs_args->nz_dataset, '@');
 	if (at) {
 		*at = '\0';
 		(void) strlcpy(ndmpd_zfs_args->nz_snapname, ++at,
-		    ZFS_MAXNAMELEN);
+		    ZFS_MAX_DATASET_NAME_LEN);
 	} else {
 		ndmpd_zfs_args->nz_snapname[0] = '\0';
 	}
@@ -1349,15 +1350,13 @@ static int
 ndmpd_zfs_restore_getpath(ndmpd_zfs_args_t *ndmpd_zfs_args)
 {
 	int version = ndmpd_zfs_params->mp_protocol_version;
-	char zpath[ZFS_MAXNAMELEN];
+	char zpath[ZFS_MAX_DATASET_NAME_LEN];
 	mem_ndmp_name_v3_t *namep_v3;
 	char *dataset = ndmpd_zfs_args->nz_dataset;
 	char *nm;
 	char *p;
 	int len;
 	int err;
-
-	dataset = ndmpd_zfs_args->nz_dataset;
 
 	namep_v3 = (mem_ndmp_name_v3_t *)MOD_GETNAME(ndmpd_zfs_params, 0);
 
@@ -1375,12 +1374,12 @@ ndmpd_zfs_restore_getpath(ndmpd_zfs_args_t *ndmpd_zfs_args)
 		}
 
 		(void) strlcpy(dataset, &(namep_v3->nm3_dpath[1]),
-		    ZFS_MAXNAMELEN);
+		    ZFS_MAX_DATASET_NAME_LEN);
 
 		if (namep_v3->nm3_newnm) {
-			(void) strlcat(dataset, "/", ZFS_MAXNAMELEN);
+			(void) strlcat(dataset, "/", ZFS_MAX_DATASET_NAME_LEN);
 			(void) strlcat(dataset, namep_v3->nm3_newnm,
-			    ZFS_MAXNAMELEN);
+			    ZFS_MAX_DATASET_NAME_LEN);
 
 		} else {
 			if (version == NDMPV3) {
@@ -1392,13 +1391,15 @@ ndmpd_zfs_restore_getpath(ndmpd_zfs_args_t *ndmpd_zfs_args)
 				 */
 				p = strrchr(namep_v3->nm3_opath, '/');
 				nm = p? p : namep_v3->nm3_opath;
-				(void) strlcat(dataset, "/", ZFS_MAXNAMELEN);
-				(void) strlcat(dataset, nm, ZFS_MAXNAMELEN);
+				(void) strlcat(dataset, "/",
+				    ZFS_MAX_DATASET_NAME_LEN);
+				(void) strlcat(dataset, nm,
+				    ZFS_MAX_DATASET_NAME_LEN);
 			}
 		}
 	} else {
 		err = ndmpd_zfs_backup_getpath(ndmpd_zfs_args, zpath,
-		    ZFS_MAXNAMELEN);
+		    ZFS_MAX_DATASET_NAME_LEN);
 		if (err)
 			return (err);
 	}
@@ -1784,8 +1785,8 @@ ndmpd_zfs_snapshot_cleanup(ndmpd_zfs_args_t *ndmpd_zfs_args, int err)
 		 * upon for user-supplied snapshots.)
 		 */
 
-		(void) snprintf(snapdata.nzs_snapskip, ZFS_MAXNAMELEN, "%s",
-		    ndmpd_zfs_args->nz_snapname);
+		(void) snprintf(snapdata.nzs_snapskip, ZFS_MAX_DATASET_NAME_LEN,
+		    "%s", ndmpd_zfs_args->nz_snapname);
 
 		if (ndmpd_zfs_snapshot_find(ndmpd_zfs_args, &snapdata)) {
 			NDMP_LOG(LOG_DEBUG, "ndmpd_zfs_snapshot_find error\n");
@@ -1812,7 +1813,7 @@ ndmpd_zfs_snapshot_cleanup(ndmpd_zfs_args_t *ndmpd_zfs_args, int err)
 
 _remove_tmp_snap:
 
-	(void) snprintf(snapdata.nzs_snapname, ZFS_MAXNAMELEN, "%s",
+	(void) snprintf(snapdata.nzs_snapname, ZFS_MAX_DATASET_NAME_LEN, "%s",
 	    ndmpd_zfs_args->nz_snapname);
 
 	(void) strlcpy(snapdata.nzs_snapprop, ndmpd_zfs_args->nz_snapprop,
@@ -1838,7 +1839,7 @@ ndmpd_zfs_snapshot_create(ndmpd_zfs_args_t *ndmpd_zfs_args)
 	boolean_t recursive = B_FALSE;
 
 	if (ndmpd_zfs_snapname_create(ndmpd_zfs_args,
-	    ndmpd_zfs_args->nz_snapname, ZFS_MAXNAMELEN -1) < 0) {
+	    ndmpd_zfs_args->nz_snapname, ZFS_MAX_DATASET_NAME_LEN - 1) < 0) {
 		NDMP_LOG(LOG_ERR, "Error (%d) creating snapshot name for %s",
 		    errno, ndmpd_zfs_args->nz_dataset);
 		return (-1);
@@ -2015,7 +2016,7 @@ ndmpd_zfs_snapshot_prop_find(zfs_handle_t *zhp, void *arg)
 
 	if (strcmp(justsnap, snapdata_p->nzs_snapskip) != 0) {
 		(void) strlcpy(snapdata_p->nzs_snapname, justsnap,
-		    ZFS_MAXNAMELEN);
+		    ZFS_MAX_DATASET_NAME_LEN);
 
 		(void) strlcpy(snapdata_p->nzs_snapprop, propstr,
 		    ZFS_MAXPROPLEN);
@@ -2088,13 +2089,13 @@ ndmpd_zfs_snapshot_prop_get(zfs_handle_t *zhp, char *propstr)
 static int
 ndmpd_zfs_snapshot_prop_add(ndmpd_zfs_args_t *ndmpd_zfs_args)
 {
-	char fullname[ZFS_MAXNAMELEN];
+	char fullname[ZFS_MAX_DATASET_NAME_LEN];
 	char propstr[ZFS_MAXPROPLEN];
 	zfs_handle_t *zhp;
 	boolean_t set;
 	int err;
 
-	(void) snprintf(fullname, ZFS_MAXNAMELEN, "%s@%s",
+	(void) snprintf(fullname, ZFS_MAX_DATASET_NAME_LEN, "%s@%s",
 	    ndmpd_zfs_args->nz_dataset,
 	    ndmpd_zfs_args->nz_snapname);
 
@@ -2211,14 +2212,14 @@ ndmpd_zfs_snapshot_prop_remove(ndmpd_zfs_args_t *ndmpd_zfs_args,
     ndmpd_zfs_snapfind_t *snapdata_p)
 {
 	char findprop_plus_slash[ZFS_MAXPROPLEN];
-	char fullname[ZFS_MAXNAMELEN];
+	char fullname[ZFS_MAX_DATASET_NAME_LEN];
 	char newprop[ZFS_MAXPROPLEN];
 	char tmpstr[ZFS_MAXPROPLEN];
 	zfs_handle_t *zhp;
 	char *ptr;
 	int err;
 
-	(void) snprintf(fullname, ZFS_MAXNAMELEN, "%s@%s",
+	(void) snprintf(fullname, ZFS_MAX_DATASET_NAME_LEN, "%s@%s",
 	    ndmpd_zfs_args->nz_dataset,
 	    snapdata_p->nzs_snapname);
 

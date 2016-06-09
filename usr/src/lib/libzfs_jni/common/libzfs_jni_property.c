@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015 by Delphix. All rights reserved.
  */
 
 #include "libzfs_jni_property.h"
@@ -168,7 +169,7 @@ create_BasicProperty(JNIEnv *env, zfs_handle_t *zhp, zfs_prop_t prop,
     char *propClass, char *valueClass)
 {
 	jobject propertyObject = NULL;
-	char source[ZFS_MAXNAMELEN];
+	char source[ZFS_MAX_DATASET_NAME_LEN];
 	zprop_source_t srctype;
 	jobject propValue = NULL;
 
@@ -261,7 +262,7 @@ create_ObjectProperty(JNIEnv *env, zfs_handle_t *zhp, zfs_prop_t prop,
     char *propClass, char *valueClass)
 {
 	jobject propertyObject = NULL;
-	char source[ZFS_MAXNAMELEN];
+	char source[ZFS_MAX_DATASET_NAME_LEN];
 	zprop_source_t srctype;
 	jobject propValue = NULL;
 

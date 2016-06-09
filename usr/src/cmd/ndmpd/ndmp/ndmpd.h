@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015 by Delphix. All rights reserved.
  */
 
 /*
@@ -456,9 +457,9 @@ typedef struct {
 
 typedef struct ndmpd_zfs_args {
 	zfs_type_t nz_type;			/* type of ZFS dataset */
-	char nz_dataset[ZFS_MAXNAMELEN];	/* dataset name */
-	char nz_snapname[ZFS_MAXNAMELEN];	/* snapname (following '@') */
-	char nz_fromsnap[ZFS_MAXNAMELEN];	/* snap of L-1 bkup */
+	char nz_dataset[ZFS_MAX_DATASET_NAME_LEN]; /* dataset name */
+	char nz_snapname[ZFS_MAX_DATASET_NAME_LEN]; /* snapname (following @) */
+	char nz_fromsnap[ZFS_MAX_DATASET_NAME_LEN]; /* snap of L-1 bkup */
 	char nz_snapprop[ZFS_MAXPROPLEN];	/* contents of snap incr prop */
 	boolean_t nz_ndmpd_snap;		/* ndmpd-generated snap? */
 
