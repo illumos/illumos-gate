@@ -395,6 +395,7 @@ MANFILES= 	ASSERT.9f				\
 	 	pm_power_has_changed.9f			\
 	 	pm_raise_power.9f			\
 	 	pm_trans_check.9f			\
+		pollhead_clean.9f			\
 	 	pollwakeup.9f				\
 	 	priv_getbyname.9f			\
 	 	priv_policy.9f				\
