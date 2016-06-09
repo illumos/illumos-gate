@@ -102,10 +102,10 @@ create_home(char *homedir, char *skeldir, uid_t uid, gid_t gid, int flags)
 		}
 		if ((dataset = get_mnt_special(pdir, stbuf.st_fstype))
 		    != NULL) {
-			char nm[ZFS_MAXNAMELEN];
+			char nm[ZFS_MAX_DATASET_NAME_LEN];
 			zfs_handle_t *zhp;
 
-			(void) snprintf(nm, ZFS_MAXNAMELEN, "%s/%s",
+			(void) snprintf(nm, sizeof (nm), "%s/%s",
 			    dataset, bname);
 
 			if ((zfs_create(g_zfs, nm, ZFS_TYPE_FILESYSTEM, NULL)

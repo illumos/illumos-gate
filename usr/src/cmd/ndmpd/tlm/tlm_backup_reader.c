@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015 by Delphix. All rights reserved.
  */
 
 /*
@@ -1225,7 +1226,8 @@ zfs_put_prop_cb(int prop, void *pp)
 		return (ZPROP_CONT);
 	}
 
-	(void) strlcpy(mpp->mp_name, zfs_prop_to_name(prop), ZFS_MAXNAMELEN);
+	(void) strlcpy(mpp->mp_name, zfs_prop_to_name(prop),
+	    ZFS_MAX_DATASET_NAME_LEN);
 	(void) strlcpy(mpp->mp_value, vbuf, ZFS_MAXPROPLEN);
 
 	switch (stype) {
@@ -1281,12 +1283,13 @@ zfs_put_quota_cb(void *pp, const char *domain, uid_t rid, uint64_t space)
 	else
 		typestr = "groupquota";
 
-	if (domain == NULL || *domain == '\0')
-		(void) snprintf(mpp->mp_name, ZFS_MAXNAMELEN, "%s@%llu",
-		    typestr, (longlong_t)rid);
-	else
-		(void) snprintf(mpp->mp_name, ZFS_MAXNAMELEN, "%s@%s-%llu",
-		    typestr, domain, (longlong_t)rid);
+	if (domain == NULL || *domain == '\0') {
+		(void) snprintf(mpp->mp_name, ZFS_MAX_DATASET_NAME_LEN,
+		    "%s@%llu", typestr, (longlong_t)rid);
+	} else {
+		(void) snprintf(mpp->mp_name, ZFS_MAX_DATASET_NAME_LEN,
+		    "%s@%s-%llu", typestr, domain, (longlong_t)rid);
+	}
 	(void) snprintf(mpp->mp_value, ZFS_MAXPROPLEN, "%llu", space);
 	(void) strlcpy(mpp->mp_source, mhp->nh_dataset, ZFS_MAXPROPLEN);
 
@@ -1429,8 +1432,10 @@ ndmp_include_zfs(ndmp_context_t *nctx, const char *dataset)
 			free(mhp);
 			return (-1);
 		}
-		if ((pname = nvpair_name(elp)) != NULL)
-			(void) strlcpy(mpp->mp_name, pname, ZFS_MAXNAMELEN);
+		if ((pname = nvpair_name(elp)) != NULL) {
+			(void) strlcpy(mpp->mp_name, pname,
+			    ZFS_MAX_DATASET_NAME_LEN);
+		}
 
 		(void) strlcpy(mpp->mp_value, sval, ZFS_MAXPROPLEN);
 		(void) strlcpy(mpp->mp_source, ssrc, ZFS_MAXPROPLEN);
