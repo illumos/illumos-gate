@@ -174,6 +174,7 @@ main(int argc, char *argv[])
 
 	printf("#define\tCPU_DTRACE_NOFAULT 0x%x\n", CPU_DTRACE_NOFAULT);
 	printf("#define\tCPU_DTRACE_BADADDR 0x%x\n", CPU_DTRACE_BADADDR);
+	printf("#define\tCPU_DTRACE_DIVZERO 0x%x\n", CPU_DTRACE_DIVZERO);
 	printf("#define\tCPU_DTRACE_ILLOP 0x%x\n", CPU_DTRACE_ILLOP);
 
 	printf("#define\tMODS_NOUNLOAD 0x%x\n", MODS_NOUNLOAD);
