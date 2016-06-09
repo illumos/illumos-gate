@@ -730,6 +730,30 @@ lx_mount(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 	lx_debug("\tlinux mount target: %s", target);
 	lx_debug("\tlinux mount fstype: %s", fstype);
 
+	/*
+	 * While SunOS is picky about mount(2) target paths being absolute,
+	 * Linux is not so strict.  In order to facilitate this looser
+	 * requirement, the cwd is prepended to non-absolute target paths.
+	 */
+	if (target[0] != '/') {
+		char *cpath, *buf = NULL;
+		int len;
+
+		if ((cpath = getcwd(NULL, MAXPATHLEN)) == NULL) {
+			return (-ENOMEM);
+		}
+		len = asprintf(&buf, "%s/%s", cpath, target);
+		free(cpath);
+		if (len < 0) {
+			return (-ENOMEM);
+		} else if (len >= MAXPATHLEN) {
+			free(buf);
+			return (-ENAMETOOLONG);
+		}
+		strlcpy(target, buf, sizeof (target));
+		free(buf);
+	}
+
 	/* Make sure we support the requested mount flags. */
 	if ((flags & ~LX_MS_SUPPORTED) != 0) {
 		lx_unsupported("unsupported mount flags: 0x%x", flags);
