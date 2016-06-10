@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015 by Delphix. All rights reserved.
  */
 
 /*
@@ -723,10 +724,10 @@ tlm_build_snapshot_name(char *name, char *sname, char *jname)
 {
 	zfs_handle_t *zhp;
 	char *rest;
-	char volname[ZFS_MAXNAMELEN];
+	char volname[ZFS_MAX_DATASET_NAME_LEN];
 	char mountpoint[PATH_MAX];
 
-	if (get_zfsvolname(volname, ZFS_MAXNAMELEN, name) == -1)
+	if (get_zfsvolname(volname, ZFS_MAX_DATASET_NAME_LEN, name) == -1)
 		goto notzfs;
 
 	(void) mutex_lock(&zlib_mtx);
@@ -1271,7 +1272,7 @@ boolean_t
 fs_is_chkpntvol(char *path)
 {
 	zfs_handle_t *zhp;
-	char vol[ZFS_MAXNAMELEN];
+	char vol[ZFS_MAX_DATASET_NAME_LEN];
 
 	if (!path || !*path)
 		return (FALSE);
@@ -1303,7 +1304,7 @@ boolean_t
 fs_is_chkpnt_enabled(char *path)
 {
 	zfs_handle_t *zhp;
-	char vol[ZFS_MAXNAMELEN];
+	char vol[ZFS_MAX_DATASET_NAME_LEN];
 
 	if (!path || !*path)
 		return (FALSE);
@@ -1337,15 +1338,13 @@ fs_is_rdonly(char *path)
  * Min/max functions
  */
 unsigned
-min(a, b)
-	unsigned a, b;
+min(unsigned a, unsigned b)
 {
 	return (a < b ? a : b);
 }
 
 unsigned
-max(a, b)
-	unsigned a, b;
+max(unsigned a, unsigned b)
 {
 	return (a > b ? a : b);
 }

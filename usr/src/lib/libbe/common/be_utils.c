@@ -21,11 +21,9 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- */
-
-/*
  * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2015 Toomas Soome <tsoome@me.com>
+ * Copyright (c) 2015 by Delphix. All rights reserved.
  */
 
 
@@ -206,7 +204,7 @@ be_get_defaults(struct be_defaults *defaults)
 		const char *res = defread_r(BE_DFLT_BENAME_STARTS, defp);
 		if (res != NULL && res[0] != NULL) {
 			(void) strlcpy(defaults->be_deflt_bename_starts_with,
-			    res, ZFS_MAXNAMELEN);
+			    res, ZFS_MAX_DATASET_NAME_LEN);
 			defaults->be_deflt_rpool_container = B_TRUE;
 		}
 		defclose_r(defp);
@@ -318,7 +316,7 @@ be_make_container_ds(const char *zpool,  char *container_ds,
 char *
 be_make_name_from_ds(const char *dataset, char *rc_loc)
 {
-	char	ds[ZFS_MAXNAMELEN];
+	char	ds[ZFS_MAX_DATASET_NAME_LEN];
 	char	*tok = NULL;
 	char	*name = NULL;
 	struct be_defaults be_defaults;

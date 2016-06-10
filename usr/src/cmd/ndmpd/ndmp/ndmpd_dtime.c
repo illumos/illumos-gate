@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015 by Delphix. All rights reserved.
  */
 
 /*
@@ -832,7 +833,7 @@ ndmpd_get_dumptime(char *path, int *level, time_t *ddate)
 {
 	int i;
 	dumpdates_t ddhead, *ddp, *save;
-	char vol[ZFS_MAXNAMELEN];
+	char vol[ZFS_MAX_DATASET_NAME_LEN];
 	nvlist_t *userprops;
 	zfs_handle_t *zhp;
 	nvlist_t *propval = NULL;
@@ -956,7 +957,7 @@ ndmpd_get_dumptime(char *path, int *level, time_t *ddate)
 int
 ndmpd_put_dumptime(char *path, int level, time_t ddate)
 {
-	char vol[ZFS_MAXNAMELEN];
+	char vol[ZFS_MAX_DATASET_NAME_LEN];
 	zfs_handle_t *zhp;
 	char tbuf[64];
 	int rv;
@@ -993,7 +994,7 @@ ndmpd_put_dumptime(char *path, int level, time_t ddate)
 int
 ndmpd_append_dumptime(char *fname, char *path, int level, time_t ddate)
 {
-	char vol[ZFS_MAXNAMELEN];
+	char vol[ZFS_MAX_DATASET_NAME_LEN];
 	zfs_handle_t *zhp;
 	char tbuf[64];
 	int rv;
