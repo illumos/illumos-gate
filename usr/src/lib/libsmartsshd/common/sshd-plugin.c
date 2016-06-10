@@ -18,12 +18,10 @@
  *
  * CDDL HEADER END
  */
-/*
- * Copyright 2011 Joyent, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
 
-#pragma ident "%Z%%M% %I% %E% SMI"
+/*
+ * Copyright 2016 Joyent, Inc.
+ */
 
 #include <alloca.h>
 #include <door.h>
@@ -44,7 +42,7 @@
 extern "C" {
 #endif
 
-#define	LOG_OOM(SZ)	fprintf(stderr, "Unable to alloca %d bytes\n", SZ)
+#define	LOG_OOM(SZ)	(void) fprintf(stderr, "Cannot alloca %d bytes\n", SZ)
 
 static const char *DOOR = "/var/tmp/._joyent_sshd_key_is_authorized";
 static const char *REQ_FMT_STR = "%s %d %s"; /* name uid fp */
@@ -84,37 +82,59 @@ sshd_allowed_in_capi(struct passwd *pw, const char *fp)
 		LOG_OOM(RETURN_SZ);
 		return (0);
 	}
-	memset(door_args.rbuf, 0, RETURN_SZ);
+	(void) memset(door_args.rbuf, 0, RETURN_SZ);
 
 	do {
 		fd = open(DOOR, O_RDWR);
-		if (fd < 0)
+		if (fd < 0) {
+			if (errno == ENOENT) {
+				/*
+				 * On systems which are not running SmartLogin,
+				 * such as vanilla SmartOS, the door will be
+				 * completely absent.  The sleep/retry loop is
+				 * skipped in this case to keep the login
+				 * process more lively.
+				 */
+				perror("smartplugin: door does not exist");
+				return (0);
+			}
 			perror("smartplugin: open (of door FD) failed");
-
-		if (door_call(fd, &door_args) < 0) {
+		} else if (door_call(fd, &door_args) < 0) {
 			perror("smartplugin: door_call failed");
 		} else {
 			allowed = atoi(door_args.rbuf);
-			munmap(door_args.rbuf, door_args.rsize);
+			if (door_args.rsize > RETURN_SZ) {
+				/*
+				 * Given what we know about the SmartLogin
+				 * daemon on the other end of the door, this
+				 * should never occur.  An assert might be
+				 * preferable, but that is avoided since the
+				 * error can be handled.
+				 */
+				(void) munmap(door_args.rbuf, door_args.rsize);
+			}
 			return (allowed);
 		}
-		if (++attempts < MAX_ATTEMPTS)
-			sleep(SLEEP_PERIOD);
+		if (++attempts < MAX_ATTEMPTS) {
+			(void) sleep(SLEEP_PERIOD);
+		}
 	} while (attempts < MAX_ATTEMPTS);
 
 	return (0);
 }
 
+/* ARGSUSED */
 int
 sshd_user_rsa_key_allowed(struct passwd *pw, RSA *key, const char *fp)
 {
-	return sshd_allowed_in_capi(pw, fp);
+	return (sshd_allowed_in_capi(pw, fp));
 }
 
+/* ARGSUSED */
 int
 sshd_user_dsa_key_allowed(struct passwd *pw, DSA *key, const char *fp)
 {
-	return sshd_allowed_in_capi(pw, fp);
+	return (sshd_allowed_in_capi(pw, fp));
 }
 
 
