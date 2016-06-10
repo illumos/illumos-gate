@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2013 by Delphix. All rights reserved.
+ * Copyright (c) 2013, 2015 by Delphix. All rights reserved.
  * Copyright (c) 2013 Steven Hartland. All rights reserved.
  * Copyright (c) 2016 Martin Matuska. All rights reserved.
  */
@@ -103,7 +103,7 @@ ndmp_has_backup_snapshot(char *volname, char *jobname)
 {
 	zfs_handle_t *zhp;
 	snap_param_t snp;
-	char chname[ZFS_MAXNAMELEN];
+	char chname[ZFS_MAX_DATASET_NAME_LEN];
 
 	(void) mutex_lock(&zlib_mtx);
 	if ((zhp = zfs_open(zlibh, volname, ZFS_TYPE_DATASET)) == 0) {
@@ -113,7 +113,7 @@ ndmp_has_backup_snapshot(char *volname, char *jobname)
 	}
 
 	snp.snp_found = 0;
-	(void) snprintf(chname, ZFS_MAXNAMELEN, "@%s", jobname);
+	(void) snprintf(chname, ZFS_MAX_DATASET_NAME_LEN, "@%s", jobname);
 	snp.snp_name = chname;
 
 	(void) zfs_iter_snapshots(zhp, B_FALSE, ndmp_has_backup, &snp);
@@ -140,7 +140,7 @@ ndmp_has_backup_snapshot(char *volname, char *jobname)
 int
 ndmp_create_snapshot(char *vol_name, char *jname)
 {
-	char vol[ZFS_MAXNAMELEN];
+	char vol[ZFS_MAX_DATASET_NAME_LEN];
 
 	if (vol_name == 0 ||
 	    get_zfsvolname(vol, sizeof (vol), vol_name) == -1)
@@ -174,7 +174,7 @@ ndmp_create_snapshot(char *vol_name, char *jname)
 int
 ndmp_remove_snapshot(char *vol_name, char *jname)
 {
-	char vol[ZFS_MAXNAMELEN];
+	char vol[ZFS_MAX_DATASET_NAME_LEN];
 
 	if (vol_name == 0 ||
 	    get_zfsvolname(vol, sizeof (vol), vol_name) == -1)
@@ -247,13 +247,14 @@ int
 snapshot_create(char *volname, char *jname, boolean_t recursive,
     boolean_t hold)
 {
-	char snapname[ZFS_MAXNAMELEN];
+	char snapname[ZFS_MAX_DATASET_NAME_LEN];
 	int rv;
 
 	if (!volname || !*volname)
 		return (-1);
 
-	(void) snprintf(snapname, ZFS_MAXNAMELEN, "%s@%s", volname, jname);
+	(void) snprintf(snapname, ZFS_MAX_DATASET_NAME_LEN,
+	    "%s@%s", volname, jname);
 
 	(void) mutex_lock(&zlib_mtx);
 	if ((rv = zfs_snapshot(zlibh, snapname, recursive, NULL))
@@ -287,7 +288,7 @@ int
 snapshot_destroy(char *volname, char *jname, boolean_t recursive,
     boolean_t hold, int *zfs_err)
 {
-	char snapname[ZFS_MAXNAMELEN];
+	char snapname[ZFS_MAX_DATASET_NAME_LEN];
 	zfs_handle_t *zhp;
 	zfs_type_t ztype;
 	char *namep;
@@ -303,8 +304,8 @@ snapshot_destroy(char *volname, char *jname, boolean_t recursive,
 		ztype = ZFS_TYPE_VOLUME | ZFS_TYPE_FILESYSTEM;
 		namep = volname;
 	} else {
-		(void) snprintf(snapname, ZFS_MAXNAMELEN, "%s@%s", volname,
-		    jname);
+		(void) snprintf(snapname, ZFS_MAX_DATASET_NAME_LEN,
+		    "%s@%s", volname, jname);
 		namep = snapname;
 		ztype = ZFS_TYPE_SNAPSHOT;
 	}
