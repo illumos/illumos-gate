@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2011, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2015, Joyent, Inc.
  * Copyright 2014 Nexenta Systems, Inc. All rights reserved.
  */
 
@@ -106,8 +106,8 @@ extern int brand_config_iter_privilege(brand_handle_t,
 extern int brand_platform_iter_devices(brand_handle_t, const char *,
     int (*)(void *, const char *, const char *), void *, const char *);
 extern int brand_platform_iter_gmounts(brand_handle_t, const char *,
-    int (*)(void *, const char *, const char *, const char *, const char *),
-    void *);
+    const char *, int (*)(void *, const char *, const char *, const char *,
+    const char *), void *);
 extern int brand_platform_iter_link(brand_handle_t, int (*)(void *,
     const char *, const char *), void *);
 extern int brand_platform_iter_mounts(brand_handle_t, int (*)(void *,
