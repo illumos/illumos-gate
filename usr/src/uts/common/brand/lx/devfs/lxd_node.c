@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -318,7 +318,7 @@ lxd_dirlookup(lxd_node_t *parent, char *name, lxd_node_t **foundnp, cred_t *cr)
  * The target directory is locked by the caller.
  */
 static int
-lxd_dircheckpath(lxd_node_t *fromnode, lxd_node_t *toparent, cred_t *cr)
+lxd_dircheckpath(lxd_node_t *fromnode, lxd_node_t *toparent)
 {
 	int error = 0;
 	lxd_node_t *dir, *dotdot;
@@ -402,7 +402,7 @@ lxd_dir_make_node(lxd_node_t *dir, lxd_mnt_t *lxdm, struct vattr *va,
 		ldn->lxdn_mtime = va->va_mtime;
 
 	if (op == DE_MKDIR) {
-		lxd_dirinit(dir, ldn, cred);
+		lxd_dirinit(dir, ldn);
 	}
 
 	*newnode = ldn;
@@ -410,7 +410,7 @@ lxd_dir_make_node(lxd_node_t *dir, lxd_mnt_t *lxdm, struct vattr *va,
 }
 
 static int
-lxd_diraddentry(lxd_node_t *dir, lxd_node_t *ldn, char *name, enum de_op op)
+lxd_diraddentry(lxd_node_t *dir, lxd_node_t *ldn, char *name)
 {
 	lxd_dirent_t	*dp, *pdp;
 	size_t		namelen, alloc_size;
@@ -525,8 +525,7 @@ lxd_direnter(
 	lxd_node_t	*ldn,		/* existing lxd_node, if rename */
 	struct vattr	*va,
 	lxd_node_t	**rnp,		/* return lxd_node, if create/mkdir */
-	cred_t		*cr,
-	caller_context_t *ctp)
+	cred_t		*cr)
 {
 	lxd_dirent_t *dirp;
 	lxd_node_t *found = NULL;
@@ -591,7 +590,7 @@ lxd_direnter(
 		}
 		if ((ldn->lxdn_vnode->v_type) == VDIR) {
 			if ((fromparent != dir) &&
-			    (error = lxd_dircheckpath(ldn, dir, cr)) != 0) {
+			    (error = lxd_dircheckpath(ldn, dir)) != 0) {
 				goto out;
 			}
 		}
@@ -634,7 +633,7 @@ lxd_direnter(
 			if (error != 0)
 				goto out;
 
-			error = lxd_diraddentry(dir, ldn, name, op);
+			error = lxd_diraddentry(dir, ldn, name);
 			if (error == 0 && rnp != NULL)
 				*rnp = ldn;
 			break;
@@ -657,7 +656,7 @@ lxd_direnter(
 				goto out;
 		}
 
-		error = lxd_diraddentry(dir, ldn, name, op);
+		error = lxd_diraddentry(dir, ldn, name);
 		if (error != 0) {
 			if (op == DE_CREATE || op == DE_MKDIR) {
 				/*
@@ -895,7 +894,7 @@ lxd_node_init(lxd_mnt_t *lxdm, lxd_node_t *ldn, vnode_t *realvp, vattr_t *vap,
  * directory.
  */
 void
-lxd_dirinit(lxd_node_t *parent, lxd_node_t *dir, cred_t *cr)
+lxd_dirinit(lxd_node_t *parent, lxd_node_t *dir)
 {
 	lxd_dirent_t *dot, *dotdot;
 	timestruc_t now;

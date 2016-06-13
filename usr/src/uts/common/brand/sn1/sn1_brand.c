@@ -49,7 +49,7 @@ void	sn1_setbrand(proc_t *);
 int	sn1_getattr(zone_t *, int, void *, size_t *);
 int	sn1_setattr(zone_t *, int, void *, size_t);
 int	sn1_brandsys(int, int64_t *, uintptr_t, uintptr_t, uintptr_t,
-		uintptr_t, uintptr_t);
+		uintptr_t);
 void	sn1_copy_procdata(proc_t *, proc_t *);
 void	sn1_proc_exit(struct proc *);
 void	sn1_exec();
@@ -179,10 +179,10 @@ sn1_setattr(zone_t *zone, int attr, void *buf, size_t bufsize)
 	return (EINVAL);
 }
 
-/*ARGSUSED*/
+/* ARGSUSED5 */
 int
 sn1_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
-    uintptr_t arg3, uintptr_t arg4, uintptr_t arg5)
+    uintptr_t arg3, uintptr_t arg4)
 {
 	int	res;
 
@@ -251,8 +251,8 @@ sn1_init_brand_data(zone_t *zone, kmutex_t *zsl)
 
 int
 sn1_elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
-	int level, long *execsz, int setid, caddr_t exec_file, cred_t *cred,
-	int *brand_action)
+    int level, long *execsz, int setid, caddr_t exec_file, cred_t *cred,
+    int *brand_action)
 {
 	return (brand_solaris_elfexec(vp, uap, args, idatap, level, execsz,
 	    setid, exec_file, cred, brand_action, &sn1_brand, SN1_BRANDNAME,

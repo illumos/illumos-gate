@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -32,7 +32,7 @@
 
 static int cgrp_dirmakecgnode(cgrp_node_t *, cgrp_mnt_t *, struct vattr *,
 	enum de_op, cgrp_node_t **, struct cred *);
-static int cgrp_diraddentry(cgrp_node_t *, cgrp_node_t *, char *, enum de_op);
+static int cgrp_diraddentry(cgrp_node_t *, cgrp_node_t *, char *);
 
 static cgrp_subsys_dirent_t cgrp_generic_dir[] = {
 	{ CG_PROCS,		"cgroup.procs" },
@@ -128,7 +128,7 @@ cgrp_hash_out(cgrp_dirent_t *c)
 
 static cgrp_dirent_t *
 cgrp_hash_lookup(char *name, cgrp_node_t *parent, cgrp_nodehold_t hold,
-	cgrp_node_t **found)
+    cgrp_node_t **found)
 {
 	cgrp_dirent_t	*l;
 	uint_t		hash;
@@ -222,14 +222,12 @@ cgrp_cg_hash_remove(cgrp_mnt_t *cgm, cgrp_node_t *cn)
  * We have to look at all of the processes to find applicable ones.
  */
 static void
-cgrp_cg_hash_init(cgrp_mnt_t *cgm, cgrp_node_t *cn)
+cgrp_cg_hash_init(cgrp_node_t *cn)
 {
 	int i;
 	int cnt = 0;
 	zoneid_t zoneid = curproc->p_zone->zone_id;
 	pid_t schedpid = curproc->p_zone->zone_zsched->p_pid;
-
-	ASSERT(MUTEX_HELD(&cgm->cg_contents));
 
 	/* Scan all of the process entries */
 	mutex_enter(&pidlock);
@@ -351,10 +349,9 @@ int
 cgrp_dirlookup(cgrp_node_t *parent, char *name, cgrp_node_t **foundcp,
     cred_t *cred)
 {
-	cgrp_mnt_t *cgm = VTOCGM(parent->cgn_vnode);
 	int error;
 
-	ASSERT(MUTEX_HELD(&cgm->cg_contents));
+	ASSERT(MUTEX_HELD(&VTOCGM(parent->cgn_vnode)->cg_contents));
 	*foundcp = NULL;
 	if (parent->cgn_type != CG_CGROUP_DIR)
 		return (ENOTDIR);
@@ -398,8 +395,7 @@ cgrp_direnter(
 	cgrp_node_t	*cn,		/* existing cgrp_node, if rename */
 	struct vattr	*va,
 	cgrp_node_t	**cnp,		/* return cgrp_node, if create/mkdir */
-	cred_t		*cred,
-	caller_context_t *ctp)
+	cred_t		*cred)
 {
 	cgrp_dirent_t *cdp;
 	cgrp_node_t *found = NULL;
@@ -484,7 +480,7 @@ cgrp_direnter(
 			}
 		}
 
-		error = cgrp_diraddentry(dir, cn, name, op);
+		error = cgrp_diraddentry(dir, cn, name);
 		if (error != 0) {
 			if (op == DE_CREATE || op == DE_MKDIR) {
 				/*
@@ -715,8 +711,8 @@ cgrp_addnode(cgrp_mnt_t *cgm, cgrp_node_t *dir, char *name,
 
 	ASSERT(MUTEX_HELD(&cgm->cg_contents));
 
-	cgrp_direnter(cgm, dir, name, DE_CREATE, (cgrp_node_t *)NULL, nattr,
-	    &ncn, cr, NULL);
+	VERIFY0(cgrp_direnter(cgm, dir, name, DE_CREATE, (cgrp_node_t *)NULL,
+	    nattr, &ncn, cr));
 
 	/*
 	 * Fix the inode and assign the pseudo file type to be correct.
@@ -772,7 +768,7 @@ cgrp_dirinit(cgrp_node_t *parent, cgrp_node_t *dir, cred_t *cr)
 	cgrp_cg_hash_insert(cgm, dir);
 	/* Initialise the first cgroup if this is top-level group */
 	if (parent == dir)
-		cgrp_cg_hash_init(cgm, dir);
+		cgrp_cg_hash_init(dir);
 
 	/*
 	 * Initialize the entries
@@ -844,9 +840,8 @@ cgrp_dirtrunc(cgrp_node_t *dir)
 {
 	cgrp_dirent_t *cgdp;
 	timestruc_t now;
-	cgrp_mnt_t *cgm = VTOCGM(dir->cgn_vnode);
 
-	ASSERT(MUTEX_HELD(&cgm->cg_contents));
+	ASSERT(MUTEX_HELD(&VTOCGM(dir->cgn_vnode)->cg_contents));
 	ASSERT(dir->cgn_type == CG_CGROUP_DIR);
 
 	for (cgdp = dir->cgn_dir; cgdp; cgdp = dir->cgn_dir) {
@@ -884,7 +879,7 @@ cgrp_dirtrunc(cgrp_node_t *dir)
 }
 
 static int
-cgrp_diraddentry(cgrp_node_t *dir, cgrp_node_t *cn, char *name, enum de_op op)
+cgrp_diraddentry(cgrp_node_t *dir, cgrp_node_t *cn, char *name)
 {
 	cgrp_dirent_t *cdp, *cpdp;
 	size_t		namelen, alloc_size;

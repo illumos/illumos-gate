@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include <sys/systm.h>
@@ -92,7 +92,7 @@ lx_getdents_common(int fd, caddr_t uptr, size_t count,
 	file_t *fp;
 	struct uio auio;
 	struct iovec aiov;
-	int error;
+	int error, at_eof;
 	int sbufsz, lbufsz, bufsz;
 	void *lbuf, *sbuf;
 	size_t outb = 0;
@@ -158,8 +158,9 @@ lx_getdents_common(int fd, caddr_t uptr, size_t count,
 	 * When this happens, we can simply repeat the READDIR operation until
 	 * the available records are exhausted or we've filled the user buffer.
 	 */
-	while (1) {
-		int at_eof, res;
+	do {
+		int res;
+
 		(void) VOP_RWLOCK(vp, V_WRITELOCK_FALSE, NULL);
 		error = VOP_READDIR(vp, &auio, fp->f_cred, &at_eof, NULL, 0);
 		VOP_RWUNLOCK(vp, V_WRITELOCK_FALSE, NULL);
@@ -187,15 +188,6 @@ lx_getdents_common(int fd, caddr_t uptr, size_t count,
 		}
 		outb += res;
 
-		if (at_eof != 0 || (count - outb) < (lx_size + MAXPATHLEN)) {
-			/*
-			 * If there are no records left or the remaining buffer
-			 * space is not large enough to hold a max-length
-			 * filename, do not continue iteration.
-			 */
-			break;
-		}
-
 		/*
 		 * We undershot the request buffer.
 		 * Reset for another READDIR, taking care not to overshoot.
@@ -204,7 +196,13 @@ lx_getdents_common(int fd, caddr_t uptr, size_t count,
 		auio.uio_resid = bufsz;
 		aiov.iov_len = bufsz;
 		aiov.iov_base = sbuf;
-	}
+
+		/*
+		 * Continued progress is allowed only if EOF has not been
+		 * reached and there is enough remaining buffer space to hold
+		 * an entry with a max-length filename.
+		 */
+	} while (at_eof == 0 && (count - outb) >= (lx_size + MAXPATHLEN));
 
 	kmem_free(lbuf, lbufsz);
 	kmem_free(sbuf, sbufsz);
@@ -229,7 +227,9 @@ lx_getdents_format32(caddr_t sbuf, caddr_t lbuf, int len)
 	int size = 0;
 
 	while (len > 0) {
+		/* LINTED: alignment */
 		sd = (struct dirent *)sbuf;
+		/* LINTED: alignment */
 		ld = (struct lx_dirent_32 *)lbuf;
 		namelen = MIN(strlen(sd->d_name), LX_NAMEMAX - 1);
 
@@ -260,7 +260,9 @@ lx_getdents_format64(caddr_t sbuf, caddr_t lbuf, int len)
 	int size = 0;
 
 	while (len > 0) {
+		/* LINTED: alignment */
 		sd = (struct dirent *)sbuf;
+		/* LINTED: alignment */
 		ld = (struct lx_dirent_64 *)lbuf;
 		namelen = MIN(strlen(sd->d_name), LX_NAMEMAX - 1);
 
@@ -320,7 +322,9 @@ lx_getdents64_format(caddr_t sbuf, caddr_t lbuf, int len)
 	int size = 0;
 
 	while (len > 0) {
+		/* LINTED: alignment */
 		sd = (struct dirent *)sbuf;
+		/* LINTED: alignment */
 		ld = (struct lx_dirent64 *)lbuf;
 		namelen = MIN(strlen(sd->d_name), LX_NAMEMAX - 1);
 

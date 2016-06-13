@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*
@@ -171,11 +171,10 @@ lxsys_node_t *
 lxsys_getnode_static(vnode_t *dp, unsigned int instance)
 {
 	lxsys_mnt_t *lxsm = VTOLXSM(dp);
-	lxsys_node_t *lnp;
+	lxsys_node_t *lnp, *tail = NULL;
 
 	mutex_enter(&lxsm->lxsysm_lock);
-	lnp = lxsm->lxsysm_node;
-	while (1) {
+	for (lnp = lxsm->lxsysm_node; lnp != NULL; lnp = lnp->lxsys_next) {
 		if (lnp->lxsys_instance == instance) {
 			VERIFY(lnp->lxsys_parentvp == dp);
 
@@ -183,20 +182,16 @@ lxsys_getnode_static(vnode_t *dp, unsigned int instance)
 			mutex_exit(&lxsm->lxsysm_lock);
 			return (lnp);
 		} else if (lnp->lxsys_next == NULL) {
+			/* Found no match by the end of the list */
+			tail = lnp;
 			break;
 		}
-		lnp = lnp->lxsys_next;
 	}
 
-	/*
-	 * No persistent node found.
-	 * Create one and add it to the end of the list.
-	 */
-	lnp->lxsys_next = lxsys_getnode(dp, LXSYS_STATIC, instance, 0);
-	lnp = lnp->lxsys_next;
+	tail->lxsys_next = lxsys_getnode(dp, LXSYS_STATIC, instance, 0);
+	lnp = tail->lxsys_next;
 	/* Allow mounts on static entries */
 	LXSTOV(lnp)->v_flag &= (~VNOMOUNT);
-
 	mutex_exit(&lxsm->lxsysm_lock);
 	return (lnp);
 }

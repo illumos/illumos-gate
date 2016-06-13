@@ -193,7 +193,6 @@ static lxsys_dirent_t dirlist_root[] = {
 	{ LXSYS_INST_DEVICESDIR,	"devices" },
 	{ LXSYS_INST_FSDIR,		"fs" }
 };
-static lxsys_dirent_t dirlist_empty[] = {};
 static lxsys_dirent_t dirlist_class[] = {
 	{ LXSYS_INST_CLASS_NETDIR,	"net" }
 };
@@ -258,7 +257,7 @@ static lxsys_dirlookup_t lxsys_dirlookup[] = {
 	SYSDLENT(LXSYS_INST_ROOT, dirlist_root),
 	SYSDLENT(LXSYS_INST_CLASSDIR, dirlist_class),
 	SYSDLENT(LXSYS_INST_FSDIR, dirlist_fs),
-	SYSDLENT(LXSYS_INST_FS_CGROUPDIR, dirlist_empty),
+	{ LXSYS_INST_FS_CGROUPDIR, NULL, 0 },
 	SYSDLENT(LXSYS_INST_DEVICESDIR, dirlist_devices),
 	SYSDLENT(LXSYS_INST_DEVICES_SYSTEMDIR, dirlist_devices_system),
 	SYSDLENT(LXSYS_INST_DEVICES_VIRTUALDIR, dirlist_devices_virtual),
@@ -334,6 +333,7 @@ typedef struct lxsys_cpu_info {
 /*
  * lxsys_open(): Vnode operation for VOP_OPEN()
  */
+/* ARGSUSED */
 static int
 lxsys_open(vnode_t **vpp, int flag, cred_t *cr, caller_context_t *ct)
 {
@@ -397,6 +397,7 @@ lxsys_read(vnode_t *vp, uio_t *uiop, int ioflag, cred_t *cr,
 /*
  * lxsys_getattr(): Vnode operation for VOP_GETATTR()
  */
+/* ARGSUSED */
 static int
 lxsys_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
     caller_context_t *ct)
@@ -422,6 +423,7 @@ lxsys_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 /*
  * lxsys_access(): Vnode operation for VOP_ACCESS()
  */
+/* ARGSUSED */
 static int
 lxsys_access(vnode_t *vp, int mode, int flags, cred_t *cr, caller_context_t *ct)
 {
@@ -793,11 +795,13 @@ lxsys_lookup_devices_syscpu(lxsys_node_t *ldp, char *comp)
 		}
 	} else if (ldp->lxsys_endpoint == 0) {
 		/* cpu-level sub-item listing, currently empty */
+		/* EMPTY */
 	}
 
 	return (NULL);
 }
 
+/* ARGSUSED */
 static vnode_t *
 lxsys_lookup_devices_syscpuinfo(lxsys_node_t *ldp, char *comp)
 {
@@ -916,6 +920,7 @@ lxsys_read_devices_virtual_net(lxsys_node_t *lnp, lxsys_uiobuf_t *luio)
 	return (error);
 }
 
+/* ARGSUSED1 */
 static int
 lxsys_read_devices_zfs_block(lxsys_node_t *lnp, lxsys_uiobuf_t *luio)
 {
@@ -1128,6 +1133,8 @@ lxsys_readdir_subdir(lxsys_node_t *lxsnp, uio_t *uiop, int *eofp,
 	dirent64_t *dirent = (dirent64_t *)bp;
 	ssize_t oresid;	/* save a copy for testing later */
 	ssize_t uresid;
+
+	VERIFY(dirtab != NULL || dirtablen == 0);
 
 	oresid = uiop->uio_resid;
 
@@ -1559,8 +1566,7 @@ lxsys_readdir_devices_syscpu(lxsys_node_t *lnp, uio_t *uiop, int *eofp)
 		error = lxsys_readdir_cpu(lnp, uiop, eofp);
 	} else if (lnp->lxsys_endpoint == 0) {
 		/* cpu-level sub-item listing */
-		error = lxsys_readdir_subdir(lnp, uiop, eofp,
-		    dirlist_empty, SYSDIRLISTSZ(dirlist_empty));
+		error = lxsys_readdir_subdir(lnp, uiop, eofp, NULL, 0);
 	} else {
 		/*
 		 * Currently there shouldn't be subdirs below this but

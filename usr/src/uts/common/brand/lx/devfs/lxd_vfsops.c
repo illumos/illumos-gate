@@ -320,7 +320,7 @@ lxd_xlate_init()
 
 			if (lookupnameat(tpath, UIO_SYSSPACE, FOLLOW, NULL,
 			    &vp, NULL) != 0) {
-				mt[j].lxd_mt_minor = -1;
+				mt[j].lxd_mt_minor = UINT_MAX;
 				continue;
 			}
 
@@ -476,7 +476,7 @@ lxd_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 	lxdm->lxdm_rootnode = ldn;
 
 	ldn->lxdn_nodeid = lxdm->lxdm_gen++;
-	lxd_dirinit(ldn, ldn, cr);
+	lxd_dirinit(ldn, ldn);
 
 	rw_exit(&ldn->lxdn_rwlock);
 
@@ -823,6 +823,7 @@ lxd_pts_devt_translator(dev_t dev, dev_t *jdev)
 	*jdev = LX_MAKEDEVICE(lx_maj, lx_min);
 }
 
+/* ARGSUSED */
 static void
 lxd_ptm_devt_translator(dev_t dev, dev_t *jdev)
 {

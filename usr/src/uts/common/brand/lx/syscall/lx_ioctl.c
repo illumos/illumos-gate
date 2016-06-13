@@ -466,7 +466,7 @@ typedef struct lx_ifreq32 {
 	char	ifr_name[IFNAMSIZ];
 	union {
 		struct	sockaddr ifru_addr;
-	};
+	} ifr_ifrn;
 } lx_ifreq32_t;
 
 typedef struct lx_ifreq64 {
@@ -475,7 +475,7 @@ typedef struct lx_ifreq64 {
 		struct	sockaddr ifru_addr;
 		/* pad this out to the Linux size */
 		uint64_t	ifmap[3];
-	};
+	} ifr_ifrn;
 } lx_ifreq64_t;
 
 typedef struct lx_ifconf32 {
@@ -491,6 +491,7 @@ typedef struct lx_ifconf64 {
 
 /* Generic translators */
 
+/* ARGSUSED */
 static int
 ict_pass(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 {
@@ -502,6 +503,7 @@ ict_pass(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 	return ((error != 0) ? set_errno(error) : 0);
 }
 
+/* ARGSUSED */
 static int
 ict_fionbio(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 {
@@ -527,6 +529,7 @@ ict_fionbio(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 	return ((error != 0) ? set_errno(error) : 0);
 }
 
+/* ARGSUSED */
 static int
 ict_fionread(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 {
@@ -596,6 +599,7 @@ lx_lookup_zvol(lx_zone_data_t *lxzd, dev_t dev)
  * See zvol_ioctl() which always fails for DKIOCGGEOM. The geometry for a
  * zvol (or really any modern disk) is made up, so we do that here as well.
  */
+/* ARGSUSED */
 static int
 ict_hdgetgeo(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 {
@@ -655,6 +659,7 @@ ict_hdgetgeo(file_t *fp, int cmd, intptr_t arg, int lxcmd)
  * Per the Linux sd(4) man page, get the number of sectors. The linux/fs.h
  * header says its 512 byte blocks.
  */
+/* ARGSUSED */
 static int
 ict_blkgetsize(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 {
@@ -703,6 +708,7 @@ ict_blkgetsize(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 /*
  * Get the sector size (i.e. the logical block size).
  */
+/* ARGSUSED */
 static int
 ict_blkgetssize(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 {
@@ -746,6 +752,7 @@ ict_blkgetssize(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 /*
  * Get the size. The linux/fs.h header says its in bytes.
  */
+/* ARGSUSED */
 static int
 ict_blkgetsize64(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 {
@@ -786,8 +793,10 @@ ict_blkgetsize64(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 	return (0);
 }
 
+/* ARGSUSED */
 /* Terminal-related translators */
 
+/* ARGSUSED */
 static int
 ict_tcsets(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 {
@@ -813,6 +822,7 @@ ict_tcsets(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 	return (0);
 }
 
+/* ARGSUSED */
 static int
 ict_tcseta(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 {
@@ -838,6 +848,7 @@ ict_tcseta(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 	return (0);
 }
 
+/* ARGSUSED */
 static int
 ict_tcgets_ptm(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 {
@@ -862,6 +873,7 @@ ict_tcgets_ptm(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 	return (0);
 }
 
+/* ARGSUSED */
 static int
 ict_tcgets_native(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 {
@@ -892,6 +904,7 @@ ict_tcgets_native(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 	return (0);
 }
 
+/* ARGSUSED */
 static int
 ict_tcgets(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 {
@@ -901,6 +914,7 @@ ict_tcgets(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 		return (ict_tcgets_native(fp, cmd, arg, lxcmd));
 }
 
+/* ARGSUSED */
 static int
 ict_tcgeta(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 {
@@ -928,6 +942,7 @@ ict_tcgeta(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 	return (0);
 }
 
+/* ARGSUSED */
 static int
 ict_tiocspgrp(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 {
@@ -945,6 +960,7 @@ ict_tiocspgrp(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 	return ((error != 0) ? set_errno(error) : 0);
 }
 
+/* ARGSUSED */
 static int
 ict_tcsbrkp(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 {
@@ -956,6 +972,7 @@ ict_tcsbrkp(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 	return ((error != 0) ? set_errno(error) : 0);
 }
 
+/* ARGSUSED */
 static int
 ict_tiocgpgrp(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 {
@@ -975,6 +992,7 @@ ict_tiocgpgrp(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 	return ((error != 0) ? set_errno(error) : 0);
 }
 
+/* ARGSUSED */
 static int
 ict_sptlock(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 {
@@ -995,6 +1013,7 @@ ict_sptlock(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 	return ((error != 0) ? set_errno(error) : 0);
 }
 
+/* ARGSUSED */
 static int
 ict_gptn(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 {
@@ -1029,6 +1048,7 @@ ict_gptn(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 	return (0);
 }
 
+/* ARGSUSED */
 static int
 ict_tiocgwinsz(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 {
@@ -1069,6 +1089,7 @@ ict_tiocgwinsz(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 	return (0);
 }
 
+/* ARGSUSED */
 static int
 ict_tiocsctty(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 {
@@ -1109,6 +1130,7 @@ ict_tiocsctty(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 
 /* Socket-related translators */
 
+/* ARGSUSED */
 static int
 ict_siocatmark(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 {
@@ -1200,6 +1222,7 @@ ict_sioghwaddr(file_t *fp, struct lifreq *lreq)
 	return (error);
 }
 
+/* ARGSUSED */
 static int
 ict_siocgifname(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 {
@@ -1233,7 +1256,7 @@ ict_siocgifname(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 	phyi = avl_find(&ipst->ips_phyint_g_list->phyint_list_avl_by_index,
 	    (void *) &req.ifr_index, NULL);
 	if (phyi != NULL) {
-		strncpy(name, phyi->phyint_name, LIFNAMSIZ);
+		(void) strncpy(name, phyi->phyint_name, LIFNAMSIZ);
 		lx_ifname_convert(name, LX_IF_FROMNATIVE);
 	} else {
 		name[0] = '\0';
@@ -1244,7 +1267,7 @@ ict_siocgifname(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 
 	if (strlen(name) != 0) {
 		/* Truncate for ifreq and copyout */
-		strncpy(req.ifr_name, name, IFNAMSIZ);
+		(void) strncpy(req.ifr_name, name, IFNAMSIZ);
 		if (copyout(&req, (struct ifreq *)arg, len) != 0) {
 			return (set_errno(EFAULT));
 		}
@@ -1254,6 +1277,7 @@ ict_siocgifname(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 	return (set_errno(EINVAL));
 }
 
+/* ARGSUSED */
 static int
 ict_siolifreq(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 {
@@ -1269,7 +1293,7 @@ ict_siolifreq(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 	if (copyin((struct ifreq *)arg, &req, len) != 0)
 		return (set_errno(EFAULT));
 	bzero(&lreq, sizeof (lreq));
-	strncpy(lreq.lifr_name, req.ifr_name, IFNAMSIZ);
+	(void) strncpy(lreq.lifr_name, req.ifr_name, IFNAMSIZ);
 	bcopy(&req.ifr_ifru, &lreq.lifr_lifru, len - IFNAMSIZ);
 	lx_ifname_convert(lreq.lifr_name, LX_IF_TONATIVE);
 
@@ -1352,7 +1376,7 @@ ict_siolifreq(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 	/* Convert back to a Linux ifreq */
 	lx_ifname_convert(lreq.lifr_name, LX_IF_FROMNATIVE);
 	bzero(&req, sizeof (req));
-	strncpy(req.ifr_name, lreq.lifr_name, IFNAMSIZ);
+	(void) strncpy(req.ifr_name, lreq.lifr_name, IFNAMSIZ);
 	bcopy(&lreq.lifr_lifru, &req.ifr_ifru, len - IFNAMSIZ);
 
 	if (copyout(&req, (struct lifreq *)arg, len) != 0)
@@ -1361,6 +1385,7 @@ ict_siolifreq(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 	return (0);
 }
 
+/* ARGSUSED */
 static int
 ict_siocgifconf32(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 {
@@ -1418,6 +1443,7 @@ ict_siocgifconf32(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 	return (error);
 }
 
+/* ARGSUSED */
 static int
 ict_siocgifconf64(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 {
@@ -1475,6 +1501,7 @@ ict_siocgifconf64(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 	return (error);
 }
 
+/* ARGSUSED */
 static int
 ict_siocgifconf(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 {
@@ -1490,6 +1517,7 @@ ict_siocgifconf(file_t *fp, int cmd, intptr_t arg, int lxcmd)
  * rest of the code, we'll treat a positive return as an errno and a negative
  * return as the non-error return (which we then negate).
  */
+/* ARGSUSED */
 static int
 ict_autofs(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 {

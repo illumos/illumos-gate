@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*
@@ -235,9 +235,9 @@ lx_rw_uc(proc_t *p, void *ucp, void *kucp, size_t ucsz, boolean_t writing)
 		size_t len = MIN(rem, PAGESIZE - (addr & PAGEOFFSET));
 
 		if (writing) {
-			error = uwrite(p, kucp + pos, len, addr);
+			error = uwrite(p, (caddr_t)kucp + pos, len, addr);
 		} else {
-			error = uread(p, kucp + pos, len, addr);
+			error = uread(p, (caddr_t)kucp + pos, len, addr);
 		}
 
 		if (error != 0) {
@@ -990,6 +990,7 @@ lx_user_regs_copyin(lx_lwp_data_t *lwpd, void *uregsp)
 			}
 			return (0);
 		}
+		break;
 
 #ifdef __amd64
 	case DATAMODEL_LP64:
@@ -1032,6 +1033,7 @@ lx_user_regs_copyout(lx_lwp_data_t *lwpd, void *uregsp)
 			}
 			return (0);
 		}
+		break;
 
 #ifdef __amd64
 	case DATAMODEL_LP64:
@@ -1072,6 +1074,7 @@ lx_user_fpregs_copyin(lx_lwp_data_t *lwpd, void *uregsp)
 			lx_setfpregs32(lwpd, &regs);
 			return (0);
 		}
+		break;
 
 #ifdef __amd64
 	case DATAMODEL_LP64:
@@ -1110,6 +1113,7 @@ lx_user_fpregs_copyout(lx_lwp_data_t *lwpd, void *uregsp)
 			}
 			return (0);
 		}
+		break;
 
 #ifdef __amd64
 	case DATAMODEL_LP64:
@@ -1132,6 +1136,7 @@ lx_user_fpregs_copyout(lx_lwp_data_t *lwpd, void *uregsp)
 	return (EIO);
 }
 
+/* ARGSUSED */
 int
 lx_user_fpxregs_copyin(lx_lwp_data_t *lwpd, void *uregsp)
 {
@@ -1139,6 +1144,7 @@ lx_user_fpxregs_copyin(lx_lwp_data_t *lwpd, void *uregsp)
 	return (EIO);
 }
 
+/* ARGSUSED */
 int
 lx_user_fpxregs_copyout(lx_lwp_data_t *lwpd, void *uregsp)
 {
@@ -1168,6 +1174,7 @@ lx_ptrace_peekuser(lx_lwp_data_t *lwpd, uintptr_t offset, void *uptr)
 			}
 			return (0);
 		}
+		break;
 
 #ifdef __amd64
 	case DATAMODEL_LP64:
@@ -1196,6 +1203,7 @@ lx_ptrace_peekuser(lx_lwp_data_t *lwpd, uintptr_t offset, void *uptr)
 	return (EIO);
 }
 
+/* ARGSUSED */
 int
 lx_ptrace_pokeuser(lx_lwp_data_t *lwpd, uintptr_t offset, void *uptr)
 {
@@ -1704,6 +1712,7 @@ badstack:
 
 #else	/* !__amd64 (__i386) */
 
+/* ARGSUSED */
 void
 lx_emulate_user(klwp_t *lwp, int syscall_num, uintptr_t *args)
 {

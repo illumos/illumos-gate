@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -284,7 +284,7 @@ lx_setresgid16(l_gid16_t rgid16, l_gid16_t egid16, l_gid16_t sgid16)
  * Linux defines NGROUPS_MAX to be 32, but on illumos it is only 16. We employ
  * the terrible hack below so that tests may proceed, if only on DEBUG kernels.
  */
-long
+int
 lx_helper_setgroups(int ngroups, gid_t *grouplist)
 {
 #ifdef DEBUG

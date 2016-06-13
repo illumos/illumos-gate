@@ -21,7 +21,7 @@
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-# Copyright 2015 Joyent, Inc.
+# Copyright 2016 Joyent, Inc.
 #
 #
 
@@ -95,3 +95,6 @@ $(LINTS_DIR)/%.ln:		$(LX_CMN)/%.c
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/brand/lx/%.s
 	@($(LHEAD) $(LINT.s) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/brand/lx/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))

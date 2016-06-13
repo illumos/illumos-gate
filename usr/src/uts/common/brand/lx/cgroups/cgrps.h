@@ -202,8 +202,7 @@ extern struct vnodeops *cgrp_vnodeops;
 
 int cgrp_dirdelete(cgrp_node_t *, cgrp_node_t *, char *, enum dr_op, cred_t *);
 int cgrp_direnter(cgrp_mnt_t *, cgrp_node_t *, char *, enum de_op,
-    cgrp_node_t *, struct vattr *, cgrp_node_t **, cred_t *,
-    caller_context_t *);
+    cgrp_node_t *, struct vattr *, cgrp_node_t **, cred_t *);
 void cgrp_dirinit(cgrp_node_t *, cgrp_node_t *, cred_t *);
 int cgrp_dirlookup(cgrp_node_t *, char *, cgrp_node_t **, cred_t *);
 void cgrp_dirtrunc(cgrp_node_t *);

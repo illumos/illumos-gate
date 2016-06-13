@@ -146,7 +146,7 @@ lx_exec()
 	 * function is called that the exec has succeeded.
 	 */
 	rp->r_r0 = 0;
-	lx_ptrace_stop(LX_PR_SYSEXIT);
+	(void) lx_ptrace_stop(LX_PR_SYSEXIT);
 }
 
 static void
@@ -765,6 +765,7 @@ lx_exit_with_sig(proc_t *cp, sigqueue_t *sqp)
  * More information on wait in lx brands can be found at
  * usr/src/lib/brand/lx/lx_brand/common/wait.c.
  */
+/* ARGSUSED */
 boolean_t
 lx_wait_filter(proc_t *pp, proc_t *cp)
 {

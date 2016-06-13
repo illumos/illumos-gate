@@ -52,7 +52,7 @@ void	s10_setbrand(proc_t *);
 int	s10_getattr(zone_t *, int, void *, size_t *);
 int	s10_setattr(zone_t *, int, void *, size_t);
 int	s10_brandsys(int, int64_t *, uintptr_t, uintptr_t, uintptr_t,
-		uintptr_t, uintptr_t);
+		uintptr_t);
 void	s10_copy_procdata(proc_t *, proc_t *);
 void	s10_proc_exit(struct proc *);
 void	s10_exec();
@@ -280,10 +280,10 @@ s10_native(void *cmd, void *args)
 	return (0);
 }
 
-/*ARGSUSED*/
+/* ARGSUSED5 */
 int
 s10_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
-    uintptr_t arg3, uintptr_t arg4, uintptr_t arg5)
+    uintptr_t arg3, uintptr_t arg4)
 {
 	proc_t	*p = curproc;
 	int	res;
@@ -420,8 +420,8 @@ s10_init_brand_data(zone_t *zone, kmutex_t *zsl)
 
 int
 s10_elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
-	int level, long *execsz, int setid, caddr_t exec_file, cred_t *cred,
-	int *brand_action)
+    int level, long *execsz, int setid, caddr_t exec_file, cred_t *cred,
+    int *brand_action)
 {
 	return (brand_solaris_elfexec(vp, uap, args, idatap, level, execsz,
 	    setid, exec_file, cred, brand_action, &s10_brand, S10_BRANDNAME,
