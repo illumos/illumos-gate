@@ -100,7 +100,7 @@ extern "C" {
 #define	B_JUMP_TO_LINUX		139
 #define	B_SET_THUNK_PID		140
 #define	B_EXIT_AS_SIG		141
-#define	B_HELPER_WAITID		142
+/* formerly B_HELPER_WAITID	142 */
 #define	B_HELPER_CLONE		143
 #define	B_HELPER_SETGROUPS	144
 #define	B_HELPER_SIGQUEUE	145
@@ -630,7 +630,7 @@ extern int lx_runexe(klwp_t *, void *);
 extern void lx_switch_to_native(klwp_t *);
 
 extern int lx_syscall_enter(void);
-extern int lx_syscall_return(klwp_t *, int, long);
+extern void lx_syscall_return(klwp_t *, int, long);
 
 extern int lx_syscall_fast_enter(void);
 

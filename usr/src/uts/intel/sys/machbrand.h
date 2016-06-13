@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2015, Joyent, Inc. All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #ifndef _SYS_MACHBRAND_H
@@ -33,6 +33,7 @@ extern "C" {
 #ifndef	_ASM
 
 #include <sys/model.h>
+#include <sys/thread.h>
 
 struct brand_mach_ops {
 	void	(*b_sysenter)(void);

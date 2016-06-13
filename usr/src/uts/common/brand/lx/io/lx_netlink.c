@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*
@@ -591,7 +591,7 @@ lx_netlink_alloc_mp1(lx_netlink_sock_t *lxsock)
 	mp->b_datap->db_type = M_PROTO;
 	tunit->PRIM_type = T_UNITDATA_IND;
 	tunit->SRC_length = sizeof (*lxsa);
-	tunit->SRC_offset = (caddr_t)lxsa - (caddr_t)mp->b_rptr;
+	tunit->SRC_offset = sizeof (*tunit);
 
 	lxsa->lxnl_family = AF_LX_NETLINK;
 	lxsa->lxnl_port = 0;
@@ -613,7 +613,7 @@ lx_netlink_alloc_mp1(lx_netlink_sock_t *lxsock)
 
 		tunit->OPT_length = sizeof (*cmsg) +
 		    ROUNDUP_cmsglen(sizeof (*ucred));
-		tunit->OPT_offset = (caddr_t)cmsg - (caddr_t)mp->b_rptr;
+		tunit->OPT_offset = tunit->SRC_offset + tunit->SRC_length;
 	} else {
 		tunit->OPT_length = 0;
 		tunit->OPT_offset = 0;
@@ -917,7 +917,8 @@ lx_netlink_parse_msg_attrs(mblk_t *mp, void **msgp, unsigned int msg_size,
  * Takes an IPv4 address (in network byte order) and returns the address scope.
  */
 static uint8_t
-lx_ipv4_rtscope(in_addr_t nbo_addr) {
+lx_ipv4_rtscope(in_addr_t nbo_addr)
+{
 	in_addr_t addr = ntohl(nbo_addr);
 	if ((addr >> IN_CLASSA_NSHIFT) == IN_LOOPBACKNET) {
 		return (LX_RTSCOPE_HOST);
@@ -936,7 +937,8 @@ lx_ipv4_rtscope(in_addr_t nbo_addr) {
  * Takes an IPv6 address and returns the address scope.
  */
 static uint8_t
-lx_ipv6_rtscope(const in6_addr_t *addr) {
+lx_ipv6_rtscope(const in6_addr_t *addr)
+{
 	if (IN6_ARE_ADDR_EQUAL(addr, &ipv6_loopback)) {
 		return (LX_RTSCOPE_HOST);
 	} else if (IN6_IS_ADDR_LINKLOCAL(addr)) {
@@ -1029,7 +1031,7 @@ lx_netlink_getlink_lifreq(lx_netlink_reply_t *reply, struct lifreq *lifr)
 	sdl = (struct sockaddr_dl *)&lifr->lifr_addr;
 	bzero(sdl, sizeof (*sdl));
 	if (!is_loopback) {
-		lx_netlink_reply_ioctl(reply, SIOCGLIFHWADDR, lifr);
+		(void) lx_netlink_reply_ioctl(reply, SIOCGLIFHWADDR, lifr);
 	} else {
 		/* Simulate an empty hwaddr for loopback */
 		sdl->sdl_type = DL_LOOP;

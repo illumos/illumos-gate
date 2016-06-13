@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright (c) 2014, Joyent, Inc. All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include <sys/brand.h>
@@ -37,7 +37,7 @@
  */
 int64_t
 brandsys(int cmd, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3,
-    uintptr_t arg4, uintptr_t arg5)
+    uintptr_t arg4)
 {
 	struct proc *p = curthread->t_procp;
 	int64_t rval = 0;
@@ -51,7 +51,7 @@ brandsys(int cmd, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3,
 		return (set_errno(ENOSYS));
 
 	if ((err = ZBROP(p->p_zone)->b_brandsys(cmd, &rval, arg1, arg2, arg3,
-	    arg4, arg5)) != 0)
+	    arg4)) != 0)
 		return (set_errno(err));
 
 	return (rval);

@@ -215,9 +215,8 @@ vnode_t *lxd_make_back_node(vnode_t *, lxd_mnt_t *);
 void lxd_free_back_node(lxd_node_t *);
 int lxd_dirdelete(lxd_node_t *, lxd_node_t *, char *, enum dr_op, cred_t *);
 int lxd_direnter(lxd_mnt_t *, lxd_node_t *, char *, enum de_op, lxd_node_t *,
-	lxd_node_t *, struct vattr *, lxd_node_t **, cred_t *,
-	caller_context_t *);
-void lxd_dirinit(lxd_node_t *, lxd_node_t *, cred_t *);
+	lxd_node_t *, struct vattr *, lxd_node_t **, cred_t *);
+void lxd_dirinit(lxd_node_t *, lxd_node_t *);
 int lxd_dirlookup(lxd_node_t *, char *, lxd_node_t **, cred_t *);
 void lxd_dirtrunc(lxd_node_t *);
 void lxd_node_init(lxd_mnt_t *, lxd_node_t *, vnode_t *, vattr_t *, cred_t *);

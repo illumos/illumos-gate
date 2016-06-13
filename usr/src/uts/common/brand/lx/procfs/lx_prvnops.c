@@ -282,7 +282,7 @@ extern rctl_hndl_t rc_zone_semmni;
 extern rctl_hndl_t rc_zone_msgmni;
 extern rctl_hndl_t rc_zone_shmmax;
 extern rctl_hndl_t rc_zone_shmmni;
-#define	FOURGB	4294967295
+#define	FOURGB	4294967295ULL
 
 /*
  * The maximum length of the concatenation of argument vector strings we
@@ -695,6 +695,7 @@ static int
 lxpr_close(vnode_t *vp, int flag, int count, offset_t offset, cred_t *cr,
     caller_context_t *ct)
 {
+#ifdef DEBUG
 	lxpr_node_t	*lxpr = VTOLXP(vp);
 	lxpr_nodetype_t	type = lxpr->lxpr_type;
 
@@ -706,6 +707,7 @@ lxpr_close(vnode_t *vp, int flag, int count, offset_t offset, cred_t *cr,
 	    type != LXPR_PID_CURDIR &&
 	    type != LXPR_PID_ROOTDIR &&
 	    type != LXPR_PID_EXE);
+#endif /* DEBUG */
 
 	return (0);
 }
@@ -1433,7 +1435,7 @@ lxpr_read_pid_comm(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 		lxpr_uiobuf_seterr(uiobuf, EINVAL);
 		return;
 	}
-	strlcpy(buf, p->p_user.u_comm, sizeof (buf));
+	(void) strlcpy(buf, p->p_user.u_comm, sizeof (buf));
 	lxpr_unlock(p);
 	lxpr_uiobuf_printf(uiobuf, "%s\n", buf);
 }
@@ -2224,7 +2226,7 @@ lxpr_read_status_common(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf,
 	crhold(cr = p->p_cred);
 	mutex_exit(&p->p_crlock);
 
-	strlcpy(buf_comm, up->u_comm, sizeof (buf_comm));
+	(void) strlcpy(buf_comm, up->u_comm, sizeof (buf_comm));
 	fdlim = p->p_fno_ctl;
 	lwpcnt = p->p_lwpcnt;
 
@@ -2533,12 +2535,13 @@ lxpr_read_stat_common(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf,
 		stime = p->p_stime;
 	} else {
 		/* tid: utime & stime for the thread set in block above */
+		/* EMPTY */
 	}
 	cutime = p->p_cutime;
 	cstime = p->p_cstime;
 	lwpcnt = p->p_lwpcnt;
 	vmem_ctl = p->p_vmem_ctl;
-	strlcpy(buf_comm, p->p_user.u_comm, sizeof (buf_comm));
+	(void) strlcpy(buf_comm, p->p_user.u_comm, sizeof (buf_comm));
 	ticks = p->p_user.u_ticks;	/* lbolt at process start */
 	/* adjust ticks to account for zone boot time */
 	boottime = LXPTOZ(lxpnp)->zone_zsched->p_user.u_ticks;
@@ -3050,21 +3053,19 @@ lxpr_read_net_sockstat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 
 typedef struct lxpr_snmp_table {
 	const char *lst_proto;
-	const char *lst_fields[];
+	const char **lst_fields;
 } lxpr_snmp_table_t;
 
-static lxpr_snmp_table_t lxpr_snmp_ip = { "ip",
-	{
+static const char *lxpr_snmp_ip_fields[] = {
 	"forwarding", "defaultTTL", "inReceives", "inHdrErrors",
 	"inAddrErrors", "forwDatagrams", "inUnknownProtos", "inDiscards",
 	"inDelivers", "outRequests", "outDiscards", "outNoRoutes",
 	"reasmTimeout", "reasmReqds", "reasmOKs", "reasmFails", "fragOKs",
 	"fragFails", "fragCreates",
 	NULL
-	}
 };
-static lxpr_snmp_table_t lxpr_snmp_icmp = { "icmp",
-	{
+
+static const char *lxpr_snmp_icmp_fields[] = {
 	"inMsgs", "inErrors", "inCsumErrors", "inDestUnreachs", "inTimeExcds",
 	"inParmProbs", "inSrcQuenchs", "inRedirects", "inEchos", "inEchoReps",
 	"inTimestamps", "inTimestampReps", "inAddrMasks", "inAddrMaskReps",
@@ -3073,23 +3074,25 @@ static lxpr_snmp_table_t lxpr_snmp_icmp = { "icmp",
 	"outEchoReps", "outTimestamps", "outTimestampReps", "outAddrMasks",
 	"outAddrMaskReps",
 	NULL
-	}
 };
-static lxpr_snmp_table_t lxpr_snmp_tcp = { "tcp",
-	{
+
+static const char *lxpr_snmp_tcp_fields[] = {
 	"rtoAlgorithm", "rtoMin", "rtoMax", "maxConn", "activeOpens",
 	"passiveOpens", "attemptFails", "estabResets", "currEstab", "inSegs",
 	"outSegs", "retransSegs", "inErrs", "outRsts", "inCsumErrors",
 	NULL
-	}
 };
-static lxpr_snmp_table_t lxpr_snmp_udp = { "udp",
-	{
+
+static const char *lxpr_snmp_udp_fields[] = {
 	"inDatagrams", "noPorts", "inErrors", "outDatagrams", "rcvbufErrors",
 	"sndbufErrors", "inCsumErrors",
 	NULL
-	}
 };
+
+static lxpr_snmp_table_t lxpr_snmp_ip = { "ip", lxpr_snmp_ip_fields };
+static lxpr_snmp_table_t lxpr_snmp_icmp = { "icmp", lxpr_snmp_icmp_fields };
+static lxpr_snmp_table_t lxpr_snmp_tcp = { "tcp", lxpr_snmp_tcp_fields };
+static lxpr_snmp_table_t lxpr_snmp_udp = { "udp", lxpr_snmp_udp_fields };
 
 static lxpr_snmp_table_t *lxpr_net_snmptab[] = {
 	&lxpr_snmp_ip,
@@ -3587,6 +3590,7 @@ lxpr_read_net_unix(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 
 #define	LX_KMSG_PRI	"<0>"
 
+/* ARGSUSED */
 static void
 lxpr_read_kmsg(lxpr_node_t *lxpnp, struct lxpr_uiobuf *uiobuf, ldi_handle_t lh)
 {
@@ -3918,8 +3922,8 @@ lxpr_read_diskstats(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	 * Use the zone_vfs kstat, which is a superset of a kstat_io_t, since
 	 * it tracks IO at the zone level.
 	 */
-	strlcpy(kn.ks_module, "zone_vfs", sizeof (kn.ks_module));
-	strlcpy(kn.ks_name, zone->zone_name, sizeof (kn.ks_name));
+	(void) strlcpy(kn.ks_module, "zone_vfs", sizeof (kn.ks_module));
+	(void) strlcpy(kn.ks_name, zone->zone_name, sizeof (kn.ks_name));
 	kn.ks_instance = getzoneid();
 
 	kip = (zone_vfs_kstat_t *)lxpr_kstat_read(&kn, B_TRUE, &size, &num);
@@ -4327,6 +4331,7 @@ extern int inotify_maxevents;
 extern int inotify_maxinstances;
 extern int inotify_maxwatches;
 
+/* ARGSUSED */
 static void
 lxpr_read_sys_fs_inotify_max_queued_events(lxpr_node_t *lxpnp,
     lxpr_uiobuf_t *uiobuf)
@@ -4335,6 +4340,7 @@ lxpr_read_sys_fs_inotify_max_queued_events(lxpr_node_t *lxpnp,
 	lxpr_uiobuf_printf(uiobuf, "%d\n", inotify_maxevents);
 }
 
+/* ARGSUSED */
 static void
 lxpr_read_sys_fs_inotify_max_user_instances(lxpr_node_t *lxpnp,
     lxpr_uiobuf_t *uiobuf)
@@ -4343,6 +4349,7 @@ lxpr_read_sys_fs_inotify_max_user_instances(lxpr_node_t *lxpnp,
 	lxpr_uiobuf_printf(uiobuf, "%d\n", inotify_maxinstances);
 }
 
+/* ARGSUSED */
 static void
 lxpr_read_sys_fs_inotify_max_user_watches(lxpr_node_t *lxpnp,
     lxpr_uiobuf_t *uiobuf)
@@ -4351,6 +4358,7 @@ lxpr_read_sys_fs_inotify_max_user_watches(lxpr_node_t *lxpnp,
 	lxpr_uiobuf_printf(uiobuf, "%d\n", inotify_maxwatches);
 }
 
+/* ARGSUSED */
 static void
 lxpr_read_sys_kernel_caplcap(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -4358,6 +4366,7 @@ lxpr_read_sys_kernel_caplcap(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	lxpr_uiobuf_printf(uiobuf, "%d\n", LX_CAP_MAX_VALID);
 }
 
+/* ARGSUSED */
 static void
 lxpr_read_sys_kernel_corepatt(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -4400,6 +4409,7 @@ lxpr_read_sys_kernel_corepatt(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	lxpr_uiobuf_printf(uiobuf, "%s\n", tr);
 }
 
+/* ARGSUSED */
 static void
 lxpr_read_sys_kernel_hostname(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -4407,6 +4417,7 @@ lxpr_read_sys_kernel_hostname(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	lxpr_uiobuf_printf(uiobuf, "%s\n", uts_nodename());
 }
 
+/* ARGSUSED */
 static void
 lxpr_read_sys_kernel_msgmni(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -4422,6 +4433,7 @@ lxpr_read_sys_kernel_msgmni(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	lxpr_uiobuf_printf(uiobuf, "%u\n", (uint_t)val);
 }
 
+/* ARGSUSED */
 static void
 lxpr_read_sys_kernel_ngroups_max(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -4429,6 +4441,7 @@ lxpr_read_sys_kernel_ngroups_max(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	lxpr_uiobuf_printf(uiobuf, "%d\n", ngroups_max);
 }
 
+/* ARGSUSED */
 static void
 lxpr_read_sys_kernel_osrel(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -4449,6 +4462,7 @@ lxpr_read_sys_kernel_osrel(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	}
 }
 
+/* ARGSUSED */
 static void
 lxpr_read_sys_kernel_pid_max(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -4456,6 +4470,7 @@ lxpr_read_sys_kernel_pid_max(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	lxpr_uiobuf_printf(uiobuf, "%d\n", maxpid);
 }
 
+/* ARGSUSED */
 static void
 lxpr_read_sys_kernel_rand_bootid(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -4486,7 +4501,6 @@ lxpr_read_sys_kernel_rand_bootid(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	br_data = ztolxzd(curproc->p_zone);
 	mutex_enter(&br_data->lxzd_lock);
 	if (br_data->lxzd_bootid[0] == '\0') {
-		extern int getrandom(void *, size_t, int);
 		int i;
 
 		for (i = 0; i < 5; i++) {
@@ -4506,9 +4520,9 @@ lxpr_read_sys_kernel_rand_bootid(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 				break;
 			}
 			if (i > 0)
-				strlcat(br_data->lxzd_bootid, "-",
+				(void) strlcat(br_data->lxzd_bootid, "-",
 				    sizeof (br_data->lxzd_bootid));
-			strlcat(br_data->lxzd_bootid, s,
+			(void) strlcat(br_data->lxzd_bootid, s,
 			    sizeof (br_data->lxzd_bootid));
 		}
 	}
@@ -4519,6 +4533,7 @@ lxpr_read_sys_kernel_rand_bootid(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 
 }
 
+/* ARGSUSED */
 static void
 lxpr_read_sys_kernel_sem(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -4547,6 +4562,7 @@ lxpr_read_sys_kernel_sem(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	    vmsl, vmns, vopm, vmni);
 }
 
+/* ARGSUSED */
 static void
 lxpr_read_sys_kernel_shmall(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -4563,6 +4579,7 @@ lxpr_read_sys_kernel_shmall(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	lxpr_uiobuf_printf(uiobuf, "%u\n", (uint_t)btop(val));
 }
 
+/* ARGSUSED */
 static void
 lxpr_read_sys_kernel_shmmax(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -4581,6 +4598,7 @@ lxpr_read_sys_kernel_shmmax(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	lxpr_uiobuf_printf(uiobuf, "%u\n", (uint_t)val);
 }
 
+/* ARGSUSED */
 static void
 lxpr_read_sys_kernel_shmmni(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -4599,6 +4617,7 @@ lxpr_read_sys_kernel_shmmni(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	lxpr_uiobuf_printf(uiobuf, "%u\n", (uint_t)val);
 }
 
+/* ARGSUSED */
 static void
 lxpr_read_sys_kernel_threads_max(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -4606,6 +4625,7 @@ lxpr_read_sys_kernel_threads_max(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	lxpr_uiobuf_printf(uiobuf, "%d\n", curproc->p_zone->zone_nlwps_ctl);
 }
 
+/* ARGSUSED */
 static void
 lxpr_read_sys_net_core_somaxc(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -4634,6 +4654,7 @@ lxpr_read_sys_net_core_somaxc(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
  * illumos: tcp_smallest_anon_port & tcp_largest_anon_port
  * Not in tcp(7p) man page.
  */
+/* ARGSUSED */
 static void
 lxpr_read_sys_net_ipv4_ip_lport_range(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -4667,6 +4688,7 @@ lxpr_read_sys_net_ipv4_ip_lport_range(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
  * in the tcp_input_data() function on the use of tcp_fin_wait_2_flush_interval.
  * The value is in milliseconds.
  */
+/* ARGSUSED */
 static void
 lxpr_read_sys_net_ipv4_tcp_fin_to(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -4700,6 +4722,7 @@ lxpr_read_sys_net_ipv4_tcp_fin_to(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
  * 9 times (giving a total of 11.25 minutes) so we emulate this by dividing out
  * tcps_keepalive_abort_interval by 9.
  */
+/* ARGSUSED */
 static void
 lxpr_read_sys_net_ipv4_tcp_ka_int(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -4730,6 +4753,7 @@ lxpr_read_sys_net_ipv4_tcp_ka_int(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
  * The interval for sending out the first probe in milliseconds. The default is
  * two hours.
  */
+/* ARGSUSED */
 static void
 lxpr_read_sys_net_ipv4_tcp_ka_tim(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -4759,6 +4783,7 @@ lxpr_read_sys_net_ipv4_tcp_ka_tim(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
  * tcp_sack_permitted 0 == disabled, 1 == no initiate but accept,
  * 2 == initiate and accept. default is 2.
  */
+/* ARGSUSED */
 static void
 lxpr_read_sys_net_ipv4_tcp_sack(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -4791,6 +4816,7 @@ lxpr_read_sys_net_ipv4_tcp_sack(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
  * window scale option will be set only if the user has requested a send or
  * receive window larger than 64K. The default value of is 1.
  */
+/* ARGSUSED */
 static void
 lxpr_read_sys_net_ipv4_tcp_winscale(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -4810,6 +4836,7 @@ lxpr_read_sys_net_ipv4_tcp_winscale(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	netstack_rele(ns);
 }
 
+/* ARGSUSED */
 static void
 lxpr_read_sys_vm_max_map_cnt(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -4818,6 +4845,7 @@ lxpr_read_sys_vm_max_map_cnt(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	lxpr_uiobuf_printf(uiobuf, "%d\n", 16777215);
 }
 
+/* ARGSUSED */
 static void
 lxpr_read_sys_vm_minfr_kb(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -4825,6 +4853,7 @@ lxpr_read_sys_vm_minfr_kb(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	lxpr_uiobuf_printf(uiobuf, "%d\n", 0);
 }
 
+/* ARGSUSED */
 static void
 lxpr_read_sys_vm_nhpages(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -4832,6 +4861,7 @@ lxpr_read_sys_vm_nhpages(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	lxpr_uiobuf_printf(uiobuf, "%d\n", 0);
 }
 
+/* ARGSUSED */
 static void
 lxpr_read_sys_vm_overcommit_mem(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -4839,6 +4869,7 @@ lxpr_read_sys_vm_overcommit_mem(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	lxpr_uiobuf_printf(uiobuf, "%d\n", 0);
 }
 
+/* ARGSUSED */
 static void
 lxpr_read_sys_vm_swappiness(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -4972,6 +5003,7 @@ static const char *intc_ecx[] = {
  * cgroup subsystems as being installed. The commented example below shows
  * how to print a subsystem entry.
  */
+/* ARGSUSED */
 static void
 lxpr_read_cgroups(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -4984,6 +5016,7 @@ lxpr_read_cgroups(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	 */
 }
 
+/* ARGSUSED */
 static void
 lxpr_read_cpuinfo(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -5157,6 +5190,7 @@ lxpr_read_fd(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
  * which we support and which may be checked by various components to see if
  * they are loaded.
  */
+/* ARGSUSED */
 static void
 lxpr_read_filesystems(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -5576,10 +5610,8 @@ lxpr_lookup_task_tid_dir(vnode_t *dp, char *comp)
 static vnode_t *
 lxpr_lookup_fddir(vnode_t *dp, char *comp)
 {
-	lxpr_node_t *dlxpnp = VTOLXP(dp);
-
-	ASSERT(dlxpnp->lxpr_type == LXPR_PID_FDDIR ||
-	    dlxpnp->lxpr_type == LXPR_PID_TID_FDDIR);
+	ASSERT(VTOLXP(dp)->lxpr_type == LXPR_PID_FDDIR ||
+	    VTOLXP(dp)->lxpr_type == LXPR_PID_TID_FDDIR);
 
 	return (lxpr_lookup_fdnode(dp, comp));
 }
@@ -5759,7 +5791,7 @@ lxpr_readdir(vnode_t *dp, uio_t *uiop, cred_t *cr, int *eofp,
 	if (uoffset % LXPR_SDSIZE)
 		return (ENOENT);
 
-	return (lxpr_readdir_function[lxpnp->lxpr_type](lxpnp, uiop, eofp));
+	return (lxpr_readdir_function[type](lxpnp, uiop, eofp));
 }
 
 /* ARGSUSED */
@@ -6580,6 +6612,7 @@ lxpr_xlate_sack(char *val, int size)
  * set two properties on the netstack_tcp, so we can't reuse
  * lxpr_write_tcp_property.
  */
+/* ARGSUSED */
 static int
 lxpr_write_sys_net_ipv4_ip_lport_range(lxpr_node_t *lxpnp, struct uio *uio,
     struct cred *cr, caller_context_t *ct)
@@ -6962,6 +6995,7 @@ lxpr_realvp(vnode_t *vp, vnode_t **vpp, caller_context_t *ct)
 	return (0);
 }
 
+/* ARGSUSED */
 static int
 lxpr_write(vnode_t *vp, uio_t *uiop, int ioflag, cred_t *cr,
     caller_context_t *ct)
@@ -6986,6 +7020,7 @@ lxpr_write(vnode_t *vp, uio_t *uiop, int ioflag, cred_t *cr,
 }
 
 /* Needed for writable files which are first "truncated" */
+/* ARGSUSED */
 static int
 lxpr_space(vnode_t *vp, int cmd, flock64_t *bfp, int flag, offset_t offset,
     cred_t *cred, caller_context_t *ct)
@@ -7004,6 +7039,7 @@ lxpr_space(vnode_t *vp, int cmd, flock64_t *bfp, int flag, offset_t offset,
  * Needed for writable files which are first "truncated". We only support
  * truncation.
  */
+/* ARGSUSED */
 static int
 lxpr_setattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
     caller_context_t *ct)
@@ -7021,7 +7057,7 @@ lxpr_setattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 /*
  * We need to allow open with O_CREAT for the writable files.
  */
-/*ARGSUSED7*/
+/* ARGSUSED */
 static int
 lxpr_create(vnode_t *dvp, char *nm, vattr_t *vap, enum vcexcl exclusive,
     int mode, vnode_t **vpp, cred_t *cr, int flag, caller_context_t *ct,

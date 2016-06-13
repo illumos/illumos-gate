@@ -21,7 +21,7 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -38,6 +38,7 @@
 #include <sys/controlregs.h>
 #include <lx_syscall.h>
 
+/* ARGSUSED */
 long
 lx_arch_prctl(int code, ulong_t addr)
 {

@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*
@@ -93,6 +93,7 @@ static lx_clock_backend_t lx_clock_backends[] = {
 #define	LX_CLOCK_BACKEND(clk) \
 	((clk) < LX_CLOCK_MAX && (clk) >= 0 ? &lx_clock_backends[(clk)] : NULL)
 
+/* ARGSUSED */
 static int
 lx_emul_clock_settime(clockid_t clock, timespec_t *tp)
 {
@@ -369,7 +370,8 @@ lx_time(time_t *tp)
 
 		return (tv32.tv_sec);
 	}
-#endif
+#endif /* _SYSCALL32_IMPL */
+	/* NOTREACHED */
 }
 
 long

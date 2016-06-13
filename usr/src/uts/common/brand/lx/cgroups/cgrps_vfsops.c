@@ -484,7 +484,7 @@ cgrp_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 	cgm->cg_rootnode = cp;
 
 	cp->cgn_type = CG_CGROUP_DIR;
-	cp->cgn_nodeid = cgrp_inode(ssid, cgm->cg_gen);
+	cp->cgn_nodeid = cgrp_inode(CG_CGROUP_DIR, cgm->cg_gen);
 	cgrp_dirinit(cp, cp, cr);
 
 	mutex_exit(&cgm->cg_contents);
@@ -915,7 +915,6 @@ cgrp_rel_agent_event(cgrp_mnt_t *cgm, cgrp_node_t *cn)
 	char nm[MAXNAMELEN];
 	char *argstr, *oldstr, *tmp;
 	id_t cid;
-	int agent_err;
 	proc_t *p = ttoproc(curthread);
 	zone_t *z = p->p_zone;
 	lx_lwp_data_t *plwpd = ttolxlwp(curthread);
@@ -944,7 +943,7 @@ cgrp_rel_agent_event(cgrp_mnt_t *cgm, cgrp_node_t *cn)
 	 * Iterate up the directory tree to construct the agent argument string.
 	 */
 	do {
-		cgrp_get_dirname(cn, nm, sizeof (nm));
+		VERIFY0(cgrp_get_dirname(cn, nm, sizeof (nm)));
 		DTRACE_PROBE1(cgrp__dir__name, char *, nm);
 		if (*argstr == '\0') {
 			(void) snprintf(argstr, MAXPATHLEN, "/%s", nm);
@@ -999,8 +998,8 @@ cgrp_rel_agent_event(cgrp_mnt_t *cgm, cgrp_node_t *cn)
 	if (cid == -1)
 		cid = defaultcid;
 
-	if ((agent_err = newproc(cgrp_run_rel_agent, (void *)rarg, cid,
-	    minclsyspri - 1, NULL, -1)) != 0) {
+	if (newproc(cgrp_run_rel_agent, (void *)rarg, cid, minclsyspri - 1,
+	    NULL, -1) != 0) {
 		/* There's nothing we can do if creating the proc fails. */
 		kmem_free(rarg->crraa_event_path, MAXPATHLEN);
 		kmem_free(rarg->crraa_agent_path, sizeof (cgm->cg_agent));

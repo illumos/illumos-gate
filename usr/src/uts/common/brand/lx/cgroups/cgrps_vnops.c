@@ -401,15 +401,12 @@ cgrp_wr_proc_or_task(cgrp_mnt_t *cgm, cgrp_node_t *cn, struct uio *uio,
 }
 
 static int
-cgrp_wr(cgrp_mnt_t *cgm, cgrp_node_t *cn, struct uio *uio, struct cred *cr,
-    caller_context_t *ct)
+cgrp_wr(cgrp_mnt_t *cgm, cgrp_node_t *cn, struct uio *uio)
 {
-	struct vnode *vp;
 	int error = 0;
 	rlim64_t limit = uio->uio_llimit;
 
-	vp = CGNTOV(cn);
-	ASSERT(vp->v_type == VREG);
+	ASSERT(CGNTOV(cn)->v_type == VREG);
 
 	if (uio->uio_loffset < 0)
 		return (EINVAL);
@@ -610,7 +607,7 @@ cgrp_rd_procs(cgrp_mnt_t *cgm, cgrp_node_t *cn, struct uio *uio)
 	/* Scan all of the process entries */
 	for (i = 1; i < v.v_proc && (uresid = uio->uio_resid) > 0; i++) {
 		proc_t *p;
-		int len;
+		ssize_t len;
 		pid_t pid;
 		char buf[16];
 		char *rdp;
@@ -780,12 +777,11 @@ cgrp_rd_proc_tasks(uint_t cg_id, proc_t *p, pid_t initpid, ssize_t *offset,
  * can change if we fill up the read buffer and come back later for a
  * subsequent read).
  */
-int
+static int
 cgrp_rd_tasks(cgrp_mnt_t *cgm, cgrp_node_t *cn, struct uio *uio)
 {
 	int i;
 	ssize_t offset = 0;
-	ssize_t uresid;
 	zoneid_t zoneid = curproc->p_zone->zone_id;
 	int error = 0;
 	pid_t initpid = curproc->p_zone->zone_proc_initpid;
@@ -794,7 +790,7 @@ cgrp_rd_tasks(cgrp_mnt_t *cgm, cgrp_node_t *cn, struct uio *uio)
 	uint_t cg_id = cn->cgn_parent->cgn_id;
 
 	/* Scan all of the process entries */
-	for (i = 1; i < v.v_proc && (uresid = uio->uio_resid) > 0; i++) {
+	for (i = 1; i < v.v_proc && uio->uio_resid > 0; i++) {
 		proc_t *p;
 
 		mutex_enter(&pidlock);
@@ -843,7 +839,7 @@ cgrp_rd_tasks(cgrp_mnt_t *cgm, cgrp_node_t *cn, struct uio *uio)
 }
 
 static int
-cgrp_rd(cgrp_mnt_t *cgm, cgrp_node_t *cn, struct uio *uio, caller_context_t *ct)
+cgrp_rd(cgrp_mnt_t *cgm, cgrp_node_t *cn, struct uio *uio)
 {
 	int error = 0;
 
@@ -890,11 +886,12 @@ cgrp_read(struct vnode *vp, struct uio *uiop, int ioflag, cred_t *cred,
 		return (EISDIR);
 	if (vp->v_type != VREG)
 		return (EINVAL);
-	error = cgrp_rd(cgm, cn, uiop, ct);
+	error = cgrp_rd(cgm, cn, uiop);
 
 	return (error);
 }
 
+/* ARGSUSED */
 static int
 cgrp_write(struct vnode *vp, struct uio *uiop, int ioflag, struct cred *cred,
     struct caller_context *ct)
@@ -914,7 +911,7 @@ cgrp_write(struct vnode *vp, struct uio *uiop, int ioflag, struct cred *cred,
 		uiop->uio_loffset = cn->cgn_size;
 	}
 
-	error = cgrp_wr(cgm, cn, uiop, cred, ct);
+	error = cgrp_wr(cgm, cn, uiop);
 
 	return (error);
 }
@@ -926,15 +923,9 @@ cgrp_getattr(struct vnode *vp, struct vattr *vap, int flags, struct cred *cred,
 {
 	cgrp_node_t *cn = VTOCGN(vp);
 	cgrp_mnt_t *cgm;
-	struct vattr va;
-	int attrs = 1;
 
 	cgm = VTOCGM(cn->cgn_vnode);
 	mutex_enter(&cgm->cg_contents);
-	if (attrs == 0) {
-		cn->cgn_uid = va.va_uid;
-		cn->cgn_gid = va.va_gid;
-	}
 	vap->va_type = vp->v_type;
 	vap->va_mode = cn->cgn_mode & MODEMASK;
 	vap->va_uid = cn->cgn_uid;
@@ -1065,7 +1056,7 @@ cgrp_lookup(struct vnode *dvp, char *nm, struct vnode **vpp,
 	return (error);
 }
 
-/*ARGSUSED7*/
+/* ARGSUSED */
 static int
 cgrp_create(struct vnode *dvp, char *nm, struct vattr *vap,
     enum vcexcl exclusive, int mode, struct vnode **vpp, struct cred *cred,
@@ -1141,7 +1132,7 @@ cgrp_remove(struct vnode *dvp, char *nm, struct cred *cred,
 	return (EPERM);
 }
 
-/* ARGSUSED4 */
+/* ARGSUSED */
 static int
 cgrp_link(struct vnode *dvp, struct vnode *srcvp, char *cnm, struct cred *cred,
     caller_context_t *ct, int flags)
@@ -1222,7 +1213,7 @@ cgrp_rename(
 	 */
 	error = cgrp_direnter(cgm, fromparent, nnm, DE_RENAME,
 	    fromcn, (struct vattr *)NULL,
-	    (cgrp_node_t **)NULL, cred, ct);
+	    (cgrp_node_t **)NULL, cred);
 
 	if (error)
 		goto done;
@@ -1282,7 +1273,7 @@ cgrp_mkdir(struct vnode *dvp, char *nm, struct vattr *va, struct vnode **vpp,
 	}
 
 	error = cgrp_direnter(cgm, parent, nm, DE_MKDIR, (cgrp_node_t *)NULL,
-	    va, &self, cred, ct);
+	    va, &self, cred);
 	if (error) {
 		mutex_exit(&cgm->cg_contents);
 		if (self != NULL)
@@ -1422,6 +1413,7 @@ cgrp_readdir(struct vnode *vp, struct uio *uiop, struct cred *cred, int *eofp,
 	bufsize = total_bytes_wanted + sizeof (struct dirent64);
 	outbuf = kmem_alloc(bufsize, KM_SLEEP);
 
+	/* LINTED: alignment */
 	dp = (struct dirent64 *)outbuf;
 
 	offset = 0;
@@ -1478,7 +1470,7 @@ cgrp_readdir(struct vnode *vp, struct uio *uiop, struct cred *cred, int *eofp,
 	return (error);
 }
 
-/* ARGSUSED5 */
+/* ARGSUSED */
 static int
 cgrp_symlink(struct vnode *dvp, char *lnm, struct vattr *cva, char *cnm,
     struct cred *cred, caller_context_t *ct, int flags)

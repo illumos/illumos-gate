@@ -129,8 +129,8 @@ static const int ltos_family[LX_AF_MAX + 1] =  {
 	AF_NOTSUPPORTED,	/* LX_AF_PPOX		*/
 	AF_NOTSUPPORTED,	/* LX_AF_WANPIPE	*/
 	AF_NOTSUPPORTED,	/* LX_AF_LLC		*/
-	AF_NOTSUPPORTED,	/* EMPTY		*/
-	AF_NOTSUPPORTED,	/* EMPTY		*/
+	AF_NOTSUPPORTED,	/* NONE			*/
+	AF_NOTSUPPORTED,	/* NONE			*/
 	AF_NOTSUPPORTED,	/* LX_AF_CAN		*/
 	AF_NOTSUPPORTED,	/* LX_AF_TIPC		*/
 	AF_NOTSUPPORTED,	/* LX_AF_BLUETOOTH	*/
@@ -200,7 +200,7 @@ static const int stol_socktype[SOCK_SEQPACKET + 1] = {
 #define	LTOS_SOCKTYPE(t)	\
 	((t) <= LX_SOCK_PACKET ? ltos_socktype[(t)] : SOCK_INVAL)
 #define	STOL_SOCKTYPE(t)	\
-	((t) <= SOCK_SEQPACKET ? ltos_socktype[(t)] : SOCK_INVAL)
+	((t) <= SOCK_SEQPACKET ? stol_socktype[(t)] : SOCK_INVAL)
 
 
 /*
@@ -316,15 +316,15 @@ lx_xlate_sock_flags(int inflags, lx_xlate_dir_t dir)
 			break;
 		case LXFM_UNSUP:
 			if (match != 0) {
-				snprintf(buf, LX_UNSUP_BUFSZ,
+				(void) snprintf(buf, LX_UNSUP_BUFSZ,
 				    "unsupported sock flag %s", map->lxfm_name);
 				lx_unsupported(buf);
 			}
 		}
 	}
 	if (inflags != 0) {
-		snprintf(buf, LX_UNSUP_BUFSZ, "unsupported sock flags 0x%08x",
-		    inflags);
+		(void) snprintf(buf, LX_UNSUP_BUFSZ,
+		    "unsupported sock flags 0x%08x", inflags);
 		lx_unsupported(buf);
 	}
 
@@ -472,6 +472,7 @@ ltos_sockaddr_copyin(const struct sockaddr *inaddr, const socklen_t inlen,
 			*outlen = sizeof (struct sockaddr_ll);
 
 			/* sll_protocol must be translated */
+			/* LINTED: alignment */
 			sal = (struct sockaddr_ll *)laddr;
 			proto = ltos_pkt_proto(sal->sll_protocol);
 			if (proto < 0) {
@@ -726,11 +727,13 @@ stol_conv_ucred(struct cmsghdr *inmsg, struct cmsghdr *omsg)
 	 * Format the data correctly in the omsg buffer.
 	 */
 	if (omsg != NULL) {
-		struct ucred_s *scred = (struct ucred_s *)CMSG_CONTENT(inmsg);
+		struct ucred_s *scred;
 		prcred_t *cr;
 		lx_ucred_t lcred;
 
+		scred = (struct ucred_s *)CMSG_CONTENT(inmsg);
 		lcred.lxu_pid = scred->uc_pid;
+		/* LINTED: alignment */
 		cr = UCCRED(scred);
 		if (cr != NULL) {
 			lcred.lxu_uid = cr->pr_euid;
@@ -754,6 +757,7 @@ ltos_conv_ucred(struct cmsghdr *inmsg, struct cmsghdr *omsg)
 		lx_ucred_t *lcred;
 
 		uc = (struct ucred_s *)CMSG_CONTENT(omsg);
+		/* LINTED: alignment */
 		pc = (prcred_t *)((char *)uc + sizeof (struct ucred_s));
 
 		uc->uc_credoff = sizeof (struct ucred_s);
@@ -2860,6 +2864,7 @@ lx_setsockopt_socket(sonode_t *so, int optname, void *optval, socklen_t optlen)
 		}
 		lbp = (struct lx_bpf_program *)optval;
 		bp.bf_len = lbp->bf_len;
+		/* LINTED: alignment */
 		bp.bf_insns = (struct bpf_insn *)lbp->bf_insns;
 		optval = &bp;
 		break;
@@ -3091,7 +3096,7 @@ lx_getsockopt_tcp(sonode_t *so, int optname, void *optval, socklen_t *optlen)
 			socklen_t len = sizeof (fi);
 
 			if ((error = socket_getsockopt(so, SOL_FILTER,
-			    FIL_LIST, fi, &len, 0, CRED()) != 0)) {
+			    FIL_LIST, fi, &len, 0, CRED())) != 0) {
 				*optlen = sizeof (int);
 				return (error);
 			}
@@ -3340,8 +3345,8 @@ lx_setsockopt(int sock, int level, int optname, void *optval, socklen_t optlen)
 	if (error == ENOPROTOOPT) {
 		char buf[LX_UNSUP_BUFSZ];
 
-		snprintf(buf, LX_UNSUP_BUFSZ, "setsockopt(%d, %d)", level,
-		    optname);
+		(void) snprintf(buf, LX_UNSUP_BUFSZ, "setsockopt(%d, %d)",
+		    level, optname);
 		lx_unsupported(buf);
 	}
 	if (buflen != 0) {
@@ -3431,8 +3436,8 @@ lx_getsockopt(int sock, int level, int optname, void *optval,
 	if (error == ENOPROTOOPT) {
 		char buf[LX_UNSUP_BUFSZ];
 
-		snprintf(buf, LX_UNSUP_BUFSZ, "getsockopt(%d, %d)", level,
-		    optname);
+		(void) snprintf(buf, LX_UNSUP_BUFSZ, "getsockopt(%d, %d)",
+		    level, optname);
 		lx_unsupported(buf);
 	}
 	if (copyout(&optlen, optlenp, sizeof (optlen)) != 0) {

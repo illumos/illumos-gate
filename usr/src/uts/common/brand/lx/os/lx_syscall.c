@@ -208,7 +208,7 @@ lx_emulate_args(klwp_t *lwp, const lx_sysent_t *s, uintptr_t *args)
 }
 #endif
 
-int
+void
 lx_syscall_return(klwp_t *lwp, int syscall_num, long ret)
 {
 	lx_lwp_data_t *lwpd = lwptolxlwp(lwp);
@@ -242,7 +242,7 @@ lx_syscall_return(klwp_t *lwp, int syscall_num, long ret)
 	 * PTRACE_SYSCALL.  Note that the register state may be modified by
 	 * tracer.
 	 */
-	lx_ptrace_stop(LX_PR_SYSEXIT);
+	(void) lx_ptrace_stop(LX_PR_SYSEXIT);
 
 	/*
 	 * Fire the DTrace "lx-syscall:::return" probe:
@@ -265,8 +265,6 @@ lx_syscall_return(klwp_t *lwp, int syscall_num, long ret)
 	lwp->lwp_eosys = JUSTRETURN;
 	curthread->t_post_sys = 1;
 	aston(curthread);
-
-	return (0);
 }
 
 static void
@@ -346,7 +344,7 @@ lx_syscall_enter(void)
 	 * PTRACE_SYSCALL.  The system call number and arguments may be
 	 * modified by the tracer.
 	 */
-	lx_ptrace_stop(LX_PR_SYSENTRY);
+	(void) lx_ptrace_stop(LX_PR_SYSENTRY);
 
 	/*
 	 * Check that the system call number is within the bounds we expect.
@@ -355,7 +353,7 @@ lx_syscall_enter(void)
 	if (syscall_num < 0 || syscall_num > LX_MAX_SYSCALL(lwp)) {
 		lx_syscall_unsup_msg(NULL, syscall_num, 0);
 
-		set_errno(ENOTSUP);
+		(void) set_errno(ENOTSUP);
 		lx_syscall_return(lwp, syscall_num, -1);
 		return (0);
 	}
@@ -380,7 +378,7 @@ lx_syscall_enter(void)
 		 * Could not read and process the arguments.  Return the error
 		 * to the process.
 		 */
-		set_errno(error);
+		(void) set_errno(error);
 		lx_syscall_return(lwp, syscall_num, -1);
 		return (0);
 	}
@@ -422,7 +420,7 @@ lx_syscall_enter(void)
 		 */
 		lx_syscall_unsup_msg(s, syscall_num, unsup_reason);
 
-		set_errno(ENOTSUP);
+		(void) set_errno(ENOTSUP);
 		lx_syscall_return(lwp, syscall_num, -1);
 		return (0);
 	}
@@ -479,7 +477,7 @@ lx_vsyscall_enter(proc_t *p, klwp_t *lwp, int scnum)
 	rp->r_rip = raddr;
 	rp->r_rsp += sizeof (uintptr_t);
 
-	lx_syscall_enter();
+	(void) lx_syscall_enter();
 }
 
 boolean_t

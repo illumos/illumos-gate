@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include <sys/systm.h>
@@ -146,7 +146,7 @@ lx_prctl(int opt, uintptr_t data)
 		lx_proc_data_t *lxpd;
 
 		mutex_enter(&curproc->p_lock);
-		VERIFY(lxpd = ptolxproc(curproc));
+		VERIFY((lxpd = ptolxproc(curproc)) != NULL);
 		sig = lxpd->l_parent_deathsig;
 		mutex_exit(&curproc->p_lock);
 
@@ -165,7 +165,7 @@ lx_prctl(int opt, uintptr_t data)
 		mutex_enter(&pidlock);
 		/* Set signal on our self */
 		mutex_enter(&curproc->p_lock);
-		VERIFY(lxpd = ptolxproc(curproc));
+		VERIFY((lxpd = ptolxproc(curproc)) != NULL);
 		lxpd->l_parent_deathsig = sig;
 		pp = curproc->p_parent;
 		mutex_exit(&curproc->p_lock);
@@ -173,7 +173,7 @@ lx_prctl(int opt, uintptr_t data)
 		/* Configure parent to potentially signal children on death */
 		mutex_enter(&pp->p_lock);
 		if (PROC_IS_BRANDED(pp)) {
-			VERIFY(lxpd = ptolxproc(pp));
+			VERIFY((lxpd = ptolxproc(pp)) != NULL);
 			/*
 			 * Mark the parent as having children which wish to be
 			 * signaled on death of parent.
@@ -185,6 +185,7 @@ lx_prctl(int opt, uintptr_t data)
 			 * hooks to facilitate this mechanism will not fire
 			 * when it dies. We lie about success in this case.
 			 */
+			/* EMPTY */
 		}
 		mutex_exit(&pp->p_lock);
 		mutex_exit(&pidlock);
@@ -204,7 +205,7 @@ lx_prctl(int opt, uintptr_t data)
 		break;
 	}
 
-	snprintf(ebuf, 64, "prctl option %d", opt);
+	(void) snprintf(ebuf, 64, "prctl option %d", opt);
 	lx_unsupported(ebuf);
 	return (set_errno(EINVAL));
 }

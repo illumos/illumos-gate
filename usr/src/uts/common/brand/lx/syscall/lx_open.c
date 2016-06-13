@@ -22,7 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2015 Joyent, Inc.  All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include <sys/systm.h>
@@ -242,7 +242,7 @@ lx_openat(int atfd, char *path, int fmode, int cmode)
 			if (error != 0)
 				return (set_errno(ENOTDIR));
 
-			set_errno(oerror);
+			(void) set_errno(oerror);
 		}
 		return (ttolwp(curthread)->lwp_errno);
 	}

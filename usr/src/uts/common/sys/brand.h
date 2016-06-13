@@ -154,7 +154,7 @@ struct brand_ops {
 	void	(*b_init_brand_data)(zone_t *, kmutex_t *);
 	void	(*b_free_brand_data)(zone_t *);
 	int	(*b_brandsys)(int, int64_t *, uintptr_t, uintptr_t, uintptr_t,
-		uintptr_t, uintptr_t);
+		uintptr_t);
 	void	(*b_setbrand)(struct proc *);
 	int	(*b_getattr)(zone_t *, int, void *, size_t *);
 	int	(*b_setattr)(zone_t *, int, void *, size_t);

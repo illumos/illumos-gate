@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include <sys/systm.h>
@@ -23,6 +23,7 @@
  * We support neither the second argument (NUMA node), nor the third (obsolete
  * pre-2.6.24 caching functionality which was ultimately broken).
  */
+/* ARGSUSED1 */
 long
 lx_getcpu(unsigned int *cpu, uintptr_t p2, uintptr_t p3)
 {
