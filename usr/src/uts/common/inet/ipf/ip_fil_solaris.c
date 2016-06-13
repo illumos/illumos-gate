@@ -5,7 +5,7 @@
  *
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  *
- * Copyright (c) 2015, Joyent, Inc.  All rights reserved.
+ * Copyright 2016, Joyent, Inc.
  */
 
 #if !defined(lint)
@@ -1940,8 +1940,12 @@ frdest_t *fdp;
 		return (-1);
 	}
 
-	/* Check the src here, fin_ifp is the src interface. */
-	if (!fr_forwarding_enabled((phy_if_t)fin->fin_ifp, net_data_p))
+	/*
+	 * If we're forwarding (vs. injecting), check the src here, fin_ifp is
+	 * the src interface.
+	 */
+	if (fdp != NULL &&
+	   !fr_forwarding_enabled((phy_if_t)fin->fin_ifp, net_data_p))
 		return (-1);
 
 	inj = net_inject_alloc(NETINFO_VERSION);
@@ -2008,8 +2012,8 @@ frdest_t *fdp;
 		inj->ni_physical = net_routeto(net_data_p, sinp, NULL);
 	}
 
-	/* we're checking the destinatation here */
-	if (!fr_forwarding_enabled(inj->ni_physical, net_data_p))
+	/* If we're forwarding (vs. injecting), check the destinatation here. */
+	if (fdp != NULL && !fr_forwarding_enabled(inj->ni_physical, net_data_p))
 		goto bad_fastroute;
 
 	/*
