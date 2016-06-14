@@ -320,7 +320,8 @@ usr/src/uts/common/io/e1000api/e1000_manage.h
 usr/src/uts/common/io/e1000api/e1000_nvm.h
 usr/src/uts/common/io/e1000api/e1000_phy.h
 usr/src/uts/common/io/e1000api/e1000_regs.h
-usr/src/uts/common/io/ixgbe/core/ixgbe_common.h
+usr/src/uts/common/io/ixgbe/ixgbe_common.h
+usr/src/uts/common/io/i40e/core/i40e_adminq_cmd.h
 usr/src/uts/common/sys/scsi/adapters/mpt_sas/mpi/mpi2.h
 usr/src/uts/common/sys/scsi/adapters/mpt_sas/mpi/mpi2_cnfg.h
 usr/src/uts/common/sys/scsi/adapters/mpt_sas/mpi/mpi2_hbd.h

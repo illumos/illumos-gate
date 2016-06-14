@@ -14,6 +14,7 @@
 # Copyright 2014 Joyent, Inc. All rights reserved.
 # Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2016 Garrett D'Amore <garrett@damore.org>
+# Copyright 2016 Joyent, Inc.
 #
 
 include		$(SRC)/Makefile.master
@@ -211,6 +212,7 @@ i386_MANFILES=	ahci.7d		\
 		ecpp.7d		\
 		elxl.7d		\
 		heci.7d		\
+		i40e.7d		\
 		i915.7d		\
 		ipmi.7d		\
 		iprb.7d		\
