@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright (c) 2012, 2015 by Delphix. All rights reserved.
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  * Copyright (c) 2016 Martin Matuska. All rights reserved.
  */
@@ -261,7 +261,7 @@ take_snapshot(zfs_handle_t *zhp, char *snapshot_name, int snap_size,
     char *presnapbuf, char *postsnapbuf)
 {
 	int			res;
-	char			template[ZFS_MAXNAMELEN];
+	char			template[ZFS_MAX_DATASET_NAME_LEN];
 	zfs_snapshot_data_t	cb;
 
 	/*
@@ -563,8 +563,8 @@ static int
 get_direct_clone(zfs_handle_t *zhp, void *data)
 {
 	clone_data_t	*cd = data;
-	char		origin[ZFS_MAXNAMELEN];
-	char		ds_path[ZFS_MAXNAMELEN];
+	char		origin[ZFS_MAX_DATASET_NAME_LEN];
+	char		ds_path[ZFS_MAX_DATASET_NAME_LEN];
 
 	if (zfs_get_type(zhp) != ZFS_TYPE_FILESYSTEM) {
 		zfs_close(zhp);
@@ -668,7 +668,7 @@ rename_snap(zfs_handle_t *zhp, void *data)
 {
 	int			res;
 	zfs_snapshot_data_t	*cbp;
-	char			template[ZFS_MAXNAMELEN];
+	char			template[ZFS_MAX_DATASET_NAME_LEN];
 
 	cbp = (zfs_snapshot_data_t *)data;
 
@@ -724,8 +724,8 @@ static int
 promote_clone(zfs_handle_t *src_zhp, zfs_handle_t *cln_zhp)
 {
 	zfs_snapshot_data_t	sd;
-	char			nm[ZFS_MAXNAMELEN];
-	char			template[ZFS_MAXNAMELEN];
+	char			nm[ZFS_MAX_DATASET_NAME_LEN];
+	char			template[ZFS_MAX_DATASET_NAME_LEN];
 
 	(void) strlcpy(nm, zfs_get_name(cln_zhp), sizeof (nm));
 	/*
@@ -785,7 +785,7 @@ int
 promote_all_clones(zfs_handle_t *zhp)
 {
 	clone_data_t	cd;
-	char		nm[ZFS_MAXNAMELEN];
+	char		nm[ZFS_MAX_DATASET_NAME_LEN];
 
 	cd.clone_zhp = NULL;
 	cd.origin_creation = 0;
@@ -1195,7 +1195,7 @@ verify_datasets(zone_dochandle_t handle)
 	struct zone_dstab dstab;
 	zfs_handle_t *zhp;
 	char propbuf[ZFS_MAXPROPLEN];
-	char source[ZFS_MAXNAMELEN];
+	char source[ZFS_MAX_DATASET_NAME_LEN];
 	zprop_source_t srctype;
 
 	if (zonecfg_setdsent(handle) != Z_OK) {

@@ -230,7 +230,7 @@ mdb_dsl_dir_name(uintptr_t addr, char *buf)
 	static int gotid;
 	static mdb_ctf_id_t dd_id;
 	uintptr_t dd_parent;
-	char dd_myname[MAXNAMELEN];
+	char dd_myname[ZFS_MAX_DATASET_NAME_LEN];
 
 	if (!gotid) {
 		if (mdb_ctf_lookup_by_name(ZFS_STRUCT "dsl_dir",
@@ -265,7 +265,7 @@ objset_name(uintptr_t addr, char *buf)
 	static int gotid;
 	static mdb_ctf_id_t os_id, ds_id;
 	uintptr_t os_dsl_dataset;
-	char ds_snapname[MAXNAMELEN];
+	char ds_snapname[ZFS_MAX_DATASET_NAME_LEN];
 	uintptr_t ds_dir;
 
 	buf[0] = '\0';
@@ -466,7 +466,7 @@ dbuf(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	mdb_dmu_buf_impl_t db;
 	char objectname[32];
 	char blkidname[32];
-	char path[MAXNAMELEN];
+	char path[ZFS_MAX_DATASET_NAME_LEN];
 	int ptr_width = (int)(sizeof (void *)) * 2;
 
 	if (DCMD_HDRSPEC(flags))
@@ -725,7 +725,7 @@ dbufs_cb(uintptr_t addr, const void *unknown, void *arg)
 	dmu_buf_t db;
 	uint8_t level;
 	uint64_t blkid;
-	char osname[MAXNAMELEN];
+	char osname[ZFS_MAX_DATASET_NAME_LEN];
 
 	if (GETMEMBID(addr, &data->id, db_objset, objset) ||
 	    GETMEMBID(addr, &data->id, db, db) ||
@@ -1079,7 +1079,7 @@ arc_print(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 typedef struct mdb_spa_print {
 	pool_state_t spa_state;
-	char spa_name[MAXNAMELEN];
+	char spa_name[ZFS_MAX_DATASET_NAME_LEN];
 } mdb_spa_print_t;
 
 /*

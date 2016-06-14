@@ -21,10 +21,9 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- */
-/*
  * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2015 EveryCity Ltd.
+ * Copyright (c) 2015 by Delphix. All rights reserved.
  */
 
 /*
@@ -1147,7 +1146,7 @@ be_mount_callback(zfs_handle_t *zhp, void *data)
 {
 	zprop_source_t	sourcetype;
 	const char	*fs_name = zfs_get_name(zhp);
-	char		source[ZFS_MAXNAMELEN];
+	char		source[ZFS_MAX_DATASET_NAME_LEN];
 	char		*altroot = data;
 	char		zhp_mountpoint[MAXPATHLEN];
 	char		mountpoint[MAXPATHLEN];
@@ -1297,7 +1296,7 @@ be_unmount_callback(zfs_handle_t *zhp, void *data)
 	be_unmount_data_t	*ud = data;
 	zprop_source_t	sourcetype;
 	const char	*fs_name = zfs_get_name(zhp);
-	char		source[ZFS_MAXNAMELEN];
+	char		source[ZFS_MAX_DATASET_NAME_LEN];
 	char		mountpoint[MAXPATHLEN];
 	char		*zhp_mountpoint;
 	int		ret = 0;
@@ -2036,7 +2035,7 @@ static int
 fix_mountpoint_callback(zfs_handle_t *zhp, void *data)
 {
 	zprop_source_t	sourcetype;
-	char		source[ZFS_MAXNAMELEN];
+	char		source[ZFS_MAX_DATASET_NAME_LEN];
 	char		mountpoint[MAXPATHLEN];
 	char		*zhp_mountpoint = NULL;
 	char		*altroot = data;

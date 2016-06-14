@@ -20,8 +20,8 @@
  */
 
 /*
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.
  */
 
 /*
@@ -51,6 +51,7 @@
 #include "libshare_nfs.h"
 #include <nfs/nfs.h>
 #include <nfs/nfssys.h>
+#include <netconfig.h>
 #include "smfcfg.h"
 
 /* should really be in some global place */
@@ -449,7 +450,7 @@ nfs_alistcat(char *str1, char *str2, char sep)
 
 static int
 add_security_prop(struct securities *sec, char *name, char *value,
-			int persist, int iszfs)
+    int persist, int iszfs)
 {
 	sa_property_t prop;
 	int ret = SA_OK;
@@ -1328,7 +1329,7 @@ count_security(sa_optionset_t opts)
 
 static int
 nfs_sprint_option(char **rbuff, size_t *rbuffsize, size_t incr,
-			sa_property_t prop, int sep)
+    sa_property_t prop, int sep)
 {
 	char *name;
 	char *value;
@@ -1557,8 +1558,7 @@ err:
  * Append an entry to the nfslogtab file
  */
 static int
-nfslogtab_add(dir, buffer, tag)
-	char *dir, *buffer, *tag;
+nfslogtab_add(char *dir, char *buffer, char *tag)
 {
 	FILE *f;
 	struct logtab_ent lep;
@@ -1640,8 +1640,7 @@ out:
  * Deactivate an entry from the nfslogtab file
  */
 static int
-nfslogtab_deactivate(path)
-	char *path;
+nfslogtab_deactivate(char *path)
 {
 	FILE *f;
 	int error = 0;
@@ -3097,13 +3096,31 @@ nfs_validate_proto_prop(int index, char *name, char *value)
 		}
 		break;
 
-	case OPT_TYPE_PROTOCOL:
-		if (strlen(value) != 0 &&
-		    strcasecmp(value, "all") != 0 &&
-		    strcasecmp(value, "tcp") != 0 &&
-		    strcasecmp(value, "udp") != 0)
+	case OPT_TYPE_PROTOCOL: {
+		struct netconfig *nconf;
+		void *nc;
+		boolean_t pfound = B_FALSE;
+
+		if (strcasecmp(value, "all") == 0)
+			break;
+
+		if ((nc = setnetconfig()) == NULL) {
+			(void) fprintf(stderr, dgettext(TEXT_DOMAIN,
+			    "setnetconfig failed: %s\n"), strerror(errno));
+		} else {
+			while ((nconf = getnetconfig(nc)) != NULL) {
+				if (strcmp(nconf->nc_proto, value) == 0) {
+					pfound = B_TRUE;
+					break;
+				}
+			}
+			(void) endnetconfig(nc);
+		}
+
+		if (!pfound)
 			ret = SA_BAD_VALUE;
 		break;
+	}
 
 	default:
 		/* treat as a string */
