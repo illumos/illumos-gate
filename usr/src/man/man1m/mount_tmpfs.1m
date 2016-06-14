@@ -1,9 +1,10 @@
 '\" te
 .\"  Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved
+.\"  Copyright (c) 2011, Joyent, Inc.  All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH MOUNT_TMPFS 1M "Nov 24, 2003"
+.TH MOUNT_TMPFS 1M "Dec 2, 2011"
 .SH NAME
 mount_tmpfs \- mount tmpfs file systems
 .SH SYNOPSIS
@@ -13,7 +14,6 @@ mount_tmpfs \- mount tmpfs file systems
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBtmpfs\fR is a memory based file system which uses kernel resources relating
 to the \fBVM\fR system and page cache as a file system.
@@ -32,7 +32,6 @@ values.
 The \fIspecial\fR argument is usually specified as \fBswap\fR but is in fact
 disregarded and assumed to be the virtual memory resources within the system.
 .SH OPTIONS
-.sp
 .ne 2
 .na
 \fB\fB-o\fR \fIspecific_options\fR\fR
@@ -42,6 +41,17 @@ Specify \fBtmpfs\fR file system specific options in a comma-separated list with
 no intervening spaces. If invalid options are specified, a warning  message is
 printed and the invalid options are ignored. The following options are
 available:
+.sp
+.ne 2
+.na
+\fB\fBremount\fR\fR
+.ad
+.sp .6
+.RS 19n
+Remounts a file system with a new size. A size not explicitly
+set with \fBremount\fR reverts to no limit.
+.RE
+
 .sp
 .ne 2
 .na
@@ -82,7 +92,6 @@ producing the error\f(CWdevice busy\fR.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/mnttab\fR\fR
@@ -92,13 +101,11 @@ Table of mounted file systems
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBmount\fR(1M), \fBmkdir\fR(2), \fBmount\fR(2), \fBopen\fR(2),
 \fBumount\fR(2), \fBmnttab\fR(4), \fBattributes\fR(5), \fBfsattr\fR(5),
 \fBtmpfs\fR(7FS)
 .SH NOTES
-.sp
 .LP
 If the directory on which a file system is to be mounted is a symbolic link,
 the file system is mounted on the directory to which the symbolic link refers,

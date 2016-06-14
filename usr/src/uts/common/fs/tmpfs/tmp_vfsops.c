@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, Joyent, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -76,7 +77,7 @@ static vfsdef_t vfw = {
 	VFSDEF_VERSION,
 	"tmpfs",
 	tmpfsinit,
-	VSW_HASPROTO|VSW_STATS|VSW_ZMOUNT,
+	VSW_HASPROTO|VSW_CANREMOUNT|VSW_STATS|VSW_ZMOUNT,
 	&tmpfs_proto_opttbl
 };
 
@@ -249,7 +250,7 @@ tmp_mount(
 		return (ENOTDIR);
 
 	mutex_enter(&mvp->v_lock);
-	if ((uap->flags & MS_OVERLAY) == 0 &&
+	if ((uap->flags & MS_REMOUNT) == 0 && (uap->flags & MS_OVERLAY) == 0 &&
 	    (mvp->v_count != 1 || (mvp->v_flag & VROOT))) {
 		mutex_exit(&mvp->v_lock);
 		return (EBUSY);
@@ -285,6 +286,21 @@ tmp_mount(
 	if (error = pn_get(uap->dir,
 	    (uap->flags & MS_SYSSPACE) ? UIO_SYSSPACE : UIO_USERSPACE, &dpn))
 		goto out;
+
+	if (uap->flags & MS_REMOUNT) {
+		tm = (struct tmount *)VFSTOTM(vfsp);
+
+		/*
+		 * If we change the size so its less than what is currently
+		 * being used, we allow that. The file system will simply be
+		 * full until enough files have been removed to get below the
+		 * new max.
+		 */
+		mutex_enter(&tm->tm_contents);
+		tm->tm_anonmax = anonmax;
+		mutex_exit(&tm->tm_contents);
+		goto out;
+	}
 
 	if ((tm = tmp_memalloc(sizeof (struct tmount), 0)) == NULL) {
 		pn_free(&dpn);
