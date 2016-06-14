@@ -280,6 +280,8 @@ dlmgmt_init(void)
 		return (err);
 	}
 
+	(void) unlink(ZONE_LOCK);
+
 	/*
 	 * First derive the name of the cache file from the FMRI name. This
 	 * cache name is used to keep active datalink configuration.

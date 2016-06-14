@@ -1364,6 +1364,8 @@ dlmgmt_zonehalt(void *argp, void *retp, size_t *sz, zoneid_t zoneid,
 			dlmgmt_table_lock(B_TRUE);
 			dlmgmt_db_fini(zonehalt->ld_zoneid);
 			dlmgmt_table_unlock();
+
+			(void) unlink(ZONE_LOCK);
 		}
 	}
 	retvalp->lr_err = err;
