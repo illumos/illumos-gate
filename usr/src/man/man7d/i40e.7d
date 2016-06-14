@@ -1,0 +1,284 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2016 Joyent, Inc.
+.\"
+.Dd March 25, 2016
+.Dt I40E 7D
+.Os
+.Sh NAME
+.Nm i40e
+.Nd Intel XL710 10/40 Gigabit Ethernet Device Driver
+.Sh SYNOPSIS
+.Pa /dev/i40e*
+.Sh DESCRIPTION
+The
+.Nm
+driver is a GLDv3, multi-threaded, clonable, loadable device driver that
+supports the Data Link Provider Interface,
+.Xr dlpi 7P .
+The
+.Nm
+driver supports the Intel XL710 Ethernet Controller family of networking
+interface cards which come in both 10 GbE and 40 GbE variants.
+.Pp
+In addition to basic device initialization and the sending and receiving
+of frames, it supports the following features:
+.Bl -dash -offset indent
+.It
+Jumbo frames up to 9710 bytes.
+.It
+Promiscuous access via
+.Xr snoop 1M and
+.Xr dlpi 7P
+.It
+IPv4 Checksum Offload
+.It
+TCP, UDP, and SCTP checksum offload
+.El
+.Pp
+At this time, the
+.Nm
+driver does not enable the use of energy efficient Ethernet (EEE) or
+support the use of flow control through hardware pause frames.
+.Sh APPLICATION PROGRAMMING INTERFACE
+For each device supported by the
+.Nm
+installed in the system, a character-special file will be created. This
+file supports the Data Link Provider Interface (DLPI) which is documented
+in
+.Xr dlpi 7P .
+For most consumers, the use of
+.Xr libdlpi 3LIB ,
+is recommended.
+.Pp
+Each instance is assigned a unique ascending integer identifier. A
+device which has multiple ports may appear to the system as separate
+instances. The system does not provide a guarnatee on how these will be
+presented. Using this instance identifier, one can determine the exact
+character-special file to open. For example, the first instance
+enumerated in the system, with id 0, would be named
+.Sy i40e0 .
+It exists in the file system at
+.Pa /dev/i40e0 .
+.Sh CONFIGURATION
+The
+.Nm i40e
+driver always performs auto-negotiation and depending on the model may
+negotiate to 40 Gbps, 10 Gbps, or 1 Gbps. At this time, there are no
+models that support 1000BASE-T and thus auto-negotiation is required.
+.Pp
+The
+.Nm
+driver is managed by the
+.Xr dladm 1M
+utility.
+.Xr dladm 1M
+is the preferred interface for setting all properties. While
+.Xr driver.conf based configuration is possible,
+.Xr dladm 1M
+is recommended. The
+.Nm
+driver may be joined into an aggregation based on the link aggregation
+control protocol (LACP) through
+.Xr dladm 1M .
+.Sh PROPERTIES
+The device supports the following properties which may be tuned through
+its driver.conf file,
+.Pa /kernel/drv/i40e.conf .
+Most of these properties cannot be changed after the device has been
+started. The device is started in response to a DLPI consumer opening
+the device and binding to it. This happens when an IP interfaces is
+plumbed or another
+.Xr dlpi 7P
+consumer such as
+.Xr snoop 1M
+or an LLDP daemon is started.
+.Pp
+Some properties may be tuned at runtime with the
+.Xr dladm 1M
+utility. Properties that can be will have the name of the dladm property
+called out explicitly.
+.Pp
+These properties are not considered stable at this time. They may change
+and should not be relied on. They are considered
+.Sy Volatile .
+It is not expected that administrators of the system will have to tune
+these values.
+.Bl -hang -width Ds
+.It Sy default_mtu
+.Bd -filled -compact
+Minimum:
+.Sy 1500 |
+Maximum:
+.Sy 9710 |
+Runtime Property:
+.Sy mtu
+.Ed
+.Bd -filled
+The
+.Sy default_mtu
+property determines the starting MTU of the various device instances.
+Note that the device's MTU also determines the upper bound of the MTU of
+all VNICs created over the device. The default MTU is
+.Sy 1500 .
+.Ed
+.It Sy mr_enable
+.Bd -filled -compact
+Minimum:
+.Sy 0 |
+Maximum:
+.Sy 1
+.Ed
+.Bd -filled
+The
+.Sy mr_enable
+proeprty determines whether or not support for multiple rings is enabled
+for the device. The default is always to enable them. It is not
+recommended to to disable them.
+.Ed
+.It Sy rx_ring_size
+.Bd -filled -compact
+Minimum:
+.Sy 64 |
+Maximum:
+.Sy 4096
+.Ed
+.Bd -filled
+The
+.Sy rx_ring_size
+property determines the number of descriptors that will be used in each
+receive ring on the card. Administrators should not normally need to
+tune this value. Hardware requires that the ring size be a multiple of
+32. The system will round up the set value to the nearest multiple of
+32.
+.Ed
+.It Sy tx_ring_size
+.Bd -filled -compact
+Minimum:
+.Sy 64 |
+Maximum:
+.Sy 4096
+.Ed
+.Bd -filled
+The
+.Sy tx_ring_size
+property determines the number of descriptors that will be used in each
+transmit ring on the card. Administrators should not normally need to
+tune this value. Hardware requires that the ring size be a multiple of
+32. The system will round up the set value to the nearest multiple of
+32.
+.Ed
+.It Sy tx_resched_threshold
+.Bd -filled -compact
+Minimum:
+.Sy 8 |
+Maximum:
+.Sy Variable
+.Ed
+.Bd -filled
+The
+.Sy tx_resched_threshold
+property determines the number of descriptors that must be available for
+a frame to be transmitted. The maximum is variable. It is dependent on
+the value of the
+.Sy tx_ring_size
+property. At least eight descriptors must be available for the device to
+function correctly.
+.Ed
+.It Sy rx_limit_per_intr
+.Bd -filled -compact
+Minimum:
+.Sy 16 |
+Maximum:
+.Sy 4096
+.Ed
+.Bd -filled
+The
+.Sy rx_limit_per_intr
+property determines the maximum number of packets that will be processed
+on a given ring during a single interrupt. This is done to try and
+guarantee some amount of liveness in the system. It is not expected
+that administrators will have to tune this value.
+.Ed
+.It Sy tx_hcksum_enable
+.Bd -filled -compact
+Minimum:
+.Sy 0 |
+Maximum:
+.Sy 1
+.Ed
+.Bd -filled
+The
+.Sy tx_hcksum_enable
+property controls whether or not the device enables support for hardware
+checksuming of outgoing packets. The default is to always enable support
+for this. Turning it off will increase latency and decrease throughput
+when transmitting packets, but should be done if a hardware bug is
+suspected.
+.Ed
+.It Sy rx_hcksum_enable
+.Bd -filled -compact
+Minimum:
+.Sy 0 |
+Maximum:
+.Sy 1
+.Ed
+.Bd -filled
+The
+.Sy rx_hcksum_enable
+property controls whether or not the device enables support for hardware
+checksuming of incoming packets. The default is to always enable support
+for this. Turning it off will increase latency and decrease throughput
+when receiving packets, but should be done if a hardware bug is
+suspected.
+.Ed
+.It Sy rx_dma_threshold
+.Bd -filled -compact
+Minimum:
+.Sy 0 |
+Maximum:
+.Sy INT32_MAX |
+Runtime Property:
+.Sy _rx_dma_treshold
+.Ed
+.Bd -filled
+The
+.Sy rx_dma_treshold
+indicates the size in bytes of a received frame, including all of its
+headers, at which the driver should not copy the frame but instead bind
+DMA memory. By setting this property to its minimum, all frames will be
+processed with DMA binding. By setting this property to its maximum, all
+frames will be processed by copying the frame.
+.Ed
+.El
+.Sh ARCHITECTURE
+The
+.Nm
+driver is only supported on
+.Sy x86
+systems at this time.
+.Sh FILES
+.Bl -tag -width Pa
+.It Pa /dev/i40e*
+Per-instance character device.
+.It Pa /kernel/drv/i40e
+32-bit device driver (x86).
+.It Pa /kernel/drv/amd64/i40e
+64-bit device driver (x86).
+.It Pa /kernel/drv/i40e.conf
+Driver configuration file.
+.El
+.Sh SEE ALSO
+.Xr dladm 1M ,
+.Xr snoop 1M ,
+.Xr driver.conf 4 ,
+.Xr dlpi 7P
