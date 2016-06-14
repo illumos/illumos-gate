@@ -66,6 +66,14 @@
  * is likely to use few signalfds relative to its total file descriptors.  It
  * reduces the work required for each received signal.
  *
+ * When matching sigfd_poll_waiter_t entries are encountered in the poller list
+ * during signalfd_pollwake_cb, they are dispatched into signalfd_wakeq to
+ * perform the pollwake.  This is due to a lock ordering conflict between
+ * signalfd_poll and signalfd_pollwake_cb.  The former acquires
+ * pollcache_t`pc_lock before proc_t`p_lock.  The latter (via sigtoproc)
+ * reverses the order.  Defering the pollwake into a taskq means it can be
+ * performed without proc_t`p_lock held, avoiding the deadlock.
+ *
  * The sigfd_list is self-cleaning; as signalfd_pollwake_cb is called, the list
  * will clear out on its own.  Any remaining per-process state which remains
  * will be cleaned up by the exit helper (signalfd_exit_helper).
@@ -100,6 +108,8 @@
 #include <sys/id_space.h>
 #include <sys/sdt.h>
 #include <sys/brand.h>
+#include <sys/disp.h>
+#include <sys/taskq_impl.h>
 
 typedef struct signalfd_state signalfd_state_t;
 
@@ -115,6 +125,8 @@ typedef struct sigfd_poll_waiter {
 	list_node_t		spw_list;
 	signalfd_state_t	*spw_state;
 	pollhead_t		spw_pollhd;
+	taskq_ent_t		spw_taskent;
+	short			spw_pollev;
 } sigfd_poll_waiter_t;
 
 /*
@@ -126,10 +138,11 @@ static dev_info_t	*signalfd_devi;		/* device info */
 static id_space_t	*signalfd_minor;	/* minor number arena */
 static void		*signalfd_softstate;	/* softstate pointer */
 static list_t		signalfd_state;		/* global list of state */
+static taskq_t		*signalfd_wakeq;	/* pollwake event taskq */
 
 
 static void
-signalfd_state_enter(signalfd_state_t *state)
+signalfd_state_enter_locked(signalfd_state_t *state)
 {
 	ASSERT(MUTEX_HELD(&state->sfd_lock));
 	ASSERT(state->sfd_count > 0);
@@ -139,15 +152,23 @@ signalfd_state_enter(signalfd_state_t *state)
 }
 
 static void
-signalfd_state_release(signalfd_state_t *state, boolean_t locked)
+signalfd_state_release(signalfd_state_t *state, boolean_t force_invalidate)
 {
-	ASSERT(MUTEX_HELD(&state->sfd_lock));
-	ASSERT(state->sfd_count > 0);
+	mutex_enter(&state->sfd_lock);
 
+	if (force_invalidate) {
+		state->sfd_valid = B_FALSE;
+	}
+
+	ASSERT(state->sfd_count > 0);
 	if (state->sfd_count == 1) {
 		VERIFY(state->sfd_valid == B_FALSE);
 		mutex_exit(&state->sfd_lock);
-		if (locked) {
+		if (force_invalidate) {
+			/*
+			 * The invalidation performed in signalfd_close is done
+			 * while signalfd_lock is held.
+			 */
 			ASSERT(MUTEX_HELD(&signalfd_lock));
 			list_remove(&signalfd_state, state);
 		} else {
@@ -178,7 +199,7 @@ signalfd_wake_list_add(sigfd_proc_state_t *pstate, signalfd_state_t *state)
 		pw = kmem_zalloc(sizeof (*pw), KM_SLEEP);
 
 		mutex_enter(&state->sfd_lock);
-		signalfd_state_enter(state);
+		signalfd_state_enter_locked(state);
 		pw->spw_state = state;
 		mutex_exit(&state->sfd_lock);
 		list_insert_head(lst, pw);
@@ -200,9 +221,8 @@ signalfd_wake_list_rm(sigfd_proc_state_t *pstate, signalfd_state_t *state)
 
 	if (pw != NULL) {
 		list_remove(lst, pw);
-		mutex_enter(&state->sfd_lock);
-		signalfd_state_release(state, B_FALSE);
 		pw->spw_state = NULL;
+		signalfd_state_release(state, B_FALSE);
 	}
 
 	return (pw);
@@ -223,7 +243,6 @@ signalfd_wake_list_cleanup(proc_t *p)
 		signalfd_state_t *state = pw->spw_state;
 
 		pw->spw_state = NULL;
-		mutex_enter(&state->sfd_lock);
 		signalfd_state_release(state, B_FALSE);
 
 		pollwakeup(&pw->spw_pollhd, POLLERR);
@@ -244,6 +263,25 @@ signalfd_exit_helper(void)
 	mutex_enter(&p->p_lock);
 	signalfd_wake_list_cleanup(p);
 	mutex_exit(&p->p_lock);
+}
+
+/*
+ * Perform pollwake for a sigfd_poll_waiter_t entry.
+ * Thanks to the strict and conflicting lock orders required for signalfd_poll
+ * (pc_lock before p_lock) and signalfd_pollwake_cb (p_lock before pc_lock),
+ * this is relegated to a taskq to avoid deadlock.
+ */
+static void
+signalfd_wake_task(void *arg)
+{
+	sigfd_poll_waiter_t *pw = arg;
+	signalfd_state_t *state = pw->spw_state;
+
+	pw->spw_state = NULL;
+	signalfd_state_release(state, B_FALSE);
+	pollwakeup(&pw->spw_pollhd, pw->spw_pollev);
+	pollhead_clean(&pw->spw_pollhd);
+	kmem_free(pw, sizeof (*pw));
 }
 
 /*
@@ -274,27 +312,29 @@ signalfd_pollwake_cb(void *arg0, int sig)
 	while (pw != NULL) {
 		signalfd_state_t *state = pw->spw_state;
 		sigfd_poll_waiter_t *next;
-		short pollev;
 
 		mutex_enter(&state->sfd_lock);
 		if (!state->sfd_valid) {
-			pollev = POLLERR;
+			pw->spw_pollev = POLLERR;
 		} else if (sigismember(&state->sfd_set, sig)) {
-			pollev = POLLRDNORM | POLLIN;
+			pw->spw_pollev = POLLRDNORM | POLLIN;
 		} else {
 			mutex_exit(&state->sfd_lock);
 			pw = list_next(lst, pw);
 			continue;
 		}
+		mutex_exit(&state->sfd_lock);
 
-		signalfd_state_release(state, B_FALSE);
-		pw->spw_state = NULL;
-		pollwakeup(&pw->spw_pollhd, pollev);
-		pollhead_clean(&pw->spw_pollhd);
-
+		/*
+		 * Pull the sigfd_poll_waiter_t out of the list and dispatch it
+		 * to perform a pollwake.  This cannot be done synchronously
+		 * since signalfd_poll and signalfd_pollwake_cb have
+		 * conflicting lock orders which can deadlock.
+		 */
 		next = list_next(lst, pw);
 		list_remove(lst, pw);
-		kmem_free(pw, sizeof (*pw));
+		taskq_dispatch_ent(signalfd_wakeq, signalfd_wake_task, pw, 0,
+		    &pw->spw_taskent);
 		pw = next;
 	}
 }
@@ -648,8 +688,6 @@ signalfd_close(dev_t dev, int flag, int otyp, cred_t *cred_p)
 	ddi_soft_state_free(signalfd_softstate, minor);
 	id_free(signalfd_minor, minor);
 
-	mutex_enter(&state->sfd_lock);
-	state->sfd_valid = B_FALSE;
 	signalfd_state_release(state, B_TRUE);
 
 	mutex_exit(&signalfd_lock);
@@ -697,6 +735,9 @@ signalfd_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	list_create(&signalfd_state, sizeof (signalfd_state_t),
 	    offsetof(signalfd_state_t, sfd_list));
 
+	signalfd_wakeq = taskq_create("signalfd_wake", 1, minclsyspri,
+	    0, INT_MAX, TASKQ_PREPOPULATE);
+
 	mutex_exit(&signalfd_lock);
 
 	return (DDI_SUCCESS);
@@ -722,10 +763,16 @@ signalfd_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		 * entries on the global list.  Detach is not possible until
 		 * they purge themselves.
 		 */
-		return (DDI_FAILURE);
 		mutex_exit(&signalfd_lock);
+		return (DDI_FAILURE);
 	}
 	list_destroy(&signalfd_state);
+
+	/*
+	 * With no remaining entries in the signalfd_state list, the wake taskq
+	 * should be empty with no possibility for new entries.
+	 */
+	taskq_destroy(signalfd_wakeq);
 
 	id_space_destroy(signalfd_minor);
 
