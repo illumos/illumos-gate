@@ -367,16 +367,6 @@ usr/src/uts/common/io/e1000api/e1000_regs.h
 usr/src/uts/common/io/ixgbe/core/ixgbe_common.h
 usr/src/uts/common/io/ixgbe/ixgbe_common.h
 usr/src/uts/common/io/i40e/core/i40e_adminq_cmd.h
-usr/src/uts/common/io/i40e/core/i40e_adminq.h
-usr/src/uts/common/io/i40e/core/i40e_alloc.h
-usr/src/uts/common/io/i40e/core/i40e_devids.h
-usr/src/uts/common/io/i40e/core/i40e_hmc.h
-usr/src/uts/common/io/i40e/core/i40e_lan_hmc.h
-usr/src/uts/common/io/i40e/core/i40e_prototype.h
-usr/src/uts/common/io/i40e/core/i40e_register.h
-usr/src/uts/common/io/i40e/core/i40e_status.h
-usr/src/uts/common/io/i40e/core/i40e_type.h
-usr/src/uts/common/io/i40e/core/i40e_virtchnl.h
 usr/src/uts/common/io/nfp/nfp.h
 usr/src/uts/common/io/nfp/nfpci.h
 usr/src/uts/common/io/nfp/nfp_error.h

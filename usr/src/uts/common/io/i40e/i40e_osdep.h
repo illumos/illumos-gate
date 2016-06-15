@@ -29,8 +29,10 @@ extern "C" {
 
 /*
  * For the moment, we use this to basically deal with a few custom changes
- * particularly around mutex initialization. This is used to indicate that we
- * should take illumos variants.
+ * particularly around the use of sprintf() in the common code. The DDI defines
+ * sprintf() in a rather different way than the rest of the world expects it.
+ * This is currently necessary to indicate that we should use an alternate
+ * behavior.
  */
 #define	I40E_ILLUMOS 1
 
@@ -53,7 +55,7 @@ extern "C" {
 #define	UNREFERENCED_1PARAMETER(_p)		UNREFERENCED_PARAMETER(_p)
 #define	UNREFERENCED_2PARAMETER(_p, _q)		_NOTE(ARGUNUSED(_p, _q))
 #define	UNREFERENCED_3PARAMETER(_p, _q, _r)	_NOTE(ARGUNUSED(_p, _q, _r))
-#define	UNREFERENCED_4PARAMETER(_p, _q, _r, _s)	_NOTE(ARGUNUSED(_p, _q,_r, _s))
+#define	UNREFERENCED_4PARAMETER(_p, _q, _r, _s)	_NOTE(ARGUNUSED(_p, _q, _r, _s))
 
 #define	INLINE  inline
 
@@ -169,7 +171,7 @@ struct i40e_hw; /* forward decl */
 	(pci_config_put16(OS_DEP(hw)->ios_cfg_handle, (reg), (value)))
 
 /*
- * Intel expects that the symbol wr32 and r32 be defined to something which can
+ * Intel expects that the symbol wr32 and rd32 be defined to something which can
  * read and write the 32-bit register in PCI space.
  *
  * To make it easier for readers and satisfy the general agreement that macros
@@ -185,7 +187,7 @@ struct i40e_hw; /* forward decl */
 #define	I40E_READ_REG	rd32
 
 /*
- * The use of GLEN_STAT presumes that we're only using this file for a PF
+ * The use of GLGEN_STAT presumes that we're only using this file for a PF
  * driver. If we end up doing a VF driver, then we'll want to logically change
  * this.
  */

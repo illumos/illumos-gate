@@ -295,9 +295,9 @@ i40e_multicast_add(i40e_t *i40e, const uint8_t *multicast_address)
 			ret = i40e_aq_set_vsi_multicast_promiscuous(hw,
 			    i40e->i40e_vsi_id, B_TRUE, NULL);
 			if (ret != I40E_SUCCESS) {
-				i40e_error(i40e, "failed to enable promiscuous "
-				    "mode on VSI %d: %d", i40e->i40e_vsi_id,
-				    ret);
+				i40e_error(i40e, "failed to enable multicast "
+				    "promiscuous mode on VSI %d: %d",
+				    i40e->i40e_vsi_id, ret);
 				return (EIO);
 			}
 		}
@@ -383,7 +383,7 @@ i40e_multicast_remove(i40e_t *i40e, const uint8_t *multicast_address)
 			    i40e->i40e_vsi_id, B_FALSE, NULL);
 			if (ret != I40E_SUCCESS) {
 				i40e_error(i40e, "failed to disable "
-				    "promiscuous mode on VSI %d: %d",
+				    "multicast promiscuous mode on VSI %d: %d",
 				    i40e->i40e_vsi_id, ret);
 				return (EIO);
 			}

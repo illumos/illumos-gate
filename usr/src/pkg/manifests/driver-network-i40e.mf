@@ -14,7 +14,7 @@
 #
 
 <include global_zone_only_component>
-set name=pkg.fmri value=pkg:/driver/network/i40e$(PKGVERS)
+set name=pkg.fmri value=pkg:/driver/network/i40e@$(PKGVERS)
 set name=pkg.description value="Intel XL710 10/40 Gb Ethernet Driver"
 set name=pkg.summary value="Intel XL710 10/40 Gb Ethernet Driver"
 set name=info.classification \

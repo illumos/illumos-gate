@@ -86,8 +86,8 @@ i40e_allocate_dma_mem(struct i40e_hw *hw, struct i40e_dma_mem *mem,
 		ddi_dma_free_handle(&mem->idm_dma_handle);
 		mem->idm_dma_handle = NULL;
 
-		i40e_error(i40e, "failed to allocate %d bytes of DMA memory "
-		    "for common code", size);
+		i40e_error(i40e, "failed to allocate %" PRIu64 " bytes of DMA "
+		    "memory for common code", size);
 		return (I40E_ERR_NO_MEMORY);
 	}
 
@@ -106,7 +106,7 @@ i40e_allocate_dma_mem(struct i40e_hw *hw, struct i40e_dma_mem *mem,
 		ddi_dma_free_handle(&mem->idm_dma_handle);
 		mem->idm_dma_handle = NULL;
 
-		i40e_error(i40e, "failed to bind %d byte sized dma region: %d",
+		i40e_error(i40e, "failed to bind %ld byte sized dma region: %d",
 		    len, rc);
 		switch (rc) {
 		case DDI_DMA_INUSE:

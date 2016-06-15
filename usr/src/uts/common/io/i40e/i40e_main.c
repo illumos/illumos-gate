@@ -91,8 +91,9 @@
  * by the system, resulting in an instance being created and attached to. While
  * there are many resources that are unique to each physical function eg.
  * instance of the device, there are many that are shared across all of them.
- * Several resources have an amount reserved for each VSI and then a static pool
- * of resources, available for all functions on the card.
+ * Several resources have an amount reserved for each Virtual Station Interface
+ * (VSI) and then a static pool of resources, available for all functions on the
+ * card.
  *
  * The most important resource in hardware are its transmit and receive queue
  * pairs (i40e_trqpair_t). These should be thought of as rings in GLDv3
@@ -314,7 +315,7 @@
  * -------------
  *
  * In order to ensure that we don't deadlock, the following represents the
- * lock oder being used. When grabbing locks, follow the following order. Lower
+ * lock order being used. When grabbing locks, follow the following order. Lower
  * numbers are more important. Thus, the i40e_glock which is number 0, must be
  * taken before any other locks in the driver. On the other hand, the
  * i40e_t`i40e_stat_lock, has the highest number because it's the least
@@ -415,6 +416,7 @@ i40e_dev_err(i40e_t *i40e, int level, boolean_t console, const char *fmt,
  * and variable arguments, I need to instantiate these.	 Pardon the redundant
  * code.
  */
+/*PRINTFLIKE2*/
 void
 i40e_error(i40e_t *i40e, const char *fmt, ...)
 {
@@ -425,6 +427,7 @@ i40e_error(i40e_t *i40e, const char *fmt, ...)
 	va_end(ap);
 }
 
+/*PRINTFLIKE2*/
 void
 i40e_log(i40e_t *i40e, const char *fmt, ...)
 {
@@ -435,6 +438,7 @@ i40e_log(i40e_t *i40e, const char *fmt, ...)
 	va_end(ap);
 }
 
+/*PRINTFLIKE2*/
 void
 i40e_notice(i40e_t *i40e, const char *fmt, ...)
 {
@@ -763,7 +767,7 @@ i40e_get_vsi_id(i40e_t *i40e)
 	rc = i40e_aq_get_switch_config(hw, sw_config, sizeof (aq_buf), &next,
 	    NULL);
 	if (rc != I40E_SUCCESS) {
-		i40e_error(i40e, "i40e_aq_get_switch_config() failed %d: %d\n",
+		i40e_error(i40e, "i40e_aq_get_switch_config() failed %d: %d",
 		    rc, hw->aq.asq_last_status);
 		return (-1);
 	}
@@ -793,8 +797,9 @@ i40e_get_hw_capabilities(i40e_t *i40e, i40e_hw_t *hw)
 	uint16_t needed;
 	int nelems = I40E_HW_CAP_DEFAULT;
 
+	len = nelems * sizeof (*buf);
+
 	for (;;) {
-		len = nelems * sizeof (*buf);
 		ASSERT(len > 0);
 		buf = kmem_alloc(len, KM_SLEEP);
 		rc = i40e_aq_discover_capabilities(hw, buf, len,
@@ -808,9 +813,10 @@ i40e_get_hw_capabilities(i40e_t *i40e, i40e_hw_t *hw)
 				    "due to byzantine common code");
 				return (B_FALSE);
 			}
-			nelems = needed;
+			len = needed;
 			continue;
-		} else if (hw->aq.asq_last_status != I40E_AQ_RC_OK) {
+		} else if (rc != I40E_SUCCESS ||
+		    hw->aq.asq_last_status != I40E_AQ_RC_OK) {
 			i40e_error(i40e, "Capability discovery failed: %d", rc);
 			return (B_FALSE);
 		}
@@ -852,7 +858,7 @@ i40e_get_switch_resources(i40e_t *i40e)
 		} else if (ret != I40E_SUCCESS) {
 			kmem_free(buf, size);
 			i40e_error(i40e,
-			    "failed to retrieve switch statistics: %d\n", ret);
+			    "failed to retrieve switch statistics: %d", ret);
 			return (B_FALSE);
 		}
 
@@ -1003,7 +1009,7 @@ i40e_get_available_resources(i40e_t *i40e)
 	    i40e->i40e_resources.ifr_nmcastfilt, KM_SLEEP);
 
 	/*
-	 * Initialize these a multicast address to indicate it's invalid for
+	 * Initialize these as multicast addresses to indicate it's invalid for
 	 * sanity purposes. Think of it like 0xdeadbeef.
 	 */
 	for (i = 0; i < i40e->i40e_resources.ifr_nmacfilt; i++)
@@ -1253,14 +1259,14 @@ i40e_common_code_init(i40e_t *i40e, i40e_hw_t *hw)
 	    hw->func_caps.num_rx_qp, 0, 0);
 	if (rc != 0) {
 		i40e_error(i40e, "failed to initialize hardware memory cache: "
-		    "%d\n", rc);
+		    "%d", rc);
 		return (B_FALSE);
 	}
 
 	rc = i40e_configure_lan_hmc(hw, I40E_HMC_MODEL_DIRECT_ONLY);
 	if (rc != 0) {
 		i40e_error(i40e, "failed to configure hardware memory cache: "
-		    "%d\n", rc);
+		    "%d", rc);
 		return (B_FALSE);
 	}
 
@@ -1276,7 +1282,7 @@ i40e_common_code_init(i40e_t *i40e, i40e_hw_t *hw)
 	rc = i40e_validate_mac_addr(hw->mac.addr);
 	if (rc != 0) {
 		i40e_error(i40e, "failed to validate internal mac address: "
-		    "%d\n", rc);
+		    "%d", rc);
 		return (B_FALSE);
 	}
 	bcopy(hw->mac.addr, hw->mac.perm_addr, ETHERADDRL);
@@ -1617,14 +1623,14 @@ i40e_alloc_intr_handles(i40e_t *i40e, dev_info_t *devinfo, int intr_type)
 	rc = ddi_intr_get_nintrs(devinfo, intr_type, &count);
 	if (rc != DDI_SUCCESS || count < min) {
 		i40e_log(i40e, "Get interrupt number failed, "
-		    "returned %d, count %d\n", rc, count);
+		    "returned %d, count %d", rc, count);
 		return (B_FALSE);
 	}
 
 	rc = ddi_intr_get_navail(devinfo, intr_type, &count);
 	if (rc != DDI_SUCCESS || count < min) {
 		i40e_log(i40e, "Get AVAILABLE interrupt number failed, "
-		    "returned %d, count %d\n", rc, count);
+		    "returned %d, count %d", rc, count);
 		return (B_FALSE);
 	}
 
@@ -1866,7 +1872,7 @@ i40e_get_hw_state(i40e_t *i40e, i40e_hw_t *hw)
 	 */
 	rc = i40e_aq_set_phy_int_mask(hw, 0, NULL);
 	if (rc != I40E_SUCCESS) {
-		i40e_error(i40e, "failed to update phy link mask: %d\n", rc);
+		i40e_error(i40e, "failed to update phy link mask: %d", rc);
 	}
 }
 
@@ -1899,7 +1905,7 @@ i40e_config_vsi(i40e_t *i40e, i40e_hw_t *hw)
 	context.pf_num = hw->pf_id;
 	err = i40e_aq_get_vsi_params(hw, &context, NULL);
 	if (err != I40E_SUCCESS) {
-		i40e_error(i40e, "get VSI params failed with %d\n", err);
+		i40e_error(i40e, "get VSI params failed with %d", err);
 		return (B_FALSE);
 	}
 
@@ -1947,7 +1953,7 @@ i40e_chip_start(i40e_t *i40e)
 		if (i40e_aq_set_link_restart_an(hw, TRUE, NULL) !=
 		    I40E_SUCCESS) {
 			i40e_error(i40e, "failed to restart link: admin queue "
-			    "error: %d\n", hw->aq.asq_last_status);
+			    "error: %d", hw->aq.asq_last_status);
 			return (B_FALSE);
 		}
 	}
@@ -2112,7 +2118,7 @@ i40e_shutdown_rings_wait(i40e_t *i40e)
 		}
 
 		if ((reg & I40E_QRX_ENA_QENA_STAT_MASK) != 0) {
-			i40e_error(i40e, "timed out disabling rx queue %d\n",
+			i40e_error(i40e, "timed out disabling rx queue %d",
 			    i);
 			return (B_FALSE);
 		}
@@ -2125,7 +2131,7 @@ i40e_shutdown_rings_wait(i40e_t *i40e)
 		}
 
 		if ((reg & I40E_QTX_ENA_QENA_STAT_MASK) != 0) {
-			i40e_error(i40e, "timed out disabling tx queue %d\n",
+			i40e_error(i40e, "timed out disabling tx queue %d",
 			    i);
 			return (B_FALSE);
 		}
@@ -2201,14 +2207,14 @@ i40e_setup_rx_hmc(i40e_trqpair_t *itrq)
 
 	err = i40e_clear_lan_rx_queue_context(hw, itrq->itrq_index);
 	if (err != I40E_SUCCESS) {
-		i40e_error(i40e, "failed to clear rx queue %d context: %d\n",
+		i40e_error(i40e, "failed to clear rx queue %d context: %d",
 		    itrq->itrq_index, err);
 		return (B_FALSE);
 	}
 
 	err = i40e_set_lan_rx_queue_context(hw, itrq->itrq_index, &rctx);
 	if (err != I40E_SUCCESS) {
-		i40e_error(i40e, "failed to set rx queue %d context: %d\n",
+		i40e_error(i40e, "failed to set rx queue %d context: %d",
 		    itrq->itrq_index, err);
 		return (B_FALSE);
 	}
@@ -2282,7 +2288,7 @@ i40e_setup_rx_rings(i40e_t *i40e)
 
 		if ((reg & I40E_QRX_ENA_QENA_STAT_MASK) == 0) {
 			i40e_error(i40e, "failed to enable rx queue %d, timed "
-			    "out.");
+			    "out.", i);
 			return (B_FALSE);
 		}
 	}
@@ -2335,21 +2341,21 @@ i40e_setup_tx_hmc(i40e_trqpair_t *itrq)
 	context.pf_num = hw->pf_id;
 	err = i40e_aq_get_vsi_params(hw, &context, NULL);
 	if (err != I40E_SUCCESS) {
-		i40e_error(i40e, "get VSI params failed with %d\n", err);
+		i40e_error(i40e, "get VSI params failed with %d", err);
 		return (B_FALSE);
 	}
 	tctx.rdylist = LE_16(context.info.qs_handle[0]);
 
 	err = i40e_clear_lan_tx_queue_context(hw, itrq->itrq_index);
 	if (err != I40E_SUCCESS) {
-		i40e_error(i40e, "failed to clear tx queue %d context: %d\n",
+		i40e_error(i40e, "failed to clear tx queue %d context: %d",
 		    itrq->itrq_index, err);
 		return (B_FALSE);
 	}
 
 	err = i40e_set_lan_tx_queue_context(hw, itrq->itrq_index, &tctx);
 	if (err != I40E_SUCCESS) {
-		i40e_error(i40e, "failed to set tx queue %d context: %d\n",
+		i40e_error(i40e, "failed to set tx queue %d context: %d",
 		    itrq->itrq_index, err);
 		return (B_FALSE);
 	}
@@ -2424,7 +2430,7 @@ i40e_setup_tx_rings(i40e_t *i40e)
 
 		if ((reg & I40E_QTX_ENA_QENA_STAT_MASK) == 0) {
 			i40e_error(i40e, "failed to enable tx queue %d, timed "
-			    "out");
+			    "out", i);
 			return (B_FALSE);
 		}
 	}
@@ -2567,14 +2573,14 @@ i40e_start(i40e_t *i40e, boolean_t alloc)
 	 */
 	err = i40e_aq_set_vsi_broadcast(hw, i40e->i40e_vsi_id, B_TRUE, NULL);
 	if (err != I40E_SUCCESS) {
-		i40e_error(i40e, "failed to set default VSI: %d\n", err);
+		i40e_error(i40e, "failed to set default VSI: %d", err);
 		rc = B_FALSE;
 		goto done;
 	}
 
 	err = i40e_aq_set_mac_config(hw, i40e->i40e_frame_max, B_TRUE, 0, NULL);
 	if (err != I40E_SUCCESS) {
-		i40e_error(i40e, "failed to set MAC config: %d\n", err);
+		i40e_error(i40e, "failed to set MAC config: %d", err);
 		rc = B_FALSE;
 		goto done;
 	}

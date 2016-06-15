@@ -87,8 +87,9 @@
  * memory, which means that we need to have the receive specific control block.
  * We have a couple different, but related goals:
  *
- *   o Once we've completed the mc_start GLDv3 endpoint, we do not want to do
- *     any additional memory allocations or DMA allocations if we don't have to.
+ *   o Once we've completed the mc_start GLDv3 endpoint (i40e_m_start), we do
+ *     not want to do any additional memory allocations or DMA allocations if
+ *     we don't have to.
  *
  *   o We'd like to try and do as much zero-copy as possible, while taking into
  *     account the cost of mapping in DMA resources.
@@ -306,10 +307,10 @@
  * they correspond to. Once we are indicated that the corresponding descriptor
  * has been freed, we'll return it to the list.
  *
- * The thread control block free list is managed by keeping track of the number
- * of entries in it, i40e_trqpair_t`itrq_tcb_free. We use it as a way to index
- * into the free list and add things to it. In effect, we always push and pop
- * from the tail and protect it with a single lock,
+ * The transmit control block free list is managed by keeping track of the
+ * number of entries in it, i40e_trqpair_t`itrq_tcb_free. We use it as a way to
+ * index into the free list and add things to it. In effect, we always push and
+ * pop from the tail and protect it with a single lock,
  * i40e_trqpair_t`itrq_tcb_lock. This scheme is somewhat simplistic and may not
  * stand up to further performance testing; however, it does allow us to get off
  * the ground with the device driver.
@@ -581,7 +582,7 @@ i40e_alloc_dma_buffer(i40e_t *i40e, i40e_dma_buffer_t *dmap,
 	    DDI_DMA_DONTWAIT, NULL, &dmap->dmab_address, &len,
 	    &dmap->dmab_acc_handle);
 	if (ret != DDI_SUCCESS) {
-		i40e_error(i40e, "failed to allocate %d bytes of DMA for I/O "
+		i40e_error(i40e, "failed to allocate %ld bytes of DMA for I/O "
 		    "buffers", size);
 		dmap->dmab_address = NULL;
 		dmap->dmab_acc_handle = NULL;
@@ -602,7 +603,7 @@ i40e_alloc_dma_buffer(i40e_t *i40e, i40e_dma_buffer_t *dmap,
 	    dmap->dmab_address, len, DDI_DMA_RDWR | flags, DDI_DMA_DONTWAIT,
 	    NULL, &cookie, &ncookies);
 	if (ret != DDI_DMA_MAPPED) {
-		i40e_error(i40e, "failed to allocate %d bytes of DMA for I/O "
+		i40e_error(i40e, "failed to allocate %ld bytes of DMA for I/O "
 		    "buffers: %d", size, ret);
 		i40e_free_dma_buffer(dmap);
 		return (B_FALSE);
@@ -642,6 +643,7 @@ i40e_free_rx_data(i40e_rx_data_t *rxd)
 		kmem_free(rxd->rxd_work_list,
 		    sizeof (i40e_rx_control_block_t *) *
 		    rxd->rxd_ring_size);
+		rxd->rxd_work_list = NULL;
 	}
 
 	kmem_free(rxd, sizeof (i40e_rx_data_t));
@@ -956,8 +958,8 @@ i40e_alloc_tx_dma(i40e_trqpair_t *itrq)
 		if (i40e_alloc_dma_buffer(i40e, &tcb->tcb_dma,
 		    &i40e->i40e_static_dma_attr, &i40e->i40e_buf_acc_attr,
 		    B_TRUE, B_FALSE, dmasz) == B_FALSE) {
-			i40e_error(i40e, "failed to allocate %d bytes of "
-			    "DMA for tx data binding on ring %d: %d", dmasz,
+			i40e_error(i40e, "failed to allocate %ld bytes of "
+			    "DMA for tx data binding on ring %d", dmasz,
 			    itrq->itrq_index);
 			goto cleanup;
 		}
@@ -1415,7 +1417,7 @@ i40e_ring_rx(i40e_trqpair_t *itrq, int poll_bytes)
 	stword = LE64_TO_CPU(cur_desc->wb.qword1.status_error_len);
 
 	/*
-	 * Note, the primary invariant of this loop should be tha cur_head,
+	 * Note, the primary invariant of this loop should be that cur_head,
 	 * cur_desc, and stword always point to the currently processed
 	 * descriptor. When we leave the loop, it should point to a descriptor
 	 * that HAS NOT been processed. Meaning, that if we haven't consumed the
@@ -1766,7 +1768,7 @@ mac_ether_offload_info(mblk_t *mp, mac_ether_offload_info_t *meoi)
  * to properly program the hardware for checksum offload as well as the
  * generally required flags.
  *
- * The i40e_tx_contex_t`itc_cmdflags contains the set of flags we need to or
+ * The i40e_tx_context_t`itc_cmdflags contains the set of flags we need to or
  * into the descriptor based on the checksum flags for this mblk_t and the
  * actual information we care about.
  */
@@ -1927,7 +1929,7 @@ i40e_tcb_reset(i40e_tx_control_block_t *tcb)
 		break;
 	case I40E_TX_NONE:
 		/* Cast to pacify lint */
-		panic("trying to free tcb %p with bad type none\n", (void *)tcb);
+		panic("trying to free tcb %p with bad type none", (void *)tcb);
 	default:
 		panic("unknown i40e tcb type: %d", tcb->tcb_type);
 	}

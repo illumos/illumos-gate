@@ -80,7 +80,9 @@ The
 .Nm
 driver is managed by the
 .Xr dladm 1M
-utility and it is the preferred interface for setting all properties. While
+utility.
+.Xr dladm 1M
+is the preferred interface for setting all properties. While
 .Xr driver.conf based configuration is possible,
 .Xr dladm 1M
 is recommended. The

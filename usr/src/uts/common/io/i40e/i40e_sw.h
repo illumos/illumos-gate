@@ -107,7 +107,7 @@ extern "C" {
 /*
  * Note, while the min and maximum values are based upon the sizing of the ring
  * itself, the default is taken from ixgbe without much thought. It's basically
- * been cargo culted. See i40e_transciever.c for a bit more information.
+ * been cargo culted. See i40e_transceiver.c for a bit more information.
  */
 #define	I40E_MIN_RX_LIMIT_PER_INTR	16
 #define	I40E_MAX_RX_LIMIT_PER_INTR	4096
@@ -166,9 +166,9 @@ typedef enum i40e_itr_index {
 #define	I40E_QUEUE_TYPE_EOL	0x7FF
 
 /*
- * See the comments in i40e_buf.c as to the purpose of this value and how it's
- * used to ensure that the IP header is eventually aligned when it's received by
- * the OS.
+ * See the comments in i40e_transceiver.c as to the purpose of this value and
+ * how it's used to ensure that the IP header is eventually aligned when it's
+ * received by the OS.
  */
 #define	I40E_BUF_IPHDR_ALIGNMENT	2
 
@@ -310,7 +310,7 @@ typedef enum i40e_attach_state {
 	I40E_ATTACH_ALLOC_INTR	= 0x0008,	/* Interrupts allocated */
 	I40E_ATTACH_ALLOC_RINGSLOCKS	= 0x0010, /* Rings & locks allocated */
 	I40E_ATTACH_ADD_INTR	= 0x0020,	/* Intr handlers added */
-	I40E_ATTACH_COMMON_CODE	= 0x0040, /* Intel code initialized */
+	I40E_ATTACH_COMMON_CODE	= 0x0040, 	/* Intel code initialized */
 	I40E_ATTACH_INIT	= 0x0080,	/* Device initialized */
 	I40E_ATTACH_STATS	= 0x0200,	/* Kstats created */
 	I40E_ATTACH_MAC		= 0x0800,	/* MAC registered */
@@ -420,7 +420,7 @@ typedef struct i40e_rx_data {
 	/*
 	 * RX software ring settings
 	 */
-	uint32_t	rxd_ring_size;	/* Rx descriptor ring size */
+	uint32_t	rxd_ring_size;		/* Rx descriptor ring size */
 	uint32_t	rxd_free_list_size;	/* Rx free list size */
 
 	/*
@@ -830,8 +830,8 @@ typedef struct i40e {
 	boolean_t	i40e_intr_poll;
 
 	/*
-	 * DMA attributes. See i40e_buf.c for why we have copies of them in the
-	 * i40e_t.
+	 * DMA attributes. See i40e_transceiver.c for why we have copies of them
+	 * in the i40e_t.
 	 */
 	ddi_dma_attr_t		i40e_static_dma_attr;
 	ddi_dma_attr_t		i40e_txbind_dma_attr;
@@ -894,9 +894,12 @@ typedef struct i40e_device {
 /*
  * Logging functions.
  */
-extern void i40e_error(i40e_t *, const char *, ...);
-extern void i40e_notice(i40e_t *, const char *, ...);
-extern void i40e_log(i40e_t *, const char *, ...);
+/*PRINTFLIKE2*/
+extern void i40e_error(i40e_t *, const char *, ...) __KPRINTFLIKE(2);
+/*PRINTFLIKE2*/
+extern void i40e_notice(i40e_t *, const char *, ...) __KPRINTFLIKE(2);
+/*PRINTFLIKE2*/
+extern void i40e_log(i40e_t *, const char *, ...) __KPRINTFLIKE(2);
 
 /*
  * General link handling functions.

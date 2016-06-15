@@ -26,6 +26,7 @@
 # Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2016 Joyent, Inc.
 # Copyright 2016 Garrett D'Amore <garrett@damore.org>
+# Copyright 2016 Joyent, Inc.
 #
 
 #
@@ -2044,6 +2045,8 @@ I40E_OBJS =	i40e_main.o i40e_osdep.o i40e_intr.o i40e_transceiver.o \
 # Intel-written ones.
 I40E_INTC_OBJS = i40e_adminq.o i40e_common.o i40e_hmc.o i40e_lan_hmc.o \
 		 i40e_nvm.o
+
+#
 #	Solarflare 1/10/40GbE NIC driver module
 #
 #	NB: The illumos specific sources are listed first, with the
