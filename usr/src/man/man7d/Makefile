@@ -61,7 +61,6 @@ _MANFILES=	aac.7d		\
 		hme.7d		\
 		hubd.7d		\
 		hxge.7d		\
-		i40e.7d		\
 		ib.7d		\
 		ibcm.7d		\
 		ibd.7d		\
