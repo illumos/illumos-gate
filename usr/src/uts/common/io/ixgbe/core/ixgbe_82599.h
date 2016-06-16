@@ -1,6 +1,6 @@
 /******************************************************************************
 
-  Copyright (c) 2001-2012, Intel Corporation 
+  Copyright (c) 2001-2015, Intel Corporation 
   All rights reserved.
   
   Redistribution and use in source and binary forms, with or without 
@@ -30,7 +30,7 @@
   POSSIBILITY OF SUCH DAMAGE.
 
 ******************************************************************************/
-/*$FreeBSD: src/sys/dev/ixgbe/ixgbe_82599.h,v 1.1 2012/01/30 16:42:02 jfv Exp $*/
+/*$FreeBSD$*/
 
 #ifndef _IXGBE_82599_H_
 #define _IXGBE_82599_H_
@@ -41,16 +41,15 @@ enum ixgbe_media_type ixgbe_get_media_type_82599(struct ixgbe_hw *hw);
 void ixgbe_disable_tx_laser_multispeed_fiber(struct ixgbe_hw *hw);
 void ixgbe_enable_tx_laser_multispeed_fiber(struct ixgbe_hw *hw);
 void ixgbe_flap_tx_laser_multispeed_fiber(struct ixgbe_hw *hw);
-s32 ixgbe_setup_mac_link_multispeed_fiber(struct ixgbe_hw *hw,
-					  ixgbe_link_speed speed, bool autoneg,
-					  bool autoneg_wait_to_complete);
+void ixgbe_set_hard_rate_select_speed(struct ixgbe_hw *hw,
+					ixgbe_link_speed speed);
 s32 ixgbe_setup_mac_link_smartspeed(struct ixgbe_hw *hw,
-				    ixgbe_link_speed speed, bool autoneg,
+				    ixgbe_link_speed speed,
 				    bool autoneg_wait_to_complete);
 s32 ixgbe_start_mac_link_82599(struct ixgbe_hw *hw,
 			       bool autoneg_wait_to_complete);
 s32 ixgbe_setup_mac_link_82599(struct ixgbe_hw *hw, ixgbe_link_speed speed,
-			       bool autoneg, bool autoneg_wait_to_complete);
+			       bool autoneg_wait_to_complete);
 s32 ixgbe_setup_sfp_modules_82599(struct ixgbe_hw *hw);
 void ixgbe_init_mac_link_ops_82599(struct ixgbe_hw *hw);
 s32 ixgbe_reset_hw_82599(struct ixgbe_hw *hw);
@@ -61,5 +60,6 @@ s32 ixgbe_identify_phy_82599(struct ixgbe_hw *hw);
 s32 ixgbe_init_phy_ops_82599(struct ixgbe_hw *hw);
 u32 ixgbe_get_supported_physical_layer_82599(struct ixgbe_hw *hw);
 s32 ixgbe_enable_rx_dma_82599(struct ixgbe_hw *hw, u32 regval);
-bool ixgbe_verify_lesm_fw_enabled_82599(struct ixgbe_hw *hw);
+s32 prot_autoc_read_82599(struct ixgbe_hw *hw, bool *locked, u32 *reg_val);
+s32 prot_autoc_write_82599(struct ixgbe_hw *hw, u32 reg_val, bool locked);
 #endif /* _IXGBE_82599_H_ */

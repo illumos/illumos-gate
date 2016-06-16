@@ -29,12 +29,12 @@
  * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2013 Saso Kiselkov. All rights reserved.
  * Copyright (c) 2013 OSN Online Service Nuernberg GmbH. All rights reserved.
+ * Copyright 2016 OmniTI Computer Consulting, Inc. All rights reserved.
  */
 
 #include "ixgbe_sw.h"
 
 static char ixgbe_ident[] = "Intel 10Gb Ethernet";
-static char ixgbe_version[] = "ixgbe 1.1.7";
 
 /*
  * Local function protoypes
@@ -65,6 +65,7 @@ static void ixgbe_setup_tx_ring(ixgbe_tx_ring_t *);
 static void ixgbe_setup_rss(ixgbe_t *);
 static void ixgbe_setup_vmdq(ixgbe_t *);
 static void ixgbe_setup_vmdq_rss(ixgbe_t *);
+static void ixgbe_setup_rss_table(ixgbe_t *);
 static void ixgbe_init_unicst(ixgbe_t *);
 static int ixgbe_unicst_find(ixgbe_t *, const uint8_t *);
 static void ixgbe_setup_multicst(ixgbe_t *);
@@ -76,6 +77,7 @@ static int ixgbe_get_prop(ixgbe_t *, char *, int, int, int);
 static void ixgbe_driver_link_check(ixgbe_t *);
 static void ixgbe_sfp_check(void *);
 static void ixgbe_overtemp_check(void *);
+static void ixgbe_phy_check(void *);
 static void ixgbe_link_timer(void *);
 static void ixgbe_local_timer(void *);
 static void ixgbe_arm_watchdog_timer(ixgbe_t *);
@@ -314,14 +316,38 @@ static adapter_info_t ixgbe_X540_cap = {
 	16,		/* maximum number of ring vectors */
 	2,		/* maximum number of other vectors */
 	(IXGBE_EICR_LSC
-	| IXGBE_EICR_GPI_SDP1
-	| IXGBE_EICR_GPI_SDP2), /* "other" interrupt types handled */
+	| IXGBE_EICR_GPI_SDP1_X540
+	| IXGBE_EICR_GPI_SDP2_X540), /* "other" interrupt types handled */
 
-	(IXGBE_SDP1_GPIEN
-	| IXGBE_SDP2_GPIEN), /* "other" interrupt types enable mask */
+	(IXGBE_SDP1_GPIEN_X540
+	| IXGBE_SDP2_GPIEN_X540), /* "other" interrupt types enable mask */
 
 	(IXGBE_FLAG_DCA_CAPABLE
 	| IXGBE_FLAG_RSS_CAPABLE
+	| IXGBE_FLAG_VMDQ_CAPABLE
+	| IXGBE_FLAG_RSC_CAPABLE) /* capability flags */
+};
+
+static adapter_info_t ixgbe_X550_cap = {
+	128,		/* maximum number of rx queues */
+	1,		/* minimum number of rx queues */
+	128,		/* default number of rx queues */
+	64,		/* maximum number of rx groups */
+	1,		/* minimum number of rx groups */
+	1,		/* default number of rx groups */
+	128,		/* maximum number of tx queues */
+	1,		/* minimum number of tx queues */
+	8,		/* default number of tx queues */
+	15500,		/* maximum MTU size */
+	0xFF8,		/* maximum interrupt throttle rate */
+	0,		/* minimum interrupt throttle rate */
+	0x200,		/* default interrupt throttle rate */
+	64,		/* maximum total msix vectors */
+	16,		/* maximum number of ring vectors */
+	2,		/* maximum number of other vectors */
+	IXGBE_EICR_LSC,	/* "other" interrupt types handled */
+	0,		/* "other" interrupt types enable mask */
+	(IXGBE_FLAG_RSS_CAPABLE
 	| IXGBE_FLAG_VMDQ_CAPABLE
 	| IXGBE_FLAG_RSC_CAPABLE) /* capability flags */
 };
@@ -426,7 +452,7 @@ ixgbe_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	ddi_set_driver_private(devinfo, ixgbe);
 
 	/*
-	 * Initialize for fma support
+	 * Initialize for FMA support
 	 */
 	ixgbe->fm_capabilities = ixgbe_get_prop(ixgbe, PROP_FM_CAPABLE,
 	    0, 0x0f, DDI_FM_EREPORT_CAPABLE | DDI_FM_ACCCHK_CAPABLE |
@@ -535,6 +561,17 @@ ixgbe_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	ixgbe->attach_progress |= ATTACH_PROGRESS_OVERTEMP_TASKQ;
 
 	/*
+	 * Create a taskq for processing external PHY interrupts
+	 */
+	(void) sprintf(taskqname, "ixgbe%d_phy_taskq", instance);
+	if ((ixgbe->phy_taskq = ddi_taskq_create(devinfo, taskqname,
+	    1, TASKQ_DEFAULTPRI, 0)) == NULL) {
+		ixgbe_error(ixgbe, "phy_taskq create failed");
+		goto attach_fail;
+	}
+	ixgbe->attach_progress |= ATTACH_PROGRESS_PHY_TASKQ;
+
+	/*
 	 * Initialize driver parameters
 	 */
 	if (ixgbe_init_driver_settings(ixgbe) != IXGBE_SUCCESS) {
@@ -567,6 +604,11 @@ ixgbe_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 		ddi_fm_service_impact(ixgbe->dip, DDI_SERVICE_LOST);
 		goto attach_fail;
 	}
+
+	/*
+	 * Initialize adapter capabilities
+	 */
+	ixgbe_init_params(ixgbe);
 
 	/*
 	 * Initialize statistics
@@ -605,7 +647,7 @@ ixgbe_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	}
 	ixgbe->attach_progress |= ATTACH_PROGRESS_ENABLE_INTR;
 
-	ixgbe_log(ixgbe, "%s, %s", ixgbe_ident, ixgbe_version);
+	ixgbe_log(ixgbe, "%s", ixgbe_ident);
 	atomic_or_32(&ixgbe->ixgbe_state, IXGBE_INITIALIZED);
 
 	return (DDI_SUCCESS);
@@ -788,6 +830,13 @@ ixgbe_unconfigure(dev_info_t *devinfo, ixgbe_t *ixgbe)
 	}
 
 	/*
+	 * Remove taskq for external PHYs
+	 */
+	if (ixgbe->attach_progress & ATTACH_PROGRESS_PHY_TASKQ) {
+		ddi_taskq_destroy(ixgbe->phy_taskq);
+	}
+
+	/*
 	 * Remove interrupts
 	 */
 	if (ixgbe->attach_progress & ATTACH_PROGRESS_ALLOC_INTR) {
@@ -957,6 +1006,25 @@ ixgbe_identify_hardware(ixgbe_t *ixgbe)
 		 */
 		break;
 
+	case ixgbe_mac_X550:
+	case ixgbe_mac_X550EM_x:
+		IXGBE_DEBUGLOG_0(ixgbe, "identify X550 adapter\n");
+		ixgbe->capab = &ixgbe_X550_cap;
+
+		if (hw->device_id == IXGBE_DEV_ID_X550EM_X_SFP)
+			ixgbe->capab->flags |= IXGBE_FLAG_SFP_PLUG_CAPABLE;
+
+		/*
+		 * Link detection on X552 SFP+ and X552/X557-AT
+		 */
+		if (hw->device_id == IXGBE_DEV_ID_X550EM_X_SFP ||
+		    hw->device_id == IXGBE_DEV_ID_X550EM_X_10G_T) {
+			ixgbe->capab->other_intr |=
+			    IXGBE_EIMS_GPI_SDP0_BY_MAC(hw);
+			ixgbe->capab->other_gpie |= IXGBE_SDP0_GPIEN_X540;
+		}
+		break;
+
 	default:
 		IXGBE_DEBUGLOG_1(ixgbe,
 		    "adapter not supported in ixgbe_identify_hardware(): %d\n",
@@ -1011,8 +1079,6 @@ ixgbe_init_properties(ixgbe_t *ixgbe)
 	 * jumbo frames, ring number, descriptor number, etc.
 	 */
 	ixgbe_get_conf(ixgbe);
-
-	ixgbe_init_params(ixgbe);
 }
 
 /*
@@ -1247,16 +1313,52 @@ ixgbe_init(ixgbe_t *ixgbe)
 {
 	struct ixgbe_hw *hw = &ixgbe->hw;
 	u8 pbanum[IXGBE_PBANUM_LENGTH];
+	int rv;
 
 	mutex_enter(&ixgbe->gen_lock);
 
 	/*
-	 * Reset chipset to put the hardware in a known state
-	 * before we try to do anything with the eeprom.
+	 * Configure/Initialize hardware
 	 */
-	if (ixgbe_reset_hw(hw) != IXGBE_SUCCESS) {
-		ixgbe_fm_ereport(ixgbe, DDI_FM_DEVICE_INVAL_STATE);
-		goto init_fail;
+	rv = ixgbe_init_hw(hw);
+	if (rv != IXGBE_SUCCESS) {
+		switch (rv) {
+
+		/*
+		 * The first three errors are not prohibitive to us progressing
+		 * further, and are maily advisory in nature. In the case of a
+		 * SFP module not being present or not deemed supported by the
+		 * common code, we adivse the operator of this fact but carry on
+		 * instead of failing hard, as SFPs can be inserted or replaced
+		 * while the driver is running. In the case of a unknown error,
+		 * we fail-hard, logging the reason and emitting a FMA event.
+		 */
+		case IXGBE_ERR_EEPROM_VERSION:
+			ixgbe_error(ixgbe,
+			    "This Intel 10Gb Ethernet device is pre-release and"
+			    " contains outdated firmware. Please contact your"
+			    " hardware vendor for a replacement.");
+			break;
+		case IXGBE_ERR_SFP_NOT_PRESENT:
+			ixgbe_error(ixgbe,
+			    "No SFP+ module detected on this interface. Please "
+			    "install a supported SFP+ module for this "
+			    "interface to become operational.");
+			break;
+		case IXGBE_ERR_SFP_NOT_SUPPORTED:
+			ixgbe_error(ixgbe,
+			    "Unsupported SFP+ module detected. Please replace "
+			    "it with a supported SFP+ module per Intel "
+			    "documentation, or bypass this check with "
+			    "allow_unsupported_sfp=1 in ixgbe.conf.");
+			break;
+		default:
+			ixgbe_error(ixgbe,
+			    "Failed to initialize hardware. ixgbe_init_hw "
+			    "returned %d", rv);
+			ixgbe_fm_ereport(ixgbe, DDI_FM_DEVICE_INVAL_STATE);
+			goto init_fail;
+		}
 	}
 
 	/*
@@ -1295,6 +1397,11 @@ ixgbe_init(ixgbe_t *ixgbe)
 	hw->fc.low_water[0] = DEFAULT_FCRTL;
 	hw->fc.pause_time = DEFAULT_FCPAUSE;
 	hw->fc.send_xon = B_TRUE;
+
+	/*
+	 * Initialize flow control
+	 */
+	(void) ixgbe_start_hw(hw);
 
 	/*
 	 * Initialize link settings
@@ -1344,7 +1451,7 @@ static int
 ixgbe_chip_start(ixgbe_t *ixgbe)
 {
 	struct ixgbe_hw *hw = &ixgbe->hw;
-	int ret_val, i;
+	int i;
 
 	ASSERT(mutex_owned(&ixgbe->gen_lock));
 
@@ -1364,22 +1471,6 @@ ixgbe_chip_start(ixgbe_t *ixgbe)
 	if (!is_valid_mac_addr(hw->mac.addr)) {
 		ixgbe_error(ixgbe, "Invalid mac address");
 		return (IXGBE_FAILURE);
-	}
-
-	/*
-	 * Configure/Initialize hardware
-	 */
-	ret_val = ixgbe_init_hw(hw);
-	if (ret_val != IXGBE_SUCCESS) {
-		if (ret_val == IXGBE_ERR_EEPROM_VERSION) {
-			ixgbe_error(ixgbe,
-			    "This 82599 device is pre-release and contains"
-			    " outdated firmware, please contact your hardware"
-			    " vendor for a replacement.");
-		} else {
-			ixgbe_error(ixgbe, "Failed to initialize hardware");
-			return (IXGBE_FAILURE);
-		}
 	}
 
 	/*
@@ -1412,7 +1503,33 @@ ixgbe_chip_start(ixgbe_t *ixgbe)
 	}
 
 	/*
-	 * Save the state of the phy
+	 * Disable Wake-on-LAN
+	 */
+	IXGBE_WRITE_REG(hw, IXGBE_WUC, 0);
+
+	/*
+	 * Some adapters offer Energy Efficient Ethernet (EEE) support.
+	 * Due to issues with EEE in e1000g/igb, we disable this by default
+	 * as a precautionary measure.
+	 *
+	 * Currently, the only known adapter which supports EEE in the ixgbe
+	 * line is 8086,15AB (IXGBE_DEV_ID_X550EM_X_KR), and only after the
+	 * first revision of it, as well as any X550 with MAC type 6 (non-EM)
+	 */
+	(void) ixgbe_setup_eee(hw, B_FALSE);
+
+	/*
+	 * Turn on any present SFP Tx laser
+	 */
+	ixgbe_enable_tx_laser(hw);
+
+	/*
+	 * Power on the PHY
+	 */
+	(void) ixgbe_set_phy_power(hw, B_TRUE);
+
+	/*
+	 * Save the state of the PHY
 	 */
 	ixgbe_get_hw_state(ixgbe);
 
@@ -1431,13 +1548,15 @@ static void
 ixgbe_chip_stop(ixgbe_t *ixgbe)
 {
 	struct ixgbe_hw *hw = &ixgbe->hw;
+	int rv;
 
 	ASSERT(mutex_owned(&ixgbe->gen_lock));
 
 	/*
-	 * Tell firmware driver is no longer in control
+	 * Stop interupt generation and disable Tx unit
 	 */
-	ixgbe_release_driver_control(hw);
+	hw->adapter_stopped = B_FALSE;
+	(void) ixgbe_stop_adapter(hw);
 
 	/*
 	 * Reset the chipset
@@ -1448,6 +1567,32 @@ ixgbe_chip_stop(ixgbe_t *ixgbe)
 	 * Reset PHY
 	 */
 	(void) ixgbe_reset_phy(hw);
+
+	/*
+	 * Enter LPLU (Low Power, Link Up) mode, if available. Avoid resetting
+	 * the PHY while doing so. Else, just power down the PHY.
+	 */
+	if (hw->phy.ops.enter_lplu != NULL) {
+		hw->phy.reset_disable = B_TRUE;
+		rv = hw->phy.ops.enter_lplu(hw);
+		if (rv != IXGBE_SUCCESS)
+			ixgbe_error(ixgbe, "Error while entering LPLU: %d", rv);
+		hw->phy.reset_disable = B_FALSE;
+	} else {
+		(void) ixgbe_set_phy_power(hw, B_FALSE);
+	}
+
+	/*
+	 * Turn off any present SFP Tx laser
+	 * Expected for health and safety reasons
+	 */
+	ixgbe_disable_tx_laser(hw);
+
+	/*
+	 * Tell firmware driver is no longer in control
+	 */
+	ixgbe_release_driver_control(hw);
+
 }
 
 /*
@@ -1649,6 +1794,7 @@ ixgbe_rx_drain(ixgbe_t *ixgbe)
 int
 ixgbe_start(ixgbe_t *ixgbe, boolean_t alloc_buffer)
 {
+	struct ixgbe_hw *hw = &ixgbe->hw;
 	int i;
 
 	ASSERT(mutex_owned(&ixgbe->gen_lock));
@@ -1682,6 +1828,24 @@ ixgbe_start(ixgbe_t *ixgbe, boolean_t alloc_buffer)
 	if (ixgbe_chip_start(ixgbe) != IXGBE_SUCCESS) {
 		ixgbe_fm_ereport(ixgbe, DDI_FM_DEVICE_INVAL_STATE);
 		goto start_failure;
+	}
+
+	/*
+	 * Configure link now for X550
+	 *
+	 * X550 possesses a LPLU (Low-Power Link Up) mode which keeps the
+	 * resting state of the adapter at a 1Gb FDX speed. Prior to the X550,
+	 * the resting state of the link would be the maximum speed that
+	 * autonegotiation will allow (usually 10Gb, infrastructure allowing)
+	 * so we never bothered with explicitly setting the link to 10Gb as it
+	 * would already be at that state on driver attach. With X550, we must
+	 * trigger a re-negotiation of the link in order to switch from a LPLU
+	 * 1Gb link to 10Gb (cable and link partner permitting.)
+	 */
+	if (hw->mac.type == ixgbe_mac_X550 ||
+	    hw->mac.type == ixgbe_mac_X550EM_x) {
+		(void) ixgbe_driver_setup_link(ixgbe, B_TRUE);
+		ixgbe_get_hw_state(ixgbe);
 	}
 
 	if (ixgbe_check_acc_handle(ixgbe->osdep.reg_handle) != DDI_FM_OK) {
@@ -2191,14 +2355,16 @@ ixgbe_setup_rx_ring(ixgbe_rx_ring_t *rx_ring)
 	reg_val = IXGBE_READ_REG(hw, IXGBE_RXDCTL(rx_ring->hw_index));
 	reg_val |= IXGBE_RXDCTL_ENABLE;	/* enable queue */
 
-	/* Not a valid value for 82599 or X540 */
+	/* Not a valid value for 82599, X540 or X550 */
 	if (hw->mac.type == ixgbe_mac_82598EB) {
 		reg_val |= 0x0020;	/* pthresh */
 	}
 	IXGBE_WRITE_REG(hw, IXGBE_RXDCTL(rx_ring->hw_index), reg_val);
 
 	if (hw->mac.type == ixgbe_mac_82599EB ||
-	    hw->mac.type == ixgbe_mac_X540) {
+	    hw->mac.type == ixgbe_mac_X540 ||
+	    hw->mac.type == ixgbe_mac_X550 ||
+	    hw->mac.type == ixgbe_mac_X550EM_x) {
 		reg_val = IXGBE_READ_REG(hw, IXGBE_RDRXCTL);
 		reg_val |= (IXGBE_RDRXCTL_CRCSTRIP | IXGBE_RDRXCTL_AGGDIS);
 		IXGBE_WRITE_REG(hw, IXGBE_RDRXCTL, reg_val);
@@ -2224,6 +2390,12 @@ ixgbe_setup_rx(ixgbe_t *ixgbe)
 	uint32_t i, index;
 	uint32_t psrtype_rss_bit;
 
+	/*
+	 * Ensure that Rx is disabled while setting up
+	 * the Rx unit and Rx descriptor ring(s)
+	 */
+	ixgbe_disable_rx(hw);
+
 	/* PSRTYPE must be configured for 82599 */
 	if (ixgbe->classify_mode != IXGBE_CLASSIFY_VMDQ &&
 	    ixgbe->classify_mode != IXGBE_CLASSIFY_VMDQ_RSS) {
@@ -2248,20 +2420,24 @@ ixgbe_setup_rx(ixgbe_t *ixgbe)
 	}
 
 	/*
-	 * Set filter control in FCTRL to accept broadcast packets and do
-	 * not pass pause frames to host.  Flow control settings are already
-	 * in this register, so preserve them.
+	 * Set filter control in FCTRL to determine types of packets are passed
+	 * up to the driver.
+	 * - Pass broadcast packets.
+	 * - Do not pass flow control pause frames (82598-specific)
 	 */
 	reg_val = IXGBE_READ_REG(hw, IXGBE_FCTRL);
-	reg_val |= IXGBE_FCTRL_BAM;	/* broadcast accept mode */
-	reg_val |= IXGBE_FCTRL_DPF;	/* discard pause frames */
+	reg_val |= IXGBE_FCTRL_BAM; /* Broadcast Accept Mode */
+	if (hw->mac.type == ixgbe_mac_82598EB) {
+		reg_val |= IXGBE_FCTRL_DPF; /* Discard Pause Frames */
+	}
 	IXGBE_WRITE_REG(hw, IXGBE_FCTRL, reg_val);
 
 	/*
 	 * Hardware checksum settings
 	 */
 	if (ixgbe->rx_hcksum_enable) {
-		reg_val = IXGBE_RXCSUM_IPPCSE;	/* IP checksum */
+		reg_val = IXGBE_READ_REG(hw, IXGBE_RXCSUM);
+		reg_val |= IXGBE_RXCSUM_IPPCSE;	/* IP checksum */
 		IXGBE_WRITE_REG(hw, IXGBE_RXCSUM, reg_val);
 	}
 
@@ -2299,11 +2475,14 @@ ixgbe_setup_rx(ixgbe_t *ixgbe)
 
 	/*
 	 * Enable the receive unit.  This must be done after filter
-	 * control is set in FCTRL.
+	 * control is set in FCTRL. On 82598, we disable the descriptor monitor.
+	 * 82598 is the only adapter which defines this RXCTRL option.
 	 */
-	reg_val = (IXGBE_RXCTRL_RXEN	/* Enable Receive Unit */
-	    | IXGBE_RXCTRL_DMBYPS);	/* descriptor monitor bypass */
-	IXGBE_WRITE_REG(hw, IXGBE_RXCTRL, reg_val);
+	reg_val = IXGBE_READ_REG(hw, IXGBE_RXCTRL);
+	if (hw->mac.type == ixgbe_mac_82598EB)
+		reg_val |= IXGBE_RXCTRL_DMBYPS; /* descriptor monitor bypass */
+	reg_val |= IXGBE_RXCTRL_RXEN;
+	(void) ixgbe_enable_rx_dma(hw, reg_val);
 
 	/*
 	 * ixgbe_setup_rx_ring must be called after configuring RXCTRL
@@ -2330,18 +2509,21 @@ ixgbe_setup_rx(ixgbe_t *ixgbe)
 	 * ethernet header and frame check sequence.
 	 * Register is MAXFRS in 82599.
 	 */
-	reg_val = (ixgbe->default_mtu + sizeof (struct ether_header)
+	reg_val = IXGBE_READ_REG(hw, IXGBE_MHADD);
+	reg_val &= ~IXGBE_MHADD_MFS_MASK;
+	reg_val |= (ixgbe->default_mtu + sizeof (struct ether_header)
 	    + ETHERFCSL) << IXGBE_MHADD_MFS_SHIFT;
 	IXGBE_WRITE_REG(hw, IXGBE_MHADD, reg_val);
 
 	/*
 	 * Setup Jumbo Frame enable bit
 	 */
-	if (ixgbe->default_mtu > ETHERMTU) {
-		reg_val = IXGBE_READ_REG(hw, IXGBE_HLREG0);
+	reg_val = IXGBE_READ_REG(hw, IXGBE_HLREG0);
+	if (ixgbe->default_mtu > ETHERMTU)
 		reg_val |= IXGBE_HLREG0_JUMBOEN;
-		IXGBE_WRITE_REG(hw, IXGBE_HLREG0, reg_val);
-	}
+	else
+		reg_val &= ~IXGBE_HLREG0_JUMBOEN;
+	IXGBE_WRITE_REG(hw, IXGBE_HLREG0, reg_val);
 
 	/*
 	 * Setup RSC for multiple receive queues.
@@ -2496,6 +2678,8 @@ ixgbe_setup_tx(ixgbe_t *ixgbe)
 
 			case ixgbe_mac_82599EB:
 			case ixgbe_mac_X540:
+			case ixgbe_mac_X550:
+			case ixgbe_mac_X550EM_x:
 				IXGBE_WRITE_REG(hw, IXGBE_TQSM(i >> 2),
 				    ring_mapping);
 				break;
@@ -2515,6 +2699,8 @@ ixgbe_setup_tx(ixgbe_t *ixgbe)
 
 		case ixgbe_mac_82599EB:
 		case ixgbe_mac_X540:
+		case ixgbe_mac_X550:
+		case ixgbe_mac_X550EM_x:
 			IXGBE_WRITE_REG(hw, IXGBE_TQSM(i >> 2), ring_mapping);
 			break;
 
@@ -2531,10 +2717,12 @@ ixgbe_setup_tx(ixgbe_t *ixgbe)
 	IXGBE_WRITE_REG(hw, IXGBE_HLREG0, reg_val);
 
 	/*
-	 * enable DMA for 82599 and X540 parts
+	 * enable DMA for 82599, X540 and X550 parts
 	 */
 	if (hw->mac.type == ixgbe_mac_82599EB ||
-	    hw->mac.type == ixgbe_mac_X540) {
+	    hw->mac.type == ixgbe_mac_X540 ||
+	    hw->mac.type == ixgbe_mac_X550 ||
+	    hw->mac.type == ixgbe_mac_X550EM_x) {
 		/* DMATXCTL.TE must be set after all Tx config is complete */
 		reg_val = IXGBE_READ_REG(hw, IXGBE_DMATXCTL);
 		reg_val |= IXGBE_DMATXCTL_TE;
@@ -2568,32 +2756,12 @@ static void
 ixgbe_setup_rss(ixgbe_t *ixgbe)
 {
 	struct ixgbe_hw *hw = &ixgbe->hw;
-	uint32_t i, mrqc, rxcsum;
-	uint32_t random;
-	uint32_t reta;
-	uint32_t ring_per_group;
+	uint32_t mrqc;
 
 	/*
-	 * Fill out redirection table
+	 * Initialize RETA/ERETA table
 	 */
-	reta = 0;
-	ring_per_group = ixgbe->num_rx_rings / ixgbe->num_rx_groups;
-
-	for (i = 0; i < 128; i++) {
-		reta = (reta << 8) | (i % ring_per_group) |
-		    ((i % ring_per_group) << 4);
-		if ((i & 3) == 3)
-			IXGBE_WRITE_REG(hw, IXGBE_RETA(i >> 2), reta);
-	}
-
-	/*
-	 * Fill out hash function seeds with a random constant
-	 */
-	for (i = 0; i < 10; i++) {
-		(void) random_get_pseudo_bytes((uint8_t *)&random,
-		    sizeof (uint32_t));
-		IXGBE_WRITE_REG(hw, IXGBE_RSSRK(i), random);
-	}
+	ixgbe_setup_rss_table(ixgbe);
 
 	/*
 	 * Enable RSS & perform hash on these packet types
@@ -2609,16 +2777,6 @@ ixgbe_setup_rss(ixgbe_t *ixgbe)
 	    IXGBE_MRQC_RSS_FIELD_IPV6_UDP |
 	    IXGBE_MRQC_RSS_FIELD_IPV6_EX_UDP;
 	IXGBE_WRITE_REG(hw, IXGBE_MRQC, mrqc);
-
-	/*
-	 * Disable Packet Checksum to enable RSS for multiple receive queues.
-	 * It is an adapter hardware limitation that Packet Checksum is
-	 * mutually exclusive with RSS.
-	 */
-	rxcsum = IXGBE_READ_REG(hw, IXGBE_RXCSUM);
-	rxcsum |= IXGBE_RXCSUM_PCSD;
-	rxcsum &= ~IXGBE_RXCSUM_IPPCSE;
-	IXGBE_WRITE_REG(hw, IXGBE_RXCSUM, rxcsum);
 }
 
 /*
@@ -2647,6 +2805,8 @@ ixgbe_setup_vmdq(ixgbe_t *ixgbe)
 
 	case ixgbe_mac_82599EB:
 	case ixgbe_mac_X540:
+	case ixgbe_mac_X550:
+	case ixgbe_mac_X550EM_x:
 		/*
 		 * Enable VMDq-only.
 		 */
@@ -2683,32 +2843,13 @@ static void
 ixgbe_setup_vmdq_rss(ixgbe_t *ixgbe)
 {
 	struct ixgbe_hw *hw = &ixgbe->hw;
-	uint32_t i, mrqc, rxcsum;
-	uint32_t random;
-	uint32_t reta;
-	uint32_t ring_per_group;
-	uint32_t vmdctl, vtctl;
+	uint32_t i, mrqc;
+	uint32_t vtctl, vmdctl;
 
 	/*
-	 * Fill out redirection table
+	 * Initialize RETA/ERETA table
 	 */
-	reta = 0;
-	ring_per_group = ixgbe->num_rx_rings / ixgbe->num_rx_groups;
-	for (i = 0; i < 128; i++) {
-		reta = (reta << 8) | (i % ring_per_group) |
-		    ((i % ring_per_group) << 4);
-		if ((i & 3) == 3)
-			IXGBE_WRITE_REG(hw, IXGBE_RETA(i >> 2), reta);
-	}
-
-	/*
-	 * Fill out hash function seeds with a random constant
-	 */
-	for (i = 0; i < 10; i++) {
-		(void) random_get_pseudo_bytes((uint8_t *)&random,
-		    sizeof (uint32_t));
-		IXGBE_WRITE_REG(hw, IXGBE_RSSRK(i), random);
-	}
+	ixgbe_setup_rss_table(ixgbe);
 
 	/*
 	 * Enable and setup RSS and VMDq
@@ -2741,6 +2882,8 @@ ixgbe_setup_vmdq_rss(ixgbe_t *ixgbe)
 
 	case ixgbe_mac_82599EB:
 	case ixgbe_mac_X540:
+	case ixgbe_mac_X550:
+	case ixgbe_mac_X550EM_x:
 		/*
 		 * Enable RSS & Setup RSS Hash functions
 		 */
@@ -2776,18 +2919,10 @@ ixgbe_setup_vmdq_rss(ixgbe_t *ixgbe)
 
 	}
 
-	/*
-	 * Disable Packet Checksum to enable RSS for multiple receive queues.
-	 * It is an adapter hardware limitation that Packet Checksum is
-	 * mutually exclusive with RSS.
-	 */
-	rxcsum = IXGBE_READ_REG(hw, IXGBE_RXCSUM);
-	rxcsum |= IXGBE_RXCSUM_PCSD;
-	rxcsum &= ~IXGBE_RXCSUM_IPPCSE;
-	IXGBE_WRITE_REG(hw, IXGBE_RXCSUM, rxcsum);
-
 	if (hw->mac.type == ixgbe_mac_82599EB ||
-	    hw->mac.type == ixgbe_mac_X540) {
+	    hw->mac.type == ixgbe_mac_X540 ||
+	    hw->mac.type == ixgbe_mac_X550 ||
+	    hw->mac.type == ixgbe_mac_X550EM_x) {
 		/*
 		 * Enable Virtualization and Replication.
 		 */
@@ -2800,6 +2935,99 @@ ixgbe_setup_vmdq_rss(ixgbe_t *ixgbe)
 		IXGBE_WRITE_REG(hw, IXGBE_VFRE(0), IXGBE_VFRE_ENABLE_ALL);
 		IXGBE_WRITE_REG(hw, IXGBE_VFRE(1), IXGBE_VFRE_ENABLE_ALL);
 	}
+}
+
+/*
+ * ixgbe_setup_rss_table - Setup RSS table
+ */
+static void
+ixgbe_setup_rss_table(ixgbe_t *ixgbe)
+{
+	struct ixgbe_hw *hw = &ixgbe->hw;
+	uint32_t i, j;
+	uint32_t random;
+	uint32_t reta;
+	uint32_t ring_per_group;
+	uint32_t ring;
+	uint32_t table_size;
+	uint32_t index_mult;
+	uint32_t rxcsum;
+
+	/*
+	 * Set multiplier for RETA setup and table size based on MAC type.
+	 * RETA table sizes vary by model:
+	 *
+	 * 82598, 82599, X540: 128 table entries.
+	 * X550: 512 table entries.
+	 */
+	index_mult = 0x1;
+	table_size = 128;
+	switch (ixgbe->hw.mac.type) {
+	case ixgbe_mac_82598EB:
+		index_mult = 0x11;
+		break;
+	case ixgbe_mac_X550:
+	case ixgbe_mac_X550EM_x:
+		table_size = 512;
+		break;
+	default:
+		break;
+	}
+
+	/*
+	 * Fill out RSS redirection table. The configuation of the indices is
+	 * hardware-dependent.
+	 *
+	 *  82598: 8 bits wide containing two 4 bit RSS indices
+	 *  82599, X540: 8 bits wide containing one 4 bit RSS index
+	 *  X550: 8 bits wide containing one 6 bit RSS index
+	 */
+	reta = 0;
+	ring_per_group = ixgbe->num_rx_rings / ixgbe->num_rx_groups;
+
+	for (i = 0, j = 0; i < table_size; i++, j++) {
+		if (j == ring_per_group) j = 0;
+
+		/*
+		 * The low 8 bits are for hash value (n+0);
+		 * The next 8 bits are for hash value (n+1), etc.
+		 */
+		ring = (j * index_mult);
+		reta = reta >> 8;
+		reta = reta | (((uint32_t)ring) << 24);
+
+		if ((i & 3) == 3)
+			/*
+			 * The first 128 table entries are programmed into the
+			 * RETA register, with any beyond that (eg; on X550)
+			 * into ERETA.
+			 */
+			if (i < 128)
+				IXGBE_WRITE_REG(hw, IXGBE_RETA(i >> 2), reta);
+			else
+				IXGBE_WRITE_REG(hw, IXGBE_ERETA((i >> 2) - 32),
+				    reta);
+			reta = 0;
+	}
+
+	/*
+	 * Fill out hash function seeds with a random constant
+	 */
+	for (i = 0; i < 10; i++) {
+		(void) random_get_pseudo_bytes((uint8_t *)&random,
+		    sizeof (uint32_t));
+		IXGBE_WRITE_REG(hw, IXGBE_RSSRK(i), random);
+	}
+
+	/*
+	 * Disable Packet Checksum to enable RSS for multiple receive queues.
+	 * It is an adapter hardware limitation that Packet Checksum is
+	 * mutually exclusive with RSS.
+	 */
+	rxcsum = IXGBE_READ_REG(hw, IXGBE_RXCSUM);
+	rxcsum |= IXGBE_RXCSUM_PCSD;
+	rxcsum &= ~IXGBE_RXCSUM_IPPCSE;
+	IXGBE_WRITE_REG(hw, IXGBE_RXCSUM, rxcsum);
 }
 
 /*
@@ -2999,6 +3227,8 @@ ixgbe_setup_vmdq_rss_conf(ixgbe_t *ixgbe)
 
 	case ixgbe_mac_82599EB:
 	case ixgbe_mac_X540:
+	case ixgbe_mac_X550:
+	case ixgbe_mac_X550EM_x:
 		/*
 		 * 82599 supports the following combination:
 		 * vmdq no. x rss no.
@@ -3008,7 +3238,7 @@ ixgbe_setup_vmdq_rss_conf(ixgbe_t *ixgbe)
 		 * However 8 rss queue per pool (vmdq) is sufficient for
 		 * most cases.
 		 *
-		 * For now, treat X540 like the 82599.
+		 * For now, treat X540 and X550 like the 82599.
 		 */
 		ring_per_group = ixgbe->num_rx_rings / ixgbe->num_rx_groups;
 		if (ixgbe->num_rx_groups == 1) {
@@ -3171,9 +3401,11 @@ ixgbe_get_conf(ixgbe_t *ixgbe)
 	ixgbe->relax_order_enable = ixgbe_get_prop(ixgbe,
 	    PROP_RELAX_ORDER_ENABLE, 0, 1, DEFAULT_RELAX_ORDER_ENABLE);
 
-	/* Head Write Back not recommended for 82599 and X540 */
+	/* Head Write Back not recommended for 82599, X540 and X550 */
 	if (hw->mac.type == ixgbe_mac_82599EB ||
-	    hw->mac.type == ixgbe_mac_X540) {
+	    hw->mac.type == ixgbe_mac_X540 ||
+	    hw->mac.type == ixgbe_mac_X550 ||
+	    hw->mac.type == ixgbe_mac_X550EM_x) {
 		ixgbe->tx_head_wb_enable = B_FALSE;
 	}
 
@@ -3196,7 +3428,7 @@ ixgbe_get_conf(ixgbe_t *ixgbe)
 	}
 
 	/*
-	 * ixgbe LRO only been supported by 82599 and X540 now
+	 * ixgbe LRO only supported by 82599, X540 and X550
 	 */
 	if (hw->mac.type == ixgbe_mac_82598EB) {
 		ixgbe->lro_enable = B_FALSE;
@@ -3226,11 +3458,13 @@ ixgbe_get_conf(ixgbe_t *ixgbe)
 	    ixgbe->capab->max_intr_throttle,
 	    ixgbe->capab->def_intr_throttle);
 	/*
-	 * 82599 and X540 require the interrupt throttling rate is
-	 * a multiple of 8. This is enforced by the register
-	 * definiton.
+	 * 82599, X540 and X550 require the interrupt throttling rate is
+	 * a multiple of 8. This is enforced by the register definiton.
 	 */
-	if (hw->mac.type == ixgbe_mac_82599EB || hw->mac.type == ixgbe_mac_X540)
+	if (hw->mac.type == ixgbe_mac_82599EB ||
+	    hw->mac.type == ixgbe_mac_X540 ||
+	    hw->mac.type == ixgbe_mac_X550 ||
+	    hw->mac.type == ixgbe_mac_X550EM_x)
 		ixgbe->intr_throttling[0] = ixgbe->intr_throttling[0] & 0xFF8;
 
 	hw->allow_unsupported_sfp = ixgbe_get_prop(ixgbe,
@@ -3240,12 +3474,81 @@ ixgbe_get_conf(ixgbe_t *ixgbe)
 static void
 ixgbe_init_params(ixgbe_t *ixgbe)
 {
-	ixgbe->param_en_10000fdx_cap = 1;
-	ixgbe->param_en_1000fdx_cap = 1;
-	ixgbe->param_en_100fdx_cap = 1;
-	ixgbe->param_adv_10000fdx_cap = 1;
-	ixgbe->param_adv_1000fdx_cap = 1;
-	ixgbe->param_adv_100fdx_cap = 1;
+	struct ixgbe_hw *hw = &ixgbe->hw;
+	ixgbe_link_speed speeds_supported = 0;
+	boolean_t negotiate;
+
+	/*
+	 * Get a list of speeds the adapter supports. If the hw struct hasn't
+	 * been populated with this information yet, retrieve it from the
+	 * adapter and save it to our own variable.
+	 *
+	 * On certain adapters, such as ones which use SFPs, the contents of
+	 * hw->phy.speeds_supported (and hw->phy.autoneg_advertised) are not
+	 * updated, so we must rely on calling ixgbe_get_link_capabilities()
+	 * in order to ascertain the speeds which we are capable of supporting,
+	 * and in the case of SFP-equipped adapters, which speed we are
+	 * advertising. If ixgbe_get_link_capabilities() fails for some reason,
+	 * we'll go with a default list of speeds as a last resort.
+	 */
+	speeds_supported = hw->phy.speeds_supported;
+
+	if (speeds_supported == 0) {
+		if (ixgbe_get_link_capabilities(hw, &speeds_supported,
+		    &negotiate) != IXGBE_SUCCESS) {
+			if (hw->mac.type == ixgbe_mac_82598EB) {
+				speeds_supported =
+				    IXGBE_LINK_SPEED_82598_AUTONEG;
+			} else {
+				speeds_supported =
+				    IXGBE_LINK_SPEED_82599_AUTONEG;
+			}
+		}
+	}
+	ixgbe->speeds_supported = speeds_supported;
+
+	/*
+	 * By default, all supported speeds are enabled and advertised.
+	 */
+	if (speeds_supported & IXGBE_LINK_SPEED_10GB_FULL) {
+		ixgbe->param_en_10000fdx_cap = 1;
+		ixgbe->param_adv_10000fdx_cap = 1;
+	} else {
+		ixgbe->param_en_10000fdx_cap = 0;
+		ixgbe->param_adv_10000fdx_cap = 0;
+	}
+
+	if (speeds_supported & IXGBE_LINK_SPEED_5GB_FULL) {
+		ixgbe->param_en_5000fdx_cap = 1;
+		ixgbe->param_adv_5000fdx_cap = 1;
+	} else {
+		ixgbe->param_en_5000fdx_cap = 0;
+		ixgbe->param_adv_5000fdx_cap = 0;
+	}
+
+	if (speeds_supported & IXGBE_LINK_SPEED_2_5GB_FULL) {
+		ixgbe->param_en_2500fdx_cap = 1;
+		ixgbe->param_adv_2500fdx_cap = 1;
+	} else {
+		ixgbe->param_en_2500fdx_cap = 0;
+		ixgbe->param_adv_2500fdx_cap = 0;
+	}
+
+	if (speeds_supported & IXGBE_LINK_SPEED_1GB_FULL) {
+		ixgbe->param_en_1000fdx_cap = 1;
+		ixgbe->param_adv_1000fdx_cap = 1;
+	} else {
+		ixgbe->param_en_1000fdx_cap = 0;
+		ixgbe->param_adv_1000fdx_cap = 0;
+	}
+
+	if (speeds_supported & IXGBE_LINK_SPEED_100_FULL) {
+		ixgbe->param_en_100fdx_cap = 1;
+		ixgbe->param_adv_100fdx_cap = 1;
+	} else {
+		ixgbe->param_en_100fdx_cap = 0;
+		ixgbe->param_adv_100fdx_cap = 0;
+	}
 
 	ixgbe->param_pause_cap = 1;
 	ixgbe->param_asym_pause_cap = 1;
@@ -3257,6 +3560,8 @@ ixgbe_init_params(ixgbe_t *ixgbe)
 	ixgbe->param_adv_rem_fault = 0;
 
 	ixgbe->param_lp_10000fdx_cap = 0;
+	ixgbe->param_lp_5000fdx_cap = 0;
+	ixgbe->param_lp_2500fdx_cap = 0;
 	ixgbe->param_lp_1000fdx_cap = 0;
 	ixgbe->param_lp_100fdx_cap = 0;
 	ixgbe->param_lp_autoneg_cap = 0;
@@ -3304,32 +3609,43 @@ ixgbe_get_prop(ixgbe_t *ixgbe,
 int
 ixgbe_driver_setup_link(ixgbe_t *ixgbe, boolean_t setup_hw)
 {
-	u32 autoneg_advertised = 0;
+	struct ixgbe_hw *hw = &ixgbe->hw;
+	ixgbe_link_speed advertised = 0;
 
 	/*
-	 * No half duplex support with 10Gb parts
+	 * Assemble a list of enabled speeds to auto-negotiate with.
 	 */
-	if (ixgbe->param_adv_10000fdx_cap == 1)
-		autoneg_advertised |= IXGBE_LINK_SPEED_10GB_FULL;
+	if (ixgbe->param_en_10000fdx_cap == 1)
+		advertised |= IXGBE_LINK_SPEED_10GB_FULL;
 
-	if (ixgbe->param_adv_1000fdx_cap == 1)
-		autoneg_advertised |= IXGBE_LINK_SPEED_1GB_FULL;
+	if (ixgbe->param_en_5000fdx_cap == 1)
+		advertised |= IXGBE_LINK_SPEED_5GB_FULL;
 
-	if (ixgbe->param_adv_100fdx_cap == 1)
-		autoneg_advertised |= IXGBE_LINK_SPEED_100_FULL;
+	if (ixgbe->param_en_2500fdx_cap == 1)
+		advertised |= IXGBE_LINK_SPEED_2_5GB_FULL;
 
-	if (ixgbe->param_adv_autoneg_cap == 1 && autoneg_advertised == 0) {
-		ixgbe_notice(ixgbe, "Invalid link settings. Setup link "
-		    "to autonegotiation with full link capabilities.");
+	if (ixgbe->param_en_1000fdx_cap == 1)
+		advertised |= IXGBE_LINK_SPEED_1GB_FULL;
 
-		autoneg_advertised = IXGBE_LINK_SPEED_10GB_FULL |
-		    IXGBE_LINK_SPEED_1GB_FULL |
-		    IXGBE_LINK_SPEED_100_FULL;
+	if (ixgbe->param_en_100fdx_cap == 1)
+		advertised |= IXGBE_LINK_SPEED_100_FULL;
+
+	/*
+	 * As a last resort, autoneg with a default list of speeds.
+	 */
+	if (ixgbe->param_adv_autoneg_cap == 1 && advertised == 0) {
+		ixgbe_notice(ixgbe, "Invalid link settings. Setting link "
+		    "to autonegotiate with full capabilities.");
+
+		if (hw->mac.type == ixgbe_mac_82598EB)
+			advertised = IXGBE_LINK_SPEED_82598_AUTONEG;
+		else
+			advertised = IXGBE_LINK_SPEED_82599_AUTONEG;
 	}
 
 	if (setup_hw) {
-		if (ixgbe_setup_link(&ixgbe->hw, autoneg_advertised,
-		    ixgbe->param_adv_autoneg_cap, B_TRUE) != IXGBE_SUCCESS) {
+		if (ixgbe_setup_link(&ixgbe->hw, advertised,
+		    ixgbe->param_adv_autoneg_cap) != IXGBE_SUCCESS) {
 			ixgbe_notice(ixgbe, "Setup link failed on this "
 			    "device.");
 			return (IXGBE_FAILURE);
@@ -3354,7 +3670,7 @@ ixgbe_driver_link_check(ixgbe_t *ixgbe)
 
 	ASSERT(mutex_owned(&ixgbe->gen_lock));
 
-	(void) ixgbe_check_link(hw, &speed, &link_up, false);
+	(void) ixgbe_check_link(hw, &speed, &link_up, B_FALSE);
 	if (link_up) {
 		ixgbe->link_check_complete = B_TRUE;
 
@@ -3368,6 +3684,12 @@ ixgbe_driver_link_check(ixgbe_t *ixgbe)
 			switch (speed) {
 			case IXGBE_LINK_SPEED_10GB_FULL:
 				ixgbe->link_speed = SPEED_10GB;
+				break;
+			case IXGBE_LINK_SPEED_5GB_FULL:
+				ixgbe->link_speed = SPEED_5GB;
+				break;
+			case IXGBE_LINK_SPEED_2_5GB_FULL:
+				ixgbe->link_speed = SPEED_2_5GB;
 				break;
 			case IXGBE_LINK_SPEED_1GB_FULL:
 				ixgbe->link_speed = SPEED_1GB;
@@ -3422,25 +3744,25 @@ ixgbe_sfp_check(void *arg)
 	struct ixgbe_hw *hw = &ixgbe->hw;
 
 	mutex_enter(&ixgbe->gen_lock);
-	if (eicr & IXGBE_EICR_GPI_SDP1) {
+	if (eicr & IXGBE_EICR_GPI_SDP1_BY_MAC(hw)) {
 		/* clear the interrupt */
-		IXGBE_WRITE_REG(hw, IXGBE_EICR, IXGBE_EICR_GPI_SDP1);
+		IXGBE_WRITE_REG(hw, IXGBE_EICR, IXGBE_EICR_GPI_SDP1_BY_MAC(hw));
 
 		/* if link up, do multispeed fiber setup */
 		(void) ixgbe_setup_link(hw, IXGBE_LINK_SPEED_82599_AUTONEG,
-		    B_TRUE, B_TRUE);
+		    B_TRUE);
 		ixgbe_driver_link_check(ixgbe);
 		ixgbe_get_hw_state(ixgbe);
-	} else if (eicr & IXGBE_EICR_GPI_SDP2) {
+	} else if (eicr & IXGBE_EICR_GPI_SDP2_BY_MAC(hw)) {
 		/* clear the interrupt */
-		IXGBE_WRITE_REG(hw, IXGBE_EICR, IXGBE_EICR_GPI_SDP2);
+		IXGBE_WRITE_REG(hw, IXGBE_EICR, IXGBE_EICR_GPI_SDP2_BY_MAC(hw));
 
 		/* if link up, do sfp module setup */
 		(void) hw->mac.ops.setup_sfp(hw);
 
 		/* do multispeed fiber setup */
 		(void) ixgbe_setup_link(hw, IXGBE_LINK_SPEED_82599_AUTONEG,
-		    B_TRUE, B_TRUE);
+		    B_TRUE);
 		ixgbe_driver_link_check(ixgbe);
 		ixgbe_get_hw_state(ixgbe);
 	}
@@ -3473,10 +3795,10 @@ ixgbe_overtemp_check(void *arg)
 	mutex_enter(&ixgbe->gen_lock);
 
 	/* make sure we know current state of link */
-	(void) ixgbe_check_link(hw, &speed, &link_up, false);
+	(void) ixgbe_check_link(hw, &speed, &link_up, B_FALSE);
 
 	/* check over-temp condition */
-	if (((eicr & IXGBE_EICR_GPI_SDP0) && (!link_up)) ||
+	if (((eicr & IXGBE_EICR_GPI_SDP0_BY_MAC(hw)) && (!link_up)) ||
 	    (eicr & IXGBE_EICR_LSC)) {
 		if (hw->phy.ops.check_overtemp(hw) == IXGBE_ERR_OVERTEMP) {
 			atomic_or_32(&ixgbe->ixgbe_state, IXGBE_OVERTEMP);
@@ -3504,6 +3826,65 @@ ixgbe_overtemp_check(void *arg)
 
 	/* write to clear the interrupt */
 	IXGBE_WRITE_REG(hw, IXGBE_EICR, eicr);
+
+	mutex_exit(&ixgbe->gen_lock);
+}
+
+/*
+ * ixgbe_phy_check - taskq to process interrupts from an external PHY
+ *
+ * This routine will only be called on adapters with external PHYs
+ * (such as X550) that may be trying to raise our attention to some event.
+ * Currently, this is limited to claiming PHY overtemperature and link status
+ * change (LSC) events, however this may expand to include other things in
+ * future adapters.
+ */
+static void
+ixgbe_phy_check(void *arg)
+{
+	ixgbe_t *ixgbe = (ixgbe_t *)arg;
+	struct ixgbe_hw *hw = &ixgbe->hw;
+	int rv;
+
+	mutex_enter(&ixgbe->gen_lock);
+
+	/*
+	 * X550 baseT PHY overtemp and LSC events are handled here.
+	 *
+	 * If an overtemp event occurs, it will be reflected in the
+	 * return value of phy.ops.handle_lasi() and the common code will
+	 * automatically power off the baseT PHY. This is our cue to trigger
+	 * an FMA event.
+	 *
+	 * If a link status change event occurs, phy.ops.handle_lasi() will
+	 * automatically initiate a link setup between the integrated KR PHY
+	 * and the external X557 PHY to ensure that the link speed between
+	 * them matches the link speed of the baseT link.
+	 */
+	rv = ixgbe_handle_lasi(hw);
+
+	if (rv == IXGBE_ERR_OVERTEMP) {
+		atomic_or_32(&ixgbe->ixgbe_state, IXGBE_OVERTEMP);
+
+		/*
+		 * Disable the adapter interrupts
+		 */
+		ixgbe_disable_adapter_interrupts(ixgbe);
+
+		/*
+		 * Disable Rx/Tx units
+		 */
+		(void) ixgbe_stop_adapter(hw);
+
+		ddi_fm_service_impact(ixgbe->dip, DDI_SERVICE_LOST);
+		ixgbe_error(ixgbe,
+		    "Problem: Network adapter has been stopped due to a "
+		    "overtemperature event being detected.");
+		ixgbe_error(ixgbe,
+		    "Action: Shut down or restart the computer. If the issue "
+		    "persists, please take action in accordance with the "
+		    "recommendations from your system vendor.");
+	}
 
 	mutex_exit(&ixgbe->gen_lock);
 }
@@ -3672,7 +4053,7 @@ ixgbe_find_mac_address(ixgbe_t *ixgbe)
 	 * Finally(!), if there's a valid "mac-address" property (created
 	 * if we netbooted from this interface), we must use this instead
 	 * of any of the above to ensure that the NFS/install server doesn't
-	 * get confused by the address changing as Solaris takes over!
+	 * get confused by the address changing as illumos takes over!
 	 */
 	err = ddi_prop_lookup_byte_array(DDI_DEV_T_ANY, ixgbe->dip,
 	    DDI_PROP_DONTPASS, "mac-address", &bytes, &nelts);
@@ -3862,8 +4243,8 @@ ixgbe_enable_adapter_interrupts(ixgbe_t *ixgbe)
 
 		/*
 		 * General purpose interrupt enable.
-		 * For 82599 or X540, extended interrupt automask enable
-		 * only in MSI or MSI-X mode
+		 * For 82599, X540 and X550, extended interrupt
+		 * automask enable only in MSI or MSI-X mode
 		 */
 		if ((hw->mac.type == ixgbe_mac_82598EB) ||
 		    (ixgbe->intr_type == DDI_INTR_TYPE_MSI)) {
@@ -3879,6 +4260,8 @@ ixgbe_enable_adapter_interrupts(ixgbe_t *ixgbe)
 
 	case ixgbe_mac_82599EB:
 	case ixgbe_mac_X540:
+	case ixgbe_mac_X550:
+	case ixgbe_mac_X550EM_x:
 		gpie |= ixgbe->capab->other_gpie;
 
 		/* Enable RSC Delay 8us when LRO enabled  */
@@ -4073,13 +4456,15 @@ ixgbe_set_internal_mac_loopback(ixgbe_t *ixgbe)
 
 	case ixgbe_mac_82599EB:
 	case ixgbe_mac_X540:
+	case ixgbe_mac_X550:
+	case ixgbe_mac_X550EM_x:
 		reg = IXGBE_READ_REG(&ixgbe->hw, IXGBE_AUTOC);
 		reg |= (IXGBE_AUTOC_FLU |
 		    IXGBE_AUTOC_10G_KX4);
 		IXGBE_WRITE_REG(&ixgbe->hw, IXGBE_AUTOC, reg);
 
 		(void) ixgbe_setup_link(&ixgbe->hw, IXGBE_LINK_SPEED_10GB_FULL,
-		    B_FALSE, B_TRUE);
+		    B_FALSE);
 		break;
 
 	default:
@@ -4139,6 +4524,8 @@ ixgbe_intr_tx_work(ixgbe_tx_ring_t *tx_ring)
 static void
 ixgbe_intr_other_work(ixgbe_t *ixgbe, uint32_t eicr)
 {
+	struct ixgbe_hw *hw = &ixgbe->hw;
+
 	ASSERT(mutex_owned(&ixgbe->gen_lock));
 
 	/*
@@ -4181,7 +4568,8 @@ ixgbe_intr_other_work(ixgbe_t *ixgbe, uint32_t eicr)
 	 * Do SFP check for adapters with hot-plug capability
 	 */
 	if ((ixgbe->capab->flags & IXGBE_FLAG_SFP_PLUG_CAPABLE) &&
-	    ((eicr & IXGBE_EICR_GPI_SDP1) || (eicr & IXGBE_EICR_GPI_SDP2))) {
+	    ((eicr & IXGBE_EICR_GPI_SDP1_BY_MAC(hw)) ||
+	    (eicr & IXGBE_EICR_GPI_SDP2_BY_MAC(hw)))) {
 		ixgbe->eicr = eicr;
 		if ((ddi_taskq_dispatch(ixgbe->sfp_taskq,
 		    ixgbe_sfp_check, (void *)ixgbe,
@@ -4195,13 +4583,28 @@ ixgbe_intr_other_work(ixgbe_t *ixgbe, uint32_t eicr)
 	 * Do over-temperature check for adapters with temp sensor
 	 */
 	if ((ixgbe->capab->flags & IXGBE_FLAG_TEMP_SENSOR_CAPABLE) &&
-	    ((eicr & IXGBE_EICR_GPI_SDP0) || (eicr & IXGBE_EICR_LSC))) {
+	    ((eicr & IXGBE_EICR_GPI_SDP0_BY_MAC(hw)) ||
+	    (eicr & IXGBE_EICR_LSC))) {
 		ixgbe->eicr = eicr;
 		if ((ddi_taskq_dispatch(ixgbe->overtemp_taskq,
 		    ixgbe_overtemp_check, (void *)ixgbe,
 		    DDI_NOSLEEP)) != DDI_SUCCESS) {
 			ixgbe_log(ixgbe, "No memory available to dispatch "
 			    "taskq for overtemp check");
+		}
+	}
+
+	/*
+	 * Process an external PHY interrupt
+	 */
+	if (hw->device_id == IXGBE_DEV_ID_X550EM_X_10G_T &&
+	    (eicr & IXGBE_EICR_GPI_SDP0_X540)) {
+		ixgbe->eicr = eicr;
+		if ((ddi_taskq_dispatch(ixgbe->phy_taskq,
+		    ixgbe_phy_check, (void *)ixgbe,
+		    DDI_NOSLEEP)) != DDI_SUCCESS) {
+			ixgbe_log(ixgbe, "No memory available to dispatch "
+			    "taskq for PHY check");
 		}
 	}
 }
@@ -4292,6 +4695,8 @@ ixgbe_intr_legacy(void *arg1, void *arg2)
 
 			case ixgbe_mac_82599EB:
 			case ixgbe_mac_X540:
+			case ixgbe_mac_X550:
+			case ixgbe_mac_X550EM_x:
 				ixgbe->eimc = IXGBE_82599_OTHER_INTR;
 				IXGBE_WRITE_REG(hw, IXGBE_EIMC, ixgbe->eimc);
 				break;
@@ -4386,6 +4791,8 @@ ixgbe_intr_msi(void *arg1, void *arg2)
 
 		case ixgbe_mac_82599EB:
 		case ixgbe_mac_X540:
+		case ixgbe_mac_X550:
+		case ixgbe_mac_X550EM_x:
 			ixgbe->eimc = IXGBE_82599_OTHER_INTR;
 			IXGBE_WRITE_REG(hw, IXGBE_EIMC, ixgbe->eimc);
 			break;
@@ -4466,6 +4873,8 @@ ixgbe_intr_msix(void *arg1, void *arg2)
 
 			case ixgbe_mac_82599EB:
 			case ixgbe_mac_X540:
+			case ixgbe_mac_X550:
+			case ixgbe_mac_X550EM_x:
 				ixgbe->eims |= IXGBE_EICR_RTX_QUEUE;
 				ixgbe_intr_other_work(ixgbe, eicr);
 				break;
@@ -4555,6 +4964,23 @@ ixgbe_alloc_intrs(ixgbe_t *ixgbe)
 	 * Install legacy interrupts
 	 */
 	if (intr_types & DDI_INTR_TYPE_FIXED) {
+		/*
+		 * Disallow legacy interrupts for X550. X550 has a silicon
+		 * bug which prevents Shared Legacy interrupts from working.
+		 * For details, please reference:
+		 *
+		 * Intel Ethernet Controller X550 Specification Update rev. 2.1
+		 * May 2016, erratum 22: PCIe Interrupt Status Bit
+		 */
+		if (ixgbe->hw.mac.type == ixgbe_mac_X550 ||
+		    ixgbe->hw.mac.type == ixgbe_mac_X550EM_x ||
+		    ixgbe->hw.mac.type == ixgbe_mac_X550_vf ||
+		    ixgbe->hw.mac.type == ixgbe_mac_X550EM_x_vf) {
+			ixgbe_log(ixgbe,
+			    "Legacy interrupts are not supported on this "
+			    "adapter. Please use MSI or MSI-X instead.");
+			return (IXGBE_FAILURE);
+		}
 		rc = ixgbe_alloc_intr_handles(ixgbe, DDI_INTR_TYPE_FIXED);
 		if (rc == IXGBE_SUCCESS)
 			return (IXGBE_SUCCESS);
@@ -4867,6 +5293,8 @@ ixgbe_setup_ivar(ixgbe_t *ixgbe, uint16_t intr_alloc_entry, uint8_t msix_vector,
 
 	case ixgbe_mac_82599EB:
 	case ixgbe_mac_X540:
+	case ixgbe_mac_X550:
+	case ixgbe_mac_X550EM_x:
 		if (cause == -1) {
 			/* other causes */
 			msix_vector |= IXGBE_IVAR_ALLOC_VAL;
@@ -4921,6 +5349,8 @@ ixgbe_enable_ivar(ixgbe_t *ixgbe, uint16_t intr_alloc_entry, int8_t cause)
 
 	case ixgbe_mac_82599EB:
 	case ixgbe_mac_X540:
+	case ixgbe_mac_X550:
+	case ixgbe_mac_X550EM_x:
 		if (cause == -1) {
 			/* other causes */
 			index = (intr_alloc_entry & 1) * 8;
@@ -4971,6 +5401,8 @@ ixgbe_disable_ivar(ixgbe_t *ixgbe, uint16_t intr_alloc_entry, int8_t cause)
 
 	case ixgbe_mac_82599EB:
 	case ixgbe_mac_X540:
+	case ixgbe_mac_X550:
+	case ixgbe_mac_X550EM_x:
 		if (cause == -1) {
 			/* other causes */
 			index = (intr_alloc_entry & 1) * 8;
@@ -5014,6 +5446,8 @@ ixgbe_get_hw_rx_index(ixgbe_t *ixgbe, uint32_t sw_rx_index)
 
 		case ixgbe_mac_82599EB:
 		case ixgbe_mac_X540:
+		case ixgbe_mac_X550:
+		case ixgbe_mac_X550EM_x:
 			return (sw_rx_index * 2);
 
 		default:
@@ -5030,6 +5464,8 @@ ixgbe_get_hw_rx_index(ixgbe_t *ixgbe, uint32_t sw_rx_index)
 
 		case ixgbe_mac_82599EB:
 		case ixgbe_mac_X540:
+		case ixgbe_mac_X550:
+		case ixgbe_mac_X550EM_x:
 			if (ixgbe->num_rx_groups > 32) {
 				hw_rx_index = (sw_rx_index /
 				    rx_ring_per_group) * 2 +
@@ -5135,6 +5571,8 @@ ixgbe_setup_adapter_vector(ixgbe_t *ixgbe)
 
 	case ixgbe_mac_82599EB:
 	case ixgbe_mac_X540:
+	case ixgbe_mac_X550:
+	case ixgbe_mac_X550EM_x:
 		for (v_idx = 0; v_idx < 64; v_idx++)
 			IXGBE_WRITE_REG(hw, IXGBE_IVAR(v_idx), 0);
 		IXGBE_WRITE_REG(hw, IXGBE_IVAR_MISC, 0);
@@ -5310,20 +5748,22 @@ static void
 ixgbe_get_hw_state(ixgbe_t *ixgbe)
 {
 	struct ixgbe_hw *hw = &ixgbe->hw;
-	ixgbe_link_speed speed = IXGBE_LINK_SPEED_UNKNOWN;
+	ixgbe_link_speed speed = 0;
 	boolean_t link_up = B_FALSE;
 	uint32_t pcs1g_anlp = 0;
-	uint32_t pcs1g_ana = 0;
-	boolean_t autoneg = B_FALSE;
 
 	ASSERT(mutex_owned(&ixgbe->gen_lock));
 	ixgbe->param_lp_1000fdx_cap = 0;
 	ixgbe->param_lp_100fdx_cap  = 0;
 
 	/* check for link, don't wait */
-	(void) ixgbe_check_link(hw, &speed, &link_up, false);
-	pcs1g_ana = IXGBE_READ_REG(hw, IXGBE_PCS1GANA);
+	(void) ixgbe_check_link(hw, &speed, &link_up, B_FALSE);
 
+	/*
+	 * Update the observed Link Partner's capabilities. Not all adapters
+	 * can provide full information on the LP's capable speeds, so we
+	 * provide what we can.
+	 */
 	if (link_up) {
 		pcs1g_anlp = IXGBE_READ_REG(hw, IXGBE_PCS1GANLP);
 
@@ -5333,12 +5773,36 @@ ixgbe_get_hw_state(ixgbe_t *ixgbe)
 		    (pcs1g_anlp & IXGBE_PCS1GANLP_LPFD) ? 1 : 0;
 	}
 
-	(void) ixgbe_get_link_capabilities(hw, &speed, &autoneg);
+	/*
+	 * Update GLD's notion of the adapter's currently advertised speeds.
+	 * Since the common code doesn't always record the current autonegotiate
+	 * settings in the phy struct for all parts (specifically, adapters with
+	 * SFPs) we first test to see if it is 0, and if so, we fall back to
+	 * using the adapter's speed capabilities which we saved during instance
+	 * init in ixgbe_init_params().
+	 *
+	 * Adapters with SFPs will always be shown as advertising all of their
+	 * supported speeds, and adapters with baseT PHYs (where the phy struct
+	 * is maintained by the common code) will always have a factual view of
+	 * their currently-advertised speeds. In the case of SFPs, this is
+	 * acceptable as we default to advertising all speeds that the adapter
+	 * claims to support, and those properties are immutable; unlike on
+	 * baseT (copper) PHYs, where speeds can be enabled or disabled at will.
+	 */
+	speed = hw->phy.autoneg_advertised;
+	if (speed == 0)
+		speed = ixgbe->speeds_supported;
 
-	ixgbe->param_adv_1000fdx_cap = ((pcs1g_ana & IXGBE_PCS1GANA_FDC) &&
-	    (speed & IXGBE_LINK_SPEED_1GB_FULL)) ? 1 : 0;
-	ixgbe->param_adv_100fdx_cap = ((pcs1g_ana & IXGBE_PCS1GANA_FDC) &&
-	    (speed & IXGBE_LINK_SPEED_100_FULL)) ? 1 : 0;
+	ixgbe->param_adv_10000fdx_cap =
+	    (speed & IXGBE_LINK_SPEED_10GB_FULL) ? 1 : 0;
+	ixgbe->param_adv_5000fdx_cap =
+	    (speed & IXGBE_LINK_SPEED_5GB_FULL) ? 1 : 0;
+	ixgbe->param_adv_2500fdx_cap =
+	    (speed & IXGBE_LINK_SPEED_2_5GB_FULL) ? 1 : 0;
+	ixgbe->param_adv_1000fdx_cap =
+	    (speed & IXGBE_LINK_SPEED_1GB_FULL) ? 1 : 0;
+	ixgbe->param_adv_100fdx_cap =
+	    (speed & IXGBE_LINK_SPEED_100_FULL) ? 1 : 0;
 }
 
 /*

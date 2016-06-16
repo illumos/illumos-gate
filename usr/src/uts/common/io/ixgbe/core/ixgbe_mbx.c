@@ -1,6 +1,6 @@
 /******************************************************************************
 
-  Copyright (c) 2001-2012, Intel Corporation 
+  Copyright (c) 2001-2015, Intel Corporation 
   All rights reserved.
   
   Redistribution and use in source and binary forms, with or without 
@@ -42,7 +42,7 @@
  *  @size: Length of buffer
  *  @mbx_id: id of mailbox to read
  *
- *  returns SUCCESS if it successfuly read message from buffer
+ *  returns SUCCESS if it successfully read message from buffer
  **/
 s32 ixgbe_read_mbx(struct ixgbe_hw *hw, u32 *msg, u16 size, u16 mbx_id)
 {
@@ -77,10 +77,11 @@ s32 ixgbe_write_mbx(struct ixgbe_hw *hw, u32 *msg, u16 size, u16 mbx_id)
 
 	DEBUGFUNC("ixgbe_write_mbx");
 
-	if (size > mbx->size)
+	if (size > mbx->size) {
 		ret_val = IXGBE_ERR_MBX;
-
-	else if (mbx->ops.write)
+		ERROR_REPORT2(IXGBE_ERROR_ARGUMENT,
+			     "Invalid mailbox message size %d", size);
+	} else if (mbx->ops.write)
 		ret_val = mbx->ops.write(hw, msg, size, mbx_id);
 
 	return ret_val;
@@ -170,6 +171,10 @@ static s32 ixgbe_poll_for_msg(struct ixgbe_hw *hw, u16 mbx_id)
 		usec_delay(mbx->usec_delay);
 	}
 
+	if (countdown == 0)
+		ERROR_REPORT2(IXGBE_ERROR_POLLING,
+			   "Polling for VF%d mailbox message timedout", mbx_id);
+
 out:
 	return countdown ? IXGBE_SUCCESS : IXGBE_ERR_MBX;
 }
@@ -197,6 +202,10 @@ static s32 ixgbe_poll_for_ack(struct ixgbe_hw *hw, u16 mbx_id)
 			break;
 		usec_delay(mbx->usec_delay);
 	}
+
+	if (countdown == 0)
+		ERROR_REPORT2(IXGBE_ERROR_POLLING,
+			     "Polling for VF%d mailbox ack timedout", mbx_id);
 
 out:
 	return countdown ? IXGBE_SUCCESS : IXGBE_ERR_MBX;
@@ -429,12 +438,8 @@ static s32 ixgbe_write_mbx_vf(struct ixgbe_hw *hw, u32 *msg, u16 size,
 		goto out_no_write;
 
 	/* flush msg and acks as we are overwriting the message buffer */
-	ret_val = ixgbe_check_for_msg_vf(hw, 0);
-	if (ret_val)
-		goto out_no_write;
-	ret_val = ixgbe_check_for_ack_vf(hw, 0);
-	if (ret_val)
-		goto out_no_write;
+	ixgbe_check_for_msg_vf(hw, 0);
+	ixgbe_check_for_ack_vf(hw, 0);
 
 	/* copy the caller specified message to the mailbox memory buffer */
 	for (i = 0; i < size; i++)
@@ -457,7 +462,7 @@ out_no_write:
  *  @size: Length of buffer
  *  @mbx_id: id of mailbox to read
  *
- *  returns SUCCESS if it successfuly read message from buffer
+ *  returns SUCCESS if it successfully read message from buffer
  **/
 static s32 ixgbe_read_mbx_vf(struct ixgbe_hw *hw, u32 *msg, u16 size,
 			     u16 mbx_id)
@@ -600,6 +605,8 @@ static s32 ixgbe_check_for_rst_pf(struct ixgbe_hw *hw, u16 vf_number)
 	case ixgbe_mac_82599EB:
 		vflre = IXGBE_READ_REG(hw, IXGBE_VFLRE(reg_offset));
 		break;
+	case ixgbe_mac_X550:
+	case ixgbe_mac_X550EM_x:
 	case ixgbe_mac_X540:
 		vflre = IXGBE_READ_REG(hw, IXGBE_VFLREC(reg_offset));
 		break;
@@ -637,6 +644,10 @@ static s32 ixgbe_obtain_mbx_lock_pf(struct ixgbe_hw *hw, u16 vf_number)
 	p2v_mailbox = IXGBE_READ_REG(hw, IXGBE_PFMAILBOX(vf_number));
 	if (p2v_mailbox & IXGBE_PFMAILBOX_PFU)
 		ret_val = IXGBE_SUCCESS;
+	else
+		ERROR_REPORT2(IXGBE_ERROR_POLLING,
+			   "Failed to obtain mailbox lock for VF%d", vf_number);
+
 
 	return ret_val;
 }
@@ -664,12 +675,8 @@ static s32 ixgbe_write_mbx_pf(struct ixgbe_hw *hw, u32 *msg, u16 size,
 		goto out_no_write;
 
 	/* flush msg and acks as we are overwriting the message buffer */
-	ret_val = ixgbe_check_for_msg_vf(hw, 0);
-	if (ret_val)
-		goto out_no_write;
-	ret_val = ixgbe_check_for_ack_vf(hw, 0);
-	if (ret_val)
-		goto out_no_write;
+	ixgbe_check_for_msg_pf(hw, vf_number);
+	ixgbe_check_for_ack_pf(hw, vf_number);
 
 	/* copy the caller specified message to the mailbox memory buffer */
 	for (i = 0; i < size; i++)
@@ -735,6 +742,8 @@ void ixgbe_init_mbx_params_pf(struct ixgbe_hw *hw)
 	struct ixgbe_mbx_info *mbx = &hw->mbx;
 
 	if (hw->mac.type != ixgbe_mac_82599EB &&
+	    hw->mac.type != ixgbe_mac_X550 &&
+	    hw->mac.type != ixgbe_mac_X550EM_x &&
 	    hw->mac.type != ixgbe_mac_X540)
 		return;
 
