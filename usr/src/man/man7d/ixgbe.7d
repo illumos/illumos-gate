@@ -1,10 +1,11 @@
 '\" te
 .\"  Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
 .\"  Copyright 2012, Nexenta Systems, Inc. All rights reserved.
+.\"  Copyright 2016, OmniTI Computer Consulting, Inc. All rights reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH IXGBE 7D "Jun 3, 2009"
+.TH IXGBE 7D "Apr 10, 2016"
 .SH NAME
 ixgbe \- Intel 10Gb PCI Express NIC Driver
 .SH SYNOPSIS
@@ -14,7 +15,6 @@ ixgbe \- Intel 10Gb PCI Express NIC Driver
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBixgbe\fR 10 Gigabit Ethernet driver is a multi-threaded, loadable,
 clonable, GLD-based STREAMS driver supporting the Data Link Provider Interface,
@@ -26,13 +26,38 @@ transmit and receive, promiscuous and multicast support, and error recovery and
 reporting.
 .sp
 .LP
+The \fBixgbe\fR driver supports the following Intel 10-Gigabit PCI Express Ethernet controllers:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Intel Ethernet Controller 82598EB Family
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Intel Ethernet Controller 82599EB (X520) Family
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Intel Ethernet Controller X540 Family
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Intel Ethernet Controller X550 Family
+.RE
+.LP
 The \fBixgbe\fR driver and hardware support auto-negotiation, a protocol
 specified by the \fIIEEE 802.3ae\fR specification.
 .SH APPLICATION PROGRAMMING INTERFACE
-.sp
 .LP
 The cloning character-special device, \fB/dev/ixgbe\fR, is used to access all
-Intel 10 -Gigabit PCI Express Ethernet devices installed within the system.
+Intel 10-Gigabit PCI Express Ethernet devices installed within the system.
 .sp
 .LP
 The \fBixgbe\fR driver is managed by the \fBdladm\fR(1M) command line utility,
@@ -54,7 +79,13 @@ your DL_INFO_REQ are:
 .TP
 .ie t \(bu
 .el o
-Maximum SDU is 16366.
+Maximum SDU for Intel 82598EB is 16366.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Maximum SDU for Intel 82599EB, X540 and X550 is 15500.
 .RE
 .RS +4
 .TP
@@ -93,13 +124,11 @@ Once in the DL_ATTACHED state, you must send a DL_BIND_REQ to associate a
 particular SAP with the stream.
 .RE
 .SH CONFIGURATION
-.sp
 .LP
 By default, the \fBixgbe\fR driver performs auto-negotiation to select the link
 speed and mode. Link speed and mode can only be 10000 Mbps full-duplex for fiber, and only 10000, 1000, or 100 Mbps full-duplex for copper. See the
 \fIIEEE802.3\fR standard for more information.
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/dev/ixgbe*\fR\fR
@@ -145,7 +174,6 @@ Configuration file.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -153,15 +181,16 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 .TS
 box;
-l l
-l l .
+c | c
+l | l .
 ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
 Architecture	SPARC, x86
+_
 Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBdladm\fR(1M), \fBnetstat\fR(1M), \fBdriver.conf\fR(4), \fBattributes\fR(5),
 \fBstreamio\fR(7I), \fBdlpi\fR(7P)

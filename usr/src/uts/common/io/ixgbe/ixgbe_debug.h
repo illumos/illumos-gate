@@ -26,6 +26,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2016 OmniTI Computer Consulting, Inc. All rights reserved.
+ */
+
 #ifndef	_IXGBE_DEBUG_H
 #define	_IXGBE_DEBUG_H
 
@@ -67,17 +71,10 @@ extern "C" {
 
 #endif	/* IXGBE_DEBUG */
 
-#define	IXGBE_STAT(val)		(val)++;
-
 #ifdef IXGBE_DEBUG
-
 void ixgbe_pci_dump(void *);
 void ixgbe_dump_interrupt(void *, char *);
 void ixgbe_dump_addr(void *, char *, const uint8_t *);
-
-#endif	/* IXGBE_DEBUG */
-
-#ifdef IXGBE_DEBUG
 
 #define	DEBUGOUT(S)	\
 	IXGBE_DEBUGLOG_0(NULL, S)
@@ -90,17 +87,16 @@ void ixgbe_dump_addr(void *, char *, const uint8_t *);
 #define	DEBUGOUT6(S, A, B, C, D, E, F)	\
 	IXGBE_DEBUGLOG_6(NULL, S, A, B, C, D, E, F)
 
-/*
- * DEBUGFUNC() is used to print the function call information, however since
- * Dtrace in Solaris can be used to trace function calls, this function is
- * not useful in Solaris, and DEBUGFUNC() can spam a large number of
- * function call system logs (see CR6918426). We sould eliminate
- * DEBUGFUNC(), but since DEBUGFUNC() is used by the shared code
- * (maintained by Intel) which is used and shared by ixgbe drivers in
- * different OSes, we can not remove it, so in Solaris just simply define
- * it as blank.
- */
-#define	DEBUGFUNC(F)
+#define	IXGBE_ERROR_INVALID_STATE	"INVALID STATE"
+#define	IXGBE_ERROR_POLLING		"POLLING ERROR"
+#define	IXGBE_ERROR_CAUTION		"CAUTION"
+#define	IXGBE_ERROR_SOFTWARE		"SOFTWARE ERROR"
+#define	IXGBE_ERROR_ARGUMENT		"BAD ARGUMENT"
+#define	IXGBE_ERROR_UNSUPPORTED		"UNSUPPORTED"
+
+#define	ERROR_REPORT1(S, A)		DEBUGOUT(S ":" A)
+#define	ERROR_REPORT2(S, A, B)		DEBUGOUT1(S ":" A, B)
+#define	ERROR_REPORT3(S, A, B, C)	DEBUGOUT2(S ":" A, B, C)
 
 #else
 
@@ -110,9 +106,25 @@ void ixgbe_dump_addr(void *, char *, const uint8_t *);
 #define	DEBUGOUT3(S, A, B, C)
 #define	DEBUGOUT6(S, A, B, C, D, E, F)
 
-#define	DEBUGFUNC(F)
+#define	ERROR_REPORT1(S, A)
+#define	ERROR_REPORT2(S, A, B)
+#define	ERROR_REPORT3(S, A, B, C)
 
 #endif	/* IXGBE_DEBUG */
+
+/*
+ * DEBUGFUNC() is used to print the function call information, however since
+ * DTrace in illumos can be used to trace function calls, this function is
+ * not useful in illumos, and DEBUGFUNC() can spam a large number of
+ * function call system logs (see CR6918426). We sould eliminate
+ * DEBUGFUNC(), but since DEBUGFUNC() is used by the shared code
+ * (maintained by Intel) which is used and shared by ixgbe drivers in
+ * different OSes, we can not remove it, so in illumos just simply define
+ * it as blank.
+ */
+#define	DEBUGFUNC(F)
+
+#define	IXGBE_STAT(val)		(val)++;
 
 extern void ixgbe_log(void *, const char *, ...);
 
