@@ -297,12 +297,23 @@ ixgbe_m_setprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 	uint32_t cur_mtu, new_mtu;
 	uint32_t rx_size;
 	uint32_t tx_size;
+	ixgbe_link_speed speeds = 0;
 
 	mutex_enter(&ixgbe->gen_lock);
 	if (ixgbe->ixgbe_state & IXGBE_SUSPENDED) {
 		mutex_exit(&ixgbe->gen_lock);
 		return (ECANCELED);
 	}
+
+	/*
+	 * We cannot always rely on the common code maintaining
+	 * hw->phy.speeds_supported, therefore we fall back to use the recorded
+	 * supported speeds which were obtained during instance init in
+	 * ixgbe_init_params().
+	 */
+	speeds = hw->phy.speeds_supported;
+	if (speeds == 0)
+		speeds = ixgbe->speeds_supported;
 
 	if (ixgbe->loopback_mode != IXGBE_LB_NONE &&
 	    ixgbe_param_locked(pr_num)) {
@@ -314,39 +325,57 @@ ixgbe_m_setprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 		return (EBUSY);
 	}
 
+	/*
+	 * We allow speed changes only on baseT PHYs. MAC_PROP_EN_* are marked
+	 * read-only on non-baseT PHYs.
+	 */
 	switch (pr_num) {
 	case MAC_PROP_EN_10GFDX_CAP:
-		/* read/write on copper, read-only on serdes */
-		if (ixgbe->hw.phy.media_type != ixgbe_media_type_copper) {
+		if (hw->phy.media_type == ixgbe_media_type_copper &&
+		    speeds & IXGBE_LINK_SPEED_10GB_FULL) {
+			ixgbe->param_en_10000fdx_cap = *(uint8_t *)pr_val;
+			goto setup_link;
+		} else {
 			err = ENOTSUP;
 			break;
-		} else {
-			ixgbe->param_en_10000fdx_cap = *(uint8_t *)pr_val;
-			ixgbe->param_adv_10000fdx_cap = *(uint8_t *)pr_val;
+		}
+	case MAC_PROP_EN_5000FDX_CAP:
+		if (hw->phy.media_type == ixgbe_media_type_copper &&
+		    speeds & IXGBE_LINK_SPEED_5GB_FULL) {
+			ixgbe->param_en_5000fdx_cap = *(uint8_t *)pr_val;
 			goto setup_link;
+		} else {
+			err = ENOTSUP;
+			break;
+		}
+	case MAC_PROP_EN_2500FDX_CAP:
+		if (hw->phy.media_type == ixgbe_media_type_copper &&
+		    speeds & IXGBE_LINK_SPEED_2_5GB_FULL) {
+			ixgbe->param_en_2500fdx_cap = *(uint8_t *)pr_val;
+			goto setup_link;
+		} else {
+			err = ENOTSUP;
+			break;
 		}
 	case MAC_PROP_EN_1000FDX_CAP:
-		/* read/write on copper, read-only on serdes */
-		if (ixgbe->hw.phy.media_type != ixgbe_media_type_copper) {
+		if (hw->phy.media_type == ixgbe_media_type_copper &&
+		    speeds & IXGBE_LINK_SPEED_1GB_FULL) {
+			ixgbe->param_en_1000fdx_cap = *(uint8_t *)pr_val;
+			goto setup_link;
+		} else {
 			err = ENOTSUP;
 			break;
-		} else {
-			ixgbe->param_en_1000fdx_cap = *(uint8_t *)pr_val;
-			ixgbe->param_adv_1000fdx_cap = *(uint8_t *)pr_val;
-			goto setup_link;
 		}
 	case MAC_PROP_EN_100FDX_CAP:
-		/* read/write on copper, read-only on serdes */
-		if (ixgbe->hw.phy.media_type != ixgbe_media_type_copper) {
+		if (hw->phy.media_type == ixgbe_media_type_copper &&
+		    speeds & IXGBE_LINK_SPEED_100_FULL) {
+			ixgbe->param_en_100fdx_cap = *(uint8_t *)pr_val;
+			goto setup_link;
+		} else {
 			err = ENOTSUP;
 			break;
-		} else {
-			ixgbe->param_en_100fdx_cap = *(uint8_t *)pr_val;
-			ixgbe->param_adv_100fdx_cap = *(uint8_t *)pr_val;
-			goto setup_link;
 		}
 	case MAC_PROP_AUTONEG:
-		/* read/write on copper, read-only on serdes */
 		if (ixgbe->hw.phy.media_type != ixgbe_media_type_copper) {
 			err = ENOTSUP;
 			break;
@@ -382,6 +411,8 @@ setup_link:
 		}
 		break;
 	case MAC_PROP_ADV_10GFDX_CAP:
+	case MAC_PROP_ADV_5000FDX_CAP:
+	case MAC_PROP_ADV_2500FDX_CAP:
 	case MAC_PROP_ADV_1000FDX_CAP:
 	case MAC_PROP_ADV_100FDX_CAP:
 	case MAC_PROP_STATUS:
@@ -448,6 +479,17 @@ ixgbe_m_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 	int err = 0;
 	uint32_t flow_control;
 	uint64_t tmp = 0;
+	ixgbe_link_speed speeds = 0;
+
+	/*
+	 * We cannot always rely on the common code maintaining
+	 * hw->phy.speeds_supported, therefore we fall back to use the recorded
+	 * supported speeds which were obtained during instance init in
+	 * ixgbe_init_params().
+	 */
+	speeds = hw->phy.speeds_supported;
+	if (speeds == 0)
+		speeds = ixgbe->speeds_supported;
 
 	switch (pr_num) {
 	case MAC_PROP_DUPLEX:
@@ -483,22 +525,64 @@ ixgbe_m_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 		bcopy(&flow_control, pr_val, sizeof (flow_control));
 		break;
 	case MAC_PROP_ADV_10GFDX_CAP:
-		*(uint8_t *)pr_val = ixgbe->param_adv_10000fdx_cap;
+		if (speeds & IXGBE_LINK_SPEED_10GB_FULL)
+			*(uint8_t *)pr_val = ixgbe->param_adv_10000fdx_cap;
+		else
+			err = ENOTSUP;
 		break;
 	case MAC_PROP_EN_10GFDX_CAP:
-		*(uint8_t *)pr_val = ixgbe->param_en_10000fdx_cap;
+		if (speeds & IXGBE_LINK_SPEED_10GB_FULL)
+			*(uint8_t *)pr_val = ixgbe->param_en_10000fdx_cap;
+		else
+			err = ENOTSUP;
+		break;
+	case MAC_PROP_ADV_5000FDX_CAP:
+		if (speeds & IXGBE_LINK_SPEED_5GB_FULL)
+			*(uint8_t *)pr_val = ixgbe->param_adv_5000fdx_cap;
+		else
+			err = ENOTSUP;
+		break;
+	case MAC_PROP_EN_5000FDX_CAP:
+		if (speeds & IXGBE_LINK_SPEED_5GB_FULL)
+			*(uint8_t *)pr_val = ixgbe->param_en_5000fdx_cap;
+		else
+			err = ENOTSUP;
+		break;
+	case MAC_PROP_ADV_2500FDX_CAP:
+		if (speeds & IXGBE_LINK_SPEED_2_5GB_FULL)
+			*(uint8_t *)pr_val = ixgbe->param_adv_2500fdx_cap;
+		else
+			err = ENOTSUP;
+		break;
+	case MAC_PROP_EN_2500FDX_CAP:
+		if (speeds & IXGBE_LINK_SPEED_2_5GB_FULL)
+			*(uint8_t *)pr_val = ixgbe->param_en_2500fdx_cap;
+		else
+			err = ENOTSUP;
 		break;
 	case MAC_PROP_ADV_1000FDX_CAP:
-		*(uint8_t *)pr_val = ixgbe->param_adv_1000fdx_cap;
+		if (speeds & IXGBE_LINK_SPEED_1GB_FULL)
+			*(uint8_t *)pr_val = ixgbe->param_adv_1000fdx_cap;
+		else
+			err = ENOTSUP;
 		break;
 	case MAC_PROP_EN_1000FDX_CAP:
-		*(uint8_t *)pr_val = ixgbe->param_en_1000fdx_cap;
+		if (speeds & IXGBE_LINK_SPEED_1GB_FULL)
+			*(uint8_t *)pr_val = ixgbe->param_en_1000fdx_cap;
+		else
+			err = ENOTSUP;
 		break;
 	case MAC_PROP_ADV_100FDX_CAP:
-		*(uint8_t *)pr_val = ixgbe->param_adv_100fdx_cap;
+		if (speeds & IXGBE_LINK_SPEED_100_FULL)
+			*(uint8_t *)pr_val = ixgbe->param_adv_100fdx_cap;
+		else
+			err = ENOTSUP;
 		break;
 	case MAC_PROP_EN_100FDX_CAP:
-		*(uint8_t *)pr_val = ixgbe->param_en_100fdx_cap;
+		if (speeds & IXGBE_LINK_SPEED_100_FULL)
+			*(uint8_t *)pr_val = ixgbe->param_en_100fdx_cap;
+		else
+			err = ENOTSUP;
 		break;
 	case MAC_PROP_PRIVATE:
 		err = ixgbe_get_priv_prop(ixgbe, pr_name,
@@ -516,7 +600,20 @@ ixgbe_m_propinfo(void *arg, const char *pr_name, mac_prop_id_t pr_num,
     mac_prop_info_handle_t prh)
 {
 	ixgbe_t *ixgbe = (ixgbe_t *)arg;
+	struct ixgbe_hw *hw = &ixgbe->hw;
 	uint_t perm;
+	uint8_t value;
+	ixgbe_link_speed speeds = 0;
+
+	/*
+	 * We cannot always rely on the common code maintaining
+	 * hw->phy.speeds_supported, therefore we fall back to use the
+	 * recorded supported speeds which were obtained during instance init in
+	 * ixgbe_init_params().
+	 */
+	speeds = hw->phy.speeds_supported;
+	if (speeds == 0)
+		speeds = ixgbe->speeds_supported;
 
 	switch (pr_num) {
 	case MAC_PROP_DUPLEX:
@@ -525,20 +622,89 @@ ixgbe_m_propinfo(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 		break;
 
 	case MAC_PROP_ADV_100FDX_CAP:
-	case MAC_PROP_ADV_1000FDX_CAP:
-	case MAC_PROP_ADV_10GFDX_CAP:
 		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
-		mac_prop_info_set_default_uint8(prh, 1);
+		value = (speeds & IXGBE_LINK_SPEED_100_FULL) ? 1 : 0;
+		mac_prop_info_set_default_uint8(prh, value);
 		break;
 
+	case MAC_PROP_ADV_1000FDX_CAP:
+		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
+		value = (speeds & IXGBE_LINK_SPEED_1GB_FULL) ? 1 : 0;
+		mac_prop_info_set_default_uint8(prh, value);
+		break;
+
+	case MAC_PROP_ADV_2500FDX_CAP:
+		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
+		value = (speeds & IXGBE_LINK_SPEED_2_5GB_FULL) ? 1 : 0;
+		mac_prop_info_set_default_uint8(prh, value);
+		break;
+
+	case MAC_PROP_ADV_5000FDX_CAP:
+		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
+		value = (speeds & IXGBE_LINK_SPEED_5GB_FULL) ? 1 : 0;
+		mac_prop_info_set_default_uint8(prh, value);
+		break;
+
+	case MAC_PROP_ADV_10GFDX_CAP:
+		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
+		value = (speeds & IXGBE_LINK_SPEED_10GB_FULL) ? 1 : 0;
+		mac_prop_info_set_default_uint8(prh, value);
+		break;
+
+	/*
+	 * We allow speed changes only on baseT PHYs. MAC_PROP_EN_* are marked
+	 * read-only on non-baseT (SFP) PHYs.
+	 */
 	case MAC_PROP_AUTONEG:
-	case MAC_PROP_EN_10GFDX_CAP:
-	case MAC_PROP_EN_1000FDX_CAP:
-	case MAC_PROP_EN_100FDX_CAP:
-		perm = (ixgbe->hw.phy.media_type == ixgbe_media_type_copper) ?
+		perm = (hw->phy.media_type == ixgbe_media_type_copper) ?
 		    MAC_PROP_PERM_RW : MAC_PROP_PERM_READ;
 		mac_prop_info_set_perm(prh, perm);
 		mac_prop_info_set_default_uint8(prh, 1);
+		break;
+
+	case MAC_PROP_EN_10GFDX_CAP:
+		if (speeds & IXGBE_LINK_SPEED_10GB_FULL) {
+			perm = (hw->phy.media_type == ixgbe_media_type_copper) ?
+			    MAC_PROP_PERM_RW : MAC_PROP_PERM_READ;
+			mac_prop_info_set_perm(prh, perm);
+			mac_prop_info_set_default_uint8(prh, 1);
+		}
+		break;
+
+	case MAC_PROP_EN_5000FDX_CAP:
+		if (speeds & IXGBE_LINK_SPEED_5GB_FULL) {
+			perm = (hw->phy.media_type == ixgbe_media_type_copper) ?
+			    MAC_PROP_PERM_RW : MAC_PROP_PERM_READ;
+			mac_prop_info_set_perm(prh, perm);
+			mac_prop_info_set_default_uint8(prh, 1);
+		}
+		break;
+
+	case MAC_PROP_EN_2500FDX_CAP:
+		if (speeds & IXGBE_LINK_SPEED_2_5GB_FULL) {
+			perm = (hw->phy.media_type == ixgbe_media_type_copper) ?
+			    MAC_PROP_PERM_RW : MAC_PROP_PERM_READ;
+			mac_prop_info_set_perm(prh, perm);
+			mac_prop_info_set_default_uint8(prh, 1);
+		}
+		break;
+
+	case MAC_PROP_EN_1000FDX_CAP:
+		if (speeds & IXGBE_LINK_SPEED_1GB_FULL) {
+			perm = (hw->phy.media_type == ixgbe_media_type_copper) ?
+			    MAC_PROP_PERM_RW : MAC_PROP_PERM_READ;
+			mac_prop_info_set_perm(prh, perm);
+			mac_prop_info_set_default_uint8(prh, 1);
+		}
+		break;
+
+	case MAC_PROP_EN_100FDX_CAP:
+		if (speeds & IXGBE_LINK_SPEED_100_FULL) {
+			perm = (hw->phy.media_type == ixgbe_media_type_copper) ?
+			    MAC_PROP_PERM_RW : MAC_PROP_PERM_READ;
+			mac_prop_info_set_perm(prh, perm);
+			mac_prop_info_set_default_uint8(prh, 1);
+		}
 		break;
 
 	case MAC_PROP_FLOWCTRL:
@@ -595,6 +761,8 @@ ixgbe_param_locked(mac_prop_id_t pr_num)
 	 */
 	switch (pr_num) {
 		case MAC_PROP_EN_10GFDX_CAP:
+		case MAC_PROP_EN_5000FDX_CAP:
+		case MAC_PROP_EN_2500FDX_CAP:
 		case MAC_PROP_EN_1000FDX_CAP:
 		case MAC_PROP_EN_100FDX_CAP:
 		case MAC_PROP_AUTONEG:
@@ -712,12 +880,14 @@ ixgbe_set_priv_prop(ixgbe_t *ixgbe, const char *pr_name,
 			ixgbe->intr_throttling[0] = (uint32_t)result;
 
 			/*
-			 * 82599 and X540 require the interrupt throttling
+			 * 82599, X540 and X550 require the interrupt throttling
 			 * rate is a multiple of 8. This is enforced by the
 			 * register definiton.
 			 */
 			if (hw->mac.type == ixgbe_mac_82599EB ||
-			    hw->mac.type == ixgbe_mac_X540) {
+			    hw->mac.type == ixgbe_mac_X540 ||
+			    hw->mac.type == ixgbe_mac_X550 ||
+			    hw->mac.type == ixgbe_mac_X550EM_x) {
 				ixgbe->intr_throttling[0] =
 				    ixgbe->intr_throttling[0] & 0xFF8;
 			}

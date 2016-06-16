@@ -1,6 +1,6 @@
 /******************************************************************************
 
-  Copyright (c) 2001-2012, Intel Corporation 
+  Copyright (c) 2001-2015, Intel Corporation 
   All rights reserved.
   
   Redistribution and use in source and binary forms, with or without 
@@ -30,7 +30,7 @@
   POSSIBILITY OF SUCH DAMAGE.
 
 ******************************************************************************/
-/*$FreeBSD: src/sys/dev/ixgbe/ixgbe_82598.h,v 1.2 2012/07/05 20:51:44 jfv Exp $*/
+/*$FreeBSD$*/
 
 #ifndef _IXGBE_82598_H_
 #define _IXGBE_82598_H_
@@ -49,4 +49,5 @@ u32 ixgbe_get_supported_physical_layer_82598(struct ixgbe_hw *hw);
 s32 ixgbe_init_phy_ops_82598(struct ixgbe_hw *hw);
 void ixgbe_set_lan_id_multi_port_pcie_82598(struct ixgbe_hw *hw);
 void ixgbe_set_pcie_completion_timeout(struct ixgbe_hw *hw);
+s32 ixgbe_enable_rx_dma_82598(struct ixgbe_hw *hw, u32 regval);
 #endif /* _IXGBE_82598_H_ */

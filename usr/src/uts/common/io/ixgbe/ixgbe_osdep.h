@@ -28,6 +28,7 @@
  */
 /*
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright 2016 OmniTI Computer Consulting, Inc. All rights reserved.
  */
 
 #ifndef	_IXGBE_OSDEP_H
@@ -81,6 +82,8 @@ void ixgbe_write_pci_cfg(struct ixgbe_hw *, uint32_t, uint32_t);
 #define	PCI_COMMAND_REGISTER	0x04
 #define	PCI_EX_CONF_CAP		0xE0
 #define	SPEED_10GB		10000
+#define	SPEED_5GB		5000
+#define	SPEED_2_5GB		2500
 #define	SPEED_1GB		1000
 #define	SPEED_100		100
 #define	FULL_DUPLEX		2
@@ -107,18 +110,22 @@ void ixgbe_write_pci_cfg(struct ixgbe_hw *, uint32_t, uint32_t);
 #define	IXGBE_NTOHS	ntohs
 
 #ifdef _BIG_ENDIAN
-#define IXGBE_CPU_TO_LE32	BSWAP_32
-#define IXGBE_LE32_TO_CPUS 	BSWAP_32
+#define	IXGBE_CPU_TO_LE32	BSWAP_32
+#define	IXGBE_LE32_TO_CPUS	BSWAP_32
+#define	IXGBE_CPU_TO_BE16	(x)
+#define	IXGBE_CPU_TO_BE32	(x)
 #else
-#define IXGBE_CPU_TO_LE32(x)	(x)
-#define IXGBE_LE32_TO_CPUS(x)	(x)
-#endif	/* _BIG_ENDIAN */
+#define	IXGBE_CPU_TO_LE32(x)	(x)
+#define	IXGBE_LE32_TO_CPUS(x)	(x)
+#define	IXGBE_CPU_TO_BE16	BSWAP_16
+#define	IXGBE_CPU_TO_BE32	BSWAP_32
+#endif /* _BIG_ENDIAN */
 
 #define	UNREFERENCED_PARAMETER(x)		_NOTE(ARGUNUSED(x))
-#define UNREFERENCED_1PARAMETER(_p)		UNREFERENCED_PARAMETER(_p)
-#define UNREFERENCED_2PARAMETER(_p, _q)		_NOTE(ARGUNUSED(_p, _q))
-#define UNREFERENCED_3PARAMETER(_p, _q, _r)	_NOTE(ARGUNUSED(_p, _q, _r))
-#define UNREFERENCED_4PARAMETER(_p, _q, _r, _s)	_NOTE(ARGUNUSED(_p, _q,_r, _s))
+#define	UNREFERENCED_1PARAMETER(_p)		UNREFERENCED_PARAMETER(_p)
+#define	UNREFERENCED_2PARAMETER(_p, _q)		_NOTE(ARGUNUSED(_p, _q))
+#define	UNREFERENCED_3PARAMETER(_p, _q, _r)	_NOTE(ARGUNUSED(_p, _q, _r))
+#define	UNREFERENCED_4PARAMETER(_p, _q, _r, _s)	_NOTE(ARGUNUSED(_p, _q,_r, _s))
 
 
 
@@ -131,6 +138,14 @@ typedef	uint16_t 	u16;
 typedef	uint32_t	u32;
 typedef	uint64_t	u64;
 typedef boolean_t	bool;
+
+/* shared code requires this */
+#define	__le16  u16
+#define	__le32  u32
+#define	__le64  u64
+#define	__be16  u16
+#define	__be32  u32
+#define	__be64  u64
 
 struct ixgbe_osdep {
 	ddi_acc_handle_t reg_handle;

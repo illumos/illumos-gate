@@ -1,6 +1,6 @@
 /******************************************************************************
 
-  Copyright (c) 2001-2012, Intel Corporation 
+  Copyright (c) 2001-2015, Intel Corporation 
   All rights reserved.
   
   Redistribution and use in source and binary forms, with or without 
@@ -30,25 +30,28 @@
   POSSIBILITY OF SUCH DAMAGE.
 
 ******************************************************************************/
-/*$FreeBSD: src/sys/dev/ixgbe/ixgbe_common.h,v 1.12 2012/07/05 20:51:44 jfv Exp $*/
+/*$FreeBSD$*/
 
 #ifndef _IXGBE_COMMON_H_
 #define _IXGBE_COMMON_H_
 
 #include "ixgbe_type.h"
-#ifdef lint
-/* Use "hw" somehow... */
-#define IXGBE_WRITE_REG64(hw, reg, value) hw = hw
-#else
 #define IXGBE_WRITE_REG64(hw, reg, value) \
 	do { \
 		IXGBE_WRITE_REG(hw, reg, (u32) value); \
 		IXGBE_WRITE_REG(hw, reg + 4, (u32) (value >> 32)); \
 	} while (0)
+#define IXGBE_REMOVED(a) (0)
+#if !defined(NO_READ_PBA_RAW) || !defined(NO_WRITE_PBA_RAW)
+struct ixgbe_pba {
+	u16 word[2];
+	u16 *pba_block;
+};
 #endif
 
-u16 ixgbe_get_pcie_msix_count_generic(struct ixgbe_hw *hw);
+void ixgbe_dcb_get_rtrup2tc_generic(struct ixgbe_hw *hw, u8 *map);
 
+u16 ixgbe_get_pcie_msix_count_generic(struct ixgbe_hw *hw);
 s32 ixgbe_init_ops_generic(struct ixgbe_hw *hw);
 s32 ixgbe_init_hw_generic(struct ixgbe_hw *hw);
 s32 ixgbe_start_hw_generic(struct ixgbe_hw *hw);
@@ -57,8 +60,16 @@ s32 ixgbe_clear_hw_cntrs_generic(struct ixgbe_hw *hw);
 s32 ixgbe_read_pba_num_generic(struct ixgbe_hw *hw, u32 *pba_num);
 s32 ixgbe_read_pba_string_generic(struct ixgbe_hw *hw, u8 *pba_num,
 				  u32 pba_num_size);
+s32 ixgbe_read_pba_raw(struct ixgbe_hw *hw, u16 *eeprom_buf,
+		       u32 eeprom_buf_size, u16 max_pba_block_size,
+		       struct ixgbe_pba *pba);
+s32 ixgbe_write_pba_raw(struct ixgbe_hw *hw, u16 *eeprom_buf,
+			u32 eeprom_buf_size, struct ixgbe_pba *pba);
+s32 ixgbe_get_pba_block_size(struct ixgbe_hw *hw, u16 *eeprom_buf,
+			     u32 eeprom_buf_size, u16 *pba_block_size);
 s32 ixgbe_get_mac_addr_generic(struct ixgbe_hw *hw, u8 *mac_addr);
 s32 ixgbe_get_bus_info_generic(struct ixgbe_hw *hw);
+void ixgbe_set_pci_config_data_generic(struct ixgbe_hw *hw, u16 link_status);
 void ixgbe_set_lan_id_multi_port_pcie(struct ixgbe_hw *hw);
 s32 ixgbe_stop_adapter_generic(struct ixgbe_hw *hw);
 
@@ -79,7 +90,7 @@ s32 ixgbe_read_eeprom_bit_bang_generic(struct ixgbe_hw *hw, u16 offset,
 				       u16 *data);
 s32 ixgbe_read_eeprom_buffer_bit_bang_generic(struct ixgbe_hw *hw, u16 offset,
 					      u16 words, u16 *data);
-u16 ixgbe_calc_eeprom_checksum_generic(struct ixgbe_hw *hw);
+s32 ixgbe_calc_eeprom_checksum_generic(struct ixgbe_hw *hw);
 s32 ixgbe_validate_eeprom_checksum_generic(struct ixgbe_hw *hw,
 					   u16 *checksum_val);
 s32 ixgbe_update_eeprom_checksum_generic(struct ixgbe_hw *hw);
@@ -101,12 +112,17 @@ s32 ixgbe_disable_sec_rx_path_generic(struct ixgbe_hw *hw);
 s32 ixgbe_enable_sec_rx_path_generic(struct ixgbe_hw *hw);
 
 s32 ixgbe_fc_enable_generic(struct ixgbe_hw *hw);
+bool ixgbe_device_supports_autoneg_fc(struct ixgbe_hw *hw);
 void ixgbe_fc_autoneg(struct ixgbe_hw *hw);
+s32 ixgbe_setup_fc_generic(struct ixgbe_hw *hw);
 
 s32 ixgbe_validate_mac_addr(u8 *mac_addr);
-s32 ixgbe_acquire_swfw_sync(struct ixgbe_hw *hw, u16 mask);
-void ixgbe_release_swfw_sync(struct ixgbe_hw *hw, u16 mask);
+s32 ixgbe_acquire_swfw_sync(struct ixgbe_hw *hw, u32 mask);
+void ixgbe_release_swfw_sync(struct ixgbe_hw *hw, u32 mask);
 s32 ixgbe_disable_pcie_master(struct ixgbe_hw *hw);
+
+s32 prot_autoc_read_generic(struct ixgbe_hw *hw, bool *, u32 *reg_val);
+s32 prot_autoc_write_generic(struct ixgbe_hw *hw, u32 reg_val, bool locked);
 
 s32 ixgbe_blink_led_start_generic(struct ixgbe_hw *hw, u32 index);
 s32 ixgbe_blink_led_stop_generic(struct ixgbe_hw *hw, u32 index);
@@ -142,5 +158,22 @@ void ixgbe_set_rxpba_generic(struct ixgbe_hw *hw, int num_pb, u32 headroom,
 void ixgbe_enable_relaxed_ordering_gen2(struct ixgbe_hw *hw);
 s32 ixgbe_set_fw_drv_ver_generic(struct ixgbe_hw *hw, u8 maj, u8 min,
 				 u8 build, u8 ver);
+u8 ixgbe_calculate_checksum(u8 *buffer, u32 length);
+s32 ixgbe_host_interface_command(struct ixgbe_hw *hw, u32 *buffer,
+				 u32 length, u32 timeout, bool return_data);
+
 void ixgbe_clear_tx_pending(struct ixgbe_hw *hw);
+
+extern s32 ixgbe_reset_pipeline_82599(struct ixgbe_hw *hw);
+extern void ixgbe_stop_mac_link_on_d3_82599(struct ixgbe_hw *hw);
+bool ixgbe_mng_present(struct ixgbe_hw *hw);
+bool ixgbe_mng_enabled(struct ixgbe_hw *hw);
+
+void ixgbe_disable_rx_generic(struct ixgbe_hw *hw);
+void ixgbe_enable_rx_generic(struct ixgbe_hw *hw);
+s32 ixgbe_setup_mac_link_multispeed_fiber(struct ixgbe_hw *hw,
+					  ixgbe_link_speed speed,
+					  bool autoneg_wait_to_complete);
+void ixgbe_set_soft_rate_select_speed(struct ixgbe_hw *hw,
+				      ixgbe_link_speed speed);
 #endif /* IXGBE_COMMON */
