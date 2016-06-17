@@ -108,11 +108,11 @@ lx_io_setup(unsigned int nr_events, lx_aio_context_t *cidp)
 	ctx->lxaio_nevents = nr_events;
 
 	if ((ctx->lxaio_port = port_create()) == -1) {
-		munmap((caddr_t)ctx, ctx->lxaio_size);
+		(void) munmap((caddr_t)ctx, ctx->lxaio_size);
 		return (-EAGAIN);
 	}
 
-	(void) mutex_init(&ctx->lxaio_lock, USYNC_THREAD, NULL);
+	(void) mutex_init(&ctx->lxaio_lock, USYNC_THREAD|LOCK_ERRORCHECK, NULL);
 
 	/*
 	 * Link up the free list.
@@ -126,7 +126,7 @@ lx_io_setup(unsigned int nr_events, lx_aio_context_t *cidp)
 
 	if (uucopy(&ctx, cidp, sizeof (cidp)) != 0) {
 		(void) close(ctx->lxaio_port);
-		munmap((caddr_t)ctx, ctx->lxaio_size);
+		(void) munmap((caddr_t)ctx, ctx->lxaio_size);
 		return (-EFAULT);
 	}
 
@@ -154,7 +154,7 @@ lx_io_submit(lx_aio_context_t cid, long nr, uintptr_t **bpp)
 		return (-EFAULT);
 	}
 
-	mutex_lock(&ctx->lxaio_lock);
+	mutex_enter(&ctx->lxaio_lock);
 
 	for (i = 0; i < nr; i++) {
 		if ((lxcb = ctx->lxaio_free) == NULL) {
@@ -268,7 +268,7 @@ lx_io_submit(lx_aio_context_t cid, long nr, uintptr_t **bpp)
 		processed++;
 	}
 
-	mutex_unlock(&ctx->lxaio_lock);
+	mutex_exit(&ctx->lxaio_lock);
 
 	free(iocbpp);
 	if (processed == 0)
@@ -303,21 +303,21 @@ lx_io_getevents(lx_aio_context_t cid, long min_nr, long nr,
 	 * waiters.  This is needed in case this context is destroyed while
 	 * we're still waiting on it.
 	 */
-	mutex_lock(&ctx->lxaio_lock);
+	mutex_enter(&ctx->lxaio_lock);
 
 	if (ctx->lxaio_destroying) {
-		mutex_unlock(&ctx->lxaio_lock);
+		mutex_exit(&ctx->lxaio_lock);
 		free(list);
 		return (-EINVAL);
 	}
 
 	ctx->lxaio_waiters++;
-	mutex_unlock(&ctx->lxaio_lock);
+	mutex_exit(&ctx->lxaio_lock);
 
 	rval = port_getn(ctx->lxaio_port, list, max, &nget, timeout);
 	err = errno;
 
-	mutex_lock(&ctx->lxaio_lock);
+	mutex_enter(&ctx->lxaio_lock);
 
 	assert(ctx->lxaio_waiters > 0);
 	ctx->lxaio_waiters--;
@@ -329,18 +329,18 @@ lx_io_getevents(lx_aio_context_t cid, long min_nr, long nr,
 		 * EINVAL -- this is effectively an application-level race.
 		 */
 		if (ctx->lxaio_destroying) {
-			cond_signal(&ctx->lxaio_destroyer);
+			(void) cond_signal(&ctx->lxaio_destroyer);
 			err = EINVAL;
 		}
 
-		mutex_unlock(&ctx->lxaio_lock);
+		mutex_exit(&ctx->lxaio_lock);
 
 		free(list);
 		return (nget == 0 ? 0 : -err);
 	}
 
 	if ((out = malloc(nget * sizeof (lx_io_event_t))) == NULL) {
-		mutex_unlock(&ctx->lxaio_lock);
+		mutex_exit(&ctx->lxaio_lock);
 		free(list);
 		return (-EINTR);
 	}
@@ -391,13 +391,13 @@ lx_io_getevents(lx_aio_context_t cid, long min_nr, long nr,
 	 * this after having properly cleaned up the completed I/O.)
 	 */
 	if (ctx->lxaio_destroying) {
-		cond_signal(&ctx->lxaio_destroyer);
-		mutex_unlock(&ctx->lxaio_lock);
+		(void) cond_signal(&ctx->lxaio_destroyer);
+		mutex_exit(&ctx->lxaio_lock);
 		free(out);
 		return (-EINVAL);
 	}
 
-	mutex_unlock(&ctx->lxaio_lock);
+	mutex_exit(&ctx->lxaio_lock);
 
 	if (uucopy(out, events, nget * sizeof (lx_io_event_t)) != 0) {
 		free(out);
@@ -449,10 +449,10 @@ lx_io_cancel(lx_aio_context_t cid, lx_iocb_t *iocbp, lx_io_event_t *result)
 	if (uucopy(iocbp, &iocb, sizeof (lx_iocb_t)) != 0)
 		return (-EFAULT);
 
-	mutex_lock(&ctx->lxaio_lock);
+	mutex_enter(&ctx->lxaio_lock);
 
 	if (ctx->lxaio_destroying) {
-		mutex_unlock(&ctx->lxaio_lock);
+		mutex_exit(&ctx->lxaio_lock);
 		return (-EINVAL);
 	}
 
@@ -460,7 +460,7 @@ lx_io_cancel(lx_aio_context_t cid, lx_iocb_t *iocbp, lx_io_event_t *result)
 	    lxcb->lxaiocb_iocbp != (uintptr_t)iocbp; lxcb = lxcb->lxaiocb_next)
 		continue;
 
-	mutex_unlock(&ctx->lxaio_lock);
+	mutex_exit(&ctx->lxaio_lock);
 
 	if (lxcb == NULL)
 		return (-EINVAL);
@@ -487,10 +487,10 @@ lx_io_destroy(lx_aio_context_t cid)
 	lx_aio_ctxt_t *ctx = (lx_aio_ctxt_t *)cid;
 
 	port = ctx->lxaio_port;
-	mutex_lock(&ctx->lxaio_lock);
+	mutex_enter(&ctx->lxaio_lock);
 
 	if (ctx->lxaio_destroying) {
-		mutex_unlock(&ctx->lxaio_lock);
+		mutex_exit(&ctx->lxaio_lock);
 		return (-EINVAL);
 	}
 
@@ -502,8 +502,10 @@ lx_io_destroy(lx_aio_context_t cid)
 		 */
 		(void) port_alert(port, PORT_ALERT_SET, B_TRUE, NULL);
 
-		while (ctx->lxaio_waiters)
-			cond_wait(&ctx->lxaio_destroyer, &ctx->lxaio_lock);
+		while (ctx->lxaio_waiters) {
+			(void) cond_wait(&ctx->lxaio_destroyer,
+			    &ctx->lxaio_lock);
+		}
 
 		/*
 		 * Transition the port out of alert mode:  we will need to
@@ -550,7 +552,7 @@ lx_io_destroy(lx_aio_context_t cid)
 	 * port and nuke the mapping that contains our context.
 	 */
 	(void) close(ctx->lxaio_port);
-	munmap((caddr_t)ctx, ctx->lxaio_size);
+	(void) munmap((caddr_t)ctx, ctx->lxaio_size);
 
 	return (0);
 }

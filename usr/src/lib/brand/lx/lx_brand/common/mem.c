@@ -362,7 +362,7 @@ lx_mprotect(uintptr_t start, uintptr_t len, uintptr_t prot)
 static prmap_t	lx_remap_anoncache[LX_REMAP_ANONCACHE_NENTRIES];
 static int	lx_remap_anoncache_nentries = LX_REMAP_ANONCACHE_NENTRIES;
 static offset_t	lx_remap_anoncache_generation;
-static mutex_t	lx_remap_anoncache_lock = DEFAULTMUTEX;
+static mutex_t	lx_remap_anoncache_lock = ERRORCHECKMUTEX;
 
 static void
 lx_remap_anoncache_invalidate(uintptr_t addr, size_t size)
@@ -372,7 +372,7 @@ lx_remap_anoncache_invalidate(uintptr_t addr, size_t size)
 	if (lx_remap_anoncache_generation == 0)
 		return;
 
-	mutex_lock(&lx_remap_anoncache_lock);
+	mutex_enter(&lx_remap_anoncache_lock);
 
 	for (i = 0; i < LX_REMAP_ANONCACHE_NENTRIES; i++) {
 		prmap_t *map = &lx_remap_anoncache[i];
@@ -387,7 +387,7 @@ lx_remap_anoncache_invalidate(uintptr_t addr, size_t size)
 		}
 	}
 
-	mutex_unlock(&lx_remap_anoncache_lock);
+	mutex_exit(&lx_remap_anoncache_lock);
 }
 
 static void
@@ -426,7 +426,7 @@ lx_remap_anoncache_load(prmap_t *map, size_t size)
 		return;
 	}
 
-	mutex_lock(&lx_remap_anoncache_lock);
+	mutex_enter(&lx_remap_anoncache_lock);
 
 	for (i = 0; i < lx_remap_anoncache_nentries; i++) {
 		if (lx_remap_anoncache[i].pr_vaddr == 0) {
@@ -446,7 +446,7 @@ lx_remap_anoncache_load(prmap_t *map, size_t size)
 		evict->pr_size = size;
 	}
 
-	mutex_unlock(&lx_remap_anoncache_lock);
+	mutex_exit(&lx_remap_anoncache_lock);
 }
 
 /*
@@ -622,7 +622,7 @@ lx_remap(uintptr_t old_address, uintptr_t old_size,
 	 * drop straight into lx_remap_anon() and save ourself the pain of
 	 * the /proc reads.
 	 */
-	mutex_lock(&lx_remap_anoncache_lock);
+	mutex_enter(&lx_remap_anoncache_lock);
 
 	for (i = 0; i < lx_remap_anoncache_nentries; i++) {
 		map = &lx_remap_anoncache[i];
@@ -635,14 +635,14 @@ lx_remap(uintptr_t old_address, uintptr_t old_size,
 
 		if (lx_remap_anon(map, NULL,
 		    0, new_size, 0, new_address) == old_address) {
-			mutex_unlock(&lx_remap_anoncache_lock);
+			mutex_exit(&lx_remap_anoncache_lock);
 			return (old_address);
 		}
 
 		break;
 	}
 
-	mutex_unlock(&lx_remap_anoncache_lock);
+	mutex_exit(&lx_remap_anoncache_lock);
 
 	/*
 	 * We need to search the mappings to find our specified mapping.  Note

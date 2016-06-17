@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2015 Joyent, Inc.  All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*
@@ -19,6 +19,7 @@
 
 #include <sys/types.h>
 #include <sys/errno.h>
+#include <sys/debug.h>
 #include <sys/lx_types.h>
 #include <sys/lx_syscall.h>
 #include <sys/syscall.h>
@@ -191,20 +192,20 @@ static unsigned int lx_cap_priv_size = 0;
 
 /* safely allocate priv_set_t triplet on the stack */
 #define	LX_CAP_ALLOC_PRIVS(ptr)	\
-	do { \
+	{ \
 		ptr = SAFE_ALLOCA(sizeof (lx_cap_privs_t) + \
 		    (3 * lx_cap_priv_size)); \
 		if (ptr != NULL) { \
-			ptr->p_effective = (void *) ptr + \
-			    sizeof (lx_cap_privs_t); \
-			ptr->p_permitted = (void *) ptr + \
-			    sizeof (lx_cap_privs_t) + \
-			    lx_cap_priv_size;\
-			ptr->p_inheritable = (void *) ptr + \
-			    sizeof (lx_cap_privs_t) + \
-			    2 * lx_cap_priv_size; \
+			ptr->p_effective = (priv_set_t *) \
+			    ((caddr_t)ptr + sizeof (lx_cap_privs_t)); \
+			ptr->p_permitted = (priv_set_t *) \
+			    ((caddr_t)ptr + sizeof (lx_cap_privs_t) + \
+			    lx_cap_priv_size);\
+			ptr->p_inheritable = (priv_set_t *) \
+			    ((caddr_t)ptr + sizeof (lx_cap_privs_t) + \
+			    2 * lx_cap_priv_size); \
 		} \
-	} while (0)
+	}
 
 static long
 lx_cap_update_priv(priv_set_t *priv, const uint32_t cap[])
@@ -239,10 +240,12 @@ lx_cap_update_priv(priv_set_t *priv, const uint32_t cap[])
 		for (j = 0; lx_cap_mapping[i][j] != NULL; j++) {
 			priv_set = priv_ismember(priv, lx_cap_mapping[i][j]);
 			if (priv_set && !cap_set) {
-				priv_delset(priv, lx_cap_mapping[i][j]);
+				VERIFY0(priv_delset(priv,
+				    lx_cap_mapping[i][j]));
 				updated = B_TRUE;
 			} else if (!priv_set && cap_set) {
-				priv_addset(priv, lx_cap_mapping[i][j]);
+				VERIFY0(priv_addset(priv,
+				    lx_cap_mapping[i][j]));
 				updated = B_TRUE;
 			}
 		}
@@ -285,7 +288,7 @@ lx_cap_from_priv(const priv_set_t *priv, uint32_t cap[])
 {
 	int i, j;
 	boolean_t valid;
-	memset(cap, '\0', sizeof (uint32_t) * LX_CAP_MAXLEN);
+	(void) memset(cap, '\0', sizeof (uint32_t) * LX_CAP_MAXLEN);
 	for (i = 0; i <= LX_CAP_MAX_VALID; i++) {
 		if (lx_cap_mapping[i] == NULL) {
 			continue;
@@ -332,7 +335,7 @@ lx_cap_read_cap(const lx_cap_user_header_t *uhp, const lx_cap_user_data_t *udp,
 		return (-EPERM);
 
 	/* zero the struct in case cap_count < 2 */
-	memset(cd, '\0', sizeof (lx_cap_data_t));
+	(void) memset(cd, '\0', sizeof (lx_cap_data_t));
 
 	for (i = 0; i < cap_count; i++) {
 		if (uucopy(udp + i, &ud_buf, sizeof (ud_buf)) != 0)
@@ -394,7 +397,8 @@ lx_capget(uintptr_t p1, uintptr_t p2)
 	if (uh.pid < 0)
 		return (-EINVAL);
 
-	LX_CAP_ALLOC_PRIVS(privs);
+	LX_CAP_ALLOC_PRIVS(privs)
+
 	if (privs == NULL)
 		return (-ENOMEM);
 
@@ -440,7 +444,8 @@ lx_capset(uintptr_t p1, uintptr_t p2)
 	if (result != 0)
 		return (result);
 
-	LX_CAP_ALLOC_PRIVS(privs);
+	LX_CAP_ALLOC_PRIVS(privs)
+
 	if (privs == NULL)
 		return (-ENOMEM);
 

@@ -266,6 +266,7 @@ clone_start(void *arg)
 	 * Jump to the Linux process.  This call cannot return.
 	 */
 	lx_jump_to_linux(&cs->c_uc);
+	/* NOTREACHED */
 }
 
 /*
@@ -522,7 +523,9 @@ lx_clone(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4, uintptr_t p5)
 			 * not to mention myriad other undefined behaviour.
 			 */
 			bcopy(ucp, &vforkuc, sizeof (vforkuc));
-			vforkuc.uc_brand_data[1] -= LX_NATIVE_STACK_VFORK_GAP;
+			vforkuc.uc_brand_data[1] =
+			    (caddr_t)vforkuc.uc_brand_data[1] -
+			    LX_NATIVE_STACK_VFORK_GAP;
 			vforkuc.uc_link = NULL;
 
 			lx_debug("\tvfork native stack sp %p",

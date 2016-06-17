@@ -25,38 +25,25 @@
  */
 
 #include <stdlib.h>
-#include <assert.h>
-#include <alloca.h>
+#include <unistd.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <priv.h>
 #include <strings.h>
-#include <macros.h>
-#include <sys/brand.h>
 #include <sys/reboot.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
 #include <sys/sysmacros.h>
 #include <sys/systeminfo.h>
 #include <sys/types.h>
-#include <sys/mman.h>
 #include <sys/shm.h>
 #include <sys/socket.h>
-#include <sys/lx_types.h>
+#include <sys/inotify.h>
+#include <sys/eventfd.h>
 #include <sys/lx_debug.h>
 #include <sys/lx_misc.h>
 #include <sys/lx_syscall.h>
 #include <sys/lx_fcntl.h>
-#include <sys/lx_thread.h>
-#include <sys/inotify.h>
-#include <sys/eventfd.h>
-#include <thread.h>
-#include <unistd.h>
-#include <libintl.h>
-#include <zone.h>
-#include <priv.h>
-#include <procfs.h>
-#include <lx_syscall.h>
-#include <sys/lx_socket.h>
 
 extern int sethostname(char *, int);
 
