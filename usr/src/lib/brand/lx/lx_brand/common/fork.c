@@ -151,7 +151,8 @@ lx_vfork(void)
 		 * in lx_stack_prefork().
 		 */
 		bcopy(ucp, &vforkuc, sizeof (vforkuc));
-		vforkuc.uc_brand_data[1] -= LX_NATIVE_STACK_VFORK_GAP;
+		vforkuc.uc_brand_data[1] = (caddr_t)vforkuc.uc_brand_data[1] -
+		    LX_NATIVE_STACK_VFORK_GAP;
 		vforkuc.uc_link = NULL;
 
 		lx_debug("\tvfork native stack sp %p",

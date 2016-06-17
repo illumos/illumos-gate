@@ -167,7 +167,7 @@ static void
 lx_sigev_thread_id(union sigval sival)
 {
 	lx_sigevent_t *lev = (lx_sigevent_t *)sival.sival_ptr;
-	syscall(SYS_brand, B_SIGEV_THREAD_ID, lev->lx_sigev_un.lx_tid,
+	(void) syscall(SYS_brand, B_SIGEV_THREAD_ID, lev->lx_sigev_un.lx_tid,
 	    lev->lx_sigev_signo, lev->lx_sigev_value.sival_ptr);
 	free(lev);
 }

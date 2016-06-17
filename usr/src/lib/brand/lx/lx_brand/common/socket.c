@@ -111,24 +111,7 @@ static const int ltos_family[LX_AF_MAX + 1] =  {
 	AF_NOTSUPPORTED
 };
 
-#define	LX_AF_INET6	10
-#define	LX_AF_NETLINK	16
-#define	LX_AF_PACKET	17
-
-static const int stol_family[LX_AF_MAX + 1] =  {
-	AF_UNSPEC, AF_UNIX, AF_INET, AF_NOTSUPPORTED, AF_NOTSUPPORTED,
-	AF_NOTSUPPORTED, AF_NOTSUPPORTED, AF_NOTSUPPORTED, AF_NOTSUPPORTED,
-	AF_NOTSUPPORTED, AF_NOTSUPPORTED, AF_NOTSUPPORTED, AF_NOTSUPPORTED,
-	AF_NOTSUPPORTED, AF_NOTSUPPORTED, AF_NOTSUPPORTED, AF_NOTSUPPORTED,
-	AF_NOTSUPPORTED, AF_NOTSUPPORTED, AF_NOTSUPPORTED, AF_NOTSUPPORTED,
-	AF_NOTSUPPORTED, AF_NOTSUPPORTED, AF_NOTSUPPORTED, AF_NOTSUPPORTED,
-	AF_NOTSUPPORTED, LX_AF_INET6, AF_NOTSUPPORTED, AF_NOTSUPPORTED,
-	AF_NOTSUPPORTED, AF_NOTSUPPORTED, AF_NOTSUPPORTED, LX_AF_PACKET,
-	LX_AF_NETLINK
-};
-
 #define	LTOS_FAMILY(d) ((d) <= LX_AF_MAX ? ltos_family[(d)] : AF_INVAL)
-#define	STOL_FAMILY(d) ((d) <= LX_AF_MAX ? stol_family[(d)] : AF_INVAL)
 
 static const int ltos_socktype[LX_SOCK_PACKET + 1] = {
 	SOCK_NOTSUPPORTED, SOCK_STREAM, SOCK_DGRAM, SOCK_RAW,
@@ -138,11 +121,6 @@ static const int ltos_socktype[LX_SOCK_PACKET + 1] = {
 
 #define	LTOS_SOCKTYPE(t)	\
 	((t) <= LX_SOCK_PACKET ? ltos_socktype[(t)] : SOCK_INVAL)
-
-static const int stol_socktype[SOCK_SEQPACKET + 1] = {
-	SOCK_NOTSUPPORTED, LX_SOCK_DGRAM, LX_SOCK_STREAM, SOCK_NOTSUPPORTED,
-	LX_SOCK_RAW, LX_SOCK_RDM, LX_SOCK_SEQPACKET
-};
 
 typedef struct {
 	sa_family_t	nl_family;
@@ -304,6 +282,7 @@ lx_shutdown32(ulong_t *args)
 	return (lx_shutdown((int)args[0], (int)args[1]));
 }
 
+/* ARGSUSED */
 static int
 lx_recvmmsg32(ulong_t *args)
 {
@@ -311,6 +290,7 @@ lx_recvmmsg32(ulong_t *args)
 	return (-EINVAL);
 }
 
+/* ARGSUSED */
 static int
 lx_sendmmsg32(ulong_t *args)
 {

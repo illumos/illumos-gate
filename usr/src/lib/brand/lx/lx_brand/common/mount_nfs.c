@@ -266,13 +266,11 @@ static int make_secure(struct nfs_args *, char *, struct netconfig *,
 	rpcvers_t, nfs_mnt_data_t *);
 static int mount_nfs(struct mnttab *, int, err_ret_t *, nfs_mnt_data_t *);
 static int getaddr_nfs(struct nfs_args *, char *, struct netconfig **,
-	char *, ushort_t, err_ret_t *, bool_t, nfs_mnt_data_t *);
+	ushort_t, err_ret_t *, bool_t, nfs_mnt_data_t *);
 static struct netbuf *get_addr(char *, rpcprog_t, rpcvers_t,
-	struct netconfig **, char *, ushort_t, struct t_info *,
-	caddr_t *, char *, err_ret_t *);
+	struct netconfig **, char *, ushort_t, struct t_info *, err_ret_t *);
 static struct netbuf *get_the_addr(char *, rpcprog_t, rpcvers_t,
-	struct netconfig *, ushort_t, struct t_info *, caddr_t *,
-	char *, err_ret_t *);
+	struct netconfig *, ushort_t, struct t_info *, err_ret_t *);
 
 static int lx_nsl_set_sz_func(void);
 static struct netconfig *lx_get_ent_func(int);
@@ -397,8 +395,8 @@ mount_nfs(struct mnttab *mntp, int mntflags, err_ret_t *retry_error,
 	if (argp == NULL)
 		return (-ENOMEM);
 
-	memset(argp, 0, sizeof (*argp));
-	memset(&nmdp->nmd_nfs_sec, 0, sizeof (seconfig_t));
+	(void) memset(argp, 0, sizeof (*argp));
+	(void) memset(&nmdp->nmd_nfs_sec, 0, sizeof (seconfig_t));
 	nmdp->nmd_sec_opt = 0;
 	port = 0;
 
@@ -427,8 +425,8 @@ mount_nfs(struct mnttab *mntp, int mntflags, err_ret_t *retry_error,
 	if (!(argp->flags & NFSMNT_KNCONF)) {
 		nconf = NULL;
 		/* returns a negative errno or positive EAGAIN for retry */
-		r = getaddr_nfs(argp, host, &nconf, path, port,
-		    retry_error, TRUE, nmdp);
+		r = getaddr_nfs(argp, host, &nconf, port, retry_error, TRUE,
+		    nmdp);
 		if (r != 0) {
 			goto out;
 		}
@@ -600,7 +598,7 @@ set_args(int *mntflags, struct nfs_args *args, char *fshost, struct mnttab *mnt,
 	int largefiles = 0;
 	int invalid = 0;
 	int attrpref = 0;
-	int optlen;
+	int optlen, oldlen;
 
 	args->flags = NFSMNT_INT;	/* default is "intr" */
 	args->flags |= NFSMNT_HOSTNAME;
@@ -608,8 +606,9 @@ set_args(int *mntflags, struct nfs_args *args, char *fshost, struct mnttab *mnt,
 	args->hostname = fshost;
 
 	optstr = opts = strdup(mnt->mnt_mntopts);
+	oldlen = strlen(mnt->mnt_mntopts);
 	/* sizeof (MNTOPT_XXX) includes one extra byte we may need for "," */
-	optlen = strlen(mnt->mnt_mntopts) + sizeof (MNTOPT_XATTR) + 1;
+	optlen = oldlen + sizeof (MNTOPT_XATTR) + 1;
 	if (optlen > MAX_MNTOPT_STR)
 		return (-EINVAL);
 
@@ -822,18 +821,20 @@ set_args(int *mntflags, struct nfs_args *args, char *fshost, struct mnttab *mnt,
 			break;
 		}
 		if (!invalid) {
-			if (newopts[0])
-				strcat(newopts, ",");
-			strcat(newopts, saveopt);
+			if (newopts[0] != '\0') {
+				(void) strlcat(newopts, ",", optlen);
+			}
+			(void) strlcat(newopts, saveopt, optlen);
 		}
 	}
 	/* Default is to turn extended attrs on */
 	if (!attrpref) {
-		if (newopts[0])
-			strcat(newopts, ",");
-		strcat(newopts, MNTOPT_XATTR);
+		if (newopts[0]) {
+			(void) strlcat(newopts, ",", optlen);
+		}
+		(void) strlcat(newopts, MNTOPT_XATTR, optlen);
 	}
-	strcpy(mnt->mnt_mntopts, newopts);
+	(void) strlcpy(mnt->mnt_mntopts, newopts, oldlen);
 	free(newopts);
 	free(optstr);
 
@@ -990,7 +991,7 @@ make_secure(struct nfs_args *args, char *hostname, struct netconfig *nconf,
 	 */
 	if (!nmdp->nmd_sec_opt) {
 		/* AUTH_UNIX is the default. */
-		strlcpy(nmdp->nmd_nfs_sec.sc_name, "sys", MAX_NAME_LEN);
+		(void) strlcpy(nmdp->nmd_nfs_sec.sc_name, "sys", MAX_NAME_LEN);
 		nmdp->nmd_nfs_sec.sc_nfsnum = 1;
 		args->flags |= NFSMNT_SECDEFAULT;
 	}
@@ -1015,7 +1016,7 @@ make_secure(struct nfs_args *args, char *hostname, struct netconfig *nconf,
 		 */
 		if (vers != NFS_V4)
 			syncaddr = get_the_addr(hostname, RPCBPROG, RPCBVERS,
-			    nconf, 0, NULL, NULL, NULL, NULL);
+			    nconf, 0, NULL, NULL);
 
 		if (syncaddr != NULL) {
 			/* for flags in sec_data */
@@ -1109,8 +1110,8 @@ make_secure(struct nfs_args *args, char *hostname, struct netconfig *nconf,
  */
 static struct netbuf *
 get_the_addr(char *hostname, rpcprog_t prog, rpcvers_t vers,
-	struct netconfig *nconf, ushort_t port, struct t_info *tinfo,
-	caddr_t *fhp, char *fspath, err_ret_t *error)
+    struct netconfig *nconf, ushort_t port, struct t_info *tinfo,
+    err_ret_t *error)
 {
 	struct netbuf *nb = NULL;
 	struct t_bind *tbind = NULL;
@@ -1161,7 +1162,7 @@ get_the_addr(char *hostname, rpcprog_t prog, rpcvers_t vers,
 
 			goto done;
 		}
-		memcpy(tbind->addr.buf, retaddrs->n_addrs->buf,
+		(void) memcpy(tbind->addr.buf, retaddrs->n_addrs->buf,
 		    retaddrs->n_addrs->len);
 		tbind->addr.len = retaddrs->n_addrs->len;
 		netdir_free((void *)retaddrs, ND_ADDRLIST);
@@ -1175,13 +1176,15 @@ get_the_addr(char *hostname, rpcprog_t prog, rpcvers_t vers,
 	}
 
 	if (port) {
-		/* LINTED pointer alignment */
-		if (strcmp(nconf->nc_protofmly, NC_INET) == 0)
+		if (strcmp(nconf->nc_protofmly, NC_INET) == 0) {
+			/* LINTED alignment */
 			((struct sockaddr_in *)tbind->addr.buf)->sin_port
 			    = port;
-		else if (strcmp(nconf->nc_protofmly, NC_INET6) == 0)
+		} else if (strcmp(nconf->nc_protofmly, NC_INET6) == 0) {
+			/* LINTED alignment */
 			((struct sockaddr_in6 *)tbind->addr.buf)->sin6_port
 			    = port;
+		}
 
 	}
 
@@ -1263,7 +1266,7 @@ done:
 		cl = NULL;
 	}
 	if (tbind) {
-		t_free((char *)tbind, T_BIND);
+		(void) t_free((char *)tbind, T_BIND);
 		tbind = NULL;
 	}
 	if (fd >= 0)
@@ -1358,7 +1361,7 @@ nomem:
 static struct netbuf *
 get_addr(char *hostname, rpcprog_t prog, rpcvers_t vers,
     struct netconfig **nconfp, char *proto, ushort_t port,
-    struct t_info *tinfo, caddr_t *fhp, char *fspath, err_ret_t *error)
+    struct t_info *tinfo, err_ret_t *error)
 {
 	struct netbuf *nb = NULL;
 	struct netconfig *nconf = NULL;
@@ -1373,7 +1376,7 @@ get_addr(char *hostname, rpcprog_t prog, rpcvers_t vers,
 
 	if (nconfp && *nconfp)
 		return (get_the_addr(hostname, prog, vers, *nconfp, port,
-		    tinfo, fhp, fspath, error));
+		    tinfo, error));
 	/*
 	 * No nconf passed in.
 	 *
@@ -1400,7 +1403,7 @@ get_addr(char *hostname, rpcprog_t prog, rpcvers_t vers,
 			SET_ERR_RET(error, ERR_PROTO_UNSUPP, 0);
 
 			nb = get_the_addr(hostname, prog, vers, nconf, port,
-			    tinfo, fhp, fspath, error);
+			    tinfo, error);
 			if (nb != NULL)
 				break;
 
@@ -1427,7 +1430,7 @@ get_addr(char *hostname, rpcprog_t prog, rpcvers_t vers,
 
 		if (nb == NULL &&
 		    (nb = get_the_addr(hostname, prog, vers, nconf, port,
-		    tinfo, fhp, fspath, error)) == NULL)
+		    tinfo, error)) == NULL)
 			goto done;
 	} else {
 retry:
@@ -1443,7 +1446,7 @@ retry:
 					continue;
 
 				nb = get_the_addr(hostname, prog, vers, nconf,
-				    port, tinfo, fhp, fspath, error);
+				    port, tinfo, error);
 				if (nb != NULL)
 					break;
 
@@ -1658,7 +1661,7 @@ get_fh(struct nfs_args *args, char *fshost, char *fspath, int *versp,
 		/* Let's hope for the best */
 		nmdp->nmd_nfsvers_to_use = NFS_V4;
 		retval = getaddr_nfs(args, fshost, nconfp,
-		    fspath, port, &error, vers_min == NFS_V4, nmdp);
+		    port, &error, vers_min == NFS_V4, nmdp);
 
 		if (retval == RET_OK) {
 			*versp = nmdp->nmd_nfsvers_to_use = NFS_V4;
@@ -1766,7 +1769,8 @@ get_fh(struct nfs_args *args, char *fshost, char *fspath, int *versp,
 		if (args->fh == NULL)
 			return (-EAGAIN);
 
-		memcpy((caddr_t)args->fh, (caddr_t)&fhs.fhstatus_u.fhs_fhandle,
+		(void) memcpy((caddr_t)args->fh,
+		    (caddr_t)&fhs.fhstatus_u.fhs_fhandle,
 		    sizeof (fhs.fhstatus_u.fhs_fhandle));
 		if (!errno && nmdp->nmd_posix) {
 			rpc_stat = clnt_call(cl, MOUNTPROC_PATHCONF,
@@ -1791,7 +1795,7 @@ get_fh(struct nfs_args *args, char *fshost, char *fspath, int *versp,
 				clnt_destroy(cl);
 				return (-EAGAIN);
 			}
-			memcpy((caddr_t)args->pathconf, (caddr_t)&p,
+			(void) memcpy((caddr_t)args->pathconf, (caddr_t)&p,
 			    sizeof (p));
 		}
 		break;
@@ -1865,7 +1869,8 @@ get_fh(struct nfs_args *args, char *fshost, char *fspath, int *versp,
 				goto autherr;
 		} else {
 			/* AUTH_UNIX is the default. */
-			strlcpy(nmdp->nmd_nfs_sec.sc_name, "sys", MAX_NAME_LEN);
+			(void) strlcpy(nmdp->nmd_nfs_sec.sc_name, "sys",
+			    MAX_NAME_LEN);
 			nmdp->nmd_nfs_sec.sc_nfsnum = 1;
 		}
 		break;
@@ -1892,7 +1897,7 @@ autherr:
  */
 static int
 getaddr_nfs(struct nfs_args *args, char *fshost, struct netconfig **nconfp,
-    char *fspath, ushort_t port, err_ret_t *error, bool_t print_rpcerror,
+    ushort_t port, err_ret_t *error, bool_t print_rpcerror,
     nfs_mnt_data_t *nmdp)
 {
 	struct stat sb;
@@ -1905,8 +1910,7 @@ getaddr_nfs(struct nfs_args *args, char *fshost, struct netconfig **nconfp,
 	SET_ERR_RET(&addr_error, ERR_PROTO_NONE, 0);
 
 	args->addr = get_addr(fshost, NFS_PROGRAM, nmdp->nmd_nfsvers_to_use,
-	    nconfp, nmdp->nmd_nfs_proto, port, &tinfo, &args->fh, fspath,
-	    &addr_error);
+	    nconfp, nmdp->nmd_nfs_proto, port, &tinfo, &addr_error);
 
 	if (args->addr == NULL) {
 		switch (addr_error.error_type) {
@@ -2158,7 +2162,7 @@ convert_nfs_arg_str(char *srcp, char *mntopts)
 				char spec[MAXPATHLEN + LX_NMD_MAXHOSTNAMELEN
 				    + 1];
 
-				strlcpy(spec, srcp, sizeof (spec));
+				(void) strlcpy(spec, srcp, sizeof (spec));
 				pp = strchr(spec, ':');
 				if (pp == NULL)
 					return (-EINVAL);
@@ -2172,6 +2176,7 @@ convert_nfs_arg_str(char *srcp, char *mntopts)
 				 * Ignore, this is an artifact of the
 				 * user-level lx mount code.
 				 */
+				/* EMPTY */
 			} else if (strcmp(key, "vers") == 0) {
 				/*
 				 * This may be implicitly or explicitly passed.
@@ -2222,6 +2227,7 @@ convert_nfs_arg_str(char *srcp, char *mntopts)
 	return (0);
 }
 
+/* ARGSUSED2 */
 int
 lx_nfs_mount(char *srcp, char *mntp, char *fst, int lx_flags, char *opts)
 {
@@ -2245,7 +2251,10 @@ lx_nfs_mount(char *srcp, char *mntp, char *fst, int lx_flags, char *opts)
 	 * 'hostname'. This also converts the opts string so that we'll be
 	 * dealing with Illumos options after this.
 	 */
-	convert_nfs_arg_str(srcp, opts);
+	if ((r = convert_nfs_arg_str(srcp, opts)) < 0) {
+		return (r);
+	}
+
 
 	/* Linux seems to always allow overlay mounts */
 	il_flags |= MS_OVERLAY;

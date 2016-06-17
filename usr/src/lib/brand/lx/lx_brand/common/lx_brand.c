@@ -307,7 +307,6 @@ lx_unsupported(char *msg, ...)
 
 	/* make a brand call so we can easily dtrace unsupported actions */
 	va_start(ap, msg);
-	/* LINTED [possible expansion issues] */
 	(void) vsnprintf(dmsg, sizeof (dmsg), msg, ap);
 	dmsg[255] = '\0';
 	lastc = strlen(dmsg) - 1;

@@ -954,11 +954,12 @@ lx_sigreturn_find_native_context(const char *caller, ucontext_t **sigucp,
 			 */
 			if (copy_ok) {
 				lx_err_fatal("%s: sp 0x%p, expected 0x%x, "
-				    "found 0x%x!", caller, sp, LX_SIGRT_MAGIC,
-				    lxsdf.lxsdf_magic);
+				    "found 0x%lx!", caller, (void *)sp,
+				    LX_SIGRT_MAGIC,
+				    (unsigned long)lxsdf.lxsdf_magic);
 			} else {
 				lx_err_fatal("%s: sp 0x%p, could not read "
-				    "magic", caller, sp);
+				    "magic", caller, (void *)sp);
 			}
 		}
 
@@ -1048,7 +1049,7 @@ lx_sigreturn(void)
 	 */
 	lx_debug("lx_sigreturn: calling setcontext; retucp %p flags %lx "
 	    "link %p\n", retucp, retucp->uc_flags, retucp->uc_link);
-	setcontext(retucp);
+	(void) setcontext(retucp);
 	assert(0);
 
 	/*NOTREACHED*/
@@ -1211,7 +1212,7 @@ lx_rt_sigreturn(void)
 	 * interrupted execution as the original Linux code would do.
 	 */
 	lx_debug("lx_rt_sigreturn: calling setcontext; retucp %p\n", retucp);
-	setcontext(retucp);
+	(void) setcontext(retucp);
 	assert(0);
 
 	/*NOTREACHED*/
@@ -1224,6 +1225,7 @@ lx_rt_sigreturn(void)
  * Build signal frame for processing for "old" (legacy) Linux signals
  * This stack-builder function is only used by 32-bit code.
  */
+/* ARGSUSED4 */
 static void
 lx_build_old_signal_frame(int lx_sig, siginfo_t *sip, void *p, void *sp,
     uintptr_t *hargs)
@@ -1298,6 +1300,7 @@ lx_build_old_signal_frame(int lx_sig, siginfo_t *sip, void *p, void *sp,
  * modern Linux signals. This is the only stack-builder function for 64-bit
  * code (32-bit code also calls this when using "modern" signals).
  */
+/* ARGSUSED4 */
 static void
 lx_build_signal_frame(int lx_sig, siginfo_t *sip, void *p, void *sp,
     uintptr_t *hargs)
