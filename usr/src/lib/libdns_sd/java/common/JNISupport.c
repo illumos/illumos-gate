@@ -1069,4 +1069,8 @@ exit:
 
 // NOT static -- otherwise the compiler may optimize it out
 // The "@(#) " pattern is a special prefix the "what" command looks for
+#ifndef MDNS_VERSIONSTR_NODTS
 const char VersionString_SCCS[] = "@(#) libjdns_sd " STRINGIFY(mDNSResponderVersion) " (" __DATE__ " " __TIME__ ")";
+#else
+const char VersionString_SCCS[] = "@(#) libjdns_sd " STRINGIFY(mDNSResponderVersion);
+#endif
