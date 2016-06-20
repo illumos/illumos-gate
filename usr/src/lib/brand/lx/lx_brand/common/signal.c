@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright 2015 Joyent, Inc. All rights reserved.
+ * Copyright 2016 Joyent, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -1076,6 +1076,12 @@ lx_rt_sigreturn(void)
 	ucontext_t *sigucp;
 	ucontext_t *retucp;
 	uintptr_t sp;
+
+	/*
+	 * Since we don't take the normal return path from this syscall, we
+	 * inform the kernel that we're returning, for the sake of ptrace.
+	 */
+	(void) syscall(SYS_brand, B_PTRACE_SIG_RETURN);
 
 	/* Get the registers at the emulated Linux rt_sigreturn syscall */
 	ucp = lx_syscall_regs();
