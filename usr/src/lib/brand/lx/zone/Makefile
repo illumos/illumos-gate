@@ -22,9 +22,10 @@
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Copyright 2015 Joyent, Inc.  All rights reserved.
+# Copyright 2016 OmniTI Computer Consulting, Inc. All rights reserved.
 #
 
-PROGS =	lx_boot
+PROGS =	lx_install lx_boot
 PROGS += lx_boot_zone_redhat lx_boot_zone_ubuntu lx_boot_zone_debian
 PROGS += lx_boot_zone_busybox
 XMLDOCS =	config.xml platform.xml

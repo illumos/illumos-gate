@@ -55,7 +55,6 @@ i386_DIRS=			\
 	/lib/libmvec		\
 	/usr/lib/brand/lx \
 	/usr/lib/brand/lx/amd64 \
-	/usr/lib/brand/lx/distros \
 	/usr/lib/xen		\
 	/usr/lib/xen/bin
 

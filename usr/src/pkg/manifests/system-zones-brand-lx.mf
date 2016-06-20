@@ -62,7 +62,6 @@ dir path=usr/lib
 dir path=usr/lib/brand
 dir path=usr/lib/brand/lx
 dir path=usr/lib/brand/lx/$(ARCH64)
-dir path=usr/lib/brand/lx/distros
 dir path=usr/lib/brand/lx/ld
 dir path=usr/lib/brand/lx/ld/64
 dir path=usr/lib/devfsadm group=sys
@@ -108,15 +107,6 @@ file path=usr/kernel/fs/lx_sysfs group=sys mode=0755
 file path=usr/lib/$(ARCH64)/lx_brand.so.1
 file path=usr/lib/brand/lx/$(ARCH64)/lx_librtld_db.so.1
 file path=usr/lib/brand/lx/$(ARCH64)/lx_vdso.so.1 mode=0755
-#file path=usr/lib/brand/lx/distros/centos35.distro mode=0444
-#file path=usr/lib/brand/lx/distros/centos36.distro mode=0444
-#file path=usr/lib/brand/lx/distros/centos37.distro mode=0444
-#file path=usr/lib/brand/lx/distros/centos38.distro mode=0444
-#file path=usr/lib/brand/lx/distros/rhel35.distro mode=0444
-#file path=usr/lib/brand/lx/distros/rhel36.distro mode=0444
-#file path=usr/lib/brand/lx/distros/rhel37.distro mode=0444
-#file path=usr/lib/brand/lx/distros/rhel38.distro mode=0444
-#file path=usr/lib/brand/lx/distros/rhel_centos_common mode=0444
 file path=usr/lib/brand/lx/config.xml mode=0444
 file path=usr/lib/brand/lx/etc_default_nfs group=sys mode=0444
 file path=usr/lib/brand/lx/ld/64/ld.config group=sys
@@ -128,6 +118,7 @@ file path=usr/lib/brand/lx/lx_boot_zone_busybox mode=0755
 file path=usr/lib/brand/lx/lx_boot_zone_debian mode=0755
 file path=usr/lib/brand/lx/lx_boot_zone_redhat mode=0755
 file path=usr/lib/brand/lx/lx_boot_zone_ubuntu mode=0755
+file path=usr/lib/brand/lx/lx_install mode=0755
 file path=usr/lib/brand/lx/lx_librtld_db.so.1
 file path=usr/lib/brand/lx/lx_support mode=0755
 file path=usr/lib/brand/lx/lx_vdso.so.1 mode=0755
