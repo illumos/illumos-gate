@@ -11627,7 +11627,7 @@ f usr/share/man/man1/mach.1 0444 root bin
 f usr/share/man/man1/machid.1 0444 root bin
 f usr/share/man/man1/mail.1 0444 root bin
 f usr/share/man/man1/mailcompat.1 0444 root bin
-f usr/share/man/man1/mailq.1 0444 root bin
+s usr/share/man/man1/mailq.1=sendmail-mailq.1
 f usr/share/man/man1/mailstats.1 0444 root bin
 f usr/share/man/man1/mailx.1 0444 root bin
 f usr/share/man/man1/makekey.1 0444 root bin
@@ -11739,6 +11739,7 @@ f usr/share/man/man1/rusers.1 0444 root bin
 f usr/share/man/man1/script.1 0444 root bin
 f usr/share/man/man1/sdiff.1 0444 root bin
 f usr/share/man/man1/sed.1 0444 root bin
+f usr/share/man/man1/sendmail-mailq.1 0444 root bit
 f usr/share/man/man1/setfacl.1 0444 root bin
 f usr/share/man/man1/setpgrp.1 0444 root bin
 s usr/share/man/man1/settime.1=touch.1
