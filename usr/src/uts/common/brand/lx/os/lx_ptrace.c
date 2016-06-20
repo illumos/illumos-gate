@@ -127,10 +127,10 @@
  *
  * Various actions, either directly ptrace(2) related or commonly associated
  * with tracing, cause process- or thread-directed SIGSTOP signals to be sent
- * to tracees.  These signals, and indeed any signal other than SIGKILL, can
- * be suppressed by the tracer when using a restarting request (including
- * PTRACE_DETACH) on a child.  The signal may also be substituted for a
- * different signal.
+ * to tracees (a "signal-delivery-stop"). These signals, and indeed any signal
+ * other than SIGKILL, can be suppressed by the tracer when using a restarting
+ * request (including PTRACE_DETACH) on a child.  The signal may also be
+ * substituted for a different signal.
  *
  * If a SIGSTOP (or other stopping signal) is not suppressed by the tracer,
  * it will induce the regular illumos native job control stop of the entire
@@ -147,6 +147,20 @@
  * SIGCLD/waitpid(2) in the usual way.  The flag LX_PTF_SYSCALL flag is
  * cleared after each stop; for ongoing system call tracing the tracee must
  * be continuously restarted with PTRACE_SYSCALL.
+ *
+ * SPECIAL CASES FOR STOP EVENTS
+ *
+ * The strace command is one of the primary consumers of ptrace. In order for
+ * strace to properly understand what is actually happening when it receives a
+ * signal associated with a stop event, these signals must match Linux behavior
+ * exactly or the strace consumer will get out of sync and report incorrect
+ * state. There are a couple of special cases we have to handle to provide
+ * proper interaction of the syscall-entry-stop, syscall-exit-stop, and
+ * signal-delivery-stop events:
+ * 1) The child process of a clone/fork does not emit a syscall-exit-stop event.
+ * 2) A signal that arrives between syscall-enter-stop & syscall-exit-stop must
+ *    not immediately emit signal-delivery-stop. This event must be emitted
+ *    after the syscall is interrupted and syscall-exit-stop has been emitted.
  *
  * EVENT STOPS
  *
@@ -1042,6 +1056,9 @@ lx_ptrace_attach(pid_t lx_pid)
 		rlwpd->br_ptrace_attach = LX_PTA_ATTACH;
 		rlwpd->br_ptrace_tracer = accord;
 
+		/* Don't emit ptrace syscall-stop-exit event on kernel exit. */
+		rlwpd->br_ptrace_flags |= LX_PTF_NOSTOP;
+
 		/*
 		 * We had no tracer, and are thus not in the tracees list.
 		 * It is safe to take the tracee list lock while we insert
@@ -1568,6 +1585,16 @@ lx_ptrace_stop(ushort_t what)
 	 * Lock this process and re-check the condition.
 	 */
 	mutex_enter(&p->p_lock);
+
+	/*
+	 * The child after a fork/clone doesn't emit syscall-exit-stop event.
+	 */
+	if (what == LX_PR_SYSEXIT && (lwpd->br_ptrace_flags & LX_PTF_NOSTOP)) {
+		lwpd->br_ptrace_flags &= ~LX_PTF_NOSTOP;
+		mutex_exit(&p->p_lock);
+		return (B_FALSE);
+	}
+
 	if (lwpd->br_ptrace_tracer == NULL) {
 		VERIFY0(lwpd->br_ptrace_flags & LX_PTF_SYSCALL);
 		mutex_exit(&p->p_lock);
@@ -1575,6 +1602,12 @@ lx_ptrace_stop(ushort_t what)
 	}
 
 	if (what == LX_PR_SYSENTRY || what == LX_PR_SYSEXIT) {
+		if (what == LX_PR_SYSENTRY) {
+			lwpd->br_ptrace_flags |= LX_PTF_INSYSCALL;
+		} else {
+			lwpd->br_ptrace_flags &= ~LX_PTF_INSYSCALL;
+		}
+
 		/*
 		 * This is a syscall-entry-stop or syscall-exit-stop point.
 		 */
@@ -1638,6 +1671,17 @@ lx_ptrace_issig_stop(proc_t *p, klwp_t *lwp)
 			 */
 			lwpd->br_ptrace_donesig = 0;
 		}
+		return (0);
+	}
+
+	/*
+	 * We can't deliver the signal-delivery-stop condition while we're
+	 * between the syscall-enter-stop and syscall-exit-stop conditions.
+	 * We must first let the signal interrupt the in-progress syscall, let
+	 * it emit syscall-exit-stop with the interrupted result, then we'll
+	 * come back here to emit signal-delivery-stop.
+	 */
+	if (lwpd->br_ptrace_flags & LX_PTF_INSYSCALL) {
 		return (0);
 	}
 
@@ -2399,6 +2443,14 @@ lx_ptrace_kernel(int ptrace_op, pid_t lxpid, uintptr_t addr, uintptr_t data)
 		 */
 		mutex_exit(&accord->lxpa_tracees_lock);
 		return (ESRCH);
+	}
+
+	if (ptrace_op == LX_PTRACE_DETACH) {
+		/*
+		 * We're detaching, make sure in-syscall flag is off so that
+		 * signal will stop the process directly.
+		 */
+		remote->br_ptrace_flags &= ~LX_PTF_INSYSCALL;
 	}
 
 	/*

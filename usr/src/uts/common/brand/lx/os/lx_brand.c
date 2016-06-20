@@ -1485,6 +1485,22 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 		return (lx_ptrace_set_clone_inherit((int)arg1, arg2 == 0 ?
 		    B_FALSE : B_TRUE));
 
+	case B_PTRACE_SIG_RETURN: {
+		/*
+		 * Our ptrace emulation must emit PR_SYSEXIT for rt_sigreturn.
+		 * Since that syscall does not pass through the normal
+		 * emulation, which would call lx_syscall_return, the event is
+		 * emitted manually. A successful result of the syscall is
+		 * assumed since there is little to be done in the face of
+		 * failure.
+		 */
+		struct regs *rp = lwptoregs(lwp);
+
+		rp->r_r0 = 0;
+		lx_ptrace_stop(LX_PR_SYSEXIT);
+		return (0);
+	}
+
 	case B_UNSUPPORTED: {
 		char dmsg[256];
 
