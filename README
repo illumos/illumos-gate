@@ -1,4 +1,4 @@
-Last illumos-joyent commit:  1f08385768db431ea5cf7fa5d3c37d4991908a2f
+Last illumos-joyent commit:  158f4dbcf60701c4d8de07146a38d78ab1b77dfe
 
 This is an attempt to port over LX zones into OmniOS.  It's going to be a long,
 painful slog, and I don't mean the ZFS kind, either.  :)
