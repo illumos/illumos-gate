@@ -1,6 +1,6 @@
 /* -*- Mode: C; tab-width: 4 -*-
  *
- * Copyright (c) 2004 Apple Computer, Inc. All rights reserved.
+ * Copyright (c) 2004-2015 Apple Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -64,8 +64,12 @@ mDNSexport void mDNSPlatformSourceAddrForDest(mDNSAddr *const src, const mDNSAdd
     }
     else return;
 
-    if ((connect(sock, &addr.s, inner_len)) < 0)
-    { if (errno != ENETUNREACH) LogMsg("mDNSPlatformSourceAddrForDest: connect %#a failed errno %d (%s)", dst, errno, strerror(errno)); goto exit; }
+    if ((connect(sock, &addr.s, inner_len)) < 0) {
+	if (errno != ENETUNREACH)
+		LogMsg("mDNSPlatformSourceAddrForDest: connect %#a failed errno %d (%s)", dst, errno,
+		    strerror(errno));
+	goto exit;
+    }
 
     if ((getsockname(sock, &addr.s, &len)) < 0)
     { LogMsg("mDNSPlatformSourceAddrForDest: getsockname failed errno %d (%s)", errno, strerror(errno)); goto exit; }
@@ -190,10 +194,13 @@ mDNSexport void mDNSPlatformWriteLogMsg(const char *ident, const char *buffer, m
         if (ident && ident[0] && mDNSPlatformClockDivisor)
             syslog(syslog_level, "%8d.%03d: %s", (int)(t/1000), ms, buffer);
         else
-#elif APPLE_OSX_mDNSResponder
-        mDNSPlatformLogToFile(syslog_level, buffer);
-#else
-        syslog(syslog_level, "%s", buffer);
 #endif
+        {
+#if APPLE_OSX_mDNSResponder
+            mDNSPlatformLogToFile(syslog_level, buffer);
+#else
+            syslog(syslog_level, "%s", buffer);
+#endif
+        }
     }
 }

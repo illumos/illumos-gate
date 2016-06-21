@@ -87,14 +87,12 @@ void plen_to_mask(int plen, char *addr) {
 struct ifi_info *get_ifi_info_linuxv6(int family, int doaliases)
 {
     struct ifi_info *ifi, *ifihead, **ifipnext, *ifipold, **ifiptr;
-    FILE *fp;
+    FILE *fp = NULL;
     char addr[8][5];
     int flags, myflags, index, plen, scope;
     char ifname[9], lastname[IFNAMSIZ];
     char addr6[32+7+1]; /* don't forget the seven ':' */
     struct addrinfo hints, *res0;
-    struct sockaddr_in6 *sin6;
-    struct in6_addr *addrptr;
     int err;
     int sockfd = -1;
     struct ifreq ifr;
@@ -154,18 +152,13 @@ struct ifi_info *get_ifi_info_linuxv6(int family, int doaliases)
             char ipv6addr[INET6_ADDRSTRLEN];
             plen_to_mask(plen, ipv6addr);
             ifi->ifi_netmask = calloc(1, sizeof(struct sockaddr_in6));
-            if (ifi->ifi_addr == NULL) {
+            if (ifi->ifi_netmask == NULL) {
                 goto gotError;
             }
-            sin6=calloc(1, sizeof(struct sockaddr_in6));
-            addrptr=calloc(1, sizeof(struct in6_addr));
-            inet_pton(family, ipv6addr, addrptr);
-            sin6->sin6_family=family;
-            sin6->sin6_addr=*addrptr;
-            sin6->sin6_scope_id=scope;
-            memcpy(ifi->ifi_netmask, sin6, sizeof(struct sockaddr_in6));
-            free(sin6);
 
+            ((struct sockaddr_in6 *)ifi->ifi_netmask)->sin6_family=family;
+            ((struct sockaddr_in6 *)ifi->ifi_netmask)->sin6_scope_id=scope;
+            inet_pton(family, ipv6addr, &((struct sockaddr_in6 *)ifi->ifi_netmask)->sin6_addr);
 
             /* Add interface name */
             memcpy(ifi->ifi_name, ifname, IFI_NAME);
@@ -183,6 +176,7 @@ struct ifi_info *get_ifi_info_linuxv6(int family, int doaliases)
                      * EADDRNOTAVAIL for the main interface
                      */
                     free(ifi->ifi_addr);
+                    free(ifi->ifi_netmask);
                     free(ifi);
                     ifipnext  = ifiptr;
                     *ifipnext = ifipold;
@@ -211,6 +205,9 @@ done:
     if (sockfd != -1) {
         assert(close(sockfd) == 0);
     }
+    if (fp != NULL) {
+        fclose(fp);
+    }
     return(ifihead);    /* pointer to first structure in linked list */
 }
 #endif // defined(AF_INET6) && HAVE_IPV6 && HAVE_LINUX
@@ -218,7 +215,7 @@ done:
 #if HAVE_SOLARIS
 
 /*
- * Converts prefix length to network mask. Assumes 
+ * Converts prefix length to network mask. Assumes
  * addr points to a zeroed out buffer and prefix <= sizeof(addr)
  * Unlike plen_to_mask returns netmask in binary form and not
  * in text form.
@@ -231,10 +228,10 @@ static void plen_to_netmask(int prefix, unsigned char *addr) {
 }
 
 /*
- * This function goes through all the IP interfaces associated with a 
- * physical interface and finds the best matched one for use by mDNS. 
+ * This function goes through all the IP interfaces associated with a
+ * physical interface and finds the best matched one for use by mDNS.
  * Returns NULL when none of the IP interfaces associated with a physical
- * interface are usable. Otherwise returns the best matched interface 
+ * interface are usable. Otherwise returns the best matched interface
  * information and a pointer to the best matched lifreq.
  */
 struct ifi_info *
@@ -253,7 +250,7 @@ select_src_ifi_info_solaris(int sockfd, int numifs,
 
     *best_lifr = NULL;
 
-    /* 
+    /*
      * Check all logical interfaces associated with the physical
      * interface and figure out which one works best for us.
      */
@@ -266,7 +263,7 @@ select_src_ifi_info_solaris(int sockfd, int numifs,
         if ((chptr = strchr(cmpifname, ':')) != NULL)
             *chptr = '\0';
 
-        /* 
+        /*
          * Check ifname to see if the logical interface is associated
          * with the physical interface we are interested in.
          */
@@ -286,7 +283,7 @@ select_src_ifi_info_solaris(int sockfd, int numifs,
         if ((ifflags & IFF_UP) == 0)
             continue;
         /*
-         * Avoid address if any of the following flags are set: 
+         * Avoid address if any of the following flags are set:
          *  IFF_NOXMIT: no packets transmitted over interface
          *  IFF_NOLOCAL: no address
          *  IFF_PRIVATE: is not advertised
@@ -294,17 +291,17 @@ select_src_ifi_info_solaris(int sockfd, int numifs,
         if (ifflags & (IFF_NOXMIT | IFF_NOLOCAL | IFF_PRIVATE))
             continue;
 
-	/* A DHCP client will have IFF_UP set yet the address is zero. Ignore */
+       /* A DHCP client will have IFF_UP set yet the address is zero. Ignore */
         if (lifr->lifr_addr.ss_family == AF_INET) {
-		struct sockaddr_in *sinptr;
+               struct sockaddr_in *sinptr;
 
-		sinptr = (struct sockaddr_in *) &lifr->lifr_addr;
-		if (sinptr->sin_addr.s_addr == INADDR_ANY)
-			continue;
-	}
+               sinptr = (struct sockaddr_in *) &lifr->lifr_addr;
+               if (sinptr->sin_addr.s_addr == INADDR_ANY)
+                       continue;
+       }
 
         if (*best_lifr != NULL) {
-            /* 
+            /*
              * Check if we found a better interface by checking
              * the flags. If flags are identical we prefer
              * the new found interface.
@@ -343,7 +340,7 @@ select_src_ifi_info_solaris(int sockfd, int numifs,
     if (ifi == NULL)
         return(NULL);
 
-    ifi->ifi_flags = best_lifrflags;  
+    ifi->ifi_flags = best_lifrflags;
     ifi->ifi_index = if_nametoindex((*best_lifr)->lifr_name);
     if (strlcpy(ifi->ifi_name, (*best_lifr)->lifr_name, sizeof(ifi->ifi_name)) >= sizeof(ifi->ifi_name)) {
         free(ifi);
@@ -388,7 +385,7 @@ again:
     if (ioctl(sockfd, SIOCGLIFNUM, &lifn) < 0)
         goto gotError;
     /*
-     * Pad interface count to detect & retrieve any 
+     * Pad interface count to detect & retrieve any
      * additional interfaces between IFNUM & IFCONF calls.
      */
     lifn.lifn_count += 4;
@@ -416,7 +413,7 @@ again:
         if (lifrp->lifr_addr.ss_family != family)
             continue;
 
-        /* 
+        /*
          * See if we have already processed the interface
          * by checking the interface names.
          */
@@ -425,12 +422,12 @@ again:
         if ((cptr = strchr(ifname, ':')) != NULL)
             *cptr = '\0';
 
-        /* 
+        /*
          * If any of the interfaces found so far share the physical
          * interface name then we have already processed the interface.
          */
         for (ifi = ifihead; ifi != NULL; ifi = ifi->ifi_next) {
-            
+
             /* Retrieve physical interface name */
             (void) strlcpy(cmpifname, ifi->ifi_name, sizeof(cmpifname));
 
@@ -444,7 +441,7 @@ again:
         if (ifi != NULL)
             continue; /* already processed */
 
-        /* 
+        /*
          * New interface, find the one with the preferred source
          * address for our use in Multicast DNS.
          */
@@ -496,7 +493,7 @@ again:
             }
 
             ifi->ifi_netmask = malloc(sizeof(struct sockaddr_in));
-            if (ifi->ifi_netmask == NULL) 
+            if (ifi->ifi_netmask == NULL)
                 goto gotError;
             sinptr = (struct sockaddr_in *) &lifrcopy.lifr_addr;
             sinptr->sin_family = AF_INET;
@@ -928,11 +925,11 @@ recvfrom_flags(int fd, void *ptr, size_t nbytes, int *flagsp,
             int nameLen = (sdl->sdl_nlen < IFI_NAME - 1) ? sdl->sdl_nlen : (IFI_NAME - 1);
             strncpy(pktp->ipi_ifname, sdl->sdl_data, nameLen);
 #endif
-            /*
-             * the is memcpy used for sparc? no idea;)
-             * pktp->ipi_ifindex = sdl->sdl_index;
+	    /*
+	     * the is memcpy used for sparc? no idea;)
+	     * pktp->ipi_ifindex = sdl->sdl_index;
 	     */
-            (void) memcpy(&pktp->ipi_ifindex, CMSG_DATA(cmptr), sizeof(uint_t));
+	    (void) memcpy(&pktp->ipi_ifindex, CMSG_DATA(cmptr), sizeof(uint_t));
 #ifdef HAVE_BROKEN_RECVIF_NAME
             if (sdl->sdl_index == 0) {
                 pktp->ipi_ifindex = *(uint_t*)sdl;

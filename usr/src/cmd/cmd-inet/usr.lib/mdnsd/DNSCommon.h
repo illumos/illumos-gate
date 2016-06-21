@@ -220,7 +220,7 @@ extern mDNSu8 *putDeletionRecord(DNSMessage *msg, mDNSu8 *ptr, ResourceRecord *r
 extern mDNSu8 *putDeletionRecordWithLimit(DNSMessage *msg, mDNSu8 *ptr, ResourceRecord *rr, mDNSu8 *limit);
 extern mDNSu8 *putDeleteRRSetWithLimit(DNSMessage *msg, mDNSu8 *ptr, const domainname *name, mDNSu16 rrtype, mDNSu8 *limit);
 extern mDNSu8 *putDeleteAllRRSets(DNSMessage *msg, mDNSu8 *ptr, const domainname *name);
-extern mDNSu8 *putUpdateLease(DNSMessage *msg, mDNSu8 *end, mDNSu32 lease);
+extern mDNSu8 *putUpdateLease(DNSMessage *msg, mDNSu8 *ptr, mDNSu32 lease);
 extern mDNSu8 *putUpdateLeaseWithLimit(DNSMessage *msg, mDNSu8 *ptr, mDNSu32 lease, mDNSu8 *limit);
 
 extern mDNSu8 *putHINFO(const mDNS *const m, DNSMessage *const msg, mDNSu8 *ptr, DomainAuthInfo *authInfo, mDNSu8 *limit);
@@ -297,16 +297,16 @@ extern void mDNS_Unlock_(mDNS *const m, const char * const functionname);
 
 #define mDNS_Unlock(X) mDNS_Unlock_((X), __func__)
 
-#define mDNS_CheckLock(X) { if ((X)->mDNS_busy != (X)->mDNS_reentrancy+1) \
-                            LogMsg("%s: Lock not held! mDNS_busy (%ld) mDNS_reentrancy (%ld)", __func__, (X)->mDNS_busy, (X)->mDNS_reentrancy); }
+#define mDNS_CheckLock(X) \
+    if ((X)->mDNS_busy != (X)->mDNS_reentrancy+1) LogMsg("%s: Lock not held! mDNS_busy (%ld) mDNS_reentrancy (%ld)", __func__, (X)->mDNS_busy, (X)->mDNS_reentrancy)
 
 #define mDNS_DropLockBeforeCallback() do { m->mDNS_reentrancy++; \
-                                           if (m->mDNS_busy != m->mDNS_reentrancy) LogMsg("%s: Locking Failure! mDNS_busy (%ld) != mDNS_reentrancy (%ld)", __func__, m->mDNS_busy, m->mDNS_reentrancy);                                                                                                                                                                  \
-} while (0)
+    if (m->mDNS_busy != m->mDNS_reentrancy) LogMsg("%s: Locking Failure! mDNS_busy (%ld) != mDNS_reentrancy (%ld)", __func__, m->mDNS_busy, m->mDNS_reentrancy); \
+    } while (0)
 
 #define mDNS_ReclaimLockAfterCallback() do { \
-        if (m->mDNS_busy != m->mDNS_reentrancy) LogMsg("%s: Unlocking Failure! mDNS_busy (%ld) != mDNS_reentrancy (%ld)", __func__, m->mDNS_busy, m->mDNS_reentrancy);                                                                                                                                                                    \
-        m->mDNS_reentrancy--; } while (0)
+    if (m->mDNS_busy != m->mDNS_reentrancy) LogMsg("%s: Unlocking Failure! mDNS_busy (%ld) != mDNS_reentrancy (%ld)", __func__, m->mDNS_busy, m->mDNS_reentrancy); \
+    m->mDNS_reentrancy--; } while (0)
 
 #ifdef  __cplusplus
 }
