@@ -7,7 +7,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH T_ERRNO 3NSL "May 7, 1998"
+.TH T_ERRNO 3NSL "April 9, 2016"
 .SH NAME
 t_errno \- XTI error return value
 .SH SYNOPSIS
@@ -17,13 +17,12 @@ t_errno \- XTI error return value
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 This error return value is part of the XTI interfaces that evolved from the TLI
 interfaces. XTI represents the future evolution of these interfaces. However,
 TLI interfaces are supported for compatibility. When using a TLI interface that
 has the same name as an XTI interfaces, a different headerfile,
-<\fBtiuser.h\fR>, must be used. Refer the the TLI COMPATIBILITY section for a
+<\fBtiuser.h\fR>, must be used. Refer to the TLI COMPATIBILITY section for a
 description of differences between the two interfaces.
 .sp
 .LP
@@ -51,7 +50,6 @@ undefined.
 The symbolic values stored in  \fBt_errno\fR by an XTI function are defined in
 the \fBERRORS\fR sections in all relevant XTI function definition pages.
 .SH TLI COMPATIBILITY
-.sp
 .LP
 \fBt_errno\fR is also used by TLI functions to return error values.
 .sp
@@ -60,7 +58,6 @@ The \fBXTI\fR and \fBTLI\fR interface definitions have common names but use
 different header files. This, and other semantic differences between the two
 interfaces are described in the subsections below.
 .SS "Interface Header"
-.sp
 .LP
 The \fBXTI\fR interfaces use the header file, <\fBxti.h\fR>. \fBTLI\fR
 interfaces should \fInot\fR use this header.  They should use the header:
@@ -69,7 +66,6 @@ interfaces should \fInot\fR use this header.  They should use the header:
 \fB#include <tiuser.h>\fR
 .in -2
 .SS "Error Description Values"
-.sp
 .LP
 The \fBt_errno\fR values that can be set by the \fBXTI\fR interface but cannot
 be set by the \fBTLI\fR interface are:
@@ -110,7 +106,6 @@ be set by the \fBTLI\fR interface are:
 \fBTPROTO\fR
 .in -2
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -126,6 +121,5 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBattributes\fR(5)

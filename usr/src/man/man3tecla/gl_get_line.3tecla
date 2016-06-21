@@ -25,7 +25,7 @@
 .\" or other dealings in this Software without prior written authorization
 .\" of the copyright holder.
 .\" Portions Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
-.TH GL_GET_LINE 3TECLA "Sep 10, 2013"
+.TH GL_GET_LINE 3TECLA "April 9, 2016"
 .SH NAME
 gl_get_line, new_GetLine, del_GetLine, gl_customize_completion,
 gl_change_terminal, gl_configure_getline, gl_load_history, gl_save_history,
@@ -267,10 +267,9 @@ cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-ltecla\fR [ \fIlibrary\fR\&.\
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBgl_get_line()\fR function is part of the \fBlibtecla\fR(3LIB) library.
-If the user is typing at a terminal, each call prompts them for an line of
+If the user is typing at a terminal, each call prompts them for a line of
 input, then provides interactive editing facilities, similar to those of the
 UNIX \fBtcsh\fR shell. In addition to simple command-line editing, it supports
 recall of previously entered command lines, TAB completion of file names, and
@@ -278,7 +277,6 @@ in-line wild-card expansion of filenames. Documentation of both the user-level
 command-line editing features and all user configuration options can be found
 on the \fBtecla\fR(5) manual page.
 .SS "An Example"
-.sp
 .LP
 The following shows a complete example of how to use the \fBgl_get_line()\fR
 function to get input from the user:
@@ -324,7 +322,6 @@ safety precaution. If the program subsequently attempts to pass \fIgl\fR to
 \fBgl_get_line()\fR, said function will complain, and return an error, instead
 of attempting to use the deleted resource object.
 .SS "The Functions Used In The Example"
-.sp
 .LP
 The \fBnew_GetLine()\fR function creates the resources used by the
 \fBgl_get_line()\fR function and returns an opaque pointer to the object that
@@ -378,7 +375,6 @@ store in the internal buffer. In the latter case you should call
 makes \fBgl_get_line()\fR similar to \fBfgets\fR(3C). When \fBstdin\fR is not
 connected to a terminal, \fBgl_get_line()\fR simply calls \fBfgets()\fR.
 .SS "The Return Status Of \fBgl_get_line()\fR"
-.sp
 .LP
 The \fBgl_get_line()\fR function has two possible return values: a pointer to
 the completed input line, or \fINULL\fR. Additional information about what
@@ -479,7 +475,6 @@ terminator, will be written within the first \fIn\fR elements of this buffer,
 and the return value will be a pointer to the first element of this buffer. If
 the message will not fit in the provided buffer, it will be truncated to fit.
 .SS "Optional Prompt Formatting"
-.sp
 .LP
 Whereas by default the prompt string that you specify is displayed literally
 without any special interpretation of the characters within it, the
@@ -637,7 +632,6 @@ style.
 .RE
 
 .SS "Alternate Configuration Sources"
-.sp
 .LP
 By default users have the option of configuring the behavior of
 \fBgl_get_line()\fR with a configuration file called \fB\&.teclarc\fR in their
@@ -737,7 +731,6 @@ The \fIaction\fR argument must either be a string containing the name of the
 action to bind the key sequence to, or it must be \fINULL\fR or \fB""\fR to
 unbind the key sequence.
 .SS "Customized Word Completion"
-.sp
 .LP
 If in your application you would like to have TAB completion complete other
 things in addition to or instead of filenames, you can arrange this by
@@ -781,7 +774,6 @@ input line that is currently being edited, reinstate normal terminal I/O, and
 notify \fBgl_get_line()\fR that the input line will need to be redrawn when the
 callback returns.
 .SS "Adding Completion Actions"
-.sp
 .LP
 In the previous section the ability to customize the behavior of the only
 default completion action, complete-word, was described. In this section the
@@ -819,7 +811,6 @@ As discussed for \fBgl_customize_completion()\fR, if your callback function
 needs to write anything to the terminal, it must call \fBgl_normal_io()\fR
 before doing so.
 .SS "Defining Custom Actions"
-.sp
 .LP
 Although the built-in key-binding actions are sufficient for the needs of most
 applications, occasionally a specialized application may need to define one or
@@ -946,7 +937,6 @@ allows them to re-bind the action to an alternate key-sequence. In order for
 this to work, it is necessary to call \fBgl_register_action()\fR between
 calling \fBnew_GetLine()\fR and the first call to \fBgl_get_line()\fR.
 .SS "History Files"
-.sp
 .LP
 To save the contents of the history buffer before quitting your application and
 subsequently restore them when you next start the application, the
@@ -980,7 +970,6 @@ Both fuctions return non-zero on error, after writing an error message to
 \fBstderr\fR. Note that \fBgl_load_history()\fR does not consider the
 non-existence of a file to be an error.
 .SS "Multiple History Lists"
-.sp
 .LP
 If your application uses a single \fBGetLine\fR object for entering many
 different types of input lines, you might want \fBgl_get_line()\fR to
@@ -1004,7 +993,6 @@ current history identifier is recorded with it, and when it is asked to recall
 a historical input line, it only recalls lines that are marked with the current
 identifier.
 .SS "Displaying History"
-.sp
 .LP
 The history list can be displayed by calling \fBgl_show_history()\fR. This
 function displays the current contents of the history list to the \fBstdio\fR
@@ -1083,7 +1071,6 @@ Thus a format string like "%D %T %H0" would output something like:
 .LP
 Note the inclusion of an explicit newline character in the format string.
 .SS "Looking Up History"
-.sp
 .LP
 The \fBgl_lookup_history()\fR function allows the calling application to look
 up lines in the history list.
@@ -1105,7 +1092,6 @@ history buffer, so it must not be modified by the caller, and will be recycled
 on the next call to any function that takes \fIgl\fR as its argument. Therefore
 you should make a private copy of this string if you need to keep it.
 .SS "Manual History Archival"
-.sp
 .LP
 By default, whenever a line is entered by the user, it is automatically
 appended to the history list, just before \fBgl_get_line()\fR returns the line
@@ -1161,7 +1147,6 @@ A textual description of the error can optionally be obtained by calling
 remains in a valid state to receive new history lines, so there is little harm
 in simply ignoring the return status of \fBgl_append_history()\fR.
 .SS "Miscellaneous History Configuration"
-.sp
 .LP
 If you wish to change the size of the history buffer that was originally
 specified in the call to \fBnew_GetLine()\fR, you can do so with the
@@ -1177,7 +1162,7 @@ can be stored in the history buffer, depends on the lengths of the individual
 lines. For example, a 1000 byte buffer could equally store 10 lines of average
 length 100 bytes, or 20 lines of average length 50 bytes. Although the buffer
 is never expanded when new lines are added, a list of pointers into the buffer
-does get expanded when needed to accomodate the number of lines currently
+does get expanded when needed to accommodate the number of lines currently
 stored in the buffer. To place an upper limit on the number of lines in the
 buffer, and thus a ceiling on the amount of memory used in this list, you can
 call the \fBgl_limit_history()\fR function.
@@ -1207,7 +1192,6 @@ setting it to 1 turns it back on. When history is turned off, no new lines will
 be added to the history list, and history lookup key-bindings will act as
 though there is nothing in the history buffer.
 .SS "Querying History Information"
-.sp
 .LP
 The configured state of the history list can be queried with the
 \fBgl_history_state()\fR function. On return, the status information is
@@ -1229,7 +1213,6 @@ buffer and the amount of the buffer that is currently occupied.
 On return, the size information is recorded in the variable pointed to by the
 \fIsize\fR argument.
 .SS "Changing Terminals"
-.sp
 .LP
 The \fBnew_GetLine()\fR constructor function assumes that input is to be read
 from \fBstdin\fR and output written to \fBstdout\fR. The following function
@@ -1256,7 +1239,6 @@ Note that if you want to pass file descriptors to \fBgl_change_terminal()\fR,
 you can do this by creating \fBstdio\fR stream wrappers using the POSIX
 \fBfdopen\fR(3C) function.
 .SS "External Event Handling"
-.sp
 .LP
 By default, \fBgl_get_line()\fR does not return until either a complete input
 line has been entered by the user, or an error occurs. In programs that need to
@@ -1398,7 +1380,6 @@ descriptor and event, simply call \fBgl_watch_fd()\fR with the same \fIfd\fR
 and \fIevent\fR arguments, but with a \fIcallback\fR argument of 0. The
 \fIdata\fR argument is ignored in this case.
 .SS "Setting An Inactivity Timeout"
-.sp
 .LP
 The \fBgl_inactivity_timeout()\fR function can be used to set or cancel an
 inactivity timeout. Inactivity in this case refers both to keyboard input, and
@@ -1425,7 +1406,7 @@ prototype timeout callback functions.
 .sp
 .LP
 On returning, the application's callback is expected to return one of the
-following enumerators to tell \fBgl_get_line()\fR how to procede after the
+following enumerators to tell \fBgl_get_line()\fR how to proceed after the
 timeout has been handled by the callback.
 .sp
 .ne 2
@@ -1493,7 +1474,6 @@ example, by calling \fBsysconf\fR(\fB_SC_CLK_TCK\fR)).
 To turn off timeouts, simply call \fBgl_inactivity_timeout()\fR with a
 \fIcallback\fR argument of 0. The \fIdata\fR argument is ignored in this case.
 .SS "Signal Handling Defaults"
-.sp
 .LP
 By default, the \fBgl_get_line()\fR function intercepts a number of signals.
 This is particularly important for signals that would by default terminate the
@@ -1590,7 +1570,7 @@ signal that was received during the most recent call to \fBgl_get_line()\fR, or
 .LP
 On systems that support it, when a \fBSIGWINCH\fR (window change) signal is
 received, \fBgl_get_line()\fR queries the terminal to find out its new size,
-redraws the current input line to accomodate the new size, then returns to
+redraws the current input line to accommodate the new size, then returns to
 waiting for keyboard input from the user. Unlike other signals, this signal is
 not resent to the application.
 .sp
@@ -1732,7 +1712,6 @@ practice, job-control shells usually reset the terminal settings when a process
 relinquishes the controlling terminal, so this is only a problem with older
 shells.
 .SS "Customized Signal Handling"
-.sp
 .LP
 The previous section listed the signals that \fBgl_get_line()\fR traps by
 default, and described how it responds to them. This section describes how to
@@ -1934,9 +1913,8 @@ can also, however, be used with the \fBGL_RETURN\fR option, in case you want to
 have a way to distinguish between an input line that was entered using the
 return key, and one that was entered by the receipt of a signal.
 .SS "Reliable Signal Handling"
-.sp
 .LP
-Signal handling is suprisingly hard to do reliably without race conditions. In
+Signal handling is surprisingly hard to do reliably without race conditions. In
 \fBgl_get_line()\fR a lot of care has been taken to allow applications to
 perform reliable signal handling around \fBgl_get_line()\fR. This section
 explains how to make use of this.
@@ -2149,7 +2127,6 @@ What the above steps do in essence is to take asynchronously delivered signals
 and handle them synchronously, one at a time, at a point in the code where
 \fBgl_get_line()\fR has complete control over its environment.
 .SS "The Terminal Size"
-.sp
 .LP
 On most systems the combination of the \fBTIOCGWINSZ\fR ioctl and the
 \fBSIGWINCH\fR signal is used to maintain an accurate idea of the terminal
@@ -2182,7 +2159,7 @@ dimensions of the terminal, and must not be less than 1. On systems that do
 support ioctl(\fBTIOCGWINSZ\fR), this function first calls
 ioctl(\fBTIOCSWINSZ\fR) to tell the terminal driver about the change in size.
 In non-blocking server-I/O mode, if a line is currently being input, the input
-line is then redrawn to accomodate the changed size. Finally the new values are
+line is then redrawn to accommodate the changed size. Finally the new values are
 recorded in \fIgl\fR for future use by \fBgl_get_line()\fR.
 .sp
 .LP
@@ -2201,7 +2178,6 @@ The \fIdef_ncolumn\fR and \fIdef_nline\fR arguments specify the default number
 of terminal columns and lines to use if the terminal size cannot be determined
 by ioctl(\fBTIOCGWINSZ\fR) or environment variables.
 .SS "Hiding What You Type"
-.sp
 .LP
 When entering sensitive information, such as passwords, it is best not to have
 the text that you are entering echoed on the terminal. Furthermore, such text
@@ -2229,7 +2205,6 @@ When echoing is turned off, note that although tab completion will invisibly
 complete your prefix as far as possible, ambiguous completions will not be
 displayed.
 .SS "Single Character Queries"
-.sp
 .LP
 Using \fBgl_get_line()\fR to query the user for a single character reply, is
 inconvenient for the user, since they must hit the enter or return key before
@@ -2278,7 +2253,6 @@ line is discarded, and erased from the terminal, before the new prompt is
 displayed. The next call to \fBgl_get_line()\fR will thus start editing a new
 line.
 .SS "Reading Raw Characters"
-.sp
 .LP
 Whereas the \fBgl_query_char()\fR function visibly prompts the user for a
 character, and displays what they typed, the \fBgl_read_char()\fR function
@@ -2301,14 +2275,12 @@ Beware that certain keyboard keys, such as function keys, and cursor keys,
 usually generate at least three characters each, so a single call to
 \fBgl_read_char()\fR will not be enough to identify such keystrokes.
 .SS "Clearing The Terminal"
-.sp
 .LP
 The calling program can clear the terminal by calling
 \fBgl_erase_terminal()\fR. In non-blocking server-I/O mode, this function also
 arranges for the current input line to be redrawn from scratch when
 \fBgl_get_line()\fR is next called.
 .SS "Displaying Text Dynamically"
-.sp
 .LP
 Between calls to \fBgl_get_line()\fR, the \fBgl_display_text()\fR function
 provides a convenient way to display paragraphs of text, left-justified and
@@ -2352,7 +2324,6 @@ to force a new line to be started.
 .LP
 On error, \fBgl_display_text()\fR returns -1.
 .SS "Callback Function Facilities"
-.sp
 .LP
 Unless otherwise stated, callback functions such as tab completion callbacks
 and event callbacks should not call any functions in this module. The following
@@ -2367,7 +2338,6 @@ to \fBgl_get_line()\fR that are operating on the same input line, the current
 input line will be re-drawn with the new prompt on the following call to
 \fBgl_get_line()\fR.
 .SS "International Character Sets"
-.sp
 .LP
 Since \fBlibtecla\fR(3LIB) version 1.4.0, \fBgl_get_line()\fR has been 8-bit
 clean. This means that all 8-bit characters that are printable in the user's
@@ -2402,7 +2372,6 @@ locale -a
 at the shell prompt. Further documentation on how the user can make use of this
 to enter international characters can be found in the \fBtecla\fR(5) man page.
 .SS "Thread Safety"
-.sp
 .LP
 Unfortunately neither \fBterminfo\fR nor \fBtermcap\fR were designed to be
 reentrant, so you cannot safely use the functions of the getline module in
@@ -2413,7 +2382,6 @@ directories, it is safe to use this module from a single thread of a
 multi-threaded program, provided that your other threads do not use any
 \fBtermcap\fR or \fBterminfo\fR functions.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -2431,7 +2399,6 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBcpl_complete_word\fR(3TECLA), \fBef_expand_file\fR(3TECLA),
 \fBgl_io_mode\fR(3TECLA), \fBlibtecla\fR(3LIB), \fBpca_lookup_file\fR(3TECLA),

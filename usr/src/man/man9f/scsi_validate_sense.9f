@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SCSI_VALIDATE_SENSE 9F "Jun 29, 2006"
+.TH SCSI_VALIDATE_SENSE 9F "April 9, 2016"
 .SH NAME
 scsi_validate_sense \- find descriptor in SCSI sense data
 .SH SYNOPSIS
@@ -18,11 +18,9 @@ scsi_validate_sense \- find descriptor in SCSI sense data
 .fi
 
 .SH INTERFACE LEVEL
-.sp
 .LP
 Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIsense_buffer\fR\fR
@@ -51,7 +49,6 @@ Returns additional properties of the sense data.
 .RE
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBscsi_validate_sense()\fR function returns the format of the sense data
 contained in the provided sense buffer. If the response code field in the sense
@@ -81,11 +78,10 @@ sense data.
 .RS 20n
 The sense data contained in the buffer relates to an error that has occurred
 during the processing of a successfully completed command, such as a cached
-write that could not be commited to the media.
+write that could not be committed to the media.
 .RE
 
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fBSENSE_UNUSABLE\fR\fR
@@ -114,12 +110,10 @@ The sense data in the buffer is in "descriptor format".
 .RE
 
 .SH CONTEXT
-.sp
 .LP
 The \fBscsi_validate_sense()\fR function can be called from user or interrupt
 context.
 .SH SEE ALSO
-.sp
 .LP
 \fBscsi_ext_sense_fields\fR(9F), \fBscsi_find_sense_descr\fR(9F),
 \fBscsi_sense_asc\fR(9F), \fBscsi_sense_ascq\fR(9F),

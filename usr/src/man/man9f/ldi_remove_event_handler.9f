@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LDI_REMOVE_EVENT_HANDLER 9F "Aug 21, 2007"
+.TH LDI_REMOVE_EVENT_HANDLER 9F "April 9, 2016"
 .SH NAME
 ldi_remove_event_handler \- remove an NDI event service callback
 .SH SYNOPSIS
@@ -16,11 +16,9 @@ ldi_remove_event_handler \- remove an NDI event service callback
 .fi
 
 .SH INTERFACE LEVEL
-.sp
 .LP
 Obsolete
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIldi_handle_t lh\fR\fR
@@ -41,7 +39,6 @@ upon successful registration.
 .RE
 
 .SH DESCRIPTION
-.sp
 .LP
 This function is obsolete and is only maintained for compatibility. Use of this
 function is strongly discouraged. For equivalent functionality provided by new
@@ -52,9 +49,8 @@ interfaces, see \fBldi_ev_register_callbacks\fR(9F) and
 The \fBldi_remove_event_handler()\fR function removes the callback handler
 specified by the registration ID (\fIldi_callback_id_t\fR). Upon successful
 removal, the callback handler is removed from the system and is not invoked at
-the event occurance.
+the event occurrence.
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fBDDI_SUCCESS\fR\fR
@@ -73,11 +69,9 @@ Failed to remove callback handler.
 .RE
 
 .SH CONTEXT
-.sp
 .LP
 This function can be called from user and kernel contexts only.
 .SH SEE ALSO
-.sp
 .LP
 \fBldi_ev_register_callbacks\fR(9F), \fBldi_ev_remove_callbacks\fR(9F),
 \fBldi_add_event_handler\fR(9F), \fBldi_get_eventcookie\fR(9F)

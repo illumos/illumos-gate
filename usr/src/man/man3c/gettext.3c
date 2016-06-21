@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH GETTEXT 3C "Jun 4, 2008"
+.TH GETTEXT 3C "April 9, 2016"
 .SH NAME
 gettext, dgettext, dcgettext, ngettext, dngettext, dcngettext, textdomain,
 bindtextdomain, bind_textdomain_codeset \- message handling functions
@@ -77,7 +77,6 @@ extern int *_nl_domain_bindings;
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBgettext()\fR, \fBdgettext()\fR, and \fBdcgettext()\fR functions attempt
 to retrieve a target string based on the specified \fImsgid\fR argument within
@@ -200,7 +199,6 @@ in the function and must not be changed by the user.
 The external variables \fB_nl_msg_cat_cntr\fR and \fB_nl_domain_bindings\fR are
 provided for the compatibility with the GNU \fBgettext()\fR implementation.
 .SH RETURN VALUES
-.sp
 .LP
 The \fBgettext()\fR, \fBdgettext()\fR, and \fBdcgettext()\fR functions return
 the message string if the search succeeds. Otherwise they return the
@@ -219,7 +217,7 @@ is a null pointer, the return value is undefined. The string returned must not
 be modified by the program and can be invalidated by a subsequent call to
 \fBbind_textdomain_codeset()\fR or \fBsetlocale\fR(3C). If the
 \fIdomainname\fR argument to  \fBdgettext()\fR,\fBdcgettext()\fR,
-\fBdngettext()\fR, or \fBdcngettext()\fR is a null pointer, the the domain
+\fBdngettext()\fR, or \fBdcngettext()\fR is a null pointer, the domain
 currently bound by \fBtextdomain()\fR is used.
 .sp
 .LP
@@ -240,7 +238,6 @@ pointer or an empty string, \fBbindtextdomain()\fR takes no action and returns
 a null pointer. The string returned must not be modified by the caller. If
 \fBbindtextdomain()\fR fails, a null pointer is returned.
 .SH USAGE
-.sp
 .LP
 These functions impose no limit on message length. However, a text
 \fIdomainname\fR is limited to \fBTEXTDOMAINMAX\fR (256) bytes.
@@ -261,7 +258,6 @@ functions work only with GNU-compatible message catalogues.  See
 \fBmsgfmt\fR(1) for information about Solaris message catalogues and
 GNU-compatible message catalogues.
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/usr/lib/locale\fR\fR
@@ -325,7 +321,6 @@ location for files containing messages for domain \fIdomainname,\fR language
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -347,7 +342,6 @@ MT-Level	Safe with exceptions
 The external variables \fB_nl_msg_cat_cntr\fR and \fB_nl_domain_bindings\fR are
 Uncommitted.
 .SH SEE ALSO
-.sp
 .LP
 \fBmsgfmt\fR(1), \fBxgettext\fR(1), \fBiconv_open\fR(3C),
 \fBlibintl.h\fR(3HEAD), \fBsetlocale\fR(3C), \fBattributes\fR(5),

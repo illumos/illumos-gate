@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH CSX_REGISTERCLIENT 9F "Jul 19, 1996"
+.TH CSX_REGISTERCLIENT 9F "April 9, 2016"
 .SH NAME
 csx_RegisterClient \- register a client
 .SH SYNOPSIS
@@ -17,11 +17,9 @@ csx_RegisterClient \- register a client
 .fi
 
 .SH INTERFACE LEVEL
-.sp
 .LP
 Solaris \fBDDI\fR Specific (Solaris \fBDDI\fR)
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIch\fR\fR
@@ -40,13 +38,11 @@ Pointer to a \fBclient_reg_t\fR structure.
 .RE
 
 .SH DESCRIPTION
-.sp
 .LP
 This function registers a client with Card Services and returns a unique client
 handle for the client. The client handle must be passed to
 \fBcsx_DeregisterClient\fR(9F) when the client terminates.
 .SH STRUCTURE MEMBERS
-.sp
 .LP
 The structure members of \fBclient_reg_t\fR are:
 .sp
@@ -156,7 +152,7 @@ of the bits must be set.
 .RS 4n
 If either of these bits is set, the client will receive a
 \fBCS_EVENT_REGISTRATION_COMPLETE\fR event when Card Services has completed its
-internal client registration processing and after a sucessful call to
+internal client registration processing and after a successful call to
 \fBcsx_RequestSocketMask\fR(9F).
 .sp
 Also, if either of these bits is set, and if a card of the type that the client
@@ -255,7 +251,6 @@ identical across all instances of the driver.
 .RE
 
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fBCS_SUCCESS\fR\fR
@@ -310,11 +305,9 @@ No \fBPCMCIA\fR hardware installed.
 .RE
 
 .SH CONTEXT
-.sp
 .LP
 This function may be called from user or kernel context.
 .SH SEE ALSO
-.sp
 .LP
 \fBcsx_DeregisterClient\fR(9F), \fBcsx_RequestSocketMask\fR(9F)
 .sp

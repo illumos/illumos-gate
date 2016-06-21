@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH GSS_STORE_CRED 3GSS "Jun 30, 2005"
+.TH GSS_STORE_CRED 3GSS "April 9, 2016"
 .SH NAME
 gss_store_cred \- store a credential in the current credential store
 .SH SYNOPSIS
@@ -20,7 +20,6 @@ gss_store_cred \- store a credential in the current credential store
 .fi
 
 .SH PARAMETERS
-.sp
 .LP
 The parameter descriptions for \fBgss_store_cred()\fR follow:
 .sp
@@ -117,9 +116,8 @@ single mechanism in the \fIinput_cred_handle\fR. In all other cases,
 .RE
 
 .SH DESCRIPTION
-.sp
 .LP
-The \fBgss_store_cred()\fR function stores a credential in the the current
+The \fBgss_store_cred()\fR function stores a credential in the current
 GSS-API credential store for the calling process. Input credentials can be
 re-acquired through \fBgss_add_cred\fR(3GSS) and \fBgss_acquire_cred\fR(3GSS).
 .sp
@@ -143,7 +141,6 @@ effective UID.
 In general, acceptor applications should switch the current credential store by
 changing the effective UID before storing a delegated credential.
 .SH RETURN VALUES
-.sp
 .LP
 The \fBgss_store_cred()\fR can return the following status codes:
 .sp
@@ -211,7 +208,6 @@ the \fIminor_status\fR parameter details the error condition.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -229,7 +225,6 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBgss_accept_sec_context\fR(3GSS), \fBgss_acquire_cred\fR(3GSS),
 \fBgss_add_cred\fR(3GSS), \fBgss_init_sec_context\fR(3GSS),

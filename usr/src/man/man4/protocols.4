@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PROTOCOLS 4 "Jun 13, 2002"
+.TH PROTOCOLS 4 "April 9, 2016"
 .SH NAME
 protocols \- protocol name database
 .SH SYNOPSIS
@@ -19,13 +19,12 @@ protocols \- protocol name database
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBprotocols\fR file  is a local source of information regarding the known
 protocols used in the \fBDARPA\fR Internet. The protocols file can be used in
 conjunction with or instead of other protocols sources, including the \fBNIS\fR
-maps ``protcols.byname'' and "protocols.bynumber" and the \fBNIS+\fR table
-``protocols''. Programs use the \fBgetprotobyname\fR(3SOCKET) routine to access
+maps "protocols.byname" and "protocols.bynumber" and the \fBNIS+\fR table
+"protocols". Programs use the \fBgetprotobyname\fR(3SOCKET) routine to access
 this information.
 .sp
 .LP
@@ -83,7 +82,6 @@ ipv6-opts   60  IPv6-Opts   # Destination Options for IPv6
 .sp
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/nsswitch.conf\fR\fR
@@ -93,11 +91,9 @@ configuration file for name-service switch
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBgetprotobyname\fR(3SOCKET), \fBnsswitch.conf\fR(4)
 .SH NOTES
-.sp
 .LP
 \fB/etc/inet/protocols\fR is the official SVR4 name of the \fBprotocols\fR
 file.  The symbolic link \fB/etc/protocols\fR exists for \fBBSD\fR

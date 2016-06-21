@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH CPUTRACK 1 "Apr 19, 2004"
+.TH CPUTRACK 1 "April 9, 2016"
 .SH NAME
 cputrack \- monitor process and LWP behavior using CPU performance counters
 .SH SYNOPSIS
@@ -25,7 +25,6 @@ cputrack \- monitor process and LWP behavior using CPU performance counters
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBcputrack\fR utility allows \fBCPU\fR performance counters to be used to
 monitor the behavior of a process or family of processes running on the system.
@@ -43,7 +42,6 @@ Because \fBcputrack\fR is an unprivileged program, it is subject to the same
 restrictions that apply to \fBtruss\fR(1). For example, \fBsetuid\fR(2)
 executables cannot be tracked.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -189,7 +187,6 @@ Enables more verbose output.
 .RE
 
 .SH USAGE
-.sp
 .LP
 The operating system enforces certain restrictions on the tracing of processes.
 In particular, a command whose object file cannot be read by a user cannot be
@@ -234,7 +231,7 @@ user and system modes, regardless of the settings applied to the performance
 counter registers.
 .sp
 .LP
-The output of \fBcputrack\fR is designed to be readily parseable by
+The output of \fBcputrack\fR is designed to be readily parsable by
 \fBnawk\fR(1) and \fBperl\fR(1), thereby allowing performance tools to be
 composed by embedding \fBcputrack\fR in scripts. Alternatively, tools may be
 constructed directly using the same \fBAPI\fRs that \fBcputrack\fR is built
@@ -366,7 +363,6 @@ example% \fBcputrack -c ITLB_reference,emask=1 date\fR
 .sp
 
 .SH WARNINGS
-.sp
 .LP
 By running any instance of the \fBcpustat\fR(1M) utility, all existing
 performance counter context is forcibly invalidated across the machine. This
@@ -394,7 +390,6 @@ the problem and possible solutions.
 If a short interval is requested, \fBcputrack\fR may not be able to keep up
 with the desired sample rate. In this case, some samples may be dropped.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -409,7 +404,6 @@ Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBnawk\fR(1), \fBperl\fR(1), \fBproc\fR(1), \fBtruss\fR(1), \fBprstat\fR(1M),
 \fBcpustat\fR(1M), \fBexec\fR(2), \fBexit\fR(2), \fBfork\fR(2),

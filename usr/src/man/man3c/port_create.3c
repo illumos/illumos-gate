@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PORT_CREATE 3C "Feb 5, 2008"
+.TH PORT_CREATE 3C "April 9, 2016"
 .SH NAME
 port_create \- create a port
 .SH SYNOPSIS
@@ -15,7 +15,6 @@ port_create \- create a port
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBport_create()\fR function establishes a queue that multiplexes events
 from disjoint sources.  Each source has a corresponding object type and
@@ -103,13 +102,11 @@ processes when child processes inherit opened file decriptors from the parent
 process. See \fBfork\fR(2). \fBPORT_SOURCE_TIMER\fR and \fBPORT_SOURCE_AIO\fR
 cannot be shared between processes.
 .SH RETURN VALUES
-.sp
 .LP
-Upon succesful completion, the \fBport_create()\fR function returns a
+Upon successful completion, the \fBport_create()\fR function returns a
 non-negative value, the port identifier. Otherwise, \(mi1 is returned and errno
 is set to indicate the error.
 .SH ERRORS
-.sp
 .LP
 The \fBport_create()\fR function will fail if:
 .sp
@@ -134,7 +131,6 @@ The process has too many open descriptors.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -154,7 +150,6 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBrctladm\fR(1M), \fBclose\fR(2), \fBexit\fR(2), \fBfork\fR(2), \fBpoll\fR(2),
 \fBsetrctl\fR(2), \fBaio_read\fR(3C), \fBaio_write\fR(3C), \fBaio.h\fR(3HEAD),

@@ -11,7 +11,7 @@
 .\"
 .\" Copyright (c) 2014, Joyent, Inc. All Rights Reserved.
 .\"
-.Dd Dec 3, 2014
+.Dd April 9, 2016
 .Dt EVENTFD 3C
 .Os
 .Sh NAME
@@ -158,7 +158,7 @@ will be set.
 .Ed
 .El
 .Sh RETURN VALUES
-Upon succesful completion, a file descriptor associated with the instance
+Upon successful completion, a file descriptor associated with the instance
 is returned. Otherwise,
 .Sy -1 is returned and
 .Sy errno

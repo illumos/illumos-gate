@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH P_ONLINE 2 "Jan 11, 2009"
+.TH P_ONLINE 2 "April 9, 2016"
 .SH NAME
 p_online \- return or change processor operational status
 .SH SYNOPSIS
@@ -16,7 +16,6 @@ p_online \- return or change processor operational status
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBp_online()\fR function changes or returns the operational status of
 processors. The state of the processor specified by the \fIprocessorid\fR
@@ -57,13 +56,13 @@ one processor must always be available to service system clock interrupts.
 .sp
 .LP
 A processor in the \fBP_SPARE\fR state is not allowed to process LWPs. In many
-respects the \fBP_SPARE\fR state is similiar to the \fBP_OFFLINE\fR state, but
+respects, the \fBP_SPARE\fR state is similar to the \fBP_OFFLINE\fR state, but
 describes a processor that is available for reactivation by management tools
 without administrator intervention.
 .sp
 .LP
 A processor in the \fBP_FAULTED\fR state is not allowed to process LWPs. In
-many respects the \fBP_FAULTED\fR state is similiar to the \fBP_OFFLINE\fR
+many respects, the \fBP_FAULTED\fR state is similar to the \fBP_OFFLINE\fR
 state, but describes a processor that has been diagnosed as faulty. The
 privileged caller can change the state of the processor from \fBP_FAULTED\fR to
 any of the other states, but since the processor might generate additional
@@ -89,14 +88,12 @@ determined by calling \fBp_online()\fR with \fIprocessorid\fR values from 0 to
 the maximum returned by \fBsysconf(_SC_CPUID_MAX)\fR. The \fBEINVAL\fR error is
 returned for invalid processor numbers.  See \fBEXAMPLES\fR below.
 .SH RETURN VALUES
-.sp
 .LP
 On successful completion, the value returned is the previous state of the
 processor, \fBP_ONLINE\fR, \fBP_OFFLINE\fR, \fBP_NOINTR\fR, \fBP_FAULTED\fR,
 \fBP_SPARE\fR, or \fBP_POWEROFF\fR. Otherwise, \fB\(mi1\fR is returned, the CPU
 state remains unchanged, and  \fBerrno\fR is set to indicate the error.
 .SH ERRORS
-.sp
 .LP
 The \fBp_online()\fR function will fail if:
 .sp
@@ -182,7 +179,6 @@ main()
 .in -2
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -198,7 +194,6 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBpooladm\fR(1M), \fBpsradm\fR(1M), \fBpsrinfo\fR(1M), \fBzoneadm\fR(1M),
 \fBprocessor_bind\fR(2), \fBprocessor_info\fR(2), \fBpset_create\fR(2),

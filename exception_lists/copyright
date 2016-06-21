@@ -72,8 +72,6 @@ usr/src/common/bzip2/bzlib.c
 usr/src/common/bzip2/decompress.c
 usr/src/common/bzip2/bzlib_private.h
 usr/src/common/bzip2/huffman.c
-usr/src/common/openssl/crypto/krb5/krb5_asn.c
-usr/src/common/openssl/crypto/krb5/krb5_asn.h
 usr/src/grub/grub-0.97/stage2/Makefile.am
 usr/src/grub/grub-0.97/stage2/builtins.c
 usr/src/grub/grub-0.97/stage2/disk_io.c

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH POLL 7D "Sep 10, 2013"
+.TH POLL 7D "April 9, 2016"
 .SH NAME
 poll \- driver for fast poll on many file descriptors
 .SH SYNOPSIS
@@ -109,7 +109,7 @@ successfully or \fB-1\fR when write fails.
 .sp
 .LP
 The \fBDP_POLL\fR ioctl is used to retrieve returned \fBpoll\fR \fBevents\fR
-occured on the  polled file descriptors in the monitored set represented by
+occurred on the  polled file descriptors in the monitored set represented by
 \fIfd\fR. \fIarg\fR \fIis\fR \fIa\fR pointer to the devpoll structures which
 are defined as follows:
 .sp

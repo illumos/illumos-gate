@@ -3,11 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH USBA 7D "Apr 22, 2009"
+.TH USBA 7D "April 9, 2016"
 .SH NAME
 usba, usb \- Solaris USB Architecture (USBA)
 .SH DESCRIPTION
-.sp
 .LP
 USB provides a low-cost means for attaching peripheral devices, including
 mass-storage devices, keyboards, mice, and printers, to a system. For complete
@@ -33,7 +32,6 @@ a complete list of USBA interfaces, see \fBIntro\fR(9F) and \fBIntro\fR(9S).
 Devices without a driver may have a  \fBlibusb\fR(3LIB) application. For more
 information, see \fB/usr/sfw/share/doc/libusb/libusb.txt\fR.
 .SH FILES
-.sp
 .LP
 Listed below are drivers and modules which either utilize or are utilized by
 USBA. Drivers in \fB/kernel/drv\fR are 32 bit drivers (x86 only). Drivers in
@@ -91,7 +89,6 @@ kernel/drv/[sparcv9|amd64/]ehci         enhanced host controller driver
 .sp
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for a description of the following attributes:
 .sp
@@ -107,7 +104,6 @@ Architecture	PCI-based  systems
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBcfgadm_usb\fR(1M), \fBlibusb\fR(3LIB), \fBattributes\fR(5), \fBehci\fR(7D),
 \fBhid\fR(7D), \fBhubd\fR(7D), \fBohci\fR(7D), \fBscsa2usb\fR(7D),
@@ -131,12 +127,10 @@ Architecture	PCI-based  systems
 .LP
 http://www.sun.com
 .SH NOTES
-.sp
 .LP
 Booting from USB mass-storage devices is not supported on SPARC, but is
 supported on X86.
 .SH DIAGNOSTICS
-.sp
 .LP
 The messages described below may appear on the system console as well as being
 logged. All  messages are formatted in the following manner:
@@ -168,7 +162,7 @@ name or the device name.
 .ad
 .sp .6
 .RS 4n
-An internal error occured.  Please reboot your system.  If this problem
+An internal error occurred.  Please reboot your system.  If this problem
 persists, contact your system vendor.
 .RE
 

@@ -1,7 +1,7 @@
 '\" te
 .\"  Portions Copyright 1989 AT&T Portions Copyright (c) 1985, 1995 Regents of the University of California.
 .\" Copyright (C) 2006, Sun Microsystems, Inc. All Rights Reserved
-.TH RESOLVER 3RESOLV "Dec 26, 2006"
+.TH RESOLVER 3RESOLV "April 9, 2016"
 .SH NAME
 resolver, res_ninit, fp_resstat, res_hostalias, res_nquery, res_nsearch,
 res_nquerydomain, res_nmkquery, res_nsend, res_nclose, res_nsendsigned,
@@ -163,7 +163,6 @@ Deprecated Interfaces
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 These routines are used for making, sending, and interpreting query and reply
 messages with Internet domain name servers.
@@ -180,7 +179,7 @@ The \fBres_ndestroy()\fR function should be called to free memory allocated by
 .LP
 The functions \fBres_init()\fR, \fBres_query()\fR, \fBres_search()\fR,
 \fBres_mkquery()\fR, \fBres_send()\fR, and \fBherror()\fR are deprecated. They
-are supplied for backwards compatability. They use global configuration and
+are supplied for backwards compatibility. They use global configuration and
 state information that is kept in the structure \fB_res\fR rather than state
 information referenced through \fIstatp\fR.
 .sp
@@ -327,7 +326,6 @@ the header would be updated.
 .RE
 
 .SS "\fBres_ninit()\fR, \fBres_init()\fR"
-.sp
 .LP
 The \fBres_ninit()\fR and \fBres_init()\fR routines read the configuration
 file, if any is present, to get the default domain name, search list and the
@@ -347,7 +345,6 @@ are inherited from the configuration file's \fBoptions\fR command. See
 \fBRES_OPTIONS\fR environment variable. Initialization normally occurs on the
 first call to one of the other resolver routines.
 .SS "\fBres_nquery()\fR, \fBres_query()\fR"
-.sp
 .LP
 The \fBres_nquery()\fR and \fBres_query()\fR functions provide interfaces to
 the server query mechanism. They construct a query, send it to the local
@@ -367,7 +364,6 @@ by the previous query. \fIanswer\fR must be large enough to receive a maximum
 \fBUDP\fR response from the server or parts of the \fIanswer\fR will be
 silently discarded. The default maximum \fBUDP\fR response size is 512 bytes.
 .SS "\fBres_nsearch()\fR, \fBres_search()\fR"
-.sp
 .LP
 The \fBres_nsearch()\fR and \fBres_search()\fR routines make a query and await
 a response, just like like \fBres_nquery()\fR and \fBres_query()\fR. In
@@ -385,13 +381,11 @@ by the previous query. \fIanswer\fR must be large enough to receive a maximum
 \fBUDP\fR response from the server or parts of the \fIanswer\fR will be
 silently discarded. The default maximum \fBUDP\fR response size is 512 bytes.
 .SS "\fBres_nquerydomain()\fR"
-.sp
 .LP
 The \fBres_nquerydomain()\fR function calls \fBres_query()\fR on the
 concatenation of \fIname\fR and \fIdomain\fR, removing a trailing dot from
 \fIname\fR if \fIdomain\fR is \fINULL\fR.
 .SS "\fBres_nmkquery()\fR, \fBres_mkquery()\fR"
-.sp
 .LP
 These routines are used by \fBres_nquery()\fR and \fBres_query()\fR. The
 \fBres_nmkquery()\fR and \fBres_mkquery()\fR functions construct a standard
@@ -401,7 +395,6 @@ the query, or -1 if the query is larger than \fIbuflen\fR. The query type
 <\fBarpa/nameser.h\fR>. The domain name for the query is given by \fIdname\fR.
 \fInewrr\fR is currently unused but is intended for making update messages.
 .SS "\fBres_nsend()\fR, \fBres_send()\fR, \fBres_nsendsigned()\fR"
-.sp
 .LP
 The \fBres_nsend()\fR, \fBres_send()\fR, and \fBres_nsendsigned()\fR routines
 send a pre-formatted query that returns an \fIanswer\fR. The routine calls
@@ -421,30 +414,25 @@ by the previous query. \fIanswer\fR must be large enough to receive a maximum
 \fBUDP\fR response from the server or parts of the \fIanswer\fR will be
 silently discarded. The default maximum \fBUDP\fR response size is 512 bytes.
 .SS "\fBfp_resstat()\fR"
-.sp
 .LP
 The function \fBfp_resstat()\fR prints out the active flag bits in
 \fIstatp\fR->\fBoptions\fR preceded by the text "\fB;; res options:\fR" on
 \fIfile\fR.
 .SS "\fBres_hostalias()\fR"
-.sp
 .LP
 The function \fBres_hostalias()\fR looks up \fIname\fR in the file referred to
 by the \fBHOSTALIASES\fR environment variable and returns the fully qualified
 host name. If \fIname\fR is not found or an error occurs, \fBNULL\fR is
 returned. \fBres_hostalias()\fR stores the result in \fIbuf\fR.
 .SS "\fBres_nclose()\fR"
-.sp
 .LP
 The \fBres_nclose()\fR function closes any open files referenced through
 \fIstatp\fR.
 .SS "\fBres_ndestroy()\fR"
-.sp
 .LP
 The \fBres_ndestroy()\fR function calls \fBres_nclose()\fR, then frees any
 memory allocated by \fBres_ninit()\fR referenced through \fIstatp\fR.
 .SS "\fBdn_comp()\fR"
-.sp
 .LP
 The \fBdn_comp()\fR function compresses the domain name \fIexp_dn\fR and stores
 it in \fIcomp_dn\fR. The \fBdn_comp()\fR function returns the size of the
@@ -463,7 +451,6 @@ labels inserted into the message by \fBdn_comp()\fR as the name is compressed.
 If \fIdnptrs\fR is \fINULL\fR, names are not compressed. If \fIlastdnptr\fR is
 \fINULL\fR, \fBdn_comp()\fR does not update the list of labels.
 .SS "\fBdn_expand()\fR"
-.sp
 .LP
 The \fBdn_expand()\fR function expands the compressed domain name \fIcomp_dn\fR
 to a full domain name. The compressed name is contained in a query or reply
@@ -472,7 +459,6 @@ uncompressed name is placed in the buffer indicated by \fIexp_dn\fR, which is
 of size \fIlength\fR. The \fBdn_expand()\fR function returns the size of the
 compressed name, or \fB\(mi1\fR if there was an error.
 .SS "\fBhstrerror()\fR, \fBherror()\fR"
-.sp
 .LP
 The variables \fIstatp->res_h_errno\fR and \fI_res.res_h_errno\fR and external
 variable \fIh_errno\fR are set whenever an error occurs during a resolver
@@ -500,12 +486,10 @@ message corresponding to the value of \fIh_errno\fR.
 The \fBhstrerror()\fR function returns a string, which is the message text that
 corresponds to the value of the \fIerr\fR parameter.
 .SS "\fBres_setservers()\fR, \fBres_getservers()\fR"
-.sp
 .LP
 The functions \fBres_getservers()\fR and \fBres_setservers()\fR are used to get
 and set the list of servers to be queried.
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/resolv.conf\fR\fR
@@ -515,7 +499,6 @@ resolver configuration file
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -534,7 +517,6 @@ T}
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBdomainname\fR(1M), \fBgethostbyname\fR(3NSL), \fBlibresolv\fR(3LIB),
 \fBresolv.conf\fR(4), \fBattributes\fR(5)
@@ -563,7 +545,6 @@ November 1987.
 Vixie, Paul, Dunlap, Kevin J., Karels, Michael J. \fIName Server Operations
 Guide for BIND\fR. Internet Software Consortium, 1996.
 .SH NOTES
-.sp
 .LP
 When the caller supplies a work buffer, for example the \fIanswer\fR buffer
 argument to \fBres_nsend()\fR or \fBres_send()\fR, the buffer should be aligned

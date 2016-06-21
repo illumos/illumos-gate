@@ -4,11 +4,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LDAP 1 "Aug 28, 2006"
+.TH LDAP 1 "April 9, 2016"
 .SH NAME
 ldap \- LDAP as a naming repository
 .SH DESCRIPTION
-.sp
 .LP
 LDAP refers to Lightweight Directory Access Protocol, which is an industry
 standard for accessing directory servers. By initializing the client using
@@ -202,7 +201,7 @@ More protection can be provided by means of access control, allowing the server
 to grant access for certain containers or entries. Access control is specified
 by Access Control Lists (ACLs) that are defined and stored in the LDAP server.
 The Access Control Lists on the LDAP server are called Access Control
-Instructions (ACIs) by the the SunOne Directory Server. Each ACL or ACI
+Instructions (ACIs) by the SunOne Directory Server. Each ACL or ACI
 specifies one or more directory objects, for example, the \fBcn\fR attribute in
 a specific container, one or more clients to whom you grant or deny access, and
 one or more access rights that determine what the clients can do to or with the
@@ -257,7 +256,6 @@ Lists the contents of the LDAP naming space.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/var/ldap/ldap_client_cred\fR\fR
@@ -301,7 +299,6 @@ PAM framework configuration file.
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBldaplist\fR(1), \fBidsconfig\fR(1M), \fBldap_cachemgr\fR(1M),
 \fBldapaddent\fR(1M), \fBldapclient\fR(1M), \fBnsswitch.conf\fR(4),
@@ -314,7 +311,6 @@ PAM framework configuration file.
 \fISystem Administration Guide: Naming and Directory Services (DNS, NIS, and
 LDAP)\fR
 .SH NOTES
-.sp
 .LP
 The \fBpam_unix\fR(5) module is no longer supported. Similar functionality is
 provided by \fBpam_authtok_check\fR(5), \fBpam_authtok_get\fR(5),

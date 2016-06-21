@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH RSM_INTR_SIGNAL_WAIT_POLLFD 3RSM "Dec 1, 2002"
+.TH RSM_INTR_SIGNAL_WAIT_POLLFD 3RSM "April 9, 2016"
 .SH NAME
 rsm_intr_signal_wait_pollfd \- wait for events on a list of file descriptors
 .SH SYNOPSIS
@@ -17,7 +17,6 @@ cc [ \fIflag\fR... ] \fIfile\fR\&.\|.\|. \fB-lrsm\fR [ \fIlibrary \&.\|.\|.\fR ]
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBrsm_intr_signal_wait_pollfd()\fR function is similar to
 \fBrsm_intr_signal_wait\fR(3RSM), except that it  allows an application to
@@ -48,7 +47,6 @@ that the segment has not been destroyed.
 For file descriptors other than RSMAPI segments, the behavior of
 \fBrsm_intr_signal_wait_pollfd()\fR is similar to \fBpoll()\fR.
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, \fBrsm_intr_signal_wait_pollfd()\fR returns 0 and
 the \fBrevents\fR member of the \fBpollfd\fR struct corresponding to an RSMAPI
@@ -59,7 +57,6 @@ that segment was received. Otherwise, an error value is returned.
 For file descriptors other than RSMAPI segments, the \fBrevents\fR member of
 the \fBpollfd\fR struct is identical to that returned by \fBpoll\fR(2).
 .SH ERRORS
-.sp
 .LP
 The \fBrsm_intr_signal_wait_pollfd()\fR function can return the following
 errors:
@@ -70,7 +67,7 @@ errors:
 .ad
 .sp .6
 .RS 4n
-Timeout has occured.
+Timeout has occurred.
 .RE
 
 .sp
@@ -124,7 +121,6 @@ Insufficient resources.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -142,7 +138,6 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBpoll\fR(2), \fBrsm_intr_signal_wait\fR(3RSM),
 \fBrsm_memseg_get_pollfd\fR(3RSM), \fBrsm_memseg_release_pollfd\fR(3RSM),

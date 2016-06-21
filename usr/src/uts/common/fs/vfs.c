@@ -22,6 +22,7 @@
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2014, Joyent, Inc. All rights reserved.
  * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2016 Toomas Soome <tsoome@me.com>
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -355,8 +356,8 @@ fs_copyfsops(const fs_operation_def_t *template, vfsops_t *actual,
 }
 
 void
-zfs_boot_init() {
-
+zfs_boot_init(void)
+{
 	if (strcmp(rootfs.bo_fstype, MNTTYPE_ZFS) == 0)
 		spa_boot_init();
 }
@@ -525,7 +526,7 @@ vfs_init(vfs_t *vfsp, vfsops_t *op, void *data)
 	vfsp->vfs_prev = vfsp;
 	vfsp->vfs_zone_next = vfsp;
 	vfsp->vfs_zone_prev = vfsp;
-	vfsp->vfs_lofi_minor = 0;
+	vfsp->vfs_lofi_id = 0;
 	sema_init(&vfsp->vfs_reflock, 1, NULL, SEMA_DEFAULT, NULL);
 	vfsimpl_setup(vfsp);
 	vfsp->vfs_data = (data);
@@ -984,7 +985,7 @@ lofi_add(const char *fsname, struct vfs *vfsp,
 	ldi_ident_t ldi_id;
 	ldi_handle_t ldi_hdl;
 	vfssw_t *vfssw;
-	int minor;
+	int id;
 	int err = 0;
 
 	if ((vfssw = vfs_getvfssw(fsname)) == NULL)
@@ -1028,12 +1029,12 @@ lofi_add(const char *fsname, struct vfs *vfsp,
 		goto out2;
 
 	err = ldi_ioctl(ldi_hdl, LOFI_MAP_FILE, (intptr_t)li,
-	    FREAD | FWRITE | FKIOCTL, kcred, &minor);
+	    FREAD | FWRITE | FKIOCTL, kcred, &id);
 
 	(void) ldi_close(ldi_hdl, FREAD | FWRITE, kcred);
 
 	if (!err)
-		vfsp->vfs_lofi_minor = minor;
+		vfsp->vfs_lofi_id = id;
 
 out2:
 	ldi_ident_release(ldi_id);
@@ -1054,13 +1055,13 @@ lofi_remove(struct vfs *vfsp)
 	ldi_handle_t ldi_hdl;
 	int err;
 
-	if (vfsp->vfs_lofi_minor == 0)
+	if (vfsp->vfs_lofi_id == 0)
 		return;
 
 	ldi_id = ldi_ident_from_anon();
 
 	li = kmem_zalloc(sizeof (*li), KM_SLEEP);
-	li->li_minor = vfsp->vfs_lofi_minor;
+	li->li_id = vfsp->vfs_lofi_id;
 	li->li_cleanup = B_TRUE;
 
 	err = ldi_open_by_name("/dev/lofictl", FREAD | FWRITE, kcred,
@@ -1075,7 +1076,7 @@ lofi_remove(struct vfs *vfsp)
 	(void) ldi_close(ldi_hdl, FREAD | FWRITE, kcred);
 
 	if (!err)
-		vfsp->vfs_lofi_minor = 0;
+		vfsp->vfs_lofi_id = 0;
 
 out:
 	ldi_ident_release(ldi_id);
@@ -1105,7 +1106,7 @@ out:
  */
 int
 domount(char *fsname, struct mounta *uap, vnode_t *vp, struct cred *credp,
-	struct vfs **vfspp)
+    struct vfs **vfspp)
 {
 	struct vfssw	*vswp;
 	vfsops_t	*vfsops;
@@ -1481,7 +1482,7 @@ domount(char *fsname, struct mounta *uap, vnode_t *vp, struct cred *credp,
 	/*
 	 * PRIV_SYS_MOUNT doesn't mean you can become root.
 	 */
-	if (vfsp->vfs_lofi_minor != 0) {
+	if (vfsp->vfs_lofi_id != 0) {
 		uap->flags |= MS_NOSUID;
 		vfs_setmntopt_nolock(&mnt_mntopts, MNTOPT_NOSUID, NULL, 0, 0);
 	}
@@ -2788,7 +2789,7 @@ vfs_freeopttbl(mntopts_t *mp)
 /* ARGSUSED */
 static int
 vfs_mntdummyread(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cred,
-	caller_context_t *ct)
+    caller_context_t *ct)
 {
 	return (0);
 }
@@ -2796,7 +2797,7 @@ vfs_mntdummyread(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cred,
 /* ARGSUSED */
 static int
 vfs_mntdummywrite(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cred,
-	caller_context_t *ct)
+    caller_context_t *ct)
 {
 	return (0);
 }
@@ -4800,14 +4801,14 @@ vfs_get_lofi(vfs_t *vfsp, vnode_t **vpp)
 	int strsize;
 	int err;
 
-	if (vfsp->vfs_lofi_minor == 0) {
+	if (vfsp->vfs_lofi_id == 0) {
 		*vpp = NULL;
 		return (-1);
 	}
 
-	strsize = snprintf(NULL, 0, LOFINODE_PATH, vfsp->vfs_lofi_minor);
+	strsize = snprintf(NULL, 0, LOFINODE_PATH, vfsp->vfs_lofi_id);
 	path = kmem_alloc(strsize + 1, KM_SLEEP);
-	(void) snprintf(path, strsize + 1, LOFINODE_PATH, vfsp->vfs_lofi_minor);
+	(void) snprintf(path, strsize + 1, LOFINODE_PATH, vfsp->vfs_lofi_id);
 
 	/*
 	 * We may be inside a zone, so we need to use the /dev path, but

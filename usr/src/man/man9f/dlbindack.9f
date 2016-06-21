@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DLBINDACK 9F "Jan 16, 2006"
+.TH DLBINDACK 9F "April 9, 2016"
 .SH NAME
 dlbindack, dlphysaddrack, dlokack, dlerrorack, dluderrorind \- DLPI device
 driver helper functions
@@ -42,11 +42,9 @@ driver helper functions
 .fi
 
 .SH INTERFACE LEVEL
-.sp
 .LP
 Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIwq\fR\fR
@@ -148,7 +146,6 @@ in the \fBDLPI\fR request.
 .RE
 
 .SH DESCRIPTION
-.sp
 .LP
 All functions described in this manpage take a pointer to the message passed to
 the \fBDLPI\fR provider (\fBmblk_t\fR) and attempt to reuse it in formulating
@@ -160,12 +157,12 @@ All functions reply upstream using \fBqreply\fR(9F). The write-side queue
 pointer must be provided.
 .sp
 .LP
-The \fBdlokack()\fR function provides the successfull acknowledgement
+The \fBdlokack()\fR function provides the successful acknowledgement
 \fBDL_OK_ACK\fR message reply to the \fBDLPI\fR provider and is used to
 complete many of the \fBDLPI\fR requests in the \fBDLPI\fR consumer.
 .sp
 .LP
-The \fBdlerrorack()\fR function provides the unsuccessfull acknowledgement
+The \fBdlerrorack()\fR function provides the unsuccessful acknowledgement
 \fBDL_ERROR_ACK\fR message reply to the \fBDLPI\fR() provider and is used for
 error completions were required for \fBDLPI\fR requests in the \fBDLPI\fR
 consumer.
@@ -183,21 +180,17 @@ message reply used to complete the \fBDL_PHYS_ADDR_ACK\fR processing.
 The \fBdluderrorind()\fR function provides the \fBDL_UDERROR_IND\fR message
 reply used to complete an unsuccessful \fBDL_UNITDATA_REQ\fR.
 .SH RETURN VALUES
-.sp
 .LP
 None.
 .SH NOTES
-.sp
 .LP
 These functions are not required if you are are writing a \fBDLPI\fR device
 driver using \fBgld\fR(7D).
 .SH CONTEXT
-.sp
 .LP
 All \fBDLPI\fR helper functions can be called from user, interrupt, or kernel
 context.
 .SH SEE ALSO
-.sp
 .LP
 \fBgld\fR(7D), \fBdlpi\fR(7P), \fBqreply\fR(9F)
 .sp

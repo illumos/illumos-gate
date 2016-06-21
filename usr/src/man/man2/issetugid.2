@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ISSETUGID 2 "Feb 19, 2003"
+.TH ISSETUGID 2 "April 9, 2016"
 .SH NAME
 issetugid \- determine if current executable is running setuid or setgid
 .SH SYNOPSIS
@@ -15,12 +15,11 @@ issetugid \- determine if current executable is running setuid or setgid
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBissetugid()\fR function enables library functions (in \fBlibtermlib\fR,
 \fBlibc\fR, or other libraries) to guarantee safe behavior when used in
 \fBsetuid\fR or \fBsetgid\fR programs or programs that run with more privileges
-after a succesful \fBexec\fR(2). Some library functions might be passed
+after a successful \fBexec\fR(2). Some library functions might be passed
 insufficient information and not know whether the current program was started
 \fBsetuid\fR or \fBsetgid\fR because a higher level calling code might have
 made changes to the \fBuid\fR, \fBeuid\fR, \fBgid\fR, or \fBegid\fR. These
@@ -49,18 +48,15 @@ executable file. If the new executable file modes are \fBsetuid\fR or
 before the call to the \fBexec\fR function is not a superset of the inheritable
 set at that time, \fBissetugid()\fR returns 1 in the new process.
 .SH RETURN VALUES
-.sp
 .LP
 The \fBissetugid()\fR function returns 1 if the process was made \fBsetuid\fR
 or \fBsetgid\fR as the result of the last or a previous call to \fBexecve()\fR.
 Otherwise it returns 0.
 .SH ERRORS
-.sp
 .LP
 The \fBissetugid()\fR function is always successful. No return value is
 reserved to indicate an error.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -78,7 +74,6 @@ MT-Level	Async-Signal-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBexec\fR(2), \fBfork\fR(2), \fBsetuid\fR(2), \fBgetenv\fR(3C),
 \fBattributes\fR(5), \fBprivileges\fR(5)
