@@ -279,6 +279,7 @@ MANFILES= 	ASSERT.9f				\
 	 	gld.9f					\
 	 	hook_alloc.9f				\
 	 	hook_free.9f				\
+		id_space.9f				\
 	 	id32_alloc.9f				\
 	 	inb.9f					\
 	 	insq.9f					\
@@ -892,6 +893,15 @@ MANLINKS=	SIZEOF_PTR.9f				\
 	 	gld_register.9f				\
 	 	gld_sched.9f				\
 	 	gld_unregister.9f			\
+		id_space_create.9f			\
+		id_space_destroy.9f			\
+		id_space_extend.9f			\
+		id_alloc.9f				\
+		id_alloc_nosleep.9f			\
+		id_allocff.9f				\
+		id_allocff_nosleep.9f			\
+		id_alloc_specific_nosleep.9f		\
+		id_free.9f				\
 	 	id32_free.9f				\
 	 	id32_lookup.9f				\
 	 	inl.9f					\
@@ -1658,6 +1668,16 @@ gld_recv.9f				:= LINKSRC = gld.9f
 gld_register.9f				:= LINKSRC = gld.9f
 gld_sched.9f				:= LINKSRC = gld.9f
 gld_unregister.9f			:= LINKSRC = gld.9f
+
+id_space_create.9f			:= LINKSRC = id_space.9f
+id_space_destroy.9f			:= LINKSRC = id_space.9f
+id_space_extend.9f			:= LINKSRC = id_space.9f
+id_alloc.9f				:= LINKSRC = id_space.9f
+id_alloc_nosleep.9f			:= LINKSRC = id_space.9f
+id_allocff.9f				:= LINKSRC = id_space.9f
+id_allocff_nosleep.9f			:= LINKSRC = id_space.9f
+id_alloc_specific_nosleep.9f		:= LINKSRC = id_space.9f
+id_free.9f				:= LINKSRC = id_space.9f
 
 id32_free.9f				:= LINKSRC = id32_alloc.9f
 id32_lookup.9f				:= LINKSRC = id32_alloc.9f

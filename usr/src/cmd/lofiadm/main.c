@@ -1935,7 +1935,7 @@ main(int argc, char *argv[])
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
 
-	while ((c = getopt(argc, argv, "a:b:c:Cd:efk:lrRs:T:U")) != EOF) {
+	while ((c = getopt(argc, argv, "a:c:Cd:efk:lrs:T:U")) != EOF) {
 		switch (c) {
 		case 'a':
 			addflag = B_TRUE;
