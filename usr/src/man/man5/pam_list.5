@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PAM_LIST 5 "Mar 26, 2009"
+.TH PAM_LIST 5 "April 9, 2016"
 .SH NAME
 pam_list \- PAM account management module for UNIX
 .SH SYNOPSIS
@@ -13,7 +13,6 @@ pam_list \- PAM account management module for UNIX
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBpam_list\fR module implements \fBpam_sm_acct_mgmt\fR(3PAM), which
 provides  functionality to the PAM account management stack.  The module
@@ -21,7 +20,7 @@ provides functions to validate  that  the  user's account  is  valid on this
 host based on a list of users and/or netgroups in the given file. The users and
 netgroups are separated by newline character. Netgroups are specified with
 character '@' as prefix before name of netgroup in the list. The maximum line
-lenght is 1023 characters.
+length is 1023 characters.
 .sp
 .LP
 The username is the value of \fBPAM_USER\fR. The host is the value of
@@ -129,7 +128,6 @@ The user and hostname must be in the same netgroup.
 .RE
 
 .SH ERRORS
-.sp
 .LP
 The following error values are returned:
 .sp
@@ -247,7 +245,6 @@ remoteloginname
 .in -2
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -269,7 +266,6 @@ MT-Level	MT-Safe with exceptions
 The interfaces in \fBlibpam\fR(3LIB) are MT-Safe only if each thread within the
 multithreaded application uses its own PAM handle.
 .SH SEE ALSO
-.sp
 .LP
 \fBpam\fR(3PAM), \fBpam_authenticate\fR(3PAM), \fBpam_sm_acct_mgmt\fR(3PAM),
 \fBsyslog\fR(3C), \fBlibpam\fR(3LIB), \fBnsswitch.conf\fR(4),

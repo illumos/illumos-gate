@@ -7,7 +7,7 @@
 .\" OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER
 .\" IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 .\" Portions Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved.
-.TH ROUTE 7P "Sep 02, 2015"
+.TH ROUTE 7P "April 9, 2016"
 .SH NAME
 route \- kernel packet forwarding database
 .SH SYNOPSIS
@@ -91,7 +91,7 @@ are exhausted.
 .sp
 .LP
 The \fIprotocol\fR parameter specifies which messages an application listening
-on the routing socket is interested in seeing, based on the the address family
+on the routing socket is interested in seeing, based on the address family
 of the \fBsockaddrs\fR present. Currently, you can specify \fBAF_INET\fR and
 \fBAF_INET6\fR to filter the messages seen by the listener, or alternatively,
 you can specify \fBAF_UNSPEC\fR to indicate that the listener is interested in

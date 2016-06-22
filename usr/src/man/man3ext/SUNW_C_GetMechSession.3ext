@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SUNW_C_GETMECHSESSION 3EXT "Oct 27, 2005"
+.TH SUNW_C_GETMECHSESSION 3EXT "April 9, 2016"
 .SH NAME
 SUNW_C_GetMechSession, SUNW_C_KeyToObject \- PKCS#11 Cryptographic Framework
 functions
@@ -26,7 +26,6 @@ cc [ \fIflag \&.\|.\|.\fR ] \fIfile\fR\&.\|.\|. \fB-lpkcs11\fR [ \fIlibrary\&.\|
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 These functions implement the RSA PKCS#11 v2.20 specification by using plug-ins
 to provide the slots.
@@ -35,7 +34,7 @@ to provide the slots.
 The \fBSUNW_C_GetMechSession()\fR function initializes the PKCS#11
 cryptographic framework and performs all necessary calls to Standard PKCS#11
 functions (see \fBlibpkcs11\fR(3LIB)) to create a session capable of providing
-operations on the requested mechanism. It is not neccessary to call
+operations on the requested mechanism. It is not necessary to call
 \fBC_Initalize()\fR or \fBC_GetSlotList()\fR before the first call to
 \fBSUNW_C_GetMechSession()\fR.
 .sp
@@ -53,7 +52,6 @@ The \fBSUNW_C_KeyToObject()\fR function creates a key object for the specified
 mechanism from the \fIrawkey\fR data. The object should be destroyed with
 \fBC_DestroyObject()\fR when it is no longer required.
 .SH RETURN VALUES
-.sp
 .LP
 The \fBSUNW_C_GetMechSession()\fR function returns the following values:
 .sp
@@ -165,14 +163,12 @@ A general error occurred.
 The return values of each of the implemented functions are defined and listed
 in the RSA PKCS#11 v2.20 specification. See http://www.rsasecurity.com.
 .SH USAGE
-.sp
 .LP
 These functions are not part of the RSA PKCS#11 v2.20 specification. They are
 not likely to exist on non-Solaris systems. They are provided as a convenience
 to application programmers. Use of these functions will make the application
 non-portable to other systems.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -190,7 +186,6 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBlibpkcs11\fR(3LIB), \fBattributes\fR(5)
 .sp

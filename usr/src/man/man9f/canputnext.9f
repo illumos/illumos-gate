@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
 .\"
-.Dd "Dec 15, 2014"
+.Dd "April 9, 2016"
 .Dt CANPUTNEXT 9F
 .Os
 .Sh NAME
@@ -43,7 +43,7 @@ They are preferable to and safer than calling
 .Xr canput 9F
 and
 .Xr bcanput 9F
-directly on the the queue linked to by
+directly on the queue linked to by
 .Fa q Ns No -> Ns Fa q_next .
 .Lp
 Drivers and modules should call these routines to ensure that room

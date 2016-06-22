@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH USB_INTR_REQUEST 9S "Jan 5, 2004"
+.TH USB_INTR_REQUEST 9S "April 9, 2016"
 .SH NAME
 usb_intr_request \- USB interrupt request structure
 .SH SYNOPSIS
@@ -13,11 +13,9 @@ usb_intr_request \- USB interrupt request structure
 .fi
 
 .SH INTERFACE LEVEL
-.sp
 .LP
 Solaris DDI specific (Solaris DDI)
 .SH DESCRIPTION
-.sp
 .LP
 An interrupt request (that is, a request sent through an interrupt pipe), is
 used to transfer  small amounts  of data infrequently, but with bounded
@@ -152,7 +150,7 @@ constraints and caveats:
      Table notes:
 
        A) Continuous polling, new data is returned in cloned request
-          structures via continous callbacks, original request is
+          structures via continuous callbacks, original request is
           returned on stop polling.
 
        B) One time poll, no timeout, callback when data is
@@ -263,7 +261,6 @@ constraints and caveats:
 .in -2
 
 .SH ATTRIBUTES
-.sp
 .LP
 See attributes(5) for descriptions of the following attributes:
 .sp
@@ -281,7 +278,6 @@ Interface stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBusb_alloc_request\fR(9F), \fBusb_pipe_ctrl_xfer\fR(9F),
 \fBusb_pipe_bulk_xfer\fR(9F), \fBusb_pipe_intr_xfer\fR(9F),

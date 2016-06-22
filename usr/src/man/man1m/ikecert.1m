@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH IKECERT 1M "Jun 10, 2009"
+.TH IKECERT 1M "April 9, 2016"
 .SH NAME
 ikecert \- manipulates the machine's on-filesystem public-key certificate
 databases
@@ -35,7 +35,6 @@ databases
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBikecert\fR command manipulates the machine's on-filesystem public-key
 certificate databases. See the "Files" section, below.
@@ -73,7 +72,6 @@ repository.
 The only supported PKCS#11 library and hardware is the Sun Cryptographic
 Accelerator 4000.
 .SH OPTIONS
-.sp
 .LP
 Except for \fBtokens\fR, each subcommand requires one option, possibly followed
 by one or more option-specific arguments.
@@ -543,7 +541,6 @@ token with \fBikeadm\fR(1M) once \fBin.iked\fR(1M) is running.
 .RE
 
 .SH PARAMETERS
-.sp
 .LP
 The following parameters are supported:
 .sp
@@ -729,7 +726,6 @@ instance.
 .RE
 
 .SH SECURITY
-.sp
 .LP
 This command can save private keys of a public-private key pair into a file.
 Any exposure of a private key may lead to compromise if the key is somehow
@@ -738,7 +734,7 @@ obtained by an adversary.
 .LP
 The PKCS#11 hardware object functionality can address some of the shortcomings
 of on-disk private keys. Because IKE is a system service, user intervention at
-boot is not desireable. The token's PIN, however, is still needed. The PINfor
+boot is not desirable. The token's PIN, however, is still needed. The PIN for
 the PKCS#11 token, therefore, is stored where normally the on-disk
 cryptographic keys would reside. This design decision is deemed acceptable
 because, with a hardware key store, \fBpossession\fR of the key is still
@@ -813,7 +809,6 @@ example# \fB# ikecert certlocal -kc -m 1024 -t rsa-md5 -T vca0-keystore \e
 .sp
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -837,7 +832,6 @@ An error occurred. Writes an appropriate error message to standard error.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/inet/secret/ike.privatekeys/*\fR\fR
@@ -880,7 +874,6 @@ Consulted for the pathname of a PKCS#11 library.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -896,7 +889,6 @@ Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBikeadm\fR(1M), \fBin.iked\fR(1M), \fBgetdate\fR(3C), \fBike.config\fR(4),
 \fBattributes\fR(5), \fBpkcs11_softtoken\fR(5)
@@ -909,7 +901,6 @@ Code in C\fR. Second Edition. John Wiley & Sons. New York, NY. 1996.
 RSA Labs, PKCS#11 v2.11: \fICryptographic Token Interface Standards\fR,
 November 2001.
 .SH NOTES
-.sp
 .LP
 The following is the validity date and time syntax when the \fB-F\fR or
 \fB-S\fR flags are used:

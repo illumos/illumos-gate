@@ -41,4 +41,5 @@ __all__ = [
 	'JStyle',
 	'Keywords',
 	'ManLint',
-	'Mapfile']
+	'Mapfile',
+	'SpellCheck']

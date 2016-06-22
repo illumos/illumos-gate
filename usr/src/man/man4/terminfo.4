@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH TERMINFO 4 "Jul 9, 1996"
+.TH TERMINFO 4 "April 9, 2016"
 .SH NAME
 terminfo \- terminal and printer capability database
 .SH SYNOPSIS
@@ -14,7 +14,6 @@ terminfo \- terminal and printer capability database
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBterminfo\fR database describes the capabilities of devices such as
 terminals and printers. Devices are described in \fBterminfo\fR source files by
@@ -110,7 +109,6 @@ The \fBterminfo\fR reference manual page is organized in two sections:
 \fBPART 2: PRINTER CAPABILITIES\fR
 .RE
 .SS "PART 1: DEVICE CAPABILITIES"
-.sp
 .LP
 Capabilities in \fBterminfo\fR are of three types:  Boolean capabilities (which
 show that a device has or does not have a particular feature), numeric
@@ -141,7 +139,6 @@ exception of those used for input. Input capabilities, listed under the
 \fBkey_\fR. The \fB#i\fR symbol in the description field of the following
 tables refers to the \fIi\fRth parameter.
 .SS "Booleans"
-.sp
 .in +2
 .nf
 ________________________________________________________________
@@ -215,7 +212,6 @@ xon_xoff                  xon    xo       Terminal uses xon/xoff
 .sp
 
 .SS "Numbers"
-.sp
 .in +2
 .nf
 ________________________________________________________________
@@ -280,7 +276,6 @@ width_status_line     wsl     ws       Number of columns in status line
 .sp
 
 .SS "Strings"
-.sp
 .in +2
 .nf
 ________________________________________________________________
@@ -448,7 +443,6 @@ insert_padding             ip     ip       Insert pad after
 .sp
 
 .SS "key_Strings"
-.sp
 .LP
 The ``\fBkey_\fR'' strings are sent by specific keys. The ``\fBkey_\fR''
 descriptions include the macro, defined in \fB<curses.h>\fR, for the code
@@ -627,7 +621,7 @@ key_left                kcub1   kl       KEY_LEFT, sent by
 key_ll                  kll     kH       KEY_LL, sent by home-down key
 key_mark                kmrk    %2       KEY_MARK, sent by
 key_message             kmsg    %3       KEY_MESSAGE, sent by message key
-key_mouse               kmous   Km       0631, Mouse event has occured
+key_mouse               kmous   Km       0631, Mouse event has occurred
 key_move                kmov    %4       KEY_MOVE, sent by move key
 key_next                knxt    %5       KEY_NEXT, sent by next-object
                                          key
@@ -911,7 +905,6 @@ zero_motion             zerom   Zx       No motion for the
 .sp
 
 .SS "Sample Entry"
-.sp
 .LP
 The following entry, which describes the AT&T 610 terminal, is among the more
 complex entries in the \fBterminfo\fR file as of this writing.
@@ -953,7 +946,6 @@ complex entries in the \fBterminfo\fR file as of this writing.
 .in -2
 
 .SS "Types of Capabilities in the Sample Entry"
-.sp
 .LP
 The sample entry shows the formats for the three types of \fBterminfo\fR
 capabilities listed:  Boolean, numeric, and string. All capabilities specified
@@ -1016,7 +1008,6 @@ period before the capability name. For example, see the second \fBind\fR in the
 example above. Note that capabilities are defined in a left-to-right order and,
 therefore, a prior definition will override a later definition.
 .SS "Preparing Descriptions"
-.sp
 .LP
 The most effective way to prepare a device description is by imitating the
 description of a similar device in \fBterminfo\fR and building up a description
@@ -1033,7 +1024,6 @@ from the middle of the screen, and then press the \fBu\fR key several times
 quickly. If the display is corrupted, more padding is usually needed. A similar
 test can be used for insert-character.
 .SS "Section 1-1: Basic Capabilities"
-.sp
 .LP
 The number of columns on each line for the device is given by the \fBcols\fR
 numeric capability. If the device has a screen, then the number of lines on the
@@ -1123,7 +1113,6 @@ adm3 | lsi adm3,
 .sp
 
 .SS "Section 1-2: Parameterized Strings"
-.sp
 .LP
 Cursor addressing and other strings requiring parameters are described by a
 parameterized string capability, with \fBprintf\fR-like escapes
@@ -1359,7 +1348,6 @@ space (32), adds them (pushing the sum on the stack in place of the two
 previous values), and outputs that value as a character. Then the same is done
 for the second parameter. More complex arithmetic is possible using the stack.
 .SS "Section 1-3: Cursor Motions"
-.sp
 .LP
 If the terminal has a fast way to home the cursor (to very upper left corner of
 screen) then this can be given as \fBhome\fR; similarly a fast way of getting
@@ -1394,7 +1382,6 @@ command character to be the one used by \fBterminfo\fR. If the \fBsmcup\fR
 sequence will not restore the screen after an \fBrmcup\fR sequence is output
 (to the state prior to outputting \fBrmcup\fR), specify \fBnrrmc\fR.
 .SS "Section 1-4: Area Clears"
-.sp
 .LP
 If the terminal can clear from the current position to the end of the line,
 leaving the cursor where it is, this should be given as \fBel\fR. If the
@@ -1405,7 +1392,6 @@ then this should be given as \fBed\fR. \fBed\fR is only defined from the first
 column of a line. (Thus, it can be simulated by a request to delete a large
 number of lines, if a true \fBed\fR is not available.)
 .SS "Section 1-5: Insert/Delete Line"
-.sp
 .LP
 If the terminal can open a new blank line before the line where the cursor is,
 this should be given as \fBil1\fR; this is done only from the first position of
@@ -1452,7 +1438,6 @@ be given. These indicate that deleting a line or scrolling a full screen may
 bring non-blank lines up from below or that scrolling back with \fBri\fR may
 bring down non-blank lines.
 .SS "Section 1-6: Insert/Delete Character"
-.sp
 .LP
 There are two basic kinds of intelligent terminals with respect to
 insert/delete character operations which can be described using \fBterminfo.\fR
@@ -1515,7 +1500,6 @@ terminal needs to be placed in for \fBdch1\fR to work).
 A command to erase \fIn\fR characters (equivalent to outputting \fIn\fR blanks
 without moving the cursor) can be given as \fBech\fR with one parameter.
 .SS "Section 1-7: Highlighting, Underlining, and Visible Bells"
-.sp
 .LP
 Your device may have one or more kinds of display attributes that allow you to
 highlight selected characters when they appear on the screen. The following
@@ -1661,7 +1645,6 @@ Putting this all together into the \fBsgr\fR sequence gives:
 .LP
 Remember that \fBsgr\fR and \fBsgr0\fR must always be specified.
 .SS "Section 1-8: Keypad"
-.sp
 .LP
 If the device has a keypad that transmits sequences when the keys are pressed,
 this information can also be specified. Note that it is not possible to handle
@@ -1704,7 +1687,6 @@ and off, give them in \fBsmln\fR and \fBrmln\fR. \fBsmln\fR is normally output
 after one or more \fBpln\fR sequences to make sure that the change becomes
 visible.
 .SS "Section 1-9: Tabs and Initialization"
-.sp
 .LP
 If the device has hardware tabs, the command to advance to the next tab stop
 can be given as \fBht\fR (usually control I). A ``backtab'' command that moves
@@ -1761,7 +1743,6 @@ Any margin can be cleared with \fBmgc\fR. (For instructions on how to specify
 commands to set and clear margins, see "Margins" below under "PRINTER
 CAPABILITIES".)
 .SS "Section 1-10: Delays"
-.sp
 .LP
 Certain capabilities control padding in the \fBtty\fR driver. These are
 primarily needed by hard-copy terminals, and are used by \fBtput\fR \fBinit\fR
@@ -1771,7 +1752,6 @@ appropriate delay bits to be set in the tty driver. If \fBpb\fR (padding baud
 rate) is given, these values can be ignored at baud rates below the value of
 \fBpb\fR.
 .SS "Section 1-11: Status Lines"
-.sp
 .LP
 If the terminal has an extra ``status line'' that is not normally used by
 software, this fact can be indicated. If the status line is viewed as an extra
@@ -1796,7 +1776,6 @@ line is a different width (possibly because the terminal does not allow an
 entire line to be loaded) the width, in columns, can be indicated with the
 numeric parameter \fBwsl\fR.
 .SS "Section 1-12: Line Graphics"
-.sp
 .LP
 If the device has a line drawing alternate character set, the mapping of glyph
 to character would be given in \fBacsc\fR. The definition of this string is
@@ -1868,7 +1847,6 @@ Now write down the characters left to right, as in
 In addition, \fBterminfo\fR allows you to define multiple character sets. See
 Section 2-5 for details.
 .SS "Section 1-13: Color Manipulation"
-.sp
 .LP
 Let us define two methods of color manipulation:  the Tektronix method and the
 HP method. The Tektronix method uses a set of N predefined colors (usually 8)
@@ -1960,7 +1938,6 @@ cannot coexist with colors. For example, if the terminal uses colors to
 simulate reverse video (bit number 2 and decimal value 4) and bold (bit number
 5 and decimal value 32), the resulting value for \fBncv\fR will be 36 (4 + 32).
 .SS "Section 1-14: Miscellaneous"
-.sp
 .LP
 If the terminal requires other than a null (zero) character as a pad, then this
 can be given as \fBpad\fR. Only the first character of the \fBpad\fR string is
@@ -2032,7 +2009,6 @@ screen when the printer is on, specify \fBmc5i\fR (silent printer). All text,
 including \fBmc4\fR, is transparently passed to the printer while an \fBmc5p\fR
 is in effect.
 .SS "Section 1-15: Special Cases"
-.sp
 .LP
 The working model used by \fBterminfo\fR fits most terminals reasonably well.
 However, some terminals do not completely match that model, requiring special
@@ -2068,7 +2044,6 @@ Those Beehive Superbee terminals which do not transmit the escape or
 control\(miC characters, should specify \fBxsb\fR, indicating that the f1 key
 is to be used for escape and the f2 key for control C.
 .SS "Section 1-16: Similar Terminals"
-.sp
 .LP
 If there are two very similar terminals, one can be defined as being just like
 the other with certain exceptions. The string capability \fBuse\fR can be given
@@ -2092,14 +2067,12 @@ defines an AT&T4424 terminal that does not have the \fBrev\fR, \fBsgr\fR, and
 different modes for a terminal, or for different user preferences. More than
 one \fBuse\fR capability may be given.
 .SS "PART 2: PRINTER CAPABILITIES"
-.sp
 .LP
 The \fBterminfo\fR database allows you to define capabilities of printers as
 well as terminals. To find out what capabilities are available for printers as
 well as for terminals, see the two lists under "DEVICE CAPABILITIES" that list
 capabilities by variable and by capability name.
 .SS "Section 2-1: Rounding Values"
-.sp
 .LP
 Because parameterized string capabilities work only with integer values, we
 recommend that \fBterminfo\fR designers create strings that expect numeric
@@ -2107,7 +2080,6 @@ values that have been rounded. Application designers should note this and
 should always round values to the nearest integer before using them with a
 parameterized string capability.
 .SS "Section 2-2: Printer Resolution"
-.sp
 .LP
 A printer's resolution is defined to be the smallest spacing of characters it
 can achieve. In general printers have independent resolution horizontally and
@@ -2150,7 +2122,6 @@ capability would give the width of a page in columns. In ``micro mode,'' many
 printers the micro mode may be concomitant with normal mode, so that all the
 capabilities work at the same time.
 .SS "Section 2-3: Specifying Printer Resolution"
-.sp
 .LP
 The printing resolution of a printer is given in several ways. Each specifies
 the resolution as the number of smallest steps per distance:
@@ -2318,7 +2289,6 @@ $V sub italic cpi$, $V sub italic lpi$, $V sub italic chr$, and $V sub italic
 cvr$ are the arguments used with \fBcpi\fR, \fBlpi\fR, \fBchr\fR, and
 \fBcvr\fR, respectively. The prime marks (\|'\|) indicate the old values.
 .SS "Section 2-4: Capabilities that Cause Movement"
-.sp
 .LP
 In the following descriptions, ``movement'' refers to the motion of the
 ``current position.'' With video terminals this would be the cursor; with some
@@ -2483,7 +2453,6 @@ Miscellaneous Motion Strings
 .sp
 
 .SS "Margins"
-.sp
 .LP
 \fBterminfo\fR provides two strings for setting margins on terminals:  one for
 the left and one for the right margin. Printers, however, have two additional
@@ -2547,7 +2516,6 @@ the bottom line of the page.
 .LP
 All margins can be cleared with \fBmgc\fR.
 .SS "Shadows, Italics, Wide Characters"
-.sp
 .LP
 Five new sets of strings describe the capabilities printers have of enhancing
 printed text.
@@ -2626,7 +2594,6 @@ affecting shadow, italicized, widened, superscript, or subscript printing.
 Conversely, if \fBmsgr\fR is not set, a program should end these modes before
 attempting any motion.
 .SS "Section 2-5: Alternate Character Sets"
-.sp
 .LP
 In addition to allowing you to define line graphics (described in Section
 1-12), \fBterminfo\fR lets you define alternate character sets. The following
@@ -2713,7 +2680,6 @@ are not available, the strings should not be defined. For printers that have
 manually changed print-wheels or font cartridges, the boolean \fBdaisy\fR is
 set.
 .SS "Section 2-6: Dot-Matrix Graphics"
-.sp
 .LP
 Dot-matrix printers typically have the capability of reproducing
 ``raster-graphics'' images. Three new numeric capabilities and three new string
@@ -2803,7 +2769,6 @@ the decimal values are further offset by the value 63. The \fBporder\fR string
 for these printers would be \fB,,6,5,4,3,2,1;63\fR, or alternately
 \fBo,o,6,5,4,3,2,1;63\fR.
 .SS "Section 2-7: Effect of Changing Printing Resolution"
-.sp
 .LP
 If the control sequences to change the character pitch or the line pitch are
 used, the pin or dot spacing may change:
@@ -2864,7 +2829,6 @@ in steps per inch, before using \fBlpi\fR and after using \fBlpi\fR,
 respectively. Thus, the changes in the dots per inch for dot-matrix graphics
 follow the changes in steps per inch for printer resolution.
 .SS "Section 2-8: Print Quality"
-.sp
 .LP
 Many dot-matrix printers can alter the dot spacing of printed text to produce
 near ``letter quality'' printing or ``draft quality'' printing. Usually it is
@@ -2889,7 +2853,6 @@ The capabilities are listed in decreasing levels of quality. If a printer
 doesn't have all three levels, one or two of the strings should be left blank
 as appropriate.
 .SS "Section 2-9: Printing Rate and Buffer Size"
-.sp
 .LP
 Because there is no standard protocol that can be used to keep a program
 synchronized with a printer, and because modern printers can buffer data before
@@ -2945,7 +2908,6 @@ already been printed, it should shrink the estimate. The application will thus
 err in favor of the user, who wants, above all, to see all the output in its
 correct place.
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/usr/share/lib/terminfo/?/*\fR\fR
@@ -2977,13 +2939,11 @@ terminal (escape sequences that set margins and tabs)
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBls\fR(1), \fBpg\fR(1), \fBstty\fR(1), \fBtput\fR(1), \fBtty\fR(1),
 \fBvi\fR(1), \fBinfocmp\fR(1M), \fBtic\fR(1M), \fBprintf\fR(3C),
 \fBcurses\fR(3CURSES), \fBcurses\fR(3XCURSES)
 .SH NOTES
-.sp
 .LP
 The most effective way to prepare a terminal description is by imitating the
 description of a similar terminal in \fBterminfo\fR and to build up a

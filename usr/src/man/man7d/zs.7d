@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ZS 7D "Jul 16, 2009"
+.TH ZS 7D "April 9, 2016"
 .SH NAME
 zs \- Zilog 8530 SCC serial communications driver
 .SH SYNOPSIS
@@ -33,7 +33,6 @@ open("/dev/cua/\fIn\fR", \fImode\fR);
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The Zilog 8530 provides two serial input/output channels capable of supporting
 a variety of communication protocols.  A typical system uses two or more of
@@ -92,7 +91,6 @@ information on parameters that are persistent across reboots, see the
 \fBeeprom\fR(1M) man page.
 .RE
 .SH IOCTLS
-.sp
 .LP
 The \fBzs\fR module supports the standard set of \fBtermio ioctl\fR(\|) calls.
 .sp
@@ -127,7 +125,7 @@ command, respectively.  Due to hardware limitations, only the \fBRTS\fR and
 .LP
 The input and output line speeds may be set to any of the speeds supported by
 \fBtermio\fR. The input and output line speeds cannot be set independently; for
-example, when you set the the output speed, the input speed is automatically
+example, when you set the output speed, the input speed is automatically
 set to the same speed.
 .sp
 .LP
@@ -160,7 +158,6 @@ tilde and control-B (CR ~ CTRL-B), but may be changed by the driver. For more
 information on breaking (entering the debugger or monitor), see \fBkbd\fR(1)
 and \fBkb\fR(7M).
 .SH ERRORS
-.sp
 .LP
 An \fBopen\fR will fail under the following conditions:
 .sp
@@ -212,7 +209,6 @@ The open was interrupted by the delivery of a signal.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/dev/cua/\fR[\fIa-z\fR]\fR
@@ -240,7 +236,6 @@ binary compatibility package device names
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -256,14 +251,12 @@ Architecture	SPARC
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBeeprom\fR(1M), \fBkadb\fR(1M), \fBtip\fR(1), \fBcu\fR(1C), \fBuucp\fR(1C),
 \fBports\fR(1M), \fBpppd\fR(1M), \fBioctl\fR(2), \fBopen\fR(2),
 \fBattributes\fR(5), \fBzsh\fR(7D), \fBtermio\fR(7I), \fBkb\fR(7M),
 \fBldterm\fR(7M), \fBttcompat\fR(7M)
 .SH DIAGNOSTICS
-.sp
 .ne 2
 .na
 \fB\fBzs\fR\fIn\fR\fB\|: silo overflow.\fR\fR

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ACL_GET 3SEC "Oct 6, 2005"
+.TH ACL_GET 3SEC "April 9, 2016"
 .SH NAME
 acl_get, facl_get, acl_set, facl_set \- get or set a file's Access Control List
 (ACL)
@@ -32,7 +32,6 @@ cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lsec\fR [ \fIlibrary\fR\&.\|.
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBacl_get()\fR and \fBfacl_get()\fR functions retrieve an Access Control
 List (ACL) of a file whose name is given by \fIpath\fR or referenced by the
@@ -53,7 +52,6 @@ target file's style of ACL. Currently this is only possible when translating
 from a POSIX-draft ACL such as on UFS to a file system that supports NFSv4 ACL
 semantics such as ZFS or NFSv4.
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, \fBacl_get()\fR and \fBfacl_get()\fR return 0 and
 \fIaclp\fR is non-\fINULL\fR. The \fIaclp\fR argument can be \fINULL\fR after
@@ -65,7 +63,6 @@ indicate the error.
 Upon successful completion, \fBacl_set()\fR and \fBfacl_set()\fR return 0.
 Otherwise, -1 is returned and \fBerrno\fR is set to indicate the error.
 .SH ERRORS
-.sp
 .LP
 These functions will fail if:
 .sp
@@ -83,7 +80,7 @@ The caller does not have access to a component of \fIpath\fR.
 \fB\fBEIO\fR\fR
 .ad
 .RS 11n
-A disk I/O error has occured while retrieving the ACL.
+A disk I/O error has occurred while retrieving the ACL.
 .RE
 
 .sp
@@ -114,7 +111,6 @@ The ACL supplied could not be translated to an NFSv4 ACL.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -132,6 +128,5 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBchmod\fR(1), \fBacl\fR(2), \fBacl\fR(5), \fBattributes\fR(5)

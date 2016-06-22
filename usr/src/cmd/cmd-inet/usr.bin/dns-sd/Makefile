@@ -24,6 +24,7 @@ OBJS=		ClientCommon.o dns-sd.o
 SRCS=		ClientCommon.c dns-sd.c
 
 CFLAGS += $(C99_ENABLE)
+CPPFLAGS += -DMDNS_VERSIONSTR_NODTS
 LDLIBS += -lsocket -ldns_sd
 
 .KEEP_STATE:

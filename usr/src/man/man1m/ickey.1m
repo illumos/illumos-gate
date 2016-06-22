@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ICKEY 1M "May 7, 2003"
+.TH ICKEY 1M "April 9, 2016"
 .SH NAME
 ickey \- install a client key for WAN boot
 .SH SYNOPSIS
@@ -23,7 +23,6 @@ ickey \- install a client key for WAN boot
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBickey\fR command is used to install WAN boot keys on a running UNIX
 system so that they can be used the next time the system is installed. You can
@@ -39,13 +38,12 @@ of data in transit.
 .sp
 .LP
 Keys are expected to be presented as strings of hexadecimal digits; they can
-(but need not) be preceeded by a \fB0x\fR or \fB0X\fR.
+(but need not) be preceded by a \fB0x\fR or \fB0X\fR.
 .sp
 .LP
 The \fBickey\fR command has a single option, described below. An argument of
 the type \fB-o\fR\ \fBtype=\fR\fIkeytype\fR is required.
 .SH OPTIONS
-.sp
 .LP
 The \fBickey\fR command the following option.
 .sp
@@ -58,12 +56,10 @@ Delete the key specified by the \fIkeytype\fR argument.
 .RE
 
 .SH EXIT STATUS
-.sp
 .LP
 On success, \fBickey\fR exits with status 0; if a problem occurs, a diagnostic
 message is printed and \fBickey\fR exits with non-zero status.
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/dev/openprom\fR\fR
@@ -73,7 +69,6 @@ WAN boot key storage driver
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -89,6 +84,5 @@ Interface Stability	Unstable
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBssh\fR(1), \fBopenprom\fR(7D),  \fBattributes\fR(5)

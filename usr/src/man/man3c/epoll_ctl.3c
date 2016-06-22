@@ -8,7 +8,7 @@
 .\"  A full copy of the text of the CDDL should have accompanied this
 .\"  source.  A copy of the CDDL is also available via the Internet at
 .\"  http://www.illumos.org/license/CDDL.
-.TH EPOLL_CTL 3C "Apr 17, 2014"
+.TH EPOLL_CTL 3C "April 9, 2016"
 .SH NAME
 epoll_ctl \- control an epoll instance
 .SH SYNOPSIS
@@ -245,7 +245,7 @@ with caution.
 
 .SH RETURN VALUES
 .LP
-Upon succesful completion, \fBepoll_ctl()\fR returns 0.
+Upon successful completion, \fBepoll_ctl()\fR returns 0.
 If an error occurs, -1 is returned and errno is set to indicate
 the error.
 

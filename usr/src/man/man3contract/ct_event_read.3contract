@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH CT_EVENT_READ 3CONTRACT "Apr 1, 2004"
+.TH CT_EVENT_READ 3CONTRACT "April 9, 2016"
 .SH NAME
 ct_event_read, ct_event_read_critical, ct_event_reset, ct_event_reliable,
 ct_event_free, ct_event_get_flags, ct_event_get_ctid, ct_event_get_evid,
@@ -69,7 +69,6 @@ cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-D_LARGEFILE64_SOURCE\fR \fB -
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 These functions operate on contract event endpoint file descriptors obtained
 from the \fBcontract\fR(4) file system and event object handles returned by
@@ -157,7 +156,6 @@ when the negotiation referenced by the \fBCT_EV_NEGEND\fR event succeeded. If
 no contract was created, \fIctidp\fR will be 0.  If the operation was
 cancelled, *\fIctidp\fR will equal the ID of the existing contract.
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, \fBct_event_read()\fR,
 \fBct_event_read_critical()\fR, \fBct_event_reset()\fR,
@@ -170,7 +168,6 @@ The \fBct_event_get_flags()\fR, \fBct_event_get_ctid()\fR,
 \fBct_event_get_evid()\fR, and \fBct_event_get_type()\fR functions return data
 as described in the DESCRIPTION.
 .SH ERRORS
-.sp
 .LP
 The \fBct_event_reliable()\fR function will fail if:
 .sp
@@ -198,7 +195,7 @@ available to be read.
 
 .sp
 .LP
-The The \fBct_event_get_nevid()\fR and \fBct_event_get_newct()\fR functions
+The \fBct_event_get_nevid()\fR and \fBct_event_get_newct()\fR functions
 will fail if:
 .sp
 .ne 2
@@ -210,7 +207,6 @@ The \fIevthndl\fR argument is not a \fBCT_EV_NEGEND\fR event object.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -228,7 +224,6 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBlibcontract\fR(3LIB), \fBcontract\fR(4), \fBattributes\fR(5),
 \fBlfcompile\fR(5)

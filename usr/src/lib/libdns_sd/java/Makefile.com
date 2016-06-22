@@ -22,7 +22,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 LIBRARY=	libjdns_sd.a
 VERS=		.1
@@ -39,6 +38,7 @@ C99MODE =       $(C99_ENABLE)
 CPPFLAGS +=	-I$(JAVA_ROOT)/include -I$(JAVA_ROOT)/include/solaris
 CPPFLAGS +=	-I../com/apple/dnssd
 CPPFLAGS +=	-D_REENTRANT
+CPPFLAGS +=	-DMDNS_VERSIONSTR_NODTS
 
 LDLIBS +=	-lc -lsocket -ldns_sd
 

@@ -31,7 +31,7 @@
 .\" add the following below this CDDL HEADER, with the fields enclosed by
 .\" brackets "[]" replaced with your own identifying information:
 .\" Portions Copyright [yyyy] [name of copyright owner]
-.TH LOCALEDEF 1 "Aug 24, 2013"
+.TH LOCALEDEF 1 "April 9, 2016"
 .SH NAME
 localedef \- define locale environment
 .SH SYNOPSIS
@@ -43,7 +43,6 @@ localedef \- define locale environment
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBlocaledef\fR utility converts source definitions for locale categories
 into a format usable by the functions and utilities whose operational behavior
@@ -115,7 +114,6 @@ Defines the format and values of affirmative and negative responses.
 .RE
 
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -142,7 +140,7 @@ Emit verbose debugging output on standard output.
 \fB\fB-U\fR\fR
 .ad
 .RS 23n
-Ignore the presence of character symbols that have no maching character
+Ignore the presence of character symbols that have no matching character
 definition.  This facilitates the use of a common locale definition file
 to be used across multiple encodings, even when some symbols are not
 present in a given encoding.
@@ -200,7 +198,6 @@ ISO/IEC 10646-1: 2000 standard position constant values. See NOTES.
 .RE
 
 .SH OPERANDS
-.sp
 .LP
 The following operand is supported:
 .sp
@@ -218,7 +215,6 @@ belonging to the same locale can be processed.)
 .RE
 
 .SH OUTPUT
-.sp
 .LP
 \fBlocaledef\fR creates a directory of files that represents the locale's
 data. The contants of this directory should generally be copied into the
@@ -226,13 +222,11 @@ appropriate subdirectory of /usr/lib/locale in order the definitions to
 be visible to programs linked with libc.
 .sp
 .SH ENVIRONMENT VARIABLES
-.sp
 .LP
 See \fBenviron\fR(5) for definitions of the following environment variables
 that affect the execution of \fBlocaledef\fR: \fBLANG\fR, \fBLC_ALL\fR,
 \fBLC_COLLATE\fR, \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -277,8 +271,6 @@ Warnings or errors occurred and no output was created.
 .LP
 If an error is detected, no permanent output will be created.
 .SH FILES
-
-.sp
 .ne 2
 .na
 \fB\fB/usr/lib/locale/\fIlocalename\fR/
@@ -289,7 +281,6 @@ The directory containing locale data.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -305,13 +296,11 @@ Interface Stability	Standard
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBlocale\fR(1), \fBiconv_open\fR(3C), \fBnl_langinfo\fR(3C),
 \fBstrftime\fR(3C), \fBattributes\fR(5), \fBcharmap\fR(5), \fBenviron\fR(5),
 \fBextensions\fR(5), \fBlocale\fR(5), \fBstandards\fR(5)
 .SH WARNINGS
-.sp
 .LP
 If warnings occur, permanent output will be created if the \fB-c\fR option was
 specified. The following conditions will cause warning messages to be issued:
@@ -331,7 +320,6 @@ If optional keywords not supported by the implementation are present in the
 source.
 .RE
 .SH NOTES
-.sp
 .LP
 When the \fB-u\fR option is used, the \fIcode_set_name\fR option-argument is
 interpreted as a name of a codeset to which the ISO/IEC 10646-1: 2000 standard

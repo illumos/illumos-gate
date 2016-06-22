@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH POOL_ASSOCIATE 3POOL "Jul 18, 2005"
+.TH POOL_ASSOCIATE 3POOL "April 9, 2016"
 .SH NAME
 pool_associate, pool_create, pool_destroy, pool_dissociate, pool_info,
 pool_query_pool_resources \- resource pool manipulation functions
@@ -46,7 +46,6 @@ cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lpool\fR [ \fIlibrary\fR\&.\|
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 These functions provide mechanisms for constructing and modifying pools entries
 within a target pools configuration.  The \fIconf\fR argument for each function
@@ -74,7 +73,7 @@ default resource of the same type.
 .sp
 .LP
 The \fBpool_info()\fR function returns a string describing the given pool. The
-string is allocated with \fBmalloc\fR(3C). The caller is reponsible for freeing
+string is allocated with \fBmalloc\fR(3C). The caller is responsible for freeing
 the returned string. If the \fIflags\fR option is non-zero, the string returned
 also describes the associated resources of the pool.
 .sp
@@ -84,7 +83,6 @@ of resources currently associated with the pool that match the given list of
 properties. The return value must be freed by the caller. The \fInelem\fR
 argument is set to be the length of the array returned.
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, \fBpool_create()\fR returns a new initialized pool.
 Otherwise it returns \fINULL\fR and \fBpool_error\fR(3POOL) returns the
@@ -105,7 +103,6 @@ Upon successful completion, \fBpool_query_pool_resources()\fR returns a
 null-terminated array of resources. Otherwise it returns \fINULL\fR and
 \fBpool_error()\fR returns the pool-specific error value.
 .SH ERRORS
-.sp
 .LP
 The \fBpool_create()\fR function will fail if:
 .sp
@@ -275,13 +272,11 @@ A system error has occurred. Check the system error code for more details.
 .RE
 
 .SH USAGE
-.sp
 .LP
 Pool names are unique across pools in a given configuration file. It is an
 error to attempt to create a pool with a name that is currently used by another
 pool within the same configuration.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -301,6 +296,5 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBlibpool\fR(3LIB), \fBpool_error\fR(3POOL), \fBattributes\fR(5)

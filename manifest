@@ -19617,6 +19617,16 @@ s usr/share/man/man9f/gld_sched.9f=gld.9f
 s usr/share/man/man9f/gld_unregister.9f=gld.9f
 f usr/share/man/man9f/hook_alloc.9f 0444 root bin
 f usr/share/man/man9f/hook_free.9f 0444 root bin
+s usr/share/man/man9f/id_alloc.9f=id_space.9f
+s usr/share/man/man9f/id_alloc_nosleep.9f=id_space.9f
+s usr/share/man/man9f/id_alloc_specific_nosleep.9f=id_space.9f
+s usr/share/man/man9f/id_allocff.9f=id_space.9f
+s usr/share/man/man9f/id_allocff_nosleep.9f=id_space.9f
+s usr/share/man/man9f/id_free.9f=id_space.9f
+f usr/share/man/man9f/id_space.9f 0444 root bin
+s usr/share/man/man9f/id_space_create.9f=id_space.9f
+s usr/share/man/man9f/id_space_destroy.9f=id_space.9f
+s usr/share/man/man9f/id_space_extend.9f=id_space.9f
 f usr/share/man/man9f/id32_alloc.9f 0444 root bin
 s usr/share/man/man9f/id32_free.9f=id32_alloc.9f
 s usr/share/man/man9f/id32_lookup.9f=id32_alloc.9f

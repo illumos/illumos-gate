@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DAT_EP_DISCONNECT 3DAT "Jul 16, 2004"
+.TH DAT_EP_DISCONNECT 3DAT "April 9, 2016"
 .SH NAME
 dat_ep_disconnect \- terminate a connection or a connection establishment
 .SH SYNOPSIS
@@ -21,7 +21,6 @@ DAT_RETURN
 .fi
 
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIep_handle\fR\fR
@@ -58,7 +57,6 @@ Graceful close.
 .RE
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBdat_ep_disconnect()\fR function requests a termination of a connection
 or connection establishment. This operation is used by the active/client or a
@@ -75,7 +73,7 @@ unsuccessfully, and in-progress DTOs and RMR Binds can be completed
 successfully or unsuccessfully. If an in-progress DTO is completed
 unsuccessfully, all follow on in-progress DTOs in the same direction also must
 be completed unsuccessfully. This order is presented to the Consumer through a
-DTO completion Event Stream of the \fIrecv_evd_handle\fR and and
+DTO completion Event Stream of the \fIrecv_evd_handle\fR and
 \fIrequest_evd_handle\fR of the Endpoint.
 .sp
 .LP
@@ -123,7 +121,6 @@ establishment, \fBDAT_EP_STATE_ACTIVE_CONNECTION_PENDING\fR and
 and transitions the local Endpoint into \fBDAT_EP_STATE_DISCONNECTED\fR. That
 causes preposted Recv DTOs to be flushed to \fIrecv_evd_handle\fR.
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fBDAT_SUCCESS\fR\fR
@@ -170,7 +167,6 @@ disconnect.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -188,6 +184,5 @@ MT-Level	 Unsafe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBlibdat\fR(3LIB), \fBattributes\fR(5)

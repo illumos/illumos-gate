@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LGRP_VIEW 3LGRP "Apr 16, 2003"
+.TH LGRP_VIEW 3LGRP "April 9, 2016"
 .SH NAME
 lgrp_view \- get view of lgroup hierarchy
 .SH SYNOPSIS
@@ -16,7 +16,6 @@ cc [ \fIflag \&.\|.\|.\fR ] \fIfile\fR\&.\|.\|. \fB-llgrp\fR [ \fIlibrary \&.\|.
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBlgrp_view()\fR function takes a \fIcookie\fR representing the snapshot
 of the lgroup hierarchy obtained from \fBlgrp_init\fR(3LGRP) and returns the
@@ -28,13 +27,11 @@ resources that are available to the caller (such as those with respect to
 processor sets).  When the view is \fBLGRP_VIEW_OS\fR, the snapshot contains
 what is available to the operating system.
 .SH RETURN VALUES
-.sp
 .LP
-Upon succesful completion, \fBlgrp_view()\fR returns the view for the snapshot
+Upon successful completion, \fBlgrp_view()\fR returns the view for the snapshot
 of the lgroup hierarchy represented by the given cookie.  Otherwise, \(mi1 is
 returned and \fBerrno\fR is set to indicate the error.
 .SH ERRORS
-.sp
 .LP
 The \fBlgrp_view()\fR function will fail if:
 .sp
@@ -47,7 +44,6 @@ The \fIcookie\fR is not valid.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -65,7 +61,6 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBlgrp_cookie_stale\fR(3LGRP), \fBlgrp_fini\fR(3LGRP), \fBlgrp_init\fR(3LGRP),
 \fBliblgrp\fR(3LIB), \fBattributes\fR(5)

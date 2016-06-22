@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH VOLUME-REQUEST 4 "Apr 27, 2005"
+.TH VOLUME-REQUEST 4 "April 9, 2016"
 .SH NAME
 volume-request, volume-defaults \- Solaris Volume Manager configuration
 information for top down volume creation with metassist
@@ -24,7 +24,6 @@ information for top down volume creation with metassist
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 A volume request file, XML-based and compliant with the
 \fBvolume-request.dtd\fR Document Type Definition, describes the
@@ -55,7 +54,6 @@ definition in the volume-request.dtd file, located at
 \fB/usr/share/lib/xml/dtd/volume-request.dtd\fR. You create a volume request
 file, and provide it as input to metassist to create volumes from the top down.
 .SS "Defining Volume Request"
-.sp
 .LP
 The top level element \fB<volume-request>\fR surrounds the volume request data.
 This element has no attributes. A volume request requires at least one
@@ -83,14 +81,12 @@ Optionally, the volume-request can include one or more \fB<concat>\fR,
 \fB<stripe>\fR, \fB<mirror>\fR, \fB<volume>\fR elements to specify volumes to
 create.
 .SS "Defining Disk Set"
-.sp
 .LP
 Within the \fB<volume-request>\fR element, a \fB<diskset>\fR element must
 exist. The \fB<diskset>\fR element, with the name attribute, specifies the name
 of the disk set to be used. If this disk set does not exist, it is created.
 This element and the name attribute are required.
 .SS "Defining Availability"
-.sp
 .LP
 Within the \fB<volume-request>\fR element and within other elements, you can
 specify available or unavailable components (disks, or disks on a specific
@@ -111,7 +107,7 @@ specifying \fBc3t2d\fR0 as available would look like:
 .sp
 .LP
 The \fB<available>\fR element also makes any unnamed components unavailable.
-Specifying all controllers exept \fBc1\fR unavailable would look like:
+Specifying all controllers except \fBc1\fR unavailable would look like:
 .sp
 .in +2
 .nf
@@ -132,7 +128,7 @@ Specifying all disks on controller 2 as unavailable would look like:
 .sp
 .LP
 The \fB<unavailable>\fR element can also be used to further restrict the list
-of available components. For example, specifying all controllers exept \fBc1\fR
+of available components. For example, specifying all controllers except \fBc1\fR
 unavailable, and making all devices associated with c1t2 unavailable as well
 would look like this:
 .sp
@@ -158,7 +154,6 @@ example, an unmounted slice that is reserved for different uses) must be
 explicitly specified as unavailable, or the \fBmetassist\fR command can include
 them in the configuration.
 .SS "Defining Hot Spare Pool"
-.sp
 .LP
 The next element within the <volume-request> element, after the \fB<diskset>\fR
 and, optionally, \fB<available>\fR and \fB<unavailable>\fR elements, is the
@@ -190,7 +185,6 @@ SLICE\fR). Depending on the requirements placed on the hot spare pool by other
 parts of the volume request, additional slices can be added to the hot spare
 pool.
 .SS "Defining Slice"
-.sp
 .LP
 The \fB<slice>\fR element is used to define slices to include or exclude within
 other elements. It requires only a name attribute to specify the ctd name of
@@ -205,7 +199,6 @@ of the element. Sample slice elements might look like:
 .in -2
 
 .SS "Defining Stripe"
-.sp
 .LP
 The \fB<stripe>\fR element defines stripes (interlaced RAID 0 volumes) to be
 used in a volume. It can contain either slice elements (to explicitly determine
@@ -244,14 +237,12 @@ hot spare pool should be associated with this component. This attribute is
 specified as a boolean value, as \fBusehsp="TRUE"\fR. If the component is not a
 submirror, this attribute is ignored.
 .SS "Defining Concat"
-.sp
 .LP
 The \fB<concat>\fR element defines concats (non-interlaced RAID 0 volumes) to
 be used in a configuration. It is specified in the same way as a \fB<stripe>\fR
 element, except that the \fBmincomp\fR, \fBmaxcomp\fR, and interlace attributes
 are not valid.
 .SS "Defining Mirror"
-.sp
 .LP
 The \fB<mirror>\fR element defines mirrors (RAID 1 volumes) to be used in a
 volume configuration. It can contain combinations of \fB<concat>\fR and
@@ -293,7 +284,6 @@ attribute is specified in the configuration of the \fB<stripe>\fR or
 \fB<concat>\fR element used as a submirror, it overrides the value of
 \fBusehsp\fR attributes for the mirror as a whole.
 .SS "Defining Volume by Quality of Service"
-.sp
 .LP
 The \fB<volume>\fR element defines volumes (high-level) by the quality of
 service they should provide. (The \fB<volume>\fR element offers the same
@@ -333,7 +323,6 @@ The \fB<volume>\fR element takes an optional datapaths attribute to determine
 if multiple data paths should be required to access the volume. The datapaths
 attribute should be set to a numeric value.
 .SS "Defining Default Values Globally"
-.sp
 .LP
 Global defaults can be set in \fB/etc/default/metassist.xml\fR. This
 volume-defaults file can contain most of the same elements as a volume-request
@@ -429,7 +418,6 @@ set name, and specifically itemizes characteristics of components to create.
 .in -2
 
 .SH BOUNDARY VALUES
-.sp
 .in +2
 .nf
 Attribute       Minimum         Maximum
@@ -444,7 +432,6 @@ redundancy      0               4
 .sp
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/usr/share/lib/xml/dtd/volume-request.dtd\fR\fR
@@ -475,7 +462,6 @@ redundancy      0               4
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBmetassist\fR(1M), \fBmetaclear\fR(1M), \fBmetadb\fR(1M),
 \fBmetadetach\fR(1M), \fBmetahs\fR(1M), \fBmetainit\fR(1M),

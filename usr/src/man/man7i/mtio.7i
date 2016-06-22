@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH MTIO 7I "Sep 15, 2007"
+.TH MTIO 7I "April 9, 2016"
 .SH NAME
 mtio \- general magnetic tape interface
 .SH SYNOPSIS
@@ -15,7 +15,6 @@ mtio \- general magnetic tape interface
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 1/2", 1/4", 4mm, and 8mm magnetic tape drives all share the same general
 character device interface.
@@ -29,7 +28,6 @@ record is separated by interrecord (or tape) gaps on a tape.
 End-of-recorded-media (EOM) is indicated by two \fBEOF\fR marks on 1/2" tape;
 by one \fBEOF\fR mark on 1/4", 4mm, and 8mm cartridge tapes.
 .SS "1/2" Reel Tape"
-.sp
 .LP
 Data bytes are recorded in parallel onto the 9-track tape. Since it is a
 variable-length tape device, the number of bytes in a  physical record may
@@ -43,7 +41,6 @@ example, using a 2400 foot tape, 20 Mbyte can be stored using 800 \fBBPI,\fR 40
 Mbyte using 1600 \fBBPI,\fR 140 Mbyte using 6250 \fBBPI,\fR or up to 700 Mbyte
 using data compression.
 .SS "1/4" Cartridge Tape"
-.sp
 .LP
 Data is recorded serially onto 1/4" cartridge tape. The number of bytes per
 record is determined by the physical record size of the device. The I/O request
@@ -73,14 +70,12 @@ The \fBQIC-150\fR tape drives require \fBDC-6150\fR (or equivalent) tape
 cartridges for writing. However, they can read other tape cartridges in
 \fBQIC-11,\fR \fBQIC-24,\fR or \fBQIC-120\fR tape formats.
 .SS "8mm Cartridge Tape"
-.sp
 .LP
 Data is recorded serially onto 8mm helical scan cartridge tape. Since it is a
 variable-length tape device, the number of bytes in a  physical record may
 vary. The recording formats available (check specific tape drive) are standard
 2Gbyte, 5Gbyte, and compressed format.
 .SS "4mm DAT Tape"
-.sp
 .LP
 Data is recorded either in Digital Data Storage (DDS) tape format or in Digital
 Data Storage, Data Compressed (DDS-DC) tape format. Since it is a
@@ -88,7 +83,6 @@ variable-length tape device, the number of bytes in a  physical record may
 vary. The recording formats available are standard 2Gbyte and compressed
 format.
 .SS "Persistent Error Handling"
-.sp
 .LP
 Persistent error handling is a modification of the current error handling
 behaviors, BSD and SVR4. With persistent error handling enabled, all tape
@@ -122,7 +116,6 @@ disable persistent error handling and clear any errors or exceptions.
 The \fBRead Operation\fR and \fBWrite Operation\fR subsections contain more
 pertinent information reguarding persistent error handling.
 .SS "Read Operation"
-.sp
 .LP
 The \fBread\fR(2) function reads the next record on the tape. The record size
 is passed back as the number of bytes read, provided it is not greater than the
@@ -165,7 +158,6 @@ should never hit physical EOT.
 Read requests that are lesser than a physical tape record are not allowed.
 Appropriate error is returned.
 .SS "Write Operation"
-.sp
 .LP
 The \fBwrite\fR(2) function writes the next record on the tape. The record has
 the same length as the given buffer.
@@ -235,7 +227,6 @@ the file as soon as possible.
 .LP
 Seeks are ignored in tape I/O.
 .SS "Close Operation"
-.sp
 .LP
 Magnetic tapes are rewound when closed, except when the "no-rewind" devices
 have been specified. The names of no-rewind device files use the letter \fBn\fR
@@ -284,7 +275,6 @@ one or two file marks are written, thus creating a null file.
 After closing the device, persistent error handling will be disabled and any
 error or exception will be cleared.
 .SH IOCTLS
-.sp
 .LP
 Not all devices support all \fBioctls\fR. The driver returns an \fBENOTTY\fR
 error on unsupported ioctls.
@@ -701,7 +691,7 @@ extensive start-stop operations or long-term storage.
 .LP
 \fBMTERASE\fR rewinds the tape, erases it completely, and returns to the
 beginning of tape. Erasing may take a long time depending on the device and/or
-tapes.  For time details, refer to the the drive specific manual.
+tapes. For time details, refer to the drive specific manual.
 .sp
 .LP
 \fBMTEOM\fR positions the tape at a location just after the last file written
@@ -786,7 +776,6 @@ returned in struct tapepos as defined in
 .LP
 The  MTIOCRESTPOS ioctl restores a saved position from the MTIOCGETPOS.
 .SS "Persistent Error Handling IOCTLs and Asynchronous Tape Operations"
-.sp
 .ne 2
 .na
 \fBMTIOCPERSISTENT\fR
@@ -879,7 +868,6 @@ ioctl(fd, MTIOCGUARANTEEDORDER)
 See the \fBPersistent Error Handling\fR subsection above for more information
 on persistent error handling.
 .SS "Asynchronous and State Change IOCTLS"
-.sp
 .ne 2
 .na
 \fB\fBMTIOCSTATE\fR\fR
@@ -909,7 +897,6 @@ MTIO_INSERTED  /* Tape state is "inserted" */
 When using asynchronous operations, most ioctls will wait for all outstanding
 commands to complete before they are executed.
 .SS "IOCTLS for Multi-initiator Configurations"
-.sp
 .ne 2
 .na
 \fBMTIOCRESERVE\fR
@@ -970,13 +957,12 @@ ioctl(fd, MTIOCFORCERESERVE);
 .in -2
 
 .SS "IOCTLS for Handling Tape Configuration Options"
-.sp
 .ne 2
 .na
 \fBMTIOCSHORTFMK\fR
 .ad
 .RS 23n
-enables/disable support for writing short filemarks. This is specific to
+enables/disables support for writing short filemarks. This is specific to
 Exabyte drives.
 .RE
 
@@ -986,7 +972,7 @@ Exabyte drives.
 \fBMTIOCREADIGNOREILI\fR
 .ad
 .RS 23n
-enables/disable supress incorrect length indicator support during reads
+enables/disables suppress incorrect length indicator (SILI) support during reads
 .RE
 
 .sp
@@ -995,7 +981,7 @@ enables/disable supress incorrect length indicator support during reads
 \fBMTIOCREADIGNOREEOFS\fR
 .ad
 .RS 23n
-enables/disable support for reading past two EOF marks which otherwise indicate
+enables/disables support for reading past two EOF marks which otherwise indicate
 End-Of-recording-Media (EOM) in the case of 1/2" reel tape drives
 .RE
 
@@ -1005,7 +991,7 @@ The \fBMTIOCSHORTFMK\fR ioctl enables or disables support for short filemarks.
 This ioctl is only applicable to Exabyte drives which support short filemarks.
 As an argument, it takes a pointer to an integer.  If 0 (zero) is the
 specified integer, then long filemarks will be written. If 1 is the  specified
-integer, then short filemarks will be written. The specified tape bahavior will
+integer, then short filemarks will be written. The specified tape behavior will
 be in effect until the device is closed.
 .sp
 .LP
@@ -1031,9 +1017,9 @@ Tape drives which do not support short filemarks will return an \fBerrno\fR of
 The \fBMTIOCREADIGNOREILI\fR ioctl enables or disables the suppress incorrect
 length indicator (SILI) support during reads.  As an argument, it takes a
 pointer to an integer.   If 0 (zero) is the specified integer, SILI will not be
-used during reads and incorrect length indicator will not be supressed.  If 1
+used during reads and incorrect length indicator will not be suppressed.  If 1
 is  the specified integer, SILI will be used during reads and incorrect length
-indicator will be supressed.  The specified  tape bahavior will be in effect
+indicator will be suppressed.  The specified  tape behavior will be in effect
 until the device is closed.
 .sp
 .LP
@@ -1057,7 +1043,7 @@ integer.   If 0 (zero) is the specified integer, then double EOF marks indicate
 End-Of-recodred-media (EOD). If 1 is the specified integer, the double EOF
 marks no longer indicate EOM, thus allowing applications to read past two EOF
 marks.  In this case it is the responsibility of the application to detect
-end-of-recorded-media (EOM).  The specified  tape bahavior will be in effect
+end-of-recorded-media (EOM).  The specified  tape behavior will be in effect
 until the device is closed.
 .sp
 .LP
@@ -1144,7 +1130,6 @@ ioctl(fd, MTIOCGETDRIVETYPE, &mtreq);
 .in -2
 
 .SH FILES
-.sp
 .LP
 \fB/dev/rmt/\fR\fI<unit number><density>\fR[\fI<BSD behavior>\fR][\fI<no
 rewind>\fR]
@@ -1158,7 +1143,6 @@ high, ultra/compressed, respectively), the \fIBSD behavior \fR option is
 For example, \fB/dev/rmt/0hbn\fR specifies unit 0, high density, \fBBSD\fR
 behavior and no rewind.
 .SH SEE ALSO
-.sp
 .LP
 \fBmt\fR(1), \fBtar\fR(1), \fBdd\fR(1M), \fBopen\fR(2), \fBread\fR(2),
 \fBwrite\fR(2), \fBaioread\fR(3C), \fBaiowrite\fR(3C), \fBar.h\fR(3HEAD),

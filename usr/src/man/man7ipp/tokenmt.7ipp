@@ -3,11 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH TOKENMT 7IPP "Sep 29, 2004"
+.TH TOKENMT 7IPP "April 9, 2016"
 .SH NAME
 tokenmt \- Single and Two Rate Three Conformance Level Meter
 .SH DESCRIPTION
-.sp
 .LP
 The \fBtokenmt\fR module can be configured as a Single or a Two Rate meter.
 Packets are deemed to belong to one of the three levels - Red, Yellow or Green
@@ -72,7 +71,7 @@ is decided as follows:
                 T(t) = committed rate * (t - t')
                 (where t' is the time the last packet was seen)
               o Add T tokens to C up to a maximum of committed burst
-                size. Add remaining tokens ((C+T) - Commited Burst),
+                size. Add remaining tokens ((C+T) - Committed Burst),
                 if any, to P, to a maximum of peak burst size.
         - Decide outcome
               o If not color aware
@@ -123,7 +122,6 @@ When operating as a Two Rate meter, the outcome (level) is decided as follows:
 .in -2
 
 .SH STATISTICS
-.sp
 .LP
 The \fBtokenmt\fR module exports the following statistics through \fBkstat\fR:
 .sp
@@ -145,7 +143,6 @@ module: tokenmt                          instance: <action id>
 .in -2
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/kernel/ipp/sparcv9/tokenmt\fR\fR
@@ -156,7 +153,6 @@ module: tokenmt                          instance: <action id>
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBipqosconf\fR(1M), \fBdlcosmk\fR(7ipp), \fBdscpmk\fR(7ipp),
 \fBflowacct\fR(7ipp), \fBipqos\fR(7ipp), \fBipgpc\fR(7ipp),

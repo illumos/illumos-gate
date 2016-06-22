@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH UTMPX 4 "Mar 6, 2008"
+.TH UTMPX 4 "April 9, 2016"
 .SH NAME
 utmpx, wtmpx \- utmpx and wtmpx database entry formats
 .SH SYNOPSIS
@@ -16,7 +16,6 @@ utmpx, wtmpx \- utmpx and wtmpx database entry formats
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fButmpx\fR and \fBwtmpx\fR files are extended database files that have
 superseded the obsolete \fButmp\fR and \fBwtmp\fR database files.
@@ -27,20 +26,18 @@ commands such as \fBwho\fR(1), \fBwrite\fR(1), and \fBlogin\fR(1). The
 \fBwtmpx\fR database contains the history of user access and accounting
 information for the  \fButmpx\fR database.
 .SH USAGE
-.sp
 .LP
 Applications should not access these databases directly, but should use the
 functions described on the \fBgetutxent\fR(3C) manual page to interact with the
 \fButmpx\fR and \fBwtmpx\fR databases to ensure that they are maintained
 consistently.
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/var/adm/utmpx\fR\fR
 .ad
 .RS 18n
-user access and adminstration information
+user access and administration information
 .RE
 
 .sp
@@ -49,10 +46,9 @@ user access and adminstration information
 \fB\fB/var/adm/wtmpx\fR\fR
 .ad
 .RS 18n
-history of user access and adminstrative information
+history of user access and administrative information
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBgetutxent\fR(3C), \fBwait\fR(3C), \fBwait.h\fR(3HEAD)

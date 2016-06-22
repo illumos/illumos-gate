@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH KRB5.CONF 4 "Oct 29, 2015"
+.TH KRB5.CONF 4 "April 9, 2016"
 .SH NAME
 krb5.conf \- Kerberos configuration file
 .SH SYNOPSIS
@@ -13,7 +13,6 @@ krb5.conf \- Kerberos configuration file
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBkrb5.conf\fR file contains Kerberos configuration information, including
 the locations of \fBKDC\fRs and administration daemons for the Kerberos realms
@@ -142,7 +141,6 @@ For a Key Distribution Center (\fBKDC\fR), can contain the location of the
 .RE
 
 .SS "The \fB[libdefaults]\fR Section"
-.sp
 .LP
 The \fB[libdefaults]\fR section can contain any of the following relations:
 .sp
@@ -409,7 +407,6 @@ to make it a network-wide setting for all realms.
 .RE
 
 .SS "The \fB[appdefaults]\fR Section"
-.sp
 .LP
 This section contains subsections for Kerberos V5 applications, where
 \fIrelation-subsection\fR is the name of an application. Each subsection
@@ -592,7 +589,6 @@ In the following example, \fBkinit\fR gets forwardable tickets by default and
 The application defaults specified here are overridden by those specified in
 the \fB[realms]\fR section.
 .SS "The \fB[realms]\fR Section"
-.sp
 .LP
 This section contains subsections for Kerberos realms, where
 \fIrelation-subsection\fR is the name of a realm. Each subsection contains
@@ -873,7 +869,6 @@ parameters. Most often, you need to specify them only when using a
 non-Solaris-based Kerberos server. Otherwise, the change request is sent over
 \fBRPCSEC_GSS\fR to the Solaris Kerberos administration server.
 .SS "The \fB[domain_realm]\fR Section"
-.sp
 .LP
 This section provides a translation from a domain name or hostname to a
 Kerberos realm name. The \fIrelation\fR can be a host name, or a domain name,
@@ -907,7 +902,6 @@ default into the \fBFUBAR.ORG\fR realm. The entries for the hosts \fBmit.edu\fR
 and \fBfubar.org\fR. Without these entries, these hosts would be mapped into
 the Kerberos realms \fBEDU\fR and \fBORG\fR, respectively.
 .SS "The \fB[logging]\fR Section"
-.sp
 .LP
 This section indicates how Kerberos programs are to perform logging. There are
 two types of relations for this section: relations to specify how to log and a
@@ -1117,7 +1111,6 @@ with a specified time interval of a day.
 .sp
 
 .SS "The \fB[capaths]\fR Section"
-.sp
 .LP
 In order to perform direct (non-hierarchical) cross-realm authentication, a
 database is needed to construct the authentication paths between the realms.
@@ -1222,7 +1215,6 @@ In the above examples, the ordering is not important, except when the same
 relation is used more than once. The client uses this to determine the path.
 (It is not important to the server, since the transited field is not sorted.)
 .SS "PKINIT-specific Options"
-.sp
 .LP
 The following are \fBpkinit-specific\fR options. These values can be specified
 in \fB[libdefaults]\fR as global defaults, or within a realm-specific
@@ -1443,7 +1435,7 @@ it has an acceptable EKU. The use of this option is not recommended.
 .ad
 .sp .6
 .RS 4n
-The presense of this option indicates that the client is willing to accept a
+The presence of this option indicates that the client is willing to accept a
 KDC certificate with a \fBdNSName\fR SAN (Subject Alternative Name) rather than
 requiring the \fBid-pkinit-san\fR as defined in RFC4556. This option can be
 specified multiple times. Its value should contain the acceptable hostname for
@@ -1536,7 +1528,6 @@ pkinit_cert_match = <EKU>msScLogin,clientAuth<KU>digitalSignature
 .RE
 
 .SS "PKINIT URI Types"
-.sp
 .ne 2
 .na
 \fB\fBFILE:\fR\fIfile-name[,key-file-name]\fR\fR
@@ -1655,7 +1646,6 @@ been set to \fBFILE:/tmp/my_proxy.pem\fR.
 .RE
 
 .SS "The \fB[dbmodules]\fR Section"
-.sp
 .LP
 This section consists of relations that provide configuration information for
 plug-in modules. In particular, the relations describe the configuration for
@@ -1840,7 +1830,6 @@ a Kerberos configuration file when the KDC is using the LDAP KDB plug-in.
 .sp
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/var/krb5/kdc.log\fR\fR
@@ -1851,7 +1840,6 @@ a Kerberos configuration file when the KDC is using the LDAP KDB plug-in.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -1871,13 +1859,11 @@ Interface Stability	See below.
 All of the keywords are Committed, except for the \fBPKINIT\fR keywords, which
 are Volatile.
 .SH SEE ALSO
-.sp
 .LP
 \fBkinit\fR(1), \fBrcp\fR(1), \fBrdist\fR(1), \fBrlogin\fR(1), \fBrsh\fR(1),
 \fBtelnet\fR(1), \fBsyslog\fR(3C), \fBattributes\fR(5), \fBkerberos\fR(5),
 \fBregex\fR(5)
 .SH NOTES
-.sp
 .LP
 If the \fBkrb5.conf\fR file is not formatted properly, the \fBtelnet\fR command
 fails. However, the \fBdtlogin\fR and \fBlogin\fR commands still succeed, even

@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PKGADD 1M "Oct 30, 2007"
+.TH PKGADD 1M "April 9, 2016"
 .SH NAME
 pkgadd \- transfer software packages to the system
 .SH SYNOPSIS
@@ -24,7 +24,6 @@ pkgadd \- transfer software packages to the system
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBpkgadd\fR transfers the contents of a software package from the distribution
 medium or directory to install it onto the system. Used without the \fB-d\fR
@@ -35,7 +34,7 @@ option, it writes the package to a spool directory instead of installing it.
 .LP
 The \fBpkgadd\fR utility requires an amount of temporary space the size of the
 package that is being installed. \fBpkgadd\fR determines which temporary
-directory to use by checking for the existance of the \fB$TMPDIR\fR environment
+directory to use by checking for the existence of the \fB$TMPDIR\fR environment
 variable. If \fB$TMPDIR\fR is not defined, \fBpkgadd\fR uses \fBP_tmpdir\fR
 from \fBstdio.h\fR. \fBP_tmpdir\fR has a default of \fB/var/tmp/\fR.
 .sp
@@ -83,7 +82,6 @@ datastream of  up to 4 GB.
 The \fB-d\fR, \fB-Y\fR, and \fIpkginst\fR arguments shown in the SYNOPSIS are
 described under OPERANDS, following OPTIONS.
 .SH OPTIONS
-.sp
 .LP
 The supported options are described as follows. The \fB-d\fR \fIdevice\fR
 source specifier is described under OPERANDS, below.
@@ -257,11 +255,9 @@ for more information on alternate methods of specifying a default proxy.
 When executed without options or operands, \fBpkgadd\fR uses
 \fB/var/spool/pkg\fR (the default spool directory).
 .SH OPERANDS
-.sp
 .LP
 The following operands are supported:
 .SS "Sources"
-.sp
 .LP
 By default, pkgadd looks in the \fB/var/spool/pkg\fR directory when searching
 for instances of a package to install or spool. Optionally, the source for the
@@ -312,7 +308,6 @@ comma-separated list of package names or the keyword \fBall\fR.
 .RE
 
 .SS "Instances"
-.sp
 .LP
 By default, \fBpkgadd\fR searches the specified source, and presents an
 interactive menu allowing the user to select which package instances found on
@@ -348,7 +343,6 @@ installation or spooling.
 .RE
 
 .SH KEYSTORE LOCATIONS
-.sp
 .LP
 Package and tools such as \fBpkgadd\fR use a set of trusted certificates to
 perform signature validation on any signatures found within the packages. If
@@ -401,7 +395,6 @@ the following locations are successively searched to find the trust store:
 This searching order enables administrators to have a single location for most
 applications, and special certificate locations for certain applications.
 .SH KEYSTORE AND CERTIFICATE FORMATS
-.sp
 .LP
 The packaging utilities, such as \fBpkgtrans\fR, require access to a set of
 keys and certificates in order to sign, and optionally verify, packages.
@@ -424,7 +417,6 @@ and keys into a PKCS#12 keystore. For example, a trusted certificate can be
 exported from Mozilla, and then imported into a PKCS#12 keystore for use with
 \fBpkgadd\fR with the OpenSSL Toolkit.
 .SH PASS PHRASE ARGUMENTS
-.sp
 .LP
 \fBpkgtrans\fR and \fBpkgadd\fR accept password arguments, typically using
 \fB-p\fR to specify the password. These allow the password to be obtained from
@@ -517,7 +509,6 @@ The keyword \fBall\fR specifies that all of the packages found in the
 designated datastream will be installed.
 
 .SH EXIT STATUS
-.sp
 .ne 2
 .na
 \fB\fB0\fR\fR
@@ -598,7 +589,6 @@ Reboot after installation of this package.
 .RE
 
 .SH ENVIRONMENT VARIABLES
-.sp
 .ne 2
 .na
 \fB\fBHTTPPROXY\fR\fR
@@ -632,7 +622,6 @@ setting.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/var/sadm/install/logs/\fR\fR
@@ -643,7 +632,6 @@ Location where \fBpkgadd\fR logs an instance of software installation.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -659,7 +647,6 @@ Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBpkginfo\fR(1), \fBpkgmk\fR(1), \fBpkgparam\fR(1), \fBpkgproto\fR(1),
 \fBpkgtrans\fR(1), \fBinstallf\fR(1M), \fBpkgadm\fR(1M), \fBpkgask\fR(1M),
@@ -672,7 +659,6 @@ Interface Stability	Evolving
 .LP
 \fBhttp://www.openssl.org\fR
 .SH NOTES
-.sp
 .LP
 When transferring a package to a spool directory, the \fB-r\fR, \fB-n\fR, and
 \fB-a\fR options cannot be used.
