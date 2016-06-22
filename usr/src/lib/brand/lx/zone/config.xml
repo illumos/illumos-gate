@@ -37,8 +37,8 @@
 	<forcedlogin_cmd>/bin/login -h zone:%Z -f %u</forcedlogin_cmd>
 	<user_cmd>/usr/bin/getent passwd %u</user_cmd>
 
-	<install>/usr/lib/brand/lx/lx_install %z %R</install>
-	<installopts>d:hsvX</installopts>
+	<install>/usr/lib/brand/lx/lx_install -z %z -R %R</install>
+	<installopts></installopts>
 	<boot>/usr/lib/brand/lx/lx_boot %z %R</boot>
 	<halt>/usr/lib/brand/lx/lx_support halt %R %z</halt>
 	<verify_cfg>/usr/lib/brand/lx/lx_support verify</verify_cfg>

@@ -21,7 +21,23 @@
 PATH=/bin:/usr/bin:/usr/sbin
 export PATH
 
-echo "Invoked:  lx_install $1 $2 $3 $4"
-echo "     (Will do something someday.)"
+. /usr/lib/brand/shared/common.ksh
+
+bad_usage() {
+	echo "LX zone install bad option"
+	echo "Available options are:"
+	echo "	none (for now, KEBE SAYS fix me)"
+	exit $ZONE_SUBPROC_USAGE
+}
+
+while getopts "R:z:" opt
+do
+	case "$opt" in
+		R)	ZONEPATH="$OPTARG";;
+		z)	ZONENAME="$OPTARG";;
+		*)	bad_usage ;;
+	esac
+done
+shift OPTIND-1
 
 exit 0
