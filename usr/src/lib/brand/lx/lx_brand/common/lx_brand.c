@@ -89,6 +89,7 @@
 
 char lx_release[LX_KERN_RELEASE_MAX];
 char lx_cmd_name[MAXNAMLEN];
+boolean_t lx_no_abort_handler = B_FALSE;
 
 /*
  * Map a linux locale ending string to the solaris equivalent.
@@ -558,17 +559,71 @@ lx_start(uintptr_t sp, uintptr_t entry)
 	lx_jump_to_linux(&jump_uc);
 }
 
+enum lx_env_setting {
+	LXES_INSTALL = 0,
+	LXES_VERBOSE,
+	LXES_DTRACE,
+	LXES_DEBUG,
+	LXES_DEBUG_FILE,
+	LXES_NO_ABORT_HANDLER,
+	LXES_RELEASE,
+	LXES_VERSION,
+	LXES_STRICT,
+	LXES_LIMIT
+};
+
+static void
+lx_parse_env(char *envp[], char *settings[])
+{
+	int i, j;
+	char *env;
+
+	typedef struct lx_env_entry {
+		char *lee_name;
+		int lee_len;
+		int lee_index;
+	} lx_env_entry_t;
+#define	LX_ENV_ENTRY(name, idx) { name, (sizeof (name)) - 1, idx }
+	static const lx_env_entry_t lx_env_entries[] = {
+		LX_ENV_ENTRY("LX_INSTALL", LXES_INSTALL),
+		LX_ENV_ENTRY("LX_VERBOSE", LXES_VERBOSE),
+		LX_ENV_ENTRY("LX_DTRACE", LXES_DTRACE),
+		LX_ENV_ENTRY("LX_DEBUG", LXES_DEBUG),
+		LX_ENV_ENTRY("LX_DEBUG_FILE", LXES_DEBUG_FILE),
+		LX_ENV_ENTRY("LX_NO_ABORT_HANDLER", LXES_NO_ABORT_HANDLER),
+		LX_ENV_ENTRY("LX_RELEASE", LXES_RELEASE),
+		LX_ENV_ENTRY("LX_VERSION", LXES_VERSION),
+		LX_ENV_ENTRY("LX_STRICT", LXES_STRICT)
+	};
+#define	LX_ENV_ENTRY_COUNT	\
+	(sizeof (lx_env_entries) / sizeof (lx_env_entries[0]))
+
+	for (i = 0; (env = envp[i]) != NULL; i++) {
+		if (env[0] != 'L' || env[1] != 'X' || env[2] != '_')
+			continue;
+		for (j = 0; j < LX_ENV_ENTRY_COUNT; j++) {
+			const lx_env_entry_t *lee = &lx_env_entries[j];
+
+			if (strncmp(env, lee->lee_name, lee->lee_len) != 0 ||
+			    env[lee->lee_len] != '=')
+				continue;
+			settings[lee->lee_index] = &env[lee->lee_len + 1];
+			break;
+		}
+	}
+}
+
 /*ARGSUSED*/
 int
 lx_init(int argc, char *argv[], char *envp[])
 {
-	char		*rele, *vers;
 	auxv_t		*ap, *oap;
 	long		*p;
 	int		err;
 	lx_elf_data_t	edp;
 	lx_brand_registration_t reg;
 	lx_tsd_t	*lxtsd;
+	char		*lx_settings[LXES_LIMIT];
 
 	bzero(&reg, sizeof (reg));
 	stack_size = 2 * sysconf(_SC_PAGESIZE);
@@ -583,21 +638,44 @@ lx_init(int argc, char *argv[], char *envp[])
 	lx_close_fh(stdout);
 	lx_close_fh(stderr);
 
-	lx_debug_init();
+	/*
+	 * Parse LX-related settings out of the environment array.
+	 * This is done manually instead of utilizing libc's getenv() to avoid
+	 * triggering any env-cleaning routines which are present.
+	 */
+	bzero(lx_settings, sizeof (lx_settings));
+	lx_parse_env(envp, lx_settings);
 
-	rele = getenv("LX_RELEASE");
-	vers = getenv("LX_VERSION");
-	if (rele == NULL) {
+	/*
+	 * Setting LX_NO_ABORT_HANDLER in the environment will prevent the
+	 * emulated Linux program from modifying the signal handling
+	 * disposition for SIGSEGV or SIGABRT.  It is useful for debugging
+	 * programs which fall over themselves to prevent useful core files
+	 * being generated.
+	 */
+	lx_no_abort_handler = (lx_settings[LXES_NO_ABORT_HANDLER] != NULL);
+
+	lx_debug_init(lx_settings[LXES_DTRACE] != NULL,
+	    lx_settings[LXES_DEBUG] != NULL,
+	    lx_settings[LXES_DEBUG_FILE]);
+
+	if (lx_settings[LXES_RELEASE] == NULL) {
 		if (zone_getattr(getzoneid(), LX_ATTR_KERN_RELEASE,
 		    lx_release, sizeof (lx_release)) <= 0)
 			(void) strlcpy(lx_release, "2.4.21",
 			    LX_KERN_RELEASE_MAX);
 	} else {
-		(void) strlcpy(lx_release, rele, LX_KERN_RELEASE_MAX);
+		(void) strlcpy(lx_release, lx_settings[LXES_RELEASE],
+		    LX_KERN_RELEASE_MAX);
 	}
 
-	if (syscall(SYS_brand, B_OVERRIDE_KERN_VER, rele, vers) != 0) {
-		lx_debug("failed to override kernel release/version");
+	if (lx_settings[LXES_RELEASE] != NULL ||
+	    lx_settings[LXES_VERSION] != NULL) {
+		if (syscall(SYS_brand, B_OVERRIDE_KERN_VER,
+		    lx_settings[LXES_RELEASE],
+		    lx_settings[LXES_VERSION]) != 0) {
+			lx_debug("failed to override kernel release/version");
+		}
 	}
 	lx_debug("lx_release: %s\n", lx_release);
 
@@ -606,7 +684,7 @@ lx_init(int argc, char *argv[], char *envp[])
 	 * Should we kill an application that attempts an unimplemented
 	 * system call?
 	 */
-	if (getenv("LX_STRICT") != NULL) {
+	if (lx_settings[LXES_STRICT] != NULL) {
 		reg.lxbr_flags |= LX_PROC_STRICT_MODE;
 		lx_debug("STRICT mode enabled.\n");
 	}
@@ -614,18 +692,10 @@ lx_init(int argc, char *argv[], char *envp[])
 	/*
 	 * Are we in install mode?
 	 */
-	if (getenv("LX_INSTALL") != NULL) {
+	if (lx_settings[LXES_INSTALL] != NULL) {
 		reg.lxbr_flags |= LX_PROC_INSTALL_MODE;
 		lx_install = 1;
 		lx_debug("INSTALL mode enabled.\n");
-	}
-
-	/*
-	 * Should we attempt to send messages to the screen?
-	 */
-	if (getenv("LX_VERBOSE") != NULL) {
-		lx_verbose = 1;
-		lx_debug("VERBOSE mode enabled.\n");
 	}
 
 	(void) strlcpy(lx_cmd_name, basename(argv[0]), sizeof (lx_cmd_name));
@@ -665,12 +735,31 @@ lx_init(int argc, char *argv[], char *envp[])
 	p = (long *)envp;
 	while (*p != NULL)
 		p++;
+
 	/*
-	 * p is now pointing at the 0 word after the environ pointers. After
-	 * that is the aux vectors.
+	 * Now 'p' points at the NULL word immediately following the environ
+	 * pointers.  The list of auxv entries _should_ immediately follow.
+	 * If anything (such as the native linker or libc) has removed entries
+	 * from the environment array, extra NULLs will be present.
+	 *
+	 * The brand library takes care to avoid such behavior (via the
+	 * lx_parse_env routine above) but a belt-and-suspenders approach is
+	 * taken for safety.
+	 *
+	 * The address following the NULL spacer is recorded as the target for
+	 * auxv translation and any addition NULLs following it are skipped
+	 * until the first auxv entry is located.
 	 */
 	p++;
-	for (ap = (auxv_t *)p, oap = ap; ap->a_type != AT_NULL; ap++) {
+	oap = (auxv_t *)p;
+	while (*p == NULL)
+		p++;
+	ap = (auxv_t *)p;
+
+	/*
+	 * Translate auxv entries to Linux equivalents.
+	 */
+	for (; ap->a_type != AT_NULL; ap++) {
 		if (lx_auxv_stol(ap, oap, &edp) == 0) {
 			/*
 			 * Copy only auxv entries which Linux programs will
@@ -679,11 +768,10 @@ lx_init(int argc, char *argv[], char *envp[])
 			oap++;
 		}
 	}
+
 	/* NULL out skipped entries */
-	while (oap < ap) {
-		oap->a_type = AT_NULL;
-		oap->a_un.a_val = 0;
-		oap++;
+	if (oap < ap) {
+		bzero(oap, (uintptr_t)ap - (uintptr_t)oap);
 	}
 
 	/* Setup signal handler information. */

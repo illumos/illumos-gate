@@ -21,7 +21,7 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2014 Joyent, Inc.  All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include <assert.h>
@@ -43,21 +43,13 @@
 #include <sys/lx_misc.h>
 
 /* internal debugging state */
-static char	*lx_debug_path = NULL;		/* debug output file path */
-static char	lx_debug_path_buf[MAXPATHLEN];
+static const char	*lx_debug_path = NULL;	/* debug output file path */
+static char		lx_debug_path_buf[MAXPATHLEN];
 
 int		lx_dtrace_lazyload = 1;		/* patchable; see below */
 
 void
-lx_debug_enable(void)
-{
-	/* send all debugging output to /dev/tty */
-	lx_debug_path = "/dev/tty";
-	lx_debug("lx_debug: debugging output enabled: %s", lx_debug_path);
-}
-
-void
-lx_debug_init(void)
+lx_debug_init(boolean_t do_dtrace, boolean_t dbg_enable, const char *dbg_file)
 {
 	/*
 	 * Our DTrace USDT provider is loaded in our .init section, which is
@@ -72,12 +64,12 @@ lx_debug_init(void)
 	 * provided in situations where setting an environment variable is
 	 * tedious or otherwise impossible.
 	 */
-	if (getenv("LX_DTRACE") != NULL || !lx_dtrace_lazyload) {
+	if (do_dtrace || !lx_dtrace_lazyload) {
 		extern void _init(void);
 		_init();
 	}
 
-	if (getenv("LX_DEBUG") == NULL)
+	if (!dbg_enable)
 		return;
 
 	/*
@@ -92,7 +84,7 @@ lx_debug_init(void)
 	lx_debug_enabled = 1;
 
 	/* check if there's a debug log file specified */
-	lx_debug_path = getenv("LX_DEBUG_FILE");
+	lx_debug_path = dbg_file;
 	if (lx_debug_path == NULL) {
 		/* send all debugging output to /dev/tty */
 		lx_debug_path = "/dev/tty";

@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright (c) 2014 Joyent, Inc.  All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #ifndef	_LX_DEBUG_H
@@ -37,7 +37,7 @@ extern "C" {
 #endif
 
 /* initialize the debugging subsystem */
-extern void lx_debug_init(void);
+extern void lx_debug_init(boolean_t, boolean_t, const char *);
 
 /* printf() style debug message functionality */
 extern void lx_debug(const char *, ...);

@@ -304,14 +304,6 @@ struct lx_oldsigstack {
  */
 static lx_sighandlers_t lx_sighandlers;
 
-/*
- * Setting LX_NO_ABORT_HANDLER in the environment will prevent the emulated
- * Linux program from modifying the signal handling disposition for SIGSEGV or
- * SIGABRT.  Useful for debugging programs which fall over themselves to
- * prevent useful core files being generated.
- */
-static int lx_no_abort_handler = 0;
-
 static void lx_sigdeliver(int, siginfo_t *, ucontext_t *, size_t, void (*)(),
     void (*)(), struct lx_sigaction *);
 
@@ -1913,7 +1905,7 @@ lx_sigaction_common(int lx_sig, struct lx_sigaction *lxsp,
 			return (-errno);
 
 		if ((sig = ltos_signo[lx_sig]) != -1) {
-			if (lx_no_abort_handler != 0) {
+			if (lx_no_abort_handler) {
 				/*
 				 * If LX_NO_ABORT_HANDLER has been set, we will
 				 * not allow the emulated program to do
@@ -2181,10 +2173,6 @@ lx_siginit(void)
 	struct sigaction sa;
 	sigset_t new_set, oset;
 	int lx_sig, sig;
-
-	if (getenv("LX_NO_ABORT_HANDLER") != NULL) {
-		lx_no_abort_handler = 1;
-	}
 
 	/*
 	 * Block all signals possible while setting up the signal imposition
