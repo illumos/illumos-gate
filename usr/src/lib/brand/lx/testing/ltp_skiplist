@@ -191,6 +191,7 @@ process_vm_readv03
 process_vm_writev01
 process_vm_writev02
 prot_hsymlinks
+pty01			# OS-5437
 read02
 readahead01
 readahead02
