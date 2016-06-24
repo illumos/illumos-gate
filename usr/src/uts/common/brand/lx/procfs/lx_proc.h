@@ -124,6 +124,7 @@ typedef enum lxpr_nodetype {
 	LXPR_PID_MAPS,		/* /proc/<pid>/maps	*/
 	LXPR_PID_MEM,		/* /proc/<pid>/mem	*/
 	LXPR_PID_MOUNTINFO,	/* /proc/<pid>/mountinfo */
+	LXPR_PID_MOUNTS,	/* /proc/<pid>/mounts	*/
 	LXPR_PID_OOM_SCR_ADJ,	/* /proc/<pid>/oom_score_adj	*/
 	LXPR_PID_PERSONALITY,	/* /proc/<pid>/personality	*/
 	LXPR_PID_ROOTDIR,	/* /proc/<pid>/root	*/

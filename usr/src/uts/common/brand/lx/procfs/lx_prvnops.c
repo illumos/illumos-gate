@@ -365,6 +365,7 @@ static lxpr_dirent_t piddir[] = {
 	{ LXPR_PID_MAPS,	"maps" },
 	{ LXPR_PID_MEM,		"mem" },
 	{ LXPR_PID_MOUNTINFO,	"mountinfo" },
+	{ LXPR_PID_MOUNTS,	"mounts" },
 	{ LXPR_PID_OOM_SCR_ADJ,	"oom_score_adj" },
 	{ LXPR_PID_PERSONALITY,	"personality" },
 	{ LXPR_PID_ROOTDIR,	"root" },
@@ -729,6 +730,7 @@ static void (*lxpr_read_function[LXPR_NFILES])() = {
 	lxpr_read_pid_maps,		/* /proc/<pid>/maps	*/
 	lxpr_read_empty,		/* /proc/<pid>/mem	*/
 	lxpr_read_pid_mountinfo,	/* /proc/<pid>/mountinfo */
+	lxpr_read_mounts,		/* /proc/<pid>/mounts	*/
 	lxpr_read_pid_oom_scr_adj,	/* /proc/<pid>/oom_score_adj */
 	lxpr_read_pid_personality,	/* /proc/<pid>/personality */
 	lxpr_read_invalid,		/* /proc/<pid>/root	*/
@@ -864,6 +866,7 @@ static vnode_t *(*lxpr_lookup_function[LXPR_NFILES])() = {
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/maps	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/mem	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/mountinfo */
+	lxpr_lookup_not_a_dir,		/* /proc/<pid>/mounts	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/oom_score_adj */
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/personality */
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/root	*/
@@ -999,6 +1002,7 @@ static int (*lxpr_readdir_function[LXPR_NFILES])() = {
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/maps	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/mem	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/mountinfo */
+	lxpr_readdir_not_a_dir,		/* /proc/<pid>/mounts	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/oom_score_adj */
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/personality */
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/root	*/
@@ -2392,6 +2396,7 @@ lxpr_read_stat_common(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf,
 	clock_t utime, stime, cutime, cstime, ticks, boottime;
 	char buf_comm[MAXCOMLEN + 1];
 	rlim64_t vmem_ctl;
+	int exit_signal = -1;
 
 	real_pid = get_real_pid(lxpnp->lxpr_pid);
 	p = lxpr_lock(real_pid, ZOMB_OK);
@@ -2462,6 +2467,21 @@ lxpr_read_stat_common(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf,
 		klwp_t *lwp = ttolwp(t);
 		struct mstate *ms = &lwp->lwp_mstate;
 		hrtime_t utm, stm;
+
+		/*
+		 * For field 38 (the exit signal), some apps explicitly use
+		 * this field in a check to distinguish processes from threads,
+		 * and assume only processes have a valid signal in this field!
+		 */
+		if (t->t_tid == 1) {
+			lx_proc_data_t *lxpd = ptolxproc(p);
+
+			if (lxpd != NULL) {
+				exit_signal = lxpd->l_signal;
+			} else {
+				exit_signal = SIGCHLD;
+			}
+		}
 
 		switch (t->t_state) {
 		case TS_SLEEP:
@@ -2578,7 +2598,7 @@ lxpr_read_stat_common(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf,
 	    0l, 0l, 0l, 0l, /* signal, blocked, sigignore, sigcatch 31-34 */
 	    wchan,					/* 35 */
 	    0l, 0l,					/* nswap,cnswap 36-37 */
-	    0,						/* exit_signal	38 */
+	    exit_signal,				/* exit_signal	38 */
 	    cpu						/* 39 */);
 }
 
@@ -3764,6 +3784,9 @@ lxpr_read_meminfo(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 
 /*
  * lxpr_read_mounts():
+ *
+ * Note: we currently also use this for /proc/{pid}/mounts since we don't
+ * yet support mount namespaces.
  */
 /* ARGSUSED */
 static void
