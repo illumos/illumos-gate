@@ -239,6 +239,13 @@ smb_com_session_setup_andx(smb_request_t *sr)
 		sr->session->native_lm = sinfo->ssi_native_lm;
 	}
 
+	/* RejectUnencryptedAccess precludes SMB1 access */
+	if (sr->sr_server->sv_cfg.skc_encrypt == SMB_CONFIG_REQUIRED) {
+		smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
+		    ERRDOS, ERROR_ACCESS_DENIED);
+		return (SDRC_ERROR);
+	}
+
 	/*
 	 * The "meat" of authentication happens here.
 	 */

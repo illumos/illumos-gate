@@ -40,7 +40,7 @@
 
 #include <sys/uio.h>
 #include <smbsrv/smb_kproto.h>
-#include <smbsrv/smb_signing.h>
+#include <smbsrv/smb_kcrypt.h>
 #include <sys/isa_defs.h>
 #include <sys/byteorder.h>
 
@@ -104,7 +104,7 @@ found:
 static void
 smb_sign_fini(smb_session_t *s)
 {
-	smb_sign_mech_t *mech;
+	smb_crypto_mech_t *mech;
 
 	if ((mech = s->sign_mech) != NULL) {
 		kmem_free(mech, sizeof (*mech));
@@ -125,7 +125,7 @@ smb_sign_begin(smb_request_t *sr, smb_token_t *token)
 	smb_arg_sessionsetup_t *sinfo = sr->sr_ssetup;
 	smb_session_t *session = sr->session;
 	struct smb_sign *sign = &session->signing;
-	smb_sign_mech_t *mech;
+	smb_crypto_mech_t *mech;
 	int rc;
 
 	/*
@@ -187,9 +187,10 @@ smb_sign_begin(smb_request_t *sr, smb_token_t *token)
 	sr->reply_seqnum = 1;
 	sign->flags = 0;
 
-	if (session->secmode & NEGOTIATE_SECURITY_SIGNATURES_ENABLED) {
+	if (session->srv_secmode & NEGOTIATE_SECURITY_SIGNATURES_ENABLED) {
 		sign->flags |= SMB_SIGNING_ENABLED;
-		if (session->secmode & NEGOTIATE_SECURITY_SIGNATURES_REQUIRED)
+		if (session->srv_secmode &
+		    NEGOTIATE_SECURITY_SIGNATURES_REQUIRED)
 			sign->flags |= SMB_SIGNING_CHECK;
 	}
 

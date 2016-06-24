@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef	_SMBSRV_SMBINFO_H
@@ -131,6 +131,14 @@ typedef struct smb_version {
 	uint32_t	sv_platform_id;
 } smb_version_t;
 
+typedef enum smb_cfg_val {
+	SMB_CONFIG_DISABLED = 0,
+	SMB_CONFIG_ENABLED = 1,
+	SMB_CONFIG_REQUIRED = 2
+} smb_cfg_val_t;
+
+void smb_cfg_set_require(const char *, smb_cfg_val_t *);
+
 /* See also: smb_ioc_cfg_t */
 typedef struct smb_kmod_cfg {
 	uint32_t skc_maxworkers;
@@ -147,6 +155,7 @@ typedef struct smb_kmod_cfg {
 	int32_t skc_print_enable;
 	int32_t skc_traverse_mounts;
 	uint32_t skc_max_protocol;	/* SMB_VERS_... */
+	smb_cfg_val_t skc_encrypt; /* EncryptData and RejectUnencryptedAccess */
 	uint32_t skc_execflags;
 	uint32_t skc_negtok_len;
 	smb_version_t skc_version;

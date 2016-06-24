@@ -719,6 +719,7 @@ typedef struct smb_kshare {
 	char		*shr_access_rw;
 	avl_node_t	shr_link;
 	kmutex_t	shr_mutex;
+	smb_cfg_val_t	shr_encrypt; /* Share.EncryptData */
 } smb_kshare_t;
 
 
@@ -938,9 +939,11 @@ typedef struct smb_session {
 	uint16_t		s_max_credits;
 
 	uint32_t		capabilities;
+	uint32_t		srv_cap;
 
 	struct smb_sign		signing;	/* SMB1 */
 	void			*sign_mech;	/* mechanism info */
+	void			*enc_mech;
 
 	/* SMB2/SMB3 signing support */
 	int			(*sign_calc)(struct smb_request *,
@@ -961,7 +964,8 @@ typedef struct smb_session {
 	volatile uint32_t	s_file_cnt;
 	volatile uint32_t	s_dir_cnt;
 
-	uint16_t		secmode;
+	uint16_t		cli_secmode;
+	uint16_t		srv_secmode;
 	uint32_t		sesskey;
 	uint32_t		challenge_len;
 	unsigned char		challenge_key[SMB_CHALLENGE_SZ];
@@ -994,6 +998,7 @@ typedef struct smb_session {
 #define	SMB_USER_VALID(u)	\
     ASSERT(((u) != NULL) && ((u)->u_magic == SMB_USER_MAGIC))
 
+/* These flags are all <= 0x00000010 */
 #define	SMB_USER_FLAG_GUEST			SMB_ATF_GUEST
 #define	SMB_USER_FLAG_ANON			SMB_ATF_ANON
 #define	SMB_USER_FLAG_ADMIN			SMB_ATF_ADMIN
@@ -1053,6 +1058,13 @@ typedef struct smb_user {
 
 	uint32_t		u_sign_flags;
 	struct smb_key		u_sign_key;	/* SMB2 signing */
+
+	struct smb_key		u_enc_key;
+	struct smb_key		u_dec_key;
+	volatile uint64_t	u_nonce_cnt;
+	uint8_t			u_nonce_fixed[4];
+	uint64_t		u_salt;
+	smb_cfg_val_t		u_encrypt;
 } smb_user_t;
 
 #define	SMB_TREE_MAGIC			0x54524545	/* 'TREE' */
@@ -1130,6 +1142,7 @@ typedef struct smb_tree {
 	uint32_t		t_execflags;
 	time_t			t_connect_time;
 	volatile uint32_t	t_open_files;
+	smb_cfg_val_t		t_encrypt; /* Share.EncryptData */
 } smb_tree_t;
 
 #define	SMB_TREE_VFS(tree)	((tree)->t_snode->vp->v_vfsp)
@@ -1840,6 +1853,16 @@ typedef struct smb_request {
 	/* uint32_t		smb2_tid; use smb_tid */
 	uint64_t		smb2_ssnid;	/* See u_ssnid */
 	uint8_t			smb2_sig[16];	/* signature */
+
+	/*
+	 * SMB3 transform header fields. [MS-SMB2 2.2.41]
+	 */
+	uint64_t		smb3_tform_ssnid;
+	smb_user_t		*tform_ssn;
+	uint32_t		msgsize;
+	uint8_t			nonce[16];
+
+	boolean_t		encrypted;
 
 	boolean_t		smb2_async;
 	uint64_t		smb2_async_id;

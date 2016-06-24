@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2017 Joyent, Inc.
  */
 
@@ -70,7 +70,7 @@ typedef	struct smb_ioc_spooldoc {
 
 typedef	struct {
 	smb_ioc_header_t hdr;
-	int32_t 	offset;
+	int32_t		offset;
 } smb_ioc_gmt_t;
 
 typedef struct smb_ioc_share {
@@ -172,6 +172,7 @@ typedef struct smb_ioc_cfg {
 	int32_t		print_enable;
 	int32_t		traverse_mounts;
 	uint32_t	max_protocol;
+	uint32_t	encrypt;
 	uint32_t	exec_flags;
 	uint32_t	negtok_len;
 	smb_version_t	version;

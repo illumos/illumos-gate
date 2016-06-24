@@ -1102,6 +1102,7 @@ NFSSRV_OBJS +=	nfs_server.o	nfs_srv.o	nfs3_srv.o \
 		nfs4_deleg_ops.o nfs4_srv_readdir.o nfs4_dispatch.o
 
 SMBSRV_SHARED_OBJS += \
+		smb_cfg_util.o \
 		smb_door_legacy.o \
 		smb_inet.o \
 		smb_match.o \
@@ -1230,7 +1231,10 @@ SMBSRV_OBJS +=	$(SMBSRV_SHARED_OBJS)			\
 		smb2_signing.o \
 		smb2_tree_connect.o \
 		smb2_tree_disconn.o \
-		smb2_write.o
+		smb2_write.o \
+		\
+		smb3_encrypt.o \
+		smb3_encrypt_kcf.o
 
 PCFS_OBJS +=	pc_alloc.o	pc_dir.o	pc_node.o	pc_subr.o \
 		pc_vfsops.o	pc_vnops.o

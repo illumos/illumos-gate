@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 
@@ -23,6 +23,7 @@
 smb_sdrc_t smb2_invalid_cmd(smb_request_t *);
 static void smb2_tq_work(void *);
 static void smb2sr_run_postwork(smb_request_t *);
+static int smb3_decrypt_msg(smb_request_t *);
 
 static const smb_disp_entry_t
 smb2_disp_table[SMB2__NCMDS] = {
@@ -131,6 +132,18 @@ smb2sr_newrq(smb_request_t *sr)
 
 	if (smb_mbc_peek(mbc, 0, "l", &magic) != 0)
 		goto drop;
+
+	/* 0xFD S M B */
+	if (magic == SMB3_ENCRYPTED_MAGIC) {
+		if (smb3_decrypt_msg(sr) != 0)
+			goto drop;
+		/*
+		 * Should now be looking at an un-encrypted
+		 * SMB2 message header.
+		 */
+		if (smb_mbc_peek(mbc, 0, "l", &magic) != 0)
+			goto drop;
+	}
 
 	if (magic != SMB2_PROTOCOL_MAGIC)
 		goto drop;
@@ -241,6 +254,39 @@ smb2_tq_work(void *arg)
 	smb2sr_work(sr);
 
 	smb_srqueue_runq_exit(srq);
+}
+
+static int
+smb3_decrypt_msg(smb_request_t *sr)
+{
+	int save_offset;
+
+	if (sr->session->dialect < SMB_VERS_3_0) {
+		cmn_err(CE_WARN, "encrypted message in SMB 2.x");
+		return (-1);
+	}
+
+	sr->encrypted = B_TRUE;
+	save_offset = sr->command.chain_offset;
+	if (smb3_decode_tform_header(sr) != 0) {
+		cmn_err(CE_WARN, "bad transform header");
+		return (-1);
+	}
+	sr->command.chain_offset = save_offset;
+
+	sr->tform_ssn = smb_session_lookup_ssnid(sr->session,
+	    sr->smb3_tform_ssnid);
+	if (sr->tform_ssn == NULL) {
+		cmn_err(CE_WARN, "transform header: session not found");
+		return (-1);
+	}
+
+	if (smb3_decrypt_sr(sr) != 0) {
+		cmn_err(CE_WARN, "smb3 decryption failed");
+		return (-1);
+	}
+
+	return (0);
 }
 
 /*
@@ -610,6 +656,24 @@ cmd_start:
 			 * [MS-SMB2] 3.3.5.2 Verifying the Session
 			 */
 			ASSERT(sr->uid_user == NULL);
+			/*
+			 * [MS-SMB2] 3.3.5.2.7 Handling Compounded Requests
+			 *
+			 * If this is an encrypted compound request,
+			 * ensure that the ssnid in the request
+			 * is the same as the tform ssnid if this
+			 * message is not related.
+			 *
+			 * The reasons this is done seem to apply equally
+			 * to uncompounded requests, so we apply it to all.
+			 */
+
+			if (sr->encrypted &&
+			    sr->smb2_ssnid != sr->smb3_tform_ssnid) {
+				disconnect = B_TRUE;
+				goto cleanup; /* just do this for now */
+			}
+
 			sr->uid_user = smb_session_lookup_ssnid(session,
 			    sr->smb2_ssnid);
 			if (sr->uid_user == NULL) {
@@ -617,9 +681,45 @@ cmd_start:
 				    NT_STATUS_USER_SESSION_DELETED);
 				goto cmd_done;
 			}
+
+			/*
+			 * [MS-SMB2] 3.3.5.2.9 Verifying the Session
+			 *
+			 * If we're talking 3.x,
+			 * RejectUnencryptedAccess is TRUE,
+			 * Session.EncryptData is TRUE,
+			 * and the message wasn't encrypted,
+			 * return ACCESS_DENIED.
+			 *
+			 * Note that Session.EncryptData can only be TRUE when
+			 * we're talking 3.x.
+			 */
+
+			if (sr->uid_user->u_encrypt ==
+			    SMB_CONFIG_REQUIRED &&
+			    !sr->encrypted) {
+				smb2sr_put_error(sr,
+				    NT_STATUS_ACCESS_DENIED);
+				goto cmd_done;
+			}
+
 			sr->user_cr = smb_user_getcred(sr->uid_user);
 		}
 		ASSERT(sr->uid_user != NULL);
+
+		/*
+		 * Encrypt if:
+		 * - The cmd is not SESSION_SETUP or NEGOTIATE; AND
+		 * - Session.EncryptData is TRUE
+		 *
+		 * Those commands suppress UID, so they can't be the cmd here.
+		 */
+		if (sr->uid_user->u_encrypt != SMB_CONFIG_DISABLED &&
+		    sr->tform_ssn == NULL) {
+			smb_user_hold_internal(sr->uid_user);
+			sr->tform_ssn = sr->uid_user;
+			sr->smb3_tform_ssnid = sr->smb2_ssnid;
+		}
 	}
 
 	if ((sdd->sdt_flags & SDDF_SUPPRESS_TID) == 0) {
@@ -650,8 +750,49 @@ cmd_start:
 				    NT_STATUS_NETWORK_NAME_DELETED);
 				goto cmd_done;
 			}
+
+			/*
+			 * [MS-SMB2] 3.3.5.2.11 Verifying the Tree Connect
+			 *
+			 * If we support 3.x, RejectUnencryptedAccess is TRUE,
+			 * if Tcon.EncryptData is TRUE or
+			 * global EncryptData is TRUE and
+			 * the message wasn't encrypted, or
+			 * if Tcon.EncryptData is TRUE or
+			 * global EncryptData is TRUE or
+			 * the request was encrypted and
+			 * the connection doesn't support encryption,
+			 * return ACCESS_DENIED.
+			 *
+			 * If RejectUnencryptedAccess is TRUE, we force
+			 * max_protocol to at least 3.0. Additionally,
+			 * if the tree requires encryption, we don't care
+			 * what we support, we still enforce encryption.
+			 */
+			if (sr->tid_tree->t_encrypt == SMB_CONFIG_REQUIRED &&
+			    (!sr->encrypted ||
+			    (session->srv_cap & SMB2_CAP_ENCRYPTION) == 0)) {
+				smb2sr_put_error(sr,
+				    NT_STATUS_ACCESS_DENIED);
+				goto cmd_done;
+			}
 		}
 		ASSERT(sr->tid_tree != NULL);
+
+		/*
+		 * Encrypt if:
+		 * - The cmd is not TREE_CONNECT; AND
+		 * - Tree.EncryptData is TRUE
+		 *
+		 * TREE_CONNECT suppresses TID, so that can't be the cmd here.
+		 * NOTE: assumes we can't have a tree without a user
+		 */
+		if (sr->tid_tree->t_encrypt != SMB_CONFIG_DISABLED &&
+		    sr->tform_ssn == NULL) {
+			smb_user_hold_internal(sr->uid_user);
+			sr->tform_ssn = sr->uid_user;
+			sr->smb3_tform_ssnid = sr->smb2_ssnid;
+		}
 	}
 
 	/*
@@ -673,9 +814,14 @@ cmd_start:
 	 * The SDDF_SUPPRESS_UID dispatch is set for requests that
 	 * don't need a UID (user).  These also don't require a
 	 * signature check here.
+	 *
+	 * [MS-SMB2] 3.3.5.2.4 Verifying the Signature
+	 *
+	 * If the packet was successfully decrypted, the message
+	 * signature has already been verified, so we can skip this.
 	 */
 	if ((sdd->sdt_flags & SDDF_SUPPRESS_UID) == 0 &&
-	    sr->uid_user != NULL &&
+	    !sr->encrypted && sr->uid_user != NULL &&
 	    (sr->uid_user->u_sign_flags & SMB_SIGNING_CHECK) != 0) {
 		/*
 		 * This request type should be signed, and
@@ -822,7 +968,9 @@ cmd_done:
 	 */
 	(void) smb2_encode_header(sr, B_TRUE);
 
-	if (sr->smb2_hdr_flags & SMB2_FLAGS_SIGNED)
+	/* Don't sign if we're going to encrypt */
+	if (sr->tform_ssn == NULL &&
+	    (sr->smb2_hdr_flags & SMB2_FLAGS_SIGNED) != 0)
 		smb2_sign_reply(sr);
 
 	/*
@@ -1141,6 +1289,64 @@ cleanup:
 }
 
 int
+smb3_decode_tform_header(smb_request_t *sr)
+{
+	uint16_t flags;
+	int rc;
+	uint32_t protocolid;
+
+	rc = smb_mbc_decodef(
+	    &sr->command, "l16c16cl..wq",
+	    &protocolid,	/*  l  */
+	    sr->smb2_sig,	/* 16c */
+	    sr->nonce,	/* 16c */
+	    &sr->msgsize,	/* l */
+	    /* reserved	  .. */
+	    &flags,		/* w */
+	    &sr->smb3_tform_ssnid); /* q */
+	if (rc)
+		return (rc);
+
+	ASSERT3U(protocolid, ==, SMB3_ENCRYPTED_MAGIC);
+
+	if (flags != 1) {
+#ifdef DEBUG
+		cmn_err(CE_NOTE, "flags field not 1: %x", flags);
+#endif
+		return (-1);
+	}
+
+	/*
+	 * MsgSize is the amount of data the client tell us to decrypt.
+	 * Make sure this value is not too big and not too small.
+	 */
+	if (sr->msgsize < SMB2_HDR_SIZE ||
+	    sr->msgsize > sr->session->cmd_max_bytes ||
+	    sr->msgsize > sr->command.max_bytes - SMB3_TFORM_HDR_SIZE)
+		return (-1);
+
+	return (rc);
+}
+
+int
+smb3_encode_tform_header(smb_request_t *sr, struct mbuf_chain *mbc)
+{
+	int rc;
+
+	/* Signature and Nonce are added in smb3_encrypt_sr */
+	rc = smb_mbc_encodef(
+	    mbc, "l32.lwwq",
+	    SMB3_ENCRYPTED_MAGIC, /* l */
+	    /* signature(16), nonce(16) 32. */
+	    sr->msgsize,	/* l */
+	    0, /* reserved	   w */
+	    1, /* flags		   w */
+	    sr->smb3_tform_ssnid); /* q */
+
+	return (rc);
+}
+
+int
 smb2_decode_header(smb_request_t *sr)
 {
 	uint32_t pid, tid;
@@ -1232,9 +1438,62 @@ smb2_encode_header(smb_request_t *sr, boolean_t overwrite)
 void
 smb2_send_reply(smb_request_t *sr)
 {
+	struct mbuf_chain enc_reply;
+	smb_session_t *session = sr->session;
+	void *tmpbuf;
+	size_t buflen;
+	struct mbuf_chain tmp;
 
-	if (smb_session_send(sr->session, 0, &sr->reply) == 0)
-		sr->reply.chain = 0;
+	/*
+	 * [MS-SMB2] 3.3.4.1.4 Encrypting the Message
+	 *
+	 * When the connection supports encryption and the dialect
+	 * is 3.x, encrypt if:
+	 * - The request was encrypted OR
+	 * - The cmd is not SESSION_SETUP or NEGOTIATE AND
+	 * -- Session.EncryptData is TRUE OR
+	 * -- The cmd is not TREE_CONNECT AND
+	 * --- Tree.EncryptData is TRUE
+	 *
+	 * This boils down to sr->tform_ssn != NULL, and the rest
+	 * is enforced when tform_ssn is set.
+	 */
+
+	if ((session->capabilities & SMB2_CAP_ENCRYPTION) == 0 ||
+	    sr->tform_ssn == NULL) {
+		if (smb_session_send(sr->session, 0, &sr->reply) == 0)
+			sr->reply.chain = 0;
+		return;
+	}
+
+	sr->msgsize = sr->reply.chain_offset;
+	(void) MBC_SHADOW_CHAIN(&tmp, &sr->reply,
+	    0, sr->msgsize);
+
+	buflen = SMB3_TFORM_HDR_SIZE + sr->msgsize;
+
+	/* taken from smb_request_init_command_mbuf */
+	tmpbuf = kmem_alloc(buflen, KM_SLEEP);
+	MBC_ATTACH_BUF(&enc_reply, tmpbuf, buflen);
+	enc_reply.flags = 0;
+	enc_reply.shadow_of = NULL;
+
+	if (smb3_encode_tform_header(sr, &enc_reply) != 0) {
+		cmn_err(CE_WARN, "couldn't encode transform header");
+		goto errout;
+	}
+	if (smb3_encrypt_sr(sr, &tmp, &enc_reply) != 0) {
+		cmn_err(CE_WARN, "smb3 encryption failed");
+		goto errout;
+	}
+
+	if (smb_session_send(sr->session, 0, &enc_reply) == 0)
+		enc_reply.chain = 0;
+	return;
+
+errout:
+	kmem_free(tmpbuf, buflen);
+	smb_session_disconnect(sr->session);
 }
 
 /*

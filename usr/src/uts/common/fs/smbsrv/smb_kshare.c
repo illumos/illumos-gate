@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2017 Joyent, Inc.
  */
 
@@ -849,7 +849,7 @@ smb_kshare_decode(nvlist_t *share)
 	smb_kshare_t tmp;
 	smb_kshare_t *shr;
 	nvlist_t *smb;
-	char *csc_name = NULL;
+	char *csc_name = NULL, *strbuf = NULL;
 	int rc;
 
 	ASSERT(share);
@@ -905,6 +905,9 @@ smb_kshare_decode(nvlist_t *share)
 		}
 	}
 
+	(void) nvlist_lookup_string(smb, SHOPT_ENCRYPT, &strbuf);
+	smb_cfg_set_require(strbuf, &tmp.shr_encrypt);
+
 	(void) nvlist_lookup_string(smb, SHOPT_CSC, &csc_name);
 	smb_kshare_csc_flags(&tmp, csc_name);
 
@@ -930,6 +933,7 @@ smb_kshare_decode(nvlist_t *share)
 	shr->shr_oemname = smb_kshare_oemname(shr->shr_name);
 	shr->shr_flags = tmp.shr_flags | smb_kshare_is_admin(shr->shr_name);
 	shr->shr_type = tmp.shr_type | smb_kshare_is_special(shr->shr_name);
+	shr->shr_encrypt = tmp.shr_encrypt;
 
 	shr->shr_uid = tmp.shr_uid;
 	shr->shr_gid = tmp.shr_gid;
