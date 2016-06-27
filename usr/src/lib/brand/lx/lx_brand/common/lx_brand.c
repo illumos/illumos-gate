@@ -1059,12 +1059,12 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/*  45: recvfrom */
 	NULL,				/*  46: sendmsg */
 	NULL,				/*  47: recvmsg */
-	lx_shutdown,			/*  48: shutdown */
+	NULL,				/*  48: shutdown */
 	NULL,				/*  49: bind */
-	lx_listen,			/*  50: listen */
+	NULL,				/*  50: listen */
 	NULL,				/*  51: getsockname */
 	NULL,				/*  52: getpeername */
-	lx_socketpair,			/*  53: socketpair */
+	NULL,				/*  53: socketpair */
 	NULL,				/*  54: setsockopt */
 	NULL,				/*  55: getsockopt */
 	lx_clone,			/*  56: clone */
@@ -1444,7 +1444,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_statfs,			/*  99: statfs */
 	lx_fstatfs,			/* 100: fstatfs */
 	NULL,				/* 101: ioperm */
-	lx_socketcall,			/* 102: socketcall */
+	NULL,				/* 102: socketcall */
 	lx_syslog,			/* 103: syslog */
 	lx_setitimer,			/* 104: setitimer */
 	lx_getitimer,			/* 105: getitimer */
