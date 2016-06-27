@@ -72,11 +72,6 @@ extern long lx_vhangup(void);
 extern long lx_fadvise64(uintptr_t, off64_t, uintptr_t, uintptr_t);
 extern long lx_fadvise64_64(uintptr_t, off64_t, off64_t, uintptr_t);
 
-extern long lx_socketcall(uintptr_t, uintptr_t);
-extern long lx_listen(int, int);
-extern long lx_shutdown(int, int);
-extern long lx_socketpair(int, int, int, int *);
-
 extern long lx_settimeofday(uintptr_t, uintptr_t);
 extern long lx_getrusage(uintptr_t, uintptr_t);
 extern long lx_mknod(uintptr_t, uintptr_t, uintptr_t);

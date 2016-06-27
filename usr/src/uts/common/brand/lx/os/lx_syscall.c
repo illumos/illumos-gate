@@ -1033,12 +1033,12 @@ lx_sysent_t lx_sysent64[] = {
 	{"recvfrom",	lx_recvfrom,		0,		6}, /* 45 */
 	{"sendmsg",	lx_sendmsg,		0,		3}, /* 46 */
 	{"recvmsg",	lx_recvmsg,		0,		3}, /* 47 */
-	{"shutdown",	NULL,			0,		2}, /* 48 */
+	{"shutdown",	lx_shutdown,		0,		2}, /* 48 */
 	{"bind",	lx_bind,		0,		3}, /* 49 */
-	{"listen",	NULL,			0,		2}, /* 50 */
+	{"listen",	lx_listen,		0,		2}, /* 50 */
 	{"getsockname",	lx_getsockname,		0,		3}, /* 51 */
 	{"getpeername",	lx_getpeername,		0,		3}, /* 52 */
-	{"socketpair",	NULL,			0,		4}, /* 53 */
+	{"socketpair",	lx_socketpair,		0,		4}, /* 53 */
 	{"setsockopt",	lx_setsockopt,		0,		5}, /* 54 */
 	{"getsockopt",	lx_getsockopt,		0,		5}, /* 55 */
 	{"clone",	NULL,			0,		5}, /* 56 */

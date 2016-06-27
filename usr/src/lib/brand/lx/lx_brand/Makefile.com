@@ -50,7 +50,6 @@ COBJS	=	aio.o			\
 		sched.o			\
 		sendfile.o		\
 		signal.o		\
-		socket.o		\
 		stack.o			\
 		statfs.o		\
 		sysctl.o		\
