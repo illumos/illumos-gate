@@ -38,7 +38,7 @@
 	<user_cmd>/usr/bin/getent passwd %u</user_cmd>
 
 	<install>/usr/lib/brand/lx/lx_install -z %z -R %R</install>
-	<installopts></installopts>
+	<installopts>s:</installopts>
 	<boot>/usr/lib/brand/lx/lx_boot %z %R</boot>
 	<halt>/usr/lib/brand/lx/lx_support halt %R %z</halt>
 	<verify_cfg>/usr/lib/brand/lx/lx_support verify</verify_cfg>
