@@ -72,8 +72,10 @@ dir path=usr/share/man
 dir path=usr/share/man/man3c
 dir path=usr/share/man/man5
 dir path=usr/share/man/man7fs
+driver name=inotify perms="* 0666 root sys"
 driver name=lx_ptm perms="lx_ptmajor 0666 root sys"
 driver name=lx_systrace perms="* 0644 root sys"
+driver name=lxautofs perms="lxautofs 0600 root sys"
 file path=etc/zones/SUNWlx.xml mode=0444
 file path=etc/zones/SUNWlx26.xml mode=0444
 file path=kernel/fs/$(ARCH64)/lxprocfs group=sys mode=0755
