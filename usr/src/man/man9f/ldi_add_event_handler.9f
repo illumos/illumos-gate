@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LDI_ADD_EVENT_HANDLER 9F "Aug 21, 2007"
+.TH LDI_ADD_EVENT_HANDLER 9F "April 9, 2016"
 .SH NAME
 ldi_add_event_handler \- add NDI event service callback handler
 .SH SYNOPSIS
@@ -17,11 +17,9 @@ ldi_add_event_handler \- add NDI event service callback handler
 .fi
 
 .SH INTERFACE LEVEL
-.sp
 .LP
 Obsolete
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIldi_handle_t lh\fR\fR
@@ -75,7 +73,6 @@ Registration id must be saved and used when calling
 .RE
 
 .SH DESCRIPTION
-.sp
 .LP
 This function is obsolete and is only maintained for compatibility. Use of this
 function is strongly discouraged. For equivalent functionality provided by new
@@ -84,7 +81,7 @@ interfaces, see \fBldi_ev_get_cookie\fR(9F) and
 .sp
 .LP
 The \fBldi_add_event_handler()\fR function adds a callback handler to be
-invoked at the occurance of the event specified by the cookie. Adding a
+invoked at the occurrence of the event specified by the cookie. Adding a
 callback handler is also known as subscribing to an event. Upon successful
 subscription, the handler is invoked when the event occurs. You can unregister
 the handler by using \fBldi_remove_event_handler\fR(9F).
@@ -135,7 +132,6 @@ callback function.
 .RE
 
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fBDDI_SUCCESS\fR\fR
@@ -155,12 +151,10 @@ or a bad cookie.
 .RE
 
 .SH CONTEXT
-.sp
 .LP
 The \fBldi_add_event_handler()\fR function can be called from user and kernel
 contexts only.
 .SH SEE ALSO
-.sp
 .LP
 \fBldi_ev_get_cookie\fR(9F), \fBldi_ev_register_callbacks\fR(9F),
 \fBldi_get_eventcookie\fR(9F), \fBldi_remove_event_handler\fR(9F)
@@ -168,7 +162,6 @@ contexts only.
 .LP
 \fIWriting Device Drivers\fR
 .SH NOTES
-.sp
 .LP
 Layered drivers must remove all registered callback handlers for a device
 instance, represented by the layered handle, by calling

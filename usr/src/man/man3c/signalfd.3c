@@ -165,7 +165,7 @@ the child only calls
 .Xr close 2
 on the descriptors.
 .Sh RETURN VALUES
-Upon succesful completion, a file descriptor associated with the instance
+Upon successful completion, a file descriptor associated with the instance
 is returned. Otherwise, -1 is returned and errno is set to indicate the error.
 When
 .Va fd

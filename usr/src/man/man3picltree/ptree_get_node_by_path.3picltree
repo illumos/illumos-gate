@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PTREE_GET_NODE_BY_PATH 3PICLTREE "Aug 1, 2000"
+.TH PTREE_GET_NODE_BY_PATH 3PICLTREE "April 9, 2016"
 .SH NAME
 ptree_get_node_by_path \- get handle of node specified by PICL tree path
 .SH SYNOPSIS
@@ -17,7 +17,6 @@ ptree_get_node_by_path \- get handle of node specified by PICL tree path
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBptree_get_node_by_path()\fR function copies the handle of the node in
 the PICL tree specified by the path given in \fIptreepath\fR into the location
@@ -48,7 +47,7 @@ the form of one or more pairs of property names and values such as
 .sp
 .LP
 where '@' is a shorthand notation to refer to the device address, which is
-followed by the device addres value address. The address value is matched with
+followed by the device address value address. The address value is matched with
 the value of the property "bus-addr" if it exists. If no "bus-addr" property
 exists, then it is matched with the value of the property "UnitAddress". Use
 the '?' notation to limit explicitly the comparison to "bus-addr" or
@@ -70,7 +69,6 @@ All valid paths must start at the root node denoted by '/'.
 If no prefix is specified for the path, then the prefix defaults to the "name"
 property.
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, \fB0\fR is returned. On failure, a non-negative
 integer is returned to indicate an error.
@@ -79,7 +77,6 @@ integer is returned to indicate an error.
 \fBPICL_NOTNODE\fR is returned if there is no node corresponding to the
 specified path.
 .SH ERRORS
-.sp
 .ne 2
 .na
 \fB\fBPICL_INVALIDARG\fR\fR
@@ -107,7 +104,6 @@ General system failure
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -125,6 +121,5 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBptree_get_propval_by_name\fR(3PICLTREE), \fBattributes\fR(5)

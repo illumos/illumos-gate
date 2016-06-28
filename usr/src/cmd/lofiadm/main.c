@@ -59,6 +59,8 @@
 #include <cryptoutil.h>
 #include <sys/crypto/ioctl.h>
 #include <sys/crypto/ioctladmin.h>
+#include <sys/cmlb.h>
+#include <sys/mkdev.h>
 #include "utils.h"
 #include <LzmaEnc.h>
 
@@ -68,7 +70,7 @@
 #include <blowfish/blowfish_impl.h>
 
 static const char USAGE[] =
-	"Usage: %s [-r] -a file [ device ]\n"
+	"Usage: %s [-r] [-l] -a file [ device ]\n"
 	"       %s [-r] -c crypto_algorithm -a file [device]\n"
 	"       %s [-r] -c crypto_algorithm -k raw_key_file -a file [device]\n"
 	"       %s [-r] -c crypto_algorithm -T [token]:[manuf]:[serial]:key "
@@ -218,7 +220,7 @@ static ISzAlloc g_Alloc = {
 /*ARGSUSED*/
 static int
 lzma_compress(void *src, size_t srclen, void *dst,
-	size_t *dstlen, int level)
+    size_t *dstlen, int level)
 {
 	CLzmaEncProps props;
 	size_t outsize2;
@@ -280,14 +282,30 @@ lzma_compress(void *src, size_t srclen, void *dst,
 static int
 name_to_minor(const char *devicename)
 {
-	int	minor;
+	struct stat st;
 
-	if (sscanf(devicename, "/dev/" LOFI_BLOCK_NAME "/%d", &minor) == 1) {
-		return (minor);
+	/*
+	 * If devicename does not exist, then devicename contains
+	 * the name of the device to be created.
+	 * Note we only allow non-labeled devices here.
+	 */
+	if (stat(devicename, &st)) {
+		int minor, rv;
+
+		rv = sscanf(devicename, "/dev/" LOFI_BLOCK_NAME "/%d", &minor);
+		if (rv == 1)
+			return (minor);
+		rv = sscanf(devicename, "/dev/" LOFI_CHAR_NAME "/%d", &minor);
+		if (rv == 1)
+			return (minor);
+
+		return (0);
 	}
-	if (sscanf(devicename, "/dev/" LOFI_CHAR_NAME "/%d", &minor) == 1) {
-		return (minor);
+
+	if (st.st_mode & S_IFCHR || st.st_mode & S_IFBLK) {
+		return (LOFI_MINOR2ID(minor(st.st_rdev)));
 	}
+
 	return (0);
 }
 
@@ -303,7 +321,32 @@ static int sleeptime = 2;	/* number of seconds to sleep between stat's */
 static int maxsleep = 120;	/* maximum number of seconds to sleep */
 
 static void
-wait_until_dev_complete(int minor)
+make_blkdevname(struct lofi_ioctl *li, char *path, size_t len)
+{
+	char *r1, *r2;
+	size_t l1;
+
+	if (li->li_devpath[0] == '\0') {
+		if (li->li_labeled)
+			(void) strlcpy(path, "unknown", len);
+		else
+			(void) snprintf(path, len,
+			    "/dev/" LOFI_BLOCK_NAME "/%d", li->li_id);
+		return;
+	}
+	(void) strlcpy(path, li->li_devpath, len);
+	r1 = strchr(path, 'r');
+	l1 = r1 - path;
+	r2 = strchr(li->li_devpath, 'r');
+	(void) strlcpy(r1, r2+1, len - l1);
+
+	if (li->li_labeled) {
+		(void) strlcat(path, "p0", len);
+	}
+}
+
+static void
+wait_until_dev_complete(struct lofi_ioctl *li)
 {
 	struct stat64 buf;
 	int	cursleep;
@@ -311,10 +354,12 @@ wait_until_dev_complete(int minor)
 	char	charpath[MAXPATHLEN];
 	di_devlink_handle_t hdl;
 
-	(void) snprintf(blkpath, sizeof (blkpath), "/dev/%s/%d",
-	    LOFI_BLOCK_NAME, minor);
-	(void) snprintf(charpath, sizeof (charpath), "/dev/%s/%d",
-	    LOFI_CHAR_NAME, minor);
+	make_blkdevname(li, blkpath, sizeof (blkpath));
+	(void) strlcpy(charpath, li->li_devpath, sizeof (charpath));
+
+	if (li->li_labeled) {
+		(void) strlcat(charpath, "p0", sizeof (charpath));
+	}
 
 	/* Check if links already present */
 	if (stat64(blkpath, &buf) == 0 && stat64(charpath, &buf) == 0)
@@ -352,20 +397,20 @@ out:
  * DO NOT use this function if the filename is actually the device name.
  */
 static int
-lofi_map_file(int lfd, struct lofi_ioctl li, const char *filename)
+lofi_map_file(int lfd, struct lofi_ioctl *li, const char *filename)
 {
 	int	minor;
 
-	li.li_minor = 0;
-	(void) strlcpy(li.li_filename, filename, sizeof (li.li_filename));
-	minor = ioctl(lfd, LOFI_MAP_FILE, &li);
+	li->li_id = 0;
+	(void) strlcpy(li->li_filename, filename, sizeof (li->li_filename));
+	minor = ioctl(lfd, LOFI_MAP_FILE, li);
 	if (minor == -1) {
 		if (errno == ENOTSUP)
 			warn(gettext("encrypting compressed files is "
 			    "unsupported"));
 		die(gettext("could not map file %s"), filename);
 	}
-	wait_until_dev_complete(minor);
+	wait_until_dev_complete(li);
 	return (minor);
 }
 
@@ -375,11 +420,14 @@ lofi_map_file(int lfd, struct lofi_ioctl li, const char *filename)
  */
 static void
 add_mapping(int lfd, const char *devicename, const char *filename,
-    mech_alias_t *cipher, const char *rkey, size_t rksz, boolean_t rdonly)
+    mech_alias_t *cipher, const char *rkey, size_t rksz, boolean_t rdonly,
+    boolean_t label)
 {
 	struct lofi_ioctl li;
 
+	bzero(&li, sizeof (li));
 	li.li_readonly = rdonly;
+	li.li_labeled = label;
 
 	li.li_crypto_enabled = B_FALSE;
 	if (cipher != NULL) {
@@ -409,17 +457,22 @@ add_mapping(int lfd, const char *devicename, const char *filename,
 
 	if (devicename == NULL) {
 		int	minor;
+		char	path[MAXPATHLEN];
 
 		/* pick one via the driver */
-		minor = lofi_map_file(lfd, li, filename);
-		/* if mapping succeeds, print the one picked */
-		(void) printf("/dev/%s/%d\n", LOFI_BLOCK_NAME, minor);
+		minor = lofi_map_file(lfd, &li, filename);
+		if (minor > 0) {
+			make_blkdevname(&li, path, sizeof (path));
+
+			/* if mapping succeeds, print the one picked */
+			(void) printf("%s\n", path);
+		}
 		return;
 	}
 
 	/* use device we were given */
-	li.li_minor = name_to_minor(devicename);
-	if (li.li_minor == 0) {
+	li.li_id = name_to_minor(devicename);
+	if (li.li_id == 0) {
 		die(gettext("malformed device name %s\n"), devicename);
 	}
 	(void) strlcpy(li.li_filename, filename, sizeof (li.li_filename));
@@ -432,7 +485,7 @@ add_mapping(int lfd, const char *devicename, const char *filename,
 		die(gettext("could not map file %s to %s"), filename,
 		    devicename);
 	}
-	wait_until_dev_complete(li.li_minor);
+	wait_until_dev_complete(&li);
 }
 
 /*
@@ -452,7 +505,7 @@ delete_mapping(int lfd, const char *devicename, const char *filename,
 		/* delete by filename */
 		(void) strlcpy(li.li_filename, filename,
 		    sizeof (li.li_filename));
-		li.li_minor = 0;
+		li.li_id = 0;
 		if (ioctl(lfd, LOFI_UNMAP_FILE, &li) == -1) {
 			die(gettext("could not unmap file %s"), filename);
 		}
@@ -460,8 +513,8 @@ delete_mapping(int lfd, const char *devicename, const char *filename,
 	}
 
 	/* delete by device */
-	li.li_minor = name_to_minor(devicename);
-	if (li.li_minor == 0) {
+	li.li_id = name_to_minor(devicename);
+	if (li.li_id == 0) {
 		die(gettext("malformed device name %s\n"), devicename);
 	}
 	if (ioctl(lfd, LOFI_UNMAP_FILE_MINOR, &li) == -1) {
@@ -476,22 +529,24 @@ static void
 print_one_mapping(int lfd, const char *devicename, const char *filename)
 {
 	struct lofi_ioctl li;
+	char blkpath[MAXPATHLEN];
 
 	if (devicename == NULL) {
 		/* given filename, print devicename */
-		li.li_minor = 0;
+		li.li_id = 0;
 		(void) strlcpy(li.li_filename, filename,
 		    sizeof (li.li_filename));
 		if (ioctl(lfd, LOFI_GET_MINOR, &li) == -1) {
 			die(gettext("could not find device for %s"), filename);
 		}
-		(void) printf("/dev/%s/%d\n", LOFI_BLOCK_NAME, li.li_minor);
+		make_blkdevname(&li, blkpath, sizeof (blkpath));
+		(void) printf("%s\n", blkpath);
 		return;
 	}
 
 	/* given devicename, print filename */
-	li.li_minor = name_to_minor(devicename);
-	if (li.li_minor == 0) {
+	li.li_id = name_to_minor(devicename);
+	if (li.li_id == 0) {
 		die(gettext("malformed device name %s\n"), devicename);
 	}
 	if (ioctl(lfd, LOFI_GET_FILENAME, &li) == -1) {
@@ -512,24 +567,23 @@ print_mappings(int fd)
 	char	path[MAXPATHLEN];
 	char	options[MAXPATHLEN] = { 0 };
 
-	li.li_minor = 0;
+	li.li_id = 0;
 	if (ioctl(fd, LOFI_GET_MAXMINOR, &li) == -1) {
 		die("ioctl");
 	}
-	maxminor = li.li_minor;
+	maxminor = li.li_id;
 
 	(void) printf(FORMAT, gettext("Block Device"), gettext("File"),
 	    gettext("Options"));
 	for (minor = 1; minor <= maxminor; minor++) {
-		li.li_minor = minor;
+		li.li_id = minor;
 		if (ioctl(fd, LOFI_GET_FILENAME, &li) == -1) {
 			if (errno == ENXIO)
 				continue;
 			warn("ioctl");
 			break;
 		}
-		(void) snprintf(path, sizeof (path), "/dev/%s/%d",
-		    LOFI_BLOCK_NAME, minor);
+		make_blkdevname(&li, path, sizeof (path));
 
 		options[0] = '\0';
 
@@ -544,12 +598,20 @@ print_mappings(int fd)
 			    gettext("Compressed(%s)"), li.li_algorithm);
 		if (li.li_readonly) {
 			if (strlen(options) != 0) {
-				(void) strlcat(options, ",", sizeof (options));
-				(void) strlcat(options, "Readonly",
+				(void) strlcat(options, ",Readonly",
 				    sizeof (options));
 			} else {
 				(void) snprintf(options, sizeof (options),
 				    gettext("Readonly"));
+			}
+		}
+		if (li.li_labeled) {
+			if (strlen(options) != 0) {
+				(void) strlcat(options, ",Labeled",
+				    sizeof (options));
+			} else {
+				(void) snprintf(options, sizeof (options),
+				    gettext("Labeled"));
 			}
 		}
 		if (strlen(options) == 0)
@@ -1304,7 +1366,7 @@ lofi_uncompress(int lfd, const char *filename)
 	 * already mapped.
 	 */
 	li.li_crypto_enabled = B_FALSE;
-	li.li_minor = 0;
+	li.li_id = 0;
 	(void) strlcpy(li.li_filename, filename, sizeof (li.li_filename));
 	if (ioctl(lfd, LOFI_GET_MINOR, &li) != -1)
 		die(gettext("%s must be unmapped before uncompressing"),
@@ -1316,7 +1378,7 @@ lofi_uncompress(int lfd, const char *filename)
 	if (statbuf.st_size == 0)
 		return;
 
-	minor = lofi_map_file(lfd, li, filename);
+	minor = lofi_map_file(lfd, &li, filename);
 	(void) snprintf(devicename, sizeof (devicename), "/dev/%s/%d",
 	    LOFI_BLOCK_NAME, minor);
 
@@ -1428,7 +1490,7 @@ lofi_compress(int *lfd, const char *filename, int compress_index,
 	 * Disallow compressing the file if it is
 	 * already mapped
 	 */
-	lic.li_minor = 0;
+	lic.li_id = 0;
 	(void) strlcpy(lic.li_filename, filename, sizeof (lic.li_filename));
 	if (ioctl(*lfd, LOFI_GET_MINOR, &lic) != -1)
 		die(gettext("%s must be unmapped before compressing"),
@@ -1845,13 +1907,14 @@ main(int argc, char *argv[])
 	const char *algname = COMPRESS_ALGORITHM;
 	int	openflag;
 	int	minor;
-	int 	compress_index;
+	int	compress_index;
 	uint32_t segsize = SEGSIZE;
 	static char *lofictl = "/dev/" LOFI_CTL_NAME;
 	boolean_t force = B_FALSE;
 	const char *pname;
 	boolean_t errflag = B_FALSE;
 	boolean_t addflag = B_FALSE;
+	boolean_t labelflag = B_FALSE;
 	boolean_t rdflag = B_FALSE;
 	boolean_t deleteflag = B_FALSE;
 	boolean_t ephflag = B_FALSE;
@@ -1872,7 +1935,7 @@ main(int argc, char *argv[])
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
 
-	while ((c = getopt(argc, argv, "a:c:Cd:efk:rs:T:U")) != EOF) {
+	while ((c = getopt(argc, argv, "a:c:Cd:efk:lrs:T:U")) != EOF) {
 		switch (c) {
 		case 'a':
 			addflag = B_TRUE;
@@ -1927,6 +1990,9 @@ main(int argc, char *argv[])
 			need_crypto = B_TRUE;
 			cipher_only = B_FALSE;	/* need to unset cipher_only */
 			break;
+		case 'l':
+			labelflag = B_TRUE;
+			break;
 		case 'r':
 			rdflag = B_TRUE;
 			break;
@@ -1960,9 +2026,12 @@ main(int argc, char *argv[])
 	/* Check for mutually exclusive combinations of options */
 	if (errflag ||
 	    (addflag && deleteflag) ||
+	    (labelflag && !addflag) ||
 	    (rdflag && !addflag) ||
 	    (!addflag && need_crypto) ||
-	    ((compressflag || uncompressflag) && (addflag || deleteflag)))
+	    (need_crypto && labelflag) ||
+	    ((compressflag || uncompressflag) &&
+	    (labelflag || addflag || deleteflag)))
 		usage(pname);
 
 	/* ephemeral key, and key from either file or token are incompatible */
@@ -2079,7 +2148,7 @@ main(int argc, char *argv[])
 	 */
 	if (addflag)
 		add_mapping(lfd, devicename, filename, cipher, rkey, rksz,
-		    rdflag);
+		    rdflag, labelflag);
 	else if (compressflag)
 		lofi_compress(&lfd, filename, compress_index, segsize);
 	else if (uncompressflag)

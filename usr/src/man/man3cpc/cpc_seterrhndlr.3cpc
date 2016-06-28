@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH CPC_SETERRHNDLR 3CPC "Jan 30, 2004"
+.TH CPC_SETERRHNDLR 3CPC "April 9, 2016"
 .SH NAME
 cpc_seterrhndlr \- control libcpc error reporting
 .SH SYNOPSIS
@@ -22,7 +22,6 @@ cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lcpc\fR [ \fIlibrary\fR\&.\|.
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 For the convenience of programmers instrumenting their code, several
 \fBlibcpc\fR(3LIB) functions automatically emit to \fBstderr\fR error messages
@@ -35,7 +34,7 @@ file.
 The \fBcpc_seterrhndlr()\fR function allows the caller to provide an alternate
 function for reporting errors. The type signature is shown in the SYNOPSIS. The
 \fIfn\fR argument is passed the library function name that detected the error,
-an integer subcode indicating the specific error condidtion that has occurred,
+an integer subcode indicating the specific error condition that has occurred,
 and the format string \fIfmt\fR that contains a textual description of the
 integer subcode. The format string \fIfmt\fR and argument pointer \fIap\fR can
 be passed directly to \fBvsnprintf\fR(3C) or similar \fIvarargs\fR-based
@@ -166,7 +165,6 @@ myapp_errfn(const char *fn, int subcode, const char *fmt, va_list ap)
 .in -2
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -184,7 +182,6 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBcpc_bind_curlwp\fR(3CPC), \fBlibcpc\fR(3LIB), \fBvsnprintf\fR(3C),
 \fBattributes\fR(5)

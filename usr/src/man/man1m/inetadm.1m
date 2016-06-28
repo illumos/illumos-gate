@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH INETADM 1M "Jul 5, 2007"
+.TH INETADM 1M "April 9, 2016"
 .SH NAME
 inetadm \- observe or configure inetd-controlled services
 .SH SYNOPSIS
@@ -48,7 +48,6 @@ inetadm \- observe or configure inetd-controlled services
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBinetadm\fR utility provides the following capabilities for
 \fBinetd\fR-managed SMF services:
@@ -86,7 +85,6 @@ With no arguments, \fBinetadm\fR lists all services under \fBinetd\fR(1M)
 control, including such attributes as their current run state and whether or
 not they are enabled.
 .SH OPTIONS
-.sp
 .LP
 For options taking one or more FMRI operands (see \fBsmf\fR(5) for a
 description of an FMRI), if the operand specifies a service (instead of a
@@ -94,8 +92,8 @@ service instance), and that service has only a single instance, \fBinetadm\fR
 operates on that instance.
 .sp
 .LP
-If a service name is supplied and it contains more than one instances or a
-pattern is supplied and and it matches more than one instance, a warning
+If a service name is supplied and it contains more than one instance or a
+pattern is supplied and it matches more than one instance, a warning
 message is displayed and that operand is ignored.
 .sp
 .LP
@@ -287,7 +285,6 @@ default  connection_backlog=10
 .in -2
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -319,7 +316,6 @@ Invalid arguments were supplied, such as an ambiguous service FMRI or pattern.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -335,6 +331,5 @@ Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBinetd\fR(1M), \fBsvccfg\fR(1M), \fBattributes\fR(5), \fBsmf\fR(5)

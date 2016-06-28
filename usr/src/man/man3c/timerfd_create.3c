@@ -11,7 +11,7 @@
 .\"
 .\" Copyright (c) 2015, Joyent, Inc. All Rights Reserved.
 .\"
-.Dd Feb 23, 2105
+.Dd April 9, 2016
 .Dt TIMERFD 3C
 .Os
 .Sh NAME
@@ -164,7 +164,7 @@ same functional signature and semantics as
 .Ed
 .El
 .Sh RETURN VALUES
-Upon succesful completion, a file descriptor associated with the instance
+Upon successful completion, a file descriptor associated with the instance
 is returned. Otherwise,
 .Sy -1
 is returned and errno is set to indicate the error.

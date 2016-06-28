@@ -188,10 +188,10 @@ file path=usr/sbin/editmap mode=0555
 file path=usr/sbin/etrn mode=0555
 file path=usr/sbin/makemap mode=0555
 file path=usr/share/man/man1/mailcompat.1
-file path=usr/share/man/man1/mailq.1
 file path=usr/share/man/man1/mailstats.1
 file path=usr/share/man/man1/mconnect.1
 file path=usr/share/man/man1/praliases.1
+file path=usr/share/man/man1/sendmail-mailq.1
 file path=usr/share/man/man1/vacation.1
 file path=usr/share/man/man1m/check-hostname.1m
 file path=usr/share/man/man1m/check-permissions.1m
@@ -235,6 +235,8 @@ link path=usr/sbin/newaliases mediator=mta mediator-implementation=sendmail \
     target=../lib/smtp/sendmail/newaliases
 link path=usr/sbin/sendmail mediator=mta mediator-implementation=sendmail \
     target=../lib/smtp/sendmail/sendmail
+link path=usr/share/man/man1/mailq.1 mediator=mta \
+    mediator-implementation=sendmail target=sendmail-mailq.1
 link path=usr/share/man/man4/addresses.4 target=aliases.4
 link path=usr/share/man/man4/forward.4 target=aliases.4
 link path=usr/share/man/man4/sendmail.cf.4 target=sendmail.4

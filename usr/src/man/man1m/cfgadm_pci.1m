@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH CFGADM_PCI 1M "Jun 13, 2008"
+.TH CFGADM_PCI 1M "April 9, 2016"
 .SH NAME
 cfgadm_pci \- PCI, CompactPCI, and PCI Express Hotplug hardware specific
 commands for cfgadm
@@ -39,7 +39,6 @@ commands for cfgadm
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The PCI hardware specific library, \fB/usr/lib/cfgadm/pci.so.1\fR, provides the
 support for hot plugging PCI, CompactPCI, and PCI Express adapter cards into
@@ -76,7 +75,6 @@ Note that the \fBap_type\fR is not the same as the information in the
 .LP
 See the \fI\fR for a detailed description of the hot plug procedure.
 .SS "PCI Express ap_id naming"
-.sp
 .LP
 For attachment points located in a PCI Express hierarchy (that is, the parent
 or an ancestor is a PCI Express device), including attachment points which are
@@ -117,7 +115,7 @@ is the PCI device number in standard PCI nomenclature.
 First, an \fIabsolute-slot-path\fR is constructed that attempts to describe the
 attachment point's topological location in more physically identifiable terms
 for the user . This \fIabsolute-slot-path\fR consists of \fIslot-path\fR
-components each seperated by a ":" (colon). The leaf or left-most
+components each separated by a ":" (colon). The leaf or left-most
 \fIslot-path\fR component describes the device of the attachment point itself
 while its right adjacent \fIslot-path\fR component up to the right or top-most
 \fIslot-path\fR component describes the parent up to the root devices,
@@ -254,7 +252,7 @@ Whichever final \fIap_id\fR name is used, the \fIabsolute-slot-path\fR is
 stored in the Information ("info") field which can be displayed using the
 \fB-s\fR or \fB-v\fRoptions. This information can be used to physically locate
 any \fIap_id\fRs named using "ap_id form (2)" or "ap_id form (3)". The
-\fIabsolute-slot-path\fR is tranformed slightly when stored in the information
+\fIabsolute-slot-path\fR is transformed slightly when stored in the information
 field, by the replacement of a colon (":") with forward slashes ("/") to more
 closely denote a topological context. The \fIabsolute-slot-path\fR can include
 \fIslot-path\fR components that are not hotpluggable above the leaf or
@@ -263,7 +261,6 @@ right-most \fIslot-path\fR component up to the onboard host slot.
 .LP
 See the EXAMPLES section for a list of hotpluggable examples.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -411,7 +408,7 @@ command outputs information about the attachment point. For attachment points
 located in a PCI Express hierarhcy, the Information field will contain the
 attachment point's absolute slot path location, including any hardware or
 platform specific labeling information for each component in the slot path.
-Each component in the slot path will be seperated by a "/" (foward slash). See
+Each component in the slot path will be separated by a "/" (forward slash). See
 the PCI Express ap_id naming section. For PCI Hot Plug attachment points not
 located in a PCI Express hieararchy, the \fBInformation\fR field will be the
 slot's system label, if any. This string will be obtained from the
@@ -935,7 +932,6 @@ component ".../iob.pcie2" represents a  PCI Express slot with device number 0,
 bound to driver instance 21 of "px_pci"
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB/usr/lib/cfgadm/pci.so.1\fR
@@ -946,7 +942,6 @@ Hardware specific library for PCI hot plugging.
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBcfgadm\fR(1M), \fBconfig_admin\fR(3CFGADM), \fBlibcfgadm\fR(3LIB),
 \fBattributes\fR(5)

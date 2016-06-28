@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LGRPINFO 1 "Sep 11, 2006"
+.TH LGRPINFO 1 "April 9, 2016"
 .SH NAME
 lgrpinfo \- display information about locality groups
 .SH SYNOPSIS
@@ -28,7 +28,6 @@ lgrpinfo \- display information about locality groups
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBlgrpinfo\fR prints information about the locality group (\fBlgroup\fR)
 hierarchy and its contents.
@@ -70,7 +69,6 @@ lgroup.
 lgroups can be specified on the command line as lgroup IDs or by using specific
 keywords. See \fBOPERANDS\fR.
 .SH OPTIONS
-.sp
 .LP
 You can combine options together and the order in which options are specified
 is not important. Lowercase options select what information should be printed
@@ -221,7 +219,7 @@ Print memory information.
 Memory sizes are scaled to the unit of measure that yields an integer from
 \fB0\fR to \fB1023\fR unless the \fB-u\fR option is specified as well. The
 fractional part of the number is only displayed for values less than \fB10\fR.
-This behavior is similiar to using the \fB-h\fR option of \fBls\fR(1) or
+This behavior is similar to using the \fB-h\fR option of \fBls\fR(1) or
 \fBdf\fR(1M) to display a human readable format.
 .sp
 This is the default.
@@ -287,12 +285,11 @@ is printed for the \fBroot\fR lgroup unless it is the only lgroup.
 Specify memory units. Units should be b, k, m, g, t, p, or e for bytes,
 kilobytes, megabytes, gigabytes, terabytes, petabytes, or exabytes
 respectively. The fractional part of the number is only displayed for values
-less than 10. This behavior is similiar to using the \fB-h\fR option of
+less than 10. This behavior is similar to using the \fB-h\fR option of
 \fBls\fR(1) or \fBdf\fR(1M) to display a human readable format.
 .RE
 
 .SH OPERANDS
-.sp
 .LP
 The following operands are supported:
 .sp
@@ -504,7 +501,6 @@ The following example prints information about lgroup latencies:
 .sp
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -544,7 +540,6 @@ Invalid syntax.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -563,7 +558,6 @@ Interface Stability	See below.
 .LP
 The human readable output is Unstable.
 .SH SEE ALSO
-.sp
 .LP
 \fBls\fR(1), \fBplgrp\fR(1), \fBpmap\fR(1), \fBproc\fR(1), \fBps\fR(1),
 \fBdf\fR(1M), \fBprstat\fR(1M), \fBlgrp_init\fR(3LGRP), \fBliblgrp\fR(3LIB),

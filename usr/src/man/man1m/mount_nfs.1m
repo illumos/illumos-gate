@@ -5,7 +5,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\" See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH MOUNT_NFS 1M "Mar 13, 2016"
+.TH MOUNT_NFS 1M "April 9, 2016"
 .SH NAME
 mount_nfs \- mount remote NFS resources
 .SH SYNOPSIS
@@ -286,7 +286,7 @@ the client. When a file is opened the client sends a request to the server to
 validate the client's local caches. This behavior ensures a file's consistency
 across multiple NFS clients. When \fB-nocto\fR is in effect, the client does
 not perform the flush on close and the request for validation, allowing the
-possiblity of differences among copies of the same file as stored on multiple
+possibility of differences among copies of the same file as stored on multiple
 clients.
 .sp
 This option can be used where it can be guaranteed that accesses to a specified

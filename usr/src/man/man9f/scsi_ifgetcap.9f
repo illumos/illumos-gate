@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SCSI_IFGETCAP 9F "May 24, 2014"
+.TH SCSI_IFGETCAP 9F "April 9, 2016"
 .SH NAME
 scsi_ifgetcap, scsi_ifsetcap \- get/set SCSI transport capability
 .SH SYNOPSIS
@@ -24,11 +24,9 @@ scsi_ifgetcap, scsi_ifsetcap \- get/set SCSI transport capability
 .fi
 
 .SH INTERFACE LEVEL
-.sp
 .LP
 Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIap\fR\fR
@@ -65,7 +63,6 @@ Determines if all targets or only the specified target is affected.
 .RE
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBscsi_ifsetcap()\fR function is used by target drivers to set the
 capabilities of the host adapter driver. The \fIcap\fR pointer is a name-value
@@ -238,7 +235,7 @@ If geometry is not relevant or appropriate for the target disk,
 \fBscsi_ifgetcap()\fR can return \fB-1\fR to indicate that the geometry is not
 defined. For example, if the \fBHBA\fR BIOS supports Logical Block Addressing
 for the target disk, \fBscsi_ifgetcap()\fR returns \fB-1\fR. Attempts to
-retreive the "virtual geometry" from the target driver, such as the
+retrieve the "virtual geometry" from the target driver, such as the
 \fBDKIOCG_VIRTGEOM\fR ioctl, will fail. See \fBdkio\fR(7I) for more information
 about \fBDKIOCG_VIRTGEOM\fR.
 .RE
@@ -334,7 +331,6 @@ the default value of the target driver is used for the \fBCDB\fR determination.
 .RE
 
 .SH RETURN VALUES
-.sp
 .LP
 The \fBscsi_ifsetcap()\fR function returns:
 .sp
@@ -406,11 +402,9 @@ if (scsi_ifsetcap(&devp->sd_address, "tagged-qing", 1, 1) == 1) {
 .in -2
 
 .SH CONTEXT
-.sp
 .LP
 These functions can be called from user, interrupt, or kernel context.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -426,7 +420,6 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBtran_reset\fR(9E), \fBscsi_hba_lookup_capstr\fR(9F), \fBscsi_reset\fR(9F),
 \fBscsi_reset_notify\fR(9F), \fBddi_dma_attr\fR(9S),

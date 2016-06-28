@@ -35,11 +35,17 @@ PCFLAGS64= -m64 -DPERL_EUPXS_ALWAYS_EXPORT -D_LARGEFILE64_SOURCE \
 $(MACH) $(MACH64):
 	$(INS.dir)
 
+# Sorry about this...
+# BUILD.SO doesn't have distinct versions like COMPILE.c/COMPILE64.c does.
+# To that end - we're defining BUILD64.SO here.
+BUILD64.SO=       $(CC) $(CFLAGS64) -o $@ $(GSHARED) $(DYNFLAGS) \
+                $(PICS) $(EXTPICS) -L $(ROOTLIBDIR64) $(LDLIBS)
+
 $(PERLEXT): $(MACH)/$(MODULE).o
 	$(BUILD.SO) $(MACH)/$(MODULE).o
 
 $(PERLEXT64): $(MACH64)/$(MODULE).o
-	$(BUILD.SO) -m64 $(MACH64)/$(MODULE).o
+	$(BUILD64.SO) $(MACH64)/$(MODULE).o
 
 # NOTE: With later version of Perl, we need to define PERL_EUPXS_ALWAYS_EXPORT
 # which is a backward-compatibility definition for the assumes-5.10 stuff here.
@@ -47,7 +53,7 @@ $(MACH)/$(MODULE).o: $(MACH)/$(MODULE).c
 	$(COMPILE.c) $(PCFLAGS) $(C_PICFLAGS) -I$(PERLINCDIR) $< -o $@
 
 $(MACH64)/$(MODULE).o: $(MACH64)/$(MODULE).c
-	$(COMPILE.c) $(PCFLAGS64) $(C_PICFLAGS) -I$(PERLINCDIR64) $< -o $@
+	$(COMPILE64.c) $(PCFLAGS64) $(C_PICFLAGS) -I$(PERLINCDIR64) $< -o $@
 
 $(MACH)/$(MODULE).c: $(MACH) $(MODULE).xs 
 	$(XSUBPP) $(XSUBPPFLAGS) $(MODULE).xs >$@

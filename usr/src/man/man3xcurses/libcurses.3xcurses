@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LIBCURSES 3XCURSES "May 20, 2003"
+.TH LIBCURSES 3XCURSES "April 9, 2016"
 .SH NAME
 libcurses \- X/Open Curses library
 .SH SYNOPSIS
@@ -21,13 +21,11 @@ c89 [ \fIflag\fR... ] \fIfile\fR... \fB-lcurses\fR [ \fIlibrary\fR... ]
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 Functions in this library provide a terminal-independent method of updating
 character screens with reasonable optimization, conforming to X/Open Curses,
 Issue 4, Version 2.
 .SH INTERFACES
-.sp
 .LP
 The shared object \fBlibcurses.so.2\fR provides the public interfaces defined
 below. See \fBIntro\fR(3) for additional information on shared object
@@ -232,7 +230,6 @@ l l .
 .TE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/usr/xpg4/lib/libcurses.so.1\fR\fR
@@ -273,15 +270,13 @@ shared object
 .RE
 
 .SH NOTES
-.sp
 .LP
 The \fBlibcurses.so.1\fR listed above is an earlier shared object that provides
 the previous version of the X/Open Curses library (Issue 4). There is no binary
-compatiblity between \fBlibcurses.so.1\fR and \fBlibcurses.so.2\fR. This file
-is provided for backwards compatiblity and will be removed in a future Solaris
-release. There is no plan to fix any of its defects.
+compatibility between \fBlibcurses.so.1\fR and \fBlibcurses.so.2\fR. This file
+is provided for backwards compatibility and will be removed in a future release
+of the operating system. There is no plan to fix any of its defects.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -299,7 +294,6 @@ MT-Level	Unsafe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBIntro\fR(3), \fBcurses\fR(3XCURSES), \fBlibcurses\fR(3LIB),
 \fBlibcurses\fR(3LIBUCB), \fBattributes\fR(5), \fBstandards\fR(5)

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PRINTERS.CONF 4 "Jun 2, 2006"
+.TH PRINTERS.CONF 4 "April 9, 2016"
 .SH NAME
 printers.conf \- system printing configuration database
 .SH SYNOPSIS
@@ -31,7 +31,6 @@ printers.conf \- system printing configuration database
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBprinters.conf\fR file is the system printing configuration database.
 System administrators use \fBprinters.conf\fR to describe destinations for the
@@ -46,7 +45,6 @@ checks to see if the NIS+ table (\fBprinters.org_dir\fR) exists and if it does
 not it goes ahead and creates it in the correct format. See \fBlpset\fR(1M) for
 more information.
 .SS "Entries"
-.sp
 .LP
 Each entry in \fBprinters.conf\fR describes one destination. Entries are one
 line consisting of any number of fields separated by colons (`\fB:\fR') and
@@ -76,13 +74,11 @@ NEWLINE. Use the \fBlpset\fR command to create or modify \fBprinters.conf\fR.
 See \fBlpset\fR(1M). Do \fBnot\fR make changes in \fBprinters.conf\fR by using
 an editor.
 .SS "Specifying Configuration Options"
-.sp
 .LP
 \fIkey\fR\fB=\fR\fIvalue\fR pairs are configuration options defined by the
 system administrator. \fIkey\fR and \fIvalue\fR can be of arbitrary length.
 Separate \fIkey\fR and \fIvalue\fR by the equal (`\fB='\fR) character.
 .SS "Client/Server Configuration Options"
-.sp
 .LP
 The following client/server configuration options (represented as
 \fIkey\fR\fB=\fR\fIvalue\fR pairs) are supported:
@@ -139,12 +135,12 @@ and format of the endpoint is determined by the remote print service.
 .ad
 .sp .6
 .RS 4n
-This URI form is used for print queues that are remotely accessable by way of
+This URI form is used for print queues that are remotely accessible by way of
 the BSD Print Protocol. Though limited in capability, this protocol is widely
-used between client and server. It provides maximium interoperability with
+used between client and server. It provides maximum interoperability with
 remote print services. When used to communicate with print services on a
 Solaris print server, the optional \fB#Solaris\fR component of the URI
-indicates that Solaris protcol extensions can be used during print job
+indicates that Solaris protocol extensions can be used during print job
 submission.
 .RE
 
@@ -168,7 +164,7 @@ no protocol extensions are generated. \fIserver\fR is the name of the host
 containing the queue for \fIdestination\fR. \fIdestination\fR is the atomic
 name by which the server knows the destination.  If the configuration file
 contents are to be shared with legacy systems (Solaris 2.6 - Solaris 10), this
-key/value pair should be provided for backward compatability.
+key/value pair should be provided for backward compatibility.
 .RE
 
 .sp
@@ -198,7 +194,6 @@ See \fBlpget\fR(1M), \fBlpstat\fR(1), and \fBcancel\fR(1).
 .RE
 
 .SS "LP Server Options"
-.sp
 .LP
 The following \fBLP\fR configuration options (represented as
 \fIkey\fR\fB=\fR\fIvalue\fR pairs) are supported:
@@ -216,12 +211,11 @@ print requests submitted from a different host. \fBuser-equivalence\fR is set
 to \fBfalse\fR by default. \fBfalse\fR means that usernames are not considered
 equivalent, and does not permit users cancel a print request submitted from a
 different host. If \fBuser-equivalence\fR is set to \fBfalse\fR, print requests
-can only be cancelled by the users on the host on whichs the print prequest was
+can only be cancelled by the users on the host on which the print request was
 generated or by the superuser on the print server.
 .RE
 
 .SS "Print Queue Name Resolution"
-.sp
 .LP
 Applications needing to resolve print queue names (destinations) to the
 associated print service and communications endpoint make use of a specific
@@ -230,7 +224,6 @@ unto themselves and require no further resolution.  Names in atomic form are
 resolved based on the \fBprinters\fR database entry in the /etc/nsswitch.conf
 file. See nsswitch.conf(4)
 .SS "Locating the Personal Default Destination"
-.sp
 .LP
 The default destination is located differently depending on the command.
 .sp
@@ -291,7 +284,6 @@ destination in the following order:
 \fB_default\fR destination in \fB/etc/printers.conf\fR.
 .RE
 .SS "Locating the Interest List for lpstat, lpget, and cancel"
-.sp
 .LP
 The \fBlpget\fR, \fBlpstat\fR, and \fBcancel\fR commands locate the interest
 list in the following order:
@@ -325,7 +317,7 @@ and \fBcancel\fR commands to \fBprinter1\fR, \fBprinter2\fR and \fBprinter3\fR:
 \fBExample 2 \fRSetting the Server Name
 .sp
 .LP
-The following entry sets the server name to \fBserver\fR and and printer name
+The following entry sets the server name to \fBserver\fR and printer name
 to \fBps_printer\fR for destinations \fBprinter1\fR and \fBps\fR. It does not
 generate BSD protocol extensions.
 
@@ -400,7 +392,6 @@ The following example uses IPP as the URI:
 .sp
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/printers.conf\fR\fR
@@ -446,7 +437,6 @@ LDAP version of \fB/etc/printers.conf\fR
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -462,7 +452,6 @@ Stability Level	Stable
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBcancel\fR(1), \fBenable\fR(1), \fBenable\fR(1), \fBlp\fR(1), \fBlpq\fR(1B),
 \fBlpr\fR(1B), \fBlprm\fR(1B), \fBlpstat\fR(1), \fBaccept\fR(1M),

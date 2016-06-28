@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH GETDEVPOLICY 1M "Apr 9, 2004"
+.TH GETDEVPOLICY 1M "April 9, 2016"
 .SH NAME
 getdevpolicy \- inspect the system's device policy
 .SH SYNOPSIS
@@ -13,22 +13,19 @@ getdevpolicy \- inspect the system's device policy
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 Without arguments, \fBgetdevpolicy\fR outputs the device policy in effect to
 standard output.
 .sp
 .LP
 With arguments, each argument is treated as a pathname to a device and the
-device policy in effect for that specific device is printed preceeded by the
+device policy in effect for that specific device is printed preceded by the
 supplied pathname.
 .SH USAGE
-.sp
 .LP
  The device policy adds access restrictions over and above the file
 permissions.
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -50,7 +47,6 @@ An error occurred.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -69,7 +65,6 @@ Interface Stability	See below
 .LP
 The invocation is evolving. The output is unstable.
 .SH SEE ALSO
-.sp
 .LP
 \fBadd_drv\fR(1M), \fBrem_drv\fR(1M), \fBupdate_drv\fR(1M),
 \fBattributes\fR(5), \fBprivileges\fR(5), \fBdevfs\fR(7FS)

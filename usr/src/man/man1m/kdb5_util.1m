@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH KDB5_UTIL 1M "Oct 29, 2015"
+.TH KDB5_UTIL 1M "April 9, 2016"
 .SH NAME
 kdb5_util \- Kerberos Database maintenance utility
 .SH SYNOPSIS
@@ -15,13 +15,11 @@ kdb5_util \- Kerberos Database maintenance utility
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBkdb5_util\fR utility enables you to create, dump, load, and destroy the
 Kerberos V5 database. You can also use \fBkdb5_util\fR to create a stash file
 containing the Kerberos database master key.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -162,7 +160,6 @@ Directory server connection port.
 .RE
 
 .SH OPERANDS
-.sp
 .LP
 The following operands are supported:
 .sp
@@ -311,7 +308,7 @@ be changed.
 .sp .6
 .RS 4n
 Dumps in reverse order. This might recover principals that do not dump
-normally, in cases where database corruption has occured.
+normally, in cases where database corruption has occurred.
 .RE
 
 .sp
@@ -466,7 +463,6 @@ jdb@ACME.COM pak@ACME.COM
 .sp
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/var/krb5/principal\fR\fR
@@ -509,7 +505,6 @@ The update log file for incremental propagation.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -525,7 +520,6 @@ Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBkpasswd\fR(1), \fBkadmin\fR(1M), \fBkadmind\fR(1M),
 \fBkadmin.local\fR(1M), \fBkdb5_ldap_util\fR(1M), \fBkproplog\fR(1M),

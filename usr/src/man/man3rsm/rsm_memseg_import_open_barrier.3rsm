@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH RSM_MEMSEG_IMPORT_OPEN_BARRIER 3RSM "Jun 8, 2001"
+.TH RSM_MEMSEG_IMPORT_OPEN_BARRIER 3RSM "April 9, 2016"
 .SH NAME
 rsm_memseg_import_open_barrier, rsm_memseg_import_order_barrier,
 rsm_memseg_import_close_barrier \- remote memory access error detection
@@ -28,7 +28,6 @@ cc [ \fIflag\fR... ] \fIfile\fR... -lrsm [ \fIlibrary\fR... ]
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The  \fBrsm_memseg_import_open_barrier()\fR and
 \fBrsm_memseg_import_close_barrier()\fR functions provide a means of remote
@@ -37,7 +36,7 @@ memory access error detection when the barrier mode is set to
 span-of-time interval for error detection. A successful close barrier
 guarantees that remote memory access covered between the open barrier and close
 barrier have completed successfully. Any individual failures which may have
-occured between the open barrier and close barrier occur without any
+occurred between the open barrier and close barrier occur without any
 notification and the failure is not reported until the close barrier.
 .sp
 .LP
@@ -47,12 +46,10 @@ the order barrier are all completed before the operations after the order
 barrier. Effectively, with the order barrier call, all writes within one
 barrier scope are ordered with respect to those in another barrier scope.
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, these functions return 0. Otherwise, an error value
 is returned to indicate the error.
 .SH ERRORS
-.sp
 .LP
 The \fBrsm_memseg_import_open_barrier()\fR,
 \fBrsm_memseg_import_order_barrier()\fR, and
@@ -121,7 +118,6 @@ Connection aborted.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -139,7 +135,6 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBrsm_memseg_import_init_barrier\fR(3RSM),
 \fBrsm_memseg_import_set_mode\fR(3RSM), \fBattributes\fR(5)

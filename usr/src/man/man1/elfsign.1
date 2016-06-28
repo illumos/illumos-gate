@@ -4,7 +4,7 @@
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced
 .\" with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ELFSIGN 1 "Jul 7, 2008"
+.TH ELFSIGN 1 "April 9, 2016"
 .SH NAME
 elfsign \- sign binaries
 .SH SYNOPSIS
@@ -43,7 +43,6 @@ elfsign \- sign binaries
 .fi
 
 .SH DESCRIPTION
-.sp
 .ne 2
 .na
 \fB\fBlist\fR\fR
@@ -94,7 +93,6 @@ an appropriate certificate in \fB/etc/crypto/certs\fR if \fB-c\fR is not given.
 .RE
 
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -287,11 +285,10 @@ It is an error to specify both the \fB-T\fR and \fB-k\fR options.
 .RS 4n
 Requests more detailed information. The additional output includes the signer
 and, if the signature format contains it, the time the object was signed. This
-is not stable parseable output.
+is not stable parsable output.
 .RE
 
 .SH OPERANDS
-.sp
 .LP
 The following operand is supported:
 .sp
@@ -381,7 +378,6 @@ CN=VENDOR, OU=Software Development, O=Vendor Inc.
 .sp
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -390,7 +386,7 @@ The following exit values are returned:
 .TS
 c c c
 l l l .
-VALUE	MEANING	SUB-COMMAND
+VALUE	MEANING	SUBCOMMAND
 \fB0\fR	Operation successful	sign/verify/request
 \fB1\fR	Invalid arguments	
 \fB2\fR	Failed to verify ELF object 	verify
@@ -406,7 +402,6 @@ T}	verify
 .TE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/crypto/certs\fR\fR
@@ -417,7 +412,6 @@ used
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -438,7 +432,6 @@ The \fBelfsign\fR command and subcommands are Committed. While applications
 should not depend on the output format of \fBelfsign\fR, the output format of
 the \fBlist\fR subcommand is Committed.
 .SH SEE ALSO
-.sp
 .LP
 \fBdate\fR(1), \fBpktool\fR(1), \fBcryptoadm\fR(1M), \fBlibpkcs11\fR(3LIB),
 \fBattributes\fR(5)

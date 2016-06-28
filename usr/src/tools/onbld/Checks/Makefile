@@ -25,6 +25,7 @@
 
 # Copyright 2010, Richard Lowe
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright 2016, Joyent, Inc.
 
 include $(SRC)/Makefile.master
 include ../../Makefile.tools
@@ -42,6 +43,7 @@ PYSRCS = \
 	ManLint.py	\
 	Mapfile.py	\
 	ProcessCheck.py \
+	SpellCheck.py \
 	__init__.py
 
 PYOBJS =	$(PYSRCS:%.py=%.pyc)

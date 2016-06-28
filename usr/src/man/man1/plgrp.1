@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PLGRP 1 "Sep 8, 2006"
+.TH PLGRP 1 "April 9, 2016"
 .SH NAME
 plgrp \- observe and affect home lgroup and lgroup affinities of threads
 .SH SYNOPSIS
@@ -29,7 +29,6 @@ plgrp \- observe and affect home lgroup and lgroup affinities of threads
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBplgrp\fR displays or sets the home \fBlgroup\fR and \fBlgroup\fR affinities
 for one or more processes, threads, or LWPs.
@@ -62,7 +61,6 @@ The different levels of lgroup affinities and their semantics are fully
 described in \fBlgrp_affinity_set\fR(3LGRP).
 .SH USAGE
 .SS "Specifying lgroups"
-.sp
 .LP
 \fIlgroup_list\fR is a comma separated list of one or more of the following:
 .sp
@@ -85,10 +83,9 @@ keyword represents the ID of the root \fBlgroup\fR. The \fBleaves\fR keyword
 represents the IDs of all \fBleaf\fR \fBlgroups\fR, that is, lgroups which do
 not have any children.
 .SS "Specifying Processes and Threads"
-.sp
 .LP
 \fBplgrp\fR takes one or more space separated processes or threads as
-arguments. Processes and threads can be specified in a manner similiar to the
+arguments. Processes and threads can be specified in a manner similar to the
 \fBproc\fR(1) tools. A process ID may be specified as an integer \fIpid\fR or
 \fB/proc/\fR\fIpid\fR. Shell expansions can be used to specify processes when
 \fB/proc/\fR\fIpid\fR is used. For example, \fB/proc/*\fR can be used to
@@ -102,7 +99,6 @@ selected at once by using the hyphen (\fB-\fR) and comma(\fB,\fR). For example,
 \fIpid\fR\fB/1,2,7-9\fR specifies threads 1, 2, 7, 8, and 9 of the process with
 \fIpid\fR as its process ID.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -172,7 +168,6 @@ to the \fBlgroups\fR in a round robin fashion.
 .RE
 
 .SH OPERANDS
-.sp
 .LP
 The following operands are supported:
 .sp
@@ -270,7 +265,6 @@ PID/LWPID    HOME       AFFINITY
 .sp
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -301,7 +295,6 @@ Non-fatal error or interrupt. Something might have changed.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -320,14 +313,12 @@ Interface Stability	See below.
 .LP
 The command syntax is Unstable. The output formats are Unstable.
 .SH SEE ALSO
-.sp
 .LP
 \fBlgrpinfo\fR(1), \fBmadv.so.1\fR(1), \fBpmadvise\fR(1), \fBpmap\fR(1),
 \fBproc\fR(1), \fBps\fR(1), \fBprstat\fR(1M), \fBlgrp_affinity_get\fR(3LGRP),
 \fBlgrp_affinity_set\fR(3LGRP), \fBlgrp_home\fR(3LGRP), \fBliblgrp\fR(3LIB),
 \fBproc\fR(4), \fBattributes\fR(5)
 .SH WARNINGS
-.sp
 .LP
 Like the \fBproc\fR(1) tools, the \fBplgrp\fR utility stops its target
 processes while inspecting them and reports the results when invoked with any

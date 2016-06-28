@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LDAP_MEMCACHE 3LDAP "Jan 6, 2003"
+.TH LDAP_MEMCACHE 3LDAP "April 9, 2016"
 .SH NAME
 ldap_memcache, ldap_memcache_init, ldap_memcache_set, ldap_memcache_get,
 ldap_memcache_flush, ldap_memcache_destroy, ldap_memcache_update \- LDAP client
@@ -46,7 +46,6 @@ caching functions
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 Use the \fBldap_memcache\fR functions to maintain an in-memory client side
 cache to store search requests. Caching improves performance and reduces
@@ -61,7 +60,7 @@ Make a call to \fBldap_memcache_init()\fR to create the in-memory client side
 \fIcache\fR. The function passes back a pointer to an \fBLDAPMemCache\fR
 structure, which represents the \fIcache\fR. Make a call to the
 \fBldap_memcache_set()\fR function to associate this \fIcache\fR with an LDAP
-connection handle, an LDAP structure. \fIttl\fR is the the maximum  amount of
+connection handle, an LDAP structure. \fIttl\fR is the maximum amount of
 time (in seconds) that an item can be cached. If a \fIttl\fR value  of 0 is
 passed, there is no limit to the amount of time that an item  can be cached.
 \fIsize\fR is the maximum amount of memory (in bytes) that the cache will
@@ -132,7 +131,6 @@ update the \fIcache\fR at this point in time. This function is only  useful in
 a multithreaded application, since it will not return until the \fIcache\fR is
 destroyed.
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIttl\fR\fR
@@ -215,13 +213,11 @@ The search requests that you want flushed from the \fIcache\fR
 .RE
 
 .SH ERRORS
-.sp
 .LP
 The functions that have \fBint\fR return values return \fBLDAP_SUCCESS\fR if
 the operation was successful. Otherwise, they return another LDAP error code.
 See \fBldap_error\fR(3LDAP) for a list of the LDAP error codes.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -237,7 +233,6 @@ Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBldap_error\fR(3LDAP), \fBldap_open\fR(3LDAP), \fBldap_search\fR(3LDAP),
 \fBattributes\fR(5)

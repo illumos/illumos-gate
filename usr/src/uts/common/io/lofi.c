@@ -23,6 +23,7 @@
  *
  * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2016 Andrey Sokolov
+ * Copyright 2016 Toomas Soome <tsoome@me.com>
  */
 
 /*
@@ -34,14 +35,25 @@
  * mounting images of filesystems.
  *
  * lofi is controlled through /dev/lofictl - this is the only device exported
- * during attach, and is minor number 0. lofiadm communicates with lofi through
- * ioctls on this device. When a file is attached to lofi, block and character
- * devices are exported in /dev/lofi and /dev/rlofi. Currently, these devices
- * are identified by their minor number, and the minor number is also used
- * as the name in /dev/lofi. If we ever decide to support virtual disks,
- * we'll have to divide the minor number space to identify fdisk partitions
- * and slices, and the name will then be the minor number shifted down a
- * few bits. Minor devices are tracked with state structures handled with
+ * during attach, and is instance number 0. lofiadm communicates with lofi
+ * through ioctls on this device. When a file is attached to lofi, block and
+ * character devices are exported in /dev/lofi and /dev/rlofi. These devices
+ * are identified by lofi instance number, and the instance number is also used
+ * as the name in /dev/lofi.
+ *
+ * Virtual disks, or, labeled lofi, implements virtual disk support to
+ * support partition table and related tools. Such mappings will cause
+ * block and character devices to be exported in /dev/dsk and /dev/rdsk
+ * directories.
+ *
+ * To support virtual disks, the instance number space is divided to two
+ * parts, upper part for instance number and lower part for minor number
+ * space to identify partitions and slices. The virtual disk support is
+ * implemented by stacking cmlb module. For virtual disks, the partition
+ * related ioctl calls are routed to cmlb module. Compression and encryption
+ * is not supported for virtual disks.
+ *
+ * Mapped devices are tracked with state structures handled with
  * ddi_soft_state(9F) for simplicity.
  *
  * A file attached to lofi is opened when attached and not closed until
@@ -131,6 +143,10 @@
 #include <sys/crypto/common.h>
 #include <sys/crypto/api.h>
 #include <sys/rctl.h>
+#include <sys/vtoc.h>
+#include <sys/scsi/scsi.h>	/* for DTYPE_DIRECT */
+#include <sys/scsi/impl/uscsi.h>
+#include <sys/sysevent/dev.h>
 #include <LzmaDec.h>
 
 #define	NBLOCKS_PROP_NAME	"Nblocks"
@@ -151,10 +167,16 @@
 		return (EINVAL); \
 	}
 
-static dev_info_t *lofi_dip = NULL;
-static void *lofi_statep = NULL;
+#define	DEVFS_CHANNEL	"devfsadm_event_channel"
+#define	LOFI_TIMEOUT	30
+static evchan_t *lofi_chan;
+static kmutex_t lofi_chan_lock;
+static kcondvar_t lofi_chan_cv;
+static nvlist_t *lofi_devlink_cache;
+
+static void *lofi_statep;
 static kmutex_t lofi_lock;		/* state lock */
-static id_space_t *lofi_minor_id;
+static id_space_t *lofi_id;		/* lofi ID values */
 static list_t lofi_list;
 static zone_key_t lofi_zone_key;
 
@@ -204,6 +226,17 @@ lofi_compress_info_t lofi_compress_table[LOFI_COMPRESS_FUNCTIONS] = {
 	{lzma_decompress,	NULL,	0,	"lzma"}
 };
 
+static void lofi_strategy_task(void *);
+static int lofi_tg_rdwr(dev_info_t *, uchar_t, void *, diskaddr_t,
+    size_t, void *);
+static int lofi_tg_getinfo(dev_info_t *, int, void *, void *);
+
+struct cmlb_tg_ops lofi_tg_ops = {
+	TG_DK_OPS_VERSION_1,
+	lofi_tg_rdwr,
+	lofi_tg_getinfo
+};
+
 /*ARGSUSED*/
 static void
 *SzAlloc(void *p, size_t size)
@@ -240,47 +273,24 @@ lofi_free_comp_cache(struct lofi_state *lsp)
 static int
 is_opened(struct lofi_state *lsp)
 {
-	ASSERT(MUTEX_HELD(&lofi_lock));
-	return (lsp->ls_chr_open || lsp->ls_blk_open || lsp->ls_lyr_open_count);
-}
+	int i;
+	boolean_t last = B_TRUE;
 
-static int
-mark_opened(struct lofi_state *lsp, int otyp)
-{
 	ASSERT(MUTEX_HELD(&lofi_lock));
-	switch (otyp) {
-	case OTYP_CHR:
-		lsp->ls_chr_open = 1;
-		break;
-	case OTYP_BLK:
-		lsp->ls_blk_open = 1;
-		break;
-	case OTYP_LYR:
-		lsp->ls_lyr_open_count++;
-		break;
-	default:
-		return (-1);
+	for (i = 0; i < LOFI_PART_MAX; i++) {
+		if (lsp->ls_open_lyr[i]) {
+			last = B_FALSE;
+			break;
+		}
 	}
-	return (0);
-}
 
-static void
-mark_closed(struct lofi_state *lsp, int otyp)
-{
-	ASSERT(MUTEX_HELD(&lofi_lock));
-	switch (otyp) {
-	case OTYP_CHR:
-		lsp->ls_chr_open = 0;
-		break;
-	case OTYP_BLK:
-		lsp->ls_blk_open = 0;
-		break;
-	case OTYP_LYR:
-		lsp->ls_lyr_open_count--;
-		break;
-	default:
-		break;
+	for (i = 0; last && (i < OTYP_LYR); i++) {
+		if (lsp->ls_open_reg[i]) {
+			last = B_FALSE;
+		}
 	}
+
+	return (!last);
 }
 
 static void
@@ -320,10 +330,171 @@ lofi_free_crypto(struct lofi_state *lsp)
 	}
 }
 
+/* ARGSUSED */
+static int
+lofi_tg_rdwr(dev_info_t *dip, uchar_t cmd, void *bufaddr, diskaddr_t start,
+    size_t length, void *tg_cookie)
+{
+	struct lofi_state *lsp;
+	buf_t	*bp;
+	int	instance;
+	int	rv = 0;
+
+	instance = ddi_get_instance(dip);
+	if (instance == 0)	/* control node does not have disk */
+		return (ENXIO);
+
+	lsp = ddi_get_soft_state(lofi_statep, instance);
+
+	if (lsp == NULL)
+		return (ENXIO);
+
+	if (cmd != TG_READ && cmd != TG_WRITE)
+		return (EINVAL);
+
+	/*
+	 * Make sure the mapping is set up by checking lsp->ls_vp_ready.
+	 */
+	mutex_enter(&lsp->ls_vp_lock);
+	while (lsp->ls_vp_ready == B_FALSE)
+		cv_wait(&lsp->ls_vp_cv, &lsp->ls_vp_lock);
+	mutex_exit(&lsp->ls_vp_lock);
+
+	if (P2PHASE(length, (1U << lsp->ls_lbshift)) != 0) {
+		/* We can only transfer whole blocks at a time! */
+		return (EINVAL);
+	}
+
+	bp = getrbuf(KM_SLEEP);
+
+	if (cmd == TG_READ) {
+		bp->b_flags = B_READ;
+	} else {
+		if (lsp->ls_readonly == B_TRUE) {
+			freerbuf(bp);
+			return (EROFS);
+		}
+		bp->b_flags = B_WRITE;
+	}
+
+	bp->b_un.b_addr = bufaddr;
+	bp->b_bcount = length;
+	bp->b_lblkno = start;
+	bp->b_private = NULL;
+	bp->b_edev = lsp->ls_dev;
+
+	if (lsp->ls_kstat) {
+		mutex_enter(lsp->ls_kstat->ks_lock);
+		kstat_waitq_enter(KSTAT_IO_PTR(lsp->ls_kstat));
+		mutex_exit(lsp->ls_kstat->ks_lock);
+	}
+	(void) taskq_dispatch(lsp->ls_taskq, lofi_strategy_task, bp, KM_SLEEP);
+	(void) biowait(bp);
+
+	rv = geterror(bp);
+	freerbuf(bp);
+	return (rv);
+}
+
+/*
+ * Get device geometry info for cmlb.
+ *
+ * We have mapped disk image as virtual block device and have to report
+ * physical/virtual geometry to cmlb.
+ *
+ * So we have two principal cases:
+ * 1. Uninitialised image without any existing labels,
+ *    for this case we fabricate the data based on mapped image.
+ * 2. Image with existing label information.
+ *    Since we have no information how the image was created (it may be
+ *    dump from some physical device), we need to rely on label information
+ *    from image, or we get "corrupted label" errors.
+ *    NOTE: label can be MBR, MBR+SMI, GPT
+ */
+static int
+lofi_tg_getinfo(dev_info_t *dip, int cmd, void *arg, void *tg_cookie)
+{
+	struct lofi_state *lsp;
+	int instance;
+	int ashift;
+
+	_NOTE(ARGUNUSED(tg_cookie));
+	instance = ddi_get_instance(dip);
+	if (instance == 0)		/* control device has no storage */
+		return (ENXIO);
+
+	lsp = ddi_get_soft_state(lofi_statep, instance);
+
+	if (lsp == NULL)
+		return (ENXIO);
+
+	/*
+	 * Make sure the mapping is set up by checking lsp->ls_vp_ready.
+	 *
+	 * When mapping is created, new lofi instance is created and
+	 * lofi_attach() will call cmlb_attach() as part of the procedure
+	 * to set the mapping up. This chain of events will happen in
+	 * the same thread.
+	 * Since cmlb_attach() will call lofi_tg_getinfo to get
+	 * capacity, we return error on that call if cookie is set,
+	 * otherwise lofi_attach will be stuck as the mapping is not yet
+	 * finalized and lofi is not yet ready.
+	 * Note, such error is not fatal for cmlb, as the label setup
+	 * will be finalized when cmlb_validate() is called.
+	 */
+	mutex_enter(&lsp->ls_vp_lock);
+	if (tg_cookie != NULL && lsp->ls_vp_ready == B_FALSE) {
+		mutex_exit(&lsp->ls_vp_lock);
+		return (ENXIO);
+	}
+	while (lsp->ls_vp_ready == B_FALSE)
+		cv_wait(&lsp->ls_vp_cv, &lsp->ls_vp_lock);
+	mutex_exit(&lsp->ls_vp_lock);
+
+	ashift = lsp->ls_lbshift;
+
+	switch (cmd) {
+	case TG_GETPHYGEOM: {
+		cmlb_geom_t *geomp = arg;
+
+		geomp->g_capacity	=
+		    (lsp->ls_vp_size - lsp->ls_crypto_offset) >> ashift;
+		geomp->g_nsect		= lsp->ls_dkg.dkg_nsect;
+		geomp->g_nhead		= lsp->ls_dkg.dkg_nhead;
+		geomp->g_acyl		= lsp->ls_dkg.dkg_acyl;
+		geomp->g_ncyl		= lsp->ls_dkg.dkg_ncyl;
+		geomp->g_secsize	= (1U << ashift);
+		geomp->g_intrlv		= lsp->ls_dkg.dkg_intrlv;
+		geomp->g_rpm		= lsp->ls_dkg.dkg_rpm;
+		return (0);
+	}
+
+	case TG_GETCAPACITY:
+		*(diskaddr_t *)arg =
+		    (lsp->ls_vp_size - lsp->ls_crypto_offset) >> ashift;
+		return (0);
+
+	case TG_GETBLOCKSIZE:
+		*(uint32_t *)arg = (1U << ashift);
+		return (0);
+
+	case TG_GETATTR: {
+		tg_attribute_t *tgattr = arg;
+
+		tgattr->media_is_writable = !lsp->ls_readonly;
+		tgattr->media_is_solid_state = B_FALSE;
+		return (0);
+	}
+
+	default:
+		return (EINVAL);
+	}
+}
+
 static void
 lofi_destroy(struct lofi_state *lsp, cred_t *credp)
 {
-	minor_t minor = getminor(lsp->ls_dev);
+	int id = LOFI_MINOR2ID(getminor(lsp->ls_dev));
 	int i;
 
 	ASSERT(MUTEX_HELD(&lofi_lock));
@@ -345,13 +516,17 @@ lofi_destroy(struct lofi_state *lsp, cred_t *credp)
 		    sizeof (struct compbuf) * lofi_taskq_nthreads);
 	}
 
-	(void) VOP_CLOSE(lsp->ls_vp, lsp->ls_openflag,
-	    1, 0, credp, NULL);
-	VN_RELE(lsp->ls_vp);
+	if (lsp->ls_vp != NULL) {
+		(void) VOP_PUTPAGE(lsp->ls_vp, 0, 0, B_INVAL, credp, NULL);
+		(void) VOP_CLOSE(lsp->ls_vp, lsp->ls_openflag,
+		    1, 0, credp, NULL);
+		VN_RELE(lsp->ls_vp);
+	}
 	if (lsp->ls_stacked_vp != lsp->ls_vp)
 		VN_RELE(lsp->ls_stacked_vp);
 
-	taskq_destroy(lsp->ls_taskq);
+	if (lsp->ls_taskq != NULL)
+		taskq_destroy(lsp->ls_taskq);
 
 	if (lsp->ls_kstat != NULL)
 		kstat_delete(lsp->ls_kstat);
@@ -374,28 +549,27 @@ lofi_destroy(struct lofi_state *lsp, cred_t *credp)
 	mutex_destroy(&lsp->ls_comp_bufs_lock);
 	mutex_destroy(&lsp->ls_kstat_lock);
 	mutex_destroy(&lsp->ls_vp_lock);
+	cv_destroy(&lsp->ls_vp_cv);
+	lsp->ls_vp_ready = B_FALSE;
 
-	ASSERT(ddi_get_soft_state(lofi_statep, minor) == lsp);
-	ddi_soft_state_free(lofi_statep, minor);
-	id_free(lofi_minor_id, minor);
+	ASSERT(ddi_get_soft_state(lofi_statep, id) == lsp);
+	(void) ndi_devi_offline(lsp->ls_dip, NDI_DEVI_REMOVE);
+	id_free(lofi_id, id);
 }
 
 static void
-lofi_free_dev(dev_t dev)
+lofi_free_dev(struct lofi_state *lsp)
 {
-	minor_t minor = getminor(dev);
-	char namebuf[50];
-
 	ASSERT(MUTEX_HELD(&lofi_lock));
 
-	(void) ddi_prop_remove(dev, lofi_dip, ZONE_PROP_NAME);
-	(void) ddi_prop_remove(dev, lofi_dip, SIZE_PROP_NAME);
-	(void) ddi_prop_remove(dev, lofi_dip, NBLOCKS_PROP_NAME);
-
-	(void) snprintf(namebuf, sizeof (namebuf), "%d", minor);
-	ddi_remove_minor_node(lofi_dip, namebuf);
-	(void) snprintf(namebuf, sizeof (namebuf), "%d,raw", minor);
-	ddi_remove_minor_node(lofi_dip, namebuf);
+	if (lsp->ls_cmlbhandle != NULL) {
+		cmlb_invalidate(lsp->ls_cmlbhandle, 0);
+		cmlb_detach(lsp->ls_cmlbhandle, 0);
+		cmlb_free_handle(&lsp->ls_cmlbhandle);
+		lsp->ls_cmlbhandle = NULL;
+	}
+	(void) ddi_prop_remove_all(lsp->ls_dip);
+	ddi_remove_minor_node(lsp->ls_dip, NULL);
 }
 
 /*ARGSUSED*/
@@ -424,7 +598,7 @@ lofi_zone_shutdown(zoneid_t zoneid, void *arg)
 		if (is_opened(lsp)) {
 			lsp->ls_cleanup = 1;
 		} else {
-			lofi_free_dev(lsp->ls_dev);
+			lofi_free_dev(lsp);
 			lofi_destroy(lsp, kcred);
 		}
 	}
@@ -436,8 +610,19 @@ lofi_zone_shutdown(zoneid_t zoneid, void *arg)
 static int
 lofi_open(dev_t *devp, int flag, int otyp, struct cred *credp)
 {
-	minor_t	minor;
+	int id;
+	minor_t	part;
+	uint64_t mask;
+	diskaddr_t nblks;
+	diskaddr_t lba;
+	boolean_t ndelay;
+
 	struct lofi_state *lsp;
+
+	if (otyp >= OTYPCNT)
+		return (EINVAL);
+
+	ndelay = (flag & (FNDELAY | FNONBLOCK)) ? B_TRUE : B_FALSE;
 
 	/*
 	 * lofiadm -a /dev/lofi/1 gets us here.
@@ -447,16 +632,18 @@ lofi_open(dev_t *devp, int flag, int otyp, struct cred *credp)
 
 	mutex_enter(&lofi_lock);
 
-	minor = getminor(*devp);
+	id = LOFI_MINOR2ID(getminor(*devp));
+	part = LOFI_PART(getminor(*devp));
+	mask = (1U << part);
 
 	/* master control device */
-	if (minor == 0) {
+	if (id == 0) {
 		mutex_exit(&lofi_lock);
 		return (0);
 	}
 
 	/* otherwise, the mapping should already exist */
-	lsp = ddi_get_soft_state(lofi_statep, minor);
+	lsp = ddi_get_soft_state(lofi_statep, id);
 	if (lsp == NULL) {
 		mutex_exit(&lofi_lock);
 		return (EINVAL);
@@ -472,9 +659,53 @@ lofi_open(dev_t *devp, int flag, int otyp, struct cred *credp)
 		return (EROFS);
 	}
 
-	if (mark_opened(lsp, otyp) == -1) {
+	if ((lsp->ls_open_excl) & (mask)) {
 		mutex_exit(&lofi_lock);
-		return (EINVAL);
+		return (EBUSY);
+	}
+
+	if (flag & FEXCL) {
+		if (lsp->ls_open_lyr[part]) {
+			mutex_exit(&lofi_lock);
+			return (EBUSY);
+		}
+		for (int i = 0; i < OTYP_LYR; i++) {
+			if (lsp->ls_open_reg[i] & mask) {
+				mutex_exit(&lofi_lock);
+				return (EBUSY);
+			}
+		}
+	}
+
+	if (lsp->ls_cmlbhandle != NULL) {
+		if (cmlb_validate(lsp->ls_cmlbhandle, 0, 0) != 0) {
+			/*
+			 * non-blocking opens are allowed to succeed to
+			 * support format and fdisk to create partitioning.
+			 */
+			if (!ndelay) {
+				mutex_exit(&lofi_lock);
+				return (ENXIO);
+			}
+		} else if (cmlb_partinfo(lsp->ls_cmlbhandle, part, &nblks, &lba,
+		    NULL, NULL, 0) == 0) {
+			if ((!nblks) && ((!ndelay) || (otyp != OTYP_CHR))) {
+				mutex_exit(&lofi_lock);
+				return (ENXIO);
+			}
+		} else if (!ndelay) {
+			mutex_exit(&lofi_lock);
+			return (ENXIO);
+		}
+	}
+
+	if (otyp == OTYP_LYR) {
+		lsp->ls_open_lyr[part]++;
+	} else {
+		lsp->ls_open_reg[otyp] |= mask;
+	}
+	if (flag & FEXCL) {
+		lsp->ls_open_excl |= mask;
 	}
 
 	mutex_exit(&lofi_lock);
@@ -485,23 +716,35 @@ lofi_open(dev_t *devp, int flag, int otyp, struct cred *credp)
 static int
 lofi_close(dev_t dev, int flag, int otyp, struct cred *credp)
 {
-	minor_t	minor;
+	minor_t	part;
+	int id;
+	uint64_t mask;
 	struct lofi_state *lsp;
 
+	id = LOFI_MINOR2ID(getminor(dev));
+	part = LOFI_PART(getminor(dev));
+	mask = (1U << part);
+
 	mutex_enter(&lofi_lock);
-	minor = getminor(dev);
-	lsp = ddi_get_soft_state(lofi_statep, minor);
+	lsp = ddi_get_soft_state(lofi_statep, id);
 	if (lsp == NULL) {
 		mutex_exit(&lofi_lock);
 		return (EINVAL);
 	}
 
-	if (minor == 0) {
+	if (id == 0) {
 		mutex_exit(&lofi_lock);
 		return (0);
 	}
 
-	mark_closed(lsp, otyp);
+	if (lsp->ls_open_excl & mask)
+		lsp->ls_open_excl &= ~mask;
+
+	if (otyp == OTYP_LYR) {
+		lsp->ls_open_lyr[part]--;
+	} else {
+		lsp->ls_open_reg[otyp] &= ~mask;
+	}
 
 	/*
 	 * If we forcibly closed the underlying device (li_force), or
@@ -509,7 +752,7 @@ lofi_close(dev_t dev, int flag, int otyp, struct cred *credp)
 	 * out of the door.
 	 */
 	if (!is_opened(lsp) && (lsp->ls_cleanup || lsp->ls_vp == NULL)) {
-		lofi_free_dev(lsp->ls_dev);
+		lofi_free_dev(lsp);
 		lofi_destroy(lsp, credp);
 	}
 
@@ -970,7 +1213,7 @@ gzip_decompress(void *src, size_t srclen, void *dst,
 /*ARGSUSED*/
 static int
 lzma_decompress(void *src, size_t srclen, void *dst,
-	size_t *dstlen, int level)
+    size_t *dstlen, int level)
 {
 	size_t insizepure;
 	void *actual_src;
@@ -1005,7 +1248,9 @@ lofi_strategy_task(void *arg)
 	size_t	xfersize;
 	boolean_t bufinited = B_FALSE;
 
-	lsp = ddi_get_soft_state(lofi_statep, getminor(bp->b_edev));
+	lsp = ddi_get_soft_state(lofi_statep,
+	    LOFI_MINOR2ID(getminor(bp->b_edev)));
+
 	if (lsp == NULL) {
 		error = ENXIO;
 		goto errout;
@@ -1015,9 +1260,15 @@ lofi_strategy_task(void *arg)
 		kstat_waitq_to_runq(KSTAT_IO_PTR(lsp->ls_kstat));
 		mutex_exit(lsp->ls_kstat->ks_lock);
 	}
+
+	mutex_enter(&lsp->ls_vp_lock);
+	lsp->ls_vp_iocount++;
+	mutex_exit(&lsp->ls_vp_lock);
+
 	bp_mapin(bp);
 	bufaddr = bp->b_un.b_addr;
-	offset = bp->b_lblkno * DEV_BSIZE;	/* offset within file */
+	offset = (bp->b_lblkno + (diskaddr_t)(uintptr_t)bp->b_private)
+	    << lsp->ls_lbshift;	/* offset within file */
 	if (lsp->ls_crypto_enabled) {
 		/* encrypted data really begins after crypto header */
 		offset += lsp->ls_crypto_offset;
@@ -1345,6 +1596,10 @@ lofi_strategy(struct buf *bp)
 {
 	struct lofi_state *lsp;
 	offset_t	offset;
+	minor_t		part;
+	diskaddr_t	p_lba;
+	diskaddr_t	p_nblks;
+	int		shift;
 
 	/*
 	 * We cannot just do I/O here, because the current thread
@@ -1357,12 +1612,38 @@ lofi_strategy(struct buf *bp)
 	 * do the I/O asynchronously, or we could use task queues. task
 	 * queues were incredibly easy so they win.
 	 */
-	lsp = ddi_get_soft_state(lofi_statep, getminor(bp->b_edev));
+
+	lsp = ddi_get_soft_state(lofi_statep,
+	    LOFI_MINOR2ID(getminor(bp->b_edev)));
+	part = LOFI_PART(getminor(bp->b_edev));
+
 	if (lsp == NULL) {
 		bioerror(bp, ENXIO);
 		biodone(bp);
 		return (0);
 	}
+	shift = lsp->ls_lbshift;
+
+	p_lba = 0;
+	p_nblks = lsp->ls_vp_size >> shift;
+
+	if (lsp->ls_cmlbhandle != NULL) {
+		if (cmlb_partinfo(lsp->ls_cmlbhandle, part, &p_nblks, &p_lba,
+		    NULL, NULL, 0)) {
+			bioerror(bp, ENXIO);
+			biodone(bp);
+			return (0);
+		}
+	}
+
+	/* start block past partition end? */
+	if (bp->b_lblkno > p_nblks) {
+		bioerror(bp, ENXIO);
+		biodone(bp);
+		return (0);
+	}
+
+	offset = (bp->b_lblkno+p_lba) << shift;	/* offset within file */
 
 	mutex_enter(&lsp->ls_vp_lock);
 	if (lsp->ls_vp == NULL || lsp->ls_vp_closereq) {
@@ -1372,12 +1653,14 @@ lofi_strategy(struct buf *bp)
 		return (0);
 	}
 
-	offset = bp->b_lblkno * DEV_BSIZE;	/* offset within file */
 	if (lsp->ls_crypto_enabled) {
 		/* encrypted data really begins after crypto header */
 		offset += lsp->ls_crypto_offset;
 	}
-	if (offset == lsp->ls_vp_size) {
+
+	/* make sure we will not pass the file or partition size */
+	if (offset == lsp->ls_vp_size ||
+	    offset == (((p_lba + p_nblks) << shift) + lsp->ls_crypto_offset)) {
 		/* EOF */
 		if ((bp->b_flags & B_READ) != 0) {
 			bp->b_resid = bp->b_bcount;
@@ -1390,13 +1673,15 @@ lofi_strategy(struct buf *bp)
 		mutex_exit(&lsp->ls_vp_lock);
 		return (0);
 	}
-	if (offset > lsp->ls_vp_size) {
+	if ((offset > lsp->ls_vp_size) ||
+	    (offset > (((p_lba + p_nblks) << shift) + lsp->ls_crypto_offset)) ||
+	    ((offset + bp->b_bcount) > ((p_lba + p_nblks) << shift))) {
 		bioerror(bp, ENXIO);
 		biodone(bp);
 		mutex_exit(&lsp->ls_vp_lock);
 		return (0);
 	}
-	lsp->ls_vp_iocount++;
+
 	mutex_exit(&lsp->ls_vp_lock);
 
 	if (lsp->ls_kstat) {
@@ -1404,6 +1689,7 @@ lofi_strategy(struct buf *bp)
 		kstat_waitq_enter(KSTAT_IO_PTR(lsp->ls_kstat));
 		mutex_exit(lsp->ls_kstat->ks_lock);
 	}
+	bp->b_private = (void *)(uintptr_t)p_lba;	/* partition start */
 	(void) taskq_dispatch(lsp->ls_taskq, lofi_strategy_task, bp, KM_SLEEP);
 	return (0);
 }
@@ -1452,54 +1738,269 @@ lofi_awrite(dev_t dev, struct aio_req *aio, struct cred *credp)
 static int
 lofi_info(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg, void **result)
 {
+	struct lofi_state *lsp;
+	dev_t	dev = (dev_t)arg;
+	int instance;
+
+	instance = LOFI_MINOR2ID(getminor(dev));
 	switch (infocmd) {
 	case DDI_INFO_DEVT2DEVINFO:
-		*result = lofi_dip;
+		lsp = ddi_get_soft_state(lofi_statep, instance);
+		if (lsp == NULL)
+			return (DDI_FAILURE);
+		*result = lsp->ls_dip;
 		return (DDI_SUCCESS);
 	case DDI_INFO_DEVT2INSTANCE:
-		*result = 0;
+		*result = (void *) (intptr_t)instance;
 		return (DDI_SUCCESS);
 	}
 	return (DDI_FAILURE);
 }
 
 static int
+lofi_create_minor_nodes(struct lofi_state *lsp, boolean_t labeled)
+{
+	int error = 0;
+	int instance = ddi_get_instance(lsp->ls_dip);
+
+	if (labeled == B_TRUE) {
+		cmlb_alloc_handle(&lsp->ls_cmlbhandle);
+		error = cmlb_attach(lsp->ls_dip, &lofi_tg_ops, DTYPE_DIRECT,
+		    B_FALSE, B_FALSE, DDI_NT_BLOCK_CHAN,
+		    CMLB_CREATE_P0_MINOR_NODE, lsp->ls_cmlbhandle, (void *)1);
+
+		if (error != DDI_SUCCESS) {
+			cmlb_free_handle(&lsp->ls_cmlbhandle);
+			lsp->ls_cmlbhandle = NULL;
+			error = ENXIO;
+		}
+	} else {
+		/* create minor nodes */
+		error = ddi_create_minor_node(lsp->ls_dip, LOFI_BLOCK_NODE,
+		    S_IFBLK, LOFI_ID2MINOR(instance), DDI_PSEUDO, 0);
+		if (error == DDI_SUCCESS) {
+			error = ddi_create_minor_node(lsp->ls_dip,
+			    LOFI_CHAR_NODE, S_IFCHR, LOFI_ID2MINOR(instance),
+			    DDI_PSEUDO, 0);
+			if (error != DDI_SUCCESS) {
+				ddi_remove_minor_node(lsp->ls_dip,
+				    LOFI_BLOCK_NODE);
+				error = ENXIO;
+			}
+		} else
+			error = ENXIO;
+	}
+	return (error);
+}
+
+static int
+lofi_zone_bind(struct lofi_state *lsp)
+{
+	int error = 0;
+
+	mutex_enter(&curproc->p_lock);
+	if ((error = rctl_incr_lofi(curproc, curproc->p_zone, 1)) != 0) {
+		mutex_exit(&curproc->p_lock);
+		return (error);
+	}
+	mutex_exit(&curproc->p_lock);
+
+	if (ddi_prop_update_string(lsp->ls_dev, lsp->ls_dip, ZONE_PROP_NAME,
+	    (char *)curproc->p_zone->zone_name) != DDI_PROP_SUCCESS) {
+		rctl_decr_lofi(curproc->p_zone, 1);
+		error = EINVAL;
+	} else {
+		zone_init_ref(&lsp->ls_zone);
+		zone_hold_ref(curzone, &lsp->ls_zone, ZONE_REF_LOFI);
+	}
+	return (error);
+}
+
+static void
+lofi_zone_unbind(struct lofi_state *lsp)
+{
+	(void) ddi_prop_remove(DDI_DEV_T_NONE, lsp->ls_dip, ZONE_PROP_NAME);
+	rctl_decr_lofi(curproc->p_zone, 1);
+	zone_rele_ref(&lsp->ls_zone, ZONE_REF_LOFI);
+}
+
+static int
+lofi_online_dev(dev_info_t *dip)
+{
+	boolean_t labeled;
+	int	error;
+	int	instance = ddi_get_instance(dip);
+	struct lofi_state *lsp;
+
+	labeled = B_FALSE;
+	if (ddi_prop_exists(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS, "labeled"))
+		labeled = B_TRUE;
+
+	/* lsp alloc+init, soft state is freed in lofi_detach */
+	error = ddi_soft_state_zalloc(lofi_statep, instance);
+	if (error == DDI_FAILURE) {
+		return (ENOMEM);
+	}
+
+	lsp = ddi_get_soft_state(lofi_statep, instance);
+	lsp->ls_dip = dip;
+
+	if ((error = lofi_zone_bind(lsp)) != 0)
+		goto err;
+
+	cv_init(&lsp->ls_vp_cv, NULL, CV_DRIVER, NULL);
+	mutex_init(&lsp->ls_comp_cache_lock, NULL, MUTEX_DRIVER, NULL);
+	mutex_init(&lsp->ls_comp_bufs_lock, NULL, MUTEX_DRIVER, NULL);
+	mutex_init(&lsp->ls_kstat_lock, NULL, MUTEX_DRIVER, NULL);
+	mutex_init(&lsp->ls_vp_lock, NULL, MUTEX_DRIVER, NULL);
+
+	if ((error = lofi_create_minor_nodes(lsp, labeled)) != 0) {
+		lofi_zone_unbind(lsp);
+		goto lerr;
+	}
+
+	/* driver handles kernel-issued IOCTLs */
+	if (ddi_prop_create(DDI_DEV_T_NONE, dip, DDI_PROP_CANSLEEP,
+	    DDI_KERNEL_IOCTL, NULL, 0) != DDI_PROP_SUCCESS) {
+		error = DDI_FAILURE;
+		goto merr;
+	}
+
+	lsp->ls_kstat = kstat_create_zone(LOFI_DRIVER_NAME, instance,
+	    NULL, "disk", KSTAT_TYPE_IO, 1, 0, getzoneid());
+	if (lsp->ls_kstat == NULL) {
+		(void) ddi_prop_remove(DDI_DEV_T_NONE, lsp->ls_dip,
+		    DDI_KERNEL_IOCTL);
+		error = ENOMEM;
+		goto merr;
+	}
+
+	lsp->ls_kstat->ks_lock = &lsp->ls_kstat_lock;
+	kstat_zone_add(lsp->ls_kstat, GLOBAL_ZONEID);
+	kstat_install(lsp->ls_kstat);
+	return (DDI_SUCCESS);
+merr:
+	if (lsp->ls_cmlbhandle != NULL) {
+		cmlb_detach(lsp->ls_cmlbhandle, 0);
+		cmlb_free_handle(&lsp->ls_cmlbhandle);
+	}
+	ddi_remove_minor_node(dip, NULL);
+	lofi_zone_unbind(lsp);
+lerr:
+	mutex_destroy(&lsp->ls_comp_cache_lock);
+	mutex_destroy(&lsp->ls_comp_bufs_lock);
+	mutex_destroy(&lsp->ls_kstat_lock);
+	mutex_destroy(&lsp->ls_vp_lock);
+	cv_destroy(&lsp->ls_vp_cv);
+err:
+	ddi_soft_state_free(lofi_statep, instance);
+	return (error);
+}
+
+/*ARGSUSED*/
+static int
+lofi_dev_callback(sysevent_t *ev, void *cookie)
+{
+	nvlist_t *nvlist;
+	char *class, *driver;
+	char name[10];
+	int32_t instance;
+
+	class = sysevent_get_class_name(ev);
+	if (strcmp(class, EC_DEV_ADD) && strcmp(class, EC_DEV_REMOVE))
+		return (0);
+
+	(void) sysevent_get_attr_list(ev, &nvlist);
+	driver = fnvlist_lookup_string(nvlist, DEV_DRIVER_NAME);
+	instance = fnvlist_lookup_int32(nvlist, DEV_INSTANCE);
+
+	if (strcmp(driver, LOFI_DRIVER_NAME) != 0) {
+		fnvlist_free(nvlist);
+		return (0);
+	}
+
+	/*
+	 * insert or remove device info, then announce the change
+	 * via cv_broadcast.
+	 * This allows the MAP/UNMAP to monitor device change.
+	 */
+	(void) snprintf(name, sizeof (name), "%d", instance);
+	if (strcmp(class, EC_DEV_ADD) == 0) {
+		mutex_enter(&lofi_chan_lock);
+		fnvlist_add_nvlist(lofi_devlink_cache, name, nvlist);
+		cv_broadcast(&lofi_chan_cv);
+		mutex_exit(&lofi_chan_lock);
+	} else if (strcmp(class, EC_DEV_REMOVE) == 0) {
+		mutex_enter(&lofi_chan_lock);
+		/* Can not use fnvlist_remove() as we can get ENOENT. */
+		(void) nvlist_remove_all(lofi_devlink_cache, name);
+		cv_broadcast(&lofi_chan_cv);
+		mutex_exit(&lofi_chan_lock);
+	}
+
+	fnvlist_free(nvlist);
+	return (0);
+}
+
+static int
 lofi_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
-	int	error;
+	int	rv;
+	int	instance = ddi_get_instance(dip);
+	struct lofi_state *lsp;
 
 	if (cmd != DDI_ATTACH)
 		return (DDI_FAILURE);
 
-	lofi_minor_id = id_space_create("lofi_minor_id", 1, L_MAXMIN32 + 1);
+	/*
+	 * Instance 0 is control instance, attaching control instance
+	 * will set the lofi up and ready.
+	 */
+	if (instance == 0) {
+		rv = ddi_soft_state_zalloc(lofi_statep, 0);
+		if (rv == DDI_FAILURE) {
+			return (DDI_FAILURE);
+		}
+		lsp = ddi_get_soft_state(lofi_statep, instance);
+		rv = ddi_create_minor_node(dip, LOFI_CTL_NODE, S_IFCHR, 0,
+		    DDI_PSEUDO, 0);
+		if (rv == DDI_FAILURE) {
+			ddi_soft_state_free(lofi_statep, 0);
+			return (DDI_FAILURE);
+		}
+		/* driver handles kernel-issued IOCTLs */
+		if (ddi_prop_create(DDI_DEV_T_NONE, dip, DDI_PROP_CANSLEEP,
+		    DDI_KERNEL_IOCTL, NULL, 0) != DDI_PROP_SUCCESS) {
+			ddi_remove_minor_node(dip, NULL);
+			ddi_soft_state_free(lofi_statep, 0);
+			return (DDI_FAILURE);
+		}
 
-	if (!lofi_minor_id)
-		return (DDI_FAILURE);
+		rv = sysevent_evc_bind(DEVFS_CHANNEL, &lofi_chan,
+		    EVCH_CREAT | EVCH_HOLD_PEND);
+		if (rv == 0) {
+			rv = sysevent_evc_subscribe(lofi_chan, "lofi",
+			    EC_ALL, lofi_dev_callback, NULL, 0);
+			rv |= sysevent_evc_subscribe(lofi_chan, "disk",
+			    EC_ALL, lofi_dev_callback, NULL, 0);
+		} else
+			lofi_chan = NULL;
+		if (rv != 0) {
+			if (lofi_chan != NULL)
+				(void) sysevent_evc_unbind(lofi_chan);
+			ddi_prop_remove_all(dip);
+			ddi_remove_minor_node(dip, NULL);
+			ddi_soft_state_free(lofi_statep, 0);
+			return (DDI_FAILURE);
+		}
+		zone_key_create(&lofi_zone_key, NULL, lofi_zone_shutdown, NULL);
 
-	error = ddi_soft_state_zalloc(lofi_statep, 0);
-	if (error == DDI_FAILURE) {
-		id_space_destroy(lofi_minor_id);
-		return (DDI_FAILURE);
+		lsp->ls_dip = dip;
+	} else {
+		if (lofi_online_dev(dip) == DDI_FAILURE)
+			return (DDI_FAILURE);
 	}
-	error = ddi_create_minor_node(dip, LOFI_CTL_NODE, S_IFCHR, 0,
-	    DDI_PSEUDO, NULL);
-	if (error == DDI_FAILURE) {
-		ddi_soft_state_free(lofi_statep, 0);
-		id_space_destroy(lofi_minor_id);
-		return (DDI_FAILURE);
-	}
-	/* driver handles kernel-issued IOCTLs */
-	if (ddi_prop_create(DDI_DEV_T_NONE, dip, DDI_PROP_CANSLEEP,
-	    DDI_KERNEL_IOCTL, NULL, 0) != DDI_PROP_SUCCESS) {
-		ddi_remove_minor_node(dip, NULL);
-		ddi_soft_state_free(lofi_statep, 0);
-		id_space_destroy(lofi_minor_id);
-		return (DDI_FAILURE);
-	}
 
-	zone_key_create(&lofi_zone_key, NULL, lofi_zone_shutdown, NULL);
-
-	lofi_dip = dip;
 	ddi_report_dev(dip);
 	return (DDI_SUCCESS);
 }
@@ -1507,9 +2008,25 @@ lofi_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 static int
 lofi_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
+	struct lofi_state *lsp;
+	int instance = ddi_get_instance(dip);
+
 	if (cmd != DDI_DETACH)
 		return (DDI_FAILURE);
 
+	/*
+	 * If the instance is not 0, release state.
+	 * The instance 0 is control device, we can not detach it
+	 * before other instances are detached.
+	 */
+	if (instance != 0) {
+		lsp = ddi_get_soft_state(lofi_statep, instance);
+		if (lsp != NULL && lsp->ls_vp_ready == B_FALSE) {
+			ddi_soft_state_free(lofi_statep, instance);
+			return (DDI_SUCCESS);
+		} else
+			return (DDI_FAILURE);
+	}
 	mutex_enter(&lofi_lock);
 
 	if (!list_is_empty(&lofi_list)) {
@@ -1517,26 +2034,24 @@ lofi_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		return (DDI_FAILURE);
 	}
 
-	lofi_dip = NULL;
 	ddi_remove_minor_node(dip, NULL);
 	ddi_prop_remove_all(dip);
 
 	mutex_exit(&lofi_lock);
 
+	(void) sysevent_evc_unbind(lofi_chan);
 	if (zone_key_delete(lofi_zone_key) != 0)
 		cmn_err(CE_WARN, "failed to delete zone key");
 
 	ddi_soft_state_free(lofi_statep, 0);
 
-	id_space_destroy(lofi_minor_id);
-
 	return (DDI_SUCCESS);
 }
 
 /*
- * With addition of encryption, be careful that encryption key is wiped before
- * kernel memory structures are freed, and also that key is not accidentally
- * passed out into userland structures.
+ * With the addition of encryption, we must be careful that encryption key is
+ * wiped before kernel's data structures are freed so it cannot accidentally
+ * slip out to userland through uninitialized data elsewhere.
  */
 static void
 free_lofi_ioctl(struct lofi_ioctl *klip)
@@ -1547,7 +2062,7 @@ free_lofi_ioctl(struct lofi_ioctl *klip)
 }
 
 /*
- * These two just simplify the rest of the ioctls that need to copyin/out
+ * These two functions simplify the rest of the ioctls that need to copyin/out
  * the lofi_ioctl structure.
  */
 int
@@ -1564,11 +2079,12 @@ copy_in_lofi_ioctl(const struct lofi_ioctl *ulip, struct lofi_ioctl **klipp,
 
 	/* ensure NULL termination */
 	klip->li_filename[MAXPATHLEN-1] = '\0';
+	klip->li_devpath[MAXPATHLEN-1] = '\0';
 	klip->li_algorithm[MAXALGLEN-1] = '\0';
 	klip->li_cipher[CRYPTO_MAX_MECH_NAME-1] = '\0';
 	klip->li_iv_cipher[CRYPTO_MAX_MECH_NAME-1] = '\0';
 
-	if (klip->li_minor > L_MAXMIN32) {
+	if (klip->li_id > L_MAXMIN32) {
 		error = EINVAL;
 		goto err;
 	}
@@ -1582,7 +2098,7 @@ err:
 
 int
 copy_out_lofi_ioctl(const struct lofi_ioctl *klip, struct lofi_ioctl *ulip,
-	int flag)
+    int flag)
 {
 	int	error;
 
@@ -1698,12 +2214,9 @@ file_to_lofi(char *filename, boolean_t readonly, struct lofi_state **lspp)
 }
 
 /*
- * Fakes up a disk geometry, and one big partition, based on the size
- * of the file. This is needed because we allow newfs'ing the device,
- * and newfs will do several disk ioctls to figure out the geometry and
- * partition information. It uses that information to determine the parameters
- * to pass to mkfs. Geometry is pretty much irrelevant these days, but we
- * have to support it.
+ * Fakes up a disk geometry based on the size of the file. This is needed
+ * to support newfs on traditional lofi device, but also will provide
+ * geometry hint for cmlb.
  */
 static void
 fake_disk_geometry(struct lofi_state *lsp)
@@ -1722,6 +2235,7 @@ fake_disk_geometry(struct lofi_state *lsp)
 	 * for a small file, or so many on a big file that you waste space
 	 * for backup superblocks or cylinder group structures.
 	 */
+	bzero(&lsp->ls_dkg, sizeof (lsp->ls_dkg));
 	if (dsize < (2 * 1024 * 1024)) /* floppy? */
 		lsp->ls_dkg.dkg_ncyl = dsize / (100 * 1024);
 	else
@@ -1729,70 +2243,74 @@ fake_disk_geometry(struct lofi_state *lsp)
 	/* in case file file is < 100k */
 	if (lsp->ls_dkg.dkg_ncyl == 0)
 		lsp->ls_dkg.dkg_ncyl = 1;
-	lsp->ls_dkg.dkg_acyl = 0;
-	lsp->ls_dkg.dkg_bcyl = 0;
-	lsp->ls_dkg.dkg_nhead = 1;
-	lsp->ls_dkg.dkg_obs1 = 0;
-	lsp->ls_dkg.dkg_intrlv = 0;
-	lsp->ls_dkg.dkg_obs2 = 0;
-	lsp->ls_dkg.dkg_obs3 = 0;
-	lsp->ls_dkg.dkg_apc = 0;
-	lsp->ls_dkg.dkg_rpm = 7200;
-	lsp->ls_dkg.dkg_pcyl = lsp->ls_dkg.dkg_ncyl + lsp->ls_dkg.dkg_acyl;
-	lsp->ls_dkg.dkg_nsect = dsize / (DEV_BSIZE * lsp->ls_dkg.dkg_ncyl);
-	lsp->ls_dkg.dkg_write_reinstruct = 0;
-	lsp->ls_dkg.dkg_read_reinstruct = 0;
 
-	/* vtoc - see dkio(7I) */
-	bzero(&lsp->ls_vtoc, sizeof (struct vtoc));
-	lsp->ls_vtoc.v_sanity = VTOC_SANE;
-	lsp->ls_vtoc.v_version = V_VERSION;
-	(void) strncpy(lsp->ls_vtoc.v_volume, LOFI_DRIVER_NAME,
-	    sizeof (lsp->ls_vtoc.v_volume));
-	lsp->ls_vtoc.v_sectorsz = DEV_BSIZE;
-	lsp->ls_vtoc.v_nparts = 1;
-	lsp->ls_vtoc.v_part[0].p_tag = V_UNASSIGNED;
+	lsp->ls_dkg.dkg_pcyl = lsp->ls_dkg.dkg_ncyl;
+	lsp->ls_dkg.dkg_nhead = 1;
+	lsp->ls_dkg.dkg_rpm = 7200;
+
+	lsp->ls_dkg.dkg_nsect = dsize /
+	    (lsp->ls_dkg.dkg_ncyl << lsp->ls_pbshift);
+}
+
+/*
+ * build vtoc - see dkio(7I)
+ *
+ * Fakes one big partition based on the size of the file. This is needed
+ * because we allow newfs'ing the traditional lofi device and newfs will
+ * do several disk ioctls to figure out the geometry and partition information.
+ * It uses that information to determine the parameters to pass to mkfs.
+ */
+static void
+fake_disk_vtoc(struct lofi_state *lsp, struct vtoc *vt)
+{
+	bzero(vt, sizeof (struct vtoc));
+	vt->v_sanity = VTOC_SANE;
+	vt->v_version = V_VERSION;
+	(void) strncpy(vt->v_volume, LOFI_DRIVER_NAME,
+	    sizeof (vt->v_volume));
+	vt->v_sectorsz = 1 << lsp->ls_pbshift;
+	vt->v_nparts = 1;
+	vt->v_part[0].p_tag = V_UNASSIGNED;
 
 	/*
 	 * A compressed file is read-only, other files can
 	 * be read-write
 	 */
 	if (lsp->ls_uncomp_seg_sz > 0) {
-		lsp->ls_vtoc.v_part[0].p_flag = V_UNMNT | V_RONLY;
+		vt->v_part[0].p_flag = V_UNMNT | V_RONLY;
 	} else {
-		lsp->ls_vtoc.v_part[0].p_flag = V_UNMNT;
+		vt->v_part[0].p_flag = V_UNMNT;
 	}
-	lsp->ls_vtoc.v_part[0].p_start = (daddr_t)0;
+	vt->v_part[0].p_start = (daddr_t)0;
 	/*
 	 * The partition size cannot just be the number of sectors, because
 	 * that might not end on a cylinder boundary. And if that's the case,
 	 * newfs/mkfs will print a scary warning. So just figure the size
 	 * based on the number of cylinders and sectors/cylinder.
 	 */
-	lsp->ls_vtoc.v_part[0].p_size = lsp->ls_dkg.dkg_pcyl *
+	vt->v_part[0].p_size = lsp->ls_dkg.dkg_pcyl *
 	    lsp->ls_dkg.dkg_nsect * lsp->ls_dkg.dkg_nhead;
+}
 
-	/* dk_cinfo - see dkio(7I) */
-	bzero(&lsp->ls_ci, sizeof (struct dk_cinfo));
-	(void) strcpy(lsp->ls_ci.dki_cname, LOFI_DRIVER_NAME);
-	lsp->ls_ci.dki_ctype = DKC_MD;
-	lsp->ls_ci.dki_flags = 0;
-	lsp->ls_ci.dki_cnum = 0;
-	lsp->ls_ci.dki_addr = 0;
-	lsp->ls_ci.dki_space = 0;
-	lsp->ls_ci.dki_prio = 0;
-	lsp->ls_ci.dki_vec = 0;
-	(void) strcpy(lsp->ls_ci.dki_dname, LOFI_DRIVER_NAME);
-	lsp->ls_ci.dki_unit = 0;
-	lsp->ls_ci.dki_slave = 0;
-	lsp->ls_ci.dki_partition = 0;
+/*
+ * build dk_cinfo - see dkio(7I)
+ */
+static void
+fake_disk_info(dev_t dev, struct dk_cinfo *ci)
+{
+	bzero(ci, sizeof (struct dk_cinfo));
+	(void) strlcpy(ci->dki_cname, LOFI_DRIVER_NAME, sizeof (ci->dki_cname));
+	ci->dki_ctype = DKC_SCSI_CCS;
+	(void) strlcpy(ci->dki_dname, LOFI_DRIVER_NAME, sizeof (ci->dki_dname));
+	ci->dki_unit = LOFI_MINOR2ID(getminor(dev));
+	ci->dki_partition = LOFI_PART(getminor(dev));
 	/*
 	 * newfs uses this to set maxcontig. Must not be < 16, or it
 	 * will be 0 when newfs multiplies it by DEV_BSIZE and divides
 	 * it by the block size. Then tunefs doesn't work because
 	 * maxcontig is 0.
 	 */
-	lsp->ls_ci.dki_maxtransfer = 16;
+	ci->dki_maxtransfer = 16;
 }
 
 /*
@@ -2110,21 +2628,177 @@ lofi_init_compress(struct lofi_state *lsp)
 }
 
 /*
+ * Allocate new or proposed id from lofi_id.
+ *
+ * Special cases for proposed id:
+ * 0: not allowed, 0 is id for control device.
+ * -1: allocate first usable id from lofi_id.
+ * any other value is proposed value from userland
+ *
+ * returns DDI_SUCCESS or errno.
+ */
+static int
+lofi_alloc_id(int *idp)
+{
+	int id, error = DDI_SUCCESS;
+
+	if (*idp == -1) {
+		id = id_allocff_nosleep(lofi_id);
+		if (id == -1) {
+			error = EAGAIN;
+			goto err;
+		}
+	} else if (*idp == 0) {
+		error = EINVAL;
+		goto err;
+	} else if (*idp > ((1 << (L_BITSMINOR - LOFI_CMLB_SHIFT)) - 1)) {
+		error = ERANGE;
+		goto err;
+	} else {
+		if (ddi_get_soft_state(lofi_statep, *idp) != NULL) {
+			error = EEXIST;
+			goto err;
+		}
+
+		id = id_alloc_specific_nosleep(lofi_id, *idp);
+		if (id == -1) {
+			error = EAGAIN;
+			goto err;
+		}
+	}
+	*idp = id;
+err:
+	return (error);
+}
+
+static int
+lofi_create_dev(struct lofi_ioctl *klip)
+{
+	dev_info_t *parent, *child;
+	struct lofi_state *lsp = NULL;
+	char namebuf[MAXNAMELEN];
+	int error, circ;
+
+	/* get control device */
+	lsp = ddi_get_soft_state(lofi_statep, 0);
+	parent = ddi_get_parent(lsp->ls_dip);
+
+	if ((error = lofi_alloc_id((int *)&klip->li_id)))
+		return (error);
+
+	(void) snprintf(namebuf, sizeof (namebuf), LOFI_DRIVER_NAME "@%d",
+	    klip->li_id);
+
+	ndi_devi_enter(parent, &circ);
+	child = ndi_devi_findchild(parent, namebuf);
+	ndi_devi_exit(parent, circ);
+
+	if (child == NULL) {
+		child = ddi_add_child(parent, LOFI_DRIVER_NAME,
+		    (pnode_t)DEVI_SID_NODEID, klip->li_id);
+		if ((error = ddi_prop_update_int(DDI_DEV_T_NONE, child,
+		    "instance", klip->li_id)) != DDI_PROP_SUCCESS)
+			goto err;
+
+		if (klip->li_labeled == B_TRUE) {
+			if ((error = ddi_prop_create(DDI_DEV_T_NONE, child,
+			    DDI_PROP_CANSLEEP, "labeled", 0, 0))
+			    != DDI_PROP_SUCCESS)
+				goto err;
+		}
+
+		if ((error = ndi_devi_online(child, NDI_ONLINE_ATTACH))
+		    != NDI_SUCCESS)
+			goto err;
+	} else {
+		id_free(lofi_id, klip->li_id);
+		error = EEXIST;
+		return (error);
+	}
+
+	goto done;
+
+err:
+	ddi_prop_remove_all(child);
+	(void) ndi_devi_offline(child, NDI_DEVI_REMOVE);
+	id_free(lofi_id, klip->li_id);
+done:
+
+	return (error);
+}
+
+static void
+lofi_create_inquiry(struct lofi_state *lsp, struct scsi_inquiry *inq)
+{
+	char *p = NULL;
+
+	(void) strlcpy(inq->inq_vid, LOFI_DRIVER_NAME, sizeof (inq->inq_vid));
+
+	mutex_enter(&lsp->ls_vp_lock);
+	if (lsp->ls_vp != NULL)
+		p = strrchr(lsp->ls_vp->v_path, '/');
+	if (p != NULL)
+		(void) strncpy(inq->inq_pid, p + 1, sizeof (inq->inq_pid));
+	mutex_exit(&lsp->ls_vp_lock);
+	(void) strlcpy(inq->inq_revision, "1.0", sizeof (inq->inq_revision));
+}
+
+/*
+ * copy devlink name from event cache
+ */
+static void
+lofi_copy_devpath(struct lofi_ioctl *klip)
+{
+	int	error;
+	char	namebuf[MAXNAMELEN], *str;
+	clock_t ticks;
+	nvlist_t *nvl;
+
+	if (klip->li_labeled == B_TRUE)
+		klip->li_devpath[0] = '\0';
+	else {
+		/* no need to wait for messages */
+		(void) snprintf(klip->li_devpath, sizeof (klip->li_devpath),
+		    "/dev/" LOFI_CHAR_NAME "/%d", klip->li_id);
+		return;
+	}
+
+	(void) snprintf(namebuf, sizeof (namebuf), "%d", klip->li_id);
+	ticks = ddi_get_lbolt() + LOFI_TIMEOUT * drv_usectohz(1000000);
+
+	nvl = NULL;
+
+	mutex_enter(&lofi_chan_lock);
+	while (nvlist_lookup_nvlist(lofi_devlink_cache, namebuf, &nvl) != 0) {
+		error = cv_timedwait(&lofi_chan_cv, &lofi_chan_lock, ticks);
+		if (error == -1)
+			break;
+	}
+
+	if (nvl != NULL) {
+		if (nvlist_lookup_string(nvl, DEV_NAME, &str) == 0) {
+			(void) strlcpy(klip->li_devpath, str,
+			    sizeof (klip->li_devpath));
+		}
+	}
+	mutex_exit(&lofi_chan_lock);
+}
+
+/*
  * map a file to a minor number. Return the minor number.
  */
 static int
 lofi_map_file(dev_t dev, struct lofi_ioctl *ulip, int pickminor,
     int *rvalp, struct cred *credp, int ioctl_flag)
 {
-	minor_t	minor = (minor_t)-1;
+	int	id = -1;
 	struct lofi_state *lsp = NULL;
 	struct lofi_ioctl *klip;
 	int	error;
 	struct vnode *vp = NULL;
 	vattr_t	vattr;
 	int	flag;
-	dev_t	newdev;
-	char	namebuf[50];
+	char	namebuf[MAXNAMELEN];
 
 	error = copy_in_lofi_ioctl(ulip, &klip, ioctl_flag);
 	if (error != 0)
@@ -2132,36 +2806,10 @@ lofi_map_file(dev_t dev, struct lofi_ioctl *ulip, int pickminor,
 
 	mutex_enter(&lofi_lock);
 
-	mutex_enter(&curproc->p_lock);
-	if ((error = rctl_incr_lofi(curproc, curproc->p_zone, 1)) != 0) {
-		mutex_exit(&curproc->p_lock);
-		mutex_exit(&lofi_lock);
-		free_lofi_ioctl(klip);
-		return (error);
-	}
-	mutex_exit(&curproc->p_lock);
-
 	if (file_to_lofi_nocheck(klip->li_filename, klip->li_readonly,
 	    NULL) == 0) {
 		error = EBUSY;
 		goto err;
-	}
-
-	if (pickminor) {
-		minor = (minor_t)id_allocff_nosleep(lofi_minor_id);
-		if (minor == (minor_t)-1) {
-			error = EAGAIN;
-			goto err;
-		}
-	} else {
-		if (ddi_get_soft_state(lofi_statep, klip->li_minor) != NULL) {
-			error = EEXIST;
-			goto err;
-		}
-
-		minor = (minor_t)
-		    id_alloc_specific_nosleep(lofi_minor_id, klip->li_minor);
-		ASSERT(minor != (minor_t)-1);
 	}
 
 	flag = FREAD | FWRITE | FOFFMAX | FEXCL;
@@ -2191,35 +2839,22 @@ lofi_map_file(dev_t dev, struct lofi_ioctl *ulip, int pickminor,
 		goto err;
 	}
 
-	/* lsp alloc+init */
-
-	error = ddi_soft_state_zalloc(lofi_statep, minor);
-	if (error == DDI_FAILURE) {
-		error = ENOMEM;
-		goto err;
+	if (pickminor) {
+		klip->li_id = (uint32_t)-1;
 	}
+	if ((error = lofi_create_dev(klip)) != 0)
+		goto err;
 
-	lsp = ddi_get_soft_state(lofi_statep, minor);
-	list_insert_tail(&lofi_list, lsp);
+	id = klip->li_id;
+	lsp = ddi_get_soft_state(lofi_statep, id);
+	if (lsp == NULL)
+		goto err;
 
-	newdev = makedevice(getmajor(dev), minor);
-	lsp->ls_dev = newdev;
-	zone_init_ref(&lsp->ls_zone);
-	zone_hold_ref(curzone, &lsp->ls_zone, ZONE_REF_LOFI);
-	lsp->ls_uncomp_seg_sz = 0;
-	lsp->ls_comp_algorithm[0] = '\0';
-	lsp->ls_crypto_offset = 0;
-
-	cv_init(&lsp->ls_vp_cv, NULL, CV_DRIVER, NULL);
-	mutex_init(&lsp->ls_comp_cache_lock, NULL, MUTEX_DRIVER, NULL);
-	mutex_init(&lsp->ls_comp_bufs_lock, NULL, MUTEX_DRIVER, NULL);
-	mutex_init(&lsp->ls_kstat_lock, NULL, MUTEX_DRIVER, NULL);
-	mutex_init(&lsp->ls_vp_lock, NULL, MUTEX_DRIVER, NULL);
-
-	(void) snprintf(namebuf, sizeof (namebuf), "%s_taskq_%d",
-	    LOFI_DRIVER_NAME, minor);
-	lsp->ls_taskq = taskq_create_proc(namebuf, lofi_taskq_nthreads,
-	    minclsyspri, 1, lofi_taskq_maxalloc, curzone->zone_zsched, 0);
+	/*
+	 * from this point lofi_destroy() is used to clean up on error
+	 * make sure the basic data is set
+	 */
+	lsp->ls_dev = makedevice(getmajor(dev), LOFI_ID2MINOR(id));
 
 	list_create(&lsp->ls_comp_cache, sizeof (struct lofi_comp_cache),
 	    offsetof(struct lofi_comp_cache, lc_list));
@@ -2232,6 +2867,10 @@ lofi_map_file(dev_t dev, struct lofi_ioctl *ulip, int pickminor,
 
 	lsp->ls_vp = vp;
 	lsp->ls_stacked_vp = vp;
+
+	lsp->ls_vp_size = vattr.va_size;
+	lsp->ls_vp_comp_size = lsp->ls_vp_size;
+
 	/*
 	 * Try to handle stacked lofs vnodes.
 	 */
@@ -2249,21 +2888,18 @@ lofi_map_file(dev_t dev, struct lofi_ioctl *ulip, int pickminor,
 		}
 	}
 
-	lsp->ls_vp_size = vattr.va_size;
-	lsp->ls_vp_comp_size = lsp->ls_vp_size;
-
-	lsp->ls_kstat = kstat_create_zone(LOFI_DRIVER_NAME, minor,
-	    NULL, "disk", KSTAT_TYPE_IO, 1, 0, getzoneid());
-
-	if (lsp->ls_kstat == NULL) {
-		error = ENOMEM;
-		goto err;
-	}
-
-	lsp->ls_kstat->ks_lock = &lsp->ls_kstat_lock;
-	kstat_zone_add(lsp->ls_kstat, GLOBAL_ZONEID);
+	lsp->ls_lbshift = highbit(DEV_BSIZE) - 1;
+	lsp->ls_pbshift = lsp->ls_lbshift;
 
 	lsp->ls_readonly = klip->li_readonly;
+	lsp->ls_uncomp_seg_sz = 0;
+	lsp->ls_comp_algorithm[0] = '\0';
+	lsp->ls_crypto_offset = 0;
+
+	(void) snprintf(namebuf, sizeof (namebuf), "%s_taskq_%d",
+	    LOFI_DRIVER_NAME, id);
+	lsp->ls_taskq = taskq_create_proc(namebuf, lofi_taskq_nthreads,
+	    minclsyspri, 1, lofi_taskq_maxalloc, curzone->zone_zsched, 0);
 
 	if ((error = lofi_init_crypto(lsp, klip)) != 0)
 		goto err;
@@ -2273,74 +2909,46 @@ lofi_map_file(dev_t dev, struct lofi_ioctl *ulip, int pickminor,
 
 	fake_disk_geometry(lsp);
 
-	/* create minor nodes */
-
-	(void) snprintf(namebuf, sizeof (namebuf), "%d", minor);
-	error = ddi_create_minor_node(lofi_dip, namebuf, S_IFBLK, minor,
-	    DDI_PSEUDO, NULL);
-	if (error != DDI_SUCCESS) {
-		error = ENXIO;
-		goto err;
-	}
-
-	(void) snprintf(namebuf, sizeof (namebuf), "%d,raw", minor);
-	error = ddi_create_minor_node(lofi_dip, namebuf, S_IFCHR, minor,
-	    DDI_PSEUDO, NULL);
-	if (error != DDI_SUCCESS) {
-		/* remove block node */
-		(void) snprintf(namebuf, sizeof (namebuf), "%d", minor);
-		ddi_remove_minor_node(lofi_dip, namebuf);
-		error = ENXIO;
-		goto err;
-	}
-
-	/* create DDI properties */
-
-	if ((ddi_prop_update_int64(newdev, lofi_dip, SIZE_PROP_NAME,
+	if ((ddi_prop_update_int64(lsp->ls_dev, lsp->ls_dip, SIZE_PROP_NAME,
 	    lsp->ls_vp_size - lsp->ls_crypto_offset)) != DDI_PROP_SUCCESS) {
 		error = EINVAL;
-		goto nodeerr;
+		goto err;
 	}
 
-	if ((ddi_prop_update_int64(newdev, lofi_dip, NBLOCKS_PROP_NAME,
+	if ((ddi_prop_update_int64(lsp->ls_dev, lsp->ls_dip, NBLOCKS_PROP_NAME,
 	    (lsp->ls_vp_size - lsp->ls_crypto_offset) / DEV_BSIZE))
 	    != DDI_PROP_SUCCESS) {
 		error = EINVAL;
-		goto nodeerr;
+		goto err;
 	}
 
-	if (ddi_prop_update_string(newdev, lofi_dip, ZONE_PROP_NAME,
-	    (char *)curproc->p_zone->zone_name) != DDI_PROP_SUCCESS) {
-		error = EINVAL;
-		goto nodeerr;
-	}
-
-	kstat_install(lsp->ls_kstat);
-
+	list_insert_tail(&lofi_list, lsp);
+	/*
+	 * Notify we are ready to rock.
+	 */
+	mutex_enter(&lsp->ls_vp_lock);
+	lsp->ls_vp_ready = B_TRUE;
+	cv_broadcast(&lsp->ls_vp_cv);
+	mutex_exit(&lsp->ls_vp_lock);
 	mutex_exit(&lofi_lock);
 
+	lofi_copy_devpath(klip);
+
 	if (rvalp)
-		*rvalp = (int)minor;
-	klip->li_minor = minor;
+		*rvalp = id;
 	(void) copy_out_lofi_ioctl(klip, ulip, ioctl_flag);
 	free_lofi_ioctl(klip);
 	return (0);
 
-nodeerr:
-	lofi_free_dev(newdev);
 err:
 	if (lsp != NULL) {
 		lofi_destroy(lsp, credp);
 	} else {
 		if (vp != NULL) {
+			(void) VOP_PUTPAGE(vp, 0, 0, B_INVAL, credp, NULL);
 			(void) VOP_CLOSE(vp, flag, 1, 0, credp, NULL);
 			VN_RELE(vp);
 		}
-
-		if (minor != (minor_t)-1)
-			id_free(lofi_minor_id, minor);
-
-		rctl_decr_lofi(curproc->p_zone, 1);
 	}
 
 	mutex_exit(&lofi_lock);
@@ -2357,6 +2965,9 @@ lofi_unmap_file(struct lofi_ioctl *ulip, int byfilename,
 {
 	struct lofi_state *lsp;
 	struct lofi_ioctl *klip;
+	nvlist_t *nvl = NULL;
+	clock_t ticks;
+	char name[MAXNAMELEN];
 	int err;
 
 	err = copy_in_lofi_ioctl(ulip, &klip, ioctl_flag);
@@ -2370,12 +2981,12 @@ lofi_unmap_file(struct lofi_ioctl *ulip, int byfilename,
 			mutex_exit(&lofi_lock);
 			return (err);
 		}
-	} else if (klip->li_minor == 0) {
+	} else if (klip->li_id == 0) {
 		mutex_exit(&lofi_lock);
 		free_lofi_ioctl(klip);
 		return (ENXIO);
 	} else {
-		lsp = ddi_get_soft_state(lofi_statep, klip->li_minor);
+		lsp = ddi_get_soft_state(lofi_statep, klip->li_id);
 	}
 
 	if (lsp == NULL || lsp->ls_vp == NULL || lofi_access(lsp) != 0) {
@@ -2384,7 +2995,7 @@ lofi_unmap_file(struct lofi_ioctl *ulip, int byfilename,
 		return (ENXIO);
 	}
 
-	klip->li_minor = getminor(lsp->ls_dev);
+	klip->li_id = LOFI_MINOR2ID(getminor(lsp->ls_dev));
 
 	/*
 	 * If it's still held open, we'll do one of three things:
@@ -2432,8 +3043,26 @@ lofi_unmap_file(struct lofi_ioctl *ulip, int byfilename,
 	}
 
 out:
-	lofi_free_dev(lsp->ls_dev);
+	lofi_free_dev(lsp);
 	lofi_destroy(lsp, credp);
+
+	/*
+	 * check the lofi_devlink_cache if device is really gone.
+	 * note: we just wait for timeout here and dont give error if
+	 * timer will expire. This check is to try to ensure the unmap is
+	 * really done when lofiadm -d completes.
+	 * Since lofi_lock is held, also hopefully the lofiadm -a calls
+	 * wont interfere the the unmap.
+	 */
+	(void) snprintf(name, sizeof (name), "%d", klip->li_id);
+	ticks = ddi_get_lbolt() + LOFI_TIMEOUT * drv_usectohz(1000000);
+	mutex_enter(&lofi_chan_lock);
+	while (nvlist_lookup_nvlist(lofi_devlink_cache, name, &nvl) == 0) {
+		err = cv_timedwait(&lofi_chan_cv, &lofi_chan_lock, ticks);
+		if (err == -1)
+			break;
+	}
+	mutex_exit(&lofi_chan_lock);
 
 	mutex_exit(&lofi_lock);
 	(void) copy_out_lofi_ioctl(klip, ulip, ioctl_flag);
@@ -2460,13 +3089,13 @@ lofi_get_info(dev_t dev, struct lofi_ioctl *ulip, int which,
 
 	switch (which) {
 	case LOFI_GET_FILENAME:
-		if (klip->li_minor == 0) {
+		if (klip->li_id == 0) {
 			free_lofi_ioctl(klip);
 			return (EINVAL);
 		}
 
 		mutex_enter(&lofi_lock);
-		lsp = ddi_get_soft_state(lofi_statep, klip->li_minor);
+		lsp = ddi_get_soft_state(lofi_statep, klip->li_id);
 		if (lsp == NULL || lofi_access(lsp) != 0) {
 			mutex_exit(&lofi_lock);
 			free_lofi_ioctl(klip);
@@ -2484,11 +3113,14 @@ lofi_get_info(dev_t dev, struct lofi_ioctl *ulip, int which,
 		}
 
 		klip->li_readonly = lsp->ls_readonly;
+		klip->li_labeled = lsp->ls_cmlbhandle != NULL;
 
 		(void) strlcpy(klip->li_algorithm, lsp->ls_comp_algorithm,
 		    sizeof (klip->li_algorithm));
 		klip->li_crypto_enabled = lsp->ls_crypto_enabled;
 		mutex_exit(&lofi_lock);
+
+		lofi_copy_devpath(klip);
 		error = copy_out_lofi_ioctl(klip, ulip, ioctl_flag);
 		free_lofi_ioctl(klip);
 		return (error);
@@ -2496,12 +3128,19 @@ lofi_get_info(dev_t dev, struct lofi_ioctl *ulip, int which,
 		mutex_enter(&lofi_lock);
 		error = file_to_lofi(klip->li_filename,
 		    klip->li_readonly, &lsp);
-		if (error == 0)
-			klip->li_minor = getminor(lsp->ls_dev);
+		if (error != 0) {
+			mutex_exit(&lofi_lock);
+			free_lofi_ioctl(klip);
+			return (error);
+		}
+		klip->li_id = LOFI_MINOR2ID(getminor(lsp->ls_dev));
+
+		klip->li_readonly = lsp->ls_readonly;
+		klip->li_labeled = lsp->ls_cmlbhandle != NULL;
 		mutex_exit(&lofi_lock);
 
-		if (error == 0)
-			error = copy_out_lofi_ioctl(klip, ulip, ioctl_flag);
+		lofi_copy_devpath(klip);
+		error = copy_out_lofi_ioctl(klip, ulip, ioctl_flag);
 
 		free_lofi_ioctl(klip);
 		return (error);
@@ -2515,7 +3154,7 @@ lofi_get_info(dev_t dev, struct lofi_ioctl *ulip, int which,
 			return (error);
 		}
 
-		klip->li_minor = getminor(lsp->ls_dev);
+		klip->li_id = LOFI_MINOR2ID(getminor(lsp->ls_dev));
 		(void) strlcpy(klip->li_algorithm, lsp->ls_comp_algorithm,
 		    sizeof (klip->li_algorithm));
 
@@ -2530,17 +3169,63 @@ lofi_get_info(dev_t dev, struct lofi_ioctl *ulip, int which,
 }
 
 static int
+uscsi_is_inquiry(intptr_t arg, int flag, union scsi_cdb *cdb,
+    struct uscsi_cmd *uscmd)
+{
+	int rval;
+
+#ifdef	_MULTI_DATAMODEL
+	switch (ddi_model_convert_from(flag & FMODELS)) {
+	case DDI_MODEL_ILP32: {
+		struct uscsi_cmd32 ucmd32;
+
+		if (ddi_copyin((void *)arg, &ucmd32, sizeof (ucmd32), flag)) {
+			rval = EFAULT;
+			goto err;
+		}
+		uscsi_cmd32touscsi_cmd((&ucmd32), uscmd);
+		break;
+	}
+	case DDI_MODEL_NONE:
+		if (ddi_copyin((void *)arg, uscmd, sizeof (*uscmd), flag)) {
+			rval = EFAULT;
+			goto err;
+		}
+		break;
+	default:
+		rval = EFAULT;
+		goto err;
+	}
+#else
+	if (ddi_copyin((void *)arg, uscmd, sizeof (*uscmd), flag)) {
+		rval = EFAULT;
+		goto err;
+	}
+#endif	/* _MULTI_DATAMODEL */
+	if (ddi_copyin(uscmd->uscsi_cdb, cdb, uscmd->uscsi_cdblen, flag)) {
+		rval = EFAULT;
+		goto err;
+	}
+	if (cdb->scc_cmd == SCMD_INQUIRY) {
+		return (0);
+	}
+err:
+	return (rval);
+}
+
+static int
 lofi_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *credp,
     int *rvalp)
 {
 	int	error;
 	enum dkio_state dkstate;
 	struct lofi_state *lsp;
-	minor_t	minor;
+	int	id;
 
-	minor = getminor(dev);
+	id = LOFI_MINOR2ID(getminor(dev));
+
 	/* lofi ioctls only apply to the master device */
-	if (minor == 0) {
+	if (id == 0) {
 		struct lofi_ioctl *lip = (struct lofi_ioctl *)arg;
 
 		/*
@@ -2576,27 +3261,29 @@ lofi_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *credp,
 		 * This API made limited sense when this value was fixed
 		 * at LOFI_MAX_FILES.  However, its use to iterate
 		 * across all possible devices in lofiadm means we don't
-		 * want to return L_MAXMIN32, but the highest
-		 * *allocated* minor.
+		 * want to return L_MAXMIN, but the highest
+		 * *allocated* id.
 		 */
 		case LOFI_GET_MAXMINOR:
-			minor = 0;
+			id = 0;
 
 			mutex_enter(&lofi_lock);
 
 			for (lsp = list_head(&lofi_list); lsp != NULL;
 			    lsp = list_next(&lofi_list, lsp)) {
+				int i;
 				if (lofi_access(lsp) != 0)
 					continue;
 
-				if (getminor(lsp->ls_dev) > minor)
-					minor = getminor(lsp->ls_dev);
+				i = ddi_get_instance(lsp->ls_dip);
+				if (i > id)
+					id = i;
 			}
 
 			mutex_exit(&lofi_lock);
 
-			error = ddi_copyout(&minor, &lip->li_minor,
-			    sizeof (minor), flag);
+			error = ddi_copyout(&id, &lip->li_id,
+			    sizeof (id), flag);
 			if (error)
 				return (EFAULT);
 			return (0);
@@ -2610,12 +3297,20 @@ lofi_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *credp,
 	}
 
 	mutex_enter(&lofi_lock);
-	lsp = ddi_get_soft_state(lofi_statep, minor);
+	lsp = ddi_get_soft_state(lofi_statep, id);
 	if (lsp == NULL || lsp->ls_vp_closereq) {
 		mutex_exit(&lofi_lock);
 		return (ENXIO);
 	}
 	mutex_exit(&lofi_lock);
+
+	if (ddi_prop_exists(DDI_DEV_T_ANY, lsp->ls_dip, DDI_PROP_DONTPASS,
+	    "labeled") == 1) {
+		error = cmlb_ioctl(lsp->ls_cmlbhandle, dev, cmd, arg, flag,
+		    credp, rvalp, 0);
+		if (error != ENOTTY)
+			return (error);
+	}
 
 	/*
 	 * We explicitly allow DKIOCSTATE, but all other ioctls should fail with
@@ -2626,12 +3321,44 @@ lofi_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *credp,
 
 	/* these are for faking out utilities like newfs */
 	switch (cmd) {
-	case DKIOCGVTOC:
+	case DKIOCGMEDIAINFO:
+	case DKIOCGMEDIAINFOEXT: {
+		struct dk_minfo_ext media_info;
+		int shift = lsp->ls_lbshift;
+		int size;
+
+		if (cmd == DKIOCGMEDIAINFOEXT) {
+			media_info.dki_pbsize = 1U << lsp->ls_pbshift;
+			size = sizeof (struct dk_minfo_ext);
+		} else {
+			size = sizeof (struct dk_minfo);
+		}
+
+		media_info.dki_media_type = DK_FIXED_DISK;
+		media_info.dki_lbsize = 1U << shift;
+		media_info.dki_capacity =
+		    (lsp->ls_vp_size - lsp->ls_crypto_offset) >> shift;
+
+		if (ddi_copyout(&media_info, (void *)arg, size, flag))
+			return (EFAULT);
+		return (0);
+	}
+	case DKIOCREMOVABLE: {
+		int i = 0;
+		if (ddi_copyout(&i, (caddr_t)arg, sizeof (int), flag))
+			return (EFAULT);
+		return (0);
+	}
+
+	case DKIOCGVTOC: {
+		struct vtoc vt;
+		fake_disk_vtoc(lsp, &vt);
+
 		switch (ddi_model_convert_from(flag & FMODELS)) {
 		case DDI_MODEL_ILP32: {
 			struct vtoc32 vtoc32;
 
-			vtoctovtoc32(lsp->ls_vtoc, vtoc32);
+			vtoctovtoc32(vt, vtoc32);
 			if (ddi_copyout(&vtoc32, (void *)arg,
 			    sizeof (struct vtoc32), flag))
 				return (EFAULT);
@@ -2639,18 +3366,20 @@ lofi_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *credp,
 			}
 
 		case DDI_MODEL_NONE:
-			if (ddi_copyout(&lsp->ls_vtoc, (void *)arg,
+			if (ddi_copyout(&vt, (void *)arg,
 			    sizeof (struct vtoc), flag))
 				return (EFAULT);
 			break;
 		}
 		return (0);
-	case DKIOCINFO:
-		error = ddi_copyout(&lsp->ls_ci, (void *)arg,
-		    sizeof (struct dk_cinfo), flag);
-		if (error)
+	}
+	case DKIOCINFO: {
+		struct dk_cinfo ci;
+		fake_disk_info(dev, &ci);
+		if (ddi_copyout(&ci, (void *)arg, sizeof (ci), flag))
 			return (EFAULT);
 		return (0);
+	}
 	case DKIOCG_VIRTGEOM:
 	case DKIOCG_PHYGEOM:
 	case DKIOCGGEOM:
@@ -2697,9 +3426,78 @@ lofi_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *credp,
 		    sizeof (dkstate), flag) != 0)
 			return (EFAULT);
 		return (0);
+	case USCSICMD: {
+		struct uscsi_cmd uscmd;
+		union scsi_cdb cdb;
+
+		if (uscsi_is_inquiry(arg, flag, &cdb, &uscmd) == 0) {
+			struct scsi_inquiry inq = {0};
+
+			lofi_create_inquiry(lsp, &inq);
+			if (ddi_copyout(&inq, uscmd.uscsi_bufaddr,
+			    uscmd.uscsi_buflen, flag) != 0)
+				return (EFAULT);
+			return (0);
+		} else if (cdb.scc_cmd == SCMD_READ_CAPACITY) {
+			struct scsi_capacity capacity;
+
+			capacity.capacity =
+			    BE_32((lsp->ls_vp_size - lsp->ls_crypto_offset) >>
+			    lsp->ls_lbshift);
+			capacity.lbasize = BE_32(1 << lsp->ls_lbshift);
+			if (ddi_copyout(&capacity, uscmd.uscsi_bufaddr,
+			    uscmd.uscsi_buflen, flag) != 0)
+				return (EFAULT);
+			return (0);
+		}
+
+		uscmd.uscsi_rqstatus = 0xff;
+#ifdef	_MULTI_DATAMODEL
+		switch (ddi_model_convert_from(flag & FMODELS)) {
+		case DDI_MODEL_ILP32: {
+			struct uscsi_cmd32 ucmd32;
+			uscsi_cmdtouscsi_cmd32((&uscmd), (&ucmd32));
+			if (ddi_copyout(&ucmd32, (void *)arg, sizeof (ucmd32),
+			    flag) != 0)
+				return (EFAULT);
+			break;
+		}
+		case DDI_MODEL_NONE:
+			if (ddi_copyout(&uscmd, (void *)arg, sizeof (uscmd),
+			    flag) != 0)
+				return (EFAULT);
+			break;
+		default:
+			return (EFAULT);
+		}
+#else
+		if (ddi_copyout(&uscmd, (void *)arg, sizeof (uscmd), flag) != 0)
+			return (EFAULT);
+#endif	/* _MULTI_DATAMODEL */
+		return (0);
+	}
 	default:
+#ifdef DEBUG
+		cmn_err(CE_WARN, "lofi_ioctl: %d is not implemented\n", cmd);
+#endif	/* DEBUG */
 		return (ENOTTY);
 	}
+}
+
+static int
+lofi_prop_op(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op, int mod_flags,
+    char *name, caddr_t valuep, int *lengthp)
+{
+	struct lofi_state *lsp;
+
+	lsp = ddi_get_soft_state(lofi_statep, ddi_get_instance(dip));
+	if (lsp == NULL) {
+		return (ddi_prop_op(dev, dip, prop_op, mod_flags,
+		    name, valuep, lengthp));
+	}
+
+	return (cmlb_prop_op(lsp->ls_cmlbhandle, dev, dip, prop_op, mod_flags,
+	    name, valuep, lengthp, LOFI_PART(getminor(dev)), NULL));
 }
 
 static struct cb_ops lofi_cb_ops = {
@@ -2715,7 +3513,7 @@ static struct cb_ops lofi_cb_ops = {
 	nodev,			/* mmap */
 	nodev,			/* segmap */
 	nochpoll,		/* poll */
-	ddi_prop_op,		/* prop_op */
+	lofi_prop_op,		/* prop_op */
 	0,			/* streamtab  */
 	D_64BIT | D_NEW | D_MP,	/* Driver compatibility flag */
 	CB_REV,
@@ -2758,17 +3556,43 @@ _init(void)
 	list_create(&lofi_list, sizeof (struct lofi_state),
 	    offsetof(struct lofi_state, ls_list));
 
-	error = ddi_soft_state_init(&lofi_statep,
+	error = ddi_soft_state_init((void **)&lofi_statep,
 	    sizeof (struct lofi_state), 0);
-	if (error)
+	if (error) {
+		list_destroy(&lofi_list);
 		return (error);
+	}
+
+	/*
+	 * The minor number is stored as id << LOFI_CMLB_SHIFT as
+	 * we need to reserve space for cmlb minor numbers.
+	 * This will leave out 4096 id values on 32bit kernel, which should
+	 * still suffice.
+	 */
+	lofi_id = id_space_create("lofi_id", 1,
+	    (1 << (L_BITSMINOR - LOFI_CMLB_SHIFT)));
+
+	if (lofi_id == NULL) {
+		ddi_soft_state_fini((void **)&lofi_statep);
+		list_destroy(&lofi_list);
+		return (DDI_FAILURE);
+	}
 
 	mutex_init(&lofi_lock, NULL, MUTEX_DRIVER, NULL);
+	mutex_init(&lofi_chan_lock, NULL, MUTEX_DRIVER, NULL);
+	cv_init(&lofi_chan_cv, NULL, CV_DRIVER, NULL);
+	error = nvlist_alloc(&lofi_devlink_cache, NV_UNIQUE_NAME, KM_SLEEP);
 
-	error = mod_install(&modlinkage);
+	if (error == 0)
+		error = mod_install(&modlinkage);
 	if (error) {
+		id_space_destroy(lofi_id);
+		if (lofi_devlink_cache != NULL)
+			nvlist_free(lofi_devlink_cache);
+		mutex_destroy(&lofi_chan_lock);
+		cv_destroy(&lofi_chan_cv);
 		mutex_destroy(&lofi_lock);
-		ddi_soft_state_fini(&lofi_statep);
+		ddi_soft_state_fini((void **)&lofi_statep);
 		list_destroy(&lofi_list);
 	}
 
@@ -2793,8 +3617,16 @@ _fini(void)
 	if (error)
 		return (error);
 
+	mutex_enter(&lofi_chan_lock);
+	nvlist_free(lofi_devlink_cache);
+	lofi_devlink_cache = NULL;
+	mutex_exit(&lofi_chan_lock);
+
+	mutex_destroy(&lofi_chan_lock);
+	cv_destroy(&lofi_chan_cv);
 	mutex_destroy(&lofi_lock);
-	ddi_soft_state_fini(&lofi_statep);
+	id_space_destroy(lofi_id);
+	ddi_soft_state_fini((void **)&lofi_statep);
 	list_destroy(&lofi_list);
 
 	return (error);

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PRTFRU 1M "May 30, 2002"
+.TH PRTFRU 1M "April 9, 2016"
 .SH NAME
 prtfru \- print FRUID-specific information about the FRUs on a system or domain
 .SH SYNOPSIS
@@ -13,7 +13,6 @@ prtfru \- print FRUID-specific information about the FRUs on a system or domain
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBprtfru\fR utility is used to obtain \fBFRUID\fR data from the system or
 domain. Its output is that of a tree structure echoing the path in the
@@ -26,7 +25,6 @@ well.
 of the \fBFRUID\fR container data. \fBprtfru\fR prints to stdout which may be
 redirected to a file.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -73,9 +71,8 @@ Prints in \fBXML\fR format with a system identifier (SYSTEM) of
 Options \fB-c\fR and \fB-l\fR can be used together to obtain a list of the
 containers.
 .SH OPERANDS
-.sp
 .LP
-The folowing operand is supported:
+The following operand is supported:
 .sp
 .ne 2
 .na
@@ -87,7 +84,6 @@ the name or path/name of a container as displayed in the \fB-l\fR option.
 .RE
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -109,6 +105,5 @@ An error has occurred.
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBfruadm\fR(1M), \fBattributes\fR(5)

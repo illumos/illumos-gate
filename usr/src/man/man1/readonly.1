@@ -5,7 +5,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH READONLY 1 "Nov 2, 2007"
+.TH READONLY 1 "April 9, 2016"
 .SH NAME
 readonly \- shell built-in function to protect the value of the given variable
 from reassignment
@@ -35,13 +35,11 @@ from reassignment
 
 .SH DESCRIPTION
 .SS "sh"
-.sp
 .LP
-The given \fIname\fRs are marked \fBreadonly\fR and the values of the these
+The given \fIname\fRs are marked \fBreadonly\fR and the values of these
 \fIname\fRs may not be changed by subsequent assignment. If no arguments are
 given, a list of all \fBreadonly\fR names is printed.
 .SS "ksh"
-.sp
 .LP
 The given \fIname\fRs are marked \fBreadonly\fR and these names cannot be
 changed by subsequent assignment.
@@ -118,7 +116,6 @@ This means that tilde substitution is performed after the \fB=\fR sign and word
 splitting and file name generation are not performed.
 .RE
 .SS "ksh93"
-.sp
 .LP
 \fBreadonly\fR sets the \fBreadonly\fR attribute on each of the variables
 specified by name which prevents their values from being changed. If
@@ -178,7 +175,6 @@ field splitting and file name generation are not performed.
 .RE
 .SH EXIT STATUS
 .SS "ksh93"
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -200,7 +196,6 @@ An error occurred.
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBksh\fR(1), \fBksh93\fR(1), \fBsh\fR(1), \fBtypeset\fR(1),
 \fBattributes\fR(5)

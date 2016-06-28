@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH RWHO 1 "Nov 6, 2000"
+.TH RWHO 1 "April 9, 2016"
 .SH NAME
 rwho \- who is logged in on local machines
 .SH SYNOPSIS
@@ -13,7 +13,6 @@ rwho \- who is logged in on local machines
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBrwho\fR command produces output similar to \fBwho\fR(1), but for all
 machines on your network.  If no report has been received from a machine for 5
@@ -26,7 +25,6 @@ this idle time.  If a user has not typed to the system for an hour or more, the
 user is omitted from the output of \fBrwho\fR unless the \fB-a\fR flag is
 given.
 .SH OPTIONS
-.sp
 .ne 2
 .na
 \fB\fB-a\fR\fR
@@ -36,7 +34,6 @@ Report all users whether or not they have typed to the system in the past hour.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/var/spool/rwho/whod.*\fR\fR
@@ -46,12 +43,10 @@ information about other machines
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBfinger\fR(1), \fBruptime\fR(1), \fBwho\fR(1), \fBin.rwhod\fR(1M),
 \fBattributes\fR(5)
 .SH NOTES
-.sp
 .LP
 \fBrwho\fR does not work through gateways.
 .sp
@@ -60,7 +55,7 @@ The directory \fB/var/spool/rwho\fR must exist on the host from which
 \fBrwho\fR is run.
 .sp
 .LP
-This service takes up progressively more network bandwith as the number of
+This service takes up progressively more network bandwidth as the number of
 hosts on the local net increases. For large networks, the cost becomes
 prohibitive.
 .sp

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH IPMPSTAT 1M "Feb 10, 2009"
+.TH IPMPSTAT 1M "April 9, 2016"
 .SH NAME
 ipmpstat \- display IPMP subsystem status
 .SH SYNOPSIS
@@ -13,19 +13,17 @@ ipmpstat \- display IPMP subsystem status
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBipmpstat\fR command concisely displays information about the IPMP
 subsystem. It supports five different output modes, each of which provides a
 different view of the IPMP subsystem (address, group, interface, probe, and
 target), described below. At most one output mode may be specified per
 invocation, and the displayed information is guaranteed to be self-consistent.
-It also provides a parseable output format which may be used by scripts to
+It also provides a parsable output format which may be used by scripts to
 examine the state of the IPMP subsystem. Only basic privileges are needed to
 invoke \fBipmpstat\fR, with the exception of probe mode which requires all
 privileges.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -109,13 +107,12 @@ Display IPMP target information ("target" output mode).
 .ad
 .sp .6
 .RS 4n
-Display using a machine-parseable format, described below. If this option is
+Display using a machine-parsable format, described below. If this option is
 specified, an explicit list of fields must be specified using the \fB-o\fR
 option.
 .RE
 
 .SH OUTPUT MODES
-.sp
 .LP
 The \fBipmpstat\fR utility supports the output modes listed below. Note that
 these modes map to some of the options described above.
@@ -765,7 +762,6 @@ If \fB-o\fR is not specified, all output fields are displayed.
 .RE
 
 .SH OUTPUT FORMAT
-.sp
 .LP
 By default, \fBipmpstat\fR uses a human-friendly tabular format for its output
 modes, where each row contains one or more fields of information about a given
@@ -778,8 +774,8 @@ displayed as "\fB?\fR" and a diagnostic message will be output to standard
 error.
 .sp
 .LP
-Machine-parseable format also uses a tabular format, but is designed to be
-efficient to programmatically parse. Specifically, machine-parseable format
+Machine-parsable format also uses a tabular format, but is designed to be
+efficient to programmatically parse. Specifically, machine-parsable format
 differs from human-friendly format in the following ways:
 .RS +4
 .TP
@@ -813,7 +809,7 @@ If multiple fields are requested, and a literal \fB:\fR or a backslash
 \fBExample 1 \fRObtaining Failure Detection Time of a Specific Interface
 .sp
 .LP
-The following code uses the machine-parseable output format to create a
+The following code uses the machine-parsable output format to create a
 \fBksh\fR function that outputs the failure detection time of a given IPMP IP
 interface:
 
@@ -830,7 +826,6 @@ interface:
 .sp
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -847,7 +842,7 @@ ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
 Interface Stability	Committed
 _
-Machine-Parseable Format	Committed
+Machine-Parsable Format	Committed
 _
 Human-Friendly Format	Not-an-Interface
 .TE
@@ -856,7 +851,6 @@ Human-Friendly Format	Not-an-Interface
 .LP
 \fB/sbin/ipmpstat\fR is not a Committed interface.
 .SH SEE ALSO
-.sp
 .LP
 \fBif_mpadm\fR(1M), \fBifconfig\fR(1M), \fBin.mpathd\fR(1M),
 \fBattributes\fR(5)

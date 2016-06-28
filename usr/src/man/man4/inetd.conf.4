@@ -1,7 +1,7 @@
 '\" te
 .\"  Copyright 1989 AT&T Copyright (c) 1985 Regents of the University of California. All rights reserved. The Berkeley software License Agreement specifies the terms and conditions for redistribution.
 .\" Copyright (C) 2004, Sun Microsystems, Inc. All Rights Reserved
-.TH INETD.CONF 4 "Dec 17, 2004"
+.TH INETD.CONF 4 "April 9, 2016"
 .SH NAME
 inetd.conf \- Internet servers database
 .SH SYNOPSIS
@@ -16,7 +16,6 @@ inetd.conf \- Internet servers database
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 In the current release of the Solaris operating system, the \fBinetd.conf\fR
 file is no longer directly used to configure \fBinetd\fR. The Solaris services
@@ -161,7 +160,7 @@ the server that is invoked by \fBinetd\fR will take over the listening socket
 associated with the service, and whether once launched, \fBinetd\fR will
 \fBwait\fR for that server to exit, if ever, before it resumes listening for
 new service requests. The \fIwait-status\fR for datagram servers must be set to
-\fBwait\fR, as they are always invoked with the orginal datagram socket that
+\fBwait\fR, as they are always invoked with the original datagram socket that
 will participate in delivering the service bound to the specified service. They
 do not have separate "listening" and "accepting" sockets. Accordingly, do not
 configure \fBUDP\fR services as \fBnowait\fR. This causes a race condition by
@@ -208,7 +207,6 @@ for services whose \fIwait-status\fR value is \fBnowait\fR.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/netconfig\fR\fR
@@ -236,12 +234,10 @@ Internet network services
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBrlogin\fR(1), \fBrsh\fR(1), \fBin.tftpd\fR(1M), \fBinetadm\fR(1M),
 \fBinetconv\fR(1M), \fBinetd\fR(1M), \fBservices\fR(4), \fBsmf\fR(5)
 .SH NOTES
-.sp
 .LP
 \fB/etc/inet/inetd.conf\fR is the official SVR4 name of the \fBinetd.conf\fR
 file. The symbolic link \fB/etc/inetd.conf\fR exists for \fBBSD\fR

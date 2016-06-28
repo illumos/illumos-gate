@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH KSTAT 1M "Jan 9, 2013"
+.TH KSTAT 1M "April 9, 2016"
 .SH NAME
 kstat \- display kernel statistics
 .SH SYNOPSIS
@@ -22,7 +22,6 @@ kstat \- display kernel statistics
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBkstat\fR utility examines the available kernel statistics, or kstats, on
 the system and reports those statistics which match the criteria specified on
@@ -50,7 +49,6 @@ When invoked without any module operands or options, kstat will match all
 defined statistics on the system. Example invocations are provided below. All
 times are displayed as fractional seconds since system boot.
 .SH OPTIONS
-.sp
 .LP
 The tests specified by the following options are logically ANDed, and all
 matching kstats will be selected. A regular expression containing shell
@@ -67,7 +65,7 @@ enclosed in '/' characters.
 \fB\fB-C\fR\fR
 .ad
 .RS 16n
-Displays output in parseable format with a colon as separator.
+Displays output in parsable format with a colon as separator.
 .RE
 
 .sp
@@ -131,7 +129,7 @@ Displays only kstats that match the specified name.
 \fB\fB-p\fR\fR
 .ad
 .RS 16n
-Displays output in parseable format. All example output in this document is
+Displays output in parsable format. All example output in this document is
 given in this format. If this option is not specified, \fBkstat\fR produces
 output in a human-readable, table format.
 .RE
@@ -167,7 +165,6 @@ format (\fBd\fR) or as an alphanumeric representation of the value returned by
 .RE
 
 .SH OPERANDS
-.sp
 .LP
 The following operands are supported:
 .sp
@@ -206,7 +203,6 @@ The number of reports to be printed.
 .RE
 
 .SH EXAMPLES
-.sp
 .LP
 In the following examples, all the command lines in a block produce the same
 output, as shown immediately below. The exact statistics and values will of
@@ -327,7 +323,6 @@ unix:0:system_misc:avenrun_5min 18
 .sp
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -367,7 +362,6 @@ A fatal error occurred.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/dev/kstat\fR\fR
@@ -377,13 +371,11 @@ kernel statistics driver
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBdate\fR(1), \fBsh\fR(1), \fBtime\fR(2), \fBgmatch\fR(3GEN),
 \fBkstat\fR(3KSTAT), \fBattributes\fR(5), \fBregex\fR(5), \fBkstat\fR(7D),
 \fBsd\fR(7D), \fBkstat\fR(9S)
 .SH NOTES
-.sp
 .LP
 If the pattern argument contains glob or RE metacharacters which are also
 shell metacharacters, it will be necessary to enclose the pattern with

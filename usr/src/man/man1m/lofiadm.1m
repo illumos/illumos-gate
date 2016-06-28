@@ -1,786 +1,620 @@
 '\" te
+.\" Copyright 2016 Toomas Soome <tsoome@me.com>
 .\" Copyright 2013 Nexenta Systems, Inc. All rights reserved.
 .\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LOFIADM 1M "Aug 28, 2013"
-.SH NAME
-lofiadm \- administer files available as block devices through lofi
-.SH SYNOPSIS
-.LP
-.nf
-\fBlofiadm\fR [\fB-r\fR] \fB-a\fR \fIfile\fR [\fIdevice\fR]
-.fi
-
-.LP
-.nf
-\fBlofiadm\fR [\fB-r\fR] \fB-c\fR \fIcrypto_algorithm\fR \fB-a\fR \fIfile\fR [\fIdevice\fR]
-.fi
-
-.LP
-.nf
-\fBlofiadm\fR [\fB-r\fR] \fB-c\fR \fIcrypto_algorithm\fR \fB-k\fR \fIraw_key_file\fR \fB-a\fR \fIfile\fR [\fIdevice\fR]
-.fi
-
-.LP
-.nf
-\fBlofiadm\fR [\fB-r\fR] \fB-c\fR \fIcrypto_algorithm\fR \fB-T\fR \fItoken_key\fR \fB-a\fR \fIfile\fR [\fIdevice\fR]
-.fi
-
-.LP
-.nf
-\fBlofiadm\fR [\fB-r\fR] \fB-c\fR \fIcrypto_algorithm\fR \fB-T\fR \fItoken_key\fR
-     \fB-k\fR \fIwrapped_key_file\fR \fB-a\fR \fIfile\fR [\fIdevice\fR]
-.fi
-
-.LP
-.nf
-\fBlofiadm\fR [\fB-r\fR] \fB-c\fR \fIcrypto_algorithm\fR \fB-e\fR \fB-a\fR \fIfile\fR [\fIdevice\fR]
-.fi
-
-.LP
-.nf
-\fBlofiadm\fR \fB-C\fR \fIalgorithm\fR [\fB-s\fR \fIsegment_size\fR] \fIfile\fR
-.fi
-
-.LP
-.nf
-\fBlofiadm\fR \fB-d\fR \fIfile\fR | \fIdevice\fR
-.fi
-
-.LP
-.nf
-\fBlofiadm\fR \fB-U\fR \fIfile\fR
-.fi
-
-.LP
-.nf
-\fBlofiadm\fR [ \fIfile\fR | \fIdevice\fR]
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
-\fBlofiadm\fR administers \fBlofi\fR, the loopback file driver. \fBlofi\fR
+.Dd Jun 14, 2016
+.Dt LOFIADM 1M
+.Os
+.Sh NAME
+.Nm lofiadm
+.Nd administer files available as block devices through lofi
+.Sh SYNOPSIS
+.Nm
+.Op Fl r
+.Op Fl l
+.Fl a Ar file Op Ar device
+.Nm
+.Op Fl r
+.Fl c
+.Ar crypto_algorithm
+.Fl a
+.Ar file Op Ar device
+.Nm
+.Op Fl r
+.Fl c Ar crypto_algorithm
+.Fl k Ar raw_key_file
+.Fl a  Ar file Op Ar device
+.Nm
+.Op Fl r
+.Fl c Ar crypto_algorithm
+.Fl T Ar token_key
+.Fl a Ar file Op Ar device
+.Nm
+.Op Fl r
+.Fl c Ar crypto_algorithm
+.Fl T Ar token_key
+.Fl k Ar wrapped_key_file
+.Fl a Ar file Op Ar device
+.Nm
+.Op Fl r
+.Fl c Ar crypto_algorithm
+.Fl e
+.Fl a Ar file Op Ar device
+.Nm
+.Fl C Ar algorithm
+.Op Fl s Ar segment_size
+.Ar file
+.Nm
+.Fl d Ar file Ns | Ns Ar device
+.Nm
+.Fl U Ar file
+.Nm
+.Op Ar file Ns | Ns device
+.Sh DESCRIPTION
+.Nm
+administers
+.Sy lofi ,
+the loopback file driver.
+.Sy lofi
 allows a file to be associated with a block device. That file can then be
 accessed through the block device. This is useful when the file contains an
-image of some filesystem (such as a floppy or \fBCD-ROM\fR image), because the
-block device can then be used with the normal system utilities for mounting,
-checking or repairing filesystems. See \fBfsck\fR(1M) and \fBmount\fR(1M).
-.sp
-.LP
-Use \fBlofiadm\fR to add a file as a loopback device, remove such an
+image of some filesystem (such as a floppy or
+.Sy CD-ROM
+image), because the block device can then be used with the normal system
+utilities for mounting, checking or repairing filesystems. See
+.Xr fsck 1M
+and
+.Xr mount 1M .
+.Pp
+Use
+.Nm
+to add a file as a loopback device, remove such an
 association, or print information about the current associations.
-.sp
-.LP
+.Pp
 Encryption and compression options are mutually exclusive on the command line.
 Further, an encrypted file cannot be compressed later, nor can a compressed
 file be encrypted later.
-
-In the global zone, \fBlofiadm\fR can be used on both the global
+.Pp
+In the global zone,
+.Nm
+can be used on both the global
 zone devices and all devices owned by other non-global zones on the system.
-.sp
-.SH OPTIONS
-.sp
-.LP
+.Ss Labeled Devices
+If the command line flag,
+.Fl l ,
+is used while creating a loopack device,
+.Sy lofi
+will create a labeled loopback
+device, and will generate device links in
+.Pa /dev/{dsk,rdsk}
+directories for partitions or slices.
+.Pp
+Before using these devices, users should create or verify
+partitioning by using partition management tools such as
+.Xr format 1M and
+.Xr fdisk 1M .
+Once the device has been appropriately partitioned, the labeled
+device can be used as normal disk to create and mount file systems and to store
+data.  Mappings created by
+.Nm
+are not permanent and not persisted by the system. If power is lost or the system
+is rebooted, then the mappings will need to be created again.
+.Pp
+The partition table requires space from the mapped file.
+.Sy lofi
+does not support converting previously created unlabeled loopback device images
+to labeled loopback devices. If an unlabeled device is used as a labeled device,
+writing to it will corrupt it.
+.Sh OPTIONS
 The following options are supported:
-.sp
-.ne 2
-.na
-\fB\fB-a\fR \fIfile\fR [\fIdevice\fR]\fR
-.ad
-.sp .6
-.RS 4n
-Add \fIfile\fR as a block device.
-.sp
-If \fIdevice\fR is not specified, an available device is picked.
-.sp
-If \fIdevice\fR is specified, \fBlofiadm\fR attempts to assign it to
-\fIfile\fR. \fIdevice\fR must be available or \fBlofiadm\fR will fail. The
-ability to specify a device is provided for use in scripts that wish to
-reestablish a particular set of associations.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-C\fR {\fIgzip\fR | \fIgzip-N\fR | \fIlzma\fR}\fR
-.ad
-.sp .6
-.RS 4n
+.Bl -tag -width Ds
+.It Fl a Ar file Op Ar device
+Add
+.Sy file
+as a block device.
+.Pp
+If
+.Sy device
+is not specified, an available device is picked.
+.Pp
+If
+.Sy device
+is specified,
+.Nm
+attempts to assign it to
+.Sy file .
+.Sy device
+must be available or
+.Nm
+will fail. The ability to specify a device is provided for use in scripts that
+wish to reestablish a particular set of associations.
+A device may not be specified when using a labeled lofi device.
+.It Fl C Ar {gzip | gzip-N | lzma}
 Compress the file with the specified compression algorithm.
-.sp
-The \fBgzip\fR compression algorithm uses the same compression as the
-open-source \fBgzip\fR command. You can specify the \fBgzip\fR level by using
-the value \fBgzip-\fR\fIN\fR where \fIN\fR is 6 (fast) or 9 (best compression
-ratio). Currently, \fBgzip\fR, without a number, is equivalent to \fBgzip-6\fR
-(which is also the default for the \fBgzip\fR command).
-.sp
-\fIlzma\fR stands for the LZMA (Lempel-Ziv-Markov) compression algorithm.
-.sp
+.Pp
+The
+.Sy gzip
+compression algorithm uses the same compression as the open-source
+.Sy gzip
+command. You can specify the
+.Sy gzip
+level by using the value gzip-\fR\fIN\fR where \fIN\fR is 6 (fast) or 9
+(best compression ratio). Currently,
+.Sy gzip ,
+without a number, is equivalent to
+.Sy gzip-6
+(which is also the default for the
+.Sy gzip
+command).
+.Pp
+.Sy lzma
+stands for the LZMA (Lempel-Ziv-Markov) compression algorithm.
+.Pp
 Note that you cannot write to a compressed file, nor can you mount a compressed
 file read/write.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-d\fR \fIfile\fR | \fIdevice\fR\fR
-.ad
-.sp .6
-.RS 4n
-Remove an association by \fIfile\fR or \fIdevice\fR name, if the associated
-block device is not busy, and deallocates the block device.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-r\fR
-.ad
-.sp .6
-.RS 4n
-If the \fB-r\fR option is specified before the \fB-a\fR option, the
-\fIdevice\fR will be opened read-only.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-s\fR \fIsegment_size\fR\fR
-.ad
-.sp .6
-.RS 4n
-The segment size to use to divide the file being compressed. \fIsegment_size\fR
+.It Fl d Ar file Ns | Ns Ar device
+Remove an association by
+.Sy file
+or
+.Sy device
+name, if the associated block device is not busy, and deallocates the block
+device.
+.It Fl l
+This option should be used with
+.Fl a
+option to create labeled loopback device. If created in local zone, the device
+has to be enabled in zone configuration.
+.It Fl r
+If the
+.Fl r
+option is specified before the
+.Fl a
+option, the
+.Sy device
+will be opened read-only.
+.It Fl s Ar segment_size
+The segment size to use to divide the file being compressed.
+.Sy segment_size
 can be an integer multiple of 512.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-U\fR \fIfile\fR\fR
-.ad
-.sp .6
-.RS 4n
+.It Fl U Ar file
 Uncompress a compressed file.
-.RE
-
-.sp
-.LP
+.El
+.Pp
 The following options are used when the file is encrypted:
-.sp
-.ne 2
-.na
-\fB\fB-c\fR \fIcrypto_algorithm\fR\fR
-.ad
-.sp .6
-.RS 4n
+.Bl -tag -width Ds
+.It Fl c Ar crypto_algorithm
 Select the encryption algorithm. The algorithm must be specified when
 encryption is enabled because the algorithm is not stored in the disk image.
-.sp
-If none of \fB-e\fR, \fB-k\fR, or \fB-T\fR is specified, \fBlofiadm\fR prompts
-for a passphrase, with a minimum length of eight characters, to be entered .
+.Pp
+If none of
+.Fl e ,
+.Fl k ,
+or
+.Fl T
+is specified,
+.Nm
+prompts for a passphrase, with a minimum length of eight characters, to be
+entered.
 The passphrase is used to derive a symmetric encryption key using PKCS#5 PBKD2.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-k\fR \fIraw_key_file\fR | \fIwrapped_key_file\fR\fR
-.ad
-.sp .6
-.RS 4n
+.It Fl k Ar raw_key_file | Ar wrapped_key_file
 Path to raw or wrapped symmetric encryption key. If a PKCS#11 object is also
-given with the \fB-T\fR option, then the key is wrapped by that object. If
-\fB-T\fR is not specified, the key is used raw.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-T\fR \fItoken_key\fR\fR
-.ad
-.sp .6
-.RS 4n
+given with the
+.Fl T
+option, then the key is wrapped by that object. If
+.Fl T
+is not specified, the key is used raw.
+.It Fl T Ar token_key
 The key in a PKCS#11 token to use for the encryption or for unwrapping the key
 file.
-.sp
-If \fB-k\fR is also specified, \fB-T\fR identifies the unwrapping key, which
-must be an RSA private key.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-e\fR\fR
-.ad
-.sp .6
-.RS 4n
+.Pp
+If
+.Fl k
+is also specified,
+.Fl T
+identifies the unwrapping key, which must be an RSA private key.
+.It Fl e
 Generate an ephemeral symmetric encryption key.
-.RE
-
-.SH OPERANDS
-.sp
-.LP
+.El
+.Sh OPERANDS
 The following operands are supported:
-.sp
-.ne 2
-.na
-\fB\fIcrypto_algorithm\fR\fR
-.ad
-.sp .6
-.RS 4n
-One of: \fBaes-128-cbc\fR, \fBaes-192-cbc\fR, \fBaes-256-cbc\fR,
-\fBdes3-cbc\fR, \fBblowfish-cbc\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fIdevice\fR\fR
-.ad
-.sp .6
-.RS 4n
-Display the file name associated with the block device \fIdevice\fR.
-.sp
+.Bl -tag -width Ds
+.It Ar crypto_algorithm
+One of:
+.Sy aes-128-cbc ,
+.Sy aes-192-cbc ,
+.Sy aes-256-cbc ,
+.Sy des3-cbc ,
+.Sy blowfish-cbc .
+.It Ar device
+Display the file name associated with the block device
+.Sy device .
+.Pp
 Without arguments, print a list of the current associations. Filenames must be
 valid absolute pathnames.
-.sp
+.Pp
 When a file is added, it is opened for reading or writing by root. Any
-restrictions apply (such as restricted root access over \fBNFS\fR). The file is
-held open until the association is removed. It is not actually accessed until
-the block device is used, so it will never be written to if the block device is
-only opened read-only.
-
+restrictions apply (such as restricted root access over
+.Sy NFS Ns ).
+The file is held open until the association is removed. It is not actually
+accessed until the block device is used, so it will never be written to if the
+block device is only opened read-only.
+.Pp
 Note that the filename may appear as "?" if it is not possible to resolve the
 path in the current context (for example, if it's an NFS path in a non-global
 zone).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fIfile\fR\fR
-.ad
-.sp .6
-.RS 4n
-Display the block device associated with \fIfile\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fIraw_key_file\fR\fR
-.ad
-.sp .6
-.RS 4n
+.It Ar file
+Display the block device associated with
+.Sy file .
+.It Ar raw_key_file
 Path to a file of the appropriate length, in bits, to use as a raw symmetric
 encryption key.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fItoken_key\fR\fR
-.ad
-.sp .6
-.RS 4n
+.It Ar token_key
 PKCS#11 token object in the format:
-.sp
-.in +2
-.nf
-\fItoken_name\fR:\fImanufacturer_id\fR:\fIserial_number\fR:\fIkey_label\fR
-.fi
-.in -2
-.sp
-
+.Pp
+.Ar token_name Ns : Ns Ar manufacturer_id Ns : Ns Ar serial_number Ns : Ns Ar key_label
+.Pp
 All but the key label are optional and can be empty. For example, to specify a
-token object with only its key label \fBMylofiKey\fR, use:
-.sp
-.in +2
-.nf
--T :::MylofiKey
-.fi
-.in -2
-.sp
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fIwrapped_key_file\fR\fR
-.ad
-.sp .6
-.RS 4n
+token object with only its key label
+.Sy MylofiKey ,
+use:
+.Pp
+.Fl T Ar ::: Ns Ar MylofiKey
+.It Ar wrapped_key_file
 Path to file containing a symmetric encryption key wrapped by the RSA private
-key specified by \fB-T\fR.
-.RE
-
-.SH EXAMPLES
-.LP
-\fBExample 1 \fRMounting an Existing CD-ROM Image
-.sp
-.LP
+key specified by
+.Fl T .
+.El
+.Sh ENVIRONMENT
+See
+.Xr environ 5
+for descriptions of the following environment variables
+that affect the execution of
+.Nm
+:
+.Sy LC_CTYPE ,
+.Sy LC_MESSAGES
+and
+.Sy NLSPATH .
+.Sh EXIT STATUS
+The following exit values are returned:
+.Bl -tag -width Ds
+.It Sy 0
+Successful completion.
+.It Sy >0
+An error occurred.
+.El
+.Sh EXAMPLES
+.Bl -tag -width Ds
+.It Sy Example 1 No Mounting an Existing CD-ROM Image
 You should ensure that Solaris understands the image before creating the
-\fBCD\fR. \fBlofi\fR allows you to mount the image and see if it works.
-
-.sp
-.LP
-This example mounts an existing \fBCD-ROM\fR image (\fBsparc.iso\fR), of the
-\fBRed Hat 6.0 CD\fR which was downloaded from the Internet. It was created
-with the \fBmkisofs\fR utility from the Internet.
-
-.sp
-.LP
-Use \fBlofiadm\fR to attach a block device to it:
-
-.sp
-.in +2
-.nf
-# \fBlofiadm -a /home/mike_s/RH6.0/sparc.iso\fR
+.Sy CD .
+.Sy lofi
+allows you to mount the image and see if it works.
+.Pp
+This example mounts an existing
+.Sy CD-ROM
+image
+.Pf ( Sy sparc.iso Ns ),
+of the
+.Sy Red Hat 6.0 CD
+which was downloaded from the Internet. It was created
+with the
+.Sy mkisofs
+utility from the Internet.
+.Pp
+Use
+.Nm
+to attach a block device to it:
+.Bd -literal
+# lofiadm -a /home/mike_s/RH6.0/sparc.iso
 /dev/lofi/1
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-\fBlofiadm\fR picks the device and prints the device name to the standard
-output. You can run \fBlofiadm\fR again by issuing the following command:
-
-.sp
-.in +2
-.nf
-# \fBlofiadm\fR
+.Ed
+.Pp
+.Nm
+picks the device and prints the device name to the standard
+output. You can run
+.Nm
+again by issuing the following command:
+.Bd -literal
+# lofiadm
 Block Device     File                           Options
 /dev/lofi/1      /home/mike_s/RH6.0/sparc.iso   -
-.fi
-.in -2
-.sp
-
-.sp
-.LP
+.Ed
+.Pp
 Or, you can give it one name and ask for the other, by issuing the following
 command:
-
-.sp
-.in +2
-.nf
-# \fBlofiadm /dev/lofi/1\fR
+.Bd -literal
+# lofiadm /dev/lofi/1
 /home/mike_s/RH6.0/sparc.iso
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-Use the \fBmount\fR command to mount the image:
-
-.sp
-.in +2
-.nf
-# \fBmount -F hsfs -o ro /dev/lofi/1 /mnt\fR
-.fi
-.in -2
-.sp
-
-.sp
-.LP
+.Ed
+.Pp
+Use the
+.Xr mount 1M
+command to mount the image:
+.Bd -literal
+# mount -F hsfs -o ro /dev/lofi/1 /mnt
+.Ed
+.Pp
 Check to ensure that Solaris understands the image:
-
-.sp
-.in +2
-.nf
-# \fBdf -k /mnt\fR
+.Bd -literal
+# df -k /mnt
 Filesystem            kbytes    used   avail capacity  Mounted on
 /dev/lofi/1           512418  512418       0   100%    /mnt
-# \fBls /mnt\fR
+# ls /mnt
 \&./            RedHat/       doc/          ls-lR         rr_moved/
 \&../           TRANS.TBL     dosutils/     ls-lR.gz      sbin@
 \&.buildlog     bin@          etc@          misc/         tmp/
 COPYING       boot/         images/       mnt/          usr@
 README        boot.cat*     kernels/      modules/
 RPM-PGP-KEY   dev@          lib@          proc/
-.fi
-.in -2
-.sp
-
-.sp
-.LP
+.Ed
+.Pp
 Solaris can mount the CD-ROM image, and understand the filenames. The image was
-created properly, and you can now create the \fBCD-ROM\fR with confidence.
-
-.sp
-.LP
+created properly, and you can now create the
+.Sy CD-ROM
+with confidence.
+.Pp
 As a final step, unmount and detach the images:
-
-.sp
-.in +2
-.nf
-# \fBumount /mnt\fR
-# \fBlofiadm -d /dev/lofi/1\fR
-# \fBlofiadm\fR
+.Bd -literal
+# umount /mnt
+# lofiadm -d /dev/lofi/1
+# lofiadm
 Block Device             File             Options
-.fi
-.in -2
-.sp
-
-.LP
-\fBExample 2 \fRMounting a Floppy Image
-.sp
-.LP
+.Ed
+.It Sy Example 2 No Mounting a Floppy Image
 This is similar to the first example.
-
-.sp
-.LP
-Using \fBlofi\fR to help you mount files that contain floppy images is helpful
+.Pp
+Using
+.Sy lofi
+to help you mount files that contain floppy images is helpful
 if a floppy disk contains a file that you need, but the machine which you are
 on does not have a floppy drive. It is also helpful if you do not want to take
-the time to use the \fBdd\fR command to copy the image to a floppy.
-
-.sp
-.LP
-This is an example of getting to \fBMDB\fR floppy for Solaris on an x86
-platform:
-
-.sp
-.in +2
-.nf
-# \fBlofiadm -a /export/s28/MDB_s28x_wos/latest/boot.3\fR
+the time to use the
+.Sy dd
+command to copy the image to a floppy.
+.Pp
+This is an example of getting to
+.Sy MDB
+floppy for Solaris on an x86 platform:
+.Bd -literal
+# lofiadm -a /export/s28/MDB_s28x_wos/latest/boot.3
 /dev/lofi/1
-# \fBmount -F pcfs /dev/lofi/1 /mnt\fR
-# \fBls /mnt\fR
+# mount -F pcfs /dev/lofi/1 /mnt
+# ls /mnt
 \&./            COMMENT.BAT*  RC.D/         SOLARIS.MAP*
 \&../           IDENT*        REPLACE.BAT*  X/
 APPEND.BAT*   MAKEDIR.BAT*  SOLARIS/
-# \fBumount /mnt\fR
-# \fBlofiadm -d /export/s28/MDB_s28x_wos/latest/boot.3\fR
-.fi
-.in -2
-.sp
-
-.LP
-\fBExample 3 \fRMaking a \fBUFS\fR Filesystem on a File
-.sp
-.LP
-Making a \fBUFS\fR filesystem on a file can be useful, particularly if a test
+# umount /mnt
+# lofiadm -d /export/s28/MDB_s28x_wos/latest/boot.3
+.Ed
+.It Sy Example 3 No Making a Sy UFS No Filesystem on a File
+Making a
+.Sy UFS
+filesystem on a file can be useful, particularly if a test
 suite requires a scratch filesystem. It can be painful (or annoying) to have to
 repartition a disk just for the test suite, but you do not have to. You can
-\fBnewfs\fR a file with \fBlofi\fR
-
-.sp
-.LP
+.Sy newfs
+a file with
+.Sy lofi .
+.Pp
 Create the file:
-
-.sp
-.in +2
-.nf
-# \fBmkfile 35m /export/home/test\fR
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-Attach it to a block device. You also get the character device that \fBnewfs\fR
-requires, so \fBnewfs\fR that:
-
-.sp
-.in +2
-.nf
-# \fBlofiadm -a /export/home/test\fR
+.Bd -literal
+# mkfile 35m /export/home/test
+.Ed
+.Pp
+Attach it to a block device. You also get the character device that
+.Sy newfs
+requires, so
+.Sy newfs
+that:
+.Bd -literal
+# lofiadm -a /export/home/test
 /dev/lofi/1
-# \fBnewfs /dev/rlofi/1\fR
-newfs: construct a new file system /dev/rlofi/1: (y/n)? \fBy\fR
+# newfs /dev/rlofi/1
+newfs: construct a new file system /dev/rlofi/1: (y/n)? y
 /dev/rlofi/1:   71638 sectors in 119 cylinders of 1 tracks, 602 sectors
         35.0MB in 8 cyl groups (16 c/g, 4.70MB/g, 2240 i/g)
 super-block backups (for fsck -F ufs -o b=#) at:
  32, 9664, 19296, 28928, 38560, 48192, 57824, 67456,
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-Note that \fBufs\fR might not be able to use the entire file. Mount and use the
-filesystem:
-
-.sp
-.in +2
-.nf
-# \fBmount /dev/lofi/1 /mnt\fR
-# \fBdf -k /mnt\fR
+.Ed
+.Pp
+Note that
+.Sy ufs
+might not be able to use the entire file. Mount and use the filesystem:
+.Bd -literal
+# mount /dev/lofi/1 /mnt
+# df -k /mnt
 Filesystem            kbytes    used   avail capacity  Mounted on
 /dev/lofi/1            33455       9   30101     1%    /mnt
-# \fBls /mnt\fR
+# ls /mnt
 \&./           ../          lost+found/
-# \fBumount /mnt\fR
-# \fBlofiadm -d /dev/lofi/1\fR
-.fi
-.in -2
-.sp
-
-.LP
-\fBExample 4 \fRCreating a PC (FAT) File System on a Unix File
-.sp
-.LP
-The following series of commands creates a \fBFAT\fR file system on a Unix
-file. The file is associated with a block device created by \fBlofiadm\fR.
-
-.sp
-.in +2
-.nf
-# \fBmkfile 10M /export/test/testfs\fR
-# \fBlofiadm -a /export/test testfs\fR
+# umount /mnt
+# lofiadm -d /dev/lofi/1
+.Ed
+.It Sy Example 4 No Creating a PC (FAT) File System on a Unix File
+The following series of commands creates a
+.Sy FAT
+file system on a Unix file. The file is associated with a block device created by
+.Nm
+.
+.Bd -literal
+# mkfile 10M /export/test/testfs
+# lofiadm -a /export/test testfs
 /dev/lofi/1
-\fBNote use of\fR rlofi\fB, not\fR lofi\fB, in following command.\fR
-# \fBmkfs -F pcfs -o nofdisk,size=20480 /dev/rlofi/1\fR
-\fBConstruct a new FAT file system on /dev/rlofi/1: (y/n)?\fR y
-# \fBmount -F pcfs /dev/lofi/1 /mnt\fR
-# \fBcd /mnt\fR
-# \fBdf -k .\fR
+.Ed
+.Pp
+Note use of
+.Sy rlofi ,
+not
+.Sy lofi ,
+in following command.
+.Bd -literal
+# mkfs -F pcfs -o nofdisk,size=20480 /dev/rlofi/1
+Construct a new FAT file system on /dev/rlofi/1: (y/n)? y
+# mount -F pcfs /dev/lofi/1 /mnt
+# cd /mnt
+# df -k .
 Filesystem            kbytes    used   avail capacity  Mounted on
 /dev/lofi/1            10142       0   10142     0%    /mnt
-.fi
-.in -2
-.sp
-
-.LP
-\fBExample 5 \fRCompressing an Existing CD-ROM Image
-.sp
-.LP
+.Ed
+.It Sy Example 5 No Compressing an Existing CD-ROM Image
 The following example illustrates compressing an existing CD-ROM image
-(\fBsolaris.iso\fR), verifying that the image is compressed, and then
-uncompressing it.
-
-.sp
-.in +2
-.nf
-# \fBlofiadm -C gzip /export/home/solaris.iso\fR
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-Use \fBlofiadm\fR to attach a block device to it:
-
-.sp
-.in +2
-.nf
-# \fBlofiadm -a /export/home/solaris.iso\fR
+.Pf ( Sy solaris.iso Ns ),
+verifying that the image is compressed, and then uncompressing it.
+.Bd -literal
+# lofiadm -C gzip /export/home/solaris.iso
+.Ed
+.Pp
+Use
+.Nm
+to attach a block device to it:
+.Bd -literal
+# lofiadm -a /export/home/solaris.iso
   /dev/lofi/1
-.fi
-.in -2
-.sp
-
-.sp
-.LP
+.Ed
+.Pp
 Check if the mapped image is compressed:
-
-.sp
-.in +2
-.nf
-# \fBlofiadm\fR
+.Bd -literal
+# lofiadm
 Block Device      File                            Options
 /dev/lofi/1       /export/home/solaris.iso        Compressed(gzip)
 /dev/lofi/2       /export/home/regular.iso        -
-.fi
-.in -2
-.sp
-
-.sp
-.LP
+.Ed
+.Pp
 Unmap the compressed image and uncompress it:
-
-.sp
-.in +2
-.nf
-# \fBlofiadm -d /dev/lofi/1\fR
-# \fBlofiadm -U /export/home/solaris.iso\fR
-.fi
-.in -2
-.sp
-
-.LP
-\fBExample 6 \fRCreating an Encrypted UFS File System on a File
-.sp
-.LP
+.Bd -literal
+# lofiadm -d /dev/lofi/1
+# lofiadm -U /export/home/solaris.iso
+.Ed
+.It Sy Example 6 No Creating an Encrypted UFS File System on a File
 This example is similar to the example of making a UFS filesystem on a file,
 above.
-
-.sp
-.LP
+.Pp
 Create the file:
-
-.sp
-.in +2
-.nf
-# \fBmkfile 35m /export/home/test\fR
-.fi
-.in -2
-.sp
-
-.sp
-.LP
+.Bd -literal
+# mkfile 35m /export/home/test
+.Ed
+.Pp
 Attach the file to a block device and specify that the file image is encrypted.
 As a result of this command, you obtain the character device, which is
-subsequently used by \fBnewfs\fR:
-
-.sp
-.in +2
-.nf
-# \fBlofiadm -c aes-256-cbc -a /export/home/secrets\fR
-Enter passphrase: \fBMy-M0th3r;l0v3s_m3+4lw4ys!\fR           (\fBnot echoed\fR)
-Re-enter passphrase: \fBMy-M0th3r;l0v3s_m3+4lw4ys!\fR        (\fBnot echoed\fR)
+subsequently used by
+.Sy newfs :
+.Bd -literal
+# lofiadm -c aes-256-cbc -a /export/home/secrets
+Enter passphrase: My-M0th3r;l0v3s_m3+4lw4ys!           (not echoed)
+Re-enter passphrase: My-M0th3r;l0v3s_m3+4lw4ys!        (not echoed)
 /dev/lofi/1
 
-# \fBnewfs /dev/rlofi/1\fR
-newfs: construct a new file system /dev/rlofi/1: (y/n)? \fBy\fR
+# newfs /dev/rlofi/1
+newfs: construct a new file system /dev/rlofi/1: (y/n)? y
 /dev/rlofi/1:   71638 sectors in 119 cylinders of 1 tracks, 602 sectors
        35.0MB in 8 cyl groups (16 c/g, 4.70MB/g, 2240 i/g)
 super-block backups (for fsck -F ufs -o b=#) at:
 32, 9664, 19296, 28928, 38560, 48192, 57824, 67456,
-.fi
-.in -2
-.sp
-
-.sp
-.LP
+.Ed
+.Pp
 The mapped file system shows that encryption is enabled:
-
-.sp
-.in +2
-.nf
-# \fBlofiadm\fR
+.Bd -literal
+# lofiadm
 Block Device    File                     Options
 /dev/lofi/1     /export/home/secrets     Encrypted
-.fi
-.in -2
-.sp
-
-.sp
-.LP
+.Ed
+.Pp
 Mount and use the filesystem:
-
-.sp
-.in +2
-.nf
-# \fBmount /dev/lofi/1 /mnt\fR
-# \fBcp moms_secret_*_recipe /mnt\fR
-# \fBls /mnt\fR
-\&./           moms_secret_cookie_recipe    moms_secret_soup_recipe
-\&../          moms_secret_fudge_recipe     moms_secret_stuffing_recipe
+.Bd -literal
+# mount /dev/lofi/1 /mnt
+# cp moms_secret_*_recipe /mnt
+# ls /mnt
+\&./         moms_secret_cookie_recipe    moms_secret_soup_recipe
+\&../        moms_secret_fudge_recipe     moms_secret_stuffing_recipe
 lost+found/  moms_secret_meatloaf_recipe  moms_secret_waffle_recipe
-# \fBumount /mnt\fR
-# \fBlofiadm -d /dev/lofi/1\fR
-.fi
-.in -2
-.sp
-
-.sp
-.LP
+# umount /mnt
+# lofiadm -d /dev/lofi/1
+.Ed
+.Pp
 Subsequent attempts to map the filesystem with the wrong key or the wrong
 encryption algorithm will fail:
-
-.sp
-.in +2
-.nf
-# \fBlofiadm -c blowfish-cbc -a /export/home/secrets\fR
-Enter passphrase: \fBmommy\fR                                (\fInot echoed\fR)
-Re-enter passphrase: \fBmommy\fR                             (\fInot echoed\fR)
+.Bd -literal
+# lofiadm -c blowfish-cbc -a /export/home/secrets\fR
+Enter passphrase: mommy                                (not echoed)
+Re-enter passphrase: mommy                             (not echoed)
 lofiadm: could not map file /root/lofi: Invalid argument
-# \fBlofiadm\fR
+# lofiadm
 Block Device    File                    Options
 #
-.fi
-.in -2
-.sp
-
-.sp
-.LP
+.Ed
+.Pp
 Attempts to map the filesystem without encryption will succeed, however
 attempts to mount and use the filesystem will fail:
-
-.sp
-.in +2
-.nf
-# \fBlofiadm -a /export/home/secrets\fR
+.Bd -literal
+# lofiadm -a /export/home/secrets
 /dev/lofi/1
-# \fBlofiadm\fR
+# lofiadm
 Block Device    File                     Options
 /dev/lofi/1     /export/home/secrets     -
-# \fBmount /dev/lofi/1 /mnt\fR
+# mount /dev/lofi/1 /mnt
 mount: /dev/lofi/1 is not this fstype
 #
-.fi
-.in -2
-.sp
-
-.SH ENVIRONMENT VARIABLES
-.sp
-.LP
-See \fBenviron\fR(5) for descriptions of the following environment variables
-that affect the execution of \fBlofiadm\fR: \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR
-and \fBNLSPATH\fR.
-.SH EXIT STATUS
-.sp
-.LP
-The following exit values are returned:
-.sp
-.ne 2
-.na
-\fB\fB0\fR\fR
-.ad
-.sp .6
-.RS 4n
-Successful completion.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB>0\fR\fR
-.ad
-.sp .6
-.RS 4n
-An error occurred.
-.RE
-
-.SH SEE ALSO
-.sp
-.LP
-\fBfsck\fR(1M), \fBmount\fR(1M), \fBmount_ufs\fR(1M), \fBnewfs\fR(1M),
-\fBattributes\fR(5), \fBlofi\fR(7D), \fBlofs\fR(7FS)
-.SH NOTES
-.sp
-.LP
+.Ed
+.El
+.Sh SEE ALSO
+.Xr fdisk 1M ,
+.Xr format 1M ,
+.Xr fsck 1M ,
+.Xr mount 1M ,
+.Xr mount_ufs 1M ,
+.Xr newfs 1M ,
+.Xr attributes 5 ,
+.Xr lofi 7D ,
+.Xr lofs 7FS
+.Sh NOTES
 Just as you would not directly access a disk device that has mounted file
 systems, you should not access a file associated with a block device except
-through the \fBlofi\fR file driver. It might also be appropriate to ensure that
+through the
+.Sy lofi
+file driver. It might also be appropriate to ensure that
 the file has appropriate permissions to prevent such access.
-.sp
-.LP
-The abilities of \fBlofiadm\fR, and who can use them, are controlled by the
-permissions of \fB/dev/lofictl\fR. Read-access allows query operations, such as
+.Pp
+The abilities of
+.Nm
+, and who can use them, are controlled by the
+permissions of
+.Pa /dev/lofictl .
+Read-access allows query operations, such as
 listing all the associations. Write-access is required to do any state-changing
-operations, like adding an association. As shipped, \fB/dev/lofictl\fR is owned
-by \fBroot\fR, in group \fBsys\fR, and mode \fB0644\fR, so all users can do
-query operations but only root can change anything. The administrator can give
-users write-access, allowing them to add or delete associations, but that is
-very likely a security hole and should probably only be given to a trusted
-group.
-.sp
-.LP
+operations, like adding an association. As shipped,
+.Pa /dev/lofictl
+is owned by
+.Sy root ,
+in group
+.Sy sys ,
+and mode
+.Sy 0644 ,
+so all users can do query operations but only root can change anything.
+The administrator can give users write-access, allowing them to add or
+delete associations, but that is very likely a security hole and should
+probably only be given to a trusted group.
+.Pp
 When mounting a filesystem image, take care to use appropriate mount options.
-In particular, the \fBnosuid\fR mount option might be appropriate for \fBUFS\fR
+In particular, the
+.Sy nosuid
+mount option might be appropriate for
+.Sy UFS
 images whose origin is unknown. Also, some options might not be useful or
-appropriate, like \fBlogging\fR or \fBforcedirectio\fR for \fBUFS\fR. For
-compatibility purposes, a raw device is also exported along with the block
-device. For example, \fBnewfs\fR(1M) requires one.
-.sp
-.LP
-The output of \fBlofiadm\fR (without arguments) might change in future
-releases.
+appropriate, like
+.Sy logging
+or
+.Sy forcedirectio
+for
+.Sy UFS .
+For compatibility purposes, a raw device is also exported along with the block
+device. For example,
+.Xr newfs 1M
+requires one.
+.Pp
+The output of
+.Nm
+(without arguments) might change in future releases.
