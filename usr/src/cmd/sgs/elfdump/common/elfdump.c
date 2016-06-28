@@ -1775,7 +1775,7 @@ interp(const char *file, Cache *cache, Word shnum, Word phnum, Elf *elf)
 
 	Word	cnt;
 	Shdr	*ishdr = NULL;
-	Cache	*icache;
+	Cache	*icache = NULL;
 	Off	iphdr_off = 0;
 	Xword	iphdr_fsz;
 
@@ -1821,7 +1821,11 @@ interp(const char *file, Cache *cache, Word shnum, Word phnum, Elf *elf)
 	 * Print the interpreter string based on the offset defined in the
 	 * program header, as this is the offset used by the kernel.
 	 */
-	if (ishdr && icache->c_data) {
+	if ((ishdr != NULL) &&
+	    (icache != NULL) &&
+	    (icache->c_data != NULL) &&
+	    (icache->c_data->d_buf != NULL) &&
+	    (icache->c_data->d_size > 0)) {
 		dbg_print(0, MSG_ORIG(MSG_STR_EMPTY));
 		dbg_print(0, MSG_INTL(MSG_ELF_SCN_INTERP), icache->c_name);
 		dbg_print(0, MSG_ORIG(MSG_FMT_INDENT),
