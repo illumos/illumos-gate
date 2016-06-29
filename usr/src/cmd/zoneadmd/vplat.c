@@ -2895,6 +2895,25 @@ free_ip_interface(zone_addr_list_t *zalist)
 }
 
 /*
+ * For IP networking, we need to use the illumos-native device tree.  For most
+ * zones, this is $ZONEROOT/dev.  For LX ones, it's $ZONEROOT/native/dev.
+ * Return the appropriate post-$ZONEROOT path.
+ */
+static char *
+get_brand_dev(void)
+{
+	static char *lxpath = "/native/dev";
+	/* Cheesy hard-coding of strlen("/native") */
+	char *default_path = lxpath + 7;
+
+	/* LX zones are the exception... */
+	if (strcmp(brand_name, "lx") == 0)
+		return (lxpath);
+
+	return (default_path);
+}
+
+/*
  * Add the kernel access control information for the interface names.
  * If anything goes wrong, we log a general error message, attempt to tear down
  * whatever we set up, and return an error.
@@ -2940,7 +2959,7 @@ configure_exclusive_network_interfaces(zlog_t *zlogp, zoneid_t zoneid)
 				return (-1);
 			}
 			(void) snprintf(path, sizeof (path), "%s%s", rootpath,
-			    "/dev");
+			    get_brand_dev());
 			if (di_prof_init(path, &prof) != 0) {
 				(void) zonecfg_endnwifent(handle);
 				zonecfg_fini_handle(handle);
