@@ -1805,7 +1805,7 @@ lofi_zone_bind(struct lofi_state *lsp)
 	}
 	mutex_exit(&curproc->p_lock);
 
-	if (ddi_prop_update_string(lsp->ls_dev, lsp->ls_dip, ZONE_PROP_NAME,
+	if (ddi_prop_update_string(DDI_DEV_T_NONE, lsp->ls_dip, ZONE_PROP_NAME,
 	    (char *)curproc->p_zone->zone_name) != DDI_PROP_SUCCESS) {
 		rctl_decr_lofi(curproc->p_zone, 1);
 		error = EINVAL;
@@ -2909,13 +2909,14 @@ lofi_map_file(dev_t dev, struct lofi_ioctl *ulip, int pickminor,
 
 	fake_disk_geometry(lsp);
 
-	if ((ddi_prop_update_int64(lsp->ls_dev, lsp->ls_dip, SIZE_PROP_NAME,
+	if ((ddi_prop_update_int64(DDI_DEV_T_NONE, lsp->ls_dip, SIZE_PROP_NAME,
 	    lsp->ls_vp_size - lsp->ls_crypto_offset)) != DDI_PROP_SUCCESS) {
 		error = EINVAL;
 		goto err;
 	}
 
-	if ((ddi_prop_update_int64(lsp->ls_dev, lsp->ls_dip, NBLOCKS_PROP_NAME,
+	if ((ddi_prop_update_int64(DDI_DEV_T_NONE, lsp->ls_dip,
+	    NBLOCKS_PROP_NAME,
 	    (lsp->ls_vp_size - lsp->ls_crypto_offset) / DEV_BSIZE))
 	    != DDI_PROP_SUCCESS) {
 		error = EINVAL;
@@ -3489,6 +3490,7 @@ lofi_prop_op(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op, int mod_flags,
     char *name, caddr_t valuep, int *lengthp)
 {
 	struct lofi_state *lsp;
+	int rc;
 
 	lsp = ddi_get_soft_state(lofi_statep, ddi_get_instance(dip));
 	if (lsp == NULL) {
@@ -3496,8 +3498,13 @@ lofi_prop_op(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op, int mod_flags,
 		    name, valuep, lengthp));
 	}
 
-	return (cmlb_prop_op(lsp->ls_cmlbhandle, dev, dip, prop_op, mod_flags,
-	    name, valuep, lengthp, LOFI_PART(getminor(dev)), NULL));
+	rc = cmlb_prop_op(lsp->ls_cmlbhandle, dev, dip, prop_op, mod_flags,
+	    name, valuep, lengthp, LOFI_PART(getminor(dev)), NULL);
+	if (rc == DDI_PROP_SUCCESS)
+		return (rc);
+
+	return (ddi_prop_op(DDI_DEV_T_ANY, dip, prop_op, mod_flags,
+	    name, valuep, lengthp));
 }
 
 static struct cb_ops lofi_cb_ops = {
