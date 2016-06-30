@@ -108,6 +108,7 @@ LX_CGROUP_OBJS +=	\
 	cgrps_vnops.o
 
 LX_DEVFS_OBJS +=	\
+	lxd_attrdb.o	\
 	lxd_node.o	\
 	lxd_vfsops.o	\
 	lxd_vnops.o

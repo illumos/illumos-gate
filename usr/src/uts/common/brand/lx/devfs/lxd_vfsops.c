@@ -41,6 +41,12 @@
  * In addition, lx has a need for some illumos/Linux translation for the
  * various *stat(2) system calls when used on a device. This translation can
  * be centralized within lxd's getattr vnode entry point.
+ *
+ * Because the front file system only exists in memory and the back file
+ * system is the zone's devfs, which is not persistent across reboots, we
+ * track any device uid/gid/mode changes in a per-zone /etc/.lxd_dev_attr
+ * file and re-apply those changes when the lx devfs file system is mounted.
+ * Currently only changes to block device nodes are persistent.
  */
 
 #include <sys/types.h>
@@ -434,6 +440,10 @@ lxd_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 	/* init but don't bother entering the mutex (not on mount list yet) */
 	mutex_init(&lxdm->lxdm_contents, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&lxdm->lxdm_renamelck, NULL, MUTEX_DEFAULT, NULL);
+	mutex_init(&lxdm->lxdm_attrlck, NULL, MUTEX_DEFAULT, NULL);
+
+	list_create(&lxdm->lxdm_devattrs, sizeof (lxd_dev_attr_t),
+	    offsetof(lxd_dev_attr_t, lxda_link));
 
 	/* Initialize the hash table mutexes */
 	for (i = 0; i < LXD_HASH_SZ; i++) {
@@ -505,6 +515,9 @@ lxd_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 
 		vd = list_next(lxzdata->lxzd_vdisks, vd);
 	}
+
+	/* Apply any persistent attribute changes. */
+	lxd_apply_db(lxdm);
 
 out:
 	if (error == 0)
@@ -613,6 +626,7 @@ lxd_freevfs(vfs_t *vfsp)
 	lxd_mnt_t *lxdm = (lxd_mnt_t *)VFSTOLXDM(vfsp);
 	lxd_node_t *ldn;
 	struct vnode *vp;
+	lxd_dev_attr_t *da;
 
 	/*
 	 * Free all kmemalloc'd and anonalloc'd memory associated with
@@ -690,8 +704,16 @@ lxd_freevfs(vfs_t *vfsp)
 	ASSERT(lxdm->lxdm_mntpath != NULL);
 	kmem_free(lxdm->lxdm_mntpath, strlen(lxdm->lxdm_mntpath) + 1);
 
+	da = list_remove_head(&lxdm->lxdm_devattrs);
+	while (da != NULL) {
+		kmem_free(da, sizeof (lxd_dev_attr_t));
+		da = list_remove_head(&lxdm->lxdm_devattrs);
+	}
+	list_destroy(&lxdm->lxdm_devattrs);
+
 	mutex_destroy(&lxdm->lxdm_contents);
 	mutex_destroy(&lxdm->lxdm_renamelck);
+	mutex_destroy(&lxdm->lxdm_attrlck);
 	kmem_free(lxdm, sizeof (lxd_mnt_t));
 
 	/* Allow _fini() to succeed now */

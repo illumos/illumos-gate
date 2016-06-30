@@ -73,6 +73,14 @@ extern "C" {
 
 enum lxd_node_type	{ LXDNT_NONE, LXDNT_BACK, LXDNT_FRONT };
 
+typedef struct lxd_dev_attr {
+	list_node_t	lxda_link;
+	char 		lxda_name[MAXPATHLEN];
+	uid_t 		lxda_uid;
+	gid_t 		lxda_gid;
+	mode_t 		lxda_mode;
+} lxd_dev_attr_t;
+
 /*
  * lxd per-mount data structure.
  *
@@ -86,6 +94,8 @@ typedef struct lxd_mnt {
 	dev_t		lxdm_dev;	/* unique dev # of mounted `device' */
 	kmutex_t	lxdm_contents;	/* per-mount lock */
 	kmutex_t	lxdm_renamelck;	/* rename lock for this mount */
+	kmutex_t	lxdm_attrlck;	/* per-mount attr. file lock */
+	list_t		lxdm_devattrs;	/* list of device attr. settings */
 	uint_t		lxdm_gen;	/* node ID source for files */
 
 	/* protects buckets in both "dir ent" and "back" hash tables */
@@ -221,6 +231,9 @@ int lxd_dirlookup(lxd_node_t *, char *, lxd_node_t **, cred_t *);
 void lxd_dirtrunc(lxd_node_t *);
 void lxd_node_init(lxd_mnt_t *, lxd_node_t *, vnode_t *, vattr_t *, cred_t *);
 int lxd_naccess(void *, int, cred_t *);
+
+void lxd_save_attrs(lxd_mnt_t *, vnode_t *);
+void lxd_apply_db(lxd_mnt_t *);
 
 #endif /* KERNEL */
 

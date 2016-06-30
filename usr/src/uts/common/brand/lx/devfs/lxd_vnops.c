@@ -266,6 +266,8 @@ lxd_setattr(vnode_t *vp, struct vattr *vap, int flags, struct cred *cr,
     caller_context_t *ct)
 {
 	lxd_node_t *ldn = VTOLDN(vp);
+	lxd_mnt_t *lxdm = VTOLXDM(vp);
+	int res;
 
 	if (ldn->lxdn_type == LXDNT_FRONT) {
 		int error = 0;
@@ -315,7 +317,11 @@ lxd_setattr(vnode_t *vp, struct vattr *vap, int flags, struct cred *cr,
 
 	ASSERT(ldn->lxdn_type == LXDNT_BACK);
 	vp = REALVP(vp);
-	return (VOP_SETATTR(vp, vap, flags, cr, ct));
+	res = VOP_SETATTR(vp, vap, flags, cr, ct);
+	if (res == 0 && (vap->va_mask & (AT_MODE | AT_UID | AT_GID))) {
+		lxd_save_attrs(lxdm, vp);
+	}
+	return (res);
 }
 
 static int
