@@ -632,7 +632,6 @@ lxi_get_old_ip(struct zone_res_attrtab *attrs, const char **ipaddrs,
 static void
 lxi_net_setup(zone_dochandle_t handle)
 {
-#if 0	/* XXX KEBE SAYS NOT YET */
 	struct zone_nwiftab lookup;
 	boolean_t do_addrconf = B_FALSE;
 
@@ -640,24 +639,32 @@ lxi_net_setup(zone_dochandle_t handle)
 		return;
 	while (zonecfg_getnwifent(handle, &lookup) == Z_OK) {
 		const char *iface = lookup.zone_nwif_physical;
+#if 0	/* XXX KEBE SAYS NOT YET */
 		struct zone_res_attrtab *attrs = lookup.zone_nwif_attrp;
 		const char *ipaddrs, *primary, *gateway;
 		char ipaddrs_copy[MAXNAMELEN], cidraddr[BUFSIZ],
 		    *ipaddr, *tmp, *lasts;
 		boolean_t first_ipv4_configured = B_FALSE;
 		boolean_t *ficp = &first_ipv4_configured;
+#endif	/* XXX KEBE */
 
 		lxi_net_plumb(iface);
+
+		/* XXX KEBE SAYS this bit was shuffled around. */
+		if (lxi_iface_ipv6_link_local(iface) != 0) {
+			lxi_warn("unable to bring up link-local address on "
+			    "interface %s", iface);
+		} else {
+			/* XXX KEBE SAYS this bit is new. */
+			do_addrconf = B_TRUE;
+		}
+
+#if 0	/* XXX KEBE SAYS NOT YET */
 		if (zone_find_attr(attrs, "ips", &ipaddrs) != 0 &&
 		    lxi_get_old_ip(attrs, &ipaddrs, cidraddr, BUFSIZ) != 0) {
 			lxi_warn("Could not find a valid network configuration "
 			    "for the %s interface", iface);
 			continue;
-		}
-
-		if (lxi_iface_ipv6_link_local(iface) != 0) {
-			lxi_warn("unable to bring up link-local address on "
-			    "interface %s", iface);
 		}
 
 		/*
@@ -697,6 +704,7 @@ lxi_net_setup(zone_dochandle_t handle)
 		    zone_find_attr(attrs, "gateway", &gateway) == 0) {
 			lxi_iface_gateway(iface, NULL, 0, gateway);
 		}
+#endif /* XXX KEBE */
 	}
 
 	if (do_addrconf) {
@@ -704,7 +712,6 @@ lxi_net_setup(zone_dochandle_t handle)
 	}
 
 	(void) zonecfg_endnwifent(handle);
-#endif /* XXX KEBE */
 }
 
 static void
