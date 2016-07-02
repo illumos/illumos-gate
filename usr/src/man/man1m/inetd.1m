@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH INETD 1M "Jul 5, 2007"
+.TH INETD 1M "April 9, 2016"
 .SH NAME
 inetd \- Solaris Management Facility delegated restarter for inet services
 .SH SYNOPSIS
@@ -19,7 +19,6 @@ inetd \- Solaris Management Facility delegated restarter for inet services
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBinetd\fR is the delegated restarter for internet services for the Service
 Management Facility (SMF). Its basic responsibilities are to manage service
@@ -66,7 +65,6 @@ configuration changes to Internet services within the SMF repository.
 \fBinetadm\fR has the advantage over \fBsvccfg\fR in that it provides an
 Internet/RPC service context.
 .SS "Service States"
-.sp
 .LP
 As part of its service management duties, \fBinetd\fR implements a state
 machine for each of its managed services. The states in this machine are made
@@ -170,7 +168,7 @@ exit this state.
 .sp .6
 .RS 4n
 A service is in this state because it is either malfunctioning and needs
-adminstrator attention or because an administrator has requested it.
+administrator attention or because an administrator has requested it.
 .sp
 Events constituting malfunctioning include: \fBinetd\fR's inability to listen
 on behalf on any of the service's protocols before exceeding the service's bind
@@ -187,7 +185,6 @@ this state.
 .LP
 Use \fBinetadm\fR(1M) to obtain the current state of a managed service.
 .SS "Service Methods"
-.sp
 .LP
 As part of certain state transitions \fBinetd\fR will execute, if supplied, one
 of a set of methods provided by the service. The set of supported methods are:
@@ -273,7 +270,6 @@ The only compulsory method is the \fBinetd_start\fR method. In the absence of
 any of the others, \fBinetd\fR runs no method but behaves as if one was run
 successfully.
 .SS "Service Properties"
-.sp
 .LP
 Configuration for SMF-managed services is stored in the SMF repository. The
 configuration is made up of the basic configuration of a service, the
@@ -645,7 +641,6 @@ were supplied, except that the \fBkill\fR signal is sent only to the parent
 process of the \fBwait\fR-type service's \fBstart\fR method, not to all members
 of its encompassing process contract (see \fBprocess\fR(4)).
 .SS "Configuring Protocols for Sockets-Based Services"
-.sp
 .LP
 When configuring \fBinetd\fR for a sockets-based service, you have the choice,
 depending on what is supported by the service, of the alternatives described
@@ -688,7 +683,6 @@ entry has \fBtcp\fR and the other has \fBtcp6only\fR, or \fBudp\fR plus
 See EXAMPLES for an example of a configuration of a service that supports both
 IPv4 and IPv6.
 .SS "\fBinetd\fR Methods"
-.sp
 .LP
 \fBinetd\fR provides the methods listed below for consumption by the master
 restarter, \fBsvc.startd\fR(1M).
@@ -770,11 +764,9 @@ if it is in the \fBonline\fR state and a re-binding is not necessary, then the
 .RE
 
 .SH OPTIONS
-.sp
 .LP
 No options are supported.
 .SH OPERANDS
-.sp
 .ne 2
 .na
 \fB\fIconfiguration-file\fR\fR
@@ -825,7 +817,6 @@ online         15:52:10 svc:/network/mysvc:stream6
 See \fBsvcs\fR(1) and \fBinetadm\fR(1M) for descriptions of those commands.
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -841,7 +832,6 @@ Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBfmd\fR(1M), \fBinetadm\fR(1M), \fBinetconv\fR(1M), \fBsvcadm\fR(1M),
 \fBsvccfg\fR(1M), \fBsvcs\fR(1), \fBsvc.startd\fR(1M), \fBsyslog\fR(3C),
@@ -849,7 +839,6 @@ Interface Stability	Evolving
 \fBgetservbyname\fR(3SOCKET), \fBinetd.conf\fR(4), \fBprocess\fR(4),
 \fBsyslog.conf\fR(4), \fBattributes\fR(5), \fBsmf\fR(5), \fBsmf_method\fR(5)
 .SH NOTES
-.sp
 .LP
 The \fBinetd\fR daemon performs the same function as, but is implemented
 significantly differently from, the daemon of the same name in Solaris 9 and

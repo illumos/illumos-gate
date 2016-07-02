@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -342,6 +343,7 @@ typedef struct dumpsync {
 	uint_t neednl;			/* will need to print a newline */
 	uint_t percent;			/* dump progress */
 	uint_t percent_done;		/* dump progress reported */
+	int sec_done;			/* dump progress last report time */
 	cqueue_t freebufq;		/* free kmem bufs for writing */
 	cqueue_t mainq;			/* input for main task */
 	cqueue_t helperq;		/* input for helpers */
@@ -2285,7 +2287,7 @@ dumpsys_main_task(void *arg)
 	cbuf_t *cp;
 	pgcnt_t baseoff, pfnoff;
 	pfn_t base, pfn;
-	int sec, i, dumpserial;
+	int i, dumpserial;
 
 	/*
 	 * Fall back to serial mode if there are no helpers.
@@ -2311,13 +2313,20 @@ dumpsys_main_task(void *arg)
 
 	dump_init_memlist_walker(&mlw);
 
-	/* CONSTCOND */
-	while (1) {
+	for (;;) {
+		int sec = (gethrtime() - ds->start) / NANOSEC;
 
-		if (ds->percent > ds->percent_done) {
+		/*
+		 * Render a simple progress display on the system console to
+		 * make clear to the operator that the system has not hung.
+		 * Emit an update when dump progress has advanced by one
+		 * percent, or when no update has been drawn in the last
+		 * second.
+		 */
+		if (ds->percent > ds->percent_done || sec > ds->sec_done) {
+			ds->sec_done = sec;
 			ds->percent_done = ds->percent;
-			sec = (gethrtime() - ds->start) / 1000 / 1000 / 1000;
-			uprintf("^\r%2d:%02d %3d%% done",
+			uprintf("^\rdumping: %2d:%02d %3d%% done",
 			    sec / 60, sec % 60, ds->percent);
 			ds->neednl = 1;
 		}
@@ -2501,8 +2510,7 @@ dumpsys_main_task(void *arg)
 			break;
 
 		} /* end switch */
-
-	} /* end while(1) */
+	}
 }
 
 #ifdef	COLLECT_METRICS

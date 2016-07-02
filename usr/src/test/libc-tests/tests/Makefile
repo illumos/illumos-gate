@@ -86,7 +86,7 @@ $(ROOTOPTDIR)/%: %.ksh
 	$(POST_PROCESS)
 
 %.32: %.c
-	$(LINK.c) -m32 -o $@ $< $(LDLIBS)
+	$(LINK.c) -o $@ $< $(LDLIBS)
 	$(POST_PROCESS)
 
 clobber: $(SUBDIRS)

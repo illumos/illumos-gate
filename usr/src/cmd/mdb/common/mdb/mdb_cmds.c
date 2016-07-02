@@ -253,7 +253,7 @@ write_arglist(mdb_tgt_as_t as, mdb_tgt_addr_t addr,
 			mdb_warn("failed to write %llr at address 0x%llx",
 			    value, addr);
 			mdb.m_incr = 0;
-			break;
+			return (DCMD_ERR);
 		}
 
 		mdb.m_incr = naddr - addr;
@@ -521,8 +521,7 @@ cmd_print_phys(uintptr_t x, uint_t flags, int argc, const mdb_arg_t *argv)
 
 /*ARGSUSED*/
 static int
-cmd_print_value(uintptr_t addr, uint_t flags,
-	int argc, const mdb_arg_t *argv)
+cmd_print_value(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	uintmax_t ndot, dot = mdb_get_dot();
 	const char *tgt_argv[1];

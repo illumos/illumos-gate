@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH NCAD_ADDR 4 "Feb 18, 2003"
+.TH NCAD_ADDR 4 "April 9, 2016"
 .SH NAME
 ncad_addr \- name of the Solaris Network Cache and Accelerator (NCA) socket
 utility library
@@ -14,7 +14,6 @@ utility library
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBncad_addr.so\fR is the Solaris Network Cache and Accelerator (\fBNCA\fR)
 socket utility library. Use this library with a web server to avoid support for
@@ -33,7 +32,7 @@ Interpose the \fBncad_addr\fR interfaces before the interfaces in
 .sp
 .LP
 Using Bourne shell syntax as an example, set \fBLD_PRELOAD\fR as shown below to
-interpose the \fBncad_addr\fR socket utility libary:
+interpose the \fBncad_addr\fR socket utility library:
 
 .sp
 .in +2
@@ -43,7 +42,6 @@ LD_PRELOAD=/usr/lib/ncad_addr.so /usr/bin/httpd
 .in -2
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/usr/lib/ncad_addr.so\fR\fR
@@ -53,7 +51,6 @@ LD_PRELOAD=/usr/lib/ncad_addr.so /usr/bin/httpd
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5)  for descriptions of the following attributes:
 .sp
@@ -69,12 +66,10 @@ Interface Stability	Unstable
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBnca\fR(1), \fBncab2clf\fR(1), \fBncakmod\fR(1), \fBsocket\fR(3SOCKET),
 \fBnca.if\fR(4),  \fBncakmod.conf\fR(4), \fBattributes\fR(5)
 .SH NOTES
-.sp
 .LP
 Only applications that use the \fBNCA\fR feature, for example, web servers,
 should interpose this library.

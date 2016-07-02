@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH TH_DEFINE 1M "Apr 11, 2001"
+.TH TH_DEFINE 1M "April 9, 2016"
 .SH NAME
 th_define \- create fault injection test harness error specifications
 .SH SYNOPSIS
@@ -40,7 +40,6 @@ th_define \- create fault injection test harness error specifications
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBth_define\fR utility provides an interface to the \fBbus_ops\fR fault
 injection \fBbofi\fR device driver for defining error injection specifications
@@ -95,7 +94,6 @@ the final value for the option is used. If an option is not specified, its
 associated value is set to an appropriate default, which will provide maximal
 error coverage as described below.
 .SH OPTIONS
-.sp
 .LP
 The following options are available:
 .sp
@@ -157,7 +155,7 @@ If \fIacc_types\fR is set to \fBlog\fR, logging will match all \fBPIO\fR
 accesses, interrupts and DMA accesses to and from areas mapped for both reading
 and writing. \fBlog\fR can be combined with other \fIacc_types\fR, in which
 case the matching condition for logging will be restricted to the specified
-addional \fIacc_types\fR. Note that \fBdma_r\fR will match only DMA handles
+additional \fIacc_types\fR. Note that \fBdma_r\fR will match only DMA handles
 mapped for reading only; \fBdma_w\fR will match only DMA handles mapped for
 writing only; \fBdma\fR will match only DMA handles mapped for both reading and
 writing.
@@ -659,7 +657,6 @@ given, a default script is used. This script repeatedly attempts to detach and
 then re-attach the device instance under test.
 .SH EXAMPLES
 .SS "Examples of Error Definitions"
-.sp
 .LP
 \fBth_define -n foo -i 1 -a log\fR
 .sp
@@ -802,7 +799,6 @@ driver occurs, a further ten interrupts are also generated.
 Causes the next interrupt for instance 3 of the \fBfoo\fR driver to be delayed
 by 1024 microseconds.
 .SH NOTES
-.sp
 .LP
 The policy option in the \fBth_define\fR \fB-p\fR syntax determines how a set
 of logged accesses will be converted into the set of error definitions. Each
@@ -813,7 +809,6 @@ an error definition should be created based on the access.
 Any number of policy options can be combined to modify the generated error
 definitions.
 .SS "Bytewise Policies"
-.sp
 .LP
 These select particular I/O transfer sizes. Specifing a byte policy will
 exclude other byte policies that have not been chosen. If none of the byte type
@@ -865,7 +860,6 @@ Create errdefs for repeated byte accesses (\fBddi_rep_get*()\fR)
 .RE
 
 .SS "Frequency of Access Policies"
-.sp
 .LP
 The frequency of access to a location is determined according to the access
 type, location and transfer size (for example, a two-byte read access to
@@ -917,7 +911,6 @@ Create errdefs for locations that are accessed a median frequency.
 .RE
 
 .SS "Policies for Minimizing errdefs"
-.sp
 .LP
 If a transaction is duplicated, either a single or multiple errdefs will be
 written to the test scripts, depending upon the following two policies:
@@ -952,7 +945,6 @@ operators.
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBkill\fR(1), \fBth_manage\fR(1M), \fBalarm\fR(2),
 \fBddi_check_acc_handle\fR(9F), \fBddi_check_dma_handle\fR(9F)

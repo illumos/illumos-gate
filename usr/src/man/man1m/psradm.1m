@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PSRADM 1M "Feb 25, 2008"
+.TH PSRADM 1M "April 9, 2016"
 .SH NAME
 psradm \- change processor operational status
 .SH SYNOPSIS
@@ -19,7 +19,6 @@ psradm \- change processor operational status
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBpsradm\fR utility changes the operational status of processors. The
 legal states for the processor are \fBon-line\fR, \fBoff-line\fR, \fBspare\fR,
@@ -75,7 +74,6 @@ one or more processors.
 Only users with the \fBPRIV_SYS_RES_CONFIG\fR privilege can use the
 \fBpsradm\fR utility.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -148,7 +146,6 @@ Output a message giving the results of each attempted operation.
 .RE
 
 .SH OPERANDS
-.sp
 .LP
 The following operands are supported:
 .sp
@@ -237,7 +234,6 @@ processor bindings from the processes bound to them:
 .sp
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -259,7 +255,6 @@ An error occurred.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/wtmpx\fR\fR
@@ -269,12 +264,10 @@ Records logging processor status changes
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBpbind\fR(1M), \fBpsrinfo\fR(1M), \fBpsrset\fR(1M), \fBp_online\fR(2),
 \fBprocessor_bind\fR(2), \fBattributes\fR(5)
 .SH DIAGNOSTICS
-.sp
 .ne 2
 .na
 \fB\fBpsradm: processor 4: Invalid argument\fR\fR
@@ -304,7 +297,7 @@ needed by the system because it provides some essential service.
 .sp .6
 .RS 4n
 The specified processor could not be set \fBno-intr\fR because it is the last
-interruptible processor in the system, or or it is the only processor in the
+interruptible processor in the system, or it is the only processor in the
 system that can service interrupts needed by the system.
 .RE
 

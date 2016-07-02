@@ -8,7 +8,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH WCSCOLL 3C "Jun 25, 2014"
+.TH WCSCOLL 3C "April 9, 2016"
 .SH NAME
 wcscoll, wcscoll_l wscoll \- wide character string comparison using collating information
 .SH SYNOPSIS
@@ -49,7 +49,7 @@ Upon successful completion, these functions return an
 integer greater than, equal to, or less than 0, depending upon whether the wide
 character string pointed to by \fIws1\fR is greater than, equal to, or less
 than the wide character string pointed to by \fIws2\fR, when both are
-interpreted as appropriate to the the current locale, or the locale
+interpreted as appropriate to the current locale, or the locale
 specified by \fIloc\fR. On error,
 they set \fBerrno\fR, but no return value is reserved to indicate an error.
 .SH ERRORS
@@ -65,10 +65,9 @@ The \fIws1\fR or \fIws2\fR arguments contain wide character codes outside the
 domain of the collating sequence.
 .RE
 .SH USAGE
-.sp
 .LP
 The \fBwcsxfrm\fR(3C) and \fBwcscmp\fR(3C) functions should be used for sorting
-large lists, or when performing many comparisions on the same strings.
+large lists, or when performing many comparisons on the same strings.
 .SH ATTRIBUTES
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:

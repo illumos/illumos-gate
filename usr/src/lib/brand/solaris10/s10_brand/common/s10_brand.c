@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright 2016 Toomas Soome <tsoome@me.com>
  * Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
@@ -622,7 +623,7 @@ zfs_ioctl(sysret_t *rval, int fdes, int cmd, intptr_t arg)
 }
 
 struct s10_lofi_ioctl {
-	uint32_t li_minor;
+	uint32_t li_id;
 	boolean_t li_force;
 	char li_filename[MAXPATHLEN + 1];
 };
@@ -652,7 +653,7 @@ lofi_ioctl(sysret_t *rval, int fdes, int cmd, intptr_t arg)
 
 	bzero(&native_param, sizeof (native_param));
 
-	struct_assign(native_param, s10_param, li_minor);
+	struct_assign(native_param, s10_param, li_id);
 	struct_assign(native_param, s10_param, li_force);
 
 	/*
@@ -665,7 +666,7 @@ lofi_ioctl(sysret_t *rval, int fdes, int cmd, intptr_t arg)
 
 	err = __systemcall(rval, SYS_ioctl + 1024, fdes, cmd, &native_param);
 
-	struct_assign(s10_param, native_param, li_minor);
+	struct_assign(s10_param, native_param, li_id);
 	/* li_force is input-only */
 
 	bcopy(native_param.li_filename, s10_param.li_filename,

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DLPI 7P "Sep 7, 2009"
+.TH DLPI 7P "April 9, 2016"
 .SH NAME
 dlpi \- Data Link Provider Interface
 .SH SYNOPSIS
@@ -13,7 +13,6 @@ dlpi \- Data Link Provider Interface
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 SunOS STREAMS-based device drivers wishing to support the STREAMS \fB TCP/IP\fR
 and other STREAMS-based networking protocol suite implementations support
@@ -43,7 +42,6 @@ Solaris conforms to The Open Group Technical Standard for \fIDLPI, Version
 \fIwww.opengroup.org/pubs/catalog/c811.htm\fR. Solaris also provides extensions
 to the DLPI standard, as detailed in this man page.
 .SH SOLARIS-SPECIFIC DLPI EXTENSIONS
-.sp
 .ne 2
 .na
 \fBNotification Support\fR
@@ -155,7 +153,7 @@ set to zero by DLPI providers and ignored by DLPI consumers.
 .sp
 In addition to generating DL_NOTIFY_IND messages when a requested event has
 occurred, the \fBDLPI\fR provider must initially generate one or more
-DL_NOTIFY_IND messages to notify the \fBDLPI\fR consumer of the the current
+DL_NOTIFY_IND messages to notify the \fBDLPI\fR consumer of the current
 state of the interface. For instance, if the consumer has requested
 DL_NOTE_LINK_UP | DL_NOTE_LINK_DOWN, the provider must send a DL_NOTIFY_IND
 containing the current state of the link (either DL_NOTE_LINK_UP or
@@ -166,7 +164,7 @@ recommended against sending DL_NOTE_LINK_DOWN, even if the interface is still
 initializing and is not yet ready to send or receive packets. Instead, either
 delaying the DL_NOTIFY_IND message until the interface is ready or
 optimistically reporting DL_NOTIFY_LINK_UP and subsequently   reporting
-DL_NOTE_LINK_DOWN if the negotation fails is strongly   preferred. This
+DL_NOTE_LINK_DOWN if the negotiation fails is strongly   preferred. This
 prevents DL_NOTIFY_IND consumers from needlessly triggering network failover
 operations and logging error messages during network interface initialization.
 .sp
@@ -241,7 +239,7 @@ the links do not have any DLPI consumers or only \fBpassive\fR consumers.
 .RS 4n
 The \fBDLIOCRAW\fR ioctl function is used by some DLPI applications, most
 notably the \fBsnoop\fR(1M) command. The \fBDLIOCRAW\fR command puts the stream
-into a raw mode, which, upon receive, causes the the full MAC-level packet to
+into a raw mode, which, upon receive, causes the full MAC-level packet to
 be sent upstream in an \fBM_DATA\fR message instead of it being transformed
 into the \fBDL_UNITDATA_IND\fR form normally used for reporting incoming
 packets. Packet \fBSAP\fR filtering is still performed on streams that are in
@@ -297,7 +295,6 @@ size.
 .SH DL_ETHER-SPECIFIC DLPI SEMANTICS
 .SS "VLAN Support"
 .SS "Traditional VLAN Access"
-.sp
 .LP
 Some \fBDL_ETHER DLPI\fR providers support \fIIEEE 802.1Q\fR Virtual LANs
 (VLAN). For these providers, traffic for a particular VLAN can be accessed by
@@ -311,7 +308,6 @@ are added by the provider) and received data is passed to interested DLPI
 consumers without link-layer headers.  As a result,  DLPI consumers not require
 special-case logic to implement VLAN access.
 .SS "SAP-Based VLAN Access"
-.sp
 .LP
 As per \fIIEEE 802.1Q\fR, all VLAN traffic is sent using Ether- Type  0x8100,
 meaning  that in addition to directly opening a VLAN data-link, all VLAN
@@ -333,7 +329,6 @@ enables promiscuous mode of a stream at the \fBDL_PROMISC_SAP\fR level. As
 mentioned earlier, these packets are received starting with their VLAN headers
 if raw mode is not enabled.
 .SS "QoS Support"
-.sp
 .LP
 The \fIIEEE 802.1Q\fR standard defines eight classes of priority values used by
 QoS traffic control of Ethernet packets. Although the priority values are
@@ -349,7 +344,6 @@ also specify the per-packet priority value using the b_band field of a M_DATA
 message or the \fBdl_priority\fR field of a \fBDL_UNITDATA_REQ\fR.
 .SS "Raw Mode"
 .SS "SAP-Based VLAN Access"
-.sp
 .LP
 When raw mode is enabled, the complete, unmodified MAC- level packet (including
 Ethernet  and  VLAN headers) is passed to interested DLPI consumers. Similarly,
@@ -358,7 +352,6 @@ to the DLPI provider for transmission.  Note that the priority value specified
 in the b_band field can be overridden by encoding the priority value (if any)
 into the VLAN header.
 .SS "Traditional VLAN Access"
-.sp
 .LP
 When raw mode is enabled, only packets with the correct VLAN ID are passed up
 to interested DLPI consumers. With the exception of priority-tagged packets,
@@ -375,11 +368,9 @@ the VLAN header to  indicate the priority value, however its VLAN ID must be
 zero. The DLPI providers then insert the VLAN tags or encode the VLAN tags
 using the priority value specified in the VLAN headers and send the packets.
 .SH FILES
-.sp
 .LP
 Files in or under \fB/dev\fR.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -397,12 +388,10 @@ T}	Committed
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBdladm\fR(1M), \fBsnoop\fR(1M), \fBlibdlpi\fR(3LIB), \fBgld\fR(7D),
 \fBip\fR(7P)
 .SH NOTES
-.sp
 .LP
 A Solaris DLPI link name consists of a \fBDLPI provider name\fR followed by a
 numeric \fBPPA\fR (physical point of attachment).

@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH UFSDUMP 1M "Mar 17, 2008"
+.TH UFSDUMP 1M "April 9, 2016"
 .SH NAME
 ufsdump \- incremental file system dump
 .SH SYNOPSIS
@@ -14,10 +14,9 @@ ufsdump \- incremental file system dump
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBufsdump\fR backs up all files specified by \fIfiles_to_dump\fR (usually
-either a whole file system or files within a file sytem changed after a certain
+either a whole file system or files within a file system changed after a certain
 date) to magnetic tape, diskette, or disk file.
 .sp
 .LP
@@ -52,7 +51,6 @@ multi-volume dumps, unless \fBufsdump\fR does not understand the way the device
 detects the end-of-media, or the files are to be restored on a system with an
 older version of the \fBrestore\fR command.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -422,7 +420,6 @@ that have not been backed up within a day are highlighted.
 .RE
 
 .SH OPERANDS
-.sp
 .LP
 The following operand is supported:
 .sp
@@ -453,7 +450,6 @@ line.
 If no \fIoptions\fR are given, the default is \fB9uf\fR \fB/dev/rmt/0\fR
 \fIfiles_to_dump\fR.
 .SH USAGE
-.sp
 .LP
 See \fBlargefile\fR(5) for the description of the behavior of \fBufsdump\fR
 when encountering files greater than or equal to 2 Gbyte ( 2^31 bytes).
@@ -488,7 +484,6 @@ example# ufsdump 5fuv /dev/rmt/1 /dev/rdsk/c0t3d0s6
 .sp
 
 .SH EXIT STATUS
-.sp
 .LP
 While running, \fBufsdump\fR emits many verbose messages. \fBufsdump\fR returns
 the following exit values:
@@ -523,7 +518,6 @@ Abort \(mi no checkpoint attempted.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/dev/rmt/0\fR\fR
@@ -574,7 +568,6 @@ list of file systems
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBcpio\fR(1), \fBtar\fR(1), \fBdd\fR(1M), \fBdevnm\fR(1M), \fBfssnap\fR(1M),
 \fBprtvtoc\fR(1M), \fBrmt\fR(1M), \fBshutdown\fR(1M), \fBufsrestore\fR(1M),
@@ -582,16 +575,13 @@ list of file systems
 \fBattributes\fR(5), \fBlargefile\fR(5), \fBst\fR(7D)
 .SH NOTES
 .SS "Read Errors"
-.sp
 .LP
 Fewer than 32 read errors on the file system are ignored.
 .SS "Process Per Reel"
-.sp
 .LP
 Because each reel requires a new process, parent processes for reels that are
 already written hang around until the entire tape is written.
 .SS "Operator Intervention"
-.sp
 .LP
 \fBufsdump\fR requires operator intervention on these conditions: end of
 volume, end of dump, volume write error, volume open error or disk read error
@@ -607,7 +597,6 @@ checkpoints at the start of each volume. If writing that volume fails for some
 reason, \fBufsdump\fR will, with operator permission, restart itself from the
 checkpoint after a defective volume has been replaced.
 .SS "Suggested Dump Schedule"
-.sp
 .LP
 It is vital to perform full, "level \fB0\fR", dumps at regular intervals. When
 performing a full dump, bring the machine down to single-user mode using
@@ -644,7 +633,6 @@ Although the Tuesday through Friday incrementals contain "extra copies" of
 files from Monday, this scheme assures that any file modified during the week
 can be recovered from the previous day's incremental dump.
 .SS "Process Priority of ufsdump"
-.sp
 .LP
 \fBufsdump\fR uses multiple processes to allow it to read from the disk and
 write to the media concurrently. Due to the way it synchronizes between these
@@ -652,7 +640,6 @@ processes, any attempt to run dump with a \fBnice\fR (process priority) of
 `\(mi5' or better will likely make \fBufsdump\fR run \fIslower\fR instead of
 faster.
 .SS "Overlapping Partitions"
-.sp
 .LP
 Most disks contain one or more overlapping slices because slice 2 covers the
 entire disk. The other slices are of various sizes and usually do not overlap.
@@ -667,7 +654,6 @@ entire disk would instead dump only the \fBroot\fR file system on slice 0. To
 dump the entire disk, the user must dump the file systems on each slice
 separately.
 .SH BUGS
-.sp
 .LP
 The \fB/etc/vfstab\fR file does not allow the desired frequency of backup for
 file systems to be specified (as \fB/etc/fstab\fR did). Consequently, the

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LANGINFO.H 3HEAD "Aug 30, 2002"
+.TH LANGINFO.H 3HEAD "April 9, 2016"
 .SH NAME
 langinfo.h, langinfo \- language information constants
 .SH SYNOPSIS
@@ -13,7 +13,6 @@ langinfo.h, langinfo \- language information constants
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The <\fBlanginfo.h\fR> header contains the constants used to identify items of
 \fBlanginfo\fR data (see \fBnl_langinfo\fR(3C)). The type of the constant,
@@ -171,7 +170,9 @@ _
 \fBNOSTR\fR	\fBLC_MESSAGES\fR	negative response ro yes/no queries
 _
 \fBCRNCYSTR\fR	\fBLC_MONETARY\fR	T{
-local currency symbol, preceded by '-' if the symbol sould appear before the value, '+' if the symbol should appear after the value, or '.' if the symbol should replace the radix character
+local currency symbol, preceded by '-' if the symbol should appear before the
+value, '+' if the symbol should appear after the value, or '.' if the symbol
+should replace the radix character
 T}
 .TE
 
@@ -194,7 +195,6 @@ char *nl_langinfo(nl_item);
 Inclusion of <\fBlanginfo.h\fR> header may also make visible all symbols from
 <\fBnl_types.h\fR>.
 .SH USAGE
-.sp
 .LP
 Wherever possible, users are advised to use functions compatible with those in
 the ISO C standard to access items of \fBlanginfo\fR data. In particular, the
@@ -203,7 +203,6 @@ defined in category \fBLC_TIME\fR. The \fBlocaleconv\fR(3C) function should be
 used to access information corresponding to \fBRADIXCHAR\fR, \fBTHOUSEP\fR, and
 \fBCRNCYSTR\fR.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -219,7 +218,6 @@ Interface Stability	Standard
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBmkmsgs\fR(1), \fBlocaleconv\fR(3C), \fBnl_langinfo\fR(3C),
 \fBnl_types.h\fR(3HEAD), \fBsetlocale\fR(3C), \fBstrftime\fR(3C),

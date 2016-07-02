@@ -39,6 +39,7 @@ dir path=opt/SUNWdtrt/lib/java
 dir path=opt/SUNWdtrt/tst
 dir path=opt/SUNWdtrt/tst/$(ARCH)
 dir path=opt/SUNWdtrt/tst/$(ARCH)/arrays
+$(i386_ONLY)dir path=opt/SUNWdtrt/tst/$(ARCH)/error
 $(i386_ONLY)dir path=opt/SUNWdtrt/tst/$(ARCH)/funcs
 dir path=opt/SUNWdtrt/tst/$(ARCH)/pid
 $(sparc_ONLY)dir path=opt/SUNWdtrt/tst/$(ARCH)/usdt
@@ -140,6 +141,8 @@ file path=opt/SUNWdtrt/bin/exception.lst mode=0444
 file path=opt/SUNWdtrt/bin/jdtrace mode=0555
 file path=opt/SUNWdtrt/lib/java/jdtrace.jar
 file path=opt/SUNWdtrt/tst/$(ARCH)/arrays/tst.uregsarray.d mode=0444
+$(i386_ONLY)file path=opt/SUNWdtrt/tst/$(ARCH)/error/tst.DTRACEFLT_DIVZERO.d \
+    mode=0444
 $(i386_ONLY)file path=opt/SUNWdtrt/tst/$(ARCH)/funcs/tst.badcopyin.d mode=0444
 $(i386_ONLY)file path=opt/SUNWdtrt/tst/$(ARCH)/funcs/tst.badcopyinstr.d \
     mode=0444

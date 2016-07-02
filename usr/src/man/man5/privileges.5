@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PRIVILEGES 5 "Oct 30, 2015"
+.TH PRIVILEGES 5 "April 9, 2016"
 .SH NAME
 privileges \- process privilege model
 .SH DESCRIPTION
@@ -405,7 +405,7 @@ Extensions.
 .ad
 .sp .6
 .RS 4n
-Allow a proces to set \fBSO_MAC_IMPLICIT\fR option by using
+Allow a process to set \fBSO_MAC_IMPLICIT\fR option by using
 \fBsetsockopt\fR(3SOCKET).  This allows a privileged process to transmit
 implicitly-labeled packets to a peer.
 .sp
@@ -1240,7 +1240,7 @@ with I=basic.
 .sp
 .LP
 For most privileges, absence of the privilege simply results in a failure. In
-some instances, the absense of a privilege can cause system calls to behave
+some instances, the absence of a privilege can cause system calls to behave
 differently. In other instances, the removal of a privilege can force a set-uid
 application to seriously malfunction. Privileges of this type are considered
 "unsafe". When a process is lacking any of the unsafe privileges from its limit

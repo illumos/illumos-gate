@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PMAP 1 "Sep 9, 2006"
+.TH PMAP 1 "April 9, 2016"
 .SH NAME
 pmap \- display information about the address space of a process
 .SH SYNOPSIS
@@ -28,11 +28,9 @@ pmap \- display information about the address space of a process
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBpmap\fR utility prints information about the address space of a process.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -172,7 +170,6 @@ Displays additional information per mapping. See USAGE for more information.
 .RE
 
 .SH USAGE
-.sp
 .LP
 The \fBpmap\fR utility prints information about the address space of a process.
 .sp
@@ -279,7 +276,6 @@ assured only if the primary controlling process, typically a debugger, has
 stopped the victim process and the primary controlling process is doing nothing
 at the moment of application of the \fBproc\fR tool in question.
 .SH DISPLAY FORMATS
-.sp
 .LP
 One line of output is printed for each mapping within the process, unless the
 -\fB-s\fR or -\fB-L\fR option is specified. With \fB-s\fR option, one line is
@@ -743,8 +739,8 @@ total Kb   50464   42264   18888   16384
 .sp
 .LP
 The \fB-s\fR option can be used to display the hardware translation page sizes
-for each portion of the address space. (See \fBmemcntl\fR(2) for futher
-information on Solaris multiple page size support).
+for each portion of the address space. (See \fBmemcntl\fR(2) for further
+information on illumos multiple page size support).
 
 .sp
 .LP
@@ -943,7 +939,6 @@ FFBFE000       8K rw---   2   [ stack ]
 .sp
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -965,7 +960,6 @@ An error has occurred.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/proc/*\fR\fR
@@ -984,7 +978,6 @@ process files
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -1004,7 +997,6 @@ Interface Stability	See below.
 The command syntax is Evolving. The \fB-L\fR option and the output formats are
 Unstable.
 .SH SEE ALSO
-.sp
 .LP
 \fBldd\fR(1), \fBlgrpinfo\fR(1), \fBmadv.so.1\fR(1), \fBmdb\fR(1),
 \fBplgrp\fR(1), \fBpmadvise\fR(1), \fBproc\fR(1), \fBps\fR(1),

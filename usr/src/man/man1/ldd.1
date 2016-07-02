@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LDD 1 "Jun 3, 2008"
+.TH LDD 1 "April 9, 2016"
 .SH NAME
 ldd \- list dynamic dependencies of executable files or shared objects
 .SH SYNOPSIS
@@ -15,7 +15,6 @@ ldd \- list dynamic dependencies of executable files or shared objects
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBldd\fR utility lists the dynamic dependencies of executable files or
 shared objects. \fBldd\fR uses the runtime linker, \fBld.so.1\fR, to generate
@@ -57,7 +56,6 @@ Therefore, \fBldd\fR does not list any shared objects explicitly attached using
 \fBdlopen\fR(3C). To display all the objects in use by a process, or a core
 file, use \fBpldd\fR(1).
 .SH OPTIONS
-.sp
 .LP
 \fBldd\fR can also check the compatibility of \fIfilename\fR with the shared
 objects \fIfilename\fR uses. With the following options, \fBldd\fR prints
@@ -315,12 +313,11 @@ This option also displays any dependency version requirements. See
 
 .SH USAGE
 .SS "Security"
-.sp
 .LP
 A superuser should use the \fB-f\fR option only if the executable to be
 examined is known to be trustworthy. The use of \fB-f\fR on an untrustworthy
 executable while superuser can compromise system security. If an executables
-trustworthyness is unknown, a superuser should temporarily become a regular
+trustworthiness is unknown, a superuser should temporarily become a regular
 user. Then invoke \fBldd\fR as this regular user.
 .sp
 .LP
@@ -331,7 +328,6 @@ non-superuser can use either the \fB:r\fR subcommand of \fBmdb\fR, or
 compromise. To minimize risk when using \fBldd\fR, \fBadb :r\fR, or \fBtruss\fR
 on an untrustworthy executable, use the \fBUID\fR \fB"nobody"\fR.
 .SS "Lazy Loading"
-.sp
 .LP
 Lazy loading can be applied directly by specified lazy dependencies. See the
 \fB-z\fR \fBlazyload\fR option of \fBld\fR(1). Lazy loading can also be applied
@@ -386,7 +382,6 @@ any references. These objects, in this example, \fBlibnsl.so.1\fR, are
 candidates for removal from the link-line used to build the object being
 inspected.
 .SS "Initialization Order"
-.sp
 .LP
 Objects that do not explicitly define their required dependencies might observe
 variations in the initialization section order displayed by \fBldd\fR due to
@@ -445,7 +440,6 @@ order for these dependencies can not be established.
 Users that prefer a more static analysis of object files can inspect
 dependencies using tools such as \fBdump\fR(1) and \fBelfdump\fR(1).
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/usr/lib/lddstub\fR\fR
@@ -464,7 +458,6 @@ Fake 64-bit executable loaded to check the dependencies of shared objects.
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBcrle\fR(1), \fBdump\fR(1), \fBelfdump\fR(1), \fBlari\fR(1), \fBld\fR(1),
 \fBld.so.1\fR(1), \fBmdb\fR(1), \fBpldd\fR(1), \fBpvs\fR(1), \fBtruss\fR(1),
@@ -473,7 +466,6 @@ Fake 64-bit executable loaded to check the dependencies of shared objects.
 .LP
 \fILinker and Libraries Guide\fR
 .SH DIAGNOSTICS
-.sp
 .LP
 \fBldd\fR prints the record of shared object path names to \fBstdout\fR. The
 optional list of symbol resolution problems is printed to \fBstderr\fR. If
@@ -481,7 +473,6 @@ optional list of symbol resolution problems is printed to \fBstderr\fR. If
 \fIfilename\fR cannot be opened for reading, a non-zero exit status is
 returned.
 .SH NOTES
-.sp
 .LP
 Use of the \fB-d\fR or \fB-r\fR option with shared objects can give misleading
 results. \fBldd\fR does a worst case analysis of the shared objects. However,

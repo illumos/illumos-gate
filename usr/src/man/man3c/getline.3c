@@ -12,7 +12,7 @@
 .\"
 .\" Copyright (c) 2013, Joyent, Inc. All rights reserved.
 .\"
-.TH GETLINE 3C "Apr 24, 2013"
+.TH GETLINE 3C "April 9, 2016"
 .SH NAME
 getline, getdelim \- read delimited input from streams
 .SH SYNOPSIS
@@ -36,7 +36,7 @@ getline, getdelim \- read delimited input from streams
 .fi
 
 .SH DESCRIPTION
-The \fBgetdelim\fR() function reads bytes from the \fIstream\fR into the the
+The \fBgetdelim\fR() function reads bytes from the \fIstream\fR into the
 array pointed to by \fIptr\fR, until the \fIdelimiter\fR byte or an end-of-file
 condition is encountered.  The \fBgetline\fR() function is identical in
 behaviour, but uses the newline character as the delimiter.  The delimiter
@@ -51,7 +51,6 @@ hold the string it will be expanded, as if via \fBrealloc(3C)\fR.  The caller
 must \fBfree(3C)\fR the buffer when it is no longer required.
 
 .SH RETURN VALUES
-.sp
 .LP
 If successful, \fBgetdelim\fR() and \fBgetline\fR() return the number of bytes
 written into the buffer, excluding the terminating null byte.  If an error
@@ -59,7 +58,6 @@ occurs, or if end-of-file is reached prior to reading any bytes, the value
 \fB\(mi1\fR is returned and \fIerrno\fR is set to indicate the error.
 
 .SH ERRORS
-.sp
 .LP
 The \fBgetline\fR() and \fBgetdelim\fR() functions may fail due to the
 following errors:
@@ -117,7 +115,6 @@ free(ptr);
 .in -2
 
 .SH ATTRIBUTES
-.sp
 .TS
 box;
 c | c
@@ -130,7 +127,6 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBfgetc\fR(3C), \fBfgets\fR(3C), \fBfree\fR(3C), \fBmalloc\fR(3C),
 \fBrealloc\fR(3C), \fBattributes\fR(5)

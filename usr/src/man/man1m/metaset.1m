@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\" See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH METASET 1M "Mar 4, 2009"
+.TH METASET 1M "April 9, 2016"
 .SH NAME
 metaset \- configure disk sets
 .SH SYNOPSIS
@@ -94,7 +94,6 @@ metaset \- configure disk sets
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBmetaset\fR command administers sets of disks in named disk sets. Named
 disk sets include any disk set that is not in the local set. While disk sets
@@ -200,14 +199,12 @@ convention:
 where \fIsetname\fR is the name of the disk set, and \fIhot_spare_pool\fR is
 the name of the hot spare pool associated with the disk set.
 .SS "Multi-node Environment"
-.sp
 .LP
 To create and work with a disk set in a multi\(emnode environment, \fBroot\fR
 must be a member of Group 14 on all hosts, or the \fB/.rhosts\fR file must
 contain an entry for all other host names. This is not required in a SunCluster
-3.x enviroment.
+3.x environment.
 .SS "Tagged data"
-.sp
 .LP
 Tagged data occurs when there are different versions of a disk set's replicas.
 This tagged data consists of the set owner's nodename, the hardware serial
@@ -236,7 +233,6 @@ take. An error message is displayed, and user intervention is required.
 Use the \fB-q\fR to query the disk set and the \fB-t\fR, \fB-u\fR, and
 \fB-y\fR, options to select the tag and take the disk set. See \fBOPTIONS\fR.
 .SS "Mediator Configuration"
-.sp
 .LP
 SVM provides support for a low-end HA solution consisting of two hosts that
 share only two strings of drives. The hosts in this type of configuration,
@@ -254,7 +250,6 @@ data accessible. See \fBmediator\fR(7D) for further details.
 .LP
 Use the \fB-m\fR option to add or delete a mediator host. See \fBOPTIONS\fR.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -827,7 +822,6 @@ additional hosts added later. The last host cannot be deleted until all of the
 drives within the set have been deleted.
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/lvm/md.tab\fR\fR
@@ -838,7 +832,6 @@ Contains list of metadevice configurations.
 .RE
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -862,7 +855,6 @@ An error occurred.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -878,7 +870,6 @@ Interface Stability	Stable
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBmdmonitord\fR(1M), \fBmetaclear\fR(1M), \fBmetadb\fR(1M),
 \fBmetadetach\fR(1M), \fBmetahs\fR(1M), \fBmetainit\fR(1M),
@@ -891,7 +882,6 @@ Interface Stability	Stable
 .LP
 \fI\fR
 .SH NOTES
-.sp
 .LP
 Disk set administration, including the addition and deletion of hosts and
 drives, requires all hosts in the set to be accessible from the network.

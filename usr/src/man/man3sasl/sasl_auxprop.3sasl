@@ -5,11 +5,11 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SASL_AUXPROP 3SASL "Oct 14, 2003"
+.TH SASL_AUXPROP 3SASL "April 9, 2016"
 .SH NAME
 sasl_auxprop, prop_new, prop_dup, prop_request, prop_get, prop_getnames,
 prop_clear, prop_erase, prop_dispose, prop_format, prop_set, prop_setvals \-
-SASL auxilliary properties
+SASL auxiliary properties
 .SH SYNOPSIS
 .LP
 .nf
@@ -74,43 +74,37 @@ SASL auxilliary properties
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
-The SASL auxilliary properties are used to obtain properties from external
-sources during the authentication process. For example, a mechanizm might need
+The SASL auxiliary properties are used to obtain properties from external
+sources during the authentication process. For example, a mechanism might need
 to query an LDAP server to obtain the authentication secret. The application
 probably needs other information from the LDAP server as well, such as the home
-directory of the UID. The auxilliary property interface allows the two to
+directory of the UID. The auxiliary property interface allows the two to
 cooperate and results in only a single query against the property sources.
 .sp
 .LP
 Property lookups take place directly after user canonicalization occurs.
 Therefore, all request should be registered with the context before user
-canonicalization occurs. Requests can calso be registered by using the
-\fBsasl_auxprop_request\fR(3SASL) function. Most of the auxilliary property
+canonicalization occurs. Requests can also be registered by using the
+\fBsasl_auxprop_request\fR(3SASL) function. Most of the auxiliary property
 functions require a property context that can be obtained by calling
 \fBsasl_auxprop_getctx\fR(3SASL).
 .SS "\fBprop_new()\fR"
-.sp
 .LP
 The \fBprop_new()\fR function creates a new property context. It is unlikely
 that application developers will use this call.
 .SS "\fBprop_dup()\fR"
-.sp
 .LP
 The \fBprop_dup()\fR function duplicates a given property context.
 .SS "\fBprop_request()\fR"
-.sp
 .LP
 The \fBprop_request()\fR function adds properties to the request list of a
 given context.
 .SS "\fBprop_get()\fR"
-.sp
 .LP
 The \fBprop_get()\fR function returns a null-terminated array of \fBstruct\fR
 \fBpropval\fR from the given context.
 .SS "\fBprop_getnames()\fR"
-.sp
 .LP
 The \fBprop_getnames()\fR function fills in an array of \fBstruct\fR
 \fBpropval\fR based on a list of property names. The \fBvals\fR array is at
@@ -123,39 +117,32 @@ requested, then its associated values entry will be set to \fINULL\fR.
 The \fBprop_getnames()\fR function returns the number of matching properties
 that were found or a SASL error code.
 .SS "\fBprop_clear()\fR"
-.sp
 .LP
 The \fBprop_clear()\fR function clears \fIvalues\fR and \fIrequests\fR from a
 property context. If the value of \fIrequests\fR is \fB1\fR, then
 \fIrequests\fR is cleared. Otherwise, the value of \fIrequests\fR is \fB0\fR.
 .SS "\fBprop_erase()\fR"
-.sp
 .LP
 The \fBprop_erase()\fR function securely erases the value of a property.
 \fIname\fR is the name of the property to erase.
 .SS "\fBprop_dispose()\fR"
-.sp
 .LP
 The \fBprop_dispose()\fR function disposes of a property context and nullifies
 the pointer.
 .SS "\fBprop_format()\fR"
-.sp
 .LP
 The \fBprop_format()\fR function formats the requested property names into a
 string. The \fBprop_format()\fR function is not intended to be used by the
 application. The function is used only by \fBauxprop\fR plug-ins.
 .SS "\fBprop_set()\fR"
-.sp
 .LP
 The \fBprop_set()\fR functions adds a property value to the context. The
 \fBprop_set()\fR function is used only by \fBauxprop\fR plug-ins.
 .SS "\fBprop_setvals()\fR"
-.sp
 .LP
 The \fBprop_setvals()\fR function adds multiple values to a single property.
 The \fBprop_setvals()\fR function is used only by \fBauxprop\fR plug-ins.
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIconn\fR\fR
@@ -260,8 +247,8 @@ The separator to use for the string.
 \fB\fIseplen\fR\fR
 .ad
 .RS 12n
-The length of the separator. The the values is less than 0, then \fBstrlen\fR
-will be used as \fIsep\fR.
+The length of the separator. If the value is less than 0, then \fBstrlen\fR
+will be used to determine the length of \fIsep\fR instead.
 .RE
 
 .sp
@@ -301,14 +288,12 @@ A null-terminated array of values to be added to the property.
 .RE
 
 .SH ERRORS
-.sp
 .LP
 The \fBsasl_auxprop()\fR functions that return an \fBint\fR will return a SASL
 error code. See \fBsasl_errors\fR(3SASL). Those \fBsasl_auxprop()\fR functions
 that return a pointer will return a valid pointer upon success and return
 \fINULL\fR upon failure.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -326,7 +311,6 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBsasl_auxprop_getctx\fR(3SASL), \fBsasl_auxprop_request\fR(3SASL),
 \fBsasl_errors\fR(3SASL), \fBattributes\fR(5)

@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "lint.h"
 #include "thr_uberdata.h"
 
@@ -41,7 +39,7 @@ pthread_condattr_init(pthread_condattr_t *attr)
 
 	if ((ap = lmalloc(sizeof (cvattr_t))) == NULL)
 		return (ENOMEM);
-	ap->pshared = DEFAULT_TYPE;
+	ap->pshared = PTHREAD_PROCESS_PRIVATE;
 	ap->clockid = CLOCK_REALTIME;
 	attr->__pthread_condattrp = ap;
 	return (0);
@@ -143,7 +141,7 @@ pthread_cond_init(pthread_cond_t *cond, const pthread_condattr_t *attr)
 	int error;
 
 	if (attr == NULL) {
-		type = DEFAULT_TYPE;
+		type = PTHREAD_PROCESS_PRIVATE;
 		clock_id = CLOCK_REALTIME;
 	} else if ((ap = attr->__pthread_condattrp) != NULL) {
 		type = ap->pshared;

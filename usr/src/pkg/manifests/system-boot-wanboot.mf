@@ -21,7 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2012 OmniTI Computer Consulting, Inc.  All rights reserved.
+# Copyright 2016 OmniTI Computer Consulting, Inc.  All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/system/boot/wanboot@$(PKGVERS)
@@ -60,4 +60,3 @@ file path=usr/share/man/man1m/wanbootutil.1m
 legacy pkg=SUNWwbsup desc="Solaris WAN boot support" name="WAN boot support"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
-license usr/src/common/openssl/LICENSE license=usr/src/common/openssl/LICENSE

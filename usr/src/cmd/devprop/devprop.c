@@ -21,9 +21,9 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2016 Nexenta Systems, Inc. All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <unistd.h>
@@ -50,7 +50,7 @@ main(int argc, char *argv[])
 	uchar_t *val_b;
 	int *val_i;
 	int64_t *val_l;
-	char *val_s;
+	char *val_s, *ptr;
 	int n;
 
 	extern char *optarg;
@@ -73,7 +73,8 @@ case ch:					\
 	while ((c = getopt(argc, argv, ":n:vqbils")) != -1) {
 		switch (c) {
 		case 'n':
-			path = optarg;
+			if ((path = realpath(optarg, NULL)) == NULL)
+				path = optarg;
 			break;
 		case ':':
 			usage();
@@ -108,8 +109,13 @@ case ch:					\
 	 * "/devices", which we strip off here as di_init() expects
 	 * just the path to the node.
 	 */
-	if (strncmp("/devices/", path, strlen("/devices/")) == 0)
+	if (strncmp("/devices/", path, strlen("/devices/")) == 0) {
 		path += strlen("/devices");
+
+		/* cut off minor name */
+		if ((ptr = strrchr(path, ':')) != NULL)
+			*ptr = '\0';
+	}
 
 	if ((dn = di_init(path, DINFOPROP)) == DI_NODE_NIL) {
 		perror("di_init");

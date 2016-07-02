@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH IPSECCONF 1M "Sep 28, 2009"
+.TH IPSECCONF 1M "April 9, 2016"
 .SH NAME
 ipsecconf \- configure system wide IPsec policy
 .SH SYNOPSIS
@@ -48,7 +48,6 @@ ipsecconf \- configure system wide IPsec policy
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBipsecconf\fR utility configures the IPsec policy for a host or for one
 of its tunnels. Once the policy is configured, all outbound and inbound
@@ -122,7 +121,6 @@ svc:/network/ipsec/policy
 See \fBNOTES\fR for more information on managing IPsec security policy and
 \fBSECURITY\fR for issues in securing \fB/etc/inet/ipsecinit.conf\fR.
 .SH OPTIONS
-.sp
 .LP
 \fBipsecconf\fR supports the following options:
 .sp
@@ -280,7 +278,6 @@ Quiet mode. Suppresses the warning message generated when adding policies.
 .RE
 
 .SH OPERANDS
-.sp
 .LP
 Each policy entry contains three parts specified as follows:
 .sp
@@ -1095,7 +1092,6 @@ at the end of all the old entries. See .
 A new entry is considered duplicate of the old entry if an old entry matches
 the same traffic pattern as the new entry. See  for information on duplicates.
 .SH SECURITY
-.sp
 .LP
 If, for example, the policy file comes over the wire from an \fBNFS\fR mounted
 file system, an adversary can modify the data contained in the file, thus
@@ -1379,7 +1375,7 @@ all other entries. \fBNULL\fR pattern matches all the traffic.
 .LP
 The following entry on the host with the link local address
 \fBfe80::a00:20ff:fe21:4483\fR specifies that any outbound traffic between the
-hosts wtih IPv6 link-local addresses \fBfe80::a00:20ff:fe21:4483\fR and
+hosts with IPv6 link-local addresses \fBfe80::a00:20ff:fe21:4483\fR and
 \fBfe80::a00:20ff:felf:e346\fR must be encrypted with \fB3DES\fR and \fBMD5.\fR
 
 .sp
@@ -1582,7 +1578,6 @@ C-prefix/24} ipsec {encr_algs aes encr_auth_algs md5}
 .in -2
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/var/run/ipsecpolicy.conf\fR\fR
@@ -1615,7 +1610,6 @@ Sample input file for \fBipseconf\fR.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -1631,7 +1625,6 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBauths\fR(1), \fBprofiles\fR(1), \fBsvcprop\fR(1), \fBsvcs\fR(1),
 \fBin.iked\fR(1M), \fBinit\fR(1M), \fBifconfig\fR(1M), \fBipsecalgs\fR(1M),
@@ -1676,7 +1669,6 @@ The Internet Society. 1998.
 Frankel, S. and Kelly, R. Glenn, \fIThe AES Cipher Algorithm and Its Use With
 IPsec\fR. 2001.
 .SH DIAGNOSTICS
-.sp
 .ne 2
 .na
 \fBBad "string" on line \fIN\fR.\fR
@@ -1735,7 +1727,6 @@ new entry.
 .RE
 
 .SH NOTES
-.sp
 .LP
 IPsec manual keys are managed by the service management facility, \fBsmf\fR(5).
 The services listed below manage the components of IPsec. These services are

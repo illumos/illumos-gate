@@ -8,7 +8,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH FCNTL.H 3HEAD "Feb 5, 2008"
+.TH FCNTL.H 3HEAD "April 9, 2016"
 .SH NAME
 fcntl.h, fcntl \- file control options
 .SH SYNOPSIS
@@ -18,7 +18,6 @@ fcntl.h, fcntl \- file control options
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fB<fcntl.h>\fR header defines the following requests and arguments for use
 by the functions \fBfcntl\fR(2), \fBopen\fR(2), and \fBopenat\fR(2).
@@ -507,7 +506,7 @@ working directory.
 \fB\fBAT_SYMLINK_NOFOLLOW\fR\fR
 .ad
 .RS 23n
-Flag passed to \fBfstatat\fR(2) and \fBfchownat\fR(2) to change the bahavior of
+Flag passed to \fBfstatat\fR(2) and \fBfchownat\fR(2) to change the behavior of
 these functions when they are given a file as an argument that is a symbolic
 link. In this case the functions operate on the symbolic link file rather than
 the file the link references.
@@ -553,7 +552,6 @@ long    f_id;     /* Process unique identifier */
 .in -2
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -571,13 +569,11 @@ Standard	See \fBstandards\fR(5).
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBcreat\fR(2), \fBexec\fR(2), \fBfcntl\fR(2), \fBopen\fR(2),
 \fBfdatasync\fR(3C), \fBfsync\fR(3C), \fBfsattr\fR(5), \fBattributes\fR(5),
 \fBstandards\fR(5)
 .SH NOTES
-.sp
 .LP
 Data is successfully  transferred for a write operation to a regular file when
 the system ensures that all data written is readable on any subsequent open of

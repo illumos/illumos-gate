@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PAM_AUTHTOK_GET 5 "Dec 14, 2004"
+.TH PAM_AUTHTOK_GET 5 "April 9, 2016"
 .SH NAME
 pam_authtok_get \- authentication and password management module
 .SH SYNOPSIS
@@ -13,14 +13,12 @@ pam_authtok_get \- authentication and password management module
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBpam_authtok_get\fR service module provides password prompting
-funtionality to the PAM stack. It implements \fBpam_sm_authenticate()\fR and
+functionality to the PAM stack. It implements \fBpam_sm_authenticate()\fR and
 \fBpam_sm_chauthtok()\fR, providing functionality to both the Authentication
 Stack and the Password Management Stack.
 .SS "Authentication Service"
-.sp
 .LP
 The implementation of \fBpam_sm_authenticate\fR(3PAM) prompts the user name if
 not set and then tries to get the authentication token from the pam handle. If
@@ -29,7 +27,6 @@ the \fBPAM\fR item \fBPAM_AUTHTOK\fR. This module is meant to be the first
 module on an authentication stack where users are to authenticate using a
 keyboard.
 .SS "Password Management Service"
-.sp
 .LP
 Due to the nature of the PAM Password Management stack traversal mechanism, the
 \fBpam_sm_chauthtok\fR(3PAM) function is called twice. Once with the
@@ -65,7 +62,6 @@ The following option can be passed to the module:
 .RE
 
 .SH ERRORS
-.sp
 .LP
 The authentication service returns the following error codes:
 .sp
@@ -108,7 +104,6 @@ Authentication token manipulation error
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -126,7 +121,6 @@ MT Level	MT-Safe with exceptions
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBpam\fR(3PAM), \fBpam_authenticate\fR(3PAM), \fBsyslog\fR(3C),
 \fBlibpam\fR(3LIB), \fBpam.conf\fR(4), \fBattributes\fR(5),
@@ -134,7 +128,6 @@ MT Level	MT-Safe with exceptions
 \fBpam_dhkeys\fR(5), \fBpam_passwd_auth\fR(5), \fBpam_unix_account\fR(5),
 \fBpam_unix_auth\fR(5), \fBpam_unix_session\fR(5)
 .SH NOTES
-.sp
 .LP
 The interfaces in \fBlibpam\fR(3LIB) are MT-Safe only if each thread within the
 multi-threaded application uses its own PAM handle.

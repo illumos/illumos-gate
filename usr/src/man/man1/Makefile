@@ -221,7 +221,6 @@ MANFILES=	acctcom.1			\
 	 	madv.so.1.1			\
 	 	mail.1				\
 	 	mailcompat.1			\
-	 	mailq.1				\
 	 	mailstats.1			\
 	 	mailx.1				\
 		make.1				\
@@ -333,6 +332,7 @@ MANFILES=	acctcom.1			\
 	 	script.1			\
 	 	sdiff.1				\
 	 	sed.1				\
+		sendmail-mailq.1		\
 	 	set.1				\
 	 	setfacl.1			\
 	 	setlabel.1			\
@@ -480,6 +480,7 @@ MANLINKS=	batch.1		\
 		jsh.1		\
 		ksh.1		\
 		ldapadd.1	\
+		mailq.1		\
 		neqn.1		\
 		notify.1	\
 		onintr.1	\
@@ -654,6 +655,8 @@ rksh93.1	:= LINKSRC = ksh93.1
 sh.1		:= LINKSRC = ksh93.1
 
 ldapadd.1	:= LINKSRC = ldapmodify.1
+
+mailq.1		:= LINKSRC = sendmail-mailq.1
 
 ulimit.1	:= LINKSRC = limit.1
 unlimit.1	:= LINKSRC = limit.1

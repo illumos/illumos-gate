@@ -29,7 +29,7 @@
 include ../Makefile.obj
 include ../../Makefile.lib.64
 include ../Makefile.flag
-LDLIBS += -lc -m64
+LDLIBS += -lc
 LDLIBS += -L$(SRC)/lib/libfruutils/$(MACH64) -lfruutils
 LDLIBS += -L$(SRC)/lib/libfru/libfrureg/$(MACH64) -lfrureg
 

@@ -1,916 +1,792 @@
-'\" te
-.\" Copyright (c) 2009 Sun Microsystems, Inc. All Rights Reserved
-.\" Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.\"
 .\" Copyright 1989 AT&T
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
-.\" See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
-.\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH MOUNT_NFS 1M "Mar 13, 2016"
-.SH NAME
-mount_nfs \- mount remote NFS resources
-.SH SYNOPSIS
-.LP
-.nf
-\fBmount\fR [\fB-F\fR nfs] [\fIgeneric_options\fR] [\fB-o\fR \fIspecific_options\fR] [\fB-O\fR] \fIresource\fR
-.fi
-
-.LP
-.nf
-\fBmount\fR [\fB-F\fR nfs] [\fIgeneric_options\fR] [\fB-o\fR \fIspecific_options\fR] [\fB-O\fR] \fImount_point\fR
-.fi
-
-.LP
-.nf
-\fBmount\fR [\fB-F\fR nfs] [\fIgeneric_options\fR] [\fB-o\fR \fIspecific_options\fR]
-     [\fB-O\fR] \fIresource\fR \fImount_point\fR
-.fi
-
-.SH DESCRIPTION
-.LP
-The \fBmount\fR utility attaches a named \fIresource\fR to the file system
-hierarchy at the pathname location \fImount_point\fR, which must already exist.
-If \fImount_point\fR has any contents prior to the \fBmount\fR operation, the
-contents remain hidden until the \fIresource\fR is once again unmounted.
-.sp
-.LP
-\fBmount_nfs\fR starts the \fBlockd\fR(1M) and \fBstatd\fR(1M) daemons if they
-are not already running.
-.sp
-.LP
-If the resource is listed in the \fB/etc/vfstab\fR file, the command line can
-specify either \fIresource\fR or \fImount_point\fR, and \fBmount\fR consults
-\fB/etc/vfstab\fR for more information. If the \fB-F\fR option is omitted,
-\fBmount\fR takes the file system type from \fB/etc/vfstab\fR.
-.sp
-.LP
-If the resource is not listed in the \fB/etc/vfstab\fR file, then the command
-line must specify both the \fIresource\fR and the \fImount_point\fR.
-.sp
-.LP
-\fIhost\fR can be an IPv4 or IPv6 address string. As IPv6 addresses already
-contain colons, enclose \fIhost\fR in a pair of square brackets when specifying
-an IPv6 address string. Otherwise the first occurrence of a colon can be
-interpreted as the separator between the host name and path, for example,
-\fB[1080::8:800:200C:417A]:tmp/file\fR. See \fBinet\fR(7P) and \fBinet6\fR(7P).
-.sp
-.ne 2
-.na
-\fB\fIhost\fR:\fIpathname\fR\fR
-.ad
-.sp .6
-.RS 4n
-Where \fIhost\fR is the name of the \fBNFS\fR server host, and \fIpathname\fR
+.\" Copyright (c) 2009 Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright 2016 Nexenta Systems, Inc.
+.\"
+.Dd March 12, 2016
+.Dt MOUNT_NFS 1M
+.Os
+.Sh NAME
+.Nm mount_nfs
+.Nd mount remote NFS resources
+.Sh SYNOPSIS
+.Nm mount
+.Op Fl F Sy nfs
+.Op Ar generic_options
+.Op Fl o Ar specific_options
+.Ar resource
+.Nm mount
+.Op Fl F Sy nfs
+.Op Ar generic_options
+.Op Fl o Ar specific_options
+.Ar mount_point
+.Nm mount
+.Op Fl F Sy nfs
+.Op Ar generic_options
+.Op Fl o Ar specific_options
+.Ar resource mount_point
+.Sh DESCRIPTION
+The
+.Nm mount
+utility attaches a named
+.Ar resource
+to the file system hierarchy at the pathname location
+.Ar mount_point ,
+which must already exist. If
+.Ar mount_point
+has any contents prior to the
+.Nm mount
+operation, the contents remain hidden until the
+.Ar resource
+is once again unmounted.
+.Pp
+.Nm
+starts the
+.Xr lockd 1M
+and
+.Xr statd 1M
+daemons if they are not already running.
+.Pp
+If the resource is listed in the
+.Pa /etc/vfstab
+file, the command line can specify either
+.Ar resource
+or
+.Ar mount_point ,
+and
+.Nm mount
+consults
+.Pa /etc/vfstab
+for more information. If the
+.Fl F
+option is omitted,
+.Nm mount
+takes the file system type from
+.Pa /etc/vfstab .
+.Pp
+If the resource is not listed in the
+.Pa /etc/vfstab
+file, then the command line must specify both the
+.Ar resource
+and the
+.Ar mount_point .
+.Pp
+.Ar host
+can be an IPv4 or IPv6 address string. As IPv6 addresses already contain colons,
+enclose
+.Ar host
+in a pair of square brackets when specifying an IPv6 address string. Otherwise
+the first occurrence of a colon can be interpreted as the separator between the
+host name and path, for example,
+.Li [1080::8:800:200C:417A]:tmp/file .
+See
+.Xr inet 7P
+and
+.Xr inet6 7P .
+.Bl -tag -width Ds
+.It Ar host Ns : Ns Ar pathname
+Where
+.Ar host
+is the name of the NFS server host, and
+.Ar pathname
 is the path name of the directory on the server being mounted. The path name is
 interpreted according to the server's path name parsing rules and is not
 necessarily slash-separated, though on most servers, this is the case.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fInfs\fR://\fIhost\fR[:\fIport\fR]/\fIpathname\fR\fR
-.ad
-.sp .6
-.RS 4n
-This is an \fBNFS\fR \fBURL\fR and follows the standard convention for
-\fBNFS\fR \fBURL\fRs as described in \fINFS URL Scheme\fR, RFC 2224. See the
-discussion of \fBURL\fR's and the public option under \fBNFS FILE SYSTEMS\fR
+.It No nfs:// Ns Ar host Ns Oo : Ns Ar port Oc Ns / Ns Ar pathname
+This is an NFS URL and follows the standard convention for NFS URLs as described
+in
+.Rs
+.%R NFS URL Scheme
+.%T RFC 2224
+.Re
+See the discussion of URLs and the public option under
+.Sx NFS FILE SYSTEMS
 for a more detailed discussion.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fIhost\fR:\fIpathname\fR
-\fInfs\fR://\fIhost\fR[:\fIport\fR]/\fIpathname\fR\fR
-.ad
-.br
-.na
-\fB\fR
-.ad
-.sp .6
-.RS 4n
-\fIhost\fR:\fIpathname\fR is a comma-separated list of
-\fIhost\fR:\fIpathname\fR.
-.sp
-See the discussion of replicated file systems and failover under \fBNFS FILE
-SYSTEMS\fR for a more detailed discussion.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fIhostlist\fR \fIpathname\fR\fR
-.ad
-.sp .6
-.RS 4n
-\fIhostlist\fR is a comma-separated list of hosts.
-.sp
-See the discussion of replicated file systems and failover under \fBNFS FILE
-SYSTEMS\fR for a more detailed discussion.
-.RE
-
-.sp
-.LP
-The \fBmount\fR command maintains a table of mounted file systems in
-\fB/etc/mnttab\fR, described in \fBmnttab\fR(4).
-.sp
-.LP
-\fBmount_nfs\fR supports both NFSv3 and NFSv4 mounts. The default NFS version
-is NFSv4.
-.SH OPTIONS
-.LP
-See \fBmount\fR(1M) for the list of supported \fIgeneric_options\fR. See
-\fBshare_nfs\fR(1M) for a description of server options.
-.sp
-.ne 2
-.na
-\fB\fB-o\fR \fIspecific_options\fR\fR
-.ad
-.sp .6
-.RS 4n
+.It Xo
+.Ar host Ns : Ns Ar pathname
+.No nfs:// Ns Ar host Ns Oo : Ns Ar port Oc Ns / Ns Ar pathname
+.Xc
+.Ar host Ns : Ns Ar pathname
+is a comma-separated list of
+.Ar host Ns : Ns Ar pathname .
+See the discussion of replicated file systems and failover under
+.Sx NFS FILE SYSTEMS
+for a more detailed discussion.
+.It Ar hostlist pathname
+.Ar hostlist
+is a comma-separated list of hosts. See the discussion of replicated file
+systems and failover under
+.Sx NFS FILE SYSTEMS
+for a more detailed discussion.
+.El
+.Pp
+The
+.Nm mount
+command maintains a table of mounted file systems in
+.Pa /etc/mnttab ,
+described in
+.Xr mnttab 4 .
+.Pp
+.Nm mount_nfs
+supports both NFSv3 and NFSv4 mounts. The default NFS version is NFSv4.
+.Ss Options
+See
+.Xr mount 1M
+for the list of supported
+.Ar generic_options .
+See
+.Xr share_nfs 1M
+for a description of server options.
+.Bl -tag -width Ds
+.It Fl o Ar specific_options
 Set file system specific options according to a comma-separated list with no
 intervening spaces.
-.sp
-.ne 2
-.na
-\fB\fBacdirmax=\fR\fIn\fR\fR
-.ad
-.sp .6
-.RS 4n
-Hold cached attributes for no more than \fIn\fR seconds after directory update.
-The default value is \fB60\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBacdirmin=\fR\fIn\fR\fR
-.ad
-.sp .6
-.RS 4n
-Hold cached attributes for at least \fIn\fR seconds after directory update. The
-default value is \fB30\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBacregmax=\fR\fIn\fR\fR
-.ad
-.sp .6
-.RS 4n
-Hold cached attributes for no more than \fIn\fR seconds after file
-modification. The default value is \fB60\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBacregmin=\fR\fIn\fR\fR
-.ad
-.sp .6
-.RS 4n
-Hold cached attributes for at least \fIn\fR seconds after file modification.
-The default value is \fB3\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBactimeo=\fR\fIn\fR\fR
-.ad
-.sp .6
-.RS 4n
-Set \fImin\fR and \fImax\fR times for regular files and directories to \fIn\fR
-seconds. See "File Attributes," below, for a description of the effect of
-setting this option to \fB0\fR.
-.sp
-See "Specifying Values for Attribute Cache Duration Options," below, for a
-description of how \fBacdirmax\fR, \fBacdirmin\fR, \fBacregmax\fR,
-\fBacregmin\fR, and \fBactimeo\fR are parsed on a \fBmount\fR command line.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBbg\fR | \fBfg\fR\fR
-.ad
-.sp .6
-.RS 4n
+.El
+.Pp
+The following list describes
+.Ar specific_options :
+.Bl -tag -width Ds
+.It Sy acdirmax Ns = Ns Ar n
+Hold cached attributes for no more than
+.Ar n
+seconds after directory update.
+The default value is 60.
+.It Sy acdirmin Ns = Ns Ar n
+Hold cached attributes for at least
+.Ar n
+seconds after directory update. The default value is 30.
+.It Sy acregmax Ns = Ns Ar n
+Hold cached attributes for no more than
+.Ar n
+seconds after file modification. The default value is 60.
+.It Sy acregmin Ns = Ns Ar n
+Hold cached attributes for at least
+.Ar n
+seconds after file modification. The default value is 3.
+.It Sy actimeo Ns = Ns n
+Set
+.Sy min
+and
+.Sy max
+times for regular files and directories to
+.Ar n
+seconds. See
+.Sx File Attributes ,
+below, for a description of the effect of setting this option to 0.
+.Pp
+See
+.Sx Specifying Values for Attribute Cache Duration Options ,
+below, for a description of how
+.Sy acdirmax , acdirmin , acregmax , acregmin ,
+and
+.Sy actimeo
+are parsed on a
+.Nm mount
+command line.
+.It Sy bg Ns | Ns Sy fg
 If the first attempt fails, retry in the background, or, in the foreground. The
-default is \fBfg\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBforcedirectio\fR | \fBnoforcedirectio\fR\fR
-.ad
-.sp .6
-.RS 4n
-If \fBforcedirectio\fR is specified, then for the duration of the mount, forced
-direct \fBI/O\fR is used. If the filesystem is mounted using
-\fBforcedirectio\fR, data is transferred directly between client and server,
-with no buffering on the client. If the filesystem is mounted using
-\fBnoforcedirectio\fR, data is buffered on the client. \fBforcedirectio\fR is a
-performance option that is of benefit only in large sequential data transfers.
-The default behavior is \fBnoforcedirectio\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBgrpid\fR\fR
-.ad
-.sp .6
-.RS 4n
-By default, the \fBGID\fR associated with a newly created file obeys the System
-V semantics; that is, the \fBGID\fR is set to the effective \fBGID\fR of the
-calling process. This behavior can be overridden on a per-directory basis by
-setting the set-GID bit of the parent directory; in this case, the \fBGID\fR of
-a newly created file is set to the \fBGID\fR of the parent directory (see
-\fBopen\fR(2) and \fBmkdir\fR(2)). Files created on file systems that are
-mounted with the \fBgrpid\fR option obeys \fBBSD\fR semantics independent of
-whether the set-GID bit of the parent directory is set; that is, the \fBGID\fR
-is unconditionally inherited from that of the parent directory.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBhard\fR | \fBsoft\fR\fR
-.ad
-.sp .6
-.RS 4n
-Continue to retry requests until the server responds (\fBhard\fR) or give up
-and return an error (\fBsoft\fR). The default value is \fBhard\fR. Note that
-NFSv4 clients do not support soft mounts.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBintr\fR | \fBnointr\fR\fR
-.ad
-.sp .6
-.RS 4n
-Allow (do not allow) keyboard interrupts to kill a process that is hung while
-waiting for a response on a hard-mounted file system. The default is
-\fBintr\fR, which makes it possible for clients to interrupt applications that
-can be waiting for a remote mount.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBnoac\fR\fR
-.ad
-.sp .6
-.RS 4n
+default is
+.Sy fg .
+.It Sy forcedirectio Ns | Ns Sy noforcedirectio
+If
+.Sy forcedirectio
+is specified, then for the duration of the mount, forced direct I/O is used. If
+the filesystem is mounted using
+.Sy forcedirectio ,
+data is transferred directly between client and server, with no buffering on the
+client. If the filesystem is mounted using
+.Sy noforcedirectio ,
+data is buffered on the client.
+.Sy forcedirectio
+is a performance option that is of benefit only in large sequential data
+transfers. The default behavior is
+.Sy noforcedirectio .
+.It Sy grpid
+By default, the GID associated with a newly created file obeys the System V
+semantics; that is, the GID is set to the effective GID of the calling process.
+This behavior can be overridden on a per-directory basis by setting the set-GID
+bit of the parent directory; in this case, the GID of a newly created file is
+set to the GID of the parent directory
+.Po see
+.Xr open 2
+and
+.Xr mkdir 2
+.Pc .
+Files created on file systems that are mounted with the
+.Sy grpid
+option obeys BSD semantics independent of whether the set-GID bit of the parent
+directory is set; that is, the GID is unconditionally inherited from that of the
+parent directory.
+.It Sy hard Ns | Ns Sy soft
+Continue to retry requests until the server responds
+.Pq Sy hard
+or give up and return an error
+.Pq Sy soft .
+The default value is
+.Sy hard .
+Note that NFSv4 clients do not support soft mounts.
+.It Sy intr Ns | Ns Sy nointr
+Allow
+.Pq do not allow
+keyboard interrupts to kill a process that is hung while waiting for a response
+on a hard-mounted file system. The default is
+.Sy intr ,
+which makes it possible for clients to interrupt applications that can be
+waiting for a remote mount.
+.It Sy noac
 Suppress data and attribute caching. The data caching that is suppressed is the
 write-behind. The local page cache is still maintained, but data copied into it
 is immediately written to the server.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBnocto\fR\fR
-.ad
-.sp .6
-.RS 4n
+.It Sy nocto
 Do not perform the normal close-to-open consistency. When a file is closed, all
 modified data associated with the file is flushed to the server and not held on
 the client. When a file is opened the client sends a request to the server to
 validate the client's local caches. This behavior ensures a file's consistency
-across multiple NFS clients. When \fB-nocto\fR is in effect, the client does
-not perform the flush on close and the request for validation, allowing the
-possiblity of differences among copies of the same file as stored on multiple
-clients.
-.sp
+across multiple NFS clients. When
+.Sy nocto
+is in effect, the client does not perform the flush on close and the request for
+validation, allowing the possibility of differences among copies of the same
+file as stored on multiple clients.
+.Pp
 This option can be used where it can be guaranteed that accesses to a specified
 file system are made from only one client and only that client. Under such a
-condition, the effect of \fB-nocto\fR can be a slight performance gain.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBport=\fR\fIn\fR\fR
-.ad
-.sp .6
-.RS 4n
-The server \fBIP\fR port number. The default is \fBNFS_PORT\fR. If the
-\fBport\fR option is specified, and if the resource includes one or more
-\fBNFS\fR \fBURL\fRs, and if any of the \fBURL\fRs include a \fBport\fR number,
-then the \fBport\fR number in the option and in the \fBURL\fR must be the same.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBposix\fR\fR
-.ad
-.sp .6
-.RS 4n
-Request \fBPOSIX.1\fR semantics for the file system. Requires a mount Version 2
-\fBmountd\fR(1M) on the server. See \fBstandards\fR(5) for information
-regarding POSIX.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBproto=\fR\fInetid\fR | \fBrdma\fR\fR
-.ad
-.sp .6
-.RS 4n
+condition, the effect of
+.Sy nocto
+can be a slight performance gain.
+.It Sy port Ns = Ns Ar n
+The server IP port number. The default is
+.Dv NFS_PORT .
+If the
+.Sy port
+option is specified, and if the resource includes one or more NFS URLs, and if
+any of the URLs include a port number, then the port number in the option and in
+the URL must be the same.
+.It Sy posix
+Request POSIX.1 semantics for the file system. Requires a mount Version 2
+.Xr mountd 1M
+on the server. See
+.Xr standards 5
+for information regarding POSIX.
+.It Sy proto Ns = Ns Ar netid Ns | Ns Sy rdma
 By default, the transport protocol that the NFS mount uses is the first
-available RDMA transport supported both by the client and the server. If no
-RDMA transport is found, then it attempts to use a TCP transport or, failing
-that, a UDP transport, as ordered in the \fB/etc/netconfig\fR file. If it does
-not find a connection oriented transport, it uses the first available
-connectionless transport.
-.sp
-Use this option to override the default behavior.
-.sp
-\fBproto\fR is set to the value of \fInetid\fR or \fBrdma\fR. \fInetid\fR is
-the value of the \fBnetwork_id\fR field entry in the \fB/etc/netconfig\fR file.
-.sp
+available RDMA transport supported both by the client and the server. If no RDMA
+transport is found, then it attempts to use a TCP transport or, failing that, a
+UDP transport, as ordered in the
+.Pa /etc/netconfig
+file. If it does not find a connection oriented transport, it uses the first
+available connectionless transport. Use this option to override the default
+behavior.
+.Pp
+.Sy proto
+is set to the value of
+.Ar netid
+or
+.Sy rdma .
+.Ar netid
+is the value of the
+.Sy network_id
+field entry in the
+.Pa /etc/netconfig
+file.
+.Pp
 The UDP protocol is not supported for NFS Version 4. If you specify a UDP
-protocol with the \fBproto\fR option, NFS version 4 is not used.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBpublic\fR\fR
-.ad
-.sp .6
-.RS 4n
-The \fBpublic\fR option forces the use of the public file handle when
-connecting to the \fBNFS\fR server. The resource specified might not have an
-\fBNFS\fR \fBURL\fR. See the discussion of \fBURL\fRs and the public option
-under \fBNFS FILE SYSTEMS\fR for a more detailed discussion.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBquota\fR | \fBnoquota\fR\fR
-.ad
-.sp .6
-.RS 4n
-Enable or prevent \fBquota\fR(1M) to check whether the user is over quota on
-this file system; if the file system has quotas enabled on the server, quotas
-are still checked for operations on this file system.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBremount\fR\fR
-.ad
-.sp .6
-.RS 4n
-Remounts a read-only file system as read-write (using the \fBrw\fR option).
-This option cannot be used with other \fB-o\fR options, and this option works
-only on currently mounted read-only file systems.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBretrans=\fR\fIn\fR\fR
-.ad
-.sp .6
-.RS 4n
-Set the number of \fBNFS\fR retransmissions to \fIn\fR. The default value is
-\fB5\fR. For connection-oriented transports, this option has no effect because
-it is assumed that the transport performs retransmissions on behalf of NFS.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBretry=\fR\fIn\fR\fR
-.ad
-.sp .6
-.RS 4n
-The number of times to retry the \fBmount\fR operation. The default for the
-\fBmount\fR command is \fB10000\fR.
-.sp
-The default for the automounter is \fB0\fR, in other words, do not retry. You
-might find it useful to increase this value on heavily loaded servers, where
-automounter traffic is dropped, causing unnecessary server not responding
+protocol with the
+.Sy proto
+option, NFS version 4 is not used.
+.It Sy public
+The
+.Sy public
+option forces the use of the public file handle when connecting to the NFS
+server. The resource specified might not have an NFS URL. See the discussion of
+URLs and the public option under
+.Sx NFS FILE SYSTEMS
+for a more detailed discussion.
+.It Sy quota Ns | Ns Sy noquota
+Enable or prevent
+.Xr quota 1M
+to check whether the user is over quota on this file system; if the file system
+has quotas enabled on the server, quotas are still checked for operations on
+this file system.
+.It Sy remount
+Remounts a read-only file system as read-write
+.Po using the
+.Sy rw
+option
+.Pc .
+This option cannot be used with other
+.Fl o
+options, and this option works only on currently mounted read-only file systems.
+.It Sy retrans Ns = Ns Ar n
+Set the number of NFS retransmissions to
+.Ar n .
+The default value is 5.
+For connection-oriented transports, this option has no effect because it is
+assumed that the transport performs retransmissions on behalf of NFS.
+.It Sy retry Ns = Ns Ar n
+The number of times to retry the
+.Nm mount
+operation. The default for the
+.Nm mount
+command is 10000.
+.Pp
+The default for the automounter is 0, in other words, do not retry. You might
+find it useful to increase this value on heavily loaded servers, where
+automounter traffic is dropped, causing unnecessary
+.Qq server not responding
 errors.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBrsize=\fR\fIn\fR\fR
-.ad
-.sp .6
-.RS 4n
-Set the read buffer size to a maximum of \fIn\fR bytes. The default value is
-\fB1048576\fR when using connection-oriented transports with Version 3 or
-Version 4 of the \fBNFS\fR protocol, and \fB32768\fR when using connection-less
-transports. The default can be negotiated down if the server prefers a smaller
-transfer size. "\fBRead\fR" operations may not necessarily use the maximum
-buffer size. When using Version 2, the default value is \fB32768\fR for all
-transports.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBsec=\fR\fImode\fR\fR
-.ad
-.sp .6
-.RS 4n
-Set the security \fImode\fR for \fBNFS\fR transactions. If \fBsec=\fR is not
-specified, then the default action is to use \fBAUTH_SYS\fR over \fBNFS\fR
-Version 2 mounts, use a user-configured default \fBauth\fR over NFS version 3
-mounts, or to  negotiate a mode over Version 4 mounts.
-.sp
+.It Sy rsize Ns = Ns Ar n
+Set the read buffer size to a maximum of
+.Ar n
+bytes. The default value is 1048576 when using connection-oriented transports
+with Version 3 or Version 4 of the NFS protocol, and 32768 when using
+connection-less transports. The default can be negotiated down if the server
+prefers a smaller transfer size.
+.Qq Read
+operations may not necessarily use the maximum buffer size. When using Version
+2, the default value is 32768 for all transports.
+.It Sy sec Ns = Ns Ar mode
+Set the security
+.Ar mode
+for NFS transactions. If
+.Sy sec Ns =
+is not specified, then the default action is to use AUTH_SYS over NFS Version 2
+mounts, use a user-configured default
+.Sy auth
+over NFS version 3 mounts, or to  negotiate a mode over Version 4 mounts.
+.Pp
 The preferred mode for NFS Version 3 mounts is the default mode specified in
-\fB/etc/nfssec.conf\fR (see \fBnfssec.conf\fR(4)) on the client. If there is no
-default configured in this file or if the server does not export using the
-client's default mode, then the client picks the first mode that it supports in
-the array of modes returned by the server. These alternatives are limited to
-the security flavors listed in \fB/etc/nfssec.conf\fR.
-.sp
+.Pa /etc/nfssec.conf
+.Po see
+.Xr nfssec.conf 4
+.Pc
+on the client. If there is no default configured in this file or if the server
+does not export using the client's default mode, then the client picks the first
+mode that it supports in the array of modes returned by the server. These
+alternatives are limited to the security flavors listed in
+.Pa /etc/nfssec.conf .
+.Pp
 NFS Version 4 mounts negotiate a security mode when the server returns an array
 of security modes. The client attempts the mount with each security mode, in
 order, until one is successful.
-.sp
-Only one mode can be specified with the \fBsec=\fR option. See \fBnfssec\fR(5)
-for the available \fImode\fR options.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBsecure\fR\fR
-.ad
-.sp .6
-.RS 4n
-This option has been deprecated in favor of the \fBsec=\fR\fIdh\fR option.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBtimeo=\fR\fIn\fR\fR
-.ad
-.sp .6
-.RS 4n
-Set the \fBNFS\fR timeout to \fIn\fR tenths of a second. The default value is
-\fB11\fR tenths of a second for connectionless transports, and \fB600\fR tenths
-of a second for connection-oriented transports. This value is ignored for
-connectionless transports. Such transports might implement their own timeouts,
-which are outside the control of NFS.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBvers=\fR\fINFS version number\fR\fR
-.ad
-.sp .6
-.RS 4n
-By default, the version of \fBNFS\fR protocol used between the client and the
-server is the highest one available on both systems. The default maximum for
-the client is Version 4. This can be changed by setting the
-\fBNFS_CLIENT_VERSMAX\fR parameter in \fB/etc/default/nfs\fR to a valid version
-(2, 3, or 4). If the \fBNFS\fR server does not support the client's default
-maximum, the next lowest version attempted until a matching version is found.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBwsize=\fR\fIn\fR\fR
-.ad
-.sp .6
-.RS 4n
-Set the write buffer size to a maximum of \fIn\fR bytes. The default value is
-\fB1048576\fR when using connection-oriented transports with Version 3 or
-Version 4 of the \fBNFS\fR protocol, and \fB32768\fR when using connection-less
-transports. The default can be negotiated down if the server prefers a smaller
-transfer size. "\fBWrite\fR" operations may not necessarily use the maximum
-buffer size. When using Version 2, the default value is \fB32768\fR for all
-transports.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBxattr\fR | \fBnoxattr\fR\fR
-.ad
-.sp .6
-.RS 4n
+.Pp
+Only one mode can be specified with the
+.Sy sec Ns =
+option. See
+.Xr nfssec 5
+for the available
+.Ar mode
+options.
+.It Sy secure
+This option has been deprecated in favor of the
+.Sy sec Ns = Ns Sy dh
+option.
+.It Sy timeo Ns = Ns Ar n
+Set the NFS timeout to
+.Ar n
+tenths of a second. The default value is 11 tenths of a second for
+connectionless transports, and 600 tenths of a second for connection-oriented
+transports. This value is ignored for connectionless transports. Such transports
+might implement their own timeouts, which are outside the control of NFS.
+.It Sy vers Ns = Ns Ar "NFS version number"
+By default, the version of NFS protocol used between the client and the server
+is the highest one available on both systems. If the NFS server does not support
+the client's default maximum, the next lowest version attempted until a matching
+version is found. See
+.Xr nfs 4
+for more information on setting default minimum and maximum client versions.
+.It Sy wsize Ns = Ns Ar n
+Set the write buffer size to a maximum of
+.Ar n
+bytes. The default value is 1048576 when using connection-oriented transports
+with Version 3 or Version 4 of the NFS protocol, and 32768 when using
+connection-less transports. The default can be negotiated down if the server
+prefers a smaller transfer size.
+.Qq Write
+operations may not necessarily use the maximum buffer size. When using Version
+2, the default value is 32768 for all transports.
+.It Sy xattr Ns | Ns Sy noxattr
 Allow or disallow the creation and manipulation of extended attributes. The
-default is \fBxattr\fR. See \fBfsattr\fR(5) for a description of extended
-attributes.
-.RE
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-O\fR\fR
-.ad
-.sp .6
-.RS 4n
-Overlay mount. Allow the file system to be mounted over an existing mount
-point, making the underlying file system inaccessible. If a mount is attempted
-on a pre-existing mount point without setting this flag, the mount fails,
-producing the error "device busy."
-.RE
-
-.SH NFS FILE SYSTEMS
-.ne 2
-.na
-\fBBackground versus Foreground\fR
-.ad
-.sp .6
-.RS 4n
-File systems mounted with the \fBbg\fR option indicate that \fBmount\fR is to
-retry in the background if the server's mount daemon (\fBmountd\fR(1M)) does
-not respond. \fBmount\fR retries the request up to the count specified in the
-\fBretry=\fR\fIn\fR option. (Note that the default value for \fBretry\fR
-differs between \fBmount\fR and \fBautomount\fR. See the description of
-\fBretry\fR, above.) Once the file system is mounted, each \fBNFS\fR request
-made in the kernel waits \fBtimeo=\fR\fIn\fR tenths of a second for a response.
-If no response arrives, the time-out is multiplied by \fB2\fR and the request
-is retransmitted. When the number of retransmissions has reached the number
-specified in the \fBretrans=\fR\fIn\fR option, a file system mounted with the
-\fBsoft\fR option returns an error on the request; one mounted with the
-\fBhard\fR option prints a warning message and continues to retry the request.
-.RE
-
-.sp
-.ne 2
-.na
-\fBHard versus Soft\fR
-.ad
-.sp .6
-.RS 4n
-File systems that are mounted read-write or that contain executable files
-should always be mounted with the \fBhard\fR option. Applications using
-\fBsoft\fR mounted file systems can incur unexpected \fBI/O\fR errors, file
-corruption, and unexpected program core dumps. The soft option is not
-recommended.
-.RE
-
-.sp
-.ne 2
-.na
-\fBAuthenticated requests\fR
-.ad
-.sp .6
-.RS 4n
-The server can require authenticated \fBNFS\fR requests from the client.
-\fBsec=\fR\fIdh\fR authentication might be required. See \fBnfssec\fR(5).
-.RE
-
-.sp
-.ne 2
-.na
-\fBURLs and the public option\fR
-.ad
-.sp .6
-.RS 4n
-If the \fBpublic\fR option is specified, or if the \fIresource\fR includes an
-\fBNFS\fR \fBURL\fR, \fBmount\fR attempts to connect to the server using the
-public file handle lookup protocol. See \fIWebNFS Client Specification\fR, RFC
-2054. If the server supports the public file handle, the attempt is successful;
-\fBmount\fR does not need to contact the server's \fBrpcbind\fR(1M) and the
-\fBmountd\fR(1M) daemons to get the port number of the \fBmount\fR server and
-the initial file handle of \fIpathname\fR, respectively. If the \fBNFS\fR
-client and server are separated by a firewall that allows all outbound
-connections through specific ports, such as \fBNFS_PORT\fR, then this enables
-\fBNFS\fR operations through the firewall. The public option and the \fBNFS\fR
-\fBURL\fR can be specified independently or together. They interact as
-specified in the following matrix:
-.sp
-.in +2
-.nf
+default is
+.Sy xattr .
+See
+.Xr fsattr 5
+for a description of extended attributes.
+.El
+.Sh NFS FILE SYSTEMS
+.Ss Background versus Foreground
+File systems mounted with the
+.Sy bg
+option indicate that
+.Nm mount
+is to retry in the background if the server's mount daemon
+.Pq Xr mountd 1M
+does not respond.
+.Nm mount
+retries the request up to the count specified in the
+.Sy retry Ns = Ns Ar n
+option
+.Po note that the default value for
+.Sy retry
+differs between
+.Nm mount
+and
+.Nm automount ;
+see the description of
+.Sy retry ,
+above
+.Pc .
+Once the file system is mounted, each NFS request made in the kernel waits
+.Sy timeo Ns = Ns Ar n
+tenths of a second for a response. If no response arrives, the time-out is
+multiplied by 2 and the request is retransmitted. When the number of
+retransmissions has reached the number specified in the
+.Sy retrans Ns = Ns Ar n
+option, a file system mounted with the
+.Sy soft
+option returns an error on the request; one mounted with the
+.Sy hard
+option prints a warning message and continues to retry the request.
+.Ss Hard versus Soft
+File systems that are mounted read-write or that contain executable files should
+always be mounted with the
+.Sy hard
+option. Applications using
+.Sy soft
+mounted file systems can incur unexpected I/O errors, file corruption, and
+unexpected program core dumps. The
+.Sy soft
+option is not recommended.
+.Ss Authenticated requests
+The server can require authenticated NFS requests from the client.
+.Sy sec Ns = Ns Sy dh
+authentication might be required. See
+.Xr nfssec 5 .
+.Ss URLs and the public option
+If the
+.Sy public
+option is specified, or if the
+.Ar resource
+includes and NFS URL,
+.Nm mount
+attempts to connect to the server using the public file handle lookup protocol.
+See
+.Rs
+.%R WebNFS Client Specification
+.%T RFC 2054
+.Re
+If the server supports the public file handle, the attempt is successful;
+.Nm mount
+does not need to contact the server's
+.Xr rpcbind 1M
+and the
+.Xr mountd 1M
+daemons to get the port number of the
+.Nm mount
+server and the initial file handle of
+.Ar pathname ,
+respectively. If the NFS client and server are separated by a firewall that
+allows all outbound connections through specific ports, such as
+.Dv NFS_PORT ,
+then this enables NFS operations through the firewall. The public option and the
+NFS URL can be specified independently or together. They interact as specified
+in the following matrix:
+.Bd -literal
                    Resource Style
 
-                    \fIhost\fR:\fIpathname\fR              NFS URL
+                   host:pathname              NFS URL
 
 public option      Force public file          Force public file
-                    handle and fail            handle and fail
-                    mount if not supported.    mount if not supported.
+                   handle and fail            handle and fail
+                   mount if not supported.    mount if not supported.
 
-                    Use Native paths.          Use Canonical paths.
+                   Use Native paths.          Use Canonical paths.
 
 default            Use MOUNT protocol.        Try public file handle
-                                               with Canonical paths.
-                                               Fall back to MOUNT
-                                               protocol if not
-                                               supported.
-.fi
-.in -2
-
+                                              with Canonical paths.
+                                              Fall back to MOUNT
+                                              protocol if not
+                                              supported.
+.Ed
+.Pp
 A Native path is a path name that is interpreted according to conventions used
-on the native operating system of the \fBNFS\fR server. A Canonical path is a
-path name that is interpreted according to the \fBURL\fR rules. See \fIUniform
-Resource Locators (URL)\fR, RFC 1738. See  for uses of Native and Canonical
-paths.
-.RE
-
-.sp
-.ne 2
-.na
-\fBReplicated file systems and failover\fR
-.ad
-.sp .6
-.RS 4n
-\fIresource\fR can list multiple read\(mionly file systems to be used to
-provide data. These file systems should contain equivalent directory structures
-and identical files. It is also recommended that they be created by a utility
-such as \fBrdist\fR(1). The file systems can be specified either with a
-comma\(miseparated list of \fIhost:/pathname\fR entries and/or \fBNFS\fR
-\fBURL\fR entries, or with a comma \(miseparated list of hosts, if all file
-system names are the same. If multiple file systems are named and the first
+on the native operating system of the NFS server. A Canonical path is a
+path name that is interpreted according to the URL rules. See
+.Rs
+.%R Uniform Resource Locators (URL)
+.%T RFC 1738
+.Re
+.Ss Replicated file systems and failover
+.Ar resource
+can list multiple read-only file systems to be used to provide data. These file
+systems should contain equivalent directory structures and identical files. It
+is also recommended that they be created by a utility such as
+.Xr rdist 1 .
+The file systems can be specified either with a comma-separated list of
+.Pa host:/pathname
+entries and/or NFS URL entries, or with a comma-separated list of hosts, if all
+file system names are the same. If multiple file systems are named and the first
 server in the list is down, failover uses the next alternate server to access
-files. If the read\(mionly option is not chosen, replication is disabled. File
+files. If the read-only option is not chosen, replication is disabled. File
 access, for NFS Versions 2 and 3, is blocked on the original if NFS locks are
 active for that file.
-.RE
-
-.SS "File Attributes"
-.LP
-To improve \fBNFS\fR read performance, files and file attributes are cached.
-File modification times get updated whenever a write occurs. However, file
-access times can be temporarily out-of-date until the cache gets refreshed.
-.sp
-.LP
+.Ss File Attributes
+To improve NFS read performance, files and file attributes are cached. File
+modification times get updated whenever a write occurs. However, file access
+times can be temporarily out-of-date until the cache gets refreshed.
+.Pp
 The attribute cache retains file attributes on the client. Attributes for a
 file are assigned a time to be flushed. If the file is modified before the
 flush time, then the flush time is extended by the time since the last
-modification (under the assumption that files that changed recently are likely
-to change soon). There is a minimum and maximum flush time extension for
-regular files and for directories. Setting \fBactimeo=\fR\fIn\fR sets flush
-time to \fIn\fR seconds for both regular files and directories.
-.sp
-.LP
-Setting \fBactimeo=0\fR disables attribute caching on the client. This means
-that every reference to attributes is satisfied directly from the server though
-file data is still cached. While this guarantees that the client always has the
-latest file attributes from the server, it has an adverse effect on performance
-through additional latency, network load, and server load.
-.sp
-.LP
-Setting the \fBnoac\fR option also disables attribute caching, but has the
-further effect of disabling client write caching. While this guarantees that
-data written by an application is written directly to a server, where it can be
-viewed immediately by other clients, it has a significant adverse effect on
-client write performance. Data written into memory-mapped file pages
-(\fBmmap\fR(2)) are not written directly to this server.
-.SS "Specifying Values for Attribute Cache Duration Options"
-.LP
-The attribute cache duration options are \fBacdirmax\fR, \fBacdirmin\fR,
-\fBacregmax\fR, \fBacregmin\fR, and \fBactimeo\fR, as described under OPTIONS.
-A value specified for \fBactimeo\fR sets the values of all attribute cache
-duration options except for any of these options specified following
-\fBactimeo\fR on a \fBmount\fR command line. For example, consider the
-following command:
-.sp
-.in +2
-.nf
+modification
+.Po under the assumption that files that changed recently are likely to change
+soon
+.Pc .
+There is a minimum and maximum flush time extension for regular files and for
+directories. Setting
+.Sy actimeo Ns = Ns Ar n
+sets flush time to
+.Ar n
+seconds for both regular files and directories.
+.Pp
+Setting
+.Sy actimeo Ns = Ns Sy 0
+disables attribute caching on the client. This means that every reference to
+attributes is satisfied directly from the server though file data is still
+cached. While this guarantees that the client always has the latest file
+attributes from the server, it has an adverse effect on performance through
+additional latency, network load, and server load.
+.Pp
+Setting the
+.Sy noac
+option also disables attribute caching, but has the further effect of disabling
+client write caching. While this guarantees that data written by an application
+is written directly to a server, where it can be viewed immediately by other
+clients, it has a significant adverse effect on client write performance. Data
+written into memory-mapped file pages
+.Pq Xr mmap 2
+are not written directly to this server.
+.Ss Specifying Values for Attribute Cache Duration Options
+The attribute cache duration options are
+.Sy acdirmax , acdirmin , acregmax , acregmin ,
+and
+.Sy actimeo ,
+as described under
+.Sx Options.
+A value specified for
+.Sy actimeo
+sets the values of all attribute cache duration options except for any of these
+options specified following
+.Sy actimeo
+on a
+.Nm mount
+command line. For example, consider the following command:
+.Bd -literal -offset indent
 example# mount -o acdirmax=10,actimeo=1000 server:/path /localpath
-.fi
-.in -2
-
-.sp
-.LP
-Because \fBactimeo\fR is the last duration option in the command line, its
-value (\fB1000\fR) becomes the setting for all of the duration options,
-including \fBacdirmax\fR. Now consider:
-.sp
-.in +2
-.nf
+.Ed
+.Pp
+Because
+.Sy actimeo
+is the last duration option in the command line, its value
+.Pq 1000
+becomes the setting for all of the duration options, including
+.Sy acdirmax .
+Now consider:
+.Bd -literal -offset indent
 example# mount -o actimeo=1000,acdirmax=10 server:/path /localpath
-.fi
-.in -2
-
-.sp
-.LP
-Because the \fBacdirmax\fR option follows \fBactimeo\fR on the command line, it
-is assigned the value specified (\fB10\fR). The remaining duration options are
-set to the value of \fBactimeo\fR (\fB1000\fR).
-.SH EXAMPLES
-.LP
-\fBExample 1 \fRMounting an \fBNFS\fR File System
-.sp
-.LP
-To mount an \fBNFS\fR file system:
-
-.sp
-.in +2
-.nf
-example# mount serv:/usr/src /usr/src
-.fi
-.in -2
-.sp
-
-.LP
-\fBExample 2 \fRMounting An \fBNFS\fR File System Read-Only With No suid
-Privileges
-.sp
-.LP
-To mount an \fBNFS\fR file system read-only with no suid privileges:
-
-.sp
-.in +2
-.nf
-example# mount -r -o nosuid serv:/usr/src /usr/src
-.fi
-.in -2
-.sp
-
-.LP
-\fBExample 3 \fRMounting An \fBNFS\fR File System Over Version 2, with the UDP
-Transport
-.sp
-.LP
-To mount an \fBNFS\fR file system over Version 2, with the UDP transport:
-
-.sp
-.in +2
-.nf
-example# mount -o vers=2,proto=udp serv:/usr/src /usr/src
-.fi
-.in -2
-.sp
-
-.LP
-\fBExample 4 \fRMounting an \fBNFS\fR File System Using An \fBNFS\fR \fBURL\fR
-.sp
-.LP
-To mount an \fBNFS\fR file system using an \fBNFS\fR \fBURL\fR (a canonical
-path):
-
-.sp
-.in +2
-.nf
-example# mount nfs://serv/usr/man /usr/man
-.fi
-.in -2
-.sp
-
-.LP
-\fBExample 5 \fRMounting An \fBNFS\fR File System Forcing Use Of The Public
-File Handle
-.sp
-.LP
-To mount an \fBNFS\fR file system and force the use of the public file handle
-and an \fBNFS\fR \fBURL\fR (a canonical path) that has a non 7-bit ASCII escape
-sequence:
-
-.sp
-.in +2
-.nf
-example# mount -o public nfs://serv/usr/%A0abc /mnt/test
-.fi
-.in -2
-.sp
-
-.LP
-\fBExample 6 \fRMounting an \fBNFS\fR File System Using a Native Path
-.sp
-.LP
-To mount an \fBNFS\fR file system using a native path (where the server uses
-colons (":") as the component separator) and the public file handle:
-
-.sp
-.in +2
-.nf
-example# mount -o public serv:C:doc:new /usr/doc
-.fi
-.in -2
-.sp
-
-.LP
-\fBExample 7 \fRMounting a Replicated Set of \fBNFS\fR File Systems with the
-Same Pathnames
-.sp
-.LP
-To mount a replicated set of \fBNFS\fR file systems with the same pathnames:
-
-.sp
-.in +2
-.nf
-example# mount serv\(mia,serv\(mib,serv\(mic:/usr/man /usr/man
-.fi
-.in -2
-.sp
-
-.LP
-\fBExample 8 \fRMounting a Replicated Set of \fBNFS\fR File Systems with
-Different Pathnames
-.sp
-.LP
-To mount a replicated set of \fBNFS\fR file systems with different pathnames:
-
-.sp
-.in +2
-.nf
-example# mount serv\(mix:/usr/man,serv\(miy:/var/man,nfs://serv-z/man /usr/man
-.fi
-.in -2
-.sp
-
-.SH FILES
-.ne 2
-.na
-\fB\fB/etc/mnttab\fR\fR
-.ad
-.sp .6
-.RS 4n
+.Ed
+.Pp
+Because the
+.Sy acdirmax
+option follows
+.Sy actimeo
+on the command line, it is assigned the value specified
+.Pq 10 .
+The remaining duration options are set to the value of
+.Sy actimeo
+.Pq 1000 .
+.Sh FILES
+.Bl -tag -width Ds
+.It Pa /etc/mnttab
 table of mounted file systems
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/etc/dfs/fstypes\fR\fR
-.ad
-.sp .6
-.RS 4n
+.It Pa /etc/dfs/fstypes
 default distributed file system type
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/etc/vfstab\fR\fR
-.ad
-.sp .6
-.RS 4n
+.It Pa /etc/vfstab
 table of automatically mounted resources
-.RE
-
-.SH SEE ALSO
-.LP
-\fBrdist\fR(1), \fBlockd\fR(1M), \fBmountall\fR(1M), \fBmountd\fR(1M),
-\fBnfsd\fR(1M), \fBquota\fR(1M), \fBstatd\fR(1M), \fBmkdir\fR(2),
-\fBmmap\fR(2), \fBmount\fR(2), \fBopen\fR(2), \fBumount\fR(2), \fBmnttab\fR(4),
-\fBnfs\fR(4), \fBnfssec.conf\fR(4), \fBattributes\fR(5), \fBfsattr\fR(5),
-\fBnfssec\fR(5), \fBstandards\fR(5), \fBinet\fR(7P), \fBinet6\fR(7P),
-\fBlofs\fR(7FS)
-.sp
-.LP
-Callaghan, Brent, \fIWebNFS Client Specification\fR, RFC 2054, October 1996.
-.sp
-.LP
-Callaghan, Brent, \fINFS URL Scheme\fR, RFC 2224, October 1997.
-.sp
-.LP
-Berners-Lee, Masinter & McCahill , \fIUniform Resource Locators (URL)\fR, RFC
-1738, December 1994.
-.SH NOTES
-.LP
-An \fBNFS\fR server should not attempt to mount its own file systems. See
-\fBlofs\fR(7FS).
-.sp
-.LP
+.El
+.Sh EXAMPLES
+.Bl -tag -width Ds
+.It Sy Example 1 No Mounting an NFS File System
+To mount an NFS file system:
+.Bd -literal
+example# mount serv:/usr/src /usr/src
+.Ed
+.It Xo
+.Sy Example 2
+Mounting An NFS File System Read-Only With No suid Privileges
+.Xc
+To mount an NFS file system read-only with no suid privileges:
+.Bd -literal
+example# mount -r -o nosuid serv:/usr/src /usr/src
+.Ed
+.It Xo
+.Sy Example 3
+Mounting An NFS File System Over Version 2, with the UDP Transport
+.Xc
+To mount an NFS file system over Version 2, with the UDP transport:
+.Bd -literal
+example# mount -o vers=2,proto=udp serv:/usr/src /usr/src
+.Ed
+.It Xo
+.Sy Example 4
+Mounting an NFS File System Using An NFS URL
+.Xc
+To mount an NFS file system using an NFS URL
+.Pq a canonical path :
+.Bd -literal
+example# mount nfs://serv/usr/man /usr/man
+.Ed
+.It Xo
+.Sy Example 5
+Mounting An NFS File System Forcing Use Of The Public File Handle
+.Xc
+To mount an NFS file system and force the use of the public file handle
+and an NFS URL
+.Pq a canonical path
+that has a non 7-bit ASCII escape sequence:
+.Bd -literal
+example# mount -o public nfs://serv/usr/%A0abc /mnt/test
+.Ed
+.It Xo
+.Sy Example 6
+Mounting an NFS File System Using a Native Path
+.Xc
+To mount an NFS file system using a native path
+.Po where the server uses colons
+.Pq Qq Sy \:
+as the component separator
+.Pc
+and the public file handle:
+.Bd -literal
+example# mount -o public serv:C:doc:new /usr/doc
+.Ed
+.It Xo
+.Sy Example 7
+Mounting a Replicated Set of NFS File Systems with the Same Pathnames
+.Xc
+To mount a replicated set of NFS file systems with the same pathnames:
+.Bd -literal
+example# mount serv-a,serv-b,serv-c:/usr/man /usr/man
+.Ed
+.It Xo
+.Sy Example 8
+Mounting a Replicated Set of NFS File Systems with Different Pathnames
+.Xc
+To mount a replicated set of NFS file systems with different pathnames:
+.Bd -literal
+example# mount serv-x:/usr/man,serv-y:/var/man,nfs://serv-z/man /usr/man
+.Ed
+.El
+.Sh SEE ALSO
+.Xr rdist 1 ,
+.Xr lockd 1M ,
+.Xr mountall 1M ,
+.Xr mountd 1M ,
+.Xr nfsd 1M ,
+.Xr quota 1M ,
+.Xr statd 1M ,
+.Xr mkdir 2 ,
+.Xr mmap 2 ,
+.Xr mount 2 ,
+.Xr open 2 ,
+.Xr umount 2 ,
+.Xr mnttab 4 ,
+.Xr nfs 4 ,
+.Xr nfssec.conf 4 ,
+.Xr attributes 5 ,
+.Xr fsattr 5 ,
+.Xr nfssec 5 ,
+.Xr standards 5 ,
+.Xr lofs 7FS ,
+.Xr inet 7P ,
+.Xr inet6 7P
+.Rs
+.%A Callaghan
+.%A Brent
+.%R WebNFS Client Specification
+.%T RFC 2054
+.%D October 1996
+.Re
+.Rs
+.%A Callaghan
+.%A Brent
+.%R NFS URL Scheme
+.%T RFC 2224
+.%D October 1997
+.Re
+.Rs
+.%A Berners-Lee
+.%A Masinter
+.%A McCahill
+.%R Uniform Resource Locators (URL)
+.%T RFC 1738
+.%D December 1994
+.Re
+.Sh NOTES
+An NFS server should not attempt to mount its own file systems. See
+.Xr lofs 7FS .
+.Pp
 If the directory on which a file system is to be mounted is a symbolic link,
-the file system is mounted on \fBthe directory to which the symbolic link
-refers,\fR rather than being mounted on top of the symbolic link itself.
-.sp
-.LP
-SunOS 4.x used the \fBbiod\fR maintenance procedure to perform parallel
-read-ahead and write-behind on \fBNFS\fR clients. SunOS 5.x made \fBbiod\fR
+the file system is mounted on the directory to which the symbolic link refers,
+rather than being mounted on top of the symbolic link itself.
+.Pp
+SunOS 4.x used the
+.Sy biod
+maintenance procedure to perform parallel read-ahead and write-behind on NFS
+clients. SunOS 5.x made
+.Sy biod
 obsolete with multi-threaded processing, which transparently performs parallel
 read-ahead and write-behind.
-.sp
-.LP
-Since the root \fB(\fR/\fB)\fR file system is mounted read-only by the kernel
-during the boot process, only the \fBremount\fR option (and options that can be
-used in conjunction with \fBremount\fR) affect the root (\fB/\fR) entry in the
-\fB/etc/vfstab\fR file.
-.sp
-.LP
+.Pp
+Since the root
+.Pq Pa /
+file system is mounted read-only by the kernel during the boot process, only the
+.Sy remount
+option
+.Po and options that can be used in conjunction with
+.Sy remount
+.Pc
+affect the root
+.Pq Pa /
+entry in the
+.Pa /etc/vfstab
+file.
+.Pp
 The NFS client service is managed by the service management facility,
-\fBsmf\fR(5), under the service identifier:
-.sp
-.in +2
-.nf
+.Xr smf 5 ,
+under the service identifier:
+.Bd -literal -offset indent
 svc:/network/nfs/client:default
-.fi
-.in -2
-.sp
-
-.sp
-.LP
+.Ed
+.Pp
 Administrative actions on this service, such as enabling, disabling, or
-requesting restart, can be performed using \fBsvcadm\fR(1M). The service's
-status can be queried using the \fBsvcs\fR(1) command.
+requesting restart, can be performed using
+.Xr svcadm 1M .
+The service's status can be queried using the
+.Xr svcs 1
+command.

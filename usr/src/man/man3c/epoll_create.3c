@@ -8,7 +8,7 @@
 .\"  A full copy of the text of the CDDL should have accompanied this
 .\"  source.  A copy of the CDDL is also available via the Internet at
 .\"  http://www.illumos.org/license/CDDL.
-.TH EPOLL_CREATE 3C "Apr 17, 2014"
+.TH EPOLL_CREATE 3C "April 9, 2016"
 .SH NAME
 epoll_create, epoll_create1 \- create an epoll instance
 .SH SYNOPSIS
@@ -50,7 +50,7 @@ Instance should be closed upon an
 
 .SH RETURN VALUES
 .LP
-Upon succesful completion, 0 is returned. Otherwise, -1 is returned and errno
+Upon successful completion, 0 is returned. Otherwise, -1 is returned and errno
 is set to indicate the error.
 .SH ERRORS
 .LP

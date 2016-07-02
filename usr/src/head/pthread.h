@@ -69,11 +69,6 @@ extern "C" {
 #define	PTHREAD_PROCESS_SHARED		1	/* = USYNC_PROCESS */
 #define	PTHREAD_PROCESS_PRIVATE		0	/* = USYNC_THREAD */
 
-#define	_DEFAULT_TYPE 			PTHREAD_PROCESS_PRIVATE
-#if !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__)
-#define	DEFAULT_TYPE			_DEFAULT_TYPE
-#endif
-
 /*
  * mutex types
  * keep these in synch which sys/synch.h lock flags
@@ -113,13 +108,13 @@ extern "C" {
  * should be consistent with the definition for pthread_mutex_t).
  */
 #define	PTHREAD_MUTEX_INITIALIZER		/* = DEFAULTMUTEX */	\
-	{{0, 0, 0, _DEFAULT_TYPE, _MUTEX_MAGIC}, {{{0}}}, 0}
+	{{0, 0, 0, PTHREAD_PROCESS_PRIVATE, _MUTEX_MAGIC}, {{{0}}}, 0}
 
 #define	PTHREAD_COND_INITIALIZER		/* = DEFAULTCV */	\
-	{{{0, 0, 0, 0}, _DEFAULT_TYPE, _COND_MAGIC}, 0}
+	{{{0, 0, 0, 0}, PTHREAD_PROCESS_PRIVATE, _COND_MAGIC}, 0}
 
 #define	PTHREAD_RWLOCK_INITIALIZER		/* = DEFAULTRWLOCK */	\
-	{0, _DEFAULT_TYPE, _RWL_MAGIC, PTHREAD_MUTEX_INITIALIZER,	\
+	{0, PTHREAD_PROCESS_PRIVATE, _RWL_MAGIC, PTHREAD_MUTEX_INITIALIZER, \
 	PTHREAD_COND_INITIALIZER, PTHREAD_COND_INITIALIZER}
 
 /* cancellation type and state */

@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
 .\"
-.Dd "Nov 4, 2014"
+.Dd "April 9, 2016"
 .Dt WCSCASECMP 3C
 .Os
 .Sh NAME
@@ -62,7 +62,7 @@ and
 .Fa ws2
 are compared consecutively, ignoring differences in case (if the
 .\"POSIX\." locale upper case characters are treated as lower case).  If
-the two values are different, the comparision stops and either
+the two values are different, the comparison stops and either
 a negative value is returned if the character from
 .Fa ws1
 is less than that from

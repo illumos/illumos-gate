@@ -48,7 +48,7 @@ sys.path.insert(2, os.path.join(os.path.dirname(__file__), ".."))
 
 from onbld.Scm import Ignore
 from onbld.Checks import Comments, Copyright, CStyle, HdrChk
-from onbld.Checks import JStyle, Keywords, ManLint, Mapfile
+from onbld.Checks import JStyle, Keywords, ManLint, Mapfile, SpellCheck
 
 
 class GitError(Exception):
@@ -291,11 +291,12 @@ def jstyle(root, parent, flist, output):
 
 def manlint(root, parent, flist, output):
     ret = 0
-    output.write("Man page format:\n")
+    output.write("Man page format/spelling:\n")
     ManfileRE = re.compile(r'.*\.[0-9][a-z]*$', re.IGNORECASE)
     for f in flist(lambda x: ManfileRE.match(x)):
         fh = open(f, 'r')
         ret |= ManLint.manlint(fh, output=output, picky=True)
+        ret |= SpellCheck.spellcheck(fh, output=output)
 	fh.close()
     return ret
 

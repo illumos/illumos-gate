@@ -4,11 +4,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH TERMIOX 7I "Jul 3, 1990"
+.TH TERMIOX 7I "April 9, 2016"
 .SH NAME
 termiox \- extended general terminal interface
 .SH DESCRIPTION
-.sp
 .LP
 The extended general terminal interface supplements the \fBtermio\fR(7I)
 general terminal interface by adding support for asynchronous hardware flow
@@ -19,7 +18,6 @@ may not permit certain functions to be disabled.  In these cases the
 appropriate bits will be ignored.  See <\fBsys/termiox.h\fR> for your system to
 find out which capabilities are supported.
 .SS "Hardware Flow Control Modes"
-.sp
 .LP
 Hardware flow control supplements the \fBtermio\fR(7I) \fBIXON\fR, \fBIXOFF\fR,
 and \fBIXANY\fR character flow control. Character flow control occurs when one
@@ -51,7 +49,6 @@ connected device is also a DTE and not a DCE, then DTE to DTE (for example,
 terminal or printer connected to computer) hardware flow control is possible by
 using a null modem to interconnect the appropriate data and control circuits.
 .SS "Clock Modes"
-.sp
 .LP
 Isochronous communication is a variation of asynchronous communication whereby
 two communicating devices may provide transmit and/or receive clock signals to
@@ -69,7 +66,6 @@ In terms of clock modes, traditional asynchronous communication is implemented
 simply by using the local baud rate generator as the incoming transmit and
 receive clock source and not outputting any clock signals.
 .SS "Terminal Parameters"
-.sp
 .LP
 The parameters that control the behavior of devices providing the \fBtermiox\fR
 interface are specified by the \fBtermiox\fR structure defined in the
@@ -129,7 +125,7 @@ functions.
 .sp
 .LP
 Variations of different hardware flow control methods may be selected by
-setting the the appropriate bits. For example, bidirectional RTS/CTS flow
+setting the appropriate bits. For example, bidirectional RTS/CTS flow
 control is selected by setting both the \fBRTSXOFF\fR and \fBCTSXON\fR bits and
 bidirectional DTR/CTS flow control is selected by setting both the
 \fBDTRXOFF\fR and \fBCTSXON\fR. Modem control or unidirectional CTS hardware
@@ -288,7 +284,6 @@ be used by any implementations. The \fBx_sflag\fR may be used by local
 implementations wishing to customize their terminal interface using the
 \fBtermiox\fR ioctl system calls.
 .SH IOCTLS
-.sp
 .LP
 The  \fBioctl\fR(2) system calls have the form:
 .sp
@@ -347,15 +342,12 @@ queued for input are discarded and then the change occurs.
 .RE
 
 .SH FILES
-.sp
 .LP
 \fB/dev/*\fR
 .SH SEE ALSO
-.sp
 .LP
 \fBstty\fR(1), \fBioctl\fR(2), \fBtermio\fR(7I)
 .SH NOTES
-.sp
 .LP
 The  termiox(7I) system call is provided for compatibility with previous
 releases and  its use is discouraged.  Instead, the  \fBtermio\fR(7I) system

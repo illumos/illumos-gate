@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PORT_ALERT 3C "Oct 1, 2003"
+.TH PORT_ALERT 3C "April 9, 2016"
 .SH NAME
 port_alert \- set a port in alert mode
 .SH SYNOPSIS
@@ -15,7 +15,6 @@ port_alert \- set a port in alert mode
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBport_alert()\fR function transitions a port into or out of alert mode.
 A port in alert mode immediately awakens all threads blocked in
@@ -67,12 +66,10 @@ function with a zero \fIevents\fR parameter.
 Events can be queued to a port that is in alert mode, but they will not be
 retrievable until the port is transitioned out of alert mode.
 .SH RETURN VALUES
-.sp
 .LP
-Upon succesful completion, 0 is returned. Otherwise, -1 is returned and
+Upon successful completion, 0 is returned. Otherwise, -1 is returned and
 \fBerrno\fR is set to indicate the error.
 .SH ERRORS
-.sp
 .LP
 The \fBport_alert()\fR function will fail if:
 .sp
@@ -112,7 +109,6 @@ Mutually exclusive \fIflags\fR are set.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -132,7 +128,6 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBport_associate\fR(3C), \fBport_create\fR(3C), \fBport_get\fR(3C),
 \fBport_send\fR(3C), \fBattributes\fR(5)

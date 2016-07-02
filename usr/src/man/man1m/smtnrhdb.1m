@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SMTNRHDB 1M "Dec 19, 2008"
+.TH SMTNRHDB 1M "April 9, 2016"
 .SH NAME
 smtnrhdb \- manage entries in the tnrhdb database
 .SH SYNOPSIS
@@ -13,7 +13,6 @@ smtnrhdb \- manage entries in the tnrhdb database
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBsmtnrhdb\fR command adds, modifies, deletes, and lists entries in the
 \fBtnrhdb\fR database.
@@ -30,7 +29,6 @@ initialized for the command to succeed (see \fBsmc\fR(1M)). After rebooting the
 Solaris Management Console server, the first \fBsmc\fR connection can time out,
 so you might need to retry the command.
 .SS "Valid Host Addresses and Wildcards"
-.sp
 .LP
 The trusted network software uses a network "longest prefix of matching bits"
 mechanism when looking for a host. The software looks first for the IP address
@@ -56,8 +54,7 @@ addresses, see \fISystem Administration Guide: IP Services\fR.
 The \fBsmtnrhdb\fR command accepts a hostname, IP address, and wildcard address
 with as optional prefix as valid addresses. See \fIsubcommand_args\fR, below,
 for the format of valid addresses.
-.SH SUB-COMMANDS
-.sp
+.SH SUBCOMMANDS
 .LP
 \fBsmtnrhdb\fR \fIsubcommand\fRs are:
 .sp
@@ -109,7 +106,6 @@ administrator must have the \fBsolaris.network.host.write\fR and
 .RE
 
 .SH OPTIONS
-.sp
 .LP
 The \fBsmtnrhdb\fR authentication arguments, \fIauth_args\fR, are derived from
 the \fBsmc\fR arg set. These arguments are the same regardless of which
@@ -119,7 +115,6 @@ subcommand you use.
 The subcommand-specific options, \fIsubcommand_args\fR, must be preceded by the
 \fB--\fR option.
 .SS "\fIauth_args\fR"
-.sp
 .LP
 The valid \fIauth_args\fR are \fB-D\fR, \fB-H\fR, \fB-l\fR, \fB-p\fR, \fB-r\fR,
 and \fB-u\fR; they are all optional. If no \fIauth_args\fR are specified,
@@ -219,7 +214,6 @@ not enter the preceding options, you must still enter the \fB--\fR option.
 .RE
 
 .SS "\fIsubcommand_args\fR"
-.sp
 .LP
 \fBNote:\fR Descriptions and other arg options that contain white spaces must
 be enclosed in double quotes.
@@ -450,7 +444,6 @@ from machine1.ExampleCo.COM was successful.
 .sp
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -484,7 +477,6 @@ An error occurred while executing the command. An error message displays.
 .RE
 
 .SH FILES
-.sp
 .LP
 The following files are used by the \fBsmtnrhdb\fR command:
 .sp
@@ -498,7 +490,6 @@ Trusted network remote-host database.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -514,14 +505,12 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBsmc\fR(1M), \fBnetmasks\fR(4), \fBattributes\fR(5)
 .sp
 .LP
 \fISystem Administration Guide: Security Services\fR
 .SH NOTES
-.sp
 .LP
 The functionality described on this manual page is available only if the system
 is configured with Trusted Extensions.

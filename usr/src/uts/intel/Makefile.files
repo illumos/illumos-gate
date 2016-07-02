@@ -22,6 +22,7 @@
 #
 # Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2013, Joyent, Inc. All rights reserved.
+# Copyright 2016 Nexenta Systems, Inc.
 #
 
 #
@@ -317,3 +318,8 @@ VMXNET3S_OBJS =	vmxnet3_main.o \
 		vmxnet3_rx.o \
 		vmxnet3_tx.o \
 		vmxnet3_utils.o
+
+#
+# VMware PVSCSI SCSI Controller
+#
+PVSCSI_OBJS =	pvscsi.o

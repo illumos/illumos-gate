@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LPADMIN 1M "May 24, 2006"
+.TH LPADMIN 1M "April 9, 2016"
 .SH NAME
 lpadmin \- configure the LP print service
 .SH SYNOPSIS
@@ -29,14 +29,12 @@ lpadmin \- configure the LP print service
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBlpadmin\fR configures the LP print service by defining printers and devices.
 It is used to add and change printers, to remove printers from service, to set
 or change the system default destination, to define alerts for printer faults,
 and to mount print wheels.
 .SH OPTIONS
-.sp
 .LP
 The \fBlpadmin\fR command has options for:
 .RS +4
@@ -83,7 +81,6 @@ one,two,three
 .in -2
 
 .SS "Adding or Changing a Printer"
-.sp
 .LP
 The first form of the \fBlpadmin\fR command (\fBlpadmin\fR \fB-p\fR
 \fIprinter\fR {\fIoptions\fR}) configures a new printer or changes the
@@ -896,7 +893,6 @@ See the \fB/usr/sfw/man/man1m/smbspool.1m\fR man page for details.
 .RE
 
 .SS "Removing a Printer Destination"
-.sp
 .LP
 The \fB-x\fR \fIdest\fR option removes the destination \fIdest\fR (a printer or
 a class), from the \fBLP\fR print service. If \fIdest\fR is a printer and is
@@ -907,14 +903,12 @@ local printers and the scheduler is still running, the scheduler is shut down.
 .LP
 No other \fIoptions\fR are allowed with \fB-x\fR.
 .SS "Setting/Changing the System Default Destination"
-.sp
 .LP
 The \fB-d\fR [\fIdest\fR] option makes \fIdest\fR (an existing printer or
 class) the new system default destination. If \fIdest\fR is not supplied, then
 there is no system default destination. No other \fIoptions\fR are allowed with
 \fB-d\fR.
 .SS "Setting an Alert for a Print Wheel"
-.sp
 .ne 2
 .na
 \fB\fB-S\fR \fIprint-wheel\fR [\fB-A\fR \fIalert-type\fR] [\fB-W\fR
@@ -1035,7 +1029,6 @@ anyone submits a print request for the print wheel when it is not mounted.
 .RE
 
 .SH PREDEFINED OPTIONS USED WITH THE \fB-o\fR OPTION
-.sp
 .LP
 A number of options, described below, are predefined for use with \fB-o\fR.
 These options are used for adjusting printer capabilities, adjusting printer
@@ -1043,7 +1036,6 @@ port characteristics, configuring network printers, and controlling the use of
 banner. The \fB-o\fR also supports an arbitrary \fB\fIkeyword\fR=\fIvalue\fR\fR
 format, which is referred to below as an undefined option.
 .SS "Adjusting Printer Capabilities"
-.sp
 .LP
 The \fBlength\fR, \fBwidth\fR, \fBcpi\fR, and \fBlpi\fR parameters can be used
 in conjunction with the \fB-o\fR option to adjust printer capabilities. The
@@ -1090,7 +1082,6 @@ lpadmin -p \fIprintername\fR -o lpi=\fR
 .sp
 
 .SS "Adjusting Printer Port Characteristics"
-.sp
 .LP
 You use the \fBstty\fR keyword in conjunction with the o option to adjust
 printer port characteristics. The general form of the \fBstty\fR portion of the
@@ -1135,7 +1126,6 @@ The default can be reset by:
 .sp
 
 .SS "Configuring Network Printers"
-.sp
 .LP
 The \fBdest\fR, \fBprotocol\fR, \fBbsdctrl\fR, and \fBtimeout\fR parameters are
 used in conjunction with the \fB-o\fR option to configure network printers. The
@@ -1179,7 +1169,6 @@ lpadmin -p \fIprintername\fR -o timeout=
 .sp
 
 .SS "Controlling the Use of the Banner Page"
-.sp
 .LP
 Use the following commands to control the use of the banner page:
 .sp
@@ -1211,7 +1200,6 @@ The fourth command (\fB-o\fR \fBbanner=never\fR) causes a banner page never to
 be printed, even if a user specifies \fBlp\fR \fB-o\fR \fBbanner\fR. The root
 user can override this command.
 .SS "Undefined Options"
-.sp
 .LP
 The \fB-o\fR option supports the use of arbitrary, user-defined options with
 the following format:
@@ -1249,7 +1237,6 @@ Sets boolean values \fBfoo=true | foo=false\fR.
 .RE
 
 .SH EXAMPLES
-.sp
 .LP
 In the following examples, \fIprtr\fR can be any name up to 14 characters and
 can be the same name as the \fBping\fR(1M) name.
@@ -1291,7 +1278,6 @@ example# \fBaccept \fIprtr\fR\fR
 .sp
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -1313,7 +1299,6 @@ An error occurred.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/var/spool/lp/*\fR\fR
@@ -1350,7 +1335,6 @@ System printer configuration database
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -1366,7 +1350,6 @@ Interface Stability	Obsolete
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBenable\fR(1), \fBlp\fR(1), \fBlpstat\fR(1), \fBmail\fR(1), \fBstty\fR(1),
 \fBaccept\fR(1M), \fBlpforms\fR(1M), \fBlpsched\fR(1M), \fBlpsystem\fR(1M),
@@ -1375,7 +1358,6 @@ Interface Stability	Obsolete
 .LP
 \fI\fR
 .SH NOTES
-.sp
 .LP
 When using lpadmin to provide access to a remote printer, remote configuration
 data is stored in \fB/etc/printers.conf\fR. This data includes a \fBbsdaddr\fR
@@ -1385,5 +1367,5 @@ systems. If the data is shared, it is important to make sure that the
 \fBbsdaddr\fR and \fBprinter-uri-supported\fR contain hostname information that
 is correctly resolved on all hosts sharing this data. Also, the
 \fBprinter-uri-supported\fR is the preferred means of accessing remote print
-service. The \fBbsdaddr\fR is supplied for backward compatability with Solaris
+service. The \fBbsdaddr\fR is supplied for backward compatibility with Solaris
 2.6-10 systems.

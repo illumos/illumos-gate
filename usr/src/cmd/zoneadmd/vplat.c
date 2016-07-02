@@ -1734,7 +1734,7 @@ mount_filesystems(zlog_t *zlogp, zone_mnt_t mount_cmd)
 	cb.pgcd_zlogp = zlogp;
 	cb.pgcd_fs_tab = &fs_ptr;
 	cb.pgcd_num_fs = &num_fs;
-	if (brand_platform_iter_gmounts(bh, zonepath,
+	if (brand_platform_iter_gmounts(bh, zone_name, zonepath,
 	    plat_gmount_cb, &cb) != 0) {
 		zerror(zlogp, B_FALSE, "unable to mount filesystems");
 		brand_close(bh);

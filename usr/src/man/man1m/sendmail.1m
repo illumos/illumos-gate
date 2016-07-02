@@ -6,7 +6,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SENDMAIL 1M "Feb 25, 2009"
+.TH SENDMAIL 1M "April 9, 2016"
 .SH NAME
 sendmail \- send mail over the internet
 .SH SYNOPSIS
@@ -23,7 +23,6 @@ sendmail \- send mail over the internet
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBsendmail\fR utility sends a message to one or more people, routing the
 message over whatever networks are necessary. \fBsendmail\fR does internetwork
@@ -60,7 +59,6 @@ If a message is found to be undeliverable, it is returned to the sender with
 diagnostics that indicate the location and nature of the failure; or, the
 message is placed in a \fBdead.letter\fR file in the sender's home directory.
 .SS "Service Management"
-.sp
 .LP
 The \fBsendmail\fR service is managed by the service management facility,
 \fBsmf\fR(5), under the service identifiers:
@@ -114,7 +112,6 @@ For the last two, note the difference, as the latter has the \fB":sendmail"\fR
 instance specification, whereas the former does not, thus representing the more
 general service.
 .SS "Enabling Access to Remote Clients"
-.sp
 .LP
 On an unmodified system, access to \fBsendmail\fR by remote clients is enabled
 and disabled through the service management facility (see \fBsmf\fR(5)). In
@@ -154,12 +151,10 @@ Note, however, on a system where any of the \fBsendmail\fR(4) files have been
 customized, setting this property might not have the intended effect. See
 \fBsendmail\fR(4) for details.
 .SS "Automated Rebuilding of Configuration Files"
-.sp
 .LP
 See \fBsendmail\fR(4) for details on which service properties can be set to
 automate (re)building of configuration files when the service is started.
 .SS "Restricting Host Access"
-.sp
 .LP
 \fBsendmail\fR uses TCP Wrappers to restrict access to hosts. It uses the
 service name of \fBsendmail\fR for \fBhosts_access()\fR. For more information
@@ -167,7 +162,6 @@ on TCP Wrappers, see \fBtcpd\fR(1M) and \fBhosts_access\fR(4) in the
 \fBSUNWtcpd\fR package. \fBtcpd\fR(1M) and \fBhosts_access\fR(4) are not part
 of the Solaris man pages.
 .SS "Startup Options"
-.sp
 .LP
 The \fB/etc/default/sendmail\fR file stores startup options for \fBsendmail\fR
 so that the options are not removed when a host is upgraded. See also
@@ -271,12 +265,10 @@ is not set.
 .RE
 
 .SS "Mail Filter API"
-.sp
 .LP
 \fBsendmail\fR supports a mail filter API called "milter". For more
 information, see \fB/usr/include/libmilter/README\fR and http://www.milter.org
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -545,7 +537,7 @@ Does not do aliasing.
 Tags all addresses being sent as wanting the indicated \fInotifications\fR,
 which consists of the word "NEVER" or a comma-separated list of "SUCCESS",
 "FAILURE", and "DELAY" for successful delivery, failure and a message that is
-stuck in a queue somwhere. The default is "FAILURE,DELAY".
+stuck in a queue somewhere. The default is "FAILURE,DELAY".
 .RE
 
 .sp
@@ -763,7 +755,6 @@ should be used sparingly.
 .RE
 
 .SS "Processing Options"
-.sp
 .LP
 There are a number of "random" options that can be set from a configuration
 file. Options are represented by a single character or by multiple character
@@ -3177,7 +3168,6 @@ long as the \fB/etc/mail/aliases*\fR files are owned by root \fIand\fR root has
 exclusive write permission. If invoked as \fBmailq\fR, \fBsendmail\fR prints
 the contents of the mail queue.
 .SH OPERANDS
-.sp
 .ne 2
 .na
 \fB\fIaddress\fR\fR
@@ -3188,12 +3178,10 @@ address of an intended recipient of the message being sent.
 .RE
 
 .SH USAGE
-.sp
 .LP
 See \fBlargefile\fR(5) for the description of the behavior of \fBsendmail\fR
 when encountering files greater than or equal to 2 Gbyte ( 2^31 bytes).
 .SH EXIT STATUS
-.sp
 .LP
 \fBsendmail\fR returns an exit status describing what it did. The codes are
 defined in \fB/usr/include/sysexits.h\fR.
@@ -3278,7 +3266,6 @@ Message could not be sent immediately, but was queued.
 .RE
 
 .SH ENVIRONMENT VARIABLES
-.sp
 .LP
 No environment variables are used. However, sendmail's start-up script, invoked
 by \fBsvcadm\fR(1M), reads \fB/etc/default/sendmail\fR. In this file, if the
@@ -3310,7 +3297,6 @@ for each \fIclient\fR name. This is comparable to running:
 .LP
 on the host \fIserver\fR.
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fBdead.letter\fR\fR
@@ -3447,7 +3433,6 @@ Describes the steps needed to compile and run a filter
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBsvcs\fR(1), \fBbiff\fR(1B), \fBmail\fR(1), \fBmailq\fR(1), \fBmailx\fR(1),
 \fBnice\fR(1), \fBcheck-hostname\fR(1M), \fBcheck-permissions\fR(1M),
@@ -3476,7 +3461,6 @@ http://www.sendmail.org
 .LP
 http://www.milter.org
 .SH NOTES
-.sp
 .LP
 The \fBsendmail\fR program requires a fully qualified host name when starting.
 A script has been included to help verify if the host name is defined properly

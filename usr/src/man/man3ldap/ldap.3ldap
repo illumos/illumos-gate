@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LDAP 3LDAP "Jan 27, 2002"
+.TH LDAP 3LDAP "April 9, 2016"
 .SH NAME
 ldap \- Lightweight Directory Access Protocol package
 .SH SYNOPSIS
@@ -16,7 +16,6 @@ cc[ \fIflag\fR... ] \fIfile\fR... -lldap[ \fIlibrary\fR... ]
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The Lightweight Directory Access Protocol ("LDAP") package (SUNWlldap) includes
 various command line LDAP clients and a LDAP client library to provide
@@ -45,7 +44,6 @@ Asynchronous routines provide an invocation identifier which can be used to
 obtain the  result of a specific operation by passing it to
 the\fBldap_result\fR(3LDAP) function.
 .SS "Initializing a LDAP session"
-.sp
 .LP
 Initializing a LDAP session involves calling the \fBldap_init\fR(3LDAP)
 function. However, the call does not actually open a connection to the LDAP
@@ -54,7 +52,6 @@ connection is opened when the first operation is attempted. Unlike
 \fBldap_init()\fR, \fBldap_open\fR(3LDAP) attempts to open a connection with
 the LDAP server. However, the use of \fBldap_open()\fR is deprecated.
 .SS "Authenticating to a LDAP server"
-.sp
 .LP
 The \fBldap_sasl_bind\fR(3LDAP) and \fBldap_sasl_bind_s\fR(3LDAP) functions
 provide general and extensible authenticaton for an LDAP client to a LDAP
@@ -63,7 +60,6 @@ routines \fBldap_simple_bind\fR(3LDAP) and \fBldap_simple_bind_s\fR(3LDAP) use
 cleartext passwords to bind to the LDAP server. Use of \fBldap_bind\fR(3LDAP)
 and \fBldap_bind_s\fR(3LDAP)(3LDAP) is deprecated.
 .SS "Searching a LDAP directory"
-.sp
 .LP
 Search for an entry in a LDAP directory by calling the
 \fBldap_search_ext\fR(3LDAP) or the \fBldap_search_ext_s\fR(3LDAP) functions.
@@ -72,7 +68,6 @@ size and time limits as arguments for each search operation.
 \fBldap_search\fR(3LDAP) and \fBldap_search_s\fR(3LDAP) are identical functions
 but do not support the controls and limits as arguments to the call.
 .SS "Adding or Deleting an entry"
-.sp
 .LP
 Use \fBldap_add_ext\fR(3LDAP) and \fBldap_delete_ext\fR(3LDAP) to add or delete
 entries in a LDAP directory server. The synchronous counterparts to these
@@ -81,7 +76,6 @@ The \fBldap_add\fR(3LDAP), \fBldap_add_s\fR(3LDAP), \fBldap_delete\fR(3LDAP),
 and \fBldap_delete_s\fR(3LDAP) provide identical functionality to add and to
 delete entries, but they do not support LDAP v3 server and client controls.
 .SS "Modifying Entries"
-.sp
 .LP
 Use \fBldap_modify_ext\fR(3LDAP) and \fBldap_modify_ext_s\fR(3LDAP) to modify
 an existing entry in a LDAP server that supports for LDAPv3 server and client
@@ -90,18 +84,16 @@ controls. Similarly, use \fBldap_rename\fR(3LDAP) and
 \fBldap_modrdn\fR(3LDAP), \fBldap_modrdn_s\fR(3LDAP), \fBldap_modrdn2\fR(3LDAP)
 and \fBldap_modrdn2_s\fR(3LDAP) interfaces are deprecated.
 .SS "Obtaining Results"
-.sp
 .LP
 Use \fBldap_result\fR(3LDAP) to obtain the results of a previous asynchronous
 operation. For all LDAP operations other than search, only one message is
 returned. For the search operation, a list of result messages can be returned.
 .SS "Handling Errors and Parsing Results"
-.sp
 .LP
 Use the \fBldap_parse_result\fR(3LDAP),
 \fBldap_parse_sasl_bind_result\fR(3LDAP), and the
 \fBldap_parse_extended_result\fR(3LDAP) functions to extract required
-information from results and and to handle the returned errors. To covert a
+information from results and to handle the returned errors. To convert a
 numeric error code into a null-terminated character string message describing
 the error, use \fBldap_err2string\fR(3LDAP). The \fBldap_result2error\fR(3LDAP)
 and \fBldap_perror\fR(3LDAP) functions are deprecated. To step through the list
@@ -129,26 +121,22 @@ returns an array of an attribute's string values that matches a specified
 language subtype. To retrieve the binary data from an attribute, call the
 \fBldap_get_lang_values_len()\fR function instead.
 .SS "Uniform Resource Locators (URLS)"
-.sp
 .LP
 You can use the \fBldap_url\fR(3LDAP)functions to test a URL to verify that it
 is an LDAP URL, to parse LDAP URLs into their component pieces, to initiate
 searches directly using an LDAP URL, and to retrieve the URL associated with a
 DNS domain name or a distinguished name.
 .SS "User Friendly Naming"
-.sp
 .LP
 The \fBldap_ufn\fR(3LDAP) functions implement a user friendly naming scheme by
 means of LDAP. This scheme allows you to look up entries using fuzzy, untyped
 names like "mark smith, umich, us".
 .SS "Caching"
-.sp
 .LP
 The \fBldap_memcache\fR(3LDAP) functions provide an in-memory client side cache
 to store search requests. Caching improves performance and reduces network
 bandwidth when a client  makes repeated requests.
 .SS "Utility Functions"
-.sp
 .LP
 There are also various utility functions. You can use the
 \fBldap_sort\fR(3LDAP) functions are used to sort the entries and values
@@ -158,7 +146,6 @@ longer  "friendlier" names. Use the \fBldap_charset\fR(3LDAP) functions to
 translate to and from the T.61 character set that is used for many character
 strings in the LDAP protocol.
 .SS "Generating Filters"
-.sp
 .LP
 Make calls to \fBldap_init_getfilter\fR(3LDAP) and \fBldap_search\fR(3LDAP) to
 generate filters to be used in \fBldap_search\fR(3LDAP) and
@@ -168,7 +155,6 @@ generate filters to be used in \fBldap_search\fR(3LDAP) and
 \fIbuf\fR of length \fIbuflen\fR. \fBldap_getfilter_free\fR(3LDAP) frees memory
 that has been allocated by means of \fBldap_init_getfilter()\fR.
 .SS "BER Library"
-.sp
 .LP
 The LDAP package includes a set of lightweight Basic Encoding Rules ("BER)"
 functions. The LDAP library functions use the BER functions to encode and
@@ -177,7 +163,6 @@ LDAP. They are not normally used directly by an LDAP  application program will
 not normally use the BER functions directly. Instead, these functions provide a
 \fBprintf()\fR and \fBscanf()\fR-like interface, as well as lower-level access.
 .SH LIST OF INTERFACES
-.sp
 .ne 2
 .na
 \fB\fBldap_open\fR(3LDAP)\fR
@@ -1589,7 +1574,6 @@ Free memory allocated by LDAP API functions.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for a description of the following attributes:
 .sp
@@ -1605,6 +1589,5 @@ Stability Level	Evolving
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBattributes\fR(5)

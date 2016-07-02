@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SCSI_VU_ERRMSG 9F "Jan 16, 2006"
+.TH SCSI_VU_ERRMSG 9F "April 9, 2016"
 .SH NAME
 scsi_vu_errmsg \- display a SCSI request sense message
 .SH SYNOPSIS
@@ -21,11 +21,9 @@ scsi_vu_errmsg \- display a SCSI request sense message
 .fi
 
 .SH INTERFACE LEVEL
-.sp
 .LP
 Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
-.sp
 .LP
 The following parameters are supported:
 .sp
@@ -126,7 +124,6 @@ possible and \fINULL\fR if no decoding is possible.
 .RE
 
 .SH DESCRIPTION
-.sp
 .LP
 This function is very similar to \fBscsi_errmsg\fR(9F) but allows decoding of
 vendor-unique ASC/ASCQ and FRU information.
@@ -217,7 +214,6 @@ For a basic SCSI disk, the following list is appropriate:
 .in -2
 
 .SH CONTEXT
-.sp
 .LP
 The \fBscsi_vu_errmsg()\fR function may be called from user, interrupt, or
 kernel context.
@@ -228,7 +224,7 @@ kernel context.
 .in +2
 .nf
      struct scsi_asq_key_strings cd_slist[] = {
-             0x81, 0, "Logical Unit is inaccessable",
+             0x81, 0, "Logical Unit is inaccessible",
              -1, 0, NULL,
      };
 
@@ -252,13 +248,12 @@ WARNING: /sbus@1,f8000000/esp@0,800000/sd@1,0 (sd1):
           Requested Block: 23936         Error Block: 23936
           Vendor: XYZ                Serial Number: 123456
           Sense Key:  Unit Attention
-          ASC: 0x81 (Logical Unit is inaccessable), ASCQ: 0x0
+          ASC: 0x81 (Logical Unit is inaccessible), ASCQ: 0x0
           FRU: 0x11 (replace LUN 1, located in slot 1)
 .fi
 .in -2
 
 .SH SEE ALSO
-.sp
 .LP
 \fBcmn_err\fR(9F), \fBscsi_errmsg\fR(9F), \fBscsi_log\fR(9F),
 \fBscsi_errmsg\fR(9F), \fBscsi_asc_key_strings\fR(9S), \fBscsi_device\fR(9S),

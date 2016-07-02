@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2015, Joyent, Inc.
 .\"
-.Dd May 18, 2015
+.Dd April 9, 2016
 .Dt SOCKADDR 3SOCKET
 .Os
 .Sh NAME
@@ -507,7 +507,7 @@ The following example shows how one would open a socket and prepare it
 to bind to the local IPv6 address ::1 port on port 12345. This program
 should be compiled with the C compiler
 .Sy cc
-and linked aginst the libraries libsocket and libnsl. If this example
+and linked against the libraries libsocket and libnsl. If this example
 was named ip6.c, then the full compiler line would be
 .Ic cc ip6.c -lsocket -lnsl .
 .Bd -literal

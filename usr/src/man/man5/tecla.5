@@ -24,11 +24,10 @@
 .\" or other dealings in this Software without prior written authorization
 .\" of the copyright holder.
 .\" Portions Copyright (c) 2005, Sun Microsystems, Inc. All Rights Reserved.
-.TH TECLA 5 "Sep 10, 2013"
+.TH TECLA 5 "April 9, 2016"
 .SH NAME
 tecla, teclarc \- User interface provided by the tecla library.
 .SH DESCRIPTION
-.sp
 .LP
 This man page describes the command-line editing features that are available to
 users of programs that read keyboard input via the tecla library. Users of the
@@ -44,7 +43,6 @@ default, tab completion is provided. If the application hasn't reconfigured
 this to complete other types of symbols, then tab completion completes file
 names.
 .SS "Key Sequence Notation"
-.sp
 .LP
 In the rest of this man page, and also in all tecla configuration files, key
 sequences are expressed as follows.
@@ -117,7 +115,6 @@ This is just a normal 'A' key.
 .RE
 
 .SS "The Tecla Configuration File"
-.sp
 .LP
 By default, tecla looks for a file called \fB\&.teclarc\fR in your home
 directory (ie. \fB~/.teclarc\fR). If it finds this file, it reads it,
@@ -251,7 +248,6 @@ If you create a \fB~/.teclarc\fR configuration file, but it appears to have no
 effect on the program, check the documentation of the program to see if the
 author chose a different name for this file.
 .SS "Filename and Tilde Completion"
-.sp
 .LP
 With the default key bindings, pressing the TAB key (aka. \fB^I\fR) results in
 tecla attempting to complete the incomplete file name that precedes the cursor.
@@ -273,7 +269,6 @@ The completion binding is implemented using the \fBcpl_complete_word()\fR
 function, which is also available separately to users of this library. See the
 \fBcpl_complete_word\fR(3TECLA) man page for more details.
 .SS "Filename Expansion"
-.sp
 .LP
 With the default key bindings, pressing \fB^X*\fR causes tecla to expand the
 file name that precedes the cursor, replacing \fB~/\fR and \fB~user/\fR
@@ -286,7 +281,6 @@ space-separated list of the files which match the wild cards.
 The expansion binding is implemented using the \fBef_expand_file()\fR function.
 See the \fBef_expand_file\fR(3TECLA) man page for more details.
 .SS "Recalling Previously Typed Lines"
-.sp
 .LP
 Every time that a new line is entered by the user, it is appended to a list of
 historical input lines maintained within the \fBGetLine\fR resource object. You
@@ -362,7 +356,6 @@ hitting it once more would recall the "ls ~/tecla/" line. The pattern syntax is
 the same as that described for file name expansion, in the
 \fBef_expand_file\fR(3TECLA).
 .SS "History Files"
-.sp
 .LP
 Authors of programs that use the tecla library have the option of saving
 historical command-lines in a file before exiting, and subsequently reading
@@ -371,7 +364,6 @@ standard name for this file, since it makes sense for each application to use
 its own history file, so that commands from different applications don't get
 mixed up.
 .SS "International Character Sets"
-.sp
 .LP
 Since \fBlibtecla\fR version 1.4.0, tecla has been 8-bit clean. This means that
 all 8-bit characters that are printable in the user's current locale are now
@@ -403,7 +395,6 @@ locale -a
 .LP
 at the shell prompt.
 .SS "Meta Keys and Locales"
-.sp
 .LP
 Beware that in most locales other than the default C locale, META characters
 become printable, and they are then no longer considered to match \fBM-c\fR
@@ -440,7 +431,6 @@ when you press the left mouse button and the CONTROL key within an xterm
 window. In CDE, dtterms can be similarly coerced to generate escape pairs in
 place of meta characters, by setting the \fBDtterm*KshMode\fR resource to True.
 .SS "Entering International Characters"
-.sp
 .LP
 If you don't have a keyboard that generates all of the international characters
 that you need, there is usually a compose key that will allow you to enter
@@ -462,7 +452,6 @@ xmodmap -e 'keycode 115 = Multi_key'
 .LP
 Type this key followed by a " character to enter an 'I' with a umlaut over it.
 .SS "The Available Key Binding Functions"
-.sp
 .LP
 The following is a list of the editing functions provided by the tecla library.
 The names in the leftmost column of the list can be used in configuration files
@@ -1138,7 +1127,7 @@ parenthesis, or next close parenthesis.
 .ad
 .RS 30n
 Delete the characters from the cursor up to and including the following
-occurence of the next character typed.
+occurrence of the next character typed.
 .RE
 
 .sp
@@ -1148,7 +1137,7 @@ occurence of the next character typed.
 .ad
 .RS 30n
 Delete the characters from the cursor up to and including the preceding
-occurence of the next character typed.
+occurrence of the next character typed.
 .RE
 
 .sp
@@ -1158,7 +1147,7 @@ occurence of the next character typed.
 .ad
 .RS 30n
 Delete the characters from the cursor up to, but not including, the following
-occurence of the next character typed.
+occurrence of the next character typed.
 .RE
 
 .sp
@@ -1168,7 +1157,7 @@ occurence of the next character typed.
 .ad
 .RS 30n
 Delete the characters from the cursor up to, but not including, the preceding
-occurence of the next character typed.
+occurrence of the next character typed.
 .RE
 
 .sp
@@ -1215,7 +1204,7 @@ parenthesis, or next close parenthesis, into the cut buffer.
 \fBforward-copy-find\fR
 .ad
 .RS 30n
-Copy the characters from the cursor up to and including the following occurence
+Copy the characters from the cursor up to and including the following occurrence
 of the next character typed, into the cut buffer.
 .RE
 
@@ -1225,7 +1214,7 @@ of the next character typed, into the cut buffer.
 \fBbackward-copy-find\fR
 .ad
 .RS 30n
-Copy the characters from the cursor up to and including the preceding occurence
+Copy the characters from the cursor up to and including the preceding occurrence
 of the next character typed, into the cut buffer.
 .RE
 
@@ -1236,7 +1225,7 @@ of the next character typed, into the cut buffer.
 .ad
 .RS 30n
 Copy the characters from the cursor up to, but not including, the following
-occurence of the next character typed, into the cut buffer.
+occurrence of the next character typed, into the cut buffer.
 .RE
 
 .sp
@@ -1246,7 +1235,7 @@ occurence of the next character typed, into the cut buffer.
 .ad
 .RS 30n
 Copy the characters from the cursor up to, but not including, the preceding
-occurence of the next character typed, into the cut buffer.
+occurrence of the next character typed, into the cut buffer.
 .RE
 
 .sp
@@ -1435,7 +1424,7 @@ parenthesis, or next close parenthesis, then enter \fBvi\fR insert mode.
 .ad
 .RS 30n
 From \fBvi\fR command mode, delete the characters from the cursor up to and
-including the following occurence of the next character typed, then enter
+including the following occurrence of the next character typed, then enter
 insert mode.
 .RE
 
@@ -1446,7 +1435,7 @@ insert mode.
 .ad
 .RS 30n
 From vi command mode, delete the characters from the cursor up to and including
-the preceding occurence of the next character typed, then enter insert mode.
+the preceding occurrence of the next character typed, then enter insert mode.
 .RE
 
 .sp
@@ -1456,7 +1445,7 @@ the preceding occurence of the next character typed, then enter insert mode.
 .ad
 .RS 30n
 From \fBvi\fR command mode, delete the characters from the cursor up to, but
-not including, the following occurence of the next character typed, then enter
+not including, the following occurrence of the next character typed, then enter
 insert mode.
 .RE
 
@@ -1467,7 +1456,7 @@ insert mode.
 .ad
 .RS 30n
 From \fBvi\fR command mode, delete the characters from the cursor up to, but
-not including, the preceding occurence of the next character typed, then enter
+not including, the preceding occurrence of the next character typed, then enter
 insert mode.
 .RE
 
@@ -1509,7 +1498,6 @@ In \fBvi\fR command mode, repeat the last command that modified the line.
 .RE
 
 .SS "Default Key Bindings In \fBemacs\fR Mode"
-.sp
 .LP
 The following default key bindings, which can be overriden by the tecla
 configuration file, are designed to mimic most of the bindings of the unix
@@ -1580,7 +1568,7 @@ literal-next
 
 .sp
 .LP
-The cursor keys are refered to by name, as follows. This is necessary because
+The cursor keys are referred to by name, as follows. This is necessary because
 different types of terminals generate different key sequences when their cursor
 keys are pressed.
 .sp
@@ -2015,7 +2003,6 @@ Note that \fB^I\fR is what the TAB key generates, and that \fB^@\fR can be
 generated not only by pressing the CONTROL key and the @ key simultaneously,
 but also by pressing the CONTROL key and the space bar at the same time.
 .SS "Default Key Bindings in \fBvi\fR Mode"
-.sp
 .LP
 The following default key bindings are designed to mimic the \fBvi\fR style of
 editing as closely as possible. This means that very few editing functions are
@@ -2150,7 +2137,7 @@ when you type the letter i, for example, the tecla library actually looks up
 the binding for \fBM-i\fR.
 .sp
 .LP
-The cursor keys are refered to by name, as follows. This is necessary because
+The cursor keys are referred to by name, as follows. This is necessary because
 different types of terminals generate different key sequences when their cursor
 keys are pressed.
 .sp
@@ -3563,7 +3550,6 @@ digit-argument (see below)
 .LP
 Note that \fB^I\fR is what the TAB key generates.
 .SS "Entering Repeat Counts"
-.sp
 .LP
 Many of the key binding functions described previously, take an optional count,
 typed in before the target key sequence. This is interpreted as a repeat count
@@ -3627,7 +3613,6 @@ doesn't end in a numeric digit, a new repeat count is started with a value of
 zero, and can be completed by typing in the number, after letting go of the key
 which triggered the digit-argument action.
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/usr/lib/libtecla.so\fR\fR
@@ -3655,7 +3640,6 @@ The personal tecla customization file
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -3671,7 +3655,6 @@ Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBvi\fR(1), \fBcpl_complete_word\fR(3TECLA), \fBef_expand_file\fR(3TECLA),
 \fBgl_get_line\fR(3TECLA), \fBgl_io_mode\fR(3TECLA), \fBlibtecla\fR(3LIB),

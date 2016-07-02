@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LIBPOOL 3LIB "Dec 14, 2006"
+.TH LIBPOOL 3LIB "April 9, 2016"
 .SH NAME
 libpool \- pool configuration manipulation library
 .SH SYNOPSIS
@@ -14,10 +14,9 @@ libpool \- pool configuration manipulation library
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The functions in this library define the interface for reading and writing
-resource pools configuration files, as well as that for commiting an existing
+resource pools configuration files, as well as that for committing an existing
 configuration to becoming the running OS configuration (with respect to
 partitioning subsystems). The <\fBpool.h\fR> header provides type and function
 declarations for all library services.
@@ -70,9 +69,6 @@ used by the default pools commands, except when a configuration is initiated by
 the \fBpoolcfg\fR utility, in which case an informative message is placed in
 the \fBsystem.comment\fR property for that configuration.
 .SS "System"
-.sp
-
-.sp
 .TS
 c c c
 l l l .
@@ -195,9 +191,6 @@ objective when he is relatively satisfied with the constraints established
 using the minimum and maximum properties and would like the DRP to manipulate
 resources freely within those constraints.
 .SS "Pools"
-.sp
-
-.sp
 .TS
 c c c
 l l l .
@@ -232,9 +225,6 @@ If pool.scheduler is specified, it must be set to the name of a valid
 scheduling class for the system. See the \fB-c\fR option for \fBpriocntl\fR(1)
 for a list of valid class names.
 .SS "Processor Sets"
-.sp
-
-.sp
 .TS
 c c c
 l l l .
@@ -376,9 +366,6 @@ Only one objective of each type of operator can be set. For example, if the
 possible to set a \fB<\fR and a \fB>\fR operator together; the values will be
 validated to ensure that they do not overlap.
 .SS "Processors"
-.sp
-
-.sp
 .TS
 c c c
 l l l .
@@ -395,7 +382,7 @@ T}
 .sp
 .LP
 The \fBcpu.comment\fR, \fBcpu.pinned\fR, and \fBcpu.status\fR properties are
-writeable.
+writable.
 .sp
 .LP
 The \fBcpu.status\fR property can be set only to the following values:
@@ -431,7 +418,6 @@ Disable interrupt processing on the CPU.
 These values are defined in <\fBsys/processor.h\fR> as the \fBPS_OFFLINE\fR,
 \fBPS_ONLINE\fR, and \fBPS_NOINTR\fR macros.
 .SH INTERFACES
-.sp
 .LP
 The shared object \fBlibpool.so.1\fR provides the public interfaces defined
 below. See \fBIntro\fR(3) for additional information on shared object
@@ -480,7 +466,6 @@ l l .
 .TE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/usr/lib/libpool.so.1\fR\fR
@@ -499,7 +484,6 @@ shared object
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -519,7 +503,6 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBIntro\fR(3), \fBpool_component_info\fR(3POOL), \fBpool_conf_open\fR(3POOL),
 \fBpool_conf_to_elem\fR(3POOL), \fBpool_create\fR(3POOL),
@@ -528,7 +511,6 @@ MT-Level	Safe
 \fBpool_resource_create\fR(3POOL), \fBpool_value_alloc\fR(3POOL),
 \fBpool_walk_pools\fR(3POOL), \fBattributes\fR(5), \fBsmf\fR(5)
 .SH NOTES
-.sp
 .LP
 Functions in \fBlibpool\fR can be used to manipulate static configurations even
 when the pools facility is not enabled. See \fBpooladm\fR(1M) and

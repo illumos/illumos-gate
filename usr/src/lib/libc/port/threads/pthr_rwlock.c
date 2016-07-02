@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "lint.h"
 #include "thr_uberdata.h"
 
@@ -41,7 +39,7 @@ pthread_rwlockattr_init(pthread_rwlockattr_t *attr)
 
 	if ((ap = lmalloc(sizeof (rwlattr_t))) == NULL)
 		return (ENOMEM);
-	ap->pshared = DEFAULT_TYPE;
+	ap->pshared = PTHREAD_PROCESS_PRIVATE;
 	attr->__pthread_rwlockattrp = ap;
 	return (0);
 }
@@ -109,7 +107,7 @@ pthread_rwlock_init(pthread_rwlock_t *_RESTRICT_KYWD rwlock,
 	int type;
 
 	if (attr == NULL)
-		type = DEFAULT_TYPE;
+		type = PTHREAD_PROCESS_PRIVATE;
 	else if ((ap = attr->__pthread_rwlockattrp) != NULL)
 		type = ap->pshared;
 	else
