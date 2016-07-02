@@ -174,6 +174,8 @@
 #include <util/sscanf.h>
 #include <sys/lx_brand.h>
 #include <sys/zfs_ioctl.h>
+#include <inet/tcp_impl.h>
+#include <inet/udp_impl.h>
 
 int	lx_debug = 0;
 
@@ -1073,6 +1075,47 @@ lx_zone_cleanup_vdisks(lx_zone_data_t *lxzd)
 	lxzd->lxzd_vdisks = NULL;
 }
 
+/*
+ * See mod_set_extra_privports. By default illumos restricts access to
+ * ULP_DEF_EPRIV_PORT1 and ULP_DEF_EPRIV_PORT2 for TCP and UDP, even though
+ * these ports are outside of the privileged port range. Linux does not do
+ * this, so we need to remove these defaults.
+ */
+static void
+lx_fix_netstack()
+{
+	netstack_t	*ns;
+	tcp_stack_t	*tcps;
+	udp_stack_t	*udps;
+	in_port_t	*ports;
+	uint_t		i, nports;
+	kmutex_t	*lock;
+
+	ns = netstack_get_current();
+	if (ns == NULL)
+		return;
+
+	tcps = ns->netstack_tcp;
+	ports = tcps->tcps_g_epriv_ports;
+	nports = tcps->tcps_g_num_epriv_ports;
+	lock = &tcps->tcps_epriv_port_lock;
+
+	mutex_enter(lock);
+	for (i = 0; i < nports; i++)
+		ports[i] = 0;
+	mutex_exit(lock);
+
+	udps = ns->netstack_udp;
+	ports = udps->us_epriv_ports;
+	nports = udps->us_num_epriv_ports;
+	lock = &udps->us_epriv_port_lock;
+
+	mutex_enter(lock);
+	for (i = 0; i < nports; i++)
+		ports[i] = 0;
+	mutex_exit(lock);
+}
+
 void
 lx_init_brand_data(zone_t *zone, kmutex_t *zsl)
 {
@@ -1314,6 +1357,20 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 		pd = p->p_brand_data;
 		pd->l_handler = (uintptr_t)reg.lxbr_handler;
 		pd->l_flags = reg.lxbr_flags & LX_PROC_ALL;
+
+		/*
+		 * We can't fix up our netstack from the lx_init_brand_data
+		 * hook since that hook is run by zoneadmd (which has the GZ's
+		 * stack). Instead, we fix it up when the init process starts
+		 * inside the zone since it will have the proper stack.
+		 * Note that it is conceivable that a Linux init could be
+		 * illumos-aware and re-enable additional privileged ports,
+		 * then exec(2) over itself. This would cause those settings to
+		 * be lost, but this scenario is considered unlikely so we
+		 * don't worry about it.
+		 */
+		if (p->p_pid == p->p_zone->zone_proc_initpid)
+			lx_fix_netstack();
 
 		return (0);
 
