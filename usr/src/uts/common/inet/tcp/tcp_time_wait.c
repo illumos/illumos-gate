@@ -400,7 +400,7 @@ void
 tcp_time_wait_collector(void *arg)
 {
 	tcp_t *tcp;
-	int64_t now, active_schedule, new_schedule;
+	int64_t now, sched_active, sched_cur, sched_new;
 	unsigned int idx;
 
 	squeue_t *sqp = (squeue_t *)arg;
@@ -421,6 +421,18 @@ tcp_time_wait_collector(void *arg)
 		return;
 	}
 	tsp->tcp_time_wait_collector_active = B_TRUE;
+
+	/*
+	 * After its assignment here, the value of sched_active must not be
+	 * altered as it is used to validate the state of the
+	 * tcp_time_wait_collector callout schedule for this squeue.
+	 *
+	 * The same does not hold true of sched_cur, which holds the timestamp
+	 * of the bucket undergoing processing.  While it is initially equal to
+	 * sched_active, certain conditions below can walk it forward,
+	 * triggering the retry loop.
+	 */
+	sched_cur = sched_active = tsp->tcp_time_wait_schedule;
 
 	/*
 	 * Purge the free list if necessary
@@ -450,13 +462,12 @@ tcp_time_wait_collector(void *arg)
 		return;
 	}
 
+retry:
 	/*
 	 * Grab the bucket which we were scheduled to cleanse.
 	 */
-	active_schedule = tsp->tcp_time_wait_schedule;
-	idx = TW_BUCKET(active_schedule - 1);
+	idx = TW_BUCKET(sched_cur - 1);
 	now = ddi_get_lbolt64() - tsp->tcp_time_wait_offset;
-retry:
 	tcp = tsp->tcp_time_wait_bucket[idx];
 
 	while (tcp != NULL) {
@@ -507,7 +518,7 @@ retry:
 		 * cleared only if it was untouched while the collector dropped
 		 * its locks during tcp_time_wait_purge.
 		 */
-		if (tsp->tcp_time_wait_schedule == active_schedule) {
+		if (tsp->tcp_time_wait_schedule == sched_active) {
 			tsp->tcp_time_wait_offset = 0;
 			tsp->tcp_time_wait_schedule = 0;
 			tsp->tcp_time_wait_tid = 0;
@@ -521,15 +532,14 @@ retry:
 		/*
 		 * Locate the next bucket containing entries.
 		 */
-		new_schedule = active_schedule
-		    + MSEC_TO_TICK(TCP_TIME_WAIT_DELAY);
+		sched_new = sched_cur + MSEC_TO_TICK(TCP_TIME_WAIT_DELAY);
 		nidx = TW_BUCKET_NEXT(idx);
 		while (tsp->tcp_time_wait_bucket[nidx] == NULL) {
 			if (nidx == idx) {
 				break;
 			}
 			nidx = TW_BUCKET_NEXT(nidx);
-			new_schedule += MSEC_TO_TICK(TCP_TIME_WAIT_DELAY);
+			sched_new += MSEC_TO_TICK(TCP_TIME_WAIT_DELAY);
 		}
 		ASSERT(tsp->tcp_time_wait_bucket[nidx] != NULL);
 	}
@@ -540,13 +550,15 @@ retry:
 	 * overran the interval allocated to this bucket.
 	 */
 	now = ddi_get_lbolt64() - tsp->tcp_time_wait_offset;
-	if (new_schedule <= now) {
+	if (sched_new <= now) {
 		/*
 		 * Attempt to right the situation by immediately performing a
 		 * purge on the next bucket.  This loop will continue as needed
 		 * until the schedule can be pushed out ahead of the clock.
 		 */
-		idx = TW_BUCKET(new_schedule - 1);
+		sched_cur = sched_new;
+		DTRACE_PROBE3(tcp__time__wait__overrun,
+		    tcp_squeue_priv_t *, tsp, int64_t, sched_new, int64_t, now);
 		goto retry;
 	}
 
@@ -555,7 +567,7 @@ retry:
 	 * were dropped during tcp_time_wait_purge.  Defer to the running timer
 	 * if that is the case.
 	 */
-	if (tsp->tcp_time_wait_schedule != active_schedule) {
+	if (tsp->tcp_time_wait_schedule != sched_active) {
 		tsp->tcp_time_wait_collector_active = B_FALSE;
 		mutex_exit(&tsp->tcp_time_wait_lock);
 		return;
@@ -564,11 +576,11 @@ retry:
 	/*
 	 * Schedule the next timer.
 	 */
-	tsp->tcp_time_wait_schedule = new_schedule;
+	tsp->tcp_time_wait_schedule = sched_new;
 	tsp->tcp_time_wait_tid =
 	    timeout_generic(CALLOUT_NORMAL,
 	    tcp_time_wait_collector, sqp,
-	    TICK_TO_NSEC(new_schedule - now),
+	    TICK_TO_NSEC(sched_new - now),
 	    CALLOUT_TCP_RESOLUTION, CALLOUT_FLAG_ROUNDUP);
 	tsp->tcp_time_wait_collector_active = B_FALSE;
 	mutex_exit(&tsp->tcp_time_wait_lock);
