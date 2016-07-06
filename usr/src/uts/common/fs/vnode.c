@@ -3409,11 +3409,12 @@ fop_read(
 	zone_t	*zonep = curzone;
 	zone_vfs_kstat_t *zvp = zonep->zone_vfs_stats;
 
-	hrtime_t start, lat;
+	hrtime_t start = 0, lat;
 	ssize_t len;
 	int err;
 
-	if (vp->v_type == VREG || vp->v_type == VDIR || vp->v_type == VBLK) {
+	if ((vp->v_type == VREG || vp->v_type == VDIR || vp->v_type == VBLK) &&
+	    vp->v_vfsp != NULL && (vp->v_vfsp->vfs_flag & VFS_STATS)) {
 		start = gethrtime();
 
 		mutex_enter(&zonep->zone_vfs_lock);
@@ -3428,7 +3429,7 @@ fop_read(
 
 	VOPSTATS_UPDATE_IO(vp, read, read_bytes, len);
 
-	if (vp->v_type == VREG || vp->v_type == VDIR || vp->v_type == VBLK) {
+	if (start != 0) {
 		mutex_enter(&zonep->zone_vfs_lock);
 		zonep->zone_vfs_rwstats.reads++;
 		zonep->zone_vfs_rwstats.nread += len;
@@ -3471,7 +3472,7 @@ fop_write(
 	zone_t	*zonep = curzone;
 	zone_vfs_kstat_t *zvp = zonep->zone_vfs_stats;
 
-	hrtime_t start, lat;
+	hrtime_t start = 0, lat;
 	ssize_t len;
 	int	err;
 
@@ -3480,7 +3481,8 @@ fop_write(
 	 * repurposed as the active queue for VFS write operations.  There's no
 	 * actual wait queue for VFS operations.
 	 */
-	if (vp->v_type == VREG || vp->v_type == VDIR || vp->v_type == VBLK) {
+	if ((vp->v_type == VREG || vp->v_type == VDIR || vp->v_type == VBLK) &&
+	    vp->v_vfsp != NULL && (vp->v_vfsp->vfs_flag & VFS_STATS)) {
 		start = gethrtime();
 
 		mutex_enter(&zonep->zone_vfs_lock);
@@ -3495,7 +3497,7 @@ fop_write(
 
 	VOPSTATS_UPDATE_IO(vp, write, write_bytes, len);
 
-	if (vp->v_type == VREG || vp->v_type == VDIR || vp->v_type == VBLK) {
+	if (start != 0) {
 		mutex_enter(&zonep->zone_vfs_lock);
 		zonep->zone_vfs_rwstats.writes++;
 		zonep->zone_vfs_rwstats.nwritten += len;
