@@ -134,7 +134,7 @@ ath9k_hw_ani_control(struct ath_hal *ah, enum ath9k_ani_cmd cmd, int param)
 			REG_CLR_BIT(ah, AR_PHY_SFCORR_LOW,
 			    AR_PHY_SFCORR_LOW_USE_SELF_CORR_LOW);
 
-		if (!on != aniState->ofdmWeakSigDetectOff) {
+		if ((!on) != aniState->ofdmWeakSigDetectOff) {
 			if (on)
 				ahp->ah_stats.ast_ani_ofdmon++;
 			else

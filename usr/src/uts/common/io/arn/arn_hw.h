@@ -472,7 +472,7 @@ struct ar5416Stats {
 #define	AR5416_EEP4K_MAX_CHAINS					1
 
 enum eeprom_param {
-	EEP_NFTHRESH_5,
+	EEP_NFTHRESH_5 = 0,
 	EEP_NFTHRESH_2,
 	EEP_MAC_MSW,
 	EEP_MAC_MID,
@@ -494,7 +494,10 @@ enum eeprom_param {
 	EEP_OL_PWRCTRL,
 	EEP_RC_CHAIN_MASK,
 	EEP_DAC_HPWR_5G,
-	EEP_FRAC_N_5G
+	EEP_FRAC_N_5G,
+	EEP_MAC_0 = AR_EEPROM_MAC(0),
+	EEP_MAC_1 = AR_EEPROM_MAC(1),
+	EEP_MAC_2 = AR_EEPROM_MAC(2)
 };
 
 enum ar5416_rates {

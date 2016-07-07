@@ -62,10 +62,8 @@ LDFLAGS		+= -dy -Nmisc/mac -Nmisc/net80211
 LINTTAGS        += -erroff=E_BAD_PTR_CAST_ALIGN
 
 CERRWARN	+= -_gcc=-Wno-unused-variable
-CERRWARN	+= -_gcc=-Wno-unused-function
 CERRWARN	+= -_gcc=-Wno-uninitialized
 CERRWARN	+= -_gcc=-Wno-char-subscripts
-CERRWARN	+= -_gcc=-Wno-empty-body
 
 #
 #	Default build targets.
