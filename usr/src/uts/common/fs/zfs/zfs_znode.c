@@ -1246,6 +1246,8 @@ zfs_zget(zfsvfs_t *zfsvfs, uint64_t obj_num, znode_t **zpp)
 	if (zp == NULL) {
 		err = SET_ERROR(ENOENT);
 	} else {
+		if (zp->z_links == 0)
+			zp->z_unlinked = B_TRUE;
 		*zpp = zp;
 	}
 	ZFS_OBJ_HOLD_EXIT(zfsvfs, obj_num);
