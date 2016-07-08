@@ -39,6 +39,8 @@
 #include <sys/pathname.h>
 #include <sys/varargs.h>
 #include <sys/zone.h>
+#include <sys/cmn_err.h>
+#include <sys/sdt.h>
 #include <netinet/in.h>
 
 #define	ROUNDUP(a, n) (((a) + ((n) - 1)) & ~((n) - 1))
@@ -860,8 +862,13 @@ pfexec_call(const cred_t *cr, struct pathname *rpnp, cred_t **pfcr,
 		klpd_hold(pfd);
 	mutex_exit(&myzone->zone_lock);
 
-	if (pfd == NULL)
+	if (pfd == NULL) {
+		DTRACE_PROBE2(pfexecd__not__running,
+		    zone_t *, myzone, char *, rpnp->pn_path);
+		uprintf("pfexecd not running; pid %d privileges not "
+		    "elevated\n", curproc->p_pid);
 		return (0);
+	}
 
 	if (pfd->klpd_door_pid == curproc->p_pid) {
 		klpd_rele(pfd);
@@ -896,6 +903,9 @@ pfexec_call(const cred_t *cr, struct pathname *rpnp, cred_t **pfcr,
 		case EINTR:
 			/* FALLTHROUGH */
 		default:
+			DTRACE_PROBE4(pfexecd__failure,
+			    int, dres, zone_t *, myzone,
+			    char *, rpnp->pn_path, klpd_reg_t *, pfd);
 			goto out;
 		}
 	}
