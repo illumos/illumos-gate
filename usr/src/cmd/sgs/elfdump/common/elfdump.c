@@ -312,15 +312,27 @@ stringtbl(Cache *cache, int symtab, Word ndx, Word shnum, const char *file,
 {
 	Shdr	*shdr = cache[ndx].c_shdr;
 
-	if (symtab) {
+	/*
+	 * If symtab is non-zero, the ndx we are called with represents a
+	 * shdr which links to a symbol table (which then links to a string
+	 * table)
+	 */
+	if (symtab != 0) {
 		/*
-		 * Validate the symbol table section.
+		 * Validate the symbol table linkage.
 		 */
 		if ((shdr->sh_link == 0) || (shdr->sh_link >= shnum)) {
 			(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADSHLINK),
 			    file, cache[ndx].c_name, EC_WORD(shdr->sh_link));
 			return (0);
 		}
+
+		/*
+		 * Establish the symbol table index.
+		 */
+		ndx = shdr->sh_link;
+		shdr = cache[ndx].c_shdr;
+
 		if ((shdr->sh_entsize == 0) || (shdr->sh_size == 0)) {
 			(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADSZ),
 			    file, cache[ndx].c_name);
@@ -338,12 +350,6 @@ stringtbl(Cache *cache, int symtab, Word ndx, Word shnum, const char *file,
 		}
 
 		/*
-		 * Establish the string table index.
-		 */
-		ndx = shdr->sh_link;
-		shdr = cache[ndx].c_shdr;
-
-		/*
 		 * Return symbol table information.
 		 */
 		if (symnum)
@@ -353,7 +359,7 @@ stringtbl(Cache *cache, int symtab, Word ndx, Word shnum, const char *file,
 	}
 
 	/*
-	 * Validate the associated string table section.
+	 * Validate the string table linkage.
 	 */
 	if ((shdr->sh_link == 0) || (shdr->sh_link >= shnum)) {
 		(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADSHLINK),
@@ -1913,6 +1919,13 @@ syminfo(Cache *cache, Word shnum, Ehdr *ehdr, uchar_t osabi, const char *file)
 			    file, dyncache->c_name);
 		}
 		if (dyns != NULL) {
+			if ((dyncache->c_shdr->sh_entsize == 0) ||
+			    (dyncache->c_shdr->sh_size == 0)) {
+				(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADSZ),
+				    file, dyncache->c_name);
+				return;
+			}
+
 			dynnum = dyncache->c_shdr->sh_size /
 			    dyncache->c_shdr->sh_entsize;
 
@@ -4014,6 +4027,13 @@ hash(Cache *cache, Word shnum, const char *file, uint_t flags)
 		}
 
 		sshdr = _cache->c_shdr;
+
+		if ((sshdr->sh_entsize == 0) || (sshdr->sh_size == 0)) {
+			(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADSZ),
+			    file, ssecname);
+			continue;
+		}
+
 		/* LINTED */
 		symn = (Word)(sshdr->sh_size / sshdr->sh_entsize);
 
@@ -4361,6 +4381,13 @@ got(Cache *cache, Word shnum, Ehdr *ehdr, const char *file)
 			 */
 			if ((offset < gotbgn) || (offset >= gotend))
 				continue;
+
+			if ((gotshdr->sh_entsize == 0) ||
+			    (gotshdr->sh_size == 0)) {
+				(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADSZ),
+				    file, gotcache->c_name);
+				continue;
+			}
 
 			/* LINTED */
 			gotndx = (Word)((offset - gotbgn) /
