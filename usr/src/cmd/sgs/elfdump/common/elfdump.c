@@ -210,7 +210,7 @@ string(Cache *refsec, Word ndx, Cache *strsec, const char *file, Word name)
 	const char	*strs;
 	Word		strn;
 
-	if (strsec->c_data == NULL)
+	if ((strsec->c_data == NULL) || (strsec->c_data->d_buf == NULL))
 		return (NULL);
 
 	strs = (char *)strsec->c_data->d_buf;
@@ -413,7 +413,7 @@ symlookup(const char *name, Cache *cache, Word shnum, Sym **sym,
 		    file, symtab->c_name);
 		return (0);
 	}
-	if (symtab->c_data == NULL)
+	if ((symtab->c_data == NULL) || (symtab->c_data->d_buf == NULL))
 		return (0);
 
 	/* LINTED */
@@ -944,7 +944,7 @@ unwind(Cache *cache, Word shnum, Word phnum, Ehdr *ehdr, uchar_t osabi,
 		if (!match(MATCH_F_ALL, _cache->c_name, cnt, shdr->sh_type))
 			continue;
 
-		if (_cache->c_data == NULL)
+		if ((_cache->c_data == NULL) || (_cache->c_data->d_buf == NULL))
 			continue;
 
 		dbg_print(0, MSG_ORIG(MSG_STR_EMPTY));
@@ -1002,7 +1002,8 @@ init_symtbl_state(SYMTBL_STATE *state, Cache *cache, Word shnum, Word secndx,
 		    file, state->secname);
 		return (0);
 	}
-	if (state->seccache->c_data == NULL)
+	if ((state->seccache->c_data == NULL) ||
+	    (state->seccache->c_data->d_buf == NULL))
 		return (0);
 
 	/* LINTED */
@@ -1055,7 +1056,7 @@ symbols_getxindex(SYMTBL_STATE *state)
 		    ((symn = (uint_t)(shdr->sh_size / shdr->sh_entsize)) == 0))
 			continue;
 
-		if (_cache->c_data == NULL)
+		if ((_cache->c_data == NULL) || (_cache->c_data->d_buf == NULL))
 			continue;
 
 		state->shxndx.data = _cache->c_data->d_buf;
@@ -1880,7 +1881,7 @@ syminfo(Cache *cache, Word shnum, Ehdr *ehdr, uchar_t osabi, const char *file)
 		    file, infocache->c_name);
 		return;
 	}
-	if (infocache->c_data == NULL)
+	if ((infocache->c_data == NULL) || (infocache->c_data->d_buf == NULL))
 		return;
 
 	infonum = (Word)(infoshdr->sh_size / infoshdr->sh_entsize);
@@ -2325,8 +2326,10 @@ versions(Cache *cache, Word shnum, const char *file, uint_t flags,
 			 * which ld produced this object, and how to interpret
 			 * the version values.
 			 */
-			if ((shdr->sh_entsize == 0) || (shdr->sh_size == 0) ||
-			    (_cache->c_data == NULL))
+			if ((shdr->sh_entsize == 0) ||
+			    (shdr->sh_size == 0) ||
+			    (_cache->c_data == NULL) ||
+			    (_cache->c_data->d_buf == NULL))
 				continue;
 			numdyn = shdr->sh_size / shdr->sh_entsize;
 			dyn = (Dyn *)_cache->c_data->d_buf;
@@ -2655,7 +2658,7 @@ reloc(Cache *cache, Word shnum, Ehdr *ehdr, const char *file)
 			    file, relname);
 			continue;
 		}
-		if (_cache->c_data == NULL)
+		if ((_cache->c_data == NULL) || (_cache->c_data->d_buf == NULL))
 			continue;
 
 		rels = _cache->c_data->d_buf;
@@ -3081,7 +3084,7 @@ dynamic(Cache *cache, Word shnum, Ehdr *ehdr, uchar_t osabi, const char *file)
 			    file, _cache->c_name);
 			continue;
 		}
-		if (_cache->c_data == NULL)
+		if ((_cache->c_data == NULL) || (_cache->c_data->d_buf == NULL))
 			continue;
 
 		numdyn = shdr->sh_size / shdr->sh_entsize;
@@ -3459,7 +3462,7 @@ move(Cache *cache, Word shnum, const char *file, uint_t flags)
 			    file, _cache->c_name);
 			continue;
 		}
-		if (_cache->c_data == NULL)
+		if ((_cache->c_data == NULL) || (_cache->c_data->d_buf == NULL))
 			continue;
 
 		move = (Move *)_cache->c_data->d_buf;
@@ -3842,7 +3845,7 @@ note(Cache *cache, Word shnum, Ehdr *ehdr, const char *file)
 			(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADALIGN),
 			    file, _cache->c_name);
 
-		if (_cache->c_data == NULL)
+		if ((_cache->c_data == NULL) || (_cache->c_data->d_buf == NULL))
 			continue;
 
 		dbg_print(0, MSG_ORIG(MSG_STR_EMPTY));
@@ -3880,7 +3883,9 @@ has_linux_abi_note(Cache *cache, Word shnum, const char *file)
 		 */
 		if ((shdr->sh_type != SHT_NOTE) ||
 		    (strcmp(MSG_ORIG(MSG_STR_NOTEABITAG),
-		    _cache->c_name) != 0) || (_cache->c_data == NULL))
+		    _cache->c_name) != 0) ||
+		    (_cache->c_data == NULL) ||
+		    (_cache->c_data->d_buf == NULL))
 			continue;
 
 		pnstate.pns_file = file;
@@ -3997,7 +4002,7 @@ hash(Cache *cache, Word shnum, const char *file, uint_t flags)
 			    file, hsecname);
 			continue;
 		}
-		if (_cache->c_data == NULL)
+		if ((_cache->c_data == NULL) || (_cache->c_data->d_buf == NULL))
 			continue;
 
 		hash = (uint_t *)_cache->c_data->d_buf;
@@ -4017,7 +4022,7 @@ hash(Cache *cache, Word shnum, const char *file, uint_t flags)
 		_cache = &cache[hshdr->sh_link];
 		ssecname = _cache->c_name;
 
-		if (_cache->c_data == NULL)
+		if ((_cache->c_data == NULL) || (_cache->c_data->d_buf == NULL))
 			continue;
 
 		if ((syms = (Sym *)_cache->c_data->d_buf) == NULL) {
@@ -4268,7 +4273,7 @@ got(Cache *cache, Word shnum, Ehdr *ehdr, const char *file)
 	if ((gentsize = gotshdr->sh_entsize) == 0)
 		gentsize = sizeof (Xword);
 
-	if (gotcache->c_data == NULL)
+	if ((gotcache->c_data == NULL) || (gotcache->c_data->d_buf == NULL))
 		return;
 
 	/* LINTED */
@@ -4331,7 +4336,7 @@ got(Cache *cache, Word shnum, Ehdr *ehdr, const char *file)
 			    file, _cache->c_name);
 			continue;
 		}
-		if (_cache->c_data == NULL)
+		if ((_cache->c_data == NULL) || (_cache->c_data->d_buf == NULL))
 			continue;
 
 		rels = _cache->c_data->d_buf;
