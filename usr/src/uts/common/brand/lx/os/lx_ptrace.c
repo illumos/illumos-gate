@@ -252,6 +252,11 @@ extern int lx_user_fpxregs_copyout(lx_lwp_data_t *, void *);
 
 #define	ACCORD_HELD(a)	MUTEX_HELD(&(a)->lxpa_lock)
 
+#define	LX_PID_TO_INIT(x)	((x) == curproc->p_zone->zone_proc_initpid ? \
+	1 : (x))
+#define	LX_INIT_TO_PID(x)	((x) == 1 ? \
+	curproc->p_zone->zone_proc_initpid : (x))
+
 static kcondvar_t lx_ptrace_busy_cv;
 static kmem_cache_t *lx_ptrace_accord_cache;
 
@@ -525,7 +530,7 @@ lx_ptrace_winfo(lx_lwp_data_t *remote, k_siginfo_t *ip, boolean_t waitflag,
 	 */
 	bzero(ip, sizeof (*ip));
 	ip->si_signo = SIGCLD;
-	ip->si_pid = remote->br_pid;
+	ip->si_pid = LX_PID_TO_INIT(remote->br_pid);
 	ip->si_code = CLD_TRAPPED;
 
 	switch (remote->br_ptrace_whatstop) {
@@ -2591,7 +2596,7 @@ lx_ptrace(int ptrace_op, pid_t lxpid, uintptr_t addr, uintptr_t data)
 {
 	int error;
 
-	error = lx_ptrace_kernel(ptrace_op, lxpid, addr, data);
+	error = lx_ptrace_kernel(ptrace_op, LX_INIT_TO_PID(lxpid), addr, data);
 	if (error != 0) {
 		return (set_errno(error));
 	}
