@@ -4163,6 +4163,8 @@ lxpr_read_stat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	hrtime_t msnsecs[NCMSTATES];
 	/* is the emulated release > 2.4 */
 	boolean_t newer_than24 = lx_kern_release_cmp(LXPTOZ(lxpnp), "2.4") > 0;
+	zone_t *zone = LXPTOZ(lxpnp);
+	const char *fmtstr0, *fmtstr1;
 	/* temporary variable since scalehrtime modifies data in place */
 	hrtime_t tmptime;
 
@@ -4219,15 +4221,26 @@ lxpr_read_stat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 			cp = cp->cpu_next;
 	} while (cp != cpstart);
 
-	if (newer_than24) {
-		lxpr_uiobuf_printf(uiobuf,
-		    "cpu %lu %lu %lu %lu %lu %lu %lu\n",
-		    user_cum, 0L, sys_cum, idle_cum, 0L, irq_cum, 0L);
+	if (lx_kern_release_cmp(zone, "2.6.33") >= 0) {
+		fmtstr0 = "cpu %lu 0 %lu %lu 0 %lu 0 0 0 0\n";
+		fmtstr1 = "cpu%d %lu 0 %lu %lu 0 %lu 0 0 0 0\n";
+	} else if (lx_kern_release_cmp(zone, "2.6.24") >= 0) {
+		fmtstr0 = "cpu %lu 0 %lu %lu 0 %lu 0 0 0\n";
+		fmtstr1 = "cpu%d %lu 0 %lu %lu 0 %lu 0 0 0\n";
+	} else if (lx_kern_release_cmp(zone, "2.6.11") >= 0) {
+		fmtstr0 = "cpu %lu 0 %lu %lu 0 %lu 0 0\n";
+		fmtstr1 = "cpu%d %lu 0 %lu %lu 0 %lu 0 0\n";
+	} else if (lx_kern_release_cmp(zone, "2.5.41") >= 0) {
+		fmtstr0 = "cpu %lu 0 %lu %lu 0 %lu 0\n";
+		fmtstr1 = "cpu%d %lu 0 %lu %lu 0 %lu 0\n";
 	} else {
-		lxpr_uiobuf_printf(uiobuf,
-		    "cpu %lu %lu %lu %lu\n",
-		    user_cum, 0L, sys_cum, idle_cum);
+		/* Note: we pass an unused param to these fmt strings */
+		fmtstr0 = "cpu %lu 0 %lu %lu\n";
+		fmtstr1 = "cpu%d %lu 0 %lu %lu\n";
 	}
+
+	lxpr_uiobuf_printf(uiobuf, fmtstr0,
+	    user_cum, sys_cum, idle_cum, irq_cum);
 
 	/* Do per processor stats */
 	do {
@@ -4258,17 +4271,8 @@ lxpr_read_stat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 			irq_ticks += NSEC_TO_TICK(tmptime);
 		}
 
-		if (newer_than24) {
-			lxpr_uiobuf_printf(uiobuf,
-			    "cpu%d %lu %lu %lu %lu %lu %lu %lu\n",
-			    cp->cpu_id, user_ticks, 0L, sys_ticks, idle_ticks,
-			    0L, irq_ticks, 0L);
-		} else {
-			lxpr_uiobuf_printf(uiobuf,
-			    "cpu%d %lu %lu %lu %lu\n",
-			    cp->cpu_id,
-			    user_ticks, 0L, sys_ticks, idle_ticks);
-		}
+		lxpr_uiobuf_printf(uiobuf, fmtstr1,
+		    cp->cpu_id, user_ticks, sys_ticks, idle_ticks, irq_ticks);
 
 		if (pools_enabled)
 			cp = cp->cpu_next_part;
