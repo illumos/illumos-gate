@@ -634,8 +634,6 @@ extern void lx_switch_to_native(klwp_t *);
 extern int lx_syscall_enter(void);
 extern void lx_syscall_return(klwp_t *, int, long);
 
-extern int lx_syscall_fast_enter(void);
-
 extern void lx_trace_sysenter(int, uintptr_t *);
 extern void lx_trace_sysreturn(int, long);
 

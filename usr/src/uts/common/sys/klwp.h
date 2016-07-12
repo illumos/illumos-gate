@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #ifndef	_SYS_KLWP_H
@@ -195,14 +195,9 @@ typedef struct _klwp {
 	 * Branding:
 	 * lwp_brand			- per-lwp brand data
 	 * lwp_brand_syscall		- brand syscall interposer
-	 * lwp_brand_syscall_fast	- brand "fast path" syscall interposer
-	 *
-	 * The lwp_brand_syscall_fast handler should only be used if an
-	 * lwp_brand_syscall handler is also in place.
 	 */
 	void	*lwp_brand;
 	int	(*lwp_brand_syscall)(void);
-	int	(*lwp_brand_syscall_fast)(void);
 
 	struct psinfo *lwp_spymaster;	/* if an agent LWP, our spymaster */
 } klwp_t;
