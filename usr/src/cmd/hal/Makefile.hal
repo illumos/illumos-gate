@@ -36,7 +36,8 @@ HAL_USER =		daemon
 HAL_GROUP =		daemon
 
 # derived from the generated config.h
-HAL_CONFIG_CPPFLAGS =	-DPACKAGE_DATA_DIR=\"/usr/lib\" \
+HAL_CONFIG_CPPFLAGS =	-DPACKAGE_DATA_DIR=\"/usr/share\" \
+			-DPACKAGE_OLD_DATA_DIR=\"/usr/lib\" \
 			-DPACKAGE_BIN_DIR=\"/usr/bin\" \
 			-DPACKAGE_LIBEXEC_DIR=\"/usr/lib/hal\" \
 			-DPACKAGE_SCRIPT_DIR=\"/usr/lib/hal\" \
