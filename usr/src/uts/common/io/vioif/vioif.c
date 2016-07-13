@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2013 Nexenta Inc.  All rights reserved.
- * Copyright (c) 2014, 2015 by Delphix. All rights reserved.
+ * Copyright (c) 2014, 2016 by Delphix. All rights reserved.
  */
 
 /* Based on the NetBSD virtio driver by Minoura Makoto. */
@@ -186,16 +186,15 @@ static int vioif_attach(dev_info_t *, ddi_attach_cmd_t);
 static int vioif_detach(dev_info_t *, ddi_detach_cmd_t);
 
 DDI_DEFINE_STREAM_OPS(vioif_ops,
-	nulldev,		/* identify */
-	nulldev,		/* probe */
-	vioif_attach,		/* attach */
-	vioif_detach,		/* detach */
-	nodev,			/* reset */
-	NULL,			/* cb_ops */
-	D_MP,			/* bus_ops */
-	NULL,			/* power */
-	vioif_quiesce		/* quiesce */
-);
+    nulldev,		/* identify */
+    nulldev,		/* probe */
+    vioif_attach,	/* attach */
+    vioif_detach,	/* detach */
+    nodev,		/* reset */
+    NULL,		/* cb_ops */
+    D_MP,		/* bus_ops */
+    NULL,		/* power */
+    vioif_quiesce	/* quiesce */);
 
 static char vioif_ident[] = "VirtIO ethernet driver";
 
@@ -709,113 +708,104 @@ vioif_unicst(void *arg, const uint8_t *macaddr)
 }
 
 
-static int
+static uint_t
 vioif_add_rx(struct vioif_softc *sc, int kmflag)
 {
-	struct vq_entry *ve;
-	struct vioif_rx_buf *buf;
-
-	ve = vq_alloc_entry(sc->sc_rx_vq);
-	if (!ve) {
-		/*
-		 * Out of free descriptors - ring already full.
-		 * It would be better to update sc_norxdescavail
-		 * but MAC does not ask for this info, hence we
-		 * update sc_norecvbuf.
-		 */
-		sc->sc_norecvbuf++;
-		goto exit_vq;
-	}
-	buf = sc->sc_rxbufs[ve->qe_index];
-
-	if (!buf) {
-		/* First run, allocate the buffer. */
-		buf = kmem_cache_alloc(sc->sc_rxbuf_cache, kmflag);
-		sc->sc_rxbufs[ve->qe_index] = buf;
-	}
-
-	/* Still nothing? Bye. */
-	if (!buf) {
-		dev_err(sc->sc_dev, CE_WARN, "Can't allocate rx buffer");
-		sc->sc_norecvbuf++;
-		goto exit_buf;
-	}
-
-	ASSERT(buf->rb_mapping.vbm_ncookies >= 1);
-
-	/*
-	 * For an unknown reason, the virtio_net_hdr must be placed
-	 * as a separate virtio queue entry.
-	 */
-	virtio_ve_add_indirect_buf(ve, buf->rb_mapping.vbm_dmac.dmac_laddress,
-	    sizeof (struct virtio_net_hdr), B_FALSE);
-
-	/* Add the rest of the first cookie. */
-	virtio_ve_add_indirect_buf(ve,
-	    buf->rb_mapping.vbm_dmac.dmac_laddress +
-	    sizeof (struct virtio_net_hdr),
-	    buf->rb_mapping.vbm_dmac.dmac_size -
-	    sizeof (struct virtio_net_hdr), B_FALSE);
-
-	/*
-	 * If the buffer consists of a single cookie (unlikely for a
-	 * 64-k buffer), we are done. Otherwise, add the rest of the cookies
-	 * using indirect entries.
-	 */
-	if (buf->rb_mapping.vbm_ncookies > 1) {
-		ddi_dma_cookie_t *first_extra_dmac;
-		ddi_dma_cookie_t dmac;
-		first_extra_dmac =
-		    vioif_dma_curr_cookie(buf->rb_mapping.vbm_dmah);
-
-		ddi_dma_nextcookie(buf->rb_mapping.vbm_dmah, &dmac);
-		virtio_ve_add_cookie(ve, buf->rb_mapping.vbm_dmah,
-		    dmac, buf->rb_mapping.vbm_ncookies - 1, B_FALSE);
-		vioif_dma_reset_cookie(buf->rb_mapping.vbm_dmah,
-		    first_extra_dmac);
-	}
-
-	virtio_push_chain(ve, B_FALSE);
-
-	return (DDI_SUCCESS);
-
-exit_buf:
-	vq_free_entry(sc->sc_rx_vq, ve);
-exit_vq:
-	return (DDI_FAILURE);
-}
-
-static int
-vioif_populate_rx(struct vioif_softc *sc, int kmflag)
-{
-	int i = 0;
-	int ret;
+	uint_t num_added = 0;
 
 	for (;;) {
-		ret = vioif_add_rx(sc, kmflag);
-		if (ret)
+		struct vq_entry *ve;
+		struct vioif_rx_buf *buf;
+
+		ve = vq_alloc_entry(sc->sc_rx_vq);
+		if (!ve) {
 			/*
-			 * We could not allocate some memory. Try to work with
-			 * what we've got.
+			 * Out of free descriptors - ring already full.
+			 * It would be better to update sc_norxdescavail
+			 * but MAC does not ask for this info, hence we
+			 * update sc_norecvbuf.
 			 */
+			sc->sc_norecvbuf++;
 			break;
-		i++;
+		}
+		buf = sc->sc_rxbufs[ve->qe_index];
+
+		if (!buf) {
+			/* First run, allocate the buffer. */
+			buf = kmem_cache_alloc(sc->sc_rxbuf_cache, kmflag);
+			sc->sc_rxbufs[ve->qe_index] = buf;
+		}
+
+		/* Still nothing? Bye. */
+		if (!buf) {
+			dev_err(sc->sc_dev, CE_WARN,
+			    "Can't allocate rx buffer");
+			sc->sc_norecvbuf++;
+			vq_free_entry(sc->sc_rx_vq, ve);
+			break;
+		}
+
+		ASSERT(buf->rb_mapping.vbm_ncookies >= 1);
+
+		/*
+		 * For an unknown reason, the virtio_net_hdr must be placed
+		 * as a separate virtio queue entry.
+		 */
+		virtio_ve_add_indirect_buf(ve,
+		    buf->rb_mapping.vbm_dmac.dmac_laddress,
+		    sizeof (struct virtio_net_hdr), B_FALSE);
+
+		/* Add the rest of the first cookie. */
+		virtio_ve_add_indirect_buf(ve,
+		    buf->rb_mapping.vbm_dmac.dmac_laddress +
+		    sizeof (struct virtio_net_hdr),
+		    buf->rb_mapping.vbm_dmac.dmac_size -
+		    sizeof (struct virtio_net_hdr), B_FALSE);
+
+		/*
+		 * If the buffer consists of a single cookie (unlikely for a
+		 * 64-k buffer), we are done. Otherwise, add the rest of the
+		 * cookies using indirect entries.
+		 */
+		if (buf->rb_mapping.vbm_ncookies > 1) {
+			ddi_dma_cookie_t *first_extra_dmac;
+			ddi_dma_cookie_t dmac;
+			first_extra_dmac =
+			    vioif_dma_curr_cookie(buf->rb_mapping.vbm_dmah);
+
+			ddi_dma_nextcookie(buf->rb_mapping.vbm_dmah, &dmac);
+			virtio_ve_add_cookie(ve, buf->rb_mapping.vbm_dmah,
+			    dmac, buf->rb_mapping.vbm_ncookies - 1, B_FALSE);
+			vioif_dma_reset_cookie(buf->rb_mapping.vbm_dmah,
+			    first_extra_dmac);
+		}
+
+		virtio_push_chain(ve, B_FALSE);
+		num_added++;
 	}
 
-	if (i)
-		virtio_sync_vq(sc->sc_rx_vq);
-
-	return (i);
+	return (num_added);
 }
 
-static int
+static uint_t
+vioif_populate_rx(struct vioif_softc *sc, int kmflag)
+{
+	uint_t num_added = vioif_add_rx(sc, kmflag);
+
+	if (num_added > 0)
+		virtio_sync_vq(sc->sc_rx_vq);
+
+	return (num_added);
+}
+
+static uint_t
 vioif_process_rx(struct vioif_softc *sc)
 {
 	struct vq_entry *ve;
 	struct vioif_rx_buf *buf;
-	mblk_t *mp;
+	mblk_t *mphead = NULL, *lastmp = NULL, *mp;
 	uint32_t len;
-	int i = 0;
+	uint_t num_processed = 0;
 
 	while ((ve = virtio_pull_chain(sc->sc_rx_vq, &len))) {
 
@@ -832,7 +822,7 @@ vioif_process_rx(struct vioif_softc *sc)
 
 		len -= sizeof (struct virtio_net_hdr);
 		/*
-		 * We copy small packets that happenned to fit into a single
+		 * We copy small packets that happen to fit into a single
 		 * cookie and reuse the buffers. For bigger ones, we loan
 		 * the buffers upstream.
 		 */
@@ -887,21 +877,31 @@ vioif_process_rx(struct vioif_softc *sc)
 		sc->sc_ipackets++;
 
 		virtio_free_chain(ve);
-		mac_rx(sc->sc_mac_handle, NULL, mp);
-		i++;
+
+		if (lastmp == NULL) {
+			mphead = mp;
+		} else {
+			lastmp->b_next = mp;
+		}
+		lastmp = mp;
+		num_processed++;
 	}
 
-	return (i);
+	if (mphead != NULL) {
+		mac_rx(sc->sc_mac_handle, NULL, mphead);
+	}
+
+	return (num_processed);
 }
 
-static void
+static uint_t
 vioif_reclaim_used_tx(struct vioif_softc *sc)
 {
 	struct vq_entry *ve;
 	struct vioif_tx_buf *buf;
 	uint32_t len;
 	mblk_t *mp;
-	int i = 0;
+	uint_t num_reclaimed = 0;
 
 	while ((ve = virtio_pull_chain(sc->sc_tx_vq, &len))) {
 		/* We don't chain descriptors for tx, so don't expect any. */
@@ -912,7 +912,7 @@ vioif_reclaim_used_tx(struct vioif_softc *sc)
 		buf->tb_mp = NULL;
 
 		if (mp) {
-			for (i = 0; i < buf->tb_external_num; i++)
+			for (int i = 0; i < buf->tb_external_num; i++)
 				(void) ddi_dma_unbind_handle(
 				    buf->tb_external_mapping[i].vbm_dmah);
 		}
@@ -922,13 +922,15 @@ vioif_reclaim_used_tx(struct vioif_softc *sc)
 		/* External mapping used, mp was not freed in vioif_send() */
 		if (mp)
 			freemsg(mp);
-		i++;
+		num_reclaimed++;
 	}
 
-	if (sc->sc_tx_stopped && i) {
+	if (sc->sc_tx_stopped && num_reclaimed > 0) {
 		sc->sc_tx_stopped = 0;
 		mac_tx_update(sc->sc_mac_handle);
 	}
+
+	return (num_reclaimed);
 }
 
 /* sc will be used to update stat counters. */
@@ -1201,11 +1203,28 @@ int
 vioif_start(void *arg)
 {
 	struct vioif_softc *sc = arg;
+	struct vq_entry *ve;
+	uint32_t len;
 
 	mac_link_update(sc->sc_mac_handle,
 	    vioif_link_state(sc));
 
 	virtio_start_vq_intr(sc->sc_rx_vq);
+
+	/*
+	 * Don't start interrupts on sc_tx_vq. We use VIRTIO_F_NOTIFY_ON_EMPTY,
+	 * so the device will send a transmit interrupt when the queue is empty
+	 * and we can reclaim it in one sweep.
+	 */
+
+	/*
+	 * Clear any data that arrived early on the receive queue and populate
+	 * it with free buffers that the device can use moving forward.
+	 */
+	while ((ve = virtio_pull_chain(sc->sc_rx_vq, &len)) != NULL) {
+		virtio_free_chain(ve);
+	}
+	(void) vioif_populate_rx(sc, KM_SLEEP);
 
 	return (DDI_SUCCESS);
 }
@@ -1577,8 +1596,12 @@ vioif_rx_handler(caddr_t arg1, caddr_t arg2)
 	struct vioif_softc *sc = container_of(vsc,
 	    struct vioif_softc, sc_virtio);
 
+	/*
+	 * The return values of these functions are not needed but they make
+	 * debugging interrupts simpler because you can use them to detect when
+	 * stuff was processed and repopulated in this handler.
+	 */
 	(void) vioif_process_rx(sc);
-
 	(void) vioif_populate_rx(sc, KM_NOSLEEP);
 
 	return (DDI_INTR_CLAIMED);
@@ -1592,7 +1615,13 @@ vioif_tx_handler(caddr_t arg1, caddr_t arg2)
 	struct vioif_softc *sc = container_of(vsc,
 	    struct vioif_softc, sc_virtio);
 
-	vioif_reclaim_used_tx(sc);
+	/*
+	 * The return value of this function is not needed but makes debugging
+	 * interrupts simpler because you can use it to detect if anything was
+	 * reclaimed in this handler.
+	 */
+	(void) vioif_reclaim_used_tx(sc);
+
 	return (DDI_INTR_CLAIMED);
 }
 

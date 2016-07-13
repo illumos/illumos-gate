@@ -1,227 +1,211 @@
-'\" te
-.\" Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.\"
 .\" Copyright 1989 AT&T
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH NFSD 1M "Jul 22, 2008"
-.SH NAME
-nfsd \- NFS daemon
-.SH SYNOPSIS
-.LP
-.nf
-\fB/usr/lib/nfs/nfsd\fR [\fB-a\fR] [\fB-c\fR \fI#_conn\fR] [\fB-l\fR \fIlisten_backlog\fR]
-     [\fB-p\fR \fIprotocol\fR] [\fB-t\fR \fIdevice\fR] [\fInservers\fR]
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
-\fBnfsd\fR is the daemon that handles client file system requests. Only users
-with \fB{PRIV_SYS_NFS}\fR and sufficient privileges to write to \fB/var/run\fR
+.\" Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright 2016 Nexenta Systems, Inc.
+.\"
+.Dd March 12, 2016
+.Dt NFSD 1M
+.Os
+.Sh NAME
+.Nm nfsd
+.Nd NFS daemon
+.Sh SYNOPSIS
+.Nm /usr/lib/nfs/nfsd
+.Op Fl a
+.Op Fl c Ar max_conn
+.Op Fl l Ar listen_backlog
+.Op Fl p Ar protocol
+.Op Fl t Ar device
+.Op Ar nservers
+.Sh DESCRIPTION
+.Nm
+is the daemon that handles client file system requests. Only users with
+.Brq Sy PRIV_SYS_NFS
+and sufficient privileges to write to
+.Pa /var/run
 can run this daemon.
-.sp
-.LP
-The \fBnfsd\fR daemon is automatically invoked using \fBshare\fR(1M) with the
-\fB-a\fR option.
-.sp
-.LP
-By default, \fBnfsd\fR starts over the TCP and UDP transports for versions 2
-and 3. By default, it starts over the TCP for version 4. You can change this
-with the \fB-p\fR option.
-.sp
-.LP
-A previously invoked \fBnfsd\fR daemon started with or without options must be
-stopped before invoking another \fBnfsd\fR command.
-.sp
-.LP
-To change startup parameters for \fBnfsd\fR, use the \fBsharectl\fR(1M) and
-\fBsharemgr\fR(1M) commands.
-.SH OPTIONS
-.sp
-.LP
+.Pp
+The
+.Nm
+daemon is automatically invoked using
+.Xr share 1M
+with the
+.Fl a
+option.
+.Pp
+By default,
+.Nm
+starts over the TCP and UDP transports for versions 2 and 3. By default, it
+starts over the TCP for version 4. You can change this
+with the
+.Fl p
+option.
+.Pp
+A previously invoked
+.Nm
+daemon started with or without options must be stopped before invoking another
+.Nm
+command.
+.Pp
+See
+.Xr nfs 4
+for available configuration properties for
+.Nm .
+.Ss Options
 The following options are supported:
-.sp
-.ne 2
-.na
-\fB\fB-a\fR\fR
-.ad
-.RS 15n
-Start a \fBNFS\fR daemon over all available connectionless and
-connection-oriented transports, including UDP and TCP. Equivalent of setting
-the \fBNFSD_PROTOCOL\fR parameter to \fBALL\fR in the \fBnfs\fR file.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-c\fR \fI#_conn\fR\fR
-.ad
-.RS 15n
-This sets the maximum number of connections allowed to the \fBNFS\fR server
-over connection-oriented transports. By default, the number of connections is
-unlimited. Equivalent of the \fBNFSD_MAX_CONNECTIONS\fR parameter in the
-\fBnfs\fR file.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-l\fR\fR
-.ad
-.RS 15n
-Set connection queue length for the \fBNFS TCP\fR over a connection-oriented
+.Bl -tag -width Ds
+.It Fl a
+Start a NFS daemon over all available connectionless and connection-oriented
+transports, including UDP and TCP. Equivalent of setting the
+.Sy protocol
+property to
+.Sy all .
+.It Fl c Ar max_conn
+Set the maximum number of connections allowed to the NFS server over
+connection-oriented transports. By default, the number of connections is
+unlimited. Equivalent of the
+.Sy max_connections
+property.
+.It Fl l
+Set connection queue length for the NFS server over a connection-oriented
 transport. The default value is 32 entries. Equivalent of the
-\fBNFSD_LISTEN_BACKLOG\fR parameter in the \fBnfs\fR file.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-p\fR \fIprotocol\fR\fR
-.ad
-.RS 15n
-Start a \fBNFS\fR daemon over the specified protocol. Equivalent of the
-\fBNFSD_PROTOCOL\fR parameter in the \fBnfs\fR file.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-t\fR \fIdevice\fR\fR
-.ad
-.RS 15n
-Start a \fBNFS\fR daemon for the transport specified by the given device.
-Equivalent of the \fBNFSD_DEVICE\fR parameter in the \fBnfs\fR file.
-.RE
-
-.SH OPERANDS
-.sp
-.LP
+.Sy listen_backlog
+property.
+.It Fl p Ar protocol
+Start a NFS daemon over the specified protocol. Equivalent of the
+.Sy protocol
+property.
+.It Fl t Ar device
+Start a NFS daemon for the transport specified by the given device. Equivalent
+of the
+.Sy device
+property.
+.El
+.Ss Operands
 The following operands are supported:
-.sp
-.ne 2
-.na
-\fB\fInservers\fR\fR
-.ad
-.RS 12n
-This sets the maximum number of concurrent \fBNFS\fR requests that the server
-can handle. This concurrency is achieved by up to \fInservers\fR threads
-created as needed in the kernel. \fInservers\fR should be based on the load
-expected on this server. 16 is the usual number of \fInservers\fR. If
-\fInservers\fR is not specified, the maximum number of concurrent \fBNFS\fR
-requests will default to 1. Equivalent of the \fBNFSD_SERVERS\fR parameter in
-the \fBnfs\fR file.
-.RE
-
-.SH USAGE
-.sp
-.LP
-If the \fBNFS_PORTMON\fR variable is set in \fB/etc/system\fR, then clients are
-required to use privileged ports (ports < \fBIPPORT_RESERVED\fR) to get
-\fBNFS\fR services. This variable is equal to zero by default. This variable
-has been moved from the "nfs" module to the "nfssrv" module. To set the
-variable, edit the \fB/etc/system\fR file and add this entry:
-.sp
-.LP
-\fBset\fR \fBnfssrv:nfs_portmon\fR \fB=\fR \fB1\fR
-.SH EXIT STATUS
-.sp
-.ne 2
-.na
-\fB\fB0\fR\fR
-.ad
-.RS 5n
-Daemon started successfully.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB1\fR\fR
-.ad
-.RS 5n
-Daemon failed to start.
-.RE
-
-.SH FILES
-.sp
-.ne 2
-.na
-\fB\fB\&.nfs\fIXXX\fR\fR\fR
-.ad
-.RS 24n
+.Bl -tag -width Ds
+.It Ar nservers
+This sets the maximum number of concurrent NFS requests that the server can
+handle. This concurrency is achieved by up to
+.Ar nservers
+threads created as needed in the kernel.
+.Ar nservers
+should be based on the load expected on this server. 16 is the usual number of
+.Ar nservers .
+If
+.Ar nservers
+is not specified, the maximum number of concurrent NFS requests will default to
+1. Equivalent of the
+.Sy servers
+property.
+.El
+.Ss Usage
+If the
+.Sy nfs_portmon
+variable is set to non-zero value in
+.Pa /etc/system ,
+then clients are required to use privileged ports
+.Po ports <
+.Dv IPPORT_RESERVED
+.Pc
+to get NFS services. This variable is equal to zero by default. This variable
+has been moved from the
+.Qq nfs
+module to the
+.Qq nfssrv
+module. To set the variable, edit the
+.Pa /etc/system
+file and add this entry:
+.Bd -literal -offset indent
+set nfssrv:nfs_portmon = 1
+.Ed
+.Sh FILES
+.Bl -tag -width Ds
+.It Pa \&.nfsXXX
 Client machine pointer to an open-but-unlinked file.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/etc/default/nfs\fR\fR
-.ad
-.RS 24n
-Contains startup parameters for \fBnfsd\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/etc/system\fR\fR
-.ad
-.RS 24n
+.It Pa /etc/system
 System configuration information file.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/var/nfs/v4_state\fR\fR
-.ad
+.It Xo
+.Pa /var/nfs/v4_state
 .br
-.na
-\fB\fB/var/nfs/v4_oldstate\fR\fR
-.ad
-.RS 24n
+.Pa /var/nfs/v4_oldstate
+.Xc
 Directories used by the server to manage client state information. These
 directories should not be removed.
-.RE
-
-.SH SEE ALSO
-.sp
-.LP
-\fBps\fR(1), \fBsvcs\fR(1), \fBmountd\fR(1M), \fBshare\fR(1M),
-\fBsharectl\fR(1M), \fBsharemgr\fR(1M), \fBsvcadm\fR(1M), \fBnfs\fR(4),
-\fBsharetab\fR(4), \fBsystem\fR(4), \fBattributes\fR(5), \fBsmf\fR(5)
-.sp
-.LP
-\fI\fR
-.SH NOTES
-.sp
-.LP
-Manually starting and restarting \fBnfsd\fR is not recommended. If it is
-necessary to do so, use \fBsvcadm\fR to enable or disable the \fBnfs\fR service
-(\fBsvc:/network/nfs/server\fR). If it is disabled, it will be enabled by
-\fBshare_nfs\fR(1M), unless its \fBapplication/auto_enable\fR property is set
-to \fBfalse\fR. See the \fI\fR, and \fBsvcadm\fR(1M) for more information.
-.sp
-.LP
-The \fBnfsd\fR service is managed by the service management facility,
-\fBsmf\fR(5), under the service identifier:
-.sp
-.in +2
-.nf
+.El
+.Sh EXIT STATUS
+.Bl -tag -width Ds
+.It Sy 0
+Daemon started successfully.
+.It Sy 1
+Daemon failed to start.
+.El
+.Sh SEE ALSO
+.Xr svcs 1 ,
+.Xr mountd 1M ,
+.Xr share 1M ,
+.Xr sharectl 1M ,
+.Xr sharemgr 1M ,
+.Xr svcadm 1M ,
+.Xr nfs 4 ,
+.Xr sharetab 4 ,
+.Xr system 4 ,
+.Xr attributes 5 ,
+.Xr smf 5
+.Sh NOTES
+Manually starting and restarting
+.Nm
+is not recommended. If it is necessary to do so, use
+.Nm svcadm
+to enable or disable the nfs service
+.Pq svc:/network/nfs/server .
+If it is disabled, it will be enabled by
+.Xr share_nfs 1M ,
+unless its
+.Sy application Ns / Ns Sy auto_enable
+property is set to
+.Sy false .
+See the , and
+.Xr svcadm 1M
+for more information.
+.Pp
+The
+.Nm
+service is managed by the service management facility,
+.Xr smf 5 ,
+under the service identifier:
+.Bd -literal -offset indent
 svc:/network/nfs/server
-.fi
-.in -2
-.sp
-
-.sp
-.LP
+.Ed
+.Pp
 Administrative actions on this service, such as enabling, disabling, or
-requesting restart, can be performed using \fBsvcadm\fR(1M). The service's
-status can be queried using the \fBsvcs\fR(1) command.
-.sp
-.LP
-If \fBnfsd\fR is killed with \fBSIGTERM\fR, it will not be restarted by the
-service management facility. Instead, \fBnfsd\fR can be restarted by other
-signals, such as \fBSIGINT\fR.
+requesting restart, can be performed using
+.Xr svcadm 1M .
+The service's status can be queried using the
+.Xr svcs 1
+command.
+.Pp
+If
+.Nm
+is killed with
+.Sy SIGTERM ,
+it will not be restarted by the service management facility. Instead,
+.Nm
+can be restarted by other signals, such as
+.Sy SIGINT .

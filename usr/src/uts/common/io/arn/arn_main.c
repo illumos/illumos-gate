@@ -502,52 +502,6 @@ arn_desc_alloc(dev_info_t *devinfo, struct arn_softc *sc)
 	return (DDI_SUCCESS);
 }
 
-static struct ath_rate_table *
-/* LINTED E_STATIC_UNUSED */
-arn_get_ratetable(struct arn_softc *sc, uint32_t mode)
-{
-	struct ath_rate_table *rate_table = NULL;
-
-	switch (mode) {
-	case IEEE80211_MODE_11A:
-		rate_table = sc->hw_rate_table[ATH9K_MODE_11A];
-		break;
-	case IEEE80211_MODE_11B:
-		rate_table = sc->hw_rate_table[ATH9K_MODE_11B];
-		break;
-	case IEEE80211_MODE_11G:
-		rate_table = sc->hw_rate_table[ATH9K_MODE_11G];
-		break;
-#ifdef ARB_11N
-	case IEEE80211_MODE_11NA_HT20:
-		rate_table = sc->hw_rate_table[ATH9K_MODE_11NA_HT20];
-		break;
-	case IEEE80211_MODE_11NG_HT20:
-		rate_table = sc->hw_rate_table[ATH9K_MODE_11NG_HT20];
-		break;
-	case IEEE80211_MODE_11NA_HT40PLUS:
-		rate_table = sc->hw_rate_table[ATH9K_MODE_11NA_HT40PLUS];
-		break;
-	case IEEE80211_MODE_11NA_HT40MINUS:
-		rate_table = sc->hw_rate_table[ATH9K_MODE_11NA_HT40MINUS];
-		break;
-	case IEEE80211_MODE_11NG_HT40PLUS:
-		rate_table = sc->hw_rate_table[ATH9K_MODE_11NG_HT40PLUS];
-		break;
-	case IEEE80211_MODE_11NG_HT40MINUS:
-		rate_table = sc->hw_rate_table[ATH9K_MODE_11NG_HT40MINUS];
-		break;
-#endif
-	default:
-		ARN_DBG((ARN_DBG_FATAL, "arn: arn_get_ratetable(): "
-		    "invalid mode %u\n", mode));
-		return (NULL);
-	}
-
-	return (rate_table);
-
-}
-
 static void
 arn_setcurmode(struct arn_softc *sc, enum wireless_mode mode)
 {
@@ -976,7 +930,6 @@ arn_set_channel(struct arn_softc *sc, struct ath9k_channel *hchan)
  */
 static void
 arn_ani_calibrate(void *arg)
-
 {
 	ieee80211com_t *ic = (ieee80211com_t *)arg;
 	struct arn_softc *sc = (struct arn_softc *)ic;
@@ -1017,7 +970,7 @@ arn_ani_calibrate(void *arg)
 		if ((timestamp - sc->sc_ani.sc_resetcal_timer) >=
 		    ATH_RESTART_CALINTERVAL) {
 			ath9k_hw_reset_calvalid(ah, ah->ah_curchan,
-						&sc->sc_ani.sc_caldone);
+			    &sc->sc_ani.sc_caldone);
 			if (sc->sc_ani.sc_caldone)
 				sc->sc_ani.sc_resetcal_timer = timestamp;
 		}
@@ -2628,8 +2581,6 @@ arn_setup_ht_cap(struct arn_softc *sc)
 #define	ATH9K_HT_CAP_MAXRXAMPDU_65536 0x3	/* 2 ^ 16 */
 #define	ATH9K_HT_CAP_MPDUDENSITY_8 0x6		/* 8 usec */
 
-	/* LINTED E_FUNC_SET_NOT_USED */
-	uint8_t tx_streams;
 	uint8_t rx_streams;
 
 	arn_ht_conf *ht_info = &sc->sc_ht_conf;
@@ -2646,7 +2597,6 @@ arn_setup_ht_cap(struct arn_softc *sc)
 
 	/* set up supported mcs set */
 	(void) memset(&ht_info->rx_mcs_mask, 0, sizeof (ht_info->rx_mcs_mask));
-	tx_streams = ISP2(sc->sc_ah->ah_caps.tx_chainmask) ? 1 : 2;
 	rx_streams = ISP2(sc->sc_ah->ah_caps.rx_chainmask) ? 1 : 2;
 
 	ht_info->rx_mcs_mask[0] = 0xff;
@@ -3501,7 +3451,7 @@ DDI_DEFINE_STREAM_OPS(arn_dev_ops, nulldev, nulldev, arn_attach, arn_detach,
 
 static struct modldrv arn_modldrv = {
 	&mod_driverops, /* Type of module.  This one is a driver */
-	"arn-Atheros 9000 series driver:2.0", /* short description */
+	"Atheros 9000 series driver", /* short description */
 	&arn_dev_ops /* driver specific ops */
 };
 
