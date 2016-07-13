@@ -10,33 +10,32 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
+# Copyright (c) 2015 by Delphix. All rights reserved.
 #
 
 include $(SRC)/Makefile.master
 
-SRCS = delphix.run \
-	openindiana.run \
-	omnios.run \
-	perf-regression.run
-
 ROOTOPTPKG = $(ROOT)/opt/zfs-tests
-RUNFILES = $(ROOTOPTPKG)/runfiles
+TESTDIR = $(ROOTOPTPKG)/tests/perf/fio
 
-CMDS = $(SRCS:%=$(RUNFILES)/%)
+FILES = mkfiles.fio \
+	random_reads.fio \
+	random_readwrite.fio \
+	random_writes.fio \
+	sequential_reads.fio \
+	sequential_writes.fio
+
+CMDS = $(FILES:%=$(TESTDIR)/%)
 $(CMDS) := FILEMODE = 0444
 
-all: $(SRCS)
+all lint clean clobber:
 
 install: $(CMDS)
 
-clean lint clobber:
+$(CMDS): $(TESTDIR)
 
-$(CMDS): $(RUNFILES) $(SRCS)
-
-$(RUNFILES):
+$(TESTDIR):
 	$(INS.dir)
 
-$(RUNFILES)/%: %
+$(TESTDIR)/%: %
 	$(INS.file)
