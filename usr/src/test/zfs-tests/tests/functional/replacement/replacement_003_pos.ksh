@@ -26,7 +26,7 @@
 #
 
 #
-# Copyright (c) 2013 by Delphix. All rights reserved.
+# Copyright (c) 2013, 2015 by Delphix. All rights reserved.
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -125,7 +125,7 @@ function detach_test
 specials_list=""
 i=0
 while [[ $i != 2 ]]; do
-	$MKFILE 100m $TESTDIR/$TESTFILE1.$i
+	$MKFILE $MINVDEVSIZE $TESTDIR/$TESTFILE1.$i
 	specials_list="$specials_list $TESTDIR/$TESTFILE1.$i"
 
 	((i = i + 1))
