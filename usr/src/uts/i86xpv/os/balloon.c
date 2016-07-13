@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2016 PALO, Richard.
  */
 
 #include <sys/balloon_impl.h>
@@ -98,7 +99,8 @@ extern void unlock_contig_pfnlist(void);
  * Lock the pfnlist if necessary (see above), and return whether we locked it.
  */
 static int
-balloon_lock_contig_pfnlist(int count) {
+balloon_lock_contig_pfnlist(int count)
+{
 	if (count > bln_contig_list_quota) {
 		clear_and_lock_contig_pfnlist();
 		return (1);
@@ -604,7 +606,7 @@ balloon_handler(struct xenbus_watch *watch, const char **vec, uint_t len)
 	int rv;
 	static uchar_t warning_cnt = 0;
 
-	rv = xenbus_scanf(NULL, "memory", "target", "%lu", &new_target_kb);
+	rv = xenbus_scanf(0, "memory", "target", "%lu", &new_target_kb);
 	if (rv != 0) {
 		return;
 	}

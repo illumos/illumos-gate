@@ -13,23 +13,7 @@
 # Copyright 2016 Joyent, Inc.
 #
 
-
-MODULE = i40e.so
-MDBTGT = kvm
-
-MODSRCS = i40e.c
-
-include ../../../../Makefile.cmd
-include ../../../../Makefile.cmd.64
-include ../../Makefile.amd64
-include ../../../Makefile.module
-
-CPPFLAGS += -I$(SRC)/uts/common/io/i40e
-CPPFLAGS += -I$(SRC)/uts/common/io/i40e/core
-CPPFLAGS += -I$(SRC)/uts/common
-CPPFLAGS += -D_I40E_MDB_DMOD
-
-#
-# i40e needs this due to the use of Intel provided headers.
-#
-LINTFLAGS64 += -erroff=E_STATIC_UNUSED
+include $(SRC)/Makefile.master
+SUBDIRS =		ia32
+$(BUILD64)SUBDIRS += 	$(MACH64)
+include ../../../Makefile.subdirs

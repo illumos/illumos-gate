@@ -29,42 +29,6 @@
 #include "arn_core.h"
 
 /*
- * This function will modify certain transmit queue properties depending on
- * the operating mode of the station (AP or AdHoc).  Parameters are AIFS
- * settings and channel width min/max
- */
-
-static int
-/* LINTED E_STATIC_UNUSED */
-arn_beaconq_config(struct arn_softc *sc)
-{
-	struct ath_hal *ah = sc->sc_ah;
-	struct ath9k_tx_queue_info qi;
-
-	(void) ath9k_hw_get_txq_props(ah, sc->sc_beaconq, &qi);
-	if (sc->sc_ah->ah_opmode == ATH9K_M_HOSTAP) {
-		/* Always burst out beacon and CAB traffic. */
-		qi.tqi_aifs = 1;
-		qi.tqi_cwmin = 0;
-		qi.tqi_cwmax = 0;
-	} else {
-		/* Adhoc mode; important thing is to use 2x cwmin. */
-		qi.tqi_aifs = sc->sc_beacon_qi.tqi_aifs;
-		qi.tqi_cwmin = 2*sc->sc_beacon_qi.tqi_cwmin;
-		qi.tqi_cwmax = sc->sc_beacon_qi.tqi_cwmax;
-	}
-
-	if (!ath9k_hw_set_txq_props(ah, sc->sc_beaconq, &qi)) {
-		arn_problem("unable to update h/w beacon queue parameters\n");
-		return (0);
-	} else {
-		/* push to h/w */
-		(void) ath9k_hw_resettxqueue(ah, sc->sc_beaconq);
-		return (1);
-	}
-}
-
-/*
  * Associates the beacon frame buffer with a transmit descriptor.  Will set
  * up all required antenna switch parameters, rate codes, and channel flags.
  * Beacons are always sent out at the lowest rate, and are not retried.
@@ -152,7 +116,6 @@ arn_beacon_setup(struct arn_softc *sc, struct ath_buf *bf)
 #ifdef ARN_IBSS
 static void
 arn_beacon_start_adhoc(struct arn_softc *sc)
-
 {
 	struct ath_buf *bf = list_head(&sc->sc_bcbuf_list);
 	struct ieee80211_node *in = bf->bf_in;
@@ -257,7 +220,6 @@ arn_beacon_return(struct arn_softc *sc)
 
 void
 arn_beacon_config(struct arn_softc *sc)
-
 {
 	struct ath_beacon_config conf;
 	ieee80211com_t *ic = (ieee80211com_t *)sc;
@@ -333,7 +295,7 @@ arn_beacon_config(struct arn_softc *sc)
 	 */
 	if (sleepduration > intval) {
 		bs.bs_bmissthreshold = conf.listen_interval *
-			ATH_DEFAULT_BMISS_LIMIT / 2;
+		    ATH_DEFAULT_BMISS_LIMIT / 2;
 	} else {
 		bs.bs_bmissthreshold = DIV_ROUND_UP(conf.bmiss_timeout, intval);
 		if (bs.bs_bmissthreshold > 15)

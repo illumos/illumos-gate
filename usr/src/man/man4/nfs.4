@@ -1,296 +1,273 @@
-'\" te
-.\"  Copyright (c) 2004 Sun Microsystems, Inc. All rights reserved.
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH NFS 4 "Oct 13, 2004"
-.SH NAME
-nfs \- file containing parameter values for NFS-related daemons
-.SH SYNOPSIS
-.LP
-.nf
-\fB/etc/default/nfs\fR
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
-The \fBnfs\fR file resides in directory \fB/etc/default\fR and provides startup
-parameters for the \fBnfsd\fR(1M) and \fBlockd\fR(1M) daemons.
-.sp
-.LP
-The \fBnfs\fR file format is \fBASCII\fR; comment lines begin with the
-crosshatch (\fB#\fR) character. Parameters consist of a keyword followed by an
-equals (\fB=\fR) sign followed by the parameter value, of the form:
-.sp
-.in +2
-.nf
-\fIkeyword\fR=\fIvalue\fR
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-The following parameters are currently supported in the \fBnfs\fR file:
-.sp
-.ne 2
-.na
-\fB\fBNFS_CLIENT_VERSMIN=\fR\fInum\fR\fR
-.ad
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.\"
+.\" Copyright 1989 AT&T
+.\" Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 2016 Nexenta Systems, Inc.
+.\"
+.Dd March 12, 2016
+.Dt NFS 4
+.Os
+.Sh NAME
+.Nm nfs
+.Nd NFS configuration properties
+.Sh DESCRIPTION
+The behavior of the
+.Xr nfsd 1M ,
+.Xr nfsmapid 1M ,
+.Xr lockd 1M ,
+and
+.Xr mountd 1M
+daemons and
+.Xr mount_nfs 1M
+command is controlled by property values that are stored in the Service
+Management Facility, smf(5). The
+.Xr sharectl 1M
+command should be used to query or change values for these properties.
+.Pp
+Changes made to
+.Nm
+property values on the
+.Nm nfsd ,
+.Nm lockd ,
+.Nm mountd ,
+or
+.Nm mount_nfs
+command line override the values set using
+.Xr sharectl 1M .
+.Pp
+The following list describes the properties:
+.Bl -tag -width Ds
+.It Xo
+.Sy client_versmin Ns = Ns Ar num
 .br
-.na
-\fB\fBNFS_CLIENT_VERSMAX=\fR\fInum\fR\fR
-.ad
-.sp .6
-.RS 4n
+.Sy client_versmax Ns = Ns Ar num
+.Xc
 The NFS client only uses NFS versions in the range specified by these
-variables. Valid values or versions are: \fB2\fR, \fB3\fR, and \fB4\fR. By
-default these variables are unspecified (commented out) and the client's
-default minimum is Version 2. The default maximum is Version 4. You can
-override this range on a per-mount basis by using the \fB-o vers=\fR option to
-\fBmount_nfs\fR(1M).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBNFS_SERVER_VERSMIN=\fR\fInum\fR\fR
-.ad
+properties. Valid values of versions are: 2, 3, and 4. Default minimum version
+is
+.Li 2 ,
+while default maximum is
+.Li 4 .
+.Pp
+You can override this range on a per-mount basis by using the
+.Fl o Sy vers Ns =
+option to
+.Xr mount_nfs 1M .
+.It Xo
+.Sy server_versmin Ns = Ns Ar num
 .br
-.na
-\fB\fBNFS_SERVER_VERSMAX=\fR\fInum\fR\fR
-.ad
-.sp .6
-.RS 4n
+.Sy server_versmax Ns = Ns Ar num
+.Xc
 The NFS server only uses NFS versions in the range specified by these
-variables. Valid values or versions are: \fB2\fR, \fB3\fR, and \fB4\fR. As with
-the client, the default is to leave these variables commented out and the
-default minimum version is \fB2\fR, while the default maximum version is
-\fB4\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBNFS_SERVER_DELEGATION=on | off\fR\fR
-.ad
-.sp .6
-.RS 4n
+properties. Valid values of versions are: 2, 3, and 4. Default minimum version
+is
+.Li 2 ,
+while the default maximum version is
+.Li 4 .
+.It Sy delegation Ns = Ns Sy on Ns | Ns Sy off
 By default, this variable is commented out and the NFS server provides
 delegations to clients. The user can turn off delegations for all exported
-filesystems by setting this variable to \fBoff\fR (case-sensitive). This
-variable only applies to NFS Version 4.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBNFSMAPID_DOMAIN=\fR\fIdomain-string\fR\fR
-.ad
-.sp .6
-.RS 4n
-By default, the \fBnfsmapid\fR uses the DNS domain of the system. This setting
-overrides the default. This domain is used for identifying user and group
-attribute strings in the NFS Version 4 protocol. Clients and servers must match
-with this domain for operation to proceed normally. This variable only applies
-to NFS Version 4. See "Setting \fBNFSMAPID_DOMAIN\fR," below for further
-details.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBNFSD_MAX_CONNECTIONS=\fR\fInum\fR\fR
-.ad
-.sp .6
-.RS 4n
+filesystems by setting this variable to
+.Li off .
+This variable only applies to NFS Version 4.
+.It Sy nfsmapid_domain Ns = Ns Op Ar string
+By default, the
+.Nm nfsmapid
+uses the DNS domain of the system. This setting overrides the default. This
+domain is used for identifying user and group attribute strings in the NFS
+Version 4 protocol. Clients and servers must match with this domain for
+operation to proceed normally. This variable only applies to NFS Version 4. See
+.Sx Setting nfsmapid_domain
+below for further details.
+.It Sy max_connections Ns = Ns Ar num
 Sets the maximum number of concurrent, connection-oriented connections. The
-default is unlimited and is obtained by not setting (that is, commenting out)
-\fBNFSD_MAX_CONNECTIONS\fR. Equivalent to the \fB-c\fR option in \fBnfsd\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBNFSD_LISTEN_BACKLOG=\fR\fInum\fR\fR
-.ad
-.sp .6
-.RS 4n
+default is
+.Li -1
+.Pq unlimited .
+Equivalent to the
+.Fl c
+option in
+.Nm nfsd .
+.It Sy listen_backlog Ns = Ns Ar num
 Set connection queue length for the NFS over a connection-oriented transport.
-The default value is 32, meaning 32 entries in the queue. Equivalent to the
-\fB-l\fR option in \fBnfsd\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBNFSD_PROTOCOL=ALL\fR\fR
-.ad
-.sp .6
-.RS 4n
-Start \fBnfsd\fR over the specified protocol only. Equivalent to the \fB-p\fR
-option in \fBnfsd\fR. \fBALL\fR is equivalent to \fB-a\fR on the \fBnfsd\fR
-command line. Mutually exlusive of \fBNFSD_DEVICE\fR. One or the other of
-\fBNFSD_DEVICE\fR and \fBNFSD_PROTOCOL\fR must be commented out. For the UDP
-protocol, only version 2 and version 3 service is established. NFS Version 4 is
-not supported for the UDP protocol.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBNFSD_DEVICE=\fR\fIdevname\fR\fR
-.ad
-.sp .6
-.RS 4n
+The default value is
+.Li 32 ,
+meaning 32 entries in the queue. Equivalent to the
+.Fl l
+option in
+.Nm nfsd .
+.It Sy protocol Ns = Ns Op Sy all Ns | Ns Ar protocol
+Start
+.Nm nfsd
+over the specified protocol only. Equivalent to the
+.Fl p
+option in
+.Nm nfsd .
+.Sy all
+is equivalent to
+.Fl a
+on the
+.Nm nfsd
+command line. Mutually exlusive of
+.Sy device .
+For the UDP protocol, only version 2 and version 3 service is established. NFS
+Version 4 is not supported for the UDP protocol.
+.It Sy device Ns = Ns Op Ar devname
 Start NFS daemon for the transport specified by the given device only.
-Equivalent to the \fB-t\fR option in \fBnfsd\fR. Mutually exclusive of
-\fBNFSD_PROTOCOL\fR. One or the other of \fBNFSD_DEVICE\fR and
-\fBNFSD_PROTOCOL\fR must be commented out.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBNFSD_SERVERS=\fR\fInum\fR\fR
-.ad
-.sp .6
-.RS 4n
+Equivalent to the
+.Fl t
+option in
+.Nm nfsd .
+Mutually exclusive of
+.Sy protocol .
+.It Sy servers Ns = Ns Ar num
 Maximum number of concurrent NFS requests. Equivalent to last numeric argument
-on the \fBnfsd\fR command line. The default is \fB16\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBLOCKD_LISTEN_BACKLOG=\fR\fInum\fR\fR
-.ad
-.sp .6
-.RS 4n
-Set connection queue length for \fBlockd\fR over a connection-oriented
-transport. The default and minimum value is \fB32\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBLOCKD_SERVERS=\fR\fInum\fR\fR
-.ad
-.sp .6
-.RS 4n
-Maximum number of concurrent \fBlockd\fR requests. The default is \fB20\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBLOCKD_RETRANSMIT_TIMEOUT=\fR\fInum\fR\fR
-.ad
-.sp .6
-.RS 4n
-Retransmit timeout, in seconds, before \fBlockd\fR retries. The default is
-\fB5\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBGRACE_PERIOD=\fR\fInum\fR\fR
-.ad
-.sp .6
-.RS 4n
-Grace period, in seconds, that all clients (both \fBNLM\fR and \fBNFSv4\fR)
+on the
+.Nm nfsd
+command line. The default is
+.Li 16 .
+.It Sy lockd_listen_backlog Ns = Ns Ar num
+Set connection queue length for
+.Nm lockd
+over a connection-oriented transport. The default and minimum value is
+.Li 32 .
+.It Sy lockd_servers Ns = Ns Ar num
+Maximum number of concurrent
+.Nm lockd
+requests. The default is 20.
+.It Sy lockd_retransmit_timeout Ns = Ns Ar num
+Retransmit timeout, in seconds, before
+.Nm lockd
+retries. The default is
+.Li 5 .
+.It Sy grace_period Ns = Ns Ar num
+Grace period, in seconds, that all clients
+.Pq both NLM and NFSv4
 have to reclaim locks after a server reboot. This parameter also controls the
-\fBNFSv4\fR lease interval and overrides the deprecated setting
-\fBLOCKD_GRACE_PERIOD\fR. The default is \fB90\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBLOCKD_GRACE_PERIOD=\fR\fInum\fR\fR
-.ad
-.sp .6
-.RS 4n
-Deprecated. Same as \fBGRACE_PERIOD=\fR\fInum\fR above. The default is
-\fB90\fR.
-.RE
-
-.SS "Setting \fBNFSMAPID_DOMAIN\fR"
-.sp
-.LP
-As described above, the setting for \fBNFSMAPID_DOMAIN\fR overrides the domain
-used by \fBnfsmapid\fR(1M) for building and comparing outbound and inbound
-attribute strings, respectively. This setting overrides any other mechanism for
-setting the NFSv4 domain. In the absence of a \fBNFSMAPID_DOMAIN\fR setting,
-the \fBnfsmapid\fR(1M) daemon determines the NFSv4 domain as follows:
-.RS +4
-.TP
-.ie t \(bu
-.el o
-If a properly configured \fB/etc/resolv.conf\fR (see \fBresolv.conf\fR(4))
-exists, \fBnfsmapid\fR queries specified nameserver(s) for the domain.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-If a properly configured \fB/etc/resolv.conf\fR (see \fBresolv.conf\fR(4))
+NFSv4 lease interval. The default is
+.Li 90 .
+.It Sy mountd_listen_backlog Ns = Ns Ar num
+Set the connection queue length for
+.Nm mountd
+over a connection-oriented transport. The default value is
+.Li 64 .
+.It Sy mountd_max_threads Ns = Ns Ar num
+Maximum number of threads for
+.Nm mountd .
+The default value is
+.Li 16 .
+.El
+.Ss Setting nfsmapid_domain
+As described above, the setting for
+.Sy nfsmapid_domain
+overrides the domain used by
+.Xr nfsmapid 1M
+for building and comparing outbound and inbound attribute strings, respectively.
+This setting overrides any other mechanism for setting the NFSv4 domain. In the
+absence of a
+.Sy nfsmapid_domain
+setting, the
+.Xr nfsmapid 1M
+daemon determines the NFSv4 domain as follows:
+.Bl -bullet
+.It
+If a properly configured
+.Pa /etc/resolv.conf
+.Po see
+.Xr resolv.conf 4
+.Pc
+exists,
+.Nm nfsmapid
+queries specified nameserver(s) for the domain.
+.It
+If a properly configured
+.Pa /etc/resolv.conf
+.Po see
+.Xr resolv.conf 4
+.Pc
 exists, but the queried nameserver does not have a proper record of the domain
-name, \fBnfsmapid\fR attempts to obtain the domain name through the BIND
-interface (see \fBresolver\fR(3RESOLV)).
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-If no \fB/etc/resolv.conf\fR exists, \fBnfsmapid\fR falls back on using the
-configured domain name (see \fBdomainname\fR(1M)), which is returned with the
-leading domain suffix removed. For example, for \fBwidgets.sales.acme.com\fR,
-\fBsales.acme.com\fR is returned.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-If \fB/etc/resolv.conf\fR does not exist, no domain name has been configured
-(or no \fB/etc/defaultdomain\fR exists), \fBnfsmapid\fR falls back on obtaining
-the domain name from the host name, if the host name contains a fully qualified
-domain name (FQDN).
-.RE
-.sp
-.LP
+name,
+.Nm nfsmapid
+attempts to obtain the domain name through the BIND interface
+.Po see
+.Xr resolver 3RESOLV
+.Pc .
+.It
+If no
+.Pa /etc/resolv.conf
+exists,
+.Nm nfsmapid
+falls back on using the configured domain name
+.Po see
+.Xr domainname 1M
+.Pc ,
+which is returned with the leading domain suffix removed. For example, for
+.Li widgets.sales.acme.com ,
+.Li sales.acme.com
+is returned.
+.It
+If
+.Pa /etc/resolv.conf
+does not exist, no domain name has been configured
+.Po or no
+.Pa /etc/defaultdomain
+exists
+.Pc ,
+.Nm nfsmapid
+falls back on obtaining the domain name from the host name, if the host name
+contains a fully qualified domain name
+.Pq FQDN .
+.El
+.Pp
 If a domainname is still not obtained following all of the preceding steps,
-\fBnfsmapid\fR will have no domain configured. This results in the following
-behavior:
-.RS +4
-.TP
-.ie t \(bu
-.el o
-Outbound "owner" and "owner_group" attribute strings are encoded as literal
-id's. For example, the UID 12345 is encoded as \fB12345\fR.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-\fBnfsmapid\fR ignores the "domain" portion of the inbound attribute string and
-performs name service lookups only for the user or group. If the user/group
-exists in the local system name service databases, then the proper uid/gid will
-be mapped even when no domain has been configured.
-.sp
+.Nm nfsmapid
+will have no domain configured. This results in the following behavior:
+.Bl -bullet
+.It
+Outbound
+.Qq owner
+and
+.Qq owner_group
+attribute strings are encoded as literal id's. For example, the UID 12345 is
+encoded as
+.Li 12345 .
+.It
+.Nm nfsmapid
+ignores the
+.Qq domain
+portion of the inbound attribute string and performs name service lookups only
+for the user or group. If the user/group exists in the local system name service
+databases, then the proper uid/gid will be mapped even when no domain has been
+configured.
+.Pp
 This behavior implies that the same administrative user/group domain exists
 between NFSv4 client and server (that is, the same uid/gid's for users/groups
 on both client and server). In the case of overlapping id spaces, the inbound
 attribute string could potentially be mapped to the wrong id. However, this is
-not functionally different from mapping the inbound string to \fBnobody\fR, yet
-provides greater flexibility.
-.RE
-.SH SEE ALSO
-.sp
-.LP
-\fBlockd\fR(1M), \fBmount_nfs\fR(1M), \fBnfsd\fR(1M), \fBnfsmapid\fR(1M)
-.sp
-.LP
-\fISystem Administration Guide: Network Services\fR
+not functionally different from mapping the inbound string to
+.Sy nobody ,
+yet provides greater flexibility.
+.El
+.Sh SEE ALSO
+.Xr lockd 1M ,
+.Xr mount_nfs 1M ,
+.Xr mountd 1M ,
+.Xr nfsd 1M ,
+.Xr nfsmapid 1M ,
+.Xr sharectl 1M ,
+.Xr smf 5

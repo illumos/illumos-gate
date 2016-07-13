@@ -289,7 +289,6 @@ static void
 arn_tid_drain(struct arn_softc *sc,
     struct ath_txq *txq,
     struct ath_atx_tid *tid)
-
 {
 	struct ath_buf *bf;
 
@@ -1147,49 +1146,6 @@ arn_tx_txqaddbuf(struct arn_softc *sc,
 }
 #endif /* ARN_TX_AGGREGATION */
 
-/*
- * ath_pkt_dur - compute packet duration (NB: not NAV)
- * rix - rate index
- * pktlen - total bytes (delims + data + fcs + pads + pad delims)
- * width  - 0 for 20 MHz, 1 for 40 MHz
- * half_gi - to use 4us v/s 3.6 us for symbol time
- */
-
-static uint32_t
-/* LINTED E_STATIC_UNUSED */
-arn_pkt_duration(struct arn_softc *sc, uint8_t rix, struct ath_buf *bf,
-    int width, int half_gi, boolean_t shortPreamble)
-{
-	struct ath_rate_table *rate_table = sc->sc_currates;
-	uint32_t nbits, nsymbits, duration, nsymbols;
-	uint8_t rc;
-	int streams, pktlen;
-
-	pktlen = bf_isaggr(bf) ? bf->bf_al : bf->bf_frmlen;
-	rc = rate_table->info[rix].ratecode;
-
-	/* for legacy rates, use old function to compute packet duration */
-	if (!IS_HT_RATE(rc))
-		return (ath9k_hw_computetxtime(sc->sc_ah, rate_table, pktlen,
-		    rix, shortPreamble));
-
-	/* find number of symbols: PLCP + data */
-	nbits = (pktlen << 3) + OFDM_PLCP_BITS;
-	nsymbits = bits_per_symbol[HT_RC_2_MCS(rc)][width];
-	nsymbols = (nbits + nsymbits - 1) / nsymbits;
-
-	if (!half_gi)
-		duration = SYMBOL_TIME(nsymbols);
-	else
-		duration = SYMBOL_TIME_HALFGI(nsymbols);
-
-	/* addup duration for legacy/ht training and signal fields */
-	streams = HT_RC_2_STREAMS(rc);
-	duration += L_STF + L_LTF + L_SIG + HT_SIG + HT_STF + HT_LTF(streams);
-
-	return (duration);
-}
-
 static struct ath_buf *
 arn_tx_get_buffer(struct arn_softc *sc)
 {
@@ -1332,8 +1288,8 @@ ath_pkt_duration(struct arn_softc *sc, uint8_t rix, struct ath_buf *bf,
 /* Rate module function to set rate related fields in tx descriptor */
 static void
 ath_buf_set_rate(struct arn_softc *sc,
-struct ath_buf *bf,
-struct ieee80211_frame *wh)
+    struct ath_buf *bf,
+    struct ieee80211_frame *wh)
 {
 	struct ath_hal *ah = sc->sc_ah;
 	struct ath_rate_table *rt;

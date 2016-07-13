@@ -18,9 +18,10 @@ MDBTGT = kvm
 
 MODSRCS = i40e.c
 
-include ../../../../Makefile.cmd
-include ../../Makefile.ia32
-include ../../../Makefile.module
+include ../../../../../Makefile.cmd
+include ../../../../../Makefile.cmd.64
+include ../../../Makefile.amd64
+include ../../../../Makefile.module
 
 CPPFLAGS += -I$(SRC)/uts/common/io/i40e
 CPPFLAGS += -I$(SRC)/uts/common/io/i40e/core
@@ -30,4 +31,4 @@ CPPFLAGS += -D_I40E_MDB_DMOD
 #
 # i40e needs this due to the use of Intel provided headers.
 #
-LINTFLAGS += -erroff=E_STATIC_UNUSED
+LINTFLAGS64 += -erroff=E_STATIC_UNUSED
