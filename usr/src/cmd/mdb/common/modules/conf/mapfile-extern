@@ -1,6 +1,6 @@
 #
 # Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright (c) 2013 by Delphix. All rights reserved.
+# Copyright (c) 2013, 2015 by Delphix. All rights reserved.
 #
 # CDDL HEADER START
 #
@@ -67,6 +67,7 @@ SYMBOL_SCOPE {
 		mdb_ctf_module_lookup		{ FLAGS = EXTERN };
 		mdb_ctf_offsetof		{ FLAGS = EXTERN };
 		mdb_ctf_offsetof_by_name	{ FLAGS = EXTERN };
+		mdb_ctf_sizeof_by_name		{ FLAGS = EXTERN };
 		mdb_ctf_readsym			{ FLAGS = EXTERN };
 		mdb_ctf_type_cmp		{ FLAGS = EXTERN };
 		mdb_ctf_type_invalidate		{ FLAGS = EXTERN };

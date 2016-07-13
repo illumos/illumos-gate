@@ -1,3 +1,5 @@
+#!/usr/bin/ksh
+
 #
 # This file and its contents are supplied under the terms of the
 # Common Development and Distribution License ("CDDL"), version 1.0.
@@ -10,11 +12,12 @@
 #
 
 #
-# Copyright (c) 2012, 2015 by Delphix. All rights reserved.
+# Copyright (c) 2015 by Delphix. All rights reserved.
 #
 
-.PARALLEL: $(SUBDIRS)
+. $STF_SUITE/include/libtest.shlib
 
-SUBDIRS = functional perf
+verify_runnable "global"
+verify_disk_count "$DISKS" 3
 
-include $(SRC)/test/Makefile.com
+log_pass

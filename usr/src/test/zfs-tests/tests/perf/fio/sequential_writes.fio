@@ -10,11 +10,24 @@
 #
 
 #
-# Copyright (c) 2012, 2015 by Delphix. All rights reserved.
+# Copyright (c) 2015 by Delphix. All rights reserved.
 #
 
-.PARALLEL: $(SUBDIRS)
+[global]
+filename_format=file$jobnum
+group_reporting=1
+fallocate=0
+thread=1
+rw=write
+time_based=1
+directory=/${TESTFS}
+runtime=${RUNTIME}
+bs=${BLOCKSIZE}
+ioengine=psync
+sync=${SYNC_TYPE}
+numjobs=${NUMJOBS}
+filesize=${FILESIZE}
+buffer_compress_percentage=33
+buffer_compress_chunk=4096
 
-SUBDIRS = functional perf
-
-include $(SRC)/test/Makefile.com
+[job]
