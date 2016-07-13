@@ -503,14 +503,21 @@ lxd_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 
 	vd = list_head(lxzdata->lxzd_vdisks);
 	while (vd != NULL) {
-		/* only create links for actual zvols */
 		if (vd->lxvd_type == LXVD_ZVOL) {
 			char lnknm[MAXPATHLEN];
 
+			/* Create a symlink for the actual zvol. */
 			(void) snprintf(lnknm, sizeof (lnknm),
 			    "./zvol/dsk/%s", vd->lxvd_real_name);
 			(void) lxd_symlink(LDNTOV(ldn), vd->lxvd_name, &vattr,
 			    lnknm, cr, NULL, 0);
+		} else if (vd->lxvd_type == LXVD_ZFS_DS) {
+			/*
+			 * Create a symlink for the root "disk" using /dev/zfs
+			 * as the target device.
+			 */
+			(void) lxd_symlink(LDNTOV(ldn), vd->lxvd_name, &vattr,
+			    "./zfs", cr, NULL, 0);
 		}
 
 		vd = list_next(lxzdata->lxzd_vdisks, vd);
