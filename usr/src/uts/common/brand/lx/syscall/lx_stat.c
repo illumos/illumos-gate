@@ -114,14 +114,49 @@ static void
 lx_stat_xlate_dev(vattr_t *vattr)
 {
 	lx_zone_data_t *lxzd = ztolxzd(curproc->p_zone);
-	dev_t dev = vattr->va_fsid;
+	dev_t dev;
 	lx_virt_disk_t *vd;
+	boolean_t is_dev;
 
-	/* Substitute emulated major/minor on mounted datasets */
+	if (S_ISCHR(vattr->va_mode) || S_ISBLK(vattr->va_mode)) {
+		dev = vattr->va_rdev;
+		is_dev = B_TRUE;
+	} else {
+		dev = vattr->va_fsid;
+		is_dev = B_FALSE;
+	}
+
+	/*
+	 * See if this is the /dev/zfs device. If it is, the device number has
+	 * already been converted to Linux format in the lx devfs so we have
+	 * to check for that and not a native major/minor style.
+	 */
+	if (S_ISCHR(vattr->va_mode) &&
+	    LX_GETMAJOR(dev) == getmajor(lxzd->lxzd_zfs_dev) &&
+	    LX_GETMINOR(dev) == 0) {
+		/*
+		 * We use the /dev/zfs device as a placeholder for our in-zone
+		 * fabricated /dev/zfsds0 device that we're pretending / is
+		 * mounted on. lx_zone_get_zfsds has pre-allocated this
+		 * entry in the emulated device list. Reset dev so we can
+		 * properly match in the following loop.
+		 */
+		dev = curproc->p_zone->zone_rootvp->v_vfsp->vfs_dev;
+	}
+
+	/* Substitute emulated major/minor on zvols or mounted datasets. */
 	vd = list_head(lxzd->lxzd_vdisks);
 	while (vd != NULL) {
 		if (vd->lxvd_real_dev == dev) {
 			dev = vd->lxvd_emul_dev;
+			/*
+			 * We only update rdev for matching zfds/zvol devices
+			 * so that the other devices are unchanged.
+			 */
+			if (is_dev) {
+				vattr->va_rdev = LX_MAKEDEVICE(getmajor(dev),
+				    getminor(dev));
+			}
 			break;
 		}
 		vd = list_next(lxzd->lxzd_vdisks, vd);
