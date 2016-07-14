@@ -353,8 +353,9 @@ repoll:
 					pdp->pd_fp = NULL;
 					pdp->pd_events = 0;
 
-					if (php != NULL) {
-						pollhead_delete(php, pdp);
+					if (pdp->pd_php != NULL) {
+						pollhead_delete(pdp->pd_php,
+						    pdp);
 						pdp->pd_php = NULL;
 					}
 
@@ -503,8 +504,9 @@ repoll:
 					pdp->pd_fp = NULL;
 					pdp->pd_events = 0;
 
-					if (php != NULL) {
-						pollhead_delete(php, pdp);
+					if (pdp->pd_php != NULL) {
+						pollhead_delete(pdp->pd_php,
+						    pdp);
 						pdp->pd_php = NULL;
 					}
 
