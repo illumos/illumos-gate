@@ -22,6 +22,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2013, 2016 Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2014 by Delphix. All rights reserved.
  */
 
 /* vnode ops for the /dev/zvol directory */
@@ -63,6 +64,13 @@ static ldi_handle_t devzvol_lh;
 ddi_modhandle_t zfs_mod;
 int (*szcm)(char *);
 int (*szn2m)(char *, minor_t *);
+
+
+/*
+ * Enable/disable snapshots from being created in /dev/zvol. By default,
+ * they are enabled, preserving the historic behavior.
+ */
+boolean_t devzvol_snaps_allowed = B_TRUE;
 
 int
 sdev_zvol_create_minor(char *dsname)
@@ -172,11 +180,17 @@ again:
 int
 devzvol_objset_check(char *dsname, dmu_objset_type_t *type)
 {
-	boolean_t	ispool;
+	boolean_t	ispool, is_snapshot;
 	zfs_cmd_t	*zc;
 	int rc;
 	nvlist_t 	*nvl;
 	size_t nvsz;
+
+	ispool = (strchr(dsname, '/') == NULL);
+	is_snapshot = (strchr(dsname, '@') != NULL);
+
+	if (is_snapshot && !devzvol_snaps_allowed)
+		return (ENOTSUP);
 
 	zc = kmem_zalloc(sizeof (zfs_cmd_t), KM_SLEEP);
 	(void) strlcpy(zc->zc_name, dsname, MAXPATHLEN);
@@ -187,7 +201,6 @@ devzvol_objset_check(char *dsname, dmu_objset_type_t *type)
 	zc->zc_nvlist_src_size = nvsz;
 	fnvlist_free(nvl);
 
-	ispool = (strchr(dsname, '/') == NULL) ? B_TRUE : B_FALSE;
 	rc = devzvol_handle_ioctl(ispool ? ZFS_IOC_POOL_STATS :
 	    ZFS_IOC_OBJSET_STATS, zc, NULL);
 	if (type && rc == 0)
@@ -863,7 +876,8 @@ sdev_iter_datasets(struct vnode *dvp, int arg, char *name)
 			goto skip;
 		}
 		if (arg == ZFS_IOC_DATASET_LIST_NEXT &&
-		    zc->zc_objset_stats.dds_type != DMU_OST_ZFS)
+		    zc->zc_objset_stats.dds_type == DMU_OST_ZVOL &&
+		    devzvol_snaps_allowed)
 			sdev_iter_snapshots(dvp, zc->zc_name);
 skip:
 		(void) strcpy(zc->zc_name, name);
