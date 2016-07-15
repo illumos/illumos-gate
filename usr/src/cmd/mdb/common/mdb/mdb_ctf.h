@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright (c) 2013 by Delphix. All rights reserved.
+ * Copyright (c) 2013, 2015 by Delphix. All rights reserved.
  * Copyright (c) 2015, Joyent, Inc.
  */
 
@@ -136,6 +136,7 @@ extern int mdb_ctf_member_info(mdb_ctf_id_t, const char *,
 extern int mdb_ctf_offsetof(mdb_ctf_id_t, const char *, ulong_t *);
 extern int mdb_ctf_num_members(mdb_ctf_id_t);
 extern int mdb_ctf_offsetof_by_name(const char *, const char *);
+extern ssize_t mdb_ctf_sizeof_by_name(const char *);
 
 extern ssize_t mdb_ctf_offset_to_name(mdb_ctf_id_t, ulong_t, char *, size_t,
     int, mdb_ctf_id_t *, ulong_t *);

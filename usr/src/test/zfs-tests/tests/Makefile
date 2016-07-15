@@ -10,11 +10,11 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2012, 2015 by Delphix. All rights reserved.
 #
 
 .PARALLEL: $(SUBDIRS)
 
-SUBDIRS = functional stress
+SUBDIRS = functional perf
 
 include $(SRC)/test/Makefile.com
