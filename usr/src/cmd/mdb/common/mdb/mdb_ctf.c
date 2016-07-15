@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright (c) 2013 by Delphix. All rights reserved.
+ * Copyright (c) 2013, 2015 by Delphix. All rights reserved.
  * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
  */
 
@@ -910,6 +910,24 @@ mdb_ctf_offsetof_by_name(const char *type, const char *member)
 	return (off);
 }
 
+ssize_t
+mdb_ctf_sizeof_by_name(const char *type)
+{
+	mdb_ctf_id_t id;
+	ssize_t size;
+
+	if (mdb_ctf_lookup_by_name(type, &id) == -1) {
+		mdb_warn("couldn't find type %s", type);
+		return (-1);
+	}
+
+	if ((size = mdb_ctf_type_size(id)) == -1) {
+		mdb_warn("couldn't determine type size of %s", type);
+		return (-1);
+	}
+
+	return (size);
+}
 
 /*ARGSUSED*/
 static int

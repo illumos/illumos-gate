@@ -1172,7 +1172,7 @@ function zfs_zones_setup #zone_name zone_root zone_ip
 	#
 	if verify_slog_support ; then
 		typeset sdevs="/var/tmp/sdev1 /var/tmp/sdev2"
-		log_must $MKFILE 100M $sdevs
+		log_must $MKFILE $MINVDEVSIZE $sdevs
 		log_must $ZPOOL add $pool_name log mirror $sdevs
 	fi
 
@@ -2088,7 +2088,7 @@ function verify_slog_support
 	typeset sdev=$dir/b
 
 	$MKDIR -p $dir
-	$MKFILE 64M $vdev $sdev
+	$MKFILE $MINVDEVSIZE $vdev $sdev
 
 	typeset -i ret=0
 	if ! $ZPOOL create -n $pool $vdev log $sdev > /dev/null 2>&1; then
@@ -2445,4 +2445,28 @@ function vdevs_in_pool
 	$RM -f $tmpfile
 
 	return 0;
+}
+
+function get_max
+{
+	typeset -l i max=$1
+	shift
+
+	for i in "$@"; do
+		max=$(echo $((max > i ? max : i)))
+	done
+
+	echo $max
+}
+
+function get_min
+{
+	typeset -l i min=$1
+	shift
+
+	for i in "$@"; do
+		min=$(echo $((min < i ? min : i)))
+	done
+
+	echo $min
 }
