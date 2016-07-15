@@ -741,9 +741,15 @@ lx_stop_notify(proc_t *p, klwp_t *lwp, ushort_t why, ushort_t what)
  * PTRACE_DETACH) to be allowed, the tracee LWP must be in "ptrace-stop".  This
  * check must ONLY be run on tracees of the current LWP.  If the check is
  * successful, we return with the tracee p_lock held.
+ *
+ * In the case of PTRACE_DETACH, we can return with the tracee locked even if
+ * it is not in "ptrace-stop". This can happen for various reasons, such as if
+ * the remote process is already job-stopped in the kernel. We must still be
+ * able to detach from this process. We return ENOENT in this case.
  */
 static int
-lx_ptrace_lock_if_stopped(lx_ptrace_accord_t *accord, lx_lwp_data_t *remote)
+lx_ptrace_lock_if_stopped(lx_ptrace_accord_t *accord, lx_lwp_data_t *remote,
+    boolean_t detaching)
 {
 	klwp_t *rlwp = remote->br_lwp;
 	proc_t *rproc = lwptoproc(rlwp);
@@ -778,6 +784,15 @@ lx_ptrace_lock_if_stopped(lx_ptrace_accord_t *accord, lx_lwp_data_t *remote)
 	VERIFY(remote->br_ptrace_tracer == accord);
 
 	if (!(remote->br_ptrace_flags & LX_PTF_STOPPED)) {
+		if (detaching) {
+			/*
+			 * The tracee is not in "ptrace-stop", but we still
+			 * return with the locked process. This is indicated
+			 * by ENOENT.
+			 */
+			return (ENOENT);
+		}
+
 		/*
 		 * The tracee is not in "ptrace-stop", so we release the
 		 * process.
@@ -907,15 +922,11 @@ lx_ptrace_cont(lx_lwp_data_t *remote, lx_ptrace_cont_flags_t flags, int signo)
  * Implements the PTRACE_DETACH subcommand of the Linux ptrace(2) interface.
  *
  * The LWP identified by the Linux pid "lx_pid" will, if it as a tracee of the
- * current LWP, be detached and set runnable.  If the specified LWP is not
- * currently in the "ptrace-stop" state, the routine will return ESRCH as if
- * the LWP did not exist at all.
- *
- * The caller must not hold p_lock on any process.
+ * current LWP, be detached and (optionally) set runnable.
  */
-static int
+static void
 lx_ptrace_detach(lx_ptrace_accord_t *accord, lx_lwp_data_t *remote, int signo,
-    boolean_t *release_hold)
+    boolean_t restart)
 {
 	klwp_t *rlwp = remote->br_lwp;
 
@@ -932,7 +943,6 @@ lx_ptrace_detach(lx_ptrace_accord_t *accord, lx_lwp_data_t *remote, int signo,
 	remote->br_ptrace_attach = LX_PTA_NONE;
 	remote->br_ptrace_tracer = NULL;
 	remote->br_ptrace_flags = 0;
-	*release_hold = B_TRUE;
 
 	/*
 	 * Decrement traced-lwp count for the process.
@@ -947,9 +957,9 @@ lx_ptrace_detach(lx_ptrace_accord_t *accord, lx_lwp_data_t *remote, int signo,
 	remote->br_ptrace_stopsig = signo;
 	remote->br_ptrace_donesig = 0;
 
-	lx_ptrace_restart_lwp(rlwp);
-
-	return (0);
+	if (restart) {
+		lx_ptrace_restart_lwp(rlwp);
+	}
 }
 
 /*
@@ -2059,7 +2069,7 @@ lx_sigcld_repost(proc_t *pp, sigqueue_t *sqp)
 		 * Check if this LWP is in "ptrace-stop".  If in the correct
 		 * stop condition, lock the process containing the tracee LWP.
 		 */
-		if (lx_ptrace_lock_if_stopped(accord, remote) != 0) {
+		if (lx_ptrace_lock_if_stopped(accord, remote, B_FALSE) != 0) {
 			continue;
 		}
 
@@ -2231,7 +2241,7 @@ lx_waitid_helper(idtype_t idtype, id_t id, k_siginfo_t *ip, int options,
 		 * Check if this LWP is in "ptrace-stop".  If in the correct
 		 * stop condition, lock the process containing the tracee LWP.
 		 */
-		if (lx_ptrace_lock_if_stopped(accord, remote) != 0) {
+		if (lx_ptrace_lock_if_stopped(accord, remote, B_FALSE) != 0) {
 			continue;
 		}
 
@@ -2403,7 +2413,7 @@ lx_ptrace_kernel(int ptrace_op, pid_t lxpid, uintptr_t addr, uintptr_t data)
 	klwp_t *rlwp;
 	proc_t *rproc;
 	int error;
-	boolean_t found = B_FALSE;
+	boolean_t found = B_FALSE, restart = B_TRUE;
 
 	/*
 	 * PTRACE_TRACEME and PTRACE_ATTACH operations induce the tracing of
@@ -2461,12 +2471,23 @@ lx_ptrace_kernel(int ptrace_op, pid_t lxpid, uintptr_t addr, uintptr_t data)
 	/*
 	 * Attempt to lock the target LWP.
 	 */
-	if ((error = lx_ptrace_lock_if_stopped(accord, remote)) != 0) {
+	if ((error = lx_ptrace_lock_if_stopped(accord, remote,
+	    (ptrace_op == LX_PTRACE_DETACH))) != 0) {
 		/*
-		 * The LWP was not in "ptrace-stop".
+		 * The LWP was not in "ptrace-stop". For detach, ENOENT
+		 * indicates that the LWP was not in "ptrace-stop", but is
+		 * still locked.
 		 */
-		mutex_exit(&accord->lxpa_tracees_lock);
-		return (error);
+		if (ptrace_op == LX_PTRACE_DETACH && error == ENOENT) {
+			/*
+			 * We're detaching, but the process was not in
+			 * ptrace_stop, so we don't want to try to restart it.
+			 */
+			restart = B_FALSE;
+		} else {
+			mutex_exit(&accord->lxpa_tracees_lock);
+			return (error);
+		}
 	}
 
 	/*
@@ -2478,25 +2499,21 @@ lx_ptrace_kernel(int ptrace_op, pid_t lxpid, uintptr_t addr, uintptr_t data)
 
 
 	if (ptrace_op == LX_PTRACE_DETACH) {
-		boolean_t release_hold = B_FALSE;
-		error = lx_ptrace_detach(accord, remote, (int)data,
-		    &release_hold);
+		lx_ptrace_detach(accord, remote, (int)data, restart);
 		/*
 		 * Drop the lock on both the tracee process and the tracee list.
 		 */
 		mutex_exit(&rproc->p_lock);
 		mutex_exit(&accord->lxpa_tracees_lock);
 
-		if (release_hold) {
-			/*
-			 * Release a hold from the accord.
-			 */
-			lx_ptrace_accord_enter(accord);
-			lx_ptrace_accord_rele(accord);
-			lx_ptrace_accord_exit(accord);
-		}
+		/*
+		 * Release a hold from the accord.
+		 */
+		lx_ptrace_accord_enter(accord);
+		lx_ptrace_accord_rele(accord);
+		lx_ptrace_accord_exit(accord);
 
-		return (error);
+		return (0);
 	}
 
 	/*
