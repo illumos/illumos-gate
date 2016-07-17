@@ -22,6 +22,7 @@
 /*
  * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015 by Delphix. All rights reserved.
  */
 
 #include <sys/param.h>
@@ -59,6 +60,8 @@ volatile uint_t nfsauth_cache_hit;
 volatile uint_t nfsauth_cache_miss;
 volatile uint_t nfsauth_cache_refresh;
 volatile uint_t nfsauth_cache_reclaim;
+volatile uint_t exi_cache_auth_reclaim_failed;
+volatile uint_t exi_cache_clnt_reclaim_failed;
 
 /*
  * The lifetime of an auth cache entry:
@@ -1434,10 +1437,8 @@ exi_cache_trim(struct exportinfo *exi)
 	avl_tree_t *tree;
 
 	for (i = 0; i < AUTH_TABLESIZE; i++) {
-
 		tree = exi->exi_cache[i];
 		stale_time = gethrestime_sec() - NFSAUTH_CACHE_TRIM;
-
 		rw_enter(&exi->exi_cache_lock, RW_READER);
 
 		/*
@@ -1445,7 +1446,16 @@ exi_cache_trim(struct exportinfo *exi)
 		 * used for NFSAUTH_CACHE_TRIM seconds.
 		 */
 		for (c = avl_first(tree); c != NULL; c = AVL_NEXT(tree, c)) {
-			rw_enter(&c->authc_lock, RW_WRITER);
+			/*
+			 * We are being called by the kmem subsystem to reclaim
+			 * memory so don't block if we can't get the lock.
+			 */
+			if (rw_tryenter(&c->authc_lock, RW_WRITER) == 0) {
+				exi_cache_auth_reclaim_failed++;
+				rw_exit(&exi->exi_cache_lock);
+				return;
+			}
+
 			for (p = avl_first(&c->authc_tree); p != NULL;
 			    p = next) {
 				next = AVL_NEXT(&c->authc_tree, p);
@@ -1491,7 +1501,8 @@ exi_cache_trim(struct exportinfo *exi)
 
 		if (rw_tryupgrade(&exi->exi_cache_lock) == 0) {
 			rw_exit(&exi->exi_cache_lock);
-			rw_enter(&exi->exi_cache_lock, RW_WRITER);
+			exi_cache_clnt_reclaim_failed++;
+			continue;
 		}
 
 		for (c = avl_first(tree); c != NULL; c = nextc) {
