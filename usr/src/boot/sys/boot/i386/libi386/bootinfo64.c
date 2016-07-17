@@ -127,46 +127,6 @@ bi_copymodules64(vm_offset_t addr)
 }
 
 /*
- * Check to see if this CPU supports long mode.
- */
-int
-bi_checkcpu(void)
-{
-    char *cpu_vendor;
-    int vendor[3];
-    int eflags;
-    unsigned int regs[4];
-
-    /* Check for presence of "cpuid". */
-    eflags = read_eflags();
-    write_eflags(eflags ^ PSL_ID);
-    if (!((eflags ^ read_eflags()) & PSL_ID))
-	return (0);
-
-    /* Fetch the vendor string. */
-    do_cpuid(0, regs);
-    vendor[0] = regs[1];
-    vendor[1] = regs[3];
-    vendor[2] = regs[2];
-    cpu_vendor = (char *)vendor;
-
-    /* Check for vendors that support AMD features. */
-    if (strncmp(cpu_vendor, INTEL_VENDOR_ID, 12) != 0 &&
-	strncmp(cpu_vendor, AMD_VENDOR_ID, 12) != 0 &&
-	strncmp(cpu_vendor, CENTAUR_VENDOR_ID, 12) != 0)
-	return (0);
-
-    /* Has to support AMD features. */
-    do_cpuid(0x80000000, regs);
-    if (!(regs[0] >= 0x80000001))
-	return (0);
-
-    /* Check for long mode. */
-    do_cpuid(0x80000001, regs);
-    return (regs[3] & AMDID_LM);
-}
-
-/*
  * Load the information expected by an amd64 kernel.
  *
  * - The 'boothowto' argument is constructed
@@ -196,8 +156,8 @@ bi_load64(char *args, vm_offset_t addr, vm_offset_t *modulep,
 
     howto = bi_getboothowto(args);
 
-    /* 
-     * Allow the environment variable 'rootdev' to override the supplied device 
+    /*
+     * Allow the environment variable 'rootdev' to override the supplied device
      * This should perhaps go to MI code and/or have $rootdev tested/set by
      * MI code before launching the kernel.
      */

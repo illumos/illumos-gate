@@ -192,11 +192,7 @@ main(void)
     setenv("LINES", "24", 1);			/* optional */
     setenv("COLUMNS", "80", 1);			/* optional */
 
-    if (bi_checkcpu())
-	setenv("ISADIR", "amd64", 1);
-    else
-	setenv("ISADIR", "", 1);
-
+    bi_isadir();
     bios_getsmap();
 
     interact(NULL);

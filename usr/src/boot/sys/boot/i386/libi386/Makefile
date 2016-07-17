@@ -35,14 +35,14 @@ COMPILE.s  = $(AS) $(AS_FLAGS)
 
 SRCS=	biosacpi.c bioscd.c biosdisk.c biosmem.c biospnp.c \
 	biospci.c biossmap.c bootinfo.c bootinfo32.c bootinfo64.c \
-	comconsole.c devicename.c elf32_freebsd.c \
+	comconsole.c cpuid.c devicename.c elf32_freebsd.c \
 	elf64_freebsd.c multiboot.c multiboot_tramp.S \
 	i386_copy.c i386_module.c nullconsole.c pxe.c pxetramp.s \
 	smbios.c time.c vidconsole.c amd64_tramp.S spinconsole.c linux.c \
 	relocater_tramp.S
 OBJS=	biosacpi.o bioscd.o biosdisk.o biosmem.o biospnp.o \
 	biospci.o biossmap.o bootinfo.o bootinfo32.o bootinfo64.o \
-	comconsole.o devicename.o elf32_freebsd.o \
+	comconsole.o cpuid.o devicename.o elf32_freebsd.o \
 	elf64_freebsd.o multiboot.o multiboot_tramp.o \
 	i386_copy.o i386_module.o nullconsole.o pxe.o pxetramp.o \
 	smbios.o time.o vidconsole.o amd64_tramp.o spinconsole.o linux.o \

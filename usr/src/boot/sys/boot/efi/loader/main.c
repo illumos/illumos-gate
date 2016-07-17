@@ -468,6 +468,7 @@ main(int argc, CHAR16 *argv[])
 
 	efi_init_environment();
 	setenv("ISADIR", "amd64", 1);	/* we only build 64bit */
+	bi_isadir();			/* set ISADIR */
 	acpi_detect();
 
 	if ((ptr = efi_get_table(&smbios3)) == NULL)
