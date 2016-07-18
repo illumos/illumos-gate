@@ -21,6 +21,7 @@
 
 /*
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -55,6 +56,7 @@
 #include	<stropts.h>
 #include	<sys/conf.h>
 #include	<locale.h>
+#include	<zone.h>
 #include	"fslib.h"
 
 #define	VFS_PATH	"/usr/lib/fs"
@@ -801,6 +803,7 @@ mnterror(int flag)
 void
 doexec(char *fstype, char *newargv[])
 {
+	const char *zroot = zone_get_nroot();
 	char	full_path[PATH_MAX];
 	char	alter_path[PATH_MAX];
 	char	*vfs_path = VFS_PATH;
@@ -808,7 +811,8 @@ doexec(char *fstype, char *newargv[])
 	int	i;
 
 	/* build the full pathname of the fstype dependent command. */
-	sprintf(full_path, "%s/%s/%s", vfs_path, fstype, myname);
+	(void) snprintf(full_path, sizeof (full_path), "%s/%s/%s/%s",
+	    (zroot != NULL ? zroot : ""), vfs_path, fstype, myname);
 	sprintf(alter_path, "%s/%s/%s", alt_path, fstype, myname);
 	newargv[1] = myname;
 
