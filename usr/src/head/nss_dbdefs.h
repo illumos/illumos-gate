@@ -669,14 +669,13 @@ typedef struct {
 	(str)->h_errno    = 0,				\
 	(str)->erange    = 0)
 
-#define	NSS_XbyY_FINI(str)				(\
-	(str)->returnval == 0 && (str)->erange && (errno = ERANGE), \
-	(str)->returnval)
+#define	NSS_XbyY_FINI(str)	_nss_XbyY_fini(str)
 
 #define	NSS_PACKED_CRED_CHECK(buf, ruid, euid)		(\
 	((nss_pheader_t *)(buf))->p_ruid == (ruid) && \
 	((nss_pheader_t *)(buf))->p_euid == (euid))
 
+extern void		*_nss_XbyY_fini(nss_XbyY_args_t *);
 extern char		**_nss_netdb_aliases(const char *, int, char *, int);
 extern nss_status_t	nss_default_key2str(void *, size_t, nss_XbyY_args_t *,
 					const char *, int, size_t *);
