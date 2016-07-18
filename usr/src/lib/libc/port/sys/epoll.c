@@ -165,9 +165,18 @@ epoll_ctl(int epfd, int op, int fd, struct epoll_event *event)
 	}
 
 	epoll[i].dpep_pollfd.events = ev;
+retry:
 	res = write(epfd, epoll, sizeof (epoll[0]) * (i + 1));
 
 	if (res == -1) {
+		if (errno == EINTR) {
+			/*
+			 * Linux does not document EINTR as an allowed error
+			 * for epoll_ctl.  The write must be retried if it is
+			 * not done automatically via SA_RESTART.
+			 */
+			goto retry;
+		}
 		if (errno == ELOOP) {
 			/*
 			 * Convert the specific /dev/poll error about an fd
