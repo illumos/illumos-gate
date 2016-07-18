@@ -641,6 +641,7 @@ dpwrite(dev_t dev, struct uio *uiop, cred_t *credp)
 	uintptr_t	limit;
 	int		error, size;
 	ssize_t		uiosize;
+	size_t		copysize;
 	nfds_t		pollfdnum;
 	struct pollhead	*php = NULL;
 	polldat_t	*pdp;
@@ -706,11 +707,19 @@ dpwrite(dev_t dev, struct uio *uiop, cred_t *credp)
 	 * here for every call.
 	 */
 	uiop->uio_loffset = 0;
-	if ((error = uiomove((caddr_t)pollfdp, uiosize, UIO_WRITE, uiop))
-	    != 0) {
+
+	/*
+	 * Use uiocopy instead of uiomove when populating pollfdp, keeping
+	 * uio_resid untouched for now.  Write syscalls will translate EINTR
+	 * into a success if they detect "successfully transfered" data via an
+	 * updated uio_resid.  Falsely suppressing such errors is disastrous.
+	 */
+	if ((error = uiocopy((caddr_t)pollfdp, uiosize, UIO_WRITE, uiop,
+	    &copysize)) != 0) {
 		kmem_free(pollfdp, uiosize);
 		return (error);
 	}
+
 	/*
 	 * We are about to enter the core portion of dpwrite(). Make sure this
 	 * write has exclusive access in this portion of the code, i.e., no
@@ -983,6 +992,13 @@ bypass:
 	cv_broadcast(&dpep->dpe_cv);
 	mutex_exit(&dpep->dpe_lock);
 	kmem_free(pollfdp, uiosize);
+	if (error == 0) {
+		/*
+		 * The state of uio_resid is updated only after the pollcache
+		 * is successfully modified.
+		 */
+		uioskip(uiop, copysize);
+	}
 	return (error);
 }
 
