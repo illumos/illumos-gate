@@ -2909,18 +2909,21 @@ lofi_map_file(dev_t dev, struct lofi_ioctl *ulip, int pickminor,
 
 	fake_disk_geometry(lsp);
 
-	if ((ddi_prop_update_int64(DDI_DEV_T_NONE, lsp->ls_dip, SIZE_PROP_NAME,
-	    lsp->ls_vp_size - lsp->ls_crypto_offset)) != DDI_PROP_SUCCESS) {
-		error = EINVAL;
-		goto err;
-	}
-
-	if ((ddi_prop_update_int64(DDI_DEV_T_NONE, lsp->ls_dip,
-	    NBLOCKS_PROP_NAME,
-	    (lsp->ls_vp_size - lsp->ls_crypto_offset) / DEV_BSIZE))
-	    != DDI_PROP_SUCCESS) {
-		error = EINVAL;
-		goto err;
+	/* For unlabeled lofi add Nblocks and Size */
+	if (klip->li_labeled == B_FALSE) {
+		error = ddi_prop_update_int64(lsp->ls_dev, lsp->ls_dip,
+		    SIZE_PROP_NAME, lsp->ls_vp_size - lsp->ls_crypto_offset);
+		if (error != DDI_PROP_SUCCESS) {
+			error = EINVAL;
+			goto err;
+		}
+		error = ddi_prop_update_int64(lsp->ls_dev, lsp->ls_dip,
+		    NBLOCKS_PROP_NAME,
+		    (lsp->ls_vp_size - lsp->ls_crypto_offset) / DEV_BSIZE);
+		if (error != DDI_PROP_SUCCESS) {
+			error = EINVAL;
+			goto err;
+		}
 	}
 
 	list_insert_tail(&lofi_list, lsp);

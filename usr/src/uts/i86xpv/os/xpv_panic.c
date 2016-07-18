@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2012 Gary Mills
+ * Copyright 2016 PALO, Richard.
  *
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
@@ -912,7 +913,7 @@ init_xen_module()
 		 * Xen marks its text section as writable, so we need to
 		 * look for the name - not just the flag.
 		 */
-		if ((strcmp(&names[shp->sh_name], ".text") != NULL) &&
+		if ((strcmp(&names[shp->sh_name], ".text") != 0) &&
 		    (shp->sh_flags & SHF_WRITE) != 0) {
 			if (shp->sh_addralign > data_align)
 				data_align = shp->sh_addralign;

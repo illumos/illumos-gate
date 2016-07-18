@@ -724,13 +724,6 @@ ath9k_hw_getnf(struct ath_hal *ah, struct ath9k_channel *chan)
 	int16_t nf, nfThresh;
 	int16_t nfarray[NUM_NF_READINGS] = { 0 };
 	struct ath9k_nfcal_hist *h;
-	/* LINTED E_FUNC_SET_NOT_USED */
-	uint8_t chainmask;
-
-	if (AR_SREV_9280(ah))
-		chainmask = 0x1B;
-	else
-		chainmask = 0x3F;
 
 	chan->channelFlags &= (~CHANNEL_CW_INT);
 	if (REG_READ(ah, AR_PHY_AGC_CONTROL) & AR_PHY_AGC_CONTROL_NF) {
