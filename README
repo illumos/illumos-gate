@@ -1,13 +1,45 @@
-Last illumos-joyent commit:  e21a4068a53d8be1a50ef97dfcc0e3d66aaf00b2
+Last illumos-joyent commit:  bd10f95d113c1cd280d324e137d4b9f1a75fb23e
 
 This is an attempt to port over LX zones into OmniOS.  It's going to be a long,
 painful slog, and I don't mean the ZFS kind, either.  :)
 
-These bits will ONU, and work on a global-only boot.  ipkg & lipkg zones
-do not boot yet, and LX hasn't even been tried yet (not until I sort out
-ipkg & lipkg).  Feel free to discuss this on the OmniOS discussion list.
+An IPS repo that matches public updates of the r151019 bloody repo can be
+found at http:/pkg.omniti.com/omnios/LX/.  ipkg and lipkg zones can boot,
+appear to be fully functional, but ned more testing.  LX zones can be
+installed using ZFS send streams (gzipped or uncompressed) from Joyent's
+images.  The "kernel-version" attribute must be set by the administrator to
+match the installed image.  For example:
 
-I may occasionally burn this repo to the ground and start fresh.
+	# zonecfg -z lx0 export
+	create -b
+	set zonepath=/zones/lx0
+	set brand=lx
+	set autoboot=false
+	set ip-type=exclusive
+	add net
+	set physical=lx0
+	end
+	add attr
+	set name=kernel-version
+	set type=string
+	set value=2.6.32
+	end
+	#
+
+This matches a CentOS 6.8 image from Joyent.  To install the image:
+
+     zoneadm -z lx0 install -s /root/path/to/centos68.gz
+
+You'd obtain the .gz file from Joyent's image servers.
+
+LX zones boot, but with undiagnosed errors in some cases, and one needs to use
+/native tools and/or scripts to configure networking on them.  (NOTE:  This
+follows the OmniOS adminstrative model for zones.)  LX zones need even more
+testing than ipkg/lipkg zones, but appear to at least boot and allow both
+"zlogin -C" console logins and "zlogin" direct logins.
+
+
+I reserve the right to burn this repo to the ground and start fresh.
 
 This repo also has the "joyent" branch, which is a downstream of illumos-joyent.
 
