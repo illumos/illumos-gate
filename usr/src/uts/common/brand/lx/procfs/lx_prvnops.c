@@ -4969,61 +4969,6 @@ lxpr_read_uptime(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	    "%ld.%02d %ld.%02d\n", up_s, up_cs, idle_s, idle_cs);
 }
 
-static const char *amd_x_edx[] = {
-	NULL,	NULL,	NULL,	NULL,
-	NULL,	NULL,	NULL,	NULL,
-	NULL,	NULL,	NULL,	"syscall",
-	NULL,	NULL,	NULL,	NULL,
-	NULL,	NULL,	NULL,	"mp",
-	"nx",	NULL,	"mmxext", NULL,
-	NULL,	NULL,	NULL,	NULL,
-	NULL,	"lm",	"3dnowext", "3dnow"
-};
-
-static const char *amd_x_ecx[] = {
-	"lahf_lm", NULL, "svm", NULL,
-	"altmovcr8"
-};
-
-static const char *tm_x_edx[] = {
-	"recovery", "longrun", NULL, "lrti"
-};
-
-/*
- * Intel calls no-execute "xd" in its docs, but Linux still reports it as "nx."
- */
-static const char *intc_x_edx[] = {
-	NULL,	NULL,	NULL,	NULL,
-	NULL,	NULL,	NULL,	NULL,
-	NULL,	NULL,	NULL,	"syscall",
-	NULL,	NULL,	NULL,	NULL,
-	NULL,	NULL,	NULL,	NULL,
-	"nx",	NULL,	NULL,   NULL,
-	NULL,	NULL,	NULL,	NULL,
-	NULL,	"lm",   NULL,   NULL
-};
-
-static const char *intc_edx[] = {
-	"fpu",	"vme",	"de",	"pse",
-	"tsc",	"msr",	"pae",	"mce",
-	"cx8",	"apic",	 NULL,	"sep",
-	"mtrr",	"pge",	"mca",	"cmov",
-	"pat",	"pse36", "pn",	"clflush",
-	NULL,	"dts",	"acpi",	"mmx",
-	"fxsr",	"sse",	"sse2",	"ss",
-	"ht",	"tm",	"ia64",	"pbe"
-};
-
-/*
- * "sse3" on linux is called "pni" (Prescott New Instructions).
- */
-static const char *intc_ecx[] = {
-	"pni",	NULL,	NULL, "monitor",
-	"ds_cpl", NULL,	NULL, "est",
-	"tm2",	NULL,	"cid", NULL,
-	NULL,	"cx16",	"xtpr"
-};
-
 /*
  * Report a list of each cgroup subsystem supported by our emulated cgroup fs.
  * This needs to exist for systemd to run but for now we don't report any
@@ -5043,19 +4988,286 @@ lxpr_read_cgroups(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	 */
 }
 
+
+typedef enum {
+	LXCS_ALWAYS = 0,
+	LXCS_CPUID1_ECX,
+	LXCS_CPUID1_EDX,
+	LXCS_CPUID7_EBX,
+	LXCS_CPUIDD1_EAX,
+	LXCS_CPUIDX1_ECX,
+	LXCS_CPUIDX1_EDX,
+	LXCS_REG_MAX
+} lx_cpuinfo_source_t;
+
+typedef struct {
+	lx_cpuinfo_source_t	lxcm_source;
+	uint32_t		lxcm_flag;
+	const char		*lxcm_name;
+} lx_cpuinfo_mapping_t;
+
+/*
+ * This listing is derived from the X86_FEATURE flags data in the Linux kernel.
+ * Some entries are missing detectino routines.  They remain in the list,
+ * although commented out, to preserve proper order should they be fixed later.
+ */
+lx_cpuinfo_mapping_t lx_cpuinfo_mappings[] = {
+	/* CPUID EDX: */
+	{ LXCS_CPUID1_EDX, CPUID_INTC_EDX_FPU,		"fpu" },
+	{ LXCS_CPUID1_EDX, CPUID_INTC_EDX_VME,		"vme" },
+	{ LXCS_CPUID1_EDX, CPUID_INTC_EDX_DE,		"de" },
+	{ LXCS_CPUID1_EDX, CPUID_INTC_EDX_PSE,		"pse" },
+	{ LXCS_CPUID1_EDX, CPUID_INTC_EDX_TSC,		"tsc" },
+	{ LXCS_CPUID1_EDX, CPUID_INTC_EDX_MSR,		"msr" },
+	{ LXCS_CPUID1_EDX, CPUID_INTC_EDX_PAE,		"pae" },
+	{ LXCS_CPUID1_EDX, CPUID_INTC_EDX_MCE,		"mce" },
+	{ LXCS_CPUID1_EDX, CPUID_INTC_EDX_CX8,		"cx8" },
+	{ LXCS_CPUID1_EDX, CPUID_INTC_EDX_APIC,		"apic" },
+	/* reserved */
+	{ LXCS_CPUID1_EDX, CPUID_INTC_EDX_SEP,		"sep" },
+	{ LXCS_CPUID1_EDX, CPUID_INTC_EDX_MTRR,		"mtrr" },
+	{ LXCS_CPUID1_EDX, CPUID_INTC_EDX_PGE,		"pge" },
+	{ LXCS_CPUID1_EDX, CPUID_INTC_EDX_MCA,		"mca" },
+	{ LXCS_CPUID1_EDX, CPUID_INTC_EDX_CMOV,		"cmov" },
+	{ LXCS_CPUID1_EDX, CPUID_INTC_EDX_PAT,		"pat" },
+	{ LXCS_CPUID1_EDX, CPUID_INTC_EDX_PSE36,	"pse36" },
+	{ LXCS_CPUID1_EDX, CPUID_INTC_EDX_PSN,		"pn" },
+	{ LXCS_CPUID1_EDX, CPUID_INTC_EDX_CLFSH,	"clflush" },
+	/* reserved */
+	{ LXCS_CPUID1_EDX, CPUID_INTC_EDX_DS,		"dts" },
+	{ LXCS_CPUID1_EDX, CPUID_INTC_EDX_ACPI,		"acpi" },
+	{ LXCS_CPUID1_EDX, CPUID_INTC_EDX_MMX,		"mmx" },
+	{ LXCS_CPUID1_EDX, CPUID_INTC_EDX_FXSR,		"fxsr" },
+	{ LXCS_CPUID1_EDX, CPUID_INTC_EDX_SSE,		"sse" },
+	{ LXCS_CPUID1_EDX, CPUID_INTC_EDX_SSE2,		"sse2" },
+	{ LXCS_CPUID1_EDX, CPUID_INTC_EDX_SS,		"ss" },
+	{ LXCS_CPUID1_EDX, CPUID_INTC_EDX_HTT,		"ht" },
+	{ LXCS_CPUID1_EDX, CPUID_INTC_EDX_TM,		"tm" },
+	/* reserved */
+	{ LXCS_CPUID1_EDX, CPUID_INTC_EDX_PBE,		"pbe" },
+
+	/* AMD-defined CPU features, CPUID level 0x80000001, word 1 */
+#if defined(__amd64)
+	{ LXCS_ALWAYS, 1,				"syscall" },
+#endif
+	/* Present in the Linux listing but not in recent AMD docs: "mp" */
+	{ LXCS_CPUIDX1_EDX, CPUID_AMD_EDX_NX,		"nx" },
+	{ LXCS_CPUIDX1_EDX, CPUID_AMD_EDX_MMXamd,	"mmxext" },
+	{ LXCS_CPUIDX1_EDX, CPUID_AMD_EDX_FFXSR,	"fxsr_opt" },
+	{ LXCS_CPUIDX1_EDX, CPUID_AMD_EDX_1GPG,		"pdpe1gb" },
+	{ LXCS_CPUIDX1_EDX, CPUID_AMD_EDX_TSCP,		 "rdtscp" },
+	{ LXCS_CPUIDX1_EDX, CPUID_AMD_EDX_LM,		"lm" },
+	{ LXCS_CPUIDX1_EDX, CPUID_AMD_EDX_3DNowx,	"3dnowext" },
+	{ LXCS_CPUIDX1_EDX, CPUID_AMD_EDX_3DNow,	"3dnow" },
+
+	/* CPUID ECX: */
+	{ LXCS_CPUID1_ECX, CPUID_INTC_ECX_SSE3,		"pni" },
+	{ LXCS_CPUID1_ECX, CPUID_INTC_ECX_PCLMULQDQ,	"pclmulqdq" },
+	{ LXCS_CPUID1_ECX, CPUID_INTC_ECX_DTES64,	"dtes64" },
+	{ LXCS_CPUID1_ECX, CPUID_INTC_ECX_MON,		"monitor" },
+	{ LXCS_CPUID1_ECX, CPUID_INTC_ECX_DSCPL,	"ds_cpl" },
+	{ LXCS_CPUID1_ECX, CPUID_INTC_ECX_VMX,		"vmx" },
+	{ LXCS_CPUID1_ECX, CPUID_INTC_ECX_SMX,		"smx" },
+	{ LXCS_CPUID1_ECX, CPUID_INTC_ECX_EST,		"est" },
+	{ LXCS_CPUID1_ECX, CPUID_INTC_ECX_TM2,		"tm2" },
+	{ LXCS_CPUID1_ECX, CPUID_INTC_ECX_SSSE3,	"ssse3" },
+	{ LXCS_CPUID1_ECX, CPUID_INTC_ECX_CID,		"cid" },
+	{ LXCS_CPUID1_ECX, 0x00000800,			"sdbg" },
+	{ LXCS_CPUID1_ECX, CPUID_INTC_ECX_FMA,		"fma" },
+	{ LXCS_CPUID1_ECX, CPUID_INTC_ECX_CX16,		"cx16" },
+	{ LXCS_CPUID1_ECX, CPUID_INTC_ECX_ETPRD,	"xtpr" },
+	{ LXCS_CPUID1_ECX, CPUID_INTC_ECX_PDCM,		"pdcm" },
+	/* reserved */
+	{ LXCS_CPUID1_ECX, CPUID_INTC_ECX_PCID,		"pcid" },
+	{ LXCS_CPUID1_ECX, CPUID_INTC_ECX_DCA,		"dca" },
+	{ LXCS_CPUID1_ECX, CPUID_INTC_ECX_SSE4_1,	"sse4_1" },
+	{ LXCS_CPUID1_ECX, CPUID_INTC_ECX_SSE4_2,	"sse4_2" },
+	{ LXCS_CPUID1_ECX, CPUID_INTC_ECX_X2APIC,	"x2apic" },
+	{ LXCS_CPUID1_ECX, CPUID_INTC_ECX_MOVBE,	"movbe" },
+	{ LXCS_CPUID1_ECX, CPUID_INTC_ECX_POPCNT,	"popcnt" },
+	{ LXCS_CPUID1_ECX, CPUID_INTC_ECX_TSCDL,	"tsc_deadline_timer" },
+	{ LXCS_CPUID1_ECX, CPUID_INTC_ECX_AES,		"aes" },
+	{ LXCS_CPUID1_ECX, CPUID_INTC_ECX_XSAVE,	"xsave" },
+	/* osxsave */
+	{ LXCS_CPUID1_ECX, CPUID_INTC_ECX_AVX,		"avx" },
+	{ LXCS_CPUID1_ECX, CPUID_INTC_ECX_F16C,		"f16c" },
+	{ LXCS_CPUID1_ECX, CPUID_INTC_ECX_RDRAND,	"rdrand" },
+	/* not used */
+
+	/*
+	 * Other features, Linux-defined mapping
+	 * This range is used for feature bits which conflict or are synthesized
+	 * Skipped:
+	 * "recovery",
+	 * "longrun",
+	 * "lrti",
+	 * "cxmmx",
+	 * "k6_mtrr",
+	 * "cyrix_arr",
+	 * "centaur_mcr",
+	 * "constant_tsc",
+	 * "up",
+	 * "arch_perfmon",
+	 * "pebs",
+	 * "bts",
+	 * "rep_good",
+	 * "nopl",
+	 * "xtopology",
+	 * "tsc_reliable",
+	 * "nonstop_tsc",
+	 * "extd_apicid",
+	 * "amd_dcm",
+	 * "aperfmperf",
+	 * "eagerfpu",
+	 * "nonstop_tsc_s3",
+	 *
+	 * "hypervisor",
+	 * "rng",
+	 * "rng_en",
+	 * "ace",
+	 * "ace_en",
+	 * "ace2",
+	 * "ace2_en",
+	 * "phe",
+	 * "phe_en",
+	 * "pmm",
+	 * "pmm_en",
+	 */
+
+	/*
+	 * More extended AMD flags: CPUID level 0x80000001, ecx, word 6
+	 */
+	{ LXCS_CPUIDX1_ECX, CPUID_AMD_ECX_AHF64,	"lahf_lm" },
+	{ LXCS_CPUIDX1_ECX, CPUID_AMD_ECX_CMP_LGCY,	"cmp_legacy" },
+	{ LXCS_CPUIDX1_ECX, CPUID_AMD_ECX_SVM,		"svm" },
+	{ LXCS_CPUIDX1_ECX, CPUID_AMD_ECX_EAS,		"extapic" },
+	{ LXCS_CPUIDX1_ECX, CPUID_AMD_ECX_CR8D,		"cr8_legacy" },
+	{ LXCS_CPUIDX1_ECX, CPUID_AMD_ECX_LZCNT,	"abm" },
+	{ LXCS_CPUIDX1_ECX, CPUID_AMD_ECX_SSE4A,	"sse4a" },
+	{ LXCS_CPUIDX1_ECX, CPUID_AMD_ECX_MAS,		"misalignsse" },
+	{ LXCS_CPUIDX1_ECX, CPUID_AMD_ECX_3DNP,		"3dnowprefetch" },
+	{ LXCS_CPUIDX1_ECX, CPUID_AMD_ECX_OSVW,		"osvw" },
+	{ LXCS_CPUIDX1_ECX, CPUID_AMD_ECX_IBS,		"ibs" },
+	{ LXCS_CPUIDX1_ECX, CPUID_AMD_ECX_SSE5,		"xop" },
+	{ LXCS_CPUIDX1_ECX, CPUID_AMD_ECX_SKINIT,	"skinit" },
+	{ LXCS_CPUIDX1_ECX, CPUID_AMD_ECX_WDT,		"wdt" },
+	{ LXCS_CPUIDX1_ECX, CPUID_AMD_ECX_LWP,		"lwp" },
+	{ LXCS_CPUIDX1_ECX, CPUID_AMD_ECX_FMA4,		"fma4" },
+	{ LXCS_CPUIDX1_ECX, 0x00020000,			"tce" },
+
+	{ LXCS_CPUIDX1_ECX, CPUID_AMD_ECX_NIDMSR,	"nodeid_msr" },
+
+	{ LXCS_CPUIDX1_ECX, CPUID_AMD_ECX_TBM,		"tbm" },
+	{ LXCS_CPUIDX1_ECX, CPUID_AMD_ECX_TOPOEXT,	"topoext" },
+	{ LXCS_CPUIDX1_ECX, 0x00800000,			"perfctr_core" },
+	{ LXCS_CPUIDX1_ECX, 0x01000000,			"perfctr_nb" },
+	{ LXCS_CPUIDX1_ECX, 0x02000000,			"bpext" },
+	{ LXCS_CPUIDX1_ECX, 0x04000000,			"perfctr_l2" },
+	{ LXCS_CPUIDX1_ECX, 0x08000000,			"mwaitx" },
+
+	/*
+	 * Aux flags and virt bits.
+	 * Skipped:
+	 * "cpb",
+	 * "epb",
+	 * "hw_pstate",
+	 * "proc_feedback",
+	 * "intel_pt",
+	 * "tpr_shadow",
+	 * "vnmi",
+	 * "flexpriority",
+	 * "ept",
+	 * "vpid",
+	 * "vmmcall",
+	 */
+
+	/*
+	 * Intel-defined CPU features, CPUID level 0x00000007:0 (ebx), word 9
+	 */
+	{ LXCS_CPUID7_EBX, 0x00000001,			"fsgsbase" },
+	{ LXCS_CPUID7_EBX, 0x00000002,			"tsc_adjust" },
+	{ LXCS_CPUID7_EBX, CPUID_INTC_EBX_7_0_BMI1,	"bmi1" },
+	{ LXCS_CPUID7_EBX, 0x00000010,			"hle" },
+	{ LXCS_CPUID7_EBX, CPUID_INTC_EBX_7_0_AVX2,	"avx2" },
+	{ LXCS_CPUID7_EBX, CPUID_INTC_EBX_7_0_SMEP,	"smep" },
+	{ LXCS_CPUID7_EBX, CPUID_INTC_EBX_7_0_BMI2,	"bmi2" },
+	{ LXCS_CPUID7_EBX, 0x00000200,			"erms" },
+	{ LXCS_CPUID7_EBX, 0x00000400,			"invpcid" },
+	{ LXCS_CPUID7_EBX, 0x00000800,			"rtm" },
+	{ LXCS_CPUID7_EBX, 0x00000000,			"cqm" },
+	{ LXCS_CPUID7_EBX, 0x00004000,			"mpx" },
+	{ LXCS_CPUID7_EBX, 0x00010000,			"avx512f" },
+
+	{ LXCS_CPUID7_EBX, CPUID_INTC_EBX_7_0_RDSEED,	"rdseed" },
+	{ LXCS_CPUID7_EBX, CPUID_INTC_EBX_7_0_ADX,	"adx" },
+	{ LXCS_CPUID7_EBX, CPUID_INTC_EBX_7_0_SMAP,	"smap" },
+
+	{ LXCS_CPUID7_EBX, 0x00400000,			"pcommit" },
+	{ LXCS_CPUID7_EBX, 0x00800000,			"clflushopt" },
+	{ LXCS_CPUID7_EBX, 0x01000000,			"clwb" },
+
+	{ LXCS_CPUID7_EBX, 0x04000000,			"avx512pf" },
+	{ LXCS_CPUID7_EBX, 0x08000000,			"avx512er" },
+	{ LXCS_CPUID7_EBX, 0x10000000,			"avx512cd" },
+	{ LXCS_CPUID7_EBX, 0x20000000,			"sha_ni" },
+
+	/*
+	 * Extended state features, CPUID level 0x0000000d:1 (eax)
+	 */
+	{ LXCS_CPUIDD1_EAX, 0x00000001,			"xsaveopt" },
+	{ LXCS_CPUIDD1_EAX, 0x00000002,			"xsavec" },
+	{ LXCS_CPUIDD1_EAX, 0x00000004,			"xgetbv1" },
+	{ LXCS_CPUIDD1_EAX, 0x00000008,			"xsaves" },
+
+	/*
+	 * Skipped:
+	 * "cqm_llc",
+	 * "cqm_occup_llc",
+	 * "clzero",
+	 */
+
+	/*
+	 * Thermal and Power Management Leaf, CPUID level 0x00000006 (eax)
+	 * Skipped:
+	 * "dtherm",
+	 * "ida",
+	 * "arat",
+	 * "pln",
+	 * "pts",
+	 * "hwp",
+	 * "hwp_notify",
+	 * "hwp_act_window",
+	 * "hwp_epp",
+	 * "hwp_pkg_req",
+	 */
+
+	/*
+	 * AMD SVM Feature Identification, CPUID level 0x8000000a (edx)
+	 * Skipped:
+	 * "npt",
+	 * "lbrv",
+	 * "svm_lock",
+	 * "nrip_save",
+	 * "tsc_scale",
+	 * "vmcb_clean",
+	 * "flushbyasid",
+	 * "decodeassists",
+	 * "pausefilter",
+	 * "pfthreshold",
+	 */
+};
+
+#define	LX_CPUINFO_MAPPING_MAX	\
+	(sizeof (lx_cpuinfo_mappings) / sizeof (lx_cpuinfo_mappings[0]))
+
 /* ARGSUSED */
 static void
 lxpr_read_cpuinfo(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
 	int i;
-	uint32_t bits;
 	cpu_t *cp, *cpstart;
 	int pools_enabled;
-	const char **fp;
 	char brandstr[CPU_IDSTRLEN];
-	struct cpuid_regs cpr;
-	int maxeax;
-	int std_ecx, std_edx, ext_ecx, ext_edx;
 
 	ASSERT(lxpnp->lxpr_type == LXPR_CPUINFO);
 
@@ -5064,29 +5276,38 @@ lxpr_read_cpuinfo(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 
 	cp = cpstart = CPU->cpu_part->cp_cpulist;
 	do {
-		/*
-		 * This returns the maximum eax value for standard cpuid
-		 * functions in eax.
-		 */
+		struct cpuid_regs cpr;
+		uint32_t maxeax, xmaxeax, cpuid_res[LXCS_REG_MAX] = { 0 };
+
 		cpr.cp_eax = 0;
-		(void) cpuid_insn(cp, &cpr);
-		maxeax = cpr.cp_eax;
+		maxeax = cpuid_insn(cp, &cpr);
+		cpr.cp_eax = 0x80000000;
+		xmaxeax = cpuid_insn(cp, &cpr);
 
-		/*
-		 * Get standard x86 feature flags.
-		 */
-		cpr.cp_eax = 1;
-		(void) cpuid_insn(cp, &cpr);
-		std_ecx = cpr.cp_ecx;
-		std_edx = cpr.cp_edx;
-
-		/*
-		 * Now get extended feature flags.
-		 */
-		cpr.cp_eax = 0x80000001;
-		(void) cpuid_insn(cp, &cpr);
-		ext_ecx = cpr.cp_ecx;
-		ext_edx = cpr.cp_edx;
+		cpuid_res[LXCS_ALWAYS] = 1;
+		if (maxeax >= 1) {
+			cpr.cp_eax = 1;
+			(void) cpuid_insn(cp, &cpr);
+			cpuid_res[LXCS_CPUID1_ECX] = cpr.cp_ecx;
+			cpuid_res[LXCS_CPUID1_EDX] = cpr.cp_edx;
+		}
+		if (maxeax >= 7) {
+			cpr.cp_eax = 7;
+			(void) cpuid_insn(cp, &cpr);
+			cpuid_res[LXCS_CPUID7_EBX] = cpr.cp_ebx;
+		}
+		if (maxeax >= 0xd) {
+			cpr.cp_eax = 0xd;
+			cpr.cp_ecx = 1;
+			(void) cpuid_insn(cp, &cpr);
+			cpuid_res[LXCS_CPUIDD1_EAX] = cpr.cp_eax;
+		}
+		if (xmaxeax >= 0x80000001) {
+			cpr.cp_eax = 0x80000001;
+			(void) cpuid_insn(cp, &cpr);
+			cpuid_res[LXCS_CPUIDX1_ECX] = cpr.cp_ecx;
+			cpuid_res[LXCS_CPUIDX1_EDX] = cpr.cp_edx;
+		}
 
 		(void) cpuid_getbrandstr(cp, brandstr, CPU_IDSTRLEN);
 
@@ -5146,52 +5367,16 @@ lxpr_read_cpuinfo(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 		    fpu_exists ? "yes" : "no", fpu_exists ? "yes" : "no",
 		    maxeax);
 
-		for (bits = std_edx, fp = intc_edx, i = 0;
-		    i < sizeof (intc_edx) / sizeof (intc_edx[0]); fp++, i++)
-			if ((bits & (1 << i)) != 0 && *fp)
-				lxpr_uiobuf_printf(uiobuf, " %s", *fp);
+		/* Print CPUID feature flags */
+		for (i = 0; i < LX_CPUINFO_MAPPING_MAX; i++) {
+			lx_cpuinfo_mapping_t *lxm = &lx_cpuinfo_mappings[i];
 
-		/*
-		 * name additional features where appropriate
-		 */
-		switch (x86_vendor) {
-		case X86_VENDOR_Intel:
-			for (bits = ext_edx, fp = intc_x_edx, i = 0;
-			    i < sizeof (intc_x_edx) / sizeof (intc_x_edx[0]);
-			    fp++, i++)
-				if ((bits & (1 << i)) != 0 && *fp)
-					lxpr_uiobuf_printf(uiobuf, " %s", *fp);
-			break;
-
-		case X86_VENDOR_AMD:
-			for (bits = ext_edx, fp = amd_x_edx, i = 0;
-			    i < sizeof (amd_x_edx) / sizeof (amd_x_edx[0]);
-			    fp++, i++)
-				if ((bits & (1 << i)) != 0 && *fp)
-					lxpr_uiobuf_printf(uiobuf, " %s", *fp);
-
-			for (bits = ext_ecx, fp = amd_x_ecx, i = 0;
-			    i < sizeof (amd_x_ecx) / sizeof (amd_x_ecx[0]);
-			    fp++, i++)
-				if ((bits & (1 << i)) != 0 && *fp)
-					lxpr_uiobuf_printf(uiobuf, " %s", *fp);
-			break;
-
-		case X86_VENDOR_TM:
-			for (bits = ext_edx, fp = tm_x_edx, i = 0;
-			    i < sizeof (tm_x_edx) / sizeof (tm_x_edx[0]);
-			    fp++, i++)
-				if ((bits & (1 << i)) != 0 && *fp)
-					lxpr_uiobuf_printf(uiobuf, " %s", *fp);
-			break;
-		default:
-			break;
+			ASSERT(lxm->lxcm_source < LXCS_REG_MAX);
+			if (cpuid_res[lxm->lxcm_source] & lxm->lxcm_flag) {
+				lxpr_uiobuf_printf(uiobuf, " %s",
+				    lxm->lxcm_name);
+			}
 		}
-
-		for (bits = std_ecx, fp = intc_ecx, i = 0;
-		    i < sizeof (intc_ecx) / sizeof (intc_ecx[0]); fp++, i++)
-			if ((bits & (1 << i)) != 0 && *fp)
-				lxpr_uiobuf_printf(uiobuf, " %s", *fp);
 
 		lxpr_uiobuf_printf(uiobuf, "\n\n");
 
