@@ -125,7 +125,6 @@ segumap_create(struct seg *seg, void *argsp)
 	rw_init(&data->sud_lock, NULL, RW_DEFAULT, NULL);
 	data->sud_kaddr = a->kaddr;
 	data->sud_prot = a->prot;
-	data->sud_loaded = B_FALSE;
 
 	seg->s_ops = &segumap_ops;
 	seg->s_data = data;
@@ -168,7 +167,6 @@ segumap_dup(struct seg *seg, struct seg *newseg)
 	rw_init(&newsud->sud_lock, NULL, RW_DEFAULT, NULL);
 	newsud->sud_kaddr = sud->sud_kaddr;
 	newsud->sud_prot = sud->sud_prot;
-	newsud->sud_loaded = B_FALSE;
 
 	newseg->s_ops = seg->s_ops;
 	newseg->s_data = newsud;
@@ -190,13 +188,10 @@ segumap_unmap(struct seg *seg, caddr_t addr, size_t len)
 		return (EAGAIN);
 	}
 
-	hat_unload(seg->s_as->a_hat, addr, len, HAT_UNLOAD_UNMAP);
 	/*
-	 * While setting this field before immediately freeing the segment is
-	 * not necessary, it is done for the sake of completeness.  Doing so
-	 * outside sud_lock is safe with the AS write-locked.
+	 * Unconditionally unload the entire segment range.
 	 */
-	sud->sud_loaded = B_FALSE;
+	hat_unload(seg->s_as->a_hat, addr, len, HAT_UNLOAD_UNMAP);
 
 	seg_free(seg);
 	return (0);
@@ -210,7 +205,6 @@ segumap_free(struct seg *seg)
 	ASSERT(data != NULL);
 
 	rw_destroy(&data->sud_lock);
-	VERIFY(data->sud_loaded == B_FALSE);
 	VERIFY(data->sud_softlockcnt == 0);
 	kmem_free(data, sizeof (*data));
 	seg->s_data = NULL;
@@ -244,15 +238,14 @@ segumap_fault(struct hat *hat, struct seg *seg, caddr_t addr, size_t len,
 	ASSERT(type == F_INVAL || type == F_SOFTLOCK);
 	rw_enter(&sud->sud_lock, RW_WRITER);
 
-	if (type == F_INVAL && sud->sud_loaded) {
-		rw_exit(&sud->sud_lock);
-		return (FC_NOMAP);
-	}
-
-	/*
-	 * Load the (entire) segment into the HAT if it has not been done so.
-	 */
-	if (!sud->sud_loaded) {
+	if (type == F_INVAL) {
+		/*
+		 * Load the (entire) segment into the HAT.
+		 *
+		 * It's possible that threads racing into as_fault will cause
+		 * seg_umap to load the same range multiple times in quick
+		 * succession.  This is safely handled by hat_devload.
+		 */
 		for (uintptr_t i = 0; i < seg->s_size; i += PAGESIZE) {
 			pfn_t pfn;
 
@@ -261,15 +254,7 @@ segumap_fault(struct hat *hat, struct seg *seg, caddr_t addr, size_t len,
 			hat_devload(seg->s_as->a_hat, seg->s_base + i,
 			    PAGESIZE, pfn, sud->sud_prot, HAT_LOAD);
 		}
-		sud->sud_loaded = B_TRUE;
-	} else {
-		/*
-		 * If there the segment has already been loaded, there is no
-		 * reason to take an F_INVALID fault.
-		 */
-		VERIFY(type != F_INVAL);
 	}
-
 	if (type == F_SOFTLOCK) {
 		size_t nval = sud->sud_softlockcnt + btop(len);
 
@@ -279,6 +264,7 @@ segumap_fault(struct hat *hat, struct seg *seg, caddr_t addr, size_t len,
 		}
 		sud->sud_softlockcnt = nval;
 	}
+
 	rw_exit(&sud->sud_lock);
 	return (0);
 }

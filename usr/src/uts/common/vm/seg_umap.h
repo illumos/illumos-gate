@@ -31,7 +31,6 @@ typedef struct segumap_data {
 	caddr_t		sud_kaddr;
 	uchar_t		sud_prot;
 	size_t		sud_softlockcnt;
-	boolean_t	sud_loaded;
 } segumap_data_t;
 
 extern int segumap_create(struct seg *, void *);
