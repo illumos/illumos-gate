@@ -1,0 +1,80 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2016, Joyent, Inc.
+#
+
+I) Introduction
+
+The procedure to run the illumos tests under SmartOS is unlike that for
+other distributions because of the zone-centric nature of the distribution,
+and because there is no built-in package management for the global zone.
+
+This Readme assumes you will run the tests in the global zone, as root.
+Although it is possible to run some of the tests within a non-global zone, as a
+user configured within that zone, that approach is not described here.
+
+Some test suites, such as the ZFS tests, assume there are available disks to
+use for the test run. This configuration is not currently available on a
+standard SmartOS installation, where all of the disks are already setup in the
+"zones" zpool, so these tests are not runnable at this time. The ZFS tests
+also are required to run as a non-root user, and that is non-standard for a
+SmartOS global zone, where any user created is lost on reboot.
+
+II) Setup to Run the Tests
+
+1) The tests currently require python26 to run, so you need to install this in
+   the global zone. The easiest way to do this is with pkgsrc using the
+   following procedure:
+
+   a) Get a copy of the following bootstrap tarball onto the test machine:
+      https://pkgsrc.joyent.com/packages/SmartOS/bootstrap/bootstrap-2014Q4-multiarch.tar.gz
+
+   b) Install the bootstrap tarball:
+      # gzcat bootstrap-2014Q4-multiarch.tar.gz | (cd /; tar -xpf -)
+
+   c) Install python26:
+      pkgin in python26
+
+2) You need to get the tests from your build machine onto the test machine's
+   global zone. This can be done in whatever way is easiest for you. Here is
+   one simple way:
+
+   a) On your build machine, in your fully built smartos-live proto area,
+      create a tarball of the test directory:
+      % cd proto/opt
+      % tar czf ../opt.tgz *
+
+
+   b) Copy the tarball from the build machine to the test machine running
+      SmartOS (the next step assumes you placed the tarball into the /zones
+      directory).
+
+3) In the global zone on your test machine, install the tests.
+
+   # cd /opt
+   # tar xf /zones/opt.tgz
+
+III) Run the Tests
+
+Now that setup is complete, you can run the tests using the normal procedure.
+For example:
+
+    # /opt/util-tests/bin/utiltest
+or
+    # /opt/os-tests/bin/ostest
+
+IV) Running New Tests
+
+During development, if you are creating or updating new tests, you can repeat
+steps 2 and 3 as often as necessary to make the new tests available on the test
+machine.
