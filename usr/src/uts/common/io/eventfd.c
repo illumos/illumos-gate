@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright (c) 2015 Joyent, Inc.  All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*
@@ -37,6 +37,7 @@ struct eventfd_state {
 	kcondvar_t efd_cv;			/* condvar */
 	pollhead_t efd_pollhd;			/* poll head */
 	uint64_t efd_value;			/* value */
+	size_t efd_bwriters;			/* count of blocked writers */
 	eventfd_state_t *efd_next;		/* next state on global list */
 };
 
@@ -126,10 +127,21 @@ eventfd_read(dev_t dev, uio_t *uio, cred_t *cr)
 
 	err = uiomove(&val, sizeof (val), UIO_READ, uio);
 
+	/*
+	 * Wake any writers blocked on this eventfd as this read operation may
+	 * have created adequate capacity for their values.
+	 */
+	if (state->efd_bwriters != 0) {
+		cv_broadcast(&state->efd_cv);
+	}
 	mutex_exit(&state->efd_lock);
 
+	/*
+	 * It is necessary to emit POLLOUT events only when the eventfd
+	 * transitions from EVENTFD_VALMAX to a lower value.  At all other
+	 * times, it is already considered writable by poll.
+	 */
 	if (oval == EVENTFD_VALMAX) {
-		cv_broadcast(&state->efd_cv);
 		pollwakeup(&state->efd_pollhd, POLLWRNORM | POLLOUT);
 	}
 
@@ -164,10 +176,13 @@ eventfd_write(dev_t dev, struct uio *uio, cred_t *credp)
 			return (EAGAIN);
 		}
 
+		state->efd_bwriters++;
 		if (!cv_wait_sig_swap(&state->efd_cv, &state->efd_lock)) {
+			state->efd_bwriters--;
 			mutex_exit(&state->efd_lock);
 			return (EINTR);
 		}
+		state->efd_bwriters--;
 	}
 
 	/*
@@ -175,10 +190,19 @@ eventfd_write(dev_t dev, struct uio *uio, cred_t *credp)
 	 */
 	state->efd_value = (oval = state->efd_value) + val;
 
-	mutex_exit(&state->efd_lock);
-
+	/*
+	 * If the value was previously "empty", notify blocked readers that
+	 * data is available.
+	 */
 	if (oval == 0) {
 		cv_broadcast(&state->efd_cv);
+	}
+	mutex_exit(&state->efd_lock);
+
+	/*
+	 * Notify pollers as well if the eventfd is now readable.
+	 */
+	if (oval == 0) {
 		pollwakeup(&state->efd_pollhd, POLLRDNORM | POLLIN);
 	}
 
