@@ -756,8 +756,7 @@ tems_reset_colormap(cred_t *credp, enum called_from called_from)
 }
 
 void
-tem_get_size(ushort_t *r, ushort_t *c,
-	ushort_t *x, ushort_t *y)
+tem_get_size(ushort_t *r, ushort_t *c, ushort_t *x, ushort_t *y)
 {
 	mutex_enter(&tems.ts_lock);
 	*r = (ushort_t)tems.ts_c_dimension.height;
@@ -768,8 +767,7 @@ tem_get_size(ushort_t *r, ushort_t *c,
 }
 
 void
-tem_register_modechg_cb(tem_modechg_cb_t func,
-	tem_modechg_cb_arg_t arg)
+tem_register_modechg_cb(tem_modechg_cb_t func, tem_modechg_cb_arg_t arg)
 {
 	mutex_enter(&tems.ts_lock);
 
@@ -920,8 +918,24 @@ tems_get_initial_color(tem_color_t *pcolor)
 			flags |= TEM_ATTR_REVERSE;
 		if (inverse_screen)
 			flags |= TEM_ATTR_SCREEN_REVERSE;
-		if (flags != 0)
+
+		if (flags != 0) {
+			/*
+			 * If either reverse flag is set, the screen is in
+			 * white-on-black mode.  We set the bold flag to
+			 * improve readability.
+			 */
 			flags |= TEM_ATTR_BOLD;
+		} else {
+			/*
+			 * Otherwise, the screen is in black-on-white mode.
+			 * The SPARC PROM console, which starts in this mode,
+			 * uses the bright white background colour so we
+			 * match it here.
+			 */
+			if (pcolor->bg_color == ANSI_COLOR_WHITE)
+				flags |= TEM_ATTR_BRIGHT_BG;
+		}
 	}
 
 	pcolor->a_flags = flags;
