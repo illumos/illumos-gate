@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -43,6 +43,7 @@
 #include <sys/fs/tmpnode.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
+#include <vm/anon.h>
 
 #define	KILOBYTE	1024
 #define	MEGABYTE	(1024 * KILOBYTE)
@@ -53,6 +54,48 @@
 #define	VALIDMODEBITS	07777
 
 extern pgcnt_t swapfs_minfree;
+
+void *
+tmp_kmem_zalloc(struct tmount *tm, size_t size, int flag)
+{
+	void *buf;
+	zone_t *zone;
+
+	zone = tm->tm_vfsp->vfs_zone;
+	mutex_enter(&tm->tm_contents);
+	if (tm->tm_anonmem + size > tm->tm_anonmax ||
+	    tm->tm_anonmem + size < tm->tm_anonmem ||
+	    size + ptob(tmpfs_minfree) <= size ||
+	    !anon_checkspace(size + ptob(tmpfs_minfree), zone) ||
+	    anon_try_resv_zone(size, zone) == 0) {
+		mutex_exit(&tm->tm_contents);
+		return (NULL);
+	}
+	tm->tm_anonmem += size;
+	mutex_exit(&tm->tm_contents);
+
+	buf = kmem_zalloc(size, flag);
+	if (buf == NULL) {
+		mutex_enter(&tm->tm_contents);
+		ASSERT(tm->tm_anonmem > tm->tm_anonmem - size);
+		tm->tm_anonmem -= size;
+		mutex_exit(&tm->tm_contents);
+		anon_unresv_zone(size, tm->tm_vfsp->vfs_zone);
+	}
+
+	return (buf);
+}
+
+void
+tmp_kmem_free(struct tmount *tm, void *buf, size_t size)
+{
+	kmem_free(buf, size);
+	mutex_enter(&tm->tm_contents);
+	ASSERT(tm->tm_anonmem > tm->tm_anonmem - size);
+	tm->tm_anonmem -= size;
+	mutex_exit(&tm->tm_contents);
+	anon_unresv_zone(size, tm->tm_vfsp->vfs_zone);
+}
 
 int
 tmp_taccess(void *vtp, int mode, struct cred *cred)
@@ -99,8 +142,8 @@ tmp_sticky_remove_access(struct tmpnode *dir, struct tmpnode *entry,
 }
 
 /*
- * Convert a string containing a number (number of bytes) to a pgcnt_t,
- * containing the corresponding number of pages. On 32-bit kernels, the
+ * Convert a string containing a number (number of bytes) to a size_t,
+ * containing the corresponding number of bytes. On 32-bit kernels, the
  * maximum value encoded in 'str' is PAGESIZE * ULONG_MAX, while the value
  * returned in 'maxpg' is at most ULONG_MAX.
  *
@@ -118,14 +161,12 @@ tmp_sticky_remove_access(struct tmpnode *dir, struct tmpnode *entry,
  * error.
  */
 int
-tmp_convnum(char *str, pgcnt_t *maxpg)
+tmp_convnum(char *str, size_t *maxbytes)
 {
 	u_longlong_t num = 0;
-#ifdef _LP64
-	u_longlong_t max_bytes = ULONG_MAX;
-#else
-	u_longlong_t max_bytes = PAGESIZE * (uint64_t)ULONG_MAX;
-#endif
+	u_longlong_t max_bytes = (uint64_t)SIZE_MAX;
+	size_t pages;
+
 	char *c;
 	const struct convchar {
 		char *cc_char;
@@ -215,14 +256,23 @@ valid_char:
 	}
 
 done:
+
 	/*
-	 * Since btopr() rounds up to page granularity, this round-up can
-	 * cause an overflow only if 'num' is between (max_bytes - PAGESIZE)
-	 * and (max_bytes). In this case the resulting number is zero, which
-	 * is what we check for below.
+	 * We've been given a size in bytes; however, we want to make sure that
+	 * we have at least one page worth no matter what. Therefore we use
+	 * btopr to round up. However, this may cause an overflow only if 'num'
+	 * is between (max_bytes - PAGESIZE) and (max_bytes). In this case the
+	 * resulting number is zero, which is what we check for below. Note, we
+	 * require at least one page, so if pages is zero, well, it wasn't going
+	 * to work anyways.
 	 */
-	if ((*maxpg = (pgcnt_t)btopr(num)) == 0 && num != 0)
+	pages = btopr(num);
+	if (pages == 0) {
 		return (EINVAL);
+	}
+
+	*maxbytes = ptob(pages);
+
 	return (0);
 }
 

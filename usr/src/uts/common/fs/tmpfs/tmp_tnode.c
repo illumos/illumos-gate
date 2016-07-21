@@ -21,6 +21,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -64,21 +65,35 @@ tmp_resv(
 	int pagecreate)		/* call anon_resv if set */
 {
 	pgcnt_t pages = btopr(delta);
+	size_t pbytes = ptob(pages);
 	zone_t *zone;
 
 	ASSERT(RW_WRITE_HELD(&tp->tn_rwlock));
 	ASSERT(tp->tn_type == VREG);
+
 	/*
-	 * pagecreate is set only if we actually need to call anon_resv
-	 * to reserve an additional page of anonymous memory.
-	 * Since anon_resv always reserves a page at a time,
-	 * it should only get called when we know we're growing the
-	 * file into a new page or filling a hole.
+	 * pagecreate is set only if we actually need to call anon_resv to
+	 * reserve an additional page of anonymous memory.  Since anon_resv
+	 * always reserves a page at a time, it should only get called when we
+	 * know we're growing the file into a new page or filling a hole. This
+	 * is why we transform delta into a number of pages. However, because we
+	 * track bytes and not pages, we convert that back to a number of bytes
+	 * that we allocate against.
 	 *
-	 * Deny if trying to reserve more than tmpfs can allocate
+	 * Deny if trying to reserve more than tmpfs can allocate, the
+	 * allocation causes an overflow, or the delta round up overflowed.
+	 * Note, that btopr rounds up, so we need to catch the unsigned
+	 * overflow. Note, rounding up when we are within a page of SIZE_MAX is
+	 * done by adding a page, overflowing, which will then be rounded back
+	 * to zero. Hence the following check.
 	 */
+	if (pages == 0 && delta != 0)
+		return (1);
+
 	zone = tm->tm_vfsp->vfs_zone;
-	if (pagecreate && ((tm->tm_anonmem + pages > tm->tm_anonmax) ||
+	if (pagecreate && ((tm->tm_anonmem + pbytes > tm->tm_anonmax) ||
+	    (tm->tm_anonmem + pbytes < tm->tm_anonmem) ||
+	    (ptob(pages + tmpfs_minfree) <= pbytes) ||
 	    (!anon_checkspace(ptob(pages + tmpfs_minfree), zone)) ||
 	    (anon_try_resv_zone(delta, zone) == 0))) {
 		return (1);
@@ -89,7 +104,7 @@ tmp_resv(
 	 */
 	if (pagecreate) {
 		mutex_enter(&tm->tm_contents);
-		tm->tm_anonmem += pages;
+		tm->tm_anonmem += pbytes;
 		mutex_exit(&tm->tm_contents);
 
 		TRACE_2(TR_FAC_VM, TR_ANON_TMPFS, "anon tmpfs:%p %lu",
@@ -110,13 +125,27 @@ tmp_unresv(
 	struct tmpnode *tp,
 	size_t delta)
 {
+	size_t pages, pbytes;
+
 	ASSERT(RW_WRITE_HELD(&tp->tn_rwlock));
 	ASSERT(tp->tn_type == VREG);
+
+	/*
+	 * If this is true, we have a grevious overflow bug and some size
+	 * accounting has been messed with as having an amount to truncate at
+	 * this size would imply that all of memory was used for this file. No
+	 * matter how small the kernel, it will always need at least one page.
+	 */
+	pages = btopr(delta);
+	if (pages == 0 && delta != 0)
+		panic("tmpfs unsigned overflow detected");
+	pbytes = ptob(pages);
 
 	anon_unresv_zone(delta, tm->tm_vfsp->vfs_zone);
 
 	mutex_enter(&tm->tm_contents);
-	tm->tm_anonmem -= btopr(delta);
+	ASSERT(tm->tm_anonmem > tm->tm_anonmem - pbytes);
+	tm->tm_anonmem -= pbytes;
 	mutex_exit(&tm->tm_contents);
 
 	TRACE_2(TR_FAC_VM, TR_ANON_TMPFS, "anon tmpfs:%p %lu", tp, delta);
@@ -151,6 +180,26 @@ tmpnode_growmap(struct tmpnode *tp, ulong_t newsize)
 	tp->tn_asize = anon_grow(tp->tn_anon, NULL, tp->tn_asize,
 	    np - tp->tn_asize, ANON_SLEEP);
 	ASSERT(tp->tn_asize >= np);
+}
+
+/*
+ * This is used to clean up a tmpnode that hasn't made it out the door. In other
+ * words, we allocated it and did a tmpnode_init; however, before it could get
+ * fully inserted into a directory, bad things happened and it failed.
+ */
+void
+tmpnode_cleanup(struct tmpnode *tp)
+{
+	rw_enter(&tp->tn_rwlock, RW_WRITER);
+	if ((tp->tn_type) == VDIR) {
+		tdirtrunc(tp);
+	}
+	mutex_enter(&tp->tn_tlock);
+	tp->tn_nlink = 0;
+	mutex_exit(&tp->tn_tlock);
+	gethrestime(&tp->tn_ctime);
+	rw_exit(&tp->tn_rwlock);
+	tmpnode_rele(tp);
 }
 
 /*

@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -237,7 +237,7 @@ tmp_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 	struct tmpnode *tp;
 	struct pathname dpn;
 	int error;
-	pgcnt_t anonmax;
+	size_t anonmax;
 	struct vattr rattr;
 	int got_attrs;
 	boolean_t mode_arg = B_FALSE;
@@ -281,7 +281,7 @@ tmp_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 		if ((error = tmp_convnum(argstr, &anonmax)) != 0)
 			goto out;
 	} else {
-		anonmax = ULONG_MAX;
+		anonmax = SIZE_MAX;
 	}
 
 	/*
@@ -357,7 +357,17 @@ tmp_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 	rattr.va_mode = (mode_t)(S_IFDIR | root_mode);
 	rattr.va_type = VDIR;
 	rattr.va_rdev = 0;
-	tp = kmem_zalloc(sizeof (struct tmpnode), KM_SLEEP);
+	tp = tmp_kmem_zalloc(tm, sizeof (struct tmpnode), KM_SLEEP);
+	if (tp == NULL) {
+		kmem_free(tm->tm_mntpath, strlen(tm->tm_mntpath) + 1);
+		mutex_destroy(&tm->tm_contents);
+		mutex_destroy(&tm->tm_renamelck);
+		kmem_free(tm, sizeof (struct tmount));
+
+		pn_free(&dpn);
+		error = ENOMEM;
+		goto out;
+	}
 	tmpnode_init(tm, tp, &rattr, cr);
 
 	/*
@@ -396,7 +406,28 @@ tmp_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 	tp->tn_nlink = 0;
 	tm->tm_rootnode = tp;
 
-	tdirinit(tp, tp);
+	if (tdirinit(tp, tp) != 0) {
+		/*
+		 * While we would normally let our VOP_INACTIVE function take
+		 * care of cleaning up here, we're in a bit of a delicate
+		 * situation, so we do so manually. While it's tempting to try
+		 * and rely upon tmpfs_freevfs() and others, it's probably safer
+		 * for the time to do this manually at the cost of duplication.
+		 */
+		vn_invalid(TNTOV(tp));
+		rw_destroy(&tp->tn_rwlock);
+		mutex_destroy(&tp->tn_tlock);
+		vn_free(TNTOV(tp));
+		tmp_kmem_free(tm, tp, sizeof (struct tmpnode));
+
+		kmem_free(tm->tm_mntpath, strlen(tm->tm_mntpath) + 1);
+		mutex_destroy(&tm->tm_contents);
+		mutex_destroy(&tm->tm_renamelck);
+		kmem_free(tm, sizeof (struct tmount));
+		pn_free(&dpn);
+		error = ENOMEM;
+		goto out;
+	}
 
 	rw_exit(&tp->tn_rwlock);
 

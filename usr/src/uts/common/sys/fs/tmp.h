@@ -23,7 +23,7 @@
  * All rights reserved.  Use is subject to license terms.
  */
 /*
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #ifndef	_SYS_FS_TMP_H
@@ -43,8 +43,9 @@ struct tmount {
 	struct vfs	*tm_vfsp;	/* filesystem's vfs struct */
 	struct tmpnode	*tm_rootnode;	/* root tmpnode */
 	char 		*tm_mntpath;	/* name of tmpfs mount point */
-	ulong_t		tm_anonmax;	/* file system max anon reservation */
-	pgcnt_t		tm_anonmem;	/* pages of reserved anon memory */
+	size_t		tm_anonmax;	/* file system max anon reservation */
+	size_t		tm_anonmem;	/* bytes of reserved anon memory */
+					/* and allocated kmem for the fs */
 	dev_t		tm_dev;		/* unique dev # of mounted `device' */
 	uint_t		tm_gen;		/* pseudo generation number for files */
 	kmutex_t	tm_contents;	/* lock for tmount structure */
@@ -58,6 +59,7 @@ struct tmount {
 #define	VTOTM(vp)		((struct tmount *)(vp)->v_vfsp->vfs_data)
 #define	VTOTN(vp)		((struct tmpnode *)(vp)->v_data)
 #define	TNTOV(tp)		((tp)->tn_vnode)
+#define	TNTOTM(tp)		(VTOTM(TNTOV(tp)))
 #define	tmpnode_hold(tp)	VN_HOLD(TNTOV(tp))
 #define	tmpnode_rele(tp)	VN_RELE(TNTOV(tp))
 
@@ -93,23 +95,27 @@ extern size_t	tmpfs_minfree;		/* Anonymous memory in pages */
 
 extern	void	tmpnode_init(struct tmount *, struct tmpnode *,
 	struct vattr *, struct cred *);
+extern	void	tmpnode_cleanup(struct tmpnode *tp);
 extern	int	tmpnode_trunc(struct tmount *, struct tmpnode *, ulong_t);
 extern	void	tmpnode_growmap(struct tmpnode *, ulong_t);
 extern	int	tdirlookup(struct tmpnode *, char *, struct tmpnode **,
     struct cred *);
 extern	int	tdirdelete(struct tmpnode *, struct tmpnode *, char *,
 	enum dr_op, struct cred *);
-extern	void	tdirinit(struct tmpnode *, struct tmpnode *);
+extern	int	tdirinit(struct tmpnode *, struct tmpnode *);
 extern	void	tdirtrunc(struct tmpnode *);
 extern	int	tmp_resv(struct tmount *, struct tmpnode *, size_t, int);
 extern	int	tmp_taccess(void *, int, struct cred *);
 extern	int	tmp_sticky_remove_access(struct tmpnode *, struct tmpnode *,
 	struct cred *);
-extern	int	tmp_convnum(char *, pgcnt_t *);
+extern	int	tmp_convnum(char *, size_t *);
 extern	int	tmp_convmode(char *, mode_t *);
 extern	int	tdirenter(struct tmount *, struct tmpnode *, char *,
 	enum de_op, struct tmpnode *, struct tmpnode *, struct vattr *,
 	struct tmpnode **, struct cred *, caller_context_t *);
+
+extern void	*tmp_kmem_zalloc(struct tmount *, size_t, int);
+extern void	tmp_kmem_free(struct tmount *, void *, size_t);
 
 #define	TMP_MUSTHAVE	0x01
 

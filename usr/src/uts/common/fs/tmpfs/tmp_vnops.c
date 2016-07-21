@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright 2016, Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2016 RackTop Systems.
  */
@@ -868,6 +868,8 @@ tmp_lookup(
 
 		rw_enter(&tp->tn_rwlock, RW_WRITER);
 		if (tp->tn_xattrdp == NULL) {
+			int err;
+
 			if (!(flags & CREATE_XATTR_DIR)) {
 				rw_exit(&tp->tn_rwlock);
 				return (ENOENT);
@@ -888,8 +890,13 @@ tmp_lookup(
 				return (error);
 			}
 
-			xdp = kmem_zalloc(sizeof (struct tmpnode), KM_SLEEP);
 			tm = VTOTM(dvp);
+			xdp = tmp_kmem_zalloc(tm, sizeof (struct tmpnode),
+			    KM_SLEEP);
+			if (xdp == NULL) {
+				rw_exit(&tp->tn_rwlock);
+				return (ENOSPC);
+			}
 			tmpnode_init(tm, xdp, &tp->tn_attr, NULL);
 			/*
 			 * Fix-up fields unique to attribute directories.
@@ -907,7 +914,16 @@ tmp_lookup(
 			}
 			xdp->tn_vnode->v_type = VDIR;
 			xdp->tn_vnode->v_flag |= V_XATTRDIR;
-			tdirinit(tp, xdp);
+			if ((err = tdirinit(tp, xdp)) != 0) {
+				rw_exit(&tp->tn_rwlock);
+				/*
+				 * This never got properly initialized so we can
+				 * just clean it up.
+				 */
+				xdp->tn_vnode->v_flag &= V_XATTRDIR;
+				tmpnode_cleanup(tp);
+				return (err);
+			}
 			tp->tn_xattrdp = xdp;
 		} else {
 			VN_HOLD(tp->tn_xattrdp->tn_vnode);
@@ -1626,12 +1642,12 @@ tmp_symlink(
 	rw_exit(&parent->tn_rwlock);
 
 	if (error) {
-		if (self)
+		if (self != NULL)
 			tmpnode_rele(self);
 		return (error);
 	}
 	len = strlen(tnm) + 1;
-	cp = kmem_alloc(len, KM_NOSLEEP | KM_NORMALPRI);
+	cp = tmp_kmem_zalloc(tm, len, KM_NOSLEEP | KM_NORMALPRI);
 	if (cp == NULL) {
 		tmpnode_rele(self);
 		return (ENOSPC);
@@ -1741,7 +1757,7 @@ top:
 			goto top;
 		}
 		if (tp->tn_type == VLNK)
-			kmem_free(tp->tn_symlink, tp->tn_size + 1);
+			tmp_kmem_free(tm, tp->tn_symlink, tp->tn_size + 1);
 	}
 
 	/*
@@ -1775,7 +1791,7 @@ top:
 	rw_destroy(&tp->tn_rwlock);
 	mutex_destroy(&tp->tn_tlock);
 	vn_free(TNTOV(tp));
-	kmem_free(tp, sizeof (struct tmpnode));
+	tmp_kmem_free(tm, tp, sizeof (struct tmpnode));
 
 	/* If the filesystem was umounted by force, rele the vfs ref */
 	if (tm->tm_vfsp->vfs_flag & VFS_UNMOUNTED)

@@ -26,3 +26,7 @@ user = root
 
 [/opt/os-tests/tests/sigqueue]
 tests = ['sigqueue_queue_size']
+
+[/opt/os-tests/tests/tmpfs]
+user = root
+tests = ['tmpfs_badmount', 'tmpfs_enospc']

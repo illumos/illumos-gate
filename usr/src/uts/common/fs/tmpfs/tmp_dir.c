@@ -21,9 +21,8 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2016 Joyent, Inc.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -383,20 +382,7 @@ tdirenter(
 				/*
 				 * Unmake the inode we just made.
 				 */
-				rw_enter(&tp->tn_rwlock, RW_WRITER);
-				if ((tp->tn_type) == VDIR) {
-					ASSERT(tdp == NULL);
-					/*
-					 * cleanup allocs made by tdirinit()
-					 */
-					tdirtrunc(tp);
-				}
-				mutex_enter(&tp->tn_tlock);
-				tp->tn_nlink = 0;
-				mutex_exit(&tp->tn_tlock);
-				gethrestime(&tp->tn_ctime);
-				rw_exit(&tp->tn_rwlock);
-				tmpnode_rele(tp);
+				tmpnode_cleanup(tp);
 				tp = NULL;
 			}
 		} else if (tpp) {
@@ -431,6 +417,7 @@ tdirdelete(
 	enum dr_op op,
 	struct cred *cred)
 {
+	struct tmount *tm;
 	struct tdirent *tpdp;
 	int error;
 	size_t namelen;
@@ -516,7 +503,8 @@ tdirdelete(
 	 */
 	namelen = strlen(tpdp->td_name) + 1;
 
-	kmem_free(tpdp, sizeof (struct tdirent) + namelen);
+	tm = TNTOTM(dir);
+	tmp_kmem_free(tm, tpdp, sizeof (struct tdirent) + namelen);
 	dir->tn_size -= (sizeof (struct tdirent) + namelen);
 	dir->tn_dirents--;
 
@@ -538,19 +526,27 @@ tdirdelete(
  * tdirinit is used internally to initialize a directory (dir)
  * with '.' and '..' entries without checking permissions and locking
  */
-void
+int
 tdirinit(
 	struct tmpnode *parent,		/* parent of directory to initialize */
 	struct tmpnode *dir)		/* the new directory */
 {
+	struct tmount *tm;
 	struct tdirent *dot, *dotdot;
 	timestruc_t now;
 
 	ASSERT(RW_WRITE_HELD(&parent->tn_rwlock));
 	ASSERT(dir->tn_type == VDIR);
 
-	dot = kmem_zalloc(sizeof (struct tdirent) + 2, KM_SLEEP);
-	dotdot = kmem_zalloc(sizeof (struct tdirent) + 3, KM_SLEEP);
+	tm = TNTOTM(parent);
+	dot = tmp_kmem_zalloc(tm, sizeof (struct tdirent) + 2, KM_SLEEP);
+	if (dot == NULL)
+		return (ENOSPC);
+	dotdot = tmp_kmem_zalloc(tm, sizeof (struct tdirent) + 3, KM_SLEEP);
+	if (dotdot == NULL) {
+		tmp_kmem_free(tm, dot, sizeof (struct tdirent) + 2);
+		return (ENOSPC);
+	}
 
 	/*
 	 * Initialize the entries
@@ -601,6 +597,8 @@ tdirinit(
 	dir->tn_size = 2 * sizeof (struct tdirent) + 5;	/* dot and dotdot */
 	dir->tn_dirents = 2;
 	dir->tn_nlink = 2;
+
+	return (0);
 }
 
 
@@ -612,12 +610,15 @@ tdirtrunc(struct tmpnode *dir)
 {
 	struct tdirent *tdp;
 	struct tmpnode *tp;
+	struct tmount *tm;
 	size_t namelen;
 	timestruc_t now;
 	int isvattrdir, isdotdot, skip_decr;
 
 	ASSERT(RW_WRITE_HELD(&dir->tn_rwlock));
 	ASSERT(dir->tn_type == VDIR);
+
+	tm = TNTOTM(dir);
 
 	isvattrdir = (dir->tn_vnode->v_flag & V_XATTRDIR) ? 1 : 0;
 	for (tdp = dir->tn_dir; tdp; tdp = dir->tn_dir) {
@@ -650,7 +651,7 @@ tdirtrunc(struct tmpnode *dir)
 
 		tmpfs_hash_out(tdp);
 
-		kmem_free(tdp, sizeof (struct tdirent) + namelen);
+		tmp_kmem_free(tm, tdp, sizeof (struct tdirent) + namelen);
 		dir->tn_size -= (sizeof (struct tdirent) + namelen);
 		dir->tn_dirents--;
 	}
@@ -903,6 +904,7 @@ tdiraddentry(
 	enum de_op	op,
 	struct tmpnode	*fromtp)
 {
+	struct tmount *tm;
 	struct tdirent *tdp, *tpdp;
 	size_t		namelen, alloc_size;
 	timestruc_t	now;
@@ -923,9 +925,10 @@ tdiraddentry(
 	/*
 	 * Allocate and initialize directory entry
 	 */
+	tm = TNTOTM(dir);
 	namelen = strlen(name) + 1;
 	alloc_size = namelen + sizeof (struct tdirent);
-	tdp = kmem_zalloc(alloc_size, KM_NOSLEEP | KM_NORMALPRI);
+	tdp = tmp_kmem_zalloc(tm, alloc_size, KM_NOSLEEP | KM_NORMALPRI);
 	if (tdp == NULL)
 		return (ENOSPC);
 
@@ -1025,7 +1028,10 @@ tdirmaketnode(
 	    ((va->va_mask & AT_MTIME) && TIMESPEC_OVERFLOW(&va->va_mtime)))
 		return (EOVERFLOW);
 	type = va->va_type;
-	tp = kmem_zalloc(sizeof (struct tmpnode), KM_SLEEP);
+	tp = tmp_kmem_zalloc(tm, sizeof (struct tmpnode), KM_SLEEP);
+	if (tp == NULL) {
+		return (ENOSPC);
+	}
 	tmpnode_init(tm, tp, va, cred);
 
 	/* setup normal file/dir's extended attribute directory */
@@ -1087,8 +1093,13 @@ tdirmaketnode(
 	if (va->va_mask & AT_MTIME)
 		tp->tn_mtime = va->va_mtime;
 
-	if (op == DE_MKDIR)
-		tdirinit(dir, tp);
+	if (op == DE_MKDIR) {
+		int ret;
+		if ((ret = tdirinit(dir, tp)) != 0) {
+			tmpnode_cleanup(tp);
+			return (ret);
+		}
+	}
 
 	*newnode = tp;
 	return (0);
