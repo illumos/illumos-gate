@@ -675,6 +675,18 @@ dpwrite(dev_t dev, struct uio *uiop, cred_t *credp)
 	pollfdnum = uiosize / size;
 
 	/*
+	 * For epoll-enabled handles, restrict the allowed write size to 2.
+	 * This corresponds to an epoll_ctl(3C) performing an EPOLL_CTL_MOD
+	 * operation which is expanded into two operations (DEL and ADD).
+	 *
+	 * All other operations performed through epoll_ctl(3C) will consist of
+	 * a single entry.
+	 */
+	if (is_epoll && pollfdnum > 2) {
+		return (EINVAL);
+	}
+
+	/*
 	 * We want to make sure that pollfdnum isn't large enough to DoS us,
 	 * but we also don't want to grab p_lock unnecessarily -- so we
 	 * perform the full check against our resource limits if and only if
@@ -733,6 +745,21 @@ dpwrite(dev_t dev, struct uio *uiop, cred_t *credp)
 	while ((dpep->dpe_flag & DP_WRITER_PRESENT) != 0) {
 		ASSERT(dpep->dpe_refcnt != 0);
 
+		/*
+		 * The epoll API does not allow EINTR as a result when making
+		 * modifications to the set of polled fds.  Given that write
+		 * activity is relatively quick and the size of accepted writes
+		 * is limited above to two entries, a signal-ignorant wait is
+		 * used here to avoid the EINTR.
+		 */
+		if (is_epoll) {
+			cv_wait(&dpep->dpe_cv, &dpep->dpe_lock);
+			continue;
+		}
+
+		/*
+		 * Non-epoll writers to /dev/poll handles can tolerate EINTR.
+		 */
 		if (!cv_wait_sig_swap(&dpep->dpe_cv, &dpep->dpe_lock)) {
 			dpep->dpe_writerwait--;
 			mutex_exit(&dpep->dpe_lock);
