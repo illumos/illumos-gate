@@ -191,16 +191,39 @@ lx_epoll_ctl(int fd, int op, int pfd, void *event)
 	error = VOP_WRITE(fp->f_vnode, &auio, 1, fp->f_cred, NULL);
 
 	releasef(fd);
-	if (error == ELOOP) {
+
+	switch (error) {
+	case 0:
+		return (0);
+
+	case EBADF:
+	case EEXIST:
+	case EINVAL:
+	case ENOENT:
+	case ENOMEM:
+	case ENOSPC:
+	case EPERM:
+		/*
+		 * Legal errors should pass straight through.
+		 */
+		return (set_errno(error));
+
+	case ELOOP:
 		/*
 		 * In the case of descriptor loops, /dev/poll emits a more
 		 * descriptive error than Linux epoll consumers would expect.
 		 */
 		return (set_errno(EINVAL));
-	} else if (error != 0) {
-		return (set_errno(error));
+
+	default:
+		/*
+		 * While devpoll itself should not emit unexpected errors, it
+		 * is possible that a VOP_POLL handler might.  There is little
+		 * choice but to map these unexpected errors to something which
+		 * is valid for epoll_ctl.
+		 */
+		return (set_errno(ENOMEM));
 	}
-	return (0);
 }
 
 long
