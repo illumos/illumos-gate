@@ -113,9 +113,13 @@ static const char *lx_cap_map_setuid[] = { PRIV_PROC_SETID, NULL };
 static const char *lx_cap_map_linux_immutable[] = { PRIV_FILE_FLAG_SET, NULL };
 static const char *lx_cap_map_bind_service[] = { PRIV_NET_PRIVADDR, NULL };
 static const char *lx_cap_map_net_admin[] = {
-	PRIV_SYS_IPC_CONFIG,
-	PRIV_SYS_DL_CONFIG,
+	PRIV_SYS_IP_CONFIG,
 	NULL
+	/*
+	 * It would probably make sense to include PRIV_SYS_DL_CONFIG, but that
+	 * privilege is not extended to non-global zones by default.  A more
+	 * sophisticated capabilities translation layer could make it optional.
+	 */
 };
 static const char *lx_cap_map_net_raw[] = {
 	PRIV_NET_RAWACCESS,
