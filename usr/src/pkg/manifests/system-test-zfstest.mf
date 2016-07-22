@@ -1465,9 +1465,42 @@ file \
     mode=0444
 file path=opt/zfs-tests/tests/functional/cli_root/zpool_import/cleanup \
     mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/cli_root/zpool_import/import_cachefile_device_added \
+    mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/cli_root/zpool_import/import_cachefile_device_removed \
+    mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/cli_root/zpool_import/import_cachefile_device_replaced \
+    mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/cli_root/zpool_import/import_cachefile_mirror_attached \
+    mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/cli_root/zpool_import/import_cachefile_mirror_detached \
+    mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/cli_root/zpool_import/import_cachefile_shared_device \
+    mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/cli_root/zpool_import/import_devices_missing \
+    mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/cli_root/zpool_import/import_paths_changed \
+    mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/cli_root/zpool_import/import_rewind_config_changed \
+    mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/cli_root/zpool_import/import_rewind_device_replaced \
+    mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zpool_import/setup mode=0555
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zpool_import/zpool_import.cfg \
+    mode=0444
+file \
+    path=opt/zfs-tests/tests/functional/cli_root/zpool_import/zpool_import.kshlib \
     mode=0444
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zpool_import/zpool_import_001_pos \
