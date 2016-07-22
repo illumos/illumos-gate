@@ -1569,6 +1569,9 @@ do_print_vdev(uintptr_t addr, int flags, int depth, boolean_t recursive,
 		case VDEV_AUX_SPLIT_POOL:
 			aux = "SPLIT_POOL";
 			break;
+		case VDEV_AUX_CHILDREN_OFFLINE:
+			aux = "CHILDREN_OFFLINE";
+			break;
 		default:
 			aux = "UNKNOWN";
 			break;
