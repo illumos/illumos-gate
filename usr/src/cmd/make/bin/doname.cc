@@ -21,6 +21,8 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc. All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2016 RackTop Systems.
  */
 
 /*
@@ -2893,8 +2895,12 @@ add_pattern_conditionals(register Name target)
 		pattern = wcb1.get_string();
 		if (pattern[1] != 0) {
 			percent = (wchar_t *) wcschr(pattern, (int) percent_char);
+			/* Check for possible buffer under-read */
+			if ((length = wcb.length()-wcslen(percent+1)) <= 0) {
+				continue;
+			}
 			if (!wcb.equaln(pattern, percent-pattern) ||
-			    !IS_WEQUAL(wcb.get_string(wcb.length()-wcslen(percent+1)), percent+1)) {
+			    !IS_WEQUAL(wcb.get_string(length), percent+1)) {
 				continue;
 			}
 		}
