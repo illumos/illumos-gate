@@ -11,8 +11,8 @@
 
 #
 # Copyright 2011, Richard Lowe
-# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright 2016 Nexenta Systems, Inc.
 #
 
 file path=usr/share/man/man9f/ASSERT.9f
@@ -240,6 +240,7 @@ file path=usr/share/man/man9f/ddi_umem_alloc.9f
 file path=usr/share/man/man9f/ddi_umem_iosetup.9f
 file path=usr/share/man/man9f/ddi_umem_lock.9f
 file path=usr/share/man/man9f/delay.9f
+file path=usr/share/man/man9f/devfs_clean.9f
 file path=usr/share/man/man9f/devmap_default_access.9f
 file path=usr/share/man/man9f/devmap_devmem_setup.9f
 file path=usr/share/man/man9f/devmap_do_ctxmgt.9f
