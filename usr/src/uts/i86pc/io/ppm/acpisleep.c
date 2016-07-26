@@ -22,7 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2012 Joyent, Inc.  All rights reserved.
+ * Copyright 2016, Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -57,19 +57,6 @@
 
 int acpi_rtc_wake = 0x0;		/* wake in N seconds */
 
-/*
- * Execute optional ACPI methods for suspend/resume.
- * The value can be ACPI_EXECUTE_GTS and/or ACPI_EXECUTE_BFS.
- * Global so it can be set in /etc/system.
- * From usr/src/uts/intel/io/acpica/changes.txt:
- *    It has been seen on some systems where the execution of these
- *    methods causes errors and also prevents the machine from entering S5.
- *    It is therefore suggested that host operating systems do not execute
- *    these methods by default. In the future, perhaps these methods can be
- *    optionally executed based on the age of the system...
- */
-int acpi_sleep_flags = ACPI_NO_OPTIONAL_METHODS;
-
 #if 0	/* debug */
 static uint8_t	branchbuf[64 * 1024];	/* for the HDT branch trace stuff */
 #endif	/* debug */
@@ -100,7 +87,7 @@ acpi_enter_sleepstate(s3a_t *s3ap)
 
 	PT(PT_SWV);
 	/* Set waking vector */
-	if (AcpiSetFirmwareWakingVector(wakephys) != AE_OK) {
+	if (AcpiSetFirmwareWakingVector(wakephys, NULL) != AE_OK) {
 		PT(PT_SWV_FAIL);
 		PMD(PMD_SX, ("Can't SetFirmwareWakingVector(%lx)\n",
 		    (long)wakephys))
@@ -156,9 +143,8 @@ acpi_enter_sleepstate(s3a_t *s3ap)
 	 * Tell the hardware to sleep.
 	 */
 	PT(PT_SXE);
-	PMD(PMD_SX, ("Calling AcpiEnterSleepState(%d, %d) ...\n", Sx,
-	    acpi_sleep_flags))
-	if (AcpiEnterSleepState(Sx, acpi_sleep_flags) != AE_OK) {
+	PMD(PMD_SX, ("Calling AcpiEnterSleepState(%d) ...\n", Sx))
+	if (AcpiEnterSleepState(Sx) != AE_OK) {
 		PT(PT_SXE_FAIL);
 		PMD(PMD_SX, ("... failed!\n"))
 	}
@@ -178,7 +164,7 @@ acpi_exit_sleepstate(s3a_t *s3ap)
 	PMD(PMD_SX, ("!We woke up!\n"))
 
 	PT(PT_LSS);
-	if (AcpiLeaveSleepStatePrep(Sx, acpi_sleep_flags) != AE_OK) {
+	if (AcpiLeaveSleepStatePrep(Sx) != AE_OK) {
 		PT(PT_LSS_FAIL);
 		PMD(PMD_SX, ("Problem with LeaveSleepState!\n"))
 	}

@@ -6,7 +6,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2012, Intel Corp.
+ * Copyright (C) 2000 - 2016, Intel Corp.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -55,7 +55,6 @@
  * FUNCTION:    AcpiHwLegacySleep
  *
  * PARAMETERS:  SleepState          - Which sleep state to enter
- *              Flags               - ACPI_EXECUTE_GTS to run optional method
  *
  * RETURN:      Status
  *
@@ -66,8 +65,7 @@
 
 ACPI_STATUS
 AcpiHwLegacySleep (
-    UINT8                   SleepState,
-    UINT8                   Flags)
+    UINT8                   SleepState)
 {
     ACPI_BIT_REGISTER_INFO  *SleepTypeRegInfo;
     ACPI_BIT_REGISTER_INFO  *SleepEnableRegInfo;
@@ -85,7 +83,8 @@ AcpiHwLegacySleep (
 
     /* Clear wake status */
 
-    Status = AcpiWriteBitRegister (ACPI_BITREG_WAKE_STATUS, ACPI_CLEAR_STATUS);
+    Status = AcpiWriteBitRegister (ACPI_BITREG_WAKE_STATUS,
+        ACPI_CLEAR_STATUS);
     if (ACPI_FAILURE (Status))
     {
         return_ACPI_STATUS (Status);
@@ -97,20 +96,6 @@ AcpiHwLegacySleep (
     if (ACPI_FAILURE (Status))
     {
         return_ACPI_STATUS (Status);
-    }
-
-    if (SleepState != ACPI_STATE_S5)
-    {
-        /*
-         * Disable BM arbitration. This feature is contained within an
-         * optional register (PM2 Control), so ignore a BAD_ADDRESS
-         * exception.
-         */
-        Status = AcpiWriteBitRegister (ACPI_BITREG_ARB_DISABLE, 1);
-        if (ACPI_FAILURE (Status) && (Status != AE_BAD_ADDRESS))
-        {
-            return_ACPI_STATUS (Status);
-        }
     }
 
     /*
@@ -130,17 +115,10 @@ AcpiHwLegacySleep (
         return_ACPI_STATUS (Status);
     }
 
-    /* Optionally execute _GTS (Going To Sleep) */
-
-    if (Flags & ACPI_EXECUTE_GTS)
-    {
-        AcpiHwExecuteSleepMethod (METHOD_PATHNAME__GTS, SleepState);
-    }
-
     /* Get current value of PM1A control */
 
     Status = AcpiHwRegisterRead (ACPI_REGISTER_PM1_CONTROL,
-                &Pm1aControl);
+        &Pm1aControl);
     if (ACPI_FAILURE (Status))
     {
         return_ACPI_STATUS (Status);
@@ -151,7 +129,7 @@ AcpiHwLegacySleep (
     /* Clear the SLP_EN and SLP_TYP fields */
 
     Pm1aControl &= ~(SleepTypeRegInfo->AccessBitMask |
-                     SleepEnableRegInfo->AccessBitMask);
+         SleepEnableRegInfo->AccessBitMask);
     Pm1bControl = Pm1aControl;
 
     /* Insert the SLP_TYP bits */
@@ -202,10 +180,10 @@ AcpiHwLegacySleep (
          * to still read the right value. Ideally, this block would go
          * away entirely.
          */
-        AcpiOsStall (10000000);
+        AcpiOsStall (10 * ACPI_USEC_PER_SEC);
 
         Status = AcpiHwRegisterWrite (ACPI_REGISTER_PM1_CONTROL,
-                    SleepEnableRegInfo->AccessBitMask);
+            SleepEnableRegInfo->AccessBitMask);
         if (ACPI_FAILURE (Status))
         {
             return_ACPI_STATUS (Status);
@@ -233,7 +211,6 @@ AcpiHwLegacySleep (
  * FUNCTION:    AcpiHwLegacyWakePrep
  *
  * PARAMETERS:  SleepState          - Which sleep state we just exited
- *              Flags               - ACPI_EXECUTE_BFS to run optional method
  *
  * RETURN:      Status
  *
@@ -245,8 +222,7 @@ AcpiHwLegacySleep (
 
 ACPI_STATUS
 AcpiHwLegacyWakePrep (
-    UINT8                   SleepState,
-    UINT8                   Flags)
+    UINT8                   SleepState)
 {
     ACPI_STATUS             Status;
     ACPI_BIT_REGISTER_INFO  *SleepTypeRegInfo;
@@ -263,7 +239,7 @@ AcpiHwLegacyWakePrep (
      * by some machines.
      */
     Status = AcpiGetSleepTypeData (ACPI_STATE_S0,
-                    &AcpiGbl_SleepTypeA, &AcpiGbl_SleepTypeB);
+        &AcpiGbl_SleepTypeA, &AcpiGbl_SleepTypeB);
     if (ACPI_SUCCESS (Status))
     {
         SleepTypeRegInfo =
@@ -274,7 +250,7 @@ AcpiHwLegacyWakePrep (
         /* Get current value of PM1A control */
 
         Status = AcpiHwRegisterRead (ACPI_REGISTER_PM1_CONTROL,
-                    &Pm1aControl);
+            &Pm1aControl);
         if (ACPI_SUCCESS (Status))
         {
             /* Clear the SLP_EN and SLP_TYP fields */
@@ -296,12 +272,6 @@ AcpiHwLegacyWakePrep (
         }
     }
 
-    /* Optionally execute _BFS (Back From Sleep) */
-
-    if (Flags & ACPI_EXECUTE_BFS)
-    {
-        AcpiHwExecuteSleepMethod (METHOD_PATHNAME__BFS, SleepState);
-    }
     return_ACPI_STATUS (Status);
 }
 
@@ -311,7 +281,6 @@ AcpiHwLegacyWakePrep (
  * FUNCTION:    AcpiHwLegacyWake
  *
  * PARAMETERS:  SleepState          - Which sleep state we just exited
- *              Flags               - Reserved, set to zero
  *
  * RETURN:      Status
  *
@@ -322,8 +291,7 @@ AcpiHwLegacyWakePrep (
 
 ACPI_STATUS
 AcpiHwLegacyWake (
-    UINT8                   SleepState,
-    UINT8                   Flags)
+    UINT8                   SleepState)
 {
     ACPI_STATUS             Status;
 
@@ -367,7 +335,8 @@ AcpiHwLegacyWake (
      * and use it to determine whether the system is rebooting or
      * resuming. Clear WAK_STS for compatibility.
      */
-    (void) AcpiWriteBitRegister (ACPI_BITREG_WAKE_STATUS, ACPI_CLEAR_STATUS);
+    (void) AcpiWriteBitRegister (ACPI_BITREG_WAKE_STATUS,
+        ACPI_CLEAR_STATUS);
     AcpiGbl_SystemAwakeAndRunning = TRUE;
 
     /* Enable power button */
@@ -379,17 +348,6 @@ AcpiHwLegacyWake (
     (void) AcpiWriteBitRegister(
             AcpiGbl_FixedEventInfo[ACPI_EVENT_POWER_BUTTON].StatusRegisterId,
             ACPI_CLEAR_STATUS);
-
-    /*
-     * Enable BM arbitration. This feature is contained within an
-     * optional register (PM2 Control), so ignore a BAD_ADDRESS
-     * exception.
-     */
-    Status = AcpiWriteBitRegister (ACPI_BITREG_ARB_DISABLE, 0);
-    if (ACPI_FAILURE (Status) && (Status != AE_BAD_ADDRESS))
-    {
-        return_ACPI_STATUS (Status);
-    }
 
     AcpiHwExecuteSleepMethod (METHOD_PATHNAME__SST, ACPI_SST_WORKING);
     return_ACPI_STATUS (Status);

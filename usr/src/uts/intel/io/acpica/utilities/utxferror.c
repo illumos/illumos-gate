@@ -5,7 +5,7 @@
  ******************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2012, Intel Corp.
+ * Copyright (C) 2000 - 2016, Intel Corp.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -41,11 +41,10 @@
  * POSSIBILITY OF SUCH DAMAGES.
  */
 
-#define __UTXFERROR_C__
+#define EXPORT_ACPI_INTERFACES
 
 #include "acpi.h"
 #include "accommon.h"
-#include "acnamesp.h"
 
 
 #define _COMPONENT          ACPI_UTILITIES
@@ -54,45 +53,9 @@
 /*
  * This module is used for the in-kernel ACPICA as well as the ACPICA
  * tools/applications.
- *
- * For the iASL compiler case, the output is redirected to stderr so that
- * any of the various ACPI errors and warnings do not appear in the output
- * files, for either the compiler or disassembler portions of the tool.
  */
-#ifdef ACPI_ASL_COMPILER
-#include <stdio.h>
 
-extern FILE                 *AcpiGbl_OutputFile;
-
-#define ACPI_MSG_REDIRECT_BEGIN \
-    FILE                    *OutputFile = AcpiGbl_OutputFile; \
-    AcpiOsRedirectOutput (stderr);
-
-#define ACPI_MSG_REDIRECT_END \
-    AcpiOsRedirectOutput (OutputFile);
-
-#else
-/*
- * non-iASL case - no redirection, nothing to do
- */
-#define ACPI_MSG_REDIRECT_BEGIN
-#define ACPI_MSG_REDIRECT_END
-#endif
-
-/*
- * Common message prefixes
- */
-#define ACPI_MSG_ERROR          "ACPI Error: "
-#define ACPI_MSG_EXCEPTION      "ACPI Exception: "
-#define ACPI_MSG_WARNING        "ACPI Warning: "
-#define ACPI_MSG_INFO           "ACPI: "
-
-/*
- * Common message suffix
- */
-#define ACPI_MSG_SUFFIX \
-    AcpiOsPrintf (" (%8.8X/%s-%u)\n", ACPI_CA_VERSION, ModuleName, LineNumber)
-
+#ifndef ACPI_NO_ERROR_MESSAGES /* Entire module */
 
 /*******************************************************************************
  *
@@ -160,7 +123,19 @@ AcpiException (
 
 
     ACPI_MSG_REDIRECT_BEGIN;
-    AcpiOsPrintf (ACPI_MSG_EXCEPTION "%s, ", AcpiFormatException (Status));
+
+    /* For AE_OK, just print the message */
+
+    if (ACPI_SUCCESS (Status))
+    {
+        AcpiOsPrintf (ACPI_MSG_EXCEPTION);
+
+    }
+    else
+    {
+        AcpiOsPrintf (ACPI_MSG_EXCEPTION "%s, ",
+            AcpiFormatException (Status));
+    }
 
     va_start (ArgList, Format);
     AcpiOsVprintf (Format, ArgList);
@@ -230,8 +205,6 @@ ACPI_EXPORT_SYMBOL (AcpiWarning)
 
 void ACPI_INTERNAL_VAR_XFACE
 AcpiInfo (
-    const char              *ModuleName,
-    UINT32                  LineNumber,
     const char              *Format,
     ...)
 {
@@ -252,227 +225,81 @@ AcpiInfo (
 ACPI_EXPORT_SYMBOL (AcpiInfo)
 
 
-/*
- * The remainder of this module contains internal error functions that may
- * be configured out.
- */
-#if !defined (ACPI_NO_ERROR_MESSAGES) && !defined (ACPI_BIN_APP)
-
 /*******************************************************************************
  *
- * FUNCTION:    AcpiUtPredefinedWarning
+ * FUNCTION:    AcpiBiosError
  *
- * PARAMETERS:  ModuleName      - Caller's module name (for error output)
- *              LineNumber      - Caller's line number (for error output)
- *              Pathname        - Full pathname to the node
- *              NodeFlags       - From Namespace node for the method/object
- *              Format          - Printf format string + additional args
+ * PARAMETERS:  ModuleName          - Caller's module name (for error output)
+ *              LineNumber          - Caller's line number (for error output)
+ *              Format              - Printf format string + additional args
  *
  * RETURN:      None
  *
- * DESCRIPTION: Warnings for the predefined validation module. Messages are
- *              only emitted the first time a problem with a particular
- *              method/object is detected. This prevents a flood of error
- *              messages for methods that are repeatedly evaluated.
+ * DESCRIPTION: Print "ACPI Firmware Error" message with module/line/version
+ *              info
  *
  ******************************************************************************/
 
 void ACPI_INTERNAL_VAR_XFACE
-AcpiUtPredefinedWarning (
+AcpiBiosError (
     const char              *ModuleName,
     UINT32                  LineNumber,
-    char                    *Pathname,
-    UINT8                   NodeFlags,
     const char              *Format,
     ...)
 {
     va_list                 ArgList;
 
 
-    /*
-     * Warning messages for this method/object will be disabled after the
-     * first time a validation fails or an object is successfully repaired.
-     */
-    if (NodeFlags & ANOBJ_EVALUATED)
-    {
-        return;
-    }
-
-    AcpiOsPrintf (ACPI_MSG_WARNING "For %s: ", Pathname);
+    ACPI_MSG_REDIRECT_BEGIN;
+    AcpiOsPrintf (ACPI_MSG_BIOS_ERROR);
 
     va_start (ArgList, Format);
     AcpiOsVprintf (Format, ArgList);
     ACPI_MSG_SUFFIX;
     va_end (ArgList);
+
+    ACPI_MSG_REDIRECT_END;
 }
+
+ACPI_EXPORT_SYMBOL (AcpiBiosError)
 
 
 /*******************************************************************************
  *
- * FUNCTION:    AcpiUtPredefinedInfo
+ * FUNCTION:    AcpiBiosWarning
  *
- * PARAMETERS:  ModuleName      - Caller's module name (for error output)
- *              LineNumber      - Caller's line number (for error output)
- *              Pathname        - Full pathname to the node
- *              NodeFlags       - From Namespace node for the method/object
- *              Format          - Printf format string + additional args
+ * PARAMETERS:  ModuleName          - Caller's module name (for error output)
+ *              LineNumber          - Caller's line number (for error output)
+ *              Format              - Printf format string + additional args
  *
  * RETURN:      None
  *
- * DESCRIPTION: Info messages for the predefined validation module. Messages
- *              are only emitted the first time a problem with a particular
- *              method/object is detected. This prevents a flood of
- *              messages for methods that are repeatedly evaluated.
+ * DESCRIPTION: Print "ACPI Firmware Warning" message with module/line/version
+ *              info
  *
  ******************************************************************************/
 
 void ACPI_INTERNAL_VAR_XFACE
-AcpiUtPredefinedInfo (
+AcpiBiosWarning (
     const char              *ModuleName,
     UINT32                  LineNumber,
-    char                    *Pathname,
-    UINT8                   NodeFlags,
     const char              *Format,
     ...)
 {
     va_list                 ArgList;
 
 
-    /*
-     * Warning messages for this method/object will be disabled after the
-     * first time a validation fails or an object is successfully repaired.
-     */
-    if (NodeFlags & ANOBJ_EVALUATED)
-    {
-        return;
-    }
-
-    AcpiOsPrintf (ACPI_MSG_INFO "For %s: ", Pathname);
+    ACPI_MSG_REDIRECT_BEGIN;
+    AcpiOsPrintf (ACPI_MSG_BIOS_WARNING);
 
     va_start (ArgList, Format);
     AcpiOsVprintf (Format, ArgList);
     ACPI_MSG_SUFFIX;
     va_end (ArgList);
-}
 
-
-/*******************************************************************************
- *
- * FUNCTION:    AcpiUtNamespaceError
- *
- * PARAMETERS:  ModuleName          - Caller's module name (for error output)
- *              LineNumber          - Caller's line number (for error output)
- *              InternalName        - Name or path of the namespace node
- *              LookupStatus        - Exception code from NS lookup
- *
- * RETURN:      None
- *
- * DESCRIPTION: Print error message with the full pathname for the NS node.
- *
- ******************************************************************************/
-
-void
-AcpiUtNamespaceError (
-    const char              *ModuleName,
-    UINT32                  LineNumber,
-    const char              *InternalName,
-    ACPI_STATUS             LookupStatus)
-{
-    ACPI_STATUS             Status;
-    UINT32                  BadName;
-    char                    *Name = NULL;
-
-
-    ACPI_MSG_REDIRECT_BEGIN;
-    AcpiOsPrintf (ACPI_MSG_ERROR);
-
-    if (LookupStatus == AE_BAD_CHARACTER)
-    {
-        /* There is a non-ascii character in the name */
-
-        ACPI_MOVE_32_TO_32 (&BadName, ACPI_CAST_PTR (UINT32, InternalName));
-        AcpiOsPrintf ("[0x%4.4X] (NON-ASCII)", BadName);
-    }
-    else
-    {
-        /* Convert path to external format */
-
-        Status = AcpiNsExternalizeName (ACPI_UINT32_MAX,
-                    InternalName, NULL, &Name);
-
-        /* Print target name */
-
-        if (ACPI_SUCCESS (Status))
-        {
-            AcpiOsPrintf ("[%s]", Name);
-        }
-        else
-        {
-            AcpiOsPrintf ("[COULD NOT EXTERNALIZE NAME]");
-        }
-
-        if (Name)
-        {
-            ACPI_FREE (Name);
-        }
-    }
-
-    AcpiOsPrintf (" Namespace lookup failure, %s",
-        AcpiFormatException (LookupStatus));
-
-    ACPI_MSG_SUFFIX;
     ACPI_MSG_REDIRECT_END;
 }
 
-
-/*******************************************************************************
- *
- * FUNCTION:    AcpiUtMethodError
- *
- * PARAMETERS:  ModuleName          - Caller's module name (for error output)
- *              LineNumber          - Caller's line number (for error output)
- *              Message             - Error message to use on failure
- *              PrefixNode          - Prefix relative to the path
- *              Path                - Path to the node (optional)
- *              MethodStatus        - Execution status
- *
- * RETURN:      None
- *
- * DESCRIPTION: Print error message with the full pathname for the method.
- *
- ******************************************************************************/
-
-void
-AcpiUtMethodError (
-    const char              *ModuleName,
-    UINT32                  LineNumber,
-    const char              *Message,
-    ACPI_NAMESPACE_NODE     *PrefixNode,
-    const char              *Path,
-    ACPI_STATUS             MethodStatus)
-{
-    ACPI_STATUS             Status;
-    ACPI_NAMESPACE_NODE     *Node = PrefixNode;
-
-
-    ACPI_MSG_REDIRECT_BEGIN;
-    AcpiOsPrintf (ACPI_MSG_ERROR);
-
-    if (Path)
-    {
-        Status = AcpiNsGetNode (PrefixNode, Path, ACPI_NS_NO_UPSEARCH,
-                    &Node);
-        if (ACPI_FAILURE (Status))
-        {
-            AcpiOsPrintf ("[Could not get node by pathname]");
-        }
-    }
-
-    AcpiNsPrintNodePathname (Node, Message);
-    AcpiOsPrintf (", %s", AcpiFormatException (MethodStatus));
-
-    ACPI_MSG_SUFFIX;
-    ACPI_MSG_REDIRECT_END;
-}
+ACPI_EXPORT_SYMBOL (AcpiBiosWarning)
 
 #endif /* ACPI_NO_ERROR_MESSAGES */

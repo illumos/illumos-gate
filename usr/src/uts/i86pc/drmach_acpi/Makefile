@@ -25,6 +25,8 @@
 # Copyright (c) 2010, Intel Corporation.
 # All rights reserved.
 #
+# Copyright 2016 Joyent, Inc.
+#
 #	This makefile drives the production of the drmach_acpi loadable module.
 #
 #	i86pc architecture dependent
@@ -60,6 +62,8 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 DEF_BUILDS	= $(DEF_BUILDS64)
 ALL_BUILDS	= $(ALL_BUILDS64)
+
+$(OBJS_DIR)/drmach_acpi.o :=	CERRWARN	+= -_gcc=-Wno-unused-function
 
 #
 # lint pass one enforcement

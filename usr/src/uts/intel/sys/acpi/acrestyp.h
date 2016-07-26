@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2012, Intel Corp.
+ * Copyright (C) 2000 - 2016, Intel Corp.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -103,8 +103,11 @@ typedef UINT32                          ACPI_RSDESC_SIZE;  /* Max Resource Descr
 
 #define ACPI_EXCLUSIVE                  (UINT8) 0x00
 #define ACPI_SHARED                     (UINT8) 0x01
-#define ACPI_EXCLUSIVE_AND_WAKE         (UINT8) 0x02
-#define ACPI_SHARED_AND_WAKE            (UINT8) 0x03
+
+/* Wake */
+
+#define ACPI_NOT_WAKE_CAPABLE           (UINT8) 0x00
+#define ACPI_WAKE_CAPABLE               (UINT8) 0x01
 
 /*
  * DMA Attributes
@@ -177,6 +180,7 @@ typedef struct acpi_resource_irq
     UINT8                           Triggering;
     UINT8                           Polarity;
     UINT8                           Sharable;
+    UINT8                           WakeCapable;
     UINT8                           InterruptCount;
     UINT8                           Interrupts[1];
 
@@ -341,6 +345,36 @@ typedef struct acpi_resource_source
     UINT8                           MaxAddressFixed; \
     ACPI_RESOURCE_ATTRIBUTE         Info;
 
+typedef struct acpi_address16_attribute
+{
+    UINT16                          Granularity;
+    UINT16                          Minimum;
+    UINT16                          Maximum;
+    UINT16                          TranslationOffset;
+    UINT16                          AddressLength;
+
+} ACPI_ADDRESS16_ATTRIBUTE;
+
+typedef struct acpi_address32_attribute
+{
+    UINT32                          Granularity;
+    UINT32                          Minimum;
+    UINT32                          Maximum;
+    UINT32                          TranslationOffset;
+    UINT32                          AddressLength;
+
+} ACPI_ADDRESS32_ATTRIBUTE;
+
+typedef struct acpi_address64_attribute
+{
+    UINT64                          Granularity;
+    UINT64                          Minimum;
+    UINT64                          Maximum;
+    UINT64                          TranslationOffset;
+    UINT64                          AddressLength;
+
+} ACPI_ADDRESS64_ATTRIBUTE;
+
 typedef struct acpi_resource_address
 {
     ACPI_RESOURCE_ADDRESS_COMMON
@@ -350,11 +384,7 @@ typedef struct acpi_resource_address
 typedef struct acpi_resource_address16
 {
     ACPI_RESOURCE_ADDRESS_COMMON
-    UINT16                          Granularity;
-    UINT16                          Minimum;
-    UINT16                          Maximum;
-    UINT16                          TranslationOffset;
-    UINT16                          AddressLength;
+    ACPI_ADDRESS16_ATTRIBUTE        Address;
     ACPI_RESOURCE_SOURCE            ResourceSource;
 
 } ACPI_RESOURCE_ADDRESS16;
@@ -362,11 +392,7 @@ typedef struct acpi_resource_address16
 typedef struct acpi_resource_address32
 {
     ACPI_RESOURCE_ADDRESS_COMMON
-    UINT32                          Granularity;
-    UINT32                          Minimum;
-    UINT32                          Maximum;
-    UINT32                          TranslationOffset;
-    UINT32                          AddressLength;
+    ACPI_ADDRESS32_ATTRIBUTE        Address;
     ACPI_RESOURCE_SOURCE            ResourceSource;
 
 } ACPI_RESOURCE_ADDRESS32;
@@ -374,11 +400,7 @@ typedef struct acpi_resource_address32
 typedef struct acpi_resource_address64
 {
     ACPI_RESOURCE_ADDRESS_COMMON
-    UINT64                          Granularity;
-    UINT64                          Minimum;
-    UINT64                          Maximum;
-    UINT64                          TranslationOffset;
-    UINT64                          AddressLength;
+    ACPI_ADDRESS64_ATTRIBUTE        Address;
     ACPI_RESOURCE_SOURCE            ResourceSource;
 
 } ACPI_RESOURCE_ADDRESS64;
@@ -387,11 +409,7 @@ typedef struct acpi_resource_extended_address64
 {
     ACPI_RESOURCE_ADDRESS_COMMON
     UINT8                           RevisionID;
-    UINT64                          Granularity;
-    UINT64                          Minimum;
-    UINT64                          Maximum;
-    UINT64                          TranslationOffset;
-    UINT64                          AddressLength;
+    ACPI_ADDRESS64_ATTRIBUTE        Address;
     UINT64                          TypeSpecific;
 
 } ACPI_RESOURCE_EXTENDED_ADDRESS64;
@@ -402,6 +420,7 @@ typedef struct acpi_resource_extended_irq
     UINT8                           Triggering;
     UINT8                           Polarity;
     UINT8                           Sharable;
+    UINT8                           WakeCapable;
     UINT8                           InterruptCount;
     ACPI_RESOURCE_SOURCE            ResourceSource;
     UINT32                          Interrupts[1];
@@ -425,6 +444,7 @@ typedef struct acpi_resource_gpio
     UINT8                           ProducerConsumer;   /* For values, see Producer/Consumer above */
     UINT8                           PinConfig;
     UINT8                           Sharable;           /* For values, see Interrupt Attributes above */
+    UINT8                           WakeCapable;        /* For values, see Interrupt Attributes above */
     UINT8                           IoRestriction;
     UINT8                           Triggering;         /* For values, see Interrupt Attributes above */
     UINT8                           Polarity;           /* For values, see Interrupt Attributes above */
@@ -465,6 +485,7 @@ typedef struct acpi_resource_gpio
     UINT8                           Type; \
     UINT8                           ProducerConsumer;    /* For values, see Producer/Consumer above */\
     UINT8                           SlaveMode; \
+    UINT8                           ConnectionSharing; \
     UINT8                           TypeRevisionId; \
     UINT16                          TypeDataLength; \
     UINT16                          VendorLength; \
@@ -675,7 +696,10 @@ typedef struct acpi_resource
 #define ACPI_RS_SIZE_MIN                    (UINT32) ACPI_ROUND_UP_TO_NATIVE_WORD (12)
 #define ACPI_RS_SIZE(Type)                  (UINT32) (ACPI_RS_SIZE_NO_DATA + sizeof (Type))
 
-#define ACPI_NEXT_RESOURCE(Res)             (ACPI_RESOURCE *)((UINT8 *) Res + Res->Length)
+/* Macro for walking resource templates with multiple descriptors */
+
+#define ACPI_NEXT_RESOURCE(Res) \
+    ACPI_ADD_PTR (ACPI_RESOURCE, (Res), (Res)->Length)
 
 
 typedef struct acpi_pci_routing_table
@@ -689,4 +713,3 @@ typedef struct acpi_pci_routing_table
 } ACPI_PCI_ROUTING_TABLE;
 
 #endif /* __ACRESTYP_H__ */
-

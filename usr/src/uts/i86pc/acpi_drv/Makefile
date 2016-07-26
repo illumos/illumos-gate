@@ -23,7 +23,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2016 Joyent, Inc.
 #
 
 #	This makefile drives the production of the acpi_drv 
@@ -62,6 +62,8 @@ DEBUG_FLGS      =
 $(NOT_RELEASE_BUILD)DEBUG_DEFS	+= $(DEBUG_FLGS)
 
 CPPFLAGS	+= -DSUNDDI
+
+CERRWARN	+= -_gcc=-Wno-unused-function
 
 LDFLAGS		+= -dy -N misc/acpica
 

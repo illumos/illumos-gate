@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright 2016, Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -167,7 +167,7 @@ acpi_get_gsiv(dev_info_t *dip, ACPI_HANDLE pciobj, int devno, int ipin,
  */
 static int
 acpi_eval_lnk(dev_info_t *dip, char *lnkname, int *pci_irqp,
-iflag_t *intr_flagp, acpi_psm_lnk_t *acpipsmlnkp)
+    iflag_t *intr_flagp, acpi_psm_lnk_t *acpipsmlnkp)
 {
 	ACPI_HANDLE	tmpobj;
 	ACPI_HANDLE	lnkobj;
@@ -980,7 +980,7 @@ acpi_poweroff(void)
 		return (1);
 	}
 	ACPI_DISABLE_IRQS();
-	status = AcpiEnterSleepState(5, ACPI_NO_OPTIONAL_METHODS);
+	status = AcpiEnterSleepState(5);
 	ACPI_ENABLE_IRQS();
 
 	/* we should be off; if we get here it's an error */

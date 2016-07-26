@@ -23,6 +23,8 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2016 Joyent, Inc.
+#
 #	This makefile drives the production of the ISA nexus driver
 #
 #	i86xpv implementation architecture dependent
@@ -53,6 +55,8 @@ include $(UTSBASE)/i86xpv/Makefile.i86xpv
 ALL_TARGET	= $(BINARY)
 LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
+
+$(OBJS_DIR)/isa.o :=	CERRWARN	+= -_gcc=-Wno-unused-function
 
 #
 # lint pass one enforcement

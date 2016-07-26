@@ -25,6 +25,8 @@
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2016 Joyent, Inc.
+#
 
 #
 #	This makefile drives the production of the pci-ide "drv"
@@ -68,6 +70,7 @@ DEBUG_DEFS	+= $(DEBUG_FLGS)
 INC_PATH	+= -I$(UTSBASE)/common/io/pci-ide
 
 CERRWARN	+= -_gcc=-Wno-switch
+CERRWARN	+= -_gcc=-Wno-unused-function
 
 #
 #	Default build targets.

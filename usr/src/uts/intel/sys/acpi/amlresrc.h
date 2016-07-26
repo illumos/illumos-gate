@@ -1,4 +1,3 @@
-
 /******************************************************************************
  *
  * Module Name: amlresrc.h - AML resource descriptors
@@ -6,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2012, Intel Corp.
+ * Copyright (C) 2000 - 2016, Intel Corp.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -122,6 +121,14 @@ typedef struct asl_resource_node
     struct asl_resource_node        *Next;
 
 } ASL_RESOURCE_NODE;
+
+typedef struct asl_resource_info
+{
+    ACPI_PARSE_OBJECT               *DescriptorTypeOp;  /* Resource descriptor parse node */
+    ACPI_PARSE_OBJECT               *MappingOp;         /* Used for mapfile support */
+    UINT32                          CurrentByteOffset;  /* Offset in resource template */
+
+} ASL_RESOURCE_INFO;
 
 
 /* Macros used to generate AML resource length fields */
@@ -575,5 +582,50 @@ typedef union aml_resource
 
 } AML_RESOURCE;
 
-#endif
 
+/* Interfaces used by both the disassembler and compiler */
+
+void
+MpSaveGpioInfo (
+    ACPI_PARSE_OBJECT       *Op,
+    AML_RESOURCE            *Resource,
+    UINT32                  PinCount,
+    UINT16                  *PinList,
+    char                    *DeviceName);
+
+void
+MpSaveSerialInfo (
+    ACPI_PARSE_OBJECT       *Op,
+    AML_RESOURCE            *Resource,
+    char                    *DeviceName);
+
+char *
+MpGetHidFromParseTree (
+    ACPI_NAMESPACE_NODE     *HidNode);
+
+char *
+MpGetHidViaNamestring (
+    char                    *DeviceName);
+
+char *
+MpGetConnectionInfo (
+    ACPI_PARSE_OBJECT       *Op,
+    UINT32                  PinIndex,
+    ACPI_NAMESPACE_NODE     **TargetNode,
+    char                    **TargetName);
+
+char *
+MpGetParentDeviceHid (
+    ACPI_PARSE_OBJECT       *Op,
+    ACPI_NAMESPACE_NODE     **TargetNode,
+    char                    **ParentDeviceName);
+
+char *
+MpGetDdnValue (
+    char                    *DeviceName);
+
+char *
+MpGetHidValue (
+    ACPI_NAMESPACE_NODE     *DeviceNode);
+
+#endif

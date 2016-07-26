@@ -21,6 +21,8 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2016 Joyent, Inc.
+#
 #	This Makefile drives production of the amd_iommu driver kernel module.
 #
 #
@@ -58,6 +60,7 @@ LDFLAGS         += -dy -Nmisc/iommulib -Nmisc/acpica
 
 CERRWARN	+= -_gcc=-Wno-uninitialized
 CERRWARN	+= -_gcc=-Wno-parentheses
+CERRWARN	+= -_gcc=-Wno-unused-function
 
 #
 #	Default build targets.

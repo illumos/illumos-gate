@@ -23,6 +23,8 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2016 Joyent, Inc.
+#
 #	This makefile drives the production of unix (and unix.o).
 #
 #	i86xpv implementation architecture dependent
@@ -118,6 +120,9 @@ CLEANLINTFILES	+= $(LINT_LIB) $(DBOOT_LINT_LIB) $(DBOOT_LINTS)
 # instr_size needs a special header
 $(OBJS_DIR)/instr_size.o :=	EXTRA_OPTIONS	= -I$(SRC)/common/dis/i386
 $(OBJS_DIR)/instr_size.ln :=	EXTRA_OPTIONS	= -I$(SRC)/common/dis/i386
+
+# Additional definition for files including ACPI headers
+$(OBJS_DIR)/cpupm_mach.o :=	EXTRA_OPTIONS	= -DACPI_USE_SYSTEM_CLIBRARY
 
 CFLAGS += -DDIS_MEM
 

@@ -22,6 +22,7 @@
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2016 Joyent, Inc.
 #
 #	This makefile drives the production of unix (and unix.o).
 #
@@ -124,6 +125,17 @@ CLEANLINTFILES	+= $(LINT_LIB) $(DBOOT_LINT_LIB) $(DBOOT_LINTS)
 # instr_size needs a special header
 $(OBJS_DIR)/instr_size.o :=	EXTRA_OPTIONS	= -I$(SRC)/common/dis/i386
 $(OBJS_DIR)/instr_size.ln :=	EXTRA_OPTIONS	= -I$(SRC)/common/dis/i386
+
+# Additional definition for files including ACPI headers
+$(OBJS_DIR)/cpu_acpi.o :=	EXTRA_OPTIONS	= -DACPI_USE_SYSTEM_CLIBRARY
+$(OBJS_DIR)/cpu_idle.o :=	EXTRA_OPTIONS	= -DACPI_USE_SYSTEM_CLIBRARY
+$(OBJS_DIR)/cpupm_amd.o :=	EXTRA_OPTIONS	= -DACPI_USE_SYSTEM_CLIBRARY
+$(OBJS_DIR)/cpupm_intel.o :=	EXTRA_OPTIONS	= -DACPI_USE_SYSTEM_CLIBRARY
+$(OBJS_DIR)/cpupm_mach.o :=	EXTRA_OPTIONS	= -DACPI_USE_SYSTEM_CLIBRARY
+$(OBJS_DIR)/cpupm_throttle.o :=	EXTRA_OPTIONS	= -DACPI_USE_SYSTEM_CLIBRARY
+$(OBJS_DIR)/pwrnow.o :=		EXTRA_OPTIONS	= -DACPI_USE_SYSTEM_CLIBRARY
+$(OBJS_DIR)/speedstep.o :=	EXTRA_OPTIONS	= -DACPI_USE_SYSTEM_CLIBRARY
+$(OBJS_DIR)/turbo.o :=		EXTRA_OPTIONS	= -DACPI_USE_SYSTEM_CLIBRARY
 
 CFLAGS += -DDIS_MEM
 

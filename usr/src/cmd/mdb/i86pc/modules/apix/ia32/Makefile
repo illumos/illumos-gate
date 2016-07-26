@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2016, Joyent, Inc.
 #
 
 MODULE = apix.so
@@ -39,3 +40,5 @@ CPPFLAGS += -I../../../../common
 CPPFLAGS += -I../../common
 CPPFLAGS += -I$(SRC)/uts/intel
 CPPFLAGS += -I$(SRC)/uts/i86pc
+
+CERRWARN += -_gcc=-Wno-unused-function

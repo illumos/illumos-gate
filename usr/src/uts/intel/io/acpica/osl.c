@@ -22,7 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2012 Joyent, Inc.  All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 /*
  * Copyright (c) 2009-2010, Intel Corporation.
@@ -747,6 +747,22 @@ AcpiOsExecute(ACPI_EXECUTE_TYPE Type, ACPI_OSD_EXEC_CALLBACK  Function,
 	}
 	return (AE_OK);
 
+}
+
+
+void
+AcpiOsWaitEventsComplete(void)
+{
+	int	i;
+
+	/*
+	 * Wait for event queues to be empty.
+	 */
+	for (i = OSL_GLOBAL_LOCK_HANDLER; i <= OSL_EC_BURST_HANDLER; i++) {
+		if (osl_eventq[i] != NULL) {
+			ddi_taskq_wait(osl_eventq[i]);
+		}
+	}
 }
 
 void
@@ -2349,4 +2365,16 @@ acpica_write_cpupm_capabilities(boolean_t pstates, boolean_t cstates)
 	if (cstates && AcpiGbl_FADT.CstControl != 0)
 		(void) AcpiHwRegisterWrite(ACPI_REGISTER_SMI_COMMAND_BLOCK,
 		    AcpiGbl_FADT.CstControl);
+}
+
+uint32_t
+acpi_strtoul(const char *str, char **ep, int base)
+{
+	ulong_t v;
+
+	if (ddi_strtoul(str, ep, base, &v) != 0 || v > ACPI_UINT32_MAX) {
+		return (ACPI_UINT32_MAX);
+	}
+
+	return ((uint32_t)v);
 }
