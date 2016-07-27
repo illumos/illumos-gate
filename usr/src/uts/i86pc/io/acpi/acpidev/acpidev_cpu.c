@@ -256,11 +256,11 @@ acpidev_cpu_query_MAT(ACPI_SUBTABLE_HEADER *ap, void *context)
 	switch (ap->Type) {
 	case ACPI_MADT_TYPE_LOCAL_APIC:
 		mpa = (ACPI_MADT_LOCAL_APIC *)ap;
-		ASSERT(mpa->Id != 255);
 		rp->found = B_TRUE;
 		rp->proc_id = mpa->ProcessorId;
 		rp->apic_id = mpa->Id;
 		if (mpa->LapicFlags & ACPI_MADT_ENABLED) {
+			ASSERT(mpa->Id != 255);
 			rp->enabled = B_TRUE;
 		} else {
 			rp->enabled = B_FALSE;
