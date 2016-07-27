@@ -384,7 +384,7 @@ jfs_dir (char *dirname)
 }
 
 int
-jfs_embed (int *start_sector, int needed_sectors)
+jfs_embed (unsigned long long *start_sector, int needed_sectors)
 {
 	struct jfs_superblock super;
 

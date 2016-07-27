@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2011, 2015 by Delphix. All rights reserved.
+ * Copyright (c) 2011, 2016 by Delphix. All rights reserved.
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2013 Steven Hartland. All rights reserved.
  * Copyright (c) 2014 Integros [integros.com]
@@ -4792,7 +4792,7 @@ ztest_fault_inject(ztest_ds_t *zd, uint64_t id)
 	char path0[MAXPATHLEN];
 	char pathrand[MAXPATHLEN];
 	size_t fsize;
-	int bshift = SPA_MAXBLOCKSHIFT + 2;	/* don't scrog all labels */
+	int bshift = SPA_MAXBLOCKSHIFT + 2;
 	int iters = 1000;
 	int maxfaults;
 	int mirror_save;
@@ -4982,7 +4982,29 @@ ztest_fault_inject(ztest_ds_t *zd, uint64_t id)
 		    (leaves << bshift) + (leaf << bshift) +
 		    (ztest_random(1ULL << (bshift - 1)) & -8ULL);
 
-		if (offset >= fsize)
+		/*
+		 * Only allow damage to the labels at one end of the vdev.
+		 *
+		 * If all labels are damaged, the device will be totally
+		 * inaccessible, which will result in loss of data,
+		 * because we also damage (parts of) the other side of
+		 * the mirror/raidz.
+		 *
+		 * Additionally, we will always have both an even and an
+		 * odd label, so that we can handle crashes in the
+		 * middle of vdev_config_sync().
+		 */
+		if ((leaf & 1) == 0 && offset < VDEV_LABEL_START_SIZE)
+			continue;
+
+		/*
+		 * The two end labels are stored at the "end" of the disk, but
+		 * the end of the disk (vdev_psize) is aligned to
+		 * sizeof (vdev_label_t).
+		 */
+		uint64_t psize = P2ALIGN(fsize, sizeof (vdev_label_t));
+		if ((leaf & 1) == 1 &&
+		    offset + sizeof (bad) > psize - VDEV_LABEL_END_SIZE)
 			continue;
 
 		VERIFY(mutex_lock(&ztest_vdev_lock) == 0);
@@ -5046,9 +5068,14 @@ ztest_ddt_repair(ztest_ds_t *zd, uint64_t id)
 		return;
 	}
 
+	dmu_objset_stats_t dds;
+	dsl_pool_config_enter(dmu_objset_pool(os), FTAG);
+	dmu_objset_fast_stat(os, &dds);
+	dsl_pool_config_exit(dmu_objset_pool(os), FTAG);
+
 	object = od[0].od_object;
 	blocksize = od[0].od_blocksize;
-	pattern = zs->zs_guid ^ dmu_objset_fsid_guid(os);
+	pattern = zs->zs_guid ^ dds.dds_guid;
 
 	ASSERT(object != 0);
 
@@ -5650,9 +5677,13 @@ ztest_run(ztest_shared_t *zs)
 	metaslab_preload_limit = ztest_random(20) + 1;
 	ztest_spa = spa;
 
+	dmu_objset_stats_t dds;
 	VERIFY0(dmu_objset_own(ztest_opts.zo_pool,
 	    DMU_OST_ANY, B_TRUE, FTAG, &os));
-	zs->zs_guid = dmu_objset_fsid_guid(os);
+	dsl_pool_config_enter(dmu_objset_pool(os), FTAG);
+	dmu_objset_fast_stat(os, &dds);
+	dsl_pool_config_exit(dmu_objset_pool(os), FTAG);
+	zs->zs_guid = dds.dds_guid;
 	dmu_objset_disown(os, FTAG);
 
 	spa->spa_dedup_ditto = 2 * ZIO_DEDUPDITTO_MIN;

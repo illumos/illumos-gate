@@ -39,14 +39,14 @@ endian_fromhost(void)
 	uint32_t ebe32, ele32, test32;
 	uint64_t ebe64, ele64, test64;
 
-#ifdef	_LITTLE_ENDIAN
+#if	defined(_LITTLE_ENDIAN)
 	ebe16 = 0x2211;
 	ebe32 = 0x44332211UL;
 	ebe64 = 0x8877665544332211ULL;
 	ele16 = 0x1122;
 	ele32 = 0x11223344UL;
 	ele64 = 0x1122334455667788ULL;
-#elif	_BIG_ENDIAN
+#elif	defined(_BIG_ENDIAN)
 	ele16 = 0x2211;
 	ele32 = 0x44332211UL;
 	ele64 = 0x8877665544332211ULL;
@@ -82,11 +82,11 @@ endian_frombig(void)
 	uint32_t e32, test32;
 	uint64_t e64, test64;
 
-#ifdef	_LITTLE_ENDIAN
+#if	defined(_LITTLE_ENDIAN)
 	e16 = 0x2211;
 	e32 = 0x44332211UL;
 	e64 = 0x8877665544332211ULL;
-#elif	_BIG_ENDIAN
+#elif	defined(_BIG_ENDIAN)
 	e16 = 0x1122;
 	e32 = 0x11223344UL;
 	e64 = 0x1122334455667788ULL;
@@ -120,11 +120,11 @@ endian_fromlittle(void)
 	uint32_t e32, test32;
 	uint64_t e64, test64;
 
-#ifdef	_LITTLE_ENDIAN
+#if	defined(_LITTLE_ENDIAN)
 	e16 = 0x1122;
 	e32 = 0x11223344UL;
 	e64 = 0x1122334455667788ULL;
-#elif	_BIG_ENDIAN
+#elif	defined(_BIG_ENDIAN)
 	e16 = 0x2211;
 	e32 = 0x44332211UL;
 	e64 = 0x8877665544332211ULL;

@@ -1,6 +1,6 @@
 /* -*- Mode: C; tab-width: 4 -*-
  *
- * Copyright (c) 2002-2003 Apple Computer, Inc. All rights reserved.
+ * Copyright (c) 2002-2013 Apple Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,13 +13,6 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
-
-    File:		uds_daemon.h
-
-    Contains:	Interfaces necessary to talk to uds_daemon.c.
-
-    Version:	1.0
-
  */
 
 #include "mDNSEmbeddedAPI.h"
@@ -28,6 +21,8 @@
 /* Client interface: */
 
 #define SRS_PORT(S) mDNSVal16((S)->RR_SRV.resrec.rdata->u.srv.port)
+
+#define LogTimer(MSG,T) LogMsgNoIdent( MSG " %08X %11d  %08X %11d", (T), (T), (T)-now, (T)-now)
 
 extern int udsserver_init(dnssd_sock_t skts[], mDNSu32 count);
 extern mDNSs32 udsserver_idle(mDNSs32 nextevent);

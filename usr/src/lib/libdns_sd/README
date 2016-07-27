@@ -21,8 +21,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2016 Toomas Soome <tsoome@me.com>
-#
+Updated from upstream version mDNSResponder-625.41.2
 Updated from upstream version mDNSResponder-576.30.4
 
 Multicast DNS and Service Discovery support in Solaris using the

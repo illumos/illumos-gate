@@ -1,6 +1,6 @@
 /* -*- Mode: C; tab-width: 4 -*-
  *
- * Copyright (c) 2002-2013 Apple Computer, Inc. All rights reserved.
+ * Copyright (c) 2002-2015 Apple Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -513,7 +513,7 @@ mDNSexport char *GetRRDisplayString_rdb(const ResourceRecord *const rr, const RD
                                 expTimeBuf, inceptTimeBuf, swap16(rrsig->keyTag), ((domainname *)(&rrsig->signerName))->c);
 
         len = DomainNameLength((domainname *)&rrsig->signerName);
-        length += baseEncode(buffer + length, RemSpc, (const mDNSu8 *)(rd->data + len + RRSIG_FIXED_SIZE),
+        baseEncode(buffer + length, RemSpc, (const mDNSu8 *)(rd->data + len + RRSIG_FIXED_SIZE),
                                rr->rdlength - (len + RRSIG_FIXED_SIZE), ENC_BASE64);
     }
     break;
@@ -521,7 +521,7 @@ mDNSexport char *GetRRDisplayString_rdb(const ResourceRecord *const rr, const RD
         rdataDNSKey *rrkey = (rdataDNSKey *)rd->data;
         length += mDNS_snprintf(buffer+length, RemSpc, "\t%d  %d  %s  %u ", swap16(rrkey->flags), rrkey->proto,
                                 DNSSECAlgName(rrkey->alg), (unsigned int)keytag((mDNSu8 *)rrkey, rr->rdlength));
-        length += baseEncode(buffer + length, RemSpc, (const mDNSu8 *)(rd->data + DNSKEY_FIXED_SIZE),
+        baseEncode(buffer + length, RemSpc, (const mDNSu8 *)(rd->data + DNSKEY_FIXED_SIZE),
                                rr->rdlength - DNSKEY_FIXED_SIZE, ENC_BASE64);
     }
     break;
@@ -1481,6 +1481,7 @@ mDNSexport void mDNS_SetupQuestion(DNSQuestion *const q, const mDNSInterfaceID I
     q->qnameOrig           = mDNSNULL;
     q->AnonInfo            = mDNSNULL;
     q->pid                 = mDNSPlatformGetPID();
+    q->euid                = 0;
     q->DisallowPID         = mDNSfalse;
     q->ServiceID           = -1;
     q->QuestionCallback    = callback;
@@ -2357,13 +2358,9 @@ mDNSexport mDNSu8 *putRData(const DNSMessage *const msg, mDNSu8 *ptr, const mDNS
     case kDNSType_NSEC: {
         // For NSEC records, rdlength represents the exact number of bytes
         // of in memory storage.
-        int len = rr->rdlength;
         mDNSu8 *nsec = (mDNSu8 *)rdb->data;
         domainname *name = (domainname *)nsec;
-        int dlen;
-
-        dlen = DomainNameLength(name);
-        len -= dlen;
+        const int dlen = DomainNameLength(name);
         nsec += dlen;
         // This function is called when we are sending a NSEC record as part of mDNS,
         // or to copy the data to any other buffer needed which could be a mDNS or uDNS
@@ -2376,7 +2373,6 @@ mDNSexport mDNSu8 *putRData(const DNSMessage *const msg, mDNSu8 *ptr, const mDNS
             int i, j, wlen;
             wlen = *(nsec + 1);
             nsec += 2;                     // Skip the window number and len
-            len -= 2;
 
             // For our simplified use of NSEC synthetic records:
             //
@@ -2406,6 +2402,7 @@ mDNSexport mDNSu8 *putRData(const DNSMessage *const msg, mDNSu8 *ptr, const mDNS
         else
         {
             int win, wlen;
+            int len = rr->rdlength - dlen;
 
             // Sanity check whether the bitmap is good
             while (len)
@@ -2607,7 +2604,7 @@ mDNSexport mDNSu8 *putDeleteAllRRSets(DNSMessage *msg, mDNSu8 *ptr, const domain
 }
 
 // for dynamic updates
-mDNSexport mDNSu8 *putUpdateLease(DNSMessage *msg, mDNSu8 *end, mDNSu32 lease)
+mDNSexport mDNSu8 *putUpdateLease(DNSMessage *msg, mDNSu8 *ptr, mDNSu32 lease)
 {
     AuthRecord rr;
     mDNS_SetupResourceRecord(&rr, mDNSNULL, mDNSInterface_Any, kDNSType_OPT, kStandardTTL, kDNSRecordTypeKnownUnique, AuthRecordAny, mDNSNULL, mDNSNULL);
@@ -2616,13 +2613,13 @@ mDNSexport mDNSu8 *putUpdateLease(DNSMessage *msg, mDNSu8 *end, mDNSu32 lease)
     rr.resrec.rdestimate = sizeof(rdataOPT);
     rr.resrec.rdata->u.opt[0].opt           = kDNSOpt_Lease;
     rr.resrec.rdata->u.opt[0].u.updatelease = lease;
-    end = PutResourceRecordTTLJumbo(msg, end, &msg->h.numAdditionals, &rr.resrec, 0);
-    if (!end) { LogMsg("ERROR: putUpdateLease - PutResourceRecordTTL"); return mDNSNULL; }
-    return end;
+    ptr = PutResourceRecordTTLJumbo(msg, ptr, &msg->h.numAdditionals, &rr.resrec, 0);
+    if (!ptr) { LogMsg("ERROR: putUpdateLease - PutResourceRecordTTL"); return mDNSNULL; }
+    return ptr;
 }
 
 // for dynamic updates
-mDNSexport mDNSu8 *putUpdateLeaseWithLimit(DNSMessage *msg, mDNSu8 *end, mDNSu32 lease, mDNSu8 *limit)
+mDNSexport mDNSu8 *putUpdateLeaseWithLimit(DNSMessage *msg, mDNSu8 *ptr, mDNSu32 lease, mDNSu8 *limit)
 {
     AuthRecord rr;
     mDNS_SetupResourceRecord(&rr, mDNSNULL, mDNSInterface_Any, kDNSType_OPT, kStandardTTL, kDNSRecordTypeKnownUnique, AuthRecordAny, mDNSNULL, mDNSNULL);
@@ -2631,9 +2628,9 @@ mDNSexport mDNSu8 *putUpdateLeaseWithLimit(DNSMessage *msg, mDNSu8 *end, mDNSu32
     rr.resrec.rdestimate = sizeof(rdataOPT);
     rr.resrec.rdata->u.opt[0].opt           = kDNSOpt_Lease;
     rr.resrec.rdata->u.opt[0].u.updatelease = lease;
-    end = PutResourceRecordTTLWithLimit(msg, end, &msg->h.numAdditionals, &rr.resrec, 0, limit);
-    if (!end) { LogMsg("ERROR: putUpdateLease - PutResourceRecordTTLWithLimit"); return mDNSNULL; }
-    return end;
+    ptr = PutResourceRecordTTLWithLimit(msg, ptr, &msg->h.numAdditionals, &rr.resrec, 0, limit);
+    if (!ptr) { LogMsg("ERROR: putUpdateLeaseWithLimit - PutResourceRecordTTLWithLimit"); return mDNSNULL; }
+    return ptr;
 }
 
 mDNSexport mDNSu8 *putDNSSECOption(DNSMessage *msg, mDNSu8 *end, mDNSu8 *limit)
@@ -2650,7 +2647,7 @@ mDNSexport mDNSu8 *putDNSSECOption(DNSMessage *msg, mDNSu8 *end, mDNSu8 *limit)
     // set the DO bit
     ttl |= 0x8000;
     end = PutResourceRecordTTLWithLimit(msg, end, &msg->h.numAdditionals, &rr.resrec, ttl, limit);
-    if (!end) { LogMsg("ERROR: putUpdateLease - PutResourceRecordTTLWithLimit"); return mDNSNULL; }
+    if (!end) { LogMsg("ERROR: putDNSSECOption - PutResourceRecordTTLWithLimit"); return mDNSNULL; }
     return end;
 }
 
@@ -3441,12 +3438,7 @@ mDNSexport const mDNSu8 *GetLargeResourceRecord(mDNS *const m, const DNSMessage 
     mDNSu16 pktrdlength;
 
     if (largecr == &m->rec && m->rec.r.resrec.RecordType)
-    {
-        LogMsg("GetLargeResourceRecord: m->rec appears to be already in use for %s", CRDisplayString(m, &m->rec.r));
-#if ForceAlerts
-        *(long*)0 = 0;
-#endif
-    }
+        LogFatalError("GetLargeResourceRecord: m->rec appears to be already in use for %s", CRDisplayString(m, &m->rec.r));
 
     rr->next              = mDNSNULL;
     rr->resrec.name       = &largecr->namestorage;
@@ -3713,7 +3705,7 @@ mDNSexport void DumpPacket(mDNS *const m, mStatus status, mDNSBool sent, char *t
     }
     ptr = DumpRecords(m, msg, ptr, end, msg->h.numAnswers,     IsUpdate ? "Prerequisites" : "Answers");
     ptr = DumpRecords(m, msg, ptr, end, msg->h.numAuthorities, IsUpdate ? "Updates"       : "Authorities");
-    ptr = DumpRecords(m, msg, ptr, end, msg->h.numAdditionals, "Additionals");
+          DumpRecords(m, msg, ptr, end, msg->h.numAdditionals, "Additionals");
     LogMsg("--------------");
 }
 
@@ -3725,11 +3717,8 @@ mDNSexport void DumpPacket(mDNS *const m, mStatus status, mDNSBool sent, char *t
 
 // Stub definition of TCPSocket_struct so we can access flags field. (Rest of TCPSocket_struct is platform-dependent.)
 struct TCPSocket_struct { TCPSocketFlags flags; /* ... */ };
-
-struct UDPSocket_struct
-{
-    mDNSIPPort port; // MUST BE FIRST FIELD -- mDNSCoreReceive expects every UDPSocket_struct to begin with mDNSIPPort port
-};
+// Stub definition of UDPSocket_struct so we can access port field. (Rest of UDPSocket_struct is platform-dependent.)
+struct UDPSocket_struct { mDNSIPPort     port;  /* ... */ };
 
 // Note: When we sign a DNS message using DNSDigest_SignMessage(), the current real-time clock value is used, which
 // is why we generally defer signing until we send the message, to ensure the signature is as fresh as possible.
@@ -3821,10 +3810,10 @@ mDNSexport mStatus mDNSSendDNSMessage(mDNS *const m, DNSMessage *const msg, mDNS
     // Dump the packet with the HINFO and TSIG
     if (mDNS_PacketLoggingEnabled && !mDNSOpaque16IsZero(msg->h.id)) {
 	mDNSIPPort port = MulticastDNSPort;
-        DumpPacket(m, status, mDNStrue, sock &&
-	(sock->flags & kTCPSocketFlags_UseTLS) ?
-	"TLS" : sock ? "TCP" : "UDP", mDNSNULL,
-	src ? src->port : port, dst, dstport, msg, end);
+        DumpPacket(m, status, mDNStrue,
+	    sock && (sock->flags & kTCPSocketFlags_UseTLS) ?
+	    "TLS" : sock ? "TCP" : "UDP", mDNSNULL,
+	    src ? src->port : port, dst, dstport, msg, end);
     }
 
     // put the number of additionals back the way it was
@@ -3849,12 +3838,7 @@ mDNSexport void mDNS_Lock_(mDNS *const m, const char * const functionname)
     // If that client callback does mDNS API calls, mDNS_reentrancy and mDNS_busy will both be one
     // If mDNS_busy != mDNS_reentrancy that's a bad sign
     if (m->mDNS_busy != m->mDNS_reentrancy)
-    {
-        LogMsg("%s: mDNS_Lock: Locking failure! mDNS_busy (%ld) != mDNS_reentrancy (%ld)", functionname, m->mDNS_busy, m->mDNS_reentrancy);
-#if ForceAlerts
-        *(long*)0 = 0;
-#endif
-    }
+        LogFatalError("%s: mDNS_Lock: Locking failure! mDNS_busy (%ld) != mDNS_reentrancy (%ld)", functionname, m->mDNS_busy, m->mDNS_reentrancy);
 
     // If this is an initial entry into the mDNSCore code, set m->timenow
     // else, if this is a re-entrant entry into the mDNSCore code, m->timenow should already be set
@@ -3935,82 +3919,89 @@ mDNSlocal mDNSs32 GetNextScheduledEvent(const mDNS *const m)
     return(e);
 }
 
+#define LogTSE TSE++,LogMsg
+
 mDNSexport void ShowTaskSchedulingError(mDNS *const m)
 {
+    int TSE = 0;
     AuthRecord *rr;
     mDNS_Lock(m);
 
-    LogMsg("Task Scheduling Error: Continuously busy for more than a second");
+    LogMsg("Task Scheduling Error: *** Continuously busy for more than a second");
 
     // Note: To accurately diagnose *why* we're busy, the debugging code here needs to mirror the logic in GetNextScheduledEvent above
 
     if (m->NewQuestions && (!m->NewQuestions->DelayAnswering || m->timenow - m->NewQuestions->DelayAnswering >= 0))
-        LogMsg("Task Scheduling Error: NewQuestion %##s (%s)",
+        LogTSE("Task Scheduling Error: NewQuestion %##s (%s)",
                m->NewQuestions->qname.c, DNSTypeName(m->NewQuestions->qtype));
 
     if (m->NewLocalOnlyQuestions)
-        LogMsg("Task Scheduling Error: NewLocalOnlyQuestions %##s (%s)",
+        LogTSE("Task Scheduling Error: NewLocalOnlyQuestions %##s (%s)",
                m->NewLocalOnlyQuestions->qname.c, DNSTypeName(m->NewLocalOnlyQuestions->qtype));
 
     if (m->NewLocalRecords)
     {
         rr = AnyLocalRecordReady(m);
-        if (rr) LogMsg("Task Scheduling Error: NewLocalRecords %s", ARDisplayString(m, rr));
+        if (rr) LogTSE("Task Scheduling Error: NewLocalRecords %s", ARDisplayString(m, rr));
     }
 
-    if (m->NewLocalOnlyRecords) LogMsg("Task Scheduling Error: NewLocalOnlyRecords");
+    if (m->NewLocalOnlyRecords) LogTSE("Task Scheduling Error: NewLocalOnlyRecords");
 
-    if (m->SPSProxyListChanged) LogMsg("Task Scheduling Error: SPSProxyListChanged");
-    if (m->LocalRemoveEvents) LogMsg("Task Scheduling Error: LocalRemoveEvents");
+    if (m->SPSProxyListChanged) LogTSE("Task Scheduling Error: SPSProxyListChanged");
 
-    if (m->timenow - m->NextScheduledEvent    >= 0)
-        LogMsg("Task Scheduling Error: m->NextScheduledEvent %d",    m->timenow - m->NextScheduledEvent);
+    if (m->LocalRemoveEvents) LogTSE("Task Scheduling Error: LocalRemoveEvents");
 
 #ifndef UNICAST_DISABLED
     if (m->timenow - m->NextuDNSEvent         >= 0)
-        LogMsg("Task Scheduling Error: m->NextuDNSEvent %d",         m->timenow - m->NextuDNSEvent);
+        LogTSE("Task Scheduling Error: m->NextuDNSEvent %d",         m->timenow - m->NextuDNSEvent);
     if (m->timenow - m->NextScheduledNATOp    >= 0)
-        LogMsg("Task Scheduling Error: m->NextScheduledNATOp %d",    m->timenow - m->NextScheduledNATOp);
+        LogTSE("Task Scheduling Error: m->NextScheduledNATOp %d",    m->timenow - m->NextScheduledNATOp);
     if (m->NextSRVUpdate && m->timenow - m->NextSRVUpdate >= 0)
-        LogMsg("Task Scheduling Error: m->NextSRVUpdate %d",         m->timenow - m->NextSRVUpdate);
+        LogTSE("Task Scheduling Error: m->NextSRVUpdate %d",         m->timenow - m->NextSRVUpdate);
 #endif
 
     if (m->timenow - m->NextCacheCheck        >= 0)
-        LogMsg("Task Scheduling Error: m->NextCacheCheck %d",        m->timenow - m->NextCacheCheck);
+        LogTSE("Task Scheduling Error: m->NextCacheCheck %d",        m->timenow - m->NextCacheCheck);
     if (m->timenow - m->NextScheduledSPS      >= 0)
-        LogMsg("Task Scheduling Error: m->NextScheduledSPS %d",      m->timenow - m->NextScheduledSPS);
+        LogTSE("Task Scheduling Error: m->NextScheduledSPS %d",      m->timenow - m->NextScheduledSPS);
     if (m->timenow - m->NextScheduledKA       >= 0)
-        LogMsg("Task Scheduling Error: m->NextScheduledKA %d",      m->timenow - m->NextScheduledKA);
+        LogTSE("Task Scheduling Error: m->NextScheduledKA %d",      m->timenow - m->NextScheduledKA);
     if (!m->DelaySleep && m->SleepLimit && m->timenow - m->NextScheduledSPRetry >= 0)
-        LogMsg("Task Scheduling Error: m->NextScheduledSPRetry %d",  m->timenow - m->NextScheduledSPRetry);
+        LogTSE("Task Scheduling Error: m->NextScheduledSPRetry %d",  m->timenow - m->NextScheduledSPRetry);
     if (m->DelaySleep && m->timenow - m->DelaySleep >= 0)
-        LogMsg("Task Scheduling Error: m->DelaySleep %d",            m->timenow - m->DelaySleep);
+        LogTSE("Task Scheduling Error: m->DelaySleep %d",            m->timenow - m->DelaySleep);
 
     if (m->SuppressSending && m->timenow - m->SuppressSending >= 0)
-        LogMsg("Task Scheduling Error: m->SuppressSending %d",       m->timenow - m->SuppressSending);
+        LogTSE("Task Scheduling Error: m->SuppressSending %d",       m->timenow - m->SuppressSending);
     if (m->timenow - m->NextScheduledQuery    >= 0)
-        LogMsg("Task Scheduling Error: m->NextScheduledQuery %d",    m->timenow - m->NextScheduledQuery);
+        LogTSE("Task Scheduling Error: m->NextScheduledQuery %d",    m->timenow - m->NextScheduledQuery);
     if (m->timenow - m->NextScheduledProbe    >= 0)
-        LogMsg("Task Scheduling Error: m->NextScheduledProbe %d",    m->timenow - m->NextScheduledProbe);
+        LogTSE("Task Scheduling Error: m->NextScheduledProbe %d",    m->timenow - m->NextScheduledProbe);
     if (m->timenow - m->NextScheduledResponse >= 0)
-        LogMsg("Task Scheduling Error: m->NextScheduledResponse %d", m->timenow - m->NextScheduledResponse);
+        LogTSE("Task Scheduling Error: m->NextScheduledResponse %d", m->timenow - m->NextScheduledResponse);
+    if (m->timenow - m->NextScheduledStopTime >= 0)
+        LogTSE("Task Scheduling Error: m->NextScheduledStopTime %d", m->timenow - m->NextScheduledStopTime);
+
+    if (m->timenow - m->NextScheduledEvent    >= 0)
+        LogTSE("Task Scheduling Error: m->NextScheduledEvent %d",    m->timenow - m->NextScheduledEvent);
+
+    if (m->NetworkChanged && m->timenow - m->NetworkChanged >= 0)
+        LogTSE("Task Scheduling Error: NetworkChanged %d",           m->timenow - m->NetworkChanged);
+
+    if (!TSE) LogMsg("Task Scheduling Error: *** No likely causes identified");
+    else LogMsg("Task Scheduling Error: *** %d potential cause%s identified (significant only if the same cause consistently appears)", TSE, TSE > 1 ? "s" : "");
 
     mDNS_Unlock(m);
 }
 
-mDNSexport void mDNS_Unlock_(mDNS *const m, const char * const functionname)
+mDNSexport void mDNS_Unlock_(mDNS *const m, const char *const functionname)
 {
     // Decrement mDNS_busy
     m->mDNS_busy--;
 
     // Check for locking failures
     if (m->mDNS_busy != m->mDNS_reentrancy)
-    {
-        LogMsg("%s: mDNS_Unlock: Locking failure! mDNS_busy (%ld) != mDNS_reentrancy (%ld)", functionname, m->mDNS_busy, m->mDNS_reentrancy);
-#if ForceAlerts
-        *(long*)0 = 0;
-#endif
-    }
+        LogFatalError("%s: mDNS_Unlock: Locking failure! mDNS_busy (%ld) != mDNS_reentrancy (%ld)", functionname, m->mDNS_busy, m->mDNS_reentrancy);
 
     // If this is a final exit from the mDNSCore code, set m->NextScheduledEvent and clear m->timenow
     if (m->mDNS_busy == 0)
