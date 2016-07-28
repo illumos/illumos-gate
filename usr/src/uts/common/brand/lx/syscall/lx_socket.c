@@ -1280,17 +1280,23 @@ lx_convert_sock_args(int in_dom, int in_type, int in_proto, int *out_dom,
 		return (EINVAL);
 
 	type = LTOS_SOCKTYPE(in_type & LX_SOCK_TYPE_MASK);
-	if (type == SOCK_NOTSUPPORTED)
-		return (ESOCKTNOSUPPORT);
 	if (type == SOCK_INVAL)
 		return (EINVAL);
-
 	/*
 	 * Linux does not allow the app to specify IP Protocol for raw sockets.
 	 * SunOS does, so bail out here.
 	 */
-	if (domain == AF_INET && type == SOCK_RAW && in_proto == IPPROTO_IP)
-		return (ESOCKTNOSUPPORT);
+	if (type == SOCK_NOTSUPPORTED ||
+	    (domain == AF_INET && type == SOCK_RAW && in_proto == IPPROTO_IP)) {
+		if (lx_kern_release_cmp(curzone, "2.6.15") < 0) {
+			/*
+			 * Use error appropriate for kernel version.
+			 * See lx_socket_create for more detail.
+			 */
+			return (ESOCKTNOSUPPORT);
+		}
+		return (EPROTONOSUPPORT);
+	}
 
 	options = 0;
 	in_type &= ~(LX_SOCK_TYPE_MASK);
@@ -1336,7 +1342,18 @@ lx_socket_create(int domain, int type, int protocol, int options, file_t **fpp,
 		switch (err) {
 		case EPROTOTYPE:
 		case EPROTONOSUPPORT:
-			return (ESOCKTNOSUPPORT);
+			if (lx_kern_release_cmp(curzone, "2.6.15") < 0) {
+				/*
+				 * Linux changed its socket error behavior in
+				 * versions 2.6.15 and later.  See git commit
+				 * 86c8f9d158f68538a971a47206a46a22c7479bac in
+				 * the Linux repository.
+				 *
+				 * LTP presently checks for version 2.6.16.
+				 */
+				return (ESOCKTNOSUPPORT);
+			}
+			return (EPROTONOSUPPORT);
 		default:
 			return (err);
 		}
@@ -3818,7 +3835,6 @@ lx_socketpair(int domain, int type, int protocol, int *sv)
 
 	if ((err = lx_socket_create(domain, type, protocol, options, &fps[0],
 	    &fds[0])) != 0) {
-		err = (err == EPROTONOSUPPORT) ? ESOCKTNOSUPPORT : err;
 		return (set_errno(err));
 	}
 
