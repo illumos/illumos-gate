@@ -1213,7 +1213,7 @@ reiserfs_dir (char *dirname)
 }
 
 int
-reiserfs_embed (int *start_sector, int needed_sectors)
+reiserfs_embed (unsigned long long *start_sector, int needed_sectors)
 {
   struct reiserfs_super_block super;
   int num_sectors;

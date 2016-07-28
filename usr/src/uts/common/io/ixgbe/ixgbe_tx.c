@@ -26,6 +26,7 @@
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2016 OmniTI Computer Consulting, Inc. All rights reserved.
  */
 
 #include "ixgbe_sw.h"
@@ -1081,8 +1082,8 @@ ixgbe_tx_fill_ring(ixgbe_tx_ring_t *tx_ring, link_list_t *pending_list,
 	 * The Insert Ethernet CRC (IFCS) bit and the checksum fields are only
 	 * valid in the first descriptor of the packet.
 	 * Setting paylen in every first_tbd for all parts.
-	 * 82599 and X540 require the packet length in paylen field with or
-	 * without LSO and 82598 will ignore it in non-LSO mode.
+	 * 82599, X540 and X550 require the packet length in paylen field
+	 * with or without LSO and 82598 will ignore it in non-LSO mode.
 	 */
 	ASSERT(first_tbd != NULL);
 	first_tbd->read.cmd_type_len |= IXGBE_ADVTXD_DCMD_IFCS;
@@ -1099,6 +1100,8 @@ ixgbe_tx_fill_ring(ixgbe_tx_ring_t *tx_ring, link_list_t *pending_list,
 
 	case ixgbe_mac_82599EB:
 	case ixgbe_mac_X540:
+	case ixgbe_mac_X550:
+	case ixgbe_mac_X550EM_x:
 		if (ctx != NULL && ctx->lso_flag) {
 			first_tbd->read.cmd_type_len |= IXGBE_ADVTXD_DCMD_TSE;
 			first_tbd->read.olinfo_status |=
