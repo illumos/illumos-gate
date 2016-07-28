@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright (c) 2012, 2015 by Delphix. All rights reserved.
+# Copyright (c) 2012, 2016 by Delphix. All rights reserved.
 # Copyright 2016, OmniTI Computer Consulting, Inc. All rights reserved.
 #
 
@@ -19,7 +19,7 @@ pre = setup
 quiet = False
 pre_user = root
 user = root
-timeout = 600
+timeout = 1800
 post_user = root
 post = cleanup
 outputdir = /var/tmp/test_results

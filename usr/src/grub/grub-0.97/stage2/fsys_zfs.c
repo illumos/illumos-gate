@@ -1888,7 +1888,7 @@ zfs_read(char *buf, int len)
  * No-Op
  */
 int
-zfs_embed(int *start_sector, int needed_sectors)
+zfs_embed(unsigned long long *start_sector, int needed_sectors)
 {
 	return (1);
 }

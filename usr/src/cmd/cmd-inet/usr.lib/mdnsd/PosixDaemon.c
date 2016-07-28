@@ -50,7 +50,7 @@ extern int daemon(int, int);
 #include "PlatformCommon.h"
 
 #ifndef MDNSD_USER
-#define MDNSD_USER "nobody"
+#define	MDNSD_USER "nobody"
 #endif
 
 #define CONFIG_FILE "/etc/mdnsd.conf"

@@ -290,7 +290,7 @@ loop:
 }
 
 int
-ffs_embed (int *start_sector, int needed_sectors)
+ffs_embed (unsigned long long *start_sector, int needed_sectors)
 {
   /* XXX: I don't know if this is really correct. Someone who is
      familiar with BSD should check for this.  */

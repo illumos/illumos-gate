@@ -27,6 +27,7 @@
 /*
  * Copyright 2016, Joyent, Inc.
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 RackTop Systems.
  */
 
 #include <sys/types.h>
@@ -1109,7 +1110,8 @@ tmp_remove(
 
 	if (tp->tn_type != VDIR ||
 	    (error = secpolicy_fs_linkdir(cred, dvp->v_vfsp)) == 0)
-		error = tdirdelete(parent, tp, nm, DR_REMOVE, cred);
+		error = tdirdelete(parent, tp, nm, tp->tn_type == VDIR ?
+		    DR_RMDIR : DR_REMOVE, cred);
 
 	rw_exit(&tp->tn_rwlock);
 	rw_exit(&parent->tn_rwlock);

@@ -1,6 +1,6 @@
 /* -*- Mode: C; tab-width: 4 -*-
  *
- * Copyright (c) 2012 Apple Computer, Inc. All rights reserved.
+ * Copyright (c) 2012-2013 Apple Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,6 +26,14 @@
 #ifndef ANONYMOUS_DISABLED
 
 #define ANON_NSEC3_ITERATIONS        1 
+
+struct AnonInfoResourceRecord_struct
+{
+    ResourceRecord resrec;
+    RData          rdatastorage;
+};
+
+typedef struct AnonInfoResourceRecord_struct AnonInfoResourceRecord;
 
 mDNSlocal mDNSBool InitializeNSEC3Record(ResourceRecord *rr, const mDNSu8 *AnonData, int len, mDNSu32 salt)
 {
@@ -118,9 +126,10 @@ mDNSlocal ResourceRecord *ConstructNSEC3Record(const domainname *service, const 
 
 mDNSlocal ResourceRecord *CopyNSEC3ResourceRecord(AnonymousInfo *si, const ResourceRecord *rr)
 {
-    int len;
+    AnonInfoResourceRecord *anonRR;
     domainname *name;
-    ResourceRecord *nsec3rr;
+    mDNSu32 neededLen;
+    mDNSu32 extraLen;
 
     if (rr->rdlength < MCAST_NSEC3_RDLENGTH)
     {
@@ -128,22 +137,26 @@ mDNSlocal ResourceRecord *CopyNSEC3ResourceRecord(AnonymousInfo *si, const Resou
         return mDNSNULL;
     }
     // Allocate space for the name and the rdata along with the ResourceRecord
-    len = DomainNameLength(rr->name);
-    nsec3rr = mDNSPlatformMemAllocate(sizeof(ResourceRecord) + len + sizeof(RData));
-    if (!nsec3rr)
+    neededLen = rr->rdlength + DomainNameLength(rr->name);
+    extraLen = (neededLen > sizeof(RDataBody)) ? (neededLen - sizeof(RDataBody)) : 0;
+    anonRR = (AnonInfoResourceRecord *)mDNSPlatformMemAllocate(sizeof(AnonInfoResourceRecord) + extraLen);
+    if (!anonRR)
         return mDNSNULL;
 
-    *nsec3rr = *rr;
-    name = (domainname *)((mDNSu8 *)nsec3rr + sizeof(ResourceRecord));
-    nsec3rr->name = (const domainname *)name;
+    anonRR->resrec = *rr;
+
+    anonRR->rdatastorage.MaxRDLength = rr->rdlength;
+    mDNSPlatformMemCopy(anonRR->rdatastorage.u.data, rr->rdata->u.data, rr->rdlength);
+
+    name = (domainname *)(anonRR->rdatastorage.u.data + rr->rdlength);
     AssignDomainName(name, rr->name);
 
-    nsec3rr->rdata = (RData *)((mDNSu8 *)nsec3rr->name + len);
-    mDNSPlatformMemCopy(nsec3rr->rdata->u.data, rr->rdata->u.data, rr->rdlength);
+    anonRR->resrec.name = name;
+    anonRR->resrec.rdata = &anonRR->rdatastorage;
 
-    si->nsec3RR = nsec3rr;
+    si->nsec3RR = (ResourceRecord *)anonRR;
 
-    return nsec3rr;
+    return si->nsec3RR;
 }
 
 // When a service is started or a browse is started with the Anonymous data, we allocate a new random

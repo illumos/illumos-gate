@@ -94,9 +94,9 @@ void ixgbe_dump_addr(void *, char *, const uint8_t *);
 #define	IXGBE_ERROR_ARGUMENT		"BAD ARGUMENT"
 #define	IXGBE_ERROR_UNSUPPORTED		"UNSUPPORTED"
 
-#define	ERROR_REPORT1(S, A)		DEBUGOUT1(S, A)
-#define	ERROR_REPORT2(S, A, B)		DEBUGOUT2(S, A, B)
-#define	ERROR_REPORT3(S, A, B, C)	DEBUGOUT3(S, A, B, C)
+#define	ERROR_REPORT1(S, A)		DEBUGOUT(S ":" A)
+#define	ERROR_REPORT2(S, A, B)		DEBUGOUT1(S ":" A, B)
+#define	ERROR_REPORT3(S, A, B, C)	DEBUGOUT2(S ":" A, B, C)
 
 #else
 
