@@ -58,7 +58,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 CFLAGS += $(CCVERBOSE)
 
-LDFLAGS += -dy -Nfs/sockfs -Nmisc/dls -Nmisc/mac -Ndrv/bpf -Ndrv/ip
+LDFLAGS += -dy -Nfs/sockfs -Nmisc/dls -Nmisc/mac -Ndrv/ip
 INC_PATH += -I$(UTSBASE)/common/inet/sockmods -I$(UTSBASE)/common/io/bpf
 
 #

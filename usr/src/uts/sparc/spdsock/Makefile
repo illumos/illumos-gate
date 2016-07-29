@@ -61,11 +61,6 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 LDFLAGS += -dy -Ndrv/ip
 
 #
-# Overrides
-#
-INC_PATH += -I$(UTSBASE)/common/io/bpf
-
-#
 # lint pass one enforcement
 #
 CFLAGS += $(CCVERBOSE)

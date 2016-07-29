@@ -60,8 +60,6 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #
 LDFLAGS += -dy -Ndrv/ip
 
-INC_PATH += -I$(UTSBASE)/common/io/bpf
-
 #
 # For now, disable these lint checks; maintainers should endeavor
 # to investigate and remove these for maximum lint coverage.

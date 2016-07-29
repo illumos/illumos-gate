@@ -568,6 +568,7 @@ IP_OBJS +=	igmp.o ipmp.o ip.o ip6.o ip6_asp.o ip6_if.o ip6_ire.o \
 		ip_helper_stream.o ip_tunables.o \
 		ip_output.o ip_input.o ip6_input.o ip6_output.o ip_arp.o \
 		conn_opt.o ip_attr.o ip_dce.o \
+		bpf_filter.o \
 		$(IP_ICMP_OBJS) \
 		$(IP_RTS_OBJS) \
 		$(IP_TCP_OBJS) \
@@ -648,7 +649,7 @@ TL_OBJS +=	tl.o
 
 DUMP_OBJS +=	dump.o
 
-BPF_OBJS +=	bpf.o bpf_filter.o bpf_mod.o bpf_dlt.o bpf_mac.o
+BPF_OBJS +=	bpf.o bpf_wrap.o bpf_mod.o bpf_dlt.o bpf_mac.o
 
 CLONE_OBJS +=	clone.o
 
