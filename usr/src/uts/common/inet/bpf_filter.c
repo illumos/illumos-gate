@@ -38,6 +38,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include <sys/param.h>
@@ -45,11 +46,12 @@
 #include <sys/stream.h>
 #include <sys/byteorder.h>
 #include <sys/sdt.h>
+#include <inet/bpf.h>
+#include <net/bpf.h>
 
 #define	EXTRACT_SHORT(p)	BE_IN16(p)
 #define	EXTRACT_LONG(p)		BE_IN32(p)
 
-#ifdef _KERNEL
 #define	M_LEN(_m)	((_m)->b_wptr - (_m)->b_rptr)
 #define	mtod(_a, _t)	((_t)((_a)->b_rptr))
 #define	MINDEX(len, m, k) 		\
@@ -123,11 +125,7 @@ m_xhalf(mblk_t *m, uint32_t k, int *err)
 	*err = 0;
 	return ((cp[0] << 8) | mtod(m0, uchar_t *)[0]);
 }
-#else /* _KERNEL */
-#include <stdlib.h>
-#endif /* !_KERNEL */
 
-#include <net/bpf.h>
 
 /*
  * Execute the filter program starting at pc on the packet p
@@ -137,8 +135,8 @@ m_xhalf(mblk_t *m, uint32_t k, int *err)
  * packet is only in one mblk_t.
  * When buflen is 0, p is an mblk_t pointer.
  */
-uint_t
-bpf_filter(struct bpf_insn *pc, uchar_t *p, uint_t wirelen, uint_t buflen)
+uint32_t
+ip_bpf_filter(ip_bpf_insn_t *pc, uchar_t *p, uint_t wirelen, uint_t buflen)
 {
 	uint32_t A, X, k;
 	uint32_t mem[BPF_MEMWORDS];
@@ -147,7 +145,7 @@ bpf_filter(struct bpf_insn *pc, uchar_t *p, uint_t wirelen, uint_t buflen)
 		/*
 		 * No filter means accept all.
 		 */
-		return ((uint_t)-1);
+		return ((uint32_t)-1);
 	A = 0;
 	X = 0;
 	--pc;
@@ -165,10 +163,10 @@ bpf_filter(struct bpf_insn *pc, uchar_t *p, uint_t wirelen, uint_t buflen)
 			abort();
 #endif
 		case BPF_RET|BPF_K:
-			return ((uint_t)pc->k);
+			return (pc->k);
 
 		case BPF_RET|BPF_A:
-			return ((uint_t)A);
+			return (A);
 
 		case BPF_LD|BPF_W|BPF_ABS:
 			k = pc->k;
@@ -456,7 +454,6 @@ bpf_filter(struct bpf_insn *pc, uchar_t *p, uint_t wirelen, uint_t buflen)
 	/* NOTREACHED */
 }
 
-#ifdef _KERNEL
 /*
  * Return true if the 'fcode' is a valid filter program.
  * The constraints are that each jump be forward and to a valid
@@ -468,14 +465,14 @@ bpf_filter(struct bpf_insn *pc, uchar_t *p, uint_t wirelen, uint_t buflen)
  * The kernel needs to be able to verify an application's filter code.
  * Otherwise, a bogus program could easily crash the system.
  */
-int
-bpf_validate(struct bpf_insn *f, int len)
+boolean_t
+ip_bpf_validate(ip_bpf_insn_t *f, uint_t len)
 {
 	uint_t i, from;
-	struct bpf_insn *p;
+	ip_bpf_insn_t *p;
 
 	if (len < 1 || len > BPF_MAXINSNS)
-		return (0);
+		return (B_FALSE);
 
 	for (i = 0; i < len; ++i) {
 		p = &f[i];
@@ -489,7 +486,7 @@ bpf_validate(struct bpf_insn *f, int len)
 			switch (BPF_MODE(p->code)) {
 			case BPF_MEM:
 				if (p->k >= BPF_MEMWORDS)
-					return (0);
+					return (B_FALSE);
 				break;
 			case BPF_ABS:
 			case BPF_IND:
@@ -498,13 +495,13 @@ bpf_validate(struct bpf_insn *f, int len)
 			case BPF_LEN:
 				break;
 			default:
-				return (0);
+				return (B_FALSE);
 			}
 			break;
 		case BPF_ST:
 		case BPF_STX:
 			if (p->k >= BPF_MEMWORDS)
-				return (0);
+				return (B_FALSE);
 			break;
 		case BPF_ALU:
 			switch (BPF_OP(p->code)) {
@@ -522,10 +519,10 @@ bpf_validate(struct bpf_insn *f, int len)
 				 * Check for constant division by 0.
 				 */
 				if (BPF_RVAL(p->code) == BPF_K && p->k == 0)
-					return (0);
+					return (B_FALSE);
 				break;
 			default:
-				return (0);
+				return (B_FALSE);
 			}
 			break;
 		case BPF_JMP:
@@ -549,17 +546,17 @@ bpf_validate(struct bpf_insn *f, int len)
 			switch (BPF_OP(p->code)) {
 			case BPF_JA:
 				if (from + p->k < from || from + p->k >= len)
-					return (0);
+					return (B_FALSE);
 				break;
 			case BPF_JEQ:
 			case BPF_JGT:
 			case BPF_JGE:
 			case BPF_JSET:
 				if (from + p->jt >= len || from + p->jf >= len)
-					return (0);
+					return (B_FALSE);
 				break;
 			default:
-				return (0);
+				return (B_FALSE);
 			}
 			break;
 		case BPF_RET:
@@ -567,10 +564,9 @@ bpf_validate(struct bpf_insn *f, int len)
 		case BPF_MISC:
 			break;
 		default:
-			return (0);
+			return (B_FALSE);
 		}
 	}
 
 	return (BPF_CLASS(f[len - 1].code) == BPF_RET);
 }
-#endif

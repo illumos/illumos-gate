@@ -60,7 +60,6 @@ CFLAGS				+= $(CCVERBOSE)
 $(RELEASE_BUILD)CFLAGS		+= -xinline=auto -xcrossfile
 $(RELEASE_BUILD)COPTIMIZE	= -xO5
 LDFLAGS				+= -dy
-INC_PATH			+= -I$(UTSBASE)/common/io/bpf
 
 LINTTAGS			+= -erroff=E_PTRDIFF_OVERFLOW
 LINTTAGS			+= -erroff=E_BAD_PTR_CAST_ALIGN

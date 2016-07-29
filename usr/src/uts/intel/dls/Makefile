@@ -53,7 +53,6 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 CFLAGS		+= $(CCVERBOSE)
 LDFLAGS		+= -dy -N misc/mac
-INC_PATH	+= -I$(UTSBASE)/common/io/bpf
 
 #
 # For now, disable these lint checks; maintainers should endeavor

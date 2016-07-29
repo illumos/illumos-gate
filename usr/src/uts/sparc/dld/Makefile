@@ -57,7 +57,6 @@ CFLAGS				+= $(CCVERBOSE)
 $(RELEASE_BUILD)CFLAGS		+= -xinline=auto -xcrossfile
 $(RELEASE_BUILD)COPTIMIZE	= -xO5
 LDFLAGS				+= -dy -N misc/dls -N misc/mac
-INC_PATH			+= -I$(UTSBASE)/common/io/bpf
 
 #
 # For now, disable these lint checks; maintainers should endeavor

@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015 Joyent, Inc. All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -51,6 +51,7 @@
 #include <sys/mac_client.h>
 #include <sys/mac_provider.h>
 #include <sys/mac_client_priv.h>
+#include <inet/bpf.h>
 
 #include <netpacket/packet.h>
 
@@ -448,7 +449,7 @@ pfp_packet(void *arg, mac_resource_handle_t mrh, mblk_t *mp, boolean_t flag)
 			buffer = (uchar_t *)mp;
 		}
 		rw_enter(&ps->ps_bpflock, RW_READER);
-		if (bpf_filter(ps->ps_bpf.bf_insns, buffer,
+		if (ip_bpf_filter((ip_bpf_insn_t *)ps->ps_bpf.bf_insns, buffer,
 		    hdr.mhi_pktsize, buflen) == 0) {
 			rw_exit(&ps->ps_bpflock);
 			ps->ps_stats.tp_drops++;
@@ -1336,7 +1337,7 @@ pfp_setsocket_sockopt(sock_lower_handle_t handle, int option_name,
     const void *optval, socklen_t optlen)
 {
 	struct bpf_program prog;
-	struct bpf_insn *fcode;
+	ip_bpf_insn_t *fcode;
 	struct pfpsock *ps;
 	struct sock_proto_props sopp;
 	int error = 0;
@@ -1370,10 +1371,10 @@ pfp_setsocket_sockopt(sock_lower_handle_t handle, int option_name,
 			return (EFAULT);
 		}
 
-		if (bpf_validate(fcode, (int)prog.bf_len)) {
+		if (ip_bpf_validate(fcode, prog.bf_len)) {
 			rw_enter(&ps->ps_bpflock, RW_WRITER);
 			pfp_release_bpf(ps);
-			ps->ps_bpf.bf_insns = fcode;
+			ps->ps_bpf.bf_insns = (struct bpf_insn *)fcode;
 			ps->ps_bpf.bf_len = size;
 			rw_exit(&ps->ps_bpflock);
 
