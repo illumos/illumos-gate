@@ -22,6 +22,7 @@
 # uts/sparc/icmp/Makefile
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2016 Joyent, Inc.
 #
 #	This makefile drives the production of the icmp IP driver
 #
@@ -61,6 +62,8 @@ include $(UTSBASE)/sparc/Makefile.sparc
 ALL_TARGET	= $(BINARY) $(SRC_CONFFILE)
 LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTLINK) $(ROOT_CONFFILE)
+
+INC_PATH	+= -I$(UTSBASE)/common/io/bpf
 
 #
 # lint pass one enforcement
