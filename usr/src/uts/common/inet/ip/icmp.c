@@ -22,6 +22,7 @@
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -80,6 +81,7 @@
 #include <sys/tsol/tnet.h>
 
 #include <inet/rawip_impl.h>
+#include <net/bpf.h>
 
 #include <sys/disp.h>
 
@@ -1009,6 +1011,12 @@ icmp_close_free(conn_t *connp)
 	if (icmp->icmp_filter != NULL) {
 		kmem_free(icmp->icmp_filter, sizeof (icmp6_filter_t));
 		icmp->icmp_filter = NULL;
+	}
+
+	if (icmp->icmp_bpf_len != 0) {
+		kmem_free(icmp->icmp_bpf_prog, icmp->icmp_bpf_len);
+		icmp->icmp_bpf_len = 0;
+		icmp->icmp_bpf_prog = NULL;
 	}
 
 	/*
@@ -1964,6 +1972,104 @@ icmp_tpi_opt_get(queue_t *q, int level, int name, uchar_t *ptr)
 	return (err);
 }
 
+static int
+icmp_attach_filter(icmp_t *icmp, uint_t inlen, const uchar_t *invalp)
+{
+	struct bpf_program prog;
+	ip_bpf_insn_t *insns = NULL;
+	unsigned int size;
+
+#ifdef _LP64
+	if (get_udatamodel() != DATAMODEL_NATIVE) {
+		struct bpf_program32 *prog32;
+
+		if (inlen != sizeof (struct bpf_program32)) {
+			return (EINVAL);
+		}
+		prog32 = (struct bpf_program32 *)invalp;
+		prog.bf_len = prog32->bf_len;
+		prog.bf_insns = (void *)(uint64_t)prog32->bf_insns;
+	} else
+#endif
+	if (inlen == sizeof (struct bpf_program)) {
+		bcopy(invalp, &prog, sizeof (prog));
+	} else {
+		return (EINVAL);
+	}
+
+	if (prog.bf_len > BPF_MAXINSNS || prog.bf_len == 0) {
+		return (EINVAL);
+	}
+	size = prog.bf_len * sizeof (struct bpf_insn);
+	insns = kmem_alloc(size, KM_SLEEP);
+	if (copyin(prog.bf_insns, insns, size) != 0) {
+		kmem_free(insns, size);
+		return (EFAULT);
+	}
+	if (!ip_bpf_validate(insns, prog.bf_len)) {
+		kmem_free(insns, size);
+		return (EINVAL);
+	}
+
+	rw_enter(&icmp->icmp_bpf_lock, RW_WRITER);
+	if (icmp->icmp_bpf_len != 0) {
+		ASSERT(icmp->icmp_bpf_prog != NULL);
+
+		kmem_free(icmp->icmp_bpf_prog, icmp->icmp_bpf_len);
+	}
+	icmp->icmp_bpf_len = size;
+	icmp->icmp_bpf_prog = insns;
+	rw_exit(&icmp->icmp_bpf_lock);
+	return (0);
+}
+
+static int
+icmp_detach_filter(icmp_t *icmp)
+{
+	int error;
+
+	rw_enter(&icmp->icmp_bpf_lock, RW_WRITER);
+	if (icmp->icmp_bpf_len == 0) {
+		ASSERT(icmp->icmp_bpf_prog == NULL);
+		error = ENOENT;
+	} else {
+		kmem_free(icmp->icmp_bpf_prog,
+		    icmp->icmp_bpf_len);
+		icmp->icmp_bpf_len = 0;
+		icmp->icmp_bpf_prog = NULL;
+		error = 0;
+	}
+	rw_exit(&icmp->icmp_bpf_lock);
+	return (error);
+}
+
+static boolean_t
+icmp_eval_filter(icmp_t *icmp, mblk_t *mp, ip_recv_attr_t *ira)
+{
+	boolean_t res;
+	uchar_t *buf = mp->b_rptr;
+	uint_t wirelen, len = MBLKL(mp);
+
+	rw_enter(&icmp->icmp_bpf_lock, RW_READER);
+	if (icmp->icmp_bpf_len == 0) {
+		rw_exit(&icmp->icmp_bpf_lock);
+		return (B_FALSE);
+	}
+	if (ira->ira_flags & IRAF_IS_IPV4) {
+		ipha_t *ipha = (ipha_t *)buf;
+
+		wirelen = ntohs(ipha->ipha_length);
+	} else {
+		ip6_t *ip6h = (ip6_t *)buf;
+
+		wirelen = ntohs(ip6h->ip6_plen) + IPV6_HDR_LEN;
+	}
+	res = !ip_bpf_filter(icmp->icmp_bpf_prog, buf, wirelen, len);
+	rw_exit(&icmp->icmp_bpf_lock);
+
+	return (res);
+}
+
 /*
  * This routine sets socket options.
  */
@@ -2053,6 +2159,10 @@ icmp_do_opt_set(conn_opt_arg_t *coa, int level, int name,
 				return (ENOBUFS);
 			}
 			break;
+		case SO_ATTACH_FILTER:
+			return (icmp_attach_filter(icmp, inlen, invalp));
+		case SO_DETACH_FILTER:
+			return (icmp_detach_filter(icmp));
 		}
 		break;
 
@@ -2597,6 +2707,14 @@ icmp_input(void *arg1, mblk_t *mp, void *arg2, ip_recv_attr_t *ira)
 
 	/* Initialize regardless of IP version */
 	ipps.ipp_fields = 0;
+
+	/* Apply socket filter, if needed */
+	if (icmp->icmp_bpf_len != 0) {
+		if (icmp_eval_filter(icmp, mp, ira)) {
+			freemsg(mp);
+			return;
+		}
+	}
 
 	if (ira->ira_flags & IRAF_IS_IPV4) {
 		ASSERT(IPH_HDR_VERSION(rptr) == IPV4_VERSION);
@@ -5027,7 +5145,8 @@ rawip_stack_fini(netstackid_t stackid, void *arg)
 }
 
 static void *
-rawip_kstat_init(netstackid_t stackid) {
+rawip_kstat_init(netstackid_t stackid)
+{
 	kstat_t	*ksp;
 
 	rawip_named_kstat_t template = {
@@ -5039,9 +5158,7 @@ rawip_kstat_init(netstackid_t stackid) {
 	};
 
 	ksp = kstat_create_netstack("icmp", 0, "rawip", "mib2",
-					KSTAT_TYPE_NAMED,
-					NUM_OF_FIELDS(rawip_named_kstat_t),
-					0, stackid);
+	    KSTAT_TYPE_NAMED, NUM_OF_FIELDS(rawip_named_kstat_t), 0, stackid);
 	if (ksp == NULL || ksp->ks_data == NULL)
 		return (NULL);
 

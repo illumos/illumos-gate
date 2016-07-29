@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2000, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -43,6 +44,7 @@ extern "C" {
 #include <inet/ip.h>
 #include <inet/optcom.h>
 #include <inet/tunables.h>
+#include <inet/bpf.h>
 
 /*
  * ICMP stack instances
@@ -84,6 +86,10 @@ typedef	struct icmp_s {
 	mblk_t		*icmp_fallback_queue_head;
 	mblk_t		*icmp_fallback_queue_tail;
 	struct sockaddr_storage	icmp_delayed_addr;
+
+	krwlock_t	icmp_bpf_lock;	/* protects icmp_bpf */
+	ip_bpf_insn_t	*icmp_bpf_prog; /* SO_ATTACH_FILTER bpf */
+	uint_t		icmp_bpf_len;
 } icmp_t;
 
 /*

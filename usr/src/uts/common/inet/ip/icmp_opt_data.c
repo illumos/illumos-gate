@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -41,6 +42,7 @@
 #include <netinet/ip_mroute.h>
 #include <inet/optcom.h>
 #include <inet/rawip_impl.h>
+#include <net/bpf.h>
 
 /*
  * Table of all known options handled on a ICMP protocol stack.
@@ -85,6 +87,10 @@ opdes_t	icmp_opt_arr[] = {
 { SO_ALLZONES, SOL_SOCKET, OA_R, OA_RW, OP_CONFIG, 0, sizeof (int),
 	0 },
 { SO_DOMAIN,	SOL_SOCKET, OA_R, OA_R, OP_NP, 0, sizeof (int), 0 },
+
+{ SO_ATTACH_FILTER,	SOL_SOCKET, OA_W, OA_W, OP_NP, 0,
+	sizeof (struct bpf_program), 0 },
+{ SO_DETACH_FILTER,	SOL_SOCKET, OA_W, OA_W, OP_NP, 0, 0, 0 },
 
 { IP_OPTIONS,	IPPROTO_IP, OA_RW, OA_RW, OP_NP,
 	(OP_VARLEN|OP_NODEFAULT),

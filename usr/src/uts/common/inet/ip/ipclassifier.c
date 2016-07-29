@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*
@@ -2117,6 +2117,7 @@ rawip_conn_constructor(void *buf, void *cdrarg, int kmflags)
 	connp->conn_flags = IPCL_RAWIPCONN;
 	connp->conn_proto = IPPROTO_ICMP;
 	icmp->icmp_connp = connp;
+	rw_init(&icmp->icmp_bpf_lock, NULL, RW_DEFAULT, NULL);
 	rw_init(&connp->conn_ilg_lock, NULL, RW_DEFAULT, NULL);
 	connp->conn_ixa = kmem_zalloc(sizeof (ip_xmit_attr_t), kmflags);
 	if (connp->conn_ixa == NULL)
@@ -2141,6 +2142,7 @@ rawip_conn_destructor(void *buf, void *cdrarg)
 	mutex_destroy(&connp->conn_lock);
 	cv_destroy(&connp->conn_cv);
 	rw_destroy(&connp->conn_ilg_lock);
+	rw_destroy(&icmp->icmp_bpf_lock);
 
 	/* Can be NULL if constructor failed */
 	if (connp->conn_ixa != NULL) {
