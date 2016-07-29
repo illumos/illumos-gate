@@ -75,9 +75,6 @@ static pthread_attr_t pgn_attr;
 static pthread_attr_t pgn_thr_attr;
 static pthread_barrier_t pgn_barrier;
 
-#ifdef	__sparc
-#define	gregs	__gregs
-#endif
 
 /*
  * Verify that the stack pointer of a context is consistent with where the
@@ -100,9 +97,6 @@ pgn_verif_thr_stack(pthread_attr_t *attr)
 	VERIFY3U(sp, <, (uintptr_t)stk + stksz);
 }
 
-#ifdef	__sparc
-#undef	gregs
-#endif
 
 static void
 pgn_test_fini(void)
