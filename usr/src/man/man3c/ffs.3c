@@ -31,7 +31,7 @@ ffs \- find first set bit
 
 .SH DESCRIPTION
 .LP
-The \fBffs()\fR, \fBffsl()\, and \fBffsll()\fR functions finds the first bit set
+The \fBffs()\fR, \fBffsl()\fR, and \fBffsll()\fR functions finds the first bit set
 (beginning with the least significant bit) and return the index of that bit.
 Bits are numbered starting at one (the least significant bit).
 .sp
