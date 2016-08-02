@@ -364,7 +364,6 @@ poll_common(pollstate_t *ps, pollfd_t *fds, nfds_t nfds, timespec_t *tsp,
     int *fdcnt)
 {
 	kthread_t *t = curthread;
-	proc_t *p = ttoproc(t);
 	hrtime_t deadline; /* hrtime value when we want to return */
 	pollfd_t *pollfdp;
 	pollcache_t *pcp;
@@ -378,11 +377,34 @@ poll_common(pollstate_t *ps, pollfd_t *fds, nfds_t nfds, timespec_t *tsp,
 		deadline = -1;
 	} else if (tsp->tv_sec == 0 && tsp->tv_nsec == 0) {
 		deadline = 0;
+	} else if (tsp->tv_sec >= HRTIME_MAX/NANOSEC) {
+		/* Use an indefinite timeout if tv_sec would cause overflow */
+		deadline = -1;
 	} else {
+		/*
+		 * The above check, when combined with the protections offered
+		 * by itimerspecfix (ensuring that neither field is negative
+		 * and that tv_nsec represents less than a whole second), will
+		 * prevent overflow during the conversion from timespec_t to
+		 * uhrtime_t.
+		 */
+		uhrtime_t utime = tsp->tv_sec * NANOSEC;
+		utime += tsp->tv_nsec;
+
 		/* They must wait at least a tick. */
-		deadline = ((hrtime_t)tsp->tv_sec * NANOSEC) + tsp->tv_nsec;
-		deadline = MAX(deadline, nsec_per_tick);
-		deadline += gethrtime();
+		utime = MAX(utime, nsec_per_tick);
+
+		/*
+		 * Since utime has an upper bound of HRTIME_MAX, adding the
+		 * gethrtime() result cannot incur an overflow as the unsigned
+		 * type has an adequate bound.
+		 */
+		utime += (uhrtime_t)gethrtime();
+		if (utime > HRTIME_MAX) {
+			deadline = -1;
+		} else {
+			deadline = (hrtime_t)utime;
+		}
 	}
 
 	/*

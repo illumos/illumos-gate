@@ -15,6 +15,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*
@@ -260,6 +261,14 @@ struct itimerval32 {
 typedef	longlong_t	hrtime_t;
 
 #if defined(_KERNEL) || defined(_FAKE_KERNEL)
+
+/*
+ * Unsigned counterpart to hrtime_t
+ */
+typedef	u_longlong_t	uhrtime_t;
+
+#define	HRTIME_MAX	LLONG_MAX
+#define	UHRTIME_MAX	ULLONG_MAX
 
 #include <sys/time_impl.h>
 #include <sys/mutex.h>
