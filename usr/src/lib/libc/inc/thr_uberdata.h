@@ -1185,6 +1185,7 @@ typedef struct uberdata32 {
 	caddr32_t	robustlocks;
 	caddr32_t	robustlist;
 	caddr32_t	progname;
+	caddr32_t	ub_broot;
 	caddr32_t	ub_comm_page;
 	caddr32_t	tdb_bootstrap;
 	tdb32_t		tdb;
