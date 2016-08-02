@@ -4443,7 +4443,7 @@ s32 ixgbe_host_interface_command(struct ixgbe_hw *hw, u32 *buffer,
 	/* first pull in the header so we know the buffer length */
 	for (bi = 0; bi < dword_len; bi++) {
 		buffer[bi] = IXGBE_READ_REG_ARRAY(hw, IXGBE_FLEX_MNG, bi);
-		IXGBE_LE32_TO_CPUS(&buffer[bi]);
+		buffer[bi] = IXGBE_LE32_TO_CPUS(buffer[bi]);
 	}
 
 	/* If there is any thing in data position pull it in */
@@ -4462,7 +4462,7 @@ s32 ixgbe_host_interface_command(struct ixgbe_hw *hw, u32 *buffer,
 	/* Pull in the rest of the buffer (bi is where we left off) */
 	for (; bi <= dword_len; bi++) {
 		buffer[bi] = IXGBE_READ_REG_ARRAY(hw, IXGBE_FLEX_MNG, bi);
-		IXGBE_LE32_TO_CPUS(&buffer[bi]);
+		buffer[bi] = IXGBE_LE32_TO_CPUS(buffer[bi]);
 	}
 
 	return 0;
