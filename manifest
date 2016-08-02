@@ -10263,6 +10263,8 @@ f usr/sadm/ugdates 0444 root bin
 d usr/sbin 0755 root bin
 f usr/sbin/6to4relay 0555 root bin
 f usr/sbin/acctadm 0555 root bin
+f usr/sbin/acpidump 0555 root bin
+f usr/sbin/acpixtract 0555 root bin
 h usr/sbin/add_drv=usr/lib/isaexec
 f usr/sbin/allocate 4555 root bin
 d usr/sbin/amd64 0755 root bin
@@ -11856,6 +11858,8 @@ d usr/share/man/man1m 0755 root bin
 f usr/share/man/man1m/6to4relay.1m 0444 root bin
 f usr/share/man/man1m/Intro.1m 0444 root bin
 f usr/share/man/man1m/acctadm.1m 0444 root bin
+f usr/share/man/man1m/acpidump.1m 0444 root bin
+f usr/share/man/man1m/acpixtract.1m 0444 root bin
 f usr/share/man/man1m/add_drv.1m 0444 root bin
 f usr/share/man/man1m/addbadsec.1m 0444 root bin
 f usr/share/man/man1m/arcstat.1m 0444 root bin

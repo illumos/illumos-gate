@@ -1,0 +1,44 @@
+
+
+This file and its contents are supplied under the terms of the
+Common Development and Distribution License ("CDDL"), version 1.0.
+You may only use this file in accordance with the terms of version
+1.0 of the CDDL.
+
+A full copy of the text of the CDDL should have accompanied this
+source.  A copy of the CDDL is also available via the Internet at
+http://www.illumos.org/license/CDDL.
+
+Copyright 2016 Joyent, Inc.
+
+---
+
+There is a bug in the interaction of acpidump and acpixtract when the table
+size is greater than 1MB. The acpixtract code will stop parsing a table if
+the first character on a line is not a space (' '). The acpidump code will
+overflow the offset into the first character after 1MB. Until this is fixed
+upstream, the following patch can be used against new versions of the acpi
+source.
+
+
+--- a/usr/src/cmd/acpi/acpidump/utbuffer.c
++++ b/usr/src/cmd/acpi/acpidump/utbuffer.c
+@@ -97,7 +97,7 @@ AcpiUtDumpBuffer (
+     {
+         /* Print current offset */
+ 
+-        AcpiOsPrintf ("%6.4X: ", (BaseOffset + i));
++        AcpiOsPrintf ("%7.4X: ", (BaseOffset + i));
+ 
+         /* Print 16 hex chars */
+ 
+@@ -279,7 +279,7 @@ AcpiUtDumpBufferToFile (
+     {
+         /* Print current offset */
+ 
+-        AcpiUtFilePrintf (File, "%6.4X: ", (BaseOffset + i));
++        AcpiUtFilePrintf (File, "%7.4X: ", (BaseOffset + i));
+ 
+         /* Print 16 hex chars */
+ 
+

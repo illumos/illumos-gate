@@ -37,7 +37,14 @@ extern "C" {
 #include <sys/varargs.h>
 #include <sys/cpu.h>
 #include <sys/thread.h>
+
+#ifdef _KERNEL
 #include <sys/ctype.h>
+#else
+#include <ctype.h>
+#include <strings.h>
+#include <stdlib.h>
+#endif
 
 /* Function name used for debug output. */
 #define	ACPI_GET_FUNCTION_NAME	__func__
@@ -52,9 +59,6 @@ uint32_t acpi_strtoul(const char *, char **, int);
 #elif	defined(_LP64)
 #define	ACPI_MACHINE_WIDTH	64
 #endif
-
-#define	toupper(x)	(islower(x) ? (x) - 'a' + 'A' : (x))
-#define	tolower(x)	(isupper(x) ? (x) - 'A' + 'a' : (x))
 
 #define	COMPILER_DEPENDENT_INT64	int64_t
 #define	COMPILER_DEPENDENT_UINT64	uint64_t
@@ -82,7 +86,11 @@ uint32_t acpi_strtoul(const char *, char **, int);
 #define	ACPI_INTERNAL_XFACE
 #define	ACPI_INTERNAL_VAR_XFACE
 
+#ifdef _KERNEL
 #define	strtoul(s, r, b)	acpi_strtoul(s, r, b)
+#define	toupper(x)		(islower(x) ? (x) - 'a' + 'A' : (x))
+#define	tolower(x)		(isupper(x) ? (x) - 'A' + 'a' : (x))
+#endif
 
 #define	ACPI_ASM_MACROS
 #define	BREAKPOINT3
