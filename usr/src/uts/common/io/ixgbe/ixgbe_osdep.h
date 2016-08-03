@@ -112,8 +112,8 @@ void ixgbe_write_pci_cfg(struct ixgbe_hw *, uint32_t, uint32_t);
 #ifdef _BIG_ENDIAN
 #define	IXGBE_CPU_TO_LE32	BSWAP_32
 #define	IXGBE_LE32_TO_CPUS	BSWAP_32
-#define	IXGBE_CPU_TO_BE16	(x)
-#define	IXGBE_CPU_TO_BE32	(x)
+#define	IXGBE_CPU_TO_BE16(x)	(x)
+#define	IXGBE_CPU_TO_BE32(x)	(x)
 #else
 #define	IXGBE_CPU_TO_LE32(x)	(x)
 #define	IXGBE_LE32_TO_CPUS(x)	(x)

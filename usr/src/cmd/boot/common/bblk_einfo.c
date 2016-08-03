@@ -189,7 +189,7 @@ print_einfo(uint8_t flags, bblk_einfo_t *einfo, unsigned long bufsize)
 	int		i = 0;
 	char		*version;
 	boolean_t	has_hash = B_FALSE;
-	unsigned char	*hash;
+	unsigned char	*hash = NULL;
 
 	if (einfo->str_off + einfo->str_size > bufsize) {
 		(void) fprintf(stdout, gettext("String offset %d is beyond the "

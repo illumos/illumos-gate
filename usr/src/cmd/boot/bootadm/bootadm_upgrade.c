@@ -93,7 +93,7 @@ get_findroot_cap(const char *osroot)
 		bam_is_findroot = BAM_FINDROOT_ABSENT;
 		BAM_DPRINTF((D_FINDROOT_ABSENT, fcn));
 	}
-out:
+
 	ret = fclose(fp);
 	error = errno;
 	INJECT_ERROR1("GET_CAP_FINDROOT_FCLOSE", ret = 1);
@@ -409,7 +409,7 @@ cvt_kernel_line(line_t *line, const char *osroot, entry_t *entry)
 	 *
 	 * old_ptr is either at "flags1" or "unix"
 	 */
-	if (unix_ptr = strstr(old_ptr, "/unix")) {
+	if ((unix_ptr = strstr(old_ptr, "/unix")) != NULL) {
 
 		/*
 		 * There is a  unix.
@@ -702,12 +702,13 @@ bam_add_findroot(menu_t *mp, char *grubsign, char *grubroot, int root_opt)
 
 	bam_print(CVT_FINDROOT);
 
-	entry = mp->entries;
-	for (; entry = find_matching_entry(entry, grubsign, grubroot, root_opt);
-	    entry = entry->next) {
+	entry = find_matching_entry(mp->entries, grubsign, grubroot, root_opt);
+	while (entry != NULL) {
 		if (entry->flags & BAM_ENTRY_FINDROOT) {
 			/* already converted */
 			BAM_DPRINTF((D_ALREADY_FINDROOT, fcn, entry->entryNum));
+			entry = find_matching_entry(entry->next, grubsign,
+			    grubroot, root_opt);
 			continue;
 		}
 		for (line = entry->start; line; line = line->next) {
@@ -747,6 +748,8 @@ bam_add_findroot(menu_t *mp, char *grubsign, char *grubroot, int root_opt)
 				break;
 			}
 		}
+		entry = find_matching_entry(entry->next, grubsign, grubroot,
+		    root_opt);
 	}
 
 	if (update_num) {
@@ -766,13 +769,14 @@ bam_add_hv(menu_t *mp, char *grubsign, char *grubroot, int root_opt)
 
 	bam_print(CVT_HV);
 
-	entry = mp->entries;
-	for (; entry = find_matching_entry(entry, grubsign, grubroot, root_opt);
-	    entry = entry->next) {
+	entry = find_matching_entry(mp->entries, grubsign, grubroot, root_opt);
+	while (entry != NULL) {
 		if (entry->flags & BAM_ENTRY_HV) {
 			BAM_DPRINTF((D_ALREADY_HV, fcn, entry->entryNum));
 			return (BAM_SUCCESS);
 		}
+		entry = find_matching_entry(entry->next, grubsign, grubroot,
+		    root_opt);
 	}
 
 	(void) add_boot_entry(mp, NEW_HV_ENTRY, grubsign, XEN_MENU,
@@ -803,9 +807,8 @@ bam_add_dboot(
 
 	bam_print(CVT_DBOOT);
 
-	entry = mp->entries;
-	for (; entry = find_matching_entry(entry, grubsign, grubroot, root_opt);
-	    entry = entry->next) {
+	entry = find_matching_entry(mp->entries, grubsign, grubroot, root_opt);
+	while (entry != NULL) {
 		for (line = entry->start; line; line = line->next) {
 			if (line->cmd == NULL || line->arg == NULL) {
 				if (line == entry->end) {
@@ -857,6 +860,8 @@ bam_add_dboot(
 				break;
 			}
 		}
+		entry = find_matching_entry(entry->next, grubsign, grubroot,
+		    root_opt);
 	}
 
 	ret = msg ? BAM_MSG : BAM_SUCCESS;

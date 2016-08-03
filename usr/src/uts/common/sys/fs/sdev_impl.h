@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2015, 2016 Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2014 by Delphix. All rights reserved.
  */
 
 #ifndef _SYS_SDEV_IMPL_H
@@ -581,20 +582,20 @@ extern int sdev_debug;
 #define	sdcmn_err13(args) if (sdev_debug & SDEV_DEBUG_ZVOL) printf args
 #define	impossible(args) printf args
 #else
-#define	sdcmn_err(args)		/* does nothing */
-#define	sdcmn_err2(args)	/* does nothing */
-#define	sdcmn_err3(args)	/* does nothing */
-#define	sdcmn_err4(args)	/* does nothing */
-#define	sdcmn_err5(args)	/* does nothing */
-#define	sdcmn_err6(args)	/* does nothing */
-#define	sdcmn_err7(args)	/* does nothing */
-#define	sdcmn_err8(args)	/* does nothing */
-#define	sdcmn_err9(args)	/* does nothing */
-#define	sdcmn_err10(args)	/* does nothing */
-#define	sdcmn_err11(args)	/* does nothing */
-#define	sdcmn_err12(args)	/* does nothing */
-#define	sdcmn_err13(args) 	/* does nothing */
-#define	impossible(args)	/* does nothing */
+#define	sdcmn_err(args)		((void)0)
+#define	sdcmn_err2(args)	((void)0)
+#define	sdcmn_err3(args)	((void)0)
+#define	sdcmn_err4(args)	((void)0)
+#define	sdcmn_err5(args)	((void)0)
+#define	sdcmn_err6(args)	((void)0)
+#define	sdcmn_err7(args)	((void)0)
+#define	sdcmn_err8(args)	((void)0)
+#define	sdcmn_err9(args)	((void)0)
+#define	sdcmn_err10(args)	((void)0)
+#define	sdcmn_err11(args)	((void)0)
+#define	sdcmn_err12(args)	((void)0)
+#define	sdcmn_err13(args)	((void)0)
+#define	impossible(args)	((void)0)
 #endif
 
 #ifdef DEBUG
@@ -606,7 +607,7 @@ extern int sdev_debug;
 		    __LINE__);						\
 	}
 #else
-#define	SD_TRACE_FAILED_LOOKUP(ddv, nm, retried)
+#define	SD_TRACE_FAILED_LOOKUP(ddv, nm, retried)	((void)0)
 #endif
 
 #endif	/* _KERNEL */

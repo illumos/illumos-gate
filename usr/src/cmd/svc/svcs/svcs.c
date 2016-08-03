@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2015 by Delphix. All rights reserved.
  */
 
 /*
@@ -3810,6 +3811,9 @@ again:
 		for (cp = columns_str; *cp != '\0'; ++cp)
 			if (*cp == ',')
 				++opt_cnum;
+
+		if (*columns_str == '\0')
+			uu_die(gettext("No columns specified.\n"));
 
 		opt_columns = malloc(opt_cnum * sizeof (*opt_columns));
 		if (opt_columns == NULL)
