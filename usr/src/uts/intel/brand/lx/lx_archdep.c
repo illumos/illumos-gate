@@ -875,8 +875,6 @@ lx_set_user_regs64(lx_lwp_data_t *lwpd, lx_user_regs64_t *lxrp)
 	struct pcb *pcb = &lwp->lwp_pcb;
 	void *ucp;
 
-	VERIFY(lwp_getdatamodel(lwp) == DATAMODEL_LP64);
-
 	switch (lx_regs_location(lwpd, &ucp, B_TRUE)) {
 	case LX_REG_LOC_UNAVAIL:
 		return (-1);
@@ -958,8 +956,7 @@ lx_peekuser64(lx_lwp_data_t *lwpd, uintptr_t offset, uintptr_t *res)
 
 	bzero(&lxu, sizeof (lxu));
 	if (offset < sizeof (lx_user_regs64_t)) {
-		lx_user_regs64_t regs;
-		if (lx_get_user_regs64(lwpd, &regs) == 0) {
+		if (lx_get_user_regs64(lwpd, &lxu.lxu_regs) == 0) {
 			valid = B_TRUE;
 		}
 	}
