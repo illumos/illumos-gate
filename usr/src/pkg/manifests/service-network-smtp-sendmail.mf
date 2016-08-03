@@ -29,6 +29,7 @@ set name=pkg.fmri \
 set name=pkg.description value="Sendmail Utilities"
 set name=pkg.summary value=Sendmail
 set name=info.classification value=org.opensolaris.category.2008:System/Core
+set name=org.opensolaris.noincorp value=true
 set name=variant.arch value=$(ARCH)
 dir path=etc group=sys
 dir path=etc/mail group=mail
