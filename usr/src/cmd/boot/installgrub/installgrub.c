@@ -103,10 +103,8 @@ static int get_start_sector(ig_device_t *);
 static int get_disk_fd(ig_device_t *device);
 static int get_raw_partition_fd(ig_device_t *);
 static char *get_raw_partition_path(ig_device_t *);
-static boolean_t gather_stage2_from_dev(ig_data_t *);
 static int propagate_bootblock(ig_data_t *, ig_data_t *, char *);
 static int find_x86_bootpar(struct mboot *, int *, uint32_t *);
-static int copy_stage2_to_pcfs(ig_data_t *);
 static int write_stage2(ig_data_t *);
 static int write_stage1(ig_data_t *);
 static void usage(char *);
@@ -730,7 +728,7 @@ get_start_sector(ig_device_t *device)
 	uint32_t		secnum = 0, numsec = 0;
 	int			i, pno, rval, log_part = 0;
 	struct mboot		*mboot;
-	struct ipart		*part;
+	struct ipart		*part = NULL;
 	ext_part_t		*epp;
 	struct part_info	dkpi;
 	struct extpart_info	edkpi;
@@ -887,8 +885,8 @@ found_part:
 static int
 get_disk_fd(ig_device_t *device)
 {
-	int	i;
-	char	save[2];
+	int	i = 0;
+	char	save[2] = { '\0', '\0' };
 	char	*end = NULL;
 
 	assert(device != NULL);
@@ -1556,83 +1554,4 @@ get_raw_partition_fd(ig_device_t *device)
 
 	free(raw);
 	return (BC_SUCCESS);
-}
-
-#define	TMP_MNTPT	"/tmp/installgrub_pcfs"
-static int
-copy_stage2_to_pcfs(ig_data_t *install)
-{
-	FILE		*mntfp;
-	int		pcfs_fp;
-	int		status = BC_ERROR;
-	char		buf[SECTOR_SIZE];
-	char		*cp;
-	struct mnttab	mp = {0}, mpref = {0};
-	ig_device_t	*device = &install->device;
-	ig_stage2_t	*stage2 = &install->stage2;
-
-	/* convert raw to block device name by removing the first 'r' */
-	(void) strncpy(buf, device->path, sizeof (buf));
-	buf[sizeof (buf) - 1] = 0;
-	cp = strchr(buf, 'r');
-	if (cp == NULL) {
-		(void) fprintf(stderr, CONVERT_FAIL, device->path);
-		return (BC_ERROR);
-	}
-	do {
-		*cp = *(cp + 1);
-	} while (*(++cp));
-
-	/* get the mount point, if any */
-	mntfp = fopen("/etc/mnttab", "r");
-	if (mntfp == NULL) {
-		(void) fprintf(stderr, OPEN_FAIL_FILE, "/etc/mnttab");
-		return (BC_ERROR);
-	}
-
-	mpref.mnt_special = buf;
-	if (getmntany(mntfp, &mp, &mpref) != 0) {
-		char cmd[128];
-
-		/* not mounted, try remount */
-		(void) mkdir(TMP_MNTPT, S_IRWXU);
-		(void) snprintf(cmd, sizeof (cmd), "mount -F pcfs %s %s",
-		    buf, TMP_MNTPT);
-		(void) system(cmd);
-		rewind(mntfp);
-		bzero(&mp, sizeof (mp));
-		if (getmntany(mntfp, &mp, &mpref) != 0) {
-			(void) fprintf(stderr, MOUNT_FAIL, buf);
-			return (BC_ERROR);
-		}
-	}
-
-	(void) snprintf(buf, sizeof (buf),
-	    "%s/boot", mp.mnt_mountp);
-	(void) mkdir(buf, S_IRWXU);
-	(void) strcat(buf, "/grub");
-	(void) mkdir(buf, S_IRWXU);
-
-	(void) strcat(buf, "/stage2");
-	pcfs_fp = open(buf, O_WRONLY | O_CREAT, S_IRWXU);
-	if (pcfs_fp == -1) {
-		(void) fprintf(stderr, OPEN_FAIL_FILE, buf);
-		perror("open:");
-		goto out;
-	}
-
-	/* write stage2 to the pcfs mounted filesystem. */
-	if (write(pcfs_fp, stage2->file, stage2->file_size)
-	    != stage2->file_size) {
-		perror(gettext("Error writing stage2"));
-		goto out;
-	}
-
-	status = BC_SUCCESS;
-out_fd:
-	(void) close(pcfs_fp);
-out:
-	(void) umount(TMP_MNTPT);
-	(void) rmdir(TMP_MNTPT);
-	return (status);
 }

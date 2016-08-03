@@ -157,12 +157,6 @@ pcfs_glue_read(int fd, void *buf, size_t size)
 	return (BRD_READ(bfs_ops, fd, buf, size));
 }
 
-static off_t
-pcfs_glue_lseek(int fd, off_t addr, int whence)
-{
-	return (BRD_SEEK(bfs_ops, fd, addr, whence));
-}
-
 /*
  * Get the blocklist for stage2
  */
