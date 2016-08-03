@@ -238,13 +238,14 @@ segumap_fault(struct hat *hat, struct seg *seg, caddr_t addr, size_t len,
 	ASSERT(type == F_INVAL || type == F_SOFTLOCK);
 	rw_enter(&sud->sud_lock, RW_WRITER);
 
-	if (type == F_INVAL) {
+	if (type == F_INVAL ||
+	    (type == F_SOFTLOCK && sud->sud_softlockcnt == 0)) {
 		/*
 		 * Load the (entire) segment into the HAT.
 		 *
 		 * It's possible that threads racing into as_fault will cause
 		 * seg_umap to load the same range multiple times in quick
-		 * succession.  This is safely handled by hat_devload.
+		 * succession.  Redundant hat_devload operations are safe.
 		 */
 		for (uintptr_t i = 0; i < seg->s_size; i += PAGESIZE) {
 			pfn_t pfn;
