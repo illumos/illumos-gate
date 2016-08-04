@@ -1496,12 +1496,17 @@ get_zone(dladm_handle_t handle, prop_desc_t *pdp, datalink_id_t linkid,
 }
 
 typedef int (*zone_get_devroot_t)(char *, char *, size_t);
+typedef int (*zone_get_brand_t)(char *, char *, size_t);
 
 static int
 i_dladm_get_zone_dev(char *zone_name, char *dev, size_t devlen)
 {
 	char			root[MAXPATHLEN];
+	char			brand[MAXPATHLEN]; /* Overkill, for sure. */
+	static char		*full_native_path = "/native/dev";
+	char			*native_dev_path = full_native_path;
 	zone_get_devroot_t	real_zone_get_devroot;
+	zone_get_brand_t	real_zone_get_brand;
 	void			*dlhandle;
 	void			*sym;
 	int			ret;
@@ -1513,11 +1518,28 @@ i_dladm_get_zone_dev(char *zone_name, char *dev, size_t devlen)
 		(void) dlclose(dlhandle);
 		return (-1);
 	}
-
 	real_zone_get_devroot = (zone_get_devroot_t)sym;
 
+	if ((sym = dlsym(dlhandle, "zone_get_brand")) == NULL) {
+		(void) dlclose(dlhandle);
+		return (-1);
+	}
+	real_zone_get_brand = (zone_get_devroot_t)sym;
+
+	/* Have "/dev" be LX-agile for possibility of "/native/dev". */
+	ret = real_zone_get_brand(zone_name, brand, sizeof (brand));
+	if (ret != 0) {
+		(void) dlclose(dlhandle);
+		return (ret);
+	}
+	/* Can use strcmp with constant string... */
+	if (strcmp(brand, "lx") != 0) {
+		/* Non-LX zone, don't use "/native/dev" */
+		native_dev_path += 7;	/* strlen("/native") */
+	}
+
 	if ((ret = real_zone_get_devroot(zone_name, root, sizeof (root))) == 0)
-		(void) snprintf(dev, devlen, "%s%s", root, "/dev");
+		(void) snprintf(dev, devlen, "%s%s", root, native_dev_path);
 	(void) dlclose(dlhandle);
 	return (ret);
 }
