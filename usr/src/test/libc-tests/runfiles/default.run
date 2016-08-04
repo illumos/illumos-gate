@@ -62,6 +62,8 @@ outputdir = /var/tmp/test_results
 [/opt/libc-tests/tests/catopen]
 [/opt/libc-tests/tests/env-OS-4089.32]
 [/opt/libc-tests/tests/env-OS-4089.64]
+[/opt/libc-tests/tests/env-7076.32]
+[/opt/libc-tests/tests/env-7076.64]
 [/opt/libc-tests/tests/endian.32]
 [/opt/libc-tests/tests/endian.64]
 [/opt/libc-tests/tests/quick_exit]
