@@ -3,6 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.\" Copyright (c) 2016 Delphix. All Rights Reserved.
 .TH NVLIST_ADD_BOOLEAN 3NVPAIR "Sep 15, 2009"
 .SH NAME
 nvlist_add_boolean, nvlist_add_boolean_value, nvlist_add_byte, nvlist_add_int8,
@@ -179,7 +180,6 @@ add new name-value pair to nvlist_t
 .fi
 
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fInvl\fR\fR
@@ -225,7 +225,6 @@ Value or starting address of the array value.
 .RE
 
 .SH DESCRIPTION
-.sp
 .LP
 These functions add a new name-value pair to an \fBnvlist_t\fR. The uniqueness
 of \fBnvpair\fR name and data types follows the \fInvflag\fR argument specified
@@ -249,6 +248,15 @@ of the name-value pairs across packing, unpacking, and duplication.
 Multiple threads can simultaneously read the same \fBnvlist_t\fR, but only one
 thread can actively change a given \fBnvlist_t\fR at a time. The caller is
 responsible for the synchronization.
+.sp
+.LP
+The name used for any name-value pair, including the terminating null
+byte, can be no more than
+.B INT16_MAX
+(2^15 - 1) bytes in
+length, otherwise
+.B EINVAL
+will be returned.
 .sp
 .LP
 The list that is added to the parent \fBnvlist_t\fR by calling
@@ -285,11 +293,9 @@ nvlist_t *child_nvl;
 The \fBnvlist_add_boolean()\fR function is deprecated. The
 \fBnvlist_add_boolean_value()\fR function should be used instead.
 .SH RETURN VALUES
-.sp
 .LP
 These functions return 0 on success and an error value on failure.
 .SH ERRORS
-.sp
 .LP
 These functions will fail if:
 .sp
@@ -311,7 +317,6 @@ There is insufficient memory.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -329,6 +334,5 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBlibnvpair\fR(3LIB), \fBnvlist_alloc\fR(3NVPAIR), \fBattributes\fR(5)
