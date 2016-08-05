@@ -90,6 +90,13 @@ uint32_t acpi_strtoul(const char *, char **, int);
 #define	strtoul(s, r, b)	acpi_strtoul(s, r, b)
 #define	toupper(x)		(islower(x) ? (x) - 'a' + 'A' : (x))
 #define	tolower(x)		(isupper(x) ? (x) - 'A' + 'a' : (x))
+
+/*
+ * The ACPI headers shipped from Intel defines a bunch of functions which are
+ * already provided by the kernel.  The variable below prevents those from
+ * being loaded as part of accommon.h.
+ */
+#define	ACPI_USE_SYSTEM_CLIBRARY
 #endif
 
 #define	ACPI_ASM_MACROS

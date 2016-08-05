@@ -1200,6 +1200,7 @@ AcpiBiosWarning (
 /*
  * Debug output
  */
+/* ARGSUSED */
 ACPI_DBG_DEPENDENT_RETURN_VOID (
 ACPI_PRINTF_LIKE(6)
 void ACPI_INTERNAL_VAR_XFACE
@@ -1212,6 +1213,7 @@ AcpiDebugPrint (
     const char              *Format,
     ...))
 
+/* ARGSUSED */
 ACPI_DBG_DEPENDENT_RETURN_VOID (
 ACPI_PRINTF_LIKE(6)
 void ACPI_INTERNAL_VAR_XFACE
@@ -1224,6 +1226,7 @@ AcpiDebugPrintRaw (
     const char              *Format,
     ...))
 
+/* ARGSUSED */
 ACPI_DBG_DEPENDENT_RETURN_VOID (
 void
 AcpiTracePoint (
@@ -1232,6 +1235,7 @@ AcpiTracePoint (
     UINT8                   *Aml,
     char                    *Pathname))
 
+/* ARGSUSED */
 ACPI_APP_DEPENDENT_RETURN_VOID (
 ACPI_PRINTF_LIKE(1)
 void ACPI_INTERNAL_VAR_XFACE

@@ -60,8 +60,6 @@ CERRWARN	+= -_gcc=-Wno-uninitialized
 CERRWARN	+= -_gcc=-Wno-parentheses
 CERRWARN	+= -_gcc=-Wno-unused-function
 
-EXTRA_OPTIONS	= -DACPI_USE_SYSTEM_CLIBRARY
-
 #
 # Link to acpica for ACPI services
 #

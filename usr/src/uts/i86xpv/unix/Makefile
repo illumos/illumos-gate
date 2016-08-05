@@ -121,9 +121,6 @@ CLEANLINTFILES	+= $(LINT_LIB) $(DBOOT_LINT_LIB) $(DBOOT_LINTS)
 $(OBJS_DIR)/instr_size.o :=	EXTRA_OPTIONS	= -I$(SRC)/common/dis/i386
 $(OBJS_DIR)/instr_size.ln :=	EXTRA_OPTIONS	= -I$(SRC)/common/dis/i386
 
-# Additional definition for files including ACPI headers
-$(OBJS_DIR)/cpupm_mach.o :=	EXTRA_OPTIONS	= -DACPI_USE_SYSTEM_CLIBRARY
-
 CFLAGS += -DDIS_MEM
 
 #
