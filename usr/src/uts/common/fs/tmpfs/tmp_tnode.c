@@ -281,7 +281,6 @@ tmpnode_trunc(
 {
 	size_t oldsize = tp->tn_size;
 	size_t delta;
-	struct vnode *vp = TNTOV(tp);
 	timestruc_t now;
 	int error = 0;
 
@@ -365,7 +364,7 @@ tmpnode_trunc(
 			/* Delete anon array for tmpnode */
 			ASSERT(tp->tn_nblocks == 0);
 			ASSERT(anon_get_ptr(tp->tn_anon, 0) == NULL);
-			ASSERT(!vn_has_cached_data(vp));
+			ASSERT(!vn_has_cached_data(TNTOV(tp)));
 
 			anon_release(tp->tn_anon, tp->tn_asize);
 			tp->tn_anon = NULL;

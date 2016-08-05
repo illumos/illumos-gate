@@ -60,17 +60,31 @@ tmp_kmem_zalloc(struct tmount *tm, size_t size, int flag)
 {
 	void *buf;
 	zone_t *zone;
+	size_t pages;
 
-	zone = tm->tm_vfsp->vfs_zone;
 	mutex_enter(&tm->tm_contents);
+	zone = tm->tm_vfsp->vfs_zone;
 	if (tm->tm_anonmem + size > tm->tm_anonmax ||
 	    tm->tm_anonmem + size < tm->tm_anonmem ||
 	    size + ptob(tmpfs_minfree) <= size ||
-	    !anon_checkspace(size + ptob(tmpfs_minfree), zone) ||
-	    anon_try_resv_zone(size, zone) == 0) {
+	    !anon_checkspace(size + ptob(tmpfs_minfree), zone)) {
 		mutex_exit(&tm->tm_contents);
 		return (NULL);
 	}
+
+	/*
+	 * Only make anonymous memory reservations when a page boundary is
+	 * crossed.  This is necessary since the anon_resv functions rounds up
+	 * to PAGESIZE internally.
+	 */
+	pages = btopr(tm->tm_allocmem + size);
+	pages -= btopr(tm->tm_allocmem);
+	if (pages > 0 && anon_try_resv_zone(ptob(pages), zone) == 0) {
+		mutex_exit(&tm->tm_contents);
+		return (NULL);
+	}
+
+	tm->tm_allocmem += size;
 	tm->tm_anonmem += size;
 	mutex_exit(&tm->tm_contents);
 
@@ -79,8 +93,15 @@ tmp_kmem_zalloc(struct tmount *tm, size_t size, int flag)
 		mutex_enter(&tm->tm_contents);
 		ASSERT(tm->tm_anonmem > tm->tm_anonmem - size);
 		tm->tm_anonmem -= size;
+		if (pages > 0) {
+			/*
+			 * Re-chasing the zone pointer is necessary since a
+			 * forced umount could have been performed while the
+			 * tm_contents lock was dropped during allocation.
+			 */
+			anon_unresv_zone(ptob(pages), tm->tm_vfsp->vfs_zone);
+		}
 		mutex_exit(&tm->tm_contents);
-		anon_unresv_zone(size, tm->tm_vfsp->vfs_zone);
 	}
 
 	return (buf);
@@ -89,12 +110,23 @@ tmp_kmem_zalloc(struct tmount *tm, size_t size, int flag)
 void
 tmp_kmem_free(struct tmount *tm, void *buf, size_t size)
 {
+	size_t pages;
+
 	kmem_free(buf, size);
 	mutex_enter(&tm->tm_contents);
 	ASSERT(tm->tm_anonmem > tm->tm_anonmem - size);
 	tm->tm_anonmem -= size;
+	pages = btopr(tm->tm_allocmem);
+	tm->tm_allocmem -= size;
+	pages -= btopr(tm->tm_allocmem);
+	/*
+	 * Like the tmp_kmem_zalloc case, only unreserve anonymous memory when
+	 * a page boundary has been crossed.
+	 */
+	if (pages > 0) {
+		anon_unresv_zone(size, tm->tm_vfsp->vfs_zone);
+	}
 	mutex_exit(&tm->tm_contents);
-	anon_unresv_zone(size, tm->tm_vfsp->vfs_zone);
 }
 
 int
@@ -127,7 +159,7 @@ tmp_taccess(void *vtp, int mode, struct cred *cred)
  */
 int
 tmp_sticky_remove_access(struct tmpnode *dir, struct tmpnode *entry,
-	struct cred *cr)
+    struct cred *cr)
 {
 	uid_t uid = crgetuid(cr);
 
@@ -196,7 +228,7 @@ tmp_convnum(char *str, size_t *maxbytes)
 	 * system's total available swap size as the initial value. Perform the
 	 * intermediate calculation in pages to avoid overflow.
 	 */
-	if (*c == '\%') {
+	if (*c == '%') {
 		u_longlong_t cap;
 
 		if (*(c + 1) != '\0')

@@ -351,6 +351,16 @@ tmp_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 	(void) strcpy(tm->tm_mntpath, dpn.pn_path);
 
 	/*
+	 * Preemptively set vfs_zone before any of the tmp_kmem_* functions are
+	 * called.  That field is not populated until after a successful
+	 * VFS_MOUNT when domount() sets vfsp metadata via vfs_add().  An
+	 * accurate value is required for proper swap usage accounting.
+	 */
+	ASSERT0(uap->flags & MS_REMOUNT);
+	ASSERT(vfsp->vfs_zone == NULL);
+	vfsp->vfs_zone = curproc->p_zone;
+
+	/*
 	 * allocate and initialize root tmpnode structure
 	 */
 	bzero(&rattr, sizeof (struct vattr));
@@ -759,18 +769,19 @@ tmp_statvfs(struct vfs *vfsp, struct statvfs64 *sbp)
 	 * If tm_anonmax for this mount is less than the available swap space
 	 * (minus the amount tmpfs can't use), use that instead
 	 */
-	if (blocks > tmpfs_minfree)
+	if (blocks > tmpfs_minfree && tm->tm_anonmax > tm->tm_anonmem) {
 		sbp->f_bfree = MIN(blocks - tmpfs_minfree,
-		    tm->tm_anonmax - tm->tm_anonmem);
-	else
+		    btop(tm->tm_anonmax) - btopr(tm->tm_anonmem));
+	} else {
 		sbp->f_bfree = 0;
+	}
 
 	sbp->f_bavail = sbp->f_bfree;
 
 	/*
 	 * Total number of blocks is what's available plus what's been used
 	 */
-	sbp->f_blocks = (fsblkcnt64_t)(sbp->f_bfree + tm->tm_anonmem);
+	sbp->f_blocks = (fsblkcnt64_t)(sbp->f_bfree + btopr(tm->tm_anonmem));
 
 	if (eff_zid != GLOBAL_ZONEUNIQID &&
 	    zp->zone_max_swap_ctl != UINT64_MAX) {

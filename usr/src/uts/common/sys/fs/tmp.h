@@ -46,6 +46,7 @@ struct tmount {
 	size_t		tm_anonmax;	/* file system max anon reservation */
 	size_t		tm_anonmem;	/* bytes of reserved anon memory */
 					/* and allocated kmem for the fs */
+	size_t		tm_allocmem;	/* bytes alloced from tmp_kmem_ funcs */
 	dev_t		tm_dev;		/* unique dev # of mounted `device' */
 	uint_t		tm_gen;		/* pseudo generation number for files */
 	kmutex_t	tm_contents;	/* lock for tmount structure */
