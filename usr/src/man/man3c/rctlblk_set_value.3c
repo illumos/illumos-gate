@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH RCTLBLK_SET_VALUE 3C "May 15, 2006"
+.TH RCTLBLK_SET_VALUE 3C "Aug 2, 2016"
 .SH NAME
 rctlblk_set_value, rctlblk_get_firing_time, rctlblk_get_global_action,
 rctlblk_get_global_flags, rctlblk_get_local_action, rctlblk_get_local_flags,
@@ -91,7 +91,6 @@ resource control blocks
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The resource control block routines allow the establishment or retrieval of
 values from a resource control block used to transfer information using the
@@ -354,13 +353,11 @@ for use in memory allocation. The \fBrctlblk_t *\fR type is an opaque pointer
 whose size is not connected with that of the resource control block itself. Use
 of \fBrctlblk_size()\fR is illustrated in the example below.
 .SH RETURN VALUES
-.sp
 .LP
 The various set routines have no return values. Incorrectly composed resource
 control blocks will generate errors when used with \fBsetrctl\fR(2) or
 \fBgetrctl\fR(2).
 .SH ERRORS
-.sp
 .LP
 No error values are returned. Incorrectly constructed resource control blocks
 will be rejected by the system calls.
@@ -379,47 +376,48 @@ block.
 #include <stdio.h>
 #include <stdlib.h>
 
-rctlblk_t *rblk;
-int rsignal;
-int raction;
-
-if ((rblk = malloc(rctlblk_size())) == NULL) {
-       (void) perror("rblk malloc");
-       exit(1);
-}
-
-if (getrctl("process.max-cpu-time", NULL, rblk, RCTL_FIRST) == -1) {
-       (void) perror("getrctl");
-       exit(1);
-}
-
+int
 main()
 {
-    raction = rctlblk_get_local_action(rblk, &rsignal),
-    (void) printf("Resource control for %s\en",
-        "process.max-cpu-time");
-    (void) printf("Process ID:     %d\en",
-        rctlblk_get_recipient_pid(rblk));
-    (void) printf("Privilege:      %x\en"
-        rctlblk_get_privilege(rblk));
-    (void) printf("Global flags:   %x\en"
-        rctlblk_get_global_flags(rblk));
-    (void) printf("Global actions: %x\en"
-        rctlblk_get_global_action(rblk));
-    (void) printf("Local flags:    %x\en"
-        rctlblk_get_local_flags(rblk));
-    (void) printf("Local action:   %x (%d)\en"
-        raction, raction == RCTL_LOCAL_SIGNAL ? rsignal : 0);
-    (void) printf("Value:          %llu\en",
-        rctlblk_get_value(rblk));
-    (void) printf("\tEnforced value: %llu\en",
-        rctlblk_get_enforced_value(rblk));
+	rctlblk_t *rblk;
+	int rsignal, raction;
+
+	if ((rblk = malloc(rctlblk_size())) == NULL) {
+		(void) perror("rblk malloc");
+		exit(1);
+	}
+
+	if (getrctl("process.max-cpu-time", NULL, rblk, RCTL_FIRST) == -1) {
+		(void) perror("getrctl");
+		exit(1);
+	}
+
+	raction = rctlblk_get_local_action(rblk, &rsignal),
+	(void) printf("Resource control for %s\en",
+	    "process.max-cpu-time");
+	(void) printf("Process ID:     %d\en",
+	    (int)rctlblk_get_recipient_pid(rblk));
+	(void) printf("Privilege:      %x\en",
+	    rctlblk_get_privilege(rblk));
+	(void) printf("Global flags:   %x\en",
+	    rctlblk_get_global_flags(rblk));
+	(void) printf("Global actions: %x\en",
+	    rctlblk_get_global_action(rblk));
+	(void) printf("Local flags:    %x\en",
+	    rctlblk_get_local_flags(rblk));
+	(void) printf("Local action:   %x (%d)\en",
+	    raction, raction == RCTL_LOCAL_SIGNAL ? rsignal : 0);
+	(void) printf("Value:          %llu\en",
+	    rctlblk_get_value(rblk));
+	(void) printf("\tEnforced value: %llu\en",
+	    rctlblk_get_enforced_value(rblk));
+
+	return (0);
 }
 .fi
 .in -2
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -437,7 +435,6 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBrctladm\fR(1M), \fBgetrctl\fR(2), \fBsetrctl\fR(2), \fBgethrtime\fR(3C),
 \fBattributes\fR(5)

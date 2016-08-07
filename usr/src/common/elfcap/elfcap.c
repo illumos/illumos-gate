@@ -332,6 +332,14 @@ static const elfcap_desc_t hw2_386[ELFCAP_NUM_HW2_386] = {
 		AV_386_2_AVX2, STRDESC("AV_386_2_AVX2"),
 		STRDESC("AVX2"), STRDESC("avx2"),
 	},
+	{						/* 0x00000040 */
+		AV_386_2_ADX, STRDESC("AV_386_2_ADX"),
+		STRDESC("ADX"), STRDESC("adx"),
+	},
+	{						/* 0x00000080 */
+		AV_386_2_RDSEED, STRDESC("AV_386_2_RDSEED"),
+		STRDESC("RDSEED"), STRDESC("rdseed"),
+	}
 };
 
 /*

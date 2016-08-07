@@ -875,8 +875,11 @@ found_part:
 	 * warn, if Solaris in primary partition and GRUB not in MBR and
 	 * partition is not active
 	 */
-	if (!log_part && part->bootid != 128 && !write_mbr) {
-		(void) fprintf(stdout, SOLPAR_INACTIVE, device->partition + 1);
+	if (part != NULL) {
+		if (!log_part && part->bootid != 128 && !write_mbr) {
+			(void) fprintf(stdout, SOLPAR_INACTIVE,
+			    device->partition + 1);
+		}
 	}
 
 	return (BC_SUCCESS);

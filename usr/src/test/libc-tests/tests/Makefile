@@ -34,6 +34,7 @@ PROGS = \
 	c11_tss \
 	call_once \
 	endian \
+	env-7076 \
 	quick_exit_order \
 	quick_exit_status \
 	timespec_get
