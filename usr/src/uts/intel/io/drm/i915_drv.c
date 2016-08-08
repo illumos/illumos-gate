@@ -40,6 +40,10 @@
  */
 
 /*
+ * Copyright 2014 RackTop Systems.
+ */
+
+/*
  * I915 DRM Driver for Solaris
  *
  * This driver provides the hardware 3D acceleration support for Intel
@@ -708,7 +712,7 @@ i915_resume(struct drm_device *dev)
 	
 	for (i = 0; i < 16; i++) {
 		S3_WRITE(SWF0 + (i << 2), s3_priv->saveSWF0[i]);
-		S3_WRITE(SWF10 + (i << 2), s3_priv->saveSWF1[i+7]);
+		S3_WRITE(SWF10 + (i << 2), s3_priv->saveSWF1[i]);
         }
 	for (i = 0; i < 3; i++)
 		S3_WRITE(SWF30 + (i << 2), s3_priv->saveSWF2[i]);
