@@ -2038,7 +2038,7 @@ nvme_init(nvme_t *nvme)
 		 * performance. A value of 3 means "degraded", 0 is best.
 		 */
 		last_rp = 3;
-		for (int j = 0; j != idns->id_nlbaf; j++) {
+		for (int j = 0; j <= idns->id_nlbaf; j++) {
 			if (idns->id_lbaf[j].lbaf_lbads == 0)
 				break;
 			if (idns->id_lbaf[j].lbaf_ms != 0)
