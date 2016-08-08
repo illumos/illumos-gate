@@ -1747,14 +1747,6 @@ nvme_init(nvme_t *nvme)
 	char model[sizeof (nvme->n_idctl->id_model) + 1];
 	char *vendor, *product;
 
-	/* Setup fixed interrupt for admin queue. */
-	if (nvme_setup_interrupts(nvme, DDI_INTR_TYPE_FIXED, 1)
-	    != DDI_SUCCESS) {
-		dev_err(nvme->n_dip, CE_WARN,
-		    "!failed to setup fixed interrupt");
-		goto fail;
-	}
-
 	/* Check controller version */
 	vs.r = nvme_get32(nvme, NVME_REG_VS);
 	dev_err(nvme->n_dip, CE_CONT, "?NVMe spec version %d.%d",
@@ -1891,6 +1883,20 @@ nvme_init(nvme_t *nvme)
 	 * that later when we know the true abort command limit.
 	 */
 	sema_init(&nvme->n_abort_sema, 1, NULL, SEMA_DRIVER, NULL);
+
+	/*
+	 * Setup initial interrupt for admin queue.
+	 */
+	if ((nvme_setup_interrupts(nvme, DDI_INTR_TYPE_MSIX, 1)
+	    != DDI_SUCCESS) &&
+	    (nvme_setup_interrupts(nvme, DDI_INTR_TYPE_MSI, 1)
+	    != DDI_SUCCESS) &&
+	    (nvme_setup_interrupts(nvme, DDI_INTR_TYPE_FIXED, 1)
+	    != DDI_SUCCESS)) {
+		dev_err(nvme->n_dip, CE_WARN,
+		    "!failed to setup initial interrupt");
+		goto fail;
+	}
 
 	/*
 	 * Post an asynchronous event command to catch errors.
@@ -2174,6 +2180,7 @@ nvme_intr(caddr_t arg1, caddr_t arg2)
 	/*LINTED: E_PTR_BAD_CAST_ALIGN*/
 	nvme_t *nvme = (nvme_t *)arg1;
 	int inum = (int)(uintptr_t)arg2;
+	int ccnt = 0;
 	int qnum;
 	nvme_cmd_t *cmd;
 
@@ -2191,10 +2198,11 @@ nvme_intr(caddr_t arg1, caddr_t arg2)
 		while ((cmd = nvme_retrieve_cmd(nvme, nvme->n_ioq[qnum]))) {
 			taskq_dispatch_ent((taskq_t *)cmd->nc_nvme->n_cmd_taskq,
 			    cmd->nc_callback, cmd, TQ_NOSLEEP, &cmd->nc_tqent);
+			ccnt++;
 		}
 	}
 
-	return (DDI_INTR_CLAIMED);
+	return (ccnt > 0 ? DDI_INTR_CLAIMED : DDI_INTR_UNCLAIMED);
 }
 
 static void
