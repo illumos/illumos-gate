@@ -36,7 +36,6 @@
 #
 ./usr/src/cmd/oawk/EXPLAIN
 ./usr/src/cmd/vi/port/ex.news
-./usr/src/cmd/ssh/doc
 
 #
 # Ignore everything under trees that may be resynched from outside ON.
@@ -247,12 +246,6 @@
 # referenced in the CDDL headers.
 #
 ./usr/src/OPENSOLARIS.LICENSE
-
-# Though "COPYING" is usually used as a filename for GPL, the license
-# information for openssh is actually found in usr/src/cmd/ssh/doc/LICENSE.
-# The COPYING.Ylonen file is merely additional information.
-#
-./usr/src/cmd/ssh/doc/COPYING.Ylonen
 
 #
 # This covers header files that are not delivered.
