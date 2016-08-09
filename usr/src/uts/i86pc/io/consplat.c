@@ -45,9 +45,10 @@
 #include <sys/modctl.h>
 #include <sys/termios.h>
 #include <sys/pci.h>
+#include <sys/framebuffer.h>
+#include <sys/boot_console.h>
 #if defined(__xpv)
 #include <sys/hypervisor.h>
-#include <sys/boot_console.h>
 #endif
 
 extern int pseudo_isa;
@@ -560,6 +561,13 @@ plat_diagpath(void)
  * functions should be re-considered. Now these functions are
  * unused on x86.
  */
+void
+plat_tem_get_colors(uint8_t *fg, uint8_t *bg)
+{
+	*fg = fb_info.fg_color;
+	*bg = fb_info.bg_color;
+}
+
 void
 plat_tem_get_inverses(int *inverse, int *inverse_screen)
 {
