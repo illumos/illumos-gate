@@ -257,8 +257,8 @@ nlm_reclaim_client(struct nlm_globals *g, struct nlm_host *hostp)
 /* ARGSUSED */
 int
 nlm_frlock(struct vnode *vp, int cmd, struct flock64 *flkp,
-	int flags, u_offset_t offset, struct cred *crp,
-	struct netobj *fhp, struct flk_callback *flcb, int vers)
+    int flags, u_offset_t offset, struct cred *crp,
+    struct netobj *fhp, struct flk_callback *flcb, int vers)
 {
 	mntinfo_t *mi;
 	servinfo_t *sv;
@@ -618,13 +618,13 @@ void
 nlm_register_lock_locally(struct vnode *vp, struct nlm_host *hostp,
     struct flock64 *flk, int flags, u_offset_t offset)
 {
+	struct nlm_globals *g = NULL;
 	int sysid = 0;
 
 	if (hostp == NULL) {
 		mntinfo_t *mi;
 		servinfo_t *sv;
 		const char *netid;
-		struct nlm_globals *g;
 
 		mi = VTOMI(vp);
 		sv = mi->mi_curr_serv;
@@ -639,6 +639,9 @@ nlm_register_lock_locally(struct vnode *vp, struct nlm_host *hostp,
 
 	if (hostp != NULL) {
 		sysid = hostp->nh_sysid | LM_SYSID_CLIENT;
+
+		if (g != NULL)
+			nlm_host_release(g, hostp);
 	}
 
 	flk->l_sysid = sysid;
@@ -743,8 +746,8 @@ nlm_local_cancelk(vnode_t *vp, struct flock64 *flp)
  */
 static int
 nlm_call_lock(vnode_t *vp, struct flock64 *flp,
-	struct nlm_host *hostp, struct netobj *fhp,
-	struct flk_callback *flcb, int vers, int xflags)
+    struct nlm_host *hostp, struct netobj *fhp,
+    struct flk_callback *flcb, int vers, int xflags)
 {
 	struct nlm4_lockargs args;
 	struct nlm_owner_handle oh;
@@ -944,7 +947,7 @@ out:
  */
 static int
 nlm_call_cancel(struct nlm4_lockargs *largs,
-	struct nlm_host *hostp, int vers)
+    struct nlm_host *hostp, int vers)
 {
 	nlm4_cancargs cargs;
 	uint32_t xid;
@@ -1182,8 +1185,8 @@ nlm_call_test(struct flock64 *flp, struct nlm_host *hostp,
 
 static void
 nlm_init_lock(struct nlm4_lock *lock,
-	const struct flock64 *fl, struct netobj *fh,
-	struct nlm_owner_handle *oh)
+    const struct flock64 *fl, struct netobj *fh,
+    struct nlm_owner_handle *oh)
 {
 
 	/* Caller converts to zero-base. */
@@ -1205,7 +1208,7 @@ nlm_init_lock(struct nlm4_lock *lock,
 
 int
 nlm_shrlock(struct vnode *vp, int cmd, struct shrlock *shr,
-	int flags, struct netobj *fh, int vers)
+    int flags, struct netobj *fh, int vers)
 {
 	struct shrlock shlk;
 	mntinfo_t *mi;
@@ -1481,7 +1484,7 @@ nlm_call_unshare(struct shrlock *shr, struct nlm_host *host,
 
 static void
 nlm_init_share(struct nlm4_share *args,
-	const struct shrlock *shr, struct netobj *fh)
+    const struct shrlock *shr, struct netobj *fh)
 {
 
 	bzero(args, sizeof (*args));
