@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2016 Joyent, Inc.
 .\"
-.Dd June 04, 2016
+.Dd Aug 02, 2016
 .Dt ID_SPACE 9F
 .Os
 .Sh NAME
@@ -82,12 +82,12 @@ function.
 .It Fa id
 An identifier, a signed 32-bit integer.
 .It Fa name
-A null-terminated ASCII character string to call the identifier space.
+An ASCII character string to call the identifier space.
 .It Fa low
 The lower end of an identifier space. This value is included in the
 range.
 .It Fa high
-The upper end of an identifier space. This value is excluded in the
+The upper end of an identifier space. This value is excluded from the
 range.
 .El
 .Sh DESCRIPTION
@@ -153,12 +153,9 @@ All three of these functions,
 .Fn id_space_create ,
 .Fn id_space_extend ,
 and
-.Fn id_space_destory
+.Fn id_space_destroy
 may block. They should only be called from a context where it's safe for
-it to block. This is logically the equivalent of calling
-.Xr kmem_alloc 9F
-with the flag
-.Dv KMEM_SLEEP .
+it to block. This is equivalent to performing a blocking memory allocation.
 .Ss Allocating Identifiers
 Once an id space has been created with the
 .Fn id_space_create
@@ -219,22 +216,18 @@ It is a programmer error to call the
 .Fn id_free
 function on an identifier that has not been allocated.
 .Sh CONTEXT
-In general, all the functions listed here may be executed in either
-.Sy user ,
-.Sy kernel ,
+All of these functions may be called in
+.Sy user
 or
-.Sy interrupt
-context. However, the functions
-.Fn id_space_create ,
-.Fn id_space_destroy ,
-.Fn id_space_extend ,
-.Fn id_alloc ,
+.Sy kernel
+context. The
+.Fn id_alloc_nosleep ,
+.Fn id_allocff_nosleep ,
 and
-.Fn id_allocff
-must be called from a context where it is safe to block and sleep. If
-the caller is not in such a context, then it must only use the
-.Sy '_nosleep'
-functions.
+.Fn id_alloc_specific_nosleep
+functions may be called in
+.Sy interrupt
+context.
 .Sh RETURN VALUES
 Upon successful completion, the
 .Fn id_space_create
