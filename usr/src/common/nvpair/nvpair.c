@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2000, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015, 2016 by Delphix. All rights reserved.
  */
 
 #include <sys/stropts.h>
@@ -137,6 +138,11 @@ static int nvlist_add_common(nvlist_t *nvl, const char *name, data_type_t type,
 #define	NVPAIR2I_NVP(nvp) \
 	((i_nvp_t *)((size_t)(nvp) - offsetof(i_nvp_t, nvi_nvp)))
 
+#ifdef _KERNEL
+int nvpair_max_recursion = 20;
+#else
+int nvpair_max_recursion = 100;
+#endif
 
 int
 nv_alloc_init(nv_alloc_t *nva, const nv_alloc_ops_t *nvo, /* args */ ...)
@@ -903,6 +909,8 @@ nvlist_add_common(nvlist_t *nvl, const char *name,
 
 	/* calculate sizes of the nvpair elements and the nvpair itself */
 	name_sz = strlen(name) + 1;
+	if (name_sz >= 1ULL << (sizeof (nvp->nvp_name_sz) * NBBY - 1))
+		return (EINVAL);
 
 	nvp_sz = NVP_SIZE_CALC(name_sz, value_sz);
 
@@ -2013,6 +2021,7 @@ typedef struct {
 	const nvs_ops_t	*nvs_ops;
 	void		*nvs_private;
 	nvpriv_t	*nvs_priv;
+	int		nvs_recursion;
 } nvstream_t;
 
 /*
@@ -2164,9 +2173,16 @@ static int
 nvs_embedded(nvstream_t *nvs, nvlist_t *embedded)
 {
 	switch (nvs->nvs_op) {
-	case NVS_OP_ENCODE:
-		return (nvs_operation(nvs, embedded, NULL));
+	case NVS_OP_ENCODE: {
+		int err;
 
+		if (nvs->nvs_recursion >= nvpair_max_recursion)
+			return (EINVAL);
+		nvs->nvs_recursion++;
+		err = nvs_operation(nvs, embedded, NULL);
+		nvs->nvs_recursion--;
+		return (err);
+	}
 	case NVS_OP_DECODE: {
 		nvpriv_t *priv;
 		int err;
@@ -2179,8 +2195,12 @@ nvs_embedded(nvstream_t *nvs, nvlist_t *embedded)
 
 		nvlist_init(embedded, embedded->nvl_nvflag, priv);
 
+		if (nvs->nvs_recursion >= nvpair_max_recursion)
+			return (EINVAL);
+		nvs->nvs_recursion++;
 		if ((err = nvs_operation(nvs, embedded, NULL)) != 0)
 			nvlist_free(embedded);
+		nvs->nvs_recursion--;
 		return (err);
 	}
 	default:
@@ -2268,6 +2288,7 @@ nvlist_common(nvlist_t *nvl, char *buf, size_t *buflen, int encoding,
 		return (EINVAL);
 
 	nvs.nvs_op = nvs_op;
+	nvs.nvs_recursion = 0;
 
 	/*
 	 * For NVS_OP_ENCODE and NVS_OP_DECODE make sure an nvlist and

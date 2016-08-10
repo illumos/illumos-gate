@@ -30,11 +30,9 @@ pollhead_clean \- inform the kernel that a pollhead is being deallocated
 .fi
 
 .SH INTERFACE LEVEL
-.sp
 .LP
 Architecture independent level 1 (DDI/DKI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIphp\fR\fR
@@ -44,7 +42,6 @@ Pointer to a \fBpollhead\fR structure.
 .RE
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBpollhead_clean()\fR function informs the kernel that a driver's
 \fBpollhead\fR structure is about to be deallocated, usually as part of
@@ -52,13 +49,11 @@ the driver's \fBclose\fR(9E) entry point before the software state that
 contains the \fBpollhead\fR is deallocated via \fBddi_soft_state_free\fR(9F).
 See \fBchpoll\fR(9E), \fBpollwakeup\fR(9E) and \fBpoll\fR(2) for more detail.
 .SH CONTEXT
-.sp
 .LP
 The \fBpollhead_clean()\fR function is generally called from the context
 of a \fBclose\fR(9E) entry point, but may be called from user or kernel
 context.
 .SH SEE ALSO
-.sp
 .LP
 \fBpoll\fR(2), \fBchpoll\fR(9E), \fBpollwakeup\fR(9E)
 

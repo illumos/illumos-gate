@@ -387,6 +387,14 @@ extern "C" {
 #define	X86FSET_RDSEED		48
 
 /*
+ * flags to patch tsc_read routine.
+ */
+#define	X86_NO_TSC		0x0
+#define	X86_HAVE_TSCP		0x1
+#define	X86_TSC_MFENCE		0x2
+#define	X86_TSC_LFENCE		0x4
+
+/*
  * Intel Deep C-State invariant TSC in leaf 0x80000007.
  */
 #define	CPUID_TSC_CSTATE_INVARIANCE	(0x100)

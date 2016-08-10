@@ -30,7 +30,6 @@ SRCS = $(OBJS:.o=.c)
 
 include ../Makefile.com
 
-CERRWARN += -_gcc=-Wno-parentheses
 CLOBBERFILES = $(BOOTPROG)
 
 .KEEP_STATE:

@@ -116,11 +116,12 @@ main(int argc, char *argv[])
 	mboot = (struct mboot *)boot_sect;
 	for (i = 0; i < FD_NUMPART; i++) {
 		struct ipart *part = (struct ipart *)mboot->parts + i;
-		if (!list_hd)
+		if (!list_hd) {
 			if (part->bootid == 128)
 				printf("active ");
 			else
 				printf("       ");
+		}
 		if (setnew && part->systid == 0x82) {
 			part->systid = 0xbf;
 			sol_part = i;

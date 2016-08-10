@@ -21,7 +21,9 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
  * Copyright 2012 OmniTI Computer Consulting, Inc. All rights reserved.
+ * Copyright 2016 Toomas Soome <tsoome@me.com>.
  */
 
 #ifndef _BOOTADM_H
@@ -189,6 +191,7 @@ extern void unlink_line(menu_t *mp, line_t *lp);
 extern void line_free(line_t *lp);
 extern char *s_strdup(char *);
 extern int is_sparc(void);
+extern int bootadm_digest(const char *, char **);
 
 #define	BAM_MAXLINE	8192
 
