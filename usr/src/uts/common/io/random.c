@@ -20,6 +20,8 @@
  *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2016 Joyent, Inc.
  */
 
 
@@ -288,6 +290,9 @@ rnd_write(dev_t dev, struct uio *uiop, cred_t *credp)
 		uiop->uio_loffset = 0;
 		if ((error = uiomove(buf, bytes, UIO_WRITE, uiop)) != 0)
 			return (error);
+
+		if (crgetzone(credp) != global_zone)
+			continue;
 
 		switch (devno) {
 		case DEVRANDOM:
