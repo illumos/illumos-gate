@@ -485,6 +485,20 @@ cgrp_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 
 	cp->cgn_type = CG_CGROUP_DIR;
 	cp->cgn_nodeid = cgrp_inode(CG_CGROUP_DIR, cgm->cg_gen);
+
+	/*
+	 * This initial cgrp_node will have an ID of 0. All existing processes
+	 * inside the zone will have been started with, or inherited, a
+	 * br_cgroupid of 0. The cgrp_cg_hash_init function will initialize the
+	 * cgn_task_cnt for cgroup 0 to reflect the number of tasks already in
+	 * the group.
+	 *
+	 * Because we must hold cg_contents in cgrp_lwp_fork_helper and
+	 * cgrp_lwp_exit_helper, no process can be creating or exiting another
+	 * thread (although that is unlikely anyway since the cgroup filesystem
+	 * is normally mounted at the start of zone bootup, before anything
+	 * else is started).
+	 */
 	cgrp_dirinit(cp, cp, cr);
 
 	mutex_exit(&cgm->cg_contents);
@@ -909,7 +923,7 @@ cgrp_run_rel_agent(void *a)
  * The cg_contents mutex is held on entry and dropped before returning.
  */
 void
-cgrp_rel_agent_event(cgrp_mnt_t *cgm, cgrp_node_t *cn)
+cgrp_rel_agent_event(cgrp_mnt_t *cgm, cgrp_node_t *cn, boolean_t is_exit)
 {
 	cgrp_node_t *parent;
 	char nm[MAXNAMELEN];
@@ -979,8 +993,14 @@ cgrp_rel_agent_event(cgrp_mnt_t *cgm, cgrp_node_t *cn)
 	DTRACE_PROBE2(cgrp__agent__event, cgrp_rra_arg_t *, rarg,
 	    int, plwpd->br_cgroupid);
 
-	/* The release agent process cannot belong to our cgroup */
-	plwpd->br_cgroupid = 0;
+	/*
+	 * When we're exiting, the release agent process cannot belong to our
+	 * cgroup. When the release agent is called for a move or rmdir, then
+	 * we do not change our cgroupid.
+	 */
+	if (is_exit) {
+		plwpd->br_cgroupid = 0;
+	}
 
 	/*
 	 * The cg_contents mutex cannot be held while taking the pool lock
@@ -1043,7 +1063,7 @@ cgrp_lwp_exit_helper(vfs_t *vfsp, uint_t cg_id, id_t tid, pid_t tpid)
 
 	if (cn->cgn_task_cnt == 0 && cn->cgn_dirents == N_DIRENTS(cgm) &&
 	    cn->cgn_notify == 1) {
-		cgrp_rel_agent_event(cgm, cn);
+		cgrp_rel_agent_event(cgm, cn, B_TRUE);
 		ASSERT(MUTEX_NOT_HELD(&cgm->cg_contents));
 	} else {
 		mutex_exit(&cgm->cg_contents);

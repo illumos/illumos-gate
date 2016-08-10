@@ -211,7 +211,7 @@ int cgrp_taccess(void *, int, cred_t *);
 ino_t cgrp_inode(cgrp_nodetype_t, unsigned int);
 int cgrp_num_pseudo_ents(cgrp_ssid_t);
 cgrp_node_t *cgrp_cg_hash_lookup(cgrp_mnt_t *, uint_t);
-void cgrp_rel_agent_event(cgrp_mnt_t *, cgrp_node_t *);
+void cgrp_rel_agent_event(cgrp_mnt_t *, cgrp_node_t *, boolean_t);
 
 #endif /* KERNEL */
 
