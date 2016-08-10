@@ -43,7 +43,7 @@ STAT_COMMON_SRCS = $(STAT_COMMON_OBJS:%.o=$(STATCOMMONDIR)/%.c)
 
 $(NOT_RELEASE_BUILD)CPPFLAGS 	+= -DDEBUG
 CPPFLAGS 			+= -I$(COMMON_DIR) -I$(STATCOMMONDIR)
-LDLIBS 				+= -lumem -lzonecfg -lscf
+LDLIBS 				+= -lumem -lscf
 LDFLAGS				+= $(MAPFILE.NGB:%=-M%)
 
 LINTFLAGS			+= $(LDLIBS) -mnu

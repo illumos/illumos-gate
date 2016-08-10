@@ -40,7 +40,7 @@ LINTSRCS =	$(COMMON_DIR)/utils.c \
 
 $(NOT_RELEASE_BUILD)CPPFLAGS 	+= -DDEBUG
 CPPFLAGS 			+= -I$(COMMON_DIR)
-LDLIBS 				+= -lumem -lscf -lzonecfg
+LDLIBS 				+= -lscf -lzonecfg
 
 LINTFLAGS 			+= $(LDLIBS) -mnu
 
