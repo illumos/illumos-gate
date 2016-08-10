@@ -166,6 +166,9 @@ futex_wake04		# OS-4471
 getdents02
 getdents02_64
 get_mempolicy01
+getxattr01
+getxattr02
+getxattr03
 ioctl03
 io_cancel01
 io_destroy01
@@ -176,6 +179,11 @@ keyctl01
 kcmp01
 kcmp02
 kcmp03
+lgetxattr01
+lgetxattr02
+llistxattr01
+llistxattr02
+llistxattr03
 mmap13
 mq_notify01
 mq_notify02
@@ -202,6 +210,10 @@ readahead01
 readahead02
 readdir2
 readdir21
+removexattr01
+removexattr02
+request_key01
+request_key02
 sched_rr_get_interval01
 sched_rr_get_interval02
 sched_rr_get_interval03
