@@ -124,7 +124,7 @@ static int nlm_vop_frlock(vnode_t *, int, flock64_t *, int, offset_t,
  */
 static int
 nlm_init_flock(struct flock64 *fl, struct nlm4_lock *nl,
-	struct nlm_host *host, rpcvers_t vers, short type)
+    struct nlm_host *host, rpcvers_t vers, short type)
 {
 	uint64_t off, len;
 
@@ -795,7 +795,7 @@ nlm_do_cancel(nlm4_cancargs *argp, nlm4_res *resp,
 		error = nlm_host_get_rpc(host, sr->rq_vers, &rpcp);
 		if (error != 0) {
 			resp->stat.stat = nlm4_denied_nolocks;
-			return;
+			goto out;
 		}
 	}
 
@@ -1250,7 +1250,7 @@ out:
  */
 static int
 nlm_vop_frlock(vnode_t *vp, int cmd, flock64_t *bfp, int flag, offset_t offset,
-	struct flk_callback *flk_cbp, cred_t *cr, caller_context_t *ct)
+    struct flk_callback *flk_cbp, cred_t *cr, caller_context_t *ct)
 {
 	if (bfp->l_len != 0 && bfp->l_start + (bfp->l_len - 1) < bfp->l_start) {
 		return (EOVERFLOW);
