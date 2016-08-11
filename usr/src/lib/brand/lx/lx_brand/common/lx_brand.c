@@ -1019,7 +1019,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/*   5: fstat */
 	NULL,				/*   6: lstat */
 	NULL,				/*   7: poll */
-	lx_lseek,			/*   8: lseek */
+	NULL,				/*   8: lseek */
 	lx_mmap,			/*   9: mmap */
 	lx_mprotect,			/*  10: mprotect */
 	lx_munmap,			/*  11: munmap */
@@ -1361,7 +1361,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/*  16: lchown16 */
 	NULL,				/*  17: break */
 	NULL,				/*  18: stat */
-	lx_lseek,			/*  19: lseek */
+	NULL,				/*  19: lseek */
 	NULL,				/*  20: getpid */
 	lx_mount,			/*  21: mount */
 	lx_umount,			/*  22: umount */
@@ -1482,7 +1482,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/* 137: afs_syscall */
 	lx_setfsuid16,			/* 138: setfsuid16 */
 	lx_setfsgid16,			/* 139: setfsgid16 */
-	lx_llseek,			/* 140: llseek */
+	NULL,				/* 140: llseek */
 	NULL,				/* 141: getdents */
 	NULL,				/* 142: select */
 	lx_flock,			/* 143: flock */

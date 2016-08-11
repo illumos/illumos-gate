@@ -236,63 +236,6 @@ lx_utime(uintptr_t p1, uintptr_t p2)
 	return (0);
 }
 
-#if defined(_ILP32)
-/*
- * llseek() - The Linux implementation takes an additional parameter, which is
- * the resulting position in the file.
- */
-long
-lx_llseek(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
-    uintptr_t p5)
-{
-	offset_t ret;
-	offset_t *res = (offset_t *)p4;
-
-	/* SEEK_DATA and SEEK_HOLE are only valid in Solaris */
-	if ((int)p5 > SEEK_END)
-		return (-EINVAL);
-
-	if ((ret = llseek((int)p1, LX_32TO64(p3, p2), p5)) < 0)
-		return (-errno);
-
-	*res = ret;
-	return (0);
-}
-#endif
-
-/*
- * seek() - For 32-bit lx, when the resultant file offset cannot be represented
- * in 32 bits, Linux performs the seek but Illumos doesn't, though both set
- * EOVERFLOW.  We call llseek() and then check to see if we need to return
- * EOVERFLOW.
- */
-long
-lx_lseek(uintptr_t p1, uintptr_t p2, uintptr_t p3)
-{
-	offset_t offset = (offset_t)(off_t)(p2);	/* sign extend */
-	offset_t ret;
-#if defined(_ILP32)
-	off_t ret32;
-#endif
-
-	/* SEEK_DATA and SEEK_HOLE are only valid in Illumos */
-	if ((int)p3 > SEEK_END)
-		return (-EINVAL);
-
-	if ((ret = llseek((int)p1, offset, p3)) < 0)
-		return (-errno);
-
-#if defined(_LP64)
-	return (ret);
-#else
-	ret32 = (off_t)ret;
-	if ((offset_t)ret32 == ret)
-		return (ret32);
-	else
-		return (-EOVERFLOW);
-#endif
-}
-
 /*
  * Neither Illumos nor Linux actually returns anything to the caller, but glibc
  * expects to see SOME value returned, so placate it and return 0.

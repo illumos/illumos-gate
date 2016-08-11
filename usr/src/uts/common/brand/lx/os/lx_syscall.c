@@ -540,7 +540,7 @@ lx_sysent_t lx_sysent32[] = {
 	{"lchown16",	lx_lchown16,		0,		3}, /* 16 */
 	{"break",	NULL,			NOSYS_OBSOLETE,	0}, /* 17 */
 	{"stat",	NULL,			NOSYS_OBSOLETE,	0}, /* 18 */
-	{"lseek",	NULL,			0,		3}, /* 19 */
+	{"lseek",	lx_lseek32,		0,		3}, /* 19 */
 	{"getpid",	lx_getpid,		0,		0}, /* 20 */
 	{"mount",	NULL,			0,		5}, /* 21 */
 	{"umount",	NULL,			0,		1}, /* 22 */
@@ -661,7 +661,7 @@ lx_sysent_t lx_sysent32[] = {
 	{"afs_syscall",	NULL,			NOSYS_KERNEL,	0}, /* 137 */
 	{"setfsuid16",	NULL,			0,		1}, /* 138 */
 	{"setfsgid16",	NULL,			0,		1}, /* 139 */
-	{"llseek",	NULL,			0,		5}, /* 140 */
+	{"llseek",	lx_llseek,		0,		5}, /* 140 */
 	{"getdents",	lx_getdents_32,		0,		3}, /* 141 */
 	{"select",	lx_select,		0,		5}, /* 142 */
 	{"flock",	NULL,			0,		2}, /* 143 */
@@ -900,7 +900,7 @@ lx_sysent_t lx_sysent64[] = {
 	{"fstat",	lx_fstat64,		0,		2}, /* 5 */
 	{"lstat",	lx_lstat64,		0,		2}, /* 6 */
 	{"poll",	lx_poll,		0,		3}, /* 7 */
-	{"lseek",	NULL,			0,		3}, /* 8 */
+	{"lseek",	lx_lseek64,		0,		3}, /* 8 */
 	{"mmap",	NULL,			0,		6}, /* 9 */
 	{"mprotect",	NULL,			0,		3}, /* 10 */
 	{"munmap",	NULL,			0,		2}, /* 11 */
