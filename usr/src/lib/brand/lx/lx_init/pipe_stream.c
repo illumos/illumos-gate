@@ -21,7 +21,6 @@
 #include <poll.h>
 #include <errno.h>
 #include <sys/types.h>
-#include <sys/debug.h>
 #include <sys/list.h>
 
 #include "pipe_stream.h"
@@ -65,7 +64,7 @@ pipe_stream_loop_fini(pipe_stream_loop_t *psl)
 	VERIFY0(close(psl->psl_port));
 
 	while (!list_is_empty(&psl->psl_pipes)) {
-		pipe_stream_fini(list_head(&psl->psl_pipes));
+		(void)pipe_stream_fini(list_head(&psl->psl_pipes));
 	}
 
 	list_destroy(&psl->psl_pipes);

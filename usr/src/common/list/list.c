@@ -38,7 +38,17 @@
 #endif
 
 #ifdef lint
-extern list_node_t *list_d2l(list_t *list, void *obj);
+static list_node_t *
+list_d2l(list_t *list, void *obj)
+{
+	/* Pretty version for lint... */
+	uint64_t *offset = (uint64_t *)obj;
+
+	if (!IS_P2ALIGNED(obj, 8))
+		return (NULL);
+
+	return ((list_node_t *)(offset + (list->list_offset >> 3)));
+}
 #else
 #define	list_d2l(a, obj) ((list_node_t *)(((char *)obj) + (a)->list_offset))
 #endif

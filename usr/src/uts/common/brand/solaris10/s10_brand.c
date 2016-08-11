@@ -368,6 +368,7 @@ s10_exec()
 	brand_solaris_exec(&s10_brand);
 }
 
+/* ARGSUSED */
 void
 s10_initlwp(klwp_t *l, void *bd)
 {
@@ -410,6 +411,7 @@ s10_free_brand_data(zone_t *zone)
 	kmem_free(zone->zone_brand_data, sizeof (s10_zone_data_t));
 }
 
+/* ARGSUSED */
 void
 s10_init_brand_data(zone_t *zone, kmutex_t *zsl)
 {

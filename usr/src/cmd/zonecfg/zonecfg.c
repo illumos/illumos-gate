@@ -5435,7 +5435,6 @@ info_func(cmd_t *cmd)
 	uint64_t swap_limit;
 	uint64_t locked_limit;
 	uint64_t phys_limit;
-	struct stat statbuf;
 
 	assert(cmd != NULL);
 

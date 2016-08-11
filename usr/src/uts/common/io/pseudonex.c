@@ -385,6 +385,7 @@ pseudonex_auto_assign(dev_info_t *child)
 	return (-1);
 }
 
+/* ARGSUSED */
 static int
 pseudonex_fm_init(dev_info_t *dip, dev_info_t *tdip, int cap,
     ddi_iblock_cookie_t *ibc)

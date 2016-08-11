@@ -88,6 +88,7 @@ typedef struct lx_autofs_dv_ioctl {
 	uint32_t lad_ioctlfd;
 	uint32_t lad_arg1;
 	uint32_t lad_arg2;
+	/* LINTED - C99 construct. */
 	char	lad_path[0];
 } lx_autofs_dv_ioctl_t;
 
@@ -1518,7 +1519,7 @@ lx_autofs_automounter_ioctl(vnode_t *vp, int cmd, intptr_t arg, cred_t *cr)
 	}
 	mutex_exit(&pidlock);
 
-	switch (cmd) {
+	switch ((unsigned int)cmd) {
 	case LX_AUTOFS_IOC_READY:
 		if ((err = lx_autofs_ack(id, vp->v_vfsp, LXACR_READY)) != 0)
 			return (err);
@@ -1570,7 +1571,8 @@ lx_autofs_automounter_ioctl(vnode_t *vp, int cmd, intptr_t arg, cred_t *cr)
 		return (ENOTSUP);
 
 	case LX_AUTOFS_IOC_EXPIRE_MULTI:
-		lx_autofs_expire(vp->v_vfsp, cr);
+		/* Should we return lx_autofs_expire()'s value instead? */
+		(void) lx_autofs_expire(vp->v_vfsp, cr);
 		return (EAGAIN);
 
 	default:
@@ -2851,7 +2853,7 @@ lx_autofs_dev_ismntpt(intptr_t arg)
 	if (fnd_vfs->vfs_op == lx_autofs_vfsops) {
 		dc->lad_arg2 = LX_AUTOFS_SB_MAGIC;
 	} else {
-		dc->lad_arg2 = ~LX_AUTOFS_SB_MAGIC;
+		dc->lad_arg2 = ~((uint32_t)LX_AUTOFS_SB_MAGIC);
 	}
 
 	VFS_RELE(fnd_vfs);
@@ -2901,7 +2903,12 @@ static int
 lx_autofs_dev_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
     int *rvalp)
 {
-	switch (cmd) {
+	/*
+	 * Many of these constants are negative for a signed int.
+	 * Cast "cmd" to unsigned to prevent lint errors and not have any
+	 * other problems.
+	 */
+	switch ((unsigned int)cmd) {
 	case LX_AUTOFS_DEV_IOC_VERSION_CMD:
 		return (lx_autofs_dev_vers(arg));
 

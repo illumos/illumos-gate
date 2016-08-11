@@ -285,7 +285,7 @@ connect_zone_sock(const char *zname, const char *suffix, boolean_t verbose)
 	    sizeof (servaddr)) == -1) {
 		if (verbose)
 			zperror(gettext("Could not connect to zone"));
-		close(sockfd);
+		(void) close(sockfd);
 		return (-1);
 	}
 	return (sockfd);
@@ -561,8 +561,8 @@ sigwinch(int s)
 	if (ioctl(0, TIOCGWINSZ, &ws) == 0) {
 		if (ctlfd != -1) {
 			char buf[BUFSIZ];
-			snprintf(buf, sizeof (buf), "TIOCSWINSZ %hu %hu\n",
-			    ws.ws_row, ws.ws_col);
+			(void) snprintf(buf, sizeof (buf),
+			    "TIOCSWINSZ %hu %hu\n", ws.ws_row, ws.ws_col);
 			(void) send_ctl_sock(buf, strlen(buf));
 		} else {
 			(void) ioctl(masterfd, TIOCSWINSZ, &ws);
@@ -580,7 +580,7 @@ sigusr1(int s)
 	connect_flags ^= ZLOGIN_ZFD_EOF;
 	if (ctlfd != -1) {
 		char buf[BUFSIZ];
-		snprintf(buf, sizeof (buf), "SETFLAGS %u\n",
+		(void) snprintf(buf, sizeof (buf), "SETFLAGS %u\n",
 		    connect_flags);
 		(void) send_ctl_sock(buf, strlen(buf));
 	}
@@ -2217,7 +2217,7 @@ main(int argc, char **argv)
 			    (imode ? "server_ctl" : "console_sock"), B_FALSE);
 			if (masterfd != -1)
 				break;
-			sleep(1);
+			(void) sleep(1);
 		}
 
 		if (retry == MAX_RETRY) {

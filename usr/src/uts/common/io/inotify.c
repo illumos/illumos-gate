@@ -505,7 +505,7 @@ inotify_watch_event(inotify_watch_t *watch, uint64_t mask, char *name)
 	event->ine_event.len = len;
 
 	if (name != NULL)
-		strcpy(event->ine_event.name, name);
+		(void) strcpy(event->ine_event.name, name);
 
 	if (tail != NULL) {
 		tail->ine_next = event;

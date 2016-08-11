@@ -103,7 +103,7 @@ lxi_err(char *msg, ...)
 	 * Since a non-zero exit will cause the zone to reboot, a pause here
 	 * will prevent a mis-configured zone from spinning in a reboot loop.
 	 */
-	pause();
+	(void) pause();
 	exit(1);
 	/*NOTREACHED*/
 }
@@ -204,19 +204,21 @@ zone_find_attr(struct zone_res_attrtab *attrs, const char *name,
 }
 #endif /* XXX KEBE SAYS NOT YET */
 
-void
+static void
 lxi_svc_start(char *name, char *path, char *fmri)
 {
 	pid_t pid;
 	int status;
-	char *const argv[] = {
-		name,
+	char *argv[] = {
+		NULL,
 		NULL
 	};
-	char *const envp[] = {
-		fmri,
+	char *envp[] = {
+		NULL,
 		NULL
 	};
+	argv[0] = name;
+	envp[0] = fmri;
 
 	pid = fork();
 	if (pid == -1) {
@@ -235,16 +237,15 @@ lxi_svc_start(char *name, char *path, char *fmri)
 		(void) snprintf(cmd, sizeof (cmd), "%s%s", zroot != NULL ?
 		    zroot : "", path);
 
-		execve(cmd, argv, envp);
+		(void) execve(cmd, argv, envp);
 
 		lxi_err("execve(%s) failed: %s", cmd, strerror(errno));
 		/* NOTREACHED */
 	}
 
 	/* parent */
-	while (wait(&status) != pid) {
-		/* EMPTY */;
-	}
+	while (wait(&status) != pid)
+		;
 
 	if (WIFEXITED(status)) {
 		if (WEXITSTATUS(status) != 0) {
@@ -498,10 +499,10 @@ lxi_iface_gateway(const char *iface, const char *dst, int dstpfx,
     const char *gwaddr)
 {
 	int idx, len, sockfd;
-	char rtbuf[RTMBUFSZ];
+	/* For lint-happy alignment, use a uint32_t array... */
+	uint32_t rtbuf[RTMBUFSZ / sizeof (uint32_t)];
 	struct rt_msghdr *rtm = (struct rt_msghdr *)rtbuf;
-	struct sockaddr_in *dst_sin = (struct sockaddr_in *)
-	    (rtbuf + sizeof (struct rt_msghdr));
+	struct sockaddr_in *dst_sin = (struct sockaddr_in *)(rtm + 1);
 	struct sockaddr_in *gw_sin = (struct sockaddr_in *)(dst_sin + 1);
 	struct sockaddr_in *netmask_sin = (struct sockaddr_in *)(gw_sin + 1);
 
@@ -553,15 +554,15 @@ lxi_iface_gateway(const char *iface, const char *dst, int dstpfx,
 
 	if ((len = write(sockfd, rtbuf, rtm->rtm_msglen)) < 0) {
 		lxi_warn("could not write rtmsg: %s", strerror(errno));
-		close(sockfd);
+		(void) close(sockfd);
 		return (-1);
 	} else if (len < rtm->rtm_msglen) {
 		lxi_warn("write() rtmsg incomplete");
-		close(sockfd);
+		(void) close(sockfd);
 		return (-1);
 	}
 
-	close(sockfd);
+	(void) close(sockfd);
 	return (0);
 }
 
@@ -848,7 +849,7 @@ lxi_init_exec(char **argv)
 	 * treats anything else as 'other' but this is enough to make it
 	 * behave better inside a zone. See 'detect_container' in systemd.
 	 */
-	execve(cmd, argv, envp);
+	(void) execve(cmd, argv, envp);
 	e = errno;
 
 	/*

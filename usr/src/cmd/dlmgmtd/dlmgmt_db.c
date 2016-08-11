@@ -723,11 +723,11 @@ parse_linkprops(char *buf, dlmgmt_link_t *linkp)
 	len = strlen(buf);
 	attr_name[0] = '\0';
 	for (i = 0; i < len; i++) {
-		rename = B_FALSE;
 		char		c = buf[i];
 		boolean_t	match = (c == '=' ||
 		    (c == ',' && !found_type) || c == ';');
 
+		rename = B_FALSE;
 		/*
 		 * Move to the next character if there is no match and
 		 * if we have not reached the last character.

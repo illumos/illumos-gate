@@ -890,6 +890,8 @@ zfd_wput(queue_t *qp, mblk_t *mp)
 			}
 
 			/* Get the primary slave minor device number */
+			ASSERT(IS_P2ALIGNED(mp->b_cont->b_rptr, 4));
+			/* LINTED - b_rptr will always be aligned. */
 			to = *(int *)mp->b_cont->b_rptr;
 			instance = ZFD_INSTANCE(to);
 
@@ -942,6 +944,8 @@ zfd_wput(queue_t *qp, mblk_t *mp)
 			prim_zfds = zfds->zfd_inst_pri;
 
 			/* Get the flow control setting */
+			ASSERT(IS_P2ALIGNED(mp->b_cont->b_rptr, 4));
+			/* LINTED - b_rptr will always be aligned. */
 			val = *(int *)mp->b_cont->b_rptr;
 			if (val != 0 && val != 1) {
 				miocack(qp, mp, 0, EINVAL);

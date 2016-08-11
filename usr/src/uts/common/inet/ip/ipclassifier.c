@@ -920,7 +920,6 @@ ipcl_hash_insert_bound(connf_t *connfp, conn_t *connp)
 void
 ipcl_hash_insert_wildcard(connf_t *connfp, conn_t *connp)
 {
-	conn_t **list, *prev, *next;
 	conn_t *pconnp = NULL, *nconnp;
 	boolean_t isv4mapped = IN6_IS_ADDR_V4MAPPED(&connp->conn_laddr_v6);
 

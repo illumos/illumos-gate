@@ -629,6 +629,7 @@ lx_ldb_init32(rd_agent_t *rap, struct ps_prochandle *php)
 	for (offs = symtab; offs < strtab; offs += sizeof (Elf32_Sym)) {
 		uint32_t p;
 
+		/* LINTED - "offs" increments always in sizeof (Elf32_Sym). */
 		sym = (Elf32_Sym *)&mem[offs];
 
 		if (sym->st_name > memsz) {

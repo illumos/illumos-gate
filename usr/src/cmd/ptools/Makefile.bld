@@ -115,6 +115,12 @@ CPPFLAGS +=	$(CPPFLAGS_$(PROG))
 OBJS +=		$(OBJS_$(PROG))
 SRCS +=		$(SRCS_$(PROG))
 
+# For lint, always include ptools_common.c, but suppress the "defined but
+# not used" error, in case a given ptool doesn't need it.
+SRCS +=		../../common/ptools_common.c
+LINTFLAGS +=	-xerroff=E_NAME_DEF_NOT_USED2
+LINTFLAGS64 +=	-xerroff=E_NAME_DEF_NOT_USED2
+
 INSTALL_NEW=
 INSTALL_LEGACY=$(RM) $(ROOTPROCBINSYMLINK) ; \
 	$(LN) -s ../../bin/$(PROG) $(ROOTPROCBINSYMLINK)

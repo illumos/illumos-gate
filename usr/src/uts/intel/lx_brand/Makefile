@@ -77,6 +77,7 @@ LDFLAGS		+= -dy -Nexec/elfexec -Nfs/fifofs -Nfs/sockfs -Ndrv/ip -Nfs/zfs
 #
 LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
 LINTTAGS	+= -erroff=E_SUSPICIOUS_COMPARISON
+LINTTAGS	+= -erroff=E_TRUE_LOGICAL_EXPR
 
 #
 #	Default build targets.

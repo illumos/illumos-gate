@@ -44,8 +44,9 @@ CLOBBERFILES =	$(OBJS) $(ROOTPROG)
 UTSBASE =	$(SRC)/uts
 
 CFLAGS +=	$(CCVERBOSE)
-CPPFLAGS +=	-D_REENTRANT -I$(UTSBASE)/common/brand/lx
+CPPFLAGS +=	-D_FILE_OFFSET_BITS=64 -D_REENTRANT -I$(UTSBASE)/common/brand/lx
 LDLIBS +=	-lzonecfg -lipadm -lsocket -linetutil -lnsl -lcmdutils -ldhcpagent
+LINTFLAGS +=	-xerroff=E_NAME_DEF_NOT_USED2
 
 .KEEP_STATE:
 
@@ -54,7 +55,7 @@ install: all $(ROOTPROG)
 clean:
 	$(RM) $(PROG) $(OBJS)
 
-lint: lint_PROG lint_SRCS
+lint: lint_SRCS
 
 $(PROG): $(OBJS)
 	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)

@@ -848,9 +848,11 @@ restartinit(brand_handle_t bh)
  * zone's init. When true, the contract will include CT_PR_EV_EXIT in the fatal
  * set, so that when any service which is in the same contract exits, the init
  * application will be terminated.
+ *
+ * We use the global "snap_hndl", so no parameters get passed here.
  */
 static boolean_t
-is_app_svc_dep(brand_handle_t bh)
+is_app_svc_dep(void)
 {
 	struct zone_attrtab a;
 
@@ -940,7 +942,7 @@ zone_bootup(zlog_t *zlogp, const char *bootargs, int zstate)
 	 * See if we need to setup contract dependencies between the zone's
 	 * primary application and any of its services.
 	 */
-	app_svc_dep = is_app_svc_dep(bh);
+	app_svc_dep = is_app_svc_dep();
 
 	brand_close(bh);
 
@@ -966,9 +968,11 @@ zone_bootup(zlog_t *zlogp, const char *bootargs, int zstate)
 		goto bad;
 	}
 
-	if ((st.st_mode & S_IFMT) == S_IFLNK) {
-		/* symlink, we'll have to wait and resolve when we boot */
-	} else if ((st.st_mode & S_IXUSR) == 0) {
+	/*
+	 * If a symlink, we'll have to wait and resolve when we boot,
+	 * otherwise check the executable bits now.
+	 */
+	if ((st.st_mode & S_IFMT) != S_IFLNK && (st.st_mode & S_IXUSR) == 0) {
 		zerror(zlogp, B_FALSE, "%s is not executable", initpath);
 		goto bad;
 	}
@@ -1296,7 +1300,6 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 
 	zone_state_t zstate;
 	zone_cmd_t cmd;
-	boolean_t debug;
 	int init_status;
 	zone_cmd_arg_t *zargp;
 
@@ -1350,7 +1353,6 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 		goto out;
 	}
 	cmd = zargp->cmd;
-	debug = zargp->debug;
 	init_status = zargp->status;
 
 	if (door_ucred(&uc) != 0) {

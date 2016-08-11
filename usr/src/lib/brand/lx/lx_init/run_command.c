@@ -20,7 +20,6 @@
 #include <unistd.h>
 #include <wait.h>
 #include <sys/types.h>
-#include <sys/debug.h>
 #include <libcmdutils.h>
 
 #include "run_command.h"
@@ -118,7 +117,7 @@ run_command(const char *path, char *const argv[], char *const envp[],
 		    STDERR_FILENO));
 		closefrom(3);
 
-		execve(path, argv, envp);
+		(void) execve(path, argv, envp);
 		err(127, "exec(%s) failed", path);
 	}
 

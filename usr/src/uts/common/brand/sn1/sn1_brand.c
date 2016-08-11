@@ -213,6 +213,7 @@ sn1_exec()
 	brand_solaris_exec(&sn1_brand);
 }
 
+/* ARGSUSED */
 void
 sn1_initlwp(klwp_t *l, void *bd)
 {

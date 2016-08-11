@@ -189,7 +189,7 @@ tmp_convnum(char *str, pgcnt_t *maxpg)
 	 * system's total available swap size as the initial value. Perform the
 	 * intermediate calculation in pages to avoid overflow.
 	 */
-	if (*c == '\%') {
+	if (*c == '%') {
 		u_longlong_t cap;
 
 		if (*(c + 1) != '\0')

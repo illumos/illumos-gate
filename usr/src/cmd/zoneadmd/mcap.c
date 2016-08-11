@@ -162,8 +162,6 @@ static boolean_t skip_vmusage = B_FALSE;
 static boolean_t skip_pageout = B_FALSE;
 static boolean_t skip_pf_throttle = B_FALSE;
 
-static zlog_t	*logp;
-
 static int64_t check_suspend();
 static void get_mcap_tunables();
 
@@ -388,7 +386,6 @@ pageout_process(pid_t pid, int64_t excess)
 	int			psfd;
 	prmap_t			*pmap;
 	proc_map_t		cur;
-	int			res;
 	int64_t			sum_d_rss, d_rss;
 	int64_t			old_rss;
 	int			map_cnt;
@@ -440,9 +437,10 @@ pageout_process(pid_t pid, int64_t excess)
 	sum_d_rss = 0;
 	while (excess > 0 && pmap != NULL && !shutting_down) {
 		/* invalidate the entire mapping */
-		if ((res = pageout_mapping(pid, pmap)) < 0)
+		if (pageout_mapping(pid, pmap) < 0)
 			debug("pid %ld: mapping 0x%p %ldkb unpageable (%d)\n",
-			    pid, pmap->pr_vaddr, pmap->pr_size / 1024, errno);
+			    pid, (void *)pmap->pr_vaddr,
+			    (long)pmap->pr_size / 1024L, errno);
 
 		map_cnt++;
 
@@ -1156,7 +1154,6 @@ create_mcap_thread(zlog_t *zlogp, zoneid_t id)
 
 	shutting_down = 0;
 	zid = id;
-	logp = zlogp;
 
 	/* all but the lx brand currently use /proc */
 	if (strcmp(brand_name, "lx") == 0) {

@@ -1208,7 +1208,7 @@ srvr(void *modearg)
 	 * This thread should receive SIGHUP so that it can close the log
 	 * file, and reopen it, during log rotation.
 	 */
-	sigset(SIGHUP, hup_handler);
+	(void) sigset(SIGHUP, hup_handler);
 	(void) sigfillset(&blockset);
 	(void) sigdelset(&blockset, SIGHUP);
 	(void) thr_sigsetmask(SIG_BLOCK, &blockset, NULL);
@@ -1384,6 +1384,7 @@ done:
 	zonecfg_fini_handle(handle);
 }
 
+/* ARGSUSED -- "id" might be used in the future. */
 void
 create_log_thread(zlog_t *logp, zoneid_t id)
 {

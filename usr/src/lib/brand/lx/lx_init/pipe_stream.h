@@ -41,6 +41,13 @@ extern int pipe_stream_child_afterfork(pipe_stream_t *, int);
 extern boolean_t pipe_stream_loop_should_run(pipe_stream_loop_t *);
 extern int pipe_stream_loop_run(pipe_stream_loop_t *);
 
+#include <assert.h>
+/*
+ * Kernel-like macros that don't trigger lint.
+ */
+#define	VERIFY0(stmt) assert((stmt) == 0)
+#define	VERIFY(stmt) assert(stmt)
+
 #ifdef __cplusplus
 }
 #endif

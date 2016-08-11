@@ -1564,8 +1564,6 @@ stk_add(uarg_t *args, const char *sp, enum uio_seg segflg)
 static int
 stk_byte_add(uarg_t *args, const uint8_t *sp, size_t len)
 {
-	int error;
-
 	if (STK_AVAIL(args) < sizeof (int))
 		return (E2BIG);
 	*--args->stk_offp = args->stk_strp - args->stk_base;
