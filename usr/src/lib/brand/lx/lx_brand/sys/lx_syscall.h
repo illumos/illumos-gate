@@ -127,8 +127,6 @@ extern long lx_unlink(uintptr_t);
 extern long lx_rmdir(uintptr_t);
 extern long lx_rename(uintptr_t, uintptr_t);
 extern long lx_utime(uintptr_t, uintptr_t);
-extern long lx_llseek(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t);
-extern long lx_lseek(uintptr_t, uintptr_t, uintptr_t);
 extern long lx_sysfs(uintptr_t, uintptr_t, uintptr_t);
 
 extern long lx_uname(uintptr_t);

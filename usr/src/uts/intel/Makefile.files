@@ -315,6 +315,7 @@ LX_BRAND_OBJS  =		\
 	lx_ioprio.o		\
 	lx_kill.o		\
 	lx_link.o		\
+	lx_lseek.o		\
 	lx_misc.o		\
 	lx_mkdir.o		\
 	lx_modify_ldt.o		\
