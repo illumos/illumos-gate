@@ -13,6 +13,6 @@
 # Copyright (c) 2012 by Delphix. All rights reserved.
 #
 
-SUBDIRS = poll sigqueue spoof-ras
+SUBDIRS = poll sigqueue spoof-ras tmpfs file-locking
 
 include $(SRC)/test/Makefile.com
