@@ -173,25 +173,41 @@ lx_fcntl_getfl(int fd)
 	return (rc);
 }
 
+#define	LX_SETFL_MASK	(O_NONBLOCK | O_APPEND | O_SYNC |  FASYNC);
+
 static int
 lx_fcntl_setfl(int fd, ulong_t arg)
 {
-	int new_arg;
+	int flags;
 
-	new_arg = 0;
+	/*
+	 * When performing fcntl(F_SETFL), only certain flags are
+	 * allowed to be manipulated. A mask is used to preserve
+	 * other flags, such as those which are specified during
+	 * open(2). The mask on Linux excludes O_LARGEFILE from
+	 * being manipulated, whereas illumos expects the flag to
+	 * be set. In order to properly preserve the O_LARGEFILE
+	 * (FOFFMAX) state, we must first query for it via
+	 * fcntl(F_GETFL) so that the value can be carried
+	 * through.
+	 */
+	flags = fcntl(fd, F_GETFL, 0);
+	if (ttolwp(curthread)->lwp_errno != 0)
+		return (ttolwp(curthread)->lwp_errno);
+
+	flags &= ~LX_SETFL_MASK;
+
 	/* LX_O_NDELAY == LX_O_NONBLOCK, so we only check for one */
 	if (arg & LX_O_NDELAY)
-		new_arg |= O_NONBLOCK;
+		flags |= O_NONBLOCK;
 	if (arg & LX_O_APPEND)
-		new_arg |= O_APPEND;
+		flags |= O_APPEND;
 	if (arg & LX_O_SYNC)
-		new_arg |= O_SYNC;
-	if (arg & LX_O_LARGEFILE)
-		new_arg |= O_LARGEFILE;
+		flags |= O_SYNC;
 	if (arg & LX_O_ASYNC)
-		new_arg |= FASYNC;
+		flags |= FASYNC;
 
-	return (fcntl(fd, F_SETFL, new_arg));
+	return (fcntl(fd, F_SETFL, flags));
 }
 
 /* The default unprivileged limit in Linux is 1MB */
