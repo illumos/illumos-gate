@@ -30,3 +30,6 @@ tests = ['sigqueue_queue_size']
 [/opt/os-tests/tests/tmpfs]
 user = root
 tests = ['tmpfs_badmount', 'tmpfs_enospc']
+
+[/opt/os-tests/tests/file-locking]
+tests = ['runtests.32', 'runtests.64']
