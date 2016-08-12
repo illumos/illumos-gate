@@ -19589,6 +19589,7 @@ s usr/share/man/man9f/ddi_umem_unlock.9f=ddi_umem_lock.9f
 s usr/share/man/man9f/ddi_unmap_regs.9f=ddi_map_regs.9f
 f usr/share/man/man9f/delay.9f 0444 root bin
 s usr/share/man/man9f/desballoc.9f=esballoc.9f
+f usr/share/man/man9f/devfs_clean.9f 0444 root bin
 f usr/share/man/man9f/devmap_default_access.9f 0444 root bin
 f usr/share/man/man9f/devmap_devmem_setup.9f 0444 root bin
 f usr/share/man/man9f/devmap_do_ctxmgt.9f 0444 root bin

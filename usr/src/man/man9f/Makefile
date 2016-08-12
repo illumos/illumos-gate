@@ -11,9 +11,9 @@
 
 #
 # Copyright 2011, Richard Lowe
-# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore>
 # Copyright 2016 Joyent, Inc.
+# Copyright 2016 Nexenta Systems, Inc.
 #
 
 include		$(SRC)/Makefile.master
@@ -245,6 +245,7 @@ MANFILES= 	ASSERT.9f				\
 	 	ddi_umem_iosetup.9f			\
 	 	ddi_umem_lock.9f			\
 	 	delay.9f				\
+		devfs_clean.9f				\
 	 	devmap_default_access.9f		\
 	 	devmap_devmem_setup.9f			\
 	 	devmap_do_ctxmgt.9f			\
