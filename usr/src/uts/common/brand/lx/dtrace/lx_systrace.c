@@ -22,7 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 
@@ -190,8 +190,8 @@ lx_systrace_enable(void *arg, dtrace_id_t id, void *parg)
 		lx_brand_systrace_enable();
 	mutex_exit(&lx_systrace_lock);
 
-	if (LX_SYSTRACE_IS64BIT((uintptr_t)parg)) {
 #if defined(_LP64)
+	if (LX_SYSTRACE_IS64BIT((uintptr_t)parg)) {
 		ASSERT(sysnum < lx_systrace_nsysent64);
 
 		if (LX_SYSTRACE_ISENTRY((uintptr_t)parg)) {
@@ -199,8 +199,9 @@ lx_systrace_enable(void *arg, dtrace_id_t id, void *parg)
 		} else {
 			lx_systrace_sysent64[sysnum].lss_return = id;
 		}
+	} else
 #endif
-	} else {
+	{
 		ASSERT(sysnum < lx_systrace_nsysent32);
 
 		if (LX_SYSTRACE_ISENTRY((uintptr_t)parg)) {
@@ -218,8 +219,8 @@ lx_systrace_disable(void *arg, dtrace_id_t id, void *parg)
 {
 	int sysnum = LX_SYSTRACE_SYSNUM((uintptr_t)parg);
 
-	if (LX_SYSTRACE_IS64BIT((uintptr_t)parg)) {
 #if defined(_LP64)
+	if (LX_SYSTRACE_IS64BIT((uintptr_t)parg)) {
 		ASSERT(sysnum < lx_systrace_nsysent64);
 
 		if (LX_SYSTRACE_ISENTRY((uintptr_t)parg)) {
@@ -227,8 +228,9 @@ lx_systrace_disable(void *arg, dtrace_id_t id, void *parg)
 		} else {
 			lx_systrace_sysent64[sysnum].lss_return = DTRACE_IDNONE;
 		}
+	} else
 #endif
-	} else {
+	{
 		ASSERT(sysnum < lx_systrace_nsysent32);
 
 		if (LX_SYSTRACE_ISENTRY((uintptr_t)parg)) {

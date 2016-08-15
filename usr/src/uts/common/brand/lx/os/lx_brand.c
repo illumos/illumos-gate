@@ -1554,7 +1554,7 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 		struct regs *rp = lwptoregs(lwp);
 
 		rp->r_r0 = 0;
-		lx_ptrace_stop(LX_PR_SYSEXIT);
+		(void) lx_ptrace_stop(LX_PR_SYSEXIT);
 		return (0);
 	}
 
