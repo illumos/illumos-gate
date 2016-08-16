@@ -14,13 +14,16 @@
 # Copyright 2016 RackTop Systems.
 #
 
-MACHINE=	$(MACH)
+MACHINE=	$(MACH64)
+ASFLAGS=	-m64
 
-all install: libzfsboot.a
+all:		libefi.a
 
+SRCS=	time.c
 include ../Makefile.com
 
-CLEANFILES +=	x86
-CFLAGS +=	-m32
+CFLAGS +=	-m64
+
+CLEANFILES +=	machine x86
 
 $(OBJS): machine x86

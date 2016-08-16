@@ -19,13 +19,11 @@ ROOT_BOOT=	$(ROOT)/boot
 ROOTBOOTPROG=$(PROG:%=$(ROOT_BOOT)/%)
 
 LOADER_ADDRESS=0x200000
-CFLAGS +=	-march=i386 -ffreestanding
-CFLAGS +=	-mpreferred-stack-boundary=2
+CFLAGS +=	-m32 -ffreestanding
 CFLAGS +=	-mno-mmx -mno-3dnow -mno-sse -mno-sse2 -mno-sse3 -msoft-float
-CFLAGS +=	-std=gnu99 -fno-reorder-functions
+CFLAGS +=	-std=gnu99
 LDFLAGS +=	-nostdlib
 
-CFLAGS +=	-m32
 ACFLAGS +=	-m32
 AFLAGS +=	--32
 

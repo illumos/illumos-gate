@@ -39,16 +39,16 @@
 struct chunk {
 	EFI_VIRTUAL_ADDRESS chunk_vaddr;
 	EFI_PHYSICAL_ADDRESS chunk_paddr;
-	UINT64 chunk_size;
+	size_t chunk_size;
 	STAILQ_ENTRY(chunk) chunk_next;
 };
 
 STAILQ_HEAD(chunk_head, chunk);
 
 struct relocator {
-	UINT64 rel_stack;
-	UINT64 rel_copy;
-	UINT64 rel_memmove;
+	vm_offset_t rel_stack;
+	vm_offset_t rel_copy;
+	vm_offset_t rel_memmove;
 	struct chunk_head rel_chunk_head;
 	struct chunk rel_chunklist[];
 };
@@ -58,8 +58,8 @@ int	efi_autoload(void);
 ssize_t	efi_copyin(const void *, vm_offset_t, const size_t);
 ssize_t	efi_copyout(const vm_offset_t, void *, const size_t);
 ssize_t	efi_readin(const int, vm_offset_t, const size_t);
-uint64_t efi_loadaddr(u_int, void *, uint64_t);
-void efi_free_loadaddr(uint64_t, uint64_t);
+vm_offset_t efi_loadaddr(u_int, void *, vm_offset_t);
+void efi_free_loadaddr(vm_offset_t, size_t);
 void * efi_translate(vm_offset_t);
 vm_offset_t efi_physaddr(multiboot_tag_module_t *, vm_offset_t,
     EFI_MEMORY_DESCRIPTOR *, size_t, UINTN, size_t);

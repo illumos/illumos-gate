@@ -15,12 +15,19 @@
 #
 
 MACHINE=	$(MACH)
+ASFLAGS=	-m32
+EFIPROG=	loader32.efi
 
-all install: libzfsboot.a
+all:		$(EFIPROG)
 
 include ../Makefile.com
 
-CLEANFILES +=	x86
+EFI_TARGET=	pei-i386
+LDFLAGS +=	-znocombreloc
+
+efi_main.o := CPPFLAGS += -DLOADER_EFI=L\"loader32.efi\"
 CFLAGS +=	-m32
 
-$(OBJS): machine x86
+CLEANFILES +=	machine x86 $(EFIPROG)
+
+$(OBJS):	machine x86

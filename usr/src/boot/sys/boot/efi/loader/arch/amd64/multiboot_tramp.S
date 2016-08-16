@@ -18,16 +18,15 @@
 	.file	"multiboot_tramp.s"
 
 /*
- * The current dboot in illumos kernel is running in 32bit mode
- * and expecting following 32-bit multiboot execution environment:
+ * dboot expects a 32-bit multiboot environment and to execute in 32-bit mode.
  *
  * EAX: MB magic
  * EBX: 32-bit physical address of MBI
  * CS: 32-bit read/execute code segment with offset 0 and limit 0xFFFFFFFF
- * DS: 32-bit read/write code segment with offset 0 and limit 0xFFFFFFFF
- * ES: 32-bit read/write code segment with offset 0 and limit 0xFFFFFFFF
- * FS: 32-bit read/write code segment with offset 0 and limit 0xFFFFFFFF
- * GS: 32-bit read/write code segment with offset 0 and limit 0xFFFFFFFF
+ * DS: 32-bit read/write data segment with offset 0 and limit 0xFFFFFFFF
+ * ES: 32-bit read/write data segment with offset 0 and limit 0xFFFFFFFF
+ * FS: 32-bit read/write data segment with offset 0 and limit 0xFFFFFFFF
+ * GS: 32-bit read/write data segment with offset 0 and limit 0xFFFFFFFF
  * SS: 32-bit read/write data segment with offset 0 and limit 0xFFFFFFFF
  * A20 enabled
  * CR0: PG cleared, PE set
@@ -45,7 +44,7 @@
 
 /*
  * void multiboot_tramp(uint32_t magic, struct relocator *relocator,
- *    uint64_t entry)
+ *    vm_offset_t entry)
  */
 multiboot_tramp:
 		cli
@@ -103,6 +102,15 @@ multiboot_tramp_2:
 /* GDT record */
 		.p2align 4
 gdt:
+/*
+ * This will create access for 4GB flat memory with
+ * base = 0x00000000, segment limit = 0xffffffff
+ * page granulariy 4k
+ * 32-bit protected mode
+ * ring 0
+ * code segment is executable RW
+ * data segment is not-executable RW
+ */
 		.word	0x0, 0x0		/* NULL entry */
 		.byte	0x0, 0x0, 0x0, 0x0
 		.word	0xffff, 0x0		/* code segment */

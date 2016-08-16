@@ -153,8 +153,8 @@ efi_physaddr(multiboot_tag_module_t *module, vm_offset_t addr,
  * address, we can not make any assumptions about actual location or
  * about the order of the allocated blocks.
  */
-uint64_t
-efi_loadaddr(u_int type, void *data, uint64_t addr)
+vm_offset_t
+efi_loadaddr(u_int type, void *data, vm_offset_t addr)
 {
 	EFI_PHYSICAL_ADDRESS paddr;
 	struct stat st;
@@ -192,7 +192,7 @@ efi_loadaddr(u_int type, void *data, uint64_t addr)
 }
 
 void
-efi_free_loadaddr(uint64_t addr, uint64_t pages)
+efi_free_loadaddr(vm_offset_t addr, size_t pages)
 {
 	(void) BS->FreePages(addr, pages);
 }
@@ -249,7 +249,7 @@ efi_copy_finish(struct relocator *relocator)
 	/* MBI is the last chunk in the list. */
 	head = &relocator->rel_chunk_head;
 	chunk = STAILQ_LAST(head, chunk, chunk_next);
-	mbi = (multiboot2_info_header_t *)chunk->chunk_paddr;
+	mbi = (multiboot2_info_header_t *)(uintptr_t)chunk->chunk_paddr;
 
 	/*
 	 * If chunk paddr == vaddr, the chunk is in place.
@@ -304,8 +304,8 @@ efi_copy_finish(struct relocator *relocator)
 		}
 		/* If there are no conflicts, move to place and restart. */
 		if (c == NULL) {
-			move((void *)chunk->chunk_paddr,
-			    (void *)chunk->chunk_vaddr,
+			move((void *)(uintptr_t)chunk->chunk_paddr,
+			    (void *)(uintptr_t)chunk->chunk_vaddr,
 			    chunk->chunk_size);
 			chunk->chunk_vaddr = chunk->chunk_paddr;
 			chunk = NULL;

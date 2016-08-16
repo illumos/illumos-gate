@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2015 Toomas Soome <tsoome@me.com>
+# Copyright 2017 Toomas Soome <tsoome@me.com>
 #
 
 include $(SRC)/Makefile.master
@@ -33,7 +33,9 @@ all clean clobber: $(SUBDIRS)
 
 install: all .WAIT $(INSTDIRS)
 
+loader: libi386
 pxeldr: loader
+cdboot gptzfsboot loader pxeldr: btx
 
 FRC:
 

@@ -11,7 +11,6 @@
 
 #
 # Copyright 2016 Toomas Soome <tsoome@me.com>
-# Copyright 2016 RackTop Systems.
 #
 
 include $(SRC)/Makefile.master
@@ -20,29 +19,26 @@ AS=	$(GNU_ROOT)/bin/gas
 LD=	$(GNU_ROOT)/bin/gld
 CC=	$(GNUC_ROOT)/bin/gcc
 
-LIBRARY=	libstand.a
-
-all install: $(LIBRARY)
-
 LIB_BASE=	$(SRC)/boot/lib
 LIBSTAND_SRC=	$(LIB_BASE)/libstand
 
-CPPFLAGS =	-nostdinc -I../../../../include -I${LIBSTAND_SRC} -I../../..
-CPPFLAGS +=	-I../../../sys -I. -I$(SRC)/common/bzip2
+ASFLAGS =	-fPIC
+CPPFLAGS =	-nostdinc -I../../../../include -I$(LIBSTAND_SRC)
+CPPFLAGS +=	-I../../..  -I../../../sys -I. -I$(SRC)/common/bzip2
 CPPFLAGS +=	-D_STANDALONE
 
-CFLAGS =	-O2 -ffreestanding -Wformat
+CFLAGS =	-O2 -fPIC -ffreestanding -Wformat
 CFLAGS +=	-mno-mmx -mno-3dnow -mno-sse -mno-sse2 -mno-sse3 -msoft-float
 CFLAGS +=	-Wall -Werror
-
-include ${LIBSTAND_SRC}/Makefile.inc
 
 $(LIBRARY): $(SRCS) $(OBJS)
 	$(AR) $(ARFLAGS) $@ $(OBJS)
 
+include $(LIBSTAND_SRC)/Makefile.inc
+
 clean: clobber
 clobber:
-	$(RM) $(CLEANFILES) $(OBJS) machine x86 libstand.a
+	$(RM) $(CLEANFILES) $(OBJS) machine $(LIBRARY)
 
 machine:
 	$(RM) machine
@@ -51,8 +47,6 @@ machine:
 x86:
 	$(RM) x86
 	$(SYMLINK) ../../../x86/include x86
-
-$(OBJS): machine x86
 
 %.o:	$(LIBSTAND_SRC)/%.c
 	$(COMPILE.c) $<

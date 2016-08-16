@@ -11,16 +11,23 @@
 
 #
 # Copyright 2016 Toomas Soome <tsoome@me.com>
+# Copyright 2016 RackTop Systems.
 #
 
-include $(SRC)/Makefile.master
+MACHINE=	$(MACH)
+ASFLAGS=	-m32
+EFIPROG=	bootia32.efi
 
-MACHINE=	$(MACH64)
+all:		$(EFIPROG)
 
-all install: lib
+include ../Makefile.com
 
-include ../Makefile.inc
+EFI_TARGET=	pei-i386
+LDFLAGS +=	-znocombreloc
 
-CFLAGS += -fPIC -m64 -mno-red-zone
+CPPFLAGS +=	-DLOADER_EFI=\"loader32.efi\"
+CFLAGS +=	-m32
 
-FRC:
+CLEANFILES +=	machine x86
+
+$(OBJS): machine x86

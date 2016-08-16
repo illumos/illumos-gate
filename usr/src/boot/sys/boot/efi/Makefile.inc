@@ -17,8 +17,9 @@ BINDIR=	/boot
 
 # Options used when building app-specific efi components
 # See conf/kern.mk for the correct set of these
-CFLAGS +=	-m64 -fPIC -ffreestanding -Wformat -msoft-float
-CFLAGS +=	-mno-mmx -mno-sse -mno-avx -fshort-wchar -mno-red-zone -mno-aes
+CFLAGS +=	-fPIC -ffreestanding -Wformat -msoft-float
+CFLAGS +=	-mno-mmx -mno-3dnow -mno-sse2 -mno-sse3 -mno-sse
+CFLAGS +=	-mno-avx -fshort-wchar -mno-aes
 CFLAGS +=	-std=gnu99 -Wno-pointer-sign -Wno-empty-body
 
 #CFLAGS +=	-Wsystem-headers -Werror -Wall -Wno-format-y2k -W
@@ -28,4 +29,5 @@ CFLAGS +=	-std=gnu99 -Wno-pointer-sign -Wno-empty-body
 #CFLAGS +=	-Wchar-subscripts -Winline -Wnested-externs -Wredundant-decls
 #CFLAGS +=	-Wold-style-definition
 
+ASFLAGS +=	-fPIC
 # include ../Makefile.inc

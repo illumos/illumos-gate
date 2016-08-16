@@ -15,12 +15,15 @@
 #
 
 MACHINE=	$(MACH)
+ASFLAGS=	-m32
 
-all install: libzfsboot.a
+all:		libefi.a
 
+SRCS=	time.c
 include ../Makefile.com
 
-CLEANFILES +=	x86
 CFLAGS +=	-m32
+
+CLEANFILES +=	machine x86
 
 $(OBJS): machine x86

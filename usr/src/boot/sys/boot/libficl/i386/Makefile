@@ -14,13 +14,16 @@
 # Copyright 2016 RackTop Systems.
 #
 
+include $(SRC)/Makefile.master
+
 MACHINE=	$(MACH)
 
-all install: libzfsboot.a
+all install: lib
 
 include ../Makefile.com
 
-CLEANFILES +=	x86
-CFLAGS +=	-m32
+CFLAGS += -m32
 
-$(OBJS): machine x86
+$(OBJECTS): machine x86
+
+FRC:

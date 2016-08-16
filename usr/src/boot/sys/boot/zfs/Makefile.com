@@ -11,14 +11,11 @@
 
 #
 # Copyright 2016 Toomas Soome <tsoome@me.com>
-# Copyright 2016 RackTop Systems.
 #
 
 include $(SRC)/Makefile.master
 
 LIB=		zfsboot
-
-all: libzfsboot.a
 
 clean: clobber
 
@@ -26,30 +23,32 @@ clobber:
 	$(RM) machine x86 $(OBJS) libzfsboot.a
 
 CC=     $(GNUC_ROOT)/bin/gcc
-CPPFLAGS=
 
-SRCS +=		../zfs.c ../gzip.c
+CFLAGS=		-O2
+CFLAGS +=       -fPIC -ffreestanding -msoft-float
+CFLAGS +=       -mno-mmx -mno-3dnow -mno-sse2 -mno-sse3 -mno-sse
+CFLAGS +=       -mno-avx -mno-aes -std=gnu99
+
+SRCS +=		$(SRC)/boot/sys/boot/zfs/zfs.c $(SRC)/boot/sys/boot/zfs/gzip.c
 SRCS +=		$(SRC)/common/crypto/edonr/edonr.c
 SRCS +=		$(SRC)/common/crypto/skein/skein.c
 SRCS +=		$(SRC)/common/crypto/skein/skein_iv.c
 SRCS +=		$(SRC)/common/crypto/skein/skein_block.c
 OBJS +=		zfs.o gzip.o edonr.o skein.o skein_iv.o skein_block.o
 
-CFLAGS= -O2 -D_STANDALONE -nostdinc -I../../../../include -I../../..
-CFLAGS +=	-I../../common -I../../.. -I.. -I.
-CFLAGS +=	-I../../../../lib/libstand
-CFLAGS +=	-I../../../../lib/libz
-CFLAGS +=	-I../../../cddl/boot/zfs
-CFLAGS +=	-I$(SRC)/uts/common
+CPPFLAGS=	-D_STANDALONE -nostdinc -I../../../../include -I../..
+CPPFLAGS +=	-I../../common -I../../.. -I.. -I.
+CPPFLAGS +=	-I../../../../lib/libstand
+CPPFLAGS +=	-I../../../../lib/libz
+CPPFLAGS +=	-I../../../cddl/boot/zfs
+CPPFLAGS +=	-I$(SRC)/uts/common
 
 # Do not unroll skein loops, reduce code size
-CFLAGS +=	-DSKEIN_LOOP=111
+CPPFLAGS +=	-DSKEIN_LOOP=111
 
-CFLAGS +=	-ffreestanding
-CFLAGS +=	-mno-mmx -mno-3dnow -mno-sse -mno-sse2 -mno-sse3 -msoft-float
-CFLAGS +=	-Wformat -Wall -std=gnu99
+#include ../../Makefile.inc
 
-CLEANFILES +=    machine x86
+CLEANFILES +=    machine
 
 machine:
 	$(RM) machine
@@ -59,12 +58,10 @@ x86:
 	$(RM) x86
 	$(SYMLINK) ../../../x86/include x86
 
-$(OBJS): machine x86
-
 libzfsboot.a: $(OBJS)
 	$(AR) $(ARFLAGS) $@ $(OBJS)
 
-%.o:	../%.c
+%.o:	$(SRC)/boot/sys/boot/zfs/%.c
 	$(COMPILE.c) -o $@ $<
 
 %.o:	$(SRC)/common/crypto/edonr/%.c
@@ -73,4 +70,4 @@ libzfsboot.a: $(OBJS)
 %.o:	$(SRC)/common/crypto/skein/%.c
 	$(COMPILE.c) -o $@ $<
 
-zfs.o: ../zfsimpl.c
+zfs.o: $(SRC)/boot/sys/boot/zfs/zfsimpl.c

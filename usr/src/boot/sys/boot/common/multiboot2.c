@@ -1038,6 +1038,7 @@ multiboot2_exec(struct preloaded_file *fp)
 	}
 
 #if defined (EFI)
+#ifdef  __LP64__
 	{
 		multiboot_tag_efi64_t *tag;
 		tag = (multiboot_tag_efi64_t *)
@@ -1047,6 +1048,17 @@ multiboot2_exec(struct preloaded_file *fp)
 		tag->mb_size = sizeof (*tag);
 		tag->mb_pointer = (uint64_t)(uintptr_t)ST;
 	}
+#else
+	{
+		multiboot_tag_efi32_t *tag;
+		tag = (multiboot_tag_efi32_t *)
+		    mb_malloc(sizeof (*tag));
+
+		tag->mb_type = MULTIBOOT_TAG_TYPE_EFI32;
+		tag->mb_size = sizeof (*tag);
+		tag->mb_pointer = (uint32_t)ST;
+	}
+#endif /* __LP64__ */
 
 	if (have_framebuffer == true) {
 		multiboot_tag_framebuffer_t *tag;
@@ -1218,7 +1230,7 @@ multiboot2_exec(struct preloaded_file *fp)
 		    MULTIBOOT_TAG_ALIGN);
 	}
 	chunk = &relocator->rel_chunklist[i++];
-	chunk->chunk_vaddr = (EFI_VIRTUAL_ADDRESS)mbi;
+	chunk->chunk_vaddr = (EFI_VIRTUAL_ADDRESS)(uintptr_t)mbi;
 	chunk->chunk_paddr = efi_physaddr(module, tmp, map,
 		    map_size / desc_size, desc_size, mbi->mbi_total_size);
 	chunk->chunk_size = mbi->mbi_total_size;
@@ -1247,7 +1259,7 @@ error:
 		free(cmdline);
 #if defined (EFI)
 	if (mbi != NULL)
-		efi_free_loadaddr((uint64_t)mbi, EFI_SIZE_TO_PAGES(size));
+		efi_free_loadaddr((vm_offset_t)mbi, EFI_SIZE_TO_PAGES(size));
 #endif
 	return (error);
 }
