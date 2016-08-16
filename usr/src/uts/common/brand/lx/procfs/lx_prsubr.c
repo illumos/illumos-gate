@@ -658,9 +658,9 @@ lxpr_lookup_fdnode(vnode_t *dvp, const char *name)
 		UF_EXIT(ufp);
 	}
 	mutex_exit(&fip->fi_lock);
-	mutex_enter(&p->p_lock);
 
 	if (vp == NULL) {
+		mutex_enter(&p->p_lock);
 		lxpr_unlock(p);
 		lxpr_freenode(lxfp);
 		return (NULL);
@@ -682,6 +682,7 @@ lxpr_lookup_fdnode(vnode_t *dvp, const char *name)
 			LXPTOV(lxfp)->v_type = VNON;
 	}
 
+	mutex_enter(&p->p_lock);
 	lxpr_unlock(p);
 	ASSERT(LXPTOV(lxfp) != NULL);
 	return (LXPTOV(lxfp));
