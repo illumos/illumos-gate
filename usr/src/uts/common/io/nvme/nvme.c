@@ -2233,7 +2233,6 @@ nvme_release_interrupts(nvme_t *nvme)
 static int
 nvme_setup_interrupts(nvme_t *nvme, int intr_type, int nqpairs)
 {
-	int failed = 0;
 	int nintrs, navail, count;
 	int ret;
 	int i;
@@ -2303,23 +2302,16 @@ nvme_setup_interrupts(nvme_t *nvme, int intr_type, int nqpairs)
 	(void) ddi_intr_get_cap(nvme->n_inth[0], &nvme->n_intr_cap);
 
 	for (i = 0; i < count; i++) {
-		if (nvme->n_inth[i] == NULL)
-			break;
+		if (nvme->n_intr_cap & DDI_INTR_FLAG_BLOCK)
+			ret = ddi_intr_block_enable(&nvme->n_inth[i], 1);
+		else
+			ret = ddi_intr_enable(nvme->n_inth[i]);
 
-		if (nvme->n_intr_cap & DDI_INTR_FLAG_BLOCK) {
-			if (ddi_intr_block_enable(&nvme->n_inth[i], 1) !=
-			    DDI_SUCCESS)
-				failed++;
-		} else {
-			if (ddi_intr_enable(nvme->n_inth[i]) != DDI_SUCCESS)
-				failed++;
+		if (ret != DDI_SUCCESS) {
+			dev_err(nvme->n_dip, CE_WARN,
+			    "!%s: enabling interrupt %d failed", __func__, i);
+			goto fail;
 		}
-	}
-
-	if (failed != 0) {
-		dev_err(nvme->n_dip, CE_WARN,
-		    "!%s: enabling interrupts failed", __func__);
-		goto fail;
 	}
 
 	nvme->n_intr_type = intr_type;
