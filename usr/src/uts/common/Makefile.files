@@ -1162,8 +1162,6 @@ HSFS_OBJS +=	hsfs_node.o	hsfs_subr.o	hsfs_vfsops.o	hsfs_vnops.o \
 
 LOFS_OBJS +=	lofs_subr.o	lofs_vfsops.o	lofs_vnops.o
 
-LXPROC_OBJS +=	lxpr_subr.o	lxpr_vfsops.o	lxpr_vnops.o
-
 NAMEFS_OBJS +=	namevfs.o	namevno.o
 
 NFS_OBJS +=	nfs_client.o	nfs_common.o	nfs_dump.o \

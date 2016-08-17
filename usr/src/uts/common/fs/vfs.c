@@ -3902,8 +3902,6 @@ vfs_to_modname(const char *vfstype)
 		vfstype = "fdfs";
 	} else if (strncmp(vfstype, "nfs", 3) == 0) {
 		vfstype = "nfs";
-	} else if (strcmp(vfstype, "lxproc") == 0) {
-		vfstype = "lxprocfs";
 	}
 
 	return (vfstype);
