@@ -135,7 +135,6 @@ file path=usr/share/man/man3c/inotify_rm_watch.3c
 file path=usr/share/man/man5/inotify.5
 file path=usr/share/man/man5/lx.5
 file path=usr/share/man/man7fs/lxproc.7fs
-file path=usr/share/man/man9f/pollhead_clean.9f
 hardlink path=usr/kernel/dtrace/$(ARCH64)/lx_systrace \
     target=../../../kernel/drv/$(ARCH64)/lx_systrace
 hardlink path=usr/kernel/dtrace/lx_systrace \
