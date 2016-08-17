@@ -12,6 +12,7 @@
 /*
  * Copyright 2016 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2016 Tegile Systems, Inc. All rights reserved.
+ * Copyright (c) 2016 The MathWorks, Inc.  All rights reserved.
  */
 
 /*
@@ -297,7 +298,7 @@ static ddi_dma_attr_t nvme_prp_dma_attr = {
 	.dma_attr_burstsizes	= 0x7ff,
 	.dma_attr_minxfer	= 0x1000,
 	.dma_attr_maxxfer	= 0x1000,
-	.dma_attr_seg		= 0xffffffffffffffffULL,
+	.dma_attr_seg		= 0xfff,
 	.dma_attr_sgllen	= -1,
 	.dma_attr_granular	= 1,
 	.dma_attr_flags		= 0,
@@ -1799,6 +1800,7 @@ nvme_init(nvme_t *nvme)
 	nvme->n_prp_dma_attr.dma_attr_maxxfer = nvme->n_pagesize;
 	nvme->n_prp_dma_attr.dma_attr_minxfer = nvme->n_pagesize;
 	nvme->n_prp_dma_attr.dma_attr_align = nvme->n_pagesize;
+	nvme->n_prp_dma_attr.dma_attr_seg = nvme->n_pagesize - 1;
 
 	/*
 	 * Reset controller if it's still in ready state.
