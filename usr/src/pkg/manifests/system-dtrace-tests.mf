@@ -21,7 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright (c) 2012, 2014 by Delphix. All rights reserved.
+# Copyright (c) 2012, 2016 by Delphix. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/system/dtrace/tests@$(PKGVERS)
@@ -112,6 +112,7 @@ dir path=opt/SUNWdtrt/tst/common/stop
 dir path=opt/SUNWdtrt/tst/common/strlen
 dir path=opt/SUNWdtrt/tst/common/strtoll
 dir path=opt/SUNWdtrt/tst/common/struct
+dir path=opt/SUNWdtrt/tst/common/sugar
 dir path=opt/SUNWdtrt/tst/common/syscall
 dir path=opt/SUNWdtrt/tst/common/sysevent
 dir path=opt/SUNWdtrt/tst/common/tick-n
@@ -1818,6 +1819,13 @@ file path=opt/SUNWdtrt/tst/common/struct/tst.StructDataTypes.d mode=0444
 file path=opt/SUNWdtrt/tst/common/struct/tst.StructInside.d mode=0444
 file path=opt/SUNWdtrt/tst/common/struct/tst.clauselocal.d mode=0444
 file path=opt/SUNWdtrt/tst/common/struct/tst.clauselocal.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/sugar/tst.else.d mode=0444
+file path=opt/SUNWdtrt/tst/common/sugar/tst.if.d mode=0444
+file path=opt/SUNWdtrt/tst/common/sugar/tst.if2.d mode=0444
+file path=opt/SUNWdtrt/tst/common/sugar/tst.if_before_after.d mode=0444
+file path=opt/SUNWdtrt/tst/common/sugar/tst.if_nested.d mode=0444
+file path=opt/SUNWdtrt/tst/common/sugar/tst.if_trailing_semicolon.d mode=0444
+file path=opt/SUNWdtrt/tst/common/sugar/tst.if_trailing_semicolon2.d mode=0444
 file path=opt/SUNWdtrt/tst/common/syscall/tst.args.d mode=0444
 file path=opt/SUNWdtrt/tst/common/syscall/tst.args.exe mode=0555
 file path=opt/SUNWdtrt/tst/common/syscall/tst.openret.ksh mode=0444

@@ -8219,28 +8219,14 @@ fcp_trigger_lun(struct fcp_lun *plun, child_info_t *cip, int old_mpxio,
 				devname = kmem_alloc(MAXNAMELEN + 1, KM_SLEEP);
 				ndi_devi_enter(pdip, &circ);
 				(void) ddi_deviname(cdip, devname);
-				ndi_devi_exit(pdip, circ);
 				/*
 				 * Release parent lock before calling
 				 * devfs_clean().
 				 */
-				rval = devfs_clean(pdip, devname + 1,
+				ndi_devi_exit(pdip, circ);
+				(void) devfs_clean(pdip, devname + 1,
 				    DV_CLEAN_FORCE);
 				kmem_free(devname, MAXNAMELEN + 1);
-				/*
-				 * Return if devfs_clean() fails for
-				 * non-MPXIO case.
-				 * For MPXIO case, another path could be
-				 * offlined.
-				 */
-				if (rval && plun->lun_mpxio == 0) {
-					FCP_TRACE(fcp_logq, pptr->port_instbuf,
-					    fcp_trace, FCP_BUF_LEVEL_3, 0,
-					    "fcp_trigger_lun: devfs_clean "
-					    "failed rval=%x  dip=%p",
-					    rval, pdip);
-					return (NDI_FAILURE);
-				}
 			}
 		}
 	}
@@ -15653,7 +15639,8 @@ fcp_update_mpxio_path(struct fcp_lun *plun, child_info_t *cip, int what)
  * will be returned.
  */
 static char *
-fcp_get_lun_path(struct fcp_lun *plun) {
+fcp_get_lun_path(struct fcp_lun *plun)
+{
 	dev_info_t	*dip = NULL;
 	char		*path = NULL;
 	mdi_pathinfo_t	*pip = NULL;
@@ -15928,7 +15915,8 @@ fcp_reconfig_wait(struct fcp_port *pptr)
  */
 static void
 fcp_read_blacklist(dev_info_t *dip,
-    struct fcp_black_list_entry **pplun_blacklist) {
+    struct fcp_black_list_entry **pplun_blacklist)
+{
 	char **prop_array	= NULL;
 	char *curr_pwwn		= NULL;
 	char *curr_lun		= NULL;
@@ -15985,7 +15973,8 @@ fcp_read_blacklist(dev_info_t *dip,
  */
 static void
 fcp_mask_pwwn_lun(char *curr_pwwn, char *curr_lun,
-    struct fcp_black_list_entry **pplun_blacklist) {
+    struct fcp_black_list_entry **pplun_blacklist)
+{
 	int		idx			= 0;
 	uint32_t	offset			= 0;
 	unsigned long	lun_id			= 0;
@@ -16018,8 +16007,8 @@ fcp_mask_pwwn_lun(char *curr_pwwn, char *curr_lun,
 			break;
 		}
 		if (idx == 0) {	/* ignore ' ' or ',' or '\0' */
-		    offset++;
-		    continue;
+			offset++;
+			continue;
 		}
 
 		bcopy(curr_lun + offset, lunid_buf, idx);
@@ -16041,7 +16030,8 @@ fcp_mask_pwwn_lun(char *curr_pwwn, char *curr_lun,
  */
 static void
 fcp_add_one_mask(char *curr_pwwn, uint32_t lun_id,
-    struct fcp_black_list_entry **pplun_blacklist) {
+    struct fcp_black_list_entry **pplun_blacklist)
+{
 	struct fcp_black_list_entry	*tmp_entry	= *pplun_blacklist;
 	struct fcp_black_list_entry	*new_entry	= NULL;
 	la_wwn_t			wwn;
@@ -16070,7 +16060,8 @@ fcp_add_one_mask(char *curr_pwwn, uint32_t lun_id,
  * Check if we should mask the specified lun of this fcp_tgt
  */
 static int
-fcp_should_mask(la_wwn_t *wwn, uint32_t lun_id) {
+fcp_should_mask(la_wwn_t *wwn, uint32_t lun_id)
+{
 	struct fcp_black_list_entry *remote_port;
 
 	remote_port = fcp_lun_blacklist;
@@ -16100,7 +16091,8 @@ fcp_should_mask(la_wwn_t *wwn, uint32_t lun_id) {
  * Release all allocated resources
  */
 static void
-fcp_cleanup_blacklist(struct fcp_black_list_entry **pplun_blacklist) {
+fcp_cleanup_blacklist(struct fcp_black_list_entry **pplun_blacklist)
+{
 	struct fcp_black_list_entry	*tmp_entry	= *pplun_blacklist;
 	struct fcp_black_list_entry	*current_entry	= NULL;
 

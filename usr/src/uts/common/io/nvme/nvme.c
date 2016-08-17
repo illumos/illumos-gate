@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*
@@ -194,8 +194,6 @@ static int nvme_attach(dev_info_t *, ddi_attach_cmd_t);
 static int nvme_detach(dev_info_t *, ddi_detach_cmd_t);
 static int nvme_quiesce(dev_info_t *);
 static int nvme_fm_errcb(dev_info_t *, ddi_fm_error_t *, const void *);
-static void nvme_disable_interrupts(nvme_t *);
-static int nvme_enable_interrupts(nvme_t *);
 static int nvme_setup_interrupts(nvme_t *, int, int);
 static void nvme_release_interrupts(nvme_t *);
 static uint_t nvme_intr(caddr_t, caddr_t);
@@ -1936,16 +1934,15 @@ nvme_init(nvme_t *nvme)
 
 	nvme->n_abort_command_limit = nvme->n_idctl->id_acl + 1;
 
-	/* disable NVMe interrupts while reinitializing the semaphore */
-	nvme_disable_interrupts(nvme);
+	/*
+	 * Reinitialize the semaphore with the true abort command limit
+	 * supported by the hardware. It's not necessary to disable interrupts
+	 * as only command aborts use the semaphore, and no commands are
+	 * executed or aborted while we're here.
+	 */
 	sema_destroy(&nvme->n_abort_sema);
 	sema_init(&nvme->n_abort_sema, nvme->n_abort_command_limit - 1, NULL,
 	    SEMA_DRIVER, NULL);
-	if (nvme_enable_interrupts(nvme) != DDI_SUCCESS) {
-		dev_err(nvme->n_dip, CE_WARN,
-		    "!failed to re-enable interrupts");
-		goto fail;
-	}
 
 	nvme->n_progress |= NVME_CTRL_LIMITS;
 
@@ -2198,7 +2195,7 @@ nvme_intr(caddr_t arg1, caddr_t arg2)
 }
 
 static void
-nvme_disable_interrupts(nvme_t *nvme)
+nvme_release_interrupts(nvme_t *nvme)
 {
 	int i;
 
@@ -2210,41 +2207,6 @@ nvme_disable_interrupts(nvme_t *nvme)
 			(void) ddi_intr_block_disable(&nvme->n_inth[i], 1);
 		else
 			(void) ddi_intr_disable(nvme->n_inth[i]);
-	}
-}
-
-static int
-nvme_enable_interrupts(nvme_t *nvme)
-{
-	int i, fail = 0;
-
-	for (i = 0; i < nvme->n_intr_cnt; i++) {
-		if (nvme->n_inth[i] == NULL)
-			break;
-
-		if (nvme->n_intr_cap & DDI_INTR_FLAG_BLOCK) {
-			if (ddi_intr_block_enable(&nvme->n_inth[i], 1) !=
-			    DDI_SUCCESS)
-				fail++;
-		} else {
-			if (ddi_intr_enable(nvme->n_inth[i]) != DDI_SUCCESS)
-				fail++;
-		}
-	}
-
-	return (fail ? DDI_FAILURE : DDI_SUCCESS);
-}
-
-static void
-nvme_release_interrupts(nvme_t *nvme)
-{
-	int i;
-
-	nvme_disable_interrupts(nvme);
-
-	for (i = 0; i < nvme->n_intr_cnt; i++) {
-		if (nvme->n_inth[i] == NULL)
-			break;
 
 		(void) ddi_intr_remove_handler(nvme->n_inth[i]);
 		(void) ddi_intr_free(nvme->n_inth[i]);
@@ -2260,6 +2222,7 @@ nvme_release_interrupts(nvme_t *nvme)
 static int
 nvme_setup_interrupts(nvme_t *nvme, int intr_type, int nqpairs)
 {
+	int failed = 0;
 	int nintrs, navail, count;
 	int ret;
 	int i;
@@ -2328,11 +2291,23 @@ nvme_setup_interrupts(nvme_t *nvme, int intr_type, int nqpairs)
 
 	(void) ddi_intr_get_cap(nvme->n_inth[0], &nvme->n_intr_cap);
 
-	ret = nvme_enable_interrupts(nvme);
+	for (i = 0; i < count; i++) {
+		if (nvme->n_inth[i] == NULL)
+			break;
 
-	if (ret != DDI_SUCCESS) {
+		if (nvme->n_intr_cap & DDI_INTR_FLAG_BLOCK) {
+			if (ddi_intr_block_enable(&nvme->n_inth[i], 1) !=
+			    DDI_SUCCESS)
+				failed++;
+		} else {
+			if (ddi_intr_enable(nvme->n_inth[i]) != DDI_SUCCESS)
+				failed++;
+		}
+	}
+
+	if (failed != 0) {
 		dev_err(nvme->n_dip, CE_WARN,
-		    "!%s: nvme_enable_interrupts failed", __func__);
+		    "!%s: enabling interrupts failed", __func__);
 		goto fail;
 	}
 

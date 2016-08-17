@@ -1,0 +1,120 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+.\" Copyright 2016 Nexenta Systems, Inc.
+.\"
+.Dd July 26, 2016
+.Dt DEVFS_CLEAN 9F
+.Os
+.Sh NAME
+.Nm devfs_clean
+.Nd destroy unreferenced devfs nodes and detach devices
+.Sh SYNOPSIS
+.In sys/fs/dv_node.h
+.Ft int
+.Fo devfs_clean
+.Fa "dev_info_t *dip"
+.Fa "char *devnm"
+.Fa "uint_t flags"
+.Fc
+.Sh INTERFACE LEVEL
+.Sy Volatile -
+private DDI function
+.Pp
+This is a private function that is not part of the stable DDI.
+It may be removed or changed at any time.
+.Sh PARAMETERS
+.Bl -tag -width Ds
+.It Va dip
+A pointer to the device's
+.Vt dev_info
+structure.
+Clean up is rooted at this device.
+.It Va devnm
+An optional character string used to restrict the devfs nodes list.
+.It Va flags
+The following flag is supported:
+.Bl -tag -width "DV_CLEAN_FORCE"
+.It Sy DV_CLEAN_FORCE
+force clean of referenced directories, referenced empty directories are marked
+as stale to facilitate DR
+.Pq dynamic reconfiguration
+.El
+.El
+.Sh DESCRIPTION
+The
+.Fn devfs_clean
+function is used to clean up and detach devices from the system.
+While many device drivers may have one or more minor nodes created with
+.Xr ddi_create_minor_node 9F ,
+some device drivers may have children devices with different device drivers
+attached.
+Each of these entries shows up in the file system of the global zone under
+.Pa /devices
+.Po see
+.Xr devfs 7FS
+.Pc .
+These nodes are referred to as a devfs nodes
+.Pq Vt dv_node .
+.Pp
+.Nm devfs
+caches unreferenced devfs nodes to speed up the performance of
+.Nm ls ,
+.Nm find ,
+etc.
+The
+.Fn devfs_clean
+function is used to cleanup cached nodes to reclaim memory as well as to
+facilitate device removal
+.Pq devfs nodes reference dev_info nodes, which prevents driver from detaching .
+.Pp
+The
+.Fn devfs_clean
+function starts searching the tree rooted at
+.Va dip .
+All directories encountered are recursed through.
+If
+.Va devnm
+is not NULL, then it is used to limit the nodes that it searches.
+It compares the name of the node, ignoring any part of the device's name that
+corresponds to a minor node.
+If
+.Va devnm
+has been specified, then cleanup stops immediately after a busy devfs node has
+been encountered.
+.Pp
+Not all nodes may be cleaned up when a driver calls the
+.Fn devfs_clean
+function.
+However, this is a non-fatal situation.
+Callers should continue trying to offline devices as many holds from userland
+processes may exist due to device contracts which will be released when the
+device is offlined.
+.Pp
+If a shell parks in a
+.Pa /devices
+directory, the devfs node will be held, preventing the corresponding device to
+be detached.
+This would be a denial of service against DR (dynamic reconfiguration).
+To prevent this, DR code calls
+.Fn devfs_clean
+with the
+.Sy DV_CLEAN_FORCE
+flag.
+.Sh CONTEXT
+This function may be called in user or kernel context.
+.Sh RETURN VALUES
+The
+.Fn devfs_clean
+function always succeeds and returns zero.
+.Sh SEE ALSO
+.Xr devfs 7FS
