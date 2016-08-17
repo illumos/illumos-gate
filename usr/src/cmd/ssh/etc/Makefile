@@ -26,15 +26,11 @@ MANIFEST = ssh.xml
 SVCMETHOD = sshd
 
 include ../../Makefile.cmd
-include ../Makefile.ssh-common
 
-SSHASKPASS=	$(ROOTLIBSSH)/ssh-askpass
 ETCSSHDIR=	$(ROOTETC)/ssh
-DIRS=		$(ETCSSHDIR) $(ROOTLIBSSH) $(ROOTLIBSUNSSH)
+DIRS=		$(ETCSSHDIR)
 
-FILES= sshd_config ssh_config moduli.sunssh
-
-ETCSSHLINKS= $(ETCSSHDIR)/moduli
+FILES= sshd_config ssh_config
 
 ETCSSHFILES=	$(FILES:%=$(ETCSSHDIR)/%)
 
@@ -48,18 +44,11 @@ $(ETCSSHDIR)/% : %
 $(DIRS):
 	$(INS.dir)
 
-$(ETCSSHDIR)/moduli: $(ETCSSHDIR)/moduli.sunssh
-	-$(RM) $@; $(SYMLINK) moduli.sunssh $@
-
-$(ROOTLIBSSH)/%: %
-	$(INS.file)
-
 $(POFILE):
 
 all lint clean clobber _msg:
 
-install: all $(DIRS) $(ETCSSHFILES) $(ETCSSHLINKS) $(ROOTMANIFEST) $(ROOTSVCMETHOD) \
-	$(SSHASKPASS)
+install: all $(DIRS) $(ETCSSHFILES) $(ROOTMANIFEST) $(ROOTSVCMETHOD)
 
 check: $(CHKMANIFEST)
 

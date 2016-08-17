@@ -78,8 +78,6 @@ boolean_t		g_sig_resize;
 uint_t			g_argc;
 char			**g_argv;
 
-char			*optarg;
-
 static const int	true = 1;
 
 void

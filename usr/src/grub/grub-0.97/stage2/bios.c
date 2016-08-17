@@ -211,6 +211,7 @@ int
 get_diskinfo (int drive, struct geometry *geometry)
 {
   int err;
+  int gotchs = 0;
 
   /* Clear the flags.  */
   geometry->flags = 0;
@@ -229,6 +230,20 @@ get_diskinfo (int drive, struct geometry *geometry)
 	  if (get_cdinfo (drive, geometry))
 	    return 0;
 	}
+
+      /* Don't pass GEOMETRY directly, but pass each element instead,
+	 so that we can change the structure easily.  */
+      err = get_diskinfo_standard (drive,
+				   &geometry->cylinders,
+				   &geometry->heads,
+				   &geometry->sectors);
+      if (err == 0)
+	gotchs = 1;
+      /* get_diskinfo_standard returns 0x60 if the BIOS call actually
+	 succeeded but returned 0 sectors -- in this case don't
+	 return yet but continue to check the LBA geom */
+      else if (err != 0x60)
+	return err;
       
       if (version)
 	{
@@ -280,6 +295,30 @@ get_diskinfo (int drive, struct geometry *geometry)
 	      /* I'm not sure if GRUB should check the bit 1 of DRP.FLAGS,
 		 so I omit the check for now. - okuji  */
 	      /* if (drp.flags & (1 << 1)) */
+
+	      /* If we didn't get valid CHS info from the standard call,
+		 then we should fill it out here */
+	      if (! gotchs)
+		{
+		  geometry->cylinders = drp.cylinders;
+
+		  if (drp.sectors > 0 && drp.heads > 0)
+		    {
+		      geometry->heads = drp.heads;
+		      geometry->sectors = drp.sectors;
+		    }
+		  else
+		    {
+		      /* Return fake geometry. This disk reports that it
+			 supports LBA, so all the other routines will use LBA
+			 to talk to it and not look at this geometry. However,
+			 some of the partition-finding routines still need
+			 non-zero values in these fields. */
+		      geometry->heads = 16;
+		      geometry->sectors = 63;
+		    }
+		  gotchs = 1;
+		}
 	       
 	      if (drp.total_sectors)
 		total_sectors = drp.total_sectors;
@@ -292,14 +331,10 @@ get_diskinfo (int drive, struct geometry *geometry)
 	    }
 	}
 
-      /* Don't pass GEOMETRY directly, but pass each element instead,
-	 so that we can change the structure easily.  */
-      err = get_diskinfo_standard (drive,
-				   &geometry->cylinders,
-				   &geometry->heads,
-				   &geometry->sectors);
-      if (err)
-	return err;
+      /* In case we got the 0x60 return code from _standard on a disk that
+	 didn't support LBA (or was somehow invalid), return that error now */
+      if (! gotchs)
+	return 0x60;
 
       if (! total_sectors)
 	{

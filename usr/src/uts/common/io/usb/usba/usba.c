@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ * Copyright 2016 James S. Blachly, MD <james.blachly@gmail.com>
  */
 
 
@@ -34,8 +35,6 @@
 #include <sys/usb/usba/hcdi_impl.h>
 #include <sys/usb/hubd/hub.h>
 #include <sys/fs/dv_node.h>
-
-static int usba_str_startcmp(char *, char *);
 
 /*
  * USBA private variables and tunables
@@ -267,7 +266,7 @@ usba_bus_ctl(dev_info_t	*dip,
 			name = kmem_alloc(MAXNAMELEN, KM_SLEEP);
 			(void) usba_get_mfg_prod_sn_str(rdip, name, MAXNAMELEN);
 			if (name[0] != '\0') {
-				cmn_err(CE_CONT, "?\t%s\n", name);
+				cmn_err(CE_CONT, "?%s\n", name);
 			}
 			kmem_free(name, MAXNAMELEN);
 
@@ -2830,28 +2829,6 @@ usba_get_dev_string_descrs(dev_info_t *dip, usba_device_t *ud)
 
 
 /*
- * usba_str_startcmp:
- *	Return the number of characters duplicated from the beginning of the
- *	string.  Return -1 if a complete duplicate.
- *
- * Arguments:
- *	Two strings to compare.
- */
-static int usba_str_startcmp(char *first, char *second)
-{
-	int num_same_chars = 0;
-	while (*first == *second++) {
-		if (*first++ == '\0') {
-			return (-1);
-		}
-		num_same_chars++;
-	}
-
-	return (num_same_chars);
-}
-
-
-/*
  * usba_get_mfg_prod_sn_str:
  *	Return a string containing mfg, product, serial number strings.
  *	Remove duplicates if some strings are the same.
@@ -2873,11 +2850,11 @@ usba_get_mfg_prod_sn_str(
 	usba_device_t *usba_device = usba_get_usba_device(dip);
 	int return_len = 0;
 	int len = 0;
-	int duplen;
 
 	buffer[0] = '\0';
 	buffer[buflen-1] = '\0';
 
+	/* Manufacturer string exists. */
 	if ((usba_device->usb_mfg_str) &&
 	    ((len = strlen(usba_device->usb_mfg_str)) != 0)) {
 		(void) strncpy(buffer, usba_device->usb_mfg_str, buflen - 1);
@@ -2887,25 +2864,15 @@ usba_get_mfg_prod_sn_str(
 	/* Product string exists to append. */
 	if ((usba_device->usb_product_str) &&
 	    ((len = strlen(usba_device->usb_product_str)) != 0)) {
-
-		/* Append only parts of string that don't match mfg string. */
-		duplen = usba_str_startcmp(buffer,
-		    usba_device->usb_product_str);
-
-		if (duplen != -1) {		/* Not a complete match. */
-			if (return_len > 0) {
-				buffer[return_len++] = ' ';
-			}
-
-			/* Skip over the dup part of the concat'ed string. */
-			len -= duplen;
-			(void) strncpy(&buffer[return_len],
-			    &usba_device->usb_product_str[duplen],
-			    buflen - return_len - 1);
-			return_len = min(buflen - 1, return_len + len);
+		if (return_len > 0) {
+			buffer[return_len++] = ' ';
 		}
+		(void) strncpy(&buffer[return_len],
+		    usba_device->usb_product_str, buflen - return_len - 1);
+		return_len = min(buflen - 1, return_len + len);
 	}
 
+	/* Serial number string exists to append. */
 	if ((usba_device->usb_serialno_str) &&
 	    ((len = strlen(usba_device->usb_serialno_str)) != 0)) {
 		if (return_len > 0) {

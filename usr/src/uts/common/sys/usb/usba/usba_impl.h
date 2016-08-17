@@ -239,7 +239,6 @@ typedef  struct usba_hubdi {
 /*
  * usba_get_mfg_prod_sn_str:
  *	Return a string containing mfg, product, serial number strings.
- *	Remove duplicates if some strings are the same.
  */
 char	*usba_get_mfg_prod_sn_str(dev_info_t *, char *, int);
 
