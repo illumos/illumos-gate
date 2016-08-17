@@ -257,13 +257,20 @@ lx_clock_getres(int clock, timespec_t *tp)
 {
 	lx_clock_backend_t *backend;
 
-	if (tp == NULL) {
-		return (0);
-	}
-
 	if ((backend = LX_CLOCK_BACKEND(clock)) == NULL) {
 		lx_clock_unsupported(clock);
 		return (set_errno(EINVAL));
+	}
+
+	/*
+	 * It is important this check is performed after the clock
+	 * check. Both glibc and musl, in their clock_getcpuclockid(),
+	 * use clock_getres() with a NULL tp to validate a clock
+	 * value. Performing the tp check before the clock check could
+	 * indicate a valid clock to libc when it shouldn't.
+	 */
+	if (tp == NULL) {
+		return (0);
 	}
 
 	return (backend->lclk_clock_getres(backend->lclk_ntv_id, tp));
