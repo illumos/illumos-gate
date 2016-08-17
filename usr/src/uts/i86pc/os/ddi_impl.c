@@ -1909,6 +1909,13 @@ get_boot_properties(void)
 		} else if (strcmp(name, "smbios-address") == 0) {
 			(void) ndi_prop_update_int64(DDI_DEV_T_NONE, devi,
 			    property_name, *((int64_t *)bop_staging_area));
+		} else if (strcmp(name, "efi-systab") == 0) {
+			(void) ndi_prop_update_int64(DDI_DEV_T_NONE, devi,
+			    property_name, *((int64_t *)bop_staging_area));
+		} else if (strcmp(name, "efi-systype") == 0) {
+			copy_boot_str(bop_staging_area, property_val, 50);
+			(void) ndi_prop_update_string(DDI_DEV_T_NONE, devi,
+			    property_name, property_val);
 		} else if (strcmp(name, "stdout") == 0) {
 			(void) ndi_prop_update_int(DDI_DEV_T_NONE, devi,
 			    property_name, *((int *)bop_staging_area));

@@ -2734,6 +2734,20 @@ build_firmware_properties(struct xboot_info *xbp)
 	ACPI_TABLE_HEADER *tp = NULL;
 
 #ifndef __xpv
+	if (xbp->bi_uefi_arch == XBI_UEFI_ARCH_64) {
+		bsetprops("efi-systype", "64");
+		bsetprop64("efi-systab",
+		    (uint64_t)(uintptr_t)xbp->bi_uefi_systab);
+		if (kbm_debug)
+			bop_printf(NULL, "64-bit UEFI detected.\n");
+	} else if (xbp->bi_uefi_arch == XBI_UEFI_ARCH_32) {
+		bsetprops("efi-systype", "32");
+		bsetprop64("efi-systab",
+		    (uint64_t)(uintptr_t)xbp->bi_uefi_systab);
+		if (kbm_debug)
+			bop_printf(NULL, "32-bit UEFI detected.\n");
+	}
+
 	if (xbp->bi_acpi_rsdp != NULL) {
 		bsetprop64("acpi-root-tab",
 		    (uint64_t)(uintptr_t)xbp->bi_acpi_rsdp);
