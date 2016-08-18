@@ -37,12 +37,11 @@ $(PROG): $(OBJS)
 	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 
-install: all $(ROOTPROG) 
+install: all $(ROOTPROG)
 
 clean:
 	$(RM) $(OBJS)
 
-lint:	lint_SRCS
+lint:  lint_SRCS
 
 include ../../../Makefile.targ
-

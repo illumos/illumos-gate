@@ -214,6 +214,38 @@ hold any mutex across the call to \fBpollwakeup\fR(9F) that is acquired in its
 the time of the call to \fBchpoll()\fR.
 
 .RE
+.RS +4
+.TP
+4.
+In the \fBclose\fR(9E) entry point, the driver should call \fBpollwakeup()\fR
+on the \fBpollhead\fR structure that corresponds to the closing software
+state, specifying \fBPOLLERR\fR for the events.  Further, upon return from
+\fBpollwakeup()\fR, the driver's \fBclose\fR(9E) entry point should call
+the \fBpollhead_clean\fR(9F) function, specifying the \fBpollhead\fR that
+corresponds to the structure that will be deallocated:
+
+.sp
+.in +2
+.nf
+static int
+mydriver_close(dev_t dev, int flag, int otyp, cred_t *cp)
+{
+      minor_t minor = getminor(dev);
+      mydriver_state_t *state;
+
+      state = ddi_get_soft_state(mydriver_softstate, minor);
+
+      pollwakeup(&state->mydriver_pollhd, POLLERR);
+      pollhead_clean(&state->mydriver_pollhd);
+      ...
+.fi
+.in -2
+
+This step is necessary to inform other kernel subsystems that the memory
+associated with the \fBpollhead\fR is about to be deallocated by the
+\fBclose\fR(9E) entry point.
+
+.RE
 .SH RETURN VALUES
 .LP
 \fBchpoll()\fR should return \fB0\fR for success, or the appropriate error

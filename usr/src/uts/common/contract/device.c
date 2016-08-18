@@ -974,7 +974,6 @@ contract_device_dvclean(dev_info_t *dip)
 {
 	char		*devnm;
 	dev_info_t	*pdip;
-	int		error;
 
 	ASSERT(dip);
 
@@ -995,13 +994,13 @@ contract_device_dvclean(dev_info_t *dip)
 	if (pdip) {
 		devnm = kmem_alloc(MAXNAMELEN + 1, KM_SLEEP);
 		(void) ddi_deviname(dip, devnm);
-		error = devfs_clean(pdip, devnm + 1, DV_CLEAN_FORCE);
+		(void) devfs_clean(pdip, devnm + 1, DV_CLEAN_FORCE);
 		kmem_free(devnm, MAXNAMELEN + 1);
 	} else {
-		error = devfs_clean(dip, NULL, DV_CLEAN_FORCE);
+		(void) devfs_clean(dip, NULL, DV_CLEAN_FORCE);
 	}
 
-	return (error);
+	return (0);
 }
 
 /*

@@ -1,6 +1,6 @@
 /* -*- Mode: C; tab-width: 4 -*-
  *
- * Copyright (c) 2003-2013 Apple Computer, Inc. All rights reserved.
+ * Copyright (c) 2003-2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright notice,
  *     this list of conditions and the following disclaimer in the documentation
  *     and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of its
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of its
  *     contributors may be used to endorse or promote products derived from this
  *     software without specific prior written permission.
  *
@@ -66,7 +66,7 @@
  */
 
 #ifndef _DNS_SD_H
-#define _DNS_SD_H 5763004
+#define _DNS_SD_H 6254102
 
 #ifdef  __cplusplus
 extern "C" {
@@ -497,10 +497,16 @@ enum
      * as the "serviceIndex".
      */
 
-     kDNSServiceFlagsDenyExpensive          = 0x20000000
+     kDNSServiceFlagsDenyExpensive          = 0x20000000,
     /*
      * This flag is meaningful only for Unicast DNS queries. When set, the kernel will restrict
      * DNS resolutions on interfaces defined as expensive for that request.
+     */
+
+     kDNSServiceFlagsPathEvaluationDone     = 0x40000000
+    /*
+     * This flag is meaningful for only Unicast DNS queries.
+     * When set, it indicates that Network PathEvaluation has already been performed.
      */
 
 };
@@ -724,9 +730,8 @@ enum
  * DNS server." Normally, most clients will use 0 for interface index to
  * automatically get the default sensible behaviour.
  *
- * If the client passes a positive interface index, then for multicast names that
- * indicates to do the operation only on that one interface. For unicast names the
- * interface index is ignored unless kDNSServiceFlagsForceMulticast is also set.
+ * If the client passes a positive interface index, then that indicates to do the
+ * operation only on that one specified interface.
  *
  * If the client passes kDNSServiceInterfaceIndexLocalOnly when registering
  * a service, then that service will be found *only* by other local clients
@@ -2604,34 +2609,6 @@ DNSServiceErrorType DNSSD_API DNSServiceSleepKeepalive
     DNSServiceSleepKeepaliveReply callBack,
     void                                *context
 );
-#endif
-
-#ifdef APPLE_OSX_mDNSResponder
-/* DNSServiceCreateDelegateConnection()
- *
- * Create a delegate connection to the daemon allowing efficient registration of
- * multiple individual records.
- *
- * Parameters:
- *
- * sdRef:           A pointer to an uninitialized DNSServiceRef. Deallocating
- *                  the reference (via DNSServiceRefDeallocate()) severs the
- *                  connection and deregisters all records registered on this connection.
- *
- * pid :            Process ID of the delegate
- *
- * uuid:            UUID of the delegate
- *
- *                  Note that only one of the two arguments (pid or uuid) can be specified. If pid
- *                  is zero, uuid will be assumed to be a valid value; otherwise pid will be used.
- *
- * return value:    Returns kDNSServiceErr_NoError on success, otherwise returns
- *                  an error code indicating the specific failure that occurred (in which
- *                  case the DNSServiceRef is not initialized). kDNSServiceErr_NotAuth is
- *                  returned to indicate that the calling process does not have entitlements
- *                  to use this API.
- */
-DNSServiceErrorType DNSSD_API DNSServiceCreateDelegateConnection(DNSServiceRef *sdRef, int32_t pid, uuid_t uuid);
 #endif
 
 #ifdef __APPLE_API_PRIVATE

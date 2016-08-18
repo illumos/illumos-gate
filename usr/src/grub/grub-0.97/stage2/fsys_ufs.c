@@ -136,7 +136,7 @@ ufs_read(char *buf, int len)
 }
 
 int
-ufs_embed (int *start_sector, int needed_sectors)
+ufs_embed (unsigned long long *start_sector, int needed_sectors)
 {
 	if (needed_sectors > 14)
         	return 0;

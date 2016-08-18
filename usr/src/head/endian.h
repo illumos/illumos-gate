@@ -27,17 +27,21 @@ extern "C" {
 #include <sys/isa_defs.h>
 #include <inttypes.h>
 
-#define	LITTLE_ENDIAN	1234
-#define	BIG_ENDIAN	4321
-#define	PDP_ENDIAN	3412
+#define	__LITTLE_ENDIAN	1234
+#define	__BIG_ENDIAN	4321
+#define	__PDP_ENDIAN	3412
 
-#ifdef	_LITTLE_ENDIAN
-#define	BYTE_ORDER	LITTLE_ENDIAN
-#elif	_BIG_ENDIAN
-#define	BYTE_ORDER	BIG_ENDIAN
+#if	defined(_LITTLE_ENDIAN)
+#define	__BYTE_ORDER	LITTLE_ENDIAN
+#elif	defined(_BIG_ENDIAN)
+#define	__BYTE_ORDER	BIG_ENDIAN
 #else
 #error	"Unknown byte order"
 #endif	/* _LITTLE_ENDIAN */
+
+#define	LITTLE_ENDIAN	__LITTLE_ENDIAN
+#define	BIG_ENDIAN	__BIG_ENDIAN
+#define	BYTE_ORDER	__BYTE_ORDER
 
 extern uint16_t htobe16(uint16_t);
 extern uint32_t htobe32(uint32_t);

@@ -13,6 +13,8 @@
  * Copyright (c) 2015, Joyent, Inc.
  */
 
+#include <endian.h>
+
 /*
  * endian(3C) routines
  */

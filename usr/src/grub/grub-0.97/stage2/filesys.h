@@ -25,7 +25,7 @@
 int ffs_mount (void);
 int ffs_read (char *buf, int len);
 int ffs_dir (char *dirname);
-int ffs_embed (int *start_sector, int needed_sectors);
+int ffs_embed (unsigned long long *start_sector, int needed_sectors);
 #else
 #define FSYS_FFS_NUM 0
 #endif
@@ -35,7 +35,7 @@ int ffs_embed (int *start_sector, int needed_sectors);
 int ufs_mount (void);
 int ufs_read (char *buf, int len);
 int ufs_dir (char *dirname);
-int ufs_embed (int *start_sector, int needed_sectors);
+int ufs_embed (unsigned long long *start_sector, int needed_sectors);
 #else
 #define FSYS_UFS_NUM 0
 #endif
@@ -45,7 +45,7 @@ int ufs_embed (int *start_sector, int needed_sectors);
 int ufs2_mount (void);
 int ufs2_read (char *buf, int len);
 int ufs2_dir (char *dirname);
-int ufs2_embed (int *start_sector, int needed_sectors);
+int ufs2_embed (unsigned long long *start_sector, int needed_sectors);
 #else
 #define FSYS_UFS2_NUM 0
 #endif
@@ -55,7 +55,7 @@ int ufs2_embed (int *start_sector, int needed_sectors);
 int zfs_mount (void);
 int zfs_read (char *buf, int len);
 int zfs_open (char *dirname);
-int zfs_embed (int *start_sector, int needed_sectors);
+int zfs_embed (unsigned long long *start_sector, int needed_sectors);
 #else
 #define FSYS_ZFS_NUM 0
 #endif
@@ -92,7 +92,7 @@ int minix_dir (char *dirname);
 int reiserfs_mount (void);
 int reiserfs_read (char *buf, int len);
 int reiserfs_dir (char *dirname);
-int reiserfs_embed (int *start_sector, int needed_sectors);
+int reiserfs_embed (unsigned long long *start_sector, int needed_sectors);
 #else
 #define FSYS_REISERFS_NUM 0
 #endif
@@ -111,7 +111,7 @@ int vstafs_dir (char *dirname);
 int jfs_mount (void);
 int jfs_read (char *buf, int len);
 int jfs_dir (char *dirname);
-int jfs_embed (int *start_sector, int needed_sectors);
+int jfs_embed (unsigned long long *start_sector, int needed_sectors);
 #else
 #define FSYS_JFS_NUM 0
 #endif
@@ -173,7 +173,7 @@ struct fsys_entry
   int (*read_func) (char *buf, int len);
   int (*dir_func) (char *dirname);
   void (*close_func) (void);
-  int (*embed_func) (int *start_sector, int needed_sectors);
+  int (*embed_func) (unsigned long long *start_sector, int needed_sectors);
 };
 
 #ifdef STAGE1_5

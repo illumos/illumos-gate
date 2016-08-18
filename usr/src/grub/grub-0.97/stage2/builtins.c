@@ -182,15 +182,15 @@ blocklist_func (char *arg, int flags)
 	  else
 	    {
 	      if (last_length == SECTOR_SIZE)
-		grub_printf ("%s%lld+%d", num_entries ? "," : "",
+		grub_printf ("%s%llu+%d", num_entries ? "," : "",
 			     start_sector - part_start, num_sectors);
 	      else if (num_sectors > 1)
-		grub_printf ("%s%lld+%d,%lld[0-%d]", num_entries ? "," : "",
+		grub_printf ("%s%llu+%d,%lld[0-%d]", num_entries ? "," : "",
 			     start_sector - part_start, num_sectors-1,
 			     start_sector + num_sectors-1 - part_start, 
 			     last_length);
 	      else
-		grub_printf ("%s%;lld[0-%d]", num_entries ? "," : "",
+		grub_printf ("%s%llu[0-%d]", num_entries ? "," : "",
 			     start_sector - part_start, last_length);
 	      num_entries++;
 	      num_sectors = 0;
@@ -236,7 +236,7 @@ blocklist_func (char *arg, int flags)
   /* The last entry may not be printed yet.  Don't check if it is a
    * full sector, since it doesn't matter if we read too much. */
   if (num_sectors > 0)
-    grub_printf ("%s%lld+%d", num_entries ? "," : "",
+    grub_printf ("%s%llu+%d", num_entries ? "," : "",
 		 start_sector - part_start, num_sectors);
 
   grub_printf ("\n");
@@ -1397,7 +1397,7 @@ embed_func (char *arg, int flags)
   char *device;
   char *stage1_5_buffer = (char *) RAW_ADDR (0x100000);
   int len, size;
-  int sector;
+  unsigned long long sector;
   
   stage1_5 = arg;
   device = skip_to (0, stage1_5);
@@ -1480,7 +1480,7 @@ embed_func (char *arg, int flags)
   else
     {
       /* Embed it in the bootloader block in the filesystem.  */
-      int start_sector;
+      unsigned long long start_sector;
       
       /* Open the partition.  */
       if (! open_device ())
@@ -1505,7 +1505,7 @@ embed_func (char *arg, int flags)
     return 1;
   
   grub_printf (" %d sectors are embedded.\n", size);
-  grub_sprintf (embed_info, "%d+%d", sector - part_start, size);
+  grub_sprintf (embed_info, "%llu+%d", sector - part_start, size);
   return 0;
 }
 

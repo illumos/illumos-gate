@@ -26,6 +26,7 @@
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2016 OmniTI Computer Consulting, Inc. All rights reserved.
  */
 
 #include "ixgbe_sw.h"
@@ -114,6 +115,8 @@ ixgbe_update_stats(kstat_t *ks, int rw)
 
 		case ixgbe_mac_82599EB:
 		case ixgbe_mac_X540:
+		case ixgbe_mac_X550:
+		case ixgbe_mac_X550EM_x:
 			ixgbe_ks->qbtc[i].value.ui64 +=
 			    IXGBE_READ_REG(hw, IXGBE_QBTC_L(i));
 			ixgbe_ks->qbtc[i].value.ui64 +=
@@ -168,6 +171,8 @@ ixgbe_update_stats(kstat_t *ks, int rw)
 
 	case ixgbe_mac_82599EB:
 	case ixgbe_mac_X540:
+	case ixgbe_mac_X550:
+	case ixgbe_mac_X550EM_x:
 		ixgbe_ks->lxonrxc.value.ui64 += IXGBE_READ_REG(hw,
 		    IXGBE_LXONRXCNT);
 		break;
@@ -184,6 +189,8 @@ ixgbe_update_stats(kstat_t *ks, int rw)
 
 	case ixgbe_mac_82599EB:
 	case ixgbe_mac_X540:
+	case ixgbe_mac_X550:
+	case ixgbe_mac_X550EM_x:
 		ixgbe_ks->lxoffrxc.value.ui64 += IXGBE_READ_REG(hw,
 		    IXGBE_LXOFFRXCNT);
 		break;
@@ -477,10 +484,21 @@ ixgbe_m_stat(void *arg, uint_t stat, uint64_t *val)
 	struct ixgbe_hw *hw = &ixgbe->hw;
 	ixgbe_stat_t *ixgbe_ks;
 	int i;
+	ixgbe_link_speed speeds = 0;
 
 	ixgbe_ks = (ixgbe_stat_t *)ixgbe->ixgbe_ks->ks_data;
 
 	mutex_enter(&ixgbe->gen_lock);
+
+	/*
+	 * We cannot always rely on the common code maintaining
+	 * hw->phy.speeds_supported, therefore we fall back to use the recorded
+	 * supported speeds which were obtained during instance init in
+	 * ixgbe_init_params().
+	 */
+	speeds = hw->phy.speeds_supported;
+	if (speeds == 0)
+		speeds = ixgbe->speeds_supported;
 
 	if (ixgbe->ixgbe_state & IXGBE_SUSPENDED) {
 		mutex_exit(&ixgbe->gen_lock);
@@ -561,6 +579,8 @@ ixgbe_m_stat(void *arg, uint_t stat, uint64_t *val)
 
 			case ixgbe_mac_82599EB:
 			case ixgbe_mac_X540:
+			case ixgbe_mac_X550:
+			case ixgbe_mac_X550EM_x:
 				ixgbe_ks->qbtc[i].value.ui64 +=
 				    IXGBE_READ_REG(hw, IXGBE_QBTC_L(i));
 				ixgbe_ks->qbtc[i].value.ui64 +=
@@ -645,15 +665,23 @@ ixgbe_m_stat(void *arg, uint_t stat, uint64_t *val)
 		break;
 
 	case ETHER_STAT_CAP_10GFDX:
-		*val = 1;
+		*val = (speeds & IXGBE_LINK_SPEED_10GB_FULL) ? 1 : 0;
+		break;
+
+	case ETHER_STAT_CAP_5000FDX:
+		*val = (speeds & IXGBE_LINK_SPEED_5GB_FULL) ? 1 : 0;
+		break;
+
+	case ETHER_STAT_CAP_2500FDX:
+		*val = (speeds & IXGBE_LINK_SPEED_2_5GB_FULL) ? 1 : 0;
 		break;
 
 	case ETHER_STAT_CAP_1000FDX:
-		*val = 1;
+		*val = (speeds & IXGBE_LINK_SPEED_1GB_FULL) ? 1 : 0;
 		break;
 
 	case ETHER_STAT_CAP_100FDX:
-		*val = 1;
+		*val = (speeds & IXGBE_LINK_SPEED_100_FULL) ? 1 : 0;
 		break;
 
 	case ETHER_STAT_CAP_ASMPAUSE:
@@ -670,6 +698,14 @@ ixgbe_m_stat(void *arg, uint_t stat, uint64_t *val)
 
 	case ETHER_STAT_ADV_CAP_10GFDX:
 		*val = ixgbe->param_adv_10000fdx_cap;
+		break;
+
+	case ETHER_STAT_ADV_CAP_5000FDX:
+		*val = ixgbe->param_adv_5000fdx_cap;
+		break;
+
+	case ETHER_STAT_ADV_CAP_2500FDX:
+		*val = ixgbe->param_adv_2500fdx_cap;
 		break;
 
 	case ETHER_STAT_ADV_CAP_1000FDX:
@@ -694,6 +730,14 @@ ixgbe_m_stat(void *arg, uint_t stat, uint64_t *val)
 
 	case ETHER_STAT_LP_CAP_10GFDX:
 		*val = ixgbe->param_lp_10000fdx_cap;
+		break;
+
+	case ETHER_STAT_LP_CAP_5000FDX:
+		*val = ixgbe->param_lp_5000fdx_cap;
+		break;
+
+	case ETHER_STAT_LP_CAP_2500FDX:
+		*val = ixgbe->param_lp_2500fdx_cap;
 		break;
 
 	case ETHER_STAT_LP_CAP_1000FDX:

@@ -23,12 +23,13 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2016 RackTop Systems.
 #
 
 include ../Makefile.com
 include ../../../Makefile.lib.64
 
+LDLIBS += -L$(ROOT)/usr/lib/smbsrv/$(MACH64)
 DYNFLAGS += -R/usr/lib/smbsrv/$(MACH64)
 DYNFLAGS += $(ROOT)/usr/lib/$(MACH64)/passwdutil.so.1
 
