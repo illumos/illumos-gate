@@ -22,6 +22,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
@@ -43,6 +44,7 @@
 #include <synch.h>
 #include <spawn.h>
 #include <paths.h>
+#include <zone.h>
 #include "libc.h"
 
 extern const char **_environ;
@@ -125,10 +127,17 @@ system(const char *cmd)
 	int error;
 	sigset_t mask;
 	struct stat64 buf;
-	const char *shpath = _PATH_BSHELL;
+	char shpath[MAXPATHLEN];
+	const char *zroot = zone_get_nroot();
 	char *argv[4];
 	posix_spawnattr_t attr;
 	static const char *shell = "sh";
+
+	/*
+	 * If executing in brand use native root.
+	 */
+	(void) snprintf(shpath, sizeof (shpath), "%s%s",
+	    zroot != NULL ? zroot : "", _PATH_BSHELL);
 
 	if (cmd == NULL) {
 		if (stat64(shpath, &buf) != 0) {
