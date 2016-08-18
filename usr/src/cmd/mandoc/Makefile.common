@@ -11,7 +11,7 @@
 
 #
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
-# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2016 Nexenta Systems, Inc.
 #
 
 PROG=		mandoc
@@ -33,12 +33,14 @@ OBJS=		att.o		\
 		man_validate.o	\
 		mandoc.o	\
 		mandoc_aux.o	\
+		mandoc_ohash.o	\
 		mdoc.o		\
 		mdoc_argv.o	\
 		mdoc_hash.o	\
 		mdoc_html.o	\
 		mdoc_macro.o	\
 		mdoc_man.o	\
+		mdoc_state.o	\
 		mdoc_term.o	\
 		mdoc_validate.o	\
 		msec.o		\
@@ -47,6 +49,7 @@ OBJS=		att.o		\
 		roff.o		\
 		preconv.o	\
 		st.o		\
+		tag.o		\
 		tbl.o		\
 		tbl_data.o	\
 		tbl_html.o	\
@@ -58,10 +61,13 @@ OBJS=		att.o		\
 		term_ps.o	\
 		tree.o
 
-OBJS +=		compat_fgetln.o		\
+OBJS +=		compat_ohash.o		\
 		compat_reallocarray.o	\
 		compat_strtonum.o
 
 CFLAGS +=	$(CC_VERBOSE)
+C99MODE =	$(C99_ENABLE)
 
 CPPFLAGS +=	-DOSNAME="\"illumos\""
+
+LDLIBS +=	-lz

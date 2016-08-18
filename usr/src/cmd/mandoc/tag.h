@@ -1,6 +1,6 @@
-/*	$Id: st.c,v 1.13 2015/10/06 18:32:20 schwarze Exp $ */
+/*      $Id: tag.h,v 1.7 2015/11/20 21:59:54 schwarze Exp $    */
 /*
- * Copyright (c) 2009 Kristaps Dzonsons <kristaps@bsd.lv>
+ * Copyright (c) 2015 Ingo Schwarze <schwarze@openbsd.org>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -14,24 +14,18 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
-#include "config.h"
 
-#include <sys/types.h>
+struct	tag_files {
+	char	 ofn[20];
+	char	 tfn[20];
+	int	 ofd;
+	int	 tfd;
+	pid_t	 tcpgid;
+	pid_t	 pager_pid;
+};
 
-#include <string.h>
 
-#include "roff.h"
-#include "mdoc.h"
-#include "libmdoc.h"
-
-#define LINE(x, y) \
-	if (0 == strcmp(p, x)) return(y);
-
-const char *
-mdoc_a2st(const char *p)
-{
-
-#include "st.in"
-
-	return NULL;
-}
+struct tag_files *tag_init(void);
+void	 tag_put(const char *, int, size_t);
+void	 tag_write(void);
+void	 tag_unlink(void);
