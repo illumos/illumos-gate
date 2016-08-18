@@ -64,7 +64,7 @@ GENUNIX_DIR	= ../../intel/$(GENUNIX)
 
 LIBOPTS		= -L $(GENUNIX_DIR)/$(OBJS_DIR) -l $(GENUNIX)
 
-CTFEXTRAOBJS	= $(OBJS_DIR)/vers.o
+CTFEXTRAOBJS	= $(OBJS_DIR)/vers.o $(OBJS_DIR)/comm_page_ctf.o
 
 DBOOT_OBJS_DIR	= dboot/$(OBJS_DIR)
 DBOOT_OBJECTS	= $(DBOOT_OBJS:%=$(DBOOT_OBJS_DIR)/%)
@@ -97,9 +97,10 @@ UNIX_DIR	= .
 #
 CLEANFILES	+=		\
 	$(UNIX_O) $(MODSTUBS_O)	\
-	$(OBJS_DIR)/vers.c $(OBJS_DIR)/vers.o \
+	$(OBJS_DIR)/vers.c \
 	$(OBJS_DIR)/dtracestubs.s \
-	$(DTRACESTUBS_O) $(DTRACESTUBS)
+	$(DTRACESTUBS_O) $(DTRACESTUBS) \
+	$(CTFEXTRAOBJS)
 
 CLEANFILES	+=		\
 	$(DBOOT_O) $(DBOOT_S)	\
@@ -188,7 +189,7 @@ $(UNIX_BIN):	$(UNIX_O) $(MODSTUBS_O) $(MAPFILE_NAME) \
 	$(CTFMERGE_UNIQUIFY_AGAINST_GENUNIX)
 	$(POST_PROCESS)
 
-$(UNIX_O):	$(OBJECTS) $(OBJS_DIR)/vers.o
+$(UNIX_O):	$(OBJECTS) $(CTFEXTRAOBJS)
 	$(LD) -r -o $@ $(OBJECTS) $(OBJS_DIR)/vers.o
 
 $(DBOOT_BIN):	$(DBOOT_OBJS_DIR) $(DBOOT_OBJECTS) dboot/Mapfile.dboot
@@ -204,6 +205,10 @@ $(DBOOT_O):	$(DBOOT_BIN)
 
 $(DBOOT_OBJS_DIR):
 	-@mkdir -p $@ 2> /dev/null
+
+$(OBJS_DIR)/comm_page_ctf.o:	$(UTSBASE)/i86pc/ml/comm_page.s
+	$(COMPILE.c) -_gcc=-xc -D_GENCTF -o $@ $(UTSBASE)/i86pc/ml/comm_page.s
+	$(CTFCONVERT_O)
 
 #
 # dboot is built as an intermediate target in dboot.o, so just make
