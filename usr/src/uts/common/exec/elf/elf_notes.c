@@ -393,9 +393,10 @@ write_elfnotes(proc_t *p, int sig, vnode_t *vp, offset_t offset,
 			error = elfnote(vp, &offset, NT_FDINFO,
 			    sizeof (fdinfo), &fdinfo, rlimit, credp);
 			VN_RELE(fvp);
-			VN_RELE(vroot);
-			if (error)
+			if (error) {
+				VN_RELE(vroot);
 				goto done;
+			}
 			continue;
 		}
 
