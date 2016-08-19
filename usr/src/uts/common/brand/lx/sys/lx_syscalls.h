@@ -111,6 +111,7 @@ extern long lx_listxattr();
 extern long lx_mkdir();
 extern long lx_mkdirat();
 extern long lx_modify_ldt();
+extern long lx_mount();
 extern long lx_nanosleep();
 extern long lx_oldgetrlimit();
 extern long lx_open();
@@ -171,6 +172,8 @@ extern long lx_removexattr();
 extern long lx_tgkill();
 extern long lx_time();
 extern long lx_tkill();
+extern long lx_umount();
+extern long lx_umount2();
 extern long lx_uname();
 extern long lx_wait4();
 extern long lx_waitid();
@@ -199,6 +202,7 @@ extern long lx_writev();
 #if defined(__amd64)
 #define	LX_SYS_close		3
 #define	LX_SYS_gettimeofday	96
+#define	LX_SYS_mount		165
 #define	LX_SYS_time		201
 #define	LX_SYS_io_setup		206
 #define	LX_SYS_clock_gettime	228
@@ -207,11 +211,13 @@ extern long lx_writev();
 #define	LX_SYS32_close		6
 #define	LX_SYS32_gettimeofday	78
 #define	LX_SYS32_time		13
+#define	LX_SYS32_mount		21
 #define	LX_SYS32_clock_gettime	265
 #define	LX_SYS32_io_setup	245
 #define	LX_SYS32_getcpu		318
 #elif defined(__i386)
 #define	LX_SYS_close		6
+#define	LX_SYS_mount		21
 #define	LX_SYS_gettimeofday	78
 #define	LX_SYS_time		13
 #define	LX_SYS_clock_gettime	265

@@ -1177,7 +1177,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/* 163: acct */
 	lx_settimeofday,		/* 164: settimeofday */
 	lx_mount,			/* 165: mount */
-	lx_umount2,			/* 166: umount2 */
+	NULL,				/* 166: umount2 */
 	NULL,				/* 167: swapon */
 	NULL,				/* 168: swapoff */
 	lx_reboot,			/* 169: reboot */
@@ -1364,7 +1364,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/*  19: lseek */
 	NULL,				/*  20: getpid */
 	lx_mount,			/*  21: mount */
-	lx_umount,			/*  22: umount */
+	NULL,				/*  22: umount */
 	lx_setuid16,			/*  23: setuid16 */
 	lx_getuid16,			/*  24: getuid16 */
 	lx_stime,			/*  25: stime */
@@ -1394,7 +1394,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_geteuid16,			/*  49: geteuid16 */
 	lx_getegid16,			/*  50: getegid16 */
 	NULL,				/*  51: acct */
-	lx_umount2,			/*  52: umount2 */
+	NULL,				/*  52: umount2 */
 	NULL,				/*  53: lock */
 	NULL,				/*  54: ioctl */
 	NULL,				/*  55: fcntl */
