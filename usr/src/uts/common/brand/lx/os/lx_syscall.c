@@ -542,8 +542,8 @@ lx_sysent_t lx_sysent32[] = {
 	{"stat",	NULL,			NOSYS_OBSOLETE,	0}, /* 18 */
 	{"lseek",	lx_lseek32,		0,		3}, /* 19 */
 	{"getpid",	lx_getpid,		0,		0}, /* 20 */
-	{"mount",	NULL,			0,		5}, /* 21 */
-	{"umount",	NULL,			0,		1}, /* 22 */
+	{"mount",	lx_mount,		0,		5}, /* 21 */
+	{"umount",	lx_umount,		0,		1}, /* 22 */
 	{"setuid16",	NULL,			0,		1}, /* 23 */
 	{"getuid16",	NULL,			0,		0}, /* 24 */
 	{"stime",	NULL,			0,		1}, /* 25 */
@@ -573,7 +573,7 @@ lx_sysent_t lx_sysent32[] = {
 	{"geteuid16",	NULL,			0,		0}, /* 49 */
 	{"getegid16",	NULL,			0,		0}, /* 50 */
 	{"acct",	NULL,			NOSYS_NO_EQUIV,	0}, /* 51 */
-	{"umount2",	NULL,			0,		2}, /* 52 */
+	{"umount2",	lx_umount2,		0,		2}, /* 52 */
 	{"lock",	NULL,			NOSYS_OBSOLETE,	0}, /* 53 */
 	{"ioctl",	lx_ioctl,		0,		3}, /* 54 */
 	{"fcntl",	lx_fcntl,		0,		3}, /* 55 */
@@ -1057,8 +1057,8 @@ lx_sysent_t lx_sysent64[] = {
 	{"sync",	NULL,			0,		0}, /* 162 */
 	{"acct",	NULL,			NOSYS_NO_EQUIV,	0}, /* 163 */
 	{"settimeofday", NULL,			0,		2}, /* 164 */
-	{"mount",	NULL,			0,		5}, /* 165 */
-	{"umount2",	NULL,			0,		2}, /* 166 */
+	{"mount",	lx_mount,		0,		5}, /* 165 */
+	{"umount2",	lx_umount2,		0,		2}, /* 166 */
 	{"swapon",	NULL,			NOSYS_KERNEL,	0}, /* 167 */
 	{"swapoff",	NULL,			NOSYS_KERNEL,	0}, /* 168 */
 	{"reboot",	NULL,			0,		4}, /* 169 */

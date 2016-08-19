@@ -25,24 +25,16 @@
  * Copyright 2016 Joyent, Inc.
  */
 
-#include <alloca.h>
 #include <assert.h>
-#include <ctype.h>
-#include <fcntl.h>
 #include <errno.h>
-#include <signal.h>
-#include <string.h>
 #include <strings.h>
 #include <nfs/mount.h>
 #include <sys/types.h>
 #include <sys/mount.h>
-#include <sys/param.h>
 #include <sys/stat.h>
-#include <sys/types.h>
 #include <unistd.h>
 #include <stdlib.h>
 
-#include <sys/lx_autofs.h>
 #include <sys/lx_debug.h>
 #include <sys/lx_misc.h>
 #include <sys/lx_syscall.h>
@@ -56,322 +48,6 @@ union fh_buffer {
 	struct nfs_fh3	fh3;
 	char		fh_data[NFS3_FHSIZE + 2];
 };
-
-typedef enum mount_opt_type {
-	MOUNT_OPT_INVALID	= 0,
-	MOUNT_OPT_NORMAL	= 1,	/* option value: none */
-	MOUNT_OPT_UINT		= 2,	/* option value: unsigned int */
-	MOUNT_OPT_BYTESIZE	= 3	/* option value: byte size, e.g. 25m */
-} mount_opt_type_t;
-
-typedef struct mount_opt {
-	char			*mo_name;
-	mount_opt_type_t	mo_type;
-} mount_opt_t;
-
-
-/*
- * Globals
- */
-mount_opt_t lofs_options[] = {
-	{ NULL,			MOUNT_OPT_INVALID }
-};
-
-mount_opt_t lx_proc_options[] = {
-	{ NULL,			MOUNT_OPT_INVALID }
-};
-
-mount_opt_t lx_sysfs_options[] = {
-	{ NULL,			MOUNT_OPT_INVALID }
-};
-
-mount_opt_t lx_tmpfs_options[] = {
-	{ "size",		MOUNT_OPT_BYTESIZE },
-	{ "mode",		MOUNT_OPT_UINT },
-	{ "uid",		MOUNT_OPT_UINT },
-	{ "gid",		MOUNT_OPT_UINT },
-	{ NULL,			MOUNT_OPT_INVALID }
-};
-
-mount_opt_t lx_autofs_options[] = {
-	{ LX_MNTOPT_FD,		MOUNT_OPT_UINT },
-	{ LX_MNTOPT_PGRP,	MOUNT_OPT_UINT },
-	{ LX_MNTOPT_MINPROTO,	MOUNT_OPT_UINT },
-	{ LX_MNTOPT_MAXPROTO,	MOUNT_OPT_UINT },
-	{ LX_MNTOPT_INDIRECT,	MOUNT_OPT_NORMAL },
-	{ LX_MNTOPT_DIRECT,	MOUNT_OPT_NORMAL },
-	{ LX_MNTOPT_OFFSET,	MOUNT_OPT_NORMAL },
-	{ NULL,			MOUNT_OPT_INVALID }
-};
-
-
-/*
- * i_lx_opt_verify() - Check the mount options.
- *
- * You might wonder why we're being so strict about the mount options
- * we allow.  The reason is that normally all mount option verification
- * is done by the Solaris userland mount command.  Once mount options
- * are passed to the kernel, invalid options are simply ignored.  So
- * if we actually want to catch requests for functionality that we
- * don't support, or if we want to make sure that we don't randomly
- * enable options that we haven't check to make sure they have the
- * same syntax on Linux and Solaris, we need to reject any options
- * we don't know to be ok here.
- */
-static int
-i_lx_opt_verify(char *opts, mount_opt_t *mop)
-{
-	int	opts_len = strlen(opts);
-	char	*opts_tmp, *opt;
-	int	opt_len, i;
-
-	assert((opts != NULL) && (mop != NULL));
-
-	/* If no options were specified, there's no problem. */
-	if (opts_len == 0) {
-		errno = 0;
-		return (0);
-	}
-
-	/* If no options are allowed, fail. */
-	if (mop[0].mo_name == NULL) {
-		errno = ENOTSUP;
-		return (-1);
-	}
-
-	/* Don't accept leading or trailing ','. */
-	if ((opts[0] == ',') || (opts[opts_len] == ',')) {
-		errno = EINVAL;
-		return (-1);
-	}
-
-	/* Don't accept sequential ','. */
-	for (i = 1; i < opts_len; i++) {
-		if ((opts[i - 1] ==  ',') && (opts[i] ==  ',')) {
-			errno = EINVAL;
-			return (-1);
-		}
-	}
-
-	/*
-	 * We're going to use strtok() which modifies the target
-	 * string so make a temporary copy.
-	 */
-	opts_tmp = SAFE_ALLOCA(opts_len);
-	if (opts_tmp == NULL) {
-		errno = ENOMEM;
-		return (-1);
-	}
-	bcopy(opts, opts_tmp, opts_len + 1);
-
-	/* Verify each prop one at a time. */
-	opt = strtok(opts_tmp, ",");
-	opt_len = strlen(opt);
-	for (;;) {
-
-		/* Check for matching option/value pair. */
-		for (i = 0; mop[i].mo_name != NULL; i++) {
-			char	*ovalue;
-			int	ovalue_len, mo_len;
-
-			/* If the options is too short don't bother comparing */
-			mo_len = strlen(mop[i].mo_name);
-			if (opt_len < mo_len) {
-				/* Keep trying to find a match. */
-				continue;
-			}
-
-			/* Compare the option to an allowed option. */
-			if (strncmp(mop[i].mo_name, opt, mo_len) != 0) {
-				/* Keep trying to find a match. */
-				continue;
-			}
-
-			if (mop[i].mo_type == MOUNT_OPT_NORMAL) {
-				/* The option doesn't take a value. */
-				if (opt_len == mo_len) {
-					/* This option is ok. */
-					break;
-				} else {
-					/* Keep trying to find a match. */
-					continue;
-				}
-			}
-
-			/* This options takes a value. */
-			if ((opt_len == mo_len) || (opt[mo_len] != '=')) {
-				/* Keep trying to find a match. */
-				continue;
-			}
-
-			/* We have an option match.  Verify option value. */
-			ovalue = &opt[mo_len] + 1;
-			ovalue_len = strlen(ovalue);
-
-			/* Value can't be zero length string. */
-			if (ovalue_len == 0) {
-				errno = EINVAL;
-				return (-1);
-			}
-
-			if (mop[i].mo_type == MOUNT_OPT_UINT) {
-				int j;
-				/* Verify that value is an unsigned int. */
-				for (j = 0; j < ovalue_len; j++) {
-					if (!isdigit(ovalue[j])) {
-						errno = EINVAL;
-						return (-1);
-					}
-				}
-			} else if (mop[i].mo_type == MOUNT_OPT_BYTESIZE) {
-				int j;
-				int stage = 0;
-				int suffix;
-
-				/*
-				 * Verify that the value is an unsigned integer
-				 * that ends in a magnitude suffix (i.e. case
-				 * insensitive 'k' 'm' or 'g') or a '%'
-				 * character.
-				 */
-				for (j = 0; j < ovalue_len; j++) {
-					switch (stage) {
-					case 0:
-						/*
-						 * Look for at least one digit.
-						 */
-						if (!isdigit(ovalue[j])) {
-							errno = EINVAL;
-							return (-1);
-						}
-						stage = 1;
-						break;
-					case 1:
-						/*
-						 * Allow an unlimited number of
-						 * digits.
-						 */
-						if (isdigit(ovalue[j])) {
-							break;
-						}
-						/*
-						 * Allow one (valid) byte
-						 * magnitude character.
-						 */
-						suffix = tolower(ovalue[j]);
-						if (suffix == 'k' ||
-						    suffix == 'm' ||
-						    suffix == 'g' ||
-						    suffix == '%') {
-							stage = 2;
-							break;
-						}
-						errno = EINVAL;
-						return (-1);
-					case 2:
-						/*
-						 * Invalid trailing characters.
-						 */
-						errno = EINVAL;
-						return (-1);
-					}
-				}
-
-				if (stage < 1) {
-					errno = EINVAL;
-					return (-1);
-				}
-			} else {
-				/* Unknown option type specified. */
-				assert(0);
-			}
-
-			/* The option is ok. */
-			break;
-		}
-
-		/* If there were no matches this is an unsupported option. */
-		if (mop[i].mo_name == NULL) {
-			errno = EINVAL;
-			return (-1);
-		}
-
-		/* This option is ok, move onto the next option. */
-		if ((opt = strtok(NULL, ",")) == NULL)
-			break;
-		opt_len = strlen(opt);
-	};
-
-	/* We verified all the options. */
-	return (0);
-}
-
-/*
- * Remove an option from the string and save it in the provided buffer.
- * The option string should have already been verified as valid.
- * Return 0 if not present, -1 if error, and 1 if present and fine.
- */
-static int
-opt_rm(char *opts, char *rmopt, char *retstr, int retlen)
-{
-	int	opts_len = strlen(opts);
-	char	*optstart, *optend;
-	int	optlen;
-
-	assert((opts != NULL) && (rmopt != NULL));
-
-	retstr[0] = '\0';
-
-	/* If no options were specified, there's no problem. */
-	if (opts_len == 0)
-		return (0);
-
-	if ((optstart = strstr(opts, rmopt)) == NULL)
-		return (0);
-
-	for (optend = optstart; *optend != ',' && *optend != '\0'; optend++)
-		;
-
-	optlen = optend - optstart;
-	if (optlen >= retlen)
-		return (-1);
-	(void) strncpy(retstr, optstart, optlen);
-	retstr[optlen] = '\0';
-
-	if (*optend == ',')
-		optend++;
-
-	optlen = strlen(optend) + 1;
-	bcopy(optend, optstart, optlen);
-
-	if (*optstart == '\0' && optstart != opts) {
-		/* removed last opt and it had a preceeding opt, remove comma */
-		*(optstart - 1) = '\0';
-	}
-
-	return (1);
-}
-
-static int
-opt_id_val(char *opt, int *valp)
-{
-	char *vp;
-	long lval;
-
-	if ((vp = strchr(opt, '=')) == NULL)
-		return (-1);
-
-	vp++;
-	if (!isdigit(*vp))
-		return (-1);
-
-	lval = strtol(vp, &vp, 10);
-	if (*vp != '\0' || lval > INT_MAX)
-		return (-1);
-
-	*valp = (int)lval;
-	return (0);
-}
 
 static int
 i_add_option(char *option, char *buf, size_t buf_size)
@@ -675,6 +351,10 @@ i_make_nfs_args(lx_nfs_mount_data_t *lx_nmd, struct nfs_args *nfs_args,
 	return (0);
 }
 
+/*
+ * The user-level mount(2) code is only used to support NFS mounts. All other
+ * fstypes are handled in-kernel.
+ */
 long
 lx_mount(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
     uintptr_t p5)
@@ -686,19 +366,12 @@ lx_mount(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 	unsigned int		flags = (unsigned int)p4;
 	const void		*datap = (const void *)p5;
 
-	/* Variables needed for all mounts. */
 	char			source[MAXPATHLEN + LX_NMD_MAXHOSTNAMELEN + 1];
 	char			target[MAXPATHLEN];
-	char			fstype[MAXPATHLEN], options[MAX_MNTOPT_STR];
+	char			fstype[8], options[MAX_MNTOPT_STR];
 	int			sflags, rv;
 	long			res;
-	boolean_t		is_tmpfs = B_FALSE;
 
-	/* Variable for tmpfs mounts. */
-	int			uid = -1;
-	int			gid = -1;
-
-	/* Variables needed for nfs mounts. */
 	lx_nfs_mount_data_t	lx_nmd;
 	struct nfs_args		nfs_args;
 	struct netbuf 		nfs_args_addr;
@@ -707,8 +380,9 @@ lx_mount(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 	struct sec_data		nfs_args_secdata;
 	char			*sdataptr = NULL;
 	int			sdatalen = 0;
+	int			vers;
 
-	/* Initialize Solaris mount arguments. */
+	/* Initialize illumos mount arguments. */
 	sflags = MS_OPTIONSTR;
 	options[0] = '\0';
 	sdatalen = 0;
@@ -729,6 +403,9 @@ lx_mount(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 	lx_debug("\tlinux mount source: %s", source);
 	lx_debug("\tlinux mount target: %s", target);
 	lx_debug("\tlinux mount fstype: %s", fstype);
+
+	/* The in-kernel mount code should only call us for an NFS mount. */
+	assert(strcmp(fstype, "nfs") == 0);
 
 	/*
 	 * While SunOS is picky about mount(2) target paths being absolute,
@@ -760,261 +437,72 @@ lx_mount(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 		return (-ENOTSUP);
 	}
 
-	/* Do filesystem specific mount work. */
-	if (flags & LX_MS_BIND) {
+	/*
+	 * Copy in Linux mount options. Note that for older Linux kernels
+	 * (pre 2.6.23) the mount options pointer (which normally points to a
+	 * string) points to a structure which is populated by the user-level
+	 * code after it has done the preliminary RPCs (similar to how our NFS
+	 * mount cmd works). For newer kernels the options pointer is just a
+	 * string of options. We're unlikely to actually emulate a kernel that
+	 * uses the old style but support is kept and handled in
+	 * i_make_nfs_args(). The new style handling is implemented in
+	 * lx_nfs_mount(). The user-level mount caller is in charge of
+	 * determining the format in which it passes the data parameter.
+	 */
+	if (datap == NULL)
+		return (-EINVAL);
+	if (uucopy((void *)datap, &vers, sizeof (int)) < 0)
+		return (-errno);
 
-		/* If MS_BIND is set, we turn this into a lofs mount.  */
-		(void) strcpy(fstype, "lofs");
-
-		/* Copy in Linux mount options. */
-		if (datap != NULL) {
-			rv = uucopystr((void *)datap,
-			    options, sizeof (options));
-			if ((rv == -1) || (rv == sizeof (options)))
-				return (-EFAULT);
-		}
-		lx_debug("\tlinux mount options: \"%s\"", options);
-
-		/* Verify Linux mount options. */
-		if (i_lx_opt_verify(options, lofs_options) != 0) {
-			lx_unsupported("unsupported lofs mount options: %s",
-			    options);
-			return (-errno);
-		}
-	} else if (strcmp(fstype, "tmpfs") == 0) {
-		char	idstr[64];
-
-		/* Copy in Linux mount options. */
-		if (datap != NULL) {
-			rv = uucopystr((void *)datap,
-			    options, sizeof (options));
-			if ((rv == -1) || (rv == sizeof (options)))
-				return (-EFAULT);
-		}
-		lx_debug("\tlinux mount options: \"%s\"", options);
-
-		/* Verify Linux mount options. */
-		if (i_lx_opt_verify(options, lx_tmpfs_options) != 0) {
-			lx_unsupported("unsupported tmpfs mount options: %s",
-			    options);
-			return (-errno);
-		}
-
+	/*
+	 * As described above, the data parameter might be a versioned lx_nmd
+	 * structure or (most likely on a modern distribution) it is a string.
+	 */
+	if (vers < 1 || vers > 6) {
 		/*
-		 * Linux defaults to mode=1777 for tmpfs mounts.
+		 * Handle the modern style with options as a string, make the
+		 * preliminary RPC calls and do the native mount all within
+		 * lx_nfs_mount().
 		 */
-		if (strstr(options, "mode=") == NULL) {
-			if (options[0] != '\0')
-				(void) strlcat(options, ",", sizeof (options));
-			(void) strlcat(options, "mode=1777", sizeof (options));
-		}
-
-		switch (opt_rm(options, "uid=", idstr, sizeof (idstr))) {
-		case 0:
-			uid = -1;
-			break;
-		case 1:
-			if (opt_id_val(idstr, &uid) < 0)
-				return (-EINVAL);
-			break;
-		default:
-			return (-E2BIG);
-		}
-		switch (opt_rm(options, "gid=", idstr, sizeof (idstr))) {
-		case 0:
-			gid = -1;
-			break;
-		case 1:
-			if (opt_id_val(idstr, &gid) < 0)
-				return (-EINVAL);
-			break;
-		default:
-			return (-E2BIG);
-		}
-
-		/*
-		 * Linux seems to always allow overlay mounts. We allow this
-		 * everywhere except under /dev where it interferes with device
-		 * emulation.
-		 */
-		if (strcmp(targetp, "/dev") != 0 &&
-		    strncmp(targetp, "/dev/", 5) != 0)
-			sflags |= MS_OVERLAY;
-
-		is_tmpfs = B_TRUE;
-
-	} else if (strcmp(fstype, "proc") == 0) {
-		struct stat64	sb;
-
-		/* Translate proc mount requests to lx_proc requests. */
-		(void) strcpy(fstype, "lx_proc");
-
-		/* Copy in Linux mount options. */
-		if (datap != NULL) {
-			rv = uucopystr((void *)datap,
-			    options, sizeof (options));
-			if ((rv == -1) || (rv == sizeof (options)))
-				return (-EFAULT);
-		}
-		lx_debug("\tlinux mount options: \"%s\"", options);
-
-		/* Verify Linux mount options. */
-		if (i_lx_opt_verify(options, lx_proc_options) != 0) {
-			lx_unsupported("unsupported proc mount options: %s",
-			    options);
+		if (uucopystr((void *)datap, options, sizeof (options)) < 0)
 			return (-errno);
-		}
-
-		/* If mounting proc over itself, just return ok */
-		if (stat64(target, &sb) == 0 &&
-		    strcmp(sb.st_fstype, "lx_proc") == 0) {
-			return (0);
-		}
-	} else if (strcmp(fstype, "sysfs") == 0) {
-		/* Translate sysfs mount requests to lx_sysfs requests. */
-		(void) strcpy(fstype, "lx_sysfs");
-
-		/* Copy in Linux mount options. */
-		if (datap != NULL) {
-			rv = uucopystr((void *)datap,
-			    options, sizeof (options));
-			if ((rv == -1) || (rv == sizeof (options)))
-				return (-EFAULT);
-		}
-		lx_debug("\tlinux mount options: \"%s\"", options);
-
-		/* Verify Linux mount options. */
-		if (i_lx_opt_verify(options, lx_sysfs_options) != 0) {
-			lx_unsupported("unsupported sysfs mount options: %s",
-			    options);
-			return (-errno);
-		}
-	} else if (strcmp(fstype, "cgroup") == 0) {
-		/* Translate cgroup mount requests to lx_cgroup requests. */
-		(void) strcpy(fstype, "lx_cgroup");
-
-		/* Copy in Linux mount options. */
-		if (datap != NULL) {
-			rv = uucopystr((void *)datap,
-			    options, sizeof (options));
-			if ((rv == -1) || (rv == sizeof (options)))
-				return (-EFAULT);
-		}
-		lx_debug("\tlinux mount options: \"%s\"", options);
-
-		/*
-		 * Currently don't verify Linux mount options since we can
-		 * have asubsystem string provided.
-		 */
-
-	} else if (strcmp(fstype, "autofs") == 0) {
-
-		/* Translate autofs mount requests to lxautofs requests. */
-		(void) strcpy(fstype, LX_AUTOFS_NAME);
-
-		/* Copy in Linux mount options. */
-		if (datap != NULL) {
-			rv = uucopystr((void *)datap,
-			    options, sizeof (options));
-			if ((rv == -1) || (rv == sizeof (options)))
-				return (-EFAULT);
-		}
-		lx_debug("\tlinux mount options: \"%s\"", options);
-
-		/* Verify Linux mount options. */
-		if (i_lx_opt_verify(options, lx_autofs_options) != 0) {
-			lx_unsupported("unsupported autofs mount options: %s",
-			    options);
-			return (-errno);
-		}
-
-		/* Linux seems to always allow overlay mounts */
-		sflags |= MS_OVERLAY;
-
-	} else if (strcmp(fstype, "nfs") == 0) {
-
-		/*
-		 * Copy in Linux mount options. Note that for older Linux
-		 * kernels (pre 2.6.23) the mount options pointer (which
-		 * normally points to a string) points to a structure which
-		 * is populated by the user-level code after it has done the
-		 * preliminary RPCs (similar to how our NFS mount cmd works).
-		 * For newer kernels the options pointer is just a string of
-		 * options. We're unlikely to actually emulate a kernel that
-		 * uses the old style but support is kept and handled in
-		 * i_make_nfs_args(). The new style handling is implemented in
-		 * nfs_pre_mount(). The user-level mount caller is in charge of
-		 * determining the format in which it passes the data parameter.
-		 */
-		int vers;
-
-		if (datap == NULL)
-			return (-EINVAL);
-		if (uucopy((void *)datap, &vers, sizeof (int)) < 0)
-			return (-errno);
-
-		/*
-		 * As described above, the data parameter might be a versioned
-		 * lx_nmd structure or (most likely) it is just a string.
-		 */
-		switch (vers) {
-		case 1:
-		case 2:
-		case 3:
-		case 5:
-		case 6:
-			lx_unsupported("unsupported nfs mount request "
-			    "version: %d\n", vers);
-			return (-ENOTSUP);
-
-		case 4:
-			if (uucopy((void *)datap, &lx_nmd, sizeof (lx_nmd)) < 0)
-				return (-errno);
-
-			/*
-			 * For Illumos nfs mounts, the kernel expects a special
-			 * structure, but a pointer to this structure is passed
-			 * in via an extra parameter (sdataptr below.)
-			 */
-			if ((rv = i_make_nfs_args(&lx_nmd, &nfs_args,
-			    &nfs_args_addr, &nfs_args_knconf, &nfs_args_fh,
-			    &nfs_args_secdata, fstype, options,
-			    sizeof (options))) != 0)
-				return (rv);
-
-			break;
-
-		default:
-			/*
-			 * Handle new style with options as a string, make
-			 * the preliminary RPC calls and do the native mount
-			 * all within lx_nfs_mount().
-			 */
-			if (uucopystr((void *)datap, options,
-			    sizeof (options)) < 0)
-				return (-errno);
-			return (lx_nfs_mount(source, target, fstype, flags,
-			    options));
-			break;
-		}
-
-		/*
-		 * For nfs mounts we need to tell the mount system call
-		 * to expect extra parameters.
-		 */
-		sflags |= MS_DATA;
-		sdataptr = (char *)&nfs_args;
-		sdatalen = sizeof (nfs_args);
-
-		/* Linux seems to always allow overlay mounts */
-		sflags |= MS_OVERLAY;
-
-	} else {
-		lx_unsupported("unsupported mount filesystem type: %s", fstype);
-		return (-ENODEV);
+		return (lx_nfs_mount(source, target, fstype, flags, options));
 	}
 
-	/* Convert some Linux flags to Illumos flags. */
+	/*
+	 * This is an old style NFS mount call and we only support v4.
+	 */
+	if (vers != 4) {
+		lx_unsupported("unsupported nfs mount request version: %d\n",
+		    vers);
+		return (-ENOTSUP);
+	}
+
+	if (uucopy((void *)datap, &lx_nmd, sizeof (lx_nmd)) < 0)
+		return (-errno);
+
+	/*
+	 * For illumos NFS mounts, the kernel expects a special structure, but
+	 * a pointer to this structure is passed in via an extra parameter
+	 * (sdataptr below.)
+	 */
+	if ((rv = i_make_nfs_args(&lx_nmd, &nfs_args, &nfs_args_addr,
+	    &nfs_args_knconf, &nfs_args_fh, &nfs_args_secdata, fstype, options,
+	    sizeof (options))) != 0)
+		return (rv);
+
+	/*
+	 * For the following old-style NFS mount we need to tell the mount
+	 * system call to expect extra parameters.
+	 */
+	sflags |= MS_DATA;
+	sdataptr = (char *)&nfs_args;
+	sdatalen = sizeof (nfs_args);
+
+	/* Linux seems to always allow overlay mounts */
+	sflags |= MS_OVERLAY;
+
+	/* Convert some Linux flags to illumos flags. */
 	if (flags & LX_MS_RDONLY)
 		sflags |= MS_RDONLY;
 	if (flags & LX_MS_NOSUID)
@@ -1023,7 +511,7 @@ lx_mount(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 		sflags |= MS_REMOUNT;
 
 	/*
-	 * Convert some Linux flags to Illumos option strings.
+	 * Convert some Linux flags to illumos option strings.
 	 */
 	if (flags & LX_MS_STRICTATIME) {
 		/*
@@ -1048,48 +536,5 @@ lx_mount(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 	res = mount(source, target, sflags, fstype, sdataptr, sdatalen,
 	    options, sizeof (options));
 
-	if (res == 0) {
-		if (is_tmpfs) {
-			/* Handle uid/gid mount options. */
-			if (uid != -1 || gid != -1)
-				(void) chown(target, uid, gid);
-			return (0);
-
-		} else {
-			return (0);
-		}
-	} else {
-		return (-errno);
-	}
-}
-
-/*
- * umount() is identical, though it is implemented on top of umount2() in
- * Solaris so it cannot be a pass-thru system call.
- */
-long
-lx_umount(uintptr_t p1)
-{
-	return (umount((char *)p1) ? -errno : 0);
-}
-
-/*
- * The Linux umount2() system call is identical but has a different value for
- * MNT_FORCE (the logical equivalent to MS_FORCE).
- */
-#define	LX_MNT_FORCE	0x1
-
-long
-lx_umount2(uintptr_t p1, uintptr_t p2)
-{
-	char *path = (char *)p1;
-	int flags = 0;
-
-	if (p2 & ~LX_MNT_FORCE)
-		return (-EINVAL);
-
-	if (p2 & LX_MNT_FORCE)
-		flags |= MS_FORCE;
-
-	return (umount2(path, flags) ? -errno : 0);
+	return ((res == 0) ? 0 : -errno);
 }
