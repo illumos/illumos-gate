@@ -30,22 +30,117 @@
 #include <sys/systm.h>
 #include <sys/errno.h>
 #include <sys/zone.h>
+#include <sys/cred.h>
 #include <sys/cred_impl.h>
 #include <sys/policy.h>
-
-typedef ushort_t	l_uid16_t;
-typedef ushort_t	l_gid16_t;
-typedef uint_t		l_uid_t;
-typedef uint_t		l_gid_t;
-
-#define	LINUX_UID16_TO_UID32(uid16)	\
-	(((uid16) == (l_uid16_t)-1) ? ((l_uid_t)-1) : (l_uid_t)(uid16))
-
-#define	LINUX_GID16_TO_GID32(gid16)     \
-	(((gid16) == (l_gid16_t)-1) ? ((l_gid_t)-1) : (l_gid_t)(gid16))
+#include <sys/lx_types.h>
 
 #define	LX_NGROUPS_MAX	32
+
+/* From usr/src/uts/common/syscall/gid.c & uid.c */
+extern int setgid(gid_t);
+extern int setregid(gid_t, gid_t);
+extern int setreuid(uid_t, uid_t);
+extern int setuid(uid_t);
+
+/* From usr/src/uts/common/syscall/groups.c */
 extern int setgroups(int, gid_t *);
+
+long
+lx_getegid(void)
+{
+	return (crgetgid(CRED()));
+}
+
+long
+lx_getegid16(void)
+{
+	return ((int)LX_GID32_TO_GID16(crgetgid(CRED())));
+}
+
+long
+lx_geteuid(void)
+{
+	return (crgetuid(CRED()));
+}
+
+long
+lx_geteuid16(void)
+{
+	return ((int)LX_UID32_TO_UID16(crgetuid(CRED())));
+}
+
+long
+lx_getgid(void)
+{
+	return (crgetrgid(CRED()));
+}
+
+long
+lx_getgid16(void)
+{
+	return ((int)LX_GID32_TO_GID16(crgetrgid(CRED())));
+}
+
+long
+lx_getuid(void)
+{
+	return (crgetruid(CRED()));
+}
+
+long
+lx_getuid16(void)
+{
+	return ((int)LX_UID32_TO_UID16(crgetruid(CRED())));
+}
+
+long
+lx_setgid(gid_t gid)
+{
+	return (setgid(gid));
+}
+
+long
+lx_setgid16(lx_gid16_t gid)
+{
+	return (setgid(LX_GID16_TO_GID32(gid)));
+}
+
+long
+lx_setregid(gid_t rgid, gid_t egid)
+{
+	return (setregid(rgid, egid));
+}
+
+long
+lx_setregid16(lx_gid16_t rgid, lx_gid16_t egid)
+{
+	return (setregid(LX_UID16_TO_UID32(rgid), LX_UID16_TO_UID32(egid)));
+}
+
+long
+lx_setreuid(uid_t ruid, uid_t euid)
+{
+	return (setreuid(ruid, euid));
+}
+
+long
+lx_setreuid16(lx_uid16_t ruid, lx_uid16_t euid)
+{
+	return (setreuid(LX_UID16_TO_UID32(ruid), LX_UID16_TO_UID32(euid)));
+}
+
+long
+lx_setuid(uid_t uid)
+{
+	return (setuid(uid));
+}
+
+long
+lx_setuid16(lx_uid16_t uid)
+{
+	return (setuid(LX_UID16_TO_UID32(uid)));
+}
 
 /*
  * This function is based on setreuid in common/syscall/uid.c and exists
@@ -53,7 +148,7 @@ extern int setgroups(int, gid_t *);
  * from any other system call.
  */
 long
-lx_setresuid(l_uid_t ruid, l_uid_t euid, l_uid_t suid)
+lx_setresuid(lx_uid_t ruid, lx_uid_t euid, lx_uid_t suid)
 {
 	proc_t	*p;
 	int	error = 0;
@@ -173,14 +268,14 @@ done:
 }
 
 long
-lx_setresuid16(l_uid16_t ruid16, l_uid16_t euid16, l_uid16_t suid16)
+lx_setresuid16(lx_uid16_t ruid16, lx_uid16_t euid16, lx_uid16_t suid16)
 {
 	long	rval;
 
 	rval = lx_setresuid(
-	    LINUX_UID16_TO_UID32(ruid16),
-	    LINUX_UID16_TO_UID32(euid16),
-	    LINUX_UID16_TO_UID32(suid16));
+	    LX_UID16_TO_UID32(ruid16),
+	    LX_UID16_TO_UID32(euid16),
+	    LX_UID16_TO_UID32(suid16));
 
 	return (rval);
 }
@@ -189,7 +284,7 @@ lx_setresuid16(l_uid16_t ruid16, l_uid16_t euid16, l_uid16_t suid16)
  * This function is based on setregid in common/syscall/gid.c
  */
 long
-lx_setresgid(l_gid_t rgid, l_gid_t egid, l_gid_t sgid)
+lx_setresgid(lx_gid_t rgid, lx_gid_t egid, lx_gid_t sgid)
 {
 	proc_t	*p;
 	int	error = 0;
@@ -268,14 +363,14 @@ done:
 }
 
 long
-lx_setresgid16(l_gid16_t rgid16, l_gid16_t egid16, l_gid16_t sgid16)
+lx_setresgid16(lx_gid16_t rgid16, lx_gid16_t egid16, lx_gid16_t sgid16)
 {
 	long	rval;
 
 	rval = lx_setresgid(
-	    LINUX_GID16_TO_GID32(rgid16),
-	    LINUX_GID16_TO_GID32(egid16),
-	    LINUX_GID16_TO_GID32(sgid16));
+	    LX_GID16_TO_GID32(rgid16),
+	    LX_GID16_TO_GID32(egid16),
+	    LX_GID16_TO_GID32(sgid16));
 
 	return (rval);
 }
@@ -293,4 +388,84 @@ lx_helper_setgroups(int ngroups, gid_t *grouplist)
 #endif /* DEBUG */
 
 	return (setgroups(ngroups, grouplist));
+}
+
+long
+lx_getresuid(lx_uid_t *ruid, lx_uid_t *euid, lx_uid_t *suid)
+{
+	lx_uid_t lx_ruid, lx_euid, lx_suid;
+	cred_t *cr = CRED();
+
+	lx_ruid = (lx_uid_t)crgetruid(cr);
+	lx_euid = (lx_uid_t)crgetuid(cr);
+	lx_suid = (lx_uid_t)crgetsuid(cr);
+
+	if (copyout(&lx_ruid, (void *)ruid, sizeof (lx_uid_t)) != 0)
+		return (set_errno(EFAULT));
+	if (copyout(&lx_euid, (void *)euid, sizeof (lx_uid_t)) != 0)
+		return (set_errno(EFAULT));
+	if (copyout(&lx_suid, (void *)suid, sizeof (lx_uid_t)) != 0)
+		return (set_errno(EFAULT));
+
+	return (0);
+}
+
+long
+lx_getresuid16(lx_uid16_t *ruid16, lx_uid16_t *euid16, lx_uid16_t *suid16)
+{
+	lx_uid16_t lx_ruid16, lx_euid16, lx_suid16;
+	cred_t *cr = CRED();
+
+	lx_ruid16 = LX_UID32_TO_UID16((lx_uid_t)crgetruid(cr));
+	lx_euid16 = LX_UID32_TO_UID16((lx_uid_t)crgetuid(cr));
+	lx_suid16 = LX_UID32_TO_UID16((lx_uid_t)crgetsuid(cr));
+
+	if (copyout(&lx_ruid16, (void *)ruid16, sizeof (lx_uid16_t)) != 0)
+		return (set_errno(EFAULT));
+	if (copyout(&lx_euid16, (void *)euid16, sizeof (lx_uid16_t)) != 0)
+		return (set_errno(EFAULT));
+	if (copyout(&lx_suid16, (void *)suid16, sizeof (lx_uid16_t)) != 0)
+		return (set_errno(EFAULT));
+
+	return (0);
+}
+
+long
+lx_getresgid(lx_gid_t *rgid, lx_gid_t *egid, lx_gid_t *sgid)
+{
+	lx_gid_t lx_rgid, lx_egid, lx_sgid;
+	cred_t *cr = CRED();
+
+	lx_rgid = (lx_gid_t)crgetrgid(cr);
+	lx_egid = (lx_gid_t)crgetgid(cr);
+	lx_sgid = (lx_gid_t)crgetsgid(cr);
+
+	if (copyout(&lx_rgid, (void *)rgid, sizeof (lx_gid_t)) != 0)
+		return (set_errno(EFAULT));
+	if (copyout(&lx_egid, (void *)egid, sizeof (lx_gid_t)) != 0)
+		return (set_errno(EFAULT));
+	if (copyout(&lx_sgid, (void *)sgid, sizeof (lx_gid_t)) != 0)
+		return (set_errno(EFAULT));
+
+	return (0);
+}
+
+long
+lx_getresgid16(lx_gid16_t *rgid16, lx_gid16_t *egid16, lx_gid16_t *sgid16)
+{
+	lx_gid16_t lx_rgid16, lx_egid16, lx_sgid16;
+	cred_t *cr = CRED();
+
+	lx_rgid16 = LX_GID32_TO_GID16((lx_gid_t)crgetrgid(cr));
+	lx_egid16 = LX_GID32_TO_GID16((lx_gid_t)crgetgid(cr));
+	lx_sgid16 = LX_GID32_TO_GID16((lx_gid_t)crgetsgid(cr));
+
+	if (copyout(&lx_rgid16, (void *)rgid16, sizeof (lx_gid16_t)) != 0)
+		return (set_errno(EFAULT));
+	if (copyout(&lx_egid16, (void *)egid16, sizeof (lx_gid16_t)) != 0)
+		return (set_errno(EFAULT));
+	if (copyout(&lx_sgid16, (void *)sgid16, sizeof (lx_gid16_t)) != 0)
+		return (set_errno(EFAULT));
+
+	return (0);
 }

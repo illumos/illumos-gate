@@ -544,8 +544,8 @@ lx_sysent_t lx_sysent32[] = {
 	{"getpid",	lx_getpid,		0,		0}, /* 20 */
 	{"mount",	lx_mount,		0,		5}, /* 21 */
 	{"umount",	lx_umount,		0,		1}, /* 22 */
-	{"setuid16",	NULL,			0,		1}, /* 23 */
-	{"getuid16",	NULL,			0,		0}, /* 24 */
+	{"setuid16",	lx_setuid16,		0,		1}, /* 23 */
+	{"getuid16",	lx_getuid16,		0,		0}, /* 24 */
 	{"stime",	NULL,			0,		1}, /* 25 */
 	{"ptrace",	lx_ptrace,		0,		4}, /* 26 */
 	{"alarm",	NULL,			0,		1}, /* 27 */
@@ -562,16 +562,16 @@ lx_sysent_t lx_sysent32[] = {
 	{"rename",	NULL,			0,		2}, /* 38 */
 	{"mkdir",	lx_mkdir,		0,		2}, /* 39 */
 	{"rmdir",	NULL,			0,		1}, /* 40 */
-	{"dup",		NULL,			0,		1}, /* 41 */
+	{"dup",		lx_dup,			0,		1}, /* 41 */
 	{"pipe",	lx_pipe,		0,		1}, /* 42 */
 	{"times",	NULL,			0,		1}, /* 43 */
 	{"prof",	NULL,			NOSYS_OBSOLETE,	0}, /* 44 */
 	{"brk",		lx_brk,			0,		1}, /* 45 */
-	{"setgid16",	NULL,			0,		1}, /* 46 */
-	{"getgid16",	NULL,			0,		0}, /* 47 */
+	{"setgid16",	lx_setgid16,		0,		1}, /* 46 */
+	{"getgid16",	lx_getgid16,		0,		0}, /* 47 */
 	{"signal",	NULL,			0,		2}, /* 48 */
-	{"geteuid16",	NULL,			0,		0}, /* 49 */
-	{"getegid16",	NULL,			0,		0}, /* 50 */
+	{"geteuid16",	lx_geteuid16,		0,		0}, /* 49 */
+	{"getegid16",	lx_getegid16,		0,		0}, /* 50 */
 	{"acct",	NULL,			NOSYS_NO_EQUIV,	0}, /* 51 */
 	{"umount2",	lx_umount2,		0,		2}, /* 52 */
 	{"lock",	NULL,			NOSYS_OBSOLETE,	0}, /* 53 */
@@ -581,18 +581,18 @@ lx_sysent_t lx_sysent32[] = {
 	{"setpgid",	NULL,			0,		2}, /* 57 */
 	{"ulimit",	NULL,			NOSYS_OBSOLETE,	0}, /* 58 */
 	{"olduname",	NULL,			NOSYS_OBSOLETE,	0}, /* 59 */
-	{"umask",	NULL,			0,		1}, /* 60 */
+	{"umask",	lx_umask,		0,		1}, /* 60 */
 	{"chroot",	NULL,			0,		1}, /* 61 */
 	{"ustat",	NULL,			NOSYS_OBSOLETE,	2}, /* 62 */
-	{"dup2",	NULL,			0,		2}, /* 63 */
+	{"dup2",	lx_dup2,		0,		2}, /* 63 */
 	{"getppid",	lx_getppid,		0,		0}, /* 64 */
 	{"getpgrp",	NULL,			0,		0}, /* 65 */
 	{"setsid",	NULL,			0,		0}, /* 66 */
 	{"sigaction",	NULL,			0,		3}, /* 67 */
 	{"sgetmask",	NULL,			NOSYS_OBSOLETE,	0}, /* 68 */
 	{"ssetmask",	NULL,			NOSYS_OBSOLETE,	0}, /* 69 */
-	{"setreuid16",	NULL,			0,		2}, /* 70 */
-	{"setregid16",	NULL,			0,		2}, /* 71 */
+	{"setreuid16",	lx_setreuid16,		0,		2}, /* 70 */
+	{"setregid16",	lx_setregid16,		0,		2}, /* 71 */
 	{"sigsuspend",	NULL,			0,		1}, /* 72 */
 	{"sigpending",	NULL,			0,		1}, /* 73 */
 	{"sethostname",	NULL,			0,		2}, /* 74 */
@@ -686,13 +686,13 @@ lx_sysent_t lx_sysent32[] = {
 	{"nanosleep",	lx_nanosleep,		0,		2}, /* 162 */
 	{"mremap",	NULL,			0,		5}, /* 163 */
 	{"setresuid16",	lx_setresuid16,		0,		3}, /* 164 */
-	{"getresuid16",	NULL,			0,		3}, /* 165 */
+	{"getresuid16",	lx_getresuid16,		0,		3}, /* 165 */
 	{"vm86",	NULL,			NOSYS_NO_EQUIV,	0}, /* 166 */
 	{"query_module", NULL,			0,		5}, /* 167 */
 	{"poll",	lx_poll,		0,		3}, /* 168 */
 	{"nfsservctl",	NULL,			NOSYS_KERNEL,	0}, /* 169 */
 	{"setresgid16",	lx_setresgid16,		0,		3}, /* 170 */
-	{"getresgid16",	NULL,			0,		3}, /* 171 */
+	{"getresgid16",	lx_getresgid16,		0,		3}, /* 171 */
 	{"prctl",	lx_prctl,		0,		5}, /* 172 */
 	{"rt_sigreturn", NULL,			0,		0}, /* 173 */
 	{"rt_sigaction", NULL,			0,		4}, /* 174 */
@@ -720,22 +720,22 @@ lx_sysent_t lx_sysent32[] = {
 	{"lstat64",	lx_lstat64,		0,		2}, /* 196 */
 	{"fstat64",	lx_fstat64,		0,		2}, /* 197 */
 	{"lchown",	lx_lchown,		0,		3}, /* 198 */
-	{"getuid",	NULL,			0,		0}, /* 199 */
-	{"getgid",	NULL,			0,		0}, /* 200 */
-	{"geteuid",	NULL,			0,		0}, /* 201 */
-	{"getegid",	NULL,			0,		0}, /* 202 */
-	{"setreuid",	NULL,			0,		0}, /* 203 */
-	{"setregid",	NULL,			0,		0}, /* 204 */
+	{"getuid",	lx_getuid,		0,		0}, /* 199 */
+	{"getgid",	lx_getgid,		0,		0}, /* 200 */
+	{"geteuid",	lx_geteuid,		0,		0}, /* 201 */
+	{"getegid",	lx_getegid,		0,		0}, /* 202 */
+	{"setreuid",	lx_setreuid,		0,		0}, /* 203 */
+	{"setregid",	lx_setregid,		0,		0}, /* 204 */
 	{"getgroups",	NULL,			0,		2}, /* 205 */
 	{"setgroups",	NULL,			0,		2}, /* 206 */
 	{"fchown",	lx_fchown,		0,		3}, /* 207 */
 	{"setresuid",	lx_setresuid,		0,		3}, /* 208 */
-	{"getresuid",	NULL,			0,		3}, /* 209 */
+	{"getresuid",	lx_getresuid,		0,		3}, /* 209 */
 	{"setresgid",	lx_setresgid,		0,		3}, /* 210 */
-	{"getresgid",	NULL,			0,		3}, /* 211 */
+	{"getresgid",	lx_getresgid,		0,		3}, /* 211 */
 	{"chown",	lx_chown,		0,		3}, /* 212 */
-	{"setuid",	NULL,			0,		1}, /* 213 */
-	{"setgid",	NULL,			0,		1}, /* 214 */
+	{"setuid",	lx_setuid,		0,		1}, /* 213 */
+	{"setgid",	lx_setgid,		0,		1}, /* 214 */
 	{"setfsuid",	NULL,			0,		1}, /* 215 */
 	{"setfsgid",	NULL,			0,		1}, /* 216 */
 	{"pivot_root",	NULL,			NOSYS_KERNEL,	0}, /* 217 */
@@ -855,7 +855,7 @@ lx_sysent_t lx_sysent32[] = {
 	{"signalfd4",	NULL,			0,		4}, /* 327 */
 	{"eventfd2",	NULL,			0,		2}, /* 328 */
 	{"epoll_create1", lx_epoll_create1,	0,		1}, /* 329 */
-	{"dup3",	NULL,			0,		3}, /* 330 */
+	{"dup3",	lx_dup3,		0,		3}, /* 330 */
 	{"pipe2",	lx_pipe2,		0,		2}, /* 331 */
 	{"inotify_init1", NULL,			0,		1}, /* 332 */
 	{"preadv",	lx_preadv32,		0,		5}, /* 333 */
@@ -924,8 +924,8 @@ lx_sysent_t lx_sysent64[] = {
 	{"shmget",	NULL,			0,		3}, /* 29 */
 	{"shmat",	NULL,			0,		4}, /* 30 */
 	{"shmctl",	NULL,			0,		3}, /* 31 */
-	{"dup",		NULL,			0,		1}, /* 32 */
-	{"dup2",	NULL,			0,		2}, /* 33 */
+	{"dup",		lx_dup,			0,		1}, /* 32 */
+	{"dup2",	lx_dup2,		0,		2}, /* 33 */
 	{"pause",	NULL,			0,		0}, /* 34 */
 	{"nanosleep",	lx_nanosleep,		0,		2}, /* 35 */
 	{"getitimer",	NULL,			0,		2}, /* 36 */
@@ -987,32 +987,32 @@ lx_sysent_t lx_sysent64[] = {
 	{"chown",	lx_chown,		0,		3}, /* 92 */
 	{"fchown",	lx_fchown,		0,		3}, /* 93 */
 	{"lchown",	lx_lchown,		0,		3}, /* 94 */
-	{"umask",	NULL,			0,		1}, /* 95 */
+	{"umask",	lx_umask,		0,		1}, /* 95 */
 	{"gettimeofday", lx_gettimeofday,	0,		2}, /* 96 */
 	{"getrlimit",	lx_getrlimit,		0,		2}, /* 97 */
 	{"getrusage",	NULL,			0,		2}, /* 98 */
 	{"sysinfo",	lx_sysinfo64,		0,		1}, /* 99 */
 	{"times",	NULL,			0,		1}, /* 100 */
 	{"ptrace",	lx_ptrace,		0,		4}, /* 101 */
-	{"getuid",	NULL,			0,		0}, /* 102 */
+	{"getuid",	lx_getuid,		0,		0}, /* 102 */
 	{"syslog",	NULL,			0,		3}, /* 103 */
-	{"getgid",	NULL,			0,		0}, /* 104 */
-	{"setuid",	NULL,			0,		1}, /* 105 */
-	{"setgid",	NULL,			0,		1}, /* 106 */
-	{"geteuid",	NULL,			0,		0}, /* 107 */
-	{"getegid",	NULL,			0,		0}, /* 108 */
+	{"getgid",	lx_getgid,		0,		0}, /* 104 */
+	{"setuid",	lx_setuid,		0,		1}, /* 105 */
+	{"setgid",	lx_setgid,		0,		1}, /* 106 */
+	{"geteuid",	lx_geteuid,		0,		0}, /* 107 */
+	{"getegid",	lx_getegid,		0,		0}, /* 108 */
 	{"setpgid",	NULL,			0,		2}, /* 109 */
 	{"getppid",	lx_getppid,		0,		0}, /* 110 */
 	{"getpgrp",	NULL,			0,		0}, /* 111 */
 	{"setsid",	NULL,			0,		0}, /* 112 */
-	{"setreuid",	NULL,			0,		0}, /* 113 */
-	{"setregid",	NULL,			0,		0}, /* 114 */
+	{"setreuid",	lx_setreuid,		0,		0}, /* 113 */
+	{"setregid",	lx_setregid,		0,		0}, /* 114 */
 	{"getgroups",	NULL,			0,		2}, /* 115 */
 	{"setgroups",	NULL,			0,		2}, /* 116 */
 	{"setresuid",	lx_setresuid,		0,		3}, /* 117 */
-	{"getresuid",	NULL,			0,		3}, /* 118 */
+	{"getresuid",	lx_getresuid,		0,		3}, /* 118 */
 	{"setresgid",	lx_setresgid,		0,		3}, /* 119 */
-	{"getresgid",	NULL,			0,		3}, /* 120 */
+	{"getresgid",	lx_getresgid,		0,		3}, /* 120 */
 	{"getpgid",	NULL,			0,		1}, /* 121 */
 	{"setfsuid",	NULL,			0,		1}, /* 122 */
 	{"setfsgid",	NULL,			0,		1}, /* 123 */
@@ -1184,7 +1184,7 @@ lx_sysent_t lx_sysent64[] = {
 	{"signalfd4",	NULL,			0,		4}, /* 289 */
 	{"eventfd2",	NULL,			0,		2}, /* 290 */
 	{"epoll_create1", lx_epoll_create1,	0,		1}, /* 291 */
-	{"dup3",	NULL,			0,		3}, /* 292 */
+	{"dup3",	lx_dup3,		0,		3}, /* 292 */
 	{"pipe2",	lx_pipe2,		0,		2}, /* 293 */
 	{"inotify_init1", NULL,			0,		1}, /* 294 */
 	{"preadv",	lx_preadv,		0,		4}, /* 295 */
