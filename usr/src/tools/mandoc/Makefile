@@ -19,7 +19,8 @@ CMDDIR=		$(SRC)/cmd/mandoc
 include		../Makefile.tools
 include		$(CMDDIR)/Makefile.common
 
-CPPFLAGS += $(CPPFLAGS.master)
+CPPFLAGS += -_gcc=-nostdinc -I/usr/include -I$(NATIVE_ADJUNCT)/include
+LDFLAGS += -L$(NATIVE_ADJUNCT)/lib -R$(NATIVE_ADJUNCT)/lib
 
 .KEEP_STATE:
 
