@@ -507,30 +507,12 @@ lx_creat(const char *path, mode_t mode)
 }
 
 long
-lx_dup(int fildes)
-{
-	int r;
-
-	r = dup(fildes);
-	return ((r == -1) ? -errno : r);
-}
-
-long
 lx_fchdir(int fildes)
 {
 	int r;
 
 	r = fchdir(fildes);
 	return ((r == -1) ? -errno : r);
-}
-
-long
-lx_getgid(void)
-{
-	int r;
-
-	r = getgid();
-	return (r);
 }
 
 long
@@ -549,15 +531,6 @@ lx_getitimer(int which, struct itimerval *value)
 
 	r = getitimer(which, value);
 	return ((r == -1) ? -errno : r);
-}
-
-long
-lx_getuid(void)
-{
-	int r;
-
-	r = getuid();
-	return (r);
 }
 
 long
@@ -642,42 +615,6 @@ lx_pause(void)
 }
 
 long
-lx_setgid(gid_t gid)
-{
-	int r;
-
-	r = setgid(gid);
-	return ((r == -1) ? -errno : r);
-}
-
-long
-lx_setuid(uid_t uid)
-{
-	int r;
-
-	r = setuid(uid);
-	return ((r == -1) ? -errno : r);
-}
-
-long
-lx_setregid(gid_t rgid, gid_t egid)
-{
-	int r;
-
-	r = setregid(rgid, egid);
-	return ((r == -1) ? -errno : r);
-}
-
-long
-lx_setreuid(uid_t ruid, uid_t euid)
-{
-	int r;
-
-	r = setreuid(ruid, euid);
-	return ((r == -1) ? -errno : r);
-}
-
-long
 lx_shmdt(char *shmaddr)
 {
 	int r;
@@ -701,15 +638,6 @@ lx_symlink(const char *name1, const char *name2)
 	int r;
 
 	r = symlink(name1, name2);
-	return ((r == -1) ? -errno : r);
-}
-
-long
-lx_umask(mode_t cmask)
-{
-	int r;
-
-	r = umask(cmask);
 	return ((r == -1) ? -errno : r);
 }
 

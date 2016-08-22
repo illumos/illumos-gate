@@ -1043,8 +1043,8 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_shmget,			/*  29: shmget */
 	lx_shmat,			/*  30: shmat */
 	lx_shmctl,			/*  31: shmctl */
-	lx_dup,				/*  32: dup */
-	lx_dup2,			/*  33: dup2 */
+	NULL,				/*  32: dup */
+	NULL,				/*  33: dup2 */
 	lx_pause,			/*  34: pause */
 	NULL,				/*  35: nanosleep */
 	lx_getitimer,			/*  36: getitimer */
@@ -1106,32 +1106,32 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/*  92: chown */
 	NULL,				/*  93: fchown */
 	NULL,				/*  94: lchown */
-	lx_umask,			/*  95: umask */
+	NULL,				/*  95: umask */
 	NULL,				/*  96: gettimeofday */
 	NULL,				/*  97: getrlimit */
 	lx_getrusage,			/*  98: getrusage */
 	NULL,				/*  99: sysinfo */
 	lx_times,			/* 100: times */
 	NULL,				/* 101: ptrace */
-	lx_getuid,			/* 102: getuid */
+	NULL,				/* 102: getuid */
 	lx_syslog,			/* 103: syslog */
-	lx_getgid,			/* 104: getgid */
-	lx_setuid,			/* 105: setuid */
-	lx_setgid,			/* 106: setgid */
-	lx_geteuid,			/* 107: geteuid */
-	lx_getegid,			/* 108: getegid */
+	NULL,				/* 104: getgid */
+	NULL,				/* 105: setuid */
+	NULL,				/* 106: setgid */
+	NULL,				/* 107: geteuid */
+	NULL,				/* 108: getegid */
 	lx_setpgid,			/* 109: setpgid */
 	NULL,				/* 110: getppid */
 	lx_getpgrp,			/* 111: getpgrp */
 	lx_setsid,			/* 112: setsid */
-	lx_setreuid,			/* 113: setreuid */
-	lx_setregid,			/* 114: setregid */
+	NULL,				/* 113: setreuid */
+	NULL,				/* 114: setregid */
 	lx_getgroups,			/* 115: getgroups */
 	lx_setgroups,			/* 116: setgroups */
 	NULL,				/* 117: setresuid */
-	lx_getresuid,			/* 118: getresuid */
+	NULL,				/* 118: getresuid */
 	NULL,				/* 119: setresgid */
-	lx_getresgid,			/* 120: getresgid */
+	NULL,				/* 120: getresgid */
 	lx_getpgid,			/* 121: getpgid */
 	lx_setfsuid,			/* 122: setfsuid */
 	lx_setfsgid,			/* 123: setfsgid */
@@ -1303,7 +1303,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_signalfd4,			/* 289: signalfd4 */
 	lx_eventfd2,			/* 290: eventfd2 */
 	NULL,				/* 291: epoll_create1 */
-	lx_dup3,			/* 292: dup3 */
+	NULL,				/* 292: dup3 */
 	NULL,				/* 293: pipe2 */
 	lx_inotify_init1,		/* 294: inotify_init1 */
 	NULL,				/* 295: preadv */
@@ -1365,8 +1365,8 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/*  20: getpid */
 	lx_mount,			/*  21: mount */
 	NULL,				/*  22: umount */
-	lx_setuid16,			/*  23: setuid16 */
-	lx_getuid16,			/*  24: getuid16 */
+	NULL,				/*  23: setuid16 */
+	NULL,				/*  24: getuid16 */
 	lx_stime,			/*  25: stime */
 	NULL,				/*  26: ptrace */
 	lx_alarm,			/*  27: alarm */
@@ -1383,16 +1383,16 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_rename,			/*  38: rename */
 	NULL,				/*  39: mkdir */
 	lx_rmdir,			/*  40: rmdir */
-	lx_dup,				/*  41: dup */
+	NULL,				/*  41: dup */
 	NULL,				/*  42: pipe */
 	lx_times,			/*  43: times */
 	NULL,				/*  44: prof */
 	NULL,				/*  45: brk */
-	lx_setgid16,			/*  46: setgid16 */
-	lx_getgid16,			/*  47: getgid16 */
+	NULL,				/*  46: setgid16 */
+	NULL,				/*  47: getgid16 */
 	lx_signal,			/*  48: signal */
-	lx_geteuid16,			/*  49: geteuid16 */
-	lx_getegid16,			/*  50: getegid16 */
+	NULL,				/*  49: geteuid16 */
+	NULL,				/*  50: getegid16 */
 	NULL,				/*  51: acct */
 	NULL,				/*  52: umount2 */
 	NULL,				/*  53: lock */
@@ -1402,18 +1402,18 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_setpgid,			/*  57: setpgid */
 	NULL,				/*  58: ulimit */
 	NULL,				/*  59: olduname */
-	lx_umask,			/*  60: umask */
+	NULL,				/*  60: umask */
 	lx_chroot,			/*  61: chroot */
 	NULL,				/*  62: ustat */
-	lx_dup2,			/*  63: dup2 */
+	NULL,				/*  63: dup2 */
 	NULL,				/*  64: getppid */
 	lx_getpgrp,			/*  65: getpgrp */
 	lx_setsid,			/*  66: setsid */
 	lx_sigaction,			/*  67: sigaction */
 	NULL,				/*  68: sgetmask */
 	NULL,				/*  69: ssetmask */
-	lx_setreuid16,			/*  70: setreuid16 */
-	lx_setregid16,			/*  71: setregid16 */
+	NULL,				/*  70: setreuid16 */
+	NULL,				/*  71: setregid16 */
 	lx_sigsuspend,			/*  72: sigsuspend */
 	lx_sigpending,			/*  73: sigpending */
 	lx_sethostname,			/*  74: sethostname */
@@ -1507,13 +1507,13 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/* 162: nanosleep */
 	lx_remap,			/* 163: mremap */
 	NULL,				/* 164: setresuid16 */
-	lx_getresuid16,			/* 165: getresuid16 */
+	NULL,				/* 165: getresuid16 */
 	NULL,				/* 166: vm86 */
 	lx_query_module,		/* 167: query_module */
 	NULL,				/* 168: poll */
 	NULL,				/* 169: nfsservctl */
 	NULL,				/* 170: setresgid16 */
-	lx_getresgid16,			/* 171: getresgid16 */
+	NULL,				/* 171: getresgid16 */
 	NULL,				/* 172: prctl */
 	lx_rt_sigreturn,		/* 173: rt_sigreturn */
 	lx_rt_sigaction,		/* 174: rt_sigaction */
@@ -1541,22 +1541,22 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/* 196: lstat64 */
 	NULL,				/* 197: fstat64 */
 	NULL,				/* 198: lchown */
-	lx_getuid,			/* 199: getuid */
-	lx_getgid,			/* 200: getgid */
-	lx_geteuid,			/* 201: geteuid */
-	lx_getegid,			/* 202: getegid */
-	lx_setreuid,			/* 203: setreuid */
-	lx_setregid,			/* 204: setregid */
+	NULL,				/* 199: getuid */
+	NULL,				/* 200: getgid */
+	NULL,				/* 201: geteuid */
+	NULL,				/* 202: getegid */
+	NULL,				/* 203: setreuid */
+	NULL,				/* 204: setregid */
 	lx_getgroups,			/* 205: getgroups */
 	lx_setgroups,			/* 206: setgroups */
 	NULL,				/* 207: fchown */
 	NULL,				/* 208: setresuid */
-	lx_getresuid,			/* 209: getresuid */
+	NULL,				/* 209: getresuid */
 	NULL,				/* 210: setresgid */
-	lx_getresgid,			/* 211: getresgid */
+	NULL,				/* 211: getresgid */
 	NULL,				/* 212: chown */
-	lx_setuid,			/* 213: setuid */
-	lx_setgid,			/* 214: setgid */
+	NULL,				/* 213: setuid */
+	NULL,				/* 214: setgid */
 	lx_setfsuid,			/* 215: setfsuid */
 	lx_setfsgid,			/* 216: setfsgid */
 	NULL,				/* 217: pivot_root */
@@ -1672,7 +1672,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_signalfd4,			/* 327: signalfd4 */
 	lx_eventfd2,			/* 328: eventfd2 */
 	NULL,				/* 329: epoll_create1 */
-	lx_dup3,			/* 330: dup3 */
+	NULL,				/* 330: dup3 */
 	NULL,				/* 331: pipe2 */
 	lx_inotify_init1,		/* 332: inotify_init1 */
 	NULL,				/* 333: preadv */

@@ -301,6 +301,7 @@ LX_BRAND_OBJS  =		\
 	lx_clone.o		\
 	lx_close.o		\
 	lx_cpu.o		\
+	lx_dup.o		\
 	lx_errno.o		\
 	lx_epoll.o		\
 	lx_fallocate.o		\
@@ -339,6 +340,7 @@ LX_BRAND_OBJS  =		\
 	lx_sysinfo.o		\
 	lx_thread_area.o	\
 	lx_timer.o		\
+	lx_umask.o		\
 	lx_uname.o		\
 	lx_wait.o		\
 	lx_xattr.o

@@ -65,8 +65,6 @@ extern long lx_flock(uintptr_t, uintptr_t);
 extern long lx_readlink(uintptr_t, uintptr_t, uintptr_t);
 extern long lx_readdir(uintptr_t, uintptr_t, uintptr_t);
 extern long lx_execve(uintptr_t, uintptr_t, uintptr_t);
-extern long lx_dup2(uintptr_t, uintptr_t);
-extern long lx_dup3(uintptr_t, uintptr_t, uintptr_t);
 extern long lx_ioctl(uintptr_t, uintptr_t, uintptr_t);
 extern long lx_vhangup(void);
 extern long lx_fadvise64(uintptr_t, off64_t, uintptr_t, uintptr_t);
@@ -82,23 +80,9 @@ extern long lx_setpgid(uintptr_t, uintptr_t);
 extern long lx_getsid(uintptr_t);
 extern long lx_setsid(void);
 
-extern long lx_getuid16(void);
-extern long lx_getgid16(void);
-extern long lx_geteuid16(void);
-extern long lx_getegid16(void);
-extern long lx_geteuid(void);
-extern long lx_getegid(void);
-extern long lx_getresuid16(uintptr_t, uintptr_t, uintptr_t);
-extern long lx_getresgid16(uintptr_t, uintptr_t, uintptr_t);
-extern long lx_getresuid(uintptr_t, uintptr_t, uintptr_t);
-extern long lx_getresgid(uintptr_t, uintptr_t, uintptr_t);
 extern long lx_capget(uintptr_t, uintptr_t);
 extern long lx_capset(uintptr_t, uintptr_t);
 
-extern long lx_setuid16(uintptr_t);
-extern long lx_setreuid16(uintptr_t, uintptr_t);
-extern long lx_setregid16(uintptr_t, uintptr_t);
-extern long lx_setgid16(uintptr_t);
 extern long lx_setfsuid16(uintptr_t);
 extern long lx_setfsgid16(uintptr_t);
 
@@ -241,14 +225,11 @@ extern long lx_close(int);
 extern long lx_chdir(const char *);
 extern long lx_chroot(const char *);
 extern long lx_creat(const char *, mode_t);
-extern long lx_dup(int);
 extern long lx_eventfd(unsigned int);
 extern long lx_eventfd2(unsigned int, int);
 extern long lx_fchdir(int);
-extern long lx_getgid(void);
 extern long lx_getgroups(int, gid_t *);
 extern long lx_getitimer(int, struct itimerval *);
-extern long lx_getuid(void);
 extern long lx_inotify_add_watch(int, const char *, uint32_t);
 extern long lx_inotify_init(void);
 extern long lx_inotify_init1(int);
@@ -257,10 +238,6 @@ extern long lx_mincore(caddr_t, size_t, char *);
 extern long lx_munmap(void *, size_t);
 extern long lx_nice(int);
 extern long lx_pause(void);
-extern long lx_setgid(gid_t);
-extern long lx_setuid(uid_t);
-extern long lx_setregid(gid_t, gid_t);
-extern long lx_setreuid(uid_t, uid_t);
 extern long lx_shmdt(char *);
 extern long lx_signalfd(int, uintptr_t, size_t);
 extern long lx_signalfd4(int, uintptr_t, size_t, int);
@@ -271,7 +248,6 @@ extern long lx_timerfd_create(int, int);
 extern long lx_timerfd_settime(int, int,
     const struct itimerspec *, struct itimerspec *);
 extern long lx_timerfd_gettime(int, struct itimerspec *);
-extern long lx_umask(mode_t);
 extern long lx_utimes(const char *, const struct timeval *);
 
 #endif	/* !defined(_ASM) */
