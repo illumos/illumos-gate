@@ -22,6 +22,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2013, 2015 by Delphix. All rights reserved.
+ */
 
 #ifndef	_DHCPAGENT_IPC_H
 #define	_DHCPAGENT_IPC_H
@@ -255,7 +258,12 @@ typedef hrtime_t dhcp_ipc_id_t;
 /*
  * note: the first 4 fields of the dhcp_ipc_request_t and dhcp_ipc_reply_t
  *	 are intentionally identical; code in dhcpagent_ipc.c counts on it!
+ *
+ * we pack these structs to ensure that their lengths will be identical between
+ * 32-bit and 64-bit executables.
  */
+
+#pragma pack(4)
 
 struct	dhcp_ipc_request {
 	dhcp_ipc_type_t  message_type;	/* type of request */
@@ -276,13 +284,10 @@ struct	dhcp_ipc_reply {
 	uchar_t		 buffer[1];	/* dynamically extended */
 };
 
-/*
- * since ansi c won't let us define arrays with 0 elements, the
- * size of the ipc request/reply structures is off-by-1; use macros.
- */
+#pragma pack()
 
-#define	DHCP_IPC_REPLY_SIZE	(sizeof (dhcp_ipc_reply_t) - 1)
-#define	DHCP_IPC_REQUEST_SIZE	(sizeof (dhcp_ipc_request_t) - 1)
+#define	DHCP_IPC_REPLY_SIZE	offsetof(dhcp_ipc_reply_t, buffer)
+#define	DHCP_IPC_REQUEST_SIZE	offsetof(dhcp_ipc_request_t, buffer)
 
 #define	DHCP_IPC_DEFAULT_WAIT	120	/* seconds */
 
