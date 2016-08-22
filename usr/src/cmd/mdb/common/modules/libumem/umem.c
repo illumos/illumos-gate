@@ -25,7 +25,7 @@
 
 /*
  * Copyright 2012 Joyent, Inc.  All rights reserved.
- * Copyright (c) 2013 by Delphix. All rights reserved.
+ * Copyright (c) 2013, 2015 by Delphix. All rights reserved.
  */
 
 #include "umem.h"
@@ -336,6 +336,7 @@ umem_debug_flags_t umem_status_flags[] = {
 	{ "nosignal",	UMF_CHECKSIGNAL },
 	{ "firewall",	UMF_FIREWALL },
 	{ "lite",	UMF_LITE },
+	{ "checknull",	UMF_CHECKNULL },
 	{ NULL }
 };
 
