@@ -1,5 +1,6 @@
 '\" te
 .\" Copyright 1989 AT&T.  Copyright (c) 2004, Sun Microsystems, Inc.  All Rights Reserved.  Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
+.\" Copyright 2016 Joyent, Inc.
 .\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
@@ -7,7 +8,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PUTENV 3C "Aug 7, 2004"
+.TH PUTENV 3C "Jun 22, 2016"
 .SH NAME
 putenv \- change or add value to environment
 .SH SYNOPSIS
@@ -19,7 +20,6 @@ putenv \- change or add value to environment
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBputenv()\fR function makes the value of the environment variable
 \fIname\fR equal to \fIvalue\fR by altering an existing variable or creating a
@@ -29,7 +29,11 @@ the environment, so altering the string will change the environment.
 .LP
 The \fIstring\fR argument points to a string of the form
 \fIname\fR\fB=\fR\fIvalue\fR. The space used by \fIstring\fR is no longer used
-once a new string-defining \fIname\fR is passed to \fBputenv()\fR.
+once a new string-defining \fIname\fR is passed to \fBputenv()\fR. If
+there is no equals sign (\fB=\fR) present as a separator, then
+\fIstring\fR is treated as the \fIname\fR of an environment variable to
+remove from the environment, as though \fBunsetenv\fR(3C) had been
+called.
 .sp
 .LP
 The \fBputenv()\fR function uses \fBmalloc\fR(3C) to enlarge the environment.
@@ -38,12 +42,10 @@ The \fBputenv()\fR function uses \fBmalloc\fR(3C) to enlarge the environment.
 After \fBputenv()\fR is called, environment variables are not in alphabetical
 order.
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, \fBputenv()\fR returns 0. Otherwise, it returns a
 non-zero value and sets \fBerrno\fR to indicate the error.
 .SH ERRORS
-.sp
 .LP
 The \fBputenv()\fR function may fail if:
 .sp
@@ -56,7 +58,6 @@ Insufficient memory was available.
 .RE
 
 .SH USAGE
-.sp
 .LP
 The \fBputenv()\fR function can be safely called from multithreaded programs.
 Caution must be exercised when using this function and \fBgetenv\fR(3C) in
@@ -66,7 +67,6 @@ list from being accessed simultaneously by two different threads.  It does not,
 however, prevent two threads from successively accessing the environment list
 using \fBputenv()\fR or \fBgetenv()\fR.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -84,12 +84,10 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBexec\fR(2), \fBgetenv\fR(3C), \fBmalloc\fR(3C), \fBattributes\fR(5),
 \fBenviron\fR(5), \fBstandards\fR(5)
 .SH WARNINGS
-.sp
 .LP
 The \fIstring\fR argument should not be an automatic variable.  It should be
 declared static if it is declared within a function because it cannot be

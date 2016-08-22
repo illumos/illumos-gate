@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2016 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <stdio.h>			/* Standard */
@@ -124,10 +125,12 @@ static char *power_button_cmd[] = {
 	"-h", "-d", ":0", NULL
 };
 
+#ifdef __x86
 static char *autoS3_cmd[] = {
 	"/usr/bin/sys-suspend",
 	"-n", "-d", ":0", NULL
 };
+#endif
 
 static char pidpath[] = PIDPATH;
 static char scratch[PATH_MAX];
@@ -151,7 +154,9 @@ static int open_pidfile(char *);
 static int write_pidfile(int, pid_t);
 static int read_cpr_config(void);
 static void system_activity_monitor(void);
+#ifdef __x86
 static void autos3_monitor(void);
+#endif
 static void do_attach(void);
 static void *attach_devices(void *);
 static int powerd_debug;
@@ -324,6 +329,7 @@ main(int argc, char *argv[])
 		logerror("Unable to create thread to monitor system activity.");
 	}
 
+#ifdef __x86
 	/*
 	 * Create a new thread to handle autos3 trigger
 	 */
@@ -333,6 +339,7 @@ main(int argc, char *argv[])
 	    (void *(*)(void *))autos3_monitor, NULL, THR_DAEMON, NULL) != 0) {
 		logerror("Unable to create thread to monitor autos3 activity.");
 	}
+#endif
 
 	/*
 	 * Block until we receive an explicit terminate signal
@@ -387,6 +394,7 @@ system_activity_monitor(void)
 	} while (errno == EINTR);
 }
 
+#ifdef __x86
 static void
 autos3_monitor(void)
 {
@@ -447,6 +455,7 @@ autos3_monitor(void)
 		continue;
 	}
 }
+#endif
 
 static int
 read_cpr_config(void)
@@ -1083,7 +1092,7 @@ poweroff(const char *msg, char **cmd_argv)
  */
 static int
 get_prom(int prom_fd, prom_node_t node_name,
-	char *property_name, char *property_value, size_t len)
+    char *property_name, char *property_value, size_t len)
 {
 	union {
 		char buf[PBUFSIZE + sizeof (uint_t)];

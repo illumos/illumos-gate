@@ -132,6 +132,7 @@
 			 version definitions available: 0-%d\n"
 @ MSG_ERR_NOTSTRTAB	"%s: section[%d] is not a string table as expected \
 			 by section[%d]\n";
+@ MSG_ERR_BADCHAINIDX	"%s: %s: invalid chain index %d for bucket %d (max %d)\n"
 
 @ MSG_ERR_LDYNNOTADJ	"%s: bad dynamic symbol table layout: %s and %s \
 			 sections are not adjacent\n"
@@ -161,7 +162,7 @@
 			 range (0 - %d): %d\n";
 @ MSG_ERR_BADSIDYNTAG	"%s: [%d: %s][%d]: dynamic element \
 			 [%d: %s][%d] should have type %s: %s\n";
-@ MSG_ERR_BADCIEFDELEN	"%s: %s: invalid CIE/FDE length: %#llx at %#llx\n"                         
+@ MSG_ERR_BADCIEFDELEN	"%s: %s: invalid CIE/FDE length: %#llx at %#llx\n"
 
 
 @ MSG_WARN_INVINTERP1	"%s: PT_INTERP header has no associated section\n"

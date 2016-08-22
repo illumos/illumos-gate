@@ -1,0 +1,59 @@
+'\" te
+.\"  Copyright (c) 2015, Joyent, Inc. All Rights Reserved.
+.\"  This file and its contents are supplied under the terms of the
+.\"  Common Development and Distribution License ("CDDL"), version 1.0.
+.\"  You may only use this file in accordance with the terms of version
+.\"  1.0 of the CDDL.
+.\" 
+.\"  A full copy of the text of the CDDL should have accompanied this
+.\"  source.  A copy of the CDDL is also available via the Internet at
+.\"  http://www.illumos.org/license/CDDL.
+.TH POLLHEAD_CLEAN 9F "Jun 12, 1998"
+.\"
+.\" A little inside joke with the above date: that's the date that the
+.\" devpoll work integrated (under bug 1265897).  The original work included
+.\" pollhead_clean() -- but didn't bother to document it!  With the date,
+.\" we are therefore giving this man page the date it should have had in an
+.\" attempt to right an historical wrong -- albeit nearly two decades after
+.\" the fact.
+.\"
+.SH NAME
+pollhead_clean \- inform the kernel that a pollhead is being deallocated
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/poll.h>
+
+
+
+\fBvoid\fR \fBpollhead_clean\fR(\fBstruct pollhead *\fR\fIphp\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.LP
+Architecture independent level 1 (DDI/DKI).
+.SH PARAMETERS
+.ne 2
+.na
+\fB\fIphp\fR\fR
+.ad
+.RS 9n
+Pointer to a \fBpollhead\fR structure.
+.RE
+
+.SH DESCRIPTION
+.LP
+The \fBpollhead_clean()\fR function informs the kernel that a driver's
+\fBpollhead\fR structure is about to be deallocated, usually as part of
+the driver's \fBclose\fR(9E) entry point before the software state that
+contains the \fBpollhead\fR is deallocated via \fBddi_soft_state_free\fR(9F).
+See \fBchpoll\fR(9E), \fBpollwakeup\fR(9E) and \fBpoll\fR(2) for more detail.
+.SH CONTEXT
+.LP
+The \fBpollhead_clean()\fR function is generally called from the context
+of a \fBclose\fR(9E) entry point, but may be called from user or kernel
+context.
+.SH SEE ALSO
+.LP
+\fBpoll\fR(2), \fBchpoll\fR(9E), \fBpollwakeup\fR(9E)
+

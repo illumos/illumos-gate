@@ -1456,7 +1456,7 @@ vmxnet3_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	macr->m_src_addr = dp->macaddr;
 	macr->m_dst_addr = NULL;
 	macr->m_callbacks = &vmxnet3_mac_callbacks;
-	macr->m_min_sdu = VMXNET3_MIN_MTU;
+	macr->m_min_sdu = 0;
 	macr->m_max_sdu = ETHERMTU;
 	macr->m_margin = VLAN_TAGSZ;
 	macr->m_pdata = NULL;

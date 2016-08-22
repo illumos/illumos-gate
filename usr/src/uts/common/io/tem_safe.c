@@ -155,10 +155,9 @@ static void	bit_to_pix24(struct tem_vt_state *tem, uchar_t c,
 		    text_color_t fg_color, text_color_t bg_color);
 
 /* BEGIN CSTYLED */
-/*                                      Bk  Rd  Gr  Br  Bl  Mg  Cy  Wh */
-static text_color_t fg_dim_xlate[] = {  1,  5,  3,  7,  2,  6,  4,  8 };
-static text_color_t fg_brt_xlate[] = {  9, 13, 11, 15, 10, 14, 12,  0 };
-static text_color_t bg_xlate[] = {      1,  5,  3,  7,  2,  6,  4,  0 };
+/*                                  Bk  Rd  Gr  Br  Bl  Mg  Cy  Wh */
+static text_color_t dim_xlate[] = {  1,  5,  3,  7,  2,  6,  4,  8 };
+static text_color_t brt_xlate[] = {  9, 13, 11, 15, 10, 14, 12,  0 };
 /* END CSTYLED */
 
 
@@ -509,13 +508,18 @@ tem_safe_selgraph(struct tem_vt_state *tem)
 		case 36: /* cyan	(light cyan) 	foreground */
 		case 37: /* white	(bright white) 	foreground */
 			tem->tvs_fg_color = param - 30;
+			tem->tvs_flags &= ~TEM_ATTR_BRIGHT_FG;
 			break;
 
 		case 39:
 			/*
-			 * Reset the foreground colour.
+			 * Reset the foreground colour and brightness.
 			 */
 			tem->tvs_fg_color = tems.ts_init_color.fg_color;
+			if (tems.ts_init_color.a_flags & TEM_ATTR_BRIGHT_FG)
+				tem->tvs_flags |= TEM_ATTR_BRIGHT_FG;
+			else
+				tem->tvs_flags &= ~TEM_ATTR_BRIGHT_FG;
 			break;
 
 		case 40: /* black	(grey) 		background */
@@ -527,13 +531,42 @@ tem_safe_selgraph(struct tem_vt_state *tem)
 		case 46: /* cyan	(light cyan) 	background */
 		case 47: /* white	(bright white) 	background */
 			tem->tvs_bg_color = param - 40;
+			tem->tvs_flags &= ~TEM_ATTR_BRIGHT_BG;
 			break;
 
 		case 49:
 			/*
-			 * Reset the background colour.
+			 * Reset the background colour and brightness.
 			 */
 			tem->tvs_bg_color = tems.ts_init_color.bg_color;
+			if (tems.ts_init_color.a_flags & TEM_ATTR_BRIGHT_BG)
+				tem->tvs_flags |= TEM_ATTR_BRIGHT_BG;
+			else
+				tem->tvs_flags &= ~TEM_ATTR_BRIGHT_BG;
+			break;
+
+		case 90: /* black	(grey)		foreground */
+		case 91: /* red		(light red)	foreground */
+		case 92: /* green	(light green)	foreground */
+		case 93: /* brown	(yellow)	foreground */
+		case 94: /* blue	(light blue)	foreground */
+		case 95: /* magenta	(light magenta)	foreground */
+		case 96: /* cyan	(light cyan)	foreground */
+		case 97: /* white	(bright white)	foreground */
+			tem->tvs_fg_color = param - 90;
+			tem->tvs_flags |= TEM_ATTR_BRIGHT_FG;
+			break;
+
+		case 100: /* black	(grey)		background */
+		case 101: /* red	(light red)	background */
+		case 102: /* green	(light green)	background */
+		case 103: /* brown	(yellow)	background */
+		case 104: /* blue	(light blue)	background */
+		case 105: /* magenta	(light magenta)	background */
+		case 106: /* cyan	(light cyan)	background */
+		case 107: /* white	(bright white)	background */
+			tem->tvs_bg_color = param - 100;
+			tem->tvs_flags |= TEM_ATTR_BRIGHT_BG;
 			break;
 
 		default:
@@ -1172,8 +1205,7 @@ tem_safe_bell(struct tem_vt_state *tem, enum called_from called_from)
 
 static void
 tem_safe_scroll(struct tem_vt_state *tem, int start, int end, int count,
-    int direction,
-	cred_t *credp, enum called_from called_from)
+    int direction, cred_t *credp, enum called_from called_from)
 {
 	int	row;
 	int	lines_affected;
@@ -1217,10 +1249,10 @@ tem_safe_scroll(struct tem_vt_state *tem, int start, int end, int count,
 
 static void
 tem_safe_copy_area(struct tem_vt_state *tem,
-	screen_pos_t s_col, screen_pos_t s_row,
-	screen_pos_t e_col, screen_pos_t e_row,
-	screen_pos_t t_col, screen_pos_t t_row,
-	cred_t *credp, enum called_from called_from)
+    screen_pos_t s_col, screen_pos_t s_row,
+    screen_pos_t e_col, screen_pos_t e_row,
+    screen_pos_t t_col, screen_pos_t t_row,
+    cred_t *credp, enum called_from called_from)
 {
 	int rows;
 	int cols;
@@ -1262,7 +1294,7 @@ tem_safe_copy_area(struct tem_vt_state *tem,
 
 static void
 tem_safe_clear_chars(struct tem_vt_state *tem, int count, screen_pos_t row,
-	screen_pos_t col, cred_t *credp, enum called_from called_from)
+    screen_pos_t col, cred_t *credp, enum called_from called_from)
 {
 	ASSERT((MUTEX_HELD(&tems.ts_lock) && MUTEX_HELD(&tem->tvs_lock)) ||
 	    called_from == CALLED_FROM_STANDALONE);
@@ -1291,9 +1323,9 @@ tem_safe_clear_chars(struct tem_vt_state *tem, int count, screen_pos_t row,
 /*ARGSUSED*/
 void
 tem_safe_text_display(struct tem_vt_state *tem, uchar_t *string,
-	int count, screen_pos_t row, screen_pos_t col,
-	text_color_t fg_color, text_color_t bg_color,
-	cred_t *credp, enum called_from called_from)
+    int count, screen_pos_t row, screen_pos_t col,
+    text_color_t fg_color, text_color_t bg_color,
+    cred_t *credp, enum called_from called_from)
 {
 	struct vis_consdisplay da;
 
@@ -1324,8 +1356,8 @@ tem_safe_text_display(struct tem_vt_state *tem, uchar_t *string,
 /*ARGSUSED*/
 static void
 tem_safe_image_display(struct tem_vt_state *tem, uchar_t *image,
-	int height, int width, screen_pos_t row, screen_pos_t col,
-	cred_t *credp, enum called_from called_from)
+    int height, int width, screen_pos_t row, screen_pos_t col,
+    cred_t *credp, enum called_from called_from)
 {
 	struct vis_consdisplay da;
 
@@ -1348,10 +1380,10 @@ tem_safe_image_display(struct tem_vt_state *tem, uchar_t *image,
 /*ARGSUSED*/
 void
 tem_safe_text_copy(struct tem_vt_state *tem,
-	screen_pos_t s_col, screen_pos_t s_row,
-	screen_pos_t e_col, screen_pos_t e_row,
-	screen_pos_t t_col, screen_pos_t t_row,
-	cred_t *credp, enum called_from called_from)
+    screen_pos_t s_col, screen_pos_t s_row,
+    screen_pos_t e_col, screen_pos_t e_row,
+    screen_pos_t t_col, screen_pos_t t_row,
+    cred_t *credp, enum called_from called_from)
 {
 	struct vis_conscopy da;
 
@@ -1370,8 +1402,8 @@ tem_safe_text_copy(struct tem_vt_state *tem,
 
 void
 tem_safe_text_cls(struct tem_vt_state *tem,
-	int count, screen_pos_t row, screen_pos_t col, cred_t *credp,
-	enum called_from called_from)
+    int count, screen_pos_t row, screen_pos_t col, cred_t *credp,
+    enum called_from called_from)
 {
 	struct vis_consdisplay da;
 
@@ -1392,10 +1424,10 @@ tem_safe_text_cls(struct tem_vt_state *tem,
 
 void
 tem_safe_pix_display(struct tem_vt_state *tem,
-	uchar_t *string, int count,
-	screen_pos_t row, screen_pos_t col,
-	text_color_t fg_color, text_color_t bg_color,
-	cred_t *credp, enum called_from called_from)
+    uchar_t *string, int count,
+    screen_pos_t row, screen_pos_t col,
+    text_color_t fg_color, text_color_t bg_color,
+    cred_t *credp, enum called_from called_from)
 {
 	struct vis_consdisplay da;
 	int	i;
@@ -1418,11 +1450,11 @@ tem_safe_pix_display(struct tem_vt_state *tem,
 
 void
 tem_safe_pix_copy(struct tem_vt_state *tem,
-	screen_pos_t s_col, screen_pos_t s_row,
-	screen_pos_t e_col, screen_pos_t e_row,
-	screen_pos_t t_col, screen_pos_t t_row,
-	cred_t *credp,
-	enum called_from called_from)
+    screen_pos_t s_col, screen_pos_t s_row,
+    screen_pos_t e_col, screen_pos_t e_row,
+    screen_pos_t t_col, screen_pos_t t_row,
+    cred_t *credp,
+    enum called_from called_from)
 {
 	struct vis_conscopy ma;
 	static boolean_t need_clear = B_TRUE;
@@ -1509,8 +1541,8 @@ tem_safe_pix_bit2pix(struct tem_vt_state *tem, unsigned char c,
  */
 void
 tem_safe_pix_cls(struct tem_vt_state *tem, int count,
-	screen_pos_t row, screen_pos_t col, cred_t *credp,
-	enum called_from called_from)
+    screen_pos_t row, screen_pos_t col, cred_t *credp,
+    enum called_from called_from)
 {
 	ASSERT((MUTEX_HELD(&tems.ts_lock) && MUTEX_HELD(&tem->tvs_lock)) ||
 	    called_from == CALLED_FROM_STANDALONE);
@@ -2152,20 +2184,24 @@ bit_to_pix24(
 	}
 }
 
-/* ARGSUSED */
 static text_color_t
 ansi_bg_to_solaris(struct tem_vt_state *tem, int ansi)
 {
-	return (bg_xlate[ansi]);
+	if (tem->tvs_flags & TEM_ATTR_BRIGHT_BG)
+		return (brt_xlate[ansi]);
+	else
+		return (dim_xlate[ansi]);
 }
 
 static text_color_t
 ansi_fg_to_solaris(struct tem_vt_state *tem, int ansi)
 {
-	if (tem->tvs_flags & TEM_ATTR_BOLD)
-		return (fg_brt_xlate[ansi]);
-	else
-		return (fg_dim_xlate[ansi]);
+	if (tem->tvs_flags & TEM_ATTR_BRIGHT_FG ||
+	    tem->tvs_flags & TEM_ATTR_BOLD) {
+		return (brt_xlate[ansi]);
+	} else {
+		return (dim_xlate[ansi]);
+	}
 }
 
 /*
@@ -2203,10 +2239,10 @@ tem_safe_get_color(struct tem_vt_state *tem, text_color_t *fg,
  */
 void
 tem_safe_pix_cls_range(struct tem_vt_state *tem,
-	screen_pos_t row, int nrows, int offset_y,
-	screen_pos_t col, int ncols, int offset_x,
-	boolean_t sroll_up, cred_t *credp,
-	enum called_from called_from)
+    screen_pos_t row, int nrows, int offset_y,
+    screen_pos_t col, int ncols, int offset_x,
+    boolean_t sroll_up, cred_t *credp,
+    enum called_from called_from)
 {
 	struct vis_consdisplay da;
 	int	i, j;
@@ -2243,8 +2279,8 @@ tem_safe_pix_cls_range(struct tem_vt_state *tem,
  */
 static void
 tem_safe_virtual_display(struct tem_vt_state *tem, unsigned char *string,
-	int count, screen_pos_t row, screen_pos_t col,
-	text_color_t fg_color, text_color_t bg_color)
+    int count, screen_pos_t row, screen_pos_t col,
+    text_color_t fg_color, text_color_t bg_color)
 {
 	int i, width;
 	unsigned char *addr;
@@ -2269,9 +2305,9 @@ tem_safe_virtual_display(struct tem_vt_state *tem, unsigned char *string,
 
 static void
 i_virtual_copy(unsigned char *base,
-	screen_pos_t s_col, screen_pos_t s_row,
-	screen_pos_t e_col, screen_pos_t e_row,
-	screen_pos_t t_col, screen_pos_t t_row)
+    screen_pos_t s_col, screen_pos_t s_row,
+    screen_pos_t e_col, screen_pos_t e_row,
+    screen_pos_t t_col, screen_pos_t t_row)
 {
 	unsigned char   *from;
 	unsigned char   *to;
@@ -2318,9 +2354,9 @@ i_virtual_copy(unsigned char *base,
 
 static void
 tem_safe_virtual_copy(struct tem_vt_state *tem,
-	screen_pos_t s_col, screen_pos_t s_row,
-	screen_pos_t e_col, screen_pos_t e_row,
-	screen_pos_t t_col, screen_pos_t t_row)
+    screen_pos_t s_col, screen_pos_t s_row,
+    screen_pos_t e_col, screen_pos_t e_row,
+    screen_pos_t t_col, screen_pos_t t_row)
 {
 	screen_size_t chars_per_row;
 	screen_size_t   rows_to_move;
@@ -2358,7 +2394,7 @@ tem_safe_virtual_copy(struct tem_vt_state *tem,
 
 static void
 tem_safe_virtual_cls(struct tem_vt_state *tem,
-	int count, screen_pos_t row, screen_pos_t col)
+    int count, screen_pos_t row, screen_pos_t col)
 {
 	text_color_t fg_color;
 	text_color_t bg_color;
@@ -2373,7 +2409,7 @@ tem_safe_virtual_cls(struct tem_vt_state *tem,
  */
 void
 tem_safe_blank_screen(struct tem_vt_state *tem, cred_t *credp,
-	enum called_from called_from)
+    enum called_from called_from)
 {
 	int	row;
 
@@ -2397,7 +2433,7 @@ tem_safe_blank_screen(struct tem_vt_state *tem, cred_t *credp,
  */
 void
 tem_safe_unblank_screen(struct tem_vt_state *tem, cred_t *credp,
-	enum called_from called_from)
+    enum called_from called_from)
 {
 	text_color_t fg_color, fg_last;
 	text_color_t bg_color, bg_last;

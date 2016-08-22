@@ -26,6 +26,7 @@
 # Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2016 Garrett D'Amore <garrett@damore.org>
 # Copyright 2016 Joyent, Inc.
+# Copyright 2016 OmniTI Computer Consulting, Inc.  All rights reserved.
 #
 
 #
@@ -1997,12 +1998,16 @@ IPRB_OBJS =	iprb.o
 #
 #       Intel 10GbE PCIE NIC driver module
 #
-IXGBE_OBJS =    ixgbe_82598.o ixgbe_82599.o ixgbe_api.o		\
-                ixgbe_common.o ixgbe_phy.o			\
-                ixgbe_buf.o ixgbe_debug.o ixgbe_gld.o           \
-                ixgbe_log.o ixgbe_main.o 	                \
-                ixgbe_osdep.o ixgbe_rx.o ixgbe_stat.o           \
-                ixgbe_tx.o  ixgbe_x540.o ixgbe_mbx.o
+
+# illumos-written source files
+IXGBE_OBJS =    ixgbe_buf.o ixgbe_debug.o ixgbe_gld.o ixgbe_log.o ixgbe_main.o \
+		ixgbe_osdep.o ixgbe_rx.o ixgbe_stat.o ixgbe_tx.o
+
+# Intel-written source files
+IXGBE_INTC_OBJS	=	ixgbe_82598.o ixgbe_82599.o ixgbe_api.o ixgbe_common.o \
+			ixgbe_phy.o ixgbe_dcb.o ixgbe_dcb_82598.o \
+			ixgbe_dcb_82599.o ixgbe_mbx.o ixgbe_vf.o ixgbe_x540.o \
+			ixgbe_x550.o
 
 #
 #	Intel 40GbE PCIe NIC driver module

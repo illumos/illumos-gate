@@ -13,7 +13,6 @@
  * Copyright (c) 2015, Joyent, Inc.
  */
 
-#include <sys/isa_defs.h>
 #include <endian.h>
 
 /*

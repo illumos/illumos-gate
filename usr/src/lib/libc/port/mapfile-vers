@@ -3040,6 +3040,7 @@ $endif
 	nss_search;
 	nss_setent;
 	_nss_XbyY_fgets;
+	_nss_XbyY_fini;
 	__nsw_extended_action_v1;
 	__nsw_freeconfig_v1;
 	__nsw_getconfig_v1;

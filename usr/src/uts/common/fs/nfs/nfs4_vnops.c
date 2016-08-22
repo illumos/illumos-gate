@@ -2239,7 +2239,7 @@ nfs4_open_non_reg_file(vnode_t **vpp, int flag, cred_t *cr)
 /* ARGSUSED */
 static int
 nfs4_close(vnode_t *vp, int flag, int count, offset_t offset, cred_t *cr,
-	caller_context_t *ct)
+    caller_context_t *ct)
 {
 	rnode4_t	*rp;
 	int		 error = 0;
@@ -2302,6 +2302,8 @@ nfs4_close(vnode_t *vp, int flag, int count, offset_t offset, cred_t *cr,
 		} else {
 			cleanlocks(vp, ttoproc(curthread)->p_pid,
 			    (lm_sysidt(lmsid) | LM_SYSID_CLIENT));
+
+			lm_rel_sysid(lmsid);
 		}
 		return (e.error);
 	}
@@ -3616,7 +3618,7 @@ recov_retry:
 /* ARGSUSED */
 static int
 nfs4_ioctl(vnode_t *vp, int cmd, intptr_t arg, int flag, cred_t *cr, int *rvalp,
-	caller_context_t *ct)
+    caller_context_t *ct)
 {
 	if (nfs_zone() != VTOMI4(vp)->mi_zone)
 		return (EIO);
@@ -6511,8 +6513,8 @@ recov_retry:
 /* ARGSUSED */
 static int
 nfs4_create(vnode_t *dvp, char *nm, struct vattr *va, enum vcexcl exclusive,
-	int mode, vnode_t **vpp, cred_t *cr, int flags, caller_context_t *ct,
-	vsecattr_t *vsecp)
+    int mode, vnode_t **vpp, cred_t *cr, int flags, caller_context_t *ct,
+    vsecattr_t *vsecp)
 {
 	int error;
 	vnode_t *vp = NULL;
@@ -8901,7 +8903,7 @@ nfs4_symlink(vnode_t *dvp, char *lnm, struct vattr *tva, char *tnm, cred_t *cr,
 /* ARGSUSED */
 static int
 nfs4_readdir(vnode_t *vp, struct uio *uiop, cred_t *cr, int *eofp,
-	caller_context_t *ct, int flags)
+    caller_context_t *ct, int flags)
 {
 	int error;
 	uint_t count;
@@ -9728,7 +9730,7 @@ nfs4_seek(vnode_t *vp, offset_t ooff, offset_t *noffp, caller_context_t *ct)
 static int
 nfs4_getpage(vnode_t *vp, offset_t off, size_t len, uint_t *protp,
     page_t *pl[], size_t plsz, struct seg *seg, caddr_t addr,
-	enum seg_rw rw, cred_t *cr, caller_context_t *ct)
+    enum seg_rw rw, cred_t *cr, caller_context_t *ct)
 {
 	rnode4_t *rp;
 	int error;
@@ -10199,7 +10201,7 @@ nfs4_readahead(vnode_t *vp, u_offset_t blkoff, caddr_t addr, struct seg *seg,
 /* ARGSUSED */
 static int
 nfs4_putpage(vnode_t *vp, offset_t off, size_t len, int flags, cred_t *cr,
-	caller_context_t *ct)
+    caller_context_t *ct)
 {
 	int error;
 	rnode4_t *rp;
@@ -11321,7 +11323,7 @@ nfs4_have_xattrs(vnode_t *vp, ulong_t *valp, cred_t *cr)
 /* ARGSUSED */
 int
 nfs4_pathconf(vnode_t *vp, int cmd, ulong_t *valp, cred_t *cr,
-	caller_context_t *ct)
+    caller_context_t *ct)
 {
 	int error;
 	hrtime_t t;
@@ -11475,7 +11477,7 @@ nfs4_sync_pageio(vnode_t *vp, page_t *pp, u_offset_t io_off, size_t io_len,
 /* ARGSUSED */
 static int
 nfs4_pageio(vnode_t *vp, page_t *pp, u_offset_t io_off, size_t io_len,
-	int flags, cred_t *cr, caller_context_t *ct)
+    int flags, cred_t *cr, caller_context_t *ct)
 {
 	int error;
 	rnode4_t *rp;
@@ -11506,7 +11508,7 @@ nfs4_pageio(vnode_t *vp, page_t *pp, u_offset_t io_off, size_t io_len,
 /* ARGSUSED */
 static void
 nfs4_dispose(vnode_t *vp, page_t *pp, int fl, int dn, cred_t *cr,
-	caller_context_t *ct)
+    caller_context_t *ct)
 {
 	int error;
 	rnode4_t *rp;
@@ -12259,7 +12261,7 @@ do_nfs4_async_commit(vnode_t *vp, page_t *plist, offset3 offset, count3 count,
 /*ARGSUSED*/
 static int
 nfs4_setsecattr(vnode_t *vp, vsecattr_t *vsecattr, int flag, cred_t *cr,
-	caller_context_t *ct)
+    caller_context_t *ct)
 {
 	int		error = 0;
 	mntinfo4_t	*mi;
@@ -12308,7 +12310,7 @@ nfs4_setsecattr(vnode_t *vp, vsecattr_t *vsecattr, int flag, cred_t *cr,
 /* ARGSUSED */
 int
 nfs4_getsecattr(vnode_t *vp, vsecattr_t *vsecattr, int flag, cred_t *cr,
-	caller_context_t *ct)
+    caller_context_t *ct)
 {
 	int		error;
 	mntinfo4_t	*mi;

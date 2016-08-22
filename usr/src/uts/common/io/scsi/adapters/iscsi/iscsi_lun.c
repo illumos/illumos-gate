@@ -687,13 +687,8 @@ iscsi_lun_offline(iscsi_hba_t *ihp, iscsi_lun_t *ilp, boolean_t lun_free)
 			ndi_devi_exit(pdip, circ);
 
 			/* Clean cache */
-			rval = devfs_clean(pdip, devname + 1,
-			    DV_CLEAN_FORCE);
+			(void) devfs_clean(pdip, devname + 1, DV_CLEAN_FORCE);
 			kmem_free(devname, MAXNAMELEN + 1);
-
-			if ((rval != 0) && (ilp->lun_pip == NULL)) {
-				return (ISCSI_STATUS_BUSY);
-			}
 		}
 	}
 

@@ -23,13 +23,14 @@
 # Use is subject to license terms.
 # 
 # Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2016 Toomas Soome <tsoome@me.com>
 #
 
 PROG= bootadm
 
 SBINLINKS= $(PROG)
 
-OBJS= bootadm.o bootadm_upgrade.o bootadm_hyper.o
+OBJS= bootadm.o bootadm_upgrade.o bootadm_hyper.o bootadm_digest.o
 SRCS = $(OBJS:.o=.c)
 
 include ../Makefile.com
@@ -38,7 +39,7 @@ include ../Makefile.com
 .KEEP_STATE:
 
 LDLIBS_i386= -lfdisk
-LDLIBS +=	-lnvpair -lgen -ladm -lefi -lscf -lz -lbe -lzfs $(LDLIBS_$(MACH))
+LDLIBS +=	-lpkcs11 -lcryptoutil -lnvpair -lgen -ladm -lefi -lscf -lz -lbe -lzfs $(LDLIBS_$(MACH))
 
 # Writing into string literals is incorrect.  We need to match gcc's
 # behavior, which causes us to take SIGSEGV on such a write.
@@ -46,9 +47,7 @@ CFLAGS +=	$(XSTRCONST)
 CPPFLAGS +=	-D_FILE_OFFSET_BITS=64
 CPPFLAGS +=	-I../../../uts/common -I../../../common
 
-CERRWARN +=	-_gcc=-Wno-parentheses
-CERRWARN +=	-_gcc=-Wno-uninitialized
-CERRWARN +=	-_gcc=-Wno-unused-label
+C99MODE=	$(C99_ENABLE)
 
 LINTFLAGS += -erroff=E_INCONS_ARG_DECL2
 LINTFLAGS += -erroff=E_INCONS_VAL_TYPE_DECL2

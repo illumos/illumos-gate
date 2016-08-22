@@ -44,7 +44,6 @@ Coordination Manager
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 Reconfiguration and Coordination Manager (RCM) is a framework designed to
 coordinate device consumers during Solaris Dynamic Reconfiguration (DR). The
@@ -240,7 +239,6 @@ by newlines, where \fIname\fR is the name of the return data item that RCM
 expects and \fIvalue\fR is the value associated with the data item.
 .RE
 .SS "Environment"
-.sp
 .LP
 The initial environment of RCM scripts is set as follows:
 .RS +4
@@ -365,7 +363,6 @@ commands, environment parameters, and name-value pairs is ASCII unless the
 controlling environment variables are specified otherwise.
 .SS "Commands"
 .SS "\fBscriptinfo\fR"
-.sp
 .LP
 The \fBscriptinfo\fR command is invoked to gather information about the script.
 .sp
@@ -416,7 +413,6 @@ pair \fBrcm_failure_reason\fR and exit with status 1.
 .RE
 
 .SS "\fBregister\fR"
-.sp
 .LP
 The \fBregister\fR command is invoked to allow a script to specify the
 resources that it or its application handles that could potentially be removed
@@ -450,7 +446,6 @@ pair \fBrcm_failure_reason\fR and exit with status 1.
 .RE
 
 .SS "\fBresourceinfo\fR \fIresourcename\fR"
-.sp
 .LP
 The \fBresourceinfo\fR command is invoked to get the usage information about
 \fIresourcename\fR.
@@ -478,7 +473,6 @@ pair \fBrcm_failure_reason\fR and exit with status 1.
 .RE
 
 .SS "\fBqueryremove\fR \fIresourcename\fR"
-.sp
 .LP
 Prior to removing the resource from the system, the \fBqueryremove\fR command
 is invoked to query the script to determine whether the script can release the
@@ -535,7 +529,6 @@ name-value pair \fBrcm_failure_reason\fR and exit with status 1.
 .RE
 
 .SS "\fBpreremove\fR \fIresourcename\fR"
-.sp
 .LP
 The \fBpreremove\fR command is invoked prior to an attempt to remove the given
 \fIresourcename\fR. In response to this command the script can either release
@@ -590,7 +583,6 @@ name-value pair \fBrcm_failure_reason\fR and exit with status 1.
 .RE
 
 .SS "\fBpostremove\fR \fIresourcename\fR"
-.sp
 .LP
 The \fBpostremove\fR command is invoked after the given \fIresourcename\fR has
 been removed.
@@ -628,7 +620,6 @@ pair \fBrcm_failure_reason\fR and exit with status 1.
 .RE
 
 .SS "Logging"
-.sp
 .LP
 A script must log all error and debug messages by writing to stdout the
 name-value pairs listed below. The logged messages go to \fBsyslogd\fR(1M) with
@@ -676,7 +667,6 @@ the amount of information to log. \fBRCM_ENV_DEBUG_LEVEL\fR is a numeric value
 ranging from 0 to 9, with 0 meaning log the least amount of information and 9
 meaning log the most.
 .SS "Installing or Removing RCM Scripts"
-.sp
 .LP
 You must use the following format to name a script:
 .sp
@@ -739,7 +729,6 @@ Scripts for any hardware
 .RE
 
 .SS "Installing a Script"
-.sp
 .LP
 To install a script, copy the script to the appropriate directory from the list
 above, change the userid and the groupid of the script to the desired values,
@@ -755,7 +744,6 @@ and send \fBSIGHUP\fR to \fBrcm_daemon\fR. For example:
 .sp
 
 .SS "Removing a script"
-.sp
 .LP
 Remove the script from the appropriate directory from the list above and send
 \fBSIGHUP\fR to \fBrcm_daemon\fR. For example:
@@ -854,7 +842,7 @@ sub do_resourceinfo
     my ($rsrc, $unit);
 
     $rsrc = shift(@ARGV);
-    if ($rsrc =~ /^\/dev\/rmt\/([0-9]+)$/) {
+    if ($rsrc =~ /^\e/dev\e/rmt\e/([0-9]+)$/) {
         $unit = $1;
         print "rcm_resource_usage_info=Backup Tape Unit Number $unit\en";
         exit (0);
@@ -900,7 +888,6 @@ sub do_preremove
 .in -2
 
 .SH EXIT STATUS
-.sp
 .LP
 A script must exit with following exit status values:
 .sp
@@ -948,7 +935,6 @@ name-value pair \fBrcm_failure_reason\fR before exiting.
 .RE
 
 .SH ERRORS
-.sp
 .LP
 If a script cannot successfully process an RCM command, it must supply to the
 RCM a message indicating the reason for failure by writing a name-value pair,
@@ -967,7 +953,6 @@ rcm_failure_reason=\fIfailure_reason\fR
 where \fIfailure_reason\fR is a localized human readable message describing the
 reason for failure of the RCM command.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -983,13 +968,11 @@ Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBgettext\fR(1), \fBcfgadm\fR(1M), \fBcfgadm_scsi\fR(1M),
 \fBcfgadm_pci\fR(1M), \fBsyslog\fR(3C), \fBsignal.h\fR(3HEAD),
 \fBsyslog.conf\fR(4), \fBattributes\fR(5), \fBenviron\fR(5)
 .SH NOTES
-.sp
 .LP
 RCM scripts are expected to properly handle all RCM commands that the script
 implements and to log all errors. Only root has permission to add or remove an

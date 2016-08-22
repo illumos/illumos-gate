@@ -171,7 +171,9 @@ static char *x86_feature_names[NUM_X86_FEATURES] = {
 	"bmi2",
 	"fma",
 	"smep",
-	"smap"
+	"smap",
+	"adx",
+	"rdseed"
 };
 
 boolean_t
@@ -1264,6 +1266,11 @@ cpuid_pass1(cpu_t *cpu, uchar_t *featureset)
 		    disable_smap == 0)
 			add_x86_feature(featureset, X86FSET_SMAP);
 #endif
+		if (ecp->cp_ebx & CPUID_INTC_EBX_7_0_RDSEED)
+			add_x86_feature(featureset, X86FSET_RDSEED);
+
+		if (ecp->cp_ebx & CPUID_INTC_EBX_7_0_ADX)
+			add_x86_feature(featureset, X86FSET_ADX);
 	}
 
 	/*
@@ -2739,6 +2746,10 @@ cpuid_pass4(cpu_t *cpu, uint_t *hwcap_out)
 			*ebx &= ~CPUID_INTC_EBX_7_0_BMI2;
 		if (!is_x86_feature(x86_featureset, X86FSET_AVX2))
 			*ebx &= ~CPUID_INTC_EBX_7_0_AVX2;
+		if (!is_x86_feature(x86_featureset, X86FSET_RDSEED))
+			*ebx &= ~CPUID_INTC_EBX_7_0_RDSEED;
+		if (!is_x86_feature(x86_featureset, X86FSET_ADX))
+			*ebx &= ~CPUID_INTC_EBX_7_0_ADX;
 
 		/*
 		 * [no explicit support required beyond x87 fp context]
@@ -2808,6 +2819,11 @@ cpuid_pass4(cpu_t *cpu, uint_t *hwcap_out)
 
 		if (*ecx & CPUID_INTC_ECX_RDRAND)
 			hwcap_flags_2 |= AV_386_2_RDRAND;
+		if (*ebx & CPUID_INTC_EBX_7_0_ADX)
+			hwcap_flags_2 |= AV_386_2_ADX;
+		if (*ebx & CPUID_INTC_EBX_7_0_RDSEED)
+			hwcap_flags_2 |= AV_386_2_RDSEED;
+
 	}
 
 	if (cpi->cpi_xmaxeax < 0x80000001)

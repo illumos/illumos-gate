@@ -1,6 +1,6 @@
 /* -*- Mode: C; tab-width: 4 -*-
  *
- * Copyright (c) 2002-2003 Apple Computer, Inc. All rights reserved.
+ * Copyright (c) 2002-2015 Apple Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -148,12 +148,18 @@ extern void LogMsgWithLevel(mDNSLogLevel_t logLevel, const char *format, ...) IS
 // (or completely overhauled to use the new "log to a separate file" facility)
 #define LogMsgNoIdent LogMsg
 
+#if APPLE_OSX_mDNSResponder
+extern void LogFatalError(const char *format, ...);
+#else
+#define LogFatalError LogMsg
+#endif
+
 #if APPLE_OSX_mDNSResponder && MACOSX_MDNS_MALLOC_DEBUGGING >= 1
 extern void *mallocL(char *msg, unsigned int size);
 extern void freeL(char *msg, void *x);
-extern void LogMemCorruption(const char *format, ...);
 extern void uds_validatelists(void);
 extern void udns_validatelists(void *const v);
+extern void LogMemCorruption(const char *format, ...);
 #else
 #define mallocL(X,Y) malloc(Y)
 #define freeL(X,Y) free(Y)
