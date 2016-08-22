@@ -19,27 +19,36 @@ export PATH
 . /usr/lib/brand/shared/common.ksh
 
 ZFS_SEED=""
+TAR_SEED=""
 
 bad_usage() {
 	echo "LX zone install bad option"
 	echo "Available options are:"
 	echo "	-s <absolute-pathname>	Path to ZFS send stream or gzip thereof"
+	echo "	-t <absolute-pathname>	Path to tar archive or gzip thereof"
 	exit $ZONE_SUBPROC_USAGE
 }
 
-while getopts "R:s:z:" opt
+while getopts "R:s:t:z:" opt
 do
 	case "$opt" in
 		R)	ZONEPATH="$OPTARG";;
 		z)	ZONENAME="$OPTARG";;
 		s)	ZFS_SEED="$OPTARG";;
+		t)	TAR_SEED="$OPTARG";;
 		*)	bad_usage ;;
 	esac
 done
 shift OPTIND-1
 
-if [[ $ZFS_SEED == "" ]]; then
-    echo "The -s <absolute-pathname> argument is required for LX installation."
+if [[ $ZFS_SEED == "" && $TAR_SEED == "" ]]; then
+    echo "The -s <absolute-pathname> argument or the -t <absolute-pathname>"
+    echo "argument is required for LX installation."
+    bad_usage
+fi
+
+if [[ $ZFS_SEED != "" && $TAR_SEED != "" ]]; then
+    echo "You must only specify one of -s or -t for LX installation."
     bad_usage
 fi
 
@@ -48,8 +57,22 @@ get_zonepath_ds $ZONEPATH
 
 # Do something based on whatever ZFS_SEED is.
 
-if [[ ! -f $ZFS_SEED ]]; then
-    echo "Seed file $ZFS_SEED not found."
+if [[ -f $TAR_SEED ]]; then
+    type=`file -b $TAR_SEED | awk '{print $1}'`
+    if [[ $type == "gzip" ]]; then
+	args="-xzf"
+    else
+	args="-xf"
+    fi
+    cd $ZONEPATH
+    # XXX KEBE ASKS - umask setting?
+    mkdir dev
+    mkdir root
+    cd root
+    gtar $args $TAR_SEED
+    exit 0
+elif [[ ! -f $ZFS_SEED ]]; then
+    echo "Seed file $ZFS_SEED $TAR_SEED not found."
     # XXX KEBE SAYS maybe we can eat a snapshot name here, or even a
     # Joyent-style UUID for direct snagging from Joyent's image
     # servers.
