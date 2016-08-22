@@ -57,7 +57,7 @@ lx_lseek32(int fd, off32_t offset, int whence)
 	 * successful seek.
 	 */
 	ASSERT(get_udatamodel() == DATAMODEL_ILP32);
-	res = llseek32(fd, 0, (uint32_t)offset, whence);
+	res = llseek32(fd, (uint32_t)offset, 0, whence);
 	if (ttolwp(curthread)->lwp_errno == 0 && res > MAXOFF32_T) {
 		return (set_errno(EOVERFLOW));
 	}
