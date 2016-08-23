@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -853,9 +853,10 @@ tcp_bindi(tcp_t *tcp, in_port_t port, const in6_addr_t *laddr,
 				 * This entry is bound to the exact same
 				 * address and port.  If SO_REUSEPORT is set on
 				 * the calling socket, attempt to reuse this
-				 * binding if it too appears to be willing.
+				 * binding if it too had SO_REUSEPORT enabled
+				 * when it was bound.
 				 */
-				attempt_reuse = B_TRUE;
+				attempt_reuse = (ltcp->tcp_rg_bind != NULL);
 				break;
 			}
 
@@ -905,6 +906,7 @@ tcp_bindi(tcp_t *tcp, in_port_t port, const in6_addr_t *laddr,
 		} else {
 			if (attempt_reuse) {
 				int err;
+				struct tcp_rg_s *rg;
 
 				ASSERT(ltcp != NULL);
 				ASSERT(ltcp->tcp_rg_bind != NULL);
@@ -921,9 +923,10 @@ tcp_bindi(tcp_t *tcp, in_port_t port, const in6_addr_t *laddr,
 				 * the existing reuseport group on ltcp, it
 				 * should clean up its own (empty) group.
 				 */
-				VERIFY(tcp_rg_remove(tcp->tcp_rg_bind, tcp));
-				tcp_rg_destroy(tcp->tcp_rg_bind);
+				rg = tcp->tcp_rg_bind;
 				tcp->tcp_rg_bind = ltcp->tcp_rg_bind;
+				VERIFY(tcp_rg_remove(rg, tcp));
+				tcp_rg_destroy(rg);
 			}
 
 			/*
