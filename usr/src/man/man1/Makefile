@@ -332,7 +332,6 @@ MANFILES=	acctcom.1			\
 	 	rusers.1			\
 	 	rwho.1				\
 	 	sar.1				\
-		scp.sunssh.1		\
 	 	script.1			\
 	 	sdiff.1				\
 	 	sed.1				\
@@ -341,7 +340,6 @@ MANFILES=	acctcom.1			\
 	 	setfacl.1			\
 	 	setlabel.1			\
 	 	setpgrp.1			\
-		sftp.sunssh.1		\
 	 	shcomp.1			\
 	 	shell_builtins.1		\
 	 	shift.1				\
@@ -516,11 +514,9 @@ MANLINKS=	batch.1		\
 		rmail.1		\
 		rmdir.1		\
 		rmumount.1	\
-		scp.1		\
 		select.1	\
 		setenv.1	\
 		settime.1	\
-		sftp.1		\
 		sh.1		\
 		snca.1		\
 		source.1	\
@@ -722,9 +718,6 @@ while.1		:= LINKSRC = shell_builtins.1
 hashcheck.1	:= LINKSRC = spell.1
 hashmake.1	:= LINKSRC = spell.1
 spellin.1	:= LINKSRC = spell.1
-
-scp.1				:= LINKSRC = scp.sunssh.1
-sftp.1				:= LINKSRC = sftp.sunssh.1
 
 strconf.1	:= LINKSRC = strchg.1
 

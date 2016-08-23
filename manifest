@@ -2294,7 +2294,6 @@ f usr/bin/setfacl 0555 root bin
 f usr/bin/setpgrp 0555 root sys
 h usr/bin/settime=usr/bin/touch
 h usr/bin/setuname=usr/lib/isaexec
-f usr/bin/sftp 0555 root bin
 s usr/bin/sh=ksh93
 f usr/bin/shcomp 0555 root bin
 f usr/bin/size 0555 root bin

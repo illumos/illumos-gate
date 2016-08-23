@@ -24,36 +24,6 @@
 #
 
 set name=pkg.fmri value=pkg:/service/network/ssh@$(PKGVERS)
-set name=pkg.description value="Secure Shell protocol Server"
-set name=pkg.summary value="SSH Server"
-set name=info.classification \
-    value=org.opensolaris.category.2008:System/Security
+set name=pkg.obsolete value=true
+set name=org.opensolaris.noincorp value=true
 set name=variant.arch value=$(ARCH)
-dir path=etc group=sys
-dir path=etc/ssh group=sys
-dir path=usr group=sys
-dir path=usr/lib
-dir path=usr/lib/ssh
-dir path=usr/share/man
-dir path=usr/share/man/man1m
-dir path=usr/share/man/man4
-file path=usr/lib/sunssh/sftp-server mode=0555
-file path=usr/lib/sunssh/sshd mode=0555
-file path=usr/share/man/man1m/sftp-server.sunssh.1m
-file path=usr/share/man/man1m/sshd.sunssh.1m
-legacy pkg=SUNWsshdr desc="Secure Shell protocol Server" \
-    name="SSH Server, (Root)"
-legacy pkg=SUNWsshdu desc="Secure Shell protocol Server" \
-    name="SSH Server, (Usr)"
-license usr/src/cmd/ssh/THIRDPARTYLICENSE \
-    license=usr/src/cmd/ssh/THIRDPARTYLICENSE
-link path=usr/lib/ssh/sftp-server mediator=ssh mediator-implementation=sunssh \
-    target=../sunssh/sftp-server
-link path=usr/lib/ssh/sshd mediator=ssh mediator-implementation=sunssh \
-    target=../sunssh/sshd
-link path=usr/share/man/man1m/sftp-server.1m mediator=ssh \
-    mediator-implementation=sunssh target=sftp-server.sunssh.1m
-link path=usr/share/man/man1m/sshd.1m mediator=ssh \
-    mediator-implementation=sunssh target=sshd.sunssh.1m
-depend fmri=service/network/ssh-common type=require
-depend fmri=text/locale type=require
