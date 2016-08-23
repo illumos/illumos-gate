@@ -16,7 +16,7 @@
 
 include $(SRC)/Makefile.master
 
-CFLAGS= -O2 -I../../../../include -I../../..
+CFLAGS= -Os -I../../../../include -I../../..
 CPPFLAGS= -D_STANDALONE -DLOADER_ZFS_SUPPORT
 
 all install: libi386.a

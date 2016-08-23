@@ -17,7 +17,7 @@
 include $(SRC)/Makefile.master
 include $(SRC)/boot/Makefile.version
 
-CFLAGS=		-O2 -fno-reorder-functions
+CFLAGS=		-Os -fno-reorder-functions
 CPPFLAGS=	-D_STANDALONE -nostdinc -I../../../../include -I../../..
 CPPFLAGS +=	-I$(SRC)/uts/intel/sys/acpi
 CPPFLAGS +=	-I../../../../lib/libz
