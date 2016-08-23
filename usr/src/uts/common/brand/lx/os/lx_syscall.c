@@ -263,8 +263,6 @@ lx_syscall_return(klwp_t *lwp, int syscall_num, long ret)
 	 * emulated Linux system call:
 	 */
 	lwp->lwp_eosys = JUSTRETURN;
-	curthread->t_post_sys = 1;
-	aston(curthread);
 }
 
 static void
