@@ -531,12 +531,21 @@ noprod_sys_syscall:
 	addq	$8, %rsp
 
 	/*
-	 * If the alternate handler returns 0, we skip straight to the return to
-	 * usermode.  Otherwise, we resume regular system call processing.
+	 * If the alternate handler returns non-zero, the normal system call
+	 * processing is resumed.
 	 */
 	testl	%eax, %eax
 	popq	%rax
-	jz	_syscall_after_brand
+	jnz	_syscall_no_brand
+
+	/*
+	 * For branded syscalls which were handled in-kernel, shuffle the
+	 * register state as would be done by the native handler before jumping
+	 * to the post-syscall logic.
+	 */
+	movq	REGOFF_RAX(%rsp), %r12
+	movq	REGOFF_RDX(%rsp), %r13
+	jmp	_syscall_after_brand
 
 _syscall_no_brand:
 	movw	%ax, T_SYSNUM(%r15)
@@ -831,11 +840,20 @@ _syscall32_save:
 	call	*%rax
 
 	/*
-	 * If the alternate handler returns 0, we skip straight to the return
-	 * to usermode.  Otherwise, we resume regular system call processing.
+	 * If the alternate handler returns non-zero, the normal system call
+	 * processing is resumed.
 	 */
 	testl	%eax, %eax
-	jz	_syscall32_after_brand
+	jnz	_syscall32_no_brand
+
+	/*
+	 * For branded syscalls which were handled in-kernel, shuffle the
+	 * register state as would be done by the native handler before jumping
+	 * to the post-syscall logic.
+	 */
+	movl	REGOFF_RAX(%rsp), %r12d
+	movl	REGOFF_RDX(%rsp), %r13d
+	jmp	_syscall32_after_brand
 
 _syscall32_no_brand:
 	/*
