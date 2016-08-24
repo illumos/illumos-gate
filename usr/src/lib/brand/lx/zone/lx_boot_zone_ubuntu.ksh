@@ -29,29 +29,32 @@ safe_dir /etc/network
 safe_dir /etc/network/interfaces.d
 safe_dir /etc/network/interfaces.d/smartos
 
-# Populate resolve.conf setup files
-zonecfg -z $ZONENAME info attr name=resolvers | awk '
-BEGIN {
+# Populate resolve.conf setup files IF we have resolvers information.
+zonecfg -z $ZONENAME info attr name=resolvers | grep -q resolvers
+if [[ $? == 0 ]]; then
+    zonecfg -z $ZONENAME info attr name=resolvers | awk '
+    BEGIN {
 	print("# AUTOMATIC ZONE CONFIG")
-}
-$1 == "value:" {
+    }
+    $1 == "value:" {
 	nres = split($2, resolvers, ",");
 	for (i = 1; i <= nres; i++) {
 		print("nameserver", resolvers[i]);
 	}
-}
-' > $tmpfile
-zonecfg -z $ZONENAME info attr name=dns-domain | awk '
-$1 == "value:" {
+    }
+    ' > $tmpfile
+    zonecfg -z $ZONENAME info attr name=dns-domain | awk '
+    $1 == "value:" {
 	dom = $2
-}
-END {
+    }
+    END {
 	print("search", dom);
-}
-' >> $tmpfile
-fnm=$ZONEROOT/etc/resolvconf/resolv.conf.d/tail
-if [[ -f $fnm || -h $fnm || ! -e $fnm ]]; then
+    }
+    ' >> $tmpfile
+    fnm=$ZONEROOT/etc/resolvconf/resolv.conf.d/tail
+    if [[ -f $fnm || -h $fnm || ! -e $fnm ]]; then
 	mv -f $tmpfile $fnm
+    fi
 fi
 
 # Override network configuration

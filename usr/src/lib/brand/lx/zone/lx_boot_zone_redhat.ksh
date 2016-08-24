@@ -57,14 +57,20 @@ case "\$1" in
     start)
     [ "\$EUID" != "0" ] && exit 4
 
+EOF
+
+# Alter resolv.conf if we're pulling resolver information from zonecfg(1M).
+zonecfg -z $ZONENAME info attr name=resolvers | grep -q resolvers
+if [[ $? == 0 ]]; then
+    cat >> $tmpfile <<EOF
     if [ ! -e /etc/resolv.conf ]; then
         if [ -h /etc/resolv.conf ]; then
             rm -f /etc/resolv.conf
         fi
         echo "# AUTOMATIC ZONE CONFIG" > /etc/resolv.conf
-EOF
-zonecfg -z $ZONENAME info attr name=resolvers |
-awk '
+    EOF
+    zonecfg -z $ZONENAME info attr name=resolvers |
+    awk '
     {
         if ($1 == "value:") {
             nres = split($2, resolvers, ",")
@@ -76,9 +82,9 @@ awk '
                 "/etc/resolv.conf")
         }
     }
-' >> $tmpfile
-zonecfg -z $ZONENAME info attr name=dns-domain |
-awk '
+    ' >> $tmpfile
+    zonecfg -z $ZONENAME info attr name=dns-domain |
+    awk '
     {
         if ($1 == "value:") {
             dom = $2
@@ -87,9 +93,13 @@ awk '
     END {
         printf("        echo \"search %s\" >> %s\n", dom, "/etc/resolv.conf")
     }
-' >> $tmpfile
-cat >> $tmpfile <<EOF
+    ' >> $tmpfile
+    cat >> $tmpfile <<EOF
     fi
+    EOF
+fi
+
+cat >> $tmpfile <<EOF
     touch /var/lock/subsys/network
     rc=0
     ;;

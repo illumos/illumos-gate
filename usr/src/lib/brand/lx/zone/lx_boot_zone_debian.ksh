@@ -36,29 +36,32 @@ safe_dir /etc/rc6.d
 safe_dir /etc/rcS.d
 safe_opt_dir /etc/selinux
 
-# Populate resolve.conf setup files
-zonecfg -z $ZONENAME info attr name=resolvers | awk '
-BEGIN {
+# Populate resolve.conf setup files IF we have resolvers information.
+zonecfg -z $ZONENAME info attr name=resolvers | grep -q resolvers
+if [[ $? == 0 ]]; then
+    zonecfg -z $ZONENAME info attr name=resolvers | awk '
+    BEGIN {
 	print("# AUTOMATIC ZONE CONFIG")
-}
-$1 == "value:" {
+    }
+    $1 == "value:" {
 	nres = split($2, resolvers, ",");
 	for (i = 1; i <= nres; i++) {
 		print("nameserver", resolvers[i]);
 	}
-}
-' > $tmpfile
-zonecfg -z $ZONENAME info attr name=dns-domain | awk '
-$1 == "value:" {
+    }
+    ' > $tmpfile
+    zonecfg -z $ZONENAME info attr name=dns-domain | awk '
+    $1 == "value:" {
 	dom = $2
-}
-END {
+    }
+    END {
 	print("search", dom);
-}
-' >> $tmpfile
-fnm=$ZONEROOT/etc/resolv.conf
-if [[ -f $fnm || -h $fnm ]]; then
+    }
+    ' >> $tmpfile
+    fnm=$ZONEROOT/etc/resolv.conf
+    if [[ -f $fnm || -h $fnm ]]; then
 	mv -f $tmpfile $fnm
+    fi
 fi
 
 # Override network configuration

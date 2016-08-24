@@ -36,11 +36,16 @@ depend() {
     keyword nojail noprefix novserver
 }
 start() {
+EOF
+# Only alter resolve.conf if we're getting info from zonecfg(1M).
+zonecfg -z $ZONENAME info attr name=resolvers | grep -q resolvers
+if [[ $? == 0 ]]; then
+    cat > $tmpfile <<EOF
     if [ ! -e /etc/resolv.conf ]; then
         echo "# AUTOMATIC ZONE CONFIG" > /etc/resolv.conf
-EOF
-zonecfg -z $ZONENAME info attr name=resolvers |
-awk '
+    EOF
+    zonecfg -z $ZONENAME info attr name=resolvers |
+    awk '
     {
         if ($1 == "value:") {
             nres = split($2, resolvers, ",")
@@ -52,9 +57,9 @@ awk '
                 "/etc/resolv.conf")
         }
     }
-' >> $tmpfile
-zonecfg -z $ZONENAME info attr name=dns-domain |
-awk '
+    ' >> $tmpfile
+    zonecfg -z $ZONENAME info attr name=dns-domain |
+    awk '
     {
         if ($1 == "value:") {
             dom = $2
@@ -63,14 +68,23 @@ awk '
     END {
         printf("        echo \"search %s\" >> %s\n", dom, "/etc/resolv.conf")
     }
-' >> $tmpfile
-cat >> $tmpfile <<EOF
+    ' >> $tmpfile
+    cat >> $tmpfile <<EOF
     fi
     return 0
-}
-stop() {
+    }
+    EOF
+else
+    cat >> $tmpfile <<EOF
     return 0
-}
+    }
+    EOF
+fi
+
+cat >> $tmpfile <<EOF
+    stop() {
+        return 0
+    }
 EOF
 fnm=$ZONEROOT/etc/init.d/networking
 if [[ -f $fnm || -h $fnm ]]; then
