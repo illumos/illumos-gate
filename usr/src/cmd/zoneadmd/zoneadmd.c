@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2014 Nexenta Systems, Inc. All rights reserved.
- * Copyright 2015, Joyent, Inc. All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*
@@ -264,9 +264,20 @@ zerror(zlog_t *zlogp, boolean_t use_strerror, const char *fmt, ...)
 }
 
 /*
- * Since Solaris boot arguments are getopt(3c) compatible (see kernel(1m)), we
+ * Append src to dest, modifying dest in the process. Prefix src with
+ * a space character if dest is a non-empty string.
+ */
+static void
+strnappend(char *dest, size_t n, const char *src)
+{
+	(void) snprintf(dest, n, "%s%s%s", dest,
+	    dest[0] == '\0' ? "" : " ", src);
+}
+
+/*
+ * Since illumos boot arguments are getopt(3c) compatible (see kernel(1m)), we
  * put the arguments into an argv style array, use getopt to process them,
- * and put the resultant argument string back into outargs. Non-Solaris brands
+ * and put the resultant argument string back into outargs. Non-native brands
  * may support alternate forms of boot arguments so we must handle that as well.
  *
  * During the filtering, we pull out any arguments which are truly "boot"
@@ -286,6 +297,7 @@ filter_bootargs(zlog_t *zlogp, const char *inargs, char *outargs,
 	char *arg, *lasts, **argv = NULL, **argv_save;
 	char zonecfg_args[BOOTARGS_MAX];
 	char scratchargs[BOOTARGS_MAX], *sargs;
+	char scratchopt[3];
 	char c;
 
 	bzero(outargs, BOOTARGS_MAX);
@@ -397,8 +409,11 @@ filter_bootargs(zlog_t *zlogp, const char *inargs, char *outargs,
 		case 'm':
 		case 's':
 			/* These pass through unmolested */
-			(void) snprintf(outargs, BOOTARGS_MAX,
-			    "%s -%c %s ", outargs, c, optarg ? optarg : "");
+			(void) snprintf(scratchopt, sizeof (scratchopt),
+			    "-%c", c);
+			strnappend(outargs, BOOTARGS_MAX, scratchopt);
+			if (optarg != NULL)
+				strnappend(outargs, BOOTARGS_MAX, optarg);
 			break;
 		case '?':
 			/*
@@ -407,8 +422,7 @@ filter_bootargs(zlog_t *zlogp, const char *inargs, char *outargs,
 			 * unknown string here so that we correctly handle
 			 * unknown long options (e.g. --debug).
 			 */
-			(void) snprintf(outargs, BOOTARGS_MAX,
-			    "%s %s", outargs, argv[optind - 1]);
+			strnappend(outargs, BOOTARGS_MAX, argv[optind - 1]);
 			break;
 		}
 	}
@@ -422,8 +436,7 @@ filter_bootargs(zlog_t *zlogp, const char *inargs, char *outargs,
 	 * any of our known options (-ifms) to preceed the brand-specific ones.
 	 */
 	while (optind < argc) {
-		(void) snprintf(outargs, BOOTARGS_MAX, "%s %s", outargs,
-		    argv[optind]);
+		strnappend(outargs, BOOTARGS_MAX, argv[optind]);
 		optind++;
 	}
 
