@@ -158,6 +158,7 @@ static int lxpr_readdir_task_tid_dir(lxpr_node_t *, uio_t *, int *);
 static void lxpr_read_invalid(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_empty(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_cgroups(lxpr_node_t *, lxpr_uiobuf_t *);
+static void lxpr_read_cmdline(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_cpuinfo(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_devices(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_diskstats(lxpr_node_t *, lxpr_uiobuf_t *);
@@ -763,7 +764,7 @@ static void (*lxpr_read_function[LXPR_NFILES])() = {
 	lxpr_read_isdir,		/* /proc/<pid>/task/<tid>/fd	*/
 	lxpr_read_fd,			/* /proc/<pid>/task/<tid>/fd/nn	*/
 	lxpr_read_cgroups,		/* /proc/cgroups	*/
-	lxpr_read_empty,		/* /proc/cmdline	*/
+	lxpr_read_cmdline,		/* /proc/cmdline	*/
 	lxpr_read_cpuinfo,		/* /proc/cpuinfo	*/
 	lxpr_read_devices,		/* /proc/devices	*/
 	lxpr_read_diskstats,		/* /proc/diskstats	*/
@@ -4986,6 +4987,16 @@ lxpr_read_cgroups(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	 * lxpr_uiobuf_printf(uiobuf, "%s\t%s\t%s\t%s\n",
 	 *   "cpu,cpuacct", "2", "1", "1");
 	 */
+}
+
+/*
+ * Report the zone boot arguments.
+ */
+static void
+lxpr_read_cmdline(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+{
+	zone_t *zone = LXPTOZ(lxpnp);
+	lxpr_uiobuf_printf(uiobuf, "%s\n", zone->zone_bootargs);
 }
 
 
