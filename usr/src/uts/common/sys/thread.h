@@ -607,6 +607,7 @@ int thread_setname(kthread_t *, const char *);
 int thread_vsetname(kthread_t *, const char *, ...);
 
 extern int default_binding_mode;
+extern int default_stksize;
 
 #endif	/* _KERNEL */
 

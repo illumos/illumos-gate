@@ -1361,26 +1361,19 @@ int mac_srs_worker_wakeup_ticks = 0;
 }
 
 /*
- * MAC_RX_SRS_TOODEEP
- *
- * Macro called as part of receive-side processing to determine if handling
+ * Threshold used in receive-side processing to determine if handling
  * can occur in situ (in the interrupt thread) or if it should be left to a
  * worker thread.  Note that the constant used to make this determination is
  * not entirely made-up, and is a result of some emprical validation. That
- * said, the constant is left as a static variable to allow it to be
+ * said, the constant is left as a global variable to allow it to be
  * dynamically tuned in the field if and as needed.
  */
-static uintptr_t mac_rx_srs_stack_needed = 10240;
-static uint_t mac_rx_srs_stack_toodeep;
+uintptr_t mac_rx_srs_stack_needed = 14336;
+uint_t mac_rx_srs_stack_toodeep;
 
 #ifndef STACK_GROWTH_DOWN
 #error Downward stack growth assumed.
 #endif
-
-#define	MAC_RX_SRS_TOODEEP() (STACK_BIAS + (uintptr_t)getfp() - \
-	(uintptr_t)curthread->t_stkbase < mac_rx_srs_stack_needed && \
-	++mac_rx_srs_stack_toodeep)
-
 
 /*
  * Drop the rx packet and advance to the next one in the chain.
@@ -3416,8 +3409,7 @@ mac_rx_srs_process(void *arg, mac_resource_handle_t srs, mblk_t *mp_chain,
 		 * latency, or if our stack is running deep, we should signal
 		 * the worker thread.
 		 */
-		if (loopback || !(mac_srs->srs_state & SRS_LATENCY_OPT) ||
-		    MAC_RX_SRS_TOODEEP()) {
+		if (loopback || !(mac_srs->srs_state & SRS_LATENCY_OPT)) {
 			/*
 			 * For loopback, We need to let the worker take
 			 * over as we don't want to continue in the same
@@ -3425,6 +3417,11 @@ mac_rx_srs_process(void *arg, mac_resource_handle_t srs, mblk_t *mp_chain,
 			 * overflows and may also end up using
 			 * resources (cpu) incorrectly.
 			 */
+			cv_signal(&mac_srs->srs_async);
+		} else if (STACK_BIAS + (uintptr_t)getfp() -
+		    (uintptr_t)curthread->t_stkbase < mac_rx_srs_stack_needed) {
+			if (++mac_rx_srs_stack_toodeep == 0)
+				mac_rx_srs_stack_toodeep = 1;
 			cv_signal(&mac_srs->srs_async);
 		} else {
 			/*
