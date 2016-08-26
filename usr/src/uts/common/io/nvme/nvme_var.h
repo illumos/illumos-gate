@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc. All rights reserved.
  */
 
 #ifndef _NVME_VAR_H
@@ -42,7 +42,6 @@
 #define	NVME_DEFAULT_ASYNC_EVENT_LIMIT	10
 #define	NVME_MIN_ASYNC_EVENT_LIMIT	1
 
-#define	NVME_ADMIN_CMD_TIMEOUT		100000
 
 typedef struct nvme nvme_t;
 typedef struct nvme_namespace nvme_namespace_t;
