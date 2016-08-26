@@ -601,6 +601,7 @@ extern disp_lock_t stop_lock;		/* lock protecting stopped threads */
 caddr_t	thread_stk_init(caddr_t);	/* init thread stack */
 
 extern int default_binding_mode;
+extern int default_stksize;
 
 #endif	/* _KERNEL */
 

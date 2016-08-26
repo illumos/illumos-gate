@@ -1367,11 +1367,11 @@ int mac_srs_worker_wakeup_ticks = 0;
  * can occur in situ (in the interrupt thread) or if it should be left to a
  * worker thread.  Note that the constant used to make this determination is
  * not entirely made-up, and is a result of some emprical validation. That
- * said, the constant is left as a static variable to allow it to be
+ * said, the constant is left as a global variable to allow it to be
  * dynamically tuned in the field if and as needed.
  */
-static uintptr_t mac_rx_srs_stack_needed = 13312;
-static uint_t mac_rx_srs_stack_toodeep;
+uintptr_t mac_rx_srs_stack_needed = 14336;
+uint_t mac_rx_srs_stack_toodeep;
 
 #ifndef STACK_GROWTH_DOWN
 #error Downward stack growth assumed.
@@ -1379,7 +1379,7 @@ static uint_t mac_rx_srs_stack_toodeep;
 
 #define	MAC_RX_SRS_TOODEEP() (STACK_BIAS + (uintptr_t)getfp() - \
 	(uintptr_t)curthread->t_stkbase < mac_rx_srs_stack_needed && \
-	++mac_rx_srs_stack_toodeep)
+	(++mac_rx_srs_stack_toodeep || (mac_rx_srs_stack_toodeep = 1)))
 
 
 /*
