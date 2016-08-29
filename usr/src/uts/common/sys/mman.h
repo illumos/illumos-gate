@@ -81,6 +81,7 @@ extern "C" {
 #define	MAP_TYPE	0xf		/* mask for share type */
 
 /* other flags to mmap (or-ed in to MAP_SHARED or MAP_PRIVATE) */
+#define	MAP_FILE	0		/* map from file (default) */
 #define	MAP_FIXED	0x10		/* user assigns address */
 #define	MAP_NORESERVE	0x40		/* don't reserve needed swap area */
 #define	MAP_ANON	0x100		/* map anonymous pages directly */
