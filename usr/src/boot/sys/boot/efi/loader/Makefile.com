@@ -33,6 +33,7 @@ OBJS=	autoload.o bootinfo.o conf.o copy.o efi_main.o framebuffer.o main.o \
 CFLAGS=	-O2
 CPPFLAGS= -nostdinc -I../../../../../include -I../../..../
 CPPFLAGS += -I../../../../../lib/libstand
+CPPFLAGS += -I../../../../../lib/libz
 
 include ../../Makefile.inc
 
