@@ -21,9 +21,9 @@
 #
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright (c) 2015 by Delphix. All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 #
 # Start the lockd service; we are serving NFS and we need to verify
@@ -60,5 +60,16 @@ then
 		echo "$0: WARNING svcadm refresh failed" 1>&2
 	fi
 fi
-   
+
+#
+# We have to wait for statd to finish starting up before lockd can
+# start running. If statd hangs after service startup (so SMF thinks
+# it's done) but before it registers an rpc address, we can end up
+# failing in the kernel when we attempt to contact it.
+#
+until /usr/bin/rpcinfo -T tcp 127.0.0.1 status >/dev/null 2>&1
+do
+	sleep 1
+done
+
 exec /usr/lib/nfs/lockd
