@@ -27,7 +27,6 @@
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Bootstrap routine for run-time linker.
@@ -95,11 +94,17 @@ main()
 	.type	_rt_boot,@function
 	.align	4
 
+	/ init is called from the _init symbol in the CRT, however .init_array
+	/ are called "naturally" from call_init.  Because of that, we need the
+	/ stack aligned here so that initializers called via _array sections may
+	/ safely use SIMD instructions.
 _rt_alias:
 	jmp	.get_ip			/ in case we were invoked from libc.so
 _rt_boot:
 	movl	%esp,%ebp		/ save for referencing args
 	subl	$EB_MAX_SIZE32,%esp	/ make room for a max sized boot vector
+	andl	$-16,%esp
+	subl	$8,%esp
 	movl	%esp,%esi		/ use esi as a pointer to &eb[0]
 	movl	$EB_ARGV,0(%esi)	/ set up tag for argv
 	leal	4(%ebp),%eax		/ get address of argv

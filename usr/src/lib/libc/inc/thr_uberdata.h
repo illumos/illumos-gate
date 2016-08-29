@@ -905,15 +905,24 @@ typedef struct _qexthdlr {
 	_quick_exithdlr_func_t	hdlr;	/* handler itself */
 } _qexthdlr_t;
 
+/*
+ * We add a pad on 32-bit systems to allow us to always have the structure size
+ * be 32-bytes which helps us deal with the compiler's alignment when building
+ * in ILP32 / LP64 systems.
+ */
 typedef struct {
 	mutex_t		exitfns_lock;
 	_qexthdlr_t	*head;
+#if !defined(_LP64)
+	uint32_t	pad;
+#endif
 } quickexit_root_t;
 
 #ifdef _SYSCALL32
 typedef struct {
 	mutex_t		exitfns_lock;
 	caddr32_t	head;
+	uint32_t	pad;
 } quickexit_root32_t;
 #endif /* _SYSCALL32 */
 
