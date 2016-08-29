@@ -317,7 +317,6 @@ lx_clone(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4, uintptr_t p5)
 	sigset_t sigmask, osigmask;
 	int fork_flags = 0;
 	int ptrace_event;
-	int error = 0;
 	lx_tsd_t *lx_tsd = lx_get_tsd();
 
 	if (flags & LX_CLONE_SETTLS) {
@@ -672,8 +671,7 @@ lx_clone(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4, uintptr_t p5)
 	/*
 	 * If the thread did not start, free the resources we allocated:
 	 */
-	if (rval == -1) {
-		error = errno;
+	if (rval != 0) {
 		(void) munmap(cs->c_ntv_stk, cs->c_ntv_stk_sz);
 		free(cs->c_lx_tsd);
 		free(cs);
@@ -700,6 +698,6 @@ lx_clone(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4, uintptr_t p5)
 		/*
 		 * Return the error from thr_create(3C).
 		 */
-		return (-error);
+		return (-rval);
 	}
 }
