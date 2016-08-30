@@ -1114,6 +1114,8 @@ lx_fix_netstack()
 	for (i = 0; i < nports; i++)
 		ports[i] = 0;
 	mutex_exit(lock);
+
+	netstack_rele(ns);
 }
 
 void
