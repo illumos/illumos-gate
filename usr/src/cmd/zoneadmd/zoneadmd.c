@@ -551,10 +551,7 @@ zone_ready(zlog_t *zlogp, zone_mnt_t mount_cmd, int zstate)
 		goto bad;
 	}
 
-	if (zone_did == 0)
-		zone_did = zone_get_did(zone_name);
-
-	if ((zone_id = vplat_create(zlogp, mount_cmd, zone_did)) == -1) {
+	if ((zone_id = vplat_create(zlogp, mount_cmd)) == -1) {
 		if ((err = zonecfg_destroy_snapshot(zone_name)) != Z_OK)
 			zerror(zlogp, B_FALSE, "destroying snapshot: %s",
 			    zonecfg_strerror(err));
@@ -765,9 +762,16 @@ mount_early_fs(void *data, const char *spec, const char *dir,
 static void
 set_zonecfg_env(char *rsrc, char *attr, char *name, char *val)
 {
-	char nm[MAXNAMELEN];
+	char *p;
+	/* Enough for maximal name, rsrc + attr, & slop for ZONECFG & _'s */
+	char nm[2 * MAXNAMELEN + 32];
 
-	(void) snprintf(nm, sizeof (nm), "_ZONECFG_%s_%s_%s", rsrc, attr, name);
+	if (attr == NULL)
+		(void) snprintf(nm, sizeof (nm), "_ZONECFG_%s_%s", rsrc,
+		    name);
+	else
+		(void) snprintf(nm, sizeof (nm), "_ZONECFG_%s_%s_%s", rsrc,
+		    attr, name);
 
 	p = nm;
 	while ((p = strchr(p, '-')) != NULL)
@@ -852,11 +856,6 @@ setup_subproc_env()
 	}
 
 	(void) zonecfg_enddevent(handle);
-
-	if (debug)
-		(void) setenv("_ZONEADMD_brand_debug", "1", 1);
-	else
-		(void) setenv("_ZONEADMD_brand_debug", "", 1);
 
 	res = Z_OK;
 
@@ -1798,8 +1797,7 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 			    != 0)
 				break;
 			zcons_statechanged();
-			if ((rval = zone_ready(zlogp, Z_MNT_BOOT, zstate,
-			    debug)) == 0)
+			if ((rval = zone_ready(zlogp, Z_MNT_BOOT, zstate)) == 0)
 				eventstream_write(Z_EVT_ZONE_READIED);
 			else
 				eventstream_write(Z_EVT_ZONE_HALTED);
@@ -1837,8 +1835,8 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 				break;
 			}
 			zcons_statechanged();
-			if ((rval = zone_ready(zlogp, Z_MNT_BOOT, zstate,
-			    debug)) != 0) {
+			if ((rval = zone_ready(zlogp, Z_MNT_BOOT, zstate)) !=
+			    0) {
 				eventstream_write(Z_EVT_ZONE_BOOTFAILED);
 				boot_args[0] = '\0';
 				break;

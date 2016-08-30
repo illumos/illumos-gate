@@ -118,6 +118,8 @@
 
 #define	CONSOLE_SOCKPATH	ZONES_TMPDIR "/%s.console_sock"
 
+#define	ZCONS_RETRY		10
+
 static int	serverfd = -1;	/* console server unix domain socket fd */
 char boot_args[BOOTARGS_MAX];
 

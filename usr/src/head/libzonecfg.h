@@ -157,6 +157,7 @@ extern "C" {
 #define	ALIAS_SHARES		"cpu-shares"
 #define	ALIAS_CPUCAP		"cpu-cap"
 #define	ALIAS_MAXPROCS		"max-processes"
+#define	ALIAS_ZFSPRI		"zfs-io-priority"
 
 /* Default name for zone detached manifest */
 #define	ZONE_DETACHED	"SUNWdetached.xml"
