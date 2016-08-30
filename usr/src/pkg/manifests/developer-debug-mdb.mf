@@ -296,7 +296,8 @@ file path=usr/lib/mdb/proc/$(ARCH64)/libc.so group=sys mode=0555
 file path=usr/lib/mdb/proc/$(ARCH64)/libcmdutils.so group=sys mode=0555
 file path=usr/lib/mdb/proc/$(ARCH64)/libnvpair.so group=sys mode=0555
 file path=usr/lib/mdb/proc/$(ARCH64)/libproc.so group=sys mode=0555
-file path=usr/lib/mdb/proc/$(ARCH64)/libpython2.6.so group=sys mode=0555
+file path=usr/lib/mdb/proc/$(ARCH64)/libpython$(PYTHON_VERSION).so group=sys \
+    mode=0555
 file path=usr/lib/mdb/proc/$(ARCH64)/libsysevent.so group=sys mode=0555
 file path=usr/lib/mdb/proc/$(ARCH64)/libtopo.so group=sys mode=0555
 file path=usr/lib/mdb/proc/$(ARCH64)/libumem.so group=sys mode=0555
@@ -310,7 +311,7 @@ file path=usr/lib/mdb/proc/libc.so group=sys mode=0555
 file path=usr/lib/mdb/proc/libcmdutils.so group=sys mode=0555
 file path=usr/lib/mdb/proc/libnvpair.so group=sys mode=0555
 file path=usr/lib/mdb/proc/libproc.so group=sys mode=0555
-file path=usr/lib/mdb/proc/libpython2.6.so group=sys mode=0555
+file path=usr/lib/mdb/proc/libpython$(PYTHON_VERSION).so group=sys mode=0555
 file path=usr/lib/mdb/proc/libsysevent.so group=sys mode=0555
 file path=usr/lib/mdb/proc/libtopo.so group=sys mode=0555
 file path=usr/lib/mdb/proc/libumem.so group=sys mode=0555

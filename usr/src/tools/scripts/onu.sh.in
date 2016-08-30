@@ -23,7 +23,7 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2010, Richard Lowe
-# 
+#
 
 PATH=/usr/bin:/usr/sbin
 export PATH
@@ -128,7 +128,7 @@ update_zone()
 
 	state=`echo $zone | cut -d: -f 3`
 
-	case "$state" in 
+	case "$state" in
 	configured|incomplete)
 		return
 		;;
@@ -208,7 +208,7 @@ if [ -n "$repodir" ]; then
 	[[ ! -e $cfgfile ]] && cfgfile=$redistdir/pkg5.repository
 	# need an absolute path
 	[[ $redistdir == /* ]] || redistdir=$PWD/$redistdir
-	redistpub=$(python2.6 <<# EOF
+	redistpub=$(python@PYTHON_VERSION@ <<# EOF
 		import ConfigParser
 		p = ConfigParser.SafeConfigParser()
 		p.read("$cfgfile")

@@ -35,8 +35,7 @@ include ../../Makefile.lib
 
 LIBLINKS = 
 SRCDIR =	../common
-ROOTLIBDIR=	$(ROOT)/usr/lib/python2.6/vendor-packages/zfs
-PYTHON=		$(PYTHON_26)
+ROOTLIBDIR=	$(ROOT)/usr/lib/python$(PYTHON_VERSION)/vendor-packages/zfs
 PYOBJS=		$(PYSRCS:%.py=$(SRCDIR)/%.pyc)
 PYFILES=	$(PYSRCS) $(PYSRCS:%.py=%.pyc)
 ROOTPYZFSFILES= $(PYFILES:%=$(ROOTLIBDIR)/%)
@@ -45,10 +44,10 @@ C99MODE=        -xc99=%all
 C99LMODE=       -Xc99=%all
 
 LIBS =		$(DYNLIB)
-LDLIBS +=	-lc -lnvpair -lpython2.6 -lzfs
+LDLIBS +=	-lc -lnvpair -lpython$(PYTHON_VERSION) -lzfs
 CFLAGS +=	$(CCVERBOSE)
 CERRWARN +=	-_gcc=-Wno-unused-variable
-CPPFLAGS +=	-I$(ADJUNCT_PROTO)/usr/include/python2.6
+CPPFLAGS +=	-I$(ADJUNCT_PROTO)/usr/include/python$(PYTHON_VERSION)
 CPPFLAGS +=	-I../../../uts/common/fs/zfs
 CPPFLAGS +=	-I../../../common/zfs
 
@@ -59,6 +58,9 @@ all: $(PYOBJS) $(LIBS)
 install: all $(ROOTPYZFSFILES)
 
 $(ROOTLIBDIR)/%: %
+	$(INS.pyfile)
+
+$(ROOTLIBDIR)/%: ../common/%
 	$(INS.pyfile)
 
 lint: lintcheck
