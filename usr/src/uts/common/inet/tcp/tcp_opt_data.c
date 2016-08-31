@@ -520,7 +520,6 @@ tcp_set_reuseport(conn_t *connp, boolean_t do_enable)
 			 * of SO_REUSEPORT.
 			 */
 			ASSERT(connp->conn_reuseport == 0);
-			ASSERT(tcp->tcp_conn_rg_bind == NULL);
 			return (0);
 		}
 	}
