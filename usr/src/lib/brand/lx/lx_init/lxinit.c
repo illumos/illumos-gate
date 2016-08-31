@@ -187,7 +187,6 @@ lxi_config_open()
 
 }
 
-#if 0 /* XXX KEBE SAYS NOT YET */
 static int
 zone_find_attr(struct zone_res_attrtab *attrs, const char *name,
     const char **result)
@@ -202,7 +201,6 @@ zone_find_attr(struct zone_res_attrtab *attrs, const char *name,
 	}
 	return (-1);
 }
-#endif /* XXX KEBE SAYS NOT YET */
 
 static void
 lxi_svc_start(char *name, char *path, char *fmri)
@@ -407,7 +405,6 @@ done:
 	return (err);
 }
 
-#if 0 /* XXX KEBE SAYS NOT YET */
 static int
 lxi_iface_dhcp(const char *origiface, boolean_t *first_ipv4_configured)
 {
@@ -459,7 +456,6 @@ done:
 	free(dhcpreply);
 	return (err);
 }
-#endif /* XXX KEBE SAYS NOT YET */
 
 /*
  * Initialize an IPv6 link-local address on a given interface
@@ -577,59 +573,6 @@ lxi_net_loopback()
 	(void) lxi_iface_ipv6_link_local(iface);
 }
 
-
-
-#if 0 /* XXX KEBE SAYS NOT YET */
-/*
- * This function is used when the "ips" property doesn't exist in a zone's
- * configuration. It may be an older configuration, so we should search for
- * "ip" and "netmask" and convert them into the new format.
- */
-static int
-lxi_get_old_ip(struct zone_res_attrtab *attrs, const char **ipaddrs,
-    char *cidraddr, int len)
-{
-
-	const char *netmask;
-	int prefixlen;
-	struct sockaddr_in mask_sin;
-
-	lxi_warn("Could not find \"ips\" property for zone. Looking "
-	    "for older \"ip\" and \"netmask\" properties, instead.");
-
-	if (zone_find_attr(attrs, "ip", ipaddrs) != 0) {
-		return (-1);
-	}
-
-	if (strcmp(*ipaddrs, "dhcp") == 0) {
-		return (0);
-	}
-
-	if (zone_find_attr(attrs, "netmask", &netmask) != 0) {
-		lxi_err("could not find netmask for interface");
-		/* NOTREACHED */
-	}
-
-	/* Convert the netmask to a number */
-	mask_sin.sin_family = AF_INET;
-	if (inet_pton(AF_INET, netmask, &mask_sin.sin_addr) != 1) {
-		lxi_err("invalid netmask address: %s\n",
-		    strerror(errno));
-		/* NOTREACHED */
-	}
-	prefixlen = mask2plen((struct sockaddr *)&mask_sin);
-
-	/*
-	 * Write out the IP address in the new format and use
-	 * that instead
-	 */
-	(void) snprintf(cidraddr, len, "%s/%d", *ipaddrs, prefixlen);
-
-	*ipaddrs = cidraddr;
-	return (0);
-}
-#endif /* XXX KEBE SAYS NOT YET */
-
 static void
 lxi_net_setup(zone_dochandle_t handle)
 {
@@ -640,37 +583,49 @@ lxi_net_setup(zone_dochandle_t handle)
 		return;
 	while (zonecfg_getnwifent(handle, &lookup) == Z_OK) {
 		const char *iface = lookup.zone_nwif_physical;
-#if 0	/* XXX KEBE SAYS NOT YET */
 		struct zone_res_attrtab *attrs = lookup.zone_nwif_attrp;
 		const char *ipaddrs, *primary, *gateway;
-		char ipaddrs_copy[MAXNAMELEN], cidraddr[BUFSIZ],
+		char ipaddrs_copy[MAXNAMELEN], /* cidraddr[BUFSIZ], */
 		    *ipaddr, *tmp, *lasts;
 		boolean_t first_ipv4_configured = B_FALSE;
 		boolean_t *ficp = &first_ipv4_configured;
-#endif	/* XXX KEBE */
+		boolean_t no_zonecfg;
 
+		/*
+		 * Regardless of whether we're configured in zonecfg(1M), or
+		 * configured by other means, make sure we plumb every
+		 * physical=<foo> for IPv4 and IPv6.
+		 */
 		lxi_net_plumb(iface);
 
-		/* XXX KEBE SAYS this bit was shuffled around. */
+		if (zone_find_attr(attrs, "ips", &ipaddrs) != 0 /* &&
+		    lxi_get_old_ip(attrs, &ipaddrs, cidraddr, BUFSIZ) != 0*/) {
+			/*
+			 * Do not panic.  This interface has no in-zonecfg(1M)
+			 * configuration.  We keep a warning around for now.
+			 */
+			lxi_warn("Could not find zonecfg(1M) network "
+			    "configuration for the %s interface", iface);
+			no_zonecfg = B_TRUE;
+		} else {
+			no_zonecfg = B_FALSE;
+		}
+
 		if (lxi_iface_ipv6_link_local(iface) != 0) {
 			lxi_warn("unable to bring up link-local address on "
 			    "interface %s", iface);
-		} else {
-			/* XXX KEBE SAYS this bit is new. */
-			do_addrconf = B_TRUE;
-		}
-
-#if 0	/* XXX KEBE SAYS NOT YET */
-		if (zone_find_attr(attrs, "ips", &ipaddrs) != 0 &&
-		    lxi_get_old_ip(attrs, &ipaddrs, cidraddr, BUFSIZ) != 0) {
-			lxi_warn("Could not find a valid network configuration "
-			    "for the %s interface", iface);
-			continue;
 		}
 
 		/*
-		 * If we're going to be doing DHCP, we have to do it first since
-		 * dhcpagent doesn't like to operate on non-zero logical
+		 * Every thing else below only happens if we have zonecfg(1M)
+		 * network configuration.
+		 */
+		if (no_zonecfg)
+			continue;
+
+		/*
+		 * If we're going to be doing DHCP, we have to do it first
+		 * since dhcpagent doesn't like to operate on non-zero logical
 		 * interfaces.
 		 */
 		if (strstr(ipaddrs, "dhcp") != NULL &&
@@ -703,9 +658,11 @@ lxi_net_setup(zone_dochandle_t handle)
 		if (zone_find_attr(attrs, "primary", &primary) == 0 &&
 		    strncmp(primary, "true", MAXNAMELEN) == 0 &&
 		    zone_find_attr(attrs, "gateway", &gateway) == 0) {
-			lxi_iface_gateway(iface, NULL, 0, gateway);
+			if (lxi_iface_gateway(iface, NULL, 0, gateway) != 0) {
+				lxi_err("default route on %s -> %s failed",
+				    iface, gateway);
+			}
 		}
-#endif /* XXX KEBE */
 	}
 
 	if (do_addrconf) {
