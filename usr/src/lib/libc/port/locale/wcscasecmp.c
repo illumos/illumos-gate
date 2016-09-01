@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2013 Garrett D'Amore <garrett@damore.org>
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*
@@ -64,10 +65,10 @@ wcscasecmp(const wchar_t *s1, const wchar_t *s2)
 int
 wcsncasecmp_l(const wchar_t *s1, const wchar_t *s2, size_t n, locale_t loc)
 {
-	if (s1 == s2)
+	if (s1 == s2 || n == 0)
 		return (0);
 
-	while ((towlower_l(*s1, loc) == towlower_l(*s2, loc)) && n--) {
+	while ((towlower_l(*s1, loc) == towlower_l(*s2, loc)) && --n) {
 		if (*s1 == 0)
 			return (0);
 		s1++;
