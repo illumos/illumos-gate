@@ -20,9 +20,9 @@
  */
 
 /*
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013 RackTop Systems.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <stdlib.h>
@@ -142,7 +142,11 @@ typedef struct smb_lgmid {
 	uint16_t m_type;
 } smb_lgmid_t;
 
+/* Buffer size to hold hex form of the above (>24). */
 #define	SMB_LGRP_MID_HEXSZ	32
+
+/* Size of idx,rid parts of above, in hex form. */
+#define	SMB_LGRP_IDXRID_LEN	16
 
 /* Member list */
 typedef struct smb_lgmlist {
@@ -2039,6 +2043,10 @@ smb_lgrp_mlist_add(smb_lgmlist_t *in_members, smb_lgmid_t *newm,
  * memory for out_members by calling free().
  *
  * in_members and out_members are hex strings.
+ *
+ * Note that we ignore the SID "type" when matching because
+ * we always want to delete when the SID part matches.
+ * The "type" part can be fiction.
  */
 static int
 smb_lgrp_mlist_del(smb_lgmlist_t *in_members, smb_lgmid_t *mid,
@@ -2073,7 +2081,8 @@ smb_lgrp_mlist_del(smb_lgmlist_t *in_members, smb_lgmid_t *mid,
 
 	in_list = in_members->m_ids;
 	for (i = 0, out_cnt = 0; i < in_members->m_cnt; i++) {
-		if (strncmp(in_list, mid_hex, mid_hexsz)) {
+		/* Keep only those NOT matching in IDX,RID */
+		if (strncmp(in_list, mid_hex, SMB_LGRP_IDXRID_LEN)) {
 			(void) strncat(out_list, in_list, mid_hexsz);
 			out_cnt++;
 		}
