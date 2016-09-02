@@ -74,32 +74,64 @@ if [[ -f $TAR_SEED ]]; then
     gtar $args $TAR_SEED
     exit 0
 elif [[ ! -f $ZFS_SEED ]]; then
-    echo "Seed file $ZFS_SEED $TAR_SEED not found."
-    # XXX KEBE SAYS maybe we can eat a snapshot name here, or even a
-    # Joyent-style UUID for direct snagging from Joyent's image
-    # servers.
-    bad_usage
-fi
+    # Try and eat a snapshot or a filesystem.
+    outstr=`zfs list -Ht filesystem $ZFS_SEED 2>/dev/null | awk '{print $1}'`
+    if [[ $outstr == $ZFS_SEED ]]; then
+	# We have a zfs filesystem name.
+	# Snapshot it using today's date/time
+	snapname=`date -u "+%Y-%m-%d:%H:%M:%S"`
+	ZFS_SEED=$ZFS_SEED@$snapname
+	zfs snapshot $ZFS_SEED
+	if [[ $? != 0 ]]; then
+	    echo "ZFS snapshot ($ZFS_SEED) command failed ($?)."
+	    exit $ZONE_SUBPROC_FATAL
+	fi
+	# else continue on with the new snapshot...
+    fi
 
-type=`file -b $ZFS_SEED | awk '{print $1}'`
-
-# For now, we are dependent on the output of file(1).
-# I'm being cheesy in checking the first word of file(1)'s output.
-if [[ $type == "ZFS" ]]; then
-    zfs recv -F $ZONEPATH_DS < $ZFS_SEED
-elif [[ $type == "gzip" ]]; then
-    gunzip -c $ZFS_SEED | zfs recv -F $ZONEPATH_DS
+    outstr=`zfs list -Ht snapshot $ZFS_SEED 2>/dev/null | awk '{print $1}'`
+    if [[ $outstr == $ZFS_SEED ]]; then
+	# Hmmm, we found a snapshot name!
+	echo "Cloning from snapshot $ZFS_SEED"
+	# zoneadm already created $ZONEPATH_DS, destroy it before we clone.
+	zfs destroy $ZONEPATH_DS
+	zfs clone $ZFS_SEED $ZONEPATH_DS
+	if [[ $? != 0 ]]; then
+	    echo "ZFS clone ($ZFS_SEED to $ZONEPATH_DS) failed ($?)."
+	    exit $ZONE_SUBPROC_FAIL
+	fi
+	# zfs promote $ZONEPATH_DS
+	# if [[ $? != 0 ]]; then
+	#    echo "ZFS promote ($ZONEPATH_DS) failed ($?)."
+	#    exit $ZONE_SUBPROC_FAIL
+	# fi
+    else 
+	echo "Seed file $ZFS_SEED $TAR_SEED not found."
+	bad_usage
+    fi
 else
-    echo "Seed file $ZFS_SEED not a ZFS receive (or compressed) one."
-    bad_usage
-fi
+    type=`file -b $ZFS_SEED | awk '{print $1}'`
 
-if [[ $? != 0 ]]; then
-   echo "ZFS receive command failed ($?)."
-   exit $ZONE_SUBPROC_FATAL
+    # For now, we are dependent on the output of file(1).
+    # I'm being cheesy in checking the first word of file(1)'s output.
+    if [[ $type == "ZFS" ]]; then
+	zfs recv -F $ZONEPATH_DS < $ZFS_SEED
+    elif [[ $type == "gzip" ]]; then
+	gunzip -c $ZFS_SEED | zfs recv -F $ZONEPATH_DS
+    else
+	echo "Seed file $ZFS_SEED not a ZFS receive (or compressed) one."
+	bad_usage
+    fi
+
+    if [[ $? != 0 ]]; then
+	echo "ZFS receive command failed ($?)."
+	exit $ZONE_SUBPROC_FATAL
+    fi
 fi
 
 # One Joyent-ism we need to clean up.
 rmdir $ZONEPATH/cores
+# And one we should probably adopt.
+zfs set devices=off $ZONEPATH_DS
 
 exit 0
