@@ -12,7 +12,7 @@
 
 #
 # Copyright 2015 Joyent, Inc.
-# Copyright 2015 OmniTI Computer Consulting, Inc. All rights reserved.
+# Copyright 2016 OmniTI Computer Consulting, Inc. All rights reserved.
 #
 
 #
@@ -68,7 +68,7 @@ if [[ $? == 0 ]]; then
             rm -f /etc/resolv.conf
         fi
         echo "# AUTOMATIC ZONE CONFIG" > /etc/resolv.conf
-    EOF
+EOF
     zonecfg -z $ZONENAME info attr name=resolvers |
     awk '
     {
@@ -94,9 +94,7 @@ if [[ $? == 0 ]]; then
         printf("        echo \"search %s\" >> %s\n", dom, "/etc/resolv.conf")
     }
     ' >> $tmpfile
-    cat >> $tmpfile <<EOF
-    fi
-    EOF
+    echo fi >> $tmpfile
 fi
 
 cat >> $tmpfile <<EOF

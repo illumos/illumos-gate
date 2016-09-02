@@ -43,7 +43,7 @@ if [[ $? == 0 ]]; then
     cat > $tmpfile <<EOF
     if [ ! -e /etc/resolv.conf ]; then
         echo "# AUTOMATIC ZONE CONFIG" > /etc/resolv.conf
-    EOF
+EOF
     zonecfg -z $ZONENAME info attr name=resolvers |
     awk '
     {
@@ -73,12 +73,12 @@ if [[ $? == 0 ]]; then
     fi
     return 0
     }
-    EOF
+EOF
 else
     cat >> $tmpfile <<EOF
     return 0
     }
-    EOF
+EOF
 fi
 
 cat >> $tmpfile <<EOF
