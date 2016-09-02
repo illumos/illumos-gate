@@ -933,51 +933,6 @@ do_subproc(zlog_t *zlogp, char *cmdbuf, char **retstr)
 	return (WEXITSTATUS(status));
 }
 
-#if 0 /* XXX KEBE SAYS not yet */
-/*
- * Get the path for this zone's init(1M) (or equivalent) process. First look
- * for a zone-specific init-name attr, then get it from the brand.
- */
-static int
-get_initname(brand_handle_t bh, char *initname, int len)
-{
-	struct zone_attrtab a;
-
-	bzero(&a, sizeof (a));
-	(void) strlcpy(a.zone_attr_name, "init-name",
-	    sizeof (a.zone_attr_name));
-
-	if (zonecfg_lookup_attr(snap_hndl, &a) == Z_OK) {
-		(void) strlcpy(initname, a.zone_attr_value, len);
-		return (0);
-	}
-
-	return (brand_get_initname(bh, initname, len));
-}
-
-/*
- * Get the restart-init flag for this zone's init(1M) (or equivalent) process.
- * First look for a zone-specific restart-init attr, then get it from the brand.
- */
-static boolean_t
-restartinit(brand_handle_t bh)
-{
-	struct zone_attrtab a;
-
-	bzero(&a, sizeof (a));
-	(void) strlcpy(a.zone_attr_name, "restart-init",
-	    sizeof (a.zone_attr_name));
-
-	if (zonecfg_lookup_attr(snap_hndl, &a) == Z_OK) {
-		if (strcmp(a.zone_attr_value, "false") == 0)
-			return (B_FALSE);
-		return (B_TRUE);
-	}
-
-	return (brand_restartinit(bh));
-}
-#endif /* XXX KEBE */
-
 /*
  * Get the app-svc-dependent flag for this zone's init process. This is a
  * zone-specific attr which controls the type of contract we create for the

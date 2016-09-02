@@ -65,9 +65,11 @@ if [[ -f $TAR_SEED ]]; then
 	args="-xf"
     fi
     cd $ZONEPATH
-    # XXX KEBE ASKS - umask setting?
-    mkdir dev
-    mkdir root
+    # Be very precise about permissions and ownership.
+    mkdir -m 0755 dev
+    chgrp sys dev
+    mkdir -m 0755 root
+    chgrp root sys
     cd root
     gtar $args $TAR_SEED
     exit 0

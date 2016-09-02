@@ -644,7 +644,6 @@ typedef struct zone {
 	 * kstats for ZFS I/O ops and bytes.
 	 */
 	kmutex_t	zone_zfs_lock;		/* protects ZFS statistics */
-	kstat_t		*zone_zfs_ksp;
 	kstat_io_t	zone_zfs_rwstats;
 	zone_zfs_kstat_t *zone_zfs_stats;
 
