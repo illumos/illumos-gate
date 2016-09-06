@@ -75,9 +75,8 @@
  * NVMe devices can have multiple namespaces, each being a independent data
  * store. The driver supports multiple namespaces and creates a blkdev interface
  * for each namespace found. Namespaces can have various attributes to support
- * thin provisioning, extended LBAs, and protection information. This driver
- * does not support any of this and ignores namespaces that have these
- * attributes.
+ * thin provisioning and protection information. This driver does not support
+ * any of this and ignores namespaces that have these attributes.
  *
  *
  * Blkdev Interface:
@@ -2067,17 +2066,14 @@ nvme_init(nvme_t *nvme)
 		/*
 		 * We currently don't support namespaces that use either:
 		 * - thin provisioning
-		 * - extended LBAs
 		 * - protection information
 		 */
 		if (idns->id_nsfeat.f_thin ||
-		    idns->id_flbas.lba_extlba ||
 		    idns->id_dps.dp_pinfo) {
 			dev_err(nvme->n_dip, CE_WARN,
 			    "!ignoring namespace %d, unsupported features: "
-			    "thin = %d, extlba = %d, pinfo = %d", i + 1,
-			    idns->id_nsfeat.f_thin, idns->id_flbas.lba_extlba,
-			    idns->id_dps.dp_pinfo);
+			    "thin = %d, pinfo = %d", i + 1,
+			    idns->id_nsfeat.f_thin, idns->id_dps.dp_pinfo);
 			nvme->n_ns[i].ns_ignore = B_TRUE;
 		}
 	}
