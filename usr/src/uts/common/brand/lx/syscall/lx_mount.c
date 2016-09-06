@@ -95,6 +95,9 @@ typedef struct mount_opt {
 /* From uts/common/syscall/umount.c */
 extern int umount2(char *, int);
 
+/* From lx_chown.c */
+extern long lx_vn_chown(vnode_t *, uid_t, gid_t);
+
 /*
  * Globals
  */
@@ -520,8 +523,8 @@ lx_mount(const char *sourcep, const char *targetp, const char *fstypep,
 		 * everywhere except under /dev where it interferes with device
 		 * emulation.
 		 */
-		if (strcmp(targetp, "/dev") != 0 &&
-		    strncmp(targetp, "/dev/", 5) != 0)
+		if (strcmp(target, "/dev") != 0 &&
+		    strncmp(target, "/dev/", 5) != 0)
 			sflags |= MS_OVERLAY;
 	} else if (strcmp(fstype, "proc") == 0) {
 		/* Translate proc mount requests to lx_proc requests. */
@@ -614,7 +617,11 @@ lx_mount(const char *sourcep, const char *targetp, const char *fstypep,
 	VFS_RELE(vfsp);
 	if (strcmp(fstype, "tmpfs") == 0 && (uid != -1 || gid != -1)) {
 		/* Handle tmpfs uid/gid mount options. */
-		(void) lx_chown(target, uid, gid);
+		if (lookupname(target, UIO_SYSSPACE, FOLLOW, NULLVPP,
+		    &vp) == 0) {
+			(void) lx_vn_chown(vp, (uid_t)uid, (gid_t)gid);
+			VN_RELE(vp);
+		}
 	}
 
 	return (0);
