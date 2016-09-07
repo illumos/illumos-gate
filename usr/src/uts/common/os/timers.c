@@ -22,6 +22,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*
@@ -1172,6 +1173,14 @@ timespectohz64(timespec_t *tv)
 void
 hrt2ts(hrtime_t hrt, timestruc_t *tsp)
 {
+#if defined(__amd64)
+	/*
+	 * The cleverness explained above is unecessary on x86_64 CPUs where
+	 * modern compilers are able to optimize down to faster operations.
+	 */
+	tsp->tv_sec = hrt / NANOSEC;
+	tsp->tv_nsec = hrt % NANOSEC;
+#else
 	uint32_t sec, nsec, tmp;
 
 	tmp = (uint32_t)(hrt >> 30);
@@ -1193,20 +1202,28 @@ hrt2ts(hrtime_t hrt, timestruc_t *tsp)
 	}
 	tsp->tv_sec = (time_t)sec;
 	tsp->tv_nsec = nsec;
+#endif /* defined(__amd64) */
 }
 
 /*
  * Convert from timestruc_t to hrtime_t.
- *
- * The code below is equivalent to:
- *
- *	hrt = tsp->tv_sec * NANOSEC + tsp->tv_nsec;
- *
- * but requires no integer multiply.
  */
 hrtime_t
 ts2hrt(const timestruc_t *tsp)
 {
+#if defined(__amd64) || defined(__i386)
+	/*
+	 * On modern x86 CPUs, the simple version is faster.
+	 */
+	return ((tsp->tv_sec * NANOSEC) + tsp->tv_nsec);
+#else
+	/*
+	 * The code below is equivalent to:
+	 *
+	 *	hrt = tsp->tv_sec * NANOSEC + tsp->tv_nsec;
+	 *
+	 * but requires no integer multiply.
+	 */
 	hrtime_t hrt;
 
 	hrt = tsp->tv_sec;
@@ -1215,6 +1232,7 @@ ts2hrt(const timestruc_t *tsp)
 	hrt = (hrt << 7) - hrt - hrt - hrt;
 	hrt = (hrt << 9) + tsp->tv_nsec;
 	return (hrt);
+#endif /* defined(__amd64) || defined(__i386) */
 }
 
 /*
@@ -1246,6 +1264,13 @@ tv2hrt(struct timeval *tvp)
 void
 hrt2tv(hrtime_t hrt, struct timeval *tvp)
 {
+#if defined(__amd64)
+	/*
+	 * Like hrt2ts, the simple version is faster on x86_64.
+	 */
+	tvp->tv_sec = hrt / NANOSEC;
+	tvp->tv_usec = (hrt % NANOSEC) / (NANOSEC / MICROSEC);
+#else
 	uint32_t sec, nsec, tmp;
 	uint32_t q, r, t;
 
@@ -1267,17 +1292,17 @@ hrt2tv(hrtime_t hrt, struct timeval *tvp)
 		sec++;
 	}
 	tvp->tv_sec = (time_t)sec;
-/*
- * this routine is very similar to hr2ts, but requires microseconds
- * instead of nanoseconds, so an interger divide by 1000 routine
- * completes the conversion
- */
+	/*
+	 * this routine is very similar to hr2ts, but requires microseconds
+	 * instead of nanoseconds, so an interger divide by 1000 routine
+	 * completes the conversion
+	 */
 	t = (nsec >> 7) + (nsec >> 8) + (nsec >> 12);
 	q = (nsec >> 1) + t + (nsec >> 15) + (t >> 11) + (t >> 14);
 	q = q >> 9;
 	r = nsec - q*1000;
 	tvp->tv_usec = q + ((r + 24) >> 10);
-
+#endif /* defined(__amd64) */
 }
 
 int
