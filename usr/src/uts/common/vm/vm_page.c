@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 1986, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2015, Josef 'Jeff' Sipek <jeffpc@josefsipek.net>
+ * Copyright (c) 2015 by Delphix. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989  AT&T	*/
@@ -342,7 +343,6 @@ static void page_demote_vp_pages(page_t *);
 
 void
 pcf_init(void)
-
 {
 	if (boot_ncpus != -1) {
 		pcf_fanout = boot_ncpus;
@@ -5685,7 +5685,8 @@ next:
 	}
 }
 
-#define	MAX_CNT	60	/* max num of iterations */
+uint_t page_reclaim_maxcnt = 60; /* max total iterations */
+uint_t page_reclaim_nofree_maxcnt = 3; /* max iterations without progress */
 /*
  * Reclaim/reserve availrmem for npages.
  * If there is not enough memory start reaping seg, kmem caches.
@@ -5701,15 +5702,22 @@ int
 page_reclaim_mem(pgcnt_t npages, pgcnt_t epages, int adjust)
 {
 	int	i = 0;
+	int	i_nofree = 0;
 	int	ret = 0;
 	pgcnt_t	deficit;
-	pgcnt_t old_availrmem;
+	pgcnt_t old_availrmem = 0;
 
 	mutex_enter(&freemem_lock);
-	old_availrmem = availrmem - 1;
-	while ((availrmem < tune.t_minarmem + npages + epages) &&
-	    (old_availrmem < availrmem) && (i++ < MAX_CNT)) {
-		old_availrmem = availrmem;
+	while (availrmem < tune.t_minarmem + npages + epages &&
+	    i++ < page_reclaim_maxcnt) {
+		/* ensure we made some progress in the last few iterations */
+		if (old_availrmem < availrmem) {
+			old_availrmem = availrmem;
+			i_nofree = 0;
+		} else if (i_nofree++ >= page_reclaim_nofree_maxcnt) {
+			break;
+		}
+
 		deficit = tune.t_minarmem + npages + epages - availrmem;
 		mutex_exit(&freemem_lock);
 		page_needfree(deficit);
