@@ -1,4 +1,5 @@
 '\" te
+.\" Copyright 2016 James S Blachly, MD. All Rights Reserved.
 .\" Copyright 2013 OmniTI Computer Consulting, Inc. All Rights Reserved.
 .\" Copyright 1989 AT&T.  Copyright (c) 2009, Sun Microsystems, Inc.  All Rights Reserved.  Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
 .\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
@@ -8,7 +9,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH MMAP 2 "April 9, 2016"
+.TH MMAP 2 "August 29, 2016"
 .SH NAME
 mmap \- map pages of memory
 .SH SYNOPSIS
@@ -209,6 +210,18 @@ Map initialized data segment.
 .ad
 .RS 17n
 Map to the lower 32 bits of address space.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBMAP_FILE\fR\fR
+.ad
+.RS 17n
+Map a regular file. This is the default behavior;
+specifying this flag is not required. It is provided
+for compatibility with other systems and should not be
+included in new code.
 .RE
 
 .sp
