@@ -21,7 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include <sys/mutex.h>
@@ -1070,6 +1070,17 @@ contract_process_fork(ctmpl_process_t *rtmpl, proc_t *cp, proc_t *pp,
 		event->cte_type = CT_PR_EV_FORK;
 		(void) cte_publish_all(ct, event, nvl, NULL);
 	}
+
+	/*
+	 * Because the CT_PR_KEEP_EXEC flag is meant to be used by applications
+	 * which are not contract aware, we can assume that these applications
+	 * will never explicitly abandon the child's new contract. Thus, we
+	 * abandon it now.
+	 */
+	if (ctp->conp_params & CT_PR_KEEP_EXEC) {
+		contract_abandon(ct, pp, 1);
+	}
+
 	return (ctp);
 }
 
