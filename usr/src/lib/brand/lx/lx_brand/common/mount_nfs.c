@@ -233,9 +233,12 @@ typedef struct nfs_mnt_data {
 	int		nmd_retries;
 	ushort_t	nmd_nfs_port;
 	char		*nmd_nfs_proto;
+	ushort_t	nmd_mnt_port;
+	char		*nmd_mnt_proto;
 	char		*nmd_fstype;
 	seconfig_t	nmd_nfs_sec;
 	int		nmd_sec_opt;	/* any security option ? */
+	rpcvers_t	nmd_mnt_vers;
 	rpcvers_t	nmd_nfsvers;
 	rpcvers_t	nmd_nfsvers_to_use;
 	rpcvers_t	nmd_nfsretry_vers;
@@ -261,12 +264,12 @@ static int retry(struct mnttab *, int, nfs_mnt_data_t *);
 static int set_args(int *, struct nfs_args *, char *, struct mnttab *,
     nfs_mnt_data_t *);
 static int get_fh(struct nfs_args *, char *, char *, int *,
-	struct netconfig **, ushort_t, nfs_mnt_data_t *);
+	struct netconfig **, nfs_mnt_data_t *);
 static int make_secure(struct nfs_args *, char *, struct netconfig *,
 	rpcvers_t, nfs_mnt_data_t *);
 static int mount_nfs(struct mnttab *, int, err_ret_t *, nfs_mnt_data_t *);
 static int getaddr_nfs(struct nfs_args *, char *, struct netconfig **,
-	ushort_t, err_ret_t *, bool_t, nfs_mnt_data_t *);
+	err_ret_t *, bool_t, nfs_mnt_data_t *);
 static struct netbuf *get_addr(char *, rpcprog_t, rpcvers_t,
 	struct netconfig **, char *, ushort_t, struct t_info *, err_ret_t *);
 static struct netbuf *get_the_addr(char *, rpcprog_t, rpcvers_t,
@@ -374,7 +377,6 @@ mount_nfs(struct mnttab *mntp, int mntflags, err_ret_t *retry_error,
 	struct netconfig *nconf = NULL;
 	int vers = 0;
 	int r = 0;
-	ushort_t port;
 	char *colonp;
 	char *path;
 	char *host;
@@ -398,21 +400,13 @@ mount_nfs(struct mnttab *mntp, int mntflags, err_ret_t *retry_error,
 	(void) memset(argp, 0, sizeof (*argp));
 	(void) memset(&nmdp->nmd_nfs_sec, 0, sizeof (seconfig_t));
 	nmdp->nmd_sec_opt = 0;
-	port = 0;
 
 	/* returns a negative errno */
 	if ((r = set_args(&mntflags, argp, host, mntp, nmdp)) != 0)
 		goto out;
 
-	if (port == 0) {
-		port = nmdp->nmd_nfs_port;
-	} else if (nmdp->nmd_nfs_port != 0 && nmdp->nmd_nfs_port != port) {
-		r = -EINVAL;
-		goto out;
-	}
-
 	/* returns a negative errno or positive EAGAIN for retry */
-	r = get_fh(argp, host, path, &vers, &nconf, port, nmdp);
+	r = get_fh(argp, host, path, &vers, &nconf, nmdp);
 	if (r != 0) {
 		/* All attempts failed */
 		goto out;
@@ -420,13 +414,12 @@ mount_nfs(struct mnttab *mntp, int mntflags, err_ret_t *retry_error,
 
 	/*
 	 * Call to get_fh() above may have obtained the netconfig info and NULL
-	 * proc'd the server. This would be the case with v4
+	 * proc'd the server via a call to getaddr_nfs. This would only be the
+	 * case with v4.
 	 */
 	if (!(argp->flags & NFSMNT_KNCONF)) {
-		nconf = NULL;
 		/* returns a negative errno or positive EAGAIN for retry */
-		r = getaddr_nfs(argp, host, &nconf, port, retry_error, TRUE,
-		    nmdp);
+		r = getaddr_nfs(argp, host, &nconf, retry_error, TRUE, nmdp);
 		if (r != 0) {
 			goto out;
 		}
@@ -445,6 +438,8 @@ mount_nfs(struct mnttab *mntp, int mntflags, err_ret_t *retry_error,
 	if (r != 0)
 		r = -errno;
 out:
+	if (nconf != NULL)
+		freenetconfigent(nconf);
 	if (argp->fh)
 		free(argp->fh);
 	if (argp->pathconf)
@@ -468,8 +463,8 @@ out:
 }
 
 /*
- * These options are duplicated in uts/common/fs/nfs/nfs_dlinet.c
- * Changes must be made to both lists.
+ * These options were initially derived from uts/common/fs/nfs/nfs_dlinet.c
+ * but have been extended to add additional Linux options.
  */
 static char *optlist[] = {
 #define	OPT_RO		0
@@ -570,6 +565,13 @@ static char *optlist[] = {
 	MNTOPT_EXEC,
 #define	OPT_NOEXEC	48
 	MNTOPT_NOEXEC,
+#define	OPT_MNT_VERS	49
+	"mountvers",
+#define	OPT_MNT_PORT	50
+	"mountport",
+#define	OPT_MNT_PROTO	51
+	"mountproto",
+
 	NULL
 };
 
@@ -671,7 +673,7 @@ set_args(int *mntflags, struct nfs_args *args, char *fshost, struct mnttab *mnt,
 		case OPT_PORT:
 			if (convert_int(&num, val) != 0)
 				goto badopt;
-			nmdp->nmd_nfs_port = htons((ushort_t)num);
+			nmdp->nmd_nfs_port = num;
 			break;
 
 		case OPT_NOCTO:
@@ -816,6 +818,30 @@ set_args(int *mntflags, struct nfs_args *args, char *fshost, struct mnttab *mnt,
 			 */
 			attrpref = 1;
 			break;
+
+		case OPT_MNT_VERS:
+			if (convert_int(&num, val) != 0)
+				goto badopt;
+			nmdp->nmd_mnt_vers = (rpcvers_t)num;
+			invalid = 1;	/* Invalid as a native option */
+			break;
+
+		case OPT_MNT_PORT:
+			if (convert_int(&num, val) != 0)
+				goto badopt;
+			nmdp->nmd_mnt_port = num;
+			invalid = 1;	/* Invalid as a native option */
+			break;
+
+		case OPT_MNT_PROTO:
+			if (val == NULL)
+				goto badopt;
+			nmdp->nmd_mnt_proto = strdup(val);
+			if (nmdp->nmd_mnt_proto == NULL)
+				return (-ENOMEM);
+			invalid = 1;	/* Invalid as a native option */
+			break;
+
 		default:
 			invalid = 1;
 			break;
@@ -1585,6 +1611,61 @@ err2errno(int err)
 }
 
 /*
+ * Use our built-in netconfig table to lookup and construct a netconfig struct
+ * for the given netid.
+ */
+static struct netconfig *
+get_netconf(char *id)
+{
+	int i;
+	struct netconfig *nconf, *np;
+
+	if ((nconf = calloc(1, sizeof (struct netconfig))) == NULL)
+		return (NULL);
+
+	for (i = 0; i < N_NETCONF_ENTS; i++) {
+		np = &nca[i];
+		if (strcmp(np->nc_netid, id) != 0)
+			continue;
+
+		nconf->nc_semantics = np->nc_semantics;
+		if ((nconf->nc_netid = strdup(np->nc_netid)) == NULL)
+			goto out;
+		if ((nconf->nc_protofmly = strdup(np->nc_protofmly)) == NULL)
+			goto out;
+		if ((nconf->nc_proto = strdup(np->nc_proto)) == NULL)
+			goto out;
+		if ((nconf->nc_device = strdup(np->nc_device)) == NULL)
+			goto out;
+
+		return (nconf);
+	}
+
+out:
+	freenetconfigent(nconf);
+	return (NULL);
+}
+
+/*
+ * If the user provided a logical name for the NFS server, then the user-level
+ * mount command will have already resolved that name and passed it in using
+ * the 'addr' option (see convert_nfs_arg_str where we've already handled this).
+ * We construct a netbuf from that provided IP and a given port option.
+ *
+ * Note: this code may need to be revisited when we add IPv6 support.
+ */
+static struct netbuf *
+get_netbuf(struct netconfig *nconf, char *ip, ushort_t port)
+{
+	char buf[64];
+
+	assert(port != 0);
+	(void) snprintf(buf, sizeof (buf), "%s.%d.%d", ip,
+	    port >> 8 & 0xff, port & 0xff);
+	return (uaddr2taddr(nconf, buf));
+}
+
+/*
  * get fhandle of remote path from server's mountd
  *
  * Return a positive EAGAIN if the caller should retry and a -EAGAIN to
@@ -1593,14 +1674,14 @@ err2errno(int err)
  */
 static int
 get_fh(struct nfs_args *args, char *fshost, char *fspath, int *versp,
-    struct netconfig **nconfp, ushort_t port, nfs_mnt_data_t *nmdp)
+    struct netconfig **nconfp, nfs_mnt_data_t *nmdp)
 {
 	struct fhstatus fhs;
 	struct mountres3 mountres3;
 	struct pathcnf p;
 	nfs_fh3 *fh3p;
 	struct timeval timeout = { 25, 0};
-	CLIENT *cl;
+	CLIENT *cl = NULL;
 	enum clnt_stat rpc_stat;
 	rpcvers_t outvers = 0;
 	rpcvers_t vers_to_try;
@@ -1660,8 +1741,8 @@ get_fh(struct nfs_args *args, char *fshost, char *fspath, int *versp,
 
 		/* Let's hope for the best */
 		nmdp->nmd_nfsvers_to_use = NFS_V4;
-		retval = getaddr_nfs(args, fshost, nconfp,
-		    port, &error, vers_min == NFS_V4, nmdp);
+		retval = getaddr_nfs(args, fshost, nconfp, &error,
+		    vers_min == NFS_V4, nmdp);
 
 		if (retval == RET_OK) {
 			*versp = nmdp->nmd_nfsvers_to_use = NFS_V4;
@@ -1705,34 +1786,65 @@ get_fh(struct nfs_args *args, char *fshost, char *fspath, int *versp,
 			return (-err2errno(error.error_type));
 	}
 
-	while ((cl = clnt_create_vers(fshost, MOUNTPROG, &outvers,
-	    vers_min, vers_to_try, NULL)) == NULL) {
-		if (rpc_createerr.cf_stat == RPC_UNKNOWNHOST)
-			return (-EAGAIN);
+	if (nmdp->nmd_mnt_port != 0 && nmdp->nmd_mnt_proto != NULL) {
+		/* We have the necessary info to skip the call to rpcbind. */
+		struct netconfig *nconf;
 
-		/*
-		 * We don't want to downgrade version on lost packets
-		 */
-		if ((rpc_createerr.cf_stat == RPC_TIMEDOUT) ||
-		    (rpc_createerr.cf_stat == RPC_PMAPFAILURE))
-			return (EAGAIN);
+		outvers = nmdp->nmd_mnt_vers;
 
-		/*
-		 * back off and try the previous version - patch to the
-		 * problem of version numbers not being contigous and
-		 * clnt_create_vers failing (SunOS4.1 clients & SGI servers)
-		 * The problem happens with most non-Sun servers who
-		 * don't support mountd protocol #2. So, in case the
-		 * call fails, we re-try the call anyway.
-		 */
-		vers_to_try--;
-		if (vers_to_try < vers_min) {
-			if (rpc_createerr.cf_stat == RPC_PROGVERSMISMATCH)
-				return (-EAGAIN);
+		if ((nconf = get_netconf(nmdp->nmd_mnt_proto)) != NULL) {
+			struct netbuf *srvaddr;
 
-			return (EAGAIN);
+			srvaddr = get_netbuf(nconf, fshost, nmdp->nmd_mnt_port);
+			if (srvaddr != NULL) {
+				cl = clnt_tli_create(RPC_ANYFD, nconf, srvaddr,
+				    MOUNTPROG, outvers, 0, 0);
+				free(srvaddr->buf);
+				free(srvaddr);
+			}
+
+			freenetconfigent(nconf);
 		}
 	}
+
+	/*
+	 * If we cannot bypass the call to rpcbind then do the lookup of the
+	 * mountd via rpcbind now.
+	 */
+	if (cl == NULL) {
+		while ((cl = clnt_create_vers(fshost, MOUNTPROG, &outvers,
+		    vers_min, vers_to_try, NULL)) == NULL) {
+			if (rpc_createerr.cf_stat == RPC_UNKNOWNHOST)
+				return (-EAGAIN);
+
+			/*
+			 * We don't want to downgrade version on lost packets
+			 */
+			if ((rpc_createerr.cf_stat == RPC_TIMEDOUT) ||
+			    (rpc_createerr.cf_stat == RPC_PMAPFAILURE))
+				return (EAGAIN);
+
+			/*
+			 * Back off and try the previous version - patch to the
+			 * problem of version numbers not being contigous and
+			 * clnt_create_vers failing (SunOS4.1 clients & SGI
+			 * servers).
+			 * The problem happens with most non-Sun servers who
+			 * don't support mountd protocol #2. So, in case the
+			 * call fails, we re-try the call anyway.
+			 */
+			vers_to_try--;
+			if (vers_to_try < vers_min) {
+				if (rpc_createerr.cf_stat ==
+				    RPC_PROGVERSMISMATCH) {
+					return (-EAGAIN);
+				}
+
+				return (EAGAIN);
+			}
+		}
+	}
+
 	if (nmdp->nmd_posix && outvers < MOUNTVERS_POSIX) {
 		clnt_destroy(cl);
 		return (-EAGAIN);
@@ -1879,7 +1991,8 @@ get_fh(struct nfs_args *args, char *fshost, char *fspath, int *versp,
 		return (-EAGAIN);
 	}
 
-	clnt_destroy(cl);
+	if (cl != NULL)
+		clnt_destroy(cl);
 	return (0);
 
 autherr:
@@ -1897,11 +2010,10 @@ autherr:
  */
 static int
 getaddr_nfs(struct nfs_args *args, char *fshost, struct netconfig **nconfp,
-    ushort_t port, err_ret_t *error, bool_t print_rpcerror,
-    nfs_mnt_data_t *nmdp)
+    err_ret_t *error, bool_t print_rpcerror, nfs_mnt_data_t *nmdp)
 {
 	struct stat sb;
-	struct netconfig *nconf;
+	struct netconfig *nconf = NULL;
 	struct knetconfig *knconfp;
 	struct t_info tinfo;
 	err_ret_t addr_error;
@@ -1909,8 +2021,23 @@ getaddr_nfs(struct nfs_args *args, char *fshost, struct netconfig **nconfp,
 	SET_ERR_RET(error, ERR_PROTO_NONE, 0);
 	SET_ERR_RET(&addr_error, ERR_PROTO_NONE, 0);
 
-	args->addr = get_addr(fshost, NFS_PROGRAM, nmdp->nmd_nfsvers_to_use,
-	    nconfp, nmdp->nmd_nfs_proto, port, &tinfo, &addr_error);
+	if (nmdp->nmd_nfs_port != 0 && nmdp->nmd_nfs_proto != NULL) {
+		/* We have the necessary info to skip the call to rpcbind. */
+		nconf = get_netconf(nmdp->nmd_nfs_proto);
+		if (nconf != NULL) {
+			args->addr = get_netbuf(nconf, fshost,
+			    nmdp->nmd_nfs_port);
+
+			*nconfp = nconf;
+			tinfo.tsdu = 0;
+		}
+	}
+
+	if (args->addr == NULL) {
+		args->addr = get_addr(fshost, NFS_PROGRAM,
+		    nmdp->nmd_nfsvers_to_use, nconfp, nmdp->nmd_nfs_proto,
+		    htons(nmdp->nmd_nfs_port), &tinfo, &addr_error);
+	}
 
 	if (args->addr == NULL) {
 		switch (addr_error.error_type) {
@@ -1982,6 +2109,8 @@ getaddr_nfs(struct nfs_args *args, char *fshost, struct netconfig **nconfp,
 	knconfp->knc_protofmly = nconf->nc_protofmly;
 	knconfp->knc_proto = nconf->nc_proto;
 	knconfp->knc_rdev = sb.st_rdev;
+	args->flags |= NFSMNT_KNCONF;
+	args->knconf = knconfp;
 
 	/* make sure we don't overload the transport */
 	if (tinfo.tsdu > 0 && tinfo.tsdu < NFS_MAXDATA + NFS_RPC_HDR) {
@@ -1992,8 +2121,6 @@ getaddr_nfs(struct nfs_args *args, char *fshost, struct netconfig **nconfp,
 			args->wsize = tinfo.tsdu - NFS_RPC_HDR;
 	}
 
-	args->flags |= NFSMNT_KNCONF;
-	args->knconf = knconfp;
 	return (0);
 }
 
