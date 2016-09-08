@@ -14,29 +14,44 @@
  */
 
 #include <cp_defs.h>
+#include <vdso_defs.h>
 
 
-struct lx_timezone {
-	int tz_minuteswest;	/* minutes W of Greenwich */
-	int tz_dsttime;		/* type of dst correction */
-};
+#if defined(__i386)
 
-extern comm_page_t *__vdso_find_commpage();
-extern int __vdso_sys_gettimeofday(timespec_t *, struct lx_timezone *);
-extern time_t __vdso_sys_time(time_t *);
-extern long __vdso_sys_clock_gettime(uint_t, timespec_t *);
+long
+__vdso_clock_gettime(uint_t clock_id, timespec_t *tp)
+{
+	comm_page_t *cp = __vdso_find_commpage();
 
-#define	LX_CLOCK_REALTIME		0	/* CLOCK_REALTIME	*/
-#define	LX_CLOCK_MONOTONIC		1	/* CLOCK_HIGHRES	*/
-#define	LX_CLOCK_PROCESS_CPUTIME_ID	2	/* Emulated		*/
-#define	LX_CLOCK_THREAD_CPUTIME_ID	3	/* Emulated		*/
-#define	LX_CLOCK_MONOTONIC_RAW		4	/* CLOCK_HIGHRES	*/
-#define	LX_CLOCK_REALTIME_COARSE	5	/* CLOCK_REALTIME	*/
-#define	LX_CLOCK_MONOTONIC_COARSE	6	/* CLOCK_HIGHRES	*/
+	if (__cp_can_gettime(cp) == 0) {
+		return (__vdso_sys_clock_gettime(clock_id, tp));
+	}
 
+	switch (clock_id) {
+	case LX_CLOCK_REALTIME:
+	case LX_CLOCK_REALTIME_COARSE:
+		return (__cp_clock_gettime_realtime(cp, tp));
 
+	case LX_CLOCK_MONOTONIC:
+	case LX_CLOCK_MONOTONIC_RAW:
+	case LX_CLOCK_MONOTONIC_COARSE:
+		return (__cp_clock_gettime_monotonic(cp, tp));
+
+	case LX_CLOCK_PROCESS_CPUTIME_ID:
+	case LX_CLOCK_THREAD_CPUTIME_ID:
+	default:
+		return (__vdso_sys_clock_gettime(clock_id, tp));
+	}
+}
+
+/*
+ * On i386, the implementation of __cp_clock_gettime_monotonic expects that an
+ * hrt2ts function is provided.  It is provided below since the vDSO is
+ * operating on its own, without native libc.
+ */
 void
-__hrt2ts(hrtime_t hrt, timespec_t *tsp)
+hrt2ts(hrtime_t hrt, timespec_t *tsp)
 {
 	uint32_t sec, nsec, tmp;
 
@@ -61,40 +76,34 @@ __hrt2ts(hrtime_t hrt, timespec_t *tsp)
 	tsp->tv_nsec = nsec;
 }
 
+#else
+
+/*
+ * On amd64, the __vdso_clock_gettime function is implemented in asm to stay
+ * within the allowed stack budget.
+ */
+
+#endif /* defined(__i386) */
+
+
 int
 __vdso_gettimeofday(timespec_t *tp, struct lx_timezone *tz)
 {
-	comm_page_t *cp = __vdso_find_commpage();
-
-	if (__cp_can_gettime(cp) != 0) {
-		return (__vdso_sys_gettimeofday(tp, tz));
-	}
-
-	if (tp != NULL) {
-		long usec, nsec;
-
-		__cp_clock_gettime_realtime(cp, tp);
-
-		nsec = tp->tv_nsec;
-		usec = nsec + (nsec >> 2);
-		usec = nsec + (usec >> 1);
-		usec = nsec + (usec >> 2);
-		usec = nsec + (usec >> 4);
-		usec = nsec - (usec >> 3);
-		usec = nsec + (usec >> 2);
-		usec = nsec + (usec >> 3);
-		usec = nsec + (usec >> 4);
-		usec = nsec + (usec >> 1);
-		usec = nsec + (usec >> 6);
-		usec = usec >> 10;
-		tp->tv_nsec = usec;
-	}
-
 	if (tz != NULL) {
 		tz->tz_minuteswest = 0;
 		tz->tz_dsttime = 0;
 	}
 
+	if (tp != NULL) {
+		comm_page_t *cp = __vdso_find_commpage();
+
+		if (__cp_can_gettime(cp) == 0) {
+			return (__vdso_sys_gettimeofday(tp, tz));
+		}
+
+		__cp_clock_gettime_realtime(cp, tp);
+		tp->tv_nsec /= 1000;
+	}
 	return (0);
 }
 
@@ -104,7 +113,7 @@ __vdso_time(time_t *tp)
 	comm_page_t *cp = __vdso_find_commpage();
 	timespec_t ts;
 
-	if (__cp_can_gettime(cp) != 0) {
+	if (__cp_can_gettime(cp) == 0) {
 		return (__vdso_sys_time(tp));
 	}
 
@@ -115,36 +124,7 @@ __vdso_time(time_t *tp)
 	return (ts.tv_sec);
 }
 
-long
-__vdso_clock_gettime(uint_t clock_id, timespec_t *tp)
-{
-	comm_page_t *cp = __vdso_find_commpage();
-
-	if (__cp_can_gettime(cp) != 0) {
-		return (__vdso_sys_clock_gettime(clock_id, tp));
-	}
-
-	switch (clock_id) {
-	case LX_CLOCK_REALTIME:
-	case LX_CLOCK_REALTIME_COARSE:
-		__cp_clock_gettime_realtime(cp, tp);
-		return (0);
-
-	case LX_CLOCK_MONOTONIC:
-	case LX_CLOCK_MONOTONIC_RAW:
-	case LX_CLOCK_MONOTONIC_COARSE:
-		__hrt2ts(__cp_gethrtime(cp), tp);
-		return (0);
-
-	case LX_CLOCK_PROCESS_CPUTIME_ID:
-	case LX_CLOCK_THREAD_CPUTIME_ID:
-	default:
-		break;
-	}
-	return (__vdso_sys_clock_gettime(clock_id, tp));
-}
-
-long
+int
 __vdso_getcpu(uint_t *cpu, uint_t *node, void *tcache)
 {
 	comm_page_t *cp = __vdso_find_commpage();

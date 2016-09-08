@@ -21,6 +21,9 @@ pics/%.o: $(SRC)/lib/commpage/common/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
 
-pics/%.o: $(SRC)/lib/commpage/$(TARGET_ARCH)/%.s
+pics/%.o: $(SRC)/lib/commpage/$(TARGET_ARCH)/%.s $(COMMPAGE_OFFSETS_H)
 	$(COMPILE.s) -o $@ $<
 	$(POST_PROCESS_O)
+
+$(COMMPAGE_OFFSETS_H): $(COMMPAGE_OFFSETS_SRC)
+	$(OFFSETS_CREATE) <$(COMMPAGE_OFFSETS_SRC) >$@

@@ -23,6 +23,9 @@ ASFLAGS += -D__$(MACH64)
 
 SONAME = linux-vdso.so.1
 
+# Disable save-args since some vDSO consumers are sensitive to stack usage.
+SAVEARGS =
+
 #
 # You might ask, why aren't we overriding BUILD.SO in Makefile.com.
 # That's a sad story. The answer is that Makefile.lib.64 includes

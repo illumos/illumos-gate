@@ -27,7 +27,8 @@ typedef struct comm_page comm_page_t;
 
 extern uint_t __cp_can_gettime(comm_page_t *);
 extern hrtime_t __cp_gethrtime(comm_page_t *);
-extern void __cp_clock_gettime_realtime(comm_page_t *, timespec_t *);
+extern int __cp_clock_gettime_realtime(comm_page_t *, timespec_t *);
+extern int __cp_clock_gettime_monotonic(comm_page_t *, timespec_t *);
 extern uint_t __cp_getcpu(comm_page_t *cp);
 
 #ifdef	__cplusplus
