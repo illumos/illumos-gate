@@ -37,8 +37,8 @@ CPP=		/usr/lib/cpp
 TARGET_ARCH=	amd64
 
 # include comm page definitions
-include $(SRC)/lib/commpage/Makefile.shared.targ
 include $(SRC)/lib/commpage/Makefile.shared.com
+include $(SRC)/lib/commpage/Makefile.shared.targ
 
 # objects are grouped by source directory
 
@@ -1066,7 +1066,7 @@ BUILD.AR= $(RM) $@ ; \
 	$(AR) q $@ `$(LORDER) $(MOSTOBJS:%=$(DIR)/%) | $(GREP) -v ' L ' | $(TSORT)`
 
 # extra files for the clean target
-CLEANFILES=			\
+CLEANFILES+=			\
 	$(LIBCDIR)/port/gen/errlst.c	\
 	$(LIBCDIR)/port/gen/new_list.c	\
 	assym.h			\

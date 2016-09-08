@@ -52,7 +52,7 @@ ASFLAGS =	-P $(ASFLAGS_$(CURTYPE)) -D_ASM
 
 LIBS =		$(DYNLIB)
 
-CLEANFILES =	$(DYNLIB)
+CLEANFILES +=	$(DYNLIB)
 ROOTLIBDIR =	$(ROOT)/usr/lib/brand/lx
 ROOTLIBDIR64 =	$(ROOT)/usr/lib/brand/lx/$(MACH64)
 
@@ -81,5 +81,5 @@ pics/%.o: $(ISASRCDIR)/%.s
 	$(COMPILE.s) -o $@ $<
 	$(POST_PROCESS_O)
 
-pics/vdso_main.o := CPPFLAGS += $(COMMPAGE_CPPFLAGS)
-pics/vdso_subr.o := ASFLAGS += -I$(SRC)/uts/common/brand/lx
+pics/vdso_main.o := CPPFLAGS += $(COMMPAGE_CPPFLAGS) -I$(SRCDIR)
+pics/vdso_subr.o := ASFLAGS += -I$(SRC)/uts/common/brand/lx -I$(SRCDIR)

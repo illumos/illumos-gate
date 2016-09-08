@@ -17,6 +17,7 @@
 #include <sys/segments.h>
 #include <sys/time_impl.h>
 #include <sys/tsc.h>
+#include <cp_offsets.h>
 
 #define	GETCPU_GDT_OFFSET	SEL_GDT(GDT_CPUID, SEL_UPL)
 
@@ -25,122 +26,125 @@
 /*
  * hrtime_t
  * __cp_tsc_read(uint_t cp_tsc_type)
+ *
+ * Stack usage: 0x18 bytes
  */
 	ENTRY_NP(__cp_tsc_read)
-	movl	4(%esp), %eax
-	cmpl	$TSC_TSCP, %eax
-	je	1f
-	cmpl	$TSC_RDTSC_MFENCE, %eax
-	je	2f
-	cmpl	$TSC_RDTSC_LFENCE, %eax
-	je	3f
-	cmpl	$TSC_RDTSC_CPUID, %eax
-	je	4f
-	ud2a	/* abort with SIGILL */
-1:
-	rdtscp
-	ret
-2:
-	mfence
-	rdtsc
-	ret
-3:
-	lfence
-	rdtsc
-	ret
-4:
-	pushl	%ebx
-	xorl	%eax, %eax
-	cpuid
-	rdtsc
-	popl	%ebx
-	ret
-	SET_SIZE(__cp_tsc_read)
-
-/*
- * hrtime_t
- *  __cp_tsc_readcpu(uint_t cp_tsc_type, uint_t *cpu_id)
- */
-	ENTRY_NP(__cp_tsc_readcpu)
-	/*
-	 * Both time and cpu_id can be queried quickly (using few registers) on
-	 * systems which support RDTSCP.  On each cpu, the cpu_id is stored in
-	 * the TSC_AUX MSR by the kernel.
-	 */
-	movl	4(%esp), %eax
-	cmpl	$TSC_TSCP, %eax
-	jne	1f
-	rdtscp
-	pushl	%eax
-	movl	0xc(%esp), %eax
-	movl	%ecx, (%eax)
-	popl	%eax
-	ret
-1:
-	/*
-	 * Since the other methods of querying the TSC and cpu_id are
-	 * vulnurable to CPU migrations, build a proper stack frame so a more
-	 * complicated and thorough check and be performed.
-	 */
 	pushl	%ebp
 	movl	%esp, %ebp
 	pushl	%edi
 	pushl	%esi
-	movl	%eax, %edi
+	subl	$0x4, %esp
+
+	movl	0x8(%ebp), %edi
+	movl	CP_TSC_TYPE(%edi), %eax
+	movl	CP_TSC_NCPU(%edi), %esi
+	cmpl	$TSC_TSCP, %eax
+	jne	3f
+	rdtscp
+	cmpl	$0, %esi
+	jne	2f
+1:
+	addl	$0x4, %esp
+	popl	%esi
+	popl	%edi
+	leave
+	ret
 2:
+	/*
+	 * When cp_tsc_ncpu is non-zero, it indicates the length of the
+	 * cp_tsc_sync_tick_delta array, which contains per-CPU offsets for the
+	 * TSC.  The CPU ID furnished by the IA32_TSC_AUX register via rdtscp
+	 * is used to look up an offset value in that array and apply it to the
+	 * TSC reading.
+	 */
+	leal	CP_TSC_SYNC_TICK_DELTA(%edi), %esi
+	leal	(%esi, %ecx, 8), %ecx
+	addl	(%ecx), %eax
+	adcl	0x4(%ecx), %edx
+	jmp	1b
+
+3:
+	cmpl	$0, %esi
+	je	4f
 	mov	$GETCPU_GDT_OFFSET, %eax
 	lsl	%ax, %eax
-	movl	%eax, %esi
-	cmpl	$TSC_RDTSC_MFENCE, %edi
-	je	3f
-	cmpl	$TSC_RDTSC_LFENCE, %edi
-	je	4f
-	cmpl	$TSC_RDTSC_CPUID, %edi
-	je	5f
-	ud2a	/* abort with SIGILL */
-3:
+	movl	%eax, (%esp)
+	movl	CP_TSC_TYPE(%edi), %eax
+
+4:
+	cmpl	$TSC_RDTSC_MFENCE, %eax
+	jne	5f
 	mfence
 	rdtsc
-	jmp 6f
-4:
+	jmp	8f
+
+5:
+	cmpl	$TSC_RDTSC_LFENCE, %eax
+	jne	6f
 	lfence
 	rdtsc
-	jmp 6f
-5:
+	jmp	8f
+
+6:
+	cmpl	$TSC_RDTSC_CPUID, %eax
+	jne	7f
 	pushl	%ebx
 	xorl	%eax, %eax
 	cpuid
 	rdtsc
 	popl	%ebx
-6:
+	jmp	8f
+
+7:
+	/*
+	 * Other protections should have prevented this function from being
+	 * called in the first place.  The only sane action is to abort.
+	 * The easiest means in this context is via SIGILL.
+	 */
+	ud2a
+
+8:
+
+	cmpl	$0, %esi
+	je	1b
 	/*
 	 * With a TSC reading in-hand, confirm that the thread has not migrated
 	 * since the cpu_id was first checked.
 	 */
-	pushl	%eax
-	mov	$GETCPU_GDT_OFFSET, %eax
-	lsl	%ax, %eax
-	cmpl	%eax, %esi
-	jne	2b
-	movl	0xc(%ebp), %edi
-	mov	%eax, (%edi)
-	popl	%eax
-	popl	%esi
-	popl	%edi
-	leave
-	ret
-	SET_SIZE(__cp_tsc_readcpu)
+	movl	$GETCPU_GDT_OFFSET, %ecx
+	lsl	%cx, %ecx
+	movl	(%esp), %esi
+	cmpl	%ecx, %esi
+	je	9f
+	/*
+	 * There was a CPU migration, perform another reading.
+	 */
+	movl	%eax, (%esp)
+	movl	CP_TSC_NCPU(%edi), %esi
+	movl	CP_TSC_TYPE(%edi), %eax
+	jmp	4b
+
+9:
+	/* Grab the per-cpu offset and add it to the TSC result */
+	leal	CP_TSC_SYNC_TICK_DELTA(%edi), %esi
+	leal	(%esi, %ecx, 8), %ecx
+	addl	(%ecx), %eax
+	adcl	0x4(%ecx), %edx
+	jmp	1b
+	SET_SIZE(__cp_tsc_read)
 
 /*
  * uint_t
- * __cp_do_getcpu(uint_t cp_tsc_type)
+ * __cp_getcpu(uint_t cp_tsc_type)
  */
-	ENTRY_NP(__cp_do_getcpu)
+	ENTRY_NP(__cp_getcpu)
 	/*
 	 * If RDTSCP is available, it is a quick way to grab the cpu_id which
 	 * is stored in the TSC_AUX MSR by the kernel.
 	 */
 	movl	4(%esp), %eax
+	movl	CP_TSC_TYPE(%eax), %eax
 	cmpl	$TSC_TSCP, %eax
 	jne	1f
 	rdtscp
@@ -150,4 +154,4 @@
 	mov	$GETCPU_GDT_OFFSET, %eax
 	lsl	%ax, %eax
 	ret
-	SET_SIZE(__cp_do_getcpu)
+	SET_SIZE(__cp_getcpu)

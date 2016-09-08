@@ -13,16 +13,41 @@
  * Copyright 2016 Joyent, Inc.
  */
 
-
 #include <sys/comm_page.h>
 #include <sys/tsc.h>
+
+
+/*
+ * Interrogate if querying the clock via the comm page is possible.
+ */
+int
+__cp_can_gettime(comm_page_t *cp)
+{
+	switch (cp->cp_tsc_type) {
+	case TSC_TSCP:
+	case TSC_RDTSC_MFENCE:
+	case TSC_RDTSC_LFENCE:
+	case TSC_RDTSC_CPUID:
+		return (1);
+	default:
+		break;
+	}
+	return (0);
+}
+
+#ifdef __amd64
+
+/*
+ * The functions used for calculating time (both monotonic and wall-clock) are
+ * implemented in assembly on amd64.  This is primarily for stack conservation.
+ */
+
+#else /* i386 below */
 
 /*
  * ASM-defined functions.
  */
-extern hrtime_t __cp_tsc_read(uint_t);
-extern hrtime_t __cp_tsc_readcpu(uint_t, uint_t *);
-extern uint_t __cp_do_getcpu(uint_t);
+extern hrtime_t __cp_tsc_read(comm_page_t *);
 
 /*
  * These are cloned from TSC and time related code in the kernel.  The should
@@ -38,7 +63,6 @@ extern uint_t __cp_do_getcpu(uint_t);
 	(hrt) += (uint64_t)(_l[1] * sc) << NSEC_SHIFT;		\
 	(hrt) += (uint64_t)(_l[0] * sc) >> (32 - NSEC_SHIFT);	\
 } while (0)
-
 
 /*
  * Userspace version of tsc_gethrtime.
@@ -66,35 +90,12 @@ __cp_gethrtime(comm_page_t *cp)
 	 * this check.  Such a possibility is considered an acceptable risk.
 	 *
 	 */
-	if (cp->cp_tsc_ncpu == 0) {
-		/*
-		 * No per-CPU offset data, use the simple hres_lock loop.
-		 */
-		do {
-			old_hres_lock = cp->cp_hres_lock;
-			tsc_last = cp->cp_tsc_last;
-			hrt = cp->cp_tsc_hrtime_base;
-			tsc = __cp_tsc_read(cp->cp_tsc_type);
-		} while ((old_hres_lock & ~1) != cp->cp_hres_lock);
-	} else {
-		/*
-		 * Per-CPU offset data is needed for an accurate TSC reading.
-		 */
-		do {
-			uint_t cpu_id;
-
-			old_hres_lock = cp->cp_hres_lock;
-			tsc_last = cp->cp_tsc_last;
-			hrt = cp->cp_tsc_hrtime_base;
-			/*
-			 * When collecting the TSC and cpu_id, cp_tsc_readcpu
-			 * will accurately detect CPU migrations in all but
-			 * the most pathological scheduling conditions.
-			 */
-			tsc = __cp_tsc_readcpu(cp->cp_tsc_type, &cpu_id);
-			tsc += cp->cp_tsc_sync_tick_delta[cpu_id];
-		} while ((old_hres_lock & ~1) != cp->cp_hres_lock);
-	}
+	do {
+		old_hres_lock = cp->cp_hres_lock;
+		tsc_last = cp->cp_tsc_last;
+		hrt = cp->cp_tsc_hrtime_base;
+		tsc = __cp_tsc_read(cp);
+	} while ((old_hres_lock & ~1) != cp->cp_hres_lock);
 
 	if (tsc >= tsc_last) {
 		tsc -= tsc_last;
@@ -112,10 +113,10 @@ __cp_gethrtime(comm_page_t *cp)
  * Userspace version of pc_gethrestime.
  * See: uts/i86pc/os/machdep.c
  */
-void
-__cp_clock_gettime_realtime(comm_page_t *cp, timespec_t *tp)
+int
+__cp_clock_gettime_realtime(comm_page_t *cp, timespec_t *tsp)
 {
-	int lock_prev, nslt, adj;
+	int lock_prev, nslt;
 	timespec_t now;
 	int64_t hres_adj;
 
@@ -132,54 +133,52 @@ loop:
 		goto loop;
 	}
 	now.tv_nsec += nslt;
-	if (hres_adj != 0) {
-		if (hres_adj > 0) {
-			adj = (nslt >> ADJ_SHIFT);
-			if (adj > hres_adj)
-				adj = (int)hres_adj;
-		} else {
-			adj = -(nslt >> ADJ_SHIFT);
-			if (adj < hres_adj)
-				adj = (int)hres_adj;
-		}
-		now.tv_nsec += adj;
+
+	/*
+	 * Apply hres_adj skew, if needed.
+	 */
+	if (hres_adj > 0) {
+		nslt = (nslt >> ADJ_SHIFT);
+		if (nslt > hres_adj)
+			nslt = (int)hres_adj;
+		now.tv_nsec += nslt;
+	} else if (hres_adj < 0) {
+		nslt = -(nslt >> ADJ_SHIFT);
+		if (nslt < hres_adj)
+			nslt = (int)hres_adj;
+		now.tv_nsec += nslt;
 	}
+
+	/*
+	 * Rope in tv_nsec from any excessive adjustments.
+	 */
 	while ((unsigned long)now.tv_nsec >= NANOSEC) {
-		/*
-		 * Rope in tv_nsec from any excessive adjustments.
-		 */
 		now.tv_nsec -= NANOSEC;
 		now.tv_sec++;
 	}
+
 	if ((cp->cp_hres_lock & ~1) != lock_prev)
 		goto loop;
 
-	*tp = now;
+	*tsp = now;
+	return (0);
 }
 
 /*
- * Interrogate if querying the clock via the comm page is possible.
+ * The __cp_clock_gettime_monotonic function expects that hrt2ts be present
+ * when the code is finally linked.
+ * (The amd64 version has no such requirement.)
  */
+extern void hrt2ts(hrtime_t, timespec_t *);
+
 int
-__cp_can_gettime(comm_page_t *cp)
+__cp_clock_gettime_monotonic(comm_page_t *cp, timespec_t *tsp)
 {
-	switch (cp->cp_tsc_type) {
-	case TSC_TSCP:
-	case TSC_RDTSC_MFENCE:
-	case TSC_RDTSC_LFENCE:
-	case TSC_RDTSC_CPUID:
-		return (0);
-	default:
-		break;
-	}
-	return (1);
+	hrtime_t hrt;
+
+	hrt = __cp_gethrtime(cp);
+	hrt2ts(hrt, tsp);
+	return (0);
 }
 
-/*
- * Query which CPU this LWP is running on.
- */
-uint_t
-__cp_getcpu(comm_page_t *cp)
-{
-	return (__cp_do_getcpu(cp->cp_tsc_type));
-}
+#endif /* __amd64 */

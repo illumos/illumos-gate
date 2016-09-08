@@ -25,16 +25,14 @@ __clock_gettime(clockid_t clock_id, timespec_t *tp)
 {
 	comm_page_t *cp = (comm_page_t *)__uberdata.ub_comm_page;
 
-	if (cp != NULL && __cp_can_gettime(cp) == 0) {
+	if (cp != NULL && __cp_can_gettime(cp) != 0) {
 		switch (clock_id) {
 		case __CLOCK_REALTIME0:
 		case CLOCK_REALTIME:
-			__cp_clock_gettime_realtime(cp, tp);
-			return (0);
+			return (__cp_clock_gettime_realtime(cp, tp));
 
 		case CLOCK_MONOTONIC:
-			hrt2ts(__cp_gethrtime(cp), tp);
-			return (0);
+			return (__cp_clock_gettime_monotonic(cp, tp));
 
 		default:
 			/* Fallback */

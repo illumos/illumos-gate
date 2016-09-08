@@ -35,8 +35,8 @@ CPP=		/usr/lib/cpp
 TARGET_ARCH=	i386
 
 # include comm page definitions
-include $(SRC)/lib/commpage/Makefile.shared.targ
 include $(SRC)/lib/commpage/Makefile.shared.com
+include $(SRC)/lib/commpage/Makefile.shared.targ
 
 VALUES=		values-Xa.o
 
@@ -1127,7 +1127,7 @@ BUILD.AR= $(RM) $@ ; \
 	$(AR) q $@ `$(LORDER) $(MOSTOBJS:%=$(DIR)/%) | $(GREP) -v ' L ' | $(TSORT)`
 
 # extra files for the clean target
-CLEANFILES=			\
+CLEANFILES+=			\
 	$(LIBCDIR)/port/gen/errlst.c	\
 	$(LIBCDIR)/port/gen/new_list.c	\
 	assym.h			\
