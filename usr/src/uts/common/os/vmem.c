@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright (c) 2012, 2015 by Delphix. All rights reserved.
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
 
@@ -935,7 +935,7 @@ vmem_canalloc(vmem_t *vmp, size_t size)
  */
 void *
 vmem_xalloc(vmem_t *vmp, size_t size, size_t align_arg, size_t phase,
-	size_t nocross, void *minaddr, void *maxaddr, int vmflag)
+    size_t nocross, void *minaddr, void *maxaddr, int vmflag)
 {
 	vmem_seg_t *vsp;
 	vmem_seg_t *vbest = NULL;
@@ -1379,7 +1379,7 @@ vmem_add(vmem_t *vmp, void *vaddr, size_t size, int vmflag)
  */
 void
 vmem_walk(vmem_t *vmp, int typemask,
-	void (*func)(void *, void *, size_t), void *arg)
+    void (*func)(void *, void *, size_t), void *arg)
 {
 	vmem_seg_t *vsp;
 	vmem_seg_t *seg0 = &vmp->vm_seg0;
@@ -1443,9 +1443,9 @@ vmem_size(vmem_t *vmp, int typemask)
  */
 static vmem_t *
 vmem_create_common(const char *name, void *base, size_t size, size_t quantum,
-	void *(*afunc)(vmem_t *, size_t, int),
-	void (*ffunc)(vmem_t *, void *, size_t),
-	vmem_t *source, size_t qcache_max, int vmflag)
+    void *(*afunc)(vmem_t *, size_t, int),
+    void (*ffunc)(vmem_t *, void *, size_t),
+    vmem_t *source, size_t qcache_max, int vmflag)
 {
 	int i;
 	size_t nqcache;
@@ -1647,6 +1647,12 @@ vmem_destroy(vmem_t *vmp)
 }
 
 /*
+ * Only shrink vmem hashtable if it is 1<<vmem_rescale_minshift times (8x)
+ * larger than necessary.
+ */
+int vmem_rescale_minshift = 3;
+
+/*
  * Resize vmp's hash table to keep the average lookup depth near 1.0.
  */
 static void
@@ -1661,7 +1667,8 @@ vmem_hash_rescale(vmem_t *vmp)
 	new_size = MAX(VMEM_HASH_INITIAL, 1 << (highbit(3 * nseg + 4) - 2));
 	old_size = vmp->vm_hash_mask + 1;
 
-	if ((old_size >> 1) <= new_size && new_size <= (old_size << 1))
+	if ((old_size >> vmem_rescale_minshift) <= new_size &&
+	    new_size <= (old_size << 1))
 		return;
 
 	new_table = vmem_alloc(vmem_hash_arena, new_size * sizeof (void *),
@@ -1743,9 +1750,9 @@ vmem_qcache_reap(vmem_t *vmp)
  */
 vmem_t *
 vmem_init(const char *heap_name,
-	void *heap_start, size_t heap_size, size_t heap_quantum,
-	void *(*heap_alloc)(vmem_t *, size_t, int),
-	void (*heap_free)(vmem_t *, void *, size_t))
+    void *heap_start, size_t heap_size, size_t heap_quantum,
+    void *(*heap_alloc)(vmem_t *, size_t, int),
+    void (*heap_free)(vmem_t *, void *, size_t))
 {
 	uint32_t id;
 	int nseg = VMEM_SEG_INITIAL;
