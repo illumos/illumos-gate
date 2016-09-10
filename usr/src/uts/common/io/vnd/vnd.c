@@ -2162,7 +2162,10 @@ vnd_mac_input(vnd_str_t *vsp, mac_resource_t *unused, mblk_t *mp_chain,
 		mp->b_rptr -= mhip->mhi_hdrsize;
 		vid = VLAN_ID(mhip->mhi_tci);
 		if (mhip->mhi_istagged && vid != VLAN_ID_NONE) {
-			bcopy(mp->b_rptr, mp->b_rptr + 4, 12);
+			/*
+			 * This is an overlapping copy. Do not use bcopy(9F).
+			 */
+			memmove(mp->b_rptr + 4, mp->b_rptr, 12);
 			mp->b_rptr += 4;
 		}
 
@@ -2180,7 +2183,6 @@ vnd_mac_input(vnd_str_t *vsp, mac_resource_t *unused, mblk_t *mp_chain,
 		signal |= vnd_dq_push(&vsp->vns_dq_read, mp, B_FALSE,
 		    vnd_drop_in);
 		mutex_exit(&vsp->vns_dq_read.vdq_lock);
-
 	}
 
 	if (signal != 0) {
