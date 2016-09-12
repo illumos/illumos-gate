@@ -1011,6 +1011,9 @@ file \
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zfs_rename/zfs_rename_013_pos \
     mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/cli_root/zfs_rename/zfs_rename_014_neg \
+    mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_reservation/cleanup \
     mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_reservation/setup \
