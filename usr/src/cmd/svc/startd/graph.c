@@ -22,7 +22,6 @@
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2015, Syneto S.R.L. All rights reserved.
- * Copyright 2016 RackTop Systems.
  */
 
 /*
@@ -208,6 +207,7 @@ int info_events_all;
 
 #define	is_depgrp_bypassed(v) ((v->gv_type == GVT_GROUP) && \
 	((v->gv_depgroup == DEPGRP_EXCLUDE_ALL) || \
+	(v->gv_depgroup == DEPGRP_OPTIONAL_ALL) || \
 	(v->gv_restart < RERR_RESTART)))
 
 static uu_list_pool_t *graph_edge_pool, *graph_vertex_pool;
@@ -530,8 +530,8 @@ graph_walk_dependents(graph_vertex_t *v, void (*func)(graph_vertex_t *, void *),
 }
 
 static void
-graph_walk_dependencies(graph_vertex_t *v,
-    void (*func)(graph_vertex_t *, void *), void *arg)
+graph_walk_dependencies(graph_vertex_t *v, void (*func)(graph_vertex_t *,
+	void *), void *arg)
 {
 	graph_edge_t *e;
 
@@ -1328,11 +1328,15 @@ optional_all_satisfied(graph_vertex_t *groupv, boolean_t satbility)
 
 		switch (v->gv_type) {
 		case GVT_INST:
-			/* Skip missing instances */
-			if ((v->gv_flags & GV_CONFIGURED) == 0)
+			/* Skip missing or disabled instances */
+			if ((v->gv_flags & (GV_CONFIGURED | GV_ENABLED)) !=
+			    (GV_CONFIGURED | GV_ENABLED))
 				continue;
 
 			if (v->gv_state == RESTARTER_STATE_MAINT)
+				continue;
+
+			if (v->gv_flags & GV_TOOFFLINE)
 				continue;
 
 			any_qualified = B_TRUE;
@@ -1346,11 +1350,11 @@ optional_all_satisfied(graph_vertex_t *groupv, boolean_t satbility)
 					i = 1;
 			} else if (v->gv_state == RESTARTER_STATE_DISABLED) {
 				/*
-				 * If the instance is transitioning out of
-				 * disabled the dependency is temporarily
-				 * unsatisfied (not unsatisfiable).
+				 * The service is enabled, but hasn't
+				 * transitioned out of disabled yet.  Treat it
+				 * as unsatisfied (not unsatisfiable).
 				 */
-				i = v->gv_flags & GV_ENABLED ? 0 : 1;
+				i = 0;
 			} else {
 				i = dependency_satisfied(v, satbility);
 			}
@@ -1363,9 +1367,68 @@ optional_all_satisfied(graph_vertex_t *groupv, boolean_t satbility)
 			break;
 
 		case GVT_SVC: {
-			any_qualified = B_TRUE;
-			i = optional_all_satisfied(v, satbility);
+			boolean_t svc_any_qualified;
+			boolean_t svc_satisfied;
+			boolean_t svc_satisfiable;
+			graph_vertex_t *v2;
+			graph_edge_t *e2;
 
+			svc_any_qualified = B_FALSE;
+			svc_satisfied = B_FALSE;
+			svc_satisfiable = B_FALSE;
+
+			for (e2 = uu_list_first(v->gv_dependencies);
+			    e2 != NULL;
+			    e2 = uu_list_next(v->gv_dependencies, e2)) {
+				v2 = e2->ge_vertex;
+				assert(v2->gv_type == GVT_INST);
+
+				if ((v2->gv_flags &
+				    (GV_CONFIGURED | GV_ENABLED)) !=
+				    (GV_CONFIGURED | GV_ENABLED))
+					continue;
+
+				if (v2->gv_state == RESTARTER_STATE_MAINT)
+					continue;
+
+				if (v2->gv_flags & GV_TOOFFLINE)
+					continue;
+
+				svc_any_qualified = B_TRUE;
+
+				if (v2->gv_state == RESTARTER_STATE_OFFLINE) {
+					/*
+					 * For offline dependencies, treat
+					 * unsatisfiable as satisfied.
+					 */
+					i = dependency_satisfied(v2, B_TRUE);
+					if (i == -1)
+						i = 1;
+				} else if (v2->gv_state ==
+				    RESTARTER_STATE_DISABLED) {
+					i = 0;
+				} else {
+					i = dependency_satisfied(v2, satbility);
+				}
+
+				if (i == 1) {
+					svc_satisfied = B_TRUE;
+					break;
+				}
+				if (i == 0)
+					svc_satisfiable = B_TRUE;
+			}
+
+			if (!svc_any_qualified)
+				continue;
+			any_qualified = B_TRUE;
+			if (svc_satisfied) {
+				i = 1;
+			} else if (svc_satisfiable) {
+				i = 0;
+			} else {
+				i = -1;
+			}
 			break;
 		}
 
@@ -1545,14 +1608,11 @@ dependency_satisfied(graph_vertex_t *v, boolean_t satbility)
 		}
 
 		/*
-		 * Any vertex with the GV_TODISABLE flag set is guaranteed
-		 * to have its dependencies unsatisfiable.  Any vertex with
-		 * GV_TOOFFLINE may be satisfied after it transitions.
+		 * Any vertex with the GV_TOOFFLINE flag set is guaranteed
+		 * to have its dependencies unsatisfiable.
 		 */
-		if (v->gv_flags & GV_TODISABLE)
-			return (-1);
 		if (v->gv_flags & GV_TOOFFLINE)
-			return (0);
+			return (-1);
 
 		switch (v->gv_state) {
 		case RESTARTER_STATE_ONLINE:
@@ -1668,9 +1728,6 @@ graph_start_if_satisfied(graph_vertex_t *v)
 static int
 satbility_cb(graph_vertex_t *v, void *arg)
 {
-	if (v->gv_flags & GV_TOOFFLINE)
-		return (UU_WALK_NEXT);
-
 	if (v->gv_type == GVT_INST)
 		graph_start_if_satisfied(v);
 
@@ -1685,34 +1742,13 @@ propagate_satbility(graph_vertex_t *v)
 
 static void propagate_stop(graph_vertex_t *, void *);
 
-/*
- * propagate_start()
- *
- * This function is used to propagate a start event to the dependents of the
- * given vertex.  Any dependents that are offline but have their dependencies
- * satisfied are started.  Any dependents that are online and have restart_on
- * set to "restart" or "refresh" are restarted because their dependencies have
- * just changed.  This only happens with optional_all dependencies.
- */
+/* ARGSUSED */
 static void
 propagate_start(graph_vertex_t *v, void *arg)
 {
-	restarter_error_t err = (restarter_error_t)arg;
-
-	if (v->gv_flags & GV_TOOFFLINE)
-		return;
-
 	switch (v->gv_type) {
 	case GVT_INST:
-		/* Restarter */
-		if (inst_running(v)) {
-			if (err == RERR_RESTART || err == RERR_REFRESH) {
-				vertex_send_event(v,
-				    RESTARTER_EVENT_TYPE_STOP_RESET);
-			}
-		} else {
-			graph_start_if_satisfied(v);
-		}
+		graph_start_if_satisfied(v);
 		break;
 
 	case GVT_GROUP:
@@ -1721,11 +1757,10 @@ propagate_start(graph_vertex_t *v, void *arg)
 			    (void *)RERR_RESTART);
 			break;
 		}
-		err = v->gv_restart;
 		/* FALLTHROUGH */
 
 	case GVT_SVC:
-		graph_walk_dependents(v, propagate_start, (void *)err);
+		graph_walk_dependents(v, propagate_start, NULL);
 		break;
 
 	case GVT_FILE:
@@ -1745,22 +1780,12 @@ propagate_start(graph_vertex_t *v, void *arg)
 	}
 }
 
-/*
- * propagate_stop()
- *
- * This function is used to propagate a stop event to the dependents of the
- * given vertex.  Any dependents that are online (or in degraded state) with
- * the restart_on property set to "restart" or "refresh" will be stopped as
- * their dependencies have just changed, propagate_start() will start them
- * again once their dependencies have been re-satisfied.
- */
 static void
 propagate_stop(graph_vertex_t *v, void *arg)
 {
+	graph_edge_t *e;
+	graph_vertex_t *svc;
 	restarter_error_t err = (restarter_error_t)arg;
-
-	if (v->gv_flags & GV_TOOFFLINE)
-		return;
 
 	switch (v->gv_type) {
 	case GVT_INST:
@@ -1796,7 +1821,19 @@ propagate_stop(graph_vertex_t *v, void *arg)
 		if (err == RERR_NONE || err > v->gv_restart)
 			break;
 
-		graph_walk_dependents(v, propagate_stop, arg);
+		assert(uu_list_numnodes(v->gv_dependents) == 1);
+		e = uu_list_first(v->gv_dependents);
+		svc = e->ge_vertex;
+
+		if (inst_running(svc)) {
+			if (err == RERR_RESTART || err == RERR_REFRESH) {
+				vertex_send_event(svc,
+				    RESTARTER_EVENT_TYPE_STOP_RESET);
+			} else {
+				vertex_send_event(svc,
+				    RESTARTER_EVENT_TYPE_STOP);
+			}
+		}
 		break;
 
 	default:
@@ -4361,9 +4398,9 @@ insubtree_dependents_down(graph_vertex_t *v)
 				return (B_FALSE);
 		} else {
 			/*
-			 * Skip all excluded dependents and decide whether
-			 * to offline the service based on the restart_on
-			 * on attribute.
+			 * Skip all excluded and optional_all dependencies
+			 * and decide whether to offline the service based
+			 * on restart_on attribute.
 			 */
 			if (is_depgrp_bypassed(vv))
 				continue;
@@ -4928,7 +4965,7 @@ graph_transition_propagate(graph_vertex_t *v, propagate_event_t type,
 	if (type == PROPAGATE_STOP) {
 		graph_walk_dependents(v, propagate_stop, (void *)rerr);
 	} else if (type == PROPAGATE_START || type == PROPAGATE_SAT) {
-		graph_walk_dependents(v, propagate_start, (void *)RERR_NONE);
+		graph_walk_dependents(v, propagate_start, NULL);
 
 		if (type == PROPAGATE_SAT)
 			propagate_satbility(v);
@@ -4999,7 +5036,7 @@ dgraph_remove_instance(const char *fmri, scf_handle_t *h)
 	v->gv_flags &= ~GV_CONFIGURED;
 	v->gv_flags &= ~GV_DEATHROW;
 
-	graph_walk_dependents(v, propagate_start, (void *)RERR_NONE);
+	graph_walk_dependents(v, propagate_start, NULL);
 	propagate_satbility(v);
 
 	/*
@@ -5424,8 +5461,8 @@ mark_subtree(graph_edge_t *e, void *arg)
 		break;
 	case GVT_GROUP:
 		/*
-		 * Skip all excluded dependents and decide whether to offline
-		 * the service based on the restart_on attribute.
+		 * Skip all excluded and optional_all dependencies and decide
+		 * whether to offline the service based on restart_on attribute.
 		 */
 		if (is_depgrp_bypassed(v))
 			return (UU_WALK_NEXT);
