@@ -21,6 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2016 RackTop Systems.
  */
 
 
@@ -137,6 +139,13 @@ gt_enter_maint(scf_handle_t *h, graph_vertex_t *v,
 		    "%s.\n", v->gv_name);
 
 		graph_transition_propagate(v, PROPAGATE_STOP, rerr);
+
+		/*
+		 * The maintenance transition may satisfy optional_all/restart
+		 * dependencies and should be propagated to determine
+		 * whether new dependents are satisfiable.
+		 */
+		graph_transition_propagate(v, PROPAGATE_SAT, rerr);
 	} else {
 		log_framework(LOG_DEBUG, "Propagating maintenance of %s.\n",
 		    v->gv_name);
@@ -267,6 +276,12 @@ gt_enter_disabled(scf_handle_t *h, graph_vertex_t *v,
 
 		graph_transition_propagate(v, PROPAGATE_STOP, rerr);
 
+		/*
+		 * The disable transition may satisfy optional_all/restart
+		 * dependencies and should be propagated to determine
+		 * whether new dependents are satisfiable.
+		 */
+		graph_transition_propagate(v, PROPAGATE_SAT, rerr);
 	} else {
 		log_framework(LOG_DEBUG, "Propagating disable of %s.\n",
 		    v->gv_name);
