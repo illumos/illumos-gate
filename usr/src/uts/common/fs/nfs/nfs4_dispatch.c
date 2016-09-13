@@ -20,10 +20,6 @@
  */
 
 /*
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
- */
-
-/*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -364,7 +360,6 @@ rfs4_find_dr(struct svc_req *req, rfs4_drc_t *drc, rfs4_dupreq_t **dup)
  * 	req	The request to process
  * 	xprt	The server transport handle
  * 	ap	A pointer to the arguments
- *	rlen	A pointer to the reply length (output)
  *
  *
  * When appropriate this function is responsible for inserting
@@ -379,7 +374,7 @@ rfs4_find_dr(struct svc_req *req, rfs4_drc_t *drc, rfs4_dupreq_t **dup)
  */
 int
 rfs4_dispatch(struct rpcdisp *disp, struct svc_req *req,
-    SVCXPRT *xprt, char *ap, size_t *rlen)
+		SVCXPRT *xprt, char *ap)
 {
 
 	COMPOUND4res	 res_buf;
@@ -405,7 +400,6 @@ rfs4_dispatch(struct rpcdisp *disp, struct svc_req *req,
 			return (1);
 		}
 		DTRACE_NFSV4_1(null__done, struct svc_req *, req);
-		*rlen = xdr_sizeof(xdr_void, NULL);
 		return (0);
 	}
 
@@ -413,11 +407,6 @@ rfs4_dispatch(struct rpcdisp *disp, struct svc_req *req,
 
 	rbp = &res_buf;
 	cap = (COMPOUND4args *)ap;
-
-	/*
-	 * Update kstats
-	 */
-	rfs4_compound_kstat_args(cap);
 
 	/*
 	 * Figure out the disposition of the whole COMPOUND
@@ -503,18 +492,12 @@ rfs4_dispatch(struct rpcdisp *disp, struct svc_req *req,
 	/*
 	 * Send out the replayed reply or the 'real' one.
 	 */
-	if (!svc_sendreply(xprt, xdr_COMPOUND4res_srv, (char *)rbp)) {
+	if (!svc_sendreply(xprt,  xdr_COMPOUND4res_srv, (char *)rbp)) {
 		DTRACE_PROBE2(nfss__e__dispatch_sendfail,
 		    struct svc_req *, xprt,
 		    char *, rbp);
 		svcerr_systemerr(xprt);
 		error++;
-	} else {
-		/*
-		 * Update kstats
-		 */
-		rfs4_compound_kstat_res(rbp);
-		*rlen = xdr_sizeof(xdr_COMPOUND4res_srv, rbp);
 	}
 
 	/*
