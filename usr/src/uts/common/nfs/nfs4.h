@@ -1348,7 +1348,6 @@ extern struct nfs4_ntov_map nfs4_ntov_map[];
 extern uint_t nfs4_ntov_map_size;
 
 extern kstat_named_t	*rfsproccnt_v4_ptr;
-extern kstat_t		**rfsprocio_v4_ptr;
 extern struct vfsops	*nfs4_vfsops;
 extern struct vnodeops	*nfs4_vnodeops;
 extern const struct	fs_operation_def nfs4_vnodeops_template[];
@@ -1381,8 +1380,6 @@ extern void	rfs4_compound(COMPOUND4args *, COMPOUND4res *,
 			struct exportinfo *, struct svc_req *, cred_t *, int *);
 extern void	rfs4_compound_free(COMPOUND4res *);
 extern void	rfs4_compound_flagproc(COMPOUND4args *, int *);
-extern void	rfs4_compound_kstat_args(COMPOUND4args *);
-extern void	rfs4_compound_kstat_res(COMPOUND4res *);
 
 extern int	rfs4_srvrinit(void);
 extern void	rfs4_srvrfini(void);
