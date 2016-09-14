@@ -18,9 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2016 Nexenta Systems, Inc.
  */
 
 /*
@@ -164,14 +166,16 @@ slm_init()
 	if (rcm_alloc_handle(NULL, 0, NULL, &rcm_hdl) != RCM_SUCCESS)
 		return (NULL);
 
+	(void) mutex_init(&dl_mx, USYNC_THREAD, NULL);
+	(void) cond_init(&dl_cv, USYNC_THREAD, NULL);
+
 	if (thr_create(NULL, 0,  datalink_notify_thread, NULL, 0,
 	    &dl_notify_tid) != 0) {
 		(void) rcm_free_handle(rcm_hdl);
+		(void) mutex_destroy(&dl_mx);
+		(void) cond_destroy(&dl_cv);
 		return (NULL);
 	}
-
-	(void) mutex_init(&dl_mx, USYNC_THREAD, NULL);
-	(void) cond_init(&dl_cv, USYNC_THREAD, NULL);
 
 	return (&datalink_mod_ops);
 }

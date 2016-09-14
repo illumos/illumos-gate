@@ -643,6 +643,12 @@ acpi_probe(char *modname)
 		case ACPI_MADT_TYPE_LOCAL_APIC:
 			mpa = (ACPI_MADT_LOCAL_APIC *) ap;
 			if (mpa->LapicFlags & ACPI_MADT_ENABLED) {
+				if (mpa->Id == 255) {
+					cmn_err(CE_WARN, "!%s: encountered "
+					    "invalid entry in MADT: CPU %d "
+					    "has Local APIC Id equal to 255 ",
+					    psm_name, mpa->ProcessorId);
+				}
 				if (mpa->Id == local_ids[0]) {
 					ASSERT(index == 1);
 					proc_ids[0] = mpa->ProcessorId;

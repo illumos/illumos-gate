@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2012, 2015 by Delphix. All rights reserved.
 #
 
 include $(SRC)/Makefile.master
@@ -31,6 +31,7 @@ PROGS = cleanup \
 	zfs_mount_009_neg \
 	zfs_mount_010_neg \
 	zfs_mount_011_neg \
+	zfs_mount_012_neg \
 	zfs_mount_all_001_pos
 
 FILES = zfs_mount.cfg \

@@ -23,7 +23,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2015 by Delphix. All rights reserved.
+ */
 
 #include <sys/systm.h>
 #include <sys/types.h>
@@ -134,12 +136,9 @@ top_seterror(ufsvfs_t *ufsvfsp)
  * issue a empty sync op to help empty the delta/log map or the log
  */
 static void
-top_issue_sync(void *arg)
+top_issue_sync(ufsvfs_t *ufsvfsp)
 {
-	ufsvfs_t *ufsvfsp = (ufsvfs_t *)arg;
-	ml_unit_t *ul = (ml_unit_t *)ufsvfsp->vfs_log;
-	mt_map_t *mtm = ul->un_logmap;
-	int	error = 0;
+	int error = 0;
 
 	if ((curthread->t_flag & T_DONTBLOCK) == 0)
 		curthread->t_flag |= T_DONTBLOCK;
@@ -147,21 +146,30 @@ top_issue_sync(void *arg)
 	if (!error) {
 		top_end_sync(ufsvfsp, &error, TOP_COMMIT_ASYNC, 0);
 	}
+}
+
+static void
+top_issue_from_taskq(void *arg)
+{
+	ufsvfs_t *ufsvfsp = arg;
+	ml_unit_t *ul = ufsvfsp->vfs_log;
+	mt_map_t *mtm = ul->un_logmap;
+
+	top_issue_sync(ufsvfsp);
 
 	/*
-	 * If we are a taskq thread, decrement mtm_taskq_sync_count and
-	 * wake up the thread waiting on the mtm_cv if the mtm_taskq_sync_count
-	 * hits zero.
+	 * We were called from the taskq_dispatch() in top_begin_async(), so
+	 * decrement mtm_taskq_sync_count and wake up the thread waiting
+	 * on the mtm_cv if the mtm_taskq_sync_count hits zero.
 	 */
+	ASSERT(taskq_member(system_taskq, curthread));
 
-	if (taskq_member(system_taskq, curthread)) {
-		mutex_enter(&mtm->mtm_lock);
-		mtm->mtm_taskq_sync_count--;
-		if (mtm->mtm_taskq_sync_count == 0) {
-			cv_signal(&mtm->mtm_cv);
-		}
-		mutex_exit(&mtm->mtm_lock);
+	mutex_enter(&mtm->mtm_lock);
+	mtm->mtm_taskq_sync_count--;
+	if (mtm->mtm_taskq_sync_count == 0) {
+		cv_signal(&mtm->mtm_cv);
 	}
+	mutex_exit(&mtm->mtm_lock);
 }
 
 /*
@@ -408,7 +416,7 @@ retry:
 			mtm->mtm_taskq_sync_count++;
 			mutex_exit(&mtm->mtm_lock);
 			(void) taskq_dispatch(system_taskq,
-			    top_issue_sync, ufsvfsp, TQ_SLEEP);
+			    top_issue_from_taskq, ufsvfsp, TQ_SLEEP);
 			if (tryasync) {
 				tryfail_cnt++;
 				return (EWOULDBLOCK);

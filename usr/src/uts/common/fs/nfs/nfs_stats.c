@@ -18,11 +18,6 @@
  *
  * CDDL HEADER END
  */
-
-/*
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
- */
-
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -132,53 +127,6 @@ nfsstat_zone_fini_server(zoneid_t zoneid, kstat_named_t **svstatp)
 }
 
 /*
- * Support functions for the kstat_io alloc/free
- */
-static kstat_t **
-rfs_kstat_io_init(zoneid_t zoneid, const char *module, int instance,
-    const char *name, const char *class, const kstat_named_t *tmpl, int count,
-    kmutex_t *lock)
-{
-	int i;
-	kstat_t **ret = kmem_alloc(count * sizeof (*ret), KM_SLEEP);
-
-	for (i = 0; i < count; i++) {
-		char namebuf[KSTAT_STRLEN];
-
-		(void) snprintf(namebuf, sizeof (namebuf), "%s_%s", name,
-		    tmpl[i].name);
-		ret[i] = kstat_create_zone(module, instance, namebuf, class,
-		    KSTAT_TYPE_IO, 1, 0, zoneid);
-		if (ret[i] != NULL) {
-			ret[i]->ks_lock = lock;
-			kstat_install(ret[i]);
-		}
-	}
-
-	return (ret);
-}
-
-static void
-rfs_kstat_io_delete(kstat_t **ks, int count)
-{
-	int i;
-
-	for (i = 0; i < count; i++) {
-		if (ks[i] != NULL) {
-			kstat_delete(ks[i]);
-			ks[i] = NULL;
-		}
-	}
-}
-
-static void
-rfs_kstat_io_free(kstat_t **ks, int count)
-{
-	rfs_kstat_io_delete(ks, count);
-	kmem_free(ks, count * sizeof (*ks));
-}
-
-/*
  * NFSv2 client stats
  */
 static const kstat_named_t rfsreqcnt_v2_tmpl[] = {
@@ -240,44 +188,27 @@ static const kstat_named_t rfsproccnt_v2_tmpl[] = {
 	{ "statfs",	KSTAT_DATA_UINT64 }
 };
 
-#define	RFSPROCCNT_V2_COUNT	\
-	(sizeof (rfsproccnt_v2_tmpl) / sizeof (rfsproccnt_v2_tmpl[0]))
-
 kstat_named_t *rfsproccnt_v2_ptr;
-kstat_t **rfsprocio_v2_ptr;
 
 static void
 nfsstat_zone_init_rfsproc_v2(zoneid_t zoneid, struct nfs_version_stats *statsp)
 {
-	statsp->rfsproccnt_ptr = nfsstat_zone_init_common(zoneid, "nfs", 0,
-	    "rfsproccnt_v2", rfsproccnt_v2_tmpl, sizeof (rfsproccnt_v2_tmpl));
+	kstat_named_t *ks_data;
 
-	mutex_init(&statsp->rfsprocio_lock, NULL, MUTEX_DEFAULT, NULL);
-
-	statsp->rfsprocio_ptr = rfs_kstat_io_init(zoneid, "nfs", 0,
-	    "rfsprocio_v2", "rfsprocio_v2", rfsproccnt_v2_tmpl,
-	    RFSPROCCNT_V2_COUNT, &statsp->rfsprocio_lock);
-
-	if (zoneid == GLOBAL_ZONEID) {
-		rfsproccnt_v2_ptr = statsp->rfsproccnt_ptr;
-		rfsprocio_v2_ptr = statsp->rfsprocio_ptr;
-	}
+	ks_data = nfsstat_zone_init_common(zoneid, "nfs", 0, "rfsproccnt_v2",
+	    rfsproccnt_v2_tmpl, sizeof (rfsproccnt_v2_tmpl));
+	statsp->rfsproccnt_ptr = ks_data;
+	if (zoneid == GLOBAL_ZONEID)
+		rfsproccnt_v2_ptr = ks_data;
 }
 
 static void
 nfsstat_zone_fini_rfsproc_v2(zoneid_t zoneid, struct nfs_version_stats *statsp)
 {
-	if (zoneid == GLOBAL_ZONEID) {
+	if (zoneid == GLOBAL_ZONEID)
 		rfsproccnt_v2_ptr = NULL;
-		rfsprocio_v2_ptr = NULL;
-	}
-
 	nfsstat_zone_fini_common(zoneid, "nfs", 0, "rfsproccnt_v2");
 	kmem_free(statsp->rfsproccnt_ptr, sizeof (rfsproccnt_v2_tmpl));
-
-	rfs_kstat_io_free(statsp->rfsprocio_ptr, RFSPROCCNT_V2_COUNT);
-
-	mutex_destroy(&statsp->rfsprocio_lock);
 }
 
 /*
@@ -318,44 +249,28 @@ static const kstat_named_t aclproccnt_v2_tmpl[] = {
 	{ "getxattrdir",	KSTAT_DATA_UINT64 }
 };
 
-#define	ACLPROCCNT_V2_COUNT	\
-	(sizeof (aclproccnt_v2_tmpl) / sizeof (aclproccnt_v2_tmpl[0]))
-
 kstat_named_t *aclproccnt_v2_ptr;
-kstat_t **aclprocio_v2_ptr;
 
 static void
 nfsstat_zone_init_aclproc_v2(zoneid_t zoneid, struct nfs_version_stats *statsp)
 {
-	statsp->aclproccnt_ptr = nfsstat_zone_init_common(zoneid, "nfs_acl", 0,
-	    "aclproccnt_v2", aclproccnt_v2_tmpl, sizeof (aclproccnt_v2_tmpl));
+	kstat_named_t *ks_data;
 
-	mutex_init(&statsp->aclprocio_lock, NULL, MUTEX_DEFAULT, NULL);
-
-	statsp->aclprocio_ptr = rfs_kstat_io_init(zoneid, "nfs_acl", 0,
-	    "aclprocio_v2", "aclprocio_v2", aclproccnt_v2_tmpl,
-	    ACLPROCCNT_V2_COUNT, &statsp->aclprocio_lock);
-
-	if (zoneid == GLOBAL_ZONEID) {
-		aclproccnt_v2_ptr = statsp->aclproccnt_ptr;
-		aclprocio_v2_ptr = statsp->aclprocio_ptr;
-	}
+	ks_data = nfsstat_zone_init_common(zoneid, "nfs_acl", 0,
+	    "aclproccnt_v2", aclproccnt_v2_tmpl,
+	    sizeof (aclproccnt_v2_tmpl));
+	statsp->aclproccnt_ptr = ks_data;
+	if (zoneid == GLOBAL_ZONEID)
+		aclproccnt_v2_ptr = ks_data;
 }
 
 static void
 nfsstat_zone_fini_aclproc_v2(zoneid_t zoneid, struct nfs_version_stats *statsp)
 {
-	if (zoneid == GLOBAL_ZONEID) {
+	if (zoneid == GLOBAL_ZONEID)
 		aclproccnt_v2_ptr = NULL;
-		aclprocio_v2_ptr = NULL;
-	}
-
 	nfsstat_zone_fini_common(zoneid, "nfs_acl", 0, "aclproccnt_v2");
 	kmem_free(statsp->aclproccnt_ptr, sizeof (aclproccnt_v2_tmpl));
-
-	rfs_kstat_io_free(statsp->aclprocio_ptr, ACLPROCCNT_V2_COUNT);
-
-	mutex_destroy(&statsp->aclprocio_lock);
 }
 
 /*
@@ -428,44 +343,27 @@ static const kstat_named_t rfsproccnt_v3_tmpl[] = {
 	{ "commit",	KSTAT_DATA_UINT64 }
 };
 
-#define	RFSPROCCNT_V3_COUNT	\
-	(sizeof (rfsproccnt_v3_tmpl) / sizeof (rfsproccnt_v3_tmpl[0]))
-
 kstat_named_t *rfsproccnt_v3_ptr;
-kstat_t **rfsprocio_v3_ptr;
 
 static void
 nfsstat_zone_init_rfsproc_v3(zoneid_t zoneid, struct nfs_version_stats *statsp)
 {
-	statsp->rfsproccnt_ptr = nfsstat_zone_init_common(zoneid, "nfs", 0,
-	    "rfsproccnt_v3", rfsproccnt_v3_tmpl, sizeof (rfsproccnt_v3_tmpl));
+	kstat_named_t *ks_data;
 
-	mutex_init(&statsp->rfsprocio_lock, NULL, MUTEX_DEFAULT, NULL);
-
-	statsp->rfsprocio_ptr = rfs_kstat_io_init(zoneid, "nfs", 0,
-	    "rfsprocio_v3", "rfsprocio_v3", rfsproccnt_v3_tmpl,
-	    RFSPROCCNT_V3_COUNT, &statsp->rfsprocio_lock);
-
-	if (zoneid == GLOBAL_ZONEID) {
-		rfsproccnt_v3_ptr = statsp->rfsproccnt_ptr;
-		rfsprocio_v3_ptr = statsp->rfsprocio_ptr;
-	}
+	ks_data = nfsstat_zone_init_common(zoneid, "nfs", 0, "rfsproccnt_v3",
+	    rfsproccnt_v3_tmpl, sizeof (rfsproccnt_v3_tmpl));
+	statsp->rfsproccnt_ptr = ks_data;
+	if (zoneid == GLOBAL_ZONEID)
+		rfsproccnt_v3_ptr = ks_data;
 }
 
 static void
 nfsstat_zone_fini_rfsproc_v3(zoneid_t zoneid, struct nfs_version_stats *statsp)
 {
-	if (zoneid == GLOBAL_ZONEID) {
+	if (zoneid == GLOBAL_ZONEID)
 		rfsproccnt_v3_ptr = NULL;
-		rfsprocio_v3_ptr = NULL;
-	}
-
 	nfsstat_zone_fini_common(zoneid, "nfs", 0, "rfsproccnt_v3");
 	kmem_free(statsp->rfsproccnt_ptr, sizeof (rfsproccnt_v3_tmpl));
-
-	rfs_kstat_io_free(statsp->rfsprocio_ptr, RFSPROCCNT_V3_COUNT);
-
-	mutex_destroy(&statsp->rfsprocio_lock);
 }
 
 /*
@@ -502,44 +400,28 @@ static const kstat_named_t aclproccnt_v3_tmpl[] = {
 	{ "getxattrdir",	KSTAT_DATA_UINT64 }
 };
 
-#define	ACLPROCCNT_V3_COUNT	\
-	(sizeof (aclproccnt_v3_tmpl) / sizeof (aclproccnt_v3_tmpl[0]))
-
 kstat_named_t *aclproccnt_v3_ptr;
-kstat_t **aclprocio_v3_ptr;
 
 static void
 nfsstat_zone_init_aclproc_v3(zoneid_t zoneid, struct nfs_version_stats *statsp)
 {
-	statsp->aclproccnt_ptr = nfsstat_zone_init_common(zoneid, "nfs_acl", 0,
-	    "aclproccnt_v3", aclproccnt_v3_tmpl, sizeof (aclproccnt_v3_tmpl));
+	kstat_named_t *ks_data;
 
-	mutex_init(&statsp->aclprocio_lock, NULL, MUTEX_DEFAULT, NULL);
-
-	statsp->aclprocio_ptr = rfs_kstat_io_init(zoneid, "nfs_acl", 0,
-	    "aclprocio_v3", "aclprocio_v3", aclproccnt_v3_tmpl,
-	    ACLPROCCNT_V3_COUNT, &statsp->aclprocio_lock);
-
-	if (zoneid == GLOBAL_ZONEID) {
-		aclproccnt_v3_ptr = statsp->aclproccnt_ptr;
-		aclprocio_v3_ptr = statsp->aclprocio_ptr;
-	}
+	ks_data = nfsstat_zone_init_common(zoneid, "nfs_acl", 0,
+	    "aclproccnt_v3", aclproccnt_v3_tmpl,
+	    sizeof (aclproccnt_v3_tmpl));
+	statsp->aclproccnt_ptr = ks_data;
+	if (zoneid == GLOBAL_ZONEID)
+		aclproccnt_v3_ptr = ks_data;
 }
 
 static void
 nfsstat_zone_fini_aclproc_v3(zoneid_t zoneid, struct nfs_version_stats *statsp)
 {
-	if (zoneid == GLOBAL_ZONEID) {
+	if (zoneid == GLOBAL_ZONEID)
 		aclproccnt_v3_ptr = NULL;
-		aclprocio_v3_ptr = NULL;
-	}
-
 	nfsstat_zone_fini_common(zoneid, "nfs_acl", 0, "aclproccnt_v3");
 	kmem_free(statsp->aclproccnt_ptr, sizeof (aclproccnt_v3_tmpl));
-
-	rfs_kstat_io_free(statsp->aclprocio_ptr, ACLPROCCNT_V3_COUNT);
-
-	mutex_destroy(&statsp->aclprocio_lock);
 }
 
 /*
@@ -648,44 +530,27 @@ static const kstat_named_t rfsproccnt_v4_tmpl[] = {
 	{ "illegal",	KSTAT_DATA_UINT64 },
 };
 
-#define	RFSPROCCNT_V4_COUNT	\
-	(sizeof (rfsproccnt_v4_tmpl) / sizeof (rfsproccnt_v4_tmpl[0]))
-
 kstat_named_t *rfsproccnt_v4_ptr;
-kstat_t **rfsprocio_v4_ptr;
 
 static void
 nfsstat_zone_init_rfsproc_v4(zoneid_t zoneid, struct nfs_version_stats *statsp)
 {
-	statsp->rfsproccnt_ptr = nfsstat_zone_init_common(zoneid, "nfs", 0,
-	    "rfsproccnt_v4", rfsproccnt_v4_tmpl, sizeof (rfsproccnt_v4_tmpl));
+	kstat_named_t *ks_data;
 
-	mutex_init(&statsp->rfsprocio_lock, NULL, MUTEX_DEFAULT, NULL);
-
-	statsp->rfsprocio_ptr = rfs_kstat_io_init(zoneid, "nfs", 0,
-	    "rfsprocio_v4", "rfsprocio_v4", rfsproccnt_v4_tmpl,
-	    RFSPROCCNT_V4_COUNT, &statsp->rfsprocio_lock);
-
-	if (zoneid == GLOBAL_ZONEID) {
-		rfsproccnt_v4_ptr = statsp->rfsproccnt_ptr;
-		rfsprocio_v4_ptr = statsp->rfsprocio_ptr;
-	}
+	ks_data = nfsstat_zone_init_common(zoneid, "nfs", 0, "rfsproccnt_v4",
+	    rfsproccnt_v4_tmpl, sizeof (rfsproccnt_v4_tmpl));
+	statsp->rfsproccnt_ptr = ks_data;
+	if (zoneid == GLOBAL_ZONEID)
+		rfsproccnt_v4_ptr = ks_data;
 }
 
 static void
 nfsstat_zone_fini_rfsproc_v4(zoneid_t zoneid, struct nfs_version_stats *statsp)
 {
-	if (zoneid == GLOBAL_ZONEID) {
+	if (zoneid == GLOBAL_ZONEID)
 		rfsproccnt_v4_ptr = NULL;
-		rfsprocio_v4_ptr = NULL;
-	}
-
 	nfsstat_zone_fini_common(zoneid, "nfs", 0, "rfsproccnt_v4");
 	kmem_free(statsp->rfsproccnt_ptr, sizeof (rfsproccnt_v4_tmpl));
-
-	rfs_kstat_io_free(statsp->rfsprocio_ptr, RFSPROCCNT_V4_COUNT);
-
-	mutex_destroy(&statsp->rfsprocio_lock);
 }
 
 /*
@@ -820,173 +685,4 @@ nfsstat_zone_fini(zoneid_t zoneid, void *data)
 	nfsstat_zone_fini_aclproc_v4(zoneid, &nfs_stats_ptr->nfs_stats_v4);
 
 	kmem_free(nfs_stats_ptr, sizeof (*nfs_stats_ptr));
-}
-
-/*
- * Support for exp_kstats initialization and tear down
- */
-struct exp_kstats *
-exp_kstats_init(zoneid_t zoneid, int instance, const char *path, size_t len,
-    bool_t pseudo)
-{
-	struct exp_kstats *exp_kstats;
-
-	exp_kstats = kmem_alloc(sizeof (*exp_kstats), KM_SLEEP);
-
-	mutex_init(&exp_kstats->procio_lock, NULL, MUTEX_DEFAULT, NULL);
-
-	/*
-	 * Generic share kstat.
-	 */
-	exp_kstats->share_kstat = kstat_create_zone("nfs", instance, "share",
-	    "misc", KSTAT_TYPE_NAMED,
-	    sizeof (exp_kstats->share_kstat_data) / sizeof (kstat_named_t),
-	    KSTAT_FLAG_VIRTUAL | KSTAT_FLAG_VAR_SIZE, zoneid);
-	if (exp_kstats->share_kstat != NULL) {
-		len = strnlen(path, len);
-		exp_kstats->share_path = kmem_alloc(len + 1, KM_SLEEP);
-		bcopy(path, exp_kstats->share_path, len);
-		exp_kstats->share_path[len] = '\0';
-
-		exp_kstats->share_kstat->ks_data =
-		    &exp_kstats->share_kstat_data;
-
-		kstat_named_init(&exp_kstats->share_kstat_data.path, "path",
-		    KSTAT_DATA_STRING);
-		kstat_named_setstr(&exp_kstats->share_kstat_data.path,
-		    exp_kstats->share_path);
-
-		kstat_named_init(&exp_kstats->share_kstat_data.filesystem,
-		    "filesystem", KSTAT_DATA_STRING);
-		kstat_named_setstr(&exp_kstats->share_kstat_data.filesystem,
-		    pseudo ? "pseudo" : "real");
-
-		exp_kstats->share_kstat->ks_lock = &exp_kstats->procio_lock;
-		kstat_install(exp_kstats->share_kstat);
-	}
-
-	/*
-	 * NFS_ACL version 2
-	 */
-	exp_kstats->aclprocio_v2_ptr = rfs_kstat_io_init(zoneid, "nfs_acl",
-	    instance, "share_v2", "aclprocio_v2", aclproccnt_v2_tmpl,
-	    ACLPROCCNT_V2_COUNT, &exp_kstats->procio_lock);
-
-	/*
-	 * NFS_ACL version 3
-	 */
-	exp_kstats->aclprocio_v3_ptr = rfs_kstat_io_init(zoneid, "nfs_acl",
-	    instance, "share_v3", "aclprocio_v3", aclproccnt_v3_tmpl,
-	    ACLPROCCNT_V3_COUNT, &exp_kstats->procio_lock);
-
-	/*
-	 * NFS version 2
-	 */
-	exp_kstats->rfsprocio_v2_ptr = rfs_kstat_io_init(zoneid, "nfs",
-	    instance, "share_v2", "rfsprocio_v2", rfsproccnt_v2_tmpl,
-	    RFSPROCCNT_V2_COUNT, &exp_kstats->procio_lock);
-
-	/*
-	 * NFS version 3
-	 */
-	exp_kstats->rfsprocio_v3_ptr = rfs_kstat_io_init(zoneid, "nfs",
-	    instance, "share_v3", "rfsprocio_v3", rfsproccnt_v3_tmpl,
-	    RFSPROCCNT_V3_COUNT, &exp_kstats->procio_lock);
-
-	/*
-	 * NFS version 4
-	 */
-	exp_kstats->rfsprocio_v4_ptr = rfs_kstat_io_init(zoneid, "nfs",
-	    instance, "share_v4", "rfsprocio_v4", rfsproccnt_v4_tmpl,
-	    RFSPROCCNT_V4_COUNT, &exp_kstats->procio_lock);
-
-	return (exp_kstats);
-}
-
-void
-exp_kstats_delete(struct exp_kstats *exp_kstats)
-{
-	if (exp_kstats == NULL)
-		return;
-
-	/*
-	 * Generic share kstat
-	 */
-	if (exp_kstats->share_kstat != NULL) {
-		kstat_delete(exp_kstats->share_kstat);
-		exp_kstats->share_kstat = NULL;
-		strfree(exp_kstats->share_path);
-	}
-
-	/*
-	 * NFS_ACL kstats
-	 */
-	rfs_kstat_io_delete(exp_kstats->aclprocio_v2_ptr, ACLPROCCNT_V2_COUNT);
-	rfs_kstat_io_delete(exp_kstats->aclprocio_v3_ptr, ACLPROCCNT_V3_COUNT);
-
-	/*
-	 * NFS kstats
-	 */
-	rfs_kstat_io_delete(exp_kstats->rfsprocio_v2_ptr, RFSPROCCNT_V2_COUNT);
-	rfs_kstat_io_delete(exp_kstats->rfsprocio_v3_ptr, RFSPROCCNT_V3_COUNT);
-	rfs_kstat_io_delete(exp_kstats->rfsprocio_v4_ptr, RFSPROCCNT_V4_COUNT);
-}
-
-void
-exp_kstats_fini(struct exp_kstats *exp_kstats)
-{
-	if (exp_kstats == NULL)
-		return;
-
-	/*
-	 * Generic share kstat
-	 */
-	if (exp_kstats->share_kstat != NULL) {
-		kstat_delete(exp_kstats->share_kstat);
-		strfree(exp_kstats->share_path);
-	}
-
-	/*
-	 * NFS_ACL kstats
-	 */
-	rfs_kstat_io_free(exp_kstats->aclprocio_v2_ptr, ACLPROCCNT_V2_COUNT);
-	rfs_kstat_io_free(exp_kstats->aclprocio_v3_ptr, ACLPROCCNT_V3_COUNT);
-
-	/*
-	 * NFS kstats
-	 */
-	rfs_kstat_io_free(exp_kstats->rfsprocio_v2_ptr, RFSPROCCNT_V2_COUNT);
-	rfs_kstat_io_free(exp_kstats->rfsprocio_v3_ptr, RFSPROCCNT_V3_COUNT);
-	rfs_kstat_io_free(exp_kstats->rfsprocio_v4_ptr, RFSPROCCNT_V4_COUNT);
-
-	mutex_destroy(&exp_kstats->procio_lock);
-
-	kmem_free(exp_kstats, sizeof (*exp_kstats));
-}
-
-void
-exp_kstats_reset(struct exp_kstats *exp_kstats, const char *path, size_t len,
-    bool_t pseudo)
-{
-	char *old;
-	char *new;
-
-	if (exp_kstats->share_kstat == NULL)
-		return;
-
-	len = strnlen(path, len);
-	new = kmem_alloc(len + 1, KM_SLEEP);
-	bcopy(path, new, len);
-	new[len] = '\0';
-
-	mutex_enter(exp_kstats->share_kstat->ks_lock);
-	old = exp_kstats->share_path;
-	exp_kstats->share_path = new;
-	kstat_named_setstr(&exp_kstats->share_kstat_data.path,
-	    exp_kstats->share_path);
-	kstat_named_setstr(&exp_kstats->share_kstat_data.filesystem,
-	    pseudo ? "pseudo" : "real");
-	mutex_exit(exp_kstats->share_kstat->ks_lock);
-
-	strfree(old);
 }

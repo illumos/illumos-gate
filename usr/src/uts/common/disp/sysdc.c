@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright (c) 2012, 2015 by Delphix. All rights reserved.
  */
 
 /*
@@ -393,7 +393,7 @@ sysdc_initparam(void)
 	sysdc_minDC = 1;
 	sysdc_maxDC = SYSDC_DC_MAX;
 	sysdc_minpri = 0;
-	sysdc_maxpri = maxclsyspri;
+	sysdc_maxpri = maxclsyspri - 1;
 
 	/* break parameters */
 	if (sysdc_max_pset_DC > SYSDC_DC_MAX) {

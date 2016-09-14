@@ -22,6 +22,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2015, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -99,7 +100,7 @@ int do_as_verify = 0;
  */
 int
 as_add_callback(struct as *as, void (*cb_func)(), void *arg, uint_t events,
-		caddr_t vaddr, size_t size, int sleepflag)
+    caddr_t vaddr, size_t size, int sleepflag)
 {
 	struct as_callback 	*current_head, *cb;
 	caddr_t 		saddr;
@@ -231,7 +232,7 @@ as_delete_callback(struct as *as, void *arg)
  */
 static struct as_callback *
 as_find_callback(struct as *as, uint_t events, caddr_t event_addr,
-			size_t event_len)
+    size_t event_len)
 {
 	struct as_callback	*cb;
 
@@ -263,7 +264,7 @@ as_find_callback(struct as *as, uint_t events, caddr_t event_addr,
  */
 static void
 as_execute_callback(struct as *as, struct as_callback *cb,
-				uint_t events)
+    uint_t events)
 {
 	struct as_callback **prevcb;
 	void	*cb_arg;
@@ -331,7 +332,7 @@ as_execute_callback(struct as *as, struct as_callback *cb,
  */
 static int
 as_do_callbacks(struct as *as, uint_t events, caddr_t event_addr,
-			size_t event_len)
+    size_t event_len)
 {
 	struct as_callback *cb;
 
@@ -665,6 +666,7 @@ as_alloc(void)
 	as->a_lastgap		= NULL;
 	as->a_lastgaphl		= NULL;
 	as->a_callbacks		= NULL;
+	as->a_proc		= NULL;
 
 	AS_LOCK_ENTER(as, RW_WRITER);
 	as->a_hat = hat_alloc(as);	/* create hat for default system mmu */
@@ -837,7 +839,7 @@ as_dup(struct as *as, struct proc *forkedproc)
  */
 faultcode_t
 as_fault(struct hat *hat, struct as *as, caddr_t addr, size_t size,
-	enum fault_type type, enum seg_rw rw)
+    enum fault_type type, enum seg_rw rw)
 {
 	struct seg *seg;
 	caddr_t raddr;			/* rounded down addr */
@@ -1659,14 +1661,21 @@ as_map(struct as *as, caddr_t addr, size_t size, int (*crfp)(), void *argsp)
 
 int
 as_map_locked(struct as *as, caddr_t addr, size_t size, int (*crfp)(),
-		void *argsp)
+    void *argsp)
 {
 	struct seg *seg = NULL;
 	caddr_t raddr;			/* rounded down addr */
 	size_t rsize;			/* rounded up size */
 	int error;
 	int unmap = 0;
-	struct proc *p = curproc;
+	/*
+	 * The use of a_proc is preferred to handle the case where curproc is
+	 * a door_call server and is allocating memory in the client's (a_proc)
+	 * address space.
+	 * When creating a shared memory segment a_proc will be NULL so we
+	 * fallback to curproc in that case.
+	 */
+	struct proc *p = (as->a_proc == NULL) ? curproc : as->a_proc;
 	struct segvn_crargs crargs;
 
 	raddr = (caddr_t)((uintptr_t)addr & (uintptr_t)PAGEMASK);
@@ -2159,7 +2168,7 @@ as_incore(struct as *as, caddr_t addr,
 
 static void
 as_segunlock(struct seg *seg, caddr_t addr, int attr,
-	ulong_t *bitmap, size_t position, size_t npages)
+    ulong_t *bitmap, size_t position, size_t npages)
 {
 	caddr_t	range_start;
 	size_t	pos1 = position;
@@ -2180,7 +2189,7 @@ as_segunlock(struct seg *seg, caddr_t addr, int attr,
 
 static void
 as_unlockerr(struct as *as, int attr, ulong_t *mlock_map,
-	caddr_t raddr, size_t rsize)
+    caddr_t raddr, size_t rsize)
 {
 	struct seg *seg = as_segat(as, raddr);
 	size_t ssize;
