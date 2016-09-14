@@ -41,7 +41,7 @@ extern cpqary3_driver_info_t gdriver_info;
  * Global Variables Definitions
  */
 
-static char cpqary3_brief[]    =	"HP Smart Array Driver";
+static char cpqary3_brief[]    =	"HP Smart Array (Legacy)";
 void *cpqary3_state;
 
 /* HPQaculi Changes */

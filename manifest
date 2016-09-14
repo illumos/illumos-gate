@@ -676,6 +676,7 @@ f kernel/drv/amd64/si3124 0755 root sys
 f kernel/drv/amd64/simnet 0755 root sys
 f kernel/drv/amd64/skd 0755 root sys
 f kernel/drv/amd64/smbios 0755 root sys
+f kernel/drv/amd64/smrt 0755 root sys
 f kernel/drv/amd64/softmac 0755 root sys
 f kernel/drv/amd64/spdsock 0755 root sys
 f kernel/drv/amd64/srn 0755 root sys
@@ -815,6 +816,7 @@ f kernel/drv/simnet.conf 0644 root sys
 f kernel/drv/skd.conf 0644 root sys
 f kernel/drv/smbios.conf 0644 root sys
 f kernel/drv/smp.conf 0644 root sys
+f kernel/drv/smrt.conf 0644 root sys
 f kernel/drv/softmac.conf 0644 root sys
 f kernel/drv/spdsock.conf 0644 root sys
 f kernel/drv/srn.conf 0644 root sys

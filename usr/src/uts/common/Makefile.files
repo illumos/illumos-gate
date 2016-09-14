@@ -2164,6 +2164,18 @@ CPQARY3_OBJS =	cpqary3.o cpqary3_noe.o cpqary3_talk2ctlr.o	\
 		cpqary3_bd.o
 
 #
+#	HP Smart Array driver module (smrt)
+#
+SMRT_OBJS =	smrt.o \
+		smrt_device.o \
+		smrt_interrupts.o \
+		smrt_commands.o \
+		smrt_logvol.o \
+		smrt_hba.o \
+		smrt_ciss_simple.o \
+		smrt_ciss.o
+
+#
 #	ISCSI_INITIATOR module
 #
 ISCSI_INITIATOR_OBJS =	chap.o iscsi_io.o iscsi_thread.o	\
