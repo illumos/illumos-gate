@@ -459,6 +459,7 @@ struct smbios_hdl {
 
 #define	SMB_FL_DEBUG	0x1		/* print debug messages for this hdl */
 #define	SMB_FL_BUFALLOC	0x2		/* sh_buf was allocated by library */
+#define	SMB_FL_TRUNC	0x4		/* smbios table is truncated */
 
 #define	SMB_BIOS_DEVICE		"/dev/xsvc"	/* device w/ BIOS physmem */
 #define	SMB_SMBIOS_DEVICE	"/dev/smbios"	/* device w/ SMBIOS image */

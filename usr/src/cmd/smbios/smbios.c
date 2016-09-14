@@ -1332,6 +1332,11 @@ main(int argc, char *argv[])
 		return (SMBIOS_ERROR);
 	}
 
+	if (opt_i == -1 && opt_t == -1 && opt_e == 0 &&
+	    smbios_truncated(shp))
+		(void) fprintf(stderr, "%s: SMBIOS table is truncated\n",
+		    g_pname);
+
 	if (ofile != NULL) {
 		if ((fd = open(ofile, O_WRONLY|O_CREAT|O_TRUNC, 0666)) == -1) {
 			(void) fprintf(stderr, "%s: failed to open %s: %s\n",

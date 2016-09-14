@@ -170,8 +170,10 @@ smbios_bufopen(const smbios_entry_t *ep, const void *buf, size_t len,
 		smb_struct_t *stp = &shp->sh_structs[i];
 		uint_t n = 0;
 
-		if ((const uchar_t *)hp + sizeof (smb_header_t) > q)
-			return (smb_open_error(shp, errp, ESMB_CORRUPT));
+		if ((const uchar_t *)hp + sizeof (smb_header_t) > q) {
+			shp->sh_flags |= SMB_FL_TRUNC;
+			break;
+		}
 
 		smb_dprintf(shp, "struct [%u] type %u len %u hdl %u at %p\n",
 		    i, hp->smbh_type, hp->smbh_len, hp->smbh_hdl, (void *)hp);
@@ -179,8 +181,10 @@ smbios_bufopen(const smbios_entry_t *ep, const void *buf, size_t len,
 		if (hp->smbh_type == SMB_TYPE_EOT)
 			break; /* ignore any entries beyond end-of-table */
 
-		if ((const uchar_t *)hp + hp->smbh_len > q - 2)
-			return (smb_open_error(shp, errp, ESMB_CORRUPT));
+		if ((const uchar_t *)hp + hp->smbh_len > q - 2) {
+			shp->sh_flags |= SMB_FL_TRUNC;
+			break;
+		}
 
 		h = hp->smbh_hdl & (shp->sh_hashlen - 1);
 		p = s = (const uchar_t *)hp + hp->smbh_len;
@@ -190,8 +194,10 @@ smbios_bufopen(const smbios_entry_t *ep, const void *buf, size_t len,
 				n++; /* count strings until \0\0 delimiter */
 		}
 
-		if (p > q - 2)
-			return (smb_open_error(shp, errp, ESMB_CORRUPT));
+		if (p > q - 2) {
+			shp->sh_flags |= SMB_FL_TRUNC;
+			break;
+		}
 
 		if (p > s)
 			n++; /* add one for final string in string table */
@@ -218,6 +224,10 @@ smbios_bufopen(const smbios_entry_t *ep, const void *buf, size_t len,
 			}
 		}
 	}
+
+	/* error out if we couldn't find any complete entries in the table */
+	if ((shp->sh_flags & SMB_FL_TRUNC) && i == 0)
+		return (smb_open_error(shp, errp, ESMB_CORRUPT));
 
 	if (flags & SMB_O_ZIDS)
 		smb_strip(shp);
@@ -393,4 +403,10 @@ smb_gteq(smbios_hdl_t *shp, int version)
 	return (SMB_MAJOR(shp->sh_smbvers) > SMB_MAJOR(version) || (
 	    SMB_MAJOR(shp->sh_smbvers) == SMB_MAJOR(version) &&
 	    SMB_MINOR(shp->sh_smbvers) >= SMB_MINOR(version)));
+}
+
+boolean_t
+smbios_truncated(smbios_hdl_t *shp)
+{
+	return ((shp->sh_flags & SMB_FL_TRUNC) != 0);
 }

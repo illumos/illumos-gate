@@ -25,8 +25,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Platform-Specific SMBIOS Subroutines
  *
@@ -115,6 +113,8 @@ smbios_open(const char *file, int version, int flags, int *errp)
 	if (ksmbios == NULL) {
 		cmn_err(CE_CONT, "?SMBIOS v%u.%u loaded (%u bytes)",
 		    ep->smbe_major, ep->smbe_minor, ep->smbe_stlen);
+		if (shp->sh_flags & SMB_FL_TRUNC)
+			cmn_err(CE_CONT, "?SMBIOS table is truncated");
 	}
 
 	shp->sh_flags |= SMB_FL_BUFALLOC;
