@@ -37,6 +37,7 @@
 #include <sys/sysevent_impl.h>
 #include <sys/sysevent/dev.h>
 #include <sys/modctl.h>
+#include <sys/lofi_impl.h>
 #include <sys/sysmacros.h>
 #include <sys/disp.h>
 #include <sys/autoconf.h>
@@ -148,6 +149,9 @@ int sysevent_daemon_init = 0;
 static kmutex_t	event_pause_mutex;
 static kcondvar_t event_pause_cv;
 static int event_pause_state = 0;
+
+/* Cached device links for lofi. */
+lofi_nvl_t lofi_devlink_cache;
 
 /*ARGSUSED*/
 static void
@@ -438,11 +442,26 @@ log_event_deliver()
 }
 
 /*
+ * Set up the nvlist based data cache. User by lofi to find
+ * device name for mapped file.
+ */
+static void
+lofi_nvl_init(lofi_nvl_t *cache)
+{
+	mutex_init(&cache->ln_lock, NULL, MUTEX_DRIVER, NULL);
+	cv_init(&cache->ln_cv, NULL, CV_DRIVER, NULL);
+	(void) nvlist_alloc(&cache->ln_data, NV_UNIQUE_NAME, KM_SLEEP);
+}
+
+/*
  * log_event_init - Allocate and initialize log_event data structures.
  */
 void
 log_event_init()
 {
+	/* Set up devlink cache for lofi. */
+	lofi_nvl_init(&lofi_devlink_cache);
+
 	mutex_init(&event_door_mutex, NULL, MUTEX_DEFAULT, NULL);
 
 	mutex_init(&eventq_head_mutex, NULL, MUTEX_DEFAULT, NULL);
@@ -1752,29 +1771,42 @@ log_sysevent(sysevent_t *ev, int flag, sysevent_id_t *eid)
 static void
 notify_lofi(sysevent_t *ev)
 {
-	static evchan_t *devfs_chan = NULL;
 	nvlist_t *nvlist;
-	int ret;
+	char name[10], *class, *driver;
+	int32_t instance;
 
-	if ((strcmp(EC_DEV_ADD, sysevent_get_class_name(ev)) != 0) &&
-	    (strcmp(EC_DEV_REMOVE, sysevent_get_class_name(ev)) != 0))
+	class = sysevent_get_class_name(ev);
+	if ((strcmp(EC_DEV_ADD, class) != 0) &&
+	    (strcmp(EC_DEV_REMOVE, class) != 0)) {
 		return;
-
-	/* only bind once to avoid bind/unbind storm on busy system */
-	if (devfs_chan == NULL) {
-		if ((ret = sysevent_evc_bind("devfsadm_event_channel",
-		    &devfs_chan, EVCH_CREAT | EVCH_HOLD_PEND)) != 0) {
-			cmn_err(CE_CONT, "sysevent_evc_bind failed: %d\n", ret);
-			return;
-		}
 	}
 
 	(void) sysevent_get_attr_list(ev, &nvlist);
-	(void) sysevent_evc_publish(devfs_chan, sysevent_get_class_name(ev),
-	    sysevent_get_subclass_name(ev), "illumos", EC_DEVFS, nvlist,
-	    EVCH_SLEEP);
+	driver = fnvlist_lookup_string(nvlist, DEV_DRIVER_NAME);
+	instance = fnvlist_lookup_int32(nvlist, DEV_INSTANCE);
 
-	nvlist_free(nvlist);
+	/* We are only interested about lofi. */
+	if (strcmp(driver, "lofi") != 0) {
+		fnvlist_free(nvlist);
+		return;
+	}
+
+	/*
+	 * insert or remove device info, then announce the change
+	 * via cv_broadcast.
+	 */
+	(void) snprintf(name, sizeof (name), "%d", instance);
+	mutex_enter(&lofi_devlink_cache.ln_lock);
+	if (strcmp(class, EC_DEV_ADD) == 0) {
+		fnvlist_add_nvlist(lofi_devlink_cache.ln_data, name, nvlist);
+	} else {
+		/* Can not use fnvlist_remove() as we can get ENOENT. */
+		(void) nvlist_remove_all(lofi_devlink_cache.ln_data, name);
+	}
+	cv_broadcast(&lofi_devlink_cache.ln_cv);
+	mutex_exit(&lofi_devlink_cache.ln_lock);
+
+	fnvlist_free(nvlist);
 }
 
 /*

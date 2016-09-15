@@ -352,6 +352,7 @@ CHKHDRS=			\
 	lockfs.h		\
 	lockstat.h		\
 	lofi.h			\
+	lofi_impl.h		\
 	log.h			\
 	logindmux.h		\
 	logindmux_impl.h	\
