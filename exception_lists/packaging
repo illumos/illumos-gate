@@ -49,6 +49,10 @@ usr/include/sys/clock_impl.h
 usr/include/sys/winlockio.h
 usr/include/scsi/plugins/ses/vendor/sun_impl.h
 #
+# Private lofi interface.
+#
+usr/include/sys/lofi_impl.h
+#
 # Private/Internal libraries of the Cryptographic Framework.
 #
 lib/libkcfd.so
