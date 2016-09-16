@@ -57,10 +57,9 @@
  * correctly since on linux they have the same value.
  *
  * Some code can actually pass in other bits in the flag. We may have to simply
- * ignore these, as indicated by the enforce parameter. See lx_fchmodat for
- * another example of this type of behavior.
+ * ignore these, as indicated by the enforce parameter.
  */
-static int
+int
 ltos_at_flag(int lflag, int allow, boolean_t enforce)
 {
 	int sflag = 0;
@@ -80,7 +79,7 @@ ltos_at_flag(int lflag, int allow, boolean_t enforce)
 		sflag |= AT_SYMLINK_NOFOLLOW;
 	}
 
-	/* right now solaris doesn't have a _FOLLOW flag, so use a fake one */
+	/* right now SunOS doesn't have a _FOLLOW flag, so use a fake one */
 	if ((lflag & LX_AT_SYMLINK_FOLLOW) && (allow & LX_AT_SYMLINK_FOLLOW)) {
 		lflag &= ~LX_AT_SYMLINK_FOLLOW;
 		sflag |= LX_AT_SYMLINK_FOLLOW;
@@ -88,7 +87,7 @@ ltos_at_flag(int lflag, int allow, boolean_t enforce)
 
 	/* If lflag is not zero than some flags did not hit the above code. */
 	if (enforce && lflag)
-		return (-EINVAL);
+		return (-1);
 
 	return (sflag);
 }
