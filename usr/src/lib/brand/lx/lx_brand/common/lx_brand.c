@@ -1098,9 +1098,9 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_rmdir,			/*  84: rmdir */
 	lx_creat,			/*  85: creat */
 	NULL,				/*  86: link */
-	lx_unlink,			/*  87: unlink */
-	lx_symlink,			/*  88: symlink */
-	lx_readlink,			/*  89: readlink */
+	NULL,				/*  87: unlink */
+	NULL,				/*  88: symlink */
+	NULL,				/*  89: readlink */
 	NULL,				/*  90: chmod */
 	NULL,				/*  91: fchmod */
 	NULL,				/*  92: chown */
@@ -1274,11 +1274,11 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/* 260: fchownat */
 	lx_futimesat,			/* 261: futimesat */
 	NULL,				/* 262: fstatat64 */
-	lx_unlinkat,			/* 263: unlinkat */
+	NULL,				/* 263: unlinkat */
 	lx_renameat,			/* 264: renameat */
 	NULL,				/* 265: linkat */
-	lx_symlinkat,			/* 266: symlinkat */
-	lx_readlinkat,			/* 267: readlinkat */
+	NULL,				/* 266: symlinkat */
+	NULL,				/* 267: readlinkat */
 	NULL,				/* 268: fchmodat */
 	NULL,				/* 269: faccessat */
 	NULL,				/* 270: pselect6 */
@@ -1352,7 +1352,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/*   7: waitpid */
 	lx_creat,			/*   8: creat */
 	NULL,				/*   9: link */
-	lx_unlink,			/*  10: unlink */
+	NULL,				/*  10: unlink */
 	lx_execve,			/*  11: execve */
 	lx_chdir,			/*  12: chdir */
 	NULL,				/*  13: time */
@@ -1425,9 +1425,9 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_getgroups16,			/*  80: getgroups16 */
 	lx_setgroups16,			/*  81: setgroups16 */
 	NULL,				/*  82: select */
-	lx_symlink,			/*  83: symlink */
+	NULL,				/*  83: symlink */
 	NULL,				/*  84: oldlstat */
-	lx_readlink,			/*  85: readlink */
+	NULL,				/*  85: readlink */
 	NULL,				/*  86: uselib */
 	NULL,				/*  87: swapon */
 	lx_reboot,			/*  88: reboot */
@@ -1643,11 +1643,11 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/* 298: fchownat */
 	lx_futimesat,			/* 299: futimesat */
 	NULL,				/* 300: fstatat64 */
-	lx_unlinkat,			/* 301: unlinkat */
+	NULL,				/* 301: unlinkat */
 	lx_renameat,			/* 302: renameat */
 	NULL,				/* 303: linkat */
-	lx_symlinkat,			/* 304: symlinkat */
-	lx_readlinkat,			/* 305: readlinkat */
+	NULL,				/* 304: symlinkat */
+	NULL,				/* 305: readlinkat */
 	NULL,				/* 306: fchmodat */
 	NULL,				/* 307: faccessat */
 	NULL,				/* 308: pselect6 */

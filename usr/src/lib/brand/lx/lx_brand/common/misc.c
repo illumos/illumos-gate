@@ -633,15 +633,6 @@ lx_stime(const time_t *tp)
 }
 
 long
-lx_symlink(const char *name1, const char *name2)
-{
-	int r;
-
-	r = symlink(name1, name2);
-	return ((r == -1) ? -errno : r);
-}
-
-long
 lx_utimes(const char *path, const struct timeval times[2])
 {
 	int r;

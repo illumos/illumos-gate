@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2015 Joyent, Inc.  All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #ifndef _SYS__LX_MISC_H
@@ -48,6 +48,8 @@ extern void lx_exit_with_sig(proc_t *, sigqueue_t *);
 extern boolean_t lx_wait_filter(proc_t *, proc_t *);
 extern void lx_sigfd_translate(k_siginfo_t *);
 extern int stol_ksiginfo_copyout(k_siginfo_t *, void *);
+
+extern int ltos_at_flag(int, int, boolean_t);
 #if defined(_SYSCALL32_IMPL)
 extern int stol_ksiginfo32_copyout(k_siginfo_t *, void *);
 #endif

@@ -531,7 +531,7 @@ lx_sysent_t lx_sysent32[] = {
 	{"waitpid",	lx_waitpid,		0,		3}, /*  7 */
 	{"creat",	NULL,			0,		2}, /*  8 */
 	{"link",	lx_link,		0,		2}, /*  9 */
-	{"unlink",	NULL,			0,		1}, /* 10 */
+	{"unlink",	lx_unlink,		0,		1}, /* 10 */
 	{"execve",	NULL,			0,		3}, /* 11 */
 	{"chdir",	NULL,			0,		1}, /* 12 */
 	{"time",	lx_time,		0,		1}, /* 13 */
@@ -604,9 +604,9 @@ lx_sysent_t lx_sysent32[] = {
 	{"getgroups16",	NULL,			0,		2}, /* 80 */
 	{"setgroups16",	NULL,			0,		2}, /* 81 */
 	{"select",	NULL,			NOSYS_OBSOLETE,	0}, /* 82 */
-	{"symlink",	NULL,			0,		2}, /* 83 */
+	{"symlink",	lx_symlink,		0,		2}, /* 83 */
 	{"oldlstat",	NULL,			NOSYS_OBSOLETE,	0}, /* 84 */
-	{"readlink",	NULL,			0,		3}, /* 85 */
+	{"readlink",	lx_readlink,		0,		3}, /* 85 */
 	{"uselib",	NULL,			NOSYS_KERNEL,	0}, /* 86 */
 	{"swapon",	NULL,			NOSYS_KERNEL,	0}, /* 87 */
 	{"reboot",	NULL,			0,		4}, /* 88 */
@@ -826,11 +826,11 @@ lx_sysent_t lx_sysent32[] = {
 	{"fchownat",	lx_fchownat,		0,		5}, /* 298 */
 	{"futimesat",	NULL,			0,		3}, /* 299 */
 	{"fstatat64",	lx_fstatat64,		0,		4}, /* 300 */
-	{"unlinkat",	NULL,			0,		3}, /* 301 */
+	{"unlinkat",	lx_unlinkat,		0,		3}, /* 301 */
 	{"renameat",	NULL,			0,		4}, /* 302 */
 	{"linkat",	lx_linkat,		0,		5}, /* 303 */
-	{"symlinkat",	NULL,			0,		3}, /* 304 */
-	{"readlinkat",	NULL,			0,		4}, /* 305 */
+	{"symlinkat",	lx_symlinkat,		0,		3}, /* 304 */
+	{"readlinkat",	lx_readlinkat,		0,		4}, /* 305 */
 	{"fchmodat",	lx_fchmodat,		0,		3}, /* 306 */
 	{"faccessat",	lx_faccessat,		0,		4}, /* 307 */
 	{"pselect6",	lx_pselect,		LX_SYS_EBPARG6,	6}, /* 308 */
@@ -979,9 +979,9 @@ lx_sysent_t lx_sysent64[] = {
 	{"rmdir",	NULL,			0,		1}, /* 84 */
 	{"creat",	NULL,			0,		2}, /* 85 */
 	{"link",	lx_link,		0,		2}, /* 86 */
-	{"unlink",	NULL,			0,		1}, /* 87 */
-	{"symlink",	NULL,			0,		2}, /* 88 */
-	{"readlink",	NULL,			0,		3}, /* 89 */
+	{"unlink",	lx_unlink,		0,		1}, /* 87 */
+	{"symlink",	lx_symlink,		0,		2}, /* 88 */
+	{"readlink",	lx_readlink,		0,		3}, /* 89 */
 	{"chmod",	lx_chmod,		0,		2}, /* 90 */
 	{"fchmod",	lx_fchmod,		0,		2}, /* 91 */
 	{"chown",	lx_chown,		0,		3}, /* 92 */
@@ -1155,11 +1155,11 @@ lx_sysent_t lx_sysent64[] = {
 	{"fchownat",	lx_fchownat,		0,		5}, /* 260 */
 	{"futimesat",	NULL,			0,		3}, /* 261 */
 	{"fstatat64",	lx_fstatat64,		0,		4}, /* 262 */
-	{"unlinkat",	NULL,			0,		3}, /* 263 */
+	{"unlinkat",	lx_unlinkat,		0,		3}, /* 263 */
 	{"renameat",	NULL,			0,		4}, /* 264 */
 	{"linkat",	lx_linkat,		0,		5}, /* 265 */
-	{"symlinkat",	NULL,			0,		3}, /* 266 */
-	{"readlinkat",	NULL,			0,		4}, /* 267 */
+	{"symlinkat",	lx_symlinkat,		0,		3}, /* 266 */
+	{"readlinkat",	lx_readlinkat,		0,		4}, /* 267 */
 	{"fchmodat",	lx_fchmodat,		0,		3}, /* 268 */
 	{"faccessat",	lx_faccessat,		0,		4}, /* 269 */
 	{"pselect6",	lx_pselect,		0,		6}, /* 270 */

@@ -19,8 +19,18 @@
 #include <sys/vnode.h>
 #include <sys/systm.h>
 #include <sys/lx_fcntl.h>
+#include <sys/lx_misc.h>
 
 #define	LX_LINK_ALLOWED	(LX_AT_SYMLINK_FOLLOW | LX_AT_EMPTY_PATH)
+
+/* From "uts/common/syscall/stat.c" */
+extern int cstatat_getvp(int, char *, int, vnode_t **, cred_t **);
+/* From uts/common/syscall/unlink.c */
+extern int unlinkat(int, char *, int);
+/* From uts/common/syscall/symlink.c */
+extern int symlinkat(char *, int, char *);
+/* From uts/common/syscall/readlink.c */
+extern int readlinkat(int, char *, char *, size_t);
 
 static long
 lx_link_common(int ffd, char *from, int tfd, char *to, int flags)
@@ -94,4 +104,91 @@ lx_linkat(int ffd, char *from, int tfd, char *to, int flags)
 	tfd = (tfd == LX_AT_FDCWD) ? AT_FDCWD : tfd;
 
 	return (lx_link_common(ffd, from, tfd, to, flags));
+}
+
+static boolean_t
+lx_isdir(int atfd, char *path)
+{
+	cred_t *cr = NULL;
+	vnode_t *vp = NULL;
+	boolean_t is_dir;
+
+	if (cstatat_getvp(atfd, path, NO_FOLLOW, &vp, &cr) != 0)
+		return (B_FALSE);
+
+	is_dir = (vp->v_type == VDIR);
+	VN_RELE(vp);
+
+	return (is_dir);
+}
+
+long
+lx_unlink(char *path)
+{
+	int err;
+
+	if ((err = unlinkat(AT_FDCWD, path, 0)) == EPERM) {
+		/* On Linux, an unlink of a dir returns EISDIR, not EPERM. */
+		if (lx_isdir(AT_FDCWD, path))
+			return (set_errno(EISDIR));
+	}
+
+	return (err);
+}
+
+long
+lx_unlinkat(int atfd, char *path, int flag)
+{
+	int err;
+
+	if (atfd == LX_AT_FDCWD)
+		atfd = AT_FDCWD;
+
+	if ((flag = ltos_at_flag(flag, AT_REMOVEDIR, B_TRUE)) < 0)
+		return (set_errno(EINVAL));
+
+	err = unlinkat(atfd, path, flag);
+	if (err == EPERM && !(flag & AT_REMOVEDIR)) {
+		/* On Linux, an unlink of a dir returns EISDIR, not EPERM. */
+		if (lx_isdir(atfd, path))
+			return (set_errno(EISDIR));
+	}
+
+	return (err);
+}
+
+long
+lx_symlink(char *name1, char *name2)
+{
+	return (symlinkat(name1, AT_FDCWD, name2));
+}
+
+long
+lx_symlinkat(char *name1, int atfd, char *name2)
+{
+	if (atfd == LX_AT_FDCWD)
+		atfd = AT_FDCWD;
+
+	return (symlinkat(name1, atfd, name2));
+}
+
+long
+lx_readlink(char *path, char *buf, size_t bufsize)
+{
+	if (bufsize <= 0)
+		return (set_errno(EINVAL));
+
+	return (readlinkat(AT_FDCWD, path, buf, bufsize));
+}
+
+long
+lx_readlinkat(int atfd, char *path, char *buf, size_t bufsize)
+{
+	if (bufsize <= 0)
+		return (set_errno(EINVAL));
+
+	if (atfd == LX_AT_FDCWD)
+		atfd = AT_FDCWD;
+
+	return (readlinkat(atfd, path, buf, bufsize));
 }
