@@ -508,6 +508,7 @@ nvme_free_dma(nvme_dma_t *dma)
 	kmem_free(dma, sizeof (*dma));
 }
 
+/* ARGSUSED */
 static void
 nvme_prp_dma_destructor(void *buf, void *private)
 {
@@ -572,6 +573,7 @@ nvme_zalloc_dma(nvme_t *nvme, size_t len, uint_t flags,
 	return (DDI_SUCCESS);
 }
 
+/* ARGSUSED */
 static int
 nvme_prp_dma_constructor(void *buf, void *private, int flags)
 {
