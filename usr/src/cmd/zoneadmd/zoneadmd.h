@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2014 Nexenta Systems, Inc. All rights reserved.
- * Copyright 2014, Joyent, Inc. All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #ifndef	_ZONEADMD_H
@@ -70,6 +70,7 @@ extern "C" {
 #define	DEFAULT_DIR_USER -1	/* user ID for chown: -1 means don't change */
 #define	DEFAULT_DIR_GROUP -1	/* grp ID for chown: -1 means don't change */
 
+#define	ALT_MOUNT(mount_cmd) 	((mount_cmd) != Z_MNT_BOOT)
 
 typedef struct zlog {
 	FILE *logfile;	/* file to log to */

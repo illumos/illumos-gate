@@ -535,6 +535,9 @@ notify_zonestatd(zoneid_t zoneid)
  * Bring a zone up to the pre-boot "ready" stage.  The mount_cmd argument is
  * 'true' if this is being invoked as part of the processing for the "mount"
  * subcommand.
+ *
+ * If a scratch zone mount (ALT_MOUNT) is being performed then do not
+ * call the state change hooks.
  */
 static int
 zone_ready(zlog_t *zlogp, zone_mnt_t mount_cmd, int zstate, boolean_t debug)
@@ -561,7 +564,8 @@ zone_ready(zlog_t *zlogp, zone_mnt_t mount_cmd, int zstate, boolean_t debug)
 	if (zone_did == 0)
 		zone_did = zone_get_did(zone_name);
 
-	if (brand_prestatechg(zlogp, zstate, Z_READY, debug) != 0)
+	if (!ALT_MOUNT(mount_cmd) &&
+	    brand_prestatechg(zlogp, zstate, Z_READY, debug) != 0)
 		goto bad;
 
 	if ((zone_id = vplat_create(zlogp, mount_cmd, zone_did)) == -1)
@@ -574,7 +578,8 @@ zone_ready(zlog_t *zlogp, zone_mnt_t mount_cmd, int zstate, boolean_t debug)
 		goto bad;
 	}
 
-	if (brand_poststatechg(zlogp, zstate, Z_READY, debug) != 0)
+	if (!ALT_MOUNT(mount_cmd) &&
+	    brand_poststatechg(zlogp, zstate, Z_READY, debug) != 0)
 		goto bad;
 
 	return (0);
@@ -584,7 +589,10 @@ bad:
 	 * If something goes wrong, we up the zones's state to the target
 	 * state, READY, and then invoke the hook as if we're halting.
 	 */
-	(void) brand_poststatechg(zlogp, ZONE_STATE_READY, Z_HALT, debug);
+	if (!ALT_MOUNT(mount_cmd))
+		(void) brand_poststatechg(zlogp, ZONE_STATE_READY, Z_HALT,
+		    debug);
+
 	if (snapped)
 		if ((err = zonecfg_destroy_snapshot(zone_name)) != Z_OK)
 			zerror(zlogp, B_FALSE, "destroying snapshot: %s",
@@ -1242,7 +1250,12 @@ zone_halt(zlog_t *zlogp, boolean_t unmount_cmd, boolean_t rebooting, int zstate,
 {
 	int err;
 
-	if (brand_prestatechg(zlogp, zstate, Z_HALT, debug) != 0)
+	/*
+	 * If performing a scratch zone unmount then do not call the
+	 * state change hooks.
+	 */
+	if (unmount_cmd == B_FALSE &&
+	    brand_prestatechg(zlogp, zstate, Z_HALT, debug) != 0)
 		return (-1);
 
 	/* Shutting down, stop the memcap thread */
@@ -1258,7 +1271,8 @@ zone_halt(zlog_t *zlogp, boolean_t unmount_cmd, boolean_t rebooting, int zstate,
 	/* Shut down is done, stop the log thread */
 	destroy_log_thread();
 
-	if (brand_poststatechg(zlogp, zstate, Z_HALT, debug) != 0)
+	if (unmount_cmd == B_FALSE &&
+	    brand_poststatechg(zlogp, zstate, Z_HALT, debug) != 0)
 		return (-1);
 
 	if ((err = zonecfg_destroy_snapshot(zone_name)) != Z_OK)

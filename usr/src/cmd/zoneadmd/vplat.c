@@ -136,8 +136,6 @@
 #define	DFSTYPES	"/etc/dfs/fstypes"
 #define	MAXTNZLEN	2048
 
-#define	ALT_MOUNT(mount_cmd) 	((mount_cmd) != Z_MNT_BOOT)
-
 /* Number of times to retry unmounting if it fails */
 #define	UMOUNT_RETRIES	30
 
@@ -1812,23 +1810,40 @@ mount_filesystems(zlog_t *zlogp, zone_mnt_t mount_cmd)
 	qsort(fs_ptr, num_fs, sizeof (*fs_ptr), fs_compare);
 
 	for (i = 0; i < num_fs; i++) {
-		if (ALT_MOUNT(mount_cmd) &&
-		    strcmp(fs_ptr[i].zone_fs_dir, "/dev") == 0) {
-			size_t slen = strlen(rootpath) - 2;
+		if (ALT_MOUNT(mount_cmd)) {
+			if (strcmp(fs_ptr[i].zone_fs_dir, "/dev") == 0) {
+				size_t slen = strlen(rootpath) - 2;
 
-			/*
-			 * By default we'll try to mount /dev as /a/dev
-			 * but /dev is special and always goes at the top
-			 * so strip the trailing '/a' from the rootpath.
-			 */
-			assert(strcmp(&rootpath[slen], "/a") == 0);
-			rootpath[slen] = '\0';
-			if (mount_one(zlogp, &fs_ptr[i], rootpath, mount_cmd)
-			    != 0)
-				goto bad;
-			rootpath[slen] = '/';
-			continue;
+				/*
+				 * By default we'll try to mount /dev
+				 * as /a/dev but /dev is special and
+				 * always goes at the top so strip the
+				 * trailing '/a' from the rootpath.
+				 */
+				assert(strcmp(&rootpath[slen], "/a") == 0);
+				rootpath[slen] = '\0';
+				if (mount_one(zlogp, &fs_ptr[i], rootpath,
+				    mount_cmd) != 0)
+					goto bad;
+				rootpath[slen] = '/';
+				continue;
+			} else if (strcmp(brand_name, default_brand) != 0) {
+				/*
+				 * If mounting non-native brand, skip
+				 * mounting global mounts and
+				 * filesystem entries since they are
+				 * only needed for native pkg upgrade
+				 * tools.
+				 *
+				 * The only exception right now is
+				 * /dev (handled above), which is
+				 * needed in the luroot in order to
+				 * zlogin -S into the zone.
+				 */
+				continue;
+			}
 		}
+
 		if (mount_one(zlogp, &fs_ptr[i], rootpath, mount_cmd) != 0)
 			goto bad;
 	}
