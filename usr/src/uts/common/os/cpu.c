@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*
@@ -108,6 +109,7 @@ kmutex_t	cpu_lock;
 cpu_t		*cpu_list;		/* list of all CPUs */
 cpu_t		*clock_cpu_list;	/* used by clock to walk CPUs */
 cpu_t		*cpu_active;		/* list of active CPUs */
+cpuset_t	cpu_active_set;		/* cached set of active CPUs */
 static cpuset_t	cpu_available;		/* set of available CPUs */
 cpuset_t	cpu_seqid_inuse;	/* which cpu_seqids are in use */
 
@@ -1724,6 +1726,7 @@ cpu_list_init(cpu_t *cp)
 	cp->cpu_part = &cp_default;
 
 	CPUSET_ADD(cpu_available, cp->cpu_id);
+	CPUSET_ADD(cpu_active_set, cp->cpu_id);
 }
 
 /*
@@ -1895,6 +1898,7 @@ cpu_add_active_internal(cpu_t *cp)
 	cp->cpu_prev_onln = cpu_active->cpu_prev_onln;
 	cpu_active->cpu_prev_onln->cpu_next_onln = cp;
 	cpu_active->cpu_prev_onln = cp;
+	CPUSET_ADD(cpu_active_set, cp->cpu_id);
 
 	if (pp->cp_cpulist) {
 		cp->cpu_next_part = pp->cp_cpulist;
@@ -1965,6 +1969,7 @@ cpu_remove_active(cpu_t *cp)
 	}
 	cp->cpu_next_onln = cp;
 	cp->cpu_prev_onln = cp;
+	CPUSET_DEL(cpu_active_set, cp->cpu_id);
 
 	cp->cpu_prev_part->cpu_next_part = cp->cpu_next_part;
 	cp->cpu_next_part->cpu_prev_part = cp->cpu_prev_part;
@@ -2704,13 +2709,18 @@ cpu_bind_thread(kthread_id_t tp, processorid_t bind, processorid_t *obind,
 	return (0);
 }
 
-#if CPUSET_WORDS > 1
 
-/*
- * Functions for implementing cpuset operations when a cpuset is more
- * than one word.  On platforms where a cpuset is a single word these
- * are implemented as macros in cpuvar.h.
- */
+cpuset_t *
+cpuset_alloc(int kmflags)
+{
+	return (kmem_alloc(sizeof (cpuset_t), kmflags));
+}
+
+void
+cpuset_free(cpuset_t *s)
+{
+	kmem_free(s, sizeof (cpuset_t));
+}
 
 void
 cpuset_all(cpuset_t *s)
@@ -2735,25 +2745,45 @@ cpuset_only(cpuset_t *s, uint_t cpu)
 	CPUSET_ADD(*s, cpu);
 }
 
+long
+cpu_in_set(cpuset_t *s, uint_t cpu)
+{
+	return (BT_TEST(s->cpub, cpu));
+}
+
+void
+cpuset_add(cpuset_t *s, uint_t cpu)
+{
+	BT_SET(s->cpub, cpu);
+}
+
+void
+cpuset_del(cpuset_t *s, uint_t cpu)
+{
+	BT_CLEAR(s->cpub, cpu);
+}
+
 int
 cpuset_isnull(cpuset_t *s)
 {
 	int i;
 
-	for (i = 0; i < CPUSET_WORDS; i++)
+	for (i = 0; i < CPUSET_WORDS; i++) {
 		if (s->cpub[i] != 0)
 			return (0);
+	}
 	return (1);
 }
 
 int
-cpuset_cmp(cpuset_t *s1, cpuset_t *s2)
+cpuset_isequal(cpuset_t *s1, cpuset_t *s2)
 {
 	int i;
 
-	for (i = 0; i < CPUSET_WORDS; i++)
+	for (i = 0; i < CPUSET_WORDS; i++) {
 		if (s1->cpub[i] != s2->cpub[i])
 			return (0);
+	}
 	return (1);
 }
 
@@ -2822,7 +2852,68 @@ cpuset_bounds(cpuset_t *s, uint_t *smallestid, uint_t *largestid)
 	*smallestid = *largestid = CPUSET_NOTINSET;
 }
 
-#endif	/* CPUSET_WORDS */
+void
+cpuset_atomic_del(cpuset_t *s, uint_t cpu)
+{
+	BT_ATOMIC_CLEAR(s->cpub, (cpu))
+}
+
+void
+cpuset_atomic_add(cpuset_t *s, uint_t cpu)
+{
+	BT_ATOMIC_SET(s->cpub, (cpu))
+}
+
+long
+cpuset_atomic_xadd(cpuset_t *s, uint_t cpu)
+{
+	long res;
+
+	BT_ATOMIC_SET_EXCL(s->cpub, cpu, res);
+	return (res);
+}
+
+long
+cpuset_atomic_xdel(cpuset_t *s, uint_t cpu)
+{
+	long res;
+
+	BT_ATOMIC_CLEAR_EXCL(s->cpub, cpu, res);
+	return (res);
+}
+
+void
+cpuset_or(cpuset_t *dst, cpuset_t *src)
+{
+	for (int i = 0; i < CPUSET_WORDS; i++) {
+		dst->cpub[i] |= src->cpub[i];
+	}
+}
+
+void
+cpuset_xor(cpuset_t *dst, cpuset_t *src)
+{
+	for (int i = 0; i < CPUSET_WORDS; i++) {
+		dst->cpub[i] ^= src->cpub[i];
+	}
+}
+
+void
+cpuset_and(cpuset_t *dst, cpuset_t *src)
+{
+	for (int i = 0; i < CPUSET_WORDS; i++) {
+		dst->cpub[i] &= src->cpub[i];
+	}
+}
+
+void
+cpuset_zero(cpuset_t *dst)
+{
+	for (int i = 0; i < CPUSET_WORDS; i++) {
+		dst->cpub[i] = 0;
+	}
+}
+
 
 /*
  * Unbind threads bound to specified CPU.
