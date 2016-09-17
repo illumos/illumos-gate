@@ -22,7 +22,7 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -166,24 +166,10 @@ smb_net_send_uio(smb_session_t *s, struct uio *uio)
 	mutex_enter(&txl->tl_mutex);
 	while (txl->tl_active)
 		cv_wait(&txl->tl_wait_cv, &txl->tl_mutex);
-
-	/*
-	 * Did the connection close while we waited?
-	 */
-	switch (s->s_state) {
-	case SMB_SESSION_STATE_DISCONNECTED:
-	case SMB_SESSION_STATE_TERMINATED:
-		rc = ENOTCONN;
-		break;
-	default:
-		txl->tl_active = B_TRUE;
-		break;
-	}
+	txl->tl_active = B_TRUE;
 	mutex_exit(&txl->tl_mutex);
 
 	DTRACE_PROBE1(send__wait__done, struct smb_session_t *, s);
-	if (rc != 0)
-		return (rc);
 
 	/*
 	 * OK, try to send.
