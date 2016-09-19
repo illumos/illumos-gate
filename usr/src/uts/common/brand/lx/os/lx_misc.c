@@ -344,6 +344,7 @@ lx_lwpdata_alloc(proc_t *p)
 {
 	lx_lwp_data_t *lwpd;
 	struct lx_pid *lpidp;
+	cpuset_t *affmask;
 	pid_t newpid = 0;
 	struct pid *pidp = NULL;
 
@@ -364,10 +365,13 @@ lx_lwpdata_alloc(proc_t *p)
 
 	lwpd = kmem_zalloc(sizeof (struct lx_lwp_data), KM_SLEEP);
 	lpidp = kmem_zalloc(sizeof (struct lx_pid), KM_SLEEP);
+	affmask = cpuset_alloc(KM_SLEEP);
 
 	lpidp->l_pid = newpid;
 	lpidp->l_pidp = pidp;
 	lwpd->br_lpid = lpidp;
+	lwpd->br_affinitymask = affmask;
+
 	return (lwpd);
 }
 
@@ -382,7 +386,9 @@ lx_lwpdata_free(void *lwpbd)
 	lx_lwp_data_t *lwpd = (lx_lwp_data_t *)lwpbd;
 	VERIFY(lwpd != NULL);
 	VERIFY(lwpd->br_lpid != NULL);
+	VERIFY(lwpd->br_affinitymask != NULL);
 
+	cpuset_free(lwpd->br_affinitymask);
 	if (lwpd->br_lpid->l_pidp != NULL) {
 		(void) pid_rele(lwpd->br_lpid->l_pidp);
 	}
@@ -409,10 +415,7 @@ lx_initlwp(klwp_t *lwp, void *lwpbd)
 	lwpd->br_set_ctidp = NULL;
 	lwpd->br_signal = 0;
 	lwpd->br_stack_mode = LX_STACK_MODE_PREINIT;
-	/*
-	 * lwpd->br_affinitymask was zeroed by kmem_zalloc()
-	 * as was lwpd->br_scall_args and lwpd->br_args_size.
-	 */
+	cpuset_all(lwpd->br_affinitymask);
 
 	/*
 	 * The first thread in a process has ppid set to the parent
@@ -548,6 +551,7 @@ lx_forklwp(klwp_t *srclwp, klwp_t *dstlwp)
 	 */
 	dst->br_lwp_flags = src->br_lwp_flags & BR_CPU_BOUND;
 	dst->br_scall_args = NULL;
+	lx_affinity_forklwp(srclwp, dstlwp);
 
 	/*
 	 * Flag so child doesn't ptrace-stop on syscall exit.

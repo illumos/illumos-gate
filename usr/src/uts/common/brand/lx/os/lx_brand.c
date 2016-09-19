@@ -1524,18 +1524,6 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 		return (0);
 	}
 
-	case B_SET_AFFINITY_MASK:
-	case B_GET_AFFINITY_MASK:
-		/*
-		 * Retrieve or store the CPU affinity mask for the
-		 * requested linux pid.
-		 *
-		 * arg1 is a linux PID (0 means curthread).
-		 * arg2 is the size of the given mask.
-		 * arg3 is the address of the affinity mask.
-		 */
-		return (lx_sched_affinity(cmd, arg1, arg2, arg3, rval));
-
 	case B_PTRACE_STOP_FOR_OPT:
 		return (lx_ptrace_stop_for_option((int)arg1, arg2 == 0 ?
 		    B_FALSE : B_TRUE, (ulong_t)arg3, arg4));

@@ -37,6 +37,8 @@ extern void lx_initlwp(klwp_t *, void *);
 extern void lx_initlwp_post(klwp_t *);
 extern void lx_forklwp(klwp_t *, klwp_t *);
 
+extern void lx_affinity_forklwp(klwp_t *, klwp_t *);
+
 extern void lx_set_gdt(int, user_desc_t *);
 extern void lx_clear_gdt(int);
 

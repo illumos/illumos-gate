@@ -93,7 +93,6 @@ struct clone_state {
 	struct lx_desc	*c_ldtinfo;	/* thread-specific segment */
 	void		*c_ctidp;
 	ucontext_t	c_uc;		/* original register state/sigmask */
-	lx_affmask_t	c_affmask;	/* CPU affinity mask */
 	volatile int	*c_clone_res;	/* pid/error returned to cloner */
 	int		c_ptrace_event;	/* ptrace(2) event for child stop */
 	void		*c_ntv_stk;	/* native stack for this thread */
@@ -203,14 +202,6 @@ clone_start(void *arg)
 		free(cs->c_lx_tsd);
 		free(cs);
 		return (NULL);
-	}
-
-	if (lx_sched_setaffinity(0, sizeof (cs->c_affmask),
-	    (uintptr_t)&cs->c_affmask) != 0) {
-		*(cs->c_clone_res) = -errno;
-
-		lx_err_fatal("Unable to set affinity mask in child thread: %s",
-		    strerror(errno));
 	}
 
 	/*
@@ -633,12 +624,6 @@ lx_clone(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4, uintptr_t p5)
 	if ((cs->c_lx_tsd = malloc(sizeof (*cs->c_lx_tsd))) == NULL) {
 		free(cs);
 		return (-ENOMEM);
-	}
-
-	if (lx_sched_getaffinity(0, sizeof (cs->c_affmask),
-	    (uintptr_t)&cs->c_affmask) == -1) {
-		lx_err_fatal("Unable to get affinity mask for parent "
-		    "thread: %s", strerror(errno));
 	}
 
 	clone_res = 0;
