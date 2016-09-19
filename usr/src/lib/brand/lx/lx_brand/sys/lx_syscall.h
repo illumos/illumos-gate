@@ -162,8 +162,6 @@ extern long lx_setpriority(uintptr_t, uintptr_t, uintptr_t);
 
 extern long lx_ptrace(uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 
-extern long lx_sched_getaffinity(uintptr_t, uintptr_t, uintptr_t);
-extern long lx_sched_setaffinity(uintptr_t, uintptr_t, uintptr_t);
 extern long lx_sched_getparam(uintptr_t, uintptr_t);
 extern long lx_sched_setparam(uintptr_t, uintptr_t);
 extern long lx_sched_rr_get_interval(uintptr_t pid, uintptr_t);

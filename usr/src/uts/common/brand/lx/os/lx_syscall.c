@@ -760,8 +760,8 @@ lx_sysent_t lx_sysent32[] = {
 	{"tkill",	lx_tkill,		0,		2}, /* 238 */
 	{"sendfile64",	NULL,			0,		4}, /* 239 */
 	{"futex",	lx_futex,		LX_SYS_EBPARG6,	6}, /* 240 */
-	{"sched_setaffinity", NULL, 		0,		3}, /* 241 */
-	{"sched_getaffinity", NULL, 		0,		3}, /* 242 */
+	{"sched_setaffinity", lx_sched_setaffinity,	0,	3}, /* 241 */
+	{"sched_getaffinity", lx_sched_getaffinity,	0,	3}, /* 242 */
 	{"set_thread_area", lx_set_thread_area,	0,		1}, /* 243 */
 	{"get_thread_area", lx_get_thread_area,	0,		1}, /* 244 */
 	{"io_setup",	lx_io_setup,		0,		2}, /* 245 */
@@ -1093,8 +1093,8 @@ lx_sysent_t lx_sysent64[] = {
 	{"tkill",	lx_tkill,		0,		2}, /* 200 */
 	{"time",	lx_time,		0,		1}, /* 201 */
 	{"futex",	lx_futex,		0,		6}, /* 202 */
-	{"sched_setaffinity", NULL,		0,		3}, /* 203 */
-	{"sched_getaffinity", NULL,		0,		3}, /* 204 */
+	{"sched_setaffinity", lx_sched_setaffinity,	0,	3}, /* 203 */
+	{"sched_getaffinity", lx_sched_getaffinity,	0,	3}, /* 204 */
 	{"set_thread_area", lx_set_thread_area, 0,		1}, /* 205 */
 	{"io_setup",	lx_io_setup,		0,		2}, /* 206 */
 	{"io_destroy",	NULL,			0,		1}, /* 207 */

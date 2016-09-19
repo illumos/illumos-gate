@@ -1214,8 +1214,8 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/* 200: tkill */
 	NULL,				/* 201: time */
 	NULL,				/* 202: futex */
-	lx_sched_setaffinity,		/* 203: sched_setaffinity */
-	lx_sched_getaffinity,		/* 204: sched_getaffinity */
+	NULL,				/* 203: sched_setaffinity */
+	NULL,				/* 204: sched_getaffinity */
 	NULL,				/* 205: set_thread_area */
 	lx_io_setup,			/* 206: io_setup */
 	lx_io_destroy,			/* 207: io_destroy */
@@ -1583,8 +1583,8 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/* 238: tkill */
 	lx_sendfile64,			/* 239: sendfile64 */
 	NULL,				/* 240: futex */
-	lx_sched_setaffinity,		/* 241: sched_setaffinity */
-	lx_sched_getaffinity,		/* 242: sched_getaffinity */
+	NULL,				/* 241: sched_setaffinity */
+	NULL,				/* 242: sched_getaffinity */
 	NULL,				/* 243: set_thread_area */
 	NULL,				/* 244: get_thread_area */
 	lx_io_setup,			/* 245: io_setup */

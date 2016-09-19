@@ -38,6 +38,7 @@
 #include <sys/vfs.h>
 #include <sys/sunddi.h>
 #include <sys/sunldi.h>
+#include <sys/cpuvar.h>
 #endif
 
 #ifdef	__cplusplus
@@ -90,8 +91,8 @@ extern "C" {
 #define	B_GET_CURRENT_CONTEXT	129
 #define	B_EMULATION_DONE	130
 /* formerly B_PTRACE_KERNEL	131 */
-#define	B_SET_AFFINITY_MASK	132
-#define	B_GET_AFFINITY_MASK	133
+/* formerly B_SET_AFFINITY_MASK	132 */
+/* formerly B_GET_AFFINITY_MASK	133 */
 #define	B_PTRACE_CLONE_BEGIN	134
 #define	B_PTRACE_STOP_FOR_OPT	135
 #define	B_UNSUPPORTED		136
@@ -456,7 +457,7 @@ struct lx_lwp_data {
 					/* clone()'ed child terminates */
 	int	br_exitwhy;		/* reason for thread (process) exit */
 	int	br_exitwhat;		/* exit code / killing signal */
-	lx_affmask_t br_affinitymask;	/* bitmask of CPU sched affinities */
+	cpuset_t *br_affinitymask;	/* bitmask of CPU sched affinities */
 	struct user_desc br_tls[LX_TLSNUM];
 			/* descriptors used by libc for TLS */
 	ulong_t	br_lx_fsbase;		/* lx fsbase for 64-bit thread ptr */

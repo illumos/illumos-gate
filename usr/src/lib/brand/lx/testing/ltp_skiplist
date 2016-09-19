@@ -75,8 +75,6 @@ sched_getparam01
 sched_getparam02
 sched_setscheduler01
 sched_setscheduler03	# OS-5524
-sched_setaffinity01
-sched_getaffinity01
 sched_setparam02
 sched_setparam03
 setfsuid04
