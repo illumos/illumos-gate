@@ -26,7 +26,7 @@
 #
 
 #
-# Copyright (c) 2013 by Delphix. All rights reserved.
+# Copyright (c) 2013, 2015 by Delphix. All rights reserved.
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -34,6 +34,9 @@
 . $STF_SUITE/tests/functional/zvol/zvol_swap/zvol_swap.cfg
 
 verify_runnable "global"
+
+# Restart fmd to lower the chances of swap -d failing with ENOMEM.
+log_must $SVCADM restart svc:/system/fmd:default
 
 for i in $SAVESWAPDEVS ; do
 	log_note "Executing: swap -d $i"

@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Argo Technologie SA.
  */
 
 /*
@@ -112,19 +113,22 @@ ipmgmt_nvlist_match(nvlist_t *db_nvl, const char *proto, const char *ifname,
 
 	if ((proto == NULL && db_proto != NULL) ||
 	    (proto != NULL && db_proto == NULL) ||
-	    strcmp(proto, db_proto) != 0) {
+	    (proto != NULL && db_proto != NULL &&
+	    strcmp(proto, db_proto) != 0)) {
 		/* no intersection - different protocols. */
 		return (B_FALSE);
 	}
 	if ((ifname == NULL && db_ifname != NULL) ||
 	    (ifname != NULL && db_ifname == NULL) ||
-	    strcmp(ifname, db_ifname) != 0) {
+	    (ifname != NULL && db_ifname != NULL &&
+	    strcmp(ifname, db_ifname) != 0)) {
 		/* no intersection - different interfaces. */
 		return (B_FALSE);
 	}
 	if ((aobjname == NULL && db_aobjname != NULL) ||
 	    (aobjname != NULL && db_aobjname == NULL) ||
-	    strcmp(aobjname, db_aobjname) != 0) {
+	    (aobjname != NULL && db_aobjname != NULL &&
+	    strcmp(aobjname, db_aobjname) != 0)) {
 		/* no intersection - different address objects */
 		return (B_FALSE);
 	}

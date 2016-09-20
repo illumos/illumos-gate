@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2016 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2016 The MathWorks, Inc. All rights reserved.
  */
 
 #ifndef _NVME_VAR_H
@@ -57,6 +58,7 @@ struct nvme_dma {
 	uint_t nd_ncookie;
 	caddr_t nd_memp;
 	size_t nd_len;
+	boolean_t nd_cached;
 };
 
 struct nvme_cmd {
@@ -108,6 +110,7 @@ struct nvme {
 	ddi_acc_handle_t n_regh;
 
 	kmem_cache_t *n_cmd_cache;
+	kmem_cache_t *n_prp_cache;
 
 	size_t n_inth_sz;
 	ddi_intr_handle_t *n_inth;

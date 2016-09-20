@@ -125,6 +125,12 @@ file path=opt/libc-tests/tests/symbols/symbols_test.$(ARCH) mode=0555
 file path=opt/libc-tests/tests/symbols/symbols_test.$(ARCH64) mode=0555
 file path=opt/libc-tests/tests/timespec_get.32 mode=0555
 file path=opt/libc-tests/tests/timespec_get.64 mode=0555
+file path=opt/libc-tests/tests/wcsncasecmp-7344.32 mode=0555
+file path=opt/libc-tests/tests/wcsncasecmp-7344.64 mode=0555
+file path=opt/libc-tests/tests/wcsncasecmp-7350.32 mode=0555
+file path=opt/libc-tests/tests/wcsncasecmp-7350.64 mode=0555
+file path=opt/libc-tests/tests/wcsncasecmp.32 mode=0555
+file path=opt/libc-tests/tests/wcsncasecmp.64 mode=0555
 file path=opt/libc-tests/tests/wcsrtombs_test mode=0555
 file path=opt/libc-tests/tests/wcsrtombs_test.$(ARCH) mode=0555
 file path=opt/libc-tests/tests/wcsrtombs_test.$(ARCH64) mode=0555

@@ -4301,29 +4301,16 @@ xdr_cnfs_argop4_wrap(XDR *xdrs, nfs_argop4 *objp)
 static bool_t
 xdr_snfs_argop4(XDR *xdrs, nfs_argop4 *objp)
 {
-	uint_t pos;
-	bool_t ret;
-
-	if (xdrs->x_op == XDR_DECODE)
-		pos = XDR_GETPOS(xdrs);
-
 	if (!xdr_int(xdrs, (int *)&objp->argop))
 		return (FALSE);
 
 	switch (objp->argop) {
 	case OP_PUTFH:
-		ret = xdr_decode_nfs_fh4(xdrs,
-		    &objp->nfs_argop4_u.opputfh.object);
-		break;
+		return (xdr_decode_nfs_fh4(xdrs,
+		    &objp->nfs_argop4_u.opputfh.object));
 	default:
-		ret = xdr_nfs_argop4(xdrs, objp);
-		break;
+		return (xdr_nfs_argop4(xdrs, objp));
 	}
-
-	if (ret && xdrs->x_op == XDR_DECODE)
-		objp->opsize = XDR_GETPOS(xdrs) - pos;
-
-	return (ret);
 }
 
 /*
@@ -4775,12 +4762,6 @@ xdr_nfs_resop4(XDR *xdrs, nfs_resop4 *objp)
 static bool_t
 xdr_snfs_resop4(XDR *xdrs, nfs_resop4 *objp)
 {
-	uint_t pos;
-	bool_t ret;
-
-	if (xdrs->x_op == XDR_ENCODE)
-		pos = XDR_GETPOS(xdrs);
-
 	if (!xdr_int(xdrs, (int *)&objp->resop))
 		return (FALSE);
 
@@ -4790,20 +4771,12 @@ xdr_snfs_resop4(XDR *xdrs, nfs_resop4 *objp)
 		    (int32_t *)&objp->nfs_resop4_u.opgetfh.status))
 			return (FALSE);
 		if (objp->nfs_resop4_u.opgetfh.status != NFS4_OK)
-			ret = TRUE;
-		else
-			ret = xdr_encode_nfs_fh4(xdrs,
-			    &objp->nfs_resop4_u.opgetfh.object);
-		break;
+			return (TRUE);
+		return (xdr_encode_nfs_fh4(xdrs,
+		    &objp->nfs_resop4_u.opgetfh.object));
 	default:
-		ret = xdr_nfs_resop4(xdrs, objp);
-		break;
+		return (xdr_nfs_resop4(xdrs, objp));
 	}
-
-	if (ret && xdrs->x_op == XDR_ENCODE)
-		objp->opsize = XDR_GETPOS(xdrs) - pos;
-
-	return (ret);
 }
 
 static bool_t
