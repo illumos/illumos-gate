@@ -357,44 +357,84 @@ AcpiOsGetTableByIndex(UINT32 Index, ACPI_TABLE_HEADER **Table,
  * RETURN:      Status
  *
  * DESCRIPTION: Scan and load RSDP.
- *
+ * See the find_rsdp() function in usr/src/uts/i86pc/os/fakebop.c, which is how
+ * the kernel finds the RSDP. That algorithm matches AcpiFindRootPointer().
+ * The code here is derived from AcpiFindRootPointer, except that we will try
+ * the BIOS if the EBDA fails, and we will copy the table if found.
  */
 static ACPI_STATUS
 OslLoadRsdp(void)
 {
-	ACPI_TABLE_HEADER	*MappedTable;
-	UINT8			*RsdpAddress;
-	ACPI_PHYSICAL_ADDRESS	RsdpBase;
-	ACPI_SIZE		RsdpSize;
+	UINT8			*mapp;
+	ACPI_TABLE_HEADER	*tblp;
+	ACPI_SIZE		mapsize;
+	ACPI_PHYSICAL_ADDRESS	physaddr;
 
-	/* Get RSDP from memory */
+	/* 1a) Get the location of the Extended BIOS Data Area (EBDA) */
+	mapp = AcpiOsMapMemory((ACPI_PHYSICAL_ADDRESS)ACPI_EBDA_PTR_LOCATION,
+	    ACPI_EBDA_PTR_LENGTH);
+	if (mapp == NULL)
+		goto try_bios;
 
-	RsdpSize = sizeof (ACPI_TABLE_RSDP);
-	if (Gbl_RsdpBase) {
-		RsdpBase = Gbl_RsdpBase;
+	ACPI_MOVE_16_TO_32(&physaddr, mapp);
+
+	/* Convert segment part to physical address */
+	physaddr <<= 4;
+	AcpiOsUnmapMemory(mapp, ACPI_EBDA_PTR_LENGTH);
+
+	/* EBDA present? */
+	if (physaddr <= 0x400)
+		goto try_bios;
+
+	/*
+	 * 1b) Search EBDA paragraphs (EBDA is required to be a minimum of 1K
+	 * length)
+	 */
+	mapp = AcpiOsMapMemory(physaddr, ACPI_EBDA_WINDOW_SIZE);
+	if (mapp == NULL) {
+		(void) fprintf(stderr, "EBDA (0x%p) found, but is not "
+		    "mappable\n", physaddr);
+		goto try_bios;
+	}
+
+	tblp = ACPI_CAST_PTR(ACPI_TABLE_HEADER,
+	    AcpiTbScanMemoryForRsdp(mapp, ACPI_EBDA_WINDOW_SIZE));
+	if (tblp != NULL) {
+		physaddr += (ACPI_PHYSICAL_ADDRESS) ACPI_PTR_DIFF(tblp, mapp);
+		Gbl_RsdpAddress = physaddr;
+		memcpy(&Gbl_Rsdp, tblp, sizeof (ACPI_TABLE_RSDP));
+		AcpiOsUnmapMemory(mapp, ACPI_EBDA_WINDOW_SIZE);
+
+		return (AE_OK);
+	}
+	AcpiOsUnmapMemory(mapp, ACPI_EBDA_WINDOW_SIZE);
+
+try_bios:
+	/* Try to get RSDP from BIOS memory */
+	if (Gbl_RsdpBase != NULL) {
+		physaddr = Gbl_RsdpBase;
+		mapsize = sizeof (ACPI_TABLE_RSDP);
 	} else {
-		RsdpBase = ACPI_HI_RSDP_WINDOW_BASE;
-		RsdpSize = ACPI_HI_RSDP_WINDOW_SIZE;
+		physaddr = ACPI_HI_RSDP_WINDOW_BASE;
+		mapsize = ACPI_HI_RSDP_WINDOW_SIZE;
 	}
 
-	RsdpAddress = AcpiOsMapMemory(RsdpBase, RsdpSize);
-	if (RsdpAddress == NULL) {
+	mapp = AcpiOsMapMemory(physaddr, mapsize);
+	if (mapp == NULL)
 		return (OslGetLastStatus(AE_BAD_ADDRESS));
-	}
 
 	/* Search low memory for the RSDP */
-
-	MappedTable = ACPI_CAST_PTR(ACPI_TABLE_HEADER,
-	    AcpiTbScanMemoryForRsdp(RsdpAddress, RsdpSize));
-	if (MappedTable == NULL) {
-		AcpiOsUnmapMemory(RsdpAddress, RsdpSize);
+	tblp = ACPI_CAST_PTR(ACPI_TABLE_HEADER,
+	    AcpiTbScanMemoryForRsdp(mapp, mapsize));
+	if (tblp == NULL) {
+		AcpiOsUnmapMemory(mapp, mapsize);
 		return (AE_NOT_FOUND);
 	}
 
-	Gbl_RsdpAddress = RsdpBase + (ACPI_CAST8(MappedTable) - RsdpAddress);
-
-	memcpy(&Gbl_Rsdp, MappedTable, sizeof (ACPI_TABLE_RSDP));
-	AcpiOsUnmapMemory(RsdpAddress, RsdpSize);
+	physaddr += (ACPI_PHYSICAL_ADDRESS) ACPI_PTR_DIFF(tblp, mapp);
+	Gbl_RsdpAddress = physaddr;
+	memcpy(&Gbl_Rsdp, tblp, sizeof (ACPI_TABLE_RSDP));
+	AcpiOsUnmapMemory(mapp, mapsize);
 
 	return (AE_OK);
 }
@@ -1013,5 +1053,5 @@ AcpiOsUnmapMemory(void *LogicalAddress, ACPI_SIZE Size)
 
 	offset = (ulong_t)LogicalAddress % pagesize;
 
-	(void)munmap(LogicalAddress - offset, Size + offset);
+	(void) munmap(LogicalAddress - offset, Size + offset);
 }
