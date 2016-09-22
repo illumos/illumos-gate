@@ -126,6 +126,7 @@ dir path=opt/zfs-tests/tests/functional/quota
 dir path=opt/zfs-tests/tests/functional/redundancy
 dir path=opt/zfs-tests/tests/functional/refquota
 dir path=opt/zfs-tests/tests/functional/refreserv
+dir path=opt/zfs-tests/tests/functional/removal
 dir path=opt/zfs-tests/tests/functional/rename_dirs
 dir path=opt/zfs-tests/tests/functional/replacement
 dir path=opt/zfs-tests/tests/functional/reservation
@@ -153,6 +154,8 @@ dir path=opt/zfs-tests/tests/perf
 dir path=opt/zfs-tests/tests/perf/fio
 dir path=opt/zfs-tests/tests/perf/regression
 dir path=opt/zfs-tests/tests/perf/scripts
+dir path=opt/zfs-tests/tests/stress
+dir path=opt/zfs-tests/tests/stress/races
 file path=opt/zfs-tests/README mode=0444
 file path=opt/zfs-tests/bin/chg_usr_exec mode=0555
 file path=opt/zfs-tests/bin/devname2devid mode=0555
@@ -184,6 +187,7 @@ file path=opt/zfs-tests/runfiles/delphix.run mode=0444
 file path=opt/zfs-tests/runfiles/omnios.run mode=0444
 file path=opt/zfs-tests/runfiles/openindiana.run mode=0444
 file path=opt/zfs-tests/runfiles/perf-regression.run mode=0444
+file path=opt/zfs-tests/runfiles/stress.run mode=0444
 file path=opt/zfs-tests/tests/functional/acl/acl.cfg mode=0444
 file path=opt/zfs-tests/tests/functional/acl/acl_common.kshlib mode=0444
 file path=opt/zfs-tests/tests/functional/acl/cifs/cifs.kshlib mode=0444
@@ -2211,6 +2215,42 @@ file path=opt/zfs-tests/tests/functional/refreserv/refreserv_003_pos mode=0555
 file path=opt/zfs-tests/tests/functional/refreserv/refreserv_004_pos mode=0555
 file path=opt/zfs-tests/tests/functional/refreserv/refreserv_005_pos mode=0555
 file path=opt/zfs-tests/tests/functional/refreserv/setup mode=0555
+file path=opt/zfs-tests/tests/functional/removal/cleanup mode=0555
+file path=opt/zfs-tests/tests/functional/removal/removal.kshlib mode=0555
+file path=opt/zfs-tests/tests/functional/removal/removal_all_vdev mode=0555
+file path=opt/zfs-tests/tests/functional/removal/removal_check_space mode=0555
+file path=opt/zfs-tests/tests/functional/removal/removal_condense_export \
+    mode=0555
+file path=opt/zfs-tests/tests/functional/removal/removal_multiple_indirection \
+    mode=0555
+file path=opt/zfs-tests/tests/functional/removal/removal_remap mode=0555
+file path=opt/zfs-tests/tests/functional/removal/removal_remap_deadlists \
+    mode=0555
+file path=opt/zfs-tests/tests/functional/removal/removal_reservation mode=0555
+file path=opt/zfs-tests/tests/functional/removal/removal_resume_export \
+    mode=0555
+file path=opt/zfs-tests/tests/functional/removal/removal_sanity mode=0555
+file path=opt/zfs-tests/tests/functional/removal/removal_with_add mode=0555
+file path=opt/zfs-tests/tests/functional/removal/removal_with_create_fs \
+    mode=0555
+file path=opt/zfs-tests/tests/functional/removal/removal_with_dedup mode=0555
+file path=opt/zfs-tests/tests/functional/removal/removal_with_export mode=0555
+file path=opt/zfs-tests/tests/functional/removal/removal_with_ganging \
+    mode=0555
+file path=opt/zfs-tests/tests/functional/removal/removal_with_remap mode=0555
+file path=opt/zfs-tests/tests/functional/removal/removal_with_remove mode=0555
+file path=opt/zfs-tests/tests/functional/removal/removal_with_scrub mode=0555
+file path=opt/zfs-tests/tests/functional/removal/removal_with_send mode=0555
+file path=opt/zfs-tests/tests/functional/removal/removal_with_send_recv \
+    mode=0555
+file path=opt/zfs-tests/tests/functional/removal/removal_with_snapshot \
+    mode=0555
+file path=opt/zfs-tests/tests/functional/removal/removal_with_write mode=0555
+file path=opt/zfs-tests/tests/functional/removal/removal_with_zdb mode=0555
+file path=opt/zfs-tests/tests/functional/removal/remove_mirror mode=0555
+file path=opt/zfs-tests/tests/functional/removal/remove_mirror_sanity \
+    mode=0555
+file path=opt/zfs-tests/tests/functional/removal/remove_raidz mode=0555
 file path=opt/zfs-tests/tests/functional/rename_dirs/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/rename_dirs/rename_dirs_001_pos \
     mode=0555
@@ -2541,6 +2581,7 @@ file path=opt/zfs-tests/tests/perf/regression/setup mode=0555
 file path=opt/zfs-tests/tests/perf/scripts/io.d mode=0444
 file path=opt/zfs-tests/tests/perf/scripts/prefetch_io.d mode=0444
 file path=opt/zfs-tests/tests/perf/scripts/profile.d mode=0444
+file path=opt/zfs-tests/tests/stress/races/remove_file_while_remap mode=0555
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 depend fmri=system/file-system/zfs/tests type=require

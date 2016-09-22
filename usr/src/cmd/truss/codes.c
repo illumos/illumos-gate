@@ -1274,6 +1274,8 @@ const struct ioc {
 		"zfs_cmd_t" },
 	{ (uint_t)ZFS_IOC_CLONE,		"ZFS_IOC_CLONE",
 		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_REMAP,		"ZFS_IOC_REMAP",
+		"zfs_cmd_t" },
 	{ (uint_t)ZFS_IOC_BOOKMARK,		"ZFS_IOC_BOOKMARK",
 		"zfs_cmd_t" },
 	{ (uint_t)ZFS_IOC_GET_BOOKMARKS,	"ZFS_IOC_GET_BOOKMARKS",

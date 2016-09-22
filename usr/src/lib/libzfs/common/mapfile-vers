@@ -21,7 +21,7 @@
 
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright (c) 2011, 2014 by Delphix. All rights reserved.
+# Copyright (c) 2011, 2015 by Delphix. All rights reserved.
 # Copyright 2016 Nexenta Systems, Inc.
 #
 
@@ -140,6 +140,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zfs_receive;
 	zfs_refresh_properties;
 	zfs_release;
+	zfs_remap_indirects;
 	zfs_rename;
 	zfs_rollback;
 	zfs_save_arguments;
@@ -247,10 +248,12 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zpool_vdev_degrade;
 	zpool_vdev_detach;
 	zpool_vdev_fault;
+	zpool_vdev_indirect_size;
 	zpool_vdev_name;
 	zpool_vdev_offline;
 	zpool_vdev_online;
 	zpool_vdev_remove;
+	zpool_vdev_remove_cancel;
 	zpool_vdev_split;
 	zprop_free_list;
 	zprop_get_list;
