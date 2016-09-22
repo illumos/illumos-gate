@@ -423,6 +423,23 @@ zfs_params(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 /* ARGSUSED */
 static int
+dva(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	dva_t dva;
+	if (mdb_vread(&dva, sizeof (dva_t), addr) == -1) {
+		mdb_warn("failed to read dva_t");
+		return (DCMD_ERR);
+	}
+	mdb_printf("<%llu:%llx:%llx>\n",
+	    (u_longlong_t)DVA_GET_VDEV(&dva),
+	    (u_longlong_t)DVA_GET_OFFSET(&dva),
+	    (u_longlong_t)DVA_GET_ASIZE(&dva));
+
+	return (DCMD_OK);
+}
+
+/* ARGSUSED */
+static int
 blkptr(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	char type[80], checksum[80], compress[80];
@@ -2055,10 +2072,12 @@ spa_space(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    sd.ms_freeingtree >> shift, suffix);
 	mdb_printf("ms_freedtree = %llu%s\n",
 	    sd.ms_freedtree >> shift, suffix);
-	mdb_printf("ms_tree = %llu%s\n", sd.ms_tree >> shift, suffix);
+	mdb_printf("ms_tree = %llu%s\n",
+	    sd.ms_tree >> shift, suffix);
 	mdb_printf("ms_deferspace = %llu%s\n",
 	    sd.ms_deferspace >> shift, suffix);
-	mdb_printf("last synced avail = %llu%s\n", sd.avail >> shift, suffix);
+	mdb_printf("last synced avail = %llu%s\n",
+	    sd.avail >> shift, suffix);
 	mdb_printf("current syncing avail = %llu%s\n",
 	    sd.nowavail >> shift, suffix);
 
@@ -3916,6 +3935,7 @@ out:
 static const mdb_dcmd_t dcmds[] = {
 	{ "arc", "[-bkmg]", "print ARC variables", arc_print },
 	{ "blkptr", ":", "print blkptr_t", blkptr },
+	{ "dva", ":", "print dva_t", dva },
 	{ "dbuf", ":", "print dmu_buf_impl_t", dbuf },
 	{ "dbuf_stats", ":", "dbuf stats", dbuf_stats },
 	{ "dbufs",

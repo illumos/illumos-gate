@@ -230,7 +230,8 @@ class Cmd(object):
 
         try:
             self.result.starttime = time()
-            proc = Popen(privcmd, stdout=PIPE, stderr=PIPE)
+            proc = Popen(privcmd, stdout=PIPE, stderr=PIPE, stdin=PIPE)
+            proc.stdin.close()
 
             # Allow a special timeout value of 0 to mean infinity
             if int(self.timeout) == 0:
