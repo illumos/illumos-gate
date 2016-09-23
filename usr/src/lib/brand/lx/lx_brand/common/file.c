@@ -130,17 +130,6 @@ lx_utime(uintptr_t p1, uintptr_t p2)
 	return (0);
 }
 
-/*
- * Neither Illumos nor Linux actually returns anything to the caller, but glibc
- * expects to see SOME value returned, so placate it and return 0.
- */
-long
-lx_sync(void)
-{
-	sync();
-	return (0);
-}
-
 long
 lx_rmdir(uintptr_t p1)
 {

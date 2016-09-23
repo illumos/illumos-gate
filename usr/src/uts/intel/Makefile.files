@@ -320,6 +320,7 @@ LX_BRAND_OBJS  =		\
 	lx_dup.o		\
 	lx_errno.o		\
 	lx_epoll.o		\
+	lx_fadvise.o		\
 	lx_fallocate.o		\
 	lx_fcntl.o		\
 	lx_futex.o		\
@@ -334,16 +335,19 @@ LX_BRAND_OBJS  =		\
 	lx_link.o		\
 	lx_lseek.o		\
 	lx_misc.o		\
+	lx_miscsys.o		\
 	lx_mkdir.o		\
 	lx_modify_ldt.o		\
 	lx_mount.o		\
 	lx_open.o		\
 	lx_personality.o	\
+	lx_pgrp.o		\
 	lx_pid.o		\
 	lx_pipe.o		\
 	lx_poll.o		\
 	lx_prctl.o		\
 	lx_ptrace.o		\
+	lx_rename.o		\
 	lx_rlimit.o		\
 	lx_rw.o			\
 	lx_sched.o		\

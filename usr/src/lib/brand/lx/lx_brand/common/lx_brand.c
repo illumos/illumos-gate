@@ -1022,7 +1022,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/*   8: lseek */
 	lx_mmap,			/*   9: mmap */
 	lx_mprotect,			/*  10: mprotect */
-	lx_munmap,			/*  11: munmap */
+	NULL,				/*  11: munmap */
 	NULL,				/*  12: brk */
 	lx_rt_sigaction,		/*  13: rt_sigaction */
 	lx_rt_sigprocmask,		/*  14: rt_sigprocmask */
@@ -1038,17 +1038,17 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/*  24: sched_yield */
 	lx_remap,			/*  25: mremap */
 	lx_msync,			/*  26: msync */
-	lx_mincore,			/*  27: mincore */
+	NULL,				/*  27: mincore */
 	lx_madvise,			/*  28: madvise */
 	lx_shmget,			/*  29: shmget */
 	lx_shmat,			/*  30: shmat */
 	lx_shmctl,			/*  31: shmctl */
 	NULL,				/*  32: dup */
 	NULL,				/*  33: dup2 */
-	lx_pause,			/*  34: pause */
+	NULL,				/*  34: pause */
 	NULL,				/*  35: nanosleep */
-	lx_getitimer,			/*  36: getitimer */
-	lx_alarm,			/*  37: alarm */
+	NULL,				/*  36: getitimer */
+	NULL,				/*  37: alarm */
 	lx_setitimer,			/*  38: setitimer */
 	NULL,				/*  39: getpid */
 	lx_sendfile64,			/*  40: sendfile */
@@ -1091,12 +1091,12 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_ftruncate,			/*  77: ftruncate */
 	NULL,				/*  78: getdents */
 	NULL,				/*  79: getcwd */
-	lx_chdir,			/*  80: chdir */
-	lx_fchdir,			/*  81: fchdir */
-	lx_rename,			/*  82: rename */
+	NULL,				/*  80: chdir */
+	NULL,				/*  81: fchdir */
+	NULL,				/*  82: rename */
 	NULL,				/*  83: mkdir */
 	lx_rmdir,			/*  84: rmdir */
-	lx_creat,			/*  85: creat */
+	NULL,				/*  85: creat */
 	NULL,				/*  86: link */
 	NULL,				/*  87: unlink */
 	NULL,				/*  88: symlink */
@@ -1109,21 +1109,21 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/*  95: umask */
 	NULL,				/*  96: gettimeofday */
 	NULL,				/*  97: getrlimit */
-	lx_getrusage,			/*  98: getrusage */
+	NULL,				/*  98: getrusage */
 	NULL,				/*  99: sysinfo */
 	lx_times,			/* 100: times */
 	NULL,				/* 101: ptrace */
 	NULL,				/* 102: getuid */
-	lx_syslog,			/* 103: syslog */
+	NULL,				/* 103: syslog */
 	NULL,				/* 104: getgid */
 	NULL,				/* 105: setuid */
 	NULL,				/* 106: setgid */
 	NULL,				/* 107: geteuid */
 	NULL,				/* 108: getegid */
-	lx_setpgid,			/* 109: setpgid */
+	NULL,				/* 109: setpgid */
 	NULL,				/* 110: getppid */
-	lx_getpgrp,			/* 111: getpgrp */
-	lx_setsid,			/* 112: setsid */
+	NULL,				/* 111: getpgrp */
+	NULL,				/* 112: setsid */
 	NULL,				/* 113: setreuid */
 	NULL,				/* 114: setregid */
 	lx_getgroups,			/* 115: getgroups */
@@ -1132,10 +1132,10 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/* 118: getresuid */
 	NULL,				/* 119: setresgid */
 	NULL,				/* 120: getresgid */
-	lx_getpgid,			/* 121: getpgid */
-	lx_setfsuid,			/* 122: setfsuid */
-	lx_setfsgid,			/* 123: setfsgid */
-	lx_getsid,			/* 124: getsid */
+	NULL,				/* 121: getpgid */
+	NULL,				/* 122: setfsuid */
+	NULL,				/* 123: setfsgid */
+	NULL,				/* 124: getsid */
 	lx_capget,			/* 125: capget */
 	lx_capset,			/* 126: capset */
 	lx_rt_sigpending,		/* 127: rt_sigpending */
@@ -1164,7 +1164,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_munlock,			/* 150: munlock */
 	lx_mlockall,			/* 151: mlockall */
 	lx_munlockall,			/* 152: munlockall */
-	lx_vhangup,			/* 153: vhangup */
+	NULL,				/* 153: vhangup */
 	NULL,				/* 154: modify_ldt */
 	NULL,				/* 155: pivot_root */
 	lx_sysctl,			/* 156: sysctl */
@@ -1172,17 +1172,17 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/* 158: arch_prctl */
 	lx_adjtimex,			/* 159: adjtimex */
 	NULL,				/* 160: setrlimit */
-	lx_chroot,			/* 161: chroot */
-	lx_sync,			/* 162: sync */
+	NULL,				/* 161: chroot */
+	NULL,				/* 162: sync */
 	NULL,				/* 163: acct */
 	lx_settimeofday,		/* 164: settimeofday */
 	lx_mount,			/* 165: mount */
 	NULL,				/* 166: umount2 */
 	NULL,				/* 167: swapon */
 	NULL,				/* 168: swapoff */
-	lx_reboot,			/* 169: reboot */
-	lx_sethostname,			/* 170: sethostname */
-	lx_setdomainname,		/* 171: setdomainname */
+	NULL,				/* 169: reboot */
+	NULL,				/* 170: sethostname */
+	NULL,				/* 171: setdomainname */
 	NULL,				/* 172: iopl */
 	NULL,				/* 173: ioperm */
 	NULL,				/* 174: create_module */
@@ -1232,7 +1232,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/* 218: set_tid_address */
 	NULL,				/* 219: restart_syscall */
 	lx_semtimedop,			/* 220: semtimedop */
-	lx_fadvise64_64,		/* 221: fadvise64 */
+	NULL,				/* 221: fadvise64 */
 	lx_timer_create,		/* 222: timer_create */
 	lx_timer_settime,		/* 223: timer_settime */
 	lx_timer_gettime,		/* 224: timer_gettime */
@@ -1275,7 +1275,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_futimesat,			/* 261: futimesat */
 	NULL,				/* 262: fstatat64 */
 	NULL,				/* 263: unlinkat */
-	lx_renameat,			/* 264: renameat */
+	NULL,				/* 264: renameat */
 	NULL,				/* 265: linkat */
 	NULL,				/* 266: symlinkat */
 	NULL,				/* 267: readlinkat */
@@ -1350,11 +1350,11 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/*   5: open */
 	lx_close,			/*   6: close */
 	NULL,				/*   7: waitpid */
-	lx_creat,			/*   8: creat */
+	NULL,				/*   8: creat */
 	NULL,				/*   9: link */
 	NULL,				/*  10: unlink */
 	lx_execve,			/*  11: execve */
-	lx_chdir,			/*  12: chdir */
+	NULL,				/*  12: chdir */
 	NULL,				/*  13: time */
 	lx_mknod,			/*  14: mknod */
 	NULL,				/*  15: chmod */
@@ -1367,20 +1367,20 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/*  22: umount */
 	NULL,				/*  23: setuid16 */
 	NULL,				/*  24: getuid16 */
-	lx_stime,			/*  25: stime */
+	NULL,				/*  25: stime */
 	NULL,				/*  26: ptrace */
-	lx_alarm,			/*  27: alarm */
+	NULL,				/*  27: alarm */
 	NULL,				/*  28: fstat */
-	lx_pause,			/*  29: pause */
+	NULL,				/*  29: pause */
 	lx_utime,			/*  30: utime */
 	NULL,				/*  31: stty */
 	NULL,				/*  32: gtty */
 	NULL,				/*  33: access */
-	lx_nice,			/*  34: nice */
+	NULL,				/*  34: nice */
 	NULL,				/*  35: ftime */
-	lx_sync,			/*  36: sync */
+	NULL,				/*  36: sync */
 	NULL,				/*  37: kill */
-	lx_rename,			/*  38: rename */
+	NULL,				/*  38: rename */
 	NULL,				/*  39: mkdir */
 	lx_rmdir,			/*  40: rmdir */
 	NULL,				/*  41: dup */
@@ -1399,16 +1399,16 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/*  54: ioctl */
 	NULL,				/*  55: fcntl */
 	NULL,				/*  56: mpx */
-	lx_setpgid,			/*  57: setpgid */
+	NULL,				/*  57: setpgid */
 	NULL,				/*  58: ulimit */
 	NULL,				/*  59: olduname */
 	NULL,				/*  60: umask */
-	lx_chroot,			/*  61: chroot */
+	NULL,				/*  61: chroot */
 	NULL,				/*  62: ustat */
 	NULL,				/*  63: dup2 */
 	NULL,				/*  64: getppid */
-	lx_getpgrp,			/*  65: getpgrp */
-	lx_setsid,			/*  66: setsid */
+	NULL,				/*  65: getpgrp */
+	NULL,				/*  66: setsid */
 	lx_sigaction,			/*  67: sigaction */
 	NULL,				/*  68: sgetmask */
 	NULL,				/*  69: ssetmask */
@@ -1416,10 +1416,10 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/*  71: setregid16 */
 	lx_sigsuspend,			/*  72: sigsuspend */
 	lx_sigpending,			/*  73: sigpending */
-	lx_sethostname,			/*  74: sethostname */
+	NULL,				/*  74: sethostname */
 	NULL,				/*  75: setrlimit */
 	NULL,				/*  76: getrlimit */
-	lx_getrusage,			/*  77: getrusage */
+	NULL,				/*  77: getrusage */
 	NULL,				/*  78: gettimeofday */
 	lx_settimeofday,		/*  79: settimeofday */
 	lx_getgroups16,			/*  80: getgroups16 */
@@ -1430,10 +1430,10 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/*  85: readlink */
 	NULL,				/*  86: uselib */
 	NULL,				/*  87: swapon */
-	lx_reboot,			/*  88: reboot */
+	NULL,				/*  88: reboot */
 	lx_readdir,			/*  89: readdir */
 	lx_mmap,			/*  90: mmap */
-	lx_munmap,			/*  91: munmap */
+	NULL,				/*  91: munmap */
 	lx_truncate,			/*  92: truncate */
 	lx_ftruncate,			/*  93: ftruncate */
 	NULL,				/*  94: fchmod */
@@ -1445,15 +1445,15 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_fstatfs,			/* 100: fstatfs */
 	NULL,				/* 101: ioperm */
 	NULL,				/* 102: socketcall */
-	lx_syslog,			/* 103: syslog */
+	NULL,				/* 103: syslog */
 	lx_setitimer,			/* 104: setitimer */
-	lx_getitimer,			/* 105: getitimer */
+	NULL,				/* 105: getitimer */
 	NULL,				/* 106: stat */
 	NULL,				/* 107: lstat */
 	NULL,				/* 108: fstat */
 	NULL,				/* 109: uname */
 	NULL,				/* 110: oldiopl */
-	lx_vhangup,			/* 111: vhangup */
+	NULL,				/* 111: vhangup */
 	NULL,				/* 112: idle */
 	NULL,				/* 113: vm86old */
 	NULL,				/* 114: wait4 */
@@ -1463,7 +1463,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_fsync,			/* 118: fsync */
 	lx_sigreturn,			/* 119: sigreturn */
 	lx_clone,			/* 120: clone */
-	lx_setdomainname,		/* 121: setdomainname */
+	NULL,				/* 121: setdomainname */
 	NULL,				/* 122: uname */
 	NULL,				/* 123: modify_ldt */
 	lx_adjtimex,			/* 124: adjtimex */
@@ -1474,14 +1474,14 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/* 129: delete_module */
 	NULL,				/* 130: get_kernel_syms */
 	NULL,				/* 131: quotactl */
-	lx_getpgid,			/* 132: getpgid */
-	lx_fchdir,			/* 133: fchdir */
+	NULL,				/* 132: getpgid */
+	NULL,				/* 133: fchdir */
 	NULL,				/* 134: bdflush */
 	lx_sysfs,			/* 135: sysfs */
 	NULL,				/* 136: personality */
 	NULL,				/* 137: afs_syscall */
-	lx_setfsuid16,			/* 138: setfsuid16 */
-	lx_setfsgid16,			/* 139: setfsgid16 */
+	NULL,				/* 138: setfsuid16 */
+	NULL,				/* 139: setfsgid16 */
 	NULL,				/* 140: llseek */
 	NULL,				/* 141: getdents */
 	NULL,				/* 142: select */
@@ -1489,7 +1489,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_msync,			/* 144: msync */
 	NULL,				/* 145: readv */
 	NULL,				/* 146: writev */
-	lx_getsid,			/* 147: getsid */
+	NULL,				/* 147: getsid */
 	lx_fdatasync,			/* 148: fdatasync */
 	lx_sysctl,			/* 149: sysctl */
 	lx_mlock,			/* 150: mlock */
@@ -1557,10 +1557,10 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/* 212: chown */
 	NULL,				/* 213: setuid */
 	NULL,				/* 214: setgid */
-	lx_setfsuid,			/* 215: setfsuid */
-	lx_setfsgid,			/* 216: setfsgid */
+	NULL,				/* 215: setfsuid */
+	NULL,				/* 216: setfsgid */
 	NULL,				/* 217: pivot_root */
-	lx_mincore,			/* 218: mincore */
+	NULL,				/* 218: mincore */
 	lx_madvise,			/* 219: madvise */
 	NULL,				/* 220: getdents64 */
 	NULL,				/* 221: fcntl64 */
@@ -1592,7 +1592,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_io_getevents,		/* 247: io_getevents */
 	lx_io_submit,			/* 248: io_submit */
 	lx_io_cancel,			/* 249: io_cancel */
-	lx_fadvise64,			/* 250: fadvise64 */
+	NULL,				/* 250: fadvise64 */
 	NULL,				/* 251: nosys */
 	lx_group_exit,			/* 252: group_exit */
 	NULL,				/* 253: lookup_dcookie */
@@ -1614,7 +1614,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_fstatfs64,			/* 269: fstatfs64 */
 	NULL,				/* 270: tgkill */
 	lx_utimes,			/* 271: utimes */
-	lx_fadvise64_64,		/* 272: fadvise64_64 */
+	NULL,			/* 272: fadvise64_64 */
 	NULL,				/* 273: vserver */
 	NULL,				/* 274: mbind */
 	NULL,				/* 275: get_mempolicy */
@@ -1644,7 +1644,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_futimesat,			/* 299: futimesat */
 	NULL,				/* 300: fstatat64 */
 	NULL,				/* 301: unlinkat */
-	lx_renameat,			/* 302: renameat */
+	NULL,				/* 302: renameat */
 	NULL,				/* 303: linkat */
 	NULL,				/* 304: symlinkat */
 	NULL,				/* 305: readlinkat */
