@@ -54,7 +54,6 @@ extern long lx_fstat(uintptr_t, uintptr_t);
 extern long lx_lstat(uintptr_t, uintptr_t);
 extern long lx_stat64(uintptr_t, uintptr_t);
 extern long lx_fstat64(uintptr_t, uintptr_t);
-extern long lx_renameat(uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 extern long lx_lstat64(uintptr_t, uintptr_t);
 extern long lx_fcntl(uintptr_t, uintptr_t, uintptr_t);
 extern long lx_fcntl64(uintptr_t, uintptr_t, uintptr_t);
@@ -62,28 +61,12 @@ extern long lx_flock(uintptr_t, uintptr_t);
 extern long lx_readdir(uintptr_t, uintptr_t, uintptr_t);
 extern long lx_execve(uintptr_t, uintptr_t, uintptr_t);
 extern long lx_ioctl(uintptr_t, uintptr_t, uintptr_t);
-extern long lx_vhangup(void);
-extern long lx_fadvise64(uintptr_t, off64_t, uintptr_t, uintptr_t);
-extern long lx_fadvise64_64(uintptr_t, off64_t, off64_t, uintptr_t);
 
 extern long lx_settimeofday(uintptr_t, uintptr_t);
-extern long lx_getrusage(uintptr_t, uintptr_t);
 extern long lx_mknod(uintptr_t, uintptr_t, uintptr_t);
-
-extern long lx_getpgrp(void);
-extern long lx_getpgid(uintptr_t);
-extern long lx_setpgid(uintptr_t, uintptr_t);
-extern long lx_getsid(uintptr_t);
-extern long lx_setsid(void);
 
 extern long lx_capget(uintptr_t, uintptr_t);
 extern long lx_capset(uintptr_t, uintptr_t);
-
-extern long lx_setfsuid16(uintptr_t);
-extern long lx_setfsgid16(uintptr_t);
-
-extern long lx_setfsuid(uintptr_t);
-extern long lx_setfsgid(uintptr_t);
 
 extern long lx_clock_nanosleep(int, int flags, struct timespec *,
     struct timespec *);
@@ -104,12 +87,10 @@ extern long lx_sysctl(uintptr_t);
 extern long lx_fsync(uintptr_t);
 extern long lx_fdatasync(uintptr_t);
 extern long lx_rmdir(uintptr_t);
-extern long lx_rename(uintptr_t, uintptr_t);
 extern long lx_utime(uintptr_t, uintptr_t);
 extern long lx_sysfs(uintptr_t, uintptr_t, uintptr_t);
 
 extern long lx_uname(uintptr_t);
-extern long lx_reboot(uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 extern long lx_getgroups16(uintptr_t, uintptr_t);
 extern long lx_setgroups(uintptr_t, uintptr_t);
 extern long lx_setgroups16(uintptr_t, uintptr_t);
@@ -161,8 +142,6 @@ extern long lx_rt_sigtimedwait(uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 extern long lx_rt_sigqueueinfo(uintptr_t, uintptr_t, uintptr_t);
 extern long lx_rt_tgsigqueueinfo(uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 
-extern long lx_sync(void);
-
 extern long lx_futex(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t,
     uintptr_t);
 
@@ -170,9 +149,6 @@ extern long lx_tkill(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t,
     uintptr_t);
 extern long lx_tgkill(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t,
     uintptr_t);
-
-extern long lx_sethostname(uintptr_t, uintptr_t);
-extern long lx_setdomainname(uintptr_t, uintptr_t);
 
 extern long lx_sendfile(uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 extern long lx_sendfile64(uintptr_t, uintptr_t, uintptr_t, uintptr_t);
@@ -215,29 +191,17 @@ extern long lx_shmget(key_t, size_t, int);
 extern long lx_shmat(int, void *, int);
 extern long lx_shmctl(int, int, void *);
 
-extern long lx_alarm(unsigned int);
 extern long lx_close(int);
-extern long lx_chdir(const char *);
-extern long lx_chroot(const char *);
-extern long lx_creat(const char *, mode_t);
 extern long lx_eventfd(unsigned int);
 extern long lx_eventfd2(unsigned int, int);
-extern long lx_fchdir(int);
 extern long lx_getgroups(int, gid_t *);
-extern long lx_getitimer(int, struct itimerval *);
 extern long lx_inotify_add_watch(int, const char *, uint32_t);
 extern long lx_inotify_init(void);
 extern long lx_inotify_init1(int);
 extern long lx_inotify_rm_watch(int, int);
-extern long lx_mincore(caddr_t, size_t, char *);
-extern long lx_munmap(void *, size_t);
-extern long lx_nice(int);
-extern long lx_pause(void);
 extern long lx_shmdt(char *);
 extern long lx_signalfd(int, uintptr_t, size_t);
 extern long lx_signalfd4(int, uintptr_t, size_t, int);
-extern long lx_stime(const time_t *);
-extern long lx_syslog(int, char *, int);
 extern long lx_timerfd_create(int, int);
 extern long lx_timerfd_settime(int, int,
     const struct itimerspec *, struct itimerspec *);

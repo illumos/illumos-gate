@@ -37,14 +37,12 @@ COBJS	=	aio.o			\
 		file.o			\
 		fcntl.o			\
 		fork.o			\
-		id.o			\
 		lx_brand.o		\
 		mem.o			\
 		misc.o			\
 		module.o		\
 		mount.o			\
 		mount_nfs.o		\
-		pgrp.o			\
 		priority.o		\
 		ptrace.o		\
 		sched.o			\

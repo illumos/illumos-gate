@@ -22,7 +22,7 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2015 Joyent, Inc.  All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -85,51 +85,4 @@ lx_flock(uintptr_t p1, uintptr_t p2)
 	ret = fcntl(fd, cmd, &fl);
 
 	return ((ret == -1) ? -errno : ret);
-}
-
-/*
- * Based on Illumos posix_fadvise which does nothing. The only difference is
- * that on Linux an fd refering to a pipe or FIFO returns EINVAL.
- * The Linux POSIX_FADV_* values are the same as the Illumos values.
- * See how glibc calls fadvise64; the offeset is a 64bit value, but the length
- * is not, whereas fadvise64_64 passes both the offset and length as 64bit
- * values.
- */
-/* ARGSUSED */
-long
-lx_fadvise64(uintptr_t p1, off64_t p2, uintptr_t p3, uintptr_t p4)
-{
-	int fd = (int)p1;
-	int advice = (int)p4;
-	int32_t len = (int32_t)p3;
-	struct stat64 statb;
-
-	switch (advice) {
-	case POSIX_FADV_NORMAL:
-	case POSIX_FADV_RANDOM:
-	case POSIX_FADV_SEQUENTIAL:
-	case POSIX_FADV_WILLNEED:
-	case POSIX_FADV_DONTNEED:
-	case POSIX_FADV_NOREUSE:
-		break;
-	default:
-		return (-EINVAL);
-	}
-	if (len < 0)
-		return (-EINVAL);
-	if (fstat64(fd, &statb) != 0)
-		return (-EBADF);
-	if (S_ISFIFO(statb.st_mode))
-		return (-ESPIPE);
-	return (0);
-}
-
-long
-lx_fadvise64_64(uintptr_t p1, off64_t p2, off64_t p3, uintptr_t p4)
-{
-
-	if (p3 < 0)
-		return (-EINVAL);
-
-	return (lx_fadvise64(p1, p2, 0, p4));
 }

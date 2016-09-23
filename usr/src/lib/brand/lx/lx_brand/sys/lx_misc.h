@@ -56,31 +56,7 @@ extern boolean_t lx_no_abort_handler;
 /*
  * Values Linux expects for init
  */
-#define	LX_INIT_PGID	1
-#define	LX_INIT_SID	1
 #define	LX_INIT_PID	1
-
-/*
- * Codes to reboot(2).
- */
-#define	LINUX_REBOOT_MAGIC1		0xfee1dead
-#define	LINUX_REBOOT_MAGIC2		672274793
-#define	LINUX_REBOOT_MAGIC2A		85072278
-#define	LINUX_REBOOT_MAGIC2B		369367448
-#define	LINUX_REBOOT_MAGIC2C		537993216
-
-/*
- * This was observed as coming from Red Hat's init process, but it's not in
- * their reboot(2) man page.
- */
-#define	LINUX_REBOOT_MAGIC2D		0x28121969
-
-#define	LINUX_REBOOT_CMD_RESTART	0x1234567
-#define	LINUX_REBOOT_CMD_HALT		0xcdef0123
-#define	LINUX_REBOOT_CMD_POWER_OFF	0x4321fedc
-#define	LINUX_REBOOT_CMD_RESTART2	0xa1b2c3d4
-#define	LINUX_REBOOT_CMD_CAD_ON		0x89abcdef
-#define	LINUX_REBOOT_CMD_CAD_OFF	0
 
 /*
  * the maximum length of messages to be output with lx_msg(), lx_err(),
@@ -95,14 +71,6 @@ extern boolean_t lx_no_abort_handler;
 #define	LX_SCHED_PRIORITY_MAX_OTHER	0
 #define	LX_SCHED_PRIORITY_MIN_RRFIFO	1
 #define	LX_SCHED_PRIORITY_MAX_RRFIFO	99
-
-/*
- * Constants to indicate who getrusage() should return information about.
- */
-#define	LX_RUSAGE_SELF		0
-#define	LX_RUSAGE_CHILDREN	(-1)
-#define	LX_RUSAGE_BOTH		(-2)
-#define	LX_RUSAGE_THREAD	1
 
 /*
  * Based on code from brand_misc.h, but use of that is incompatible with the

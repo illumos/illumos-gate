@@ -469,3 +469,41 @@ lx_getresgid16(lx_gid16_t *rgid16, lx_gid16_t *egid16, lx_gid16_t *sgid16)
 
 	return (0);
 }
+
+/*
+ * The lx brand cannot support the setfs[ug]id16/setfs[ug]id calls as that
+ * would require significant rework of the illumos privilege mechanisms, so
+ * instead return the current effective [ug]id.
+ *
+ * In Linux, fsids track effective IDs, so returning the effective IDs works
+ * as a substitute; returning the current value also denotes failure of the
+ * call if the caller had specified something different.  We don't need to
+ * worry about setting error codes because the Linux calls don't set any.
+ */
+/*ARGSUSED*/
+long
+lx_setfsuid16(uid_t fsuid16)
+{
+	return ((int)LX_UID32_TO_UID16(crgetuid(CRED())));
+}
+
+/*ARGSUSED*/
+long
+lx_setfsgid16(gid_t fsgid16)
+{
+	return ((int)LX_GID32_TO_GID16(crgetgid(CRED())));
+}
+
+/*ARGSUSED*/
+long
+lx_setfsuid(uid_t fsuid)
+{
+	return (crgetuid(CRED()));
+}
+
+/*ARGSUSED*/
+long
+lx_setfsgid(gid_t fsgid)
+{
+	return (crgetgid(CRED()));
+}
