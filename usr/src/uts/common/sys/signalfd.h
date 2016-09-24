@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*
@@ -75,13 +75,9 @@ extern int signalfd(int, const sigset_t *, int);
 #define	SIGNALFDMNRN_SIGNALFD	0
 #define	SIGNALFDMNRN_CLONE	1
 
-typedef struct sigfd_wake_list {
-	list_node_t sigfd_wl_lst;
-	void *sigfd_wl_state;
-} sigfd_wake_list_t;
-
 /*
  * This holds the proc_t state for a process which is using signalfd.
+ * Its presence and contents are protected by p_lock.
  */
 typedef struct sigfd_proc_state {
 	void (*sigfd_pollwake_cb)(void *, int);
