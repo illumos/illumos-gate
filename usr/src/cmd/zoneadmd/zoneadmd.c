@@ -555,7 +555,8 @@ zone_ready(zlog_t *zlogp, zone_mnt_t mount_cmd, int zstate)
 {
 	int err;
 
-	if (brand_prestatechg(zlogp, zstate, Z_READY) != 0)
+	if (!ALT_MOUNT(mount_cmd) &&
+	    brand_prestatechg(zlogp, zstate, Z_READY) != 0)
 		return (-1);
 
 	if ((err = zonecfg_create_snapshot(zone_name)) != Z_OK) {
@@ -579,7 +580,8 @@ zone_ready(zlog_t *zlogp, zone_mnt_t mount_cmd, int zstate)
 		goto bad;
 	}
 
-	if (brand_poststatechg(zlogp, zstate, Z_READY) != 0)
+	if (!ALT_MOUNT(mount_cmd) &&
+	    brand_poststatechg(zlogp, zstate, Z_READY) != 0)
 		goto bad;
 
 	return (0);
@@ -589,7 +591,8 @@ bad:
 	 * If something goes wrong, we up the zones's state to the target
 	 * state, READY, and then invoke the hook as if we're halting.
 	 */
-	(void) brand_poststatechg(zlogp, ZONE_STATE_READY, Z_HALT);
+	if (!ALT_MOUNT(mount_cmd))
+		(void) brand_poststatechg(zlogp, ZONE_STATE_READY, Z_HALT);
 	return (-1);
 }
 
@@ -1166,7 +1169,8 @@ zone_halt(zlog_t *zlogp, boolean_t unmount_cmd, boolean_t rebooting, int zstate)
 {
 	int err;
 
-	if (brand_prestatechg(zlogp, zstate, Z_HALT) != 0)
+	if (unmount_cmd == B_FALSE &&
+	    brand_prestatechg(zlogp, zstate, Z_HALT) != 0)
 		return (-1);
 
 	/* Shutting down, stop the memcap thread */
@@ -1182,7 +1186,8 @@ zone_halt(zlog_t *zlogp, boolean_t unmount_cmd, boolean_t rebooting, int zstate)
 	/* Shut down is done, stop the log thread */
 	destroy_log_thread();
 
-	if (brand_poststatechg(zlogp, zstate, Z_HALT) != 0)
+	if (unmount_cmd == B_FALSE &&
+	    brand_poststatechg(zlogp, zstate, Z_HALT) != 0)
 		return (-1);
 
 	if ((err = zonecfg_destroy_snapshot(zone_name)) != Z_OK)
