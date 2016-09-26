@@ -357,8 +357,10 @@ bf_run(char *line)
 	printf("Parse error!\n");
 	break;
     default:
-        /* Hopefully, all other codes filled this buffer */
-	printf("%s\n", command_errmsg);
+	if (command_errmsg != NULL) {
+	    printf("%s\n", command_errmsg);
+	    command_errmsg = NULL;
+	}
     }
 
     /* bye is same as reboot and will behave depending on platform */
@@ -366,5 +368,5 @@ bf_run(char *line)
 	bf_run("reboot");
     setenv("interpret", bf_vm->state ? "" : "ok", 1);
 
-    return result;
+    return (result);
 }
