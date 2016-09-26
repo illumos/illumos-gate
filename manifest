@@ -12005,6 +12005,7 @@ f usr/share/man/man1m/inetd.1m 0444 root bin
 f usr/share/man/man1m/infocmp.1m 0444 root bin
 f usr/share/man/man1m/init.1m 0444 root bin
 f usr/share/man/man1m/install.1m 0444 root bin
+f usr/share/man/man1m/installboot.1m 0444 root bin
 f usr/share/man/man1m/installgrub.1m 0444 root bin
 f usr/share/man/man1m/intrd.1m 0444 root bin
 s usr/share/man/man1m/intro.1m=Intro.1m
