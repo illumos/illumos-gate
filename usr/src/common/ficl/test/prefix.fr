@@ -1,0 +1,6 @@
+: 0x  { | old-base -- n }
+    base @ to old-base
+    16 base !
+    0 0 parse-word >number 2drop drop
+    old-base base !
+;

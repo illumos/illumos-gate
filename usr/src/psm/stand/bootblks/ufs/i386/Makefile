@@ -19,7 +19,7 @@
 #
 # CDDL HEADER END
 #
-#
+# Copyright 2016 Toomas Soome <tsoome@me.com>
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -49,7 +49,7 @@ $(INSTALL_TARGETS) := FILEMODE = 0444
 PROGS		= mboot
 
 
-all: $(INSTALLBOOT) $(PROGS)
+all: $(PROGS)
 
 $(PROGS): $$(@).exec
 	$(OBJCOPY) -O binary $@.exec $@
@@ -58,7 +58,7 @@ $(PROGS): $$(@).exec
 	$(LD) $(LDFLAGS) -o $@ $(@:exec=o)
 
 
-install: all $(INSTALL_TARGETS) $(USR_SBIN_INSTALLBOOT)
+install: all $(INSTALL_TARGETS)
 
 $(INSTALL_DIR)/%: $(INSTALL_DIR) %
 	$(INS.file)
@@ -73,12 +73,3 @@ clean:
 
 clobber: clean
 	$(RM) $(PROGS) $(INSTALLBOOT)
-
-
-#
-# Pattern matching rules for source in this directory
-#
-%: %.sh
-	$(RM) $@
-	cat $< > $@
-	chmod +x $@

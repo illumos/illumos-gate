@@ -1,0 +1,36 @@
+# $FreeBSD$
+
+SRCS +=	boot.c commands.c console.c devopen.c interp.c
+SRCS +=	interp_backslash.c interp_parse.c ls.c misc.c
+SRCS +=	module.c panic.c linenoise.c
+
+OBJS += boot.o commands.o console.o devopen.o interp.o \
+	interp_backslash.o interp_parse.o ls.o misc.o \
+	module.o panic.o linenoise.o
+
+SRCS +=	load_elf32.c load_elf32_obj.c reloc_elf32.c
+SRCS +=	load_elf64.c load_elf64_obj.c reloc_elf64.c
+
+OBJS += load_elf32.o load_elf32_obj.o reloc_elf32.o \
+	load_elf64.o load_elf64_obj.o reloc_elf64.o
+
+SRCS +=	disk.c part.c
+OBJS += disk.o part.o
+CFLAGS += -DLOADER_DISK_SUPPORT
+SRCS +=	crc32.c
+OBJS +=	crc32.o
+CFLAGS += -DLOADER_GPT_SUPPORT
+CFLAGS += -DLOADER_MBR_SUPPORT
+
+SRCS +=  bcache.c
+OBJS +=  bcache.o
+
+#SRCS +=	isapnp.c
+#SRCS +=	pnp.c
+
+# Forth interpreter
+SRCS +=	interp_forth.c
+OBJS +=	interp_forth.o
+
+MAN +=	loader.8
+MAN +=	zfsloader.8

@@ -25,7 +25,7 @@
 # Use is subject to license terms.
 
 #
-# Copyright (c) 2013 by Delphix. All rights reserved.
+# Copyright (c) 2013, 2015 by Delphix. All rights reserved.
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -370,20 +370,19 @@ function scan_state { #state-file
 	done
 }
 
-
+#
+# Note that we keep this list relatively short so that this test doesn't
+# time out (after taking more than 10 minutes).
+#
 set -A prop "checksum" "" \
-	"compression" "compress" \
+	"compression" "" \
 	"atime" "" \
-	"devices" "" \
-	"exec" "" \
-	"setuid" "" \
 	"sharenfs" "" \
 	"recordsize" "recsize" \
 	"mountpoint" "" \
 	"snapdir" "" \
 	"aclmode" "" \
-	"aclinherit" "" \
-	"readonly" "rdonly"
+	"readonly" ""
 
 #
 # Note except for the mountpoint default value (which is handled in
@@ -391,14 +390,14 @@ set -A prop "checksum" "" \
 # above must have a corresponding entry in the two arrays below.
 #
 
-set -A def_val "on" "off" "on" "on" "on" \
-	"on" "off" "" \
-	"" "hidden" "discard" "secure" \
+set -A def_val "on" "off" "on" \
+	"off" "" \
+	"" "hidden" "discard" \
 	"off"
 
-set -A local_val "off" "on" "off" "off" "off" \
-	"off" "on" "" \
-	"$TESTDIR" "visible" "groupmask" "discard" \
+set -A local_val "off" "on" "off" \
+	"on" "" \
+	"$TESTDIR" "visible" "groupmask" \
 	"off"
 
 #

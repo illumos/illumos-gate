@@ -1,0 +1,252 @@
+\ ** ficl/softwords/softcore.fr
+\ ** FICL soft extensions
+\ ** John Sadler (john_sadler@alum.mit.edu)
+\ ** September, 1998
+
+
+\ ** ficl extras
+\ EMPTY cleans the parameter stack
+: empty   ( xn..x1 -- ) depth 0 ?do drop loop ;
+\ CELL- undoes CELL+
+: cell-   ( addr -- addr )  [ 1 cells ] literal -  ;
+: -rot   ( a b c -- c a b )  2 -roll ;
+
+\ ** CORE
+: abs   ( x -- x )
+    dup 0< if negate endif ;
+decimal 32 constant bl
+
+: space   ( -- )     bl emit ;
+
+: spaces  ( n -- )   0 ?do space loop ;
+
+: abort"
+    state @ if
+        postpone if
+        postpone ."
+        postpone cr
+        -2
+        postpone literal
+        postpone throw
+        postpone endif
+    else
+	    [char] " parse
+        rot if
+            type
+            cr
+            -2 throw
+        else
+            2drop
+        endif
+    endif
+; immediate
+
+\ ** CORE EXT
+.( loading CORE EXT words ) cr
+0  constant false
+false invert constant true
+: <>   = 0= ;
+: 0<>  0= 0= ;
+: compile,  , ;
+: convert   char+ 65535 >number drop ;  \ cribbed from DPANS A.6.2.0970
+: erase   ( addr u -- )    0 fill ;
+variable span
+: expect  ( c-addr u1 -- ) accept span ! ;
+\ see marker.fr for MARKER implementation
+: nip     ( y x -- x )     swap drop ;
+: tuck    ( y x -- x y x)  swap over ;
+: within  ( test low high -- flag )   over - >r - r>  u<  ;
+
+: dnegate ( d -- -d ) invert swap negate tuck 0= - ;
+: dabs   ( d -- ud ) dup 0< if dnegate endif ;
+
+: .r ( n +n -- )
+  swap dup abs 0 <# #s rot sign #>
+  rot over - dup 0< if
+    drop else spaces
+  then
+  type space ;
+
+: u.r ( n +n -- )
+  swap 0 <# #s #>
+  rot over - dup 0< if
+    drop else spaces
+  then
+  type space ;
+
+: d. ( d -- )
+  swap over dabs <# #s rot sign #> type space ;
+
+: d.r ( d +n -- )
+  -rot swap over dabs <# #s rot sign #>
+  rot over - dup 0< if
+    drop else spaces
+  then
+  type space ;
+
+: du. ( d -- )
+  <# #s #> type space ;
+
+: du.r ( d +n -- )
+  -rot <# #s #> rot over - dup 0< if drop else spaces then type space ;
+
+: d>s ( d -- n ) drop ;
+
+: d0= ( d -- flag ) or 0= ;
+: d= ( d1 d2 -- flag ) rot = -rot = and ;
+: d0< ( d -- f ) nip 0< ;
+
+: d< ( d1 d2 -- flag )
+  2 pick
+  over
+  = if
+    rot 2drop
+    <
+  else
+    swap drop
+    <
+    swap drop
+  then
+;
+
+: du< d< ;
+: dmax ( d1 d2 -- d3 )
+  2over 2over
+  d< if
+    2swap
+  then
+  2drop
+;
+
+: dmin ( d1 d2 -- d3 )
+  2over 2over
+  d< if
+    2drop
+  else
+    2swap
+    2drop
+  then
+;
+
+: d+ ( d1 d2 -- d3 ) rot + >r tuck + tuck swap u<  r> swap - ;
+: d- ( d1 d2 -- d3 ) dnegate d+ ;
+: d2* ( d1 -- d2 ) 2dup d+ ;
+: d2/ ( d1 -- d2 )
+  dup 1 and >r 2/ swap 2/ [ 1 8 cells 1- lshift 1- ] literal and
+  r> if
+    [ 1 8 cells 1- lshift ] literal +
+  then
+  swap
+;
+
+: m+ ( d1 +n -- d2 ) s>d d+ ;
+
+\ ** TOOLS word set...
+: ?     ( addr -- )  @ . ;
+
+Variable /dump
+
+: i' ( R:w R:w2 -- R:w R:w2 w )
+  r> r> r> dup >r swap >r swap >r ;
+
+: .4 ( addr -- addr' )
+    4 0 DO  -1 /dump +!  /dump @ 0<
+        IF 3 spaces  ELSE  dup c@ 0 <# # # #> type space  THEN
+    char+ LOOP ;
+
+: .chars ( addr -- )
+    /dump @ over + swap
+    ?DO I c@ dup 127 bl within
+        IF  drop [char] .  THEN  emit
+    LOOP ;
+
+: .line ( addr -- )
+  dup .4 space .4 ." - " .4 space .4 drop  16 /dump +!  space .chars ;
+
+: dump  ( addr u -- ) \ tools dump
+    cr base @ >r hex        \ save base on return stack
+    0 ?DO  I' I - 16 min /dump !
+        dup 8 u.r ." : " dup .line cr 16 +
+        16 +LOOP
+    drop r> base ! ;
+
+\ ** SEARCH+EXT words and ficl helpers
+.( loading SEARCH & SEARCH-EXT words ) cr
+\ BRAND-WORDLIST is a helper for ficl-named-wordlist. Usage idiom:
+\   wordlist dup create , brand-wordlist
+\ gets the name of the word made by create and applies it to the wordlist...
+: brand-wordlist  ( wid -- )   last-word >name drop wid-set-name ;
+
+: ficl-named-wordlist  \ ( hash-size name -- ) run: ( -- wid )
+    ficl-wordlist dup create , brand-wordlist does> @ ;
+
+: wordlist   ( -- )
+    1 ficl-wordlist ;
+
+\ FICL-SET-CURRENT sets the compile wordlist and pushes the previous value
+: ficl-set-current   ( wid -- old-wid )
+    get-current swap set-current ;
+
+\ DO_VOCABULARY handles the DOES> part of a VOCABULARY
+\ When executed, new voc replaces top of search stack
+: do-vocabulary   ( -- )
+    does>  @ search> drop >search ;
+
+: ficl-vocabulary   ( nBuckets name -- )
+    ficl-named-wordlist do-vocabulary ;
+
+: vocabulary   ( name -- )
+    1 ficl-vocabulary ;
+
+\ PREVIOUS drops the search order stack
+: previous  ( --  )  search> drop ;
+
+\ HIDDEN vocabulary is a place to keep helper words from cluttering the namespace
+\ USAGE:
+\ hide
+\ <definitions to hide>
+\ set-current
+\ <words that use hidden defs>
+\ previous ( pop HIDDEN off the search order )
+
+1 ficl-named-wordlist hidden
+: hide     hidden dup >search ficl-set-current ;
+
+\ ALSO dups the search stack...
+: also   ( -- )
+    search> dup >search >search ;
+
+\ FORTH drops the top of the search stack and pushes FORTH-WORDLIST
+: forth   ( -- )
+    search> drop
+    forth-wordlist >search ;
+
+\ ONLY sets the search order to a default state
+: only   ( -- )
+    -1 set-order ;
+
+\ ORDER displays the compile wid and the search order list
+hide
+: list-wid ( wid -- )
+    dup wid-get-name   ( wid c-addr u )
+    ?dup if
+        type drop
+    else
+        drop ." (unnamed wid) " x.
+    endif cr
+;
+set-current   \ stop hiding words
+
+: order   ( -- )
+    ." Search:" cr
+    get-order  0 ?do 3 spaces list-wid loop cr
+   ." Compile: " get-current list-wid cr
+;
+
+: debug  ' debug-xt ; immediate
+: on-step   ." S: " .s-simple cr ;
+
+
+previous   \ lose hidden words from search order
+
+\ ** E N D   S O F T C O R E . F R

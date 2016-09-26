@@ -1,0 +1,78 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2016, Toomas Soome <tsoome@me.com>
+#
+
+#
+# The default for payload-bearing actions in this package is to appear in the
+# global zone only.  See the include file for greater detail, as well as
+# information about overriding the defaults.
+#
+<include global_zone_only_component>
+set name=pkg.fmri \
+    value=pkg:/system/boot/loader@1.1,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
+$(i386_ONLY)set name=pkg.description value="Boot Loader"
+$(i386_ONLY)set name=pkg.summary value="BootForth Boot Loader"
+set name=info.classification value=org.opensolaris.category.2008:System/Core
+set name=variant.arch value=$(ARCH)
+$(i386_ONLY)dir path=boot group=sys
+$(i386_ONLY)dir path=boot/conf.d group=sys
+$(i386_ONLY)dir path=boot/defaults group=sys
+$(i386_ONLY)dir path=boot/forth group=sys
+$(i386_ONLY)file path=boot/cdboot group=sys mode=0444
+$(i386_ONLY)file path=boot/defaults/loader.conf group=sys mode=0444
+$(i386_ONLY)file path=boot/forth/beadm.4th group=sys mode=0444
+$(i386_ONLY)file path=boot/forth/beastie.4th group=sys mode=0444
+$(i386_ONLY)file path=boot/forth/brand-illumos.4th group=sys mode=0444
+$(i386_ONLY)file path=boot/forth/brand.4th group=sys mode=0444
+$(i386_ONLY)file path=boot/forth/check-password.4th group=sys mode=0444
+$(i386_ONLY)file path=boot/forth/color.4th group=sys mode=0444
+$(i386_ONLY)file path=boot/forth/delay.4th group=sys mode=0444
+$(i386_ONLY)file path=boot/forth/frames.4th group=sys mode=0444
+$(i386_ONLY)file path=boot/forth/loader.4th group=sys mode=0444
+$(i386_ONLY)file path=boot/forth/logo-beastie.4th group=sys mode=0444
+$(i386_ONLY)file path=boot/forth/logo-beastiebw.4th group=sys mode=0444
+$(i386_ONLY)file path=boot/forth/logo-fbsdbw.4th group=sys mode=0444
+$(i386_ONLY)file path=boot/forth/logo-illumos.4th group=sys mode=0444
+$(i386_ONLY)file path=boot/forth/logo-orb.4th group=sys mode=0444
+$(i386_ONLY)file path=boot/forth/logo-orbbw.4th group=sys mode=0444
+$(i386_ONLY)file path=boot/forth/menu-commands.4th group=sys mode=0444
+$(i386_ONLY)file path=boot/forth/menu.4th group=sys mode=0444
+$(i386_ONLY)file path=boot/forth/menu.rc group=sys mode=0444
+$(i386_ONLY)file path=boot/forth/menusets.4th group=sys mode=0444
+$(i386_ONLY)file path=boot/forth/pcibios.4th group=sys mode=0444
+$(i386_ONLY)file path=boot/forth/screen.4th group=sys mode=0444
+$(i386_ONLY)file path=boot/forth/shortcuts.4th group=sys mode=0444
+$(i386_ONLY)file path=boot/forth/support.4th group=sys mode=0444
+$(i386_ONLY)file path=boot/forth/version.4th group=sys mode=0444
+$(i386_ONLY)file path=boot/gptzfsboot group=sys mode=0444
+#$(i386_ONLY)file path=boot/loader.efi group=sys mode=0555
+$(i386_ONLY)file path=boot/loader.help group=sys mode=0444
+$(i386_ONLY)file path=boot/loader.rc group=sys mode=0444
+$(i386_ONLY)file path=boot/pmbr group=sys mode=0444
+$(i386_ONLY)file path=boot/pxeboot group=sys mode=0444
+$(i386_ONLY)file path=boot/zfsloader group=sys mode=0444
+license lic_CDDL license=lic_CDDL
+license usr/src/boot/COPYRIGHT license=usr/src/boot/COPYRIGHT
+license usr/src/boot/sys/boot/common/linenoise/LICENSE \
+    license=usr/src/boot/sys/boot/common/linenoise/LICENSE

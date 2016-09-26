@@ -25,6 +25,7 @@
 
 /*
  * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2016 Toomas Soome <tsoome@me.com>
  */
 
 #include <assert.h>
@@ -945,9 +946,15 @@ be_do_installboot_helper(zpool_handle_t *zphp, nvlist_t *child, char *stage1,
 				flag = "-m -f";
 		}
 
-		(void) snprintf(install_cmd, sizeof (install_cmd),
-		    "%s %s %s %s %s", BE_INSTALL_GRUB, flag,
-		    stage1, stage2, diskname);
+		if (be_has_grub()) {
+			(void) snprintf(install_cmd, sizeof (install_cmd),
+			    "%s %s %s %s %s", BE_INSTALL_GRUB, flag,
+			    stage1, stage2, diskname);
+		} else {
+			(void) snprintf(install_cmd, sizeof (install_cmd),
+			    "%s %s %s %s %s", BE_INSTALL_BOOT, flag,
+			    stage1, stage2, diskname);
+		}
 	} else if (be_is_isa("sparc")) {
 		if ((flags & BE_INSTALLBOOT_FLAG_FORCE) ==
 		    BE_INSTALLBOOT_FLAG_FORCE)
@@ -1215,6 +1222,7 @@ be_do_installboot(be_transaction_data_t *bt, uint16_t flags)
 	int ret = BE_SUCCESS;
 	boolean_t be_mounted = B_FALSE;
 	boolean_t update = B_FALSE;
+	boolean_t verbose = B_FALSE;
 
 	/*
 	 * check versions. This call is to support detached
@@ -1226,6 +1234,7 @@ be_do_installboot(be_transaction_data_t *bt, uint16_t flags)
 		if (ret != BE_SUCCESS || update == B_FALSE)
 			return (ret);
 	}
+	verbose = do_print;
 
 	if ((zhp = zfs_open(g_zfs, bt->obe_root_ds, ZFS_TYPE_FILESYSTEM)) ==
 	    NULL) {
@@ -1247,27 +1256,37 @@ be_do_installboot(be_transaction_data_t *bt, uint16_t flags)
 	}
 	ZFS_CLOSE(zhp);
 
-	if (be_has_grub()) {
-		(void) snprintf(stage1, sizeof (stage1), "%s%s",
-		    tmp_mntpt, BE_GRUB_STAGE_1);
-		(void) snprintf(stage2, sizeof (stage2), "%s%s",
-		    tmp_mntpt, BE_GRUB_STAGE_2);
-	} else {
+	if (be_is_isa("i386")) {
+		if (be_has_grub()) {
+			(void) snprintf(stage1, sizeof (stage1), "%s%s",
+			    tmp_mntpt, BE_GRUB_STAGE_1);
+			(void) snprintf(stage2, sizeof (stage2), "%s%s",
+			    tmp_mntpt, BE_GRUB_STAGE_2);
+		} else {
+			(void) snprintf(stage1, sizeof (stage1), "%s%s",
+			    tmp_mntpt, BE_LOADER_STAGE_1);
+			(void) snprintf(stage2, sizeof (stage2), "%s%s",
+			    tmp_mntpt, BE_LOADER_STAGE_2);
+		}
+	} else if (be_is_isa("sparc")) {
 		char *platform = be_get_platform();
 
 		if (platform == NULL) {
-			be_print_err(gettext("be_do_installboot: failed to "
-			    "detect system platform name\n"));
+			be_print_err(gettext("be_do_installboot: "
+			    "failed to detect system platform name\n"));
 			if (be_mounted)
 				(void) _be_unmount(bt->obe_name, 0);
 			free(tmp_mntpt);
 			return (BE_ERR_BOOTFILE_INST);
 		}
-
 		stage1[0] = '\0';	/* sparc has no stage1 */
 		(void) snprintf(stage2, sizeof (stage2),
 		    "%s/usr/platform/%s%s", tmp_mntpt,
 		    platform, BE_SPARC_BOOTBLK);
+	} else {
+		be_print_err(gettext("be_do_installboot: unsupported "
+		    "architecture.\n"));
+		return (BE_ERR_BOOTFILE_INST);
 	}
 
 	if ((zphp = zpool_open(g_zfs, bt->obe_zpool)) == NULL) {
@@ -1309,7 +1328,9 @@ be_do_installboot(be_transaction_data_t *bt, uint16_t flags)
 	for (c = 0; c < children; c++) {
 		uint_t i, nchildren = 0;
 		nvlist_t **nvchild;
-		vname = zpool_vdev_name(g_zfs, zphp, child[c], B_FALSE);
+
+		/* ensure update on child status */
+		vname = zpool_vdev_name(g_zfs, zphp, child[c], verbose);
 		if (vname == NULL) {
 			be_print_err(gettext(
 			    "be_do_installboot: "
@@ -1317,28 +1338,49 @@ be_do_installboot(be_transaction_data_t *bt, uint16_t flags)
 			    libzfs_error_description(g_zfs));
 			ret = zfs_err_to_be_err(g_zfs);
 			goto done;
+		} else if (verbose == B_TRUE) {
+			be_print_err(gettext("be_do_installboot: "
+			    "device %s\n"), vname);
 		}
-		if (strcmp(vname, "mirror") == 0 || vname[0] != 'c') {
-			free(vname);
+		free(vname);
 
-			if (nvlist_lookup_nvlist_array(child[c],
-			    ZPOOL_CONFIG_CHILDREN, &nvchild, &nchildren) != 0) {
+		ret = nvlist_lookup_nvlist_array(child[c],
+		    ZPOOL_CONFIG_CHILDREN, &nvchild, &nchildren);
+		if (ret != 0) {
+			if (ret != ENOENT) {
 				be_print_err(gettext("be_do_installboot: "
 				    "failed to traverse the vdev tree: %s\n"),
 				    libzfs_error_description(g_zfs));
 				ret = zfs_err_to_be_err(g_zfs);
 				goto done;
 			}
+			nchildren = 0;	/* This is leaf device. */
+		}
 
+		if (nchildren != 0) {
 			for (i = 0; i < nchildren; i++) {
+				/* ensure update on child status */
+				vname = zpool_vdev_name(g_zfs, zphp,
+				    nvchild[i], verbose);
+				if (vname == NULL) {
+					be_print_err(gettext(
+					    "be_do_installboot: "
+					    "failed to get device name: %s\n"),
+					    libzfs_error_description(g_zfs));
+					ret = zfs_err_to_be_err(g_zfs);
+					goto done;
+				} else if (verbose == B_TRUE) {
+					be_print_err(gettext(
+					    "be_do_installboot: device %s\n"),
+					    vname);
+				}
+				free(vname);
 				ret = be_do_installboot_helper(zphp, nvchild[i],
 				    stage1, stage2, flags);
 				if (ret != BE_SUCCESS)
 					goto done;
 			}
 		} else {
-			free(vname);
-
 			ret = be_do_installboot_helper(zphp, child[c], stage1,
 			    stage2, flags);
 			if (ret != BE_SUCCESS)

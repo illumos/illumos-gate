@@ -25,6 +25,7 @@
 # Copyright 2012, Piotr Jasiukajtis
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright (c) 2014, Joyent, Inc.
+# Copyright 2016 Toomas Soome <tsoome@me.com>
 #
 
 set name=pkg.fmri value=pkg:/developer/build/onbld@$(PKGVERS)
@@ -60,6 +61,7 @@ dir path=opt/onbld/man
 dir path=opt/onbld/man/man1onbld
 dir path=opt/onbld/share
 $(i386_ONLY)file path=opt/onbld/bin/$(ARCH)/aw mode=0555
+$(i386_ONLY)file path=opt/onbld/bin/$(ARCH)/btxld mode=0555
 $(sparc_ONLY)file path=opt/onbld/bin/$(ARCH)/chk4ubin mode=0555
 file path=opt/onbld/bin/$(ARCH)/codereview mode=0555
 file path=opt/onbld/bin/$(ARCH)/cscope-fast mode=0555

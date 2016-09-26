@@ -12,6 +12,7 @@
 #
 # Copyright 2011, Richard Lowe
 # Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2016 Toomas Soome <tsoome@me.com>
 #
 
 file path=usr/share/man/man1m/6to4relay.1m
@@ -121,6 +122,7 @@ file path=usr/share/man/man1m/inetd.1m
 file path=usr/share/man/man1m/infocmp.1m
 file path=usr/share/man/man1m/init.1m
 file path=usr/share/man/man1m/install.1m
+file path=usr/share/man/man1m/installboot.1m
 file path=usr/share/man/man1m/installgrub.1m
 file path=usr/share/man/man1m/intrd.1m
 file path=usr/share/man/man1m/iostat.1m
