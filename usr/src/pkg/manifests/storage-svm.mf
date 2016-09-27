@@ -21,7 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2016 Nexenta Systems, Inc.
 #
 
 #
@@ -165,7 +165,6 @@ file path=usr/share/man/man1m/rpc.metamhd.1m
 file path=usr/share/man/man4/md.tab.4
 file path=usr/share/man/man4/mddb.cf.4
 file path=usr/share/man/man4/meddb.4
-file path=usr/share/man/man7d/console.7d
 file path=usr/share/man/man7d/md.7d
 file path=usr/share/man/man7d/mediator.7d
 file path=usr/snadm/lib/libsvm.so.1
