@@ -1,4 +1,3 @@
-
 /******************************************************************************
  *
  * Module Name: exutils - interpreter/scanner utilities
@@ -6,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2011, Intel Corp.
+ * Copyright (C) 2000 - 2016, Intel Corp.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -42,17 +41,15 @@
  * POSSIBILITY OF SUCH DAMAGES.
  */
 
-#define __EXUTILS_C__
-
 /*
  * DEFINE_AML_GLOBALS is tested in amlcode.h
  * to determine whether certain global names should be "defined" or only
- * "declared" in the current compilation.  This enhances maintainability
+ * "declared" in the current compilation. This enhances maintainability
  * by enabling a single header file to embody all knowledge of the names
  * in question.
  *
  * Exactly one module of any executable should #define DEFINE_GLOBALS
- * before #including the header files which use this convention.  The
+ * before #including the header files which use this convention. The
  * names in question will be defined and initialized in that module,
  * and declared as extern in all other modules which #include those
  * header files.
@@ -113,42 +110,6 @@ AcpiExEnterInterpreter (
 
 /*******************************************************************************
  *
- * FUNCTION:    AcpiExReacquireInterpreter
- *
- * PARAMETERS:  None
- *
- * RETURN:      None
- *
- * DESCRIPTION: Reacquire the interpreter execution region from within the
- *              interpreter code. Failure to enter the interpreter region is a
- *              fatal system error. Used in  conjuction with
- *              RelinquishInterpreter
- *
- ******************************************************************************/
-
-void
-AcpiExReacquireInterpreter (
-    void)
-{
-    ACPI_FUNCTION_TRACE (ExReacquireInterpreter);
-
-
-    /*
-     * If the global serialized flag is set, do not release the interpreter,
-     * since it was not actually released by AcpiExRelinquishInterpreter.
-     * This forces the interpreter to be single threaded.
-     */
-    if (!AcpiGbl_AllMethodsSerialized)
-    {
-        AcpiExEnterInterpreter ();
-    }
-
-    return_VOID;
-}
-
-
-/*******************************************************************************
- *
  * FUNCTION:    AcpiExExitInterpreter
  *
  * PARAMETERS:  None
@@ -157,7 +118,16 @@ AcpiExReacquireInterpreter (
  *
  * DESCRIPTION: Exit the interpreter execution region. This is the top level
  *              routine used to exit the interpreter when all processing has
- *              been completed.
+ *              been completed, or when the method blocks.
+ *
+ * Cases where the interpreter is unlocked internally:
+ *      1) Method will be blocked on a Sleep() AML opcode
+ *      2) Method will be blocked on an Acquire() AML opcode
+ *      3) Method will be blocked on a Wait() AML opcode
+ *      4) Method will be blocked to acquire the global lock
+ *      5) Method will be blocked waiting to execute a serialized control
+ *          method that is currently executing
+ *      6) About to invoke a user-installed opregion handler
  *
  ******************************************************************************/
 
@@ -183,61 +153,18 @@ AcpiExExitInterpreter (
 
 /*******************************************************************************
  *
- * FUNCTION:    AcpiExRelinquishInterpreter
- *
- * PARAMETERS:  None
- *
- * RETURN:      None
- *
- * DESCRIPTION: Exit the interpreter execution region, from within the
- *              interpreter - before attempting an operation that will possibly
- *              block the running thread.
- *
- * Cases where the interpreter is unlocked internally
- *      1) Method to be blocked on a Sleep() AML opcode
- *      2) Method to be blocked on an Acquire() AML opcode
- *      3) Method to be blocked on a Wait() AML opcode
- *      4) Method to be blocked to acquire the global lock
- *      5) Method to be blocked waiting to execute a serialized control method
- *          that is currently executing
- *      6) About to invoke a user-installed opregion handler
- *
- ******************************************************************************/
-
-void
-AcpiExRelinquishInterpreter (
-    void)
-{
-    ACPI_FUNCTION_TRACE (ExRelinquishInterpreter);
-
-
-    /*
-     * If the global serialized flag is set, do not release the interpreter.
-     * This forces the interpreter to be single threaded.
-     */
-    if (!AcpiGbl_AllMethodsSerialized)
-    {
-        AcpiExExitInterpreter ();
-    }
-
-    return_VOID;
-}
-
-
-/*******************************************************************************
- *
  * FUNCTION:    AcpiExTruncateFor32bitTable
  *
  * PARAMETERS:  ObjDesc         - Object to be truncated
  *
- * RETURN:      none
+ * RETURN:      TRUE if a truncation was performed, FALSE otherwise.
  *
  * DESCRIPTION: Truncate an ACPI Integer to 32 bits if the execution mode is
  *              32-bit, as determined by the revision of the DSDT.
  *
  ******************************************************************************/
 
-void
+BOOLEAN
 AcpiExTruncateFor32bitTable (
     ACPI_OPERAND_OBJECT     *ObjDesc)
 {
@@ -247,23 +174,27 @@ AcpiExTruncateFor32bitTable (
 
     /*
      * Object must be a valid number and we must be executing
-     * a control method. NS node could be there for AML_INT_NAMEPATH_OP.
+     * a control method. Object could be NS node for AML_INT_NAMEPATH_OP.
      */
     if ((!ObjDesc) ||
         (ACPI_GET_DESCRIPTOR_TYPE (ObjDesc) != ACPI_DESC_TYPE_OPERAND) ||
         (ObjDesc->Common.Type != ACPI_TYPE_INTEGER))
     {
-        return;
+        return (FALSE);
     }
 
-    if (AcpiGbl_IntegerByteWidth == 4)
+    if ((AcpiGbl_IntegerByteWidth == 4) &&
+        (ObjDesc->Integer.Value > (UINT64) ACPI_UINT32_MAX))
     {
         /*
-         * We are running a method that exists in a 32-bit ACPI table.
-         * Truncate the value to 32 bits by zeroing out the upper 32-bit field
+         * We are executing in a 32-bit ACPI table. Truncate
+         * the value to 32 bits by zeroing out the upper 32-bit field
          */
         ObjDesc->Integer.Value &= (UINT64) ACPI_UINT32_MAX;
+        return (TRUE);
     }
+
+    return (FALSE);
 }
 
 
@@ -301,7 +232,7 @@ AcpiExAcquireGlobalLock (
     /* Attempt to get the global lock, wait forever */
 
     Status = AcpiExAcquireMutexObject (ACPI_WAIT_FOREVER,
-                AcpiGbl_GlobalLockMutex, AcpiOsGetThreadId ());
+        AcpiGbl_GlobalLockMutex, AcpiOsGetThreadId ());
 
     if (ACPI_FAILURE (Status))
     {
@@ -410,8 +341,8 @@ AcpiExDigitsNeeded (
  *
  * FUNCTION:    AcpiExEisaIdToString
  *
- * PARAMETERS:  CompressedId    - EISAID to be converted
- *              OutString       - Where to put the converted string (8 bytes)
+ * PARAMETERS:  OutString       - Where to put the converted string (8 bytes)
+ *              CompressedId    - EISAID to be converted
  *
  * RETURN:      None
  *
@@ -438,7 +369,8 @@ AcpiExEisaIdToString (
     if (CompressedId > ACPI_UINT32_MAX)
     {
         ACPI_WARNING ((AE_INFO,
-            "Expected EISAID is larger than 32 bits: 0x%8.8X%8.8X, truncating",
+            "Expected EISAID is larger than 32 bits: "
+            "0x%8.8X%8.8X, truncating",
             ACPI_FORMAT_UINT64 (CompressedId)));
     }
 
@@ -468,7 +400,7 @@ AcpiExEisaIdToString (
  *                                possible 64-bit integer.
  *              Value           - Value to be converted
  *
- * RETURN:      None, string
+ * RETURN:      Converted string in OutString
  *
  * DESCRIPTION: Convert a 64-bit integer to decimal string representation.
  *              Assumes string buffer is large enough to hold the string. The
@@ -497,6 +429,72 @@ AcpiExIntegerToString (
         (void) AcpiUtShortDivide (Value, 10, &Value, &Remainder);
         OutString[Count-1] = (char) ('0' + Remainder);\
     }
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    AcpiExPciClsToString
+ *
+ * PARAMETERS:  OutString       - Where to put the converted string (7 bytes)
+ *              ClassCode       - PCI class code to be converted (3 bytes)
+ *
+ * RETURN:      Converted string in OutString
+ *
+ * DESCRIPTION: Convert 3-bytes PCI class code to string representation.
+ *              Return buffer must be large enough to hold the string. The
+ *              string returned is always exactly of length
+ *              ACPI_PCICLS_STRING_SIZE (includes null terminator).
+ *
+ ******************************************************************************/
+
+void
+AcpiExPciClsToString (
+    char                    *OutString,
+    UINT8                   ClassCode[3])
+{
+
+    ACPI_FUNCTION_ENTRY ();
+
+
+    /* All 3 bytes are hexadecimal */
+
+    OutString[0] = AcpiUtHexToAsciiChar ((UINT64) ClassCode[0], 4);
+    OutString[1] = AcpiUtHexToAsciiChar ((UINT64) ClassCode[0], 0);
+    OutString[2] = AcpiUtHexToAsciiChar ((UINT64) ClassCode[1], 4);
+    OutString[3] = AcpiUtHexToAsciiChar ((UINT64) ClassCode[1], 0);
+    OutString[4] = AcpiUtHexToAsciiChar ((UINT64) ClassCode[2], 4);
+    OutString[5] = AcpiUtHexToAsciiChar ((UINT64) ClassCode[2], 0);
+    OutString[6] = 0;
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    AcpiIsValidSpaceId
+ *
+ * PARAMETERS:  SpaceId             - ID to be validated
+ *
+ * RETURN:      TRUE if SpaceId is a valid/supported ID.
+ *
+ * DESCRIPTION: Validate an operation region SpaceID.
+ *
+ ******************************************************************************/
+
+BOOLEAN
+AcpiIsValidSpaceId (
+    UINT8                   SpaceId)
+{
+
+    if ((SpaceId >= ACPI_NUM_PREDEFINED_REGIONS) &&
+        (SpaceId < ACPI_USER_REGION_BEGIN) &&
+        (SpaceId != ACPI_ADR_SPACE_DATA_TABLE) &&
+        (SpaceId != ACPI_ADR_SPACE_FIXED_HARDWARE))
+    {
+        return (FALSE);
+    }
+
+    return (TRUE);
 }
 
 #endif

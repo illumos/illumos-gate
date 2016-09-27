@@ -23,6 +23,8 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2016 Joyent, Inc.
+#
 
 #
 #	This makefile drives the production of the PCI nexus driver
@@ -72,6 +74,7 @@ LINTTAGS	+= -erroff=E_SUSPICIOUS_COMPARISON
 
 CERRWARN	+= -_gcc=-Wno-uninitialized
 CERRWARN	+= -_gcc=-Wno-parentheses
+CERRWARN	+= -_gcc=-Wno-unused-function
 
 #
 #	Default build targets.

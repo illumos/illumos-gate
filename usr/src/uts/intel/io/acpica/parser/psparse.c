@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2011, Intel Corp.
+ * Copyright (C) 2000 - 2016, Intel Corp.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -41,12 +41,11 @@
  * POSSIBILITY OF SUCH DAMAGES.
  */
 
-
 /*
  * Parse the AML and build an operation tree as most interpreters,
- * like Perl, do.  Parsing is done by hand rather than with a YACC
+ * like Perl, do. Parsing is done by hand rather than with a YACC
  * generated parser to tightly constrain stack and dynamic memory
- * usage.  At the same time, parsing is kept flexible and the code
+ * usage. At the same time, parsing is kept flexible and the code
  * fairly compact by parsing based on a list of AML opcode
  * templates in AmlOpInfo[]
  */
@@ -162,6 +161,8 @@ AcpiPsCompleteThisOp (
         return_ACPI_STATUS (AE_OK);  /* OK for now */
     }
 
+    AcpiExStopTraceOpcode (Op, WalkState);
+
     /* Delete this op and the subtree below it if asked to */
 
     if (((WalkState->ParseFlags & ACPI_PARSE_TREE_MASK) != ACPI_PARSE_DELETE_TREE) ||
@@ -191,15 +192,16 @@ AcpiPsCompleteThisOp (
         switch (ParentInfo->Class)
         {
         case AML_CLASS_CONTROL:
+
             break;
 
         case AML_CLASS_CREATE:
-
             /*
-             * These opcodes contain TermArg operands.  The current
+             * These opcodes contain TermArg operands. The current
              * op must be replaced by a placeholder return op
              */
-            ReplacementOp = AcpiPsAllocOp (AML_INT_RETURN_VALUE_OP);
+            ReplacementOp = AcpiPsAllocOp (
+                AML_INT_RETURN_VALUE_OP, Op->Common.Aml);
             if (!ReplacementOp)
             {
                 Status = AE_NO_MEMORY;
@@ -207,9 +209,8 @@ AcpiPsCompleteThisOp (
             break;
 
         case AML_CLASS_NAMED_OBJECT:
-
             /*
-             * These opcodes contain TermArg operands.  The current
+             * These opcodes contain TermArg operands. The current
              * op must be replaced by a placeholder return op
              */
             if ((Op->Common.Parent->Common.AmlOpcode == AML_REGION_OP)       ||
@@ -219,7 +220,8 @@ AcpiPsCompleteThisOp (
                 (Op->Common.Parent->Common.AmlOpcode == AML_BANK_FIELD_OP)   ||
                 (Op->Common.Parent->Common.AmlOpcode == AML_VAR_PACKAGE_OP))
             {
-                ReplacementOp = AcpiPsAllocOp (AML_INT_RETURN_VALUE_OP);
+                ReplacementOp = AcpiPsAllocOp (
+                    AML_INT_RETURN_VALUE_OP, Op->Common.Aml);
                 if (!ReplacementOp)
                 {
                     Status = AE_NO_MEMORY;
@@ -232,7 +234,8 @@ AcpiPsCompleteThisOp (
                     (Op->Common.AmlOpcode == AML_PACKAGE_OP) ||
                     (Op->Common.AmlOpcode == AML_VAR_PACKAGE_OP))
                 {
-                    ReplacementOp = AcpiPsAllocOp (Op->Common.AmlOpcode);
+                    ReplacementOp = AcpiPsAllocOp (Op->Common.AmlOpcode,
+                        Op->Common.Aml);
                     if (!ReplacementOp)
                     {
                         Status = AE_NO_MEMORY;
@@ -248,7 +251,8 @@ AcpiPsCompleteThisOp (
 
         default:
 
-            ReplacementOp = AcpiPsAllocOp (AML_INT_RETURN_VALUE_OP);
+            ReplacementOp = AcpiPsAllocOp (
+                AML_INT_RETURN_VALUE_OP, Op->Common.Aml);
             if (!ReplacementOp)
             {
                 Status = AE_NO_MEMORY;
@@ -263,11 +267,11 @@ AcpiPsCompleteThisOp (
 
             if (ReplacementOp)
             {
-                ReplacementOp->Common.Parent        = Op->Common.Parent;
-                ReplacementOp->Common.Value.Arg     = NULL;
-                ReplacementOp->Common.Node          = Op->Common.Node;
+                ReplacementOp->Common.Parent = Op->Common.Parent;
+                ReplacementOp->Common.Value.Arg = NULL;
+                ReplacementOp->Common.Node = Op->Common.Node;
                 Op->Common.Parent->Common.Value.Arg = ReplacementOp;
-                ReplacementOp->Common.Next          = Op->Common.Next;
+                ReplacementOp->Common.Next = Op->Common.Next;
             }
             else
             {
@@ -286,11 +290,11 @@ AcpiPsCompleteThisOp (
             {
                 if (ReplacementOp)
                 {
-                    ReplacementOp->Common.Parent    = Op->Common.Parent;
+                    ReplacementOp->Common.Parent = Op->Common.Parent;
                     ReplacementOp->Common.Value.Arg = NULL;
-                    ReplacementOp->Common.Node      = Op->Common.Node;
-                    Prev->Common.Next               = ReplacementOp;
-                    ReplacementOp->Common.Next      = Op->Common.Next;
+                    ReplacementOp->Common.Node = Op->Common.Node;
+                    Prev->Common.Next = ReplacementOp;
+                    ReplacementOp->Common.Next = Op->Common.Next;
                     Next = NULL;
                 }
                 else
@@ -352,7 +356,6 @@ AcpiPsNextParseState (
         Status = AE_CTRL_TERMINATE;
         break;
 
-
     case AE_CTRL_BREAK:
 
         ParserState->Aml = WalkState->AmlLastWhile;
@@ -360,13 +363,11 @@ AcpiPsNextParseState (
         Status = AE_CTRL_BREAK;
         break;
 
-
     case AE_CTRL_CONTINUE:
 
         ParserState->Aml = WalkState->AmlLastWhile;
         Status = AE_CTRL_CONTINUE;
         break;
-
 
     case AE_CTRL_PENDING:
 
@@ -390,11 +391,10 @@ AcpiPsNextParseState (
         Status = AE_CTRL_PENDING;
         break;
 
-
     case AE_CTRL_FALSE:
         /*
          * Either an IF/WHILE Predicate was false or we encountered a BREAK
-         * opcode.  In both cases, we do not execute the rest of the
+         * opcode. In both cases, we do not execute the rest of the
          * package;  We simply close out the parent (finishing the walk of
          * this branch of the tree) and continue execution at the parent
          * level.
@@ -406,7 +406,6 @@ AcpiPsNextParseState (
         WalkState->ControlState->Common.Value = FALSE;
         Status = AE_CTRL_END;
         break;
-
 
     case AE_CTRL_TRANSFER:
 
@@ -421,7 +420,6 @@ AcpiPsNextParseState (
 
         WalkState->ReturnUsed = AcpiDsIsResultUsed (Op, WalkState);
         break;
-
 
     default:
 
@@ -496,7 +494,8 @@ AcpiPsParseAml (
      */
     if (WalkState->MethodDesc)
     {
-        WalkState->Thread->CurrentSyncLevel = WalkState->MethodDesc->Method.SyncLevel;
+        WalkState->Thread->CurrentSyncLevel =
+            WalkState->MethodDesc->Method.SyncLevel;
     }
 
     AcpiDsPushWalkState (WalkState, Thread);
@@ -508,7 +507,7 @@ AcpiPsParseAml (
     AcpiGbl_CurrentWalkList = Thread;
 
     /*
-     * Execute the walk loop as long as there is a valid Walk State.  This
+     * Execute the walk loop as long as there is a valid Walk State. This
      * handles nested control method invocations without recursion.
      */
     ACPI_DEBUG_PRINT ((ACPI_DB_PARSE, "State=%p\n", WalkState));
@@ -542,8 +541,8 @@ AcpiPsParseAml (
             }
 
             /*
-             * If the transfer to the new method method call worked, a new walk
-             * state was created -- get it
+             * If the transfer to the new method method call worked
+             *, a new walk state was created -- get it
              */
             WalkState = AcpiDsGetCurrentWalkState (Thread);
             continue;
@@ -562,7 +561,8 @@ AcpiPsParseAml (
             /* Check for possible multi-thread reentrancy problem */
 
             if ((Status == AE_ALREADY_EXISTS) &&
-                (!(WalkState->MethodDesc->Method.InfoFlags & ACPI_METHOD_SERIALIZED)))
+                (!(WalkState->MethodDesc->Method.InfoFlags &
+                    ACPI_METHOD_SERIALIZED)))
             {
                 /*
                  * Method is not serialized and tried to create an object
@@ -588,7 +588,8 @@ AcpiPsParseAml (
          * encountered an error during the method parse phase, there's lots of
          * cleanup to do
          */
-        if (((WalkState->ParseFlags & ACPI_PARSE_MODE_MASK) == ACPI_PARSE_EXECUTE) ||
+        if (((WalkState->ParseFlags & ACPI_PARSE_MODE_MASK) ==
+            ACPI_PARSE_EXECUTE) ||
             (ACPI_FAILURE (Status)))
         {
             AcpiDsTerminateControlMethod (WalkState->MethodDesc, WalkState);
@@ -635,7 +636,7 @@ AcpiPsParseAml (
                     /* Restart the calling control method */
 
                     Status = AcpiDsRestartControlMethod (WalkState,
-                                PreviousWalkState->ImplicitReturnObj);
+                        PreviousWalkState->ImplicitReturnObj);
                 }
                 else
                 {
@@ -646,7 +647,7 @@ AcpiPsParseAml (
                     AcpiDsClearImplicitReturn (PreviousWalkState);
 
                     Status = AcpiDsRestartControlMethod (WalkState,
-                                PreviousWalkState->ReturnDesc);
+                        PreviousWalkState->ReturnDesc);
                 }
                 if (ACPI_SUCCESS (Status))
                 {
@@ -707,5 +708,3 @@ AcpiPsParseAml (
     AcpiGbl_CurrentWalkList = PrevWalkList;
     return_ACPI_STATUS (Status);
 }
-
-

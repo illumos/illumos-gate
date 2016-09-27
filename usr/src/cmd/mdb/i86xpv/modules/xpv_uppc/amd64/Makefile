@@ -22,7 +22,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2016 Joyent, Inc.
 
 MODULE = xpv_uppc.so
 MDBTGT = kvm
@@ -44,3 +44,5 @@ CPPFLAGS += -I$(SRC)/uts/common
 CPPFLAGS += -I$(SRC)/uts/i86xpv
 CPPFLAGS += -I$(SRC)/uts/i86pc
 CPPFLAGS += -I$(SRC)/uts/intel
+
+CERRWARN += -_gcc=-Wno-unused-function

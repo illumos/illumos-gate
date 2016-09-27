@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2011, Intel Corp.
+ * Copyright (C) 2000 - 2016, Intel Corp.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -40,8 +40,6 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  */
-
-#define __EXCREATE_C__
 
 #include "acpi.h"
 #include "accommon.h"
@@ -89,7 +87,7 @@ AcpiExCreateAlias (
     {
         /*
          * Dereference an existing alias so that we don't create a chain
-         * of aliases.  With this code, we guarantee that an alias is
+         * of aliases. With this code, we guarantee that an alias is
          * always exactly one level of indirection away from the
          * actual aliased name.
          */
@@ -99,7 +97,7 @@ AcpiExCreateAlias (
     /*
      * For objects that can never change (i.e., the NS node will
      * permanently point to the same object), we can simply attach
-     * the object to the new NS node.  For other objects (such as
+     * the object to the new NS node. For other objects (such as
      * Integers, buffers, etc.), we have to point the Alias node
      * to the original Node.
      */
@@ -113,7 +111,6 @@ AcpiExCreateAlias (
     case ACPI_TYPE_BUFFER:
     case ACPI_TYPE_PACKAGE:
     case ACPI_TYPE_BUFFER_FIELD:
-
     /*
      * These types open a new scope, so we need the NS node in order to access
      * any children.
@@ -123,7 +120,6 @@ AcpiExCreateAlias (
     case ACPI_TYPE_PROCESSOR:
     case ACPI_TYPE_THERMAL:
     case ACPI_TYPE_LOCAL_SCOPE:
-
         /*
          * The new alias has the type ALIAS and points to the original
          * NS node, not the object itself.
@@ -133,7 +129,6 @@ AcpiExCreateAlias (
         break;
 
     case ACPI_TYPE_METHOD:
-
         /*
          * Control method aliases need to be differentiated
          */
@@ -147,12 +142,12 @@ AcpiExCreateAlias (
 
         /*
          * The new alias assumes the type of the target, and it points
-         * to the same object.  The reference count of the object has an
+         * to the same object. The reference count of the object has an
          * additional reference to prevent deletion out from under either the
          * target node or the alias Node
          */
         Status = AcpiNsAttachObject (AliasNode,
-                    AcpiNsGetAttachedObject (TargetNode), TargetNode->Type);
+            AcpiNsGetAttachedObject (TargetNode), TargetNode->Type);
         break;
     }
 
@@ -197,7 +192,7 @@ AcpiExCreateEvent (
      * that the event is created in an unsignalled state
      */
     Status = AcpiOsCreateSemaphore (ACPI_NO_UNIT_LIMIT, 0,
-                &ObjDesc->Event.OsSemaphore);
+        &ObjDesc->Event.OsSemaphore);
     if (ACPI_FAILURE (Status))
     {
         goto Cleanup;
@@ -205,8 +200,9 @@ AcpiExCreateEvent (
 
     /* Attach object to the Node */
 
-    Status = AcpiNsAttachObject ((ACPI_NAMESPACE_NODE *) WalkState->Operands[0],
-                ObjDesc, ACPI_TYPE_EVENT);
+    Status = AcpiNsAttachObject (
+        (ACPI_NAMESPACE_NODE *) WalkState->Operands[0],
+        ObjDesc, ACPI_TYPE_EVENT);
 
 Cleanup:
     /*
@@ -265,7 +261,8 @@ AcpiExCreateMutex (
     ObjDesc->Mutex.SyncLevel = (UINT8) WalkState->Operands[1]->Integer.Value;
     ObjDesc->Mutex.Node = (ACPI_NAMESPACE_NODE *) WalkState->Operands[0];
 
-    Status = AcpiNsAttachObject (ObjDesc->Mutex.Node, ObjDesc, ACPI_TYPE_MUTEX);
+    Status = AcpiNsAttachObject (
+        ObjDesc->Mutex.Node, ObjDesc, ACPI_TYPE_MUTEX);
 
 
 Cleanup:
@@ -284,7 +281,7 @@ Cleanup:
  *
  * PARAMETERS:  AmlStart            - Pointer to the region declaration AML
  *              AmlLength           - Max length of the declaration AML
- *              RegionSpace         - SpaceID for the region
+ *              SpaceId             - Address space ID for the region
  *              WalkState           - Current state
  *
  * RETURN:      Status
@@ -297,7 +294,7 @@ ACPI_STATUS
 AcpiExCreateRegion (
     UINT8                   *AmlStart,
     UINT32                  AmlLength,
-    UINT8                   RegionSpace,
+    UINT8                   SpaceId,
     ACPI_WALK_STATE         *WalkState)
 {
     ACPI_STATUS             Status;
@@ -326,16 +323,19 @@ AcpiExCreateRegion (
      * Space ID must be one of the predefined IDs, or in the user-defined
      * range
      */
-    if ((RegionSpace >= ACPI_NUM_PREDEFINED_REGIONS) &&
-        (RegionSpace < ACPI_USER_REGION_BEGIN) &&
-        (RegionSpace != ACPI_ADR_SPACE_DATA_TABLE))
+    if (!AcpiIsValidSpaceId (SpaceId))
     {
-        ACPI_ERROR ((AE_INFO, "Invalid AddressSpace type 0x%X", RegionSpace));
-        return_ACPI_STATUS (AE_AML_INVALID_SPACE_ID);
+        /*
+         * Print an error message, but continue. We don't want to abort
+         * a table load for this exception. Instead, if the region is
+         * actually used at runtime, abort the executing method.
+         */
+        ACPI_ERROR ((AE_INFO,
+            "Invalid/unknown Address Space ID: 0x%2.2X", SpaceId));
     }
 
     ACPI_DEBUG_PRINT ((ACPI_DB_LOAD, "Region Type - %s (0x%X)\n",
-        AcpiUtGetRegionName (RegionSpace), RegionSpace));
+        AcpiUtGetRegionName (SpaceId), SpaceId));
 
     /* Create the region descriptor */
 
@@ -350,16 +350,29 @@ AcpiExCreateRegion (
      * Remember location in AML stream of address & length
      * operands since they need to be evaluated at run time.
      */
-    RegionObj2 = ObjDesc->Common.NextObject;
+    RegionObj2 = AcpiNsGetSecondaryObject (ObjDesc);
     RegionObj2->Extra.AmlStart = AmlStart;
     RegionObj2->Extra.AmlLength = AmlLength;
+    RegionObj2->Extra.Method_REG = NULL;
+    if (WalkState->ScopeInfo)
+    {
+        RegionObj2->Extra.ScopeNode = WalkState->ScopeInfo->Scope.Node;
+    }
+    else
+    {
+        RegionObj2->Extra.ScopeNode = Node;
+    }
 
     /* Init the region from the operands */
 
-    ObjDesc->Region.SpaceId = RegionSpace;
+    ObjDesc->Region.SpaceId = SpaceId;
     ObjDesc->Region.Address = 0;
     ObjDesc->Region.Length = 0;
     ObjDesc->Region.Node = Node;
+    ObjDesc->Region.Handler = NULL;
+    ObjDesc->Common.Flags &=
+        ~(AOPOBJ_SETUP_COMPLETE | AOPOBJ_REG_CONNECTED |
+          AOPOBJ_OBJECT_INITIALIZED);
 
     /* Install the new region object in the parent Node */
 
@@ -418,7 +431,7 @@ AcpiExCreateProcessor (
     /* Install the processor object in the parent Node */
 
     Status = AcpiNsAttachObject ((ACPI_NAMESPACE_NODE *) Operand[0],
-                    ObjDesc, ACPI_TYPE_PROCESSOR);
+        ObjDesc, ACPI_TYPE_PROCESSOR);
 
     /* Remove local reference to the object */
 
@@ -469,7 +482,7 @@ AcpiExCreatePowerResource (
     /* Install the  power resource object in the parent Node */
 
     Status = AcpiNsAttachObject ((ACPI_NAMESPACE_NODE *) Operand[0],
-                    ObjDesc, ACPI_TYPE_POWER);
+        ObjDesc, ACPI_TYPE_POWER);
 
     /* Remove local reference to the object */
 
@@ -521,13 +534,15 @@ AcpiExCreateMethod (
 
     ObjDesc->Method.AmlStart = AmlStart;
     ObjDesc->Method.AmlLength = AmlLength;
+    ObjDesc->Method.Node = Operand[0];
 
     /*
      * Disassemble the method flags. Split off the ArgCount, Serialized
      * flag, and SyncLevel for efficiency.
      */
     MethodFlags = (UINT8) Operand[1]->Integer.Value;
-    ObjDesc->Method.ParamCount = (UINT8) (MethodFlags & AML_METHOD_ARG_COUNT);
+    ObjDesc->Method.ParamCount = (UINT8)
+        (MethodFlags & AML_METHOD_ARG_COUNT);
 
     /*
      * Get the SyncLevel. If method is serialized, a mutex will be
@@ -548,7 +563,7 @@ AcpiExCreateMethod (
     /* Attach the new object to the method Node */
 
     Status = AcpiNsAttachObject ((ACPI_NAMESPACE_NODE *) Operand[0],
-                    ObjDesc, ACPI_TYPE_METHOD);
+        ObjDesc, ACPI_TYPE_METHOD);
 
     /* Remove local reference to the object */
 
@@ -560,5 +575,3 @@ Exit:
     AcpiUtRemoveReference (Operand[1]);
     return_ACPI_STATUS (Status);
 }
-
-

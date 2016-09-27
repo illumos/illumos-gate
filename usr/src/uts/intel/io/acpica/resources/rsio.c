@@ -5,7 +5,7 @@
  ******************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2011, Intel Corp.
+ * Copyright (C) 2000 - 2016, Intel Corp.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -40,8 +40,6 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  */
-
-#define __RSIO_C__
 
 #include "acpi.h"
 #include "accommon.h"
@@ -300,5 +298,3 @@ ACPI_RSCONVERT_INFO   AcpiRsSetStartDpf[10] =
 
     {ACPI_RSC_LENGTH,   0, 0, sizeof (AML_RESOURCE_START_DEPENDENT_NOPRIO)}
 };
-
-

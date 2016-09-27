@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2011, Intel Corp.
+ * Copyright (C) 2000 - 2016, Intel Corp.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -40,7 +40,6 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  */
-
 
 #include "acpi.h"
 #include "accommon.h"
@@ -237,9 +236,9 @@ AcpiPsPopScope (
 
         /* Return to parsing previous op */
 
-        *Op                 = Scope->ParseScope.Op;
-        *ArgList            = Scope->ParseScope.ArgList;
-        *ArgCount           = Scope->ParseScope.ArgCount;
+        *Op = Scope->ParseScope.Op;
+        *ArgList = Scope->ParseScope.ArgList;
+        *ArgCount = Scope->ParseScope.ArgCount;
         ParserState->PkgEnd = Scope->ParseScope.PkgEnd;
 
         /* All done with this scope state structure */
@@ -250,8 +249,8 @@ AcpiPsPopScope (
     {
         /* Empty parse stack, prepare to fetch next opcode */
 
-        *Op       = NULL;
-        *ArgList  = 0;
+        *Op = NULL;
+        *ArgList = 0;
         *ArgCount = 0;
     }
 
@@ -299,4 +298,3 @@ AcpiPsCleanupScope (
 
     return_VOID;
 }
-

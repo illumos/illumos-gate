@@ -22,6 +22,8 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
+ * Copyright 2016 Joyent, Inc.
+ *
  * pci_resource.c -- routines to retrieve available bus resources from
  *		 the MP Spec. Table and Hotplug Resource Table
  */
@@ -321,23 +323,23 @@ acpi_wr_cb(ACPI_RESOURCE *rp, void *context)
 		break;
 
 	case ACPI_RESOURCE_TYPE_ADDRESS16:
-		if (rp->Data.Address16.AddressLength == 0)
+		if (rp->Data.Address16.Address.AddressLength == 0)
 			break;
 		acpi_cb_cnt++;
 		memlist_insert(rlistpp(rp->Data.Address16.ResourceType,
 		    rp->Data.Address16.Info.TypeSpecific, bus),
-		    rp->Data.Address16.Minimum,
-		    rp->Data.Address16.AddressLength);
+		    rp->Data.Address16.Address.Minimum,
+		    rp->Data.Address16.Address.AddressLength);
 		break;
 
 	case ACPI_RESOURCE_TYPE_ADDRESS32:
-		if (rp->Data.Address32.AddressLength == 0)
+		if (rp->Data.Address32.Address.AddressLength == 0)
 			break;
 		acpi_cb_cnt++;
 		memlist_insert(rlistpp(rp->Data.Address32.ResourceType,
 		    rp->Data.Address32.Info.TypeSpecific, bus),
-		    rp->Data.Address32.Minimum,
-		    rp->Data.Address32.AddressLength);
+		    rp->Data.Address32.Address.Minimum,
+		    rp->Data.Address32.Address.AddressLength);
 		break;
 
 	case ACPI_RESOURCE_TYPE_ADDRESS64:

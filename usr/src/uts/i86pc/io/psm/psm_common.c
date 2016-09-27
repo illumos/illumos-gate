@@ -166,7 +166,7 @@ acpi_get_gsiv(dev_info_t *dip, ACPI_HANDLE pciobj, int devno, int ipin,
  */
 static int
 acpi_eval_lnk(dev_info_t *dip, char *lnkname, int *pci_irqp,
-iflag_t *intr_flagp, acpi_psm_lnk_t *acpipsmlnkp)
+    iflag_t *intr_flagp, acpi_psm_lnk_t *acpipsmlnkp)
 {
 	ACPI_HANDLE	tmpobj;
 	ACPI_HANDLE	lnkobj;

@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2011, Intel Corp.
+ * Copyright (C) 2000 - 2016, Intel Corp.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -45,139 +45,51 @@
 #define __ACGLOBAL_H__
 
 
-/*
- * Ensure that the globals are actually defined and initialized only once.
- *
- * The use of these macros allows a single list of globals (here) in order
- * to simplify maintenance of the code.
- */
-#ifdef DEFINE_ACPI_GLOBALS
-#define ACPI_EXTERN
-#define ACPI_INIT_GLOBAL(a,b) a=b
-#else
-#define ACPI_EXTERN extern
-#define ACPI_INIT_GLOBAL(a,b) a
-#endif
-
-
-#ifdef DEFINE_ACPI_GLOBALS
-
-/* Public globals, available from outside ACPICA subsystem */
-
 /*****************************************************************************
  *
- * Runtime configuration (static defaults that can be overriden at runtime)
+ * Globals related to the ACPI tables
  *
  ****************************************************************************/
 
-/*
- * Enable "slack" in the AML interpreter?  Default is FALSE, and the
- * interpreter strictly follows the ACPI specification.  Setting to TRUE
- * allows the interpreter to ignore certain errors and/or bad AML constructs.
- *
- * Currently, these features are enabled by this flag:
- *
- * 1) Allow "implicit return" of last value in a control method
- * 2) Allow access beyond the end of an operation region
- * 3) Allow access to uninitialized locals/args (auto-init to integer 0)
- * 4) Allow ANY object type to be a source operand for the Store() operator
- * 5) Allow unresolved references (invalid target name) in package objects
- * 6) Enable warning messages for behavior that is not ACPI spec compliant
- */
-UINT8       ACPI_INIT_GLOBAL (AcpiGbl_EnableInterpreterSlack, FALSE);
+/* Master list of all ACPI tables that were found in the RSDT/XSDT */
 
-/*
- * Automatically serialize ALL control methods? Default is FALSE, meaning
- * to use the Serialized/NotSerialized method flags on a per method basis.
- * Only change this if the ASL code is poorly written and cannot handle
- * reentrancy even though methods are marked "NotSerialized".
- */
-UINT8       ACPI_INIT_GLOBAL (AcpiGbl_AllMethodsSerialized, FALSE);
-
-/*
- * Create the predefined _OSI method in the namespace? Default is TRUE
- * because ACPI CA is fully compatible with other ACPI implementations.
- * Changing this will revert ACPI CA (and machine ASL) to pre-OSI behavior.
- */
-UINT8       ACPI_INIT_GLOBAL (AcpiGbl_CreateOsiMethod, TRUE);
-
-/*
- * Optionally use default values for the ACPI register widths. Set this to
- * TRUE to use the defaults, if an FADT contains incorrect widths/lengths.
- */
-UINT8       ACPI_INIT_GLOBAL (AcpiGbl_UseDefaultRegisterWidths, TRUE);
-
-/*
- * Optionally enable output from the AML Debug Object.
- */
-UINT8       ACPI_INIT_GLOBAL (AcpiGbl_EnableAmlDebugObject, FALSE);
-
-/*
- * Optionally copy the entire DSDT to local memory (instead of simply
- * mapping it.) There are some BIOSs that corrupt or replace the original
- * DSDT, creating the need for this option. Default is FALSE, do not copy
- * the DSDT.
- */
-UINT8       ACPI_INIT_GLOBAL (AcpiGbl_CopyDsdtLocally, FALSE);
-
-/*
- * Optionally truncate I/O addresses to 16 bits. Provides compatibility
- * with other ACPI implementations. NOTE: During ACPICA initialization,
- * this value is set to TRUE if any Windows OSI strings have been
- * requested by the BIOS.
- */
-UINT8       ACPI_INIT_GLOBAL (AcpiGbl_TruncateIoAddresses, FALSE);
-
-
-/* AcpiGbl_FADT is a local copy of the FADT, converted to a common format. */
-
-ACPI_TABLE_FADT             AcpiGbl_FADT;
-UINT32                      AcpiCurrentGpeCount;
-UINT32                      AcpiGbl_TraceFlags;
-ACPI_NAME                   AcpiGbl_TraceMethodName;
-BOOLEAN                     AcpiGbl_SystemAwakeAndRunning;
-
-#endif
-
-/*****************************************************************************
- *
- * ACPI Table globals
- *
- ****************************************************************************/
-
-/*
- * AcpiGbl_RootTableList is the master list of ACPI tables that were
- * found in the RSDT/XSDT.
- */
-ACPI_EXTERN ACPI_TABLE_LIST             AcpiGbl_RootTableList;
-ACPI_EXTERN ACPI_TABLE_FACS            *AcpiGbl_FACS;
-
-/* These addresses are calculated from the FADT Event Block addresses */
-
-ACPI_EXTERN ACPI_GENERIC_ADDRESS        AcpiGbl_XPm1aStatus;
-ACPI_EXTERN ACPI_GENERIC_ADDRESS        AcpiGbl_XPm1aEnable;
-
-ACPI_EXTERN ACPI_GENERIC_ADDRESS        AcpiGbl_XPm1bStatus;
-ACPI_EXTERN ACPI_GENERIC_ADDRESS        AcpiGbl_XPm1bEnable;
+ACPI_GLOBAL (ACPI_TABLE_LIST,           AcpiGbl_RootTableList);
 
 /* DSDT information. Used to check for DSDT corruption */
 
-ACPI_EXTERN ACPI_TABLE_HEADER          *AcpiGbl_DSDT;
-ACPI_EXTERN ACPI_TABLE_HEADER           AcpiGbl_OriginalDsdtHeader;
+ACPI_GLOBAL (ACPI_TABLE_HEADER *,       AcpiGbl_DSDT);
+ACPI_GLOBAL (ACPI_TABLE_HEADER,         AcpiGbl_OriginalDsdtHeader);
+ACPI_INIT_GLOBAL (UINT32,               AcpiGbl_DsdtIndex, ACPI_INVALID_TABLE_INDEX);
+ACPI_INIT_GLOBAL (UINT32,               AcpiGbl_FacsIndex, ACPI_INVALID_TABLE_INDEX);
+ACPI_INIT_GLOBAL (UINT32,               AcpiGbl_XFacsIndex, ACPI_INVALID_TABLE_INDEX);
+ACPI_INIT_GLOBAL (UINT32,               AcpiGbl_FadtIndex, ACPI_INVALID_TABLE_INDEX);
+
+#if (!ACPI_REDUCED_HARDWARE)
+ACPI_GLOBAL (ACPI_TABLE_FACS *,         AcpiGbl_FACS);
+
+#endif /* !ACPI_REDUCED_HARDWARE */
+
+/* These addresses are calculated from the FADT Event Block addresses */
+
+ACPI_GLOBAL (ACPI_GENERIC_ADDRESS,      AcpiGbl_XPm1aStatus);
+ACPI_GLOBAL (ACPI_GENERIC_ADDRESS,      AcpiGbl_XPm1aEnable);
+
+ACPI_GLOBAL (ACPI_GENERIC_ADDRESS,      AcpiGbl_XPm1bStatus);
+ACPI_GLOBAL (ACPI_GENERIC_ADDRESS,      AcpiGbl_XPm1bEnable);
 
 /*
- * Handle both ACPI 1.0 and ACPI 2.0 Integer widths. The integer width is
+ * Handle both ACPI 1.0 and ACPI 2.0+ Integer widths. The integer width is
  * determined by the revision of the DSDT: If the DSDT revision is less than
  * 2, use only the lower 32 bits of the internal 64-bit Integer.
  */
-ACPI_EXTERN UINT8                       AcpiGbl_IntegerBitWidth;
-ACPI_EXTERN UINT8                       AcpiGbl_IntegerByteWidth;
-ACPI_EXTERN UINT8                       AcpiGbl_IntegerNybbleWidth;
+ACPI_GLOBAL (UINT8,                     AcpiGbl_IntegerBitWidth);
+ACPI_GLOBAL (UINT8,                     AcpiGbl_IntegerByteWidth);
+ACPI_GLOBAL (UINT8,                     AcpiGbl_IntegerNybbleWidth);
 
 
 /*****************************************************************************
  *
- * Mutual exlusion within ACPICA subsystem
+ * Mutual exclusion within ACPICA subsystem
  *
  ****************************************************************************/
 
@@ -186,35 +98,36 @@ ACPI_EXTERN UINT8                       AcpiGbl_IntegerNybbleWidth;
  * actual OS mutex handles, indexed by the local ACPI_MUTEX_HANDLEs.
  * (The table maps local handles to the real OS handles)
  */
-ACPI_EXTERN ACPI_MUTEX_INFO             AcpiGbl_MutexInfo[ACPI_NUM_MUTEX];
+ACPI_GLOBAL (ACPI_MUTEX_INFO,           AcpiGbl_MutexInfo[ACPI_NUM_MUTEX]);
 
 /*
  * Global lock mutex is an actual AML mutex object
  * Global lock semaphore works in conjunction with the actual global lock
  * Global lock spinlock is used for "pending" handshake
  */
-ACPI_EXTERN ACPI_OPERAND_OBJECT        *AcpiGbl_GlobalLockMutex;
-ACPI_EXTERN ACPI_SEMAPHORE              AcpiGbl_GlobalLockSemaphore;
-ACPI_EXTERN ACPI_SPINLOCK               AcpiGbl_GlobalLockPendingLock;
-ACPI_EXTERN UINT16                      AcpiGbl_GlobalLockHandle;
-ACPI_EXTERN BOOLEAN                     AcpiGbl_GlobalLockAcquired;
-ACPI_EXTERN BOOLEAN                     AcpiGbl_GlobalLockPresent;
-ACPI_EXTERN BOOLEAN                     AcpiGbl_GlobalLockPending;
+ACPI_GLOBAL (ACPI_OPERAND_OBJECT *,     AcpiGbl_GlobalLockMutex);
+ACPI_GLOBAL (ACPI_SEMAPHORE,            AcpiGbl_GlobalLockSemaphore);
+ACPI_GLOBAL (ACPI_SPINLOCK,             AcpiGbl_GlobalLockPendingLock);
+ACPI_GLOBAL (UINT16,                    AcpiGbl_GlobalLockHandle);
+ACPI_GLOBAL (BOOLEAN,                   AcpiGbl_GlobalLockAcquired);
+ACPI_GLOBAL (BOOLEAN,                   AcpiGbl_GlobalLockPresent);
+ACPI_GLOBAL (BOOLEAN,                   AcpiGbl_GlobalLockPending);
 
 /*
  * Spinlocks are used for interfaces that can be possibly called at
  * interrupt level
  */
-ACPI_EXTERN ACPI_SPINLOCK               AcpiGbl_GpeLock;      /* For GPE data structs and registers */
-ACPI_EXTERN ACPI_SPINLOCK               AcpiGbl_HardwareLock; /* For ACPI H/W except GPE registers */
+ACPI_GLOBAL (ACPI_SPINLOCK,             AcpiGbl_GpeLock);       /* For GPE data structs and registers */
+ACPI_GLOBAL (ACPI_SPINLOCK,             AcpiGbl_HardwareLock);  /* For ACPI H/W except GPE registers */
+ACPI_GLOBAL (ACPI_SPINLOCK,             AcpiGbl_ReferenceCountLock);
 
 /* Mutex for _OSI support */
 
-ACPI_EXTERN ACPI_MUTEX                  AcpiGbl_OsiMutex;
+ACPI_GLOBAL (ACPI_MUTEX,                AcpiGbl_OsiMutex);
 
 /* Reader/Writer lock is used for namespace walk and dynamic table unload */
 
-ACPI_EXTERN ACPI_RW_LOCK                AcpiGbl_NamespaceRwLock;
+ACPI_GLOBAL (ACPI_RW_LOCK,              AcpiGbl_NamespaceRwLock);
 
 
 /*****************************************************************************
@@ -225,78 +138,70 @@ ACPI_EXTERN ACPI_RW_LOCK                AcpiGbl_NamespaceRwLock;
 
 /* Object caches */
 
-ACPI_EXTERN ACPI_CACHE_T               *AcpiGbl_NamespaceCache;
-ACPI_EXTERN ACPI_CACHE_T               *AcpiGbl_StateCache;
-ACPI_EXTERN ACPI_CACHE_T               *AcpiGbl_PsNodeCache;
-ACPI_EXTERN ACPI_CACHE_T               *AcpiGbl_PsNodeExtCache;
-ACPI_EXTERN ACPI_CACHE_T               *AcpiGbl_OperandCache;
+ACPI_GLOBAL (ACPI_CACHE_T *,            AcpiGbl_NamespaceCache);
+ACPI_GLOBAL (ACPI_CACHE_T *,            AcpiGbl_StateCache);
+ACPI_GLOBAL (ACPI_CACHE_T *,            AcpiGbl_PsNodeCache);
+ACPI_GLOBAL (ACPI_CACHE_T *,            AcpiGbl_PsNodeExtCache);
+ACPI_GLOBAL (ACPI_CACHE_T *,            AcpiGbl_OperandCache);
+
+/* System */
+
+ACPI_INIT_GLOBAL (UINT32,               AcpiGbl_StartupFlags, 0);
+ACPI_INIT_GLOBAL (BOOLEAN,              AcpiGbl_Shutdown, TRUE);
+ACPI_INIT_GLOBAL (BOOLEAN,              AcpiGbl_EarlyInitialization, TRUE);
 
 /* Global handlers */
 
-ACPI_EXTERN ACPI_OBJECT_NOTIFY_HANDLER  AcpiGbl_DeviceNotify;
-ACPI_EXTERN ACPI_OBJECT_NOTIFY_HANDLER  AcpiGbl_SystemNotify;
-ACPI_EXTERN ACPI_EXCEPTION_HANDLER      AcpiGbl_ExceptionHandler;
-ACPI_EXTERN ACPI_INIT_HANDLER           AcpiGbl_InitHandler;
-ACPI_EXTERN ACPI_TABLE_HANDLER          AcpiGbl_TableHandler;
-ACPI_EXTERN void                       *AcpiGbl_TableHandlerContext;
-ACPI_EXTERN ACPI_WALK_STATE            *AcpiGbl_BreakpointWalk;
-ACPI_EXTERN ACPI_INTERFACE_HANDLER      AcpiGbl_InterfaceHandler;
+ACPI_GLOBAL (ACPI_GLOBAL_NOTIFY_HANDLER,AcpiGbl_GlobalNotify[2]);
+ACPI_GLOBAL (ACPI_EXCEPTION_HANDLER,    AcpiGbl_ExceptionHandler);
+ACPI_GLOBAL (ACPI_INIT_HANDLER,         AcpiGbl_InitHandler);
+ACPI_GLOBAL (ACPI_TABLE_HANDLER,        AcpiGbl_TableHandler);
+ACPI_GLOBAL (void *,                    AcpiGbl_TableHandlerContext);
+ACPI_GLOBAL (ACPI_INTERFACE_HANDLER,    AcpiGbl_InterfaceHandler);
+ACPI_GLOBAL (ACPI_SCI_HANDLER_INFO *,   AcpiGbl_SciHandlerList);
 
 /* Owner ID support */
 
-ACPI_EXTERN UINT32                      AcpiGbl_OwnerIdMask[ACPI_NUM_OWNERID_MASKS];
-ACPI_EXTERN UINT8                       AcpiGbl_LastOwnerIdIndex;
-ACPI_EXTERN UINT8                       AcpiGbl_NextOwnerIdOffset;
+ACPI_GLOBAL (UINT32,                    AcpiGbl_OwnerIdMask[ACPI_NUM_OWNERID_MASKS]);
+ACPI_GLOBAL (UINT8,                     AcpiGbl_LastOwnerIdIndex);
+ACPI_GLOBAL (UINT8,                     AcpiGbl_NextOwnerIdOffset);
 
 /* Initialization sequencing */
 
-ACPI_EXTERN BOOLEAN                     AcpiGbl_RegMethodsExecuted;
+ACPI_INIT_GLOBAL (BOOLEAN,              AcpiGbl_NamespaceInitialized, FALSE);
 
 /* Misc */
 
-ACPI_EXTERN UINT32                      AcpiGbl_OriginalMode;
-ACPI_EXTERN UINT32                      AcpiGbl_RsdpOriginalLocation;
-ACPI_EXTERN UINT32                      AcpiGbl_NsLookupCount;
-ACPI_EXTERN UINT32                      AcpiGbl_PsFindCount;
-ACPI_EXTERN UINT16                      AcpiGbl_Pm1EnableRegisterSave;
-ACPI_EXTERN UINT8                       AcpiGbl_DebuggerConfiguration;
-ACPI_EXTERN BOOLEAN                     AcpiGbl_StepToNextCall;
-ACPI_EXTERN BOOLEAN                     AcpiGbl_AcpiHardwarePresent;
-ACPI_EXTERN BOOLEAN                     AcpiGbl_EventsInitialized;
-ACPI_EXTERN UINT8                       AcpiGbl_OsiData;
-ACPI_EXTERN ACPI_INTERFACE_INFO        *AcpiGbl_SupportedInterfaces;
+ACPI_GLOBAL (UINT32,                    AcpiGbl_OriginalMode);
+ACPI_GLOBAL (UINT32,                    AcpiGbl_NsLookupCount);
+ACPI_GLOBAL (UINT32,                    AcpiGbl_PsFindCount);
+ACPI_GLOBAL (UINT16,                    AcpiGbl_Pm1EnableRegisterSave);
+ACPI_GLOBAL (UINT8,                     AcpiGbl_DebuggerConfiguration);
+ACPI_GLOBAL (BOOLEAN,                   AcpiGbl_StepToNextCall);
+ACPI_GLOBAL (BOOLEAN,                   AcpiGbl_AcpiHardwarePresent);
+ACPI_GLOBAL (BOOLEAN,                   AcpiGbl_EventsInitialized);
+ACPI_GLOBAL (ACPI_INTERFACE_INFO *,     AcpiGbl_SupportedInterfaces);
+ACPI_GLOBAL (ACPI_ADDRESS_RANGE *,      AcpiGbl_AddressRangeList[ACPI_ADDRESS_RANGE_MAX]);
 
+/* Other miscellaneous, declared and initialized in utglobal */
 
-#ifndef DEFINE_ACPI_GLOBALS
-
-/* Exception codes */
-
-extern char const                       *AcpiGbl_ExceptionNames_Env[];
-extern char const                       *AcpiGbl_ExceptionNames_Pgm[];
-extern char const                       *AcpiGbl_ExceptionNames_Tbl[];
-extern char const                       *AcpiGbl_ExceptionNames_Aml[];
-extern char const                       *AcpiGbl_ExceptionNames_Ctrl[];
-
-/* Other miscellaneous */
-
-extern BOOLEAN                          AcpiGbl_Shutdown;
-extern UINT32                           AcpiGbl_StartupFlags;
 extern const char                      *AcpiGbl_SleepStateNames[ACPI_S_STATE_COUNT];
 extern const char                      *AcpiGbl_LowestDstateNames[ACPI_NUM_SxW_METHODS];
 extern const char                      *AcpiGbl_HighestDstateNames[ACPI_NUM_SxD_METHODS];
-extern const ACPI_OPCODE_INFO           AcpiGbl_AmlOpInfo[AML_NUM_OPCODES];
 extern const char                      *AcpiGbl_RegionTypes[ACPI_NUM_PREDEFINED_REGIONS];
-#endif
+extern const char                       AcpiGbl_LowerHexDigits[];
+extern const char                       AcpiGbl_UpperHexDigits[];
+extern const ACPI_OPCODE_INFO           AcpiGbl_AmlOpInfo[AML_NUM_OPCODES];
 
 
 #ifdef ACPI_DBG_TRACK_ALLOCATIONS
 
-/* Lists for tracking memory allocations */
+/* Lists for tracking memory allocations (debug only) */
 
-ACPI_EXTERN ACPI_MEMORY_LIST           *AcpiGbl_GlobalList;
-ACPI_EXTERN ACPI_MEMORY_LIST           *AcpiGbl_NsNodeList;
-ACPI_EXTERN BOOLEAN                     AcpiGbl_DisplayFinalMemStats;
-ACPI_EXTERN BOOLEAN                     AcpiGbl_DisableMemTracking;
+ACPI_GLOBAL (ACPI_MEMORY_LIST *,        AcpiGbl_GlobalList);
+ACPI_GLOBAL (ACPI_MEMORY_LIST *,        AcpiGbl_NsNodeList);
+ACPI_GLOBAL (BOOLEAN,                   AcpiGbl_DisplayFinalMemStats);
+ACPI_GLOBAL (BOOLEAN,                   AcpiGbl_DisableMemTracking);
 #endif
 
 
@@ -312,22 +217,23 @@ ACPI_EXTERN BOOLEAN                     AcpiGbl_DisableMemTracking;
 #define NUM_PREDEFINED_NAMES            9
 #endif
 
-ACPI_EXTERN ACPI_NAMESPACE_NODE         AcpiGbl_RootNodeStruct;
-ACPI_EXTERN ACPI_NAMESPACE_NODE        *AcpiGbl_RootNode;
-ACPI_EXTERN ACPI_NAMESPACE_NODE        *AcpiGbl_FadtGpeDevice;
-ACPI_EXTERN ACPI_OPERAND_OBJECT        *AcpiGbl_ModuleCodeList;
+ACPI_GLOBAL (ACPI_NAMESPACE_NODE,       AcpiGbl_RootNodeStruct);
+ACPI_GLOBAL (ACPI_NAMESPACE_NODE *,     AcpiGbl_RootNode);
+ACPI_GLOBAL (ACPI_NAMESPACE_NODE *,     AcpiGbl_FadtGpeDevice);
+ACPI_GLOBAL (ACPI_OPERAND_OBJECT *,     AcpiGbl_ModuleCodeList);
 
 
 extern const UINT8                      AcpiGbl_NsProperties [ACPI_NUM_NS_TYPES];
 extern const ACPI_PREDEFINED_NAMES      AcpiGbl_PreDefinedNames [NUM_PREDEFINED_NAMES];
 
 #ifdef ACPI_DEBUG_OUTPUT
-ACPI_EXTERN UINT32                      AcpiGbl_CurrentNodeCount;
-ACPI_EXTERN UINT32                      AcpiGbl_CurrentNodeSize;
-ACPI_EXTERN UINT32                      AcpiGbl_MaxConcurrentNodeCount;
-ACPI_EXTERN ACPI_SIZE                  *AcpiGbl_EntryStackPointer;
-ACPI_EXTERN ACPI_SIZE                  *AcpiGbl_LowestStackPointer;
-ACPI_EXTERN UINT32                      AcpiGbl_DeepestNesting;
+ACPI_GLOBAL (UINT32,                    AcpiGbl_CurrentNodeCount);
+ACPI_GLOBAL (UINT32,                    AcpiGbl_CurrentNodeSize);
+ACPI_GLOBAL (UINT32,                    AcpiGbl_MaxConcurrentNodeCount);
+ACPI_GLOBAL (ACPI_SIZE *,               AcpiGbl_EntryStackPointer);
+ACPI_GLOBAL (ACPI_SIZE *,               AcpiGbl_LowestStackPointer);
+ACPI_GLOBAL (UINT32,                    AcpiGbl_DeepestNesting);
+ACPI_INIT_GLOBAL (UINT32,               AcpiGbl_NestingLevel, 0);
 #endif
 
 
@@ -337,12 +243,15 @@ ACPI_EXTERN UINT32                      AcpiGbl_DeepestNesting;
  *
  ****************************************************************************/
 
+ACPI_GLOBAL (ACPI_THREAD_STATE *,       AcpiGbl_CurrentWalkList);
 
-ACPI_EXTERN ACPI_THREAD_STATE          *AcpiGbl_CurrentWalkList;
+/* Maximum number of While() loop iterations before forced abort */
+
+ACPI_GLOBAL (UINT16,                    AcpiGbl_MaxLoopIterations);
 
 /* Control method single step flag */
 
-ACPI_EXTERN UINT8                       AcpiGbl_CmSingleStep;
+ACPI_GLOBAL (UINT8,                     AcpiGbl_CmSingleStep);
 
 
 /*****************************************************************************
@@ -351,9 +260,10 @@ ACPI_EXTERN UINT8                       AcpiGbl_CmSingleStep;
  *
  ****************************************************************************/
 
-extern      ACPI_BIT_REGISTER_INFO      AcpiGbl_BitRegisterInfo[ACPI_NUM_BITREG];
-ACPI_EXTERN UINT8                       AcpiGbl_SleepTypeA;
-ACPI_EXTERN UINT8                       AcpiGbl_SleepTypeB;
+extern ACPI_BIT_REGISTER_INFO           AcpiGbl_BitRegisterInfo[ACPI_NUM_BITREG];
+
+ACPI_GLOBAL (UINT8,                     AcpiGbl_SleepTypeA);
+ACPI_GLOBAL (UINT8,                     AcpiGbl_SleepTypeB);
 
 
 /*****************************************************************************
@@ -362,14 +272,18 @@ ACPI_EXTERN UINT8                       AcpiGbl_SleepTypeB;
  *
  ****************************************************************************/
 
-ACPI_EXTERN UINT8                       AcpiGbl_AllGpesInitialized;
-ACPI_EXTERN ACPI_GPE_XRUPT_INFO        *AcpiGbl_GpeXruptListHead;
-ACPI_EXTERN ACPI_GPE_BLOCK_INFO        *AcpiGbl_GpeFadtBlocks[ACPI_MAX_GPE_BLOCKS];
-ACPI_EXTERN ACPI_GBL_EVENT_HANDLER      AcpiGbl_GlobalEventHandler;
-ACPI_EXTERN void                       *AcpiGbl_GlobalEventHandlerContext;
-ACPI_EXTERN ACPI_FIXED_EVENT_HANDLER    AcpiGbl_FixedEventHandlers[ACPI_NUM_FIXED_EVENTS];
-extern      ACPI_FIXED_EVENT_INFO       AcpiGbl_FixedEventInfo[ACPI_NUM_FIXED_EVENTS];
+#if (!ACPI_REDUCED_HARDWARE)
 
+ACPI_GLOBAL (UINT8,                     AcpiGbl_AllGpesInitialized);
+ACPI_GLOBAL (ACPI_GPE_XRUPT_INFO *,     AcpiGbl_GpeXruptListHead);
+ACPI_GLOBAL (ACPI_GPE_BLOCK_INFO *,     AcpiGbl_GpeFadtBlocks[ACPI_MAX_GPE_BLOCKS]);
+ACPI_GLOBAL (ACPI_GBL_EVENT_HANDLER,    AcpiGbl_GlobalEventHandler);
+ACPI_GLOBAL (void *,                    AcpiGbl_GlobalEventHandlerContext);
+ACPI_GLOBAL (ACPI_FIXED_EVENT_HANDLER,  AcpiGbl_FixedEventHandlers[ACPI_NUM_FIXED_EVENTS]);
+
+extern ACPI_FIXED_EVENT_INFO            AcpiGbl_FixedEventInfo[ACPI_NUM_FIXED_EVENTS];
+
+#endif /* !ACPI_REDUCED_HARDWARE */
 
 /*****************************************************************************
  *
@@ -377,82 +291,124 @@ extern      ACPI_FIXED_EVENT_INFO       AcpiGbl_FixedEventInfo[ACPI_NUM_FIXED_EV
  *
  ****************************************************************************/
 
-/* Procedure nesting level for debug output */
-
-extern      UINT32                      AcpiGbl_NestingLevel;
-
 /* Event counters */
 
-ACPI_EXTERN UINT32                      AcpiMethodCount;
-ACPI_EXTERN UINT32                      AcpiGpeCount;
-ACPI_EXTERN UINT32                      AcpiSciCount;
-ACPI_EXTERN UINT32                      AcpiFixedEventCount[ACPI_NUM_FIXED_EVENTS];
+ACPI_GLOBAL (UINT32,                    AcpiMethodCount);
+ACPI_GLOBAL (UINT32,                    AcpiGpeCount);
+ACPI_GLOBAL (UINT32,                    AcpiSciCount);
+ACPI_GLOBAL (UINT32,                    AcpiFixedEventCount[ACPI_NUM_FIXED_EVENTS]);
 
 /* Support for dynamic control method tracing mechanism */
 
-ACPI_EXTERN UINT32                      AcpiGbl_OriginalDbgLevel;
-ACPI_EXTERN UINT32                      AcpiGbl_OriginalDbgLayer;
-ACPI_EXTERN UINT32                      AcpiGbl_TraceDbgLevel;
-ACPI_EXTERN UINT32                      AcpiGbl_TraceDbgLayer;
+ACPI_GLOBAL (UINT32,                    AcpiGbl_OriginalDbgLevel);
+ACPI_GLOBAL (UINT32,                    AcpiGbl_OriginalDbgLayer);
 
 
 /*****************************************************************************
  *
- * Debugger globals
+ * Debugger and Disassembler globals
  *
  ****************************************************************************/
 
-ACPI_EXTERN UINT8                       AcpiGbl_DbOutputFlags;
+ACPI_INIT_GLOBAL (UINT8,                AcpiGbl_DbOutputFlags, ACPI_DB_CONSOLE_OUTPUT);
 
 #ifdef ACPI_DISASSEMBLER
 
-ACPI_EXTERN BOOLEAN                     AcpiGbl_DbOpt_disasm;
-ACPI_EXTERN BOOLEAN                     AcpiGbl_DbOpt_verbose;
-ACPI_EXTERN ACPI_EXTERNAL_LIST         *AcpiGbl_ExternalList;
-ACPI_EXTERN ACPI_EXTERNAL_FILE         *AcpiGbl_ExternalFileList;
-#endif
+/* Do not disassemble buffers to resource descriptors */
 
+ACPI_INIT_GLOBAL (UINT8,                AcpiGbl_NoResourceDisassembly, FALSE);
+ACPI_INIT_GLOBAL (BOOLEAN,              AcpiGbl_IgnoreNoopOperator, FALSE);
+ACPI_INIT_GLOBAL (BOOLEAN,              AcpiGbl_CstyleDisassembly, TRUE);
+ACPI_INIT_GLOBAL (BOOLEAN,              AcpiGbl_ForceAmlDisassembly, FALSE);
+ACPI_INIT_GLOBAL (BOOLEAN,              AcpiGbl_DmOpt_Verbose, TRUE);
+ACPI_INIT_GLOBAL (BOOLEAN,              AcpiGbl_DmEmitExternalOpcodes, FALSE);
+
+ACPI_GLOBAL (BOOLEAN,                   AcpiGbl_DmOpt_Disasm);
+ACPI_GLOBAL (BOOLEAN,                   AcpiGbl_DmOpt_Listing);
+ACPI_GLOBAL (BOOLEAN,                   AcpiGbl_NumExternalMethods);
+ACPI_GLOBAL (UINT32,                    AcpiGbl_ResolvedExternalMethods);
+ACPI_GLOBAL (ACPI_EXTERNAL_LIST *,      AcpiGbl_ExternalList);
+ACPI_GLOBAL (ACPI_EXTERNAL_FILE *,      AcpiGbl_ExternalFileList);
+#endif
 
 #ifdef ACPI_DEBUGGER
 
-extern      BOOLEAN                     AcpiGbl_MethodExecuting;
-extern      BOOLEAN                     AcpiGbl_AbortMethod;
-extern      BOOLEAN                     AcpiGbl_DbTerminateThreads;
+ACPI_INIT_GLOBAL (BOOLEAN,              AcpiGbl_AbortMethod, FALSE);
+ACPI_INIT_GLOBAL (BOOLEAN,              AcpiGbl_MethodExecuting, FALSE);
+ACPI_INIT_GLOBAL (ACPI_THREAD_ID,       AcpiGbl_DbThreadId, ACPI_INVALID_THREAD_ID);
 
-ACPI_EXTERN BOOLEAN                     AcpiGbl_DbOpt_tables;
-ACPI_EXTERN BOOLEAN                     AcpiGbl_DbOpt_stats;
-ACPI_EXTERN BOOLEAN                     AcpiGbl_DbOpt_ini_methods;
-ACPI_EXTERN BOOLEAN                     AcpiGbl_DbOpt_NoRegionSupport;
+ACPI_GLOBAL (BOOLEAN,                   AcpiGbl_DbOpt_NoIniMethods);
+ACPI_GLOBAL (BOOLEAN,                   AcpiGbl_DbOpt_NoRegionSupport);
+ACPI_GLOBAL (BOOLEAN,                   AcpiGbl_DbOutputToFile);
+ACPI_GLOBAL (char *,                    AcpiGbl_DbBuffer);
+ACPI_GLOBAL (char *,                    AcpiGbl_DbFilename);
+ACPI_GLOBAL (UINT32,                    AcpiGbl_DbDebugLevel);
+ACPI_GLOBAL (UINT32,                    AcpiGbl_DbConsoleDebugLevel);
+ACPI_GLOBAL (ACPI_NAMESPACE_NODE *,     AcpiGbl_DbScopeNode);
+ACPI_GLOBAL (BOOLEAN,                   AcpiGbl_DbTerminateLoop);
+ACPI_GLOBAL (BOOLEAN,                   AcpiGbl_DbThreadsTerminated);
 
-ACPI_EXTERN char                       *AcpiGbl_DbArgs[ACPI_DEBUGGER_MAX_ARGS];
-ACPI_EXTERN ACPI_OBJECT_TYPE            AcpiGbl_DbArgTypes[ACPI_DEBUGGER_MAX_ARGS];
-ACPI_EXTERN char                        AcpiGbl_DbLineBuf[ACPI_DB_LINE_BUFFER_SIZE];
-ACPI_EXTERN char                        AcpiGbl_DbParsedBuf[ACPI_DB_LINE_BUFFER_SIZE];
-ACPI_EXTERN char                        AcpiGbl_DbScopeBuf[80];
-ACPI_EXTERN char                        AcpiGbl_DbDebugFilename[80];
-ACPI_EXTERN BOOLEAN                     AcpiGbl_DbOutputToFile;
-ACPI_EXTERN char                       *AcpiGbl_DbBuffer;
-ACPI_EXTERN char                       *AcpiGbl_DbFilename;
-ACPI_EXTERN UINT32                      AcpiGbl_DbDebugLevel;
-ACPI_EXTERN UINT32                      AcpiGbl_DbConsoleDebugLevel;
-ACPI_EXTERN ACPI_NAMESPACE_NODE        *AcpiGbl_DbScopeNode;
+ACPI_GLOBAL (char *,                    AcpiGbl_DbArgs[ACPI_DEBUGGER_MAX_ARGS]);
+ACPI_GLOBAL (ACPI_OBJECT_TYPE,          AcpiGbl_DbArgTypes[ACPI_DEBUGGER_MAX_ARGS]);
+
+/* These buffers should all be the same size */
+
+ACPI_GLOBAL (char,                      AcpiGbl_DbLineBuf[ACPI_DB_LINE_BUFFER_SIZE]);
+ACPI_GLOBAL (char,                      AcpiGbl_DbParsedBuf[ACPI_DB_LINE_BUFFER_SIZE]);
+ACPI_GLOBAL (char,                      AcpiGbl_DbScopeBuf[ACPI_DB_LINE_BUFFER_SIZE]);
+ACPI_GLOBAL (char,                      AcpiGbl_DbDebugFilename[ACPI_DB_LINE_BUFFER_SIZE]);
 
 /*
  * Statistic globals
  */
-ACPI_EXTERN UINT16                      AcpiGbl_ObjTypeCount[ACPI_TYPE_NS_NODE_MAX+1];
-ACPI_EXTERN UINT16                      AcpiGbl_NodeTypeCount[ACPI_TYPE_NS_NODE_MAX+1];
-ACPI_EXTERN UINT16                      AcpiGbl_ObjTypeCountMisc;
-ACPI_EXTERN UINT16                      AcpiGbl_NodeTypeCountMisc;
-ACPI_EXTERN UINT32                      AcpiGbl_NumNodes;
-ACPI_EXTERN UINT32                      AcpiGbl_NumObjects;
+ACPI_GLOBAL (UINT16,                    AcpiGbl_ObjTypeCount[ACPI_TOTAL_TYPES]);
+ACPI_GLOBAL (UINT16,                    AcpiGbl_NodeTypeCount[ACPI_TOTAL_TYPES]);
+ACPI_GLOBAL (UINT16,                    AcpiGbl_ObjTypeCountMisc);
+ACPI_GLOBAL (UINT16,                    AcpiGbl_NodeTypeCountMisc);
+ACPI_GLOBAL (UINT32,                    AcpiGbl_NumNodes);
+ACPI_GLOBAL (UINT32,                    AcpiGbl_NumObjects);
 
-
-ACPI_EXTERN UINT32                      AcpiGbl_SizeOfParseTree;
-ACPI_EXTERN UINT32                      AcpiGbl_SizeOfMethodTrees;
-ACPI_EXTERN UINT32                      AcpiGbl_SizeOfNodeEntries;
-ACPI_EXTERN UINT32                      AcpiGbl_SizeOfAcpiObjects;
+ACPI_GLOBAL (ACPI_MUTEX,                AcpiGbl_DbCommandReady);
+ACPI_GLOBAL (ACPI_MUTEX,                AcpiGbl_DbCommandComplete);
 
 #endif /* ACPI_DEBUGGER */
+
+#if defined (ACPI_DISASSEMBLER) || defined (ACPI_ASL_COMPILER)
+
+ACPI_GLOBAL (const char,                *AcpiGbl_PldPanelList[]);
+ACPI_GLOBAL (const char,                *AcpiGbl_PldVerticalPositionList[]);
+ACPI_GLOBAL (const char,                *AcpiGbl_PldHorizontalPositionList[]);
+ACPI_GLOBAL (const char,                *AcpiGbl_PldShapeList[]);
+
+#endif
+
+/*****************************************************************************
+ *
+ * Application globals
+ *
+ ****************************************************************************/
+
+#ifdef ACPI_APPLICATION
+
+ACPI_INIT_GLOBAL (ACPI_FILE,            AcpiGbl_DebugFile, NULL);
+ACPI_INIT_GLOBAL (ACPI_FILE,            AcpiGbl_OutputFile, NULL);
+
+/* Print buffer */
+
+ACPI_GLOBAL (ACPI_SPINLOCK,             AcpiGbl_PrintLock);     /* For print buffer */
+ACPI_GLOBAL (char,                      AcpiGbl_PrintBuffer[1024]);
+
+#endif /* ACPI_APPLICATION */
+
+
+/*****************************************************************************
+ *
+ * Info/help support
+ *
+ ****************************************************************************/
+
+extern const AH_PREDEFINED_NAME         AslPredefinedInfo[];
+extern const AH_DEVICE_ID               AslDeviceIds[];
+
 
 #endif /* __ACGLOBAL_H__ */

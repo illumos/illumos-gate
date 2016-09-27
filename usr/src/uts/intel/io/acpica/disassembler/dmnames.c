@@ -5,7 +5,7 @@
  ******************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2011, Intel Corp.
+ * Copyright (C) 2000 - 2016, Intel Corp.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -41,16 +41,12 @@
  * POSSIBILITY OF SUCH DAMAGES.
  */
 
-
 #include "acpi.h"
 #include "accommon.h"
-#include "acparser.h"
 #include "amlcode.h"
 #include "acnamesp.h"
 #include "acdisasm.h"
 
-
-#ifdef ACPI_DISASSEMBLER
 
 #define _COMPONENT          ACPI_CA_DEBUGGER
         ACPI_MODULE_NAME    ("dmnames")
@@ -128,7 +124,7 @@ AcpiDmDumpName (
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Diplay the pathname associated with a named object.  Two
+ * DESCRIPTION: Diplay the pathname associated with a named object. Two
  *              versions. One searches the parse tree (for parser-only
  *              applications suchas AcpiDump), and the other searches the
  *              ACPI namespace (the parse tree is probably deleted)
@@ -159,15 +155,15 @@ AcpiPsDisplayObjectPathname (
         /* Node not defined in this scope, look it up */
 
         Status = AcpiNsLookup (WalkState->ScopeInfo, Op->Common.Value.String,
-                    ACPI_TYPE_ANY, ACPI_IMODE_EXECUTE, ACPI_NS_SEARCH_PARENT,
-                    WalkState, &(Node));
+            ACPI_TYPE_ANY, ACPI_IMODE_EXECUTE, ACPI_NS_SEARCH_PARENT,
+            WalkState, &(Node));
 
         if (ACPI_FAILURE (Status))
         {
             /*
-             * We can't get the pathname since the object
-             * is not in the namespace.  This can happen during single
-             * stepping where a dynamic named object is *about* to be created.
+             * We can't get the pathname since the object is not in the
+             * namespace. This can happen during single stepping
+             * where a dynamic named object is *about* to be created.
              */
             AcpiOsPrintf ("  [Path not found]");
             goto Exit;
@@ -181,7 +177,7 @@ AcpiPsDisplayObjectPathname (
     /* Convert NamedDesc/handle to a full pathname */
 
     Buffer.Length = ACPI_ALLOCATE_LOCAL_BUFFER;
-    Status = AcpiNsHandleToPathname (Node, &Buffer);
+    Status = AcpiNsHandleToPathname (Node, &Buffer, FALSE);
     if (ACPI_FAILURE (Status))
     {
         AcpiOsPrintf ("****Could not get pathname****)");
@@ -226,7 +222,8 @@ AcpiDmNamestring (
 
     /* Handle all Scope Prefix operators */
 
-    while (AcpiPsIsPrefixChar (ACPI_GET8 (Name)))
+    while (ACPI_IS_ROOT_PREFIX (ACPI_GET8 (Name)) ||
+           ACPI_IS_PARENT_PREFIX (ACPI_GET8 (Name)))
     {
         /* Append prefix character */
 
@@ -237,20 +234,24 @@ AcpiDmNamestring (
     switch (ACPI_GET8 (Name))
     {
     case 0:
+
         SegCount = 0;
         break;
 
     case AML_DUAL_NAME_PREFIX:
+
         SegCount = 2;
         Name++;
         break;
 
     case AML_MULTI_NAME_PREFIX_OP:
+
         SegCount = (UINT32) ACPI_GET8 (Name + 1);
         Name += 2;
         break;
 
     default:
+
         SegCount = 1;
         break;
     }
@@ -268,6 +269,7 @@ AcpiDmNamestring (
 
             AcpiOsPrintf (".");
         }
+
         Name += ACPI_NAME_SIZE;
     }
 }
@@ -323,7 +325,7 @@ AcpiDmDisplayPath (
 
         if ((NamePath) &&
             (NamePath->Common.Value.String) &&
-            (NamePath->Common.Value.String[0] == '\\'))
+            (ACPI_IS_ROOT_PREFIX (NamePath->Common.Value.String[0])))
         {
             AcpiDmNamestring (NamePath->Common.Value.String);
             return;
@@ -331,7 +333,6 @@ AcpiDmDisplayPath (
     }
 
     Prev = NULL;            /* Start with Root Node */
-
     while (Prev != Op)
     {
         /* Search upwards in the tree to find scope with "prev" as its parent */
@@ -389,6 +390,7 @@ AcpiDmDisplayPath (
                 DoDot = TRUE;
             }
         }
+
         Prev = Search;
     }
 }
@@ -411,6 +413,8 @@ AcpiDmValidateName (
     char                    *Name,
     ACPI_PARSE_OBJECT       *Op)
 {
+    ACPI_PARSE_OBJECT       *TargetOp;
+
 
     if ((!Name) ||
         (!Op->Common.Parent))
@@ -424,9 +428,6 @@ AcpiDmValidateName (
             " /**** Name not found or not accessible from this scope ****/ ");
     }
 
-    ACPI_PARSE_OBJECT       *TargetOp;
-
-
     if ((!Name) ||
         (!Op->Common.Parent))
     {
@@ -437,9 +438,9 @@ AcpiDmValidateName (
     if (!TargetOp)
     {
         /*
-         * Didn't find the name in the parse tree.  This may be
+         * Didn't find the name in the parse tree. This may be
          * a problem, or it may simply be one of the predefined names
-         * (such as _OS_).  Rather than worry about looking up all
+         * (such as _OS_). Rather than worry about looking up all
          * the predefined names, just display the name as given
          */
         AcpiOsPrintf (
@@ -447,7 +448,3 @@ AcpiDmValidateName (
     }
 }
 #endif
-
-#endif
-
-

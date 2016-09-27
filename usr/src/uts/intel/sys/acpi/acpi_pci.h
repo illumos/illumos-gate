@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #ifndef	_ACPI_PCI_H
@@ -32,13 +33,10 @@ extern "C" {
 
 /*
  * Memory mapped configuration space address description table documented
- * in ACPI 3.0.  These definitions are currently not included in the
- * actbl.h from Intel.  This file will need to be removed once Intel has
- * updated their include file with these information.
+ * in ACPI 3.0.  These definitions are currently not the same as in the
+ * actbl2.h from Intel.  This file might be removed if the code can be ported
+ * to use the definition provided by Intel.
  */
-#define	MCFG_SIG	"MCFG"		/* Memory mapped config space address */
-					/* description table's signature */
-
 #pragma pack(1)
 
 typedef struct cfg_base_addr_alloc {

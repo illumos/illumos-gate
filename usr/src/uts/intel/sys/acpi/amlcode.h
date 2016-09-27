@@ -7,7 +7,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2011, Intel Corp.
+ * Copyright (C) 2000 - 2016, Intel Corp.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -65,6 +65,7 @@
 #define AML_PACKAGE_OP              (UINT16) 0x12
 #define AML_VAR_PACKAGE_OP          (UINT16) 0x13     /* ACPI 2.0 */
 #define AML_METHOD_OP               (UINT16) 0x14
+#define AML_EXTERNAL_OP             (UINT16) 0x15     /* ACPI 6.0 */
 #define AML_DUAL_NAME_PREFIX        (UINT16) 0x2e
 #define AML_MULTI_NAME_PREFIX_OP    (UINT16) 0x2f
 #define AML_NAME_CHAR_SUBSEQ        (UINT16) 0x30
@@ -119,7 +120,7 @@
 #define AML_CREATE_WORD_FIELD_OP    (UINT16) 0x8b
 #define AML_CREATE_BYTE_FIELD_OP    (UINT16) 0x8c
 #define AML_CREATE_BIT_FIELD_OP     (UINT16) 0x8d
-#define AML_TYPE_OP                 (UINT16) 0x8e
+#define AML_OBJECT_TYPE_OP          (UINT16) 0x8e
 #define AML_CREATE_QWORD_FIELD_OP   (UINT16) 0x8f     /* ACPI 2.0 */
 #define AML_LAND_OP                 (UINT16) 0x90
 #define AML_LOR_OP                  (UINT16) 0x91
@@ -191,6 +192,15 @@
 
 
 /*
+ * Opcodes for "Field" operators
+ */
+#define AML_FIELD_OFFSET_OP         (UINT8) 0x00
+#define AML_FIELD_ACCESS_OP         (UINT8) 0x01
+#define AML_FIELD_CONNECTION_OP     (UINT8) 0x02        /* ACPI 5.0 */
+#define AML_FIELD_EXT_ACCESS_OP     (UINT8) 0x03        /* ACPI 5.0 */
+
+
+/*
  * Internal opcodes
  * Use only "Unknown" AML opcodes, don't attempt to use
  * any valid ACPI ASCII values (A-Z, 0-9, '-')
@@ -200,11 +210,11 @@
 #define AML_INT_RESERVEDFIELD_OP    (UINT16) 0x0031
 #define AML_INT_ACCESSFIELD_OP      (UINT16) 0x0032
 #define AML_INT_BYTELIST_OP         (UINT16) 0x0033
-#define AML_INT_STATICSTRING_OP     (UINT16) 0x0034
 #define AML_INT_METHODCALL_OP       (UINT16) 0x0035
 #define AML_INT_RETURN_VALUE_OP     (UINT16) 0x0036
 #define AML_INT_EVAL_SUBTREE_OP     (UINT16) 0x0037
-
+#define AML_INT_CONNECTION_OP       (UINT16) 0x0038
+#define AML_INT_EXTACCESSFIELD_OP   (UINT16) 0x0039
 
 #define ARG_NONE                    0x0
 
@@ -231,7 +241,8 @@
 #define ARGP_TERMLIST               0x0F
 #define ARGP_WORDDATA               0x10
 #define ARGP_QWORDDATA              0x11
-#define ARGP_SIMPLENAME             0x12
+#define ARGP_SIMPLENAME             0x12 /* NameString | LocalTerm | ArgTerm */
+#define ARGP_NAME_OR_REF            0x13 /* For ObjectType only */
 
 /*
  * Resolved argument types for the AML Interpreter
@@ -270,14 +281,15 @@
 #define ARGI_TARGETREF              0x0F    /* Target, subject to implicit conversion */
 #define ARGI_FIXED_TARGET           0x10    /* Target, no implicit conversion */
 #define ARGI_SIMPLE_TARGET          0x11    /* Name, Local, Arg -- no implicit conversion */
+#define ARGI_STORE_TARGET           0x12    /* Target for store is TARGETREF + package objects */
 
 /* Multiple/complex types */
 
-#define ARGI_DATAOBJECT             0x12    /* Buffer, String, package or reference to a Node - Used only by SizeOf operator*/
-#define ARGI_COMPLEXOBJ             0x13    /* Buffer, String, or package (Used by INDEX op only) */
-#define ARGI_REF_OR_STRING          0x14    /* Reference or String (Used by DEREFOF op only) */
-#define ARGI_REGION_OR_BUFFER       0x15    /* Used by LOAD op only */
-#define ARGI_DATAREFOBJ             0x16
+#define ARGI_DATAOBJECT             0x13    /* Buffer, String, package or reference to a Node - Used only by SizeOf operator*/
+#define ARGI_COMPLEXOBJ             0x14    /* Buffer, String, or package (Used by INDEX op only) */
+#define ARGI_REF_OR_STRING          0x15    /* Reference or String (Used by DEREFOF op only) */
+#define ARGI_REGION_OR_BUFFER       0x16    /* Used by LOAD op only */
+#define ARGI_DATAREFOBJ             0x17
 
 /* Note: types above can expand to 0x1F maximum */
 
@@ -478,13 +490,16 @@ typedef enum
  */
 typedef enum
 {
-    AML_FIELD_ATTRIB_SMB_QUICK      = 0x02,
-    AML_FIELD_ATTRIB_SMB_SEND_RCV   = 0x04,
-    AML_FIELD_ATTRIB_SMB_BYTE       = 0x06,
-    AML_FIELD_ATTRIB_SMB_WORD       = 0x08,
-    AML_FIELD_ATTRIB_SMB_BLOCK      = 0x0A,
-    AML_FIELD_ATTRIB_SMB_WORD_CALL  = 0x0C,
-    AML_FIELD_ATTRIB_SMB_BLOCK_CALL = 0x0D
+    AML_FIELD_ATTRIB_QUICK          = 0x02,
+    AML_FIELD_ATTRIB_SEND_RCV       = 0x04,
+    AML_FIELD_ATTRIB_BYTE           = 0x06,
+    AML_FIELD_ATTRIB_WORD           = 0x08,
+    AML_FIELD_ATTRIB_BLOCK          = 0x0A,
+    AML_FIELD_ATTRIB_MULTIBYTE      = 0x0B,
+    AML_FIELD_ATTRIB_WORD_CALL      = 0x0C,
+    AML_FIELD_ATTRIB_BLOCK_CALL     = 0x0D,
+    AML_FIELD_ATTRIB_RAW_BYTES      = 0x0E,
+    AML_FIELD_ATTRIB_RAW_PROCESS    = 0x0F
 
 } AML_ACCESS_ATTRIBUTE;
 

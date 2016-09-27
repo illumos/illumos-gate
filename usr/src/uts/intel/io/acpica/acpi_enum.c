@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2016, Joyent, Inc.
  * Copyright (c) 2012 Gary Mills
  *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
@@ -135,7 +136,7 @@ parse_resources_irq(ACPI_RESOURCE *resource_ptr, int *interrupt_count)
 		    resource_ptr->Data.Irq.Interrupts[i];
 		used_interrupts |= 1 << resource_ptr->Data.Irq.Interrupts[i];
 		if (acpi_enum_debug & PARSE_RES_IRQ) {
-			cmn_err(CE_NOTE, "parse_resources() "\
+			cmn_err(CE_NOTE, "!parse_resources() "\
 			    "IRQ num %u, intr # = %u",
 			    i, resource_ptr->Data.Irq.Interrupts[i]);
 		}
@@ -151,7 +152,7 @@ parse_resources_dma(ACPI_RESOURCE *resource_ptr, int *dma_count)
 		dma[(*dma_count)++] = resource_ptr->Data.Dma.Channels[i];
 		used_dmas |= 1 << resource_ptr->Data.Dma.Channels[i];
 		if (acpi_enum_debug & PARSE_RES_DMA) {
-			cmn_err(CE_NOTE, "parse_resources() "\
+			cmn_err(CE_NOTE, "!parse_resources() "\
 			    "DMA num %u, channel # = %u",
 			    i, resource_ptr->Data.Dma.Channels[i]);
 		}
@@ -171,7 +172,7 @@ parse_resources_io(ACPI_RESOURCE *resource_ptr, struct regspec *io,
 	io[*io_count].regspec_size = acpi_io.AddressLength;
 	io[*io_count].regspec_addr = acpi_io.Minimum;
 	if (acpi_enum_debug & PARSE_RES_IO) {
-		cmn_err(CE_NOTE, "parse_resources() "\
+		cmn_err(CE_NOTE, "!parse_resources() "\
 		    "IO min 0x%X, max 0x%X, length: 0x%X",
 		    acpi_io.Minimum,
 		    acpi_io.Maximum,
@@ -193,7 +194,7 @@ parse_resources_fixed_io(ACPI_RESOURCE *resource_ptr, struct regspec *io,
 	io[*io_count].regspec_addr = fixed_io.Address;
 	io[*io_count].regspec_size = fixed_io.AddressLength;
 	if (acpi_enum_debug & PARSE_RES_IO) {
-		cmn_err(CE_NOTE, "parse_resources() "\
+		cmn_err(CE_NOTE, "!parse_resources() "\
 		    "Fixed IO 0x%X, length: 0x%X",
 		    fixed_io.Address, fixed_io.AddressLength);
 	}
@@ -214,7 +215,7 @@ parse_resources_fixed_mem32(ACPI_RESOURCE *resource_ptr, struct regspec *io,
 	io[*io_count].regspec_addr = fixed_mem32.Address;
 	io[*io_count].regspec_size = fixed_mem32.AddressLength;
 	if (acpi_enum_debug & PARSE_RES_MEMORY) {
-		cmn_err(CE_NOTE, "parse_resources() "\
+		cmn_err(CE_NOTE, "!parse_resources() "\
 		    "Fixed Mem 32 %ul, length: %ul",
 		    fixed_mem32.Address, fixed_mem32.AddressLength);
 	}
@@ -237,16 +238,16 @@ parse_resources_mem32(ACPI_RESOURCE *resource_ptr, struct regspec *io,
 		io[*io_count].regspec_size = mem32.AddressLength;
 		(*io_count)++;
 		if (acpi_enum_debug & PARSE_RES_MEMORY) {
-			cmn_err(CE_NOTE, "parse_resources() "\
+			cmn_err(CE_NOTE, "!parse_resources() "\
 			    "Mem 32 0x%X, length: 0x%X",
 			    mem32.Minimum, mem32.AddressLength);
 		}
 		return;
 	}
 	if (acpi_enum_debug & PARSE_RES_MEMORY) {
-		cmn_err(CE_NOTE, "parse_resources() "\
+		cmn_err(CE_NOTE, "!parse_resources() "\
 		    "MEM32 Min Max not equal!");
-		cmn_err(CE_NOTE, "parse_resources() "\
+		cmn_err(CE_NOTE, "!parse_resources() "\
 		    "Mem 32 Minimum 0x%X, Maximum: 0x%X",
 		    mem32.Minimum, mem32.Maximum);
 	}
@@ -259,22 +260,22 @@ parse_resources_addr16(ACPI_RESOURCE *resource_ptr, struct regspec *io,
 	ACPI_RESOURCE_ADDRESS16 addr16 =
 	    resource_ptr->Data.Address16;
 
-	if (addr16.AddressLength == 0)
+	if (addr16.Address.AddressLength == 0)
 		return;
 
 	if (acpi_enum_debug & PARSE_RES_ADDRESS) {
 		if (addr16.ResourceType == ACPI_MEMORY_RANGE) {
-			cmn_err(CE_NOTE, "parse_resources() "\
+			cmn_err(CE_NOTE, "!parse_resources() "\
 			    "ADDRESS 16 MEMORY RANGE");
 		} else
 		if (addr16.ResourceType == ACPI_IO_RANGE) {
-			cmn_err(CE_NOTE, "parse_resources() "\
+			cmn_err(CE_NOTE, "!parse_resources() "\
 			    "ADDRESS 16 IO RANGE");
 		} else {
-			cmn_err(CE_NOTE, "parse_resources() "\
+			cmn_err(CE_NOTE, "!parse_resources() "\
 			    "ADDRESS 16 OTHER");
 		}
-		cmn_err(CE_NOTE, "parse_resources() "\
+		cmn_err(CE_NOTE, "!parse_resources() "\
 		    "%s "\
 		    "MinAddressFixed 0x%X, "\
 		    "MaxAddressFixed 0x%X, "\
@@ -285,16 +286,16 @@ parse_resources_addr16(ACPI_RESOURCE *resource_ptr, struct regspec *io,
 		    "CONSUMER" : "PRODUCER",
 		    addr16.MinAddressFixed,
 		    addr16.MaxAddressFixed,
-		    addr16.Minimum,
-		    addr16.Maximum,
-		    addr16.AddressLength);
+		    addr16.Address.Minimum,
+		    addr16.Address.Maximum,
+		    addr16.Address.AddressLength);
 	}
 	if (addr16.ProducerConsumer == ACPI_PRODUCER ||
 	    (addr16.ResourceType != ACPI_MEMORY_RANGE &&
 	    addr16.ResourceType != ACPI_IO_RANGE)) {
 		return;
 	}
-	if (addr16.AddressLength > 0) {
+	if (addr16.Address.AddressLength > 0) {
 		if (addr16.ResourceType == ACPI_MEMORY_RANGE) {
 			/* memory */
 			io[*io_count].regspec_bustype = 0;
@@ -302,8 +303,8 @@ parse_resources_addr16(ACPI_RESOURCE *resource_ptr, struct regspec *io,
 			/* io */
 			io[*io_count].regspec_bustype = 1;
 		}
-		io[*io_count].regspec_addr = addr16.Minimum;
-		io[*io_count].regspec_size = addr16.AddressLength;
+		io[*io_count].regspec_addr = addr16.Address.Minimum;
+		io[*io_count].regspec_size = addr16.Address.AddressLength;
 		(*io_count)++;
 	}
 }
@@ -315,22 +316,22 @@ parse_resources_addr32(ACPI_RESOURCE *resource_ptr, struct regspec *io,
 	ACPI_RESOURCE_ADDRESS32 addr32 =
 	    resource_ptr->Data.Address32;
 
-	if (addr32.AddressLength == 0)
+	if (addr32.Address.AddressLength == 0)
 		return;
 
 	if (acpi_enum_debug & PARSE_RES_ADDRESS) {
 		if (addr32.ResourceType == ACPI_MEMORY_RANGE) {
-			cmn_err(CE_NOTE, "parse_resources() "\
+			cmn_err(CE_NOTE, "!parse_resources() "\
 			    "ADDRESS 32 MEMORY RANGE");
 		} else
 		if (addr32.ResourceType == ACPI_IO_RANGE) {
-			cmn_err(CE_NOTE, "parse_resources() "\
+			cmn_err(CE_NOTE, "!parse_resources() "\
 			    "ADDRESS 32 IO RANGE");
 		} else {
-			cmn_err(CE_NOTE, "parse_resources() "\
+			cmn_err(CE_NOTE, "!parse_resources() "\
 			    "ADDRESS 32 OTHER");
 		}
-		cmn_err(CE_NOTE, "parse_resources() "\
+		cmn_err(CE_NOTE, "!parse_resources() "\
 		    "%s "\
 		    "MinAddressFixed 0x%X, "\
 		    "MaxAddressFixed 0x%X, "\
@@ -341,16 +342,16 @@ parse_resources_addr32(ACPI_RESOURCE *resource_ptr, struct regspec *io,
 		    "CONSUMER" : "PRODUCER",
 		    addr32.MinAddressFixed,
 		    addr32.MaxAddressFixed,
-		    addr32.Minimum,
-		    addr32.Maximum,
-		    addr32.AddressLength);
+		    addr32.Address.Minimum,
+		    addr32.Address.Maximum,
+		    addr32.Address.AddressLength);
 	}
 	if (addr32.ProducerConsumer == ACPI_PRODUCER ||
 	    (addr32.ResourceType != ACPI_MEMORY_RANGE &&
 	    addr32.ResourceType != ACPI_IO_RANGE)) {
 		return;
 	}
-	if (addr32.AddressLength > 0) {
+	if (addr32.Address.AddressLength > 0) {
 		if (addr32.ResourceType == ACPI_MEMORY_RANGE) {
 			/* memory */
 			io[*io_count].regspec_bustype = 0;
@@ -358,8 +359,8 @@ parse_resources_addr32(ACPI_RESOURCE *resource_ptr, struct regspec *io,
 			/* io */
 			io[*io_count].regspec_bustype = 1;
 		}
-		io[*io_count].regspec_addr = addr32.Minimum;
-		io[*io_count].regspec_size = addr32.AddressLength;
+		io[*io_count].regspec_addr = addr32.Address.Minimum;
+		io[*io_count].regspec_size = addr32.Address.AddressLength;
 		(*io_count)++;
 	}
 }
@@ -371,23 +372,23 @@ parse_resources_addr64(ACPI_RESOURCE *resource_ptr, struct regspec *io,
 	ACPI_RESOURCE_ADDRESS64 addr64 =
 	    resource_ptr->Data.Address64;
 
-	if (addr64.AddressLength == 0)
+	if (addr64.Address.AddressLength == 0)
 		return;
 
 	if (acpi_enum_debug & PARSE_RES_ADDRESS) {
 		if (addr64.ResourceType == ACPI_MEMORY_RANGE) {
-			cmn_err(CE_NOTE, "parse_resources() "\
+			cmn_err(CE_NOTE, "!parse_resources() "\
 			    "ADDRESS 64 MEMORY RANGE");
 		} else
 		if (addr64.ResourceType == ACPI_IO_RANGE) {
-			cmn_err(CE_NOTE, "parse_resources() "\
+			cmn_err(CE_NOTE, "!parse_resources() "\
 			    "ADDRESS 64 IO RANGE");
 		} else {
-			cmn_err(CE_NOTE, "parse_resources() "\
+			cmn_err(CE_NOTE, "!parse_resources() "\
 			    "ADDRESS 64 OTHER");
 		}
 #ifdef _LP64
-		cmn_err(CE_NOTE, "parse_resources() "\
+		cmn_err(CE_NOTE, "!parse_resources() "\
 		    "%s "\
 		    "MinAddressFixed 0x%X, "\
 		    "MaxAddressFixed 0x%X, "\
@@ -398,11 +399,11 @@ parse_resources_addr64(ACPI_RESOURCE *resource_ptr, struct regspec *io,
 		    "CONSUMER" : "PRODUCER",
 		    addr64.MinAddressFixed,
 		    addr64.MaxAddressFixed,
-		    addr64.Minimum,
-		    addr64.Maximum,
-		    addr64.AddressLength);
+		    addr64.Address.Minimum,
+		    addr64.Address.Maximum,
+		    addr64.Address.AddressLength);
 #else
-		cmn_err(CE_NOTE, "parse_resources() "\
+		cmn_err(CE_NOTE, "!parse_resources() "\
 		    "%s "\
 		    "MinAddressFixed 0x%X, "\
 		    "MaxAddressFixed 0x%X, "\
@@ -413,9 +414,9 @@ parse_resources_addr64(ACPI_RESOURCE *resource_ptr, struct regspec *io,
 		    "CONSUMER" : "PRODUCER",
 		    addr64.MinAddressFixed,
 		    addr64.MaxAddressFixed,
-		    addr64.Minimum,
-		    addr64.Maximum,
-		    addr64.AddressLength);
+		    addr64.Address.Minimum,
+		    addr64.Address.Maximum,
+		    addr64.Address.AddressLength);
 #endif
 	}
 	if (addr64.ProducerConsumer == ACPI_PRODUCER ||
@@ -423,7 +424,7 @@ parse_resources_addr64(ACPI_RESOURCE *resource_ptr, struct regspec *io,
 	    addr64.ResourceType != ACPI_IO_RANGE)) {
 		return;
 	}
-	if (addr64.AddressLength > 0) {
+	if (addr64.Address.AddressLength > 0) {
 		if (addr64.ResourceType == ACPI_MEMORY_RANGE) {
 			/* memory */
 			io[*io_count].regspec_bustype = 0;
@@ -431,8 +432,8 @@ parse_resources_addr64(ACPI_RESOURCE *resource_ptr, struct regspec *io,
 			/* io */
 			io[*io_count].regspec_bustype = 1;
 		}
-		io[*io_count].regspec_addr = addr64.Minimum;
-		io[*io_count].regspec_size = addr64.AddressLength;
+		io[*io_count].regspec_addr = addr64.Address.Minimum;
+		io[*io_count].regspec_size = addr64.Address.AddressLength;
 		(*io_count)++;
 	}
 }
@@ -699,7 +700,7 @@ process_cids(ACPI_OBJECT *rv, device_id_t **dd)
 			break;
 		default:
 			if (acpi_enum_debug & PROCESS_CIDS) {
-				cmn_err(CE_NOTE, "unexpected CID type: %d",
+				cmn_err(CE_NOTE, "!unexpected CID type: %d",
 				    obj.Type);
 			}
 			break;
@@ -824,7 +825,7 @@ isa_acpi_callback(ACPI_HANDLE ObjHandle, uint32_t NestingLevel, void *a,
 		 */
 		if (!((info->CurrentStatus & 0x7) == 7)) {
 			if (acpi_enum_debug & DEVICES_NOT_ENUMED) {
-				cmn_err(CE_NOTE, "parse_resources() "
+				cmn_err(CE_NOTE, "!parse_resources() "
 				    "Bad status 0x%x for %s",
 				    info->CurrentStatus, path);
 			}
@@ -841,7 +842,7 @@ isa_acpi_callback(ACPI_HANDLE ObjHandle, uint32_t NestingLevel, void *a,
 	if (!(info->Valid & ACPI_VALID_HID)) {
 		/* No _HID, we skip this node */
 		if (acpi_enum_debug & DEVICES_NOT_ENUMED) {
-			cmn_err(CE_NOTE, "parse_resources() "
+			cmn_err(CE_NOTE, "!parse_resources() "
 			    "No _HID for %s", path);
 		}
 		goto done;
@@ -1064,7 +1065,7 @@ acpi_isa_device_enum(dev_info_t *isa_dip)
 	}
 
 	if (acpi_enum_debug & ISA_DEVICE_ENUM) {
-		cmn_err(CE_NOTE, "acpi_isa_device_enum() called");
+		cmn_err(CE_NOTE, "!acpi_isa_device_enum() called");
 	}
 
 	if (acpica_init() != AE_OK) {

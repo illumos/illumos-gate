@@ -1,4 +1,3 @@
-
 /******************************************************************************
  *
  * Module Name: exsystem - Interface to OS services
@@ -6,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2011, Intel Corp.
+ * Copyright (C) 2000 - 2016, Intel Corp.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -42,8 +41,6 @@
  * POSSIBILITY OF SUCH DAMAGES.
  */
 
-#define __EXSYSTEM_C__
-
 #include "acpi.h"
 #include "accommon.h"
 #include "acinterp.h"
@@ -62,7 +59,7 @@
  * RETURN:      Status
  *
  * DESCRIPTION: Implements a semaphore wait with a check to see if the
- *              semaphore is available immediately.  If it is not, the
+ *              semaphore is available immediately. If it is not, the
  *              interpreter is released before waiting.
  *
  ******************************************************************************/
@@ -88,8 +85,7 @@ AcpiExSystemWaitSemaphore (
     {
         /* We must wait, so unlock the interpreter */
 
-        AcpiExRelinquishInterpreter ();
-
+        AcpiExExitInterpreter ();
         Status = AcpiOsWaitSemaphore (Semaphore, 1, Timeout);
 
         ACPI_DEBUG_PRINT ((ACPI_DB_EXEC,
@@ -98,7 +94,7 @@ AcpiExSystemWaitSemaphore (
 
         /* Reacquire the interpreter */
 
-       AcpiExReacquireInterpreter ();
+        AcpiExEnterInterpreter ();
     }
 
     return_ACPI_STATUS (Status);
@@ -115,7 +111,7 @@ AcpiExSystemWaitSemaphore (
  * RETURN:      Status
  *
  * DESCRIPTION: Implements a mutex wait with a check to see if the
- *              mutex is available immediately.  If it is not, the
+ *              mutex is available immediately. If it is not, the
  *              interpreter is released before waiting.
  *
  ******************************************************************************/
@@ -141,8 +137,7 @@ AcpiExSystemWaitMutex (
     {
         /* We must wait, so unlock the interpreter */
 
-        AcpiExRelinquishInterpreter ();
-
+        AcpiExExitInterpreter ();
         Status = AcpiOsAcquireMutex (Mutex, Timeout);
 
         ACPI_DEBUG_PRINT ((ACPI_DB_EXEC,
@@ -151,7 +146,7 @@ AcpiExSystemWaitMutex (
 
         /* Reacquire the interpreter */
 
-        AcpiExReacquireInterpreter ();
+        AcpiExEnterInterpreter ();
     }
 
     return_ACPI_STATUS (Status);
@@ -170,7 +165,7 @@ AcpiExSystemWaitMutex (
  * DESCRIPTION: Suspend running thread for specified amount of time.
  *              Note: ACPI specification requires that Stall() does not
  *              relinquish the processor, and delays longer than 100 usec
- *              should use Sleep() instead.  We allow stalls up to 255 usec
+ *              should use Sleep() instead. We allow stalls up to 255 usec
  *              for compatibility with other interpreters and existing BIOSs.
  *
  ******************************************************************************/
@@ -193,8 +188,8 @@ AcpiExSystemDoStall (
          * (ACPI specifies 100 usec as max, but this gives some slack in
          * order to support existing BIOSs)
          */
-        ACPI_ERROR ((AE_INFO, "Time parameter is too large (%u)",
-            HowLong));
+        ACPI_ERROR ((AE_INFO,
+            "Time parameter is too large (%u)", HowLong));
         Status = AE_AML_OPERAND_VALUE;
     }
     else
@@ -228,7 +223,7 @@ AcpiExSystemDoSleep (
 
     /* Since this thread will sleep, we must release the interpreter */
 
-    AcpiExRelinquishInterpreter ();
+    AcpiExExitInterpreter ();
 
     /*
      * For compatibility with other ACPI implementations and to prevent
@@ -243,7 +238,7 @@ AcpiExSystemDoSleep (
 
     /* And now we must get the interpreter again */
 
-    AcpiExReacquireInterpreter ();
+    AcpiExEnterInterpreter ();
     return (AE_OK);
 }
 
@@ -290,7 +285,7 @@ AcpiExSystemSignalEvent (
  * RETURN:      Status
  *
  * DESCRIPTION: Provides an access point to perform synchronization operations
- *              within the AML.  This operation is a request to wait for an
+ *              within the AML. This operation is a request to wait for an
  *              event.
  *
  ******************************************************************************/
@@ -309,7 +304,7 @@ AcpiExSystemWaitEvent (
     if (ObjDesc)
     {
         Status = AcpiExSystemWaitSemaphore (ObjDesc->Event.OsSemaphore,
-                    (UINT16) TimeDesc->Integer.Value);
+            (UINT16) TimeDesc->Integer.Value);
     }
 
     return_ACPI_STATUS (Status);
@@ -352,4 +347,3 @@ AcpiExSystemResetEvent (
 
     return (Status);
 }
-

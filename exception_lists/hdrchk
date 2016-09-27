@@ -1,4 +1,8 @@
 usr/src/boot/*
+usr/src/cmd/acpi/acpidump/acpidump.h
+usr/src/cmd/acpi/acpixtract/acpixtract.h
+usr/src/cmd/acpi/acpixtract/axmain.h
+usr/src/cmd/acpi/acpixtract/axutils.h
 usr/src/cmd/cmd-inet/usr.bin/dns-sd/ClientCommon.h
 usr/src/cmd/cmd-inet/usr.lib/mdnsd/CryptoAlg.h
 usr/src/cmd/cmd-inet/usr.lib/mdnsd/DNSCommon.h

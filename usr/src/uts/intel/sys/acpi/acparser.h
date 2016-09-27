@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2011, Intel Corp.
+ * Copyright (C) 2000 - 2016, Intel Corp.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -41,7 +41,6 @@
  * POSSIBILITY OF SUCH DAMAGES.
  */
 
-
 #ifndef __ACPARSER_H__
 #define __ACPARSER_H__
 
@@ -72,6 +71,9 @@
  * Parser interfaces
  *
  *****************************************************************************/
+
+extern const UINT8      AcpiGbl_ShortOpIndex[];
+extern const UINT8      AcpiGbl_LongOpIndex[];
 
 
 /*
@@ -104,7 +106,12 @@ AcpiPsGetNextNamepath (
     ACPI_WALK_STATE         *WalkState,
     ACPI_PARSE_STATE        *ParserState,
     ACPI_PARSE_OBJECT       *Arg,
-    BOOLEAN                 MethodCall);
+    BOOLEAN                 PossibleMethodCall);
+
+/* Values for BOOLEAN above */
+
+#define ACPI_NOT_METHOD_CALL            FALSE
+#define ACPI_POSSIBLE_METHOD_CALL       TRUE
 
 ACPI_STATUS
 AcpiPsGetNextArg (
@@ -129,13 +136,42 @@ AcpiPsGetParent (
 
 
 /*
- * psopcode - AML Opcode information
+ * psobject - support for parse object processing
+ */
+ACPI_STATUS
+AcpiPsBuildNamedOp (
+    ACPI_WALK_STATE         *WalkState,
+    UINT8                   *AmlOpStart,
+    ACPI_PARSE_OBJECT       *UnnamedOp,
+    ACPI_PARSE_OBJECT       **Op);
+
+ACPI_STATUS
+AcpiPsCreateOp (
+    ACPI_WALK_STATE         *WalkState,
+    UINT8                   *AmlOpStart,
+    ACPI_PARSE_OBJECT       **NewOp);
+
+ACPI_STATUS
+AcpiPsCompleteOp (
+    ACPI_WALK_STATE         *WalkState,
+    ACPI_PARSE_OBJECT       **Op,
+    ACPI_STATUS             Status);
+
+ACPI_STATUS
+AcpiPsCompleteFinalOp (
+    ACPI_WALK_STATE         *WalkState,
+    ACPI_PARSE_OBJECT       *Op,
+    ACPI_STATUS             Status);
+
+
+/*
+ * psopinfo - AML Opcode information
  */
 const ACPI_OPCODE_INFO *
 AcpiPsGetOpcodeInfo (
     UINT16                  Opcode);
 
-char *
+const char *
 AcpiPsGetOpcodeName (
     UINT16                  Opcode);
 
@@ -275,7 +311,7 @@ AcpiPsDeleteParseTree (
  */
 ACPI_PARSE_OBJECT *
 AcpiPsCreateScopeOp (
-    void);
+    UINT8                   *Aml);
 
 void
 AcpiPsInitOp (
@@ -284,7 +320,8 @@ AcpiPsInitOp (
 
 ACPI_PARSE_OBJECT *
 AcpiPsAllocOp (
-    UINT16                  opcode);
+    UINT16                  Opcode,
+    UINT8                   *Aml);
 
 void
 AcpiPsFreeOp (
@@ -292,10 +329,6 @@ AcpiPsFreeOp (
 
 BOOLEAN
 AcpiPsIsLeadingChar (
-    UINT32                  c);
-
-BOOLEAN
-AcpiPsIsPrefixChar (
     UINT32                  c);
 
 UINT32

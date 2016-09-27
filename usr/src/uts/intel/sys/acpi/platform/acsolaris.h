@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2016 Joyent, Inc.
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -37,12 +38,21 @@ extern "C" {
 #include <sys/cpu.h>
 #include <sys/thread.h>
 
+#ifdef _KERNEL
+#include <sys/ctype.h>
+#else
+#include <ctype.h>
+#include <strings.h>
+#include <stdlib.h>
+#endif
+
 /* Function name used for debug output. */
 #define	ACPI_GET_FUNCTION_NAME	__func__
 
 uint32_t __acpi_acquire_global_lock(void *);
 uint32_t __acpi_release_global_lock(void *);
 void	 __acpi_wbinvd(void);
+uint32_t acpi_strtoul(const char *, char **, int);
 
 #ifdef	_ILP32
 #define	ACPI_MACHINE_WIDTH	32
@@ -75,6 +85,19 @@ void	 __acpi_wbinvd(void);
 #define	ACPI_EXTERNAL_XFACE
 #define	ACPI_INTERNAL_XFACE
 #define	ACPI_INTERNAL_VAR_XFACE
+
+#ifdef _KERNEL
+#define	strtoul(s, r, b)	acpi_strtoul(s, r, b)
+#define	toupper(x)		(islower(x) ? (x) - 'a' + 'A' : (x))
+#define	tolower(x)		(isupper(x) ? (x) - 'A' + 'a' : (x))
+
+/*
+ * The ACPI headers shipped from Intel defines a bunch of functions which are
+ * already provided by the kernel.  The variable below prevents those from
+ * being loaded as part of accommon.h.
+ */
+#define	ACPI_USE_SYSTEM_CLIBRARY
+#endif
 
 #define	ACPI_ASM_MACROS
 #define	BREAKPOINT3

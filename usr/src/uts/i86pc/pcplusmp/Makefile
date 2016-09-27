@@ -24,6 +24,8 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2016, Joyent, Inc.
+#
 
 #
 #	This makefile drives the production of the pcplusmp "mach"
@@ -64,6 +66,8 @@ $(NOT_RELEASE_BUILD)DEBUG_DEFS	+= $(DEBUG_FLGS)
 # Depends on ACPI CA interpreter
 #
 LDFLAGS		+= -dy -N misc/acpica
+
+CERRWARN	+= -_gcc=-Wno-unused-function
 
 #
 # For now, disable these lint checks; maintainers should endeavor

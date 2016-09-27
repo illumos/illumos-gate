@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2011, Intel Corp.
+ * Copyright (C) 2000 - 2016, Intel Corp.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -40,8 +40,6 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  */
-
-#define __EXDEBUG_C__
 
 #include "acpi.h"
 #include "accommon.h"
@@ -82,6 +80,9 @@ AcpiExDoDebugObject (
     UINT32                  Index)
 {
     UINT32                  i;
+    UINT32                  Timer;
+    ACPI_OPERAND_OBJECT     *ObjectDesc;
+    UINT32                  Value;
 
 
     ACPI_FUNCTION_TRACE_PTR (ExDoDebugObject, SourceDesc);
@@ -95,20 +96,52 @@ AcpiExDoDebugObject (
         return_VOID;
     }
 
+    /* Null string or newline -- don't emit the line header */
+
+    if (SourceDesc &&
+        (ACPI_GET_DESCRIPTOR_TYPE (SourceDesc) == ACPI_DESC_TYPE_OPERAND) &&
+        (SourceDesc->Common.Type == ACPI_TYPE_STRING))
+    {
+        if ((SourceDesc->String.Length == 0) ||
+                ((SourceDesc->String.Length == 1) &&
+                (*SourceDesc->String.Pointer == '\n')))
+        {
+            AcpiOsPrintf ("\n");
+            return_VOID;
+        }
+    }
+
     /*
      * Print line header as long as we are not in the middle of an
      * object display
      */
     if (!((Level > 0) && Index == 0))
     {
-        AcpiOsPrintf ("[ACPI Debug] %*s", Level, " ");
+        if (AcpiGbl_DisplayDebugTimer)
+        {
+            /*
+             * We will emit the current timer value (in microseconds) with each
+             * debug output. Only need the lower 26 bits. This allows for 67
+             * million microseconds or 67 seconds before rollover.
+             *
+             * Convert 100 nanosecond units to microseconds
+             */
+            Timer = ((UINT32) AcpiOsGetTimer () / 10);
+            Timer &= 0x03FFFFFF;
+
+            AcpiOsPrintf ("[ACPI Debug T=0x%8.8X] %*s", Timer, Level, " ");
+        }
+        else
+        {
+            AcpiOsPrintf ("[ACPI Debug] %*s", Level, " ");
+        }
     }
 
     /* Display the index for package output only */
 
     if (Index > 0)
     {
-       AcpiOsPrintf ("(%.2u) ", Index-1);
+       AcpiOsPrintf ("(%.2u) ", Index - 1);
     }
 
     if (!SourceDesc)
@@ -119,7 +152,13 @@ AcpiExDoDebugObject (
 
     if (ACPI_GET_DESCRIPTOR_TYPE (SourceDesc) == ACPI_DESC_TYPE_OPERAND)
     {
-        AcpiOsPrintf ("%s ", AcpiUtGetObjectTypeName (SourceDesc));
+        /* No object type prefix needed for integers and strings */
+
+        if ((SourceDesc->Common.Type != ACPI_TYPE_INTEGER) &&
+            (SourceDesc->Common.Type != ACPI_TYPE_STRING))
+        {
+            AcpiOsPrintf ("%s  ", AcpiUtGetObjectTypeName (SourceDesc));
+        }
 
         if (!AcpiUtValidInternalObject (SourceDesc))
         {
@@ -129,9 +168,9 @@ AcpiExDoDebugObject (
     }
     else if (ACPI_GET_DESCRIPTOR_TYPE (SourceDesc) == ACPI_DESC_TYPE_NAMED)
     {
-        AcpiOsPrintf ("%s: %p\n",
+        AcpiOsPrintf ("%s  (Node %p)\n",
             AcpiUtGetTypeName (((ACPI_NAMESPACE_NODE *) SourceDesc)->Type),
-            SourceDesc);
+                SourceDesc);
         return_VOID;
     }
     else
@@ -162,20 +201,19 @@ AcpiExDoDebugObject (
     case ACPI_TYPE_BUFFER:
 
         AcpiOsPrintf ("[0x%.2X]\n", (UINT32) SourceDesc->Buffer.Length);
-        AcpiUtDumpBuffer2 (SourceDesc->Buffer.Pointer,
+        AcpiUtDumpBuffer (SourceDesc->Buffer.Pointer,
             (SourceDesc->Buffer.Length < 256) ?
-                SourceDesc->Buffer.Length : 256, DB_BYTE_DISPLAY);
+                SourceDesc->Buffer.Length : 256, DB_BYTE_DISPLAY, 0);
         break;
 
     case ACPI_TYPE_STRING:
 
-        AcpiOsPrintf ("[0x%.2X] \"%s\"\n",
-            SourceDesc->String.Length, SourceDesc->String.Pointer);
+        AcpiOsPrintf ("\"%s\"\n", SourceDesc->String.Pointer);
         break;
 
     case ACPI_TYPE_PACKAGE:
 
-        AcpiOsPrintf ("[Contains 0x%.2X Elements]\n",
+        AcpiOsPrintf ("(Contains 0x%.2X Elements):\n",
             SourceDesc->Package.Count);
 
         /* Output the entire contents of the package */
@@ -183,7 +221,7 @@ AcpiExDoDebugObject (
         for (i = 0; i < SourceDesc->Package.Count; i++)
         {
             AcpiExDoDebugObject (SourceDesc->Package.Elements[i],
-                Level+4, i+1);
+                Level + 4, i + 1);
         }
         break;
 
@@ -205,9 +243,10 @@ AcpiExDoDebugObject (
             /* Case for DdbHandle */
 
             AcpiOsPrintf ("Table Index 0x%X\n", SourceDesc->Reference.Value);
-            return;
+            return_VOID;
 
         default:
+
             break;
         }
 
@@ -218,7 +257,7 @@ AcpiExDoDebugObject (
         if (SourceDesc->Reference.Node)
         {
             if (ACPI_GET_DESCRIPTOR_TYPE (SourceDesc->Reference.Node) !=
-                    ACPI_DESC_TYPE_NAMED)
+                ACPI_DESC_TYPE_NAMED)
             {
                 AcpiOsPrintf (" %p - Not a valid namespace node\n",
                     SourceDesc->Reference.Node);
@@ -241,8 +280,9 @@ AcpiExDoDebugObject (
                     break;
 
                 default:
+
                     AcpiExDoDebugObject ((SourceDesc->Reference.Node)->Object,
-                        Level+4, 0);
+                        Level + 4, 0);
                     break;
                 }
             }
@@ -250,23 +290,61 @@ AcpiExDoDebugObject (
         else if (SourceDesc->Reference.Object)
         {
             if (ACPI_GET_DESCRIPTOR_TYPE (SourceDesc->Reference.Object) ==
-                    ACPI_DESC_TYPE_NAMED)
+                ACPI_DESC_TYPE_NAMED)
             {
-                AcpiExDoDebugObject (((ACPI_NAMESPACE_NODE *)
-                    SourceDesc->Reference.Object)->Object,
-                    Level+4, 0);
+                /* Reference object is a namespace node */
+
+                AcpiExDoDebugObject (ACPI_CAST_PTR (ACPI_OPERAND_OBJECT,
+                    SourceDesc->Reference.Object),
+                    Level + 4, 0);
             }
             else
             {
-                AcpiExDoDebugObject (SourceDesc->Reference.Object,
-                    Level+4, 0);
+                ObjectDesc = SourceDesc->Reference.Object;
+                Value = SourceDesc->Reference.Value;
+
+                switch (ObjectDesc->Common.Type)
+                {
+                case ACPI_TYPE_BUFFER:
+
+                    AcpiOsPrintf ("Buffer[%u] = 0x%2.2X\n",
+                        Value, *SourceDesc->Reference.IndexPointer);
+                    break;
+
+                case ACPI_TYPE_STRING:
+
+                    AcpiOsPrintf ("String[%u] = \"%c\" (0x%2.2X)\n",
+                        Value, *SourceDesc->Reference.IndexPointer,
+                        *SourceDesc->Reference.IndexPointer);
+                    break;
+
+                case ACPI_TYPE_PACKAGE:
+
+                    AcpiOsPrintf ("Package[%u] = ", Value);
+                    if (!(*SourceDesc->Reference.Where))
+                    {
+                        AcpiOsPrintf ("[Uninitialized Package Element]\n");
+                    }
+                    else
+                    {
+                        AcpiExDoDebugObject (*SourceDesc->Reference.Where,
+                            Level+4, 0);
+                    }
+                    break;
+
+                default:
+
+                    AcpiOsPrintf ("Unknown Reference object type %X\n",
+                        ObjectDesc->Common.Type);
+                    break;
+                }
             }
         }
         break;
 
     default:
 
-        AcpiOsPrintf ("%p\n", SourceDesc);
+        AcpiOsPrintf ("(Descriptor %p)\n", SourceDesc);
         break;
     }
 
@@ -274,5 +352,3 @@ AcpiExDoDebugObject (
     return_VOID;
 }
 #endif
-
-

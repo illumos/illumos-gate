@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2011, Intel Corp.
+ * Copyright (C) 2000 - 2016, Intel Corp.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -41,8 +41,6 @@
  * POSSIBILITY OF SUCH DAMAGES.
  */
 
-#define __UTEVAL_C__
-
 #include "acpi.h"
 #include "accommon.h"
 #include "acnamesp.h"
@@ -74,7 +72,7 @@
 ACPI_STATUS
 AcpiUtEvaluateObject (
     ACPI_NAMESPACE_NODE     *PrefixNode,
-    char                    *Path,
+    const char              *Path,
     UINT32                  ExpectedReturnBtypes,
     ACPI_OPERAND_OBJECT     **ReturnDesc)
 {
@@ -95,7 +93,7 @@ AcpiUtEvaluateObject (
     }
 
     Info->PrefixNode = PrefixNode;
-    Info->Pathname = Path;
+    Info->RelativePathname = Path;
 
     /* Evaluate the object/method */
 
@@ -136,22 +134,27 @@ AcpiUtEvaluateObject (
     switch ((Info->ReturnObject)->Common.Type)
     {
     case ACPI_TYPE_INTEGER:
+
         ReturnBtype = ACPI_BTYPE_INTEGER;
         break;
 
     case ACPI_TYPE_BUFFER:
+
         ReturnBtype = ACPI_BTYPE_BUFFER;
         break;
 
     case ACPI_TYPE_STRING:
+
         ReturnBtype = ACPI_BTYPE_STRING;
         break;
 
     case ACPI_TYPE_PACKAGE:
+
         ReturnBtype = ACPI_BTYPE_PACKAGE;
         break;
 
     default:
+
         ReturnBtype = 0;
         break;
     }
@@ -216,7 +219,7 @@ Cleanup:
 
 ACPI_STATUS
 AcpiUtEvaluateNumericObject (
-    char                    *ObjectName,
+    const char              *ObjectName,
     ACPI_NAMESPACE_NODE     *DeviceNode,
     UINT64                  *Value)
 {
@@ -228,7 +231,7 @@ AcpiUtEvaluateNumericObject (
 
 
     Status = AcpiUtEvaluateObject (DeviceNode, ObjectName,
-                ACPI_BTYPE_INTEGER, &ObjDesc);
+        ACPI_BTYPE_INTEGER, &ObjDesc);
     if (ACPI_FAILURE (Status))
     {
         return_ACPI_STATUS (Status);
@@ -255,7 +258,8 @@ AcpiUtEvaluateNumericObject (
  * RETURN:      Status
  *
  * DESCRIPTION: Executes _STA for selected device and stores results in
- *              *Flags.
+ *              *Flags. If _STA does not exist, then the device is assumed
+ *              to be present/functional/enabled (as per the ACPI spec).
  *
  *              NOTE: Internal function, no parameter validation
  *
@@ -274,11 +278,16 @@ AcpiUtExecute_STA (
 
 
     Status = AcpiUtEvaluateObject (DeviceNode, METHOD_NAME__STA,
-                ACPI_BTYPE_INTEGER, &ObjDesc);
+        ACPI_BTYPE_INTEGER, &ObjDesc);
     if (ACPI_FAILURE (Status))
     {
         if (AE_NOT_FOUND == Status)
         {
+            /*
+             * if _STA does not exist, then (as per the ACPI specification),
+             * the returned flags will indicate that the device is present,
+             * functional, and enabled.
+             */
             ACPI_DEBUG_PRINT ((ACPI_DB_EXEC,
                 "_STA on %4.4s was not found, assuming device is present\n",
                 AcpiUtGetNodeName (DeviceNode)));
@@ -342,8 +351,8 @@ AcpiUtExecutePowerMethods (
          * return type is an Integer.
          */
         Status = AcpiUtEvaluateObject (DeviceNode,
-                    ACPI_CAST_PTR (char, MethodNames[i]),
-                    ACPI_BTYPE_INTEGER, &ObjDesc);
+            ACPI_CAST_PTR (char, MethodNames[i]),
+            ACPI_BTYPE_INTEGER, &ObjDesc);
         if (ACPI_SUCCESS (Status))
         {
             OutValues[i] = (UINT8) ObjDesc->Integer.Value;

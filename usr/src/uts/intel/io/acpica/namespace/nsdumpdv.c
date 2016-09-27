@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2011, Intel Corp.
+ * Copyright (C) 2000 - 2016, Intel Corp.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -40,8 +40,6 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  */
-
-#define __NSDUMPDV_C__
 
 #include "acpi.h"
 
@@ -141,7 +139,7 @@ AcpiNsDumpRootDevices (
         return;
     }
 
-    Status = AcpiGetHandle (NULL, ACPI_NS_SYSTEM_BUS, &SysBusHandle);
+    Status = AcpiGetHandle (NULL, METHOD_NAME__SB_, &SysBusHandle);
     if (ACPI_FAILURE (Status))
     {
         return;
@@ -151,11 +149,9 @@ AcpiNsDumpRootDevices (
         "Display of all devices in the namespace:\n"));
 
     Status = AcpiNsWalkNamespace (ACPI_TYPE_DEVICE, SysBusHandle,
-                ACPI_UINT32_MAX, ACPI_NS_WALK_NO_UNLOCK,
-                AcpiNsDumpOneDevice, NULL, NULL, NULL);
+        ACPI_UINT32_MAX, ACPI_NS_WALK_NO_UNLOCK,
+        AcpiNsDumpOneDevice, NULL, NULL, NULL);
 }
 
 #endif
 #endif
-
-

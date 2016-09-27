@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2011, Intel Corp.
+ * Copyright (C) 2000 - 2016, Intel Corp.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -40,8 +40,6 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  */
-
-#define __DSOBJECT_C__
 
 #include "acpi.h"
 #include "accommon.h"
@@ -104,10 +102,10 @@ AcpiDsBuildInternalObject (
         if (!Op->Common.Node)
         {
             Status = AcpiNsLookup (WalkState->ScopeInfo,
-                        Op->Common.Value.String,
-                        ACPI_TYPE_ANY, ACPI_IMODE_EXECUTE,
-                        ACPI_NS_SEARCH_PARENT | ACPI_NS_DONT_OPEN_SCOPE, NULL,
-                        ACPI_CAST_INDIRECT_PTR (ACPI_NAMESPACE_NODE, &(Op->Common.Node)));
+                Op->Common.Value.String,
+                ACPI_TYPE_ANY, ACPI_IMODE_EXECUTE,
+                ACPI_NS_SEARCH_PARENT | ACPI_NS_DONT_OPEN_SCOPE, NULL,
+                ACPI_CAST_INDIRECT_PTR (ACPI_NAMESPACE_NODE, &(Op->Common.Node)));
             if (ACPI_FAILURE (Status))
             {
                 /* Check if we are resolving a named reference within a package */
@@ -163,8 +161,8 @@ AcpiDsBuildInternalObject (
             ObjDesc = ACPI_CAST_PTR (ACPI_OPERAND_OBJECT, Op->Common.Node);
 
             Status = AcpiExResolveNodeToValue (
-                        ACPI_CAST_INDIRECT_PTR (ACPI_NAMESPACE_NODE, &ObjDesc),
-                        WalkState);
+                ACPI_CAST_INDIRECT_PTR (ACPI_NAMESPACE_NODE, &ObjDesc),
+                WalkState);
             if (ACPI_FAILURE (Status))
             {
                 return_ACPI_STATUS (Status);
@@ -224,14 +222,14 @@ AcpiDsBuildInternalObject (
     /* Create and init a new internal ACPI object */
 
     ObjDesc = AcpiUtCreateInternalObject (
-                (AcpiPsGetOpcodeInfo (Op->Common.AmlOpcode))->ObjectType);
+        (AcpiPsGetOpcodeInfo (Op->Common.AmlOpcode))->ObjectType);
     if (!ObjDesc)
     {
         return_ACPI_STATUS (AE_NO_MEMORY);
     }
 
-    Status = AcpiDsInitObjectFromOp (WalkState, Op, Op->Common.AmlOpcode,
-                &ObjDesc);
+    Status = AcpiDsInitObjectFromOp (
+        WalkState, Op, Op->Common.AmlOpcode, &ObjDesc);
     if (ACPI_FAILURE (Status))
     {
         AcpiUtRemoveReference (ObjDesc);
@@ -296,7 +294,7 @@ AcpiDsBuildInternalBufferObj (
 
     /*
      * Second arg is the buffer data (optional) ByteList can be either
-     * individual bytes or a string initializer.  In either case, a
+     * individual bytes or a string initializer. In either case, a
      * ByteList appears in the AML.
      */
     Arg = Op->Common.Value.Arg;         /* skip first arg */
@@ -338,8 +336,8 @@ AcpiDsBuildInternalBufferObj (
     }
     else
     {
-        ObjDesc->Buffer.Pointer = ACPI_ALLOCATE_ZEROED (
-                                        ObjDesc->Buffer.Length);
+        ObjDesc->Buffer.Pointer =
+            ACPI_ALLOCATE_ZEROED (ObjDesc->Buffer.Length);
         if (!ObjDesc->Buffer.Pointer)
         {
             AcpiUtDeleteObjectDesc (ObjDesc);
@@ -350,8 +348,8 @@ AcpiDsBuildInternalBufferObj (
 
         if (ByteList)
         {
-            ACPI_MEMCPY (ObjDesc->Buffer.Pointer, ByteList->Named.Data,
-                         ByteListLength);
+            memcpy (ObjDesc->Buffer.Pointer, ByteList->Named.Data,
+                ByteListLength);
         }
     }
 
@@ -470,8 +468,8 @@ AcpiDsBuildInternalPackageObj (
                  * invocation, so we special case it here
                  */
                 Arg->Common.AmlOpcode = AML_INT_NAMEPATH_OP;
-                Status = AcpiDsBuildInternalObject (WalkState, Arg,
-                            &ObjDesc->Package.Elements[i]);
+                Status = AcpiDsBuildInternalObject (
+                    WalkState, Arg, &ObjDesc->Package.Elements[i]);
             }
             else
             {
@@ -483,8 +481,8 @@ AcpiDsBuildInternalPackageObj (
         }
         else
         {
-            Status = AcpiDsBuildInternalObject (WalkState, Arg,
-                        &ObjDesc->Package.Elements[i]);
+            Status = AcpiDsBuildInternalObject (
+                WalkState, Arg, &ObjDesc->Package.Elements[i]);
         }
 
         if (*ObjDescPtr)
@@ -540,8 +538,9 @@ AcpiDsBuildInternalPackageObj (
             Arg = Arg->Common.Next;
         }
 
-        ACPI_INFO ((AE_INFO,
-            "Actual Package length (%u) is larger than NumElements field (%u), truncated\n",
+        ACPI_INFO ((
+            "Actual Package length (%u) is larger than "
+            "NumElements field (%u), truncated",
             i, ElementCount));
     }
     else if (i < ElementCount)
@@ -551,7 +550,8 @@ AcpiDsBuildInternalPackageObj (
          * Note: this is not an error, the package is padded out with NULLs.
          */
         ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
-            "Package List length (%u) smaller than NumElements count (%u), padded with null elements\n",
+            "Package List length (%u) smaller than NumElements "
+            "count (%u), padded with null elements\n",
             i, ElementCount));
     }
 
@@ -590,7 +590,7 @@ AcpiDsCreateNode (
 
     /*
      * Because of the execution pass through the non-control-method
-     * parts of the table, we can arrive here twice.  Only init
+     * parts of the table, we can arrive here twice. Only init
      * the named object node the first time through
      */
     if (AcpiNsGetAttachedObject (Node))
@@ -607,8 +607,8 @@ AcpiDsCreateNode (
 
     /* Build an internal object for the argument(s) */
 
-    Status = AcpiDsBuildInternalObject (WalkState, Op->Common.Value.Arg,
-                &ObjDesc);
+    Status = AcpiDsBuildInternalObject (
+        WalkState, Op->Common.Value.Arg, &ObjDesc);
     if (ACPI_FAILURE (Status))
     {
         return_ACPI_STATUS (Status);
@@ -643,7 +643,7 @@ AcpiDsCreateNode (
  * RETURN:      Status
  *
  * DESCRIPTION: Initialize a namespace object from a parser Op and its
- *              associated arguments.  The namespace object is a more compact
+ *              associated arguments. The namespace object is a more compact
  *              representation of the Op and its arguments.
  *
  ******************************************************************************/
@@ -677,28 +677,24 @@ AcpiDsInitObjectFromOp (
     switch (ObjDesc->Common.Type)
     {
     case ACPI_TYPE_BUFFER:
-
         /*
          * Defer evaluation of Buffer TermArg operand
          */
-        ObjDesc->Buffer.Node      = ACPI_CAST_PTR (ACPI_NAMESPACE_NODE,
-                                        WalkState->Operands[0]);
-        ObjDesc->Buffer.AmlStart  = Op->Named.Data;
+        ObjDesc->Buffer.Node = ACPI_CAST_PTR (
+            ACPI_NAMESPACE_NODE, WalkState->Operands[0]);
+        ObjDesc->Buffer.AmlStart = Op->Named.Data;
         ObjDesc->Buffer.AmlLength = Op->Named.Length;
         break;
 
-
     case ACPI_TYPE_PACKAGE:
-
         /*
          * Defer evaluation of Package TermArg operand
          */
-        ObjDesc->Package.Node      = ACPI_CAST_PTR (ACPI_NAMESPACE_NODE,
-                                        WalkState->Operands[0]);
-        ObjDesc->Package.AmlStart  = Op->Named.Data;
+        ObjDesc->Package.Node = ACPI_CAST_PTR (
+            ACPI_NAMESPACE_NODE, WalkState->Operands[0]);
+        ObjDesc->Package.AmlStart = Op->Named.Data;
         ObjDesc->Package.AmlLength = Op->Named.Length;
         break;
-
 
     case ACPI_TYPE_INTEGER:
 
@@ -734,7 +730,7 @@ AcpiDsInitObjectFromOp (
                 /* Truncate value if we are executing from a 32-bit ACPI table */
 
 #ifndef ACPI_NO_METHOD_EXECUTION
-                AcpiExTruncateFor32bitTable (ObjDesc);
+                (void) AcpiExTruncateFor32bitTable (ObjDesc);
 #endif
                 break;
 
@@ -752,17 +748,25 @@ AcpiDsInitObjectFromOp (
             }
             break;
 
-
         case AML_TYPE_LITERAL:
 
             ObjDesc->Integer.Value = Op->Common.Value.Integer;
+
 #ifndef ACPI_NO_METHOD_EXECUTION
-            AcpiExTruncateFor32bitTable (ObjDesc);
+            if (AcpiExTruncateFor32bitTable (ObjDesc))
+            {
+                /* Warn if we found a 64-bit constant in a 32-bit table */
+
+                ACPI_WARNING ((AE_INFO,
+                    "Truncated 64-bit constant found in 32-bit table: %8.8X%8.8X => %8.8X",
+                    ACPI_FORMAT_UINT64 (Op->Common.Value.Integer),
+                    (UINT32) ObjDesc->Integer.Value));
+            }
 #endif
             break;
 
-
         default:
+
             ACPI_ERROR ((AE_INFO, "Unknown Integer type 0x%X",
                 OpInfo->Type));
             Status = AE_AML_OPERAND_TYPE;
@@ -770,11 +774,10 @@ AcpiDsInitObjectFromOp (
         }
         break;
 
-
     case ACPI_TYPE_STRING:
 
         ObjDesc->String.Pointer = Op->Common.Value.String;
-        ObjDesc->String.Length = (UINT32) ACPI_STRLEN (Op->Common.Value.String);
+        ObjDesc->String.Length = (UINT32) strlen (Op->Common.Value.String);
 
         /*
          * The string is contained in the ACPI table, don't ever try
@@ -783,10 +786,8 @@ AcpiDsInitObjectFromOp (
         ObjDesc->Common.Flags |= AOPOBJ_STATIC_POINTER;
         break;
 
-
     case ACPI_TYPE_METHOD:
         break;
-
 
     case ACPI_TYPE_LOCAL_REFERENCE:
 
@@ -801,12 +802,11 @@ AcpiDsInitObjectFromOp (
 
 #ifndef ACPI_NO_METHOD_EXECUTION
             Status = AcpiDsMethodDataGetNode (ACPI_REFCLASS_LOCAL,
-                        ObjDesc->Reference.Value, WalkState,
-                        ACPI_CAST_INDIRECT_PTR (ACPI_NAMESPACE_NODE,
-                            &ObjDesc->Reference.Object));
+                ObjDesc->Reference.Value, WalkState,
+                ACPI_CAST_INDIRECT_PTR (ACPI_NAMESPACE_NODE,
+                    &ObjDesc->Reference.Object));
 #endif
             break;
-
 
         case AML_TYPE_METHOD_ARGUMENT:
 
@@ -817,9 +817,9 @@ AcpiDsInitObjectFromOp (
 
 #ifndef ACPI_NO_METHOD_EXECUTION
             Status = AcpiDsMethodDataGetNode (ACPI_REFCLASS_ARG,
-                        ObjDesc->Reference.Value, WalkState,
-                        ACPI_CAST_INDIRECT_PTR (ACPI_NAMESPACE_NODE,
-                            &ObjDesc->Reference.Object));
+                ObjDesc->Reference.Value, WalkState,
+                ACPI_CAST_INDIRECT_PTR (ACPI_NAMESPACE_NODE,
+                    &ObjDesc->Reference.Object));
 #endif
             break;
 
@@ -851,7 +851,6 @@ AcpiDsInitObjectFromOp (
         }
         break;
 
-
     default:
 
         ACPI_ERROR ((AE_INFO, "Unimplemented data type: 0x%X",
@@ -863,5 +862,3 @@ AcpiDsInitObjectFromOp (
 
     return_ACPI_STATUS (Status);
 }
-
-
