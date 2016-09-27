@@ -10,10 +10,10 @@
 #
 
 #
-# Copyright 2015 Joyent, Inc. All rights reserved.
+# Copyright 2016 Joyent, Inc.
 #
 
-TXTS = ltp_skiplist ltp_tests
+TXTS = ltp_skiplist ltp_tests pts_ignorelist
 
 all:
 

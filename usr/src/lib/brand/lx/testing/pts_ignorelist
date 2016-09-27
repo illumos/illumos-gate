@@ -1,0 +1,380 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+# Copyright 2016 Joyent, Inc.
+
+# The Open POSIX Test Suite (PTS) tests the POSIX conformance of an
+# operating system. A test may have one of six different results:
+#
+# o PASS: the test passed
+# o FAIL: the test failed
+# o UNRESOLVED: the test was unable to determine pass/fail
+# o UNSUPPORTED: this feature is not supported by the OS
+# o UNTESTED: this test is not yet implemented
+#
+# You can read more about these result codes in:
+#
+#   ltp/testcases/open_posix_testsuite/Documentation/HOWTO_ResultCodes
+#
+# This file (pts_ignorelist) contains a list of tests which are known
+# not to pass on lx-brand zones, along with the expected test result.
+# These tests are grouped based on the reason for their failure,
+# described by the comment above the grouping. Ideally, any test
+# resulting in FAILED indicates a bug in lx-brand, but PTS is not
+# ideal. Many of the tests will return FAILED when they should return
+# UNRESOLVED instead. E.g., some of the MQ tests will return FAILED if
+# mq_open() fails while some will return UNRESOLVED. Unless otherwise
+# noted in the group comment, assume FAILED is a true bug (as opposed
+# to a lack of support by lx-brand).
+#
+# To run the tests and check your results against this list:
+#
+# cd ltp/testcases/open_posix_testsuite
+# make
+# make test 2>&1 | tee pts.log
+# diff <(egrep -v '^#|^$' /native/usr/lib/brand/lx/pts_ignorelist | sort) \
+# <(grep execution pts.log | tr -d : | awk '{ print $1, $3 }' | sort)
+#
+# Any delta reported by the diff is either a regression in lx-brand or
+# a change in the test code.
+
+#
+# POSIX message queues are not implemented in lx-brand. In illumos,
+# MQs are implemented completely in libc. In Linux, MQs are
+# implemented as system calls. The lx-brand code returns ENOSYS for
+# all the MQ system calls. The MQ tests are not consistent in how they
+# classify a failed mq_open() and thus the tests return a mixture of
+# UNRESOLVED and FAILED.
+#
+conformance/interfaces/fork/fork_19-1 UNRESOLVED
+conformance/interfaces/mq_close/mq_close_1-1 UNRESOLVED
+conformance/interfaces/mq_close/mq_close_2-1 UNRESOLVED
+conformance/interfaces/mq_close/mq_close_3-1 UNRESOLVED
+conformance/interfaces/mq_close/mq_close_4-1 UNRESOLVED
+conformance/interfaces/mq_getattr/mq_getattr_2-1 UNRESOLVED
+conformance/interfaces/mq_getattr/mq_getattr_2-2 UNRESOLVED
+conformance/interfaces/mq_getattr/mq_getattr_3-1 UNRESOLVED
+conformance/interfaces/mq_getattr/mq_getattr_4-1 UNRESOLVED
+conformance/interfaces/mq_notify/mq_notify_1-1 UNRESOLVED
+conformance/interfaces/mq_notify/mq_notify_2-1 UNRESOLVED
+conformance/interfaces/mq_notify/mq_notify_3-1 UNRESOLVED
+conformance/interfaces/mq_notify/mq_notify_4-1 UNRESOLVED
+conformance/interfaces/mq_notify/mq_notify_5-1 UNRESOLVED
+conformance/interfaces/mq_notify/mq_notify_8-1 FAILED
+conformance/interfaces/mq_notify/mq_notify_9-1 UNRESOLVED
+conformance/interfaces/mq_open/mq_open_1-1 FAILED
+conformance/interfaces/mq_open/mq_open_11-1 FAILED
+conformance/interfaces/mq_open/mq_open_12-1 FAILED
+conformance/interfaces/mq_open/mq_open_13-1 FAILED
+conformance/interfaces/mq_open/mq_open_15-1 UNRESOLVED
+conformance/interfaces/mq_open/mq_open_16-1 FAILED
+conformance/interfaces/mq_open/mq_open_18-1 FAILED
+conformance/interfaces/mq_open/mq_open_19-1 UNRESOLVED
+conformance/interfaces/mq_open/mq_open_2-1 UNRESOLVED
+conformance/interfaces/mq_open/mq_open_20-1 FAILED
+conformance/interfaces/mq_open/mq_open_23-1 UNRESOLVED
+conformance/interfaces/mq_open/mq_open_25-2 FAILED
+conformance/interfaces/mq_open/mq_open_27-1 FAILED
+conformance/interfaces/mq_open/mq_open_27-2 FAILED
+conformance/interfaces/mq_open/mq_open_29-1 FAILED
+conformance/interfaces/mq_open/mq_open_7-1 UNRESOLVED
+conformance/interfaces/mq_open/mq_open_7-2 UNRESOLVED
+conformance/interfaces/mq_open/mq_open_7-3 FAILED
+conformance/interfaces/mq_open/mq_open_8-1 UNRESOLVED
+conformance/interfaces/mq_open/mq_open_8-2 UNRESOLVED
+conformance/interfaces/mq_open/mq_open_9-1 UNRESOLVED
+conformance/interfaces/mq_open/mq_open_9-2 UNRESOLVED
+conformance/interfaces/mq_receive/mq_receive_1-1 FAILED
+conformance/interfaces/mq_receive/mq_receive_10-1 FAILED
+conformance/interfaces/mq_receive/mq_receive_11-1 FAILED
+conformance/interfaces/mq_receive/mq_receive_11-2 FAILED
+conformance/interfaces/mq_receive/mq_receive_12-1 FAILED
+conformance/interfaces/mq_receive/mq_receive_13-1 UNRESOLVED
+conformance/interfaces/mq_receive/mq_receive_2-1 UNRESOLVED
+conformance/interfaces/mq_receive/mq_receive_5-1 FAILED
+conformance/interfaces/mq_receive/mq_receive_7-1 UNRESOLVED
+conformance/interfaces/mq_receive/mq_receive_8-1 FAILED
+conformance/interfaces/mq_send/mq_send_1-1 UNRESOLVED
+conformance/interfaces/mq_send/mq_send_10-1 UNRESOLVED
+conformance/interfaces/mq_send/mq_send_11-1 UNRESOLVED
+conformance/interfaces/mq_send/mq_send_11-2 UNRESOLVED
+conformance/interfaces/mq_send/mq_send_12-1 UNRESOLVED
+conformance/interfaces/mq_send/mq_send_13-1 UNRESOLVED
+conformance/interfaces/mq_send/mq_send_14-1 UNRESOLVED
+conformance/interfaces/mq_send/mq_send_2-1 UNRESOLVED
+conformance/interfaces/mq_send/mq_send_3-1 UNRESOLVED
+conformance/interfaces/mq_send/mq_send_3-2 UNRESOLVED
+conformance/interfaces/mq_send/mq_send_4-1 UNRESOLVED
+conformance/interfaces/mq_send/mq_send_4-2 UNRESOLVED
+conformance/interfaces/mq_send/mq_send_4-3 UNRESOLVED
+conformance/interfaces/mq_send/mq_send_5-1 UNRESOLVED
+conformance/interfaces/mq_send/mq_send_5-2 UNRESOLVED
+conformance/interfaces/mq_send/mq_send_7-1 UNRESOLVED
+conformance/interfaces/mq_send/mq_send_8-1 UNRESOLVED
+conformance/interfaces/mq_send/mq_send_9-1 UNRESOLVED
+conformance/interfaces/mq_setattr/mq_setattr_1-1 UNRESOLVED
+conformance/interfaces/mq_setattr/mq_setattr_1-2 UNRESOLVED
+conformance/interfaces/mq_setattr/mq_setattr_2-1 UNRESOLVED
+conformance/interfaces/mq_setattr/mq_setattr_5-1 UNRESOLVED
+conformance/interfaces/mq_timedreceive/mq_timedreceive_1-1 FAILED
+conformance/interfaces/mq_timedreceive/mq_timedreceive_10-1 FAILED
+conformance/interfaces/mq_timedreceive/mq_timedreceive_10-2 FAILED
+conformance/interfaces/mq_timedreceive/mq_timedreceive_11-1 FAILED
+conformance/interfaces/mq_timedreceive/mq_timedreceive_13-1 FAILED
+conformance/interfaces/mq_timedreceive/mq_timedreceive_14-1 FAILED
+conformance/interfaces/mq_timedreceive/mq_timedreceive_15-1 FAILED
+conformance/interfaces/mq_timedreceive/mq_timedreceive_17-1 FAILED
+conformance/interfaces/mq_timedreceive/mq_timedreceive_17-2 FAILED
+conformance/interfaces/mq_timedreceive/mq_timedreceive_17-3 FAILED
+conformance/interfaces/mq_timedreceive/mq_timedreceive_18-1 FAILED
+conformance/interfaces/mq_timedreceive/mq_timedreceive_18-2 FAILED
+conformance/interfaces/mq_timedreceive/mq_timedreceive_2-1 UNRESOLVED
+conformance/interfaces/mq_timedreceive/mq_timedreceive_5-1 FAILED
+conformance/interfaces/mq_timedreceive/mq_timedreceive_5-2 FAILED
+conformance/interfaces/mq_timedreceive/mq_timedreceive_5-3 UNRESOLVED
+conformance/interfaces/mq_timedreceive/mq_timedreceive_7-1 UNRESOLVED
+conformance/interfaces/mq_timedreceive/mq_timedreceive_8-1 FAILED
+conformance/interfaces/mq_timedsend/mq_timedsend_1-1 UNRESOLVED
+conformance/interfaces/mq_timedsend/mq_timedsend_10-1 UNRESOLVED
+conformance/interfaces/mq_timedsend/mq_timedsend_11-1 UNRESOLVED
+conformance/interfaces/mq_timedsend/mq_timedsend_11-2 UNRESOLVED
+conformance/interfaces/mq_timedsend/mq_timedsend_12-1 UNRESOLVED
+conformance/interfaces/mq_timedsend/mq_timedsend_13-1 UNRESOLVED
+conformance/interfaces/mq_timedsend/mq_timedsend_14-1 UNRESOLVED
+conformance/interfaces/mq_timedsend/mq_timedsend_15-1 UNRESOLVED
+conformance/interfaces/mq_timedsend/mq_timedsend_16-1 UNRESOLVED
+conformance/interfaces/mq_timedsend/mq_timedsend_18-1 UNRESOLVED
+conformance/interfaces/mq_timedsend/mq_timedsend_19-1 UNRESOLVED
+conformance/interfaces/mq_timedsend/mq_timedsend_2-1 UNRESOLVED
+conformance/interfaces/mq_timedsend/mq_timedsend_20-1 UNRESOLVED
+conformance/interfaces/mq_timedsend/mq_timedsend_3-1 UNRESOLVED
+conformance/interfaces/mq_timedsend/mq_timedsend_3-2 UNRESOLVED
+conformance/interfaces/mq_timedsend/mq_timedsend_4-1 UNRESOLVED
+conformance/interfaces/mq_timedsend/mq_timedsend_4-2 UNRESOLVED
+conformance/interfaces/mq_timedsend/mq_timedsend_4-3 UNRESOLVED
+conformance/interfaces/mq_timedsend/mq_timedsend_5-1 UNRESOLVED
+conformance/interfaces/mq_timedsend/mq_timedsend_5-2 UNRESOLVED
+conformance/interfaces/mq_timedsend/mq_timedsend_5-3 UNRESOLVED
+conformance/interfaces/mq_timedsend/mq_timedsend_7-1 UNRESOLVED
+conformance/interfaces/mq_timedsend/mq_timedsend_8-1 UNRESOLVED
+conformance/interfaces/mq_timedsend/mq_timedsend_9-1 UNRESOLVED
+conformance/interfaces/mq_unlink/mq_unlink_1-1 UNRESOLVED
+conformance/interfaces/mq_unlink/mq_unlink_2-1 UNRESOLVED
+conformance/interfaces/mq_unlink/mq_unlink_2-2 UNRESOLVED
+conformance/interfaces/mq_unlink/mq_unlink_7-1 FAILED
+functional/mqueues/mqueues_send_rev_1 UNRESOLVED
+functional/mqueues/mqueues_send_rev_2 UNRESOLVED
+
+#
+# Other features not implemented on Linux.
+#
+conformance/interfaces/pthread_rwlock_unlock/pthread_rwlock_unlock_4-1 UNSUPPORTED
+conformance/interfaces/pthread_rwlock_unlock/pthread_rwlock_unlock_4-2 UNSUPPORTED
+
+#
+# lx-brand does not have proc_priocntl privilege.
+#
+# pthread_setschedparam_1-1 returns FAILED instead UNRESOLVED
+#
+conformance/interfaces/fork/fork_17-1 UNRESOLVED
+conformance/interfaces/fork/fork_17-2 UNRESOLVED
+conformance/interfaces/pthread_attr_setinheritsched/pthread_attr_setinheritsched_2-2 UNRESOLVED
+conformance/interfaces/pthread_attr_setinheritsched/pthread_attr_setinheritsched_2-3 UNRESOLVED
+conformance/interfaces/pthread_attr_setinheritsched/pthread_attr_setinheritsched_2-4 UNRESOLVED
+conformance/interfaces/pthread_attr_setschedparam/pthread_attr_setschedparam_1-3 UNRESOLVED
+conformance/interfaces/pthread_attr_setschedparam/pthread_attr_setschedparam_1-4 UNRESOLVED
+conformance/interfaces/pthread_attr_setschedpolicy/pthread_attr_setschedpolicy_1-2 UNRESOLVED
+conformance/interfaces/pthread_attr_setschedpolicy/pthread_attr_setschedpolicy_1-3 UNRESOLVED
+conformance/interfaces/pthread_attr_setschedpolicy/pthread_attr_setschedpolicy_2-1 UNRESOLVED
+conformance/interfaces/pthread_cancel/pthread_cancel_3-1 UNRESOLVED
+conformance/interfaces/pthread_create/pthread_create_1-6 UNRESOLVED
+conformance/interfaces/pthread_getschedparam/pthread_getschedparam_1-2 UNRESOLVED
+conformance/interfaces/pthread_getschedparam/pthread_getschedparam_1-3 UNRESOLVED
+conformance/interfaces/pthread_setschedprio/pthread_setschedprio_1-1 UNRESOLVED
+conformance/interfaces/pthread_setschedparam/pthread_setschedparam_1-1 FAILED
+conformance/interfaces/pthread_setschedparam/pthread_setschedparam_1-2 UNRESOLVED
+conformance/interfaces/pthread_setschedparam/pthread_setschedparam_4-1 UNRESOLVED
+conformance/interfaces/sched_rr_get_interval/sched_rr_get_interval_1-1 UNRESOLVED
+conformance/interfaces/sched_rr_get_interval/sched_rr_get_interval_2-1 UNRESOLVED
+conformance/interfaces/sched_rr_get_interval/sched_rr_get_interval_3-1 UNRESOLVED
+conformance/interfaces/sched_setparam/sched_setparam_2-1 UNRESOLVED
+conformance/interfaces/sched_setparam/sched_setparam_2-2 UNRESOLVED
+conformance/interfaces/sched_setparam/sched_setparam_9-1 UNRESOLVED
+conformance/interfaces/sched_setparam/sched_setparam_23-6 UNRESOLVED
+conformance/interfaces/sched_setscheduler/sched_setscheduler_1-1 UNRESOLVED
+conformance/interfaces/sched_setscheduler/sched_setscheduler_4-1 UNRESOLVED
+conformance/interfaces/sched_setscheduler/sched_setscheduler_16-1 UNRESOLVED
+conformance/interfaces/sched_setscheduler/sched_setscheduler_19-1 UNRESOLVED
+conformance/interfaces/sched_setscheduler/sched_setscheduler_22-1 UNRESOLVED
+conformance/interfaces/sched_setscheduler/sched_setscheduler_22-2 UNRESOLVED
+conformance/interfaces/sched_yield/sched_yield_1-1 UNRESOLVED
+conformance/interfaces/sem_post/sem_post_8-1 UNRESOLVED
+conformance/interfaces/sigaction/sigaction_16-1 UNTESTED
+functional/threads/condvar/condvar_pthread_cond_wait_1 UNRESOLVED
+functional/threads/condvar/condvar_pthread_cond_wait_2 UNRESOLVED
+functional/threads/pi_test/pi_test_pitest-1 UNRESOLVED
+functional/threads/pi_test/pi_test_pitest-2 UNRESOLVED
+functional/threads/pi_test/pi_test_pitest-3 UNRESOLVED
+functional/threads/pi_test/pi_test_pitest-4 UNRESOLVED
+functional/threads/pi_test/pi_test_pitest-5 UNRESOLVED
+functional/threads/pi_test/pi_test_pitest-6 UNRESOLVED
+functional/threads/schedule/schedule_1-1 UNRESOLVED
+functional/threads/schedule/schedule_1-2 UNRESOLVED
+
+#
+# glibc doesn't support PTHREAD_SCOPE_PROCESS.
+#
+conformance/interfaces/sched_setparam/sched_setparam_20-1 UNSUPPORTED
+conformance/interfaces/sched_setparam/sched_setparam_21-1 UNSUPPORTED
+conformance/interfaces/sched_setparam/sched_setparam_21-2 UNSUPPORTED
+conformance/interfaces/sched_setscheduler/sched_setscheduler_15-1 UNSUPPORTED
+conformance/interfaces/sched_setscheduler/sched_setscheduler_15-2 UNSUPPORTED
+
+#
+# _POSIX_SPORADIC_SERVER is not available on Linux.
+#
+conformance/interfaces/sched_get_priority_max/sched_get_priority_max_1-3 UNSUPPORTED
+conformance/interfaces/sched_get_priority_min/sched_get_priority_min_1-3 UNSUPPORTED
+conformance/interfaces/sched_setparam/sched_setparam_23-2 UNSUPPORTED
+conformance/interfaces/sched_setparam/sched_setparam_23-3 UNSUPPORTED
+conformance/interfaces/sched_setparam/sched_setparam_23-4 UNSUPPORTED
+conformance/interfaces/sched_setparam/sched_setparam_23-5 UNSUPPORTED
+conformance/interfaces/sched_setparam/sched_setparam_25-2 UNSUPPORTED
+conformance/interfaces/sched_setparam/sched_setparam_25-3 UNSUPPORTED
+conformance/interfaces/sched_setparam/sched_setparam_25-4 UNSUPPORTED
+conformance/interfaces/sched_setscheduler/sched_setscheduler_17-2 UNSUPPORTED
+conformance/interfaces/sched_setscheduler/sched_setscheduler_17-3 UNSUPPORTED
+conformance/interfaces/sched_setscheduler/sched_setscheduler_17-4 UNSUPPORTED
+conformance/interfaces/sched_setscheduler/sched_setscheduler_19-2 UNSUPPORTED
+conformance/interfaces/sched_setscheduler/sched_setscheduler_19-3 UNSUPPORTED
+conformance/interfaces/sched_setscheduler/sched_setscheduler_19-4 UNSUPPORTED
+
+#
+# No semaphore limit (_SC_SEM_NSEMS_MAX).
+#
+conformance/interfaces/sem_init/sem_init_7-1 UNTESTED
+
+#
+# CLOCK_PROCESS_CPUTIME_ID/CLOCK_THREAD_CPUTIME_ID not supported.
+#
+conformance/interfaces/fork/fork_22-1 UNRESOLVED
+conformance/interfaces/timer_create/timer_create_10-1 UNRESOLVED
+
+#
+# Multiple instances of the same signal are coalesced on sigwait().
+#
+conformance/interfaces/sigwait/sigwait_2-1 FAILED
+
+#
+# Need sys_time privs.
+#
+# clock_settime_20-1 returns FAILED because it expects EINVAL but gets EPERM.
+#
+conformance/interfaces/clock_settime/clock_settime_1-1 UNRESOLVED
+conformance/interfaces/clock_settime/clock_settime_4-1 UNRESOLVED
+conformance/interfaces/clock_settime/clock_settime_4-2 UNRESOLVED
+conformance/interfaces/clock_settime/clock_settime_5-1 UNRESOLVED
+conformance/interfaces/clock_settime/clock_settime_5-2 UNRESOLVED
+conformance/interfaces/clock_settime/clock_settime_7-1 UNRESOLVED
+conformance/interfaces/clock_settime/clock_settime_7-2 UNRESOLVED
+conformance/interfaces/clock_settime/clock_settime_8-1 UNRESOLVED
+conformance/interfaces/clock_settime/clock_settime_20-1 FAILED
+
+#
+# https://github.com/joyent/illumos-joyent/issues/66
+#
+conformance/interfaces/clock_getcpuclockid/clock_getcpuclockid_1-1 FAILED
+conformance/interfaces/clock_getcpuclockid/clock_getcpuclockid_1-2 UNRESOLVED
+conformance/interfaces/clock_getcpuclockid/clock_getcpuclockid_2-1 FAILED
+conformance/interfaces/clock_getcpuclockid/clock_getcpuclockid_5-1 UNRESOLVED
+
+#
+# Various AIO functions don't EINVAL on bogus struct aiocb.
+#
+# Faulty on lx brand, Linux on KVM, and illumos.
+#
+conformance/interfaces/aio_error/aio_error_3-1 UNTESTED
+conformance/interfaces/aio_return/aio_return_4-1 UNTESTED
+
+#
+# _SC_AIO_MAX == -1
+#
+conformance/interfaces/aio_read/aio_read_9-1 UNSUPPORTED
+conformance/interfaces/aio_write/aio_write_7-1 UNSUPPORTED
+
+#
+# PTS is a wasteland, these tests hard-coded to fail.
+#
+conformance/interfaces/aio_suspend/aio_suspend_5-1 UNSUPPORTED
+
+#
+# Tests that fail on lx-brand and Linux but pass illumos.
+#
+conformance/interfaces/aio_return/aio_return_2-1 UNTESTED
+conformance/interfaces/aio_return/aio_return_3-2 UNTESTED
+conformance/interfaces/pthread_rwlock_rdlock/pthread_rwlock_rdlock_2-1 FAILED
+conformance/interfaces/pthread_rwlock_rdlock/pthread_rwlock_rdlock_2-2 FAILED
+
+#
+# Tests that fail everywhere: lx-brand, Linux, and illumos.
+#
+conformance/interfaces/pthread_rwlock_unlock/pthread_rwlock_unlock_3-1 FAILED
+conformance/interfaces/sched_getparam/sched_getparam_6-1 UNTESTED
+conformance/interfaces/sched_getscheduler/sched_getscheduler_7-1 UNTESTED
+
+#
+# Never hits expected memory limit.
+#
+conformance/interfaces/mmap/mmap_24-1 SKIPPED
+
+#
+# mmap() is supposed to return ENODEV for pipe but returns ENOSYS.
+# This is an illumos bug.
+#
+conformance/interfaces/mmap/mmap_23-1 FAILED
+
+#
+# I'm not sure.
+#
+conformance/interfaces/mmap/mmap_18-1 FAILED
+
+#
+# According to the spec "Memory access within the mapping but beyond
+# the current end of the underlying objects __may__ result in SIGBUS
+# signals being sent to the process". So I don't think it breaks POSIX
+# but it surely doesn't behave like Linux.
+#
+conformance/interfaces/mmap/mmap_11-2 FAILED
+
+#
+# The test uses /proc/mounts to check for noatime but the lx-brand
+# does not indicate noatime even if the underlying zfs fs has atime
+# disabled.
+#
+conformance/interfaces/mmap/mmap_13-1 FAILED
+
+#
+# Doesn't run on 64bit.
+#
+conformance/interfaces/mmap/mmap_31-1 UNSUPPORTED
+
+#
+# Bytes written past the end of the mmap object (but still in page)
+# are not written to disk but they do appear to persist in the page
+# when mmap'd by another pid. Perhaps this test is really testing an
+# implementation detail of Linux's VM system.
+#
+conformance/interfaces/mmap/mmap_11-4 FAILED
+
+#
+# lx-brand doesn't implement clock_getcpudclockid(pid,...).
+#
+conformance/interfaces/pthread_condattr_setclock/pthread_condattr_setclock_1-3 FAILED
