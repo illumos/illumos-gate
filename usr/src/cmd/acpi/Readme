@@ -1,0 +1,7 @@
+The ACPI utilities are based on the Intel ACPI source code drops. No changes
+are made to Intel-provided source code. Most of the ACPI lives in the kernel
+under usr/src/uts/intel/io/acpica and usr/src/uts/intel/sys/acpi.
+
+The assembler/disassembler (iasl) is currently not being built here, but it
+can be used on the dumped tables from within a non-native environment, such
+as within an lx-branded zone.

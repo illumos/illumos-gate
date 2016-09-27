@@ -1,11 +1,11 @@
 /*******************************************************************************
  *
- * Module Name: utresrc - Resource managment utilities
+ * Module Name: utresrc - Resource management utilities
  *
  ******************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2011, Intel Corp.
+ * Copyright (C) 2000 - 2016, Intel Corp.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -41,23 +41,20 @@
  * POSSIBILITY OF SUCH DAMAGES.
  */
 
-
-#define __UTRESRC_C__
-
 #include "acpi.h"
 #include "accommon.h"
-#include "amlresrc.h"
+#include "acresrc.h"
 
 
 #define _COMPONENT          ACPI_UTILITIES
         ACPI_MODULE_NAME    ("utresrc")
 
 
-#if defined(ACPI_DISASSEMBLER) || defined (ACPI_DEBUGGER)
+#if defined(ACPI_DEBUG_OUTPUT) || defined (ACPI_DISASSEMBLER) || defined (ACPI_DEBUGGER)
 
 /*
  * Strings used to decode resource descriptors.
- * Used by both the disasssembler and the debugger resource dump routines
+ * Used by both the disassembler and the debugger resource dump routines
  */
 const char                      *AcpiGbl_BmDecode[] =
 {
@@ -100,7 +97,9 @@ const char                      *AcpiGbl_IoDecode[] =
 const char                      *AcpiGbl_LlDecode[] =
 {
     "ActiveHigh",
-    "ActiveLow"
+    "ActiveLow",
+    "ActiveBoth",
+    "Reserved"
 };
 
 const char                      *AcpiGbl_MaxDecode[] =
@@ -148,7 +147,9 @@ const char                      *AcpiGbl_RwDecode[] =
 const char                      *AcpiGbl_ShrDecode[] =
 {
     "Exclusive",
-    "Shared"
+    "Shared",
+    "ExclusiveAndWake",         /* ACPI 5.0 */
+    "SharedAndWake"             /* ACPI 5.0 */
 };
 
 const char                      *AcpiGbl_SizDecode[] =
@@ -179,6 +180,154 @@ const char                      *AcpiGbl_TypDecode[] =
     "TypeF"
 };
 
+const char                      *AcpiGbl_PpcDecode[] =
+{
+    "PullDefault",
+    "PullUp",
+    "PullDown",
+    "PullNone"
+};
+
+const char                      *AcpiGbl_IorDecode[] =
+{
+    "IoRestrictionNone",
+    "IoRestrictionInputOnly",
+    "IoRestrictionOutputOnly",
+    "IoRestrictionNoneAndPreserve"
+};
+
+const char                      *AcpiGbl_DtsDecode[] =
+{
+    "Width8bit",
+    "Width16bit",
+    "Width32bit",
+    "Width64bit",
+    "Width128bit",
+    "Width256bit",
+};
+
+/* GPIO connection type */
+
+const char                      *AcpiGbl_CtDecode[] =
+{
+    "Interrupt",
+    "I/O"
+};
+
+/* Serial bus type */
+
+const char                      *AcpiGbl_SbtDecode[] =
+{
+    "/* UNKNOWN serial bus type */",
+    "I2C",
+    "SPI",
+    "UART"
+};
+
+/* I2C serial bus access mode */
+
+const char                      *AcpiGbl_AmDecode[] =
+{
+    "AddressingMode7Bit",
+    "AddressingMode10Bit"
+};
+
+/* I2C serial bus slave mode */
+
+const char                      *AcpiGbl_SmDecode[] =
+{
+    "ControllerInitiated",
+    "DeviceInitiated"
+};
+
+/* SPI serial bus wire mode */
+
+const char                      *AcpiGbl_WmDecode[] =
+{
+    "FourWireMode",
+    "ThreeWireMode"
+};
+
+/* SPI serial clock phase */
+
+const char                      *AcpiGbl_CphDecode[] =
+{
+    "ClockPhaseFirst",
+    "ClockPhaseSecond"
+};
+
+/* SPI serial bus clock polarity */
+
+const char                      *AcpiGbl_CpoDecode[] =
+{
+    "ClockPolarityLow",
+    "ClockPolarityHigh"
+};
+
+/* SPI serial bus device polarity */
+
+const char                      *AcpiGbl_DpDecode[] =
+{
+    "PolarityLow",
+    "PolarityHigh"
+};
+
+/* UART serial bus endian */
+
+const char                      *AcpiGbl_EdDecode[] =
+{
+    "LittleEndian",
+    "BigEndian"
+};
+
+/* UART serial bus bits per byte */
+
+const char                      *AcpiGbl_BpbDecode[] =
+{
+    "DataBitsFive",
+    "DataBitsSix",
+    "DataBitsSeven",
+    "DataBitsEight",
+    "DataBitsNine",
+    "/* UNKNOWN Bits per byte */",
+    "/* UNKNOWN Bits per byte */",
+    "/* UNKNOWN Bits per byte */"
+};
+
+/* UART serial bus stop bits */
+
+const char                      *AcpiGbl_SbDecode[] =
+{
+    "StopBitsZero",
+    "StopBitsOne",
+    "StopBitsOnePlusHalf",
+    "StopBitsTwo"
+};
+
+/* UART serial bus flow control */
+
+const char                      *AcpiGbl_FcDecode[] =
+{
+    "FlowControlNone",
+    "FlowControlHardware",
+    "FlowControlXON",
+    "/* UNKNOWN flow control keyword */"
+};
+
+/* UART serial bus parity type */
+
+const char                      *AcpiGbl_PtDecode[] =
+{
+    "ParityTypeNone",
+    "ParityTypeEven",
+    "ParityTypeOdd",
+    "ParityTypeMark",
+    "ParityTypeSpace",
+    "/* UNKNOWN parity keyword */",
+    "/* UNKNOWN parity keyword */",
+    "/* UNKNOWN parity keyword */"
+};
+
 #endif
 
 
@@ -200,7 +349,7 @@ const UINT8                 AcpiGbl_ResourceAmlSizes[] =
     ACPI_AML_SIZE_SMALL (AML_RESOURCE_END_DEPENDENT),
     ACPI_AML_SIZE_SMALL (AML_RESOURCE_IO),
     ACPI_AML_SIZE_SMALL (AML_RESOURCE_FIXED_IO),
-    0,
+    ACPI_AML_SIZE_SMALL (AML_RESOURCE_FIXED_DMA),
     0,
     0,
     0,
@@ -220,7 +369,18 @@ const UINT8                 AcpiGbl_ResourceAmlSizes[] =
     ACPI_AML_SIZE_LARGE (AML_RESOURCE_ADDRESS16),
     ACPI_AML_SIZE_LARGE (AML_RESOURCE_EXTENDED_IRQ),
     ACPI_AML_SIZE_LARGE (AML_RESOURCE_ADDRESS64),
-    ACPI_AML_SIZE_LARGE (AML_RESOURCE_EXTENDED_ADDRESS64)
+    ACPI_AML_SIZE_LARGE (AML_RESOURCE_EXTENDED_ADDRESS64),
+    ACPI_AML_SIZE_LARGE (AML_RESOURCE_GPIO),
+    0,
+    ACPI_AML_SIZE_LARGE (AML_RESOURCE_COMMON_SERIALBUS),
+};
+
+const UINT8                 AcpiGbl_ResourceAmlSerialBusSizes[] =
+{
+    0,
+    ACPI_AML_SIZE_LARGE (AML_RESOURCE_I2C_SERIALBUS),
+    ACPI_AML_SIZE_LARGE (AML_RESOURCE_SPI_SERIALBUS),
+    ACPI_AML_SIZE_LARGE (AML_RESOURCE_UART_SERIALBUS),
 };
 
 
@@ -238,33 +398,36 @@ static const UINT8          AcpiGbl_ResourceTypes[] =
     0,
     0,
     0,
-    ACPI_SMALL_VARIABLE_LENGTH,
-    ACPI_FIXED_LENGTH,
-    ACPI_SMALL_VARIABLE_LENGTH,
-    ACPI_FIXED_LENGTH,
-    ACPI_FIXED_LENGTH,
-    ACPI_FIXED_LENGTH,
+    ACPI_SMALL_VARIABLE_LENGTH,     /* 04 IRQ */
+    ACPI_FIXED_LENGTH,              /* 05 DMA */
+    ACPI_SMALL_VARIABLE_LENGTH,     /* 06 StartDependentFunctions */
+    ACPI_FIXED_LENGTH,              /* 07 EndDependentFunctions */
+    ACPI_FIXED_LENGTH,              /* 08 IO */
+    ACPI_FIXED_LENGTH,              /* 09 FixedIO */
+    ACPI_FIXED_LENGTH,              /* 0A FixedDMA */
     0,
     0,
     0,
-    0,
-    ACPI_VARIABLE_LENGTH,
-    ACPI_FIXED_LENGTH,
+    ACPI_VARIABLE_LENGTH,           /* 0E VendorShort */
+    ACPI_FIXED_LENGTH,              /* 0F EndTag */
 
     /* Large descriptors */
 
     0,
-    ACPI_FIXED_LENGTH,
-    ACPI_FIXED_LENGTH,
+    ACPI_FIXED_LENGTH,              /* 01 Memory24 */
+    ACPI_FIXED_LENGTH,              /* 02 GenericRegister */
     0,
-    ACPI_VARIABLE_LENGTH,
-    ACPI_FIXED_LENGTH,
-    ACPI_FIXED_LENGTH,
-    ACPI_VARIABLE_LENGTH,
-    ACPI_VARIABLE_LENGTH,
-    ACPI_VARIABLE_LENGTH,
-    ACPI_VARIABLE_LENGTH,
-    ACPI_FIXED_LENGTH
+    ACPI_VARIABLE_LENGTH,           /* 04 VendorLong */
+    ACPI_FIXED_LENGTH,              /* 05 Memory32 */
+    ACPI_FIXED_LENGTH,              /* 06 Memory32Fixed */
+    ACPI_VARIABLE_LENGTH,           /* 07 Dword* address */
+    ACPI_VARIABLE_LENGTH,           /* 08 Word* address */
+    ACPI_VARIABLE_LENGTH,           /* 09 ExtendedIRQ */
+    ACPI_VARIABLE_LENGTH,           /* 0A Qword* address */
+    ACPI_FIXED_LENGTH,              /* 0B Extended* address */
+    ACPI_VARIABLE_LENGTH,           /* 0C Gpio* */
+    0,
+    ACPI_VARIABLE_LENGTH            /* 0E *SerialBus */
 };
 
 
@@ -272,11 +435,12 @@ static const UINT8          AcpiGbl_ResourceTypes[] =
  *
  * FUNCTION:    AcpiUtWalkAmlResources
  *
- * PARAMETERS:  Aml             - Pointer to the raw AML resource template
- *              AmlLength       - Length of the entire template
- *              UserFunction    - Called once for each descriptor found. If
- *                                NULL, a pointer to the EndTag is returned
- *              Context         - Passed to UserFunction
+ * PARAMETERS:  WalkState           - Current walk info
+ * PARAMETERS:  Aml                 - Pointer to the raw AML resource template
+ *              AmlLength           - Length of the entire template
+ *              UserFunction        - Called once for each descriptor found. If
+ *                                    NULL, a pointer to the EndTag is returned
+ *              Context             - Passed to UserFunction
  *
  * RETURN:      Status
  *
@@ -287,16 +451,18 @@ static const UINT8          AcpiGbl_ResourceTypes[] =
 
 ACPI_STATUS
 AcpiUtWalkAmlResources (
+    ACPI_WALK_STATE         *WalkState,
     UINT8                   *Aml,
     ACPI_SIZE               AmlLength,
     ACPI_WALK_AML_CALLBACK  UserFunction,
-    void                    *Context)
+    void                    **Context)
 {
     ACPI_STATUS             Status;
     UINT8                   *EndAml;
     UINT8                   ResourceIndex;
     UINT32                  Length;
     UINT32                  Offset = 0;
+    UINT8                   EndTag[2] = {0x79, 0x00};
 
 
     ACPI_FUNCTION_TRACE (UtWalkAmlResources);
@@ -319,9 +485,13 @@ AcpiUtWalkAmlResources (
     {
         /* Validate the Resource Type and Resource Length */
 
-        Status = AcpiUtValidateResource (Aml, &ResourceIndex);
+        Status = AcpiUtValidateResource (WalkState, Aml, &ResourceIndex);
         if (ACPI_FAILURE (Status))
         {
+            /*
+             * Exit on failure. Cannot continue because the descriptor
+             * length may be bogus also.
+             */
             return_ACPI_STATUS (Status);
         }
 
@@ -333,10 +503,11 @@ AcpiUtWalkAmlResources (
 
         if (UserFunction)
         {
-            Status = UserFunction (Aml, Length, Offset, ResourceIndex, Context);
+            Status = UserFunction (
+                Aml, Length, Offset, ResourceIndex, Context);
             if (ACPI_FAILURE (Status))
             {
-                return (Status);
+                return_ACPI_STATUS (Status);
             }
         }
 
@@ -357,7 +528,7 @@ AcpiUtWalkAmlResources (
 
             if (!UserFunction)
             {
-                *(void **) Context = Aml;
+                *Context = Aml;
             }
 
             /* Normal exit */
@@ -371,7 +542,19 @@ AcpiUtWalkAmlResources (
 
     /* Did not find an EndTag descriptor */
 
-    return (AE_AML_NO_RESOURCE_END_TAG);
+    if (UserFunction)
+    {
+        /* Insert an EndTag anyway. AcpiRsGetListLength always leaves room */
+
+        (void) AcpiUtValidateResource (WalkState, EndTag, &ResourceIndex);
+        Status = UserFunction (EndTag, 2, Offset, ResourceIndex, Context);
+        if (ACPI_FAILURE (Status))
+        {
+            return_ACPI_STATUS (Status);
+        }
+    }
+
+    return_ACPI_STATUS (AE_AML_NO_RESOURCE_END_TAG);
 }
 
 
@@ -379,9 +562,10 @@ AcpiUtWalkAmlResources (
  *
  * FUNCTION:    AcpiUtValidateResource
  *
- * PARAMETERS:  Aml             - Pointer to the raw AML resource descriptor
- *              ReturnIndex     - Where the resource index is returned. NULL
- *                                if the index is not required.
+ * PARAMETERS:  WalkState           - Current walk info
+ *              Aml                 - Pointer to the raw AML resource descriptor
+ *              ReturnIndex         - Where the resource index is returned. NULL
+ *                                    if the index is not required.
  *
  * RETURN:      Status, and optionally the Index into the global resource tables
  *
@@ -393,9 +577,11 @@ AcpiUtWalkAmlResources (
 
 ACPI_STATUS
 AcpiUtValidateResource (
+    ACPI_WALK_STATE         *WalkState,
     void                    *Aml,
     UINT8                   *ReturnIndex)
 {
+    AML_RESOURCE            *AmlResource;
     UINT8                   ResourceType;
     UINT8                   ResourceIndex;
     ACPI_RS_LENGTH          ResourceLength;
@@ -420,7 +606,7 @@ AcpiUtValidateResource (
 
         if (ResourceType > ACPI_RESOURCE_NAME_LARGE_MAX)
         {
-            return (AE_AML_INVALID_RESOURCE_TYPE);
+            goto InvalidResource;
         }
 
         /*
@@ -439,17 +625,18 @@ AcpiUtValidateResource (
             ((ResourceType & ACPI_RESOURCE_NAME_SMALL_MASK) >> 3);
     }
 
-    /* Check validity of the resource type, zero indicates name is invalid */
-
+    /*
+     * Check validity of the resource type, via AcpiGbl_ResourceTypes.
+     * Zero indicates an invalid resource.
+     */
     if (!AcpiGbl_ResourceTypes[ResourceIndex])
     {
-        return (AE_AML_INVALID_RESOURCE_TYPE);
+        goto InvalidResource;
     }
 
-
     /*
-     * 2) Validate the ResourceLength field. This ensures that the length
-     *    is at least reasonable, and guarantees that it is non-zero.
+     * Validate the ResourceLength field. This ensures that the length
+     * is at least reasonable, and guarantees that it is non-zero.
      */
     ResourceLength = AcpiUtGetResourceLength (Aml);
     MinimumResourceLength = AcpiGbl_ResourceAmlSizes[ResourceIndex];
@@ -464,7 +651,7 @@ AcpiUtValidateResource (
 
         if (ResourceLength != MinimumResourceLength)
         {
-            return (AE_AML_BAD_RESOURCE_LENGTH);
+            goto BadResourceLength;
         }
         break;
 
@@ -474,7 +661,7 @@ AcpiUtValidateResource (
 
         if (ResourceLength < MinimumResourceLength)
         {
-            return (AE_AML_BAD_RESOURCE_LENGTH);
+            goto BadResourceLength;
         }
         break;
 
@@ -485,7 +672,7 @@ AcpiUtValidateResource (
         if ((ResourceLength > MinimumResourceLength) ||
             (ResourceLength < (MinimumResourceLength - 1)))
         {
-            return (AE_AML_BAD_RESOURCE_LENGTH);
+            goto BadResourceLength;
         }
         break;
 
@@ -493,7 +680,25 @@ AcpiUtValidateResource (
 
         /* Shouldn't happen (because of validation earlier), but be sure */
 
-        return (AE_AML_INVALID_RESOURCE_TYPE);
+        goto InvalidResource;
+    }
+
+    AmlResource = ACPI_CAST_PTR (AML_RESOURCE, Aml);
+    if (ResourceType == ACPI_RESOURCE_NAME_SERIAL_BUS)
+    {
+        /* Validate the BusType field */
+
+        if ((AmlResource->CommonSerialBus.Type == 0) ||
+            (AmlResource->CommonSerialBus.Type > AML_RESOURCE_MAX_SERIALBUSTYPE))
+        {
+            if (WalkState)
+            {
+                ACPI_ERROR ((AE_INFO,
+                    "Invalid/unsupported SerialBus resource descriptor: BusType 0x%2.2X",
+                    AmlResource->CommonSerialBus.Type));
+            }
+            return (AE_AML_INVALID_RESOURCE_TYPE);
+        }
     }
 
     /* Optionally return the resource table index */
@@ -504,6 +709,28 @@ AcpiUtValidateResource (
     }
 
     return (AE_OK);
+
+
+InvalidResource:
+
+    if (WalkState)
+    {
+        ACPI_ERROR ((AE_INFO,
+            "Invalid/unsupported resource descriptor: Type 0x%2.2X",
+            ResourceType));
+    }
+    return (AE_AML_INVALID_RESOURCE_TYPE);
+
+BadResourceLength:
+
+    if (WalkState)
+    {
+        ACPI_ERROR ((AE_INFO,
+            "Invalid resource descriptor length: Type "
+            "0x%2.2X, Length 0x%4.4X, MinLength 0x%4.4X",
+            ResourceType, ResourceLength, MinimumResourceLength));
+    }
+    return (AE_AML_BAD_RESOURCE_LENGTH);
 }
 
 
@@ -587,7 +814,7 @@ AcpiUtGetResourceLength (
         /* Small Resource type -- bits 2:0 of byte 0 contain the length */
 
         ResourceLength = (UINT16) (ACPI_GET8 (Aml) &
-                                    ACPI_RESOURCE_NAME_SMALL_LENGTH_MASK);
+            ACPI_RESOURCE_NAME_SMALL_LENGTH_MASK);
     }
 
     return (ResourceLength);
@@ -652,7 +879,7 @@ AcpiUtGetDescriptorLength (
      * the header length (depends on if this is a small or large resource)
      */
     return (AcpiUtGetResourceLength (Aml) +
-            AcpiUtGetResourceHeaderLength (Aml));
+        AcpiUtGetResourceHeaderLength (Aml));
 }
 
 
@@ -691,10 +918,8 @@ AcpiUtGetResourceEndTag (
 
     /* Validate the template and get a pointer to the EndTag */
 
-    Status = AcpiUtWalkAmlResources (ObjDesc->Buffer.Pointer,
-                ObjDesc->Buffer.Length, NULL, EndTag);
+    Status = AcpiUtWalkAmlResources (NULL, ObjDesc->Buffer.Pointer,
+        ObjDesc->Buffer.Length, NULL, (void **) EndTag);
 
     return_ACPI_STATUS (Status);
 }
-
-

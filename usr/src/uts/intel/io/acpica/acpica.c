@@ -20,8 +20,8 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2011, Joyent, Inc. All rights reserved.
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016, Joyent, Inc.
  */
 /*
  * Copyright (c) 2009, Intel Corporation.
@@ -95,6 +95,9 @@ static kstat_t	*acpica_ksp;
  * After successful initialization, will be ACPICA_INITIALIZED
  */
 int acpica_init_state = ACPICA_NOT_INITIALIZED;
+
+void *AcpiGbl_DbBuffer;
+uint32_t AcpiGbl_DbConsoleDebugLevel;
 
 /*
  * Following are set by acpica_process_user_options()
@@ -192,37 +195,42 @@ static int
 acpica_install_handlers()
 {
 	ACPI_STATUS	rv = AE_OK;
+	ACPI_STATUS	res;
 
 	/*
 	 * Install ACPI CA default handlers
 	 */
-	if (AcpiInstallAddressSpaceHandler(ACPI_ROOT_OBJECT,
+	if ((res = AcpiInstallAddressSpaceHandler(ACPI_ROOT_OBJECT,
 	    ACPI_ADR_SPACE_SYSTEM_MEMORY,
-	    ACPI_DEFAULT_HANDLER, NULL, NULL) != AE_OK) {
+	    ACPI_DEFAULT_HANDLER, NULL, NULL)) != AE_OK &&
+	    res != AE_SAME_HANDLER) {
 		cmn_err(CE_WARN, "!acpica: no default handler for"
 		    " system memory");
 		rv = AE_ERROR;
 	}
 
-	if (AcpiInstallAddressSpaceHandler(ACPI_ROOT_OBJECT,
+	if ((res = AcpiInstallAddressSpaceHandler(ACPI_ROOT_OBJECT,
 	    ACPI_ADR_SPACE_SYSTEM_IO,
-	    ACPI_DEFAULT_HANDLER, NULL, NULL) != AE_OK) {
+	    ACPI_DEFAULT_HANDLER, NULL, NULL)) != AE_OK &&
+	    res != AE_SAME_HANDLER) {
 		cmn_err(CE_WARN, "!acpica: no default handler for"
 		    " system I/O");
 		rv = AE_ERROR;
 	}
 
-	if (AcpiInstallAddressSpaceHandler(ACPI_ROOT_OBJECT,
+	if ((res = AcpiInstallAddressSpaceHandler(ACPI_ROOT_OBJECT,
 	    ACPI_ADR_SPACE_PCI_CONFIG,
-	    ACPI_DEFAULT_HANDLER, NULL, NULL) != AE_OK) {
+	    ACPI_DEFAULT_HANDLER, NULL, NULL)) != AE_OK &&
+	    res != AE_SAME_HANDLER) {
 		cmn_err(CE_WARN, "!acpica: no default handler for"
 		    " PCI Config");
 		rv = AE_ERROR;
 	}
 
-	if (AcpiInstallAddressSpaceHandler(ACPI_ROOT_OBJECT,
+	if ((res = AcpiInstallAddressSpaceHandler(ACPI_ROOT_OBJECT,
 	    ACPI_ADR_SPACE_DATA_TABLE,
-	    ACPI_DEFAULT_HANDLER, NULL, NULL) != AE_OK) {
+	    ACPI_DEFAULT_HANDLER, NULL, NULL)) != AE_OK &&
+	    res != AE_SAME_HANDLER) {
 		cmn_err(CE_WARN, "!acpica: no default handler for"
 		    " Data Table");
 		rv = AE_ERROR;

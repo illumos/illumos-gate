@@ -5,7 +5,7 @@
  ******************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2011, Intel Corp.
+ * Copyright (C) 2000 - 2016, Intel Corp.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -40,8 +40,6 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  */
-
-#define __DSMTHDAT_C__
 
 #include "acpi.h"
 #include "accommon.h"
@@ -86,7 +84,7 @@ AcpiDsMethodDataGetType (
  * RETURN:      Status
  *
  * DESCRIPTION: Initialize the data structures that hold the method's arguments
- *              and locals.  The data struct is an array of namespace nodes for
+ *              and locals. The data struct is an array of namespace nodes for
  *              each - this allows RefOf and DeRefOf to work properly for these
  *              special data types.
  *
@@ -112,7 +110,9 @@ AcpiDsMethodDataInit (
 
     for (i = 0; i < ACPI_METHOD_NUM_ARGS; i++)
     {
-        ACPI_MOVE_32_TO_32 (&WalkState->Arguments[i].Name, NAMEOF_ARG_NTE);
+        ACPI_MOVE_32_TO_32 (&WalkState->Arguments[i].Name,
+            NAMEOF_ARG_NTE);
+
         WalkState->Arguments[i].Name.Integer |= (i << 24);
         WalkState->Arguments[i].DescriptorType = ACPI_DESC_TYPE_NAMED;
         WalkState->Arguments[i].Type = ACPI_TYPE_ANY;
@@ -123,7 +123,8 @@ AcpiDsMethodDataInit (
 
     for (i = 0; i < ACPI_METHOD_NUM_LOCALS; i++)
     {
-        ACPI_MOVE_32_TO_32 (&WalkState->LocalVariables[i].Name, NAMEOF_LOCAL_NTE);
+        ACPI_MOVE_32_TO_32 (&WalkState->LocalVariables[i].Name,
+            NAMEOF_LOCAL_NTE);
 
         WalkState->LocalVariables[i].Name.Integer |= (i << 24);
         WalkState->LocalVariables[i].DescriptorType = ACPI_DESC_TYPE_NAMED;
@@ -143,7 +144,7 @@ AcpiDsMethodDataInit (
  *
  * RETURN:      None
  *
- * DESCRIPTION: Delete method locals and arguments.  Arguments are only
+ * DESCRIPTION: Delete method locals and arguments. Arguments are only
  *              deleted if this method was called from another method.
  *
  ******************************************************************************/
@@ -165,7 +166,7 @@ AcpiDsMethodDataDeleteAll (
         if (WalkState->LocalVariables[Index].Object)
         {
             ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Deleting Local%u=%p\n",
-                    Index, WalkState->LocalVariables[Index].Object));
+                Index, WalkState->LocalVariables[Index].Object));
 
             /* Detach object (if present) and remove a reference */
 
@@ -180,7 +181,7 @@ AcpiDsMethodDataDeleteAll (
         if (WalkState->Arguments[Index].Object)
         {
             ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Deleting Arg%u=%p\n",
-                    Index, WalkState->Arguments[Index].Object));
+                Index, WalkState->Arguments[Index].Object));
 
             /* Detach object (if present) and remove a reference */
 
@@ -202,7 +203,7 @@ AcpiDsMethodDataDeleteAll (
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Initialize arguments for a method.  The parameter list is a list
+ * DESCRIPTION: Initialize arguments for a method. The parameter list is a list
  *              of ACPI operand objects, either null terminated or whose length
  *              is defined by MaxParamCount.
  *
@@ -223,7 +224,8 @@ AcpiDsMethodDataInitArgs (
 
     if (!Params)
     {
-        ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "No param list passed to method\n"));
+        ACPI_DEBUG_PRINT ((ACPI_DB_EXEC,
+            "No parameter list passed to method\n"));
         return_ACPI_STATUS (AE_OK);
     }
 
@@ -238,8 +240,8 @@ AcpiDsMethodDataInitArgs (
          * Store the argument in the method/walk descriptor.
          * Do not copy the arg in order to implement call by reference
          */
-        Status = AcpiDsMethodDataSetValue (ACPI_REFCLASS_ARG, Index,
-                    Params[Index], WalkState);
+        Status = AcpiDsMethodDataSetValue (
+            ACPI_REFCLASS_ARG, Index, Params[Index], WalkState);
         if (ACPI_FAILURE (Status))
         {
             return_ACPI_STATUS (Status);
@@ -315,6 +317,7 @@ AcpiDsMethodDataGetNode (
         break;
 
     default:
+
         ACPI_ERROR ((AE_INFO, "Type %u is invalid", Type));
         return_ACPI_STATUS (AE_TYPE);
     }
@@ -443,7 +446,7 @@ AcpiDsMethodDataGetValue (
          * This means that either 1) The expected argument was
          * not passed to the method, or 2) A local variable
          * was referenced by the method (via the ASL)
-         * before it was initialized.  Either case is an error.
+         * before it was initialized. Either case is an error.
          */
 
         /* If slack enabled, init the LocalX/ArgX to an Integer of value zero */
@@ -472,7 +475,6 @@ AcpiDsMethodDataGetValue (
             return_ACPI_STATUS (AE_AML_UNINITIALIZED_ARG);
 
         case ACPI_REFCLASS_LOCAL:
-
             /*
              * No error message for this case, will be trapped again later to
              * detect and ignore cases of Store(LocalX,LocalX)
@@ -508,7 +510,7 @@ AcpiDsMethodDataGetValue (
  *
  * RETURN:      None
  *
- * DESCRIPTION: Delete the entry at Opcode:Index.  Inserts
+ * DESCRIPTION: Delete the entry at Opcode:Index. Inserts
  *              a null into the stack slot after the object is deleted.
  *
  ******************************************************************************/
@@ -573,7 +575,7 @@ AcpiDsMethodDataDeleteValue (
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Store a value in an Arg or Local.  The ObjDesc is installed
+ * DESCRIPTION: Store a value in an Arg or Local. The ObjDesc is installed
  *              as the new value for the Arg or Local and the reference count
  *              for ObjDesc is incremented.
  *
@@ -621,7 +623,7 @@ AcpiDsStoreObjectToLocal (
 
     /*
      * If the reference count on the object is more than one, we must
-     * take a copy of the object before we store.  A reference count
+     * take a copy of the object before we store. A reference count
      * of exactly 1 means that the object was just created during the
      * evaluation of an expression, and we can safely use it since it
      * is not used anywhere else.
@@ -629,7 +631,8 @@ AcpiDsStoreObjectToLocal (
     NewObjDesc = ObjDesc;
     if (ObjDesc->Common.ReferenceCount > 1)
     {
-        Status = AcpiUtCopyIobjectToIobject (ObjDesc, &NewObjDesc, WalkState);
+        Status = AcpiUtCopyIobjectToIobject (
+            ObjDesc, &NewObjDesc, WalkState);
         if (ACPI_FAILURE (Status))
         {
             return_ACPI_STATUS (Status);
@@ -666,13 +669,16 @@ AcpiDsStoreObjectToLocal (
              * If we have a valid reference object that came from RefOf(),
              * do the indirect store
              */
-            if ((ACPI_GET_DESCRIPTOR_TYPE (CurrentObjDesc) == ACPI_DESC_TYPE_OPERAND) &&
-                (CurrentObjDesc->Common.Type == ACPI_TYPE_LOCAL_REFERENCE) &&
-                (CurrentObjDesc->Reference.Class == ACPI_REFCLASS_REFOF))
+            if ((ACPI_GET_DESCRIPTOR_TYPE (CurrentObjDesc) ==
+                    ACPI_DESC_TYPE_OPERAND) &&
+                (CurrentObjDesc->Common.Type ==
+                    ACPI_TYPE_LOCAL_REFERENCE) &&
+                (CurrentObjDesc->Reference.Class ==
+                    ACPI_REFCLASS_REFOF))
             {
                 ACPI_DEBUG_PRINT ((ACPI_DB_EXEC,
-                        "Arg (%p) is an ObjRef(Node), storing in node %p\n",
-                        NewObjDesc, CurrentObjDesc));
+                    "Arg (%p) is an ObjRef(Node), storing in node %p\n",
+                    NewObjDesc, CurrentObjDesc));
 
                 /*
                  * Store this object to the Node (perform the indirect store)
@@ -680,8 +686,8 @@ AcpiDsStoreObjectToLocal (
                  * specification rules on storing to Locals/Args.
                  */
                 Status = AcpiExStoreObjectToNode (NewObjDesc,
-                            CurrentObjDesc->Reference.Object, WalkState,
-                            ACPI_NO_IMPLICIT_CONVERSION);
+                    CurrentObjDesc->Reference.Object, WalkState,
+                    ACPI_NO_IMPLICIT_CONVERSION);
 
                 /* Remove local reference if we copied the object above */
 
@@ -689,6 +695,7 @@ AcpiDsStoreObjectToLocal (
                 {
                     AcpiUtRemoveReference (NewObjDesc);
                 }
+
                 return_ACPI_STATUS (Status);
             }
         }
@@ -768,5 +775,3 @@ AcpiDsMethodDataGetType (
     return_VALUE (Object->Type);
 }
 #endif
-
-

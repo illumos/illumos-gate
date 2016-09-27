@@ -1,12 +1,11 @@
-
 /******************************************************************************
  *
- * Module Name: exstorob - AML Interpreter object store support, store to object
+ * Module Name: exstorob - AML object store support, store to object
  *
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2011, Intel Corp.
+ * Copyright (C) 2000 - 2016, Intel Corp.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -41,8 +40,6 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  */
-
-#define __EXSTOROB_C__
 
 #include "acpi.h"
 #include "accommon.h"
@@ -112,13 +109,13 @@ AcpiExStoreBufferToBuffer (
     {
         /* Clear existing buffer and copy in the new one */
 
-        ACPI_MEMSET (TargetDesc->Buffer.Pointer, 0, TargetDesc->Buffer.Length);
-        ACPI_MEMCPY (TargetDesc->Buffer.Pointer, Buffer, Length);
+        memset (TargetDesc->Buffer.Pointer, 0, TargetDesc->Buffer.Length);
+        memcpy (TargetDesc->Buffer.Pointer, Buffer, Length);
 
 #ifdef ACPI_OBSOLETE_BEHAVIOR
         /*
          * NOTE: ACPI versions up to 3.0 specified that the buffer must be
-         * truncated if the string is smaller than the buffer.  However, "other"
+         * truncated if the string is smaller than the buffer. However, "other"
          * implementations of ACPI never did this and thus became the defacto
          * standard. ACPI 3.0A changes this behavior such that the buffer
          * is no longer truncated.
@@ -127,7 +124,7 @@ AcpiExStoreBufferToBuffer (
         /*
          * OBSOLETE BEHAVIOR:
          * If the original source was a string, we must truncate the buffer,
-         * according to the ACPI spec.  Integer-to-Buffer and Buffer-to-Buffer
+         * according to the ACPI spec. Integer-to-Buffer and Buffer-to-Buffer
          * copy must not truncate the original buffer.
          */
         if (OriginalSrcType == ACPI_TYPE_STRING)
@@ -142,7 +139,7 @@ AcpiExStoreBufferToBuffer (
     {
         /* Truncate the source, copy only what will fit */
 
-        ACPI_MEMCPY (TargetDesc->Buffer.Pointer, Buffer,
+        memcpy (TargetDesc->Buffer.Pointer, Buffer,
             TargetDesc->Buffer.Length);
 
         ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
@@ -206,9 +203,9 @@ AcpiExStoreStringToString (
          * String will fit in existing non-static buffer.
          * Clear old string and copy in the new one
          */
-        ACPI_MEMSET (TargetDesc->String.Pointer, 0,
+        memset (TargetDesc->String.Pointer, 0,
             (ACPI_SIZE) TargetDesc->String.Length + 1);
-        ACPI_MEMCPY (TargetDesc->String.Pointer, Buffer, Length);
+        memcpy (TargetDesc->String.Pointer, Buffer, Length);
     }
     else
     {
@@ -224,15 +221,16 @@ AcpiExStoreStringToString (
             ACPI_FREE (TargetDesc->String.Pointer);
         }
 
-        TargetDesc->String.Pointer = ACPI_ALLOCATE_ZEROED (
-                                        (ACPI_SIZE) Length + 1);
+        TargetDesc->String.Pointer =
+            ACPI_ALLOCATE_ZEROED ((ACPI_SIZE) Length + 1);
+
         if (!TargetDesc->String.Pointer)
         {
             return_ACPI_STATUS (AE_NO_MEMORY);
         }
 
         TargetDesc->Common.Flags &= ~AOPOBJ_STATIC_POINTER;
-        ACPI_MEMCPY (TargetDesc->String.Pointer, Buffer, Length);
+        memcpy (TargetDesc->String.Pointer, Buffer, Length);
     }
 
     /* Set the new target length */
@@ -240,5 +238,3 @@ AcpiExStoreStringToString (
     TargetDesc->String.Length = Length;
     return_ACPI_STATUS (AE_OK);
 }
-
-

@@ -23,6 +23,8 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2016 Joyent, Inc.
+#
 
 #
 #	This makefile drives the production of the power driver
@@ -66,6 +68,8 @@ CFLAGS += $(CCVERBOSE)
 #
 CFLAGS += -DACPI_POWER_BUTTON
 LINTFLAGS += -DACPI_POWER_BUTTON
+
+CERRWARN += -_gcc=-Wno-unused-function
 
 LDFLAGS += -dy -N misc/acpica
 

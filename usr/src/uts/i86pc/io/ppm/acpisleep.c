@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2016, Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -86,7 +87,7 @@ acpi_enter_sleepstate(s3a_t *s3ap)
 
 	PT(PT_SWV);
 	/* Set waking vector */
-	if (AcpiSetFirmwareWakingVector(wakephys) != AE_OK) {
+	if (AcpiSetFirmwareWakingVector(wakephys, NULL) != AE_OK) {
 		PT(PT_SWV_FAIL);
 		PMD(PMD_SX, ("Can't SetFirmwareWakingVector(%lx)\n",
 		    (long)wakephys))
@@ -163,6 +164,11 @@ acpi_exit_sleepstate(s3a_t *s3ap)
 	PMD(PMD_SX, ("!We woke up!\n"))
 
 	PT(PT_LSS);
+	if (AcpiLeaveSleepStatePrep(Sx) != AE_OK) {
+		PT(PT_LSS_FAIL);
+		PMD(PMD_SX, ("Problem with LeaveSleepState!\n"))
+	}
+
 	if (AcpiLeaveSleepState(Sx) != AE_OK) {
 		PT(PT_LSS_FAIL);
 		PMD(PMD_SX, ("Problem with LeaveSleepState!\n"))

@@ -24,6 +24,7 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 # Copyright (c) 2011 Bayard G. Bell. All rights reserved.
+# Copyright 2016 Joyent, Inc.
 #
 #	This makefile drives the production of the power managment
 #	module for the ACPI subsystem
@@ -57,6 +58,9 @@ include $(UTSBASE)/i86pc/Makefile.i86pc
 ALL_TARGET	= $(BINARY) $(SRC_CONFILE)
 LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
+
+$(OBJS_DIR)/acpippm.o :=	CERRWARN	+= -_gcc=-Wno-unused-function
+$(OBJS_DIR)/acpisleep.o :=	CERRWARN	+= -_gcc=-Wno-unused-function
 
 #
 # lint pass one enforcement

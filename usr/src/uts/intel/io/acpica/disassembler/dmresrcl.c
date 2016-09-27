@@ -5,7 +5,7 @@
  ******************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2011, Intel Corp.
+ * Copyright (C) 2000 - 2016, Intel Corp.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -41,13 +41,10 @@
  * POSSIBILITY OF SUCH DAMAGES.
  */
 
-
 #include "acpi.h"
 #include "accommon.h"
 #include "acdisasm.h"
 
-
-#ifdef ACPI_DISASSEMBLER
 
 #define _COMPONENT          ACPI_CA_DEBUGGER
         ACPI_MODULE_NAME    ("dbresrcl")
@@ -55,7 +52,7 @@
 
 /* Common names for address and memory descriptors */
 
-static char                 *AcpiDmAddressNames[] =
+static const char           *AcpiDmAddressNames[] =
 {
     "Granularity",
     "Range Minimum",
@@ -64,7 +61,7 @@ static char                 *AcpiDmAddressNames[] =
     "Length"
 };
 
-static char                 *AcpiDmMemoryNames[] =
+static const char           *AcpiDmMemoryNames[] =
 {
     "Range Minimum",
     "Range Maximum",
@@ -153,16 +150,19 @@ AcpiDmMemoryFields (
         switch (Type)
         {
         case 16:
+
             AcpiDmDumpInteger16 (ACPI_CAST_PTR (UINT16, Source)[i],
                 AcpiDmMemoryNames[i]);
             break;
 
         case 32:
+
             AcpiDmDumpInteger32 (ACPI_CAST_PTR (UINT32, Source)[i],
                 AcpiDmMemoryNames[i]);
             break;
 
         default:
+
             return;
         }
     }
@@ -201,21 +201,25 @@ AcpiDmAddressFields (
         switch (Type)
         {
         case 16:
+
             AcpiDmDumpInteger16 (ACPI_CAST_PTR (UINT16, Source)[i],
                 AcpiDmAddressNames[i]);
             break;
 
         case 32:
+
             AcpiDmDumpInteger32 (ACPI_CAST_PTR (UINT32, Source)[i],
                 AcpiDmAddressNames[i]);
             break;
 
         case 64:
+
             AcpiDmDumpInteger64 (ACPI_CAST_PTR (UINT64, Source)[i],
                 AcpiDmAddressNames[i]);
             break;
 
         default:
+
             return;
         }
     }
@@ -242,22 +246,27 @@ AcpiDmAddressPrefix (
     switch (Type)
     {
     case ACPI_RESOURCE_TYPE_ADDRESS16:
+
         AcpiOsPrintf ("Word");
         break;
 
     case ACPI_RESOURCE_TYPE_ADDRESS32:
+
         AcpiOsPrintf ("DWord");
         break;
 
     case ACPI_RESOURCE_TYPE_ADDRESS64:
+
         AcpiOsPrintf ("QWord");
         break;
 
     case ACPI_RESOURCE_TYPE_EXTENDED_ADDRESS64:
+
         AcpiOsPrintf ("Extended");
         break;
 
     default:
+
         return;
     }
 }
@@ -298,7 +307,8 @@ AcpiDmAddressCommon (
 
     if ((ResourceType > 2) && (ResourceType < 0xC0))
     {
-        AcpiOsPrintf ("/**** Invalid Resource Type: 0x%X ****/", ResourceType);
+        AcpiOsPrintf (
+            "/**** Invalid Resource Type: 0x%X ****/", ResourceType);
         return;
     }
 
@@ -318,7 +328,8 @@ AcpiDmAddressCommon (
 
     /* This is either a Memory, IO, or BusNumber descriptor (0,1,2) */
 
-    AcpiOsPrintf ("%s (", AcpiGbl_WordDecode [ResourceType & 0x3]);
+    AcpiOsPrintf ("%s (",
+        AcpiGbl_WordDecode [ACPI_GET_2BIT_FLAG (ResourceType)]);
 
     /* Decode the general and type-specific flags */
 
@@ -331,7 +342,8 @@ AcpiDmAddressCommon (
         AcpiDmIoFlags (Flags);
         if (ResourceType == ACPI_IO_RANGE)
         {
-            AcpiOsPrintf (" %s,", AcpiGbl_RngDecode [SpecificFlags & 0x3]);
+            AcpiOsPrintf (" %s,",
+                AcpiGbl_RngDecode [ACPI_GET_2BIT_FLAG (SpecificFlags)]);
         }
     }
 }
@@ -383,10 +395,10 @@ AcpiDmSpaceFlags (
 {
 
     AcpiOsPrintf ("%s, %s, %s, %s,",
-        AcpiGbl_ConsumeDecode [(Flags & 1)],
-        AcpiGbl_DecDecode [(Flags & 0x2) >> 1],
-        AcpiGbl_MinDecode [(Flags & 0x4) >> 2],
-        AcpiGbl_MaxDecode [(Flags & 0x8) >> 3]);
+        AcpiGbl_ConsumeDecode [ACPI_GET_1BIT_FLAG (Flags)],
+        AcpiGbl_DecDecode [ACPI_EXTRACT_1BIT_FLAG (Flags, 1)],
+        AcpiGbl_MinDecode [ACPI_EXTRACT_1BIT_FLAG (Flags, 2)],
+        AcpiGbl_MaxDecode [ACPI_EXTRACT_1BIT_FLAG (Flags, 3)]);
 }
 
 
@@ -407,10 +419,10 @@ AcpiDmIoFlags (
         UINT8               Flags)
 {
     AcpiOsPrintf ("%s, %s, %s, %s,",
-        AcpiGbl_ConsumeDecode [(Flags & 1)],
-        AcpiGbl_MinDecode [(Flags & 0x4) >> 2],
-        AcpiGbl_MaxDecode [(Flags & 0x8) >> 3],
-        AcpiGbl_DecDecode [(Flags & 0x2) >> 1]);
+        AcpiGbl_ConsumeDecode [ACPI_GET_1BIT_FLAG (Flags)],
+        AcpiGbl_MinDecode [ACPI_EXTRACT_1BIT_FLAG (Flags, 2)],
+        AcpiGbl_MaxDecode [ACPI_EXTRACT_1BIT_FLAG (Flags, 3)],
+        AcpiGbl_DecDecode [ACPI_EXTRACT_1BIT_FLAG (Flags, 1)]);
 }
 
 
@@ -432,14 +444,14 @@ AcpiDmIoFlags2 (
 {
 
     AcpiOsPrintf (", %s",
-        AcpiGbl_TtpDecode [(SpecificFlags & 0x10) >> 4]);
+        AcpiGbl_TtpDecode [ACPI_EXTRACT_1BIT_FLAG (SpecificFlags, 4)]);
 
     /* TRS is only used if TTP is TypeTranslation */
 
     if (SpecificFlags & 0x10)
     {
         AcpiOsPrintf (", %s",
-            AcpiGbl_TrsDecode [(SpecificFlags & 0x20) >> 5]);
+            AcpiGbl_TrsDecode [ACPI_EXTRACT_1BIT_FLAG (SpecificFlags, 5)]);
     }
 }
 
@@ -464,12 +476,12 @@ AcpiDmMemoryFlags (
 {
 
     AcpiOsPrintf ("%s, %s, %s, %s, %s, %s,",
-        AcpiGbl_ConsumeDecode [(Flags & 1)],
-        AcpiGbl_DecDecode [(Flags & 0x2) >> 1],
-        AcpiGbl_MinDecode [(Flags & 0x4) >> 2],
-        AcpiGbl_MaxDecode [(Flags & 0x8) >> 3],
-        AcpiGbl_MemDecode [(SpecificFlags & 0x6) >> 1],
-        AcpiGbl_RwDecode [(SpecificFlags & 0x1)]);
+        AcpiGbl_ConsumeDecode [ACPI_GET_1BIT_FLAG (Flags)],
+        AcpiGbl_DecDecode [ACPI_EXTRACT_1BIT_FLAG (Flags, 1)],
+        AcpiGbl_MinDecode [ACPI_EXTRACT_1BIT_FLAG (Flags, 2)],
+        AcpiGbl_MaxDecode [ACPI_EXTRACT_1BIT_FLAG (Flags, 3)],
+        AcpiGbl_MemDecode [ACPI_EXTRACT_2BIT_FLAG (SpecificFlags, 1)],
+        AcpiGbl_RwDecode [ACPI_GET_1BIT_FLAG (SpecificFlags)]);
 }
 
 
@@ -491,8 +503,8 @@ AcpiDmMemoryFlags2 (
 {
 
     AcpiOsPrintf (", %s, %s",
-        AcpiGbl_MtpDecode [(SpecificFlags & 0x18) >> 3],
-        AcpiGbl_TtpDecode [(SpecificFlags & 0x20) >> 5]);
+        AcpiGbl_MtpDecode [ACPI_EXTRACT_2BIT_FLAG (SpecificFlags, 3)],
+        AcpiGbl_TtpDecode [ACPI_EXTRACT_1BIT_FLAG (SpecificFlags, 5)]);
 }
 
 
@@ -553,7 +565,7 @@ AcpiDmResourceSource (
     if (TotalLength > (MinimumTotalLength + 1))
     {
         AcpiOsPrintf (" ");
-        AcpiUtPrintString ((char *) &AmlResourceSource[1], ACPI_UINT8_MAX);
+        AcpiUtPrintString ((char *) &AmlResourceSource[1], ACPI_UINT16_MAX);
     }
 
     AcpiOsPrintf (", ");
@@ -564,7 +576,8 @@ AcpiDmResourceSource (
  *
  * FUNCTION:    AcpiDmWordDescriptor
  *
- * PARAMETERS:  Resource            - Pointer to the resource descriptor
+ * PARAMETERS:  Info                - Extra resource info
+ *              Resource            - Pointer to the resource descriptor
  *              Length              - Length of the descriptor in bytes
  *              Level               - Current source code indentation level
  *
@@ -576,6 +589,7 @@ AcpiDmResourceSource (
 
 void
 AcpiDmWordDescriptor (
+    ACPI_OP_WALK_INFO       *Info,
     AML_RESOURCE            *Resource,
     UINT32                  Length,
     UINT32                  Level)
@@ -609,7 +623,8 @@ AcpiDmWordDescriptor (
  *
  * FUNCTION:    AcpiDmDwordDescriptor
  *
- * PARAMETERS:  Resource            - Pointer to the resource descriptor
+ * PARAMETERS:  Info                - Extra resource info
+ *              Resource            - Pointer to the resource descriptor
  *              Length              - Length of the descriptor in bytes
  *              Level               - Current source code indentation level
  *
@@ -621,6 +636,7 @@ AcpiDmWordDescriptor (
 
 void
 AcpiDmDwordDescriptor (
+    ACPI_OP_WALK_INFO       *Info,
     AML_RESOURCE            *Resource,
     UINT32                  Length,
     UINT32                  Level)
@@ -654,7 +670,8 @@ AcpiDmDwordDescriptor (
  *
  * FUNCTION:    AcpiDmQwordDescriptor
  *
- * PARAMETERS:  Resource            - Pointer to the resource descriptor
+ * PARAMETERS:  Info                - Extra resource info
+ *              Resource            - Pointer to the resource descriptor
  *              Length              - Length of the descriptor in bytes
  *              Level               - Current source code indentation level
  *
@@ -666,6 +683,7 @@ AcpiDmDwordDescriptor (
 
 void
 AcpiDmQwordDescriptor (
+    ACPI_OP_WALK_INFO       *Info,
     AML_RESOURCE            *Resource,
     UINT32                  Length,
     UINT32                  Level)
@@ -699,7 +717,8 @@ AcpiDmQwordDescriptor (
  *
  * FUNCTION:    AcpiDmExtendedDescriptor
  *
- * PARAMETERS:  Resource            - Pointer to the resource descriptor
+ * PARAMETERS:  Info                - Extra resource info
+ *              Resource            - Pointer to the resource descriptor
  *              Length              - Length of the descriptor in bytes
  *              Level               - Current source code indentation level
  *
@@ -711,6 +730,7 @@ AcpiDmQwordDescriptor (
 
 void
 AcpiDmExtendedDescriptor (
+    ACPI_OP_WALK_INFO       *Info,
     AML_RESOURCE            *Resource,
     UINT32                  Length,
     UINT32                  Level)
@@ -718,7 +738,8 @@ AcpiDmExtendedDescriptor (
 
     /* Dump resource name and flags */
 
-    AcpiDmAddressCommon (Resource, ACPI_RESOURCE_TYPE_EXTENDED_ADDRESS64, Level);
+    AcpiDmAddressCommon (
+        Resource, ACPI_RESOURCE_TYPE_EXTENDED_ADDRESS64, Level);
 
     /* Dump the 5 contiguous QWORD values */
 
@@ -746,7 +767,8 @@ AcpiDmExtendedDescriptor (
  *
  * FUNCTION:    AcpiDmMemory24Descriptor
  *
- * PARAMETERS:  Resource            - Pointer to the resource descriptor
+ * PARAMETERS:  Info                - Extra resource info
+ *              Resource            - Pointer to the resource descriptor
  *              Length              - Length of the descriptor in bytes
  *              Level               - Current source code indentation level
  *
@@ -758,6 +780,7 @@ AcpiDmExtendedDescriptor (
 
 void
 AcpiDmMemory24Descriptor (
+    ACPI_OP_WALK_INFO       *Info,
     AML_RESOURCE            *Resource,
     UINT32                  Length,
     UINT32                  Level)
@@ -767,7 +790,7 @@ AcpiDmMemory24Descriptor (
 
     AcpiDmIndent (Level);
     AcpiOsPrintf ("Memory24 (%s,\n",
-        AcpiGbl_RwDecode [Resource->Memory24.Flags & 1]);
+        AcpiGbl_RwDecode [ACPI_GET_1BIT_FLAG (Resource->Memory24.Flags)]);
 
     /* Dump the 4 contiguous WORD values */
 
@@ -785,7 +808,8 @@ AcpiDmMemory24Descriptor (
  *
  * FUNCTION:    AcpiDmMemory32Descriptor
  *
- * PARAMETERS:  Resource            - Pointer to the resource descriptor
+ * PARAMETERS:  Info                - Extra resource info
+ *              Resource            - Pointer to the resource descriptor
  *              Length              - Length of the descriptor in bytes
  *              Level               - Current source code indentation level
  *
@@ -797,6 +821,7 @@ AcpiDmMemory24Descriptor (
 
 void
 AcpiDmMemory32Descriptor (
+    ACPI_OP_WALK_INFO       *Info,
     AML_RESOURCE            *Resource,
     UINT32                  Length,
     UINT32                  Level)
@@ -806,7 +831,7 @@ AcpiDmMemory32Descriptor (
 
     AcpiDmIndent (Level);
     AcpiOsPrintf ("Memory32 (%s,\n",
-        AcpiGbl_RwDecode [Resource->Memory32.Flags & 1]);
+        AcpiGbl_RwDecode [ACPI_GET_1BIT_FLAG (Resource->Memory32.Flags)]);
 
     /* Dump the 4 contiguous DWORD values */
 
@@ -824,7 +849,8 @@ AcpiDmMemory32Descriptor (
  *
  * FUNCTION:    AcpiDmFixedMemory32Descriptor
  *
- * PARAMETERS:  Resource            - Pointer to the resource descriptor
+ * PARAMETERS:  Info                - Extra resource info
+ *              Resource            - Pointer to the resource descriptor
  *              Length              - Length of the descriptor in bytes
  *              Level               - Current source code indentation level
  *
@@ -836,6 +862,7 @@ AcpiDmMemory32Descriptor (
 
 void
 AcpiDmFixedMemory32Descriptor (
+    ACPI_OP_WALK_INFO       *Info,
     AML_RESOURCE            *Resource,
     UINT32                  Length,
     UINT32                  Level)
@@ -845,13 +872,15 @@ AcpiDmFixedMemory32Descriptor (
 
     AcpiDmIndent (Level);
     AcpiOsPrintf ("Memory32Fixed (%s,\n",
-        AcpiGbl_RwDecode [Resource->FixedMemory32.Flags & 1]);
+        AcpiGbl_RwDecode [ACPI_GET_1BIT_FLAG (Resource->FixedMemory32.Flags)]);
 
     AcpiDmIndent (Level + 1);
-    AcpiDmDumpInteger32 (Resource->FixedMemory32.Address, "Address Base");
+    AcpiDmDumpInteger32 (Resource->FixedMemory32.Address,
+        "Address Base");
 
     AcpiDmIndent (Level + 1);
-    AcpiDmDumpInteger32 (Resource->FixedMemory32.AddressLength, "Address Length");
+    AcpiDmDumpInteger32 (Resource->FixedMemory32.AddressLength,
+        "Address Length");
 
     /* Insert a descriptor name */
 
@@ -865,7 +894,8 @@ AcpiDmFixedMemory32Descriptor (
  *
  * FUNCTION:    AcpiDmGenericRegisterDescriptor
  *
- * PARAMETERS:  Resource            - Pointer to the resource descriptor
+ * PARAMETERS:  Info                - Extra resource info
+ *              Resource            - Pointer to the resource descriptor
  *              Length              - Length of the descriptor in bytes
  *              Level               - Current source code indentation level
  *
@@ -877,6 +907,7 @@ AcpiDmFixedMemory32Descriptor (
 
 void
 AcpiDmGenericRegisterDescriptor (
+    ACPI_OP_WALK_INFO       *Info,
     AML_RESOURCE            *Resource,
     UINT32                  Length,
     UINT32                  Level)
@@ -921,7 +952,8 @@ AcpiDmGenericRegisterDescriptor (
  *
  * FUNCTION:    AcpiDmInterruptDescriptor
  *
- * PARAMETERS:  Resource            - Pointer to the resource descriptor
+ * PARAMETERS:  Info                - Extra resource info
+ *              Resource            - Pointer to the resource descriptor
  *              Length              - Length of the descriptor in bytes
  *              Level               - Current source code indentation level
  *
@@ -933,6 +965,7 @@ AcpiDmGenericRegisterDescriptor (
 
 void
 AcpiDmInterruptDescriptor (
+    ACPI_OP_WALK_INFO       *Info,
     AML_RESOURCE            *Resource,
     UINT32                  Length,
     UINT32                  Level)
@@ -942,10 +975,10 @@ AcpiDmInterruptDescriptor (
 
     AcpiDmIndent (Level);
     AcpiOsPrintf ("Interrupt (%s, %s, %s, %s, ",
-        AcpiGbl_ConsumeDecode [(Resource->ExtendedIrq.Flags & 1)],
-        AcpiGbl_HeDecode [(Resource->ExtendedIrq.Flags >> 1) & 1],
-        AcpiGbl_LlDecode [(Resource->ExtendedIrq.Flags >> 2) & 1],
-        AcpiGbl_ShrDecode [(Resource->ExtendedIrq.Flags >> 3) & 1]);
+        AcpiGbl_ConsumeDecode [ACPI_GET_1BIT_FLAG (Resource->ExtendedIrq.Flags)],
+        AcpiGbl_HeDecode [ACPI_EXTRACT_1BIT_FLAG (Resource->ExtendedIrq.Flags, 1)],
+        AcpiGbl_LlDecode [ACPI_EXTRACT_1BIT_FLAG (Resource->ExtendedIrq.Flags, 2)],
+        AcpiGbl_ShrDecode [ACPI_EXTRACT_2BIT_FLAG (Resource->ExtendedIrq.Flags, 3)]);
 
     /*
      * The ResourceSource fields are optional and appear after the interrupt
@@ -995,7 +1028,7 @@ AcpiDmInterruptDescriptor (
 
 void
 AcpiDmVendorCommon (
-    char                    *Name,
+    const char              *Name,
     UINT8                   *ByteData,
     UINT32                  Length,
     UINT32                  Level)
@@ -1027,7 +1060,8 @@ AcpiDmVendorCommon (
  *
  * FUNCTION:    AcpiDmVendorLargeDescriptor
  *
- * PARAMETERS:  Resource            - Pointer to the resource descriptor
+ * PARAMETERS:  Info                - Extra resource info
+ *              Resource            - Pointer to the resource descriptor
  *              Length              - Length of the descriptor in bytes
  *              Level               - Current source code indentation level
  *
@@ -1039,6 +1073,7 @@ AcpiDmVendorCommon (
 
 void
 AcpiDmVendorLargeDescriptor (
+    ACPI_OP_WALK_INFO       *Info,
     AML_RESOURCE            *Resource,
     UINT32                  Length,
     UINT32                  Level)
@@ -1048,6 +1083,3 @@ AcpiDmVendorLargeDescriptor (
         ACPI_ADD_PTR (UINT8, Resource, sizeof (AML_RESOURCE_LARGE_HEADER)),
         Length, Level);
 }
-
-#endif
-

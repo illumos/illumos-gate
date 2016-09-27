@@ -1,4 +1,3 @@
-
 /******************************************************************************
  *
  * Module Name: exnames - interpreter/scanner name load/execute
@@ -6,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2011, Intel Corp.
+ * Copyright (C) 2000 - 2016, Intel Corp.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -42,8 +41,6 @@
  * POSSIBILITY OF SUCH DAMAGES.
  */
 
-#define __EXNAMES_C__
-
 #include "acpi.h"
 #include "accommon.h"
 #include "acinterp.h"
@@ -73,7 +70,7 @@ AcpiExNameSegment (
  *                                    (-1)==root,  0==none
  *              NumNameSegs         - count of 4-character name segments
  *
- * RETURN:      A pointer to the allocated string segment.  This segment must
+ * RETURN:      A pointer to the allocated string segment. This segment must
  *              be deleted by the caller.
  *
  * DESCRIPTION: Allocate a buffer for a name string. Ensure allocated name
@@ -163,6 +160,7 @@ AcpiExAllocateNameString (
     return_PTR (NameString);
 }
 
+
 /*******************************************************************************
  *
  * FUNCTION:    AcpiExNameSegment
@@ -192,8 +190,8 @@ AcpiExNameSegment (
 
 
     /*
-     * If first character is a digit, then we know that we aren't looking at a
-     * valid name segment
+     * If first character is a digit, then we know that we aren't looking
+     * at a valid name segment
      */
     CharBuf[0] = *AmlAddress;
 
@@ -206,7 +204,7 @@ AcpiExNameSegment (
     ACPI_DEBUG_PRINT ((ACPI_DB_LOAD, "Bytes from stream:\n"));
 
     for (Index = 0;
-        (Index < ACPI_NAME_SIZE) && (AcpiUtValidAcpiChar (*AmlAddress, 0));
+        (Index < ACPI_NAME_SIZE) && (AcpiUtValidNameChar (*AmlAddress, 0));
         Index++)
     {
         CharBuf[Index] = *AmlAddress++;
@@ -224,7 +222,7 @@ AcpiExNameSegment (
 
         if (NameString)
         {
-            ACPI_STRCAT (NameString, CharBuf);
+            strcat (NameString, CharBuf);
             ACPI_DEBUG_PRINT ((ACPI_DB_NAMES,
                 "Appended to - %s\n", NameString));
         }
@@ -335,7 +333,6 @@ AcpiExGetNameString (
             HasPrefix = TRUE;
             break;
 
-
         case AML_PARENT_PREFIX:
 
             /* Increment past possibly multiple parent prefixes */
@@ -352,7 +349,6 @@ AcpiExGetNameString (
 
             HasPrefix = TRUE;
             break;
-
 
         default:
 
@@ -389,7 +385,6 @@ AcpiExGetNameString (
             }
             break;
 
-
         case AML_MULTI_NAME_PREFIX_OP:
 
             ACPI_DEBUG_PRINT ((ACPI_DB_LOAD, "MultiNamePrefix at %p\n",
@@ -400,7 +395,8 @@ AcpiExGetNameString (
             AmlAddress++;
             NumSegments = *AmlAddress;
 
-            NameString = AcpiExAllocateNameString (PrefixCount, NumSegments);
+            NameString = AcpiExAllocateNameString (
+                PrefixCount, NumSegments);
             if (!NameString)
             {
                 Status = AE_NO_MEMORY;
@@ -420,7 +416,6 @@ AcpiExGetNameString (
             }
 
             break;
-
 
         case 0:
 
@@ -443,7 +438,6 @@ AcpiExGetNameString (
             }
 
             break;
-
 
         default:
 
@@ -484,5 +478,3 @@ AcpiExGetNameString (
 
     return_ACPI_STATUS (Status);
 }
-
-

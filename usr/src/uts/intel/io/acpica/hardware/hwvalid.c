@@ -1,4 +1,3 @@
-
 /******************************************************************************
  *
  * Module Name: hwvalid - I/O request validation
@@ -6,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2011, Intel Corp.
+ * Copyright (C) 2000 - 2016, Intel Corp.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -41,8 +40,6 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  */
-
-#define __HWVALID_C__
 
 #include "acpi.h"
 #include "accommon.h"
@@ -149,6 +146,8 @@ AcpiHwValidateIoRequest (
         (BitWidth != 16) &&
         (BitWidth != 32))
     {
+        ACPI_ERROR ((AE_INFO,
+            "Bad BitWidth parameter: %8.8X", BitWidth));
         return (AE_BAD_PARAMETER);
     }
 
@@ -156,8 +155,8 @@ AcpiHwValidateIoRequest (
     ByteWidth = ACPI_DIV_8 (BitWidth);
     LastAddress = Address + ByteWidth - 1;
 
-    ACPI_DEBUG_PRINT ((ACPI_DB_IO, "Address %p LastAddress %p Length %X",
-        ACPI_CAST_PTR (void, Address), ACPI_CAST_PTR (void, LastAddress),
+    ACPI_DEBUG_PRINT ((ACPI_DB_IO, "Address %8.8X%8.8X LastAddress %8.8X%8.8X Length %X",
+        ACPI_FORMAT_UINT64 (Address), ACPI_FORMAT_UINT64 (LastAddress),
         ByteWidth));
 
     /* Maximum 16-bit address in I/O space */
@@ -165,8 +164,8 @@ AcpiHwValidateIoRequest (
     if (LastAddress > ACPI_UINT16_MAX)
     {
         ACPI_ERROR ((AE_INFO,
-            "Illegal I/O port address/length above 64K: %p/0x%X",
-            ACPI_CAST_PTR (void, Address), ByteWidth));
+            "Illegal I/O port address/length above 64K: %8.8X%8.8X/0x%X",
+            ACPI_FORMAT_UINT64 (Address), ByteWidth));
         return_ACPI_STATUS (AE_LIMIT);
     }
 
@@ -197,8 +196,8 @@ AcpiHwValidateIoRequest (
             if (AcpiGbl_OsiData >= PortInfo->OsiDependency)
             {
                 ACPI_DEBUG_PRINT ((ACPI_DB_IO,
-                    "Denied AML access to port 0x%p/%X (%s 0x%.4X-0x%.4X)",
-                    ACPI_CAST_PTR (void, Address), ByteWidth, PortInfo->Name,
+                    "Denied AML access to port 0x%8.8X%8.8X/%X (%s 0x%.4X-0x%.4X)",
+                    ACPI_FORMAT_UINT64 (Address), ByteWidth, PortInfo->Name,
                     PortInfo->Start, PortInfo->End));
 
                 return_ACPI_STATUS (AE_AML_ILLEGAL_ADDRESS);
@@ -362,5 +361,3 @@ AcpiHwWritePort (
 
     return (AE_OK);
 }
-
-

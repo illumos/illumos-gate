@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2011, Intel Corp.
+ * Copyright (C) 2000 - 2016, Intel Corp.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -40,9 +40,6 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  */
-
-
-#define __PSTREE_C__
 
 #include "acpi.h"
 #include "accommon.h"
@@ -85,7 +82,12 @@ AcpiPsGetArg (
 
     ACPI_FUNCTION_ENTRY ();
 
-
+/*
+    if (Op->Common.AmlOpcode == AML_INT_CONNECTION_OP)
+    {
+        return (Op->Common.Value.Arg);
+    }
+*/
     /* Get the info structure for this opcode */
 
     OpInfo = AcpiPsGetOpcodeInfo (Op->Common.AmlOpcode);
@@ -317,7 +319,6 @@ AcpiPsGetChild (
         Child = AcpiPsGetArg (Op, 0);
         break;
 
-
     case AML_BUFFER_OP:
     case AML_PACKAGE_OP:
     case AML_METHOD_OP:
@@ -328,13 +329,11 @@ AcpiPsGetChild (
         Child = AcpiPsGetArg (Op, 1);
         break;
 
-
     case AML_POWER_RES_OP:
     case AML_INDEX_FIELD_OP:
 
         Child = AcpiPsGetArg (Op, 2);
         break;
-
 
     case AML_PROCESSOR_OP:
     case AML_BANK_FIELD_OP:
@@ -342,14 +341,13 @@ AcpiPsGetChild (
         Child = AcpiPsGetArg (Op, 3);
         break;
 
-
     default:
+
         /* All others have no children */
+
         break;
     }
 
     return (Child);
 }
 #endif
-
-

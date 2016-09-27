@@ -5,7 +5,7 @@
  ******************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2011, Intel Corp.
+ * Copyright (C) 2000 - 2016, Intel Corp.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -40,9 +40,6 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  */
-
-
-#define __NSALLOC_C__
 
 #include "acpi.h"
 #include "accommon.h"
@@ -88,7 +85,7 @@ AcpiNsCreateNode (
 
 #ifdef ACPI_DBG_TRACK_ALLOCATIONS
         Temp = AcpiGbl_NsNodeList->TotalAllocated -
-                AcpiGbl_NsNodeList->TotalFreed;
+            AcpiGbl_NsNodeList->TotalFreed;
         if (Temp > AcpiGbl_NsNodeList->MaxOccupied)
         {
             AcpiGbl_NsNodeList->MaxOccupied = Temp;
@@ -121,6 +118,7 @@ AcpiNsDeleteNode (
     ACPI_NAMESPACE_NODE     *Node)
 {
     ACPI_OPERAND_OBJECT     *ObjDesc;
+    ACPI_OPERAND_OBJECT     *NextDesc;
 
 
     ACPI_FUNCTION_NAME (NsDeleteNode);
@@ -131,12 +129,13 @@ AcpiNsDeleteNode (
     AcpiNsDetachObject (Node);
 
     /*
-     * Delete an attached data object if present (an object that was created
-     * and attached via AcpiAttachData). Note: After any normal object is
-     * detached above, the only possible remaining object is a data object.
+     * Delete an attached data object list if present (objects that were
+     * attached via AcpiAttachData). Note: After any normal object is
+     * detached above, the only possible remaining object(s) are data
+     * objects, in a linked list.
      */
     ObjDesc = Node->Object;
-    if (ObjDesc &&
+    while (ObjDesc &&
         (ObjDesc->Common.Type == ACPI_TYPE_LOCAL_DATA))
     {
         /* Invoke the attached data deletion handler if present */
@@ -146,7 +145,16 @@ AcpiNsDeleteNode (
             ObjDesc->Data.Handler (Node, ObjDesc->Data.Pointer);
         }
 
+        NextDesc = ObjDesc->Common.NextObject;
         AcpiUtRemoveReference (ObjDesc);
+        ObjDesc = NextDesc;
+    }
+
+    /* Special case for the statically allocated root node */
+
+    if (Node == AcpiGbl_RootNode)
+    {
+        return;
     }
 
     /* Now we can delete the node */
@@ -269,7 +277,8 @@ AcpiNsInstallNode (
              * modified the namespace. This is used for cleanup when the
              * method exits.
              */
-            WalkState->MethodDesc->Method.InfoFlags |= ACPI_METHOD_MODIFIED_NAMESPACE;
+            WalkState->MethodDesc->Method.InfoFlags |=
+                ACPI_METHOD_MODIFIED_NAMESPACE;
         }
     }
 
@@ -376,7 +385,7 @@ AcpiNsDeleteChildren (
  *
  * RETURN:      None.
  *
- * DESCRIPTION: Delete a subtree of the namespace.  This includes all objects
+ * DESCRIPTION: Delete a subtree of the namespace. This includes all objects
  *              stored within the subtree.
  *
  ******************************************************************************/
@@ -472,7 +481,7 @@ AcpiNsDeleteNamespaceSubtree (
  * RETURN:      Status
  *
  * DESCRIPTION: Delete entries within the namespace that are owned by a
- *              specific ID.  Used to delete entire ACPI tables.  All
+ *              specific ID. Used to delete entire ACPI tables. All
  *              reference counts are updated.
  *
  * MUTEX:       Locks namespace during deletion walk.
@@ -584,5 +593,3 @@ AcpiNsDeleteNamespaceByOwner (
     (void) AcpiUtReleaseMutex (ACPI_MTX_NAMESPACE);
     return_VOID;
 }
-
-

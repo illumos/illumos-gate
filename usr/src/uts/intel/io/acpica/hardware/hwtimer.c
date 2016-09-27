@@ -1,4 +1,3 @@
-
 /******************************************************************************
  *
  * Name: hwtimer.c - ACPI Power Management Timer Interface
@@ -6,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2011, Intel Corp.
+ * Copyright (C) 2000 - 2016, Intel Corp.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -42,6 +41,8 @@
  * POSSIBILITY OF SUCH DAMAGES.
  */
 
+#define EXPORT_ACPI_INTERFACES
+
 #include "acpi.h"
 #include "accommon.h"
 
@@ -49,6 +50,7 @@
         ACPI_MODULE_NAME    ("hwtimer")
 
 
+#if (!ACPI_REDUCED_HARDWARE) /* Entire module */
 /******************************************************************************
  *
  * FUNCTION:    AcpiGetTimerResolution
@@ -115,8 +117,14 @@ AcpiGetTimer (
         return_ACPI_STATUS (AE_BAD_PARAMETER);
     }
 
-    Status = AcpiHwRead (Ticks, &AcpiGbl_FADT.XPmTimerBlock);
+    /* ACPI 5.0A: PM Timer is optional */
 
+    if (!AcpiGbl_FADT.XPmTimerBlock.Address)
+    {
+        return_ACPI_STATUS (AE_SUPPORT);
+    }
+
+    Status = AcpiHwRead (Ticks, &AcpiGbl_FADT.XPmTimerBlock);
     return_ACPI_STATUS (Status);
 }
 
@@ -143,7 +151,7 @@ ACPI_EXPORT_SYMBOL (AcpiGetTimer)
  *              a versatile and accurate timer.
  *
  *              Note that this function accommodates only a single timer
- *              rollover.  Thus for 24-bit timers, this function should only
+ *              rollover. Thus for 24-bit timers, this function should only
  *              be used for calculating durations less than ~4.6 seconds
  *              (~20 minutes for 32-bit timers) -- calculations below:
  *
@@ -169,6 +177,13 @@ AcpiGetTimerDuration (
     if (!TimeElapsed)
     {
         return_ACPI_STATUS (AE_BAD_PARAMETER);
+    }
+
+    /* ACPI 5.0A: PM Timer is optional */
+
+    if (!AcpiGbl_FADT.XPmTimerBlock.Address)
+    {
+        return_ACPI_STATUS (AE_SUPPORT);
     }
 
     /*
@@ -203,10 +218,11 @@ AcpiGetTimerDuration (
     /*
      * Compute Duration (Requires a 64-bit multiply and divide):
      *
-     * TimeElapsed = (DeltaTicks * 1000000) / PM_TIMER_FREQUENCY;
+     * TimeElapsed (microseconds) =
+     *  (DeltaTicks * ACPI_USEC_PER_SEC) / ACPI_PM_TIMER_FREQUENCY;
      */
-    Status = AcpiUtShortDivide (((UINT64) DeltaTicks) * 1000000,
-                PM_TIMER_FREQUENCY, &Quotient, NULL);
+    Status = AcpiUtShortDivide (((UINT64) DeltaTicks) * ACPI_USEC_PER_SEC,
+                ACPI_PM_TIMER_FREQUENCY, &Quotient, NULL);
 
     *TimeElapsed = (UINT32) Quotient;
     return_ACPI_STATUS (Status);
@@ -214,3 +230,4 @@ AcpiGetTimerDuration (
 
 ACPI_EXPORT_SYMBOL (AcpiGetTimerDuration)
 
+#endif /* !ACPI_REDUCED_HARDWARE */
