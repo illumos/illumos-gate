@@ -459,6 +459,7 @@ typedef struct {
 	kstat_named_t	zm_ffnoproc;
 	kstat_named_t	zm_ffnomem;
 	kstat_named_t	zm_ffmisc;
+	kstat_named_t	zm_mfseglim;
 	kstat_named_t	zm_nested_intp;
 	kstat_named_t	zm_init_pid;
 	kstat_named_t	zm_boot_time;
@@ -705,6 +706,8 @@ typedef struct zone {
 	uint32_t	zone_ffnoproc;		/* get proc/lwp error */
 	uint32_t	zone_ffnomem;		/* as_dup/memory error */
 	uint32_t	zone_ffmisc;		/* misc. other error */
+
+	uint32_t	zone_mfseglim;		/* map failure (# segs limit) */
 
 	uint32_t	zone_nested_intp;	/* nested interp. kstat */
 

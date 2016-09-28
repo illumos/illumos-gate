@@ -21,7 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2015, Joyent, Inc.  All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
@@ -71,6 +71,8 @@
 #include <vm/page.h>
 
 clock_t deadlk_wait = 1; /* number of ticks to wait before retrying */
+
+ulong_t as_user_seg_limit = 0xffff; /* max segments in an (non-kas) AS */
 
 static struct kmem_cache *as_cache;
 
@@ -1709,13 +1711,28 @@ as_map_locked(struct as *as, caddr_t addr, size_t size, int (*crfp)(),
 	as->a_updatedir = 1;	/* inform /proc */
 	gethrestime(&as->a_updatetime);
 
-	if (as != &kas && as->a_size + rsize > (size_t)p->p_vmem_ctl) {
-		AS_LOCK_EXIT(as);
+	if (as != &kas) {
+		if (as->a_size + rsize > (size_t)p->p_vmem_ctl) {
+			AS_LOCK_EXIT(as);
 
-		(void) rctl_action(rctlproc_legacy[RLIMIT_VMEM], p->p_rctls, p,
-		    RCA_UNSAFE_ALL);
+			(void) rctl_action(rctlproc_legacy[RLIMIT_VMEM],
+			    p->p_rctls, p, RCA_UNSAFE_ALL);
+			return (ENOMEM);
+		}
 
-		return (ENOMEM);
+		/*
+		 * Keep the number of segments in a userspace AS constrained to
+		 * a reasonable limit.  Linux enforces a value slightly less
+		 * than 64k in order to avoid ELF limits if/when a process
+		 * dumps core.  While SunOS avoids that specific problem with
+		 * other tricks, the limit is still valuable to keep kernel
+		 * memory consumption in check.
+		 */
+		if (avl_numnodes(&as->a_segtree) >= as_user_seg_limit) {
+			AS_LOCK_EXIT(as);
+			atomic_inc_32(&p->p_zone->zone_mfseglim);
+			return (ENOMEM);
+		}
 	}
 
 	if (AS_MAP_CHECK_VNODE_LPOOB(crfp, argsp)) {

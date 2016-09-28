@@ -2268,6 +2268,8 @@ zone_misc_kstat_update(kstat_t *ksp, int rw)
 	zmp->zm_ffnomem.value.ui32 = zone->zone_ffnomem;
 	zmp->zm_ffmisc.value.ui32 = zone->zone_ffmisc;
 
+	zmp->zm_mfseglim.value.ui32 = zone->zone_mfseglim;
+
 	zmp->zm_nested_intp.value.ui32 = zone->zone_nested_intp;
 
 	zmp->zm_init_pid.value.ui32 = zone->zone_proc_initpid;
@@ -2311,6 +2313,8 @@ zone_misc_kstat_create(zone_t *zone)
 	    KSTAT_DATA_UINT32);
 	kstat_named_init(&zmp->zm_ffnomem, "forkfail_nomem", KSTAT_DATA_UINT32);
 	kstat_named_init(&zmp->zm_ffmisc, "forkfail_misc", KSTAT_DATA_UINT32);
+	kstat_named_init(&zmp->zm_mfseglim, "mapfail_seglim",
+	    KSTAT_DATA_UINT32);
 	kstat_named_init(&zmp->zm_nested_intp, "nested_interp",
 	    KSTAT_DATA_UINT32);
 	kstat_named_init(&zmp->zm_init_pid, "init_pid", KSTAT_DATA_UINT32);
