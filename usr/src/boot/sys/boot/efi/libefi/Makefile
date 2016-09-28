@@ -19,7 +19,7 @@ CC=     $(GCC_ROOT)/bin/gcc
 
 LIB=	efi
 
-all:	machine x86 lib$(LIB).a
+all:	machine x86 .WAIT lib$(LIB).a
 install:
 
 SRCS=	delay.c efi_console.c efinet.c efipart.c errno.c handles.c \

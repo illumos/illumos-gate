@@ -42,7 +42,7 @@ ROOTBOOTFORTH=$(FORTH:%=$(ROOT_BOOT_FORTH)/%)
 ROOTBOOTDEFAULTS=$(DEFFILES:%=$(ROOT_BOOT_DEFAULTS)/%)
 FILEMODE=0444
 
-all: machine x86 ${LOADER} loader.help
+all: machine x86 .WAIT ${LOADER} loader.help
 
 install: all $(ROOTBOOTLOADER)
 

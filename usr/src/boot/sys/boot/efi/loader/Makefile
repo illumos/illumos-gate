@@ -88,7 +88,7 @@ CLEANFILES=	vers.c loader.efi
 
 NEWVERSWHAT=	"EFI loader" ${MACHINE}
 
-all: machine x86 loader.efi
+all: machine x86 .WAIT loader.efi
 install: all $(ROOTBOOTFILES)
 
 vers.c:	../../common/newvers.sh ../../efi/loader/version

@@ -19,7 +19,7 @@ CFLAGS= -O2 -I../../../../include -I../../..
 CFLAGS += -DLOADER_ZFS_SUPPORT
 CPPFLAGS=
 
-all: machine x86 libi386.a
+all: machine x86 .WAIT libi386.a
 
 clean: clobber
 clobber:

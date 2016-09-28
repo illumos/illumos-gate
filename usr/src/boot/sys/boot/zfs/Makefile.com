@@ -17,7 +17,7 @@ include $(SRC)/Makefile.master
 
 LIB=		zfsboot
 
-all: machine x86 libzfsboot.a
+all: machine x86 .WAIT libzfsboot.a
 clean: clobber
 
 clobber:

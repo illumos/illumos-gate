@@ -36,7 +36,7 @@ HEADERS= $(FICLDIR)/ficl.h $(FICLDIR)/ficlplatform/unix.h ../ficllocal.h
 MAJOR = 4
 MINOR = 1.0
 
-lib: machine x86 libficl.a
+lib: machine x86 .WAIT libficl.a
 
 # static library build
 libficl.a: $(OBJECTS)

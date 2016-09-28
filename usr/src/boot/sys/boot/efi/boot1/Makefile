@@ -66,7 +66,7 @@ LDFLAGS=	-nostdlib --eh-frame-hdr -znocombreloc
 LDFLAGS +=	-shared --hash-style=both --enable-new-dtags
 LDFLAGS +=	-T${LDSCRIPT} -Bsymbolic
 
-all: machine x86 boot1.efi
+all: machine x86 .WAIT boot1.efi
 install: all $(ROOTBOOTFILES)
 
 #

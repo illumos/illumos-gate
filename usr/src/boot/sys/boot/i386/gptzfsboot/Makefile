@@ -73,7 +73,7 @@ include ../Makefile.inc
 
 .PARALLEL:
 
-all: machine x86 $(PROG)
+all: machine x86 .WAIT $(PROG)
 
 install: all $(ROOTBOOTPROG)
 
