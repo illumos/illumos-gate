@@ -200,6 +200,7 @@ typedef enum lxpr_nodetype {
 	LXPR_SWAPS,		/* /proc/swaps		*/
 	LXPR_SYSDIR,		/* /proc/sys/		*/
 	LXPR_SYS_FSDIR,		/* /proc/sys/fs/	*/
+	LXPR_SYS_FS_FILEMAX,	/* /proc/sys/fs/file-max */
 	LXPR_SYS_FS_INOTIFYDIR,	/* /proc/sys/fs/inotify	*/
 	LXPR_SYS_FS_INOTIFY_MAX_QUEUED_EVENTS,	/* inotify/max_queued_events */
 	LXPR_SYS_FS_INOTIFY_MAX_USER_INSTANCES,	/* inotify/max_user_instances */
@@ -227,8 +228,11 @@ typedef enum lxpr_nodetype {
 	LXPR_SYS_NET_IPV4_TCP_FIN_TO,	/* /proc/sys/net/ipv4/tcp_fin_timeout */
 	LXPR_SYS_NET_IPV4_TCP_KA_INT,	/* .../net/ipv4/tcp_keepalive_intvl */
 	LXPR_SYS_NET_IPV4_TCP_KA_TIM,	/* .../net/ipv4/tcp_keepalive_time */
+	LXPR_SYS_NET_IPV4_TCP_MAX_SYN_BL, /* .../net/ipv4/tcp_max_syn_backlog */
+	LXPR_SYS_NET_IPV4_TCP_RMEM,	/* /proc/sys/net/ipv4/tcp_rmem */
 	LXPR_SYS_NET_IPV4_TCP_SACK,	/* /proc/sys/net/ipv4/tcp_sack */
 	LXPR_SYS_NET_IPV4_TCP_WINSCALE,	/* .../net/ipv4/tcp_window_scaling */
+	LXPR_SYS_NET_IPV4_TCP_WMEM,	/* /proc/sys/net/ipv4/tcp_wmem */
 	LXPR_SYS_VMDIR,			/* /proc/sys/vm			*/
 	LXPR_SYS_VM_MAX_MAP_CNT,	/* /proc/sys/vm/max_map_count	*/
 	LXPR_SYS_VM_MINFR_KB,		/* /proc/sys/vm/min_free_kbytes	*/
