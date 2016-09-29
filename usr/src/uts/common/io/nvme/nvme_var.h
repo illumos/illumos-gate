@@ -10,7 +10,8 @@
  */
 
 /*
- * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2016 The MathWorks, Inc. All rights reserved.
  */
 
 #ifndef _NVME_VAR_H
@@ -42,7 +43,6 @@
 #define	NVME_DEFAULT_ASYNC_EVENT_LIMIT	10
 #define	NVME_MIN_ASYNC_EVENT_LIMIT	1
 
-#define	NVME_ADMIN_CMD_TIMEOUT		100000
 
 typedef struct nvme nvme_t;
 typedef struct nvme_namespace nvme_namespace_t;
@@ -58,6 +58,7 @@ struct nvme_dma {
 	uint_t nd_ncookie;
 	caddr_t nd_memp;
 	size_t nd_len;
+	boolean_t nd_cached;
 };
 
 struct nvme_cmd {
@@ -109,6 +110,7 @@ struct nvme {
 	ddi_acc_handle_t n_regh;
 
 	kmem_cache_t *n_cmd_cache;
+	kmem_cache_t *n_prp_cache;
 
 	size_t n_inth_sz;
 	ddi_intr_handle_t *n_inth;

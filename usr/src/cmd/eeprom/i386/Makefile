@@ -18,9 +18,7 @@
 #
 # CDDL HEADER END
 #
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
+# Copyright 2016 Toomas Soome <tsoome@me.com>
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -28,10 +26,6 @@
 SRCDIR		= ..
 
 include $(SRCDIR)/Makefile.com
-
-# We "borrow" some error messages from bootadm.  Add the path to pick these up
-CFLAGS +=	-I../../boot/bootadm
-LINTFLAGS +=	-I../../boot/bootadm
 
 OBJS += benv.o benv_kvm.o
 

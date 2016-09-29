@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-#
+# Copyright 2016 Toomas Soome <tsoome@me.com>
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -40,11 +40,6 @@ UFSBOOT_FTH		= $(UFS_DIR)/boot-ufs.fth
 UFS_FTH			= $(UFS_DIR)/ufs.fth
 
 #
-# This program is used to install the boot block
-#
-INSTALLBOOT		= installboot
-
-#
 # Where and how stuff gets installed
 #
 ROOT_PSM_BOOTBLOCK	= $(ROOT_PSM_LIB_UFS_DIR)/$(PROG)
@@ -52,23 +47,9 @@ USR_PSM_BOOTBLOCK	= $(USR_PSM_LIB_UFS_DIR)/$(PROG)
 BOOTBLK_LINK		= $(BOOTBLK_LINK_PREFIX)/ufs/$(PROG)
 
 USR			= $(ROOT)/usr
-USR_SBIN		= $(USR)/sbin
-USR_SBIN_INSTALLBOOT	= $(USR_SBIN)/$(INSTALLBOOT)
-
-#
-# Overrides for installing installboot.
-#
-INS.file.555		= $(RM) $@; $(INS) -s -m 555 -f $(@D) $<
 
 %.fcode:	$(UFS_DIR)/%.fth
 	$(TOKENIZE) $<
 
 $(FS_FCODE):	$(UTIL_FTH) $(UFS_FTH) $(BOOT_FTH)
 	$(TOKENIZE) $(UFSBOOT_FTH)
-
-#
-# install rules
-#
-$(USR_SBIN)/%:	% $(USR_SBIN)
-	$(INS.file.555)
-

@@ -15,11 +15,11 @@
 
 set name=pkg.fmri value=pkg:/service/network/ssh-common@$(PKGVERS)
 set name=pkg.description \
-    value="Provides configuration files and server support for the Secure Shell (SSH) service which creates RSA and DSA host keys if they are not available and start or stop the sshd (Secure Shell daemon)."
-set name=pkg.summary \
-    value="Secure Shell (SSH) service and configuration files"
+    value="Provides SMF service for the Secure Shell (SSH) service which creates RSA and DSA host keys if they are not available and start or stop the sshd (Secure Shell daemon)."
+set name=pkg.summary value="Secure Shell (SSH) service."
 set name=info.classification \
     value=org.opensolaris.category.2008:System/Security
+set name=org.opensolaris.noincorp value=true
 set name=variant.arch value=$(ARCH)
 dir path=etc group=sys
 dir path=etc/ssh group=sys
@@ -31,20 +31,11 @@ dir path=lib/svc/method
 dir path=usr group=sys
 dir path=usr/share/man
 dir path=usr/share/man/man4
-file path=etc/ssh/moduli.sunssh group=sys preserve=true
 file path=etc/ssh/ssh_config group=sys \
     original_name=network/ssh:etc/ssh/ssh_config preserve=true
 file path=etc/ssh/sshd_config group=sys \
     original_name=service/network/ssh:etc/ssh/sshd_config preserve=true
 file path=lib/svc/manifest/network/ssh.xml group=sys mode=0444
 file path=lib/svc/method/sshd mode=0555
-file path=usr/share/man/man4/ssh_config.sunssh.4
-file path=usr/share/man/man4/sshd_config.sunssh.4
 license usr/src/cmd/ssh/THIRDPARTYLICENSE \
     license=usr/src/cmd/ssh/THIRDPARTYLICENSE
-link path=etc/ssh/moduli mediator=ssh mediator-implementation=sunssh \
-    target=moduli.sunssh
-link path=usr/share/man/man4/ssh_config.4 mediator=ssh \
-    mediator-implementation=sunssh target=ssh_config.sunssh.4
-link path=usr/share/man/man4/sshd_config.4 mediator=ssh \
-    mediator-implementation=sunssh target=sshd_config.sunssh.4

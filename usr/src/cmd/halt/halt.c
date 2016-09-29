@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2016 Toomas Soome <tsoome@me.com>
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -84,8 +85,8 @@
 #include <spawn.h>
 
 #include <libzfs.h>
-#if defined(__i386)
-#include <libgrubmgmt.h>
+#if defined(__x86)
+#include <libbe.h>
 #endif
 
 #if !defined(TEXT_DOMAIN)
@@ -94,7 +95,7 @@
 
 #if defined(__sparc)
 #define	CUR_ELFDATA	ELFDATA2MSB
-#elif defined(__i386)
+#elif defined(__x86)
 #define	CUR_ELFDATA	ELFDATA2LSB
 #endif
 
@@ -135,11 +136,11 @@ static ctid_t startdct = -1;
  */
 static char	fastboot_mounted[MAXPATHLEN];
 
-#if defined(__i386)
-static grub_boot_args_t	fbarg;
-static grub_boot_args_t	*fbarg_used;
-static int fbarg_entnum = GRUB_ENTRY_DEFAULT;
-#endif	/* __i386 */
+#if defined(__x86)
+static char *fbarg;
+static char *fbarg_used;
+static int fbarg_entnum = BE_ENTRY_DEFAULT;
+#endif	/* __x86 */
 
 static int validate_ufs_disk(char *, char *);
 static int validate_zfs_pool(char *, char *);
@@ -1045,49 +1046,47 @@ parse_fastboot_args(char *bootargs_buf, size_t buf_size,
 	if (*is_dryrun)
 		return (rc);
 
-#if defined(__i386)
-	/* Read boot args from GRUB menu */
+#if defined(__x86)
+	/* Read boot args from Boot Environment */
 	if ((bootargs_buf[0] == 0 || isdigit(bootargs_buf[0])) &&
 	    bename == NULL) {
 		/*
-		 * If no boot arguments are given, or a GRUB menu entry
-		 * number is provided, process the GRUB menu.
+		 * If no boot arguments are given, or a BE entry
+		 * number is provided, process the boot arguments from BE.
 		 */
 		int entnum;
 		if (bootargs_buf[0] == 0)
-			entnum = GRUB_ENTRY_DEFAULT;
+			entnum = BE_ENTRY_DEFAULT;
 		else {
 			errno = 0;
 			entnum = strtoul(bootargs_buf, NULL, 10);
 			rc = errno;
 		}
 
-		if (rc == 0 && (rc = grub_get_boot_args(&fbarg, NULL,
-		    entnum)) == 0) {
-			if (strlcpy(bootargs_buf, fbarg.gba_bootargs,
+		if (rc == 0 && (rc = be_get_boot_args(&fbarg, entnum)) == 0) {
+			if (strlcpy(bootargs_buf, fbarg,
 			    buf_size) >= buf_size) {
-				grub_cleanup_boot_args(&fbarg);
+				free(fbarg);
 				bcopy(bootargs_saved, bootargs_buf, buf_size);
 				rc = E2BIG;
 			}
 		}
-		/* Failed to read GRUB menu, fall back to normal reboot */
+		/* Failed to read FB args, fall back to normal reboot */
 		if (rc != 0) {
 			(void) fprintf(stderr,
-			    gettext("%s: Failed to process GRUB menu "
-			    "entry for fast reboot.\n\t%s\n"),
-			    cmdname, grub_strerror(rc));
+			    gettext("%s: Failed to process boot "
+			    "arguments from Boot Environment.\n"), cmdname);
 			(void) fprintf(stderr,
 			    gettext("%s: Falling back to regular reboot.\n"),
 			    cmdname);
 			return (-1);
 		}
 		/* No need to process further */
-		fbarg_used = &fbarg;
+		fbarg_used = fbarg;
 		fbarg_entnum = entnum;
 		return (0);
 	}
-#endif	/* __i386 */
+#endif	/* __x86 */
 
 	/* Zero out the boot argument buffer as we will reconstruct it */
 	bzero(bootargs_buf, buf_size);
@@ -1294,7 +1293,7 @@ main(int argc, char *argv[])
 		fcn = AD_POWEROFF;
 	} else if (strcmp(cmdname, "reboot") == 0) {
 		(void) audit_reboot_setup();
-#if defined(__i386)
+#if defined(__x86)
 		optstring = "dlnqpfe:";
 		usage = gettext("usage: %s [ -dlnq(p|fe:) ] [ boot args ]\n");
 #else
@@ -1341,7 +1340,7 @@ main(int argc, char *argv[])
 		case 'p':
 			prom_reboot = 1;
 			break;
-#if defined(__i386)
+#if defined(__x86)
 		case 'e':
 			bename = optarg;
 			break;
@@ -1502,14 +1501,14 @@ main(int argc, char *argv[])
 		need_check_zones = halt_zones();
 	}
 
-#if defined(__i386)
+#if defined(__x86)
 	/* set new default entry in the GRUB entry */
-	if (fbarg_entnum != GRUB_ENTRY_DEFAULT) {
+	if (fbarg_entnum != BE_ENTRY_DEFAULT) {
 		char buf[32];
 		(void) snprintf(buf, sizeof (buf), "default=%u", fbarg_entnum);
 		(void) halt_exec(BOOTADM_PROG, "set-menu", buf, NULL);
 	}
-#endif	/* __i386 */
+#endif	/* __x86 */
 
 	/* if we're dumping, do the archive update here and don't defer it */
 	if (cmd == A_DUMP && zoneid == GLOBAL_ZONEID && !nosync)
@@ -1663,10 +1662,10 @@ fail:
 
 		} else if (strlen(fastboot_mounted) != 0) {
 			(void) umount(fastboot_mounted);
-#if defined(__i386)
-		} else if (fbarg_used != NULL) {
-			grub_cleanup_boot_args(fbarg_used);
-#endif	/* __i386 */
+#if defined(__x86)
+		} else {
+			free(fbarg_used);
+#endif	/* __x86 */
 		}
 	}
 

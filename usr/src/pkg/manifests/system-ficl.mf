@@ -1,0 +1,39 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2016, Toomas Soome <tsoome@me.com>
+#
+
+#
+# The default for payload-bearing actions in this package is to appear in the
+# global zone only.  See the include file for greater detail, as well as
+# information about overriding the defaults.
+#
+set name=pkg.fmri \
+    value=pkg:/system/ficl@4.1.0,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
+set name=pkg.description value="Forth Inspired Command Language"
+set name=pkg.summary value="FICL Forth Implementation"
+set name=info.classification value=org.opensolaris.category.2008:System/Core
+set name=variant.arch value=$(ARCH)
+dir path=usr group=sys
+dir path=usr/bin group=bin
+dir path=usr/bin/$(ARCH32) group=bin
+dir path=usr/bin/$(ARCH64) group=bin
+dir path=usr/lib group=bin
+dir path=usr/lib/$(ARCH64) group=bin
+file path=usr/bin/$(ARCH32)/ficl-sys group=sys mode=0555
+file path=usr/bin/$(ARCH64)/ficl-sys group=sys mode=0555
+file path=usr/lib/$(ARCH64)/libficl-sys.so.4.1.0 group=sys mode=0755
+file path=usr/lib/libficl-sys.so.4.1.0 group=sys mode=0755
+hardlink path=usr/bin/ficl-sys target=../../usr/lib/isaexec
+license lic_CDDL license=lic_CDDL
+license usr/src/common/ficl/LICENSE license=usr/src/common/ficl/LICENSE

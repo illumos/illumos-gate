@@ -22,6 +22,7 @@
 #
 # Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright 2016 Toomas Soome <tsoome@me.com>
 #
 
 include ../Makefile.master
@@ -66,7 +67,8 @@ sparc_SUBDIRS= \
 i386_SUBDIRS=		\
 	aw		\
 	elfextract	\
-	mbh_patch
+	mbh_patch	\
+	btxld
 
 LINTSUBDIRS= \
 	codereview \

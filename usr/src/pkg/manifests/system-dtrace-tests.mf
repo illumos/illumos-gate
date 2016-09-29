@@ -1039,6 +1039,10 @@ file path=opt/SUNWdtrt/tst/common/llquantize/tst.bases.d mode=0444
 file path=opt/SUNWdtrt/tst/common/llquantize/tst.bases.d.out mode=0444
 file path=opt/SUNWdtrt/tst/common/llquantize/tst.basic.d mode=0444
 file path=opt/SUNWdtrt/tst/common/llquantize/tst.basic.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/tst.clear.d mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/tst.clear.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/tst.multiaggs.d mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/tst.multiaggs.d.out mode=0444
 file path=opt/SUNWdtrt/tst/common/llquantize/tst.negorder.d mode=0444
 file path=opt/SUNWdtrt/tst/common/llquantize/tst.negorder.d.out mode=0444
 file path=opt/SUNWdtrt/tst/common/llquantize/tst.negvalue.d mode=0444

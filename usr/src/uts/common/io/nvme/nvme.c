@@ -11,6 +11,8 @@
 
 /*
  * Copyright 2016 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2016 Tegile Systems, Inc. All rights reserved.
+ * Copyright (c) 2016 The MathWorks, Inc.  All rights reserved.
  */
 
 /*
@@ -73,9 +75,8 @@
  * NVMe devices can have multiple namespaces, each being a independent data
  * store. The driver supports multiple namespaces and creates a blkdev interface
  * for each namespace found. Namespaces can have various attributes to support
- * thin provisioning, extended LBAs, and protection information. This driver
- * does not support any of this and ignores namespaces that have these
- * attributes.
+ * thin provisioning and protection information. This driver does not support
+ * any of this and ignores namespaces that have these attributes.
  *
  *
  * Blkdev Interface:
@@ -190,6 +191,9 @@
 static const int nvme_version_major = 1;
 static const int nvme_version_minor = 0;
 
+/* tunable for admin command timeout in seconds, default is 1s */
+static volatile int nvme_admin_cmd_timeout = 1;
+
 static int nvme_attach(dev_info_t *, ddi_attach_cmd_t);
 static int nvme_detach(dev_info_t *, ddi_detach_cmd_t);
 static int nvme_quiesce(dev_info_t *);
@@ -253,6 +257,9 @@ static int nvme_bd_write(void *, bd_xfer_t *);
 static int nvme_bd_sync(void *, bd_xfer_t *);
 static int nvme_bd_devid(void *, dev_info_t *, ddi_devid_t *);
 
+static int nvme_prp_dma_constructor(void *, void *, int);
+static void nvme_prp_dma_destructor(void *, void *);
+
 static void nvme_prepare_devid(nvme_t *, uint32_t);
 
 static void *nvme_state;
@@ -268,7 +275,7 @@ static ddi_dma_attr_t nvme_queue_dma_attr = {
 	.dma_attr_version	= DMA_ATTR_V0,
 	.dma_attr_addr_lo	= 0,
 	.dma_attr_addr_hi	= 0xffffffffffffffffULL,
-	.dma_attr_count_max	= (UINT16_MAX + 1) * sizeof (nvme_sqe_t),
+	.dma_attr_count_max	= (UINT16_MAX + 1) * sizeof (nvme_sqe_t) - 1,
 	.dma_attr_align		= 0x1000,
 	.dma_attr_burstsizes	= 0x7ff,
 	.dma_attr_minxfer	= 0x1000,
@@ -296,7 +303,7 @@ static ddi_dma_attr_t nvme_prp_dma_attr = {
 	.dma_attr_burstsizes	= 0x7ff,
 	.dma_attr_minxfer	= 0x1000,
 	.dma_attr_maxxfer	= 0x1000,
-	.dma_attr_seg		= 0xffffffffffffffffULL,
+	.dma_attr_seg		= 0xfff,
 	.dma_attr_sgllen	= -1,
 	.dma_attr_granular	= 1,
 	.dma_attr_flags		= 0,
@@ -484,7 +491,7 @@ nvme_check_dma_hdl(nvme_dma_t *dma)
 }
 
 static void
-nvme_free_dma(nvme_dma_t *dma)
+nvme_free_dma_common(nvme_dma_t *dma)
 {
 	if (dma->nd_dmah != NULL)
 		(void) ddi_dma_unbind_handle(dma->nd_dmah);
@@ -492,15 +499,28 @@ nvme_free_dma(nvme_dma_t *dma)
 		ddi_dma_mem_free(&dma->nd_acch);
 	if (dma->nd_dmah != NULL)
 		ddi_dma_free_handle(&dma->nd_dmah);
-	kmem_free(dma, sizeof (nvme_dma_t));
+}
+
+static void
+nvme_free_dma(nvme_dma_t *dma)
+{
+	nvme_free_dma_common(dma);
+	kmem_free(dma, sizeof (*dma));
+}
+
+/* ARGSUSED */
+static void
+nvme_prp_dma_destructor(void *buf, void *private)
+{
+	nvme_dma_t *dma = (nvme_dma_t *)buf;
+
+	nvme_free_dma_common(dma);
 }
 
 static int
-nvme_zalloc_dma(nvme_t *nvme, size_t len, uint_t flags,
-    ddi_dma_attr_t *dma_attr, nvme_dma_t **ret)
+nvme_alloc_dma_common(nvme_t *nvme, nvme_dma_t *dma,
+    size_t len, uint_t flags, ddi_dma_attr_t *dma_attr)
 {
-	nvme_dma_t *dma = kmem_zalloc(sizeof (nvme_dma_t), KM_SLEEP);
-
 	if (ddi_dma_alloc_handle(nvme->n_dip, dma_attr, DDI_DMA_SLEEP, NULL,
 	    &dma->nd_dmah) != DDI_SUCCESS) {
 		/*
@@ -527,8 +547,23 @@ nvme_zalloc_dma(nvme_t *nvme, size_t len, uint_t flags,
 		dev_err(nvme->n_dip, CE_WARN,
 		    "!failed to bind DMA memory");
 		atomic_inc_32(&nvme->n_dma_bind_err);
+		nvme_free_dma_common(dma);
+		return (DDI_FAILURE);
+	}
+
+	return (DDI_SUCCESS);
+}
+
+static int
+nvme_zalloc_dma(nvme_t *nvme, size_t len, uint_t flags,
+    ddi_dma_attr_t *dma_attr, nvme_dma_t **ret)
+{
+	nvme_dma_t *dma = kmem_zalloc(sizeof (nvme_dma_t), KM_SLEEP);
+
+	if (nvme_alloc_dma_common(nvme, dma, len, flags, dma_attr) !=
+	    DDI_SUCCESS) {
 		*ret = NULL;
-		nvme_free_dma(dma);
+		kmem_free(dma, sizeof (nvme_dma_t));
 		return (DDI_FAILURE);
 	}
 
@@ -536,6 +571,28 @@ nvme_zalloc_dma(nvme_t *nvme, size_t len, uint_t flags,
 
 	*ret = dma;
 	return (DDI_SUCCESS);
+}
+
+/* ARGSUSED */
+static int
+nvme_prp_dma_constructor(void *buf, void *private, int flags)
+{
+	nvme_dma_t *dma = (nvme_dma_t *)buf;
+	nvme_t *nvme = (nvme_t *)private;
+
+	dma->nd_dmah = NULL;
+	dma->nd_acch = NULL;
+
+	if (nvme_alloc_dma_common(nvme, dma, nvme->n_pagesize,
+	    DDI_DMA_READ, &nvme->n_prp_dma_attr) != DDI_SUCCESS) {
+		return (-1);
+	}
+
+	ASSERT(dma->nd_ncookie == 1);
+
+	dma->nd_cached = B_TRUE;
+
+	return (0);
 }
 
 static int
@@ -656,7 +713,11 @@ static void
 nvme_free_cmd(nvme_cmd_t *cmd)
 {
 	if (cmd->nc_dma) {
-		nvme_free_dma(cmd->nc_dma);
+		if (cmd->nc_dma->nd_cached)
+			kmem_cache_free(cmd->nc_nvme->n_prp_cache,
+			    cmd->nc_dma);
+		else
+			nvme_free_dma(cmd->nc_dma);
 		cmd->nc_dma = NULL;
 	}
 
@@ -782,7 +843,7 @@ nvme_check_vendor_cmd_status(nvme_cmd_t *cmd)
 	    "sc = %x, sct = %x, dnr = %d, m = %d", cmd->nc_sqe.sqe_opc,
 	    cqe->cqe_sqid, cqe->cqe_cid, cqe->cqe_sf.sf_sc, cqe->cqe_sf.sf_sct,
 	    cqe->cqe_sf.sf_dnr, cqe->cqe_sf.sf_m);
-	if (cmd->nc_nvme->n_ignore_unknown_vendor_status) {
+	if (!cmd->nc_nvme->n_ignore_unknown_vendor_status) {
 		cmd->nc_nvme->n_dead = B_TRUE;
 		ddi_fm_service_impact(cmd->nc_nvme->n_dip, DDI_SERVICE_LOST);
 	}
@@ -1083,7 +1144,7 @@ nvme_abort_cmd(nvme_cmd_t *abort_cmd)
 	 * Send the ABORT to the hardware. The ABORT command will return _after_
 	 * the aborted command has completed (aborted or otherwise).
 	 */
-	if (nvme_admin_cmd(cmd, NVME_ADMIN_CMD_TIMEOUT) != DDI_SUCCESS) {
+	if (nvme_admin_cmd(cmd, nvme_admin_cmd_timeout) != DDI_SUCCESS) {
 		sema_v(&nvme->n_abort_sema);
 		dev_err(nvme->n_dip, CE_WARN,
 		    "!nvme_admin_cmd failed for ABORT");
@@ -1117,9 +1178,9 @@ nvme_abort_cmd(nvme_cmd_t *abort_cmd)
  * will be declared dead and FMA will be notified.
  */
 static boolean_t
-nvme_wait_cmd(nvme_cmd_t *cmd, uint_t usec)
+nvme_wait_cmd(nvme_cmd_t *cmd, uint_t sec)
 {
-	clock_t timeout = ddi_get_lbolt() + drv_usectohz(usec);
+	clock_t timeout = ddi_get_lbolt() + drv_usectohz(sec * MICROSEC);
 	nvme_t *nvme = cmd->nc_nvme;
 	nvme_reg_csts_t csts;
 
@@ -1353,7 +1414,7 @@ nvme_async_event_task(void *arg)
 }
 
 static int
-nvme_admin_cmd(nvme_cmd_t *cmd, int usec)
+nvme_admin_cmd(nvme_cmd_t *cmd, int sec)
 {
 	int ret;
 
@@ -1369,7 +1430,7 @@ nvme_admin_cmd(nvme_cmd_t *cmd, int usec)
 		return (DDI_FAILURE);
 	}
 
-	if (nvme_wait_cmd(cmd, usec) == B_FALSE) {
+	if (nvme_wait_cmd(cmd, sec) == B_FALSE) {
 		/*
 		 * The command timed out. An abort command was posted that
 		 * will take care of the cleanup.
@@ -1408,7 +1469,7 @@ nvme_get_logpage(nvme_t *nvme, uint8_t logpage, ...)
 {
 	nvme_cmd_t *cmd = nvme_alloc_cmd(nvme, KM_SLEEP);
 	void *buf = NULL;
-	nvme_getlogpage_t getlogpage;
+	nvme_getlogpage_t getlogpage = { 0 };
 	size_t bufsize;
 	va_list ap;
 
@@ -1472,7 +1533,7 @@ nvme_get_logpage(nvme_t *nvme, uint8_t logpage, ...)
 		    cmd->nc_dma->nd_cookie.dmac_laddress;
 	}
 
-	if (nvme_admin_cmd(cmd, NVME_ADMIN_CMD_TIMEOUT) != DDI_SUCCESS) {
+	if (nvme_admin_cmd(cmd, nvme_admin_cmd_timeout) != DDI_SUCCESS) {
 		dev_err(nvme->n_dip, CE_WARN,
 		    "!nvme_admin_cmd failed for GET LOG PAGE");
 		return (NULL);
@@ -1528,7 +1589,7 @@ nvme_identify(nvme_t *nvme, uint32_t nsid)
 		    cmd->nc_dma->nd_cookie.dmac_laddress;
 	}
 
-	if (nvme_admin_cmd(cmd, NVME_ADMIN_CMD_TIMEOUT) != DDI_SUCCESS) {
+	if (nvme_admin_cmd(cmd, nvme_admin_cmd_timeout) != DDI_SUCCESS) {
 		dev_err(nvme->n_dip, CE_WARN,
 		    "!nvme_admin_cmd failed for IDENTIFY");
 		return (NULL);
@@ -1556,7 +1617,7 @@ nvme_set_nqueues(nvme_t *nvme, uint16_t nqueues)
 	nvme_cmd_t *cmd = nvme_alloc_cmd(nvme, KM_SLEEP);
 	nvme_nqueue_t nq = { 0 };
 
-	nq.b.nq_nsq = nq.b.nq_ncq = nqueues;
+	nq.b.nq_nsq = nq.b.nq_ncq = nqueues - 1;
 
 	cmd->nc_sqid = 0;
 	cmd->nc_callback = nvme_wakeup_cmd;
@@ -1564,7 +1625,7 @@ nvme_set_nqueues(nvme_t *nvme, uint16_t nqueues)
 	cmd->nc_sqe.sqe_cdw10 = NVME_FEAT_NQUEUES;
 	cmd->nc_sqe.sqe_cdw11 = nq.r;
 
-	if (nvme_admin_cmd(cmd, NVME_ADMIN_CMD_TIMEOUT) != DDI_SUCCESS) {
+	if (nvme_admin_cmd(cmd, nvme_admin_cmd_timeout) != DDI_SUCCESS) {
 		dev_err(nvme->n_dip, CE_WARN,
 		    "!nvme_admin_cmd failed for SET FEATURES (NQUEUES)");
 		return (0);
@@ -1585,7 +1646,7 @@ nvme_set_nqueues(nvme_t *nvme, uint16_t nqueues)
 	 * Always use the same number of submission and completion queues, and
 	 * never use more than the requested number of queues.
 	 */
-	return (MIN(nqueues, MIN(nq.b.nq_nsq, nq.b.nq_ncq)));
+	return (MIN(nqueues, MIN(nq.b.nq_nsq, nq.b.nq_ncq) + 1));
 }
 
 static int
@@ -1610,7 +1671,7 @@ nvme_create_io_qpair(nvme_t *nvme, nvme_qpair_t *qp, uint16_t idx)
 	cmd->nc_sqe.sqe_cdw11 = c_dw11.r;
 	cmd->nc_sqe.sqe_dptr.d_prp[0] = qp->nq_cqdma->nd_cookie.dmac_laddress;
 
-	if (nvme_admin_cmd(cmd, NVME_ADMIN_CMD_TIMEOUT) != DDI_SUCCESS) {
+	if (nvme_admin_cmd(cmd, nvme_admin_cmd_timeout) != DDI_SUCCESS) {
 		dev_err(nvme->n_dip, CE_WARN,
 		    "!nvme_admin_cmd failed for CREATE CQUEUE");
 		return (DDI_FAILURE);
@@ -1637,7 +1698,7 @@ nvme_create_io_qpair(nvme_t *nvme, nvme_qpair_t *qp, uint16_t idx)
 	cmd->nc_sqe.sqe_cdw11 = s_dw11.r;
 	cmd->nc_sqe.sqe_dptr.d_prp[0] = qp->nq_sqdma->nd_cookie.dmac_laddress;
 
-	if (nvme_admin_cmd(cmd, NVME_ADMIN_CMD_TIMEOUT) != DDI_SUCCESS) {
+	if (nvme_admin_cmd(cmd, nvme_admin_cmd_timeout) != DDI_SUCCESS) {
 		dev_err(nvme->n_dip, CE_WARN,
 		    "!nvme_admin_cmd failed for CREATE SQUEUE");
 		return (DDI_FAILURE);
@@ -1746,14 +1807,6 @@ nvme_init(nvme_t *nvme)
 	char model[sizeof (nvme->n_idctl->id_model) + 1];
 	char *vendor, *product;
 
-	/* Setup fixed interrupt for admin queue. */
-	if (nvme_setup_interrupts(nvme, DDI_INTR_TYPE_FIXED, 1)
-	    != DDI_SUCCESS) {
-		dev_err(nvme->n_dip, CE_WARN,
-		    "!failed to setup fixed interrupt");
-		goto fail;
-	}
-
 	/* Check controller version */
 	vs.r = nvme_get32(nvme, NVME_REG_VS);
 	dev_err(nvme->n_dip, CE_CONT, "?NVMe spec version %d.%d",
@@ -1806,6 +1859,7 @@ nvme_init(nvme_t *nvme)
 	nvme->n_prp_dma_attr.dma_attr_maxxfer = nvme->n_pagesize;
 	nvme->n_prp_dma_attr.dma_attr_minxfer = nvme->n_pagesize;
 	nvme->n_prp_dma_attr.dma_attr_align = nvme->n_pagesize;
+	nvme->n_prp_dma_attr.dma_attr_seg = nvme->n_pagesize - 1;
 
 	/*
 	 * Reset controller if it's still in ready state.
@@ -1845,11 +1899,13 @@ nvme_init(nvme_t *nvme)
 	nvme_put64(nvme, NVME_REG_ASQ, asq);
 	nvme_put64(nvme, NVME_REG_ACQ, acq);
 
-	cc.b.cc_ams = 0; /* use Round-Robin arbitration */
-	cc.b.cc_css = 0; /* use NVM command set */
+	cc.b.cc_ams = 0;	/* use Round-Robin arbitration */
+	cc.b.cc_css = 0;	/* use NVM command set */
 	cc.b.cc_mps = nvme->n_pageshift - 12;
-	cc.b.cc_shn = 0; /* no shutdown in progress */
-	cc.b.cc_en = 1;  /* enable controller */
+	cc.b.cc_shn = 0;	/* no shutdown in progress */
+	cc.b.cc_en = 1;		/* enable controller */
+	cc.b.cc_iosqes = 6;	/* submission queue entry is 2^6 bytes long */
+	cc.b.cc_iocqes = 4;	/* completion queue entry is 2^4 bytes long */
 
 	nvme_put32(nvme, NVME_REG_CC, cc.r);
 
@@ -1888,6 +1944,20 @@ nvme_init(nvme_t *nvme)
 	 * that later when we know the true abort command limit.
 	 */
 	sema_init(&nvme->n_abort_sema, 1, NULL, SEMA_DRIVER, NULL);
+
+	/*
+	 * Setup initial interrupt for admin queue.
+	 */
+	if ((nvme_setup_interrupts(nvme, DDI_INTR_TYPE_MSIX, 1)
+	    != DDI_SUCCESS) &&
+	    (nvme_setup_interrupts(nvme, DDI_INTR_TYPE_MSI, 1)
+	    != DDI_SUCCESS) &&
+	    (nvme_setup_interrupts(nvme, DDI_INTR_TYPE_FIXED, 1)
+	    != DDI_SUCCESS)) {
+		dev_err(nvme->n_dip, CE_WARN,
+		    "!failed to setup initial interrupt");
+		goto fail;
+	}
 
 	/*
 	 * Post an asynchronous event command to catch errors.
@@ -2038,7 +2108,7 @@ nvme_init(nvme_t *nvme)
 		 * performance. A value of 3 means "degraded", 0 is best.
 		 */
 		last_rp = 3;
-		for (int j = 0; j != idns->id_nlbaf; j++) {
+		for (int j = 0; j <= idns->id_nlbaf; j++) {
 			if (idns->id_lbaf[j].lbaf_lbads == 0)
 				break;
 			if (idns->id_lbaf[j].lbaf_ms != 0)
@@ -2053,17 +2123,14 @@ nvme_init(nvme_t *nvme)
 		/*
 		 * We currently don't support namespaces that use either:
 		 * - thin provisioning
-		 * - extended LBAs
 		 * - protection information
 		 */
 		if (idns->id_nsfeat.f_thin ||
-		    idns->id_flbas.lba_extlba ||
 		    idns->id_dps.dp_pinfo) {
 			dev_err(nvme->n_dip, CE_WARN,
 			    "!ignoring namespace %d, unsupported features: "
-			    "thin = %d, extlba = %d, pinfo = %d", i + 1,
-			    idns->id_nsfeat.f_thin, idns->id_flbas.lba_extlba,
-			    idns->id_dps.dp_pinfo);
+			    "thin = %d, pinfo = %d", i + 1,
+			    idns->id_nsfeat.f_thin, idns->id_dps.dp_pinfo);
 			nvme->n_ns[i].ns_ignore = B_TRUE;
 		}
 	}
@@ -2114,8 +2181,8 @@ nvme_init(nvme_t *nvme)
 	if (nvme->n_ioq_count < nqueues) {
 		nvme_release_interrupts(nvme);
 
-		if (nvme_setup_interrupts(nvme, nvme->n_intr_type, nqueues)
-		    != DDI_SUCCESS) {
+		if (nvme_setup_interrupts(nvme, nvme->n_intr_type,
+		    nvme->n_ioq_count) != DDI_SUCCESS) {
 			dev_err(nvme->n_dip, CE_WARN,
 			    "!failed to reduce number of interrupts");
 			goto fail;
@@ -2171,6 +2238,7 @@ nvme_intr(caddr_t arg1, caddr_t arg2)
 	/*LINTED: E_PTR_BAD_CAST_ALIGN*/
 	nvme_t *nvme = (nvme_t *)arg1;
 	int inum = (int)(uintptr_t)arg2;
+	int ccnt = 0;
 	int qnum;
 	nvme_cmd_t *cmd;
 
@@ -2188,10 +2256,11 @@ nvme_intr(caddr_t arg1, caddr_t arg2)
 		while ((cmd = nvme_retrieve_cmd(nvme, nvme->n_ioq[qnum]))) {
 			taskq_dispatch_ent((taskq_t *)cmd->nc_nvme->n_cmd_taskq,
 			    cmd->nc_callback, cmd, TQ_NOSLEEP, &cmd->nc_tqent);
+			ccnt++;
 		}
 	}
 
-	return (DDI_INTR_CLAIMED);
+	return (ccnt > 0 ? DDI_INTR_CLAIMED : DDI_INTR_UNCLAIMED);
 }
 
 static void
@@ -2222,7 +2291,6 @@ nvme_release_interrupts(nvme_t *nvme)
 static int
 nvme_setup_interrupts(nvme_t *nvme, int intr_type, int nqpairs)
 {
-	int failed = 0;
 	int nintrs, navail, count;
 	int ret;
 	int i;
@@ -2292,23 +2360,16 @@ nvme_setup_interrupts(nvme_t *nvme, int intr_type, int nqpairs)
 	(void) ddi_intr_get_cap(nvme->n_inth[0], &nvme->n_intr_cap);
 
 	for (i = 0; i < count; i++) {
-		if (nvme->n_inth[i] == NULL)
-			break;
+		if (nvme->n_intr_cap & DDI_INTR_FLAG_BLOCK)
+			ret = ddi_intr_block_enable(&nvme->n_inth[i], 1);
+		else
+			ret = ddi_intr_enable(nvme->n_inth[i]);
 
-		if (nvme->n_intr_cap & DDI_INTR_FLAG_BLOCK) {
-			if (ddi_intr_block_enable(&nvme->n_inth[i], 1) !=
-			    DDI_SUCCESS)
-				failed++;
-		} else {
-			if (ddi_intr_enable(nvme->n_inth[i]) != DDI_SUCCESS)
-				failed++;
+		if (ret != DDI_SUCCESS) {
+			dev_err(nvme->n_dip, CE_WARN,
+			    "!%s: enabling interrupt %d failed", __func__, i);
+			goto fail;
 		}
-	}
-
-	if (failed != 0) {
-		dev_err(nvme->n_dip, CE_WARN,
-		    "!%s: enabling interrupts failed", __func__);
-		goto fail;
 	}
 
 	nvme->n_intr_type = intr_type;
@@ -2443,6 +2504,14 @@ nvme_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		goto fail;
 	}
 
+	/*
+	 * Create PRP DMA cache
+	 */
+	(void) snprintf(name, sizeof (name), "%s%d_prp_cache",
+	    ddi_driver_name(dip), ddi_get_instance(dip));
+	nvme->n_prp_cache = kmem_cache_create(name, sizeof (nvme_dma_t),
+	    0, nvme_prp_dma_constructor, nvme_prp_dma_destructor,
+	    NULL, (void *)nvme, NULL, 0);
 
 	if (nvme_init(nvme) != DDI_SUCCESS)
 		goto fail;
@@ -2533,6 +2602,10 @@ nvme_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 		kmem_free(nvme->n_ioq, sizeof (nvme_qpair_t *) *
 		    (nvme->n_ioq_count + 1));
+	}
+
+	if (nvme->n_prp_cache != NULL) {
+		kmem_cache_destroy(nvme->n_prp_cache);
 	}
 
 	if (nvme->n_progress & NVME_REGS_MAPPED) {
@@ -2631,15 +2704,10 @@ nvme_fill_prp(nvme_cmd_t *cmd, bd_xfer_t *xfer)
 	 */
 	VERIFY(nprp == 1);
 
-	if (nvme_zalloc_dma(nvme, nvme->n_pagesize * nprp, DDI_DMA_READ,
-	    &nvme->n_prp_dma_attr, &cmd->nc_dma) != DDI_SUCCESS) {
-		dev_err(nvme->n_dip, CE_WARN, "!%s: nvme_zalloc_dma failed",
-		    __func__);
-		return (DDI_FAILURE);
-	}
+	cmd->nc_dma = kmem_cache_alloc(nvme->n_prp_cache, KM_SLEEP);
+	bzero(cmd->nc_dma->nd_memp, cmd->nc_dma->nd_len);
 
 	cmd->nc_sqe.sqe_dptr.d_prp[1] = cmd->nc_dma->nd_cookie.dmac_laddress;
-	ddi_dma_nextcookie(cmd->nc_dma->nd_dmah, &cmd->nc_dma->nd_cookie);
 
 	/*LINTED: E_PTR_BAD_CAST_ALIGN*/
 	for (prp = (uint64_t *)cmd->nc_dma->nd_memp;

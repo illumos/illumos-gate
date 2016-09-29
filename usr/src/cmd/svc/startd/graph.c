@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2015, Syneto S.R.L. All rights reserved.
+ * Copyright 2016 Toomas Soome <tsoome@me.com>
  */
 
 /*
@@ -159,9 +160,9 @@
 #include <sys/statvfs.h>
 #include <sys/uadmin.h>
 #include <zone.h>
-#if defined(__i386)
-#include <libgrubmgmt.h>
-#endif	/* __i386 */
+#if defined(__x86)
+#include <libbe.h>
+#endif	/* __x86 */
 
 #include "startd.h"
 #include "protocol.h"
@@ -530,8 +531,8 @@ graph_walk_dependents(graph_vertex_t *v, void (*func)(graph_vertex_t *, void *),
 }
 
 static void
-graph_walk_dependencies(graph_vertex_t *v, void (*func)(graph_vertex_t *,
-	void *), void *arg)
+graph_walk_dependencies(graph_vertex_t *v,
+    void (*func)(graph_vertex_t *, void *), void *arg)
 {
 	graph_edge_t *e;
 
@@ -3585,9 +3586,9 @@ do_uadmin(void)
 	struct tm nowtm;
 	char down_buf[256], time_buf[256];
 	uintptr_t mdep;
-#if defined(__i386)
-	grub_boot_args_t fbarg;
-#endif	/* __i386 */
+#if defined(__x86)
+	char *fbarg = NULL;
+#endif	/* __x86 */
 
 	mdep = NULL;
 	fd = creat(resetting, 0777);
@@ -3638,27 +3639,22 @@ do_uadmin(void)
 	 * print warning and fall back to regular reboot.
 	 */
 	if (halting == AD_FASTREBOOT) {
-#if defined(__i386)
-		int rc;
-
-		if ((rc = grub_get_boot_args(&fbarg, NULL,
-		    GRUB_ENTRY_DEFAULT)) == 0) {
-			mdep = (uintptr_t)&fbarg.gba_bootargs;
+#if defined(__x86)
+		if (be_get_boot_args(&fbarg, BE_ENTRY_DEFAULT) == 0) {
+			mdep = (uintptr_t)fbarg;
 		} else {
 			/*
-			 * Failed to read GRUB menu, fall back to normal reboot
+			 * Failed to read BE info, fall back to normal reboot
 			 */
 			halting = AD_BOOT;
-			uu_warn("Failed to process GRUB menu entry "
-			    "for fast reboot.\n\t%s\n"
-			    "Falling back to regular reboot.\n",
-			    grub_strerror(rc));
+			uu_warn("Failed to get fast reboot arguments.\n"
+			    "Falling back to regular reboot.\n");
 		}
-#else	/* __i386 */
+#else	/* __x86 */
 		halting = AD_BOOT;
 		uu_warn("Fast reboot configured, but not supported by "
 		    "this ISA\n");
-#endif	/* __i386 */
+#endif	/* __x86 */
 	}
 
 	fork_with_timeout("/sbin/umountall -l", 0, 5);
@@ -3714,11 +3710,10 @@ do_uadmin(void)
 	(void) uadmin(A_SHUTDOWN, halting, mdep);
 	uu_warn("uadmin() failed");
 
-#if defined(__i386)
-	/* uadmin fail, cleanup grub_boot_args */
+#if defined(__x86)
 	if (halting == AD_FASTREBOOT)
-		grub_cleanup_boot_args(&fbarg);
-#endif	/* __i386 */
+		free(fbarg);
+#endif	/* __x86 */
 
 	if (remove(resetting) != 0 && errno != ENOENT)
 		uu_warn("Could not remove \"%s\"", resetting);

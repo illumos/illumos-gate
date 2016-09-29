@@ -6,7 +6,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PROC 1 "Apr 01, 2013"
+.TH PROC 1 "Jun 15, 2016"
 .SH NAME
 proc, pflags, pcred, pldd, psig, pstack, pfiles, pwdx, pstop, prun, pwait,
 ptime \- proc tools
@@ -111,7 +111,7 @@ See \fBWARNINGS\fR.
 .RS 10n
 Print the \fB/proc\fR tracing flags, the pending and held signals, and other
 \fB/proc\fR status information for each process or specified lwps in each
-process.
+process. If an lwp has a non-empty signal mask, it will be printed.
 .RE
 
 .sp
@@ -141,7 +141,8 @@ explicitly attached using \fBdlopen\fR(3C). See also \fBldd\fR(1).
 .ad
 .RS 10n
 List the signal actions and handlers of each process. See
-\fBsignal.h\fR(3HEAD).
+\fBsignal.h\fR(3HEAD). Use \fBpflags\fR to see more information about currently
+pending signals and signal masks.
 .RE
 
 .sp

@@ -20,11 +20,11 @@
  */
 
 /*
+ * Copyright 2016 Toomas Soome <tsoome@me.com>
  * Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include "benv.h"
-#include "message.h"
 #include <ctype.h>
 #include <stdarg.h>
 #include <sys/mman.h>
@@ -186,280 +186,15 @@ get_var(char *name, eplist_t *list)
 	return (NULL);
 }
 
-/*PRINTFLIKE1*/
-static void
-eeprom_error(const char *format, ...)
-{
-	va_list ap;
-
-	va_start(ap, format);
-	(void) fprintf(stderr, "eeprom: ");
-	(void) vfprintf(stderr, format, ap);
-	va_end(ap);
-}
-
-static int
-exec_cmd(char *cmdline, char *output, int64_t osize)
-{
-	char buf[BUFSIZ];
-	int ret;
-	size_t len;
-	FILE *ptr;
-	sigset_t set;
-	void (*disp)(int);
-
-	if (output)
-		output[0] = '\0';
-
-	/*
-	 * For security
-	 * - only absolute paths are allowed
-	 * - set IFS to space and tab
-	 */
-	if (*cmdline != '/') {
-		eeprom_error(ABS_PATH_REQ, cmdline);
-		return (-1);
-	}
-	(void) putenv("IFS= \t");
-
-	/*
-	 * We may have been exec'ed with SIGCHLD blocked
-	 * unblock it here
-	 */
-	(void) sigemptyset(&set);
-	(void) sigaddset(&set, SIGCHLD);
-	if (sigprocmask(SIG_UNBLOCK, &set, NULL) != 0) {
-		eeprom_error(FAILED_SIG, strerror(errno));
-		return (-1);
-	}
-
-	/*
-	 * Set SIGCHLD disposition to SIG_DFL for popen/pclose
-	 */
-	disp = sigset(SIGCHLD, SIG_DFL);
-	if (disp == SIG_ERR) {
-		eeprom_error(FAILED_SIG, strerror(errno));
-		return (-1);
-	}
-	if (disp == SIG_HOLD) {
-		eeprom_error(BLOCKED_SIG, cmdline);
-		return (-1);
-	}
-
-	ptr = popen(cmdline, "r");
-	if (ptr == NULL) {
-		eeprom_error(POPEN_FAIL, cmdline, strerror(errno));
-		return (-1);
-	}
-
-	/*
-	 * If we simply do a pclose() following a popen(), pclose()
-	 * will close the reader end of the pipe immediately even
-	 * if the child process has not started/exited. pclose()
-	 * does wait for cmd to terminate before returning though.
-	 * When the executed command writes its output to the pipe
-	 * there is no reader process and the command dies with
-	 * SIGPIPE. To avoid this we read repeatedly until read
-	 * terminates with EOF. This indicates that the command
-	 * (writer) has closed the pipe and we can safely do a
-	 * pclose().
-	 *
-	 * Since pclose() does wait for the command to exit,
-	 * we can safely reap the exit status of the command
-	 * from the value returned by pclose()
-	 */
-	while (fgets(buf, sizeof (buf), ptr) != NULL) {
-		if (output && osize > 0) {
-			(void) snprintf(output, osize, "%s", buf);
-			len = strlen(buf);
-			output += len;
-			osize -= len;
-		}
-	}
-
-	/*
-	 * If there's a "\n" at the end, we want to chop it off
-	 */
-	if (output) {
-		len = strlen(output) - 1;
-		if (output[len] == '\n')
-			output[len] = '\0';
-	}
-
-	ret = pclose(ptr);
-	if (ret == -1) {
-		eeprom_error(PCLOSE_FAIL, cmdline, strerror(errno));
-		return (-1);
-	}
-
-	if (WIFEXITED(ret)) {
-		return (WEXITSTATUS(ret));
-	} else {
-		eeprom_error(EXEC_FAIL, cmdline, ret);
-		return (-1);
-	}
-}
-
-#define	BOOTADM_STR	"bootadm: "
-
-/*
- * bootadm starts all error messages with "bootadm: ".
- * Add a note so users don't get confused on how they ran bootadm.
- */
-static void
-output_error_msg(const char *msg)
-{
-	size_t len = sizeof (BOOTADM_STR) - 1;
-
-	if (strncmp(msg, BOOTADM_STR, len) == 0) {
-		eeprom_error("error returned from %s\n", msg);
-	} else if (msg[0] != '\0') {
-		eeprom_error("%s\n", msg);
-	}
-}
-
-static char *
-get_bootadm_value(char *name, const int quiet)
-{
-	char *ptr, *ret_str, *end_ptr, *orig_ptr;
-	char output[BUFSIZ];
-	int is_console, is_kernel = 0;
-	size_t len;
-
-	is_console = (strcmp(name, "console") == 0);
-
-	if (strcmp(name, "boot-file") == 0) {
-		is_kernel = 1;
-		ptr = "/sbin/bootadm set-menu kernel 2>&1";
-	} else if (is_console || (strcmp(name, "boot-args") == 0)) {
-		ptr = "/sbin/bootadm set-menu args 2>&1";
-	} else {
-		eeprom_error("Unknown value in get_bootadm_value: %s\n", name);
-		return (NULL);
-	}
-
-	if (exec_cmd(ptr, output, BUFSIZ) != 0) {
-		if (quiet == 0) {
-			output_error_msg(output);
-		}
-		return (NULL);
-	}
-
-	if (is_console) {
-		if ((ptr = strstr(output, "console=")) == NULL) {
-			return (NULL);
-		}
-		ptr += strlen("console=");
-
-		/*
-		 * -B may have comma-separated values.  It may also be
-		 * followed by other flags.
-		 */
-		len = strcspn(ptr, " \t,");
-		ret_str = calloc(len + 1, 1);
-		if (ret_str == NULL) {
-			eeprom_error(NO_MEM, len + 1);
-			return (NULL);
-		}
-		(void) strncpy(ret_str, ptr, len);
-		return (ret_str);
-	} else if (is_kernel) {
-		ret_str = strdup(output);
-		if (ret_str == NULL)
-			eeprom_error(NO_MEM, strlen(output) + 1);
-		return (ret_str);
-	} else {
-		/* If there's no console setting, we can return */
-		if ((orig_ptr = strstr(output, "console=")) == NULL) {
-			return (strdup(output));
-		}
-		len = strcspn(orig_ptr, " \t,");
-		ptr = orig_ptr;
-		end_ptr = orig_ptr + len + 1;
-
-		/* Eat up any white space */
-		while ((*end_ptr == ' ') || (*end_ptr == '\t'))
-			end_ptr++;
-
-		/*
-		 * If there's data following the console string, copy it.
-		 * If not, cut off the new string.
-		 */
-		if (*end_ptr == '\0')
-			*ptr = '\0';
-
-		while (*end_ptr != '\0') {
-			*ptr = *end_ptr;
-			ptr++;
-			end_ptr++;
-		}
-		*ptr = '\0';
-		if ((strchr(output, '=') == NULL) &&
-		    (strncmp(output, "-B ", 3) == 0)) {
-			/*
-			 * Since we removed the console setting, we no
-			 * longer need the initial "-B "
-			 */
-			orig_ptr = output + 3;
-		} else {
-			orig_ptr = output;
-		}
-
-		ret_str = strdup(orig_ptr);
-		if (ret_str == NULL)
-			eeprom_error(NO_MEM, strlen(orig_ptr) + 1);
-		return (ret_str);
-	}
-}
-
-/*
- * If quiet is 1, print nothing if there is no value.  If quiet is 0, print
- * a message.  Return 1 if the value is printed, 0 otherwise.
- */
-static int
-print_bootadm_value(char *name, const int quiet)
-{
-	int rv = 0;
-	char *value = get_bootadm_value(name, quiet);
-
-	if ((value != NULL) && (value[0] != '\0')) {
-		(void) printf("%s=%s\n", name, value);
-		rv = 1;
-	} else if (quiet == 0) {
-		(void) printf("%s: data not available.\n", name);
-	}
-
-	if (value != NULL)
-		free(value);
-	return (rv);
-}
-
 static void
 print_var(char *name, eplist_t *list)
 {
 	benv_ent_t *p;
 	char *bootcmd;
 
-	/*
-	 * The console property is kept in both menu.lst and bootenv.rc.  The
-	 * menu.lst value takes precedence.
-	 */
-	if (strcmp(name, "console") == 0) {
-		if (print_bootadm_value(name, 1) == 0) {
-			if ((p = get_var(name, list)) != NULL) {
-				(void) printf("%s=%s\n", name, p->val ?
-				    p->val : "");
-			} else {
-				(void) printf("%s: data not available.\n",
-				    name);
-			}
-		}
-	} else if (strcmp(name, "bootcmd") == 0) {
+	if (strcmp(name, "bootcmd") == 0) {
 		bootcmd = getbootcmd();
 		(void) printf("%s=%s\n", name, bootcmd ? bootcmd : "");
-	} else if ((strcmp(name, "boot-file") == 0) ||
-	    (strcmp(name, "boot-args") == 0)) {
-		(void) print_bootadm_value(name, 0);
 	} else if ((p = get_var(name, list)) == NULL) {
 		(void) printf("%s: data not available.\n", name);
 	} else {
@@ -472,30 +207,13 @@ print_vars(eplist_t *list)
 {
 	eplist_t *e;
 	benv_ent_t *p;
-	int console_printed = 0;
-
-	/*
-	 * The console property is kept both in menu.lst and bootenv.rc.
-	 * The menu.lst value takes precedence, so try printing that one
-	 * first.
-	 */
-	console_printed = print_bootadm_value("console", 1);
 
 	for (e = list->next; e != list; e = e->next) {
 		p = (benv_ent_t *)e->item;
 		if (p->name != NULL) {
-			if (((strcmp(p->name, "console") == 0) &&
-			    (console_printed == 1)) ||
-			    ((strcmp(p->name, "boot-file") == 0) ||
-			    (strcmp(p->name, "boot-args") == 0))) {
-				/* handle these separately */
-				continue;
-			}
 			(void) printf("%s=%s\n", p->name, p->val ? p->val : "");
 		}
 	}
-	(void) print_bootadm_value("boot-file", 1);
-	(void) print_bootadm_value("boot-args", 1);
 }
 
 /*
@@ -522,77 +240,6 @@ put_quoted(FILE *fp, char *val)
 	(void) putc('\'', fp);
 }
 
-static void
-set_bootadm_var(char *name, char *value)
-{
-	char buf[BUFSIZ];
-	char output[BUFSIZ] = "";
-	char *console, *args;
-	int is_console;
-
-	if (verbose) {
-		(void) printf("old:");
-		(void) print_bootadm_value(name, 0);
-	}
-
-	/*
-	 * For security, we single-quote whatever we run on the command line,
-	 * and we don't allow single quotes in the string.
-	 */
-	if (strchr(value, '\'') != NULL) {
-		eeprom_error("Single quotes are not allowed "
-		    "in the %s property.\n", name);
-		return;
-	}
-
-	is_console = (strcmp(name, "console") == 0);
-	if (strcmp(name, "boot-file") == 0) {
-		(void) snprintf(buf, BUFSIZ, "/sbin/bootadm set-menu "
-		    "kernel='%s' 2>&1", value);
-	} else if (is_console || (strcmp(name, "boot-args") == 0)) {
-		if (is_console) {
-			args = get_bootadm_value("boot-args", 1);
-			console = value;
-		} else {
-			args = value;
-			console = get_bootadm_value("console", 1);
-		}
-		if (((args == NULL) || (args[0] == '\0')) &&
-		    ((console == NULL) || (console[0] == '\0'))) {
-			(void) snprintf(buf, BUFSIZ, "/sbin/bootadm set-menu "
-			    "args= 2>&1");
-		} else if ((args == NULL) || (args[0] == '\0')) {
-			(void) snprintf(buf, BUFSIZ, "/sbin/bootadm "
-			    "set-menu args='-B console=%s' 2>&1",
-			    console);
-		} else if ((console == NULL) || (console[0] == '\0')) {
-			(void) snprintf(buf, BUFSIZ, "/sbin/bootadm "
-			    "set-menu args='%s' 2>&1", args);
-		} else if (strncmp(args, "-B ", 3) != 0) {
-			(void) snprintf(buf, BUFSIZ, "/sbin/bootadm "
-			    "set-menu args='-B console=%s %s' 2>&1",
-			    console, args);
-		} else {
-			(void) snprintf(buf, BUFSIZ, "/sbin/bootadm "
-			    "set-menu args='-B console=%s,%s' 2>&1",
-			    console, args + 3);
-		}
-	} else {
-		eeprom_error("Unknown value in set_bootadm_value: %s\n", name);
-		return;
-	}
-
-	if (exec_cmd(buf, output, BUFSIZ) != 0) {
-		output_error_msg(output);
-		return;
-	}
-
-	if (verbose) {
-		(void) printf("new:");
-		(void) print_bootadm_value(name, 0);
-	}
-}
-
 /*
  * Returns 1 if bootenv.rc was modified, 0 otherwise.
  */
@@ -600,27 +247,9 @@ static int
 set_var(char *name, char *val, eplist_t *list)
 {
 	benv_ent_t *p;
-	int old_verbose;
 
 	if (strcmp(name, "bootcmd") == 0)
 		return (0);
-
-	if ((strcmp(name, "boot-file") == 0) ||
-	    (strcmp(name, "boot-args") == 0)) {
-		set_bootadm_var(name, val);
-		return (0);
-	}
-
-	/*
-	 * The console property is kept in two places: menu.lst and bootenv.rc.
-	 * Update them both.  We clear verbose to prevent duplicate messages.
-	 */
-	if (strcmp(name, "console") == 0) {
-		old_verbose = verbose;
-		verbose = 0;
-		set_bootadm_var(name, val);
-		verbose = old_verbose;
-	}
 
 	if (verbose) {
 		(void) printf("old:");

@@ -187,8 +187,6 @@ _MANFILES=	Intro.4				\
 		sndr.4				\
 		sock2path.d.4			\
 		space.4				\
-		ssh_config.sunssh.4	\
-		sshd_config.sunssh.4	\
 		sulog.4				\
 		syslog.conf.4			\
 		system.4			\
@@ -243,8 +241,6 @@ _MANLINKS=	addresses.4			\
 		rhosts.4			\
 		sendmail.cf.4			\
 		snapshot_cache.4		\
-		ssh_config.4			\
-		sshd_config.4			\
 		submit.cf.4			\
 		volume-defaults.4		\
 		wtmp.4				\
@@ -296,8 +292,6 @@ pcie.4				:= LINKSRC = pci.4
 sendmail.cf.4			:= LINKSRC = sendmail.4
 submit.cf.4			:= LINKSRC = sendmail.4
 
-ssh_config.4			:= LINKSRC = ssh_config.sunssh.4
-sshd_config.4			:= LINKSRC = sshd_config.sunssh.4
 
 isa.4				:= LINKSRC = sysbus.4
 

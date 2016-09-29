@@ -30,6 +30,7 @@ exception_lists/closed-bins
 exception_lists/copyright
 exception_lists/cstyle
 exception_lists/hdrchk
+usr/src/boot/*
 usr/src/cmd/cmd-inet/usr.bin/dns-sd/ClientCommon.c
 usr/src/cmd/cmd-inet/usr.bin/dns-sd/ClientCommon.h
 usr/src/cmd/cmd-inet/usr.bin/dns-sd/dns-sd.c
@@ -72,6 +73,7 @@ usr/src/common/bzip2/bzlib.c
 usr/src/common/bzip2/decompress.c
 usr/src/common/bzip2/bzlib_private.h
 usr/src/common/bzip2/huffman.c
+usr/src/common/ficl/*
 usr/src/grub/grub-0.97/stage2/Makefile.am
 usr/src/grub/grub-0.97/stage2/builtins.c
 usr/src/grub/grub-0.97/stage2/disk_io.c
@@ -357,6 +359,12 @@ usr/src/lib/libsmbfs/smb/spnego.c
 usr/src/lib/libsmbfs/smb/spnegoparse.[ch]
 usr/src/test/zfs-tests/tests/functional/history/*Z
 usr/src/test/zfs-tests/tests/functional/history/*txt
+usr/src/tools/btxld/btx.h
+usr/src/tools/btxld/btxld.8
+usr/src/tools/btxld/btxld.c
+usr/src/tools/btxld/elfh.c
+usr/src/tools/btxld/elfh.h
+usr/src/tools/btxld/imgact_aout.h
 usr/src/uts/intel/nsmb/ioc_check.ref
 usr/src/uts/intel/os/splashimage.xpm
 usr/src/uts/common/gssapi/mechs/krb5/crypto/block_size.c

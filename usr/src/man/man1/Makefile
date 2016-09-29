@@ -328,7 +328,6 @@ MANFILES=	acctcom.1			\
 	 	rusers.1			\
 	 	rwho.1				\
 	 	sar.1				\
-		scp.sunssh.1		\
 	 	script.1			\
 	 	sdiff.1				\
 	 	sed.1				\
@@ -337,7 +336,6 @@ MANFILES=	acctcom.1			\
 	 	setfacl.1			\
 	 	setlabel.1			\
 	 	setpgrp.1			\
-		sftp.sunssh.1		\
 	 	shcomp.1			\
 	 	shell_builtins.1		\
 	 	shift.1				\
@@ -351,13 +349,6 @@ MANFILES=	acctcom.1			\
 	 	spell.1				\
 	 	split.1				\
 	 	srchtxt.1			\
-		ssh.sunssh.1			\
-		ssh-add.sunssh.1			\
-		ssh-agent.sunssh.1			\
-		ssh-http-proxy-connect.sunssh.1	\
-		ssh-keygen.sunssh.1		\
-		ssh-keyscan.sunssh.1		\
-		ssh-socks5-proxy-connect.sunssh.1	\
 	 	strchg.1			\
 	 	strings.1			\
 	 	strip.1				\
@@ -514,22 +505,13 @@ MANLINKS=	batch.1		\
 		rmail.1		\
 		rmdir.1		\
 		rmumount.1	\
-		scp.1		\
 		select.1	\
 		setenv.1	\
 		settime.1	\
-		sftp.1		\
 		sh.1		\
 		snca.1		\
 		source.1	\
 		spellin.1	\
-		ssh.1		\
-		ssh-add.1	\
-		ssh-agent.1	\
-		ssh-http-proxy-connect.1	\
-		ssh-keygen.1	\
-		ssh-keyscan.1	\
-		ssh-socks5-proxy-connect.1	\
 		stop.1		\
 		strconf.1	\
 		switch.1	\
@@ -717,15 +699,6 @@ hashcheck.1	:= LINKSRC = spell.1
 hashmake.1	:= LINKSRC = spell.1
 spellin.1	:= LINKSRC = spell.1
 
-scp.1				:= LINKSRC = scp.sunssh.1
-sftp.1				:= LINKSRC = sftp.sunssh.1
-ssh.1				:= LINKSRC = ssh.sunssh.1
-ssh-add.1			:= LINKSRC = ssh-add.sunssh.1
-ssh-agent.1			:= LINKSRC = ssh-agent.sunssh.1
-ssh-http-proxy-connect.1	:= LINKSRC = ssh-http-proxy-connect.sunssh.1
-ssh-keygen.1			:= LINKSRC = ssh-keygen.sunssh.1
-ssh-keyscan.1			:= LINKSRC = ssh-keyscan.sunssh.1
-ssh-socks5-proxy-connect.1	:= LINKSRC = ssh-socks5-proxy-connect.sunssh.1
 
 strconf.1	:= LINKSRC = strchg.1
 

@@ -1,0 +1,73 @@
+\ OOP test stuff
+
+only
+also oop definitions
+
+object subclass c-aggregate
+c-byte obj: m0
+c-byte obj: m1
+c-4byte obj: m2
+c-2byte obj: m3
+end-class
+
+object --> sub class1
+
+cell: .a
+cell: .b
+: init
+	locals| class inst |
+	0 inst class --> .a !
+	1 inst class --> .b !
+;
+end-class
+
+class1 --> new c1inst
+
+class1 --> sub class2
+cell: .c
+cell: .d
+
+: init
+	locals| class inst |
+	inst class --> super --> init
+	2 inst class --> .c !
+	3 inst class --> .d !
+;
+end-class
+
+class2 --> new c2inst
+
+object subclass c-list
+c-list ref: link
+c-ref  obj: payload
+end-class
+
+\ test stuff from ficl.html
+.( metaclass methods ) cr
+metaclass --> methods
+
+cr .( c-foo class ) cr
+object --> sub c-foo
+cell: m_cell1
+    4 chars: m_chars
+    : init   ( inst class -- )
+        locals| class inst |
+        0 inst class --> m_cell1 !
+        inst class --> m_chars 4 0 fill
+        ." initializing an instance of c_foo at " inst x. cr
+    ;
+end-class
+
+.( c-foo instance methods... ) cr
+c-foo --> new foo-instance
+cr
+foo-instance --> methods
+foo-instance --> pedigree
+cr
+foo-instance 2dup
+    --> methods
+    --> pedigree
+cr
+c-foo --> see init
+cr
+foo-instance --> class --> see init

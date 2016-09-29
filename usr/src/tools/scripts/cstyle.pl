@@ -20,6 +20,7 @@
 # CDDL HEADER END
 #
 # Copyright 2015 Toomas Soome <tsoome@me.com>
+# Copyright 2016 Nexenta Systems, Inc.
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -400,7 +401,7 @@ line: while (<$filehandle>) {
 		$prev = $line;
 		next line;
 	}
-	if ($in_function_header && ! /^    \w/ ) {
+	if ($in_function_header && ! /^    (\w|\.)/ ) {
 		if (/^{}$/) {
 			$in_function_header = 0;
 			$function_header_full_indent = 0;
@@ -497,7 +498,7 @@ line: while (<$filehandle>) {
 		err("spaces instead of tabs");
 	}
 	if (/^ / && !/^ \*[ \t\/]/ && !/^ \*$/ &&
-	    (!/^    \w/ || $in_function != 0)) {
+	    (!/^    (\w|\.)/ || $in_function != 0)) {
 		err("indent by spaces instead of tabs");
 	}
 	if (/^\t+ [^ \t\*]/ || /^\t+  \S/ || /^\t+   \S/) {

@@ -1,3 +1,4 @@
+usr/src/boot/*
 usr/src/cmd/cmd-inet/usr.bin/dns-sd/ClientCommon.h
 usr/src/cmd/cmd-inet/usr.lib/mdnsd/CryptoAlg.h
 usr/src/cmd/cmd-inet/usr.lib/mdnsd/DNSCommon.h
@@ -51,6 +52,7 @@ usr/src/cmd/mandoc/roff_int.h
 usr/src/cmd/mandoc/roff.h
 usr/src/cmd/mandoc/tag.h
 usr/src/cmd/mandoc/term.h
+usr/src/common/ficl/ficltokens.h
 usr/src/grub/grub-0.97/stage2/shared.h
 usr/src/lib/gss_mechs/mech_krb5/et/error_table.h
 usr/src/lib/gss_mechs/mech_krb5/et/internal.h
@@ -180,6 +182,7 @@ usr/src/lib/librstp/common/vector.h
 usr/src/lib/libsmbfs/netsmb/spnego.h
 usr/src/lib/libsmbfs/smb/derparse.h
 usr/src/lib/libsmbfs/smb/spnegoparse.h
+usr/src/tools/btxld/*
 usr/src/uts/common/gssapi/mechs/krb5/include/aes_s2k.h
 usr/src/uts/common/gssapi/mechs/krb5/include/auth_con.h
 usr/src/uts/common/gssapi/mechs/krb5/include/cksumtypes.h

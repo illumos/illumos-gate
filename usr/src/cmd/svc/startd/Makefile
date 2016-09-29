@@ -21,6 +21,7 @@
 #
 # Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2012 Milan Jurik. All rights reserved.
+# Copyright 2016 Toomas Soome <tsoome@me.com>
 #
 
 PROG = svc.startd
@@ -93,7 +94,7 @@ LDLIBS += \
 	-lumem \
 	-luutil
 
-LDLIBS_i386 +=	-lgrubmgmt
+LDLIBS_i386 +=	-lbe
 LDLIBS +=	$(LDLIBS_$(MACH)) -L $(ROOT)/lib/fm -lfmevent
 LDFLAGS +=	-R /lib/fm
 
