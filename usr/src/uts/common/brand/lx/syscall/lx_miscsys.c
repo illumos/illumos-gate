@@ -278,5 +278,12 @@ lx_vhangup(void)
 {
 	if (crgetuid(CRED()) != 0)
 		return (set_errno(EPERM));
-	return (vhangup());
+
+	/*
+	 * The native vhangup code does nothing except check for the sys_config
+	 * privilege. Eventually we'll first want to check our emulation for the
+	 * Linux CAP_SYS_TTY_CONFIG capability, but currently, since we've
+	 * already checked that our process is root, just succeed.
+	 */
+	return (0);
 }
