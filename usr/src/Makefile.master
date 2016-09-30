@@ -180,7 +180,14 @@ PERL_ARCH =		i86pc-solaris-64int
 $(SPARC_BLD)PERL_ARCH =	sun4-solaris-64int
 PYTHON_VERSION=	2.6
 PYTHON_PKGVERS=	-26
-PYTHON=		/opt/local/bin/python$(PYTHON_VERSION)
+#
+# Until we cross the python flag day, we need to rely on the environment
+# variable to properly help us across. To that end, we purposefully
+# replace this PYTHON definition with the old version, which comes from
+# the environment.
+#
+#PYTHON=		/usr/bin/python$(PYTHON_VERSION)
+PYTHON=		$(PYTHON_26)
 SORT=		/usr/bin/sort
 TOUCH=		/usr/bin/touch
 WC=		/usr/bin/wc
@@ -249,7 +256,7 @@ INS.symlink=	$(RM) $@; $(SYMLINK) $(INSLINKTARGET) $@
 # (.py) file. As a part of this we also go through and change the #!
 # line in the python script to that of the actual python we are using.
 #
-INS.pyfile=	$(RM) $@; $(SED) -e "1s:^\#!@PYTHON@:\#!/usr/bin/python$(PYTHON_VERSION):" < $< > $@; $(CHMOD) $(FILEMODE) $@; $(TOUCH) -r $< $@
+INS.pyfile=	$(RM) $@; $(SED) -e "1s:^\#!@PYTHON@:\#!$(PYTHON):" < $< > $@; $(CHMOD) $(FILEMODE) $@; $(TOUCH) -r $< $@
 
 # MACH must be set in the shell environment per uname -p on the build host
 # More specific architecture variables should be set in lower makefiles.
@@ -1113,7 +1120,7 @@ PKGPUBLISHER_NONREDIST=	on-extra
 	$(CHMOD) +x $@
 
 .py:
-	$(RM) $@; $(SED) -e "1s:^\#!@PYTHON@:\#!/usr/bin/python$(PYTHON_VERSION):" < $< > $@; $(CHMOD) +x $@
+	$(RM) $@; $(SED) -e "1s:^\#!@PYTHON@:\#!$(PYTHON):" < $< > $@; $(CHMOD) +x $@
 
 .py.pyc:
 	$(RM) $@
