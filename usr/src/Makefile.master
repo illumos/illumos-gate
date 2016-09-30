@@ -178,16 +178,9 @@ PERL_VERSION=	5.12
 PERL_PKGVERS=	-512
 PERL_ARCH =		i86pc-solaris-64int
 $(SPARC_BLD)PERL_ARCH =	sun4-solaris-64int
-PYTHON_VERSION=	2.6
-PYTHON_PKGVERS=	-26
-#
-# Until we cross the python flag day, we need to rely on the environment
-# variable to properly help us across. To that end, we purposefully
-# replace this PYTHON definition with the old version, which comes from
-# the environment.
-#
-#PYTHON=		/usr/bin/python$(PYTHON_VERSION)
-PYTHON=		$(PYTHON_26)
+PYTHON_VERSION=	2.7
+PYTHON_PKGVERS=	-27
+PYTHON=		/usr/bin/python$(PYTHON_VERSION)
 SORT=		/usr/bin/sort
 TOUCH=		/usr/bin/touch
 WC=		/usr/bin/wc

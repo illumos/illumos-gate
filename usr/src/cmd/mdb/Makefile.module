@@ -102,13 +102,19 @@ LINTFILES_raw		= $(LINTOBJS)
 LINTFILES		= $(LINTFILES_$(MDBTGT))
 
 #
-# Python specific flags. To try and make life easier for folks how are
+# Python specific flags. To try and make life easier for folks who are
 # building with an LFS python, we attempt to use -isystem when it's
 # available.
 #
 PYCPPFLAGS		= -_gcc=-isystem -_gcc=$(ADJUNCT_PROTO)/usr/include/python$(PYTHON_VERSION)
 PYCPPFLAGS		+= -_cc=-I$(ADJUNCT_PROTO)/usr/include/python$(PYTHON_VERSION)
 PYLNFLAGS		= -I$(ADJUNCT_PROTO)/usr/include/python$(PYTHON_VERSION)
+
+#
+# At this time, we do not have python27 in the adjunct proto area, only
+# python26. As such, we explicitly override the python version dmod here.
+#
+PYTHON_VERSION		= 2.6
 
 kvm_TGTFLAGS		= -D_KERNEL
 proc_TGTFLAGS		= -D_USER
