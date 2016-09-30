@@ -9,9 +9,9 @@
 .\" http://www.illumos.org/license/CDDL.
 .\"
 .\"
-.\" Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+.\" Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
 .\"
-.Dd July 20, 2015
+.Dd May 13, 2016
 .Dt NVME 7D
 .Os
 .Sh NAME
@@ -34,35 +34,49 @@ instance in the system.
 .Sh CONFIGURATION
 The
 .Nm
-driver can be configured by defining properties in the \fBnvme.conf\fR
-file. The parameters are considered an unstable interface, subject to
-change without notice. The following properties are currently
-supported:
+driver can be configured by defining properties in the
+.Pa nvme.conf
+file.
+The parameters are considered an unstable interface, subject to
+change without notice.
+The following properties are currently supported:
 .Bl -tag -width Va
 .It Va strict-version
 This can be set to 0 to allow
 .Nm
 to attach to devices supporting newer version of the NVMe
-specification. The default value is 1, limiting
+specification.
+The default value is 1, limiting
 .Nm
-to work with devices up to specification version 1.0.
+to work with devices up to specification version 1.1.
 .It Va ignore-unknown-vendor-status
 This can be set to 1 to allow
 .Nm
 to continue operating even if it receives an unknown vendor command
 status.
 .It Va admin-queue-len
-This is the number of entries in the admin command queue. Legal values
-are between 16 and 4096, the default value is 256.
+This is the number of entries in the admin command queue.
+Legal values are between 16 and 4096, the default value is 256.
 .It Va io-queue-len
-This is the number of entries in each I/O command queue. Legal values
-are between 16 and 65536, the default value is 1024.
+This is the number of entries in each I/O command queue.
+Legal values are between 16 and 65536, the default value is 1024.
 .It Va async-event-limit
 This is the maximum number of asynchronous event requests issued by
-the driver. Asynchronous events are used to report error conditions.
+the driver.
+Asynchronous events are used to report error conditions.
 The driver will never use more asynchronous events than this value, or
-what the hardware supports if it is less, or what 1/10th of the admin
-queue length if it is less.
+what the hardware supports if it is less, or 1/10th of the admin queue
+length if it is less.
+.It Va volatile-write-cache-enable
+This property can be set to 0 to disable the volatile write cache, if
+the hardware supports it.
+The default setting is 1, which enables the volatile write cache.
+.It Va min-phys-block-size
+This is the minimum physical block size that is reported to
+.Xr blkdev 7d .
+This value must be a power of 2 greater than or equal to 512.
+If the device reports a best block size larger than what is
+specified here the driver will ignore the value specified here.
 .El
 .
 .Sh FILES
@@ -78,16 +92,18 @@ In the device minor nodes, the following substitutions may occur:
 .It Va cn
 A controller number, typically one for each
 .Nm
-device found. Controller numbers are dynamically assigned by the
-system.
+device found.
+Controller numbers are dynamically assigned by the system.
 .It Va tn
-The target number, this corresponds to the namespace ID used by the
-hardware. Namespace ID 0 is reserved, hence target numbers start with
-1.
+The target number.
+This is the namespace EUI64 if available, or the namespace ID used by
+the hardware.
+Namespace ID 0 is reserved, hence target numbers start with 1.
 .It Va sn
 This is the
 .Em slice
-number, representing a subset of the disk.  See
+number, representing a subset of the disk.
+See
 .Xr dkio 7I .
 .El
 .

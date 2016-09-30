@@ -178,8 +178,9 @@ PERL_VERSION=	5.12
 PERL_PKGVERS=	-512
 PERL_ARCH =		i86pc-solaris-64int
 $(SPARC_BLD)PERL_ARCH =	sun4-solaris-64int
-PYTHON_26=	/usr/bin/python2.6
-PYTHON=		$(PYTHON_26)
+PYTHON_VERSION=	2.7
+PYTHON_PKGVERS=	-27
+PYTHON=		/usr/bin/python$(PYTHON_VERSION)
 SORT=		/usr/bin/sort
 TOUCH=		/usr/bin/touch
 WC=		/usr/bin/wc
@@ -248,7 +249,7 @@ INS.symlink=	$(RM) $@; $(SYMLINK) $(INSLINKTARGET) $@
 # (.py) file. As a part of this we also go through and change the #!
 # line in the python script to that of the actual python we are using.
 #
-INS.pyfile=	$(INS.file); $(TOUCH) -r $< $@
+INS.pyfile=	$(RM) $@; $(SED) -e "1s:^\#!@PYTHON@:\#!/usr/bin/python$(PYTHON_VERSION):" < $< > $@; $(CHMOD) $(FILEMODE) $@; $(TOUCH) -r $< $@
 
 # MACH must be set in the shell environment per uname -p on the build host
 # More specific architecture variables should be set in lower makefiles.
@@ -1119,7 +1120,7 @@ SED.py=	$(SED) -e 's?^$(POUND_SIGN)!ON_PYTHON_26$$?$(POUND_SIGN)!$(PYTHON_26)?' 
 	    -e 's?^$(POUND_SIGN)!ON_PYTHON$$?$(POUND_SIGN)!$(PYTHON)?'
 
 .py:
-	$(RM) $@; $(SED.py) $< > $@; $(CHMOD) +x $@
+	$(RM) $@; $(SED) -e "1s:^\#!@PYTHON@:\#!/usr/bin/python$(PYTHON_VERSION):" < $< > $@; $(CHMOD) +x $@
 
 .py.pyc:
 	$(RM) $@

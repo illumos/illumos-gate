@@ -31,13 +31,20 @@
 
 include $(SRC)/cmd/mdb/Makefile.tools
 
+#
+# Make sure we're getting a consistent execution environment for the
+# embedded scripts.
+#
+SHELL= /usr/bin/ksh93
+
 $(KMOD_SOURCES_DIFFERENT)KMODSRCS = $(MODSRCS)
 $(KMOD_SOURCES_DIFFERENT)KMODASMSRCS = $(MODASMSRCS)
 
 MODOBJS = $(MODSRCS:%.c=dmod/%.o) $(MODASMSRCS:%.s=dmod/%.o)
 KMODOBJS = $(KMODSRCS:%.c=kmod/%.o) $(KMODASMSRCS:%.s=kmod/%.o)
 
-MODNAME = $(MODULE:%.so=%)
+MODNAME_cmd = if [ -n "$(MODULE_NAME)" ]; then print $(MODULE_NAME); else print $(MODULE)| sed -e 's:\.so$$::'; fi
+MODNAME = $(MODNAME_cmd:sh)
 KMODULE = $(MODNAME)
 
 MODFILE = dmod/$(MODULE)
@@ -101,7 +108,7 @@ C99MODE			= $(C99_ENABLE)
 
 CFLAGS			+= $(CCVERBOSE)
 CFLAGS64		+= $(CCVERBOSE)
-CPPFLAGS		+= $($(MDBTGT)_TGTFLAGS) -I../../../common
+CPPFLAGS		+= $($(MDBTGT)_TGTFLAGS) -I../../../common -I/usr/include/python$(PYTHON_VERSION)
 LDFLAGS			+= $(ZTEXT)
 LDFLAGS64		+= $(ZTEXT)
 ASFLAGS			+= -P

@@ -33,7 +33,5 @@ $(CMDS): $(ROOTBIN)
 $(ROOTBIN):
 	$(INS.dir)
 
-$(ROOTBIN)/%: %.py
-	$(RM) $@
-	$(SED.py) $< > $@
-	$(CHMOD) 0555 $@
+$(ROOTBIN)/%: %
+	$(INS.pyfile)

@@ -30,7 +30,6 @@ PYSRCS=		pyzfs.py
 PYOBJS=		$(PYSRCS:%.py=%.pyc)
 PYFILES=	$(PYSRCS) $(PYOBJS)
 POFILE=		pyzfs.po
-PYTHON=		$(PYTHON_26)
 
 ROOTLIBZFSFILES= $(PYFILES:%=$(ROOTLIB)/zfs/%)
 

@@ -1,4 +1,4 @@
-#!ON_PYTHON_26
+#!@PYTHON@
 #
 # CDDL HEADER START
 #

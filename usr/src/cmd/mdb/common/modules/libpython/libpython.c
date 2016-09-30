@@ -31,14 +31,14 @@
 #include <link.h>
 #include <libproc.h>
 
-#include <python2.6/Python.h>
-#include <python2.6/frameobject.h>
+#include <Python.h>
+#include <frameobject.h>
 
 /*
  * Decoding Python Stack Frames
  * ============================
  *
- * Python2.6 uses a variety of objects to construct its call chain.  An address
+ * Python2 uses a variety of objects to construct its call chain.  An address
  * space may have one or more PyInterpreterState objects, which are the base
  * object in the interpreter's state.  These objects are kept in a linked list
  * with a head pointer named interp_head.  This makes it possible for the
@@ -110,8 +110,8 @@
 
 /*
  * The Python-dependent debugging functionality lives in its own helper
- * library.  The helper agent is provided by libpython2.6_db.so, which is also
- * used by pstack(1) for debugging Python processes.
+ * library.  The helper agent is provided by libpython2.[67]_db.so, which
+ * is also used by pstack(1) for debugging Python processes.
  *
  * Define needed prototypes here.
  */

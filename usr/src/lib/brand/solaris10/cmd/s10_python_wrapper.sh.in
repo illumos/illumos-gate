@@ -38,7 +38,7 @@
 pyname=$0
 n=/.SUNWnative
 
-PYTHONPATH=/.SUNWnative/usr/lib/python2.6/vendor-packages
+PYTHONPATH=/.SUNWnative/usr/lib/python@PYTHON_VERSION@/vendor-packages
 export PYTHONPATH
 
 # This wrapper is running in the S10 zone so there is no L10N for the
@@ -56,4 +56,4 @@ exec $n/usr/lib/brand/solaris10/s10_native \
     -e LD_PRELOAD_64=s10_npreload.so.1 \
     -e LD_LIBRARY_PATH_32="$n/lib:$n/usr/lib:$n/usr/lib/mps" \
     -e LD_LIBRARY_PATH_64="$n/lib/64:$n/usr/lib/64:$n/usr/lib/mps/64" \
-    $n/usr/bin/python2.6 $n$pyname "$@"
+    $n/usr/bin/python@PYTHON_VERSION@ $n$pyname "$@"
