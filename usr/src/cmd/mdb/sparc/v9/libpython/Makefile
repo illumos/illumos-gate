@@ -38,6 +38,10 @@ include ../../../../Makefile.cmd.64
 include ../../Makefile.sparcv9
 include ../../../Makefile.module
 
+%.o := CPPFLAGS += $(PYCPPFLAGS)
+%.ln := CPPFLAGS += $(PYLNFLAGS)
+LINTFLAGS += -erroff=E_MACRO_REDEFINED
+
 dmod/$(MODULE) := LDLIBS += -lproc
 
 %.o: $(MODSRCS_DIR)/%.c

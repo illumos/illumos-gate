@@ -247,7 +247,7 @@ INS.symlink=	$(RM) $@; $(SYMLINK) $(INSLINKTARGET) $@
 # files we must make certain to not adjust the mtime of the source
 # (.py) file.
 #
-INS.pyfile=	$(RM) $@; $(SED) -e "1s:^\#!@PYTHON@:\#!/usr/bin/python$(PYTHON_VERSION):" < $< > $@; $(CHMOD) $(FILEMODE) $@; $(TOUCH) -r $< $@
+INS.pyfile=	$(RM) $@; $(SED) -e "1s:^\#!@PYTHON@:\#!$(PYTHON):" < $< > $@; $(CHMOD) $(FILEMODE) $@; $(TOUCH) -r $< $@
 
 # MACH must be set in the shell environment per uname -p on the build host
 # More specific architecture variables should be set in lower makefiles.
@@ -1096,7 +1096,7 @@ PKGPUBLISHER_NONREDIST=	on-extra
 	$(CHMOD) +x $@
 
 .py:
-	$(RM) $@; $(SED) -e "1s:^\#!@PYTHON@:\#!/usr/bin/python$(PYTHON_VERSION):" < $< > $@; $(CHMOD) +x $@
+	$(RM) $@; $(SED) -e "1s:^\#!@PYTHON@:\#!$(PYTHON):" < $< > $@; $(CHMOD) +x $@
 
 .py.pyc:
 	$(RM) $@
