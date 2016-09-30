@@ -9632,7 +9632,6 @@ f usr/lib/mdb/proc/amd64/libc.so 0555 root sys
 f usr/lib/mdb/proc/amd64/libcmdutils.so 0555 root sys
 f usr/lib/mdb/proc/amd64/libnvpair.so 0555 root sys
 f usr/lib/mdb/proc/amd64/libproc.so 0555 root sys
-f usr/lib/mdb/proc/amd64/libpython2.6.so 0555 root sys
 f usr/lib/mdb/proc/amd64/libsysevent.so 0555 root sys
 f usr/lib/mdb/proc/amd64/libtopo.so 0555 root sys
 f usr/lib/mdb/proc/amd64/libumem.so 0555 root sys
@@ -9649,7 +9648,6 @@ f usr/lib/mdb/proc/libc.so 0555 root sys
 f usr/lib/mdb/proc/libcmdutils.so 0555 root sys
 f usr/lib/mdb/proc/libnvpair.so 0555 root sys
 f usr/lib/mdb/proc/libproc.so 0555 root sys
-f usr/lib/mdb/proc/libpython2.6.so 0555 root sys
 f usr/lib/mdb/proc/libsysevent.so 0555 root sys
 f usr/lib/mdb/proc/libtopo.so 0555 root sys
 f usr/lib/mdb/proc/libumem.so 0555 root sys

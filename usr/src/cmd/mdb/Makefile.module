@@ -108,7 +108,7 @@ C99MODE			= $(C99_ENABLE)
 
 CFLAGS			+= $(CCVERBOSE)
 CFLAGS64		+= $(CCVERBOSE)
-CPPFLAGS		+= $($(MDBTGT)_TGTFLAGS) -I../../../common -I/usr/include/python$(PYTHON_VERSION)
+CPPFLAGS		+= $($(MDBTGT)_TGTFLAGS) -I../../../common -I/opt/local/include/python$(PYTHON_VERSION)
 LDFLAGS			+= $(ZTEXT)
 LDFLAGS64		+= $(ZTEXT)
 ASFLAGS			+= -P
