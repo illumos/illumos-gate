@@ -178,8 +178,8 @@ PERL_VERSION=	5.12
 PERL_PKGVERS=	-512
 PERL_ARCH =		i86pc-solaris-64int
 $(SPARC_BLD)PERL_ARCH =	sun4-solaris-64int
-PYTHON_VERSION=	2.7
-PYTHON_PKGVERS=	-27
+PYTHON_VERSION=	2.6
+PYTHON_PKGVERS=	-26
 PYTHON=		/usr/bin/python$(PYTHON_VERSION)
 SORT=		/usr/bin/sort
 TOUCH=		/usr/bin/touch
@@ -1111,13 +1111,6 @@ PKGPUBLISHER_NONREDIST=	on-extra
 	$(RM) $@;
 	$(SED) -e "s@TEXT_DOMAIN@\"$(TEXT_DOMAIN)\"@" $< > $@;
 	$(CHMOD) +x $@
-#
-# You might ask why we aren't using -i for sed here. That's because illumos
-# 1815 hasn't been fixed and sadly we didn't back out something that broke a lot
-# of working code in favor of GNU compatibility.
-#
-SED.py=	$(SED) -e 's?^$(POUND_SIGN)!ON_PYTHON_26$$?$(POUND_SIGN)!$(PYTHON_26)?' \
-	    -e 's?^$(POUND_SIGN)!ON_PYTHON$$?$(POUND_SIGN)!$(PYTHON)?'
 
 .py:
 	$(RM) $@; $(SED) -e "1s:^\#!@PYTHON@:\#!/usr/bin/python$(PYTHON_VERSION):" < $< > $@; $(CHMOD) +x $@
