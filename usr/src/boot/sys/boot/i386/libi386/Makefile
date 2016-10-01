@@ -11,6 +11,7 @@
 
 #
 # Copyright 2015 Toomas Soome <tsoome@me.com>
+# Copyright 2016 RackTop Systems.
 #
 
 include $(SRC)/Makefile.master
@@ -19,7 +20,7 @@ CFLAGS= -O2 -I../../../../include -I../../..
 CFLAGS += -DLOADER_ZFS_SUPPORT
 CPPFLAGS=
 
-all: machine x86 libi386.a
+all: libi386.a
 
 clean: clobber
 clobber:
@@ -105,7 +106,9 @@ x86:
 	$(RM) x86
 	$(SYMLINK) ../../../x86/include x86
 
-libi386.a: machine $(OBJS)
+$(OBJS): machine x86
+
+libi386.a: $(OBJS)
 	$(AR) $(ARFLAGS) $@ $(OBJS)
 
 %.o:	$(LIBZFS)/%.c

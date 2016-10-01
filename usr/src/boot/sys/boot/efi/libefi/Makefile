@@ -11,6 +11,7 @@
 
 #
 # Copyright 2015 Toomas Soome <tsoome@me.com>
+# Copyright 2016 RackTop Systems.
 #
 
 include $(SRC)/Makefile.master
@@ -19,7 +20,8 @@ CC=     $(GCC_ROOT)/bin/gcc
 
 LIB=	efi
 
-all:	machine x86 lib$(LIB).a
+all:	lib$(LIB).a
+
 install:
 
 SRCS=	delay.c efi_console.c efinet.c efipart.c errno.c handles.c \
@@ -66,3 +68,5 @@ machine:
 x86:
 	$(RM) x86
 	$(SYMLINK) ../../../x86/include x86
+
+$(OBJS): machine x86
