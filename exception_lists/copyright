@@ -381,6 +381,7 @@ usr/src/lib/libsmbfs/netsmb/spnego.h
 usr/src/lib/libsmbfs/smb/derparse.[ch]
 usr/src/lib/libsmbfs/smb/spnego.c
 usr/src/lib/libsmbfs/smb/spnegoparse.[ch]
+usr/src/test/util-tests/tests/dis/*/*.out
 usr/src/test/zfs-tests/tests/functional/history/*Z
 usr/src/test/zfs-tests/tests/functional/history/*txt
 usr/src/tools/btxld/btx.h

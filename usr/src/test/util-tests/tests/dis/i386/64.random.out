@@ -1,0 +1,2 @@
+    libdis_test:     48 0f c7 f3        rdrand %rbx
+    libdis_test+0x4: 48 0f c7 fb        rdseed %rbx
