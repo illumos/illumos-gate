@@ -25,12 +25,12 @@ outputdir = /var/tmp/test_results
 [/opt/util-tests/tests/printf_test]
 [/opt/util-tests/tests/allowed-ips]
 [/opt/util-tests/tests/vnic-mtu]
-[/opt/util-tests/tests/bunyan]
+[/opt/util-tests/tests/bunyan/bunyan]
 
 [/opt/util-tests/tests/xargs_test]
 
-[/opt/util-tests/tests/mqt]
-[/opt/util-tests/tests/wqt]
+[/opt/util-tests/tests/mergeq/mqt]
+[/opt/util-tests/tests/mergeq/wqt]
 
 [/opt/util-tests/tests/libnvpair_json]
 tests = ['json_00_blank', 'json_01_boolean', 'json_02_numbers',
