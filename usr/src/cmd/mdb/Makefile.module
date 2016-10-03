@@ -102,13 +102,13 @@ LINTFILES_raw		= $(LINTOBJS)
 LINTFILES		= $(LINTFILES_$(MDBTGT))
 
 #
-# Python specific flags. To try and make life easier for folks who are
+# Python specific flags. To try and make life easier for folks how are
 # building with an LFS python, we attempt to use -isystem when it's
 # available.
 #
 PYCPPFLAGS		= -_gcc=-isystem -_gcc=$(ADJUNCT_PROTO)/usr/include/python$(PYTHON_VERSION)
 PYCPPFLAGS		+= -_cc=-I$(ADJUNCT_PROTO)/usr/include/python$(PYTHON_VERSION)
-
+PYLNFLAGS		= -I$(ADJUNCT_PROTO)/usr/include/python$(PYTHON_VERSION)
 
 kvm_TGTFLAGS		= -D_KERNEL
 proc_TGTFLAGS		= -D_USER
