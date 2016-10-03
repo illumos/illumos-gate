@@ -25,6 +25,7 @@ PROGS = \
 C99MODE = -xc99=%all
 
 SRCS = $(PROGS:%=%.c) $(UTILS)
+LINTS = $(SRCS:%.c=%.ln)
 PROGS32 = $(PROGS:%=%.32)
 PROGS64 = $(PROGS:%=%.64)
 
@@ -47,7 +48,7 @@ install: $(ROOTOPTPROGS)
 
 all: $(PROGS32) $(PROGS64)
 
-lint: lint_SRCS
+lint: $(LINTS)
 
 clean:
 	-rm $(PROGS32) $(PROGS64)
