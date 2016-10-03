@@ -30,7 +30,7 @@ extern int unlinkat(int, char *, int);
 /* From uts/common/syscall/symlink.c */
 extern int symlinkat(char *, int, char *);
 /* From uts/common/syscall/readlink.c */
-extern int readlinkat(int, char *, char *, size_t);
+extern ssize_t readlinkat(int, char *, char *, size_t);
 
 static long
 lx_link_common(int ffd, char *from, int tfd, char *to, int flags)
