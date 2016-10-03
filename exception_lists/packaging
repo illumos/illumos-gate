@@ -991,5 +991,4 @@ usr/bin/test-getdc
 #
 
 usr/include/sys/inotify.h
-usr/include/sys/limits.h
 usr/include/sys/zfd.h
