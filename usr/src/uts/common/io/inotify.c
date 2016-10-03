@@ -629,7 +629,8 @@ inotify_watch_add(inotify_state_t *state, inotify_watch_t *parent,
 		watch->inw_mask &= IN_CHILD_EVENTS;
 		watch->inw_parent = parent;
 		watch->inw_name = kmem_alloc(strlen(name) + 1, KM_SLEEP);
-		strcpy(watch->inw_name, name);
+		/* strcpy() is safe, because strlen(name) bounds us. */
+		(void) strcpy(watch->inw_name, name);
 
 		avl_add(&parent->inw_children, watch);
 	}

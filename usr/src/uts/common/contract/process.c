@@ -1078,7 +1078,7 @@ contract_process_fork(ctmpl_process_t *rtmpl, proc_t *cp, proc_t *pp,
 	 * abandon it now.
 	 */
 	if (ctp->conp_params & CT_PR_KEEP_EXEC) {
-		contract_abandon(ct, pp, 1);
+		(void) contract_abandon(ct, pp, 1);
 	}
 
 	return (ctp);
