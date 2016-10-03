@@ -29,9 +29,6 @@ LINTS = $(SRCS:%.c=%.ln)
 PROGS32 = $(PROGS:%=%.32)
 PROGS64 = $(PROGS:%=%.64)
 
-runtests.32 :=	LDLIBS += -lgen
-runtests.64 :=	LDLIBS64 += -lgen
-
 ROOTOPTDIR = $(ROOT)/opt/os-tests/tests/file-locking
 ROOTOPTPROGS = $(PROGS32:%=$(ROOTOPTDIR)/%) \
 	$(PROGS64:%=$(ROOTOPTDIR)/%)
