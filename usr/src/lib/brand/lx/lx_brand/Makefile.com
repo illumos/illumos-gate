@@ -74,7 +74,7 @@ SRCDIR =	../common
 UTSBASE	=	../../../../../uts
 
 LIBS =		$(DYNLIB)
-LDLIBS +=	-lc -lsocket -lmapmalloc -lproc -lrtld_db -lrpcsvc -lnsl
+LDLIBS +=	-lc -lsocket -lmapmalloc -lrpcsvc -lnsl
 DYNFLAGS +=	$(DYNFLAGS_$(CLASS))
 DYNFLAGS +=	$(BLOCAL) $(ZNOVERSION) -Wl,-e_start -M../common/mapfile
 CFLAGS +=	$(CCVERBOSE)
