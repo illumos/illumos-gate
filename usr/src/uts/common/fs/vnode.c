@@ -1722,6 +1722,17 @@ top:
 		goto out;
 	}
 
+	/*
+	 * Make sure "from" vp is not a mount point.
+	 * Note, lookup did traverse() already, so
+	 * we'll be looking at the mounted FS root.
+	 * (but allow files like mnttab)
+	 */
+	if ((fvp->v_flag & VROOT) != 0 && fvp->v_type == VDIR) {
+		error = EBUSY;
+		goto out;
+	}
+
 	if (targvp && (fvp != targvp)) {
 		nbl_start_crit(targvp, RW_READER);
 		in_crit_targ = 1;
