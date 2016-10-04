@@ -233,4 +233,10 @@ NOSYMSORT	usr/lib/amd64/libfru\.so\.1			# C++
 # unneeded library.
 UNREF_OBJ	lib/(libdevinfo|libcfgadm)\.so\.1; .*\ of\ .*SUNW,Netra-CP2300/lib/libprtdiag_psr\.so\.1
 
+# The lx brand's VDSO object is a bit special. Its construction leads us
+# to end up having several symbols for shared objects all at the same
+# address of zero. We should root cause this further and either add an
+# explicit exception for this kind of thing or better, fix the issues
+# it's upset about.
+SKIP	^usr/lib/brand/MACH(lx)/lx_vdso\.so\.1$
 
