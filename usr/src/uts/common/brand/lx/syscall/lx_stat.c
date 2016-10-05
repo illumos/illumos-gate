@@ -167,14 +167,22 @@ lx_stat_xlate_dev(vattr_t *vattr)
 }
 
 static long
-lx_stat_common(vnode_t *vp, cred_t *cr, void *outp, lx_stat_fmt_t fmt)
+lx_stat_common(vnode_t *vp, cred_t *cr, void *outp, lx_stat_fmt_t fmt,
+    int follow)
 {
 	vattr_t vattr;
 	mode_t mode;
-	int error;
+	int error, flags;
+
+	/*
+	 * When symlink following is desired, the ATTR_REAL flag is necessary
+	 * to circumvent some of the weird behavior present in filesystems like
+	 * lx_proc.
+	 */
+	flags = (follow == FOLLOW) ? ATTR_REAL : 0;
 
 	vattr.va_mask = AT_STAT | AT_NBLOCKS | AT_BLKSIZE | AT_SIZE;
-	if ((error = VOP_GETATTR(vp, &vattr, 0, cr, NULL)) != 0) {
+	if ((error = VOP_GETATTR(vp, &vattr, flags, cr, NULL)) != 0) {
 		return (error);
 	}
 
@@ -290,7 +298,7 @@ lx_stat32(char *name, void *outp)
 	if ((error = cstatat_getvp(AT_FDCWD, name, FOLLOW, &vp, &cr)) != 0) {
 		return (set_errno(error));
 	}
-	error = lx_stat_common(vp, cr, outp, LXF_STAT32);
+	error = lx_stat_common(vp, cr, outp, LXF_STAT32, FOLLOW);
 	VN_RELE(vp);
 	crfree(cr);
 	if (error != 0) {
@@ -308,7 +316,8 @@ lx_fstat32(int fd, void *outp)
 	if ((fp = getf(fd)) == NULL) {
 		return (set_errno(EBADF));
 	}
-	error = lx_stat_common(fp->f_vnode, fp->f_cred, outp, LXF_STAT32);
+	error = lx_stat_common(fp->f_vnode, fp->f_cred, outp, LXF_STAT32,
+	    FOLLOW);
 	releasef(fd);
 	if (error != 0) {
 		return (set_errno(error));
@@ -326,7 +335,7 @@ lx_lstat32(char *name, void *outp)
 	if ((error = cstatat_getvp(AT_FDCWD, name, NO_FOLLOW, &vp, &cr)) != 0) {
 		return (set_errno(error));
 	}
-	error = lx_stat_common(vp, cr, outp, LXF_STAT32);
+	error = lx_stat_common(vp, cr, outp, LXF_STAT32, NO_FOLLOW);
 	VN_RELE(vp);
 	crfree(cr);
 	if (error != 0) {
@@ -347,7 +356,7 @@ lx_stat64(char *name, void *outp)
 		return (set_errno(error));
 	}
 	error = lx_stat_common(vp, cr, outp,
-	    (model == DATAMODEL_LP64) ? LXF_STAT64_64 : LXF_STAT64_32);
+	    (model == DATAMODEL_LP64) ? LXF_STAT64_64 : LXF_STAT64_32, FOLLOW);
 	VN_RELE(vp);
 	crfree(cr);
 	if (error != 0) {
@@ -367,7 +376,7 @@ lx_fstat64(int fd, void *outp)
 		return (set_errno(EBADF));
 	}
 	error = lx_stat_common(fp->f_vnode, fp->f_cred, outp,
-	    (model == DATAMODEL_LP64) ? LXF_STAT64_64 : LXF_STAT64_32);
+	    (model == DATAMODEL_LP64) ? LXF_STAT64_64 : LXF_STAT64_32, FOLLOW);
 	releasef(fd);
 	if (error != 0) {
 		return (set_errno(error));
@@ -443,7 +452,7 @@ lx_fstatat64(int fd, char *name, void *outp, int flag)
 	}
 
 	error = lx_stat_common(vp, cr, outp,
-	    (model == DATAMODEL_LP64) ? LXF_STAT64_64 : LXF_STAT64_32);
+	    (model == DATAMODEL_LP64) ? LXF_STAT64_64 : LXF_STAT64_32, follow);
 	VN_RELE(vp);
 	crfree(cr);
 	if (error != 0) {
@@ -464,7 +473,8 @@ lx_lstat64(char *name, void *outp)
 		return (set_errno(error));
 	}
 	error = lx_stat_common(vp, cr, outp,
-	    (model == DATAMODEL_LP64) ? LXF_STAT64_64 : LXF_STAT64_32);
+	    (model == DATAMODEL_LP64) ? LXF_STAT64_64 : LXF_STAT64_32,
+	    NO_FOLLOW);
 	VN_RELE(vp);
 	crfree(cr);
 	if (error != 0) {
