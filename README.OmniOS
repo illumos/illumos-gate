@@ -1,0 +1,72 @@
+This README is new for OmniOS as of Stable release r151020 -- it is here
+because it keeps track of LX merges from OmniOS (a massive and continuing
+side-pull). LX-for-OmniOS-specific notes follow.
+
+Last illumos-joyent commit:  d21e83058c8edeb1becd9202380d088cb056f0c4
+
+LX zones can be installed using ZFS send streams (gzipped or uncompressed) from
+Joyent's images (-s /full/path/to/file), from ZFS datasets or snapshots
+(-s name/of/dataset **OR** -s name/of/this@snapshot), or from tarballs often
+used for Docker image setup (-t /full/path/to/tarball.tgz).  The
+"kernel-version" attribute MUST be set by the administrator to match the
+installed image.  For example:
+
+	# zonecfg -z lx0 export
+	create -b
+	set zonepath=/zones/lx0
+	set brand=lx
+	set autoboot=false
+	set ip-type=exclusive
+	add net
+	set physical=lx0
+	end
+	add attr
+	set name=kernel-version
+	set type=string
+	set value=2.6.32
+	end
+	#
+
+This matches a CentOS 6.8 image from Joyent.  To install the image:
+
+     zoneadm -z lx0 install -s /root/path/to/centos68.gz
+
+A tarball install uses the -t flag instead:
+
+     zoneadm -z lx0 install -t /root/path/to/docker-ubuntu.tgz
+
+In addition to /native/sbin tools, one can use SmartOS-style IP address and DNS
+configuration using zonecfg parameters.  Here's the above zone with a pre-
+configured set of networking parameters:
+
+	# zonecfg -z lx0 export
+	create -b
+	set zonepath=/zones/lx0
+	set brand=lx
+	set autoboot=false
+	set ip-type=exclusive
+	add net
+	set physical=lx0
+	add property (name=gateway,value="192.168.0.1")
+	add property (name=ips,value="192.168.0.69/24")
+	add property (name=primary,value="true")
+	end
+	add attr
+	set name=dns-domain
+	set type=string
+	set value=example.com
+	end
+	add attr
+	set name=resolvers
+	set type=string
+	set value=192.168.0.1
+	end
+	add attr
+	set name=kernel-version
+	set type=string
+	set value=2.6.32
+	end
+	#
+
+Some distros do not present a console login on the first boot, and the zone may
+need to be rebooted. Or one can use zlogin(1M) without -C.
