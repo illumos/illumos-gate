@@ -63,7 +63,6 @@ extern char bootprog_rev[];
 ficlSystemInformation *fsi;
 ficlSystem *bf_sys;
 ficlVm	*bf_vm;
-ficlWord *pInterp;
 
 /*
  * Shim for taking commands from BF and passing them out to 'standard'
@@ -311,8 +310,6 @@ bf_init(char *rc)
     ficlDictionarySetConstant(env, "loader_version",
 	       (bootprog_rev[0] - '0') * 10 + (bootprog_rev[2] - '0'));
 
-    pInterp = ficlSystemLookup(bf_sys, "interpret");
-
     /* try to load and run init file if present */
     if (rc == NULL)
 	rc = "/boot/forth/boot.4th";
@@ -323,9 +320,6 @@ bf_init(char *rc)
 	    close(fd);
 	}
     }
-
-    /* Do this again, so that interpret can be redefined. */
-    pInterp = ficlSystemLookup(bf_sys, "interpret");
 }
 
 /*
