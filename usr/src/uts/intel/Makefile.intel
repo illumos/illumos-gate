@@ -517,13 +517,6 @@ DRV_KMODS	+= ib ibp eibnx eoib rdsib sdp iser daplt hermon tavor sol_ucma sol_uv
 DRV_KMODS	+= sol_umad 
 
 #
-#	LVM modules
-#
-DRV_KMODS	+= md
-MISC_KMODS	+= md_stripe md_hotspares md_mirror md_raid md_trans md_notify
-MISC_KMODS	+= md_sp
-
-#
 #	Brand modules
 #
 BRAND_KMODS	+= sn1_brand s10_brand

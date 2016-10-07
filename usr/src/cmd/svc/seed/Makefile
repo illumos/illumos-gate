@@ -18,8 +18,11 @@
 #
 # CDDL HEADER END
 #
+
+#
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2016 Nexenta Systems, Inc.
 #
 
 include ../../Makefile.cmd
@@ -77,8 +80,7 @@ GLOBAL_ZONE_DESCRIPTIONS = \
 	../milestone/console-login.xml \
 	../milestone/multi-user-server.xml \
 	../../cmd-inet/usr.lib/inetd/inetd-upgrade.xml \
-	../../utmpd/utmp.xml \
-	../../lvm/util/metainit.xml
+	../../utmpd/utmp.xml
 
 #
 # Additional manifests for a Solaris zone

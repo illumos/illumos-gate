@@ -23,6 +23,7 @@
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Garrett D'Amore <garrett@damore.org>
  * Copyright 2014 Pluribus Networks, Inc.
+ * Copyright 2016 Nexenta Systems, Inc.
  */
 
 /*
@@ -2572,13 +2573,6 @@ impl_setup_ddi(void)
 dev_t
 getrootdev(void)
 {
-	/*
-	 * Precedence given to rootdev if set in /etc/system
-	 */
-	if (root_is_svm == B_TRUE) {
-		return (ddi_pathname_to_dev_t(svm_bootpath));
-	}
-
 	/*
 	 * Usually rootfs.bo_name is initialized by the
 	 * the bootpath property from bootenv.rc, but

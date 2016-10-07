@@ -940,7 +940,6 @@ file path=usr/lib/devfsadm/linkmod/SUNW_disk_link.so group=sys
 file path=usr/lib/devfsadm/linkmod/SUNW_fssnap_link.so group=sys
 file path=usr/lib/devfsadm/linkmod/SUNW_ieee1394_link.so group=sys
 file path=usr/lib/devfsadm/linkmod/SUNW_lofi_link.so group=sys
-file path=usr/lib/devfsadm/linkmod/SUNW_md_link.so group=sys
 file path=usr/lib/devfsadm/linkmod/SUNW_misc_link.so group=sys
 file path=usr/lib/devfsadm/linkmod/SUNW_misc_link_$(ARCH).so group=sys
 file path=usr/lib/devfsadm/linkmod/SUNW_port_link.so group=sys

@@ -22,8 +22,9 @@
 #
 # Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright 2015 Nexenta Systems, Inc. All rights reserved.
 # Copyright 2015 Garrett D'Amore <garrett@damore.org>
+# Copyright 2016 Nexenta Systems, Inc.
+#
 
 # include global definitions
 include Makefile.master
@@ -193,7 +194,6 @@ COMMON_SUBDIRS = \
 	cmd/logins \
 	cmd/ls \
 	cmd/luxadm \
-	cmd/lvm \
 	cmd/mailwrapper \
 	cmd/makekey \
 	cmd/mdb \
@@ -450,7 +450,6 @@ COMMON_SUBDIRS = \
 	lib/libzfs_jni \
 	lib/libzonecfg \
 	lib/libzoneinfo \
-	lib/lvm \
 	lib/madv \
 	lib/mpss \
 	lib/nametoaddr \

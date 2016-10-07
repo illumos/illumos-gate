@@ -18,15 +18,13 @@
  *
  * CDDL HEADER END
  */
-/*
- * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- */
 
 /*
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Milan Jurik. All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2015 by Delphix. All rights reserved.
  * Copyright 2016 Toomas Soome <tsoome@me.com>
+ * Copyright 2016 Nexenta Systems, Inc.
  */
 
 /*
@@ -272,7 +270,6 @@ static char *expand_path(const char *);
 static long s_strtol(char *);
 static int s_fputs(char *, FILE *);
 
-static int is_ufs(char *root);
 static int is_amd64(void);
 static char *get_machine(void);
 static void append_to_flist(filelist_t *, char *);
@@ -3997,30 +3994,6 @@ is_zfs(char *root)
 		return (1);
 	} else {
 		BAM_DPRINTF(("%s: is *NOT* a ZFS filesystem: %s\n", fcn, root));
-		return (0);
-	}
-}
-
-static int
-is_ufs(char *root)
-{
-	struct statvfs		vfs;
-	int			ret;
-	const char		*fcn = "is_ufs()";
-
-	ret = statvfs(root, &vfs);
-	INJECT_ERROR1("STATVFS_UFS", ret = 1);
-	if (ret != 0) {
-		bam_error(_("statvfs failed for %s: %s\n"), root,
-		    strerror(errno));
-		return (0);
-	}
-
-	if (strncmp(vfs.f_basetype, "ufs", strlen("ufs")) == 0) {
-		BAM_DPRINTF(("%s: is a UFS filesystem: %s\n", fcn, root));
-		return (1);
-	} else {
-		BAM_DPRINTF(("%s: is *NOT* a UFS filesystem: %s\n", fcn, root));
 		return (0);
 	}
 }
@@ -7968,236 +7941,6 @@ zfs_get_physical(char *special, char ***physarray, int *n)
 	return (0);
 }
 
-/*
- * Certain services needed to run metastat successfully may not
- * be enabled. Enable them now.
- */
-/*
- * Checks if the specified service is online
- * Returns: 	1 if the service is online
- *		0 if the service is not online
- *		-1 on error
- */
-static int
-is_svc_online(char *svc)
-{
-	char			*state;
-	const char		*fcn = "is_svc_online()";
-
-	BAM_DPRINTF(("%s: entered. arg: %s\n", fcn, svc));
-
-	state = smf_get_state(svc);
-	INJECT_ERROR2("GET_SVC_STATE", free(state), state = NULL);
-	if (state == NULL) {
-		bam_error(_("failed to determine state of service: %s\n"), svc);
-		return (-1);
-	}
-	BAM_DPRINTF(("%s: got status for service: %s\n", fcn, svc));
-
-	if (strcmp(state, SCF_STATE_STRING_ONLINE) == 0) {
-		BAM_DPRINTF(("%s: service is online: %s\n", fcn, svc));
-		free(state);
-		return (1);
-	}
-
-	BAM_DPRINTF(("%s: service is *NOT* online(%s): %s\n", fcn, state, svc));
-
-	free(state);
-
-	return (0);
-}
-
-static int
-enable_svc(char *svc)
-{
-	int			ret;
-	int			sleeptime;
-	const char		*fcn = "enable_svc()";
-
-	ret = is_svc_online(svc);
-	if (ret == -1) {
-		bam_error(_("failed to determine if service is online: %s\n"),
-		    svc);
-		return (-1);
-	} else if (ret == 1) {
-		BAM_DPRINTF(("%s: service is already online: %s\n", fcn, svc));
-		return (0);
-	}
-
-	/* Service is not enabled. Enable it now. */
-	ret = smf_enable_instance(svc, 0);
-	INJECT_ERROR1("ENABLE_SVC_FAILED", ret = -1);
-	if (ret != 0) {
-		bam_error(_("failed to online service: %s\n"), svc);
-		return (-1);
-	}
-
-	BAM_DPRINTF(("%s: initiated online of service: %s\n", fcn, svc));
-
-	sleeptime = 0;
-	do {
-		ret = is_svc_online(svc);
-		INJECT_ERROR1("SVC_ONLINE_SUCCESS", ret = 1);
-		INJECT_ERROR1("SVC_ONLINE_FAILURE", ret = -1);
-		INJECT_ERROR1("SVC_ONLINE_NOTYET", ret = 0);
-		if (ret == -1) {
-			bam_error(_("failed to get online status for "
-			    "service: %s\n"), svc);
-			return (-1);
-		} else if (ret == 1) {
-			BAM_DPRINTF(("%s: service is NOW online: %s\n",
-			    fcn, svc));
-			return (1);
-		}
-		(void) sleep(1);
-	} while (++sleeptime < 60);
-
-	bam_error(_("timed out waiting for service to online: %s\n"), svc);
-
-	return (-1);
-}
-
-static int
-ufs_get_physical(char *special, char ***physarray, int *n)
-{
-	char			cmd[PATH_MAX];
-	char			*shortname;
-	filelist_t		flist = {0};
-	char			*meta;
-	char			*type;
-	char			*comp1;
-	char			*comp2;
-	char			*comp3;
-	char			*comp4;
-	int			i;
-	line_t			*lp;
-	int			ret;
-	char			*svc;
-	const char		*fcn = "ufs_get_physical()";
-
-	assert(special);
-
-	BAM_DPRINTF(("%s: entered. arg: %s\n", fcn, special));
-
-	if (strncmp(special, "/dev/md/", strlen("/dev/md/")) != 0) {
-		bam_error(_("not a SVM metadevice: %s. Cannot derive physical "
-		    "device\n"), special);
-		return (-1);
-	}
-
-	if (strncmp(special, "/dev/md/dsk/", strlen("/dev/md/dsk/")) == 0) {
-		shortname = special + strlen("/dev/md/dsk/");
-	} else if (strncmp(special, "/dev/md/rdsk/",
-	    strlen("/dev/md/rdsk/")) == 0) {
-		shortname = special + strlen("/dev/md/rdsk");
-	} else {
-		bam_error(_("invalid SVM metadevice name: %s. Cannot derive "
-		    "physical device\n"), special);
-		return (-1);
-	}
-
-	BAM_DPRINTF(("%s: short SVM name for special=%s is %s\n",
-	    fcn, special, shortname));
-
-	svc = "network/rpc/meta:default";
-	if (enable_svc(svc) == -1) {
-		bam_error(_("failed to start service %s for metastat "
-		    "command\n"), svc);
-	}
-
-	(void) snprintf(cmd, sizeof (cmd), "/sbin/metastat -p %s", shortname);
-
-	ret = exec_cmd(cmd, &flist);
-	INJECT_ERROR1("UFS_SVM_METASTAT", ret = 1);
-	if (ret != 0) {
-		bam_error(_("metastat command failed on SVM metadevice: %s\n"),
-		    shortname);
-		return (-1);
-	}
-
-	INJECT_ERROR1("UFS_SVM_METASTAT_OUT", flist.head = NULL);
-	if (flist.head == NULL) {
-		bam_error(_("bad output from metastat command on SVM "
-		    "metadevice: %s\n"), shortname);
-		filelist_free(&flist);
-		return (-1);
-	}
-
-	/*
-	 * Check if not a mirror. We only parse a single metadevice
-	 * if not a mirror
-	 */
-	meta = strtok(flist.head->line, " \t");
-	type = strtok(NULL, " \t");
-	if (meta == NULL || type == NULL) {
-		bam_error(_("error parsing metastat output for SVM "
-		    "metadevice: %s\n"), shortname);
-		filelist_free(&flist);
-		return (-1);
-	}
-	if (strcmp(type, "-m") != 0) {
-		comp1 = strtok(NULL, " \t");
-		comp2 = strtok(NULL, " \t");
-		if (comp1 == NULL || comp2 != NULL) {
-			bam_error(_("invalid fields in metastat output for "
-			    "SVM metadevice: %s\n"), shortname);
-			filelist_free(&flist);
-			return (-1);
-		}
-		BAM_DPRINTF(("%s: single component %s for metadevice %s\n",
-		    fcn, comp1, shortname));
-		*physarray = s_calloc(1, sizeof (char *));
-		(*physarray)[0] = s_strdup(comp1);
-		*n = 1;
-		filelist_free(&flist);
-		return (0);
-	}
-
-	/*
-	 * Okay we have a mirror. Everything after the first line
-	 * is a submirror
-	 */
-	for (i = 0, lp = flist.head->next; lp; lp = lp->next) {
-		if (strstr(lp->line, "/dev/dsk/") == NULL &&
-		    strstr(lp->line, "/dev/rdsk/") == NULL) {
-			bam_error(_("cannot parse output of metastat command "
-			    "for metadevice: %s\n"), shortname);
-			filelist_free(&flist);
-			return (-1);
-		}
-		i++;
-	}
-
-	*physarray = s_calloc(i, sizeof (char *));
-	*n = i;
-
-	for (i = 0, lp = flist.head->next; lp; lp = lp->next) {
-		comp1 = strtok(lp->line, " \t");
-		comp2 = strtok(NULL, " \t");
-		comp3 = strtok(NULL, " \t");
-		comp4 = strtok(NULL, " \t");
-
-		if (comp3 == NULL || comp4 == NULL ||
-		    (strncmp(comp4, "/dev/dsk/", strlen("/dev/dsk/")) != 0 &&
-		    strncmp(comp4, "/dev/rdsk/", strlen("/dev/rdsk/")) != 0)) {
-			bam_error(_("cannot parse submirror line in metastat "
-			    "output for metadevice: %s\n"), shortname);
-			filelist_free(&flist);
-			free_physarray(*physarray, *n);
-			return (-1);
-		}
-
-		(*physarray)[i++] = s_strdup(comp4);
-	}
-
-	assert(i == *n);
-
-	filelist_free(&flist);
-
-	BAM_DPRINTF(("%s: returning SUCCESS\n", fcn));
-	return (0);
-}
-
 static int
 get_physical(char *menu_root, char ***physarray, int *n)
 {
@@ -8237,8 +7980,6 @@ get_physical(char *menu_root, char ***physarray, int *n)
 
 	if (is_zfs(menu_root)) {
 		ret = zfs_get_physical(special, physarray, n);
-	} else if (is_ufs(menu_root)) {
-		ret = ufs_get_physical(special, physarray, n);
 	} else {
 		bam_error(_("cannot derive physical device for %s (%s), "
 		    "unsupported filesystem\n"), menu_root, special);

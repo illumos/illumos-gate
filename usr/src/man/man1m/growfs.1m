@@ -15,7 +15,6 @@ growfs \- non-destructively expand a UFS file system
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBgrowfs\fR non-destructively expands a mounted or unmounted UNIX file system
 (UFS) to the size of the file system's slice(s).
@@ -51,7 +50,6 @@ again.
 with the result that the file system would be corrupted. In such a
 circumstance, you would have to restore the file system from backups.
 .SH OPTIONS
-.sp
 .LP
 Root privileges are required for all of the following options.
 .sp
@@ -84,118 +82,7 @@ Specifies the name of a raw metadevice or raw special device, residing in
 where you want the file system to be grown.
 .RE
 
-.SH EXAMPLES
-.LP
-\fBExample 1 \fRExpanding nonmetadevice slice for \fB/export\fR file system
-.sp
-.LP
-The following example expands a nonmetadevice slice for the \fB/export\fR file
-system. In this example, the existing slice, \fB/dev/dsk/c1t0d0s3\fR, is
-converted to a metadevice so additional slices can be concatenated.
-
-.sp
-.in +2
-.nf
-# metainit -f d8 2 1 c1t0d0s3 1 c2t0d0s3
-# umount /export
-.fi
-.in -2
-.sp
-
-.LP
-\fBExample 2 \fRAssociate \fB/export\fR with new metadevice
-.sp
-.LP
-Edit the \fB/etc/vfstab\fR file to change the entry for \fB/export\fR to the
-newly defined metadevice, \fBd8\fR.
-
-.sp
-.in +2
-.nf
-# mount /export
-# growfs -M /export /dev/md/rdsk/d8
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-The first example starts by running the \fBmetainit\fR command with the
-\fB-f\fR option to force the creation of a new concatenated metadevice
-\fBd8\fR, which consists of the existing slice \fB/dev/dsk/c1t0d0s3\fR and a
-new slice \fB/dev/dsk/c2t0d0s3\fR. Next, the file system on \fB/export\fR must
-be unmounted. The \fB/etc/vfstab\fR file is edited to change the entry for
-\fB/export\fR to the newly defined metadevice name, rather than the slice name.
-After the file system is remounted, the \fBgrowfs\fR command is run to expand
-the file system. The file system will span the entire metadevice when
-\fBgrowfs\fR completes. The \fB-M\fR option enables the \fBgrowfs\fR command to
-expand a mounted file system. During the expansion, write access for
-\fB/export\fR is suspended until \fBgrowfs\fR unlocks the file system. Read
-access is not affected, though access times are not kept when the lock is in
-effect.
-
-.LP
-\fBExample 3 \fRDynamic Expansion of \fB/export\fR file system
-.sp
-.LP
-The following example picks up from the previous one. Here, the \fB/export\fR
-file system mounted on metadevice \fBd8\fR is dynamically expanded.
-
-.sp
-.in +2
-.nf
-# metattach d8 c0t1d0s2
-# growfs -M /export /dev/md/rdsk/d8
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-This example begins by using the \fBmetattach\fR command to dynamically
-concatenate a new slice, \fB/dev/dsk/c0t1d0s2\fR, to the end of an existing
-metadevice, \fBd8\fR. Next, the \fBgrowfs\fR command specifies that the
-mount-point is \fB/export\fR and that it is to be expanded onto the raw
-metadevice \fB/dev/md/rdsk/d8\fR. The file system will span the entire
-metadevice when \fBgrowfs\fR completes. During the expansion, write access for
-\fB/export\fR is suspended until \fBgrowfs\fR unlocks the file system. Read
-access is not affected, though access times are not kept when the lock is in
-effect.
-
-.LP
-\fBExample 4 \fRExpanding mounted file system to existing mirror
-.sp
-.LP
-The following example expands a mounted file system \fB/files\fR, to an
-existing mirror, \fBd80\fR, which contains two submirrors, \fBd9\fR and
-\fBd10\fR.
-
-.sp
-.in +2
-.nf
-# metattach d9 c0t2d0s5
-# metattach d10 c0t3d0s5
-# growfs -M /files /dev/md/rdsk/d80
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-In this example, the \fBmetattach\fR command dynamically concatenates the new
-slices to each submirror. The \fBmetattach\fR command must be run for each
-submirror. The mirror will automatically grow when the last submirror is
-dynamically concatenated. The mirror will grow to the size of the smallest
-submirror. The \fBgrowfs\fR command then expands the file system. The
-\fBgrowfs\fR command specifies that the mount-point is \fB/files\fR and that it
-is to be expanded onto the raw metadevice \fB/dev/md/rdsk/d80\fR. The file
-system will span the entire mirror when the \fBgrowfs\fR command completes.
-During the expansion, write access for the file system is suspended until
-\fBgrowfs\fR unlocks the file system. Read access is not affected, though
-access times are not kept when the lock is in effect.
-
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -217,15 +104,10 @@ An error occurred.
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBfsck\fR(1M), \fBlockfs\fR(1M), \fBmkfs\fR(1M), \fBmetattach\fR(1M),
-\fBnewfs\fR(1M), \fBattributes\fR(5)
-.sp
-.LP
-\fISolaris Volume Manager Administration Guide\fR
+\fBfsck\fR(1M), \fBlockfs\fR(1M), \fBmkfs\fR(1M), \fBnewfs\fR(1M),
+\fBattributes\fR(5)
 .SH LIMITATIONS
-.sp
 .LP
 Only UFS file systems (either mounted or unmounted) can be expanded using the
 \fBgrowfs\fR command. Once a file system is expanded, it cannot be decreased in

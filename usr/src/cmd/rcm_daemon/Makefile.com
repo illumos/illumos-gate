@@ -18,8 +18,10 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2016 Nexenta Systems, Inc.
 #
 
 include ../../Makefile.cmd
@@ -32,7 +34,7 @@ RCM_SRC = \
 	$(COMMON)/rcm_impl.c \
 	$(COMMON)/rcm_subr.c \
 	$(COMMON)/rcm_lock.c \
-	$(COMMON)/rcm_script.c 
+	$(COMMON)/rcm_script.c
 
 RCM_OBJ = \
 	rcm_event.o \
@@ -56,7 +58,6 @@ COMMON_MOD_SRC = \
 	$(COMMON)/pool_rcm.c \
 	$(COMMON)/mpxio_rcm.c \
 	$(COMMON)/ip_anon_rcm.c \
-	$(COMMON)/svm_rcm.c \
 	$(COMMON)/bridge_rcm.c
 
 sparc_MOD_SRC = $(COMMON)/ttymux_rcm.c
@@ -82,7 +83,6 @@ COMMON_MOD_OBJ = \
 	pool_rcm.o \
 	mpxio_rcm.o \
 	ip_anon_rcm.o \
-	svm_rcm.o \
 	bridge_rcm.o
 
 sparc_MOD_OBJ = ttymux_rcm.o
@@ -103,7 +103,6 @@ COMMON_RCM_MODS = \
 	SUNW_pool_rcm.so \
 	SUNW_mpxio_rcm.so \
 	SUNW_ip_anon_rcm.so \
-	SUNW_svm_rcm.so \
 	SUNW_bridge_rcm.so
 
 sparc_RCM_MODS = SUNW_ttymux_rcm.so
@@ -130,9 +129,8 @@ rcm_daemon := LDFLAGS += $(MAPFILES:%=-M%)
 
 LINTFLAGS += -u -erroff=E_FUNC_ARG_UNUSED
 
-LDLIBS_MODULES = 
+LDLIBS_MODULES =
 SUNW_pool_rcm.so := LDLIBS_MODULES += -L$(ROOT)/usr/lib -lpool
-SUNW_svm_rcm.so	:= LDLIBS_MODULES += -L$(ROOT)/usr/lib -lmeta
 SUNW_network_rcm.so := LDLIBS_MODULES += -L$(ROOT)/lib -ldladm
 SUNW_vlan_rcm.so := LDLIBS_MODULES += -L$(ROOT)/lib -ldladm
 SUNW_vnic_rcm.so := LDLIBS_MODULES += -L$(ROOT)/lib -ldladm

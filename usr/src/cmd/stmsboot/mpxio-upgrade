@@ -19,9 +19,10 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2016 Nexenta Systems, Inc.
 #
 
 . /lib/svc/share/fs_include.sh
@@ -35,7 +36,6 @@ BOOTDEVICES=$SAVEDIR/boot-devices
 RECOVERFILE=$SAVEDIR/recover_instructions
 DEVFSADM=/usr/sbin/devfsadm
 DUMPADM=/usr/sbin/dumpadm
-METADEVADM=/usr/sbin/metadevadm
 ISROOTDEV=""
 ISROOTDEVPATH=""
 usrmounted=0
@@ -98,7 +98,7 @@ mpxio_mount_root()
 		fi
 		ISPHYS=`echo $special |$AWK '/^\/dev\/dsk/ {print}'`;
 		if [ -z "$ISPHYS" ]; then
-			# a metadevice, either /dev/md or /dev/vx
+			# a metadevice, /dev/vx
 			new_special=$special
 			$MOUNT -o remount,rw $new_special / >/dev/msglog 2>&1
 		else
@@ -163,9 +163,6 @@ mpxio_mount_usr()
 	ret_val=0
 	if [ -n "$mountp" ]; then
 		case "$special" in
-		/dev/md/*)
-			new_special=$special
-			;;
 		/dev/vx/*)
 			new_special=$special
 			;;
@@ -345,13 +342,7 @@ mpxio_main()
 			cecho ""
 			cecho "stmsboot: vfstab has been updated"
 			
-			if update_dumpconf; then
-				# update svm configuration to reflect new names
-				if [ -s /kernel/drv/md.conf ] && \
-				    [ -x $METADEVADM ]; then
-					$METADEVADM -r >/dev/msglog 2>&1
-				fi
-			fi
+			update_dumpconf
 			
 			MACH=`$UNAME -p`
 			if [ "$MACH" = "i386" ]; then

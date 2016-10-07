@@ -18,9 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2015, Joyent, Inc. All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.
  */
 
 #if !defined(lint)
@@ -621,7 +623,6 @@ stubs_base:
 #ifndef UFS_MODULE
 	MODULE(ufs,fs);
 	STUB(ufs, quotactl, nomod_minus_one);
-	STUB(ufs, ufs_remountroot, 0);
 	END_MODULE(ufs);
 #endif
 
@@ -731,7 +732,6 @@ stubs_base:
 #ifndef SWAPGENERIC_MODULE
 	MODULE(swapgeneric,misc);
 	STUB(swapgeneric, rootconf,     0);
-	STUB(swapgeneric, svm_rootconf, 0);
 	STUB(swapgeneric, getrootdev,   0);
 	STUB(swapgeneric, getfsname,    0);
 	STUB(swapgeneric, loadrootmodules, 0);
