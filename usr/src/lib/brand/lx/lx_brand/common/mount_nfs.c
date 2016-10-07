@@ -2269,6 +2269,7 @@ convert_nfs_arg_str(char *srcp, char *mntopts)
 	char tmpbuf[MAX_MNTOPT_STR];
 	char *tbp = tmpbuf;
 	boolean_t no_sec = B_TRUE;
+	boolean_t no_addr = B_TRUE;
 
 	(void) strlcpy(tmpbuf, mntopts, sizeof (tmpbuf));
 	*mntopts = '\0';
@@ -2298,6 +2299,8 @@ convert_nfs_arg_str(char *srcp, char *mntopts)
 				(void) snprintf(srcp,
 				    MAXPATHLEN + LX_NMD_MAXHOSTNAMELEN + 1,
 				    "%s:%s", val, pp);
+
+				no_addr = B_FALSE;
 			} else if (strcmp(key, "clientaddr") == 0) {
 				/*
 				 * Ignore, this is an artifact of the
@@ -2337,6 +2340,19 @@ convert_nfs_arg_str(char *srcp, char *mntopts)
 			if (r != 0)
 				return (r);
 		}
+	}
+
+	if (no_addr) {
+		/*
+		 * The Linux kernel requires an 'addr' option and will return
+		 * EINVAL if one has not been provided. In particular, this
+		 * behavior can be seen when the package which delivers NFS CLI
+		 * support (e.g. nfs-common on Ubuntu, nfs-utils on Centos,
+		 * etc.) is not installed. The generic mount command will not
+		 * implicitly pass in the 'addr' option, the kernel will return
+		 * EINVAL, and the mount will fail.
+		 */
+		return (-EINVAL);
 	}
 
 	if (no_sec) {
