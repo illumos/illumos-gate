@@ -1357,16 +1357,18 @@ lxsys_readdir_static(lxsys_node_t *lnp, uio_t *uiop, int *eofp)
 {
 	lxsys_dirent_t *dirent = NULL;
 	int i, len = 0;
+	boolean_t found = B_FALSE;
 
 	for (i = 0; i < SYSDIRLISTSZ(lxsys_dirlookup); i++) {
 		if (lnp->lxsys_instance == lxsys_dirlookup[i].dl_instance) {
 			dirent = lxsys_dirlookup[i].dl_list;
 			len = lxsys_dirlookup[i].dl_length;
+			found = B_TRUE;
 			break;
 		}
 	}
 
-	if (dirent == NULL) {
+	if (!found) {
 		return (ENOTDIR);
 	}
 
