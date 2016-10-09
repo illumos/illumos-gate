@@ -25,6 +25,8 @@
  *
  */
 
+#ifndef	_LIBI386_H
+#define	_LIBI386_H
 
 /*
  * i386 fully-qualified device descriptor.
@@ -153,4 +155,8 @@ int	bi_load64(char *args, vm_offset_t addr, vm_offset_t *modulep,
 	    vm_offset_t *kernend, int add_smap);
 int	bi_checkcpu(void);
 
+int	mb_kernel_cmdline(struct preloaded_file *, struct devdesc *, char **);
+void	multiboot_tramp(uint32_t, vm_offset_t, vm_offset_t);
 void	pxe_enable(void *pxeinfo);
+
+#endif /* _LIBI386_H */

@@ -88,3 +88,14 @@ struct console *consoles[] = {
 #endif
 	NULL
 };
+
+#if defined(__amd64__) || defined(__i386__)
+extern struct file_format multiboot2;
+#endif
+
+struct file_format *file_formats[] = {
+#if defined(__amd64__) || defined(__i386__)
+        &multiboot2,
+#endif
+        NULL
+};
