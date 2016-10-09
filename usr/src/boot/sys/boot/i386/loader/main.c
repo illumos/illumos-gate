@@ -38,7 +38,9 @@
 #include <machine/cpufunc.h>
 #include <machine/psl.h>
 #include <sys/disk.h>
+#include <sys/param.h>
 #include <sys/reboot.h>
+#include <sys/multiboot2.h>
 
 #include "bootstrap.h"
 #include "common/bootargs.h"
@@ -80,6 +82,18 @@ extern char end[];
 
 static void *heap_top;
 static void *heap_bottom;
+
+static uint64_t
+i386_loadaddr(u_int type, void *data, uint64_t addr)
+{
+	/*
+	 * Our modules are page aligned.
+	 */
+	if (type == LOAD_RAW)
+                return (roundup2(addr, MULTIBOOT_MOD_ALIGN));
+
+        return (addr);
+}
 
 int
 main(void)
@@ -162,6 +176,7 @@ main(void)
     archsw.arch_readin = i386_readin;
     archsw.arch_isainb = isa_inb;
     archsw.arch_isaoutb = isa_outb;
+    archsw.arch_loadaddr = i386_loadaddr;
 #ifdef LOADER_ZFS_SUPPORT
     archsw.arch_zfs_probe = i386_zfs_probe;
 #endif

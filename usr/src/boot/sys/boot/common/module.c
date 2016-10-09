@@ -413,6 +413,7 @@ file_loadraw(const char *fname, char *type, int argc, char **argv, int insert)
     char			*name;
     int				fd, got;
     vm_offset_t			laddr;
+    struct stat			st;
 
     /* We can't load first */
     if ((file_findfile(NULL, NULL)) == NULL) {
@@ -434,12 +435,25 @@ file_loadraw(const char *fname, char *type, int argc, char **argv, int insert)
 	free(name);
 	return(NULL);
     }
+    if (fstat(fd, &st) < 0) {
+	close(fd);
+	snprintf(command_errbuf, sizeof (command_errbuf),
+	    "stat error '%s': %s", name, strerror(errno));
+	free(name);
+	return(NULL);
+    }
 
     if (archsw.arch_loadaddr != NULL)
 	loadaddr = archsw.arch_loadaddr(LOAD_RAW, name, loadaddr);
+    if (loadaddr == 0) {
+	close(fd);
+	snprintf(command_errbuf, sizeof (command_errbuf),
+	    "no memory to load %s", name);
+	free(name);
+	return(NULL);
+    }
 
-    laddr = roundup(loadaddr, PAGE_SIZE);
-    loadaddr = laddr;
+    laddr = loadaddr;
     for (;;) {
 	/* read in 4k chunks; size is not really important */
 	got = archsw.arch_readin(fd, laddr, 4096);
@@ -450,6 +464,9 @@ file_loadraw(const char *fname, char *type, int argc, char **argv, int insert)
 		"error reading '%s': %s", name, strerror(errno));
 	    free(name);
 	    close(fd);
+	    if (archsw.arch_free_loadaddr != NULL)
+		archsw.arch_free_loadaddr(loadaddr,
+		    (uint64_t)(roundup2(st.st_size, PAGE_SIZE) >> 12));
 	    return(NULL);
 	}
 	laddr += got;
@@ -893,6 +910,11 @@ file_discard(struct preloaded_file *fp)
     struct kernel_module	*mp, *mp1;
     if (fp == NULL)
 	return;
+
+    if (archsw.arch_free_loadaddr != NULL && fp->f_addr)
+	archsw.arch_free_loadaddr(fp->f_addr,
+	    (uint64_t)(roundup2(fp->f_size, PAGE_SIZE) >> 12));
+
     md = fp->f_metadata;
     while (md) {
 	md1 = md;

@@ -251,11 +251,15 @@ __elfN(loadfile_raw)(char *filename, u_int64_t dest,
     if (ef.kernel == 1 && multiboot == 0)
 	setenv("kernelname", filename, 1);
     fp->f_name = strdup(filename);
-    if (multiboot == 0)
-    	fp->f_type = strdup(ef.kernel ?
-    	    __elfN(kerneltype) : __elfN(moduletype));
-    else
-    	fp->f_type = strdup("elf multiboot kernel");
+    if (multiboot == 0) {
+	fp->f_type = strdup(ef.kernel ?
+	    __elfN(kerneltype) : __elfN(moduletype));
+    } else {
+	if (multiboot == 1)
+	    fp->f_type = strdup("elf multiboot kernel");
+	else
+	    fp->f_type = strdup("elf multiboot2 kernel");
+    }
 
 #ifdef ELF_VERBOSE
     if (ef.kernel)

@@ -43,6 +43,7 @@
  * environment.
  */
 
+ACPI_TABLE_RSDP	*rsdp;
 static ACPI_TABLE_RSDP	*biosacpi_find_rsdp(void);
 static ACPI_TABLE_RSDP	*biosacpi_search_rsdp(char *base, int length);
 
@@ -51,7 +52,6 @@ static ACPI_TABLE_RSDP	*biosacpi_search_rsdp(char *base, int length);
 void
 biosacpi_detect(void)
 {
-    ACPI_TABLE_RSDP	*rsdp;
     char		buf[24];
     int			revision;
 
