@@ -39,7 +39,7 @@
  */
 
 #include "drmP.h"
-#include <gfx_private.h>
+#include <sys/gfx_private.h>
 #include "drm_io32.h"
 
 

@@ -41,7 +41,7 @@
 #include <sys/bitmap.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
-#include <gfx_private.h>
+#include <sys/gfx_private.h>
 #include "drmP.h"
 #include "drm.h"
 

@@ -1073,6 +1073,7 @@ file path=usr/include/sys/ftrace.h
 file path=usr/include/sys/fx.h
 file path=usr/include/sys/fxpriocntl.h
 file path=usr/include/sys/gfs.h
+file path=usr/include/sys/gfx_private.h
 file path=usr/include/sys/gld.h
 file path=usr/include/sys/gldpriv.h
 file path=usr/include/sys/group.h

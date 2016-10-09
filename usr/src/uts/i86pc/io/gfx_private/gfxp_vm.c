@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/debug.h>
 #include <sys/types.h>
 #include <sys/param.h>
@@ -72,7 +70,7 @@
 #include <sys/callb.h>
 #include <sys/promif.h>
 #include <sys/atomic.h>
-#include "gfx_private.h"
+#include <sys/gfx_private.h>
 
 #ifdef __xpv
 #include <sys/hypervisor.h>
