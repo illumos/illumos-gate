@@ -23,6 +23,13 @@
  * Use is subject to license terms.
  */
 
+/*
+ * This file defines interfaces consumed by the AGP kernel modules,
+ * and indirectly by the DRM system.  Please consider everything in
+ * this file to be a "contract private interface", and keep in sync
+ * with the consumers in the "DRM" gate.
+ */
+
 #ifndef	_GFX_PRIVATE_H
 #define	_GFX_PRIVATE_H
 
@@ -93,6 +100,63 @@ extern int gfxp_mlock_user_memory(caddr_t address, size_t length);
 extern int gfxp_munlock_user_memory(caddr_t address, size_t length);
 extern int gfxp_vgatext_devmap(dev_t dev, devmap_cookie_t dhp, offset_t off,
 	size_t len, size_t *maplen, uint_t model, void *ptr);
+
+
+/*
+ * Updated "glue" for newer libdrm code.
+ * See: kernel/drm/src/drm_fb_helper.c
+ */
+
+/* Same as: gfxp_vgatext_softc_ptr_t; */
+typedef char *gfxp_fb_softc_ptr_t;
+
+/*
+ * Used by drm_register_fbops().
+ * Note: only setmode is supplied.
+ */
+struct gfxp_blt_ops {
+	int (*blt)(void *);
+	int (*copy) (void *);
+	int (*clear) (void *);
+	int (*setmode) (int);
+};
+
+extern void gfxp_bm_register_fbops(gfxp_fb_softc_ptr_t,
+    struct gfxp_blt_ops *);
+
+/* See: kernel/drm/src/drm_fb_helper.c */
+
+struct gfxp_bm_fb_info {
+	uint16_t xres;
+	uint16_t yres;
+	uint8_t bpp;
+	uint8_t depth;
+};
+
+void gfxp_bm_getfb_info(gfxp_fb_softc_ptr_t, struct gfxp_bm_fb_info *);
+
+/* See: kernel/drm/src/drm_bufs.c etc */
+
+caddr_t	gfxp_alloc_kernel_space(size_t size);	/* vmem_alloc heap_arena */
+void	gfxp_free_kernel_space(caddr_t address, size_t size);
+
+void	gfxp_load_kernel_space(uint64_t start, size_t size,
+				uint32_t mode, caddr_t cvaddr);
+void	gfxp_unload_kernel_space(caddr_t address, size_t size);
+
+/*
+ * Note that "mempool" is optional and normally disabled in drm_gem.c
+ * (see HAS_MEM_POOL).  Let's just stub these out so we can reduce
+ * changes from the upstream in the DRM driver code.
+ */
+struct gfxp_pmem_cookie {
+	ulong_t a, b, c;
+};
+void	gfxp_mempool_init(void);
+void	gfxp_mempool_destroy(void);
+int gfxp_alloc_from_mempool(struct gfxp_pmem_cookie *, caddr_t *,
+			    pfn_t *, pgcnt_t, int);
+void gfxp_free_mempool(struct gfxp_pmem_cookie *, caddr_t, size_t);
 
 #ifdef __cplusplus
 }
