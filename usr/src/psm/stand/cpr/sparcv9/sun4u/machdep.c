@@ -22,16 +22,15 @@
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2016 Joyent, Inc.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/cpr.h>
 #include <sys/promimpl.h>
 #include <sys/privregs.h>
 #include <sys/stack.h>
-#include <sys/cpuvar.h>
+#include <sys/bitmap.h>
 #include "cprboot.h"
 
 
@@ -54,7 +53,7 @@ uint_t cpu_delay;
  */
 typedef void (*tlb_func_t)(int, caddr_t, tte_t *);
 static uint_t mdlen;
-static cpuset_t slave_set;
+static ulong_t slave_set[BT_BITOUL(NCPU)];
 static int has_scbc;
 
 
@@ -234,7 +233,7 @@ slave_init(int cpu_id)
 {
 	restore_tlb(mdinfo.dtte, cpu_id);
 	restore_tlb(mdinfo.itte, cpu_id);
-	CPUSET_ADD(slave_set, cpu_id);
+	BT_SET(slave_set, cpu_id);
 	membar_stld();
 	if (has_scbc) {
 		/* just spin, master will park this cpu */
@@ -282,7 +281,7 @@ cb_mpsetup(void)
 	 * and wait about a second for them to checkin with slave_set
 	 */
 	ncpu = 0;
-	CPUSET_ZERO(slave_set);
+	bzero(slave_set, sizeof (slave_set));
 	for (scip = mdinfo.sci, tail = scip + NCPU; scip < tail; scip++) {
 		if (scip->node == 0 || scip->cpu_id == cb_mid)
 			continue;
@@ -290,7 +289,7 @@ cb_mpsetup(void)
 		    (caddr_t)cpu_launch, scip->cpu_id);
 
 		for (timeout = TIMEOUT_MSECS; timeout; timeout--) {
-			if (CPU_IN_SET(slave_set, scip->cpu_id))
+			if (BT_TEST(slave_set, scip->cpu_id))
 				break;
 			cb_usec_wait(MILLISEC);
 		}
