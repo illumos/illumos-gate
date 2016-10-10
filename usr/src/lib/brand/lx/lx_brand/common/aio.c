@@ -283,12 +283,13 @@ lx_io_getevents(lx_aio_context_t cid, long min_nr, long nr,
 {
 	port_event_t *list;
 	lx_io_event_t *out;
-	unsigned int nget = min_nr;
+	uint_t nget, max;
 	int rval, i, err;
-	uint32_t max = nr;
 	lx_aio_ctxt_t *ctx = (lx_aio_ctxt_t *)cid;
 
-	if (nr > ctx->lxaio_nevents)
+	/* ctx->lxaio_nevents already validated against lx_aio_max_nr */
+	if (min_nr < 0 || min_nr > ctx->lxaio_nevents ||
+	    nr < 0 || nr > ctx->lxaio_nevents)
 		return (-EINVAL);
 
 	/*
@@ -297,6 +298,18 @@ lx_io_getevents(lx_aio_context_t cid, long min_nr, long nr,
 	 */
 	if ((list = malloc(nr * sizeof (port_event_t))) == NULL)
 		return (-EINTR);
+
+	/*
+	 * For Linux, the io_getevents() min_nr argument specifies *at least*
+	 * that number of events, but for illumos the port_getn() nget argument
+	 * specifies the *desired* numbers of events. Some applications pass 0
+	 * for min_nr. This will cause port_getn to short-circuit and return
+	 * immediately, so we use a value of 1 in this case. The port_getn()
+	 * function can still return up to max events when nget == 1.
+	 */
+	nget = (min_nr == 0 ? 1 : min_nr);
+
+	max = nr;
 
 	/*
 	 * Grab the lock associated with the context to bump the number of
