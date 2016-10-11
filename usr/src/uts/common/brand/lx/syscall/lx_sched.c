@@ -123,7 +123,7 @@ lx_sched_pidlock(l_pid_t pid, proc_t **pp, kthread_t **tp, boolean_t is_write)
 		mutex_exit(&p->p_lock);
 		return (ESRCH);
 	} else if (err > 0) {
-		sprwaitlock_proc(p);
+		sprlock_proc(p);
 		err = 0;
 	}
 
