@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright (c) 2015 Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2016 Joyent, Inc.  All rights reserved.
  * Copyright (c) 2015 The MathWorks, Inc.  All rights reserved.
  */
 
@@ -492,6 +492,10 @@ inotify_watch_event(inotify_watch_t *watch, uint64_t mask, char *name)
 	}
 
 	if (name != NULL) {
+		/*
+		 * We are in the context of a file event monitoring operation,
+		 * so the name length is bounded by the kernel.
+		 */
 		len = strlen(name) + 1;
 		len = roundup(len, sizeof (struct inotify_event));
 	} else {
@@ -628,6 +632,13 @@ inotify_watch_add(inotify_state_t *state, inotify_watch_t *parent,
 		inotify_watch_hold(parent);
 		watch->inw_mask &= IN_CHILD_EVENTS;
 		watch->inw_parent = parent;
+
+		/*
+		 * Copy the name.  Note that when the name is user-specified,
+		 * its length is bounded by the copyinstr() to be MAXPATHLEN
+		 * (and regardless, we know by this point that it exists in
+		 * our parent).
+		 */
 		watch->inw_name = kmem_alloc(strlen(name) + 1, KM_SLEEP);
 		/* strcpy() is safe, because strlen(name) bounds us. */
 		(void) strcpy(watch->inw_name, name);
@@ -956,6 +967,13 @@ inotify_rm_watch(inotify_state_t *state, int32_t wd)
 
 	inotify_watch_remove(state, watch);
 	mutex_exit(&state->ins_lock);
+
+	/*
+	 * Because removing a watch will generate an IN_IGNORED event (and
+	 * because inotify_watch_remove() won't alone induce a pollwakeup()),
+	 * we need to explicitly issue a pollwakeup().
+	 */
+	pollwakeup(&state->ins_pollhd, POLLRDNORM | POLLIN);
 
 	return (0);
 }
