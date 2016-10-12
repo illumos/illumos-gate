@@ -10,6 +10,9 @@ To build
 As root first make sure you have the tools installed:
     apt-get install build-essential autoconf automake git quota
 
+For 64-bit:
+    apt-get install libc6-dev-i386
+
 Additional prerequisites are required activate some tests:
     apt-get install attr-dev libaio-dev
 
