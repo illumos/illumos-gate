@@ -660,10 +660,38 @@ sdev_create(struct vnode *dvp, char *nm, struct vattr *vap, vcexcl_t excl,
 		return (ENOENT);
 	}
 
-	/* non-global do not allow pure node creation */
+	/*
+	 * Nodes cannot be created in NGZ context.
+	 */
 	if (!SDEV_IS_GLOBAL(parent)) {
 		rw_exit(&parent->sdev_dotdot->sdev_contents);
-		return (prof_lookup(dvp, nm, vpp, cred));
+		error = prof_lookup(dvp, nm, vpp, cred);
+
+		/*
+		 * In this case, we can't create a vnode but we can
+		 * open an existing one. However, we still want to
+		 * enforce the open(2) error semantics as if this was
+		 * a regular sdev_create() in GZ context. Since we
+		 * know the vnode already exists (error == 0) we a)
+		 * return EEXIST if exclusive access was requested, or
+		 * b) return EISDIR if write access was requested on a
+		 * directory. Otherwise, we return the value from
+		 * prof_lookup() as is.
+		 */
+		if (error == 0) {
+			if (excl == EXCL) {
+				error = EEXIST;
+			} else if (((*vpp)->v_type == VDIR) &&
+			    (mode & VWRITE)) {
+				error = EISDIR;
+			}
+
+			if (error != 0)
+				VN_RELE(*vpp);
+		}
+
+
+		return (error);
 	}
 	rw_exit(&parent->sdev_dotdot->sdev_contents);
 
