@@ -240,6 +240,15 @@ lx_fgetxattr(int fd, char *name, void *value, size_t size)
 		return (set_errno(EBADF));
 	}
 
+	/*
+	 * When a file is opened with O_PATH we clear read/write and fgetxattr
+	 * is expected to return EBADF.
+	 */
+	if ((fp->f_flag & (FREAD | FWRITE)) == 0) {
+		releasef(fd);
+		return (set_errno(EBADF));
+	}
+
 	error = lx_getxattr_common(fp->f_vnode, name, value, size, &osize);
 	releasef(fd);
 
