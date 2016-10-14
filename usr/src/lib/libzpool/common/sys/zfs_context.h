@@ -542,6 +542,7 @@ extern void kernel_fini(void);
 struct spa;
 extern void nicenum(uint64_t num, char *buf);
 extern void show_pool_stats(struct spa *);
+extern int set_global_var(char *arg);
 
 typedef struct callb_cpr {
 	kmutex_t	*cc_lockp;
