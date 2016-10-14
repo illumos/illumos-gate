@@ -20,8 +20,6 @@ CC=	$(GCC_ROOT)/bin/gcc
 LD=	$(GNU_ROOT)/bin/gld
 OBJCOPY= $(GNU_ROOT)/bin/gobjcopy
 OBJDUMP= $(GNU_ROOT)/bin/gobjdump
-OBJCOPY= /code/binutils-gdb/binutils/objcopy
-OBJDUMP= /code/binutils-gdb/binutils/objdump
 
 PROG=		boot1.sym
 MACHINE=$(MACH64)
@@ -40,7 +38,7 @@ CPPFLAGS=	-nostdinc
 CPPFLAGS +=	-I.
 CPPFLAGS +=	-I./../include
 CPPFLAGS +=	-I./../include/${MACHINE}
-CPPFLAGS +=	-I./../../../contrib/dev/acpica/include
+CPPFLAGS +=	-I$(SRC)/uts/intel/sys/acpi
 CPPFLAGS +=	-I./../../../../include
 CPPFLAGS +=	-I./../../../sys
 CPPFLAGS +=	-I./../../..
