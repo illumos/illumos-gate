@@ -5,6 +5,9 @@
  * This file is public domain.
  */
 
+#ifndef __ADM8511_H__
+#define	__ADM8511_H__
+
 #define	EC0		0x00	/* B */
 #define	EC1		0x01	/* B */
 #define	EC2		0x02	/* B */
@@ -203,3 +206,5 @@
 /* byte 3 is reserved */
 
 /* TEST register: offset 80 */
+
+#endif /* __ADM8511_H__ */

@@ -34,8 +34,6 @@
  * DAMAGE.
  */
 
-#pragma ident   "%W% %E%"
-
 /*
  *  Changelog:
  */
@@ -539,7 +537,7 @@ upf_tx_make_packet(struct usbgem_dev *dp, mblk_t *mp)
 
 	/* copy the payload */
 	for (tp = mp; tp; tp = tp->b_cont) {
-		len = tp->b_wptr - tp->b_rptr;
+		len = (uintptr_t)tp->b_wptr - (uintptr_t)tp->b_rptr;
 		if (len > 0) {
 			bcopy(tp->b_rptr, bp, len);
 			bp += len;
@@ -965,7 +963,7 @@ upfattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		ugcp = kmem_zalloc(sizeof (*ugcp), KM_SLEEP);
 
 		/* name */
-		sprintf(ugcp->usbgc_name, "%s%d", drv_name, unit);
+		(void) sprintf(ugcp->usbgc_name, "%s%d", drv_name, unit);
 		ugcp->usbgc_ppa = unit;
 
 		ugcp->usbgc_ifnum = 0;

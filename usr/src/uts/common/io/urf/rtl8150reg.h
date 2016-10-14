@@ -5,6 +5,9 @@
  * This file is public domain. Coded by M.Murayama (KHF04453@nifty.com)
  */
 
+#ifndef __RTL8150REG_H__
+#define	__RTL8150REG_H__
+
 /*
  * Register offset
  */
@@ -64,7 +67,7 @@
 #define	TCR_IFG_SHIFT		3
 #define	TCR_IFG_802_3		(3 << TCR_IFG_SHIFT)	/* 802.3 standard */
 #define	TCR_NOCRC	0x01	/* Inhibit Appending CRC */
-	
+
 #define	TCR_BITS	"\020\001NOCRC"
 
 /* Receive Configuration register */
@@ -106,8 +109,8 @@
 #define	RSR_RX_BUF_FULL	0x40	/* Receive buffer full indication */
 #define	RSR_LKCHG	0x20	/* Link change indication */
 #define	RSR_RUNT	0x10	/* short packet indication */
-#define	RSR_LONG	0x08	/* Long packet indication*/
-#define	RSR_CRC		0x04	/* CRC error indication*/
+#define	RSR_LONG	0x08	/* Long packet indication */
+#define	RSR_CRC		0x04	/* CRC error indication */
 #define	RSR_FAE		0x02	/* Frame alignment error */
 #define	RSR_ROK		0x01	/* Receive OK indication */
 
@@ -128,15 +131,15 @@
 #define	CON0_SUSLED	0x80
 #define	CON0_PARM_EN	0x40	/* parameter enable */
 #define	CON0_LDPS	0x08
-#define CON0_MSEL	0x04	/* media select 1:MII, 0:auto */
-#define CON0_LEDS	0x03	/* LED pattern */
+#define	CON0_MSEL	0x04	/* media select 1:MII, 0:auto */
+#define	CON0_LEDS	0x03	/* LED pattern */
 
 /* Config 1 */
-#define CON0_BWF	0x40	/* Broadcast wakeup function 1:on 0:off */
-#define CON0_MWF	0x20	/* Multicast wakeup function 1:on 0:off */
-#define CON0_UWF	0x10	/* Unicast wakeup function 1:on 0:off */
-#define CON0_LONGWF1	0x02	/* */
-#define CON0_LONGWF0	0x01	/* */
+#define	CON0_BWF	0x40	/* Broadcast wakeup function 1:on 0:off */
+#define	CON0_MWF	0x20	/* Multicast wakeup function 1:on 0:off */
+#define	CON0_UWF	0x10	/* Unicast wakeup function 1:on 0:off */
+#define	CON0_LONGWF1	0x02	/* */
+#define	CON0_LONGWF0	0x01	/* */
 
 
 /* MSR : Media Status register */
@@ -146,7 +149,7 @@
 #define	MSR_SPEED_100	0x08	/* 100Mbps mode */
 #define	MSR_LINK	0x04	/* link status */
 #define	MSR_TXPF	0x02	/* 8150 sends pause packet */
-#define	MSR_RXPF	0x01	/* 8150 is in backoff state*/
+#define	MSR_RXPF	0x01	/* 8150 is in backoff state */
 
 #define	MSR_BITS	\
 	"\020"		\
@@ -216,3 +219,5 @@
  */
 #define	URF_EEPROM_BASE		0x1200
 #define	EPROM_EthernetID	0x0002
+
+#endif /* __RTL8150REG_H__ */

@@ -6,7 +6,7 @@
  */
 
 #ifndef __AX88172_H__
-#define __AX88172_H__
+#define	__AX88172_H__
 
 /*
  * Vendor command definitions
@@ -119,7 +119,7 @@
 	"\001MOM"
 
 /* GPIO register */
-#define	GPIO_RSE	0x80	/* reload serial eeprom (88772)*/
+#define	GPIO_RSE	0x80	/* reload serial eeprom (88772) */
 #define	GPIO_DATA2	0x20
 #define	GPIO_EN2	0x10
 #define	GPIO_DATA1	0x08

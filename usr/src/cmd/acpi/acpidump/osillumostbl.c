@@ -1043,15 +1043,18 @@ AcpiOsMapMemory(ACPI_PHYSICAL_ADDRESS Where, ACPI_SIZE Length)
 
 	if (p == MAP_FAILED)
 		return (NULL);
-	return (p + offset);
+	p = (char *)p + offset;
+	return (p);
 }
 
 void
 AcpiOsUnmapMemory(void *LogicalAddress, ACPI_SIZE Size)
 {
 	ulong_t offset;
+	void *p;
 
 	offset = (ulong_t)LogicalAddress % pagesize;
+	p = (void *)((char *)LogicalAddress - offset);
 
-	(void) munmap(LogicalAddress - offset, Size + offset);
+	(void) munmap(p, Size + offset);
 }

@@ -1,12 +1,11 @@
 /*
- * %W% %E%
  * Macro definitions for Davicom DM9601 USB to fast ethernet controler
  * based on Davicom DM9601E data sheet
  * This file is public domain. Coded by M.Murayama (KHF04453@nifty.com)
  */
 
 #ifndef __DM9601_H__
-#define __DM9601_H__
+#define	__DM9601_H__
 
 /*
  * offset of registers
@@ -326,7 +325,7 @@
 	"\001TXC0"
 
 /* usb control register (0xf4) */
-#define	USBC_EP3ACK	0x20U	/* ep3 will alway return 8byte data if NAK=0*/
+#define	USBC_EP3ACK	0x20U	/* ep3 will alway return 8byte data if NAK=0 */
 #define	USBC_EP3NACK	0x10U	/* ep3 will alway return NAK */
 #define	USBC_MEMTST	0x01U
 

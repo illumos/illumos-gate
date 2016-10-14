@@ -290,6 +290,7 @@ static mblk_t *axf_rx_make_packet(struct usbgem_dev *, mblk_t *);
  * I/O functions
  */
 /* =============================================================== */
+/* BEGIN CSTYLED */
 #define	OUT(dp, req, val, ix, len, buf, errp, label)	\
 	if ((*(errp) = usbgem_ctrl_out((dp), 	\
 	/* bmRequestType */ USB_DEV_REQ_HOST_TO_DEV	\
@@ -311,6 +312,7 @@ static mblk_t *axf_rx_make_packet(struct usbgem_dev *, mblk_t *);
 	/* wLength */  (len),	\
 	/* valuep */   (buf),	\
 	/* size */     (len))) != USB_SUCCESS) goto label
+/* END CSTYLED */
 
 /* =============================================================== */
 /*
@@ -507,7 +509,7 @@ usberr:
 static int
 axf_get_stats(struct usbgem_dev *dp)
 {
-	/* EMPTY */
+	/* empty */
 	return (USB_SUCCESS);
 }
 
@@ -765,7 +767,7 @@ axf_tx_make_packet(struct usbgem_dev *dp, mblk_t *mp)
 
 	/* copy contents of the buffer */
 	for (tp = mp; tp; tp = tp->b_cont) {
-		n = tp->b_wptr - tp->b_rptr;
+		n = (uintptr_t)tp->b_wptr - (uintptr_t)tp->b_rptr;
 		bcopy(tp->b_rptr, bp, n);
 		bp += n;
 	}
@@ -804,14 +806,14 @@ static mblk_t *
 axf_rx_make_packet(struct usbgem_dev *dp, mblk_t *mp)
 {
 	mblk_t	*tp;
-	int	rest;
+	uintptr_t rest;
 
 	if (AX88172(dp)) {
 		return (mp);
 	}
 
 	tp = mp;
-	rest = tp->b_wptr - tp->b_rptr;
+	rest = (uintptr_t)tp->b_wptr - (uintptr_t)tp->b_rptr;
 
 	if (rest <= PKT_HEADER_SIZE) {
 		/*
@@ -1290,7 +1292,7 @@ chip_found:
 		 * softmac requires that ppa is the instance number
 		 * of the device, otherwise it hangs in seaching the device.
 		 */
-		sprintf(ugcp->usbgc_name, "%s%d", drv_name, unit);
+		(void) sprintf(ugcp->usbgc_name, "%s%d", drv_name, unit);
 		ugcp->usbgc_ppa = unit;
 
 		ugcp->usbgc_ifnum = 0;

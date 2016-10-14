@@ -31,8 +31,6 @@
  * DAMAGE.
  */
 
-#pragma ident   "%W% %E%"
-
 /*
  *  Changelog:
  */
@@ -162,6 +160,7 @@ static mblk_t *urf_rx_make_packet(struct usbgem_dev *, mblk_t *);
 	/* wLength */  2,	\
 	/* value */   (v))) != USB_SUCCESS) goto label
 
+/* BEGIN CSTYLED */
 #define	OUTS(dp, p, buf, len, errp, label)	\
 	if ((*(errp) = usbgem_ctrl_out((dp), 	\
 	/* bmRequestType */ USB_DEV_REQ_HOST_TO_DEV	\
@@ -172,6 +171,7 @@ static mblk_t *urf_rx_make_packet(struct usbgem_dev *, mblk_t *);
 	/* wLength */  (len),	\
 	/* value */    (buf),	\
 	/* size */     (len))) != USB_SUCCESS) goto label
+/* END CSTYLED */
 
 #define	IN(dp, p, vp, errp, label)	\
 	if ((*(errp) = usbgem_ctrl_in_val((dp), 	\
@@ -323,7 +323,7 @@ urf_set_rx_filter(struct usbgem_dev *dp)
 		lp->rcr &= ~(RCR_AB | RCR_AD | RCR_AAM | RCR_AAP | RCR_AM);
 		OUTW(dp, RCR, lp->rcr, &err, usberr);
 #else
-		/* receive all packets while we change rx filter*/
+		/* receive all packets while we change rx filter */
 		OUTW(dp, RCR, lp->rcr | RCR_AAM | RCR_AAP, &err, usberr);
 #endif
 	}
@@ -458,7 +458,7 @@ urf_tx_make_packet(struct usbgem_dev *dp, mblk_t *mp)
 		new->b_wptr = new->b_rptr + len;
 		bp = new->b_rptr;
 		for (tp = mp; tp; tp = tp->b_cont) {
-			len = tp->b_wptr - tp->b_rptr;
+			len = (uintptr_t)tp->b_wptr - (uintptr_t)tp->b_rptr;
 			bcopy(tp->b_rptr, bp, len);
 			bp += len;
 		}
@@ -787,7 +787,7 @@ urfattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		ugcp = kmem_zalloc(sizeof (*ugcp), KM_SLEEP);
 
 		/* name */
-		sprintf(ugcp->usbgc_name,
+		(void) sprintf(ugcp->usbgc_name,
 		    "%s%d(ppa=%d)", drv_name, unit, urf_ppa);
 #ifdef USBGEM_CONFIG_GLDv3
 		ugcp->usbgc_ppa = urf_ppa;
@@ -858,7 +858,7 @@ urfattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		ugcp->usbgc_default_mtu = ETHERMTU;
 
 		lp = kmem_zalloc(sizeof (struct urf_dev), KM_SLEEP);
-		lp->chip = p;
+		lp->chip = NULL;
 
 		ddi_set_driver_private(dip, NULL);
 

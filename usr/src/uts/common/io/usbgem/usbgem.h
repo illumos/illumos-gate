@@ -5,7 +5,7 @@
  */
 
 #ifndef __USBGEM_H__
-#define __USBGEM_H__
+#define	__USBGEM_H__
 
 #pragma	ident	"@(#)usbgem.h	1.4 12/02/09"
 
@@ -24,9 +24,9 @@
  */
 #define	USBGEM_NAME_LEN	32
 
-#define USBGEM_TX_TIMEOUT		(drv_usectohz(3*1000000))
-#define USBGEM_TX_TIMEOUT_INTERVAL	(drv_usectohz(1*1000000))
-#define USBGEM_LINK_WATCH_INTERVAL	(drv_usectohz(1*1000000))
+#define	USBGEM_TX_TIMEOUT		(drv_usectohz(3*1000000))
+#define	USBGEM_TX_TIMEOUT_INTERVAL	(drv_usectohz(1*1000000))
+#define	USBGEM_LINK_WATCH_INTERVAL	(drv_usectohz(1*1000000))
 
 /* general return code */
 #define	USBGEM_SUCCESS	0
@@ -79,7 +79,7 @@ struct mcast_addr {
 };
 
 #define	USBGEM_MAXMC	64
-#define	USBGEM_MCALLOC	(sizeof(struct mcast_addr) * USBGEM_MAXMC)
+#define	USBGEM_MCALLOC	(sizeof (struct mcast_addr) * USBGEM_MAXMC)
 
 #define	SLOT(dp, n)	((n) % (dp)->ugc.usbgc_tx_list_max)
 
@@ -289,7 +289,7 @@ struct usbgem_dev {
 
 		clock_t	usbgc_mii_an_watch_interval;
 		clock_t	usbgc_mii_an_timeout;
-		clock_t	usbgc_mii_an_wait;	
+		clock_t	usbgc_mii_an_wait;
 		clock_t	usbgc_mii_an_delay;
 
 		/* MII configuration */
@@ -299,7 +299,7 @@ struct usbgem_dev {
 #define		MII_ACTION_NONE		0
 #define		MII_ACTION_RESET	1
 #define		MII_ACTION_RSA		2
-		boolean_t	usbgc_mii_dont_reset:1;	
+		boolean_t	usbgc_mii_dont_reset:1;
 		boolean_t	usbgc_mii_an_oneshot:1;
 		boolean_t	usbgc_mii_hw_link_detection:1;
 		boolean_t	usbgc_mii_stop_mac_on_linkdown:1;
@@ -320,24 +320,28 @@ struct usbgem_dev {
 		int	(*usbgc_get_stats)(struct usbgem_dev *dp);
 		void	(*usbgc_interrupt)(struct usbgem_dev *dp, mblk_t *mp);
 
-		/* packet manupilation */
-		mblk_t	*(*usbgc_tx_make_packet)(struct usbgem_dev *dp, mblk_t *mp);
-		mblk_t	*(*usbgc_rx_make_packet)(struct usbgem_dev *dp, mblk_t *mp);
+		/* packet manipulation */
+		mblk_t	*(*usbgc_tx_make_packet)(struct usbgem_dev *dp,
+		    mblk_t *mp);
+		mblk_t	*(*usbgc_rx_make_packet)(struct usbgem_dev *dp,
+		    mblk_t *mp);
 		/* mii operations */
 		int	(*usbgc_mii_probe)(struct usbgem_dev *dp);
 		int	(*usbgc_mii_init)(struct usbgem_dev *dp);
 		int	(*usbgc_mii_config)(struct usbgem_dev *dp, int *errp);
-		uint16_t (*usbgc_mii_read)(struct usbgem_dev *dp, uint_t reg, int *errp);
-		void	(*usbgc_mii_write)(struct usbgem_dev *dp, uint_t reg, uint16_t val, int *errp);
+		uint16_t (*usbgc_mii_read)(struct usbgem_dev *dp, uint_t reg,
+		    int *errp);
+		void	(*usbgc_mii_write)(struct usbgem_dev *dp, uint_t reg,
+		    uint16_t val, int *errp);
 
 		/* jumbo frame */
-		int     usbgc_max_mtu;
-		int     usbgc_default_mtu;
-		int     usbgc_min_mtu;
+		int	usbgc_max_mtu;
+		int	usbgc_default_mtu;
+		int	usbgc_min_mtu;
 	} ugc;
 
 	int	misc_flag;
-#define USBGEM_VLAN	0x0001
+#define	USBGEM_VLAN	0x0001
 	timeout_id_t	intr_watcher_id;
 
 	/* buffer size */
@@ -345,9 +349,9 @@ struct usbgem_dev {
 
 	/* performance tuning parameters */
 	uint_t	txthr;		/* tx fifo threshoold */
-	uint_t	txmaxdma;	/* tx max dma burst size */ 
+	uint_t	txmaxdma;	/* tx max dma burst size */
 	uint_t	rxthr;		/* rx fifo threshoold */
-	uint_t	rxmaxdma;	/* tx max dma burst size */ 
+	uint_t	rxmaxdma;	/* tx max dma burst size */
 
 	/* kstat stuff */
 	kstat_t	*ksp;
@@ -402,27 +406,27 @@ int usbgem_quiesce(dev_info_t *);
 
 #ifdef USBGEM_CONFIG_GLDv3
 #if DEVO_REV < 4
-#define USBGEM_STREAM_OPS(dev_ops, attach, detach) \
-        DDI_DEFINE_STREAM_OPS(dev_ops, nulldev, nulldev, attach, detach, \
-        nodev, NULL, D_MP, NULL)
+#define	USBGEM_STREAM_OPS(dev_ops, attach, detach) \
+    DDI_DEFINE_STREAM_OPS(dev_ops, nulldev, nulldev, attach, detach, \
+    nodev, NULL, D_MP, NULL)
 #else
-#define USBGEM_STREAM_OPS(dev_ops, attach, detach) \
-	DDI_DEFINE_STREAM_OPS(dev_ops, nulldev, nulldev, attach, detach, \
-	nodev, NULL, D_MP, NULL, usbgem_quiesce)
+#define	USBGEM_STREAM_OPS(dev_ops, attach, detach) \
+    DDI_DEFINE_STREAM_OPS(dev_ops, nulldev, nulldev, attach, detach, \
+    nodev, NULL, D_MP, NULL, usbgem_quiesce)
 #endif
 #else
-#define usbgem_getinfo     gld_getinfo
-#define usbgem_open        gld_open
-#define usbgem_close       gld_close
-#define usbgem_wput        gld_wput
-#define usbgem_wsrv        gld_wsrv
-#define usbgem_rsrv        gld_rsrv
-#define usbgem_power       NULL
+#define	usbgem_getinfo	gld_getinfo
+#define	usbgem_open	gld_open
+#define	usbgem_close	gld_close
+#define	usbgem_wput	gld_wput
+#define	usbgem_wsrv	gld_wsrv
+#define	usbgem_rsrv	gld_rsrv
+#define	usbgem_power	NULL
 #endif
 int usbgem_mod_init(struct dev_ops *, char *);
 void usbgem_mod_fini(struct dev_ops *);
 
-#define USBGEM_GET_DEV(dip) \
+#define	USBGEM_GET_DEV(dip) \
 	((struct usbgem_dev *)(ddi_get_driver_private(dip)))
 
 #endif /* __USBGEM_H__ */

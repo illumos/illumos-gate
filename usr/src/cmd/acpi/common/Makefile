@@ -17,7 +17,7 @@ include	$(SRC)/lib/Makefile.lib
 
 OBJECTS= getopt.o osl.o utascii.o utdebug.o utexcep.o utglobal.o  utmath.o \
 	utnonansi.o utprint.o utxferror.o
-SRCS = $(OBJS:.o=.c)
+SRCS = $(OBJECTS:.o=.c)
 
 CERRWARN += -_gcc=-Wno-unused-function
 

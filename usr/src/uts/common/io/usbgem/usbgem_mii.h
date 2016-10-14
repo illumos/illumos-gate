@@ -30,7 +30,6 @@
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
  * DAMAGE.
  */
-#pragma ident	"@(#)gem_mii.h	1.4	07/11/30"
 
 /*
  * gem_mii.h : MII registers

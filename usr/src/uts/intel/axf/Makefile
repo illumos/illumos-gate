@@ -40,6 +40,13 @@ CERRWARN	+= -_gcc=-Wno-unused-function
 CERRWARN	+= -_gcc=-Wno-unused-variable
 CERRWARN	+= -_gcc=-Wno-unused-label
 
+LINTTAGS	+= -erroff=E_FUNC_VAR_UNUSED
+LINTTAGS	+= -erroff=E_FUNC_ARG_UNUSED
+LINTTAGS	+= -erroff=E_STATIC_UNUSED
+LINTTAGS	+= -erroff=E_FUNC_RET_ALWAYS_IGNOR2
+LINTTAGS	+= -erroff=E_FUNC_SET_NOT_USED
+LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
+
 #
 #	Define targets
 #

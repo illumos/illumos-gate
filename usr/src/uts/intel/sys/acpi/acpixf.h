@@ -349,7 +349,6 @@ ACPI_GLOBAL (BOOLEAN,               AcpiGbl_SystemAwakeAndRunning);
 
 #endif /* ACPI_NO_ERROR_MESSAGES */
 
-
 /*
  * Debugging output prototypes (default: no debug output).
  *
@@ -362,9 +361,7 @@ ACPI_GLOBAL (BOOLEAN,               AcpiGbl_SystemAwakeAndRunning);
     Prototype;
 
 #else
-#define ACPI_DBG_DEPENDENT_RETURN_VOID(Prototype) \
-    static ACPI_INLINE Prototype {return;}
-
+#define ACPI_DBG_DEPENDENT_RETURN_VOID(Prototype)
 #endif /* ACPI_DEBUG_OUTPUT */
 
 
@@ -380,9 +377,7 @@ ACPI_GLOBAL (BOOLEAN,               AcpiGbl_SystemAwakeAndRunning);
     Prototype;
 
 #else
-#define ACPI_APP_DEPENDENT_RETURN_VOID(Prototype) \
-    static ACPI_INLINE Prototype {return;}
-
+#define ACPI_APP_DEPENDENT_RETURN_VOID(Prototype)
 #endif /* ACPI_APPLICATION */
 
 
@@ -409,6 +404,11 @@ ACPI_GLOBAL (BOOLEAN,               AcpiGbl_SystemAwakeAndRunning);
 
 #endif /* ACPI_DEBUGGER */
 
+/*****************************************************************************
+ *
+ * ACPICA public interface prototypes
+ *
+ ****************************************************************************/
 
 /*****************************************************************************
  *
@@ -1200,7 +1200,6 @@ AcpiBiosWarning (
 /*
  * Debug output
  */
-/* ARGSUSED */
 ACPI_DBG_DEPENDENT_RETURN_VOID (
 ACPI_PRINTF_LIKE(6)
 void ACPI_INTERNAL_VAR_XFACE
@@ -1213,7 +1212,6 @@ AcpiDebugPrint (
     const char              *Format,
     ...))
 
-/* ARGSUSED */
 ACPI_DBG_DEPENDENT_RETURN_VOID (
 ACPI_PRINTF_LIKE(6)
 void ACPI_INTERNAL_VAR_XFACE
@@ -1226,7 +1224,6 @@ AcpiDebugPrintRaw (
     const char              *Format,
     ...))
 
-/* ARGSUSED */
 ACPI_DBG_DEPENDENT_RETURN_VOID (
 void
 AcpiTracePoint (
@@ -1235,7 +1232,6 @@ AcpiTracePoint (
     UINT8                   *Aml,
     char                    *Pathname))
 
-/* ARGSUSED */
 ACPI_APP_DEPENDENT_RETURN_VOID (
 ACPI_PRINTF_LIKE(1)
 void ACPI_INTERNAL_VAR_XFACE

@@ -769,7 +769,7 @@ usbgem_send_common(struct usbgem_dev *dp, mblk_t *mp, uint32_t flags)
 	req = dp->tx_free_list;
 	dp->tx_free_list = (usb_bulk_req_t *)req->bulk_client_private;
 	dp->tx_busy_cnt++;
-	
+
 	if (dp->tx_free_list == NULL) {
 		intr = B_TRUE;
 	}
@@ -1022,7 +1022,7 @@ usbgem_bulkin_cb(usb_pipe_handle_t pipe, usb_bulk_req_t *req)
 	mblk_t	*newmp;
 	mblk_t	*mp;
 	mblk_t	*tp;
-	int	len = 0;
+	uint64_t	len = 0;
 	int	pkts = 0;
 	int	bcast = 0;
 	int	mcast = 0;
@@ -1057,7 +1057,7 @@ usbgem_bulkin_cb(usb_pipe_handle_t pipe, usb_bulk_req_t *req)
 
 		/* the message may includes one or more ethernet packets */
 		for (tp = newmp; tp; tp = tp->b_next) {
-			len += tp->b_wptr - tp->b_rptr;
+			len += (uintptr_t)tp->b_wptr - (uintptr_t)tp->b_rptr;
 			pkts++;
 			if (tp->b_rptr[0] & 1) {
 				if (bcmp(tp->b_rptr, &usbgem_bcastaddr,
@@ -2534,8 +2534,8 @@ usbgem_mac_stop(struct usbgem_dev *dp, int new_state, boolean_t graceful)
 	/*
 	 * we must have writer lock for dev_state_lock
 	 */
-	ASSERT(new_state == MAC_STATE_STOPPED
-	    || new_state == MAC_STATE_DISCONNECTED);
+	ASSERT(new_state == MAC_STATE_STOPPED ||
+	    new_state == MAC_STATE_DISCONNECTED);
 
 	/* stop polling interrupt pipe */
 	if (dp->ugc.usbgc_interrupt && dp->intr_pipe) {
@@ -5597,10 +5597,10 @@ usbgem_ctrl_out_val(struct usbgem_dev *dp,
 	case 4:
 		buf[3] = v >> 24;
 		buf[2] = v >> 16;
-		/* fall thru */
+		/* FALLTHROUGH */
 	case 2:
 		buf[1] = v >> 8;
-		/* fall thru */
+		/* FALLTHROUGH */
 	case 1:
 		buf[0] = v;
 	}
@@ -5794,8 +5794,8 @@ usbgem_close_pipes(struct usbgem_dev *dp)
 	return (USB_SUCCESS);
 }
 
-#define FREEZE_GRACEFUL		(B_TRUE)
-#define FREEZE_NO_GRACEFUL	(B_FALSE)
+#define	FREEZE_GRACEFUL		(B_TRUE)
+#define	FREEZE_NO_GRACEFUL	(B_FALSE)
 static int
 usbgem_freeze_device(struct usbgem_dev *dp, boolean_t graceful)
 {
@@ -5823,7 +5823,7 @@ usbgem_disconnect_cb(dev_info_t *dip)
 	dp = USBGEM_GET_DEV(dip);
 
 	cmn_err(CE_NOTE, "!%s: the usb device was disconnected (dp=%p)",
-	    dp->name, dp);
+	    dp->name, (void *)dp);
 
 	/* start serialize */
 	rw_enter(&dp->dev_state_lock, RW_WRITER);
@@ -5884,7 +5884,7 @@ usbgem_reconnect_cb(dev_info_t *dip)
 	if (usb_check_same_device(dp->dip, NULL, USB_LOG_L2, -1,
 	    USB_CHK_BASIC | USB_CHK_CFG, NULL) != USB_SUCCESS) {
 		cmn_err(CE_CONT,
-		     "!%s: no or different device installed", dp->name);
+		    "!%s: no or different device installed", dp->name);
 		return (DDI_SUCCESS);
 	}
 #endif
@@ -5940,7 +5940,7 @@ usbgem_resume(dev_info_t *dip)
 	if (usb_check_same_device(dp->dip, NULL, USB_LOG_L2, -1,
 	    USB_CHK_BASIC | USB_CHK_CFG, NULL) != USB_SUCCESS) {
 		cmn_err(CE_CONT,
-		     "!%s: no or different device installed", dp->name);
+		    "!%s: no or different device installed", dp->name);
 		return (DDI_SUCCESS);
 	}
 #endif
@@ -6299,7 +6299,7 @@ usbgem_do_detach(dev_info_t *dip)
 	/* unregister with hotplug service */
 	usb_unregister_hotplug_cbs(dip);
 
-	/* stop tx watchdog watcher*/
+	/* stop tx watchdog watcher */
 	usbgem_tx_watcher_stop(dp);
 
 	/* stop the link manager */

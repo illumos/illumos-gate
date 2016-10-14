@@ -49,6 +49,15 @@ CERRWARN	+= -_gcc=-Wno-unused-variable
 CERRWARN	+= -_gcc=-Wno-unused-label
 CERRWARN	+= -_gcc=-Wno-unused-function
 
+LINTTAGS	+= -erroff=E_FUNC_VAR_UNUSED
+LINTTAGS	+= -erroff=E_FUNC_ARG_UNUSED
+LINTTAGS	+= -erroff=E_STATIC_UNUSED
+LINTTAGS	+= -erroff=E_FUNC_SET_NOT_USED
+LINTTAGS	+= -erroff=E_FUNC_RET_MAYBE_IGNORED2
+LINTTAGS	+= -erroff=E_FUNC_RET_ALWAYS_IGNOR2
+LINTTAGS	+= -erroff=E_BAD_FORMAT_ARG_TYPE2
+LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
+
 LDFLAGS		+= -dy -N misc/mac -N drv/ip -N misc/usba
 
 #

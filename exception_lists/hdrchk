@@ -3,6 +3,10 @@ usr/src/cmd/acpi/acpixtract/acpixtract.h
 usr/src/cmd/acpi/acpixtract/axmain.h
 usr/src/cmd/acpi/acpixtract/axutils.h
 usr/src/boot/*
+usr/src/cmd/acpi/acpidump/acpidump.h
+usr/src/cmd/acpi/acpixtract/acpixtract.h
+usr/src/cmd/acpi/acpixtract/axmain.h
+usr/src/cmd/acpi/acpixtract/axutils.h
 usr/src/cmd/cmd-inet/usr.bin/dns-sd/ClientCommon.h
 usr/src/cmd/cmd-inet/usr.lib/mdnsd/CryptoAlg.h
 usr/src/cmd/cmd-inet/usr.lib/mdnsd/DNSCommon.h
@@ -258,6 +262,7 @@ usr/src/uts/common/gssapi/mechs/krb5/include/krb5.h
 usr/src/uts/common/gssapi/mechs/krb5/include/old.h
 usr/src/uts/common/gssapi/mechs/krb5/include/raw.h
 usr/src/uts/common/gssapi/mechs/krb5/include/rsa-md4.h
+usr/src/uts/common/io/axf/ax88172reg.h
 usr/src/uts/common/io/bnxe/577xx/drivers/common/ecore/ecore_common.h
 usr/src/uts/common/io/bnxe/577xx/drivers/common/ecore/ecore_init_ops.h
 usr/src/uts/common/io/bnxe/577xx/drivers/common/ecore/ecore_init.h
@@ -391,6 +396,9 @@ usr/src/uts/common/io/nfp/nfp_hostif.h
 usr/src/uts/common/io/nfp/nfdev-common.h
 usr/src/uts/common/io/nfp/autoversion.h
 usr/src/uts/common/io/nfp/i21285.h
+usr/src/uts/common/io/udmf/dm9601reg.h
+usr/src/uts/common/io/upf/adm8511reg.h
+usr/src/uts/common/io/urf/rtl8150reg.h
 usr/src/uts/common/sys/scsi/adapters/mpt_sas/mpi/mpi2.h
 usr/src/uts/common/sys/scsi/adapters/mpt_sas/mpi/mpi2_cnfg.h
 usr/src/uts/common/sys/scsi/adapters/mpt_sas/mpi/mpi2_hbd.h

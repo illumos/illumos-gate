@@ -31,8 +31,6 @@
  * DAMAGE.
  */
 
-#pragma ident "%W% %E%"
-
 /*
  *  Changelog:
  */
@@ -64,6 +62,7 @@
 #include <sys/stropts.h>
 #include <sys/stream.h>
 #include <sys/strlog.h>
+#include <sys/strsun.h>
 #include <sys/usb/usba.h>
 #include "usbgem.h"
 
@@ -280,7 +279,7 @@ usberr:
 static int
 udmf_get_stats(struct usbgem_dev *dp)
 {
-	/* EMPTY */
+	/* empty */
 	return (USB_SUCCESS);
 }
 
@@ -446,7 +445,7 @@ udmf_tx_make_packet(struct usbgem_dev *dp, mblk_t *mp)
 
 	/* copy contents of the buffer */
 	for (tp = mp; tp; tp = tp->b_cont) {
-		n = tp->b_wptr - tp->b_rptr;
+		n = MBLKL(tp);
 		bcopy(tp->b_rptr, bp, n);
 		bp += n;
 	}
@@ -474,10 +473,10 @@ udmf_dump_packet(struct usbgem_dev *dp, uint8_t *bp, int n)
 static mblk_t *
 udmf_rx_make_packet(struct usbgem_dev *dp, mblk_t *mp)
 {
-	int	len;
+	size_t len;
 	uint8_t	rx_stat;
 
-	len = mp->b_wptr - mp->b_rptr;
+	len = MBLKL(mp);
 
 	if (len <= RX_HEADER_SIZE) {
 		/*
@@ -783,7 +782,7 @@ udmfattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		 * softmac requires that ppa is the instance number
 		 * of the device, otherwise it hangs in seaching the device.
 		 */
-		sprintf(ugcp->usbgc_name, "%s%d", drv_name, unit);
+		(void) sprintf(ugcp->usbgc_name, "%s%d", drv_name, unit);
 		ugcp->usbgc_ppa = unit;
 
 		ugcp->usbgc_ifnum = 0;
@@ -810,7 +809,7 @@ udmfattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		/* MII timeout parameters */
 		ugcp->usbgc_mii_link_watch_interval =
 		    USBGEM_LINK_WATCH_INTERVAL;
-		ugcp->usbgc_mii_an_watch_interval = 
+		ugcp->usbgc_mii_an_watch_interval =
 		    USBGEM_LINK_WATCH_INTERVAL/5;
 		ugcp->usbgc_mii_reset_timeout = MII_RESET_TIMEOUT; /* 1 sec */
 		ugcp->usbgc_mii_an_timeout = MII_AN_TIMEOUT;	/* 5 sec */
@@ -854,9 +853,8 @@ udmfattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		ugcp->usbgc_min_mtu = ETHERMTU;
 		ugcp->usbgc_max_mtu = ETHERMTU;
 		ugcp->usbgc_default_mtu = ETHERMTU;
-		
+
 		lp = kmem_zalloc(sizeof (struct udmf_dev), KM_SLEEP);
-		lp->last_nsr;
 
 		ddi_set_driver_private(dip, NULL);
 
@@ -973,7 +971,7 @@ static	struct dev_ops udmf_ops = {
 	nodev,		/* devo_reset */
 	&cb_udmf_ops,	/* devo_cb_ops */
 	NULL,		/* devo_bus_ops */
-        usbgem_power,   /* devo_power */
+	usbgem_power,   /* devo_power */
 #if DEVO_REV >= 4
 	usbgem_quiesce, /* devo_quiesce */
 #endif
