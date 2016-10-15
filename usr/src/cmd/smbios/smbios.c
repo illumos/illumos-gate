@@ -340,7 +340,7 @@ print_chassis(smbios_hdl_t *shp, id_t id, FILE *fp)
 
 	oprintf(fp, "  OEM Data: 0x%x\n", c.smbc_oemdata);
 	oprintf(fp, "  SKU number: %s\n",
-	    c.smbc_sku == NULL ? "<unknown>" : c.smbc_sku);
+	    c.smbc_sku[0] == '\0' ? "<unknown>" : c.smbc_sku);
 	oprintf(fp, "  Lock Present: %s\n", c.smbc_lock ? "Y" : "N");
 
 	desc_printf(smbios_chassis_type_desc(c.smbc_type),
