@@ -331,11 +331,6 @@ conformance/interfaces/sched_getparam/sched_getparam_6-1 UNTESTED
 conformance/interfaces/sched_getscheduler/sched_getscheduler_7-1 UNTESTED
 
 #
-# Never hits expected memory limit.
-#
-conformance/interfaces/mmap/mmap_24-1 SKIPPED
-
-#
 # mmap() is supposed to return ENODEV for pipe but returns ENOSYS.
 # This is an illumos bug.
 #
