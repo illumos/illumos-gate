@@ -338,8 +338,10 @@ typedef enum lxpr_zombok {
 	ZOMB_OK
 } zombok_t;
 
-proc_t *lxpr_lock(pid_t, zombok_t);
-void lxpr_unlock(proc_t *);
+extern proc_t *lxpr_lock(lxpr_node_t *, zombok_t);
+extern proc_t *lxpr_lock_pid(lxpr_node_t *, pid_t, zombok_t, kthread_t **);
+extern void lxpr_unlock(proc_t *);
+extern void lxpr_fixpid(zone_t *, proc_t *, pid_t *, pid_t *);
 
 #ifdef	__cplusplus
 }

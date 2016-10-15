@@ -86,12 +86,9 @@ stol_cpuset(cpuset_t *smask, lx_affmask_t *lmask)
 static int
 lx_sched_pidlock(l_pid_t pid, proc_t **pp, kthread_t **tp, boolean_t is_write)
 {
-	pid_t		s_pid;
-	id_t		s_tid;
 	proc_t		*p;
 	kthread_t	*t = NULL;
 	int		err = 0;
-	lwpdir_t	*ld;
 
 	if (pid < 0) {
 		return (EINVAL);
@@ -107,35 +104,11 @@ lx_sched_pidlock(l_pid_t pid, proc_t **pp, kthread_t **tp, boolean_t is_write)
 		return (0);
 	}
 
-	if (lx_lpid_to_spair((pid_t)pid, &s_pid, &s_tid) < 0) {
+	if (lx_lpid_lock((pid_t)pid, curzone, PRLOCK, &p, &t) != 0) {
 		return (ESRCH);
 	}
-	mutex_enter(&pidlock);
-	if ((p = prfind(s_pid)) == NULL) {
-		mutex_exit(&pidlock);
-		return (ESRCH);
-	}
-	mutex_enter(&p->p_lock);
-	mutex_exit(&pidlock);
-
-	err = sprtrylock_proc(p);
-	if (err < 0) {
-		mutex_exit(&p->p_lock);
-		return (ESRCH);
-	} else if (err > 0) {
-		sprlock_proc(p);
-		err = 0;
-	}
-
-	ld = lwp_hash_lookup(p, s_tid);
-	if (ld != NULL) {
-		t = ld->ld_entry->le_thread;
-	} else {
-		sprunlock(p);
-		return (ESRCH);
-	}
-
 	mutex_exit(&p->p_lock);
+
 	if (is_write) {
 		cred_t *cr = CRED();
 

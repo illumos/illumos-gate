@@ -367,8 +367,8 @@ lx_lwpdata_alloc(proc_t *p)
 	lpidp = kmem_zalloc(sizeof (struct lx_pid), KM_SLEEP);
 	affmask = cpuset_alloc(KM_SLEEP);
 
-	lpidp->l_pid = newpid;
-	lpidp->l_pidp = pidp;
+	lpidp->lxp_lpid = newpid;
+	lpidp->lxp_pidp = pidp;
 	lwpd->br_lpid = lpidp;
 	lwpd->br_affinitymask = affmask;
 
@@ -389,8 +389,8 @@ lx_lwpdata_free(void *lwpbd)
 	VERIFY(lwpd->br_affinitymask != NULL);
 
 	cpuset_free(lwpd->br_affinitymask);
-	if (lwpd->br_lpid->l_pidp != NULL) {
-		(void) pid_rele(lwpd->br_lpid->l_pidp);
+	if (lwpd->br_lpid->lxp_pidp != NULL) {
+		(void) pid_rele(lwpd->br_lpid->lxp_pidp);
 	}
 	kmem_free(lwpd->br_lpid, sizeof (*lwpd->br_lpid));
 	kmem_free(lwpd, sizeof (*lwpd));
@@ -457,7 +457,7 @@ lx_initlwp(klwp_t *lwp, void *lwpbd)
 	 * example, the single existing lwp will not need a new pid when it is
 	 * rebranded.  In that case, lx_pid_assign will free the uneeded pid.
 	 */
-	VERIFY(lwpd->br_lpid->l_pidp != NULL || p->p_lwpcnt == 0);
+	VERIFY(lwpd->br_lpid->lxp_pidp != NULL || p->p_lwpcnt == 0);
 
 	lx_pid_assign(tp, lwpd->br_lpid);
 	lwpd->br_tgid = lwpd->br_pid;

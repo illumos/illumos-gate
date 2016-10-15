@@ -188,9 +188,7 @@ static void lxpr_read_pid_maps(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_pid_mountinfo(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_pid_oom_scr_adj(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_pid_personality(lxpr_node_t *, lxpr_uiobuf_t *);
-static void lxpr_read_pid_stat(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_pid_statm(lxpr_node_t *, lxpr_uiobuf_t *);
-static void lxpr_read_pid_status(lxpr_node_t *, lxpr_uiobuf_t *);
 
 static void lxpr_read_pid_tid_stat(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_pid_tid_status(lxpr_node_t *, lxpr_uiobuf_t *);
@@ -754,9 +752,9 @@ static void (*lxpr_read_function[LXPR_NFILES])() = {
 	lxpr_read_pid_oom_scr_adj,	/* /proc/<pid>/oom_score_adj */
 	lxpr_read_pid_personality,	/* /proc/<pid>/personality */
 	lxpr_read_invalid,		/* /proc/<pid>/root	*/
-	lxpr_read_pid_stat,		/* /proc/<pid>/stat	*/
+	lxpr_read_pid_tid_stat,		/* /proc/<pid>/stat	*/
 	lxpr_read_pid_statm,		/* /proc/<pid>/statm	*/
-	lxpr_read_pid_status,		/* /proc/<pid>/status	*/
+	lxpr_read_pid_tid_status,	/* /proc/<pid>/status	*/
 	lxpr_read_isdir,		/* /proc/<pid>/task	*/
 	lxpr_read_isdir,		/* /proc/<pid>/task/nn	*/
 	lxpr_read_isdir,		/* /proc/<pid>/fd	*/
@@ -1256,7 +1254,7 @@ lxpr_read_pid_auxv(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	ASSERT(lxpnp->lxpr_type == LXPR_PID_AUXV ||
 	    lxpnp->lxpr_type == LXPR_PID_TID_AUXV);
 
-	p = lxpr_lock(lxpnp->lxpr_pid, NO_ZOMB);
+	p = lxpr_lock(lxpnp, NO_ZOMB);
 
 	if (p == NULL) {
 		return;
@@ -1327,7 +1325,7 @@ lxpr_read_pid_cgroup(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	ASSERT(lxpnp->lxpr_type == LXPR_PID_CGROUP ||
 	    lxpnp->lxpr_type == LXPR_PID_TID_CGROUP);
 
-	p = lxpr_lock(lxpnp->lxpr_pid, ZOMB_OK);
+	p = lxpr_lock(lxpnp, ZOMB_OK);
 	if (p == NULL) {
 		lxpr_uiobuf_seterr(uiobuf, EINVAL);
 		return;
@@ -1425,7 +1423,7 @@ lxpr_read_pid_cmdline(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 
 	buf = kmem_alloc(asz, KM_SLEEP);
 
-	p = lxpr_lock(lxpnp->lxpr_pid, NO_ZOMB);
+	p = lxpr_lock(lxpnp, NO_ZOMB);
 	if (p == NULL) {
 		kmem_free(buf, asz);
 		return;
@@ -1467,7 +1465,7 @@ lxpr_read_pid_comm(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	 * Because prctl(PR_SET_NAME) does not set custom names for threads
 	 * (vs processes), there is no need for special handling here.
 	 */
-	if ((p = lxpr_lock(lxpnp->lxpr_pid, ZOMB_OK)) == NULL) {
+	if ((p = lxpr_lock(lxpnp, ZOMB_OK)) == NULL) {
 		lxpr_uiobuf_seterr(uiobuf, EINVAL);
 		return;
 	}
@@ -1491,7 +1489,7 @@ lxpr_read_pid_env(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 
 	buf = kmem_alloc(asz, KM_SLEEP);
 
-	p = lxpr_lock(lxpnp->lxpr_pid, NO_ZOMB);
+	p = lxpr_lock(lxpnp, NO_ZOMB);
 	if (p == NULL) {
 		kmem_free(buf, asz);
 		return;
@@ -1521,7 +1519,7 @@ lxpr_read_pid_limits(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	ASSERT(lxpnp->lxpr_type == LXPR_PID_LIMITS ||
 	    lxpnp->lxpr_type == LXPR_PID_TID_LIMITS);
 
-	p = lxpr_lock(lxpnp->lxpr_pid, NO_ZOMB);
+	p = lxpr_lock(lxpnp, NO_ZOMB);
 	if (p == NULL) {
 		return;
 	}
@@ -1585,7 +1583,7 @@ lxpr_read_pid_loginuid(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	ASSERT(lxpnp->lxpr_type == LXPR_PID_LOGINUID ||
 	    lxpnp->lxpr_type == LXPR_PID_TID_LOGINUID);
 
-	p = lxpr_lock(lxpnp->lxpr_pid, NO_ZOMB);
+	p = lxpr_lock(lxpnp, NO_ZOMB);
 	if (p == NULL) {
 		lxpr_uiobuf_seterr(uiobuf, ENXIO);
 		return;
@@ -1627,7 +1625,7 @@ lxpr_read_pid_maps(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	ASSERT(lxpnp->lxpr_type == LXPR_PID_MAPS ||
 	    lxpnp->lxpr_type == LXPR_PID_TID_MAPS);
 
-	p = lxpr_lock(lxpnp->lxpr_pid, NO_ZOMB);
+	p = lxpr_lock(lxpnp, NO_ZOMB);
 	if (p == NULL) {
 		return;
 	}
@@ -2016,7 +2014,7 @@ lxpr_read_pid_oom_scr_adj(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	ASSERT(lxpnp->lxpr_type == LXPR_PID_OOM_SCR_ADJ ||
 	    lxpnp->lxpr_type == LXPR_PID_TID_OOM_SCR_ADJ);
 
-	p = lxpr_lock(lxpnp->lxpr_pid, ZOMB_OK);
+	p = lxpr_lock(lxpnp, ZOMB_OK);
 	if (p == NULL) {
 		lxpr_uiobuf_seterr(uiobuf, EINVAL);
 		return;
@@ -2039,7 +2037,7 @@ lxpr_read_pid_personality(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 
 	ASSERT(lxpnp->lxpr_type == LXPR_PID_PERSONALITY);
 
-	p = lxpr_lock(lxpnp->lxpr_pid, ZOMB_OK);
+	p = lxpr_lock(lxpnp, ZOMB_OK);
 	if (p == NULL) {
 		lxpr_uiobuf_seterr(uiobuf, EINVAL);
 		return;
@@ -2068,7 +2066,7 @@ lxpr_read_pid_statm(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	ASSERT(lxpnp->lxpr_type == LXPR_PID_STATM ||
 	    lxpnp->lxpr_type == LXPR_PID_TID_STATM);
 
-	p = lxpr_lock(lxpnp->lxpr_pid, ZOMB_OK);
+	p = lxpr_lock(lxpnp, ZOMB_OK);
 	if (p == NULL) {
 		lxpr_uiobuf_seterr(uiobuf, EINVAL);
 		return;
@@ -2094,75 +2092,6 @@ lxpr_read_pid_statm(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 }
 
 /*
- * Look for either the main thread (lookup_id is 0) or the specified thread.
- * If we're looking for the main thread but the proc does not have one, we
- * fallback to using prchoose to get any thread available.
- */
-static kthread_t *
-lxpr_get_thread(proc_t *p, uint_t lookup_id)
-{
-	kthread_t *t;
-	uint_t emul_tid;
-	lx_lwp_data_t *lwpd;
-	pid_t pid = p->p_pid;
-	pid_t init_pid = curproc->p_zone->zone_proc_initpid;
-	boolean_t branded = (p->p_brand == &lx_brand);
-
-	/* get specified thread  */
-	if ((t = p->p_tlist) == NULL)
-		return (NULL);
-
-	do {
-		if (lookup_id == 0 && t->t_tid == 1) {
-			thread_lock(t);
-			return (t);
-		}
-
-		lwpd = ttolxlwp(t);
-		if (branded && lwpd != NULL) {
-			if (pid == init_pid && lookup_id == 1) {
-				emul_tid = t->t_tid;
-			} else {
-				emul_tid = lwpd->br_pid;
-			}
-		} else {
-			/*
-			 * Make only the first (assumed to be main) thread
-			 * visible for non-branded processes.
-			 */
-			emul_tid = p->p_pid;
-		}
-		if (emul_tid == lookup_id) {
-			thread_lock(t);
-			return (t);
-		}
-	} while ((t = t->t_forw) != p->p_tlist);
-
-	if (lookup_id == 0)
-		return (prchoose(p));
-	return (NULL);
-}
-
-/*
- * Lookup the real pid for procs 0 or 1.
- */
-static pid_t
-get_real_pid(pid_t p)
-{
-	pid_t find_pid;
-
-	if (p == 1) {
-		find_pid = curproc->p_zone->zone_proc_initpid;
-	} else if (p == 0) {
-		find_pid = curproc->p_zone->zone_zsched->p_pid;
-	} else {
-		find_pid = p;
-	}
-
-	return (find_pid);
-}
-
-/*
  * pid/tid common code to read status file
  */
 static void
@@ -2177,51 +2106,29 @@ lxpr_read_status_common(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf,
 	struct as	*as;
 	char		*status;
 	pid_t		pid, ppid;
+	pid_t		tid = (lookup_id == 0) ? lxpnp->lxpr_pid : lookup_id;
 	k_sigset_t	current, ignore, handle;
 	int		i, lx_sig, lwpcnt, ngroups;
-	pid_t		real_pid;
 	char		buf_comm[MAXCOMLEN + 1];
 	rlim64_t	fdlim;
 	size_t		vsize = 0, nlocked = 0, rss = 0, stksize = 0;
 	boolean_t	printsz = B_FALSE;
 
-	real_pid = get_real_pid(lxpnp->lxpr_pid);
-	p = lxpr_lock(real_pid, ZOMB_OK);
+
+	p = lxpr_lock_pid(lxpnp, tid, ZOMB_OK, &t);
 	if (p == NULL) {
 		lxpr_uiobuf_seterr(uiobuf, EINVAL);
 		return;
 	}
 
-	pid = p->p_pid;
-
 	/*
 	 * Convert pid to the Linux default of 1 if we're the zone's init
 	 * process or if we're the zone's zsched the pid is 0.
 	 */
-	if (pid == curproc->p_zone->zone_proc_initpid) {
-		pid = 1;
-		ppid = 0;	/* parent pid for init is 0 */
-	} else if (pid == curproc->p_zone->zone_zsched->p_pid) {
-		pid = 0;	/* zsched is pid 0 */
-		ppid = 0;	/* parent pid for zsched is itself */
-	} else {
-		/*
-		 * Make sure not to reference parent PIDs that reside outside
-		 * the zone
-		 */
-		ppid = ((p->p_flag & SZONETOP)
-		    ? curproc->p_zone->zone_zsched->p_pid : p->p_ppid);
+	lxpr_fixpid(LXPTOZ(lxpnp), p, &pid, &ppid);
 
-		/*
-		 * Convert ppid to the Linux default of 1 if our parent is the
-		 * zone's init process
-		 */
-		if (ppid == curproc->p_zone->zone_proc_initpid)
-			ppid = 1;
-	}
-
-	t = lxpr_get_thread(p, lookup_id);
 	if (t != NULL) {
+		thread_lock(t);
 		switch (t->t_state) {
 		case TS_SLEEP:
 			status = "S (sleeping)";
@@ -2371,23 +2278,14 @@ lxpr_read_status_common(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf,
 }
 
 /*
- * lxpr_read_pid_status(): status file
- */
-static void
-lxpr_read_pid_status(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
-{
-	ASSERT(lxpnp->lxpr_type == LXPR_PID_STATUS);
-
-	lxpr_read_status_common(lxpnp, uiobuf, 0);
-}
-
-/*
  * lxpr_read_pid_tid_status(): status file
  */
 static void
 lxpr_read_pid_tid_status(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
-	ASSERT(lxpnp->lxpr_type == LXPR_PID_TID_STATUS);
+	ASSERT(lxpnp->lxpr_type == LXPR_PID_STATUS ||
+	    lxpnp->lxpr_type == LXPR_PID_TID_STATUS);
+
 	lxpr_read_status_common(lxpnp, uiobuf, lxpnp->lxpr_desc);
 }
 
@@ -2410,28 +2308,31 @@ lxpr_xlate_pts_dev(dev_t dev)
  * pid/tid common code to read stat file
  */
 static void
-lxpr_read_stat_common(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf,
-    uint_t lookup_id)
+lxpr_read_pid_tid_stat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
 	proc_t *p;
 	kthread_t *t;
 	struct as *as;
+	zone_t *zone;
 	char stat;
-	pid_t pid, ppid, pgpid, spid;
+	pid_t pid, ppid, pgpid, spid, tid;
 	gid_t psgid;
 	dev_t psdev;
 	size_t rss, vsize;
 	int nice, pri, lwpcnt;
 	caddr_t wchan, stackbase;
 	processorid_t cpu;
-	pid_t real_pid;
 	clock_t utime, stime, cutime, cstime, ticks, boottime;
 	char buf_comm[MAXCOMLEN + 1];
 	rlim64_t vmem_ctl;
 	int exit_signal = -1;
 
-	real_pid = get_real_pid(lxpnp->lxpr_pid);
-	p = lxpr_lock(real_pid, ZOMB_OK);
+	ASSERT(lxpnp->lxpr_type == LXPR_PID_STAT ||
+	    lxpnp->lxpr_type == LXPR_PID_TID_STAT);
+
+	zone = LXPTOZ(lxpnp);
+	tid = (lxpnp->lxpr_desc == 0) ? lxpnp->lxpr_pid : lxpnp->lxpr_desc;
+	p = lxpr_lock_pid(lxpnp, tid, ZOMB_OK, &t);
 	if (p == NULL) {
 		lxpr_uiobuf_seterr(uiobuf, EINVAL);
 		return;
@@ -2441,37 +2342,21 @@ lxpr_read_stat_common(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf,
 	 * Set Linux defaults if we're the zone's init process
 	 */
 	pid = p->p_pid;
-	if (pid == curproc->p_zone->zone_proc_initpid) {
-		pid = 1;		/* PID for init */
-		ppid = 0;		/* parent PID for init is 0 */
-		pgpid = 0;		/* process group for init is 0 */
-		psgid = (gid_t)-1;	/* credential GID for init is -1 */
-		spid = 0;		/* session id for init is 0 */
-		psdev = 0;		/* session device for init is 0 */
-	} else if (pid == curproc->p_zone->zone_zsched->p_pid) {
-		pid = 0;		/* PID for zsched */
-		ppid = 0;		/* parent PID for zsched is 0 */
-		pgpid = 0;		/* process group for zsched is 0 */
-		psgid = (gid_t)-1;	/* credential GID for zsched is -1 */
-		spid = 0;		/* session id for zsched is 0 */
-		psdev = 0;		/* session device for zsched is 0 */
+	lxpr_fixpid(zone, p, &pid, &ppid);
+	if (pid == 1) {
+		/* init process */
+		pgpid = 0;
+		psgid = (gid_t)-1;
+		spid = 0;
+		psdev = 0;
+	} else if (pid == 0) {
+		/* zsched process */
+		pgpid = 0;
+		psgid = (gid_t)-1;
+		spid = 0;
+		psdev = 0;
 	} else {
-		/*
-		 * Make sure not to reference parent PIDs that reside outside
-		 * the zone
-		 */
-		ppid = ((p->p_flag & SZONETOP) ?
-		    curproc->p_zone->zone_zsched->p_pid : p->p_ppid);
-
-		/*
-		 * Convert ppid to the Linux default of 1 if our parent is the
-		 * zone's init process
-		 */
-		if (ppid == curproc->p_zone->zone_proc_initpid)
-			ppid = 1;
-
 		pgpid = p->p_pgrp;
-
 		mutex_enter(&p->p_splock);
 		mutex_enter(&p->p_sessp->s_lock);
 		spid = p->p_sessp->s_sid;
@@ -2494,11 +2379,9 @@ lxpr_read_stat_common(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf,
 	}
 
 	utime = stime = 0;
-	t = lxpr_get_thread(p, lookup_id);
 	if (t != NULL) {
 		klwp_t *lwp = ttolwp(t);
-		struct mstate *ms = &lwp->lwp_mstate;
-		hrtime_t utm, stm;
+		hrtime_t utm = 0, stm = 0;
 
 		/*
 		 * For field 38 (the exit signal), some apps explicitly use
@@ -2515,6 +2398,7 @@ lxpr_read_stat_common(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf,
 			}
 		}
 
+		thread_lock(t);
 		switch (t->t_state) {
 		case TS_SLEEP:
 			stat = 'S';
@@ -2541,26 +2425,23 @@ lxpr_read_stat_common(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf,
 		wchan = t->t_wchan;
 		cpu = t->t_cpu->cpu_id;
 
-		utm = ms->ms_acct[LMS_USER];
-		stm = ms->ms_acct[LMS_SYSTEM];
+		if (lwp != NULL) {
+			struct mstate *ms = &lwp->lwp_mstate;
+
+			utm = ms->ms_acct[LMS_USER];
+			stm = ms->ms_acct[LMS_SYSTEM];
+
+			/* convert unscaled high-res time to nanoseconds */
+			scalehrtime(&utm);
+			scalehrtime(&stm);
+		}
 
 		thread_unlock(t);
-
-		/* convert unscaled high-res time to nanoseconds */
-		scalehrtime(&utm);
-		scalehrtime(&stm);
 
 		/* Linux /proc expects these values in ticks */
 		utime = (clock_t)NSEC_TO_TICK(utm);
 		stime = (clock_t)NSEC_TO_TICK(stm);
 	} else {
-		if (lookup_id != 0) {
-			/* we can't find this specific thread */
-			lxpr_uiobuf_seterr(uiobuf, EINVAL);
-			lxpr_unlock(p);
-			return;
-		}
-
 		/* Only zombies have no threads */
 		stat = 'Z';
 		nice = 0;
@@ -2581,7 +2462,7 @@ lxpr_read_stat_common(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf,
 	}
 	mutex_enter(&p->p_lock);
 
-	if (lookup_id == 0) {
+	if (tid == p->p_pid) {
 		/* process */
 		utime = p->p_utime;
 		stime = p->p_stime;
@@ -2596,7 +2477,7 @@ lxpr_read_stat_common(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf,
 	(void) strlcpy(buf_comm, p->p_user.u_comm, sizeof (buf_comm));
 	ticks = p->p_user.u_ticks;	/* lbolt at process start */
 	/* adjust ticks to account for zone boot time */
-	boottime = LXPTOZ(lxpnp)->zone_zsched->p_user.u_ticks;
+	boottime = zone->zone_zsched->p_user.u_ticks;
 	ticks -= boottime;
 	lxpr_unlock(p);
 
@@ -2617,7 +2498,7 @@ lxpr_read_stat_common(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf,
 	    "%d "					/* 38 */
 	    "%d"					/* 39 */
 	    "\n",
-	    (lookup_id == 0) ? pid : lxpnp->lxpr_desc,	/* 1 */
+	    tid,					/* 1 */
 	    buf_comm, stat, ppid, pgpid, spid, psdev, psgid, /* 2-8 */
 	    0l, 0l, 0l, 0l, 0l, /* flags, minflt, cminflt, majflt, cmajflt */
 	    utime, stime, cutime, cstime,		/* 14-17 */
@@ -2632,27 +2513,6 @@ lxpr_read_stat_common(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf,
 	    0l, 0l,					/* nswap,cnswap 36-37 */
 	    exit_signal,				/* exit_signal	38 */
 	    cpu						/* 39 */);
-}
-
-/*
- * lxpr_read_pid_stat(): pid stat file
- */
-static void
-lxpr_read_pid_stat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
-{
-	ASSERT(lxpnp->lxpr_type == LXPR_PID_STAT);
-
-	lxpr_read_stat_common(lxpnp, uiobuf, 0);
-}
-
-/*
- * lxpr_read_pid_tid_stat(): pid stat file
- */
-static void
-lxpr_read_pid_tid_stat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
-{
-	ASSERT(lxpnp->lxpr_type == LXPR_PID_TID_STAT);
-	lxpr_read_stat_common(lxpnp, uiobuf, lxpnp->lxpr_desc);
 }
 
 /* ARGSUSED */
@@ -5673,7 +5533,7 @@ lxpr_access(vnode_t *vp, int mode, int flags, cred_t *cr, caller_context_t *ct)
 	case LXPR_PID_FD_FD:
 	case LXPR_PID_TID_FDDIR:
 	case LXPR_PID_TID_FD_FD:
-		if ((tp = lxpr_lock(lxpnp->lxpr_pid, ZOMB_OK)) == NULL)
+		if ((tp = lxpr_lock(lxpnp, ZOMB_OK)) == NULL)
 			return (ENOENT);
 		if (tp != curproc && secpolicy_proc_access(cr) != 0 &&
 		    priv_proc_cred_perm(cr, tp, NULL, mode) != 0) {
@@ -5804,7 +5664,7 @@ lxpr_lookup_piddir(vnode_t *dp, char *comp)
 
 	ASSERT(VTOLXP(dp)->lxpr_type == LXPR_PIDDIR);
 
-	p = lxpr_lock(VTOLXP(dp)->lxpr_pid, ZOMB_OK);
+	p = lxpr_lock(VTOLXP(dp), ZOMB_OK);
 	if (p == NULL)
 		return (NULL);
 
@@ -5824,7 +5684,6 @@ lxpr_lookup_taskdir(vnode_t *dp, char *comp)
 	lxpr_node_t *dlxpnp = VTOLXP(dp);
 	lxpr_node_t *lxpnp;
 	proc_t *p;
-	pid_t real_pid;
 	uint_t tid;
 	int c;
 	kthread_t *t;
@@ -5850,37 +5709,31 @@ lxpr_lookup_taskdir(vnode_t *dp, char *comp)
 	/*
 	 * get the proc to work with and lock it
 	 */
-	real_pid = get_real_pid(dlxpnp->lxpr_pid);
-	p = lxpr_lock(real_pid, NO_ZOMB);
-	if ((p == NULL))
+	p = lxpr_lock_pid(dlxpnp, tid, NO_ZOMB, &t);
+	if (p == NULL)
 		return (NULL);
 
 	/*
 	 * Bail if this is a system process.
 	 */
-	if ((p->p_flag & SSYS) || (p->p_as == &kas)) {
+	if (p->p_as == &kas) {
 		lxpr_unlock(p);
 		return (NULL);
 	}
 
-	if (p->p_brand == &lx_brand) {
-		t = lxpr_get_thread(p, tid);
-	} else {
+	if (p->p_brand != &lx_brand) {
 		/*
 		 * Only the main thread is visible for non-branded processes.
 		 */
 		t = p->p_tlist;
 		if (tid != p->p_pid || t == NULL) {
 			t = NULL;
-		} else {
-			thread_lock(t);
 		}
 	}
 	if (t == NULL) {
 		lxpr_unlock(p);
 		return (NULL);
 	}
-	thread_unlock(t);
 
 	/*
 	 * Allocate and fill in a new lx /proc taskid node.
@@ -5902,7 +5755,6 @@ lxpr_lookup_task_tid_dir(vnode_t *dp, char *comp)
 	lxpr_node_t *dlxpnp = VTOLXP(dp);
 	lxpr_node_t *lxpnp;
 	proc_t *p;
-	pid_t real_pid;
 	kthread_t *t;
 	int i;
 
@@ -5911,26 +5763,17 @@ lxpr_lookup_task_tid_dir(vnode_t *dp, char *comp)
 	/*
 	 * get the proc to work with and lock it
 	 */
-	real_pid = get_real_pid(dlxpnp->lxpr_pid);
-	p = lxpr_lock(real_pid, NO_ZOMB);
-	if ((p == NULL))
+	p = lxpr_lock_pid(dlxpnp, dlxpnp->lxpr_desc, NO_ZOMB, &t);
+	if (p == NULL)
 		return (NULL);
 
 	/*
 	 * Bail if this is a system process.
 	 */
-	if ((p->p_flag & SSYS) || (p->p_as == &kas)) {
+	if (p->p_as == &kas) {
 		lxpr_unlock(p);
 		return (NULL);
 	}
-
-	/* need to confirm tid is still there */
-	t = lxpr_get_thread(p, dlxpnp->lxpr_desc);
-	if (t == NULL) {
-		lxpr_unlock(p);
-		return (NULL);
-	}
-	thread_unlock(t);
 
 	/*
 	 * allocate and fill in the new lx /proc taskid dir node
@@ -5988,7 +5831,9 @@ lxpr_lookup_procdir(vnode_t *dp, char *comp)
 	if (*comp >= '0' && *comp <= '9') {
 		pid_t pid = 0;
 		lxpr_node_t *lxpnp = NULL;
+		vnode_t *vp;
 		proc_t *p;
+		kthread_t *t;
 		int c;
 
 		while ((c = *comp++) != '\0')
@@ -5998,7 +5843,7 @@ lxpr_lookup_procdir(vnode_t *dp, char *comp)
 		 * Can't continue if the process is still loading or it doesn't
 		 * really exist yet (or maybe it just died!)
 		 */
-		p = lxpr_lock(pid, ZOMB_OK);
+		p = lxpr_lock_pid(VTOLXP(dp), pid, ZOMB_OK, &t);
 		if (p == NULL)
 			return (NULL);
 
@@ -6008,16 +5853,20 @@ lxpr_lookup_procdir(vnode_t *dp, char *comp)
 		}
 
 		/*
-		 * allocate and fill in a new lx /proc node
+		 * Allocate and populate a new LX /proc node.
+		 *
+		 * Directory entries for non-main threads can be looked up as
+		 * /proc/<tid> despite the fact that they do not appear in the
+		 * readdir output.  Record the lookup pid (tid) so that later
+		 * operations can be aware of this context.
 		 */
-		lxpnp = lxpr_getnode(dp, LXPR_PIDDIR, p, 0);
+		lxpnp = lxpr_getnode(dp, LXPR_PIDDIR, p, pid);
 
 		lxpr_unlock(p);
+		vp = LXPTOV(lxpnp);
+		ASSERT(vp != NULL);
 
-		dp = LXPTOV(lxpnp);
-		ASSERT(dp != NULL);
-
-		return (dp);
+		return (vp);
 	}
 
 	/* Lookup fixed names */
@@ -6259,15 +6108,14 @@ lxpr_readdir_procdir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
 	ssize_t oresid;	/* save a copy for testing later */
 	ssize_t uresid;
 	off_t uoffset;
-	zoneid_t zoneid;
-	pid_t pid;
+	zone_t *zone;
 	int error;
 	int ceof;
 
 	ASSERT(lxpnp->lxpr_type == LXPR_PROCDIR);
 
 	oresid = uiop->uio_resid;
-	zoneid = LXPTOZ(lxpnp)->zone_id;
+	zone = LXPTOZ(lxpnp);
 
 	/*
 	 * We return directory entries in the order: "." and ".." then the
@@ -6292,6 +6140,7 @@ lxpr_readdir_procdir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
 	/* Do the process entries */
 	while ((uresid = uiop->uio_resid) > 0) {
 		proc_t *p;
+		pid_t pid, raw_pid;
 		int len;
 		int reclen;
 		int i;
@@ -6318,37 +6167,25 @@ lxpr_readdir_procdir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
 		 * us to look at.
 		 */
 		if ((p = pid_entry(i)) == NULL || p->p_stat == SIDL ||
-		    p->p_pid == 0 ||
+		    p->p_pid == 0 || p->p_zone != zone ||
 		    secpolicy_basic_procinfo(CRED(), p, curproc) != 0) {
 			mutex_exit(&pidlock);
 			goto next;
 		}
-		mutex_exit(&pidlock);
 
 		/*
 		 * Convert pid to the Linux default of 1 if we're the zone's
 		 * init process, or 0 if zsched, otherwise use the value from
 		 * the proc structure
 		 */
-		if (p->p_pid == curproc->p_zone->zone_proc_initpid) {
-			pid = 1;
-		} else if (p->p_pid == curproc->p_zone->zone_zsched->p_pid) {
-			pid = 0;
-		} else {
-			pid = p->p_pid;
-		}
-
-		/*
-		 * If this /proc was mounted in the global zone, view
-		 * all procs; otherwise, only view zone member procs.
-		 */
-		if (zoneid != GLOBAL_ZONEID && p->p_zone->zone_id != zoneid) {
-			goto next;
-		}
+		lxpr_fixpid(LXPTOZ(lxpnp), p, &pid, NULL);
+		raw_pid = p->p_pid;
 
 		ASSERT(p->p_stat != 0);
 
-		dirent->d_ino = lxpr_inode(LXPR_PIDDIR, pid, 0);
+		mutex_exit(&pidlock);
+
+		dirent->d_ino = lxpr_inode(LXPR_PIDDIR, raw_pid, 0);
 		len = snprintf(dirent->d_name, LXPNSIZ, "%d", pid);
 		ASSERT(len < LXPNSIZ);
 		reclen = DIRENT64_RECLEN(len);
@@ -6396,29 +6233,17 @@ static int
 lxpr_readdir_piddir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
 {
 	proc_t *p;
-	pid_t find_pid;
+	int err;
 
 	ASSERT(lxpnp->lxpr_type == LXPR_PIDDIR);
 
 	/* can't read its contents if it died */
-	mutex_enter(&pidlock);
-
-	if (lxpnp->lxpr_pid == 1) {
-		find_pid = curproc->p_zone->zone_proc_initpid;
-	} else if (lxpnp->lxpr_pid == 0) {
-		find_pid = curproc->p_zone->zone_zsched->p_pid;
-	} else {
-		find_pid = lxpnp->lxpr_pid;
-	}
-	p = prfind(find_pid);
-
-	if (p == NULL || p->p_stat == SIDL) {
-		mutex_exit(&pidlock);
+	if ((p = lxpr_lock(lxpnp, ZOMB_OK)) == NULL) {
 		return (ENOENT);
 	}
-	mutex_exit(&pidlock);
-
-	return (lxpr_readdir_common(lxpnp, uiop, eofp, piddir, PIDDIRFILES));
+	err = lxpr_readdir_common(lxpnp, uiop, eofp, piddir, PIDDIRFILES);
+	lxpr_unlock(p);
+	return (err);
 }
 
 static int
@@ -6439,7 +6264,6 @@ lxpr_readdir_taskdir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
 	off_t uoffset;
 	int error, ceof, tiddirsize, tasknum;
 	proc_t *p;
-	pid_t real_pid;
 	kthread_t *t;
 	boolean_t branded;
 
@@ -6447,13 +6271,8 @@ lxpr_readdir_taskdir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
 
 	oresid = uiop->uio_resid;
 
-	real_pid = get_real_pid(lxpnp->lxpr_pid);
-	p = lxpr_lock(real_pid, ZOMB_OK);
+	p = lxpr_lock(lxpnp, ZOMB_OK);
 	if (p == NULL) {
-		return (ENOENT);
-	}
-	if (p->p_stat == SIDL) {
-		lxpr_unlock(p);
 		return (ENOENT);
 	}
 
@@ -6535,7 +6354,7 @@ lxpr_readdir_taskdir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
 				emul_tid = 1;
 		}
 
-		dirent->d_ino = lxpr_inode(LXPR_PID_TASK_IDDIR, lxpnp->lxpr_pid,
+		dirent->d_ino = lxpr_inode(LXPR_PID_TASK_IDDIR, p->p_pid,
 		    emul_tid);
 		len = snprintf(dirent->d_name, LXPNSIZ, "%d", emul_tid);
 		ASSERT(len < LXPNSIZ);
@@ -6588,31 +6407,16 @@ static int
 lxpr_readdir_task_tid_dir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
 {
 	proc_t *p;
-	pid_t real_pid;
 	kthread_t *t;
 
 	ASSERT(lxpnp->lxpr_type == LXPR_PID_TASK_IDDIR);
 
-	mutex_enter(&pidlock);
-
-	real_pid = get_real_pid(lxpnp->lxpr_pid);
-	p = prfind(real_pid);
-
-	/* can't read its contents if it died */
-	if (p == NULL || p->p_stat == SIDL) {
-		mutex_exit(&pidlock);
+	/* Confirm that process and thread are still present */
+	p = lxpr_lock_pid(lxpnp, lxpnp->lxpr_desc, NO_ZOMB, &t);
+	if (p == NULL) {
 		return (ENOENT);
 	}
-
-	mutex_exit(&pidlock);
-
-	/* need to confirm tid is still there */
-	t = lxpr_get_thread(p, lxpnp->lxpr_desc);
-	if (t == NULL) {
-		/* we can't find this specific thread */
-		return (NULL);
-	}
-	thread_unlock(t);
+	lxpr_unlock(p);
 
 	return (lxpr_readdir_common(lxpnp, uiop, eofp, tiddir, TIDDIRFILES));
 }
@@ -6635,8 +6439,7 @@ lxpr_readdir_fddir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
 
 	oresid = uiop->uio_resid;
 
-	/* can't read its contents if it died */
-	p = lxpr_lock(lxpnp->lxpr_pid, ZOMB_OK);
+	p = lxpr_lock(lxpnp, ZOMB_OK);
 	if (p == NULL)
 		return (ENOENT);
 
@@ -6697,7 +6500,7 @@ lxpr_readdir_fddir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
 		if (fip->fi_list[fd].uf_file == NULL)
 			continue;
 
-		dirent->d_ino = lxpr_inode(LXPR_PID_FD_FD, lxpnp->lxpr_pid, fd);
+		dirent->d_ino = lxpr_inode(LXPR_PID_FD_FD, p->p_pid, fd);
 		len = snprintf(dirent->d_name, LXPNSIZ, "%d", fd);
 		ASSERT(len < LXPNSIZ);
 		reclen = DIRENT64_RECLEN(len);
@@ -7286,7 +7089,7 @@ lxpr_write_pid_loginuid(lxpr_node_t *lxpnp, struct uio *uio, struct cred *cr,
 	if (*ep != '\0')
 		return (EINVAL);
 
-	if ((p = lxpr_lock(lxpnp->lxpr_pid, NO_ZOMB)) == NULL)
+	if ((p = lxpr_lock(lxpnp, NO_ZOMB)) == NULL)
 		return (ENXIO);
 
 	if ((pd = ptolxproc(p)) != NULL) {
@@ -7353,15 +7156,7 @@ lxpr_readlink(vnode_t *vp, uio_t *uiop, cred_t *cr, caller_context_t *ct)
 			 * Convert pid to the Linux default of 1 if we're the
 			 * zone's init process or 0 if zsched.
 			 */
-			if (curproc->p_pid ==
-			    curproc->p_zone->zone_proc_initpid) {
-				pid = 1;
-			} else if (curproc->p_pid ==
-			    curproc->p_zone->zone_zsched->p_pid) {
-				pid = 0;
-			} else {
-				pid = curproc->p_pid;
-			}
+			lxpr_fixpid(LXPTOZ(lxpnp), curproc, &pid, NULL);
 
 			/*
 			 * Don't need to check result as every possible int
