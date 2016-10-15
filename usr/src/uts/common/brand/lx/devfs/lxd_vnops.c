@@ -589,31 +589,32 @@ lxd_create(vnode_t *dvp, char *nm, struct vattr *va, enum vcexcl exclusive,
 	rw_enter(&parent->lxdn_rwlock, RW_READER);
 	error = lxd_dirlookup(parent, nm, &lnp, cr);
 	rw_exit(&parent->lxdn_rwlock);
+
 	/*
-	 * If this vnode already exists in lx devfs, we should pass the create
-	 * operation through to the underlying resource it represents.  For
-	 * existing back nodes, the VOP_CREATE is done directly against the
-	 * returned lxd node with an empty name (to avoid a redunant lookup).
-	 * For existing front nodes, an appropriate error must be chosen since
-	 * they cannot represent regular files
+	 * If a back node already exists then there is no need to pass
+	 * the create to native devfs -- just set the vpp to the back
+	 * vnode. If the front node already exists then fail because
+	 * it can't represent a regular file. In both cases, enforce
+	 * open(2)'s EEXIST and EISDIR semantics.
 	 */
 	if (error == 0) {
-		if (lnp->lxdn_type == LXDNT_BACK) {
-			error = VOP_CREATE(lnp->lxdn_real_vp, "\0", va,
-			    exclusive, mode, vpp, cr, flag, ct, vsecp);
-		} else {
-			if (exclusive == EXCL) {
-				error = EEXIST;
-			} else if (LDNTOV(lnp)->v_type == VDIR &&
-			    (mode & S_IWRITE)) {
-				error = EISDIR;
-			} else {
-				error = ENOTSUP;
-			}
+		if (exclusive == EXCL) {
+			error = EEXIST;
+		} else if (LDNTOV(lnp)->v_type == VDIR &&
+		    (mode & S_IWRITE)) {
+			error = EISDIR;
+		} else if (lnp->lxdn_type == LXDNT_FRONT) {
+			error = ENOTSUP;
 		}
+
 		if (error != 0) {
 			ldnode_rele(lnp);
+			return (error);
 		}
+
+		VERIFY3S(lnp->lxdn_type, ==, LXDNT_BACK);
+		*vpp = lnp->lxdn_vnode;
+
 		return (error);
 	}
 
@@ -655,9 +656,9 @@ lxd_create(vnode_t *dvp, char *nm, struct vattr *va, enum vcexcl exclusive,
 	}
 
 	/*
-	 * While we don't allow create data-containing files under LX devfs, we
-	 * must allow VSOCK front nodes to be created so that paths such as
-	 * /dev/log can be used as AF_UNIX sockets.
+	 * While we don't allow creating data-containing files under
+	 * lx devfs, we must allow VSOCK front nodes to be created so
+	 * that paths such as /dev/log can be used as AF_UNIX sockets.
 	 */
 	if (va->va_type == VSOCK) {
 		lxd_mnt_t *lxdm = VTOLXDM(parent->lxdn_vnode);
