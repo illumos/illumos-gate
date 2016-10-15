@@ -25,7 +25,6 @@ usr/src/boot is the root directory of the imported snapshot,
 containing Makefile and licence notes for build and packaging.
 
 Directories from freebsd userland (freebsd /usr/src tree):
-contrib
 include
 lib
 
@@ -44,9 +43,6 @@ sys/ufs
 
 zfs boot module import in freebsd:
 sys/cddl 
-
-acpica module import in freebsd:
-sys/contrib
 
 boot loader sources are in:
 sys/boot
