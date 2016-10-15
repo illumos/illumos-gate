@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -560,7 +560,7 @@ out:
  */
 static int
 futex_requeue(memid_t *memid, memid_t *requeue_memid, int wake_threads,
-	ulong_t requeue_threads, caddr_t addr, int *cmpval)
+    ulong_t requeue_threads, caddr_t addr, int *cmpval)
 {
 	fwaiter_t *fwp, *next;
 	int index1, index2;
@@ -707,7 +707,7 @@ get_timeout(void *lx_timeout, timestruc_t *timeout, int cmd, int clock)
 
 long
 lx_futex(uintptr_t addr, int op, int val, uintptr_t lx_timeout,
-	uintptr_t addr2, int val3)
+    uintptr_t addr2, int val3)
 {
 	struct as *as = curproc->p_as;
 	memid_t memid, memid2;
@@ -999,12 +999,10 @@ long
 lx_get_robust_list(pid_t pid, void **listp, size_t *lenp)
 {
 	model_t model = get_udatamodel();
-	pid_t rpid;
-	id_t rtid;
 	proc_t *rproc;
+	kthread_t *rthr;
 	klwp_t *rlwp;
 	lx_lwp_data_t *rlwpd;
-	kthread_t *rthr;
 	void *list;
 	int err = 0;
 
@@ -1020,16 +1018,11 @@ lx_get_robust_list(pid_t pid, void **listp, size_t *lenp)
 		mutex_enter(&curproc->p_lock);
 		sprlock_proc(rproc);
 	} else {
-		if (lx_lpid_to_spair(pid, &rpid, &rtid) != 0 ||
-		    (rproc = sprlock(rpid)) == NULL) {
-			/*
-			 * We couldn't find the specified process.
-			 */
+		if (lx_lpid_lock(pid, curzone, PRLOCK, &rproc, &rthr) != 0) {
 			return (set_errno(ESRCH));
 		}
 
 		if (rproc->p_model != model ||
-		    (rthr = idtot(rproc, rtid)) == NULL ||
 		    (rlwp = ttolwp(rthr)) == NULL ||
 		    (rlwpd = lwptolxlwp(rlwp)) == NULL) {
 			/*

@@ -399,8 +399,6 @@ static int
 lx_ptrace_accord_get_by_pid(pid_t lxpid, lx_ptrace_accord_t **accordp)
 {
 	int ret = ESRCH;
-	pid_t apid;
-	id_t atid;
 	proc_t *aproc;
 	kthread_t *athr;
 	klwp_t *alwp;
@@ -412,8 +410,7 @@ lx_ptrace_accord_get_by_pid(pid_t lxpid, lx_ptrace_accord_t **accordp)
 	 * Locate the process containing the tracer LWP based on its Linux pid
 	 * and lock it.
 	 */
-	if (lx_lpid_to_spair(lxpid, &apid, &atid) != 0 ||
-	    (aproc = sprlock(apid)) == NULL) {
+	if (lx_lpid_lock(lxpid, curzone, PRLOCK, &aproc, &athr) != 0) {
 		return (ESRCH);
 	}
 
@@ -421,8 +418,7 @@ lx_ptrace_accord_get_by_pid(pid_t lxpid, lx_ptrace_accord_t **accordp)
 	 * Locate the tracer LWP itself and ensure that it is visible to
 	 * ptrace(2).
 	 */
-	if ((athr = idtot(aproc, atid)) == NULL ||
-	    (alwp = ttolwp(athr)) == NULL ||
+	if ((alwp = ttolwp(athr)) == NULL ||
 	    (alwpd = lwptolxlwp(alwp)) == NULL ||
 	    !VISIBLE(alwpd)) {
 		sprunlock(aproc);
@@ -988,8 +984,6 @@ lx_ptrace_attach(pid_t lx_pid)
 	/*
 	 * Remote (Tracee) LWP:
 	 */
-	pid_t rpid;
-	id_t rtid;
 	proc_t *rproc;
 	kthread_t *rthr;
 	klwp_t *rlwp;
@@ -1020,8 +1014,7 @@ lx_ptrace_attach(pid_t lx_pid)
 	 * Locate the process containing the tracee LWP based on its Linux pid
 	 * and lock it.
 	 */
-	if (lx_lpid_to_spair(lx_pid, &rpid, &rtid) != 0 ||
-	    (rproc = sprlock(rpid)) == NULL) {
+	if (lx_lpid_lock(lx_pid, curzone, PRLOCK, &rproc, &rthr) != 0) {
 		/*
 		 * We could not find the target process.
 		 */
@@ -1031,8 +1024,7 @@ lx_ptrace_attach(pid_t lx_pid)
 	/*
 	 * Locate the tracee LWP.
 	 */
-	if ((rthr = idtot(rproc, rtid)) == NULL ||
-	    (rlwp = ttolwp(rthr)) == NULL ||
+	if ((rlwp = ttolwp(rthr)) == NULL ||
 	    (rlwpd = lwptolxlwp(rlwp)) == NULL ||
 	    !VISIBLE(rlwpd)) {
 		/*

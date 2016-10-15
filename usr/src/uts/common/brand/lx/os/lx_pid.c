@@ -22,7 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2015, Joyent, Inc.
+ * Copyright 2016, Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -51,15 +51,15 @@ static kmutex_t hash_lock;
 static void
 lx_pid_insert_hash(struct lx_pid *lpidp)
 {
-	int shash = STOL_HASH(lpidp->s_pid, lpidp->s_tid);
-	int lhash = LTOS_HASH(lpidp->l_pid);
+	int shash = STOL_HASH(lpidp->lxp_spid, lpidp->lxp_stid);
+	int lhash = LTOS_HASH(lpidp->lxp_lpid);
 
 	ASSERT(MUTEX_HELD(&hash_lock));
 
-	lpidp->stol_next = stol_pid_hash[shash];
+	lpidp->lxp_stol_next = stol_pid_hash[shash];
 	stol_pid_hash[shash] = lpidp;
 
-	lpidp->ltos_next = ltos_pid_hash[lhash];
+	lpidp->lxp_ltos_next = ltos_pid_hash[lhash];
 	ltos_pid_hash[lhash] = lpidp;
 }
 
@@ -73,12 +73,12 @@ lx_pid_remove_hash(pid_t pid, id_t tid)
 
 	hpp = &stol_pid_hash[STOL_HASH(pid, tid)];
 	while (*hpp) {
-		if ((*hpp)->s_pid == pid && (*hpp)->s_tid == tid) {
+		if ((*hpp)->lxp_spid == pid && (*hpp)->lxp_stid == tid) {
 			lpidp = *hpp;
-			*hpp = (*hpp)->stol_next;
+			*hpp = (*hpp)->lxp_stol_next;
 			break;
 		}
-		hpp = &(*hpp)->stol_next;
+		hpp = &(*hpp)->lxp_stol_next;
 	}
 
 	/*
@@ -88,13 +88,13 @@ lx_pid_remove_hash(pid_t pid, id_t tid)
 	if (lpidp == NULL)
 		return (NULL);
 
-	hpp = &ltos_pid_hash[LTOS_HASH(lpidp->l_pid)];
+	hpp = &ltos_pid_hash[LTOS_HASH(lpidp->lxp_lpid)];
 	while (*hpp) {
 		if (*hpp == lpidp) {
-			*hpp = lpidp->ltos_next;
+			*hpp = lpidp->lxp_ltos_next;
 			break;
 		}
-		hpp = &(*hpp)->ltos_next;
+		hpp = &(*hpp)->lxp_ltos_next;
 	}
 
 	return (lpidp);
@@ -108,8 +108,8 @@ lx_pid_assign(kthread_t *t, struct lx_pid *lpidp)
 {
 	proc_t *p = ttoproc(t);
 	lx_lwp_data_t *lwpd = ttolxlwp(t);
-	pid_t s_pid = p->p_pid;
-	id_t s_tid = t->t_tid;
+	pid_t spid = p->p_pid;
+	id_t stid = t->t_tid;
 
 	/*
 	 * When lx_initlwp is called from lx_setbrand, p_lwpcnt will already be
@@ -121,35 +121,36 @@ lx_pid_assign(kthread_t *t, struct lx_pid *lpidp)
 	if (p->p_lwpcnt > 0 && lwpd->br_ppid != 0) {
 		/*
 		 * Assign allocated pid to any thread other than the first.
-		 * The l_pid and l_pidp fields should be populated.
+		 * The lpid and pidp fields should be populated.
 		 */
-		VERIFY(lpidp->l_pidp != NULL);
-		VERIFY(lpidp->l_pid != 0);
+		VERIFY(lpidp->lxp_pidp != NULL);
+		VERIFY(lpidp->lxp_lpid != 0);
 	} else {
 		/*
 		 * There are cases where a pid is speculatively allocated but
 		 * is not needed.  We are obligated to free it here.
 		 */
-		if (lpidp->l_pidp != NULL) {
-			(void) pid_rele(lpidp->l_pidp);
+		if (lpidp->lxp_pidp != NULL) {
+			(void) pid_rele(lpidp->lxp_pidp);
 		}
-		lpidp->l_pidp = NULL;
-		lpidp->l_pid = s_pid;
+		lpidp->lxp_pidp = NULL;
+		lpidp->lxp_lpid = spid;
 	}
 
-	lpidp->s_pid = s_pid;
-	lpidp->s_tid = s_tid;
-	lpidp->l_start = t->t_start;
+	lpidp->lxp_spid = spid;
+	lpidp->lxp_stid = stid;
+	lpidp->lxp_start = t->t_start;
+	lpidp->lxp_procp = p;
 
 	/*
-	 * now put the pid into the linux-solaris and solaris-linux
-	 * conversion hash tables
+	 * Now place the pid into the Linux-SunOS and SunOS-Linux conversion
+	 * hash tables.
 	 */
 	mutex_enter(&hash_lock);
 	lx_pid_insert_hash(lpidp);
 	mutex_exit(&hash_lock);
 
-	lwpd->br_pid = lpidp->l_pid;
+	lwpd->br_pid = lpidp->lxp_lpid;
 }
 
 /*
@@ -172,15 +173,15 @@ lx_pid_reassign(kthread_t *t)
 	 */
 	lpidp = lx_pid_remove_hash(p->p_pid, t->t_tid);
 	ASSERT(lpidp != NULL);
-	old_pidp = lpidp->l_pidp;
-	lpidp->l_pidp = NULL;
+	old_pidp = lpidp->lxp_pidp;
+	lpidp->lxp_pidp = NULL;
 
 	/*
 	 * Now register this thread as (pid, 1).
 	 */
-	lpidp->l_pid = p->p_pid;
-	lpidp->s_pid = p->p_pid;
-	lpidp->s_tid = 1;
+	lpidp->lxp_lpid = p->p_pid;
+	lpidp->lxp_spid = p->p_pid;
+	lpidp->lxp_stid = 1;
 	lx_pid_insert_hash(lpidp);
 
 	mutex_exit(&hash_lock);
@@ -202,8 +203,8 @@ lx_pid_rele(pid_t pid, id_t tid)
 	mutex_exit(&hash_lock);
 
 	if (lpidp) {
-		if (lpidp->l_pidp)
-			(void) pid_rele(lpidp->l_pidp);
+		if (lpidp->lxp_pidp)
+			(void) pid_rele(lpidp->lxp_pidp);
 
 		kmem_free(lpidp, sizeof (*lpidp));
 	}
@@ -213,11 +214,11 @@ lx_pid_rele(pid_t pid, id_t tid)
  * given a linux pid, return the solaris pid/tid pair
  */
 int
-lx_lpid_to_spair(pid_t l_pid, pid_t *s_pid, id_t *s_tid)
+lx_lpid_to_spair(pid_t lpid, pid_t *spid, id_t *stid)
 {
 	struct lx_pid *hp;
 
-	if (l_pid == 1) {
+	if (lpid == 1) {
 		pid_t initpid;
 
 		/*
@@ -231,21 +232,22 @@ lx_lpid_to_spair(pid_t l_pid, pid_t *s_pid, id_t *s_tid)
 			return (-1);
 		}
 
-		if (s_pid != NULL)
-			*s_pid = initpid;
-		if (s_tid != NULL)
-			*s_tid = 1;
+		if (spid != NULL)
+			*spid = initpid;
+		if (stid != NULL)
+			*stid = 1;
 
 		return (0);
 	}
 
 	mutex_enter(&hash_lock);
-	for (hp = ltos_pid_hash[LTOS_HASH(l_pid)]; hp; hp = hp->ltos_next) {
-		if (l_pid == hp->l_pid) {
-			if (s_pid)
-				*s_pid = hp->s_pid;
-			if (s_tid)
-				*s_tid = hp->s_tid;
+	for (hp = ltos_pid_hash[LTOS_HASH(lpid)]; hp != NULL;
+	    hp = hp->lxp_ltos_next) {
+		if (hp->lxp_lpid == lpid) {
+			if (spid)
+				*spid = hp->lxp_spid;
+			if (stid)
+				*stid = hp->lxp_stid;
 			break;
 		}
 	}
@@ -261,18 +263,120 @@ lx_lpid_to_spair(pid_t l_pid, pid_t *s_pid, id_t *s_tid)
 	 * Note that prfind() only searches for processes in the current zone.
 	 */
 	mutex_enter(&pidlock);
-	if (prfind(l_pid) != NULL) {
+	if (prfind(lpid) != NULL) {
 		mutex_exit(&pidlock);
-		if (s_pid)
-			*s_pid = l_pid;
-		if (s_tid)
-			*s_tid = 0;
+		if (spid)
+			*spid = lpid;
+		if (stid)
+			*stid = 0;
 		return (0);
 	}
 	mutex_exit(&pidlock);
 
 	return (-1);
 }
+
+/*
+ * Given a Linux pid, locate the proc_t and optionally acquire P_PR_LOCK.
+ * Returns 0 on success with p_lock held for the proc_t in question.
+ */
+int
+lx_lpid_lock(pid_t lpid, zone_t *zone, lx_pid_flag_t flag, proc_t **pp,
+    kthread_t **tp)
+{
+	proc_t *p = NULL;
+	kthread_t *t;
+	id_t tid = 0;
+
+	ASSERT(MUTEX_NOT_HELD(&pidlock));
+	ASSERT(pp != NULL);
+	ASSERT(zone != NULL && zone->zone_brand == &lx_brand);
+
+retry:
+	if (lpid == 1) {
+		pid_t initpid;
+
+		/*
+		 * Look up the init process for the zone.
+		 */
+		if ((initpid = zone->zone_proc_initpid) <= 0) {
+			return (-1);
+		}
+		mutex_enter(&pidlock);
+		p = prfind_zone(initpid, zone->zone_id);
+		tid = 0;
+	} else {
+		struct lx_pid *hp;
+
+		mutex_enter(&pidlock);
+		mutex_enter(&hash_lock);
+		for (hp = ltos_pid_hash[LTOS_HASH(lpid)]; hp != NULL;
+		    hp = hp->lxp_ltos_next) {
+			if (hp->lxp_lpid == lpid) {
+				tid = hp->lxp_stid;
+				p = hp->lxp_procp;
+				break;
+			}
+		}
+		mutex_exit(&hash_lock);
+		/*
+		 * If the pid wasn't listed in the ltos hash, it may correspond
+		 * to an native process in the zone.
+		 */
+		if (p == NULL) {
+			p = prfind_zone(lpid, zone->zone_id);
+			tid = 0;
+		}
+	}
+
+	if (p == NULL) {
+		mutex_exit(&pidlock);
+		return (-1);
+	}
+
+	/* Bail on system processes or those which are incomplete */
+	if (p->p_stat == SIDL || (p->p_flag & SSYS) != 0) {
+		mutex_exit(&pidlock);
+		return (-1);
+	}
+	mutex_enter(&p->p_lock);
+	mutex_exit(&pidlock);
+
+	if (flag == PRLOCK) {
+		int res;
+
+		res = sprtrylock_proc(p);
+		if (res < 0) {
+			mutex_exit(&p->p_lock);
+			return (-1);
+		} else if (res > 0) {
+			sprwaitlock_proc(p);
+			goto retry;
+		}
+	}
+
+	if (tid == 0) {
+		t = p->p_tlist;
+	} else {
+		lwpdir_t *ld;
+
+		ld = lwp_hash_lookup(p, tid);
+		if (ld == NULL) {
+			if (flag == PRLOCK) {
+				sprunprlock(p);
+			}
+			mutex_exit(&p->p_lock);
+			return (-1);
+		}
+		t = ld->ld_entry->le_thread;
+	}
+	*pp = p;
+	if (tp != NULL) {
+		*tp = t;
+	}
+	return (0);
+}
+
 
 /*
  * Given an lwp, return the Linux pid of its parent.  If the caller
@@ -338,23 +442,23 @@ lx_lwp_ppid(klwp_t *lwp, pid_t *ppidp, id_t *ptidp)
 		 * thread was created.
 		 */
 		mutex_enter(&hash_lock);
-		for (hp = ltos_pid_hash[LTOS_HASH(lwpd->br_ppid)]; hp;
-		    hp = hp->ltos_next) {
-			if (lwpd->br_ppid == hp->l_pid) {
+		for (hp = ltos_pid_hash[LTOS_HASH(lwpd->br_ppid)]; hp != NULL;
+		    hp = hp->lxp_ltos_next) {
+			if (lwpd->br_ppid == hp->lxp_lpid) {
 				/*
 				 * We found the PID we were looking for, but
 				 * since we cached its value in this LWP's brand
 				 * structure, it has exited and been reused by
 				 * another process.
 				 */
-				if (hp->l_start > lwptot(lwp)->t_start)
+				if (hp->lxp_start > lwptot(lwp)->t_start)
 					break;
 
 				lppid = lwpd->br_ppid;
 				if (ppidp != NULL)
-					*ppidp = hp->s_pid;
+					*ppidp = hp->lxp_spid;
 				if (ptidp != NULL)
-					*ptidp = hp->s_tid;
+					*ptidp = hp->lxp_stid;
 
 				break;
 			}

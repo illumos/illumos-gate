@@ -253,7 +253,6 @@ struct lx_termios {
 /* VSD key for lx_cc information */
 static uint_t lx_ioctl_vsd = 0;
 
-extern int lx_lpid_to_spair(pid_t l_pid, pid_t *s_pid, id_t *s_tid);
 
 /* Terminal helpers */
 

@@ -438,13 +438,14 @@ typedef enum lx_stack_mode {
 } lx_stack_mode_t;
 
 struct lx_pid {
-	pid_t	s_pid;			/* the SunOS pid and ... */
-	id_t	s_tid;			/* ... tid pair */
-	pid_t	l_pid;			/* the corresponding linux pid */
-	time_t	l_start;		/* birthday of this pid */
-	struct pid *l_pidp;
-	struct lx_pid *stol_next;	/* link in stol hash table */
-	struct lx_pid *ltos_next;	/* link in ltos hash table */
+	pid_t		lxp_spid;	/* the SunOS pid and ... */
+	id_t		lxp_stid;	/* ... tid pair */
+	pid_t		lxp_lpid;	/* the corresponding linux pid */
+	time_t		lxp_start;	/* birthday of this pid */
+	struct pid	*lxp_pidp;	/* allocated pid struct */
+	proc_t		*lxp_procp;	/* proc_t corresponding to lxp_spid */
+	struct lx_pid	*lxp_stol_next;	/* link in stol hash table */
+	struct lx_pid	*lxp_ltos_next;	/* link in ltos hash table */
 };
 
 /*
@@ -646,10 +647,17 @@ extern void lx_emulate_user32(klwp_t *, int, uintptr_t *);
 extern int lx_debug;
 #define	lx_print	if (lx_debug) printf
 
+typedef enum {
+	NO_PRLOCK,
+	PRLOCK
+} lx_pid_flag_t;
+
 extern void lx_pid_assign(kthread_t *, struct lx_pid *);
 extern void lx_pid_reassign(kthread_t *);
 extern void lx_pid_rele(pid_t, id_t);
 extern pid_t lx_lpid_to_spair(pid_t, pid_t *, id_t *);
+extern int lx_lpid_lock(pid_t, zone_t *, lx_pid_flag_t, proc_t **,
+    kthread_t **);
 extern pid_t lx_lwp_ppid(klwp_t *, pid_t *, id_t *);
 extern void lx_pid_init(void);
 extern void lx_pid_fini(void);

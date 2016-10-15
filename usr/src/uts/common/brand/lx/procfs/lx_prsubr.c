@@ -35,6 +35,8 @@
 #include <sys/vmsystm.h>
 #include <sys/prsystm.h>
 #include <sys/zfs_ioctl.h>
+#include <sys/brand.h>
+#include <sys/lx_brand.h>
 
 #include "lx_proc.h"
 
@@ -188,83 +190,147 @@ lxpr_uiobuf_printf(struct lxpr_uiobuf *uiobuf, const char *fmt, ...)
 }
 
 /*
- * lxpr_lock():
- *
- * Lookup process from pid and return with p_plock and P_PR_LOCK held.
+ * Lookup process, potentially constrained by pid associated with lxpr_node and
+ * return with p_lock and P_PR_LOCK held.
  */
 proc_t *
-lxpr_lock(pid_t pid, zombok_t zombie_ok)
+lxpr_lock_pid(lxpr_node_t *lxpnp, pid_t pid, zombok_t zombie_ok,
+    kthread_t **tp)
 {
+	zone_t *zone = LXPTOZ(lxpnp);
 	proc_t *p;
-	kmutex_t *mp;
-	pid_t find_pid;
-	uint_t flags;
+	kthread_t *t;
 
 	ASSERT(!MUTEX_HELD(&pidlock));
 
-	for (;;) {
-		mutex_enter(&pidlock);
-
+retry:
+	if (pid == 0) {
 		/*
-		 * If the pid is 1, we really want the zone's init process;
-		 * if 0 we want zsched.
+		 * Present zsched as pid 0 for the zone.  There is no worry
+		 * about zsched disappearing during sprlock_proc() since the
+		 * zone (and zsched) will persist until all zone filesystems,
+		 * include this one, are unmounted.
 		 */
-		if (pid == 1) {
-			find_pid = curproc->p_zone->zone_proc_initpid;
-		} else if (pid == 0) {
-			find_pid = curproc->p_zone->zone_zsched->p_pid;
-		} else {
-			find_pid = pid;
-		}
-		p = prfind(find_pid);
-
-		if (p == NULL || p->p_stat == SIDL) {
-			mutex_exit(&pidlock);
+		p = zone->zone_zsched;
+		mutex_enter(&p->p_lock);
+		sprlock_proc(p);
+	} else {
+		if (lx_lpid_lock(pid, zone, PRLOCK, &p, &t) != 0) {
 			return (NULL);
 		}
-
-		/*
-		 * p_lock is persistent, but p itself is not -- it could
-		 * vanish during cv_wait().  Load p->p_lock now so we can
-		 * drop it after cv_wait() without referencing p.
-		 */
-		mp = &p->p_lock;
-		mutex_enter(mp);
-
-		mutex_exit(&pidlock);
-
-		/*
-		 * Filter out exiting or zombie processes, if requested.
-		 */
-		if (zombie_ok == NO_ZOMB &&
-		    ((p->p_flag & SEXITING) || p->p_stat == SZOMB)) {
-			mutex_exit(mp);
-			return (NULL);
-		}
-
-		flags = p->p_proc_flag & (P_PR_LOCK | P_PR_EXEC);
-		if (flags == 0) {
-			break;
-		} else if (flags == P_PR_EXEC && p == curproc) {
-			/*
-			 * Forward progress with (only) the PR_EXEC flag is
-			 * safe if a process is accessing resources in its own
-			 * piddir.  Executing its own /proc/<pid>/exe symlink
-			 * is one potential example.
-			 *
-			 * For all other processes, it is necessary to wait
-			 * until the exec is completed.
-			 */
-			break;
-		}
-
-		cv_wait(&pr_pid_cv[p->p_slot], mp);
-		mutex_exit(mp);
 	}
 
-	p->p_proc_flag |= P_PR_LOCK;
-	THREAD_KPRI_REQUEST();
+	/*
+	 * Make sure that thread lookups (where non-main LX threads are
+	 * assigned a pid not equal to the encompassing parent) match the pid
+	 * of the encompasing directory.
+	 *
+	 * This is necessary to constrain paths such as /proc/<pid>/task/<tid>.
+	 */
+	if (lxpnp->lxpr_pid != 0 && lxpnp->lxpr_pid != pid) {
+		klwp_t *lwp;
+		lx_lwp_data_t *lwpd;
+
+		/*
+		 * Only LWPs of branded processes will be accessible this way.
+		 * The threads of native processes lack pid assignments which
+		 * LX uses to emulate Linux's weird thread/process model.
+		 */
+		if ((lwp = ttolwp(t)) == NULL ||
+		    (lwpd = lwptolxlwp(lwp)) == NULL ||
+		    lwpd->br_pid != pid) {
+			sprunlock(p);
+			return (NULL);
+		}
+	}
+
+	if (zombie_ok == NO_ZOMB &&
+	    ((p->p_flag & SEXITING) || p->p_stat == SZOMB)) {
+		sprunlock(p);
+		return (NULL);
+	}
+
+	/*
+	 * Accessing a process which is undergoing exec(2) is somewhat risky.
+	 * In particular, the p_exec field is updated outside p_lock.  To avoid
+	 * this mess, access is denied when P_PR_EXEC set unless the caller
+	 * happens to be the process itself.  This allows actions such as
+	 * re-exec()-ing /proc/<pid>/exe to make forward progress.
+	 *
+	 * All other callers must block until the flag is cleared.
+	 */
+	if ((p->p_proc_flag & P_PR_EXEC) != 0) {
+		if (p != curproc) {
+			kmutex_t *mp;
+
+			/*
+			 * Drop PR_LOCK and wait for the exec() to ping the CV
+			 * once it has completed.  Afterward, the pid is looked
+			 * up again in case the process exited for some reason.
+			 */
+			mp = &p->p_lock;
+			sprunprlock(p);
+			cv_wait(&pr_pid_cv[p->p_slot], mp);
+			mutex_exit(mp);
+			goto retry;
+		}
+	}
+
+	if (tp != NULL) {
+		*tp = t;
+	}
 	return (p);
+}
+
+
+/*
+ * Lookup process from pid associated with lxpr_node and return with p_lock and
+ * P_PR_LOCK held.
+ */
+proc_t *
+lxpr_lock(lxpr_node_t *lxpnp, zombok_t zombie_ok)
+{
+	return (lxpr_lock_pid(lxpnp, lxpnp->lxpr_pid, zombie_ok, NULL));
+}
+
+void
+lxpr_fixpid(zone_t *zone, proc_t *p, pid_t *pidp, pid_t *ppidp)
+{
+	pid_t pid = p->p_pid;
+	pid_t ppid = p->p_ppid;
+
+	ASSERT(p != NULL);
+	ASSERT(pidp != NULL);
+	ASSERT(zone->zone_brand == &lx_brand);
+
+	if (pid == zone->zone_proc_initpid) {
+		pid = 1;
+		ppid = 0;	/* parent pid for init is 0 */
+	} else if (pid == zone->zone_zsched->p_pid) {
+		pid = 0;	/* zsched is pid 0 */
+		ppid = 0;	/* parent pid for zsched is itself */
+	} else {
+		/*
+		 * Make sure not to reference parent PIDs that reside outside
+		 * the zone
+		 */
+		if ((p->p_flag & SZONETOP) != 0) {
+			ppid = 0;
+		}
+
+		/*
+		 * Convert ppid to the Linux default of 1 if our parent is the
+		 * zone's init process
+		 */
+		if (ppid == zone->zone_proc_initpid) {
+			ppid = 1;
+		}
+	}
+
+	*pidp = pid;
+	if (ppidp != NULL) {
+		*ppidp = ppid;
+	}
 }
 
 /*
@@ -334,12 +400,6 @@ lxpr_node_destructor(void *buf, void *un)
 ino_t
 lxpr_inode(lxpr_nodetype_t type, pid_t pid, int desc)
 {
-	if (pid == 1) {
-		pid = curproc->p_zone->zone_proc_initpid;
-	} else if (pid == 0) {
-		pid = curproc->p_zone->zone_zsched->p_pid;
-	}
-
 	switch (type) {
 	case LXPR_PIDDIR:
 		return (maxpid + pid + 1);
@@ -388,7 +448,7 @@ lxpr_getnode(vnode_t *dp, lxpr_nodetype_t type, proc_t *p, int desc)
 	timestruc_t now;
 
 	/*
-	 * Allocate a new node. It is deallocated in vop_innactive
+	 * Allocate a new node. It is deallocated in vop_inactive
 	 */
 	lxpnp = kmem_cache_alloc(lxpr_node_cache, KM_SLEEP);
 
@@ -402,14 +462,13 @@ lxpr_getnode(vnode_t *dp, lxpr_nodetype_t type, proc_t *p, int desc)
 	lxpnp->lxpr_desc = desc;
 	VN_HOLD(dp);
 	if (p != NULL) {
-		if (p->p_pid == curproc->p_zone->zone_proc_initpid) {
-			lxpnp->lxpr_pid = 1;
-		} else if (p->p_pid == curproc->p_zone->zone_zsched->p_pid) {
-			lxpnp->lxpr_pid = 0;
-		} else {
-			lxpnp->lxpr_pid = p->p_pid;
-		}
+		lxpr_node_t *dlxpnp = VTOLXP(dp);
 
+		lxpnp->lxpr_pid = p->p_pid;
+		/* Propagate the tid whenever possible. */
+		if (desc == 0 && dlxpnp->lxpr_desc != 0) {
+			lxpnp->lxpr_desc = dlxpnp->lxpr_desc;
+		}
 		lxpnp->lxpr_time = PTOU(p)->u_start;
 		lxpnp->lxpr_uid = crgetruid(p->p_cred);
 		lxpnp->lxpr_gid = crgetrgid(p->p_cred);
@@ -630,12 +689,12 @@ lxpr_lookup_fdnode(vnode_t *dvp, const char *name)
 	}
 
 	/* Lock the owner process */
-	p = lxpr_lock(lxdp->lxpr_pid, NO_ZOMB);
-	if ((p == NULL))
+	if ((p = lxpr_lock(lxdp, NO_ZOMB)) == NULL) {
 		return (NULL);
+	}
 
 	/* Not applicable to processes which are system-owned. */
-	if ((p->p_flag & SSYS) || (p->p_as == &kas)) {
+	if (p->p_as == &kas) {
 		lxpr_unlock(p);
 		return (NULL);
 	}

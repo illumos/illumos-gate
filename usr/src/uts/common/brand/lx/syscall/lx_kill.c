@@ -45,20 +45,26 @@ extern int kill(pid_t, int);
  * 1.
  */
 static int
-init_sig_check(int sig, pid_t pid)
+lx_init_sig_check(int sig, pid_t pid)
 {
 	proc_t *p;
 	int rv = 0;
 
 	mutex_enter(&pidlock);
-
-	if (((p = prfind(pid)) == NULL) || (p->p_stat == SIDL))
+	if ((p = prfind(pid)) == NULL || p->p_stat == SIDL) {
 		rv = ESRCH;
-	else if (sig && (sigismember(&cantmask, sig) ||
-	    (PTOU(p)->u_signal[sig-1] == SIG_DFL) ||
-	    (PTOU(p)->u_signal[sig-1] == SIG_IGN)))
-		rv = EPERM;
-
+	} else if (sig != 0) {
+		if (sigismember(&cantmask, sig)) {
+			rv = EPERM;
+		} else {
+			mutex_enter(&p->p_lock);
+			if (PTOU(p)->u_signal[sig-1] == SIG_DFL ||
+			    PTOU(p)->u_signal[sig-1] == SIG_IGN) {
+				rv = EPERM;
+			}
+			mutex_exit(&p->p_lock);
+		}
+	}
 	mutex_exit(&pidlock);
 
 	return (rv);
@@ -69,9 +75,7 @@ lx_thrkill(pid_t tgid, pid_t pid, int lx_sig, boolean_t tgkill)
 {
 	kthread_t *t;
 	proc_t *pp, *cp = curproc;
-	pid_t initpid;
 	sigqueue_t *sqp;
-	int tid = 1;	/* default tid */
 	int sig, rv;
 
 	/*
@@ -90,30 +94,33 @@ lx_thrkill(pid_t tgid, pid_t pid, int lx_sig, boolean_t tgkill)
 	 *
 	 * Otherwise, extract the tid and real pid from the Linux pid.
 	 */
-	initpid = cp->p_zone->zone_proc_initpid;
-	if (pid == 1)
-		pid = initpid;
-	if ((pid == initpid) && ((rv = init_sig_check(sig, pid)) != 0))
-		return (set_errno(rv));
-	else if (lx_lpid_to_spair(pid, &pid, &tid) < 0)
-		return (set_errno(ESRCH));
+	if (pid == 1) {
+		pid_t initpid;
 
-	if (tgkill && tgid != pid)
-		return (set_errno(ESRCH));
-
+		initpid = cp->p_zone->zone_proc_initpid;
+		if ((rv = lx_init_sig_check(sig, initpid)) != 0) {
+			return (set_errno(rv));
+		}
+	}
 	sqp = kmem_zalloc(sizeof (sigqueue_t), KM_SLEEP);
-
 	/*
 	 * Find the process for the passed pid...
 	 */
-	mutex_enter(&pidlock);
-	if (((pp = prfind(pid)) == NULL) || (pp->p_stat == SIDL)) {
-		mutex_exit(&pidlock);
+	if (lx_lpid_lock(pid, curzone, NO_PRLOCK, &pp, &t) != 0) {
 		rv = set_errno(ESRCH);
 		goto free_and_exit;
 	}
-	mutex_enter(&pp->p_lock);
-	mutex_exit(&pidlock);
+
+	/*
+	 * Make sure the thread group matches the thread.
+	 */
+	if (tgkill) {
+		if ((pid == 1 && tgid != 1) ||
+		    (pid != 1 && tgid != pp->p_pid)) {
+			rv = set_errno(ESRCH);
+			goto free_and_exit;
+		}
+	}
 
 	/*
 	 * Deny permission to send the signal if either of the following
@@ -129,13 +136,6 @@ lx_thrkill(pid_t tgid, pid_t pid, int lx_sig, boolean_t tgkill)
 	    (!prochasprocperm(pp, cp, CRED()))) {
 		mutex_exit(&pp->p_lock);
 		rv = set_errno(EPERM);
-		goto free_and_exit;
-	}
-
-	/* check for the tid */
-	if ((t = idtot(pp, tid)) == NULL) {
-		mutex_exit(&pp->p_lock);
-		rv = set_errno(ESRCH);
 		goto free_and_exit;
 	}
 
@@ -179,7 +179,7 @@ lx_kill(pid_t lx_pid, int lx_sig)
 {
 	pid_t s_pid, initpid;
 	sigsend_t v;
-	zone_t *zone = curproc->p_zone;
+	zone_t *zone = curzone;
 	struct proc *p;
 	int err, sig, nfound;
 
@@ -187,18 +187,14 @@ lx_kill(pid_t lx_pid, int lx_sig)
 	    ((sig = ltos_signo[lx_sig]) < 0))
 		return (set_errno(EINVAL));
 
-	/*
-	 * Since some linux apps rely on init(1M) having PID 1, we
-	 * transparently translate 1 to the real init(1M)'s pid.  We then
-	 * check to be sure that it is legal for this process to send this
-	 * signal to init(1M).
-	 */
 	initpid = zone->zone_proc_initpid;
-	if (lx_pid == 1) {
-		s_pid = initpid;
-	} else if (lx_pid == 0 || lx_pid == -1) {
+	if (lx_pid == 0 || lx_pid == -1) {
 		s_pid = 0;
 	} else if (lx_pid > 0) {
+		/*
+		 * Translations for individual processes (including pid 1) is
+		 * all handled by lx_lpid_to_spair.
+		 */
 		if (lx_lpid_to_spair(lx_pid, &s_pid, NULL) != 0) {
 			/*
 			 * If we didn't find this pid that means it doesn't
@@ -220,7 +216,10 @@ lx_kill(pid_t lx_pid, int lx_sig)
 		}
 	}
 
-	if ((s_pid == initpid) && ((err = init_sig_check(sig, s_pid)) != 0))
+	/*
+	 * Check that it is legal for this signal to be sent to init
+	 */
+	if (s_pid == initpid && (err = lx_init_sig_check(sig, s_pid)) != 0)
 		return (set_errno(err));
 
 	/*
@@ -345,58 +344,64 @@ lx_helper_rt_sigqueueinfo(pid_t tgid, int sig, siginfo_t *uinfo)
 int
 lx_helper_rt_tgsigqueueinfo(pid_t tgid, pid_t tid, int sig, siginfo_t *uinfo)
 {
-	id_t s_tid;
-	pid_t s_pid;
-	proc_t *target_proc;
-	sigqueue_t *sqp;
+	int err;
+	proc_t *p = NULL;
 	kthread_t *t;
+	sigqueue_t *sqp;
 	siginfo_t kinfo;
 
-	if (copyin(uinfo, &kinfo, sizeof (siginfo_t)) != 0)
+	if (copyin(uinfo, &kinfo, sizeof (siginfo_t)) != 0) {
 		return (set_errno(EFAULT));
-	if (lx_lpid_to_spair(tid, &s_pid, &s_tid) != 0)
-		return (set_errno(ESRCH));
-	/*
-	 * For group leaders, solaris pid == linux pid, so the solaris leader
-	 * pid should be the same as the tgid but since the tgid comes in via
-	 * the syscall we need to check for an invalid value.
-	 */
-	if (s_pid != tgid)
-		return (set_errno(EINVAL));
-
-	mutex_enter(&pidlock);
-	target_proc = prfind(s_pid);
-	if (target_proc != NULL)
-		mutex_enter(&target_proc->p_lock);
-	mutex_exit(&pidlock);
-
-	if (target_proc == NULL) {
-		return (set_errno(ESRCH));
-	}
-	if (sig < 0 || sig >= NSIG)
-		return (set_errno(EINVAL));
-
-	/*
-	 * Some code adapted from lwp_kill, duplicated here because we do some
-	 * customization to the sq_info field of sqp.
-	 */
-	if ((t = idtot(target_proc, s_tid)) == NULL) {
-		mutex_exit(&target_proc->p_lock);
-		return (set_errno(ESRCH));
-	}
-	/* Just checking for existence of the process, not sending a signal. */
-	if (sig == 0) {
-		mutex_exit(&target_proc->p_lock);
-		return (0);
 	}
 	sqp = kmem_zalloc(sizeof (sigqueue_t), KM_SLEEP);
-	sqp->sq_info.si_signo = sig;
-	sqp->sq_info.si_code = kinfo.si_code;
-	sqp->sq_info.si_pid = target_proc->p_pid;
-	sqp->sq_info.si_ctid = PRCTID(target_proc);
-	sqp->sq_info.si_zoneid = getzoneid();
-	sqp->sq_info.si_uid = crgetruid(CRED());
-	sigaddqa(target_proc, t, sqp);
-	mutex_exit(&target_proc->p_lock);
+
+	if (lx_lpid_lock(tid, curzone, NO_PRLOCK, &p, &t) != 0) {
+		err = ESRCH;
+		goto errout;
+	}
+
+	/*
+	 * For group leaders, the SunOS pid == Linux pid, so the SunOS leader
+	 * pid should be the same as the tgid.   Because the tgid comes in via
+	 * the syscall, we need to check for an invalid value.
+	 */
+	if (p->p_pid != tgid) {
+		err = EINVAL;
+		goto errout;
+	}
+
+	/*
+	 * In order to match the Linux behavior of emitting ESRCH errors before
+	 * confirming that the signal is valid, this check _must_ be performed
+	 * after the target process/thread is located.
+	 */
+	if (sig < 0 || sig >= NSIG) {
+		err = EINVAL;
+		goto errout;
+	}
+
+	/*
+	 * To merely check for the existence of a thread, the caller will pass
+	 * a signal value of 0.
+	 */
+	if (sig != 0) {
+		ASSERT(sqp != NULL);
+
+		sqp->sq_info.si_signo = sig;
+		sqp->sq_info.si_code = kinfo.si_code;
+		sqp->sq_info.si_pid = p->p_pid;
+		sqp->sq_info.si_ctid = PRCTID(p);
+		sqp->sq_info.si_zoneid = getzoneid();
+		sqp->sq_info.si_uid = crgetruid(CRED());
+		sigaddqa(p, t, sqp);
+	}
+	mutex_exit(&p->p_lock);
 	return (0);
+
+errout:
+	if (p != NULL) {
+		mutex_exit(&p->p_lock);
+	}
+	kmem_free(sqp, sizeof (sigqueue_t));
+	return (set_errno(err));
 }
