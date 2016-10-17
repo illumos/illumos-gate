@@ -10,6 +10,7 @@
 .\"
 .\"
 .\" Copyright 2016, Joyent, Inc.
+.\" Copyright 2016, OmniTI Computer Consulting, Inc. All Rights Reserved.
 .\"
 .Dd February 5, 2106
 .Dt LX 5
@@ -44,12 +45,21 @@ the overall limits that have been specified on the zone's configuration.
 That is, within the zone there is no way to increase the resource limits set
 on the zone itself.
 .Pp
-The zone must be installed using a clone of a
+The zone must be installed using one of:  an absolute pathname of a
 .Xr zfs 1m
-dataset which contains an image of the software to be run in the zone.
+send stream of a dataset which contains an image of the software to be run in
+the zone, a name of a
+.Xr zfs 1m
+dataset to be cloned or snapshot to be promoted, or the absolute pathname of a
+.Xr tar 1
+file or gzipped tar file.
 .Pp
-Example:
-.Dl zoneadm -z myzone install -x nodataset -t debian7
+Examples:
+.Dl zoneadm -z myzone install -x nodataset
+.Dl zoneadm -z myzone install -s /path/to/sendstream.zss
+.Dl zoneadm -z myzone install -s name/of/dataset-to-clone
+.Dl zoneadm -z myzone install -s name/of/snapshot-to@promote
+.Dl zoneadm -z myzone install -t /path/to/tarball.tgz
 .Pp
 Applications provided by the base SunOS operating system are also available
 within the zone under the
@@ -71,6 +81,40 @@ attribute can be included in the zone's
 settings as a way to specify the Linux version that the zone is emulating. For
 example, the value could be
 .Em 3.13.0 .
+.Pp
+Persistent network configuration (including DNS resolver information) can be
+configured using
+.Xr zonecfg 1m
+as well, as attributes under the network property.  An example LX zone
+configured with vNIC "lx1" using DHCP is below:
+
+.Dl create -b
+.Dl set zonepath=/zones/lx1
+.Dl set brand=lx
+.Dl set autoboot=true
+.Dl set ip-type=exclusive
+.Dl add net
+.Dl set physical=lx1
+.Dl add property (name=ip,value="dhcp")
+.Dl add property (name=ips,value="dhcp")
+.Dl add property (name=primary,value="true")
+.Dl end
+.Dl add attr
+.Dl set name=dns-domain
+.Dl set type=string
+.Dl set value=example.com
+.Dl end
+.Dl add attr
+.Dl set name=resolvers
+.Dl set type=string
+.Dl set value=192.21.12.1
+.Dl end
+.Dl add attr
+.Dl set name=kernel-version
+.Dl set type=string
+.Dl set value=4.3.0
+.Dl end
+
 .Sh LIMITATIONS
 The brand only supports the exclusive IP stack zone configuration.
 .Pp
