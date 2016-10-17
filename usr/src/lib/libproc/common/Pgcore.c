@@ -1418,6 +1418,22 @@ Pfgcore(struct ps_prochandle *P, int fd, core_content_t content)
 			goto err;
 	}
 
+
+	{
+		prsecflags_t *psf = NULL;
+
+		if (Psecflags(P, &psf) != 0)
+			goto err;
+
+		if (write_note(fd, NT_SECFLAGS, psf,
+		    sizeof (prsecflags_t), &doff) != 0) {
+			Psecflags_free(psf);
+			goto err;
+		}
+
+		Psecflags_free(psf);
+	}
+
 #if defined(__i386) || defined(__amd64)
 	/* CSTYLED */
 	{
@@ -1501,6 +1517,7 @@ err:
 	 */
 	(void) ftruncate64(fd, 0);
 	free(pgc.pgc_chunk);
+
 	return (-1);
 }
 

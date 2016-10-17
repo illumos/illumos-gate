@@ -49,6 +49,7 @@
 #include <sys/avl.h>
 #include <sys/door_impl.h>
 #include <sys/signalfd.h>
+#include <sys/secflags.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -350,8 +351,8 @@ typedef struct	proc {
 	struct vnode	*p_execdir;	/* directory that p_exec came from */
 	struct brand	*p_brand;	/* process's brand  */
 
-	/* per-process brand state */
-	void		*p_brand_data;
+	void		*p_brand_data;	/* per-process brand state */
+	psecflags_t	p_secflags;	/* per-process security flags */
 
 	/* additional lock to protect p_sessp (but not its contents) */
 	kmutex_t p_splock;

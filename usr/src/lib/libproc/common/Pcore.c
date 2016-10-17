@@ -159,6 +159,25 @@ Pcred_core(struct ps_prochandle *P, prcred_t *pcrp, int ngroups, void *data)
 
 /*ARGSUSED*/
 static int
+Psecflags_core(struct ps_prochandle *P, prsecflags_t **psf, void *data)
+{
+	core_info_t *core = data;
+
+	if (core->core_secflags == NULL) {
+		errno = ENODATA;
+		return (-1);
+	}
+
+	if ((*psf = calloc(1, sizeof (prsecflags_t))) == NULL)
+		return (-1);
+
+	(void) memcpy(*psf, core->core_secflags, sizeof (prsecflags_t));
+
+	return (0);
+}
+
+/*ARGSUSED*/
+static int
 Ppriv_core(struct ps_prochandle *P, prpriv_t **pprv, void *data)
 {
 	core_info_t *core = data;
@@ -222,6 +241,8 @@ Pfini_core(struct ps_prochandle *P, void *data)
 			free(core->core_ppii);
 		if (core->core_zonename != NULL)
 			free(core->core_zonename);
+		if (core->core_secflags != NULL)
+			free(core->core_secflags);
 #ifdef __x86
 		if (core->core_ldt != NULL)
 			free(core->core_ldt);
@@ -308,6 +329,7 @@ static const ps_ops_t P_core_ops = {
 	.pop_platform	= Pplatform_core,
 	.pop_uname	= Puname_core,
 	.pop_zonename	= Pzonename_core,
+	.pop_secflags	= Psecflags_core,
 #ifdef __x86
 	.pop_ldt	= Pldt_core
 #endif
@@ -740,6 +762,34 @@ note_platform(struct ps_prochandle *P, size_t nbytes)
 		}
 		plat[nbytes - 1] = '\0';
 		core->core_platform = plat;
+	}
+
+	return (0);
+}
+
+static int
+note_secflags(struct ps_prochandle *P, size_t nbytes)
+{
+	core_info_t *core = P->data;
+	prsecflags_t *psf;
+
+	if (core->core_secflags != NULL)
+		return (0);	/* Already seen */
+
+	if (sizeof (*psf) != nbytes) {
+		dprintf("Pgrab_core: NT_SECFLAGS changed size."
+		    "  Need to handle a version change?\n");
+		return (-1);
+	}
+
+	if (nbytes != 0 && ((psf = malloc(nbytes)) != NULL)) {
+		if (read(P->asfd, psf, nbytes) != nbytes) {
+			dprintf("Pgrab_core: failed to read NT_SECFLAGS\n");
+			free(psf);
+			return (-1);
+		}
+
+		core->core_secflags = psf;
 	}
 
 	return (0);
@@ -1180,6 +1230,7 @@ static int (*nhdlrs[])(struct ps_prochandle *, size_t) = {
 	note_zonename,		/* 21	NT_ZONENAME		*/
 	note_fdinfo,		/* 22	NT_FDINFO		*/
 	note_spymaster,		/* 23	NT_SPYMASTER		*/
+	note_secflags,		/* 24	NT_SECFLAGS		*/
 };
 
 static void

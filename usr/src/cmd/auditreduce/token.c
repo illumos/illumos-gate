@@ -1941,6 +1941,20 @@ privilege_token(adr_t *adr)
 }
 
 /*
+ * Format of security flags token:
+ *	security flag set		string
+ *	security flags		string
+ */
+
+int
+secflags_token(adr_t *adr)
+{
+	skip_string(adr);	/* set name */
+	skip_string(adr);	/* security flags */
+	return (-1);
+}
+
+/*
  * Format of label token:
  *      label ID                1 byte
  *      compartment length      1 byte

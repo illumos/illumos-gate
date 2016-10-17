@@ -545,6 +545,15 @@ the project attribute.
 				</description>
 				<cardinality min='1' max='1'/>
 			</prop_pattern>
+			<prop_pattern name='security_flags' type='astring'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+An optional string specifying the security flags as defined in security-flags(5).
+					</loctext>
+				</description>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
 
 			<!-- method_credential properties -->
 			<prop_pattern name='user' type='astring'
@@ -660,7 +669,7 @@ A boolean property where a "true" value indicates an RPC service, equivalent to 
 			    required='false'>
 				<common_name>
 					<loctext xml:lang='C'>
-Custom firewall script 
+Custom firewall script
 					</loctext>
 				</common_name>
 				<description>

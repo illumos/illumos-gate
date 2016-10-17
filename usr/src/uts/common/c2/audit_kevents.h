@@ -347,13 +347,10 @@ extern "C" {
 #define	AUE_FACCESSAT		309	/* =no obsolete */
 #define	AUE_AUDITON_GETAMASK	310	/* =aa */
 #define	AUE_AUDITON_SETAMASK	311	/* =as */
-
-
+#define	AUE_PSECFLAGS		312	/* =pm psecflags */
 
 /* NOTE: update MAX_KEVENTS below if events are added. */
-
-#define	MAX_KEVENTS		311
-
+#define	MAX_KEVENTS		312
 
 #ifdef __cplusplus
 }

@@ -1,0 +1,77 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2016, Richard Lowe.
+.\"
+.Dd June 06, 2016
+.Dt PSECFLAGS 3PROC
+.Os
+.Sh NAME
+.Nm Psecflags ,
+.Nm Psecflags_free
+.Nd get and free process security flags
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft int
+.Fo Psecflags
+.Fa "struct ps_prochandle *P"
+.Fa "prsecflags_t **psf"
+.Fc
+.Ft void
+.Fo Psecflags_free
+.Fa "struct ps_prochandle *P"
+.Fa "prsecflags_t *psf"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Psecflags
+function obtains the security flags of the process handle
+.Fa P .
+The security flags structure will be dynamically allocated and a pointer to it
+will be placed in
+.Fa psf .
+It must be released with a call to
+.Fn Psecflags_free .
+The definition of the
+.Sy prsecflags_t
+structure is documented in
+.Xr proc 4 .
+.Pp
+The
+.Fn Psecflags_free
+function releases the storage in
+.Fa psf
+that was allocated as a result of calling
+.Fn Psecflags .
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn Psecflags
+function returns
+.Sy 0
+and
+.Fa psf
+is updated with a pointer to the allocated security flags. Otherwise,
+.Sy -1
+is returned and
+.Fa psf
+is not updated.
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr libproc 3LIB ,
+.Xr proc 4 ,
+.Xr security-flags 5

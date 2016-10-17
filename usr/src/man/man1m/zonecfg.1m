@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\" See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ZONECFG 1M "Nov 4, 2015"
+.TH ZONECFG 1M "Jun 6, 2016"
 .SH NAME
 zonecfg \- set up zone configuration
 .SH SYNOPSIS
@@ -162,6 +162,16 @@ Network interface.
 .sp .6
 .RS 4n
 Resource control.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBsecurity-flags\fR\fR
+.ad
+.sp .6
+.RS 4n
+Process security flag settings.
 .RE
 
 .SS "Properties"
@@ -430,6 +440,16 @@ The following properties are supported:
 .sp .6
 .RS 4n
 \fBncpus\fR
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBsecurity-flags\fB\fB
+.ad
+.sp .6
+.RS 4n
+\fBlower\fR, \fBdefault\fR, \fBupper\fR.
 .RE
 
 .sp
@@ -892,6 +912,18 @@ control and is related to the \fBzone.cpu-cap\fR resource control. See
 .sp
 .ne 2
 .na
+\fB\fBsecurity-flags\fR: lower, default, upper\fR
+.ad
+.sp .6
+.RS 4n
+Set the process security flags associated with the zone.  The \fBlower\fR and
+\fBupper\fR fields set the limits, the \fBdefault\fR field is set of flags all
+zone processes inherit.
+.RE
+
+.sp
+.ne 2
+.na
 \fBglobal: \fBfs-allowed\fR\fR
 .ad
 .sp .6
@@ -974,6 +1006,9 @@ capped-memory     physical        simple with scale
                    locked          simple with scale
 
 capped-cpu        ncpus           simple
+security-flags	  lower           simple
+                   default        simple
+                   upper          simple
 .fi
 .in -2
 .sp
@@ -1915,7 +1950,7 @@ Interface Stability	Volatile
 \fBzfs\fR(1M), \fBzoneadm\fR(1M), \fBpriocntl\fR(2), \fBpriv_str_to_set\fR(3C),
 \fBkstat\fR(3KSTAT), \fBvfstab\fR(4), \fBattributes\fR(5), \fBbrands\fR(5),
 \fBfnmatch\fR(5), \fBlx\fR(5), \fBprivileges\fR(5), \fBresource_controls\fR(5),
-\fBzones\fR(5)
+\fBsecurity-flags\fR(5), \fBzones\fR(5)
 .sp
 .LP
 \fISystem Administration Guide: Solaris Containers-Resource Management, and

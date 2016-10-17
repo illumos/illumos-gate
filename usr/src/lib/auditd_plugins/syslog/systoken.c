@@ -1471,6 +1471,24 @@ privilege_token(parse_context_t *ctx)
 	return (0);
 }
 
+/*
+ * -----------------------------------------------------------------------
+ * secflags_token()	: Process secflags token and display contents
+ *
+ * Format of privilege token:
+ *	secflags token id	adr_char
+ *	secflag set name	adr_string
+ *	secflags		adr_string
+ * -----------------------------------------------------------------------
+ */
+int
+secflags_token(parse_context_t *ctx)
+{
+	skip_bytes(ctx);
+	skip_bytes(ctx);
+
+	return (0);
+}
 
 /*
  * Format of label token:

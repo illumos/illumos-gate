@@ -159,6 +159,8 @@ typedef struct {
 						/*	that produced object */
 #define	DT_SUNW_CAPCHAINENT	0x6000001d	/* capabilities chain entry */
 #define	DT_SUNW_CAPCHAINSZ	0x6000001f	/* capabilities chain size */
+/* 0x60000021 would be DT_SUNW_PARENT */
+#define	DT_SUNW_ASLR		0x60000023	/* executable ASLR desire */
 
 /*
  * DT_* encoding rules do not apply between DT_HIOS and DT_LOPROC

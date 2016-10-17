@@ -137,17 +137,18 @@ complex_piece_func(int cp_type, const char *str, complex_property_ptr_t cp_next)
 %token OPEN_PAREN CLOSE_PAREN COMMA DATASET LIMITPRIV BOOTARGS BRAND PSET PCAP
 %token MCAP NCPUS IMPORTANCE SHARES MAXLWPS MAXSHMMEM MAXSHMIDS MAXMSGIDS
 %token MAXSEMIDS LOCKED SWAP SCHED CLEAR DEFROUTER ADMIN USER AUTHS MAXPROCS
-%token ZFSPRI MAC VLANID GNIC NPROP UUID
+%token ZFSPRI MAC VLANID GNIC NPROP UUID SECFLAGS
+%token DEFAULT UPPER LOWER
 
 %type <strval> TOKEN EQUAL OPEN_SQ_BRACKET CLOSE_SQ_BRACKET
     property_value OPEN_PAREN CLOSE_PAREN COMMA simple_prop_val
 %type <complex> complex_piece complex_prop_val
 %type <ival> resource_type NET FS DEVICE RCTL ATTR DATASET PSET PCAP MCAP
-    ADMIN
+    ADMIN SECFLAGS
 %type <ival> property_name SPECIAL RAW DIR OPTIONS TYPE ADDRESS PHYSICAL NAME
     MATCH ZONENAME ZONEPATH AUTOBOOT POOL LIMITPRIV BOOTARGS VALUE PRIV LIMIT
     ACTION BRAND SCHED IPTYPE DEFROUTER HOSTID USER AUTHS FS_ALLOWED
-    ALLOWED_ADDRESS MAC VLANID GNIC NPROP UUID
+    ALLOWED_ADDRESS MAC VLANID GNIC NPROP UUID DEFAULT UPPER LOWER
 %type <cmd> command
 %type <cmd> add_command ADD
 %type <cmd> cancel_command CANCEL
@@ -1040,6 +1041,7 @@ resource_type: NET	{ $$ = RT_NET; }
 	| PCAP		{ $$ = RT_PCAP; }
 	| MCAP		{ $$ = RT_MCAP; }
 	| ADMIN		{ $$ = RT_ADMIN; }
+	| SECFLAGS	{ $$ = RT_SECFLAGS; }
 
 property_name: SPECIAL	{ $$ = PT_SPECIAL; }
 	| RAW		{ $$ = PT_RAW; }
@@ -1086,6 +1088,9 @@ property_name: SPECIAL	{ $$ = PT_SPECIAL; }
 	| FS_ALLOWED	{ $$ = PT_FS_ALLOWED; }
 	| UUID		{ $$ = PT_UUID; }
 	| ZFSPRI	{ $$ = PT_ZFSPRI; }
+	| DEFAULT	{ $$ = PT_DEFAULT; }
+	| UPPER		{ $$ = PT_UPPER; }
+	| LOWER		{ $$ = PT_LOWER; }
 
 /*
  * The grammar builds data structures from the bottom up.  Thus various
@@ -1198,20 +1203,20 @@ complex_piece: property_name EQUAL TOKEN
 		if (($$ = complex_piece_func($1, prop_types[$3], NULL)) == NULL)
 			YYERROR;
 	}
-	| property_name EQUAL TOKEN COMMA complex_piece 
+	| property_name EQUAL TOKEN COMMA complex_piece
 	{
 		$$ = complex_piece_func($1, $3, complex);
 		free(claim_token($3));
 		if ($$ == NULL)
 			YYERROR;
 	}
-	| property_name EQUAL resource_type COMMA complex_piece 
+	| property_name EQUAL resource_type COMMA complex_piece
 	{
 		if (($$ = complex_piece_func($1, res_types[$3], complex)) ==
 		    NULL)
 			YYERROR;
 	}
-	| property_name EQUAL property_name COMMA complex_piece 
+	| property_name EQUAL property_name COMMA complex_piece
 	{
 		if (($$ = complex_piece_func($1, prop_types[$3], complex)) ==
 		    NULL)

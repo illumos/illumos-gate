@@ -23,7 +23,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 #
 # Please KEEP THIS (reasonably) ALPHABETIZED BY FILENAME
@@ -53,6 +52,7 @@ find_files "s.*" usr/src/common/mdesc
 find_files "s.*" usr/src/common/net/wanboot/crypt
 find_files "s.*" usr/src/common/nvpair
 find_files "s.*" usr/src/common/pci
+find_files "s.*" usr/src/common/secflags
 find_files "s.*" usr/src/common/smbios
 find_files "s.*" usr/src/common/tsol
 find_files "s.*" usr/src/common/util

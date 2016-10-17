@@ -24,5 +24,20 @@ outputdir = /var/tmp/test_results
 [/opt/os-tests/tests/poll_test]
 user = root
 
+[/opt/os-tests/tests/secflags]
+user = root
+tests = ['secflags_aslr',
+         'secflags_core',
+         'secflags_dts',
+         'secflags_elfdump',
+         'secflags_forbidnullmap',
+         'secflags_limits',
+         'secflags_noexecstack',
+         'secflags_proc',
+         'secflags_psecflags',
+         'secflags_syscall',
+         'secflags_truss',
+         'secflags_zonecfg']
+
 [/opt/os-tests/tests/sigqueue]
 tests = ['sigqueue_queue_size']

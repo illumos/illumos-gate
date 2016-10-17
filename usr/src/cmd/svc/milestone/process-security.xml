@@ -1,0 +1,86 @@
+<?xml version='1.0'?>
+<!DOCTYPE service_bundle SYSTEM '/usr/share/lib/xml/dtd/service_bundle.dtd.1'>
+
+<!--
+ Copyright 2015, Richard Lowe.
+
+ CDDL HEADER START
+
+ This file and its contents are supplied under the terms of the
+ Common Development and Distribution License ("CDDL"), version 1.0.
+ You may only use this file in accordance with the terms of version
+ 1.0 of the CDDL.
+
+ A full copy of the text of the CDDL should have accompanied this
+ source.  A copy of the CDDL is also available via the Internet at
+ http://www.illumos.org/license/CDDL.
+
+ CDDL HEADER END
+
+	NOTE:  This service manifest is not editable; its contents will
+	be overwritten by package or patch operations, including
+	operating system upgrade.  Make customizations in a different
+	file.
+-->
+
+<service_bundle type="manifest" name="process-security">
+	<service name="system/process-security" type="service" version="1">
+		<!-- Initial state of the service is disabled -->
+		<create_default_instance enabled="false" />
+
+		<single_instance />
+
+		<!-- We don't actually have any methods, but we create a
+		     default instance so that we show up in svcs -a -->
+
+		<exec_method type="method" name="start"	exec=":true" timeout_seconds="0"/>
+		<exec_method type="method" name="stop" exec=":true" timeout_seconds="30"/>
+
+		<property_group name='startd' type='framework'>
+		  <propval name='duration' type='astring' value='transient' />
+		</property_group>
+
+		<property_group name='default' type='application'>
+		  <property name='aslr' type='boolean' />
+		  <property name='forbidnullmap' type='boolean' />
+		  <property name='noexecstack' type='boolean' />
+
+		  <propval name='value_authorization' type='astring'
+			   value='solaris.smf.value.process-security' />
+		</property_group>
+
+                <property_group name='lower' type='application'>
+		  <property name='aslr' type='boolean' />
+		  <property name='forbidnullmap' type='boolean' />
+		  <property name='noexecstack' type='boolean' />
+
+		  <propval name='value_authorization' type='astring'
+			   value='solaris.smf.value.process-security' />
+		</property_group>
+
+                <property_group name='upper' type='application'>
+		  <property name='aslr' type='boolean' />
+		  <property name='forbidnullmap' type='boolean' />
+		  <property name='noexecstack' type='boolean' />
+
+		  <propval name='value_authorization' type='astring'
+			   value='solaris.smf.value.process-security' />
+		</property_group>
+
+
+
+		<stability value="Unstable" />
+
+		<template>
+			<common_name>
+				<loctext xml:lang='C'>Security Flag Configuration</loctext>
+			</common_name>
+			<documentation>
+				<manpage title='security-flags' section='5'
+					 manpath='/usr/share/man' />
+				<manpage title='psecflags' section='1'
+					 manpath='/usr/share/man' />
+			</documentation>
+		</template>
+	</service>
+</service_bundle>

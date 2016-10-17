@@ -556,7 +556,9 @@ conv_dyn_tag_strings(conv_iter_osabi_t osabi, Half mach,
 		MSG_DT_SUNW_STRPAD_CF,		MSG_DT_SUNW_CAPCHAIN_CF,
 		MSG_DT_SUNW_LDMACH_CF,		0,
 		MSG_DT_SUNW_CAPCHAINENT_CF,	0,
-		MSG_DT_SUNW_CAPCHAINSZ_CF
+		MSG_DT_SUNW_CAPCHAINSZ_CF,	0,
+		0, 				0,
+		MSG_DT_SUNW_ASLR_CF
 	};
 	static const Msg	tags_sunw_auxiliary_cfnp[] = {
 		MSG_DT_SUNW_AUXILIARY_CFNP,	MSG_DT_SUNW_RTLDINF_CFNP,
@@ -568,7 +570,9 @@ conv_dyn_tag_strings(conv_iter_osabi_t osabi, Half mach,
 		MSG_DT_SUNW_STRPAD_CFNP,	MSG_DT_SUNW_CAPCHAIN_CFNP,
 		MSG_DT_SUNW_LDMACH_CFNP,	0,
 		MSG_DT_SUNW_CAPCHAINENT_CFNP,	0,
-		MSG_DT_SUNW_CAPCHAINSZ_CFNP
+		MSG_DT_SUNW_CAPCHAINSZ_CFNP,	0,
+		0,				0,
+		MSG_DT_SUNW_ASLR_CFNP
 	};
 	static const Msg	tags_sunw_auxiliary_nf[] = {
 		MSG_DT_SUNW_AUXILIARY_NF,	MSG_DT_SUNW_RTLDINF_NF,
@@ -580,7 +584,9 @@ conv_dyn_tag_strings(conv_iter_osabi_t osabi, Half mach,
 		MSG_DT_SUNW_STRPAD_NF,		MSG_DT_SUNW_CAPCHAIN_NF,
 		MSG_DT_SUNW_LDMACH_NF,		0,
 		MSG_DT_SUNW_CAPCHAINENT_NF,	0,
-		MSG_DT_SUNW_CAPCHAINSZ_NF
+		MSG_DT_SUNW_CAPCHAINSZ_NF,	0,
+		0,				0,
+		MSG_DT_SUNW_ASLR_NF
 	};
 	static const conv_ds_msg_t ds_sunw_auxiliary_cf = {
 	    CONV_DS_MSG_INIT(DT_SUNW_AUXILIARY, tags_sunw_auxiliary_cf) };

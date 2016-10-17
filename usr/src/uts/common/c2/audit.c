@@ -727,7 +727,7 @@ audit_strputmsg(struct vnode *vp, struct strbuf *mctl, struct strbuf *mdata,
 
 void
 audit_closef(struct file *fp)
-{	/* AUDIT_CLOSEF */
+{
 	f_audit_data_t *fad;
 	t_audit_data_t *tad;
 	int success;
@@ -795,10 +795,10 @@ audit_closef(struct file *fp)
 	} else {
 #ifdef _LP64
 		au_write((caddr_t *)&(ad), au_to_arg64(
-			1, "no path: fp", (uint64_t)fp));
+		    1, "no path: fp", (uint64_t)fp));
 #else
 		au_write((caddr_t *)&(ad), au_to_arg32(
-			1, "no path: fp", (uint32_t)fp));
+		    1, "no path: fp", (uint32_t)fp));
 #endif
 	}
 
@@ -1598,10 +1598,7 @@ add_return_token(caddr_t *ad, unsigned int scid, int err, int rval)
 
 /*ARGSUSED*/
 void
-audit_fdsend(fd, fp, error)
-	int fd;
-	struct file *fp;
-	int error;		/* ignore for now */
+audit_fdsend(int fd, struct file *fp, int error)
 {
 	t_audit_data_t *tad;	/* current thread */
 	f_audit_data_t *fad;	/* per file audit structure */
@@ -1670,6 +1667,71 @@ audit_priv(int priv, const priv_set_t *set, int flag)
 		if (priv != PRIV_NONE)
 			priv_addset(target, priv);
 	}
+}
+
+/*
+ * Audit the psecflags() system call; the set name, current value, and delta
+ * are put in the audit trail.
+ */
+void
+audit_psecflags(proc_t *p,
+    psecflagwhich_t which,
+    const secflagdelta_t *psd)
+{
+	t_audit_data_t *tad;
+	secflagset_t new;
+	const secflagset_t *old;
+	const char *s;
+	cred_t *cr;
+	pid_t pid;
+	const auditinfo_addr_t	*ainfo;
+	const psecflags_t *psec = &p->p_secflags;
+
+	tad = U2A(u);
+
+	if (tad->tad_flag == 0)
+		return;
+
+	switch (which) {
+	case PSF_EFFECTIVE:
+		s = "effective";
+		old = &psec->psf_effective;
+		break;
+	case PSF_INHERIT:
+		s = "inherit";
+		old = &psec->psf_inherit;
+		break;
+	case PSF_LOWER:
+		s = "lower";
+		old = &psec->psf_lower;
+		break;
+	case PSF_UPPER:
+		s = "upper";
+		old = &psec->psf_upper;
+		break;
+	}
+
+	secflags_copy(&new, old);
+	secflags_apply_delta(&new, psd);
+
+	au_uwrite(au_to_secflags(s, *old));
+	au_uwrite(au_to_secflags(s, new));
+
+	ASSERT(mutex_owned(&p->p_lock));
+	mutex_enter(&p->p_crlock);
+
+	pid = p->p_pid;
+	crhold(cr = p->p_cred);
+	mutex_exit(&p->p_crlock);
+
+	if ((ainfo = crgetauinfo(cr)) == NULL) {
+		crfree(cr);
+		return;
+	}
+
+	AUDIT_SETPROC_GENERIC(&(u_ad), cr, ainfo, pid);
+
+	crfree(cr);
 }
 
 /*
@@ -1749,9 +1811,7 @@ audit_devpolicy(int nitems, const devplcysys_t *items)
 
 /*ARGSUSED*/
 void
-audit_fdrecv(fd, fp)
-	int fd;
-	struct file *fp;
+audit_fdrecv(int fd, struct file *fp)
 {
 	t_audit_data_t *tad;	/* current thread */
 	f_audit_data_t *fad;	/* per file audit structure */

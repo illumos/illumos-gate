@@ -37,5 +37,5 @@
 	ENTRY_NP(_brk_unlocked)
 	SYSTRAP_RVAL1(brk)
 	SYSCERROR
-	RETC
+	RET
 	SET_SIZE(_brk_unlocked)

@@ -1624,6 +1624,7 @@ f lib/svc/manifest/system/picl.xml 0444 root sys
 f lib/svc/manifest/system/poold.xml 0444 root sys
 f lib/svc/manifest/system/pools.xml 0444 root sys
 f lib/svc/manifest/system/power.xml 0444 root sys
+f lib/svc/manifest/system/process-security.xml 0444 root sys
 f lib/svc/manifest/system/rbac.xml 0444 root sys
 f lib/svc/manifest/system/rcap.xml 0444 root sys
 f lib/svc/manifest/system/resource-mgmt.xml 0444 root sys
@@ -2252,6 +2253,7 @@ f usr/bin/projects 0555 root bin
 h usr/bin/prstat=usr/lib/isaexec
 h usr/bin/prun=usr/lib/isaexec
 h usr/bin/ps=usr/lib/isaexec
+h usr/bin/psecflags=usr/lib/isaexec
 h usr/bin/psig=usr/lib/isaexec
 h usr/bin/pstack=usr/lib/isaexec
 h usr/bin/pstop=usr/lib/isaexec
@@ -4197,6 +4199,7 @@ f usr/include/sys/sdcard/sda.h 0644 root bin
 f usr/include/sys/sdcard/sda_impl.h 0644 root bin
 f usr/include/sys/sdcard/sda_ioctl.h 0644 root bin
 f usr/include/sys/sdt.h 0644 root bin
+f usr/include/sys/secflags.h 0644 root bin
 f usr/include/sys/segment.h 0644 root bin
 f usr/include/sys/segments.h 0644 root bin
 f usr/include/sys/select.h 0644 root bin
@@ -5659,6 +5662,7 @@ f usr/lib/help/auths/locale/C/SmfValueMDNS.html 0444 root bin
 f usr/lib/help/auths/locale/C/SmfValueNADD.html 0444 root bin
 f usr/lib/help/auths/locale/C/SmfValueNDMP.html 0444 root bin
 f usr/lib/help/auths/locale/C/SmfValueNWAM.html 0444 root bin
+f usr/lib/help/auths/locale/C/SmfValueProcSec.html 0444 root bin
 f usr/lib/help/auths/locale/C/SmfValueRouting.html 0444 root bin
 f usr/lib/help/auths/locale/C/SmfValueSMB.html 0444 root bin
 f usr/lib/help/auths/locale/C/SmfValueVscan.html 0444 root bin
@@ -5789,6 +5793,7 @@ f usr/lib/help/auths/locale/SmfValueMDNS.html 0444 root bin
 f usr/lib/help/auths/locale/SmfValueNADD.html 0444 root bin
 f usr/lib/help/auths/locale/SmfValueNDMP.html 0444 root bin
 f usr/lib/help/auths/locale/SmfValueNWAM.html 0444 root bin
+f usr/lib/help/auths/locale/SmfValueProcSec.html 0444 root bin
 f usr/lib/help/auths/locale/SmfValueRouting.html 0444 root bin
 f usr/lib/help/auths/locale/SmfValueSMB.html 0444 root bin
 f usr/lib/help/auths/locale/SmfValueVscan.html 0444 root bin
@@ -16733,6 +16738,7 @@ f usr/share/man/man3proc/Pread.3proc 0444 root bin
 f usr/share/man/man3proc/Prelease.3proc 0444 root bin
 f usr/share/man/man3proc/Preopen.3proc 0444 root bin
 f usr/share/man/man3proc/Preset_maps.3proc 0444 root bin
+f usr/share/man/man3proc/Psecflags.3proc 0444 root bin
 f usr/share/man/man3proc/Psetbkpt.3proc 0444 root bin
 f usr/share/man/man3proc/Psetcred.3proc 0444 root bin
 f usr/share/man/man3proc/Psetfault.3proc 0444 root bin
@@ -18666,6 +18672,7 @@ f usr/share/man/man5/rbac.5 0444 root bin
 f usr/share/man/man5/regex.5 0444 root bin
 f usr/share/man/man5/regexp.5 0444 root bin
 f usr/share/man/man5/resource_controls.5 0444 root bin
+f usr/share/man/man5/security-flags.5 0444 root bin
 f usr/share/man/man5/smf.5 0444 root bin
 f usr/share/man/man5/smf_bootstrap.5 0444 root bin
 f usr/share/man/man5/smf_method.5 0444 root bin

@@ -40,6 +40,7 @@
 #include <sys/uadmin.h>
 #include <sys/ksynch.h>
 #include <sys/socket_impl.h>
+#include <sys/secflags.h>
 #include <netinet/in.h>
 
 #ifdef	__cplusplus
@@ -110,6 +111,7 @@ extern "C" {
 #define	ZONE_ATTR_RSS		22
 #define	ZONE_ATTR_APP_SVC_CT	23
 #define	ZONE_ATTR_SCHED_FIXEDHI	24
+#define	ZONE_ATTR_SECFLAGS	25
 
 /* Start of the brand-specific attribute namespace */
 #define	ZONE_ATTR_BRAND_ATTRS	32768
@@ -682,6 +684,8 @@ typedef struct zone {
 
 	/* Num usecs to throttle page fault when zone is over phys. mem cap */
 	uint32_t	zone_pg_flt_delay;
+
+	psecflags_t	zone_secflags; /* default zone security-flags */
 
 	/*
 	 * Misc. kstats and counters for zone cpu-usage aggregation.

@@ -39,6 +39,7 @@ extern "C" {
 #include <sys/sem.h>	/* for semid_ds structure */
 #include <sys/msg.h>	/* for msqid_ds structure */
 #include <sys/atomic.h>	/* using atomics */
+#include <sys/secflags.h>
 
 /*
  * Audit conditions, statements reguarding what's to be done with
@@ -590,6 +591,8 @@ void	audit_fdsend(int, struct file *, int);
 void	audit_fdrecv(int, struct file *);
 void	audit_priv(int, const struct priv_set *, int);
 void	audit_setppriv(int, int, const struct priv_set *, const cred_t *);
+void	audit_psecflags(proc_t *, psecflagwhich_t,
+    const secflagdelta_t *);
 void	audit_devpolicy(int, const struct devplcysys *);
 void	audit_update_context(proc_t *, cred_t *);
 void	audit_kssl(int, void *, int);

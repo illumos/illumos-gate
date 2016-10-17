@@ -72,6 +72,7 @@ EXEC_DATA	^platform/.*/multiboot$
 # Objects that are allowed to have an executable stack
 EXEC_STACK	^platform/.*/MACH(kernel)/unix$
 EXEC_STACK	^platform/.*/multiboot$
+EXEC_STACK	^opt/os-tests/tests/secflags/stacky$
 
 # Objects for which we allow relocations to the text segment
 TEXTREL		^platform/.*/MACH(kernel)/unix$

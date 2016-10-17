@@ -75,6 +75,7 @@ SYSTEMSVCS= \
 	early-manifest-import.xml \
 	identity.xml \
 	manifest-import.xml \
+	process-security.xml \
 	rmtmpfiles.xml	\
 	vtdaemon.xml
 

@@ -587,6 +587,17 @@ gen_prfdinfo(void)
 	END;
 }
 
+static void
+gen_prsecflags(void)
+{
+	START(prsecflags, prsecflags_t);
+	SCALAR_FIELD(prsecflags_t, pr_version, 0);
+	SCALAR_FIELD(prsecflags_t, pr_effective, 0);
+	SCALAR_FIELD(prsecflags_t, pr_inherit, 0);
+	SCALAR_FIELD(prsecflags_t, pr_lower, 0);
+	SCALAR_FIELD(prsecflags_t, pr_upper, 0);
+	END;
+}
 
 /*ARGSUSED*/
 int
@@ -628,7 +639,7 @@ main(int argc, char *argv[])
 	gen_timestruc();
 	gen_utsname();
 	gen_prfdinfo();
-
+	gen_prsecflags();
 
 	/*
 	 * Generate the full arch_layout description
@@ -656,6 +667,7 @@ main(int argc, char *argv[])
 	(void) printf(fmt, "timestruc");
 	(void) printf(fmt, "utsname");
 	(void) printf(fmt, "prfdinfo");
+	(void) printf(fmt, "prsecflags");
 	(void) printf("};\n");
 
 	/*
@@ -759,7 +771,7 @@ do_scalar_field(char *tname, char *fname, int _sign, char *dotfield)
 
 static void
 do_array_field(char *tname, char *fname,
-	int _sign, char *dotfield)
+    int _sign, char *dotfield)
 {
 	char comment[100];
 	ctf_arinfo_t ai;
@@ -835,7 +847,7 @@ static int gfi_iter(const char *fname, ctf_id_t mbrtid,
  */
 static int
 get_field_info(char *tname, char *fname, char *dotname,
-	int *offp, int *tidp)
+    int *offp, int *tidp)
 {
 	struct gfinfo gfi;
 	ctf_id_t stype;

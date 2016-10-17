@@ -32,6 +32,7 @@
 #include <priv.h>
 #include <pwd.h>
 #include <sys/types.h>
+#include <sys/secflags.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -265,7 +266,7 @@ int restarter_remove_contract(scf_instance_t *, ctid_t,
 ssize_t restarter_state_to_string(restarter_instance_state_t, char *, size_t);
 restarter_instance_state_t restarter_string_to_state(char *);
 
-#define	RESTARTER_METHOD_CONTEXT_VERSION	7
+#define	RESTARTER_METHOD_CONTEXT_VERSION	8
 
 struct method_context {
 	/* Stable */
@@ -273,6 +274,8 @@ struct method_context {
 	gid_t		gid, egid;
 	int		ngroups;		/* -1 means use initgroups(). */
 	gid_t		groups[NGROUPS_MAX];
+	scf_secflags_t	def_secflags;
+	secflagdelta_t	secflag_delta;
 	priv_set_t	*lpriv_set, *priv_set;
 	char		*corefile_pattern;	/* Optional. */
 	char		*project;		/* NULL for no change */

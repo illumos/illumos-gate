@@ -55,6 +55,7 @@
 #include <sys/socket.h>
 #include <sys/utsname.h>
 #include <sys/corectl.h>
+#include <sys/secflags.h>
 #if defined(__i386) || defined(__amd64)
 #include <sys/sysi86.h>
 #endif
@@ -192,6 +193,7 @@ typedef void (*pop_read_aux_t)(struct ps_prochandle *, auxv_t **, int *,
 typedef int (*pop_cred_t)(struct ps_prochandle *, prcred_t *, int,
     void *);
 typedef int (*pop_priv_t)(struct ps_prochandle *, prpriv_t **, void *);
+typedef int (*pop_secflags_t)(struct ps_prochandle *, prsecflags_t **, void *);
 typedef const psinfo_t *(*pop_psinfo_t)(struct ps_prochandle *, psinfo_t *,
     void *);
 typedef void (*pop_status_t)(struct ps_prochandle *, pstatus_t *, void *);
@@ -222,6 +224,7 @@ typedef struct ps_ops {
 	pop_uname_t		pop_uname;
 	pop_zonename_t		pop_zonename;
 	pop_execname_t		pop_execname;
+	pop_secflags_t		pop_secflags;
 #if defined(__i386) || defined(__amd64)
 	pop_ldt_t		pop_ldt;
 #endif
@@ -270,6 +273,8 @@ extern	int	Psetzoneid(struct ps_prochandle *, zoneid_t);
 extern	int	Pgetareg(struct ps_prochandle *, int, prgreg_t *);
 extern	int	Pputareg(struct ps_prochandle *, int, prgreg_t);
 extern	int	Psetrun(struct ps_prochandle *, int, int);
+extern	int	Psecflags(struct ps_prochandle *, prsecflags_t **);
+extern	void	Psecflags_free(prsecflags_t *);
 extern	ssize_t	Pread(struct ps_prochandle *, void *, size_t, uintptr_t);
 extern	ssize_t Pread_string(struct ps_prochandle *, char *, size_t, uintptr_t);
 extern	ssize_t	Pwrite(struct ps_prochandle *, const void *, size_t, uintptr_t);
@@ -696,6 +701,7 @@ extern prpriv_t *proc_get_priv(pid_t);
 extern void proc_free_priv(prpriv_t *);
 extern int proc_get_psinfo(pid_t, psinfo_t *);
 extern int proc_get_status(pid_t, pstatus_t *);
+extern int proc_get_secflags(pid_t, prsecflags_t **);
 
 /*
  * Utility functions for debugging tools to convert numeric fault,
