@@ -59,10 +59,10 @@ static char *create_token(char *s);
 %}
 
 %a 8000
-%p 5000
+%p 5500
 %e 2000
 %n 1000
-%o 13000
+%o 14000
 
 %{
 /*
