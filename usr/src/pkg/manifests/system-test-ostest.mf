@@ -25,11 +25,16 @@ dir path=opt/os-tests
 dir path=opt/os-tests/bin
 dir path=opt/os-tests/runfiles
 dir path=opt/os-tests/tests
+dir path=opt/os-tests/tests/file-locking
 dir path=opt/os-tests/tests/secflags
 dir path=opt/os-tests/tests/sigqueue
 file path=opt/os-tests/README mode=0444
 file path=opt/os-tests/bin/ostest mode=0555
 file path=opt/os-tests/runfiles/default.run mode=0444
+file path=opt/os-tests/tests/file-locking/acquire-lock.32 mode=0555
+file path=opt/os-tests/tests/file-locking/acquire-lock.64 mode=0555
+file path=opt/os-tests/tests/file-locking/runtests.32 mode=0555
+file path=opt/os-tests/tests/file-locking/runtests.64 mode=0555
 file path=opt/os-tests/tests/poll_test mode=0555
 file path=opt/os-tests/tests/secflags/addrs-32 mode=0555
 file path=opt/os-tests/tests/secflags/addrs-64 mode=0555

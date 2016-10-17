@@ -41,3 +41,6 @@ tests = ['secflags_aslr',
 
 [/opt/os-tests/tests/sigqueue]
 tests = ['sigqueue_queue_size']
+
+[/opt/os-tests/tests/file-locking]
+tests = ['runtests.32', 'runtests.64']
