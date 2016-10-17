@@ -13,7 +13,7 @@
 # Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2011 EveryCity Ltd. All rights reserved.
 # Copyright 2013 DEY Storage Systems, Inc.
-# Copyright 2015 Joyent, Inc.
+# Copyright 2016 Joyent, Inc.
 #
 
 PROG=localedef
@@ -228,6 +228,8 @@ CATDIRS		= \
 
 DATA		= $(CATDIRS:%=%/LCL_DATA)
 
+.PARALLEL:
+
 DCOLL		= LC_COLLATE/LCL_DATA
 DCTYPE		= LC_CTYPE/LCL_DATA
 DMSGS		= LC_MESSAGES/LCL_DATA
@@ -253,7 +255,7 @@ OSTMOFILE	= LC_MESSAGES/SUNW_OST_OSLIB.mo
 PRIVTRANSLOCS	= \
 		zz_AA.UTF-8
 PRIVFILE	= LC_MESSAGES/priv_names
-		
+
 
 ROOTTRANSLATIONS = $(TRANSLOCS:%=$(ROOTLIB)/locale/%/$(OSTMOFILE))
 ROOTPRIVTRANS = $(PRIVTRANSLOCS:%=$(ROOTLIB)/locale/%/$(PRIVFILE))
@@ -296,7 +298,7 @@ parser.tab.c parser.tab.h: parser.y $(HDRS)
 lint:	$(SRCS)
 	$(LINT.c) $(CPPFLAGS) $(SRCS)
 
-clean:	
+clean:
 	$(RM) $(CLEANFILES)
 	$(RM) $(STAMPFILES)
 
