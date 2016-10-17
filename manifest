@@ -11731,6 +11731,7 @@ f usr/share/man/man1/profiles.1 0444 root bin
 f usr/share/man/man1/projects.1 0444 root bin
 s usr/share/man/man1/prun.1=proc.1
 f usr/share/man/man1/ps.1 0444 root bin
+f usr/share/man/man1/psecflags.1 0444 root bin
 s usr/share/man/man1/psig.1=proc.1
 s usr/share/man/man1/pstack.1=proc.1
 s usr/share/man/man1/pstop.1=proc.1
