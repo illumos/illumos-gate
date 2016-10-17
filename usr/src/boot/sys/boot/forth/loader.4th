@@ -288,7 +288,8 @@ only forth definitions also support-functions
 \ -B acpi-user-options=X to acpi-user-options=X
 \ 
 \ This is needed so that the menu can manage these options. Unfortunately, this
-\ also means that boot-args will override previously set options, but we have no\ way to control the processing order here. boot-args will be rebuilt at boot.
+\ also means that boot-args will override previously set options, but we have no
+\ way to control the processing order here. boot-args will be rebuilt at boot.
 \ 
 \ NOTE: The best way to address the order is to *not* set any above options
 \ in boot-args.

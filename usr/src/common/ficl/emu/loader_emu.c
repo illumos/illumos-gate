@@ -877,8 +877,10 @@ bf_run(char *line)
 		printf("Parse error!\n");
 	break;
 	default:
-		/* Hopefully, all other codes filled this buffer */
-		printf("%s\n", command_errmsg);
+		if (command_errmsg != NULL) {
+			printf("%s\n", command_errmsg);
+			command_errmsg = NULL;
+		}
 	}
 
 	setenv("interpret", bf_vm->state ? "" : "ok", 1);

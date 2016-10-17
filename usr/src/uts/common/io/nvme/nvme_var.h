@@ -42,6 +42,7 @@
 #define	NVME_DEFAULT_IO_QUEUE_LEN	1024
 #define	NVME_DEFAULT_ASYNC_EVENT_LIMIT	10
 #define	NVME_MIN_ASYNC_EVENT_LIMIT	1
+#define	NVME_DEFAULT_MIN_BLOCK_SIZE	512
 
 
 typedef struct nvme nvme_t;
@@ -123,15 +124,18 @@ struct nvme {
 	char *n_product;
 	char *n_vendor;
 
+	nvme_version_t n_version;
 	boolean_t n_dead;
 	boolean_t n_strict_version;
 	boolean_t n_ignore_unknown_vendor_status;
 	uint32_t n_admin_queue_len;
 	uint32_t n_io_queue_len;
 	uint16_t n_async_event_limit;
+	uint_t n_min_block_size;
 	uint16_t n_abort_command_limit;
 	uint64_t n_max_data_transfer_size;
-	boolean_t n_volatile_write_cache_enabled;
+	boolean_t n_write_cache_present;
+	boolean_t n_write_cache_enabled;
 	int n_error_log_len;
 
 	int n_nssr_supported;
@@ -212,6 +216,8 @@ struct nvme {
 
 struct nvme_namespace {
 	nvme_t *ns_nvme;
+	uint8_t ns_eui64[8];
+
 	bd_handle_t ns_bd_hdl;
 
 	uint32_t ns_id;
@@ -224,13 +230,10 @@ struct nvme_namespace {
 	nvme_identify_nsid_t *ns_idns;
 
 	/*
-	 * Section 7.7 of the spec describes how to get a unique ID for
-	 * the controller: the vendor ID, the model name and the serial
-	 * number shall be unique when combined.
-	 *
-	 * We add the hex namespace ID to get a unique ID for the namespace.
+	 * If a namespace has no EUI64, we create a devid in
+	 * nvme_prepare_devid().
 	 */
-	char ns_devid[4 + 1 + 20 + 1 + 40 + 1 + 8 + 1];
+	char *ns_devid;
 };
 
 struct nvme_task_arg {

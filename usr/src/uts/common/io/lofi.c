@@ -128,6 +128,7 @@
 #include <sys/debug.h>
 #include <sys/vnode.h>
 #include <sys/lofi.h>
+#include <sys/lofi_impl.h>	/* for cache structure */
 #include <sys/fcntl.h>
 #include <sys/pathname.h>
 #include <sys/filio.h>
@@ -167,12 +168,7 @@
 		return (EINVAL); \
 	}
 
-#define	DEVFS_CHANNEL	"devfsadm_event_channel"
 #define	LOFI_TIMEOUT	30
-static evchan_t *lofi_chan;
-static kmutex_t lofi_chan_lock;
-static kcondvar_t lofi_chan_cv;
-static nvlist_t *lofi_devlink_cache;
 
 static void *lofi_statep;
 static kmutex_t lofi_lock;		/* state lock */
@@ -1897,51 +1893,6 @@ err:
 	return (error);
 }
 
-/*ARGSUSED*/
-static int
-lofi_dev_callback(sysevent_t *ev, void *cookie)
-{
-	nvlist_t *nvlist;
-	char *class, *driver;
-	char name[10];
-	int32_t instance;
-
-	class = sysevent_get_class_name(ev);
-	if (strcmp(class, EC_DEV_ADD) && strcmp(class, EC_DEV_REMOVE))
-		return (0);
-
-	(void) sysevent_get_attr_list(ev, &nvlist);
-	driver = fnvlist_lookup_string(nvlist, DEV_DRIVER_NAME);
-	instance = fnvlist_lookup_int32(nvlist, DEV_INSTANCE);
-
-	if (strcmp(driver, LOFI_DRIVER_NAME) != 0) {
-		fnvlist_free(nvlist);
-		return (0);
-	}
-
-	/*
-	 * insert or remove device info, then announce the change
-	 * via cv_broadcast.
-	 * This allows the MAP/UNMAP to monitor device change.
-	 */
-	(void) snprintf(name, sizeof (name), "%d", instance);
-	if (strcmp(class, EC_DEV_ADD) == 0) {
-		mutex_enter(&lofi_chan_lock);
-		fnvlist_add_nvlist(lofi_devlink_cache, name, nvlist);
-		cv_broadcast(&lofi_chan_cv);
-		mutex_exit(&lofi_chan_lock);
-	} else if (strcmp(class, EC_DEV_REMOVE) == 0) {
-		mutex_enter(&lofi_chan_lock);
-		/* Can not use fnvlist_remove() as we can get ENOENT. */
-		(void) nvlist_remove_all(lofi_devlink_cache, name);
-		cv_broadcast(&lofi_chan_cv);
-		mutex_exit(&lofi_chan_lock);
-	}
-
-	fnvlist_free(nvlist);
-	return (0);
-}
-
 static int
 lofi_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
@@ -1976,23 +1927,6 @@ lofi_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			return (DDI_FAILURE);
 		}
 
-		rv = sysevent_evc_bind(DEVFS_CHANNEL, &lofi_chan,
-		    EVCH_CREAT | EVCH_HOLD_PEND);
-		if (rv == 0) {
-			rv = sysevent_evc_subscribe(lofi_chan, "lofi",
-			    EC_ALL, lofi_dev_callback, NULL, 0);
-			rv |= sysevent_evc_subscribe(lofi_chan, "disk",
-			    EC_ALL, lofi_dev_callback, NULL, 0);
-		} else
-			lofi_chan = NULL;
-		if (rv != 0) {
-			if (lofi_chan != NULL)
-				(void) sysevent_evc_unbind(lofi_chan);
-			ddi_prop_remove_all(dip);
-			ddi_remove_minor_node(dip, NULL);
-			ddi_soft_state_free(lofi_statep, 0);
-			return (DDI_FAILURE);
-		}
 		zone_key_create(&lofi_zone_key, NULL, lofi_zone_shutdown, NULL);
 
 		lsp->ls_dip = dip;
@@ -2039,7 +1973,6 @@ lofi_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 	mutex_exit(&lofi_lock);
 
-	(void) sysevent_evc_unbind(lofi_chan);
 	if (zone_key_delete(lofi_zone_key) != 0)
 		cmn_err(CE_WARN, "failed to delete zone key");
 
@@ -2752,7 +2685,7 @@ lofi_copy_devpath(struct lofi_ioctl *klip)
 	int	error;
 	char	namebuf[MAXNAMELEN], *str;
 	clock_t ticks;
-	nvlist_t *nvl;
+	nvlist_t *nvl = NULL;
 
 	if (klip->li_labeled == B_TRUE)
 		klip->li_devpath[0] = '\0';
@@ -2766,13 +2699,15 @@ lofi_copy_devpath(struct lofi_ioctl *klip)
 	(void) snprintf(namebuf, sizeof (namebuf), "%d", klip->li_id);
 	ticks = ddi_get_lbolt() + LOFI_TIMEOUT * drv_usectohz(1000000);
 
-	nvl = NULL;
-
-	mutex_enter(&lofi_chan_lock);
-	while (nvlist_lookup_nvlist(lofi_devlink_cache, namebuf, &nvl) != 0) {
-		error = cv_timedwait(&lofi_chan_cv, &lofi_chan_lock, ticks);
+	mutex_enter(&lofi_devlink_cache.ln_lock);
+	error = nvlist_lookup_nvlist(lofi_devlink_cache.ln_data, namebuf, &nvl);
+	while (error != 0) {
+		error = cv_timedwait(&lofi_devlink_cache.ln_cv,
+		    &lofi_devlink_cache.ln_lock, ticks);
 		if (error == -1)
 			break;
+		error = nvlist_lookup_nvlist(lofi_devlink_cache.ln_data,
+		    namebuf, &nvl);
 	}
 
 	if (nvl != NULL) {
@@ -2781,7 +2716,7 @@ lofi_copy_devpath(struct lofi_ioctl *klip)
 			    sizeof (klip->li_devpath));
 		}
 	}
-	mutex_exit(&lofi_chan_lock);
+	mutex_exit(&lofi_devlink_cache.ln_lock);
 }
 
 /*
@@ -3060,13 +2995,17 @@ out:
 	 */
 	(void) snprintf(name, sizeof (name), "%d", klip->li_id);
 	ticks = ddi_get_lbolt() + LOFI_TIMEOUT * drv_usectohz(1000000);
-	mutex_enter(&lofi_chan_lock);
-	while (nvlist_lookup_nvlist(lofi_devlink_cache, name, &nvl) == 0) {
-		err = cv_timedwait(&lofi_chan_cv, &lofi_chan_lock, ticks);
+	mutex_enter(&lofi_devlink_cache.ln_lock);
+	err = nvlist_lookup_nvlist(lofi_devlink_cache.ln_data, name, &nvl);
+	while (err == 0) {
+		err = cv_timedwait(&lofi_devlink_cache.ln_cv,
+		    &lofi_devlink_cache.ln_lock, ticks);
 		if (err == -1)
 			break;
+		err = nvlist_lookup_nvlist(lofi_devlink_cache.ln_data,
+		    name, &nvl);
 	}
-	mutex_exit(&lofi_chan_lock);
+	mutex_exit(&lofi_devlink_cache.ln_lock);
 
 	mutex_exit(&lofi_lock);
 	(void) copy_out_lofi_ioctl(klip, ulip, ioctl_flag);
@@ -3589,18 +3528,11 @@ _init(void)
 	}
 
 	mutex_init(&lofi_lock, NULL, MUTEX_DRIVER, NULL);
-	mutex_init(&lofi_chan_lock, NULL, MUTEX_DRIVER, NULL);
-	cv_init(&lofi_chan_cv, NULL, CV_DRIVER, NULL);
-	error = nvlist_alloc(&lofi_devlink_cache, NV_UNIQUE_NAME, KM_SLEEP);
 
-	if (error == 0)
-		error = mod_install(&modlinkage);
+	error = mod_install(&modlinkage);
+
 	if (error) {
 		id_space_destroy(lofi_id);
-		if (lofi_devlink_cache != NULL)
-			nvlist_free(lofi_devlink_cache);
-		mutex_destroy(&lofi_chan_lock);
-		cv_destroy(&lofi_chan_cv);
 		mutex_destroy(&lofi_lock);
 		ddi_soft_state_fini((void **)&lofi_statep);
 		list_destroy(&lofi_list);
@@ -3627,13 +3559,6 @@ _fini(void)
 	if (error)
 		return (error);
 
-	mutex_enter(&lofi_chan_lock);
-	nvlist_free(lofi_devlink_cache);
-	lofi_devlink_cache = NULL;
-	mutex_exit(&lofi_chan_lock);
-
-	mutex_destroy(&lofi_chan_lock);
-	cv_destroy(&lofi_chan_cv);
 	mutex_destroy(&lofi_lock);
 	id_space_destroy(lofi_id);
 	ddi_soft_state_fini((void **)&lofi_statep);
