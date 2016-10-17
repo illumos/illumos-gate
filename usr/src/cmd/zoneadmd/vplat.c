@@ -4674,7 +4674,7 @@ setup_zone_attrs(zlog_t *zlogp, zoneid_t zoneid)
 	if ((res = setup_zone_fs_allowed(snap_hndl, zlogp, zoneid)) != Z_OK)
 		goto out;
 
-	if ((res = setup_zone_secflags(handle, zlogp, zoneid)) != Z_OK)
+	if ((res = setup_zone_secflags(snap_hndl, zlogp, zoneid)) != Z_OK)
 		goto out;
 
 out:
