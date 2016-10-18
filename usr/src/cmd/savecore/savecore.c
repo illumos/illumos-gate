@@ -267,8 +267,8 @@ static void
 Fread(void *buf, size_t size, FILE *f)
 {
 	if (fread(buf, size, 1, f) != 1)
-		logprint(SC_SL_ERR | SC_EXIT_ERR, "fread: ferror %d feof %d",
-		    ferror(f), feof(f));
+		logprint(SC_SL_ERR | SC_EXIT_ERR, "fread: %s",
+		    strerror(errno));
 }
 
 static void
