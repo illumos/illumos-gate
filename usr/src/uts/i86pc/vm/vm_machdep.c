@@ -24,7 +24,7 @@
 /*
  * Copyright (c) 2010, Intel Corporation.
  * All rights reserved.
- * Copyright (c) 2014, Joyent, Inc. All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 /* Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T */
@@ -947,6 +947,7 @@ valid_usr_range(caddr_t addr, size_t len, uint_t prot, struct as *as,
 		return (RANGE_BADADDR);
 
 	if ((addr <= (caddr_t)forbidden_null_mapping_sz) &&
+	    as->a_proc != NULL &&
 	    secflag_enabled(as->a_proc, PROC_SEC_FORBIDNULLMAP))
 		return (RANGE_BADADDR);
 

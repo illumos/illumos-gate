@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*
@@ -386,6 +387,7 @@ valid_usr_range(caddr_t addr, size_t len, uint_t prot, struct as *as,
 		return (RANGE_BADADDR);
 
 	if ((addr <= (caddr_t)forbidden_null_mapping_sz) &&
+	    as->a_proc != NULL &&
 	    secflag_enabled(as->a_proc, PROC_SEC_FORBIDNULLMAP))
 		return (RANGE_BADADDR);
 
