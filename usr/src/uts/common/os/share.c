@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -504,7 +504,9 @@ print_share(struct shrlock *shr)
 
 /*
  * Return non-zero if the given I/O request conflicts with a registered
- * share reservation.
+ * share reservation.  Note: These are Windows-compatible semantics, but
+ * windows would do these checks only when opening a file.  Details in:
+ *	[MS-FSA] 2.1.5.1.2.2 Algorithm to check sharing access...
  *
  * A process is identified by the tuple (sysid, pid). When the caller
  * context is passed to nbl_share_conflict, the sysid and pid in the
@@ -523,14 +525,9 @@ print_share(struct shrlock *shr)
  *      or deny write.
  *
  *   4. An op request of NBL_REMOVE will fail if there is
- *      a mandatory share reservation with an access of read,
- *      write, or remove. (Anything other than meta data access).
+ *      a mandatory share reservation with deny remove.
  *
- *   5. An op request of NBL_RENAME will fail if there is
- *      a mandatory share reservation with:
- *        a) access write or access remove
- *      or
- *        b) access read and deny remove
+ *   5. An op request of NBL_RENAME ... (same as NBL_REMOVE)
  *
  *   Otherwise there is no conflict and the op request succeeds.
  *
@@ -571,6 +568,14 @@ nbl_share_conflict(vnode_t *vp, nbl_op_t op, caller_context_t *ct)
 		if (!(shrl->shr->s_deny & F_MANDDNY))
 			continue;
 		/*
+		 * Share deny reservations apply to _subsequent_ opens
+		 * and therefore only to I/O on _other_ handles.
+		 */
+		if (shrl->shr->s_sysid == sysid &&
+		    shrl->shr->s_pid == pid)
+			continue;
+
+		/*
 		 * NBL_READ, NBL_WRITE, and NBL_READWRITE need to
 		 * check if the share reservation being examined
 		 * belongs to the current process.
@@ -580,33 +585,20 @@ nbl_share_conflict(vnode_t *vp, nbl_op_t op, caller_context_t *ct)
 		 */
 		switch (op) {
 		case NBL_READ:
-			if ((shrl->shr->s_deny & F_RDDNY) &&
-			    (shrl->shr->s_sysid != sysid ||
-			    shrl->shr->s_pid != pid))
+			if (shrl->shr->s_deny & F_RDDNY)
 				conflict = 1;
 			break;
 		case NBL_WRITE:
-			if ((shrl->shr->s_deny & F_WRDNY) &&
-			    (shrl->shr->s_sysid != sysid ||
-			    shrl->shr->s_pid != pid))
+			if (shrl->shr->s_deny & F_WRDNY)
 				conflict = 1;
 			break;
 		case NBL_READWRITE:
-			if ((shrl->shr->s_deny & F_RWDNY) &&
-			    (shrl->shr->s_sysid != sysid ||
-			    shrl->shr->s_pid != pid))
+			if (shrl->shr->s_deny & F_RWDNY)
 				conflict = 1;
 			break;
 		case NBL_REMOVE:
-			if (shrl->shr->s_access & (F_RWACC|F_RMACC))
-				conflict = 1;
-			break;
 		case NBL_RENAME:
-			if (shrl->shr->s_access & (F_WRACC|F_RMACC))
-				conflict = 1;
-
-			else if ((shrl->shr->s_access & F_RDACC) &&
-			    (shrl->shr->s_deny & F_RMDNY))
+			if (shrl->shr->s_deny & F_RMDNY)
 				conflict = 1;
 			break;
 #ifdef DEBUG
