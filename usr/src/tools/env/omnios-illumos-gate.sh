@@ -218,6 +218,11 @@ __GNUC="";           export __GNUC
 CW_NO_SHADOW=1;     export CW_NO_SHADOW
 ONLY_LINT_DEFS=-I${SPRO_ROOT}/sunstudio12.1/prod/include/lint; export ONLY_LINT_DEFS
 
+# Starting with illumos bug 5969, upstream defaults to Python2.7.  We still
+# use Python2.6 as of r151020
+export PYTHON_VERSION="2.6"
+export PYTHON_PKGVERS="-26"
+
 # This goes along with lint - it is a series of the form "A [y|n]" which
 # means "go to directory A and run 'make lint'" Then mail me (y) the
 # difference in the lint output. 'y' should only be used if the area you're
