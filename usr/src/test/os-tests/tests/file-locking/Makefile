@@ -31,6 +31,10 @@ PROGS64 = $(PROGS:%=%.64)
 runtests.32 :=	LDLIBS += -lgen
 runtests.64 :=	LDLIBS64 += -lgen
 
+LINTS = $(PROGS:%=%.ln)
+LINTFLAGS += -erroff=E_NAME_DEF_NOT_USED2
+LINTFLAGS += -erroff=E_NAME_USED_NOT_DEF2
+
 ROOTOPTDIR = $(ROOT)/opt/os-tests/tests/file-locking
 ROOTOPTPROGS = $(PROGS32:%=$(ROOTOPTDIR)/%) \
 	$(PROGS64:%=$(ROOTOPTDIR)/%)
@@ -47,7 +51,7 @@ install: $(ROOTOPTPROGS)
 
 all: $(PROGS32) $(PROGS64)
 
-lint: lint_SRCS
+lint: $(LINTS)
 
 clean:
 	-rm $(PROGS32) $(PROGS64)
@@ -62,6 +66,9 @@ $(ROOTOPTDIR)/%: %
 
 $(ROOTOPTDIR)/%: %.ksh
 	$(INS.rename)
+
+%.ln: %.c
+	$(LINT.c) $< $(UTILS) $(LDLIBS)
 
 %.64: %.c
 	$(LINK64.c) -o $@ $< $(UTILS) $(LDLIBS64)
