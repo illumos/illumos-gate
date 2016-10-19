@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2016 RackTop Systems.
  */
 
 #ifndef	_LIBSCF_H
@@ -39,8 +40,8 @@
 extern "C" {
 #endif
 
-typedef struct scf_version *scf_version_t;
-#define	SCF_VERSION	((scf_version_t)1UL)
+typedef unsigned long scf_version_t;
+#define	SCF_VERSION		1UL
 
 /*
  * Opaque structures
@@ -228,181 +229,169 @@ typedef struct {
 /*
  * Standard services
  */
-#define	SCF_SERVICE_CONFIGD	((const char *) \
-				    "svc:/system/svc/repository:default")
-#define	SCF_INSTANCE_GLOBAL	((const char *) \
-				    "svc:/system/svc/global:default")
-#define	SCF_SERVICE_GLOBAL	((const char *) \
-				    "svc:/system/svc/global")
-#define	SCF_SERVICE_STARTD	((const char *) \
-				    "svc:/system/svc/restarter:default")
-#define	SCF_INSTANCE_EMI	((const char *) \
-				    "svc:/system/early-manifest-import:default")
-#define	SCF_INSTANCE_FS_MINIMAL	((const char *) \
-				    "svc:/system/filesystem/minimal:default")
-#define	SCF_INSTANCE_MI		((const char *) \
-				    "svc:/system/manifest-import:default")
+#define	SCF_SERVICE_CONFIGD	"svc:/system/svc/repository:default"
+#define	SCF_INSTANCE_GLOBAL	"svc:/system/svc/global:default"
+#define	SCF_SERVICE_GLOBAL	"svc:/system/svc/global"
+#define	SCF_SERVICE_STARTD	"svc:/system/svc/restarter:default"
+#define	SCF_INSTANCE_EMI	"svc:/system/early-manifest-import:default"
+#define	SCF_INSTANCE_FS_MINIMAL	"svc:/system/filesystem/minimal:default"
+#define	SCF_INSTANCE_MI		"svc:/system/manifest-import:default"
 
 /*
  * Major milestones
  */
-#define	SCF_MILESTONE_SINGLE_USER \
-	((const char *) "svc:/milestone/single-user:default")
-#define	SCF_MILESTONE_MULTI_USER \
-	((const char *) "svc:/milestone/multi-user:default")
+#define	SCF_MILESTONE_SINGLE_USER	"svc:/milestone/single-user:default"
+#define	SCF_MILESTONE_MULTI_USER	"svc:/milestone/multi-user:default"
 #define	SCF_MILESTONE_MULTI_USER_SERVER \
-	((const char *) "svc:/milestone/multi-user-server:default")
+	"svc:/milestone/multi-user-server:default"
 
 /*
  * standard scope names
  */
-#define	SCF_SCOPE_LOCAL			((const char *)"localhost")
+#define	SCF_SCOPE_LOCAL			"localhost"
 
 /*
  * Property group types
  */
-#define	SCF_GROUP_APPLICATION		((const char *)"application")
-#define	SCF_GROUP_FRAMEWORK		((const char *)"framework")
-#define	SCF_GROUP_DEPENDENCY		((const char *)"dependency")
-#define	SCF_GROUP_METHOD		((const char *)"method")
-#define	SCF_GROUP_TEMPLATE		((const char *)"template")
-#define	SCF_GROUP_TEMPLATE_PG_PATTERN	((const char *)"template_pg_pattern")
-#define	SCF_GROUP_TEMPLATE_PROP_PATTERN	((const char *)"template_prop_pattern")
+#define	SCF_GROUP_APPLICATION		"application"
+#define	SCF_GROUP_FRAMEWORK		"framework"
+#define	SCF_GROUP_DEPENDENCY		"dependency"
+#define	SCF_GROUP_METHOD		"method"
+#define	SCF_GROUP_TEMPLATE		"template"
+#define	SCF_GROUP_TEMPLATE_PG_PATTERN	"template_pg_pattern"
+#define	SCF_GROUP_TEMPLATE_PROP_PATTERN	"template_prop_pattern"
 
 /*
  * Dependency types
  */
-#define	SCF_DEP_REQUIRE_ALL		((const char *)"require_all")
-#define	SCF_DEP_REQUIRE_ANY		((const char *)"require_any")
-#define	SCF_DEP_EXCLUDE_ALL		((const char *)"exclude_all")
-#define	SCF_DEP_OPTIONAL_ALL		((const char *)"optional_all")
+#define	SCF_DEP_REQUIRE_ALL		"require_all"
+#define	SCF_DEP_REQUIRE_ANY		"require_any"
+#define	SCF_DEP_EXCLUDE_ALL		"exclude_all"
+#define	SCF_DEP_OPTIONAL_ALL		"optional_all"
 
-#define	SCF_DEP_RESET_ON_ERROR		((const char *)"error")
-#define	SCF_DEP_RESET_ON_RESTART	((const char *)"restart")
-#define	SCF_DEP_RESET_ON_REFRESH	((const char *)"refresh")
-#define	SCF_DEP_RESET_ON_NONE		((const char *)"none")
+#define	SCF_DEP_RESET_ON_ERROR		"error"
+#define	SCF_DEP_RESET_ON_RESTART	"restart"
+#define	SCF_DEP_RESET_ON_REFRESH	"refresh"
+#define	SCF_DEP_RESET_ON_NONE		"none"
 
 /*
  * Standard property group names
  */
-#define	SCF_PG_GENERAL			((const char *)"general")
-#define	SCF_PG_GENERAL_OVR		((const char *)"general_ovr")
-#define	SCF_PG_RESTARTER		((const char *)"restarter")
-#define	SCF_PG_RESTARTER_ACTIONS	((const char *)"restarter_actions")
-#define	SCF_PG_METHOD_CONTEXT		((const char *)"method_context")
-#define	SCF_PG_APP_DEFAULT		((const char *)"application")
-#define	SCF_PG_DEPENDENTS		((const char *)"dependents")
-#define	SCF_PG_OPTIONS			((const char *)"options")
-#define	SCF_PG_OPTIONS_OVR		((const char *)"options_ovr")
-#define	SCF_PG_STARTD			((const char *)"startd")
-#define	SCF_PG_STARTD_PRIVATE		((const char *)"svc-startd-private")
-#define	SCF_PG_DEATHROW			((const char *)"deathrow")
-#define	SCF_PG_MANIFESTFILES		((const char *)"manifestfiles")
+#define	SCF_PG_GENERAL			"general"
+#define	SCF_PG_GENERAL_OVR		"general_ovr"
+#define	SCF_PG_RESTARTER		"restarter"
+#define	SCF_PG_RESTARTER_ACTIONS	"restarter_actions"
+#define	SCF_PG_METHOD_CONTEXT		"method_context"
+#define	SCF_PG_APP_DEFAULT		"application"
+#define	SCF_PG_DEPENDENTS		"dependents"
+#define	SCF_PG_OPTIONS			"options"
+#define	SCF_PG_OPTIONS_OVR		"options_ovr"
+#define	SCF_PG_STARTD			"startd"
+#define	SCF_PG_STARTD_PRIVATE		"svc-startd-private"
+#define	SCF_PG_DEATHROW			"deathrow"
+#define	SCF_PG_MANIFESTFILES		"manifestfiles"
 
 /*
  * Template property group names and prefixes
  */
-#define	SCF_PG_TM_COMMON_NAME		((const char *)"tm_common_name")
-#define	SCF_PG_TM_DESCRIPTION		((const char *)"tm_description")
+#define	SCF_PG_TM_COMMON_NAME		"tm_common_name"
+#define	SCF_PG_TM_DESCRIPTION		"tm_description"
 
-#define	SCF_PG_TM_MAN_PREFIX		((const char *)"tm_man_")
-#define	SCF_PG_TM_DOC_PREFIX		((const char *)"tm_doc_")
+#define	SCF_PG_TM_MAN_PREFIX		"tm_man_"
+#define	SCF_PG_TM_DOC_PREFIX		"tm_doc_"
 
 /*
  * Standard property names
  */
-#define	SCF_PROPERTY_ACTIVE_POSTFIX	((const char *)"active")
-#define	SCF_PROPERTY_AUX_STATE		((const char *)"auxiliary_state")
-#define	SCF_PROPERTY_AUX_FMRI		((const char *)"auxiliary_fmri")
-#define	SCF_PROPERTY_AUX_TTY		((const char *)"auxiliary_tty")
-#define	SCF_PROPERTY_CONTRACT		((const char *)"contract")
-#define	SCF_PROPERTY_COREFILE_PATTERN	((const char *)"corefile_pattern")
-#define	SCF_PROPERTY_DEGRADED		((const char *)"degraded")
-#define	SCF_PROPERTY_DEGRADE_IMMEDIATE	((const char *)"degrade_immediate")
-#define	SCF_PROPERTY_DODUMP		((const char *)"do_dump")
-#define	SCF_PROPERTY_DURATION		((const char *)"duration")
-#define	SCF_PROPERTY_ENABLED		((const char *)"enabled")
-#define	SCF_PROPERTY_DEATHROW		((const char *)"deathrow")
-#define	SCF_PROPERTY_ENTITY_STABILITY	((const char *)"entity_stability")
-#define	SCF_PROPERTY_ENTITIES		((const char *)"entities")
-#define	SCF_PROPERTY_EXEC		((const char *)"exec")
-#define	SCF_PROPERTY_GROUP		((const char *)"group")
-#define	SCF_PROPERTY_GROUPING		((const char *)"grouping")
-#define	SCF_PROPERTY_IGNORE		((const char *)"ignore_error")
-#define	SCF_PROPERTY_INTERNAL_SEPARATORS ((const char *)"internal_separators")
-#define	SCF_PROPERTY_LIMIT_PRIVILEGES	((const char *)"limit_privileges")
-#define	SCF_PROPERTY_MAINT_OFF		((const char *)"maint_off")
-#define	SCF_PROPERTY_MAINT_ON		((const char *)"maint_on")
-#define	SCF_PROPERTY_MAINT_ON_IMMEDIATE	((const char *)"maint_on_immediate")
-#define	SCF_PROPERTY_MAINT_ON_IMMTEMP	((const char *)"maint_on_immtemp")
-#define	SCF_PROPERTY_MAINT_ON_TEMPORARY	((const char *)"maint_on_temporary")
-#define	SCF_PROPERTY_METHOD_PID		((const char *)"method_pid")
-#define	SCF_PROPERTY_MILESTONE		((const char *)"milestone")
-#define	SCF_PROPERTY_NEED_SESSION	((const char *)"need_session")
-#define	SCF_PROPERTY_NEXT_STATE		((const char *)"next_state")
-#define	SCF_PROPERTY_PACKAGE		((const char *)"package")
-#define	SCF_PROPERTY_PRIVILEGES		((const char *)"privileges")
-#define	SCF_PROPERTY_PROFILE		((const char *)"profile")
-#define	SCF_PROPERTY_PROJECT		((const char *)"project")
-#define	SCF_PROPERTY_REFRESH		((const char *)"refresh")
-#define	SCF_PROPERTY_RESOURCE_POOL	((const char *)"resource_pool")
-#define	SCF_PROPERTY_ENVIRONMENT	((const char *)"environment")
-#define	SCF_PROPERTY_RESTART		((const char *)"restart")
-#define	SCF_PROPERTY_RESTARTER		((const char *)"restarter")
-#define	SCF_PROPERTY_RESTART_INTERVAL	((const char *)"restart_interval")
-#define	SCF_PROPERTY_RESTART_ON		((const char *)"restart_on")
-#define	SCF_PROPERTY_RESTORE		((const char *)"restore")
-#define	SCF_PROPERTY_SECFLAGS		((const char *)"security_flags")
-#define	SCF_PROPERTY_SINGLE_INSTANCE	((const char *)"single_instance")
-#define	SCF_PROPERTY_START_METHOD_TIMESTAMP	\
-	((const char *)"start_method_timestamp")
-#define	SCF_PROPERTY_START_METHOD_WAITSTATUS	\
-	((const char *)"start_method_waitstatus")
-#define	SCF_PROPERTY_START_PID		((const char *)"start_pid")
-#define	SCF_PROPERTY_STATE		((const char *)"state")
-#define	SCF_PROPERTY_STABILITY		((const char *)"stability")
-#define	SCF_PROPERTY_STATE_TIMESTAMP	((const char *)"state_timestamp")
-#define	SCF_PROPERTY_SUPP_GROUPS	((const char *)"supp_groups")
-#define	SCF_PROPERTY_TIMEOUT		((const char *)"timeout_seconds")
-#define	SCF_PROPERTY_TIMEOUT_RETRY	((const char *)"timeout_retry")
-#define	SCF_PROPERTY_TRANSIENT_CONTRACT	((const char *)"transient_contract")
-#define	SCF_PROPERTY_TYPE		((const char *)"type")
-#define	SCF_PROPERTY_USE_PROFILE	((const char *)"use_profile")
-#define	SCF_PROPERTY_USER		((const char *)"user")
-#define	SCF_PROPERTY_UTMPX_PREFIX	((const char *)"utmpx_prefix")
-#define	SCF_PROPERTY_WORKING_DIRECTORY	((const char *)"working_directory")
+#define	SCF_PROPERTY_ACTIVE_POSTFIX		"active"
+#define	SCF_PROPERTY_AUX_STATE			"auxiliary_state"
+#define	SCF_PROPERTY_AUX_FMRI			"auxiliary_fmri"
+#define	SCF_PROPERTY_AUX_TTY			"auxiliary_tty"
+#define	SCF_PROPERTY_CONTRACT			"contract"
+#define	SCF_PROPERTY_COREFILE_PATTERN		"corefile_pattern"
+#define	SCF_PROPERTY_DEGRADED			"degraded"
+#define	SCF_PROPERTY_DEGRADE_IMMEDIATE		"degrade_immediate"
+#define	SCF_PROPERTY_DODUMP			"do_dump"
+#define	SCF_PROPERTY_DURATION			"duration"
+#define	SCF_PROPERTY_ENABLED			"enabled"
+#define	SCF_PROPERTY_DEATHROW			"deathrow"
+#define	SCF_PROPERTY_ENTITY_STABILITY		"entity_stability"
+#define	SCF_PROPERTY_ENTITIES			"entities"
+#define	SCF_PROPERTY_EXEC			"exec"
+#define	SCF_PROPERTY_GROUP			"group"
+#define	SCF_PROPERTY_GROUPING			"grouping"
+#define	SCF_PROPERTY_IGNORE			"ignore_error"
+#define	SCF_PROPERTY_INTERNAL_SEPARATORS 	"internal_separators"
+#define	SCF_PROPERTY_LIMIT_PRIVILEGES		"limit_privileges"
+#define	SCF_PROPERTY_MAINT_OFF			"maint_off"
+#define	SCF_PROPERTY_MAINT_ON			"maint_on"
+#define	SCF_PROPERTY_MAINT_ON_IMMEDIATE		"maint_on_immediate"
+#define	SCF_PROPERTY_MAINT_ON_IMMTEMP		"maint_on_immtemp"
+#define	SCF_PROPERTY_MAINT_ON_TEMPORARY		"maint_on_temporary"
+#define	SCF_PROPERTY_METHOD_PID			"method_pid"
+#define	SCF_PROPERTY_MILESTONE			"milestone"
+#define	SCF_PROPERTY_NEED_SESSION		"need_session"
+#define	SCF_PROPERTY_NEXT_STATE			"next_state"
+#define	SCF_PROPERTY_PACKAGE			"package"
+#define	SCF_PROPERTY_PRIVILEGES			"privileges"
+#define	SCF_PROPERTY_PROFILE			"profile"
+#define	SCF_PROPERTY_PROJECT			"project"
+#define	SCF_PROPERTY_REFRESH			"refresh"
+#define	SCF_PROPERTY_RESOURCE_POOL		"resource_pool"
+#define	SCF_PROPERTY_ENVIRONMENT		"environment"
+#define	SCF_PROPERTY_RESTART			"restart"
+#define	SCF_PROPERTY_RESTARTER			"restarter"
+#define	SCF_PROPERTY_RESTART_INTERVAL		"restart_interval"
+#define	SCF_PROPERTY_RESTART_ON			"restart_on"
+#define	SCF_PROPERTY_RESTORE			"restore"
+#define	SCF_PROPERTY_SECFLAGS			"security_flags"
+#define	SCF_PROPERTY_SINGLE_INSTANCE		"single_instance"
+#define	SCF_PROPERTY_START_METHOD_TIMESTAMP	"start_method_timestamp"
+#define	SCF_PROPERTY_START_METHOD_WAITSTATUS	"start_method_waitstatus"
+#define	SCF_PROPERTY_START_PID			"start_pid"
+#define	SCF_PROPERTY_STATE			"state"
+#define	SCF_PROPERTY_STABILITY			"stability"
+#define	SCF_PROPERTY_STATE_TIMESTAMP		"state_timestamp"
+#define	SCF_PROPERTY_SUPP_GROUPS		"supp_groups"
+#define	SCF_PROPERTY_TIMEOUT			"timeout_seconds"
+#define	SCF_PROPERTY_TIMEOUT_RETRY		"timeout_retry"
+#define	SCF_PROPERTY_TRANSIENT_CONTRACT		"transient_contract"
+#define	SCF_PROPERTY_TYPE			"type"
+#define	SCF_PROPERTY_USE_PROFILE		"use_profile"
+#define	SCF_PROPERTY_USER			"user"
+#define	SCF_PROPERTY_UTMPX_PREFIX		"utmpx_prefix"
+#define	SCF_PROPERTY_WORKING_DIRECTORY		"working_directory"
 
 /*
  * Template property names
  */
-#define	SCF_PROPERTY_TM_CARDINALITY_MIN	((const char *)"cardinality_min")
-#define	SCF_PROPERTY_TM_CARDINALITY_MAX	((const char *)"cardinality_max")
-#define	SCF_PROPERTY_TM_CHOICES_INCLUDE_VALUES ((const char *) \
-					    "choices_include_values")
-#define	SCF_PROPERTY_TM_CHOICES_NAME	((const char *)"choices_name")
-#define	SCF_PROPERTY_TM_CHOICES_RANGE	((const char *)"choices_range")
-#define	SCF_PROPERTY_TM_CONSTRAINT_NAME	((const char *)"constraint_name")
-#define	SCF_PROPERTY_TM_CONSTRAINT_RANGE ((const char *)"constraint_range")
-#define	SCF_PROPERTY_TM_MANPATH		((const char *)"manpath")
-#define	SCF_PROPERTY_TM_NAME		((const char *)"name")
-#define	SCF_PROPERTY_TM_PG_PATTERN	((const char *)"pg_pattern")
-#define	SCF_PROPERTY_TM_REQUIRED	((const char *)"required")
-#define	SCF_PROPERTY_TM_SECTION		((const char *)"section")
-#define	SCF_PROPERTY_TM_TARGET		((const char *)"target")
-#define	SCF_PROPERTY_TM_TITLE		((const char *)"title")
-#define	SCF_PROPERTY_TM_TYPE		((const char *)"type")
-#define	SCF_PROPERTY_TM_URI		((const char *)"uri")
-#define	SCF_PROPERTY_TM_VALUE_PREFIX	((const char *)"value_")
-#define	SCF_PROPERTY_TM_VALUES_NAME	((const char *)"values_name")
-#define	SCF_PROPERTY_TM_VISIBILITY	((const char *)"visibility")
-#define	SCF_PROPERTY_TM_COMMON_NAME_PREFIX	((const char *)"common_name_")
-#define	SCF_PROPERTY_TM_DESCRIPTION_PREFIX	((const char *)"description_")
-#define	SCF_PROPERTY_TM_UNITS_PREFIX		((const char *)"units_")
+#define	SCF_PROPERTY_TM_CARDINALITY_MIN		"cardinality_min"
+#define	SCF_PROPERTY_TM_CARDINALITY_MAX		"cardinality_max"
+#define	SCF_PROPERTY_TM_CHOICES_INCLUDE_VALUES	"choices_include_values"
+#define	SCF_PROPERTY_TM_CHOICES_NAME		"choices_name"
+#define	SCF_PROPERTY_TM_CHOICES_RANGE		"choices_range"
+#define	SCF_PROPERTY_TM_CONSTRAINT_NAME		"constraint_name"
+#define	SCF_PROPERTY_TM_CONSTRAINT_RANGE 	"constraint_range"
+#define	SCF_PROPERTY_TM_MANPATH			"manpath"
+#define	SCF_PROPERTY_TM_NAME			"name"
+#define	SCF_PROPERTY_TM_PG_PATTERN		"pg_pattern"
+#define	SCF_PROPERTY_TM_REQUIRED		"required"
+#define	SCF_PROPERTY_TM_SECTION			"section"
+#define	SCF_PROPERTY_TM_TARGET			"target"
+#define	SCF_PROPERTY_TM_TITLE			"title"
+#define	SCF_PROPERTY_TM_TYPE			"type"
+#define	SCF_PROPERTY_TM_URI			"uri"
+#define	SCF_PROPERTY_TM_VALUE_PREFIX		"value_"
+#define	SCF_PROPERTY_TM_VALUES_NAME		"values_name"
+#define	SCF_PROPERTY_TM_VISIBILITY		"visibility"
+#define	SCF_PROPERTY_TM_COMMON_NAME_PREFIX	"common_name_"
+#define	SCF_PROPERTY_TM_DESCRIPTION_PREFIX	"description_"
+#define	SCF_PROPERTY_TM_UNITS_PREFIX		"units_"
 
 /*
  * Templates wildcard string
  */
-#define	SCF_TMPL_WILDCARD	((const char *)"*")
+#define	SCF_TMPL_WILDCARD		"*"
 
 /*
  * Strings used by restarters for state and next_state properties.
@@ -412,14 +401,14 @@ typedef struct {
 
 #define	MAX_SCF_STATE_STRING_SZ		14
 
-#define	SCF_STATE_STRING_NONE		((const char *)"none")
-#define	SCF_STATE_STRING_UNINIT		((const char *)"uninitialized")
-#define	SCF_STATE_STRING_MAINT		((const char *)"maintenance")
-#define	SCF_STATE_STRING_OFFLINE	((const char *)"offline")
-#define	SCF_STATE_STRING_DISABLED	((const char *)"disabled")
-#define	SCF_STATE_STRING_ONLINE		((const char *)"online")
-#define	SCF_STATE_STRING_DEGRADED	((const char *)"degraded")
-#define	SCF_STATE_STRING_LEGACY		((const char *)"legacy_run")
+#define	SCF_STATE_STRING_NONE		"none"
+#define	SCF_STATE_STRING_UNINIT		"uninitialized"
+#define	SCF_STATE_STRING_MAINT		"maintenance"
+#define	SCF_STATE_STRING_OFFLINE	"offline"
+#define	SCF_STATE_STRING_DISABLED	"disabled"
+#define	SCF_STATE_STRING_ONLINE		"online"
+#define	SCF_STATE_STRING_DEGRADED	"degraded"
+#define	SCF_STATE_STRING_LEGACY		"legacy_run"
 
 #define	SCF_STATE_UNINIT		0x00000001
 #define	SCF_STATE_MAINT			0x00000002
@@ -433,16 +422,14 @@ typedef struct {
  * software fma svc-transition class
  */
 #define	SCF_NOTIFY_PARAMS_VERSION	0X0
-#define	SCF_NOTIFY_NAME_FMRI		((const char *)"fmri")
-#define	SCF_NOTIFY_NAME_VERSION		((const char *)"version")
-#define	SCF_NOTIFY_NAME_TSET		((const char *)"tset")
-#define	SCF_NOTIFY_PG_POSTFIX		((const char *)"fmnotify")
-#define	SCF_NOTIFY_PARAMS		((const char *)"notify-params")
-#define	SCF_NOTIFY_PARAMS_INST \
-	((const char *)"svc:/system/fm/notify-params:default")
-#define	SCF_SVC_TRANSITION_CLASS \
-	((const char *)"ireport.os.smf.state-transition")
-#define	SCF_NOTIFY_PARAMS_PG_TYPE	((const char *)"notify_params")
+#define	SCF_NOTIFY_NAME_FMRI		"fmri"
+#define	SCF_NOTIFY_NAME_VERSION		"version"
+#define	SCF_NOTIFY_NAME_TSET		"tset"
+#define	SCF_NOTIFY_PG_POSTFIX		"fmnotify"
+#define	SCF_NOTIFY_PARAMS		"notify-params"
+#define	SCF_NOTIFY_PARAMS_INST		"svc:/system/fm/notify-params:default"
+#define	SCF_SVC_TRANSITION_CLASS	"ireport.os.smf.state-transition"
+#define	SCF_NOTIFY_PARAMS_PG_TYPE	"notify_params"
 
 /*
  * Useful transition macros
@@ -458,8 +445,8 @@ typedef struct {
 /*
  * Prefixes for states in state transition notification
  */
-#define	SCF_STN_PREFIX_FROM		((const char *)"from-")
-#define	SCF_STN_PREFIX_TO		((const char *)"to-")
+#define	SCF_STN_PREFIX_FROM		"from-"
+#define	SCF_STN_PREFIX_TO		"to-"
 
 #define	SCF_PG_FLAG_NONPERSISTENT	0x1
 
