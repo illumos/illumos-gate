@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2011, Intel Corp.
+ * Copyright (C) 2000 - 2016, Intel Corp.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -41,7 +41,6 @@
  * POSSIBILITY OF SUCH DAMAGES.
  */
 
-
 #include "acpi.h"
 #include "accommon.h"
 #include "acevents.h"
@@ -50,6 +49,7 @@
 #define _COMPONENT          ACPI_EVENTS
         ACPI_MODULE_NAME    ("evgpeinit")
 
+#if (!ACPI_REDUCED_HARDWARE) /* Entire module */
 
 /*
  * Note: History of _PRW support in ACPICA
@@ -93,6 +93,9 @@ AcpiEvGpeInitialize (
     ACPI_FUNCTION_TRACE (EvGpeInitialize);
 
 
+    ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INIT,
+        "Initializing General Purpose Events (GPEs):\n"));
+
     Status = AcpiUtAcquireMutex (ACPI_MTX_NAMESPACE);
     if (ACPI_FAILURE (Status))
     {
@@ -130,14 +133,15 @@ AcpiEvGpeInitialize (
         /* GPE block 0 exists (has both length and address > 0) */
 
         RegisterCount0 = (UINT16) (AcpiGbl_FADT.Gpe0BlockLength / 2);
-
         GpeNumberMax = (RegisterCount0 * ACPI_GPE_REGISTER_WIDTH) - 1;
 
         /* Install GPE Block 0 */
 
         Status = AcpiEvCreateGpeBlock (AcpiGbl_FadtGpeDevice,
-                    &AcpiGbl_FADT.XGpe0Block, RegisterCount0, 0,
-                    AcpiGbl_FADT.SciInterrupt, &AcpiGbl_GpeFadtBlocks[0]);
+            AcpiGbl_FADT.XGpe0Block.Address,
+            AcpiGbl_FADT.XGpe0Block.SpaceId,
+            RegisterCount0, 0,
+            AcpiGbl_FADT.SciInterrupt, &AcpiGbl_GpeFadtBlocks[0]);
 
         if (ACPI_FAILURE (Status))
         {
@@ -174,9 +178,11 @@ AcpiEvGpeInitialize (
             /* Install GPE Block 1 */
 
             Status = AcpiEvCreateGpeBlock (AcpiGbl_FadtGpeDevice,
-                        &AcpiGbl_FADT.XGpe1Block, RegisterCount1,
-                        AcpiGbl_FADT.Gpe1Base,
-                        AcpiGbl_FADT.SciInterrupt, &AcpiGbl_GpeFadtBlocks[1]);
+                AcpiGbl_FADT.XGpe1Block.Address,
+                AcpiGbl_FADT.XGpe1Block.SpaceId,
+                RegisterCount1,
+                AcpiGbl_FADT.Gpe1Base,
+                AcpiGbl_FADT.SciInterrupt, &AcpiGbl_GpeFadtBlocks[1]);
 
             if (ACPI_FAILURE (Status))
             {
@@ -189,7 +195,7 @@ AcpiEvGpeInitialize (
              * space. However, GPE0 always starts at GPE number zero.
              */
             GpeNumberMax = AcpiGbl_FADT.Gpe1Base +
-                            ((RegisterCount1 * ACPI_GPE_REGISTER_WIDTH) - 1);
+                ((RegisterCount1 * ACPI_GPE_REGISTER_WIDTH) - 1);
         }
     }
 
@@ -205,16 +211,6 @@ AcpiEvGpeInitialize (
         goto Cleanup;
     }
 
-    /* Check for Max GPE number out-of-range */
-
-    if (GpeNumberMax > ACPI_GPE_MAX)
-    {
-        ACPI_ERROR ((AE_INFO,
-            "Maximum GPE number from FADT is too large: 0x%X",
-            GpeNumberMax));
-        Status = AE_BAD_VALUE;
-        goto Cleanup;
-    }
 
 Cleanup:
     (void) AcpiUtReleaseMutex (ACPI_MTX_NAMESPACE);
@@ -279,9 +275,9 @@ AcpiEvUpdateGpes (
             WalkInfo.GpeDevice = GpeBlock->Node;
 
             Status = AcpiNsWalkNamespace (ACPI_TYPE_METHOD,
-                        WalkInfo.GpeDevice, ACPI_UINT32_MAX,
-                        ACPI_NS_WALK_NO_UNLOCK, AcpiEvMatchGpeMethod,
-                        NULL, &WalkInfo, NULL);
+                WalkInfo.GpeDevice, ACPI_UINT32_MAX,
+                ACPI_NS_WALK_NO_UNLOCK, AcpiEvMatchGpeMethod,
+                NULL, &WalkInfo, NULL);
             if (ACPI_FAILURE (Status))
             {
                 ACPI_EXCEPTION ((AE_INFO, Status,
@@ -296,7 +292,7 @@ AcpiEvUpdateGpes (
 
     if (WalkInfo.Count)
     {
-        ACPI_INFO ((AE_INFO, "Enabled %u new GPEs", WalkInfo.Count));
+        ACPI_INFO (("Enabled %u new GPEs", WalkInfo.Count));
     }
 
     (void) AcpiUtReleaseMutex (ACPI_MTX_EVENTS);
@@ -378,14 +374,17 @@ AcpiEvMatchGpeMethod (
     switch (Name[1])
     {
     case 'L':
+
         Type = ACPI_GPE_LEVEL_TRIGGERED;
         break;
 
     case 'E':
+
         Type = ACPI_GPE_EDGE_TRIGGERED;
         break;
 
     default:
+
         /* Unknown method type, just ignore it */
 
         ACPI_DEBUG_PRINT ((ACPI_DB_LOAD,
@@ -396,7 +395,7 @@ AcpiEvMatchGpeMethod (
 
     /* 4) The last two characters of the name are the hex GPE Number */
 
-    GpeNumber = ACPI_STRTOUL (&Name[2], NULL, 16);
+    GpeNumber = strtoul (&Name[2], NULL, 16);
     if (GpeNumber == ACPI_UINT32_MAX)
     {
         /* Conversion failed; invalid method, just ignore it */
@@ -420,16 +419,18 @@ AcpiEvMatchGpeMethod (
         return_ACPI_STATUS (AE_OK);
     }
 
-    if ((GpeEventInfo->Flags & ACPI_GPE_DISPATCH_MASK) ==
-            ACPI_GPE_DISPATCH_HANDLER)
+    if ((ACPI_GPE_DISPATCH_TYPE (GpeEventInfo->Flags) ==
+            ACPI_GPE_DISPATCH_HANDLER) ||
+        (ACPI_GPE_DISPATCH_TYPE (GpeEventInfo->Flags) ==
+            ACPI_GPE_DISPATCH_RAW_HANDLER))
     {
         /* If there is already a handler, ignore this GPE method */
 
         return_ACPI_STATUS (AE_OK);
     }
 
-    if ((GpeEventInfo->Flags & ACPI_GPE_DISPATCH_MASK) ==
-            ACPI_GPE_DISPATCH_METHOD)
+    if (ACPI_GPE_DISPATCH_TYPE (GpeEventInfo->Flags) ==
+        ACPI_GPE_DISPATCH_METHOD)
     {
         /*
          * If there is already a method, ignore this method. But check
@@ -444,6 +445,10 @@ AcpiEvMatchGpeMethod (
         return_ACPI_STATUS (AE_OK);
     }
 
+    /* Disable the GPE in case it's been enabled already. */
+
+    (void) AcpiHwLowSetGpe (GpeEventInfo, ACPI_GPE_DISABLE);
+
     /*
      * Add the GPE information from above to the GpeEventInfo block for
      * use during dispatch of this GPE.
@@ -457,3 +462,5 @@ AcpiEvMatchGpeMethod (
         Name, GpeNumber));
     return_ACPI_STATUS (AE_OK);
 }
+
+#endif /* !ACPI_REDUCED_HARDWARE */

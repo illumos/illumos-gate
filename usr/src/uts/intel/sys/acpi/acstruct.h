@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2011, Intel Corp.
+ * Copyright (C) 2000 - 2016, Intel Corp.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -54,7 +54,7 @@
 
 
 /*
- * Walk state - current state of a parse tree walk.  Used for both a leisurely
+ * Walk state - current state of a parse tree walk. Used for both a leisurely
  * stroll through the tree (for whatever reason), and for control method
  * execution.
  */
@@ -68,11 +68,6 @@
 #define ACPI_WALK_NON_METHOD        0
 #define ACPI_WALK_METHOD            0x01
 #define ACPI_WALK_METHOD_RESTART    0x02
-
-/* Flags for iASL compiler only */
-
-#define ACPI_WALK_CONST_REQUIRED    0x10
-#define ACPI_WALK_CONST_OPTIONAL    0x20
 
 
 typedef struct acpi_walk_state
@@ -90,9 +85,10 @@ typedef struct acpi_walk_state
     UINT8                           ReturnUsed;
     UINT8                           ScopeDepth;
     UINT8                           PassNumber;         /* Parse pass during table load */
+    BOOLEAN                         NamespaceOverride;  /* Override existing objects */
     UINT8                           ResultSize;         /* Total elements for the result stack */
     UINT8                           ResultCount;        /* Current number of occupied elements of result stack */
-    UINT32                          AmlOffset;
+    UINT8                           *Aml;
     UINT32                          ArgTypes;
     UINT32                          MethodBreakpoint;   /* For single stepping */
     UINT32                          UserBreakpoint;     /* User AML breakpoint */
@@ -139,6 +135,9 @@ typedef struct acpi_init_walk_info
     UINT32                          TableIndex;
     UINT32                          ObjectCount;
     UINT32                          MethodCount;
+    UINT32                          SerialMethodCount;
+    UINT32                          NonSerialMethodCount;
+    UINT32                          SerializedMethodCount;
     UINT32                          DeviceCount;
     UINT32                          OpRegionCount;
     UINT32                          FieldCount;
@@ -195,27 +194,43 @@ typedef union acpi_aml_operands
 
 
 /*
- * Structure used to pass object evaluation parameters.
+ * Structure used to pass object evaluation information and parameters.
  * Purpose is to reduce CPU stack use.
  */
 typedef struct acpi_evaluate_info
 {
-    ACPI_NAMESPACE_NODE             *PrefixNode;
-    char                            *Pathname;
-    ACPI_OPERAND_OBJECT             *ObjDesc;
-    ACPI_OPERAND_OBJECT             **Parameters;
-    ACPI_NAMESPACE_NODE             *ResolvedNode;
-    ACPI_OPERAND_OBJECT             *ReturnObject;
-    UINT8                           ParamCount;
-    UINT8                           PassNumber;
-    UINT8                           ReturnObjectType;
-    UINT8                           Flags;
+    /* The first 3 elements are passed by the caller to AcpiNsEvaluate */
+
+    ACPI_NAMESPACE_NODE             *PrefixNode;        /* Input: starting node */
+    const char                      *RelativePathname;  /* Input: path relative to PrefixNode */
+    ACPI_OPERAND_OBJECT             **Parameters;       /* Input: argument list */
+
+    ACPI_NAMESPACE_NODE             *Node;              /* Resolved node (PrefixNode:RelativePathname) */
+    ACPI_OPERAND_OBJECT             *ObjDesc;           /* Object attached to the resolved node */
+    char                            *FullPathname;      /* Full pathname of the resolved node */
+
+    const ACPI_PREDEFINED_INFO      *Predefined;        /* Used if Node is a predefined name */
+    ACPI_OPERAND_OBJECT             *ReturnObject;      /* Object returned from the evaluation */
+    union acpi_operand_object       *ParentPackage;     /* Used if return object is a Package */
+
+    UINT32                          ReturnFlags;        /* Used for return value analysis */
+    UINT32                          ReturnBtype;        /* Bitmapped type of the returned object */
+    UINT16                          ParamCount;         /* Count of the input argument list */
+    UINT8                           PassNumber;         /* Parser pass number */
+    UINT8                           ReturnObjectType;   /* Object type of the returned object */
+    UINT8                           NodeFlags;          /* Same as Node->Flags */
+    UINT8                           Flags;              /* General flags */
 
 } ACPI_EVALUATE_INFO;
 
 /* Values for Flags above */
 
-#define ACPI_IGNORE_RETURN_VALUE        1
+#define ACPI_IGNORE_RETURN_VALUE    1
+
+/* Defines for ReturnFlags field above */
+
+#define ACPI_OBJECT_REPAIRED        1
+#define ACPI_OBJECT_WRAPPED         2
 
 
 /* Info used by AcpiNsInitializeDevices */

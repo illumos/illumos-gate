@@ -493,6 +493,15 @@ DRV_KMODS	+= usbftdi
 DRV_KMODS	+= usbecm
 
 #
+#	USBGEM modules
+#
+DRV_KMODS	+= usbgem
+DRV_KMODS	+= axf
+DRV_KMODS	+= udmf 
+DRV_KMODS	+= upf
+DRV_KMODS	+= urf 
+
+#
 #	1394 modules
 #
 MISC_KMODS	+= s1394 sbp2

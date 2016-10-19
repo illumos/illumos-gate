@@ -283,12 +283,12 @@ DIRS= \
 	/usr/net \
 	/usr/net/servers \
 	/usr/lib/pool \
-	/usr/lib/python2.6 \
-	/usr/lib/python2.6/vendor-packages \
-	/usr/lib/python2.6/vendor-packages/64 \
-	/usr/lib/python2.6/vendor-packages/solaris \
-	/usr/lib/python2.6/vendor-packages/zfs \
-	/usr/lib/python2.6/vendor-packages/beadm \
+	/usr/lib/python$(PYTHON_VERSION) \
+	/usr/lib/python$(PYTHON_VERSION)/vendor-packages \
+	/usr/lib/python$(PYTHON_VERSION)/vendor-packages/64 \
+	/usr/lib/python$(PYTHON_VERSION)/vendor-packages/solaris \
+	/usr/lib/python$(PYTHON_VERSION)/vendor-packages/zfs \
+	/usr/lib/python$(PYTHON_VERSION)/vendor-packages/beadm \
 	/usr/lib/rcap \
 	/usr/lib/rcap/$(MACH32) \
 	/usr/lib/sa  \

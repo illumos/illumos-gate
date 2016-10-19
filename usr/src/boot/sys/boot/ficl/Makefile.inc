@@ -11,6 +11,7 @@
 
 #
 # Copyright 2016 Toomas Soome <tsoome@me.com>
+# Copyright 2016 RackTop Systems.
 #
 
 
@@ -36,7 +37,7 @@ HEADERS= $(FICLDIR)/ficl.h $(FICLDIR)/ficlplatform/unix.h ../ficllocal.h
 MAJOR = 4
 MINOR = 1.0
 
-lib: machine x86 libficl.a
+lib: libficl.a
 
 # static library build
 libficl.a: $(OBJECTS)
@@ -49,6 +50,8 @@ machine:
 x86:
 	$(RM) x86
 	$(SYMLINK) ../../../x86/include x86
+
+$(OBJECTS): machine x86
 
 %.o:	../softcore/%.c $(HEADERS)
 	$(COMPILE.c) $<

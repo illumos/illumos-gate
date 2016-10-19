@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2011, Intel Corp.
+ * Copyright (C) 2000 - 2016, Intel Corp.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -40,9 +40,6 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  */
-
-
-#define __DSWSTATE_C__
 
 #include "acpi.h"
 #include "accommon.h"
@@ -302,8 +299,8 @@ AcpiDsResultStackPop (
 
     if (WalkState->Results == NULL)
     {
-        ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Result stack underflow - State=%p\n",
-            WalkState));
+        ACPI_DEBUG_PRINT ((ACPI_DB_EXEC,
+            "Result stack underflow - State=%p\n", WalkState));
         return (AE_AML_NO_OPERAND);
     }
 
@@ -385,7 +382,7 @@ AcpiDsObjStackPush (
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Pop this walk's object stack.  Objects on the stack are NOT
+ * DESCRIPTION: Pop this walk's object stack. Objects on the stack are NOT
  *              deleted by this routine.
  *
  ******************************************************************************/
@@ -549,7 +546,7 @@ AcpiDsPushWalkState (
  * RETURN:      A WalkState object popped from the thread's stack
  *
  * DESCRIPTION: Remove and return the walkstate object that is at the head of
- *              the walk stack for the given walk list.  NULL indicates that
+ *              the walk stack for the given walk list. NULL indicates that
  *              the list is empty.
  *
  ******************************************************************************/
@@ -594,7 +591,7 @@ AcpiDsPopWalkState (
  *
  * RETURN:      Pointer to the new walk state.
  *
- * DESCRIPTION: Allocate and initialize a new walk state.  The current walk
+ * DESCRIPTION: Allocate and initialize a new walk state. The current walk
  *              state is set to this new state.
  *
  ******************************************************************************/
@@ -710,7 +707,8 @@ AcpiDsInitAmlWalk (
 
         /* Push start scope on scope stack and make it current  */
 
-        Status = AcpiDsScopeStackPush (MethodNode, ACPI_TYPE_METHOD, WalkState);
+        Status = AcpiDsScopeStackPush (
+            MethodNode, ACPI_TYPE_METHOD, WalkState);
         if (ACPI_FAILURE (Status))
         {
             return_ACPI_STATUS (Status);
@@ -730,7 +728,7 @@ AcpiDsInitAmlWalk (
         /*
          * Setup the current scope.
          * Find a Named Op that has a namespace node associated with it.
-         * search upwards from this Op.  Current scope is the first
+         * search upwards from this Op. Current scope is the first
          * Op with a namespace node.
          */
         ExtraOp = ParserState->StartOp;
@@ -753,7 +751,7 @@ AcpiDsInitAmlWalk (
             /* Push start scope on scope stack and make it current  */
 
             Status = AcpiDsScopeStackPush (ParserState->StartNode,
-                            ParserState->StartNode->Type, WalkState);
+                ParserState->StartNode->Type, WalkState);
             if (ACPI_FAILURE (Status))
             {
                 return_ACPI_STATUS (Status);
@@ -790,14 +788,14 @@ AcpiDsDeleteWalkState (
 
     if (!WalkState)
     {
-        return;
+        return_VOID;
     }
 
     if (WalkState->DescriptorType != ACPI_DESC_TYPE_WALK)
     {
         ACPI_ERROR ((AE_INFO, "%p is not a valid walk state",
             WalkState));
-        return;
+        return_VOID;
     }
 
     /* There should not be any open scopes */
@@ -842,5 +840,3 @@ AcpiDsDeleteWalkState (
     ACPI_FREE (WalkState);
     return_VOID;
 }
-
-

@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2011, Intel Corp.
+ * Copyright (C) 2000 - 2016, Intel Corp.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -41,7 +41,6 @@
  * POSSIBILITY OF SUCH DAMAGES.
  */
 
-
 #include "acpi.h"
 #include "accommon.h"
 #include "acparser.h"
@@ -65,12 +64,12 @@
 
 ACPI_PARSE_OBJECT *
 AcpiPsCreateScopeOp (
-    void)
+    UINT8                   *Aml)
 {
     ACPI_PARSE_OBJECT       *ScopeOp;
 
 
-    ScopeOp = AcpiPsAllocOp (AML_SCOPE_OP);
+    ScopeOp = AcpiPsAllocOp (AML_SCOPE_OP, Aml);
     if (!ScopeOp)
     {
         return (NULL);
@@ -105,9 +104,9 @@ AcpiPsInitOp (
     Op->Common.DescriptorType = ACPI_DESC_TYPE_PARSER;
     Op->Common.AmlOpcode = Opcode;
 
-    ACPI_DISASM_ONLY_MEMBERS (ACPI_STRNCPY (Op->Common.AmlOpName,
-            (AcpiPsGetOpcodeInfo (Opcode))->Name,
-                sizeof (Op->Common.AmlOpName)));
+    ACPI_DISASM_ONLY_MEMBERS (strncpy (Op->Common.AmlOpName,
+        (AcpiPsGetOpcodeInfo (Opcode))->Name,
+        sizeof (Op->Common.AmlOpName)));
 }
 
 
@@ -116,18 +115,20 @@ AcpiPsInitOp (
  * FUNCTION:    AcpiPsAllocOp
  *
  * PARAMETERS:  Opcode          - Opcode that will be stored in the new Op
+ *              Aml             - Address of the opcode
  *
  * RETURN:      Pointer to the new Op, null on failure
  *
  * DESCRIPTION: Allocate an acpi_op, choose op type (and thus size) based on
- *              opcode.  A cache of opcodes is available for the pure
+ *              opcode. A cache of opcodes is available for the pure
  *              GENERIC_OP, since this is by far the most commonly used.
  *
  ******************************************************************************/
 
 ACPI_PARSE_OBJECT*
 AcpiPsAllocOp (
-    UINT16                  Opcode)
+    UINT16                  Opcode,
+    UINT8                   *Aml)
 {
     ACPI_PARSE_OBJECT       *Op;
     const ACPI_OPCODE_INFO  *OpInfo;
@@ -147,7 +148,7 @@ AcpiPsAllocOp (
     }
     else if (OpInfo->Flags & AML_NAMED)
     {
-        Flags = ACPI_PARSEOP_NAMED;
+        Flags = ACPI_PARSEOP_NAMED_OBJECT;
     }
     else if (Opcode == AML_INT_BYTELIST_OP)
     {
@@ -174,6 +175,7 @@ AcpiPsAllocOp (
     if (Op)
     {
         AcpiPsInitOp (Op, Opcode);
+        Op->Common.Aml = Aml;
         Op->Common.Flags = Flags;
     }
 
@@ -189,7 +191,7 @@ AcpiPsAllocOp (
  *
  * RETURN:      None.
  *
- * DESCRIPTION: Free an Op object.  Either put it on the GENERIC_OP cache list
+ * DESCRIPTION: Free an Op object. Either put it on the GENERIC_OP cache list
  *              or actually free it.
  *
  ******************************************************************************/
@@ -203,7 +205,8 @@ AcpiPsFreeOp (
 
     if (Op->Common.AmlOpcode == AML_INT_RETURN_VALUE_OP)
     {
-        ACPI_DEBUG_PRINT ((ACPI_DB_ALLOCATIONS, "Free retval op: %p\n", Op));
+        ACPI_DEBUG_PRINT ((ACPI_DB_ALLOCATIONS,
+            "Free retval op: %p\n", Op));
     }
 
     if (Op->Common.Flags & ACPI_PARSEOP_GENERIC)
@@ -234,17 +237,6 @@ AcpiPsIsLeadingChar (
     UINT32                  c)
 {
     return ((BOOLEAN) (c == '_' || (c >= 'A' && c <= 'Z')));
-}
-
-
-/*
- * Is "c" a namestring prefix character?
- */
-BOOLEAN
-AcpiPsIsPrefixChar (
-    UINT32                  c)
-{
-    return ((BOOLEAN) (c == '\\' || c == '^'));
 }
 
 
@@ -287,4 +279,3 @@ AcpiPsSetName (
 
     Op->Named.Name = name;
 }
-

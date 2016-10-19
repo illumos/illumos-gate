@@ -11,6 +11,7 @@
 
 #
 # Copyright 2015 Toomas Soome <tsoome@me.com>
+# Copyright 2016 RackTop Systems.
 #
 
 include $(SRC)/Makefile.master
@@ -42,7 +43,7 @@ ROOTBOOTFORTH=$(FORTH:%=$(ROOT_BOOT_FORTH)/%)
 ROOTBOOTDEFAULTS=$(DEFFILES:%=$(ROOT_BOOT_DEFAULTS)/%)
 FILEMODE=0444
 
-all: machine x86 ${LOADER} loader.help
+all: ${LOADER} loader.help
 
 install: all $(ROOTBOOTLOADER)
 
@@ -144,6 +145,8 @@ x86:
 	$(SYMLINK) ../../../x86/include x86
 
 OBJS=		$(SRCS:%.c=%.o)
+
+${OBJS}: machine x86
 
 ${PROG}: ${OBJS} $(LDADD)
 	$(LD) $(LDFLAGS) -o $@ $(BTXCRT) $(OBJS) $(LDADD)

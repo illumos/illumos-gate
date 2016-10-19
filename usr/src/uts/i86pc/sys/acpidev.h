@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2009-2010, Intel Corporation.
  * All rights reserved.
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
 
 #ifndef	_SYS_ACPIDEV_H
@@ -128,7 +129,7 @@ typedef enum acpidev_class_id {
 #ifdef	_KERNEL
 
 /* Common ACPI object names. */
-#define	ACPIDEV_OBJECT_NAME_SB		ACPI_NS_SYSTEM_BUS
+#define	ACPIDEV_OBJECT_NAME_SB		METHOD_NAME__SB_
 #define	ACPIDEV_OBJECT_NAME_PR		"_PR_"
 
 /* Common ACPI method names. */

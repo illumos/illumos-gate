@@ -5,7 +5,7 @@
  ******************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2011, Intel Corp.
+ * Copyright (C) 2000 - 2016, Intel Corp.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -41,7 +41,6 @@
  * POSSIBILITY OF SUCH DAMAGES.
  */
 
-
 #include "acpi.h"
 #include "accommon.h"
 #include "amlcode.h"
@@ -51,7 +50,6 @@
 #include <acnamesp.h>
 #endif
 
-#ifdef ACPI_DISASSEMBLER
 
 #define _COMPONENT          ACPI_CA_DEBUGGER
         ACPI_MODULE_NAME    ("dmutils")
@@ -135,7 +133,8 @@ const char                      *AcpiGbl_IrqDecode[] =
  *
  * RETURN:      None
  *
- * DESCRIPTION: Decode the AccessAs attribute byte.  (Mostly SMBus stuff)
+ * DESCRIPTION: Decode the AccessAs attribute byte. (Mostly SMBus and
+ *              GenericSerialBus stuff.)
  *
  ******************************************************************************/
 
@@ -146,44 +145,61 @@ AcpiDmDecodeAttribute (
 
     switch (Attribute)
     {
-    case AML_FIELD_ATTRIB_SMB_QUICK:
+    case AML_FIELD_ATTRIB_QUICK:
 
-        AcpiOsPrintf ("SMBQuick");
+        AcpiOsPrintf ("AttribQuick");
         break;
 
-    case AML_FIELD_ATTRIB_SMB_SEND_RCV:
+    case AML_FIELD_ATTRIB_SEND_RCV:
 
-        AcpiOsPrintf ("SMBSendReceive");
+        AcpiOsPrintf ("AttribSendReceive");
         break;
 
-    case AML_FIELD_ATTRIB_SMB_BYTE:
+    case AML_FIELD_ATTRIB_BYTE:
 
-        AcpiOsPrintf ("SMBByte");
+        AcpiOsPrintf ("AttribByte");
         break;
 
-    case AML_FIELD_ATTRIB_SMB_WORD:
+    case AML_FIELD_ATTRIB_WORD:
 
-        AcpiOsPrintf ("SMBWord");
+        AcpiOsPrintf ("AttribWord");
         break;
 
-    case AML_FIELD_ATTRIB_SMB_WORD_CALL:
+    case AML_FIELD_ATTRIB_BLOCK:
 
-        AcpiOsPrintf ("SMBProcessCall");
+        AcpiOsPrintf ("AttribBlock");
         break;
 
-    case AML_FIELD_ATTRIB_SMB_BLOCK:
+    case AML_FIELD_ATTRIB_MULTIBYTE:
 
-        AcpiOsPrintf ("SMBBlock");
+        AcpiOsPrintf ("AttribBytes");
         break;
 
-    case AML_FIELD_ATTRIB_SMB_BLOCK_CALL:
+    case AML_FIELD_ATTRIB_WORD_CALL:
 
-        AcpiOsPrintf ("SMBBlockProcessCall");
+        AcpiOsPrintf ("AttribProcessCall");
+        break;
+
+    case AML_FIELD_ATTRIB_BLOCK_CALL:
+
+        AcpiOsPrintf ("AttribBlockProcessCall");
+        break;
+
+    case AML_FIELD_ATTRIB_RAW_BYTES:
+
+        AcpiOsPrintf ("AttribRawBytes");
+        break;
+
+    case AML_FIELD_ATTRIB_RAW_PROCESS:
+
+        AcpiOsPrintf ("AttribRawProcessBytes");
         break;
 
     default:
 
-        AcpiOsPrintf ("0x%.2X", Attribute);
+        /* A ByteConst is allowed by the grammar */
+
+        AcpiOsPrintf ("0x%2.2X", Attribute);
         break;
     }
 }
@@ -211,7 +227,7 @@ AcpiDmIndent (
         return;
     }
 
-    AcpiOsPrintf ("%*.s", ACPI_MUL_4 (Level), " ");
+    AcpiOsPrintf ("%*.s", (Level * 4), " ");
 }
 
 
@@ -234,11 +250,18 @@ AcpiDmCommaIfListMember (
 
     if (!Op->Common.Next)
     {
-        return FALSE;
+        return (FALSE);
     }
 
     if (AcpiDmListType (Op->Common.Parent) & BLOCK_COMMA_LIST)
     {
+        /* Exit if Target has been marked IGNORE */
+
+        if (Op->Common.Next->Common.DisasmFlags & ACPI_PARSEOP_IGNORE)
+        {
+            return (FALSE);
+        }
+
         /* Check for a NULL target operand */
 
         if ((Op->Common.Next->Common.AmlOpcode == AML_INT_NAMEPATH_OP) &&
@@ -246,28 +269,34 @@ AcpiDmCommaIfListMember (
         {
             /*
              * To handle the Divide() case where there are two optional
-             * targets, look ahead one more op.  If null, this null target
-             * is the one and only target -- no comma needed.  Otherwise,
+             * targets, look ahead one more op. If null, this null target
+             * is the one and only target -- no comma needed. Otherwise,
              * we need a comma to prepare for the next target.
              */
             if (!Op->Common.Next->Common.Next)
             {
-                return FALSE;
+                return (FALSE);
             }
         }
 
-        if ((Op->Common.DisasmFlags & ACPI_PARSEOP_PARAMLIST) &&
-            (!(Op->Common.Next->Common.DisasmFlags & ACPI_PARSEOP_PARAMLIST)))
+        if ((Op->Common.DisasmFlags & ACPI_PARSEOP_PARAMETER_LIST) &&
+            (!(Op->Common.Next->Common.DisasmFlags & ACPI_PARSEOP_PARAMETER_LIST)))
         {
-            return FALSE;
+            return (FALSE);
         }
 
-        AcpiOsPrintf (", ");
+        /* Emit comma only if this is not a C-style operator */
+
+        if (!Op->Common.OperatorSymbol)
+        {
+            AcpiOsPrintf (", ");
+        }
+
         return (TRUE);
     }
 
-    else if ((Op->Common.DisasmFlags & ACPI_PARSEOP_PARAMLIST) &&
-             (Op->Common.Next->Common.DisasmFlags & ACPI_PARSEOP_PARAMLIST))
+    else if ((Op->Common.DisasmFlags & ACPI_PARSEOP_PARAMETER_LIST) &&
+             (Op->Common.Next->Common.DisasmFlags & ACPI_PARSEOP_PARAMETER_LIST))
     {
         AcpiOsPrintf (", ");
         return (TRUE);
@@ -299,5 +328,3 @@ AcpiDmCommaIfFieldMember (
         AcpiOsPrintf (", ");
     }
 }
-
-#endif

@@ -20,7 +20,7 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2016 Joyent, Inc.
 #
 
 #
@@ -63,6 +63,7 @@ INSTALL_TARGET  = $(BINARY) $(ROOTMODULE)
 #
 #	Overrides and additions
 #
+$(OBJS_DIR)/ao_mca.o :=	CERRWARN	+= -_gcc=-Wno-unused-function
 CLEANFILES	+= $(AO_MCA_DISP_C)
 CPPFLAGS	+= -I$(SRCDIR) -I$(OBJS_DIR)
 ASFLAGS		+= -I$(SRCDIR) -I$(OBJS_DIR)

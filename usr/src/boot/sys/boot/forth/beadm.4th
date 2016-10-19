@@ -380,7 +380,9 @@ builtin: beadm
 			read_line		\ skip bootfs
 			n 1+ to n
 		else
-			count 0 do
+			\ Use reverse loop to display descending order
+			\ for BE list.
+			0 count 1- do
 				read_line		\ read title line
 				get_name_value
 				value_buffer strget
@@ -409,7 +411,8 @@ builtin: beadm
 				s" bootenv_root[4]" 13 +c! setenv
 				free-memory
 				free_buffers
-			loop
+				-1
+			+loop
 
 			5 count do		\ unset unused entries
 				52 i +			\ ascii 4 + i

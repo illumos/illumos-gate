@@ -2157,6 +2157,15 @@ NULLDRIVER_OBJS =	nulldriver.o
 TPM_OBJS =	tpm.o tpm_hcall.o
 
 #
+# USB Fast ethernet drivers
+#
+USBGEM_OBJS = usbgem.o
+AXF_OBJS = axf_usbgem.o
+UDMF_OBJS = udmf_usbgem.o
+URF_OBJS = urf_usbgem.o
+UPF_OBJS = upf_usbgem.o
+
+#
 #	BNXE objects
 #
 BNXE_OBJS +=	bnxe_cfg.o		\

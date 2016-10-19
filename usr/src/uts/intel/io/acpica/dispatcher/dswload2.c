@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2011, Intel Corp.
+ * Copyright (C) 2000 - 2016, Intel Corp.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -40,8 +40,6 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  */
-
-#define __DSWLOAD2_C__
 
 #include "acpi.h"
 #include "accommon.h"
@@ -161,8 +159,8 @@ AcpiDsLoad2BeginOp (
          * for use later.
          */
         Status = AcpiNsLookup (WalkState->ScopeInfo, BufferPtr, ObjectType,
-                        ACPI_IMODE_EXECUTE, ACPI_NS_SEARCH_PARENT,
-                        WalkState, &(Node));
+            ACPI_IMODE_EXECUTE, ACPI_NS_SEARCH_PARENT,
+            WalkState, &(Node));
         break;
 
     case AML_SCOPE_OP:
@@ -187,8 +185,8 @@ AcpiDsLoad2BeginOp (
              * for use later.
              */
             Status = AcpiNsLookup (WalkState->ScopeInfo, BufferPtr, ObjectType,
-                        ACPI_IMODE_EXECUTE, ACPI_NS_SEARCH_PARENT,
-                        WalkState, &(Node));
+                ACPI_IMODE_EXECUTE, ACPI_NS_SEARCH_PARENT,
+                WalkState, &(Node));
             if (ACPI_FAILURE (Status))
             {
 #ifdef ACPI_ASL_COMPILER
@@ -236,12 +234,26 @@ AcpiDsLoad2BeginOp (
              */
             ACPI_WARNING ((AE_INFO,
                 "Type override - [%4.4s] had invalid type (%s) "
-                "for Scope operator, changed to type ANY\n",
+                "for Scope operator, changed to type ANY",
                 AcpiUtGetNodeName (Node), AcpiUtGetTypeName (Node->Type)));
 
             Node->Type = ACPI_TYPE_ANY;
             WalkState->ScopeInfo->Common.Value = ACPI_TYPE_ANY;
             break;
+
+        case ACPI_TYPE_METHOD:
+
+            /*
+             * Allow scope change to root during execution of module-level
+             * code. Root is typed METHOD during this time.
+             */
+            if ((Node == AcpiGbl_RootNode) &&
+                (WalkState->ParseFlags & ACPI_PARSE_MODULE_LEVEL))
+            {
+                break;
+            }
+
+            /*lint -fallthrough */
 
         default:
 
@@ -252,7 +264,7 @@ AcpiDsLoad2BeginOp (
                 "Scope operator [%4.4s] (Cannot override)",
                 AcpiUtGetTypeName (Node->Type), AcpiUtGetNodeName (Node)));
 
-            return (AE_AML_OPERAND_TYPE);
+            return_ACPI_STATUS (AE_AML_OPERAND_TYPE);
         }
         break;
 
@@ -311,7 +323,7 @@ AcpiDsLoad2BeginOp (
         /* Add new entry or lookup existing entry */
 
         Status = AcpiNsLookup (WalkState->ScopeInfo, BufferPtr, ObjectType,
-                    ACPI_IMODE_LOAD_PASS2, Flags, WalkState, &Node);
+            ACPI_IMODE_LOAD_PASS2, Flags, WalkState, &Node);
 
         if (ACPI_SUCCESS (Status) && (Flags & ACPI_NS_TEMPORARY))
         {
@@ -332,7 +344,7 @@ AcpiDsLoad2BeginOp (
     {
         /* Create a new op */
 
-        Op = AcpiPsAllocOp (WalkState->Opcode);
+        Op = AcpiPsAllocOp (WalkState->Opcode, WalkState->Aml);
         if (!Op)
         {
             return_ACPI_STATUS (AE_NO_MEMORY);
@@ -389,7 +401,7 @@ AcpiDsLoad2EndOp (
 
     Op = WalkState->Op;
     ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH, "Opcode [%s] Op %p State %p\n",
-            WalkState->OpInfo->Name, Op, WalkState));
+        WalkState->OpInfo->Name, Op, WalkState));
 
     /* Check if opcode had an associated namespace object */
 
@@ -482,7 +494,6 @@ AcpiDsLoad2EndOp (
         Status = AcpiDsCreateBufferField (Op, WalkState);
         break;
 
-
      case AML_TYPE_NAMED_FIELD:
         /*
          * If we are executing a method, initialize the field
@@ -496,8 +507,8 @@ AcpiDsLoad2EndOp (
         {
         case AML_INDEX_FIELD_OP:
 
-            Status = AcpiDsCreateIndexField (Op, (ACPI_HANDLE) Arg->Common.Node,
-                        WalkState);
+            Status = AcpiDsCreateIndexField (
+                Op, (ACPI_HANDLE) Arg->Common.Node, WalkState);
             break;
 
         case AML_BANK_FIELD_OP:
@@ -511,11 +522,11 @@ AcpiDsLoad2EndOp (
             break;
 
         default:
+
             /* All NAMED_FIELD opcodes must be handled above */
             break;
         }
         break;
-
 
      case AML_TYPE_NAMED_SIMPLE:
 
@@ -547,13 +558,13 @@ AcpiDsLoad2EndOp (
             Status = AcpiExCreateEvent (WalkState);
             break;
 
-
         case AML_ALIAS_OP:
 
             Status = AcpiExCreateAlias (WalkState);
             break;
 
         default:
+
             /* Unknown opcode */
 
             Status = AE_OK;
@@ -582,7 +593,7 @@ AcpiDsLoad2EndOp (
             if (Op->Common.AmlOpcode == AML_REGION_OP)
             {
                 RegionSpace = (ACPI_ADR_SPACE_TYPE)
-                      ((Op->Common.Value.Arg)->Common.Value.Integer);
+                    ((Op->Common.Value.Arg)->Common.Value.Integer);
             }
             else
             {
@@ -607,18 +618,18 @@ AcpiDsLoad2EndOp (
                  * Executing a method: initialize the region and unlock
                  * the interpreter
                  */
-                Status = AcpiExCreateRegion (Op->Named.Data, Op->Named.Length,
-                            RegionSpace, WalkState);
+                Status = AcpiExCreateRegion (Op->Named.Data,
+                    Op->Named.Length, RegionSpace, WalkState);
                 if (ACPI_FAILURE (Status))
                 {
-                    return (Status);
+                    return_ACPI_STATUS (Status);
                 }
 
                 AcpiExExitInterpreter ();
             }
 
-            Status = AcpiEvInitializeRegion (AcpiNsGetAttachedObject (Node),
-                        FALSE);
+            Status = AcpiEvInitializeRegion (
+                AcpiNsGetAttachedObject (Node), FALSE);
             if (WalkState->MethodNode)
             {
                 AcpiExEnterInterpreter ();
@@ -638,12 +649,10 @@ AcpiDsLoad2EndOp (
             }
             break;
 
-
         case AML_NAME_OP:
 
             Status = AcpiDsCreateNode (WalkState, Node, Op);
             break;
-
 
         case AML_METHOD_OP:
             /*
@@ -663,12 +672,14 @@ AcpiDsLoad2EndOp (
                 WalkState->Operands[0] = ACPI_CAST_PTR (void, Op->Named.Node);
                 WalkState->NumOperands = 1;
 
-                Status = AcpiDsCreateOperands (WalkState, Op->Common.Value.Arg);
+                Status = AcpiDsCreateOperands (
+                    WalkState, Op->Common.Value.Arg);
                 if (ACPI_SUCCESS (Status))
                 {
-                    Status = AcpiExCreateMethod (Op->Named.Data,
-                                        Op->Named.Length, WalkState);
+                    Status = AcpiExCreateMethod (
+                        Op->Named.Data, Op->Named.Length, WalkState);
                 }
+
                 WalkState->Operands[0] = NULL;
                 WalkState->NumOperands = 0;
 
@@ -682,17 +693,16 @@ AcpiDsLoad2EndOp (
 #endif /* ACPI_NO_METHOD_EXECUTION */
 
         default:
+
             /* All NAMED_COMPLEX opcodes must be handled above */
             break;
         }
         break;
 
-
     case AML_CLASS_INTERNAL:
 
         /* case AML_INT_NAMEPATH_OP: */
         break;
-
 
     case AML_CLASS_METHOD_CALL:
 
@@ -704,9 +714,9 @@ AcpiDsLoad2EndOp (
          * Lookup the method name and save the Node
          */
         Status = AcpiNsLookup (WalkState->ScopeInfo, Arg->Common.Value.String,
-                        ACPI_TYPE_ANY, ACPI_IMODE_LOAD_PASS2,
-                        ACPI_NS_SEARCH_PARENT | ACPI_NS_DONT_OPEN_SCOPE,
-                        WalkState, &(NewNode));
+            ACPI_TYPE_ANY, ACPI_IMODE_LOAD_PASS2,
+            ACPI_NS_SEARCH_PARENT | ACPI_NS_DONT_OPEN_SCOPE,
+            WalkState, &(NewNode));
         if (ACPI_SUCCESS (Status))
         {
             /*
@@ -733,6 +743,7 @@ AcpiDsLoad2EndOp (
 
 
     default:
+
         break;
     }
 
@@ -744,4 +755,3 @@ Cleanup:
     WalkState->NumOperands = 0;
     return_ACPI_STATUS (Status);
 }
-

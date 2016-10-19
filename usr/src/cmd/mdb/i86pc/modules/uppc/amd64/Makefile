@@ -22,7 +22,7 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2016 Joyent, Inc.
 
 MODULE = uppc.so
 MDBTGT = kvm
@@ -42,3 +42,5 @@ CPPFLAGS += -I../../common
 CPPFLAGS += -I../../../../common
 CPPFLAGS += -I$(SRC)/uts/intel
 CPPFLAGS += -I$(SRC)/uts/i86pc
+
+CERRWARN += -_gcc=-Wno-unused-function

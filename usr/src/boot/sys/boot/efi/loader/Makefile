@@ -11,6 +11,7 @@
 
 #
 # Copyright 2016 Toomas Soome <tsoome@me.com>
+# Copyright 2016 RackTop Systems.
 #
 
 include $(SRC)/Makefile.master
@@ -88,7 +89,8 @@ CLEANFILES=	vers.c loader.efi
 
 NEWVERSWHAT=	"EFI loader" ${MACHINE}
 
-all: machine x86 loader.efi
+all: loader.efi
+
 install: all $(ROOTBOOTFILES)
 
 vers.c:	../../common/newvers.sh ../../efi/loader/version
@@ -117,8 +119,6 @@ LDADD=		${LIBFICL} ${LIBZFSBOOT} ${LIBEFI} ${LIBFDT} ${LIBEFI_FDT} \
 loader.sym:	$(OBJS) $(DPADD)
 	$(LD) $(LDFLAGS) -o $@ $(OBJS) $(LDADD)
 
-beforedepend ${OBJS}: machine
-
 CLEANFILES +=   machine x86
 
 machine:
@@ -128,6 +128,8 @@ machine:
 x86:
 	$(RM) x86
 	$(SYMLINK) ../../../x86/include x86
+
+$(OBJS): machine x86
 
 clean clobber:
 	$(RM) $(CLEANFILES) $(OBJS) loader.sym loader.efi

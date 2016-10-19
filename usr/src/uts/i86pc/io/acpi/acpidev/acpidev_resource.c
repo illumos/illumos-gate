@@ -21,6 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2016, Joyent, Inc.
  */
 /*
  * Copyright (c) 2009-2010, Intel Corporation.
@@ -431,7 +433,7 @@ acpidev_resource_address64(acpidev_resource_handle_t rhdl,
 	uint_t high;
 
 	ASSERT(addrp != NULL && rhdl != NULL);
-	if (addrp->AddressLength == 0) {
+	if (addrp->Address.AddressLength == 0) {
 		return (AE_OK);
 	}
 
@@ -471,10 +473,11 @@ acpidev_resource_address64(acpidev_resource_handle_t rhdl,
 			acpidev_regspec_t reg;
 
 			reg.phys_hi = high;
-			reg.phys_mid = addrp->Minimum >> 32;
-			reg.phys_low = addrp->Minimum & 0xFFFFFFFF;
-			reg.size_hi = addrp->AddressLength >> 32;
-			reg.size_low = addrp->AddressLength & 0xFFFFFFFF;
+			reg.phys_mid = addrp->Address.Minimum >> 32;
+			reg.phys_low = addrp->Address.Minimum & 0xFFFFFFFF;
+			reg.size_hi = addrp->Address.AddressLength >> 32;
+			reg.size_low = addrp->Address.AddressLength &
+			    0xFFFFFFFF;
 			rc = acpidev_resource_insert_reg(rhdl, &reg);
 			if (ACPI_FAILURE(rc)) {
 				ACPIDEV_DEBUG(CE_WARN, "!acpidev: failed to "
@@ -487,19 +490,21 @@ acpidev_resource_address64(acpidev_resource_handle_t rhdl,
 			acpidev_ranges_t range;
 
 			range.child_hi = high;
-			range.child_mid = addrp->Minimum >> 32;
-			range.child_low = addrp->Minimum & 0xFFFFFFFF;
+			range.child_mid = addrp->Address.Minimum >> 32;
+			range.child_low = addrp->Address.Minimum & 0xFFFFFFFF;
 			/* It's IO on parent side if Translation is true. */
 			if (addrp->Info.Mem.Translation) {
 				range.parent_hi = ACPIDEV_REG_TYPE_IO;
 			} else {
 				range.parent_hi = high;
 			}
-			paddr = addrp->Minimum + addrp->TranslationOffset;
+			paddr = addrp->Address.Minimum +
+			    addrp->Address.TranslationOffset;
 			range.parent_mid = paddr >> 32;
 			range.parent_low = paddr & 0xFFFFFFFF;
-			range.size_hi = addrp->AddressLength >> 32;
-			range.size_low = addrp->AddressLength & 0xFFFFFFFF;
+			range.size_hi = addrp->Address.AddressLength >> 32;
+			range.size_low = addrp->Address.AddressLength &
+			    0xFFFFFFFF;
 			rc = acpidev_resource_insert_range(rhdl, &range);
 			if (ACPI_FAILURE(rc)) {
 				ACPIDEV_DEBUG(CE_WARN, "!acpidev: failed to "
@@ -539,10 +544,11 @@ acpidev_resource_address64(acpidev_resource_handle_t rhdl,
 			acpidev_regspec_t reg;
 
 			reg.phys_hi = high;
-			reg.phys_mid = addrp->Minimum >> 32;
-			reg.phys_low = addrp->Minimum & 0xFFFFFFFF;
-			reg.size_hi = addrp->AddressLength >> 32;
-			reg.size_low = addrp->AddressLength & 0xFFFFFFFF;
+			reg.phys_mid = addrp->Address.Minimum >> 32;
+			reg.phys_low = addrp->Address.Minimum & 0xFFFFFFFF;
+			reg.size_hi = addrp->Address.AddressLength >> 32;
+			reg.size_low = addrp->Address.AddressLength &
+			    0xFFFFFFFF;
 			rc = acpidev_resource_insert_reg(rhdl, &reg);
 			if (ACPI_FAILURE(rc)) {
 				ACPIDEV_DEBUG(CE_WARN, "!acpidev: failed to "
@@ -555,19 +561,21 @@ acpidev_resource_address64(acpidev_resource_handle_t rhdl,
 			acpidev_ranges_t range;
 
 			range.child_hi = high;
-			range.child_mid = addrp->Minimum >> 32;
-			range.child_low = addrp->Minimum & 0xFFFFFFFF;
+			range.child_mid = addrp->Address.Minimum >> 32;
+			range.child_low = addrp->Address.Minimum & 0xFFFFFFFF;
 			/* It's Memory on parent side if Translation is true. */
 			if (addrp->Info.Io.Translation) {
 				range.parent_hi = ACPIDEV_REG_TYPE_MEMORY;
 			} else {
 				range.parent_hi = high;
 			}
-			paddr = addrp->Minimum + addrp->TranslationOffset;
+			paddr = addrp->Address.Minimum +
+			    addrp->Address.TranslationOffset;
 			range.parent_mid = paddr >> 32;
 			range.parent_low = paddr & 0xFFFFFFFF;
-			range.size_hi = addrp->AddressLength >> 32;
-			range.size_low = addrp->AddressLength & 0xFFFFFFFF;
+			range.size_hi = addrp->Address.AddressLength >> 32;
+			range.size_low = addrp->Address.AddressLength &
+			    0xFFFFFFFF;
 			rc = acpidev_resource_insert_range(rhdl, &range);
 			if (ACPI_FAILURE(rc)) {
 				ACPIDEV_DEBUG(CE_WARN, "!acpidev: failed to "
@@ -583,14 +591,15 @@ acpidev_resource_address64(acpidev_resource_handle_t rhdl,
 			uint64_t end;
 			acpidev_bus_range_t bus;
 
-			end = addrp->Minimum + addrp->AddressLength;
-			if (end < addrp->Minimum || end > UINT_MAX) {
+			end = addrp->Address.Minimum +
+			    addrp->Address.AddressLength;
+			if (end < addrp->Address.Minimum || end > UINT_MAX) {
 				ACPIDEV_DEBUG(CE_WARN, "!acpidev: bus range "
 				    "in ADDRESS64 is invalid.");
 				rc = AE_ERROR;
 				break;
 			}
-			bus.bus_start = addrp->Minimum & 0xFFFFFFFF;
+			bus.bus_start = addrp->Address.Minimum & 0xFFFFFFFF;
 			bus.bus_end = end & 0xFFFFFFFF;
 			ASSERT(bus.bus_start <= bus.bus_end);
 			rc = acpidev_resource_insert_bus(rhdl, &bus);
@@ -696,12 +705,16 @@ acpidev_resource_walk_producer(ACPI_RESOURCE *rscp, void *ctxp)
 		}
 
 		*(ACPI_RESOURCE_ADDRESS *)&addr64 = rscp->Data.Address;
-		addr64.Granularity = rscp->Data.ExtAddress64.Granularity;
-		addr64.Minimum = rscp->Data.ExtAddress64.Minimum;
-		addr64.Maximum = rscp->Data.ExtAddress64.Maximum;
-		addr64.TranslationOffset =
-		    rscp->Data.ExtAddress64.TranslationOffset;
-		addr64.AddressLength = rscp->Data.ExtAddress64.AddressLength;
+		addr64.Address.Granularity =
+		    rscp->Data.ExtAddress64.Address.Granularity;
+		addr64.Address.Minimum =
+		    rscp->Data.ExtAddress64.Address.Minimum;
+		addr64.Address.Maximum =
+		    rscp->Data.ExtAddress64.Address.Maximum;
+		addr64.Address.TranslationOffset =
+		    rscp->Data.ExtAddress64.Address.TranslationOffset;
+		addr64.Address.AddressLength =
+		    rscp->Data.ExtAddress64.Address.AddressLength;
 		if (ACPI_FAILURE(rc = acpidev_resource_address64(rhdl,
 		    &addr64))) {
 			ACPIDEV_DEBUG(CE_WARN,
@@ -911,12 +924,16 @@ acpidev_resource_walk_consumer(ACPI_RESOURCE *rscp, void *ctxp)
 		}
 
 		*(ACPI_RESOURCE_ADDRESS *)&addr64 = rscp->Data.Address;
-		addr64.Granularity = rscp->Data.ExtAddress64.Granularity;
-		addr64.Minimum = rscp->Data.ExtAddress64.Minimum;
-		addr64.Maximum = rscp->Data.ExtAddress64.Maximum;
-		addr64.TranslationOffset =
-		    rscp->Data.ExtAddress64.TranslationOffset;
-		addr64.AddressLength = rscp->Data.ExtAddress64.AddressLength;
+		addr64.Address.Granularity =
+		    rscp->Data.ExtAddress64.Address.Granularity;
+		addr64.Address.Minimum =
+		    rscp->Data.ExtAddress64.Address.Minimum;
+		addr64.Address.Maximum =
+		    rscp->Data.ExtAddress64.Address.Maximum;
+		addr64.Address.TranslationOffset =
+		    rscp->Data.ExtAddress64.Address.TranslationOffset;
+		addr64.Address.AddressLength =
+		    rscp->Data.ExtAddress64.Address.AddressLength;
 		if (ACPI_FAILURE(rc = acpidev_resource_address64(rhdl,
 		    &addr64))) {
 			ACPIDEV_DEBUG(CE_WARN,

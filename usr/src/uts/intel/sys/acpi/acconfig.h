@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2011, Intel Corp.
+ * Copyright (C) 2000 - 2016, Intel Corp.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -53,8 +53,8 @@
 
 /*
  * ACPI_DEBUG_OUTPUT    - This switch enables all the debug facilities of the
- *                        ACPI subsystem.  This includes the DEBUG_PRINT output
- *                        statements.  When disabled, all DEBUG_PRINT
+ *                        ACPI subsystem. This includes the DEBUG_PRINT output
+ *                        statements. When disabled, all DEBUG_PRINT
  *                        statements are compiled out.
  *
  * ACPI_APPLICATION     - Use this switch if the subsystem is going to be run
@@ -63,12 +63,12 @@
  */
 
 /*
- * OS name, used for the _OS object.  The _OS object is essentially obsolete,
+ * OS name, used for the _OS object. The _OS object is essentially obsolete,
  * but there is a large base of ASL/AML code in existing machines that check
- * for the string below.  The use of this string usually guarantees that
- * the ASL will execute down the most tested code path.  Also, there is some
+ * for the string below. The use of this string usually guarantees that
+ * the ASL will execute down the most tested code path. Also, there is some
  * code that will not execute the _OSI method unless _OS matches the string
- * below.  Therefore, change this string at your own risk.
+ * below. Therefore, change this string at your own risk.
  */
 #define ACPI_OS_NAME                    "Microsoft Windows NT"
 
@@ -84,7 +84,28 @@
  * Should the subsystem abort the loading of an ACPI table if the
  * table checksum is incorrect?
  */
+#ifndef ACPI_CHECKSUM_ABORT
 #define ACPI_CHECKSUM_ABORT             FALSE
+#endif
+
+/*
+ * Generate a version of ACPICA that only supports "reduced hardware"
+ * platforms (as defined in ACPI 5.0). Set to TRUE to generate a specialized
+ * version of ACPICA that ONLY supports the ACPI 5.0 "reduced hardware"
+ * model. In other words, no ACPI hardware is supported.
+ *
+ * If TRUE, this means no support for the following:
+ *      PM Event and Control registers
+ *      SCI interrupt (and handler)
+ *      Fixed Events
+ *      General Purpose Events (GPEs)
+ *      Global Lock
+ *      ACPI PM timer
+ *      FACS table (Waking vectors and Global Lock)
+ */
+#ifndef ACPI_REDUCED_HARDWARE
+#define ACPI_REDUCED_HARDWARE           FALSE
+#endif
 
 
 /******************************************************************************
@@ -95,7 +116,7 @@
 
 /* Version of ACPI supported */
 
-#define ACPI_CA_SUPPORT_LEVEL           3
+#define ACPI_CA_SUPPORT_LEVEL           5
 
 /* Maximum count for a semaphore object */
 
@@ -117,13 +138,13 @@
 
 #define ACPI_ROOT_TABLE_SIZE_INCREMENT  4
 
-/* Maximum number of While() loop iterations before forced abort */
-
-#define ACPI_MAX_LOOP_ITERATIONS        0xFFFF
-
 /* Maximum sleep allowed via Sleep() operator */
 
-#define ACPI_MAX_SLEEP                  20000   /* Two seconds */
+#define ACPI_MAX_SLEEP                  2000    /* 2000 millisec == two seconds */
+
+/* Address Range lists are per-SpaceId (Memory and I/O only) */
+
+#define ACPI_ADDRESS_RANGE_MAX          2
 
 
 /******************************************************************************
@@ -173,8 +194,9 @@
 /* Maximum SpaceIds for Operation Regions */
 
 #define ACPI_MAX_ADDRESS_SPACE          255
+#define ACPI_NUM_DEFAULT_SPACES         4
 
-/* Array sizes.  Used for range checking also */
+/* Array sizes. Used for range checking also */
 
 #define ACPI_MAX_MATCH_OPCODE           5
 
@@ -183,9 +205,10 @@
 #define ACPI_RSDP_CHECKSUM_LENGTH       20
 #define ACPI_RSDP_XCHECKSUM_LENGTH      36
 
-/* SMBus and IPMI bidirectional buffer size */
+/* SMBus, GSBus and IPMI bidirectional buffer size */
 
 #define ACPI_SMBUS_BUFFER_SIZE          34
+#define ACPI_GSBUS_BUFFER_SIZE          34
 #define ACPI_IPMI_BUFFER_SIZE           66
 
 /* _SxD and _SxW control methods */
@@ -196,11 +219,30 @@
 
 /******************************************************************************
  *
+ * Miscellaneous constants
+ *
+ *****************************************************************************/
+
+/* UUID constants */
+
+#define UUID_BUFFER_LENGTH          16 /* Length of UUID in memory */
+#define UUID_STRING_LENGTH          36 /* Total length of a UUID string */
+
+/* Positions for required hyphens (dashes) in UUID strings */
+
+#define UUID_HYPHEN1_OFFSET         8
+#define UUID_HYPHEN2_OFFSET         13
+#define UUID_HYPHEN3_OFFSET         18
+#define UUID_HYPHEN4_OFFSET         23
+
+
+/******************************************************************************
+ *
  * ACPI AML Debugger
  *
  *****************************************************************************/
 
-#define ACPI_DEBUGGER_MAX_ARGS          ACPI_METHOD_NUM_ARGS + 2 /* Max command line arguments */
+#define ACPI_DEBUGGER_MAX_ARGS          ACPI_METHOD_NUM_ARGS + 4 /* Max command line arguments */
 #define ACPI_DB_LINE_BUFFER_SIZE        512
 
 #define ACPI_DEBUGGER_COMMAND_PROMPT    '-'
@@ -208,4 +250,3 @@
 
 
 #endif /* _ACCONFIG_H */
-

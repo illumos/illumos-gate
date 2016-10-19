@@ -11,13 +11,15 @@
 
 #
 # Copyright 2016 Toomas Soome <tsoome@me.com>
+# Copyright 2016 RackTop Systems.
 #
 
 include $(SRC)/Makefile.master
 
 LIB=		zfsboot
 
-all: machine x86 libzfsboot.a
+all: libzfsboot.a
+
 clean: clobber
 
 clobber:
@@ -48,6 +50,8 @@ machine:
 x86:
 	$(RM) x86
 	$(SYMLINK) ../../../x86/include x86
+
+$(OBJS): machine x86
 
 libzfsboot.a: $(OBJS)
 	$(AR) $(ARFLAGS) $@ $(OBJS)

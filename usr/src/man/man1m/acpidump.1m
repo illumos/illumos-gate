@@ -1,0 +1,69 @@
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2016 Joyent, Inc.
+.\"
+.Dd Aug 2, 2016
+.Dt ACPIDUMP 1M
+.Os
+.Sh NAME
+.Nm acpidump
+.Nd dump ACPI tables
+.Sh SYNOPSIS
+.Nm
+.Op Fl bhsvxz
+.Op Fl a Ar address
+.Op Fl c Ar on|off
+.Op Fl f Ar file
+.Op Fl n Ar signature
+.Op Fl o Ar file
+.Op Fl r Ar address
+.Sh DESCRIPTION
+The
+.Nm
+utility is used to dump the system's Advanced Configuration and Power Interface
+(ACPI) tables that are provided by system firmware. The dumped tables can be
+used by other utilities, such as
+.Xr acpiextract 1M
+or
+.Sy iasl .
+.Sh OPTIONS
+The following options are supported:
+.Bl -tag -width Ds
+.It Fl a Ar address
+Get the table at the given physical address.
+.It Fl b
+Dump all tables to binary files.
+.It Fl c Ar on|off
+Enable dumping customized tables. The default is off.
+.It Fl f Ar file
+Read the table from the given binary file.
+.It Fl h
+Display the usage message and exit.
+.It Fl n Ar signature
+Get the table with the specified signature.
+.It Fl o Ar file
+Write output to the given file.
+.It Fl r Ar address
+Dump tables from the
+.Sy RSDP
+at the given address.
+.It Fl s
+Only print table summaries.
+.It Fl v
+Print the version.
+.It Fl x
+Do not use the
+.Sy XSDT.
+.It Fl z
+Verbose.
+.El
+.Sh SEE ALSO
+.Xr acpixtract 1M

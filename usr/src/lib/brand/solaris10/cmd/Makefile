@@ -31,6 +31,10 @@ include ../Makefile.s10
 # override the install directory
 ROOTBIN =	$(ROOTBRANDDIR)
 CLOBBERFILES =	$(ROOTPROGS)
+CLEANFILES +=	s10_python_wrapper.sh
+
+s10_python_wrapper.sh:	s10_python_wrapper.sh.in
+	$(SED) -e "s:@PYTHON_VERSION@:$(PYTHON_VERSION):g" < s10_python_wrapper.sh.in > $@
 
 .KEEP_STATE:
 
@@ -41,6 +45,6 @@ lint:
 install: all $(ROOTPROGS)
 
 clean:
-	$(RM) $(PROGS)
+	$(RM) $(PROGS) $(CLEANFILES)
 
 include $(SRC)/cmd/Makefile.targ

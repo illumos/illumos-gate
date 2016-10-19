@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2011, Intel Corp.
+ * Copyright (C) 2000 - 2016, Intel Corp.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -41,9 +41,6 @@
  * POSSIBILITY OF SUCH DAMAGES.
  */
 
-
-#define __NSWALK_C__
-
 #include "acpi.h"
 #include "accommon.h"
 #include "acnamesp.h"
@@ -65,8 +62,8 @@
  * RETURN:      ACPI_NAMESPACE_NODE - Pointer to the NEXT child or NULL if
  *                                    none is found.
  *
- * DESCRIPTION: Return the next peer node within the namespace.  If Handle
- *              is valid, Scope is ignored.  Otherwise, the first node
+ * DESCRIPTION: Return the next peer node within the namespace. If Handle
+ *              is valid, Scope is ignored. Otherwise, the first node
  *              within Scope is returned.
  *
  ******************************************************************************/
@@ -105,8 +102,8 @@ AcpiNsGetNextNode (
  * RETURN:      ACPI_NAMESPACE_NODE - Pointer to the NEXT child or NULL if
  *                                    none is found.
  *
- * DESCRIPTION: Return the next peer node within the namespace.  If Handle
- *              is valid, Scope is ignored.  Otherwise, the first node
+ * DESCRIPTION: Return the next peer node within the namespace. If Handle
+ *              is valid, Scope is ignored. Otherwise, the first node
  *              within Scope is returned.
  *
  ******************************************************************************/
@@ -165,9 +162,9 @@ AcpiNsGetNextNodeTyped (
  *              MaxDepth            - Depth to which search is to reach
  *              Flags               - Whether to unlock the NS before invoking
  *                                    the callback routine
- *              PreOrderVisit       - Called during tree pre-order visit
+ *              DescendingCallback  - Called during tree descent
  *                                    when an object of "Type" is found
- *              PostOrderVisit      - Called during tree post-order visit
+ *              AscendingCallback   - Called during tree ascent
  *                                    when an object of "Type" is found
  *              Context             - Passed to user function(s) above
  *              ReturnValue         - from the UserFunction if terminated
@@ -195,8 +192,8 @@ AcpiNsWalkNamespace (
     ACPI_HANDLE             StartNode,
     UINT32                  MaxDepth,
     UINT32                  Flags,
-    ACPI_WALK_CALLBACK      PreOrderVisit,
-    ACPI_WALK_CALLBACK      PostOrderVisit,
+    ACPI_WALK_CALLBACK      DescendingCallback,
+    ACPI_WALK_CALLBACK      AscendingCallback,
     void                    *Context,
     void                    **ReturnValue)
 {
@@ -221,10 +218,10 @@ AcpiNsWalkNamespace (
 
     /* Null child means "get first node" */
 
-    ParentNode  = StartNode;
-    ChildNode   = AcpiNsGetNextNode (ParentNode, NULL);
-    ChildType   = ACPI_TYPE_ANY;
-    Level       = 1;
+    ParentNode = StartNode;
+    ChildNode = AcpiNsGetNextNode (ParentNode, NULL);
+    ChildType = ACPI_TYPE_ANY;
+    Level = 1;
 
     /*
      * Traverse the tree of nodes until we bubble back up to where we
@@ -274,23 +271,23 @@ AcpiNsWalkNamespace (
             }
 
             /*
-             * Invoke the user function, either pre-order or post-order
+             * Invoke the user function, either descending, ascending,
              * or both.
              */
             if (!NodePreviouslyVisited)
             {
-                if (PreOrderVisit)
+                if (DescendingCallback)
                 {
-                    Status = PreOrderVisit (ChildNode, Level,
-                                Context, ReturnValue);
+                    Status = DescendingCallback (ChildNode, Level,
+                        Context, ReturnValue);
                 }
             }
             else
             {
-                if (PostOrderVisit)
+                if (AscendingCallback)
                 {
-                    Status = PostOrderVisit (ChildNode, Level,
-                                Context, ReturnValue);
+                    Status = AscendingCallback (ChildNode, Level,
+                        Context, ReturnValue);
                 }
             }
 
@@ -327,7 +324,7 @@ AcpiNsWalkNamespace (
 
         /*
          * Depth first search: Attempt to go down another level in the
-         * namespace if we are allowed to.  Don't go any further if we have
+         * namespace if we are allowed to. Don't go any further if we have
          * reached the caller specified maximum depth or if the user
          * function has specified that the maximum depth has been reached.
          */
@@ -382,5 +379,3 @@ AcpiNsWalkNamespace (
 
     return_ACPI_STATUS (AE_OK);
 }
-
-

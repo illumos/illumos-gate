@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2011, Intel Corp.
+ * Copyright (C) 2000 - 2016, Intel Corp.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -40,8 +40,6 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  */
-
-#define __NSPARSE_C__
 
 #include "acpi.h"
 #include "accommon.h"
@@ -86,6 +84,22 @@ AcpiNsOneCompleteParse (
     ACPI_FUNCTION_TRACE (NsOneCompleteParse);
 
 
+    Status = AcpiGetTableByIndex (TableIndex, &Table);
+    if (ACPI_FAILURE (Status))
+    {
+        return_ACPI_STATUS (Status);
+    }
+
+    /* Table must consist of at least a complete header */
+
+    if (Table->Length < sizeof (ACPI_TABLE_HEADER))
+    {
+        return_ACPI_STATUS (AE_BAD_HEADER);
+    }
+
+    AmlStart = (UINT8 *) Table + sizeof (ACPI_TABLE_HEADER);
+    AmlLength = Table->Length - sizeof (ACPI_TABLE_HEADER);
+
     Status = AcpiTbGetOwnerId (TableIndex, &OwnerId);
     if (ACPI_FAILURE (Status))
     {
@@ -94,7 +108,7 @@ AcpiNsOneCompleteParse (
 
     /* Create and init a Root Node */
 
-    ParseRoot = AcpiPsCreateScopeOp ();
+    ParseRoot = AcpiPsCreateScopeOp (AmlStart);
     if (!ParseRoot)
     {
         return_ACPI_STATUS (AE_NO_MEMORY);
@@ -109,39 +123,28 @@ AcpiNsOneCompleteParse (
         return_ACPI_STATUS (AE_NO_MEMORY);
     }
 
-    Status = AcpiGetTableByIndex (TableIndex, &Table);
-    if (ACPI_FAILURE (Status))
-    {
-        AcpiDsDeleteWalkState (WalkState);
-        AcpiPsFreeOp (ParseRoot);
-        return_ACPI_STATUS (Status);
-    }
-
-    /* Table must consist of at least a complete header */
-
-    if (Table->Length < sizeof (ACPI_TABLE_HEADER))
-    {
-        Status = AE_BAD_HEADER;
-    }
-    else
-    {
-        AmlStart = (UINT8 *) Table + sizeof (ACPI_TABLE_HEADER);
-        AmlLength = Table->Length - sizeof (ACPI_TABLE_HEADER);
-        Status = AcpiDsInitAmlWalk (WalkState, ParseRoot, NULL,
-                    AmlStart, AmlLength, NULL, (UINT8) PassNumber);
-    }
-
+    Status = AcpiDsInitAmlWalk (WalkState, ParseRoot, NULL,
+        AmlStart, AmlLength, NULL, (UINT8) PassNumber);
     if (ACPI_FAILURE (Status))
     {
         AcpiDsDeleteWalkState (WalkState);
         goto Cleanup;
     }
 
+    /* Found OSDT table, enable the namespace override feature */
+
+    if (ACPI_COMPARE_NAME(Table->Signature, ACPI_SIG_OSDT) &&
+        PassNumber == ACPI_IMODE_LOAD_PASS1)
+    {
+        WalkState->NamespaceOverride = TRUE;
+    }
+
     /* StartNode is the default location to load the table  */
 
     if (StartNode && StartNode != AcpiGbl_RootNode)
     {
-        Status = AcpiDsScopeStackPush (StartNode, ACPI_TYPE_METHOD, WalkState);
+        Status = AcpiDsScopeStackPush (
+            StartNode, ACPI_TYPE_METHOD, WalkState);
         if (ACPI_FAILURE (Status))
         {
             AcpiDsDeleteWalkState (WalkState);
@@ -151,7 +154,8 @@ AcpiNsOneCompleteParse (
 
     /* Parse the AML */
 
-    ACPI_DEBUG_PRINT ((ACPI_DB_PARSE, "*PARSE* pass %u parse\n", PassNumber));
+    ACPI_DEBUG_PRINT ((ACPI_DB_PARSE,
+        "*PARSE* pass %u parse\n", PassNumber));
     Status = AcpiPsParseAml (WalkState);
 
 Cleanup:
@@ -187,16 +191,17 @@ AcpiNsParseTable (
     /*
      * AML Parse, pass 1
      *
-     * In this pass, we load most of the namespace.  Control methods
-     * are not parsed until later.  A parse tree is not created.  Instead,
-     * each Parser Op subtree is deleted when it is finished.  This saves
+     * In this pass, we load most of the namespace. Control methods
+     * are not parsed until later. A parse tree is not created. Instead,
+     * each Parser Op subtree is deleted when it is finished. This saves
      * a great deal of memory, and allows a small cache of parse objects
-     * to service the entire parse.  The second pass of the parse then
+     * to service the entire parse. The second pass of the parse then
      * performs another complete parse of the AML.
      */
     ACPI_DEBUG_PRINT ((ACPI_DB_PARSE, "**** Start pass 1\n"));
+
     Status = AcpiNsOneCompleteParse (ACPI_IMODE_LOAD_PASS1,
-                TableIndex, StartNode);
+        TableIndex, StartNode);
     if (ACPI_FAILURE (Status))
     {
         return_ACPI_STATUS (Status);
@@ -213,7 +218,7 @@ AcpiNsParseTable (
      */
     ACPI_DEBUG_PRINT ((ACPI_DB_PARSE, "**** Start pass 2\n"));
     Status = AcpiNsOneCompleteParse (ACPI_IMODE_LOAD_PASS2,
-                TableIndex, StartNode);
+        TableIndex, StartNode);
     if (ACPI_FAILURE (Status))
     {
         return_ACPI_STATUS (Status);
@@ -221,5 +226,3 @@ AcpiNsParseTable (
 
     return_ACPI_STATUS (Status);
 }
-
-

@@ -1,0 +1,104 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2016 Joyent Inc.
+#
+
+<include global_zone_only_component>
+set name=pkg.fmri value=pkg:/driver/network/upf@$(PKGVERS)
+set name=pkg.description value="ADMtek USB to Fast Ethernet Driver"
+set name=pkg.summary value="ADMtek USB to Fast Ethernet Driver"
+set name=info.classification \
+    value=org.opensolaris.category.2008:Drivers/Networking
+set name=variant.arch value=i386
+dir path=kernel group=sys
+dir path=kernel/drv group=sys
+dir path=kernel/drv/$(ARCH64) group=sys
+driver name=upf clone_perms="upf 0666 root sys" perms="* 0666 root sys" \
+    alias=usb1044,8002 \
+    alias=usb1342,304 \
+    alias=usb15e8,9100 \
+    alias=usb15e8,9110 \
+    alias=usb2001,200c \
+    alias=usb2001,4001 \
+    alias=usb2001,4002 \
+    alias=usb2001,4003 \
+    alias=usb2001,400b \
+    alias=usb2001,4102 \
+    alias=usb2001,abc1 \
+    alias=usb334,1701 \
+    alias=usb3f0,811c \
+    alias=usb411,1 \
+    alias=usb411,5 \
+    alias=usb411,9 \
+    alias=usb45e,7a \
+    alias=usb49f,8511 \
+    alias=usb4bb,904 \
+    alias=usb4bb,913 \
+    alias=usb4bb,93a \
+    alias=usb506,4601 \
+    alias=usb50d,121 \
+    alias=usb557,2007 \
+    alias=usb56e,200c \
+    alias=usb56e,4002 \
+    alias=usb56e,4005 \
+    alias=usb56e,400b \
+    alias=usb56e,4010 \
+    alias=usb56e,abc1 \
+    alias=usb5cc,3000 \
+    alias=usb66b,200c \
+    alias=usb66b,2202 \
+    alias=usb66b,2203 \
+    alias=usb66b,2204 \
+    alias=usb66b,2206 \
+    alias=usb66b,400b \
+    alias=usb66b,8b4 \
+    alias=usb67c,1001 \
+    alias=usb707,200 \
+    alias=usb707,201 \
+    alias=usb7a6,1986 \
+    alias=usb7a6,8511 \
+    alias=usb7a6,8513 \
+    alias=usb7a6,8515 \
+    alias=usb7a6,986 \
+    alias=usb7aa,4 \
+    alias=usb7aa,d \
+    alias=usb7b8,110c \
+    alias=usb7b8,200c \
+    alias=usb7b8,4002 \
+    alias=usb7b8,4004 \
+    alias=usb7b8,4007 \
+    alias=usb7b8,400b \
+    alias=usb7b8,400c \
+    alias=usb7b8,4102 \
+    alias=usb7b8,4104 \
+    alias=usb7b8,abc1 \
+    alias=usb7c9,b100 \
+    alias=usb83a,1046 \
+    alias=usb83a,5046 \
+    alias=usb83a,b004 \
+    alias=usb846,1020 \
+    alias=usb8d1,3 \
+    alias=usb8dd,8511 \
+    alias=usb8dd,986 \
+    alias=usb8dd,987 \
+    alias=usb8dd,988 \
+    alias=usb951,a \
+    alias=usbb3p,109 \
+    alias=usbb3p,901 \
+    alias=usbdb7,2 \
+    alias=usbe66,400c
+file path=kernel/drv/$(ARCH64)/upf group=sys
+file path=kernel/drv/upf group=sys
+license usr/src/uts/common/io/upf/THIRDPARTYLICENSE \
+    license=usr/src/uts/common/io/upf/THIRDPARTYLICENSE
+depend fmri=driver/usb/usbgem type=require

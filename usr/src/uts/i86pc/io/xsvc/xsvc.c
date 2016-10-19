@@ -22,6 +22,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include <sys/errno.h>
@@ -807,7 +809,7 @@ xsvc_mnode_key_compare(const void *q, const void *e)
 /*ARGSUSED*/
 static int
 xsvc_devmap(dev_t dev, devmap_cookie_t dhp, offset_t off, size_t len,
-		size_t *maplen, uint_t model)
+    size_t *maplen, uint_t model)
 {
 	ddi_umem_cookie_t cookie;
 	xsvc_state_t *state;
@@ -874,6 +876,19 @@ xsvc_devmap(dev_t dev, devmap_cookie_t dhp, offset_t off, size_t len,
 
 		kvai = kva;
 		for (i = 0; i < npages; i++) {
+			page_t *pp = page_numtopp_nolock(pfn);
+
+			/*
+			 * Preemptively check for panic conditions from
+			 * hat_devload and error out instead.
+			 */
+			if (pp != NULL && (PP_ISFREE(pp) ||
+			    (!PAGE_LOCKED(pp) && !PP_ISNORELOC(pp)))) {
+				err = DDI_FAILURE;
+				npages = i;
+				goto devmapfail_cookie_alloc;
+			}
+
 			hat_devload(kas.a_hat, kvai, PAGESIZE, pfn,
 			    PROT_READ | PROT_WRITE, HAT_LOAD_LOCK);
 			pfn++;

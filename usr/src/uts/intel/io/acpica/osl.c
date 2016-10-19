@@ -22,7 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2011 Joyent, Inc.  All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 /*
  * Copyright (c) 2009-2010, Intel Corporation.
@@ -315,6 +315,12 @@ AcpiOsTableOverride(ACPI_TABLE_HEADER *ExistingTable,
 	return (AE_OK);
 }
 
+ACPI_STATUS
+AcpiOsPhysicalTableOverride(ACPI_TABLE_HEADER *ExistingTable,
+    ACPI_PHYSICAL_ADDRESS *NewAddress, UINT32 *NewTableLength)
+{
+	return (AE_SUPPORT);
+}
 
 /*
  * ACPI semaphore implementation
@@ -743,6 +749,22 @@ AcpiOsExecute(ACPI_EXECUTE_TYPE Type, ACPI_OSD_EXEC_CALLBACK  Function,
 
 }
 
+
+void
+AcpiOsWaitEventsComplete(void)
+{
+	int	i;
+
+	/*
+	 * Wait for event queues to be empty.
+	 */
+	for (i = OSL_GLOBAL_LOCK_HANDLER; i <= OSL_EC_BURST_HANDLER; i++) {
+		if (osl_eventq[i] != NULL) {
+			ddi_taskq_wait(osl_eventq[i]);
+		}
+	}
+}
+
 void
 AcpiOsSleep(ACPI_INTEGER Milliseconds)
 {
@@ -883,7 +905,7 @@ AcpiOsWritePort(ACPI_IO_ADDRESS Address, UINT32 Value, UINT32 Width)
 
 
 static void
-osl_rw_memory(ACPI_PHYSICAL_ADDRESS Address, UINT32 *Value,
+osl_rw_memory(ACPI_PHYSICAL_ADDRESS Address, UINT64 *Value,
     UINT32 Width, int write)
 {
 	size_t	maplen = Width / 8;
@@ -902,6 +924,9 @@ osl_rw_memory(ACPI_PHYSICAL_ADDRESS Address, UINT32 *Value,
 	case 4:
 		OSL_RW(ptr, Value, uint32_t, write);
 		break;
+	case 8:
+		OSL_RW(ptr, Value, uint64_t, write);
+		break;
 	default:
 		cmn_err(CE_WARN, "!osl_rw_memory: invalid size %d",
 		    Width);
@@ -913,7 +938,7 @@ osl_rw_memory(ACPI_PHYSICAL_ADDRESS Address, UINT32 *Value,
 
 ACPI_STATUS
 AcpiOsReadMemory(ACPI_PHYSICAL_ADDRESS Address,
-		UINT32 *Value, UINT32 Width)
+		UINT64 *Value, UINT32 Width)
 {
 	osl_rw_memory(Address, Value, Width, 0);
 	return (AE_OK);
@@ -921,7 +946,7 @@ AcpiOsReadMemory(ACPI_PHYSICAL_ADDRESS Address,
 
 ACPI_STATUS
 AcpiOsWriteMemory(ACPI_PHYSICAL_ADDRESS Address,
-		UINT32 Value, UINT32 Width)
+		UINT64 Value, UINT32 Width)
 {
 	osl_rw_memory(Address, &Value, Width, 1);
 	return (AE_OK);
@@ -2340,4 +2365,16 @@ acpica_write_cpupm_capabilities(boolean_t pstates, boolean_t cstates)
 	if (cstates && AcpiGbl_FADT.CstControl != 0)
 		(void) AcpiHwRegisterWrite(ACPI_REGISTER_SMI_COMMAND_BLOCK,
 		    AcpiGbl_FADT.CstControl);
+}
+
+uint32_t
+acpi_strtoul(const char *str, char **ep, int base)
+{
+	ulong_t v;
+
+	if (ddi_strtoul(str, ep, base, &v) != 0 || v > ACPI_UINT32_MAX) {
+		return (ACPI_UINT32_MAX);
+	}
+
+	return ((uint32_t)v);
 }

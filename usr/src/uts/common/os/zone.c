@@ -4271,7 +4271,8 @@ out:
 }
 
 int
-zone_create_error(int er_error, int er_ext, int *er_out) {
+zone_create_error(int er_error, int er_ext, int *er_out)
+{
 	if (er_out != NULL) {
 		if (copyout(&er_ext, er_out, sizeof (int))) {
 			return (set_errno(EFAULT));
@@ -4367,7 +4368,7 @@ zone_create(const char *zone_name, const char *zone_root,
 	nvlist_t *rctls = NULL;
 	proc_t *pp = curproc;
 	zone_t *zone, *ztmp;
-	zoneid_t zoneid;
+	zoneid_t zoneid, start = GLOBAL_ZONEID;
 	int error;
 	int error2 = 0;
 	char *str;
@@ -4381,9 +4382,58 @@ zone_create(const char *zone_name, const char *zone_root,
 	if (PTOU(pp)->u_rdir != NULL && PTOU(pp)->u_rdir != rootdir)
 		return (zone_create_error(ENOTSUP, ZE_CHROOTED,
 		    extended_error));
+	/*
+	 * As the first step of zone creation, we want to allocate a zoneid.
+	 * This allocation is complicated by the fact that netstacks use the
+	 * zoneid to determine their stackid, but netstacks themselves are
+	 * freed asynchronously with respect to zone destruction.  This means
+	 * that a netstack reference leak (or in principle, an extraordinarily
+	 * long netstack reference hold) could result in a zoneid being
+	 * allocated that in fact corresponds to a stackid from an active
+	 * (referenced) netstack -- unleashing all sorts of havoc when that
+	 * netstack is actually (re)used.  (In the abstract, we might wish a
+	 * zoneid to not be deallocated until its last referencing netstack
+	 * has been released, but netstacks lack a backpointer into their
+	 * referencing zone -- and changing them to have such a pointer would
+	 * be substantial, to put it euphemistically.)  To avoid this, we
+	 * detect this condition on allocation: if we have allocated a zoneid
+	 * that corresponds to a netstack that's still in use, we warn about
+	 * it (as it is much more likely to be a reference leak than an actual
+	 * netstack reference), free it, and allocate another.  That these
+	 * identifers are allocated out of an ID space assures that we won't
+	 * see the identifier we just allocated.
+	 */
+	for (;;) {
+		zoneid = id_alloc(zoneid_space);
+
+		if (!netstack_inuse_by_stackid(zoneid_to_netstackid(zoneid)))
+			break;
+
+		id_free(zoneid_space, zoneid);
+
+		if (start == GLOBAL_ZONEID) {
+			start = zoneid;
+		} else if (zoneid == start) {
+			/*
+			 * We have managed to iterate over the entire available
+			 * zoneid space -- there are no identifiers available,
+			 * presumably due to some number of leaked netstack
+			 * references.  While it's in principle possible for us
+			 * to continue to try, it seems wiser to give up at
+			 * this point to warn and fail explicitly with a
+			 * distinctive error.
+			 */
+			cmn_err(CE_WARN, "zone_create() failed: all available "
+			    "zone IDs have netstacks still in use");
+			return (set_errno(ENFILE));
+		}
+
+		cmn_err(CE_WARN, "unable to reuse zone ID %d; "
+		    "netstack still in use", zoneid);
+	}
 
 	zone = kmem_zalloc(sizeof (zone_t), KM_SLEEP);
-	zoneid = zone->zone_id = id_alloc(zoneid_space);
+	zone->zone_id = zoneid;
 	zone->zone_status = ZONE_IS_UNINITIALIZED;
 	zone->zone_pool = pool_default;
 	zone->zone_pool_mod = gethrtime();

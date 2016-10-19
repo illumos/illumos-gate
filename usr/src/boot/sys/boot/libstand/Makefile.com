@@ -11,6 +11,7 @@
 
 #
 # Copyright 2016 Toomas Soome <tsoome@me.com>
+# Copyright 2016 RackTop Systems.
 #
 
 include $(SRC)/Makefile.master
@@ -21,7 +22,7 @@ CC=	$(GCC_ROOT)/bin/gcc
 
 LIBRARY=	libstand.a
 
-all install: machine x86 $(LIBRARY)
+all install: $(LIBRARY)
 
 LIB_BASE=	$(SRC)/boot/lib
 LIBSTAND_SRC=	$(LIB_BASE)/libstand
@@ -53,6 +54,8 @@ machine:
 x86:
 	$(RM) x86
 	$(SYMLINK) ../../../x86/include x86
+
+$(OBJS): machine x86
 
 %.o:	$(LIBSTAND_SRC)/%.c
 	$(COMPILE.c) $<

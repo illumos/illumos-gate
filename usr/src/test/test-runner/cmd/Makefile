@@ -33,5 +33,5 @@ $(CMDS): $(ROOTBIN)
 $(ROOTBIN):
 	$(INS.dir)
 
-$(ROOTBIN)/%: %.py
-	$(INS.rename)
+$(ROOTBIN)/%: %
+	$(INS.pyfile)

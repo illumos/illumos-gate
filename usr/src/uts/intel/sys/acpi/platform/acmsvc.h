@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2011, Intel Corp.
+ * Copyright (C) 2000 - 2016, Intel Corp.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -43,6 +43,35 @@
 
 #ifndef __ACMSVC_H__
 #define __ACMSVC_H__
+
+/* Note: do not include any C library headers here */
+
+/*
+ * Note: MSVC project files should define ACPI_DEBUGGER and ACPI_DISASSEMBLER
+ * as appropriate to enable editor functions like "Find all references".
+ * The editor isn't smart enough to dig through the include files to find
+ * out if these are actually defined.
+ */
+
+/*
+ * Map low I/O functions for MS. This allows us to disable MS language
+ * extensions for maximum portability.
+ */
+#define open            _open
+#define read            _read
+#define write           _write
+#define close           _close
+#define stat            _stat
+#define fstat           _fstat
+#define mkdir           _mkdir
+#define O_RDONLY        _O_RDONLY
+#define O_BINARY        _O_BINARY
+#define O_CREAT         _O_CREAT
+#define O_WRONLY        _O_WRONLY
+#define O_TRUNC         _O_TRUNC
+#define S_IREAD         _S_IREAD
+#define S_IWRITE        _S_IWRITE
+#define S_IFDIR         _S_IFDIR
 
 /* Eliminate warnings for "old" (non-secure) versions of clib functions */
 
@@ -122,6 +151,45 @@
 
 #if _MSC_VER > 1200 /* Versions above VC++ 6 */
 #pragma warning( disable : 4295 ) /* needed for acpredef.h array */
+#endif
+
+
+/* Debug support. */
+
+#ifdef _DEBUG
+
+/*
+ * Debugging memory corruption issues with windows:
+ * Add #include <crtdbg.h> to accommon.h if necessary.
+ * Add _ASSERTE(_CrtCheckMemory()); where needed to test memory integrity.
+ * This can quickly localize the memory corruption.
+ */
+#define ACPI_DEBUG_INITIALIZE() \
+    _CrtSetDbgFlag (\
+        _CRTDBG_CHECK_ALWAYS_DF | \
+        _CRTDBG_ALLOC_MEM_DF | \
+        _CRTDBG_DELAY_FREE_MEM_DF | \
+        _CRTDBG_LEAK_CHECK_DF | \
+        _CrtSetDbgFlag(_CRTDBG_REPORT_FLAG));
+
+#if 0
+/*
+ * _CrtSetBreakAlloc can be used to set a breakpoint at a particular
+ * memory leak, add to the macro above.
+ */
+Detected memory leaks!
+Dumping objects ->
+..\..\source\os_specific\service_layers\oswinxf.c(701) : {937} normal block at 0x002E9190, 40 bytes long.
+ Data: <                > 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+
+_CrtSetBreakAlloc (937);
+#endif
+
+#endif
+
+#if _MSC_VER > 1200 /* Versions above VC++ 6 */
+#define COMPILER_VA_MACRO               1
+#else
 #endif
 
 #endif /* __ACMSVC_H__ */
