@@ -47,6 +47,7 @@ extern off_t		_elf_getarhdrbase(Elf *);
 extern size_t		_elf_getarsymwordsize(Elf *);
 extern Elf64_Off	_elf_getxoff(Elf_Data *);
 extern GElf_Xword	_gelf_getdyndtflags_1(Elf *);
+extern GElf_Xword	_gelf_getdynval(Elf *, GElf_Sxword);
 extern int		_elf_swap_wrimage(Elf *);
 extern uint_t		_elf_sys_encoding(void);
 

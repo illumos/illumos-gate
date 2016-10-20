@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 
 /*	Copyright (c) 1987, 1988 Microsoft Corporation	*/
@@ -614,7 +614,7 @@ spcl:
  *	be applied before context-sensitive tests, to avoid
  *	false context-sensitive matches.
  *
- * 	Returns -1 on error which should result in error (non-zero)
+ *	Returns -1 on error which should result in error (non-zero)
  *	exit status for the file utility.
  *	Returns 0 if no matching file type found.
  *	Returns 1 if matching file type found.
@@ -1330,6 +1330,10 @@ elf_check(char *file)
 	if (version == 1)
 		(void) printf(" %s %d", gettext("Version"), version);
 
+	if (EInfo.kmod) {
+		(void) printf(", %s", gettext("kernel module"));
+	}
+
 	/* Print Flags */
 	print_elf_flags(EInfo);
 
@@ -1483,9 +1487,10 @@ ascom(void)
 	return (1);
 }
 
+/* look for "1hddddd" where d is a digit */
 static int
 sccs(void)
-{				/* look for "1hddddd" where d is a digit */
+{
 	register int j;
 
 	if (fbuf[0] == 1 && fbuf[1] == 'h') {

@@ -1665,3 +1665,5 @@ Bugid   Risk Synopsis
 10471	ld(1) amd64 LD->LE TLS transition causes memory corruption
 10346	ld(1) should not reduce symbol visibility of COMDAT symbols when
 	producing relocatable objects
+10366	ld(1) should support GNU-style linker sets
+10581	ld(1) should know kernel modules are a thing

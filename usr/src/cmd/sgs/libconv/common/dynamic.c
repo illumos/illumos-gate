@@ -114,7 +114,7 @@ conv_dyn_flag_strings(Conv_fmt_flags_t fmt_flags)
 	MSG_DF_SYMBOLIC_CF_SIZE		+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
 	MSG_DF_TEXTREL_CF_SIZE		+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
 	MSG_DF_BIND_NOW_CF_SIZE		+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
-	MSG_DF_STATIC_TLS_CF_SIZE 	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+	MSG_DF_STATIC_TLS_CF_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
 	CONV_INV_BUFSIZE + CONV_EXPN_FIELD_DEF_SUFFIX_SIZE
 
 	/*
@@ -557,8 +557,10 @@ conv_dyn_tag_strings(conv_iter_osabi_t osabi, Half mach,
 		MSG_DT_SUNW_LDMACH_CF,		0,
 		MSG_DT_SUNW_CAPCHAINENT_CF,	0,
 		MSG_DT_SUNW_CAPCHAINSZ_CF,	0,
-		0, 				0,
-		MSG_DT_SUNW_ASLR_CF
+		0,				0,
+		MSG_DT_SUNW_ASLR_CF,		0,
+		0,				0,
+		MSG_DT_SUNW_KMOD_CF
 	};
 	static const Msg	tags_sunw_auxiliary_cfnp[] = {
 		MSG_DT_SUNW_AUXILIARY_CFNP,	MSG_DT_SUNW_RTLDINF_CFNP,
@@ -572,7 +574,9 @@ conv_dyn_tag_strings(conv_iter_osabi_t osabi, Half mach,
 		MSG_DT_SUNW_CAPCHAINENT_CFNP,	0,
 		MSG_DT_SUNW_CAPCHAINSZ_CFNP,	0,
 		0,				0,
-		MSG_DT_SUNW_ASLR_CFNP
+		MSG_DT_SUNW_ASLR_CFNP,		0,
+		0,				0,
+		MSG_DT_SUNW_KMOD_CFNP
 	};
 	static const Msg	tags_sunw_auxiliary_nf[] = {
 		MSG_DT_SUNW_AUXILIARY_NF,	MSG_DT_SUNW_RTLDINF_NF,
@@ -586,7 +590,9 @@ conv_dyn_tag_strings(conv_iter_osabi_t osabi, Half mach,
 		MSG_DT_SUNW_CAPCHAINENT_NF,	0,
 		MSG_DT_SUNW_CAPCHAINSZ_NF,	0,
 		0,				0,
-		MSG_DT_SUNW_ASLR_NF
+		MSG_DT_SUNW_ASLR_NF,		0,
+		0,				0,
+		MSG_DT_SUNW_KMOD_NF
 	};
 	static const conv_ds_msg_t ds_sunw_auxiliary_cf = {
 	    CONV_DS_MSG_INIT(DT_SUNW_AUXILIARY, tags_sunw_auxiliary_cf) };

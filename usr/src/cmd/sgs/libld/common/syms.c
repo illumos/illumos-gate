@@ -692,9 +692,10 @@ sym_add_spec(const char *name, const char *uname, Word sdaux_id,
 				usdp->sd_flags |= FLG_SY_MAPUSED;
 
 			DBG_CALL(Dbg_syms_updated(ofl, usdp, uname));
-		} else
+		} else {
 			ld_eprintf(ofl, ERR_WARNING, MSG_INTL(MSG_SYM_RESERVE),
 			    uname, usdp->sd_file->ifl_name);
+		}
 	} else {
 		/*
 		 * If the symbol does not exist create it.
@@ -885,6 +886,72 @@ sym_undef_entry(Ofl_desc *ofl, Sym_desc *sdp, Type type, ofl_flag_t ofl_flag,
 }
 
 /*
+ * If an undef symbol exists naming a bound for the output section,
+ * turn it into a defined symbol with the correct value.
+ *
+ * We set an arbitrary 1KB limit on the resulting symbol names.
+ */
+static void
+sym_add_bounds(Ofl_desc *ofl, Os_desc *osp, Word bound)
+{
+	Sym_desc *bsdp;
+	char symn[1024];
+	size_t nsz;
+
+	switch (bound) {
+	case SDAUX_ID_SECBOUND_START:
+		nsz = snprintf(symn, sizeof (symn), "%s%s",
+		    MSG_ORIG(MSG_SYM_SECBOUND_START), osp->os_name);
+		if (nsz >= sizeof (symn))
+			return;
+		break;
+	case SDAUX_ID_SECBOUND_STOP:
+		nsz = snprintf(symn, sizeof (symn), "%s%s",
+		    MSG_ORIG(MSG_SYM_SECBOUND_STOP), osp->os_name);
+		if (nsz >= sizeof (symn))
+			return;
+		break;
+	default:
+		assert(0);
+	}
+
+	if ((bsdp = ld_sym_find(symn, SYM_NOHASH, NULL, ofl)) != NULL) {
+		if ((bsdp->sd_shndx != SHN_UNDEF) &&
+		    (bsdp->sd_ref == REF_REL_NEED)) {
+			ld_eprintf(ofl, ERR_WARNING, MSG_INTL(MSG_SYM_RESERVE),
+			    symn, bsdp->sd_file->ifl_name);
+			return;
+		}
+
+		DBG_CALL(Dbg_syms_updated(ofl, bsdp, symn));
+
+		bsdp->sd_aux->sa_symspec = bound;
+		bsdp->sd_aux->sa_boundsec = osp;
+		bsdp->sd_flags |= FLG_SY_SPECSEC;
+		bsdp->sd_ref = REF_REL_NEED;
+		bsdp->sd_sym->st_info = ELF_ST_INFO(STB_GLOBAL, STT_NOTYPE);
+		bsdp->sd_sym->st_other = STV_PROTECTED;
+		bsdp->sd_isc = NULL;
+		bsdp->sd_sym->st_size = 0;
+		bsdp->sd_sym->st_value = 0;
+		bsdp->sd_shndx = bsdp->sd_sym->st_shndx = SHN_ABS;
+	}
+}
+
+static Boolean
+is_cname(const char *name)
+{
+	if (strlen(name) == strspn(name,
+	    "abcdefghijklmnopqrstuvwxyz"
+	    "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	    "0123456789"
+	    "_"))
+		return (TRUE);
+	else
+		return (FALSE);
+}
+
+/*
  * At this point all symbol input processing has been completed, therefore
  * complete the symbol table entries by generating any necessary internal
  * symbols.
@@ -893,11 +960,39 @@ uintptr_t
 ld_sym_spec(Ofl_desc *ofl)
 {
 	Sym_desc	*sdp;
+	Sg_desc		*sgp;
+
+	DBG_CALL(Dbg_syms_spec_title(ofl->ofl_lml));
+
+	/*
+	 * For each section in the output file, look for symbols named for the
+	 * __start/__stop patterns.  If references exist, flesh the symbols to
+	 * be defined.
+	 *
+	 * The symbols are given values at the same time as the other special
+	 * symbols.
+	 */
+	if (!(ofl->ofl_flags & FLG_OF_RELOBJ) ||
+	    (ofl->ofl_flags & FLG_OF_KMOD)) {
+		Aliste		idx1;
+
+		for (APLIST_TRAVERSE(ofl->ofl_segs, idx1, sgp)) {
+			Os_desc *osp;
+			Aliste idx2;
+
+			for (APLIST_TRAVERSE(sgp->sg_osdescs, idx2, osp)) {
+				if (is_cname(osp->os_name)) {
+					sym_add_bounds(ofl, osp,
+					    SDAUX_ID_SECBOUND_START);
+					sym_add_bounds(ofl, osp,
+					    SDAUX_ID_SECBOUND_STOP);
+				}
+			}
+		}
+	}
 
 	if (ofl->ofl_flags & FLG_OF_RELOBJ)
 		return (1);
-
-	DBG_CALL(Dbg_syms_spec_title(ofl->ofl_lml));
 
 	if (sym_add_spec(MSG_ORIG(MSG_SYM_ETEXT), MSG_ORIG(MSG_SYM_ETEXT_U),
 	    SDAUX_ID_ETEXT, 0, (FLG_SY_DEFAULT | FLG_SY_EXPDEF),
@@ -1144,7 +1239,7 @@ ensure_array_local(Ofl_desc *ofl, APlist *apl, const char *str)
  *	symbols may be reduced to locals).
  *
  *  -	establish the size and alignment requirements for the global .bss
- *	section (the alignment of this section is based on the	first symbol
+ *	section (the alignment of this section is based on the first symbol
  *	that it will contain).
  */
 uintptr_t

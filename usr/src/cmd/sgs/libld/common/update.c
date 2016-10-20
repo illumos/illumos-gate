@@ -1768,6 +1768,19 @@ update_osym(Ofl_desc *ofl)
 				    ofl_osgot->os_scn);
 				sdp->sd_flags &= ~FLG_SY_SPECSEC;
 				break;
+			case SDAUX_ID_SECBOUND_START:
+				sym->st_value = sap->sa_boundsec->
+				    os_shdr->sh_addr;
+				sectndx = elf_ndxscn(sap->sa_boundsec->os_scn);
+				sdp->sd_flags &= ~FLG_SY_SPECSEC;
+				break;
+			case SDAUX_ID_SECBOUND_STOP:
+				sym->st_value = sap->sa_boundsec->
+				    os_shdr->sh_addr +
+				    sap->sa_boundsec->os_shdr->sh_size;
+				sectndx = elf_ndxscn(sap->sa_boundsec->os_scn);
+				sdp->sd_flags &= ~FLG_SY_SPECSEC;
+				break;
 			default:
 				/* NOTHING */
 				;
@@ -2578,6 +2591,12 @@ update_odynamic(Ofl_desc *ofl)
 	dyn->d_tag = DT_SUNW_LDMACH;
 	dyn->d_un.d_val = ld_sunw_ldmach();
 	dyn++;
+
+	if (ofl->ofl_flags & FLG_OF_KMOD) {
+		dyn->d_tag = DT_SUNW_KMOD;
+		dyn->d_un.d_val = 1;
+		dyn++;
+	}
 
 	(*ld_targ.t_mr.mr_mach_update_odynamic)(ofl, &dyn);
 

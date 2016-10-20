@@ -161,6 +161,7 @@ typedef struct {
 #define	DT_SUNW_CAPCHAINSZ	0x6000001f	/* capabilities chain size */
 /* 0x60000021 would be DT_SUNW_PARENT */
 #define	DT_SUNW_ASLR		0x60000023	/* executable ASLR desire */
+#define	DT_SUNW_KMOD		0x60000027	/* object is a kernel module */
 
 /*
  * DT_* encoding rules do not apply between DT_HIOS and DT_LOPROC
@@ -230,7 +231,7 @@ typedef struct {
 #define	DT_VERDEF	0x6ffffffc	/* version definition table and */
 #define	DT_VERDEFNUM	0x6ffffffd	/*	associated no. of entries */
 #define	DT_VERNEED	0x6ffffffe	/* version needed table and */
-#define	DT_VERNEEDNUM	0x6fffffff	/* 	associated no. of entries */
+#define	DT_VERNEEDNUM	0x6fffffff	/*	associated no. of entries */
 
 /*
  * DT_* entries between DT_HIPROC and DT_LOPROC are reserved for processor
@@ -366,7 +367,7 @@ typedef struct {			/* Verneed Auxiliary Structure. */
 	Elf32_Word	vna_next;	/* no. of bytes from start of this */
 } Elf32_Vernaux;			/*	vernaux to next vernaux entry */
 
-typedef	Elf32_Half 	Elf32_Versym;	/* Version symbol index array */
+typedef	Elf32_Half	Elf32_Versym;	/* Version symbol index array */
 
 typedef struct {
 	Elf32_Half	si_boundto;	/* direct bindings - symbol bound to */
@@ -464,7 +465,7 @@ typedef struct {
 #define	SYMINFO_FLG_DIRECT	0x0001	/* symbol ref has direct association */
 					/*	to object containing defn. */
 #define	SYMINFO_FLG_FILTER	0x0002	/* symbol ref is associated to a */
-					/* 	standard filter */
+					/*	standard filter */
 #define	SYMINFO_FLG_PASSTHRU	SYMINFO_FLG_FILTER /* unused obsolete name */
 #define	SYMINFO_FLG_COPY	0x0004	/* symbol is a copy-reloc */
 #define	SYMINFO_FLG_LAZYLOAD	0x0008	/* object containing defn. should be */
@@ -474,7 +475,7 @@ typedef struct {
 #define	SYMINFO_FLG_NOEXTDIRECT	0x0020	/* don't let an external reference */
 					/*	directly bind to this symbol */
 #define	SYMINFO_FLG_AUXILIARY	0x0040	/* symbol ref is associated to a */
-					/* 	auxiliary filter */
+					/*	auxiliary filter */
 #define	SYMINFO_FLG_INTERPOSE	0x0080	/* symbol defines an interposer */
 #define	SYMINFO_FLG_CAP		0x0100	/* symbol is capabilities specific */
 #define	SYMINFO_FLG_DEFERRED	0x0200	/* symbol should not be included in */
@@ -506,7 +507,7 @@ typedef struct link_map	Link_map;
 
 struct link_map {
 	unsigned long	l_addr;		/* address at which object is mapped */
-	char 		*l_name;	/* full name of loaded object */
+	char		*l_name;	/* full name of loaded object */
 #ifdef _LP64
 	Elf64_Dyn	*l_ld;		/* dynamic structure of object */
 #else

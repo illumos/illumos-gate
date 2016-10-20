@@ -26,8 +26,6 @@
 #ifndef _ELF_READ_H
 #define	_ELF_READ_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #define	BUFSZ 128
 typedef struct Elf_Info {
 	boolean_t	dynamic;	/* dymanically linked? */
@@ -40,6 +38,7 @@ typedef struct Elf_Info {
 	char		fname[PRFNSZ];	/* name of process that dumped core */
 	char		cap_str[BUFSZ];	/* hw/sw capabilities */
 	char		*file;		/* file being processed */
+	boolean_t	kmod;
 } Elf_Info;
 
 /* values for Elf_Info.stripped */
@@ -53,10 +52,14 @@ typedef struct Elf_Info {
 #define	EC_NEWCORE	0x2
 
 /* elf file processing errors */
-#define	ELF_ERR_ELFCAP1	gettext("%s: %s zero size or zero entry ELF " \
-			    "section - ELF capabilities ignored\n")
-#define	ELF_ERR_ELFCAP2	gettext("%s: %s: can't read ELF capabilities " \
-			    "data - ELF capabilities ignored\n")
+#define	ELF_ERR_ELFCAP1		gettext("%s: %s zero size or zero entry ELF " \
+	"section - ELF capabilities ignored\n")
+#define	ELF_ERR_ELFCAP2		gettext("%s: %s: can't read ELF capabilities " \
+	"data - ELF capabilities ignored\n")
+#define	ELF_ERR_DYNAMIC1	gettext("%s: %s zero size or zero entry ELF " \
+	"section - ELF dynamic tags ignored\n")
+#define	ELF_ERR_DYNAMIC2	gettext("%s: %s: can't read ELF dynamic " \
+	"data - ELF dynamic tags ignored\n")
 
 extern int is_in_list(char *str);
 
@@ -72,6 +75,7 @@ extern int is_in_list(char *str);
 #define	Elf_Cap		Elf64_Cap
 #define	Elf_Nhdr	Elf64_Nhdr
 #define	Elf_Word	Elf64_Word
+#define	Elf_Dyn		Elf64_Dyn
 
 #define	elf_read	elf_read64
 #define	elf_xlatetom	elf64_xlatetom
@@ -88,6 +92,7 @@ extern int is_in_list(char *str);
 #define	Elf_Cap		Elf32_Cap
 #define	Elf_Nhdr	Elf32_Nhdr
 #define	Elf_Word	Elf32_Word
+#define	Elf_Dyn		Elf32_Dyn
 
 #define	elf_read	elf_read32
 #define	elf_xlatetom	elf32_xlatetom

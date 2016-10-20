@@ -1,0 +1,10 @@
+Set count: 3
+a: foo
+b: bar
+c: baz
+item(foo, 0): foo
+item(foo, 1): bar
+item(foo, 2): baz
+foo[0]: foo
+foo[1]: bar
+foo[2]: baz
