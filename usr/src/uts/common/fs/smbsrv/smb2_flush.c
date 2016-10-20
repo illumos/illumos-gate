@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 Syneto S.R.L. All rights reserved.
  */
 
 /*
@@ -23,7 +24,6 @@
 smb_sdrc_t
 smb2_flush(smb_request_t *sr)
 {
-	smb_ofile_t *of = NULL;
 	uint16_t StructSize;
 	uint16_t reserved1;
 	uint32_t reserved2;
@@ -51,14 +51,8 @@ smb2_flush(smb_request_t *sr)
 		smb2sr_put_error(sr, status);
 		return (SDRC_SUCCESS);
 	}
-	of = sr->fid_ofile;
 
-	/*
-	 * XXX - todo:
-	 * Flush named pipe should drain writes.
-	 */
-	if ((of->f_node->flags & NODE_FLAGS_WRITE_THROUGH) == 0)
-		(void) smb_fsop_commit(sr, of->f_cr, of->f_node);
+	smb_ofile_flush(sr, sr->fid_ofile);
 
 	/*
 	 * SMB2 Flush reply
