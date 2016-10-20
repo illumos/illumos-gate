@@ -36,7 +36,7 @@
 /*         All Rights Reserved						*/
 
 /*
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include <sys/errno.h>
@@ -470,7 +470,7 @@ bcopy(const void *from, void *to, size_t count)
 do_copy:
 #define	L(s) .bcopy/**/s
 	cmpq	$0x50, %rdx		/* 80 */
-	jge	bcopy_ck_size
+	jae	bcopy_ck_size
 
 	/*
 	 * Performance data shows many caller's copy small buffers. So for
@@ -869,7 +869,7 @@ bcopy_patch_end:
 	.globl bcopy_ck_size
 bcopy_ck_size:
 	cmpq	$BCOPY_DFLT_REP, %rdx
-	jge	L(use_rep)
+	jae	L(use_rep)
 
 	/*
 	 * Align to a 8-byte boundary. Avoids penalties from unaligned stores
@@ -927,7 +927,7 @@ L(aligned_loop):
 	mov	%r8, 0x30(%rsi)
 	mov	%r10, 0x38(%rsi)
 	lea	0x40(%rsi), %rsi
-	jge	L(aligned_loop)
+	jae	L(aligned_loop)
 
 	/*
 	 * Copy remaining bytes (0-63)
@@ -1158,7 +1158,7 @@ do_zero:
 	xorl	%eax, %eax
 
 	cmpq	$0x50, %rsi		/* 80 */
-	jge	L(ck_align)
+	jae	L(ck_align)
 
 	/*
 	 * Performance data shows many caller's are zeroing small buffers. So
@@ -1412,7 +1412,7 @@ L(ck_align):
 	 */
 L(aligned_now):
 	cmp	$BZERO_USE_REP, %rsi
-	jg	L(use_rep)
+	ja	L(use_rep)
 
 	/*
 	 * zero 64-bytes per loop
@@ -1430,7 +1430,7 @@ L(bzero_loop):
 	movq	%rax, 0x30(%rdi) 
 	movq	%rax, 0x38(%rdi) 
 	leaq	0x40(%rdi), %rdi
-	jge	L(bzero_loop)
+	jae	L(bzero_loop)
 
 	/*
 	 * Clear any remaining bytes..
