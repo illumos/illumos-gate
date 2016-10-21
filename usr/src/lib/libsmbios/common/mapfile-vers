@@ -139,6 +139,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	smbios_slot_usage_desc;
 	smbios_slot_width_desc;
 	smbios_system_wakeup_desc;
+	smbios_truncated;
 	smbios_type_desc;
 	smbios_type_name;
 	smbios_write;

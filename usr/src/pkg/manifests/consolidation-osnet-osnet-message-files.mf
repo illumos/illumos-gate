@@ -173,6 +173,7 @@ file path=usr/lib/help/auths/locale/SmfValueMDNS.html
 file path=usr/lib/help/auths/locale/SmfValueNADD.html
 file path=usr/lib/help/auths/locale/SmfValueNDMP.html
 file path=usr/lib/help/auths/locale/SmfValueNWAM.html
+file path=usr/lib/help/auths/locale/SmfValueProcSec.html
 file path=usr/lib/help/auths/locale/SmfValueRouting.html
 file path=usr/lib/help/auths/locale/SmfValueSMB.html
 file path=usr/lib/help/auths/locale/SmfValueVscan.html

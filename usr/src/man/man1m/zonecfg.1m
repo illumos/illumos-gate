@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\" See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ZONECFG 1M "Feb 28, 2014"
+.TH ZONECFG 1M "Jun 6, 2016"
 .SH NAME
 zonecfg \- set up zone configuration
 .SH SYNOPSIS
@@ -29,7 +29,6 @@ zonecfg \- set up zone configuration
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBzonecfg\fR utility creates and modifies the configuration of a zone.
 Zone configuration consists of a number of resources and properties.
@@ -72,7 +71,6 @@ the \fBzonecfg\fR properties and resources. See the brand-specific man page for
 more details on each brand. For an overview of brands, see the \fBbrands\fR(5)
 man page.
 .SS "Resources"
-.sp
 .LP
 The following resource types are supported:
 .sp
@@ -165,8 +163,17 @@ Network interface.
 Resource control.
 .RE
 
-.SS "Properties"
 .sp
+.ne 2
+.na
+\fB\fBsecurity-flags\fR\fR
+.ad
+.sp .6
+.RS 4n
+Process security flag settings.
+.RE
+
+.SS "Properties"
 .LP
 Each resource type has one or more properties. There are also some global
 properties, that is, properties of the configuration as a whole, rather than of
@@ -422,6 +429,16 @@ The following properties are supported:
 .sp .6
 .RS 4n
 \fBncpus\fR
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBsecurity-flags\fB\fB
+.ad
+.sp .6
+.RS 4n
+\fBlower\fR, \fBdefault\fR, \fBupper\fR.
 .RE
 
 .sp
@@ -865,6 +882,18 @@ control and is related to the \fBzone.cpu-cap\fR resource control. See
 .sp
 .ne 2
 .na
+\fB\fBsecurity-flags\fR: lower, default, upper\fR
+.ad
+.sp .6
+.RS 4n
+Set the process security flags associated with the zone.  The \fBlower\fR and
+\fBupper\fR fields set the limits, the \fBdefault\fR field is set of flags all
+zone processes inherit.
+.RE
+
+.sp
+.ne 2
+.na
 \fBglobal: \fBfs-allowed\fR\fR
 .ad
 .sp .6
@@ -928,6 +957,9 @@ capped-memory     physical        simple with scale
                    locked          simple with scale
 
 capped-cpu        ncpus           simple
+security-flags	  lower           simple
+                   default        simple
+                   upper          simple
 .fi
 .in -2
 .sp
@@ -944,7 +976,6 @@ contain alphanumerics plus the hyphen (\fB-\fR), underscore (\fB_\fR), and dot
 use by the system. Finally, the "autoboot" global property must have a value of
 "true" or "false".
 .SS "Using Kernel Statistics to Monitor CPU Caps"
-.sp
 .LP
 Using the kernel statistics (\fBkstat\fR(3KSTAT)) module \fBcaps\fR, the system
 maintains information for all capped projects and zones. You can access this
@@ -1097,7 +1128,6 @@ Name of the zone for which statistics are displayed.
 .LP
 See \fBEXAMPLES\fR for sample output from a \fBkstat\fR command.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -1126,7 +1156,6 @@ cannot be used.
 .RE
 
 .SH SUBCOMMANDS
-.sp
 .LP
 You can use the \fBadd\fR and \fBselect\fR subcommands to select a specific
 resource, at which point the scope changes to that resource. The \fBend\fR and
@@ -1803,7 +1832,6 @@ for a specific project, the second for the same project within zone 1.
 .sp
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -1837,7 +1865,6 @@ Invalid usage.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -1853,7 +1880,6 @@ Interface Stability	Volatile
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBppriv\fR(1), \fBprctl\fR(1), \fBzlogin\fR(1), \fBkstat\fR(1M),
 \fBmount\fR(1M), \fBpooladm\fR(1M), \fBpoolcfg\fR(1M), \fBpoold\fR(1M),
@@ -1861,12 +1887,11 @@ Interface Stability	Volatile
 \fBzfs\fR(1M), \fBzoneadm\fR(1M), \fBpriv_str_to_set\fR(3C),
 \fBkstat\fR(3KSTAT), \fBvfstab\fR(4), \fBattributes\fR(5), \fBbrands\fR(5),
 \fBfnmatch\fR(5), \fBlx\fR(5), \fBprivileges\fR(5), \fBresource_controls\fR(5),
-\fBzones\fR(5)
+\fBsecurity-flags\fR(5), \fBzones\fR(5)
 .sp
 .LP
 \fISystem Administration Guide: Solaris Containers-Resource Management, and
 Solaris Zones\fR
 .SH NOTES
-.sp
 .LP
 All character data used by \fBzonecfg\fR must be in US-ASCII encoding.

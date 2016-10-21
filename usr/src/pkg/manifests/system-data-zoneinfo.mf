@@ -16,7 +16,7 @@
 #
 
 set name=pkg.fmri \
-    value=pkg:/system/data/zoneinfo@2016.3,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
+    value=pkg:/system/data/zoneinfo@2016.8,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
 set name=pkg.description value="timezone information"
 set name=pkg.summary value="Timezone Information"
 set name=info.classification value=org.opensolaris.category.2008:System/Core
@@ -272,7 +272,6 @@ file path=usr/share/lib/zoneinfo/Asia/Pontianak
 file path=usr/share/lib/zoneinfo/Asia/Pyongyang
 file path=usr/share/lib/zoneinfo/Asia/Qatar
 file path=usr/share/lib/zoneinfo/Asia/Qyzylorda
-file path=usr/share/lib/zoneinfo/Asia/Rangoon
 file path=usr/share/lib/zoneinfo/Asia/Riyadh
 file path=usr/share/lib/zoneinfo/Asia/Riyadh87
 file path=usr/share/lib/zoneinfo/Asia/Riyadh88
@@ -289,11 +288,13 @@ file path=usr/share/lib/zoneinfo/Asia/Tbilisi
 file path=usr/share/lib/zoneinfo/Asia/Tehran
 file path=usr/share/lib/zoneinfo/Asia/Thimphu
 file path=usr/share/lib/zoneinfo/Asia/Tokyo
+file path=usr/share/lib/zoneinfo/Asia/Tomsk
 file path=usr/share/lib/zoneinfo/Asia/Ulaanbaatar
 file path=usr/share/lib/zoneinfo/Asia/Urumqi
 file path=usr/share/lib/zoneinfo/Asia/Ust-Nera
 file path=usr/share/lib/zoneinfo/Asia/Vladivostok
 file path=usr/share/lib/zoneinfo/Asia/Yakutsk
+file path=usr/share/lib/zoneinfo/Asia/Yangon
 file path=usr/share/lib/zoneinfo/Asia/Yekaterinburg
 file path=usr/share/lib/zoneinfo/Asia/Yerevan
 file path=usr/share/lib/zoneinfo/Atlantic/Azores
@@ -368,6 +369,7 @@ file path=usr/share/lib/zoneinfo/Europe/Helsinki
 file path=usr/share/lib/zoneinfo/Europe/Istanbul
 file path=usr/share/lib/zoneinfo/Europe/Kaliningrad
 file path=usr/share/lib/zoneinfo/Europe/Kiev
+file path=usr/share/lib/zoneinfo/Europe/Kirov
 file path=usr/share/lib/zoneinfo/Europe/Lisbon
 file path=usr/share/lib/zoneinfo/Europe/London
 file path=usr/share/lib/zoneinfo/Europe/Luxembourg
@@ -573,6 +575,7 @@ hardlink path=usr/share/lib/zoneinfo/Asia/Kuwait target=../Asia/Riyadh
 hardlink path=usr/share/lib/zoneinfo/Asia/Macao target=../Asia/Macau
 hardlink path=usr/share/lib/zoneinfo/Asia/Muscat target=../Asia/Dubai
 hardlink path=usr/share/lib/zoneinfo/Asia/Phnom_Penh target=../Asia/Bangkok
+hardlink path=usr/share/lib/zoneinfo/Asia/Rangoon target=../Asia/Yangon
 hardlink path=usr/share/lib/zoneinfo/Asia/Saigon target=../Asia/Ho_Chi_Minh
 hardlink path=usr/share/lib/zoneinfo/Asia/Tel_Aviv target=../Asia/Jerusalem
 hardlink path=usr/share/lib/zoneinfo/Asia/Thimbu target=../Asia/Thimphu

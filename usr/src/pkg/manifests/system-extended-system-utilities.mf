@@ -62,6 +62,7 @@ $(i386_ONLY)file path=usr/bin/$(ARCH32)/ppgsz mode=0555
 $(i386_ONLY)file path=usr/bin/$(ARCH32)/ppriv mode=0555
 $(i386_ONLY)file path=usr/bin/$(ARCH32)/preap mode=0555
 $(i386_ONLY)file path=usr/bin/$(ARCH32)/prun mode=0555
+$(i386_ONLY)file path=usr/bin/$(ARCH32)/psecflags mode=0555
 $(i386_ONLY)file path=usr/bin/$(ARCH32)/psig mode=0555
 $(i386_ONLY)file path=usr/bin/$(ARCH32)/pstack mode=0555
 $(i386_ONLY)file path=usr/bin/$(ARCH32)/pstop mode=0555
@@ -82,6 +83,7 @@ file path=usr/bin/$(ARCH64)/ppgsz mode=0555
 file path=usr/bin/$(ARCH64)/ppriv mode=0555
 file path=usr/bin/$(ARCH64)/preap mode=0555
 file path=usr/bin/$(ARCH64)/prun mode=0555
+file path=usr/bin/$(ARCH64)/psecflags mode=0555
 file path=usr/bin/$(ARCH64)/psig mode=0555
 file path=usr/bin/$(ARCH64)/pstack mode=0555
 file path=usr/bin/$(ARCH64)/pstop mode=0555
@@ -195,6 +197,7 @@ file path=usr/share/man/man1/pmap.1
 file path=usr/share/man/man1/ppgsz.1
 file path=usr/share/man/man1/ppriv.1
 file path=usr/share/man/man1/preap.1
+file path=usr/share/man/man1/psecflags.1
 file path=usr/share/man/man1/ptree.1
 file path=usr/share/man/man1/sdiff.1
 file path=usr/share/man/man1/sort.1
@@ -227,6 +230,7 @@ hardlink path=usr/bin/ppgsz target=../../usr/lib/isaexec
 hardlink path=usr/bin/ppriv target=../../usr/lib/isaexec
 hardlink path=usr/bin/preap target=../../usr/lib/isaexec
 hardlink path=usr/bin/prun target=../../usr/lib/isaexec
+hardlink path=usr/bin/psecflags target=../../usr/lib/isaexec
 hardlink path=usr/bin/psig target=../../usr/lib/isaexec
 hardlink path=usr/bin/pstack target=../../usr/lib/isaexec
 hardlink path=usr/bin/pstop target=../../usr/lib/isaexec

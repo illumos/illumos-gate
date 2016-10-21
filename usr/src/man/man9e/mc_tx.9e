@@ -1,0 +1,169 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2016 Joyent, Inc.
+.\"
+.Dd June 02, 2016
+.Dt MC_TX 9E
+.Os
+.Sh NAME
+.Nm mc_tx
+.Nd transmit a message block chain
+.Sh SYNOPSIS
+.In sys/mac_provider.h
+.Ft "mblk_t *"
+.Fo prefix_m_tx
+.Fa "void *driver"
+.Fa "mblk_t *mp_chain"
+.Fc
+.Sh INTERFACE LEVEL
+illumos DDI specific
+.Sh PARAMETERS
+.Bl -tag -width Fa
+.It Fa driver
+A pointer to the driver's private data that was passed in via the
+.Sy m_pdata
+member of the
+.Xr mac_register 9S
+structure to the
+.Xr mac_register 9F
+function.
+.It Fa mp_chain
+A series of
+.Xr mblk 9S
+structures that may have multiple independent packets linked together on
+their
+.Sy b_next
+member.
+.El
+.Sh DESCRIPTION
+The
+.Fn mc_tx
+entry point is called when the system requires a device driver to
+transmit data. The device driver will receive a chain of messge blocks.
+The
+.Fa mp_chain
+argument represents the first frame. The frame may be spread out
+across one or more
+.Xr mblk 9S
+structures that are linked together by the
+.Sy b_cont
+member. There may be multiple frames, linked together by the
+.Sy b_next
+pointer of the
+.Xr mblk 9S .
+.Pp
+For each frame, the driver should allocate the required resources and
+prepare it for being transmitted on the wire. The driver may opt to copy
+those resources to a DMA buffer or it may bind them. For more
+information on these options, see the
+.Sx MBLKS AND DMA
+section of
+.Xr mac 9E .
+.Pp
+As it processes each frame in the chain, if the device driver has
+advertised either of the
+.Sy MAC_CAPAB_HCKSUM
+or
+.Sy MAC_CAPAB_LSO
+flags, it must check whether either apply for the given frame using the
+.Xr mac_hcksum_get 9F
+and
+.Xr mac_lso_get 9F
+functions respectively. If either is enabled for the given frame, the
+hardware must arrange for that to be taken care of.
+.Pp
+For each frame that the device driver processes it is responsible for
+doing one of three things with it:
+.Bl -enum
+.It
+Transmit the frame.
+.It
+Drop the frame by calling
+.Xr freemsg 9F
+on the individual mblk_t.
+.It
+Return the frames to indicate that resources are not available.
+.El
+.Pp
+The device driver is in charge of the memory associated with
+.Fa mp_chain .
+If the device driver does not return the message blocks to the GLDv3,
+then it must call
+.Xr freemsg 9F
+on the frames. If it does not, the memory associated with them
+will be leaked. When a frame is being transmitted, if the device driver
+performed DMA binding, it should not free the message block until after
+it is guaranteed that the frame has been transmitted. If the message
+block was copied to a DMA buffer, then it is allowed to call
+.Xr freemsg 9F
+at any point.
+.Pp
+In general, the device driver should not drop frames without
+transmitting them unless it has no other choice. Times when this happens
+may include the device driver being in a state where it can't transmit,
+an error was found in the frame while trying to establish the checksum
+or LSO state, or some other kind of error that represents an issue with
+the passed frame.
+.Pp
+The device driver should not free the chain when it does not have enough
+resources. For example, if entries in a device's descriptor ring fill
+up, then it should not drop those frames and instead should return all
+of the frames that were not transmitted. This indicates to the stack
+that the device is full and that flow control should be asserted. Back
+pressure will be applied to the rest of the stack, allowing most systems
+to behave better.
+.Pp
+Once a device driver has returned unprocessed frames from its
+.Fn mc_tx
+entry point, then the device driver will not receive any additional
+calls to its
+.Fn mc_tx
+entry point until it calls
+.Xr mac_tx_update 9F
+to indicate that resources are available again. Note that because it is
+the device driver that is calling this function to indicate resources
+are available, it is very important that it only return frames in cases
+where the device driver itself will be notified that resources are
+available again. For example, when it receives an interrupt indicating
+that the data that it transmitted has been completed so it can use
+entries in its descriptor ring or other data structures again.
+.Pp
+The device driver can obtain access to its soft state through the
+.Fa driver
+member. It should cast it to the appropriate structure. The device
+driver should employ any necessary locking to access the transmit
+related data structures. Note that the device driver should expect that
+it may have its transmit endpoints called into from other threads while
+it's servicing device interrupts related to them.
+.Sh CONTEXT
+The
+.Fn mc_tx
+entry point may be called from
+.Sy kernel
+or
+.Sy interrupt
+context.
+.Sh RETURN VALUES
+Upon successful completion, the device driver should return
+.Dv NULL .
+Otherwise, it should return all unprocessed message blocks and ensure
+that it calls
+.Xr mac_tx_update 9F
+some time in the future.
+.Sh SEE ALSO
+.Xr mac 9E ,
+.Xr freemsg 9F ,
+.Xr mac_lso_get 9F ,
+.Xr mac_register 9F ,
+.Xr mac_tx_update 9F ,
+.Xr mac_register 9S ,
+.Xr mblk 9S

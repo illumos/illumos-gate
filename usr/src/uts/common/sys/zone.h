@@ -40,6 +40,7 @@
 #include <sys/uadmin.h>
 #include <sys/ksynch.h>
 #include <sys/socket_impl.h>
+#include <sys/secflags.h>
 #include <netinet/in.h>
 
 #ifdef	__cplusplus
@@ -104,6 +105,7 @@ extern "C" {
 #define	ZONE_ATTR_FS_ALLOWED	16
 #define	ZONE_ATTR_NETWORK	17
 #define	ZONE_ATTR_INITNORESTART	20
+#define	ZONE_ATTR_SECFLAGS	21
 
 /* Start of the brand-specific attribute namespace */
 #define	ZONE_ATTR_BRAND_ATTRS	32768
@@ -577,6 +579,8 @@ typedef struct zone {
 	uint64_t	zone_execpgin;		/* exec pages paged in */
 	uint64_t	zone_fspgin;		/* fs pages paged in */
 	uint64_t	zone_anon_alloc_fail;	/* cnt of anon alloc fails */
+
+	psecflags_t	zone_secflags; /* default zone security-flags */
 
 	/*
 	 * Misc. kstats and counters for zone cpu-usage aggregation.

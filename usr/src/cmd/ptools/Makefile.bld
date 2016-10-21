@@ -34,23 +34,24 @@ FILEMODE = 0555
 
 # libproc is added individually as pwait doesn't need it.
 # These are defined this way so lint can use them
-LDLIBS_pargs	= -lproc
-LDLIBS_pcred	= -lproc
-LDLIBS_pfiles	= -lproc -lnsl
-LDLIBS_pflags	= -lproc
-LDLIBS_pldd	= -lproc
-LDLIBS_plgrp	= -lproc -llgrp
-LDLIBS_pmap	= -lproc
-LDLIBS_pmadvise	= -lproc
-LDLIBS_ppriv	= -lproc
-LDLIBS_preap	= -lproc
-LDLIBS_prun	= -lproc
-LDLIBS_psig	= -lproc
-LDLIBS_pstack	= -lproc -lc_db
-LDLIBS_pstop	= -lproc
-LDLIBS_ptime	= -lproc
-LDLIBS_ptree	= -lproc -lcontract
-LDLIBS_pwdx	= -lproc
+LDLIBS_pargs		= -lproc
+LDLIBS_pcred		= -lproc
+LDLIBS_pfiles		= -lproc -lnsl
+LDLIBS_pflags		= -lproc
+LDLIBS_pldd		= -lproc
+LDLIBS_plgrp		= -lproc -llgrp
+LDLIBS_pmap		= -lproc
+LDLIBS_pmadvise		= -lproc
+LDLIBS_ppriv		= -lproc
+LDLIBS_preap		= -lproc
+LDLIBS_prun		= -lproc
+LDLIBS_psecflags	= -lproc -lproject
+LDLIBS_psig		= -lproc
+LDLIBS_pstack		= -lproc -lc_db
+LDLIBS_pstop		= -lproc
+LDLIBS_ptime		= -lproc
+LDLIBS_ptree		= -lproc -lcontract
+LDLIBS_pwdx		= -lproc
 
 LDLIBS += $(LDLIBS_$(PROG))
 

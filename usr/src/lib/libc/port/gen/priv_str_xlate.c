@@ -72,8 +72,8 @@ priv_basic(void)
  */
 priv_set_t *
 priv_str_to_set(const char *priv_names,
-		const char *separators,
-		const char **endptr)
+    const char *separators,
+    const char **endptr)
 {
 
 	char *base;

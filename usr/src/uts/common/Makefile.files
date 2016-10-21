@@ -273,6 +273,7 @@ GENUNIX_OBJS +=	\
 		priv.o		\
 		priv_const.o	\
 		proc.o		\
+		psecflags.o	\
 		procset.o	\
 		processor_bind.o	\
 		processor_info.o	\
@@ -298,6 +299,7 @@ GENUNIX_OBJS +=	\
 		sched.o		\
 		schedctl.o	\
 		sctp_crc32.o	\
+		secflags.o	\
 		seg_dev.o	\
 		seg_kp.o	\
 		seg_kpm.o	\
@@ -1982,7 +1984,7 @@ E1000API_OBJS += e1000_80003es2lan.o e1000_82540.o e1000_82541.o e1000_82542.o \
 E1000G_OBJS +=	e1000g_debug.o e1000g_main.o e1000g_alloc.o \
 		e1000g_tx.o e1000g_rx.o e1000g_stat.o \
 		e1000g_osdep.o e1000g_workarounds.o
-		
+
 
 #
 #	Intel 82575 1G NIC driver module
@@ -2143,7 +2145,7 @@ ISCSI_INITIATOR_OBJS =	chap.o iscsi_io.o iscsi_thread.o	\
 #	ntxn 10Gb/1Gb NIC driver module
 #
 NTXN_OBJS =	unm_nic_init.o unm_gem.o unm_nic_hw.o unm_ndd.o	\
-			unm_nic_main.o unm_nic_isr.o unm_nic_ctx.o niu.o
+		unm_nic_main.o unm_nic_isr.o unm_nic_ctx.o niu.o
 
 #
 #	Myricom 10Gb NIC driver module

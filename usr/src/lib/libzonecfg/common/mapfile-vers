@@ -58,6 +58,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zonecfg_add_rctl;
 	zonecfg_add_rctl_value;
 	zonecfg_add_scratch;
+        zonecfg_add_secflags;
 	zonecfg_aliased_rctl_ok;
 	zonecfg_apply_rctls;
 	zonecfg_attach_manifest;
@@ -84,6 +85,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zonecfg_delete_pset;
 	zonecfg_delete_rctl;
 	zonecfg_delete_scratch;
+        zonecfg_delete_secflags;
 	zonecfg_del_all_resources;
 	zonecfg_destroy;
 	zonecfg_destroy_snapshot;
@@ -137,6 +139,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zonecfg_get_privset;
 	zonecfg_getpsetent;
 	zonecfg_getrctlent;
+        zonecfg_getsecflagsent;
 	zonecfg_get_root;
 	zonecfg_get_sched_class;
 	zonecfg_get_scratch;
@@ -164,6 +167,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zonecfg_lookup_nwif;
 	zonecfg_lookup_pset;
 	zonecfg_lookup_rctl;
+        zonecfg_lookup_secflags;
 	zonecfg_modify_admin;
 	zonecfg_modify_attr;
 	zonecfg_modify_dev;
@@ -173,6 +177,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zonecfg_modify_nwif;
 	zonecfg_modify_pset;
 	zonecfg_modify_rctl;
+	zonecfg_modify_secflags;
 	zonecfg_notify_bind;
 	zonecfg_notify_critical_abort;
 	zonecfg_notify_critical_enter;

@@ -523,10 +523,10 @@ ofdcleanlock(file_t *fp)
  *    file descriptor the application loses its lock and does not know).
  * 2) Locks are not preserved across fork(2).
  *
- * Because these locks are only assoiciated with a pid they are per-process.
- * This is why any close will drop the lock and is also why once the process
- * forks then the lock is no longer related to the new process. These locks can
- * be considered as pid-ful.
+ * Because these locks are only associated with a PID, they are per-process.
+ * This is why any close will drop the lock and is also why, once the process
+ * forks, the lock is no longer related to the new process. These locks can
+ * be considered as PID-ful.
  *
  * See ofdlock() for the implementation of a similar but improved locking
  * scheme.
@@ -1003,7 +1003,7 @@ flk_free_lock(lock_descriptor_t	*lock)
 
 	ASSERT(IS_DEAD(lock));
 
-	if ((fp = lock->l_ofd) != NULL)
+	if ((fp = lock->l_ofd) != NULL && fp->f_filock == (struct filock *)lock)
 		fp->f_filock = NULL;
 
 	if (IS_REFERENCED(lock)) {

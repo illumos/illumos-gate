@@ -48,6 +48,8 @@ MANFILES= 	Intro.9s			\
 	 	kstat_io.9s			\
 	 	kstat_named.9s			\
 	 	linkblk.9s			\
+		mac_callbacks.9s		\
+		mac_register.9s			\
 	 	modldrv.9s			\
 	 	modlinkage.9s			\
 	 	modlmisc.9s			\
@@ -89,15 +91,20 @@ MANFILES= 	Intro.9s			\
 	 	usb_request_attributes.9s	\
 	 	usb_string_descr.9s
 
-MANLINKS=	dblk.9s		\
-		intro.9s	\
+MANLINKS=	dblk.9s			\
+		intro.9s		\
+		mac_callbacks_t.9s	\
+		mac_register_t.9s	\
 		mblk.9s
 
-intro.9s	:= LINKSRC = Intro.9s
+intro.9s		:= LINKSRC = Intro.9s
 
-dblk.9s		:= LINKSRC = datab.9s
+dblk.9s			:= LINKSRC = datab.9s
 
-mblk.9s		:= LINKSRC = msgb.9s
+mac_callbacks_t.9s	:= LINKSRC = mac_callbacks.9s
+mac_register_t.9s	:= LINKSRC = mac_register.9s
+
+mblk.9s			:= LINKSRC = msgb.9s
 
 .KEEP_STATE:
 

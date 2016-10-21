@@ -39,7 +39,7 @@ clobber: $(SUBDIRS)
 
 lint:
 
-$(SUBDIRS): common
+$(SUBDIRS): common FRC
 	@cd $@; pwd; $(MAKE) $(MFLAGS) $(TARGET)
 
 common: FRC

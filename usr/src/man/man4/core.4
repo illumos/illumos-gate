@@ -6,11 +6,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH CORE 4 "Mar 31, 2013"
+.TH CORE 4 "Jun 6, 2016"
 .SH NAME
 core \- process core file
 .SH DESCRIPTION
-.sp
 .LP
 The operating system writes out a core file for a process when the process is
 terminated due to receiving certain signals. A core file is a disk copy of the
@@ -451,6 +450,17 @@ more details.
 .RE
 
 .sp
+.ne 2
+.na
+\fB\fBprsecflags_t\fR\fR
+.ad
+.RS 15n
+\fBn_type\fR: \fbNT_SECFLAGS\fR.  This entry contains the process
+security-flags, see \fBsecurity-flags\fR(5), \fBproc\fR(4), and
+\fBpsecflags\fR(1M) for more information.
+.RE
+
+.sp
 .LP
 Depending on the \fBcoreadm\fR(1M) settings, the section header of an ELF core
 file can contain entries for CTF, symbol table, and string table sections. The
@@ -462,13 +472,12 @@ with the corresponding load object.
 The size of the core file created by a process can be controlled by the user
 (see \fBgetrlimit\fR(2)).
 .SH SEE ALSO
-.sp
 .LP
 \fBelfdump\fR(1), \fBgcore\fR(1), \fBmdb\fR(1), \fBproc\fR(1), \fBps\fR(1),
 \fBcoreadm\fR(1M), \fBgetrlimit\fR(2), \fBsetrlimit\fR(2), \fBsetuid\fR(2),
 \fBsysinfo\fR(2), \fBuname\fR(2), \fBgetzonenamebyid\fR(3C),
 \fBgetzoneid\fR(3C), \fBelf\fR(3ELF), \fBsignal.h\fR(3HEAD), \fBa.out\fR(4),
-\fBproc\fR(4), \fBzones\fR(5)
+\fBproc\fR(4), \fBzones\fR(5), \fBsecurity-flags\fR(5)
 .sp
 .LP
 \fIANSI C Programmer's Guide\fR

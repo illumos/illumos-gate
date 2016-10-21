@@ -27,6 +27,7 @@
 #include <sys/auxv.h>
 #include <sys/old_procfs.h>
 #include <sys/utsname.h>
+#include <sys/secflags.h>
 
 /* prgregset_t is a define on intel */
 #ifdef prgregset_t
@@ -56,3 +57,4 @@ sysset_t sysset;
 timestruc_t ts;
 struct utsname uts;
 prfdinfo_t ptfd;
+prsecflags_t psf;

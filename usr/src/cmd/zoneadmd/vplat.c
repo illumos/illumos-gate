@@ -77,6 +77,7 @@
 #include <sys/stropts.h>
 #include <sys/conf.h>
 #include <sys/systeminfo.h>
+#include <sys/secflags.h>
 
 #include <libdlpi.h>
 #include <libdllink.h>
@@ -4591,6 +4592,96 @@ setup_zone_hostid(zone_dochandle_t handle, zlog_t *zlogp, zoneid_t zoneid)
 }
 
 static int
+setup_zone_secflags(zone_dochandle_t handle, zlog_t *zlogp, zoneid_t zoneid)
+{
+	psecflags_t secflags;
+	struct zone_secflagstab tab = {0};
+	secflagdelta_t delt;
+	int res;
+
+	res = zonecfg_lookup_secflags(handle, &tab);
+
+	if ((res != Z_OK) &&
+	    /* The general defaulting code will handle this */
+	    (res != Z_NO_ENTRY) && (res != Z_BAD_PROPERTY)) {
+		zerror(zlogp, B_FALSE, "security-flags property is "
+		    "invalid: %d", res);
+		return (res);
+	}
+
+	if (strlen(tab.zone_secflags_lower) == 0)
+		(void) strlcpy(tab.zone_secflags_lower, "none",
+		    sizeof (tab.zone_secflags_lower));
+	if (strlen(tab.zone_secflags_default) == 0)
+		(void) strlcpy(tab.zone_secflags_default,
+		    tab.zone_secflags_lower,
+		    sizeof (tab.zone_secflags_default));
+	if (strlen(tab.zone_secflags_upper) == 0)
+		(void) strlcpy(tab.zone_secflags_upper, "all",
+		    sizeof (tab.zone_secflags_upper));
+
+	if (secflags_parse(NULL, tab.zone_secflags_default,
+	    &delt) == -1) {
+		zerror(zlogp, B_FALSE, "default security-flags: '%s'"
+		    "are invalid", tab.zone_secflags_default);
+		return (Z_BAD_PROPERTY);
+	} else if (delt.psd_ass_active != B_TRUE) {
+		zerror(zlogp, B_FALSE, "relative security-flags are not "
+		    "allowed in zone configuration (default "
+		    "security-flags: '%s')",
+		    tab.zone_secflags_default);
+		return (Z_BAD_PROPERTY);
+	} else {
+		secflags_copy(&secflags.psf_inherit, &delt.psd_assign);
+		secflags_copy(&secflags.psf_effective, &delt.psd_assign);
+	}
+
+	if (secflags_parse(NULL, tab.zone_secflags_lower,
+	    &delt) == -1) {
+		zerror(zlogp, B_FALSE, "lower security-flags: '%s'"
+		    "are invalid", tab.zone_secflags_lower);
+		return (Z_BAD_PROPERTY);
+	} else if (delt.psd_ass_active != B_TRUE) {
+		zerror(zlogp, B_FALSE, "relative security-flags are not "
+		    "allowed in zone configuration (lower "
+		    "security-flags: '%s')",
+		    tab.zone_secflags_lower);
+		return (Z_BAD_PROPERTY);
+	} else {
+		secflags_copy(&secflags.psf_lower, &delt.psd_assign);
+	}
+
+	if (secflags_parse(NULL, tab.zone_secflags_upper,
+	    &delt) == -1) {
+		zerror(zlogp, B_FALSE, "upper security-flags: '%s'"
+		    "are invalid", tab.zone_secflags_upper);
+		return (Z_BAD_PROPERTY);
+	} else if (delt.psd_ass_active != B_TRUE) {
+		zerror(zlogp, B_FALSE, "relative security-flags are not "
+		    "allowed in zone configuration (upper "
+		    "security-flags: '%s')",
+		    tab.zone_secflags_upper);
+		return (Z_BAD_PROPERTY);
+	} else {
+		secflags_copy(&secflags.psf_upper, &delt.psd_assign);
+	}
+
+	if (!psecflags_validate(&secflags)) {
+		zerror(zlogp, B_TRUE, "security-flags violate invariants");
+		return (Z_BAD_PROPERTY);
+	}
+
+	if ((res = zone_setattr(zoneid, ZONE_ATTR_SECFLAGS, &secflags,
+	    sizeof (secflags))) != 0) {
+		zerror(zlogp, B_TRUE,
+		    "security-flags couldn't be set: %d", res);
+		return (Z_SYSTEM);
+	}
+
+	return (Z_OK);
+}
+
+static int
 setup_zone_fs_allowed(zone_dochandle_t handle, zlog_t *zlogp, zoneid_t zoneid)
 {
 	char fsallowed[ZONE_FS_ALLOWED_MAX];
@@ -4607,7 +4698,7 @@ setup_zone_fs_allowed(zone_dochandle_t handle, zlog_t *zlogp, zoneid_t zoneid)
 		report_prop_err(zlogp, "fs-allowed", fsallowed, res);
 		return (res);
 	} else if (fsallowed[0] == '-') {
-		/* dropping default privs - use remaining list */
+		/* dropping default filesystems - use remaining list */
 		if (fsallowed[1] != ',')
 			return (Z_OK);
 		fsallowedp += 2;
@@ -4650,6 +4741,9 @@ setup_zone_attrs(zlog_t *zlogp, char *zone_namep, zoneid_t zoneid)
 		goto out;
 
 	if ((res = setup_zone_fs_allowed(handle, zlogp, zoneid)) != Z_OK)
+		goto out;
+
+	if ((res = setup_zone_secflags(handle, zlogp, zoneid)) != Z_OK)
 		goto out;
 
 out:

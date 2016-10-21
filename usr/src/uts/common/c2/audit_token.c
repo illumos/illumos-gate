@@ -1149,6 +1149,40 @@ au_to_privset(
 	return (token);
 }
 
+token_t *
+au_to_secflags(const char *which, secflagset_t set)
+{
+	token_t *token, *m;
+	adr_t adr;
+	char data_header = AUT_SECFLAGS;
+	short sz;
+	char secstr[1024];
+
+	token = au_getclr();
+
+	adr_start(&adr, memtod(token, char *));
+	adr_char(&adr, &data_header, 1);
+
+	sz = strlen(which) + 1;
+	adr_short(&adr, &sz, 1);
+
+	token->len = (uchar_t)adr_count(&adr);
+	m = au_getclr();
+	(void) au_append_buf(which, sz, m);
+	(void) au_append_rec(token, m, AU_PACK);
+	adr.adr_now += sz;
+
+	secflags_to_str(set, secstr, sizeof (secstr));
+	sz = strlen(secstr) + 1;
+	adr_short(&adr, &sz, 1);
+	token->len = (uchar_t)adr_count(&adr);
+	m = au_getclr();
+	(void) au_append_buf(secstr, sz, m);
+	(void) au_append_rec(token, m, AU_PACK);
+
+	return (token);
+}
+
 /*
  * au_to_label
  * returns:

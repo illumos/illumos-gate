@@ -135,6 +135,7 @@ MANFILES=					\
 		proc_str2fltset.3proc		\
 		proc_unctrl_psinfo.3proc	\
 		proc_walk.3proc			\
+		Psecflags.3proc			\
 		Psetbkpt.3proc			\
 		Psetcred.3proc			\
 		Psetfault.3proc			\

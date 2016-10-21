@@ -526,6 +526,15 @@ typedef struct {
 	sl_field_t		pr_path;
 } sl_prfdinfo_layout_t;
 
+typedef struct {
+	sl_field_t		sizeof_struct;
+	sl_field_t		pr_version;
+	sl_field_t		pr_effective;
+	sl_field_t		pr_inherit;
+	sl_field_t		pr_lower;
+	sl_field_t		pr_upper;
+} sl_prsecflags_layout_t;
+
 /*
  * This type collects all of the layout definitions for
  * a given architecture.
@@ -551,6 +560,7 @@ typedef struct {
 	const sl_timestruc_layout_t	*timestruc;	/* timestruc_t */
 	const sl_utsname_layout_t	*utsname;	/* struct utsname */
 	const sl_prfdinfo_layout_t	*prfdinfo;	/* prdinfo_t */
+	const sl_prsecflags_layout_t	*prsecflags;	/* prsecflags_t */
 } sl_arch_layout_t;
 
 

@@ -365,7 +365,8 @@ fcntl(int fdes, int cmd, intptr_t arg)
 			}
 		}
 
-		if (cmd == F_OFD_SETLK || cmd == F_OFD_SETLKW) {
+		if (cmd == F_OFD_GETLK || cmd == F_OFD_SETLK ||
+		    cmd == F_OFD_SETLKW) {
 			/*
 			 * TBD OFD-style locking is currently limited to
 			 * covering the entire file.

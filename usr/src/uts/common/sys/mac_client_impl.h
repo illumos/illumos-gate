@@ -21,6 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
  */
 /*
  * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
@@ -330,6 +331,7 @@ extern	int	mac_tx_percpu_cnt;
 
 /* Mac protection flags */
 #define	MPT_FLAG_V6_LOCAL_ADDR_SET	0x0001
+#define	MPT_FLAG_PROMISC_FILTERED	0x0002
 
 /* in mac_client.c */
 extern void mac_promisc_client_dispatch(mac_client_impl_t *, mblk_t *);

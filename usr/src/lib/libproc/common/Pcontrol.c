@@ -54,6 +54,7 @@
 #include <sys/syscall.h>
 #include <sys/sysmacros.h>
 #include <sys/systeminfo.h>
+#include <sys/secflags.h>
 
 #include "libproc.h"
 #include "Pcontrol.h"
@@ -174,6 +175,13 @@ static int
 Pcred_live(struct ps_prochandle *P, prcred_t *pcrp, int ngroups, void *data)
 {
 	return (proc_get_cred(P->pid, pcrp, ngroups));
+}
+
+/* ARGSUSED */
+static int
+Psecflags_live(struct ps_prochandle *P, prsecflags_t **psf, void *data)
+{
+	return (proc_get_secflags(P->pid, psf));
 }
 
 /*ARGSUSED*/
@@ -326,6 +334,7 @@ static const ps_ops_t P_live_ops = {
 	.pop_uname	= Puname_live,
 	.pop_zonename	= Pzonename_live,
 	.pop_execname	= Pexecname_live,
+	.pop_secflags	= Psecflags_live,
 #if defined(__i386) || defined(__amd64)
 	.pop_ldt	= Pldt_live
 #endif
@@ -418,11 +427,11 @@ dupfd(int fd, int dfd)
  */
 struct ps_prochandle *
 Pxcreate(const char *file,	/* executable file name */
-	char *const *argv,	/* argument vector */
-	char *const *envp,	/* environment */
-	int *perr,	/* pointer to error return code */
-	char *path,	/* if non-null, holds exec path name on return */
-	size_t len)	/* size of the path buffer */
+    char *const *argv,		/* argument vector */
+    char *const *envp,		/* environment */
+    int *perr,			/* pointer to error return code */
+    char *path,		/* if non-null, holds exec path name on return */
+    size_t len)			/* size of the path buffer */
 {
 	char execpath[PATH_MAX];
 	char procname[PATH_MAX];
@@ -1293,6 +1302,28 @@ Pcred(struct ps_prochandle *P, prcred_t *pcrp, int ngroups)
 	return (P->ops.pop_cred(P, pcrp, ngroups, P->data));
 }
 
+/* Return an allocated prsecflags_t */
+int
+Psecflags(struct ps_prochandle *P, prsecflags_t **psf)
+{
+	int ret;
+
+	if ((ret = P->ops.pop_secflags(P, psf, P->data)) == 0) {
+		if ((*psf)->pr_version != PRSECFLAGS_VERSION_1) {
+			errno = EINVAL;
+			return (-1);
+		}
+	}
+
+	return (ret);
+}
+
+void
+Psecflags_free(prsecflags_t *psf)
+{
+	free(psf);
+}
+
 static prheader_t *
 Plstatus(struct ps_prochandle *P)
 {
@@ -1795,8 +1826,8 @@ prdump(struct ps_prochandle *P)
  */
 int
 Pstopstatus(struct ps_prochandle *P,
-	long request,		/* PCNULL, PCDSTOP, PCSTOP, PCWSTOP */
-	uint_t msec)		/* if non-zero, timeout in milliseconds */
+    long request,		/* PCNULL, PCDSTOP, PCSTOP, PCWSTOP */
+    uint_t msec)		/* if non-zero, timeout in milliseconds */
 {
 	int ctlfd = (P->agentctlfd >= 0)? P->agentctlfd : P->ctlfd;
 	long ctl[3];
@@ -2060,8 +2091,8 @@ Pputareg(struct ps_prochandle *P, int regno, prgreg_t reg)
 
 int
 Psetrun(struct ps_prochandle *P,
-	int sig,	/* signal to pass to process */
-	int flags)	/* PRSTEP|PRSABORT|PRSTOP|PRCSIG|PRCFAULT */
+    int sig,	/* signal to pass to process */
+    int flags)	/* PRSTEP|PRSABORT|PRSTOP|PRCSIG|PRCFAULT */
 {
 	int ctlfd = (P->agentctlfd >= 0) ? P->agentctlfd : P->ctlfd;
 	int sbits = (PR_DSTOP | PR_ISTOP | PR_ASLEEP);
@@ -2136,18 +2167,18 @@ Psetrun(struct ps_prochandle *P,
 
 ssize_t
 Pread(struct ps_prochandle *P,
-	void *buf,		/* caller's buffer */
-	size_t nbyte,		/* number of bytes to read */
-	uintptr_t address)	/* address in process */
+    void *buf,		/* caller's buffer */
+    size_t nbyte,	/* number of bytes to read */
+    uintptr_t address)	/* address in process */
 {
 	return (P->ops.pop_pread(P, buf, nbyte, address, P->data));
 }
 
 ssize_t
 Pread_string(struct ps_prochandle *P,
-	char *buf,		/* caller's buffer */
-	size_t size,		/* upper limit on bytes to read */
-	uintptr_t addr)		/* address in process */
+    char *buf,			/* caller's buffer */
+    size_t size,		/* upper limit on bytes to read */
+    uintptr_t addr)		/* address in process */
 {
 	enum { STRSZ = 40 };
 	char string[STRSZ + 1];
@@ -2183,9 +2214,9 @@ Pread_string(struct ps_prochandle *P,
 
 ssize_t
 Pwrite(struct ps_prochandle *P,
-	const void *buf,	/* caller's buffer */
-	size_t nbyte,		/* number of bytes to write */
-	uintptr_t address)	/* address in process */
+    const void *buf,	/* caller's buffer */
+    size_t nbyte,	/* number of bytes to write */
+    uintptr_t address)	/* address in process */
 {
 	return (P->ops.pop_pwrite(P, buf, nbyte, address, P->data));
 }
@@ -3392,8 +3423,8 @@ Lsync(struct ps_lwphandle *L)
  */
 static int
 Lstopstatus(struct ps_lwphandle *L,
-	long request,		/* PCNULL, PCDSTOP, PCSTOP, PCWSTOP */
-	uint_t msec)		/* if non-zero, timeout in milliseconds */
+    long request,		/* PCNULL, PCDSTOP, PCSTOP, PCWSTOP */
+    uint_t msec)		/* if non-zero, timeout in milliseconds */
 {
 	int ctlfd = L->lwp_ctlfd;
 	long ctl[3];
@@ -3592,8 +3623,8 @@ Lputareg(struct ps_lwphandle *L, int regno, prgreg_t reg)
 
 int
 Lsetrun(struct ps_lwphandle *L,
-	int sig,	/* signal to pass to LWP */
-	int flags)	/* PRSTEP|PRSABORT|PRSTOP|PRCSIG|PRCFAULT */
+    int sig,	/* signal to pass to LWP */
+    int flags)	/* PRSTEP|PRSABORT|PRSTOP|PRCSIG|PRCFAULT */
 {
 	int ctlfd = L->lwp_ctlfd;
 	int sbits = (PR_DSTOP | PR_ISTOP | PR_ASLEEP);

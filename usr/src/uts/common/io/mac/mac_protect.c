@@ -2576,6 +2576,9 @@ mac_protect_init(mac_client_impl_t *mcip)
 	    sizeof (dhcpv6_addr_t), offsetof(dhcpv6_addr_t, da_node));
 	avl_create(&mcip->mci_v6_slaac_ip, compare_slaac_ip,
 	    sizeof (slaac_addr_t), offsetof(slaac_addr_t, sla_node));
+
+	if (mcip->mci_state_flags & MCIS_IS_VNIC)
+		mcip->mci_protect_flags |= MPT_FLAG_PROMISC_FILTERED;
 }
 
 void

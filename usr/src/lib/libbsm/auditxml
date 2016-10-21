@@ -613,6 +613,7 @@ sub generateTableC {
 		  'priv_limit'		=> 'ADT_AUT_PRIV_L', 	# dummy token id
 		  'priv_inherit'	=> 'ADT_AUT_PRIV_I',	# dummy token id
 		  'return'      	=> 'AUT_RETURN',
+		  'secflags'		=> 'AUT_SECFLAGS',
 	#	  'seq'         	=> 'AUT_SEQ',		# not defined
 	#	  'socket'      	=> 'AUT_SOCKET',	# not defined
 	#	  'socket-inet' 	=> 'AUT_SOCKET_INET',

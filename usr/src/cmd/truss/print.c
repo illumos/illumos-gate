@@ -67,6 +67,7 @@
 #include <sys/rtpriocntl.h>
 #include <sys/fsspriocntl.h>
 #include <sys/fxpriocntl.h>
+#include <sys/proc.h>
 #include <netdb.h>
 #include <nss_dbdefs.h>
 #include <sys/socketvar.h>
@@ -1600,6 +1601,98 @@ prt_pc5(private_t *pri, int raw, long val)
 	prt_dec(pri, 0, PC_KY_NULL);
 }
 
+
+void
+prt_psflags(private_t *pri, secflagset_t val)
+{
+	char str[1024];
+
+	if (val == 0) {
+		outstring(pri, "0x0");
+		return;
+	}
+
+	*str = '\0';
+	if (secflag_isset(val, PROC_SEC_ASLR)) {
+		(void) strlcat(str, "|PROC_SEC_ASLR", sizeof (str));
+		secflag_clear(&val, PROC_SEC_ASLR);
+	}
+	if (secflag_isset(val, PROC_SEC_FORBIDNULLMAP)) {
+		(void) strlcat(str, "|PROC_SEC_FORBIDNULLMAP",
+		    sizeof (str));
+		secflag_clear(&val, PROC_SEC_FORBIDNULLMAP);
+	}
+	if (secflag_isset(val, PROC_SEC_NOEXECSTACK)) {
+		(void) strlcat(str, "|PROC_SEC_NOEXECSTACK",
+		    sizeof (str));
+		secflag_clear(&val, PROC_SEC_NOEXECSTACK);
+	}
+
+	if (val != 0)
+		(void) snprintf(str, sizeof (str), "%s|%#x", str, val);
+
+	outstring(pri, str + 1);
+}
+
+/*
+ * Print a psecflags(2) delta
+ */
+void
+prt_psdelta(private_t *pri, int raw, long value)
+{
+	secflagdelta_t psd;
+
+	if ((raw != 0) ||
+	    (Pread(Proc, &psd, sizeof (psd), value) != sizeof (psd))) {
+		prt_hex(pri, 0, value);
+		return;
+	}
+	outstring(pri, "{ ");
+	prt_psflags(pri, psd.psd_add);
+	outstring(pri, ", ");
+	prt_psflags(pri, psd.psd_rem);
+	outstring(pri, ", ");
+	prt_psflags(pri, psd.psd_assign);
+	outstring(pri, ", ");
+	outstring(pri, psd.psd_ass_active ? "B_TRUE" : "B_FALSE");
+	outstring(pri, " }");
+}
+
+/*
+ * Print a psecflagswhich_t
+ */
+void
+prt_psfw(private_t *pri, int raw, long value)
+{
+	psecflagwhich_t which = (psecflagwhich_t)value;
+	char *s;
+
+	if (raw != 0) {
+		prt_dec(pri, 0, value);
+		return;
+	}
+
+	switch (which) {
+	case PSF_EFFECTIVE:
+		s = "PSF_EFFECTIVE";
+		break;
+	case PSF_INHERIT:
+		s = "PSF_INHERIT";
+		break;
+	case PSF_LOWER:
+		s = "PSF_LOWER";
+		break;
+	case PSF_UPPER:
+		s = "PSF_UPPER";
+		break;
+	}
+
+	if (s == NULL)
+		prt_dec(pri, 0, value);
+	else
+		outstring(pri, s);
+}
+
 /*
  * Print processor set id, including logical expansion of "special" ids.
  */
@@ -2874,5 +2967,7 @@ void (* const Print[])() = {
 	prt_acf,	/* ACF -- print accept4 flags */
 	prt_pfd,	/* PFD -- print pipe fds */
 	prt_grf,	/* GRF -- print getrandom flags */
+	prt_psdelta,	/* PSDLT -- print psecflags(2) delta */
+	prt_psfw,	/* PSFW -- print psecflags(2) set */
 	prt_dec,	/* HID -- hidden argument, make this the last one */
 };

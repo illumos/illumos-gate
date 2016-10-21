@@ -11,10 +11,11 @@
 
 #
 # Copyright 2011, Richard Lowe
-# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2016 Nexenta Systems, Inc.
 #
 
 file path=usr/share/man/man7d/bscv.7d
+file path=usr/share/man/man7d/console.7d
 file path=usr/share/man/man7d/cpuid.7d
 file path=usr/share/man/man7d/devinfo.7d
 file path=usr/share/man/man7d/gld.7d

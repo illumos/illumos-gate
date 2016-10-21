@@ -111,6 +111,7 @@ MANFILES=	Intro.5			\
 		regex.5			\
 		regexp.5		\
 		resource_controls.5	\
+		security-flags.5	\
 		smf.5			\
 		smf_bootstrap.5		\
 		smf_method.5		\

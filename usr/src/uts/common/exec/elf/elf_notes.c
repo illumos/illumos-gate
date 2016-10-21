@@ -94,7 +94,7 @@ setup_note_header(Phdr *v, proc_t *p)
 
 	v[0].p_type = PT_NOTE;
 	v[0].p_flags = PF_R;
-	v[0].p_filesz = (sizeof (Note) * (9 + 2 * nlwp + nzomb + nfd))
+	v[0].p_filesz = (sizeof (Note) * (10 + 2 * nlwp + nzomb + nfd))
 	    + roundup(sizeof (psinfo_t), sizeof (Word))
 	    + roundup(sizeof (pstatus_t), sizeof (Word))
 	    + roundup(prgetprivsize(), sizeof (Word))
@@ -104,6 +104,7 @@ setup_note_header(Phdr *v, proc_t *p)
 	    + roundup(__KERN_NAUXV_IMPL * sizeof (aux_entry_t), sizeof (Word))
 	    + roundup(sizeof (utsname), sizeof (Word))
 	    + roundup(sizeof (core_content_t), sizeof (Word))
+	    + roundup(sizeof (prsecflags_t), sizeof (Word))
 	    + (nlwp + nzomb) * roundup(sizeof (lwpsinfo_t), sizeof (Word))
 	    + nlwp * roundup(sizeof (lwpstatus_t), sizeof (Word))
 	    + nfd * roundup(sizeof (prfdinfo_t), sizeof (Word));
@@ -182,6 +183,7 @@ write_elfnotes(proc_t *p, int sig, vnode_t *vp, offset_t offset,
 		prpriv_t	ppriv;
 		priv_impl_info_t prinfo;
 		struct utsname	uts;
+		prsecflags_t	psecflags;
 	} *bigwad;
 
 	size_t xregsize = prhasx(p)? prgetprxregsize(p) : 0;
@@ -284,6 +286,12 @@ write_elfnotes(proc_t *p, int sig, vnode_t *vp, offset_t offset,
 	}
 	error = elfnote(vp, &offset, NT_UTSNAME, sizeof (struct utsname),
 	    (caddr_t)&bigwad->uts, rlimit, credp);
+	if (error)
+		goto done;
+
+	prgetsecflags(p, &bigwad->psecflags);
+	error = elfnote(vp, &offset, NT_SECFLAGS, sizeof (prsecflags_t),
+	    (caddr_t)&bigwad->psecflags, rlimit, credp);
 	if (error)
 		goto done;
 

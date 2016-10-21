@@ -321,6 +321,8 @@ mlsetup(struct regs *rp)
 	p0.p_brkpageszc = 0;
 	p0.p_t1_lgrpid = LGRP_NONE;
 	p0.p_tr_lgrpid = LGRP_NONE;
+	psecflags_default(&p0.p_secflags);
+
 	sigorset(&p0.p_ignore, &ignoredefault);
 
 	CPU->cpu_thread = &t0;

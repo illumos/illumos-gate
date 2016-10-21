@@ -46,6 +46,7 @@
 #include <sys/memnode.h>
 #include <sys/mem_cage.h>
 #include <vm/vm_dep.h>
+#include <sys/random.h>
 
 #if defined(__sparcv9) && defined(SF_ERRATA_57)
 caddr_t errata57_limit;
@@ -135,6 +136,13 @@ adjust_data_maxlpsize(size_t ismpagesize)
 		max_shm_lpsize = ismpagesize;
 	}
 }
+
+/*
+ * The maximum amount a randomized mapping will be slewed.  We should perhaps
+ * arrange things so these tunables can be separate for mmap, mmapobj, and
+ * ld.so
+ */
+size_t aslr_max_map_skew = 256 * 1024 * 1024; /* 256MB */
 
 /*
  * map_addr_proc() is the routine called when the system is to
@@ -265,6 +273,7 @@ map_addr_proc(caddr_t *addrp, size_t len, offset_t off, int vacalign,
 	 */
 	as_purge(as);
 	off = off & (align_amount - 1);
+
 	if (as_gap_aligned(as, len, &base, &slen, AH_HI, NULL, align_amount,
 	    PAGESIZE, off) == 0) {
 		caddr_t as_addr;
@@ -286,6 +295,28 @@ map_addr_proc(caddr_t *addrp, size_t len, offset_t off, int vacalign,
 		addr += (long)off;
 		if (addr > as_addr) {
 			addr -= align_amount;
+		}
+
+		/*
+		 * If randomization is requested, slew the allocation
+		 * backwards, within the same gap, by a random amount.
+		 */
+		if (flags & _MAP_RANDOMIZE) {
+			uint32_t slew;
+			uint32_t maxslew;
+
+			(void) random_get_pseudo_bytes((uint8_t *)&slew,
+			    sizeof (slew));
+
+			maxslew = MIN(aslr_max_map_skew, (addr - base));
+			/*
+			 * Don't allow ASLR to cause mappings to fail below
+			 * because of SF erratum #57
+			 */
+			maxslew = MIN(maxslew, (addr - errata57_limit));
+
+			slew = slew % maxslew;
+			addr -= P2ALIGN(slew, align_amount);
 		}
 
 		ASSERT(addr > base);
@@ -348,10 +379,4 @@ contig_mem_prealloc(caddr_t alloc_base, pgcnt_t npages)
 {
 	/* not applicable to sun4u */
 	return (alloc_base);
-}
-
-size_t
-exec_get_spslew(void)
-{
-	return (0);
 }

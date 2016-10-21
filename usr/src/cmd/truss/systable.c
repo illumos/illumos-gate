@@ -221,7 +221,7 @@ errname(int err)	/* return the error code name (NULL if none) */
 const struct systable systable[] = {
 { NULL,		8, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX},
 {"_exit",	1, DEC, NOV, DEC},				/*   1 */
-{ NULL,		8, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX},
+{"psecflags",	3, DEC, NOV, HEX, PSFW, PSDLT},			/*   2 */
 {"read",	3, DEC, NOV, DEC, IOB, UNS},			/*   3 */
 {"write",	3, DEC, NOV, DEC, IOB, UNS},			/*   4 */
 {"open",	3, DEC, NOV, STG, OPN, OCT},			/*   5 */

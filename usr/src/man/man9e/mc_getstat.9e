@@ -1,0 +1,156 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2016 Joyent, Inc.
+.\"
+.Dd May 31, 2016
+.Dt MC_GETSTAT 9E
+.Os
+.Sh NAME
+.Nm mc_getstat
+.Nd get device statistics information
+.Sh SYNOPSIS
+.In sys/mac_provider.h
+.In sys/mac_ether.h
+.Ft int
+.Fo prefix_m_getstat
+.Fa "void *driver"
+.Fa "uint_t stat"
+.Fa "uint64_t *stat_value"
+.Fc
+.Sh INTERFACE LEVEL
+illumos DDI specific
+.Sh PARAMETERS
+.Bl -tag -width Fa
+.It Fa driver
+A pointer to the driver's private data that was passed in via the
+.Sy m_pdata
+member of the
+.Xr mac_register 9S
+structure to the
+.Xr mac_register 9F
+function.
+.It Fa stat
+The numeric identifier of a statistic.
+.It Fa stat_value
+A pointer to a 64-bit unsigned value in which the device driver should
+place the statistic.
+.El
+.Sh DESCRIPTION
+The
+.Fn mc_getstat
+entry point is used to get statistics from the device driver. Statistics
+are stored as monotonic values. They should only ever increase over the
+lifetime of a device, resetting only as part of the instance of a
+device attaching and detaching. When hardware has values that may
+overflow, it is up to the device driver to store them as a 64-bit
+quantity that does not overflow in its soft state.
+.Pp
+Most device drivers will use a
+.Sy switch
+statement, switching on the value of the statistic
+.Fa stat .
+The full list of supported statistics is available in the
+.Sx STATISTICS
+section of
+.Xr mac 9E .
+.Pp
+If a device driver recognizes the value of
+.Fa stat ,
+then it should store the current 64-bit unsigned integer into
+.Fa stat_value .
+If the device driver does not support the statistic or does not
+recognize the requested statistic, then it should not set anything in
+.Fa stat_value
+and instead return
+.Er ENOTSUP .
+.Pp
+The device driver can obtain access to its soft state through the
+.Fa driver
+member. It should be cast to the appropriate structure. The device
+driver should employ any necessary locking to access the statistic
+members of its soft state to ensure that the data is properly
+serialized.
+.Sh RETURN VALUES
+Upon successful completion, the device driver should fill in
+.Fa stat_value
+and return
+.Sy 0 .
+Otherwise it should return a non-zero error number to indicate an error
+occurred.
+.Sh EXAMPLES
+The following example shows how a driver might structure its
+.Fn mc_getstat
+entry point.
+.Bd -literal
+#include <sys/mac_provider.h>
+#include <sys/mac_ether.h>
+
+/*
+ * Note, this example merely shows the structure of the function. For
+ * the purpose of this example, we assume that we have a device which
+ * has members that indicate its stats and that it has a lock which is
+ * used to serialize access to this data.
+ */
+
+static int
+example_m_getstat(void *arg, uint_t stat, uint64_t *val)
+{
+	example_t *ep = arg;
+
+	mutex_enter(&ep->ep_lock);
+	switch (stat) {
+	case MAC_STAT_RBYTES:
+		*val = ep->ep_stats.eps_rbytes;
+		break;
+	case MAC_STAT_OBYTES:
+		*val = ep->ep_stats.eps_obytes;
+		break;
+	case MAC_STAT_IPACKETS:
+		*val = ep->ep_stats.eps_ipackets;
+		break;
+	case MAC_STAT_OPACKETS:
+		*val = ep->ep_stats.eps_opackets;
+		break;
+
+	/*
+	 * Note, there are many more stats that should be checked and
+	 * filled in if supported. You should use one case statement for
+	 * each stat.
+	 */
+
+	default:
+		mutex_exit(&ep->ep_lock);
+		return (ENOTSUP);
+	}
+	mutex_exit(&ep->ep_lock);
+
+	return (0);
+}
+.Ed
+.Sh ERRORS
+The device driver may return one of the following errors. While this list
+is not intended to be exhaustive, it is recommended to use one of these
+if possible.
+.Bl -tag -width Er
+.It Er ENOTSUP
+The specified statistic is unknown, unsupported, or unimplemented.
+.It Er EIO
+A transport or DMA FM related error occurred while trying to sync data
+from the device.
+.It Er ECANCELLED
+The device is not currently in a state where it can currently service
+the request.
+.El
+.Sh SEE ALSO
+.Xr mac 9E ,
+.Xr mac_register 9F ,
+.Xr mac_register 9S

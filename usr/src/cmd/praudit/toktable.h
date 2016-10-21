@@ -214,6 +214,7 @@ extern int	attribute32_token();
 extern int	useofauth_token();
 extern int	user_token();
 extern int	zonename_token();
+extern int	secflags_token();
 
 /*
  * X windows tokens
