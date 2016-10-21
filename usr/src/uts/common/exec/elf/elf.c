@@ -1583,9 +1583,6 @@ mapelfexec(
 	for (i = nphdrs; i > 0; i--) {
 		switch (phdr->p_type) {
 		case PT_LOAD:
-			if ((*intphdr != NULL) && (*uphdr == NULL))
-				return (0);
-
 			ptload = 1;
 			prot = PROT_USER;
 			if (phdr->p_flags & PF_R)
