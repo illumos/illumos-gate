@@ -1939,6 +1939,7 @@ f usr/bin/amd64/preap 0555 root bin
 f usr/bin/amd64/prstat 0555 root bin
 f usr/bin/amd64/prun 0555 root bin
 f usr/bin/amd64/ps 0555 root bin
+f usr/bin/amd64/psecflags 0555 root bin
 f usr/bin/amd64/psig 0555 root bin
 f usr/bin/amd64/pstack 0555 root bin
 f usr/bin/amd64/pstop 0555 root bin
