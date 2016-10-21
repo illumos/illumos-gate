@@ -340,7 +340,7 @@ print_chassis(smbios_hdl_t *shp, id_t id, FILE *fp)
 
 	oprintf(fp, "  OEM Data: 0x%x\n", c.smbc_oemdata);
 	oprintf(fp, "  SKU number: %s\n",
-	    c.smbc_sku == NULL ? "<unknown>" : c.smbc_sku);
+	    c.smbc_sku[0] == '\0' ? "<unknown>" : c.smbc_sku);
 	oprintf(fp, "  Lock Present: %s\n", c.smbc_lock ? "Y" : "N");
 
 	desc_printf(smbios_chassis_type_desc(c.smbc_type),
@@ -1331,6 +1331,11 @@ main(int argc, char *argv[])
 		    g_pname, smbios_errmsg(err));
 		return (SMBIOS_ERROR);
 	}
+
+	if (opt_i == -1 && opt_t == -1 && opt_e == 0 &&
+	    smbios_truncated(shp))
+		(void) fprintf(stderr, "%s: SMBIOS table is truncated\n",
+		    g_pname);
 
 	if (ofile != NULL) {
 		if ((fd = open(ofile, O_WRONLY|O_CREAT|O_TRUNC, 0666)) == -1) {

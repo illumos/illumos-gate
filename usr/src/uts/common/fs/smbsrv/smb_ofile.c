@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 Syneto S.R.L. All rights reserved.
  */
 
 /*
@@ -834,6 +835,27 @@ smb_ofile_seek(
 	}
 	mutex_exit(&of->f_mutex);
 	return (rc);
+}
+
+/*
+ * smb_ofile_flush
+ *
+ * If writes on this file are not synchronous, flush it using the NFSv3
+ * commit interface.
+ *
+ * XXX - todo: Flush named pipe should drain writes.
+ */
+void
+smb_ofile_flush(struct smb_request *sr, struct smb_ofile *of)
+{
+	switch (of->f_ftype) {
+	case SMB_FTYPE_DISK:
+		if ((of->f_node->flags & NODE_FLAGS_WRITE_THROUGH) == 0)
+			(void) smb_fsop_commit(sr, of->f_cr, of->f_node);
+		break;
+	default:
+		break;
+	}
 }
 
 /*

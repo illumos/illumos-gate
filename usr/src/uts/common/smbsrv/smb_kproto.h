@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 Syneto S.R.L.  All rights reserved.
  */
 
 /*
@@ -673,6 +674,7 @@ void smb_ofile_close(smb_ofile_t *, int32_t);
 void smb_ofile_delete(void *);
 uint32_t smb_ofile_access(smb_ofile_t *, cred_t *, uint32_t);
 int smb_ofile_seek(smb_ofile_t *, ushort_t, int32_t, uint32_t *);
+void smb_ofile_flush(smb_request_t *, smb_ofile_t *);
 boolean_t smb_ofile_hold(smb_ofile_t *);
 void smb_ofile_release(smb_ofile_t *);
 void smb_ofile_request_complete(smb_ofile_t *);
