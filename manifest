@@ -18963,6 +18963,7 @@ f usr/share/man/man9e/devmap_dup.9e 0444 root bin
 f usr/share/man/man9e/devmap_map.9e 0444 root bin
 f usr/share/man/man9e/devmap_unmap.9e 0444 root bin
 f usr/share/man/man9e/dump.9e 0444 root bin
+s usr/share/man/man9e/GLDv3.9e=mac.9e
 f usr/share/man/man9e/getinfo.9e 0444 root bin
 f usr/share/man/man9e/gld.9e 0444 root bin
 s usr/share/man/man9e/gldm_get_stats.9e=gld.9e
@@ -18975,11 +18976,28 @@ s usr/share/man/man9e/gldm_set_multicast.9e=gld.9e
 s usr/share/man/man9e/gldm_set_promiscuous.9e=gld.9e
 s usr/share/man/man9e/gldm_start.9e=gld.9e
 s usr/share/man/man9e/gldm_stop.9e=gld.9e
+s usr/share/man/man9e/gldv3.9e=mac.9e
 f usr/share/man/man9e/identify.9e 0444 root bin
 s usr/share/man/man9e/intro.9e=Intro.9e
 f usr/share/man/man9e/ioctl.9e 0444 root bin
 f usr/share/man/man9e/ks_snapshot.9e 0444 root bin
 f usr/share/man/man9e/ks_update.9e 0444 root bin
+s usr/share/man/man9e/MAC.9e=mac.9e
+f usr/share/man/man9e/mac.9e 0444 root bin
+s usr/share/man/man9e/mc_close.9e=mc_open.9e
+f usr/share/man/man9e/mc_getcapab.9e 0444 root bin
+f usr/share/man/man9e/mc_getprop.9e 0444 root bin
+f usr/share/man/man9e/mc_getstat.9e 0444 root bin
+f usr/share/man/man9e/mc_ioctl.9e 0444 root bin
+f usr/share/man/man9e/mc_multicst.9e 0444 root bin
+f usr/share/man/man9e/mc_open.9e 0444 root bin
+f usr/share/man/man9e/mc_propinfo.9e 0444 root bin
+f usr/share/man/man9e/mc_setpromisc.9e 0444 root bin
+f usr/share/man/man9e/mc_setprop.9e 0444 root bin
+f usr/share/man/man9e/mc_start.9e 0444 root bin
+s usr/share/man/man9e/mc_stop.9e=mc_start.9e
+f usr/share/man/man9e/mc_tx.9e 0444 root bin
+f usr/share/man/man9e/mc_unicst.9e 0444 root bin
 f usr/share/man/man9e/mmap.9e 0444 root bin
 f usr/share/man/man9e/open.9e 0444 root bin
 f usr/share/man/man9e/power.9e 0444 root bin
@@ -19764,6 +19782,27 @@ s usr/share/man/man9f/makecom_g0_s.9f=makecom.9f
 s usr/share/man/man9f/makecom_g1.9f=makecom.9f
 s usr/share/man/man9f/makecom_g5.9f=makecom.9f
 f usr/share/man/man9f/makedevice.9f 0444 root bin
+f usr/share/man/man9f/mac_alloc.9f 0444 root bin
+s usr/share/man/man9f/mac_fini_ops.9f=mac_init_ops.9f
+s usr/share/man/man9f/mac_free.9f=mac_alloc.9f
+s usr/share/man/man9f/mac_hcksum_set.9f=mac_hcksum_get.9f
+f usr/share/man/man9f/mac_hcksum_get.9f 0444 root bin
+f usr/share/man/man9f/mac_init_ops.9f 0444 root bin
+f usr/share/man/man9f/mac_link_update.9f 0444 root bin
+f usr/share/man/man9f/mac_lso_get.9f 0444 root bin
+f usr/share/man/man9f/mac_maxsdu_update.9f 0444 root bin
+f usr/share/man/man9f/mac_prop_info.9f 0444 root bin
+s usr/share/man/man9f/mac_prop_info_set_default_link_flowctrl.9f=mac_prop_info.9f
+s usr/share/man/man9f/mac_prop_info_set_default_str.9f=mac_prop_info.9f
+s usr/share/man/man9f/mac_prop_info_set_default_uint32.9f=mac_prop_info.9f
+s usr/share/man/man9f/mac_prop_info_set_default_uint64.9f=mac_prop_info.9f
+s usr/share/man/man9f/mac_prop_info_set_default_uint8.9f=mac_prop_info.9f
+s usr/share/man/man9f/mac_prop_info_set_perm.9f=mac_prop_info.9f
+s usr/share/man/man9f/mac_prop_info_set_range_uint32.9f=mac_prop_info.9f
+f usr/share/man/man9f/mac_register.9f 0444 root bin
+f usr/share/man/man9f/mac_rx.9f 0444 root bin
+f usr/share/man/man9f/mac_tx_update.9f 0444 root bin
+s usr/share/man/man9f/mac_unregister.9f=mac_register.9f
 f usr/share/man/man9f/max.9f 0444 root bin
 f usr/share/man/man9f/mcopyin.9f 0444 root bin
 f usr/share/man/man9f/mcopymsg.9f 0444 root bin
@@ -20239,6 +20278,10 @@ f usr/share/man/man9s/kstat_intr.9s 0444 root bin
 f usr/share/man/man9s/kstat_io.9s 0444 root bin
 f usr/share/man/man9s/kstat_named.9s 0444 root bin
 f usr/share/man/man9s/linkblk.9s 0444 root bin
+f usr/share/man/man9s/mac_callbacks.9s 0444 root bin
+s usr/share/man/man9s/mac_callbacks_t.9s=mac_callbacks.9s
+f usr/share/man/man9s/mac_register.9s 0444 root bin
+s usr/share/man/man9s/mac_register_t.9s=mac_register.9s
 s usr/share/man/man9s/mblk.9s=msgb.9s
 f usr/share/man/man9s/modldrv.9s 0444 root bin
 f usr/share/man/man9s/modlinkage.9s 0444 root bin

@@ -28,7 +28,7 @@ LIB_BASE=	$(SRC)/boot/lib
 LIBSTAND_SRC=	$(LIB_BASE)/libstand
 
 CPPFLAGS =	-nostdinc -I../../../../include -I${LIBSTAND_SRC} -I../../..
-CPPFLAGS +=	-I../../../sys -I.
+CPPFLAGS +=	-I../../../sys -I. -I$(SRC)/common/bzip2
 
 CFLAGS =	-O2 -ffreestanding -Wformat
 CFLAGS +=	-mno-mmx -mno-3dnow -mno-sse -mno-sse2 -mno-sse3 -msoft-float

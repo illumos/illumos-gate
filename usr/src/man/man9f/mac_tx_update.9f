@@ -1,0 +1,68 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2016 Joyent, Inc.
+.\"
+.Dd June 02, 2016
+.Dt MAC_TX_UPDATE 9F
+.Os
+.Sh NAME
+.Nm mac_tx_update
+.Nd indicate that a device can transmit again
+.Sh SYNOPSIS
+.In sys/mac_provider.h
+.Ft void
+.Fo mac_tx_update
+.Fa "mac_handle_t mh"
+.Fc
+.Sh INTERFACE LEVEL
+illumos DDI specific
+.Sh PARAMETERS
+.Bl -tag -width Fa
+.It Fa mh
+The MAC handle obtained from a call to
+.Xr mac_register 9F .
+.El
+.Sh DESCRIPTION
+The
+.Fn mac_tx_update
+function is used by device drivers to indicate that the device
+represented by the handle
+.Fa mh
+can transmit data again. It should only be called after the device
+driver has returned data from its
+.Xr mc_tx 9E
+endpoint. For more information on when this should be called, see both
+.Xr mc_tx 9E
+and the
+.Sx Transmitting Data and Back Pressure
+section of
+.Xr mac 9E .
+.Pp
+Device drivers should not hold any of their own locks when calling into
+this function. See the
+.Sx MAC Callbacks
+section of
+.Xr mac 9E
+for more information.
+.Sh CONTEXT
+The
+.Fn mac_tx_update
+function may be called from
+.Sy user ,
+.Sy kernel ,
+or
+.Sy interrupt
+context.
+.Sh SEE ALSO
+.Xr mac 9E ,
+.Xr mac_tx 9E ,
+.Xr mac_register 9F

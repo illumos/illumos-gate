@@ -1,0 +1,37 @@
+\
+\ This file and its contents are supplied under the terms of the
+\ Common Development and Distribution License ("CDDL"), version 1.0.
+\ You may only use this file in accordance with the terms of version
+\ 1.0 of the CDDL.
+\
+\ A full copy of the text of the CDDL should have accompanied this
+\ source.  A copy of the CDDL is also available via the Internet at
+\ http://www.illumos.org/license/CDDL.
+
+\ Copyright 2016 Toomas Soome <tsoome@me.com>
+
+\ This file is part of the softcore, implementing [partial] word sets.
+
+\ Optional String word set.
+\ compare is implemented in ficl core.
+
+\ search ( c-addr1 u1 c-addr2 u2 -- c-addr3 u3 flag )
+\ Search the string specified by c-addr1 u1 for the string specified by
+\ c-addr2 u2. If flag is true, a match was found at c-addr3 with u3 characters
+\ remaining. If flag is false there was no match and c-addr3 is c-addr1 and u3
+\ is u1.
+: search { c-addr1 u1 c-addr2 u2 | saved-addr1 saved-u1 -- c-addr3 u3 flag }
+	c-addr1 to saved-addr1	\ save original c-addr1
+	u1 to saved-u1		\ save original u1
+	begin
+		c-addr1 u1 u2 < if u1 else u2 then
+		c-addr2 u2 compare
+	while
+		c-addr1 1+ to c-addr1
+		u1 1- to u1
+		u1 0= if
+			saved-addr1 saved-u1 0 exit	\ not found
+		then
+	repeat
+	c-addr1 u1 -1
+;

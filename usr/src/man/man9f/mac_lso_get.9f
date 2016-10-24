@@ -1,0 +1,94 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2016 Joyent, Inc.
+.\"
+.Dd June 02, 2016
+.Dt MAC_LSO_GET 9F
+.Os
+.Sh NAME
+.Nm mac_lso_get
+.Nd get LSO information on message blocks
+.Sh SYNOPSIS
+.In sys/mac_provider.h
+.Ft void
+.Fo mac_lso_get
+.Fa "mblk_t *mp"
+.Fa "uint32_t *mss"
+.Fa "uint32_t *flags"
+.Fc
+.Sh INTERFACE LEVEL
+illumos DDI specific
+.Sh PARAMETERS
+.Bl -tag -width Fa
+.It Fa mp
+A pointer to a
+.Xr mblk 9S
+structure that contains an outgoing frame.
+.It Fa mss
+A pointer to a value that will be filled in with the maximum segment
+size (MSS).
+.It Fa flags
+A pointer to a value that will be filled in with various flags that
+indicate the behavior to perform.
+.El
+.Sh DESCRIPTION
+The
+.Fn mac_lso_get
+function is used by device drivers that have indicated that they support
+the
+.Sy MAC_CAPAB_LSO
+capability to determine whether large send offload (also known as large
+segmentation offload or LSO) is required for this frame or not. If so,
+the driver should take the appropriate actions to program the hardware
+to perform LSO.
+.Pp
+The
+.Fn mac_lso_get
+function should only be called on the first
+.Sy mblk_t
+that begins a given individual frame in a chain. In other words, it only
+works on entries where it is the first of many possible entries linked
+together by the
+.Sy b_cont
+member. The first
+.Sy mblk_t
+received from any
+.Xr mac 9E
+API or pointed to by a
+.Sy b_next
+pointer should be used.
+.Pp
+A device driver should first look at the
+.Fa flags
+argument to determine what to do.
+.Fa flags
+may be a bitwise inclusive OR of the following:
+.Bl -tag -width Sy
+.It Sy HW_LSO
+This flag indicates that hardware needs to perform segmentation
+offload. The maximum segment size that the driver should use is
+available through the
+.Fa mss
+argument.
+.El
+.Sh CONTEXT
+The
+.Fn mac_lso_get
+function may be called from
+.Sy user ,
+.Sy kernel ,
+or
+.Sy interrupt
+context.
+.Sh SEE ALSO
+.Xr mac 9E ,
+.Xr mblk 9S

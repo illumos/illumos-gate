@@ -321,6 +321,16 @@ MANFILES= 	ASSERT.9f				\
 	 	ldi_strategy.9f				\
 	 	linkb.9f				\
 	 	list_create.9f				\
+		mac_alloc.9f				\
+		mac_hcksum_get.9f			\
+		mac_init_ops.9f				\
+		mac_link_update.9f			\
+		mac_lso_get.9f				\
+		mac_maxsdu_update.9f			\
+		mac_prop_info.9f			\
+		mac_register.9f				\
+		mac_rx.9f				\
+		mac_tx_update.9f			\
 	 	makecom.9f				\
 	 	makedevice.9f				\
 	 	max.9f					\
@@ -956,6 +966,17 @@ MANLINKS=	SIZEOF_PTR.9f				\
 	 	list_remove_head.9f			\
 	 	list_remove_tail.9f			\
 	 	list_tail.9f				\
+		mac_free.9f				\
+		mac_hcksum_set.9f			\
+		mac_fini_ops.9f				\
+		mac_prop_info_set_default_link_flowctrl.9f	\
+		mac_prop_info_set_default_str.9f	\
+		mac_prop_info_set_default_uint8.9f	\
+		mac_prop_info_set_default_uint32.9f	\
+		mac_prop_info_set_default_uint64.9f	\
+		mac_prop_info_set_perm.9f		\
+		mac_prop_info_set_range_uint32.9f	\
+		mac_unregister.9f			\
 	 	makecom_g0.9f				\
 	 	makecom_g0_s.9f				\
 	 	makecom_g1.9f				\
@@ -1749,6 +1770,18 @@ list_remove.9f				:= LINKSRC = list_create.9f
 list_remove_head.9f			:= LINKSRC = list_create.9f
 list_remove_tail.9f			:= LINKSRC = list_create.9f
 list_tail.9f				:= LINKSRC = list_create.9f
+
+mac_free.9f				:= LINKSRC = mac_alloc.9f
+mac_hcksum_set.9f			:= LINKSRC = mac_hcksum_get.9f
+mac_fini_ops.9f				:= LINKSRC = mac_init_ops.9f
+mac_prop_info_set_default_link_flowctrl.9f	:= LINKSRC = mac_prop_info.9f
+mac_prop_info_set_default_str.9f	:= LINKSRC = mac_prop_info.9f
+mac_prop_info_set_default_uint8.9f	:= LINKSRC = mac_prop_info.9f
+mac_prop_info_set_default_uint32.9f	:= LINKSRC = mac_prop_info.9f
+mac_prop_info_set_default_uint64.9f	:= LINKSRC = mac_prop_info.9f
+mac_prop_info_set_perm.9f		:= LINKSRC = mac_prop_info.9f
+mac_prop_info_set_range_uint32.9f	:= LINKSRC = mac_prop_info.9f
+mac_unregister.9f			:= LINKSRC = mac_register.9f
 
 makecom_g0.9f				:= LINKSRC = makecom.9f
 makecom_g0_s.9f				:= LINKSRC = makecom.9f
