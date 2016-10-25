@@ -481,6 +481,17 @@ lx_initlwp(klwp_t *lwp, void *lwpbd)
 	if (plwpd != NULL) {
 		lwpd->br_cgroupid = plwpd->br_cgroupid;
 	}
+	/*
+	 * The new LWP inherits the parent LWP emulated scheduling info.
+	 */
+	if (plwpd != NULL) {
+		lwpd->br_schd_class = plwpd->br_schd_class;
+		lwpd->br_schd_pri = plwpd->br_schd_pri;
+		lwpd->br_schd_flags = plwpd->br_schd_flags;
+		lwpd->br_schd_runtime = plwpd->br_schd_runtime;
+		lwpd->br_schd_deadline = plwpd->br_schd_deadline;
+		lwpd->br_schd_period = plwpd->br_schd_period;
+	}
 	lxzdata = ztolxzd(p->p_zone);
 	mutex_enter(&lxzdata->lxzd_lock);
 	cgrp = lxzdata->lxzd_cgroup;

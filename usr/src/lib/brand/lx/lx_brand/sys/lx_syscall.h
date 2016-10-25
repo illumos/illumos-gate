@@ -162,14 +162,6 @@ extern long lx_setpriority(uintptr_t, uintptr_t, uintptr_t);
 
 extern long lx_ptrace(uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 
-extern long lx_sched_getparam(uintptr_t, uintptr_t);
-extern long lx_sched_setparam(uintptr_t, uintptr_t);
-extern long lx_sched_rr_get_interval(uintptr_t pid, uintptr_t);
-extern long lx_sched_getscheduler(uintptr_t);
-extern long lx_sched_setscheduler(uintptr_t, uintptr_t, uintptr_t);
-extern long lx_sched_get_priority_min(uintptr_t);
-extern long lx_sched_get_priority_max(uintptr_t);
-
 extern long lx_xattr2(uintptr_t, uintptr_t);
 extern long lx_xattr3(uintptr_t, uintptr_t, uintptr_t);
 extern long lx_xattr4(uintptr_t, uintptr_t, uintptr_t, uintptr_t);

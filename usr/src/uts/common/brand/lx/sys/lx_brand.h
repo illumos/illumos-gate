@@ -81,6 +81,8 @@ extern "C" {
 /* Highest capability we know about */
 #define	LX_CAP_MAX_VALID	36
 
+/* sched attr flag values */
+#define	LX_SCHED_FLAG_RESET_ON_FORK	0x1
 /*
  * brand(2) subcommands
  *
@@ -554,6 +556,19 @@ struct lx_lwp_data {
 	 * ID of the cgroup this thread belongs to.
 	 */
 	uint_t br_cgroupid;
+
+	/*
+	 * When the zone is running under FSS (which is the common case) then
+	 * we cannot change scheduling class, so we emulate that. By default
+	 * Linux uses LX_SCHED_OTHER (which is 0) and that only supports a
+	 * priority of 0, so no special initialization is needed.
+	 */
+	int	br_schd_class;		/* emulated scheduling class */
+	int	br_schd_pri;		/* emulated scheduling priority */
+	uint64_t br_schd_flags;		/* emulated [sg]et_attr flags */
+	uint64_t br_schd_runtime;	/* emulated DEADLINE */
+	uint64_t br_schd_deadline;	/* emulated DEADLINE */
+	uint64_t br_schd_period;	/* emulated DEADLINE */
 };
 
 /*
