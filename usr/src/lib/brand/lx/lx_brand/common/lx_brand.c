@@ -1153,13 +1153,13 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_sysfs,			/* 139: sysfs */
 	lx_getpriority,			/* 140: getpriority */
 	lx_setpriority,			/* 141: setpriority */
-	lx_sched_setparam,		/* 142: sched_setparam */
-	lx_sched_getparam,		/* 143: sched_getparam */
-	lx_sched_setscheduler,		/* 144: sched_setscheduler */
-	lx_sched_getscheduler,		/* 145: sched_getscheduler */
-	lx_sched_get_priority_max,	/* 146: sched_get_priority_max */
-	lx_sched_get_priority_min,	/* 147: sched_get_priority_min */
-	lx_sched_rr_get_interval,	/* 148: sched_rr_get_interval */
+	NULL,				/* 142: sched_setparam */
+	NULL,				/* 143: sched_getparam */
+	NULL,				/* 144: sched_setscheduler */
+	NULL,				/* 145: sched_getscheduler */
+	NULL,				/* 146: sched_get_priority_max */
+	NULL,				/* 147: sched_get_priority_min */
+	NULL,				/* 148: sched_rr_get_interval */
 	lx_mlock,			/* 149: mlock */
 	lx_munlock,			/* 150: munlock */
 	lx_mlockall,			/* 151: mlockall */
@@ -1496,14 +1496,14 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_munlock,			/* 151: munlock */
 	lx_mlockall,			/* 152: mlockall */
 	lx_munlockall,			/* 153: munlockall */
-	lx_sched_setparam,		/* 154: sched_setparam */
-	lx_sched_getparam,		/* 155: sched_getparam */
-	lx_sched_setscheduler,		/* 156: sched_setscheduler */
-	lx_sched_getscheduler,		/* 157: sched_getscheduler */
+	NULL,				/* 154: sched_setparam */
+	NULL,				/* 155: sched_getparam */
+	NULL,				/* 156: sched_setscheduler */
+	NULL,				/* 157: sched_getscheduler */
 	NULL,				/* 158: sched_yield */
-	lx_sched_get_priority_max,	/* 159: sched_get_priority_max */
-	lx_sched_get_priority_min,	/* 160: sched_get_priority_min */
-	lx_sched_rr_get_interval,	/* 161: sched_rr_get_interval */
+	NULL,				/* 159: sched_get_priority_max */
+	NULL,				/* 160: sched_get_priority_min */
+	NULL,				/* 161: sched_rr_get_interval */
 	NULL,				/* 162: nanosleep */
 	lx_remap,			/* 163: mremap */
 	NULL,				/* 164: setresuid16 */

@@ -71,12 +71,6 @@ quotactl01
 quotactl02
 remap_file_pages01
 remap_file_pages02
-sched_getparam01
-sched_getparam02
-sched_setscheduler01
-sched_setscheduler03	# OS-5524
-sched_setparam02
-sched_setparam03
 setfsuid04
 setfsuid04_16
 settimeofday01
@@ -212,14 +206,6 @@ removexattr01
 removexattr02
 request_key01
 request_key02
-sched_rr_get_interval01
-sched_rr_get_interval02
-sched_rr_get_interval03
-sched_getscheduler01
-sched_getscheduler02
-sched_getattr01
-sched_getattr02
-sched_setattr01
 semctl01
 semop02
 sendfile02		# OS-3296

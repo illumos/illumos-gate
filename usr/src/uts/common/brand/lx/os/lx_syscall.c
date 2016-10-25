@@ -673,14 +673,14 @@ lx_sysent_t lx_sysent32[] = {
 	{"munlock",	NULL,			0,		2}, /* 151 */
 	{"mlockall",	NULL,			0,		1}, /* 152 */
 	{"munlockall",	NULL,			0,		0}, /* 153 */
-	{"sched_setparam", NULL,		0,		2}, /* 154 */
-	{"sched_getparam", NULL,		0,		2}, /* 155 */
-	{"sched_setscheduler", NULL,		0,		3}, /* 156 */
-	{"sched_getscheduler", NULL,		0,		1}, /* 157 */
+	{"sched_setparam", lx_sched_setparam,	0,		2}, /* 154 */
+	{"sched_getparam", lx_sched_getparam,	0,		2}, /* 155 */
+	{"sched_setscheduler", lx_sched_setscheduler, 0,	3}, /* 156 */
+	{"sched_getscheduler", lx_sched_getscheduler, 0,	1}, /* 157 */
 	{"sched_yield",	lx_sched_yield,		0,		0}, /* 158 */
-	{"sched_get_priority_max", NULL, 	0,		1}, /* 159 */
-	{"sched_get_priority_min", NULL, 	0,		1}, /* 160 */
-	{"sched_rr_get_interval", NULL, 	0,		2}, /* 161 */
+	{"sched_get_priority_max", lx_sched_get_priority_max, 0, 1}, /* 159 */
+	{"sched_get_priority_min", lx_sched_get_priority_min, 0, 1}, /* 160 */
+	{"sched_rr_get_interval", lx_sched_rr_get_interval,  0,	 2}, /* 161 */
 	{"nanosleep",	lx_nanosleep,		0,		2}, /* 162 */
 	{"mremap",	NULL,			0,		5}, /* 163 */
 	{"setresuid16",	lx_setresuid16,		0,		3}, /* 164 */
@@ -874,8 +874,8 @@ lx_sysent_t lx_sysent32[] = {
 	{"process_vm_writev", NULL,		NOSYS_NULL,	0}, /* 348 */
 	{"kcmp",	NULL,			NOSYS_NULL,	0}, /* 349 */
 	{"finit_module", NULL,			NOSYS_NULL,	0}, /* 350 */
-	{"sched_setattr", NULL,			NOSYS_NULL,	0}, /* 351 */
-	{"sched_getattr", NULL,			NOSYS_NULL,	0}, /* 352 */
+	{"sched_setattr", lx_sched_setattr,	0,		3}, /* 351 */
+	{"sched_getattr", lx_sched_getattr,	0,		4}, /* 352 */
 	{"renameat2",	NULL,			NOSYS_NULL,	0}, /* 353 */
 	{"seccomp",	NULL,			NOSYS_NULL,	0}, /* 354 */
 	{"getrandom",	lx_getrandom,		0,		3}, /* 355 */
@@ -1032,13 +1032,13 @@ lx_sysent_t lx_sysent64[] = {
 	{"sysfs",	NULL,			0,		3}, /* 139 */
 	{"getpriority",	NULL,			0,		2}, /* 140 */
 	{"setpriority",	NULL,			0,		3}, /* 141 */
-	{"sched_setparam", NULL,		0,		2}, /* 142 */
-	{"sched_getparam", NULL,		0,		2}, /* 143 */
-	{"sched_setscheduler", NULL,		0,		3}, /* 144 */
-	{"sched_getscheduler", NULL,		0,		1}, /* 145 */
-	{"sched_get_priority_max", NULL,	0,		1}, /* 146 */
-	{"sched_get_priority_min", NULL,	0,		1}, /* 147 */
-	{"sched_rr_get_interval", NULL,		0,		2}, /* 148 */
+	{"sched_setparam", lx_sched_setparam,	0,		2}, /* 142 */
+	{"sched_getparam", lx_sched_getparam,	0,		2}, /* 143 */
+	{"sched_setscheduler", lx_sched_setscheduler, 0,	3}, /* 144 */
+	{"sched_getscheduler", lx_sched_getscheduler, 0,	1}, /* 145 */
+	{"sched_get_priority_max", lx_sched_get_priority_max, 0, 1}, /* 146 */
+	{"sched_get_priority_min", lx_sched_get_priority_min, 0, 1}, /* 147 */
+	{"sched_rr_get_interval", lx_sched_rr_get_interval, 0,	2}, /* 148 */
 	{"mlock",	NULL,			0,		2}, /* 149 */
 	{"munlock",	NULL,			0,		2}, /* 150 */
 	{"mlockall",	NULL,			0,		1}, /* 151 */
@@ -1204,8 +1204,8 @@ lx_sysent_t lx_sysent64[] = {
 	{"process_vm_writev", NULL,		NOSYS_NULL,	0}, /* 311 */
 	{"kcmp",	NULL,			NOSYS_NULL,	0}, /* 312 */
 	{"finit_module", NULL,			NOSYS_NULL,	0}, /* 313 */
-	{"sched_setattr", NULL,			NOSYS_NULL,	0}, /* 314 */
-	{"sched_getattr", NULL,			NOSYS_NULL,	0}, /* 315 */
+	{"sched_setattr", lx_sched_setattr,	0,		3}, /* 314 */
+	{"sched_getattr", lx_sched_getattr,	0,		4}, /* 315 */
 	{"renameat2", NULL,			NOSYS_NULL,	0}, /* 316 */
 	{"seccomp",	NULL,			NOSYS_NULL,	0}, /* 317 */
 	{"getrandom",	lx_getrandom,		0,		3}, /* 318 */
