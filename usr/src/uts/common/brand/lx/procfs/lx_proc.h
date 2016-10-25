@@ -341,6 +341,7 @@ typedef enum lxpr_zombok {
 extern proc_t *lxpr_lock(lxpr_node_t *, zombok_t);
 extern proc_t *lxpr_lock_pid(lxpr_node_t *, pid_t, zombok_t, kthread_t **);
 extern void lxpr_unlock(proc_t *);
+extern netstack_t *lxpr_netstack(lxpr_node_t *);
 extern void lxpr_fixpid(zone_t *, proc_t *, pid_t *, pid_t *);
 
 #ifdef	__cplusplus

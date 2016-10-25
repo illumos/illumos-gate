@@ -2535,7 +2535,8 @@ struct lxpr_ifstat {
 };
 
 static void *
-lxpr_kstat_read(kstat_t *kn, boolean_t byname, size_t *size, int *num)
+lxpr_kstat_read(kstat_t *kn, boolean_t byname, size_t *size, int *num,
+    zoneid_t zoneid)
 {
 	kstat_t *kp;
 	int i, nrec = 0;
@@ -2544,9 +2545,9 @@ lxpr_kstat_read(kstat_t *kn, boolean_t byname, size_t *size, int *num)
 
 	if (byname == B_TRUE) {
 		kp = kstat_hold_byname(kn->ks_module, kn->ks_instance,
-		    kn->ks_name, getzoneid());
+		    kn->ks_name, zoneid);
 	} else {
-		kp = kstat_hold_bykid(kn->ks_kid, getzoneid());
+		kp = kstat_hold_bykid(kn->ks_kid, zoneid);
 	}
 	if (kp == NULL) {
 		return (NULL);
@@ -2571,9 +2572,9 @@ lxpr_kstat_read(kstat_t *kn, boolean_t byname, size_t *size, int *num)
 		/* Check if bufsize still appropriate */
 		if (byname == B_TRUE) {
 			kp = kstat_hold_byname(kn->ks_module, kn->ks_instance,
-			    kn->ks_name, getzoneid());
+			    kn->ks_name, zoneid);
 		} else {
-			kp = kstat_hold_bykid(kn->ks_kid, getzoneid());
+			kp = kstat_hold_bykid(kn->ks_kid, zoneid);
 		}
 		if (kp == NULL || kp->ks_flags & KSTAT_FLAG_INVALID) {
 			if (kp != NULL) {
@@ -2611,7 +2612,7 @@ lxpr_kstat_read(kstat_t *kn, boolean_t byname, size_t *size, int *num)
 }
 
 static int
-lxpr_kstat_ifstat(kstat_t *kn, struct lxpr_ifstat *ifs)
+lxpr_kstat_ifstat(kstat_t *kn, struct lxpr_ifstat *ifs, zoneid_t zoneid)
 {
 	kstat_named_t *kp;
 	int i, num;
@@ -2622,7 +2623,7 @@ lxpr_kstat_ifstat(kstat_t *kn, struct lxpr_ifstat *ifs)
 	 * race against kstats being added/removed.
 	 */
 	bzero(ifs, sizeof (*ifs));
-	kp = (kstat_named_t *)lxpr_kstat_read(kn, B_TRUE, &size, &num);
+	kp = (kstat_named_t *)lxpr_kstat_read(kn, B_TRUE, &size, &num, zoneid);
 	if (kp == NULL)
 		return (-1);
 	for (i = 0; i < num; i++) {
@@ -2651,7 +2652,6 @@ lxpr_kstat_ifstat(kstat_t *kn, struct lxpr_ifstat *ifs)
 	return (0);
 }
 
-/* ARGSUSED */
 static void
 lxpr_read_net_dev(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -2660,6 +2660,7 @@ lxpr_read_net_dev(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	int i, nidx;
 	size_t sidx;
 	struct lxpr_ifstat ifs;
+	zoneid_t zoneid = LXPTOZ(lxpnp)->zone_id;
 
 	lxpr_uiobuf_printf(uiobuf, "Inter-|   Receive                   "
 	    "                             |  Transmit\n");
@@ -2668,14 +2669,14 @@ lxpr_read_net_dev(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	    " colls carrier compressed\n");
 
 	ks0.ks_kid = 0;
-	ksr = (kstat_t *)lxpr_kstat_read(&ks0, B_FALSE, &sidx, &nidx);
+	ksr = (kstat_t *)lxpr_kstat_read(&ks0, B_FALSE, &sidx, &nidx, zoneid);
 	if (ksr == NULL)
 		return;
 
 	for (i = 1; i < nidx; i++) {
 		if (strncmp(ksr[i].ks_module, "link", KSTAT_STRLEN) == 0 ||
 		    strncmp(ksr[i].ks_module, "lo", KSTAT_STRLEN) == 0) {
-			if (lxpr_kstat_ifstat(&ksr[i], &ifs) != 0)
+			if (lxpr_kstat_ifstat(&ksr[i], &ifs, zoneid) != 0)
 				continue;
 
 			/* Overwriting the name is ok in the local snapshot */
@@ -2726,7 +2727,7 @@ lxpr_read_net_if_inet6(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	ill_walk_context_t	ctx;
 	char ifname[LIFNAMSIZ], ip6out[33];
 
-	ns = netstack_get_current();
+	ns = lxpr_netstack(lxpnp);
 	if (ns == NULL)
 		return;
 	ipst = ns->netstack_ip;
@@ -2820,7 +2821,7 @@ lxpr_read_net_ipv6_route(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	netstack_t *ns;
 	ip_stack_t *ipst;
 
-	ns = netstack_get_current();
+	ns = lxpr_netstack(lxpnp);
 	if (ns == NULL)
 		return;
 	ipst = ns->netstack_ip;
@@ -2931,7 +2932,7 @@ lxpr_read_net_route(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	lxpr_uiobuf_printf(uiobuf, "Iface\tDestination\tGateway \tFlags\t"
 	    "RefCnt\tUse\tMetric\tMask\t\tMTU\tWindow\tIRTT\n");
 
-	ns = netstack_get_current();
+	ns = lxpr_netstack(lxpnp);
 	if (ns == NULL)
 		return;
 	ipst = ns->netstack_ip;
@@ -3016,14 +3017,15 @@ static lxpr_snmp_table_t *lxpr_net_snmptab[] = {
 
 static void
 lxpr_kstat_print_tab(lxpr_uiobuf_t *uiobuf, lxpr_snmp_table_t *table,
-    kstat_t *kn)
+    kstat_t *kn, zoneid_t zoneid)
 {
 	kstat_named_t *klist;
 	char upname[KSTAT_STRLEN], upfield[KSTAT_STRLEN];
 	int i, j, num;
 	size_t size;
 
-	klist = (kstat_named_t *)lxpr_kstat_read(kn, B_TRUE, &size, &num);
+	klist = (kstat_named_t *)lxpr_kstat_read(kn, B_TRUE, &size, &num,
+	    zoneid);
 	if (klist == NULL)
 		return;
 
@@ -3076,7 +3078,6 @@ lxpr_kstat_print_tab(lxpr_uiobuf_t *uiobuf, lxpr_snmp_table_t *table,
 	kmem_free(klist, size);
 }
 
-/* ARGSUSED */
 static void
 lxpr_read_net_snmp(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -3085,9 +3086,10 @@ lxpr_read_net_snmp(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	lxpr_snmp_table_t **table = lxpr_net_snmptab;
 	int i, t, nidx;
 	size_t sidx;
+	zoneid_t zoneid = LXPTOZ(lxpnp)->zone_id;
 
 	ks0.ks_kid = 0;
-	ksr = (kstat_t *)lxpr_kstat_read(&ks0, B_FALSE, &sidx, &nidx);
+	ksr = (kstat_t *)lxpr_kstat_read(&ks0, B_FALSE, &sidx, &nidx, zoneid);
 	if (ksr == NULL)
 		return;
 
@@ -3097,7 +3099,8 @@ lxpr_read_net_snmp(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 				continue;
 			if (strncmp(ksr[i].ks_name, table[t]->lst_proto,
 			    KSTAT_STRLEN) == 0) {
-				lxpr_kstat_print_tab(uiobuf, table[t], &ksr[i]);
+				lxpr_kstat_print_tab(uiobuf, table[t], &ksr[i],
+				    zoneid);
 				break;
 			}
 		}
@@ -3148,7 +3151,7 @@ lxpr_convert_tcp_state(int st)
 }
 
 static void
-lxpr_format_tcp(lxpr_uiobuf_t *uiobuf, ushort_t ipver)
+lxpr_format_tcp(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf, ushort_t ipver)
 {
 	int i, sl = 0;
 	connf_t *connfp;
@@ -3188,7 +3191,7 @@ lxpr_format_tcp(lxpr_uiobuf_t *uiobuf, ushort_t ipver)
 	 *  - timeout
 	 */
 
-	ns = netstack_get_current();
+	ns = lxpr_netstack(lxpnp);
 	if (ns == NULL)
 		return;
 	ipst = ns->netstack_ip;
@@ -3251,22 +3254,20 @@ lxpr_format_tcp(lxpr_uiobuf_t *uiobuf, ushort_t ipver)
 	netstack_rele(ns);
 }
 
-/* ARGSUSED */
 static void
 lxpr_read_net_tcp(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
-	lxpr_format_tcp(uiobuf, IPV4_VERSION);
+	lxpr_format_tcp(lxpnp, uiobuf, IPV4_VERSION);
 }
 
-/* ARGSUSED */
 static void
 lxpr_read_net_tcp6(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
-	lxpr_format_tcp(uiobuf, IPV6_VERSION);
+	lxpr_format_tcp(lxpnp, uiobuf, IPV6_VERSION);
 }
 
 static void
-lxpr_format_udp(lxpr_uiobuf_t *uiobuf, ushort_t ipver)
+lxpr_format_udp(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf, ushort_t ipver)
 {
 	int i, sl = 0;
 	connf_t *connfp;
@@ -3306,7 +3307,7 @@ lxpr_format_udp(lxpr_uiobuf_t *uiobuf, ushort_t ipver)
 	 *  - inode
 	 */
 
-	ns = netstack_get_current();
+	ns = lxpr_netstack(lxpnp);
 	if (ns == NULL)
 		return;
 	ipst = ns->netstack_ip;
@@ -3380,26 +3381,23 @@ lxpr_format_udp(lxpr_uiobuf_t *uiobuf, ushort_t ipver)
 	netstack_rele(ns);
 }
 
-/* ARGSUSED */
 static void
 lxpr_read_net_udp(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
-	lxpr_format_udp(uiobuf, IPV4_VERSION);
+	lxpr_format_udp(lxpnp, uiobuf, IPV4_VERSION);
 }
 
-/* ARGSUSED */
 static void
 lxpr_read_net_udp6(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
-	lxpr_format_udp(uiobuf, IPV6_VERSION);
+	lxpr_format_udp(lxpnp, uiobuf, IPV6_VERSION);
 }
 
-/* ARGSUSED */
 static void
 lxpr_read_net_unix(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
 	sonode_t *so;
-	zoneid_t zoneid = getzoneid();
+	zoneid_t zoneid = LXPTOZ(lxpnp)->zone_id;
 
 	lxpr_uiobuf_printf(uiobuf, "Num       RefCount Protocol Flags    Type "
 	    "St Inode Path\n");
@@ -3565,9 +3563,9 @@ lxpr_read_loadavg(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	 * includes the current CPU.
 	 */
 	if (pool_pset_enabled()) {
-		psetid_t psetid = zone_pset_get(curproc->p_zone);
+		psetid_t psetid = zone_pset_get(LXPTOZ(lxpnp));
 
-		ASSERT(curproc->p_zone != &zone0);
+		ASSERT(LXPTOZ(lxpnp) != &zone0);
 		cp = CPU->cpu_part;
 
 		nrunnable = cp->cp_nrunning + cp->cp_nrunnable;
@@ -3769,7 +3767,7 @@ lxpr_read_partitions(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 
 	lxpr_uiobuf_printf(uiobuf, "major minor  #blocks  name\n\n");
 
-	lxzd = ztolxzd(curproc->p_zone);
+	lxzd = ztolxzd(LXPTOZ(lxpnp));
 	if (lxzd == NULL)
 		return;
 	ASSERT(lxzd->lxzd_vdisks != NULL);
@@ -3839,9 +3837,10 @@ lxpr_read_diskstats(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	 */
 	(void) strlcpy(kn.ks_module, "zone_vfs", sizeof (kn.ks_module));
 	(void) strlcpy(kn.ks_name, zone->zone_name, sizeof (kn.ks_name));
-	kn.ks_instance = getzoneid();
+	kn.ks_instance = zone->zone_id;
 
-	kip = (zone_vfs_kstat_t *)lxpr_kstat_read(&kn, B_TRUE, &size, &num);
+	kip = (zone_vfs_kstat_t *)lxpr_kstat_read(&kn, B_TRUE, &size, &num,
+	    zone->zone_id);
 	if (kip == NULL)
 		return;
 
@@ -4224,10 +4223,10 @@ lxpr_read_stat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 static void
 lxpr_read_swaps(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
-	zone_t *zone = curzone;
+	zone_t *zone = LXPTOZ(lxpnp);
 	uint64_t totswap, usedswap;
 
-	if (zone == global_zone || zone->zone_max_swap_ctl == UINT64_MAX) {
+	if (zone->zone_max_swap_ctl == UINT64_MAX) {
 		totswap = (k_anoninfo.ani_max * PAGESIZE) >> 10;
 	} else {
 		mutex_enter(&zone->zone_mem_lock);
@@ -4255,11 +4254,12 @@ lxpr_read_swaps(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 static void
 lxpr_read_sys_fs_filemax(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
+	zone_t *zone = LXPTOZ(lxpnp);
 	uint64_t max_fh, proc_lim;
 
 	ASSERT(lxpnp->lxpr_type == LXPR_SYS_FS_FILEMAX);
-	proc_lim = (uint64_t)(curzone->zone_nprocs_ctl == INT_MAX ?
-	    maxpid : curzone->zone_nprocs_ctl);
+	proc_lim = (uint64_t)(zone->zone_nprocs_ctl == INT_MAX ?
+	    maxpid : zone->zone_nprocs_ctl);
 	max_fh = proc_lim * (uint64_t)rlim_fd_max;
 	lxpr_uiobuf_printf(uiobuf, "%llu\n", max_fh);
 }
@@ -4310,7 +4310,7 @@ lxpr_read_sys_kernel_caplcap(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 static void
 lxpr_read_sys_kernel_corepatt(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
-	zone_t *zone = curproc->p_zone;
+	zone_t *zone = LXPTOZ(lxpnp);
 	struct core_globals *cg;
 	refstr_t *rp;
 	corectl_path_t *ccp;
@@ -4367,7 +4367,7 @@ lxpr_read_sys_kernel_msgmni(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 
 	mutex_enter(&curproc->p_lock);
 	val = rctl_enforced_value(rc_zone_msgmni,
-	    curproc->p_zone->zone_rctls, curproc);
+	    LXPTOZ(lxpnp)->zone_rctls, curproc);
 	mutex_exit(&curproc->p_lock);
 
 	lxpr_uiobuf_printf(uiobuf, "%u\n", (uint_t)val);
@@ -4385,21 +4385,18 @@ lxpr_read_sys_kernel_ngroups_max(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 static void
 lxpr_read_sys_kernel_osrel(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
-	lx_zone_data_t *br_data;
+	zone_t *zone = LXPTOZ(lxpnp);
+	lx_zone_data_t *lxzd = ztolxzd(zone);
 	char version[LX_KERN_VERSION_MAX];
 
 	ASSERT(lxpnp->lxpr_type == LXPR_SYS_KERNEL_OSREL);
-	br_data = ztolxzd(curproc->p_zone);
-	if (curproc->p_zone->zone_brand == &lx_brand) {
-		mutex_enter(&br_data->lxzd_lock);
-		(void) strlcpy(version, br_data->lxzd_kernel_version,
-		    sizeof (version));
-		mutex_exit(&br_data->lxzd_lock);
+	ASSERT(zone->zone_brand == &lx_brand);
+	ASSERT(lxzd != NULL);
 
-		lxpr_uiobuf_printf(uiobuf, "%s\n", version);
-	} else {
-		lxpr_uiobuf_printf(uiobuf, "\n");
-	}
+	mutex_enter(&lxzd->lxzd_lock);
+	(void) strlcpy(version, lxzd->lxzd_kernel_version, sizeof (version));
+	mutex_exit(&lxzd->lxzd_lock);
+	lxpr_uiobuf_printf(uiobuf, "%s\n", version);
 }
 
 /* ARGSUSED */
@@ -4428,19 +4425,16 @@ lxpr_read_sys_kernel_rand_bootid(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	 * appears to resemble a uuid but since it is not documented to be a
 	 * uuid, we don't worry about that.
 	 */
-	lx_zone_data_t *br_data;
+	zone_t *zone = LXPTOZ(lxpnp);
+	lx_zone_data_t *lxzd = ztolxzd(zone);
 	char bootid[LX_BOOTID_LEN];
 
 	ASSERT(lxpnp->lxpr_type == LXPR_SYS_KERNEL_RAND_BOOTID);
+	ASSERT(zone->zone_brand == &lx_brand);
+	ASSERT(lxzd != NULL);
 
-	if (curproc->p_zone->zone_brand != &lx_brand) {
-		lxpr_uiobuf_printf(uiobuf, "0\n");
-		return;
-	}
-
-	br_data = ztolxzd(curproc->p_zone);
-	mutex_enter(&br_data->lxzd_lock);
-	if (br_data->lxzd_bootid[0] == '\0') {
+	mutex_enter(&lxzd->lxzd_lock);
+	if (lxzd->lxzd_bootid[0] == '\0') {
 		int i;
 
 		for (i = 0; i < 5; i++) {
@@ -4460,17 +4454,16 @@ lxpr_read_sys_kernel_rand_bootid(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 				break;
 			}
 			if (i > 0)
-				(void) strlcat(br_data->lxzd_bootid, "-",
-				    sizeof (br_data->lxzd_bootid));
-			(void) strlcat(br_data->lxzd_bootid, s,
-			    sizeof (br_data->lxzd_bootid));
+				(void) strlcat(lxzd->lxzd_bootid, "-",
+				    sizeof (lxzd->lxzd_bootid));
+			(void) strlcat(lxzd->lxzd_bootid, s,
+			    sizeof (lxzd->lxzd_bootid));
 		}
 	}
-	(void) strlcpy(bootid, br_data->lxzd_bootid, sizeof (bootid));
-	mutex_exit(&br_data->lxzd_lock);
+	(void) strlcpy(bootid, lxzd->lxzd_bootid, sizeof (bootid));
+	mutex_exit(&lxzd->lxzd_lock);
 
 	lxpr_uiobuf_printf(uiobuf, "%s\n", bootid);
-
 }
 
 /* ARGSUSED */
@@ -4478,6 +4471,7 @@ static void
 lxpr_read_sys_kernel_sem(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
 	proc_t *pp = curproc;
+	zone_t *zone = LXPTOZ(lxpnp);
 	rctl_qty_t vmsl, vopm, vmni, vmns;
 
 	ASSERT(lxpnp->lxpr_type == LXPR_SYS_KERNEL_SEM);
@@ -4485,7 +4479,7 @@ lxpr_read_sys_kernel_sem(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	mutex_enter(&pp->p_lock);
 	vmsl = rctl_enforced_value(rc_process_semmsl, pp->p_rctls, pp);
 	vopm = rctl_enforced_value(rc_process_semopm, pp->p_rctls, pp);
-	vmni = rctl_enforced_value(rc_zone_semmni, pp->p_zone->zone_rctls, pp);
+	vmni = rctl_enforced_value(rc_zone_semmni, zone->zone_rctls, pp);
 	mutex_exit(&pp->p_lock);
 	vmns = vmsl * vmni;
 	if (vmns < vmsl || vmns < vmni) {
@@ -4507,12 +4501,12 @@ static void
 lxpr_read_sys_kernel_shmall(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
 	rctl_qty_t val;
+	zone_t *zone = LXPTOZ(lxpnp);
 
 	ASSERT(lxpnp->lxpr_type == LXPR_SYS_KERNEL_SHMALL);
 
 	mutex_enter(&curproc->p_lock);
-	val = rctl_enforced_value(rc_zone_shmmax,
-	    curproc->p_zone->zone_rctls, curproc);
+	val = rctl_enforced_value(rc_zone_shmmax, zone->zone_rctls, curproc);
 	mutex_exit(&curproc->p_lock);
 
 	/* value is in pages */
@@ -4524,12 +4518,12 @@ static void
 lxpr_read_sys_kernel_shmmax(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
 	rctl_qty_t val;
+	zone_t *zone = LXPTOZ(lxpnp);
 
 	ASSERT(lxpnp->lxpr_type == LXPR_SYS_KERNEL_SHMMAX);
 
 	mutex_enter(&curproc->p_lock);
-	val = rctl_enforced_value(rc_zone_shmmax,
-	    curproc->p_zone->zone_rctls, curproc);
+	val = rctl_enforced_value(rc_zone_shmmax, zone->zone_rctls, curproc);
 	mutex_exit(&curproc->p_lock);
 
 	if (val > FOURGB)
@@ -4543,12 +4537,12 @@ static void
 lxpr_read_sys_kernel_shmmni(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
 	rctl_qty_t val;
+	zone_t *zone = LXPTOZ(lxpnp);
 
 	ASSERT(lxpnp->lxpr_type == LXPR_SYS_KERNEL_SHMMNI);
 
 	mutex_enter(&curproc->p_lock);
-	val = rctl_enforced_value(rc_zone_shmmni,
-	    curproc->p_zone->zone_rctls, curproc);
+	val = rctl_enforced_value(rc_zone_shmmni, zone->zone_rctls, curproc);
 	mutex_exit(&curproc->p_lock);
 
 	if (val > FOURGB)
@@ -4562,7 +4556,7 @@ static void
 lxpr_read_sys_kernel_threads_max(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
 	ASSERT(lxpnp->lxpr_type == LXPR_SYS_KERNEL_THREADS_MAX);
-	lxpr_uiobuf_printf(uiobuf, "%d\n", curproc->p_zone->zone_nlwps_ctl);
+	lxpr_uiobuf_printf(uiobuf, "%d\n", LXPTOZ(lxpnp)->zone_nlwps_ctl);
 }
 
 /* ARGSUSED */
@@ -4574,7 +4568,7 @@ lxpr_read_sys_net_core_somaxc(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 
 	ASSERT(lxpnp->lxpr_type == LXPR_SYS_NET_CORE_SOMAXCON);
 
-	ns = netstack_get_current();
+	ns = lxpr_netstack(lxpnp);
 	if (ns == NULL) {
 		lxpr_uiobuf_printf(uiobuf, "%d\n", SOMAXCONN);
 		return;
@@ -4603,7 +4597,7 @@ lxpr_read_sys_net_ipv4_ip_lport_range(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 
 	ASSERT(lxpnp->lxpr_type == LXPR_SYS_NET_IPV4_IP_LPORT_RANGE);
 
-	ns = netstack_get_current();
+	ns = lxpr_netstack(lxpnp);
 	if (ns == NULL) {
 		lxpr_uiobuf_seterr(uiobuf, ENXIO);
 		return;
@@ -4637,7 +4631,7 @@ lxpr_read_sys_net_ipv4_tcp_fin_to(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 
 	ASSERT(lxpnp->lxpr_type == LXPR_SYS_NET_IPV4_TCP_FIN_TO);
 
-	ns = netstack_get_current();
+	ns = lxpr_netstack(lxpnp);
 	if (ns == NULL) {
 		lxpr_uiobuf_seterr(uiobuf, ENXIO);
 		return;
@@ -4671,7 +4665,7 @@ lxpr_read_sys_net_ipv4_tcp_ka_int(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 
 	ASSERT(lxpnp->lxpr_type == LXPR_SYS_NET_IPV4_TCP_KA_INT);
 
-	ns = netstack_get_current();
+	ns = lxpr_netstack(lxpnp);
 	if (ns == NULL) {
 		lxpr_uiobuf_seterr(uiobuf, ENXIO);
 		return;
@@ -4702,7 +4696,7 @@ lxpr_read_sys_net_ipv4_tcp_ka_tim(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 
 	ASSERT(lxpnp->lxpr_type == LXPR_SYS_NET_IPV4_TCP_KA_TIM);
 
-	ns = netstack_get_current();
+	ns = lxpr_netstack(lxpnp);
 	if (ns == NULL) {
 		lxpr_uiobuf_seterr(uiobuf, ENXIO);
 		return;
@@ -4731,7 +4725,7 @@ lxpr_read_sys_net_ipv4_tcp_max_syn_bl(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 
 	ASSERT(lxpnp->lxpr_type == LXPR_SYS_NET_IPV4_TCP_MAX_SYN_BL);
 
-	ns = netstack_get_current();
+	ns = lxpr_netstack(lxpnp);
 	if (ns == NULL) {
 		lxpr_uiobuf_seterr(uiobuf, ENXIO);
 		return;
@@ -4765,7 +4759,7 @@ lxpr_read_sys_net_ipv4_tcp_rwmem(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	ASSERT(lxpnp->lxpr_type == LXPR_SYS_NET_IPV4_TCP_RMEM ||
 	    lxpnp->lxpr_type == LXPR_SYS_NET_IPV4_TCP_WMEM);
 
-	ns = netstack_get_current();
+	ns = lxpr_netstack(lxpnp);
 	if (ns == NULL) {
 		lxpr_uiobuf_seterr(uiobuf, ENXIO);
 		return;
@@ -4803,7 +4797,7 @@ lxpr_read_sys_net_ipv4_tcp_sack(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 
 	ASSERT(lxpnp->lxpr_type == LXPR_SYS_NET_IPV4_TCP_SACK);
 
-	ns = netstack_get_current();
+	ns = lxpr_netstack(lxpnp);
 	if (ns == NULL) {
 		lxpr_uiobuf_seterr(uiobuf, ENXIO);
 		return;
@@ -4836,7 +4830,7 @@ lxpr_read_sys_net_ipv4_tcp_winscale(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 
 	ASSERT(lxpnp->lxpr_type == LXPR_SYS_NET_IPV4_TCP_WINSCALE);
 
-	ns = netstack_get_current();
+	ns = lxpr_netstack(lxpnp);
 	if (ns == NULL) {
 		lxpr_uiobuf_seterr(uiobuf, ENXIO);
 		return;
@@ -6350,7 +6344,7 @@ lxpr_readdir_taskdir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
 			 * Convert pid to Linux default of 1 if we're the
 			 * zone's init.
 			 */
-			if (emul_tid == curproc->p_zone->zone_proc_initpid)
+			if (emul_tid == LXPTOZ(lxpnp)->zone_proc_initpid)
 				emul_tid = 1;
 		}
 
@@ -6681,7 +6675,7 @@ lxpr_write_tcp_property(lxpr_node_t *lxpnp, struct uio *uio,
 	if (val[0] == '\0') /* no input */
 		return (EINVAL);
 
-	ns = netstack_get_current();
+	ns = lxpr_netstack(lxpnp);
 	if (ns == NULL)
 		return (EINVAL);
 
@@ -6811,7 +6805,7 @@ lxpr_write_sys_net_ipv4_ip_lport_range(lxpr_node_t *lxpnp, struct uio *uio,
 	if (low > high || high > 65535)
 		return (EINVAL);
 
-	ns = netstack_get_current();
+	ns = lxpr_netstack(lxpnp);
 	if (ns == NULL)
 		return (EINVAL);
 
@@ -6906,7 +6900,7 @@ lxpr_write_sys_net_ipv4_tcp_rwmem(lxpr_node_t *lxpnp, struct uio *uio,
 	    def > ONEGB || max < 8192)
 		return (EINVAL);
 
-	ns = netstack_get_current();
+	ns = lxpr_netstack(lxpnp);
 	if (ns == NULL)
 		return (EINVAL);
 
@@ -6998,7 +6992,7 @@ static int
 lxpr_write_sys_kernel_corepatt(lxpr_node_t *lxpnp, struct uio *uio,
     struct cred *cr, caller_context_t *ct)
 {
-	zone_t *zone = curproc->p_zone;
+	zone_t *zone = LXPTOZ(lxpnp);
 	struct core_globals *cg;
 	refstr_t *rp, *nrp;
 	corectl_path_t *ccp;
