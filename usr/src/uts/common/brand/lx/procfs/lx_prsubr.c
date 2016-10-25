@@ -285,6 +285,19 @@ retry:
 	return (p);
 }
 
+netstack_t *
+lxpr_netstack(lxpr_node_t *lxpnp)
+{
+	netstack_t *ns;
+
+	ns = LXPTOZ(lxpnp)->zone_netstack;
+	ASSERT(ns != NULL);
+	if (ns->netstack_flags & (NSF_UNINIT | NSF_CLOSING))
+		return (NULL);
+
+	netstack_hold(ns);
+	return (ns);
+}
 
 /*
  * Lookup process from pid associated with lxpr_node and return with p_lock and
