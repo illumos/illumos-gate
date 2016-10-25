@@ -452,7 +452,7 @@ proc_exit(int why, int what)
 	 */
 	if (p->p_dtrace_helpers != NULL) {
 		ASSERT(dtrace_helpers_cleanup != NULL);
-		(*dtrace_helpers_cleanup)();
+		(*dtrace_helpers_cleanup)(p);
 	}
 
 	/*
