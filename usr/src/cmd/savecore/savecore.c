@@ -23,7 +23,7 @@
  * Copyright 2016 Joyent, Inc.
  */
 /*
- * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <stdio.h>
@@ -72,6 +72,7 @@ static char	*dumpfile;		/* source of raw crash dump */
 static long	bounds = -1;		/* numeric suffix */
 static long	pagesize;		/* dump pagesize */
 static int	dumpfd = -1;		/* dumpfile descriptor */
+static boolean_t have_dumpfile = B_TRUE;	/* dumpfile existence */
 static dumphdr_t corehdr, dumphdr;	/* initial and terminal dumphdrs */
 static boolean_t dump_incomplete;	/* dumphdr indicates incomplete */
 static boolean_t fm_panic;		/* dump is the result of fm_panic */
@@ -239,7 +240,7 @@ logprint(uint32_t flags, char *message, ...)
 
 	case SC_EXIT_ERR:
 	default:
-		if (!mflag && logprint_raised++ == 0)
+		if (!mflag && logprint_raised++ == 0 && have_dumpfile)
 			raise_event(SC_EVENT_SAVECORE_FAILURE, buf);
 		code = 1;
 		break;
@@ -299,9 +300,11 @@ Fstat(int fd, Stat_t *sb, const char *fname)
 static void
 Stat(const char *fname, Stat_t *sb)
 {
-	if (stat64(fname, sb) != 0)
-		logprint(SC_SL_ERR | SC_EXIT_ERR, "stat(\"%s\"): %s", fname,
-		    strerror(errno));
+	if (stat64(fname, sb) != 0) {
+		have_dumpfile = B_FALSE;
+		logprint(SC_SL_ERR | SC_EXIT_ERR, "failed to get status "
+		    "of file %s", fname);
+	}
 }
 
 static void
@@ -1711,9 +1714,11 @@ main(int argc, char *argv[])
 
 	if (dumpfile == NULL) {
 		dumpfile = Zalloc(MAXPATHLEN);
-		if (ioctl(dumpfd, DIOCGETDEV, dumpfile) == -1)
+		if (ioctl(dumpfd, DIOCGETDEV, dumpfile) == -1) {
+			have_dumpfile = B_FALSE;
 			logprint(SC_SL_NONE | SC_IF_ISATTY | SC_EXIT_ERR,
 			    "no dump device configured");
+		}
 	}
 
 	if (mflag)
