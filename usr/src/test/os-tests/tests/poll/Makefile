@@ -11,12 +11,13 @@
 
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright 2016 Joyent, Inc.
 #
 
 include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/test/Makefile.com
 
-PROG = poll_test
+PROG = poll_test epoll_test
 OBJS = $(PROG:%=%.o)
 SRCS = $(OBJS:%.o=%.c)
 
@@ -30,13 +31,6 @@ CMDS = $(PROG:%=$(TESTDIR)/%)
 $(CMDS) := FILEMODE = 0555
 
 all: $(PROG)
-
-$(PROG): $(OBJS)
-	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
-	$(POST_PROCESS)
-
-%.o: ../%.c
-	$(COMPILE.c) $<
 
 install: all $(CMDS)
 
