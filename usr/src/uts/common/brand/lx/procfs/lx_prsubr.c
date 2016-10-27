@@ -223,11 +223,14 @@ retry:
 	/*
 	 * Make sure that thread lookups (where non-main LX threads are
 	 * assigned a pid not equal to the encompassing parent) match the pid
-	 * of the encompasing directory.
+	 * of the encompasing directory.  This must be performed carefully for
+	 * the Linux pid 1 as it will not equal the native pid despite the
+	 * process matching.
 	 *
 	 * This is necessary to constrain paths such as /proc/<pid>/task/<tid>.
 	 */
-	if (lxpnp->lxpr_pid != 0 && lxpnp->lxpr_pid != pid) {
+	if (lxpnp->lxpr_pid != 0 && lxpnp->lxpr_pid != pid &&
+	    !(pid == 1 && lxpnp->lxpr_pid == zone->zone_proc_initpid)) {
 		klwp_t *lwp;
 		lx_lwp_data_t *lwpd;
 
