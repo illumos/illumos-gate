@@ -4997,56 +4997,6 @@ zone_create(const char *zone_name, const char *zone_root,
 		    "netstack still in use", zoneid);
 	}
 
-	/*
-	 * As the first step of zone creation, we want to allocate a zoneid.
-	 * This allocation is complicated by the fact that netstacks use the
-	 * zoneid to determine their stackid, but netstacks themselves are
-	 * freed asynchronously with respect to zone destruction.  This means
-	 * that a netstack reference leak (or in principle, an extraordinarily
-	 * long netstack reference hold) could result in a zoneid being
-	 * allocated that in fact corresponds to a stackid from an active
-	 * (referenced) netstack -- unleashing all sorts of havoc when that
-	 * netstack is actually (re)used.  (In the abstract, we might wish a
-	 * zoneid to not be deallocated until its last referencing netstack
-	 * has been released, but netstacks lack a backpointer into their
-	 * referencing zone -- and changing them to have such a pointer would
-	 * be substantial, to put it euphemistically.)  To avoid this, we
-	 * detect this condition on allocation: if we have allocated a zoneid
-	 * that corresponds to a netstack that's still in use, we warn about
-	 * it (as it is much more likely to be a reference leak than an actual
-	 * netstack reference), free it, and allocate another.  That these
-	 * identifers are allocated out of an ID space assures that we won't
-	 * see the identifier we just allocated.
-	 */
-	for (;;) {
-		zoneid = id_alloc(zoneid_space);
-
-		if (!netstack_inuse_by_stackid(zoneid_to_netstackid(zoneid)))
-			break;
-
-		id_free(zoneid_space, zoneid);
-
-		if (start == GLOBAL_ZONEID) {
-			start = zoneid;
-		} else if (zoneid == start) {
-			/*
-			 * We have managed to iterate over the entire available
-			 * zoneid space -- there are no identifiers available,
-			 * presumably due to some number of leaked netstack
-			 * references.  While it's in principle possible for us
-			 * to continue to try, it seems wiser to give up at
-			 * this point to warn and fail explicitly with a
-			 * distinctive error.
-			 */
-			cmn_err(CE_WARN, "zone_create() failed: all available "
-			    "zone IDs have netstacks still in use");
-			return (set_errno(ENFILE));
-		}
-
-		cmn_err(CE_WARN, "unable to reuse zone ID %d; "
-		    "netstack still in use", zoneid);
-	}
-
 	zone = kmem_zalloc(sizeof (zone_t), KM_SLEEP);
 	zone->zone_id = zoneid;
 	zone->zone_did = zone_did;
