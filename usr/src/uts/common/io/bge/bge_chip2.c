@@ -27,6 +27,7 @@
 /*
  * Copyright (c) 2002, 2010, Oracle and/or its affiliates.
  * All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include "bge_impl.h"
@@ -6493,6 +6494,11 @@ bge_asf_get_config(bge_t *bgep)
 	uint32_t niccfg;
 
 	bgep->asf_enabled = B_FALSE;
+
+	/* No ASF if APE present. */
+	if (bgep->ape_enabled)
+		return;
+
 	nicsig = bge_nic_read32(bgep, BGE_NIC_DATA_SIG_ADDR);
 	if (nicsig == BGE_NIC_DATA_SIG) {
 		niccfg = bge_nic_read32(bgep, BGE_NIC_DATA_NIC_CFG_ADDR);

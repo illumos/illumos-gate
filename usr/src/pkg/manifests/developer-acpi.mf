@@ -23,3 +23,4 @@ file path=usr/sbin/acpidump mode=0555
 file path=usr/sbin/acpixtract mode=0555
 file path=usr/share/man/man1m/acpidump.1m
 file path=usr/share/man/man1m/acpixtract.1m
+depend fmri=driver/x11/xsvc type=require
