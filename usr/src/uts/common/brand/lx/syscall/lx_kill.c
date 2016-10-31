@@ -117,6 +117,7 @@ lx_thrkill(pid_t tgid, pid_t pid, int lx_sig, boolean_t tgkill)
 	if (tgkill) {
 		if ((pid == 1 && tgid != 1) ||
 		    (pid != 1 && tgid != pp->p_pid)) {
+			mutex_exit(&pp->p_lock);
 			rv = set_errno(ESRCH);
 			goto free_and_exit;
 		}
