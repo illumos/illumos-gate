@@ -38,6 +38,7 @@
 #include <sys/lx_brand.h>
 #include <sys/lx_misc.h>
 #include <sys/lx_socket.h>
+#include <sys/lx_impl.h>
 #include <sys/ethernet.h>
 #include <sys/dlpi.h>
 #include <sys/policy.h>
@@ -405,6 +406,42 @@ static ldi_ident_t lx_netlink_ldi;		/* LDI handle */
 static int lx_netlink_bufsize = 4096;		/* default buffer size */
 static int lx_netlink_flowctrld;		/* # of times flow controlled */
 
+typedef enum {
+	LXNL_BIND,
+	LXNL_SENDMSG
+} lx_netlink_action_t;
+
+#define	LX_UNSUP_BUFSZ	64
+
+/*
+ * On Linux, CAP_NET_ADMIN is required to take certain netlink actions.  This
+ * restriction is loosened for certain protocol types, provided the activity is
+ * limited to communicating directly with the kernel (rather than transmitting
+ * to the various multicast groups)
+ */
+static int
+lx_netlink_access(lx_netlink_sock_t *lns, cred_t *cr, lx_netlink_action_t act)
+{
+	/* Simple actions are allowed on these netlink protocols. */
+	if (act != LXNL_SENDMSG) {
+		switch (lns->lxns_proto) {
+		case LX_NETLINK_ROUTE:
+		case LX_NETLINK_AUDIT:
+		case LX_NETLINK_KOBJECT_UEVENT:
+			return (0);
+		default:
+			break;
+		}
+	}
+
+	/* CAP_NET_ADMIN roughly maps to PRIV_SYS_IP_CONFIG. */
+	if (secpolicy_ip_config(cr, B_FALSE) != 0) {
+		return (EACCES);
+	}
+
+	return (0);
+}
+
 /*ARGSUSED*/
 static void
 lx_netlink_activate(sock_lower_handle_t handle,
@@ -485,14 +522,14 @@ lx_netlink_bind(sock_lower_handle_t handle, struct sockaddr *name,
 		return (EINVAL);
 	}
 
-
+	/*
+	 * Perform access checks if attempting to bind on any multicast groups.
+	 */
 	if (lxsa->lxnl_groups != 0) {
-		/*
-		 * On linux, CAP_NET_ADMIN is needed to bind to netlink groups.
-		 * This roughly maps to PRIV_SYS_IP_CONFIG.
-		 */
-		if (secpolicy_ip_config(cr, B_FALSE) != 0) {
-			return (EACCES);
+		int err;
+
+		if ((err = lx_netlink_access(lxsock, cr, LXNL_BIND)) != 0) {
+			return (err);
 		}
 
 		/* Lie about group subscription for now */
@@ -1476,6 +1513,41 @@ lx_netlink_send(sock_lower_handle_t handle, mblk_t *mp,
 		    LX_NETLINK_NLMSG_NONE, lx_netlink_kobject_uevent },
 		{ LX_NETLINK_NLMSG_NOOP, LX_NETLINK_NLMSG_NONE, NULL }
 	};
+
+	if (msg->msg_name != NULL) {
+		lx_netlink_sockaddr_t *lxsa =
+		    (lx_netlink_sockaddr_t *)msg->msg_name;
+
+		if (msg->msg_namelen != sizeof (lx_netlink_sockaddr_t) ||
+		    lxsa->lxnl_family != AF_LX_NETLINK) {
+			return (EINVAL);
+		}
+
+		/*
+		 * If this message is targeted beyond just the OS kernel, an
+		 * access check must be made.
+		 */
+		if (lxsa->lxnl_port != 0 || lxsa->lxnl_groups != 0) {
+			int err;
+			char buf[LX_UNSUP_BUFSZ];
+
+			err = lx_netlink_access(lxsock, cr, LXNL_SENDMSG);
+			if (err != 0) {
+				return (err);
+			}
+
+			/*
+			 * Support for netlink messages beyond rtnetlink(7) is
+			 * non-existent at this time.  These messages are
+			 * tolerated, rather than tossing a potentially fatal
+			 * error to the application.
+			 */
+			(void) snprintf(buf, LX_UNSUP_BUFSZ,
+			    "netlink sendmsg addr port:%X groups:%08X",
+			    lxsa->lxnl_port, lxsa->lxnl_groups);
+			lx_unsupported(buf);
+		}
+	}
 
 	if (DB_TYPE(mp) != M_DATA || MBLKL(mp) < sizeof (lx_netlink_hdr_t)) {
 		freemsg(mp);
