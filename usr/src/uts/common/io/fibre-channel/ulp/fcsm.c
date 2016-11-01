@@ -64,8 +64,7 @@ static clock_t		fcsm_offline_ticks;
 
 
 #ifdef DEBUG
-uint32_t		fcsm_debug = (SMDL_TRACE | SMDL_IO |
-    SMDL_ERR | SMDL_INFO);
+uint32_t		fcsm_debug = 0;
 #endif
 
 
