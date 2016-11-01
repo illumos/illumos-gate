@@ -355,6 +355,7 @@ file path=usr/include/deflt.h
 file path=usr/include/des/des.h
 file path=usr/include/des/desdata.h
 file path=usr/include/des/softdes.h
+file path=usr/include/devfsadm.h
 file path=usr/include/device_info.h
 file path=usr/include/devid.h
 file path=usr/include/devmgmt.h
