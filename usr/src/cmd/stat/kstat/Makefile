@@ -44,6 +44,14 @@ FILEMODE= 0555
 
 lint := LINTFLAGS = -muxs -I$(STATCOMMONDIR)
 
+#
+# Maddeningly, lint both chokes on "%hhx" in a format string and refuses to be
+# suppressed about it (ironically further complaining that the suppression
+# directive itself is unused -- without suppressing the error itself).  So we
+# must unfortunately disable E_BAD_FORMAT_STR2 entirely...
+#
+lint := LINTFLAGS += -xerroff=E_BAD_FORMAT_STR2
+
 .KEEP_STATE:
 
 all: $(PROG)
