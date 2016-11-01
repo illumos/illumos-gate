@@ -854,8 +854,28 @@ lx_sched_rr_get_interval(l_pid_t pid, struct timespec *ival)
 			interval.tv_nsec = 0;
 		}
 
-		if (copyout(&interval, ival, sizeof (interval)))
-			return (set_errno(EFAULT));
+#if defined(_SYSCALL32_IMPL)
+		if (get_udatamodel() != DATAMODEL_NATIVE) {
+			timespec32_t t32;
+
+			/*
+			 * A timespec may overflow for 32-bit but EOVERFLOW
+			 * is not documented as an acceptable error for
+			 * sched_rr_get_interval.  Such an occurance would be
+			 * exceptionally weird for the RR interval.
+			 */
+			TIMESPEC_TO_TIMESPEC32(&t32, &interval);
+
+			if (copyout(&t32, ival, sizeof (t32)) != 0) {
+				return (set_errno(EFAULT));
+			}
+		}
+		else
+#endif
+		{
+			if (copyout(&interval, ival, sizeof (interval)))
+				return (set_errno(EFAULT));
+		}
 
 		return (0);
 	}
@@ -898,8 +918,26 @@ lx_sched_rr_get_interval(l_pid_t pid, struct timespec *ival)
 		interval.tv_sec = ((rtparms_t *)pcparm.pc_clparms)->rt_tqsecs;
 		interval.tv_nsec = ((rtparms_t *)pcparm.pc_clparms)->rt_tqnsecs;
 
-		if (copyout(&interval, ival, sizeof (interval)))
-			return (set_errno(EFAULT));
+#if defined(_SYSCALL32_IMPL)
+		if (get_udatamodel() != DATAMODEL_NATIVE) {
+			timespec32_t t32;
+
+			/*
+			 * Like above, the 32-bit EOVERFLOW check is not
+			 * appropriate here.
+			 */
+			TIMESPEC_TO_TIMESPEC32(&t32, &interval);
+
+			if (copyout(&t32, ival, sizeof (t32)) != 0) {
+				return (set_errno(EFAULT));
+			}
+		}
+		else
+#endif
+		{
+			if (copyout(&interval, ival, sizeof (interval)))
+				return (set_errno(EFAULT));
+		}
 
 		return (0);
 	}
