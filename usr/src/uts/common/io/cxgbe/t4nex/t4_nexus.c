@@ -39,9 +39,12 @@
 
 #include "version.h"
 #include "common/common.h"
+#include "common/t4_msg.h"
 #include "common/t4_regs.h"
 #include "firmware/t4_fw.h"
 #include "firmware/t4_cfg.h"
+#include "firmware/t5_fw.h"
+#include "firmware/t5_cfg.h"
 #include "t4_l2t.h"
 
 static int t4_cb_open(dev_t *devp, int flag, int otyp, cred_t *credp);
@@ -132,6 +135,7 @@ struct intrs_and_queues {
 
 static int cpl_not_handled(struct sge_iq *iq, const struct rss_header *rss,
     mblk_t *m);
+static int fw_msg_not_handled(struct adapter *, const __be64 *);
 int t4_register_cpl_handler(struct adapter *sc, int opcode, cpl_handler_t h);
 static unsigned int getpf(struct adapter *sc);
 static int prep_firmware(struct adapter *sc);
@@ -139,7 +143,12 @@ static int upload_config_file(struct adapter *sc, uint32_t *mt, uint32_t *ma);
 static int partition_resources(struct adapter *sc);
 static int get_params__pre_init(struct adapter *sc);
 static int get_params__post_init(struct adapter *sc);
+static int set_params__post_init(struct adapter *);
 static void setup_memwin(struct adapter *sc);
+static int validate_mt_off_len(struct adapter *, int, uint32_t, int,
+    uint32_t *);
+void memwin_info(struct adapter *, int, uint32_t *, uint32_t *);
+uint32_t position_memwin(struct adapter *, int, uint32_t);
 static int prop_lookup_int_array(struct adapter *sc, char *name, int *data,
     uint_t count);
 static int prop_lookup_int_array(struct adapter *sc, char *name, int *data,
@@ -151,6 +160,8 @@ static int cfg_itype_and_nqueues(struct adapter *sc, int n10g, int n1g,
 static int add_child_node(struct adapter *sc, int idx);
 static int remove_child_node(struct adapter *sc, int idx);
 static kstat_t *setup_kstats(struct adapter *sc);
+static kstat_t *setup_wc_kstats(struct adapter *);
+static int update_wc_kstats(kstat_t *, int);
 #ifndef TCP_OFFLOAD_DISABLE
 static int toe_capability(struct port_info *pi, int enable);
 static int activate_uld(struct adapter *sc, int id, struct uld_softc *usc);
@@ -274,7 +285,12 @@ t4_devo_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		.devacc_attr_endian_flags = DDI_STRUCTURE_LE_ACC,
 		.devacc_attr_dataorder = DDI_UNORDERED_OK_ACC
 	};
-
+	ddi_device_acc_attr_t da1 = {
+		.devacc_attr_version = DDI_DEVICE_ATTR_V0,
+		.devacc_attr_endian_flags = DDI_STRUCTURE_LE_ACC,
+		.devacc_attr_dataorder = DDI_MERGING_OK_ACC
+	};
+ 
 	if (cmd != DDI_ATTACH)
 		return (DDI_FAILURE);
 
@@ -309,6 +325,10 @@ t4_devo_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 	sc->mbox = sc->pf;
 
+	/* Initialize the driver properties */
+	prp = &sc->props;
+	(void)init_driver_props(sc, prp);
+
 	/*
 	 * Enable access to the PCI config space.
 	 */
@@ -340,6 +360,10 @@ t4_devo_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		sc->cpl_handler[i] = cpl_not_handled;
 	}
 
+	for (i = 0; i < ARRAY_SIZE(sc->fw_msg_handler); i++) {
+		sc->fw_msg_handler[i] = fw_msg_not_handled;
+	}
+ 
 	/*
 	 * Prepare the adapter for operation.
 	 */
@@ -347,6 +371,36 @@ t4_devo_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	if (rc != 0) {
 		cxgb_printf(dip, CE_WARN, "failed to prepare adapter: %d", rc);
 		goto done;
+	}
+
+	/*
+	 * Enable BAR1 access.
+	 */
+	sc->doorbells |= DOORBELL_KDB;
+	rc = ddi_regs_map_setup(dip, 2, &sc->reg1p, 0, 0, &da1, &sc->reg1h);
+	if (rc != DDI_SUCCESS) {
+		cxgb_printf(dip, CE_WARN,
+		    "failed to map BAR1 device registers: %d", rc);
+		goto done;
+	} else {
+		if (is_t5(sc->params.chip)) {
+			sc->doorbells |= DOORBELL_UDB;
+			if (prp->wc) {
+				/*
+				 * Enable write combining on BAR2.  This is the
+				 * userspace doorbell BAR and is split into 128B
+				 * (UDBS_SEG_SIZE) doorbell regions, each associated
+				 * with an egress queue.  The first 64B has the doorbell
+				 * and the second 64B can be used to submit a tx work
+				 * request with an implicit doorbell.
+				 */
+				sc->doorbells &= ~DOORBELL_UDB;
+				sc->doorbells |= (DOORBELL_WCWR |
+				    DOORBELL_UDBWC);
+				t4_write_reg(sc, A_SGE_STAT_CFG,
+				    V_STATSOURCE_T5(7) | V_STATMODE(0));
+			}
+		}
 	}
 
 	/*
@@ -360,10 +414,6 @@ t4_devo_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		    "failed to create device node: %d", rc);
 		rc = DDI_SUCCESS; /* carry on */
 	}
-
-	/* Initialize the driver properties */
-	prp = &sc->props;
-	(void) init_driver_props(sc, prp);
 
 	/* Do this early. Memory window is required for loading config file. */
 	setup_memwin(sc);
@@ -390,6 +440,10 @@ t4_devo_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 
 	rc = get_params__post_init(sc);
+	if (rc != 0)
+		goto done; /* error message displayed already */
+
+	rc = set_params__post_init(sc);
 	if (rc != 0)
 		goto done; /* error message displayed already */
 
@@ -445,7 +499,7 @@ t4_devo_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		mutex_init(&pi->lock, NULL, MUTEX_DRIVER, NULL);
 		pi->mtu = ETHERMTU;
 
-		if (is_10G_port(pi) != 0) {
+		if (is_10G_port(pi) || is_40G_port(pi)) {
 			n10g++;
 			pi->tmr_idx = prp->tmr_idx_10g;
 			pi->pktc_idx = prp->pktc_idx_10g;
@@ -528,12 +582,13 @@ t4_devo_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		/* LINTED: E_ASSIGN_NARROW_CONV */
 		pi->first_rxq = rqidx;
 		/* LINTED: E_ASSIGN_NARROW_CONV */
-		pi->nrxq = is_10G_port(pi) ? iaq.nrxq10g : iaq.nrxq1g;
-
+		pi->nrxq = (is_10G_port(pi) || is_40G_port(pi)) ? iaq.nrxq10g
+		    : iaq.nrxq1g;
 		/* LINTED: E_ASSIGN_NARROW_CONV */
 		pi->first_txq = tqidx;
 		/* LINTED: E_ASSIGN_NARROW_CONV */
-		pi->ntxq = is_10G_port(pi) ? iaq.ntxq10g : iaq.ntxq1g;
+		pi->ntxq = (is_10G_port(pi) || is_40G_port(pi)) ? iaq.ntxq10g
+		    : iaq.ntxq1g;
 
 		rqidx += pi->nrxq;
 		tqidx += pi->ntxq;
@@ -669,6 +724,7 @@ ofld_queues:
 	}
 
 	sc->ksp = setup_kstats(sc);
+	sc->ksp_stat = setup_wc_kstats(sc);
 
 done:
 	if (rc != DDI_SUCCESS) {
@@ -713,6 +769,8 @@ t4_devo_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 	if (sc->ksp != NULL)
 		kstat_delete(sc->ksp);
+	if (sc->ksp_stat != NULL)
+		kstat_delete(sc->ksp_stat);
 
 	s = &sc->sge;
 	if (s->rxq != NULL)
@@ -761,6 +819,9 @@ t4_devo_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 	if (sc->flags & FW_OK)
 		(void) t4_fw_bye(sc, sc->mbox);
+
+	if (sc->reg1h != NULL)
+		ddi_regs_map_free(&sc->reg1h);
 
 	if (sc->regh != NULL)
 		ddi_regs_map_free(&sc->regh);
@@ -1009,30 +1070,52 @@ prep_firmware(struct adapter *sc)
 	rc = t4_check_fw_version(sc);
 	if (rc != 0) {
 		uint32_t v;
+		if (is_t4(sc->params.chip)) {
+			/* This is what the driver has */
+			v = V_FW_HDR_FW_VER_MAJOR(T4FW_VERSION_MAJOR) |
+			    V_FW_HDR_FW_VER_MINOR(T4FW_VERSION_MINOR) |
+			    V_FW_HDR_FW_VER_MICRO(T4FW_VERSION_MICRO) |
+			    V_FW_HDR_FW_VER_BUILD(T4FW_VERSION_BUILD);
 
-		/* This is what the driver has */
-		v = V_FW_HDR_FW_VER_MAJOR(T4FW_VERSION_MAJOR) |
-		    V_FW_HDR_FW_VER_MINOR(T4FW_VERSION_MINOR) |
-		    V_FW_HDR_FW_VER_MICRO(T4FW_VERSION_MICRO) |
-		    V_FW_HDR_FW_VER_BUILD(T4FW_VERSION_BUILD);
-
-		/*
-		 * Always upgrade, even for minor/micro/build mismatches.
-		 * Downgrade only for a major version mismatch.
-		 */
-		if (rc < 0 || v > sc->params.fw_vers) {
-			cxgb_printf(sc->dip, CE_NOTE,
-			    "installing firmware %d.%d.%d.%d on card.",
-			    T4FW_VERSION_MAJOR, T4FW_VERSION_MINOR,
-			    T4FW_VERSION_MICRO, T4FW_VERSION_BUILD);
-			rc = -t4_load_fw(sc, t4fw_data, t4fw_size);
-			if (rc != 0) {
-				cxgb_printf(sc->dip, CE_WARN,
-				    "failed to install firmware: %d", rc);
-				return (rc);
-			} else {
-				/* refresh */
-				(void) t4_check_fw_version(sc);
+			/*
+			 * Always upgrade, even for minor/micro/build mismatches.
+			 * Downgrade only for a major version mismatch.
+			 */
+			if (rc < 0 || v > sc->params.fw_vers) {
+				cxgb_printf(sc->dip, CE_NOTE,
+				    "installing firmware %d.%d.%d.%d on card.",
+				    T4FW_VERSION_MAJOR, T4FW_VERSION_MINOR,
+				    T4FW_VERSION_MICRO, T4FW_VERSION_BUILD);
+				rc = -t4_load_fw(sc, t4fw_data, t4fw_size);
+				if (rc != 0) {
+					cxgb_printf(sc->dip, CE_WARN,
+					    "failed to install firmware: %d", rc);
+					return (rc);
+				} else {
+					/* refresh */
+					(void) t4_check_fw_version(sc);
+				}
+			}
+		} else {
+			v = V_FW_HDR_FW_VER_MAJOR(T5FW_VERSION_MAJOR) |
+			    V_FW_HDR_FW_VER_MINOR(T5FW_VERSION_MINOR) |
+			    V_FW_HDR_FW_VER_MICRO(T5FW_VERSION_MICRO) |
+			    V_FW_HDR_FW_VER_BUILD(T5FW_VERSION_BUILD);
+			if (rc < 0 || v > sc->params.fw_vers) {
+				cxgb_printf(sc->dip, CE_NOTE,
+				    "installing firmware %d.%d.%d.%d on card.",
+				    T5FW_VERSION_MAJOR, T5FW_VERSION_MINOR,
+				    T5FW_VERSION_MICRO, T5FW_VERSION_BUILD);
+				rc = -t4_load_fw(sc, t5fw_data, t5fw_size);
+				if (rc != 0) {
+					cxgb_printf(sc->dip, CE_WARN,
+					    "failed to install firmware: %d", rc);
+					return (rc);
+				} else {
+					/* refresh */
+					(void) t4_check_fw_version(sc);
+				}
+ 
 			}
 		}
 	}
@@ -1075,6 +1158,18 @@ err:
 
 }
 
+static const struct memwin t4_memwin[] = {
+	{ MEMWIN0_BASE, MEMWIN0_APERTURE },
+	{ MEMWIN1_BASE, MEMWIN1_APERTURE },
+	{ MEMWIN2_BASE_T4, MEMWIN2_APERTURE_T4 }
+};
+
+static const struct memwin t5_memwin[] = {
+	{ MEMWIN0_BASE, MEMWIN0_APERTURE },
+	{ MEMWIN1_BASE, MEMWIN1_APERTURE },
+	{ MEMWIN2_BASE_T5, MEMWIN2_APERTURE_T5 },
+};
+
 #define	FW_PARAM_DEV(param) \
 	(V_FW_PARAMS_MNEM(FW_PARAMS_MNEM_DEV) | \
 	    V_FW_PARAMS_PARAM_X(FW_PARAMS_PARAM_DEV_##param))
@@ -1083,14 +1178,90 @@ err:
 	    V_FW_PARAMS_PARAM_X(FW_PARAMS_PARAM_PFVF_##param))
 
 /*
+ * Verify that the memory range specified by the memtype/offset/len pair is
+ * valid and lies entirely within the memtype specified.  The global address of
+ * the start of the range is returned in addr.
+ */
+int
+validate_mt_off_len(struct adapter *sc, int mtype, uint32_t off, int len,
+	uint32_t *addr)
+{
+	uint32_t em, addr_len, maddr, mlen;
+
+	/* Memory can only be accessed in naturally aligned 4 byte units */
+	if (off & 3 || len & 3 || len == 0)
+		return (EINVAL);
+
+	em = t4_read_reg(sc, A_MA_TARGET_MEM_ENABLE);
+	switch (mtype) {
+		case MEM_EDC0:
+			if (!(em & F_EDRAM0_ENABLE))
+				return (EINVAL);
+			addr_len = t4_read_reg(sc, A_MA_EDRAM0_BAR);
+			maddr = G_EDRAM0_BASE(addr_len) << 20;
+			mlen = G_EDRAM0_SIZE(addr_len) << 20;
+			break;
+		case MEM_EDC1:
+			if (!(em & F_EDRAM1_ENABLE))
+				return (EINVAL);
+			addr_len = t4_read_reg(sc, A_MA_EDRAM1_BAR);
+			maddr = G_EDRAM1_BASE(addr_len) << 20;
+			mlen = G_EDRAM1_SIZE(addr_len) << 20;
+			break;
+		case MEM_MC:
+			if (!(em & F_EXT_MEM_ENABLE))
+				return (EINVAL);
+			addr_len = t4_read_reg(sc, A_MA_EXT_MEMORY_BAR);
+			maddr = G_EXT_MEM_BASE(addr_len) << 20;
+			mlen = G_EXT_MEM_SIZE(addr_len) << 20;
+			break;
+		case MEM_MC1:
+			if (is_t4(sc->params.chip) || !(em & F_EXT_MEM1_ENABLE))
+				return (EINVAL);
+			addr_len = t4_read_reg(sc, A_MA_EXT_MEMORY1_BAR);
+			maddr = G_EXT_MEM1_BASE(addr_len) << 20;
+			mlen = G_EXT_MEM1_SIZE(addr_len) << 20;
+			break;
+		default:
+			return (EINVAL);
+	}
+
+	if (mlen > 0 && off < mlen && off + len <= mlen) {
+		*addr = maddr + off;    /* global address */
+		return (0);
+	}
+
+	return (EFAULT);
+}
+
+void
+memwin_info(struct adapter *sc, int win, uint32_t *base, uint32_t *aperture)
+{
+	const struct memwin *mw;
+
+	if (is_t4(sc->params.chip)) {
+		mw = &t4_memwin[win];
+	} else {
+		mw = &t5_memwin[win];
+	}
+
+	if (base != NULL)
+		*base = mw->base;
+	if (aperture != NULL)
+		*aperture = mw->aperture;
+}
+
+/*
  * Upload configuration file to card's memory.
  */
 static int
 upload_config_file(struct adapter *sc, uint32_t *mt, uint32_t *ma)
 {
-	int rc, i;
-	uint32_t param, val, mtype, maddr, bar, off, win, remaining;
-	const uint32_t *b;
+	int rc = 0, cflen;
+	u_int i, n;
+	uint32_t param, val, addr, mtype, maddr;
+	uint32_t off, mw_base, mw_aperture;
+	const uint32_t *cfdata;
 
 	/* Figure out where the firmware wants us to upload it. */
 	param = FW_PARAM_DEV(CF);
@@ -1104,75 +1275,42 @@ upload_config_file(struct adapter *sc, uint32_t *mt, uint32_t *ma)
 	*mt = mtype = G_FW_PARAMS_PARAM_Y(val);
 	*ma = maddr = G_FW_PARAMS_PARAM_Z(val) << 16;
 
-	if (maddr & 3) {
-		cxgb_printf(sc->dip, CE_WARN,
-		    "cannot upload config file (type %u, addr %x).\n",
-		    mtype, maddr);
-		return (EFAULT);
+	if (is_t4(sc->params.chip)) {
+		cflen = t4cfg_size & ~3;
+		/* LINTED: E_BAD_PTR_CAST_ALIGN */
+		cfdata = (const uint32_t *)t4cfg_data;
+	} else {
+		cflen = t5cfg_size & ~3;
+		/* LINTED: E_BAD_PTR_CAST_ALIGN */
+		cfdata = (const uint32_t *)t5cfg_data;
 	}
 
-	/* Translate mtype/maddr to an address suitable for the PCIe window */
-	val = t4_read_reg(sc, A_MA_TARGET_MEM_ENABLE);
-	val &= F_EDRAM0_ENABLE | F_EDRAM1_ENABLE | F_EXT_MEM_ENABLE;
-	switch (mtype) {
-	case FW_MEMTYPE_CF_EDC0:
-		if (!(val & F_EDRAM0_ENABLE))
-			goto err;
-		bar = t4_read_reg(sc, A_MA_EDRAM0_BAR);
-		maddr += G_EDRAM0_BASE(bar) << 20;
-		break;
-
-	case FW_MEMTYPE_CF_EDC1:
-		if (!(val & F_EDRAM1_ENABLE))
-			goto err;
-		bar = t4_read_reg(sc, A_MA_EDRAM1_BAR);
-		maddr += G_EDRAM1_BASE(bar) << 20;
-		break;
-
-	case FW_MEMTYPE_CF_EXTMEM:
-		if (!(val & F_EXT_MEM_ENABLE))
-			goto err;
-		bar = t4_read_reg(sc, A_MA_EXT_MEMORY_BAR);
-		maddr += G_EXT_MEM_BASE(bar) << 20;
-		break;
-
-	default:
-err:
+	if (cflen > FLASH_CFG_MAX_SIZE) {
 		cxgb_printf(sc->dip, CE_WARN,
-		    "cannot upload config file (type %u, enabled %u).\n",
-		    mtype, val);
-		return (EFAULT);
-	}
-
-	/*
-	 * Position the PCIe window (we use memwin2) to the 16B aligned area
-	 * just at/before the upload location.
-	 */
-	win = maddr & ~0xf;
-	off = maddr - win;  /* offset from the start of the window. */
-	t4_write_reg(sc, PCIE_MEM_ACCESS_REG(A_PCIE_MEM_ACCESS_OFFSET, 2), win);
-	(void) t4_read_reg(sc,
-	    PCIE_MEM_ACCESS_REG(A_PCIE_MEM_ACCESS_OFFSET, 2));
-
-	remaining = t4cfg_size;
-	if (remaining > FLASH_CFG_MAX_SIZE ||
-	    remaining > MEMWIN2_APERTURE - off) {
-		cxgb_printf(sc->dip, CE_WARN, "cannot upload config file all at"
-		    " once (size %u, max %u, room %u).\n",
-		    remaining, FLASH_CFG_MAX_SIZE, MEMWIN2_APERTURE - off);
+		    "config file too long (%d, max allowed is %d).  ",
+		    cflen, FLASH_CFG_MAX_SIZE);
 		return (EFBIG);
 	}
 
-	/*
-	 * TODO: sheer laziness.  We deliberately added 4 bytes of useless
-	 * stuffing/comments at the end of the config file so it's ok to simply
-	 * throw away the last remaining bytes when the config file is not an
-	 * exact multiple of 4.
-	 */
-	/* LINTED: E_BAD_PTR_CAST_ALIGN */
-	b =  (const uint32_t *)t4cfg_data;
-	for (i = 0; remaining >= 4; i += 4, remaining -= 4)
-		t4_write_reg(sc, MEMWIN2_BASE + off + i, *b++);
+	rc = validate_mt_off_len(sc, mtype, maddr, cflen, &addr);
+	if (rc != 0) {
+
+		cxgb_printf(sc->dip, CE_WARN,
+		    "%s: addr (%d/0x%x) or len %d is not valid: %d.  "
+		    "Will try to use the config on the card, if any.\n",
+		    __func__, mtype, maddr, cflen, rc);
+		return (EFAULT);
+	}
+
+	memwin_info(sc, 2, &mw_base, &mw_aperture);
+	while (cflen) {
+		off = position_memwin(sc, 2, addr);
+		n = min(cflen, mw_aperture - off);
+		for (i = 0; i < n; i += 4)
+			t4_write_reg(sc, mw_base + off + i, *cfdata++);
+		cflen -= n;
+		addr += n;
+	}
 
 	return (rc);
 }
@@ -1304,7 +1442,9 @@ get_params__post_init(struct adapter *sc)
 	param[1] = FW_PARAM_PFVF(EQ_START);
 	param[2] = FW_PARAM_PFVF(FILTER_START);
 	param[3] = FW_PARAM_PFVF(FILTER_END);
-	rc = -t4_query_params(sc, sc->mbox, sc->pf, 0, 4, param, val);
+	param[4] = FW_PARAM_PFVF(L2T_START);
+	param[5] = FW_PARAM_PFVF(L2T_END);
+	rc = -t4_query_params(sc, sc->mbox, sc->pf, 0, 6, param, val);
 	if (rc != 0) {
 		cxgb_printf(sc->dip, CE_WARN,
 		    "failed to query parameters (post_init): %d.\n", rc);
@@ -1316,6 +1456,8 @@ get_params__post_init(struct adapter *sc)
 	sc->sge.eq_start = val[1];
 	sc->tids.ftid_base = val[2];
 	sc->tids.nftids = val[3] - val[2] + 1;
+	sc->vres.l2t.start = val[4];
+	sc->vres.l2t.size = val[5] - val[4] + 1;
 
 	/* get capabilites */
 	bzero(&caps, sizeof (caps));
@@ -1362,6 +1504,19 @@ get_params__post_init(struct adapter *sc)
 	return (rc);
 }
 
+static int
+set_params__post_init(struct adapter *sc)
+{
+	uint32_t param, val;
+
+	/* ask for encapsulated CPLs */
+	param = FW_PARAM_PFVF(CPLFW4MSG_ENCAP);
+	val = 1;
+	(void)t4_set_params(sc, sc->mbox, sc->pf, 0, 1, &param, &val);
+
+	return (0);
+}
+
 /* TODO: verify */
 static void
 setup_memwin(struct adapter *sc)
@@ -1370,6 +1525,8 @@ setup_memwin(struct adapter *sc)
 	int rc;
 	uint_t n;
 	uintptr_t bar0;
+	uintptr_t mem_win0_base, mem_win1_base, mem_win2_base;
+	uintptr_t mem_win2_aperture;
 
 	rc = ddi_prop_lookup_int_array(DDI_DEV_T_ANY, sc->dip,
 	    DDI_PROP_DONTPASS, "assigned-addresses", (int **)&data, &n);
@@ -1383,18 +1540,67 @@ setup_memwin(struct adapter *sc)
 	bar0 = ((uint64_t)data[0].pci_phys_mid << 32) | data[0].pci_phys_low;
 	ddi_prop_free(data);
 
+	if (is_t4(sc->params.chip)) {
+		mem_win0_base = bar0 + MEMWIN0_BASE;
+		mem_win1_base = bar0 + MEMWIN1_BASE;
+		mem_win2_base = bar0 + MEMWIN2_BASE_T4;
+		mem_win2_aperture = MEMWIN2_APERTURE_T4;
+	} else {
+		/* For T5, only relative offset inside the PCIe BAR is passed */
+		mem_win0_base = MEMWIN0_BASE;
+		mem_win1_base = MEMWIN1_BASE;
+		mem_win2_base = MEMWIN2_BASE_T5;
+		mem_win2_aperture = MEMWIN2_APERTURE_T5;
+	}
+
 	t4_write_reg(sc, PCIE_MEM_ACCESS_REG(A_PCIE_MEM_ACCESS_BASE_WIN, 0),
-	    (bar0 + MEMWIN0_BASE) | V_BIR(0) |
+	    mem_win0_base | V_BIR(0) |
 	    V_WINDOW(ilog2(MEMWIN0_APERTURE) - 10));
 
 	t4_write_reg(sc, PCIE_MEM_ACCESS_REG(A_PCIE_MEM_ACCESS_BASE_WIN, 1),
-	    (bar0 + MEMWIN1_BASE) | V_BIR(0) |
+	    mem_win1_base | V_BIR(0) |
 	    V_WINDOW(ilog2(MEMWIN1_APERTURE) - 10));
 
 	t4_write_reg(sc, PCIE_MEM_ACCESS_REG(A_PCIE_MEM_ACCESS_BASE_WIN, 2),
-	    (bar0 + MEMWIN2_BASE) | V_BIR(0) |
-	    V_WINDOW(ilog2(MEMWIN2_APERTURE) - 10));
+	    mem_win2_base | V_BIR(0) |
+	    V_WINDOW(ilog2(mem_win2_aperture) - 10));
+
+	/* flush */
+	(void)t4_read_reg(sc, PCIE_MEM_ACCESS_REG(A_PCIE_MEM_ACCESS_BASE_WIN, 2));
 }
+
+/*
+ * Positions the memory window such that it can be used to access the specified
+ * address in the chip's address space.  The return value is the offset of addr
+ * from the start of the window.
+ */
+uint32_t
+position_memwin(struct adapter *sc, int n, uint32_t addr)
+{
+	uint32_t start, pf;
+	uint32_t reg;
+
+	if (addr & 3) {
+		cxgb_printf(sc->dip, CE_WARN,
+		    "addr (0x%x) is not at a 4B boundary.\n", addr);
+		return (EFAULT);
+	}
+
+	if (is_t4(sc->params.chip)) {
+		pf = 0;
+		start = addr & ~0xf;    /* start must be 16B aligned */
+	} else {
+		pf = V_PFNUM(sc->pf);
+		start = addr & ~0x7f;   /* start must be 128B aligned */
+	}
+	reg = PCIE_MEM_ACCESS_REG(A_PCIE_MEM_ACCESS_OFFSET, n);
+
+	t4_write_reg(sc, reg, start | pf);
+	(void) t4_read_reg(sc, reg);
+
+	return (addr - start);
+}
+ 
 
 /*
  * Reads the named property and fills up the "data" array (which has at least
@@ -1611,6 +1817,19 @@ init_driver_props(struct adapter *sc, struct driver_properties *p)
 		(void) ddi_prop_create(dev, dip, DDI_PROP_CANSLEEP,
 		    "interrupt-forwarding", NULL, 0);
 	}
+
+	/*
+	 * Write combining
+	 * 0 to disable, 1 to enable
+	 */
+	p->wc = prop_lookup_int(sc, "write-combine", 1);
+	cxgb_printf(dip, CE_WARN, "write-combine: using of %d", p->wc);
+	if (p->wc != 0 && p->wc != 1) {
+		cxgb_printf(dip, CE_WARN,
+		    "write-combine: using 1 instead of %d", p->wc);
+		p->wc = 1;
+	}
+	(void) ddi_prop_update_int(dev, dip, "write-combine", p->wc);
 
 	return (0);
 }
@@ -1938,7 +2157,8 @@ setup_kstats(struct adapter *sc)
 	t4_os_pci_read_cfg2(sc, PCI_CONF_DEVID, &pci_device);
 	KS_C_SET(pci_device_id, "0x%x", pci_device);
 
-#define	PSTR(pi) (pi ? (is_10G_port(pi) ? "10G" : "1G") : "-")
+#define PSTR(pi) (pi ? (is_40G_port(pi) ? "40G" : \
+		(is_10G_port(pi) ? "10G" : "1G")) : "-")
 	KS_C_SET(port_type, "%s/%s/%s/%s", PSTR(sc->port[0]), PSTR(sc->port[1]),
 	    PSTR(sc->port[2]), PSTR(sc->port[3]));
 #undef PSTR
@@ -1950,6 +2170,66 @@ setup_kstats(struct adapter *sc)
 	kstat_install(ksp);
 
 	return (ksp);
+}
+
+/*
+ * t4nex:X:stat
+ */
+struct t4_wc_kstats {
+	kstat_named_t write_coal_success;
+	kstat_named_t write_coal_failure;
+};
+static kstat_t *
+setup_wc_kstats(struct adapter *sc)
+{
+	kstat_t *ksp;
+	struct t4_wc_kstats *kstatp;
+	int ndata;
+
+	ndata = sizeof(struct t4_wc_kstats) / sizeof(kstat_named_t);
+	ksp = kstat_create(T4_NEXUS_NAME, ddi_get_instance(sc->dip), "stats",
+	    "nexus", KSTAT_TYPE_NAMED, ndata, 0);
+	if (ksp == NULL) {
+		cxgb_printf(sc->dip, CE_WARN, "failed to initialize kstats.");
+		return (NULL);
+	}
+
+	kstatp = (struct t4_wc_kstats *)ksp->ks_data;
+
+	KS_UINIT(write_coal_success);
+	KS_UINIT(write_coal_failure);
+
+	ksp->ks_update = update_wc_kstats;
+	/* Install the kstat */
+	ksp->ks_private = (void *)sc;
+	kstat_install(ksp);
+
+	return (ksp);
+}
+
+static int
+update_wc_kstats(kstat_t *ksp, int rw)
+{
+	struct t4_wc_kstats *kstatp = (struct t4_wc_kstats *)ksp->ks_data;
+	struct adapter *sc = ksp->ks_private;
+	uint32_t wc_total, wc_success, wc_failure;
+
+	if (rw == KSTAT_WRITE)
+		return (0);
+
+	if (is_t5(sc->params.chip)) {
+		wc_total = t4_read_reg(sc, A_SGE_STAT_TOTAL);
+		wc_failure = t4_read_reg(sc, A_SGE_STAT_MATCH);
+		wc_success = wc_total - wc_failure;
+	} else {
+		wc_success = 0;
+		wc_failure = 0;
+	}
+
+	KS_U_SET(write_coal_success, wc_success);
+	KS_U_SET(write_coal_failure, wc_failure);
+
+	return (0);
 }
 
 int
@@ -2231,6 +2511,38 @@ t4_register_cpl_handler(struct adapter *sc, int opcode, cpl_handler_t h)
 	new = (uint_t)(unsigned long) (h ? h : cpl_not_handled);
 	loc = (uint_t *)&sc->cpl_handler[opcode];
 	(void) atomic_swap_uint(loc, new);
+
+	return (0);
+}
+
+static int
+fw_msg_not_handled(struct adapter *sc, const __be64 *data)
+{
+	struct cpl_fw6_msg *cpl = container_of(data, struct cpl_fw6_msg, data);
+
+	cxgb_printf(sc->dip, CE_WARN, "%s fw_msg type %d", __func__, cpl->type);
+	return (0);
+}
+
+int
+t4_register_fw_msg_handler(struct adapter *sc, int type, fw_msg_handler_t h)
+{
+	fw_msg_handler_t *loc, new;
+
+	if (type >= ARRAY_SIZE(sc->fw_msg_handler))
+		return (EINVAL);
+
+	/*
+	 * These are dispatched by the handler for FW{4|6}_CPL_MSG using the CPL
+	 * handler dispatch table.  Reject any attempt to install a handler for
+	 * this subtype.
+	 */
+	if (type == FW_TYPE_RSSCPL || type == FW6_TYPE_RSSCPL)
+		return (EINVAL);
+
+	new = h ? h : fw_msg_not_handled;
+	loc = &sc->fw_msg_handler[type];
+	(void)atomic_swap_ptr(loc, (void *)new);
 
 	return (0);
 }

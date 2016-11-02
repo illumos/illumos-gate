@@ -74,7 +74,7 @@ struct dev_ops cxgbe_dev_ops = {
 
 static struct modldrv modldrv = {
 	.drv_modops =		&mod_driverops,
-	.drv_linkinfo =		"Chelsio T4 NIC " DRV_VERSION,
+	.drv_linkinfo =		"Chelsio T4/T5 NIC " DRV_VERSION,
 	.drv_dev_ops =		&cxgbe_dev_ops
 };
 

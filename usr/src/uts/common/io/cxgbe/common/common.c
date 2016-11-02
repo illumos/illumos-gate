@@ -66,6 +66,21 @@ is_bypass(const adapter_t *adap)
 	return (adap->params.bypass);
 }
 
+int is_t4(enum chip_type chip)
+{
+	return (CHELSIO_CHIP_VERSION(chip) == CHELSIO_T4);
+}
+
+int is_t5(enum chip_type chip)
+{
+	return (CHELSIO_CHIP_VERSION(chip) == CHELSIO_T5);
+}
+
+int is_fpga(enum chip_type chip)
+{
+	 return chip & CHELSIO_CHIP_FPGA;
+}
+
 int
 is_bypass_device(int device)
 {
