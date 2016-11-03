@@ -22,7 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2013 Joyent, Inc.  All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include <sys/param.h>
@@ -251,6 +251,7 @@ kadmin(int cmd, int fcn, void *mdep, cred_t *credp)
 		 * do not release these resources.
 		 */
 		if (ttoproc(curthread) != &p0) {
+			mutex_enter(&curproc->p_lock);
 			VN_RELE(PTOU(curproc)->u_cdir);
 			if (PTOU(curproc)->u_rdir)
 				VN_RELE(PTOU(curproc)->u_rdir);
@@ -260,6 +261,7 @@ kadmin(int cmd, int fcn, void *mdep, cred_t *credp)
 			PTOU(curproc)->u_cdir = rootdir;
 			PTOU(curproc)->u_rdir = NULL;
 			PTOU(curproc)->u_cwd = NULL;
+			mutex_exit(&curproc->p_lock);
 		}
 
 		/*

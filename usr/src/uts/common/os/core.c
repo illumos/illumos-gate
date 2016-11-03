@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2011, Joyent Inc. All rights reserved.
+ * Copyright 2016, Joyent Inc.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -124,6 +124,7 @@ remove_core_file(char *fp, enum core_types core_type)
 	/*
 	 * Determine what rootvp to use.
 	 */
+	mutex_enter(&curproc->p_lock);
 	if (core_type == CORE_PROC) {
 		rootvp = (PTOU(curproc)->u_rdir == NULL ?
 		    curproc->p_zone->zone_rootvp : PTOU(curproc)->u_rdir);
@@ -139,6 +140,7 @@ remove_core_file(char *fp, enum core_types core_type)
 	VN_HOLD(startvp);
 	if (rootvp != rootdir)
 		VN_HOLD(rootvp);
+	mutex_exit(&curproc->p_lock);
 	if ((error = lookuppnvp(&pn, NULL, NO_FOLLOW, &dvp, &vp, rootvp,
 	    startvp, CRED())) != 0) {
 		pn_free(&pn);

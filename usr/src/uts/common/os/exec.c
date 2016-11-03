@@ -257,8 +257,10 @@ exec_common(const char *fname, const char **argp, const char **envp,
 	 * only if the pathname does not contain a "/" the resolved path
 	 * points to a file in the current working (attribute) directory.
 	 */
-	if ((p->p_user.u_cdir->v_flag & V_XATTRDIR) != 0 &&
+	mutex_enter(&p->p_lock);
+	if ((PTOU(p)->u_cdir->v_flag & V_XATTRDIR) != 0 &&
 	    strchr(resolvepn.pn_path, '/') == NULL) {
+		mutex_exit(&p->p_lock);
 		if (dir != NULL)
 			VN_RELE(dir);
 		error = EACCES;
@@ -267,6 +269,7 @@ exec_common(const char *fname, const char **argp, const char **envp,
 		VN_RELE(vp);
 		goto out;
 	}
+	mutex_exit(&p->p_lock);
 
 	bzero(exec_file, MAXCOMLEN+1);
 	(void) strncpy(exec_file, pn.pn_path, MAXCOMLEN);

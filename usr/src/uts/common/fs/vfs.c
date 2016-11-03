@@ -852,9 +852,11 @@ vfs_mountroot(void)
 	for (p = practive; p != NULL; p = p->p_next) {
 		ASSERT(p == &p0 || p->p_parent == &p0);
 
+		mutex_enter(&p->p_lock);
 		PTOU(p)->u_cdir = rootdir;
 		VN_HOLD(PTOU(p)->u_cdir);
 		PTOU(p)->u_rdir = NULL;
+		mutex_exit(&p->p_lock);
 	}
 	mutex_exit(&pidlock);
 

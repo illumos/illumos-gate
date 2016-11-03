@@ -26,7 +26,7 @@
 
 /*
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
- * Copyright (c) 2014, Joyent, Inc. All rights reserved.
+ * Copyright 2016, Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -336,11 +336,13 @@ write_elfnotes(proc_t *p, int sig, vnode_t *vp, offset_t offset,
 
 
 	/* open file table */
+	mutex_enter(&p->p_lock);
 	vroot = PTOU(p)->u_rdir;
 	if (vroot == NULL)
 		vroot = rootdir;
 
 	VN_HOLD(vroot);
+	mutex_exit(&p->p_lock);
 
 	fip = P_FINFO(p);
 

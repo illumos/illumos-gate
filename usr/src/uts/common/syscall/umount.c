@@ -22,6 +22,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -125,6 +126,7 @@ umount2(char *pathp, int flag)
 	struct pathname pn;
 	struct vfs *vfsp;
 	int error;
+	boolean_t altroot;
 
 	/*
 	 * Some flags are disallowed through the system call interface.
@@ -154,9 +156,12 @@ umount2(char *pathp, int flag)
 	 * isn't in an environment with an alternate root (to the zone's root)
 	 * directory, i.e. chroot(2).
 	 */
-	if (secpolicy_fs_unmount(CRED(), NULL) != 0 ||
-	    (PTOU(curproc)->u_rdir != NULL &&
-	    PTOU(curproc)->u_rdir != curproc->p_zone->zone_rootvp) ||
+	mutex_enter(&curproc->p_lock);
+	altroot = (PTOU(curproc)->u_rdir != NULL &&
+	    PTOU(curproc)->u_rdir != curproc->p_zone->zone_rootvp);
+	mutex_exit(&curproc->p_lock);
+
+	if (secpolicy_fs_unmount(CRED(), NULL) != 0 || altroot ||
 	    (vfsp = vfs_mntpoint2vfsp(pn.pn_path)) == NULL) {
 		vnode_t *fsrootvp;
 

@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright 2016, Joyent, Inc.
  */
 
 #include <sys/varargs.h>
@@ -413,6 +413,7 @@ lxpr_getnode(vnode_t *dp, lxpr_nodetype_t type, proc_t *p, int fd)
 		if (p->p_stat == SZOMB) {
 			lxpnp->lxpr_realvp = NULL;
 		} else {
+			ASSERT(MUTEX_HELD(&p->p_lock));
 			up = PTOU(p);
 			lxpnp->lxpr_realvp = up->u_cdir;
 			ASSERT(lxpnp->lxpr_realvp != NULL);
@@ -428,6 +429,7 @@ lxpr_getnode(vnode_t *dp, lxpr_nodetype_t type, proc_t *p, int fd)
 		if (p->p_stat == SZOMB) {
 			lxpnp->lxpr_realvp = NULL;
 		} else {
+			ASSERT(MUTEX_HELD(&p->p_lock));
 			up = PTOU(p);
 			lxpnp->lxpr_realvp =
 			    up->u_rdir != NULL ? up->u_rdir : rootdir;

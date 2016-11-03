@@ -31,8 +31,10 @@ lx_getcwd(char *buf, int size)
 	vnode_t *vp;
 	char path[MAXPATHLEN + 1];
 
+	mutex_enter(&curproc->p_lock);
 	vp = PTOU(curproc)->u_cdir;
 	VN_HOLD(vp);
+	mutex_exit(&curproc->p_lock);
 	if ((error = vnodetopath(NULL, vp, path, sizeof (path), CRED())) != 0) {
 		VN_RELE(vp);
 		return (set_errno(error));
