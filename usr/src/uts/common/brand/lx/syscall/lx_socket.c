@@ -1116,12 +1116,28 @@ lx_cmsg_set_cloexec(void *input, socklen_t inlen)
 		    inmsg->cmsg_type == SCM_RIGHTS) {
 			int *fds = (int *)CMSG_CONTENT(inmsg);
 			int i, num = (int)CMSG_CONTENTLEN(inmsg) / sizeof (int);
+
 			for (i = 0; i < num; i++) {
 				char flags;
 				file_t *fp;
-				/* set CLOEXEC on the fd */
+
 				fp = getf(fds[i]);
-				VERIFY(fp != NULL);
+				if (fp == NULL) {
+					/*
+					 * It is possible that a received fd
+					 * will already have been closed if a
+					 * thread in the local process is
+					 * indiscriminately issuing close(2)
+					 * calls while the message is being
+					 * received.  If that is the case, no
+					 * further processing of the fd is
+					 * needed.  It will still be passed
+					 * up in the cmsg even though the
+					 * caller chose to close it already.
+					 */
+					continue;
+				}
+
 				flags = f_getfd(fds[i]);
 				flags |= FD_CLOEXEC;
 				f_setfd(fds[i], flags);
