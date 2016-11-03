@@ -126,6 +126,7 @@ add_key02
 clone02
 clone08
 crash02
+dirtyc0w
 fallocate04		# needs SEEK_HOLE
 fanotify01
 fanotify02
