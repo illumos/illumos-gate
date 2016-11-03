@@ -1116,18 +1116,19 @@ lx_ptrace_set_clone_inherit(int option, boolean_t inherit_flag)
 	proc_t *p = lwptoproc(lwp);
 	lx_lwp_data_t *lwpd = lwptolxlwp(lwp);
 
-	mutex_enter(&p->p_lock);
-
 	switch (option) {
 	case LX_PTRACE_O_TRACEFORK:
 	case LX_PTRACE_O_TRACEVFORK:
 	case LX_PTRACE_O_TRACECLONE:
-		lwpd->br_ptrace_clone_option = option;
 		break;
 
 	default:
 		return (EINVAL);
 	}
+
+	mutex_enter(&p->p_lock);
+
+	lwpd->br_ptrace_clone_option = option;
 
 	if (inherit_flag) {
 		lwpd->br_ptrace_flags |= LX_PTF_INHERIT;
