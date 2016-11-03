@@ -218,6 +218,7 @@ sendfile06_64
 sendfile07
 sendfile07_64
 sendmsg01
+sendto02		# OS-5764
 setgroups04_16
 setns01
 setns02
