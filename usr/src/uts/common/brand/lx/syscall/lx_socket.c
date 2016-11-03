@@ -2173,6 +2173,12 @@ done:
 	return (len - uiop->uio_resid);
 }
 
+/*
+ * For both send and sendto Linux evaluates errors in a different order than
+ * we do internally. Specifically it will check the buffer address before
+ * checking if the socket is connected. This can lead to a different errno on
+ * us vs. Linux (seen with LTP) but we don't bother to emulate this.
+ */
 long
 lx_send(int sock, void *buffer, size_t len, int flags)
 {
