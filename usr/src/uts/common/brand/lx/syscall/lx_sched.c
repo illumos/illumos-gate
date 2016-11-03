@@ -238,14 +238,22 @@ lx_sched_getaffinity(l_pid_t pid, unsigned int len, void *maskp)
 	kthread_t	*tp = NULL;
 	lx_lwp_data_t	*lwpd;
 	int		err;
-	unsigned int	pmin, pmax;
+	unsigned int	pmin, pmax, compare_size;
 	lx_affmask_t	lmask;
 	cpuset_t	*smask;
 
 	/*
-	 * The ulong_t boundary requirement is to match Linux's behavior.
+	 * The length boundary requirement is to match Linux's behavior.
 	 */
-	if ((len & (sizeof (ulong_t) - 1)) != 0) {
+	switch (get_udatamodel()) {
+	case DATAMODEL_ILP32:
+		compare_size = sizeof (uint32_t);
+		break;
+	default:
+		compare_size = sizeof (ulong_t);
+		break;
+	}
+	if ((len & (compare_size - 1)) != 0) {
 		return (set_errno(EINVAL));
 	}
 
