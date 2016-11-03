@@ -429,8 +429,10 @@ lx_fstatat64(int fd, char *name, void *outp, int flag)
 		 * vnode for that fd.
 		 */
 		if (fd == AT_FDCWD) {
+			mutex_enter(&curproc->p_lock);
 			vp = PTOU(curproc)->u_cdir;
 			VN_HOLD(vp);
+			mutex_exit(&curproc->p_lock);
 			cr = CRED();
 			crhold(cr);
 		} else {

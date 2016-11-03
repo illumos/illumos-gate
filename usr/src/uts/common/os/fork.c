@@ -1215,6 +1215,7 @@ getproc(proc_t **cpp, pid_t pid, uint_t flags)
 	 */
 	fcnt_add(P_FINFO(pp), 1);
 
+	mutex_enter(&pp->p_lock);
 	if (PTOU(pp)->u_cdir) {
 		VN_HOLD(PTOU(pp)->u_cdir);
 	} else {
@@ -1228,6 +1229,7 @@ getproc(proc_t **cpp, pid_t pid, uint_t flags)
 		VN_HOLD(PTOU(pp)->u_rdir);
 	if (PTOU(pp)->u_cwd)
 		refstr_hold(PTOU(pp)->u_cwd);
+	mutex_exit(&pp->p_lock);
 
 	/*
 	 * copy the parent's uarea.

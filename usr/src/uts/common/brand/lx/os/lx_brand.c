@@ -2505,9 +2505,11 @@ lx_native_exec(uint8_t osabi, const char **interp)
 	 * Processes which chroot directly into /native will be able to
 	 * function as expected with no need for the prefix.
 	 */
+	mutex_enter(&curproc->p_lock);
 	if (VN_CMP(curproc->p_user.u_rdir, curproc->p_zone->zone_rootvp)) {
 		*interp = "/native";
 	}
+	mutex_exit(&curproc->p_lock);
 
 	return (B_TRUE);
 }
