@@ -229,6 +229,8 @@ CATDIRS		= \
 DATA		= $(CATDIRS:%=%/LCL_DATA)
 
 .PARALLEL:
+# The output from yacc must be emitted serially
+.NO_PARALLEL: parser.tab.c parser.tab.h
 
 DCOLL		= LC_COLLATE/LCL_DATA
 DCTYPE		= LC_CTYPE/LCL_DATA
