@@ -1235,6 +1235,14 @@ mmapobj_map_elf(struct vnode *vp, caddr_t start_addr, mmapobj_result_t *mrp,
 		if (MR_GET_TYPE(mrp[i].mr_flags) == MR_PADDING) {
 			continue;
 		}
+
+		/* Can't execute code from "noexec" mounted filesystem. */
+		if (((vp->v_vfsp->vfs_flag & VFS_NOEXEC) != 0) &&
+		    ((mrp[i].mr_prot & PROT_EXEC) != 0)) {
+			MOBJ_STAT_ADD(noexec_fs);
+			return (EACCES);
+		}
+
 		p_memsz = mrp[i].mr_msize;
 		p_filesz = mrp[i].mr_fsize;
 		zfodlen = p_memsz - p_filesz;
@@ -2091,8 +2099,12 @@ doaoutwork(vnode_t *vp, mmapobj_result_t *mrp,
 		is_library = 1;
 	}
 
-	/* Can't execute code from "noexec" mounted filesystem. */
-	if (((vp->v_vfsp->vfs_flag & VFS_NOEXEC) != 0) && (is_library == 0)) {
+	/*
+	 * Can't execute code from "noexec" mounted filesystem.  Unlike ELF,
+	 * aout libraries are always mapped with something PROT_EXEC, so this
+	 * doesn't need to be checked for specific parts
+	 */
+	if ((vp->v_vfsp->vfs_flag & VFS_NOEXEC) != 0) {
 		MOBJ_STAT_ADD(aout_noexec);
 		return (EACCES);
 	}

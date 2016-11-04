@@ -11,9 +11,39 @@
 
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
 #
 
-SUBDIRS = dladm iconv libnvpair_json printf xargs
-
+include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/test/Makefile.com
+
+SHFILES = iconv_test
+
+ROOTBIN = $(ROOT)/opt/util-tests
+TESTDIR = $(ROOTBIN)/tests
+
+CMDS = $(SHFILES:%=$(TESTDIR)/%)
+$(CMDS) := FILEMODE = 0555
+
+all: $(PROG)
+
+$(SHFILES): $(SHFILES).sh
+	-$(RM) $(SHFILES)
+	$(CP) $(SHFILES).sh $(SHFILES)
+
+install: all $(CMDS)
+
+lint:
+
+clobber: clean
+	-$(RM) $(SHFILES)
+
+clean:
+
+$(CMDS): $(TESTDIR)
+
+$(TESTDIR):
+	$(INS.dir)
+
+$(TESTDIR)/%: %
+	$(INS.file)

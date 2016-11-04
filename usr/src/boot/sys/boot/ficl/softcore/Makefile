@@ -22,7 +22,7 @@ PROG =  makesoftcore
 # not needed: file access
 #
 FR = softcore.fr ifbrack.fr prefix.fr ficl.fr jhlocal.fr marker.fr
-FR += freebsd.fr ficllocal.fr oo.fr classes.fr string.fr
+FR += freebsd.fr ficllocal.fr oo.fr classes.fr string.fr wordsets.fr
 SOURCES=	$(FR:%=$(SOFTCORE)/%)
 
 OBJS=	makesoftcore.o lz4.o

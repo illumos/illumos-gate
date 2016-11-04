@@ -27,6 +27,7 @@
 /*
  * Copyright (c) 2002, 2010, Oracle and/or its affiliates.
  * All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include "bge_impl.h"
@@ -3711,6 +3712,36 @@ bge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	 * and allow interrupts only when everything else is set up.
 	 */
 	err = pci_config_setup(devinfo, &bgep->cfg_handle);
+
+	bgep->ape_enabled = B_FALSE;
+	bgep->ape_regs = NULL;
+
+	if (DEVICE_5717_SERIES_CHIPSETS(bgep) ||
+	    DEVICE_5725_SERIES_CHIPSETS(bgep)) {
+		err = ddi_regs_map_setup(devinfo, BGE_PCI_APEREGS_RNUMBER,
+		    &regs, 0, 0, &bge_reg_accattr, &bgep->ape_handle);
+		if (err != DDI_SUCCESS) {
+			ddi_regs_map_free(&bgep->io_handle);
+			bge_problem(bgep, "ddi_regs_map_setup() failed");
+			goto attach_fail;
+		}
+		bgep->ape_regs    = regs;
+		bgep->ape_enabled = B_TRUE;
+
+		/*
+		 * Allow reads and writes to the
+		 * APE register and memory space.
+		 */
+
+		pci_state_reg = pci_config_get32(bgep->cfg_handle,
+		    PCI_CONF_BGE_PCISTATE);
+		pci_state_reg |= PCISTATE_ALLOW_APE_CTLSPC_WR |
+		    PCISTATE_ALLOW_APE_SHMEM_WR | PCISTATE_ALLOW_APE_PSPACE_WR;
+		pci_config_put32(bgep->cfg_handle,
+		    PCI_CONF_BGE_PCISTATE, pci_state_reg);
+		bge_ape_lock_init(bgep);
+	}
+
 #ifdef BGE_IPMI_ASF
 #ifdef __sparc
 	/*
@@ -3815,35 +3846,6 @@ bge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 		goto attach_fail;
 	}
 	bgep->io_regs = regs;
-
-	bgep->ape_enabled = B_FALSE;
-	bgep->ape_regs = NULL;
-	if (DEVICE_5717_SERIES_CHIPSETS(bgep) ||
-	    DEVICE_5725_SERIES_CHIPSETS(bgep)) {
-		err = ddi_regs_map_setup(devinfo, BGE_PCI_APEREGS_RNUMBER,
-		    &regs, 0, 0, &bge_reg_accattr, &bgep->ape_handle);
-		if (err != DDI_SUCCESS) {
-			ddi_regs_map_free(&bgep->io_handle);
-			bge_problem(bgep, "ddi_regs_map_setup() failed");
-			goto attach_fail;
-		}
-		bgep->ape_regs    = regs;
-		bgep->ape_enabled = B_TRUE;
-
-		/*
-		 * Allow reads and writes to the
-		 * APE register and memory space.
-		 */
-
-		pci_state_reg = pci_config_get32(bgep->cfg_handle,
-		    PCI_CONF_BGE_PCISTATE);
-		pci_state_reg |= PCISTATE_ALLOW_APE_CTLSPC_WR |
-		    PCISTATE_ALLOW_APE_SHMEM_WR | PCISTATE_ALLOW_APE_PSPACE_WR;
-		pci_config_put32(bgep->cfg_handle,
-		    PCI_CONF_BGE_PCISTATE, pci_state_reg);
-
-		bge_ape_lock_init(bgep);
-	}
 
 	bgep->progress |= PROGRESS_REGS;
 

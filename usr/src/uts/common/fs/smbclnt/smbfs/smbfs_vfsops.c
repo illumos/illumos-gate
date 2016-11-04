@@ -599,6 +599,10 @@ smbfs_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 	smi->smi_vfsp	= vfsp;
 	smbfs_zonelist_add(smi);	/* undo in smbfs_freevfs */
 
+	/* PSARC 2007/227 VFS Feature Registration */
+	vfs_set_feature(vfsp, VFSFT_XVATTR);
+	vfs_set_feature(vfsp, VFSFT_SYSATTR_VIEWS);
+
 	/*
 	 * Create the root vnode, which we need in unmount
 	 * for the call to smbfs_check_table(), etc.

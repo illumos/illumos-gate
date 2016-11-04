@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -1474,26 +1475,22 @@ top:
 		 * and supply a null path name to indicate (conventionally)
 		 * the node itself as the "component" of interest.
 		 *
-		 * The intercession of the file system is necessary to
-		 * ensure that the appropriate permission checks are
-		 * done.
+		 * The call to VOP_CREATE() is necessary to ensure
+		 * that the appropriate permission checks are made,
+		 * i.e. EISDIR, EACCES, etc.  We already know that vpp
+		 * exists since we are in the else condition where this
+		 * was checked.
 		 */
 		if (vp->v_flag & VROOT) {
 			ASSERT(why != CRMKDIR);
 			error = VOP_CREATE(vp, "", vap, excl, mode, vpp,
 			    CRED(), flag, NULL, NULL);
 			/*
-			 * If the create succeeded, it will have created
-			 * a new reference to the vnode.  Give up the
-			 * original reference.  The assertion should not
-			 * get triggered because NBMAND locks only apply to
-			 * VREG files.  And if in_crit is non-zero for some
-			 * reason, detect that here, rather than when we
-			 * deference a null vp.
+			 * If the create succeeded, it will have created a
+			 * new reference on a new vnode (*vpp) in the child
+			 * file system, so we want to drop our reference on
+			 * the old (vp) upon exit.
 			 */
-			ASSERT(in_crit == 0);
-			VN_RELE(vp);
-			vp = NULL;
 			goto out;
 		}
 
@@ -1643,7 +1640,7 @@ vn_rename(char *from, char *to, enum uio_seg seg)
 
 int
 vn_renameat(vnode_t *fdvp, char *fname, vnode_t *tdvp,
-		char *tname, enum uio_seg seg)
+    char *tname, enum uio_seg seg)
 {
 	int error;
 	struct vattr vattr;
@@ -1722,6 +1719,17 @@ top:
 
 	if (tovp->v_vfsp->vfs_flag & VFS_RDONLY) {
 		error = EROFS;
+		goto out;
+	}
+
+	/*
+	 * Make sure "from" vp is not a mount point.
+	 * Note, lookup did traverse() already, so
+	 * we'll be looking at the mounted FS root.
+	 * (but allow files like mnttab)
+	 */
+	if ((fvp->v_flag & VROOT) != 0 && fvp->v_type == VDIR) {
+		error = EBUSY;
 		goto out;
 	}
 

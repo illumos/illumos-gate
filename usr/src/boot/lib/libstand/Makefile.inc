@@ -81,30 +81,30 @@ OBJS += uuid_create_nil.o uuid_equal.o uuid_from_string.o uuid_is_nil.o \
 # decompression functionality from libbz2
 # NOTE: to actually test this functionality after libbz2 upgrade compile
 # loader(8) with LOADER_BZIP2_SUPPORT defined
-CFLAGS += -DBZ_NO_STDIO -DBZ_NO_COMPRESS
+CFLAGS += -DBZ_LOADER -DBZ_NO_STDIO -DBZ_NO_COMPRESS
 SRCS +=	libstand_bzlib_private.h
 
 SRCS +=	_bzlib.c _crctable.c _decompress.c _huffman.c _randtable.c
 OBJS +=	_bzlib.o _crctable.o _decompress.o _huffman.o _randtable.o
 CLEANFILES +=	_bzlib.c _crctable.c _decompress.c _huffman.c _randtable.c
 
-_bzlib.c: $(LIB_BASE)/../contrib/bzip2/bzlib.c
+_bzlib.c: $(SRC)/common/bzip2/bzlib.c
 	sed "s|bzlib_private\.h|libstand_bzlib_private.h|" $^ > $@
 
-_crctable.c: $(LIB_BASE)/../contrib/bzip2/crctable.c
+_crctable.c: $(SRC)/common/bzip2/crctable.c
 	sed "s|bzlib_private\.h|libstand_bzlib_private.h|" $^ > $@
 
-_decompress.c: $(LIB_BASE)/../contrib/bzip2/decompress.c
+_decompress.c: $(SRC)/common/bzip2/decompress.c
 	sed "s|bzlib_private\.h|libstand_bzlib_private.h|" $^ > $@
 
-_huffman.c: $(LIB_BASE)/../contrib/bzip2/huffman.c
+_huffman.c: $(SRC)/common/bzip2/huffman.c
 	sed "s|bzlib_private\.h|libstand_bzlib_private.h|" $^ > $@
 
-_randtable.c: $(LIB_BASE)/../contrib/bzip2/randtable.c
+_randtable.c: $(SRC)/common/bzip2/randtable.c
 	sed "s|bzlib_private\.h|libstand_bzlib_private.h|" $^ > $@
 
 CLEANFILES += libstand_bzlib_private.h
-libstand_bzlib_private.h: $(LIB_BASE)/../contrib/bzip2/bzlib_private.h
+libstand_bzlib_private.h: $(SRC)/common/bzip2/bzlib_private.h
 	sed -e 's|<stdlib.h>|"stand.h"|' $^ > $@
 
 # decompression functionality from libz

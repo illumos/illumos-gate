@@ -274,13 +274,6 @@ AcpiOsTableOverride(ACPI_TABLE_HEADER *ExistingTable,
 	acpica_strncpy(oemid, ExistingTable->OemId, 6);
 	acpica_strncpy(oemtableid, ExistingTable->OemTableId, 8);
 
-#ifdef	DEBUG
-	cmn_err(CE_NOTE, "!acpica: table [%s] v%d OEM ID [%s]"
-	    " OEM TABLE ID [%s] OEM rev %x",
-	    signature, ExistingTable->Revision, oemid, oemtableid,
-	    ExistingTable->OemRevision);
-#endif
-
 	/* File name format is "signature_oemid_oemtableid.dat" */
 	(void) strcpy(acpi_table_loc, acpi_table_path);
 	(void) strcat(acpi_table_loc, signature); /* for example, DSDT */

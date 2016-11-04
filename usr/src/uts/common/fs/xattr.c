@@ -20,6 +20,83 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
+ */
+
+/*
+ * Big Theory Statement for Extended Attribute (XATTR) directories
+ *
+ * The Solaris VFS layer presents extended file attributes using a special
+ * "XATTR" directory under files or directories that have extended file
+ * attributes.  See fsattr(5) for background.
+ *
+ * This design avoids the need for a separate set of VFS or vnode functions
+ * for operating on XATTR objects.  File system implementations that support
+ * XATTR instantiate a special XATTR directory using this module.
+ * Applications get to the XATTR directory by passing the LOOKUP_XATTR flag
+ * to fop_lookup.  Once the XATTR directory is obtained, all other file
+ * system operations on extended attributes happen via the normal vnode
+ * functions, applied to the XATTR directory or its contents.
+ *
+ * The XATTR directories returned by fop_lookup (with LOOKUP_XATTR) are
+ * implemented differntly, depending on whether the file system supports
+ * "extended attributes" (XATTR), "system attributes" (SYSATTR), or both.
+ *
+ * When SYSATTR=true, XATTR=true:
+ *	The XATTR directory is a "generic file system" (GFS) object
+ *	that adds the special system attribute names (SUNWattr*) to
+ *	the list of XATTR files presented by the underling FS.
+ *	In this case, many operations are "passed through" to the
+ *	lower-level FS.
+ *
+ * When SYSATTR=true, XATTR=false:
+ *	The XATTR directory is a "generic file system" (GFS) object,
+ *	presenting only the system attribute names (SUNWattr*)
+ *	In this case there's no lower-level FS, only the GFS object.
+ *
+ * When SYSATTR=false, XATTR=true:
+ *	The XATTR directory is implemented by the file system code,
+ *	and this module is not involved after xattr_dir_lookup()
+ *	returns the XATTR dir from the underlying file system.
+ *
+ * When SYSATTR=false, XATTR=false:
+ *	xattr_dir_lookup just returns EINVAL
+ *
+ * In the first two cases (where we have system attributes) this module
+ * implements what can be thought of as a "translucent" directory containing
+ * both the system attribute names (SUNWattr*) and whatever XATTR names may
+ * exist in the XATTR directory of the underlying file system, if any.
+ *
+ * This affects operations on the (GFS) XATTR directory as follows:
+ *
+ * readdir:	Merges the SUNWattr* names with any contents from the
+ *		underlying XATTR directory.
+ *
+ * rename:	If "to" or "from" is a SUNWattr name, special handling,
+ *		else pass through to the lower FS.
+ *
+ * link:	If "from" is a SUNWattr name, disallow.
+ *
+ * create:	If a SUNWattr name, disallow, else pass to lower FS.
+ * remove:	(same)
+ *
+ * open,close:	Just pass through to the XATTR dir in the lower FS.
+ *
+ * lookup:	Lookup an XATTR file in either the (GFS) XATTR directory
+ *		or the "real" XATTR directory of the underlying FS.
+ *		Note for file systems the support SYSATTR but not XATTR,
+ *		only the GFS XATTR directory will exist.  When both exist,
+ *		gfs_vop_lookup uses the xattr_lookup_cb callback function
+ *		which passes the lookup call through to the "real" FS.
+ *
+ * Operations on the XATTR _files_ are simpler:
+ *
+ * If the file vnode came from lookup at the GFS level, the file is one of
+ * the special SUNWattr* vnodes, and it's vnode operations (xattr_file_tops)
+ * allow only what's appropriate on these "files".
+ *
+ * If the file vnode came from the underlying FS, all operations on that
+ * object are handled through the vnode operations set by that FS.
  */
 
 #include <sys/param.h>
@@ -54,14 +131,8 @@ typedef struct {
 
 typedef struct {
 	gfs_dir_t	xattr_gfs_private;
-	vnode_t		*xattr_realvp;  /* Only used for VOP_REALVP */
+	vnode_t		*xattr_realvp;
 } xattr_dir_t;
-
-/*
- * xattr_realvp is only used for VOP_REALVP, this is so we don't
- * keep an unnecessary hold on the *real* xattr dir unless we have
- * no other choice.
- */
 
 /* ARGSUSED */
 static int
@@ -875,54 +946,123 @@ xattr_copy(vnode_t *sdvp, char *snm, vnode_t *tdvp, char *tnm,
 	return (error);
 }
 
+/*
+ * Get the "real" XATTR directory associtated with the GFS XATTR directory.
+ * Note: This does NOT take any additional hold on the returned real_vp,
+ * because when this lookup succeeds we save the result in xattr_realvp
+ * and keep that hold until the GFS XATTR directory goes inactive.
+ */
 static int
-xattr_dir_realdir(vnode_t *dvp, vnode_t **realdvp, int lookup_flags,
+xattr_dir_realdir(vnode_t *gfs_dvp, vnode_t **ret_vpp, int flags,
     cred_t *cr, caller_context_t *ct)
 {
-	vnode_t *pvp;
-	int error;
 	struct pathname pn;
-	char *startnm = "";
+	char *nm = "";
+	xattr_dir_t *xattr_dir;
+	vnode_t *realvp;
+	int error;
 
-	*realdvp = NULL;
+	*ret_vpp = NULL;
 
-	pvp = gfs_file_parent(dvp);
-
-	error = pn_get(startnm, UIO_SYSSPACE, &pn);
-	if (error) {
-		VN_RELE(pvp);
-		return (error);
+	/*
+	 * Usually, we've already found the underlying XATTR directory
+	 * during some previous lookup and stored it in xattr_realvp.
+	 */
+	mutex_enter(&gfs_dvp->v_lock);
+	xattr_dir = gfs_dvp->v_data;
+	realvp = xattr_dir->xattr_realvp;
+	mutex_exit(&gfs_dvp->v_lock);
+	if (realvp != NULL) {
+		*ret_vpp = realvp;
+		return (0);
 	}
 
 	/*
-	 * Set the LOOKUP_HAVE_SYSATTR_DIR flag so that we don't get into an
-	 * infinite loop with fop_lookup calling back to xattr_dir_lookup.
+	 * Lookup the XATTR dir in the underlying FS, relative to our
+	 * "parent", which is the real object for which this GFS XATTR
+	 * directory was created.  Set the LOOKUP_HAVE_SYSATTR_DIR flag
+	 * so that we don't get into an infinite loop with fop_lookup
+	 * calling back to xattr_dir_lookup.
 	 */
-	lookup_flags |= LOOKUP_HAVE_SYSATTR_DIR;
-	error = VOP_LOOKUP(pvp, startnm, realdvp, &pn, lookup_flags,
-	    rootvp, cr, ct, NULL, NULL);
+	error = pn_get(nm, UIO_SYSSPACE, &pn);
+	if (error != 0)
+		return (error);
+	error = VOP_LOOKUP(gfs_file_parent(gfs_dvp), nm, &realvp, &pn,
+	    flags | LOOKUP_HAVE_SYSATTR_DIR, rootvp, cr, ct, NULL, NULL);
 	pn_free(&pn);
+	if (error != 0)
+		return (error);
 
-	return (error);
+	/*
+	 * Have the real XATTR directory.  Save it -- but first
+	 * check whether we lost a race doing the lookup.
+	 */
+	mutex_enter(&gfs_dvp->v_lock);
+	xattr_dir = gfs_dvp->v_data;
+	if (xattr_dir->xattr_realvp == NULL) {
+		/*
+		 * Note that the hold taken by the VOP_LOOKUP above is
+		 * retained from here until xattr_dir_inactive.
+		 */
+		xattr_dir->xattr_realvp = realvp;
+	} else {
+		/* We lost the race. */
+		VN_RELE(realvp);
+		realvp = xattr_dir->xattr_realvp;
+	}
+	mutex_exit(&gfs_dvp->v_lock);
+
+	*ret_vpp = realvp;
+	return (0);
 }
 
 /* ARGSUSED */
 static int
 xattr_dir_open(vnode_t **vpp, int flags, cred_t *cr, caller_context_t *ct)
 {
+	vnode_t *realvp;
+	int error;
+
 	if (flags & FWRITE) {
 		return (EACCES);
 	}
 
-	return (0);
+	/*
+	 * If there is a real extended attribute directory,
+	 * let the underlying FS see the VOP_OPEN call;
+	 * otherwise just return zero.
+	 */
+	error = xattr_dir_realdir(*vpp, &realvp, LOOKUP_XATTR, cr, ct);
+	if (error == 0) {
+		error = VOP_OPEN(&realvp, flags, cr, ct);
+	} else {
+		error = 0;
+	}
+
+	return (error);
 }
 
 /* ARGSUSED */
 static int
-xattr_dir_close(vnode_t *vpp, int flags, int count, offset_t off, cred_t *cr,
+xattr_dir_close(vnode_t *vp, int flags, int count, offset_t off, cred_t *cr,
     caller_context_t *ct)
 {
-	return (0);
+	vnode_t *realvp;
+	int error;
+
+	/*
+	 * If there is a real extended attribute directory,
+	 * let the underlying FS see the VOP_CLOSE call;
+	 * otherwise just return zero.
+	 */
+	error = xattr_dir_realdir(vp, &realvp, LOOKUP_XATTR, cr, ct);
+	if (error == 0) {
+		error = VOP_CLOSE(realvp, flags, count, off, cr, ct);
+	} else {
+		error = 0;
+	}
+
+	return (error);
 }
 
 /*
@@ -946,7 +1086,6 @@ xattr_dir_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 	error = xattr_dir_realdir(vp, &pvp, LOOKUP_XATTR, cr, ct);
 	if (error == 0) {
 		error = VOP_GETATTR(pvp, vap, 0, cr, ct);
-		VN_RELE(pvp);
 		if (error) {
 			return (error);
 		}
@@ -1016,7 +1155,6 @@ xattr_dir_setattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 	error = xattr_dir_realdir(vp, &realvp, LOOKUP_XATTR, cr, ct);
 	if (error == 0) {
 		error = VOP_SETATTR(realvp, vap, flags, cr, ct);
-		VN_RELE(realvp);
 	}
 	if (error == ENOENT) {
 		error = 0;
@@ -1036,18 +1174,18 @@ xattr_dir_access(vnode_t *vp, int mode, int flags, cred_t *cr,
 		return (EACCES);
 	}
 
-	error = xattr_dir_realdir(vp, &realvp, LOOKUP_XATTR, cr, ct);
-
-	if (realvp)
-		VN_RELE(realvp);
-
 	/*
-	 * No real xattr dir isn't an error
-	 * an error of EINVAL indicates attributes on attributes
-	 * are not supported.  In that case just allow access to the
-	 * transient directory.
+	 * If there is a real xattr directory, check access there;
+	 * otherwise just return success.
 	 */
-	return ((error == ENOENT || error == EINVAL) ? 0 : error);
+	error = xattr_dir_realdir(vp, &realvp, LOOKUP_XATTR, cr, ct);
+	if (error == 0) {
+		error = VOP_ACCESS(realvp, mode, flags, cr, ct);
+	} else {
+		error = 0;
+	}
+
+	return (error);
 }
 
 static int
@@ -1072,7 +1210,6 @@ xattr_dir_create(vnode_t *dvp, char *name, vattr_t *vap, vcexcl_t excl,
 	if (error == 0) {
 		error = VOP_CREATE(pvp, name, vap, excl, mode, vpp, cr, flag,
 		    ct, vsecp);
-		VN_RELE(pvp);
 	}
 	return (error);
 }
@@ -1091,7 +1228,6 @@ xattr_dir_remove(vnode_t *dvp, char *name, cred_t *cr, caller_context_t *ct,
 	error = xattr_dir_realdir(dvp, &pvp, LOOKUP_XATTR, cr, ct);
 	if (error == 0) {
 		error = VOP_REMOVE(pvp, name, cr, ct, flags);
-		VN_RELE(pvp);
 	}
 	return (error);
 }
@@ -1110,7 +1246,6 @@ xattr_dir_link(vnode_t *tdvp, vnode_t *svp, char *name, cred_t *cr,
 	error = xattr_dir_realdir(tdvp, &pvp, LOOKUP_XATTR, cr, ct);
 	if (error == 0) {
 		error = VOP_LINK(pvp, svp, name, cr, ct, flags);
-		VN_RELE(pvp);
 	}
 	return (error);
 }
@@ -1121,7 +1256,6 @@ xattr_dir_rename(vnode_t *sdvp, char *snm, vnode_t *tdvp, char *tnm,
 {
 	vnode_t *spvp, *tpvp;
 	int error;
-	int held_tgt;
 
 	if (is_sattr_name(snm) || is_sattr_name(tnm))
 		return (xattr_copy(sdvp, snm, tdvp, tnm, cr, ct));
@@ -1140,8 +1274,6 @@ xattr_dir_rename(vnode_t *sdvp, char *snm, vnode_t *tdvp, char *tnm,
 		 * underlying unnamed source and target dir will be the same.
 		 */
 		tpvp = spvp;
-		VN_HOLD(tpvp);
-		held_tgt = 1;
 	} else if (tdvp->v_flag & V_SYSATTR) {
 		/*
 		 * If the target dir is a different GFS directory,
@@ -1149,24 +1281,16 @@ xattr_dir_rename(vnode_t *sdvp, char *snm, vnode_t *tdvp, char *tnm,
 		 */
 		error = xattr_dir_realdir(tdvp, &tpvp, LOOKUP_XATTR, cr, ct);
 		if (error) {
-			VN_RELE(spvp);
 			return (error);
 		}
-		held_tgt = 1;
 	} else {
 		/*
 		 * Target dir is outside of GFS, pass it on through.
 		 */
 		tpvp = tdvp;
-		held_tgt = 0;
 	}
 
 	error = VOP_RENAME(spvp, snm, tpvp, tnm, cr, ct, flags);
-
-	if (held_tgt) {
-		VN_RELE(tpvp);
-	}
-	VN_RELE(spvp);
 
 	return (error);
 }
@@ -1247,8 +1371,6 @@ xattr_dir_readdir(vnode_t *dvp, uio_t *uiop, cred_t *cr, int *eofp,
 			    uiop, pino, ino, flags);
 		}
 		if (error) {
-			if (has_xattrs)
-				VN_RELE(pvp);
 			return (error);
 		}
 
@@ -1284,8 +1406,6 @@ xattr_dir_readdir(vnode_t *dvp, uio_t *uiop, cred_t *cr, int *eofp,
 
 		error = gfs_readdir_fini(&gstate, error, eofp, *eofp);
 		if (error) {
-			if (has_xattrs)
-				VN_RELE(pvp);
 			return (error);
 		}
 
@@ -1312,25 +1432,35 @@ xattr_dir_readdir(vnode_t *dvp, uio_t *uiop, cred_t *cr, int *eofp,
 	(void) VOP_RWLOCK(pvp, V_WRITELOCK_FALSE, NULL);
 	error = VOP_READDIR(pvp, uiop, cr, eofp, ct, flags);
 	VOP_RWUNLOCK(pvp, V_WRITELOCK_FALSE, NULL);
-	VN_RELE(pvp);
 
 	return (error);
 }
 
+/*
+ * Last reference on a (GFS) XATTR directory.
+ *
+ * If there's a real XATTR directory in the underlying FS, we will have
+ * taken a hold on that directory in xattr_dir_realdir.  Now that the
+ * last hold on the GFS directory is gone, it's time to release that
+ * hold on the underlying XATTR directory.
+ */
 /* ARGSUSED */
 static void
 xattr_dir_inactive(vnode_t *vp, cred_t *cr, caller_context_t *ct)
 {
 	gfs_file_t *fp;
 	xattr_dir_t *xattr_dir;
+	vnode_t *real_vp = NULL;
 
 	mutex_enter(&vp->v_lock);
 	xattr_dir = vp->v_data;
 	if (xattr_dir->xattr_realvp) {
-		VN_RELE(xattr_dir->xattr_realvp);
+		real_vp = xattr_dir->xattr_realvp;
 		xattr_dir->xattr_realvp = NULL;
 	}
 	mutex_exit(&vp->v_lock);
+	if (real_vp != NULL)
+		VN_RELE(real_vp);
 	fp = gfs_dir_inactive(vp);
 	if (fp != NULL) {
 		kmem_free(fp, fp->gfs_size);
@@ -1356,38 +1486,11 @@ xattr_dir_pathconf(vnode_t *vp, int cmd, ulong_t *valp, cred_t *cr,
 static int
 xattr_dir_realvp(vnode_t *vp, vnode_t **realvp, caller_context_t *ct)
 {
-	xattr_dir_t *xattr_dir;
+	int error;
 
-	mutex_enter(&vp->v_lock);
-	xattr_dir = vp->v_data;
-	if (xattr_dir->xattr_realvp) {
-		*realvp = xattr_dir->xattr_realvp;
-		mutex_exit(&vp->v_lock);
-		return (0);
-	} else {
-		vnode_t *xdvp;
-		int error;
+	error = xattr_dir_realdir(vp, realvp, LOOKUP_XATTR, kcred, NULL);
+	return (error);
 
-		mutex_exit(&vp->v_lock);
-		if ((error = xattr_dir_realdir(vp, &xdvp,
-		    LOOKUP_XATTR, kcred, NULL)) == 0) {
-			/*
-			 * verify we aren't racing with another thread
-			 * to find the xattr_realvp
-			 */
-			mutex_enter(&vp->v_lock);
-			if (xattr_dir->xattr_realvp == NULL) {
-				xattr_dir->xattr_realvp = xdvp;
-				*realvp = xdvp;
-				mutex_exit(&vp->v_lock);
-			} else {
-				*realvp = xattr_dir->xattr_realvp;
-				mutex_exit(&vp->v_lock);
-				VN_RELE(xdvp);
-			}
-		}
-		return (error);
-	}
 }
 
 static const fs_operation_def_t xattr_dir_tops[] = {
@@ -1418,6 +1521,9 @@ static gfs_opsvec_t xattr_opsvec[] = {
 	{ NULL, NULL, NULL }
 };
 
+/*
+ * Callback supporting lookup in a GFS XATTR directory.
+ */
 static int
 xattr_lookup_cb(vnode_t *vp, const char *nm, vnode_t **vpp, ino64_t *inop,
     cred_t *cr, int flags, int *deflags, pathname_t *rpnp)
@@ -1429,8 +1535,7 @@ xattr_lookup_cb(vnode_t *vp, const char *nm, vnode_t **vpp, ino64_t *inop,
 	*vpp = NULL;
 	*inop = 0;
 
-	error = xattr_dir_realdir(vp, &pvp, LOOKUP_XATTR|CREATE_XATTR_DIR,
-	    cr, NULL);
+	error = xattr_dir_realdir(vp, &pvp, LOOKUP_XATTR, cr, NULL);
 
 	/*
 	 * Return ENOENT for EACCES requests during lookup.  Once an
@@ -1448,7 +1553,6 @@ xattr_lookup_cb(vnode_t *vp, const char *nm, vnode_t **vpp, ino64_t *inop,
 		    cr, NULL, deflags, rpnp);
 		pn_free(&pn);
 	}
-	VN_RELE(pvp);
 
 	return (error);
 }
@@ -1470,6 +1574,13 @@ xattr_init(void)
 	VERIFY(gfs_make_opsvec(xattr_opsvec) == 0);
 }
 
+/*
+ * Get the XATTR dir for some file or directory.
+ * See vnode.c: fop_lookup()
+ *
+ * Note this only gets the GFS XATTR directory.  We'll get the
+ * real XATTR directory later, in xattr_dir_realdir.
+ */
 int
 xattr_dir_lookup(vnode_t *dvp, vnode_t **vpp, int flags, cred_t *cr)
 {

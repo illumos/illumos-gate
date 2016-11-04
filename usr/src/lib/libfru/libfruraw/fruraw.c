@@ -576,7 +576,7 @@ frt_add_tag_to_seg(fru_treehdl_t handle, const char *seg_name,
 /* ARGSUSED */
 static fru_errno_t
 frt_get_tag_list(fru_treehdl_t handle, const char *seg_name,
-		fru_tag_t **tags, int *number)
+    fru_tag_t **tags, int *number)
 {
 	/* NOT SUPPORTED */
 	return (FRU_NOTSUP);
@@ -585,9 +585,8 @@ frt_get_tag_list(fru_treehdl_t handle, const char *seg_name,
 
 /* ARGSUSED */
 static fru_errno_t
-frt_get_tag_data(fru_treehdl_t handle, const char *seg_name,
-		fru_tag_t tag, int instance,
-		uint8_t **data, size_t *data_len)
+frt_get_tag_data(fru_treehdl_t handle, const char *seg_name, fru_tag_t tag,
+    int instance, uint8_t **data, size_t *data_len)
 {
 	/* NOT SUPPORTED */
 	return (FRU_NOTSUP);
@@ -596,9 +595,8 @@ frt_get_tag_data(fru_treehdl_t handle, const char *seg_name,
 
 /* ARGSUSED */
 static fru_errno_t
-frt_set_tag_data(fru_treehdl_t handle, const char *seg_name,
-		fru_tag_t tag, int instance,
-		uint8_t *data, size_t data_len)
+frt_set_tag_data(fru_treehdl_t handle, const char *seg_name, fru_tag_t tag,
+    int instance, uint8_t *data, size_t data_len)
 {
 	/* NOT SUPPORTED */
 	return (FRU_NOTSUP);
@@ -616,13 +614,11 @@ frt_delete_tag(fru_treehdl_t handle, const char *seg_name, fru_tag_t tag,
 
 
 static fru_errno_t
-frt_for_each_packet(fru_seghdl_t node,
-    int (*function)(fru_tag_t *tag, uint8_t *payload, size_t length,
-	void *args), void *args)
+frt_for_each_packet(fru_seghdl_t node, int (*function)(fru_tag_t *tag,
+    uint8_t *payload, size_t length, void *args), void *args)
 {
 	int rc_num;
 	int status;
-	char *rc_tags;
 	char *rc_data;
 	int i;
 	packet_t *packets = NULL;
@@ -663,12 +659,6 @@ frt_for_each_packet(fru_seghdl_t node,
 	if (fru_get_packets(node, packets, rc_num, NULL) == -1) {
 		free(packets);
 		return (map_errno(errno));
-	}
-
-	rc_tags = malloc(sizeof (*rc_tags) * (rc_num));
-	if (rc_tags == NULL) {
-		free(packets);
-		return (FRU_FAILURE);
 	}
 
 	/* number of tags */
