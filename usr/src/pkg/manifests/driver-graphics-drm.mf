@@ -35,6 +35,7 @@ set name=pkg.description \
 set name=pkg.summary value="DRM Kernel Drivers"
 set name=info.classification \
     value=org.opensolaris.category.2008:Drivers/Display
+set name=org.opensolaris.noincorp value=true
 set name=variant.arch value=i386
 dir path=kernel group=sys
 dir path=kernel/drv group=sys
@@ -85,3 +86,4 @@ legacy pkg=SUNWdrmr desc="Direct Rendering Manager kernel drivers and modules" \
 license cr_Sun license=cr_Sun
 license usr/src/uts/common/io/drm/THIRDPARTYLICENSE \
     license=usr/src/uts/common/io/drm/THIRDPARTYLICENSE
+depend fmri=pkg:/driver/graphics/agpgart type=require
