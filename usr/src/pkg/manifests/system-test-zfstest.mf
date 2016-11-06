@@ -23,6 +23,7 @@ set name=info.classification \
 set name=variant.arch value=$(ARCH)
 dir path=opt/zfs-tests
 dir path=opt/zfs-tests/bin
+dir path=opt/zfs-tests/callbacks
 dir path=opt/zfs-tests/include
 dir path=opt/zfs-tests/runfiles
 dir path=opt/zfs-tests/tests
@@ -166,6 +167,7 @@ file path=opt/zfs-tests/bin/readmmap mode=0555
 file path=opt/zfs-tests/bin/rename_dir mode=0555
 file path=opt/zfs-tests/bin/rm_lnkcnt_zero_file mode=0555
 file path=opt/zfs-tests/bin/zfstest mode=0555
+file path=opt/zfs-tests/callbacks/zfs_dbgmsg.ksh mode=0555
 file path=opt/zfs-tests/include/commands.cfg mode=0555
 file path=opt/zfs-tests/include/default.cfg mode=0555
 file path=opt/zfs-tests/include/libtest.shlib mode=0555
