@@ -12,7 +12,7 @@
 #
 
 #
-# Copyright (c) 2012, 2015 by Delphix. All rights reserved.
+# Copyright (c) 2012, 2016 by Delphix. All rights reserved.
 # Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
 # Copyright 2016 Nexenta Systems, Inc.
 #
@@ -22,6 +22,10 @@ export STF_SUITE="/opt/zfs-tests"
 export STF_TOOLS="/opt/test-runner/stf"
 runner="/opt/test-runner/bin/run"
 auto_detect=false
+
+if [[ -z "$TESTFAIL_CALLBACKS" ]] ; then
+	export TESTFAIL_CALLBACKS="$STF_SUITE/callbacks/zfs_dbgmsg.ksh"
+fi
 
 function fail
 {
