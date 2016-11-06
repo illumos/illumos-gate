@@ -50,9 +50,10 @@ CPPFLAGS += -DBOOTPROG=\"gptzfsboot\" \
 
 LDSCRIPT=	../boot.ldscript
 LD_FLAGS=	-static -N --gc-sections
-LIBI386=	../libi386/libi386.a
-LIBSTAND=	../../libstand/$(MACH)/libstand.a
+LIBI386=	-L ../libi386 -li386
+LIBSTAND=	-L ../../libstand/$(MACH) -lstand
 LIBS=		$(LIBI386) $(LIBSTAND)
+DPADD=		../libi386/libi386.a ../../libstand/$(MACH)/libstand.a
 
 include ../Makefile.inc
 
@@ -65,6 +66,8 @@ install: all $(ROOTBOOTPROG)
 OBJS =	mb_header.o zfsboot.o sio.o cons.o devopen.o \
 	part.o disk.o bcache.o zfs_cmd.o
 
+zfsboot.o := CPPFLAGS += -I$(SRC)/uts/common -I$(SRC)/uts/common/fs/zfs
+zfs_cmd.o := CPPFLAGS += -I$(SRC)/uts/common
 part.o := CPPFLAGS += -I$(ZLIB)
 smbios.o := CPPFLAGS += -DSMBIOS_SERIAL_NUMBERS
 smbios.o := CPPFLAGS += -DSMBIOS_LITTLE_ENDIAN_UUID
@@ -89,7 +92,7 @@ CLEANFILES +=	gptzfsboot.bin gptzfsboot.out
 gptzfsboot.bin: gptzfsboot.out
 	$(OBJCOPY) -S -O binary gptzfsboot.out $@
 
-gptzfsboot.out: $(BTXCRT) $(OBJS) $(LIBI386) $(LIBSTAND)
+gptzfsboot.out: $(BTXCRT) $(OBJS) $(DPADD)
 	$(LD) $(LD_FLAGS) -T $(LDSCRIPT) -o $@ $(BTXCRT) $(OBJS) $(LIBS)
 
 machine:

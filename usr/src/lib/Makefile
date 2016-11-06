@@ -603,7 +603,8 @@ krb5:		gss_mechs/mech_krb5 libtecla libldap5
 libads:		libnsl
 libadt_jni:	libbsm
 libadutils:	libldap5 libresolv2
-libbe:		libzfs libinstzones libuuid libgen libdevinfo libefi libficl
+libbe:		libzfs libinstzones libuuid libgen libdevinfo libefi libficl \
+		libzfsbootenv
 libbsm:		libinetutil libscf libsecdb libtsol
 libcfgadm:	libdevinfo
 libcontract:	libnvpair

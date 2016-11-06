@@ -46,6 +46,7 @@
 
 #include <libbe.h>
 #include <libbe_priv.h>
+#include <libzfsbootenv.h>
 
 /*
  * Callback data used for zfs_iter calls.
@@ -985,13 +986,8 @@ be_qsort_compare_datasets(const void *x, const void *y)
  *		Private
  */
 static int
-be_get_node_data(
-	zfs_handle_t *zhp,
-	be_node_list_t *be_node,
-	char *be_name,
-	const char *rpool,
-	char *current_be,
-	char *be_ds)
+be_get_node_data(zfs_handle_t *zhp, be_node_list_t *be_node, char *be_name,
+    const char *rpool, char *current_be, char *be_ds)
 {
 	char prop_buf[MAXPATHLEN];
 	nvlist_t *userprops = NULL;
@@ -1040,11 +1036,23 @@ be_get_node_data(
 	be_node->be_space_used = zfs_prop_get_int(zhp, ZFS_PROP_USED);
 
 	if (getzoneid() == GLOBAL_ZONEID) {
+		char *nextboot;
+
 		if ((zphp = zpool_open(g_zfs, rpool)) == NULL) {
 			be_print_err(gettext("be_get_node_data: failed to open "
 			    "pool (%s): %s\n"), rpool,
 			    libzfs_error_description(g_zfs));
 			return (zfs_err_to_be_err(g_zfs));
+		}
+
+		/* Set nextboot info */
+		be_node->be_active_next = B_FALSE;
+		if (lzbe_get_boot_device(rpool, &nextboot) == 0) {
+			if (nextboot != NULL) {
+				if (strcmp(nextboot, be_ds) == 0)
+					be_node->be_active_next = B_TRUE;
+				free(nextboot);
+			}
 		}
 
 		(void) zpool_get_prop(zphp, ZPOOL_PROP_BOOTFS, prop_buf,

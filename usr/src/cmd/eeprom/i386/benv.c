@@ -27,10 +27,12 @@
 #include "benv.h"
 #include <ctype.h>
 #include <stdarg.h>
+#include <stdbool.h>
 #include <sys/mman.h>
 #include <unistd.h>
 #include <signal.h>
 #include <sys/wait.h>
+#include <libzfsbootenv.h>
 
 /*
  * Usage:  % eeprom [-v] [-f prom_dev] [-]
@@ -671,33 +673,295 @@ get_line(void)
 		return (NULL);
 }
 
+static int
+add_pair(const char *name, const char *nvlist, const char *key,
+    const char *type, const char *value)
+{
+	void *data, *nv;
+	size_t size;
+	int rv;
+	char *end;
+
+	rv = lzbe_nvlist_get(name, nvlist, &nv);
+	if (rv != 0)
+		return (rv);
+
+	data = NULL;
+	rv = EINVAL;
+	if (strcmp(type, "DATA_TYPE_STRING") == 0) {
+		data = (void *)(uintptr_t)value;
+		size = strlen(data) + 1;
+		rv = lzbe_add_pair(nv, key, type, data, size);
+	} else if (strcmp(type, "DATA_TYPE_UINT64") == 0) {
+		uint64_t v;
+
+		v = strtoull(value, &end, 0);
+		if (errno != 0 || *end != '\0')
+			goto done;
+		size = sizeof (v);
+		rv = lzbe_add_pair(nv, key, type, &v, size);
+	} else if (strcmp(type, "DATA_TYPE_INT64") == 0) {
+		int64_t v;
+
+		v = strtoll(value, &end, 0);
+		if (errno != 0 || *end != '\0')
+			goto done;
+		size = sizeof (v);
+		rv = lzbe_add_pair(nv, key, type, &v, size);
+	} else if (strcmp(type, "DATA_TYPE_UINT32") == 0) {
+		u_longlong_t lv;
+		uint32_t v;
+
+		lv = strtoull(value, &end, 0);
+		if (errno != 0 || *end != '\0')
+			goto done;
+		if (lv > UINT32_MAX)
+			goto done;
+		v = lv;
+		size = sizeof (v);
+		rv = lzbe_add_pair(nv, key, type, &v, size);
+	} else if (strcmp(type, "DATA_TYPE_INT32") == 0) {
+		longlong_t lv;
+		int32_t v;
+
+		lv = strtoll(value, &end, 0);
+		if (errno != 0 || *end != '\0')
+			goto done;
+		if (lv < INT32_MIN || lv > INT32_MAX)
+			goto done;
+		v = lv;
+		size = sizeof (v);
+		rv = lzbe_add_pair(nv, key, type, &v, size);
+	} else if (strcmp(type, "DATA_TYPE_UINT16") == 0) {
+		uint32_t lv;
+		uint16_t v;
+
+		lv = strtoul(value, &end, 0);
+		if (errno != 0 || *end != '\0')
+			goto done;
+		if (lv > UINT16_MAX)
+			goto done;
+		v = lv;
+		size = sizeof (v);
+		rv = lzbe_add_pair(nv, key, type, &v, size);
+	} else if (strcmp(type, "DATA_TYPE_INT16") == 0) {
+		int32_t lv;
+		int16_t v;
+
+		v = strtol(value, &end, 0);
+		if (errno != 0 || *end != '\0')
+			goto done;
+		if (lv < INT16_MIN || lv > INT16_MAX)
+			goto done;
+		v = lv;
+		size = sizeof (v);
+		rv = lzbe_add_pair(nv, key, type, &v, size);
+	} else if (strcmp(type, "DATA_TYPE_UINT8") == 0) {
+		uint32_t lv;
+		uint8_t v;
+
+		lv = strtoul(value, &end, 0);
+		if (errno != 0 || *end != '\0')
+			goto done;
+		if (lv > UINT8_MAX)
+			goto done;
+		v = lv;
+		size = sizeof (v);
+		rv = lzbe_add_pair(nv, key, type, &v, size);
+	} else if (strcmp(type, "DATA_TYPE_INT8") == 0) {
+		int32_t lv;
+		int8_t v;
+
+		lv = strtol(value, &end, 0);
+		if (errno != 0 || *end != '\0')
+			goto done;
+		if (lv < INT8_MIN || lv > INT8_MAX)
+			goto done;
+		v = lv;
+		size = sizeof (v);
+		rv = lzbe_add_pair(nv, key, type, &v, size);
+	} else if (strcmp(type, "DATA_TYPE_BYTE") == 0) {
+		uint32_t lv;
+		uint8_t v;
+
+		lv = strtoul(value, &end, 0);
+		if (errno != 0 || *end != '\0')
+			goto done;
+		if (lv > UINT8_MAX)
+			goto done;
+		v = lv;
+		size = sizeof (v);
+		rv = lzbe_add_pair(nv, key, type, &v, size);
+	} else if (strcmp(type, "DATA_TYPE_BOOLEAN_VALUE") == 0) {
+		int32_t v;
+
+		v = strtol(value, &end, 0);
+		if (errno != 0 || *end != '\0') {
+			if (strcasecmp(value, "YES") == 0)
+				v = 1;
+			else if (strcasecmp(value, "NO") == 0)
+				v = 0;
+			else if (strcasecmp(value, "true") == 0)
+				v = 1;
+			else if (strcasecmp(value, "false") == 0)
+				v = 0;
+			else goto done;
+		}
+		size = sizeof (v);
+		rv = lzbe_add_pair(nv, key, type, &v, size);
+	}
+
+	if (rv == 0)
+		rv = lzbe_nvlist_set(name, nvlist, nv);
+
+done:
+	lzbe_nvlist_free(nv);
+	return (rv);
+}
+
+static int
+delete_pair(const char *name, const char *nvlist, const char *key)
+{
+	void *nv;
+	int rv;
+
+	rv = lzbe_nvlist_get(name, nvlist, &nv);
+	if (rv == 0)
+		rv = lzbe_remove_pair(nv, key);
+
+	if (rv == 0)
+		rv = lzbe_nvlist_set(name, nvlist, nv);
+
+	lzbe_nvlist_free(nv);
+	return (rv);
+}
+
+static int
+usage(char *name)
+{
+	char *usage = "Usage: %s [-v] [-f prom-device]"
+	    " [variable[=value] ...]\n"
+	    "%s [-z pool] [-d key] [-k key -t type -v value] [-p]\n"
+	    "%s [-z pool] -n nvlist [-d key] [-k key -t type -v value] [-p]\n";
+
+	return (_error(NO_PERROR, usage, name, name, name));
+}
+
 int
 main(int argc, char **argv)
 {
 	int c;
 	int updates = 0;
-	char *usage = "Usage: %s [-v] [-f prom-device]"
-	    " [variable[=value] ...]";
 	eplist_t *elist;
 	benv_des_t *bd;
 	char *file = NULL;
+	bool bootenv, bootenv_print, bootenv_delete;
+	char *name, *key, *type, *nvlist, *value;
+	lzbe_flags_t flag = lzbe_add;
+
+	nvlist = NULL;
+	name = "rpool";
+	key = NULL;
+	type = NULL;
+	value = NULL;
+	bootenv = false;
+	bootenv_print = false;
+	bootenv_delete = false;
 
 	setpname(argv[0]);
 
-	while ((c = getopt(argc, argv, "f:Itv")) != -1)
+	while ((c = getopt(argc, argv, "bd:f:k:n:prt:v:z:")) != -1)
 		switch (c) {
-		case 'v':
-			verbose++;
+		case 'b':
+			bootenv = true;
+			break;
+		case 'd':
+			if (bootenv) {
+				bootenv_delete = true;
+				key = optarg;
+			} else {
+				exit(usage(argv[0]));
+			}
 			break;
 		case 'f':
 			file = optarg;
 			break;
+		case 'k':
+			if (bootenv)
+				key = optarg;
+			else
+				exit(usage(argv[0]));
+			break;
+		case 'n':
+			if (bootenv)
+				nvlist = optarg;
+			else
+				exit(usage(argv[0]));
+			break;
+		case 'p':
+			if (bootenv)
+				bootenv_print = true;
+			else
+				exit(usage(argv[0]));
+			break;
+		case 'r':
+			if (bootenv)
+				flag = lzbe_replace;
+			else
+				exit(usage(argv[0]));
+			break;
 		case 't':
-			test++;
+			if (bootenv)
+				type = optarg;
+			else
+				test++;
+			break;
+		case 'v':
+			if (bootenv)
+				value = optarg;
+			else
+				verbose++;
+			break;
+		case 'z':
+			if (bootenv)
+				name = optarg;
+			else
+				exit(usage(argv[0]));
 			break;
 		default:
-			exit(_error(NO_PERROR, usage, argv[0]));
+			exit(usage(argv[0]));
 		}
+
+	argc -= optind;
+	argv += optind;
+
+	if (bootenv) {
+		int rv = 0;
+
+		if (argc == 1)
+			value = argv[0];
+
+		if (bootenv_print)
+			return (lzbe_bootenv_print(name, nvlist, stdout));
+
+		if (key != NULL || value != NULL) {
+			if (type == NULL)
+				type = "DATA_TYPE_STRING";
+
+			if (bootenv_delete)
+				rv = delete_pair(name, nvlist, key);
+			else if (key == NULL)
+				rv = lzbe_set_boot_device(name, flag, value);
+			else
+				rv = add_pair(name, nvlist, key, type, value);
+
+			if (rv == 0)
+				printf("zfs bootenv is successfully written\n");
+			else
+				printf("error: %s\n", strerror(rv));
+		}
+		return (rv);
+	}
 
 	(void) uname(&uts_buf);
 	bd = new_bd();

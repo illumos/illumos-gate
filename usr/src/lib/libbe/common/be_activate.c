@@ -47,6 +47,7 @@
 
 #include <libbe.h>
 #include <libbe_priv.h>
+#include <libzfsbootenv.h>
 
 char	*mnttab = MNTTAB;
 
@@ -92,6 +93,8 @@ be_activate(nvlist_t *be_attrs)
 {
 	int	ret = BE_SUCCESS;
 	char	*be_name = NULL;
+	be_nextboot_state_t nextboot;
+	boolean_t next_boot;
 
 	/* Initialize libzfs handle */
 	if (!be_zfs_init())
@@ -114,7 +117,17 @@ be_activate(nvlist_t *be_attrs)
 		return (BE_ERR_INVAL);
 	}
 
-	ret = _be_activate(be_name);
+	if (nvlist_lookup_boolean_value(be_attrs, BE_ATTR_ACTIVE_NEXTBOOT,
+	    &next_boot) == 0) {
+		if (next_boot)
+			nextboot = BE_NEXTBOOT_SET;
+		else
+			nextboot = BE_NEXTBOOT_UNSET;
+	} else {
+		nextboot = BE_NEXTBOOT_IGNORE;
+	}
+
+	ret = _be_activate(be_name, nextboot);
 
 	be_zfs_fini();
 
@@ -206,6 +219,7 @@ be_installboot(nvlist_t *be_attrs)
  * Description:	This does the actual work described in be_activate.
  * Parameters:
  *		be_name - pointer to the name of BE to activate.
+ *		nextboot - flag to ignore, set or unset nextboot
  *
  * Return:
  *		BE_SUCCESS - Success
@@ -214,7 +228,7 @@ be_installboot(nvlist_t *be_attrs)
  *		Public
  */
 int
-_be_activate(char *be_name)
+_be_activate(char *be_name, be_nextboot_state_t nextboot)
 {
 	be_transaction_data_t cb = { 0 };
 	zfs_handle_t	*zhp = NULL;
@@ -231,6 +245,9 @@ _be_activate(char *be_name)
 	 */
 
 	if (be_name == NULL)
+		return (BE_ERR_INVAL);
+
+	if (nextboot == BE_NEXTBOOT_SET && getzoneid() != GLOBAL_ZONEID)
 		return (BE_ERR_INVAL);
 
 	/* Set obe_name to be_name in the cb structure */
@@ -288,11 +305,31 @@ _be_activate(char *be_name)
 	}
 
 	if (getzoneid() == GLOBAL_ZONEID) {
-		if ((ret = set_bootfs(be_nodes->be_rpool,
-		    root_ds)) != BE_SUCCESS) {
-			be_print_err(gettext("be_activate: failed to set "
-			    "bootfs pool property for %s\n"), root_ds);
-			goto done;
+		switch (nextboot) {
+		case BE_NEXTBOOT_SET:
+			if ((ret = lzbe_set_boot_device(be_nodes->be_rpool,
+			    lzbe_add, root_ds)) != 0) {
+				be_print_err(gettext("be_activate: failed to "
+				    "set nextboot for %s\n"), root_ds);
+				goto done;
+			}
+			break;
+		case BE_NEXTBOOT_UNSET:
+			if ((ret = lzbe_set_boot_device(be_nodes->be_rpool,
+			    lzbe_add, "")) != 0) {
+				be_print_err(gettext("be_activate: failed to "
+				    "clear nextboot for %s\n"), root_ds);
+				goto done;
+			}
+			break;
+		default:
+			if ((ret = set_bootfs(be_nodes->be_rpool,
+			    root_ds)) != BE_SUCCESS) {
+				be_print_err(gettext("be_activate: failed to "
+				    "set bootfs pool property for %s\n"),
+				    root_ds);
+				goto done;
+			}
 		}
 	}
 
@@ -415,7 +452,8 @@ be_activate_current_be(void)
 		return (ret);
 	}
 
-	if ((ret = _be_activate(bt.obe_name)) != BE_SUCCESS) {
+	ret = _be_activate(bt.obe_name, BE_NEXTBOOT_IGNORE);
+	if (ret != BE_SUCCESS) {
 		be_print_err(gettext("be_activate_current_be: failed to "
 		    "activate %s\n"), bt.obe_name);
 		return (ret);

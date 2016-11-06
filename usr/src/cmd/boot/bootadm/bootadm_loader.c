@@ -66,6 +66,7 @@ extern char *bam_root;
 typedef struct menu_entry {
 	int me_idx;
 	boolean_t me_active;
+	boolean_t me_active_next;
 	char *me_title;
 	char *me_type;
 	char *me_bootfs;
@@ -114,6 +115,10 @@ print_menu_cb(ofmt_arg_t *ofarg, char *buf, uint_t bufsize)
 		(void) snprintf(buf, bufsize, "%s", entry->me_type);
 		break;
 	case 4:
+		if (entry->me_active_next == B_TRUE) {
+			(void) snprintf(buf, bufsize, "   T");
+			break;
+		}
 		if (entry->me_active == B_TRUE)
 			(void) snprintf(buf, bufsize, "   *");
 		else
@@ -266,6 +271,26 @@ menu_active_on_boot(be_node_list_t *be_nodes, const char *bootfs)
 	return (rv);
 }
 
+/*
+ * Get the be_active_next for bootfs.
+ */
+static boolean_t
+menu_active_next(be_node_list_t *be_nodes, const char *bootfs)
+{
+	be_node_list_t *be_node;
+	boolean_t rv = B_FALSE;
+
+	for (be_node = be_nodes; be_node != NULL;
+	    be_node = be_node->be_next_node) {
+		if (strcmp(be_node->be_root_ds, bootfs) == 0) {
+			rv = be_node->be_active_next;
+			break;
+		}
+	}
+
+	return (rv);
+}
+
 error_t
 menu_read(struct menu_lst *menu, char *menu_path)
 {
@@ -335,6 +360,7 @@ menu_read(struct menu_lst *menu, char *menu_path)
 		mp->me_type = type;
 		mp->me_bootfs = bootfs;
 		mp->me_active = menu_active_on_boot(be_nodes, bootfs);
+		mp->me_active_next = menu_active_next(be_nodes, bootfs);
 		STAILQ_INSERT_TAIL(menu, mp, me_next);
 
 		title = NULL;

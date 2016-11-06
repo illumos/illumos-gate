@@ -34,6 +34,7 @@ SRCS=	\
 	memmap.c \
 	mb_header.S \
 	multiboot2.c \
+	nvstore.c \
 	self_reloc.c \
 	smbios.c \
 	tem.c \
@@ -53,6 +54,7 @@ OBJS=	\
 	memmap.o \
 	mb_header.o \
 	multiboot2.o \
+	nvstore.o \
 	self_reloc.o \
 	smbios.o \
 	tem.o \
@@ -60,6 +62,7 @@ OBJS=	\
 
 module.o := CPPFLAGS += -I$(BOOTSRC)/libcrypto
 tem.o := CPPFLAGS += $(DEFAULT_CONSOLE_COLOR)
+main.o := CPPFLAGS += -I$(SRC)/uts/common/fs/zfs
 
 CPPFLAGS += -I../../../../../include -I../../..../
 CPPFLAGS += -I../../../../../lib/libstand
