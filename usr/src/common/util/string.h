@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2016 by Delphix. All rights reserved.
+ */
+
 #ifndef	_COMMON_UTIL_STRING_H
 #define	_COMMON_UTIL_STRING_H
 
@@ -36,7 +40,7 @@ extern "C" {
 #if !defined(_KMDB) && (!defined(_BOOT) || defined(__sparc))
 
 extern size_t vsnprintf(char *, size_t, const char *, va_list);
-/*PRINTFLIKE1*/
+/*PRINTFLIKE3*/
 extern size_t snprintf(char *, size_t, const char *, ...);
 
 #if defined(_BOOT) && defined(__sparc)

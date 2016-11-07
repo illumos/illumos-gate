@@ -10,11 +10,27 @@
 #
 
 #
-# Copyright (c) 2012, 2016 by Delphix. All rights reserved.
+# Copyright (c) 2016 by Delphix. All rights reserved.
 #
 
-.PARALLEL: $(SUBDIRS)
+include $(SRC)/Makefile.master
 
-SUBDIRS = cmd include runfiles tests doc callbacks
+CALLBACKS = zfs_dbgmsg.ksh
 
-include $(SRC)/test/Makefile.com
+ROOTOPTPKG = $(ROOT)/opt/zfs-tests
+CALLBACKSDIR = $(ROOTOPTPKG)/callbacks
+
+FILES = $(CALLBACKS:%=$(CALLBACKSDIR)/%)
+$(FILES) := FILEMODE = 0555
+
+all: $(CALLBACKS)
+
+install: $(CALLBACKSDIR) $(FILES)
+
+clean lint clobber:
+
+$(CALLBACKSDIR):
+	$(INS.dir)
+
+$(CALLBACKSDIR)/%: %
+	$(INS.file)
