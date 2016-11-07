@@ -1,0 +1,195 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2016 Joyent, Inc.
+.\"
+.Dd May 31, 2016
+.Dt MAC_INIT_OPS 9F
+.Os
+.Sh NAME
+.Nm mac_init_ops ,
+.Nm mac_fini_ops
+.Nd initialize and finalize driver support for the MAC framework
+.Sh SYNOPSIS
+.In sys/mac_provider.h
+.Ft void
+.Fo mac_init_ops
+.Fa "struct dev_ops *ops"
+.Fa "const char *name"
+.Fc
+.Ft void
+.Fo mac_fini_ops
+.Fa "struct dev_ops *ops"
+.Fc
+.Sh INTERFACE LEVEL
+illumos DDI specific
+.Sh PARAMETERS
+.Bl -tag -width Ds
+.It Fa ops
+A pointer to the driver's
+.Xr dev_ops 9S
+structure.
+.It Fa name
+A pointer to a null-terminated string of ASCII characters that contains
+the name of the driver.
+.El
+.Sh DESCRIPTION
+The
+.Fn mac_init_ops
+and
+.Fn mac_fini_ops
+functions are used to initialize and finalize support for a device
+driver that implements the
+.Xr mac 9E
+networking device framework.
+.Pp
+The
+.Fn mac_init_ops
+function should be called during the driver's
+.Xr _init 9E
+entry point. As described in more detail in the
+.Sx Initializing MAC Support
+section of
+.Xr mac 9E ,
+this must be called before the driver calls
+.Xr mod_install 9F .
+If this is not done, then the call to
+.Xr mac_register 9F
+will fail.
+.Pp
+When in the driver's
+.Xr _fini 9E
+entry point, after the call to
+.Xr mod_remove 9F
+has succeeded, then the driver must call the
+.Fn mac_fini_ops
+function to finalize support and finish releasing any resources. If the
+call to
+.Xr mod_remove 9F
+fails, then the device driver should not call
+.Fn mac_fini_ops
+and should fail the call to
+.Xr _fini 9F .
+.Pp
+In addition, if the call to
+.Xr mod_install 9F
+in the driver's
+.Xr _init 9E
+entry point fails, then the driver should also call
+.Xr mac_fini_ops 9F .
+See the example below for how this should be structured.
+.Sh CONTEXT
+The
+.Fn mac_init_ops
+function should only ever be called from the context of a driver's
+.Xr _init 9E
+entry point.
+.Pp
+The
+.Fn mac_fini_ops
+function should only ever be called from the context of a driver's
+.Xr _init 9E
+or
+.Xr _fini 9E
+entry point.
+.Sh RETURN VALUES
+The
+.Fn mac_init_ops
+and
+.Fn mac_fini_ops
+functions will always succeed. They do not have any kind of return
+value.
+.Sh EXAMPLES
+The following example shows how a driver would call
+.Xr mac_init_ops 9F
+and
+.Xr mac_fini_ops 9F
+correctly in the
+.Xr _init 9E
+and
+.Xr _fini 9E
+entry points of a driver.
+.Bd -literal
+#include <sys/modctl.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+#include <sys/mac_provider.h>
+
+/*
+ * When using this, replace mydrv with the name of the actual device
+ * driver. In addition, the mydrv_ prefix that is used should be
+ * replaced with the name of the device driver
+ */
+#define	MYDRV_NAME	"mydrv"
+
+/*
+ * The following dev_ops structure would need to be filled in by a
+ * proper device driver.
+ */
+static struct dev_ops	mydrv_dev_ops;
+
+static struct modldrv mydrv_modldrv = {
+	&mod_driverops,
+	MYDRV_NAME,
+	&mydrv_dev_ops
+};
+
+static struct modlinkage mydrv_modlinkage = {
+	MODREV_1,
+	&mydrv_modldrv,
+	NULL
+};
+
+int
+_init(void)
+{
+	int ret;
+
+	/* Perform other needed initialization */
+
+	mac_init_ops(&mydrv_devops, MYDRV_NAME);
+
+	ret = mod_install(&mydrv_modlinkage);
+	if (ret != DDI_SUCCESS) {
+		mac_fini_ops(&mydrv_devops);
+		/* Perform other needed finalization */
+	}
+
+	return (ret);
+}
+
+int
+_info(struct modinfo *modinfop)
+{
+	return (mod_info(&mydrv_modlinkage, modinfo));
+}
+
+int
+_fini(void)
+{
+	int ret;
+
+	ret = mod_remove(&mydrv_modlinkage);
+	if (ret == DDI_SUCCESS) {
+		mac_fini_ops(&mydrv_devops);
+		/* Perform other needed finalization */
+	}
+
+	return (ret);
+}
+.Ed
+.Sh SEE ALSO
+.Xr _fini 9E ,
+.Xr _init 9E ,
+.Xr mac 9E ,
+.Xr mod_install 9F ,
+.Xr mod_remove 9F ,
+.Xr dev_ops 9S

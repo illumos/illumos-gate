@@ -1,0 +1,241 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2016 Joyent, Inc.
+.\"
+.Dd June 02, 2016
+.Dt MC_SETPROP 9E
+.Os
+.Sh NAME
+.Nm mc_setprop
+.Nd set device properties
+.Sh SYNOPSIS
+.In sys/mac_provider.h
+.Ft int
+.Fo prefix_m_setprop
+.Fa "void *driver"
+.Fa "const char *pr_name"
+.Fa "mac_prop_id_t pr_num"
+.Fa "uint_t pr_valsize"
+.Fa "const void *pr_val"
+.Fc
+.Sh INTERFACE LEVEL
+illumos DDI specific
+.Sh PARAMETERS
+.Bl -tag -width Fa
+.It Fa driver
+A pointer to the driver's private data that was passed in via the
+.Sy m_pdata
+member of the
+.Xr mac_register 9S
+structure to the
+.Xr mac_register 9F
+function.
+.It Fa pr_name
+A null-terminated string that contains the name of the property.
+.It Fa pr_num
+A constant that is used to identify the property.
+.It Fa pr_valsize
+A value that indicates the size in bytes of
+.Fa pr_val .
+.It Fa pr_val
+A pointer to a
+.Fa pr_valsize
+byte buffer that contains the new value of the property.
+.El
+.Sh DESCRIPTION
+The
+.Fn mc_setprop
+entry point is used to set the value of a given device's property from
+the copy stored in
+.Fa pr_val .
+.Pp
+When the
+.Fn mc_setprop
+entry point is called, the driver needs to first identify the property.
+The set of possible properties and their meaning is listed in the
+.Sx PROPERTIES
+section of
+.Xr mac 9E .
+It should identify the property based on the value of
+.Fa pr_num .
+Most drivers will use a
+.Sy switch
+statement and for any property that it supports it should then check if
+the value in
+.Fa pr_valsize
+is sufficient for the property, comparing it to the minimum size
+listed for the property in
+.Xr mac 9E .
+If it is not, then it should return an error. Otherwise, it should
+update the property based on the value in
+.Fa pr_val .
+When an unknown or unsupported property is encountered, generally the
+.Sy default
+case of the switch statement, the device driver should return an error.
+.Pp
+The special property
+.Sy MAC_PROP_PRIVATE
+indicates that this is a device driver specific private property. The
+device driver must then look at the value of the
+.Fa pr_name
+argument and use
+.Xr strcmp 9F
+on it, comparing it to each of its private properties to identify which
+one it is.
+.Pp
+Not all properties are supposed to be writable. Some devices may opt to
+not allow a property that is designated as read/write to be set. When
+such a property is encountered, the driver should return the appropriate
+error.
+.Pp
+The device
+driver can access its device soft state by casting the
+.Fa device
+pointer to the appropriate structure. As this may be called while other
+operations are ongoing, the device driver should employ the appropriate
+locking while writing the properties.
+.Sh RETURN VALUES
+Upon successful completion, the device driver should have copied the
+value of the property into
+.Fa pr_val
+and return
+.Sy 0 .
+Otherwise, a positive error should be returned to indicate failure.
+.Sh EXAMPLES
+The following examples shows how a device driver might structure its
+.Fn mc_setporp
+entry point.
+.Bd -literal
+#include <sys/mac_provider.h>
+
+/*
+ * Note, this example merely shows the structure of this function.
+ * Different devices will manage their state in different ways. Like other
+ * examples, this assumes that the device has state in a structure called
+ * example_t and that there is a lock which keeps track of that state.
+ *
+ * For the purpose of this example, we assume that this device supports 100 Mb,
+ * 1 GB, and 10 Gb full duplex speeds.
+ */
+
+static int
+exmple_m_setprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
+    uint_t pr_valsize, const void *pr_val)
+{
+	uint32_t new_mtu;
+	int ret = 0;
+	example_t *ep = arg;
+
+	mutex_enter(&ep->ep_lock);
+	switch (pr_num) {
+	/*
+	 * These represent properties that can never be changed, regardless of
+	 * the type of PHY on the device (copper, fiber, etc.)
+	 */
+	case MAC_PROP_DUPLEX:
+	case MAC_PROP_SPEED:
+	case MAC_PROP_STATUS:
+	case MAC_PROP_ADV_100FDX_CAP:
+	case MAC_PROP_ADV_1000FDX_CAP:
+	case MAC_PROP_ADV_10GFDX_CAP:
+		ret = ENOTSUP;
+		break;
+
+	/*
+	 * These EN properties are used to control the advertised speeds of the
+	 * device. For this example, we assume that this device does not have a
+	 * copper phy, at which point auto-negotiation and the speeds in
+	 * question cannot be changed. These are called out separately as they
+	 * should be controllable for copper based devices or it may need to be
+	 * conditional depending on the type of phy present.
+	 */
+	case MAC_PROP_EN_100FDX_CAP:
+	case MAC_PROP_EN_1000FDX_CAP:
+	case MAC_PROP_EN_10GFDX_CAP:
+	case MAC_PROP_AUTONEG:
+		ret = ENOTSUP;
+		break;
+
+	case MAC_PROP_MTU:
+		if (pr_valsize < sizeof (uint32_t)) {
+			ret = EOVERFLOW;
+			break;
+		}
+		bcopy(&new_mtu, pr_val, sizeof (uint32_t));
+
+		if (new_mtu < ep->ep_min_mtu ||
+		    new_mtu > ep->ep_max_mtu) {
+			ret = EINVAL;
+			break;
+		}
+
+		/*
+		 * We first ask MAC to update the MTU before we do anything.
+		 * This may fail. It returns zero on success. The
+		 * example_update_mtu function does device specific updates to
+		 * ensure that the MTU on the device is updated and any internal
+		 * data structures are up to date.
+		 */
+		ret = mac_maxdsu_update(&ep->ep_mac_hdl, new_mtu);
+		if (ret == 0) {
+			example_update_mtu(ep, new_mtu);
+		}
+		break;
+
+	/*
+	 * Devices may have their own private properties. If they do, they
+	 * should not return ENOTSUP, but instead see if it's a property they
+	 * recognize and handle it similar to those above. If it doesn't
+	 * recognize the name, then it should return ENOTSUP.
+	 */
+	case MAC_PROP_PRIVATE:
+		ret = ENOTSUP;
+		break;
+
+	default:
+		ret = ENOTSUP;
+		break;
+	}
+	mutex_exit(&ep->ep_lock);
+
+	return (ret);
+}
+.Ed
+.Sh ERRORS
+The device driver may return one of the following errors. While this list
+is not intended to be exhaustive, it is recommended to use one of these
+if possible.
+.Bl -tag -width Er
+.It Er EINVAL
+The contents of
+.Fa pr_val
+are outside the valid range for the property.
+.It Er ENOTSUP
+This error should be used whenever an unknown or unsupported property is
+encountered. It should also be used when the property is not writable.
+.It Er EOVERFLOW
+This error should be used when
+.Fa pr_valsize
+is smaller than the required size for a given value.
+.It Er EBUSY
+This error should be used when a property can't be set because the
+device has started. Note that device driver writers are encouraged to design
+device drivers such that this error is not possible.
+.It Er ECANCELLED
+The device is in a state that does not allow it to handle data; for
+example, it's suspended.
+.El
+.Sh SEE ALSO
+.Xr mac 9E ,
+.Xr mac_register 9F ,
+.Xr strcmp 9F ,
+.Xr mac_register 9S

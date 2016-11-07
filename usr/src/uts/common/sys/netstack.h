@@ -23,6 +23,11 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+/*
+ * Copyright (c) 2016, Joyent, Inc. All rights reserved.
+ */
+
 #ifndef _SYS_NETSTACK_H
 #define	_SYS_NETSTACK_H
 
@@ -233,6 +238,7 @@ extern void netstack_rele(netstack_t *);
 extern netstack_t *netstack_find_by_cred(const cred_t *);
 extern netstack_t *netstack_find_by_stackid(netstackid_t);
 extern netstack_t *netstack_find_by_zoneid(zoneid_t);
+extern boolean_t netstack_inuse_by_stackid(netstackid_t stackid);
 
 extern zoneid_t netstackid_to_zoneid(netstackid_t);
 extern zoneid_t netstack_get_zoneid(netstack_t *);

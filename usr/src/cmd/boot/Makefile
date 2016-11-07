@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-#
+# Copyright 2016 Toomas Soome <tsoome@me.com>
 # Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
@@ -30,36 +30,36 @@ COMMON_SUBDIRS=		\
 	filelist	\
 	fiocompress	\
 	scripts		\
-	bootadm
+	bootadm		\
+	installboot
 
 i386_SUBDIRS=		\
 	installgrub	\
 	mbr		\
 	symdef
 
-sparc_SUBDIRS=		\
-	installboot
+sparc_SUBDIRS=
 
 COMMON_LINTSUBDIRS=	\
-	bootadm	
+	bootadm		\
+	installboot
 
 i386_LINTSUBDIRS=	\
 	fiocompress	\
 	installgrub	\
 	symdef
 
-sparc_LINTSUBDIRS=	\
-	installboot
+sparc_LINTSUBDIRS=
 
 COMMON_MSGSUBDIRS=	\
 	bootadm		\
-	fiocompress
+	fiocompress	\
+	installboot
 
 i386_MSGSUBDIRS=	\
 	installgrub
 
-sparc_MSGSUBDIRS=	\
-	installboot
+sparc_MSGSUBDIRS=
 
 
 all:=		TARGET= all

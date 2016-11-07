@@ -1,0 +1,98 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2016 Joyent, Inc.
+.\"
+.Dd May 31, 2016
+.Dt MAC_ALLOC 9F
+.Os
+.Sh NAME
+.Nm mac_alloc ,
+.Nm mac_free
+.Nd allocate and free mac registration structures
+.Sh SYNOPSIS
+.In sys/mac_provider.h
+.Ft "mac_register_t *"
+.Fo mac_alloc
+.Fa "uint_t mac_version"
+.Fc
+.Ft void
+.Fo mac_free
+.Fa "mac_register_t *mregp"
+.Fc
+.Sh INTERFACE LEVEL
+illumos DDI specific
+.Sh PARAMETERS
+.Bl -tag -width Fa
+.It Fa mac_version
+An integer corresponding to the version of the MAC interface that the
+device driver was built against.
+.It Fa mregp
+A pointer to an allocated mac_register_t structure that was obtained
+from calling the
+.Fn mac_alloc
+function.
+.El
+.Sh DESCRIPTION
+The
+.Fn mac_alloc
+and
+.Fn mac_free
+routines are used to allocate and free the structures used to register a
+device driver with
+.Xr mac 9E .
+The device driver should call
+.Fn mac_alloc
+with the value of
+.Dv MAC_VERSION
+to indicate the current version of the MAC framework that it supports.
+The device driver will be returned an instance of a
+.Xr mac_register 9S
+structure which it can then use to call
+.Xr mac_register 9F .
+For more information on the order of events, see the
+.Sx Initializing MAC Support
+section of
+.Xr mac 9E .
+.Pp
+When the driver is done with the
+.Xr mac_register 9S
+structure, it must call the
+.Xr mac_free
+function to release any associated memory.
+.Sh CONTEXT
+The
+.Fn mac_alloc
+and
+.Fn mac_free
+routines are generally called from the context of a device driver's
+.Xr attach 9E
+entry point; however, they may be called from both
+.Sy user
+and
+.Sy kernel
+context.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn mac_register
+function will return a pointer to an allocated
+.Sy mac_register_t
+structure that can be filled in by the driver. Otherwise,
+.Dv NULL
+is returned to indicate that the structure could not be allocated. The
+most common cause for this is that the value of
+.Fa mac_version
+is not supported by the kernel.
+.Sh SEE ALSO
+.Xr attach 9E ,
+.Xr mac 9E ,
+.Xr mac_register 9F ,
+.Xr mac_register 9S

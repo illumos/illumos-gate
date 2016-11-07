@@ -360,6 +360,7 @@
 309:AUE_FACCESSAT:faccessat(2):no
 310:AUE_AUDITON_GETAMASK:auditon(2) - get default user preselection mask:aa
 311:AUE_AUDITON_SETAMASK:auditon(2) - set default user preselection mask:as
+312:AUE_PSECFLAGS:psecflags(2) - set process security flags:pm
 #
 # user level audit events
 #	2048 -  6143	Reserved

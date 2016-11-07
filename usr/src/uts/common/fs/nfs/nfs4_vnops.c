@@ -20,6 +20,10 @@
  */
 
 /*
+ * Copyright (c) 2016 STRATO AG. All rights reserved.
+ */
+
+/*
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
@@ -2575,10 +2579,20 @@ nfs4close_otw(rnode4_t *rp, cred_t *cred_otw, nfs4_open_owner_t *oop,
 	ASSERT(osp->os_ref_count >= 2);
 	osp->os_ref_count--;
 
-	if (!ep->error)
+	if (ep->error == 0) {
+		/*
+		 * Avoid a deadlock with the r_serial thread waiting for
+		 * os_sync_lock in nfs4_get_otw_cred_by_osp() which might be
+		 * held by us. We will wait in nfs4_attr_cache() for the
+		 * completion of the r_serial thread.
+		 */
+		mutex_exit(&osp->os_sync_lock);
+		*have_sync_lockp = 0;
+
 		nfs4_attr_cache(vp,
 		    &res.array[1].nfs_resop4_u.opgetattr.ga_res,
 		    t, cred_otw, TRUE, NULL);
+	}
 
 	NFS4_DEBUG(nfs4_client_state_debug, (CE_NOTE, "nfs4close_otw:"
 	    " returning %d", ep->error));

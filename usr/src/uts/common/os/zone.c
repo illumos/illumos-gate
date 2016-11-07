@@ -2358,6 +2358,7 @@ zone_zsd_init(void)
 	zone0.zone_domain = srpc_domain;
 	zone0.zone_hostid = HW_INVALID_HOSTID;
 	zone0.zone_fs_allowed = NULL;
+	psecflags_default(&zone0.zone_secflags);
 	zone0.zone_ref = 1;
 	zone0.zone_id = GLOBAL_ZONEID;
 	zone0.zone_status = ZONE_IS_RUNNING;
@@ -2835,6 +2836,32 @@ zone_set_brand(zone_t *zone, const char *brand)
 	ZBROP(zone)->b_init_brand_data(zone, &zone_status_lock);
 
 	mutex_exit(&zone_status_lock);
+	return (0);
+}
+
+static int
+zone_set_secflags(zone_t *zone, const psecflags_t *zone_secflags)
+{
+	int err = 0;
+	psecflags_t psf;
+
+	ASSERT(zone != global_zone);
+
+	if ((err = copyin(zone_secflags, &psf, sizeof (psf))) != 0)
+		return (err);
+
+	if (zone_status_get(zone) > ZONE_IS_READY)
+		return (EINVAL);
+
+	if (!psecflags_validate(&psf))
+		return (EINVAL);
+
+	(void) memcpy(&zone->zone_secflags, &psf, sizeof (psf));
+
+	/* Set security flags on the zone's zsched */
+	(void) memcpy(&zone->zone_zsched->p_secflags, &zone->zone_secflags,
+	    sizeof (zone->zone_zsched->p_secflags));
+
 	return (0);
 }
 
@@ -4408,6 +4435,7 @@ zsched(void *arg)
 			mutex_exit(&pp->p_lock);
 		}
 	}
+
 	/*
 	 * Tell the world that we're done setting up.
 	 *
@@ -4692,7 +4720,8 @@ out:
 }
 
 int
-zone_create_error(int er_error, int er_ext, int *er_out) {
+zone_create_error(int er_error, int er_ext, int *er_out)
+{
 	if (er_out != NULL) {
 		if (copyout(&er_ext, er_out, sizeof (int))) {
 			return (set_errno(EFAULT));
@@ -4788,7 +4817,7 @@ zone_create(const char *zone_name, const char *zone_root,
 	nvlist_t *rctls = NULL;
 	proc_t *pp = curproc;
 	zone_t *zone, *ztmp;
-	zoneid_t zoneid;
+	zoneid_t zoneid, start = GLOBAL_ZONEID;
 	int error;
 	int error2 = 0;
 	char *str;
@@ -4802,9 +4831,58 @@ zone_create(const char *zone_name, const char *zone_root,
 	if (PTOU(pp)->u_rdir != NULL && PTOU(pp)->u_rdir != rootdir)
 		return (zone_create_error(ENOTSUP, ZE_CHROOTED,
 		    extended_error));
+	/*
+	 * As the first step of zone creation, we want to allocate a zoneid.
+	 * This allocation is complicated by the fact that netstacks use the
+	 * zoneid to determine their stackid, but netstacks themselves are
+	 * freed asynchronously with respect to zone destruction.  This means
+	 * that a netstack reference leak (or in principle, an extraordinarily
+	 * long netstack reference hold) could result in a zoneid being
+	 * allocated that in fact corresponds to a stackid from an active
+	 * (referenced) netstack -- unleashing all sorts of havoc when that
+	 * netstack is actually (re)used.  (In the abstract, we might wish a
+	 * zoneid to not be deallocated until its last referencing netstack
+	 * has been released, but netstacks lack a backpointer into their
+	 * referencing zone -- and changing them to have such a pointer would
+	 * be substantial, to put it euphemistically.)  To avoid this, we
+	 * detect this condition on allocation: if we have allocated a zoneid
+	 * that corresponds to a netstack that's still in use, we warn about
+	 * it (as it is much more likely to be a reference leak than an actual
+	 * netstack reference), free it, and allocate another.  That these
+	 * identifers are allocated out of an ID space assures that we won't
+	 * see the identifier we just allocated.
+	 */
+	for (;;) {
+		zoneid = id_alloc(zoneid_space);
+
+		if (!netstack_inuse_by_stackid(zoneid_to_netstackid(zoneid)))
+			break;
+
+		id_free(zoneid_space, zoneid);
+
+		if (start == GLOBAL_ZONEID) {
+			start = zoneid;
+		} else if (zoneid == start) {
+			/*
+			 * We have managed to iterate over the entire available
+			 * zoneid space -- there are no identifiers available,
+			 * presumably due to some number of leaked netstack
+			 * references.  While it's in principle possible for us
+			 * to continue to try, it seems wiser to give up at
+			 * this point to warn and fail explicitly with a
+			 * distinctive error.
+			 */
+			cmn_err(CE_WARN, "zone_create() failed: all available "
+			    "zone IDs have netstacks still in use");
+			return (set_errno(ENFILE));
+		}
+
+		cmn_err(CE_WARN, "unable to reuse zone ID %d; "
+		    "netstack still in use", zoneid);
+	}
 
 	zone = kmem_zalloc(sizeof (zone_t), KM_SLEEP);
-	zoneid = zone->zone_id = id_alloc(zoneid_space);
+	zone->zone_id = zoneid;
 	zone->zone_status = ZONE_IS_UNINITIALIZED;
 	zone->zone_pool = pool_default;
 	zone->zone_pool_mod = gethrtime();
@@ -4864,6 +4942,12 @@ zone_create(const char *zone_name, const char *zone_root,
 	zone->zone_ipc.ipcq_msgmni = 0;
 	zone->zone_bootargs = NULL;
 	zone->zone_fs_allowed = NULL;
+
+	secflags_zero(&zone0.zone_secflags.psf_lower);
+	secflags_zero(&zone0.zone_secflags.psf_effective);
+	secflags_zero(&zone0.zone_secflags.psf_inherit);
+	secflags_fullset(&zone0.zone_secflags.psf_upper);
+
 	zone->zone_initname =
 	    kmem_alloc(strlen(zone_default_initname) + 1, KM_SLEEP);
 	(void) strcpy(zone->zone_initname, zone_default_initname);
@@ -5981,6 +6065,13 @@ zone_getattr(zoneid_t zoneid, int attr, void *buf, size_t bufsize)
 				error = EFAULT;
 		}
 		break;
+	case ZONE_ATTR_SECFLAGS:
+		size = sizeof (zone->zone_secflags);
+		if (bufsize > size)
+			bufsize = size;
+		if ((err = copyout(&zone->zone_secflags, buf, bufsize)) != 0)
+			error = EFAULT;
+		break;
 	case ZONE_ATTR_NETWORK:
 		zbuf = kmem_alloc(bufsize, KM_SLEEP);
 		if (copyin(buf, zbuf, bufsize) != 0) {
@@ -6088,6 +6179,8 @@ zone_setattr(zoneid_t zoneid, int attr, void *buf, size_t bufsize)
 		break;
 	case ZONE_ATTR_RSS:
 		err = zone_set_rss(zone, (const uint64_t *)buf);
+	case ZONE_ATTR_SECFLAGS:
+		err = zone_set_secflags(zone, (psecflags_t *)buf);
 		break;
 	case ZONE_ATTR_SCHED_CLASS:
 		err = zone_set_sched_class(zone, (const char *)buf);
@@ -6587,6 +6680,17 @@ zone_enter(zoneid_t zoneid)
 	vp = zone->zone_rootvp;
 	zone_chdir(vp, &PTOU(pp)->u_cdir, pp);
 	zone_chdir(vp, &PTOU(pp)->u_rdir, pp);
+
+	/*
+	 * Change process security flags.  Note that the _effective_ flags
+	 * cannot change
+	 */
+	secflags_copy(&pp->p_secflags.psf_lower,
+	    &zone->zone_secflags.psf_lower);
+	secflags_copy(&pp->p_secflags.psf_upper,
+	    &zone->zone_secflags.psf_upper);
+	secflags_copy(&pp->p_secflags.psf_inherit,
+	    &zone->zone_secflags.psf_inherit);
 
 	/*
 	 * Change process credentials

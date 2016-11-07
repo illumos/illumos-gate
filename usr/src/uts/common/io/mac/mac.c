@@ -3141,6 +3141,9 @@ mac_prop_check_size(mac_prop_id_t id, uint_t valsize, boolean_t is_range)
 	case MAC_PROP_WL_MLME:
 		minsize = sizeof (wl_mlme_t);
 		break;
+	case MAC_PROP_VN_PROMISC_FILTERED:
+		minsize = sizeof (boolean_t);
+		break;
 	}
 
 	return (valsize >= minsize);

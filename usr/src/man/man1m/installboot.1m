@@ -1,0 +1,209 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2016 Toomas Soome <tsoome@me.com>
+.\"
+.Dd February 10, 2016
+.Dt INSTALLBOOT 1M
+.Os
+.Sh NAME
+.Nm installboot
+.Nd install bootloader in a disk partition
+.Sh SYNOPSIS
+.Ss SPARC
+.Nm
+.Op Fl fn
+.Op Fl F Sy zfs Ns | Ns Sy ufs Ns | Ns Sy hsfs
+.Op Fl u Ar verstr
+.Ar bootblk raw-device
+.Nm
+.Op Fl enV
+.Fl F Sy zfs
+.Fl i
+.Ar raw-device
+.Nm
+.Op Fl n
+.Fl F Sy zfs
+.Fl M
+.Ar raw-device attach-raw-device
+.Ss x86
+.Nm
+.Op Fl fFmn
+.Op Fl u Ar verstr
+.Ar stage1 stage2 raw-device
+.Nm
+.Op Fl enV
+.Fl i
+.Ar raw-device
+.Nm
+.Op Fl n
+.Fl M
+.Ar raw-device attach-raw-device
+.Sh DESCRIPTION
+The
+.Xr boot 1M
+boot program is loaded from disk and is responsible of loading kernel and its
+support files from specific file system.
+.Pp
+The SPARC systems have one boot loader program file to be installed on the boot
+area of a disk slice. As the SPARC zfs boot loader is too large to fit into
+boot area at the start of the disk slice,
+.Nm
+command will split the zfs boot loader between disk slice boot area, and zfs
+pool boot area.
+.Pp
+The x86 systems have boot loader implemented as three stages:
+.Bl -tag -width Ds
+.It Sy stage1
+.Pa /boot/pmbr
+is used as master boot record
+.Pq MBR
+and partition boot program.
+.It Sy stage2
+.Pa /boot/gptzfsboot
+is responsible for loading files from file system. The
+.Sy stage2
+on x86 systems is always installed to zfs pool boot area, and therefore only zfs
+boot is supported.
+.Nm
+command will record the location of
+.Sy stage2
+to
+.Sy stage1 ,
+which is always installed at least on partition
+.Pq MBR or GPT
+boot area, making it possible to boot via chainload from other boot loaders.
+.Pp
+When
+.Nm
+command is used with the
+.Fl m
+option,
+.Nm
+installs the stage1 file on the master boot sector of the disk as well.
+.It Sy stage3
+.Pa /boot/zfsloader
+is read from file system and executed by
+.Sy stage2
+and will provide boot loader user environment and is responsible of loading
+and starting the operating system kernel.
+.Pp
+In case of GPT partitioning scheme, if the file system to boot from is either
+UFS or PCFS, there must be
+.Sy boot
+partition defined to store stage2 boot program. This is needed because UFS and
+PCFS do not have sufficient space reserved to store boot programs.
+.Pp
+The boot partition must use following GPT UUID:
+.Bd -literal -offset indent
+6a82cb45-1dd2-11b2-99a6-080020736631
+.Ed
+.Pp
+which is provided by
+.Qq boot
+tag in
+.Xr format 1M
+partition menu.
+.El
+.Ss Options
+The
+.Nm
+command accepts the following options:
+.Bl -tag -width Ds
+.It Fl h
+Prints short usage message.
+.It Fl m
+Installs
+.Sy stage1
+on the master boot sector interactively. You must use this option if OS is
+installed on an extended FDISK or an EFI/GPT partition.
+.It Fl f
+Suppresses interaction when overwriting the master boot sector on x86.
+Force update on SPARC.
+.It Fl n
+Dry run session. Will not write to disk.
+.It Fl F
+On SPARC, specify file system type. On x86, inhibit version check and enforce
+boot loader update.
+.It Fl u Ar verstr
+Specify custom version string. Can be used to add version on non-versioned
+boot loader or change built in version string.
+.It Fl i
+Print version string from installed boot loader.
+.It Fl e
+Print version string from installed boot loader without description.
+.It Fl V
+Print version string from installed boot loader with full description.
+.It Fl M
+Mirror boot loader from installed disk partition.
+.El
+.Ss Operands
+The
+.Nm
+command accepts the following operands:
+.Bl -tag -width Ds
+.It Ar bootblk
+The name of the SPARC boot loader code.
+.It Ar stage1
+The name of the loader stage 1 file.
+.It Ar stage2
+The name of the loader stage 2 file.
+.It Ar raw-device
+The name of the device onto which bootloader code is to be installed. It must be
+a character device that is readable and writable and part of boot pool.
+.El
+.Sh FILES
+.Bl -tag -width Ds
+.It Pa /boot
+Directory where x86 loader files reside.
+.It Pa /usr/platform/platform name/lib/fs
+Directory where SPARC boot loader files reside.
+.El
+.Sh EXAMPLES
+.Bl -tag -width Ds
+.It Sy Example 1 No Installing zfs boot loader on SPARC disk slice
+The following command installs zfs boot loader on SPARC system:
+.Bd -literal
+# installboot -F zfs /usr/platform/`uname -i`/lib/fs/zfs/bootblk \e
+  /dev/rdsk/c0t0d0s0
+.Ed
+.It Sy Example 2 No Installing boot loader on x86 system
+The following command installs loader stage files and master boot record:
+.Bd -literal
+# installboot -m /boot/pmbr /boot/gptzfsboot /dev/rdsk/c0t0d0s0
+.Ed
+.El
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh SEE ALSO
+.Xr boot 1M ,
+.Xr bootadm 1M ,
+.Xr fdisk 1M ,
+.Xr fmthard 1M ,
+.Xr format 1M ,
+.Xr kernel 1M ,
+.Xr attributes 5
+.Sh WARNINGS
+Installing
+.Sy stage1
+on the master boot sector
+.Po
+.Fl m
+option
+.Pc
+overrides any boot loader currently installed on the machine. The system will
+always boot the current OS partition regardless of which fdisk partition is
+active.
+.Pp
+If version string indicates the source boot loader might be more recent,
+.Nm
+will also verify md5 checksums to determine if update is really necessary. If
+checksums match, the install will not be performed.

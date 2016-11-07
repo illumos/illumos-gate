@@ -114,6 +114,7 @@ static int	smbfs_accessx(void *, int, cred_t *);
 static int	smbfs_readvdir(vnode_t *vp, uio_t *uio, cred_t *cr, int *eofp,
 			caller_context_t *);
 static void	smbfs_rele_fid(smbnode_t *, struct smb_cred *);
+static uint32_t xvattr_to_dosattr(smbnode_t *, struct vattr *);
 
 /*
  * These are the vnode ops routines which implement the vnode interface to
@@ -838,10 +839,6 @@ smbfs_ioctl(vnode_t *vp, int cmd, intptr_t arg, int flag,
 /*
  * Return either cached or remote attributes. If get remote attr
  * use them to check and invalidate caches, then cache the new attributes.
- *
- * XXX
- * This op should eventually support PSARC 2007/315, Extensible Attribute
- * Interfaces, for richer metadata.
  */
 /* ARGSUSED */
 static int
@@ -889,11 +886,6 @@ smbfs_getattr(vnode_t *vp, struct vattr *vap, int flags, cred_t *cr,
 
 /* smbfsgetattr() in smbfs_client.c */
 
-/*
- * XXX
- * This op should eventually support PSARC 2007/315, Extensible Attribute
- * Interfaces, for richer metadata.
- */
 /*ARGSUSED4*/
 static int
 smbfs_setattr(vnode_t *vp, struct vattr *vap, int flags, cred_t *cr,
@@ -979,6 +971,7 @@ smbfssetattr(vnode_t *vp, struct vattr *vap, int flags, cred_t *cr)
 	unsigned short	fid;
 	int have_fid = 0;
 	uint32_t rights = 0;
+	uint32_t dosattr = 0;
 
 	ASSERT(curproc->p_zone == VTOSMI(vp)->smi_zone_ref.zref_zone);
 
@@ -1009,10 +1002,18 @@ smbfssetattr(vnode_t *vp, struct vattr *vap, int flags, cred_t *cr)
 	smb_credinit(&scred, cr);
 
 	/*
+	 * If the caller has provided extensible attributes,
+	 * map those into DOS attributes supported by SMB.
+	 * Note: zero means "no change".
+	 */
+	if (mask & AT_XVATTR)
+		dosattr = xvattr_to_dosattr(np, vap);
+
+	/*
 	 * Will we need an open handle for this setattr?
 	 * If so, what rights will we need?
 	 */
-	if (mask & (AT_ATIME | AT_MTIME)) {
+	if (dosattr || (mask & (AT_ATIME | AT_MTIME))) {
 		rights |=
 		    SA_RIGHT_FILE_WRITE_ATTRIBUTES;
 	}
@@ -1028,7 +1029,7 @@ smbfssetattr(vnode_t *vp, struct vattr *vap, int flags, cred_t *cr)
 	 * Some servers like NT4 won't set times by path.
 	 * Also, we're usually setting everything anyway.
 	 */
-	if (mask & (AT_SIZE | AT_ATIME | AT_MTIME)) {
+	if (rights != 0) {
 		error = smbfs_smb_tmpopen(np, rights, &scred, &fid);
 		if (error) {
 			SMBVDEBUG("error %d opening %s\n",
@@ -1085,14 +1086,13 @@ smbfssetattr(vnode_t *vp, struct vattr *vap, int flags, cred_t *cr)
 	mtime = ((mask & AT_MTIME) ? &vap->va_mtime : 0);
 	atime = ((mask & AT_ATIME) ? &vap->va_atime : 0);
 
-	if (mtime || atime) {
+	if (dosattr || mtime || atime) {
 		/*
 		 * Always use the handle-based set attr call now.
-		 * Not trying to set DOS attributes here so pass zero.
 		 */
 		ASSERT(have_fid);
 		error = smbfs_smb_setfattr(np, fid,
-		    0, mtime, atime, &scred);
+		    dosattr, mtime, atime, &scred);
 		if (error) {
 			SMBVDEBUG("set times error %d file %s\n",
 			    error, np->n_rpath);
@@ -1121,6 +1121,64 @@ out:
 	smbfs_rw_exit(&np->r_lkserlock);
 
 	return (error);
+}
+
+/*
+ * Helper function for extensible system attributes (PSARC 2007/315)
+ * Compute the DOS attribute word to pass to _setfattr (see above).
+ * This returns zero IFF no change is being made to attributes.
+ * Otherwise return the new attributes or SMB_EFA_NORMAL.
+ */
+static uint32_t
+xvattr_to_dosattr(smbnode_t *np, struct vattr *vap)
+{
+	xvattr_t *xvap = (xvattr_t *)vap;
+	xoptattr_t *xoap = NULL;
+	uint32_t attr = np->r_attr.fa_attr;
+	boolean_t anyset = B_FALSE;
+
+	if ((xoap = xva_getxoptattr(xvap)) == NULL)
+		return (0);
+
+	if (XVA_ISSET_REQ(xvap, XAT_ARCHIVE)) {
+		if (xoap->xoa_archive)
+			attr |= SMB_FA_ARCHIVE;
+		else
+			attr &= ~SMB_FA_ARCHIVE;
+		XVA_SET_RTN(xvap, XAT_ARCHIVE);
+		anyset = B_TRUE;
+	}
+	if (XVA_ISSET_REQ(xvap, XAT_SYSTEM)) {
+		if (xoap->xoa_system)
+			attr |= SMB_FA_SYSTEM;
+		else
+			attr &= ~SMB_FA_SYSTEM;
+		XVA_SET_RTN(xvap, XAT_SYSTEM);
+		anyset = B_TRUE;
+	}
+	if (XVA_ISSET_REQ(xvap, XAT_READONLY)) {
+		if (xoap->xoa_readonly)
+			attr |= SMB_FA_RDONLY;
+		else
+			attr &= ~SMB_FA_RDONLY;
+		XVA_SET_RTN(xvap, XAT_READONLY);
+		anyset = B_TRUE;
+	}
+	if (XVA_ISSET_REQ(xvap, XAT_HIDDEN)) {
+		if (xoap->xoa_hidden)
+			attr |= SMB_FA_HIDDEN;
+		else
+			attr &= ~SMB_FA_HIDDEN;
+		XVA_SET_RTN(xvap, XAT_HIDDEN);
+		anyset = B_TRUE;
+	}
+
+	if (anyset == B_FALSE)
+		return (0);	/* no change */
+	if (attr == 0)
+		attr = SMB_EFA_NORMAL;
+
+	return (attr);
 }
 
 /*
@@ -2991,6 +3049,11 @@ smbfs_pathconf(vnode_t *vp, int cmd, ulong_t *valp, cred_t *cr,
 			break;
 		}
 		return (EINVAL);
+
+	case _PC_SATTR_ENABLED:
+	case _PC_SATTR_EXISTS:
+		*valp = 1;
+		break;
 
 	case _PC_TIMESTAMP_RESOLUTION:
 		/*

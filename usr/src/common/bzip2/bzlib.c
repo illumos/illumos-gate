@@ -128,7 +128,9 @@ BZES
 	return ("BZ_UNKNOWN_ERROR");
 }
 
+#ifndef BZ_LOADER
 #include <sys/sysmacros.h>
+#endif
 
 #ifdef _KERNEL
 

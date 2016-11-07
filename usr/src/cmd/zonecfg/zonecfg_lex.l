@@ -184,6 +184,8 @@ static char *create_token(char *s);
 
 <TSTATE>admin	{ return ADMIN; }
 
+<TSTATE>security-flags { return SECFLAGS; }
+
 <TSTATE>zonename	{ return ZONENAME; }
 <CSTATE>zonename	{ return ZONENAME; }
 
@@ -320,6 +322,15 @@ static char *create_token(char *s);
 
 <TSTATE>fs-allowed	{ return FS_ALLOWED; }
 <CSTATE>fs-allowed	{ return FS_ALLOWED; }
+
+<TSTATE>default { return DEFAULT; }
+<CSTATE>default { return DEFAULT; }
+
+<TSTATE>lower { return LOWER; }
+<CSTATE>lower { return LOWER; }
+
+<TSTATE>upper { return UPPER; }
+<CSTATE>upper { return UPPER; }
 
 <TSTATE>=	{ return EQUAL; }
 <LSTATE>=	{ return EQUAL; }

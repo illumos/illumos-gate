@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
- * Copyright 2015 Toomas Soome <tsoome@me.com>
+ * Copyright 2016 Toomas Soome <tsoome@me.com>
  * Copyright (c) 2015 by Delphix. All rights reserved.
  */
 
@@ -42,6 +42,7 @@ extern "C" {
 #define	BE_AUTO_NAME_DELIM	'-'
 #define	BE_DEFAULTS		"/etc/default/be"
 #define	BE_DFLT_BENAME_STARTS	"BENAME_STARTS_WITH="
+#define	BE_DFLT_BE_HAS_GRUB	"BE_HAS_GRUB="
 #define	BE_CONTAINER_DS_NAME	"ROOT"
 #define	BE_DEFAULT_CONSOLE	"text"
 #define	BE_POLICY_PROPERTY	"org.opensolaris.libbe:policy"
@@ -61,6 +62,8 @@ extern "C" {
 #define	BE_GRUB_STAGE_1		"/boot/grub/stage1"
 #define	BE_GRUB_STAGE_2		"/boot/grub/stage2"
 #define	BE_INSTALL_BOOT		"/usr/sbin/installboot"
+#define	BE_LOADER_STAGE_1	"/boot/pmbr"
+#define	BE_LOADER_STAGE_2	"/boot/gptzfsboot"
 #define	BE_SPARC_BOOTBLK	"/lib/fs/zfs/bootblk"
 
 #define	ZFS_CLOSE(_zhp) \
@@ -135,6 +138,7 @@ typedef struct be_plcy_list {
 
 struct be_defaults {
 	boolean_t	be_deflt_rpool_container;
+	boolean_t	be_deflt_grub;
 	char		be_deflt_bename_starts_with[ZFS_MAX_DATASET_NAME_LEN];
 };
 

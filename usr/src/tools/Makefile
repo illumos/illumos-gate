@@ -22,6 +22,7 @@
 #
 # Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright 2016 Toomas Soome <tsoome@me.com>
 #
 
 include ../Makefile.master
@@ -66,7 +67,8 @@ sparc_SUBDIRS= \
 i386_SUBDIRS=		\
 	aw		\
 	elfextract	\
-	mbh_patch
+	mbh_patch	\
+	btxld
 
 LINTSUBDIRS= \
 	codereview \
@@ -94,11 +96,11 @@ ROOTDIRS= \
 	$(ROOTONBLD)/lib/$(MACH) \
 	$(ROOTONBLD)/lib/$(MACH)/64 \
 	$(ROOTONBLD)/lib/perl \
-	$(ROOTONBLD)/lib/python2.6 \
-	$(ROOTONBLD)/lib/python2.6/onbld \
-	$(ROOTONBLD)/lib/python2.6/onbld/Checks \
-	$(ROOTONBLD)/lib/python2.6/onbld/hgext \
-	$(ROOTONBLD)/lib/python2.6/onbld/Scm \
+	$(ROOTONBLD)/lib/python$(PYTHON_VERSION) \
+	$(ROOTONBLD)/lib/python$(PYTHON_VERSION)/onbld \
+	$(ROOTONBLD)/lib/python$(PYTHON_VERSION)/onbld/Checks \
+	$(ROOTONBLD)/lib/python$(PYTHON_VERSION)/onbld/hgext \
+	$(ROOTONBLD)/lib/python$(PYTHON_VERSION)/onbld/Scm \
 	$(ROOTONBLD)/env \
 	$(ROOTONBLD)/etc \
 	$(ROOTONBLD)/etc/exception_lists \
@@ -146,7 +148,7 @@ $(ROOTDIRS):
 	$(INS.dir)
 
 $(ROOTONBLDLIBPY): $(ROOTDIRS)
-	$(RM) -r $@; $(SYMLINK) python2.6 $@
+	$(RM) -r $@; $(SYMLINK) python$(PYTHON_VERSION) $@
 
 make: ctf
 

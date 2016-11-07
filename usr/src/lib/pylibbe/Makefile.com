@@ -30,11 +30,10 @@ OBJECTS =	libbe_py.o
 
 include ../../Makefile.lib
 
-PYTHON = 	$(PYTHON_26)
 LIBLINKS = 
 SRCDIR =	../common
-ROOTLIBDIR=	$(ROOT)/usr/lib/python2.6/vendor-packages
-ROOTLIBDIR64=	$(ROOT)/usr/lib/python2.6/vendor-packages/64
+ROOTLIBDIR=	$(ROOT)/usr/lib/python$(PYTHON_VERSION)/vendor-packages
+ROOTLIBDIR64=	$(ROOT)/usr/lib/python$(PYTHON_VERSION)/vendor-packages/64
 PYOBJS=		$(PYSRCS:%.py=$(SRCDIR)/%.pyc)
 PYFILES=	$(PYSRCS) $(PYSRCS:%.py=%.pyc)
 ROOTPYBEFILES=  $(PYFILES:%=$(ROOTLIBDIR)/%)
@@ -44,12 +43,12 @@ C99MODE=        $(C99_ENABLE)
 LIBS =		$(DYNLIB)
 LDLIBS +=	-lbe -lnvpair -lc
 CFLAGS +=	$(CCVERBOSE)
-CPPFLAGS +=	-I$(ADJUNCT_PROTO)/usr/include/python2.6 \
+CPPFLAGS +=	-I$(ADJUNCT_PROTO)/usr/include/python$(PYTHON_VERSION) \
 		-D_FILE_OFFSET_BITS=64 -I../../libbe/common
 
 .KEEP_STATE:
 
-all install := LDLIBS += -lpython2.6
+all install := LDLIBS += -lpython$(PYTHON_VERSION)
 
 all: $(PYOBJS) $(LIBS)
 

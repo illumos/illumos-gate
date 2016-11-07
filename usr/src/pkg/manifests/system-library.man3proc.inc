@@ -128,6 +128,7 @@ file path=usr/share/man/man3proc/proc_str2flt.3proc
 file path=usr/share/man/man3proc/proc_str2fltset.3proc
 file path=usr/share/man/man3proc/proc_unctrl_psinfo.3proc
 file path=usr/share/man/man3proc/proc_walk.3proc
+file path=usr/share/man/man3proc/Psecflags.3proc
 file path=usr/share/man/man3proc/Psetbkpt.3proc
 file path=usr/share/man/man3proc/Psetcred.3proc
 file path=usr/share/man/man3proc/Psetfault.3proc

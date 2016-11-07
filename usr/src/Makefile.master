@@ -27,6 +27,7 @@
 # Copyright 2015, OmniTI Computer Consulting, Inc. All rights reserved.
 # Copyright 2015 Gary Mills
 # Copyright 2015 Igor Kozhukhov <ikozhukhov@gmail.com>
+# Copyright 2016 Toomas Soome <tsoome@me.com>
 #
 
 #
@@ -131,6 +132,7 @@ RPCGEN=		/usr/bin/rpcgen
 STABS=		$(ONBLD_TOOLS)/bin/$(MACH)/stabs
 ELFEXTRACT=	$(ONBLD_TOOLS)/bin/$(MACH)/elfextract
 MBH_PATCH=	$(ONBLD_TOOLS)/bin/$(MACH)/mbh_patch
+BTXLD=		$(ONBLD_TOOLS)/bin/$(MACH)/btxld
 ECHO=		echo
 INS=		install
 TRUE=		true
@@ -178,8 +180,9 @@ PERL_ARCH=	i86pc-solaris-thread-multi-64int
 PERL_ARCH64=	i86pc-solaris-thread-multi-64
 $(SPARC_BLD)PERL_ARCH= sun4-solaris-thread-multi-64int
 $(SPARC_BLD)PERL_ARCH64= sun4-solaris-thread-multi-64int
-PYTHON_26=	/usr/bin/python2.6
-PYTHON=		$(PYTHON_26)
+PYTHON_VERSION=	2.7
+PYTHON_PKGVERS=	-27
+PYTHON=		/usr/bin/python$(PYTHON_VERSION)
 SORT=		/usr/bin/sort
 TOUCH=		/usr/bin/touch
 WC=		/usr/bin/wc
@@ -247,7 +250,7 @@ INS.symlink=	$(RM) $@; $(SYMLINK) $(INSLINKTARGET) $@
 # files we must make certain to not adjust the mtime of the source
 # (.py) file.
 #
-INS.pyfile=	$(INS.file); $(TOUCH) -r $< $@
+INS.pyfile=	$(RM) $@; $(SED) -e "1s:^\#!@PYTHON@:\#!$(PYTHON):" < $< > $@; $(CHMOD) $(FILEMODE) $@; $(TOUCH) -r $< $@
 
 # MACH must be set in the shell environment per uname -p on the build host
 # More specific architecture variables should be set in lower makefiles.
@@ -1096,7 +1099,7 @@ PKGPUBLISHER_NONREDIST=	on-extra
 	$(CHMOD) +x $@
 
 .py:
-	$(RM) $@; $(CAT) $< > $@; $(CHMOD) +x $@
+	$(RM) $@; $(SED) -e "1s:^\#!@PYTHON@:\#!$(PYTHON):" < $< > $@; $(CHMOD) +x $@
 
 .py.pyc:
 	$(RM) $@

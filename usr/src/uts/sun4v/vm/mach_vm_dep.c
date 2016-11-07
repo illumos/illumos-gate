@@ -52,6 +52,7 @@
 #include <sys/stack.h>
 #include <sys/atomic.h>
 #include <sys/promif.h>
+#include <sys/random.h>
 
 uint_t page_colors = 0;
 uint_t page_colors_mask = 0;
@@ -166,6 +167,13 @@ size_t contig_mem_slab_size			= MMU_PAGESIZE4M;
 /* Boot-time allocated buffer to pre-populate the contig_mem_arena */
 static size_t contig_mem_prealloc_size;
 static void *contig_mem_prealloc_buf;
+
+/*
+ * The maximum amount a randomized mapping will be slewed.  We should perhaps
+ * arrange things so these tunables can be separate for mmap, mmapobj, and
+ * ld.so
+ */
+size_t aslr_max_map_skew = 256 * 1024 * 1024; /* 256MB */
 
 /*
  * map_addr_proc() is the routine called when the system is to
@@ -318,6 +326,20 @@ map_addr_proc(caddr_t *addrp, size_t len, offset_t off, int vacalign,
 		addr += (long)off;
 		if (addr > as_addr) {
 			addr -= align_amount;
+		}
+
+		/*
+		 * If randomization is requested, slew the allocation
+		 * backwards, within the same gap, by a random amount.
+		 */
+		if (flags & _MAP_RANDOMIZE) {
+			uint32_t slew;
+
+			(void) random_get_pseudo_bytes((uint8_t *)&slew,
+			    sizeof (slew));
+
+			slew = slew % MIN(aslr_max_map_skew, (addr - base));
+			addr -= P2ALIGN(slew, align_amount);
 		}
 
 		ASSERT(addr > base);
@@ -774,15 +796,4 @@ contig_mem_prealloc(caddr_t alloc_base, pgcnt_t npages)
 	alloc_base += contig_mem_prealloc_size;
 
 	return (alloc_base);
-}
-
-static uint_t sp_color_stride = 16;
-static uint_t sp_color_mask = 0x1f;
-static uint_t sp_current_color = (uint_t)-1;
-
-size_t
-exec_get_spslew(void)
-{
-	uint_t spcolor = atomic_inc_32_nv(&sp_current_color);
-	return ((size_t)((spcolor & sp_color_mask) * SA(sp_color_stride)));
 }

@@ -1,0 +1,66 @@
+\ ** ficl/softwords/softcore.fr
+\ ** FICL soft extensions
+\ ** John Sadler (john_sadler@alum.mit.edu)
+\ ** September, 1998
+
+S" FICL_WANT_USER" ENVIRONMENT? drop [if]
+\ ** Ficl USER variables
+\ ** See words.c for primitive def'n of USER
+variable nUser  0 nUser !
+: user   \ name ( -- )
+    nUser dup @ user 1 swap +! ;
+
+[endif]
+
+
+
+S" FICL_WANT_LOCALS" ENVIRONMENT? drop [if]
+
+\ ** LOCAL EXT word set
+
+: locals|  ( name...name | -- )
+    begin
+        bl word   count
+        dup 0= abort" where's the delimiter??"
+        over c@
+        [char] | - over 1- or
+    while
+        (local)
+    repeat 2drop   0 0 (local)
+; immediate
+
+: local  ( name -- )  bl word count (local) ;  immediate
+
+: 2local  ( name -- ) bl word count (2local) ; immediate
+
+: end-locals  ( -- )  0 0 (local) ;  immediate
+
+
+\ Submitted by lch.
+: strdup ( c-addr length -- c-addr2 length2 ior )
+	0 locals| addr2 length c-addr | end-locals
+	length 1 + allocate
+	0= if
+		to addr2
+		c-addr addr2 length move
+		addr2 length 0
+	else
+		0  -1
+	endif
+	;
+
+: strcat ( 2:a 2:b -- 2:new-a )
+	0 locals|  b-length b-u b-addr a-u a-addr | end-locals
+	b-u  to b-length
+	b-addr a-addr a-u + b-length  move
+	a-addr a-u b-length +
+	;
+
+: strcpy ( 2:a 2:b -- 2:new-a )
+	locals| b-u b-addr a-u a-addr | end-locals
+	a-addr 0  b-addr b-u  strcat
+	;
+
+[endif]
+
+\ end-of-file

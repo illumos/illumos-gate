@@ -1,0 +1,69 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2016 Joyent, Inc.
+.\"
+.Dd Aug 18, 2016
+.Dt MC_OPEN 9E
+.Os
+.Sh NAME
+.Nm mc_open ,
+.Nm mc_close
+.Nd optional device open and close entry points
+.Sh SYNOPSIS
+.In sys/mac_provider.h
+.Ft int
+.Fo prefix_m_open
+.Fa "void *driver"
+.Fc
+.Ft void
+.Fo prefix_m_close
+.Fa "void *driver"
+.Fc
+.Sh INTERFACE LEVEL
+illumos DDI specific
+.Sh PARAMETERS
+.Bl -tag -width Fa
+.It Fa driver
+A pointer to the driver's private data that was passed in via the
+.Sy m_pdata
+member of the
+.Xr mac_register 9S
+structure to the
+.Xr mac_register 9F
+function.
+.El
+.Sh DESCRIPTION
+The
+.Fn mc_open
+and
+.Fn mc_close
+entry points are called when the file system node corresponding to the
+device is opened. Standard device drivers do not need to implement this
+function and should not define the callback.
+.Pp
+The GLDv3 guarantees that calls to the
+.Fn mc_open
+and
+.Fn mc_close
+entry points are serialized. Only one such call will be issued to the
+device driver at any time.
+.Sh RETURN VALUES
+Upon successful completion, the device driver should return
+.Sy 0
+for its
+.Fn mc_open
+entry point. Otherwise, it should return a non-zero error number to
+indicate an error occurred.
+.Sh SEE ALSO
+.Xr mac 9E ,
+.Xr mac_register 9F ,
+.Xr mac_register 9S

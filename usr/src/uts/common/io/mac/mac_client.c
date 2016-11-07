@@ -3271,7 +3271,8 @@ mac_promisc_add(mac_client_handle_t mch, mac_client_promisc_type_t type,
 	}
 
 	if ((mcip->mci_state_flags & MCIS_IS_VNIC) &&
-	    type == MAC_CLIENT_PROMISC_ALL) {
+	    type == MAC_CLIENT_PROMISC_ALL &&
+	    (mcip->mci_protect_flags & MPT_FLAG_PROMISC_FILTERED)) {
 		/*
 		 * The function is being invoked by the upper MAC client
 		 * of a VNIC. The VNIC should only see the traffic
@@ -5551,4 +5552,24 @@ mac_client_set_rings(mac_client_handle_t mch, int rxrings, int txrings)
 		mrp->mrp_mask |= MRP_TX_RINGS;
 		mrp->mrp_ntxrings = txrings;
 	}
+}
+
+boolean_t
+mac_get_promisc_filtered(mac_client_handle_t mch)
+{
+	mac_client_impl_t	*mcip = (mac_client_impl_t *)mch;
+
+	return (mcip->mci_protect_flags & MPT_FLAG_PROMISC_FILTERED);
+}
+
+void
+mac_set_promisc_filtered(mac_client_handle_t mch, boolean_t enable)
+{
+	mac_client_impl_t	*mcip = (mac_client_impl_t *)mch;
+
+	ASSERT(MAC_PERIM_HELD((mac_handle_t)mcip->mci_mip));
+	if (enable)
+		mcip->mci_protect_flags |= MPT_FLAG_PROMISC_FILTERED;
+	else
+		mcip->mci_protect_flags &= ~MPT_FLAG_PROMISC_FILTERED;
 }

@@ -1,0 +1,204 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright (c) 2016, Toomas Soome <tsoome@me.com>
+#
+
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
+
+# NOTE: libficl should be kept in sync with interfaces used in standalone
+# ficl in loader, so we can use this library to verify loader functionality.
+
+$mapfile_version 2
+
+SYMBOL_VERSION ILLUMOSprivate {
+    global:
+	bf_init;
+	bf_fini;
+	bf_run;
+	ficl2IntegerDivideFloored;
+	ficl2IntegerDivideSymmetric;
+	ficl2UnsignedDivide;
+	ficlAlignPointer;
+	ficlCallbackAssert;
+	ficlCallbackDefaultTextOut;
+	ficlCallbackTextOut;
+	ficlDictionaryAbortDefinition;
+	ficlDictionaryAlign;
+	ficlDictionaryAllot;
+	ficlDictionaryAllotCells;
+	ficlDictionaryAppend2Constant;
+	ficlDictionaryAppend2ConstantInstruction;
+	ficlDictionaryAppendCell;
+	ficlDictionaryAppendCharacter;
+	ficlDictionaryAppendConstant;
+	ficlDictionaryAppendConstantInstruction;
+	ficlDictionaryAppendData;
+	ficlDictionaryAppendInstruction;
+	ficlDictionaryAppendPrimitive;
+	ficlDictionaryAppendString;
+	ficlDictionaryAppendUnsigned;
+	ficlDictionaryAppendWord;
+	ficlDictionaryCellsAvailable;
+	ficlDictionaryCellsUsed;
+	ficlDictionaryClearFlags;
+	ficlDictionaryCreate;
+	ficlDictionaryCreateHashed;
+	ficlDictionaryCreateWordlist;
+	ficlDictionaryDestroy;
+	ficlDictionaryEmpty;
+	ficlDictionaryFindEnclosingWord;
+	ficlDictionaryIncludes;
+	ficlDictionaryIsAWord;
+	ficlDictionaryLookup;
+	ficlDictionaryResetSearchOrder;
+	ficlDictionarySee;
+	ficlDictionarySet2Constant;
+	ficlDictionarySet2ConstantInstruction;
+	ficlDictionarySetConstant;
+	ficlDictionarySetConstantInstruction;
+	ficlDictionarySetFlags;
+	ficlDictionarySetImmediate;
+	ficlDictionarySetInstruction;
+	ficlDictionarySetPrimitive;
+	ficlDictionaryUnsmudge;
+	ficlDictionaryWhere;
+	ficlDigitToCharacter;
+	ficlFree;
+	ficlHashCode;
+	ficlHashForget;
+	ficlHashInsertWord;
+	ficlHashLookup;
+	ficlHashReset;
+	ficlIsPowerOfTwo;
+	ficlLocalParen;
+	ficlLocalParenIm;
+	ficlLtoa;
+	ficlMalloc;
+	ficlPrimitiveHashSummary;
+	ficlPrimitiveLiteralIm;
+	ficlPrimitiveParseStepParen;
+	ficlPrimitiveTick;
+	ficlRealloc;
+	ficlStackCheck;
+	ficlStackCreate;
+	ficlStackDepth;
+	ficlStackDestroy;
+	ficlStackWalk;
+	ficlStackDisplay;
+	ficlStackDrop;
+	ficlStackFetch;
+	ficlStackGetTop;
+	ficlStackLink;
+	ficlStackPick;
+	ficlStackPop;
+	ficlStackPop2Integer;
+	ficlStackPop2Unsigned;
+	ficlStackPopFloat;
+	ficlStackPopInteger;
+	ficlStackPopPointer;
+	ficlStackPopUnsigned;
+	ficlStackPush;
+	ficlStackPush2Integer;
+	ficlStackPush2Unsigned;
+	ficlStackPushFloat;
+	ficlStackPushInteger;
+	ficlStackPushPointer;
+	ficlStackPushUnsigned;
+	ficlStackReset;
+	ficlStackRoll;
+	ficlStackSetTop;
+	ficlStackStore;
+	ficlStackUnlink;
+	ficlStrincmp;
+	ficlStringCaseFold;
+	ficlStringReverse;
+	ficlStringSkipSpace;
+	ficlSystemAddParseStep;
+	ficlSystemAddPrimitiveParseStep;
+	ficlSystemCompileCore;
+	ficlSystemCompileExtras;
+	ficlSystemCompileFile;
+	ficlSystemCompileFloat;
+	ficlSystemCompilePlatform;
+	ficlSystemCompilePrefix;
+	ficlSystemCompileSearch;
+	ficlSystemCompileSoftCore;
+	ficlSystemCompileTools;
+	ficlSystemCreate;
+	ficlSystemCreateVm;
+	ficlSystemDestroy;
+	ficlSystemDestroyVm;
+	ficlSystemGetDictionary;
+	ficlSystemGetEnvironment;
+	ficlSystemGetLocals;
+	ficlSystemLookup;
+	ficlSystemLookupLocal;
+	ficlUltoa;
+	ficlVmBranchRelative;
+	ficlVmCreate;
+	ficlVmDestroy;
+	ficlVmDictionaryAllot;
+	ficlVmDictionaryAllotCells;
+	ficlVmDictionaryCheck;
+	ficlVmDictionarySimpleCheck;
+	ficlVmDisplayDataStack;
+	ficlVmDisplayDataStackSimple;
+	ficlVmDisplayFloatStack;
+	ficlVmDisplayReturnStack;
+	ficlVmEvaluate;
+	ficlVmExecuteString;
+	ficlVmExecuteWord;
+	ficlVmExecuteXT;
+	ficlVmGetDictionary;
+	ficlVmGetString;
+	ficlVmGetWord;
+	ficlVmGetWord0;
+	ficlVmGetWordToPad;
+	ficlVmInnerLoop;
+	ficlVmParseFloatNumber;
+	ficlVmParseNumber;
+	ficlVmParseString;
+	ficlVmParseStringEx;
+	ficlVmParseWord;
+	ficlVmParsePrefix;
+	ficlVmPop;
+	ficlVmPopIP;
+	ficlVmPopTib;
+	ficlVmPush;
+	ficlVmPushIP;
+	ficlVmPushTib;
+	ficlVmQuit;
+	ficlVmReset;
+	ficlVmSetTextOut;
+	ficlVmTextOut;
+	ficlVmThrow;
+	ficlVmThrowError;
+	ficlWordClassify;
+	ficlWordIsCompileOnly;
+	ficlWordIsImmediate;
+
+    local:
+	*;
+};

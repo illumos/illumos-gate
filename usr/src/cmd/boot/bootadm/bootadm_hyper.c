@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright 2016 Toomas Soome <tsoome@me.com>
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -32,7 +33,6 @@
 #include <ctype.h>
 #include <sys/types.h>
 
-#include "message.h"
 #include "bootadm.h"
 
 #define	HYPER_KERNEL_DIR 		"/platform/i86xpv/kernel"
@@ -82,7 +82,7 @@ append_str(char *orig, char *str, char *delim)
 
 	len = strlen(orig) + strlen(str) + strlen(delim) + 1;
 	if ((newstr = malloc(len)) == NULL) {
-		bam_error(NO_MEM, len);
+		bam_error(_("could not allocate memory: size = %u\n"), len);
 		bam_exit(1);
 	}
 
@@ -116,7 +116,7 @@ modify_path(char *path, char *old_str, char *new_str)
 	len = strlen(path) - strlen(old_str) + strlen(new_str) + 1;
 
 	if ((newpath = malloc(len)) == NULL) {
-		bam_error(NO_MEM, len);
+		bam_error(_("could not allocate memory: size = %u\n"), len);
 		bam_exit(1);
 	}
 
@@ -171,7 +171,8 @@ get_token(char **token, char *str, char *delim)
 
 			/* found a delimiter, so create a token string */
 			if ((*token = malloc(len)) == NULL) {
-				bam_error(NO_MEM, len);
+				bam_error(_("could not allocate memory: "
+				    "size = %u\n"), len);
 				bam_exit(1);
 			}
 
@@ -520,7 +521,8 @@ cvt_metal_kernel(char *kernstr, char **path)
 	 * hypervisor, so error out now.
 	 */
 	if (strstr(*path, XEN_MENU) != NULL) {
-		bam_error(ALREADY_HYPER);
+		bam_error(_("default entry already setup for use with the "
+		    "hypervisor!\n"));
 		free(*path);
 		*path = NULL;
 		return (1);
@@ -576,7 +578,8 @@ cvt_hyper_kernel(char *kernel)
 	 * to run on bare metal, so error out now.
 	 */
 	if (strncmp(token, METAL_KERNEL_DIR, strlen(METAL_KERNEL_DIR)) == 0) {
-		bam_error(ALREADY_METAL);
+		bam_error(_("default entry already setup for use with a metal "
+		    "kernel!\n"));
 		free(token);
 		return (-1);
 	}
@@ -668,7 +671,8 @@ parse_bootenvrc(char *osroot)
 
 	/* if we couldn't open the bootenv.rc file, ignore the issue. */
 	if ((fp = fopen(rcpath, "r")) == NULL) {
-		BAM_DPRINTF((D_NO_BOOTENVRC, rcpath, strerror(errno)));
+		BAM_DPRINTF(("could not open %s: %s\n", rcpath,
+		    strerror(errno)));
 		return;
 	}
 
@@ -775,13 +779,14 @@ cvt_to_hyper(menu_t *mp, char *osroot, char *extra_args)
 
 	assert(osroot);
 
-	BAM_DPRINTF((D_FUNC_ENTRY2, fcn, osroot, extra_args));
+	BAM_DPRINTF(("%s: entered. args: %s %s\n", fcn, osroot, extra_args));
 
 	/*
 	 * First just check to verify osroot is a sane directory.
 	 */
 	if ((osdev = get_special(osroot)) == NULL) {
-		bam_error(CANT_FIND_SPECIAL, osroot);
+		bam_error(_("cant find special file for mount-point %s\n"),
+		    osroot);
 		return (BAM_ERROR);
 	}
 
@@ -808,7 +813,8 @@ cvt_to_hyper(menu_t *mp, char *osroot, char *extra_args)
 
 	/* couldn't find it, so error out */
 	if (ent == NULL) {
-		bam_error(CANT_FIND_DEFAULT, curdef);
+		bam_error(_("unable to find default boot entry (%d) in "
+		    "menu.lst file.\n"), curdef);
 		goto abort;
 	}
 
@@ -854,7 +860,9 @@ cvt_to_hyper(menu_t *mp, char *osroot, char *extra_args)
 			    &kern_path)) != 0) {
 				if (ret < 0) {
 					ret = BAM_ERROR;
-					bam_error(KERNEL_NOT_PARSEABLE, curdef);
+					bam_error(_("kernel$ in default boot "
+					    "entry (%d) missing or not "
+					    "parseable.\n"), curdef);
 				} else
 					ret = BAM_NOCHANGE;
 
@@ -871,17 +879,20 @@ cvt_to_hyper(menu_t *mp, char *osroot, char *extra_args)
 	 * malformed.
 	 */
 	if (findroot == NULL) {
-		bam_error(FINDROOT_NOT_FOUND, curdef);
+		bam_error(_("findroot in default boot entry (%d) missing.\n"),
+		    curdef);
 		goto abort;
 	}
 
 	if (module == NULL) {
-		bam_error(MODULE_NOT_PARSEABLE, curdef);
+		bam_error(_("module$ in default boot entry (%d) missing or "
+		    "not parseable.\n"), curdef);
 		goto abort;
 	}
 
 	if (kern_path == NULL) {
-		bam_error(KERNEL_NOT_FOUND, curdef);
+		bam_error(_("kernel$ in default boot entry (%d) missing.\n"),
+		    curdef);
 		goto abort;
 	}
 
@@ -964,8 +975,8 @@ cvt_to_hyper(menu_t *mp, char *osroot, char *extra_args)
 	if (ent->flags & BAM_ENTRY_BOOTADM)
 		ent->flags &= ~BAM_ENTRY_BOOTADM;
 
-	BAM_DPRINTF((D_CVT_CMD_KERN_DOLLAR, fcn, kernel));
-	BAM_DPRINTF((D_CVT_CMD_MOD_DOLLAR, fcn, mod_kernel));
+	BAM_DPRINTF(("%s: converted kernel cmd to %s\n", fcn, kernel));
+	BAM_DPRINTF(("%s: converted module cmd to %s\n", fcn, mod_kernel));
 
 	if ((newdef = add_boot_entry(mp, title, findroot, kernel, mod_kernel,
 	    module, bootfs)) == BAM_ERROR)
@@ -978,7 +989,8 @@ cvt_to_hyper(menu_t *mp, char *osroot, char *extra_args)
 	if (delete_boot_entry(mp, curdef, DBE_QUIET) == BAM_SUCCESS)
 		newdef--;
 	else
-		bam_print(NEW_BOOT_ENTRY, title);
+		bam_print(_("unable to modify default entry; creating new "
+		    "boot entry for %s\n"), title);
 
 	/*
 	 * If we successfully created the new entry, set the default boot
@@ -989,7 +1001,9 @@ cvt_to_hyper(menu_t *mp, char *osroot, char *extra_args)
 
 abort:
 	if (ret != BAM_NOCHANGE)
-		bam_error(HYPER_ABORT, ((*osroot == NULL) ? "/" : osroot));
+		bam_error(_("error converting GRUB menu entry on %s for use "
+		    "with the hypervisor.\nAborting.\n"),
+		    ((*osroot == NULL) ? "/" : osroot));
 
 	return (ret);
 }
@@ -1023,13 +1037,14 @@ cvt_to_metal(menu_t *mp, char *osroot, char *menu_root)
 
 	assert(osroot);
 
-	BAM_DPRINTF((D_FUNC_ENTRY2, fcn, osroot, ""));
+	BAM_DPRINTF(("%s: entered. args: %s %s\n", fcn, osroot, ""));
 
 	/*
 	 * First just check to verify osroot is a sane directory.
 	 */
 	if ((osdev = get_special(osroot)) == NULL) {
-		bam_error(CANT_FIND_SPECIAL, osroot);
+		bam_error(_("cant find special file for mount-point %s\n"),
+		    osroot);
 		return (BAM_ERROR);
 	}
 
@@ -1048,7 +1063,8 @@ cvt_to_metal(menu_t *mp, char *osroot, char *menu_root)
 
 	/* couldn't find it, so error out */
 	if (ent == NULL) {
-		bam_error(CANT_FIND_DEFAULT, curdef);
+		bam_error(_("unable to find default boot entry (%d) in "
+		    "menu.lst file.\n"), curdef);
 		goto abort;
 	}
 
@@ -1091,17 +1107,20 @@ cvt_to_metal(menu_t *mp, char *osroot, char *menu_root)
 	 * malformed.
 	 */
 	if (findroot == NULL) {
-		bam_error(FINDROOT_NOT_FOUND, curdef);
+		bam_error(_("findroot in default boot entry (%d) missing.\n"),
+		    curdef);
 		goto abort;
 	}
 
 	if (module == NULL) {
-		bam_error(MODULE_NOT_PARSEABLE, curdef);
+		bam_error(_("module$ in default boot entry (%d) missing or "
+		    "not parseable.\n"), curdef);
 		goto abort;
 	}
 
 	if (kern_path == NULL) {
-		bam_error(KERNEL_NOT_FOUND, curdef);
+		bam_error(_("kernel$ in default boot entry (%d) missing.\n"),
+		    curdef);
 		goto abort;
 	}
 
@@ -1121,7 +1140,8 @@ cvt_to_metal(menu_t *mp, char *osroot, char *menu_root)
 
 	if ((kernel = malloc(len + zfslen)) == NULL) {
 		free(kern_path);
-		bam_error(NO_MEM, len + zfslen);
+		bam_error(_("could not allocate memory: size = %u\n"),
+		    len + zfslen);
 		bam_exit(1);
 	}
 
@@ -1220,8 +1240,8 @@ cvt_to_metal(menu_t *mp, char *osroot, char *menu_root)
 	if (ent->flags & BAM_ENTRY_BOOTADM)
 		ent->flags &= ~BAM_ENTRY_BOOTADM;
 
-	BAM_DPRINTF((D_CVT_CMD_KERN_DOLLAR, fcn, kernel));
-	BAM_DPRINTF((D_CVT_CMD_MOD_DOLLAR, fcn, module));
+	BAM_DPRINTF(("%s: converted kernel cmd to %s\n", fcn, kernel));
+	BAM_DPRINTF(("%s: converted module cmd to %s\n", fcn, module));
 
 	if ((newdef = add_boot_entry(mp, title, findroot, kernel, NULL,
 	    barchive_path, bootfs)) == BAM_ERROR) {
@@ -1236,7 +1256,8 @@ cvt_to_metal(menu_t *mp, char *osroot, char *menu_root)
 	if (delete_boot_entry(mp, curdef, DBE_QUIET) == BAM_SUCCESS)
 		newdef--;
 	else
-		bam_print(NEW_BOOT_ENTRY, title);
+		bam_print(_("unable to modify default entry; creating new "
+		    "boot entry for %s\n"), title);
 
 	free(kernel);
 
@@ -1249,7 +1270,8 @@ cvt_to_metal(menu_t *mp, char *osroot, char *menu_root)
 
 abort:
 	if (ret != BAM_NOCHANGE)
-		bam_error(METAL_ABORT, osroot);
+		bam_error(_("error converting GRUB menu entry on %s for use "
+		    "with a metal kernel.\nAborting.\n"), osroot);
 
 	return (ret);
 }

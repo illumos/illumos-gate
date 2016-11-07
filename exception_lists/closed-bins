@@ -81,6 +81,7 @@
 ./usr/lib/nfs/lockd
 ./usr/lib/snmp
 ./usr/lib/snmp/mibiisa
+./usr/bin/iconv
 ./usr/bin/kbdcomp
 ./usr/bin/localedef
 ./usr/bin/od

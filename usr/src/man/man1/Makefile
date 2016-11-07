@@ -302,6 +302,7 @@ MANFILES=	acctcom.1			\
 	 	profiles.1			\
 	 	projects.1			\
 	 	ps.1				\
+		psecflags.1			\
 	 	ptree.1				\
 	 	pvs.1				\
 	 	pwd.1				\

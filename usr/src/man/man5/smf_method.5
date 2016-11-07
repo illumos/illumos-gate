@@ -3,11 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SMF_METHOD 5 "May 20, 2009"
+.TH SMF_METHOD 5 "June 6, 2016"
 .SH NAME
 smf_method \- service management framework conventions for methods
 .SH DESCRIPTION
-.sp
 .LP
 The class of services managed by \fBsvc.startd\fR(1M) in the service management
 framework, \fBsmf\fR(5), consists of applications that fit a simple
@@ -17,7 +16,6 @@ with additional capabilities. The \fBsvc.startd\fR(1M) daemon and other
 restarters require that the methods which activate, manipulate, or examine a
 service instance follow the conventions described in this manual page.
 .SS "Invocation form"
-.sp
 .LP
 The form of a method invocation is not dictated by convention. In some cases, a
 method invocation might consist of the direct invocation of the daemon or other
@@ -43,7 +41,6 @@ A restarter might define other kinds of methods beyond those referenced in this
 page. The conventions surrounding such extensions are defined by the restarter
 and might not be identical to those given here.
 .SS "Environment Variables"
-.sp
 .LP
 The restarter provides four environment variables to the method that determine
 the context in which the method is invoked.
@@ -100,7 +97,6 @@ shell scripting to compose service methods in the include file described below.
 The method context can cause other environment variables to be set as described
 below.
 .SS "Method Definition"
-.sp
 .LP
 A method is defined minimally by three properties in a propertygroup of type
 \fBmethod\fR.
@@ -140,7 +136,6 @@ Method type. Currently always set to \fBmethod\fR.
 A Method Context can be defined to further refine the execution environment of
 the method. See the \fBMethod Context\fR section for more information.
 .SS "Method Tokens"
-.sp
 .LP
 When defined in the \fBexec\fR string of the method by the restarter
 \fBsvc.startd\fR, a set of tokens are parsed and expanded with appropriate
@@ -258,7 +253,6 @@ service implementation.
 .RE
 
 .SS "Exiting and Exit Status"
-.sp
 .LP
 The required behavior of a start method is to delay exiting until the service
 instance is ready to answer requests or is otherwise functional.
@@ -298,7 +292,6 @@ Use of a precise exit code allows the responsible restarter to categorize an
 error response as likely to be intermittent and worth pursuing restart or
 permanent and request administrative intervention.
 .SS "Timeouts"
-.sp
 .LP
 Each method can have an independent timeout, given in seconds. The choice of a
 particular timeout should be based on site expectations for detecting a method
@@ -315,7 +308,6 @@ preferred, but is available for services that absolutely require it.
 .LP
 \fB-1 timeout_seconds\fR is also accepted, but is a deprecated specification.
 .SS "Shell Programming Support"
-.sp
 .LP
 A set of environment variables that define the above exit status values is
 provided with convenience shell functions in the file
@@ -349,7 +341,6 @@ fi
 .LP
 This example shows the use of both convenience functions that are provided.
 .SS "Method Context"
-.sp
 .LP
 The service management facility offers a common mechanism set the context in
 which the \fBfork\fR(2)-\fBexec\fR(2) model services execute.
@@ -463,6 +454,27 @@ launch the method. If the property is unset, \fB:home\fR is used.
 .sp
 .ne 2
 .na
+\fB\fBsecurity_flags\fR\fR
+.ad
+.sp .6
+.RS 4n
+The security flags to apply when launching the method.  See \fBsecurity-flags\fR(5).
+.sp
+.LP
+The "default" keyword specifies those flags specified in
+\fBsvc:/system/process-security\fR.  The "all" keyword enables all flags, the
+"none" keyword enables no flags.  The "current" keyword specifies the current
+flags.  Flags may be added by specifying their name (optionally preceded
+by '+'), and removed by preceding their name with '-').
+.sp
+.LP
+Use of "all" has associated risks, as future versions of the system may
+include further flags which may harm poorly implemented software.
+.RE
+
+.sp
+.ne 2
+.na
 \fB\fBcorefile_pattern\fR\fR
 .ad
 .sp .6
@@ -534,7 +546,6 @@ File descriptor \fB0\fR is \fB/dev/null\fR. File descriptors \fB1\fR and
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/lib/svc/share/smf_include.sh\fR\fR
@@ -555,15 +566,14 @@ Definitions of exit status codes.
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBzonename\fR(1), \fBcoreadm\fR(1M), \fBinetd\fR(1M), \fBsvccfg\fR(1M),
 \fBsvc.startd\fR(1M), \fBexec\fR(2), \fBfork\fR(2),
 \fBgetdefaultproj\fR(3PROJECT), \fBexec_attr\fR(4), \fBproject\fR(4),
 \fBservice_bundle\fR(4), \fBattributes\fR(5), \fBprivileges\fR(5),
-\fBrbac\fR(5), \fBsmf\fR(5), \fBsmf_bootstrap\fR(5), \fBzones\fR(5)
+\fBrbac\fR(5), \fBsmf\fR(5), \fBsmf_bootstrap\fR(5), \fBzones\fR(5),
+\fBsecurity-flags\fR(5)
 .SH NOTES
-.sp
 .LP
 The present version of \fBsmf\fR(5) does not support multiple repositories.
 .sp

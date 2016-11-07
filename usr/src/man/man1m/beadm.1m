@@ -1,7 +1,7 @@
 '\" te
 .\" Copyright 2013 Nexenta Systems, Inc. All rights reserved.
-.\" Copyright 2015 Toomas Soome <tsoome@me.com>
-.TH BEADM 1M "Mar 2, 2015"
+.\" Copyright 2016 Toomas Soome <tsoome@me.com>
+.TH BEADM 1M "Feb 21, 2016"
 .SH NAME
 beadm \- utility for managing zfs boot environments
 .SH SYNOPSIS
@@ -176,11 +176,8 @@ provided, the new boot environment will be created as a clone of the
 currently
 running boot environment. If the \fB-d\fR option is provided then the
 description is
-also used as the title for the BE's entry in the GRUB menu for
-x86 systems or
-in the boot menu for SPARC systems. If the \fB-d\fR option is
-not provided, \fIbeName\fR
-will be used as the title.
+also used as the title for the BE's entry in the boot menu. If the \fB-d\fR
+option is not provided, \fIbeName\fR will be used as the title.
 .sp
 .ne 2
 .na

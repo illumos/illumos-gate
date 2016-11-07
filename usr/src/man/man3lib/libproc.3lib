@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2015 Joyent, Inc.
 .\"
-.Dd May 08, 2016
+.Dd June 06, 2016
 .Dt LIBPROC 3LIB
 .Os
 .Sh NAME
@@ -223,22 +223,23 @@ manipulation of the process itself.
 .It Sy Pputareg Ta Sy Prd_agent
 .It Sy Pread Ta Sy Pread_string
 .It Sy Preset_maps Ta Sy Psetbkpt
-.It Sy Psetcred Ta Sy Psetfault
-.It Sy Psetflags Ta Sy Psetpriv
-.It Sy Psetrun Ta Sy Psetsignal
-.It Sy Psetsysentry Ta Sy Psetsysexit
-.It Sy Psetwapt Ta Sy Psetzoneid
-.It Sy Psignal Ta Sy Pstate
-.It Sy Pstatus Ta Sy Pstop
-.It Sy Pstopstatus Ta Sy Psync
-.It Sy Psysentry Ta Sy Psysexit
-.It Sy Puname Ta Sy Punsetflags
-.It Sy Pupdate_maps Ta Sy Pupdate_syms
-.It Sy Pwait Ta Sy Pwrite
-.It Sy Pxecbkpt Ta Sy Pxecwapt
-.It Sy Pxlookup_by_addr Ta Sy Pxlookup_by_addr_resolved
-.It Sy Pxlookup_by_name Ta Sy Pzonename
-.It Sy Pzonepath Ta Sy Pzoneroot
+.It Sy Psecflags Ta Sy Psetcred
+.It Sy Psetfault Ta Sy Psetflags
+.It Sy Psetpriv Ta Sy Psetrun
+.It Sy Psetsignal Ta Sy Psetsysentry
+.It Sy Psetsysexit Ta Sy Psetwapt
+.It Sy Psetzoneid Ta Sy Psignal
+.It Sy Pstate Ta Sy Pstatus
+.It Sy Pstop Ta Sy Pstopstatus
+.It Sy Psync Ta Sy Psysentry
+.It Sy Psysexit Ta Sy Puname
+.It Sy Punsetflags Ta Sy Pupdate_maps
+.It Sy Pupdate_syms Ta Sy Pwait
+.It Sy Pwrite Ta Sy Pxecbkpt
+.It Sy Pxecwapt Ta Sy Pxlookup_by_addr
+.It Sy Pxlookup_by_addr_resolved Ta Sy Pxlookup_by_name
+.It Sy Pzonename Ta Sy Pzonepath
+.It Sy Pzoneroot Ta
 .El
 .Ss Thread interrogation and manipulation
 The following routines obtain information about a thread and allow
@@ -1055,6 +1056,7 @@ both source and binary compatibility.
 .Xr Pread 3PROC ,
 .Xr Pread_string 3PROC ,
 .Xr Preset_maps 3PROC ,
+.Xr Psecflags 3PROC ,
 .Xr Psetbkpt 3PROC ,
 .Xr Psetcred 3PROC ,
 .Xr Psetfault 3PROC ,

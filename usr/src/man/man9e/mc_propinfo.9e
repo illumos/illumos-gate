@@ -1,0 +1,259 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2016 Joyent, Inc.
+.\"
+.Dd May 31, 2016
+.Dt MC_PROPINFO 9E
+.Os
+.Sh NAME
+.Nm mc_propinfo
+.Nd get information about a property
+.Sh SYNOPSIS
+.In sys/mac_provider.h
+.Ft void
+.Fo prefix_m_propinfo
+.Fa "void *driver"
+.Fa "const char *pr_name"
+.Fa "mac_prop_id_t pr_num"
+.Fa "mac_prop_info_handle_t hdl"
+.Fc
+.Sh INTERFACE LEVEL
+illumos DDI specific
+.Sh PARAMETERS
+.Bl -tag -width Ds
+.It Fa driver
+A pointer to the driver's private data that was passed in via the
+.Sy m_pdata
+member of the
+.Xr mac_register 9S
+structure to the
+.Xr mac_register 9F
+function.
+.It Fa pr_name
+A null-terminated string that contains the name of the property.
+.It Ft pr_num
+The value indicates the property that the device is working with.
+.It Fa hdl
+A handle to use with the
+.Xr mac_prop_info 9F
+family of routines to indicate the property's metadata.
+.El
+.Sh DESCRIPTION
+The
+.Fn mc_propinfo
+entry point is an optional entry point for networking device drivers
+that is used to obtain metadata about a property, including its
+permissions, default value, and information about valid possible values.
+If the device driver does not implement either of the
+.Xr mc_getprop 9E
+or
+.Xr mc_setprop 9E
+entry points then it does not need to implement the
+.Xr mc_propinfo 9E
+entry point. However, it is highly recommended that these interfaces be
+implemented in order to give users and administrators of the system
+access to the properties of the device.
+.Pp
+When the
+.Fn mc_propinfo
+entry point is called, the driver needs to first identify the property.
+The set of possible properties and their meaning is listed in the
+.Sx PROPERTIES
+section of
+.Xr mac 9E .
+It should identify the property based on the value of
+.Fa pr_num .
+Most drivers will use a
+.Sy switch
+statement and for any property that it supports it should call the
+appropriate
+.Xr mac_prop_info 9F
+functions to set values and then return. When an unknown or unsupported
+property is encountered, generally the
+.Sy default
+case of the switch statement, the device driver should simply do nothing
+and return.
+.Pp
+The special property
+.Sy MAC_PROP_PRIVATE
+indicates that this is a device driver specific private property. The
+device driver must then look at the value of the
+.Fa pr_name
+argument and use
+.Xr strcmp 9F
+on it, comparing it to each of its private properties to identify which
+one it is.
+.Pp
+For each property the driver has three different sets of information
+that it can fill in. The driver should try to fill in all of these that
+make sense, if possible.
+.Bl -enum
+.It
+First, the driver should fill in the permissions of the property with
+the
+.Xr mac_prop_info_set_perm 9F
+function. These permissions indicate what the device driver supports for
+a given property. For each non-private property, see the property list
+in
+.Xr mac 9E
+to see what the maximum property permissions are. As discussed in
+.Xr mac 9E ,
+a device driver may have more limited permissions than the default. For
+example, on some SFP-based devices, it may not be possible to change any
+of the auto-negotiation properties.
+.It
+The driver should then fill in any default value that it has for a
+property. This is the value that the device driver sets by default if no
+other tuning has been performed. There are different functions depending
+on the type of the default value to call. They are all listed in
+.Xr mac_prop_info 9F .
+.It
+Finally, a driver may optionally set one or more value ranges. These are
+used for integer properties such as
+.Sy MAC_PROP_MTU .
+The driver may call
+.Xr mac_prop_info_set_range_uint32 9F
+to set a series of one or more inclusive ranges that describe valid
+values for the property. For example, a device that supports jumbo
+frames up to 9600 bytes would call
+.Xr mac_prop_info_set_range_uint32 9F
+to convey that it supports MTUs in the range of 1500-9600 bytes.
+.El
+.Pp
+If the device driver needs to access its private data, it will be
+available in the
+.Fa driver
+argument which it should cast to the appropriate structure. From there,
+the device driver may need to lock the structure to ensure that access
+to it is properly serialized.
+.Sh RETURN VALUES
+The
+.Fn mc_propinfo
+entry point does not have a return value. Drivers should simply ignore
+and immediately return when encountering unsupported and unknown
+properties.
+.Sh EXAMPLES
+The following example shows how a device driver might structure its
+.Fn mc_propinfo
+entry point.
+.Bd -literal
+#include <sys/mac_provider.h>
+
+/*
+ * Note, this example merely shows the structure of this function.
+ * Different devices will manage their state in different ways. Like other
+ * examples, this assumes that the device has state in a structure called
+ * example_t and that there is a lock which keeps track of that state.
+ */
+
+static void
+example_m_propinfo(void *arg, const char *pr_name, mac_prop_id_t pr_num,
+    mac_prop_info_handle_t prh)
+{
+	uint8_t value;
+	uint_t perm;
+
+	example_t *ep = arg;
+
+	mutex_enter(&ep->ep_lock);
+
+	switch (pr_num) {
+	/*
+	 * We try to fill in as much information for each property as makes
+	 * sense. In some cases, you may only be able to set the permissions.
+	 */
+	case MAC_PROP_DUPLEX:
+	case MAC_PROP_SPEED:
+		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
+		break;
+
+	/*
+	 * The MTU is a good example of a property that has a property range.
+	 * The range represents the valid values the MTU can take.
+	 */
+	case MAC_PROP_MTU:
+		mac_prop_info_set_perm(prh, MAC_PROP_PERM_RW);
+		mac_prop_info_set_range(prh, ep->ep_min_mtu, ep->ep_max_mtu);
+		break;
+
+	/*
+	 * The ADV properties represent things that the device supports and
+	 * can't be changed by the user. These are good examples of properties
+	 * that have a default value and are read-only.
+	 */
+	case MAC_PROP_ADV_100FDX_CAP:
+		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
+		value = (ep->ep_link_sup_speeds & EXAMPLE_100FDX) ? 1 : 0;
+		mac_prop_info_set_default_uint8(prh, value);
+		break;
+	case MAC_PROP_ADV_1000FDX_CAP:
+		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
+		value = (ep->ep_link_sup_speeds & EXAMPLE_1000FDX) ? 1 : 0;
+		mac_prop_info_set_default_uint8(prh, value);
+		break;
+	case MAC_PROP_ADV_10GFDX_CAP:
+		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
+		value = (ep->ep_link_sup_speeds & EXAMPLE_10GDX) ? 1 : 0;
+		mac_prop_info_set_default_uint8(prh, value);
+		break;
+
+	/*
+	 * The EN properties represent the speeds advertised by the driver. On
+	 * baseT (copper) PHYs, we allow them to be set, otherwise we don't.
+	 * This driver always advertises it if supported, hence why all of these
+	 * default to advertised if the link supports its.
+	 */
+	case MAC_PROP_EN_100FDX_CAP:
+		perm = ep->ep_link_type == EXAMPLE_LINK_COPPER ?
+		    MAC_PROP_PERM_RW : MAC_PROP_PERM_READ;
+		mac_prop_info_set_perm(prh, perm);
+		value = (ep->ep_link_sup_speeds & EXAMPLE_100FDX) ? 1 : 0;
+		mac_prop_info_set_default_uint8(prh, value);
+		break;
+	case MAC_PROP_EN_1000FDX_CAP:
+		perm = ep->ep_link_type == EXAMPLE_LINK_COPPER ?
+		    MAC_PROP_PERM_RW : MAC_PROP_PERM_READ;
+		mac_prop_info_set_perm(prh, perm);
+		value = (ep->ep_link_sup_speeds & EXAMPLE_1000FDX) ? 1 : 0;
+		mac_prop_info_set_default_uint8(prh, value);
+		break;
+	case MAC_PROP_EN_10GFDX_CAP:
+		perm = ep->ep_link_type == EXAMPLE_LINK_COPPER ?
+		    MAC_PROP_PERM_RW : MAC_PROP_PERM_READ;
+		mac_prop_info_set_perm(prh, perm);
+		value = (ep->ep_link_sup_speeds & EXAMPLE_10GFDX) ? 1 : 0;
+		mac_prop_info_set_default_uint8(prh, value);
+		break;
+
+	/*
+	 * If this device has private properties, then it should compare pr_name
+	 * with the device's private properties and then fill in property
+	 * information if it recognizes the name.
+	 */
+	case MAC_PROP_PRIVATE:
+		break;
+
+	/*
+	 * For unknown properties, there's not much to do. Simply don't call any
+	 * of the mac_prop_info(9F) related functions.
+	 */
+	default:
+		break;
+	}
+	mutex_exit(&ep->ep_lock);
+}
+.Ed
+.Sh SEE ALSO
+.Xr mac 9E ,
+.Xr mc_getprop 9E ,
+.Xr mc_propinfo 9E ,
+.Xr mac_prop_info 9F

@@ -121,6 +121,7 @@ extern "C" {
 #define	AUT_ATTR32		((char)0x3E)
 #define	AUT_UAUTH		((char)0x3F)
 #define	AUT_ZONENAME		((char)0x60)	/* out of order */
+#define	AUT_SECFLAGS		((char)0x62)	/* out of order */
 
 /*
  * X windows token types
@@ -298,6 +299,7 @@ token_t *au_to_exec_args(const char *, ssize_t);
 token_t *au_to_exec_env(const char *, ssize_t);
 token_t	*au_to_label(bslabel_t *);
 token_t	*au_to_privset(const char *, const priv_set_t *, char, int);
+token_t *au_to_secflags(const char *, secflagset_t);
 
 void	au_uwrite();
 void	au_close(au_kcontext_t *, caddr_t *, int, au_event_t, au_emod_t,

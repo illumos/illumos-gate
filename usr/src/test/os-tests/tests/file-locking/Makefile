@@ -25,9 +25,15 @@ PROGS = \
 C99MODE = -xc99=%all
 
 SRCS = $(PROGS:%=%.c) $(UTILS)
-LINTS = $(SRCS:%.c=%.ln)
 PROGS32 = $(PROGS:%=%.32)
 PROGS64 = $(PROGS:%=%.64)
+
+runtests.32 :=	LDLIBS += -lgen
+runtests.64 :=	LDLIBS64 += -lgen
+
+LINTS = $(PROGS:%=%.ln)
+LINTFLAGS += -erroff=E_NAME_DEF_NOT_USED2
+LINTFLAGS += -erroff=E_NAME_USED_NOT_DEF2
 
 ROOTOPTDIR = $(ROOT)/opt/os-tests/tests/file-locking
 ROOTOPTPROGS = $(PROGS32:%=$(ROOTOPTDIR)/%) \
@@ -60,6 +66,9 @@ $(ROOTOPTDIR)/%: %
 
 $(ROOTOPTDIR)/%: %.ksh
 	$(INS.rename)
+
+%.ln: %.c
+	$(LINT.c) $< $(UTILS) $(LDLIBS)
 
 %.64: %.c
 	$(LINK64.c) -o $@ $< $(UTILS) $(LDLIBS64)

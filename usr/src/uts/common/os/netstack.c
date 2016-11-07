@@ -22,7 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2016, Joyent, Inc.  All rights reserved.
  */
 
 #include <sys/param.h>
@@ -340,7 +340,7 @@ netstack_zone_create(zoneid_t zoneid)
 			/*
 			 * Should never find a pre-existing exclusive stack
 			 */
-			ASSERT(stackid == GLOBAL_NETSTACKID);
+			VERIFY(stackid == GLOBAL_NETSTACKID);
 			kmem_free(ns, sizeof (netstack_t));
 			ns = *nsp;
 			mutex_enter(&ns->netstack_lock);
@@ -1039,6 +1039,26 @@ netstack_find_by_stackid(netstackid_t stackid)
 	}
 	mutex_exit(&netstack_g_lock);
 	return (NULL);
+}
+
+boolean_t
+netstack_inuse_by_stackid(netstackid_t stackid)
+{
+	netstack_t *ns;
+	boolean_t rval = B_FALSE;
+
+	mutex_enter(&netstack_g_lock);
+
+	for (ns = netstack_head; ns != NULL; ns = ns->netstack_next) {
+		if (ns->netstack_stackid == stackid) {
+			rval = B_TRUE;
+			break;
+		}
+	}
+
+	mutex_exit(&netstack_g_lock);
+
+	return (rval);
 }
 
 void

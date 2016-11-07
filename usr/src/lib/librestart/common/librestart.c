@@ -53,6 +53,7 @@
 #include <syslog.h>
 #include <sys/corectl.h>
 #include <sys/machelf.h>
+#include <sys/secflags.h>
 #include <sys/task.h>
 #include <sys/types.h>
 #include <time.h>
@@ -2843,7 +2844,7 @@ restarter_get_method_context(uint_t version, scf_instance_t *inst,
 	    (prop = scf_property_create(h)) == NULL ||
 	    (val = scf_value_create(h)) == NULL) {
 		err = mc_error_create(err, scf_error(),
-		    "Failed to create repository object: %s\n",
+		    "Failed to create repository object: %s",
 		    scf_strerror(scf_error()));
 		goto out;
 	}
@@ -2895,7 +2896,7 @@ restarter_get_method_context(uint_t version, scf_instance_t *inst,
 		goto out;
 	default:
 		err = mc_error_create(err, ret,
-		    "Get method environment failed : %s\n", scf_strerror(ret));
+		    "Get method environment failed: %s", scf_strerror(ret));
 		goto out;
 	}
 
@@ -3099,6 +3100,82 @@ restarter_get_method_context(uint_t version, scf_instance_t *inst,
 		cip->working_dir = strdup(cip->vbuf);
 		if (cip->working_dir == NULL) {
 			err = mc_error_create(err, ENOMEM, ALLOCFAIL);
+			goto out;
+		}
+	}
+
+	/* get security flags */
+	if ((methpg != NULL && scf_pg_get_property(methpg,
+	    SCF_PROPERTY_SECFLAGS, prop) == SCF_SUCCESS) ||
+	    (instpg != NULL && scf_pg_get_property(instpg,
+	    SCF_PROPERTY_SECFLAGS, prop) == SCF_SUCCESS)) {
+		if (scf_property_get_value(prop, val) != SCF_SUCCESS) {
+			ret = scf_error();
+			switch (ret) {
+			case SCF_ERROR_CONNECTION_BROKEN:
+				err = mc_error_create(err, ret, RCBROKEN);
+				break;
+
+			case SCF_ERROR_CONSTRAINT_VIOLATED:
+				err = mc_error_create(err, ret,
+				    "\"%s\" property has multiple values.",
+				    SCF_PROPERTY_SECFLAGS);
+				break;
+
+			case SCF_ERROR_NOT_FOUND:
+				err = mc_error_create(err, ret,
+				    "\"%s\" property has no values.",
+				    SCF_PROPERTY_SECFLAGS);
+				break;
+
+			default:
+				bad_fail("scf_property_get_value", ret);
+			}
+
+			(void) strlcpy(cip->vbuf, ":default", cip->vbuf_sz);
+		} else {
+			ret = scf_value_get_astring(val, cip->vbuf,
+			    cip->vbuf_sz);
+			assert(ret != -1);
+		}
+		mc_used++;
+	} else {
+		ret = scf_error();
+		switch (ret) {
+		case SCF_ERROR_NOT_FOUND:
+			/* okay if missing. */
+			(void) strlcpy(cip->vbuf, ":default", cip->vbuf_sz);
+			break;
+
+		case SCF_ERROR_CONNECTION_BROKEN:
+			err = mc_error_create(err, ret, RCBROKEN);
+			goto out;
+
+		case SCF_ERROR_DELETED:
+			err = mc_error_create(err, ret,
+			    "Property group could not be found");
+			goto out;
+
+		case SCF_ERROR_HANDLE_MISMATCH:
+		case SCF_ERROR_INVALID_ARGUMENT:
+		case SCF_ERROR_NOT_SET:
+		default:
+			bad_fail("scf_pg_get_property", ret);
+		}
+	}
+
+
+	if (scf_default_secflags(h, &cip->def_secflags) != 0) {
+		err = mc_error_create(err, EINVAL, "couldn't fetch "
+		    "default security-flags");
+		goto out;
+	}
+
+	if (strcmp(cip->vbuf, ":default") != 0) {
+		if (secflags_parse(NULL, cip->vbuf,
+		    &cip->secflag_delta) != 0) {
+			err = mc_error_create(err, EINVAL, "couldn't parse "
+			    "security flags: %s", cip->vbuf);
 			goto out;
 		}
 	}
@@ -3343,6 +3420,12 @@ restarter_get_method_context(uint_t version, scf_instance_t *inst,
 		cip->gid = 0;
 		cip->euid = (uid_t)-1;
 		cip->egid = (gid_t)-1;
+
+		if (scf_default_secflags(h, &cip->def_secflags) != 0) {
+			err = mc_error_create(err, EINVAL, "couldn't fetch "
+			    "default security-flags");
+			goto out;
+		}
 	}
 
 	*mcpp = cip;
@@ -3508,6 +3591,35 @@ restarter_set_method_context(struct method_context *cip, const char **fp)
 			ret = -1;
 			goto out;
 		}
+	}
+
+
+	if (psecflags(P_PID, P_MYID, PSF_INHERIT,
+	    &cip->def_secflags.ss_default) != 0) {
+		*fp = "psecflags (default inherit)";
+		ret = errno;
+		goto out;
+	}
+
+	if (psecflags(P_PID, P_MYID, PSF_LOWER,
+	    &cip->def_secflags.ss_lower) != 0) {
+		*fp = "psecflags (default lower)";
+		ret = errno;
+		goto out;
+	}
+
+	if (psecflags(P_PID, P_MYID, PSF_UPPER,
+	    &cip->def_secflags.ss_upper) != 0) {
+		*fp = "psecflags (default upper)";
+		ret = errno;
+		goto out;
+	}
+
+	if (psecflags(P_PID, P_MYID, PSF_INHERIT,
+	    &cip->secflag_delta) != 0) {
+		*fp = "psecflags (from manifest)";
+		ret = errno;
+		goto out;
 	}
 
 	if (restarter_rm_libs_loadable()) {

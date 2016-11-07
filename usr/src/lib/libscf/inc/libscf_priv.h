@@ -29,6 +29,9 @@
 
 #include <libscf.h>
 #include <unistd.h>
+#if !defined(NATIVE_BUILD)
+#include <sys/secflags.h>
+#endif
 
 #ifdef	__cplusplus
 extern "C" {
@@ -591,6 +594,10 @@ int _scf_get_svc_notify_params(const char *, nvlist_t *, int32_t, int, int);
  * nvlist_t
  */
 int _scf_notify_get_params(scf_propertygroup_t *, nvlist_t *);
+
+#if !defined(NATIVE_BUILD)
+int scf_default_secflags(scf_handle_t *, scf_secflags_t *);
+#endif
 
 #define	SCF_NOTIFY_PARAMS_SOURCE_NAME	((const char *)"preference_source")
 

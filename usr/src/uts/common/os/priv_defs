@@ -318,6 +318,11 @@ privilege PRIV_PROC_PRIOCNTL
 	Allows a process to change its scheduling class to any scheduling class,
 	including the RT class.
 
+basic privilege PRIV_PROC_SECFLAGS
+
+	Allows a process to manipulate the secflags of processes (subject to,
+	additionally, the ability to signal that process)
+
 basic privilege PRIV_PROC_SESSION
 
 	Allows a process to send signals or trace processes outside its

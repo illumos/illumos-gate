@@ -72,6 +72,7 @@ EXEC_DATA	^platform/.*/multiboot$
 # Objects that are allowed to have an executable stack
 EXEC_STACK	^platform/.*/MACH(kernel)/unix$
 EXEC_STACK	^platform/.*/multiboot$
+EXEC_STACK	^opt/os-tests/tests/secflags/stacky$
 
 # Objects for which we allow relocations to the text segment
 TEXTREL		^platform/.*/MACH(kernel)/unix$
@@ -139,8 +140,8 @@ UNUSED_RPATH	/usr/postgres/8.3/lib.*\ from\ .*libpq\.so\.5
 UNUSED_RPATH	/usr/sfw/lib.*\ from\ .*libpq\.so\.5
 UNUSED_RPATH	/usr/lib.*\ from\ .*/usr/lib/mps
 UNUSED_RPATH	/usr/ccs/lib.*\ from\ .*/usr/lib/mps
-UNUSED_RPATH	/usr/gnu/lib.*\ from\ .*/usr/lib/libpython2\.6
-UNUSED_RPATH	/usr/gnu/lib.*\ from\ .*/usr/lib/64/libpython2\.6
+UNUSED_RPATH	/usr/gnu/lib.*\ from\ .*/usr/lib/libpython2\..
+UNUSED_RPATH	/usr/gnu/lib.*\ from\ .*/usr/lib/64/libpython2\..
 UNUSED_RPATH	/usr/snadm/lib.*\ from\ .*/usr/snadm/lib/libspmicommon\.so\.1
 
 

@@ -940,7 +940,6 @@ assdeflib_parse(Ofl_desc *ofl, char *optarg)
 	    MSG_STR_SOEXT_SIZE;
 	if (olen > MSG_ARG_ASSDEFLIB_SIZE) {
 		if (optarg[MSG_ARG_ASSDEFLIB_SIZE] != '=') {
-			ld_eprintf(ofl, ERR_FATAL, "Missing =\n");
 			ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_ARG_ILLEGAL),
 			    MSG_ORIG(MSG_ARG_ASSDEFLIB), optarg);
 			return (TRUE);
@@ -1437,6 +1436,32 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *usage)
 				if (ld_wrap_enter(ofl,
 				    optarg + MSG_ARG_WRAP_SIZE) == NULL)
 					return (S_ERROR);
+			} else if (strncmp(optarg, MSG_ORIG(MSG_ARG_ASLR),
+			    MSG_ARG_ASLR_SIZE) == 0) {
+				char *p = optarg + MSG_ARG_ASLR_SIZE;
+				if (*p == '\0') {
+					ofl->ofl_aslr = 1;
+				} else if (*p == '=') {
+					p++;
+
+					if (strcmp(p,
+					    MSG_ORIG(MSG_ARG_ENABLED)) == 0) {
+						ofl->ofl_aslr = 1;
+					} else if (strcmp(p,
+					    MSG_ORIG(MSG_ARG_DISABLED)) == 0) {
+						ofl->ofl_aslr = -1;
+					} else {
+						ld_eprintf(ofl, ERR_FATAL,
+						    MSG_INTL(MSG_ARG_ILLEGAL),
+						    MSG_ORIG(MSG_ARG_ZASLR), p);
+						return (S_ERROR);
+					}
+				} else {
+					ld_eprintf(ofl, ERR_FATAL,
+					    MSG_INTL(MSG_ARG_ILLEGAL),
+					    MSG_ORIG(MSG_ARG_Z), optarg);
+					return (S_ERROR);
+				}
 			} else if ((strncmp(optarg, MSG_ORIG(MSG_ARG_GUIDE),
 			    MSG_ARG_GUIDE_SIZE) == 0) &&
 			    ((optarg[MSG_ARG_GUIDE_SIZE] == '=') ||

@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2012, 2014 by Delphix. All rights reserved.
+ * Copyright (c) 2012, 2015 by Delphix. All rights reserved.
  * Copyright (c) 2013 by Saso Kiselkov. All rights reserved.
  * Copyright (c) 2014 Spectra Logic Corporation, All rights reserved.
  * Copyright (c) 2014 Integros [integros.com]
@@ -101,12 +101,19 @@ struct objset {
 	zfs_redundant_metadata_type_t os_redundant_metadata;
 	int os_recordsize;
 
+	/*
+	 * Pointer is constant; the blkptr it points to is protected by
+	 * os_dsl_dataset->ds_bp_rwlock
+	 */
+	blkptr_t *os_rootbp;
+
 	/* no lock needed: */
 	struct dmu_tx *os_synctx; /* XXX sketchy */
-	blkptr_t *os_rootbp;
 	zil_header_t os_zil_header;
 	list_t os_synced_dnodes;
 	uint64_t os_flags;
+	uint64_t os_freed_dnodes;
+	boolean_t os_rescan_dnodes;
 
 	/* Protected by os_obj_lock */
 	kmutex_t os_obj_lock;

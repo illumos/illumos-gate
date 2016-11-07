@@ -9516,6 +9516,8 @@ export_method(scf_propertygroup_t *pg, struct entity_elts *eelts)
 	    SCF_SUCCESS ||
 	    scf_pg_get_property(pg, SCF_PROPERTY_RESOURCE_POOL, NULL) ==
 	    SCF_SUCCESS ||
+	    scf_pg_get_property(pg, SCF_PROPERTY_SECFLAGS, NULL) ==
+	    SCF_SUCCESS ||
 	    scf_pg_get_property(pg, SCF_PROPERTY_USE_PROFILE, NULL) ==
 	    SCF_SUCCESS;
 
@@ -9540,6 +9542,12 @@ export_method(scf_propertygroup_t *pg, struct entity_elts *eelts)
 		    set_attr_from_prop_default(exp_prop, ctxt,
 		    "resource_pool", ":default") != 0)
 			err = 1;
+
+		if (pg_get_prop(pg, SCF_PROPERTY_SECFLAGS, exp_prop) == 0 &&
+		    set_attr_from_prop_default(exp_prop, ctxt,
+		    "security_flags", ":default") != 0)
+			err = 1;
+
 		/*
 		 * We only want to complain about profile or credential
 		 * properties if we will use them.  To determine that we must
@@ -9662,7 +9670,8 @@ export_method(scf_propertygroup_t *pg, struct entity_elts *eelts)
 		    strcmp(exp_str, SCF_PROPERTY_GROUP) == 0 ||
 		    strcmp(exp_str, SCF_PROPERTY_SUPP_GROUPS) == 0 ||
 		    strcmp(exp_str, SCF_PROPERTY_PRIVILEGES) == 0 ||
-		    strcmp(exp_str, SCF_PROPERTY_LIMIT_PRIVILEGES) == 0) {
+		    strcmp(exp_str, SCF_PROPERTY_LIMIT_PRIVILEGES) == 0 ||
+		    strcmp(exp_str, SCF_PROPERTY_SECFLAGS) == 0) {
 			if (nonenv && !use_profile)
 				continue;
 		} else if (strcmp(exp_str, SCF_PROPERTY_PROFILE) == 0) {
@@ -9847,6 +9856,10 @@ export_method_context(scf_propertygroup_t *pg, struct entity_elts *elts)
 		} else if (strcmp(exp_str, SCF_PROPERTY_RESOURCE_POOL) == 0) {
 			if (set_attr_from_prop(exp_prop, n,
 			    "resource_pool") != 0)
+				err = 1;
+		} else if (strcmp(exp_str, SCF_PROPERTY_SECFLAGS) == 0) {
+			if (set_attr_from_prop(exp_prop, n,
+			    "security_flags") != 0)
 				err = 1;
 		} else if (strcmp(exp_str, SCF_PROPERTY_USE_PROFILE) == 0) {
 			/* EMPTY */

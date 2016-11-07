@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ATA 7D "Apr 18, 2007"
+.TH ATA 7D "Aug 18, 2016"
 .SH NAME
 ata \- AT attachment disk driver
 .SH SYNOPSIS
@@ -13,7 +13,6 @@ ata \- AT attachment disk driver
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBata\fR driver supports disk and ATAPI CD/DVD devices conforming to the
 AT Attachment specification including IDE interfaces. Support is provided for
@@ -23,7 +22,6 @@ both parallel ATA (PATA) and serial ATA (SATA) interfaces.
 Refer to the \fISolaris x86 Hardware Compatibility List\fR for a list of
 supported controllers.
 .SH PRECONFIGURE
-.sp
 .LP
 A PCI IDE controller can operate in compatibility mode or in PCI-native mode.
 If more than one controller is present in the system, only one can operate in
@@ -35,7 +33,6 @@ the other to slave. If both a PATA disk drive and a PATA CD-ROM drive utilize
 the same controller, you can designate the disk drive as the master with the
 CD-ROM drive as the slave, although this is not mandatory.
 .SS "Supported Settings"
-.sp
 .LP
 Supported settings for the primary controller when in compatibility mode are:
 .RS +4
@@ -123,27 +120,26 @@ If both card and adapter implement Compact Flash Version 2.0, DMA is supported.
 If either of them does not, you should set ata-disk-dma-enabled to '0.'
 .RE
 .SH CONFIGURATION
-.sp
 .LP
 The ata driver properties are usually set in \fBata.conf\fR. However, it may be
 convenient, or in some cases necessary, for you to set some of the DMA related
 properties as a system global boot environment property. You set or modify
-properties in the boot environment immediately prior to booting the Solaris
-kernel using the GRUB boot loader kernel boot command line. You can also set
+properties in the boot environment immediately prior to booting the illumos
+kernel using the boot loader command line. You can also set
 boot environment properties using the \fBeeprom\fR(1M) command or by editing
 the \fBbootenv.rc\fR configuration file. If a property is set in both the
 driver's \fBata.conf\fR file and the boot environment, the \fBata.conf\fR
 property takes precedence.
 .sp
 .LP
-Property modifications other than with the GRUB kernel  boot  command  line are
-not effective until you reboot the system.  Property modifications via the GRUB
-kernel  boot command  line do not persist across future boots.
+Property modifications other than with the boot loader command line are
+not effective until you reboot the system.  Property modifications via the
+boot loader command line do not persist across future boots.
 .sp
 .LP
 Direct Memory Access is enabled for disks and atapi CD/DVD by default. If you
 want to disable DMA when booting from a CD/DVD, you must first set
-atapi-cd-dma-enabled  to 0 using the GRUB kernel boot command line.
+atapi-cd-dma-enabled  to 0 using the boot loader command line.
 .sp
 .ne 2
 .na
@@ -168,7 +164,7 @@ ata-dma-enabled is not set to '0.'
 If ata-disk-dma-enabled set to '0,' DMA is disabled for all ATA disks in the
 system. If this property is absent or set to '1,' DMA is enabled for all ATA
 disks and no further property checks are made. If needed, this property should
-be created by the administrator using the GRUB kernel boot command line or the
+be created by the administrator using the boot loader command line or the
 \fBeeprom\fR(1M) command.
 .RE
 
@@ -186,7 +182,7 @@ CD/DVD's. If set to '1,' DMA is enabled and no further property checks are
 made.
 .sp
 The Solaris installation program creates this property in the boot environment
-with a value of '1.' It can be changed with the GRUB kernel boot command line
+with a value of '1.' It can be changed with the boot loader command line
 or \fBeeprom\fR(1M) as shown in the Example section of this manpage.
 .RE
 
@@ -203,8 +199,8 @@ If atapi-other-dma-enabled is set to '0,' DMA is disabled for all non-CD/DVD
 ATAPI devices. If this property is absent or set to '1,' DMA is enabled and no
 further property checks are made.
 .sp
-If needed, this property should be created by the administrator using the GRUB
-kernel boot command line or the \fBeeprom\fR(1M) command.
+If needed, this property should be created by the administrator using the
+boot loader command line or the \fBeeprom\fR(1M) command.
 .RE
 
 .sp
@@ -300,10 +296,10 @@ Aug 17 06:49:43 caesar ata:[ID 521533 kern.info] model ST320420A, stat
 .in -2
 
 .LP
-\fBExample 3 \fRChange DMA property using GRUB
+\fBExample 3 \fRChange DMA property using the boot loader command line
 .sp
 .LP
-To change a DMA property using the GRUB kernel boot command line:
+To change a DMA property using the boot loader command line:
 
 .RS +4
 .TP
@@ -313,40 +309,12 @@ Reset the system.
 .RS +4
 .TP
 2.
-Press "e" to interrupt the timeout.
+Press "Esc" to interrupt the timeout.
 .RE
 .RS +4
 .TP
 3.
-Select the kernel line.
-.RE
-.RS +4
-.TP
-4.
-Press "e."
-.RE
-.RS +4
-.TP
-5.
-If there is no existing -B option:
-.sp
-Add: -B atapi-cd-dma-enabled=1
-.sp
-else...
-.sp
-Add: atapi-cd-dma-enabled=1 to the end of the current -B option. For example:-B
-foo=bar,atapi-cd-dma-enabled=1.
-.RE
-.RS +4
-.TP
-6.
-Press Enter to commit the edited line to memory. (Does not write to the disk
-and is non-persistent).
-.RE
-.RS +4
-.TP
-7.
-Press 'b' to boot the modified entry.
+Enter: boot -B atapi-cd-dma-enabled=1
 .RE
 .LP
 \fBExample 4 \fRChange DMA Property with eeprom(1M)
@@ -363,7 +331,6 @@ eeprom 'atapi-cd-dma-enabled=1'
 .in -2
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/platform/i86pc/kernel/drv/ata\fR\fR
@@ -395,7 +362,6 @@ to modify properties in this file.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -411,9 +377,8 @@ Architecture	x86
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBeeprom\fR(1M), \fBattributes\fR(5), \fBgrub\fR(5)
+\fBeeprom\fR(1M), \fBattributes\fR(5)
 .sp
 .LP
 \fIINCITS T13 ATA/ATAPI-7\fR specifications

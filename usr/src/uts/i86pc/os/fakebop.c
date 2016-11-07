@@ -89,10 +89,14 @@ static uint_t kbm_debug = 0;
 		bcons_putchar(*cp);		\
 	}
 
-struct xboot_info *xbootp;	/* boot info from "glue" code in low memory */
 bootops_t bootop;	/* simple bootops we'll pass on to kernel */
 struct bsys_mem bm;
 
+/*
+ * Boot info from "glue" code in low memory. xbootp is used by:
+ *	do_bop_phys_alloc(), do_bsys_alloc() and boot_prop_finish().
+ */
+static struct xboot_info *xbootp;
 static uintptr_t next_virt;	/* next available virtual address */
 static paddr_t next_phys;	/* next available physical address from dboot */
 static paddr_t high_phys = -(paddr_t)1;	/* last used physical address */
@@ -345,12 +349,8 @@ do_bsys_free(bootops_t *bop, caddr_t virt, size_t size)
  */
 /*ARGSUSED*/
 static caddr_t
-do_bsys_ealloc(
-	bootops_t *bop,
-	caddr_t virthint,
-	size_t size,
-	int align,
-	int flags)
+do_bsys_ealloc(bootops_t *bop, caddr_t virthint, size_t size,
+    int align, int flags)
 {
 	prom_panic("unsupported call to BOP_EALLOC()\n");
 	return (0);
@@ -1093,15 +1093,15 @@ build_panic_cmdline(const char *cmd, int cmdlen)
  * Construct boot command line for Fast Reboot
  */
 static void
-build_fastboot_cmdline(void)
+build_fastboot_cmdline(struct xboot_info *xbp)
 {
-	saved_cmdline_len =  strlen(xbootp->bi_cmdline) + 1;
+	saved_cmdline_len =  strlen(xbp->bi_cmdline) + 1;
 	if (saved_cmdline_len > FASTBOOT_SAVED_CMDLINE_LEN) {
 		DBG(saved_cmdline_len);
 		DBG_MSG("Command line too long: clearing fastreboot_capable\n");
 		fastreboot_capable = 0;
 	} else {
-		bcopy((void *)(xbootp->bi_cmdline), (void *)saved_cmdline,
+		bcopy((void *)(xbp->bi_cmdline), (void *)saved_cmdline,
 		    saved_cmdline_len);
 		saved_cmdline[saved_cmdline_len - 1] = '\0';
 		build_panic_cmdline(saved_cmdline, saved_cmdline_len - 1);
@@ -1113,8 +1113,9 @@ build_fastboot_cmdline(void)
  * Fast Reboot.
  */
 static void
-save_boot_info(multiboot_info_t *mbi, struct xboot_info *xbi)
+save_boot_info(struct xboot_info *xbi)
 {
+	multiboot_info_t *mbi = xbi->bi_mb_info;
 	struct boot_modules *modp;
 	int i;
 
@@ -1162,7 +1163,7 @@ save_boot_info(multiboot_info_t *mbi, struct xboot_info *xbi)
 /*
  * 1st pass at building the table of boot properties. This includes:
  * - values set on the command line: -B a=x,b=y,c=z ....
- * - known values we just compute (ie. from xbootp)
+ * - known values we just compute (ie. from xbp)
  * - values from /boot/solaris/bootenv.rc (ie. eeprom(1m) values)
  *
  * the grub command line looked like:
@@ -1171,7 +1172,7 @@ save_boot_info(multiboot_info_t *mbi, struct xboot_info *xbi)
  * whoami is the same as boot-file
  */
 static void
-build_boot_properties(void)
+build_boot_properties(struct xboot_info *xbp)
 {
 	char *name;
 	int name_len;
@@ -1198,10 +1199,10 @@ build_boot_properties(void)
 	DBG_MSG("Building boot properties\n");
 	propbuf = do_bsys_alloc(NULL, NULL, MMU_PAGESIZE, 0);
 	DBG((uintptr_t)propbuf);
-	if (xbootp->bi_module_cnt > 0) {
-		bm = xbootp->bi_modules;
+	if (xbp->bi_module_cnt > 0) {
+		bm = xbp->bi_modules;
 		rdbm = NULL;
-		for (midx = i = 0; i < xbootp->bi_module_cnt; i++) {
+		for (midx = i = 0; i < xbp->bi_module_cnt; i++) {
 			if (bm[i].bm_type == BMT_ROOTFS) {
 				rdbm = &bm[i];
 				continue;
@@ -1232,17 +1233,17 @@ build_boot_properties(void)
 	 * If there are any boot time modules or hashes present, then disable
 	 * fast reboot.
 	 */
-	if (xbootp->bi_module_cnt > 1) {
+	if (xbp->bi_module_cnt > 1) {
 		fastreboot_disable(FBNS_BOOTMOD);
 	}
 
 	DBG_MSG("Parsing command line for boot properties\n");
-	value = xbootp->bi_cmdline;
+	value = xbp->bi_cmdline;
 
 	/*
 	 * allocate memory to collect boot_args into
 	 */
-	boot_arg_len = strlen(xbootp->bi_cmdline) + 1;
+	boot_arg_len = strlen(xbp->bi_cmdline) + 1;
 	boot_args = do_bsys_alloc(NULL, NULL, boot_arg_len, MMU_PAGESIZE);
 	boot_args[0] = 0;
 	boot_arg_len = 0;
@@ -1434,17 +1435,17 @@ build_boot_properties(void)
 	 * set the BIOS boot device from GRUB
 	 */
 	netboot = 0;
-	mbi = xbootp->bi_mb_info;
+	mbi = xbp->bi_mb_info;
 
 	/*
 	 * Build boot command line for Fast Reboot
 	 */
-	build_fastboot_cmdline();
+	build_fastboot_cmdline(xbp);
 
 	/*
 	 * Save various boot information for Fast Reboot
 	 */
-	save_boot_info(mbi, xbootp);
+	save_boot_info(xbp);
 
 	if (mbi != NULL && mbi->flags & MB_INFO_BOOTDEV) {
 		boot_device = mbi->boot_device >> 24;
@@ -1517,10 +1518,10 @@ build_boot_properties(void)
  */
 #define	PFN_2GIG	0x80000
 static void
-relocate_boot_archive(void)
+relocate_boot_archive(struct xboot_info *xbp)
 {
 	mfn_t max_mfn = HYPERVISOR_memory_op(XENMEM_maximum_ram_page, NULL);
-	struct boot_modules *bm = xbootp->bi_modules;
+	struct boot_modules *bm = xbp->bi_modules;
 	uintptr_t va;
 	pfn_t va_pfn;
 	mfn_t va_mfn;
@@ -1540,7 +1541,7 @@ relocate_boot_archive(void)
 	 */
 	if (max_mfn < PFN_2GIG)
 		return;
-	if (xbootp->bi_module_cnt < 1) {
+	if (xbp->bi_module_cnt < 1) {
 		DBG_MSG("no boot_archive!");
 		return;
 	}
@@ -1759,8 +1760,8 @@ _start(struct xboot_info *xbp)
 	 */
 	xbootp = xbp;
 #ifdef __xpv
-	HYPERVISOR_shared_info = (void *)xbootp->bi_shared_info;
-	xen_info = xbootp->bi_xen_start_info;
+	HYPERVISOR_shared_info = (void *)xbp->bi_shared_info;
+	xen_info = xbp->bi_xen_start_info;
 #endif
 
 #ifndef __xpv
@@ -1771,17 +1772,17 @@ _start(struct xboot_info *xbp)
 	}
 #endif
 
-	bcons_init((void *)xbootp->bi_cmdline);
+	bcons_init((void *)xbp->bi_cmdline);
 	have_console = 1;
 
 	/*
 	 * enable debugging
 	 */
-	if (strstr((char *)xbootp->bi_cmdline, "kbm_debug"))
+	if (strstr((char *)xbp->bi_cmdline, "kbm_debug"))
 		kbm_debug = 1;
 
 	DBG_MSG("\n\n*** Entered Solaris in _start() cmdline is: ");
-	DBG_MSG((char *)xbootp->bi_cmdline);
+	DBG_MSG((char *)xbp->bi_cmdline);
 	DBG_MSG("\n\n\n");
 
 	/*
@@ -1795,9 +1796,9 @@ _start(struct xboot_info *xbp)
 	/*
 	 * initialize the boot time allocator
 	 */
-	next_phys = xbootp->bi_next_paddr;
+	next_phys = xbp->bi_next_paddr;
 	DBG(next_phys);
-	next_virt = (uintptr_t)xbootp->bi_next_vaddr;
+	next_virt = (uintptr_t)xbp->bi_next_vaddr;
 	DBG(next_virt);
 	DBG_MSG("Initializing boot time memory management...");
 #ifdef __xpv
@@ -1810,7 +1811,7 @@ _start(struct xboot_info *xbp)
 		DBG(xen_virt_start);
 	}
 #endif
-	kbm_init(xbootp);
+	kbm_init(xbp);
 	DBG_MSG("done\n");
 
 	/*
@@ -1839,7 +1840,7 @@ _start(struct xboot_info *xbp)
 	 * pages to high PFN memory.
 	 */
 	if (DOMAIN_IS_INITDOMAIN(xen_info))
-		relocate_boot_archive();
+		relocate_boot_archive(xbp);
 #endif
 
 #ifndef __xpv
@@ -1854,9 +1855,9 @@ _start(struct xboot_info *xbp)
 	 * Start building the boot properties from the command line
 	 */
 	DBG_MSG("Initializing boot properties:\n");
-	build_boot_properties();
+	build_boot_properties(xbp);
 
-	if (strstr((char *)xbootp->bi_cmdline, "prom_debug") || kbm_debug) {
+	if (strstr((char *)xbp->bi_cmdline, "prom_debug") || kbm_debug) {
 		char *name;
 		char *value;
 		char *cp;

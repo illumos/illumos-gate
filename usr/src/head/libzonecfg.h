@@ -268,6 +268,13 @@ struct zone_admintab {
 	char	zone_admin_auths[MAXAUTHS];
 };
 
+#define	ZONECFG_SECFLAGS_MAX	1024
+struct zone_secflagstab {
+	char zone_secflags_lower[ZONECFG_SECFLAGS_MAX];
+	char zone_secflags_upper[ZONECFG_SECFLAGS_MAX];
+	char zone_secflags_default[ZONECFG_SECFLAGS_MAX];
+};
+
 typedef struct zone_userauths {
 	char			user[MAXUSERNAME];
 	char			zonename[ZONENAME_MAX];
@@ -449,6 +456,23 @@ extern	int	zonecfg_modify_pset(zone_dochandle_t, struct zone_psettab *);
 extern	int	zonecfg_lookup_pset(zone_dochandle_t, struct zone_psettab *);
 
 /*
+ * mem-cap configuration.
+ */
+extern	int	zonecfg_delete_mcap(zone_dochandle_t);
+extern	int	zonecfg_modify_mcap(zone_dochandle_t, struct zone_mcaptab *);
+extern	int	zonecfg_lookup_mcap(zone_dochandle_t, struct zone_mcaptab *);
+
+/* security-flags configuration */
+extern	int	zonecfg_add_secflags(zone_dochandle_t,
+    struct zone_secflagstab *);
+extern	int	zonecfg_delete_secflags(zone_dochandle_t,
+    struct zone_secflagstab *);
+extern	int	zonecfg_modify_secflags(zone_dochandle_t,
+    struct zone_secflagstab *, struct zone_secflagstab *);
+extern	int	zonecfg_lookup_secflags(zone_dochandle_t,
+    struct zone_secflagstab *);
+
+/*
  * Temporary pool support functions.
  */
 extern	int	zonecfg_destroy_tmp_pool(char *, char *, int);
@@ -514,6 +538,8 @@ extern	int	zonecfg_enddevperment(zone_dochandle_t);
 extern	int	zonecfg_setadminent(zone_dochandle_t);
 extern	int	zonecfg_getadminent(zone_dochandle_t, struct zone_admintab *);
 extern	int	zonecfg_endadminent(zone_dochandle_t);
+extern	int	zonecfg_getsecflagsent(zone_dochandle_t,
+    struct zone_secflagstab *);
 
 /*
  * Privilege-related functions.

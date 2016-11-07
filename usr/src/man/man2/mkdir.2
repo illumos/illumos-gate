@@ -1,6 +1,6 @@
 '\" te
 .\" Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved.
-.\" Copyright (c) 2014, Joyent, Inc.
+.\" Copyright 2016 Joyent, Inc.
 .\" Copyright 1989 AT&T
 .\" Portions Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
 .\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
@@ -10,7 +10,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH MKDIR 2 "Dec 23, 2014"
+.TH MKDIR 2 "Sep 24, 2016"
 .SH NAME
 mkdir, mkdirat \- make a directory
 .SH SYNOPSIS
@@ -28,18 +28,18 @@ mkdir, mkdirat \- make a directory
 
 .SH DESCRIPTION
 .LP
-The \fBmkdir()\fR and \fBmkidrat()\fR functions create a  new directory named by
+The \fBmkdir()\fR and \fBmkdirat()\fR functions create a new directory named by
 the path name pointed to by \fIpath\fR. The mode of the new directory is
 initialized from \fImode\fR (see \fBchmod\fR(2) for values of mode). The
 protection part of the \fImode\fR argument is modified by the process's file
 creation mask (see \fBumask\fR(2)).
 .sp
 .LP
-The directory's owner \fBID\fR is set to  the process's effective user ID. The
-directory's group \fBID\fR is set to the  process's effective group ID, or if
+The directory's owner \fBID\fR is set to the process's effective user ID. The
+directory's group \fBID\fR is set to the process's effective group ID, or if
 the \fBS_ISGID\fR bit is set in the parent directory, then the group \fBID\fR
 of the directory is inherited from the parent.  The \fBS_ISGID\fR bit of the
-new directory is  inherited from the parent directory.
+new directory is inherited from the parent directory.
 .sp
 .LP
 If \fIpath\fR names a symbolic link, \fBmkdir()\fR and \fBmkdirat()\fR fail and
@@ -63,7 +63,7 @@ contains the new entry are marked for update.
 .SH RETURN VALUES
 .LP
 Upon successful completion, \fB0\fR is returned. Otherwise, \fB\(mi1\fR is
-returned, no directory is created, and  \fBerrno\fR is set to indicate the
+returned, no directory is created, and \fBerrno\fR is set to indicate the
 error.
 .SH ERRORS
 .LP

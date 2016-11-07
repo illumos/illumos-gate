@@ -56,7 +56,7 @@ PLUGIN		^usr/lib/lp/ipp
 PLUGIN		^usr/lib/mdb
 PLUGIN		^usr/lib/pci
 PLUGIN		^usr/lib/picl/plugins
-PLUGIN		^usr/lib/python2.[46]
+PLUGIN		^usr/lib/python2.[467]
 PLUGIN		^usr/lib/rcm/modules
 PLUGIN		^usr/lib/scsi/plugins
 PLUGIN		^usr/lib/sysevent/modules

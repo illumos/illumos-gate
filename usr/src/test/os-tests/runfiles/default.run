@@ -1,0 +1,46 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright (c) 2012 by Delphix. All rights reserved.
+#
+
+[DEFAULT]
+pre =
+verbose = False
+quiet = False
+timeout = 60
+post =
+outputdir = /var/tmp/test_results
+
+[/opt/os-tests/tests/poll_test]
+user = root
+
+[/opt/os-tests/tests/secflags]
+user = root
+tests = ['secflags_aslr',
+         'secflags_core',
+         'secflags_dts',
+         'secflags_elfdump',
+         'secflags_forbidnullmap',
+         'secflags_limits',
+         'secflags_noexecstack',
+         'secflags_proc',
+         'secflags_psecflags',
+         'secflags_syscall',
+         'secflags_truss',
+         'secflags_zonecfg']
+
+[/opt/os-tests/tests/sigqueue]
+tests = ['sigqueue_queue_size']
+
+[/opt/os-tests/tests/file-locking]
+tests = ['runtests.32', 'runtests.64']

@@ -1391,6 +1391,7 @@ extern void smbios_checksum(smbios_hdl_t *, smbios_entry_t *);
 extern int smbios_write(smbios_hdl_t *, int);
 extern void smbios_close(smbios_hdl_t *);
 
+extern boolean_t smbios_truncated(smbios_hdl_t *);
 extern int smbios_errno(smbios_hdl_t *);
 extern const char *smbios_errmsg(int);
 

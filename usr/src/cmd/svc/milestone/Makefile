@@ -76,6 +76,7 @@ SYSTEMSVCS= \
 	identity.xml \
 	initial-boot.xml \
 	manifest-import.xml \
+	process-security.xml \
 	rmtmpfiles.xml	\
 	vtdaemon.xml
 

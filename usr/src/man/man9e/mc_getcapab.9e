@@ -1,0 +1,184 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2016 Joyent, Inc.
+.\"
+.Dd June 02, 2016
+.Dt MC_GETCAPAB 9E
+.Os
+.Sh NAME
+.Nm mc_getcapab
+.Nd get device capabilities
+.Sh SYNOPSIS
+.In sys/mac_provider.h
+.Ft boolean_t
+.Fo prefix_m_getcapab
+.Fa "void *driver"
+.Fa "mac_capab_t capab"
+.Fa "void *cap_data"
+.Fc
+.Sh INTERFACE LEVEL
+illumos DDI specific
+.Sh PARAMETERS
+.Bl -tag -width Fa
+.It Fa driver
+A pointer to the driver's private data that was passed in via the
+.Sy m_pdata
+member of the
+.Xr mac_register 9S
+structure to the
+.Xr mac_register 9F
+function.
+.It Fa capab
+A value which indicates the capability being asked about. For a full
+list of capabilities, see the
+.Sx CAPABILITIES
+section of
+.Xr mac 9E .
+.It Fa cap_data
+Capability specific data that may need to be filled in. The type of data
+used is listed in the
+.Sx CAPABILITIES
+section of
+.Xr mac 9E .
+.El
+.Sh DESCRIPTION
+The
+.Fn mc_getcapab
+entry point is called to determine whether or not a device supports a
+specific capability. The capability in question is specified in
+.Fa capab
+and the list of possible capabilities is listed in the
+.Sx CAPABILITIES
+section of
+.Xr mac 9E .
+.Pp
+Capabilities are generally only queried once for a given device. An
+instance of a device cannot change whether or not it supports a given
+capability after it has been queried by the system.
+.Pp
+Each capability has its own specific kind of data that a device driver
+needs to fill in as part of declaring that it supports a given
+capability. That data is present in
+.Fa cap_data .
+The device driver should cast
+.Fa cap_data
+to the appropriate structure and fill it in. The structures to use for a
+given capability are all listed in the
+.Sx CAPABILITIES
+section of
+.Xr mac 9E .
+.Pp
+The return value is used to indicate whether or not a device driver
+supports the given capability. If it does, then the device driver should
+return
+.Sy B_TRUE
+after filling in
+.Fa cap_data .
+Otherwise, whenever it encounters an unsupported or unknown capability,
+it should return
+.Sy B_FALSE .
+Many device drivers employ
+.Sy switch
+statements and return
+.Sy B_FALSE
+from their default case statement. The system will present unknown
+capabilities to device drivers and they must properly return
+.Sy B_FALSE .
+.Pp
+The driver has access to its soft state by casting the
+.Fa driver
+argument to the specific structure. The device driver is responsible for
+any necessary locking.
+.Pp
+Many capabilities are related to features of hardware. However, all
+hardware and firmware has the possibility of having bugs. It is
+recommended that any capability that is supported have some form of
+tunable, whether in the form of a
+.Sy MAC_PROP_PRIVATE
+driver-specific property and/or a
+.Xr driver.conf 5
+property to disable it. This way when problems are discovered in the
+field, they can be worked around without requiring initial changes to
+the device driver.
+.Sh CONTEXT
+This function is generally only called from
+.Sy kernel
+context.
+.Sh RETURN VALUES
+If the device driver supports the specified capability
+.Fa capab ,
+then it should return
+.Sy B_TRUE .
+Otherwise, it should return
+.Sy B_FALSE .
+.Sh EXAMPLES
+The following example shows how a driver might structure its
+.Fn mc_getcapab
+entry point.
+.Bd -literal
+#include <sys/types.h>
+#include <sys/mac_provider.h>
+
+/*
+ * Note, this example merely shows the structure of the function. For
+ * the purpose of this example, we assume that we have a device which
+ * has members that indicate whether the various capabilities have been
+ * enabled and that they are read-only after the driver has had its
+ * mc_start(9F) entry point called.
+ */
+
+#define	EXAMPLE_LSO_MAX		65535
+
+static boolean_t
+example_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
+{
+	example_t *ep = arg;
+
+	switch (cap) {
+	case MAC_CAPAB_HCKSUM: {
+		uint32_t *txflags = cap_data;
+
+		/*
+		 * The actual flags used here should be replaced with
+		 * what the device actually supports. If the device
+		 * doesn't support checksums, then this case statement
+		 * shouldn't exist.
+		 */
+		*txflags = 0;
+		if (ep->ep_tx_hcksum_enable == B_TRUE)
+			*txflags = HCKSUM_IPHDRCKSUM;
+		break;
+	}
+
+	case MAC_CAPAB_LSO: {
+		mac_capab_lso_t *lso = cap_data;
+
+		if (ep->ep_lso_enable == B_TRUE) {
+			lso->lso_flags = LSO_TX_BASIC_TCP_IPV4;
+			lso->lso_basic_tcp_ipv4.lso_max = EXAMPLE_LSO_MAX;
+		} else {
+			return (B_FALSE);
+		}
+		break;
+	}
+
+	default:
+		return (B_FALSE);
+	}
+
+	return (B_TRUE);
+}
+.Ed
+.Sh SEE ALSO
+.Xr mac 9E ,
+.Xr mac_register 9F ,
+.Xr mac_register 9S

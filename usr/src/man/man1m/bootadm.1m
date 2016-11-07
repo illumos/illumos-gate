@@ -3,10 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.\" Copyright (c) 2015 Toomas Soome <tsoome@me.com>
-.TH BOOTADM 1M "Jul 26, 2015"
+.\" Copyright 2016 Toomas Soome <tsoome@me.com>
+.TH BOOTADM 1M "Aug 18, 2016"
 .SH NAME
-bootadm \- manage bootability of GRUB-enabled operating system
+bootadm \- manage bootability of the operating system
 .SH SYNOPSIS
 .LP
 .nf
@@ -35,17 +35,17 @@ bootadm \- manage bootability of GRUB-enabled operating system
 
 .LP
 .nf
-\fB/sbin/bootadm\fR list-menu [\fB-R\fR \fIaltroot\fR]
+\fB/sbin/bootadm\fR list-menu [\fB-R\fR \fIaltroot\fR] [\fB-o\fR \fIkey\fR=\fIvalue\fR\fR]
 .fi
 
 .SH DESCRIPTION
 .LP
 The \fBbootadm\fR command manages the boot archive and, with x86 boot
-environments, the GRUB (GRand Unified Bootloader) menu. The
+environments, the boot loader menu. The
 \fBupdate-archive\fR option provides a way for user to update the boot archive
 as a preventative measure or as part of a recovery procedure. The
 \fBset-menu\fR subcommand allows you to switch the \fBauto-boot\fR timeout and
-default boot entry in the GRUB menu.
+default boot entry in the boot menu.
 .sp
 .LP
 The \fBinstall-bootloader\fR subcommand installs the system boot loader on a
@@ -60,16 +60,17 @@ system have been replaced, one should run \fBbootadm install-bootloader\fR to
 ensure that all disks in that pool have the system boot loader installed.
 .sp
 .LP
-The \fBlist-menu\fR subcommand displays the location of the GRUB menu and the
-current GRUB menu entries. While the typical location of the GRUB menu is
-\fB/boot/grub/menu.lst\fR, depending on the install method used the active GRUB
-menu might be located somewhere else. Use the \fBlist-menu\fR subcommand to
-locate the active GRUB menu. See the EXAMPLES section for typical output from
+The \fBlist-menu\fR subcommand displays the location of the boot menu and the
+current boot menu entries. The location of the boot menu list is
+\fB/<boot pool root dataset mountpoint>/boot/menu.lst\fR.
+Use the \fBlist-menu\fR subcommand to
+locate the boot menu. See the EXAMPLES section for typical output from
 the \fBlist-menu\fR option.
 .sp
 .LP
-Note that OpenBoot PROM (OBP)-based machines, such as SPARC systems, do not use
-GRUB and have no boot menu manageable by \fBbootadm\fR.
+Note that OpenBoot PROM (OBP)-based machines, such as SPARC systems, use
+PROM variables to set boot behavior and are managed by the \fBeeprom\fR(1M)
+command.
 .sp
 .LP
 The \fBbootadm\fR command determines dynamically the options supported by the
@@ -129,9 +130,9 @@ option is specified, the \fBMBR\fR of the disk will not updated, as the system
 cannot guarantee that the \fBMBR\fR belongs to it. If, for example, the system
 was being dual booted, a different initial boot loader may be installed there.
 .sp
-When \fBGRUB\fR is being used as the system boot loader (currently on x86), to
-reinstall the boot loader on some or all of the disks, the \fB-f\fR option must
-be passed to the \fBinstall-bootloader\fR subcommand.
+To reinstall the boot loader on some or all of the disks, the \fB-f\fR option
+must be passed to the \fBinstall-bootloader\fR subcommand to override boot
+program version checks.
 .RE
 
 .sp
@@ -141,9 +142,10 @@ be passed to the \fBinstall-bootloader\fR subcommand.
 .ad
 .sp .6
 .RS 4n
-Maintain the GRUB menu. The current GRUB menu is \fBboot/grub/menu.lst\fR,
-relative to root. Do not depend on this location, because it is subject to
-change. Applies to x86 platforms only.
+Maintain the menu configuration. The index of menu entries is listed in the
+\fBmenu.lst\fR file, and the actual configuration of the menu entry is located
+in the boot environment \fB/boot\fR directory.
+Applies to x86 platforms only.
 .RE
 
 .sp
@@ -153,8 +155,8 @@ change. Applies to x86 platforms only.
 .ad
 .sp .6
 .RS 4n
-Lists the location of the active GRUB menu, as well as the current GRUB menu
-entries. This includes the autoboot-timeout, the default entry number, and the
+Lists the location of the \fBmenu.lst\fR, as well as the current menu
+entries. This listing includes the default entry, dataset name, and the
 title of each entry. Applies to x86 platforms only.
 .RE
 
@@ -168,7 +170,7 @@ The \fBbootadm\fR command has the following options:
 .ad
 .sp .6
 .RS 4n
-In an \fBinstall-bootloader\fR operation, override boot loader versioning
+In an \fBinstall-bootloader\fR operation, override the boot loader versioning
 constraints.
 .RE
 
@@ -181,6 +183,18 @@ constraints.
 .RS 4n
 In an \fBupdate-archive\fR operation, archive content is checked but not
 updated.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-o\fR\fR \fIkey\fR=\fIvalue\fR
+.ad
+.sp .6
+.RS 4n
+In a \fBlist-menu\fR operation, specify the menu entry for detailed inspection.
+Possible keys are \fBentry\fR and \fBtitle\fR, taking either entry number or
+title name as values.
 .RE
 
 .sp
@@ -275,7 +289,7 @@ Possible values are:
 .ad
 .sp .6
 .RS 4n
-The item number (for example, 0, 1, or 2) in the GRUB menu designating the
+The item number (for example, 0, 1, or 2) in the boot menu designating the
 operating system to boot when the timer expires.
 .RE
 
@@ -320,22 +334,21 @@ The following command updates the boot archive on an alternate root:
 .in -2
 
 .LP
-\fBExample 3 \fRListing Installed OS Instances
+\fBExample 3 \fRListing Boot Menu Entries and Location of Boot Menu
 .sp
 .LP
-The following command lists the installed operating system instances in a GRUB
-menu:
+The following command lists the boot environments and the location of the
+\fBmenu.lst\fR:
 
 .sp
 .in +2
 .nf
 # bootadm list-menu
-
-default=0
-timeout=10
-(0) Solaris10
-(1) Solaris10 Failsafe
-(2) Linux
+the location for the active menu is: /raid/boot/menu.lst
+Index  Default  Dataset             Menu
+0      -        raid/ROOT/test-182  test-182
+1      -        raid/ROOT/test-183  test-183
+2      *        raid/ROOT/test-184  test-184
 .fi
 .in -2
 
@@ -344,61 +357,54 @@ timeout=10
 .sp
 .LP
 The following command refers to the menu displayed in the previous example. The
-user selects Linux (item 2).
+user selects test-183 (item 1).
 
 .sp
 .in +2
 .nf
-# bootadm set-menu default=2
+# bootadm set-menu default=1
 .fi
 .in -2
 
 .LP
-\fBExample 5 \fRListing GRUB Menu Entries and Location of GRUB Menu
+\fBExample 5 \fRDetailed information about menu entry.
 .sp
 .LP
-The following command lists the GRUB menu entries and the location of the GRUB
-menu:
+The following command lists more detailed information about a boot menu entry:
 
 .sp
 .in +2
 .nf
-# bootadm list-menu
-The location for the active GRUB menu is: /stubboot/boot/grub/menu.lst
-default 0
-timeout 10
-0 Solaris10
-1 Solaris10 failsafe
-2 Linux
+# bootadm list-menu -o entry=2
+the location for the active menu is: /raid/boot/menu.lst
+
+Title:       test-184
+Timeout:     10
+Console:     text
+Bootfs:      raid/ROOT/test-184
+Kernel:      /platform/i86pc/kernel/amd64/unix
+Boot-args:   "-v"
+
+Modules:
+Name:        boot_archive
+Path:        /platform/i86pc/${ISADIR}/boot_archive
+Type:        rootfs
+Status:      Load
+
+Name:        boot_archive.hash
+Path:        /platform/i86pc/${ISADIR}/boot_archive.hash
+Type:        hash
+Status:      Load
+
+Name:        system
+Path:        /boot/modules/etc/system
+Type:        file
+Hash:        4f4fe2d2dfae393a2a87ce29e3c71b803938c5fb
+Flags:       name=etc/system
+Status:      Load
+
 .fi
 .in -2
-
-.LP
-\fBExample 6 \fRDisplaying Location of GRUB Menu
-.sp
-.LP
-The following command displays the location of the GRUB menu:
-
-.sp
-.in +2
-.nf
-# bootadm list-menu
-The location for the active GRUB menu is: /dev/dsk/c0t1d0s0 (not mounted)
-The filesystem type of the menu device is <ufs>
-default 2
-timeout 10
-0 c0t1d0s3
-1 c0t1d0s3 failsafe
-2 Solaris10
-3 Solaris10 failsafe
-.fi
-.in -2
-
-.sp
-.LP
-In this example, the active GRUB menu is located on a device which is \fBnot\fR
-mounted. To access the GRUB menu, mount the device and access the GRUB menu at
-\fB\fI<mountpoint>\fR/boot/grub/menu.lst\fR.
 
 .SH EXIT STATUS
 .LP
@@ -440,15 +446,4 @@ Interface Stability	Committed
 
 .SH SEE ALSO
 .LP
-\fBboot\fR(1M), \fBbeadm\fR(1M), \fBinstallgrub\fR(1M), \fBinstallboot\fR(1M),
-\fBattributes\fR(5)
-.sp
-.LP
-Consult the GRUB home page, under:
-.sp
-.in +2
-.nf
-http://www.gnu.org/
-.fi
-.in -2
-
+\fBboot\fR(1M), \fBbeadm\fR(1M), \fBinstallboot\fR(1M), \fBattributes\fR(5)

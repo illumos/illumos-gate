@@ -54,7 +54,8 @@ NEW_SUBDIRS =	\
 	plgrp	\
 	pmadvise \
 	ppriv	\
-	preap
+	preap	\
+	psecflags
 
 SUBDIRS = $(LEGACY_SUBDIRS) $(NEW_SUBDIRS)
 
@@ -73,7 +74,7 @@ pmadvise/pmadvise.po :=	CPPFLAGS +=	-I$(PMAP)
 #
 # Commands with messages support
 #
-POFILES = plgrp/plgrp.po pmadvise/pmadvise.po
+POFILES = plgrp/plgrp.po pmadvise/pmadvise.po psecflags/psecflags.po
 POFILE = ptools.po
 
 .KEEP_STATE:

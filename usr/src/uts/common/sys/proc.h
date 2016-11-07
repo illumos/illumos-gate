@@ -49,6 +49,7 @@
 #include <sys/avl.h>
 #include <sys/door_impl.h>
 #include <sys/signalfd.h>
+#include <sys/secflags.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -352,6 +353,7 @@ typedef struct	proc {
 
 	/* per-process brand state */
 	void		*p_brand_data;
+	psecflags_t	p_secflags;	/* per-process security flags */
 
 	/* additional lock to protect p_sessp (but not its contents) */
 	kmutex_t p_splock;

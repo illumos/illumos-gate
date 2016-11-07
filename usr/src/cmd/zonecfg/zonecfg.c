@@ -54,6 +54,7 @@
 #include <sys/mntent.h>
 #include <sys/varargs.h>
 #include <sys/sysmacros.h>
+#include <sys/secflags.h>
 
 #include <errno.h>
 #include <fcntl.h>
@@ -188,6 +189,7 @@ char *res_types[] = {
 	"admin",
 	"fs-allowed",
 	ALIAS_MAXPROCS,
+	"security-flags",
 	NULL
 };
 
@@ -240,6 +242,9 @@ char *prop_types[] = {
 	"vlan-id",
 	"global-nic",
 	"property",
+	"default",
+	"lower",
+	"upper",
 	NULL
 };
 
@@ -288,6 +293,7 @@ static const char *add_cmds[] = {
 	"add capped-cpu",
 	"add capped-memory",
 	"add admin",
+	"add security-flags",
 	NULL
 };
 
@@ -319,6 +325,7 @@ static const char *remove_cmds[] = {
 	"remove capped-cpu ",
 	"remove capped-memory ",
 	"remove admin ",
+	"remove security-flags",
 	NULL
 };
 
@@ -333,6 +340,7 @@ static const char *select_cmds[] = {
 	"select capped-cpu",
 	"select capped-memory",
 	"select admin",
+	"select security-flags",
 	NULL
 };
 
@@ -368,6 +376,7 @@ static const char *info_cmds[] = {
 	"info capped-memory",
 	"info dedicated-cpu",
 	"info capped-cpu",
+	"info security-flags",
 	"info zonename",
 	"info zonepath",
 	"info autoboot",
@@ -522,6 +531,16 @@ static const char *admin_res_scope_cmds[] = {
 	NULL
 };
 
+static const char *secflags_res_scope_cmds[] = {
+	"cancel",
+	"end",
+	"exit",
+	"set default=",
+	"set lower=",
+	"set upper=",
+	NULL
+};
+
 struct xif {
 	struct xif	*xif_next;
 	char		xif_name[LIFNAMSIZ];
@@ -598,6 +617,7 @@ static struct zone_attrtab	old_attrtab, in_progress_attrtab;
 static struct zone_dstab	old_dstab, in_progress_dstab;
 static struct zone_psettab	old_psettab, in_progress_psettab;
 static struct zone_admintab	old_admintab, in_progress_admintab;
+static struct zone_secflagstab	old_secflagstab, in_progress_secflagstab;
 
 static GetLine *gl;	/* The gl_get_line() resource object */
 
@@ -675,6 +695,10 @@ CPL_MATCH_FN(cmd_cpl_fn)
 		return (add_stuff(cpl, line, mcap_res_scope_cmds, word_end));
 	case RT_ADMIN:
 		return (add_stuff(cpl, line, admin_res_scope_cmds, word_end));
+	case RT_SECFLAGS:
+		return (add_stuff(cpl, line, secflags_res_scope_cmds,
+		    word_end));
+
 	}
 	return (0);
 }
@@ -990,7 +1014,8 @@ path_find(const char *name)
 }
 
 static FILE *
-pager_open(void) {
+pager_open(void)
+{
 	FILE *newfp;
 	char *pager, *space;
 
@@ -1016,7 +1041,8 @@ pager_open(void) {
 }
 
 static void
-pager_close(FILE *fp) {
+pager_close(FILE *fp)
+{
 	int status;
 
 	status = pclose(fp);
@@ -1258,6 +1284,21 @@ usage(boolean_t verbose, uint_t flags)
 			    pt_to_str(PT_AUTHS),
 			    gettext("<comma separated list>"));
 			break;
+		case RT_SECFLAGS:
+			(void) fprintf(fp, gettext("The '%s' resource scope is "
+			    "used to specify the default security-flags\n"
+			    "of this zone, and their upper and lower bound.\n"),
+			    rt_to_str(resource_scope));
+			(void) fprintf(fp, "\t%s %s=%s\n",
+			    cmd_to_str(CMD_SET), pt_to_str(PT_DEFAULT),
+			    gettext("<security flags>"));
+			(void) fprintf(fp, "\t%s %s=%s\n",
+			    cmd_to_str(CMD_SET), pt_to_str(PT_LOWER),
+			    gettext("<security flags>"));
+			(void) fprintf(fp, "\t%s %s=%s\n",
+			    cmd_to_str(CMD_SET), pt_to_str(PT_UPPER),
+			    gettext("<security flags>"));
+			break;
 		}
 		(void) fprintf(fp, gettext("And from any resource scope, you "
 		    "can:\n"));
@@ -1322,7 +1363,7 @@ usage(boolean_t verbose, uint_t flags)
 		    rt_to_str(RT_RCTL), rt_to_str(RT_ATTR),
 		    rt_to_str(RT_DATASET), rt_to_str(RT_DCPU),
 		    rt_to_str(RT_PCAP), rt_to_str(RT_MCAP),
-		    rt_to_str(RT_ADMIN));
+		    rt_to_str(RT_ADMIN), rt_to_str(RT_SECFLAGS));
 	}
 	if (flags & HELP_PROPS) {
 		(void) fprintf(fp, gettext("For resource type ... there are "
@@ -1391,6 +1432,9 @@ usage(boolean_t verbose, uint_t flags)
 		    pt_to_str(PT_LOCKED));
 		(void) fprintf(fp, "\t%s\t\t%s, %s\n", rt_to_str(RT_ADMIN),
 		    pt_to_str(PT_USER), pt_to_str(PT_AUTHS));
+		(void) fprintf(fp, "\t%s\t\t%s, %s, %s\n",
+		    rt_to_str(RT_SECFLAGS), pt_to_str(PT_DEFAULT),
+		    pt_to_str(PT_LOWER), pt_to_str(PT_UPPER));
 	}
 	if (need_to_close)
 		(void) pager_close(fp);
@@ -1848,6 +1892,7 @@ export_func(cmd_t *cmd)
 	struct zone_rctlvaltab *valptr;
 	struct zone_res_attrtab *rap;
 	struct zone_admintab admintab;
+	struct zone_secflagstab secflagstab;
 	int err, arg;
 	char zonepath[MAXPATHLEN], outfile[MAXPATHLEN], pool[MAXNAMELEN];
 	char bootargs[BOOTARGS_MAX];
@@ -2123,7 +2168,17 @@ export_func(cmd_t *cmd)
 		export_prop(of, PT_AUTHS, admintab.zone_admin_auths);
 		(void) fprintf(of, "%s\n", cmd_to_str(CMD_END));
 	}
+
 	(void) zonecfg_endadminent(handle);
+
+	if (zonecfg_getsecflagsent(handle, &secflagstab) == Z_OK) {
+		(void) fprintf(of, "%s %s\n", cmd_to_str(CMD_ADD),
+		    rt_to_str(RT_SECFLAGS));
+		export_prop(of, PT_DEFAULT, secflagstab.zone_secflags_default);
+		export_prop(of, PT_LOWER, secflagstab.zone_secflags_lower);
+		export_prop(of, PT_UPPER, secflagstab.zone_secflags_upper);
+		(void) fprintf(of, "%s\n", cmd_to_str(CMD_END));
+	}
 
 	/*
 	 * There is nothing to export for pcap since this resource is just
@@ -2203,6 +2258,8 @@ add_resource(cmd_t *cmd)
 {
 	int type;
 	struct zone_psettab tmp_psettab;
+	struct zone_mcaptab tmp_mcaptab;
+	struct zone_secflagstab tmp_secflagstab;
 	uint64_t tmp;
 	uint64_t tmp_mcap;
 	char pool[MAXNAMELEN];
@@ -2313,6 +2370,14 @@ add_resource(cmd_t *cmd)
 		return;
 	case RT_ADMIN:
 		bzero(&in_progress_admintab, sizeof (in_progress_admintab));
+		return;
+	case RT_SECFLAGS:
+		/* Make sure we haven't already set this */
+		if (zonecfg_lookup_secflags(handle, &tmp_secflagstab) == Z_OK)
+			zerr(gettext("The %s resource already exists."),
+			    rt_to_str(RT_SECFLAGS));
+		bzero(&in_progress_secflagstab,
+		    sizeof (in_progress_secflagstab));
 		return;
 	default:
 		zone_perror(rt_to_str(type), Z_NO_RESOURCE_TYPE, B_TRUE);
@@ -3099,6 +3164,54 @@ fill_in_admintab(cmd_t *cmd, struct zone_admintab *admintab,
 	return (err);
 }
 
+static int
+fill_in_secflagstab(cmd_t *cmd, struct zone_secflagstab *secflagstab,
+    boolean_t fill_in_only)
+{
+	int err, i;
+	property_value_ptr_t pp;
+
+	if ((err = initialize(B_TRUE)) != Z_OK)
+		return (err);
+
+	bzero(secflagstab, sizeof (*secflagstab));
+	for (i = 0; i < cmd->cmd_prop_nv_pairs; i++) {
+		pp = cmd->cmd_property_ptr[i];
+		if (pp->pv_type != PROP_VAL_SIMPLE || pp->pv_simple == NULL) {
+			zerr(gettext("A simple value was expected here."));
+			saw_error = B_TRUE;
+			return (Z_INSUFFICIENT_SPEC);
+		}
+		switch (cmd->cmd_prop_name[i]) {
+		case PT_DEFAULT:
+			(void) strlcpy(secflagstab->zone_secflags_default,
+			    pp->pv_simple,
+			    sizeof (secflagstab->zone_secflags_default));
+			break;
+		case PT_LOWER:
+			(void) strlcpy(secflagstab->zone_secflags_lower,
+			    pp->pv_simple,
+			    sizeof (secflagstab->zone_secflags_lower));
+			break;
+		case PT_UPPER:
+			(void) strlcpy(secflagstab->zone_secflags_upper,
+			    pp->pv_simple,
+			    sizeof (secflagstab->zone_secflags_upper));
+			break;
+		default:
+			zone_perror(pt_to_str(cmd->cmd_prop_name[i]),
+			    Z_NO_PROPERTY_TYPE, B_TRUE);
+			return (Z_INSUFFICIENT_SPEC);
+		}
+	}
+	if (fill_in_only)
+		return (Z_OK);
+
+	err = zonecfg_lookup_secflags(handle, secflagstab);
+
+	return (err);
+}
+
 static void
 remove_aliased_rctl(int type, char *name)
 {
@@ -3502,6 +3615,27 @@ remove_admin(cmd_t *cmd)
 }
 
 static void
+remove_secflags()
+{
+	int err;
+	struct zone_secflagstab sectab = { 0 };
+
+	if (zonecfg_lookup_secflags(handle, &sectab) != Z_OK) {
+		zerr("%s %s: %s", cmd_to_str(CMD_REMOVE),
+		    rt_to_str(RT_SECFLAGS),
+		    zonecfg_strerror(Z_NO_RESOURCE_TYPE));
+		return;
+	}
+
+	if ((err = zonecfg_delete_secflags(handle, &sectab)) != Z_OK) {
+		z_cmd_rt_perror(CMD_REMOVE, RT_SECFLAGS, err, B_TRUE);
+		return;
+	}
+
+	need_to_commit = B_TRUE;
+}
+
+static void
 remove_resource(cmd_t *cmd)
 {
 	int type;
@@ -3564,6 +3698,9 @@ remove_resource(cmd_t *cmd)
 		return;
 	case RT_ADMIN:
 		remove_admin(cmd);
+		return;
+	case RT_SECFLAGS:
+		remove_secflags();
 		return;
 	default:
 		zone_perror(rt_to_str(type), Z_NO_RESOURCE_TYPE, B_TRUE);
@@ -3839,6 +3976,22 @@ clear_property(cmd_t *cmd)
 			return;
 		}
 		break;
+	case RT_SECFLAGS:
+		switch (prop_type) {
+		case PT_LOWER:
+			in_progress_secflagstab.zone_secflags_lower[0] = '\0';
+			need_to_commit = B_TRUE;
+			return;
+		case PT_DEFAULT:
+			in_progress_secflagstab.zone_secflags_default[0] = '\0';
+			need_to_commit = B_TRUE;
+			return;
+		case PT_UPPER:
+			in_progress_secflagstab.zone_secflags_upper[0] = '\0';
+			need_to_commit = B_TRUE;
+			return;
+		}
+		break;
 	default:
 		break;
 	}
@@ -4086,6 +4239,16 @@ select_func(cmd_t *cmd)
 		}
 		bcopy(&old_admintab, &in_progress_admintab,
 		    sizeof (struct zone_admintab));
+		return;
+	case RT_SECFLAGS:
+		if ((err = fill_in_secflagstab(cmd, &old_secflagstab, B_FALSE))
+		    != Z_OK) {
+			z_cmd_rt_perror(CMD_SELECT, RT_SECFLAGS, err,
+			    B_TRUE);
+			global_scope = B_TRUE;
+		}
+		bcopy(&old_secflagstab, &in_progress_secflagstab,
+		    sizeof (struct zone_secflagstab));
 		return;
 	default:
 		zone_perror(rt_to_str(type), Z_NO_RESOURCE_TYPE, B_TRUE);
@@ -5062,6 +5225,29 @@ set_func(cmd_t *cmd)
 			usage(B_FALSE, HELP_PROPS);
 			return;
 		}
+	case RT_SECFLAGS: {
+		char *propstr;
+
+		switch (prop_type) {
+		case PT_DEFAULT:
+			propstr = in_progress_secflagstab.zone_secflags_default;
+			break;
+		case PT_UPPER:
+			propstr = in_progress_secflagstab.zone_secflags_upper;
+			break;
+		case PT_LOWER:
+			propstr = in_progress_secflagstab.zone_secflags_lower;
+			break;
+		default:
+			zone_perror(pt_to_str(prop_type), Z_NO_PROPERTY_TYPE,
+			    B_TRUE);
+			long_usage(CMD_SET, B_TRUE);
+			usage(B_FALSE, HELP_PROPS);
+			return;
+		}
+		(void) strlcpy(propstr, prop_id, ZONECFG_SECFLAGS_MAX);
+		return;
+	}
 	default:
 		zone_perror(rt_to_str(res_type), Z_NO_RESOURCE_TYPE, B_TRUE);
 		long_usage(CMD_SET, B_TRUE);
@@ -5702,6 +5888,15 @@ output_auth(FILE *fp, struct zone_admintab *admintab)
 }
 
 static void
+output_secflags(FILE *fp, struct zone_secflagstab *sftab)
+{
+	(void) fprintf(fp, "%s:\n", rt_to_str(RT_SECFLAGS));
+	output_prop(fp, PT_DEFAULT, sftab->zone_secflags_default, B_TRUE);
+	output_prop(fp, PT_LOWER, sftab->zone_secflags_lower, B_TRUE);
+	output_prop(fp, PT_UPPER, sftab->zone_secflags_upper, B_TRUE);
+}
+
+static void
 info_auth(zone_dochandle_t handle, FILE *fp, cmd_t *cmd)
 {
 	struct zone_admintab lookup, user;
@@ -5733,6 +5928,16 @@ info_auth(zone_dochandle_t handle, FILE *fp, cmd_t *cmd)
 	if (!output && cmd->cmd_prop_nv_pairs > 0)
 		(void) printf(gettext("No such %s resource.\n"),
 		    rt_to_str(RT_ADMIN));
+}
+
+static void
+info_secflags(zone_dochandle_t handle, FILE *fp)
+{
+	struct zone_secflagstab sftab;
+
+	if (zonecfg_lookup_secflags(handle, &sftab) == Z_OK) {
+		output_secflags(fp, &sftab);
+	}
 }
 
 void
@@ -5800,6 +6005,9 @@ info_func(cmd_t *cmd)
 		case RT_ADMIN:
 			output_auth(fp, &in_progress_admintab);
 			break;
+		case RT_SECFLAGS:
+			output_secflags(fp, &in_progress_secflagstab);
+			break;
 		}
 		goto cleanup;
 	}
@@ -5856,6 +6064,7 @@ info_func(cmd_t *cmd)
 			info_auth(handle, fp, cmd);
 		}
 		info_rctl(handle, fp, cmd);
+		info_secflags(handle, fp);
 		break;
 	case RT_ZONENAME:
 		info_zonename(handle, fp);
@@ -5940,6 +6149,9 @@ info_func(cmd_t *cmd)
 		break;
 	case RT_FS_ALLOWED:
 		info_fs_allowed(handle, fp);
+		break;
+	case RT_SECFLAGS:
+		info_secflags(handle, fp);
 		break;
 	default:
 		zone_perror(rt_to_str(cmd->cmd_res_type), Z_NO_RESOURCE_TYPE,
@@ -6092,6 +6304,88 @@ add_nwif(struct zone_nwiftab *nwif)
 	return (B_TRUE);
 }
 
+boolean_t
+verify_secflags(struct zone_secflagstab *tab)
+{
+	secflagdelta_t def = {0};
+	secflagdelta_t upper = {0};
+	secflagdelta_t lower = {0};
+	boolean_t def_set = B_FALSE;
+	boolean_t upper_set = B_FALSE;
+	boolean_t lower_set = B_FALSE;
+	boolean_t ret = B_TRUE;
+
+	if (strlen(tab->zone_secflags_default) > 0) {
+		def_set = B_TRUE;
+		if (secflags_parse(NULL, tab->zone_secflags_default,
+		    &def) == -1) {
+			zerr(gettext("default security flags '%s' are invalid"),
+			    tab->zone_secflags_default);
+			ret = B_FALSE;
+		}
+	} else {
+		secflags_zero(&def.psd_assign);
+		def.psd_ass_active = B_TRUE;
+	}
+
+	if (strlen(tab->zone_secflags_upper) > 0) {
+		upper_set = B_TRUE;
+		if (secflags_parse(NULL, tab->zone_secflags_upper,
+		    &upper) == -1) {
+			zerr(gettext("upper security flags '%s' are invalid"),
+			    tab->zone_secflags_upper);
+			ret = B_FALSE;
+		}
+	} else {
+		secflags_fullset(&upper.psd_assign);
+		upper.psd_ass_active = B_TRUE;
+	}
+
+	if (strlen(tab->zone_secflags_lower) > 0) {
+		lower_set = B_TRUE;
+		if (secflags_parse(NULL, tab->zone_secflags_lower,
+		    &lower) == -1) {
+			zerr(gettext("lower security flags '%s' are invalid"),
+			    tab->zone_secflags_lower);
+			ret = B_FALSE;
+		}
+	} else {
+		secflags_zero(&lower.psd_assign);
+		lower.psd_ass_active = B_TRUE;
+	}
+
+	if (def_set && !def.psd_ass_active) {
+		zerr(gettext("only assignment of security flags is "
+		    "allowed (default: %s)"), tab->zone_secflags_default);
+	}
+
+	if (lower_set && !lower.psd_ass_active) {
+		zerr(gettext("only assignment of security flags is "
+		    "allowed (lower: %s)"), tab->zone_secflags_lower);
+	}
+
+	if (upper_set && !upper.psd_ass_active) {
+		zerr(gettext("only assignment of security flags is "
+		    "allowed (upper: %s)"), tab->zone_secflags_upper);
+	}
+
+	if (def.psd_assign & ~upper.psd_assign)	{ /* In default but not upper */
+		zerr(gettext("default secflags must be within the "
+		    "upper limit"));
+		ret = B_FALSE;
+	}
+	if (lower.psd_assign & ~def.psd_assign) { /* In lower but not default */
+		zerr(gettext("default secflags must be above the lower limit"));
+		ret = B_FALSE;
+	}
+	if (lower.psd_assign & ~upper.psd_assign) { /* In lower but not upper */
+		zerr(gettext("lower secflags must be within the upper limit"));
+		ret = B_FALSE;
+	}
+
+	return (ret);
+}
+
 /*
  * See the DTD for which attributes are required for which resources.
  *
@@ -6111,6 +6405,7 @@ verify_func(cmd_t *cmd)
 	struct zone_dstab dstab;
 	struct zone_psettab psettab;
 	struct zone_admintab admintab;
+	struct zone_secflagstab secflagstab;
 	char zonepath[MAXPATHLEN];
 	char sched[MAXNAMELEN];
 	char brand[MAXNAMELEN];
@@ -6406,6 +6701,17 @@ verify_func(cmd_t *cmd)
 		}
 	}
 	(void) zonecfg_endadminent(handle);
+
+	if (zonecfg_getsecflagsent(handle, &secflagstab) == Z_OK) {
+		/*
+		 * No properties are required, but any specified should be
+		 * valid
+		 */
+		if (verify_secflags(&secflagstab) != B_TRUE) {
+			/* Error is reported from verify_secflags */
+			ret_val = Z_BAD_PROPERTY;
+		}
+	}
 
 	if (!global_scope) {
 		zerr(gettext("resource specification incomplete"));
@@ -6979,6 +7285,20 @@ end_func(cmd_t *cmd)
 			err = zonecfg_modify_admin(handle,
 			    &old_admintab, &in_progress_admintab,
 			    zone);
+		}
+		break;
+	case RT_SECFLAGS:
+		if (verify_secflags(&in_progress_secflagstab) != B_TRUE) {
+			saw_error = B_TRUE;
+			return;
+		}
+
+		if (end_op == CMD_ADD) {
+			err = zonecfg_add_secflags(handle,
+			    &in_progress_secflagstab);
+		} else {
+			err = zonecfg_modify_secflags(handle,
+			    &old_secflagstab, &in_progress_secflagstab);
 		}
 		break;
 	default:

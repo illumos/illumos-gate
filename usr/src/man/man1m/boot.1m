@@ -5,7 +5,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\" See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH BOOT 1M "Jun 13, 2015"
+.TH BOOT 1M "Aug 18, 2016"
 .SH NAME
 boot \- start the system kernel or a standalone program
 .SH SYNOPSIS
@@ -19,8 +19,7 @@ boot \- start the system kernel or a standalone program
 .SS "x86"
 .LP
 .nf
-\fBkernel$\fR \fB/platform/i86pc/kernel/$ISADIR/unix\fR [\fIboot-args\fR]
-     [\fB-B\fR \fIprop\fR=\fIval\fR [,\fIval\fR...]]
+\fBboot\fR [\fIboot-flags\fR] [\fB-B\fR \fIprop\fR=\fIval\fR [,\fIval\fR...]]
 .fi
 
 .SH DESCRIPTION
@@ -928,154 +927,42 @@ using infinite retries.
 .LP
 On x86 based systems, the bootstrapping process consists of two conceptually
 distinct phases, kernel loading and kernel initialization. Kernel loading is
-implemented in GRUB (GRand Unified Bootloader) using the BIOS ROM on the system
-board, and BIOS extensions in ROMs on peripheral boards. The BIOS loads GRUB,
-starting with the first physical sector from a hard disk, DVD, or CD. If
+implemented in the boot loader using the BIOS ROM on the system
+board, and BIOS extensions in ROMs on peripheral boards. The BIOS loads boot
+loader, starting with the first physical sector from a hard disk, DVD, or CD. If
 supported by the ROM on the network adapter, the BIOS can also download the
-\fBpxegrub\fR binary from a network boot server. Once GRUB is located, it
-executes a command in a menu to load the \fBunix\fR kernel and a
-pre-constructed boot archive containing kernel modules and data.
+\fBpxeboot\fR binary from a network boot server. Once the boot loader is
+loaded, it in turn will load the \fBunix\fR kernel, a pre-constructed boot
+archive containing kernel modules and data, and any additional files specified
+in the boot loader configuration. Once specified files are loaded, the boot
+loader will start the kernel to complete boot.
 .sp
 .LP
-If the device identified by GRUB as the boot device contains a ZFS storage
-pool, the \fBmenu.lst\fR file used to create the GRUB menu will be found in the
-dataset at the root of the pool's dataset hierarchy. This is the dataset with
-the same name as the pool itself. There is always exactly one such dataset in a
-pool, and so this dataset is well-suited for pool-wide data such as the
-\fBmenu.lst\fR file. After the system is booted, this dataset is mounted at
-/\fIpoolname\fR in the root file system.
+If the device identified by the boot loader as the boot device contains a ZFS
+storage pool, the \fBmenu.lst\fR file used to create the Boot Environment menu
+will be found in the dataset at the root of the pool's dataset hierarchy.
+This is the dataset with the same name as the pool itself. There is always
+exactly one such dataset in a pool, and so this dataset is well-suited for
+pool-wide data such as the \fBmenu.lst\fR file. After the system is booted,
+this dataset is mounted at /\fIpoolname\fR in the root file system.
 .sp
 .LP
 There can be multiple bootable datasets (that is, root file systems) within a
-pool. By default, the file system in which file name entries in a
-\fBmenu.lst\fR file are resolved is the one identified by the pool's
-\fBbootfs\fR property (see \fBzpool\fR(1M)). However, a \fBmenu.lst\fR entry
-can contain a \fBbootfs\fR command, which specifies an alternate dataset in the
-pool. In this way, the \fBmenu.lst\fR file can contain entries for multiple
-root file systems within the pool.
+pool. The default file system to load the kernel is identified by the boot
+pool \fBbootfs\fR property (see \fBzpool\fR(1M)). All bootable datasets are
+listed in the \fBmenu.lst\fR file, which is used by the boot loader to compose
+the Boot Environment menu, to implement support to load a kernel and boot from
+an alternate Boot Environment.
 .sp
 .LP
-Kernel initialization starts when GRUB finishes loading the boot archive and
-hands control over to the \fBunix\fR binary. At this point, GRUB becomes
-inactive and no more I/O occurs with the boot device. The Unix operating system
-initializes, links in the necessary modules from the boot archive and mounts
-the root file system on the real root device. At this point, the kernel regains
+Kernel initialization starts when the boot loader finishes loading the files
+specified in the boot loader configuration and hands control over to the
+\fBunix\fR binary. The Unix operating system initializes, links in the
+necessary modules from the boot archive and mounts the root file system on
+the real root device. At this point, the kernel regains
 storage I/O, mounts additional file systems (see \fBvfstab\fR(4)), and starts
 various operating system services (see \fBsmf\fR(5)).
-.SS "Failsafe Mode"
-.LP
-A requirement of booting from a root filesystem image built into a boot archive
-then remounting root onto the actual root device is that the contents of the
-boot archive and the root filesystem must be consistent. Otherwise, the proper
-operation and integrity of the machine cannot be guaranteed.
-.sp
-.LP
-The term "consistent" means that all files and modules in the root filesystem
-are also present in the boot archive and have identical contents. Since the
-boot strategy requires first reading and mounting the boot archive as the
-first-stage root image, all unloadable kernel modules and initialization
-derived from the contents of the boot archive are required to match the real
-root filesystem. Without such consistency, it is possible that the system could
-be running with a kernel module or parameter setting applied to the root device
-before reboot, but not yet updated in the root archive. This inconsistency
-could result in system instability or data loss.
-.sp
-.LP
-Once the root filesystem is mounted, and before relinquishing the in-memory
-filesystem, Solaris performs a consistency verification against the two file
-systems. If an inconsistency is detected, Solaris suspends the normal boot
-sequence and falls back to failsafe mode. Correcting this state requires the
-administrator take one of two steps. The recommended procedure is to reboot to
-the failsafe archive and rebuild the boot archive. This ensures that a known
-kernel is booted and functioning for the archive rebuild process.
-Alternatively, the administrator can elect to clear the inconsistent boot
-archive service state and continue system bring-up if the inconsistency is such
-that correct system operation will not be impaired. See \fBsvcadm\fR(1M).
-.sp
-.LP
-If the boot archive service is cleared and system bring-up is continued (the
-second alternative above), the system may be running with unloadable kernel
-drivers or other modules that are out-of-date with respect to the root
-filesystem. As such, correct system operation may be compromised.
-.sp
-.LP
-To ensure that the boot archive is consistent, the normal system shutdown
-process, as initiated by \fBreboot\fR(1M) and \fBshutdown\fR(1M), checks for
-and applies updates to the boot archive at the conclusion of the
-\fBumountall\fR(1M) milestone.
-.sp
-.LP
-An update to any kernel file, driver, module or driver configuration file that
-needs to be included in the boot archive after the \fBumountall\fR service is
-complete will result in a failed boot archive consistency check during the next
-boot. To avoid this, it is recommended to always shut down a machine cleanly.
-.sp
-.LP
-If an update is required to the kernel after completion of the \fBumountall\fR
-service, the administrator may elect to rebuild the archive by invoking:
-.sp
-.in +2
-.nf
-# \fBbootadm update-archive\fR
-.fi
-.in -2
-.sp
 
-.SS "Failsafe Boot Archive"
-.LP
-The failsafe archive can be used to boot the machine at any time for
-maintenance or troubleshooting. The failsafe boot archive is installed on the
-machine, sourced from the miniroot archive. Booting the failsafe archive causes
-the machine to boot using the in-memory filesystem as the root device.
-.SS "SPARC"
-.LP
-The SPARC failsafe archive is:
-.sp
-.in +2
-.nf
-/platform/`uname -i`/failsafe
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-\&...and can be booted as follows:
-.sp
-.in +2
-.nf
-ok \fBboot [\fIdevice-specifier\fR] -F failsafe\fR
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-If a user wishes to boot a failsafe archive from a particular ZFS bootable
-dataset, this can be done as follows:
-.sp
-.in +2
-.nf
-ok \fBboot [\fIdevice-specifier\fR] -Z \fIdataset\fR -F failsafe\fR
-.fi
-.in -2
-.sp
-
-.SS "x86"
-.LP
-The x86 failsafe archive is:
-.sp
-.in +2
-.nf
-/boot/x86.miniroot-safe
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-\&...and can be booted by selecting the \fBSolaris failsafe\fR item from the
-GRUB menu.
 .SH OPTIONS
 .SS "SPARC"
 .LP
@@ -1215,42 +1102,18 @@ One or more property-value pairs to be passed to the kernel. Multiple
 property-value pairs must be separated by a comma. Use of this option is the
 equivalent of the command: \fBeeprom\fR \fIprop\fR=\fIval\fR. See
 \fBeeprom\fR(1M) for available properties and valid values.
-.sp
-If the root file system corresponding to this menu entry is a ZFS dataset, the
-menu entry needs the following option added:
-.sp
-.in +2
-.nf
--B $ZFS-BOOTFS
-.fi
-.in -2
-.sp
-
 .RE
 
 .sp
 .ne 2
 .na
-\fB\fIboot-args\fR\fR
+\fB\fIboot-flags\fR\fR
 .ad
 .sp .6
 .RS 4n
-The boot program passes all \fIboot-args\fR to \fBfile\fR. They are not
+The boot program passes all \fIboot-flags\fR to \fBfile\fR. They are not
 interpreted by \fBboot\fR. See \fBkernel\fR(1M) and \fBkmdb\fR(1) for
 information about the options available with the kernel.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/platform/i86pc/kernel/$ISADIR/unix\fR\fR
-.ad
-.sp .6
-.RS 4n
-Name of the kernel to boot. When using the \fBkernel$\fR token, \fB$ISADIR\fR
-expands to \fBamd64\fR on 64-bit machines, and a null string on other machines.
-As a result of this dereferencing, this path expands to the proper kernel for
-the machine.
 .RE
 
 .SH X86 BOOT SEQUENCE DETAILS
@@ -1264,13 +1127,19 @@ drive, or, if that fails, from the first hard disk. The processor then jumps to
 the first byte of the sector image in memory.
 .SH X86 PRIMARY BOOT
 .LP
-The first sector on a hard disk contains the master boot block, which contains
-the master boot program and the \fBFDISK\fR table, named for the \fBPC\fR
-program that maintains it. The master boot finds the active partition in the
-\fBFDISK\fR table, loads its first sector (GRUB \fBstage1\fR), and jumps to its
-first byte in memory. This completes the standard PC-compatible hard disk boot
-sequence. If GRUB \fBstage1\fR is installed on the master boot block (see the
-\fB-m\fR option of \fBinstallgrub\fR(1M)), then \fBstage2\fR is loaded directly
+The first sector on a hard disk contains the master boot block (first stage of
+the boot program), which contains the master boot program and the Master Boot
+Record (\fBMBR\fR) table. The master boot program has recorded the location of
+the secondary stage of the boot program and using this location, master boot
+will load and start the secondary stage of the boot program.
+
+To support booting multiple operating systems, the master boot program is also
+installed as the first sector of the partition with the illumos root file
+system. This will allow configuring third party boot programs to use the
+chainload technique to boot illumos system.
+
+If the first stage is installed on the master boot block (see the \fB-m\fR
+option of \fBinstallboot\fR(1M)), then \fBstage2\fR is loaded directly
 from the Solaris partition regardless of the active partition.
 .sp
 .LP
@@ -1283,34 +1152,54 @@ Floppy booting is not longer supported. Booting from USB devices follows the
 same procedure as with hard disks.
 .sp
 .LP
-An x86 \fBFDISK\fR partition for the Solaris software begins with a
-one-cylinder boot slice, which contains GRUB \fBstage1\fR in the first sector,
-the standard Solaris disk label and volume table of contents (VTOC) in the
-second and third sectors, and GRUB \fBstage2\fR in the fiftieth and subsequent
-sectors. The area from sector 4 to 49 might contain boot blocks for older
-versions of Solaris. This makes it possible for multiple Solaris releases on
-the same FDISK to coexist. When the \fBFDISK\fR partition for the Solaris
-software is the active partition, the master boot program (\fBmboot\fR) reads
-the partition boot program in the first sector into memory and jumps to it. It
-in turn reads GRUB \fBstage2\fR program into memory and jumps to it. Once the
-GRUB menu is displayed, the user can choose to boot an operating system on a
-different partition, a different disk, or possibly from the network.
+An x86 \fBMBR\fR partition for the Solaris software begins with a
+one-cylinder boot slice, which contains the boot loader \fBstage1\fR in the
+first sector, the standard Solaris disk label and volume table of contents
+(VTOC) in the second and third sectors, and in case the UFS file system is
+used for the root file system, \fBstage2\fR in the fiftieth and subsequent
+sectors.
+
+If the zfs boot is used, \fBstage2\fR is always stored in the zfs pool
+boot program area.
 .sp
 .LP
 The behavior is slightly different when a disk is using \fBEFI\fR
-partitioning. In that case the GRUB \fBstage1\fR is always installed
-in the first sector of the disk, and it always loads \fBstage2\fR from
-the partition specified at GRUB installation time. This only works on
-partitions containing a ZFS root pool.
+partitioning.
+
+To support a UFS root file system in the \fBEFI\fR partition, the \fBstage2\fR
+must be stored on separate dedicated partition, as there is no space in UFS
+file system boot program area to store the current \fBstage2\fR. This separate
+dedicated partition is used as raw disk space, and must have enough space
+for both \fBstage1\fR and \fBstage2\fR. The type (tag) of this partition
+must be \fBboot\fR, \fBEFI\fR UUID:
+.sp
+.in +2
+.nf
+\fB6a82cb45-1dd2-11b2-99a6-080020736631\fR
+.fi
+.in -2
+.sp
+For the UUID reference, please see \fB/usr/include/sys/efi_partition.h\fR.
+
+In case of a whole disk zfs pool configuration, the \fBstage1\fR is always
+installed in the first sector of the disk, and it always loads \fBstage2\fR
+from the partition specified at the boot loader installation time.
+.sp
+.LP
+Once \fBstage2\fR is running, it will load and start the third stage boot
+program from root file system. Boot loader supports loading from the ZFS,
+UFS and PCFS file systems. The stage3 boot program defaults to be
+\fB/boot/zfsloader\fR, and implements a user interface to load and boot the
+unix kernel.
 .sp
 .LP
 For network booting, the supported method is Intel's Preboot eXecution
 Environment (PXE) standard. When booting from the network using PXE, the system
 or network adapter BIOS uses DHCP to locate a network bootstrap program
-(\fBpxegrub\fR) on a boot server and reads it using Trivial File Transfer
-Protocol (TFTP). The BIOS executes the \fBpxegrub\fR by jumping to its first
-byte in memory. The \fBpxegrub\fR program downloads a menu file and presents
-the entries to user.
+(\fBpxeboot\fR) on a boot server and reads it using Trivial File Transfer
+Protocol (TFTP). The BIOS executes the \fBpxeboot\fR by jumping to its first
+byte in memory. The \fBpxeboot\fR program is combined stage2 and stage2 boot
+program and implements user interface to load and boot unix kernel.
 .SH X86 KERNEL STARTUP
 .LP
 The kernel startup process is independent of the kernel loading process. During
@@ -1325,11 +1214,10 @@ process in \fB/boot/solaris/bootenv.rc\fR and can be overridden with the
 \fB-B\fR option, described above (see the \fBeeprom\fR(1M) man page).
 .sp
 .LP
-When booting from ZFS, the root device is specified by a boot parameter
-specified by the \fB-B\fR \fB$ZFS-BOOTFS\fR parameter on either the
-\fBkernel\fR or \fBmodule\fR line in the GRUB menu entry. This value (as with
-all parameters specified by the \fB-B\fR option) is passed by GRUB to the
-kernel.
+When booting from ZFS, the root device is automatically passed by the boot
+loader to the kernel as a boot parameter \fB-B\fR \fBzfs-bootfs\fR. The actual
+value used by the boot loader can be observed with the \fBeeprom bootcmd\fR
+command.
 .sp
 .LP
 If the console properties are not present, console I/O defaults to \fBscreen\fR
@@ -1432,49 +1320,21 @@ configuration.
 .in -2
 .sp
 
-.SS "x86 (32-bit)"
+.SS "x86"
 .LP
-\fBExample 4 \fRTo Boot the Default Kernel In 32-bit Single-User Interactive
+\fBExample 4 \fRTo Boot the Default Kernel In 64-bit Single-User Interactive
 Mode
 .sp
 .LP
-To boot the default kernel in single-user interactive mode, edit the GRUB
-kernel command line to read:
+To boot the default kernel in single-user interactive mode, press the ESC key
+to get the boot loader \fBok\fR prompt and enter:
 
 .sp
 .in +2
 .nf
-kernel /platform/i86pc/kernel/unix -as
+boot -as
 .fi
 .in -2
-.sp
-
-.SS "x86 (64-bit Only)"
-.LP
-\fBExample 5 \fRTo Boot the Default Kernel In 64-bit Single-User Interactive
-Mode
-.sp
-.LP
-To boot the default kernel in single-user interactive mode, edit the GRUB
-kernel command line to read:
-
-.sp
-.in +2
-.nf
-kernel /platform/i86pc/kernel/amd64/unix -as
-.fi
-.in -2
-.sp
-
-.LP
-\fBExample 6 \fRSwitching Between 32-bit and 64-bit Kernels on 64-bit x86
-Platform
-.sp
-.LP
-To be able to boot both 32-bit and 64-bit kernels, add entries for both kernels
-to \fB/boot/grub/menu.lst\fR, and use the \fBset-menu\fR subcommand of
-\fBbootadm\fR(1M) to switch. See \fBbootadm\fR(1M) for an example of the
-\fBbootadm set-menu\fR.
 
 .SH FILES
 .ne 2
@@ -1519,11 +1379,11 @@ Directory containing boot-related files.
 .sp
 .ne 2
 .na
-\fB\fB/rpool/boot/grub/menu.lst\fR\fR
+\fB\fB/rpool/boot/menu.lst\fR\fR
 .ad
 .sp .6
 .RS 4n
-Menu of bootable operating systems displayed by GRUB.
+Menu index file of bootable operating systems displayed by the boot loader.
 .sp
 \fBNote:\fR this file is located on the root ZFS pool. While many installs
 often name their root zpool 'rpool', this is not required and the

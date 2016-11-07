@@ -1,0 +1,222 @@
+\ Menu.rc
+\
+\ Load required Forth modules
+include /boot/forth/version.4th
+include /boot/forth/brand.4th
+include /boot/forth/menu.4th
+include /boot/forth/menu-commands.4th
+include /boot/forth/shortcuts.4th
+
+\ Screen prep
+clear         \ clear the screen (see `screen.4th')
+print_version \ print version string (bottom-right; see `version.4th')
+draw-beastie  \ draw freebsd mascot (on right; see `beastie.4th')
+draw-brand    \ draw the FreeBSD title (top-left; see `brand.4th')
+menu-init     \ initialize the menu area (see `menu.4th')
+
+\ Initialize main menu constructs (see `menu.4th')
+\ NOTE: To use `non-ansi' variants, add `loader_color=0' to loader.conf(5)
+\ NOTE: ANSI variants can use `^' in place of literal `Esc' (ASCII 27)
+
+\ 
+\ MAIN MENU
+\ 
+
+set menuset_name1="main"
+
+set mainmenu_init[1]="init_boot"
+
+s" smartos" getenv? [if]
+	set mainmenu_caption[1]="Boot SmartOS [Enter]"
+	set maintoggled_text[1]="R[e]covery (root/root) [Enter]"
+	set mainansi_caption[1]="^[1mB^[moot SmartOS ^[1m[Enter]^[m"
+	set maintoggled_ansi[1]="R^[1me^[mcovery (root/root) ^[1m[Enter]^[m"
+[else]
+	set mainmenu_caption[1]="Boot Multi User [Enter]"
+	set maintoggled_text[1]="Boot [S]ingle User [Enter]"
+	set mainansi_caption[1]="^[1mB^[moot Multi User ^[1m[Enter]^[m"
+	set maintoggled_ansi[1]="Boot ^[1mS^[mingle User ^[1m[Enter]^[m"
+[then]
+set mainmenu_command[1]="boot"
+\ keycode set by init_boot
+
+set mainmenu_init[2]="init_altboot"
+s" smartos" getenv? [if]
+	set mainmenu_caption[2]="[R]ecovery (root/root)"
+	set maintoggled_text[2]="[B]oot SmartOS"
+	set mainansi_caption[2]="^[1mR^[mecovery (root/root)"
+	set maintoggled_ansi[2]="^[1mB^[oot SmartOS"
+[else]
+	set mainmenu_caption[2]="Boot [S]ingle User"
+	set maintoggled_text[2]="Boot [M]ulti User"
+	set mainansi_caption[2]="Boot ^[1mS^[mingle User"
+	set maintoggled_ansi[2]="Boot ^[1mM^[multi User"
+[then]
+set mainmenu_command[2]="altboot"
+\ keycode set by init_altboot
+
+set mainmenu_caption[3]="[Esc]ape to loader prompt"
+set mainmenu_command[3]="goto_prompt"
+set mainmenu_keycode[3]=27
+set mainansi_caption[3]="^[1mEsc^[mape to loader prompt"
+
+\ Enable built-in "Reboot" trailing menuitem
+\ NOTE: appears before menu_options if configured
+\ 
+set mainmenu_reboot
+
+\ Enable "Options:" separator. When set to a numerical value (1-8), a visual
+\ separator is inserted before that menuitem number.
+\ 
+set mainmenu_options=5
+
+\ illumos does not have multiple kernels
+\ set mainmenu_kernel=5
+\ set mainmenu_command[5]="cycle_kernel"
+\ set mainmenu_keycode[5]=107
+
+set mainmenu_caption[5]="Configure Boot [O]ptions..."
+set mainmenu_command[5]="2 goto_menu"
+set mainmenu_keycode[5]=111
+set mainansi_caption[5]="Configure Boot ^[1mO^[mptions..."
+
+\ Boot Environments are (supported) only on ZFS
+s" currdev" getenv drop 4 s" zfs:" compare 0= be-pages and [if]
+set mainmenu_caption[6]="Select Boot [E]nvironment..."
+set mainmenu_command[6]="3 goto_menu"
+set mainmenu_keycode[6]=101
+set mainansi_caption[6]="Select Boot ^[1mE^[mnvironment..."
+
+  s" chain_disk" getenv? [if]
+	set mainmenu_caption[7]="Chain[L]load ${chain_disk}"
+	set mainmenu_command[7]="chain ${chain_disk}"
+	set mainmenu_keycode[7]=108
+	set mainansi_caption[7]="Chain^[1mL^[moad ${chain_disk}"
+  [then]
+[else]
+  s" chain_disk" getenv? [if]
+	set mainmenu_caption[6]="Chain[L]load ${chain_disk}"
+	set mainmenu_command[6]="chain ${chain_disk}"
+	set mainmenu_keycode[6]=108
+	set mainansi_caption[6]="Chain^[1mL^[moad ${chain_disk}"
+  [then]
+[then]
+
+\ 
+\ BOOT OPTIONS MENU
+\ 
+
+set menuset_name2="options"
+
+set optionsmenu_caption[1]="Back to Main Menu [Backspace]"
+set optionsmenu_command[1]="1 goto_menu"
+set optionsmenu_keycode[1]=8
+set optionsansi_caption[1]="Back to Main Menu ^[1m[Backspace]^[m"
+
+\ set optionsmenu_caption[2]="Load System [D]efaults"
+\ set optionsmenu_command[2]="set_default_boot_options"
+\ set optionsmenu_keycode[2]=100
+\ set optionsansi_caption[2]="Load System ^[1mD^[mefaults"
+
+set optionsmenu_options=2
+set optionsmenu_optionstext="Boot Options:"
+
+set optionsmenu_osconsole=2
+set optionsmenu_command[2]="cycle_osconsole"
+set optionsmenu_keycode[2]=99
+
+set optionsmenu_acpi=3
+set optionsmenu_command[3]="cycle_acpi"
+set optionsmenu_keycode[3]=97
+
+set optionsmenu_init[4]="init_singleuser"
+set optionsmenu_caption[4]="[S]ingle User. Off"
+set optionstoggled_text[4]="[S]ingle User. On"
+set optionsmenu_command[4]="toggle_singleuser"
+set optionsmenu_keycode[4]=115
+set optionsansi_caption[4]="^[1mS^[mingle User. ^[34;1mOff^[m"
+set optionstoggled_ansi[4]="^[1mS^[mingle User. ^[32;7mOn^[m"
+
+set optionsmenu_init[5]="init_verbose"
+set optionsmenu_caption[5]="[V]erbose..... off"
+set optionstoggled_text[5]="[V]erbose..... On"
+set optionsmenu_command[5]="toggle_verbose"
+set optionsmenu_keycode[5]=118
+set optionsansi_caption[5]="^[1mV^[merbose..... ^[34;1mOff^[m"
+set optionstoggled_ansi[5]="^[1mV^[merbose..... ^[32;7mOn^[m"
+
+set optionsmenu_init[6]="init_reconfigure"
+set optionsmenu_caption[6]="[R]econfigure. Off"
+set optionstoggled_text[6]="[R]econfigure. On"
+set optionsmenu_command[6]="toggle_reconfigure"
+set optionsmenu_keycode[6]=114
+set optionsansi_caption[6]="^[1mR^[meconfigure. ^[34;1mOff^[m"
+set optionstoggled_ansi[6]="^[1mR^[meconfigure. ^[32;7mOn^[m"
+
+set optionsmenu_init[7]="init_kmdb"
+set optionsmenu_caption[7]="k[M]db........ Off"
+set optionstoggled_text[7]="k[M]db........ On"
+set optionsmenu_command[7]="toggle_kmdb"
+set optionsmenu_keycode[7]=109
+set optionsansi_caption[7]="k^[1mm^[mdb........ ^[34;1mOff^[m"
+set optionstoggled_ansi[7]="k^[1mm^[mdb........ ^[32;7mOn^[m"
+
+set optionsmenu_init[8]="init_debug"
+set optionsmenu_caption[8]="[D]ebug....... Off"
+set optionstoggled_text[8]="[D]ebug....... On"
+set optionsmenu_command[8]="toggle_debug"
+set optionsmenu_keycode[8]=100
+set optionsansi_caption[8]="^[1mD^[mebug....... ^[34;1mOff^[m"
+set optionstoggled_ansi[8]="^[1mD^[mebug....... ^[32;7mOn^[m"
+
+\
+\ BOOT ENVIRONMENT MENU
+\
+
+\ the BE list is read from pool/boot/menu.lst, the list in file
+\ is ordered from oldest to most recent.
+\ the BE menu will list entries from most recent to oldest,
+\ so the first page in menu is last page in menu.lst
+
+s" currdev" getenv drop 4 s" zfs:" compare 0= be-pages and [if]
+  set zfs_be_currpage=1
+  be-set-page			\ set page data
+  set menuset_name3="bootenv"
+
+  set bootenvmenu_command[1]="be_draw_screen 1 goto_menu"
+  set bootenvmenu_keycode[1]=8
+
+  set bootenvmenu_keycode[2]=8
+  set bootenvmenu_command[2]="be_draw_screen 1 goto_menu"
+
+  set bemenu_current="Active: "
+  set beansi_current="^[1m${bemenu_current}^[m"
+  set bemenu_bootfs="bootfs: "
+  set beansi_bootfs="^[1m${bemenu_bootfs}^[m"
+  set bemenu_page="[P]age: "
+  set beansi_page="^[1mP^[mage: "
+  set bemenu_pageof=" of "
+  set beansi_pageof="${bemenu_pageof}"
+
+  set bootenvmenu_init="init_bootenv"
+
+  set bootenvmenu_keycode[3]=112
+  set bootenvmenu_command[3]="set_be_page"
+
+  set bootenvmenu_options=4
+  set bootenvmenu_optionstext="Boot Environments:"
+[then]
+
+\ Enable automatic booting (add ``autoboot_delay=N'' to loader.conf(5) to
+\ customize the timeout; default is 10-seconds)
+\ 
+set menu_timeout_command="boot"
+
+\ Include optional elements defined in a local file
+\ 
+try-include /boot/menu.rc.local
+
+\ Display the main menu (see `menu.4th')
+set menuset_initial=1
+menuset-loadinitial
+menu-display

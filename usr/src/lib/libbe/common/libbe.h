@@ -25,7 +25,7 @@
 
 /*
  * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
- * Copyright 2015 Toomas Soome <tsoome@me.com>
+ * Copyright 2016 Toomas Soome <tsoome@me.com>
  * Copyright 2015 Gary Mills
  */
 
@@ -224,6 +224,8 @@ typedef enum {
 	BE_SORT_SPACE_REV
 } be_sort_t;
 
+/* for fastboot arguments */
+#define	BE_ENTRY_DEFAULT	(-1)
 /*
  * BE functions
  */
@@ -250,7 +252,7 @@ void be_free_list(be_node_list_t *);
 int be_max_avail(char *, uint64_t *);
 char *be_err_to_str(int);
 int be_sort(be_node_list_t **, int);
-
+int be_get_boot_args(char **, int);
 /*
  * Installboot support
  */

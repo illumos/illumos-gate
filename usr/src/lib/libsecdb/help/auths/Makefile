@@ -113,6 +113,7 @@ HTMLENTS = \
 	SmfValueNDMP.html \
 	AuthReadNDMP.html \
 	SmfValueNWAM.html \
+	SmfValueProcSec.html \
 	SmfValueRouting.html \
 	SmfValueSMB.html \
 	AuthReadSMB.html \

@@ -12,13 +12,12 @@
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
+# Copyright 2016, Joyent, Inc.
 #
 
 include $(SRC)/Makefile.master
 
-SRCS = delphix.run \
-	omnios.run \
-	openindiana.run
+SRCS = default.run
 
 ROOTOPTPKG = $(ROOT)/opt/os-tests
 RUNFILES = $(ROOTOPTPKG)/runfiles

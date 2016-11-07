@@ -63,34 +63,30 @@
 
 PYFILES = $(PYSRCS) $(PYOBJS)
 
-ROOTPYDIR_26 = $(PYTOPDIR)/python2.6/$(PYMODDIR)
-ROOTPYFILES_26	= $(PYFILES:%=$(ROOTPYDIR_26)/%)
+ROOTPYDIR = $(PYTOPDIR)/python$(PYTHON_VERSION)/$(PYMODDIR)
+ROOTPYFILES	= $(PYFILES:%=$(ROOTPYDIR)/%)
 
-ROOTPYFILES = $(ROOTPYFILES_26)
 $(ROOTPYFILES) := FILEMODE = 0444
 
-PYVERSDIRS = python2.6
+PYVERSDIRS = python$(PYTHON_VERSION)
 
-PY26OBJS = $(PYOBJS:%=python2.6/%)
-$(PY26OBJS) := PYTHON = $(PYTHON_26)
-
-PYVERSOBJS = $(PY26OBJS)
+PYVERSOBJS = $(PYOBJS:%=python$(PYTHON_VERSION)/%)
 
 CLOBBERFILES += $(PYVERSOBJS)
 CLOBBERDIRS += $(PYVERSDIRS)
 
 .KEEP_STATE:
 
-python2.6/%.pyc: %.py
+python$(PYTHON_VERSION)/%.pyc: %.py
 	@[ -d $(@D) ] || mkdir $(@D)
 	$(RM) $@
 	$(PYTHON) -mpy_compile $<
 	$(MV) $(*).pyc $@
 
-$(ROOTPYDIR_26)/%.pyc: python2.6/%.pyc
+$(ROOTPYDIR)/%.pyc: python$(PYTHON_VERSION)/%.pyc
 	$(INS.pyfile)
 
-$(ROOTPYDIR_26)/%.py: %.py
+$(ROOTPYDIR)/%.py: %.py
 	$(INS.pyfile)
 
 pyclobber:

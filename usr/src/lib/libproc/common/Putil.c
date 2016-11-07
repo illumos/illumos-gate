@@ -194,6 +194,7 @@ static const ps_ops_t P_default_ops = {
 	.pop_uname	= (pop_uname_t)Pdefault_int,
 	.pop_zonename	= (pop_zonename_t)Pdefault_voidp,
 	.pop_execname	= (pop_execname_t)Pdefault_voidp,
+	.pop_secflags	= (pop_secflags_t)Pdefault_int,
 #if defined(__i386) || defined(__amd64)
 	.pop_ldt	= (pop_ldt_t)Pdefault_int
 #endif
@@ -239,6 +240,8 @@ Pinit_ops(ps_ops_t *dst, const ps_ops_t *src)
 		dst->pop_zonename = src->pop_zonename;
 	if (src->pop_execname != NULL)
 		dst->pop_execname = src->pop_execname;
+	if (src->pop_secflags != NULL)
+		dst->pop_secflags = src->pop_secflags;
 #if defined(__i386) || defined(__amd64)
 	if (src->pop_ldt != NULL)
 		dst->pop_ldt = src->pop_ldt;

@@ -1415,6 +1415,7 @@ file path=usr/include/sys/scsi/targets/sgendef.h
 file path=usr/include/sys/scsi/targets/smp.h
 $(sparc_ONLY)file path=usr/include/sys/scsi/targets/ssddef.h
 file path=usr/include/sys/scsi/targets/stdef.h
+file path=usr/include/sys/secflags.h
 $(i386_ONLY)file path=usr/include/sys/segment.h
 $(i386_ONLY)file path=usr/include/sys/segments.h
 file path=usr/include/sys/select.h

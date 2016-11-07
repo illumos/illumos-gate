@@ -1,0 +1,20 @@
+\ Loader.rc
+\ 
+\ Includes additional commands
+include /boot/forth/loader.4th
+try-include /boot/loader.rc.local
+
+\ Reads and processes loader.conf variables
+\ NOTE: Change to `initialize' if you enable the below boot menu
+\ also note that initialize will leave flag in stack from any_conf_read?
+\ start
+initialize drop
+
+\ Tests for password -- executes autoboot first if a password was defined
+check-password
+
+\ Uncomment to enable boot menu
+include /boot/forth/beastie.4th
+beastie-start
+
+\ Unless set otherwise, autoboot is automatic at this point

@@ -1,0 +1,229 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2016 Joyent, Inc.
+.\"
+.Dd May 31, 2016
+.Dt MC_MULTICST 9E
+.Os
+.Sh NAME
+.Nm mc_multicst
+.Nd add or remove multicast address from device filter
+.Sh SYNOPSIS
+.In sys/mac_provider.h
+.Ft int
+.Fo prefix_m_multicst
+.Fa "void *driver"
+.Fa "boolean_t add"
+.Fa "const uint8_t *mac"
+.Fc
+.Sh INTERFACE LEVEL
+illumos DDI Specific
+.Sh PARAMETERS
+.Bl -tag -width Fa
+.It Fa driver
+A pointer to the driver's private data that was passed in via the
+.Sy m_pdata
+member of the
+.Xr mac_register 9S
+structure to the
+.Xr mac_register 9F
+function.
+.It Fa add
+A boolean value that indicates whether the device driver should add the
+specified address to its filter list or remove it.
+.It Fa mac
+A pointer to an array of bytes that contains the new multicast address being
+added or removed. It is guaranteed to be at least a number of bytes long equal
+to the length of the MAC plugin's address length. For Ethernet devices that
+length is six bytes,
+.Sy ETHERADDRL .
+.El
+.Sh DESCRIPTION
+The
+.Fn mc_multicst
+entry point is used to program a device driver's multicast filters. For
+more background on filter management, see the
+.Sx MAC Address Filter Management
+section in
+.Xr mac 9E .
+.Pp
+The device driver can optionally sanity check
+.Fa mac
+by making sure that it's both a valid multicast address and by checking
+whether or not it's already programmed the address. Based on the value of
+.Fa add ,
+the driver should either add the specified address,
+.Fa mac ,
+or remove it from its filter tables. The device driver is not
+responsible for any form of reference counting on these requests: that
+is maintained by the broader framework.
+.Pp
+The device driver can access its own device soft state by casting the
+.Fa device
+pointer. The device driver should employ the appropriate locking while
+updating and manipulating its filter tables and its own records. It is
+recommended that device drivers always maintain a copy of the addresses
+programmed into the device's filter tables so that they can more easily
+recover from various device resets and errors, or handle requests to
+suspend and resume the device that may result in the device registers
+being cleared.
+.Sh RETURN VALUES
+Upon successful completion, the device driver should return
+.Sy 0 .
+Otherwise, the driver should return a positive error number to indicate
+why the request failed.
+.Sh EXAMPLES
+The following example shows how a device driver might structure its
+.Fn mc_multicst
+entry point.
+.Bd -literal
+#include <sys/mac_provider.h>
+
+/*
+ * Note, this example merely shows the structure of this function.
+ * Different devices will have different ways to manage the set of
+ * multicast MAC addresses that they can program into their filters and
+ * they have different ways of keeping track of them. Like other
+ * examples, this assumes that there is a lock which protects this data.
+ * In this case we assume we have an array of structures that is used to
+ * track each multicast entry and a count of valid entries.
+ */
+
+#define	EXAMPLE_NMULTICAST_ADDRS	100
+
+static int
+example_multicast_add(example_t *ep, const uint8_t *mac_addr)
+{
+	int i, ret;
+
+	mutex_enter(&ep->ep_lock);
+	for (i = 0; i < ep->ep_nmcast_addrs; i++) {
+		if (bcmp(ep->ep_nmcast_addrs[i].ema_addr, mac_addr,
+		    ETHERADDRL) == 0) {
+			/*
+			 * The address is alread in our list, so we can
+			 * return and say we're done.
+			 */
+			mutex_exit(&ep->ep_lock);
+			return (0);
+		}
+	}
+
+	/*
+	 * We need to add this multicast address to a filter, make sure
+	 * we have enough space to do so.
+	 */
+	if (ep->ep_nmcast_addrs >= EXAMPLE_NMULTICAST_ADDRS) {
+		mutex_exit(&ep->ep_lock);
+		return (ENOSPC);
+	}
+
+	/*
+	 * Program the device before we add it to our list. Assume zero
+	 * means success.
+	 */
+	ret = example_program_add_mcast_filter(ep, mac_addr);
+	if (ret == 0) {
+		bcopy(mac_addr,
+		    ep->ep_nmcast_addrs[ep->ep_nmcast_addrs].ema_addr,
+		    ETHERADDRL);
+		ep->ep_nmcast_addrs++;
+	}
+
+	mutex_exit(&ep->ep_lock);
+
+	return (ret);
+}
+
+static int
+example_multicast_remove(example_t *ep, const uint8_t *mac_addr)
+{
+	int i, ret;
+	boolean_t found = B_FALSE;
+
+	mutex_enter(&ep->ep_lock);
+	for (i = 0; i < ep->ep_nmcast_addrs; i++) {
+		if (bcmp(ep->ep_mcast_addrs[i].ema_addr, mac_addr,
+		    ETHERADDRL) == 0) {
+			found = B_TRUE;
+			break;
+		}
+	}
+
+	if (found == B_FALSE) {
+		mutex_exit(&ep->ep_lock);
+		return (ENOENT);
+	}
+
+	/*
+	 * Assume that a return value of zero indicates that the removal
+	 * was successful. Note that i still has the index of this
+	 * entry.
+	 */
+	ret = example_program_rem_mcast_filter(ep, mac_addr);
+	if (ret == 0) {
+		int last = ep->ep_nmcast_addrs - 1;
+		if (i != last) {
+			bcopy(ep->ep_mcast_addrs[last].ema_addr,
+			    ep->ep_mcast_addrs[i].ema_addr,
+			    ETHERADDRL);
+		}
+		bzero(ep->ep_mcast_addrs[last].ema_addr,
+		    ETHERADDRL);
+		VERIFY(ep->ep_nmcast_addrs > 0);
+		ep->ep_nmcast_addrs--;
+	}
+
+	mutex_exit(&ep->ep_lock);
+	return (ret);
+}
+
+static int
+example_m_multicst(void *arg, boolean_t add, const uint8_t *mac_addr)
+{
+	example_t *ep = arg;
+
+	/*
+	 * We sanity check that we've been given a multicast address.
+	 */
+	if ((mac_addr[0] & 0x01) == 0)
+		return (EINVAL);
+
+	if (add)
+		return (example_multicast_add(ep, mac_addr);
+	else
+		return (example_multicast_remove(ep, mac_addr));
+}
+.Ed
+.Sh ERRORS
+The device driver may return one of the following errors. While this list
+is not intended to be exhaustive, it is recommended to use one of these
+if possible.
+.Bl -tag -width Er
+.It Er EINVAL
+The address
+.Fa mac
+is not a valid unicast address.
+.It Er EIO
+The driver encountered a device or transport error while trying to
+update the device's state.
+.It Er ENOENT
+The device driver was asked to remove a multicast address that it does
+not have.
+.It Er ENOSPC
+The driver was asked to add a multicast address; however, it has no more
+filter slots available to program the entry.
+.El
+.Sh SEE ALSO
+.Xr mac 9E ,
+.Xr mac_register 9F ,
+.Xr mac_register 9S

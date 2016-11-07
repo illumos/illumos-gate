@@ -25,6 +25,7 @@
 #
 
 syntax: glob
+usr/src/boot/*
 usr/src/cmd/cmd-inet/usr.bin/dns-sd/dns-sd.c
 usr/src/cmd/boot/common/bblk_einfo.c
 usr/src/cmd/localedef/data/zh_CN.UTF-8.src
@@ -37,4 +38,4 @@ usr/src/cmd/terminfo/terminfo.src
 usr/src/cmd/zonestat/zonestat/zonestat.c
 usr/src/test/zfs-tests/tests/functional/cli_root/zpool_upgrade/blockfiles/zfs-pool-v15.dat.bz2
 usr/src/test/zfs-tests/tests/functional/delegate/delegate_common.kshlib
-usr/src/test/test-runner/cmd/run.py
+usr/src/test/test-runner/cmd/run

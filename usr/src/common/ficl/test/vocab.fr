@@ -1,0 +1,32 @@
+\ Here is an implementation of ALSO/ONLY in terms of the
+\ primitive search-order word set.
+\
+WORDLIST CONSTANT ROOT   ROOT SET-CURRENT
+
+: DO-VOCABULARY  ( -- ) \ Implementation factor
+    DOES>  @ >R           (  ) ( R: widnew )
+     GET-ORDER  SWAP DROP ( wid1 ... widn-1 n )
+     R> SWAP SET-ORDER
+;
+
+: DISCARD  ( x1 .. xu u - ) \ Implementation factor
+   0 ?DO DROP LOOP          \ DROP u+1 stack items
+;
+
+CREATE FORTH  FORTH-WORDLIST , DO-VOCABULARY
+
+: VOCABULARY  ( name -- )  WORDLIST CREATE ,  DO-VOCABULARY ;
+
+: ALSO  ( -- )  GET-ORDER  OVER SWAP 1+ SET-ORDER ;
+
+: PREVIOUS  ( --  )  GET-ORDER  SWAP DROP 1- SET-ORDER ;
+
+: DEFINITIONS  ( -- )  GET-ORDER  OVER SET-CURRENT DISCARD ;
+
+: ONLY ( -- )  ROOT ROOT  2 SET-ORDER ;
+
+\ Forth-83 version; just removes ONLY
+: SEAL  ( -- )  GET-ORDER 1- SET-ORDER DROP ;
+
+\ F83 and F-PC version; leaves only CONTEXT
+: SEAL  ( -- )  GET-ORDER OVER 1 SET-ORDER DISCARD ;

@@ -2532,6 +2532,13 @@ update_odynamic(Ofl_desc *ofl)
 			dyn->d_un.d_val = shdr->sh_entsize;
 			dyn++;
 		}
+
+		if (ofl->ofl_aslr != 0) {
+			dyn->d_tag = DT_SUNW_ASLR;
+			dyn->d_un.d_val = (ofl->ofl_aslr == 1);
+			dyn++;
+		}
+
 		if (flags & FLG_OF_SYMBOLIC) {
 			dyn->d_tag = DT_SYMBOLIC;
 			dyn->d_un.d_val = 0;

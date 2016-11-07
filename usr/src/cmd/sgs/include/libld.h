@@ -406,6 +406,7 @@ struct ofl_desc {
 	avl_tree_t	*ofl_wrap;	/* -z wrap symbols */
 	ofl_guideflag_t	ofl_guideflags;	/* -z guide flags */
 	APlist		*ofl_assdeflib;	/* -z assert-deflib exceptions */
+	int		ofl_aslr;	/* -z aslr, -1 disable, 1 enable */
 };
 
 #define	FLG_OF_DYNAMIC	0x00000001	/* generate dynamic output module */

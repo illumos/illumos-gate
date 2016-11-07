@@ -98,6 +98,7 @@ extern void	group_token();
 extern void	label_token(adr_t *, parse_context_t *);
 extern void	privilege_token(adr_t *, parse_context_t *);
 extern void	useofpriv_token(adr_t *, parse_context_t *);
+extern void	secflags_token(adr_t *, parse_context_t *);
 extern void	zonename_token(adr_t *, parse_context_t *);
 extern void	liaison_token(adr_t *, parse_context_t *);
 extern void	newgroup_token(adr_t *, parse_context_t *);

@@ -116,7 +116,10 @@ EXCEPTFILES= \
 	interface_check \
 	interface_cmp
 
-CLEANFILES = $(SHFILES) $(PERLFILES) $(PYFILES) bldenv.1onbld
+CLEANFILES = $(SHFILES) $(PERLFILES) $(PYFILES) bldenv.1onbld onu.sh
+
+onu.sh:	onu.sh.in
+	$(SED) -e "s:@PYTHON_VERSION@:$(PYTHON_VERSION):g" < onu.sh.in > $@
 
 include ../Makefile.tools
 

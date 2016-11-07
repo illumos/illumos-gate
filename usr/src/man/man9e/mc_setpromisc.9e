@@ -1,0 +1,85 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2016 Joyent, Inc.
+.\"
+.Dd May 31, 2016
+.Dt MC_SETPROMISC 9E
+.Os
+.Sh NAME
+.Nm mc_setpromisc
+.Nd modify device promiscuous mode entry point
+.Sh SYNOPSIS
+.In sys/mac_provider.h
+.Ft int
+.Fo prefix_m_setpromisc
+.Fa "void *driver"
+.Fa "boolean_t enable"
+.Fc
+.Sh INTERFACE LEVEL
+illumos DDI Specific
+.Sh PARAMETERS
+.Bl -tag -width Ds
+.It Fa driver
+A pointer to the driver's private data that was passed in via the
+.Sy m_pdata
+member of the
+.Xr mac_register 9S
+structure to the
+.Xr mac_register 9F
+function.
+.It Fa enable
+A boolean that indicates the desired state of the device's promiscuous
+mode. If set to
+.Sy B_TRUE ,
+promiscuous mode should be enabled on the device. If set to
+.Sy B_FALSE ,
+then promiscuous mode should be disabled on the device.
+.El
+.Sh DESCRIPTION
+The
+.Fn mc_setpromisc
+entry point is called when the GLDv3 wants to change the device's
+promiscuous mode. When this entry point is called, the device should
+manipulate both its unicast and multicast promiscuous mode.
+.Pp
+When
+.Fa enable
+is true, then it should make sure that both unicast and multicast
+promiscuous mode are enabled. When it's set to false, then they should
+be disabled. In general, devices should always start with promiscuous
+mode disabled until the framework indicates that it should be enabled.
+.Pp
+The device driver's private state is available by casting the
+.Fa driver
+argument to the function. Note, this entry point may be called in
+parallel with others and therefore the device driver should employ any
+necessary locking on that structure.
+.Sh RETURN VALUES
+Upon successful completion, the device driver's
+.Fn mc_setpromisc
+entry point should return
+.Sy 0
+after having set the device's state. Otherwise, it should return a
+non-zero positive error number to indicate the error that occurred.
+.Sh ERRORS
+The device driver may return one of the following errors. While this list
+is not intended to be exhaustive, it is recommended to use one of these
+if possible.
+.Bl -tag -width Er
+.It Er EIO
+The driver encountered a device or transport error while trying to
+update the device's state.
+.El
+.Sh SEE ALSO
+.Xr mac 9E ,
+.Xr mac_register 9F ,
+.Xr mac_register 9S

@@ -5,7 +5,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PROC 4 "May 19, 2014"
+.TH PROC 4 "Jun 6, 2016"
 .SH NAME
 proc \- /proc, the process file system
 .SH DESCRIPTION
@@ -1054,6 +1054,26 @@ which is followed by additional information about the process state
 .LP
 The full size of the structure can be computed using
 \fBPRIV_PRPRIV_SIZE\fR(\fBprpriv_t *\fR).
+.SS "secflags"
+.LP
+This file contains the security-flags of the process.  It contains a
+description of the security flags associated with the process.
+.sp
+.in +2
+.nf
+typedef struct prsecflags {
+	uint32_t pr_version;		/* ABI Versioning of this structure */
+	secflagset_t pr_effective;	/* Effective flags */
+	secflagset_t pr_inherit;	/* Inheritable flags */
+	secflagset_t pr_lower;		/* Lower flags */
+	secflagset_t pr_upper;		/* Upper flags */
+} prsecflags_t;
+.in -2
+
+.sp
+.LP
+The \fBpr_version\fR field is a version number for the structure, currently
+\fBPRSECFLAGS_VERSION_1\fR.
 .SS "sigact"
 .LP
 Contains an array of \fBsigaction structures\fR describing the current
@@ -2806,7 +2826,7 @@ For an agent LWP, the controlling process
 \fBsiginfo.h\fR(3HEAD), \fBsignal.h\fR(3HEAD), \fBthr_create\fR(3C),
 \fBthr_join\fR(3C), \fBtypes32.h\fR(3HEAD), \fBucontext.h\fR(3HEAD),
 \fBwait\fR(3C), \fBcontract\fR(4), \fBcore\fR(4), \fBprocess\fR(4),
-\fBlfcompile\fR(5), \fBprivileges\fR(5)
+\fBlfcompile\fR(5), \fBprivileges\fR(5), \fBsecurity-flags\fR(5)
 .SH DIAGNOSTICS
 .LP
 Errors that can occur in addition to the errors normally associated with file

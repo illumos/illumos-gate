@@ -1,0 +1,298 @@
+'\" te
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\" Copyright 2015, Richard Lowe.
+.\"
+.TH "PSECFLAGS" "1" "June 6, 2016"
+.SH "NAME"
+\fBpsecflags\fR - inspect or modify process security flags
+.SH "SYNOPSIS"
+.LP
+.nf
+\fB/usr/bin/psecflags\fR \fI-s\fR \fIspec\fR \fI-e\fR \fIcommand\fR \
+[\fIarg\fR]...
+.fi
+.LP
+.nf
+\fB/usr/bin/psecflags\fR \fI-s\fR \fIspec\fR [\fI-i\fR \fIidtype\fR] \
+\fIid\fR ...
+.fi
+.LP
+.nf
+\fB/usr/bin/psecflags\fR [\fI-F\fR] { \fIpid\fR | \fIcore\fR }
+.fi
+.LP
+.nf
+\fB/usr/bin/psecflags\fR \fI-l\fR
+.fi
+
+.SH "DESCRIPTION"
+The first invocation of the \fBpsecflags\fR command runs the specified
+\fIcommand\fR with the security-flags modified as described by the \fI-s\fR
+argument.
+.P
+The second invocation modifies the security-flags of the processes described
+by \fIidtype\fR and \fIid\fR according as described by the \fI-s\fR argument.
+.P
+The third invocation describes the security-flags of the specified processes
+or core files.  The effective set is signified by '\fBE\fR', the inheritable
+set by '\fBI\fR', the lower set by '\fBL\fR', and the upper set by '\fBU\fR'.
+.P
+The fourth invocation lists the supported process security-flags, documented
+in \fBsecurity-flags\fR(5).
+
+.SH "OPTIONS"
+The following options are supported:
+.sp
+.ne 2
+.na
+\fB-e\fR
+.ad
+.RS 11n
+Interpret the remaining arguments as a command line and run the command with
+the security-flags specified with the \fI-s\fR flag.
+.RE
+
+.sp
+.ne 2
+.na
+\fB-F\fR
+.ad
+.RS 11n
+Force. Grab the target process even if another process has control.
+.RE
+
+.sp
+.ne 2
+.na
+\fB-i\fR \fIidtype\fR
+.ad
+.RS 11n
+This option, together with the \fIid\fR arguments specify one or more
+processes whose security-flags will be modified. The interpretation of the
+\fIid\fR arguments is based on \fIidtype\fR. If \fIidtype\fR is omitted the
+default is \fBpid\fR.
+
+Valid \fIidtype\fR options are:
+.sp
+.ne 2
+.na
+\fBall\fR
+.ad
+.RS 11n
+The \fBpsecflags\fR command applies to all processes
+.RE
+
+.sp
+.ne 2
+.na
+\fBcontract\fR, \fBctid\fR
+.ad
+.RS 11n
+The security-flags of any process with a contract ID matching the \fIid\fR
+arguments are modified.
+.RE
+
+.sp
+.ne 2
+.na
+\fBgroup\fR, \fBgid\fR
+.ad
+.RS 11n
+The security-flags of any process with a group ID matching the \fIid\fR
+arguments are modified.
+.RE
+
+.sp
+.ne 2
+.na
+\fBpid\fR
+.ad
+.RS 11n
+The security-flags of any process with a process ID matching the \fIid\fR
+arguments are modified. This is the default.
+.RE
+
+.sp
+.ne 2
+.na
+\fBppid\fR
+.ad
+.RS 11n
+The security-flags of any processes whose parent process ID matches the
+\fIid\fR arguments are modified.
+.RE
+
+.sp
+.ne 2
+.na
+\fBproject\fR, \fBprojid\fR
+.ad
+.RS 11n
+The security-flags of any process whose project ID matches the \fIid\fR
+arguments are modified.
+.RE
+
+.sp
+.ne 2
+.na
+\fBsession\fR, \fBsid\fR
+.ad
+.RS 11n
+The security-flags of any process whose session ID matches the \fIid\fR
+arguments are modified.
+.RE
+
+.sp
+.ne 2
+.na
+\fBtaskid\fR
+.ad
+.RS 11n
+The security-flags of any process whose task ID matches the \fIid\fR arguments
+are modified.
+.RE
+
+.sp
+.ne 2
+.na
+\fBuser\fR, \fBuid\fR
+.ad
+.RS 11n
+The security-flags of any process belonging to the users matching the \fIid\fR
+arguments are modified.
+.RE
+
+.sp
+.ne 2
+.na
+\fBzone\fR, \fBzoneid\fR
+.ad
+.RS 11n
+The security-flags of any process running in the zones matching the given
+\fIid\fR arguments are modified.
+.RE
+.RE
+
+.sp
+.ne 2
+.na
+\fB-l\fR
+.ad
+.RS 11n
+List all supported process security-flags, described in
+\fBsecurity-flags\fR(5).
+.RE
+
+.sp
+.ne 2
+.na
+\fB-s\fR \fIspecification\fR
+.ad
+.RS 11n
+Modify the process security-flags according to
+\fIspecification\fR. Specifications take the form of a comma-separated list of
+flags, optionally preceded by a '-' or '!'. Where '-' and '!' indicate that the
+given flag should be removed from the specification.  The pseudo-flags "all",
+"none" and "current" are supported, to indicate that all flags, no flags, or
+the current set of flags (respectively) are to be included.
+.P
+By default, the inheritable flags are changed.  You may optionally specify the
+set to change using their single-letter identifiers and an equals sign.
+.P
+For a list of valid security-flags, see \fBpsecflags -l\fR.
+.RE
+
+.SH "EXAMPLES"
+.LP
+\fBExample 1\fR Display the security-flags of the current shell.
+.sp
+.in +2
+.nf
+example$ \fBpsecflags $$\fR
+100718:	-sh
+	E:	aslr
+	I:	aslr
+	L:	none
+	U:	aslr,forbidnullmap,noexecstack
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2\fR Run a user command with ASLR enabled in addition to any
+inherited security flags.
+.sp
+.in +2
+.nf
+example$ \fBpsecflags -s current,aslr -e /bin/sh\fR
+$ psecflags $$
+100724:	-sh
+	E:	none
+	I:	aslr
+	L:	none
+	U:	aslr,forbidnullmap,noexecstack
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 3\fR Remove aslr from the inheritable flags of all Bob's processes.
+.sp
+.in +2
+.nf
+example# \fBpsecflags -s current,-aslr -i uid bob\fR
+.fi
+.in -2
+
+.LP
+\fBExample 4\fR Add the aslr flag to the lower set, so that all future
+child processes must have this flag set.
+.sp
+.in +2
+.nf
+example# \fBpsecflags -s L=current,aslr $$\fR
+.fi
+.in -2
+
+.SH "EXIT STATUS"
+The following exit values are returned:
+
+.TP
+\fB0\fR
+.IP
+Success.
+
+.TP
+\fBnon-zero\fR
+.IP
+An error has occurred.
+
+.SH "ATTRIBUTES"
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Interface Stability	Volatile
+.TE
+
+.SH "SEE ALSO"
+.BR exec (2),
+.BR attributes (5),
+.BR contract (4),
+.BR security-flags (5),
+.BR zones (5)

@@ -1,0 +1,326 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2016 Joyent, Inc.
+.\"
+.Dd May 12, 2016
+.Dt MAC_CALLBACKS 9S
+.Os
+.Sh NAME
+.Nm mac_callbacks ,
+.Nm mac_callbacks_t
+.Nd networking device driver entry points structure
+.Sh SYNOPSIS
+.In sys/mac_provider.h
+.Sh INTERFACE LEVEL
+illumos DDI specific
+.Sh DESCRIPTION
+The
+.Sy mac_callbacks
+structure is used by GLDv3 networking device drivers implementing the
+.Xr mac 9E
+interface.
+.Pp
+The structure is normally allocated statically by drivers as a single
+global entry. A pointer to it is passed as the
+.Sy m_callbacks
+member of the
+.Sy mac_register_t
+structure.
+.Sh TYPES
+The following types define the function pointers in use in the
+.Sy mac_register_t .
+.Bd -literal -offset indent
+typedef int		(*mac_getstat_t)(void *, uint_t, uint64_t *);
+typedef	int		(*mac_start_t)(void *);
+typedef void		(*mac_stop_t)(void *);
+typedef int		(*mac_setpromisc_t)(void *, boolean_t);
+typedef int		(*mac_multicst_t)(void *, boolean_t, const uint8_t *);
+typedef int		(*mac_unicst_t)(void *, const uint8_t *);
+typedef void		(*mac_ioctl_t)(void *, queue_t *, mblk_t *);
+typedef void		(*mac_resources_t)(void *);
+typedef mblk_t		*(*mac_tx_t)(void *, mblk_t *);
+typedef	boolean_t	(*mac_getcapab_t)(void *, mac_capab_t, void *);
+typedef	int		(*mac_open_t)(void *);
+typedef void		(*mac_close_t)(void *);
+typedef	int		(*mac_set_prop_t)(void *, const char *, mac_prop_id_t,
+			    uint_t, const void *);
+typedef	int		(*mac_get_prop_t)(void *, const char *, mac_prop_id_t,
+			    uint_t, void *);
+typedef void		(*mac_prop_info_t)(void *, const char *, mac_prop_id_t,
+			    mac_prop_info_handle_t);
+.Ed
+.Sh STRUCTURE MEMBERS
+.Bd -literal -offset indent
+uint_t		mc_callbacks;	/* Denotes which callbacks are set */
+mac_getstat_t	mc_getstat;	/* Get the value of a statistic */
+mac_start_t	mc_start;	/* Start the device */
+mac_stop_t	mc_stop;	/* Stop the device */
+mac_setpromisc_t mc_setpromisc;	/* Enable or disable promiscuous mode */
+mac_multicst_t	mc_multicst;	/* Enable or disable a multicast addr */
+mac_unicst_t	mc_unicst;	/* Set the unicast MAC address */
+mac_tx_t	mc_tx;		/* Transmit a packet */
+void		*mc_reserved;	/* Reserved, do not use */
+mac_ioctl_t	mc_ioctl;	/* Process an unknown ioctl */
+mac_getcapab_t	mc_getcapab;	/* Get capability information */
+mac_open_t	mc_open;	/* Open the device */
+mac_close_t	mc_close;	/* Close the device */
+mac_set_prop_t	mc_setprop;	/* Set a device property */
+mac_get_prop_t	mc_getprop;	/* Get a device property */
+mac_prop_info_t	mc_propinfo;	/* Get property information */
+.Ed
+.Pp
+The
+.Sy mc_callbacks
+member is used to denote which of a series of optional callbacks are
+present. This method allows additional members to be added to the
+.Sy mac_callbacks_t
+structure while maintaining ABI compatibility with existing modules. If
+a member is not mentioned below, then it is a part of the base version
+of the structure and device drivers do not need to set anything to
+indicate that it is present.
+The
+.Sy mc_callbacks
+member should be set to the bitwise inclusive OR of the following
+pre-processor values:
+.Bl -tag -width Dv -offset indent
+.It Sy MC_IOCTL
+Indicates that the
+.Sy mc_ioctl
+structure member has been set.
+.It Sy MC_GETCAPAB
+Indicates that the
+.Sy mc_getcapab
+structure member has been set.
+.It Sy MC_OPEN
+Indicates that the
+.Sy mc_open
+structure member has been set.
+.It Sy MC_CLOSE
+Indicates that the
+.Sy mc_close
+structure member has been set.
+.It Sy MC_SETPROP
+Indicates that the
+.Sy mc_setprop
+structure member has been set.
+.It Sy MC_GETPROP
+Indicates that the
+.Sy mc_getprop
+structure member has been set.
+.It Sy MC_PROPINFO
+Indicates that the
+.Sy mc_propinfo
+structure member has been set.
+.It Sy MC_PROPERTIES
+Indicates that the
+.Sy mc_getprop ,
+.Sy mc_propinfo ,
+and
+.Sy mc_setprop
+structure members have been set.
+.El
+.Pp
+The
+.Sy mc_getstat
+function defines an entry point used to receive statistics about the
+device. A list of statistics that it is required to support is available
+in
+.Xr mac 9E .
+For more information on the requirements of the function, see
+.Xr mc_getstat 9E .
+.Pp
+The
+.Sy mc_start
+member defines an entry point that is used to start the device. For more
+information on the requirements of the function, see
+.Xr mc_start 9E .
+.Pp
+The
+.Sy mc_stop
+member defines an entry point that is used to stop the device. It is the
+opposite of the
+.Sy mc_start
+member. For more information on the requirements of the function, see
+.Xr mc_stop 9E .
+.Pp
+The
+.Sy mc_setpromisc
+member is used to enable and disable promiscuous mode on the device. For
+more information on the requirements of the function, see
+.Xr mc_setpromisc 9E .
+.Pp
+The
+.Sy mc_multicst
+member is used to enable or disable multicast addresses in the device's
+filters. For more information on the requirements of the function, see
+.Xr mc_multicst 9E .
+.Pp
+The
+.Sy mc_unicst
+member is used to set the primary unicast MAC address of the device.
+For more information on the requirements of the function, see
+.Xr mc_unicst 9E .
+.Pp
+The
+.Sy mc_tx
+member is used to transmit a single message on the wire. For more
+information on the requirements of the function, see
+.Xr mc_tx 9E .
+.Pp
+The
+.Sy mc_ioctl
+member is used to process device specific ioctls. The GLDv3 does not
+define any ioctls that devices should handle; however, there may be
+private ioctls for this device. This entry point is optional. For it to
+be considered, the
+.Sy MC_IOCTL
+value must be present in the
+.Sy mc_callbacks
+member. For more information on the requirements of the function, see
+.Xr mc_ioctl 9E .
+.Pp
+The
+.Sy mc_getcapab
+member is used to determine device capabilities. Each capability has its
+own data and semantics associated with it. A list of capabilities is
+provided in
+.Xr mac 9E .
+This entry point is optional. For it to be used, the
+.Sy MC_GETCAPAB
+value must be present in the
+.Sy mc_callbacks
+member. For more information on the requirements of the function, see
+.Xr mc_getcapab 9E .
+.Pp
+The
+.Sy mc_open
+member is used to provide specific actions to take when the device is
+opened. Note that most device drivers will not have a need to implement
+this. It is not required for this function to be implemented for this
+device to be used with
+.Xr dlpi 7P .
+This entry point is optional. For it to be used, the
+.Sy MC_OPEN
+value must be present in the
+.Sy mc_callbacks
+member. For more information on the requirements of the function, see
+.Xr mc_open 9E .
+.Pp
+The
+.Sy mc_close
+member is used to provide specific actions to take when the device is
+closed. Note that most device drivers will not have a need to implement
+this. It is not required for this function to be implemented for this
+device to be used with
+.Xr dlpi 7P .
+This entry point is optional. For it to be used, the
+.Sy MC_CLOSE
+value must be present in the
+.Sy mc_callbacks
+member. For more information on the requirements of the function, see
+.Xr mc_close 9E .
+.Pp
+The
+.Sy mc_getprop
+member is used to get the current value of a property from the device. A
+list of properties, their sizes, and their interpretation is available
+in
+.Xr mac 9E .
+This entry point is optional. For it to be used, the
+.Sy MC_GETPROP
+value must be present in the
+.Sy mc_callbacks
+member. For more information on the requirements of the function, see
+.Xr mc_getprop 9E .
+.Pp
+The
+.Sy mc_setprop
+member is used to set the value of a device property. A list of
+properties, their sizes, and their interpretation is available in
+.Xr mac 9E .
+This entry point is optional. For it to be used, the
+.Sy MC_SETPROP
+value must be present in the
+.Sy mc_callbacks
+member. For more information on the requirements of the function, see
+.Xr mc_setprop 9E .
+.Pp
+The
+.Sy mc_propinfo
+member is used to obtain metadata about a property such as its default
+value, whether or not it is writable, and more. A list of properties,
+their sizes, and their interpretation is available in
+.Xr mac 9E .
+This entry point is optional. For it to be used, the
+.Sy MC_PROPINFO
+value must be present in the
+.Sy mc_callbacks
+member. For more information on the requirements of the function, see
+.Xr mc_propinfo 9E .
+.Pp
+.Ss Required Members
+Many members in the structure are optional; however, the following
+members must be set or a call to
+.Xr mac_register 9F
+will fail.
+.Bl -bullet -offset indent
+.It
+.Sy mc_getstat
+.It
+.Sy mc_start
+.It
+.Sy mc_stop
+.It
+. Sy mc_setpromisc
+.It
+.Sy mc_multicst
+.It
+.Sy mc_tx
+.It
+.Sy mc_unicst
+.El
+.Pp
+Note, that devices which implement the GLDv3 ring capabilities must not
+implement the
+.Sy mc_unicst
+and
+.Sy mc_tx
+functions. However, the ring capabilities are still private and evolving
+at this time.
+.Pp
+Generally, a device that implements one of
+.Sy mc_getprop ,
+.Sy mc_setprop ,
+or
+.Sy mc_propinfo
+will want to implement all three endpoints to ensure that the property
+is fully integrated into user land utilities such as
+.Xr dladm 1M .
+.Sh SEE ALSO
+.Xr dladm 1M ,
+.Xr dlpi 7P ,
+.Xr mac 9E ,
+.Xr mc_close 9E ,
+.Xr mc_getcapab 9E ,
+.Xr mc_getprop 9E ,
+.Xr mc_getstat 9E ,
+.Xr mc_ioctl 9E ,
+.Xr mc_multicst 9E ,
+.Xr mc_open 9E ,
+.Xr mc_propinfo 9E ,
+.Xr mc_setpromisc 9E ,
+.Xr mc_setprop 9E ,
+.Xr mc_start 9E ,
+.Xr mc_stop 9E ,
+.Xr mc_tx 9E ,
+.Xr mc_unicst 9E ,
+.Xr mac_register 9S
