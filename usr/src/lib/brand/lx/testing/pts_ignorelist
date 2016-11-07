@@ -180,54 +180,45 @@ conformance/interfaces/pthread_rwlock_unlock/pthread_rwlock_unlock_4-1 UNSUPPORT
 conformance/interfaces/pthread_rwlock_unlock/pthread_rwlock_unlock_4-2 UNSUPPORTED
 
 #
-# lx-brand does not have proc_priocntl privilege.
+# Part of this test is verifying specific thread scheduling and I'm
+# not sure how much I trust it. This test fails on native too.
 #
-# pthread_setschedparam_1-1 returns FAILED instead UNRESOLVED
+conformance/interfaces/sched_setparam/sched_setparam_9-1 FAILED
+
 #
-conformance/interfaces/fork/fork_17-1 UNRESOLVED
-conformance/interfaces/fork/fork_17-2 UNRESOLVED
-conformance/interfaces/pthread_attr_setinheritsched/pthread_attr_setinheritsched_2-2 UNRESOLVED
-conformance/interfaces/pthread_attr_setinheritsched/pthread_attr_setinheritsched_2-3 UNRESOLVED
-conformance/interfaces/pthread_attr_setinheritsched/pthread_attr_setinheritsched_2-4 UNRESOLVED
-conformance/interfaces/pthread_attr_setschedparam/pthread_attr_setschedparam_1-3 UNRESOLVED
-conformance/interfaces/pthread_attr_setschedparam/pthread_attr_setschedparam_1-4 UNRESOLVED
-conformance/interfaces/pthread_attr_setschedpolicy/pthread_attr_setschedpolicy_1-2 UNRESOLVED
-conformance/interfaces/pthread_attr_setschedpolicy/pthread_attr_setschedpolicy_1-3 UNRESOLVED
-conformance/interfaces/pthread_attr_setschedpolicy/pthread_attr_setschedpolicy_2-1 UNRESOLVED
-conformance/interfaces/pthread_cancel/pthread_cancel_3-1 UNRESOLVED
-conformance/interfaces/pthread_create/pthread_create_1-6 UNRESOLVED
-conformance/interfaces/pthread_getschedparam/pthread_getschedparam_1-2 UNRESOLVED
-conformance/interfaces/pthread_getschedparam/pthread_getschedparam_1-3 UNRESOLVED
-conformance/interfaces/pthread_setschedprio/pthread_setschedprio_1-1 UNRESOLVED
-conformance/interfaces/pthread_setschedparam/pthread_setschedparam_1-1 FAILED
-conformance/interfaces/pthread_setschedparam/pthread_setschedparam_1-2 UNRESOLVED
-conformance/interfaces/pthread_setschedparam/pthread_setschedparam_4-1 UNRESOLVED
-conformance/interfaces/sched_rr_get_interval/sched_rr_get_interval_1-1 UNRESOLVED
-conformance/interfaces/sched_rr_get_interval/sched_rr_get_interval_2-1 UNRESOLVED
-conformance/interfaces/sched_rr_get_interval/sched_rr_get_interval_3-1 UNRESOLVED
-conformance/interfaces/sched_setparam/sched_setparam_2-1 UNRESOLVED
-conformance/interfaces/sched_setparam/sched_setparam_2-2 UNRESOLVED
-conformance/interfaces/sched_setparam/sched_setparam_9-1 UNRESOLVED
-conformance/interfaces/sched_setparam/sched_setparam_23-6 UNRESOLVED
-conformance/interfaces/sched_setscheduler/sched_setscheduler_1-1 UNRESOLVED
-conformance/interfaces/sched_setscheduler/sched_setscheduler_4-1 UNRESOLVED
-conformance/interfaces/sched_setscheduler/sched_setscheduler_16-1 UNRESOLVED
-conformance/interfaces/sched_setscheduler/sched_setscheduler_19-1 UNRESOLVED
-conformance/interfaces/sched_setscheduler/sched_setscheduler_22-1 UNRESOLVED
-conformance/interfaces/sched_setscheduler/sched_setscheduler_22-2 UNRESOLVED
-conformance/interfaces/sched_yield/sched_yield_1-1 UNRESOLVED
-conformance/interfaces/sem_post/sem_post_8-1 UNRESOLVED
-conformance/interfaces/sigaction/sigaction_16-1 UNTESTED
-functional/threads/condvar/condvar_pthread_cond_wait_1 UNRESOLVED
-functional/threads/condvar/condvar_pthread_cond_wait_2 UNRESOLVED
-functional/threads/pi_test/pi_test_pitest-1 UNRESOLVED
-functional/threads/pi_test/pi_test_pitest-2 UNRESOLVED
-functional/threads/pi_test/pi_test_pitest-3 UNRESOLVED
-functional/threads/pi_test/pi_test_pitest-4 UNRESOLVED
+# Linux doesn't support PTHREAD_SCOPE_PROCESS, see
+# pthread_attr_setscope(3).
+#
+conformance/interfaces/sched_setscheduler/sched_setscheduler_22-1 UNSUPPORTED
+conformance/interfaces/sched_setscheduler/sched_setscheduler_22-2 UNSUPPORTED
+
+#
+# These tests test specific scheduling behavior. They pass on native
+# when actually running in the RT class, but we run lx zones in the
+# FSS class and can't guarantee specific scheduling order.
+#
+conformance/interfaces/pthread_create/pthread_create_1-6 FAILED
+conformance/interfaces/sem_post/sem_post_8-1 FAILED
+
+#
+# It looks like we are missing some futex support that
+# pthread_mutex_timedlock() requires:
+#
+# futex(0x602820, FUTEX_LOCK_PI_PRIVATE, 1) = -1 ENOSYS
+#
+functional/threads/pi_test/pi_test_pitest-1 FAILED
+functional/threads/pi_test/pi_test_pitest-2 FAILED
+functional/threads/pi_test/pi_test_pitest-3 FAILED
+functional/threads/pi_test/pi_test_pitest-4 FAILED
+functional/threads/pi_test/pi_test_pitest-6 FAILED
+
+#
+# Another case where we need FUTEX_LOCK_PI, but slightly different
+# from the ones above. Glibc's implementation of pthread_mutex_lock()
+# doesn't check for ENOSYS from FUTEX_LOCK_PI and instead chugs along
+# assuming it has the mutex.
+#
 functional/threads/pi_test/pi_test_pitest-5 UNRESOLVED
-functional/threads/pi_test/pi_test_pitest-6 UNRESOLVED
-functional/threads/schedule/schedule_1-1 UNRESOLVED
-functional/threads/schedule/schedule_1-2 UNRESOLVED
 
 #
 # glibc doesn't support PTHREAD_SCOPE_PROCESS.
