@@ -2258,7 +2258,6 @@ add_resource(cmd_t *cmd)
 {
 	int type;
 	struct zone_psettab tmp_psettab;
-	struct zone_mcaptab tmp_mcaptab;
 	struct zone_secflagstab tmp_secflagstab;
 	uint64_t tmp;
 	uint64_t tmp_mcap;

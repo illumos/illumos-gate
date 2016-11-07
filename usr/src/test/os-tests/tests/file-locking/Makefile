@@ -28,9 +28,6 @@ SRCS = $(PROGS:%=%.c) $(UTILS)
 PROGS32 = $(PROGS:%=%.32)
 PROGS64 = $(PROGS:%=%.64)
 
-runtests.32 :=	LDLIBS += -lgen
-runtests.64 :=	LDLIBS64 += -lgen
-
 LINTS = $(PROGS:%=%.ln)
 LINTFLAGS += -erroff=E_NAME_DEF_NOT_USED2
 LINTFLAGS += -erroff=E_NAME_USED_NOT_DEF2

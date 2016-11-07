@@ -455,13 +455,6 @@ extern	int	zonecfg_delete_pset(zone_dochandle_t);
 extern	int	zonecfg_modify_pset(zone_dochandle_t, struct zone_psettab *);
 extern	int	zonecfg_lookup_pset(zone_dochandle_t, struct zone_psettab *);
 
-/*
- * mem-cap configuration.
- */
-extern	int	zonecfg_delete_mcap(zone_dochandle_t);
-extern	int	zonecfg_modify_mcap(zone_dochandle_t, struct zone_mcaptab *);
-extern	int	zonecfg_lookup_mcap(zone_dochandle_t, struct zone_mcaptab *);
-
 /* security-flags configuration */
 extern	int	zonecfg_add_secflags(zone_dochandle_t,
     struct zone_secflagstab *);

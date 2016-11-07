@@ -18,13 +18,4 @@ include ../Makefile.com
 CFLAGS +=	-march=i386 -m32 -fno-reorder-functions
 CFLAGS +=	-mpreferred-stack-boundary=2
 
-[/opt/os-tests/tests/sigqueue]
-tests = ['sigqueue_queue_size']
-
-[/opt/os-tests/tests/tmpfs]
-user = root
-tests = ['tmpfs_badmount', 'tmpfs_enospc']
-
-[/opt/os-tests/tests/file-locking]
-tests = ['runtests.32', 'runtests.64']
 MACHINE=	$(MACH)

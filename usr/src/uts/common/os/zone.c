@@ -6179,6 +6179,7 @@ zone_setattr(zoneid_t zoneid, int attr, void *buf, size_t bufsize)
 		break;
 	case ZONE_ATTR_RSS:
 		err = zone_set_rss(zone, (const uint64_t *)buf);
+		break;
 	case ZONE_ATTR_SECFLAGS:
 		err = zone_set_secflags(zone, (psecflags_t *)buf);
 		break;

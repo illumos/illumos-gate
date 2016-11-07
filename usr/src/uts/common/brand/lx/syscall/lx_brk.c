@@ -36,7 +36,7 @@
  * need for Linux to manage its own breakpoint, this has to remain in the
  * kernel.
  */
-extern int brk(caddr_t);
+extern intptr_t brk(caddr_t);
 
 long
 lx_brk(caddr_t nva)
