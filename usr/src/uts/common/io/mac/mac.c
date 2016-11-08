@@ -158,7 +158,7 @@
  * perimeter) across a call to any other layer from the mac layer. The call to
  * any other layer could be via mi_* entry points, classifier entry points into
  * the driver or via upcall pointers into layers above. The mac perimeter may
- * be acquired or held only in the down direction, for e.g. when calling into
+ * be acquired or held only in the down direction, e.g. when calling into
  * a mi_* driver enty point to provide atomicity of the operation.
  *
  * R8. Since it is not guaranteed (see R14) that drivers won't hold locks across
@@ -207,7 +207,7 @@
  * number whenever the ring's stop routine is invoked.
  * See comments in mac_rx_ring();
  *
- * R17 Similarly mi_stop is another synchronization point and the driver must
+ * R17. Similarly mi_stop is another synchronization point and the driver must
  * ensure that all upcalls are done and there won't be any future upcall
  * before returning from mi_stop.
  *
@@ -227,7 +227,7 @@
  *
  * cpu_lock -> mac_srs_g_lock -> srs_lock -> s_ring_lock [mac_walk_srs_and_bind]
  *
- * i_dls_devnet_lock -> mac layer locks [dls_devnet_rename]
+ * mac perim -> i_dls_devnet_lock [dls_devnet_rename]
  *
  * Perimeters are ordered P1 -> P2 -> P3 from top to bottom in order of mac
  * client to driver. In the case of clients that explictly use the mac provided

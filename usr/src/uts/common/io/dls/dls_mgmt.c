@@ -1854,14 +1854,50 @@ dls_devnet_destroy(mac_handle_t mh, datalink_id_t *idp, boolean_t wait)
 	mac_perim_handle_t	mph;
 
 	*idp = DATALINK_INVALID_LINKID;
-	err = dls_devnet_unset(mac_name(mh), idp, wait);
-	if (err != 0 && err != ENOENT)
-		return (err);
-
 	mac_perim_enter_by_mh(mh, &mph);
-	err = dls_link_rele_by_name(mac_name(mh));
-	mac_perim_exit(mph);
+	err = dls_devnet_unset(mac_name(mh), idp, wait);
 
+	/*
+	 * We continue on in the face of ENOENT because the devnet
+	 * unset and DLS link release are not atomic and we may have a
+	 * scenario where there is no entry in i_dls_devnet_hash for
+	 * the MAC name but there is an entry in i_dls_link_hash. For
+	 * example, if the following occurred:
+	 *
+	 * 1. dls_devnet_unset() returns success, and
+	 *
+	 * 2. dls_link_rele_by_name() fails with ENOTEMPTY because
+	 *    flows still exist, and
+	 *
+	 * 3. dls_devnet_set() fails to set the zone id and calls
+	 *    dls_devnet_unset() -- leaving an entry in
+	 *    i_dls_link_hash but no corresponding entry in
+	 *    i_dls_devnet_hash.
+	 *
+	 * Even if #3 wasn't true the dls_devnet_set() may fail for
+	 * different reasons in the future; the point is that it _can_
+	 * fail as part of its contract. We can't rely on it working
+	 * so we must assume that these two pieces of state (devnet
+	 * and link hashes), which should always be in sync, can get
+	 * out of sync and thus even if we get ENOENT from the devnet
+	 * hash we should still try to delete from the link hash just
+	 * in case.
+	 *
+	 * We could prevent the ENOTEMPTY from dls_link_rele_by_name()
+	 * by calling mac_disable() before calling
+	 * dls_devnet_destroy() but that's not currently possible due
+	 * to a long-standing bug. OpenSolaris 6791335: The semantics
+	 * of mac_disable() were modified by Crossbow such that
+	 * dls_devnet_destroy() needs to be called before
+	 * mac_disable() can succeed. This is because of the implicit
+	 * reference that dls has on the mac_impl_t.
+	 */
+	if (err != 0 && err != ENOENT) {
+		mac_perim_exit(mph);
+		return (err);
+	}
+
+	err = dls_link_rele_by_name(mac_name(mh));
 	if (err != 0) {
 		/*
 		 * XXX It is a general GLDv3 bug that dls_devnet_set() has to
@@ -1873,6 +1909,8 @@ dls_devnet_destroy(mac_handle_t mh, datalink_id_t *idp, boolean_t wait)
 		(void) dls_devnet_set(mac_name(mh), *idp, crgetzoneid(CRED()),
 		    NULL);
 	}
+
+	mac_perim_exit(mph);
 	return (err);
 }
 
