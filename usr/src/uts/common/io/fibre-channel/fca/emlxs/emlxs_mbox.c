@@ -1062,6 +1062,41 @@ emlxs_mb_heartbeat(emlxs_hba_t *hba, MAILBOXQ *mbq)
 } /* emlxs_mb_heartbeat() */
 
 
+/*ARGSUSED*/
+extern void
+emlxs_mb_gpio_write(emlxs_hba_t *hba, MAILBOXQ *mbq, uint8_t pin, uint8_t val)
+{
+	emlxs_port_t *port = &PPORT;
+	MAILBOX4 *mb4;
+	be_req_hdr_t *be_req;
+	mbox_req_hdr_t *hdr_req;
+	IOCTL_LOWLEVEL_GPIO_RDWR *gpio;
+
+	bzero((void *) mbq, sizeof (MAILBOXQ));
+
+	mbq->port = port;
+
+	mb4 = (MAILBOX4 *)mbq->mbox;
+	mb4->mbxCommand = MBX_SLI_CONFIG;
+	mb4->mbxOwner = OWN_HOST;
+
+	be_req = (be_req_hdr_t *)&mb4->un.varSLIConfig.be;
+	be_req->embedded = 1;
+	be_req->payload_length = sizeof (mbox_req_hdr_t) +
+	    sizeof (IOCTL_LOWLEVEL_GPIO_RDWR);
+
+	hdr_req = &be_req->un_hdr.hdr_req;
+	hdr_req->subsystem = IOCTL_SUBSYSTEM_LOWLEVEL;
+	hdr_req->opcode = LOWLEVEL_OPCODE_GPIO_RDWR;
+	hdr_req->timeout = 0;
+	hdr_req->req_length = sizeof (IOCTL_LOWLEVEL_GPIO_RDWR);
+
+	gpio = (IOCTL_LOWLEVEL_GPIO_RDWR *)&mb4->un.varSLIConfig.payload;
+	gpio->params.request.GpioAction = LOWLEVEL_GPIO_ACT_WRITE;
+	gpio->params.request.LogicalPin = pin;
+	gpio->params.request.PinValue = val;
+} /* emlxs_mb_gpio_write */
+
 #ifdef MSI_SUPPORT
 
 /*ARGSUSED*/

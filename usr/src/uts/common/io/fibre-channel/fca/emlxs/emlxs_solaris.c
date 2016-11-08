@@ -1769,7 +1769,8 @@ emlxs_fca_bind_port(dev_info_t *dip, fc_fca_port_info_t *port_info,
 	/* Initialize the port attributes */
 	bzero(&port_info->pi_attrs, sizeof (port_info->pi_attrs));
 
-	(void) strncpy(port_info->pi_attrs.manufacturer, "Emulex",
+	(void) strncpy(port_info->pi_attrs.manufacturer,
+	    hba->model_info.manufacturer,
 	    (sizeof (port_info->pi_attrs.manufacturer)-1));
 
 	port_info->pi_rnid_params.status = FC_SUCCESS;

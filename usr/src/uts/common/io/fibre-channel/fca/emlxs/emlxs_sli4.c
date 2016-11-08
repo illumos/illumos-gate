@@ -130,6 +130,19 @@ static void		emlxs_sli4_timer(emlxs_hba_t *hba);
 
 static void		emlxs_sli4_timer_check_mbox(emlxs_hba_t *hba);
 
+static void		emlxs_sli4_gpio_timer_start(emlxs_hba_t *hba);
+
+static void		emlxs_sli4_gpio_timer_stop(emlxs_hba_t *hba);
+
+static void		emlxs_sli4_gpio_timer(void *arg);
+
+static void		emlxs_sli4_check_gpio(emlxs_hba_t *hba);
+
+static uint32_t	emlxs_sli4_fix_gpio(emlxs_hba_t *hba,
+					uint8_t *pin, uint8_t *pinval);
+
+static uint32_t	emlxs_sli4_fix_gpio_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq);
+
 static void		emlxs_sli4_poll_erratt(emlxs_hba_t *hba);
 
 extern XRIobj_t		*emlxs_sli4_reserve_xri(emlxs_port_t *port,
@@ -341,6 +354,15 @@ emlxs_sli4_online(emlxs_hba_t *hba)
 	}
 	hba->channel_fcp = 0; /* First channel */
 
+	/* Gen6 chips only support P2P topologies */
+	if ((hba->model_info.chip == EMLXS_LANCERG6_CHIP) &&
+	    cfg[CFG_TOPOLOGY].current != 2) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_init_msg,
+		    "Loop topologies are not supported by this HBA. "
+		    "Forcing topology to P2P.");
+		cfg[CFG_TOPOLOGY].current = 2;
+	}
+
 	/* Default channel for everything else is the last channel */
 	hba->channel_ip = hba->chan_count - 1;
 	hba->channel_els = hba->chan_count - 1;
@@ -349,6 +371,22 @@ emlxs_sli4_online(emlxs_hba_t *hba)
 	hba->fc_iotag = 1;
 	hba->io_count = 0;
 	hba->channel_tx_count = 0;
+
+	/* Specific to ATTO G5 boards */
+	if (hba->model_info.flags & EMLXS_GPIO_LEDS) {
+		/* Set hard-coded GPIO pins */
+		if (hba->pci_function_number) {
+			hba->gpio_pin[EMLXS_GPIO_PIN_LO] = 27;
+			hba->gpio_pin[EMLXS_GPIO_PIN_HI] = 28;
+			hba->gpio_pin[EMLXS_GPIO_PIN_ACT] = 29;
+			hba->gpio_pin[EMLXS_GPIO_PIN_LASER] = 8;
+		} else {
+			hba->gpio_pin[EMLXS_GPIO_PIN_LO] = 13;
+			hba->gpio_pin[EMLXS_GPIO_PIN_HI] = 25;
+			hba->gpio_pin[EMLXS_GPIO_PIN_ACT] = 26;
+			hba->gpio_pin[EMLXS_GPIO_PIN_LASER] = 12;
+		}
+	}
 
 	/* Initialize the local dump region buffer */
 	bzero(&hba->sli.sli4.dump_region, sizeof (MBUF_INFO));
@@ -1341,12 +1379,14 @@ reset:
 
 	/* Create the symbolic names */
 	(void) snprintf(hba->snn, (sizeof (hba->snn)-1),
-	    "Emulex %s FV%s DV%s %s",
-	    hba->model_info.model, hba->vpd.fw_version, emlxs_version,
+	    "%s %s FV%s DV%s %s",
+	    hba->model_info.manufacturer, hba->model_info.model,
+	    hba->vpd.fw_version, emlxs_version,
 	    (char *)utsname.nodename);
 
 	(void) snprintf(hba->spn, (sizeof (hba->spn)-1),
-	    "Emulex PPN-%01x%01x:%02x:%02x:%02x:%02x:%02x:%02x:%02x",
+	    "%s PPN-%01x%01x:%02x:%02x:%02x:%02x:%02x:%02x:%02x",
+	    hba->model_info.manufacturer,
 	    hba->wwpn.nameType, hba->wwpn.IEEEextMsn, hba->wwpn.IEEEextLsb,
 	    hba->wwpn.IEEE[0], hba->wwpn.IEEE[1], hba->wwpn.IEEE[2],
 	    hba->wwpn.IEEE[3], hba->wwpn.IEEE[4], hba->wwpn.IEEE[5]);
@@ -1422,6 +1462,10 @@ done:
 		mbq = NULL;
 		mb = NULL;
 	}
+
+	if (hba->model_info.flags & EMLXS_GPIO_LEDS)
+		emlxs_sli4_gpio_timer_start(hba);
+
 	return (0);
 
 failed4:
@@ -1469,6 +1513,9 @@ static void
 emlxs_sli4_offline(emlxs_hba_t *hba, uint32_t reset_requested)
 {
 	/* Reverse emlxs_sli4_online */
+
+	if (hba->model_info.flags & EMLXS_GPIO_LEDS)
+		emlxs_sli4_gpio_timer_stop(hba);
 
 	mutex_enter(&EMLXS_PORT_LOCK);
 	if (hba->flag & FC_INTERLOCKED) {
@@ -2378,7 +2425,7 @@ emlxs_sli4_hba_init(emlxs_hba_t *hba)
 /*ARGSUSED*/
 static uint32_t
 emlxs_sli4_hba_reset(emlxs_hba_t *hba, uint32_t restart, uint32_t skip_post,
-		uint32_t quiesce)
+    uint32_t quiesce)
 {
 	emlxs_port_t *port = &PPORT;
 	emlxs_port_t *vport;
@@ -2496,6 +2543,15 @@ emlxs_sli4_hba_reset(emlxs_hba_t *hba, uint32_t restart, uint32_t skip_post,
 	hba->discovery_timer = 0;
 	hba->linkup_timer = 0;
 	hba->loopback_tics = 0;
+
+	/* Specific to ATTO G5 boards */
+	if (hba->model_info.flags & EMLXS_GPIO_LEDS) {
+		/* Assume the boot driver enabled all LEDs */
+		hba->gpio_current =
+		    EMLXS_GPIO_LO | EMLXS_GPIO_HI | EMLXS_GPIO_ACT;
+		hba->gpio_desired = 0;
+		hba->gpio_bit = 0;
+	}
 
 	/* Reset the port objects */
 	for (i = 0; i < MAX_VPORTS; i++) {
@@ -5212,7 +5268,28 @@ emlxs_sli4_process_async_event(emlxs_hba_t *hba, CQE_ASYNC_t *cqe)
 	case ASYNC_EVENT_CODE_PORT:
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
 		    "SLI Port Async Event: type=%d", cqe->event_type);
-		if (cqe->event_type == ASYNC_EVENT_MISCONFIG_PORT) {
+
+		switch (cqe->event_type) {
+		case ASYNC_EVENT_PORT_OTEMP:
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_err_msg,
+			    "SLI Port Async Event: Temperature limit exceeded");
+			cmn_err(CE_WARN,
+			    "^%s%d: Temperature limit exceeded. Fibre channel "
+			    "controller temperature %u degrees C",
+			    DRIVER_NAME, hba->ddiinst,
+			    BE_SWAP32(*(uint32_t *)cqe->un.port.link_status));
+			break;
+
+		case ASYNC_EVENT_PORT_NTEMP:
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_err_msg,
+			    "SLI Port Async Event: Temperature returned to "
+			    "normal");
+			cmn_err(CE_WARN,
+			    "^%s%d: Temperature returned to normal",
+			    DRIVER_NAME, hba->ddiinst);
+			break;
+
+		case ASYNC_EVENT_MISCONFIG_PORT:
 			*((uint32_t *)cqe->un.port.link_status) =
 			    BE_SWAP32(*((uint32_t *)cqe->un.port.link_status));
 			status =
@@ -5265,7 +5342,9 @@ emlxs_sli4_process_async_event(emlxs_hba_t *hba, CQE_ASYNC_t *cqe)
 				    DRIVER_NAME, hba->ddiinst, status);
 				break;
 			}
+			break;
 		}
+
 		break;
 	case ASYNC_EVENT_CODE_VF:
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
@@ -6699,21 +6778,8 @@ emlxs_sli4_process_unsol_rcv(emlxs_hba_t *hba, CQ_DESC_t *cq,
 		/* pass xrip to FCT in the iocbq */
 		iocbq->sbp = xrip;
 
-#define	EMLXS_FIX_CISCO_BUG1
-#ifdef EMLXS_FIX_CISCO_BUG1
-{
-uint8_t *ptr;
-ptr = ((uint8_t *)seq_mp->virt);
-if (((*ptr+12) != 0xa0) && (*(ptr+20) == 0x8) && (*(ptr+21) == 0x8)) {
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_err_msg,
-	    "RQ ENTRY: Bad CDB fixed");
-	*ptr++ = 0;
-	*ptr = 0;
-}
-}
-#endif
 		(void) emlxs_fct_handle_unsol_req(port, cp, iocbq,
-			seq_mp, seq_len);
+		    seq_mp, seq_len);
 		break;
 #endif /* SFCT_SUPPORT */
 
@@ -7270,7 +7336,6 @@ emlxs_sli4_disable_intr(emlxs_hba_t *hba, uint32_t att)
 	/* Short of reset, we cannot disable interrupts */
 } /* emlxs_sli4_disable_intr() */
 
-
 static void
 emlxs_sli4_resource_free(emlxs_hba_t *hba)
 {
@@ -7359,8 +7424,11 @@ emlxs_sli4_resource_free(emlxs_hba_t *hba)
 		bzero(buf_info, sizeof (MBUF_INFO));
 	}
 
-} /* emlxs_sli4_resource_free() */
+	/* GPIO lock */
+	if (hba->model_info.flags & EMLXS_GPIO_LEDS)
+		mutex_destroy(&hba->gpio_lock);
 
+} /* emlxs_sli4_resource_free() */
 
 static int
 emlxs_sli4_resource_alloc(emlxs_hba_t *hba)
@@ -7751,6 +7819,10 @@ emlxs_sli4_resource_alloc(emlxs_hba_t *hba)
 
 		xrip++;
 	}
+
+	/* GPIO lock */
+	if (hba->model_info.flags & EMLXS_GPIO_LEDS)
+		mutex_init(&hba->gpio_lock, NULL, MUTEX_DRIVER, NULL);
 
 #ifdef FMA_SUPPORT
 	if (hba->sli.sli4.slim2.dma_handle) {
@@ -8766,6 +8838,199 @@ emlxs_sli4_timer_check_mbox(emlxs_hba_t *hba)
 
 } /* emlxs_sli4_timer_check_mbox() */
 
+static void
+emlxs_sli4_gpio_timer_start(emlxs_hba_t *hba)
+{
+	mutex_enter(&hba->gpio_lock);
+
+	if (!hba->gpio_timer) {
+		hba->gpio_timer = timeout(emlxs_sli4_gpio_timer, (void *)hba,
+		    drv_usectohz(100000));
+	}
+
+	mutex_exit(&hba->gpio_lock);
+
+} /* emlxs_sli4_gpio_timer_start() */
+
+static void
+emlxs_sli4_gpio_timer_stop(emlxs_hba_t *hba)
+{
+	mutex_enter(&hba->gpio_lock);
+
+	if (hba->gpio_timer) {
+		(void) untimeout(hba->gpio_timer);
+		hba->gpio_timer = 0;
+	}
+
+	mutex_exit(&hba->gpio_lock);
+
+	delay(drv_usectohz(300000));
+} /* emlxs_sli4_gpio_timer_stop() */
+
+static void
+emlxs_sli4_gpio_timer(void *arg)
+{
+	emlxs_hba_t *hba = (emlxs_hba_t *)arg;
+
+	mutex_enter(&hba->gpio_lock);
+
+	if (hba->gpio_timer) {
+		emlxs_sli4_check_gpio(hba);
+		hba->gpio_timer = timeout(emlxs_sli4_gpio_timer, (void *)hba,
+		    drv_usectohz(100000));
+	}
+
+	mutex_exit(&hba->gpio_lock);
+} /* emlxs_sli4_gpio_timer() */
+
+static void
+emlxs_sli4_check_gpio(emlxs_hba_t *hba)
+{
+	hba->gpio_desired = 0;
+
+	if (hba->flag & FC_GPIO_LINK_UP) {
+		if (hba->io_active)
+			hba->gpio_desired |= EMLXS_GPIO_ACT;
+
+		/* This is model specific to ATTO gen5 lancer cards */
+
+		switch (hba->linkspeed) {
+			case LA_4GHZ_LINK:
+				hba->gpio_desired |= EMLXS_GPIO_LO;
+				break;
+
+			case LA_8GHZ_LINK:
+				hba->gpio_desired |= EMLXS_GPIO_HI;
+				break;
+
+			case LA_16GHZ_LINK:
+				hba->gpio_desired |=
+				    EMLXS_GPIO_LO | EMLXS_GPIO_HI;
+				break;
+		}
+	}
+
+	if (hba->gpio_current != hba->gpio_desired) {
+		emlxs_port_t *port = &PPORT;
+		uint8_t pin;
+		uint8_t pinval;
+		MAILBOXQ *mbq;
+		uint32_t rval;
+
+		if (!emlxs_sli4_fix_gpio(hba, &pin, &pinval))
+			return;
+
+		if ((mbq = (MAILBOXQ *)emlxs_mem_get(hba, MEM_MBOX)) == NULL) {
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_init_debug_msg,
+			    "Unable to allocate GPIO mailbox.");
+
+			hba->gpio_bit = 0;
+			return;
+		}
+
+		emlxs_mb_gpio_write(hba, mbq, pin, pinval);
+		mbq->mbox_cmpl = emlxs_sli4_fix_gpio_mbcmpl;
+
+		rval = emlxs_sli4_issue_mbox_cmd(hba, mbq, MBX_NOWAIT, 0);
+
+		if ((rval != MBX_BUSY) && (rval != MBX_SUCCESS)) {
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_init_debug_msg,
+			    "Unable to start GPIO mailbox.");
+
+			hba->gpio_bit = 0;
+			emlxs_mem_put(hba, MEM_MBOX, mbq);
+			return;
+		}
+	}
+} /* emlxs_sli4_check_gpio */
+
+static uint32_t
+emlxs_sli4_fix_gpio(emlxs_hba_t *hba, uint8_t *pin, uint8_t *pinval)
+{
+	uint8_t dif = hba->gpio_desired ^ hba->gpio_current;
+	uint8_t bit;
+	uint8_t i;
+
+	/* Get out if no pins to set a GPIO request is pending */
+
+	if (dif == 0 || hba->gpio_bit)
+		return (0);
+
+	/* Fix one pin at a time */
+
+	bit = dif & -dif;
+	hba->gpio_bit = bit;
+	dif = hba->gpio_current ^ bit;
+
+	for (i = EMLXS_GPIO_PIN_LO; bit > 1; ++i) {
+		dif >>= 1;
+		bit >>= 1;
+	}
+
+	/* Pins are active low so invert the bit value */
+
+	*pin = hba->gpio_pin[i];
+	*pinval = ~dif & bit;
+
+	return (1);
+} /* emlxs_sli4_fix_gpio */
+
+static uint32_t
+emlxs_sli4_fix_gpio_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq)
+{
+	MAILBOX *mb;
+	uint8_t pin;
+	uint8_t pinval;
+
+	mb = (MAILBOX *)mbq;
+
+	mutex_enter(&hba->gpio_lock);
+
+	if (mb->mbxStatus == 0)
+		hba->gpio_current ^= hba->gpio_bit;
+
+	hba->gpio_bit = 0;
+
+	if (emlxs_sli4_fix_gpio(hba, &pin, &pinval)) {
+		emlxs_port_t *port = &PPORT;
+		MAILBOXQ *mbq;
+		uint32_t rval;
+
+		/*
+		 * We're not using the mb_retry routine here because for some
+		 * reason it doesn't preserve the completion routine. Just let
+		 * this mbox cmd fail to start here and run when the mailbox
+		 * is no longer busy.
+		 */
+
+		if ((mbq = (MAILBOXQ *)emlxs_mem_get(hba, MEM_MBOX)) == NULL) {
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_init_debug_msg,
+			    "Unable to allocate GPIO mailbox.");
+
+			hba->gpio_bit = 0;
+			goto done;
+		}
+
+		emlxs_mb_gpio_write(hba, mbq, pin, pinval);
+		mbq->mbox_cmpl = emlxs_sli4_fix_gpio_mbcmpl;
+
+		rval = emlxs_sli4_issue_mbox_cmd(hba, mbq, MBX_NOWAIT, 0);
+
+		if ((rval != MBX_BUSY) && (rval != MBX_SUCCESS)) {
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_init_debug_msg,
+			    "Unable to start GPIO mailbox.");
+
+			hba->gpio_bit = 0;
+			emlxs_mem_put(hba, MEM_MBOX, mbq);
+			goto done;
+		}
+	}
+
+done:
+	mutex_exit(&hba->gpio_lock);
+
+	return (0);
+}
 
 extern void
 emlxs_data_dump(emlxs_port_t *port, char *str, uint32_t *iptr, int cnt, int err)

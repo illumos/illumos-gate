@@ -2734,6 +2734,7 @@ typedef struct be_req_hdr
 /* SLI_CONFIG Mailbox commands */
 
 #define	IOCTL_SUBSYSTEM_COMMON			0x01
+#define	IOCTL_SUBSYSTEM_LOWLEVEL		0x0B
 #define	IOCTL_SUBSYSTEM_FCOE			0x0C
 #define	IOCTL_SUBSYSTEM_DCBX			0x10
 
@@ -2781,6 +2782,8 @@ typedef struct be_req_hdr
 #define	COMMON_OPCODE_READ_OBJ_LIST		0xAD
 #define	COMMON_OPCODE_DELETE_OBJ		0xAE
 #define	COMMON_OPCODE_GET_SLI4_PARAMS		0xB5
+
+#define	LOWLEVEL_OPCODE_GPIO_RDWR		0x30
 
 #define	FCOE_OPCODE_WQ_CREATE			0x01
 #define	FCOE_OPCODE_CFG_POST_SGL_PAGES		0x03
@@ -3168,7 +3171,33 @@ typedef	struct _IOCTL_COMMON_QUERY_FIRMWARE_CONFIG
 
 } IOCTL_COMMON_QUERY_FIRMWARE_CONFIG;
 
+/* IOCTL_LOWLEVEL_GPIO_RDWR */
+typedef struct _IOCTL_LOWLEVEL_GPIO_RDWR
+{
+	union
+	{
+		struct
+		{
+			uint32_t	GpioAction;
+#define	LOWLEVEL_GPIO_ACT_READ		0
+#define	LOWLEVEL_GPIO_ACT_WRITE	1
+#define	LOWLEVEL_GPIO_ACT_RDSENSE	2
+#define	LOWLEVEL_GPIO_ACT_STSENSE	3
 
+			uint32_t	LogicalPin;
+			uint32_t	PinValue;
+#define	LOWLEVEL_GPIO_STSENSE_IN	0
+#define	LOWLEVEL_GPIO_STSENSE_OUT	1
+
+			uint32_t	OutputValue;
+		} request;
+
+		struct
+		{
+			uint32_t	PinValue;
+		} response;
+	} params;
+} IOCTL_LOWLEVEL_GPIO_RDWR;
 
 /* IOCTL_FCOE_READ_FCF_TABLE */
 typedef struct

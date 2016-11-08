@@ -1285,12 +1285,14 @@ reset:
 
 	/* Create the symbolic names */
 	(void) snprintf(hba->snn, (sizeof (hba->snn)-1),
-	    "Emulex %s FV%s DV%s %s",
-	    hba->model_info.model, hba->vpd.fw_version, emlxs_version,
+	    "%s %s FV%s DV%s %s",
+	    hba->model_info.manufacturer, hba->model_info.model,
+	    hba->vpd.fw_version, emlxs_version,
 	    (char *)utsname.nodename);
 
 	(void) snprintf(hba->spn, (sizeof (hba->spn)-1),
-	    "Emulex PPN-%01x%01x:%02x:%02x:%02x:%02x:%02x:%02x:%02x",
+	    "%s PPN-%01x%01x:%02x:%02x:%02x:%02x:%02x:%02x:%02x",
+	    hba->model_info.manufacturer,
 	    hba->wwpn.nameType, hba->wwpn.IEEEextMsn, hba->wwpn.IEEEextLsb,
 	    hba->wwpn.IEEE[0], hba->wwpn.IEEE[1], hba->wwpn.IEEE[2],
 	    hba->wwpn.IEEE[3], hba->wwpn.IEEE[4], hba->wwpn.IEEE[5]);

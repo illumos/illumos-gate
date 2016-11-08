@@ -1853,6 +1853,7 @@ typedef struct emlxs_hba
 #define	FC_DUMP_SAFE		0x00010000	/* Safe to DUMP */
 #define	FC_DUMP_ACTIVE		0x00020000	/* DUMP in progress */
 #define	FC_NEW_FABRIC		0x00040000
+#define	FC_GPIO_LINK_UP		0x00080000
 
 #define	FC_SLIM2_MODE		0x00100000	/* SLIM in host memory */
 #define	FC_INTERLOCKED		0x00200000
@@ -2015,6 +2016,26 @@ typedef struct emlxs_hba
 	uint32_t	linkup_timer;
 	uint32_t	discovery_timer;
 	uint32_t	pkt_timer;
+
+	/* GPIO Management */
+	uint8_t		gpio_desired;
+	uint8_t		gpio_current;
+	uint8_t		gpio_bit;
+#define	EMLXS_GPIO_LO		0x01
+#define	EMLXS_GPIO_HI		0x02
+#define	EMLXS_GPIO_ACT		0x04
+#define	EMLXS_GPIO_LASER	0x08
+#define	EMLXS_GPIO_LOC		0x10
+
+	uint8_t		gpio_pin[4];
+
+#define	EMLXS_GPIO_PIN_LO		0
+#define	EMLXS_GPIO_PIN_HI		1
+#define	EMLXS_GPIO_PIN_ACT		2
+#define	EMLXS_GPIO_PIN_LASER		3
+
+	kmutex_t	gpio_lock;		/* Timer lock */
+	timeout_id_t	gpio_timer;
 
 	/* Power Management */
 	uint32_t	pm_state;
