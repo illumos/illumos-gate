@@ -29,9 +29,11 @@ INST_TARGETS += $(ROOT_BOOT_GRUB)/$(GRUB_MENU)
 INST_TARGETS += $(ROOT_BOOT_GRUB)/$(INSTALL_MENU)
 INST_TARGETS += $(ROOT_BOOT_GRUB)/$(GRUB_DEFAULT)
 INST_TARGETS += $(ROOT_BOOT_GRUB)/$(CAPABILITY)
+INST_TARGETS += $(ROOT)/etc/default/be
 
 $(ROOT_BOOT_GRUB)/$(GRUB_DEFAULT)   := FILEMODE = 444
 $(ROOT_BOOT_GRUB)/$(CAPABILITY)   := FILEMODE = 444
+$(ROOT)/etc/default/be := FILEMODE = 444
 
 all: $(SUBDIRS)
 
@@ -45,9 +47,14 @@ $(GRUB): FRC
 $(ROOT_BOOT_GRUB)/%: $(ROOT_BOOT_GRUB) %
 	$(INS.file)
 
+$(ROOT)/etc/default/%: $(ROOT)/etc/default %
+	$(INS.file)
+
 $(ROOT_BOOT_GRUB):
 	$(INS.dir)
 
+$(ROOT)/etc/default:
+	$(INS.dir)
 
 clean clobber: $(SUBDIRS)
 
