@@ -25,6 +25,10 @@
  */
 
 /*
+ * Copyright (c) 2016 by Delphix. All rights reserved.
+ */
+
+/*
  * Implementations of the functions described in vsnprintf(3C) and string(3C),
  * for use by the kernel, the standalone, and kmdb.  Unless otherwise specified,
  * these functions match the section 3C manpages.
@@ -313,7 +317,7 @@ next_fmt:
 	return (bufp - buf);
 }
 
-/*PRINTFLIKE1*/
+/*PRINTFLIKE3*/
 size_t
 snprintf(char *buf, size_t buflen, const char *fmt, ...)
 {
