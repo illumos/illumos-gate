@@ -419,6 +419,10 @@ vend_rfc1048(u_char *cp, u_int len)
 			bcopy(cp, &dhcp_serverip.s_addr,
 			      sizeof(dhcp_serverip.s_addr));
 		}
+		if (tag == TAG_TFTP_SERVER) {
+			bcopy(cp, &tftpip.s_addr,
+			      sizeof(tftpip.s_addr));
+		}
 #endif
 		cp += size;
 	}
