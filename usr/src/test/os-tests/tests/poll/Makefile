@@ -24,6 +24,9 @@ SRCS = $(OBJS:%.o=%.c)
 LINTS = $(PROG:%=%.ln)
 LINTFLAGS += -erroff=E_NAME_USED_NOT_DEF2
 
+# Uggh, Joyent structured these so I can't selectively turn off -lsocket...
+LDFLAGS += $(ZIGNORE)
+
 LDLIBS += -lsocket
 C99MODE = -xc99=%all
 
