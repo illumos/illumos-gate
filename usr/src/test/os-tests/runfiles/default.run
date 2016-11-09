@@ -48,6 +48,10 @@ tests = ['sigqueue_queue_size']
 user = root
 tests = ['sdevfs_eisdir']
 
+[/opt/os-tests/tests/timer]
+user = root
+tests = ['timer_limit']
+
 [/opt/os-tests/tests/tmpfs]
 user = root
 tests = ['tmpfs_badmount', 'tmpfs_enospc']

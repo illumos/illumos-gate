@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright (c) 2015, Joyent, Inc. All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #ifndef	_SYS_TIMER_H
@@ -34,6 +34,7 @@
 #include <sys/types.h>
 #include <sys/proc.h>
 #include <sys/thread.h>
+#include <sys/param.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -42,7 +43,13 @@ extern "C" {
 #ifdef	_KERNEL
 
 #define	_TIMER_MAX	32
-extern	int	timer_max;		/* patchable via /etc/system */
+/*
+ * Max timers per process.  This is patchable via /etc/system and can be
+ * updated via kmdb.  Sticking to positive powers of 2 is recommended.
+ */
+extern	int	timer_max;
+
+#define	_TIMER_ALLOC_INIT	8	/* initial size for p_itimer array */
 
 /*
  * Bit values for the it_lock field.

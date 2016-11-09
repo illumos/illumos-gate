@@ -22,7 +22,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2012 Joyent, Inc.  All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -111,6 +111,9 @@ sysconfig(int which)
 
 	case _CONFIG_NPROC_MAX:
 		return (max_ncpus);
+
+	case _CONFIG_NPROC_NCPU:
+		return (NCPU); /* Private sysconfig for direct NCPU access */
 
 	case _CONFIG_STACK_PROT:
 		return (curproc->p_stkprot & ~PROT_USER);

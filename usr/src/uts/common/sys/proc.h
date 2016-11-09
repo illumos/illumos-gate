@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2015 Joyent, Inc.  All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -307,6 +307,7 @@ typedef struct	proc {
 	size_t p_swrss;			/* resident set size before last swap */
 	struct aio	*p_aio;		/* pointer to async I/O struct */
 	struct itimer	**p_itimer;	/* interval timers */
+	uint_t		p_itimer_sz;	/* max allocated interval timers */
 	timeout_id_t	p_alarmid;	/* alarm's timeout id */
 	caddr_t		p_usrstack;	/* top of the process stack */
 	uint_t		p_stkprot;	/* stack memory protection */
