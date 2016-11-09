@@ -21,6 +21,9 @@ PROG = poll_test epoll_test
 OBJS = $(PROG:%=%.o)
 SRCS = $(OBJS:%.o=%.c)
 
+LINTS = $(PROG:%=%.ln)
+LINTFLAGS += -erroff=E_NAME_USED_NOT_DEF2
+
 LDLIBS += -lsocket
 C99MODE = -xc99=%all
 
@@ -34,7 +37,7 @@ all: $(PROG)
 
 install: all $(CMDS)
 
-lint: lint_SRCS
+lint: $(LINTS)
 
 clobber: clean
 	-$(RM) $(PROG)
@@ -49,3 +52,6 @@ $(TESTDIR):
 
 $(TESTDIR)/%: %
 	$(INS.file)
+
+%.ln: %.c
+	$(LINT.c) $< $(LDLIBS)
