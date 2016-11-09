@@ -772,7 +772,6 @@ f kernel/drv/ipsecesp.conf 0644 root sys
 f kernel/drv/iptun.conf 0644 root sys
 f kernel/drv/iscsi.conf 0644 root sys
 f kernel/drv/iscsit.conf 0644 root sys
-f kernel/drv/iwn.conf 0644 root sys
 f kernel/drv/iwscn.conf 0644 root sys
 f kernel/drv/ixgbe.conf 0644 root sys
 f kernel/drv/keysock.conf 0644 root sys
