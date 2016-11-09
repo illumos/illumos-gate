@@ -28,6 +28,7 @@ SUBDIRS =       \
 		sockfs \
 		spoof-ras \
 		stress \
+		timer \
 		uccid \
 		$(SUBDIRS_$(MACH))
 

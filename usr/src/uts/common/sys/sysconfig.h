@@ -25,6 +25,7 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #ifndef _SYS_SYSCONFIG_H
@@ -101,6 +102,8 @@ extern int	mach_sysconfig(int);
 
 #define	_CONFIG_EPHID_MAX	47	/* maximum ephemeral uid */
 #define	_CONFIG_UADDR_MAX	48	/* maximum user address */
+
+#define	_CONFIG_NPROC_NCPU	49	/* NCPU (sometimes > NPROC_MAX) */
 
 #ifdef	__cplusplus
 }

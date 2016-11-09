@@ -55,6 +55,10 @@ tests = ['sdevfs_eisdir']
 user = root
 tests = ['dladm-kstat']
 
+[/opt/os-tests/tests/timer]
+user = root
+tests = ['timer_limit']
+
 [/opt/os-tests/tests/file-locking]
 tests = ['runtests.32', 'runtests.64']
 
