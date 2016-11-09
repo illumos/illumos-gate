@@ -10,10 +10,41 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2016 Joyent, Inc.
 #
 
-SUBDIRS = poll secflags sigqueue spoof-ras sdevfs timer file-locking
+include $(SRC)/Makefile.master
 
+ROOTOPTPKG = $(ROOT)/opt/os-tests
+TESTDIR = $(ROOTOPTPKG)/tests/timer
+
+PROGS = timer_limit
+
+include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/test/Makefile.com
+
+C99MODE = -xc99=%all
+
+
+CMDS = $(PROGS:%=$(TESTDIR)/%)
+$(CMDS) := FILEMODE = 0555
+
+all: $(PROGS)
+
+install: all $(CMDS)
+
+lint:
+
+clobber: clean
+	-$(RM) $(PROGS)
+
+clean:
+	-$(RM) *.o
+
+$(CMDS): $(TESTDIR) $(PROGS)
+
+$(TESTDIR):
+	$(INS.dir)
+
+$(TESTDIR)/%: %
+	$(INS.file)

@@ -25,11 +25,12 @@
  */
 
 /*
- * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include <sys/timer.h>
 #include <sys/systm.h>
+#include <sys/sysmacros.h>
 #include <sys/param.h>
 #include <sys/kmem.h>
 #include <sys/debug.h>
@@ -81,6 +82,7 @@ timer_lock(proc_t *p, itimer_t *it)
  * waiters.  p_lock must be held on entry; it will not be dropped by
  * timer_unlock().
  */
+/* ARGSUSED */
 static void
 timer_unlock(proc_t *p, itimer_t *it)
 {
@@ -123,6 +125,7 @@ timer_delete_locked(proc_t *p, timer_t tid, itimer_t *it)
 		timer_lock(p, it);
 	}
 
+	ASSERT(p->p_itimer_sz > tid);
 	ASSERT(p->p_itimer[tid] == it);
 	p->p_itimer[tid] = NULL;
 
@@ -201,12 +204,14 @@ timer_grab(proc_t *p, timer_t tid)
 {
 	itimer_t **itp, *it;
 
-	if (tid >= timer_max || tid < 0)
+	if (tid < 0) {
 		return (NULL);
+	}
 
 	mutex_enter(&p->p_lock);
 
-	if ((itp = p->p_itimer) == NULL || (it = itp[tid]) == NULL) {
+	if ((itp = p->p_itimer) == NULL || tid >= p->p_itimer_sz ||
+	    (it = itp[tid]) == NULL) {
 		mutex_exit(&p->p_lock);
 		return (NULL);
 	}
@@ -258,6 +263,13 @@ clock_timer_init()
 {
 	clock_timer_cache = kmem_cache_create("timer_cache",
 	    sizeof (itimer_t), 0, NULL, NULL, NULL, NULL, NULL, 0);
+
+	/*
+	 * Push the timer_max limit up to at least 4 * NCPU.  Due to the way
+	 * NCPU is defined, proper initialization of the timer limit is
+	 * performed at runtime.
+	 */
+	timer_max = MAX(NCPU * 4, timer_max);
 }
 
 void
@@ -466,13 +478,115 @@ timer_fire(itimer_t *it)
 		mutex_exit(&p->p_lock);
 }
 
+/*
+ * Allocate an itimer_t and find and appropriate slot for it in p_itimer.
+ * Acquires p_lock and holds it on return, regardless of success.
+ */
+static itimer_t *
+timer_alloc(proc_t *p, timer_t *id)
+{
+	itimer_t *it, **itp = NULL;
+	uint_t i;
+
+	ASSERT(MUTEX_NOT_HELD(&p->p_lock));
+
+	it = kmem_cache_alloc(clock_timer_cache, KM_SLEEP);
+	bzero(it, sizeof (itimer_t));
+	mutex_init(&it->it_mutex, NULL, MUTEX_DEFAULT, NULL);
+
+	mutex_enter(&p->p_lock);
+retry:
+	if (p->p_itimer != NULL) {
+		for (i = 0; i < p->p_itimer_sz; i++) {
+			if (p->p_itimer[i] == NULL) {
+				itp = &(p->p_itimer[i]);
+				break;
+			}
+		}
+	}
+
+	/*
+	 * A suitable slot was not found.  If possible, allocate (or resize)
+	 * the p_itimer array and try again.
+	 */
+	if (itp == NULL) {
+		uint_t target_sz = _TIMER_ALLOC_INIT;
+		itimer_t **itp_new;
+
+		if (p->p_itimer != NULL) {
+			ASSERT(p->p_itimer_sz != 0);
+
+			target_sz = p->p_itimer_sz * 2;
+		}
+		/*
+		 * Protect against exceeding the max or overflow
+		 */
+		if (target_sz > timer_max || target_sz > INT_MAX ||
+		    target_sz < p->p_itimer_sz) {
+			kmem_cache_free(clock_timer_cache, it);
+			return (NULL);
+		}
+		mutex_exit(&p->p_lock);
+		itp_new = kmem_zalloc(target_sz * sizeof (itimer_t *),
+		    KM_SLEEP);
+		mutex_enter(&p->p_lock);
+		if (target_sz <= p->p_itimer_sz) {
+			/*
+			 * A racing thread performed the resize while we were
+			 * waiting outside p_lock.  Discard our now-useless
+			 * allocation and retry.
+			 */
+			kmem_free(itp_new, target_sz * sizeof (itimer_t *));
+			goto retry;
+		} else {
+			/*
+			 * Instantiate the larger allocation and select the
+			 * first fresh entry for use.
+			 */
+			if (p->p_itimer != NULL) {
+				uint_t old_sz;
+
+				old_sz = p->p_itimer_sz;
+				bcopy(p->p_itimer, itp_new,
+				    old_sz * sizeof (itimer_t *));
+				kmem_free(p->p_itimer,
+				    old_sz * sizeof (itimer_t *));
+
+				/*
+				 * Short circuit to use the first free entry in
+				 * the new allocation.  It's possible that
+				 * other lower-indexed timers were freed while
+				 * p_lock was dropped, but skipping over them
+				 * is not harmful at all.  In the common case,
+				 * we skip the need to walk over an array
+				 * filled with timers before arriving at the
+				 * slot we know is fresh from the allocation.
+				 */
+				i = old_sz;
+			} else {
+				/*
+				 * For processes lacking any existing timers,
+				 * we can simply select the first entry.
+				 */
+				i = 0;
+			}
+			p->p_itimer = itp_new;
+			p->p_itimer_sz = target_sz;
+		}
+	}
+
+	ASSERT(i <= INT_MAX);
+	*id = (timer_t)i;
+	return (it);
+}
+
 int
 timer_create(clockid_t clock, struct sigevent *evp, timer_t *tid)
 {
 	struct sigevent ev;
 	proc_t *p = curproc;
 	clock_backend_t *backend;
-	itimer_t *it, **itp;
+	itimer_t *it;
 	sigqueue_t *sigq;
 	cred_t *cr = CRED();
 	int error = 0;
@@ -555,43 +669,19 @@ timer_create(clockid_t clock, struct sigevent *evp, timer_t *tid)
 	mutex_init(&it->it_mutex, NULL, MUTEX_DEFAULT, NULL);
 	sigq = kmem_zalloc(sizeof (sigqueue_t), KM_SLEEP);
 
-	mutex_enter(&p->p_lock);
-
 	/*
-	 * If this is this process' first timer, we need to attempt to allocate
-	 * an array of timerstr_t pointers.  We drop p_lock to perform the
-	 * allocation; if we return to discover that p_itimer is non-NULL,
-	 * we will free our allocation and drive on.
+	 * Allocate a timer and choose a slot for it. This acquires p_lock.
 	 */
-	if ((itp = p->p_itimer) == NULL) {
+	it = timer_alloc(p, &i);
+	ASSERT(MUTEX_HELD(&p->p_lock));
+
+	if (it == NULL) {
 		mutex_exit(&p->p_lock);
-		itp = kmem_zalloc(timer_max * sizeof (itimer_t *), KM_SLEEP);
-		mutex_enter(&p->p_lock);
-
-		if (p->p_itimer == NULL)
-			p->p_itimer = itp;
-		else {
-			kmem_free(itp, timer_max * sizeof (itimer_t *));
-			itp = p->p_itimer;
-		}
-	}
-
-	for (i = 0; i < timer_max && itp[i] != NULL; i++)
-		continue;
-
-	if (i == timer_max) {
-		/*
-		 * We couldn't find a slot.  Drop p_lock, free the preallocated
-		 * timer and sigqueue, and return an error.
-		 */
-		mutex_exit(&p->p_lock);
-		kmem_cache_free(clock_timer_cache, it);
 		kmem_free(sigq, sizeof (sigqueue_t));
-
 		return (set_errno(EAGAIN));
 	}
 
-	ASSERT(i < timer_max && itp[i] == NULL);
+	ASSERT(i < p->p_itimer_sz && p->p_itimer[i] == NULL);
 
 	/*
 	 * If we develop other notification mechanisms, this will need
@@ -613,8 +703,6 @@ timer_create(clockid_t clock, struct sigevent *evp, timer_t *tid)
 	it->it_sigq = sigq;
 	it->it_backend = backend;
 	it->it_lock = ITLK_LOCKED;
-	itp[i] = it;
-
 
 	if (ev.sigev_notify == SIGEV_THREAD ||
 	    ev.sigev_notify == SIGEV_PORT) {
@@ -645,7 +733,6 @@ timer_create(clockid_t clock, struct sigevent *evp, timer_t *tid)
 		    (port_source_t **)&it->it_portsrc, timer_close_port,
 		    (void *)it, NULL);
 		if (error) {
-			itp[i] = NULL;		/* clear slot */
 			mutex_exit(&p->p_lock);
 			kmem_cache_free(clock_timer_cache, it);
 			kmem_free(sigq, sizeof (sigqueue_t));
@@ -658,7 +745,6 @@ timer_create(clockid_t clock, struct sigevent *evp, timer_t *tid)
 		if (error) {
 			(void) port_dissociate_ksource(port, PORT_SOURCE_TIMER,
 			    (port_source_t *)it->it_portsrc);
-			itp[i] = NULL;		/* clear slot */
 			mutex_exit(&p->p_lock);
 			kmem_cache_free(clock_timer_cache, it);
 			kmem_free(sigq, sizeof (sigqueue_t));
@@ -675,6 +761,8 @@ timer_create(clockid_t clock, struct sigevent *evp, timer_t *tid)
 			it->it_flags |= IT_SIGNAL;
 	}
 
+	/* Populate the slot now that the timer is prepped. */
+	p->p_itimer[i] = it;
 	mutex_exit(&p->p_lock);
 
 	/*
@@ -832,7 +920,7 @@ timer_getoverrun(timer_t tid)
 void
 timer_lwpexit(void)
 {
-	timer_t i;
+	uint_t i;
 	proc_t *p = curproc;
 	klwp_t *lwp = ttolwp(curthread);
 	itimer_t *it, **itp;
@@ -842,7 +930,7 @@ timer_lwpexit(void)
 	if ((itp = p->p_itimer) == NULL)
 		return;
 
-	for (i = 0; i < timer_max; i++) {
+	for (i = 0; i < p->p_itimer_sz; i++) {
 		if ((it = itp[i]) == NULL)
 			continue;
 
@@ -876,7 +964,7 @@ timer_lwpexit(void)
 void
 timer_lwpbind()
 {
-	timer_t i;
+	uint_t i;
 	proc_t *p = curproc;
 	klwp_t *lwp = ttolwp(curthread);
 	itimer_t *it, **itp;
@@ -886,7 +974,7 @@ timer_lwpbind()
 	if ((itp = p->p_itimer) == NULL)
 		return;
 
-	for (i = 0; i < timer_max; i++) {
+	for (i = 0; i < p->p_itimer_sz; i++) {
 		if ((it = itp[i]) == NULL)
 			continue;
 
@@ -911,16 +999,19 @@ timer_lwpbind()
 void
 timer_exit(void)
 {
-	timer_t i;
+	uint_t i;
 	proc_t *p = curproc;
 
 	ASSERT(p->p_itimer != NULL);
+	ASSERT(p->p_itimer_sz != 0);
 
-	for (i = 0; i < timer_max; i++)
-		(void) timer_delete(i);
+	for (i = 0; i < p->p_itimer_sz; i++) {
+		(void) timer_delete((timer_t)i);
+	}
 
-	kmem_free(p->p_itimer, timer_max * sizeof (itimer_t *));
+	kmem_free(p->p_itimer, p->p_itimer_sz * sizeof (itimer_t *));
 	p->p_itimer = NULL;
+	p->p_itimer_sz = 0;
 }
 
 /*
