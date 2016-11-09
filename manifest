@@ -613,6 +613,7 @@ f kernel/drv/amd64/ipsecesp 0755 root sys
 f kernel/drv/amd64/iptun 0755 root sys
 f kernel/drv/amd64/iscsi 0755 root sys
 f kernel/drv/amd64/iscsit 0755 root sys
+f kernel/drv/amd64/iwn 0755 root sys
 f kernel/drv/amd64/iwscn 0755 root sys
 f kernel/drv/amd64/ixgb 0755 root sys
 f kernel/drv/amd64/ixgbe 0755 root sys
@@ -771,6 +772,7 @@ f kernel/drv/ipsecesp.conf 0644 root sys
 f kernel/drv/iptun.conf 0644 root sys
 f kernel/drv/iscsi.conf 0644 root sys
 f kernel/drv/iscsit.conf 0644 root sys
+f kernel/drv/iwn.conf 0644 root sys
 f kernel/drv/iwscn.conf 0644 root sys
 f kernel/drv/ixgbe.conf 0644 root sys
 f kernel/drv/keysock.conf 0644 root sys
@@ -858,6 +860,21 @@ d kernel/exec 0755 root sys
 d kernel/exec/amd64 0755 root sys
 f kernel/exec/amd64/elfexec 0755 root sys
 f kernel/exec/amd64/intpexec 0755 root sys
+d kernel/firmware 0755 root sys
+d kernel/firmware/iwn 0755 root sys
+f kernel/firmware/iwn/iwlwifi-100-5.ucode 0666 root sys
+f kernel/firmware/iwn/iwlwifi-1000-3.ucode 0666 root sys
+f kernel/firmware/iwn/iwlwifi-105-6.ucode 0666 root sys
+f kernel/firmware/iwn/iwlwifi-135-6.ucode 0666 root sys
+f kernel/firmware/iwn/iwlwifi-2000-6.ucode 0666 root sys
+f kernel/firmware/iwn/iwlwifi-2030-6.ucode 0666 root sys
+f kernel/firmware/iwn/iwlwifi-4965-2.ucode 0666 root sys
+f kernel/firmware/iwn/iwlwifi-5000-2.ucode 0666 root sys
+f kernel/firmware/iwn/iwlwifi-5150-2.ucode 0666 root sys
+f kernel/firmware/iwn/iwlwifi-6000-4.ucode 0666 root sys
+f kernel/firmware/iwn/iwlwifi-6000g2a-5.ucode 0666 root sys
+f kernel/firmware/iwn/iwlwifi-6000g2b-6.ucode 0666 root sys
+f kernel/firmware/iwn/iwlwifi-6050-5.ucode 0666 root sys
 d kernel/fs 0755 root sys
 d kernel/fs/amd64 0755 root sys
 f kernel/fs/amd64/autofs 0755 root sys
@@ -3624,6 +3641,7 @@ f usr/include/sys/fibre-channel/ulp/fcp_util.h 0644 root bin
 f usr/include/sys/fibre-channel/ulp/fcsm.h 0644 root bin
 f usr/include/sys/file.h 0644 root bin
 f usr/include/sys/filio.h 0644 root bin
+f usr/include/sys/firmload.h 0644 root bin
 f usr/include/sys/flock.h 0644 root bin
 f usr/include/sys/flock_impl.h 0644 root bin
 d usr/include/sys/fm 0755 root bin
@@ -18747,6 +18765,7 @@ f usr/share/man/man7d/ipmi.7d 0444 root bin
 f usr/share/man/man7d/ipnet.7d 0444 root bin
 f usr/share/man/man7d/iprb.7d 0444 root bin
 f usr/share/man/man7d/iscsi.7d 0444 root bin
+f usr/share/man/man7d/iwn.7d 0444 root bin
 f usr/share/man/man7d/ixgbe.7d 0444 root bin
 f usr/share/man/man7d/kmdb.7d 0444 root bin
 s usr/share/man/man7d/kmem.7d=mem.7d
@@ -19650,6 +19669,12 @@ f usr/share/man/man9f/dupmsg.9f 0444 root bin
 f usr/share/man/man9f/enableok.9f 0444 root bin
 f usr/share/man/man9f/esballoc.9f 0444 root bin
 f usr/share/man/man9f/esbbcall.9f 0444 root bin
+s usr/share/man/man9f/firmware_close.9f.9f=firmload.9f
+s usr/share/man/man9f/firmware_free.9f.9f=firmload.9f
+s usr/share/man/man9f/firmware_get_size.9f.9f=firmload.9f
+s usr/share/man/man9f/firmware_malloc.9f.9f=firmload.9f
+s usr/share/man/man9f/firmware_open.9f.9f=firmload.9f
+s usr/share/man/man9f/firmware_read.9f.9f=firmload.9f
 f usr/share/man/man9f/flushband.9f 0444 root bin
 f usr/share/man/man9f/flushq.9f 0444 root bin
 s usr/share/man/man9f/free_pktiopb.9f=get_pktiopb.9f

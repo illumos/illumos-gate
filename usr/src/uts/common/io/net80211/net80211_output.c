@@ -1,6 +1,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
  */
 
 /*
@@ -948,10 +950,10 @@ ieee80211_beacon_update(ieee80211com_t *ic, ieee80211_node_t *in,
  * Finally, if an ACM policy is setup (in station mode) it's
  * applied.
  */
+/* ARGSUSED */
 int
 ieee80211_classify(struct ieee80211com *ic, mblk_t *m,
     struct ieee80211_node *ni)
-/* ARGSUSED */
 {
 	int ac;
 

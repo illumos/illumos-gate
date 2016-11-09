@@ -1,0 +1,59 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
+.\"
+.Dd Jun 11, 2016
+.Dt IWN 7D
+.Os
+.Sh NAME
+.Nm iwn
+.Nd Intel(R) WiFi Link 4965 and 100/1000/2000/5000/6000 Series Driver
+.Sh DESCRIPTION
+The
+.Nm
+.Em 802.11a/g/n
+wireless NIC driver is a multi-threaded, loadable, clonable,
+GLDv3-based STREAMS driver supporting the Intel Wifi Link 4965, 100,
+1000, 2000, 5000, and 6000 series of NIC's.
+Driver functions include controller initialization, wireless
+.Em 802.11
+infrastructure network connection, WEP and frame transmit and receive.
+.Sh CONFIGURATION
+The
+.Nm
+driver performs auto-negotiation to determine the data rate and mode
+Supported data rates are 1, 2, 5.5, and 11 Mbit/sec for
+.Em 802.11b
+and
+.Em 802.11g ,
+as well as 6, 9, 12, 18, 24, 36, 48, and 54 Mbit/sec for
+.Em 802.11a
+and
+.Em 802.11g .
+.Sh FILES
+.Bl -tag -compact -width Pa
+.It Pa /dev/iwn
+Special character device.
+.It Pa /kernel/drv/iwn
+32-bit ELF kernel module (x86).
+.It Pa /kernel/drv/amd64/iwn
+64-bit ELF kernel module (x86).
+.It Pa /kernel/firmware/iwn/*.ucode
+.Nm
+firmware files
+.El
+.Sh SEE ALSO
+.Xr dladm 1M ,
+.Xr wificonfig 1M
+.Pp
+.Em 802.11 - Wireless LAN Media  Access Control  and  Physical Layer
+Specification- IEEE, 2001

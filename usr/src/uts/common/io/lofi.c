@@ -79,6 +79,25 @@
  * addition, the DKIOCSTATE ioctl will return DKIO_DEV_GONE when the device is
  * detached but not removed.
  *
+ * If detach was requested and lofi device is not open, we will perform
+ * unmap and remove the lofi instance.
+ *
+ * If the lofi device is open and the li_cleanup is set on ioctl request,
+ * we set ls_cleanup flag to notify the cleanup is requested, and the
+ * last lofi_close will perform the unmapping and this lofi instance will be
+ * removed.
+ *
+ * If the lofi device is open and the li_force is set on ioctl request,
+ * we set ls_cleanup flag to notify the cleanup is requested,
+ * we also set ls_vp_closereq to notify IO tasks to return EIO on new
+ * IO requests and wait in process IO count to become 0, indicating there
+ * are no more IO requests. Since ls_cleanup is set, the last lofi_close
+ * will perform unmap and this lofi instance will be removed.
+ * See also lofi_unmap_file() for details.
+ *
+ * Once ls_cleanup is set for the instance, we do not allow lofi_open()
+ * calls to succeed and can have last lofi_close() to remove the instance.
+ *
  * Known problems:
  *
  *	UFS logging. Mounting a UFS filesystem image "logging"
@@ -290,6 +309,17 @@ is_opened(struct lofi_state *lsp)
 }
 
 static void
+lofi_set_cleanup(struct lofi_state *lsp)
+{
+	ASSERT(MUTEX_HELD(&lofi_lock));
+
+	lsp->ls_cleanup = B_TRUE;
+
+	/* wake up any threads waiting on dkiocstate */
+	cv_broadcast(&lsp->ls_vp_cv);
+}
+
+static void
 lofi_free_crypto(struct lofi_state *lsp)
 {
 	ASSERT(MUTEX_HELD(&lofi_lock));
@@ -495,6 +525,15 @@ lofi_destroy(struct lofi_state *lsp, cred_t *credp)
 
 	ASSERT(MUTEX_HELD(&lofi_lock));
 
+	/*
+	 * Before we can start to release the other resources,
+	 * make sure we have all tasks completed and taskq removed.
+	 */
+	if (lsp->ls_taskq != NULL) {
+		taskq_destroy(lsp->ls_taskq);
+		lsp->ls_taskq = NULL;
+	}
+
 	list_remove(&lofi_list, lsp);
 
 	lofi_free_crypto(lsp);
@@ -520,12 +559,12 @@ lofi_destroy(struct lofi_state *lsp, cred_t *credp)
 	}
 	if (lsp->ls_stacked_vp != lsp->ls_vp)
 		VN_RELE(lsp->ls_stacked_vp);
+	lsp->ls_vp = lsp->ls_stacked_vp = NULL;
 
-	if (lsp->ls_taskq != NULL)
-		taskq_destroy(lsp->ls_taskq);
-
-	if (lsp->ls_kstat != NULL)
+	if (lsp->ls_kstat != NULL) {
 		kstat_delete(lsp->ls_kstat);
+		lsp->ls_kstat = NULL;
+	}
 
 	/*
 	 * Free cached decompressed segment data
@@ -547,6 +586,7 @@ lofi_destroy(struct lofi_state *lsp, cred_t *credp)
 	mutex_destroy(&lsp->ls_vp_lock);
 	cv_destroy(&lsp->ls_vp_cv);
 	lsp->ls_vp_ready = B_FALSE;
+	lsp->ls_vp_closereq = B_FALSE;
 
 	ASSERT(ddi_get_soft_state(lofi_statep, id) == lsp);
 	(void) ndi_devi_offline(lsp->ls_dip, NDI_DEVI_REMOVE);
@@ -592,7 +632,7 @@ lofi_zone_shutdown(zoneid_t zoneid, void *arg)
 		 * user destroys the device.
 		 */
 		if (is_opened(lsp)) {
-			lsp->ls_cleanup = 1;
+			lofi_set_cleanup(lsp);
 		} else {
 			lofi_free_dev(lsp);
 			lofi_destroy(lsp, kcred);
@@ -643,6 +683,11 @@ lofi_open(dev_t *devp, int flag, int otyp, struct cred *credp)
 	if (lsp == NULL) {
 		mutex_exit(&lofi_lock);
 		return (EINVAL);
+	}
+
+	if (lsp->ls_cleanup == B_TRUE) {
+		mutex_exit(&lofi_lock);
+		return (ENXIO);
 	}
 
 	if (lsp->ls_vp == NULL) {
@@ -747,7 +792,8 @@ lofi_close(dev_t dev, int flag, int otyp, struct cred *credp)
 	 * asked for cleanup (li_cleanup), finish up if we're the last
 	 * out of the door.
 	 */
-	if (!is_opened(lsp) && (lsp->ls_cleanup || lsp->ls_vp == NULL)) {
+	if (!is_opened(lsp) &&
+	    (lsp->ls_cleanup == B_TRUE || lsp->ls_vp == NULL)) {
 		lofi_free_dev(lsp);
 		lofi_destroy(lsp, credp);
 	}
@@ -1618,8 +1664,18 @@ lofi_strategy(struct buf *bp)
 		biodone(bp);
 		return (0);
 	}
-	shift = lsp->ls_lbshift;
 
+	/* Check if we are closing. */
+	mutex_enter(&lsp->ls_vp_lock);
+	if (lsp->ls_vp == NULL || lsp->ls_vp_closereq) {
+		mutex_exit(&lsp->ls_vp_lock);
+		bioerror(bp, EIO);
+		biodone(bp);
+		return (0);
+	}
+	mutex_exit(&lsp->ls_vp_lock);
+
+	shift = lsp->ls_lbshift;
 	p_lba = 0;
 	p_nblks = lsp->ls_vp_size >> shift;
 
@@ -1642,13 +1698,6 @@ lofi_strategy(struct buf *bp)
 	offset = (bp->b_lblkno+p_lba) << shift;	/* offset within file */
 
 	mutex_enter(&lsp->ls_vp_lock);
-	if (lsp->ls_vp == NULL || lsp->ls_vp_closereq) {
-		bioerror(bp, EIO);
-		biodone(bp);
-		mutex_exit(&lsp->ls_vp_lock);
-		return (0);
-	}
-
 	if (lsp->ls_crypto_enabled) {
 		/* encrypted data really begins after crypto header */
 		offset += lsp->ls_crypto_offset;
@@ -2904,9 +2953,6 @@ lofi_unmap_file(struct lofi_ioctl *ulip, int byfilename,
 {
 	struct lofi_state *lsp;
 	struct lofi_ioctl *klip;
-	nvlist_t *nvl = NULL;
-	clock_t ticks;
-	char name[MAXNAMELEN];
 	int err;
 
 	err = copy_in_lofi_ioctl(ulip, &klip, ioctl_flag);
@@ -2917,21 +2963,18 @@ lofi_unmap_file(struct lofi_ioctl *ulip, int byfilename,
 	if (byfilename) {
 		if ((err = file_to_lofi(klip->li_filename, klip->li_readonly,
 		    &lsp)) != 0) {
-			mutex_exit(&lofi_lock);
-			return (err);
+			goto done;
 		}
 	} else if (klip->li_id == 0) {
-		mutex_exit(&lofi_lock);
-		free_lofi_ioctl(klip);
-		return (ENXIO);
+		err = ENXIO;
+		goto done;
 	} else {
 		lsp = ddi_get_soft_state(lofi_statep, klip->li_id);
 	}
 
 	if (lsp == NULL || lsp->ls_vp == NULL || lofi_access(lsp) != 0) {
-		mutex_exit(&lofi_lock);
-		free_lofi_ioctl(klip);
-		return (ENXIO);
+		err = ENXIO;
+		goto done;
 	}
 
 	klip->li_id = LOFI_MINOR2ID(getminor(lsp->ls_dev));
@@ -2960,57 +3003,31 @@ lofi_unmap_file(struct lofi_ioctl *ulip, int byfilename,
 	 */
 	if (is_opened(lsp)) {
 		if (klip->li_force) {
+			/* Mark the device for cleanup. */
+			lofi_set_cleanup(lsp);
 			mutex_enter(&lsp->ls_vp_lock);
 			lsp->ls_vp_closereq = B_TRUE;
-			/* wake up any threads waiting on dkiocstate */
+			/* Wake up any threads waiting on dkiocstate. */
 			cv_broadcast(&lsp->ls_vp_cv);
 			while (lsp->ls_vp_iocount > 0)
 				cv_wait(&lsp->ls_vp_cv, &lsp->ls_vp_lock);
 			mutex_exit(&lsp->ls_vp_lock);
-
-			goto out;
 		} else if (klip->li_cleanup) {
-			lsp->ls_cleanup = 1;
-			mutex_exit(&lofi_lock);
-			free_lofi_ioctl(klip);
-			return (0);
+			lofi_set_cleanup(lsp);
+		} else {
+			err = EBUSY;
 		}
-
-		mutex_exit(&lofi_lock);
-		free_lofi_ioctl(klip);
-		return (EBUSY);
+	} else {
+		lofi_free_dev(lsp);
+		lofi_destroy(lsp, credp);
 	}
 
-out:
-	lofi_free_dev(lsp);
-	lofi_destroy(lsp, credp);
-
-	/*
-	 * check the lofi_devlink_cache if device is really gone.
-	 * note: we just wait for timeout here and dont give error if
-	 * timer will expire. This check is to try to ensure the unmap is
-	 * really done when lofiadm -d completes.
-	 * Since lofi_lock is held, also hopefully the lofiadm -a calls
-	 * wont interfere the the unmap.
-	 */
-	(void) snprintf(name, sizeof (name), "%d", klip->li_id);
-	ticks = ddi_get_lbolt() + LOFI_TIMEOUT * drv_usectohz(1000000);
-	mutex_enter(&lofi_devlink_cache.ln_lock);
-	err = nvlist_lookup_nvlist(lofi_devlink_cache.ln_data, name, &nvl);
-	while (err == 0) {
-		err = cv_timedwait(&lofi_devlink_cache.ln_cv,
-		    &lofi_devlink_cache.ln_lock, ticks);
-		if (err == -1)
-			break;
-		err = nvlist_lookup_nvlist(lofi_devlink_cache.ln_data,
-		    name, &nvl);
-	}
-	mutex_exit(&lofi_devlink_cache.ln_lock);
-
+done:
 	mutex_exit(&lofi_lock);
-	(void) copy_out_lofi_ioctl(klip, ulip, ioctl_flag);
+	if (err == 0)
+		(void) copy_out_lofi_ioctl(klip, ulip, ioctl_flag);
 	free_lofi_ioctl(klip);
-	return (0);
+	return (err);
 }
 
 /*
@@ -3241,7 +3258,7 @@ lofi_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *credp,
 
 	mutex_enter(&lofi_lock);
 	lsp = ddi_get_soft_state(lofi_statep, id);
-	if (lsp == NULL || lsp->ls_vp_closereq) {
+	if (lsp == NULL || lsp->ls_cleanup) {
 		mutex_exit(&lofi_lock);
 		return (ENXIO);
 	}
@@ -3342,27 +3359,21 @@ lofi_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *credp,
 			return (EFAULT);
 
 		mutex_enter(&lsp->ls_vp_lock);
-		lsp->ls_vp_iocount++;
 		while (((dkstate == DKIO_INSERTED && lsp->ls_vp != NULL) ||
 		    (dkstate == DKIO_DEV_GONE && lsp->ls_vp == NULL)) &&
-		    !lsp->ls_vp_closereq) {
+		    !lsp->ls_cleanup) {
 			/*
 			 * By virtue of having the device open, we know that
 			 * 'lsp' will remain valid when we return.
 			 */
-			if (!cv_wait_sig(&lsp->ls_vp_cv,
-			    &lsp->ls_vp_lock)) {
-				lsp->ls_vp_iocount--;
-				cv_broadcast(&lsp->ls_vp_cv);
+			if (!cv_wait_sig(&lsp->ls_vp_cv, &lsp->ls_vp_lock)) {
 				mutex_exit(&lsp->ls_vp_lock);
 				return (EINTR);
 			}
 		}
 
-		dkstate = (!lsp->ls_vp_closereq && lsp->ls_vp != NULL ?
+		dkstate = (!lsp->ls_cleanup && lsp->ls_vp != NULL ?
 		    DKIO_INSERTED : DKIO_DEV_GONE);
-		lsp->ls_vp_iocount--;
-		cv_broadcast(&lsp->ls_vp_cv);
 		mutex_exit(&lsp->ls_vp_lock);
 
 		if (ddi_copyout(&dkstate, (void *)arg,

@@ -1,0 +1,88 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
+#
+
+#
+# The default for payload-bearing actions in this package is to appear in the
+# global zone only.  See the include file for greater detail, as well as
+# information about overriding the defaults.
+#
+<include global_zone_only_component>
+set name=pkg.fmri value=pkg:/driver/network/iwn@$(PKGVERS)
+set name=pkg.description \
+    value="Intel(R) WiFi Link 4965 and 100/1000/2000/5000/6000 series driver"
+set name=pkg.summary \
+    value="Intel(R) WiFi Link 4965 and 100/1000/2000/5000/6000 series driver"
+set name=info.classification \
+    value=org.opensolaris.category.2008:Drivers/Networking
+set name=variant.arch value=i386
+dir path=kernel group=sys
+dir path=kernel/drv group=sys
+dir path=kernel/drv/$(ARCH64) group=sys
+dir path=kernel/firmware group=sys
+dir path=kernel/firmware/iwn group=sys
+dir path=usr/share/man
+dir path=usr/share/man/man7d
+driver name=iwn clone_perms="iwn 0666 root sys" perms="* 0666 root sys" \
+    alias=pciex8086,0082 \
+    alias=pciex8086,0083 \
+    alias=pciex8086,0084 \
+    alias=pciex8086,0085 \
+    alias=pciex8086,0087 \
+    alias=pciex8086,0089 \
+    alias=pciex8086,008a \
+    alias=pciex8086,008b \
+    alias=pciex8086,008d \
+    alias=pciex8086,008e \
+    alias=pciex8086,0090 \
+    alias=pciex8086,0091 \
+    alias=pciex8086,0887 \
+    alias=pciex8086,0888 \
+    alias=pciex8086,088e \
+    alias=pciex8086,088f \
+    alias=pciex8086,0890 \
+    alias=pciex8086,0891 \
+    alias=pciex8086,0892 \
+    alias=pciex8086,0893 \
+    alias=pciex8086,0894 \
+    alias=pciex8086,0895 \
+    alias=pciex8086,0896 \
+    alias=pciex8086,0897 \
+    alias=pciex8086,08ae \
+    alias=pciex8086,08af \
+    alias=pciex8086,422b \
+    alias=pciex8086,422c \
+    alias=pciex8086,4238 \
+    alias=pciex8086,4239
+file path=kernel/drv/$(ARCH64)/iwn group=sys
+file path=kernel/drv/iwn group=sys
+file path=kernel/firmware/iwn/iwlwifi-100-5.ucode
+file path=kernel/firmware/iwn/iwlwifi-1000-3.ucode
+file path=kernel/firmware/iwn/iwlwifi-105-6.ucode
+file path=kernel/firmware/iwn/iwlwifi-135-6.ucode
+file path=kernel/firmware/iwn/iwlwifi-2000-6.ucode
+file path=kernel/firmware/iwn/iwlwifi-2030-6.ucode
+file path=kernel/firmware/iwn/iwlwifi-4965-2.ucode
+file path=kernel/firmware/iwn/iwlwifi-5000-2.ucode
+file path=kernel/firmware/iwn/iwlwifi-5150-2.ucode
+file path=kernel/firmware/iwn/iwlwifi-6000-4.ucode
+file path=kernel/firmware/iwn/iwlwifi-6000g2a-5.ucode
+file path=kernel/firmware/iwn/iwlwifi-6000g2b-6.ucode
+file path=kernel/firmware/iwn/iwlwifi-6050-5.ucode
+file path=usr/share/man/man7d/iwn.7d
+license lic_CDDL license=lic_CDDL
+license usr/src/uts/common/io/iwn/THIRDPARTYLICENSE \
+    license=usr/src/uts/common/io/iwn/THIRDPARTYLICENSE
+license usr/src/uts/common/io/iwn/fw-iw/THIRDPARTYLICENSE \
+    license=usr/src/uts/common/io/iwn/fw-iw/THIRDPARTYLICENSE

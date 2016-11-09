@@ -28,6 +28,7 @@
 # Copyright 2016 Garrett D'Amore <garrett@damore.org>
 # Copyright 2016 Joyent, Inc.
 # Copyright 2016 OmniTI Computer Consulting, Inc.  All rights reserved.
+# Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 #
 
 #
@@ -179,6 +180,7 @@ GENUNIX_OBJS +=	\
 		fem.o		\
 		ffs.o		\
 		fio.o		\
+		firmload.o	\
 		flock.o		\
 		fm.o		\
 		fork.o		\
@@ -692,7 +694,7 @@ NET80211_OBJS += net80211.o net80211_proto.o net80211_input.o \
 		 net80211_output.o net80211_node.o net80211_crypto.o \
 		 net80211_crypto_none.o net80211_crypto_wep.o net80211_ioctl.o \
 		 net80211_crypto_tkip.o net80211_crypto_ccmp.o	\
-		 net80211_ht.o
+		 net80211_ht.o net80211_amrr.o
 
 VNIC_OBJS +=	vnic_ctl.o vnic_dev.o
 
@@ -1890,6 +1892,8 @@ IWI_OBJS += ipw2200_hw.o ipw2200.o
 IWH_OBJS += iwh.o
 
 IWK_OBJS += iwk2.o
+
+IWN_OBJS += if_iwn.o
 
 IWP_OBJS += iwp.o
 
