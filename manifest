@@ -19669,6 +19669,7 @@ f usr/share/man/man9f/dupmsg.9f 0444 root bin
 f usr/share/man/man9f/enableok.9f 0444 root bin
 f usr/share/man/man9f/esballoc.9f 0444 root bin
 f usr/share/man/man9f/esbbcall.9f 0444 root bin
+f usr/share/man/man9f/firmload.9f 0444 root bin
 s usr/share/man/man9f/firmware_close.9f.9f=firmload.9f
 s usr/share/man/man9f/firmware_free.9f.9f=firmload.9f
 s usr/share/man/man9f/firmware_get_size.9f.9f=firmload.9f
