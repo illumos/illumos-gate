@@ -1666,6 +1666,84 @@ get_netbuf(struct netconfig *nconf, char *ip, ushort_t port)
 }
 
 /*
+ * Construct a CLIENT handle to talk to the mountd without having to contact
+ * the rpcbind daemon on the server. This works for both the TCP and UDP cases,
+ * but it is primarily intended to the handle the TCP case. Note that TCP is
+ * never used by the native NFS mount client, even when the 'proto=tcp'
+ * argument is given to the mount command. The native mount code always uses UDP
+ * to get a file handle from the mountd.
+ */
+static CLIENT *
+get_mountd_client(char *fshost, nfs_mnt_data_t *nmdp, rpcvers_t *vp,
+    int *fdp)
+{
+	struct netconfig *nconf;
+	struct netbuf *srvaddr;
+	CLIENT *cl = NULL;
+	rpcvers_t vers;
+	int fd;
+	struct t_bind *tbind = NULL;
+	struct t_info tinfo;
+
+	*vp = vers = nmdp->nmd_mnt_vers;
+	*fdp = -1;
+
+	if ((nconf = get_netconf(nmdp->nmd_mnt_proto)) == NULL)
+		return (NULL);
+
+	if ((srvaddr = get_netbuf(nconf, fshost, nmdp->nmd_mnt_port)) == NULL) {
+		freenetconfigent(nconf);
+		return (NULL);
+	}
+
+	tinfo.tsdu = 0;
+	if ((fd = t_open(nconf->nc_device, O_RDWR, &tinfo)) == -1)
+		goto done;
+
+	/* LINTED pointer alignment */
+	if ((tbind = (struct t_bind *)t_alloc(fd, T_BIND, T_ADDR)) == NULL) {
+		(void) t_close(fd);
+		goto done;
+	}
+
+	/* assign our srvaddr to tbind addr */
+	(void) memcpy(tbind->addr.buf, srvaddr->buf, srvaddr->len);
+	tbind->addr.len = srvaddr->len;
+
+	/*
+	 * For compatibility, the mountd call to get the file handle must come
+	 * from a privileged port.
+	 */
+	(void) netdir_options(nconf, ND_SET_RESERVEDPORT, fd, NULL);
+
+	cl = clnt_tli_create(fd, nconf, &tbind->addr, MOUNTPROG, vers, 0, 0);
+	if (cl == NULL) {
+		(void) t_close(fd);
+	} else {
+		*fdp = fd;
+	}
+
+done:
+	if (tbind != NULL)
+		(void) t_free((char *)tbind, T_BIND);
+	free(srvaddr->buf);
+	free(srvaddr);
+	freenetconfigent(nconf);
+
+	return (cl);
+}
+
+static int
+get_fh_cleanup(CLIENT *cl, int fd, int err)
+{
+	if (cl != NULL)
+		clnt_destroy(cl);
+	if (fd != -1)
+		(void) t_close(fd);
+	return (err);
+}
+
+/*
  * get fhandle of remote path from server's mountd
  *
  * Return a positive EAGAIN if the caller should retry and a -EAGAIN to
@@ -1682,6 +1760,7 @@ get_fh(struct nfs_args *args, char *fshost, char *fspath, int *versp,
 	nfs_fh3 *fh3p;
 	struct timeval timeout = { 25, 0};
 	CLIENT *cl = NULL;
+	int fd = -1;
 	enum clnt_stat rpc_stat;
 	rpcvers_t outvers = 0;
 	rpcvers_t vers_to_try;
@@ -1788,23 +1867,7 @@ get_fh(struct nfs_args *args, char *fshost, char *fspath, int *versp,
 
 	if (nmdp->nmd_mnt_port != 0 && nmdp->nmd_mnt_proto != NULL) {
 		/* We have the necessary info to skip the call to rpcbind. */
-		struct netconfig *nconf;
-
-		outvers = nmdp->nmd_mnt_vers;
-
-		if ((nconf = get_netconf(nmdp->nmd_mnt_proto)) != NULL) {
-			struct netbuf *srvaddr;
-
-			srvaddr = get_netbuf(nconf, fshost, nmdp->nmd_mnt_port);
-			if (srvaddr != NULL) {
-				cl = clnt_tli_create(RPC_ANYFD, nconf, srvaddr,
-				    MOUNTPROG, outvers, 0, 0);
-				free(srvaddr->buf);
-				free(srvaddr);
-			}
-
-			freenetconfigent(nconf);
-		}
+		cl = get_mountd_client(fshost, nmdp, &outvers, &fd);
 	}
 
 	/*
@@ -1846,18 +1909,16 @@ get_fh(struct nfs_args *args, char *fshost, char *fspath, int *versp,
 	}
 
 	if (nmdp->nmd_posix && outvers < MOUNTVERS_POSIX) {
-		clnt_destroy(cl);
-		return (-EAGAIN);
+		return (get_fh_cleanup(cl, fd, -EAGAIN));
 	}
 
+	/* This only re-binds UDP connections to a reserved port */
 	if (__clnt_bindresvport(cl) < 0) {
-		clnt_destroy(cl);
-		return (EAGAIN);
+		return (get_fh_cleanup(cl, fd, EAGAIN));
 	}
 
 	if ((cl->cl_auth = authsys_create_default()) == NULL) {
-		clnt_destroy(cl);
-		return (EAGAIN);
+		return (get_fh_cleanup(cl, fd, EAGAIN));
 	}
 
 	switch (outvers) {
@@ -1869,17 +1930,15 @@ get_fh(struct nfs_args *args, char *fshost, char *fspath, int *versp,
 		if (rpc_stat != RPC_SUCCESS) {
 			log_err("%s:%s: server not responding %s\n",
 			    fshost, fspath, clnt_sperror(cl, ""));
-			clnt_destroy(cl);
-			return (EAGAIN);
+			return (get_fh_cleanup(cl, fd, EAGAIN));
 		}
 
 		if ((errno = fhs.fhs_status) != MNT_OK) {
-			clnt_destroy(cl);
-			return (-fhs.fhs_status);
+			return (get_fh_cleanup(cl, fd, -fhs.fhs_status));
 		}
 		args->fh = malloc(sizeof (fhs.fhstatus_u.fhs_fhandle));
 		if (args->fh == NULL)
-			return (-EAGAIN);
+			return (get_fh_cleanup(cl, fd, -EAGAIN));
 
 		(void) memcpy((caddr_t)args->fh,
 		    (caddr_t)&fhs.fhstatus_u.fhs_fhandle,
@@ -1892,20 +1951,17 @@ get_fh(struct nfs_args *args, char *fshost, char *fspath, int *versp,
 				log_err("%s:%s: server not responding %s\n",
 				    fshost, fspath, clnt_sperror(cl, ""));
 				free(args->fh);
-				clnt_destroy(cl);
-				return (EAGAIN);
+				return (get_fh_cleanup(cl, fd, EAGAIN));
 			}
 			if (_PC_ISSET(_PC_ERROR, p.pc_mask)) {
 				free(args->fh);
-				clnt_destroy(cl);
-				return (-EAGAIN);
+				return (get_fh_cleanup(cl, fd, -EAGAIN));
 			}
 			args->flags |= NFSMNT_POSIX;
 			args->pathconf = malloc(sizeof (p));
 			if (args->pathconf == NULL) {
 				free(args->fh);
-				clnt_destroy(cl);
-				return (-EAGAIN);
+				return (get_fh_cleanup(cl, fd, -EAGAIN));
 			}
 			(void) memcpy((caddr_t)args->pathconf, (caddr_t)&p,
 			    sizeof (p));
@@ -1920,8 +1976,7 @@ get_fh(struct nfs_args *args, char *fshost, char *fspath, int *versp,
 		if (rpc_stat != RPC_SUCCESS) {
 			log_err("%s:%s: server not responding %s\n",
 			    fshost, fspath, clnt_sperror(cl, ""));
-			clnt_destroy(cl);
-			return (EAGAIN);
+			return (get_fh_cleanup(cl, fd, EAGAIN));
 		}
 
 		/*
@@ -1929,13 +1984,12 @@ get_fh(struct nfs_args *args, char *fshost, char *fspath, int *versp,
 		 * codes map into E* errors. See the nfsstat enum for values.
 		 */
 		if ((errno = mountres3.fhs_status) != MNT_OK) {
-			clnt_destroy(cl);
-			return (-mountres3.fhs_status);
+			return (get_fh_cleanup(cl, fd, -mountres3.fhs_status));
 		}
 
 		fh3p = (nfs_fh3 *)malloc(sizeof (*fh3p));
 		if (fh3p == NULL)
-			return (-EAGAIN);
+			return (get_fh_cleanup(cl, fd, -EAGAIN));
 
 		fh3p->fh3_length =
 		    mountres3.mountres3_u.mountinfo.fhandle.fhandle3_len;
@@ -1968,8 +2022,7 @@ get_fh(struct nfs_args *args, char *fshost, char *fspath, int *versp,
 		    .auth_flavors_len;
 
 		if (count <= 0) {
-			clnt_destroy(cl);
-			return (-EAGAIN);
+			return (get_fh_cleanup(cl, fd, -EAGAIN));
 		}
 
 		if (nmdp->nmd_sec_opt) {
@@ -1987,17 +2040,13 @@ get_fh(struct nfs_args *args, char *fshost, char *fspath, int *versp,
 		}
 		break;
 	default:
-		clnt_destroy(cl);
-		return (-EAGAIN);
+		return (get_fh_cleanup(cl, fd, -EAGAIN));
 	}
 
-	if (cl != NULL)
-		clnt_destroy(cl);
-	return (0);
+	return (get_fh_cleanup(cl, fd, 0));
 
 autherr:
-	clnt_destroy(cl);
-	return (-EAGAIN);
+	return (get_fh_cleanup(cl, fd, -EAGAIN));
 }
 
 /*
