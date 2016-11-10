@@ -25,7 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 #include <stand.h>
 #include "openfirm.h"
@@ -41,8 +40,8 @@ time(time_t *tloc)
 	return secs;
 }
 
-int
-getsecs()
+time_t
+getsecs(void)
 {
 	time_t	n = 0;
 	time(&n);
