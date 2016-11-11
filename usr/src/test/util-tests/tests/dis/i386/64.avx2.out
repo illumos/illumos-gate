@@ -1,0 +1,59 @@
+    libdis_test:       c4 e2 7d 5a 00     vbroadcasti128 (%rax),%ymm0
+    libdis_test+0x5:   c4 e3 7d 39 dc 23  vextracti128 $0x23,%ymm3,%xmm4
+    libdis_test+0xb:   c4 e3 7d 39 1b 23  vextracti128 $0x23,%ymm3,(%rbx)
+    libdis_test+0x11:  c4 e3 65 38 e2 42  vinserti128 $0x42,%ymm2,%ymm3,%ymm4
+    libdis_test+0x17:  c4 e3 65 38 20 42  vinserti128 $0x42,(%rax),%ymm3,%ymm4
+    libdis_test+0x1d:  c4 e2 7d 2a 00     vmovntdqa (%rax),%ymm0
+    libdis_test+0x22:  c4 e3 61 02 e2 42  vpblendd $0x42,%xmm2,%xmm3,%xmm4
+    libdis_test+0x28:  c4 e3 61 02 20 42  vpblendd $0x42,(%rax),%xmm3,%xmm4
+    libdis_test+0x2e:  c4 e3 65 02 e2 42  vpblendd $0x42,%ymm2,%ymm3,%ymm4
+    libdis_test+0x34:  c4 e3 65 02 20 42  vpblendd $0x42,(%rax),%ymm3,%ymm4
+    libdis_test+0x3a:  c4 e2 79 78 c8     vpbroadcastb %xmm0,%xmm1
+    libdis_test+0x3f:  c4 e2 79 78 10     vpbroadcastb (%rax),%xmm2
+    libdis_test+0x44:  c4 e2 7d 78 c8     vpbroadcastb %xmm0,%ymm1
+    libdis_test+0x49:  c4 e2 7d 78 10     vpbroadcastb (%rax),%ymm2
+    libdis_test+0x4e:  c4 e2 79 58 c8     vpbroadcastd %xmm0,%xmm1
+    libdis_test+0x53:  c4 e2 79 58 10     vpbroadcastd (%rax),%xmm2
+    libdis_test+0x58:  c4 e2 7d 58 c8     vpbroadcastd %xmm0,%ymm1
+    libdis_test+0x5d:  c4 e2 7d 58 10     vpbroadcastd (%rax),%ymm2
+    libdis_test+0x62:  c4 e2 79 59 c8     vpbroadcastq %xmm0,%xmm1
+    libdis_test+0x67:  c4 e2 79 59 10     vpbroadcastq (%rax),%xmm2
+    libdis_test+0x6c:  c4 e2 7d 59 c8     vpbroadcastq %xmm0,%ymm1
+    libdis_test+0x71:  c4 e2 7d 59 10     vpbroadcastq (%rax),%ymm2
+    libdis_test+0x76:  c4 e2 79 79 c8     vpbroadcastw %xmm0,%xmm1
+    libdis_test+0x7b:  c4 e2 79 79 10     vpbroadcastw (%rax),%xmm2
+    libdis_test+0x80:  c4 e2 7d 79 c8     vpbroadcastw %xmm0,%ymm1
+    libdis_test+0x85:  c4 e2 7d 79 10     vpbroadcastw (%rax),%ymm2
+    libdis_test+0x8a:  c4 e3 65 46 e2 42  vperm2i128 $0x42,%ymm2,%ymm3,%ymm4
+    libdis_test+0x90:  c4 e3 65 46 20 42  vperm2i128 $0x42,(%rax),%ymm3,%ymm4
+    libdis_test+0x96:  c4 e2 65 36 e2     vpermd %ymm2,%ymm3,%ymm4
+    libdis_test+0x9b:  c4 e2 65 36 20     vpermd (%rax),%ymm3,%ymm4
+    libdis_test+0xa0:  c4 e3 fd 01 da 42  vpermpd $0x42,%ymm2,%ymm3
+    libdis_test+0xa6:  c4 e3 fd 01 18 42  vpermpd $0x42,(%rax),%ymm3
+    libdis_test+0xac:  c4 e2 6d 16 d9     vpermps %ymm1,%ymm2,%ymm3
+    libdis_test+0xb1:  c4 e2 6d 16 18     vpermps (%rax),%ymm2,%ymm3
+    libdis_test+0xb6:  c4 e3 fd 00 da 42  vpermq $0x42,%ymm2,%ymm3
+    libdis_test+0xbc:  c4 e3 fd 00 18 42  vpermq $0x42,(%rax),%ymm3
+    libdis_test+0xc2:  c4 e2 6d 8c 18     vpmaskmovd (%rax),%ymm2,%ymm3
+    libdis_test+0xc7:  c4 e2 e9 8c 18     vpmaskmovq (%rax),%xmm2,%xmm3
+    libdis_test+0xcc:  c4 e2 ed 8c 18     vpmaskmovq (%rax),%ymm2,%ymm3
+    libdis_test+0xd1:  c4 e2 69 47 d9     vpsllvd %xmm1,%xmm2,%xmm3
+    libdis_test+0xd6:  c4 e2 69 47 18     vpsllvd (%rax),%xmm2,%xmm3
+    libdis_test+0xdb:  c4 e2 6d 47 d9     vpsllvd %ymm1,%ymm2,%ymm3
+    libdis_test+0xe0:  c4 e2 6d 47 18     vpsllvd (%rax),%ymm2,%ymm3
+    libdis_test+0xe5:  c4 e2 e9 47 d9     vpsllvq %xmm1,%xmm2,%xmm3
+    libdis_test+0xea:  c4 e2 e9 47 18     vpsllvq (%rax),%xmm2,%xmm3
+    libdis_test+0xef:  c4 e2 ed 47 d9     vpsllvq %ymm1,%ymm2,%ymm3
+    libdis_test+0xf4:  c4 e2 ed 47 18     vpsllvq (%rax),%ymm2,%ymm3
+    libdis_test+0xf9:  c4 e2 69 46 d9     vpsravd %xmm1,%xmm2,%xmm3
+    libdis_test+0xfe:  c4 e2 69 46 18     vpsravd (%rax),%xmm2,%xmm3
+    libdis_test+0x103: c4 e2 6d 46 d9     vpsravd %ymm1,%ymm2,%ymm3
+    libdis_test+0x108: c4 e2 6d 46 18     vpsravd (%rax),%ymm2,%ymm3
+    libdis_test+0x10d: c4 e2 69 45 d9     vpsrlvd %xmm1,%xmm2,%xmm3
+    libdis_test+0x112: c4 e2 69 45 18     vpsrlvd (%rax),%xmm2,%xmm3
+    libdis_test+0x117: c4 e2 6d 45 d9     vpsrlvd %ymm1,%ymm2,%ymm3
+    libdis_test+0x11c: c4 e2 6d 45 18     vpsrlvd (%rax),%ymm2,%ymm3
+    libdis_test+0x121: c4 e2 e9 45 d9     vpsrlvq %xmm1,%xmm2,%xmm3
+    libdis_test+0x126: c4 e2 e9 45 18     vpsrlvq (%rax),%xmm2,%xmm3
+    libdis_test+0x12b: c4 e2 ed 45 d9     vpsrlvq %ymm1,%ymm2,%ymm3
+    libdis_test+0x130: c4 e2 ed 45 18     vpsrlvq (%rax),%ymm2,%ymm3

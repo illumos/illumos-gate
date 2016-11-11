@@ -26,6 +26,7 @@ SPARC_TESTS = \
 
 I386_TESTS =		\
 	32.adx 		\
+	32.avx2		\
 	32.aes 		\
 	32.bmi1 	\
 	32.bmi2 	\
@@ -36,9 +37,12 @@ I386_TESTS =		\
 	32.lzcnt 	\
 	32.popcnt 	\
 	32.sha		\
+	32.sse-3	\
+	32.sse-4.1 	\
 	32.sse-4.2 	\
 	32.ssse3 	\
 	32.xsave 	\
+	64.avx2		\
 	64.adx 		\
 	64.aes 		\
 	64.bmi1 	\
@@ -52,6 +56,8 @@ I386_TESTS =		\
 	64.popcnt 	\
 	64.random 	\
 	64.sha		\
+	64.sse-3	\
+	64.sse-4.1 	\
 	64.sse-4.2 	\
 	64.ssse3 	\
 	64.vmx 		\
