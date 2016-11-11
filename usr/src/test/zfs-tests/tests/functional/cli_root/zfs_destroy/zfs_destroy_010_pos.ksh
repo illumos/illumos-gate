@@ -21,7 +21,7 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2012, 2016 by Delphix. All rights reserved.
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -49,15 +49,15 @@ log_assert "'zfs destroy -R' works on deferred destroyed snapshots"
 log_onexit cleanup_testenv
 
 setup_testenv clone
-log_must $UMOUNT -f $TESTDIR1
+log_must umount -f $TESTDIR1
 
 for dstype in FS VOL; do
     ds=$(eval echo \$${dstype})
     snap=$(eval echo \$${dstype}SNAP)
     clone=$(eval echo \$${dstype}CLONE)
-    log_must $ZFS destroy -d $snap
+    log_must zfs destroy -d $snap
     log_must datasetexists $snap
-    log_must $ZFS destroy -R $ds
+    log_must zfs destroy -R $ds
     log_mustnot datasetexists $snap
     log_mustnot datasetexists $clone
 done

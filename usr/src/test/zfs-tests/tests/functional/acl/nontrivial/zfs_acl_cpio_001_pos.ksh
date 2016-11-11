@@ -26,16 +26,21 @@
 #
 # Copyright (c) 2012 by Marcelo Leal. All rights reserved.
 #
+
+#
+# Copyright (c) 2016 by Delphix. All rights reserved.
+#
+
 . $STF_SUITE/tests/functional/acl/acl_common.kshlib
 
 #
 # DESCRIPTION:
-# Verify that '$CPIO' command with -P option supports to archive ZFS ACLs
+# Verify that 'cpio' command with -P option supports to archive ZFS ACLs
 #
 # STRATEGY:
 # 1. Create file and directory in zfs filesystem
 # 2. Add new ACE in ACL or change mode of file and directory
-# 3. Use $CPIO to archive file and directory
+# 3. Use cpio to archive file and directory
 # 4. Extract the archive file
 # 5. Verify that the restored ACLs of file and directory identify
 #    with the origional ones.
@@ -46,16 +51,16 @@ verify_runnable "both"
 function cleanup
 {
 	if datasetexists $TESTPOOL/$TESTFS1; then
-		log_must $ZFS destroy -f $TESTPOOL/$TESTFS1
+		log_must zfs destroy -f $TESTPOOL/$TESTFS1
 	fi
 	if (( ${#orig_dir} != 0 )); then
 		cd $orig_dir
 	fi
-	[[ -d $TESTDIR1 ]] && log_must $RM -rf $TESTDIR1
-	[[ -d $TESTDIR ]] && log_must $RM -rf $TESTDIR/*
+	[[ -d $TESTDIR1 ]] && log_must rm -rf $TESTDIR1
+	[[ -d $TESTDIR ]] && log_must rm -rf $TESTDIR/*
 }
 
-log_assert "Verify that '$CPIO' command supports to archive ZFS ACLs."
+log_assert "Verify that 'cpio' command supports to archive ZFS ACLs."
 log_onexit cleanup
 
 set -A ops "A+user:$ZFS_ACL_OTHER1:execute:allow" \
@@ -66,9 +71,9 @@ set -A ops "A+user:$ZFS_ACL_OTHER1:execute:allow" \
 	"A1=group:$ZFS_ACL_STAFF_GROUP:write_data:deny"
 
 log_note "Create second zfs file system to restore the cpio archive."
-log_must $ZFS create $TESTPOOL/$TESTFS1
-log_must $ZFS set mountpoint=$TESTDIR1 $TESTPOOL/$TESTFS1
-log_must $CHMOD 777 $TESTDIR1
+log_must zfs create $TESTPOOL/$TESTFS1
+log_must zfs set mountpoint=$TESTDIR1 $TESTPOOL/$TESTFS1
+log_must chmod 777 $TESTDIR1
 
 # Define test fine and record the original directory.
 CPIOFILE=cpiofile.$$
@@ -86,25 +91,25 @@ for user in root $ZFS_ACL_STAFF1; do
 		log_note "Create file $file and directory $dir " \
 			"in zfs filesystem. "
 		cd $TESTDIR
-		log_must usr_exec $TOUCH $file
-		log_must usr_exec $MKDIR $dir
+		log_must usr_exec touch $file
+		log_must usr_exec mkdir $dir
 
 		log_note "Change the ACLs of file and directory with " \
-			"'$CHMOD ${ops[i]}'."
+			"'chmod ${ops[i]}'."
 		for obj in $file $dir; do
-			log_must usr_exec $CHMOD ${ops[i]} $obj
+			log_must usr_exec chmod ${ops[i]} $obj
 		done
 
 		log_note "Archive the file and directory."
 		cd $TESTDIR
-		log_must eval "usr_exec $LS | " \
-			"usr_exec $CPIO -ocP -O $CPIOFILE > /dev/null 2>&1"
+		log_must eval "usr_exec ls | " \
+			"usr_exec cpio -ocP -O $CPIOFILE > /dev/null 2>&1"
 
 		log_note "Restore the cpio archive."
-		log_must usr_exec $MV $CPIOFILE $TESTDIR1
+		log_must usr_exec mv $CPIOFILE $TESTDIR1
 		cd $TESTDIR1
-		log_must eval "usr_exec $CAT $CPIOFILE | " \
-			"usr_exec $CPIO -icP > /dev/null 2>&1"
+		log_must eval "usr_exec cat $CPIOFILE | " \
+			"usr_exec cpio -icP > /dev/null 2>&1"
 
 		log_note "Verify that the ACLs of restored file/directory " \
 			"have no changes."
@@ -113,10 +118,10 @@ for user in root $ZFS_ACL_STAFF1; do
 			log_must compare_acls $TESTDIR/$obj $TESTDIR1/$obj
 		done
 
-		log_must usr_exec $RM -rf $TESTDIR/* $TESTDIR1/*
+		log_must usr_exec rm -rf $TESTDIR/* $TESTDIR1/*
 
 		(( i = i + 1 ))
 	done
 done
 
-log_pass "'$CPIO' command succeeds to support ZFS ACLs."
+log_pass "'cpio' command succeeds to support ZFS ACLs."

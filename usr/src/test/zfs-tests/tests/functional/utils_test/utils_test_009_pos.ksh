@@ -26,7 +26,7 @@
 #
 
 #
-# Copyright (c) 2013 by Delphix. All rights reserved.
+# Copyright (c) 2013, 2016 by Delphix. All rights reserved.
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -46,7 +46,7 @@ verify_runnable "global"
 
 function cleanup
 {
-	$RM -rf $TESTDIR/*
+	rm -rf $TESTDIR/*
 }
 
 log_onexit cleanup
@@ -55,6 +55,6 @@ log_assert "Ensure that the tunefs(1M) utility fails on a ZFS file system."
 
 populate_dir $NUM_FILES
 
-log_mustnot $TUNEFS -m 80 /dev/dsk/${DISK}s0
+log_mustnot tunefs -m 80 /dev/dsk/${DISK}s0
 
 log_pass "tunefs(1M) returned an error as expected."

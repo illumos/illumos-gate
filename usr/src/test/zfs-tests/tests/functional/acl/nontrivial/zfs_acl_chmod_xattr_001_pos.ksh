@@ -25,6 +25,10 @@
 # Use is subject to license terms.
 #
 
+#
+# Copyright (c) 2016 by Delphix. All rights reserved.
+#
+
 . $STF_SUITE/tests/functional/acl/acl_common.kshlib
 
 #
@@ -50,7 +54,7 @@ function cleanup
 	cleanup_test_files $TESTDIR/basedir
 
 	if [[ -e $TESTDIR/$ARCHIVEFILE ]]; then
-		log_must $RM -f $TESTDIR/$ARCHIVEFILE
+		log_must rm -f $TESTDIR/$ARCHIVEFILE
 	fi
 
 	return 0
@@ -88,13 +92,13 @@ function operate_node #user node acl
 	fi
 
 	if [[ $acl_t == *read_xattr* ]]; then
-		chgusr_exec $user $RUNAT $node $LS > /dev/null 2>&1; ret=$?
+		chgusr_exec $user runat $node ls > /dev/null 2>&1; ret=$?
 	elif [[ $acl_t == *write_xattr* ]]; then
-		chgusr_exec $user $RUNAT $node $CP $MYTESTFILE attr.1 ; ret=$?
+		chgusr_exec $user runat $node cp $MYTESTFILE attr.1 ; ret=$?
 
 		if [[ $ret -eq 0 ]]; then
 			log_must cleanup_test_files $TESTDIR/basedir
-			log_must $TAR xpf@ $TESTDIR/$ARCHIVEFILE
+			log_must tar xpf@ $TESTDIR/$ARCHIVEFILE
 		fi
 	fi
 
@@ -149,14 +153,14 @@ function test_chmod_basic_access #node g_usr o_usr
 
 	for flag in ${a_flag[@]}; do
 		for acl_t in "${a_access[@]}"; do
-			log_must usr_exec $CHMOD A+$flag:$acl_t $node
+			log_must usr_exec chmod A+$flag:$acl_t $node
 
-			log_must $TAR cpf@ $TESTDIR/$ARCHIVEFILE basedir
+			log_must tar cpf@ $TESTDIR/$ARCHIVEFILE basedir
 
 			check_chmod_results "$node" "$flag" \
 				"$acl_t" "$g_usr" "$o_usr"
 
-			log_must usr_exec $CHMOD A0- $node
+			log_must usr_exec chmod A0- $node
 		done
 	done
 }
@@ -169,8 +173,8 @@ function setup_test_files #base_node user group
 
 	cleanup_test_files $base_node
 
-	log_must $MKDIR -p $base_node
-	log_must $CHOWN $user:$group $base_node
+	log_must mkdir -p $base_node
+	log_must chown $user:$group $base_node
 
 	log_must set_cur_usr $user
 
@@ -180,17 +184,17 @@ function setup_test_files #base_node user group
 
 	dir0=$base_node/testdir_rm
 
-	log_must usr_exec $TOUCH $file0
-	log_must usr_exec $CHMOD 444 $file0
+	log_must usr_exec touch $file0
+	log_must usr_exec chmod 444 $file0
 
-	log_must usr_exec $RUNAT $file0 $CP $MYTESTFILE attr.0
+	log_must usr_exec runat $file0 cp $MYTESTFILE attr.0
 
-	log_must usr_exec $MKDIR -p $dir0
-	log_must usr_exec $CHMOD 555 $dir0
+	log_must usr_exec mkdir -p $dir0
+	log_must usr_exec chmod 555 $dir0
 
-	log_must usr_exec $RUNAT $dir0 $CP $MYTESTFILE attr.0
+	log_must usr_exec runat $dir0 cp $MYTESTFILE attr.0
 
-	log_must usr_exec $CHMOD 777 $base_node
+	log_must usr_exec chmod 777 $base_node
 	return 0
 }
 
@@ -199,9 +203,9 @@ function cleanup_test_files #base_node
 	typeset base_node=$1
 
 	if [[ -d $base_node ]]; then
-		log_must $RM -rf $base_node
+		log_must rm -rf $base_node
 	elif [[ -e $base_node ]]; then
-		log_must $RM -f $base_node
+		log_must rm -f $base_node
 	fi
 
 	return 0

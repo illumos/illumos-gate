@@ -26,7 +26,7 @@
 #
 
 #
-# Copyright (c) 2013 by Delphix. All rights reserved.
+# Copyright (c) 2013, 2016 by Delphix. All rights reserved.
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -43,7 +43,7 @@
 
 function cleanup
 {
-	$RM -f $OUTFILE
+	rm -f $OUTFILE
 }
 
 verify_runnable "global"
@@ -81,7 +81,7 @@ typeset -i RET=0
 i=0
 while (( $i < ${#dcmds[*]} )); do
 	log_note "Verifying: '${dcmds[i]}'"
-        $ECHO "${dcmds[i]}" | $MDB -k > $OUTFILE 2>&1
+        echo "${dcmds[i]}" | mdb -k > $OUTFILE 2>&1
 	RET=$?
 	if (( $RET != 0 )); then
 		log_fail "mdb '${dcmds[i]}' returned error $RET"
@@ -90,12 +90,12 @@ while (( $i < ${#dcmds[*]} )); do
 	#
 	# mdb prefixes all errors with "mdb: " so we check the output.
 	#
-	$GREP "mdb:" $OUTFILE > /dev/null 2>&1
+	grep "mdb:" $OUTFILE > /dev/null 2>&1
 	RET=$?
 	if (( $RET == 0 )); then
-		$ECHO "mdb '${dcmds[i]}' contained 'mdb:'"
-		# Using $TAIL limits the number of lines in the log
-		$TAIL -100 $OUTFILE
+		echo "mdb '${dcmds[i]}' contained 'mdb:'"
+		# Using tail limits the number of lines in the log
+		tail -100 $OUTFILE
 		log_fail "mdb walker or dcmd failed"
 	fi
 

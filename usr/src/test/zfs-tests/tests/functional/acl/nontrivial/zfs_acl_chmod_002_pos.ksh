@@ -25,6 +25,10 @@
 # Use is subject to license terms.
 #
 
+#
+# Copyright (c) 2016 by Delphix. All rights reserved.
+#
+
 . $STF_SUITE/include/libtest.shlib
 
 #
@@ -41,7 +45,7 @@ verify_runnable "both"
 
 function acl_upgrade_cleannup
 {
-	log_must $ZFS destroy -rR $ACL_UPGRADE_FS
+	log_must zfs destroy -rR $ACL_UPGRADE_FS
 }
 
 log_assert "Verify acl after upgrading."
@@ -49,13 +53,13 @@ log_onexit acl_upgrade_cleannup
 
 ACL_UPGRADE_FS=$TESTPOOL/acl_upgrade_fs.$$
 
-log_must $ZFS create -o version=2 $ACL_UPGRADE_FS
+log_must zfs create -o version=2 $ACL_UPGRADE_FS
 mntpnt=$(get_prop mountpoint $ACL_UPGRADE_FS)
-log_must $MKDIR $mntpnt/dir.$$
-log_must $CHMOD A+owner@:rwxp:f:allow,group@:rwxp:f:allow $mntpnt/dir.$$
-log_must $ZFS upgrade $ACL_UPGRADE_FS
-log_must $TOUCH $mntpnt/dir.$$/file.$$
-log_must eval "$LS -V $mntpnt/dir.$$/file.$$ > /dev/null 2>&1"
+log_must mkdir $mntpnt/dir.$$
+log_must chmod A+owner@:rwxp:f:allow,group@:rwxp:f:allow $mntpnt/dir.$$
+log_must zfs upgrade $ACL_UPGRADE_FS
+log_must touch $mntpnt/dir.$$/file.$$
+log_must eval "ls -V $mntpnt/dir.$$/file.$$ > /dev/null 2>&1"
 
 log_pass "Verify acl after upgrading."
 

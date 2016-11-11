@@ -25,6 +25,10 @@
 # Use is subject to license terms.
 #
 
+#
+# Copyright (c) 2016 by Delphix. All rights reserved.
+#
+
 . $STF_SUITE/tests/functional/acl/acl_common.kshlib
 
 #
@@ -45,61 +49,61 @@ verify_runnable "both"
 function cleanup
 {
 	(( ${#cwd} != 0 )) && cd $cwd
-	[[ -d $TESTDIR ]] && log_must $RM -rf $TESTDIR/*
-	(( ${#mask} != 0 )) && log_must $UMASK $mask
+	[[ -d $TESTDIR ]] && log_must rm -rf $TESTDIR/*
+	(( ${#mask} != 0 )) && log_must umask $mask
 }
 
-log_assert "Verify that '$LS' command supports ZFS ACLs."
+log_assert "Verify that 'ls' command supports ZFS ACLs."
 
 log_onexit cleanup
 
 file=$TESTFILE0
 dir=dir.$$
 cwd=$PWD
-mask=`$UMASK`
+mask=`umask`
 spec_ace="everyone@:write_acl:allow"
 
-$UMASK 0022
+umask 0022
 
 log_note "Create file and directory in the zfs filesystem. "
 cd $TESTDIR
-log_must $TOUCH $file
-log_must $MKDIR $dir
+log_must touch $file
+log_must mkdir $dir
 
-log_note "Verify that '$LS [-dv]' can list file/directory ACEs of its acl."
+log_note "Verify that 'ls [-dv]' can list file/directory ACEs of its acl."
 
 typeset -i ace_num=0
 for obj in $file $dir
 do
 	typeset ls_str=""
 	if [[ -f $obj ]]; then
-		ls_str="$LS -v"
+		ls_str="ls -v"
 	else
-		ls_str="$LS -dv"
+		ls_str="ls -dv"
 	fi
 
 	for ace_type in "owner@" "group@" "everyone@"
 	do
-		$ls_str $obj | $GREP $ace_type > /dev/null 2>&1
+		$ls_str $obj | grep $ace_type > /dev/null 2>&1
 		(( $? == 0 )) && (( ace_num += 1 ))
 	done
 
 	(( ace_num < 1 )) && \
-		log_fail "'$LS [-dv] fails to list file/directroy acls."
+		log_fail "'ls [-dv] fails to list file/directroy acls."
 done
 
-log_note "Verify that '$LS [-dl] [-dv]' can output '+' to indicate " \
+log_note "Verify that 'ls [-dl] [-dv]' can output '+' to indicate " \
 	"the acl existent."
 
 for obj in $file $dir
 do
-	$CHMOD A0+$spec_ace $obj
+	chmod A0+$spec_ace $obj
 
-	log_must eval "$LS -ld -vd $obj | $GREP "+" > /dev/null"
+	log_must eval "ls -ld -vd $obj | grep "+" > /dev/null"
 	log_must plus_sign_check_v $obj
 
-	log_must eval "$LS -ld -vd $obj | $GREP $spec_ace > /dev/null"
+	log_must eval "ls -ld -vd $obj | grep $spec_ace > /dev/null"
 	log_must plus_sign_check_l $obj
 done
 
-log_pass "'$LS' command succeeds to support ZFS ACLs."
+log_pass "'ls' command succeeds to support ZFS ACLs."

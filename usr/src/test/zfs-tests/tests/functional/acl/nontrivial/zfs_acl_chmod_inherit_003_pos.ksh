@@ -60,9 +60,9 @@ verify_runnable "both"
 
 function cleanup
 {
-	[[ -f $ofile ]] && log_must $RM -f $ofile
-	[[ -d $odir ]] && log_must $RM -rf $odir
-	[[ -d $basedir ]] && log_must $RM -rf $basedir
+	[[ -f $ofile ]] && log_must rm -f $ofile
+	[[ -d $odir ]] && log_must rm -rf $odir
+	[[ -d $basedir ]] && log_must rm -rf $basedir
 }
 
 log_assert "Verify chmod have correct behaviour to directory and file when" \
@@ -98,8 +98,8 @@ function verify_inherit #<aclinherit> <object> [strategy]
 	typeset obj=$2
 	typeset str=$3
 
-	log_must usr_exec $MKDIR -p $ndir3
-	log_must usr_exec $TOUCH $nfile1 $nfile2 $nfile3
+	log_must usr_exec mkdir -p $ndir3
+	log_must usr_exec touch $nfile1 $nfile2 $nfile3
 
 	# Check if we have any inheritance flags set
 	if [[ $obj != "--" ]]; then
@@ -189,8 +189,8 @@ function verify_inherit #<aclinherit> <object> [strategy]
 			aclcur=$(get_ACE $node $count compact)
 			aclcur=${aclcur#$count:}
 			if [[ -n $expacl && $expacl != $aclcur ]]; then
-				$LS -Vd $basedir
-				$LS -Vd $node
+				ls -Vd $basedir
+				ls -Vd $node
 				log_fail "$inherit $i #$count" \
 				    "expected: $expacl, current: $aclcur"
 			fi
@@ -208,8 +208,8 @@ function verify_inherit #<aclinherit> <object> [strategy]
 			fi
 
 			if [[ $? -ne 0 ]]; then
-				$LS -Vd $basedir
-				$LS -Vd $node
+				ls -Vd $basedir
+				ls -Vd $node
 				log_fail "unexpected acl: $node," \
 				    "$inherit ($str)"
 			fi
@@ -222,10 +222,10 @@ typeset -i i=0 maxaces=6
 typeset acl0 acl1 acl2 acl3 acl4 acl5
 typeset acls0 acls1 acls2 acls3 acls4 acls5
 
-log_must $ZFS set aclmode=passthrough $TESTPOOL/$TESTFS
+log_must zfs set aclmode=passthrough $TESTPOOL/$TESTFS
 
 for inherit in "${aclinherit_flag[@]}"; do
-	log_must $ZFS set aclinherit=$inherit $TESTPOOL/$TESTFS
+	log_must zfs set aclinherit=$inherit $TESTPOOL/$TESTFS
 
 	for user in root $ZFS_ACL_STAFF1; do
 		log_must set_cur_usr $user
@@ -255,20 +255,20 @@ for inherit in "${aclinherit_flag[@]}"; do
 				acls4="$ace_prefix2:-------A-W----:$inh_b:allow"
 				acls5="$ace_prefix3:-------A-W----:$inh_b:deny"
 
-				log_must usr_exec $MKDIR $basedir
-				log_must usr_exec $MKDIR $odir
-				log_must usr_exec $TOUCH $ofile
+				log_must usr_exec mkdir $basedir
+				log_must usr_exec mkdir $odir
+				log_must usr_exec touch $ofile
 
 				((i = maxaces - 1))
 				while ((i >= 0)); do
 					eval acl=\$acl$i
-					log_must usr_exec $CHMOD A+$acl $basedir
+					log_must usr_exec chmod A+$acl $basedir
 					((i = i - 1))
 				done
 
 				verify_inherit $inherit $obj $str
 
-				log_must usr_exec $RM -rf $ofile $odir $basedir
+				log_must usr_exec rm -rf $ofile $odir $basedir
 			done
 		done
 	done

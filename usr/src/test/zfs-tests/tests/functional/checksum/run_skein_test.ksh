@@ -12,7 +12,7 @@
 #
 
 #
-# Copyright (c) 2015 by Delphix. All rights reserved.
+# Copyright (c) 2015, 2016 by Delphix. All rights reserved.
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -25,7 +25,7 @@
 log_assert "Run the tests for the Skein hash algorithm."
 
 freq=$(get_cpu_freq)
-for isa in $($ISAINFO); do
+for isa in $(isainfo); do
 	log_must $STF_SUITE/tests/functional/checksum/skein_test.$isa $freq
 done
 

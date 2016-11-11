@@ -14,7 +14,7 @@
 #
 
 #
-# Copyright (c) 2015 by Delphix. All rights reserved.
+# Copyright (c) 2015, 2016 by Delphix. All rights reserved.
 #
 
 function get_conf_section # regex conf
@@ -104,7 +104,7 @@ function cleanup
                 log_must zpool destroy -f $TESTPOOL
         fi
         if [[ -e $conf ]]; then
-                log_must $RM -f "$conf"
+                log_must rm -f "$conf"
         fi
         if [[ -e $POOL2 ]]; then
                 log_must zpool destroy -f $POOL2

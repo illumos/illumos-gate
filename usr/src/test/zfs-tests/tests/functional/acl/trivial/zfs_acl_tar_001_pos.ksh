@@ -25,6 +25,10 @@
 # Use is subject to license terms.
 #
 
+#
+# Copyright (c) 2016 by Delphix. All rights reserved.
+#
+
 . $STF_SUITE/tests/functional/acl/acl_common.kshlib
 
 #
@@ -49,32 +53,32 @@ log_onexit cleanup
 for user in root $ZFS_ACL_STAFF1; do
 	log_must set_cur_usr $user
 
-	[[ ! -d $INI_DIR ]] && $MKDIR -m 777 -p $INI_DIR
-	log_must usr_exec $MKTREE -b $INI_DIR -l 5 -d 2 -f 2
+	[[ ! -d $INI_DIR ]] && mkdir -m 777 -p $INI_DIR
+	log_must usr_exec mktree -b $INI_DIR -l 5 -d 2 -f 2
 
 	#
 	# Enter into initial directory and record all directory information,
 	# then tar all the files to $TMP_DIR/files.tar.
 	#
-	[[ ! -d $TMP_DIR ]] && usr_exec $MKDIR $TMP_DIR
+	[[ ! -d $TMP_DIR ]] && usr_exec mkdir $TMP_DIR
 	initout=$TMP_DIR/initout.$$
 	tarout=$TMP_DIR/files.tar
 	cd $INI_DIR
 	log_must record_cksum $INI_DIR $initout
-	log_must usr_exec $TAR cpf@ $tarout *
+	log_must usr_exec tar cpf@ $tarout *
 
 	#
 	# Enter into test directory and tar $TMP_DIR/files.tar to current
 	# directory. Record all directory information and compare with initial
 	# directory record.
 	#
-	[[ ! -d $TST_DIR ]] && $MKDIR -m 777 $TST_DIR
+	[[ ! -d $TST_DIR ]] && mkdir -m 777 $TST_DIR
 	testout=$TMP_DIR/testout.$$
 	cd $TST_DIR
-	log_must usr_exec $TAR xpf@ $tarout
+	log_must usr_exec tar xpf@ $tarout
 	log_must record_cksum $TST_DIR $testout
 
-	log_must usr_exec $DIFF $initout $testout
+	log_must usr_exec diff $initout $testout
 
 	log_must cleanup
 done

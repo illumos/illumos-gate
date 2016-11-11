@@ -25,16 +25,20 @@
 # Use is subject to license terms.
 #
 
+#
+# Copyright (c) 2016 by Delphix. All rights reserved.
+#
+
 . $STF_SUITE/include/libtest.shlib
 . $STF_SUITE/tests/functional/acl/acl_common.kshlib
 
 # check svc:/network/nis/client:default state
 # disable it if the state is ON
 # and the state will be restored during cleanup.ksh
-log_must $RM -f $NISSTAFILE
-if [[ "ON" == $($SVCS -H -o sta svc:/network/nis/client:default) ]]; then
-    log_must $SVCADM disable -t svc:/network/nis/client:default
-    log_must $TOUCH $NISSTAFILE
+log_must rm -f $NISSTAFILE
+if [[ "ON" == $(svcs -H -o sta svc:/network/nis/client:default) ]]; then
+    log_must svcadm disable -t svc:/network/nis/client:default
+    log_must touch $NISSTAFILE
 fi
 
 cleanup_user_group
@@ -54,6 +58,6 @@ log_must add_user $ZFS_ACL_OTHER_GROUP $ZFS_ACL_OTHER2
 
 DISK=${DISKS%% *}
 default_setup_noexit $DISK
-log_must $CHMOD 777 $TESTDIR
+log_must chmod 777 $TESTDIR
 
 log_pass

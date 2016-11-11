@@ -25,6 +25,10 @@
 # Use is subject to license terms.
 #
 
+#
+# Copyright (c) 2016 by Delphix. All rights reserved.
+#
+
 . $STF_SUITE/tests/functional/acl/acl_common.kshlib
 
 #
@@ -48,11 +52,11 @@ for user in root $ZFS_ACL_STAFF1; do
 
 	log_must create_files $TESTDIR
 
-	initfiles=$($LS -R $INI_DIR/*)
+	initfiles=$(ls -R $INI_DIR/*)
 	typeset -i i=0
 	while (( i < NUM_FILE )); do
 		f=$(getitem $i $initfiles)
-		ls_attr=$(usr_exec $LS -@ $f | $AWK '{print substr($1, 11, 1)}')
+		ls_attr=$(usr_exec ls -@ $f | awk '{print substr($1, 11, 1)}')
 		if [[ $ls_attr != "@" ]]; then
 			log_fail "ls -@ $f with attribute should success."
 		else
