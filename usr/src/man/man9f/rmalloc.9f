@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH RMALLOC 9F "Jan 16, 2006"
+.TH RMALLOC 9F "Nov 11, 2016"
 .SH NAME
 rmalloc \- allocate space from a resource map
 .SH SYNOPSIS
@@ -45,7 +45,8 @@ Number of units of the resource.
 .LP
 The \fBrmalloc()\fR function is used by a driver to allocate space from a
 previously defined and initialized resource map. The map itself is allocated by
-calling the function \fBrmallocmap\fR(9F). \fBrmalloc()\fR is one of five
+calling the function \fBrmallocmap\fR(9F) or \fBrmallocmap_wait\fR(9F).
+\fBrmalloc()\fR is one of six
 functions used for resource map management. The other functions include:
 .sp
 .ne 2
@@ -72,6 +73,15 @@ Return previously allocated space to a map.
 .ad
 .RS 20n
 Allocate a resource map and initialize it.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBrmallocmap_wait\fR(9F)\fR
+.ad
+.RS 20n
+Allocate a resource map and initialize it.  Wait if necessary.
 .RE
 
 .sp
@@ -119,8 +129,8 @@ illustrates the following procedures:
 .TP
 .ie t \(bu
 .el o
-Panics the system if the required amount of memory can not be allocated (lines
-11-15).
+Returns error if the required amount of memory can not be allocated (lines
+9-17).
 .RE
 .RS +4
 .TP
@@ -132,35 +142,37 @@ and \fBrmfree\fR(9F) to initialize the total resource area.
 .sp
 .in +2
 .nf
-1   #define XX_MAPSIZE	12
-2   #define XX_BUFSIZE  2560
-3   static struct map *xx_mp;         /* Private buffer space map */
+1   #define XX_MAPSIZE  12
+2   #define XX_SIZE     2560
+3   #define XX_BUFSIZE  (XX_MAPSIZE * XX_SIZE)
+4
+5   static struct map *xx_mp;         /* Resource map */
+6   static void *bp;                  /* Private buffer */
     .\|.\|.
-4   xxstart(\|)
-5        /*
-6         *  Allocate private buffer.  If insufficient memory,
-7         *  display message and halt system.
-8         */
-9   {
-10    register caddr_t bp;
+7   xxstart(\|)
+8   {
     .\|.\|.
-11    if ((bp = kmem_alloc(XX_BUFSIZE, KM_NOSLEEP) == 0)  {
-12
-13        cmn_err(CE_PANIC, "xxstart: kmem_alloc failed before %d buffer"
-14                  "allocation", XX_BUFSIZE);
-15    }
-16
-17    /*
-18     * Initialize the resource map with number
-19     * of slots in map.
-20     */
-21    xx_mp = rmallocmap(XX_MAPSIZE);
-22
-24    /*
-25     * Initialize space management map with total
-26     * buffer area it is to manage.
-27     */
-28    rmfree(xx_mp, XX_BUFSIZE, bp);
+9     /*
+10     *  Allocate private buffer.  If insufficient memory,
+11     *  display message and return error.
+12     */
+13    if ((bp = kmem_alloc(XX_BUFSIZE, KM_NOSLEEP) == NULL)  {
+14        cmn_err(CE_WARN, "xxstart: kmem_alloc failed for %d bytes",
+15            XX_BUFSIZE);
+16        return (ENOMEM);
+17    }
+18
+19    /*
+20     * Allocate the resource map with number
+21     * of slots in map.
+22     */
+23    xx_mp = rmallocmap(XX_MAPSIZE);
+24
+25    /*
+26     * Initialize the resource map with total
+27     * area it is to manage.
+28     */
+29    rmfree(xx_mp, XX_MAPSIZE, 1);
       .\|.\|.\fI\fR
 .fi
 .in -2
@@ -184,21 +196,35 @@ The next example illustrates the following procedures:
 .ie t \(bu
 .el o
 The size of the \fBI/O\fR request is calculated and stored in the \fIsize\fR
-variable (line 10).
+variable (line 16).
 .RE
 .RS +4
 .TP
 .ie t \(bu
 .el o
-Buffers are allocated through the \fBrmalloc()\fR function using the \fIsize\fR
-value (line 15). If the allocation fails the system will panic.
+The number of the resource units needed is calculated and stored in the
+\fIcnt\fR variable (line 19).
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Space is allocated from the resource map through the \fBrmalloc()\fR function
+using the \fIcnt\fR value (line 25).  If the allocation fails return error.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The buffer address is calculated and stored in the \fIaddr\fR variable
+(line 31).
 .RE
 .RS +4
 .TP
 .ie t \(bu
 .el o
 The \fBuiomove\fR(9F) function is used to move data to the allocated buffer
-(line 23).
+(line 37).
 .RE
 .RS +4
 .TP
@@ -211,34 +237,48 @@ returned.
 .sp
 .in +2
 .nf
-1   #define XX_BUFSIZE  2560
-2   #define XX_MAXSIZE  (XX_BUFSIZE / 4)
-3
-4   static struct map *xx_mp;         /* Private buffer space map */
+1   #define XX_MAPSIZE  12
+2   #define XX_SIZE     2560
+3   #define XX_BUFSIZE  (XX_MAPSIZE * XX_SIZE)
+4   #define XX_MAXSIZE  (XX_BUFSIZE / 4)
+5
+6   static struct map *xx_mp;         /* Resource map */
+7   static void *bp;                  /* Private buffer */
     ...
-5   xxread(dev_t dev, uio_t *uiop, cred_t *credp)
-6   {
-7
-8   register caddr_t addr;
-9   register int     size;
-10      size = min(COUNT, XX_MAXSIZE);  /* Break large I/O  */
-11                                          /* request into small ones */
-12     /*
-13      * Get buffer.
-14      */
-15    if ((addr = (caddr_t)rmalloc(xx_mp, size)) == 0)
-16        cmn_err(CE_PANIC, "read: rmalloc failed allocation of size %d",
-17                size);
+8   xxread(dev_t dev, uio_t *uiop, cred_t *credp)
+9   {
+10
+11    void *addr;
+12    size_t size;
+13    unsigned long idx;
+14    unsigned long cnt;
+15
+16    size = min(COUNT, XX_MAXSIZE);  /* Break large I/O  */
+17                                    /* request into small ones */
 18
-19     /*
-20      * Move data to buffer.  If invalid address is found,
-21      * return buffer to map and return error code.
-22      */
-23    if (uiomove(addr, size, UIO_READ, uiop) == -1)  {
-24        rmfree(xx_mp, size, addr);
-25        return(EFAULT);
-26    }
-27  }\fI\fR
+19    cnt = size / XX_SIZE;           /* Calculate the number of */
+20                                    /* chunks needed */
+21
+22    /*
+23     * Get the buffer index.
+24     */
+25    if ((idx = rmalloc(xx_mp, cnt)) == 0)
+26        return (ENOMEM);
+27
+28    /*
+29     * Get the buffer address.
+30     */
+31    addr = bp + (idx - 1) * XX_SIZE;
+32
+33    /*
+34     * Move data to buffer.  If invalid address is found,
+35     * return buffer to map and return error code.
+36     */
+37    if (uiomove(addr, size, UIO_READ, uiop) == -1)  {
+38        rmfree(xx_mp, cnt, idx);
+39        return (EFAULT);
+40    }
+41  }\fI\fR
 .fi
 .in -2
 
@@ -246,6 +286,7 @@ returned.
 .sp
 .LP
 \fBkmem_alloc\fR(9F), \fBrmalloc_wait\fR(9F), \fBrmallocmap\fR(9F),
+\fBrmallocmap_wait\fR(9F),
 \fBrmfree\fR(9F), \fBrmfreemap\fR(9F), \fBuiomove\fR(9F)
 .sp
 .LP
