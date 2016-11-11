@@ -26,7 +26,7 @@
 #
 
 #
-# Copyright (c) 2013, 2015 by Delphix. All rights reserved.
+# Copyright (c) 2013, 2016 by Delphix. All rights reserved.
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -36,11 +36,11 @@
 verify_runnable "global"
 
 # Restart fmd to lower the chances of swap -d failing with ENOMEM.
-log_must $SVCADM restart svc:/system/fmd:default
+log_must svcadm restart svc:/system/fmd:default
 
 for i in $SAVESWAPDEVS ; do
 	log_note "Executing: swap -d $i"
-	$SWAP -d $i >/dev/null 2>&1
+	swap -d $i >/dev/null 2>&1
 	if [[ $? != 0 ]]; then
 		log_untested "Unable to delete swap device $i because of" \
 				"insufficient RAM"

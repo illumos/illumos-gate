@@ -26,7 +26,7 @@
 #
 
 #
-# Copyright (c) 2013 by Delphix. All rights reserved.
+# Copyright (c) 2013, 2016 by Delphix. All rights reserved.
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -46,15 +46,15 @@ verify_runnable "global"
 
 function cleanup
 {
-	$RM -rf $TESTDIR/*
+	rm -rf $TESTDIR/*
 }
 
 log_onexit cleanup
 
 log_assert "Ensure that the quotaon(1M) utility fails on a ZFS file system."
 
-log_must $ZFS set quota=1099511627776 $TESTPOOL/$TESTFS
-log_must $TOUCH $TESTDIR/quotas
-log_mustnot $QUOTAON /dev/dsk/${DISK}s0
+log_must zfs set quota=1099511627776 $TESTPOOL/$TESTFS
+log_must touch $TESTDIR/quotas
+log_mustnot quotaon /dev/dsk/${DISK}s0
 
 log_pass "quotaon(1M) returned an error as expected."

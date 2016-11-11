@@ -12,7 +12,7 @@
 #
 
 #
-# Copyright (c) 2015 by Delphix. All rights reserved.
+# Copyright (c) 2015, 2016 by Delphix. All rights reserved.
 #
 
 #
@@ -33,12 +33,12 @@ log_onexit cleanup
 
 function cleanup
 {
-	log_must $ZFS destroy $TESTFS
+	log_must zfs destroy $TESTFS
 }
 
 export TESTFS=$PERFPOOL/testfs
 recreate_perfpool
-log_must $ZFS create $PERF_FS_OPTS $TESTFS
+log_must zfs create $PERF_FS_OPTS $TESTFS
 
 # Aim to fill the pool to 50% capacity while accounting for a 3x compressratio.
 export TOTAL_SIZE=$(($(get_prop avail $TESTFS) * 3 / 2))
@@ -62,8 +62,8 @@ fi
 lun_list=$(pool_to_lun_list $PERFPOOL)
 log_note "Collecting backend IO stats with lun list $lun_list"
 export collect_scripts=("$PERF_SCRIPTS/io.d $PERFPOOL $lun_list 1" "io"
-    "$VMSTAT 1" "vmstat" "$MPSTAT 1" "mpstat" "$IOSTAT -xcnz 1" "iostat")
+    "vmstat 1" "vmstat" "mpstat 1" "mpstat" "iostat -xcnz 1" "iostat")
 
 log_note "Sequential writes with $PERF_RUNTYPE settings"
-do_fio_run sequential_writes.fio $TRUE $FALSE
+do_fio_run sequential_writes.fio true false
 log_pass "Measure IO stats during sequential write load"

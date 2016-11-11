@@ -25,6 +25,10 @@
 # Use is subject to license terms.
 #
 
+#
+# Copyright (c) 2016 by Delphix. All rights reserved.
+#
+
 . $STF_SUITE/include/libtest.shlib
 
 #
@@ -43,7 +47,7 @@ verify_runnable "both"
 function cleanup
 {
 	if ! ismounted $fs; then
-		log_must $ZFS mount $fs
+		log_must zfs mount $fs
 	fi
 }
 
@@ -52,16 +56,16 @@ log_onexit cleanup
 
 fs=$TESTPOOL/$TESTFS
 if ! ismounted $fs; then
-	log_must $ZFS mount $fs
+	log_must zfs mount $fs
 fi
 
-log_mustnot $ZFS mount $fs
+log_mustnot zfs mount $fs
 
 mpt=$(get_prop mountpoint $fs)
-log_must $ZFS umount $fs
-curpath=`$DIRNAME $0`
+log_must zfs umount $fs
+curpath=`dirname $0`
 cd $mpt
-log_mustnot $ZFS mount $fs
+log_mustnot zfs mount $fs
 cd $curpath
 
 log_pass "zfs mount fails with mounted filesystem or busy moutpoint as expected."

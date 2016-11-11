@@ -25,6 +25,10 @@
 # Use is subject to license terms.
 #
 
+#
+# Copyright (c) 2016 by Delphix. All rights reserved.
+#
+
 . $STF_SUITE/tests/functional/acl/acl_common.kshlib
 
 #
@@ -64,7 +68,7 @@ for user in root $ZFS_ACL_STAFF1; do
 	tarout=$TMP_DIR/files.tar
 	cd $INI_DIR
 	log_must cksum_files $INI_DIR BEFORE_FCKSUM BEFORE_ACKSUM
-	log_must usr_exec $TAR cpf $tarout *
+	log_must usr_exec tar cpf $tarout *
 
 	#
 	# Enter into test directory and tar $TMP_DIR/files.tar to current
@@ -72,14 +76,14 @@ for user in root $ZFS_ACL_STAFF1; do
 	# directory record.
 	#
 	cd $TST_DIR
-	log_must usr_exec $CP $tarout $TST_DIR
-	log_must usr_exec $TAR xpf $tarout
+	log_must usr_exec cp $tarout $TST_DIR
+	log_must usr_exec tar xpf $tarout
 
-	testfiles=$($LS -R $TST_DIR/*)
+	testfiles=$(ls -R $TST_DIR/*)
 	typeset -i i=0
 	while (( i < NUM_FILE )); do
 		f=$(getitem $i $testfiles)
-		ls_attr=$($LS -@ $f | $AWK '{print substr($1, 11, 1)}')
+		ls_attr=$(ls -@ $f | awk '{print substr($1, 11, 1)}')
 		if [[ $ls_attr == "@" ]]; then
 			log_fail "extraction of attribute successful w/ -@ flag"
 		fi

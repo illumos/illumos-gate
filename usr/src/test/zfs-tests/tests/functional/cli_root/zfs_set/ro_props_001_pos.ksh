@@ -57,7 +57,7 @@ typeset snap_ro_props="volsize recordsize recsize quota reservation reserv mount
 	sharenfs checksum compression compress atime devices exec readonly rdonly \
 	setuid zoned"
 
-$ZFS upgrade -v > /dev/null 2>&1
+zfs upgrade -v > /dev/null 2>&1
 if [[ $? -eq 0 ]]; then
 	snap_ro_props="$snap_ro_props version"
 fi
@@ -102,7 +102,7 @@ while (( i < ${#dataset[@]} )); do
 			# equal to values[j].
 			#
 			if [[ $cur_value == ${values[j]} ]]; then
-				log_mustnot $ZFS set $prop=${values[j]} \
+				log_mustnot zfs set $prop=${values[j]} \
 					${dataset[i]}
 			else
 				set_n_check_prop ${values[j]} $prop \

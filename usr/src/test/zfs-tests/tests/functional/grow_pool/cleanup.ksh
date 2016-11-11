@@ -26,7 +26,7 @@
 #
 
 #
-# Copyright (c) 2013 by Delphix. All rights reserved.
+# Copyright (c) 2013, 2016 by Delphix. All rights reserved.
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -35,7 +35,7 @@
 verify_runnable "global"
 
 ismounted $TESTFS && \
-        log_must $ZFS umount $TESTDIR
+        log_must zfs umount $TESTDIR
 destroy_pool "$TESTPOOL"
 
 #

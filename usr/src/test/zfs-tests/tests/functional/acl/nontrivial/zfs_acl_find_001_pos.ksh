@@ -26,30 +26,30 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2012, 2016 by Delphix. All rights reserved.
 #
 
 . $STF_SUITE/tests/functional/acl/acl_common.kshlib
 
 #
 # DESCRIPTION:
-# Verify that '$FIND' command with '-ls' and '-acl' options supports ZFS ACL
+# Verify that 'find' command with '-ls' and '-acl' options supports ZFS ACL
 #
 # STRATEGY:
 # 1. Create 5 files and 5 directories in zfs filesystem
 # 2. Select a file or directory and add a few ACEs to it
-# 3. Use $FIND -ls to check the "+" existen only with the selected file or
+# 3. Use find -ls to check the "+" existen only with the selected file or
 #    directory
-# 4. Use $FIND -acl to check only the selected file/directory in the list
+# 4. Use find -acl to check only the selected file/directory in the list
 #
 
 verify_runnable "both"
 
 function cleanup
 {
-	[[ -d $TESTDIR ]] && $RM -rf $TESTDIR/*
+	[[ -d $TESTDIR ]] && rm -rf $TESTDIR/*
 	(( ${#cmd} != 0 )) && cd $cwd
-	(( ${#mask} != 0 )) && $UMASK $mask
+	(( ${#mask} != 0 )) && umask $mask
 }
 
 function find_ls_acl #<opt> <obj>
@@ -59,9 +59,9 @@ function find_ls_acl #<opt> <obj>
 	typeset rst_str=""
 
 	if [[ $opt == "ls" ]]; then
-		rst_str=`$FIND . -ls | $GREP "+" | $AWK '{print $11}'`
+		rst_str=`find . -ls | grep "+" | awk '{print $11}'`
 	else
-		rst_str=`$FIND . -acl`
+		rst_str=`find . -acl`
 	fi
 
 	if [[ $rst_str == "./$obj" ]]; then
@@ -71,7 +71,7 @@ function find_ls_acl #<opt> <obj>
 	fi
 }
 
-log_assert "Verify that '$FIND' command supports ZFS ACLs."
+log_assert "Verify that 'find' command supports ZFS ACLs."
 
 log_onexit cleanup
 
@@ -81,16 +81,16 @@ set -A ops " A+user:$ZFS_ACL_STAFF1:read_data:allow" \
 f_base=testfile.$$ # Base file name for tested files
 d_base=testdir.$$ # Base directory name for tested directory
 cwd=$PWD
-mask=`$UMASK`
+mask=`umask`
 
 log_note "Create five files and directories in the zfs filesystem. "
 cd $TESTDIR
-$UMASK 0777
+umask 0777
 typeset -i i=0
 while ((i < 5))
 do
-	log_must $TOUCH ${f_base}.$i
-	log_must $MKDIR ${d_base}.$i
+	log_must touch ${f_base}.$i
+	log_must mkdir ${d_base}.$i
 
 	((i = i + 1))
 done
@@ -100,7 +100,7 @@ do
 	i=0
 	while ((i < ${#ops[*]}))
 	do
-		log_must $CHMOD ${ops[i]} $obj
+		log_must chmod ${ops[i]} $obj
 
 		((i = i + 1))
 	done
@@ -120,10 +120,10 @@ do
 	i=0
 	while ((i < ${#ops[*]}))
 	do
-		log_must $CHMOD A0- $obj
+		log_must chmod A0- $obj
 
 		((i = i + 1))
 	done
 done
 
-log_pass "'$FIND' command succeeds to support ZFS ACLs."
+log_pass "'find' command succeeds to support ZFS ACLs."

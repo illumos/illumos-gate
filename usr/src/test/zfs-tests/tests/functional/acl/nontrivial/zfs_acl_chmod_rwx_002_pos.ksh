@@ -25,6 +25,10 @@
 # Use is subject to license terms.
 #
 
+#
+# Copyright (c) 2016 by Delphix. All rights reserved.
+#
+
 . $STF_SUITE/tests/functional/acl/acl_common.kshlib
 
 #
@@ -189,25 +193,25 @@ function test_chmod_map #<node>
 	typeset cur_ace=/tmp/cur_ace.$$
 
 	for operator in "A0+" "A0="; do
-		log_must usr_exec $CHMOD $init_mask $node
+		log_must usr_exec chmod $init_mask $node
 		init_mode=$(get_mode $node)
 		init_mode=${init_mode:1:9}
-		log_must usr_exec eval "$LS -vd $node > $orig_ace"
+		log_must usr_exec eval "ls -vd $node > $orig_ace"
 
 		# To "A=", firstly add one ACE which can't modify map
 		if [[ $operator == "A0=" ]]; then
-			log_must $CHMOD A0+user:$ZFS_ACL_OTHER1:execute:deny \
+			log_must chmod A0+user:$ZFS_ACL_OTHER1:execute:deny \
 				$node
 		fi
-		log_must usr_exec $CHMOD $operator$acl_spec $node
+		log_must usr_exec chmod $operator$acl_spec $node
 		check_test_result \
 			$init_mode $node $acl_flag $acl_access $acl_type
 
 		# Check "chmod A-"
-		log_must usr_exec $CHMOD A0- $node
-		log_must usr_exec eval "$LS -vd $node > $cur_ace"
+		log_must usr_exec chmod A0- $node
+		log_must usr_exec eval "ls -vd $node > $cur_ace"
 
-		if $DIFF $orig_ace $cur_ace; then
+		if diff $orig_ace $cur_ace; then
 			log_note "SUCCESS: current ACEs are equal to " \
 				"original ACEs. 'chmod A-' succeeded."
 		else
@@ -215,8 +219,8 @@ function test_chmod_map #<node>
 		fi
 	done
 
-	[[ -f $orig_ace ]] && log_must usr_exec $RM -f $orig_ace
-	[[ -f $cur_ace ]] && log_must usr_exec $RM -f $cur_ace
+	[[ -f $orig_ace ]] && log_must usr_exec rm -f $orig_ace
+	[[ -f $cur_ace ]] && log_must usr_exec rm -f $cur_ace
 }
 
 for user in root $ZFS_ACL_STAFF1; do
@@ -224,13 +228,13 @@ for user in root $ZFS_ACL_STAFF1; do
 
 	typeset -i loop_cnt=20
 	while (( loop_cnt > 0 )); do
-		log_must usr_exec $TOUCH $testfile
+		log_must usr_exec touch $testfile
 		test_chmod_map $testfile
-		log_must $RM -f $testfile
+		log_must rm -f $testfile
 
-		log_must usr_exec $MKDIR $testdir
+		log_must usr_exec mkdir $testdir
 		test_chmod_map $testdir
-		log_must $RM -rf $testdir
+		log_must rm -rf $testdir
 
 		(( loop_cnt -= 1 ))
 	done

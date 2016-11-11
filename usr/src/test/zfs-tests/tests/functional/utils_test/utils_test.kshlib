@@ -25,7 +25,7 @@
 #
 
 #
-# Copyright (c) 2013 by Delphix. All rights reserved.
+# Copyright (c) 2013, 2016 by Delphix. All rights reserved.
 #
 . $STF_SUITE/tests/functional/utils_test/utils_test.cfg
 
@@ -43,7 +43,7 @@ function populate_dir # num_files
 
 	typeset -i filenum=0
 	while (( filenum < num_files )); do
-		log_must $FILE_WRITE -o create -c $WRITE_COUNT \
+		log_must file_write -o create -c $WRITE_COUNT \
 		    -f $TESTDIR/$TESTFILE.$filenum -b $BLOCKSZ -d $DATA
 		(( filenum = filenum + 1 ))
 	done

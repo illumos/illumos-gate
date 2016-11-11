@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright (c) 2015 by Delphix. All rights reserved.
+# Copyright (c) 2015, 2016 by Delphix. All rights reserved.
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -65,14 +65,14 @@ function do_fio_run
 
 				if $do_recreate; then
 					recreate_perfpool
-					log_must $ZFS create $PERF_FS_OPTS \
+					log_must zfs create $PERF_FS_OPTS \
 					    $TESTFS
 				fi
 
 				if $clear_cache; then
 					# Clear the ARC
-					$ZPOOL export $PERFPOOL
-					$ZPOOL import $PERFPOOL
+					zpool export $PERFPOOL
+					zpool import $PERFPOOL
 				fi
 
 				export RUNTIME=$PERF_RUNTIME
@@ -80,13 +80,13 @@ function do_fio_run
 				export NUMJOBS=$threads
 				export SYNC_TYPE=$sync
 				export BLOCKSIZE=$iosize
-				$SYNC
+				sync
 
 				# Start the data collection
 				do_collect_scripts $threads $sync $iosize
 
 				# Start the load
-				log_must $FIO $FIO_SCRIPTS/$script
+				log_must fio $FIO_SCRIPTS/$script
 			done
 		done
 	done
@@ -114,17 +114,17 @@ function do_collect_scripts
 	typeset oIFS=$IFS
 	IFS=','
 	for item in $PERF_COLLECT_SCRIPTS; do
-		collect_scripts+=($($ECHO $item | $SED 's/^ *//g'))
+		collect_scripts+=($(echo $item | sed 's/^ *//g'))
 	done
 	IFS=$oIFS
 
 	typeset idx=0
 	while [[ $idx -lt "${#collect_scripts[@]}" ]]; do
-		typeset logbase="$(get_perf_output_dir)/$($BASENAME \
+		typeset logbase="$(get_perf_output_dir)/$(basename \
 		    $SUDO_COMMAND)"
 		typeset outfile="$logbase.${collect_scripts[$idx + 1]}.$suffix"
 
-		$TIMEOUT $PERF_RUNTIME ${collect_scripts[$idx]} >$outfile 2>&1 &
+		timeout $PERF_RUNTIME ${collect_scripts[$idx]} >$outfile 2>&1 &
 		((idx += 2))
 	done
 
@@ -137,9 +137,9 @@ function do_collect_scripts
 function get_perf_output_dir
 {
 	typeset dir="$(pwd)/perf_data"
-	[[ -d $dir ]] || $MKDIR -p $dir
+	[[ -d $dir ]] || mkdir -p $dir
 
-	$ECHO $dir
+	echo $dir
 }
 
 #
@@ -157,7 +157,7 @@ function recreate_perfpool
 	if [[ -n $PERFPOOL_CREATE_CMD ]]; then
 		log_must $PERFPOOL_CREATE_CMD
 	else
-		log_must eval "$ZPOOL create -f $PERFPOOL $DISKS"
+		log_must eval "zpool create -f $PERFPOOL $DISKS"
 	fi
 }
 
@@ -179,23 +179,23 @@ function get_system_config
 	typeset config=$PERF_DATA_DIR/$1
 
 	echo "{" >>$config
-	$DTRACE -qn 'BEGIN{
+	dtrace -qn 'BEGIN{
 	    printf("  \"ncpus\": %d,\n", `ncpus);
 	    printf("  \"physmem\": %u,\n", `physmem * `_pagesize);
 	    printf("  \"c_max\": %u,\n", `arc_stats.arcstat_c_max.value.ui64);
 	    printf("  \"kmem_flags\": \"0x%x\",", `kmem_flags);
 	    exit(0)}' >>$config
-	$ECHO "  \"hostname\": \"$($UNAME -n)\"," >>$config
-	$ECHO "  \"kernel version\": \"$($UNAME -v)\"," >>$config
-	$IOSTAT -En | $AWK 'BEGIN {
+	echo "  \"hostname\": \"$(uname -n)\"," >>$config
+	echo "  \"kernel version\": \"$(uname -v)\"," >>$config
+	iostat -En | awk 'BEGIN {
 	    printf("  \"disks\": {\n"); first = 1}
 	    /^c/ {disk = $1}
 	    /^Size: [^0]/ {size = $2;
 	    if (first != 1) {printf(",\n")} else {first = 0}
 	    printf("    \"%s\": \"%s\"", disk, size)}
 	    END {printf("\n  },\n")}' >>$config
-	$SED -n 's/^set \(.*\)[ ]=[ ]\(.*\)/\1=\2/p' /etc/system | \
-	    $AWK -F= 'BEGIN {printf("  \"system\": {\n"); first = 1}
+	sed -n 's/^set \(.*\)[ ]=[ ]\(.*\)/\1=\2/p' /etc/system | \
+	    awk -F= 'BEGIN {printf("  \"system\": {\n"); first = 1}
 	    {if (first != 1) {printf(",\n")} else {first = 0};
 	    printf("    \"%s\": %s", $1, $2)}
 	    END {printf("\n  }\n")}' >>$config
@@ -204,12 +204,12 @@ function get_system_config
 
 function num_jobs_by_cpu
 {
-	typeset ncpu=$($PSRINFO | $WC -l)
+	typeset ncpu=$(psrinfo | wc -l)
 	typeset num_jobs=$ncpu
 
-	[[ $ncpu -gt 8 ]] && num_jobs=$($ECHO "$ncpu * 3 / 4" | $BC)
+	[[ $ncpu -gt 8 ]] && num_jobs=$(echo "$ncpu * 3 / 4" | bc)
 
-	$ECHO $num_jobs
+	echo $num_jobs
 }
 
 function pool_to_lun_list
@@ -218,16 +218,16 @@ function pool_to_lun_list
 	typeset ctd ctds devname lun
 	typeset lun_list=':'
 
-	ctds=$($ZPOOL list -v $pool | $AWK '/c[0-9]*t[0-9a-fA-F]*d[0-9]*/ \
+	ctds=$(zpool list -v $pool | awk '/c[0-9]*t[0-9a-fA-F]*d[0-9]*/ \
 	    {print $1}')
 
 	for ctd in $ctds; do
 		# Get the device name as it appears in /etc/path_to_inst
-		devname=$($READLINK -f /dev/dsk/${ctd}s0 | $SED -n \
+		devname=$(readlink -f /dev/dsk/${ctd}s0 | sed -n \
 		    's/\/devices\([^:]*\):.*/\1/p')
 		# Add a string composed of the driver name and instance
 		# number to the list for comparison with dev_statname.
-		lun=$($SED 's/"//g' /etc/path_to_inst | $GREP $devname | $AWK \
+		lun=$(sed 's/"//g' /etc/path_to_inst | grep $devname | awk \
 		    '{print $3$2}')
 		lun_list="$lun_list$lun:"
 	done
