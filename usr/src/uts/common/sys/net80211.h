@@ -4,6 +4,10 @@
  */
 
 /*
+ * Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
+ */
+
+/*
  * Copyright (c) 2001 Atsushi Onoe
  * Copyright (c) 2002-2005 Sam Leffler, Errno Consulting
  * All rights reserved.
@@ -44,6 +48,7 @@
 #include <sys/net80211_proto.h>
 #include <sys/net80211_crypto.h>
 #include <sys/net80211_ht.h>
+#include <sys/net80211_amrr.h>
 #include <net/wpa.h>
 
 /*

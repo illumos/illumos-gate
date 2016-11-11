@@ -24,6 +24,7 @@
 # Copyright (c) 2011 Bayard G. Bell. All rights reserved.
 # Copyright (c) 2011 by Delphix. All rights reserved.
 # Copyright (c) 2013 Andrew Stormont.  All rights reserved.
+# Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 #
 
 #
@@ -467,6 +468,7 @@ ROOT_DACF_DIR		= $(ROOT_DACF_DIR_$(CLASS))
 ROOT_CRYPTO_DIR		= $(ROOT_CRYPTO_DIR_$(CLASS))
 ROOT_MAC_DIR		= $(ROOT_MAC_DIR_$(CLASS))
 ROOT_KICONV_DIR		= $(ROOT_KICONV_DIR_$(CLASS))
+ROOT_FIRMWARE_DIR	= $(ROOT_MOD_DIR)/firmware
 
 ROOT_MOD_DIRS_32	= $(ROOT_BRAND_DIR_32) $(ROOT_DRV_DIR_32)
 ROOT_MOD_DIRS_32	= $(ROOT_BRAND_DIR_32) $(ROOT_DRV_DIR_32)
@@ -484,6 +486,7 @@ ROOT_MOD_DIRS_32	+= $(ROOT_CPU_DIR_32) $(ROOT_FONT_DIR_32)
 ROOT_MOD_DIRS_32	+= $(ROOT_TOD_DIR_32) $(ROOT_DACF_DIR_32)
 ROOT_MOD_DIRS_32	+= $(ROOT_CRYPTO_DIR_32) $(ROOT_MAC_DIR_32)
 ROOT_MOD_DIRS_32	+= $(ROOT_KICONV_DIR_32)
+ROOT_MOD_DIRS_32	+= $(ROOT_FIRMWARE_DIR)
 
 USR_MOD_DIR		= $(ROOT)/usr/kernel
 

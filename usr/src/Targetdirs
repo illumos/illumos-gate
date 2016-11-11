@@ -27,6 +27,7 @@
 # Copyright (c) 2013 RackTop Systems.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 #
 
 #
@@ -199,6 +200,7 @@ DIRS= \
 	/lib/svc/seed \
 	/lib/svc/share \
 	/kernel  \
+	/kernel/firmware \
 	/mnt  \
 	/opt  \
 	/platform  \
