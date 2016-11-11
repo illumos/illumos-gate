@@ -689,7 +689,7 @@ const instable_t dis_opSIMDdata16[256] = {
 /*  [70]  */	TNSZ("pshufd",XMMP,16),	INVALID,		INVALID,		INVALID,
 /*  [74]  */	TNSZ("pcmpeqb",XMM,16),	TNSZ("pcmpeqw",XMM,16),	TNSZ("pcmpeqd",XMM,16),	INVALID,
 /*  [78]  */	TNSZ("extrq",XMM2I,16),	TNSZ("extrq",XMM,16), INVALID,		INVALID,
-/*  [7C]  */	INVALID,		INVALID,		TNSZ("movd",XMM3MXS,4),	TNSZ("movdqa",XMMS,16),
+/*  [7C]  */	TNSZ("haddpd",XMM,16),	TNSZ("hsubpd",XMM,16),	TNSZ("movd",XMM3MXS,4),	TNSZ("movdqa",XMMS,16),
 
 /*  [80]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [84]  */	INVALID,		INVALID,		INVALID,		INVALID,
@@ -716,7 +716,7 @@ const instable_t dis_opSIMDdata16[256] = {
 /*  [C8]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [CC]  */	INVALID,		INVALID,		INVALID,		INVALID,
 
-/*  [D0]  */	INVALID,		TNSZ("psrlw",XMM,16),	TNSZ("psrld",XMM,16),	TNSZ("psrlq",XMM,16),
+/*  [D0]  */	TNSZ("addsubpd",XMM,16),TNSZ("psrlw",XMM,16),	TNSZ("psrld",XMM,16),	TNSZ("psrlq",XMM,16),
 /*  [D4]  */	TNSZ("paddq",XMM,16),	TNSZ("pmullw",XMM,16),	TNSZ("movq",XMMS,8),	TNS("pmovmskb",XMMX3),
 /*  [D8]  */	TNSZ("psubusb",XMM,16),	TNSZ("psubusw",XMM,16),	TNSZ("pminub",XMM,16),	TNSZ("pand",XMM,16),
 /*  [DC]  */	TNSZ("paddusb",XMM,16),	TNSZ("paddusw",XMM,16),	TNSZ("pmaxub",XMM,16),	TNSZ("pandn",XMM,16),
@@ -823,7 +823,7 @@ const instable_t dis_opSIMDrepnz[256] = {
 /*  [08]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [0C]  */	INVALID,		INVALID,		INVALID,		INVALID,
 
-/*  [10]  */	TNSZ("movsd",XMM,8),	TNSZ("movsd",XMMS,8),	INVALID,		INVALID,
+/*  [10]  */	TNSZ("movsd",XMM,8),	TNSZ("movsd",XMMS,8),	TNSZ("movddup",XMM,8),	INVALID,
 /*  [14]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [18]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [1C]  */	INVALID,		INVALID,		INVALID,		INVALID,
@@ -856,7 +856,7 @@ const instable_t dis_opSIMDrepnz[256] = {
 /*  [70]  */	TNSZ("pshuflw",XMMP,16),INVALID,		INVALID,		INVALID,
 /*  [74]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [78]  */	TNSZ("insertq",XMMX2I,16),TNSZ("insertq",XMM,8),INVALID,		INVALID,
-/*  [7C]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [7C]  */	TNSZ("haddps",XMM,16),	TNSZ("hsubps",XMM,16),	INVALID,		INVALID,
 
 /*  [80]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [84]  */	INVALID,		INVALID,		INVALID,		INVALID,
@@ -883,7 +883,7 @@ const instable_t dis_opSIMDrepnz[256] = {
 /*  [C8]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [CC]  */	INVALID,		INVALID,		INVALID,		INVALID,
 
-/*  [D0]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [D0]  */	TNSZ("addsubps",XMM,16),INVALID,		INVALID,		INVALID,
 /*  [D4]  */	INVALID,		INVALID,		TNS("movdq2q",XMMXM),	INVALID,
 /*  [D8]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [DC]  */	INVALID,		INVALID,		INVALID,		INVALID,
@@ -893,7 +893,7 @@ const instable_t dis_opSIMDrepnz[256] = {
 /*  [E8]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [EC]  */	INVALID,		INVALID,		INVALID,		INVALID,
 
-/*  [F0]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [F0]  */	TNS("lddqu",XMMM),	INVALID,		INVALID,		INVALID,
 /*  [F4]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [F8]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [FC]  */	INVALID,		INVALID,		INVALID,		INVALID,
@@ -1235,8 +1235,8 @@ const instable_t dis_opSIMDrepz[256] = {
 /*  [08]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [0C]  */	INVALID,		INVALID,		INVALID,		INVALID,
 
-/*  [10]  */	TNSZ("movss",XMM,4),	TNSZ("movss",XMMS,4),	INVALID,		INVALID,
-/*  [14]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [10]  */	TNSZ("movss",XMM,4),	TNSZ("movss",XMMS,4),	TNSZ("movsldup",XMM,16),INVALID,
+/*  [14]  */	INVALID,		INVALID,		TNSZ("movshdup",XMM,16),INVALID,
 /*  [18]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [1C]  */	INVALID,		INVALID,		INVALID,		INVALID,
 
@@ -2078,19 +2078,19 @@ const instable_t dis_opFP1n2[8][8] = {
 /*  [2,0]  */	TNS("fiaddl",M),	TNS("fimull",M),	TNS("ficoml",M),	TNS("ficompl",M),
 /*  [2,4]  */	TNS("fisubl",M),	TNS("fisubrl",M),	TNS("fidivl",M),	TNS("fidivrl",M),
 }, {
-/*  [3,0]  */	TNS("fildl",M),		INVALID,		TNS("fistl",M),		TNS("fistpl",M),
+/*  [3,0]  */	TNS("fildl",M),		TNSZ("tisttpl",M,4),	TNS("fistl",M),		TNS("fistpl",M),
 /*  [3,4]  */	INVALID,		TNSZ("fldt",M,10),	INVALID,		TNSZ("fstpt",M,10),
 }, {
 /*  [4,0]  */	TNSZ("faddl",M,8),	TNSZ("fmull",M,8),	TNSZ("fcoml",M,8),	TNSZ("fcompl",M,8),
 /*  [4,1]  */	TNSZ("fsubl",M,8),	TNSZ("fsubrl",M,8),	TNSZ("fdivl",M,8),	TNSZ("fdivrl",M,8),
 }, {
-/*  [5,0]  */	TNSZ("fldl",M,8),	INVALID,		TNSZ("fstl",M,8),	TNSZ("fstpl",M,8),
+/*  [5,0]  */	TNSZ("fldl",M,8),	TNSZ("fisttpll",M,8),	TNSZ("fstl",M,8),	TNSZ("fstpl",M,8),
 /*  [5,4]  */	TNSZ("frstor",M,108),	INVALID,		TNSZ("fnsave",M,108),	TNSZ("fnstsw",M,2),
 }, {
 /*  [6,0]  */	TNSZ("fiadd",M,2),	TNSZ("fimul",M,2),	TNSZ("ficom",M,2),	TNSZ("ficomp",M,2),
 /*  [6,4]  */	TNSZ("fisub",M,2),	TNSZ("fisubr",M,2),	TNSZ("fidiv",M,2),	TNSZ("fidivr",M,2),
 }, {
-/*  [7,0]  */	TNSZ("fild",M,2),	INVALID,		TNSZ("fist",M,2),	TNSZ("fistp",M,2),
+/*  [7,0]  */	TNSZ("fild",M,2),	TNSZ("fisttp",M,2),	TNSZ("fist",M,2),	TNSZ("fistp",M,2),
 /*  [7,4]  */	TNSZ("fbld",M,10),	TNSZ("fildll",M,8),	TNSZ("fbstp",M,10),	TNSZ("fistpll",M,8),
 } };
 
@@ -3462,9 +3462,12 @@ dtrace_disx86(dis86_t *x, uint_t cpu_mode)
 		goto error;
 
 	/*
-	 * deal with MMX/SSE opcodes which are changed by prefixes
+	 * Deal with MMX/SSE opcodes which are changed by prefixes. Note, we do
+	 * need to include UNKNOWN below, as we may have instructions that
+	 * actually have a prefix, but don't exist in any other form.
 	 */
 	switch (dp->it_adrmode) {
+	case UNKNOWN:
 	case MMO:
 	case MMOIMPL:
 	case MMO3P:
