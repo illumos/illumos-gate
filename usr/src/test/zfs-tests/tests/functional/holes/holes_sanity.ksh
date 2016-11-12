@@ -12,7 +12,7 @@
 #
 
 #
-# Copyright (c) 2014 by Delphix. All rights reserved.
+# Copyright (c) 2014, 2016 by Delphix. All rights reserved.
 #
 
 #
@@ -34,52 +34,52 @@ verify_runnable "both"
 testfile="$TESTDIR/testfile"
 
 for bs in 512 1024 2048 4096 8192 16384 32768 65536 131072; do
-	log_must $ZFS set recsize=$bs $TESTPOOL/$TESTFS
+	log_must zfs set recsize=$bs $TESTPOOL/$TESTFS
 
 	#
 	# Create combinations of holes and data to verify holes ending files
 	# and the like. (hhh, hhd, hdh...)
 	#
-	log_must $MKHOLES -h 0:$((bs * 6)) $testfile
+	log_must mkholes -h 0:$((bs * 6)) $testfile
 	verify_holes_and_data_blocks $testfile 6 0
-	log_must $RM $testfile
+	log_must rm $testfile
 
-	log_must $MKHOLES -h 0:$((bs * 4)) -d $((bs * 4)):$((bs * 2)) $testfile
+	log_must mkholes -h 0:$((bs * 4)) -d $((bs * 4)):$((bs * 2)) $testfile
 	verify_holes_and_data_blocks $testfile 4 2
-	log_must $RM $testfile
+	log_must rm $testfile
 
-	log_must $MKHOLES -h 0:$((bs * 2)) -d $((bs * 2)):$((bs * 2)) \
+	log_must mkholes -h 0:$((bs * 2)) -d $((bs * 2)):$((bs * 2)) \
 	    -h $((bs * 4)):$((bs * 2)) $testfile
 	verify_holes_and_data_blocks $testfile 4 2
-	log_must $RM $testfile
+	log_must rm $testfile
 
-	log_must $MKHOLES -h 0:$((bs * 2)) -d $((bs * 2)):$((bs * 4)) $testfile
+	log_must mkholes -h 0:$((bs * 2)) -d $((bs * 2)):$((bs * 4)) $testfile
 	verify_holes_and_data_blocks $testfile 2 4
-	log_must $RM $testfile
+	log_must rm $testfile
 
-	log_must $MKHOLES -d 0:$((bs * 2)) -h $((bs * 2)):$((bs * 4)) $testfile
+	log_must mkholes -d 0:$((bs * 2)) -h $((bs * 2)):$((bs * 4)) $testfile
 	verify_holes_and_data_blocks $testfile 4 2
-	log_must $RM $testfile
+	log_must rm $testfile
 
-	log_must $MKHOLES -d 0:$((bs * 2)) -h $((bs * 2)):$((bs * 2)) \
+	log_must mkholes -d 0:$((bs * 2)) -h $((bs * 2)):$((bs * 2)) \
 	    -d $((bs * 4)):$((bs * 2)) $testfile
 	verify_holes_and_data_blocks $testfile 2 4
-	log_must $RM $testfile
+	log_must rm $testfile
 
-	log_must $MKHOLES -d 0:$((bs * 4)) -h $((bs * 4)):$((bs * 2)) $testfile
+	log_must mkholes -d 0:$((bs * 4)) -h $((bs * 4)):$((bs * 2)) $testfile
 	verify_holes_and_data_blocks $testfile 2 4
-	log_must $RM $testfile
+	log_must rm $testfile
 
-	log_must $MKHOLES -d 0:$((bs * 6)) $testfile
+	log_must mkholes -d 0:$((bs * 6)) $testfile
 	verify_holes_and_data_blocks $testfile 0 6
-	log_must $RM $testfile
+	log_must rm $testfile
 
 	# Verify holes are correctly seen past the largefile limit.
 	len=$((1024**3 * 5))
 	nblks=$((len / bs))
-	log_must $MKHOLES -h 0:$len -d $len:$bs $testfile
+	log_must mkholes -h 0:$len -d $len:$bs $testfile
 	verify_holes_and_data_blocks $testfile $nblks 1
-	log_must $RM $testfile
+	log_must rm $testfile
 done
 
 log_pass "Basic hole tests pass."

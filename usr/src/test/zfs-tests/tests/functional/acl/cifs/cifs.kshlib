@@ -24,6 +24,10 @@
 # Use is subject to license terms.
 #
 
+#
+# Copyright (c) 2016 by Delphix. All rights reserved.
+#
+
 . $STF_SUITE/include/libtest.shlib
 
 #
@@ -43,15 +47,15 @@ function create_object
 
 	case $type in
 	dir)
-		$MKDIR -p $object
+		mkdir -p $object
 		;;
 	file)
-		$ECHO "ZFS test suites" > $object
+		echo "ZFS test suites" > $object
 		;;
 	esac
 
 	if [[ -n $owner ]]; then
-		$CHOWN $owner $object
+		chown $owner $object
 	fi
 	return 0
 }
@@ -69,7 +73,7 @@ function destroy_object
 			# clear_attribute is a common function name,
 			# but each case should have their own implement.
 			log_must clear_attribute $object
-			log_must $RM -rf $object
+			log_must rm -rf $object
 		fi
 	done
 	return 0

@@ -26,7 +26,7 @@
 #
 
 #
-# Copyright (c) 2012, 2015 by Delphix. All rights reserved.
+# Copyright (c) 2012, 2016 by Delphix. All rights reserved.
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -52,12 +52,12 @@ verify_runnable "global"
 function cleanup
 {
         if poolexists $TESTPOOL1; then
-                log_must $ZPOOL destroy $TESTPOOL1
+                log_must zpool destroy $TESTPOOL1
         fi
 
 	for i in 1 2 3; do
 		if datasetexists $VFS/vol$i; then
-			log_must $ZFS destroy $VFS/vol$i
+			log_must zfs destroy $VFS/vol$i
 		fi
 	done
 }
@@ -67,11 +67,11 @@ log_onexit cleanup
 log_assert "zpool can expand after zpool online -e zvol vdevs on LUN expansion"
 
 for i in 1 2 3; do
-	log_must $ZFS create -V $org_size $VFS/vol$i
+	log_must zfs create -V $org_size $VFS/vol$i
 done
 
 for type in " " mirror raidz raidz2; do
-	log_must $ZPOOL create $TESTPOOL1 $type /dev/zvol/dsk/$VFS/vol1 \
+	log_must zpool create $TESTPOOL1 $type /dev/zvol/dsk/$VFS/vol1 \
 	    /dev/zvol/dsk/$VFS/vol2 /dev/zvol/dsk/$VFS/vol3
 
 	typeset autoexp=$(get_pool_prop autoexpand $TESTPOOL1)
@@ -81,24 +81,24 @@ for type in " " mirror raidz raidz2; do
 		    "$autoexp"
 	fi
 	typeset prev_size=$(get_pool_prop size $TESTPOOL1)
-	typeset zfs_prev_size=$($ZFS get -p avail $TESTPOOL1 | $TAIL -1 | \
-	    $AWK '{print $3}')
+	typeset zfs_prev_size=$(zfs get -p avail $TESTPOOL1 | tail -1 | \
+	    awk '{print $3}')
 
 	for i in 1 2 3; do
-		log_must $ZFS set volsize=$exp_size $VFS/vol$i
+		log_must zfs set volsize=$exp_size $VFS/vol$i
 	done
 
 	for i in 1 2 3; do
-		log_must $ZPOOL online -e $TESTPOOL1 /dev/zvol/dsk/$VFS/vol$i
+		log_must zpool online -e $TESTPOOL1 /dev/zvol/dsk/$VFS/vol$i
 	done
 
-	$SYNC
-	$SLEEP 10
-	$SYNC
+	sync
+	sleep 10
+	sync
 
 	typeset expand_size=$(get_pool_prop size $TESTPOOL1)
-	typeset zfs_expand_size=$($ZFS get -p avail $TESTPOOL1 | $TAIL -1 | \
-	    $AWK '{print $3}')
+	typeset zfs_expand_size=$(zfs get -p avail $TESTPOOL1 | tail -1 | \
+	    awk '{print $3}')
 	log_note "$TESTPOOL1 $type has previous size: $prev_size and " \
 	    "expanded size: $expand_size"
 
@@ -106,30 +106,30 @@ for type in " " mirror raidz raidz2; do
 	if [[ $zfs_expand_size -gt $zfs_prev_size ]]; then
 	# check for zpool history for the pool size expansion
 		if [[ $type == " " ]]; then
-			typeset	size_addition=$($ZPOOL history -il $TESTPOOL1 \
-			    | $GREP "pool '$TESTPOOL1' size:" | \
-			    $GREP "vdev online" | \
-			    $GREP "(+${EX_1GB}" | wc -l)
+			typeset	size_addition=$(zpool history -il $TESTPOOL1 \
+			    | grep "pool '$TESTPOOL1' size:" | \
+			    grep "vdev online" | \
+			    grep "(+${EX_1GB}" | wc -l)
 
 			if [[ $size_addition -ne $i ]]; then
 				log_fail "pool $TESTPOOL1 is not autoexpand " \
 				    "after LUN expansion"
 			fi
 		elif [[ $type == "mirror" ]]; then
-			$ZPOOL history -il $TESTPOOL1 | \
-			    $GREP "pool '$TESTPOOL1' size:" | \
-			    $GREP "vdev online" | \
-			    $GREP "(+${EX_1GB})" >/dev/null 2>&1
+			zpool history -il $TESTPOOL1 | \
+			    grep "pool '$TESTPOOL1' size:" | \
+			    grep "vdev online" | \
+			    grep "(+${EX_1GB})" >/dev/null 2>&1
 
 			if [[ $? -ne 0 ]]; then
 				log_fail "pool $TESTPOOL1 is not autoexpand " \
 				    "after LUN expansion"
 			fi
 		else
-			$ZPOOL history -il $TESTPOOL1 | \
-			    $GREP "pool '$TESTPOOL1' size:" | \
-			    $GREP "vdev online" | \
-			    $GREP "(+${EX_3GB})" >/dev/null 2>&1
+			zpool history -il $TESTPOOL1 | \
+			    grep "pool '$TESTPOOL1' size:" | \
+			    grep "vdev online" | \
+			    grep "(+${EX_3GB})" >/dev/null 2>&1
 
 			if [[ $? -ne 0 ]] ; then
 				log_fail "pool $TESTPOOL1 is not autoexpand " \
@@ -140,9 +140,9 @@ for type in " " mirror raidz raidz2; do
 		log_fail "pool $TESTPOOL1 is not autoexpanded after LUN " \
 		    "expansion"
 	fi
-	log_must $ZPOOL destroy $TESTPOOL1
+	log_must zpool destroy $TESTPOOL1
 	for i in 1 2 3; do
-		log_must $ZFS set volsize=$org_size $VFS/vol$i
+		log_must zfs set volsize=$org_size $VFS/vol$i
 	done
 done
 log_pass "zpool can expand after zpool online -e zvol vdevs on LUN expansion"

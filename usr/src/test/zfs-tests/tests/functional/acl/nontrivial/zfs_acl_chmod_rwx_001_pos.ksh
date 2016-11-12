@@ -26,7 +26,7 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2012, 2016 by Delphix. All rights reserved.
 #
 
 . $STF_SUITE/tests/functional/acl/acl_common.kshlib
@@ -80,9 +80,9 @@ function test_chmod_ACE_list #$opt $num $ace-spec $node
 
 	# Invoke chmod A[number]{+|-|=}<acl-specification> file|dir
 	if [[ $opt == A[0-9]*+ || $opt == A[0-9]*= ]]; then
-		log_must usr_exec $CHMOD "$opt$ace" "$node"
+		log_must usr_exec chmod "$opt$ace" "$node"
 	else
-		log_must usr_exec $CHMOD "$opt" "$node"
+		log_must usr_exec chmod "$opt" "$node"
 	fi
 
 	# Get the current ACE count and specified ACE
@@ -93,7 +93,7 @@ function test_chmod_ACE_list #$opt $num $ace-spec $node
 	# Compare with expected results
 	if [[ $opt == A[0-9]*+ || $opt == A[0-9]*= ]]; then
 		if [[ "$num:$ace" != "$cur_ace" ]]; then
-			log_fail "FAIL: $CHMOD $opt$ace $node"
+			log_fail "FAIL: chmod $opt$ace $node"
 		fi
 	fi
 	if [[ "$expect_count" != "$cur_count" ]]; then
@@ -108,15 +108,15 @@ for user in root $ZFS_ACL_STAFF1 $ZFS_ACL_OTHER1; do
 		for num in $nums; do
 			for ace in $file_ACEs; do
 				ls -l $TESTDIR
-				log_must usr_exec $TOUCH $testfile
+				log_must usr_exec touch $testfile
 				test_chmod_ACE_list $opt $num $ace $testfile
-				log_must $RM -f $testfile
+				log_must rm -f $testfile
 			done
 			for ace in $dir_ACEs; do
 				ls -l $TESTDIR
-				log_must usr_exec $MKDIR -p $testdir
+				log_must usr_exec mkdir -p $testdir
 				test_chmod_ACE_list $opt $num $ace $testdir
-				log_must $RM -rf $testdir
+				log_must rm -rf $testdir
 			done
 		done
 	done

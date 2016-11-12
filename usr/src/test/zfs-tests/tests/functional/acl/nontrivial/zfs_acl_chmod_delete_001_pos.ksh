@@ -62,13 +62,13 @@ verify_runnable "both"
 function cleanup
 {
 	if [[ ! -e $target ]]; then
-		log_must $TAR xpf $TESTDIR/$ARCHIVEFILE
+		log_must tar xpf $TESTDIR/$ARCHIVEFILE
 	fi
 
 	(( ${#cwd} != 0 )) && cd $cwd
 	cleanup_test_files $TESTDIR/basedir
 	if [[ -e $TESTDIR/$ARCHIVEFILE ]]; then
-		log_must $RM -f $TESTDIR/$ARCHIVEFILE
+		log_must rm -f $TESTDIR/$ARCHIVEFILE
 	fi
 	return 0
 }
@@ -107,9 +107,9 @@ function operate_node #user node
 		log_fail "user, node are not defined."
 	fi
 	if [[ -d $node ]]; then
-		chgusr_exec $user $RM -rf $node ; ret=$?
+		chgusr_exec $user rm -rf $node ; ret=$?
 	else
-		chgusr_exec $user $RM -f $node ; ret=$?
+		chgusr_exec $user rm -f $node ; ret=$?
 	fi
 
 	if [[ -e $node ]]; then
@@ -118,7 +118,7 @@ function operate_node #user node
 			return 1
 		fi
 	else
-		log_must $TAR xpf $TESTDIR/$ARCHIVEFILE
+		log_must tar xpf $TESTDIR/$ARCHIVEFILE
 		if [[ $ret -ne 0 ]]; then
 			log_note "$node removed, but return code is $ret."
 			return 1
@@ -206,25 +206,25 @@ function test_chmod_basic_access #node g_usr o_usr
 	for acl_p in "${access_parent[@]}"; do
 		i=0
 		for acl in $acl_p ; do
-			log_must usr_exec $CHMOD A+$flag:$acl $parent
+			log_must usr_exec chmod A+$flag:$acl $parent
 			(( i = i + 1))
 		done
 
 		for acl_t in "${access_target[@]}"; do
 			[[ -n $acl_t ]] && \
-				log_must usr_exec $CHMOD A+$flag:$acl_t $node
+				log_must usr_exec chmod A+$flag:$acl_t $node
 
-			log_must $TAR cpf $TESTDIR/$ARCHIVEFILE basedir
+			log_must tar cpf $TESTDIR/$ARCHIVEFILE basedir
 
 			check_chmod_results "$node" "$flag" \
 				 "$acl_p" "$acl_t" "$g_usr" "$o_usr"
 
 			[[ -n $acl_t ]] && \
-				log_must usr_exec $CHMOD A0- $node
+				log_must usr_exec chmod A0- $node
 		done
 
 		while (( i > 0 )); do
-			log_must usr_exec $CHMOD A0- $parent
+			log_must usr_exec chmod A0- $parent
 			(( i = i - 1 ))
 		done
 	done
@@ -239,8 +239,8 @@ function setup_test_files #base_node user group
 
 	cleanup_test_files $base_node
 
-	log_must $MKDIR -p $base_node
-	log_must $CHOWN $user:$group $base_node
+	log_must mkdir -p $base_node
+	log_must chown $user:$group $base_node
 
 	log_must set_cur_usr $user
 
@@ -248,13 +248,13 @@ function setup_test_files #base_node user group
 	file0=$base_node/testfile_rm
 	dir0=$base_node/testdir_rm
 
-	log_must usr_exec $TOUCH $file0
-	log_must usr_exec $CHMOD 444 $file0
+	log_must usr_exec touch $file0
+	log_must usr_exec chmod 444 $file0
 
-	log_must usr_exec $MKDIR -p $dir0
-	log_must usr_exec $CHMOD 444 $dir0
+	log_must usr_exec mkdir -p $dir0
+	log_must usr_exec chmod 444 $dir0
 
-	log_must usr_exec $CHMOD 555 $base_node
+	log_must usr_exec chmod 555 $base_node
 	return 0
 }
 
@@ -263,9 +263,9 @@ function cleanup_test_files #base_node
 	typeset base_node=$1
 
 	if [[ -d $base_node ]]; then
-		log_must $RM -rf $base_node
+		log_must rm -rf $base_node
 	elif [[ -e $base_node ]]; then
-		log_must $RM -f $base_node
+		log_must rm -f $base_node
 	fi
 
 	return 0

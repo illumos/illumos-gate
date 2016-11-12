@@ -25,6 +25,10 @@
 # Use is subject to license terms.
 #
 
+#
+# Copyright (c) 2016 by Delphix. All rights reserved.
+#
+
 . $STF_SUITE/tests/functional/acl/acl_common.kshlib
 
 #
@@ -62,10 +66,10 @@ verify_runnable "both"
 function cleanup
 {
 	if [[ -f $basefile ]]; then
-		log_must $RM -f $basefile
+		log_must rm -f $basefile
 	fi
 	if [[ -d $basedir ]]; then
-		log_must $RM -rf $basedir
+		log_must rm -rf $basedir
 	fi
 }
 
@@ -103,8 +107,8 @@ function verify_inherit #<object> [strategy]
 	typeset obj=$1
 	typeset str=$2
 
-	log_must usr_exec $MKDIR -p $ndir3
-	log_must usr_exec $TOUCH $nfile1 $nfile2 $nfile3
+	log_must usr_exec mkdir -p $ndir3
+	log_must usr_exec touch $nfile1 $nfile2 $nfile3
 
 	# Except for inherit_only, the basedir was affected always.
 	if [[ $str != *"inherit_only"* ]]; then
@@ -129,10 +133,10 @@ function verify_inherit #<object> [strategy]
 
 	for node in $allnodes; do
 		if [[ " $inherit_nodes " == *" $node "* ]]; then
-			log_mustnot chgusr_exec $ZFS_ACL_OTHER1 $LS -vd $node \
+			log_mustnot chgusr_exec $ZFS_ACL_OTHER1 ls -vd $node \
 				> /dev/null 2>&1
 		else
-			log_must chgusr_exec $ZFS_ACL_OTHER1 $LS -vd $node \
+			log_must chgusr_exec $ZFS_ACL_OTHER1 ls -vd $node \
 				> /dev/null 2>&1
 		fi
 	done
@@ -147,25 +151,25 @@ for user in root $ZFS_ACL_STAFF1; do
 			(( ${#str} != 0 )) && inh_opt=$inh_opt/$str
 			aclspec="A+user:$ZFS_ACL_OTHER1:read_acl:$inh_opt:deny"
 
-			log_must usr_exec $MKDIR $basedir
-			log_must usr_exec $TOUCH $basefile
-			log_must usr_exec $MKDIR -p $odir3
-			log_must usr_exec $TOUCH $ofile1 $ofile2 $ofile3
+			log_must usr_exec mkdir $basedir
+			log_must usr_exec touch $basefile
+			log_must usr_exec mkdir -p $odir3
+			log_must usr_exec touch $ofile1 $ofile2 $ofile3
 
 			#
 			# Inherit flag can only be placed on a directory,
 			# otherwise it will fail.
 			#
-			log_must usr_exec $CHMOD $aclspec $basefile
+			log_must usr_exec chmod $aclspec $basefile
 
 			#
 			# Place on a directory should succeed.
 			#
-			log_must usr_exec $CHMOD $aclspec $basedir
+			log_must usr_exec chmod $aclspec $basedir
 
 			verify_inherit $obj $str
 
-			log_must usr_exec $RM -rf $basefile $basedir
+			log_must usr_exec rm -rf $basefile $basedir
 		done
 	done
 done

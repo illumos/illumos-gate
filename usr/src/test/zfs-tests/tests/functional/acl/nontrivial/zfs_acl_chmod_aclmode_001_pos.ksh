@@ -26,7 +26,7 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2012, 2016 by Delphix. All rights reserved.
 # Copyright 2016 Nexenta Systems, Inc.
 #
 
@@ -52,8 +52,8 @@ function cleanup
 {
 	(( ${#cwd} != 0 )) && cd $cwd
 
-	[[ -f $TARFILE ]] && log_must $RM -f $TARFILE
-	[[ -d $basedir ]] && log_must $RM -rf $basedir
+	[[ -f $TARFILE ]] && log_must rm -f $TARFILE
+	[[ -d $basedir ]] && log_must rm -rf $basedir
 }
 
 log_assert "Verify chmod have correct behaviour to directory and file when" \
@@ -187,7 +187,7 @@ function cal_bits # isdir bits bits_limit acl_access ctrl
 
 	tmpstr=${tmpstr#/}
 
-	$ECHO "$tmpstr"
+	echo "$tmpstr"
 }
 
 #
@@ -211,7 +211,7 @@ function translate_acl # isdir acl
 		action=${acl##*:}
 		acl=$prefix:$(cal_bits $isdir 7 7 $acl 0):$action
 	fi
-	$ECHO "$acl"
+	echo "$acl"
 }
 
 #
@@ -266,7 +266,7 @@ function check_new_acl # bit newmode isdir
 		fi
 	fi
 	new_acl=${new_acl}${dc}
-	$ECHO "$new_acl"
+	echo "$new_acl"
 }
 
 function build_new_acl # newmode isdir
@@ -285,7 +285,7 @@ function build_new_acl # newmode isdir
 		status=$(check_new_acl $bit $newmode $isdir)
 	fi
 	expect=$prefix$status:deny
-	$ECHO $expect
+	echo $expect
 }
 
 # According to inherited flag, verify subdirectories and files within it has
@@ -441,7 +441,7 @@ function verify_aclmode # <aclmode> <node> <newmode>
 			aclcur=$(get_ACE $node $count)
 			aclcur=${aclcur#$count:}
 			if [[ -n $expect1 && $expect1 != $aclcur ]]; then
-				$LS -vd $node
+				ls -vd $node
 				log_fail "$aclmode $i #$count " \
 					"ACE: $aclcur, expect to be " \
 					"$expect1"
@@ -463,7 +463,7 @@ function verify_aclmode # <aclmode> <node> <newmode>
 		fi
 
 		if [[ $? -ne 0 ]]; then
-			$LS -vd $node
+			ls -vd $node
 			log_fail "Unexpect acl: $node, $aclmode ($newmode)"
 		fi
 	fi
@@ -480,17 +480,17 @@ cwd=$PWD
 cd $TESTDIR
 
 for mode in "${aclmode_flag[@]}"; do
-	log_must $ZFS set aclmode=$mode $TESTPOOL/$TESTFS
+	log_must zfs set aclmode=$mode $TESTPOOL/$TESTFS
 
 	for user in root $ZFS_ACL_STAFF1; do
 		log_must set_cur_usr $user
 
-		log_must usr_exec $MKDIR $basedir
+		log_must usr_exec mkdir $basedir
 
-		log_must usr_exec $MKDIR $odir
-		log_must usr_exec $TOUCH $ofile
-		log_must usr_exec $MKDIR $ndir
-		log_must usr_exec $TOUCH $nfile
+		log_must usr_exec mkdir $odir
+		log_must usr_exec touch $ofile
+		log_must usr_exec mkdir $ndir
+		log_must usr_exec touch $nfile
 
 		for obj in $allnodes; do
 			maxnumber=0
@@ -507,14 +507,14 @@ for mode in "${aclmode_flag[@]}"; do
 						;;
 					esac
 
-					log_must usr_exec $CHMOD A+$acl $obj
+					log_must usr_exec chmod A+$acl $obj
 					acls[$maxnumber]=$acl
 
 					((maxnumber = maxnumber + 1))
 				done
 			done
 			# Archive the file and directory
-			log_must $TAR cpf@ $TARFILE $basedir
+			log_must tar cpf@ $TARFILE $basedir
 
 			if [[ -d $obj ]]; then
 				target=$odir
@@ -522,14 +522,14 @@ for mode in "${aclmode_flag[@]}"; do
 				target=$ofile
 			fi
 			for newmode in "${argv[@]}"; do
-				log_must usr_exec $CHMOD $newmode $obj
-				log_must usr_exec $CHMOD $newmode $target
+				log_must usr_exec chmod $newmode $obj
+				log_must usr_exec chmod $newmode $target
 				log_must verify_aclmode $mode $obj $newmode
-				log_must $TAR xpf@ $TARFILE
+				log_must tar xpf@ $TARFILE
 			done
 		done
 
-		log_must usr_exec $RM -rf $basedir $TARFILE
+		log_must usr_exec rm -rf $basedir $TARFILE
 	done
 done
 

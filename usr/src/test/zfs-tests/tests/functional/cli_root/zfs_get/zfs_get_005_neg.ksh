@@ -25,6 +25,10 @@
 # Use is subject to license terms.
 #
 
+#
+# Copyright (c) 2016 by Delphix. All rights reserved.
+#
+
 . $STF_SUITE/tests/functional/cli_root/zfs_get/zfs_get_common.kshlib
 
 #
@@ -80,10 +84,10 @@ function test_options
 	for dst in ${dataset[@]}; do
 		for opt in $opts; do
 			for prop in $props; do
-				$ZFS get $opt -- $prop $dst > /dev/null 2>&1
+				zfs get $opt -- $prop $dst > /dev/null 2>&1
 				ret=$?
 				if [[ $ret == 0 ]]; then
-					log_fail "$ZFS get $opt -- $prop " \
+					log_fail "zfs get $opt -- $prop " \
 					    "$dst unexpectedly succeeded."
 				fi
 			done

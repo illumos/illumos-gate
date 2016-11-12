@@ -25,6 +25,10 @@
 # Use is subject to license terms.
 #
 
+#
+# Copyright (c) 2016 by Delphix. All rights reserved.
+#
+
 . $STF_SUITE/tests/functional/acl/acl_common.kshlib
 
 #
@@ -58,9 +62,9 @@ for user in root $ZFS_ACL_STAFF1; do
 	log_must create_files $TESTDIR
 
 	log_must cksum_files $INI_DIR BEFORE_FCKSUM BEFORE_ACKSUM
-	log_must usr_exec $COMPRESS $INI_DIR/*
-	log_must usr_exec $MV $INI_DIR/* $TST_DIR
-	log_must usr_exec $UNCOMPRESS $TST_DIR/*
+	log_must usr_exec compress $INI_DIR/*
+	log_must usr_exec mv $INI_DIR/* $TST_DIR
+	log_must usr_exec uncompress $TST_DIR/*
 	log_must cksum_files $TST_DIR AFTER_FCKSUM AFTER_ACKSUM
 
 	log_must compare_cksum BEFORE_FCKSUM AFTER_FCKSUM
