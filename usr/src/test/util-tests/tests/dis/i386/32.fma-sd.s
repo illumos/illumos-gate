@@ -14,7 +14,7 @@
  */
 
 /*
- * Test ADX related instructions
+ * Test FMA3 -SD related instructions
  */
 
 .text

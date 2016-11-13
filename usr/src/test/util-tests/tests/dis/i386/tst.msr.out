@@ -1,0 +1,2 @@
+    libdis_test:     0f 32              rdmsr  
+    libdis_test+0x2: 0f 30              wrmsr  

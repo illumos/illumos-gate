@@ -1772,7 +1772,7 @@ const instable_t dis_op0F[16][16] = {
 /*  [2C]  */	TNSZ("cvttps2pi",XMMOXMM,8),TNSZ("cvtps2pi",XMMOXMM,8),TNSZ("ucomiss",XMMO,4),TNSZ("comiss",XMMO,4),
 }, {
 /*  [30]  */	TNS("wrmsr",NORM),	TNS("rdtsc",NORM),	TNS("rdmsr",NORM),	TNS("rdpmc",NORM),
-/*  [34]  */	TNSx("sysenter",NORM),	TNSx("sysexit",NORM),	INVALID,		INVALID,
+/*  [34]  */	TNS("sysenter",NORM),	TNS("sysexit",NORM),	INVALID,		INVALID,
 /*  [38]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [3C]  */	INVALID,		INVALID,		INVALID,		INVALID,
 }, {
@@ -3294,6 +3294,7 @@ dtrace_disx86(dis86_t *x, uint_t cpu_mode)
 					if (opnd_size_prefix == 0) {
 						goto error;
 					}
+
 					break;
 				case XMMP_66o:
 					if (opnd_size_prefix == 0) {
@@ -4441,6 +4442,44 @@ xmmprm:
 			x->d86_opnd[0] = x->d86_opnd[1];
 			x->d86_opnd[1] = x->d86_opnd[2];
 			x->d86_numopnds = 2;
+		}
+
+		/*
+		 * The pclmulqdq instruction has a series of alternate names for
+		 * various encodings of the immediate byte. As such, if we
+		 * happen to find it and the immediate value matches, we'll
+		 * rewrite the mnemonic.
+		 */
+		if (strcmp(dp->it_name, "pclmulqdq") == 0) {
+			boolean_t changed = B_TRUE;
+			switch (x->d86_opnd[0].d86_value) {
+			case 0x00:
+				(void) strncpy(x->d86_mnem, "pclmullqlqdq",
+				    OPLEN);
+				break;
+			case 0x01:
+				(void) strncpy(x->d86_mnem, "pclmulhqlqdq",
+				    OPLEN);
+				break;
+			case 0x10:
+				(void) strncpy(x->d86_mnem, "pclmullqhqdq",
+				    OPLEN);
+				break;
+			case 0x11:
+				(void) strncpy(x->d86_mnem, "pclmulhqhqdq",
+				    OPLEN);
+				break;
+			default:
+				changed = B_FALSE;
+				break;
+			}
+
+			if (changed == B_TRUE) {
+				x->d86_opnd[0].d86_value_size = 0;
+				x->d86_opnd[0] = x->d86_opnd[1];
+				x->d86_opnd[1] = x->d86_opnd[2];
+				x->d86_numopnds = 2;
+			}
 		}
 #endif
 		break;
