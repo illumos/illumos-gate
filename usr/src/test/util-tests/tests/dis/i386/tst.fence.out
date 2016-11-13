@@ -1,0 +1,3 @@
+    libdis_test:     0f ae f0           mfence 
+    libdis_test+0x3: 0f ae e8           lfence 
+    libdis_test+0x6: 0f ae f8           sfence 

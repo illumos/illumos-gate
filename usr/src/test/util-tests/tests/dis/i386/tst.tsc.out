@@ -1,0 +1,2 @@
+    libdis_test:     0f 31              rdtsc  
+    libdis_test+0x2: 0f 01 f9           rdtscp 
