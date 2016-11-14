@@ -25,7 +25,7 @@
 # Use is subject to license terms.
 #
 
-# Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2012, 2016 by Delphix. All rights reserved.
 # Copyright 2016 Nexenta Systems, Inc.
 #
 
@@ -46,7 +46,7 @@ verify_runnable "both"
 
 function cleanup
 {
-	[[ -d $basedir ]] && log_must $RM -rf $basedir
+	[[ -d $basedir ]] && log_must rm -rf $basedir
 }
 
 log_assert "aclinherit=passthrough-x should inherit the execute permission" \
@@ -82,28 +82,28 @@ function verify_inherit
 {
 	typeset -i i=0
 
-	log_must usr_exec $MKDIR $basedir
+	log_must usr_exec mkdir $basedir
 
 	# Modify owner@, group@ and everyone@ ACEs to include execute
 	# permission (see above), and make them file-inheritable
 	while ((i < ${#aces[*]})); do
-		log_must usr_exec $CHMOD A$i=${aces[i]} $basedir
+		log_must usr_exec chmod A$i=${aces[i]} $basedir
 		((i = i + 1))
 	done
 
 	# Create file with 644 mode
-	log_must usr_exec $TOUCH $nfile1
+	log_must usr_exec touch $nfile1
 	# Check that execute permission wasn't inherited
 	log_mustnot check_execute_bit $nfile1
 
 	# Use cp(1) to copy over /usr/bin/true
-	log_must usr_exec $CP $TRUE $nfile2
+	log_must usr_exec cp /usr/bin/true $nfile2
 	# Check that execute permission was inherited
 	log_must check_execute_bit $nfile2
 }
 
-log_must $ZFS set aclmode=passthrough $TESTPOOL/$TESTFS
-log_must $ZFS set aclinherit=passthrough-x $TESTPOOL/$TESTFS
+log_must zfs set aclmode=passthrough $TESTPOOL/$TESTFS
+log_must zfs set aclinherit=passthrough-x $TESTPOOL/$TESTFS
 
 for user in root $ZFS_ACL_STAFF1; do
 	log_must set_cur_usr $user

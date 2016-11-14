@@ -26,7 +26,7 @@
 #
 
 #
-# Copyright (c) 2013 by Delphix. All rights reserved.
+# Copyright (c) 2013, 2016 by Delphix. All rights reserved.
 # Copyright (c) 2013 by Paul B. Henson <henson@acm.org>. All rights reserved.
 #
 
@@ -49,7 +49,7 @@ verify_runnable "both"
 function cleanup
 {
 	# reset aclmode=discard
-	log_must $ZFS set aclmode=discard $TESTPOOL/$TESTFS
+	log_must zfs set aclmode=discard $TESTPOOL/$TESTFS
 }
 
 #	"init_map" "options" "expect_map"
@@ -81,14 +81,14 @@ function test_chmod_mapping #<file-dir>
 	typeset -i i=0
 
 	while ((i < ${#argv[@]})); do
-		usr_exec $CHMOD ${argv[i]} $node
+		usr_exec chmod ${argv[i]} $node
 		if (($? != 0)); then
-			log_note "usr_exec $CHMOD ${argv[i]} $node"
+			log_note "usr_exec chmod ${argv[i]} $node"
 			return 1
 		fi
-		usr_exec $CHMOD ${argv[((i + 1))]} $node
+		usr_exec chmod ${argv[((i + 1))]} $node
 		if (($? != 0)); then
-			log_note "usr_exec $CHMOD ${argv[((i + 1))]} $node"
+			log_note "usr_exec chmod ${argv[((i + 1))]} $node"
 			return 1
 		fi
 
@@ -109,21 +109,21 @@ function test_chmod_mapping #<file-dir>
 }
 
 # set aclmode=restricted
-log_must $ZFS set aclmode=restricted $TESTPOOL/$TESTFS
+log_must zfs set aclmode=restricted $TESTPOOL/$TESTFS
 
 for user in root $ZFS_ACL_STAFF1; do
 	log_must set_cur_usr $user
 
 	# Test file
-	log_must usr_exec $TOUCH $testfile
+	log_must usr_exec touch $testfile
 	log_must test_chmod_mapping $testfile
 
 	# Test directory
-	log_must usr_exec $MKDIR $testdir
+	log_must usr_exec mkdir $testdir
 	log_must test_chmod_mapping $testdir
 
-	log_must usr_exec $RM $testfile
-	log_must usr_exec $RM -rf $testdir
+	log_must usr_exec rm $testfile
+	log_must usr_exec rm -rf $testdir
 done
 
 log_pass "Setting permissions using 'chmod' for aclmode=restricted completed " \

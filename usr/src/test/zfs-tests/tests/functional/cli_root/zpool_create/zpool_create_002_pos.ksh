@@ -26,7 +26,7 @@
 #
 
 #
-# Copyright (c) 2012, 2015 by Delphix. All rights reserved.
+# Copyright (c) 2012, 2016 by Delphix. All rights reserved.
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -58,7 +58,7 @@ function cleanup
 	for file in /var/tmp/$FILEDISK0 /var/tmp/$FILEDISK1 /var/tmp/$FILEDISK2
 	do
 		if [[ -e $file ]]; then
-			$RM -rf $file
+			rm -rf $file
 		fi
 	done
 
@@ -76,36 +76,36 @@ else
 	disk=$DISK0
 fi
 create_pool "$TESTPOOL" "${disk}s${SLICE0}"
-log_must $ECHO "y" | $NEWFS /dev/rdsk/${disk}s${SLICE1} >/dev/null 2>&1
+log_must echo "y" | newfs /dev/rdsk/${disk}s${SLICE1} >/dev/null 2>&1
 create_blockfile $FILESIZE $TESTDIR0/$FILEDISK0 ${disk}s${SLICE4}
 create_blockfile $FILESIZE1 $TESTDIR1/$FILEDISK1 ${disk}s${SLICE5}
-log_must $MKFILE $SIZE /var/tmp/$FILEDISK0
-log_must $MKFILE $SIZE /var/tmp/$FILEDISK1
-log_must $MKFILE $SIZE /var/tmp/$FILEDISK2
+log_must mkfile $SIZE /var/tmp/$FILEDISK0
+log_must mkfile $SIZE /var/tmp/$FILEDISK1
+log_must mkfile $SIZE /var/tmp/$FILEDISK2
 
 unset NOINUSE_CHECK
-log_must $ZPOOL export $TESTPOOL
+log_must zpool export $TESTPOOL
 log_note "'zpool create' without '-f' will fail " \
 	"while device is belong to an exported pool."
-log_mustnot $ZPOOL create "$TESTPOOL1" "${disk}s${SLICE0}"
+log_mustnot zpool create "$TESTPOOL1" "${disk}s${SLICE0}"
 create_pool "$TESTPOOL1" "${disk}s${SLICE0}"
 log_must poolexists $TESTPOOL1
 
 log_note "'zpool create' without '-f' will fail " \
 	"while device is using by an ufs filesystem."
-log_mustnot $ZPOOL create "$TESTPOOL2" "${disk}s${SLICE1}"
+log_mustnot zpool create "$TESTPOOL2" "${disk}s${SLICE1}"
 create_pool "$TESTPOOL2" "${disk}s${SLICE1}"
 log_must poolexists $TESTPOOL2
 
 log_note "'zpool create' mirror without '-f' will fail " \
 	"while devices have different size."
-log_mustnot $ZPOOL create "$TESTPOOL3" "mirror" $TESTDIR0/$FILEDISK0 $TESTDIR1/$FILEDISK1
+log_mustnot zpool create "$TESTPOOL3" "mirror" $TESTDIR0/$FILEDISK0 $TESTDIR1/$FILEDISK1
 create_pool "$TESTPOOL3" "mirror" $TESTDIR0/$FILEDISK0 $TESTDIR1/$FILEDISK1
 log_must poolexists $TESTPOOL3
 
 log_note "'zpool create' mirror without '-f' will fail " \
 	"while devices are of different types."
-log_mustnot $ZPOOL create "$TESTPOOL4" "mirror" /var/tmp/$FILEDISK0 \
+log_mustnot zpool create "$TESTPOOL4" "mirror" /var/tmp/$FILEDISK0 \
 	${disk}s${SLICE3}
 create_pool "$TESTPOOL4" "mirror" /var/tmp/$FILEDISK0 ${disk}s${SLICE3}
 log_must poolexists $TESTPOOL4
@@ -114,9 +114,9 @@ log_note "'zpool create' without '-f' will fail " \
 	"while device is part of potentially active pool."
 create_pool "$TESTPOOL5"  "mirror" /var/tmp/$FILEDISK1 \
 	/var/tmp/$FILEDISK2
-log_must $ZPOOL offline $TESTPOOL5 /var/tmp/$FILEDISK2
-log_must $ZPOOL export $TESTPOOL5
-log_mustnot $ZPOOL create "$TESTPOOL6" /var/tmp/$FILEDISK2
+log_must zpool offline $TESTPOOL5 /var/tmp/$FILEDISK2
+log_must zpool export $TESTPOOL5
+log_mustnot zpool create "$TESTPOOL6" /var/tmp/$FILEDISK2
 create_pool $TESTPOOL6 /var/tmp/$FILEDISK2
 log_must poolexists $TESTPOOL6
 

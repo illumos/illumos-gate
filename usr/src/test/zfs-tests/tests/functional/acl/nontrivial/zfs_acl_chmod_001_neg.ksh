@@ -25,6 +25,10 @@
 # Use is subject to license terms.
 #
 
+#
+# Copyright (c) 2016 by Delphix. All rights reserved.
+#
+
 . $STF_SUITE/tests/functional/acl/acl_common.kshlib
 
 #
@@ -52,13 +56,13 @@ function err_opts #node
 
 	log_note "Illegal option to chmod should fail."
 	for A in ${A_opts[@]}; do
-		log_mustnot usr_exec $CHMOD ${A}owner@:read_data:allow $node
-		log_mustnot usr_exec $CHMOD A+ asd owner@:execute:deny $node
+		log_mustnot usr_exec chmod ${A}owner@:read_data:allow $node
+		log_mustnot usr_exec chmod A+ asd owner@:execute:deny $node
 	done
 
 	typeset type_opts="everyone groups owner user@ users"
 	for tp in ${type_opts[@]}; do
-		log_mustnot usr_exec $CHMOD A+$tp:read_data:deny $node
+		log_mustnot usr_exec chmod A+$tp:read_data:deny $node
 	done
 
 	return 0
@@ -72,9 +76,9 @@ function del_all_ACE #node
 	cnt=$(count_ACE $node)
 	while (( cnt > 0 )); do
 		if (( cnt == 1 )); then
-			log_mustnot $CHMOD A0- $node
+			log_mustnot chmod A0- $node
 		else
-			log_must $CHMOD A0- $node
+			log_must chmod A0- $node
 		fi
 
 		(( cnt -= 1 ))
@@ -95,9 +99,9 @@ function exceed_max_ACE #node
 	(( max = max - cnt + 1 ))
 	while (( max > 0 )); do
 		if (( max == 1 )); then
-			log_mustnot $CHMOD A+owner@:read_data:allow $node
+			log_mustnot chmod A+owner@:read_data:allow $node
 		else
-			$CHMOD A+owner@:read_data:allow $node
+			chmod A+owner@:read_data:allow $node
 			if (($? != 0)); then
 				((cnt = 1024 - max))
 				log_fail "Add No.$cnt ACL item failed."
@@ -117,14 +121,14 @@ for usr in "root" "$ZFS_ACL_STAFF1"; do
 	log_must set_cur_usr $usr
 
 	for node in $testfile $testdir; do
-		log_must usr_exec $TOUCH $testfile
-		log_must usr_exec $MKDIR $testdir
+		log_must usr_exec touch $testfile
+		log_must usr_exec mkdir $testdir
 
 		for func in $func_name; do
 			log_must eval "$func $node"
 		done
 
-		log_must usr_exec $RM -rf $testfile $testdir
+		log_must usr_exec rm -rf $testfile $testdir
 	done
 done
 

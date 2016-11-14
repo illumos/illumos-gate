@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright (c) 2014 by Delphix. All rights reserved.
+# Copyright (c) 2014, 2016 by Delphix. All rights reserved.
 #
 
 # testfile The file to examine.
@@ -23,8 +23,8 @@ function verify_holes_and_data_blocks
 	typeset -i data_blks=$3
 	typeset -i failures=0
 
-	found_hole_blks=$($GETHOLES -h $testfile)
-	found_data_blks=$($GETHOLES -d $testfile)
+	found_hole_blks=$(getholes -h $testfile)
+	found_data_blks=$(getholes -d $testfile)
 	if [[ $found_hole_blks -ne $hole_blks ]] then;
 		log_note "Found $found_hole_blks, not $hole_blks hole blocks."
 		((failures++))

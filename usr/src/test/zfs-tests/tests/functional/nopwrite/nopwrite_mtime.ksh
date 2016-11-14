@@ -12,7 +12,7 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2012, 2016 by Delphix. All rights reserved.
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -34,27 +34,27 @@ log_onexit cleanup
 
 function cleanup
 {
-	datasetexists $origin && log_must $ZFS destroy -R $origin
-	log_must $ZFS create -o mountpoint=$TESTDIR $origin
+	datasetexists $origin && log_must zfs destroy -R $origin
+	log_must zfs create -o mountpoint=$TESTDIR $origin
 }
 
 log_assert "nopwrite updates file metadata correctly"
 
-log_must $ZFS set compress=on $origin
-log_must $ZFS set checksum=sha256 $origin
-$DD if=/dev/urandom of=$TESTDIR/file bs=1024k count=$MEGS conv=notrunc \
+log_must zfs set compress=on $origin
+log_must zfs set checksum=sha256 $origin
+dd if=/dev/urandom of=$TESTDIR/file bs=1024k count=$MEGS conv=notrunc \
     >/dev/null 2>&1 || log_fail "dd into $TESTDIR/file failed."
-$ZFS snapshot $origin@a || log_fail "zfs snap failed"
-log_must $ZFS clone $origin@a $origin/clone
+zfs snapshot $origin@a || log_fail "zfs snap failed"
+log_must zfs clone $origin@a $origin/clone
 
-o_atime=$($LS -E% all $TESTDIR/clone/file | $AWK '/atime/ {print $4}')
-o_ctime=$($LS -E% all $TESTDIR/clone/file | $AWK '/ctime/ {print $4}')
-o_mtime=$($LS -E% all $TESTDIR/clone/file | $AWK '/mtime/ {print $4}')
-$DD if=/$TESTDIR/file of=/$TESTDIR/clone/file bs=1024k count=$MEGS \
+o_atime=$(ls -E% all $TESTDIR/clone/file | awk '/atime/ {print $4}')
+o_ctime=$(ls -E% all $TESTDIR/clone/file | awk '/ctime/ {print $4}')
+o_mtime=$(ls -E% all $TESTDIR/clone/file | awk '/mtime/ {print $4}')
+dd if=/$TESTDIR/file of=/$TESTDIR/clone/file bs=1024k count=$MEGS \
     conv=notrunc >/dev/null 2>&1 || log_fail "dd failed."
-atime=$($LS -E% all $TESTDIR/clone/file | $AWK '/atime/ {print $4}')
-ctime=$($LS -E% all $TESTDIR/clone/file | $AWK '/ctime/ {print $4}')
-mtime=$($LS -E% all $TESTDIR/clone/file | $AWK '/mtime/ {print $4}')
+atime=$(ls -E% all $TESTDIR/clone/file | awk '/atime/ {print $4}')
+ctime=$(ls -E% all $TESTDIR/clone/file | awk '/ctime/ {print $4}')
+mtime=$(ls -E% all $TESTDIR/clone/file | awk '/mtime/ {print $4}')
 
 [[ $o_atime = $atime ]] || log_fail "atime changed: $o_atime $atime"
 [[ $o_ctime = $ctime ]] && log_fail "ctime unchanged: $o_ctime $ctime"

@@ -25,6 +25,10 @@
 # Use is subject to license terms.
 #
 
+#
+# Copyright (c) 2016 by Delphix. All rights reserved.
+#
+
 . $STF_SUITE/tests/functional/acl/acl_common.kshlib
 
 #
@@ -46,20 +50,20 @@ verify_runnable "both"
 function cleanup
 {
 	if datasetexists $TESTPOOL/$TESTFS1; then
-		log_must $ZFS destroy -f $TESTPOOL/$TESTFS1
+		log_must zfs destroy -f $TESTPOOL/$TESTFS1
 	fi
-	[[ -d $TESTDIR1 ]] && log_must $RM -rf $TESTDIR1
-	[[ -d $TESTDIR ]] && log_must $RM -rf $TESTDIR/*
+	[[ -d $TESTDIR1 ]] && log_must rm -rf $TESTDIR1
+	[[ -d $TESTDIR ]] && log_must rm -rf $TESTDIR/*
 }
 
-log_assert "Verify that '$CP [-p]' supports ZFS ACLs."
+log_assert "Verify that 'cp [-p]' supports ZFS ACLs."
 log_onexit cleanup
 
 log_note "Create the second zfs file system: $TESTPOOL/$TESTFS1."
-log_must $ZFS create $TESTPOOL/$TESTFS1
-log_must $ZFS set mountpoint=$TESTDIR1 $TESTPOOL/$TESTFS1
-log_must $ZFS set aclmode=passthrough $TESTPOOL/$TESTFS1
-log_must $CHMOD 777 $TESTDIR1
+log_must zfs create $TESTPOOL/$TESTFS1
+log_must zfs set mountpoint=$TESTDIR1 $TESTPOOL/$TESTFS1
+log_must zfs set aclmode=passthrough $TESTPOOL/$TESTFS1
+log_must chmod 777 $TESTDIR1
 
 # Define target directory.
 dstdir=$TESTDIR1/dstdir.$$
@@ -70,15 +74,15 @@ for user in root $ZFS_ACL_STAFF1; do
 
 	for obj in $testfile $testdir; do
 		# Create source object and target directroy
-		log_must usr_exec $TOUCH $testfile
-		log_must usr_exec $MKDIR $testdir $dstdir
+		log_must usr_exec touch $testfile
+		log_must usr_exec mkdir $testdir $dstdir
 
 		# Add the new ACE on the head.
-		log_must usr_exec $CHMOD \
+		log_must usr_exec chmod \
 			A0+user:$ZFS_ACL_OTHER1:read_acl:deny $obj
 
-		cmd_str="$CP -p"
-		[[ -d $obj ]] && cmd_str="$CP -rp"
+		cmd_str="cp -p"
+		[[ -d $obj ]] && cmd_str="cp -rp"
 		log_must usr_exec $cmd_str $obj $dstdir
 		log_must usr_exec $cmd_str $obj $TESTDIR1
 
@@ -88,8 +92,8 @@ for user in root $ZFS_ACL_STAFF1; do
 		done
 
 		# Delete all the test file and directory
-		log_must usr_exec $RM -rf $TESTDIR/* $TESTDIR1/*
+		log_must usr_exec rm -rf $TESTDIR/* $TESTDIR1/*
 	done
 done
 
-log_pass "'$CP [-p]' succeeds to support ZFS ACLs."
+log_pass "'cp [-p]' succeeds to support ZFS ACLs."

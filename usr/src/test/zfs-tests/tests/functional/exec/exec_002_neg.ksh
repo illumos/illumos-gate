@@ -26,7 +26,7 @@
 #
 
 #
-# Copyright (c) 2013 by Delphix. All rights reserved.
+# Copyright (c) 2013, 2016 by Delphix. All rights reserved.
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -49,7 +49,7 @@ MMAP_EXEC=$STF_SUITE/tests/functional/exec/mmap_exec
 
 function cleanup
 {
-	log_must $RM $TESTDIR/myls
+	log_must rm $TESTDIR/myls
 }
 
 #
@@ -76,8 +76,8 @@ log_assert "Setting exec=off on a filesystem, processes can not be executed " \
 	"from this file system."
 log_onexit cleanup
 
-log_must $CP $LS $TESTDIR/myls
-log_must $ZFS set exec=off $TESTPOOL/$TESTFS
+log_must cp /usr/bin/ls $TESTDIR/myls
+log_must zfs set exec=off $TESTPOOL/$TESTFS
 
 log_must exec_n_check 126 $TESTDIR/myls
 log_must exec_n_check 13 $MMAP_EXEC $TESTDIR/myls
