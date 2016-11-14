@@ -24,7 +24,7 @@
 #
 
 #
-# Copyright (c) 2013 by Delphix. All rights reserved.
+# Copyright (c) 2013, 2016 by Delphix. All rights reserved.
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -52,8 +52,8 @@ function cleanup {
 
 	if [ $( ismounted /tmp/ufs.$$ ufs ) ]
 	then
-		log_must $UMOUNT /tmp/ufs.$$
-		log_must $RM -rf /tmp/ufs.$$
+		log_must umount /tmp/ufs.$$
+		log_must rm -rf /tmp/ufs.$$
 	fi
 }
 
@@ -61,26 +61,26 @@ log_assert "Files from ufs,tmpfs with xattrs copied to zfs retain xattr info."
 log_onexit cleanup
 
 # Create a UFS file system that we can work in
-log_must $ZFS create -V128m $TESTPOOL/$TESTFS/zvol
-log_must eval "$ECHO y | $NEWFS /dev/zvol/dsk/$TESTPOOL/$TESTFS/zvol > /dev/null 2>&1"
+log_must zfs create -V128m $TESTPOOL/$TESTFS/zvol
+log_must eval "echo y | newfs /dev/zvol/dsk/$TESTPOOL/$TESTFS/zvol > /dev/null 2>&1"
 
-log_must $MKDIR /tmp/ufs.$$
-log_must $MOUNT /dev/zvol/dsk/$TESTPOOL/$TESTFS/zvol /tmp/ufs.$$
+log_must mkdir /tmp/ufs.$$
+log_must mount /dev/zvol/dsk/$TESTPOOL/$TESTFS/zvol /tmp/ufs.$$
 
 # Create files in ufs and tmpfs, and set some xattrs on them.
-log_must $TOUCH /tmp/ufs.$$/ufs-file.$$
-log_must $TOUCH /tmp/tmpfs-file.$$
+log_must touch /tmp/ufs.$$/ufs-file.$$
+log_must touch /tmp/tmpfs-file.$$
 
-log_must $RUNAT /tmp/ufs.$$/ufs-file.$$ $CP /etc/passwd .
-log_must $RUNAT /tmp/tmpfs-file.$$ $CP /etc/group .
+log_must runat /tmp/ufs.$$/ufs-file.$$ cp /etc/passwd .
+log_must runat /tmp/tmpfs-file.$$ cp /etc/group .
 
 # copy those files to ZFS
-log_must $CP -@ /tmp/ufs.$$/ufs-file.$$ $TESTDIR
-log_must $CP -@ /tmp/tmpfs-file.$$ $TESTDIR
+log_must cp -@ /tmp/ufs.$$/ufs-file.$$ $TESTDIR
+log_must cp -@ /tmp/tmpfs-file.$$ $TESTDIR
 
 # ensure the xattr information has been copied correctly
-log_must $RUNAT $TESTDIR/ufs-file.$$ $DIFF passwd /etc/passwd
-log_must $RUNAT $TESTDIR/tmpfs-file.$$ $DIFF group /etc/group
+log_must runat $TESTDIR/ufs-file.$$ diff passwd /etc/passwd
+log_must runat $TESTDIR/tmpfs-file.$$ diff group /etc/group
 
-log_must $UMOUNT /tmp/ufs.$$
+log_must umount /tmp/ufs.$$
 log_pass "Files from ufs,tmpfs with xattrs copied to zfs retain xattr info."

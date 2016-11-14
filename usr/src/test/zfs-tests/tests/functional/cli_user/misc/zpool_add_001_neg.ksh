@@ -26,7 +26,7 @@
 #
 
 #
-# Copyright (c) 2013 by Delphix. All rights reserved.
+# Copyright (c) 2013, 2016 by Delphix. All rights reserved.
 #
 
 . $STF_SUITE/tests/functional/cli_user/misc/misc.cfg
@@ -62,7 +62,7 @@ log_assert "zpool add [-fn] pool_name vdev"
 
 typeset -i i=0
 while [[ $i -lt ${#args[*]} ]]; do
-	log_mustnot $ZPOOL ${args[i]}
+	log_mustnot zpool ${args[i]}
 	((i = i + 1))
 done
 

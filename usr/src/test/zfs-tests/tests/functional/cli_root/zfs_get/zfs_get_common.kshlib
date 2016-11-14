@@ -24,6 +24,10 @@
 # Use is subject to license terms.
 #
 
+#
+# Copyright (c) 2016 by Delphix. All rights reserved.
+#
+
 . $STF_SUITE/include/libtest.shlib
 
 #
@@ -93,5 +97,5 @@ function cleanup
 	datasetexists $TESTPOOL/$TESTFS@$TESTSNAP && \
 		destroy_snapshot $TESTPOOL/$TESTFS@$TESTSNAP
 
-	[[ -e $TESTFILE0 ]] && log_must $RM $TESTFILE0
+	[[ -e $TESTFILE0 ]] && log_must rm $TESTFILE0
 }

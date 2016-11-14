@@ -26,7 +26,7 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2012, 2016 by Delphix. All rights reserved.
 # Copyright 2016 Nexenta Systems, Inc.
 #
 
@@ -61,11 +61,11 @@ verify_runnable "both"
 
 function cleanup
 {
-	[[ -f $ofile ]] && log_must $RM -f $ofile
-	[[ -d $odir ]] && log_must $RM -rf $odir
-	[[ -d $basedir ]] && log_must $RM -rf $basedir
+	[[ -f $ofile ]] && log_must rm -f $ofile
+	[[ -d $odir ]] && log_must rm -rf $odir
+	[[ -d $basedir ]] && log_must rm -rf $basedir
 
-	log_must $ZFS set aclmode=discard $TESTPOOL/$TESTFS
+	log_must zfs set aclmode=discard $TESTPOOL/$TESTFS
 }
 
 log_assert "Verify different inherit options combined with different" \
@@ -109,8 +109,8 @@ function verify_inherit #<aclinherit> <object> [strategy]
 	# isinherit: indicate if the current target is in the inherit list.
 	typeset -i count=0 pass=0 passcnt=0 isinherit=0 no_propagate=0
 
-	log_must usr_exec $MKDIR -p $ndir3
-	log_must usr_exec $TOUCH $nfile1 $nfile2 $nfile3
+	log_must usr_exec mkdir -p $ndir3
+	log_must usr_exec touch $nfile1 $nfile2 $nfile3
 
 	# Get the inherit type/object_flag and non-inherited nodes.
 	if [[ $obj == *"file_inherit"* && $obj == *"dir_inherit"* ]]; then
@@ -192,8 +192,8 @@ function verify_inherit #<aclinherit> <object> [strategy]
 				aclcur=${aclcur#$count:}
 				if [[ $no_propagate == 0 ]]; then
 					if [[ $expacl != $aclcur ]]; then
-						$LS -vd $basedir
-						$LS -vd $node
+						ls -vd $basedir
+						ls -vd $node
 						log_fail "$inherit $i #$count" \
 						    "ACE: $aclcur," \
 						    "expected: $expacl"
@@ -202,8 +202,8 @@ function verify_inherit #<aclinherit> <object> [strategy]
 					# Compare if directory has trivial ACL
 					compare_acls $node $odir
 					if [[ $? -ne 0 ]]; then
-						$LS -vd $basedir
-						$LS -vd $node
+						ls -vd $basedir
+						ls -vd $node
 						log_fail "unexpected ACE:"
 						    "$node, $inherit ($str)"
 					fi
@@ -212,8 +212,8 @@ function verify_inherit #<aclinherit> <object> [strategy]
 			elif [[ -f $node ]]; then
 				compare_acls $node $ofile
 				if [[ $? -ne 0 ]]; then
-					$LS -vd $basedir
-					$LS -vd $node
+					ls -vd $basedir
+					ls -vd $node
 					log_fail "unexpected ACE:" \
 					    "$node, $inherit ($str)"
 				fi
@@ -231,8 +231,8 @@ function verify_inherit #<aclinherit> <object> [strategy]
 			fi
 
 			if [[ $? -ne 0 ]]; then
-				$LS -vd $basedir
-				$LS -vd $node
+				ls -vd $basedir
+				ls -vd $node
 				log_fail "Unexpected ACE: $node, $inherit ($str)"
 			fi
 		fi
@@ -243,10 +243,10 @@ typeset -i i=0 maxaces=4
 typeset acl0 acl1 acl2 acl3
 typeset acls0 acls1 acls2 acls3
 
-log_must $ZFS set aclmode=passthrough $TESTPOOL/$TESTFS
+log_must zfs set aclmode=passthrough $TESTPOOL/$TESTFS
 
 for inherit in "${aclinherit_flag[@]}"; do
-	log_must $ZFS set aclinherit=$inherit $TESTPOOL/$TESTFS
+	log_must zfs set aclinherit=$inherit $TESTPOOL/$TESTFS
 
 	for user in root $ZFS_ACL_STAFF1; do
 		log_must set_cur_usr $user
@@ -276,21 +276,21 @@ for inherit in "${aclinherit_flag[@]}"; do
 				# Create basedir and tmp dir/file
 				# for comparison.
 				#
-				log_note "$user: $CHMOD $acl $basedir"
-				log_must usr_exec $MKDIR $basedir
-				log_must usr_exec $MKDIR $odir
-				log_must usr_exec $TOUCH $ofile
+				log_note "$user: chmod $acl $basedir"
+				log_must usr_exec mkdir $basedir
+				log_must usr_exec mkdir $odir
+				log_must usr_exec touch $ofile
 
 				i=3
 				while ((i >= 0)); do
 					eval acl=\$acl$i
-					log_must usr_exec $CHMOD A+$acl $basedir
+					log_must usr_exec chmod A+$acl $basedir
 					((i = i - 1))
 				done
 				log_note "verify_inherit $inherit $obj $str"
 				log_must verify_inherit $inherit $obj $str
 
-				log_must usr_exec $RM -rf $ofile $odir $basedir
+				log_must usr_exec rm -rf $ofile $odir $basedir
 			done
 		done
 	done

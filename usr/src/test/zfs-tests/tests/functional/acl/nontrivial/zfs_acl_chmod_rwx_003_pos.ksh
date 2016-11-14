@@ -25,6 +25,10 @@
 # Use is subject to license terms.
 #
 
+#
+# Copyright (c) 2016 by Delphix. All rights reserved.
+#
+
 . $STF_SUITE/tests/functional/acl/acl_common.kshlib
 
 #
@@ -105,10 +109,10 @@ function test_chmod_basic_access #node group_user other_user
 		for access in ${a_access[@]}; do
 			for tp in allow deny; do
 				acl_spec="$flag:$access:$tp"
-				log_must usr_exec $CHMOD A+$acl_spec $node
+				log_must usr_exec chmod A+$acl_spec $node
 				check_chmod_results \
 					$node $acl_spec $g_usr $o_usr
-				log_must usr_exec $CHMOD A0- $node
+				log_must usr_exec chmod A0- $node
 			done
 		done
 	done
@@ -118,12 +122,12 @@ typeset -i i=0
 while (( i < ${#users[@]} )); do
 	log_must set_cur_usr ${users[i]}
 
-	log_must usr_exec $TOUCH $testfile
+	log_must usr_exec touch $testfile
 	test_chmod_basic_access $testfile ${users[((i+1))]} ${users[((i+2))]}
-	log_must usr_exec $MKDIR $testdir
+	log_must usr_exec mkdir $testdir
 	test_chmod_basic_access $testdir ${users[((i+1))]} ${users[((i+2))]}
 
-	log_must usr_exec $RM -rf $testfile $testdir
+	log_must usr_exec rm -rf $testfile $testdir
 
 	(( i += 3 ))
 done

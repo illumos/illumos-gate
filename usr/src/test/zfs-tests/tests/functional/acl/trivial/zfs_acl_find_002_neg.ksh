@@ -25,6 +25,10 @@
 # Use is subject to license terms.
 #
 
+#
+# Copyright (c) 2016 by Delphix. All rights reserved.
+#
+
 . $STF_SUITE/tests/functional/acl/acl_common.kshlib
 
 #
@@ -50,18 +54,18 @@ for user in root $ZFS_ACL_STAFF1; do
 
 	log_must create_files $TESTDIR
 
-	initfiles=$($LS -R $INI_DIR/*)
+	initfiles=$(ls -R $INI_DIR/*)
 	typeset -i i=0
 	while (( i < NUM_FILE )); do
 		f=$(getitem $i $initfiles)
-		usr_exec $RUNAT $f $RM attribute*
+		usr_exec runat $f rm attribute*
 		(( i += 1 ))
 	done
 
 	i=0
 	while (( i < NUM_FILE )); do
 		f=$(getitem $i $initfiles)
-		ff=$(usr_exec $FIND $INI_DIR -type f -name ${f##*/} \
+		ff=$(usr_exec find $INI_DIR -type f -name ${f##*/} \
 			-xattr -print)
 		if [[ $ff == $f ]]; then
 			log_fail "find not containing attribute should fail."
@@ -69,8 +73,8 @@ for user in root $ZFS_ACL_STAFF1; do
 
 		typeset -i j=0
 		while (( j < NUM_ATTR )); do
-			fa=$(usr_exec $FIND $INI_DIR -type f -name ${f##*/} \
-				-xattr -exec $RUNAT {} $LS attribute.$j \\\;)
+			fa=$(usr_exec find $INI_DIR -type f -name ${f##*/} \
+				-xattr -exec runat {} ls attribute.$j \\\;)
 			if [[ $fa == attribute.$j ]]; then
 				log_fail "find file attribute should fail."
 			fi

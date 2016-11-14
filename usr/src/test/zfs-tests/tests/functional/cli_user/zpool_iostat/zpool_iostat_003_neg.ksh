@@ -26,7 +26,7 @@
 #
 
 #
-# Copyright (c) 2013 by Delphix. All rights reserved.
+# Copyright (c) 2013, 2016 by Delphix. All rights reserved.
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -58,7 +58,7 @@ log_assert "Executing 'zpool iostat' with bad options fails"
 
 typeset -i i=1
 while [[ $i -lt ${#args[*]} ]]; do
-	log_mustnot $ZPOOL iostat ${args[i]}
+	log_mustnot zpool iostat ${args[i]}
 	((i = i + 1))
 done
 

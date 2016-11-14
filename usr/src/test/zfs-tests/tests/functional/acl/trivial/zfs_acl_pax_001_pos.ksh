@@ -25,6 +25,10 @@
 # Use is subject to license terms.
 #
 
+#
+# Copyright (c) 2016 by Delphix. All rights reserved.
+#
+
 . $STF_SUITE/tests/functional/acl/acl_common.kshlib
 
 #
@@ -50,33 +54,33 @@ log_onexit cleanup
 for user in root $ZFS_ACL_STAFF1; do
 	log_must set_cur_usr $user
 
-	[[ ! -d $INI_DIR ]] && log_must usr_exec $MKDIR -m 777 -p $INI_DIR
-	log_must usr_exec $MKTREE -b $INI_DIR -l 6 -d 2 -f 2
+	[[ ! -d $INI_DIR ]] && log_must usr_exec mkdir -m 777 -p $INI_DIR
+	log_must usr_exec mktree -b $INI_DIR -l 6 -d 2 -f 2
 
 	#
 	# Enter into initial directory and record all directory information,
 	# then pax all the files to $TMP_DIR/files.pax.
 	#
-	[[ ! -d $TMP_DIR ]] && log_must usr_exec $MKDIR $TMP_DIR
+	[[ ! -d $TMP_DIR ]] && log_must usr_exec mkdir $TMP_DIR
 	initout=$TMP_DIR/initout.$$
 	paxout=$TMP_DIR/files.pax
 
 	cd $INI_DIR
 	log_must eval "record_cksum $INI_DIR $initout > /dev/null 2>&1"
-	log_must eval "usr_exec $PAX -w -@ -f $paxout * > /dev/null 2>&1"
+	log_must eval "usr_exec pax -w -@ -f $paxout * > /dev/null 2>&1"
 
 	#
 	# Enter into test directory and pax $TMP_DIR/files.pax to current
 	# directory. Record all directory information and compare with initial
 	# directory record.
 	#
-	[[ ! -d $TST_DIR ]] && log_must usr_exec $MKDIR -m 777 $TST_DIR
+	[[ ! -d $TST_DIR ]] && log_must usr_exec mkdir -m 777 $TST_DIR
 	testout=$TMP_DIR/testout.$$
 	cd $TST_DIR
-	log_must eval "usr_exec $PAX -r -@ -f $paxout > /dev/null 2>&1"
+	log_must eval "usr_exec pax -r -@ -f $paxout > /dev/null 2>&1"
 	log_must eval "record_cksum $TST_DIR $testout > /dev/null 2>&1"
 
-	log_must usr_exec $DIFF $initout $testout
+	log_must usr_exec diff $initout $testout
 
 	log_must cleanup
 done

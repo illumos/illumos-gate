@@ -26,7 +26,7 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2012, 2016 by Delphix. All rights reserved.
 #
 
 . $STF_SUITE/tests/functional/acl/acl_common.kshlib
@@ -52,7 +52,7 @@ function cleanup
 {
 	for fs in $TESTPOOL/$TESTFS $TESTPOOL ; do
 		mtpt=$(get_prop mountpoint $fs)
-		log_must $RM -rf $mtpt/file.* $mtpt/dir.*
+		log_must rm -rf $mtpt/file.* $mtpt/dir.*
 	done
 }
 
@@ -75,10 +75,10 @@ function set_attribute
 	fi
 
 	if [[ -n $user ]]; then
-		$SU $user -c "$CHMOD S+c${attr} $object"
+		su $user -c "chmod S+c${attr} $object"
 		ret=$?
 	else
-		$CHMOD S+c${attr} $object
+		chmod S+c${attr} $object
 		ret=$?
 	fi
 
@@ -104,10 +104,10 @@ function clear_attribute
 	fi
 
 	if [[ -n $user ]]; then
-		$SU $user -c "$CHMOD S-c${attr} $object"
+		su $user -c "chmod S-c${attr} $object"
 		ret=$?
 	else
-		$CHMOD S-c${attr} $object
+		chmod S-c${attr} $object
 		ret=$?
 	fi
 
@@ -134,16 +134,16 @@ function grant_attr
 	# Only grant the user explicitly while it's not root neither owner.
 
 	if [[ $user == "root" ]]; then
-		log_must $CHMOD A+user:root:write_attributes:deny $object
+		log_must chmod A+user:root:write_attributes:deny $object
 	elif [[ $user == $(get_owner $object) ]]; then
 		if (((RANDOM % 2) == 0)); then
-			log_must $CHMOD A+owner@:write_attributes:deny $object
+			log_must chmod A+owner@:write_attributes:deny $object
 		else
-			log_must $CHMOD A+user:$user:write_attributes:deny \
+			log_must chmod A+user:$user:write_attributes:deny \
 			    $object
 		fi
 	else
-		log_must $CHMOD A+user:$user:write_attributes:allow $object
+		log_must chmod A+user:$user:write_attributes:allow $object
 	fi
 	attr_mod="write_attributes"
 }
@@ -163,7 +163,7 @@ function revoke_attr
 		log_fail "User($user), Object($object) not defined."
 	fi
 
-	log_must $CHMOD A0- $object
+	log_must chmod A0- $object
 	attr_mod=
 }
 

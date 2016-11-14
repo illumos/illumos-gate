@@ -26,7 +26,7 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2012, 2016 by Delphix. All rights reserved.
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -55,25 +55,25 @@ done
 create_pool "$TESTPOOL" "$ZFSSIDE_DISK1"
 
 if [[ -d $TESTDIR ]]; then
-	$RM -rf $TESTDIR  || log_unresolved Could not remove $TESTDIR
-	$MKDIR -p $TESTDIR || log_unresolved Could not create $TESTDIR
+	rm -rf $TESTDIR  || log_unresolved Could not remove $TESTDIR
+	mkdir -p $TESTDIR || log_unresolved Could not create $TESTDIR
 fi
 
-log_must $ZFS create $TESTPOOL/$TESTFS
-log_must $ZFS set mountpoint=$TESTDIR $TESTPOOL/$TESTFS
+log_must zfs create $TESTPOOL/$TESTFS
+log_must zfs set mountpoint=$TESTDIR $TESTPOOL/$TESTFS
 
-$ECHO "y" | $NEWFS -v /dev/rdsk/$ZFSSIDE_DISK2 >/dev/null 2>&1
+echo "y" | newfs -v /dev/rdsk/$ZFSSIDE_DISK2 >/dev/null 2>&1
 (( $? != 0 )) &&
 	log_untested "Unable to setup a UFS file system"
 
 [[ ! -d $DEVICE_DIR ]] && \
-	log_must $MKDIR -p $DEVICE_DIR
+	log_must mkdir -p $DEVICE_DIR
 
-log_must $MOUNT /dev/dsk/$ZFSSIDE_DISK2 $DEVICE_DIR
+log_must mount /dev/dsk/$ZFSSIDE_DISK2 $DEVICE_DIR
 
 i=0
 while (( i < $MAX_NUM )); do
-	log_must $MKFILE $FILE_SIZE ${DEVICE_DIR}/${DEVICE_FILE}$i
+	log_must mkfile $FILE_SIZE ${DEVICE_DIR}/${DEVICE_FILE}$i
 	(( i = i + 1 ))
 done
 

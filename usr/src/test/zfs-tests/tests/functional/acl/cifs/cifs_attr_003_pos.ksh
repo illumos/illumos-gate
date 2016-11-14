@@ -26,7 +26,7 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2012, 2016 by Delphix. All rights reserved.
 #
 
 . $STF_SUITE/tests/functional/acl/acl_common.kshlib
@@ -78,10 +78,10 @@ function cleanup
 
 	for fs in $TESTPOOL/$TESTFS $TESTPOOL ; do
 		mtpt=$(get_prop mountpoint $fs)
-		log_must $RM -rf $mtpt/file.* $mtpt/dir.*
+		log_must rm -rf $mtpt/file.* $mtpt/dir.*
 	done
 
-	[[ -f $TESTFILE ]] && $RM $TESTFILE
+	[[ -f $TESTFILE ]] && rm $TESTFILE
 }
 
 #
@@ -101,7 +101,7 @@ function set_attribute
 			attr="${attr}q"
 		fi
 	fi
-	$CHMOD S+c${attr} $object
+	chmod S+c${attr} $object
 	return $?
 }
 
@@ -127,7 +127,7 @@ function clear_attribute
 		fi
 	fi
 
-	$CHMOD S-c${attr} $object
+	chmod S-c${attr} $object
 	return $?
 }
 
@@ -201,10 +201,10 @@ function unit_writefile
 	typeset user=$2
 	typeset expect=${3:-0}
 	if [[ -f $object ]]; then
-		verify_expect $expect $CHG_USR_EXEC $user \
-		    $CP $TESTFILE $object
-		verify_expect $expect $CHG_USR_EXEC $user \
-		    $EVAL "$ECHO '$TESTSTR' > $object"
+		verify_expect $expect chg_usr_exec $user \
+		    cp $TESTFILE $object
+		verify_expect $expect chg_usr_exec $user \
+		    "echo '$TESTSTR' > $object"
 	fi
 }
 
@@ -222,10 +222,10 @@ function unit_writedir
 	typeset expect=${3:-0}
 
 	if [[ -d $object ]]; then
-		verify_expect $expect $CHG_USR_EXEC $user \
-		    $CP $TESTFILE $object
-		verify_expect $expect $CHG_USR_EXEC $user \
-		    $MKDIR -p $object/$TESTDIR
+		verify_expect $expect chg_usr_exec $user \
+		    cp $TESTFILE $object
+		verify_expect $expect chg_usr_exec $user \
+		    mkdir -p $object/$TESTDIR
 	fi
 }
 
@@ -236,8 +236,8 @@ function unit_appenddata
 	typeset expect=${3:-0}
 
 	if [[ ! -d $object ]]; then
-		verify_expect $expect $CHG_USR_EXEC $user \
-		    $EVAL "$ECHO '$TESTSTR' >> $object"
+		verify_expect $expect chg_usr_exec $user \
+		    "echo '$TESTSTR' >> $object"
 	fi
 }
 
@@ -257,10 +257,10 @@ function unit_deletecontent
 	if [[ -d $object ]]; then
 		for target in $object/${TESTFILE##*/} $object/$TESTDIR ; do
 			if [[ -e $target ]]; then
-				verify_expect $expect $CHG_USR_EXEC $user \
-				    $EVAL "$MV $target $target.new"
-				verify_expect $expect $CHG_USR_EXEC $user \
-				    $EVAL "$ECHO y | $RM -r $target.new"
+				verify_expect $expect chg_usr_exec $user \
+				    "mv $target $target.new"
+				verify_expect $expect chg_usr_exec $user \
+				    "echo y | rm -r $target.new"
 			fi
 		done
 	fi
@@ -279,8 +279,8 @@ function unit_deletedata
 	typeset user=$2
 	typeset expect=${3:-0}
 
-	verify_expect $expect $CHG_USR_EXEC $user \
-	    $EVAL "$ECHO y | $RM -r $object"
+	verify_expect $expect chg_usr_exec $user \
+	    "echo y | rm -r $object"
 
 }
 
@@ -297,15 +297,15 @@ function unit_writexattr
 	typeset user=$2
 	typeset expect=${3:-0}
 
-	verify_expect $expect $CHG_USR_EXEC $user \
-	    $RUNAT $object "$CP $TESTFILE $TESTATTR"
-	verify_expect $expect $CHG_USR_EXEC $user \
-	    $EVAL "$RUNAT $object \"$ECHO '$TESTSTR' > $TESTATTR\""
-	verify_expect $expect $CHG_USR_EXEC $user \
-	    $EVAL "$RUNAT $object \"$ECHO '$TESTSTR' >> $TESTATTR\""
+	verify_expect $expect chg_usr_exec $user \
+	    runat $object "cp $TESTFILE $TESTATTR"
+	verify_expect $expect chg_usr_exec $user \
+	    "runat $object \"echo '$TESTSTR' > $TESTATTR\""
+	verify_expect $expect chg_usr_exec $user \
+	    "runat $object \"echo '$TESTSTR' >> $TESTATTR\""
 	if [[ $expect -eq 0 ]]; then
-		verify_expect $expect $CHG_USR_EXEC $user \
-		    $RUNAT $object "$RM -f $TESTATTR"
+		verify_expect $expect chg_usr_exec $user \
+		    runat $object "rm -f $TESTATTR"
 	fi
 }
 
@@ -323,9 +323,9 @@ function unit_accesstime
 	typeset expect=${3:-0}
 
 	if [[ -d $object ]]; then
-		verify_expect $expect $CHG_USR_EXEC $user $LS $object
+		verify_expect $expect chg_usr_exec $user ls $object
 	else
-		verify_expect $expect $CHG_USR_EXEC $user $CAT $object
+		verify_expect $expect chg_usr_exec $user cat $object
 	fi
 }
 
@@ -342,9 +342,9 @@ function unit_updatetime
 	typeset user=$2
 	typeset expect=${3:-0}
 	typeset immutable_expect=${4:-$expect}
-	verify_expect $expect $CHG_USR_EXEC $user $TOUCH $object
-	verify_expect $immutable_expect $CHG_USR_EXEC $user $TOUCH -a $object
-	verify_expect $expect $CHG_USR_EXEC $user $TOUCH -m $object
+	verify_expect $expect chg_usr_exec $user touch $object
+	verify_expect $immutable_expect chg_usr_exec $user touch -a $object
+	verify_expect $expect chg_usr_exec $user touch -m $object
 }
 
 #
@@ -360,12 +360,12 @@ function unit_writeacl
 	typeset user=$2
 	typeset expect=${3:-0}
 
-	verify_expect $expect $CHG_USR_EXEC $user $CHMOD A+$TESTACL $object
-	verify_expect $expect $CHG_USR_EXEC $user $CHMOD A+$TESTACL $object
-	verify_expect $expect $CHG_USR_EXEC $user $CHMOD A0- $object
-	verify_expect $expect $CHG_USR_EXEC $user $CHMOD A0- $object
+	verify_expect $expect chg_usr_exec $user chmod A+$TESTACL $object
+	verify_expect $expect chg_usr_exec $user chmod A+$TESTACL $object
+	verify_expect $expect chg_usr_exec $user chmod A0- $object
+	verify_expect $expect chg_usr_exec $user chmod A0- $object
 	oldmode=$(get_mode $object)
-	verify_expect $expect $CHG_USR_EXEC $user $CHMOD $TESTMODE $object
+	verify_expect $expect chg_usr_exec $user chmod $TESTMODE $object
 }
 
 #
@@ -385,10 +385,10 @@ function test_readonly
 
 	for user in $ZFS_ACL_CUR_USER root $ZFS_ACL_STAFF2; do
 		if [[ -d $object ]]; then
-			log_must usr_exec $CHMOD \
+			log_must usr_exec chmod \
 			    A+user:$user:${ace_dir}:allow $object
 		else
-			log_must usr_exec $CHMOD \
+			log_must usr_exec chmod \
 			    A+user:$user:${ace_file}:allow $object
 		fi
 
@@ -435,10 +435,10 @@ function test_immutable
 
 	for user in $ZFS_ACL_CUR_USER root $ZFS_ACL_STAFF2; do
 		if [[ -d $object ]]; then
-			log_must usr_exec $CHMOD \
+			log_must usr_exec chmod \
 			    A+user:$user:${ace_dir}:allow $object
 		else
-			log_must usr_exec $CHMOD \
+			log_must usr_exec chmod \
 			    A+user:$user:${ace_file}:allow $object
 		fi
 		log_must set_attribute $object "i"
@@ -474,14 +474,14 @@ function test_nounlink
 		log_fail "Object($object) not defined."
 	fi
 
-	$ECHO "Testing nounlink of $object"
+	echo "Testing nounlink of $object"
 
 	for user in $ZFS_ACL_CUR_USER root $ZFS_ACL_STAFF2; do
 		if [[ -d $object ]]; then
-			log_must usr_exec $CHMOD \
+			log_must usr_exec chmod \
 			    A+user:$user:${ace_dir}:allow $object
 		else
-			log_must usr_exec $CHMOD \
+			log_must usr_exec chmod \
 			    A+user:$user:${ace_file}:allow $object
 		fi
 		log_must set_attribute $object "u"
@@ -521,10 +521,10 @@ function test_appendonly
 
 	for user in $ZFS_ACL_CUR_USER root $ZFS_ACL_STAFF2; do
 		if [[ -d $object ]]; then
-			log_must usr_exec $CHMOD \
+			log_must usr_exec chmod \
 			    A+user:$user:${ace_dir}:allow $object
 		else
-			log_must usr_exec $CHMOD \
+			log_must usr_exec chmod \
 			    A+user:$user:${ace_file}:allow $object
 		fi
 		log_must set_attribute $object "a"
@@ -572,14 +572,14 @@ log_assert "Verify DOS & BSD'ish attributes will provide the " \
     "access limitation as expected."
 log_onexit cleanup
 
-$ECHO "$TESTSTR" > $TESTFILE
+echo "$TESTSTR" > $TESTFILE
 
 typeset gobject
 typeset gattr
 for gattr in $ATTRS ; do
 	for fs in $FS ; do
 		mtpt=$(get_prop mountpoint $fs)
-		$CHMOD 777 $mtpt
+		chmod 777 $mtpt
 		for user in root $ZFS_ACL_STAFF1; do
 			log_must set_cur_usr $user
 			for file in $FILES ; do

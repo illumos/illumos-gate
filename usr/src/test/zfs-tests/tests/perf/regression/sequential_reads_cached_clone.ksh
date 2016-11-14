@@ -12,7 +12,7 @@
 #
 
 #
-# Copyright (c) 2015 by Delphix. All rights reserved.
+# Copyright (c) 2015, 2016 by Delphix. All rights reserved.
 #
 
 #
@@ -36,7 +36,7 @@
 
 function cleanup
 {
-	log_must $ZFS destroy $TESTFS
+	log_must zfs destroy $TESTFS
 }
 
 log_assert "Measure IO stats during sequential read load"
@@ -44,7 +44,7 @@ log_onexit cleanup
 
 export TESTFS=$PERFPOOL/testfs
 recreate_perfpool
-log_must $ZFS create $PERF_FS_OPTS $TESTFS
+log_must zfs create $PERF_FS_OPTS $TESTFS
 
 # Make sure the working set can be cached in the arc. Aim for 1/2 of arc.
 export TOTAL_SIZE=$(($(get_max_arc_size) / 2))
@@ -69,7 +69,7 @@ fi
 # of the available files.
 export NUMJOBS=$(get_max $PERF_NTHREADS)
 export FILE_SIZE=$((TOTAL_SIZE / NUMJOBS))
-log_must $FIO $FIO_SCRIPTS/mkfiles.fio
+log_must fio $FIO_SCRIPTS/mkfiles.fio
 
 log_note "Creating snapshot, $TESTSNAP, of $TESTFS"
 create_snapshot $TESTFS $TESTSNAP
@@ -85,9 +85,9 @@ export TESTFS=$PERFPOOL/$TESTCLONE
 lun_list=$(pool_to_lun_list $PERFPOOL)
 log_note "Collecting backend IO stats with lun list $lun_list"
 export collect_scripts=("$PERF_SCRIPTS/io.d $PERFPOOL $lun_list 1" "io"
-    "$PERF_SCRIPTS/prefetch_io.d $PERFPOOL 1" "prefetch" "$VMSTAT 1" "vmstat"
-    "$MPSTAT 1" "mpstat" "$IOSTAT -xcnz 1" "iostat")
+    "$PERF_SCRIPTS/prefetch_io.d $PERFPOOL 1" "prefetch" "vmstat 1" "vmstat"
+    "mpstat 1" "mpstat" "iostat -xcnz 1" "iostat")
 
 log_note "Sequential cached reads from $TESTFS with $PERF_RUNTYPE settings"
-do_fio_run sequential_reads.fio $FALSE $FALSE
+do_fio_run sequential_reads.fio false false
 log_pass "Measure IO stats during sequential cached read load"

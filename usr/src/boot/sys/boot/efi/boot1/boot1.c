@@ -410,7 +410,7 @@ try_boot(void)
 	if ((status = bs->LoadImage(TRUE, image, devpath_last(dev->devpath),
 	    loaderbuf, loadersize, &loaderhandle)) != EFI_SUCCESS) {
 		printf("Failed to load image provided by %s, size: %zu, (%lu)\n",
-		     mod->name, bufsize, EFI_ERROR_CODE(status));
+		     mod->name, loadersize, EFI_ERROR_CODE(status));
 		goto errout;
 	}
 

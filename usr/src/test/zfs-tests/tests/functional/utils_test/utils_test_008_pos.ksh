@@ -26,7 +26,7 @@
 #
 
 #
-# Copyright (c) 2013 by Delphix. All rights reserved.
+# Copyright (c) 2013, 2016 by Delphix. All rights reserved.
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -48,9 +48,9 @@ function cleanup
 {
 	ismounted $TESTPOOL/$TESTFS
 	(( $? != 0 )) && \
-		log_must $ZFS mount $TESTPOOL/$TESTFS
+		log_must zfs mount $TESTPOOL/$TESTFS
 
-	$RM -rf $TESTDIR/*
+	rm -rf $TESTDIR/*
 }
 
 log_onexit cleanup
@@ -59,8 +59,8 @@ log_assert "Ensure that the ncheck(1M) utility fails on a ZFS file system."
 
 populate_dir $NUM_FILES
 
-log_must $ZFS unmount $TESTDIR
+log_must zfs unmount $TESTDIR
 
-log_mustnot $NCHECK /dev/rdsk/${DISK}s0
+log_mustnot ncheck /dev/rdsk/${DISK}s0
 
 log_pass "ncheck(1M) returned an error as expected."

@@ -4,6 +4,10 @@
  */
 
 /*
+ * Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
+ */
+
+/*
  * Copyright (c) 2001 Atsushi Onoe
  * Copyright (c) 2002-2008 Sam Leffler, Errno Consulting
  * All rights reserved.
@@ -717,7 +721,7 @@ ieee80211_wme_updateparams(struct ieee80211com *ic)
 	wme->wme_update(ic);
 
 	ieee80211_dbg(IEEE80211_MSG_WME, "ieee80211_wme_updateparams(): "
-	    "%s: WME params updated, cap_info 0x%x\n",
+	    "WME params updated, cap_info 0x%x\n",
 	    ic->ic_opmode == IEEE80211_M_STA ?
 	    wme->wme_wmeChanParams.cap_info :
 	    wme->wme_bssChanParams.cap_info);
@@ -914,7 +918,8 @@ ieee80211_newstate(ieee80211com_t *ic, enum ieee80211_state nstate, int arg)
 		}
 		break;
 	case IEEE80211_S_ASSOC:
-		ASSERT(ic->ic_opmode == IEEE80211_M_STA);
+		ASSERT(ic->ic_opmode == IEEE80211_M_STA ||
+		    ic->ic_opmode == IEEE80211_M_IBSS);
 		switch (ostate) {
 		case IEEE80211_S_INIT:
 		case IEEE80211_S_SCAN:

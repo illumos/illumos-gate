@@ -25,6 +25,10 @@
 # Use is subject to license terms.
 #
 
+#
+# Copyright (c) 2016 by Delphix. All rights reserved.
+#
+
 . $STF_SUITE/tests/functional/acl/acl_common.kshlib
 
 #
@@ -64,7 +68,7 @@ for user in root $ZFS_ACL_STAFF1; do
 	paxout=$TMP_DIR/files.pax
 	cd $INI_DIR
 	log_must cksum_files $INI_DIR BEFORE_FCKSUM BEFORE_ACKSUM
-	log_must eval "usr_exec $PAX -w -@ -f $paxout * > /dev/null 2>&1"
+	log_must eval "usr_exec pax -w -@ -f $paxout * > /dev/null 2>&1"
 
 	#
 	# Enter into test directory and pax $TMP_DIR/files.pax to current
@@ -72,7 +76,7 @@ for user in root $ZFS_ACL_STAFF1; do
 	# directory record.
 	#
 	cd $TST_DIR
-	log_must eval "usr_exec $PAX -r -@ -f $paxout > /dev/null 2>&1"
+	log_must eval "usr_exec pax -r -@ -f $paxout > /dev/null 2>&1"
 	log_must cksum_files $TST_DIR AFTER_FCKSUM AFTER_ACKSUM
 
 	log_must compare_cksum BEFORE_FCKSUM AFTER_FCKSUM

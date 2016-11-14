@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 #
 #	This Makefiles contains the common targets and definitions for
 #	all kernels. It is to be included in the Makefiles for specific
@@ -242,6 +243,14 @@ $(USR_BRAND_DIR)/%:	$(OBJS_DIR)/% $(USR_BRAND_DIR) FRC
 	$(INS.file)
 
 $(ROOT_KICONV_DIR)/%:	$(OBJS_DIR)/% $(ROOT_KICONV_DIR) FRC
+	$(INS.file)
+
+$(ROOT_FIRMWARE_DIR)/$(MODULE):
+	$(INS.dir)
+
+$(ROOT_FIRMWARE_DIR)/$(MODULE)/%:= FILEMODE = $(CFILEMODE)
+
+$(ROOT_FIRMWARE_DIR)/$(MODULE)/%: $(ROOT_FIRMWARE_DIR)/$(MODULE) $(FWDIR)/%
 	$(INS.file)
 
 include $(SRC)/Makefile.psm.targ

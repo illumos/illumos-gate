@@ -26,7 +26,7 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2012, 2016 by Delphix. All rights reserved.
 # Copyright 2016 Nexenta Systems, Inc.
 #
 
@@ -50,10 +50,10 @@ verify_runnable "global"
 
 function cleanup
 {
-	$RM -rf $mntpt/file $mntpt/dir >/dev/null 2>&1
+	rm -rf $mntpt/file $mntpt/dir >/dev/null 2>&1
 
-	log_must $CP $orig_user_attr /etc/user_attr
-	log_must $RM -f $orig_user_attr
+	log_must cp $orig_user_attr /etc/user_attr
+	log_must rm -f $orig_user_attr
 }
 
 function try
@@ -64,7 +64,7 @@ function try
 	typeset priv=$4		# What privilege to run with if non-root
 	typeset op=$5		# Whether to set or clear the attribute
 
-	typeset cmd="$CHMOD $op$attr $obj"
+	typeset cmd="chmod $op$attr $obj"
 
 	#
 	# No one can add 'q' (av_quarantine) to a directory. root can do
@@ -80,21 +80,21 @@ function try
 		fi
 	else
 		if [[ $attr =~ 'q' && -d $obj && $op == $add ]]; then
-			log_mustnot $SU $user -c "$cmd"
+			log_mustnot su $user -c "$cmd"
 		else
 			if [[ $op == $add ]]; then
 				if [[ -n $priv ]]; then
-					log_must $SU $user -c "$cmd"
+					log_must su $user -c "$cmd"
 				else
-					log_mustnot $SU $user -c "$cmd"
+					log_mustnot su $user -c "$cmd"
 				fi
 			else
 				if [[ $attr = 'q' && -d $obj ]]; then
-					log_must $SU $user -c "$cmd"
+					log_must su $user -c "$cmd"
 				elif [[ $priv =~ 'all' ]]; then
-					log_must $SU $user -c "$cmd"
+					log_must su $user -c "$cmd"
 				else
-					log_mustnot $SU $user -c "$cmd"
+					log_mustnot su $user -c "$cmd"
 					#
 					# Remove the attribute, so the next
 					# iteration starts with a known state.
@@ -118,7 +118,7 @@ function chk_attr
 	typeset attr=$3
 
 	# Extract the attribute string - just the text inside the braces
-	typeset attrstr="$($LS -d/ c $obj | $SED '1d; s/.*{\(.*\)}.*/\1/g')"
+	typeset attrstr="$(ls -d/ c $obj | sed '1d; s/.*{\(.*\)}.*/\1/g')"
 
 	if [[ $op == $add ]]; then
 		[[ $attrstr =~ $attr ]] || log_fail "$op $attr -> $attrstr"
@@ -147,7 +147,7 @@ function grant_priv
 	# If we're root, don't modify /etc/user_attr
 	[[ $user == 'root' ]] && return 0
 
-	$ECHO "$user::::type=normal;defaultpriv=basic$priv_mod" >> \
+	echo "$user::::type=normal;defaultpriv=basic$priv_mod" >> \
 	    /etc/user_attr
 	return $?
 }
@@ -167,7 +167,7 @@ function reset_privs
 
 	priv_mod=
 
-	$CP $orig_user_attr /etc/user_attr || log_fail "Couldn't modify user_attr"
+	cp $orig_user_attr /etc/user_attr || log_fail "Couldn't modify user_attr"
 	return 0
 }
 
@@ -181,12 +181,12 @@ mntpt=$(get_prop mountpoint $TESTPOOL/$TESTFS)
 orig_user_attr="/tmp/user_attr.$$"
 attributes="u i a d q m"
 
-log_must $CP /etc/user_attr $orig_user_attr
+log_must cp /etc/user_attr $orig_user_attr
 
 for owner in root $ZFS_ACL_STAFF1 $ZFS_ACL_STAFF2; do
-	$TOUCH $mntpt/file || log_fail "Failed to create $mntpt/file"
-	$MKDIR $mntpt/dir || log_fail "Failed to mkdir $mntpt/dir"
-	$CHOWN $owner $mntpt/file $mntpt/dir || log_fail "Failed to chown file"
+	touch $mntpt/file || log_fail "Failed to create $mntpt/file"
+	mkdir $mntpt/dir || log_fail "Failed to mkdir $mntpt/dir"
+	chown $owner $mntpt/file $mntpt/dir || log_fail "Failed to chown file"
 	for user in 'root' $ZFS_ACL_STAFF2; do
 		for attr in $attributes; do
 			for priv in 'file_flag_set' 'all'; do
@@ -200,8 +200,8 @@ for owner in root $ZFS_ACL_STAFF1 $ZFS_ACL_STAFF2; do
 			done
 		done
 	done
-	$RM -rf $mntpt/file $mntpt/dir || log_fail \
-	    "$($LS -d/ c $mntpt/file $mntpt/dir)"
+	rm -rf $mntpt/file $mntpt/dir || log_fail \
+	    "$(ls -d/ c $mntpt/file $mntpt/dir)"
 done
 
 log_pass "Set/Clear BSD'ish attributes succeed while user has " \

@@ -26,7 +26,7 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2012, 2016 by Delphix. All rights reserved.
 #
 
 . $STF_SUITE/tests/functional/acl/acl_common.kshlib
@@ -87,25 +87,25 @@ function verify_explicit_ACL_rule #node access flag
 		rflag=allow
 	fi
 
-	log_must usr_exec $CHMOD A+everyone@:$access:$flag $node
-	log_must usr_exec $CHMOD A+user:$ZFS_ACL_OTHER1:$access:$rflag $node
+	log_must usr_exec chmod A+everyone@:$access:$flag $node
+	log_must usr_exec chmod A+user:$ZFS_ACL_OTHER1:$access:$rflag $node
 	check_access $log $ZFS_ACL_OTHER1 $node $access $rflag
-	log_must usr_exec $CHMOD A0- $node
+	log_must usr_exec chmod A0- $node
 
 	log_must usr_exec \
-		$CHMOD A+group:$ZFS_ACL_OTHER_GROUP:$access:$rflag $node
+		chmod A+group:$ZFS_ACL_OTHER_GROUP:$access:$rflag $node
 	check_access $log $ZFS_ACL_OTHER1 $node $access $rflag
 	check_access $log $ZFS_ACL_OTHER2 $node $access $rflag
-	log_must usr_exec $CHMOD A0- $node
-	log_must usr_exec $CHMOD A0- $node
+	log_must usr_exec chmod A0- $node
+	log_must usr_exec chmod A0- $node
 
 	log_must usr_exec \
-		$CHMOD A+group:$ZFS_ACL_OTHER_GROUP:$access:$flag $node
-	log_must usr_exec $CHMOD A+user:$ZFS_ACL_OTHER1:$access:$rflag $node
+		chmod A+group:$ZFS_ACL_OTHER_GROUP:$access:$flag $node
+	log_must usr_exec chmod A+user:$ZFS_ACL_OTHER1:$access:$rflag $node
 	$log rwx_node $ZFS_ACL_OTHER1 $node $access
 	$rlog rwx_node $ZFS_ACL_OTHER2 $node $access
-	log_must usr_exec $CHMOD A0- $node
-	log_must usr_exec $CHMOD A0- $node
+	log_must usr_exec chmod A0- $node
+	log_must usr_exec chmod A0- $node
 }
 
 log_assert "Verify that explicit ACL setting to specified user or group will" \
@@ -119,9 +119,9 @@ typeset node
 for user in root $ZFS_ACL_STAFF1; do
 	log_must set_cur_usr $user
 
-	log_must usr_exec $TOUCH $testfile
-	log_must usr_exec $MKDIR $testdir
-	log_must usr_exec $CHMOD 755 $testfile $testdir
+	log_must usr_exec touch $testfile
+	log_must usr_exec mkdir $testdir
+	log_must usr_exec chmod 755 $testfile $testdir
 
 	for node in $testfile $testdir; do
 		for access in ${a_access[@]}; do
@@ -131,7 +131,7 @@ for user in root $ZFS_ACL_STAFF1; do
 		done
 	done
 
-	log_must usr_exec $RM -rf $testfile $testdir
+	log_must usr_exec rm -rf $testfile $testdir
 done
 
 log_pass "Explicit ACL setting to specified user or group will override " \
