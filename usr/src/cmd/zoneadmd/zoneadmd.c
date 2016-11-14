@@ -554,9 +554,16 @@ static int
 zone_ready(zlog_t *zlogp, zone_mnt_t mount_cmd, int zstate)
 {
 	int err;
+	boolean_t do_prestate;
 
-	if (!ALT_MOUNT(mount_cmd) &&
-	    brand_prestatechg(zlogp, zstate, Z_READY) != 0)
+	/*
+	 * LX zones don't like prestate/poststate being done on non-booting
+	 * mount commands.  Other zones may, so be picky about when/when-not
+	 * to invoke pre/post state change.
+	 */
+	do_prestate = (strcmp(brand_name, "lx") != 0 || !ALT_MOUNT(mount_cmd));
+
+	if (do_prestate && brand_prestatechg(zlogp, zstate, Z_READY) != 0)
 		return (-1);
 
 	if ((err = zonecfg_create_snapshot(zone_name)) != Z_OK) {
@@ -580,8 +587,7 @@ zone_ready(zlog_t *zlogp, zone_mnt_t mount_cmd, int zstate)
 		goto bad;
 	}
 
-	if (!ALT_MOUNT(mount_cmd) &&
-	    brand_poststatechg(zlogp, zstate, Z_READY) != 0)
+	if (do_prestate && brand_poststatechg(zlogp, zstate, Z_READY) != 0)
 		goto bad;
 
 	return (0);
@@ -591,7 +597,7 @@ bad:
 	 * If something goes wrong, we up the zones's state to the target
 	 * state, READY, and then invoke the hook as if we're halting.
 	 */
-	if (!ALT_MOUNT(mount_cmd))
+	if (do_prestate)
 		(void) brand_poststatechg(zlogp, ZONE_STATE_READY, Z_HALT);
 	return (-1);
 }
