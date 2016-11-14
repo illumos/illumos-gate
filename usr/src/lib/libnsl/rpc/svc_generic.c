@@ -182,6 +182,14 @@ SVCXPRT *
 svc_tp_create(void (*dispatch)(), const rpcprog_t prognum,
 			const rpcvers_t versnum, const struct netconfig *nconf)
 {
+	return (svc_tp_create_withbind(dispatch, prognum, versnum, nconf, NULL));
+}
+	
+SVCXPRT *
+svc_tp_create_withbind(void (*dispatch)(), const rpcprog_t prognum,
+	const rpcvers_t versnum, const struct netconfig *nconf,
+	const struct t_bind *bindaddr)
+{
 	SVCXPRT *xprt;
 	boolean_t anon_mlp = B_FALSE;
 
@@ -194,7 +202,7 @@ svc_tp_create(void (*dispatch)(), const rpcprog_t prognum,
 	/* Some programs need to allocate MLP for multilevel services */
 	if (is_system_labeled() && is_multilevel(prognum))
 		anon_mlp = B_TRUE;
-	xprt = svc_tli_create_common(RPC_ANYFD, nconf, NULL, 0, 0, anon_mlp);
+	xprt = svc_tli_create_common(RPC_ANYFD, nconf, bindaddr, 0, 0, anon_mlp);
 	if (xprt == NULL)
 		return (NULL);
 
@@ -207,6 +215,73 @@ svc_tp_create(void (*dispatch)(), const rpcprog_t prognum,
 		return (NULL);
 	}
 	return (xprt);
+}
+
+/*
+ * Wrapper around svc_tp_create_withbind() for when we just want to
+ * specify the IP port number.
+ *
+ * The normal (for TLI) way to do this would be netdir_getbyname()
+ * with HOST_ANY and our IP port as a "service" string.
+ * However, nobody really cares about the TLI way anymore,
+ * and just doing something IP specific is much easier.
+ */
+SVCXPRT *
+svc_tp_create_withport(void (*dispatch)(), const rpcprog_t prognum,
+    const rpcvers_t versnum, const struct netconfig *nconf, int portnum)
+{
+	struct sockaddr_in6 sin6;
+	struct sockaddr_in sin;
+	struct t_bind bind;
+	struct t_bind *bindp = NULL;
+
+	(void) memset(&bind, 0, sizeof (bind));
+
+	if (nconf == NULL) {
+		(void) syslog(LOG_ERR, "svc_tp_create: invalid netconfig "
+		    "structure for prog %d vers %d", prognum, versnum);
+		return (NULL);
+	}
+
+	if (portnum != 0 &&
+	    strcmp(nconf->nc_protofmly, NC_INET6) == 0) {
+
+		(void) memset(&sin6, 0, sizeof (sin6));
+		sin6.sin6_family = AF_INET6;
+		sin6.sin6_port = htons(portnum);
+		/* leave the rest zeros (IN6ADDR_ANY) */
+
+		bind.addr.len = sizeof (sin6);
+		bind.addr.buf = (char *)&sin6;
+		bindp = &bind;
+	}
+
+	if (portnum != 0 &&
+	    strcmp(nconf->nc_protofmly, NC_INET) == 0) {
+
+		(void) memset(&sin, 0, sizeof (sin));
+		sin.sin_family = AF_INET;
+		sin.sin_port = htons(portnum);
+		/* leave the rest zeros (INADDR_ANY) */
+
+		bind.addr.len = sizeof (sin);
+		bind.addr.buf = (char *)&sin;
+		bindp = &bind;
+	}
+
+	if (bindp != NULL) {
+		if (!rpc_control(__RPC_SVC_LSTNBKLOG_GET, &bind.qlen)) {
+			syslog(LOG_ERR,
+			    "svc_tli_create: can't get listen backlog");
+			return (NULL);
+		}
+	}
+
+	/*
+	 * When bindp == NULL, this is the same as svc_tp_create().
+	 */
+	return (svc_tp_create_withbind(dispatch, prognum, versnum,
+	    nconf, bindp));
 }
 
 SVCXPRT *
@@ -363,6 +438,8 @@ svc_tli_create_common(const int ofd, const struct netconfig *nconf,
 			}
 		}
 		if (bindaddr) {
+			(void) __rpc_tli_set_options(fd, SOL_SOCKET,
+			    SO_REUSEADDR, 1);
 			if (t_bind(fd, (struct t_bind *)bindaddr, tres) == -1) {
 				char errorstr[100];
 
