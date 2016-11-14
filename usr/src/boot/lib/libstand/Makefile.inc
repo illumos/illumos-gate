@@ -22,14 +22,13 @@
 # standalone components and stuff we have modified locally
 SRCS=	$(LIB_BASE)/libz/gzguts.h $(LIB_BASE)/libz/zutil.h
 SRCS += $(LIBSTAND_SRC)/__main.c $(LIBSTAND_SRC)/assert.c
-SRCS +=	$(LIBSTAND_SRC)/bcd.c $(LIBSTAND_SRC)/bswap.c
-SRCS += $(LIBSTAND_SRC)/environment.c $(LIBSTAND_SRC)/getopt.c
-SRCS += $(LIBSTAND_SRC)/strtol.c $(LIBSTAND_SRC)/strtoul.c
-SRCS += $(LIBSTAND_SRC)/random.c $(LIBSTAND_SRC)/sbrk.c
-SRCS += $(LIBSTAND_SRC)/twiddle.c $(LIBSTAND_SRC)/zalloc.c
-SRCS += $(LIBSTAND_SRC)/zalloc_malloc.c
+SRCS +=	$(LIBSTAND_SRC)/bcd.c $(LIBSTAND_SRC)/environment.c
+SRCS += $(LIBSTAND_SRC)/getopt.c $(LIBSTAND_SRC)/strtol.c
+SRCS += $(LIBSTAND_SRC)/strtoul.c $(LIBSTAND_SRC)/random.c
+SRCS += $(LIBSTAND_SRC)/sbrk.c $(LIBSTAND_SRC)/twiddle.c
+SRCS += $(LIBSTAND_SRC)/zalloc.c $(LIBSTAND_SRC)/zalloc_malloc.c
 
-OBJS=	__main.o assert.o bcd.o bswap.o environment.o \
+OBJS=	__main.o assert.o bcd.o environment.o \
 	getopt.o gets.o globals.o pager.o printf.o \
 	strdup.o strerror.o strtol.o strtoul.o random.o \
 	sbrk.o twiddle.o zalloc.o zalloc_malloc.o

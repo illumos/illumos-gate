@@ -14,6 +14,7 @@
 # Copyright 2014 Garrett D'Amore <garrett@damore>
 # Copyright 2016 Joyent, Inc.
 # Copyright 2016 Nexenta Systems, Inc.
+# Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 #
 
 include		$(SRC)/Makefile.master
@@ -264,6 +265,7 @@ MANFILES= 	ASSERT.9f				\
 	 	enableok.9f				\
 	 	esballoc.9f				\
 	 	esbbcall.9f				\
+		firmload.9f				\
 	 	flushband.9f				\
 	 	flushq.9f				\
 	 	freeb.9f				\
@@ -897,6 +899,12 @@ MANLINKS=	SIZEOF_PTR.9f				\
 	 	dlokack.9f				\
 	 	dlphysaddrack.9f			\
 	 	dluderrorind.9f				\
+		firmware_close.9f			\
+		firmware_free.9f			\
+		firmware_get_size.9f			\
+		firmware_malloc.9f			\
+		firmware_open.9f			\
+		firmware_read.9f			\
 	 	free_pktiopb.9f				\
 	 	gld_intr.9f				\
 	 	gld_mac_alloc.9f			\
@@ -1681,6 +1689,13 @@ dluderrorind.9f				:= LINKSRC = dlbindack.9f
 desballoc.9f				:= LINKSRC = esballoc.9f
 
 unfreezestr.9f				:= LINKSRC = freezestr.9f
+
+firmware_close.9f			:= LINKSRC = firmload.9f
+firmware_free.9f			:= LINKSRC = firmload.9f
+firmware_get_size.9f			:= LINKSRC = firmload.9f
+firmware_malloc.9f			:= LINKSRC = firmload.9f
+firmware_open.9f			:= LINKSRC = firmload.9f
+firmware_read.9f			:= LINKSRC = firmload.9f
 
 free_pktiopb.9f				:= LINKSRC = get_pktiopb.9f
 

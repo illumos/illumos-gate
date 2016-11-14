@@ -25,6 +25,7 @@
 # Copyright 2013 Saso Kiselkov. All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2016 Nexenta Systems, Inc.
+# Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 #
 
 set name=pkg.fmri value=pkg:/system/header@$(PKGVERS)
@@ -996,6 +997,7 @@ file path=usr/include/sys/feature_tests.h
 file path=usr/include/sys/fem.h
 file path=usr/include/sys/file.h
 file path=usr/include/sys/filio.h
+file path=usr/include/sys/firmload.h
 file path=usr/include/sys/flock.h
 file path=usr/include/sys/flock_impl.h
 $(sparc_ONLY)file path=usr/include/sys/fm/cpu/SPARC64-VI.h
@@ -1981,6 +1983,8 @@ license lic_CDDL license=lic_CDDL
 license license_in_headers license=license_in_headers
 license usr/src/lib/pkcs11/include/THIRDPARTYLICENSE \
     license=usr/src/lib/pkcs11/include/THIRDPARTYLICENSE
+license usr/src/uts/common/sys/THIRDPARTYLICENSE.firmload \
+    license=usr/src/uts/common/sys/THIRDPARTYLICENSE.firmload
 link path=usr/include/iso/assert_iso.h target=../assert.h
 link path=usr/include/iso/errno_iso.h target=../errno.h
 link path=usr/include/iso/float_iso.h target=../float.h

@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 #
 
 #
@@ -38,13 +39,7 @@ set name=variant.arch value=i386
 dir path=kernel group=sys
 dir path=kernel/drv group=sys
 dir path=kernel/drv/$(ARCH64) group=sys
-driver name=iwp clone_perms="iwp 0666 root sys" perms="* 0666 root sys" \
-    alias=pciex8086,008d \
-    alias=pciex8086,008e \
-    alias=pciex8086,422b \
-    alias=pciex8086,422c \
-    alias=pciex8086,4238 \
-    alias=pciex8086,4239
+driver name=iwp clone_perms="iwp 0666 root sys" perms="* 0666 root sys"
 file path=kernel/drv/$(ARCH64)/iwp group=sys
 file path=kernel/drv/iwp group=sys
 legacy pkg=SUNWiwp desc="Intel(R) WiFi Link 6000 series driver" \

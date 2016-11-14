@@ -1,0 +1,152 @@
+.\"	$NetBSD: firmload.9,v 1.8 2014/03/18 18:20:40 riastradh Exp $
+.\"
+.\" Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
+.\"
+.\" Copyright (c) 2006 The NetBSD Foundation, Inc.
+.\" All rights reserved.
+.\"
+.\" This code is derived from software contributed to The NetBSD Foundation
+.\" by Jason R. Thorpe.
+.\"
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\"
+.\" THIS SOFTWARE IS PROVIDED BY THE NETBSD FOUNDATION, INC. AND CONTRIBUTORS
+.\" ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+.\" TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+.\" PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE FOUNDATION OR CONTRIBUTORS
+.\" BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+.\" CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+.\" SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+.\" INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+.\" CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+.\" ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+.\" POSSIBILITY OF SUCH DAMAGE.
+.\"
+.Dd January 22, 2016
+.Dt FIRMLOAD 9F
+.Os
+.Sh NAME
+.Nm firmload
+.Nd Firmware loader API for device drivers
+.Sh SYNOPSIS
+.In sys/firmload.h
+.Ft int
+.Fo "firmware_open"
+.Fa "const char *drvname"
+.Fa "const char *imgname"
+.Fa "firmware_handle_t *fhp"
+.Fc
+.Ft int
+.Fo "firmware_close"
+.Fa "firmware_handle_t fh"
+.Fc
+.Ft off_t
+.Fo "firmware_get_size"
+.Fa "firmware_handle_t fh"
+.Fc
+.Ft int
+.Fo "firmware_read"
+.Fa "firmware_handle_t fh"
+.Fa "off_t offset"
+.Fa "void *buf"
+.Fa "size_t size"
+.Fc
+.Sh PARAMETERS
+.Bl -tag -width Va
+.It Fa drvname
+The name of the driver using
+.Nm .
+This is used as the subdirectory holding the firmware images.
+.It Fa imgname
+The file name of a firmware image.
+.It Fa fhp
+The pointer used for returing a firmware handle.
+.It Fa fh
+The firmware handle.
+.It Fa offset
+The offset in the firmware image to start reading from.
+.It Fa buf
+Pointer to a buffer to hold the firmware data.
+.It Fa size
+Size of the buffer to hold the firmware data.
+.El
+.Sh DESCRIPTION
+.Nm
+provides a simple and convenient API for device drivers to load firmware
+images from files residing in the file system that are necessary for the
+devices that they control.
+It is primarily intended for devices without non-volatile firmware
+memory, which usually require the driver to load a firmware image at
+attach time.
+Firmware images reside in sub-directories, one for each driver, in the
+namespace "firmware" in the system default module search path as
+described in
+.Xr system 4 .
+.sp
+The following functions are provided by the
+.Nm
+API:
+.Bl -tag -width indent
+.It Fn "firmware_open"
+Open the firmware image
+.Fa imgname
+for the driver
+.Fa drvname .
+The path to the firmware image file is constructed by appending the string
+.Dq "firmware/drvname/imgname"
+to each system module path prefix until opening the firmware image
+file succeeds.
+.It Fn "firmware_close"
+Close the firmware image file associated with the firmware handle
+.Fa fh .
+.It Fn "firmware_get_size"
+Returns the size of the image file associated with the firmware handle
+.Fa fh .
+.It Fn "firmware_read"
+Reads from the image file associated with the firmware handle
+.Fa fh
+beginning at offset
+.Fa offset
+for length
+.Fa size .
+The firmware image data is placed into the buffer specified by
+.Fa buf .
+.Fn "firmware_read"
+will either read as much data as requested or fail, there are no short
+reads.
+.El
+.Sh CONTEXT
+These functions can be called from user and kernel context.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn firmware_open
+function returns zero and stores a firmware handle in
+.Fa fhp .
+Otherwise a non-zero error code is returned.
+.sp
+The function
+.Fn firmware_read
+will return zero on success and
+.Fa buf
+will be filled with
+.Fa size
+bytes of data.
+On failure -1 is returned.
+.sp
+The function
+.Fn firmware_get_size
+returns the size of a firmware image.
+.sp
+.Fn firmware_close
+will always return zero.
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh SEE ALSO
+.Xr system 4

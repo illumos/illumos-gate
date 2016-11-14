@@ -13,6 +13,7 @@
 # Copyright 2011, Richard Lowe
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2016 Nexenta Systems, Inc.
+# Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 #
 
 file path=usr/share/man/man9f/ASSERT.9f
@@ -259,6 +260,7 @@ file path=usr/share/man/man9f/dupmsg.9f
 file path=usr/share/man/man9f/enableok.9f
 file path=usr/share/man/man9f/esballoc.9f
 file path=usr/share/man/man9f/esbbcall.9f
+file path=usr/share/man/man9f/firmload.9f
 file path=usr/share/man/man9f/flushband.9f
 file path=usr/share/man/man9f/flushq.9f
 file path=usr/share/man/man9f/freeb.9f
@@ -907,6 +909,12 @@ link path=usr/share/man/man9f/dlokack.9f target=dlbindack.9f
 link path=usr/share/man/man9f/dlphysaddrack.9f target=dlbindack.9f
 link path=usr/share/man/man9f/dluderrorind.9f target=dlbindack.9f
 link path=usr/share/man/man9f/free_pktiopb.9f target=get_pktiopb.9f
+link path=usr/share/man/man9f/firmware_close.9f target=firmload.9f
+link path=usr/share/man/man9f/firmware_free.9f target=firmload.9f
+link path=usr/share/man/man9f/firmware_get_size.9f target=firmload.9f
+link path=usr/share/man/man9f/firmware_malloc.9f target=firmload.9f
+link path=usr/share/man/man9f/firmware_open.9f target=firmload.9f
+link path=usr/share/man/man9f/firmware_read.9f target=firmload.9f
 link path=usr/share/man/man9f/gld_intr.9f target=gld.9f
 link path=usr/share/man/man9f/gld_mac_alloc.9f target=gld.9f
 link path=usr/share/man/man9f/gld_mac_free.9f target=gld.9f

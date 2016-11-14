@@ -1,14 +1,14 @@
 '\" te
 .\" Copyright (c) 2003 Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 .\" Copyright 1989 AT&T
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SYSTEM 4 "Nov 3, 2004"
+.TH SYSTEM 4 "Jan 25, 2016"
 .SH NAME
 system \- system configuration information file
 .SH DESCRIPTION
-.sp
 .LP
 The \fBsystem\fR file is used for customizing the operation of the operating
 system kernel. The recommended procedure is to preserve the original
@@ -97,6 +97,16 @@ javaexec
 
 .RE
 
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBfirmware\fR\fR
+.ad
+.RS 10n
+Raw firmware images in subdirectories, one for each device driver
+module using \fBfirmload\fR(9F).
 .RE
 
 .sp
@@ -337,11 +347,9 @@ set moddebug | 0x40
 .sp
 
 .SH SEE ALSO
-.sp
 .LP
 \fBboot\fR(1M), \fBinit\fR(1M), \fBkernel\fR(1M)
 .SH WARNINGS
-.sp
 .LP
 Use care when modifying the \fBsystem\fR file; it modifies the operation of the
 kernel. If you preserved the original \fBsystem\fR file, you can boot using
@@ -351,6 +359,5 @@ file that will work, you may specify \fB/dev/null\fR. This acts as an empty
 \fBsystem\fR file, and the system will attempt to boot using its default
 settings.
 .SH NOTES
-.sp
 .LP
 The \fB/etc/system\fR file is read only once, at boot time.
