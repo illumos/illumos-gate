@@ -33,16 +33,14 @@
 	$SRC/head/rpcsvc/daemon_utils.h and libnsl:open_daemon_lock().
 -->
 
+<!-- Copyright (c) 2016 by Delphix. All rights reserved. -->
+
 <service_bundle type='manifest' name='SUNWnfscr:nfs-status'>
 
 <service
 	name='network/nfs/status'
 	type='service'
 	version='1'>
-
-	<create_default_instance enabled='false' />
-
-	<single_instance />
 
 	<dependency name='network'
 	    grouping='require_any'
@@ -88,6 +86,12 @@
 		<stability value='Evolving' />
 		<propval name='auto_enable' type='boolean' value='true' />
 	</property_group>
+
+	<instance name='default' enabled='false'>
+		<property_group name='nfs-props' type='com.oracle.nfs,props'>
+			<propval name='statd_port' type='integer' value='0'/>
+		</property_group>
+	</instance>
 
 	<stability value='Stable' />
 

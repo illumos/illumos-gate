@@ -19,7 +19,7 @@
 .\" Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright 2016 Nexenta Systems, Inc.
 .\"
-.Dd December 17, 2016
+.Dd December 18, 2016
 .Dt NFS 4
 .Os
 .Sh NAME
@@ -190,6 +190,13 @@ The default value is
 .It Sy mountd_port Ns = Ns Ar num
 The IP port number on which
 .Nm mountd
+should listen.
+The default value is
+.Li 0 ,
+which means it should use a default binding.
+.It Sy statd_port Ns = Ns Ar num
+The IP port number on which
+.Nm statd
 should listen.
 The default value is
 .Li 0 ,
