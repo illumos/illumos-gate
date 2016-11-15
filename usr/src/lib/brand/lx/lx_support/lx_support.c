@@ -21,7 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2015 Joyent, Inc.  All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*
@@ -86,63 +86,19 @@ lxs_err(char *msg, ...)
 }
 
 /*
- * The Linux init(1M) command requires communication over the /dev/initctl
- * FIFO.  Since any attempt to create a file in /dev will fail, we must
- * create it here.
+ * Cleanup from earlier versions of the code which created a /dev/initctl FIFO.
  */
 static void
-lxs_make_initctl()
+lxs_remove_initctl()
 {
-	char		cmdbuf[ARG_MAX];
-	char		path[MAXPATHLEN];
 	char		special[MAXPATHLEN];
-	struct stat	buf;
-	int		err;
 
 	if (snprintf(special, sizeof (special), "%s/dev/initctl", zoneroot) >=
 	    sizeof (special))
-		lxs_err("%s: %s", gettext("Failed to create /dev/initctl"),
+		lxs_err("%s: %s", gettext("Failed to cleanup /dev/initctl"),
 		    gettext("zoneroot is too long"));
 
-	if (snprintf(path, sizeof (path), "%s/root/dev/initctl", zoneroot) >=
-	    sizeof (path))
-		lxs_err("%s: %s", gettext("Failed to create /dev/initctl"),
-		    gettext("zoneroot is too long"));
-
-	/* create the actual fifo as <zoneroot>/dev/initctl */
-	if (stat(special, &buf) != 0) {
-		err = errno;
-		if (err != ENOENT)
-			lxs_err("%s: %s",
-			    gettext("Failed to create /dev/initctl"),
-			    strerror(err));
-		if (mkfifo(special, 0644) < 0) {
-			err = errno;
-			lxs_err("%s: %s",
-			    gettext("Failed to create /dev/initctl"),
-			    strerror(err));
-		}
-	} else {
-		if ((buf.st_mode & S_IFIFO) == 0)
-			lxs_err("%s: %s",
-			    gettext("Failed to create /dev/initctl"),
-			    gettext("It already exists, and is not a FIFO."));
-	}
-
-	/*
-	 * now lofs mount the <zoneroot>/dev/initctl fifo onto
-	 * <zoneroot>/root/dev/initctl
-	 */
-	if (snprintf(cmdbuf, sizeof (cmdbuf), "%s -F lofs %s %s", MOUNT_CMD,
-	    special, path) >= sizeof (cmdbuf))
-		lxs_err("%s: %s", gettext("Failed to lofs mount /dev/initctl"),
-		    gettext("zoneroot is too long"));
-
-	if (system(cmdbuf) < 0) {
-		err = errno;
-		lxs_err("%s: %s", gettext("Failed to lofs mount /dev/initctl"),
-		    strerror(err));
-	}
+	(void) unlink(special);
 }
 
 /*
@@ -214,7 +170,7 @@ lxs_boot()
 	zone_dochandle_t zdh;
 	char		*krelease;
 
-	lxs_make_initctl();
+	lxs_remove_initctl();
 	lxs_remove_autofsck();
 
 	if ((zdh = zonecfg_init_handle()) == NULL)

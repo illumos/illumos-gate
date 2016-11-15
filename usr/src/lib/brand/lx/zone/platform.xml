@@ -150,8 +150,6 @@
 	<symlink source="kmsg" target="console" />
 	<symlink source="conslog" target="console" />
 
-	<!-- Create a mount point for the /dev/initctl fifo -->
-	<device match="null" name="initctl" />
 	<!-- Create a mount point for /dev/shm tmpfs (see shm_overview(7)) -->
 	<!-- We need to force a dir for the Linux mount to work ok -->
 	<symlink source="shm/loop" target="." />
