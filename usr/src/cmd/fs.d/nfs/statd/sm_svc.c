@@ -99,6 +99,7 @@ static char statd_home[MAXPATHLEN];
 
 int debug;
 int regfiles_only = 0;		/* 1 => use symlinks in statmon, 0 => don't */
+int statmon_port = 0;		/* Typically 1110 */
 char hostname[MAXHOSTNAMELEN];
 
 /*
@@ -469,6 +470,8 @@ main(int argc, char *argv[])
 	int sz;
 	int pipe_fd = -1;
 	int connmaxrec = RPC_MAXDATASIZE;
+	struct netconfig *nconf;
+	NCONF_HANDLE *nc;
 
 	addrix = 0;
 	pathix = 0;
@@ -477,7 +480,7 @@ main(int argc, char *argv[])
 	if (init_hostname() < 0)
 		exit(1);
 
-	while ((c = getopt(argc, argv, "Dd:a:G:p:rU:")) != EOF)
+	while ((c = getopt(argc, argv, "Dd:a:G:p:rU:P:")) != EOF)
 		switch (c) {
 		case 'd':
 			(void) sscanf(optarg, "%d", &debug);
@@ -544,6 +547,14 @@ main(int argc, char *argv[])
 			break;
 		case 'r':
 			regfiles_only = 1;
+			break;
+		case 'P':
+			(void) sscanf(optarg, "%d", &statmon_port);
+			if (statmon_port & ~0xFFFF) {
+				(void) fprintf(stderr,
+				"statd: -P port invalid.\n");
+				statmon_port = 0;
+			}
 			break;
 		default:
 			(void) fprintf(stderr,
@@ -636,16 +647,52 @@ main(int argc, char *argv[])
 		syslog(LOG_INFO, "unable to set maximum RPC record size");
 	}
 
-	if (!svc_create(sm_prog_1, SM_PROG, SM_VERS, "netpath")) {
-		syslog(LOG_ERR, "statd: unable to create (SM_PROG, SM_VERS) "
-		    "for netpath.");
-		exit(1);
+	/*
+	 * Enumerate network transports and create service listeners
+	 * as appropriate for each.
+	 */
+	if ((nc = setnetconfig()) == NULL) {
+		syslog(LOG_ERR, "setnetconfig failed: %m");
+		return (-1);
 	}
+	while ((nconf = getnetconfig(nc)) != NULL) {
+		SVCXPRT *xprt;
 
-	if (!svc_create(sm_prog_1, NSM_ADDR_PROGRAM, NSM_ADDR_V1, "netpath")) {
-		syslog(LOG_ERR, "statd: unable to create (NSM_ADDR_PROGRAM, "
-		    "NSM_ADDR_V1) for netpath.");
+		/*
+		 * Skip things like tpi_raw, invisible...
+		 */
+		if ((nconf->nc_flag & NC_VISIBLE) == 0)
+			continue;
+		if (nconf->nc_semantics != NC_TPI_CLTS &&
+		    nconf->nc_semantics != NC_TPI_COTS &&
+		    nconf->nc_semantics != NC_TPI_COTS_ORD)
+			continue;
+
+		/*
+		 * If statmon_port is set, we'll bind the service
+		 * listener on that IP port (for IP transports).
+		 */
+		xprt = svc_tp_create_withport(sm_prog_1, SM_PROG, SM_VERS,
+		    nconf, statmon_port);
+		if (xprt == NULL) {
+			syslog(LOG_ERR, "statd: unable to create "
+			    "(SM_PROG, SM_VERS) for netconfig %s",
+			    nconf->nc_netid);
+			continue;
+		}
+
+		/*
+		 * Also register the NSM_ADDR program on this
+		 * transport handle.
+		 */
+		if (!svc_reg(xprt, NSM_ADDR_PROGRAM, NSM_ADDR_V1,
+			     sm_prog_1, nconf)) {
+			syslog(LOG_ERR, "statd: failed to register "
+			    "(NSM_ADDR_PROGRAM, NSM_ADDR_V1) for "
+			    "netconfig %s", nconf->nc_netid);
+		}
 	}
+	(void) endnetconfig(nc);
 
 	/*
 	 * Make sure /var/statmon and any alternate (-p) statmon
