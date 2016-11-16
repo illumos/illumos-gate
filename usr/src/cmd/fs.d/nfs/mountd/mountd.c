@@ -121,6 +121,7 @@ static int verbose;
 static int rejecting;
 static int mount_vers_min = MOUNTVERS;
 static int mount_vers_max = MOUNTVERS3;
+static int mount_port = 0;
 
 extern void nfscmd_func(void *, char *, size_t, door_desc_t *, uint_t);
 
@@ -379,6 +380,8 @@ main(int argc, char *argv[])
 	int listen_backlog = 0;
 	int max_threads = 0;
 	int tmp;
+	struct netconfig *nconf;
+	NCONF_HANDLE *nc;
 
 	int	pipe_fd = -1;
 
@@ -398,6 +401,7 @@ main(int argc, char *argv[])
 	can_do_mlp = priv_ineffect(PRIV_NET_BINDMLP);
 	if (__init_daemon_priv(PU_RESETGROUPS|PU_CLEARLIMITSET, -1, -1,
 	    PRIV_SYS_NFS, PRIV_PROC_AUDIT, PRIV_FILE_DAC_SEARCH,
+	    PRIV_NET_PRIVADDR,
 	    can_do_mlp ? PRIV_NET_BINDMLP : NULL, NULL) == -1) {
 		(void) fprintf(stderr,
 		    "%s: must be run with sufficient privileges\n",
@@ -488,6 +492,8 @@ main(int argc, char *argv[])
 	 * even though we may get versions > MOUNTVERS3, we still need
 	 * to start nfsauth service, so continue on regardless of values.
 	 */
+	if (mount_vers_max > MOUNTVERS3)
+		mount_vers_max = MOUNTVERS3;
 	if (mount_vers_min > mount_vers_max) {
 		fprintf(stderr, "server_versmin > server_versmax\n");
 		mount_vers_max = mount_vers_min;
@@ -645,48 +651,52 @@ main(int argc, char *argv[])
 	}
 
 	/*
-	 * Create datagram and connection oriented services
+	 * Enumerate network transports and create service listeners
+	 * as appropriate for each.
 	 */
-	if (mount_vers_max >= MOUNTVERS) {
-		if (svc_create(mnt, MOUNTPROG, MOUNTVERS, "datagram_v") == 0) {
-			fprintf(stderr,
-			    "couldn't register datagram_v MOUNTVERS\n");
-			exit(1);
-		}
-		if (svc_create(mnt, MOUNTPROG, MOUNTVERS, "circuit_v") == 0) {
-			fprintf(stderr,
-			    "couldn't register circuit_v MOUNTVERS\n");
-			exit(1);
-		}
+	if ((nc = setnetconfig()) == NULL) {
+		syslog(LOG_ERR, "setnetconfig failed: %m");
+		return (-1);
 	}
+	while ((nconf = getnetconfig(nc)) != NULL) {
+		SVCXPRT *xprt;
+		rpcvers_t vers;
 
-	if (mount_vers_max >= MOUNTVERS_POSIX) {
-		if (svc_create(mnt, MOUNTPROG, MOUNTVERS_POSIX,
-		    "datagram_v") == 0) {
-			fprintf(stderr,
-			    "couldn't register datagram_v MOUNTVERS_POSIX\n");
-			exit(1);
-		}
-		if (svc_create(mnt, MOUNTPROG, MOUNTVERS_POSIX,
-		    "circuit_v") == 0) {
-			fprintf(stderr,
-			    "couldn't register circuit_v MOUNTVERS_POSIX\n");
-			exit(1);
-		}
-	}
+		/*
+		 * Skip things like tpi_raw, invisible...
+		 */
+		if ((nconf->nc_flag & NC_VISIBLE) == 0)
+			continue;
+		if (nconf->nc_semantics != NC_TPI_CLTS &&
+		    nconf->nc_semantics != NC_TPI_COTS &&
+		    nconf->nc_semantics != NC_TPI_COTS_ORD)
+			continue;
 
-	if (mount_vers_max >= MOUNTVERS3) {
-		if (svc_create(mnt, MOUNTPROG, MOUNTVERS3, "datagram_v") == 0) {
-			fprintf(stderr,
-			    "couldn't register datagram_v MOUNTVERS3\n");
-			exit(1);
+		/*
+		 * If mount_port is set, we'll bind the service
+		 * listener on that IP port (for IP transports).
+		 */
+		vers = mount_vers_max;
+		xprt = svc_tp_create_withport(mnt, MOUNTPROG, vers,
+		    nconf, mount_port);
+		if (xprt == NULL) {
+			syslog(LOG_ERR, "mountd: unable to create "
+			    "(MOUNTD,%d) for netconfig %s",
+			    vers, nconf->nc_netid);
+			continue;
 		}
-		if (svc_create(mnt, MOUNTPROG, MOUNTVERS3, "circuit_v") == 0) {
-			fprintf(stderr,
-			    "couldn't register circuit_v MOUNTVERS3\n");
-			exit(1);
+		/*
+		 * Register additional versions on the transport.
+		 */
+		while (--vers >= mount_vers_min) {
+			if (!svc_reg(xprt, MOUNTPROG, vers, mnt, nconf)) {
+				(void) syslog(LOG_ERR, "mountd: "
+				    "failed to register vers %d on %s",
+				    vers, nconf->nc_netid);
+			}
 		}
 	}
+	(void) endnetconfig(nc);
 
 	/*
 	 * Start serving
