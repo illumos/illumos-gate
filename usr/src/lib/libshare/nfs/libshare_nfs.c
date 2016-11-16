@@ -2562,6 +2562,10 @@ struct proto_option_defs {
 	{"mountd_max_threads",
 	    "mountd_max_threads", PROTO_OPT_MOUNTD_MAX_THREADS,
 	    OPT_TYPE_NUMBER, 16, SVC_NFSD|SVC_MOUNTD, 1, INT32_MAX},
+#define	PROTO_OPT_MOUNTD_PORT			17
+	{"mountd_port",
+	    "mountd_port", PROTO_OPT_MOUNTD_PORT,
+	    OPT_TYPE_NUMBER, 0, SVC_MOUNTD, 1, UINT16_MAX},
 	{NULL}
 };
 

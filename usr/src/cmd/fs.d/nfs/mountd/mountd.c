@@ -20,8 +20,9 @@
  */
 
 /*
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012, 2016 by Delphix. All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -117,10 +118,12 @@ static void umountall(struct svc_req *);
 static int newopts(char *);
 static tsol_tpent_t *get_client_template(struct sockaddr *);
 
+static int debug;
 static int verbose;
 static int rejecting;
 static int mount_vers_min = MOUNTVERS;
 static int mount_vers_max = MOUNTVERS3;
+static int mountd_port = 0;
 
 extern void nfscmd_func(void *, char *, size_t, door_desc_t *, uint_t);
 
@@ -362,6 +365,82 @@ convert_int(int *val, char *str)
 	return (0);
 }
 
+/*
+ * This function is called for each configured network type to
+ * bind and register our RPC service programs.
+ *
+ * On TCP or UDP, we may want to bind MOUNTPROG on a specific port
+ * (when mountd_port is specified) in which case we'll use the
+ * variant of svc_tp_create() that lets us pass a bind address.
+ */
+static void
+md_svc_tp_create(struct netconfig *nconf)
+{
+	char port_str[8];
+	struct nd_hostserv hs;
+	struct nd_addrlist *al = NULL;
+	SVCXPRT *xprt = NULL;
+	rpcvers_t vers;
+
+	vers = mount_vers_max;
+
+	/*
+	 * If mountd_port is set and this is an inet transport,
+	 * bind this service on the specified port.  The TLI way
+	 * to create such a bind address is netdir_getbyname()
+	 * with the special "host" HOST_SELF_BIND.  This builds
+	 * an all-zeros IP address with the specified port.
+	 */
+	if (mountd_port != 0 &&
+	    (strcmp(nconf->nc_protofmly, NC_INET) == 0 ||
+	    strcmp(nconf->nc_protofmly, NC_INET6) == 0)) {
+		int err;
+
+		snprintf(port_str, sizeof (port_str), "%u",
+		    (unsigned short)mountd_port);
+
+		hs.h_host = HOST_SELF_BIND;
+		hs.h_serv = port_str;
+		err = netdir_getbyname((struct netconfig *)nconf, &hs, &al);
+		if (err == 0 && al != NULL) {
+			xprt = svc_tp_create_addr(mnt, MOUNTPROG, vers,
+			    nconf, al->n_addrs);
+			netdir_free(al, ND_ADDRLIST);
+		}
+		if (xprt == NULL) {
+			syslog(LOG_ERR, "mountd: unable to create "
+			    "(MOUNTD,%d) on transport %s (port %d)",
+			    vers, nconf->nc_netid, mountd_port);
+		}
+		/* fall-back to default bind */
+	}
+	if (xprt == NULL) {
+		/*
+		 * Had mountd_port=0, or non-inet transport,
+		 * or the bind to a specific port failed.
+		 * Do a default bind.
+		 */
+		xprt = svc_tp_create(mnt, MOUNTPROG, vers, nconf);
+	}
+	if (xprt == NULL) {
+		syslog(LOG_ERR, "mountd: unable to create "
+		    "(MOUNTD,%d) on transport %s",
+		    vers, nconf->nc_netid);
+		return;
+	}
+
+	/*
+	 * Register additional versions on this transport.
+	 */
+	while (--vers >= mount_vers_min) {
+		if (!svc_reg(xprt, MOUNTPROG, vers, mnt, nconf)) {
+			(void) syslog(LOG_ERR, "mountd: "
+			    "failed to register vers %d on %s",
+			    vers, nconf->nc_netid);
+		}
+	}
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -379,6 +458,8 @@ main(int argc, char *argv[])
 	int listen_backlog = 0;
 	int max_threads = 0;
 	int tmp;
+	struct netconfig *nconf;
+	NCONF_HANDLE *nc;
 
 	int	pipe_fd = -1;
 
@@ -398,6 +479,7 @@ main(int argc, char *argv[])
 	can_do_mlp = priv_ineffect(PRIV_NET_BINDMLP);
 	if (__init_daemon_priv(PU_RESETGROUPS|PU_CLEARLIMITSET, -1, -1,
 	    PRIV_SYS_NFS, PRIV_PROC_AUDIT, PRIV_FILE_DAC_SEARCH,
+	    PRIV_NET_PRIVADDR,
 	    can_do_mlp ? PRIV_NET_BINDMLP : NULL, NULL) == -1) {
 		(void) fprintf(stderr,
 		    "%s: must be run with sufficient privileges\n",
@@ -422,8 +504,18 @@ main(int argc, char *argv[])
 		    "failed, using default value");
 	}
 
-	while ((c = getopt(argc, argv, "vrm:")) != EOF) {
+	ret = nfs_smf_get_iprop("mountd_port", &mountd_port,
+	    DEFAULT_INSTANCE, SCF_TYPE_INTEGER, NFSD);
+	if (ret != SA_OK) {
+		syslog(LOG_ERR, "Reading of mountd_port from SMF "
+		    "failed, using default value");
+	}
+
+	while ((c = getopt(argc, argv, "dvrm:p:")) != EOF) {
 		switch (c) {
+		case 'd':
+			debug++;
+			break;
 		case 'v':
 			verbose++;
 			break;
@@ -438,6 +530,15 @@ main(int argc, char *argv[])
 				break;
 			}
 			max_threads = tmp;
+			break;
+		case 'p':
+			if (convert_int(&tmp, optarg) != 0 || tmp < 1 ||
+			    tmp > UINT16_MAX) {
+				(void) fprintf(stderr, "%s: invalid port "
+				    "number\n", argv[0]);
+				break;
+			}
+			mountd_port = tmp;
 			break;
 		default:
 			fprintf(stderr, "usage: mountd [-v] [-r]\n");
@@ -488,6 +589,8 @@ main(int argc, char *argv[])
 	 * even though we may get versions > MOUNTVERS3, we still need
 	 * to start nfsauth service, so continue on regardless of values.
 	 */
+	if (mount_vers_max > MOUNTVERS3)
+		mount_vers_max = MOUNTVERS3;
 	if (mount_vers_min > mount_vers_max) {
 		fprintf(stderr, "server_versmin > server_versmax\n");
 		mount_vers_max = mount_vers_min;
@@ -508,7 +611,8 @@ main(int argc, char *argv[])
 	/* Don't drop core if the NFS module isn't loaded. */
 	(void) signal(SIGSYS, SIG_IGN);
 
-	pipe_fd = daemonize_init();
+	if (!debug)
+		pipe_fd = daemonize_init();
 
 	/*
 	 * If we coredump it'll be in /core
@@ -516,7 +620,8 @@ main(int argc, char *argv[])
 	if (chdir("/") < 0)
 		fprintf(stderr, "chdir /: %s\n", strerror(errno));
 
-	openlog("mountd", LOG_PID, LOG_DAEMON);
+	if (!debug)
+		openlog("mountd", LOG_PID, LOG_DAEMON);
 
 	/*
 	 * establish our lock on the lock file and write our pid to it.
@@ -601,6 +706,11 @@ main(int argc, char *argv[])
 		exit(1);
 	}
 
+	if (mountd_port < 0 || mountd_port > UINT16_MAX) {
+		fprintf(stderr, "unable to use specified port\n");
+		exit(1);
+	}
+
 	/*
 	 * Make sure to unregister any previous versions in case the
 	 * user is reconfiguring the server in interesting ways.
@@ -645,48 +755,27 @@ main(int argc, char *argv[])
 	}
 
 	/*
-	 * Create datagram and connection oriented services
+	 * Enumerate network transports and create service listeners
+	 * as appropriate for each.
 	 */
-	if (mount_vers_max >= MOUNTVERS) {
-		if (svc_create(mnt, MOUNTPROG, MOUNTVERS, "datagram_v") == 0) {
-			fprintf(stderr,
-			    "couldn't register datagram_v MOUNTVERS\n");
-			exit(1);
-		}
-		if (svc_create(mnt, MOUNTPROG, MOUNTVERS, "circuit_v") == 0) {
-			fprintf(stderr,
-			    "couldn't register circuit_v MOUNTVERS\n");
-			exit(1);
-		}
+	if ((nc = setnetconfig()) == NULL) {
+		syslog(LOG_ERR, "setnetconfig failed: %m");
+		return (-1);
 	}
+	while ((nconf = getnetconfig(nc)) != NULL) {
+		/*
+		 * Skip things like tpi_raw, invisible...
+		 */
+		if ((nconf->nc_flag & NC_VISIBLE) == 0)
+			continue;
+		if (nconf->nc_semantics != NC_TPI_CLTS &&
+		    nconf->nc_semantics != NC_TPI_COTS &&
+		    nconf->nc_semantics != NC_TPI_COTS_ORD)
+			continue;
 
-	if (mount_vers_max >= MOUNTVERS_POSIX) {
-		if (svc_create(mnt, MOUNTPROG, MOUNTVERS_POSIX,
-		    "datagram_v") == 0) {
-			fprintf(stderr,
-			    "couldn't register datagram_v MOUNTVERS_POSIX\n");
-			exit(1);
-		}
-		if (svc_create(mnt, MOUNTPROG, MOUNTVERS_POSIX,
-		    "circuit_v") == 0) {
-			fprintf(stderr,
-			    "couldn't register circuit_v MOUNTVERS_POSIX\n");
-			exit(1);
-		}
+		md_svc_tp_create(nconf);
 	}
-
-	if (mount_vers_max >= MOUNTVERS3) {
-		if (svc_create(mnt, MOUNTPROG, MOUNTVERS3, "datagram_v") == 0) {
-			fprintf(stderr,
-			    "couldn't register datagram_v MOUNTVERS3\n");
-			exit(1);
-		}
-		if (svc_create(mnt, MOUNTPROG, MOUNTVERS3, "circuit_v") == 0) {
-			fprintf(stderr,
-			    "couldn't register circuit_v MOUNTVERS3\n");
-			exit(1);
-		}
-	}
+	(void) endnetconfig(nc);
 
 	/*
 	 * Start serving
