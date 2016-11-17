@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*
@@ -2170,7 +2171,7 @@ sa_delete_sharetab(sa_handle_t handle, char *path, char *proto)
 /*
  * sa_needs_refresh(handle)
  *
- * Returns B_TRUE if the internal cache needs to be refreshed do to a
+ * Returns B_TRUE if the internal cache needs to be refreshed due to a
  * change by another process.  B_FALSE returned otherwise.
  */
 boolean_t
