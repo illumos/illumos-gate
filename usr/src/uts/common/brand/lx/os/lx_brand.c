@@ -1468,62 +1468,6 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 		return (0);
 	}
 
-	case B_SIGEV_THREAD_ID: {
-		/*
-		 * Emulate Linux's timer_create(2) SIGEV_THREAD_ID
-		 * notification method. This mechanism is only meant
-		 * for userland threading libraries such as glibc and
-		 * is documented as such. Therefore, assume this is
-		 * only ever invoked for the purpose of alerting a
-		 * Linux threading library. Assume that the tid is a
-		 * member of the caller's process and the signal
-		 * number is valid. See lx_sigev_thread_id() for the
-		 * userland side of this emulation.
-		 *
-		 * The return code from this function is not checked
-		 * by the caller since it executes in an asynchronous
-		 * context and there is nothing much to be done. If
-		 * this function does fail then it will manifest as
-		 * Linux threads waiting for a signal they will never
-		 * receive.
-		 *
-		 * arg1 -- Linux tid
-		 * arg2 -- Linux signal number
-		 * arg3 -- sigval pointer
-		 */
-
-		int native_sig = lx_ltos_signo((int)arg2, 0);
-		pid_t spid;
-		int stid;
-		sigqueue_t *sqp;
-
-		if (native_sig == 0)
-			return (EINVAL);
-
-		if (lx_lpid_to_spair((pid_t)arg1, &spid, &stid) != 0) {
-			return (ESRCH);
-		}
-		sqp = kmem_zalloc(sizeof (sigqueue_t), KM_SLEEP);
-		mutex_enter(&curproc->p_lock);
-		if ((t = idtot(curproc, stid)) == NULL) {
-			mutex_exit(&curproc->p_lock);
-			kmem_free(sqp, sizeof (sigqueue_t));
-			return (ESRCH);
-		}
-
-		sqp->sq_info.si_signo = native_sig;
-		sqp->sq_info.si_code = SI_TIMER;
-		sqp->sq_info.si_pid = curproc->p_pid;
-		sqp->sq_info.si_zoneid = getzoneid();
-		sqp->sq_info.si_uid = crgetruid(CRED());
-		sqp->sq_info.si_value.sival_ptr = (void *)arg3;
-		sigaddqa(curproc, t, sqp);
-
-		mutex_exit(&curproc->p_lock);
-
-		return (0);
-	}
-
 	case B_PTRACE_STOP_FOR_OPT:
 		return (lx_ptrace_stop_for_option((int)arg1, arg2 == 0 ?
 		    B_FALSE : B_TRUE, (ulong_t)arg3, arg4));

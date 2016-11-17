@@ -140,7 +140,7 @@ timer_delete_locked(proc_t *p, timer_t tid, itimer_t *it)
 
 	it->it_backend->clk_timer_delete(it);
 
-	if (it->it_portev) {
+	if (it->it_flags & IT_PORT) {
 		mutex_enter(&it->it_mutex);
 		if (it->it_portev) {
 			port_kevent_t	*pev;
@@ -237,7 +237,7 @@ timer_grab(proc_t *p, timer_t tid)
  * should not be held on entry; timer_release() will acquire p_lock but
  * will drop it before returning.
  */
-static void
+void
 timer_release(proc_t *p, itimer_t *it)
 {
 	mutex_enter(&p->p_lock);
@@ -250,7 +250,7 @@ timer_release(proc_t *p, itimer_t *it)
  * p_lock should not be held on entry; timer_delete_grabbed() will acquire
  * p_lock, but will drop it before returning.
  */
-static void
+void
 timer_delete_grabbed(proc_t *p, timer_t tid, itimer_t *it)
 {
 	mutex_enter(&p->p_lock);
@@ -465,6 +465,9 @@ timer_fire(itimer_t *it)
 			it->it_pending = 1;
 			port_send_event((port_kevent_t *)it->it_portev);
 			mutex_exit(&it->it_mutex);
+		} else if (it->it_flags & IT_CALLBACK) {
+			it->it_cb_func(it);
+			ASSERT(MUTEX_NOT_HELD(&it->it_mutex));
 		} else if (it->it_flags & IT_SIGNAL) {
 			it->it_pending = 1;
 			mutex_exit(&it->it_mutex);
@@ -580,19 +583,169 @@ retry:
 	return (it);
 }
 
+/*
+ * Setup a timer
+ *
+ * This allocates an itimer_t (including a timer_t ID and slot in the process),
+ * wires it up according to the provided sigevent, and associates it with the
+ * desired clock backend.  Upon successful completion, the timer will be
+ * locked, preventing it from being armed via timer_settime() or deleted via
+ * timer_delete().  This gives the caller a chance to perform any last minute
+ * manipulations (such as configuring the IT_CALLBACK functionality and/or
+ * copying the timer_t out to userspace) before using timer_release() to unlock
+ * it or timer_delete_grabbed() to delete it.
+ */
 int
-timer_create(clockid_t clock, struct sigevent *evp, timer_t *tid)
+timer_setup(clock_backend_t *backend, struct sigevent *evp, port_notify_t *pnp,
+    itimer_t **itp, timer_t *tidp)
 {
-	struct sigevent ev;
 	proc_t *p = curproc;
-	clock_backend_t *backend;
+	int error = 0;
 	itimer_t *it;
 	sigqueue_t *sigq;
-	cred_t *cr = CRED();
+	timer_t tid;
+
+	/*
+	 * We'll allocate our sigqueue now, before we grab p_lock.
+	 * If we can't find an empty slot, we'll free it before returning.
+	 */
+	sigq = kmem_zalloc(sizeof (sigqueue_t), KM_SLEEP);
+
+	/*
+	 * Allocate a timer and choose a slot for it. This acquires p_lock.
+	 */
+	it = timer_alloc(p, &tid);
+	ASSERT(MUTEX_HELD(&p->p_lock));
+
+	if (it == NULL) {
+		mutex_exit(&p->p_lock);
+		kmem_free(sigq, sizeof (sigqueue_t));
+		return (EAGAIN);
+	}
+
+	ASSERT(tid < p->p_itimer_sz && p->p_itimer[tid] == NULL);
+	ASSERT(evp != NULL);
+
+	/*
+	 * If we develop other notification mechanisms, this will need
+	 * to call into (yet another) backend.
+	 */
+	sigq->sq_info.si_signo = evp->sigev_signo;
+	sigq->sq_info.si_value = evp->sigev_value;
+	sigq->sq_info.si_code = SI_TIMER;
+	sigq->sq_info.si_pid = p->p_pid;
+	sigq->sq_info.si_ctid = PRCTID(p);
+	sigq->sq_info.si_zoneid = getzoneid();
+	sigq->sq_info.si_uid = crgetruid(CRED());
+	sigq->sq_func = timer_signal;
+	sigq->sq_next = NULL;
+	sigq->sq_backptr = it;
+	it->it_sigq = sigq;
+	it->it_backend = backend;
+	it->it_lock = ITLK_LOCKED;
+
+	if (evp->sigev_notify == SIGEV_THREAD ||
+	    evp->sigev_notify == SIGEV_PORT) {
+		int port;
+		port_kevent_t *pkevp = NULL;
+
+		ASSERT(pnp != NULL);
+
+		/*
+		 * This timer is programmed to use event port notification when
+		 * the timer fires:
+		 * - allocate a port event structure and prepare it to be sent
+		 *   to the port as soon as the timer fires.
+		 * - when the timer fires :
+		 *   - if event structure was already sent to the port then this
+		 *	is a timer fire overflow => increment overflow counter.
+		 *   - otherwise send pre-allocated event structure to the port.
+		 * - the events field of the port_event_t structure counts the
+		 *   number of timer fired events.
+		 * - The event structured is allocated using the
+		 *   PORT_ALLOC_CACHED flag.
+		 *   This flag indicates that the timer itself will manage and
+		 *   free the event structure when required.
+		 */
+
+		it->it_flags |= IT_PORT;
+		port = pnp->portnfy_port;
+
+		/* associate timer as event source with the port */
+		error = port_associate_ksource(port, PORT_SOURCE_TIMER,
+		    (port_source_t **)&it->it_portsrc, timer_close_port,
+		    (void *)it, NULL);
+		if (error) {
+			mutex_exit(&p->p_lock);
+			kmem_cache_free(clock_timer_cache, it);
+			kmem_free(sigq, sizeof (sigqueue_t));
+			return (error);
+		}
+
+		/* allocate an event structure/slot */
+		error = port_alloc_event(port, PORT_ALLOC_SCACHED,
+		    PORT_SOURCE_TIMER, &pkevp);
+		if (error) {
+			(void) port_dissociate_ksource(port, PORT_SOURCE_TIMER,
+			    (port_source_t *)it->it_portsrc);
+			mutex_exit(&p->p_lock);
+			kmem_cache_free(clock_timer_cache, it);
+			kmem_free(sigq, sizeof (sigqueue_t));
+			return (error);
+		}
+
+		/* initialize event data */
+		port_init_event(pkevp, tid, pnp->portnfy_user,
+		    timer_port_callback, it);
+		it->it_portev = pkevp;
+		it->it_portfd = port;
+	} else {
+		if (evp->sigev_notify == SIGEV_SIGNAL)
+			it->it_flags |= IT_SIGNAL;
+	}
+
+	/* Populate the slot now that the timer is prepped. */
+	p->p_itimer[tid] = it;
+	mutex_exit(&p->p_lock);
+
+	/*
+	 * Call on the backend to verify the event argument (or return
+	 * EINVAL if this clock type does not support timers).
+	 */
+	if ((error = backend->clk_timer_create(it, timer_fire)) != 0)
+		goto err;
+
+	it->it_lwp = ttolwp(curthread);
+	it->it_proc = p;
+
+	*itp = it;
+	*tidp = tid;
+	return (0);
+
+err:
+	/*
+	 * If we're here, an error has occurred late in the timer creation
+	 * process.  We need to regrab p_lock, and delete the incipient timer.
+	 * Since we never unlocked the timer (it was born locked), it's
+	 * impossible for a removal to be pending.
+	 */
+	ASSERT(!(it->it_lock & ITLK_REMOVE));
+	timer_delete_grabbed(p, tid, it);
+
+	return (error);
+}
+
+
+int
+timer_create(clockid_t clock, struct sigevent *evp, timer_t *tidp)
+{
 	int error = 0;
-	timer_t i;
+	proc_t *p = curproc;
+	clock_backend_t *backend;
+	struct sigevent ev;
+	itimer_t *it;
+	timer_t tid;
 	port_notify_t tim_pnevp;
-	port_kevent_t *pkevp = NULL;
 
 	if ((backend = CLOCK_BACKEND(clock)) == NULL)
 		return (set_errno(EINVAL));
@@ -660,121 +813,20 @@ timer_create(clockid_t clock, struct sigevent *evp, timer_t *tid)
 		ev = backend->clk_default;
 	}
 
-	/*
-	 * We'll allocate our sigqueue now, before we grab p_lock.
-	 * If we can't find an empty slot, we'll free it before returning.
-	 */
-	sigq = kmem_zalloc(sizeof (sigqueue_t), KM_SLEEP);
-
-	/*
-	 * Allocate a timer and choose a slot for it. This acquires p_lock.
-	 */
-	it = timer_alloc(p, &i);
-	ASSERT(MUTEX_HELD(&p->p_lock));
-
-	if (it == NULL) {
-		mutex_exit(&p->p_lock);
-		kmem_free(sigq, sizeof (sigqueue_t));
-		return (set_errno(EAGAIN));
+	if ((error = timer_setup(backend, &ev, &tim_pnevp, &it, &tid)) != 0) {
+		return (set_errno(error));
 	}
 
-	ASSERT(i < p->p_itimer_sz && p->p_itimer[i] == NULL);
-
 	/*
-	 * If we develop other notification mechanisms, this will need
-	 * to call into (yet another) backend.
+	 * Populate si_value with the timer ID if no sigevent was passed in.
 	 */
-	sigq->sq_info.si_signo = ev.sigev_signo;
-	if (evp == NULL)
-		sigq->sq_info.si_value.sival_int = i;
-	else
-		sigq->sq_info.si_value = ev.sigev_value;
-	sigq->sq_info.si_code = SI_TIMER;
-	sigq->sq_info.si_pid = p->p_pid;
-	sigq->sq_info.si_ctid = PRCTID(p);
-	sigq->sq_info.si_zoneid = getzoneid();
-	sigq->sq_info.si_uid = crgetruid(cr);
-	sigq->sq_func = timer_signal;
-	sigq->sq_next = NULL;
-	sigq->sq_backptr = it;
-	it->it_sigq = sigq;
-	it->it_backend = backend;
-	it->it_lock = ITLK_LOCKED;
-
-	if (ev.sigev_notify == SIGEV_THREAD ||
-	    ev.sigev_notify == SIGEV_PORT) {
-		int port;
-
-		/*
-		 * This timer is programmed to use event port notification when
-		 * the timer fires:
-		 * - allocate a port event structure and prepare it to be sent
-		 *   to the port as soon as the timer fires.
-		 * - when the timer fires :
-		 *   - if event structure was already sent to the port then this
-		 *	is a timer fire overflow => increment overflow counter.
-		 *   - otherwise send pre-allocated event structure to the port.
-		 * - the events field of the port_event_t structure counts the
-		 *   number of timer fired events.
-		 * - The event structured is allocated using the
-		 *   PORT_ALLOC_CACHED flag.
-		 *   This flag indicates that the timer itself will manage and
-		 *   free the event structure when required.
-		 */
-
-		it->it_flags |= IT_PORT;
-		port = tim_pnevp.portnfy_port;
-
-		/* associate timer as event source with the port */
-		error = port_associate_ksource(port, PORT_SOURCE_TIMER,
-		    (port_source_t **)&it->it_portsrc, timer_close_port,
-		    (void *)it, NULL);
-		if (error) {
-			mutex_exit(&p->p_lock);
-			kmem_cache_free(clock_timer_cache, it);
-			kmem_free(sigq, sizeof (sigqueue_t));
-			return (set_errno(error));
-		}
-
-		/* allocate an event structure/slot */
-		error = port_alloc_event(port, PORT_ALLOC_SCACHED,
-		    PORT_SOURCE_TIMER, &pkevp);
-		if (error) {
-			(void) port_dissociate_ksource(port, PORT_SOURCE_TIMER,
-			    (port_source_t *)it->it_portsrc);
-			mutex_exit(&p->p_lock);
-			kmem_cache_free(clock_timer_cache, it);
-			kmem_free(sigq, sizeof (sigqueue_t));
-			return (set_errno(error));
-		}
-
-		/* initialize event data */
-		port_init_event(pkevp, i, tim_pnevp.portnfy_user,
-		    timer_port_callback, it);
-		it->it_portev = pkevp;
-		it->it_portfd = port;
-	} else {
-		if (ev.sigev_notify == SIGEV_SIGNAL)
-			it->it_flags |= IT_SIGNAL;
+	if (evp == NULL) {
+		it->it_sigq->sq_info.si_value.sival_int = tid;
 	}
 
-	/* Populate the slot now that the timer is prepped. */
-	p->p_itimer[i] = it;
-	mutex_exit(&p->p_lock);
-
-	/*
-	 * Call on the backend to verify the event argument (or return
-	 * EINVAL if this clock type does not support timers).
-	 */
-	if ((error = backend->clk_timer_create(it, timer_fire)) != 0)
-		goto err;
-
-	it->it_lwp = ttolwp(curthread);
-	it->it_proc = p;
-
-	if (copyout(&i, tid, sizeof (timer_t)) != 0) {
-		error = EFAULT;
-		goto err;
+	if (copyout(&tid, tidp, sizeof (timer_t)) != 0) {
+		timer_delete_grabbed(p, tid, it);
+		return (set_errno(EFAULT));
 	}
 
 	/*
@@ -784,19 +836,8 @@ timer_create(clockid_t clock, struct sigevent *evp, timer_t *tid)
 	timer_release(p, it);
 
 	return (0);
-
-err:
-	/*
-	 * If we're here, an error has occurred late in the timer creation
-	 * process.  We need to regrab p_lock, and delete the incipient timer.
-	 * Since we never unlocked the timer (it was born locked), it's
-	 * impossible for a removal to be pending.
-	 */
-	ASSERT(!(it->it_lock & ITLK_REMOVE));
-	timer_delete_grabbed(p, i, it);
-
-	return (set_errno(error));
 }
+
 
 int
 timer_gettime(timer_t tid, itimerspec_t *val)
@@ -1065,7 +1106,7 @@ timer_close_port(void *arg, int port, pid_t pid, int lastclose)
 	for (tid = 0; tid < timer_max; tid++) {
 		if ((it = timer_grab(p, tid)) == NULL)
 			continue;
-		if (it->it_portev) {
+		if (it->it_flags & IT_PORT) {
 			mutex_enter(&it->it_mutex);
 			if (it->it_portfd == port) {
 				port_kevent_t *pev;
