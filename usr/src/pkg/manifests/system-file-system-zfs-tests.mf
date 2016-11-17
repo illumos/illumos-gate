@@ -21,7 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2012, 2015 by Delphix. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/system/file-system/zfs/tests@$(PKGVERS)
@@ -54,6 +54,7 @@ $(i386_ONLY)file path=usr/bin/$(ARCH32)/zlook mode=0555
 $(i386_ONLY)file path=usr/bin/$(ARCH32)/ztest mode=0555
 file path=usr/bin/$(ARCH64)/zlook mode=0555
 file path=usr/bin/$(ARCH64)/ztest mode=0555
+file path=usr/bin/zloop mode=0555
 file path=usr/include/sys/fs/zut.h
 file path=usr/lib/devfsadm/linkmod/SUNW_zut_link.so group=sys
 $(i386_ONLY)file path=usr/sbin/$(ARCH32)/zhack mode=0555
