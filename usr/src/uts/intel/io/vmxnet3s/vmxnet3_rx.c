@@ -13,7 +13,7 @@
  * and limitations under the License.
  */
 /*
- * Copyright (c) 2013 by Delphix. All rights reserved.
+ * Copyright (c) 2013, 2016 by Delphix. All rights reserved.
  */
 
 #include <vmxnet3.h>
@@ -34,7 +34,6 @@ vmxnet3_alloc_rxbuf(vmxnet3_softc_t *dp, boolean_t canSleep)
 	int flag = canSleep ? KM_SLEEP : KM_NOSLEEP;
 	int err;
 
-	atomic_inc_32(&dp->rx_alloc_buf);
 	rxBuf = kmem_zalloc(sizeof (vmxnet3_rxbuf_t), flag);
 	if (!rxBuf) {
 		atomic_inc_32(&dp->rx_alloc_failed);
@@ -42,7 +41,7 @@ vmxnet3_alloc_rxbuf(vmxnet3_softc_t *dp, boolean_t canSleep)
 	}
 
 	if ((err = vmxnet3_alloc_dma_mem_1(dp, &rxBuf->dma, (dp->cur_mtu + 18),
-	    canSleep)) != DDI_SUCCESS) {
+	    canSleep)) != 0) {
 		VMXNET3_DEBUG(dp, 0, "Failed to allocate %d bytes for rx buf, "
 		    "err:%d\n", (dp->cur_mtu + 18), err);
 		kmem_free(rxBuf, sizeof (vmxnet3_rxbuf_t));
@@ -54,8 +53,8 @@ vmxnet3_alloc_rxbuf(vmxnet3_softc_t *dp, boolean_t canSleep)
 	rxBuf->freeCB.free_arg = (caddr_t)rxBuf;
 	rxBuf->dp = dp;
 
-	atomic_inc_32(&dp->rxNumBufs);
-
+	atomic_inc_32(&dp->rx_num_bufs);
+	atomic_inc_32(&dp->rx_alloc_buf);
 	return (rxBuf);
 }
 
@@ -65,32 +64,36 @@ vmxnet3_free_rxbuf(vmxnet3_softc_t *dp, vmxnet3_rxbuf_t *rxBuf)
 	vmxnet3_free_dma_mem(&rxBuf->dma);
 	kmem_free(rxBuf, sizeof (vmxnet3_rxbuf_t));
 
-#ifndef DEBUG
-	atomic_dec_32(&dp->rxNumBufs);
+#ifndef	DEBUG
+	atomic_dec_32(&dp->rx_num_bufs);
 #else
 	{
-		uint32_t nv = atomic_dec_32_nv(&dp->rxNumBufs);
+		uint32_t nv = atomic_dec_32_nv(&dp->rx_num_bufs);
 		ASSERT(nv != (uint32_t)-1);
 	}
 #endif
 }
 
 /*
- * Return a rxBuf to the pool.
+ * Return a rxBuf to the pool. The init argument, when B_TRUE, indicates
+ * that we're being called for the purpose of pool initialization, and
+ * therefore, we should place the buffer in the pool even if the device
+ * isn't enabled.
  *
  * Returns:
- *	B_TRUE if there was room in the pool and the rxBuf was returned,
- *	B_FALSE otherwise.
+ *	B_TRUE if the buffer was returned to the pool, or B_FALSE if it
+ *	wasn't (e.g. if the device is stopped).
  */
 static boolean_t
-vmxnet3_put_rxpool_buf(vmxnet3_softc_t *dp, vmxnet3_rxbuf_t *rxBuf)
+vmxnet3_put_rxpool_buf(vmxnet3_softc_t *dp, vmxnet3_rxbuf_t *rxBuf,
+    boolean_t init)
 {
 	vmxnet3_rxpool_t *rxPool = &dp->rxPool;
 	boolean_t returned = B_FALSE;
 
 	mutex_enter(&dp->rxPoolLock);
 	ASSERT(rxPool->nBufs <= rxPool->nBufsLimit);
-	if (dp->devEnabled && rxPool->nBufs < rxPool->nBufsLimit) {
+	if ((dp->devEnabled || init) && rxPool->nBufs < rxPool->nBufsLimit) {
 		ASSERT((rxPool->listHead == NULL && rxPool->nBufs == 0) ||
 		    (rxPool->listHead != NULL && rxPool->nBufs != 0));
 		rxBuf->next = rxPool->listHead;
@@ -110,9 +113,7 @@ vmxnet3_put_rxbuf(vmxnet3_rxbuf_t *rxBuf)
 {
 	vmxnet3_softc_t *dp = rxBuf->dp;
 
-	VMXNET3_DEBUG(dp, 5, "free 0x%p\n", rxBuf);
-
-	if (!vmxnet3_put_rxpool_buf(dp, rxBuf))
+	if (!vmxnet3_put_rxpool_buf(dp, rxBuf, B_FALSE))
 		vmxnet3_free_rxbuf(dp, rxBuf);
 }
 
@@ -129,7 +130,7 @@ vmxnet3_get_rxpool_buf(vmxnet3_softc_t *dp)
 	vmxnet3_rxbuf_t *rxBuf = NULL;
 
 	mutex_enter(&dp->rxPoolLock);
-	if (rxPool->listHead) {
+	if (rxPool->listHead != NULL) {
 		rxBuf = rxPool->listHead;
 		rxPool->listHead = rxBuf->next;
 		rxPool->nBufs--;
@@ -141,50 +142,77 @@ vmxnet3_get_rxpool_buf(vmxnet3_softc_t *dp)
 }
 
 /*
- * Get an unused rxBuf from either the pool or from memory.
- * The returned rxBuf has a mblk associated with it.
+ * Fill a rxPool by allocating the maximum number of buffers.
  *
  * Returns:
- *	A rxBuf or NULL.
+ *	0 on success, non-zero on failure.
  */
-static vmxnet3_rxbuf_t *
-vmxnet3_get_rxbuf(vmxnet3_softc_t *dp, boolean_t canSleep)
+static int
+vmxnet3_rxpool_init(vmxnet3_softc_t *dp)
 {
+	int err = 0;
 	vmxnet3_rxbuf_t *rxBuf;
 
-	if ((rxBuf = vmxnet3_get_rxpool_buf(dp))) {
-		VMXNET3_DEBUG(dp, 5, "alloc 0x%p from pool\n", rxBuf);
-	} else if ((rxBuf = vmxnet3_alloc_rxbuf(dp, canSleep))) {
-		VMXNET3_DEBUG(dp, 5, "alloc 0x%p from mem\n", rxBuf);
+	ASSERT(dp->rxPool.nBufsLimit > 0);
+	while (dp->rxPool.nBufs < dp->rxPool.nBufsLimit) {
+		if ((rxBuf = vmxnet3_alloc_rxbuf(dp, B_FALSE)) == NULL) {
+			err = ENOMEM;
+			break;
+		}
+		VERIFY(vmxnet3_put_rxpool_buf(dp, rxBuf, B_TRUE));
 	}
 
-	if (rxBuf) {
-		rxBuf->mblk = desballoc((uchar_t *)rxBuf->dma.buf,
-		    rxBuf->dma.bufLen, BPRI_MED, &rxBuf->freeCB);
-		if (!rxBuf->mblk) {
-			vmxnet3_put_rxbuf(rxBuf);
-			atomic_inc_32(&dp->rx_alloc_failed);
-			rxBuf = NULL;
+	if (err != 0) {
+		while ((rxBuf = vmxnet3_get_rxpool_buf(dp)) != NULL) {
+			vmxnet3_free_rxbuf(dp, rxBuf);
 		}
 	}
 
-	return (rxBuf);
+	return (err);
 }
 
 /*
- * Populate a Rx descriptor with a new rxBuf.
+ * Populate a Rx descriptor with a new rxBuf. If the pool argument is B_TRUE,
+ * then try to take a buffer from rxPool. If the pool is empty and the
+ * dp->alloc_ok is true, then fall back to dynamic allocation. If pool is
+ * B_FALSE, then always allocate a new buffer (this is only used when
+ * populating the initial set of buffers in the receive queue during start).
  *
  * Returns:
- *	DDI_SUCCESS or DDI_FAILURE.
+ *	0 on success, non-zero on failure.
  */
 static int
 vmxnet3_rx_populate(vmxnet3_softc_t *dp, vmxnet3_rxqueue_t *rxq, uint16_t idx,
-    boolean_t canSleep)
+    boolean_t canSleep, boolean_t pool)
 {
-	int ret = DDI_SUCCESS;
-	vmxnet3_rxbuf_t *rxBuf = vmxnet3_get_rxbuf(dp, canSleep);
+	vmxnet3_rxbuf_t *rxBuf = NULL;
 
-	if (rxBuf) {
+	if (pool && (rxBuf = vmxnet3_get_rxpool_buf(dp)) == NULL) {
+		/* The maximum number of pool buffers have been allocated. */
+		atomic_inc_32(&dp->rx_pool_empty);
+		if (!dp->alloc_ok) {
+			atomic_inc_32(&dp->rx_alloc_failed);
+		}
+	}
+
+	if (rxBuf == NULL && (!pool || dp->alloc_ok)) {
+		rxBuf = vmxnet3_alloc_rxbuf(dp, canSleep);
+	}
+
+	if (rxBuf != NULL) {
+		rxBuf->mblk = desballoc((uchar_t *)rxBuf->dma.buf,
+		    rxBuf->dma.bufLen, BPRI_MED, &rxBuf->freeCB);
+		if (rxBuf->mblk == NULL) {
+			if (pool) {
+				VERIFY(vmxnet3_put_rxpool_buf(dp, rxBuf,
+				    B_FALSE));
+			} else {
+				vmxnet3_free_rxbuf(dp, rxBuf);
+			}
+			atomic_inc_32(&dp->rx_alloc_failed);
+			return (ENOMEM);
+		}
+
 		vmxnet3_cmdring_t *cmdRing = &rxq->cmdRing;
 		Vmxnet3_GenericDesc *rxDesc = VMXNET3_GET_DESC(cmdRing, idx);
 
@@ -195,35 +223,45 @@ vmxnet3_rx_populate(vmxnet3_softc_t *dp, vmxnet3_rxqueue_t *rxq, uint16_t idx,
 		membar_producer();
 		rxDesc->rxd.gen = cmdRing->gen;
 	} else {
-		ret = DDI_FAILURE;
+		return (ENOMEM);
 	}
 
-	return (ret);
+	return (0);
 }
 
 /*
  * Initialize a RxQueue by populating the whole Rx ring with rxBufs.
  *
  * Returns:
- *	DDI_SUCCESS or DDI_FAILURE.
+ *	0 on success, non-zero on failure.
  */
 int
 vmxnet3_rxqueue_init(vmxnet3_softc_t *dp, vmxnet3_rxqueue_t *rxq)
 {
 	vmxnet3_cmdring_t *cmdRing = &rxq->cmdRing;
+	int err;
+
+	dp->rxPool.nBufsLimit = vmxnet3_getprop(dp, "RxBufPoolLimit", 0,
+	    cmdRing->size * 10, cmdRing->size * 2);
 
 	do {
-		if (vmxnet3_rx_populate(dp, rxq, cmdRing->next2fill,
-		    B_TRUE) != DDI_SUCCESS) {
+		if ((err = vmxnet3_rx_populate(dp, rxq, cmdRing->next2fill,
+		    B_TRUE, B_FALSE)) != 0) {
 			goto error;
 		}
 		VMXNET3_INC_RING_IDX(cmdRing, cmdRing->next2fill);
 	} while (cmdRing->next2fill);
 
-	dp->rxPool.nBufsLimit = vmxnet3_getprop(dp, "RxBufPoolLimit", 0,
-	    cmdRing->size * 10, cmdRing->size * 2);
+	/*
+	 * Pre-allocate rxPool buffers so that we never have to allocate
+	 * new buffers from interrupt context when we need to replace a buffer
+	 * in the rxqueue.
+	 */
+	if ((err = vmxnet3_rxpool_init(dp)) != 0) {
+		goto error;
+	}
 
-	return (DDI_SUCCESS);
+	return (0);
 
 error:
 	while (cmdRing->next2fill) {
@@ -231,7 +269,7 @@ error:
 		vmxnet3_free_rxbuf(dp, rxq->bufRing[cmdRing->next2fill].rxBuf);
 	}
 
-	return (DDI_FAILURE);
+	return (err);
 }
 
 /*
@@ -348,8 +386,8 @@ vmxnet3_rx_intr(vmxnet3_softc_t *dp, vmxnet3_rxqueue_t *rxq)
 			 * descriptor. Grab it only if we achieve to replace
 			 * it with a fresh buffer.
 			 */
-			if (vmxnet3_rx_populate(dp, rxq, rxdIdx, B_FALSE) ==
-			    DDI_SUCCESS) {
+			if (vmxnet3_rx_populate(dp, rxq, rxdIdx, B_FALSE,
+			    B_TRUE) == 0) {
 				/* Success, we can chain the mblk with the mp */
 				mblk->b_wptr = mblk->b_rptr + compDesc->rcd.len;
 				*mpTail = mblk;

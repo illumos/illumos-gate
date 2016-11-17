@@ -14,7 +14,7 @@
  */
 
 /*
- * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright (c) 2012, 2016 by Delphix. All rights reserved.
  */
 
 #ifndef	_VMXNET3_H_
@@ -148,8 +148,8 @@ typedef struct vmxnet3_softc_t {
 	vmxnet3_rxqueue_t rxQueue;
 	kmutex_t	rxPoolLock;
 	vmxnet3_rxpool_t rxPool;
-	volatile uint32_t rxNumBufs;
 	uint32_t	rxMode;
+	boolean_t	alloc_ok;
 
 	vmxnet3_dmabuf_t mfTable;
 	kstat_t		*devKstats;
@@ -158,8 +158,10 @@ typedef struct vmxnet3_softc_t {
 	uint32_t	tx_pullup_failed;
 	uint32_t	tx_ring_full;
 	uint32_t	tx_error;
+	uint32_t	rx_num_bufs;
 	uint32_t	rx_alloc_buf;
 	uint32_t	rx_alloc_failed;
+	uint32_t	rx_pool_empty;
 } vmxnet3_softc_t;
 
 typedef struct vmxnet3_kstats_t {
@@ -167,8 +169,11 @@ typedef struct vmxnet3_kstats_t {
 	kstat_named_t	tx_pullup_needed;
 	kstat_named_t	tx_ring_full;
 	kstat_named_t	rx_alloc_buf;
+	kstat_named_t	rx_pool_empty;
+	kstat_named_t	rx_num_bufs;
 } vmxnet3_kstats_t;
 
+int	vmxnet3_dmaerr2errno(int);
 int	vmxnet3_alloc_dma_mem_1(vmxnet3_softc_t *dp, vmxnet3_dmabuf_t *dma,
 	    size_t size, boolean_t canSleep);
 int	vmxnet3_alloc_dma_mem_128(vmxnet3_softc_t *dp, vmxnet3_dmabuf_t *dma,

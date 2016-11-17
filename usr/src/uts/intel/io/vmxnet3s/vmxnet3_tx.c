@@ -14,7 +14,7 @@
  */
 
 /*
- * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright (c) 2012, 2016 by Delphix. All rights reserved.
  */
 
 #include <vmxnet3.h>
@@ -39,7 +39,7 @@ typedef struct vmxnet3_offload_t {
 int
 vmxnet3_txqueue_init(vmxnet3_softc_t *dp, vmxnet3_txqueue_t *txq)
 {
-	return (DDI_SUCCESS);
+	return (0);
 }
 
 /*
