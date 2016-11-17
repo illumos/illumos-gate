@@ -12,26 +12,20 @@
  * See the License for the specific language governing permissions
  * and limitations under the License.
  */
-
 /*
  * Copyright (c) 2013 by Delphix. All rights reserved.
  */
 
 #include <vmxnet3.h>
 
-static void vmxnet3_put_rxbuf(vmxnet3_rxbuf_t *rxBuf);
+static void vmxnet3_put_rxbuf(vmxnet3_rxbuf_t *);
 
 /*
- * vmxnet3_alloc_rxbuf --
+ * Allocate a new rxBuf from memory. All its fields are set except
+ * for its associated mblk which has to be allocated later.
  *
- *    Allocate a new rxBuf from memory. All its fields are set except
- *    for its associated mblk which has to be allocated later.
- *
- * Results:
- *    A new rxBuf or NULL.
- *
- * Side effects:
- *    None.
+ * Returns:
+ *	A new rxBuf or NULL.
  */
 static vmxnet3_rxbuf_t *
 vmxnet3_alloc_rxbuf(vmxnet3_softc_t *dp, boolean_t canSleep)
@@ -65,17 +59,6 @@ vmxnet3_alloc_rxbuf(vmxnet3_softc_t *dp, boolean_t canSleep)
 	return (rxBuf);
 }
 
-/*
- * vmxnet3_free_rxbuf --
- *
- *    Free a rxBuf.
- *
- * Results:
- *    None.
- *
- * Side effects:
- *    None.
- */
 static void
 vmxnet3_free_rxbuf(vmxnet3_softc_t *dp, vmxnet3_rxbuf_t *rxBuf)
 {
@@ -93,16 +76,11 @@ vmxnet3_free_rxbuf(vmxnet3_softc_t *dp, vmxnet3_rxbuf_t *rxBuf)
 }
 
 /*
- * vmxnet3_put_rxpool_buf --
+ * Return a rxBuf to the pool.
  *
- *    Return a rxBuf to the pool.
- *
- * Results:
- *    B_TRUE if there was room in the pool and the rxBuf was returned,
- *    B_FALSE otherwise.
- *
- * Side effects:
- *    None.
+ * Returns:
+ *	B_TRUE if there was room in the pool and the rxBuf was returned,
+ *	B_FALSE otherwise.
  */
 static boolean_t
 vmxnet3_put_rxpool_buf(vmxnet3_softc_t *dp, vmxnet3_rxbuf_t *rxBuf)
@@ -125,15 +103,7 @@ vmxnet3_put_rxpool_buf(vmxnet3_softc_t *dp, vmxnet3_rxbuf_t *rxBuf)
 }
 
 /*
- * vmxnet3_put_rxbuf --
- *
- *    Return a rxBuf to the pool or free it.
- *
- * Results:
- *    None.
- *
- * Side effects:
- *    None.
+ * Return a rxBuf to the pool or free it.
  */
 static void
 vmxnet3_put_rxbuf(vmxnet3_rxbuf_t *rxBuf)
@@ -147,15 +117,10 @@ vmxnet3_put_rxbuf(vmxnet3_rxbuf_t *rxBuf)
 }
 
 /*
- * vmxnet3_get_rxpool_buf --
+ * Get an unused rxBuf from the pool.
  *
- *    Get an unused rxBuf from the pool.
- *
- * Results:
- *    A rxBuf or NULL if there are no buffers in the pool.
- *
- * Side effects:
- *    None.
+ * Returns:
+ *	A rxBuf or NULL if there are no buffers in the pool.
  */
 static vmxnet3_rxbuf_t *
 vmxnet3_get_rxpool_buf(vmxnet3_softc_t *dp)
@@ -176,16 +141,11 @@ vmxnet3_get_rxpool_buf(vmxnet3_softc_t *dp)
 }
 
 /*
- * vmxnet3_get_rxbuf --
+ * Get an unused rxBuf from either the pool or from memory.
+ * The returned rxBuf has a mblk associated with it.
  *
- *    Get an unused rxBuf from either the pool or from memory.
- *    The returned rxBuf has a mblk associated with it.
- *
- * Results:
- *    A rxBuf or NULL.
- *
- * Side effects:
- *    None.
+ * Returns:
+ *	A rxBuf or NULL.
  */
 static vmxnet3_rxbuf_t *
 vmxnet3_get_rxbuf(vmxnet3_softc_t *dp, boolean_t canSleep)
@@ -212,15 +172,10 @@ vmxnet3_get_rxbuf(vmxnet3_softc_t *dp, boolean_t canSleep)
 }
 
 /*
- * vmxnet3_rx_populate --
+ * Populate a Rx descriptor with a new rxBuf.
  *
- *    Populate a Rx descriptor with a new rxBuf.
- *
- * Results:
- *    DDI_SUCCESS or DDI_FAILURE.
- *
- * Side effects:
- *    None.
+ * Returns:
+ *	DDI_SUCCESS or DDI_FAILURE.
  */
 static int
 vmxnet3_rx_populate(vmxnet3_softc_t *dp, vmxnet3_rxqueue_t *rxq, uint16_t idx,
@@ -247,15 +202,10 @@ vmxnet3_rx_populate(vmxnet3_softc_t *dp, vmxnet3_rxqueue_t *rxq, uint16_t idx,
 }
 
 /*
- * vmxnet3_rxqueue_init --
+ * Initialize a RxQueue by populating the whole Rx ring with rxBufs.
  *
- *    Initialize a RxQueue by populating the whole Rx ring with rxBufs.
- *
- * Results:
- *    DDI_SUCCESS or DDI_FAILURE.
- *
- * Side effects:
- *    None.
+ * Returns:
+ *	DDI_SUCCESS or DDI_FAILURE.
  */
 int
 vmxnet3_rxqueue_init(vmxnet3_softc_t *dp, vmxnet3_rxqueue_t *rxq)
@@ -285,15 +235,7 @@ error:
 }
 
 /*
- * vmxnet3_rxqueue_fini --
- *
- *    Finish a RxQueue by freeing all the related rxBufs.
- *
- * Results:
- *    DDI_SUCCESS.
- *
- * Side effects:
- *    None.
+ * Finish a RxQueue by freeing all the related rxBufs.
  */
 void
 vmxnet3_rxqueue_fini(vmxnet3_softc_t *dp, vmxnet3_rxqueue_t *rxq)
@@ -322,16 +264,8 @@ vmxnet3_rxqueue_fini(vmxnet3_softc_t *dp, vmxnet3_rxqueue_t *rxq)
 }
 
 /*
- * vmxnet3_rx_hwcksum --
- *
- *    Determine if a received packet was checksummed by the Vmxnet3
- *    device and tag the mp appropriately.
- *
- * Results:
- *    None.
- *
- * Side effects:
- *    The mp may get tagged.
+ * Determine if a received packet was checksummed by the Vmxnet3
+ * device and tag the mp appropriately.
  */
 static void
 vmxnet3_rx_hwcksum(vmxnet3_softc_t *dp, mblk_t *mp,
@@ -355,16 +289,11 @@ vmxnet3_rx_hwcksum(vmxnet3_softc_t *dp, mblk_t *mp,
 }
 
 /*
- * vmxnet3_rx_intr --
+ * Interrupt handler for Rx. Look if there are any pending Rx and
+ * put them in mplist.
  *
- *    Interrupt handler for Rx. Look if there are any pending Rx and
- *    put them in mplist.
- *
- * Results:
- *    A list of messages to pass to the MAC subystem.
- *
- * Side effects:
- *    None.
+ * Returns:
+ *	A list of messages to pass to the MAC subystem.
  */
 mblk_t *
 vmxnet3_rx_intr(vmxnet3_softc_t *dp, vmxnet3_rxqueue_t *rxq)
@@ -419,8 +348,8 @@ vmxnet3_rx_intr(vmxnet3_softc_t *dp, vmxnet3_rxqueue_t *rxq)
 			 * descriptor. Grab it only if we achieve to replace
 			 * it with a fresh buffer.
 			 */
-			if (vmxnet3_rx_populate(dp, rxq, rxdIdx,
-			    B_FALSE) == DDI_SUCCESS) {
+			if (vmxnet3_rx_populate(dp, rxq, rxdIdx, B_FALSE) ==
+			    DDI_SUCCESS) {
 				/* Success, we can chain the mblk with the mp */
 				mblk->b_wptr = mblk->b_rptr + compDesc->rcd.len;
 				*mpTail = mblk;
