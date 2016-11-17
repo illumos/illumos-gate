@@ -74,15 +74,34 @@ lx_prctl(int opt, uintptr_t data)
 
 	switch (opt) {
 	case LX_PR_GET_DUMPABLE: {
-		/* Indicate that process is always dumpable */
-		return (1);
+		/* Only track in brand data - could hook into SNOCD later */
+		lx_proc_data_t *lxpd;
+		int val;
+
+		mutex_enter(&curproc->p_lock);
+		VERIFY((lxpd = ptolxproc(curproc)) != NULL);
+		val = lxpd->l_flags & LX_PROC_NO_DUMP;
+		mutex_exit(&curproc->p_lock);
+
+		return (val == 0);
 	}
 
 	case LX_PR_SET_DUMPABLE: {
+		lx_proc_data_t *lxpd;
+
 		if (data != 0 && data != 1) {
 			return (set_errno(EINVAL));
 		}
-		/* Lie about altering process dumpability */
+
+		mutex_enter(&curproc->p_lock);
+		VERIFY((lxpd = ptolxproc(curproc)) != NULL);
+		if (data == 0) {
+			lxpd->l_flags |= LX_PROC_NO_DUMP;
+		} else {
+			lxpd->l_flags &= ~LX_PROC_NO_DUMP;
+		}
+		mutex_exit(&curproc->p_lock);
+
 		return (0);
 	}
 
