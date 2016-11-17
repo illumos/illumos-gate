@@ -1233,7 +1233,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/* 219: restart_syscall */
 	lx_semtimedop,			/* 220: semtimedop */
 	NULL,				/* 221: fadvise64 */
-	lx_timer_create,		/* 222: timer_create */
+	NULL,				/* 222: timer_create */
 	lx_timer_settime,		/* 223: timer_settime */
 	lx_timer_gettime,		/* 224: timer_gettime */
 	lx_timer_getoverrun,		/* 225: timer_getoverrun */
@@ -1601,7 +1601,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/* 256: epoll_wait */
 	NULL,				/* 257: remap_file_pages */
 	NULL,				/* 258: set_tid_address */
-	lx_timer_create,		/* 259: timer_create */
+	NULL,				/* 259: timer_create */
 	lx_timer_settime,		/* 260: timer_settime */
 	lx_timer_gettime,		/* 261: timer_gettime */
 	lx_timer_getoverrun,		/* 262: timer_getoverrun */

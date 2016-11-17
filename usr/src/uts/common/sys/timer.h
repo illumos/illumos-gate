@@ -35,6 +35,8 @@
 #include <sys/proc.h>
 #include <sys/thread.h>
 #include <sys/param.h>
+#include <sys/siginfo.h>
+#include <sys/port.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -63,6 +65,7 @@ extern	int	timer_max;
  */
 #define	IT_SIGNAL		0x01
 #define	IT_PORT			0x02	/* use event port notification */
+#define	IT_CALLBACK		0x04	/* custom callback function */
 
 struct clock_backend;
 
@@ -90,14 +93,27 @@ struct itimer {
 	struct clock_backend *it_backend;
 	void		(*it_fire)(itimer_t *);
 	kmutex_t	it_mutex;
-	void		*it_portev;	/* port_kevent_t pointer */
-	void		*it_portsrc;	/* port_source_t pointer */
-	int		it_portfd;	/* port file descriptor */
+	union {
+		struct {
+			void	*_it_portev;	/* port_kevent_t pointer */
+			void	*_it_portsrc;	/* port_source_t pointer */
+			int	_it_portfd;	/* port file descriptor */
+		} _it_ev_port;
+		struct {
+			void		(*_it_cb_func)(itimer_t *);
+			uintptr_t	_it_cb_data[2];
+		} _it_ev_cb;
+	} _it_ev_data;
 };
 
 #define	it_sigq		__data.__proc.__it_sigq
 #define	it_lwp		__data.__proc.__it_lwp
 #define	it_frontend	__data.__it_frontend
+#define	it_portev	_it_ev_data._it_ev_port._it_portev
+#define	it_portsrc	_it_ev_data._it_ev_port._it_portsrc
+#define	it_portfd	_it_ev_data._it_ev_port._it_portfd
+#define	it_cb_func	_it_ev_data._it_ev_cb._it_cb_func
+#define	it_cb_data	_it_ev_data._it_ev_cb._it_cb_data
 
 typedef struct clock_backend {
 	struct sigevent clk_default;
@@ -114,7 +130,11 @@ typedef struct clock_backend {
 extern void clock_add_backend(clockid_t clock, clock_backend_t *backend);
 extern clock_backend_t *clock_get_backend(clockid_t clock);
 
+extern void timer_release(struct proc *, itimer_t *);
+extern void timer_delete_grabbed(struct proc *, timer_t tid, itimer_t *it);
 extern void timer_lwpbind();
+extern int timer_setup(clock_backend_t *, struct sigevent *, port_notify_t *,
+    itimer_t **, timer_t *);
 
 extern	void	timer_func(sigqueue_t *);
 extern	void	timer_exit(void);

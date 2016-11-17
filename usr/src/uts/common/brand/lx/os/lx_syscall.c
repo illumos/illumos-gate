@@ -778,7 +778,7 @@ lx_sysent_t lx_sysent32[] = {
 	{"epoll_wait",	lx_epoll_wait,		0,		4}, /* 256 */
 	{"remap_file_pages", NULL,		NOSYS_NO_EQUIV,	0}, /* 257 */
 	{"set_tid_address", lx_set_tid_address,	0,		1}, /* 258 */
-	{"timer_create", NULL,			0,		3}, /* 259 */
+	{"timer_create", lx_timer_create,	0,		3}, /* 259 */
 	{"timer_settime", NULL,			0,		4}, /* 260 */
 	{"timer_gettime", NULL,			0,		2}, /* 261 */
 	{"timer_getoverrun", NULL,		0,		1}, /* 262 */
@@ -1112,7 +1112,7 @@ lx_sysent_t lx_sysent64[] = {
 	{"restart_syscall", NULL,		NOSYS_NULL,	0}, /* 219 */
 	{"semtimedop",	NULL,			0,		4}, /* 220 */
 	{"fadvise64",	lx_fadvise64,		0,		4}, /* 221 */
-	{"timer_create", NULL,			0,		3}, /* 222 */
+	{"timer_create", lx_timer_create,	0,		3}, /* 222 */
 	{"timer_settime", NULL,			0,		4}, /* 223 */
 	{"timer_gettime", NULL,			0,		2}, /* 224 */
 	{"timer_getoverrun", NULL,		0,		1}, /* 225 */

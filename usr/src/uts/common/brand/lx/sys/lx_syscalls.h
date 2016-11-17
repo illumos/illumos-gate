@@ -237,6 +237,7 @@ extern long lx_syslog();
 extern long lx_removexattr();
 extern long lx_tgkill();
 extern long lx_time();
+extern long lx_timer_create();
 extern long lx_tkill();
 extern long lx_umask();
 extern long lx_umount();

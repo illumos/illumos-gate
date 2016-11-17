@@ -32,7 +32,10 @@
 #include <sys/time.h>
 #include <sys/systm.h>
 #include <sys/cmn_err.h>
+#include <sys/brand.h>
+#include <sys/lx_brand.h>
 #include <sys/lx_impl.h>
+#include <lx_signum.h>
 
 /*
  * From "uts/common/os/timer.c":
@@ -90,8 +93,64 @@ static lx_clock_backend_t lx_clock_backends[] = {
 
 #define	LX_CLOCK_MAX \
 	(sizeof (lx_clock_backends) / sizeof (lx_clock_backends[0]))
-#define	LX_CLOCK_BACKEND(clk) \
-	((clk) < LX_CLOCK_MAX && (clk) >= 0 ? &lx_clock_backends[(clk)] : NULL)
+#define	LX_CLOCK_BACKEND(clk) (((clk) < LX_CLOCK_MAX && (clk) >= 0) ? \
+	&lx_clock_backends[(clk)] : NULL)
+
+/*
+ * Linux defines the size of the sigevent structure to be 64 bytes.  In order
+ * to meet that definition, the trailing union includes a member which pads it
+ * out to the desired length for the given architecture.
+ */
+#define	LX_SIGEV_PAD_SIZE	((64 - \
+	(sizeof (int) * 2 + sizeof (union sigval))) / sizeof (int))
+
+typedef struct {
+	union sigval	lx_sigev_value;
+	int		lx_sigev_signo;
+	int		lx_sigev_notify;
+	union {
+		int	lx_pad[LX_SIGEV_PAD_SIZE];
+		int	lx_tid;
+		struct {
+			void (*lx_notify_function)(union sigval);
+			void *lx_notify_attribute;
+		} lx_sigev_thread;
+	} lx_sigev_un;
+} lx_sigevent_t;
+
+
+#ifdef _SYSCALL32_IMPL
+
+#define	LX_SIGEV32_PAD_SIZE	((64 - \
+	(sizeof (int) * 2 + sizeof (union sigval32))) / sizeof (int))
+
+typedef struct {
+	union sigval32	lx_sigev_value;
+	int		lx_sigev_signo;
+	int		lx_sigev_notify;
+	union {
+		int	lx_pad[LX_SIGEV32_PAD_SIZE];
+		int	lx_tid;
+		struct {
+			caddr32_t lx_notify_function;
+			caddr32_t lx_notify_attribute;
+		} lx_sigev_thread;
+	} lx_sigev_un;
+} lx_sigevent32_t;
+
+#endif /* _SYSCALL32_IMPL */
+
+#define	LX_SIGEV_SIGNAL		0
+#define	LX_SIGEV_NONE		1
+#define	LX_SIGEV_THREAD		2
+#define	LX_SIGEV_THREAD_ID	4
+
+/*
+ * Access private SIGEV_THREAD_ID callback state in itimer_t
+ */
+#define	LX_SIGEV_THREAD_ID_LPID(it)	((it)->it_cb_data[0])
+#define	LX_SIGEV_THREAD_ID_TID(it)	((it)->it_cb_data[1])
+
 
 /* ARGSUSED */
 static int
@@ -276,6 +335,196 @@ lx_clock_getres(int clock, timespec_t *tp)
 	return (backend->lclk_clock_getres(backend->lclk_ntv_id, tp));
 }
 
+static int
+lx_ltos_sigev(lx_sigevent_t *lev, struct sigevent *sev)
+{
+	bzero(sev, sizeof (*sev));
+
+	switch (lev->lx_sigev_notify) {
+	case LX_SIGEV_NONE:
+		sev->sigev_notify = SIGEV_NONE;
+		break;
+
+	case LX_SIGEV_SIGNAL:
+	case LX_SIGEV_THREAD_ID:
+		sev->sigev_notify = SIGEV_SIGNAL;
+		break;
+
+	case LX_SIGEV_THREAD:
+		/*
+		 * Just as in illumos, SIGEV_THREAD handling is performed in
+		 * userspace with the help of SIGEV_SIGNAL/SIGEV_THREAD_ID.
+		 *
+		 * It's not expected to make an appearance in the syscall.
+		 */
+	default:
+		return (EINVAL);
+	}
+
+	sev->sigev_signo = lx_ltos_signo(lev->lx_sigev_signo, 0);
+	sev->sigev_value = lev->lx_sigev_value;
+
+	/* Ensure SIGEV_SIGNAL has a valid signo to work with. */
+	if (sev->sigev_notify == SIGEV_SIGNAL && sev->sigev_signo == 0) {
+		return (EINVAL);
+	}
+	return (0);
+}
+
+static int
+lx_sigev_copyin(lx_sigevent_t *userp, lx_sigevent_t *levp)
+{
+#ifdef _SYSCALL32_IMPL
+	if (get_udatamodel() != DATAMODEL_NATIVE) {
+		lx_sigevent32_t lev32;
+
+		if (copyin(userp, &lev32, sizeof (lev32)) != 0) {
+			return (EFAULT);
+		}
+		levp->lx_sigev_value.sival_int = lev32.lx_sigev_value.sival_int;
+		levp->lx_sigev_signo = lev32.lx_sigev_signo;
+		levp->lx_sigev_notify = lev32.lx_sigev_notify;
+		levp->lx_sigev_un.lx_tid = lev32.lx_sigev_un.lx_tid;
+	} else
+#endif /* _SYSCALL32_IMPL */
+	{
+		if (copyin(userp, levp, sizeof (lx_sigevent_t)) != 0) {
+			return (EFAULT);
+		}
+	}
+	return (0);
+}
+
+static void
+lx_sigev_thread_fire(itimer_t *it)
+{
+	proc_t *p = it->it_proc;
+	pid_t lpid = (pid_t)LX_SIGEV_THREAD_ID_LPID(it);
+	id_t tid = (id_t)LX_SIGEV_THREAD_ID_TID(it);
+	lwpdir_t *ld;
+
+	ASSERT(MUTEX_HELD(&it->it_mutex));
+	ASSERT(it->it_pending == 0);
+	ASSERT(it->it_flags & IT_SIGNAL);
+	ASSERT(MUTEX_HELD(&p->p_lock));
+
+	ld = lwp_hash_lookup(p, tid);
+	if (ld != NULL) {
+		lx_lwp_data_t *lwpd;
+		kthread_t *t;
+
+		t = ld->ld_entry->le_thread;
+		lwpd = ttolxlwp(t);
+		if (lwpd != NULL && lwpd->br_pid == lpid) {
+			/*
+			 * A thread matching the LX pid is still present in the
+			 * process.  Send a targeted signal as requested.
+			 */
+			it->it_pending = 1;
+			mutex_exit(&it->it_mutex);
+			sigaddqa(p, t, it->it_sigq);
+			return;
+		}
+	}
+
+	mutex_exit(&it->it_mutex);
+}
+
+long
+lx_timer_create(int clock, lx_sigevent_t *sevp, timer_t *tidp)
+{
+	int error;
+	lx_sigevent_t lev;
+	struct sigevent sev;
+	clock_backend_t *backend = NULL;
+	proc_t *p = curproc;
+	itimer_t *itp;
+	timer_t tid;
+
+	if (clock == -2) {
+		/*
+		 * A change was made to the old userspace timer emulation to
+		 * handle this specific clock ID for MapR.  It was wrongly
+		 * mapped to CLOCK_REALTIME rather than CLOCK_THREAD_CPUTIME_ID
+		 * which it maps to.  Until the CLOCK_*_CPUTIME_ID timers can
+		 * be emulated, the admittedly incorrect mapping will remain.
+		 */
+		backend = clock_get_backend(CLOCK_REALTIME);
+	} else {
+		lx_clock_backend_t *lback = LX_CLOCK_BACKEND(clock);
+
+		if (lback != NULL) {
+			backend = clock_get_backend(lback->lclk_ntv_id);
+		}
+	}
+	if (backend == NULL) {
+		return (set_errno(EINVAL));
+	}
+
+	/* We have to convert the Linux sigevent layout to the illumos layout */
+	if (sevp != NULL) {
+		if ((error = lx_sigev_copyin(sevp, &lev)) != 0) {
+			return (set_errno(error));
+		}
+		if ((error = lx_ltos_sigev(&lev, &sev)) != 0) {
+			return (set_errno(error));
+		}
+	} else {
+		bzero(&sev, sizeof (sev));
+		sev.sigev_notify = SIGEV_SIGNAL;
+		sev.sigev_signo = SIGALRM;
+	}
+
+	if ((error = timer_setup(backend, &sev, NULL, &itp, &tid)) != 0) {
+		return (set_errno(error));
+	}
+
+	/*
+	 * The SIGEV_THREAD_ID notification method in Linux allows the caller
+	 * to target a specific thread to receive the signal.  The IT_CALLBACK
+	 * timer functionality is used to fulfill this need.  After translating
+	 * the LX pid to a SunOS thread ID (ensuring it exists in the current
+	 * process), those IDs are attached to the timer along with the custom
+	 * lx_sigev_thread_fire callback.  This targets the signal notification
+	 * properly when the timer fires.
+	 */
+	if (lev.lx_sigev_notify == LX_SIGEV_THREAD_ID) {
+		pid_t lpid, spid;
+		id_t stid;
+
+		lpid = (pid_t)lev.lx_sigev_un.lx_tid;
+		if (lx_lpid_to_spair(lpid, &spid, &stid) != 0 ||
+		    spid != curproc->p_pid) {
+			error = EINVAL;
+			goto err;
+		}
+
+		itp->it_flags |= IT_CALLBACK;
+		itp->it_cb_func = lx_sigev_thread_fire;
+		LX_SIGEV_THREAD_ID_LPID(itp) = lpid;
+		LX_SIGEV_THREAD_ID_TID(itp) = stid;
+	}
+
+	/*
+	 * When the sigevent is not specified, its sigev_value field is
+	 * expected to be populated with the timer ID.
+	 */
+	if (sevp == NULL) {
+		itp->it_sigq->sq_info.si_value.sival_int = tid;
+	}
+
+	if (copyout(&tid, tidp, sizeof (timer_t)) != 0) {
+		error = EFAULT;
+		goto err;
+	}
+
+	timer_release(p, itp);
+	return (0);
+
+err:
+	timer_delete_grabbed(p, tid, itp);
+	return (set_errno(error));
+}
 
 long
 lx_gettimeofday(struct timeval *tvp, struct lx_timezone *tzp)
