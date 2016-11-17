@@ -476,8 +476,6 @@ typeset acl
 typeset target
 typeset -i passthrough=0
 typeset -i flag=0
-cwd=$PWD
-cd $TESTDIR
 
 for mode in "${aclmode_flag[@]}"; do
 	log_must zfs set aclmode=$mode $TESTPOOL/$TESTFS
