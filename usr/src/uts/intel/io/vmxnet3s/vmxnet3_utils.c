@@ -71,15 +71,10 @@ static ddi_dma_attr_t vmxnet3_dma_attrs_512 = {
 };
 
 /*
- * vmxnet3_alloc_dma_mem --
+ * Allocate /size/ bytes of contiguous DMA-ble memory.
  *
- *    Allocate /size/ bytes of contiguous DMA-ble memory.
- *
- * Results:
+ * Returns:
  *    DDI_SUCCESS or DDI_FAILURE.
- *
- * Side effects:
- *    None.
  */
 static int
 vmxnet3_alloc_dma_mem(vmxnet3_softc_t *dp, vmxnet3_dmabuf_t *dma, size_t size,
@@ -161,15 +156,7 @@ vmxnet3_alloc_dma_mem_128(vmxnet3_softc_t *dp, vmxnet3_dmabuf_t *dma,
 }
 
 /*
- * vmxnet3_free_dma_mem --
- *
- *    Free DMA-ble memory.
- *
- * Results:
- *    None.
- *
- * Side effects:
- *    None.
+ * Free DMA-ble memory.
  */
 void
 vmxnet3_free_dma_mem(vmxnet3_dmabuf_t *dma)
@@ -184,18 +171,13 @@ vmxnet3_free_dma_mem(vmxnet3_dmabuf_t *dma)
 }
 
 /*
- * vmxnet3_getprop --
+ * Get the numeric value of the property "name" in vmxnet3s.conf for
+ * the corresponding device instance.
+ * If the property isn't found or if it doesn't satisfy the conditions,
+ * "def" is returned.
  *
- *    Get the numeric value of the property "name" in vmxnet3s.conf for
- *    the corresponding device instance.
- *    If the property isn't found or if it doesn't satisfy the conditions,
- *    "def" is returned.
- *
- * Results:
- *    The value of the property or "def".
- *
- * Side effects:
- *    None.
+ * Returns:
+ *	The value of the property or "def".
  */
 int
 vmxnet3_getprop(vmxnet3_softc_t *dp, char *name, int min, int max, int def)

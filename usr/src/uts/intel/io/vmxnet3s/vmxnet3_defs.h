@@ -31,7 +31,7 @@
 #define	VMXNET3_REG_UVRS	0x8	/* UPT Version Report Selection */
 #define	VMXNET3_REG_DSAL	0x10	/* Driver Shared Address Low */
 #define	VMXNET3_REG_DSAH	0x18	/* Driver Shared Address High */
-#define	VMXNET3_REG_CMD		0x20 	/* Command */
+#define	VMXNET3_REG_CMD		0x20	/* Command */
 #define	VMXNET3_REG_MACL	0x28	/* MAC Address Low */
 #define	VMXNET3_REG_MACH	0x30	/* MAC Address High */
 #define	VMXNET3_REG_ICR		0x38	/* Interrupt Cause Register */

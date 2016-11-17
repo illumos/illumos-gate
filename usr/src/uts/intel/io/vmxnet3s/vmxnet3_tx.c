@@ -33,15 +33,7 @@ typedef struct vmxnet3_offload_t {
 } vmxnet3_offload_t;
 
 /*
- * vmxnet3_txqueue_init --
- *
- *    Initialize a TxQueue. Currently nothing needs to be done.
- *
- * Results:
- *    DDI_SUCCESS.
- *
- * Side effects:
- *    None.
+ * Initialize a TxQueue. Currently nothing needs to be done.
  */
 /* ARGSUSED */
 int
@@ -51,15 +43,7 @@ vmxnet3_txqueue_init(vmxnet3_softc_t *dp, vmxnet3_txqueue_t *txq)
 }
 
 /*
- * vmxnet3_txqueue_fini --
- *
- *    Finish a TxQueue by freeing all pending Tx.
- *
- * Results:
- *    DDI_SUCCESS.
- *
- * Side effects:
- *    None.
+ * Finish a TxQueue by freeing all pending Tx.
  */
 void
 vmxnet3_txqueue_fini(vmxnet3_softc_t *dp, vmxnet3_txqueue_t *txq)
@@ -77,24 +61,19 @@ vmxnet3_txqueue_fini(vmxnet3_softc_t *dp, vmxnet3_txqueue_t *txq)
 }
 
 /*
- * vmxnet3_tx_prepare_offload --
+ * Build the offload context of a msg.
  *
- *    Build the offload context of a msg.
- *
- * Results:
- *    0 if everything went well.
- *    +n if n bytes need to be pulled up.
- *    -1 in case of error (not used).
- *
- * Side effects:
- *    None.
+ * Returns:
+ *	0 if everything went well.
+ *	+n if n bytes need to be pulled up.
+ *	-1 in case of error (not used).
  */
 static int
 vmxnet3_tx_prepare_offload(vmxnet3_softc_t *dp, vmxnet3_offload_t *ol,
     mblk_t *mp)
 {
 	int ret = 0;
-	uint32_t start, stuff, value, flags, lsoflags, mss;
+	uint32_t start, stuff, value, flags, lso_flag, mss;
 
 	ol->om = VMXNET3_OM_NONE;
 	ol->hlen = 0;
@@ -102,12 +81,9 @@ vmxnet3_tx_prepare_offload(vmxnet3_softc_t *dp, vmxnet3_offload_t *ol,
 
 	hcksum_retrieve(mp, NULL, NULL, &start, &stuff, NULL, &value, &flags);
 
-	mac_lso_get(mp, &mss, &lsoflags);
-	if (lsoflags & HW_LSO) {
-		flags |= HW_LSO;
-	}
+	mac_lso_get(mp, &mss, &lso_flag);
 
-	if (flags) {
+	if (flags || lso_flag) {
 		struct ether_vlan_header *eth = (void *) mp->b_rptr;
 		uint8_t ethLen;
 
@@ -120,12 +96,7 @@ vmxnet3_tx_prepare_offload(vmxnet3_softc_t *dp, vmxnet3_offload_t *ol,
 		VMXNET3_DEBUG(dp, 4, "flags=0x%x, ethLen=%u, start=%u, "
 		    "stuff=%u, value=%u\n", flags, ethLen, start, stuff, value);
 
-		if (flags & HCK_PARTIALCKSUM) {
-			ol->om = VMXNET3_OM_CSUM;
-			ol->hlen = start + ethLen;
-			ol->msscof = stuff + ethLen;
-		}
-		if (flags & HW_LSO) {
+		if (lso_flag & HW_LSO) {
 			mblk_t *mblk = mp;
 			uint8_t *ip, *tcp;
 			uint8_t ipLen, tcpLen;
@@ -155,11 +126,15 @@ vmxnet3_tx_prepare_offload(vmxnet3_softc_t *dp, vmxnet3_offload_t *ol,
 
 			ol->om = VMXNET3_OM_TSO;
 			ol->hlen = ethLen + ipLen + tcpLen;
-			ol->msscof = DB_LSOMSS(mp);
+			ol->msscof = mss;
 
 			if (mblk != mp) {
 				ret = ol->hlen;
 			}
+		} else if (flags & HCK_PARTIALCKSUM) {
+			ol->om = VMXNET3_OM_CSUM;
+			ol->hlen = start + ethLen;
+			ol->msscof = stuff + ethLen;
 		}
 	}
 
@@ -167,18 +142,16 @@ vmxnet3_tx_prepare_offload(vmxnet3_softc_t *dp, vmxnet3_offload_t *ol,
 }
 
 /*
- * vmxnet3_tx_one --
+ * Map a msg into the Tx command ring of a vmxnet3 device.
  *
- *    Map a msg into the Tx command ring of a vmxnet3 device.
- *
- * Results:
- *    VMXNET3_TX_OK if everything went well.
- *    VMXNET3_TX_RINGFULL if the ring is nearly full.
- *    VMXNET3_TX_PULLUP if the msg is overfragmented.
- *    VMXNET3_TX_FAILURE if there was a DMA or offload error.
+ * Returns:
+ *	VMXNET3_TX_OK if everything went well.
+ *	VMXNET3_TX_RINGFULL if the ring is nearly full.
+ *	VMXNET3_TX_PULLUP if the msg is overfragmented.
+ *	VMXNET3_TX_FAILURE if there was a DMA or offload error.
  *
  * Side effects:
- *    The ring is filled if VMXNET3_TX_OK is returned.
+ *	The ring is filled if VMXNET3_TX_OK is returned.
  */
 static vmxnet3_txstatus
 vmxnet3_tx_one(vmxnet3_softc_t *dp, vmxnet3_txqueue_t *txq,
@@ -339,16 +312,11 @@ done:
 }
 
 /*
- * vmxnet3_tx --
+ * Send packets on a vmxnet3 device.
  *
- *    Send packets on a vmxnet3 device.
- *
- * Results:
- *    NULL in case of success or failure.
- *    The mps to be retransmitted later if the ring is full.
- *
- * Side effects:
- *    None.
+ * Returns:
+ *	NULL in case of success or failure.
+ *	The mps to be retransmitted later if the ring is full.
  */
 mblk_t *
 vmxnet3_tx(void *data, mblk_t *mps)
@@ -450,15 +418,10 @@ vmxnet3_tx(void *data, mblk_t *mps)
 }
 
 /*
- * vmxnet3_tx_complete --
+ * Parse a transmit queue and complete packets.
  *
- *    Parse a transmit queue and complete packets.
- *
- * Results:
- *    B_TRUE if Tx must be updated or B_FALSE if no action is required.
- *
- * Side effects:
- *    None.
+ * Returns:
+ *	B_TRUE if Tx must be updated or B_FALSE if no action is required.
  */
 boolean_t
 vmxnet3_tx_complete(vmxnet3_softc_t *dp, vmxnet3_txqueue_t *txq)
