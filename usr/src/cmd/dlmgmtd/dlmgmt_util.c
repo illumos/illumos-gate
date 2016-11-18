@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2011, Joyent Inc. All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*
@@ -354,9 +354,9 @@ link_destroy(dlmgmt_link_t *linkp)
 }
 
 /*
- * Set the DLMGMT_ACTIVE flag on the link to note that it is active.  When a
- * link becomes active and it belongs to a non-global zone, it is also added
- * to that zone.
+ * Set the DLMGMT_ACTIVE flag on the link to note that it is active.
+ * When a link is active and assigned to an NGZ it is added to that
+ * zone's datalink list and marked as on loan.
  */
 int
 link_activate(dlmgmt_link_t *linkp)
@@ -384,6 +384,7 @@ link_activate(dlmgmt_link_t *linkp)
 		}
 	} else if (linkp->ll_zoneid != GLOBAL_ZONEID) {
 		err = zone_add_datalink(linkp->ll_zoneid, linkp->ll_linkid);
+		linkp->ll_onloan = B_TRUE;
 	}
 done:
 	if (err == 0)
@@ -439,6 +440,10 @@ dlmgmt_create_common(const char *name, datalink_class_t class, uint32_t media,
 		return (EINVAL);
 	if (dlmgmt_nextlinkid == DATALINK_INVALID_LINKID)
 		return (ENOSPC);
+	if (flags & ~(DLMGMT_ACTIVE | DLMGMT_PERSIST | DLMGMT_TRANSIENT) ||
+	    ((flags & DLMGMT_PERSIST) && (flags & DLMGMT_TRANSIENT)) ||
+	    flags == 0)
+		return (EINVAL);
 
 	if ((linkp = calloc(1, sizeof (dlmgmt_link_t))) == NULL) {
 		err = ENOMEM;
@@ -451,7 +456,15 @@ dlmgmt_create_common(const char *name, datalink_class_t class, uint32_t media,
 	linkp->ll_linkid = dlmgmt_nextlinkid;
 	linkp->ll_zoneid = zoneid;
 	linkp->ll_gen = 0;
-	linkp->ll_tomb = B_FALSE;
+
+	/*
+	 * While DLMGMT_TRANSIENT starts off as a flag it is converted
+	 * into a link field since it is really a substate of
+	 * DLMGMT_ACTIVE -- it should not survive as a flag beyond
+	 * this point.
+	 */
+	linkp->ll_trans = (flags & DLMGMT_TRANSIENT) ? B_TRUE : B_FALSE;
+	flags &= ~DLMGMT_TRANSIENT;
 
 	if (avl_find(&dlmgmt_name_avl, linkp, &name_where) != NULL ||
 	    avl_find(&dlmgmt_id_avl, linkp, &id_where) != NULL) {
@@ -481,6 +494,12 @@ done:
 int
 dlmgmt_destroy_common(dlmgmt_link_t *linkp, uint32_t flags)
 {
+	/*
+	 * After dlmgmt_create_common() the link flags should only
+	 * ever include ACTIVE or PERSIST.
+	 */
+	assert((linkp->ll_flags & ~(DLMGMT_ACTIVE | DLMGMT_PERSIST)) == 0);
+
 	if ((linkp->ll_flags & flags) == 0) {
 		/*
 		 * The link does not exist in the specified space.

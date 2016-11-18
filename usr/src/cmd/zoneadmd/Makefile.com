@@ -20,7 +20,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2014, Joyent, Inc. All rights reserved.
+# Copyright 2016 Joyent, Inc.
 #
 
 PROG= zoneadmd
@@ -36,6 +36,9 @@ CFLAGS += $(CCVERBOSE)
 LDLIBS += -lsocket -lzonecfg -lnsl -ldevinfo -ldevice -lnvpair \
 	-lgen -lbsm -lcontract -lzfs -luuid -lbrand -ldladm -ltsnet -ltsol \
 	-linetutil -lproc -lscf
+
+C99MODE=	-xc99=%all
+C99LMODE=	-Xc99=%all
 
 .KEEP_STATE:
 

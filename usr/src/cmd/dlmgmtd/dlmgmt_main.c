@@ -22,7 +22,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2014 Joyent, Inc.  All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*
@@ -305,8 +305,6 @@ dlmgmt_init(void)
 		    strerror(err));
 		return (err);
 	}
-
-	(void) unlink(ZONE_LOCK);
 
 	/*
 	 * First derive the name of the cache file from the FMRI name. This

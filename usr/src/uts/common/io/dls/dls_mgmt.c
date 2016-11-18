@@ -21,7 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*
@@ -1414,7 +1414,7 @@ dls_devnet_phydev(datalink_id_t vlanid, dev_t *devp)
  *    This case does not change the <link name, linkid> mapping, so the link's
  *    kstats need to be updated with using name associated the given id2.
  *
- * The zonename parameter is used to allow us to create a VNIC in the global
+ * The zoneinit parameter is used to allow us to create a VNIC in the global
  * zone which is assigned to a non-global zone.  Since there is a race condition
  * in the create process if two VNICs have the same name, we need to rename it
  * after it has been assigned to the zone.

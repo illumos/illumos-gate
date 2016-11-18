@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2011, Joyent Inc. All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*
@@ -65,10 +65,9 @@ typedef struct dlmgmt_link_s {
 	boolean_t		ll_onloan;
 	avl_node_t		ll_name_node;
 	avl_node_t		ll_id_node;
-	avl_node_t		ll_loan_node;
 	uint32_t		ll_flags;
 	uint32_t		ll_gen;		/* generation number */
-	boolean_t		ll_tomb;	/* tombstombed */
+	boolean_t		ll_trans;	/* transient link */
 } dlmgmt_link_t;
 
 /*
@@ -86,8 +85,6 @@ typedef struct dlmgmt_dlconf_s {
 	avl_node_t		ld_node;
 } dlmgmt_dlconf_t;
 
-#define	ZONE_LOCK	"/etc/dladm/zone.lck"
-
 extern boolean_t	debug;
 extern const char	*progname;
 extern char		cachefile[];
@@ -95,7 +92,6 @@ extern dladm_handle_t	dld_handle;
 extern datalink_id_t	dlmgmt_nextlinkid;
 extern avl_tree_t	dlmgmt_name_avl;
 extern avl_tree_t	dlmgmt_id_avl;
-extern avl_tree_t	dlmgmt_loan_avl;
 extern avl_tree_t	dlmgmt_dlconf_avl;
 
 boolean_t	linkattr_equal(dlmgmt_linkattr_t **, const char *, void *,

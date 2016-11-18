@@ -7766,6 +7766,13 @@ zone_list_datalink(zoneid_t zoneid, int *nump, datalink_id_t *idarray)
 	mutex_exit(&zone->zone_lock);
 	zone_rele(zone);
 
+	/*
+	 * Prevent returning negative nump values -- we should never
+	 * have this many links anyways.
+	 */
+	if (num > INT_MAX)
+		return (set_errno(EOVERFLOW));
+
 	/* Increased or decreased, caller should be notified. */
 	if (num != dlcount) {
 		if (copyout(&num, nump, sizeof (num)) != 0)

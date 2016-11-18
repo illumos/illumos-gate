@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2011, Joyent Inc. All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*
@@ -59,9 +59,6 @@
 #include <libsysevent.h>
 #include <libdlmgmt.h>
 #include <librcm.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
 #include <unistd.h>
 #include "dlmgmt_impl.h"
 
@@ -384,11 +381,6 @@ dlmgmt_upcall_destroy(void *argp, void *retp, size_t *sz, zoneid_t zoneid,
 	if ((err = dlmgmt_checkprivs(linkp->ll_class, cred)) != 0)
 		goto done;
 
-	if (linkp->ll_tomb == B_TRUE) {
-		err = EINPROGRESS;
-		goto done;
-	}
-
 	if (((linkp->ll_flags & flags) & DLMGMT_ACTIVE) != 0) {
 		if ((err = dlmgmt_delete_db_entry(linkp, DLMGMT_ACTIVE)) != 0)
 			goto done;
@@ -433,7 +425,10 @@ dlmgmt_getname(void *argp, void *retp, size_t *sz, zoneid_t zoneid,
 		retvalp->lr_flags = linkp->ll_flags;
 		retvalp->lr_class = linkp->ll_class;
 		retvalp->lr_media = linkp->ll_media;
+		retvalp->lr_flags |= (linkp->ll_trans == B_TRUE) ?
+		    DLMGMT_TRANSIENT : 0;
 	}
+
 
 	dlmgmt_table_unlock();
 	retvalp->lr_err = err;
@@ -662,11 +657,6 @@ dlmgmt_remapid(void *argp, void *retp, size_t *sz, zoneid_t zoneid,
 	if ((err = dlmgmt_checkprivs(linkp->ll_class, cred)) != 0)
 		goto done;
 
-	if (linkp->ll_tomb == B_TRUE) {
-		err = EBUSY;
-		goto done;
-	}
-
 
 	if (link_by_name(remapid->ld_link, linkp->ll_zoneid) != NULL) {
 		err = EEXIST;
@@ -728,11 +718,6 @@ dlmgmt_upid(void *argp, void *retp, size_t *sz, zoneid_t zoneid,
 
 	if ((err = dlmgmt_checkprivs(linkp->ll_class, cred)) != 0)
 		goto done;
-
-	if (linkp->ll_tomb == B_TRUE) {
-		err = EBUSY;
-		goto done;
-	}
 
 	if (linkp->ll_flags & DLMGMT_ACTIVE) {
 		err = EINVAL;
@@ -1241,11 +1226,6 @@ dlmgmt_setzoneid(void *argp, void *retp, size_t *sz, zoneid_t zoneid,
 	if ((err = dlmgmt_checkprivs(linkp->ll_class, cred)) != 0)
 		goto done;
 
-	if (linkp->ll_tomb == B_TRUE) {
-		err = EBUSY;
-		goto done;
-	}
-
 	/* We can only assign an active link to a zone. */
 	if (!(linkp->ll_flags & DLMGMT_ACTIVE)) {
 		err = EINVAL;
@@ -1269,22 +1249,25 @@ dlmgmt_setzoneid(void *argp, void *retp, size_t *sz, zoneid_t zoneid,
 	}
 
 	if (oldzoneid != GLOBAL_ZONEID) {
+		if (newzoneid == GLOBAL_ZONEID && linkp->ll_onloan) {
+			/*
+			 * In this case we are attempting to assign a
+			 * loaned datalink from an NGZ to the GZ. We
+			 * can only reassign a loaned VNIC back to the
+			 * GZ when the zone is shutting down --
+			 * because otherwise the VNIC is in use by the
+			 * zone and will be busy. Leave the VNIC
+			 * loaned to the zone and return EBUSY to the
+			 * caller.
+			 */
+			err = EBUSY;
+			goto done;
+		}
+
 		if (zone_remove_datalink(oldzoneid, linkid) != 0) {
 			err = errno;
 			dlmgmt_log(LOG_WARNING, "unable to remove link %d from "
 			    "zone %d: %s", linkid, oldzoneid, strerror(err));
-			goto done;
-		}
-
-		if (newzoneid == GLOBAL_ZONEID && linkp->ll_onloan) {
-			/*
-			 * We can only reassign a loaned VNIC back to the
-			 * global zone when the zone is shutting down, since
-			 * otherwise the VNIC is in use by the zone and will be
-			 * busy.  Leave the VNIC assigned to the zone so we can
-			 * still see it and delete it when dlmgmt_zonehalt()
-			 * runs.
-			 */
 			goto done;
 		}
 
@@ -1361,26 +1344,9 @@ dlmgmt_zonehalt(void *argp, void *retp, size_t *sz, zoneid_t zoneid,
 		} else if (zonehalt->ld_zoneid == GLOBAL_ZONEID) {
 			err = EINVAL;
 		} else {
-			/*
-			 * dls and mac don't honor the locking rules defined in
-			 * mac. In order to try and make that case less likely
-			 * to happen, we try to serialize some of the zone
-			 * activity here between dlmgmtd and the brands on
-			 * /etc/dladm/zone.lck
-			 */
-			int fd;
-
-			while ((fd = open(ZONE_LOCK, O_WRONLY |
-			    O_CREAT | O_EXCL, S_IRUSR | S_IWUSR)) < 0)
-			(void) sleep(1);
-			(void) write(fd, my_pid, sizeof (my_pid));
-			(void) close(fd);
-
 			dlmgmt_table_lock(B_TRUE);
 			dlmgmt_db_fini(zonehalt->ld_zoneid);
 			dlmgmt_table_unlock();
-
-			(void) unlink(ZONE_LOCK);
 		}
 	}
 	retvalp->lr_err = err;

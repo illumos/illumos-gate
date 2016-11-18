@@ -78,6 +78,7 @@
 #include <sys/conf.h>
 #include <sys/systeminfo.h>
 #include <sys/secflags.h>
+#include <sys/vnic.h>
 
 #include <libdlpi.h>
 #include <libdllink.h>
@@ -5151,6 +5152,80 @@ unmounted:
 	}
 }
 
+/*
+ * Delete all transient VNICs belonging to this zone. A transient VNIC
+ * is one that is created and destroyed along with the lifetime of the
+ * zone. Non-transient VNICs, ones that are assigned from the GZ to a
+ * NGZ, are reassigned to the GZ in zone_shutdown() via the
+ * zone-specific data (zsd) callbacks.
+ */
+static int
+delete_transient_vnics(zlog_t *zlogp, zoneid_t zoneid)
+{
+	dladm_status_t status;
+	int num_links = 0;
+	datalink_id_t *links, link;
+	uint32_t link_flags;
+	datalink_class_t link_class;
+	char link_name[MAXLINKNAMELEN];
+	vnic_ioc_delete_t ioc;
+
+	if (zone_list_datalink(zoneid, &num_links, NULL) != 0) {
+		zerror(zlogp, B_TRUE, "unable to determine "
+		    "number of network interfaces");
+		return (-1);
+	}
+
+	if (num_links == 0)
+		return (0);
+
+	links = malloc(num_links * sizeof (datalink_id_t));
+
+	if (links == NULL) {
+		zerror(zlogp, B_TRUE, "failed to delete "
+		    "network interfaces because of alloc fail");
+		return (-1);
+	}
+
+	if (zone_list_datalink(zoneid, &num_links, links) != 0) {
+		zerror(zlogp, B_TRUE, "failed to delete "
+		    "network interfaces because of failure "
+		    "to list them");
+		return (-1);
+	}
+
+	for (int i = 0; i < num_links; i++) {
+		char dlerr[DLADM_STRSIZE];
+		link = links[i];
+
+		status = dladm_datalink_id2info(dld_handle, link, &link_flags,
+		    &link_class, NULL, link_name, sizeof (link_name));
+
+		if (status != DLADM_STATUS_OK) {
+			zerror(zlogp, B_FALSE, "failed to "
+			    "delete network interface (%u)"
+			    "due to failure to get link info: %s",
+			    link,
+			    dladm_status2str(status, dlerr));
+			return (-1);
+		}
+
+		if (link_flags & DLADM_OPT_TRANSIENT) {
+			assert(link_class & DATALINK_CLASS_VNIC);
+
+			ioc.vd_vnic_id = link;
+			if (ioctl(dladm_dld_fd(dld_handle), VNIC_IOC_DELETE,
+			    &ioc) < 0) {
+				zerror(zlogp, B_TRUE,
+				    "delete VNIC ioctl failed %d", link);
+				return (-1);
+			}
+		}
+	}
+
+	return (0);
+}
+
 int
 vplat_teardown(zlog_t *zlogp, boolean_t unmount_cmd, boolean_t rebooting,
     boolean_t debug)
@@ -5262,11 +5337,18 @@ vplat_teardown(zlog_t *zlogp, boolean_t unmount_cmd, boolean_t rebooting,
 			}
 			break;
 		case ZS_EXCLUSIVE:
+			if (delete_transient_vnics(zlogp, zoneid) != 0) {
+				zerror(zlogp, B_FALSE, "unable to delete "
+				    "transient vnics in zone");
+				goto error;
+			}
+
 			status = dladm_zone_halt(dld_handle, zoneid);
 			if (status != DLADM_STATUS_OK) {
 				zerror(zlogp, B_FALSE, "unable to notify "
 				    "dlmgmtd of zone halt: %s",
 				    dladm_status2str(status, errmsg));
+				goto error;
 			}
 			break;
 		}

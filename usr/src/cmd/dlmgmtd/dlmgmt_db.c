@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015, Joyent Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include <assert.h>
@@ -44,7 +44,6 @@
 #include <libcontract.h>
 #include <libcontract_priv.h>
 #include <sys/contract/process.h>
-#include <sys/vnic.h>
 #include <zone.h>
 #include "dlmgmt_impl.h"
 
@@ -1533,11 +1532,6 @@ done:
 
 /*
  * Remove all links in the given zoneid.
- *
- * We do this work in two different passes. In the first pass, we remove any
- * entry that hasn't been loaned and mark every entry that has been loaned as
- * something that is going to be tombstomed. In the second pass, we drop the
- * table lock for every entry and remove the tombstombed entry for our zone.
  */
 void
 dlmgmt_db_fini(zoneid_t zoneid)
@@ -1547,66 +1541,9 @@ dlmgmt_db_fini(zoneid_t zoneid)
 	while (linkp != NULL) {
 		next_linkp = AVL_NEXT(&dlmgmt_name_avl, linkp);
 		if (linkp->ll_zoneid == zoneid) {
-			boolean_t onloan = linkp->ll_onloan;
-
-			/*
-			 * Cleanup any VNICs that were loaned to the zone
-			 * before the zone goes away and we can no longer
-			 * refer to the VNIC by the name/zoneid.
-			 */
-			if (onloan) {
-				(void) dlmgmt_delete_db_entry(linkp,
-				    DLMGMT_ACTIVE);
-				linkp->ll_tomb = B_TRUE;
-			} else {
-				(void) dlmgmt_destroy_common(linkp,
-				    DLMGMT_ACTIVE | DLMGMT_PERSIST);
-			}
-
+			(void) dlmgmt_destroy_common(linkp,
+			    DLMGMT_ACTIVE | DLMGMT_PERSIST);
 		}
 		linkp = next_linkp;
 	}
-
-again:
-	linkp = avl_first(&dlmgmt_name_avl);
-	while (linkp != NULL) {
-		vnic_ioc_delete_t ioc;
-
-		next_linkp = AVL_NEXT(&dlmgmt_name_avl, linkp);
-
-		if (linkp->ll_zoneid != zoneid) {
-			linkp = next_linkp;
-			continue;
-		}
-		ioc.vd_vnic_id = linkp->ll_linkid;
-		if (linkp->ll_tomb != B_TRUE)
-			abort();
-
-		/*
-		 * We have to drop the table lock while going up into the
-		 * kernel. If we hold the table lock while deleting a vnic, we
-		 * may get blocked on the mac perimeter and the holder of it may
-		 * want something from dlmgmtd.
-		 */
-		dlmgmt_table_unlock();
-
-		if (ioctl(dladm_dld_fd(dld_handle),
-		    VNIC_IOC_DELETE, &ioc) < 0)
-			dlmgmt_log(LOG_WARNING, "dlmgmt_db_fini "
-			    "delete VNIC ioctl failed %d %d",
-			    ioc.vd_vnic_id, errno);
-
-		/*
-		 * Even though we've dropped the lock, we know that nothing else
-		 * could have removed us. Therefore, it should be safe to go
-		 * through and delete ourselves, but do nothing else. We'll have
-		 * to restart iteration from the beginning. This can be painful.
-		 */
-		dlmgmt_table_lock(B_TRUE);
-
-		(void) dlmgmt_destroy_common(linkp,
-		    DLMGMT_ACTIVE | DLMGMT_PERSIST);
-		goto again;
-	}
-
 }

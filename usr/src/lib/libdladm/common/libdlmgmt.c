@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2011, Joyent Inc. All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include <door.h>
@@ -125,6 +125,7 @@ dladm_create_datalink_id(dladm_handle_t handle, const char *link,
 
 	dlmgmt_flags = (flags & DLADM_OPT_ACTIVE) ? DLMGMT_ACTIVE : 0;
 	dlmgmt_flags |= (flags & DLADM_OPT_PERSIST) ? DLMGMT_PERSIST : 0;
+	dlmgmt_flags |= (flags & DLADM_OPT_TRANSIENT) ? DLMGMT_TRANSIENT : 0;
 
 	(void) strlcpy(createid.ld_link, link, MAXLINKNAMELEN);
 	createid.ld_class = class;
@@ -286,6 +287,7 @@ dladm_walk_datalink_id(int (*fn)(dladm_handle_t, datalink_id_t, void *),
 
 	dlmgmt_flags = (flags & DLADM_OPT_ACTIVE) ? DLMGMT_ACTIVE : 0;
 	dlmgmt_flags |= ((flags & DLADM_OPT_PERSIST) ? DLMGMT_PERSIST : 0);
+	dlmgmt_flags |= ((flags & DLADM_OPT_TRANSIENT) ? DLMGMT_TRANSIENT : 0);
 
 	getnext.ld_cmd = DLMGMT_CMD_GETNEXT;
 	getnext.ld_class = class;
@@ -638,10 +640,12 @@ dladm_datalink_id2info(dladm_handle_t handle, datalink_id_t linkid,
 	if (mediap != NULL)
 		*mediap = retval.lr_media;
 	if (flagp != NULL) {
-		*flagp = retval.lr_flags & DLMGMT_ACTIVE ?
+		*flagp = (retval.lr_flags & DLMGMT_ACTIVE) ?
 		    DLADM_OPT_ACTIVE : 0;
 		*flagp |= (retval.lr_flags & DLMGMT_PERSIST) ?
 		    DLADM_OPT_PERSIST : 0;
+		*flagp |= (retval.lr_flags & DLMGMT_TRANSIENT) ?
+		    DLADM_OPT_TRANSIENT : 0;
 	}
 	return (DLADM_STATUS_OK);
 }
