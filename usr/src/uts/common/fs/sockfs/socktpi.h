@@ -212,11 +212,16 @@ typedef struct sotpi_info {
 	 * transport. sti_ux_vp and v_stream->sd_vnode form the
 	 * cross-linkage between the underlying fs vnode corresponding
 	 * to the bound sockaddr_un and the socket node.
+	 *
+	 * sti_ux_taddr holds the result of translations done in
+	 * so_ux_addr_xlate(), which may or may not be the same as
+	 * sti_ux_faddr (which is our connected peer address).
 	 */
 	struct so_ux_addr sti_ux_laddr; /* laddr bound with the transport */
-	struct so_ux_addr sti_ux_faddr; /* temporary peer address */
+	struct so_ux_addr sti_ux_faddr; /* connected peer address */
+	struct so_ux_addr sti_ux_taddr; /* temporary address for sendmsg */
 	struct vnode	*sti_ux_bound_vp; /* bound AF_UNIX file system vnode */
-	struct sonode	*sti_next_so; 	/* next sonode on socklist	*/
+	struct sonode	*sti_next_so;	/* next sonode on socklist	*/
 	struct sonode	*sti_prev_so;	/* previous sonode on socklist	*/
 	mblk_t	*sti_discon_ind_mp;	/* T_DISCON_IND received from below */
 
