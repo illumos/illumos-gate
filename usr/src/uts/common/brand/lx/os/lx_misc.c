@@ -329,6 +329,13 @@ lx_freelwp(klwp_t *lwp)
 	}
 
 	/*
+	 * Discard the affinity mask.
+	 */
+	VERIFY(lwpd->br_affinitymask != NULL);
+	cpuset_free(lwpd->br_affinitymask);
+	lwpd->br_affinitymask = NULL;
+
+	/*
 	 * Ensure that lx_ptrace_exit() has been called to detach
 	 * ptrace(2) tracers and tracees.
 	 */
