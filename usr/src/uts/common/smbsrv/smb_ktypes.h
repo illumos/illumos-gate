@@ -1613,8 +1613,6 @@ typedef struct smb_arg_lock {
 	uint32_t	lseq;
 } smb_arg_lock_t;
 
-struct smb_async_req;
-
 /*
  * SMB Request State Machine
  * -------------------------
@@ -1829,9 +1827,8 @@ typedef struct smb_request {
 	uint64_t		smb2_ssnid;	/* See u_ssnid */
 	uint8_t			smb2_sig[16];	/* signature */
 
+	boolean_t		smb2_async;
 	uint64_t		smb2_async_id;
-	struct smb2_async_req	*sr_async_req;
-
 	/* Parameters */
 	struct mbuf_chain	smb_vwv;	/* variable width value */
 

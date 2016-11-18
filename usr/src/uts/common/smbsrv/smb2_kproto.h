@@ -41,6 +41,7 @@ void	smb2_dispatch_stats_update(smb_server_t *,
 
 int	smb2sr_newrq(smb_request_t *);
 void	smb2sr_work(smb_request_t *);
+uint32_t smb2sr_go_async(smb_request_t *);
 
 int smb2_decode_header(smb_request_t *);
 int smb2_encode_header(smb_request_t *, boolean_t);
@@ -104,8 +105,6 @@ void smb2_durable_timers(smb_server_t *);
 uint32_t smb2_dh_reconnect(smb_request_t *);
 boolean_t smb_dh_should_save(smb_ofile_t *);
 extern void smb2_dh_shutdown(smb_server_t *);
-
-void smb2sr_finish_async(smb_request_t *);
 
 #ifdef	__cplusplus
 }

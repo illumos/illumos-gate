@@ -34,7 +34,7 @@
 #include <sys/fcntl.h>
 #include <sys/nbmlock.h>
 #include <smbsrv/string.h>
-#include <smbsrv/smb_kproto.h>
+#include <smbsrv/smb2_kproto.h>
 #include <smbsrv/smb_fsops.h>
 #include <smbsrv/smbinfo.h>
 
@@ -957,15 +957,27 @@ smb_open_oplock_break(smb_request_t *sr, smb_node_t *node)
 {
 	smb_arg_open_t	*op = &sr->sr_open;
 	uint32_t	flags = 0;
+	int		rc = 0;
+
+	if (sr->session->dialect >= SMB_VERS_2_BASE &&
+	    sr->smb2_async == B_FALSE)
+		flags |= SMB_OPLOCK_BREAK_NOWAIT;
 
 	if (!smb_node_share_check(node))
 		flags |= SMB_OPLOCK_BREAK_BATCH;
 
 	if (smb_open_overwrite(op)) {
 		flags |= SMB_OPLOCK_BREAK_TO_NONE;
-		(void) smb_oplock_break(sr, node, flags);
+		rc = smb_oplock_break(sr, node, flags);
 	} else if (!smb_open_attr_only(op)) {
 		flags |= SMB_OPLOCK_BREAK_TO_LEVEL_II;
+		rc = smb_oplock_break(sr, node, flags);
+	}
+
+	if (sr->session->dialect >= SMB_VERS_2_BASE &&
+	    rc == EAGAIN) {
+		(void) smb2sr_go_async(sr);
+		flags &= ~SMB_OPLOCK_BREAK_NOWAIT;
 		(void) smb_oplock_break(sr, node, flags);
 	}
 }

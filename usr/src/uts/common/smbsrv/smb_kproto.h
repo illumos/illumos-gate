@@ -325,9 +325,6 @@ uint32_t smb_omode_to_amask(uint32_t desired_access);
 
 void	sshow_distribution_info(char *);
 
-uint32_t smb2sr_go_async(smb_request_t *sr,
-	smb_sdrc_t (*async_func)(smb_request_t *));
-
 void	smb_dispatch_stats_init(smb_server_t *);
 void	smb_dispatch_stats_fini(smb_server_t *);
 void	smb_dispatch_stats_update(smb_server_t *,

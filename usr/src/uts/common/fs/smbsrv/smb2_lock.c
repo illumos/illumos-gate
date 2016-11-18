@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -34,7 +34,7 @@ typedef struct SMB2_LOCK_ELEMENT {
 
 static uint32_t smb2_unlock(smb_request_t *);
 static uint32_t smb2_locks(smb_request_t *);
-static smb_sdrc_t smb2_lock_async(smb_request_t *);
+static uint32_t smb2_lock_blocking(smb_request_t *);
 
 static boolean_t smb2_lock_chk_lockseq(smb_ofile_t *, uint32_t);
 static void smb2_lock_set_lockseq(smb_ofile_t *, uint32_t);
@@ -104,7 +104,7 @@ smb2_lock(smb_request_t *sr)
 	if (LockSequence != 0 &&
 	    smb2_lock_chk_lockseq(sr->fid_ofile, LockSequence)) {
 		status = NT_STATUS_SUCCESS;
-		goto done;
+		goto errout;
 	}
 
 	/*
@@ -144,9 +144,7 @@ smb2_lock(smb_request_t *sr)
 
 errout:
 	sr->smb2_status = status;
-	if (status != NT_STATUS_PENDING) {
-		DTRACE_SMB2_DONE(op__Lock, smb_request_t *, sr);
-	}
+	DTRACE_SMB2_DONE(op__Lock, smb_request_t *, sr);
 
 	if (status) {
 		smb2sr_put_error(sr, status);
@@ -154,9 +152,8 @@ errout:
 	}
 
 	/*
-	 * Encode SMB2 Lock reply (sync)
+	 * Encode SMB2 Lock reply
 	 */
-done:
 	(void) smb_mbc_encodef(
 	    &sr->reply, "w..",
 	    4); /* StructSize	w */
@@ -226,7 +223,7 @@ smb2_locks(smb_request_t *sr)
 			 * invalid parameter.
 			 */
 			if (i == 0 && LockCount == 1) {
-				status = smb2sr_go_async(sr, smb2_lock_async);
+				status = smb2_lock_blocking(sr);
 				return (status);
 			}
 			/* FALLTHROUGH */
@@ -276,11 +273,11 @@ end_loop:
 }
 
 /*
- * Async handler for blocking lock requests.
+ * Handler for blocking lock requests, which may "go async".
  * Always exactly one lock request here.
  */
-static smb_sdrc_t
-smb2_lock_async(smb_request_t *sr)
+static uint32_t
+smb2_lock_blocking(smb_request_t *sr)
 {
 	lock_elem_t *lk = sr->arg.lock.lvec;
 	uint32_t LockCount = sr->arg.lock.lcnt;
@@ -304,33 +301,29 @@ smb2_lock_async(smb_request_t *sr)
 
 	default:
 		ASSERT(0);
-		status = NT_STATUS_INTERNAL_ERROR;
-		goto errout;
+		return (NT_STATUS_INTERNAL_ERROR);
 	}
-
-	status = smb_lock_range(sr, lk->Offset, lk->Length, pid,
-	    ltype, timeout);
-
-errout:
-	sr->smb2_status = status;
-	DTRACE_SMB2_DONE(op__Lock, smb_request_t *, sr);
-
-	if (status != 0) {
-		smb2sr_put_error(sr, status);
-		return (SDRC_SUCCESS);
-	}
-
-	if (LockSequence != 0)
-		smb2_lock_set_lockseq(sr->fid_ofile, LockSequence);
 
 	/*
-	 * SMB2 Lock reply (async)
+	 * Try the lock first with timeout=0 as we can often
+	 * get a lock without going async and avoid an extra
+	 * round trip with the client.  Also, only go async
+	 * for status returns that mean we will block.
 	 */
-	(void) smb_mbc_encodef(
-	    &sr->reply, "w..",
-	    4); /* StructSize	w */
-	    /* reserved		.. */
-	return (SDRC_SUCCESS);
+	status = smb_lock_range(sr, lk->Offset, lk->Length, pid, ltype, 0);
+	if (status == NT_STATUS_LOCK_NOT_GRANTED ||
+	    status == NT_STATUS_FILE_LOCK_CONFLICT) {
+		status = smb2sr_go_async(sr);
+		if (status != 0)
+			return (status);
+		status = smb_lock_range(sr, lk->Offset, lk->Length,
+		    pid, ltype, timeout);
+	}
+
+	if (status == 0 && LockSequence != 0)
+		smb2_lock_set_lockseq(sr->fid_ofile, LockSequence);
+
+	return (status);
 }
 
 /*

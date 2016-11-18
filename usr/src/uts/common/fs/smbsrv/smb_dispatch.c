@@ -836,9 +836,9 @@ andx_more:
 	sr->sr_time_start = gethrtime();
 	if ((sdrc = (*sdd->sdt_pre_op)(sr)) == SDRC_SUCCESS)
 		sdrc = (*sdd->sdt_function)(sr);
-	(*sdd->sdt_post_op)(sr);
 
 	if (sdrc != SDRC_SR_KEPT) {
+		(*sdd->sdt_post_op)(sr);
 		smbsr_cleanup(sr);
 	}
 
