@@ -1,6 +1,7 @@
 #
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright (c) 2016, Chris Fraire <cfraire@me.com>.
 #
 # CDDL HEADER START
 #
@@ -22,7 +23,6 @@
 #
 # CDDL HEADER END
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # This file provides information about all supported DHCP options, for
 # use by DHCP-related programs.  This file should only be modified to
@@ -114,6 +114,7 @@ STDAservs	STANDARD,	76,	IP,	   1,	0,	sdmi
 UserClas	STANDARD,	77,	ASCII,	   1,	0,	sdi
 SLP_DA		STANDARD,	78,	OCTET,	   1,	0,	sdmi
 SLP_SS		STANDARD,	79,	OCTET,	   1,	0,	sdmi
+ClientFQDN	STANDARD,	81,	OCTET,	   1,	0,	sdmi
 AgentOpt	STANDARD,	82,	OCTET,	   1,	0,	sdi
 FQDN		STANDARD,	89,	OCTET,	   1,	0,	sdmi
 
@@ -177,7 +178,7 @@ SHTTPproxy	VENDOR,		17,	ASCII,	   1,	0,	smi
 # The following option describes an option named ipPairs, that is in
 # the  SITE category, meaning it is defined by each individual site.
 # It is option code 132, which is of type IP Address, consisting of
-# a potentially infinite number of pairs of IP addresses.  (See 
+# a potentially infinite number of pairs of IP addresses.  (See
 # dhcp_inittab(4) for details)
 #
 # ipPairs     SITE,           132,    IP,     2,      0,      sdmi

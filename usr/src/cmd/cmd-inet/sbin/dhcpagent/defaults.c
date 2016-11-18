@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016-2017, Chris Fraire <cfraire@me.com>.
  */
 
 #include <sys/types.h>
@@ -59,7 +60,11 @@ static struct dhcp_default defaults[] = {
 	{ "DEBUG_LEVEL",	 "0",	 0,   3   },
 	{ "VERBOSE",		 "0",	 0,   0   },
 	{ "VERIFIED_LEASE_ONLY", "0",	 0,   0	  },
-	{ "PARAM_IGNORE_LIST",	 NULL,	 0,   0   }
+	{ "PARAM_IGNORE_LIST",	 NULL,	 0,   0   },
+	{ "REQUEST_FQDN",	 "1",	 0,   0	  },
+	{ "V4_DEFAULT_IAID_DUID",  "0",	 0,   0	  },
+	{ "DNS_DOMAINNAME",  NULL,	 0,   0	  },
+	{ "ADOPT_DOMAINNAME",	 "0",	 0,   0	  },
 };
 
 /*

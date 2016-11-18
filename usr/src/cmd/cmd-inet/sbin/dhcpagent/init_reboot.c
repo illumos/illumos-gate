@@ -21,13 +21,13 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016-2017, Chris Fraire <cfraire@me.com>.
  *
  * INIT_REBOOT state of the DHCP client state machine.
  */
 
 #include <sys/types.h>
 #include <stdio.h>
-#include <limits.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netinet/dhcp.h>
@@ -58,8 +58,6 @@ static void
 dhcp_init_reboot_v4(dhcp_smach_t *dsmp)
 {
 	dhcp_pkt_t		*dpkt;
-	const char		*reqhost;
-	char			hostfile[PATH_MAX + 1];
 
 	/*
 	 * assemble DHCPREQUEST message.  The max dhcp message size
@@ -79,29 +77,8 @@ dhcp_init_reboot_v4(dhcp_smach_t *dsmp)
 		(void) add_pkt_opt(dpkt, CD_CLASS_ID, class_id, class_id_len);
 	(void) add_pkt_prl(dpkt, dsmp);
 
-	/*
-	 * Set CD_HOSTNAME option if REQUEST_HOSTNAME is set and a hostname
-	 * is found in /etc/hostname.<ifname>
-	 */
-	if (df_get_bool(dsmp->dsm_name, dsmp->dsm_isv6, DF_REQUEST_HOSTNAME)) {
-		(void) snprintf(hostfile, sizeof (hostfile), "/etc/hostname.%s",
-		    dsmp->dsm_name);
-
-		if ((reqhost = iffile_to_hostname(hostfile)) != NULL) {
-			dhcpmsg(MSG_DEBUG, "dhcp_selecting: host %s", reqhost);
-			if ((dsmp->dsm_reqhost = strdup(reqhost)) != NULL)
-				(void) add_pkt_opt(dpkt, CD_HOSTNAME,
-				    dsmp->dsm_reqhost,
-				    strlen(dsmp->dsm_reqhost));
-			else
-				dhcpmsg(MSG_WARNING, "dhcp_selecting: cannot"
-				    " allocate memory for host name option");
-		} else {
-			dhcpmsg(MSG_DEBUG,
-			    "dhcp_selecting: no hostname for %s",
-			    dsmp->dsm_name);
-		}
-	}
+	if (!dhcp_add_fqdn_opt(dpkt, dsmp))
+		(void) dhcp_add_hostname_opt(dpkt, dsmp);
 
 	(void) add_pkt_opt(dpkt, CD_END, NULL, 0);
 

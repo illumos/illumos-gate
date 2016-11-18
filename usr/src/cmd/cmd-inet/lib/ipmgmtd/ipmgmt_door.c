@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016-2017, Chris Fraire <cfraire@me.com>.
  */
 
 /*
@@ -225,8 +226,6 @@ i_ipmgmt_nvl2aobjnode(nvlist_t *nvl, ipmgmt_aobjmap_t *nodep)
 	char			*aobjname = NULL, *ifname = NULL;
 	int32_t			lnum;
 	nvlist_t		*nvladdr;
-	struct sockaddr_storage	addr;
-	uint_t			n;
 	sa_family_t		af = AF_UNSPEC;
 	ipadm_addr_type_t	addrtype = IPADM_ADDR_NONE;
 	int			err = 0;
@@ -244,16 +243,37 @@ i_ipmgmt_nvl2aobjnode(nvlist_t *nvl, ipmgmt_aobjmap_t *nodep)
 	if (nvlist_exists(nvl, IPADM_NVP_IPV4ADDR)) {
 		af = AF_INET;
 		addrtype = IPADM_ADDR_STATIC;
-	} else if (nvlist_exists(nvl, IPADM_NVP_DHCP)) {
+	} else if (nvlist_lookup_nvlist(nvl, IPADM_NVP_DHCP, &nvladdr) == 0) {
+		char	*reqhost;
+
 		af = AF_INET;
 		addrtype = IPADM_ADDR_DHCP;
+
+		/*
+		 * ipmgmt_am_reqhost comes through in `nvl' for purposes of
+		 * updating the cached representation, but it is persisted as
+		 * a stand-alone DB line; so remove it after copying it.
+		 */
+		if (!nvlist_exists(nvl, IPADM_NVP_REQHOST)) {
+			*nodep->ipmgmt_am_reqhost = '\0';
+		} else {
+			if ((err = nvlist_lookup_string(nvl, IPADM_NVP_REQHOST,
+			    &reqhost)) != 0)
+				return (err);
+
+			(void) strlcpy(nodep->ipmgmt_am_reqhost, reqhost,
+			    sizeof (nodep->ipmgmt_am_reqhost));
+			(void) nvlist_remove(nvl, IPADM_NVP_REQHOST,
+			    DATA_TYPE_STRING);
+		}
 	} else if (nvlist_exists(nvl, IPADM_NVP_IPV6ADDR)) {
 		af = AF_INET6;
 		addrtype = IPADM_ADDR_STATIC;
 	} else if (nvlist_lookup_nvlist(nvl, IPADM_NVP_INTFID, &nvladdr) == 0) {
-		struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)&addr;
+		struct sockaddr_in6		sin6 = {0};
 		uint8_t	*addr6;
 		uint32_t plen;
+		uint_t	n;
 
 		af = AF_INET6;
 		addrtype = IPADM_ADDR_IPV6_ADDRCONF;
@@ -264,14 +284,15 @@ i_ipmgmt_nvl2aobjnode(nvlist_t *nvl, ipmgmt_aobjmap_t *nodep)
 			if (nvlist_lookup_uint8_array(nvladdr,
 			    IPADM_NVP_IPNUMADDR, &addr6, &n) != 0)
 				return (EINVAL);
-			bcopy(addr6, &sin6->sin6_addr, n);
-		} else {
-			bzero(&sin6->sin6_addr, sizeof (sin6->sin6_addr));
+			bcopy(addr6, &sin6.sin6_addr, n);
 		}
+
+		nodep->ipmgmt_am_linklocal = B_TRUE;
+		nodep->ipmgmt_am_ifid = sin6;
 	}
 
 	/*
-	 * populate the `*nodep' with retrieved values.
+	 * populate the non-addrtype-specific `*nodep' with retrieved values.
 	 */
 	(void) strlcpy(nodep->am_ifname, ifname, sizeof (nodep->am_ifname));
 	(void) strlcpy(nodep->am_aobjname, aobjname,
@@ -279,10 +300,6 @@ i_ipmgmt_nvl2aobjnode(nvlist_t *nvl, ipmgmt_aobjmap_t *nodep)
 	nodep->am_lnum = lnum;
 	nodep->am_family = af;
 	nodep->am_atype = addrtype;
-	if (addrtype == IPADM_ADDR_IPV6_ADDRCONF) {
-		nodep->am_linklocal = B_TRUE;
-		nodep->am_ifid = addr;
-	}
 	nodep->am_next = NULL;
 
 	/*
@@ -297,15 +314,15 @@ i_ipmgmt_nvl2aobjnode(nvlist_t *nvl, ipmgmt_aobjmap_t *nodep)
 
 /*
  * Handles the door command IPMGMT_CMD_SETADDR. It adds a new address object
- * node to the list `aobjmap' and then persists the address information in the
- * DB.
+ * node to the list `aobjmap' and optionally persists the address
+ * information in the DB.
  */
 static void
 ipmgmt_setaddr_handler(void *argp)
 {
 	ipmgmt_setaddr_arg_t	*sargp = argp;
 	ipmgmt_retval_t		rval;
-	ipmgmt_aobjmap_t	node;
+	ipmgmt_aobjmap_t	node = {0};
 	nvlist_t		*nvl = NULL;
 	char			*nvlbuf;
 	size_t			nvlsize = sargp->ia_nvlsize;
@@ -321,11 +338,11 @@ ipmgmt_setaddr_handler(void *argp)
 		if (flags & IPMGMT_INIT)
 			node.am_flags = (IPMGMT_ACTIVE|IPMGMT_PERSIST);
 		else
-			node.am_flags = flags;
+			node.am_flags = flags & ~IPMGMT_PROPS_ONLY;
 		if ((err = ipmgmt_aobjmap_op(&node, ADDROBJ_ADD)) != 0)
 			goto ret;
 	}
-	if (flags & IPMGMT_PERSIST) {
+	if ((flags & IPMGMT_PERSIST) && !(flags & IPMGMT_PROPS_ONLY)) {
 		ipadm_dbwrite_cbarg_t	cb;
 
 		cb.dbw_nvl = nvl;
@@ -339,7 +356,7 @@ ret:
 }
 
 /*
- * Handles the door commands that modify the `aobjmap' structure.
+ * Handles the door commands that read or modify the `aobjmap' structure.
  *
  * IPMGMT_CMD_ADDROBJ_LOOKUPADD - places a stub address object in `aobjmap'
  *	after ensuring that the namespace is not taken. If required, also
@@ -441,7 +458,7 @@ ipmgmt_aobjop_handler(void *argp)
 			 * have am_ifid set.
 			 */
 			if (head->am_atype != IPADM_ADDR_IPV6_ADDRCONF ||
-			    head->am_linklocal) {
+			    head->ipmgmt_am_linklocal) {
 				break;
 			}
 		}
@@ -456,9 +473,7 @@ ipmgmt_aobjop_handler(void *argp)
 		aobjrval.ir_family = head->am_family;
 		aobjrval.ir_flags = head->am_flags;
 		aobjrval.ir_atype = head->am_atype;
-		if (head->am_atype == IPADM_ADDR_IPV6_ADDRCONF &&
-		    head->am_linklocal)
-			aobjrval.ir_ifid = head->am_ifid;
+		aobjrval.ir_atype_cache = head->am_atype_cache;
 		(void) pthread_rwlock_unlock(&aobjmap.aobjmap_rwlock);
 		break;
 	case IPMGMT_CMD_LIF2ADDROBJ:
@@ -487,6 +502,7 @@ ipmgmt_aobjop_handler(void *argp)
 		    sizeof (aobjrval.ir_aobjname));
 		aobjrval.ir_atype = head->am_atype;
 		aobjrval.ir_flags = head->am_flags;
+		aobjrval.ir_atype_cache = head->am_atype_cache;
 		(void) pthread_rwlock_unlock(&aobjmap.aobjmap_rwlock);
 		break;
 	default:

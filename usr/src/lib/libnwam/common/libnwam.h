@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016, Chris Fraire <cfraire@me.com>.
  */
 
 /*
@@ -447,6 +448,8 @@ typedef enum {
 #define	NWAM_NCU_PROP_IPV6_ADDRSRC		"ipv6-addrsrc"
 #define	NWAM_NCU_PROP_IPV6_ADDR			"ipv6-addr"
 #define	NWAM_NCU_PROP_IPV6_DEFAULT_ROUTE	"ipv6-default-route"
+#define	NWAM_NCU_PROP_IP_PRIMARY		"ip-primary"
+#define	NWAM_NCU_PROP_IP_REQHOST		"ip-reqhost"
 
 /* Some properties should only be set on creation */
 #define	NWAM_NCU_PROP_SETONCE(prop)	\

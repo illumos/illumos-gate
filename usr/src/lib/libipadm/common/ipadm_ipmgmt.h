@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016, Chris Fraire <cfraire@me.com>.
  */
 
 #ifndef _IPADM_IPMGMT_H
@@ -51,8 +52,8 @@ extern "C" {
  * For more information on these definitions please refer to the top of
  * ipadm_persist.c. These are the name of the nvpairs which hold the
  * respective values. All nvpairs private to ipadm have names that begin
- * with "_". Note below that 'prefixlen' is an address property and therefore
- * not a private nvpair name.
+ * with "_". Note below that 'prefixlen' and 'reqhost' are address
+ * properties and therefore not a private nvpair name.
  */
 #define	IPADM_NVP_PROTONAME	"_protocol"	/* protocol name */
 #define	IPADM_NVP_IFNAME	"_ifname"	/* interface name */
@@ -63,6 +64,7 @@ extern "C" {
 #define	IPADM_NVP_IPADDRHNAME	"_aname"	/* local hostname */
 #define	IPADM_NVP_IPDADDRHNAME	"_dname"	/* remote hostname */
 #define	IPADM_NVP_PREFIXLEN	"prefixlen"	/* prefixlen */
+#define	IPADM_NVP_REQHOST	"reqhost"	/* requested hostname */
 #define	IPADM_NVP_IPV6ADDR	"_ipv6addr"	/* name of IPv6 addr nvlist */
 #define	IPADM_NVP_DHCP		"_dhcp"		/* name of DHCP nvlist */
 #define	IPADM_NVP_WAIT		"_wait"		/* DHCP timeout value */
@@ -152,6 +154,20 @@ typedef struct ipmgmt_prop_arg_s {
 #define	IPMGMT_APPEND	0x00000001
 #define	IPMGMT_REMOVE	0x00000002
 
+/*
+ * ipadm_addr_type_t-specific values that are cached in ipmgmtd and can
+ * make a round-trip back to client programs
+ */
+typedef union {
+	struct {
+		boolean_t		ipmgmt_linklocal;
+		struct sockaddr_in6		ipmgmt_ifid;
+	} ipmgmt_ipv6_cache_s;
+	struct {
+		char			ipmgmt_reqhost[MAXNAMELEN];
+	} ipmgmt_dhcp_cache_s;
+} ipmgmt_addr_type_cache_u;
+
 /* IPMGMT_CMD_GETIF door_call argument structure */
 typedef struct ipmgmt_getif_arg_s {
 	ipmgmt_door_cmd_type_t	ia_cmd;
@@ -221,10 +237,15 @@ typedef struct ipmgmt_aobjop_arg_s {
  *	- PERSIST updates the permanent data store
  *	- INIT	indicates that operation being performed is under init
  *		    context
+ *	- PROPS_ONLY indicates the update changes the running configuration of
+ *		    "props" data on the interface/address object. The props are
+ *		    cached there on the parent, so a PROPS_ONLY change does not
+ *		    affect the ACTIVE/PERSIST state of the parent.
  */
 #define	IPMGMT_ACTIVE		0x00000001
 #define	IPMGMT_PERSIST		0x00000002
 #define	IPMGMT_INIT		0x00000004
+#define	IPMGMT_PROPS_ONLY		0x00000008
 
 /* door call return value */
 typedef struct ipmgmt_retval_s {
@@ -260,8 +281,13 @@ typedef struct ipmgmt_aobjop_rval_s {
 	sa_family_t		ir_family;
 	uint32_t		ir_flags;
 	ipadm_addr_type_t	ir_atype;
-	struct sockaddr_storage	ir_ifid;
+	ipmgmt_addr_type_cache_u	ir_atype_cache;
 } ipmgmt_aobjop_rval_t;
+
+#define	ipmgmt_ir_intfid	ir_atype_cache. \
+	ipmgmt_ipv6_cache_s.ipmgmt_ifid
+#define	ipmgmt_ir_reqhost	ir_atype_cache. \
+	ipmgmt_dhcp_cache_s.ipmgmt_reqhost
 
 /* DB walk callback functions */
 typedef boolean_t	db_wfunc_t(void *, nvlist_t *, char *, size_t, int *);

@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016-2017, Chris Fraire <cfraire@me.com>.
  */
 
 #ifndef	DEFAULTS_H
@@ -54,7 +55,11 @@ enum {
 	DF_DEBUG_LEVEL,		/* set debug level (undocumented) */
 	DF_VERBOSE,		/* set verbose mode (undocumented) */
 	DF_VERIFIED_LEASE_ONLY,	/* send RELEASE on SIGTERM and need verify */
-	DF_PARAM_IGNORE_LIST	/* our parameter ignore list */
+	DF_PARAM_IGNORE_LIST,	/* our parameter ignore list */
+	DF_REQUEST_FQDN,	/* request FQDN associated with interface */
+	DF_V4_DEFAULT_IAID_DUID,	/* IAID/DUID if no DF_CLIENT_ID */
+	DF_DNS_DOMAINNAME,	/* static domain name if not in --reqhost */
+	DF_ADOPT_DOMAINNAME	/* adopt DHCP domain if not in --reqhost */
 };
 
 #define	DHCP_AGENT_DEFAULTS	"/etc/default/dhcpagent"

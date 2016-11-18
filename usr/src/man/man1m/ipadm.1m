@@ -12,8 +12,9 @@
 .\" Copyright (c) 2012, Joyent, Inc. All Rights Reserved
 .\" Copyright (c) 2013 by Delphix. All rights reserved.
 .\" Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+.\" Copyright (c) 2016-2017, Chris Fraire <cfraire@me.com>.
 .\"
-.Dd April 9, 2016
+.Dd June 16, 2017
 .Dt IPADM 1M
 .Os
 .Sh NAME
@@ -70,6 +71,8 @@
 .Op Fl t
 .Fl T Cm dhcp
 .Op Fl w Ar seconds Ns | Ns Cm forever
+.Op Fl 1
+.Op Fl h Ar hostname
 .Ar addrobj
 .Nm
 .Ic create-addr
@@ -418,6 +421,8 @@ subcommand for the list of property names.
 .Op Fl t
 .Fl T Cm dhcp
 .Op Fl w Ar seconds Ns | Ns Cm forever
+.Op Fl 1
+.Op Fl h Ar hostname
 .Ar addrobj
 .br
 .Nm
@@ -466,7 +471,32 @@ Obtain the address via DHCP.
 This takes the following options:
 .Bl -tag -width ""
 .It Fl w Ns \&, Ns Fl -wait
-Specify the time, in seconds, that the command should wait to obtain an address.
+Specify the time, in seconds, that the command should wait to obtain an
+address; or specify
+.Cm forever
+to wait without interruption.
+The default value is 120.
+.It Fl 1 Ns , Ns Fl -primary
+Specify that the interface is primary.
+One effect will be that
+.Xr nodename 4
+will serve as
+.Fl h Ns , Ns Fl -reqhost
+if that switch is not otherwise specified.
+.It Fl h Ns , Ns Fl -reqhost
+Specify the host name to send to the DHCP server in order to request an
+association of a Fully Qualified Domain Name to the interface.
+An FQDN is determined from
+.Ar hostname
+if it is "rooted" (ending in a '.'), or if it consists of at least three
+DNS labels, or by appending to
+.Ar hostname
+the DNS domain name value configured in
+.Pa /etc/default/dhcpagent
+for
+.Xr dhcpagent 1m .
+N.b. that the DHCP server implementation ultimately determines whether and
+how the client-sent FQDN is used.
 .El
 .It Fl T Cm addrconf
 Create an auto-configured address.
@@ -647,14 +677,29 @@ The address should not be used to send packets but can still receive packets
 .Pq Cm on Ns / Ns Cm off .
 .It Cm prefixlen
 The number of bits in the IPv4 netmask or IPv6 prefix.
+.It Cm primary
+The DHCP primary interface flag (read-only).
 .It Cm private
 The address is not advertised to routing
 .Pq Cm on Ns / Ns Cm off .
+.It Cm reqhost
+The host name to send to the DHCP server in order to request an association
+of an FQDN to the interface.
+For a primary DHCP interface,
+.Xr nodename 4
+is sent if this property is not defined.
+See the
+.Nm
+.Ic create-addr
+.Fl T Cm dhcp
+subcommand for an explanation of how an FQDN is determined.
 .It Cm transmit
 Packets can be transmitted
 .Pq Cm on Ns / Ns Cm off .
 .It Cm zone
-The zone the addrobj is in.
+The zone the addrobj is in (temporary-only--use
+.Xr zonecfg 1M
+to make persistent).
 .El
 .It Fl t Ns \&, Ns Fl -temporary
 Temporary, not persistent across reboots.
@@ -847,10 +892,12 @@ subcommand for the list of property names.
 .Sh SEE ALSO
 .Xr arp 1M ,
 .Xr cfgadm 1M ,
+.Xr dhcpagent 1M ,
 .Xr dladm 1M ,
 .Xr if_mpadm 1M ,
 .Xr ifconfig 1M ,
 .Xr ndd 1M ,
 .Xr zonecfg 1M ,
+.Xr nodename 4 ,
 .Xr nsswitch.conf 4 ,
 .Xr dhcp 5

@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016-2017, Chris Fraire <cfraire@me.com>.
  */
 
 #ifndef	STATES_H
@@ -199,6 +200,19 @@ struct dhcp_smach_s {
 	 * here between the DISCOVER and the REQUEST.  (v4 only)
 	 */
 	char		*dsm_reqhost;
+
+	/*
+	 * The host name we've been asked by IPC message (e.g.,
+	 * `ipadm -T dhcp -h ...') to request is remembered here until it is
+	 * reset by another external message.
+	 */
+	char		*dsm_msg_reqhost;
+
+	/*
+	 * The domain name returned for v4 DNSdmain is decoded here for use
+	 * (if configured and needed) to determine an FQDN.
+	 */
+	char		*dsm_dhcp_domainname;
 
 	/*
 	 * V4 and V6 use slightly different timers.  For v4, we must count

@@ -21,12 +21,11 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016, Chris Fraire <cfraire@me.com>.
  */
 
 #ifndef	_DHCP_IMPL_H
 #define	_DHCP_IMPL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Common definitions used by Sun DHCP implementations
@@ -93,6 +92,11 @@ typedef struct {
 	uint8_t    len;
 	uint8_t    value[1];
 } DHCP_OPT;
+
+/*
+ * Defines the size of DHCP_OPT code + len
+ */
+#define	DHCP_OPT_META_LEN	2
 
 typedef union sockaddr46_s {
 	struct sockaddr_in v4;

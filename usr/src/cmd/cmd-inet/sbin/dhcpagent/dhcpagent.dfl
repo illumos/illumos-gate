@@ -22,6 +22,7 @@
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright (c) 2016-2017, Chris Fraire <cfraire@me.com>.
 #
 
 #
@@ -90,16 +91,73 @@
 #
 # CLIENT_ID=
 
+# By default, for an IPv4 interface that is not in an IP network
+# multipathing (IPMP) group, that is not IP over InfiniBand (IPoIB), and
+# that is not a logical interface, the DHCP agent will forgo sending a
+# client identifier unless CLIENT_ID is defined.
+#
+# To use a system-managed, RFC 3315-style (i.e., DHCPv6-style) binding
+# identifier as documented in RFC 4361, "Node-specific Client Identifiers
+# for DHCPv4," for all IPv4 interfaces (unless CLIENT_ID is defined),
+# uncomment the following line.
+#
+# V4_DEFAULT_IAID_DUID=yes
+
+# By default, the DHCP agent will try to request the Fully Qualified Domain
+# Name (FQDN) currently associated with the interface performing DHCP.  The
+# hostname is defined by using the -h,--reqhost option of ipadm(1M) or the
+# ncu ip-reqhost property of nwamcfg(1M) or by flagging the interface as
+# primary so that nodename(4) is used as the hostname.
+#
+# A defined hostname will be used as the FQDN if it is "rooted" (i.e., if
+# it ends with a '.') or if it consists of at least three DNS labels (e.g.,
+# srv.example.com).  If the hostname is not an FQDN, then DNS_DOMAINNAME
+# will be appended if defined or ADOPT_DOMAINNAME discernment will be used
+# if active.  If no FQDN can be determined, the option will not be used.
+#
+# If this REQUEST_FQDN option is enabled, an FQDN will be sent in messages
+# to the DHCP server along with RFC 4702 options to request that a
+# collaborating DNS server perform DNS updates for A and PTR resource
+# records.  To prevent sending FQDN and DNS options, uncomment the line
+# below.
+#
+# If an FQDN is sent, REQUEST_HOSTNAME processing will not be done, per RFC
+# 4702 (3.1):  "clients that send the Client FQDN option in their messages
+# MUST NOT also send the Host Name."
+#
+# REQUEST_FQDN=no
+
+# By default, the DHCP agent will not attempt to construct an FQDN from a
+# PQDN specified by the -h,--reqhost option of ipadm(1M), by the ncu
+# ip-reqhost property of nwamcfg(1M), or by nodename(4).  Set and
+# uncomment the following parameter to indicate a domain name to be used by
+# the DHCP agent to construct if necessary an FQDN.
+#
+# DNS_DOMAINNAME=
+
+# By default, the DHCP agent will not attempt to use a domain name returned
+# by the DHCP server or the domain in resolv.conf(4) to construct an FQDN
+# from a PQDN specified by the -h,--reqhost option of ipadm(1M), by the ncu
+# ip-reqhost property of nwamcfg(1M), or by nodename(4).  Set and uncomment
+# the following parameter to indicate that a returned DHCPv4 DNSdmain or the
+# domain from resolv.conf(4) should be adopted by the DHCP agent to
+# construct if necessary an FQDN.
+#
+# ADOPT_DOMAINNAME=yes
+
 # By default, the DHCP agent will try to request the hostname currently
 # associated with the interface performing DHCP.  If this option is
-# enabled, the agent will attempt to find a host name in /etc/hostname.<if>,
-# which must contain a line of the form
+# enabled, the agent will attempt to use an -h,--reqhost option saved with
+# ipadm(1M) or an ncu ip-reqhost property set with nwamcfg(1M); or else
+# attempt to find a host name in /etc/hostname.<if>, which must contain a
+# line of the form
 #
 #	inet name
 #
-# where "name" is a single RFC 1101-compliant token.  If found, the token
-# will be used to request that host name from the DHCP server.  To prevent
-# this, uncomment the following line.
+# where "name" is a single RFC 1101-compliant token; or else use
+# nodename(4) for a DHCP interface flagged as primary.  If found in any of
+# these configurations, the token will be used to request that host name
+# from the DHCP server.  To prevent this, uncomment the following line.
 #
 # REQUEST_HOSTNAME=no
 

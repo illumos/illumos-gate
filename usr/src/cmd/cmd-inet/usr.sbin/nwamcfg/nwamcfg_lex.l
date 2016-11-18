@@ -23,6 +23,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016, Chris Fraire <cfraire@me.com>.
  */
 
 #include <string.h>
@@ -182,6 +183,8 @@ char *safe_strdup(char *s);
 <TSTATE>ipv6-addrsrc		{ return IPV6_ADDRSRC; }
 <TSTATE>ipv6-addr		{ return IPV6_ADDR; }
 <TSTATE>ipv6-default-route	{ return IPV6_DEFAULT_ROUTE; }
+<TSTATE>ip-primary		{ return IP_PRIMARY; }
+<TSTATE>ip-reqhost		{ return IP_REQHOST; }
 
 <TSTATE>state		{ return ENM_STATE; }
 <TSTATE>fmri		{ return ENM_FMRI; }

@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016, Chris Fraire <cfraire@me.com>.
  */
 
 /*
@@ -107,7 +108,7 @@ i_ipadm_create_ipv6addrs(ipadm_handle_t iph, ipadm_addrobj_t addr,
 	}
 
 	/* Persist the intfid. */
-	status = i_ipadm_addr_persist(iph, addr, B_FALSE, i_flags);
+	status = i_ipadm_addr_persist(iph, addr, B_FALSE, i_flags, NULL);
 	if (status != IPADM_SUCCESS) {
 		(void) i_ipadm_delete_addr(iph, addr);
 		(void) i_ipadm_send_ndpd_cmd(addr->ipadm_ifname, addr,

@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016-2017, Chris Fraire <cfraire@me.com>.
  */
 
 #ifndef	UTIL_H
@@ -33,6 +34,7 @@
 #include <dhcpagent_ipc.h>
 
 #include "common.h"
+#include "packet.h"
 
 /*
  * general utility functions which have no better home.  see util.c
@@ -75,6 +77,9 @@ const char	*iffile_to_hostname(const char *);
 int		dhcpv6_status_code(const dhcpv6_option_t *, uint_t,
     const char **, const char **, uint_t *);
 void		write_lease_to_hostconf(dhcp_smach_t *);
+boolean_t	dhcp_add_hostname_opt(dhcp_pkt_t *, dhcp_smach_t *);
+boolean_t	dhcp_add_fqdn_opt(dhcp_pkt_t *, dhcp_smach_t *);
+void		save_domainname(dhcp_smach_t *, PKT_LIST *);
 
 #ifdef	__cplusplus
 }

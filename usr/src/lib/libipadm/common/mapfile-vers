@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2016, Chris Fraire <cfraire@me.com>.
 #
 
 #
@@ -67,6 +68,8 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	ipadm_if_info;
 	ipadm_if_move;
 	ipadm_init_net_from_gz;
+	ipadm_is_nil_hostname;
+	ipadm_is_valid_hostname;
 	ipadm_legacy2new_propname;
 	ipadm_ndpd_read;
 	ipadm_ndpd_write;
@@ -80,6 +83,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	ipadm_set_addr;
 	ipadm_set_addrprop;
 	ipadm_set_dst_addr;
+	ipadm_set_reqhost;
 	ipadm_set_ifprop;
 	ipadm_set_interface_id;
 	ipadm_set_primary;

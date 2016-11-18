@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016, Chris Fraire <cfraire@me.com>.
  */
 
 #include <string.h>
@@ -413,15 +414,13 @@ add_pkt_opt(dhcp_pkt_t *dpkt, uint_t opt_type, const void *opt_val,
     uint_t opt_len)
 {
 	uchar_t		*raw_pkt;
-	int		req_len;
+	size_t		req_len;
 	void		*optr;
 
 	raw_pkt = (uchar_t *)dpkt->pkt;
 	optr = raw_pkt + dpkt->pkt_cur_len;
 	if (dpkt->pkt_isv6) {
-		dhcpv6_option_t d6o;
-
-		req_len = opt_len + sizeof (d6o);
+		req_len = opt_len + sizeof (dhcpv6_option_t);
 
 		if (dpkt->pkt_cur_len + req_len > dpkt->pkt_max_len) {
 			dhcpmsg(MSG_WARNING,
@@ -430,17 +429,8 @@ add_pkt_opt(dhcp_pkt_t *dpkt, uint_t opt_type, const void *opt_val,
 			    dpkt->pkt_cur_len, req_len, dpkt->pkt_max_len);
 			return (NULL);
 		}
-		d6o.d6o_code = htons(opt_type);
-		d6o.d6o_len = htons(opt_len);
-		(void) memcpy(&raw_pkt[dpkt->pkt_cur_len], &d6o, sizeof (d6o));
-		dpkt->pkt_cur_len += sizeof (d6o);
-		if (opt_len > 0) {
-			(void) memcpy(&raw_pkt[dpkt->pkt_cur_len], opt_val,
-			    opt_len);
-			dpkt->pkt_cur_len += opt_len;
-		}
 	} else {
-		req_len = opt_len + 2; /* + 2 for code & length bytes */
+		req_len = opt_len + DHCP_OPT_META_LEN;
 
 		/* CD_END and CD_PAD options don't have a length field */
 		if (opt_type == CD_END || opt_type == CD_PAD) {
@@ -457,19 +447,62 @@ add_pkt_opt(dhcp_pkt_t *dpkt, uint_t opt_type, const void *opt_val,
 			    "packet", opt_type);
 			return (NULL);
 		}
+	}
 
-		raw_pkt[dpkt->pkt_cur_len++] = opt_type;
+	req_len = encode_dhcp_opt(&raw_pkt[dpkt->pkt_cur_len], dpkt->pkt_isv6,
+	    opt_type, opt_val, opt_len);
+	dpkt->pkt_cur_len += req_len;
 
-		if (req_len > 1) {
-			raw_pkt[dpkt->pkt_cur_len++] = opt_len;
-			if (opt_len > 0) {
-				(void) memcpy(&raw_pkt[dpkt->pkt_cur_len],
-				    opt_val, opt_len);
-				dpkt->pkt_cur_len += opt_len;
-			}
+	return (optr);
+}
+
+/*
+ * encode_dhcp_opt(): sets the fields of an allocated DHCP option buffer
+ *
+ *   input: void *: the buffer allocated for enough space for
+ *		    (DHCPv6) dhcpv6_option_t and value, or for
+ *		    (DHCPv4) opt_type + length + value (length/value are
+ *		    skipped for CD_END or CD_PAD);
+ *	    boolean_t: a value indicating whether DHCPv6 or not;
+ *	    uint_t: the type of option being added;
+ *	    const void *: the value of that option;
+ *	    uint_t: the length of the value of the option
+ *  output: size_t: the number of bytes written starting at opt.
+ */
+
+size_t
+encode_dhcp_opt(void *dopt, boolean_t isv6, uint_t opt_type,
+    const void *opt_val, uint_t opt_len)
+{
+	boolean_t do_copy_value = B_FALSE;
+	size_t res_len = 0;
+	uint8_t *pval;
+
+	if (isv6) {
+		dhcpv6_option_t d6o;
+		d6o.d6o_code = htons(opt_type);
+		d6o.d6o_len = htons(opt_len);
+		(void) memcpy(dopt, &d6o, sizeof (d6o));
+		res_len += sizeof (d6o);
+
+		do_copy_value = B_TRUE;
+	} else {
+		pval = (uint8_t *)dopt;
+		pval[res_len++] = opt_type;
+
+		if (opt_type != CD_END && opt_type != CD_PAD) {
+			pval[res_len++] = opt_len;
+			do_copy_value = B_TRUE;
 		}
 	}
-	return (optr);
+
+	pval = (uint8_t *)dopt + res_len;
+	if (do_copy_value && opt_len > 0) {
+		(void) memcpy(pval, opt_val, opt_len);
+		res_len += opt_len;
+	}
+
+	return (res_len);
 }
 
 /*
