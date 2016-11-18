@@ -12,6 +12,9 @@
  * See the License for the specific language governing permissions
  * and limitations under the License.
  */
+/*
+ * Copyright (c) 2016 by Delphix. All rights reserved.
+ */
 
 #include <vmxnet3.h>
 
@@ -70,16 +73,33 @@ static ddi_dma_attr_t vmxnet3_dma_attrs_512 = {
 	.dma_attr_flags =	0
 };
 
+int
+vmxnet3_dmaerr2errno(int dmaerr)
+{
+	int err;
+
+	switch (dmaerr) {
+	case DDI_DMA_NORESOURCES:
+	case DDI_DMA_TOOBIG:
+		err = ENOMEM;
+		break;
+	case DDI_DMA_INUSE:
+		err = EBUSY;
+		break;
+	case DDI_DMA_BADATTR:
+	case DDI_DMA_NOMAPPING:
+	default:
+		err = EINVAL;
+	}
+
+	return (err);
+}
+
 /*
- * vmxnet3_alloc_dma_mem --
+ * Allocate /size/ bytes of contiguous DMA-ble memory.
  *
- *    Allocate /size/ bytes of contiguous DMA-ble memory.
- *
- * Results:
- *    DDI_SUCCESS or DDI_FAILURE.
- *
- * Side effects:
- *    None.
+ * Returns:
+ *    0 on success, non-zero on failure.
  */
 static int
 vmxnet3_alloc_dma_mem(vmxnet3_softc_t *dp, vmxnet3_dmabuf_t *dma, size_t size,
@@ -87,6 +107,7 @@ vmxnet3_alloc_dma_mem(vmxnet3_softc_t *dp, vmxnet3_dmabuf_t *dma, size_t size,
 {
 	ddi_dma_cookie_t cookie;
 	uint_t cookieCount;
+	int dmaerr, err = 0;
 	int (*cb) (caddr_t) = canSleep ? DDI_DMA_SLEEP : DDI_DMA_DONTWAIT;
 
 	ASSERT(size != 0);
@@ -94,9 +115,10 @@ vmxnet3_alloc_dma_mem(vmxnet3_softc_t *dp, vmxnet3_dmabuf_t *dma, size_t size,
 	/*
 	 * Allocate a DMA handle
 	 */
-	if (ddi_dma_alloc_handle(dp->dip, dma_attrs, cb, NULL,
-	    &dma->dmaHandle) != DDI_SUCCESS) {
-		VMXNET3_WARN(dp, "ddi_dma_alloc_handle() failed\n");
+	if ((dmaerr = ddi_dma_alloc_handle(dp->dip, dma_attrs, cb, NULL,
+	    &dma->dmaHandle)) != DDI_SUCCESS) {
+		VMXNET3_WARN(dp, "ddi_dma_alloc_handle() failed: %d", dmaerr);
+		err = vmxnet3_dmaerr2errno(dmaerr);
 		goto error;
 	}
 
@@ -106,24 +128,27 @@ vmxnet3_alloc_dma_mem(vmxnet3_softc_t *dp, vmxnet3_dmabuf_t *dma, size_t size,
 	if (ddi_dma_mem_alloc(dma->dmaHandle, size, &vmxnet3_dev_attr,
 	    DDI_DMA_CONSISTENT, cb, NULL, &dma->buf, &dma->bufLen,
 	    &dma->dataHandle) != DDI_SUCCESS) {
-		VMXNET3_WARN(dp, "ddi_dma_mem_alloc() failed\n");
+		VMXNET3_WARN(dp, "ddi_dma_mem_alloc() failed");
+		err = ENOMEM;
 		goto error_dma_handle;
 	}
 
 	/*
 	 * Map the memory
 	 */
-	if (ddi_dma_addr_bind_handle(dma->dmaHandle, NULL, dma->buf,
+	if ((dmaerr = ddi_dma_addr_bind_handle(dma->dmaHandle, NULL, dma->buf,
 	    dma->bufLen, DDI_DMA_RDWR | DDI_DMA_STREAMING, cb, NULL, &cookie,
-	    &cookieCount) != DDI_DMA_MAPPED) {
-		VMXNET3_WARN(dp, "ddi_dma_addr_bind_handle() failed\n");
+	    &cookieCount)) != DDI_DMA_MAPPED) {
+		VMXNET3_WARN(dp, "ddi_dma_addr_bind_handle() failed: %d",
+		    dmaerr);
+		err = vmxnet3_dmaerr2errno(dmaerr);
 		goto error_dma_mem;
 	}
 
 	ASSERT(cookieCount == 1);
 	dma->bufPA = cookie.dmac_laddress;
 
-	return (DDI_SUCCESS);
+	return (0);
 
 error_dma_mem:
 	ddi_dma_mem_free(&dma->dataHandle);
@@ -133,7 +158,7 @@ error:
 	dma->buf = NULL;
 	dma->bufPA = NULL;
 	dma->bufLen = 0;
-	return (DDI_FAILURE);
+	return (err);
 }
 
 int
@@ -161,15 +186,7 @@ vmxnet3_alloc_dma_mem_128(vmxnet3_softc_t *dp, vmxnet3_dmabuf_t *dma,
 }
 
 /*
- * vmxnet3_free_dma_mem --
- *
- *    Free DMA-ble memory.
- *
- * Results:
- *    None.
- *
- * Side effects:
- *    None.
+ * Free DMA-ble memory.
  */
 void
 vmxnet3_free_dma_mem(vmxnet3_dmabuf_t *dma)
@@ -184,18 +201,13 @@ vmxnet3_free_dma_mem(vmxnet3_dmabuf_t *dma)
 }
 
 /*
- * vmxnet3_getprop --
+ * Get the numeric value of the property "name" in vmxnet3s.conf for
+ * the corresponding device instance.
+ * If the property isn't found or if it doesn't satisfy the conditions,
+ * "def" is returned.
  *
- *    Get the numeric value of the property "name" in vmxnet3s.conf for
- *    the corresponding device instance.
- *    If the property isn't found or if it doesn't satisfy the conditions,
- *    "def" is returned.
- *
- * Results:
- *    The value of the property or "def".
- *
- * Side effects:
- *    None.
+ * Returns:
+ *	The value of the property or "def".
  */
 int
 vmxnet3_getprop(vmxnet3_softc_t *dp, char *name, int min, int max, int def)

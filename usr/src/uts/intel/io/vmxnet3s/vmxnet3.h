@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007 VMware, Inc. All rights reserved.
+ * Copyright (C) 2007-2014 VMware, Inc. All rights reserved.
  *
  * The contents of this file are subject to the terms of the Common
  * Development and Distribution License (the "License") version 1.0
@@ -14,7 +14,7 @@
  */
 
 /*
- * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright (c) 2012, 2016 by Delphix. All rights reserved.
  */
 
 #ifndef	_VMXNET3_H_
@@ -127,6 +127,7 @@ typedef struct vmxnet3_softc_t {
 	boolean_t	devEnabled;
 	uint8_t		macaddr[6];
 	uint32_t	cur_mtu;
+	boolean_t	allow_jumbo;
 	link_state_t	linkState;
 	uint64_t	linkSpeed;
 	vmxnet3_dmabuf_t sharedData;
@@ -147,8 +148,8 @@ typedef struct vmxnet3_softc_t {
 	vmxnet3_rxqueue_t rxQueue;
 	kmutex_t	rxPoolLock;
 	vmxnet3_rxpool_t rxPool;
-	volatile uint32_t rxNumBufs;
 	uint32_t	rxMode;
+	boolean_t	alloc_ok;
 
 	vmxnet3_dmabuf_t mfTable;
 	kstat_t		*devKstats;
@@ -157,8 +158,10 @@ typedef struct vmxnet3_softc_t {
 	uint32_t	tx_pullup_failed;
 	uint32_t	tx_ring_full;
 	uint32_t	tx_error;
+	uint32_t	rx_num_bufs;
 	uint32_t	rx_alloc_buf;
 	uint32_t	rx_alloc_failed;
+	uint32_t	rx_pool_empty;
 } vmxnet3_softc_t;
 
 typedef struct vmxnet3_kstats_t {
@@ -166,8 +169,11 @@ typedef struct vmxnet3_kstats_t {
 	kstat_named_t	tx_pullup_needed;
 	kstat_named_t	tx_ring_full;
 	kstat_named_t	rx_alloc_buf;
+	kstat_named_t	rx_pool_empty;
+	kstat_named_t	rx_num_bufs;
 } vmxnet3_kstats_t;
 
+int	vmxnet3_dmaerr2errno(int);
 int	vmxnet3_alloc_dma_mem_1(vmxnet3_softc_t *dp, vmxnet3_dmabuf_t *dma,
 	    size_t size, boolean_t canSleep);
 int	vmxnet3_alloc_dma_mem_128(vmxnet3_softc_t *dp, vmxnet3_dmabuf_t *dma,
@@ -192,13 +198,14 @@ extern ddi_device_acc_attr_t vmxnet3_dev_attr;
 
 extern int vmxnet3s_debug;
 
-#define	VMXNET3_MODNAME "vmxnet3s"
+#define	VMXNET3_MODNAME	"vmxnet3s"
+#define	VMXNET3_DRIVER_VERSION_STRING	"1.1.0.0"
 
 /* Logging stuff */
 #define	VMXNET3_WARN(Device, ...) vmxnet3_log(CE_WARN, Device, __VA_ARGS__)
 
 #ifdef	DEBUG
-#define	VMXNET3_DEBUG(Device, Level, ...) {	 		\
+#define	VMXNET3_DEBUG(Device, Level, ...) {			\
 	if (Level <= vmxnet3s_debug) {				\
 		vmxnet3_log(CE_CONT, Device, "?" __VA_ARGS__);	\
 	}							\
