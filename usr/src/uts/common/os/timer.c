@@ -661,12 +661,9 @@ timer_create(clockid_t clock, struct sigevent *evp, timer_t *tid)
 	}
 
 	/*
-	 * We'll allocate our timer and sigqueue now, before we grab p_lock.
-	 * If we can't find an empty slot, we'll free them before returning.
+	 * We'll allocate our sigqueue now, before we grab p_lock.
+	 * If we can't find an empty slot, we'll free it before returning.
 	 */
-	it = kmem_cache_alloc(clock_timer_cache, KM_SLEEP);
-	bzero(it, sizeof (itimer_t));
-	mutex_init(&it->it_mutex, NULL, MUTEX_DEFAULT, NULL);
 	sigq = kmem_zalloc(sizeof (sigqueue_t), KM_SLEEP);
 
 	/*
