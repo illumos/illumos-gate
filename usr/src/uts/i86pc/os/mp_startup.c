@@ -1718,12 +1718,23 @@ mp_startup_common(boolean_t boot)
 	}
 
 	/*
-	 * We do not support cpus with mixed monitor/mwait support if the
-	 * boot cpu supports monitor/mwait.
+	 * There exists a small subset of systems which expose differing
+	 * MWAIT/MONITOR support between CPUs.  If MWAIT support is absent from
+	 * the boot CPU, but is found on a later CPU, the system continues to
+	 * operate as if no MWAIT support is available.
+	 *
+	 * The reverse case, where MWAIT is available on the boot CPU but not
+	 * on a subsequently initialized CPU, is not presently allowed and will
+	 * result in a panic.
 	 */
 	if (is_x86_feature(x86_featureset, X86FSET_MWAIT) !=
-	    is_x86_feature(new_x86_featureset, X86FSET_MWAIT))
-		panic("unsupported mixed cpu monitor/mwait support detected");
+	    is_x86_feature(new_x86_featureset, X86FSET_MWAIT)) {
+		if (!is_x86_feature(x86_featureset, X86FSET_MWAIT)) {
+			remove_x86_feature(new_x86_featureset, X86FSET_MWAIT);
+		} else {
+			panic("unsupported mixed cpu mwait support detected");
+		}
+	}
 
 	/*
 	 * We could be more sophisticated here, and just mark the CPU

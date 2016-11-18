@@ -508,6 +508,8 @@ only forth definitions also support-functions
   include_bootenv
   include_conf_files
   include_transient
+  \ If the user defined a post-initialize hook, call it now
+  s" post-initialize" sfind if execute else drop then
   parse-boot-args
   \ Will *NOT* try to load kernel and modules if no configuration file
   \ was successfully loaded!
@@ -531,13 +533,15 @@ only forth definitions also support-functions
 \
 \	Overrides support.4th initialization word with one that does
 \	everything start one does, short of loading the kernel and
-\	modules. Returns a flag
+\	modules. Returns a flag.
 
 : initialize ( -- flag )
   s" /boot/defaults/loader.conf" initialize
   include_bootenv
   include_conf_files
   include_transient
+  \ If the user defined a post-initialize hook, call it now
+  s" post-initialize" sfind if execute else drop then
   parse-boot-args
   any_conf_read?
 ;

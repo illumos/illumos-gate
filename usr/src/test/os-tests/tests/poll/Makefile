@@ -11,16 +11,18 @@
 
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright 2016 Joyent, Inc.
 #
 
 include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/test/Makefile.com
 
-PROG = poll_test
+PROG = poll_test epoll_test
 OBJS = $(PROG:%=%.o)
 SRCS = $(OBJS:%.o=%.c)
 
-LDLIBS += -lsocket
+poll_test := LDLIBS += -lsocket
+poll_test.ln := LDLIBS += -lsocket
 C99MODE = -xc99=%all
 
 ROOTOPTPKG = $(ROOT)/opt/os-tests
@@ -29,24 +31,22 @@ TESTDIR = $(ROOTOPTPKG)/tests
 CMDS = $(PROG:%=$(TESTDIR)/%)
 $(CMDS) := FILEMODE = 0555
 
+LINTS = $(PROG:%=%.ln)
+
 all: $(PROG)
-
-$(PROG): $(OBJS)
-	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
-	$(POST_PROCESS)
-
-%.o: ../%.c
-	$(COMPILE.c) $<
 
 install: all $(CMDS)
 
-lint: lint_SRCS
+lint: $(LINTS)
 
 clobber: clean
 	-$(RM) $(PROG)
 
 clean:
 	-$(RM) $(OBJS)
+
+%.ln: %.c
+	$(LINT.c) $< $(UTILS) $(LDLIBS)
 
 $(CMDS): $(TESTDIR) $(PROG)
 
