@@ -21,13 +21,8 @@ PROG = poll_test epoll_test
 OBJS = $(PROG:%=%.o)
 SRCS = $(OBJS:%.o=%.c)
 
-LINTS = $(PROG:%=%.ln)
-LINTFLAGS += -erroff=E_NAME_USED_NOT_DEF2
-
-# Uggh, Joyent structured these so I can't selectively turn off -lsocket...
-LDFLAGS += $(ZIGNORE)
-
-LDLIBS += -lsocket
+poll_test := LDLIBS += -lsocket
+poll_test.ln := LDLIBS += -lsocket
 C99MODE = -xc99=%all
 
 ROOTOPTPKG = $(ROOT)/opt/os-tests
@@ -35,6 +30,8 @@ TESTDIR = $(ROOTOPTPKG)/tests
 
 CMDS = $(PROG:%=$(TESTDIR)/%)
 $(CMDS) := FILEMODE = 0555
+
+LINTS = $(PROG:%=%.ln)
 
 all: $(PROG)
 
@@ -47,6 +44,9 @@ clobber: clean
 
 clean:
 	-$(RM) $(OBJS)
+
+%.ln: %.c
+	$(LINT.c) $< $(UTILS) $(LDLIBS)
 
 $(CMDS): $(TESTDIR) $(PROG)
 

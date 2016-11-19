@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
- * Copyright (c) 2011, 2015 by Delphix. All rights reserved.
+ * Copyright (c) 2011, 2016 by Delphix. All rights reserved.
  */
 
 /* Portions Copyright 2010 Robert Milkowski */
@@ -66,9 +66,12 @@ enum spa_flags {
 	SPA_FLAG_HISTOGRAMS		= 1 << 5
 };
 
+/*
+ * If any of these flags are set, call spa_vdevs in spa_print
+ */
 #define	SPA_FLAG_ALL_VDEV	\
 	(SPA_FLAG_VDEVS | SPA_FLAG_ERRORS | SPA_FLAG_METASLAB_GROUPS | \
-	SPA_FLAG_METASLABS | SPA_FLAG_HISTOGRAMS)
+	SPA_FLAG_METASLABS)
 
 static int
 getmember(uintptr_t addr, const char *type, mdb_ctf_id_t *idp,
@@ -1082,7 +1085,64 @@ arc_print(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 typedef struct mdb_spa_print {
 	pool_state_t spa_state;
 	char spa_name[ZFS_MAX_DATASET_NAME_LEN];
+	uintptr_t spa_normal_class;
 } mdb_spa_print_t;
+
+
+const char histo_stars[] = "****************************************";
+const int histo_width = sizeof (histo_stars) - 1;
+
+static void
+dump_histogram(const uint64_t *histo, int size, int offset)
+{
+	int i;
+	int minidx = size - 1;
+	int maxidx = 0;
+	uint64_t max = 0;
+
+	for (i = 0; i < size; i++) {
+		if (histo[i] > max)
+			max = histo[i];
+		if (histo[i] > 0 && i > maxidx)
+			maxidx = i;
+		if (histo[i] > 0 && i < minidx)
+			minidx = i;
+	}
+
+	if (max < histo_width)
+		max = histo_width;
+
+	for (i = minidx; i <= maxidx; i++) {
+		mdb_printf("%3u: %6llu %s\n",
+		    i + offset, (u_longlong_t)histo[i],
+		    &histo_stars[(max - histo[i]) * histo_width / max]);
+	}
+}
+
+typedef struct mdb_metaslab_class {
+	uint64_t mc_histogram[RANGE_TREE_HISTOGRAM_SIZE];
+} mdb_metaslab_class_t;
+
+/*
+ * spa_class_histogram(uintptr_t class_addr)
+ *
+ * Prints free space histogram for a device class
+ *
+ * Returns DCMD_OK, or DCMD_ERR.
+ */
+static int
+spa_class_histogram(uintptr_t class_addr)
+{
+	mdb_metaslab_class_t mc;
+	if (mdb_ctf_vread(&mc, "metaslab_class_t",
+	    "mdb_metaslab_class_t", class_addr, 0) == -1)
+		return (DCMD_ERR);
+
+	mdb_inc_indent(4);
+	dump_histogram(mc.mc_histogram, RANGE_TREE_HISTOGRAM_SIZE, 0);
+	mdb_dec_indent(4);
+	return (DCMD_OK);
+}
 
 /*
  * ::spa
@@ -1144,6 +1204,8 @@ spa_print(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		state = statetab[spa.spa_state];
 
 	mdb_printf("%0?p %9s %s\n", addr, state, spa.spa_name);
+	if (spa_flags & SPA_FLAG_HISTOGRAMS)
+		spa_class_histogram(spa.spa_normal_class);
 
 	if (spa_flags & SPA_FLAG_CONFIG) {
 		mdb_printf("\n");
@@ -1216,35 +1278,7 @@ spa_print_config(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    0, NULL));
 }
 
-const char histo_stars[] = "****************************************";
-const int histo_width = sizeof (histo_stars) - 1;
 
-static void
-dump_histogram(const uint64_t *histo, int size, int offset)
-{
-	int i;
-	int minidx = size - 1;
-	int maxidx = 0;
-	uint64_t max = 0;
-
-	for (i = 0; i < size; i++) {
-		if (histo[i] > max)
-			max = histo[i];
-		if (histo[i] > 0 && i > maxidx)
-			maxidx = i;
-		if (histo[i] > 0 && i < minidx)
-			minidx = i;
-	}
-
-	if (max < histo_width)
-		max = histo_width;
-
-	for (i = minidx; i <= maxidx; i++) {
-		mdb_printf("%3u: %6llu %s\n",
-		    i + offset, (u_longlong_t)histo[i],
-		    &histo_stars[(max - histo[i]) * histo_width / max]);
-	}
-}
 
 typedef struct mdb_range_tree {
 	uint64_t rt_space;
@@ -3722,11 +3756,11 @@ static const mdb_dcmd_t dcmds[] = {
 	    "\t-M display metaslab group statistic\n"
 	    "\t-h display histogram (requires -m or -M)\n",
 	    "given a spa_t, print vdev summary", spa_vdevs },
-	{ "vdev", ":[-re]\n"
+	{ "vdev", ":[-remMh]\n"
 	    "\t-r display recursively\n"
 	    "\t-e display statistics\n"
-	    "\t-m display metaslab statistics\n"
-	    "\t-M display metaslab group statistics\n"
+	    "\t-m display metaslab statistics (top level vdev only)\n"
+	    "\t-M display metaslab group statistics (top level vdev only)\n"
 	    "\t-h display histogram (requires -m or -M)\n",
 	    "vdev_t summary", vdev_print },
 	{ "zio", ":[-cpr]\n"
