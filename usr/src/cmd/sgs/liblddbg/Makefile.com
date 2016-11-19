@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2016 RackTop Systems.
 #
 
 LIBRARY =	liblddbg.a
@@ -67,6 +68,7 @@ DYNFLAGS +=	$(VERSREF) $(CC_USE_PROTO) '-R$$ORIGIN'
 LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) -lc
 
 native :=	DYNFLAGS	+= $(CONVLIBDIR)
+native :=	CPPFLAGS	+= -DNATIVE_BUILD
 
 BLTDEFS =	msg.h
 BLTDATA =	msg.c
