@@ -38,6 +38,8 @@
 
 #include <openssl/rsa.h>
 
+#include <md5.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -123,6 +125,48 @@ sshd_allowed_in_capi(struct passwd *pw, const char *fp)
 	return (0);
 }
 
+static int
+tohexstr(uchar_t *bytes, size_t blen, char *hexstr, size_t hexlen)
+{
+	size_t i, j;
+	const char hexlist[] = "0123456789abcdef";
+
+	if (hexlen < 1)
+		return (-1);
+	for (i = 0, j = 0; i < blen; i++) {
+		/*
+		 * We need 3 bytes output per input byte -- the third byte is
+		 * either for a : or the \0 at the end.
+		 */
+		if (hexlen < (j + 3))
+			return (-1);
+		hexstr[j++] = hexlist[(bytes[i] >> 4) & 0xf];
+		hexstr[j++] = hexlist[bytes[i] & 0xf];
+		if (i + 1 < blen)
+			hexstr[j++] = ':';
+	}
+	hexstr[j] = '\0';
+	return (0);
+}
+
+/* ARGSUSED */
+int
+sshd_user_key_allowed(struct passwd *pw, const char *type,
+    const unsigned char *buf, size_t size)
+{
+	unsigned char md5buf[MD5_DIGEST_LENGTH];
+	/*
+	 * Will contain the fingerprint MD5 in colonhex format. Need 3 bytes
+	 * per MD5 byte: two for hex digits, plus one for either ':' or '\0'.
+	 */
+	char hex[MD5_DIGEST_LENGTH * 3];
+
+	md5_calc(md5buf, buf, size);
+	if (tohexstr(md5buf, sizeof (md5buf), hex, sizeof (hex)) != 0)
+		return (0);
+	return (sshd_allowed_in_capi(pw, hex));
+}
+
 /* ARGSUSED */
 int
 sshd_user_rsa_key_allowed(struct passwd *pw, RSA *key, const char *fp)
@@ -137,6 +181,12 @@ sshd_user_dsa_key_allowed(struct passwd *pw, DSA *key, const char *fp)
 	return (sshd_allowed_in_capi(pw, fp));
 }
 
+/* ARGSUSED */
+int
+sshd_user_ecdsa_key_allowed(struct passwd *pw, DSA *key, const char *fp)
+{
+	return (sshd_allowed_in_capi(pw, fp));
+}
 
 #ifdef __cplusplus
 }

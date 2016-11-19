@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright (c) 2011, Joyent Inc. All rights reserved.
+# Copyright 2016 Joyent, Inc.
 #
 
 #
@@ -40,6 +40,9 @@ $mapfile_version 2
 SYMBOL_VERSION SUNWprivate_1.1 {
     global:
 	sshd_user_rsa_key_allowed;
+	sshd_user_dsa_key_allowed;
+	sshd_user_ecdsa_key_allowed;
+	sshd_user_key_allowed;
     local:
 	*;
 };
