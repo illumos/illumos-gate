@@ -23,7 +23,7 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2016 RackTop Systems.
 #
 
 all:		$(PROG)
@@ -51,9 +51,9 @@ include		$(SRC)/cmd/sgs/Makefile.targ
 # Special target for native builds (ie. when we need to build a version of ld
 # to build a version of ld :-).
 
-native:		$(SGSPROTO)/$(PROG)
+native:		$(SGSBINDIR)/$(PROG)
 
-$(SGSPROTO)/$(PROG) \
+$(SGSBINDIR)/$(PROG) \
 $(PROG):	$$(OBJS)
 		$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
 		$(POST_PROCESS)

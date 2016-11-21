@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2016 RackTop Systems.
 #
 
 include		$(SRC)/cmd/Makefile.cmd
@@ -173,6 +174,9 @@ native-clobber:
 
 native-proto:
 		-@mkdir -p proto/$(MACH)
+		-@mkdir -p proto/$(MACH)/lib
+		-@mkdir -p proto/$(MACH)/usr
+		-@mkdir -p proto/$(MACH)/usr/bin
 
 FRC:
 
