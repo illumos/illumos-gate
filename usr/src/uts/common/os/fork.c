@@ -641,6 +641,10 @@ forklwperr:
 
 	forklwp_fail(cp);
 	fork_fail(cp);
+	if (cp->p_dtrace_helpers != NULL) {
+		ASSERT(dtrace_helpers_cleanup != NULL);
+		(*dtrace_helpers_cleanup)(cp);
+	}
 	rctl_set_free(cp->p_rctls);
 	mutex_enter(&pidlock);
 

@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include <sys/dtrace.h>
@@ -39,7 +40,7 @@
 void (*dtrace_cpu_init)(processorid_t);
 void (*dtrace_modload)(struct modctl *);
 void (*dtrace_modunload)(struct modctl *);
-void (*dtrace_helpers_cleanup)(void);
+void (*dtrace_helpers_cleanup)(proc_t *);
 void (*dtrace_helpers_fork)(proc_t *, proc_t *);
 void (*dtrace_cpustart_init)(void);
 void (*dtrace_cpustart_fini)(void);

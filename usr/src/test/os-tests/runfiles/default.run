@@ -23,6 +23,7 @@ outputdir = /var/tmp/test_results
 
 [/opt/os-tests/tests/poll_test]
 user = root
+tests = ['poll_test', 'epoll_test']
 
 [/opt/os-tests/tests/secflags]
 user = root

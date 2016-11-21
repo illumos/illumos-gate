@@ -95,8 +95,15 @@ epoll_create1(int flags)
 {
 	int fd, oflags = O_RDWR;
 
-	if (flags & EPOLL_CLOEXEC)
+	if (flags & EPOLL_CLOEXEC) {
 		oflags |= O_CLOEXEC;
+		flags ^= EPOLL_CLOEXEC;
+	}
+	/* Reject unrecognized flags */
+	if (flags != 0) {
+		errno = EINVAL;
+		return (-1);
+	}
 
 	if ((fd = open("/dev/poll", oflags)) == -1)
 		return (-1);

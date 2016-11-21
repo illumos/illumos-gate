@@ -31,6 +31,7 @@ dir path=opt/os-tests/tests/sigqueue
 file path=opt/os-tests/README mode=0444
 file path=opt/os-tests/bin/ostest mode=0555
 file path=opt/os-tests/runfiles/default.run mode=0444
+file path=opt/os-tests/tests/epoll_test mode=0555
 file path=opt/os-tests/tests/file-locking/acquire-lock.32 mode=0555
 file path=opt/os-tests/tests/file-locking/acquire-lock.64 mode=0555
 file path=opt/os-tests/tests/file-locking/runtests.32 mode=0555
