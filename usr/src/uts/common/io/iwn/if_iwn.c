@@ -1321,7 +1321,7 @@ iwn5000_attach(struct iwn_softc *sc, uint16_t pid)
 			ops->config_bt_coex = iwn_config_bt_coex_adv1;
 		}
 		else
-			sc->fwname = "iwlwifi-6000g2a-5.ucode";
+			sc->fwname = "iwlwifi-6000g2a-6.ucode";
 
 		iwn_kstat_create(sc, "temp_offset",
 		    sizeof (struct iwn_ks_toff_6000),
