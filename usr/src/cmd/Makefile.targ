@@ -22,6 +22,8 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2015 by Delphix. All rights reserved.
+#
 # cmd/Makefile.targ
 # common target definitions for command builds
 #
@@ -62,6 +64,11 @@ $(ROOTMANIFESTDIR)/%: %
 $(KSHPROG): $(KSHPROG).ksh
 	$(RM) $@
 	sed -e "s/TEXT_DOMAIN/${TEXT_DOMAIN}/g" $(KSHPROG).ksh > $@
+	$(CHMOD) +x $@
+
+$(BASHPROG): $(BASHPROG).bash
+	$(RM) $@
+	sed -e "s/TEXT_DOMAIN/${TEXT_DOMAIN}/g" $(BASHPROG).bash > $@
 	$(CHMOD) +x $@
 
 #

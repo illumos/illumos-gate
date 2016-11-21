@@ -23,7 +23,7 @@
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011 Pawel Jakub Dawidek. All rights reserved.
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
- * Copyright (c) 2011, 2015 by Delphix. All rights reserved.
+ * Copyright (c) 2011, 2016 by Delphix. All rights reserved.
  */
 
 #ifndef	_LIBZFS_IMPL_H
@@ -73,7 +73,6 @@ struct libzfs_handle {
 	int libzfs_printerr;
 	int libzfs_storeerr; /* stuff error messages into buffer */
 	void *libzfs_sharehdl; /* libshare handle */
-	uint_t libzfs_shareflags;
 	boolean_t libzfs_mnttab_enable;
 	avl_tree_t libzfs_mnttab_cache;
 	int libzfs_pool_iter;
@@ -83,8 +82,6 @@ struct libzfs_handle {
 	char libzfs_chassis_id[256];
 	boolean_t libzfs_cachedprops;
 };
-
-#define	ZFSSHARE_MISS	0x01	/* Didn't find entry in cache */
 
 struct zfs_handle {
 	libzfs_handle_t *zfs_hdl;

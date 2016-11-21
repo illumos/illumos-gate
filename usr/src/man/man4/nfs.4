@@ -19,7 +19,7 @@
 .\" Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright 2016 Nexenta Systems, Inc.
 .\"
-.Dd March 12, 2016
+.Dd November 16, 2016
 .Dt NFS 4
 .Os
 .Sh NAME
@@ -79,8 +79,8 @@ is
 .Li 2 ,
 while the default maximum version is
 .Li 4 .
-.It Sy delegation Ns = Ns Sy on Ns | Ns Sy off
-By default, this variable is commented out and the NFS server provides
+.It Sy server_delegation Ns = Ns Sy on Ns | Ns Sy off
+By default the NFS server provides
 delegations to clients. The user can turn off delegations for all exported
 filesystems by setting this variable to
 .Li off .

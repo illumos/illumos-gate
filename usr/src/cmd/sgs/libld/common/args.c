@@ -1444,11 +1444,15 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *usage)
 				} else if (*p == '=') {
 					p++;
 
-					if (strcmp(p,
-					    MSG_ORIG(MSG_ARG_ENABLED)) == 0) {
+					if ((strcmp(p,
+					    MSG_ORIG(MSG_ARG_ENABLED)) == 0) ||
+					    (strcmp(p,
+					    MSG_ORIG(MSG_ARG_ENABLE)) == 0)) {
 						ofl->ofl_aslr = 1;
-					} else if (strcmp(p,
-					    MSG_ORIG(MSG_ARG_DISABLED)) == 0) {
+					} else if ((strcmp(p,
+					    MSG_ORIG(MSG_ARG_DISABLED)) == 0) ||
+					    (strcmp(p,
+					    MSG_ORIG(MSG_ARG_DISABLE)) == 0)) {
 						ofl->ofl_aslr = -1;
 					} else {
 						ld_eprintf(ofl, ERR_FATAL,

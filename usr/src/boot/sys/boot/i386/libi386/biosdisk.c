@@ -288,9 +288,12 @@ bd_print(int verbose)
 	int i, ret = 0;
 
 	for (i = 0; i < nbdinfo; i++) {
-		sprintf(line, "    disk%d:   BIOS drive %c:\n", i,
+		snprintf(line, sizeof (line),
+		    "    disk%d:   BIOS drive %c (%ju X %u):\n", i,
 		    (bdinfo[i].bd_unit < 0x80) ? ('A' + bdinfo[i].bd_unit):
-		    ('C' + bdinfo[i].bd_unit - 0x80));
+		    ('C' + bdinfo[i].bd_unit - 0x80),
+		    (uintmax_t)bdinfo[i].bd_sectors,
+		    bdinfo[i].bd_sectorsize);
 		ret = pager_output(line);
 		if (ret != 0)
 			return (ret);

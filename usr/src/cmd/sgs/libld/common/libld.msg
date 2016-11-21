@@ -1477,6 +1477,8 @@
 
 @ MSG_ARG_ENABLED	"enabled"
 @ MSG_ARG_DISABLED	"disabled"
+@ MSG_ARG_ENABLE	"enable"
+@ MSG_ARG_DISABLE	"disable"
 
 # -z guidance=item strings
 @ MSG_ARG_GUIDE_DELIM		",: \t"

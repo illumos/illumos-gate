@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH POWER 9E "Dec 12, 2003"
+.TH POWER 9E "Sep 16, 2016"
 .SH NAME
 power \- power a device attached to the system
 .SH SYNOPSIS
@@ -18,13 +18,11 @@ power \- power a device attached to the system
 .fi
 
 .SH INTERFACE LEVEL
-.sp
 .LP
 Solaris DDI specific (Solaris DDI). This entry point is required. If the driver
 writer does not supply this entry point, the value \fBNULL\fR must be used in
-the \fBcb_ops\fR(9S) structure instead.
+the \fBdev_ops\fR(9S) structure instead.
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIdip\fR\fR
@@ -52,7 +50,6 @@ Desired component power level.
 .RE
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBpower\fR(9E) function is the device-specific Power Management entry
 point. This function is called when the system wants the driver to set the
@@ -85,7 +82,6 @@ If the system requests an inappropriate power transition for the device (for
 example, a request to power down a device which has just become busy), then the
 power level should not be changed and power should return \fBDDI_FAILURE\fR.
 .SH RETURN VALUES
-.sp
 .LP
 The \fBpower()\fR function returns:
 .sp
@@ -107,11 +103,9 @@ Failed to set the power to the requested \fIlevel\fR.
 .RE
 
 .SH CONTEXT
-.sp
 .LP
 The \fBpower()\fR function is called from user or kernel context only.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -127,10 +121,9 @@ Interface stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBattach\fR(9E), \fBdetach\fR(9E), \fBpm_busy_component\fR(9F),
-\fBpm_idle_component\fR(9F), \fBpm_raise_power\fR(9F), \fBcb_ops\fR(9S)
+\fBpm_idle_component\fR(9F), \fBpm_raise_power\fR(9F), \fBdev_ops\fR(9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR
