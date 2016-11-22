@@ -1618,10 +1618,6 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 		return (lx_helper_rt_tgsigqueueinfo(arg1, arg2, arg3,
 		    (siginfo_t *)arg4));
 
-	case B_SET_THUNK_PID:
-		lwpd->br_lx_thunk_pid = arg1;
-		return (0);
-
 	case B_GETPID:
 		/*
 		 * The usermode clone(2) code needs to be able to call
