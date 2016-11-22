@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include <sys/zone.h>
@@ -48,11 +48,7 @@ lx_getpid(void)
 	} else {
 		VERIFY(lwpd != NULL);
 
-		if (lwpd->br_lx_thunk_pid != 0) {
-			rv = lwpd->br_lx_thunk_pid;
-		} else {
-			rv = lwpd->br_tgid;
-		}
+		rv = lwpd->br_tgid;
 	}
 
 	return (rv);
