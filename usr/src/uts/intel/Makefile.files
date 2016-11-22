@@ -346,6 +346,7 @@ LX_BRAND_OBJS  =		\
 	lx_pipe.o		\
 	lx_poll.o		\
 	lx_prctl.o		\
+	lx_priority.o		\
 	lx_ptrace.o		\
 	lx_rename.o		\
 	lx_rlimit.o		\

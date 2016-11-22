@@ -113,7 +113,7 @@ copyin_vaparms32(caddr_t arg, pc_vaparms_t *vap, uio_seg_t seg)
 
 #endif
 
-static int donice(procset_t *, pcnice_t *);
+int donice(procset_t *, pcnice_t *);
 static int doprio(procset_t *, pcprio_t *);
 static int proccmp(proc_t *, struct pcmpargs *);
 static int setparms(proc_t *, struct stprmargs *);
@@ -990,7 +990,7 @@ setprocnice(proc_t *pp, pcnice_t *pcnice)
 /*
  * Update the nice value of the specified LWP or set of processes.
  */
-static int
+int
 donice(procset_t *procset, pcnice_t *pcnice)
 {
 	int err_proc = 0;

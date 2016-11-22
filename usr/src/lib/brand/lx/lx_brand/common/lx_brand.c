@@ -1151,8 +1151,8 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_statfs,			/* 137: statfs */
 	lx_fstatfs,			/* 138: fstatfs */
 	lx_sysfs,			/* 139: sysfs */
-	lx_getpriority,			/* 140: getpriority */
-	lx_setpriority,			/* 141: setpriority */
+	NULL,				/* 140: getpriority */
+	NULL,				/* 141: setpriority */
 	NULL,				/* 142: sched_setparam */
 	NULL,				/* 143: sched_getparam */
 	NULL,				/* 144: sched_setscheduler */
@@ -1438,8 +1438,8 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_ftruncate,			/*  93: ftruncate */
 	NULL,				/*  94: fchmod */
 	NULL,				/*  95: fchown16 */
-	lx_getpriority,			/*  96: getpriority */
-	lx_setpriority,			/*  97: setpriority */
+	NULL,				/*  96: getpriority */
+	NULL,				/*  97: setpriority */
 	NULL,				/*  98: profil */
 	lx_statfs,			/*  99: statfs */
 	lx_fstatfs,			/* 100: fstatfs */
