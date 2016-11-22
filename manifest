@@ -871,7 +871,7 @@ f kernel/firmware/iwn/iwlwifi-4965-2.ucode 0666 root sys
 f kernel/firmware/iwn/iwlwifi-5000-2.ucode 0666 root sys
 f kernel/firmware/iwn/iwlwifi-5150-2.ucode 0666 root sys
 f kernel/firmware/iwn/iwlwifi-6000-4.ucode 0666 root sys
-f kernel/firmware/iwn/iwlwifi-6000g2a-5.ucode 0666 root sys
+f kernel/firmware/iwn/iwlwifi-6000g2a-6.ucode 0666 root sys
 f kernel/firmware/iwn/iwlwifi-6000g2b-6.ucode 0666 root sys
 f kernel/firmware/iwn/iwlwifi-6050-5.ucode 0666 root sys
 d kernel/fs 0755 root sys

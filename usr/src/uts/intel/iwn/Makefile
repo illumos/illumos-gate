@@ -31,7 +31,7 @@ FWDIR	= $(UTSBASE)/common/io/iwn/fw-iw
 FWFILES	= iwlwifi-100-5.ucode iwlwifi-1000-3.ucode iwlwifi-105-6.ucode \
 	iwlwifi-135-6.ucode iwlwifi-2000-6.ucode iwlwifi-2030-6.ucode \
 	iwlwifi-4965-2.ucode iwlwifi-5000-2.ucode iwlwifi-5150-2.ucode \
-	iwlwifi-6000-4.ucode iwlwifi-6000g2a-5.ucode iwlwifi-6000g2b-6.ucode \
+	iwlwifi-6000-4.ucode iwlwifi-6000g2a-6.ucode iwlwifi-6000g2b-6.ucode \
 	iwlwifi-6050-5.ucode
 
 #
