@@ -615,8 +615,8 @@ lx_sysent_t lx_sysent32[] = {
 	{"ftruncate",	NULL,			0,		2}, /* 93 */
 	{"fchmod",	lx_fchmod,		0,		2}, /* 94 */
 	{"fchown16",	lx_fchown16,		0,		3}, /* 95 */
-	{"getpriority",	NULL,			0,		2}, /* 96 */
-	{"setpriority",	NULL,			0,		3}, /* 97 */
+	{"getpriority",	lx_getpriority,		0,		2}, /* 96 */
+	{"setpriority",	lx_setpriority,		0,		3}, /* 97 */
 	{"profil",	NULL,			NOSYS_NO_EQUIV,	0}, /* 98 */
 	{"statfs",	NULL,			0,		2}, /* 99 */
 	{"fstatfs",	NULL,			0,		2}, /* 100 */
@@ -1030,8 +1030,8 @@ lx_sysent_t lx_sysent64[] = {
 	{"statfs",	NULL,			0,		2}, /* 137 */
 	{"fstatfs",	NULL,			0,		2}, /* 138 */
 	{"sysfs",	NULL,			0,		3}, /* 139 */
-	{"getpriority",	NULL,			0,		2}, /* 140 */
-	{"setpriority",	NULL,			0,		3}, /* 141 */
+	{"getpriority",	lx_getpriority,		0,		2}, /* 140 */
+	{"setpriority",	lx_setpriority,		0,		3}, /* 141 */
 	{"sched_setparam", lx_sched_setparam,	0,		2}, /* 142 */
 	{"sched_getparam", lx_sched_getparam,	0,		2}, /* 143 */
 	{"sched_setscheduler", lx_sched_setscheduler, 0,	3}, /* 144 */

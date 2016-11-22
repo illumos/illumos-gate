@@ -43,7 +43,6 @@ COBJS	=	aio.o			\
 		module.o		\
 		mount.o			\
 		mount_nfs.o		\
-		priority.o		\
 		ptrace.o		\
 		sendfile.o		\
 		signal.o		\

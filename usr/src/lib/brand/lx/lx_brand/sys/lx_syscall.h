@@ -157,9 +157,6 @@ extern long lx_fork(void);
 extern long lx_vfork(void);
 extern long lx_exec(uintptr_t, uintptr_t, uintptr_t);
 
-extern long lx_getpriority(uintptr_t, uintptr_t);
-extern long lx_setpriority(uintptr_t, uintptr_t, uintptr_t);
-
 extern long lx_ptrace(uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 
 extern long lx_xattr2(uintptr_t, uintptr_t);
