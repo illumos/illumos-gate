@@ -21,7 +21,7 @@
 .\" (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 .\" THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 .\"
-.Dd "Jan 29, 2016"
+.Dd "Nov 23, 2016"
 .Dt IEEE802.3 5
 .Os
 .Sh NAME
@@ -88,8 +88,12 @@ Advertises 10 Gbps support.
 Advertises 10 Mbps half-duplex support.
 .It Sy adv_cap_2500fdx
 Advertises 2.5 Gbps support.
+.It Sy adv_cap_50gfdx
+Advertises 50 Gbps support.
 .It Sy adv_cap_40gfdx
 Advertises 40 Gbps support.
+.It Sy adv_cap_25gfdx
+Advertises 25 Gbps support.
 .It Sy adv_cap_5000fdx
 Advertises 5 Gbps support.
 .It Sy adv_cap_autoneg
@@ -126,8 +130,12 @@ Device supports 10 Gpbs.
 Device supports 10 Mbps half-duplex.
 .It Sy cap_2500fdx
 Device supports 2.5 Gbps.
+.It Sy cap_50gfdx
+Device supports 50 Gpbs.
 .It Sy cap_40gfdx
 Device supports 40 Gpbs.
+.It Sy cap_25gfdx
+Device supports 25 Gpbs.
 .It Sy cap_5000fdx
 Device supports 5 Gbps.
 .It Sy cap_asmpause
@@ -208,8 +216,12 @@ Peer supports 10 Mbps half-duplex.
 Peer supports 2.5 Gbps.
 .It Sy lp_cap_5000fdx
 Peer supports 5 Gbps.
+.It Sy lp_cap_50gfdx
+Peer supports 50 Gbps.
 .It Sy lp_cap_40gfdx
 Peer supports 40 Gbps.
+.It Sy lp_cap_25gfdx
+Peer supports 25 Gbps.
 .It Sy lp_cap_asmpause
 Peer supports asymmetric flow control.
 .It Sy lp_cap_autoneg

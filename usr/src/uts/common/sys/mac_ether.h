@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2015 Garrett D'Amore <garrett@damore.org>
+ * Copyright 2016 Joyent, Inc.
  */
 
 #ifndef	_SYS_MAC_ETHER_H
@@ -123,10 +124,18 @@ enum ether_stat {
 	ETHER_STAT_CAP_5000FDX,
 	ETHER_STAT_ADV_CAP_5000FDX,
 	ETHER_STAT_LP_CAP_5000FDX,
+
+	ETHER_STAT_CAP_25GFDX,
+	ETHER_STAT_ADV_CAP_25GFDX,
+	ETHER_STAT_LP_CAP_25GFDX,
+
+	ETHER_STAT_CAP_50GFDX,
+	ETHER_STAT_ADV_CAP_50GFDX,
+	ETHER_STAT_LP_CAP_50GFDX,
 };
 
 #define	ETHER_NSTAT	\
-	(ETHER_STAT_LP_CAP_5000FDX - ETHER_STAT_ALIGN_ERRORS + 1)
+	(ETHER_STAT_LP_CAP_50GFDX - ETHER_STAT_ALIGN_ERRORS + 1)
 
 #define	ETHER_STAT_ISACOUNTER(_ether_stat)				\
 	    ((_ether_stat) == ETHER_STAT_ALIGN_ERRORS ||		\

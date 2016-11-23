@@ -301,6 +301,12 @@ typedef enum i40e_itr_index {
 #define	I40E_RING_WAIT_PAUSE	10	/* ms */
 
 /*
+ * Printed Board Assembly (PBA) length. These are derived from Table 6-2.
+ */
+#define	I40E_PBANUM_LENGTH	12
+#define	I40E_PBANUM_STRLEN	13
+
+/*
  * Bit flags for attach_progress
  */
 typedef enum i40e_attach_state {

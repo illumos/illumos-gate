@@ -30,7 +30,7 @@
   POSSIBILITY OF SUCH DAMAGE.
 
 ******************************************************************************/
-/*$FreeBSD: head/sys/dev/ixl/i40e_hmc.h 284049 2015-06-05 22:52:42Z jfv $*/
+/*$FreeBSD$*/
 
 #ifndef _I40E_HMC_H_
 #define _I40E_HMC_H_
