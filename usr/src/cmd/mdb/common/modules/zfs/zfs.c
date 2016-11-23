@@ -312,20 +312,26 @@ objset_name(uintptr_t addr, char *buf)
 	return (0);
 }
 
-static void
-enum_lookup(char *out, size_t size, mdb_ctf_id_t id, int val,
-    const char *prefix)
+static int
+enum_lookup(char *type, int val, const char *prefix, size_t size, char *out)
 {
 	const char *cp;
 	size_t len = strlen(prefix);
+	mdb_ctf_id_t enum_type;
 
-	if ((cp = mdb_ctf_enum_name(id, val)) != NULL) {
+	if (mdb_ctf_lookup_by_name(type, &enum_type) != 0) {
+		mdb_warn("Could not find enum for %s", type);
+		return (-1);
+	}
+
+	if ((cp = mdb_ctf_enum_name(enum_type, val)) != NULL) {
 		if (strncmp(cp, prefix, len) == 0)
 			cp += len;
 		(void) strncpy(out, cp, size);
 	} else {
 		mdb_snprintf(out, size, "? (%d)", val);
 	}
+	return (0);
 }
 
 /* ARGSUSED */
@@ -418,7 +424,6 @@ zfs_params(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 static int
 blkptr(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
-	mdb_ctf_id_t type_enum, checksum_enum, compress_enum;
 	char type[80], checksum[80], compress[80];
 	blkptr_t blk, *bp = &blk;
 	char buf[BP_SPRINTF_LEN];
@@ -428,19 +433,15 @@ blkptr(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_ERR);
 	}
 
-	if (mdb_ctf_lookup_by_name("enum dmu_object_type", &type_enum) == -1 ||
-	    mdb_ctf_lookup_by_name("enum zio_checksum", &checksum_enum) == -1 ||
-	    mdb_ctf_lookup_by_name("enum zio_compress", &compress_enum) == -1) {
+	if (enum_lookup("enum dmu_object_type", BP_GET_TYPE(bp), "DMU_OT_",
+	    sizeof (type), type) == -1 ||
+	    enum_lookup("enum zio_checksum", BP_GET_CHECKSUM(bp),
+	    "ZIO_CHECKSUM_", sizeof (checksum), checksum) == -1 ||
+	    enum_lookup("enum zio_compress", BP_GET_COMPRESS(bp),
+	    "ZIO_COMPRESS_", sizeof (compress), compress) == -1) {
 		mdb_warn("Could not find blkptr enumerated types");
 		return (DCMD_ERR);
 	}
-
-	enum_lookup(type, sizeof (type), type_enum,
-	    BP_GET_TYPE(bp), "DMU_OT_");
-	enum_lookup(checksum, sizeof (checksum), checksum_enum,
-	    BP_GET_CHECKSUM(bp), "ZIO_CHECKSUM_");
-	enum_lookup(compress, sizeof (compress), compress_enum,
-	    BP_GET_COMPRESS(bp), "ZIO_COMPRESS_");
 
 	SNPRINTF_BLKPTR(mdb_snprintf, '\n', buf, sizeof (buf), bp, type,
 	    checksum, compress);
@@ -1287,13 +1288,16 @@ typedef struct mdb_range_tree {
 typedef struct mdb_metaslab_group {
 	uint64_t mg_fragmentation;
 	uint64_t mg_histogram[RANGE_TREE_HISTOGRAM_SIZE];
+	uintptr_t mg_vd;
 } mdb_metaslab_group_t;
 
 typedef struct mdb_metaslab {
 	uint64_t ms_id;
 	uint64_t ms_start;
 	uint64_t ms_size;
+	int64_t ms_deferspace;
 	uint64_t ms_fragmentation;
+	uint64_t ms_weight;
 	uintptr_t ms_alloctree[TXG_SIZE];
 	uintptr_t ms_freetree[TXG_SIZE];
 	uintptr_t ms_tree;
@@ -1313,10 +1317,17 @@ typedef struct mdb_space_map {
 } mdb_space_map_t;
 
 typedef struct mdb_vdev {
+	uintptr_t vdev_path;
 	uintptr_t vdev_ms;
+	uintptr_t vdev_ops;
 	uint64_t vdev_ms_count;
+	uint64_t vdev_id;
 	vdev_stat_t vdev_stat;
 } mdb_vdev_t;
+
+typedef struct mdb_vdev_ops {
+	char vdev_op_type[16];
+} mdb_vdev_ops_t;
 
 static int
 metaslab_stats(uintptr_t addr, int spa_flags)
@@ -1631,6 +1642,165 @@ vdev_print(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (do_print_vdev(addr, flags, (int)depth, recursive, spa_flags));
 }
 
+typedef struct mdb_metaslab_alloc_trace {
+	uintptr_t mat_mg;
+	uintptr_t mat_msp;
+	uint64_t mat_size;
+	uint64_t mat_weight;
+	uint64_t mat_offset;
+	uint32_t mat_dva_id;
+} mdb_metaslab_alloc_trace_t;
+
+static void
+metaslab_print_weight(uint64_t weight)
+{
+	char buf[100];
+
+	if (WEIGHT_IS_SPACEBASED(weight)) {
+		mdb_nicenum(
+		    weight & ~(METASLAB_ACTIVE_MASK | METASLAB_WEIGHT_TYPE),
+		    buf);
+	} else {
+		char size[NICENUM_BUFLEN];
+		mdb_nicenum(1ULL << WEIGHT_GET_INDEX(weight), size);
+		(void) mdb_snprintf(buf, sizeof (buf), "%llu x %s",
+		    WEIGHT_GET_COUNT(weight), size);
+	}
+	mdb_printf("%11s ", buf);
+}
+
+/* ARGSUSED */
+static int
+metaslab_weight(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	uint64_t weight = 0;
+	char active;
+
+	if (argc == 0 && (flags & DCMD_ADDRSPEC)) {
+		if (mdb_vread(&weight, sizeof (uint64_t), addr) == -1) {
+			mdb_warn("failed to read weight at %p\n", addr);
+			return (DCMD_ERR);
+		}
+	} else if (argc == 1 && !(flags & DCMD_ADDRSPEC)) {
+		weight = (argv[0].a_type == MDB_TYPE_IMMEDIATE) ?
+		    argv[0].a_un.a_val : mdb_strtoull(argv[0].a_un.a_str);
+	} else {
+		return (DCMD_USAGE);
+	}
+
+	if (DCMD_HDRSPEC(flags)) {
+		mdb_printf("%<u>%-6s %9s %9s%</u>\n",
+		    "ACTIVE", "ALGORITHM", "WEIGHT");
+	}
+
+	if (weight & METASLAB_WEIGHT_PRIMARY)
+		active = 'P';
+	else if (weight & METASLAB_WEIGHT_SECONDARY)
+		active = 'S';
+	else
+		active = '-';
+	mdb_printf("%6c %8s ", active,
+	    WEIGHT_IS_SPACEBASED(weight) ? "SPACE" : "SEGMENT");
+	metaslab_print_weight(weight);
+	mdb_printf("\n");
+
+	return (DCMD_OK);
+}
+
+/* ARGSUSED */
+static int
+metaslab_trace(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	mdb_metaslab_alloc_trace_t mat;
+	mdb_metaslab_group_t mg = { 0 };
+	char result_type[100];
+
+	if (mdb_ctf_vread(&mat, "metaslab_alloc_trace_t",
+	    "mdb_metaslab_alloc_trace_t", addr, 0) == -1) {
+		return (DCMD_ERR);
+	}
+
+	if (!(flags & DCMD_PIPE_OUT) && DCMD_HDRSPEC(flags)) {
+		mdb_printf("%<u>%6s %6s %8s %11s %18s %18s%</u>\n",
+		    "MSID", "DVA", "ASIZE", "WEIGHT", "RESULT", "VDEV");
+	}
+
+	if (mat.mat_msp != NULL) {
+		mdb_metaslab_t ms;
+
+		if (mdb_ctf_vread(&ms, "metaslab_t", "mdb_metaslab_t",
+		    mat.mat_msp, 0) == -1) {
+			return (DCMD_ERR);
+		}
+		mdb_printf("%6llu ", ms.ms_id);
+	} else {
+		mdb_printf("%6s ", "-");
+	}
+
+	mdb_printf("%6d %8llx ", mat.mat_dva_id, mat.mat_size);
+
+	metaslab_print_weight(mat.mat_weight);
+
+	if ((int64_t)mat.mat_offset < 0) {
+		if (enum_lookup("enum trace_alloc_type", mat.mat_offset,
+		    "TRACE_", sizeof (result_type), result_type) == -1) {
+			mdb_warn("Could not find enum for trace_alloc_type");
+			return (DCMD_ERR);
+		}
+		mdb_printf("%18s ", result_type);
+	} else {
+		mdb_printf("%<b>%18llx%</b> ", mat.mat_offset);
+	}
+
+	if (mat.mat_mg != NULL &&
+	    mdb_ctf_vread(&mg, "metaslab_group_t", "mdb_metaslab_group_t",
+	    mat.mat_mg, 0) == -1) {
+		return (DCMD_ERR);
+	}
+
+	if (mg.mg_vd != NULL) {
+		mdb_vdev_t vdev;
+		char desc[MAXNAMELEN];
+
+		if (mdb_ctf_vread(&vdev, "vdev_t", "mdb_vdev_t",
+		    mg.mg_vd, 0) == -1) {
+			return (DCMD_ERR);
+		}
+
+		if (vdev.vdev_path != NULL) {
+			char path[MAXNAMELEN];
+
+			if (mdb_readstr(path, sizeof (path),
+			    vdev.vdev_path) == -1) {
+				mdb_warn("failed to read vdev_path at %p\n",
+				    vdev.vdev_path);
+				return (DCMD_ERR);
+			}
+			char *slash;
+			if ((slash = strrchr(path, '/')) != NULL) {
+				strcpy(desc, slash + 1);
+			} else {
+				strcpy(desc, path);
+			}
+		} else if (vdev.vdev_ops != NULL) {
+			mdb_vdev_ops_t ops;
+			if (mdb_ctf_vread(&ops, "vdev_ops_t", "mdb_vdev_ops_t",
+			    vdev.vdev_ops, 0) == -1) {
+				mdb_warn("failed to read vdev_ops at %p\n",
+				    vdev.vdev_ops);
+				return (DCMD_ERR);
+			}
+			(void) mdb_snprintf(desc, sizeof (desc),
+			    "%s-%llu", ops.vdev_op_type, vdev.vdev_id);
+		} else {
+			(void) strcpy(desc, "<unknown>");
+		}
+		mdb_printf("%18s\n", desc);
+	}
+
+	return (DCMD_OK);
+}
+
 typedef struct metaslab_walk_data {
 	uint64_t mw_numvdevs;
 	uintptr_t *mw_vdevs;
@@ -1748,6 +1918,7 @@ typedef struct space_data {
 	uint64_t ms_alloctree[TXG_SIZE];
 	uint64_t ms_freetree[TXG_SIZE];
 	uint64_t ms_tree;
+	int64_t ms_deferspace;
 	uint64_t avail;
 	uint64_t nowavail;
 } space_data_t;
@@ -1795,6 +1966,7 @@ space_cb(uintptr_t addr, const void *unknown, void *arg)
 		    "mdb_space_map_phys_t", sm.sm_phys, 0);
 	}
 
+	sd->ms_deferspace += ms.ms_deferspace;
 	sd->ms_tree += rt.rt_space;
 	sd->avail += sm.sm_size - sm.sm_alloc;
 	sd->nowavail += sm.sm_size - smp.smp_alloc;
@@ -1877,6 +2049,8 @@ spa_space(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    sd.ms_freetree[2] >> shift, suffix,
 	    sd.ms_freetree[3] >> shift, suffix);
 	mdb_printf("ms_tree = %llu%s\n", sd.ms_tree >> shift, suffix);
+	mdb_printf("ms_deferspace = %llu%s\n",
+	    sd.ms_deferspace >> shift, suffix);
 	mdb_printf("last synced avail = %llu%s\n", sd.avail >> shift, suffix);
 	mdb_printf("current syncing avail = %llu%s\n",
 	    sd.nowavail >> shift, suffix);
@@ -3790,6 +3964,10 @@ static const mdb_dcmd_t dcmds[] = {
 	    "print zfs debug log", dbgmsg},
 	{ "rrwlock", ":",
 	    "print rrwlock_t, including readers", rrwlock},
+	{ "metaslab_weight", "weight",
+	    "print metaslab weight", metaslab_weight},
+	{ "metaslab_trace", ":",
+	    "print metaslab allocation trace records", metaslab_trace},
 	{ "arc_compression_stats", ":[-vabrf]\n"
 	    "\t-v verbose, display a linearly scaled histogram\n"
 	    "\t-a display ARC_anon state statistics individually\n"
