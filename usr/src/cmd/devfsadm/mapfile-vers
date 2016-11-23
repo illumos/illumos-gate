@@ -1,4 +1,5 @@
 #
+# Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
 # Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # CDDL HEADER START
@@ -39,6 +40,7 @@ $mapfile_version 2
 # External interface requirements
 SYMBOL_SCOPE {
 	global:
+		ctrl_enumerate_int		{ FLAGS = EXTERN };
 		devfsadm_devlink_cache		{ FLAGS = EXTERN };
 		devfsadm_enumerate_char_start	{ FLAGS = EXTERN };
 		devfsadm_enumerate_int		{ FLAGS = EXTERN };
