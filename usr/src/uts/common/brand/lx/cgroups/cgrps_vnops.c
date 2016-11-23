@@ -444,86 +444,6 @@ cgrp_wr(cgrp_mnt_t *cgm, cgrp_node_t *cn, struct uio *uio)
 }
 
 /*
- * pidlock is held on entry but dropped on exit. Because we might have to drop
- * locks and loop if the process is already P_PR_LOCKed, it is possible that
- * the process might be gone when we return from this function.
- */
-static proc_t *
-cgrp_p_lock(proc_t *p)
-{
-	kmutex_t *mp;
-	pid_t pid;
-
-	ASSERT(MUTEX_HELD(&pidlock));
-
-	/* first try the fast path */
-	mutex_enter(&p->p_lock);
-	if (p->p_flag & SEXITING) {
-		mutex_exit(&p->p_lock);
-		mutex_exit(&pidlock);
-		return (NULL);
-	}
-
-	if (!(p->p_proc_flag & P_PR_LOCK)) {
-		p->p_proc_flag |= P_PR_LOCK;
-		mutex_exit(&p->p_lock);
-		mutex_exit(&pidlock);
-		THREAD_KPRI_REQUEST();
-		return (p);
-	}
-	mutex_exit(&p->p_lock);
-
-	pid = p->p_pid;
-	for (;;) {
-		/*
-		 * p_lock is persistent, but p itself is not -- it could
-		 * vanish during cv_wait().  Load p->p_lock now so we can
-		 * drop it after cv_wait() without referencing p.
-		 */
-		mp = &p->p_lock;
-		mutex_enter(mp);
-		mutex_exit(&pidlock);
-
-		if (p->p_flag & SEXITING) {
-			mutex_exit(mp);
-			return (NULL);
-		}
-
-		if (!(p->p_proc_flag & P_PR_LOCK))
-			break;
-
-		cv_wait(&pr_pid_cv[p->p_slot], mp);
-		mutex_exit(mp);
-
-		mutex_enter(&pidlock);
-		p = prfind(pid);
-		if (p == NULL || p->p_stat == SIDL) {
-			mutex_exit(&pidlock);
-			return (NULL);
-		}
-	}
-
-	p->p_proc_flag |= P_PR_LOCK;
-	mutex_exit(mp);
-	ASSERT(!MUTEX_HELD(&pidlock));
-	THREAD_KPRI_REQUEST();
-	return (p);
-}
-
-static void
-cgrp_p_unlock(proc_t *p)
-{
-	ASSERT(p->p_proc_flag & P_PR_LOCK);
-	ASSERT(MUTEX_HELD(&p->p_lock));
-	ASSERT(!MUTEX_HELD(&pidlock));
-
-	p->p_proc_flag &= ~P_PR_LOCK;
-	cv_signal(&pr_pid_cv[p->p_slot]);
-	mutex_exit(&p->p_lock);
-	THREAD_KPRI_RELEASE();
-}
-
-/*
  * Read value from the notify_on_release pseudo file on the parent node
  * (which is the actual cgroup node). We don't bother taking the cg_contents
  * lock since it's a single instruction so an empty group action/read will
@@ -769,13 +689,15 @@ cgrp_rd_proc_tasks(uint_t cg_id, proc_t *p, pid_t initpid, ssize_t *offset,
 }
 
 /*
- * Read pids from the tasks pseudo file. We have to look at all of the
- * processes to find applicable ones, then report pids for any thread in the
- * cgroup. We return the emulated lx thread pid here, not the internal thread
- * ID. Because we're possibly doing IO for each taskid we lock the process
- * so that the threads don't change while we're working on it (although threads
- * can change if we fill up the read buffer and come back later for a
- * subsequent read).
+ * Read PIDs from the tasks pseudo file.  In order to do this, the process
+ * table is walked, searching for entries which are in the correct state and
+ * match this zone.  The LX emulated PIDs will be reported from branded entries
+ * which fulfill the criteria.  Since records are being emulated for every task
+ * in the process, PR_LOCK is acquired to prevent changes during output.
+ *
+ * Note: If the buffer is filled and the accessing process is forced into a
+ * subsequent read, the reported threads may changes while locks are dropped in
+ * the mean time.
  */
 static int
 cgrp_rd_tasks(cgrp_mnt_t *cgm, cgrp_node_t *cn, struct uio *uio)
@@ -783,9 +705,9 @@ cgrp_rd_tasks(cgrp_mnt_t *cgm, cgrp_node_t *cn, struct uio *uio)
 	int i;
 	ssize_t offset = 0;
 	zoneid_t zoneid = curproc->p_zone->zone_id;
+	cred_t *cred = CRED();
 	int error = 0;
 	pid_t initpid = curproc->p_zone->zone_proc_initpid;
-	pid_t schedpid = curproc->p_zone->zone_zsched->p_pid;
 	/* the cgroup ID is on the containing dir */
 	uint_t cg_id = cn->cgn_parent->cgn_id;
 
@@ -794,45 +716,75 @@ cgrp_rd_tasks(cgrp_mnt_t *cgm, cgrp_node_t *cn, struct uio *uio)
 		proc_t *p;
 
 		mutex_enter(&pidlock);
-		/*
-		 * Skip indices for which there is no pid_entry, PIDs for
-		 * which there is no corresponding process, system processes,
-		 * a PID of 0, the pid for our zsched process,  anything the
-		 * security policy doesn't allow us to look at, its not an
-		 * lx-branded process and processes that are not in the zone.
-		 */
-		if ((p = pid_entry(i)) == NULL ||
-		    p->p_stat == SIDL ||
-		    (p->p_flag & SSYS) != 0 ||
-		    p->p_pid == 0 ||
-		    p->p_pid == schedpid ||
-		    secpolicy_basic_procinfo(CRED(), p, curproc) != 0 ||
-		    p->p_brand != &lx_brand ||
-		    p->p_zone->zone_id != zoneid) {
+		for (;;) {
+			if ((p = pid_entry(i)) == NULL) {
+				/* Quickly move onto the next slot */
+				if (++i < v.v_proc) {
+					continue;
+				} else {
+					mutex_exit(&pidlock);
+					break;
+				}
+			}
+
+			/*
+			 * Check if this process would even be of interest to
+			 * cgroupfs before attempting to acquire its PR_LOCK.
+			 */
+			mutex_enter(&p->p_lock);
 			mutex_exit(&pidlock);
+			if (p->p_brand != &lx_brand ||
+			    p->p_zone->zone_id != zoneid) {
+				mutex_exit(&p->p_lock);
+				p = NULL;
+				break;
+			}
+
+			/* Attempt to grab P_PR_LOCK. */
+			error = sprtrylock_proc(p);
+			if (error == 0) {
+				/* Success */
+				break;
+			} else if (error < 0) {
+				/*
+				 * This process is not in a state where
+				 * P_PR_LOCK can be acquired.  It either
+				 * belongs to the system or is a zombie.
+				 * Regardless, give up and move on.
+				 */
+				mutex_exit(&p->p_lock);
+				p = NULL;
+				break;
+			} else {
+				/*
+				 * Wait until P_PR_LOCK is no longer contended
+				 * and attempt to acquire it again.  Since the
+				 * process may have changed state, the entry
+				 * lookup must be repeated.
+				 */
+				sprwaitlock_proc(p);
+				mutex_enter(&pidlock);
+			}
+		}
+
+		if (p == NULL) {
+			continue;
+		} else if (secpolicy_basic_procinfo(cred, p, curproc) != 0) {
+			sprunlock(p);
 			continue;
 		}
 
-		if (p->p_tlist == NULL) {
-			/* no threads, skip it */
-			mutex_exit(&pidlock);
-			continue;
-		}
-
-		p = cgrp_p_lock(p);
-		ASSERT(!MUTEX_HELD(&pidlock));
-		if (p == NULL)
-			continue;
-
+		/* Shuffle locks and output the entry. */
+		mutex_exit(&p->p_lock);
 		mutex_enter(&cgm->cg_contents);
 		error = cgrp_rd_proc_tasks(cg_id, p, initpid, &offset, uio);
 		mutex_exit(&cgm->cg_contents);
-
 		mutex_enter(&p->p_lock);
-		cgrp_p_unlock(p);
 
-		if (error != 0)
+		sprunlock(p);
+		if (error != 0) {
 			return (error);
+		}
 	}
 
 	return (0);
