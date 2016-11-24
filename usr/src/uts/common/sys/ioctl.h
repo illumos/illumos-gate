@@ -30,8 +30,6 @@
 #ifndef _SYS_IOCTL_H
 #define	_SYS_IOCTL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

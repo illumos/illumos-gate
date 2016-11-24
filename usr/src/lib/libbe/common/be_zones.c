@@ -111,7 +111,7 @@ int
 be_find_active_zone_root(zfs_handle_t *be_zhp, char *zonepath_ds,
     char *zoneroot_ds, int zoneroot_ds_size)
 {
-	active_zone_root_data_t		azr_data = { 0 };
+	active_zone_root_data_t		azr_data = { { 0 }, NULL };
 	zfs_handle_t			*zhp;
 	char				zone_container_ds[MAXPATHLEN];
 	int				ret = BE_SUCCESS;

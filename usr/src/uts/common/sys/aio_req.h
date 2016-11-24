@@ -26,8 +26,6 @@
 #ifndef _SYS_AIO_REQ_H
 #define	_SYS_AIO_REQ_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/buf.h>
 
 #ifdef	__cplusplus

@@ -27,8 +27,6 @@
 #ifndef	_SYS_SYNCH_H
 #define	_SYS_SYNCH_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef _ASM
 #include <sys/types.h>
 #include <sys/int_types.h>

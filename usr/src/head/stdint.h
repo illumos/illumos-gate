@@ -27,8 +27,6 @@
 #ifndef _STDINT_H
 #define	_STDINT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This header was introduced by the ISO C Standard, ISO/IEC
  * 9899:1999 Programming language - C. It is a subset of the

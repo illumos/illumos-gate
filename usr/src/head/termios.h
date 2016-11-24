@@ -26,8 +26,6 @@
 #ifndef _TERMIOS_H
 #define	_TERMIOS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.2	*/
-
 #include <sys/termios.h>
 
 #endif	/* _TERMIOS_H */

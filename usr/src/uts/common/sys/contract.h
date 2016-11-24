@@ -26,8 +26,6 @@
 #ifndef	_SYS_CONTRACT_H
 #define	_SYS_CONTRACT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 
 #ifdef	__cplusplus

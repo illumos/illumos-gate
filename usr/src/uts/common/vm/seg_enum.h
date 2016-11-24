@@ -33,8 +33,6 @@
 #ifndef	_VM_SEG_ENUM_H
 #define	_VM_SEG_ENUM_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
