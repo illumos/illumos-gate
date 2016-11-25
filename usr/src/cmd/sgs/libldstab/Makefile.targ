@@ -43,7 +43,9 @@ delete:
 
 native:		$(SGSLIBDIR)/$(DYNLIB)
 
-$(SGSLIBDIR)/$(DYNLIB): pics .WAIT $$(PICS)
+$(PICS):	pics
+
+$(SGSLIBDIR)/$(DYNLIB): $(PICS) $(SGSLIBDIR)
 		$(BUILD.SO)
 		$(POST_PROCESS_SO)
 

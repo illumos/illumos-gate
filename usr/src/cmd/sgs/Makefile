@@ -159,7 +159,7 @@ $(SUBDIRS):	FRC
 # itself and ld.so.1.  Once this new functionality appears in the standard ld
 # this target can be disabled.
 
-native-add:	native-proto FRC
+native-add:	FRC
 		@ cd tools/$(MACH); pwd; $(MAKE) native
 		@ cd libconv/$(MACH); pwd; $(MAKE)
 		@ cd libelf/$(MACH); pwd; $(MAKE) native
@@ -171,12 +171,6 @@ native-add:	native-proto FRC
 native-clobber:
 		@ cd tools; pwd; $(MAKE) $(TARGET)
 		$(RM) -r proto/$(MACH)
-
-native-proto:
-		-@mkdir -p proto/$(MACH)
-		-@mkdir -p proto/$(MACH)/lib
-		-@mkdir -p proto/$(MACH)/usr
-		-@mkdir -p proto/$(MACH)/usr/bin
 
 FRC:
 
