@@ -25,6 +25,7 @@
 
 /*
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*
@@ -1513,7 +1514,17 @@ iob_doprnt(mdb_iob_t *iob, const char *format, varglist_t *ap)
 		/*
 		 * If the string and the option altstr won't fit on this line
 		 * and auto-wrap is set (default), skip to the next line.
+		 * If the string contains \n, and the \n terminated substring
+		 * + altstr is shorter than the above, use the shorter lf_len.
 		 */
+		if (u.str != NULL) {
+			char *np = strchr(u.str, '\n');
+			if (np != NULL) {
+				int lf_len = (np - u.str) + altlen;
+				if (lf_len < width)
+					width = lf_len;
+			}
+		}
 		if (IOB_WRAPNOW(iob, width))
 			mdb_iob_nl(iob);
 
