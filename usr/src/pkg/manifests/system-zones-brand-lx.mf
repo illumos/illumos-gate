@@ -101,8 +101,6 @@ file path=usr/kernel/fs/lx_cgroup group=sys mode=0755
 file path=usr/kernel/fs/lx_devfs group=sys mode=0755
 file path=usr/kernel/fs/lx_proc group=sys mode=0755
 file path=usr/kernel/fs/lx_sysfs group=sys mode=0755
-#file path=usr/kernel/strmod/$(ARCH64)/ldlinux group=sys mode=0755
-#file path=usr/kernel/strmod/ldlinux group=sys mode=0755
 file path=usr/lib/$(ARCH64)/lx_brand.so.1
 file path=usr/lib/brand/lx/$(ARCH64)/lx_librtld_db.so.1
 file path=usr/lib/brand/lx/$(ARCH64)/lx_vdso.so.1 mode=0755
@@ -151,3 +149,4 @@ legacy pkg=SUNWlxu arch=$(ARCH) category=system \
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 link path=usr/lib/brand/lx/64 target=$(ARCH64)
+depend fmri=archiver/gnu-tar type=require
