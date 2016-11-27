@@ -32,11 +32,9 @@ CPPFLAGS +=	-I../../../sys -I. -I$(SRC)/common/bzip2
 
 CFLAGS =	-O2 -ffreestanding -Wformat
 CFLAGS +=	-mno-mmx -mno-3dnow -mno-sse -mno-sse2 -mno-sse3 -msoft-float
-CFLAGS +=	-Wno-pointer-sign -Wno-empty-body -Wno-string-plus-int \
-		-Wno-unused-const-variable -Wno-tautological-compare \
-		-Wno-unused-value -Wno-parentheses-equality \
-		-Wno-unused-function -Wno-enum-conversion -Wno-switch \
-		-Wno-switch-enum -Wno-knr-promoted-parameter -Wno-parentheses
+CFLAGS +=	-Wno-pointer-sign -Wno-empty-body -Wno-unused-value \
+		-Wno-unused-function -Wno-switch \
+		-Wno-switch-enum -Wno-parentheses
 
 include ${LIBSTAND_SRC}/Makefile.inc
 
