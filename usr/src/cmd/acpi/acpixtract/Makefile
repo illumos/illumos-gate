@@ -9,6 +9,7 @@
 # http://www.illumos.org/license/CDDL.
 #
 # Copyright 2016 Joyent, Inc.
+# Copyright 2016 RackTop Systems.
 #
 
 PROG=		acpixtract
@@ -28,7 +29,7 @@ CPPFLAGS += -I$(SRC)/uts/intel/sys/acpi -DACPI_XTRACT_APP
 all: $(PROG)
 
 $(PROG): $(OBJS)
-	$(LINK.c) -o $@ $(OBJS) ../common/acpi.a
+	$(LINK.c) -o $@ $(OBJS) ../common/acpi.a $(LDLIBS)
 	$(POST_PROCESS)
 
 install: all $(ROOTUSRSBINPROG)

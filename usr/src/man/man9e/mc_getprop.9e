@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2016 Joyent, Inc.
 .\"
-.Dd June 02, 2016
+.Dd November 15, 2016
 .Dt MC_GETPROP 9E
 .Os
 .Sh NAME
@@ -92,6 +92,11 @@ argument and use
 .Xr strcmp 9F
 on it, comparing it to each of its private (bounded-size) properties to
 identify which one it is.
+.Pp
+At this time, private properties are limited to being string based
+properties. If other types of property values are used, they will not be
+rendered correctly by
+.Xr dladm 1M .
 .Pp
 The device
 driver can access its device soft state by casting the

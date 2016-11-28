@@ -1659,3 +1659,4 @@ Bugid   Risk Synopsis
 6098	ld(1) should not require symbols which identify group sections be global
 6252	ld should merge function/data-sections in the same manner as GNU ld
 7323	ld(1) -zignore can erroneously discard init and fini arrays as unreferenced
+7594	ld -zaslr should accept Solaris-compatible values

@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 1996, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2016 RackTop Systems.
 #
 
 .KEEP_STATE:
@@ -120,7 +121,7 @@ CHKMSGFLAGS =	$(SGSMSGTARG:%=-m %) $(SGSMSGCHK:%=-m %)
 # Native targets should use the minimum of ld(1) flags to allow building on
 # previous releases.  We use mapfiles to scope, but don't bother versioning.
 
-native :=	DYNFLAGS = -R$(SGSPROTO) -L$(SGSPROTO) $(ZNOVERSION)
+native :=	DYNFLAGS = -R$(SGSPROTO) -L$(SGSPROTO) $(ZNOVERSION) $(HSONAME)
 
 # Comment out the following two lines to have the sgs built from the system
 # link-editor, rather than the local proto link-editor.
