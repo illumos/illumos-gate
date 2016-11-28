@@ -30,6 +30,7 @@
 
 #include "bzlib_private.h"
 
+#ifndef BZ_NO_COMPRESS
 
 /*---------------------------------------------------*/
 /*--- Compression stuff                           ---*/
@@ -85,6 +86,7 @@ void BZ2_bz__AssertH__fail ( int errcode )
 }
 #endif
 
+#endif /* BZ_NO_COMPRESS */
 
 /*---------------------------------------------------*/
 static
@@ -193,6 +195,7 @@ void default_bzfree ( void* opaque, void* addr )
 #endif	/* _KERNEL */
 
 /*---------------------------------------------------*/
+#ifndef BZ_NO_COMPRESS
 static
 void prepare_new_block ( EState* s )
 {
@@ -343,34 +346,6 @@ int BZ_API(BZ2_bzCompressReset) ( bz_stream *strm )
    strm->total_out_hi32 = 0;
    init_RL ( s );
    prepare_new_block ( s );
-   return BZ_OK;
-}
-
-int BZ_API(BZ2_bzDecompressReset) ( bz_stream* strm )
-{
-   DState* s = strm->state;
-
-   if (!bz_config_ok()) return BZ_CONFIG_ERROR;
-
-   if (strm == NULL) return BZ_PARAM_ERROR;
-
-   s->strm                  = strm;
-
-   s->state                 = BZ_X_MAGIC_1;
-   s->bsLive                = 0;
-   s->bsBuff                = 0;
-   s->calculatedCombinedCRC = 0;
-   strm->total_in_lo32      = 0;
-   strm->total_in_hi32      = 0;
-   strm->total_out_lo32     = 0;
-   strm->total_out_hi32     = 0;
-
-   s->ll4                   = NULL;
-   s->ll16                  = NULL;
-   s->tt                    = NULL;
-   s->currBlockNo           = 0;
-
-
    return BZ_OK;
 }
 
@@ -647,6 +622,7 @@ int BZ_API(BZ2_bzCompressEnd)  ( bz_stream *strm )
    return BZ_OK;
 }
 
+#endif /* BZ_NO_COMPRESS */
 
 /*---------------------------------------------------*/
 /*--- Decompression stuff                         ---*/
@@ -687,6 +663,38 @@ int BZ_API(BZ2_bzDecompressInit)
    s->tt                    = NULL;
    s->currBlockNo           = 0;
    s->verbosity             = verbosity;
+
+   return BZ_OK;
+}
+
+/*---------------------------------------------------*/
+/*
+ * added to allow reuse of bz_stream without malloc/free
+ */
+int BZ_API(BZ2_bzDecompressReset) ( bz_stream* strm )
+{
+   DState* s = strm->state;
+
+   if (!bz_config_ok()) return BZ_CONFIG_ERROR;
+
+   if (strm == NULL) return BZ_PARAM_ERROR;
+
+   s->strm                  = strm;
+
+   s->state                 = BZ_X_MAGIC_1;
+   s->bsLive                = 0;
+   s->bsBuff                = 0;
+   s->calculatedCombinedCRC = 0;
+   strm->total_in_lo32      = 0;
+   strm->total_in_hi32      = 0;
+   strm->total_out_lo32     = 0;
+   strm->total_out_hi32     = 0;
+
+   s->ll4                   = NULL;
+   s->ll16                  = NULL;
+   s->tt                    = NULL;
+   s->currBlockNo           = 0;
+
 
    return BZ_OK;
 }
@@ -1043,6 +1051,7 @@ int BZ_API(BZ2_bzDecompressEnd)  ( bz_stream *strm )
    return BZ_OK;
 }
 
+#ifndef BZ_NO_COMPRESS
 
 #ifndef BZ_NO_STDIO
 /*---------------------------------------------------*/
@@ -1732,6 +1741,7 @@ const char * BZ_API(BZ2_bzerror) (BZFILE *b, int *errnum)
 }
 #endif
 
+#endif /* BZ_NO_COMPRESS */
 
 /*-------------------------------------------------------------*/
 /*--- end                                           bzlib.c ---*/
