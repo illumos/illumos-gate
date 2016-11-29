@@ -21,37 +21,35 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2016 Joyent, Inc.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/systm.h>
+#include <sys/thread.h>
 #include <sys/errno.h>
 
-/*
- * The brk() system call needs to be in-kernel because Linux expects a call to
- * brk(0) to return the current breakpoint.  In Solaris, the process breakpoint
- * is setup and managed by libc.  Due to the way we link our libraries and the
- * need for Linux to manage its own breakpoint, this has to remain in the
- * kernel.
- */
-extern int brk(caddr_t);
+/* From usr/src/uts/common/os/grow.c */
+extern intptr_t brk(caddr_t);
 
 long
 lx_brk(caddr_t nva)
 {
-	proc_t *p = curproc;
-	klwp_t *lwp = ttolwp(curthread);
-
 	if (nva != 0) {
 		(void) brk(nva);
 
 		/*
-		 * Despite claims to the contrary in the manpage, when Linux
-		 * brk() fails, errno is left unchanged.
+		 * Despite claims to the contrary in the man page, when Linux
+		 * brk(2) fails, errno is left unchanged.
 		 */
-		lwp->lwp_errno = 0;
+		ttolwp(curthread)->lwp_errno = 0;
 	}
-	return ((long)(p->p_brkbase + p->p_brksize));
+
+	/*
+	 * When ASLR was integrated, our internal brk(2) was updated to emit
+	 * the current brk when arg0 == 0.  Using the function yields an
+	 * equivalent result to manually calculating the brk, but also
+	 * serializes with changes to the process AS.
+	 */
+	return ((long)brk((caddr_t)0));
 }
