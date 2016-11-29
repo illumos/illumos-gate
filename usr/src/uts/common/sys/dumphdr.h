@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 #ifndef _SYS_DUMPHDR_H
@@ -178,8 +179,6 @@ extern char *dumppath;
 extern int dump_timeout;
 extern int dump_timeleft;
 extern int dump_ioerr;
-extern int sync_timeout;
-extern int sync_timeleft;
 
 extern int dumpinit(struct vnode *, char *, int);
 extern void dumpfini(void);

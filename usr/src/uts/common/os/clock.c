@@ -24,6 +24,7 @@
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 #include <sys/param.h>
@@ -1957,13 +1958,7 @@ deadman(void)
 				panic("panic dump timeout");
 				/*NOTREACHED*/
 			}
-		} else if (panic_sync) {
-			if (sync_timeleft && (--sync_timeleft == 0)) {
-				panic("panic sync timeout");
-				/*NOTREACHED*/
-			}
 		}
-
 		return;
 	}
 
