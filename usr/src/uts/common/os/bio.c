@@ -24,6 +24,10 @@
  * Copyright 2011 Joyent, Inc.  All rights reserved.
  */
 
+/*
+ * Copyright (c) 2016 by Delphix. All rights reserved.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
@@ -293,7 +297,7 @@ breada(dev_t dev, daddr_t blkno, daddr_t rablkno, long bsize)
  */
 void
 bwrite_common(void *arg, struct buf *bp, int force_wait,
-				int do_relse, int clear_flags)
+    int do_relse, int clear_flags)
 {
 	register int do_wait;
 	struct ufsvfs *ufsvfsp = (struct ufsvfs *)arg;
@@ -528,7 +532,6 @@ bio_busy(int cleanit)
 	kmutex_t *hmp;
 
 	for (i = 0; i < v.v_hbuf; i++) {
-		vfs_syncprogress();
 		dp = (struct buf *)&hbuf[i];
 		hmp = &hbuf[i].b_lock;
 
@@ -887,7 +890,6 @@ bflush(dev_t dev)
 	 * candidates on the delwri_list and then drop the hash locks.
 	 */
 	for (i = 0; i < v.v_hbuf; i++) {
-		vfs_syncprogress();
 		hmp = &hbuf[i].b_lock;
 		dp = (struct buf *)&dwbuf[i];
 		mutex_enter(hmp);
@@ -908,7 +910,6 @@ bflush(dev_t dev)
 	 * and write back all the buffers that have B_DELWRI set.
 	 */
 	while (delwri_list != EMPTY_LIST) {
-		vfs_syncprogress();
 		bp = delwri_list;
 
 		sema_p(&bp->b_sem);	/* may block */

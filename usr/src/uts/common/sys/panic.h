@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 #ifndef	_SYS_PANIC_H
@@ -142,7 +143,6 @@ extern int do_polled_io;
 extern int obpdebug;
 extern int in_sync;
 extern int panic_quiesce;
-extern int panic_sync;
 extern int panic_dump;
 extern int64_t panic_lbolt64;
 extern label_t panic_regs;
