@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright (c) 2013, 2014 by Delphix. All rights reserved.
+# Copyright (c) 2013, 2015 by Delphix. All rights reserved.
 #
 
 include $(SRC)/Makefile.master
@@ -38,6 +38,21 @@ PROGS = cleanup \
 	rsend_021_pos \
 	rsend_022_pos \
 	rsend_024_pos \
+	send-cD \
+	send-c_embedded_blocks \
+	send-c_incremental \
+	send-c_lz4_disabled \
+	send-c_mixed_compression \
+	send-c_props \
+	send-c_recv_dedup \
+	send-c_recv_lz4_disabled \
+	send-c_resume \
+	send-c_stream_size_estimate \
+	send-c_verify_contents \
+	send-c_verify_ratio \
+	send-c_volume \
+	send-c_zstreamdump \
+	send-cpL_varied_recsize \
 	setup
 
 FILES = rsend.cfg \

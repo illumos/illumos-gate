@@ -2527,3 +2527,48 @@ function get_min
 
 	echo $min
 }
+
+#
+# Generate a random number between 1 and the argument.
+#
+function random
+{
+        typeset max=$1
+        echo $(( ($RANDOM % $max) + 1 ))
+}
+
+# Write data that can be compressed into a directory
+function write_compressible
+{
+	typeset dir=$1
+	typeset megs=$2
+	typeset nfiles=${3:-1}
+	typeset bs=${4:-1024k}
+	typeset fname=${5:-file}
+
+	[[ -d $dir ]] || log_fail "No directory: $dir"
+
+	log_must eval "fio \
+	    --name=job \
+	    --fallocate=0 \
+	    --minimal \
+	    --randrepeat=0 \
+	    --buffer_compress_percentage=66 \
+	    --buffer_compress_chunk=4096 \
+	    --directory=$dir \
+	    --numjobs=$nfiles \
+	    --rw=write \
+	    --bs=$bs \
+	    --filesize=$megs \
+	    --filename_format='$fname.\$jobnum' >/dev/null"
+}
+
+function get_objnum
+{
+	typeset pathname=$1
+	typeset objnum
+
+	[[ -e $pathname ]] || log_fail "No such file or directory: $pathname"
+	objnum=$(stat -c %i $pathname)
+	echo $objnum
+}
