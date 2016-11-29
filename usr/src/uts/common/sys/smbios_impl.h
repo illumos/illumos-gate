@@ -21,7 +21,7 @@
 
 /*
  * Copyright 2015 OmniTI Computer Consulting, Inc.  All rights reserved.
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -50,6 +50,14 @@
 #ifdef	__cplusplus
 extern "C" {
 #endif
+
+/*
+ * Definitions required to interpret the BIOS type information.
+ */
+#define	SMB_BIOSXB_EXTROM	6
+
+#define	SMB_BIOS_EXTROM_VALUE_MASK(x)	((x) & 0x3fff)
+#define	SMB_BIOS_EXTROM_SHIFT_MASK(x)	(((x) & 0xc000) >> 14)
 
 #pragma pack(1)
 
@@ -163,6 +171,8 @@ typedef struct smb_cache {
 	uint8_t smbca_etype;		/* error correction type */
 	uint8_t smbca_ltype;		/* logical cache type */
 	uint8_t smbca_assoc;		/* associativity */
+	uint32_t smbca_maxsize2;	/* maximum installed size 2 */
+	uint32_t smbca_size2;		/* installed size 2 */
 } smb_cache_t;
 
 /*
@@ -172,6 +182,10 @@ typedef struct smb_cache {
  */
 #define	SMB_CACHE_SIZE(s)	(((s) & 0x8000) ? \
 	((uint32_t)((s) & 0x7FFF) * 64 * 1024) : ((uint32_t)(s) * 1024))
+
+#define	SMB_CACHE_EXT_SIZE(s)	(((s) & 0x80000000U) ? 	\
+	((uint64_t)((s) & 0x7FFFFFFFULL) * 64ULL * 1024ULL) : 	\
+	((uint64_t)(s) * 1024ULL))
 
 #define	SMB_CACHE_CFG_MODE(c)		(((c) >> 8) & 3)
 #define	SMB_CACHE_CFG_ENABLED(c)	(((c) >> 7) & 1)
@@ -272,7 +286,7 @@ typedef struct smb_memdevice {
 	uint8_t smbmdev_bloc;		/* bank locator */
 	uint8_t smbmdev_type;		/* memory type */
 	uint16_t smbmdev_flags;		/* detail flags */
-	uint16_t smbmdev_speed;		/* speed in MHz */
+	uint16_t smbmdev_speed;		/* speed in MT/s */
 	uint8_t smbmdev_manufacturer;	/* manufacturer */
 	uint8_t smbmdev_serial;		/* serial number */
 	uint8_t smbmdev_asset;		/* asset tag */
@@ -498,6 +512,7 @@ extern const smb_struct_t *smb_lookup_type(smbios_hdl_t *, uint_t);
 extern const smb_struct_t *smb_lookup_id(smbios_hdl_t *, uint_t);
 extern const char *smb_strptr(const smb_struct_t *, uint_t);
 extern int smb_gteq(smbios_hdl_t *, int);
+extern int smb_libgteq(smbios_hdl_t *, int);
 
 extern int smb_set_errno(smbios_hdl_t *, int);
 extern smbios_hdl_t *smb_open_error(smbios_hdl_t *, int *, int);
@@ -566,6 +581,34 @@ typedef struct smb_base_memdevice {
 	uint8_t smbbmd_rank;		/* rank */
 } smb_base_memdevice_t;
 
+typedef struct smb_base_bios {
+	const char *smbbb_vendor;	/* bios vendor string */
+	const char *smbbb_version;	/* bios version string */
+	const char *smbbb_reldate;	/* bios release date */
+	uint32_t smbbb_segment;		/* bios address segment location */
+	uint32_t smbbb_romsize;		/* bios rom size in bytes */
+	uint32_t smbbb_runsize;		/* bios image size in bytes */
+	uint64_t smbbb_cflags;		/* bios characteristics */
+	const uint8_t *smbbb_xcflags;	/* bios characteristics extensions */
+	size_t smbbb_nxcflags;		/* number of smbb_xcflags[] bytes */
+	smbios_version_t smbbb_biosv;	/* bios version */
+	smbios_version_t smbbb_ecfwv;	/* bios embedded ctrl f/w version */
+} smb_base_bios_t;
+
+typedef struct smb_base_cache {
+	uint32_t smbba_maxsize;		/* maximum installed size in bytes */
+	uint32_t smbba_size;		/* installed size in bytes */
+	uint16_t smbba_stype;		/* supported SRAM types (SMB_CAT_*) */
+	uint16_t smbba_ctype;		/* current SRAM type (SMB_CAT_*) */
+	uint8_t smbba_speed;		/* speed in nanoseconds */
+	uint8_t smbba_etype;		/* error correction type (SMB_CAE_*) */
+	uint8_t smbba_ltype;		/* logical cache type (SMB_CAG_*) */
+	uint8_t smbba_assoc;		/* associativity (SMB_CAA_*) */
+	uint8_t smbba_level;		/* cache level */
+	uint8_t smbba_mode;		/* cache mode (SMB_CAM_*) */
+	uint8_t smbba_location;		/* cache location (SMB_CAL_*) */
+	uint8_t smbba_flags;		/* cache flags (SMB_CAF_*) */
+} smb_base_cache_t;
 
 #ifdef	__cplusplus
 }

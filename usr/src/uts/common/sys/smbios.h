@@ -21,7 +21,7 @@
 
 /*
  * Copyright 2015 OmniTI Computer Consulting, Inc. All rights reserved.
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -125,6 +125,7 @@ typedef struct smbios_entry {
 #define	SMB_TYPE_ADDINFO	40	/* additional information */
 #define	SMB_TYPE_OBDEVEXT	41	/* on-board device extended info */
 #define	SMB_TYPE_MCHI		42	/* mgmt controller host interface */
+#define	SMB_TYPE_TPM		43	/* TPM device */
 #define	SMB_TYPE_INACTIVE	126	/* inactive table entry */
 #define	SMB_TYPE_EOT		127	/* end of table */
 
@@ -174,7 +175,9 @@ typedef struct smbios_version {
 
 /*
  * SMBIOS Bios Information.  See DSP0134 Section 7.1 for more information.
- * smbb_romsize is converted from the implementation format into bytes.
+ * smbb_romsize is converted from the implementation format into bytes. Note, if
+ * we do not have an extended BIOS ROM size, it is filled in with the default
+ * BIOS ROM size.
  */
 typedef struct smbios_bios {
 	const char *smbb_vendor;	/* bios vendor string */
@@ -188,6 +191,7 @@ typedef struct smbios_bios {
 	size_t smbb_nxcflags;		/* number of smbb_xcflags[] bytes */
 	smbios_version_t smbb_biosv;	/* bios version */
 	smbios_version_t smbb_ecfwv;	/* bios embedded ctrl f/w version */
+	uint64_t smbb_extromsize;	/* Extended bios ROM Size */
 } smbios_bios_t;
 
 #define	SMB_BIOSFL_RSV0		0x00000001	/* reserved bit zero */
@@ -223,6 +227,11 @@ typedef struct smbios_bios {
 #define	SMB_BIOSFL_I10_CGA	0x40000000	/* int 0x10 CGA svcs */
 #define	SMB_BIOSFL_NEC_PC98	0x80000000	/* NEC PC-98 */
 
+/*
+ * These values are used to allow consumers to have raw access to the extended
+ * characteristic flags. We explicitly don't include the extended BIOS
+ * information from section 3.1 as part of this as it has its own member.
+ */
 #define	SMB_BIOSXB_1		0	/* bios extension byte 1 (7.1.2.1) */
 #define	SMB_BIOSXB_2		1	/* bios extension byte 2 (7.1.2.2) */
 #define	SMB_BIOSXB_BIOS_MAJ	2	/* bios major version */
@@ -349,6 +358,10 @@ typedef struct smbios_chassis {
 #define	SMB_CHT_TABLET		0x1E	/* tablet */
 #define	SMB_CHT_CONVERTIBLE	0x1F	/* convertible */
 #define	SMB_CHT_DETACHABLE	0x20	/* detachable */
+#define	SMB_CHT_IOTGW		0x21	/* IoT Gateway */
+#define	SMB_CHT_EMBEDPC		0x22	/* Embedded PC */
+#define	SMB_CHT_MINIPC		0x23	/* Mini PC */
+#define	SMB_CHT_STICKPC		0x24	/* Stick PC */
 
 #define	SMB_CHST_OTHER		0x01	/* other */
 #define	SMB_CHST_UNKNOWN	0x02	/* unknown */
@@ -474,6 +487,13 @@ typedef struct smbios_processor {
 #define	SMB_PRU_BGA1168		0x2E	/* BGA1168 */
 #define	SMB_PRU_BGA1234		0x2F	/* BGA1234 */
 #define	SMB_PRU_BGA1364		0x30	/* BGA1364 */
+#define	SMB_PRU_AM4		0x31	/* socket AM4 */
+#define	SMB_PRU_LGA1151		0x32	/* LGA1151 */
+#define	SMB_PRU_BGA1356		0x33	/* BGA1356 */
+#define	SMB_PRU_BGA1440		0x34	/* BGA1440 */
+#define	SMB_PRU_BGA1515		0x35	/* BGA1515 */
+#define	SMB_PRU_LGA36471	0x36	/* LGA3647-1 */
+#define	SMB_PRU_SP3		0x37	/* socket SP3 */
 
 #define	SMB_PRC_RESERVED	0x0001	/* reserved */
 #define	SMB_PRC_UNKNOWN		0x0002	/* unknown */
@@ -526,6 +546,9 @@ typedef struct smbios_processor {
 #define	SMB_PRF_CORE_SOLO_M	0x2A	/* Core Solo mobile */
 #define	SMB_PRF_ATOM		0x2B	/* Intel Atom */
 #define	SMB_PRF_CORE_M		0x2C	/* Intel Core M */
+#define	SMB_PRF_CORE_M3		0x2D	/* Intel Core m3 */
+#define	SMB_PRF_CORE_M5		0x2E	/* Intel Core m5 */
+#define	SMB_PRF_CORE_M7		0x2F	/* Intel Core m7 */
 #define	SMB_PRF_ALPHA		0x30	/* Alpha */
 #define	SMB_PRF_ALPHA_21064	0x31	/* Alpha 21064 */
 #define	SMB_PRF_ALPHA_21066	0x32	/* Alpha 21066 */
@@ -577,6 +600,8 @@ typedef struct smbios_processor {
 #define	SMB_PRF_ATHLON_X4	0x66	/* AMD Athlon X4 Quad-Core */
 #define	SMB_PRF_OPTERON_X1K	0x67	/* AMD Opteron X1000 */
 #define	SMB_PRF_OPTERON_X2K	0x68	/* AMD Opteron X2000 APU */
+#define	SMB_PRF_OPTERON_A	0x69	/* AMD Opteron A Series */
+#define	SMB_PRF_OPERTON_X3K	0x6A	/* AMD Opteron X3000 APU */
 #define	SMB_PRF_HOBBIT		0x70	/* Hobbit */
 #define	SMB_PRF_TM5000		0x78	/* Crusoe TM5000 */
 #define	SMB_PRF_TM3000		0x79	/* Crusoe TM3000 */
@@ -677,6 +702,8 @@ typedef struct smbios_processor {
 #define	SMB_PRF_SEMPRON_M	0xEF	/* AMD Sempron M */
 #define	SMB_PRF_I860		0xFA	/* i860 */
 #define	SMB_PRF_I960		0xFB	/* i960 */
+#define	SMB_PRF_ARMv7		0x100	/* ARMv7 */
+#define	SMB_PRF_ARMv8		0x101	/* ARMv8 */
 #define	SMB_PRF_SH3		0x104	/* SH-3 */
 #define	SMB_PRF_SH4		0x105	/* SH-4 */
 #define	SMB_PRF_ARM		0x118	/* ARM */
@@ -691,6 +718,12 @@ typedef struct smbios_processor {
 /*
  * SMBIOS Cache Information.  See DSP0134 Section 7.8 for more information.
  * If smba_size is zero, this indicates the specified cache is not present.
+ *
+ * SMBIOS 3.1 added extended cache sizes. Unfortunately, we had already baked in
+ * the uint32_t sizes, so we added extended uint64_t's that correspond to the
+ * new fields. To make life easier for consumers, we always make sure that the
+ * _maxsize2 and _size2 members are filled in with the old value if no other
+ * value is present.
  */
 typedef struct smbios_cache {
 	uint32_t smba_maxsize;		/* maximum installed size in bytes */
@@ -705,6 +738,8 @@ typedef struct smbios_cache {
 	uint8_t smba_mode;		/* cache mode (SMB_CAM_*) */
 	uint8_t smba_location;		/* cache location (SMB_CAL_*) */
 	uint8_t smba_flags;		/* cache flags (SMB_CAF_*) */
+	uint64_t smba_maxsize2;		/* maximum installed size in bytes */
+	uint64_t smba_size2;		/* installed size in bytes */
 } smbios_cache_t;
 
 #define	SMB_CAT_OTHER		0x0001		/* other */
@@ -899,6 +934,14 @@ typedef struct smbios_slot {
 #define	SMB_SLT_MXM3_B		0x1E	/* MXM 3.0 Type B */
 #define	SMB_SLT_PCIEG2_SFF	0x1F	/* PCI Express Gen 2 SFF-8639 */
 #define	SMB_SLT_PCIEG3_SFF	0x20	/* PCI Express Gen 3 SFF-8639 */
+/*
+ * These lines must be on one line for the string generating code.
+ */
+/* BEGIN CSTYLED */
+#define	SMB_SLT_PCIE_M52_WBSKO	0x21	/* PCI Express Mini 52-pin with bottom-side keep-outs */
+#define	SMB_SLT_PCIE_M52_WOBSKO	0x22	/* PCI Express Mini 52-pin without bottom-side keep-outs */
+/* END CSTYLED */
+#define	SMB_SLT_PCIE_M76	0x23	/* PCI Express Mini 72-pin */
 #define	SMB_SLT_PC98_C20	0xA0	/* PC-98/C20 */
 #define	SMB_SLT_PC98_C24	0xA1	/* PC-98/C24 */
 #define	SMB_SLT_PC98_E		0xA2	/* PC-98/E */
@@ -1105,7 +1148,7 @@ typedef struct smbios_memdevice {
 	uint8_t smbmd_type;		/* memory type */
 	uint8_t smbmd_pad;		/* padding */
 	uint32_t smbmd_flags;		/* flags (see below) */
-	uint32_t smbmd_speed;		/* speed in MHz */
+	uint32_t smbmd_speed;		/* speed in MT/s */
 	const char *smbmd_dloc;		/* physical device locator string */
 	const char *smbmd_bloc;		/* physical bank locator string */
 	uint8_t smbmd_rank;		/* rank */
@@ -1355,7 +1398,8 @@ typedef struct smbios_memdevice_ext {
 #define	SMB_VERSION_27	0x0207		/* SMBIOS encoding for DMTF spec 2.7 */
 #define	SMB_VERSION_28	0x0208		/* SMBIOS encoding for DMTF spec 2.8 */
 #define	SMB_VERSION_30	0x0300		/* SMBIOS encoding for DMTF spec 3.0 */
-#define	SMB_VERSION	SMB_VERSION_30	/* SMBIOS latest version definitions */
+#define	SMB_VERSION_31	0x0301		/* SMBIOS encoding for DMTF spec 3.1 */
+#define	SMB_VERSION	SMB_VERSION_31	/* SMBIOS latest version definitions */
 
 #define	SMB_O_NOCKSUM	0x1		/* do not verify header checksums */
 #define	SMB_O_NOVERS	0x2		/* do not verify header versions */

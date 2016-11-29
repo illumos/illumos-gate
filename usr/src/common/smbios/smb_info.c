@@ -21,7 +21,7 @@
 
 /*
  * Copyright 2015 OmniTI Computer Consulting, Inc.  All rights reserved.
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -66,6 +66,7 @@
  */
 
 #include <sys/smbios_impl.h>
+#include <sys/byteorder.h>
 
 #ifdef _KERNEL
 #include <sys/sunddi.h>
@@ -347,7 +348,10 @@ smbios_info_bios(smbios_hdl_t *shp, smbios_bios_t *bp)
 		return (smb_set_errno(shp, ESMB_CORRUPT));
 
 	bip = (smb_bios_t *)(uintptr_t)stp->smbst_hdr;
-	bzero(bp, sizeof (smbios_bios_t));
+	bzero(bp, sizeof (smb_base_bios_t));
+	if (smb_libgteq(shp, SMB_VERSION_31)) {
+		bp->smbb_extromsize = 0;
+	}
 
 	bp->smbb_vendor = smb_strptr(stp, bip->smbbi_vendor);
 	bp->smbb_version = smb_strptr(stp, bip->smbbi_version);
@@ -377,6 +381,50 @@ smbios_info_bios(smbios_hdl_t *shp, smbios_bios_t *bp)
 			bp->smbb_ecfwv.smbv_minor =
 			    bip->smbbi_xcflags[SMB_BIOSXB_ECFW_MIN];
 		}
+
+		if (bp->smbb_nxcflags > SMB_BIOSXB_EXTROM + 1 &&
+		    smb_gteq(shp, SMB_VERSION_31)) {
+			uint16_t val;
+			uint64_t rs;
+
+			/*
+			 * Because of the fact that the extended size is a
+			 * uint16_t and we'd need to define an explicit
+			 * endian-aware way to access it, we don't include it in
+			 * the number of extended flags below and thus subtract
+			 * its size.
+			 */
+			bp->smbb_nxcflags -= sizeof (uint16_t);
+			bcopy(&bip->smbbi_xcflags[SMB_BIOSXB_EXTROM], &val,
+			    sizeof (val));
+			val = LE_16(val);
+
+			/*
+			 * The upper two bits of the extended rom size are used
+			 * to indicate whether the other 14 bits are in MB or
+			 * GB.
+			 */
+			rs = SMB_BIOS_EXTROM_VALUE_MASK(val);
+			switch (SMB_BIOS_EXTROM_SHIFT_MASK(val)) {
+			case 0:
+				rs *= 1024ULL * 1024ULL;
+				break;
+			case 1:
+				rs *= 1024ULL * 1024ULL * 1024ULL;
+				break;
+			default:
+				rs = 0;
+				break;
+			}
+
+			if (smb_libgteq(shp, SMB_VERSION_31)) {
+				bp->smbb_extromsize = rs;
+			}
+		}
+	}
+
+	if (smb_libgteq(shp, SMB_VERSION_31) && bp->smbb_extromsize == 0) {
+		bp->smbb_extromsize = bp->smbb_romsize;
 	}
 
 	return (stp->smbst_hdr->smbh_hdl);
@@ -442,7 +490,7 @@ smbios_info_chassis(smbios_hdl_t *shp, id_t id, smbios_chassis_t *chp)
 
 	smb_info_bcopy(stp->smbst_hdr, ch, sizeof (buf));
 	bzero(chp, sizeof (smb_base_chassis_t));
-	if (shp->sh_libvers >= SMB_VERSION_27) {
+	if (smb_libgteq(shp, SMB_VERSION_27)) {
 		bzero(chp->smbc_sku, sizeof (chp->smbc_sku));
 	}
 
@@ -458,7 +506,7 @@ smbios_info_chassis(smbios_hdl_t *shp, id_t id, smbios_chassis_t *chp)
 	chp->smbc_elems = ch->smbch_cn;
 	chp->smbc_elemlen = ch->smbch_cm;
 
-	if (shp->sh_libvers >= SMB_VERSION_27) {
+	if (smb_libgteq(shp, SMB_VERSION_27)) {
 		(void) strlcpy(chp->smbc_sku, SMB_CH_SKU(ch),
 		    sizeof (chp->smbc_sku));
 	}
@@ -493,17 +541,18 @@ smbios_info_processor(smbios_hdl_t *shp, id_t id, smbios_processor_t *pp)
 	pp->smbp_l2cache = p.smbpr_l2cache;
 	pp->smbp_l3cache = p.smbpr_l3cache;
 
-	if (shp->sh_libvers >= SMB_VERSION_25) {
+	if (smb_libgteq(shp, SMB_VERSION_25)) {
 		pp->smbp_corecount = p.smbpr_corecount;
 		pp->smbp_coresenabled = p.smbpr_coresenabled;
 		pp->smbp_threadcount = p.smbpr_threadcount;
 		pp->smbp_cflags = p.smbpr_cflags;
 	}
 
-	if (shp->sh_libvers >= SMB_VERSION_26)
+	if (smb_libgteq(shp, SMB_VERSION_26)) {
 		pp->smbp_family2 = p.smbpr_family2;
+	}
 
-	if (shp->sh_libvers >= SMB_VERSION_30) {
+	if (smb_libgteq(shp, SMB_VERSION_30)) {
 		pp->smbp_corecount2 = p.smbpr_corecount2;
 		pp->smbp_coresenabled2 = p.smbpr_coresenabled2;
 		pp->smbp_threadcount2 = p.smbpr_threadcount2;
@@ -525,7 +574,7 @@ smbios_info_cache(smbios_hdl_t *shp, id_t id, smbios_cache_t *cap)
 		return (smb_set_errno(shp, ESMB_TYPE));
 
 	smb_info_bcopy(stp->smbst_hdr, &c, sizeof (c));
-	bzero(cap, sizeof (smbios_cache_t));
+	bzero(cap, sizeof (smb_base_cache_t));
 
 	cap->smba_maxsize = SMB_CACHE_SIZE(c.smbca_maxsize);
 	cap->smba_size = SMB_CACHE_SIZE(c.smbca_size);
@@ -544,6 +593,17 @@ smbios_info_cache(smbios_hdl_t *shp, id_t id, smbios_cache_t *cap)
 
 	if (SMB_CACHE_CFG_SOCKETED(c.smbca_config))
 		cap->smba_flags |= SMB_CAF_SOCKETED;
+
+	if (smb_libgteq(shp, SMB_VERSION_31)) {
+		if (smb_gteq(shp, SMB_VERSION_31)) {
+			cap->smba_maxsize2 =
+			    SMB_CACHE_EXT_SIZE(c.smbca_maxsize2);
+			cap->smba_size2 = SMB_CACHE_EXT_SIZE(c.smbca_size2);
+		} else {
+			cap->smba_maxsize2 = cap->smba_maxsize;
+			cap->smba_size2 = cap->smba_size;
+		}
+	}
 
 	return (0);
 }
@@ -841,13 +901,15 @@ smbios_info_memdevice(smbios_hdl_t *shp, id_t id, smbios_memdevice_t *mdp)
 	mdp->smbmd_dloc = smb_strptr(stp, m.smbmdev_dloc);
 	mdp->smbmd_bloc = smb_strptr(stp, m.smbmdev_bloc);
 
-	if (shp->sh_libvers >= SMB_VERSION_26)
+	if (smb_libgteq(shp, SMB_VERSION_26)) {
 		mdp->smbmd_rank = m.smbmdev_attrs & 0x0F;
+	}
 
-	if (shp->sh_libvers >= SMB_VERSION_27)
+	if (smb_libgteq(shp, SMB_VERSION_27)) {
 		mdp->smbmd_clkspeed = m.smbmdev_clkspeed;
+	}
 
-	if (shp->sh_libvers >= SMB_VERSION_28) {
+	if (smb_libgteq(shp, SMB_VERSION_28)) {
 		mdp->smbmd_minvolt = m.smbmdev_minvolt;
 		mdp->smbmd_maxvolt = m.smbmdev_maxvolt;
 		mdp->smbmd_confvolt = m.smbmdev_confvolt;
