@@ -83,7 +83,7 @@ extern void	sec_svc_freerootnames(int, int, caddr_t *);
 static int build_seclist_nodups(exportdata_t *, secinfo_t *, int);
 static void srv_secinfo_add(secinfo_t **, int *, secinfo_t *, int, int);
 static void srv_secinfo_remove(secinfo_t **, int *, secinfo_t *, int);
-static void srv_secinfo_treeclimb(exportinfo_t *, secinfo_t *, int, int);
+static void srv_secinfo_treeclimb(exportinfo_t *, secinfo_t *, int, bool_t);
 
 #ifdef VOLATILE_FH_TEST
 static struct ex_vol_rename *find_volrnm_fh(exportinfo_t *, nfs_fh4 *);
@@ -703,12 +703,13 @@ vis2exi(treenode_t *tnode)
  * given exportinfo from its ancestors upto the system root.
  */
 void
-srv_secinfo_treeclimb(exportinfo_t *exip, secinfo_t *sec, int seccnt, int isadd)
+srv_secinfo_treeclimb(exportinfo_t *exip, secinfo_t *sec, int seccnt,
+    bool_t isadd)
 {
 	treenode_t *tnode = exip->exi_tree;
 
 	ASSERT(RW_WRITE_HELD(&exported_lock));
-	ASSERT(tnode);
+	ASSERT(tnode != NULL);
 
 	if (seccnt == 0)
 		return;
@@ -716,7 +717,7 @@ srv_secinfo_treeclimb(exportinfo_t *exip, secinfo_t *sec, int seccnt, int isadd)
 	/*
 	 * If flavors are being added and the new export root isn't
 	 * also VROOT, its implicitly allowed flavors are inherited from
-	 * from its pseudonode.
+	 * its pseudonode.
 	 * Note - for VROOT exports the implicitly allowed flavors were
 	 * transferred from the PSEUDO export in exportfs()
 	 */
@@ -733,10 +734,10 @@ srv_secinfo_treeclimb(exportinfo_t *exip, secinfo_t *sec, int seccnt, int isadd)
 	 */
 	tnode = tnode->tree_parent;
 
-	while (tnode) {
+	while (tnode != NULL) {
 
 		/* If there is exportinfo, update it */
-		if (tnode->tree_exi) {
+		if (tnode->tree_exi != NULL) {
 			secinfo_t **pxsec =
 			    &tnode->tree_exi->exi_export.ex_secinfo;
 			int *pxcnt = &tnode->tree_exi->exi_export.ex_seccnt;
@@ -749,7 +750,7 @@ srv_secinfo_treeclimb(exportinfo_t *exip, secinfo_t *sec, int seccnt, int isadd)
 		}
 
 		/* Update every visible - only root node has no visible */
-		if (tnode->tree_vis) {
+		if (tnode->tree_vis != NULL) {
 			secinfo_t **pxsec = &tnode->tree_vis->vis_secinfo;
 			int *pxcnt = &tnode->tree_vis->vis_seccnt;
 			if (isadd)
@@ -1517,9 +1518,12 @@ exportfs(struct exportfs_args *args, model_t model, cred_t *cr)
 		if (error)
 			goto out7;
 	} else {
-	/* If it's a re-export update namespace tree */
+		/* If it's a re-export update namespace tree */
 		exi->exi_tree = ex->exi_tree;
 		exi->exi_tree->tree_exi = exi;
+
+		/* Update the change timestamp */
+		tree_update_change(exi->exi_tree, NULL);
 	}
 
 	/*
@@ -1670,7 +1674,7 @@ unexport(struct exportinfo *exi)
 	 * a pseudo export here to retain the visible list
 	 * for paths to exports below.
 	 */
-	if (exi->exi_visible) {
+	if (exi->exi_visible != NULL) {
 		struct exportinfo *newexi;
 
 		newexi = pseudo_exportfs(exi->exi_vp, &exi->exi_fid,
@@ -1680,6 +1684,9 @@ unexport(struct exportinfo *exi)
 		/* interconnect the existing treenode with the new exportinfo */
 		newexi->exi_tree = exi->exi_tree;
 		newexi->exi_tree->tree_exi = newexi;
+
+		/* Update the change timestamp */
+		tree_update_change(exi->exi_tree, NULL);
 	} else {
 		treeclimb_unexport(exi);
 	}
@@ -1893,7 +1900,7 @@ nfs_getfh(struct nfs_getfh_args *args, model_t model, cred_t *cr)
  */
 struct   exportinfo *
 nfs_vptoexi(vnode_t *dvp, vnode_t *vp, cred_t *cr, int *walk,
-	int *err,  bool_t v4srv)
+    int *err, bool_t v4srv)
 {
 	fid_t fid;
 	int error;

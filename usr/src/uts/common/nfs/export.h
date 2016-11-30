@@ -539,7 +539,7 @@ typedef struct secinfo secinfo_t;
  * a real export at the mount point (VROOT) which has a subtree shared
  * has a visible list.
  *
- * The exi_visible field is NULL for normal, non=pseudo filesystems
+ * The exi_visible field is NULL for normal, non-pseudo filesystems
  * which do not have any subtree exported. If the field is non-null,
  * it points to a list of visible entries, identified by vis_fid and/or
  * vis_ino. The presence of a "visible" list means that if this export
@@ -568,6 +568,7 @@ struct exp_visible {
 	struct exp_visible	*vis_next;
 	struct secinfo		*vis_secinfo;
 	int			vis_seccnt;
+	timespec_t		vis_change;
 };
 typedef struct exp_visible exp_visible_t;
 
@@ -635,7 +636,8 @@ extern exportinfo_t *vis2exi(treenode_t *);
 extern int	treeclimb_export(struct exportinfo *);
 extern void	treeclimb_unexport(struct exportinfo *);
 extern int	nfs_visible(struct exportinfo *, vnode_t *, int *);
-extern int	nfs_visible_inode(struct exportinfo *, ino64_t, int *);
+extern int	nfs_visible_inode(struct exportinfo *, ino64_t,
+    struct exp_visible **);
 extern int	has_visible(struct exportinfo *, vnode_t *);
 extern void	free_visible(struct exp_visible *);
 extern int	nfs_exported(struct exportinfo *, vnode_t *);
@@ -643,6 +645,9 @@ extern struct exportinfo *pseudo_exportfs(vnode_t *, fid_t *,
     struct exp_visible *, struct exportdata *);
 extern int	vop_fid_pseudo(vnode_t *, fid_t *);
 extern int	nfs4_vget_pseudo(struct exportinfo *, vnode_t **, fid_t *);
+extern bool_t	nfs_visible_change(struct exportinfo *, vnode_t *,
+    timespec_t *);
+extern void	tree_update_change(treenode_t *, timespec_t *);
 /*
  * Functions that handle the NFSv4 server namespace security flavors
  * information.

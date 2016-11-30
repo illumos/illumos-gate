@@ -2058,6 +2058,27 @@ file path=opt/zfs-tests/tests/functional/rsend/rsend_020_pos mode=0555
 file path=opt/zfs-tests/tests/functional/rsend/rsend_021_pos mode=0555
 file path=opt/zfs-tests/tests/functional/rsend/rsend_022_pos mode=0555
 file path=opt/zfs-tests/tests/functional/rsend/rsend_024_pos mode=0555
+file path=opt/zfs-tests/tests/functional/rsend/send-cD mode=0555
+file path=opt/zfs-tests/tests/functional/rsend/send-c_embedded_blocks \
+    mode=0555
+file path=opt/zfs-tests/tests/functional/rsend/send-c_incremental mode=0555
+file path=opt/zfs-tests/tests/functional/rsend/send-c_lz4_disabled mode=0555
+file path=opt/zfs-tests/tests/functional/rsend/send-c_mixed_compression \
+    mode=0555
+file path=opt/zfs-tests/tests/functional/rsend/send-c_props mode=0555
+file path=opt/zfs-tests/tests/functional/rsend/send-c_recv_dedup mode=0555
+file path=opt/zfs-tests/tests/functional/rsend/send-c_recv_lz4_disabled \
+    mode=0555
+file path=opt/zfs-tests/tests/functional/rsend/send-c_resume mode=0555
+file path=opt/zfs-tests/tests/functional/rsend/send-c_stream_size_estimate \
+    mode=0555
+file path=opt/zfs-tests/tests/functional/rsend/send-c_verify_contents \
+    mode=0555
+file path=opt/zfs-tests/tests/functional/rsend/send-c_verify_ratio mode=0555
+file path=opt/zfs-tests/tests/functional/rsend/send-c_volume mode=0555
+file path=opt/zfs-tests/tests/functional/rsend/send-c_zstreamdump mode=0555
+file path=opt/zfs-tests/tests/functional/rsend/send-cpL_varied_recsize \
+    mode=0555
 file path=opt/zfs-tests/tests/functional/rsend/setup mode=0555
 file path=opt/zfs-tests/tests/functional/scrub_mirror/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/scrub_mirror/default.cfg mode=0555
@@ -2280,7 +2301,7 @@ file path=opt/zfs-tests/tests/perf/scripts/io.d mode=0555
 file path=opt/zfs-tests/tests/perf/scripts/prefetch_io.d mode=0555
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
-#depend fmri=benchmark/fio type=require
 depend fmri=system/file-system/zfs/tests type=require
+depend fmri=system/test/fio type=require
 depend fmri=system/test/testrunner type=require
 depend fmri=system/xopen/xcu4 type=require

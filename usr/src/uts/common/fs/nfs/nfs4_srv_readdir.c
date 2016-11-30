@@ -104,8 +104,8 @@ static nfs_ftype4 vt_to_nf4[] = {
 
 int
 nfs4_readdir_getvp(vnode_t *dvp, char *d_name, vnode_t **vpp,
-		struct exportinfo **exi, struct svc_req *req,
-		struct compound_state *cs, int expseudo)
+    struct exportinfo **exi, struct svc_req *req, struct compound_state *cs,
+    int expseudo)
 {
 	int error;
 	int ismntpt;
@@ -382,8 +382,8 @@ rfs4_get_sb_encode(vfs_t *vfsp, rfs4_sb_encode_t *psbe)
  */
 /* ARGSUSED */
 void
-rfs4_op_readdir(nfs_argop4 *argop, nfs_resop4 *resop,
-	struct svc_req *req, struct compound_state *cs)
+rfs4_op_readdir(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
+    struct compound_state *cs)
 {
 	READDIR4args *args = &argop->nfs_argop4_u.opreaddir;
 	READDIR4res *resp = &resop->nfs_resop4_u.opreaddir;
@@ -409,7 +409,7 @@ rfs4_op_readdir(nfs_argop4 *argop, nfs_resop4 *resop,
 	struct uio uio;
 	int tsize;
 	int check_visible;
-	int expseudo = 0;
+	struct exp_visible *visp;
 
 	uint32_t *ptr, *ptr_redzone;
 	uint32_t *beginning_ptr;
@@ -687,8 +687,8 @@ readagain:
 	for (dp = (struct dirent64 *)rddir_data;
 	    !no_space && rddir_result_size > 0; dp = nextdp(dp)) {
 
-		/* reset expseudo */
-		expseudo = 0;
+		/* reset visp */
+		visp = NULL;
 
 		if (vp) {
 			VN_RELE(vp);
@@ -707,7 +707,7 @@ readagain:
 		}
 
 		if (check_visible &&
-		    !nfs_visible_inode(cs->exi, dp->d_ino, &expseudo)) {
+		    !nfs_visible_inode(cs->exi, dp->d_ino, &visp)) {
 			rddir_next_offset = dp->d_off;
 			continue;
 		}
@@ -724,7 +724,8 @@ readagain:
 			goto reencode_attrs;
 
 		error = nfs4_readdir_getvp(dvp, dp->d_name,
-		    &vp, &newexi, req, cs, expseudo);
+		    &vp, &newexi, req, cs,
+		    visp != NULL ? visp->vis_exported : 0);
 		if (error == ENOENT) {
 			rddir_next_offset = dp->d_off;
 			continue;
@@ -917,6 +918,13 @@ reencode_attrs:
 					u_longlong_t change;
 					NFS4_SET_FATTR4_CHANGE(change,
 					    va.va_ctime);
+					if (visp != NULL) {
+						u_longlong_t visch;
+						NFS4_SET_FATTR4_CHANGE(visch,
+						    visp->vis_change);
+						if (visch > change)
+							change = visch;
+					}
 					IXDR_PUT_HYPER(ptr, change);
 				}
 				if (ae & FATTR4_SIZE_MASK) {
