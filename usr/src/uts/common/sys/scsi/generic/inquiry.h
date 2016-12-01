@@ -362,7 +362,8 @@ struct scsi_inquiry {
 #define	DTYPE_NOTPRESENT	(DPQ_NEVER | DTYPE_UNKNOWN)
 
 /*
- * Defined Response Data Formats:
+ * Defined Versions for inquiry data. These represent the base version that a
+ * device supports.
  */
 #define	RDF_LEVEL0		0x00	/* no conformance claim (SCSI-1) */
 #define	RDF_CCS			0x01	/* Obsolete (pseudo-spec) */
@@ -370,7 +371,8 @@ struct scsi_inquiry {
 #define	RDF_SCSI_SPC		0x03	/* ANSI INCITS 301-1997 (SPC) */
 #define	RDF_SCSI_SPC2		0x04	/* ANSI INCITS 351-2001 (SPC-2) */
 #define	RDF_SCSI_SPC3		0x05	/* ANSI INCITS 408-2005 (SPC-3) */
-#define	RDF_SCSI_SPC4		0x06	/* t10 (SPC-4) */
+#define	RDF_SCSI_SPC4		0x06	/* ANSI INCITS 513-2015 (SPC-4) */
+#define	RDF_SCSI_SPC5		0x07	/* t10 (SPC-5) */
 
 /*
  * Defined Target Port Group Select values:
@@ -436,6 +438,7 @@ struct vpd_desc {
 #define	PM_CAPABLE_SPC2		RDF_SCSI_SPC2
 #define	PM_CAPABLE_SPC3		RDF_SCSI_SPC3
 #define	PM_CAPABLE_SPC4		RDF_SCSI_SPC4
+#define	PM_CAPABLE_SPC5		RDF_SCSI_SPC5
 #define	PM_CAPABLE_LOG_MASK	0xffff0000	/* use upper 16 bit to */
 						/* indicate log specifics */
 #define	PM_CAPABLE_LOG_SUPPORTED	0x10000	/* Log page 0xE might be */

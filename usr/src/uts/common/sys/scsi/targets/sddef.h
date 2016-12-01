@@ -735,6 +735,12 @@ _NOTE(MUTEX_PROTECTS_DATA(sd_lun::un_fi_mutex,
 #define	SD_FM_LOG(un)		(((struct sd_fm_internal *)\
 				((un)->un_fm_private))->fm_log_level)
 
+/*
+ * Version Related Macros
+ */
+#define	SD_SCSI_VERS_IS_GE_SPC_4(un)	\
+	(SD_INQUIRY(un)->inq_ansi == RDF_SCSI_SPC4 || \
+	SD_INQUIRY(un)->inq_ansi == RDF_SCSI_SPC5)
 
 /*
  * Values for un_ctype
@@ -1827,6 +1833,10 @@ struct sd_fm_internal {
 
 #define	SD_PM_CAPABLE_IS_SPC_4(pm_cap)	\
 	((pm_cap & PM_CAPABLE_PM_MASK) == PM_CAPABLE_SPC4)
+
+#define	SD_PM_CAPABLE_IS_GE_SPC_4(pm_cap)	\
+	(((pm_cap & PM_CAPABLE_PM_MASK) == PM_CAPABLE_SPC4) || \
+	((pm_cap & PM_CAPABLE_PM_MASK) == PM_CAPABLE_SPC5))
 
 #define	SD_PM_CAP_LOG_SUPPORTED(pm_cap)	\
 	((pm_cap & PM_CAPABLE_LOG_SUPPORTED) ? TRUE : FALSE)
