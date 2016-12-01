@@ -109,7 +109,7 @@ proc		PROCSIZE
 	p_utraps
 	p_agenttp
 	p_brand
-	__p_brand_data
+	p_brand_data
 
 \#define	P_UTRAP4	(UT_ILLTRAP_INSTRUCTION * CPTRSIZE)
 \#define	P_UTRAP7	(UT_FP_DISABLED * CPTRSIZE)

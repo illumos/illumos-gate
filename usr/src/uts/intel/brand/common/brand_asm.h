@@ -161,7 +161,7 @@ extern "C" {
 
 #define	GET_P_BRAND_DATA(sp, pcnt, reg)					\
 	GET_PROCP(sp, pcnt, reg);					\
-	mov	__P_BRAND_DATA(reg), reg	/* get p_brand_data */
+	mov	P_BRAND_DATA(reg), reg		/* get p_brand_data */
 
 /*
  * Each of the following macros returns to the standard syscall codepath if
