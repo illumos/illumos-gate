@@ -78,7 +78,7 @@ extern int lx_nfs_mount(char *, char *, char *, int, char *);
 				LX_MS_RDONLY | LX_MS_NOSUID | \
 				LX_MS_NODEV | LX_MS_NOEXEC | \
 				LX_MS_REMOUNT | LX_MS_NOATIME | \
-				LX_MS_BIND | LX_MS_SILENT | \
+				LX_MS_NODIRATIME | LX_MS_BIND | LX_MS_SILENT | \
 				LX_MS_STRICTATIME | LX_MS_NOSEC | \
 				LX_MS_BORN | LX_MS_ACTIVE | LX_MS_NOUSER)
 
