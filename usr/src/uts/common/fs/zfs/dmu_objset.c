@@ -339,9 +339,8 @@ dmu_objset_open_impl(spa_t *spa, dsl_dataset_t *ds, blkptr_t *bp,
 		/* Increase the blocksize if we are permitted. */
 		if (spa_version(spa) >= SPA_VERSION_USERSPACE &&
 		    arc_buf_size(os->os_phys_buf) < sizeof (objset_phys_t)) {
-			arc_buf_t *buf = arc_alloc_buf(spa,
-			    sizeof (objset_phys_t), &os->os_phys_buf,
-			    ARC_BUFC_METADATA);
+			arc_buf_t *buf = arc_alloc_buf(spa, &os->os_phys_buf,
+			    ARC_BUFC_METADATA, sizeof (objset_phys_t));
 			bzero(buf->b_data, sizeof (objset_phys_t));
 			bcopy(os->os_phys_buf->b_data, buf->b_data,
 			    arc_buf_size(os->os_phys_buf));
@@ -354,8 +353,8 @@ dmu_objset_open_impl(spa_t *spa, dsl_dataset_t *ds, blkptr_t *bp,
 	} else {
 		int size = spa_version(spa) >= SPA_VERSION_USERSPACE ?
 		    sizeof (objset_phys_t) : OBJSET_OLD_PHYS_SIZE;
-		os->os_phys_buf = arc_alloc_buf(spa, size,
-		    &os->os_phys_buf, ARC_BUFC_METADATA);
+		os->os_phys_buf = arc_alloc_buf(spa, &os->os_phys_buf,
+		    ARC_BUFC_METADATA, size);
 		os->os_phys = os->os_phys_buf->b_data;
 		bzero(os->os_phys, size);
 	}
@@ -1138,7 +1137,7 @@ dmu_objset_sync(objset_t *os, zio_t *pio, dmu_tx_t *tx)
 	    ZB_ROOT_OBJECT, ZB_ROOT_LEVEL, ZB_ROOT_BLKID);
 	arc_release(os->os_phys_buf, &os->os_phys_buf);
 
-	dmu_write_policy(os, NULL, 0, 0, &zp);
+	dmu_write_policy(os, NULL, 0, 0, ZIO_COMPRESS_INHERIT, &zp);
 
 	zio = arc_write(pio, os->os_spa, tx->tx_txg,
 	    blkptr_copy, os->os_phys_buf, DMU_OS_IS_L2CACHEABLE(os),
@@ -1706,6 +1705,7 @@ typedef struct dmu_objset_find_ctx {
 	taskq_t		*dc_tq;
 	dsl_pool_t	*dc_dp;
 	uint64_t	dc_ddobj;
+	char		*dc_ddname; /* last component of ddobj's name */
 	int		(*dc_func)(dsl_pool_t *, dsl_dataset_t *, void *);
 	void		*dc_arg;
 	int		dc_flags;
@@ -1717,7 +1717,6 @@ static void
 dmu_objset_find_dp_impl(dmu_objset_find_ctx_t *dcp)
 {
 	dsl_pool_t *dp = dcp->dc_dp;
-	dmu_objset_find_ctx_t *child_dcp;
 	dsl_dir_t *dd;
 	dsl_dataset_t *ds;
 	zap_cursor_t zc;
@@ -1729,7 +1728,12 @@ dmu_objset_find_dp_impl(dmu_objset_find_ctx_t *dcp)
 	if (*dcp->dc_error != 0)
 		goto out;
 
-	err = dsl_dir_hold_obj(dp, dcp->dc_ddobj, NULL, FTAG, &dd);
+	/*
+	 * Note: passing the name (dc_ddname) here is optional, but it
+	 * improves performance because we don't need to call
+	 * zap_value_search() to determine the name.
+	 */
+	err = dsl_dir_hold_obj(dp, dcp->dc_ddobj, dcp->dc_ddname, FTAG, &dd);
 	if (err != 0)
 		goto out;
 
@@ -1754,9 +1758,11 @@ dmu_objset_find_dp_impl(dmu_objset_find_ctx_t *dcp)
 			    sizeof (uint64_t));
 			ASSERT3U(attr->za_num_integers, ==, 1);
 
-			child_dcp = kmem_alloc(sizeof (*child_dcp), KM_SLEEP);
+			dmu_objset_find_ctx_t *child_dcp =
+			    kmem_alloc(sizeof (*child_dcp), KM_SLEEP);
 			*child_dcp = *dcp;
 			child_dcp->dc_ddobj = attr->za_first_integer;
+			child_dcp->dc_ddname = spa_strdup(attr->za_name);
 			if (dcp->dc_tq != NULL)
 				(void) taskq_dispatch(dcp->dc_tq,
 				    dmu_objset_find_dp_cb, child_dcp, TQ_SLEEP);
@@ -1799,16 +1805,25 @@ dmu_objset_find_dp_impl(dmu_objset_find_ctx_t *dcp)
 		}
 	}
 
-	dsl_dir_rele(dd, FTAG);
 	kmem_free(attr, sizeof (zap_attribute_t));
 
-	if (err != 0)
+	if (err != 0) {
+		dsl_dir_rele(dd, FTAG);
 		goto out;
+	}
 
 	/*
 	 * Apply to self.
 	 */
 	err = dsl_dataset_hold_obj(dp, thisobj, FTAG, &ds);
+
+	/*
+	 * Note: we hold the dir while calling dsl_dataset_hold_obj() so
+	 * that the dir will remain cached, and we won't have to re-instantiate
+	 * it (which could be expensive due to finding its name via
+	 * zap_value_search()).
+	 */
+	dsl_dir_rele(dd, FTAG);
 	if (err != 0)
 		goto out;
 	err = dcp->dc_func(dp, ds, dcp->dc_arg);
@@ -1823,6 +1838,8 @@ out:
 		mutex_exit(dcp->dc_error_lock);
 	}
 
+	if (dcp->dc_ddname != NULL)
+		spa_strfree(dcp->dc_ddname);
 	kmem_free(dcp, sizeof (*dcp));
 }
 
@@ -1867,6 +1884,7 @@ dmu_objset_find_dp(dsl_pool_t *dp, uint64_t ddobj,
 	dcp->dc_tq = NULL;
 	dcp->dc_dp = dp;
 	dcp->dc_ddobj = ddobj;
+	dcp->dc_ddname = NULL;
 	dcp->dc_func = func;
 	dcp->dc_arg = arg;
 	dcp->dc_flags = flags;

@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2016 RackTop Systems.
 #
 
 # Standard install rules
@@ -230,5 +231,20 @@ $(ROOTFS_LIBDIR)/$(LIBLINKSCCC): $(ROOTFS_LIBDIR)/$(LIBLINKSCCC)$(VERS)
 
 $(ROOTFS_LIBDIR64)/$(LIBLINKSCCC): $(ROOTFS_LIBDIR64)/$(LIBLINKSCCC)$(VERS)
 	$(INS.liblinkccc64)
+
+#
+# For those that install into the SGSPROTO directory.
+#
+$(SGSPROTO):
+	$(INS.dir)
+
+$(SGSBINDIR): $(SGSPROTO)
+	$(INS.dir)
+
+$(SGSPREFIX): $(SGSPROTO)
+	$(INS.dir)
+
+$(SGSLIBDIR): $(SGSPREFIX)
+	$(INS.dir)
 
 FRC:

@@ -34,8 +34,6 @@ include		$(SRC)/cmd/sgs/Makefile.com
 ROOTLIBDIR=	$(ROOT)/opt/SUNWonld/lib
 ROOTLIBDIR64=	$(ROOT)/opt/SUNWonld/lib/$(MACH64)
 
-SGSPROTO=	../../proto/$(MACH)
-
 SRCDIR =	../common
 
 DYNFLAGS +=	$(CC_USE_PROTO)
