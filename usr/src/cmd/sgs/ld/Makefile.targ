@@ -35,7 +35,9 @@ install:	all $(VAR_SGSBINPROG) $(VAR_SGSCCSLINK)
 		$(COMPILE.c) $<
 		$(POST_PROCESS_O)
 
-$(PROG):	$(MAPFILES)
+$(PROG):	$(OBJS) $(MAPFILES)
+		$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
+		$(POST_PROCESS)
 
 clean:
 		$(RM) $(OBJS) $(CLEANFILES)
@@ -53,8 +55,7 @@ include		$(SRC)/cmd/sgs/Makefile.targ
 
 native:		$(SGSBINDIR)/$(PROG)
 
-$(SGSBINDIR)/$(PROG) \
-$(PROG):	$$(OBJS)
+$(SGSBINDIR)/$(PROG):	$(OBJS) $(SGSBINDIR)
 		$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
 		$(POST_PROCESS)
 
