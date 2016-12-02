@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/debug.h>
 #include <sys/types.h>
 #include <sys/param.h>
@@ -72,7 +70,7 @@
 #include <sys/callb.h>
 #include <sys/promif.h>
 #include <sys/atomic.h>
-#include "gfx_private.h"
+#include <sys/gfx_private.h>
 
 #ifdef __xpv
 #include <sys/hypervisor.h>
@@ -255,4 +253,144 @@ gfxp_convert_addr(paddr_t paddr)
 #else
 	return ((gfx_maddr_t)paddr);
 #endif
+}
+
+/*
+ * Support getting VA space separately from pages
+ */
+
+/*
+ * A little like gfxp_map_kernel_space, but
+ * just the vmem_alloc part.
+ */
+caddr_t
+gfxp_alloc_kernel_space(size_t size)
+{
+	caddr_t cvaddr;
+	pgcnt_t npages;
+
+	npages = btopr(size);
+	cvaddr = vmem_alloc(heap_arena, ptob(npages), VM_NOSLEEP);
+	return (cvaddr);
+}
+
+/*
+ * Like gfxp_unmap_kernel_space, but
+ * just the vmem_free part.
+ */
+void
+gfxp_free_kernel_space(caddr_t address, size_t size)
+{
+
+	uint_t pgoffset;
+	caddr_t base;
+	pgcnt_t npages;
+
+	if (size == 0 || address == NULL)
+		return;
+
+	pgoffset = (uintptr_t)address & PAGEOFFSET;
+	base = (caddr_t)address - pgoffset;
+	npages = btopr(size + pgoffset);
+	vmem_free(heap_arena, base, ptob(npages));
+}
+
+/*
+ * Like gfxp_map_kernel_space, but
+ * just the hat_devload part.
+ */
+void
+gfxp_load_kernel_space(uint64_t start, size_t size,
+    uint32_t mode, caddr_t cvaddr)
+{
+	uint_t pgoffset;
+	uint64_t base;
+	pgcnt_t npages;
+	int hat_flags;
+	uint_t hat_attr;
+	pfn_t pfn;
+
+	if (size == 0)
+		return;
+
+#ifdef __xpv
+	/*
+	 * The hypervisor doesn't allow r/w mappings to some pages, such as
+	 * page tables, gdt, etc. Detect %cr3 to notify users of this interface.
+	 */
+	if (start == mmu_ptob(mmu_btop(getcr3())))
+		return;
+#endif
+
+	if (mode == GFXP_MEMORY_CACHED)
+		hat_attr = HAT_STORECACHING_OK;
+	else if (mode == GFXP_MEMORY_WRITECOMBINED)
+		hat_attr = HAT_MERGING_OK | HAT_PLAT_NOCACHE;
+	else	/* GFXP_MEMORY_UNCACHED */
+		hat_attr = HAT_STRICTORDER | HAT_PLAT_NOCACHE;
+	hat_flags = HAT_LOAD_LOCK;
+
+	pgoffset = start & PAGEOFFSET;
+	base = start - pgoffset;
+	npages = btopr(size + pgoffset);
+
+#ifdef __xpv
+	ASSERT(DOMAIN_IS_INITDOMAIN(xen_info));
+	pfn = xen_assign_pfn(mmu_btop(base));
+#else
+	pfn = btop(base);
+#endif
+
+	hat_devload(kas.a_hat, cvaddr, ptob(npages), pfn,
+	    PROT_READ|PROT_WRITE|hat_attr, hat_flags);
+}
+
+/*
+ * Like gfxp_unmap_kernel_space, but
+ * just the had_unload part.
+ */
+void
+gfxp_unload_kernel_space(caddr_t address, size_t size)
+{
+	uint_t pgoffset;
+	caddr_t base;
+	pgcnt_t npages;
+
+	if (size == 0 || address == NULL)
+		return;
+
+	pgoffset = (uintptr_t)address & PAGEOFFSET;
+	base = (caddr_t)address - pgoffset;
+	npages = btopr(size + pgoffset);
+	hat_unload(kas.a_hat, base, ptob(npages), HAT_UNLOAD_UNLOCK);
+}
+
+/*
+ * Note that "mempool" is optional and normally disabled in drm_gem.c
+ * (see HAS_MEM_POOL).  Let's just stub these out so we can reduce
+ * changes from the upstream in the DRM driver code.
+ */
+
+void
+gfxp_mempool_init(void)
+{
+}
+
+void
+gfxp_mempool_destroy(void)
+{
+}
+
+/* ARGSUSED */
+int
+gfxp_alloc_from_mempool(struct gfxp_pmem_cookie *cookie, caddr_t *kva,
+    pfn_t *pgarray, pgcnt_t alen, int flags)
+{
+	return (-1);
+}
+
+/* ARGSUSED */
+void
+gfxp_free_mempool(struct gfxp_pmem_cookie *cookie, caddr_t kva, size_t len)
+{
 }

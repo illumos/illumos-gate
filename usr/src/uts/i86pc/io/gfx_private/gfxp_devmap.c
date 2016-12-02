@@ -47,7 +47,7 @@
 #include <sys/pci.h>
 #include <sys/vmsystm.h>
 #include <sys/int_fmtio.h>
-#include "gfx_private.h"
+#include <sys/gfx_private.h>
 
 #ifdef __xpv
 #include <sys/hypervisor.h>
