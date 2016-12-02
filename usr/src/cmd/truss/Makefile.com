@@ -20,6 +20,7 @@
 #
 #
 # Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+# Copyright (c) 2016 by Delphix. All rights reserved.
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -46,6 +47,11 @@ C99MODE=	$(C99_ENABLE)
 LDLIBS	+= -lproc -lrtld_db -lc_db -lnsl -lsocket -ltsol -lnvpair
 CPPFLAGS += -D_REENTRANT -D_LARGEFILE64_SOURCE=1
 CPPFLAGS += -I$(SRC)/uts/common/fs/zfs
+
+LINTFLAGS += -erroff=E_STATIC_UNUSED
+LINTFLAGS += -erroff=E_NAME_USED_NOT_DEF2
+LINTFLAGS64 += -erroff=E_STATIC_UNUSED
+LINTFLAGS64 += -erroff=E_NAME_USED_NOT_DEF2
 
 .KEEP_STATE:
 
