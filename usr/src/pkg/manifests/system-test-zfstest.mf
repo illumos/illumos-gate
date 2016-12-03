@@ -316,7 +316,7 @@ file path=opt/zfs-tests/tests/functional/bootfs/bootfs_004_neg mode=0555
 file path=opt/zfs-tests/tests/functional/bootfs/bootfs_005_neg mode=0555
 file path=opt/zfs-tests/tests/functional/bootfs/bootfs_006_pos mode=0555
 file path=opt/zfs-tests/tests/functional/bootfs/bootfs_007_pos mode=0555
-file path=opt/zfs-tests/tests/functional/bootfs/bootfs_008_neg mode=0555
+file path=opt/zfs-tests/tests/functional/bootfs/bootfs_008_pos mode=0555
 file path=opt/zfs-tests/tests/functional/cache/cache.cfg mode=0555
 file path=opt/zfs-tests/tests/functional/cache/cache.kshlib mode=0555
 file path=opt/zfs-tests/tests/functional/cache/cache_001_pos mode=0555
@@ -2034,7 +2034,7 @@ file path=opt/zfs-tests/tests/functional/reservation/setup mode=0555
 file path=opt/zfs-tests/tests/functional/rootpool/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/rootpool/rootpool_002_neg mode=0555
 file path=opt/zfs-tests/tests/functional/rootpool/rootpool_003_neg mode=0555
-file path=opt/zfs-tests/tests/functional/rootpool/rootpool_007_neg mode=0555
+file path=opt/zfs-tests/tests/functional/rootpool/rootpool_007_pos mode=0555
 file path=opt/zfs-tests/tests/functional/rootpool/setup mode=0555
 file path=opt/zfs-tests/tests/functional/rsend/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/rsend/rsend.cfg mode=0555
