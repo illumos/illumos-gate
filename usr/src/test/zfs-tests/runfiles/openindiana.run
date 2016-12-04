@@ -58,7 +58,7 @@ tests = ['atime_001_pos', 'atime_002_neg']
 [/opt/zfs-tests/tests/functional/bootfs]
 tests = ['bootfs_001_pos', 'bootfs_002_neg', 'bootfs_003_pos',
     'bootfs_004_neg', 'bootfs_005_neg', 'bootfs_006_pos', 'bootfs_007_pos',
-    'bootfs_008_neg']
+    'bootfs_008_pos']
 pre =
 post =
 
@@ -467,7 +467,7 @@ tests = ['reservation_001_pos', 'reservation_002_pos', 'reservation_003_pos',
     'reservation_016_pos', 'reservation_017_pos', 'reservation_018_pos']
 
 [/opt/zfs-tests/tests/functional/rootpool]
-tests = ['rootpool_002_neg', 'rootpool_003_neg', 'rootpool_007_neg']
+tests = ['rootpool_002_neg', 'rootpool_003_neg', 'rootpool_007_pos']
 
 [/opt/zfs-tests/tests/functional/rsend]
 tests = ['rsend_001_pos', 'rsend_002_pos', 'rsend_003_pos', 'rsend_004_pos',

@@ -22,7 +22,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2016 RackTop Systems.
 #
 
 pics/%.o:	../common/%.c
@@ -55,14 +55,17 @@ lint:		$(LINTLIB32) $(LINTOUT32) $(LINTLIB64) $(LINTOUT64) \
 # Special target for native builds (ie. when we need to build a version of ld
 # to build a version of ld :-).
 
-native:		$(SGSPROTO)/$(DYNLIB)
+native:		$(SGSLIBDIR)/$(LIBLINKS)
 
-$(SGSPROTO)/$(DYNLIB): \
-		pics .WAIT $$(PICS)
+$(PICS):	pics
+
+$(SGSLIBDIR)/$(DYNLIB): $(PICS) $(SGSLIBDIR)
 		$(BUILD.SO)
 		$(POST_PROCESS_SO)
-		-@$(RM) $(SGSPROTO)/$(LIBLINKS)
-		$(SYMLINK) $(DYNLIB) $(SGSPROTO)/$(LIBLINKS)
+
+$(SGSLIBDIR)/$(LIBLINKS): $(SGSLIBDIR)/$(DYNLIB)
+		-@$(RM) $(SGSLIBDIR)/$(LIBLINKS)
+		$(SYMLINK) $(DYNLIB) $(SGSLIBDIR)/$(LIBLINKS)
 
 include		$(SRC)/lib/Makefile.targ
 include		$(SRC)/cmd/sgs/Makefile.targ

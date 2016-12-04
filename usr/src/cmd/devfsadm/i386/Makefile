@@ -23,6 +23,7 @@
 #
 
 LINK_OBJS_i386 = \
+	drm_link_i386.o \
 	misc_link_i386.o \
 	xen_link.o
 

@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2016 RackTop Systems.
 #
 
 objs/%.o \
@@ -131,14 +132,17 @@ pics/xlate.o:	xlate.c
 # Special target for native builds (ie. when we need to build a version of ld
 # to build a version of ld :-).
 
-native:		$(SGSPROTO)/$(DYNLIB)
+native:		$(SGSLIBDIR)/$(LIBLINKS)
 
-$(SGSPROTO)/$(DYNLIB): \
-		pics .WAIT $$(PICS)
+$(PICS):	pics
+
+$(SGSLIBDIR)/$(DYNLIB): $(PICS) $(SGSLIBDIR)
 		$(BUILD.SO)
 		$(POST_PROCESS_SO)
-		-@$(RM) $(SGSPROTO)/$(LIBLINKS)
-		$(SYMLINK) $(DYNLIB) $(SGSPROTO)/$(LIBLINKS)
+
+$(SGSLIBDIR)/$(LIBLINKS): $(SGSLIBDIR)/$(DYNLIB)
+		-@$(RM) $(SGSLIBDIR)/$(LIBLINKS)
+		$(SYMLINK) $(DYNLIB) $(SGSLIBDIR)/$(LIBLINKS)
 
 
 # Derived source and header files (messaging).  Make sure that the sgsmsg

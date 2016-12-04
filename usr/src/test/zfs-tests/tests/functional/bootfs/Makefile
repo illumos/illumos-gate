@@ -26,7 +26,7 @@ PROGS = bootfs_001_pos \
 	bootfs_005_neg \
 	bootfs_006_pos \
 	bootfs_007_pos \
-	bootfs_008_neg
+	bootfs_008_pos
 
 CMDS = $(PROGS:%=$(TESTDIR)/%)
 $(CMDS) := FILEMODE = 0555
