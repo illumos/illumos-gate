@@ -38,6 +38,8 @@
 #include <sys/fdio.h>
 #include <sys/dktp/fdisk.h>
 #include <sys/dkio.h>
+#include <sys/vtoc.h>
+#include <sys/efi_partition.h>
 #include <sys/sysmacros.h>
 #include "mkfs_pcfs.h"
 #include <sys/fs/pc_fs.h>
@@ -2217,6 +2219,151 @@ open_and_examine(char *dn, bpb_t *wbpb)
 }
 
 /*
+ * getdiskinfo
+ *
+ * Extracts information about disk path in dn. We need to return both a
+ * file descriptor and the device's suffix.
+ * Secondarily, we need to detect the FAT type and size when dealing with
+ * GPT partitions.
+ */
+static int
+getdiskinfo(char *dn, char **suffix)
+{
+	struct dk_minfo	dkminfo;
+	struct stat di;
+	int rv, fd, reserved;
+	char *actualdisk = NULL;
+	dk_gpt_t *gpt = NULL;
+
+	actualdisk = stat_actual_disk(dn, &di, suffix);
+
+	/*
+	 * Destination exists, now find more about it.
+	 */
+	if (!(S_ISCHR(di.st_mode))) {
+		(void) fprintf(stderr,
+		    gettext("Device name must indicate a "
+		    "character special device: %s\n"), actualdisk);
+		exit(2);
+	} else if ((fd = open(actualdisk, O_RDWR)) < 0) {
+		perror(actualdisk);
+		exit(2);
+	}
+
+	/*
+	 * Check the media sector size
+	 */
+	if (ioctl(fd, DKIOCGMEDIAINFO, &dkminfo) != -1) {
+		if (dkminfo.dki_lbsize != 0 &&
+		    ISP2(dkminfo.dki_lbsize / DEV_BSIZE) &&
+		    dkminfo.dki_lbsize != DEV_BSIZE) {
+			(void) fprintf(stderr,
+			    gettext("The device sector size %u is not "
+			    "supported by pcfs!\n"), dkminfo.dki_lbsize);
+			(void) close(fd);
+			exit(2);
+		}
+	}
+
+	rv = efi_alloc_and_read(fd, &gpt);
+	/*
+	 * We should see only VT_EINVAL, VT_EIO and VT_ERROR.
+	 * VT_EINVAL is for the case there is no GPT label.
+	 * VT_ERROR will happen if device does no support the ioctl, so
+	 * we will exit only in case of VT_EIO and unknown value of rv.
+	 */
+	if (rv < 0 && rv != VT_EINVAL && rv != VT_ERROR) {
+		switch (rv) {
+		case VT_EIO:
+			(void) fprintf(stderr,
+			    gettext("IO Error reading EFI label\n"));
+			break;
+		default:
+			(void) fprintf(stderr,
+			    gettext("Unknown Error %d reading EFI label\n"),
+			    rv);
+			break;
+		}
+		(void) close(fd);
+		exit(2);
+	}
+	if (rv >= 0) {
+		DontUseFdisk = 1;
+		if (*suffix != NULL) {
+			(void) fprintf(stderr,
+			    gettext("Can not use drive specifier \"%s\" with "
+			    "GPT partitioning.\n"), *suffix);
+			efi_free(gpt);
+			(void) close(fd);
+			exit(2);
+		}
+		/* Can not use whole disk, 7 is GPT minor node "wd" */
+		if (rv == 7) {
+			(void) fprintf(stderr,
+			    gettext("Device name must indicate a "
+			    "partition: %s\n"), actualdisk);
+			efi_free(gpt);
+			(void) close(fd);
+			exit(2);
+		}
+
+		if (GetSize == 1) {
+			TotSize = gpt->efi_parts[rv].p_size;
+			GetSize = 0;
+		}
+
+		if (GetBPF == 1) {
+			if (GetResrvd == 1) {
+				/* FAT32 has 32 reserved sectors */
+				reserved = 32;
+			} else {
+				reserved = Resrvd;
+			}
+			/*
+			 * The type of FAT is determined by the size of
+			 * the partition - reserved sectors.
+			 * The calculation is based on logic used in
+			 * compute_cluster_size() and therefore we will not
+			 * get into error situation when
+			 * compute_cluster_size() will be called.
+			 */
+			if (TotSize - reserved < FAT16_MAX_CLUSTERS) {
+				if (GetResrvd == 1)
+					reserved = 1;
+
+				if (TotSize - reserved < FAT12_MAX_CLUSTERS) {
+					int spc;
+					MakeFAT32 = 0;
+					Fatentsize = 12;
+					/*
+					 * compute sectors per cluster
+					 * for fat12
+					 */
+					for (spc = 1; spc <= 64;
+					    spc = spc * 2) {
+						if (TotSize - reserved <
+						    spc * FAT12_MAX_CLUSTERS)
+							break;
+					}
+					if (GetSPC == 1) {
+						GetSPC = 0;
+						SecPerClust = spc;
+					}
+				} else {
+					MakeFAT32 = 0;
+					Fatentsize = 16;
+				}
+			} else {
+				MakeFAT32 = 1;
+				Fatentsize = 32;
+			}
+		}
+		efi_free(gpt);
+	}
+	return (fd);
+}
+
+/*
  *  open_and_seek
  *
  *	Open the requested 'dev_name'.  Seek to point where
@@ -2232,8 +2379,6 @@ open_and_seek(char *dn, bpb_t *wbpb, off64_t *seekto)
 {
 	struct fd_char fdchar;
 	struct dk_geom dg;
-	struct stat di;
-	struct dk_minfo	dkminfo;
 	char *actualdisk = NULL;
 	char *suffix = NULL;
 	int fd;
@@ -2271,9 +2416,10 @@ open_and_seek(char *dn, bpb_t *wbpb, off64_t *seekto)
 	 * that scenario. Otherwise, try to find the device.
 	 */
 	if (Outputtofile)
-		return (fd = prepare_image_file(dn, wbpb));
+		return (prepare_image_file(dn, wbpb));
 
-	actualdisk = stat_actual_disk(dn, &di, &suffix);
+	/* Collect info about device */
+	fd = getdiskinfo(dn, &suffix);
 
 	/*
 	 * Sanity check.  If we've been provided a partition-specifying
@@ -2285,44 +2431,14 @@ open_and_seek(char *dn, bpb_t *wbpb, off64_t *seekto)
 		    gettext("Using 'nofdisk' option precludes "
 		    "appending logical drive\nspecifier "
 		    "to the device name.\n"));
-		exit(2);
-	}
-
-	/*
-	 *  Destination exists, now find more about it.
-	 */
-	if (!(S_ISCHR(di.st_mode))) {
-		(void) fprintf(stderr,
-		    gettext("\n%s: device name must indicate a "
-		    "character special device.\n"), actualdisk);
-		exit(2);
-	} else if ((fd = open(actualdisk, O_RDWR)) < 0) {
-		perror(actualdisk);
-		exit(2);
-	}
-
-	/*
-	 * Check the media sector size
-	 */
-	if (ioctl(fd, DKIOCGMEDIAINFO, &dkminfo) != -1) {
-		if (dkminfo.dki_lbsize != 0 &&
-		    ISP2(dkminfo.dki_lbsize / DEV_BSIZE) &&
-		    dkminfo.dki_lbsize != DEV_BSIZE) {
-			(void) fprintf(stderr,
-			    gettext("The device sector size %u is not "
-			    "supported by pcfs!\n"), dkminfo.dki_lbsize);
-			(void) close(fd);
-			exit(1);
-		}
+		goto err_out;
 	}
 
 	/*
 	 * Find appropriate partition if we were requested to do so.
 	 */
-	if (suffix && !(seek_partn(fd, suffix, wbpb, seekto))) {
-		(void) close(fd);
-		exit(2);
-	}
+	if (suffix && !(seek_partn(fd, suffix, wbpb, seekto)))
+		goto err_out;
 
 	if (!suffix) {
 		/*
@@ -2338,10 +2454,9 @@ open_and_seek(char *dn, bpb_t *wbpb, off64_t *seekto)
 		 * case, they should have given us a partition specifier.
 		 */
 		if (DontUseFdisk) {
-			if (!(seek_nofdisk(fd, wbpb, seekto))) {
-				(void) close(fd);
-				exit(2);
-			}
+			if (!(seek_nofdisk(fd, wbpb, seekto)))
+				goto err_out;
+
 			find_fixed_details(fd, wbpb);
 		} else if (ioctl(fd, FDIOGCHAR, &fdchar) == -1) {
 			/*
@@ -2368,8 +2483,7 @@ open_and_seek(char *dn, bpb_t *wbpb, off64_t *seekto)
 					lookup_floppy(&fdchar, wbpb);
 				} else {
 					partn_lecture(actualdisk);
-					(void) close(fd);
-					exit(2);
+					goto err_out;
 				}
 			}
 		} else {
@@ -2383,6 +2497,10 @@ open_and_seek(char *dn, bpb_t *wbpb, off64_t *seekto)
 	}
 
 	return (fd);
+
+err_out:
+	(void) close(fd);
+	exit(2);
 }
 
 /*
@@ -2967,7 +3085,7 @@ write_rest(bpb_t *wbpb, char *efn, int dfd, int sfd, int remaining)
 static
 void
 write_fat32_bootstuff(int fd, boot_sector_t *bsp,
-	struct fat_od_fsi *fsinfop, off64_t seekto)
+    struct fat_od_fsi *fsinfop, off64_t seekto)
 {
 	if (Verbose) {
 		(void) printf(gettext("Dump of the fs info sector"));
@@ -3018,7 +3136,7 @@ write_fat32_bootstuff(int fd, boot_sector_t *bsp,
 static
 void
 write_bootsects(int fd, boot_sector_t *bsp, bpb_t *wbpb,
-	struct fat_od_fsi *fsinfop, off64_t seekto)
+    struct fat_od_fsi *fsinfop, off64_t seekto)
 {
 	if (MakeFAT32) {
 		/* Copy our BPB into bootsec structure */

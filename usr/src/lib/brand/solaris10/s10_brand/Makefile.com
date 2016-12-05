@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2016 by Delphix. All rights reserved.
 #
 
 LIBRARY =	s10_brand.a
@@ -52,7 +53,7 @@ SRCS =		$(CSRCS)
 # normally stable, there are examples, such as with the solaris8 brand, where
 # we could not combine the brand's libc with the native linker.  Since we want
 # to run in a known configuration, we use the S10 libc/linker combination.
-# 
+#
 # There is one more non-obvious side effect of using the s10 linker that
 # should be mentioned.  Since the linker is used to setup processes before
 # libc is loaded, it makes system calls directly (ie avoiding libc), and
@@ -82,6 +83,8 @@ C99LMODE=	-Xc99=%all
 DYNFLAGS +=	$(DYNFLAGS_$(CLASS))
 DYNFLAGS +=	$(BLOCAL) $(ZNOVERSION) -Wl,-e_start
 LDLIBS +=	-lc -lmapmalloc
+LINTFLAGS +=	-erroff=E_STATIC_UNUSED
+LINTFLAGS64 +=	-erroff=E_STATIC_UNUSED
 
 CERRWARN +=	-_gcc=-Wno-uninitialized
 
