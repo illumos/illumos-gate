@@ -39,6 +39,7 @@
 #include <sys/sunddi.h>
 #include <sys/sunldi.h>
 #include <sys/cpuvar.h>
+#include <sys/lx_futex.h>
 #endif
 
 #ifdef	__cplusplus
@@ -563,6 +564,8 @@ struct lx_lwp_data {
 	uint64_t br_schd_runtime;	/* emulated DEADLINE */
 	uint64_t br_schd_deadline;	/* emulated DEADLINE */
 	uint64_t br_schd_period;	/* emulated DEADLINE */
+
+	fwaiter_t br_fwaiter;		/* futex upon which we're waiting */
 };
 
 /*

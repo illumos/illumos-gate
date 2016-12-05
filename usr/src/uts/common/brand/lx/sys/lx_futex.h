@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2016, Joyent, Inc.  All rights reserved.
  */
 
 #ifndef _SYS_LX_FUTEX_H
@@ -96,6 +96,25 @@ extern "C" {
 #define	FUTEX_OP_CMPARG(x)	(((x) << 20) >> 20)
 
 #ifdef _KERNEL
+
+/*
+ * This structure is used to track all the threads currently waiting on a
+ * futex.  There is one fwaiter_t for each blocked thread.  We store all
+ * fwaiter_t's in a hash structure, indexed by the memid_t of the integer
+ * containing the futex's value.
+ *
+ * At the moment, all fwaiter_t's for a single futex are simply dumped into
+ * the hash bucket.  If futex contention ever becomes a hot path, we can
+ * chain a single futex's waiters together.
+ */
+typedef struct fwaiter {
+	memid_t		fw_memid;	/* memid of the user-space futex */
+	kcondvar_t	fw_cv;		/* cond var */
+	struct fwaiter	*fw_next;	/* hash queue */
+	struct fwaiter	*fw_prev;	/* hash queue */
+	uint32_t	fw_bits;	/* bits waiting on */
+	volatile int	fw_woken;
+} fwaiter_t;
 
 #define	FUTEX_WAITERS			0x80000000
 #define	FUTEX_OWNER_DIED		0x40000000
