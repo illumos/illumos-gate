@@ -22,6 +22,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -327,12 +328,17 @@ schedctl_sigblock(kthread_t *t)
 
 
 /*
- * If the sc_sigblock field is set for the specified thread, set
- * its signal mask to block all maskable signals, then clear the
- * sc_sigblock field.  This finishes what user-level code requested
- * to be done when it set tdp->sc_shared->sc_sigblock non-zero.
- * Called from signal-related code either by the current thread for
- * itself or by a thread that holds the process's p_lock (/proc code).
+ * If the sc_sigblock field is set for the specified thread, set its signal
+ * mask to block all maskable signals, then clear the sc_sigblock field.  This
+ * accomplishes what user-level code requested to be done when it set
+ * tdp->sc_shared->sc_sigblock non-zero.
+ *
+ * This is generally called by signal-related code in the current thread.  In
+ * order to call against a thread other than curthread, p_lock for the
+ * containing process must be held.  Even then, the caller is not protected
+ * from races with the thread in question updating its own fields.  It is the
+ * responsibility of the caller to perform additional synchronization.
+ *
  */
 void
 schedctl_finish_sigblock(kthread_t *t)

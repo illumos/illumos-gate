@@ -926,6 +926,29 @@ prgetstatus(proc_t *p, pstatus_t *sp, zone_t *zp)
 	sp->pr_flags = sp->pr_lwp.pr_flags;
 }
 
+/*
+ * Query mask of held signals for a given thread.
+ *
+ * This makes use of schedctl_sigblock() to query if userspace has requested
+ * that all maskable signals be held.  While it would be tempting to call
+ * schedctl_finish_sigblock() and apply that update to t->t_hold, it cannot be
+ * done safely without the risk of racing with the thread under consideration.
+ */
+void
+prgethold(kthread_t *t, sigset_t *sp)
+{
+	k_sigset_t set;
+
+	if (schedctl_sigblock(t)) {
+		set.__sigbits[0] = FILLSET0 & ~CANTMASK0;
+		set.__sigbits[1] = FILLSET1 & ~CANTMASK1;
+		set.__sigbits[2] = FILLSET2 & ~CANTMASK2;
+	} else {
+		set = t->t_hold;
+	}
+	sigktou(&set, sp);
+}
+
 #ifdef _SYSCALL32_IMPL
 void
 prgetlwpstatus32(kthread_t *t, lwpstatus32_t *sp, zone_t *zp)
@@ -987,8 +1010,7 @@ prgetlwpstatus32(kthread_t *t, lwpstatus32_t *sp, zone_t *zp)
 	sp->pr_lwpid = t->t_tid;
 	sp->pr_cursig  = lwp->lwp_cursig;
 	prassignset(&sp->pr_lwppend, &t->t_sig);
-	schedctl_finish_sigblock(t);
-	prassignset(&sp->pr_lwphold, &t->t_hold);
+	prgethold(t, &sp->pr_lwphold);
 	if (t->t_whystop == PR_FAULTED) {
 		siginfo_kto32(&lwp->lwp_siginfo, &sp->pr_info);
 		if (t->t_whatstop == FLTPAGE)
@@ -1219,8 +1241,7 @@ prgetlwpstatus(kthread_t *t, lwpstatus_t *sp, zone_t *zp)
 	sp->pr_lwpid = t->t_tid;
 	sp->pr_cursig  = lwp->lwp_cursig;
 	prassignset(&sp->pr_lwppend, &t->t_sig);
-	schedctl_finish_sigblock(t);
-	prassignset(&sp->pr_lwphold, &t->t_hold);
+	prgethold(t, &sp->pr_lwphold);
 	if (t->t_whystop == PR_FAULTED)
 		bcopy(&lwp->lwp_siginfo,
 		    &sp->pr_info, sizeof (k_siginfo_t));
@@ -2570,7 +2591,6 @@ prgetlwpsinfo(kthread_t *t, lwpsinfo_t *psp)
 void
 prgetlwpsinfo32(kthread_t *t, lwpsinfo32_t *psp)
 {
-	proc_t *p = ttoproc(t);
 	klwp_t *lwp = ttolwp(t);
 	sobj_ops_t *sobj;
 	char c, state;
@@ -2578,7 +2598,7 @@ prgetlwpsinfo32(kthread_t *t, lwpsinfo32_t *psp)
 	int retval, niceval;
 	hrtime_t hrutime, hrstime;
 
-	ASSERT(MUTEX_HELD(&p->p_lock));
+	ASSERT(MUTEX_HELD(&ttoproc(t)->p_lock));
 
 	bzero(psp, sizeof (*psp));
 

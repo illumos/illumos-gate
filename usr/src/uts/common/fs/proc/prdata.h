@@ -27,7 +27,7 @@
 /*	  All Rights Reserved  	*/
 
 /*
- * Copyright 2015, Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #ifndef _SYS_PROC_PRDATA_H
@@ -377,6 +377,7 @@ extern	int	clear_watched_area(proc_t *, struct watched_area *);
 extern	void	pr_free_watchpoints(proc_t *);
 extern	proc_t	*pr_cancel_watch(prnode_t *);
 extern	struct seg *break_seg(proc_t *);
+extern	void	prgethold(kthread_t *, sigset_t *);
 
 /*
  * Machine-dependent routines (defined in prmachdep.c).
