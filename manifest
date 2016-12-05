@@ -484,9 +484,7 @@ f etc/security/prof_attr.d/SUNWcs 0644 root sys
 s etc/services=inet/services
 d etc/skel 0755 root sys
 f etc/skel/.profile 0644 root other
-f etc/skel/local.cshrc 0644 root sys
-f etc/skel/local.login 0644 root sys
-f etc/skel/local.profile 0644 root sys
+f etc/skel/.kshrc 0644 root other
 d etc/sock2path.d 0755 root sys
 f etc/sock2path.d/driver%2Fnetwork%2Fbpf 0644 root sys
 f etc/sock2path.d/driver%2Fnetwork%2Fsdp 0644 root sys
@@ -2653,6 +2651,7 @@ f usr/include/device_info.h 0644 root bin
 f usr/include/devid.h 0644 root bin
 f usr/include/devmgmt.h 0644 root bin
 f usr/include/devpoll.h 0644 root bin
+f usr/include/devfsadm.h 0644 root bin
 f usr/include/dial.h 0644 root bin
 f usr/include/directory.h 0644 root bin
 f usr/include/dirent.h 0644 root bin
@@ -3716,6 +3715,7 @@ f usr/include/sys/ftrace.h 0644 root bin
 f usr/include/sys/fx.h 0644 root bin
 f usr/include/sys/fxpriocntl.h 0644 root bin
 f usr/include/sys/gfs.h 0644 root bin
+f usr/include/sys/gfx_private.h.h 0644 root bin
 f usr/include/sys/gld.h 0644 root bin
 f usr/include/sys/gldpriv.h 0644 root bin
 f usr/include/sys/group.h 0644 root bin
@@ -5176,6 +5176,7 @@ d usr/lib/devfsadm/linkmod 0755 root sys
 f usr/lib/devfsadm/linkmod/SUNW_audio_link.so 0755 root sys
 f usr/lib/devfsadm/linkmod/SUNW_cfg_link.so 0755 root sys
 f usr/lib/devfsadm/linkmod/SUNW_dcam1394_link.so 0755 root sys
+f usr/lib/devfsadm/linkmod/SUNW_drm_link_i386.so 0755 root sys
 f usr/lib/devfsadm/linkmod/SUNW_disk_link.so 0755 root sys
 f usr/lib/devfsadm/linkmod/SUNW_dtrace_link.so 0755 root sys
 f usr/lib/devfsadm/linkmod/SUNW_fssnap_link.so 0755 root sys

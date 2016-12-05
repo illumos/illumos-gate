@@ -56,7 +56,7 @@ static int	userdisk_strategy(void *devdata, int flag, daddr_t dblk,
 static int	userdisk_open(struct open_file *f, ...);
 static int	userdisk_close(struct open_file *f);
 static int	userdisk_ioctl(struct open_file *f, u_long cmd, void *data);
-static void	userdisk_print(int verbose);
+static int	userdisk_print(int verbose);
 
 struct devsw userboot_disk = {
 	"disk",
@@ -110,12 +110,19 @@ userdisk_cleanup(void)
 /*
  * Print information about disks
  */
-static void
+static int
 userdisk_print(int verbose)
 {
 	struct disk_devdesc dev;
 	char line[80];
 	int i;
+
+	if (userdisk_maxunit == 0)
+		return (0);
+
+	printf("%s devices:", userboot_disk.dv_name);
+	if ((ret = pager_output("\n")) != 0)
+		return (ret);
 
 	for (i = 0; i < userdisk_maxunit; i++) {
 		sprintf(line, "    disk%d:   Guest drive image\n", i);

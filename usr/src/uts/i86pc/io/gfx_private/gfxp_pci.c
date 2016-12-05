@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/debug.h>
 #include <sys/types.h>
 #include <sys/param.h>
@@ -68,7 +66,7 @@
 #include <sys/kstat.h>
 #include <sys/callb.h>
 #include <sys/pci_cfgspace.h>
-#include "gfx_private.h"
+#include <sys/gfx_private.h>
 
 typedef struct gfxp_pci_bsf {
 	uint16_t	vendor;

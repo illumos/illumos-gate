@@ -37,10 +37,8 @@
  */
 /* END CSTYLED */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "drmP.h"
-#include <gfx_private.h>
+#include <sys/gfx_private.h>
 #include "drm_io32.h"
 
 #define	DEBUG_SCATTER 0

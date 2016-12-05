@@ -433,10 +433,8 @@ file path=etc/security/prof_attr group=sys preserve=true \
     timestamp=19700101T000000Z
 file path=etc/security/prof_attr.d/SUNWcs group=sys
 file path=etc/shadow group=sys mode=0400 preserve=true
+file path=etc/skel/.kshrc group=other preserve=true
 file path=etc/skel/.profile group=other preserve=true
-file path=etc/skel/local.cshrc group=sys preserve=true
-file path=etc/skel/local.login group=sys preserve=true
-file path=etc/skel/local.profile group=sys preserve=true
 file path=etc/svc/profile/generic_limited_net.xml group=sys mode=0444
 file path=etc/svc/profile/generic_open.xml group=sys mode=0444
 file path=etc/svc/profile/inetd_generic.xml group=sys mode=0444

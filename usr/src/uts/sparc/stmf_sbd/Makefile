@@ -20,8 +20,9 @@
 #
 #
 # Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2016 by Delphix. All rights reserved.
 #
-#	This makefile drives the production of the stmf_sbd driver for 
+#	This makefile drives the production of the stmf_sbd driver for
 #	COMSTAR.
 
 #
@@ -68,6 +69,7 @@ C99LMODE=	-Xc99=%all
 # to investigate and remove these for maximum lint coverage.
 #
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
+LINTTAGS	+= -erroff=E_STATIC_UNUSED
 
 CERRWARN	+= -_gcc=-Wno-switch
 CERRWARN	+= -_gcc=-Wno-parentheses

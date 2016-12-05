@@ -38,7 +38,7 @@
 #include <sys/modctl.h>
 #include <sys/errno.h>
 #include <sys/reboot.h>
-#include "gfx_private.h"
+#include <sys/gfx_private.h>
 
 static struct modlmisc modlmisc = {
 	&mod_miscops, "gfx private interfaces"

@@ -49,7 +49,7 @@ static int umass_disk_close(struct open_file *);
 static void umass_disk_cleanup(void);
 static int umass_disk_ioctl(struct open_file *, u_long, void *);
 static int umass_disk_strategy(void *, int, daddr_t, size_t, char *, size_t *);
-static void umass_disk_print(int);
+static int umass_disk_print(int);
 
 struct devsw umass_disk = {
 	.dv_name = "umass",
@@ -169,10 +169,14 @@ umass_disk_close(struct open_file *f)
 	return (disk_close(dev));
 }
 
-static void
+static int
 umass_disk_print(int verbose)
 {
 	struct disk_devdesc dev;
+
+	printf("%s devices:", umass_disk.dv_name);
+	if (pager_output("\n") != 0)
+		return (1);
 
 	memset(&dev, 0, sizeof(dev));
 
