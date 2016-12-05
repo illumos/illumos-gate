@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2015 Joyent, Inc.  All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -134,8 +134,8 @@ static int
 hyprlofs_ioctl(vnode_t *vp, int cmd, intptr_t data, int flag,
     cred_t *cr, int *rvalp, caller_context_t *ct)
 {
-	int len, cnt, error;
-	int i;
+	uint_t len, cnt;
+	int i, error;
 	model_t model;
 	char path[MAXPATHLEN];
 	char nm[MAXPATHLEN];
@@ -172,7 +172,7 @@ hyprlofs_ioctl(vnode_t *vp, int cmd, intptr_t data, int flag,
 
 			for (i = 0; i < cnt; i++) {
 				if (e[i].hle_nlen == 0 ||
-				    e[i].hle_nlen > MAXPATHLEN)
+				    e[i].hle_nlen >= sizeof (nm))
 					return (EINVAL);
 
 				if (copyin(e[i].hle_name, nm, e[i].hle_nlen)
@@ -184,7 +184,7 @@ hyprlofs_ioctl(vnode_t *vp, int cmd, intptr_t data, int flag,
 
 				if (cmd == HYPRLOFS_ADD_ENTRIES) {
 					if (e[i].hle_plen == 0 ||
-					    e[i].hle_plen > MAXPATHLEN)
+					    e[i].hle_plen >= sizeof (path))
 						return (EINVAL);
 
 					if (copyin(e[i].hle_path, path,
@@ -232,7 +232,7 @@ hyprlofs_ioctl(vnode_t *vp, int cmd, intptr_t data, int flag,
 
 			for (i = 0; i < cnt; i++) {
 				if (e32[i].hle_nlen == 0 ||
-				    e32[i].hle_nlen > MAXPATHLEN)
+				    e32[i].hle_nlen >= sizeof (nm))
 					return (EINVAL);
 
 				if (copyin((void *)(unsigned long)
@@ -245,7 +245,7 @@ hyprlofs_ioctl(vnode_t *vp, int cmd, intptr_t data, int flag,
 
 				if (cmd == HYPRLOFS_ADD_ENTRIES) {
 					if (e32[i].hle_plen == 0 ||
-					    e32[i].hle_plen > MAXPATHLEN)
+					    e32[i].hle_plen >= sizeof (path))
 						return (EINVAL);
 
 					if (copyin((void *)(unsigned long)
@@ -781,13 +781,13 @@ done:
  */
 static int
 hyprlofs_get_all_entries(vnode_t *dvp, hyprlofs_curr_entry_t *hcp,
-    char *prefix, int *pcnt, int n_max,
+    char *prefix, uint_t *pcnt, uint_t n_max,
     cred_t *cr, caller_context_t *ct, int flags)
 {
 	int error = 0;
 	int too_big = 0;
-	int cnt;
-	int len;
+	uint_t cnt;
+	uint_t len;
 	hlnode_t *hp = (hlnode_t *)VTOHLN(dvp);
 	hldirent_t *hdp;
 	char *path;
@@ -907,7 +907,8 @@ static int
 hyprlofs_get_all(vnode_t *dvp, intptr_t data, cred_t *cr, caller_context_t *ct,
     int flags)
 {
-	int limit, cnt, error;
+	uint_t limit, cnt;
+	int error;
 	model_t model;
 	hyprlofs_curr_entry_t *e;
 
@@ -1094,9 +1095,9 @@ hyprlofs_readdir(vnode_t *vp, struct uio *uiop, cred_t *cr, int *eofp,
 	struct dirent64 *dp;
 	ulong_t offset;
 	ulong_t total_bytes_wanted;
-	long outcount = 0;
-	long bufsize;
-	int reclen;
+	ulong_t outcount = 0;
+	ulong_t bufsize;
+	size_t reclen;
 	caddr_t outbuf;
 
 	if (VTOHLN(vp)->hln_looped == 1)
@@ -1142,7 +1143,7 @@ hyprlofs_readdir(vnode_t *vp, struct uio *uiop, cred_t *cr, int *eofp,
 		namelen = strlen(hdp->hld_name);	/* no +1 needed */
 		offset = hdp->hld_offset;
 		if (offset >= uiop->uio_offset) {
-			reclen = (int)DIRENT64_RECLEN(namelen);
+			reclen = DIRENT64_RECLEN(namelen);
 			if (outcount + reclen > total_bytes_wanted) {
 				if (!outcount)
 					/* Buffer too small for any entries. */
