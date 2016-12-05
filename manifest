@@ -3715,7 +3715,7 @@ f usr/include/sys/ftrace.h 0644 root bin
 f usr/include/sys/fx.h 0644 root bin
 f usr/include/sys/fxpriocntl.h 0644 root bin
 f usr/include/sys/gfs.h 0644 root bin
-f usr/include/sys/gfx_private.h.h 0644 root bin
+f usr/include/sys/gfx_private.h 0644 root bin
 f usr/include/sys/gld.h 0644 root bin
 f usr/include/sys/gldpriv.h 0644 root bin
 f usr/include/sys/group.h 0644 root bin
