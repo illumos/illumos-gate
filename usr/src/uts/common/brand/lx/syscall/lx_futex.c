@@ -189,25 +189,6 @@
  */
 
 /*
- * This structure is used to track all the threads currently waiting on a
- * futex.  There is one fwaiter_t for each blocked thread.  We store all
- * fwaiter_t's in a hash structure, indexed by the memid_t of the integer
- * containing the futex's value.
- *
- * At the moment, all fwaiter_t's for a single futex are simply dumped into
- * the hash bucket.  If futex contention ever becomes a hot path, we can
- * chain a single futex's waiters together.
- */
-typedef struct fwaiter {
-	memid_t		fw_memid;	/* memid of the user-space futex */
-	kcondvar_t	fw_cv;		/* cond var */
-	struct fwaiter	*fw_next;	/* hash queue */
-	struct fwaiter	*fw_prev;	/* hash queue */
-	uint32_t	fw_bits;	/* bits waiting on */
-	volatile int	fw_woken;
-} fwaiter_t;
-
-/*
  * The structure of the robust_list, as set with the set_robust_list() system
  * call.  See lx_futex_robust_exit(), below, for details.
  */
@@ -309,9 +290,10 @@ futex_wait(memid_t *memid, caddr_t addr,
     int val, timespec_t *timeout, uint32_t bits)
 {
 	kthread_t *t = curthread;
+	lx_lwp_data_t *lwpd = ttolxlwp(t);
+	fwaiter_t *fwp = &lwpd->br_fwaiter;
 	int err, ret;
 	int32_t curval;
-	fwaiter_t fw;
 	int index;
 
 	/*
@@ -322,13 +304,13 @@ futex_wait(memid_t *memid, caddr_t addr,
 	 */
 	(void) new_mstate(t, LMS_USER_LOCK);
 
-	fw.fw_woken = 0;
-	fw.fw_bits = bits;
+	fwp->fw_woken = 0;
+	fwp->fw_bits = bits;
 
-	MEMID_COPY(memid, &fw.fw_memid);
-	cv_init(&fw.fw_cv, NULL, CV_DEFAULT, NULL);
+	MEMID_COPY(memid, &fwp->fw_memid);
+	cv_init(&fwp->fw_cv, NULL, CV_DEFAULT, NULL);
 
-	index = HASH_FUNC(&fw.fw_memid);
+	index = HASH_FUNC(&fwp->fw_memid);
 	mutex_enter(&futex_hash[index].fh_lock);
 
 	if (fuword32(addr, (uint32_t *)&curval)) {
@@ -340,11 +322,11 @@ futex_wait(memid_t *memid, caddr_t addr,
 		goto out;
 	}
 
-	futex_hashin(&fw);
+	futex_hashin(fwp);
 
 	err = 0;
-	while ((fw.fw_woken == 0) && (err == 0)) {
-		ret = cv_waituntil_sig(&fw.fw_cv, &futex_hash[index].fh_lock,
+	while ((fwp->fw_woken == 0) && (err == 0)) {
+		ret = cv_waituntil_sig(&fwp->fw_cv, &futex_hash[index].fh_lock,
 		    timeout, timechanged);
 		if (ret < 0) {
 			err = set_errno(ETIMEDOUT);
@@ -362,8 +344,8 @@ futex_wait(memid_t *memid, caddr_t addr,
 	 * The futex is normally hashed out in wakeup.  If we timed out or
 	 * got a signal, we need to hash it out here instead.
 	 */
-	if (fw.fw_woken == 0)
-		futex_hashout(&fw);
+	if (fwp->fw_woken == 0)
+		futex_hashout(fwp);
 
 out:
 	mutex_exit(&futex_hash[index].fh_lock);
