@@ -1454,6 +1454,8 @@ lxpr_read_meminfo(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	} else {
 		total_mem = zone->zone_phys_mem_ctl;
 		free_mem = zone->zone_phys_mem_ctl - zone->zone_phys_mem;
+		if (free_mem < 0)
+			free_mem = 0;
 	}
 
 	if (global || zone->zone_max_swap_ctl == UINT64_MAX) {

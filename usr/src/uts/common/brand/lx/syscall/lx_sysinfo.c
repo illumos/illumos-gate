@@ -21,7 +21,7 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include <vm/anon.h>
@@ -100,8 +100,15 @@ lx_sysinfo_common(lx_sysinfo_t *si)
 		zphysmem = physmem;
 		zfreemem = freemem;
 	} else {
+		int64_t freemem;
+
 		zphysmem = btop(zone->zone_phys_mem_ctl);
-		zfreemem = btop(zone->zone_phys_mem_ctl - zone->zone_phys_mem);
+		freemem = zone->zone_phys_mem_ctl - zone->zone_phys_mem;
+		if (freemem > 0) {
+			zfreemem = btop(freemem);
+		} else {
+			zfreemem = 0;
+		}
 	}
 
 	if (zone->zone_max_swap_ctl == UINT64_MAX) {
