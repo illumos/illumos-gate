@@ -31,7 +31,7 @@ FICLDIR=	$(SRC)/common/ficl
 C99MODE=	$(C99_ENABLE)
 CPPFLAGS +=	-I.. -I$(FICLDIR) -D_LARGEFILE64_SOURCE=1
 
-LDLIBS +=	-lc -lm -lumem
+LDLIBS +=	-luuid -lc -lm -lumem
 
 HEADERS= $(FICLDIR)/ficl.h $(FICLDIR)/ficltokens.h ../ficllocal.h \
 	$(FICLDIR)/ficlplatform/unix.h

@@ -95,6 +95,24 @@ typedef enum {
 	SCF_TYPE_NET_ADDR
 } scf_type_t;
 
+/*
+ * Values returned by scf_type_to_string
+ */
+#define	SCF_TYPE_STRING_BOOLEAN		"boolean"
+#define	SCF_TYPE_STRING_COUNT		"count"
+#define	SCF_TYPE_STRING_INTEGER		"integer"
+#define	SCF_TYPE_STRING_TIME		"time"
+#define	SCF_TYPE_STRING_ASTRING		"astring"
+#define	SCF_TYPE_STRING_OPAQUE		"opaque"
+#define	SCF_TYPE_STRING_USTRING		"ustring"
+#define	SCF_TYPE_STRING_URI		"uri"
+#define	SCF_TYPE_STRING_FMRI		"fmri"
+#define	SCF_TYPE_STRING_HOST		"host"
+#define	SCF_TYPE_STRING_HOSTNAME	"hostname"
+#define	SCF_TYPE_STRING_NET_ADDR	"net_address"
+#define	SCF_TYPE_STRING_NET_ADDR_V4	"net_address_v4"
+#define	SCF_TYPE_STRING_NET_ADDR_V6	"net_address_v6"
+
 typedef struct scf_time {
 	int64_t		t_seconds;
 	int32_t		t_ns;
