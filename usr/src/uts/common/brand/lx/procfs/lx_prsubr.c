@@ -34,7 +34,6 @@
 #include <sys/mman.h>
 #include <sys/vmsystm.h>
 #include <sys/prsystm.h>
-#include <sys/zfs_ioctl.h>
 #include <sys/brand.h>
 #include <sys/lx_brand.h>
 
