@@ -46,14 +46,6 @@ static ddi_device_acc_attr_t smrt_command_dev_attr = {
 static void smrt_contig_free(smrt_dma_t *);
 
 
-extern __GNU_INLINE size_t
-smrt_round_up(size_t offset)
-{
-	size_t gran = 0x20;
-
-	return ((offset + (gran - 1)) & ~(gran - 1));
-}
-
 static int
 smrt_check_command_type(smrt_command_type_t type)
 {
@@ -65,6 +57,7 @@ smrt_check_command_type(smrt_command_type_t type)
 	case SMRT_CMDTYPE_ABORTQ:
 	case SMRT_CMDTYPE_SCSA:
 	case SMRT_CMDTYPE_INTERNAL:
+	case SMRT_CMDTYPE_PREINIT:
 		return (type);
 	}
 
@@ -155,8 +148,8 @@ smrt_contig_free(smrt_dma_t *smdma)
 	bzero(smdma, sizeof (*smdma));
 }
 
-smrt_command_t *
-smrt_command_alloc(smrt_t *smrt, smrt_command_type_t type, int kmflags)
+static smrt_command_t *
+smrt_command_alloc_impl(smrt_t *smrt, smrt_command_type_t type, int kmflags)
 {
 	smrt_command_t *smcm;
 
@@ -175,10 +168,10 @@ smrt_command_alloc(smrt_t *smrt, smrt_command_type_t type, int kmflags)
 	 * physical address of each block should be 32-byte aligned.
 	 */
 	size_t contig_size = 0;
-	contig_size += smrt_round_up(sizeof (CommandList_t));
+	contig_size += P2ROUNDUP_TYPED(sizeof (CommandList_t), 32, size_t);
 
 	size_t errorinfo_offset = contig_size;
-	contig_size += smrt_round_up(sizeof (ErrorInfo_t));
+	contig_size += P2ROUNDUP_TYPED(sizeof (ErrorInfo_t), 32, size_t);
 
 	if (smrt_contig_alloc(smrt, &smcm->smcm_contig, contig_size,
 	    kmflags, (void **)&smcm->smcm_va_cmd, &smcm->smcm_pa_cmd) !=
@@ -203,6 +196,47 @@ smrt_command_alloc(smrt_t *smrt, smrt_command_type_t type, int kmflags)
 	bzero(smcm->smcm_va_cmd, contig_size);
 	smcm->smcm_va_cmd->ErrDesc.Addr = smcm->smcm_pa_err;
 	smcm->smcm_va_cmd->ErrDesc.Len = sizeof (ErrorInfo_t);
+
+	return (smcm);
+}
+
+smrt_command_t *
+smrt_command_alloc_preinit(smrt_t *smrt, size_t datasize, int kmflags)
+{
+	smrt_command_t *smcm;
+
+	if ((smcm = smrt_command_alloc_impl(smrt, SMRT_CMDTYPE_PREINIT,
+	    kmflags)) == NULL) {
+		return (NULL);
+	}
+
+	/*
+	 * Note that most driver infrastructure has not been initialised at
+	 * this time.  All commands are submitted to the controller serially,
+	 * using a pre-specified tag, and are not attached to the command
+	 * tracking list.
+	 */
+	smcm->smcm_tag = SMRT_PRE_TAG_NUMBER;
+	smcm->smcm_va_cmd->Header.Tag.tag_value = SMRT_PRE_TAG_NUMBER;
+
+	if (smrt_command_attach_internal(smrt, smcm, datasize, kmflags) != 0) {
+		smrt_command_free(smcm);
+		return (NULL);
+	}
+
+	return (smcm);
+}
+
+smrt_command_t *
+smrt_command_alloc(smrt_t *smrt, smrt_command_type_t type, int kmflags)
+{
+	smrt_command_t *smcm;
+
+	VERIFY(type != SMRT_CMDTYPE_PREINIT);
+
+	if ((smcm = smrt_command_alloc_impl(smrt, type, kmflags)) == NULL) {
+		return (NULL);
+	}
 
 	/*
 	 * Insert into the per-controller command list.
@@ -295,18 +329,20 @@ smrt_command_free(smrt_command_t *smcm)
 
 	smrt_contig_free(&smcm->smcm_contig);
 
-	mutex_enter(&smrt->smrt_mutex);
+	if (smcm->smcm_type != SMRT_CMDTYPE_PREINIT) {
+		mutex_enter(&smrt->smrt_mutex);
 
-	/*
-	 * Ensure we are not trying to free a command that is in the finish or
-	 * abort queue.
-	 */
-	VERIFY(!list_link_active(&smcm->smcm_link_abort));
-	VERIFY(!list_link_active(&smcm->smcm_link_finish));
+		/*
+		 * Ensure we are not trying to free a command that is in the
+		 * finish or abort queue.
+		 */
+		VERIFY(!list_link_active(&smcm->smcm_link_abort));
+		VERIFY(!list_link_active(&smcm->smcm_link_finish));
 
-	list_remove(&smrt->smrt_commands, smcm);
+		list_remove(&smrt->smrt_commands, smcm);
 
-	mutex_exit(&smrt->smrt_mutex);
+		mutex_exit(&smrt->smrt_mutex);
+	}
 
 	kmem_free(smcm, sizeof (*smcm));
 }

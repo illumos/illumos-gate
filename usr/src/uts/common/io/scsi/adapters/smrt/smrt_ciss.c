@@ -15,6 +15,8 @@
 
 #include <sys/scsi/adapters/smrt/smrt.h>
 
+static int smrt_ctlr_versions(smrt_t *, uint16_t, smrt_versions_t *);
+
 /*
  * The maximum number of seconds to wait for the controller to come online.
  */
@@ -265,6 +267,7 @@ int
 smrt_submit(smrt_t *smrt, smrt_command_t *smcm)
 {
 	VERIFY(MUTEX_HELD(&smrt->smrt_mutex));
+	VERIFY(smcm->smcm_type != SMRT_CMDTYPE_PREINIT);
 
 	/*
 	 * If the controller is currently being reset, do not allow command
@@ -372,6 +375,11 @@ smrt_process_finishq_one(smrt_command_t *smcm)
 		mutex_exit(&smrt->smrt_mutex);
 		smrt_command_free(smcm);
 		mutex_enter(&smrt->smrt_mutex);
+		return;
+
+	case SMRT_CMDTYPE_PREINIT:
+		dev_err(smrt->smrt_dip, CE_PANIC, "preinit command "
+		    "completed after initialisation");
 		return;
 	}
 
@@ -760,7 +768,7 @@ smrt_ctlr_init(smrt_t *smrt)
 	 * Initialise an appropriate Transport Method.  For now, this driver
 	 * only supports the "Simple" method.
 	 */
-	if ((e = smrt_ctlr_init_simple(smrt)) != 0) {
+	if ((e = smrt_ctlr_init_simple(smrt)) != DDI_SUCCESS) {
 		return (e);
 	}
 
@@ -778,6 +786,20 @@ smrt_ctlr_init(smrt_t *smrt)
 	smrt->smrt_last_heartbeat = ddi_get32(smrt->smrt_ct_handle,
 	    &smrt->smrt_ct->HeartBeat);
 	smrt->smrt_last_heartbeat_time = gethrtime();
+
+	/*
+	 * Determine the firmware version of the controller so that we can
+	 * select which type of interrupts to use.
+	 */
+	if ((e = smrt_ctlr_versions(smrt, SMRT_LOGVOL_DISCOVER_TIMEOUT,
+	    &smrt->smrt_versions)) != 0) {
+		dev_err(smrt->smrt_dip, CE_WARN, "could not identify "
+		    "controller (%d)", e);
+		return (DDI_FAILURE);
+	}
+
+	dev_err(smrt->smrt_dip, CE_NOTE, "!firmware rev %s",
+	    smrt->smrt_versions.smrtv_firmware_rev);
 
 	return (DDI_SUCCESS);
 }
@@ -898,6 +920,167 @@ smrt_lockup_check(smrt_t *smrt)
 		    "stopped responding (odr %08x spr %08x)",
 		    odr, spr);
 	}
+}
+
+/*
+ * Probe the controller with the IDENTIFY CONTROLLER request.  This is a BMIC
+ * command, so it must be submitted to the controller and we must poll for its
+ * completion.  This functionality is only presently used during controller
+ * initialisation, so it uses the special pre-initialisation path for command
+ * allocation and submission.
+ */
+static int
+smrt_ctlr_identify(smrt_t *smrt, uint16_t timeout,
+    smrt_identify_controller_t *resp)
+{
+	smrt_command_t *smcm;
+	smrt_identify_controller_req_t smicr;
+	int r;
+	size_t sz;
+
+	/*
+	 * Allocate a command with a data buffer; the controller will fill it
+	 * with identification information.  There is some suggestion in the
+	 * firmware-level specification that the buffer length should be a
+	 * multiple of 512 bytes for some controllers, so we round up.
+	 */
+	sz = P2ROUNDUP_TYPED(sizeof (*resp), 512, size_t);
+	if ((smcm = smrt_command_alloc_preinit(smrt, sz, KM_SLEEP)) == NULL) {
+		return (ENOMEM);
+	}
+
+	/*
+	 * This BMIC command is addressed to the controller itself.  The
+	 * Masked Peripheral Device addressing mode is used, with a LUN of 0.
+	 */
+	smrt_write_lun_addr_phys(&smcm->smcm_va_cmd->Header.LUN, B_TRUE,
+	    0, 0);
+
+	smcm->smcm_va_cmd->Request.CDBLen = sizeof (smicr);
+	smcm->smcm_va_cmd->Request.Timeout = timeout;
+	smcm->smcm_va_cmd->Request.Type.Type = CISS_TYPE_CMD;
+	smcm->smcm_va_cmd->Request.Type.Attribute = CISS_ATTR_ORDERED;
+	smcm->smcm_va_cmd->Request.Type.Direction = CISS_XFER_READ;
+
+	/*
+	 * Construct the IDENTIFY CONTROLLER request CDB.  Note that any
+	 * reserved fields in the request must be filled with zeroes.
+	 */
+	bzero(&smicr, sizeof (smicr));
+	smicr.smicr_opcode = CISS_SCMD_BMIC_READ;
+	smicr.smicr_lun = 0;
+	smicr.smicr_command = CISS_BMIC_IDENTIFY_CONTROLLER;
+	bcopy(&smicr, &smcm->smcm_va_cmd->Request.CDB[0],
+	    MIN(CISS_CDBLEN, sizeof (smicr)));
+
+	/*
+	 * Send the command to the device and poll for its completion.
+	 */
+	smcm->smcm_status |= SMRT_CMD_STATUS_POLLED;
+	smcm->smcm_expiry = gethrtime() + timeout * NANOSEC;
+	if ((r = smrt_preinit_command_simple(smrt, smcm)) != 0) {
+		VERIFY3S(r, ==, ETIMEDOUT);
+		VERIFY0(smcm->smcm_status & SMRT_CMD_STATUS_POLL_COMPLETE);
+
+		/*
+		 * This command timed out, but the driver is not presently
+		 * initialised to the point where we can try to abort it.
+		 * The command was created with the PREINIT type, so it
+		 * does not appear in the global command tracking list.
+		 * In order to avoid problems with DMA from the controller,
+		 * we have to leak the command allocation.
+		 */
+		smcm = NULL;
+		goto out;
+	}
+
+	if (smcm->smcm_status & SMRT_CMD_STATUS_RESET_SENT) {
+		/*
+		 * The controller was reset while we were trying to identify
+		 * it.  Report failure.
+		 */
+		r = EIO;
+		goto out;
+	}
+
+	if (smcm->smcm_status & SMRT_CMD_STATUS_ERROR) {
+		ErrorInfo_t *ei = smcm->smcm_va_err;
+
+		if (ei->CommandStatus != CISS_CMD_DATA_UNDERRUN) {
+			dev_err(smrt->smrt_dip, CE_WARN, "identify "
+			    "controller error: status 0x%x",
+			    ei->CommandStatus);
+			r = EIO;
+			goto out;
+		}
+	}
+
+	if (resp != NULL) {
+		/*
+		 * Copy the identify response out for the caller.
+		 */
+		bcopy(smcm->smcm_internal->smcmi_va, resp, sizeof (*resp));
+	}
+
+	r = 0;
+
+out:
+	if (smcm != NULL) {
+		smrt_command_free(smcm);
+	}
+	return (r);
+}
+
+/*
+ * The firmware versions in an IDENTIFY CONTROLLER response generally take
+ * the form of a four byte ASCII string containing a dotted decimal version
+ * number; e.g., "8.00".
+ *
+ * This function sanitises the firmware version, replacing unexpected
+ * values with a question mark.
+ */
+static void
+smrt_copy_firmware_version(uint8_t *src, char *dst)
+{
+	for (unsigned i = 0; i < 4; i++) {
+		/*
+		 * Make sure that this is a 7-bit clean ASCII value.
+		 */
+		char c = src[i] <= 0x7f ? (char)(src[i] & 0x7f) : '?';
+
+		if (isalnum(c) || c == '.' || c == ' ') {
+			dst[i] = c;
+		} else {
+			dst[i] = '?';
+		}
+	}
+	dst[4] = '\0';
+}
+
+/*
+ * Using an IDENTIFY CONTROLLER request, determine firmware and controller
+ * version details.  See the comments for "smrt_ctlr_identify()" for more
+ * details about calling context.
+ */
+static int
+smrt_ctlr_versions(smrt_t *smrt, uint16_t timeout, smrt_versions_t *smrtv)
+{
+	smrt_identify_controller_t smic;
+	int r;
+
+	if ((r = smrt_ctlr_identify(smrt, timeout, &smic)) != 0) {
+		return (r);
+	}
+
+	smrtv->smrtv_hardware_version = smic.smic_hardware_version;
+	smrt_copy_firmware_version(smic.smic_firmware_rev,
+	    smrtv->smrtv_firmware_rev);
+	smrt_copy_firmware_version(smic.smic_recovery_rev,
+	    smrtv->smrtv_recovery_rev);
+	smrt_copy_firmware_version(smic.smic_bootblock_rev,
+	    smrtv->smrtv_bootblock_rev);
+
+	return (0);
 }
 
 int

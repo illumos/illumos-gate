@@ -119,6 +119,76 @@ smrt_submit_simple(smrt_t *smrt, smrt_command_t *smcm)
 	smrt_put32(smrt, CISS_I2O_INBOUND_POST_Q, smcm->smcm_pa_cmd);
 }
 
+/*
+ * Submit a command to the controller by posting it to the Inbound Post Queue
+ * Register.  Immediately begin polling on the completion of that command.
+ *
+ * NOTE: This function is for controller initialisation only.  It discards
+ * completions of commands other than the expected command as spurious, and
+ * will not interact correctly with the rest of the driver once it is running.
+ */
+int
+smrt_preinit_command_simple(smrt_t *smrt, smrt_command_t *smcm)
+{
+	/*
+	 * The controller must be initialised to use the Simple Transport
+	 * Method, but not be marked RUNNING.  The command to process must be a
+	 * PREINIT command with the expected tag number, marked for polling.
+	 */
+	VERIFY(smrt->smrt_ctlr_mode == SMRT_CTLR_MODE_SIMPLE);
+	VERIFY(!(smrt->smrt_status & SMRT_CTLR_STATUS_RUNNING));
+	VERIFY(smcm->smcm_type == SMRT_CMDTYPE_PREINIT);
+	VERIFY(smcm->smcm_status & SMRT_CMD_STATUS_POLLED);
+	VERIFY3U(smcm->smcm_tag, ==, SMRT_PRE_TAG_NUMBER);
+
+	/*
+	 * Submit this command to the controller.
+	 */
+	smcm->smcm_status |= SMRT_CMD_STATUS_INFLIGHT;
+	smrt_put32(smrt, CISS_I2O_INBOUND_POST_Q, smcm->smcm_pa_cmd);
+
+	/*
+	 * Poll the controller for completions until we see the command we just
+	 * sent, or the timeout expires.
+	 */
+	for (;;) {
+		uint32_t none = 0xffffffff;
+		uint32_t opq = smrt_get32(smrt, CISS_I2O_OUTBOUND_POST_Q);
+		uint32_t tag;
+
+		if (smcm->smcm_expiry != 0) {
+			/*
+			 * This command has an expiry time.  Check to see
+			 * if it has already passed:
+			 */
+			if (smcm->smcm_expiry < gethrtime()) {
+				return (ETIMEDOUT);
+			}
+		}
+
+		if (opq == none) {
+			delay(drv_usectohz(10 * 1000));
+			continue;
+		}
+
+		if ((tag = CISS_OPQ_READ_TAG(opq)) != SMRT_PRE_TAG_NUMBER) {
+			dev_err(smrt->smrt_dip, CE_WARN, "unexpected tag 0x%x"
+			    " completed during driver init", tag);
+			delay(drv_usectohz(10 * 1000));
+			continue;
+		}
+
+		smcm->smcm_status &= ~SMRT_CMD_STATUS_INFLIGHT;
+		if (CISS_OPQ_READ_ERROR(opq) != 0) {
+			smcm->smcm_status |= SMRT_CMD_STATUS_ERROR;
+		}
+		smcm->smcm_time_complete = gethrtime();
+		smcm->smcm_status |= SMRT_CMD_STATUS_POLL_COMPLETE;
+
+		return (0);
+	}
+}
+
 int
 smrt_ctlr_init_simple(smrt_t *smrt)
 {

@@ -202,7 +202,7 @@ smrt_logvol_discover(smrt_t *smrt, uint16_t timeout)
 	smrt_write_lun_addr_phys(&smcm->smcm_va_cmd->Header.LUN, B_TRUE,
 	    0, 0);
 
-	smcm->smcm_va_cmd->Request.CDBLen = 12;
+	smcm->smcm_va_cmd->Request.CDBLen = sizeof (smrllr);
 	smcm->smcm_va_cmd->Request.Timeout = timeout;
 	smcm->smcm_va_cmd->Request.Type.Type = CISS_TYPE_CMD;
 	smcm->smcm_va_cmd->Request.Type.Attribute = CISS_ATTR_ORDERED;
@@ -225,8 +225,7 @@ smrt_logvol_discover(smrt_t *smrt, uint16_t timeout)
 	 * Send the command to the device.
 	 */
 	smcm->smcm_status |= SMRT_CMD_STATUS_POLLED;
-	if (smrt_submit(smrt, smcm) != 0) {
-		r = EIO;
+	if ((r = smrt_submit(smrt, smcm)) != 0) {
 		goto out;
 	}
 
@@ -235,7 +234,7 @@ smrt_logvol_discover(smrt_t *smrt, uint16_t timeout)
 	 */
 	smcm->smcm_expiry = gethrtime() + timeout * NANOSEC;
 	if ((r = smrt_poll_for(smrt, smcm)) != 0) {
-		VERIFY(r == ETIMEDOUT);
+		VERIFY3S(r, ==, ETIMEDOUT);
 		VERIFY0(smcm->smcm_status & SMRT_CMD_STATUS_POLL_COMPLETE);
 
 		/*

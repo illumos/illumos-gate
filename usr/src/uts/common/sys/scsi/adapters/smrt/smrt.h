@@ -33,6 +33,7 @@
 #include <sys/sunddi.h>
 #include <sys/sdt.h>
 #include <sys/policy.h>
+#include <sys/ctype.h>
 
 #if !defined(_LITTLE_ENDIAN) || !defined(_BIT_FIELDS_LTOH)
 /*
@@ -81,9 +82,11 @@ typedef enum smrt_init_level {
  * having the controller confuse us by double-reporting the completion of a
  * particular tag, we try to reuse them as infrequently as possible.  In
  * practice, this means looping through a range of values.  The minimum and
- * maximum value are defined below.
+ * maximum value are defined below.  A single command tag value is set aside
+ * for polled commands sent prior to full initialisation of the driver.
  */
-#define	SMRT_MIN_TAG_NUMBER			0x00000100
+#define	SMRT_PRE_TAG_NUMBER			0x00000bad
+#define	SMRT_MIN_TAG_NUMBER			0x00001000
 #define	SMRT_MAX_TAG_NUMBER			0x0fffffff
 
 /*
@@ -164,6 +167,19 @@ typedef struct smrt_stats {
 	uint64_t smrts_ignored_scsi_cmds;
 } smrt_stats_t;
 
+typedef struct smrt_versions {
+	uint8_t smrtv_hardware_version;
+
+	/*
+	 * These strings must be large enough to hold the 4 byte version string
+	 * retrieved from an IDENTIFY CONTROLLER response, as well as the
+	 * terminating NUL byte:
+	 */
+	char smrtv_firmware_rev[5];
+	char smrtv_recovery_rev[5];
+	char smrtv_bootblock_rev[5];
+} smrt_versions_t;
+
 /*
  * Per-Controller Structure
  */
@@ -181,6 +197,7 @@ struct smrt {
 	uint32_t smrt_bus_support;
 	uint32_t smrt_maxcmds;
 	uint32_t smrt_sg_cnt;
+	smrt_versions_t smrt_versions;
 
 	/*
 	 * The transport mode of the controller.
@@ -419,6 +436,7 @@ typedef enum smrt_command_type {
 	SMRT_CMDTYPE_INTERNAL = 1,
 	SMRT_CMDTYPE_ABORTQ,
 	SMRT_CMDTYPE_SCSA,
+	SMRT_CMDTYPE_PREINIT,
 } smrt_command_type_t;
 
 struct smrt_command {
@@ -501,6 +519,7 @@ void smrt_submit_simple(smrt_t *, smrt_command_t *);
 int smrt_retrieve(smrt_t *);
 void smrt_retrieve_simple(smrt_t *);
 int smrt_poll_for(smrt_t *, smrt_command_t *);
+int smrt_preinit_command_simple(smrt_t *, smrt_command_t *);
 
 /*
  * Interrupt service routines.
@@ -521,7 +540,6 @@ void smrt_intr_set(smrt_t *, boolean_t);
 int smrt_ctlr_init(smrt_t *);
 void smrt_ctlr_teardown(smrt_t *);
 int smrt_ctlr_reset(smrt_t *);
-int smrt_ctlr_ping(smrt_t *, int);
 int smrt_ctlr_wait_for_state(smrt_t *, smrt_wait_state_t);
 int smrt_ctlr_init_simple(smrt_t *);
 void smrt_ctlr_teardown_simple(smrt_t *);
@@ -556,6 +574,7 @@ void smrt_process_abortq(smrt_t *);
  */
 smrt_command_t *smrt_command_alloc(smrt_t *, smrt_command_type_t,
     int);
+smrt_command_t *smrt_command_alloc_preinit(smrt_t *, size_t, int);
 int smrt_command_attach_internal(smrt_t *, smrt_command_t *, size_t,
     int);
 void smrt_command_free(smrt_command_t *);

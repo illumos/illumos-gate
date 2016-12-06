@@ -42,6 +42,15 @@ extern "C" {
 #define	CISS_SCMD_REPORT_PHYSICAL_LUNS		0xC3
 
 /*
+ * These command opcodes are _not_ in the usual vendor-specific space, but are
+ * nonetheless vendor-specific.  They allow BMIC commands to be written to and
+ * read from the controller.  If a command transfers no data, the specification
+ * suggests that BMIC_WRITE (0x27) is appropriate.
+ */
+#define	CISS_SCMD_BMIC_READ			0x26
+#define	CISS_SCMD_BMIC_WRITE			0x27
+
+/*
  * CISS Messages
  *
  * The CISS specification describes several directives that do not behave like
@@ -63,8 +72,18 @@ extern "C" {
 #define	CISS_MSG_NOP				0x3
 
 /*
+ * BMIC Commands
+ *
+ * These commands allow for the use of non-standard facilities specific to the
+ * Smart Array firmware.  They are sent to the controller through a specially
+ * constructed CDB with the CISS_SCMD_BMIC_READ or CISS_SCMD_BMIC_WRITE opcode.
+ */
+#define	CISS_BMIC_IDENTIFY_CONTROLLER		0x11
+
+/*
  * The following packed structures are used to ease the manipulation of SCSI
- * commands sent to, and status information returned from, the controller.
+ * and BMIC commands sent to, and status information returned from, the
+ * controller.
  */
 #pragma pack(1)
 
@@ -95,6 +114,42 @@ typedef struct smrt_report_logical_lun_req {
 	uint8_t smrllr_reserved2;
 	uint8_t smrllr_control;
 } smrt_report_logical_lun_req_t;
+
+/*
+ * Request structure for the BMIC command IDENTIFY CONTROLLER.  This structure
+ * is written into the CDB with the CISS_SCMD_BMIC_READ SCSI opcode.  Reserved
+ * fields should be filled with zeroes.
+ */
+typedef struct smrt_identify_controller_req {
+	uint8_t smicr_opcode;
+	uint8_t smicr_lun;
+	uint8_t smicr_reserved1[4];
+	uint8_t smicr_command;
+	uint8_t smicr_reserved2[2];
+	uint8_t smicr_reserved3[1];
+	uint8_t smicr_reserved4[6];
+} smrt_identify_controller_req_t;
+
+/*
+ * Response structure for IDENTIFY CONTROLLER.  This structure is used to
+ * interpret the response the controller will write into the data buffer.
+ */
+typedef struct smrt_identify_controller {
+	uint8_t smic_logical_drive_count;
+	uint32_t smic_config_signature;
+	uint8_t smic_firmware_rev[4];
+	uint8_t smic_recovery_rev[4];
+	uint8_t smic_hardware_version;
+	uint8_t smic_bootblock_rev[4];
+
+	/*
+	 * These are obsolete for SAS controllers:
+	 */
+	uint32_t smic_drive_present_map;
+	uint32_t smic_external_drive_map;
+
+	uint32_t smic_board_id;
+} smrt_identify_controller_t;
 
 #pragma pack()
 

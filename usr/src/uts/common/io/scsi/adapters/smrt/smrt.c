@@ -170,6 +170,8 @@ smrt_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
 	uint32_t instance;
 	smrt_t *smrt;
+	boolean_t check_for_interrupts = B_FALSE;
+	int r;
 
 	if (cmd != DDI_ATTACH) {
 		return (DDI_FAILURE);
@@ -281,6 +283,7 @@ smrt_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * command completion interrupts from the controller.
 	 */
 	smrt_intr_set(smrt, B_TRUE);
+	check_for_interrupts = B_TRUE;
 
 	/*
 	 * Register the maintenance routine for periodic execution:
@@ -292,8 +295,10 @@ smrt_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	/*
 	 * Discover the set of logical volumes attached to this controller:
 	 */
-	if (smrt_logvol_discover(smrt, SMRT_LOGVOL_DISCOVER_TIMEOUT) != 0) {
-		dev_err(dip, CE_WARN, "could not discover logical volumes");
+	if ((r = smrt_logvol_discover(smrt, SMRT_LOGVOL_DISCOVER_TIMEOUT)) !=
+	    0) {
+		dev_err(dip, CE_WARN, "could not discover logical volumes "
+		    "(%d)", r);
 		goto fail;
 	}
 
@@ -305,6 +310,12 @@ smrt_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	return (DDI_SUCCESS);
 
 fail:
+	if (check_for_interrupts) {
+		if (smrt->smrt_stats.smrts_claimed_interrupts == 0) {
+			dev_err(dip, CE_WARN, "controller did not interrupt "
+			    "during attach");
+		}
+	}
 	smrt_cleanup(smrt);
 	return (DDI_FAILURE);
 }

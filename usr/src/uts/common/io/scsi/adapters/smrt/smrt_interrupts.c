@@ -30,6 +30,32 @@ smrt_interrupt_type_name(int type)
 	}
 }
 
+static boolean_t
+smrt_try_msix(smrt_t *smrt)
+{
+	char *fwver = smrt->smrt_versions.smrtv_firmware_rev;
+
+	if (fwver[0] == '8' && fwver[1] == '.' && isdigit(fwver[2]) &&
+	    isdigit(fwver[3])) {
+		/*
+		 * Version 8.00 of the Smart Array firmware appears to have
+		 * broken MSI support on at least one controller.  We could
+		 * blindly try MSI-X everywhere, except that on at least some
+		 * 6.XX firmware versions, MSI-X interrupts do not appear
+		 * to be triggered for Simple Transport Method command
+		 * completions.
+		 *
+		 * For now, assume we should try for MSI-X with all 8.XX
+		 * versions of the firmware.
+		 */
+		dev_err(smrt->smrt_dip, CE_NOTE, "!trying MSI-X interrupts "
+		    "to work around 8.XX firmware defect");
+		return (B_TRUE);
+	}
+
+	return (B_FALSE);
+}
+
 static int
 smrt_interrupts_disable(smrt_t *smrt)
 {
@@ -146,9 +172,23 @@ smrt_interrupts_setup(smrt_t *smrt)
 	}
 
 	/*
-	 * The specification is somewhat unclear of the precise nature of MSI-X
-	 * support with Smart Array controllers, particularly with respect to
-	 * the Simple Transport Method, so we'll just try for classical MSI.
+	 * At least one firmware version has been released for the Smart Array
+	 * line with entirely defective MSI support.  The specification is
+	 * somewhat unclear on the precise nature of MSI-X support with Smart
+	 * Array controllers, particularly with respect to the Simple Transport
+	 * Method, but for those broken firmware versions we need to try
+	 * anyway.
+	 */
+	if (smrt_try_msix(smrt) && (types & DDI_INTR_TYPE_MSIX)) {
+		if (smrt_interrupts_alloc(smrt, DDI_INTR_TYPE_MSIX) ==
+		    DDI_SUCCESS) {
+			goto add_handler;
+		}
+	}
+
+	/*
+	 * If MSI-X is not available, or not expected to work, fall back to
+	 * MSI.
 	 */
 	if (types & DDI_INTR_TYPE_MSI) {
 		if (smrt_interrupts_alloc(smrt, DDI_INTR_TYPE_MSI) ==
@@ -158,7 +198,10 @@ smrt_interrupts_setup(smrt_t *smrt)
 	}
 
 	/*
-	 * If MSI is not available, fall back to fixed interrupts.
+	 * If neither MSI-X nor MSI is available, fall back to fixed
+	 * interrupts.  Note that the use of fixed interrupts has been
+	 * observed, with some combination of controllers and systems, to
+	 * result in interrupts stopping completely at random times.
 	 */
 	if (types & DDI_INTR_TYPE_FIXED) {
 		if (smrt_interrupts_alloc(smrt, DDI_INTR_TYPE_FIXED) ==
