@@ -70,7 +70,6 @@ extern "C" {
 #include <sys/atomic.h>
 #include <sys/sunddi.h>
 #include <sys/sunldi.h>
-#include <sys/zfs_ioctl.h>
 #include <sys/nvpair.h>
 #include <vm/as.h>
 #include <vm/anon.h>
