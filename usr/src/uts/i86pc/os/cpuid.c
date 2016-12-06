@@ -1793,8 +1793,10 @@ cpuid_pass2(cpu_t *cpu)
 		 *
 		 * Note: we need to explicitly initialize %ecx here, since
 		 * function 4 may have been previously invoked.
+		 *
+		 * The same is all true for CPUID function 7.
 		 */
-		if (n == 4)
+		if (n == 4 || n == 7)
 			cp->cp_ecx = 0;
 
 		(void) __cpuid_insn(cp);
