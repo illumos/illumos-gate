@@ -652,7 +652,6 @@ $(i386_ONLY)file path=kernel/mac/mac_ipv4 group=sys mode=0755
 $(i386_ONLY)file path=kernel/mac/mac_ipv6 group=sys mode=0755
 $(i386_ONLY)file path=kernel/mac/mac_wifi group=sys mode=0755
 $(i386_ONLY)file path=kernel/misc/$(ARCH64)/acpica group=sys mode=0755
-$(i386_ONLY)file path=kernel/misc/$(ARCH64)/agpmaster group=sys mode=0755
 file path=kernel/misc/$(ARCH64)/bignum group=sys mode=0755
 $(i386_ONLY)file path=kernel/misc/$(ARCH64)/bootdev group=sys mode=0755
 file path=kernel/misc/$(ARCH64)/busra group=sys mode=0755
@@ -690,7 +689,6 @@ $(sparc_ONLY)file path=kernel/misc/$(ARCH64)/swapgeneric group=sys mode=0755
 file path=kernel/misc/$(ARCH64)/tem group=sys mode=0755
 file path=kernel/misc/$(ARCH64)/tlimod group=sys mode=0755
 $(i386_ONLY)file path=kernel/misc/acpica group=sys mode=0755
-$(i386_ONLY)file path=kernel/misc/agpmaster group=sys mode=0755
 $(i386_ONLY)file path=kernel/misc/bignum group=sys mode=0755
 $(i386_ONLY)file path=kernel/misc/bootdev group=sys mode=0755
 $(i386_ONLY)file path=kernel/misc/busra group=sys mode=0755

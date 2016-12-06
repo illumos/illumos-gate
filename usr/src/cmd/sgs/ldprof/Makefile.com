@@ -34,8 +34,6 @@ include		../../Makefile.com
 
 ROOTLIBDIR=	$(ROOT)/usr/lib/link_audit
 
-SGSPROTO=	../../proto/$(MACH)
-
 MAPFILES =	../common/mapfile-vers
 
 DYNFLAGS +=	$(CC_USE_PROTO)

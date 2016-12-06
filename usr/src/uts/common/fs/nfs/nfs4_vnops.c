@@ -2233,7 +2233,6 @@ nfs4_open_non_reg_file(vnode_t **vpp, int flag, cred_t *cr)
 	    (rp->r_dir == NULL && !nfs4_has_pages(*vpp)))
 		return (0);
 
-	gar.n4g_va.va_mask = AT_ALL;
 	return (nfs4_getattr_otw(*vpp, &gar, cr, 0));
 }
 
@@ -12376,9 +12375,8 @@ nfs4_getsecattr(vnode_t *vp, vsecattr_t *vsecattr, int flag, cred_t *cr,
 		/*
 		 * The getattr otw call will always get both the acl, in
 		 * the form of a list of nfsace4's, and the number of acl
-		 * entries; independent of the value of gar.n4g_vsa.vsa_mask.
+		 * entries; independent of the value of gar.n4g_va.va_mask.
 		 */
-		gar.n4g_va.va_mask = AT_ALL;
 		error =  nfs4_getattr_otw(vp, &gar, cr, 1);
 		if (error) {
 			vs_ace4_destroy(&gar.n4g_vsa);

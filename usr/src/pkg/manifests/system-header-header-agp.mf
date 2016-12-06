@@ -28,6 +28,7 @@ set name=pkg.description value="AGP GART Header Files for x86 Workstations"
 set name=pkg.summary value="AGP GART Driver Header Files"
 set name=info.classification \
     value=org.opensolaris.category.2008:Development/System
+set name=org.opensolaris.noincorp value=true
 set name=variant.arch value=i386
 dir path=usr group=sys
 dir path=usr/include

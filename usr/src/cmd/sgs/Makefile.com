@@ -84,6 +84,12 @@ SGSONLD =	$(ROOT)/opt/SUNWonld
 SGSRPATH =	/usr/lib
 SGSRPATH64 =	$(SGSRPATH)/$(MACH64)
 
+# Mimic the structure of an installed system.
+
+SGSLIBDIR =	$(SGSPROTO)/lib
+SGSPREFIX =	$(SGSPROTO)/usr
+SGSBINDIR =	$(SGSPREFIX)/bin
+
 #
 # Macros to be used to include link against libconv and include vernote.o
 #
@@ -121,12 +127,13 @@ CHKMSGFLAGS =	$(SGSMSGTARG:%=-m %) $(SGSMSGCHK:%=-m %)
 # Native targets should use the minimum of ld(1) flags to allow building on
 # previous releases.  We use mapfiles to scope, but don't bother versioning.
 
-native :=	DYNFLAGS = -R$(SGSPROTO) -L$(SGSPROTO) $(ZNOVERSION) $(HSONAME)
+native :=	DYNFLAGS = -R$(SGSLIBDIR) -L$(SGSLIBDIR) $(ZNOVERSION) \
+			$(HSONAME)
 
 # Comment out the following two lines to have the sgs built from the system
 # link-editor, rather than the local proto link-editor.
-CC_USE_PROTO =	-Yl,$(SGSPROTO)
-LD_USE_PROTO =	$(SGSPROTO)/
+CC_USE_PROTO =	-Yl,$(SGSBINDIR)
+LD_USE_PROTO =	$(SGSBINDIR)/
 
 #
 # lint-related stuff

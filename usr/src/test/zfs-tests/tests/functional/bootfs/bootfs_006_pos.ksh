@@ -129,18 +129,18 @@ verify_no_bootfs $TESTPOOL
 
 # raidz
 log_must zpool create $TESTPOOL raidz $VDEV1 $VDEV2
-verify_no_bootfs $TESTPOOL
+verify_bootfs $TESTPOOL
 
 # raidz + hotspare
 log_must zpool create $TESTPOOL raidz $VDEV1 $VDEV2 spare $VDEV3
-verify_no_bootfs $TESTPOOL
+verify_bootfs $TESTPOOL
 
 # raidz2
 log_must zpool create $TESTPOOL raidz2 $VDEV1 $VDEV2 $VDEV3
-verify_no_bootfs $TESTPOOL
+verify_bootfs $TESTPOOL
 
 # raidz2 + hotspare
 log_must zpool create $TESTPOOL raidz2 $VDEV1 $VDEV2 $VDEV3 spare $VDEV4
-verify_no_bootfs $TESTPOOL
+verify_bootfs $TESTPOOL
 
 log_pass "Pools of correct vdev types accept boot property"

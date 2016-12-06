@@ -184,7 +184,6 @@ nfs4_validate_caches(vnode_t *vp, cred_t *cr)
 		return (0);
 	}
 
-	gar.n4g_va.va_mask = AT_ALL;
 	return (nfs4_getattr_otw(vp, &gar, cr, 0));
 }
 
@@ -582,6 +581,16 @@ nfs4_attr_cache(vnode_t *vp, nfs4_ga_res_t *garp,
 			    rp->r_attr.va_ctime.tv_nsec !=
 			    vap->va_ctime.tv_nsec)
 				ctime_changed = 1;
+
+			/*
+			 * If the change attribute was not provided by server
+			 * or it differs, then flush all caches.
+			 */
+			if (!garp->n4g_change_valid ||
+			    rp->r_change != garp->n4g_change) {
+				mtime_changed = 1;
+				ctime_changed = 1;
+			}
 		} else {
 			writemodify_set = B_TRUE;
 		}

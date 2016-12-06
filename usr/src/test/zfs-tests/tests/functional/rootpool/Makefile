@@ -21,7 +21,7 @@ TESTDIR = $(ROOTOPTPKG)/tests/functional/rootpool
 PROGS = cleanup \
 	rootpool_002_neg \
 	rootpool_003_neg \
-	rootpool_007_neg \
+	rootpool_007_pos \
 	setup
 
 CMDS = $(PROGS:%=$(TESTDIR)/%)

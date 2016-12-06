@@ -4299,8 +4299,10 @@ iwn_abort_scan(void *arg)
 	ieee80211com_t *ic = &sc->sc_ic;
 
 	mutex_enter(&sc->sc_mtx);
-	if ((sc->sc_flags & IWN_FLAG_SCANNING) == 0)
+	if ((sc->sc_flags & IWN_FLAG_SCANNING) == 0) {
+		mutex_exit(&sc->sc_mtx);
 		return;
+	}
 
 	dev_err(sc->sc_dip, CE_WARN,
 	    "!aborting scan, flags = %x, state = %s",

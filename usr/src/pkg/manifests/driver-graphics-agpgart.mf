@@ -34,13 +34,15 @@ set name=pkg.description value="AGP GART driver for x86 workstations"
 set name=pkg.summary value="AGP GART Driver"
 set name=info.classification \
     value=org.opensolaris.category.2008:Drivers/Display
+set name=org.opensolaris.noincorp value=true
 set name=variant.arch value=i386
 dir path=kernel group=sys
 dir path=kernel/drv group=sys
 dir path=kernel/drv/$(ARCH64) group=sys
+dir path=kernel/misc group=sys
+dir path=kernel/misc/$(ARCH64) group=sys
 dir path=usr/share/man
 dir path=usr/share/man/man7i
-driver name=$(ARCH64)_gart alias=pci1022,1103 perms="* 0644 root sys"
 driver name=agpgart perms="* 0644 root sys"
 driver name=agptarget perms="* 0644 root sys" \
     alias=pci1022,7454 \
@@ -76,6 +78,8 @@ driver name=agptarget perms="* 0644 root sys" \
     alias=pci8086,7120 \
     alias=pci8086,7122 \
     alias=pci8086,7124
+# Note: the name of this driver _really_is_ amd64_gart...
+driver name=amd64_gart alias=pci1022,1103 perms="* 0644 root sys"
 file path=kernel/drv/$(ARCH64)/$(ARCH64)_gart group=sys
 file path=kernel/drv/$(ARCH64)/agpgart group=sys
 file path=kernel/drv/$(ARCH64)/agptarget group=sys
@@ -83,6 +87,8 @@ file path=kernel/drv/$(ARCH64)_gart group=sys
 file path=kernel/drv/agpgart group=sys
 file path=kernel/drv/agpgart.conf group=sys
 file path=kernel/drv/agptarget group=sys
+file path=kernel/misc/$(ARCH64)/agpmaster group=sys mode=0755
+file path=kernel/misc/agpmaster group=sys mode=0755
 file path=usr/share/man/man7i/agpgart_io.7i
 legacy pkg=SUNWagp desc="AGP GART driver for x86 workstations" \
     name="AGP GART Driver"

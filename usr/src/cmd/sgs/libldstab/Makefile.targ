@@ -22,6 +22,8 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2016 RackTop Systems.
+#
 
 pics/%.o:	../common/%.c
 		$(COMPILE.c) -o $@ $<
@@ -39,10 +41,11 @@ delete:
 # Special target for native builds (ie. when we need to build a version of ld
 # to build a version of ld :-).
 
-native:		$(SGSPROTO)/$(DYNLIB)
+native:		$(SGSLIBDIR)/$(DYNLIB)
 
-$(SGSPROTO)/$(DYNLIB): \
-		pics .WAIT $$(PICS)
+$(PICS):	pics
+
+$(SGSLIBDIR)/$(DYNLIB): $(PICS) $(SGSLIBDIR)
 		$(BUILD.SO)
 		$(POST_PROCESS_SO)
 

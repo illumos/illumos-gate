@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/debug.h>
 #include <sys/types.h>
 #include <sys/param.h>
@@ -47,7 +45,7 @@
 #include <sys/fs/snode.h>
 #include <sys/pci.h>
 #include <sys/vmsystm.h>
-#include "gfx_private.h"
+#include <sys/gfx_private.h>
 
 /*
  * clone of ddi_segmap_setup(). Respects the requested cache
