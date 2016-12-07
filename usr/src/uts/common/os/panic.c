@@ -24,6 +24,7 @@
 
 /*
  * Copyright (c) 2011, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*
@@ -197,8 +198,7 @@ int panic_forced = 0;
  * Triggers for panic state transitions:
  */
 int panic_quiesce;			/* trigger for CALM    -> QUIESCE */
-int panic_sync;				/* trigger for QUIESCE -> SYNC */
-int panic_dump;				/* trigger for SYNC    -> DUMP */
+int panic_dump;				/* trigger for QUIESCE    -> DUMP */
 
 /*
  * Variable signifying quiesce(9E) is in progress.
@@ -357,7 +357,7 @@ panicsys(const char *format, va_list alist, struct regs *rp, int on_panic_stack)
 			}
 		}
 
-	} else if (panic_dump != 0 || panic_sync != 0 || panicstr != NULL) {
+	} else if (panic_dump != 0 || panicstr != NULL) {
 		printf("\n\rpanic[cpu%d]/thread=%p: ", cp->cpu_id, (void *)t);
 		vprintf(format, alist);
 		printf("\n");
@@ -365,23 +365,10 @@ panicsys(const char *format, va_list alist, struct regs *rp, int on_panic_stack)
 		goto spin;
 
 	/*
-	 * Prior to performing sync or dump, we make sure that do_polled_io is
+	 * Prior to performing dump, we make sure that do_polled_io is
 	 * set, but we'll leave ipl at 10; deadman(), a CY_HIGH_LEVEL cyclic,
-	 * will re-enter panic if we are not making progress with sync or dump.
+	 * will re-enter panic if we are not making progress with dump.
 	 */
-
-	/*
-	 * Sync the filesystems.  Reset t_cred if not set because much of
-	 * the filesystem code depends on CRED() being valid.
-	 */
-	if (!in_sync && panic_trigger(&panic_sync)) {
-		if (t->t_cred == NULL)
-			t->t_cred = kcred;
-		splx(ipltospl(CLOCK_LEVEL));
-		do_polled_io = 1;
-		vfs_syncall();
-	}
-
 	/*
 	 * Take the crash dump.  If the dump trigger is already set, try to
 	 * enter the debugger again before rebooting the system.
