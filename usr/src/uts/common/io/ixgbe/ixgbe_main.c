@@ -846,7 +846,9 @@ ixgbe_unconfigure(dev_info_t *devinfo, ixgbe_t *ixgbe)
 	/*
 	 * Unregister interrupt callback handler
 	 */
-	(void) ddi_cb_unregister(ixgbe->cb_hdl);
+	if (ixgbe->cb_hdl != NULL) {
+		(void) ddi_cb_unregister(ixgbe->cb_hdl);
+	}
 
 	/*
 	 * Remove driver properties
