@@ -164,7 +164,7 @@ typedef struct lock_manager_pid_list {
  * A homegrown reader/writer lock implementation.  It addresses
  * two requirements not addressed by the system primitives.  They
  * are that the `enter" operation is optionally interruptible and
- * that that they can be re`enter'ed by writers without deadlock.
+ * that they can be re`enter'ed by writers without deadlock.
  */
 typedef struct nfs_rwlock {
 	int count;
