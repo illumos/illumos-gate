@@ -93,12 +93,12 @@ lx_ptrace_stop_if_option(int option, boolean_t child, ulong_t msg,
  * was passed to clone(2), inherit_flag should be B_TRUE.
  */
 void
-lx_ptrace_clone_begin(int option, boolean_t inherit_flag)
+lx_ptrace_clone_begin(int option, boolean_t inherit_flag, int flags)
 {
 	lx_debug("lx_ptrace_clone_begin(%d, %sPTRACE_CLONE)", option,
 	    inherit_flag ? "" : "!");
 	if (syscall(SYS_brand, B_PTRACE_CLONE_BEGIN, option,
-	    inherit_flag) != 0) {
+	    inherit_flag, flags) != 0) {
 		lx_err_fatal("B_PTRACE_CLONE_BEGIN failed: %s",
 		    strerror(errno));
 	}

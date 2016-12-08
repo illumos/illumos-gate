@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2015, Joyent, Inc. All rights reserved.
+ * Copyright 2016, Joyent, Inc.
  */
 
 #include <sys/kmem.h>
@@ -388,6 +388,9 @@ brand_clearbrand(proc_t *p, boolean_t lwps_ok)
 	VERIFY(MUTEX_NOT_HELD(&p->p_lock));
 	VERIFY(bp != NULL);
 	VERIFY(PROC_IS_BRANDED(p));
+
+	if (BROP(p)->b_clearbrand != NULL)
+		BROP(p)->b_clearbrand(p, lwps_ok);
 
 	mutex_enter(&p->p_lock);
 	p->p_brand = &native_brand;

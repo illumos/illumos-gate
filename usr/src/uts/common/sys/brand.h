@@ -149,6 +149,7 @@ struct execa;
  * b_setid_clear - Override setid_clear behavior
  * b_pagefault - Trap pagefault events
  * b_intp_parse_arg - Controls interpreter argument handling (allow 1 or all)
+ * b_clearbrand - Perform any actions necessary when clearing the brand.
  */
 struct brand_ops {
 	void	(*b_init_brand_data)(zone_t *, kmutex_t *);
@@ -198,6 +199,7 @@ struct brand_ops {
 	int	(*b_pagefault)(proc_t *, klwp_t *, caddr_t, enum fault_type,
 	    enum seg_rw);
 	boolean_t b_intp_parse_arg;
+	void	(*b_clearbrand)(proc_t *, boolean_t);
 };
 
 /*

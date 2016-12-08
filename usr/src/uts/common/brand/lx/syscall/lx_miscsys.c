@@ -18,6 +18,7 @@
 #include <sys/resource.h>
 #include <sys/uadmin.h>
 #include <sys/lx_misc.h>
+#include <lx_syscall.h>
 
 #define	LINUX_REBOOT_MAGIC1		0xfee1dead
 #define	LINUX_REBOOT_MAGIC2		672274793
@@ -68,6 +69,18 @@ extern int getitimer(uint_t, struct itimerval *);
 extern int stime(time_t);
 /* From uts/common/syscall/uadmin.c */
 extern int uadmin(int, int, uintptr_t);
+/* From uts/common/syscall/chdir.c */
+extern int chdir_proc(proc_t *, vnode_t *, boolean_t, boolean_t);
+/* From uts/common/fs/lookup.c */
+extern int lookupname(char *, enum uio_seg, int, vnode_t **, vnode_t **);
+/* From uts/common/fs/fs_subr.c */
+extern int fs_need_estale_retry(int);
+
+/* The callback arguments when handling a FS clone group. */
+typedef struct {
+	vnode_t	*lcfa_vp;
+	boolean_t lcfa_type;
+} lx_clone_fs_arg_t;
 
 long
 lx_alarm(int seconds)
@@ -75,15 +88,89 @@ lx_alarm(int seconds)
 	return (alarm(seconds));
 }
 
+static int
+lx_clone_fs_cb(proc_t *pp, void *arg)
+{
+	lx_clone_fs_arg_t *ap = (lx_clone_fs_arg_t *)arg;
+	int err;
+
+	/*
+	 * The initial lookupname() from lx_clone_fs_do_group() will have added
+	 * a hold on the vnode to ensure its existence throughout the walk. We
+	 * need to add another hold for each process in the group.
+	 */
+	VN_HOLD(ap->lcfa_vp);
+	if ((err = chdir_proc(pp, ap->lcfa_vp, ap->lcfa_type, B_TRUE)) != 0) {
+		/* if we failed, chdir_proc already did a rele on vp */
+		return (err);
+	}
+
+	return (0);
+}
+
+/*
+ * Check to see if the process is in a CLONE_FS clone group. Return false
+ * if not (the normal case), otherwise perform the setup, do the group walk
+ * and return true.
+ */
+static boolean_t
+lx_clone_fs_do_group(char *path, boolean_t is_chroot, int *errp)
+{
+	lx_proc_data_t *lproc = ttolxproc(curthread);
+	vnode_t *vp;
+	lx_clone_fs_arg_t arg;
+	int err;
+	int estale_retry = 0;
+
+	if (!lx_clone_grp_member(lproc, LX_CLONE_FS))
+		return (B_FALSE);
+
+	/* Handle the rare case of being in a CLONE_FS clone group */
+
+retry:
+	err = lookupname(path, UIO_USERSPACE, FOLLOW, NULLVPP, &vp);
+	if (err != 0) {
+		if (err == ESTALE && fs_need_estale_retry(estale_retry++))
+			goto retry;
+		*errp = err;
+		return (B_TRUE);
+	}
+
+	arg.lcfa_vp = vp;
+	arg.lcfa_type = is_chroot;
+
+	/*
+	 * We use the VN_HOLD from the lookup to guarantee vp exists for the
+	 * entire walk.
+	 */
+	err = lx_clone_grp_walk(lproc, LX_CLONE_FS, lx_clone_fs_cb,
+	    (void *)&arg);
+	VN_RELE(vp);
+	*errp = err;
+	return (B_TRUE);
+}
+
 long
 lx_chdir(char *path)
 {
+	int err;
+
+	/* Handle the rare case of being in a CLONE_FS clone group */
+	if (lx_clone_fs_do_group(path, B_FALSE, &err))
+		return ((err != 0) ? set_errno(err) : 0);
+
 	return (chdir(path));
 }
 
 long
 lx_chroot(char *path)
 {
+	int err;
+
+	/* Handle the rare case of being in a CLONE_FS clone group */
+	if (lx_clone_fs_do_group(path, B_TRUE, &err))
+		return ((err != 0) ? set_errno(err) : 0);
+
 	return (chroot(path));
 }
 

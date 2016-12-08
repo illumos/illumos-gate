@@ -44,6 +44,13 @@ extern void lx_clear_gdt(int);
 
 extern longlong_t lx_nosys();
 
+extern void lx_clone_grp_create(uint_t);
+extern void lx_clone_grp_enter(uint_t, proc_t *, proc_t *);
+extern void lx_clone_grp_exit(proc_t *, boolean_t);
+extern boolean_t lx_clone_grp_member(lx_proc_data_t *, uint_t);
+extern int lx_clone_grp_walk(lx_proc_data_t *, uint_t,
+    int (*)(proc_t *, void *), void *);
+
 extern greg_t lx_fixsegreg(greg_t, model_t);
 extern uintptr_t lx_fsbase(klwp_t *, uintptr_t);
 extern void lx_exit_with_sig(proc_t *, sigqueue_t *);

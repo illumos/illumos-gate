@@ -245,6 +245,7 @@ static int lx_setid_clear(vattr_t *, cred_t *);
 static int lx_pagefault(proc_t *, klwp_t *, caddr_t, enum fault_type,
     enum seg_rw);
 #endif
+static void	lx_clearbrand(proc_t *, boolean_t);
 
 typedef struct lx_zfs_ds {
 	list_node_t	ds_link;
@@ -298,7 +299,8 @@ struct brand_ops lx_brops = {
 #else
 	NULL,
 #endif
-	B_FALSE				/* b_intp_parse_arg */
+	B_FALSE,			/* b_intp_parse_arg */
+	lx_clearbrand			/* b_clearbrand */
 };
 
 struct brand_mach_ops lx_mops = {
@@ -332,6 +334,8 @@ lx_proc_exit(proc_t *p)
 {
 	lx_proc_data_t *lxpd;
 	proc_t *cp;
+
+	lx_clone_grp_exit(p, B_FALSE);
 
 	mutex_enter(&p->p_lock);
 	VERIFY((lxpd = ptolxproc(p)) != NULL);
@@ -543,6 +547,12 @@ lx_pagefault(proc_t *p, klwp_t *lwp, caddr_t addr, enum fault_type type,
 	return (0);
 }
 #endif
+
+static void
+lx_clearbrand(proc_t *p, boolean_t lwps_ok)
+{
+	lx_clone_grp_exit(p, lwps_ok);
+}
 
 /*
  * This hook runs prior to sendsig() processing and allows us to nominate
@@ -1473,6 +1483,12 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 		    B_FALSE : B_TRUE, (ulong_t)arg3, arg4));
 
 	case B_PTRACE_CLONE_BEGIN:
+		/*
+		 * Leverage ptrace brand call to create a clone group for this
+		 * proc if necessary.
+		 */
+		lx_clone_grp_create((uint_t)arg3);
+
 		return (lx_ptrace_set_clone_inherit((int)arg1, arg2 == 0 ?
 		    B_FALSE : B_TRUE));
 
@@ -1869,6 +1885,8 @@ lx_copy_procdata(proc_t *cp, proc_t *pp)
 
 	cpd->l_fake_limits[LX_RLFAKE_RTTIME].rlim_cur = LX_RLIM64_INFINITY;
 	cpd->l_fake_limits[LX_RLFAKE_RTTIME].rlim_max = LX_RLIM64_INFINITY;
+
+	bzero(cpd->l_clone_grps, sizeof (cpd->l_clone_grps));
 }
 
 #if defined(_LP64)
