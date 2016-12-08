@@ -296,6 +296,21 @@ typedef struct {
 	uint64_t	rlim_max;
 } lx_rlimit64_t;
 
+typedef struct {
+	list_node_t	lx_clgrpm_link;
+	proc_t		*lx_clgrpm_pp;
+} lx_clone_grp_member_t;
+
+typedef struct {
+	kmutex_t	lx_clgrp_lock;	/* protects cnt & member list */
+	uint_t		lx_clgrp_cnt;
+	list_t		lx_clgrp_members;
+} lx_clone_grp_t;
+
+/* Entries in the l_clone_grps clone-group array */
+#define	LX_CLGRP_FS	0
+#define	LX_CLGRP_MAX	1
+
 typedef struct lx_proc_data {
 	uintptr_t l_handler;	/* address of user-space handler */
 	pid_t l_ppid;		/* pid of originating parent proc */
@@ -307,6 +322,9 @@ typedef struct lx_proc_data {
 	/* native signal to deliver to process when parent dies */
 	int l_parent_deathsig;
 	lx_proc_flags_t l_flags;
+
+	kmutex_t l_clone_grp_lock; /* protects the following member */
+	lx_clone_grp_t *l_clone_grps[LX_CLGRP_MAX];
 
 	lx_rlimit64_t l_fake_limits[LX_RLFAKE_NLIMITS];
 
@@ -566,6 +584,7 @@ struct lx_lwp_data {
 	uint64_t br_schd_period;	/* emulated DEADLINE */
 
 	fwaiter_t br_fwaiter;		/* futex upon which we're waiting */
+	uint_t	br_clone_grp_flags;	/* pending clone group */
 };
 
 /*

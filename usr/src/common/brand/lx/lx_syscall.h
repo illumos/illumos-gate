@@ -88,6 +88,20 @@ extern "C" {
 #define	LX_CLONE_DETACH		0x00400000
 #define	LX_CLONE_CHILD_SETTID	0x01000000
 
+#define	SHARED_AS \
+	(LX_CLONE_VM | LX_CLONE_FS | LX_CLONE_FILES | LX_CLONE_SIGHAND | \
+	LX_CLONE_THREAD)
+
+/*
+ * Valid clone flags when not a full process or full thread (SHARED_AS), This
+ * can be expanded as additional clone-group support is added.
+ */
+#define	LX_CLONE_GRP_SUBSET	(LX_CLONE_FS)
+
+#define	LX_IS_CLONE_GRP(X)	((X & SHARED_AS) != 0 && \
+				(X & SHARED_AS) != SHARED_AS && \
+				((X & SHARED_AS) & ~LX_CLONE_GRP_SUBSET) == 0)
+
 #ifdef	__cplusplus
 }
 #endif

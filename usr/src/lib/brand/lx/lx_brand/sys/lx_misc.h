@@ -134,7 +134,7 @@ extern void lx_ptrace_init();
 extern int lx_ptrace_wait(siginfo_t *);
 extern void lx_ptrace_fork(void);
 extern void lx_ptrace_stop_if_option(int, boolean_t, ulong_t msg, ucontext_t *);
-extern void lx_ptrace_clone_begin(int, boolean_t);
+extern void lx_ptrace_clone_begin(int, boolean_t, int);
 
 extern int lx_check_alloca(size_t);
 #define	SAFE_ALLOCA(sz)	(lx_check_alloca(sz) ? alloca(sz) : NULL)

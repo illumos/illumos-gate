@@ -53,7 +53,7 @@ lx_fork(void)
 	 * Inform the in-kernel ptrace(2) subsystem that we are about to
 	 * emulate fork(2).
 	 */
-	lx_ptrace_clone_begin(LX_PTRACE_O_TRACEFORK, B_FALSE);
+	lx_ptrace_clone_begin(LX_PTRACE_O_TRACEFORK, B_FALSE, 0);
 
 	/*
 	 * Suspend signal delivery, run the stack management prefork handler
@@ -115,7 +115,7 @@ lx_vfork(void)
 	 * Inform the in-kernel ptrace(2) subsystem that we are about to
 	 * emulate vfork(2).
 	 */
-	lx_ptrace_clone_begin(LX_PTRACE_O_TRACEVFORK, B_FALSE);
+	lx_ptrace_clone_begin(LX_PTRACE_O_TRACEVFORK, B_FALSE, 0);
 
 	/*
 	 * Suspend signal delivery, run the stack management prefork handler

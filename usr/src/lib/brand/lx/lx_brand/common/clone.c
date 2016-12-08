@@ -53,10 +53,6 @@
 #include <sys/debug.h>
 #include <lx_syscall.h>
 
-
-#define	SHARED_AS	\
-	(LX_CLONE_VM | LX_CLONE_FS | LX_CLONE_FILES | LX_CLONE_SIGHAND	\
-	    | LX_CLONE_THREAD)
 #define	CLONE_VFORK (LX_CLONE_VM | LX_CLONE_VFORK)
 #define	CLONE_TD (LX_CLONE_THREAD|LX_CLONE_DETACH)
 
@@ -364,13 +360,15 @@ lx_clone(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4, uintptr_t p5)
 	 * Inform the in-kernel ptrace(2) subsystem that we are about to
 	 * emulate a fork(2), vfork(2) or clone(2) system call.
 	 */
-	lx_ptrace_clone_begin(ptrace_event, !!(flags & LX_CLONE_PTRACE));
+	lx_ptrace_clone_begin(ptrace_event, !!(flags & LX_CLONE_PTRACE), flags);
 
 	/*
-	 * Handle a fork(2) operation here.  If this is not a fork, a new
-	 * thread will be created after this block.
+	 * Handle a fork(2) operation here. If this is not a fork, a new
+	 * thread will be created after this block. We can also create a new
+	 * clone-group here (when two or more processes share data represented
+	 * by a subset of the SHARED_AS flags, but not a true thread).
 	 */
-	if (IS_FORK(flags) || IS_VFORK(flags)) {
+	if (IS_FORK(flags) || IS_VFORK(flags) || LX_IS_CLONE_GRP(flags)) {
 		if (flags & LX_CLONE_PARENT) {
 			lx_unsupported("clone(2) only supports CLONE_PARENT "
 			    "for threads.\n");
@@ -571,11 +569,11 @@ lx_clone(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4, uintptr_t p5)
 	}
 
 	/*
-	 * We have very restricted support.... only exactly these flags are
-	 * supported
+	 * A supported clone-group was handled above, so now it must be a
+	 * true native thread, which means exactly these flags are supported
 	 */
 	if (((flags & SHARED_AS) != SHARED_AS)) {
-		lx_unsupported("clone(2) requires that all or none of "
+		lx_unsupported("clone(2) a thread requires that all or none of "
 		    "CLONE_VM/FS/FILES/THREAD/SIGHAND be set. (flags:0x%08X)\n",
 		    flags);
 		return (-ENOTSUP);

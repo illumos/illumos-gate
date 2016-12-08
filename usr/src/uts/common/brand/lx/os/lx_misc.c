@@ -575,6 +575,13 @@ lx_forklwp(klwp_t *srclwp, klwp_t *dstlwp)
 	 * Flag so child doesn't ptrace-stop on syscall exit.
 	 */
 	dst->br_ptrace_flags |= LX_PTF_NOSTOP;
+
+	if (src->br_clone_grp_flags != 0) {
+		lx_clone_grp_enter(src->br_clone_grp_flags, lwptoproc(srclwp),
+		    lwptoproc(dstlwp));
+		/* clone group no longer pending on this thread */
+		src->br_clone_grp_flags = 0;
+	}
 }
 
 /*
