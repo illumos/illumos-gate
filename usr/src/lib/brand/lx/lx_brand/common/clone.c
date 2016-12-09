@@ -338,6 +338,16 @@ lx_clone(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4, uintptr_t p5)
 			return (-EINVAL);
 	}
 
+	if ((flags & LX_CLONE_NS_UNSUP) != 0) {
+		lx_unsupported("clone(2) no namespace support "
+		    "(flags:0x%08X)\n", flags);
+		/*
+		 * When the "kernel" does not support namespaces, applications
+		 * (e.g. chromium) expect EINVAL, not ENOTSUP.
+		 */
+		return (-EINVAL);
+	}
+
 	ucp = lx_syscall_regs();
 
 	/* test if pointer passed by user are writable */
